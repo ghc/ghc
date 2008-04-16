@@ -1067,6 +1067,8 @@ scavenge_static(void)
   StgClosure* p;
   const StgInfoTable *info;
 
+  debugTrace(DEBUG_gc, "scavenging static objects");
+
   /* Always evacuate straight to the oldest generation for static
    * objects */
   gct->evac_step = &oldest_gen->steps[0];
@@ -1389,74 +1391,38 @@ scavenge_large (step_workspace *ws)
 #include "Scav.c-inc"
 
 /* ----------------------------------------------------------------------------
-   Find the oldest full block to scavenge, and scavenge it.
+   Look for work to do.
+
+   We look for the oldest step that has either a todo block that can
+   be scanned, or a block of work on the global queue that we can
+   scan.
+
+   It is important to take work from the *oldest* generation that we
+   has work available, because that minimizes the likelihood of
+   evacuating objects into a young generation when they should have
+   been eagerly promoted.  This really does make a difference (the
+   cacheprof benchmark is one that is affected).
+
+   We also want to scan the todo block if possible before grabbing
+   work from the global queue, the reason being that we don't want to
+   steal work from the global queue and starve other threads if there
+   is other work we can usefully be doing.
    ------------------------------------------------------------------------- */
 
 static rtsBool
-scavenge_find_global_work (void)
+scavenge_find_work (void)
 {
+    int s;
+    step_workspace *ws;
+    rtsBool did_something, did_anything;
     bdescr *bd;
-    int s;
-    rtsBool flag;
-    step_workspace *ws;
-
-    gct->scav_global_work++;
-
-    flag = rtsFalse;
-    for (s = total_steps-1; s>=0; s--)
-    {
-        if (s == 0 && RtsFlags.GcFlags.generations > 1) { 
-            continue; 
-        }
-        ws = &gct->steps[s];
-
-        // If we have any large objects to scavenge, do them now.
-        if (ws->todo_large_objects) {
-            scavenge_large(ws);
-            flag = rtsTrue;
-        }
-
-        if ((bd = grab_todo_block(ws)) != NULL) {
-            // no need to assign this to ws->scan_bd, we're going
-            // to scavenge the whole thing and then push it on
-            // our scavd list.  This saves pushing out the
-            // scan_bd block, which might be partial.
-            if (n_gc_threads == 1) {
-                scavenge_block1(bd, bd->start);
-            } else {
-                scavenge_block(bd, bd->start);
-            }
-            push_scan_block(bd, ws);
-            return rtsTrue;
-        }
-
-        if (flag) return rtsTrue;
-    }
-    return rtsFalse;
-}
-
-/* ----------------------------------------------------------------------------
-   Look for local work to do.
-
-   We can have outstanding scavenging to do if, for any of the workspaces,
-
-     - the scan block is the same as the todo block, and new objects
-       have been evacuated to the todo block.
-
-     - the scan block *was* the same as the todo block, but the todo
-       block filled up and a new one has been allocated.
-   ------------------------------------------------------------------------- */
-
-static rtsBool
-scavenge_find_local_work (void)
-{
-    int s;
-    step_workspace *ws;
-    rtsBool flag;
 
     gct->scav_local_work++;
 
-    flag = rtsFalse;
+    did_anything = rtsFalse;
+
+loop:
+    did_something = rtsFalse;
     for (s = total_steps-1; s >= 0; s--) {
         if (s == 0 && RtsFlags.GcFlags.generations > 1) { 
             continue; 
@@ -1486,7 +1452,7 @@ scavenge_find_local_work (void)
                 scavenge_block(ws->scan_bd, ws->scan);
             }
             ws->scan = ws->scan_bd->free;
-            flag = rtsTrue;
+            did_something = rtsTrue;
         }
         
         if (ws->scan_bd != NULL && ws->scan == ws->scan_bd->free
@@ -1497,15 +1463,42 @@ scavenge_find_local_work (void)
             push_scan_block(ws->scan_bd, ws);
             ws->scan_bd = NULL;
             ws->scan = NULL;
-            // we might be able to scan the todo block now.  But
-            // don't do it right away: there might be full blocks
-            // waiting to be scanned as a result of scavenge_block above.
-            flag = rtsTrue; 
+            // we might be able to scan the todo block now.
+            did_something = rtsTrue; 
         }
-        
-        if (flag) return rtsTrue;
+
+        if (did_something) break;
+
+        // If we have any large objects to scavenge, do them now.
+        if (ws->todo_large_objects) {
+            scavenge_large(ws);
+            did_something = rtsTrue;
+            break;
+        }
+
+        if ((bd = grab_todo_block(ws)) != NULL) {
+            // no need to assign this to ws->scan_bd, we're going
+            // to scavenge the whole thing and then push it on
+            // our scavd list.  This saves pushing out the
+            // scan_bd block, which might be partial.
+            if (n_gc_threads == 1) {
+                scavenge_block1(bd, bd->start);
+            } else {
+                scavenge_block(bd, bd->start);
+            }
+            push_scan_block(bd, ws);
+            did_something = rtsTrue;
+            break;
+        }
     }
-    return rtsFalse;
+
+    if (did_something) {
+        did_anything = rtsTrue;
+        goto loop;
+    }
+    // only return when there is no more work to do
+
+    return did_anything;
 }
 
 /* ----------------------------------------------------------------------------
@@ -1538,8 +1531,7 @@ loop:
     // local work.  Only if all the global work has been exhausted
     // do we start scavenging the fragments of blocks in the local
     // workspaces.
-    if (scavenge_find_global_work()) goto loop;
-    if (scavenge_find_local_work())  goto loop;
+    if (scavenge_find_work()) goto loop;
     
     if (work_to_do) goto loop;
 }
