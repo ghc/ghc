@@ -301,6 +301,7 @@ struct TICKY_FLAGS {
 
 struct TRACE_FLAGS {
     rtsBool sched;		/* trace scheduler events for profiling */
+    rtsBool gc;                 /* trace GC events */
     rtsBool timestamp;          /* add timestamps to traces */
 };
 

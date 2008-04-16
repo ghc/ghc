@@ -148,6 +148,14 @@ typedef struct gc_thread_ {
 #endif
 
     // -------------------
+    // stats
+
+    lnat copied;
+    lnat any_work;
+    lnat scav_global_work;
+    lnat scav_local_work;
+
+    // -------------------
     // workspaces
 
     // array of workspaces, indexed by stp->abs_no.  This is placed

@@ -92,7 +92,7 @@ push_scan_block (bdescr *bd, step_workspace *ws)
     ASSERT(bd->link == NULL);
 
     // update stats: this is a block that has been copied & scavenged
-    copied += bd->free - bd->start;
+    gct->copied += bd->free - bd->start;
 
     // put the scan block on the ws->scavd_list.
     bd->link = ws->scavd_list;

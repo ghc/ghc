@@ -73,14 +73,11 @@ void traceEnd (void);
 #define DEBUG_par		   (1<<11)
 #define DEBUG_linker		   (1<<12)
 #define DEBUG_squeeze              (1<<13)
+#define DEBUG_hpc                  (1<<14)
 
-
-
-// Profiling flags
-#define TRACE_sched                (1<<29)
-
-// Coverge flags
-#define DEBUG_hpc                  (1<<30)
+// Tracing flags
+#define TRACE_sched                (1<<20)
+#define TRACE_gc                   (1<<21)
 
 // -----------------------------------------------------------------------------
 // PRIVATE below here

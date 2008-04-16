@@ -1405,6 +1405,8 @@ scavenge_find_global_work (void)
     rtsBool flag;
     step_workspace *ws;
 
+    gct->scav_global_work++;
+
     flag = rtsFalse;
     for (s = total_steps-1; s>=0; s--)
     {
@@ -1456,6 +1458,8 @@ scavenge_find_local_work (void)
     int s;
     step_workspace *ws;
     rtsBool flag;
+
+    gct->scav_local_work++;
 
     flag = rtsFalse;
     for (s = total_steps-1; s >= 0; s--) {
@@ -1550,6 +1554,8 @@ any_work (void)
 {
     int s;
     step_workspace *ws;
+
+    gct->any_work++;
 
     write_barrier();
 

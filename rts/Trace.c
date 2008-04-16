@@ -108,6 +108,7 @@ void initTracing (void)
     GRAN_FLAG(blockedOnFetch_sanity, GRAN_DEBUG_BOF_sanity);
 
     TRACE_FLAG(sched, TRACE_sched);
+    TRACE_FLAG(gc, TRACE_gc);
 }
 
 static void tracePreface (void)

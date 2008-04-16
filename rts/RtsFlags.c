@@ -317,6 +317,7 @@ void initRtsFlagsDefaults(void)
 
     RtsFlags.TraceFlags.timestamp	= rtsFalse;
     RtsFlags.TraceFlags.sched 		= rtsFalse;
+    RtsFlags.TraceFlags.gc 		= rtsFalse;
 
 #ifdef USE_PAPI
     /* By default no special measurements taken */
@@ -1220,6 +1221,9 @@ error = rtsTrue;
 		    break;
 		case 's':
 		    RtsFlags.TraceFlags.sched = rtsTrue;
+		    break;
+		case 'g':
+		    RtsFlags.TraceFlags.gc = rtsTrue;
 		    break;
 		default:
 		    errorBelch("unknown RTS option: %s",rts_argv[arg]);

@@ -668,7 +668,6 @@ stat_exit(int alloc)
 
    Produce some detailed info on the state of the generational GC.
    -------------------------------------------------------------------------- */
-#ifdef DEBUG
 void
 statDescribeGens(void)
 {
@@ -709,7 +708,6 @@ statDescribeGens(void)
   }
   debugBelch("\n");
 }
-#endif
 
 /* -----------------------------------------------------------------------------
    Stats available via a programmatic interface, so eg. GHCi can time

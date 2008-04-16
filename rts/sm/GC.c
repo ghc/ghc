@@ -305,9 +305,6 @@ GarbageCollect ( rtsBool force_major_gc )
   inc_running();
   wakeup_gc_threads(n_gc_threads);
 
-  // Initialise stats
-  copied = 0;
-
   // this is the main thread
   gct = gc_threads[0];
 
@@ -463,6 +460,21 @@ GarbageCollect ( rtsBool force_major_gc )
 
   /* run through all the generations/steps and tidy up 
    */
+  copied = 0;
+  { 
+      nat i;
+      for (i=0; i < n_gc_threads; i++) {
+          if (major_gc) {
+              trace(TRACE_gc,"thread %d:", i);
+              trace(TRACE_gc,"   copied           %ld", gc_threads[i]->copied * sizeof(W_));
+              trace(TRACE_gc,"   any_work         %ld", gc_threads[i]->any_work);
+              trace(TRACE_gc,"   scav_global_work %ld", gc_threads[i]->scav_global_work);
+              trace(TRACE_gc,"   scav_local_work  %ld", gc_threads[i]->scav_local_work);
+          }
+          copied += gc_threads[i]->copied;
+      }
+  }
+
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
 
     if (g <= N) {
@@ -644,7 +656,7 @@ GarbageCollect ( rtsBool force_major_gc )
   IF_DEBUG(sanity, checkSanity());
 
   // extra GC trace info 
-  IF_DEBUG(gc, statDescribeGens());
+  if (traceClass(TRACE_gc)) statDescribeGens();
 
 #ifdef DEBUG
   // symbol-table based profiling 
@@ -1348,6 +1360,10 @@ init_gc_thread (gc_thread *t)
     t->failed_to_evac = rtsFalse;
     t->eager_promotion = rtsTrue;
     t->thunk_selector_depth = 0;
+    t->copied = 0;
+    t->any_work = 0;
+    t->scav_global_work = 0;
+    t->scav_local_work = 0;
 }
 
 /* -----------------------------------------------------------------------------
