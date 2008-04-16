@@ -19,49 +19,44 @@
  
 #if defined(THREADED_RTS)
 
-#if defined(DEBUG)
-typedef struct StgSync_
+#if defined(PROF_SPIN)
+typedef struct SpinLock_
 {
     StgWord32 lock;
     StgWord64 spin; // DEBUG version counts how much it spins
-} StgSync;
+} SpinLock;
 #else
-typedef StgWord StgSync;
+typedef StgWord SpinLock;
 #endif
 
-typedef lnat StgSyncCount;
+typedef lnat SpinLockCount;
 
 
-#if defined(DEBUG)
+#if defined(PROF_SPIN)
 
-// Debug versions of spin locks maintain a spin count
-
-// How to use: 
-//  To use the debug veriosn of the spin locks, a debug version of the program 
-//  can be run under a deugger with a break point on stat_exit. At exit time 
-//  of the program one can examine the state the spin count counts of various
-//  spin locks to check for contention. 
+// PROF_SPIN enables counting the number of times we spin on a lock
 
 // acquire spin lock
-INLINE_HEADER void ACQUIRE_SPIN_LOCK(StgSync * p)
+INLINE_HEADER void ACQUIRE_SPIN_LOCK(SpinLock * p)
 {
     StgWord32 r = 0;
-    do {
+spin:
+    r = cas((StgVolatilePtr)&(p->lock), 1, 0);
+    if (r == 0) {
         p->spin++;
-        r = cas((StgVolatilePtr)&(p->lock), 1, 0);
-    } while(r == 0);
-    p->spin--;
+        goto spin;
+    }
 }
 
 // release spin lock
-INLINE_HEADER void RELEASE_SPIN_LOCK(StgSync * p)
+INLINE_HEADER void RELEASE_SPIN_LOCK(SpinLock * p)
 {
     write_barrier();
     p->lock = 1;
 }
 
 // initialise spin lock
-INLINE_HEADER void initSpinLock(StgSync * p)
+INLINE_HEADER void initSpinLock(SpinLock * p)
 {
     write_barrier();
     p->lock = 1;
@@ -71,7 +66,7 @@ INLINE_HEADER void initSpinLock(StgSync * p)
 #else
 
 // acquire spin lock
-INLINE_HEADER void ACQUIRE_SPIN_LOCK(StgSync * p)
+INLINE_HEADER void ACQUIRE_SPIN_LOCK(SpinLock * p)
 {
     StgWord32 r = 0;
     do {
@@ -80,20 +75,20 @@ INLINE_HEADER void ACQUIRE_SPIN_LOCK(StgSync * p)
 }
 
 // release spin lock
-INLINE_HEADER void RELEASE_SPIN_LOCK(StgSync * p)
+INLINE_HEADER void RELEASE_SPIN_LOCK(SpinLock * p)
 {
     write_barrier();
     (*p) = 1;
 }
 
 // init spin lock
-INLINE_HEADER void initSpinLock(StgSync * p)
+INLINE_HEADER void initSpinLock(SpinLock * p)
 {
     write_barrier();
     (*p) = 1;
 }
 
-#endif /* DEBUG */
+#endif /* PROF_SPIN */
 
 #else /* !THREADED_RTS */
 
