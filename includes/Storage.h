@@ -113,6 +113,7 @@ typedef struct generation_ {
     
     // stats information
     unsigned int collections;
+    unsigned int par_collections;
     unsigned int failed_promotions;
 
     // temporary use during GC:

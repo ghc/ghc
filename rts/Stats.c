@@ -45,6 +45,9 @@ static Ticks ExitElapsedTime  = 0;
 static ullong GC_tot_alloc        = 0;
 static ullong GC_tot_copied       = 0;
 
+static ullong GC_par_max_copied = 0;
+static ullong GC_par_avg_copied = 0;
+
 static Ticks GC_start_time = 0,  GC_tot_time  = 0;  /* User GC Time */
 static Ticks GCe_start_time = 0, GCe_tot_time = 0;  /* Elapsed GC time */
 
@@ -294,7 +297,8 @@ stat_startGC(void)
    -------------------------------------------------------------------------- */
 
 void
-stat_endGC (lnat alloc, lnat live, lnat copied, lnat gen)
+stat_endGC (lnat alloc, lnat live, lnat copied, lnat gen,
+            lnat max_copied, lnat avg_copied)
 {
     if (RtsFlags.GcFlags.giveStats != NO_GC_STATS) {
 	Ticks time, etime, gc_time, gc_etime;
@@ -327,6 +331,8 @@ stat_endGC (lnat alloc, lnat live, lnat copied, lnat gen)
 
 	GC_tot_copied += (ullong) copied;
 	GC_tot_alloc  += (ullong) alloc;
+        GC_par_max_copied += (ullong) max_copied;
+        GC_par_avg_copied += (ullong) avg_copied;
 	GC_tot_time   += gc_time;
 	GCe_tot_time  += gc_etime;
 	
@@ -527,30 +533,41 @@ stat_exit(int alloc)
 	if (RtsFlags.GcFlags.giveStats >= SUMMARY_GC_STATS) {
 	    ullong_format_string(GC_tot_alloc*sizeof(W_), 
 				 temp, rtsTrue/*commas*/);
-	    statsPrintf("%11s bytes allocated in the heap\n", temp);
+	    statsPrintf("%16s bytes allocated in the heap\n", temp);
 
 	    ullong_format_string(GC_tot_copied*sizeof(W_), 
 				 temp, rtsTrue/*commas*/);
-	    statsPrintf("%11s bytes copied during GC\n", temp);
+	    statsPrintf("%16s bytes copied during GC\n", temp);
 
 	    if ( ResidencySamples > 0 ) {
 		ullong_format_string(MaxResidency*sizeof(W_), 
 				     temp, rtsTrue/*commas*/);
-		statsPrintf("%11s bytes maximum residency (%ld sample(s))\n",
+		statsPrintf("%16s bytes maximum residency (%ld sample(s))\n",
 			temp, ResidencySamples);
 	    }
-	    statsPrintf("\n");
+	    statsPrintf("%16ld MB total memory in use\n\n", 
+		    mblocks_allocated * MBLOCK_SIZE / (1024 * 1024));
 
 	    /* Print garbage collections in each gen */
 	    for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-		statsPrintf("%11d collections in generation %d, %6.2fs, %6.2fs elapsed\n", 
-			generations[g].collections, g, 
+		statsPrintf("  Generation %d: %5d collections, %5d parallel, %5.2fs, %5.2fs elapsed\n", 
+                            g, generations[g].collections, 
+                            generations[g].par_collections,
                         TICK_TO_DBL(GC_coll_times[g]),
                         TICK_TO_DBL(GC_coll_etimes[g]));
 	    }
 
-	    statsPrintf("\n%11ld MB total memory in use\n\n", 
-		    mblocks_allocated * MBLOCK_SIZE / (1024 * 1024));
+#if defined(THREADED_RTS)
+            if (RtsFlags.ParFlags.gcThreads > 1) {
+                statsPrintf("\n  Parallel GC work balance: %.2f (%ld / %ld, ideal %d)\n", 
+                            (double)GC_par_avg_copied / (double)GC_par_max_copied,
+                            (lnat)GC_par_avg_copied, (lnat)GC_par_max_copied,
+                            RtsFlags.ParFlags.gcThreads
+                    );
+            }
+#endif
+
+	    statsPrintf("\n");
 
 #if defined(THREADED_RTS)
 	    {

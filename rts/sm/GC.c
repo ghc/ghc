@@ -181,7 +181,7 @@ GarbageCollect ( rtsBool force_major_gc )
 {
   bdescr *bd;
   step *stp;
-  lnat live, allocated;
+  lnat live, allocated, max_copied, avg_copied;
   lnat oldgen_saved_blocks = 0;
   gc_thread *saved_gct;
   nat g, s, t, n;
@@ -471,24 +471,35 @@ GarbageCollect ( rtsBool force_major_gc )
   /* run through all the generations/steps and tidy up 
    */
   copied = 0;
+  max_copied = 0;
+  avg_copied = 0;
   { 
       nat i;
       for (i=0; i < n_gc_threads; i++) {
           if (n_gc_threads > 1) {
               trace(TRACE_gc,"thread %d:", i);
               trace(TRACE_gc,"   copied           %ld", gc_threads[i]->copied * sizeof(W_));
+              trace(TRACE_gc,"   scanned          %ld", gc_threads[i]->scanned * sizeof(W_));
               trace(TRACE_gc,"   any_work         %ld", gc_threads[i]->any_work);
               trace(TRACE_gc,"   no_work          %ld", gc_threads[i]->no_work);
               trace(TRACE_gc,"   scav_find_work %ld",   gc_threads[i]->scav_find_work);
           }
           copied += gc_threads[i]->copied;
+          max_copied = stg_max(gc_threads[i]->copied, max_copied);
+      }
+      if (n_gc_threads == 1) {
+          max_copied = 0;
+          avg_copied = 0;
+      } else {
+          avg_copied = copied;
       }
   }
 
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
 
-    if (g <= N) {
+    if (g == N) {
       generations[g].collections++; // for stats 
+      if (n_gc_threads > 1) generations[g].par_collections++;
     }
 
     // Count the mutable list as bytes "copied" for the purposes of
@@ -698,7 +709,7 @@ GarbageCollect ( rtsBool force_major_gc )
 #endif
 
   // ok, GC over: tell the stats department what happened. 
-  stat_endGC(allocated, live, copied, N);
+  stat_endGC(allocated, live, copied, N, max_copied, avg_copied);
 
 #if defined(RTS_USER_SIGNALS)
   if (RtsFlags.MiscFlags.install_signal_handlers) {
@@ -1399,10 +1410,6 @@ init_uncollected_gen (nat g, nat threads)
 		// from the current end point.
 		ws->scan_bd = ws->todo_bd;
 		ws->scan_bd->u.scan = ws->scan_bd->free;
-
-		// subtract the contents of this block from the stats,
-		// because we'll count the whole block later.
-		copied -= ws->scan_bd->free - ws->scan_bd->start;
 	    } 
 	    else
 	    {
@@ -1440,10 +1447,10 @@ init_gc_thread (gc_thread *t)
     t->eager_promotion = rtsTrue;
     t->thunk_selector_depth = 0;
     t->copied = 0;
+    t->scanned = 0;
     t->any_work = 0;
     t->no_work = 0;
     t->scav_find_work = 0;
-
 }
 
 /* -----------------------------------------------------------------------------

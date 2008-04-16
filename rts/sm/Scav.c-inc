@@ -444,15 +444,15 @@ scavenge_block (bdescr *bd)
   }
 
   if (p > bd->free)  {
+      gct->copied += ws->todo_free - bd->free;
       bd->free = p;
   }
 
   debugTrace(DEBUG_gc, "   scavenged %ld bytes",
              (unsigned long)((bd->free - bd->u.scan) * sizeof(W_)));
 
-  // update stats: this is a block that has been copied & scavenged
-  gct->copied += bd->free - bd->u.scan;
-
+  // update stats: this is a block that has been scavenged
+  gct->scanned += bd->free - bd->u.scan;
   bd->u.scan = bd->free;
 }
 

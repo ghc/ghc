@@ -126,7 +126,7 @@ typedef struct gc_thread_ {
     StgClosure* static_objects;      // live static objects
     StgClosure* scavenged_static_objects;   // static objects scavenged so far
 
-    lnat gc_count;                 // number of gc's this thread has done
+    lnat gc_count;                 // number of GCs this thread has done
 
     // --------------------
     // evacuate flags
@@ -157,6 +157,7 @@ typedef struct gc_thread_ {
     // stats
 
     lnat copied;
+    lnat scanned;
     lnat any_work;
     lnat no_work;
     lnat scav_find_work;

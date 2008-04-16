@@ -166,6 +166,7 @@ initStorage( void )
     gen->no = g;
     gen->mut_list = allocBlock();
     gen->collections = 0;
+    gen->par_collections = 0;
     gen->failed_promotions = 0;
     gen->max_blocks = 0;
   }

@@ -115,6 +115,7 @@ todo_block_full (nat size, step_workspace *ws)
     ASSERT(bd->link == NULL);
     ASSERT(bd->step == ws->step);
 
+    gct->copied += ws->todo_free - bd->free;
     bd->free = ws->todo_free;
 
     // If the global list is not empty, or there's not much work in

@@ -1378,6 +1378,9 @@ scavenge_large (step_workspace *ws)
 		recordMutableGen_GC((StgClosure *)p, ws->step->gen);
 	    }
 	}
+
+        // stats
+        gct->scanned += closure_sizeW((StgClosure*)p);
     }
 }
 
@@ -1428,12 +1431,14 @@ loop:
             continue; 
         }
         ws = &gct->steps[s];
-
+        
         if (ws->todo_bd != NULL)
         {
-            ws->todo_bd->free = ws->todo_free;
+            bd = ws->todo_bd;
+            gct->copied += ws->todo_free - bd->free;
+            bd->free = ws->todo_free;
         }
-        
+
         // If we have a todo block and no scan block, start
         // scanning the todo block.
         if (ws->scan_bd == NULL && ws->todo_bd != NULL)
