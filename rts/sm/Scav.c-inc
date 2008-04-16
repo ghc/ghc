@@ -17,6 +17,7 @@
 #ifndef PARALLEL_GC
 #define scavenge_block(a,b) scavenge_block1(a,b)
 #define evacuate(a) evacuate1(a)
+#define recordMutableGen_GC(a,b) recordMutableGen(a,b)
 #else
 #undef scavenge_block
 #undef evacuate
@@ -452,3 +453,4 @@ scavenge_block (bdescr *bd, StgPtr scan)
 
 #undef scavenge_block
 #undef evacuate
+#undef recordMutableGen_GC
