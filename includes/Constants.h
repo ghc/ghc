@@ -260,6 +260,11 @@
 #define TSO_INTERRUPTIBLE 8
 #define TSO_STOPPED_ON_BREAKPOINT 16 
 
+/*
+ * TSO_LINK_DIRTY is set when a TSO's link field is modified
+ */
+#define TSO_LINK_DIRTY 32
+
 /* -----------------------------------------------------------------------------
    RET_DYN stack frames
    -------------------------------------------------------------------------- */

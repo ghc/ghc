@@ -186,11 +186,11 @@ void print_bqe (StgBlockingQueueElement *bqe);
 INLINE_HEADER void
 appendToRunQueue (Capability *cap, StgTSO *tso)
 {
-    ASSERT(tso->link == END_TSO_QUEUE);
+    ASSERT(tso->_link == END_TSO_QUEUE);
     if (cap->run_queue_hd == END_TSO_QUEUE) {
 	cap->run_queue_hd = tso;
     } else {
-	cap->run_queue_tl->link = tso;
+	setTSOLink(cap, cap->run_queue_tl, tso);
     }
     cap->run_queue_tl = tso;
 }
@@ -202,7 +202,7 @@ appendToRunQueue (Capability *cap, StgTSO *tso)
 INLINE_HEADER void
 pushOnRunQueue (Capability *cap, StgTSO *tso)
 {
-    tso->link = cap->run_queue_hd;
+    setTSOLink(cap, tso, cap->run_queue_hd);
     cap->run_queue_hd = tso;
     if (cap->run_queue_tl == END_TSO_QUEUE) {
 	cap->run_queue_tl = tso;
@@ -216,8 +216,8 @@ popRunQueue (Capability *cap)
 { 
     StgTSO *t = cap->run_queue_hd;
     ASSERT(t != END_TSO_QUEUE);
-    cap->run_queue_hd = t->link;
-    t->link = END_TSO_QUEUE;
+    cap->run_queue_hd = t->_link;
+    t->_link = END_TSO_QUEUE; // no write barrier req'd
     if (cap->run_queue_hd == END_TSO_QUEUE) {
 	cap->run_queue_tl = END_TSO_QUEUE;
     }
@@ -230,11 +230,11 @@ popRunQueue (Capability *cap)
 INLINE_HEADER void
 appendToBlockedQueue(StgTSO *tso)
 {
-    ASSERT(tso->link == END_TSO_QUEUE);
+    ASSERT(tso->_link == END_TSO_QUEUE);
     if (blocked_queue_hd == END_TSO_QUEUE) {
 	blocked_queue_hd = tso;
     } else {
-	blocked_queue_tl->link = tso;
+	setTSOLink(&MainCapability, blocked_queue_tl, tso);
     }
     blocked_queue_tl = tso;
 }
@@ -244,11 +244,11 @@ appendToBlockedQueue(StgTSO *tso)
 INLINE_HEADER void
 appendToWakeupQueue (Capability *cap, StgTSO *tso)
 {
-    ASSERT(tso->link == END_TSO_QUEUE);
+    ASSERT(tso->_link == END_TSO_QUEUE);
     if (cap->wakeup_queue_hd == END_TSO_QUEUE) {
 	cap->wakeup_queue_hd = tso;
     } else {
-	cap->wakeup_queue_tl->link = tso;
+	setTSOLink(cap, cap->wakeup_queue_tl, tso);
     }
     cap->wakeup_queue_tl = tso;
 }
@@ -292,12 +292,6 @@ emptyThreadQueues(Capability *cap)
 }
 
 #endif /* !IN_STG_CODE */
-
-INLINE_HEADER void
-dirtyTSO (StgTSO *tso)
-{
-    tso->flags |= TSO_DIRTY;
-}
 
 #endif /* SCHEDULE_H */
 

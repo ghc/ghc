@@ -124,7 +124,21 @@ typedef union {
 typedef struct StgTSO_ {
     StgHeader               header;
 
-    struct StgTSO_*         link;       /* Links threads onto blocking queues */
+    /* The link field, for linking threads together in lists (e.g. the
+       run queue on a Capability.
+    */
+    struct StgTSO_*         _link;
+    /*
+       NOTE!!!  do not modify _link directly, it is subject to
+       a write barrier for generational GC.  Instead use the
+       setTSOLink() function.  Exceptions to this rule are:
+
+       * setting the link field to END_TSO_QUEUE
+       * putting a TSO on the blackhole_queue
+       * setting the link field of the currently running TSO, as it
+         will already be dirty.
+    */
+
     struct StgTSO_*         global_link;    /* Links all threads together */
     
     StgWord16               what_next;      /* Values defined in Constants.h */
@@ -170,6 +184,13 @@ typedef struct StgTSO_ {
     
     StgWord            stack[FLEXIBLE_ARRAY];
 } StgTSO;
+
+/* -----------------------------------------------------------------------------
+   functions
+   -------------------------------------------------------------------------- */
+
+extern void dirty_TSO  (Capability *cap, StgTSO *tso);
+extern void setTSOLink (Capability *cap, StgTSO *tso, StgTSO *target);
 
 /* -----------------------------------------------------------------------------
    Invariants:

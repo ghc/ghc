@@ -592,7 +592,7 @@ run_thread:
 
     cap->in_haskell = rtsTrue;
 
-    dirtyTSO(t);
+    dirty_TSO(cap,t);
 
 #if defined(THREADED_RTS)
     if (recent_activity == ACTIVITY_DONE_GC) {
@@ -768,7 +768,7 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
 
     // Check whether we have more threads on our run queue, or sparks
     // in our pool, that we could hand to another Capability.
-    if ((emptyRunQueue(cap) || cap->run_queue_hd->link == END_TSO_QUEUE)
+    if ((emptyRunQueue(cap) || cap->run_queue_hd->_link == END_TSO_QUEUE)
 	&& sparkPoolSizeCap(cap) < 2) {
 	return;
     }
@@ -809,21 +809,21 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
 
 	if (cap->run_queue_hd != END_TSO_QUEUE) {
 	    prev = cap->run_queue_hd;
-	    t = prev->link;
-	    prev->link = END_TSO_QUEUE;
+	    t = prev->_link;
+	    prev->_link = END_TSO_QUEUE;
 	    for (; t != END_TSO_QUEUE; t = next) {
-		next = t->link;
-		t->link = END_TSO_QUEUE;
+		next = t->_link;
+		t->_link = END_TSO_QUEUE;
 		if (t->what_next == ThreadRelocated
 		    || t->bound == task // don't move my bound thread
 		    || tsoLocked(t)) {  // don't move a locked thread
-		    prev->link = t;
+		    setTSOLink(cap, prev, t);
 		    prev = t;
 		} else if (i == n_free_caps) {
 		    pushed_to_all = rtsTrue;
 		    i = 0;
 		    // keep one for us
-		    prev->link = t;
+		    setTSOLink(cap, prev, t);
 		    prev = t;
 		} else {
 		    debugTrace(DEBUG_sched, "pushing thread %lu to capability %d", (unsigned long)t->id, free_caps[i]->no);
@@ -919,7 +919,7 @@ scheduleCheckWakeupThreads(Capability *cap USED_IF_THREADS)
 	    cap->run_queue_hd = cap->wakeup_queue_hd;
 	    cap->run_queue_tl = cap->wakeup_queue_tl;
 	} else {
-	    cap->run_queue_tl->link = cap->wakeup_queue_hd;
+	    setTSOLink(cap, cap->run_queue_tl, cap->wakeup_queue_hd);
 	    cap->run_queue_tl = cap->wakeup_queue_tl;
 	}
 	cap->wakeup_queue_hd = cap->wakeup_queue_tl = END_TSO_QUEUE;
@@ -1711,7 +1711,7 @@ scheduleHandleYield( Capability *cap, StgTSO *t, nat prev_what_next )
     IF_DEBUG(sanity,
 	     //debugBelch("&& Doing sanity check on yielding TSO %ld.", t->id);
 	     checkTSO(t));
-    ASSERT(t->link == END_TSO_QUEUE);
+    ASSERT(t->_link == END_TSO_QUEUE);
     
     // Shortcut if we're just switching evaluators: don't bother
     // doing stack squeezing (which can be expensive), just run the
@@ -2019,7 +2019,7 @@ scheduleDoGC (Capability *cap, Task *task USED_IF_THREADS, rtsBool force_major)
 
 	for (t = all_threads; t != END_TSO_QUEUE; t = next) {
 	    if (t->what_next == ThreadRelocated) {
-		next = t->link;
+		next = t->_link;
 	    } else {
 		next = t->global_link;
 		
@@ -2182,7 +2182,7 @@ forkProcess(HsStablePtr *entry
 
 	for (t = all_threads; t != END_TSO_QUEUE; t = next) {
 	    if (t->what_next == ThreadRelocated) {
-		next = t->link;
+		next = t->_link;
 	    } else {
 		next = t->global_link;
 		// don't allow threads to catch the ThreadKilled
@@ -2258,7 +2258,7 @@ deleteAllThreads ( Capability *cap )
     debugTrace(DEBUG_sched,"deleting all threads");
     for (t = all_threads; t != END_TSO_QUEUE; t = next) {
 	if (t->what_next == ThreadRelocated) {
-	    next = t->link;
+	    next = t->_link;
 	} else {
 	    next = t->global_link;
 	    deleteThread(cap,t);
@@ -2417,7 +2417,7 @@ resumeThread (void *task_)
 
     tso = task->suspended_tso;
     task->suspended_tso = NULL;
-    tso->link = END_TSO_QUEUE;
+    tso->_link = END_TSO_QUEUE; // no write barrier reqd
     debugTrace(DEBUG_sched, "thread %lu: re-entering RTS", (unsigned long)tso->id);
     
     if (tso->why_blocked == BlockedOnCCall) {
@@ -2436,7 +2436,7 @@ resumeThread (void *task_)
 #endif
 
     /* We might have GC'd, mark the TSO dirty again */
-    dirtyTSO(tso);
+    dirty_TSO(cap,tso);
 
     IF_DEBUG(sanity, checkTSO(tso));
 
@@ -2786,7 +2786,7 @@ threadStackOverflow(Capability *cap, StgTSO *tso)
    * dead TSO's stack.
    */
   tso->what_next = ThreadRelocated;
-  tso->link = dest;
+  setTSOLink(cap,tso,dest);
   tso->sp = (P_)&(tso->stack[tso->stack_size]);
   tso->why_blocked = NotBlocked;
 
@@ -2934,8 +2934,8 @@ checkBlackHoles (Capability *cap)
 	    *prev = t;
 	    any_woke_up = rtsTrue;
 	} else {
-	    prev = &t->link;
-	    t = t->link;
+	    prev = &t->_link;
+	    t = t->_link;
 	}
     }
 

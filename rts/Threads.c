@@ -119,7 +119,7 @@ createThread(Capability *cap, nat size)
   /* put a stop frame on the stack */
     tso->sp -= sizeofW(StgStopFrame);
     SET_HDR((StgClosure*)tso->sp,(StgInfoTable *)&stg_stop_thread_info,CCS_SYSTEM);
-    tso->link = END_TSO_QUEUE;
+    tso->_link = END_TSO_QUEUE;
     
   // ToDo: check this
 #if defined(GRAN)
@@ -292,17 +292,17 @@ rts_getThreadId(StgPtr tso)
    -------------------------------------------------------------------------- */
 
 void
-removeThreadFromQueue (StgTSO **queue, StgTSO *tso)
+removeThreadFromQueue (Capability *cap, StgTSO **queue, StgTSO *tso)
 {
     StgTSO *t, *prev;
 
     prev = NULL;
-    for (t = *queue; t != END_TSO_QUEUE; prev = t, t = t->link) {
+    for (t = *queue; t != END_TSO_QUEUE; prev = t, t = t->_link) {
 	if (t == tso) {
 	    if (prev) {
-		prev->link = t->link;
+		setTSOLink(cap,prev,t->_link);
 	    } else {
-		*queue = t->link;
+		*queue = t->_link;
 	    }
 	    return;
 	}
@@ -311,17 +311,18 @@ removeThreadFromQueue (StgTSO **queue, StgTSO *tso)
 }
 
 void
-removeThreadFromDeQueue (StgTSO **head, StgTSO **tail, StgTSO *tso)
+removeThreadFromDeQueue (Capability *cap, 
+                         StgTSO **head, StgTSO **tail, StgTSO *tso)
 {
     StgTSO *t, *prev;
 
     prev = NULL;
-    for (t = *head; t != END_TSO_QUEUE; prev = t, t = t->link) {
+    for (t = *head; t != END_TSO_QUEUE; prev = t, t = t->_link) {
 	if (t == tso) {
 	    if (prev) {
-		prev->link = t->link;
+		setTSOLink(cap,prev,t->_link);
 	    } else {
-		*head = t->link;
+		*head = t->_link;
 	    }
 	    if (*tail == tso) {
 		if (prev) {
@@ -337,9 +338,9 @@ removeThreadFromDeQueue (StgTSO **head, StgTSO **tail, StgTSO *tso)
 }
 
 void
-removeThreadFromMVarQueue (StgMVar *mvar, StgTSO *tso)
+removeThreadFromMVarQueue (Capability *cap, StgMVar *mvar, StgTSO *tso)
 {
-    removeThreadFromDeQueue (&mvar->head, &mvar->tail, tso);
+    removeThreadFromDeQueue (cap, &mvar->head, &mvar->tail, tso);
 }
 
 /* ----------------------------------------------------------------------------
@@ -489,8 +490,8 @@ unblockOne_ (Capability *cap, StgTSO *tso,
   ASSERT(tso->why_blocked != NotBlocked);
 
   tso->why_blocked = NotBlocked;
-  next = tso->link;
-  tso->link = END_TSO_QUEUE;
+  next = tso->_link;
+  tso->_link = END_TSO_QUEUE;
 
 #if defined(THREADED_RTS)
   if (tso->cap == cap || (!tsoLocked(tso) && 
@@ -792,7 +793,7 @@ printAllThreads(void)
   for (i = 0; i < n_capabilities; i++) {
       cap = &capabilities[i];
       debugBelch("threads on capability %d:\n", cap->no);
-      for (t = cap->run_queue_hd; t != END_TSO_QUEUE; t = t->link) {
+      for (t = cap->run_queue_hd; t != END_TSO_QUEUE; t = t->_link) {
 	  printThreadStatus(t);
       }
   }
@@ -803,7 +804,7 @@ printAllThreads(void)
 	  printThreadStatus(t);
       }
       if (t->what_next == ThreadRelocated) {
-	  next = t->link;
+	  next = t->_link;
       } else {
 	  next = t->global_link;
       }
@@ -815,7 +816,7 @@ void
 printThreadQueue(StgTSO *t)
 {
     nat i = 0;
-    for (; t != END_TSO_QUEUE; t = t->link) {
+    for (; t != END_TSO_QUEUE; t = t->_link) {
 	printThreadStatus(t);
 	i++;
     }

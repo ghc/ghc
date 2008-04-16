@@ -309,7 +309,7 @@ INFO_TABLE(stg_BLACKHOLE,0,1,BLACKHOLE,"BLACKHOLE","BLACKHOLE")
 #endif
 
     /* Put ourselves on the blackhole queue */
-    StgTSO_link(CurrentTSO) = W_[blackhole_queue];
+    StgTSO__link(CurrentTSO) = W_[blackhole_queue];
     W_[blackhole_queue] = CurrentTSO;
 
     /* jot down why and on what closure we are blocked */
@@ -374,7 +374,7 @@ INFO_TABLE(stg_CAF_BLACKHOLE,0,1,CAF_BLACKHOLE,"CAF_BLACKHOLE","CAF_BLACKHOLE")
 #endif
 
     /* Put ourselves on the blackhole queue */
-    StgTSO_link(CurrentTSO) = W_[blackhole_queue];
+    StgTSO__link(CurrentTSO) = W_[blackhole_queue];
     W_[blackhole_queue] = CurrentTSO;
 
     /* jot down why and on what closure we are blocked */

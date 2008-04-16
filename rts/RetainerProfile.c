@@ -1635,7 +1635,7 @@ inner_loop:
 #ifdef DEBUG_RETAINER
 	    debugBelch("ThreadRelocated encountered in retainClosure()\n");
 #endif
-	    c = (StgClosure *)((StgTSO *)c)->link;
+	    c = (StgClosure *)((StgTSO *)c)->_link;
 	    goto inner_loop;
 	}
 	break;

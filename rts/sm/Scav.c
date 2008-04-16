@@ -132,6 +132,17 @@ scavenge_fun_srt(const StgInfoTable *info)
    Scavenge a TSO.
    -------------------------------------------------------------------------- */
 
+STATIC_INLINE void
+scavenge_TSO_link (StgTSO *tso)
+{
+    // We don't always chase the link field: TSOs on the blackhole
+    // queue are not automatically alive, so the link field is a
+    // "weak" pointer in that case.
+    if (tso->why_blocked != BlockedOnBlackHole) {
+        evacuate((StgClosure **)&tso->_link);
+    }
+}
+
 static void
 scavengeTSO (StgTSO *tso)
 {
@@ -156,13 +167,6 @@ scavengeTSO (StgTSO *tso)
     }
     evacuate((StgClosure **)&tso->blocked_exceptions);
     
-    // We don't always chase the link field: TSOs on the blackhole
-    // queue are not automatically alive, so the link field is a
-    // "weak" pointer in that case.
-    if (tso->why_blocked != BlockedOnBlackHole) {
-	evacuate((StgClosure **)&tso->link);
-    }
-
     // scavange current transaction record
     evacuate((StgClosure **)&tso->trec);
     
@@ -171,8 +175,15 @@ scavengeTSO (StgTSO *tso)
 
     if (gct->failed_to_evac) {
         tso->flags |= TSO_DIRTY;
+        scavenge_TSO_link(tso);
     } else {
         tso->flags &= ~TSO_DIRTY;
+        scavenge_TSO_link(tso);
+        if (gct->failed_to_evac) {
+            tso->flags |= TSO_LINK_DIRTY;
+        } else {
+            tso->flags &= ~TSO_LINK_DIRTY;
+        }
     }
 
     gct->eager_promotion = saved_eager;
@@ -517,7 +528,6 @@ linear_scan:
 	case TSO:
 	{ 
             scavengeTSO((StgTSO*)p);
-	    gct->failed_to_evac = rtsTrue; // always on the mutable list
 	    break;
 	}
 
@@ -837,7 +847,6 @@ scavenge_one(StgPtr p)
     case TSO:
     {
 	scavengeTSO((StgTSO*)p);
-	gct->failed_to_evac = rtsTrue; // always on the mutable list
 	break;
     }
   
@@ -1026,14 +1035,17 @@ scavenge_mutable_list(generation *gen)
 	    case TSO: {
 		StgTSO *tso = (StgTSO *)p;
 		if ((tso->flags & TSO_DIRTY) == 0) {
-		    // A clean TSO: we don't have to traverse its
-		    // stack.  However, we *do* follow the link field:
-		    // we don't want to have to mark a TSO dirty just
-		    // because we put it on a different queue.
-		    if (tso->why_blocked != BlockedOnBlackHole) {
-			evacuate((StgClosure **)&tso->link);
-		    }
-		    recordMutableGen_GC((StgClosure *)p,gen);
+                    // Must be on the mutable list because its link
+                    // field is dirty.
+                    ASSERT(tso->flags & TSO_LINK_DIRTY);
+
+                    scavenge_TSO_link(tso);
+                    if (gct->failed_to_evac) {
+                        recordMutableGen_GC((StgClosure *)p,gen);
+                        gct->failed_to_evac = rtsFalse;
+                    } else {
+                        tso->flags &= ~TSO_LINK_DIRTY;
+                    }
 		    continue;
 		}
 	    }

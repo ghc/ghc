@@ -1561,9 +1561,10 @@ takeMVarzh_fast
 	if (StgMVar_head(mvar) == stg_END_TSO_QUEUE_closure) {
 	    StgMVar_head(mvar) = CurrentTSO;
 	} else {
-	    StgTSO_link(StgMVar_tail(mvar)) = CurrentTSO;
+            foreign "C" setTSOLink(MyCapability() "ptr", StgMVar_tail(mvar),
+                                   CurrentTSO);
 	}
-	StgTSO_link(CurrentTSO)        = stg_END_TSO_QUEUE_closure;
+	StgTSO__link(CurrentTSO)       = stg_END_TSO_QUEUE_closure;
 	StgTSO_why_blocked(CurrentTSO) = BlockedOnMVar::I16;
 	StgTSO_block_info(CurrentTSO)  = mvar;
 	StgMVar_tail(mvar) = CurrentTSO;
@@ -1584,15 +1585,18 @@ takeMVarzh_fast
       /* actually perform the putMVar for the thread that we just woke up */
       tso = StgMVar_head(mvar);
       PerformPut(tso,StgMVar_value(mvar));
-      dirtyTSO(tso);
+
+      if (StgTSO_flags(tso) & TSO_DIRTY == 0) {
+          foreign "C" dirty_TSO(MyCapability(), tso);
+      }
 
 #if defined(GRAN) || defined(PAR)
       /* ToDo: check 2nd arg (mvar) is right */
       ("ptr" tso) = foreign "C" unblockOne(StgMVar_head(mvar),mvar) [];
       StgMVar_head(mvar) = tso;
 #else
-      ("ptr" tso) = foreign "C" unblockOne(MyCapability() "ptr", 
-				         StgMVar_head(mvar) "ptr") [];
+      ("ptr" tso) = foreign "C" unblockOne_(MyCapability() "ptr", 
+                                            StgMVar_head(mvar) "ptr", 1) [];
       StgMVar_head(mvar) = tso;
 #endif
 
@@ -1664,15 +1668,17 @@ tryTakeMVarzh_fast
 	/* actually perform the putMVar for the thread that we just woke up */
 	tso = StgMVar_head(mvar);
 	PerformPut(tso,StgMVar_value(mvar));
-        dirtyTSO(tso);
+        if (StgTSO_flags(tso) & TSO_DIRTY == 0) {
+            foreign "C" dirty_TSO(MyCapability(), tso);
+        }
 
 #if defined(GRAN) || defined(PAR)
 	/* ToDo: check 2nd arg (mvar) is right */
 	("ptr" tso) = foreign "C" unblockOne(StgMVar_head(mvar) "ptr", mvar "ptr") [];
 	StgMVar_head(mvar) = tso;
 #else
-	("ptr" tso) = foreign "C" unblockOne(MyCapability() "ptr",
-					   StgMVar_head(mvar) "ptr") [];
+        ("ptr" tso) = foreign "C" unblockOne_(MyCapability() "ptr", 
+                                              StgMVar_head(mvar) "ptr", 1) [];
 	StgMVar_head(mvar) = tso;
 #endif
 
@@ -1721,9 +1727,10 @@ putMVarzh_fast
 	if (StgMVar_head(mvar) == stg_END_TSO_QUEUE_closure) {
 	    StgMVar_head(mvar) = CurrentTSO;
 	} else {
-	    StgTSO_link(StgMVar_tail(mvar)) = CurrentTSO;
+            foreign "C" setTSOLink(MyCapability() "ptr", StgMVar_tail(mvar),
+                                   CurrentTSO);
 	}
-	StgTSO_link(CurrentTSO)        = stg_END_TSO_QUEUE_closure;
+	StgTSO__link(CurrentTSO)       = stg_END_TSO_QUEUE_closure;
 	StgTSO_why_blocked(CurrentTSO) = BlockedOnMVar::I16;
 	StgTSO_block_info(CurrentTSO)  = mvar;
 	StgMVar_tail(mvar) = CurrentTSO;
@@ -1740,14 +1747,17 @@ putMVarzh_fast
 	/* actually perform the takeMVar */
 	tso = StgMVar_head(mvar);
 	PerformTake(tso, R2);
-        dirtyTSO(tso);
+        if (StgTSO_flags(tso) & TSO_DIRTY == 0) {
+            foreign "C" dirty_TSO(MyCapability(), tso);
+        }
       
 #if defined(GRAN) || defined(PAR)
 	/* ToDo: check 2nd arg (mvar) is right */
 	("ptr" tso) = foreign "C" unblockOne(MyCapability() "ptr", StgMVar_head(mvar) "ptr",mvar "ptr") [];
 	StgMVar_head(mvar) = tso;
 #else
-	("ptr" tso) = foreign "C" unblockOne(MyCapability() "ptr", StgMVar_head(mvar) "ptr") [];
+        ("ptr" tso) = foreign "C" unblockOne_(MyCapability() "ptr", 
+                                              StgMVar_head(mvar) "ptr", 1) [];
 	StgMVar_head(mvar) = tso;
 #endif
 
@@ -1812,14 +1822,17 @@ tryPutMVarzh_fast
 	/* actually perform the takeMVar */
 	tso = StgMVar_head(mvar);
 	PerformTake(tso, R2);
-        dirtyTSO(tso);
+        if (StgTSO_flags(tso) & TSO_DIRTY == 0) {
+            foreign "C" dirty_TSO(MyCapability(), tso);
+        }
       
 #if defined(GRAN) || defined(PAR)
 	/* ToDo: check 2nd arg (mvar) is right */
 	("ptr" tso) = foreign "C" unblockOne(MyCapability() "ptr", StgMVar_head(mvar) "ptr",mvar "ptr") [];
 	StgMVar_head(mvar) = tso;
 #else
-	("ptr" tso) = foreign "C" unblockOne(MyCapability() "ptr", StgMVar_head(mvar) "ptr") [];
+        ("ptr" tso) = foreign "C" unblockOne_(MyCapability() "ptr", 
+                                              StgMVar_head(mvar) "ptr", 1) [];
 	StgMVar_head(mvar) = tso;
 #endif
 
@@ -2037,11 +2050,11 @@ for2:
  * macro in Schedule.h).
  */
 #define APPEND_TO_BLOCKED_QUEUE(tso)			\
-    ASSERT(StgTSO_link(tso) == END_TSO_QUEUE);		\
+    ASSERT(StgTSO__link(tso) == END_TSO_QUEUE);		\
     if (W_[blocked_queue_hd] == END_TSO_QUEUE) {	\
       W_[blocked_queue_hd] = tso;			\
     } else {						\
-      StgTSO_link(W_[blocked_queue_tl]) = tso;		\
+      foreign "C" setTSOLink(MyCapability() "ptr", W_[blocked_queue_tl], tso); \
     }							\
     W_[blocked_queue_tl] = tso;
 
@@ -2137,15 +2150,15 @@ delayzh_fast
 while:
     if (t != END_TSO_QUEUE && StgTSO_block_info(t) < target) {
 	prev = t;
-	t = StgTSO_link(t);
+	t = StgTSO__link(t);
 	goto while;
     }
 
-    StgTSO_link(CurrentTSO) = t;
+    StgTSO__link(CurrentTSO) = t;
     if (prev == NULL) {
 	W_[sleeping_queue] = CurrentTSO;
     } else {
-	StgTSO_link(prev) = CurrentTSO;
+        foreign "C" setTSOLink(MyCapability() "ptr", prev, CurrentTSO) [];
     }
     jump stg_block_noregs;
 #endif

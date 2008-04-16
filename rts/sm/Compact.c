@@ -464,7 +464,7 @@ thread_AP_STACK (StgAP_STACK *ap)
 static StgPtr
 thread_TSO (StgTSO *tso)
 {
-    thread_(&tso->link);
+    thread_(&tso->_link);
     thread_(&tso->global_link);
 
     if (   tso->why_blocked == BlockedOnMVar

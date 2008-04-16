@@ -200,7 +200,7 @@ traverseWeakPtrList(void)
 	      ASSERT(get_itbl(t)->type == TSO);
 	      switch (t->what_next) {
 	      case ThreadRelocated:
-		  next = t->link;
+		  next = t->_link;
 		  *prev = next;
 		  continue;
 	      case ThreadKilled:
@@ -258,7 +258,7 @@ traverseWeakPtrList(void)
        */
       { 
 	  StgTSO **pt;
-	  for (pt = &blackhole_queue; *pt != END_TSO_QUEUE; pt = &((*pt)->link)) {
+	  for (pt = &blackhole_queue; *pt != END_TSO_QUEUE; pt = &((*pt)->_link)) {
 	      *pt = (StgTSO *)isAlive((StgClosure *)*pt);
 	      ASSERT(*pt != NULL);
 	  }
@@ -291,7 +291,7 @@ traverseBlackholeQueue (void)
     flag = rtsFalse;
     prev = NULL;
 
-    for (t = blackhole_queue; t != END_TSO_QUEUE; prev=t, t = t->link) {
+    for (t = blackhole_queue; t != END_TSO_QUEUE; prev=t, t = t->_link) {
         // if the thread is not yet alive...
 	if (! (tmp = (StgTSO *)isAlive((StgClosure*)t))) {
             // if the closure it is blocked on is either (a) a
@@ -305,7 +305,9 @@ traverseBlackholeQueue (void)
             }
             tmp = t;
             evacuate((StgClosure **)&tmp);
-            if (prev) prev->link = t;
+            if (prev) prev->_link = t; 
+                 // no write barrier when on the blackhole queue,
+                 // because we traverse the whole queue on every GC.
             flag = rtsTrue;
 	}
     }

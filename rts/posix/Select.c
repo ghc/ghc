@@ -63,9 +63,9 @@ wakeUpSleepingThreads(lnat ticks)
     while (sleeping_queue != END_TSO_QUEUE &&
 	   (int)(ticks - sleeping_queue->block_info.target) >= 0) {
 	tso = sleeping_queue;
-	sleeping_queue = tso->link;
+	sleeping_queue = tso->_link;
 	tso->why_blocked = NotBlocked;
-	tso->link = END_TSO_QUEUE;
+	tso->_link = END_TSO_QUEUE;
 	IF_DEBUG(scheduler,debugBelch("Waking up sleeping thread %lu\n", (unsigned long)tso->id));
 	// MainCapability: this code is !THREADED_RTS
 	pushOnRunQueue(&MainCapability,tso);
@@ -139,7 +139,7 @@ awaitEvent(rtsBool wait)
       FD_ZERO(&wfd);
 
       for(tso = blocked_queue_hd; tso != END_TSO_QUEUE; tso = next) {
-	next = tso->link;
+	next = tso->_link;
 
       /* On FreeBSD FD_SETSIZE is unsigned. Cast it to signed int
        * in order to switch off the 'comparison between signed and
@@ -243,7 +243,7 @@ awaitEvent(rtsBool wait)
       prev = NULL;
       if (select_succeeded || unblock_all) {
 	  for(tso = blocked_queue_hd; tso != END_TSO_QUEUE; tso = next) {
-	      next = tso->link;
+	      next = tso->_link;
 	      switch (tso->why_blocked) {
 	      case BlockedOnRead:
 		  ready = unblock_all || FD_ISSET(tso->block_info.fd, &rfd);
@@ -258,13 +258,13 @@ awaitEvent(rtsBool wait)
 	      if (ready) {
 		IF_DEBUG(scheduler,debugBelch("Waking up blocked thread %lu\n", (unsigned long)tso->id));
 		  tso->why_blocked = NotBlocked;
-		  tso->link = END_TSO_QUEUE;
+		  tso->_link = END_TSO_QUEUE;
 		  pushOnRunQueue(&MainCapability,tso);
 	      } else {
 		  if (prev == NULL)
 		      blocked_queue_hd = tso;
 		  else
-		      prev->link = tso;
+		      setTSOLink(&MainCapability, prev, tso);
 		  prev = tso;
 	      }
 	  }
@@ -272,7 +272,7 @@ awaitEvent(rtsBool wait)
 	  if (prev == NULL)
 	      blocked_queue_hd = blocked_queue_tl = END_TSO_QUEUE;
 	  else {
-	      prev->link = END_TSO_QUEUE;
+	      prev->_link = END_TSO_QUEUE;
 	      blocked_queue_tl = prev;
 	  }
       }

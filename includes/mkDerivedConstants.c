@@ -275,7 +275,7 @@ main(int argc, char *argv[])
     closure_field(StgArrWords, words);
     closure_payload(StgArrWords, payload);
 
-    closure_field(StgTSO, link);
+    closure_field(StgTSO, _link);
     closure_field(StgTSO, global_link);
     closure_field(StgTSO, what_next);
     closure_field(StgTSO, why_blocked);

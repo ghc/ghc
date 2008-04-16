@@ -88,7 +88,7 @@ isAlive(StgClosure *p)
 
     case TSO:
       if (((StgTSO *)q)->what_next == ThreadRelocated) {
-	p = (StgClosure *)((StgTSO *)q)->link;
+	p = (StgClosure *)((StgTSO *)q)->_link;
 	continue;
       } 
       return NULL;

@@ -327,18 +327,7 @@ scavenge_block (bdescr *bd)
     case TSO:
     { 
 	StgTSO *tso = (StgTSO *)p;
-
-	gct->eager_promotion = rtsFalse;
-	scavengeTSO(tso);
-	gct->eager_promotion = saved_eager_promotion;
-
-	if (gct->failed_to_evac) {
-	    tso->flags |= TSO_DIRTY;
-	} else {
-	    tso->flags &= ~TSO_DIRTY;
-	}
-
-	gct->failed_to_evac = rtsTrue; // always on the mutable list
+        scavengeTSO(tso);
 	p += tso_sizeW(tso);
 	break;
     }

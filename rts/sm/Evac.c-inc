@@ -330,7 +330,7 @@ loop:
 	  info = get_itbl(q);
 	  if (info->type == TSO && 
 	      ((StgTSO *)q)->what_next == ThreadRelocated) {
-	      q = (StgClosure *)((StgTSO *)q)->link;
+	      q = (StgClosure *)((StgTSO *)q)->_link;
               *p = q;
 	      goto loop;
 	  }
@@ -537,7 +537,7 @@ loop:
       /* Deal with redirected TSOs (a TSO that's had its stack enlarged).
        */
       if (tso->what_next == ThreadRelocated) {
-	q = (StgClosure *)tso->link;
+	q = (StgClosure *)tso->_link;
 	*p = q;
 	goto loop;
       }

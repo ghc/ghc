@@ -652,7 +652,7 @@ checkTSO(StgTSO *tso)
     StgPtr stack_end = stack + stack_size;
 
     if (tso->what_next == ThreadRelocated) {
-      checkTSO(tso->link);
+      checkTSO(tso->_link);
       return;
     }
 

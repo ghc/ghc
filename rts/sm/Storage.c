@@ -822,6 +822,35 @@ dirty_MUT_VAR(StgRegTable *reg, StgClosure *p)
     }
 }
 
+// Setting a TSO's link field with a write barrier.
+// It is *not* necessary to call this function when
+//    * setting the link field to END_TSO_QUEUE
+//    * putting a TSO on the blackhole_queue
+//    * setting the link field of the currently running TSO, as it
+//      will already be dirty.
+void
+setTSOLink (Capability *cap, StgTSO *tso, StgTSO *target)
+{
+    bdescr *bd;
+    if ((tso->flags & (TSO_DIRTY|TSO_LINK_DIRTY)) == 0) {
+        tso->flags |= TSO_LINK_DIRTY;
+	bd = Bdescr((StgPtr)tso);
+	if (bd->gen_no > 0) recordMutableCap((StgClosure*)tso,cap,bd->gen_no);
+    }
+    tso->_link = target;
+}
+
+void
+dirty_TSO (Capability *cap, StgTSO *tso)
+{
+    bdescr *bd;
+    if ((tso->flags & TSO_DIRTY) == 0) {
+        tso->flags |= TSO_DIRTY;
+	bd = Bdescr((StgPtr)tso);
+	if (bd->gen_no > 0) recordMutableCap((StgClosure*)tso,cap,bd->gen_no);
+    }
+}
+
 /*
    This is the write barrier for MVARs.  An MVAR_CLEAN objects is not
    on the mutable list; a MVAR_DIRTY is.  When written to, a

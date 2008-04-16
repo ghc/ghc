@@ -30,7 +30,7 @@ static void raiseAsync (Capability *cap,
 
 static void removeFromQueues(Capability *cap, StgTSO *tso);
 
-static void blockedThrowTo (StgTSO *source, StgTSO *target);
+static void blockedThrowTo (Capability *cap, StgTSO *source, StgTSO *target);
 
 static void performBlockedException (Capability *cap, 
 				     StgTSO *source, StgTSO *target);
@@ -152,7 +152,7 @@ throwTo (Capability *cap,	// the Capability we hold
 
     // follow ThreadRelocated links in the target first
     while (target->what_next == ThreadRelocated) {
-	target = target->link;
+	target = target->_link;
 	// No, it might be a WHITEHOLE:
 	// ASSERT(get_itbl(target)->type == TSO);
     }
@@ -261,10 +261,10 @@ check_target:
 	    // just moved this TSO.
 	    if (target->what_next == ThreadRelocated) {
 		unlockTSO(target);
-		target = target->link;
+		target = target->_link;
 		goto retry;
 	    }
-	    blockedThrowTo(source,target);
+	    blockedThrowTo(cap,source,target);
 	    *out = target;
 	    return THROWTO_BLOCKED;
 	}
@@ -294,7 +294,7 @@ check_target:
 	info = lockClosure((StgClosure *)mvar);
 
 	if (target->what_next == ThreadRelocated) {
-	    target = target->link;
+	    target = target->_link;
 	    unlockClosure((StgClosure *)mvar,info);
 	    goto retry;
 	}
@@ -309,12 +309,12 @@ check_target:
 	if ((target->flags & TSO_BLOCKEX) &&
 	    ((target->flags & TSO_INTERRUPTIBLE) == 0)) {
 	    lockClosure((StgClosure *)target);
-	    blockedThrowTo(source,target);
+	    blockedThrowTo(cap,source,target);
 	    unlockClosure((StgClosure *)mvar, info);
 	    *out = target;
 	    return THROWTO_BLOCKED; // caller releases TSO
 	} else {
-	    removeThreadFromMVarQueue(mvar, target);
+	    removeThreadFromMVarQueue(cap, mvar, target);
 	    raiseAsync(cap, target, exception, rtsFalse, NULL);
 	    unblockOne(cap, target);
 	    unlockClosure((StgClosure *)mvar, info);
@@ -333,12 +333,12 @@ check_target:
 
 	if (target->flags & TSO_BLOCKEX) {
 	    lockTSO(target);
-	    blockedThrowTo(source,target);
+	    blockedThrowTo(cap,source,target);
 	    RELEASE_LOCK(&sched_mutex);
 	    *out = target;
 	    return THROWTO_BLOCKED; // caller releases TSO
 	} else {
-	    removeThreadFromQueue(&blackhole_queue, target);
+	    removeThreadFromQueue(cap, &blackhole_queue, target);
 	    raiseAsync(cap, target, exception, rtsFalse, NULL);
 	    unblockOne(cap, target);
 	    RELEASE_LOCK(&sched_mutex);
@@ -373,12 +373,12 @@ check_target:
 	    goto retry;
 	}
 	if (target->what_next == ThreadRelocated) {
-	    target = target->link;
+	    target = target->_link;
 	    unlockTSO(target2);
 	    goto retry;
 	}
 	if (target2->what_next == ThreadRelocated) {
-	    target->block_info.tso = target2->link;
+	    target->block_info.tso = target2->_link;
 	    unlockTSO(target2);
 	    goto retry;
 	}
@@ -397,12 +397,12 @@ check_target:
 	if ((target->flags & TSO_BLOCKEX) &&
 	    ((target->flags & TSO_INTERRUPTIBLE) == 0)) {
 	    lockTSO(target);
-	    blockedThrowTo(source,target);
+	    blockedThrowTo(cap,source,target);
 	    unlockTSO(target2);
 	    *out = target;
 	    return THROWTO_BLOCKED;
 	} else {
-	    removeThreadFromQueue(&target2->blocked_exceptions, target);
+	    removeThreadFromQueue(cap, &target2->blocked_exceptions, target);
 	    raiseAsync(cap, target, exception, rtsFalse, NULL);
 	    unblockOne(cap, target);
 	    unlockTSO(target2);
@@ -419,7 +419,7 @@ check_target:
 	}
 	if ((target->flags & TSO_BLOCKEX) &&
 	    ((target->flags & TSO_INTERRUPTIBLE) == 0)) {
-	    blockedThrowTo(source,target);
+	    blockedThrowTo(cap,source,target);
 	    *out = target;
 	    return THROWTO_BLOCKED;
 	} else {
@@ -436,7 +436,7 @@ check_target:
 	// thread is blocking exceptions, and block on its
 	// blocked_exception queue.
 	lockTSO(target);
-	blockedThrowTo(source,target);
+	blockedThrowTo(cap,source,target);
 	*out = target;
 	return THROWTO_BLOCKED;
 
@@ -449,7 +449,7 @@ check_target:
 #endif
 	if ((target->flags & TSO_BLOCKEX) &&
 	    ((target->flags & TSO_INTERRUPTIBLE) == 0)) {
-	    blockedThrowTo(source,target);
+	    blockedThrowTo(cap,source,target);
 	    return THROWTO_BLOCKED;
 	} else {
 	    removeFromQueues(cap,target);
@@ -469,12 +469,12 @@ check_target:
 // complex to achieve as there's no single lock on a TSO; see
 // throwTo()).
 static void
-blockedThrowTo (StgTSO *source, StgTSO *target)
+blockedThrowTo (Capability *cap, StgTSO *source, StgTSO *target)
 {
     debugTrace(DEBUG_sched, "throwTo: blocking on thread %lu", (unsigned long)target->id);
-    source->link = target->blocked_exceptions;
+    setTSOLink(cap, source, target->blocked_exceptions);
     target->blocked_exceptions = source;
-    dirtyTSO(target); // we modified the blocked_exceptions queue
+    dirty_TSO(cap,target); // we modified the blocked_exceptions queue
     
     source->block_info.tso = target;
     write_barrier(); // throwTo_exception *must* be visible if BlockedOnException is.
@@ -748,11 +748,11 @@ removeFromQueues(Capability *cap, StgTSO *tso)
     goto done;
 
   case BlockedOnMVar:
-      removeThreadFromMVarQueue((StgMVar *)tso->block_info.closure, tso);
+      removeThreadFromMVarQueue(cap, (StgMVar *)tso->block_info.closure, tso);
       goto done;
 
   case BlockedOnBlackHole:
-      removeThreadFromQueue(&blackhole_queue, tso);
+      removeThreadFromQueue(cap, &blackhole_queue, tso);
       goto done;
 
   case BlockedOnException:
@@ -765,10 +765,10 @@ removeFromQueues(Capability *cap, StgTSO *tso)
       // ASSERT(get_itbl(target)->type == TSO);
 
       while (target->what_next == ThreadRelocated) {
-	  target = target->link;
+	  target = target->_link;
       }
       
-      removeThreadFromQueue(&target->blocked_exceptions, tso);
+      removeThreadFromQueue(cap, &target->blocked_exceptions, tso);
       goto done;
     }
 
@@ -778,7 +778,7 @@ removeFromQueues(Capability *cap, StgTSO *tso)
 #if defined(mingw32_HOST_OS)
   case BlockedOnDoProc:
 #endif
-      removeThreadFromDeQueue(&blocked_queue_hd, &blocked_queue_tl, tso);
+      removeThreadFromDeQueue(cap, &blocked_queue_hd, &blocked_queue_tl, tso);
 #if defined(mingw32_HOST_OS)
       /* (Cooperatively) signal that the worker thread should abort
        * the request.
@@ -788,7 +788,7 @@ removeFromQueues(Capability *cap, StgTSO *tso)
       goto done;
 
   case BlockedOnDelay:
-	removeThreadFromQueue(&sleeping_queue, tso);
+        removeThreadFromQueue(cap, &sleeping_queue, tso);
 	goto done;
 #endif
 
@@ -797,7 +797,7 @@ removeFromQueues(Capability *cap, StgTSO *tso)
   }
 
  done:
-  tso->link = END_TSO_QUEUE;
+  tso->_link = END_TSO_QUEUE; // no write barrier reqd
   tso->why_blocked = NotBlocked;
   tso->block_info.closure = NULL;
   appendToRunQueue(cap,tso);
@@ -871,7 +871,7 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
 #endif
 
     // mark it dirty; we're about to change its stack.
-    dirtyTSO(tso);
+    dirty_TSO(cap, tso);
 
     sp = tso->sp;
     
