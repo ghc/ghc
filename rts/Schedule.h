@@ -154,6 +154,7 @@ void interruptStgRts (void);
 nat  run_queue_len (void);
 
 void resurrectThreads (StgTSO *);
+void performPendingThrowTos (StgTSO *);
 
 void printAllThreads(void);
 

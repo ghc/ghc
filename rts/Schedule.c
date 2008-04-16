@@ -200,7 +200,7 @@ static rtsBool scheduleGetRemoteWork(rtsBool *receivedFinish);
 #if defined(PAR) || defined(GRAN)
 static void scheduleGranParReport(void);
 #endif
-static void schedulePostRunThread(void);
+static void schedulePostRunThread(StgTSO *t);
 static rtsBool scheduleHandleHeapOverflow( Capability *cap, StgTSO *t );
 static void scheduleHandleStackOverflow( Capability *cap, Task *task, 
 					 StgTSO *t);
@@ -676,7 +676,7 @@ run_thread:
     CCCS = CCS_SYSTEM;
 #endif
     
-    schedulePostRunThread();
+    schedulePostRunThread(t);
 
     t = threadStackUnderflow(task,t);
 
@@ -1450,8 +1450,36 @@ JB: TODO: investigate wether state change field could be nuked
  * ------------------------------------------------------------------------- */
 
 static void
-schedulePostRunThread(void)
+schedulePostRunThread (StgTSO *t)
 {
+    // We have to be able to catch transactions that are in an
+    // infinite loop as a result of seeing an inconsistent view of
+    // memory, e.g. 
+    //
+    //   atomically $ do
+    //       [a,b] <- mapM readTVar [ta,tb]
+    //       when (a == b) loop
+    //
+    // and a is never equal to b given a consistent view of memory.
+    //
+    if (t -> trec != NO_TREC && t -> why_blocked == NotBlocked) {
+        if (!stmValidateNestOfTransactions (t -> trec)) {
+            debugTrace(DEBUG_sched | DEBUG_stm,
+                       "trec %p found wasting its time", t);
+            
+            // strip the stack back to the
+            // ATOMICALLY_FRAME, aborting the (nested)
+            // transaction, and saving the stack of any
+            // partially-evaluated thunks on the heap.
+            throwToSingleThreaded_(&capabilities[0], t, 
+                                   NULL, rtsTrue, NULL);
+            
+#ifdef REG_R1
+            ASSERT(get_itbl((StgClosure *)t->sp)->type == ATOMICALLY_FRAME);
+#endif
+        }
+    }
+
 #if defined(PAR)
     /* HACK 675: if the last thread didn't yield, make sure to print a 
        SCHEDULE event to the log file when StgRunning the next thread, even
@@ -2004,54 +2032,6 @@ scheduleDoGC (Capability *cap, Task *task USED_IF_THREADS, rtsBool force_major)
     waiting_for_gc = rtsFalse;
 #endif
 
-    /* Kick any transactions which are invalid back to their
-     * atomically frames.  When next scheduled they will try to
-     * commit, this commit will fail and they will retry.
-     */
-    { 
-	StgTSO *next;
-        nat s;
-
-        for (s = 0; s < total_steps; s++) {
-          for (t = all_steps[s].threads; t != END_TSO_QUEUE; t = next) {
-	    if (t->what_next == ThreadRelocated) {
-		next = t->_link;
-	    } else {
-		next = t->global_link;
-		
-		// This is a good place to check for blocked
-		// exceptions.  It might be the case that a thread is
-		// blocked on delivering an exception to a thread that
-		// is also blocked - we try to ensure that this
-		// doesn't happen in throwTo(), but it's too hard (or
-		// impossible) to close all the race holes, so we
-		// accept that some might get through and deal with
-		// them here.  A GC will always happen at some point,
-		// even if the system is otherwise deadlocked.
-		maybePerformBlockedException (&capabilities[0], t);
-
-		if (t -> trec != NO_TREC && t -> why_blocked == NotBlocked) {
-		    if (!stmValidateNestOfTransactions (t -> trec)) {
-			debugTrace(DEBUG_sched | DEBUG_stm,
-				   "trec %p found wasting its time", t);
-			
-			// strip the stack back to the
-			// ATOMICALLY_FRAME, aborting the (nested)
-			// transaction, and saving the stack of any
-			// partially-evaluated thunks on the heap.
-			throwToSingleThreaded_(&capabilities[0], t, 
-					       NULL, rtsTrue, NULL);
-			
-#ifdef REG_R1
-			ASSERT(get_itbl((StgClosure *)t->sp)->type == ATOMICALLY_FRAME);
-#endif
-		    }
-		}
-	    }
-          }
-	}
-    }
-    
     // so this happens periodically:
     if (cap) scheduleCheckBlackHoles(cap);
     
@@ -3186,5 +3166,39 @@ resurrectThreads (StgTSO *threads)
 	default:
 	    barf("resurrectThreads: thread blocked in a strange way");
 	}
+    }
+}
+
+/* -----------------------------------------------------------------------------
+   performPendingThrowTos is called after garbage collection, and
+   passed a list of threads that were found to have pending throwTos
+   (tso->blocked_exceptions was not empty), and were blocked.
+   Normally this doesn't happen, because we would deliver the
+   exception directly if the target thread is blocked, but there are
+   small windows where it might occur on a multiprocessor (see
+   throwTo()).
+
+   NB. we must be holding all the capabilities at this point, just
+   like resurrectThreads().
+   -------------------------------------------------------------------------- */
+
+void
+performPendingThrowTos (StgTSO *threads)
+{
+    StgTSO *tso, *next;
+    Capability *cap;
+    step *step;
+
+    for (tso = threads; tso != END_TSO_QUEUE; tso = next) {
+	next = tso->global_link;
+
+        step = Bdescr((P_)tso)->step;
+	tso->global_link = step->threads;
+	step->threads = tso;
+
+	debugTrace(DEBUG_sched, "performing blocked throwTo to thread %lu", (unsigned long)tso->id);
+	
+	cap = tso->cap;
+        maybePerformBlockedException(cap, tso);
     }
 }

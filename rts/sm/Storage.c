@@ -846,11 +846,11 @@ void
 dirty_TSO (Capability *cap, StgTSO *tso)
 {
     bdescr *bd;
-    if ((tso->flags & TSO_DIRTY) == 0) {
-        tso->flags |= TSO_DIRTY;
+    if ((tso->flags & (TSO_DIRTY|TSO_LINK_DIRTY)) == 0) {
 	bd = Bdescr((StgPtr)tso);
 	if (bd->gen_no > 0) recordMutableCap((StgClosure*)tso,cap,bd->gen_no);
     }
+    tso->flags |= TSO_DIRTY;
 }
 
 /*

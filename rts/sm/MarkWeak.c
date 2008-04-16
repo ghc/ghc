@@ -74,9 +74,11 @@ static WeakStage weak_stage;
  */
 StgWeak *old_weak_ptr_list; // also pending finaliser list
 
-/* List of all threads during GC
- */
+// List of threads found to be unreachable
 StgTSO *resurrected_threads;
+
+// List of blocked threads found to have pending throwTos
+StgTSO *exception_threads;
 
 void
 initWeakForGC(void)
@@ -85,6 +87,7 @@ initWeakForGC(void)
     weak_ptr_list = NULL;
     weak_stage = WeakPtrs;
     resurrected_threads = END_TSO_QUEUE;
+    exception_threads = END_TSO_QUEUE;
 }
 
 rtsBool 
@@ -225,14 +228,29 @@ traverseWeakPtrList(void)
                           next = t->global_link;
                       } 
                       else {
-                          step *new_step;
-                          // alive: move this thread onto the correct
-                          // threads list.
+                          // alive
                           next = t->global_link;
-                          new_step = Bdescr((P_)t)->step;
-                          t->global_link = new_step->threads;
-                          new_step->threads  = t;
                           *prev = next;
+
+                          // This is a good place to check for blocked
+                          // exceptions.  It might be the case that a thread is
+                          // blocked on delivering an exception to a thread that
+                          // is also blocked - we try to ensure that this
+                          // doesn't happen in throwTo(), but it's too hard (or
+                          // impossible) to close all the race holes, so we
+                          // accept that some might get through and deal with
+                          // them here.  A GC will always happen at some point,
+                          // even if the system is otherwise deadlocked.
+                          if (t->blocked_exceptions != END_TSO_QUEUE) {
+                              t->global_link = exception_threads;
+                              exception_threads = t;
+                          } else {
+                              // move this thread onto the correct threads list.
+                              step *new_step;
+                              new_step = Bdescr((P_)t)->step;
+                              t->global_link = new_step->threads;
+                              new_step->threads  = t;
+                          }
                       }
                   }
               }
