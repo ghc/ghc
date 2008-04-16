@@ -11,12 +11,12 @@
  *
  * ---------------------------------------------------------------------------*/
 
-// This file is #included into Scav.c, twice: firstly with MINOR_GC
+// This file is #included into Scav.c, twice: firstly with PARALLEL_GC
 // defined, the second time without.
 
-#ifdef MINOR_GC
-#define scavenge_block(a,b) scavenge_block0(a,b)
-#define evacuate(a) evacuate0(a)
+#ifndef PARALLEL_GC
+#define scavenge_block(a,b) scavenge_block1(a,b)
+#define evacuate(a) evacuate1(a)
 #else
 #undef scavenge_block
 #undef evacuate
@@ -91,18 +91,14 @@ scavenge_block (bdescr *bd, StgPtr scan)
     }
 
     case FUN_2_0:
-#ifndef MINOR_GC
 	scavenge_fun_srt(info);
-#endif
 	evacuate(&((StgClosure *)p)->payload[1]);
 	evacuate(&((StgClosure *)p)->payload[0]);
 	p += sizeofW(StgHeader) + 2;
 	break;
 
     case THUNK_2_0:
-#ifndef MINOR_GC
 	scavenge_thunk_srt(info);
-#endif
 	evacuate(&((StgThunk *)p)->payload[1]);
 	evacuate(&((StgThunk *)p)->payload[0]);
 	p += sizeofW(StgThunk) + 2;
@@ -115,82 +111,62 @@ scavenge_block (bdescr *bd, StgPtr scan)
 	break;
 	
     case THUNK_1_0:
-#ifndef MINOR_GC
 	scavenge_thunk_srt(info);
-#endif
 	evacuate(&((StgThunk *)p)->payload[0]);
 	p += sizeofW(StgThunk) + 1;
 	break;
 	
     case FUN_1_0:
-#ifndef MINOR_GC
 	scavenge_fun_srt(info);
-#endif
     case CONSTR_1_0:
 	evacuate(&((StgClosure *)p)->payload[0]);
 	p += sizeofW(StgHeader) + 1;
 	break;
 	
     case THUNK_0_1:
-#ifndef MINOR_GC
 	scavenge_thunk_srt(info);
-#endif
 	p += sizeofW(StgThunk) + 1;
 	break;
 	
     case FUN_0_1:
-#ifndef MINOR_GC
 	scavenge_fun_srt(info);
-#endif
     case CONSTR_0_1:
 	p += sizeofW(StgHeader) + 1;
 	break;
 	
     case THUNK_0_2:
-#ifndef MINOR_GC
 	scavenge_thunk_srt(info);
-#endif
 	p += sizeofW(StgThunk) + 2;
 	break;
 	
     case FUN_0_2:
-#ifndef MINOR_GC
 	scavenge_fun_srt(info);
-#endif
     case CONSTR_0_2:
 	p += sizeofW(StgHeader) + 2;
 	break;
 	
     case THUNK_1_1:
-#ifndef MINOR_GC
 	scavenge_thunk_srt(info);
-#endif
 	evacuate(&((StgThunk *)p)->payload[0]);
 	p += sizeofW(StgThunk) + 2;
 	break;
 
     case FUN_1_1:
-#ifndef MINOR_GC
 	scavenge_fun_srt(info);
-#endif
     case CONSTR_1_1:
 	evacuate(&((StgClosure *)p)->payload[0]);
 	p += sizeofW(StgHeader) + 2;
 	break;
 	
     case FUN:
-#ifndef MINOR_GC
 	scavenge_fun_srt(info);
-#endif
 	goto gen_obj;
 
     case THUNK:
     {
 	StgPtr end;
 
-#ifndef MINOR_GC
 	scavenge_thunk_srt(info);
-#endif
 	end = (P_)((StgThunk *)p)->payload + info->layout.payload.ptrs;
 	for (p = (P_)((StgThunk *)p)->payload; p < end; p++) {
 	    evacuate((StgClosure **)p);
@@ -473,3 +449,6 @@ scavenge_block (bdescr *bd, StgPtr scan)
   debugTrace(DEBUG_gc, "   scavenged %ld bytes",
              (unsigned long)((bd->free - scan) * sizeof(W_)));
 }
+
+#undef scavenge_block
+#undef evacuate

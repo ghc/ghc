@@ -10,11 +10,11 @@
 // non-minor, parallel, GC.  This file contains the code for both,
 // controllled by the CPP symbol MINOR_GC.
 
-#ifdef MINOR_GC
-#define copy(a,b,c,d) copy0(a,b,c,d)
-#define copy_tag(a,b,c,d,e) copy_tag0(a,b,c,d,e)
-#define copyPart(a,b,c,d,e) copyPart0(a,b,c,d,e)
-#define evacuate(a) evacuate0(a)
+#ifndef PARALLEL_GC
+#define copy(a,b,c,d) copy1(a,b,c,d)
+#define copy_tag(a,b,c,d,e) copy_tag1(a,b,c,d,e)
+#define copyPart(a,b,c,d,e) copyPart1(a,b,c,d,e)
+#define evacuate(a) evacuate1(a)
 #else
 #undef copy
 #undef copy_tag
@@ -29,7 +29,7 @@ copy_tag(StgClosure **p, StgClosure *src, nat size, step *stp, StgWord tag)
     nat i;
     StgWord info;
 
-#if !defined(MINOR_GC) && defined(THREADED_RTS)
+#if defined(PARALLEL_GC) && defined(THREADED_RTS)
 spin:
 	info = xchg((StgPtr)&src->header.info, (W_)&stg_WHITEHOLE_info);
 	// so..  what is it?
@@ -68,7 +68,7 @@ spin:
 //  }
 
     ((StgEvacuated*)from)->evacuee = (StgClosure *)tagged_to;
-#if !defined(MINOR_GC) && defined(THREADED_RTS)
+#if defined(PARALLEL_GC) && defined(THREADED_RTS)
     write_barrier();
     ((StgEvacuated*)from)->header.info = &stg_EVACUATED_info;
 #endif
@@ -92,7 +92,7 @@ copyPart(StgClosure **p, StgClosure *src, nat size_to_reserve, nat size_to_copy,
     nat i;
     StgWord info;
     
-#if !defined(MINOR_GC) && defined(THREADED_RTS)
+#if defined(PARALLEL_GC) && defined(THREADED_RTS)
 spin:
 	info = xchg((StgPtr)&src->header.info, (W_)&stg_WHITEHOLE_info);
 	if (info == (W_)&stg_WHITEHOLE_info) {
@@ -123,7 +123,7 @@ spin:
     }
     
     ((StgEvacuated*)from)->evacuee = (StgClosure *)to;
-#if !defined(MINOR_GC) && defined(THREADED_RTS)
+#if defined(PARALLEL_GC) && defined(THREADED_RTS)
     write_barrier();
     ((StgEvacuated*)from)->header.info = &stg_EVACUATED_info;
 #endif
@@ -208,9 +208,6 @@ loop:
 
   if (!HEAP_ALLOCED(q)) {
 
-#ifdef MINOR_GC
-      return;
-#endif
       if (!major_gc) return;
 
       info = get_itbl(q);

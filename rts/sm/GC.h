@@ -172,6 +172,7 @@ typedef struct gc_thread_ {
 
 extern nat N;
 extern rtsBool major_gc;
+extern nat n_gc_threads;
 
 extern gc_thread **gc_threads;
 register gc_thread *gct __asm__("%rbx");

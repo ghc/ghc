@@ -1383,9 +1383,9 @@ scavenge_large (step_workspace *ws)
    Scavenge a block
    ------------------------------------------------------------------------- */
 
-#define MINOR_GC
+#define PARALLEL_GC
 #include "Scav.c-inc"
-#undef MINOR_GC
+#undef PARALLEL_GC
 #include "Scav.c-inc"
 
 /* ----------------------------------------------------------------------------
@@ -1421,8 +1421,8 @@ scavenge_find_global_work (void)
             // to scavenge the whole thing and then push it on
             // our scavd list.  This saves pushing out the
             // scan_bd block, which might be partial.
-            if (N == 0) {
-                scavenge_block0(bd, bd->start);
+            if (n_gc_threads == 1) {
+                scavenge_block1(bd, bd->start);
             } else {
                 scavenge_block(bd, bd->start);
             }
@@ -1480,8 +1480,8 @@ scavenge_find_local_work (void)
         // scavenge everything up to the free pointer.
         if (ws->scan != NULL && ws->scan < ws->scan_bd->free)
         {
-            if (N == 0) {
-                scavenge_block0(ws->scan_bd, ws->scan);
+            if (n_gc_threads == 1) {
+                scavenge_block1(ws->scan_bd, ws->scan);
             } else {
                 scavenge_block(ws->scan_bd, ws->scan);
             }

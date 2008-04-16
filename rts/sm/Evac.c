@@ -75,10 +75,10 @@ alloc_for_copy (nat size, step *stp)
    The evacuate() code
    -------------------------------------------------------------------------- */
 
-#define MINOR_GC
+#define PARALLEL_GC
 #include "Evac.c-inc"
 
-#undef MINOR_GC
+#undef PARALLEL_GC
 #include "Evac.c-inc"
 
 /* -----------------------------------------------------------------------------
