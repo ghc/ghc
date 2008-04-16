@@ -124,9 +124,9 @@ todo_block_full (nat size, step_workspace *ws)
     if (ws->step->todos != NULL || 
         (bd->free - bd->u.scan < WORK_UNIT_WORDS / 2)) {
         if (bd->free + size < bd->start + BLOCK_SIZE_W) {
-            debugTrace(DEBUG_gc, "increasing limit for %p", bd->start);
             ws->todo_lim = stg_min(bd->start + BLOCK_SIZE_W,
                                    ws->todo_lim + stg_max(WORK_UNIT_WORDS,size));
+            debugTrace(DEBUG_gc, "increasing limit for %p to %p", bd->start, ws->todo_lim);
             return ws->todo_free;
         }
     }
@@ -213,7 +213,7 @@ alloc_todo_block (step_workspace *ws, nat size)
                             bd->free + stg_max(WORK_UNIT_WORDS,size));
 
     debugTrace(DEBUG_gc, "alloc new todo block %p for step %d", 
-               bd->start, ws->step->abs_no);
+               bd->free, ws->step->abs_no);
 
     return ws->todo_free;
 }
