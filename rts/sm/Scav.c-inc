@@ -47,11 +47,10 @@ scavenge_block (bdescr *bd)
   rtsBool saved_eager_promotion;
   step_workspace *ws;
 
-  p = bd->u.scan;
-  
   debugTrace(DEBUG_gc, "scavenging block %p (gen %d, step %d) @ %p",
 	     bd->start, bd->gen_no, bd->step->no, p);
 
+  gct->scan_bd = bd;
   gct->evac_step = bd->step;
   saved_evac_step = gct->evac_step;
   saved_eager_promotion = gct->eager_promotion;
@@ -59,6 +58,8 @@ scavenge_block (bdescr *bd)
 
   ws = &gct->steps[bd->step->abs_no];
 
+  p = bd->u.scan;
+  
   // we might be evacuating into the very object that we're
   // scavenging, so we have to check the real bd->free pointer each
   // time around the loop.
@@ -454,6 +455,14 @@ scavenge_block (bdescr *bd)
   // update stats: this is a block that has been scavenged
   gct->scanned += bd->free - bd->u.scan;
   bd->u.scan = bd->free;
+
+  if (bd != ws->todo_bd) {
+      // we're not going to evac any more objects into
+      // this block, so push it now.
+      push_scanned_block(bd, ws);
+  }
+
+  gct->scan_bd = NULL;
 }
 
 #undef scavenge_block

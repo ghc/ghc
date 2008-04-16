@@ -76,9 +76,6 @@ typedef struct step_workspace_ {
     step * step;		// the step for this workspace 
     struct gc_thread_ * gct;    // the gc_thread that contains this workspace
 
-    // block that is currently being scanned
-    bdescr *     scan_bd;
-
     // where objects to be scavenged go
     bdescr *     todo_bd;
     StgPtr       todo_free;            // free ptr for todo_bd
@@ -127,6 +124,9 @@ typedef struct gc_thread_ {
     StgClosure* scavenged_static_objects;   // static objects scavenged so far
 
     lnat gc_count;                 // number of GCs this thread has done
+
+    // block that is currently being scanned
+    bdescr *     scan_bd;
 
     // --------------------
     // evacuate flags

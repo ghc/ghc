@@ -115,16 +115,13 @@ todo_block_full (nat size, step_workspace *ws)
     ASSERT(bd->link == NULL);
     ASSERT(bd->step == ws->step);
 
-    gct->copied += ws->todo_free - bd->free;
-    bd->free = ws->todo_free;
-
     // If the global list is not empty, or there's not much work in
     // this block to push, and there's enough room in
     // this block to evacuate the current object, then just increase
     // the limit.
     if (ws->step->todos != NULL || 
-        (bd->free - bd->u.scan < WORK_UNIT_WORDS / 2)) {
-        if (bd->free + size < bd->start + BLOCK_SIZE_W) {
+        (ws->todo_free - bd->u.scan < WORK_UNIT_WORDS / 2)) {
+        if (ws->todo_free + size < bd->start + BLOCK_SIZE_W) {
             ws->todo_lim = stg_min(bd->start + BLOCK_SIZE_W,
                                    ws->todo_lim + stg_max(WORK_UNIT_WORDS,size));
             debugTrace(DEBUG_gc, "increasing limit for %p to %p", bd->start, ws->todo_lim);
@@ -132,11 +129,14 @@ todo_block_full (nat size, step_workspace *ws)
         }
     }
     
+    gct->copied += ws->todo_free - bd->free;
+    bd->free = ws->todo_free;
+
     ASSERT(bd->u.scan >= bd->start && bd->u.scan <= bd->free);
 
     // If this block is not the scan block, we want to push it out and
     // make room for a new todo block.
-    if (bd != ws->scan_bd)
+    if (bd != gct->scan_bd)
     {
         // If this block does not have enough space to allocate the
         // current object, but it also doesn't have any work to push, then 

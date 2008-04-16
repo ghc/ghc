@@ -418,13 +418,13 @@ GarbageCollect ( rtsBool force_major_gc )
           // not step 0
           for (s = 1; s < total_steps; s++) {
               ws = &thr->steps[s];
-              // Not true?
-              // ASSERT( ws->scan_bd == ws->todo_bd );
-              ASSERT( ws->scan_bd ? ws->scan_bd->u.scan == ws->scan_bd->free : 1 );
 
               // Push the final block
-              if (ws->scan_bd) { push_scanned_block(ws->scan_bd, ws); }
-              
+              if (ws->todo_bd) { 
+                  push_scanned_block(ws->todo_bd, ws);
+              }
+
+              ASSERT(gct->scan_bd == NULL);
               ASSERT(countBlocks(ws->scavd_list) == ws->n_scavd_blocks);
               
               prev = ws->part_list;
@@ -1011,8 +1011,6 @@ alloc_gc_thread (int n)
         ASSERT(s == ws->step->abs_no);
         ws->gct = t;
         
-        ws->scan_bd = NULL;
-
         ws->todo_bd = NULL;
         ws->buffer_todo_bd = NULL;
         
@@ -1341,8 +1339,6 @@ init_collected_gen (nat g, nat n_threads)
 
 	    ws = &gc_threads[t]->steps[g * RtsFlags.GcFlags.steps + s];
 
-	    ws->scan_bd = NULL;
-
 	    ws->todo_large_objects = NULL;
 
             ws->part_list = NULL;
@@ -1405,15 +1401,11 @@ init_uncollected_gen (nat g, nat threads)
 		stp->n_blocks -= 1;
                 stp->n_words -= ws->todo_bd->free - ws->todo_bd->start;
 		ws->todo_bd->link = NULL;
-
-		// this block is also the scan block; we must scan
-		// from the current end point.
-		ws->scan_bd = ws->todo_bd;
-		ws->scan_bd->u.scan = ws->scan_bd->free;
+		// we must scan from the current end point.
+		ws->todo_bd->u.scan = ws->todo_bd->free;
 	    } 
 	    else
 	    {
-		ws->scan_bd = NULL;
 		ws->todo_bd = NULL;
 		alloc_todo_block(ws,0);
 	    }
@@ -1442,6 +1434,7 @@ init_gc_thread (gc_thread *t)
 {
     t->static_objects = END_OF_STATIC_LIST;
     t->scavenged_static_objects = END_OF_STATIC_LIST;
+    t->scan_bd = NULL;
     t->evac_step = 0;
     t->failed_to_evac = rtsFalse;
     t->eager_promotion = rtsTrue;
