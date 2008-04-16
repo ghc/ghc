@@ -108,7 +108,8 @@ data CoreLit = Lint Integer
 -- with Nothing.
 
 type Mname = Maybe AnMname
-type AnMname = (Pname, [Id], Id)
+newtype AnMname = M (Pname, [Id], Id)
+  deriving (Eq, Ord)
 type Pname = Id
 type Var = Id
 type Tvar = Id
@@ -179,8 +180,8 @@ isPrimVar _ = False
 primMname = mkPrimMname "Prim"
 errMname  = mkBaseMname "Err"
 mkBaseMname,mkPrimMname :: Id -> AnMname
-mkBaseMname mn = (basePkg, ghcPrefix, mn)
-mkPrimMname mn = (primPkg, ghcPrefix, mn)
+mkBaseMname mn = M (basePkg, ghcPrefix, mn)
+mkPrimMname mn = M (primPkg, ghcPrefix, mn)
 basePkg = "base"
 mainPkg = "main"
 primPkg = zEncodeString "ghc-prim"
@@ -189,8 +190,8 @@ mainPrefix = []
 baseMname = mkBaseMname "Base"
 boolMname = mkPrimMname "Bool"
 mainVar = qual mainMname "main"
-mainMname = (mainPkg, mainPrefix, "Main")
-wrapperMainMname = Just (mainPkg, mainPrefix, "ZCMain")
+mainMname = M (mainPkg, mainPrefix, "Main")
+wrapperMainMname = Just $ M (mainPkg, mainPrefix, "ZCMain")
 
 tcArrow :: Qual Tcon
 tcArrow = (Just primMname, "ZLzmzgZR")

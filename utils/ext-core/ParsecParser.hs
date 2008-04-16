@@ -1,6 +1,6 @@
-{-# OPTIONS -Wall -Werror -fno-warn-missing-signatures #-}
+{-# OPTIONS -Wall -fno-warn-missing-signatures #-}
 
-module ParsecParser where
+module ParsecParser (parseCore) where
 
 import Core
 import ParseGlue
@@ -8,9 +8,9 @@ import Check
 import PrimCoercions
 
 import Text.ParserCombinators.Parsec
---import Text.ParserCombinators.Parsec.Expr
 import qualified Text.ParserCombinators.Parsec.Token as P
 import Text.ParserCombinators.Parsec.Language
+import Data.Char
 import Data.Ratio
 
 parseCore :: FilePath -> IO (Either ParseError Module)
@@ -32,7 +32,7 @@ coreModuleName = do
    pkgName      <- corePackageName
    char ':'
    (modHierarchy,baseName) <- coreHierModuleNames
-   return (pkgName, modHierarchy, baseName)
+   return $ M (pkgName, modHierarchy, baseName)
 
 corePackageName :: Parser Pname
 -- Package names can be lowercase or uppercase!
@@ -92,11 +92,24 @@ coreQualifiedCon = coreQualifiedGen upperName
  
 coreQualifiedName = coreQualifiedGen identifier
 
-coreQualifiedGen p = do
-  maybeMname <- coreMaybeMname
-  theId      <- p
-  return (maybeMname, theId)
+coreQualifiedGen :: Parser String -> Parser (Mname, Id) 
+coreQualifiedGen p = (try (do
+  packageIdOrVarName <- corePackageName
+  maybeRest <- optionMaybe (char ':' >> coreHierModuleNames)
+  case maybeRest of
+               -- unqualified id, so backtrack
+    Nothing -> pzero
+               -- qualified name, so look for the id part
+    Just (modHierarchy, baseName) -> do
+               char '.'
+               theId <- p
+               return
+                 (Just $ M (packageIdOrVarName, modHierarchy, baseName),
+                  theId))) <|> 
+   -- unqualified name
+   (p >>= (\ res -> return (Nothing, res)))
 
+{-
 coreMaybeMname = optionMaybe coreMname
 
 coreRequiredQualifiedName = do
@@ -105,12 +118,11 @@ coreRequiredQualifiedName = do
   return (Just mname, theId)
 
 coreMname = do
--- Notice the '^' goes here:
--- it's part of a variable *occurrence*, not a module name.
   char '^'
   nm <- try coreModuleName
   symbol "."
   return nm
+-}
 
 coreAxiom :: Parser Axiom
 coreAxiom = parens (do
@@ -236,20 +248,11 @@ data CoercionTy = TransC | SymC | UnsafeC | LeftC | RightC
 
 symCo, transCo, unsafeCo :: Parser CoercionTy
 -- Would be better not to wire these in quite this way. Sigh
-symCo    = string "^ghczmprim:GHCziPrim.sym"      >> return SymC
-transCo  = string "^ghczmprim:GHCziPrim.trans"    >> return TransC 
-unsafeCo = string "^ghczmprim:GHCziPrim.CoUnsafe" >> return UnsafeC
-leftCo   = string "^ghczmprim:GHCziPrim.left"     >> return LeftC
-rightCo  = string "^ghczmprim:GHCziPrim.right"    >> return RightC
-
-coreFunTy :: Parser Ty
-coreFunTy = do
-  argTy <- coreBty
-  whiteSpace
-  symbol "->"
-  whiteSpace
-  resTy <- coreType
-  return $ tArrow argTy resTy
+symCo    = string "ghczmprim:GHCziPrim.sym"      >> return SymC
+transCo  = string "ghczmprim:GHCziPrim.trans"    >> return TransC 
+unsafeCo = string "ghczmprim:GHCziPrim.CoUnsafe" >> return UnsafeC
+leftCo   = string "ghczmprim:GHCziPrim.left"     >> return LeftC
+rightCo  = string "ghczmprim:GHCziPrim.right"    >> return RightC
 
 coreForallTy :: Parser Ty
 coreForallTy = do
@@ -316,7 +319,9 @@ coreRecVdef = do
 coreNonrecVdef = coreVdef >>= (return . Nonrec)
 
 coreVdef = do
-  (vdefLhs, vdefTy) <- topVbind
+  (vdefLhs, vdefTy) <- try topVbind <|> (do
+                        (v, ty) <- lambdaBind
+                        return (unqual v, ty))
   whiteSpace
   symbol "="
   whiteSpace
@@ -328,8 +333,7 @@ coreAtomicExp = do
 -- For stupid reasons, the whiteSpace is necessary.
 -- Without it, (pt coreAppExp "w ^a:B.C ") doesn't work.
   whiteSpace
-  res <- choice [ try coreVar,
-                    coreDcon,
+  res <- choice [try coreDconOrVar,
                     try coreLit,
                     parens coreFullExp ]
   whiteSpace
@@ -356,9 +360,13 @@ coreAppExp = do
     return $ foldl (\ op ->
                      either (App op) (Appt op)) oper args
 
-coreVar = ((try coreQualifiedName) <|> (identifier >>= (return . unqual)))
-             >>= (return . Var)
-coreDcon = coreQualifiedCon >>= (return . Dcon)
+coreDconOrVar = do
+  theThing <- coreQualifiedGen (try upperName <|> identifier)
+  return $ case theThing of
+    -- note that data constructors must be qualified
+    (Just _, idItself) | isUpper (head idItself)
+      -> Dcon theThing
+    _ -> Var theThing
 
 coreLit :: Parser Exp
 coreLit = parens (coreLiteral >>= (return . Lit))
@@ -434,7 +442,9 @@ coreVbind = parens (lambdaBind >>= (return . Vb))
 
 coreAtTbind = (symbol "@") >> coreTbind
 
+topVbind :: Parser (Qual Var, Ty)
 topVbind   = aCoreVbind coreQualifiedName
+lambdaBind :: Parser (Var, Ty)
 lambdaBind = aCoreVbind identifier
 
 aCoreVbind idP =  do
@@ -506,7 +516,6 @@ extCore = P.makeTokenParser extCoreDef
 
 parens          = P.parens extCore    
 braces          = P.braces extCore    
-semiSep1        = P.semiSep1 extCore    
 -- newlines are allowed anywhere
 whiteSpace      = P.whiteSpace extCore <|> (newline >> return ())
 symbol          = P.symbol extCore    
@@ -537,6 +546,7 @@ extCoreDef = LanguageDef {
     , caseSensitive   = True
     }       
 
+{-
 -- Stuff to help with testing in ghci.
 pTest (Left a) = error (show a)
 pTest (Right t) = print t
@@ -561,3 +571,4 @@ andThenSym a b = do
   p <- a
   symbol b
   return p
+-}

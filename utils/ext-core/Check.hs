@@ -8,6 +8,8 @@ module Check(
 
 import Maybe
 import Control.Monad.Reader
+-- just for printing warnings
+import System.IO.Unsafe
 
 import Core
 import Printer()
@@ -301,7 +303,7 @@ checkType mn menv tdefs tvenv t = case runReaderT (do
 checkExp :: (Tcenv,Tsenv,Tvenv,Cenv,Venv,Venv) -> Exp -> CheckResult Ty
 checkExp (tcenv,tsenv,tvenv,cenv,e_venv,l_venv) = ch
       where 
-	ch e0 = 
+	ch e0 =
 	  case e0 of
 	    Var qv -> 
 	      qlookupM venv_ e_venv l_venv qv
@@ -485,7 +487,21 @@ checkTy es@(tcenv,tvenv) t = ch t
                         ("Arity mismatch in coercion app: " ++ show t)
                      let (tvs, tks) = unzip tbs
                      argKs <- mapM (checkTy es) tys
-                     require (all (uncurry eqKind) (zip tks argKs))
+                     let kPairs = zip argKs tks
+                     let kindsOk = all (uncurry eqKind) kPairs
+                     if not kindsOk &&
+                        all (uncurry subKindOf) kPairs
+                       -- GHC occasionally generates code like:
+                       -- :Co:TTypeable2 (->)
+                       -- where in this case, :Co:TTypeable2 expects an
+                       -- argument of kind (*->(*->*)) and (->) has kind
+                       -- (?->(?->*)). In general, I don't think it's
+                       -- sound to apply an arbitrary coercion to an
+                       -- argument that's a subkind of what it expects.
+                       then warn $ "Applying coercion " ++ show tc ++
+                               " to arguments of kind " ++ show argKs
+                               ++ " when it expects: " ++ show tks
+                       else require kindsOk
                         ("Kind mismatch in coercion app: " ++ show tks 
                          ++ " and " ++ show argKs ++ " t = " ++ show t)
                      return $ Keq (substl tvs tys from) (substl tvs tys to)
@@ -696,3 +712,5 @@ reportError :: Show a => a -> String -> b
 reportError e s = error $ ("Core type error: checkExpr failed with "
                    ++ s ++ " and " ++ show e)
 
+warn :: String -> CheckResult ()
+warn s = (unsafePerformIO $ putStrLn ("WARNING: " ++ s)) `seq` return ()

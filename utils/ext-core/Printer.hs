@@ -48,6 +48,9 @@ instance Show KindOrCoercion where
      shows (text "<C" <+> hsep (map ptbind tbs) <+>
               parens (pkind (Keq t1 t2)) <> text ">") 
 
+instance Show AnMname where
+  showsPrec _ mn = shows (panmname mn)
+
 indent = nest 2
 
 -- seems like this is asking for a type class...
@@ -84,11 +87,9 @@ pqname (m,v) = pmname m <> pname v
 -- be sure to print the '.' here so we don't print out
 -- ".foo" for unqualified foo...
 pmname Nothing = empty
--- Notice that we print the "^" here; this is so that
--- "%module foo" doesn't get printed as "%module ^foo"
-pmname (Just m) = char '^' <> panmname m <> char '.'
+pmname (Just m) = panmname m <> char '.'
 
-panmname (pkgName, parents, name) =
+panmname (M (pkgName, parents, name)) =
   let parentStrs = map pname parents in
          pname pkgName <> char ':' <>
          -- This is to be sure to not print out:
@@ -124,16 +125,6 @@ peqkind (t1, t2) = parens (parens (pty t1) <+> text ":=:" <+> parens (pty t2))
 
 paty (Tvar n) = pname n
 paty (Tcon c) = pqname c
-paty (TransCoercion t1 t2) = 
-    parens (sep ([pqname transCoercion, pbty t1, pbty t2]))
-paty (SymCoercion t) = 
-    parens (sep [pqname symCoercion, paty t])
-paty (UnsafeCoercion t1 t2) = 
-    parens (sep [pqname unsafeCoercion, pbty t1, pbty t2])
-paty (LeftCoercion t) = 
-    parens (pqname leftCoercion <+> paty t)
-paty (RightCoercion t) = 
-    parens (pqname rightCoercion <+> paty t)
 paty t = parens (pty t)
 
 pbty (Tapp(Tapp(Tcon tc) t1) t2) | tc == tcArrow = parens(fsep [pbty t1, text "->",pty t2])
@@ -142,6 +133,16 @@ pbty t = paty t
 
 pty (Tapp(Tapp(Tcon tc) t1) t2) | tc == tcArrow = fsep [pbty t1, text "->",pty t2]
 pty (Tforall tb t) = text "%forall" <+> pforall [tb] t
+pty (TransCoercion t1 t2) = 
+    (sep ([pqname transCoercion, paty t1, paty t2]))
+pty (SymCoercion t) = 
+    (sep [pqname symCoercion, paty t])
+pty (UnsafeCoercion t1 t2) = 
+    (sep [pqname unsafeCoercion, paty t1, paty t2])
+pty (LeftCoercion t) = 
+    (pqname leftCoercion <+> paty t)
+pty (RightCoercion t) = 
+    (pqname rightCoercion <+> paty t)
 pty t = pbty t
 
 pappty (Tapp t1 t2) ts = pappty t1 (t2:ts)

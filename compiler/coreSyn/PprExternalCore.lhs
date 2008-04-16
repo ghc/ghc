@@ -82,10 +82,7 @@ pname id = text (zEncodeString id)
 
 pqname :: Qual Id -> Doc
 pqname ("",id) = pname id
--- We print out a special character before a qualified name so as to
--- disambiguate unqualified names like "m" from qualified names like
--- "m:Foo.Bar.y". This makes the ext-core parser easier.
-pqname (m,id)  = char '^' <> text m <> char '.' <> pname id
+pqname (m,id)  = text m <> char '.' <> pname id
 
 ptbind, pattbind :: Tbind -> Doc
 ptbind (t,Klifted) = pname t
