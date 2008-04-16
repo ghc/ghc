@@ -420,7 +420,12 @@ GarbageCollect ( rtsBool force_major_gc )
 	  thr = gc_threads[t];
 
           // not step 0
-          for (s = 1; s < total_steps; s++) {
+          if (RtsFlags.GcFlags.generations == 1) {
+              s = 0;
+          } else {
+              s = 1;
+          }
+          for (; s < total_steps; s++) {
               ws = &thr->steps[s];
 
               // Push the final block
@@ -470,19 +475,6 @@ GarbageCollect ( rtsBool force_major_gc )
               ASSERT(countOccupied(ws->step->blocks) == ws->step->n_words);
 	  }
       }
-  }
-
-  // Two-space collector: swap the semi-spaces around.
-  // Currently: g0s0->old_blocks is the old nursery
-  //            g0s0->blocks is to-space from this GC
-  // We want these the other way around.
-  if (RtsFlags.GcFlags.generations == 1) {
-      bdescr *nursery_blocks = g0s0->old_blocks;
-      nat n_nursery_blocks = g0s0->n_old_blocks;
-      g0s0->old_blocks = g0s0->blocks;
-      g0s0->n_old_blocks = g0s0->n_blocks;
-      g0s0->blocks = nursery_blocks;
-      g0s0->n_blocks = n_nursery_blocks;
   }
 
   /* run through all the generations/steps and tidy up 
@@ -1439,7 +1431,7 @@ resize_nursery (void)
 	 * performance we get from 3L bytes, reducing to the same
 	 * performance at 2L bytes.
 	 */
-	blocks = g0s0->n_old_blocks;
+	blocks = g0s0->n_blocks;
 	
 	if ( RtsFlags.GcFlags.maxHeapSize != 0 &&
 	     blocks * RtsFlags.GcFlags.oldGenFactor * 2 > 
