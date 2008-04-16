@@ -41,7 +41,6 @@ isAlive(StgClosure *p)
     q = UNTAG_CLOSURE(p);
 
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(q));
-    info = get_itbl(q);
 
     // ignore static closures 
     //
@@ -71,6 +70,7 @@ isAlive(StgClosure *p)
 	return p;
     }
 
+    info = get_itbl(q);
     switch (info->type) {
 
     case IND:
