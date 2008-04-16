@@ -781,13 +781,17 @@ checkThreadQsSanity (rtsBool check_TSO_too)
 void
 checkGlobalTSOList (rtsBool checkTSOs)
 {
-  extern  StgTSO *all_threads;
   StgTSO *tso;
-  for (tso=all_threads; tso != END_TSO_QUEUE; tso = tso->global_link) {
-      ASSERT(LOOKS_LIKE_CLOSURE_PTR(tso));
-      ASSERT(get_itbl(tso)->type == TSO);
-      if (checkTSOs)
-	  checkTSO(tso);
+  nat s;
+
+  for (s = 0; s < total_steps; s++) {
+      for (tso=all_steps[s].threads; tso != END_TSO_QUEUE; 
+           tso = tso->global_link) {
+          ASSERT(LOOKS_LIKE_CLOSURE_PTR(tso));
+          ASSERT(get_itbl(tso)->type == TSO);
+          if (checkTSOs)
+              checkTSO(tso);
+      }
   }
 }
 

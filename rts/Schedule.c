@@ -118,12 +118,6 @@ StgTSO *blackhole_queue = NULL;
  */
 rtsBool blackholes_need_checking = rtsFalse;
 
-/* Linked list of all threads.
- * Used for detecting garbage collected threads.
- * LOCK: sched_mutex+capability, or all capabilities
- */
-StgTSO *all_threads = NULL;
-
 /* flag set by signal handler to precipitate a context switch
  * LOCK: none (just an advisory flag)
  */
@@ -1898,7 +1892,7 @@ scheduleHandleThreadFinished (Capability *cap STG_UNUSED, Task *task, StgTSO *t)
 	      // point where we can deal with this.  Leaving it on the run
 	      // queue also ensures that the garbage collector knows about
 	      // this thread and its return value (it gets dropped from the
-	      // all_threads list so there's no other way to find it).
+	      // step->threads list so there's no other way to find it).
 	      appendToRunQueue(cap,t);
 	      return rtsFalse;
 #else
@@ -2016,8 +2010,10 @@ scheduleDoGC (Capability *cap, Task *task USED_IF_THREADS, rtsBool force_major)
      */
     { 
 	StgTSO *next;
+        nat s;
 
-	for (t = all_threads; t != END_TSO_QUEUE; t = next) {
+        for (s = 0; s < total_steps; s++) {
+          for (t = all_steps[s].threads; t != END_TSO_QUEUE; t = next) {
 	    if (t->what_next == ThreadRelocated) {
 		next = t->_link;
 	    } else {
@@ -2052,6 +2048,7 @@ scheduleDoGC (Capability *cap, Task *task USED_IF_THREADS, rtsBool force_major)
 		    }
 		}
 	    }
+          }
 	}
     }
     
@@ -2133,6 +2130,7 @@ forkProcess(HsStablePtr *entry
     pid_t pid;
     StgTSO* t,*next;
     Capability *cap;
+    nat s;
     
 #if defined(THREADED_RTS)
     if (RtsFlags.ParFlags.nNodes > 1) {
@@ -2180,7 +2178,8 @@ forkProcess(HsStablePtr *entry
 	// all Tasks, because they correspond to OS threads that are
 	// now gone.
 
-	for (t = all_threads; t != END_TSO_QUEUE; t = next) {
+        for (s = 0; s < total_steps; s++) {
+          for (t = all_steps[s].threads; t != END_TSO_QUEUE; t = next) {
 	    if (t->what_next == ThreadRelocated) {
 		next = t->_link;
 	    } else {
@@ -2190,6 +2189,7 @@ forkProcess(HsStablePtr *entry
 		// threads may be evaluating thunks that we need later.
 		deleteThread_(cap,t);
 	    }
+          }
 	}
 	
 	// Empty the run queue.  It seems tempting to let all the
@@ -2203,9 +2203,11 @@ forkProcess(HsStablePtr *entry
 	// don't exist now:
 	cap->suspended_ccalling_tasks = NULL;
 
-	// Empty the all_threads list.  Otherwise, the garbage
+	// Empty the threads lists.  Otherwise, the garbage
 	// collector may attempt to resurrect some of these threads.
-	all_threads = END_TSO_QUEUE;
+        for (s = 0; s < total_steps; s++) {
+            all_steps[s].threads = END_TSO_QUEUE;
+        }
 
 	// Wipe the task list, except the current Task.
 	ACQUIRE_LOCK(&sched_mutex);
@@ -2255,14 +2257,18 @@ deleteAllThreads ( Capability *cap )
     // NOTE: only safe to call if we own all capabilities.
 
     StgTSO* t, *next;
+    nat s;
+
     debugTrace(DEBUG_sched,"deleting all threads");
-    for (t = all_threads; t != END_TSO_QUEUE; t = next) {
+    for (s = 0; s < total_steps; s++) {
+      for (t = all_steps[s].threads; t != END_TSO_QUEUE; t = next) {
 	if (t->what_next == ThreadRelocated) {
 	    next = t->_link;
 	} else {
 	    next = t->global_link;
 	    deleteThread(cap,t);
 	}
+      }
     }      
 
     // The run queue now contains a bunch of ThreadKilled threads.  We
@@ -2572,7 +2578,6 @@ initScheduler(void)
 #endif
 
   blackhole_queue   = END_TSO_QUEUE;
-  all_threads       = END_TSO_QUEUE;
 
   context_switch = 0;
   sched_state    = SCHED_RUNNING;
@@ -3143,11 +3148,15 @@ resurrectThreads (StgTSO *threads)
 {
     StgTSO *tso, *next;
     Capability *cap;
+    step *step;
 
     for (tso = threads; tso != END_TSO_QUEUE; tso = next) {
 	next = tso->global_link;
-	tso->global_link = all_threads;
-	all_threads = tso;
+
+        step = Bdescr((P_)tso)->step;
+	tso->global_link = step->threads;
+	step->threads = tso;
+
 	debugTrace(DEBUG_sched, "resurrecting thread %lu", (unsigned long)tso->id);
 	
 	// Wake up the thread on the Capability it was last on

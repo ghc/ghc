@@ -133,11 +133,6 @@ extern  StgTSO *RTS_VAR(sleeping_queue);
 #endif
 #endif
 
-/* Linked list of all threads.
- * Locks required  : sched_mutex
- */
-extern  StgTSO *RTS_VAR(all_threads);
-
 /* Set to rtsTrue if there are threads on the blackhole_queue, and
  * it is possible that one or more of them may be available to run.
  * This flag is set to rtsFalse after we've checked the queue, and

@@ -101,6 +101,8 @@ initStep (step *stp, int g, int s)
     initSpinLock(&stp->sync_todo);
     initSpinLock(&stp->sync_large_objects);
 #endif
+    stp->threads = END_TSO_QUEUE;
+    stp->old_threads = END_TSO_QUEUE;
 }
 
 void

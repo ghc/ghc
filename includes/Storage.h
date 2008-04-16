@@ -69,6 +69,8 @@ typedef struct step_ {
     bdescr *             large_objects;	 // large objects (doubly linked)
     unsigned int         n_large_blocks; // no. of blocks used by large objs
 
+    StgTSO *             threads;       // threads in this step
+                                        // linked via global_link
 
     // ------------------------------------
     // Fields below are used during GC only
@@ -100,6 +102,7 @@ typedef struct step_ {
 
     bdescr *     bitmap;  		// bitmap for compacting collection
 
+    StgTSO *     old_threads;
 
 } step;
 

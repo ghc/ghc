@@ -77,7 +77,6 @@ StgWeak *old_weak_ptr_list; // also pending finaliser list
 /* List of all threads during GC
  */
 StgTSO *resurrected_threads;
-static StgTSO *old_all_threads;
 
 void
 initWeakForGC(void)
@@ -85,12 +84,6 @@ initWeakForGC(void)
     old_weak_ptr_list = weak_ptr_list;
     weak_ptr_list = NULL;
     weak_stage = WeakPtrs;
-
-    /* The all_threads list is like the weak_ptr_list.  
-     * See traverseWeakPtrList() for the details.
-     */
-    old_all_threads = all_threads;
-    all_threads = END_TSO_QUEUE;
     resurrected_threads = END_TSO_QUEUE;
 }
 
@@ -185,53 +178,67 @@ traverseWeakPtrList(void)
        * the weak ptr list.  If we discover any threads that are about to
        * become garbage, we wake them up and administer an exception.
        */
-      {
-	  StgTSO *t, *tmp, *next, **prev;
+     {
+          StgTSO *t, *tmp, *next, **prev;
+          nat g, s;
+          step *stp;
 	  
-	  prev = &old_all_threads;
-	  for (t = old_all_threads; t != END_TSO_QUEUE; t = next) {
+          // Traverse thread lists for generations we collected...
+          for (g = 0; g <= N; g++) {
+              for (s = 0; s < generations[g].n_steps; s++) {
+                  stp = &generations[g].steps[s];
+
+                  prev = &stp->old_threads;
+
+                  for (t = stp->old_threads; t != END_TSO_QUEUE; t = next) {
 	      
-	      tmp = (StgTSO *)isAlive((StgClosure *)t);
+                      tmp = (StgTSO *)isAlive((StgClosure *)t);
 	      
-	      if (tmp != NULL) {
-		  t = tmp;
-	      }
+                      if (tmp != NULL) {
+                          t = tmp;
+                      }
+
+                      ASSERT(get_itbl(t)->type == TSO);
+                      switch (t->what_next) {
+                      case ThreadRelocated:
+                          next = t->_link;
+                          *prev = next;
+                          continue;
+                      case ThreadKilled:
+                      case ThreadComplete:
+                          // finshed or died.  The thread might still
+                          // be alive, but we don't keep it on the
+                          // all_threads list.  Don't forget to
+                          // stub out its global_link field.
+                          next = t->global_link;
+                          t->global_link = END_TSO_QUEUE;
+                          *prev = next;
+                          continue;
+                      default:
+                          ;
+                      }
 	      
-	      ASSERT(get_itbl(t)->type == TSO);
-	      switch (t->what_next) {
-	      case ThreadRelocated:
-		  next = t->_link;
-		  *prev = next;
-		  continue;
-	      case ThreadKilled:
-	      case ThreadComplete:
-		  // finshed or died.  The thread might still be alive, but we
-		  // don't keep it on the all_threads list.  Don't forget to
-		  // stub out its global_link field.
-		  next = t->global_link;
-		  t->global_link = END_TSO_QUEUE;
-		  *prev = next;
-		  continue;
-	      default:
-		  ;
-	      }
-	      
-	      if (tmp == NULL) {
-		  // not alive (yet): leave this thread on the
-		  // old_all_threads list.
-		  prev = &(t->global_link);
-		  next = t->global_link;
-	      } 
-	      else {
-		  // alive: move this thread onto the all_threads list.
-		  next = t->global_link;
-		  t->global_link = all_threads;
-		  all_threads  = t;
-		  *prev = next;
-	      }
-	  }
+                      if (tmp == NULL) {
+                          // not alive (yet): leave this thread on the
+                          // old_all_threads list.
+                          prev = &(t->global_link);
+                          next = t->global_link;
+                      } 
+                      else {
+                          step *new_step;
+                          // alive: move this thread onto the correct
+                          // threads list.
+                          next = t->global_link;
+                          new_step = Bdescr((P_)t)->step;
+                          t->global_link = new_step->threads;
+                          new_step->threads  = t;
+                          *prev = next;
+                      }
+                  }
+              }
+          }
       }
-      
+
       /* If we evacuated any threads, we need to go back to the scavenger.
        */
       if (flag) return rtsTrue;
@@ -239,14 +246,23 @@ traverseWeakPtrList(void)
       /* And resurrect any threads which were about to become garbage.
        */
       {
+          nat g, s;
+          step *stp;
 	  StgTSO *t, *tmp, *next;
-	  for (t = old_all_threads; t != END_TSO_QUEUE; t = next) {
-	      next = t->global_link;
-	      tmp = t;
-	      evacuate((StgClosure **)&tmp);
-	      tmp->global_link = resurrected_threads;
-	      resurrected_threads = tmp;
-	  }
+
+          for (g = 0; g <= N; g++) {
+              for (s = 0; s < generations[g].n_steps; s++) {
+                  stp = &generations[g].steps[s];
+
+                  for (t = stp->old_threads; t != END_TSO_QUEUE; t = next) {
+                      next = t->global_link;
+                      tmp = t;
+                      evacuate((StgClosure **)&tmp);
+                      tmp->global_link = resurrected_threads;
+                      resurrected_threads = tmp;
+                  }
+              }
+          }
       }
       
       /* Finally, we can update the blackhole_queue.  This queue

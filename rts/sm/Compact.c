@@ -986,7 +986,9 @@ compact(StgClosure *static_objects)
     }
 
     // the global thread list
-    thread((void *)&all_threads);
+    for (s = 0; s < total_steps; s++) {
+        thread((void *)&all_steps[s].threads);
+    }
 
     // any threads resurrected during this GC
     thread((void *)&resurrected_threads);

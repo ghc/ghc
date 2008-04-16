@@ -145,8 +145,8 @@ createThread(Capability *cap, nat size)
      */
     ACQUIRE_LOCK(&sched_mutex);
     tso->id = next_thread_id++;  // while we have the mutex
-    tso->global_link = all_threads;
-    all_threads = tso;
+    tso->global_link = g0s0->threads;
+    g0s0->threads = tso;
     RELEASE_LOCK(&sched_mutex);
     
 #if defined(DIST)
@@ -771,7 +771,7 @@ void
 printAllThreads(void)
 {
   StgTSO *t, *next;
-  nat i;
+  nat i, s;
   Capability *cap;
 
 # if defined(GRAN)
@@ -799,7 +799,8 @@ printAllThreads(void)
   }
 
   debugBelch("other threads:\n");
-  for (t = all_threads; t != END_TSO_QUEUE; t = next) {
+  for (s = 0; s < total_steps; s++) {
+    for (t = all_steps[s].threads; t != END_TSO_QUEUE; t = next) {
       if (t->why_blocked != NotBlocked) {
 	  printThreadStatus(t);
       }
@@ -808,6 +809,7 @@ printAllThreads(void)
       } else {
 	  next = t->global_link;
       }
+    }
   }
 }
 

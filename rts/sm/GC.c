@@ -1078,14 +1078,19 @@ init_collected_gen (nat g, nat n_threads)
 
     for (s = 0; s < generations[g].n_steps; s++) {
 
+	stp = &generations[g].steps[s];
+	ASSERT(stp->gen_no == g);
+
+        // we'll construct a new list of threads in this step
+        // during GC, throw away the current list.
+        stp->old_threads = stp->threads;
+        stp->threads = END_TSO_QUEUE;
+
 	// generation 0, step 0 doesn't need to-space 
 	if (g == 0 && s == 0 && RtsFlags.GcFlags.generations > 1) { 
 	    continue; 
 	}
 	
-	stp = &generations[g].steps[s];
-	ASSERT(stp->gen_no == g);
-
 	// deprecate the existing blocks
 	stp->old_blocks   = stp->blocks;
 	stp->n_old_blocks = stp->n_blocks;
