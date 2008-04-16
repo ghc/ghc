@@ -121,7 +121,7 @@ extern generation * RTS_VAR(g0);
 extern step * RTS_VAR(g0s0);
 extern generation * RTS_VAR(oldest_gen);
 extern step * RTS_VAR(all_steps);
-extern nat total_steps;
+extern nat RTS_VAR(total_steps);
 
 /* -----------------------------------------------------------------------------
    Initialisation / De-initialisation
