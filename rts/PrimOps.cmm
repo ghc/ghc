@@ -1551,7 +1551,7 @@ takeMVarzh_fast
 #endif
         
     if (info == stg_MVAR_CLEAN_info) {
-        foreign "C" dirty_MVAR(BaseReg "ptr", mvar "ptr");
+        foreign "C" dirty_MVAR(BaseReg "ptr", mvar "ptr") [];
     }
 
     /* If the MVar is empty, put ourselves on its blocking queue,
@@ -1561,8 +1561,9 @@ takeMVarzh_fast
 	if (StgMVar_head(mvar) == stg_END_TSO_QUEUE_closure) {
 	    StgMVar_head(mvar) = CurrentTSO;
 	} else {
-            foreign "C" setTSOLink(MyCapability() "ptr", StgMVar_tail(mvar),
-                                   CurrentTSO);
+            foreign "C" setTSOLink(MyCapability() "ptr", 
+                                   StgMVar_tail(mvar) "ptr",
+                                   CurrentTSO) [];
 	}
 	StgTSO__link(CurrentTSO)       = stg_END_TSO_QUEUE_closure;
 	StgTSO_why_blocked(CurrentTSO) = BlockedOnMVar::I16;
@@ -1587,7 +1588,7 @@ takeMVarzh_fast
       PerformPut(tso,StgMVar_value(mvar));
 
       if (StgTSO_flags(tso) & TSO_DIRTY == 0) {
-          foreign "C" dirty_TSO(MyCapability(), tso);
+          foreign "C" dirty_TSO(MyCapability() "ptr", tso "ptr") [];
       }
 
       ("ptr" tso) = foreign "C" unblockOne_(MyCapability() "ptr", 
@@ -1663,7 +1664,7 @@ tryTakeMVarzh_fast
 	tso = StgMVar_head(mvar);
 	PerformPut(tso,StgMVar_value(mvar));
         if (StgTSO_flags(tso) & TSO_DIRTY == 0) {
-            foreign "C" dirty_TSO(MyCapability(), tso);
+            foreign "C" dirty_TSO(MyCapability() "ptr", tso "ptr") [];
         }
 
         ("ptr" tso) = foreign "C" unblockOne_(MyCapability() "ptr", 
@@ -1715,8 +1716,9 @@ putMVarzh_fast
 	if (StgMVar_head(mvar) == stg_END_TSO_QUEUE_closure) {
 	    StgMVar_head(mvar) = CurrentTSO;
 	} else {
-            foreign "C" setTSOLink(MyCapability() "ptr", StgMVar_tail(mvar),
-                                   CurrentTSO);
+            foreign "C" setTSOLink(MyCapability() "ptr", 
+                                   StgMVar_tail(mvar) "ptr",
+                                   CurrentTSO) [];
 	}
 	StgTSO__link(CurrentTSO)       = stg_END_TSO_QUEUE_closure;
 	StgTSO_why_blocked(CurrentTSO) = BlockedOnMVar::I16;
@@ -1736,7 +1738,7 @@ putMVarzh_fast
 	tso = StgMVar_head(mvar);
 	PerformTake(tso, R2);
         if (StgTSO_flags(tso) & TSO_DIRTY == 0) {
-            foreign "C" dirty_TSO(MyCapability(), tso);
+            foreign "C" dirty_TSO(MyCapability() "ptr", tso "ptr") [];
         }
       
         ("ptr" tso) = foreign "C" unblockOne_(MyCapability() "ptr", 
@@ -1805,7 +1807,7 @@ tryPutMVarzh_fast
 	tso = StgMVar_head(mvar);
 	PerformTake(tso, R2);
         if (StgTSO_flags(tso) & TSO_DIRTY == 0) {
-            foreign "C" dirty_TSO(MyCapability(), tso);
+            foreign "C" dirty_TSO(MyCapability() "ptr", tso "ptr") [];
         }
       
         ("ptr" tso) = foreign "C" unblockOne_(MyCapability() "ptr", 
@@ -2030,7 +2032,7 @@ for2:
     if (W_[blocked_queue_hd] == END_TSO_QUEUE) {	\
       W_[blocked_queue_hd] = tso;			\
     } else {						\
-      foreign "C" setTSOLink(MyCapability() "ptr", W_[blocked_queue_tl], tso); \
+      foreign "C" setTSOLink(MyCapability() "ptr", W_[blocked_queue_tl] "ptr", tso) []; \
     }							\
     W_[blocked_queue_tl] = tso;
 
@@ -2134,7 +2136,7 @@ while:
     if (prev == NULL) {
 	W_[sleeping_queue] = CurrentTSO;
     } else {
-        foreign "C" setTSOLink(MyCapability() "ptr", prev, CurrentTSO) [];
+        foreign "C" setTSOLink(MyCapability() "ptr", prev "ptr", CurrentTSO) [];
     }
     jump stg_block_noregs;
 #endif
