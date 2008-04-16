@@ -118,7 +118,7 @@ nat mutlist_MUTVARS,
 
 /* Thread-local data for each GC thread
  */
-gc_thread *gc_threads = NULL;
+gc_thread **gc_threads = NULL;
 // gc_thread *gct = NULL;  // this thread's gct TODO: make thread-local
 
 // Number of threads running in *this* GC.  Affects how many
@@ -297,7 +297,7 @@ GarbageCollect ( rtsBool force_major_gc )
 
   // Initialise all our gc_thread structures
   for (t = 0; t < n_gc_threads; t++) {
-      init_gc_thread(&gc_threads[t]);
+      init_gc_thread(gc_threads[t]);
   }
 
   // the main thread is running: this prevents any other threads from
@@ -309,7 +309,7 @@ GarbageCollect ( rtsBool force_major_gc )
   copied = 0;
 
   // this is the main thread
-  gct = &gc_threads[0];
+  gct = gc_threads[0];
 
   /* -----------------------------------------------------------------------
    * follow all the roots that we know about:
@@ -421,32 +421,29 @@ GarbageCollect ( rtsBool force_major_gc )
       bdescr *prev;
 
       for (t = 0; t < n_gc_threads; t++) {
-	  thr = &gc_threads[t];
+	  thr = gc_threads[t];
 
-	  for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-	      for (s = 0; s < generations[g].n_steps; s++) {
-		  ws = &thr->steps[g][s];
-		  if (g==0 && s==0) continue;
+          // not step 0
+          for (s = 1; s < total_steps; s++) {
+              ws = &thr->steps[s];
+              // Not true?
+              // ASSERT( ws->scan_bd == ws->todo_bd );
+              ASSERT( ws->scan_bd ? ws->scan == ws->scan_bd->free : 1 );
 
-		  // Not true?
-		  // ASSERT( ws->scan_bd == ws->todo_bd );
-		  ASSERT( ws->scan_bd ? ws->scan == ws->scan_bd->free : 1 );
-
-		  // Push the final block
-		  if (ws->scan_bd) { push_scan_block(ws->scan_bd, ws); }
-
-		  ASSERT(countBlocks(ws->scavd_list) == ws->n_scavd_blocks);
-
-		  prev = ws->scavd_list;
-		  for (bd = ws->scavd_list; bd != NULL; bd = bd->link) {
-		      bd->flags &= ~BF_EVACUATED;	 // now from-space 
-		      prev = bd;
-		  }
-		  prev->link = ws->stp->blocks;
-		  ws->stp->blocks = ws->scavd_list;
-		  ws->stp->n_blocks += ws->n_scavd_blocks;
-		  ASSERT(countBlocks(ws->stp->blocks) == ws->stp->n_blocks);
-	      }
+              // Push the final block
+              if (ws->scan_bd) { push_scan_block(ws->scan_bd, ws); }
+              
+              ASSERT(countBlocks(ws->scavd_list) == ws->n_scavd_blocks);
+              
+              prev = ws->scavd_list;
+              for (bd = ws->scavd_list; bd != NULL; bd = bd->link) {
+                  bd->flags &= ~BF_EVACUATED;	 // now from-space 
+                  prev = bd;
+              }
+              prev->link = ws->stp->blocks;
+              ws->stp->blocks = ws->scavd_list;
+              ws->stp->n_blocks += ws->n_scavd_blocks;
+              ASSERT(countBlocks(ws->stp->blocks) == ws->stp->n_blocks);
 	  }
       }
   }
@@ -920,11 +917,15 @@ initialise_N (rtsBool force_major_gc)
    Initialise the gc_thread structures.
    -------------------------------------------------------------------------- */
 
-static void
-alloc_gc_thread (gc_thread *t, int n)
+static gc_thread *
+alloc_gc_thread (int n)
 {
-    nat g, s;
+    nat s;
     step_workspace *ws;
+    gc_thread *t;
+
+    t = stgMallocBytes(sizeof(gc_thread) + total_steps * sizeof(step_workspace),
+                       "alloc_gc_thread");
 
 #ifdef THREADED_RTS
     t->id = 0;
@@ -944,32 +945,24 @@ alloc_gc_thread (gc_thread *t, int n)
     t->papi_events = -1;
 #endif
 
-    t->steps = stgMallocBytes(RtsFlags.GcFlags.generations * 
-				sizeof(step_workspace *), 
-				"initialise_gc_thread");
-
-    for (g = 0; g < RtsFlags.GcFlags.generations; g++)
+    for (s = 0; s < total_steps; s++)
     {
-        t->steps[g] = stgMallocBytes(generations[g].n_steps * 
-				       sizeof(step_workspace),
-				       "initialise_gc_thread/2");
+        ws = &t->steps[s];
+        ws->stp = &all_steps[s];
+        ASSERT(s == ws->stp->abs_no);
+        ws->gct = t;
+        
+        ws->scan_bd = NULL;
+        ws->scan = NULL;
 
-        for (s = 0; s < generations[g].n_steps; s++)
-        {
-            ws = &t->steps[g][s];
-            ws->stp = &generations[g].steps[s];
-            ws->gct = t;
-
-            ws->scan_bd = NULL;
-            ws->scan = NULL;
-
-	    ws->todo_bd = NULL;
-            ws->buffer_todo_bd = NULL;
-
-	    ws->scavd_list = NULL;
-	    ws->n_scavd_blocks = 0;
-        }
+        ws->todo_bd = NULL;
+        ws->buffer_todo_bd = NULL;
+        
+        ws->scavd_list = NULL;
+        ws->n_scavd_blocks = 0;
     }
+
+    return t;
 }
 
 
@@ -980,17 +973,17 @@ alloc_gc_threads (void)
 #if defined(THREADED_RTS)
         nat i;
 	gc_threads = stgMallocBytes (RtsFlags.ParFlags.gcThreads * 
-				     sizeof(gc_thread), 
+				     sizeof(gc_thread*), 
 				     "alloc_gc_threads");
 
 	for (i = 0; i < RtsFlags.ParFlags.gcThreads; i++) {
-	    alloc_gc_thread(&gc_threads[i], i);
+	    gc_threads[i] = alloc_gc_thread(i);
 	}
 #else
-	gc_threads = stgMallocBytes (sizeof(gc_thread), 
+	gc_threads = stgMallocBytes (sizeof(gc_thread*), 
 				     "alloc_gc_threads");
 
-	alloc_gc_thread(gc_threads, 0);
+	gc_threads[0] = alloc_gc_thread(0);
 #endif
     }
 }
@@ -1130,7 +1123,7 @@ start_gc_threads (void)
 	// Start from 1: the main thread is 0
 	for (i = 1; i < RtsFlags.ParFlags.gcThreads; i++) {
 	    createOSThread(&id, (OSThreadProc*)&gc_thread_entry, 
-			   &gc_threads[i]);
+			   gc_threads[i]);
 	}
 	done = rtsTrue;
     }
@@ -1144,10 +1137,10 @@ wakeup_gc_threads (nat n_threads USED_IF_THREADS)
     nat i;
     for (i=1; i < n_threads; i++) {
 	inc_running();
-	ACQUIRE_LOCK(&gc_threads[i].wake_mutex);
-	gc_threads[i].wakeup = rtsTrue;
-	signalCondition(&gc_threads[i].wake_cond);
-	RELEASE_LOCK(&gc_threads[i].wake_mutex);
+	ACQUIRE_LOCK(&gc_threads[i]->wake_mutex);
+	gc_threads[i]->wakeup = rtsTrue;
+	signalCondition(&gc_threads[i]->wake_cond);
+	RELEASE_LOCK(&gc_threads[i]->wake_mutex);
     }
 #endif
 }
@@ -1251,7 +1244,7 @@ init_collected_gen (nat g, nat n_threads)
 	    // we don't copy objects into g0s0, unless -G0
 	    if (g==0 && s==0 && RtsFlags.GcFlags.generations > 1) continue;
 
-	    ws = &gc_threads[t].steps[g][s];
+	    ws = &gc_threads[t]->steps[g * RtsFlags.GcFlags.steps + s];
 
 	    ws->scan_bd = NULL;
 	    ws->scan = NULL;
@@ -1292,7 +1285,7 @@ init_uncollected_gen (nat g, nat threads)
     for (t = 0; t < threads; t++) {
 	for (s = 0; s < generations[g].n_steps; s++) {
 	    
-	    ws = &gc_threads[t].steps[g][s];
+	    ws = &gc_threads[t]->steps[g * RtsFlags.GcFlags.steps + s];
 	    stp = ws->stp;
 	    
 	    ws->buffer_todo_bd = NULL;

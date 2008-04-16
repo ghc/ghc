@@ -116,8 +116,6 @@ typedef struct gc_thread_ {
 #endif
     nat thread_index;              // a zero based index identifying the thread
 
-    step_workspace ** steps;	   // 2-d array (gen,step) of workspaces
-
     bdescr * free_blocks;          // a buffer of free blocks for this thread
                                    //  during GC without accessing the block
                                    //   allocators spin lock. 
@@ -148,13 +146,22 @@ typedef struct gc_thread_ {
 #ifdef USE_PAPI
     int papi_events;
 #endif
-    
+
+    // -------------------
+    // workspaces
+
+    // array of workspaces, indexed by stp->abs_no.  This is placed
+    // directly at the end of the gc_thread structure so that we can get from
+    // the gc_thread pointer to a workspace using only pointer
+    // arithmetic, no memory access.  This happens in the inner loop
+    // of the GC, see Evac.c:alloc_for_copy().
+    step_workspace steps[];
 } gc_thread;
 
 extern nat N;
 extern rtsBool major_gc;
 
-extern gc_thread *gc_threads;
+extern gc_thread **gc_threads;
 register gc_thread *gct __asm__("%rbx");
 // extern gc_thread *gct;  // this thread's gct TODO: make thread-local
 

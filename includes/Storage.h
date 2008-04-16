@@ -53,7 +53,8 @@
  * ------------------------------------------------------------------------- */
 
 typedef struct step_ {
-    unsigned int         no;		// step number
+    unsigned int         no;		// step number in this generation
+    unsigned int         abs_no;	// absolute step number
     int                  is_compacted;	// compact this step? (old gen only)
 
     struct generation_ * gen;		// generation this step belongs to
@@ -67,28 +68,34 @@ typedef struct step_ {
     bdescr *             large_objects;	 // large objects (doubly linked)
     unsigned int         n_large_blocks; // no. of blocks used by large objs
 
+
     // ------------------------------------
     // Fields below are used during GC only
 
     // During GC, if we are collecting this step, blocks and n_blocks
     // are copied into the following two fields.  After GC, these blocks
     // are freed.
+
+#if defined(THREADED_RTS)
+    char pad[128];                      // make sure the following is
+                                        // on a separate cache line.
+    SpinLock     sync_todo;             // lock for todos
+    SpinLock     sync_large_objects;    // lock for large_objects
+                                        //    and scavenged_large_objects
+#endif
+
     bdescr *     old_blocks;	        // bdescr of first from-space block
     unsigned int n_old_blocks;		// number of blocks in from-space
     
     bdescr *     todos;		        // blocks waiting to be scavenged
     unsigned int n_todos;               // count of above
 
-#if defined(THREADED_RTS)
-    SpinLock     sync_todo;             // lock for todos
-    SpinLock     sync_large_objects;    // lock for large_objects
-                                        //    and scavenged_large_objects
-#endif
-
     bdescr *     scavenged_large_objects;  // live large objs after GC (d-link)
     unsigned int n_scavenged_large_blocks; // size (not count) of above
 
     bdescr *     bitmap;  		// bitmap for compacting collection
+
+
 } step;
 
 
@@ -112,6 +119,8 @@ extern generation * RTS_VAR(generations);
 extern generation * RTS_VAR(g0);
 extern step * RTS_VAR(g0s0);
 extern generation * RTS_VAR(oldest_gen);
+extern step * RTS_VAR(all_steps);
+extern nat total_steps;
 
 /* -----------------------------------------------------------------------------
    Initialisation / De-initialisation

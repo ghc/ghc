@@ -55,13 +55,12 @@ alloc_for_copy (nat size, step *stp)
 	}
     }
     
-    ws = &gct->steps[stp->gen_no][stp->no];
+    ws = &gct->steps[stp->abs_no];
+    // this compiles to a single mem access to stp->abs_no only
     
     /* chain a new block onto the to-space for the destination step if
      * necessary.
      */
-    
-    ASSERT(ws->todo_free >= ws->todo_bd->free && ws->todo_free <= ws->todo_lim);
     to = ws->todo_free;
     if (to + size > ws->todo_lim) {
 	to = gc_alloc_todo_block(ws);
@@ -141,7 +140,7 @@ evacuate_large(StgPtr p)
       }
   }
 
-  ws = &gct->steps[new_stp->gen_no][new_stp->no];
+  ws = &gct->steps[new_stp->abs_no];
   bd->flags |= BF_EVACUATED;
   bd->step = new_stp;
   bd->gen_no = new_stp->gen_no;

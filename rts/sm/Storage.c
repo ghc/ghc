@@ -52,6 +52,9 @@ generation *g0		= NULL; /* generation 0, for convenience */
 generation *oldest_gen  = NULL; /* oldest generation, for convenience */
 step *g0s0 		= NULL; /* generation 0, step 0, for convenience */
 
+nat total_steps         = 0;
+step *all_steps         = NULL; /* single array of steps */
+
 ullong total_allocated = 0;	/* total memory allocated during run */
 
 nat n_nurseries         = 0;    /* == RtsFlags.ParFlags.nNodes, convenience */
@@ -81,6 +84,7 @@ static void
 initStep (step *stp, int g, int s)
 {
     stp->no = s;
+    stp->abs_no = RtsFlags.GcFlags.steps * g + s;
     stp->blocks = NULL;
     stp->n_blocks = 0;
     stp->old_blocks = NULL;
@@ -104,7 +108,6 @@ initStorage( void )
 {
   nat g, s;
   generation *gen;
-  step *step_arr;
 
   if (generations != NULL) {
       // multi-init protection
@@ -152,10 +155,9 @@ initStorage( void )
      it this way, because we need the invariant that two step pointers
      can be directly compared to see which is the oldest.
      Remember that the last generation has only one step. */
-  step_arr = stgMallocBytes(sizeof(struct step_) 
-			    * (1 + ((RtsFlags.GcFlags.generations - 1)
-				    * RtsFlags.GcFlags.steps)),
-			    "initStorage: steps");
+  total_steps = 1 + (RtsFlags.GcFlags.generations - 1) * RtsFlags.GcFlags.steps;
+  all_steps   = stgMallocBytes(total_steps * sizeof(struct step_),
+                               "initStorage: steps");
 
   /* Initialise all generations */
   for(g = 0; g < RtsFlags.GcFlags.generations; g++) {
@@ -177,19 +179,19 @@ initStorage( void )
 
     /* Oldest generation: one step */
     oldest_gen->n_steps = 1;
-    oldest_gen->steps   = step_arr + (RtsFlags.GcFlags.generations - 1)
+    oldest_gen->steps   = all_steps + (RtsFlags.GcFlags.generations - 1)
 	                              * RtsFlags.GcFlags.steps;
 
     /* set up all except the oldest generation with 2 steps */
     for(g = 0; g < RtsFlags.GcFlags.generations-1; g++) {
       generations[g].n_steps = RtsFlags.GcFlags.steps;
-      generations[g].steps   = step_arr + g * RtsFlags.GcFlags.steps;
+      generations[g].steps   = all_steps + g * RtsFlags.GcFlags.steps;
     }
     
   } else {
     /* single generation, i.e. a two-space collector */
     g0->n_steps = 1;
-    g0->steps   = step_arr;
+    g0->steps   = all_steps;
   }
 
 #ifdef THREADED_RTS

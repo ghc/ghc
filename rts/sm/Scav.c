@@ -1401,40 +1401,39 @@ static rtsBool
 scavenge_find_global_work (void)
 {
     bdescr *bd;
-    int g, s;
+    int s;
     rtsBool flag;
     step_workspace *ws;
 
     flag = rtsFalse;
-    for (g = RtsFlags.GcFlags.generations-1; g >= 0; g--) {
-	for (s = generations[g].n_steps-1; s >= 0; s--) {
-	    if (g == 0 && s == 0 && RtsFlags.GcFlags.generations > 1) { 
-		continue; 
-	    }
-	    ws = &gct->steps[g][s];
+    for (s = total_steps-1; s>=0; s--)
+    {
+        if (s == 0 && RtsFlags.GcFlags.generations > 1) { 
+            continue; 
+        }
+        ws = &gct->steps[s];
 
-	    // If we have any large objects to scavenge, do them now.
-	    if (ws->todo_large_objects) {
-		scavenge_large(ws);
-		flag = rtsTrue;
-	    }
+        // If we have any large objects to scavenge, do them now.
+        if (ws->todo_large_objects) {
+            scavenge_large(ws);
+            flag = rtsTrue;
+        }
 
-	    if ((bd = grab_todo_block(ws)) != NULL) {
-		// no need to assign this to ws->scan_bd, we're going
-		// to scavenge the whole thing and then push it on
-		// our scavd list.  This saves pushing out the
-		// scan_bd block, which might be partial.
-		if (N == 0) {
-		    scavenge_block0(bd, bd->start);
-		} else {
-		    scavenge_block(bd, bd->start);
-		}
-		push_scan_block(bd, ws);
-		return rtsTrue;
-	    }
+        if ((bd = grab_todo_block(ws)) != NULL) {
+            // no need to assign this to ws->scan_bd, we're going
+            // to scavenge the whole thing and then push it on
+            // our scavd list.  This saves pushing out the
+            // scan_bd block, which might be partial.
+            if (N == 0) {
+                scavenge_block0(bd, bd->start);
+            } else {
+                scavenge_block(bd, bd->start);
+            }
+            push_scan_block(bd, ws);
+            return rtsTrue;
+        }
 
-	    if (flag) return rtsTrue;
-	}
+        if (flag) return rtsTrue;
     }
     return rtsFalse;
 }
@@ -1454,60 +1453,58 @@ scavenge_find_global_work (void)
 static rtsBool
 scavenge_find_local_work (void)
 {
-    int g, s;
+    int s;
     step_workspace *ws;
     rtsBool flag;
 
     flag = rtsFalse;
-    for (g = RtsFlags.GcFlags.generations; --g >= 0; ) {
-	for (s = generations[g].n_steps; --s >= 0; ) {
-	    if (g == 0 && s == 0 && RtsFlags.GcFlags.generations > 1) { 
-		continue; 
-	    }
-	    ws = &gct->steps[g][s];
+    for (s = total_steps-1; s >= 0; s--) {
+        if (s == 0 && RtsFlags.GcFlags.generations > 1) { 
+            continue; 
+        }
+        ws = &gct->steps[s];
 
-            if (ws->todo_bd != NULL)
-            {
-                ws->todo_bd->free = ws->todo_free;
+        if (ws->todo_bd != NULL)
+        {
+            ws->todo_bd->free = ws->todo_free;
+        }
+        
+        // If we have a todo block and no scan block, start
+        // scanning the todo block.
+        if (ws->scan_bd == NULL && ws->todo_bd != NULL)
+        {
+            ws->scan_bd = ws->todo_bd;
+            ws->scan = ws->scan_bd->start;
+        }
+        
+        // If we have a scan block with some work to do,
+        // scavenge everything up to the free pointer.
+        if (ws->scan != NULL && ws->scan < ws->scan_bd->free)
+        {
+            if (N == 0) {
+                scavenge_block0(ws->scan_bd, ws->scan);
+            } else {
+                scavenge_block(ws->scan_bd, ws->scan);
             }
-
-	    // If we have a todo block and no scan block, start
-	    // scanning the todo block.
-	    if (ws->scan_bd == NULL && ws->todo_bd != NULL)
-	    {
-		ws->scan_bd = ws->todo_bd;
-		ws->scan = ws->scan_bd->start;
-	    }
-
-	    // If we have a scan block with some work to do,
-	    // scavenge everything up to the free pointer.
-	    if (ws->scan != NULL && ws->scan < ws->scan_bd->free)
-	    {
-		if (N == 0) {
-		    scavenge_block0(ws->scan_bd, ws->scan);
-		} else {
-		    scavenge_block(ws->scan_bd, ws->scan);
-		}
-		ws->scan = ws->scan_bd->free;
-		flag = rtsTrue;
-	    }
-
-	    if (ws->scan_bd != NULL && ws->scan == ws->scan_bd->free
-		&& ws->scan_bd != ws->todo_bd)
-	    {
-		// we're not going to evac any more objects into
-		// this block, so push it now.
-		push_scan_block(ws->scan_bd, ws);
-		ws->scan_bd = NULL;
-		ws->scan = NULL;
-                // we might be able to scan the todo block now.  But
-                // don't do it right away: there might be full blocks
-		// waiting to be scanned as a result of scavenge_block above.
-		flag = rtsTrue; 
-	    }
-
-	    if (flag) return rtsTrue;
-	}
+            ws->scan = ws->scan_bd->free;
+            flag = rtsTrue;
+        }
+        
+        if (ws->scan_bd != NULL && ws->scan == ws->scan_bd->free
+            && ws->scan_bd != ws->todo_bd)
+        {
+            // we're not going to evac any more objects into
+            // this block, so push it now.
+            push_scan_block(ws->scan_bd, ws);
+            ws->scan_bd = NULL;
+            ws->scan = NULL;
+            // we might be able to scan the todo block now.  But
+            // don't do it right away: there might be full blocks
+            // waiting to be scanned as a result of scavenge_block above.
+            flag = rtsTrue; 
+        }
+        
+        if (flag) return rtsTrue;
     }
     return rtsFalse;
 }
@@ -1551,7 +1548,7 @@ loop:
 rtsBool
 any_work (void)
 {
-    int g, s;
+    int s;
     step_workspace *ws;
 
     write_barrier();
@@ -1570,15 +1567,13 @@ any_work (void)
     // Check for global work in any step.  We don't need to check for
     // local work, because we have already exited scavenge_loop(),
     // which means there is no local work for this thread.
-    for (g = RtsFlags.GcFlags.generations-1; g >= 0; g--) {
-	for (s = generations[g].n_steps-1; s >= 0; s--) {
-	    if (g == 0 && s == 0 && RtsFlags.GcFlags.generations > 1) { 
-		continue; 
-	    }
-	    ws = &gct->steps[g][s];
-	    if (ws->todo_large_objects) return rtsTrue;
-	    if (ws->stp->todos) return rtsTrue;
-	}
+    for (s = total_steps-1; s >= 0; s--) {
+        if (s == 0 && RtsFlags.GcFlags.generations > 1) { 
+            continue; 
+        }
+        ws = &gct->steps[s];
+        if (ws->todo_large_objects) return rtsTrue;
+        if (ws->stp->todos) return rtsTrue;
     }
 
     return rtsFalse;
