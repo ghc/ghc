@@ -1,6 +1,6 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team 1998-2007
+ * (c) The GHC Team 1998-2008
  *
  * MegaBlock Allocator Interface.  This file contains all the dirty
  * architecture-dependent hackery required to get a chunk of aligned

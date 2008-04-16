@@ -1,6 +1,6 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team 1998-2006
+ * (c) The GHC Team 1998-2008
  * 
  * The block allocator and free list manager.
  *

@@ -1,6 +1,6 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The University of Glasgow 2006-2007
+ * (c) The University of Glasgow 2006-2008
  *
  * OS-specific memory management
  *

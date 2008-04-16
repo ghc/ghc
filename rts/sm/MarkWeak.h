@@ -1,6 +1,6 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team 1998-2006
+ * (c) The GHC Team 1998-2008
  *
  * Weak pointers and weak-like things in the GC
  *
