@@ -11,8 +11,6 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#include <unistd.h>
-
 #include "Rts.h"
 #include "RtsFlags.h"
 #include "Storage.h"
@@ -1575,7 +1573,6 @@ any_work (void)
     }
 
     gct->no_work++;
-    usleep(1);
 
     return rtsFalse;
 }    
