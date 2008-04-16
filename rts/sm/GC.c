@@ -203,6 +203,9 @@ GarbageCollect ( rtsBool force_major_gc )
   }
 #endif
 
+  ASSERT(sizeof(step_workspace) == 16 * sizeof(StgWord));
+  // otherwise adjust the padding in step_workspace.
+
   // tell the stats department that we've started a GC 
   stat_startGC();
 

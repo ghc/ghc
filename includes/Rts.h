@@ -38,6 +38,12 @@ extern "C" {
 #define FLEXIBLE_ARRAY 0
 #endif
 
+#if __GNUC__ >= 3
+#define ATTRIBUTE_ALIGNED(n) __attribute__((aligned(n)))
+#else
+#define ATTRIBUTE_ALIGNED(n) /*nothing*/
+#endif
+
 /* Fix for mingw stat problem (done here so it's early enough) */
 #ifdef mingw32_HOST_OS
 #define __MSVCRT__ 1

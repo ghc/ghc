@@ -95,7 +95,11 @@ typedef struct step_workspace_ {
     bdescr *     part_list;
     unsigned int n_part_blocks;      // count of above
 
-} step_workspace;
+    StgWord pad[5];
+
+} step_workspace ATTRIBUTE_ALIGNED(64);
+// align so that computing gct->steps[n] is a shift, not a multiply
+// fails if the size is <64, which is why we need the pad above
 
 /* ----------------------------------------------------------------------------
    GC thread object
