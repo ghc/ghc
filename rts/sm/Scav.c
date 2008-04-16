@@ -1455,10 +1455,6 @@ loop:
         }
 
         if ((bd = grab_todo_block(ws)) != NULL) {
-            // no need to assign this to ws->scan_bd, we're going
-            // to scavenge the whole thing and then push it on
-            // our scavd list.  This saves pushing out the
-            // scan_bd block, which might be partial.
             if (n_gc_threads == 1) {
                 scavenge_block1(bd);
             } else {
