@@ -323,9 +323,9 @@ if ( $SysSpecificTiming eq '' ) {
 # print out what we found
 print STDERR "<<$SysSpecificTiming: ";
 if ( $Cachegrind ne 'yes') {
-	print STDERR "$BytesAlloc bytes, $GCs GCs, $AvgResidency/$MaxResidency avg/max bytes residency ($ResidencySamples samples), $GCWork bytes GC work, ${TotMem}M in use, $InitTime INIT ($InitElapsed elapsed), $MutTime MUT ($MutElapsed elapsed), $GcTime GC ($GcElapsed elapsed)$Counters";
+	print STDERR "$BytesAlloc bytes, $GCs GCs, $AvgResidency/$MaxResidency avg/max bytes residency ($ResidencySamples samples), $GCWork bytes GC work, ${TotMem}M in use, $InitTime INIT ($InitElapsed elapsed), $MutTime MUT ($MutElapsed elapsed), $GcTime GC ($GcElapsed elapsed), $Gc0Time GC(0) ($Gc0Elapsed elapsed), $Gc1Time GC(1) ($Gc1Elapsed elapsed), $Balance balance$Counters";
 } else {
-	print STDERR "$BytesAlloc bytes, $GCs GCs, $AvgResidency/$MaxResidency avg/max bytes residency ($ResidencySamples samples), $GCWork bytes GC work, ${TotMem}M in use, $InitTime INIT ($InitElapsed elapsed), $MutTime MUT ($MutElapsed elapsed), $GcTime GC ($GcElapsed elapsed), $TotInstrs instructions, $TotReads memory reads, $TotWrites memory writes, $TotMisses L2 cache misses";
+	print STDERR "$BytesAlloc bytes, $GCs GCs, $AvgResidency/$MaxResidency avg/max bytes residency ($ResidencySamples samples), $GCWork bytes GC work, ${TotMem}M in use, $InitTime INIT ($InitElapsed elapsed), $MutTime MUT ($MutElapsed elapsed), $GcTime GC ($GcElapsed elapsed), $Gc0Time GC(0) ($Gc0Elapsed elapsed), $Gc1Time GC(1) ($Gc1Elapsed elapsed), $Balance balance, $TotInstrs instructions, $TotReads memory reads, $TotWrites memory writes, $TotMisses L2 cache misses";
 };
 print STDERR " :$SysSpecificTiming>>\n";
 
@@ -389,6 +389,7 @@ sub process_stats_file {
 
 	$GCWork = 0;
         $GCs = 0;
+        $Balance = 1;
 	while (<STATS>) {
 	    if (! /Gen:\s+0/ && /^\s*\d+\s+\d+\s+(\d+)\s+\d+\.\d+/ ) {
 		$max_live = $1 if $max_live < $1;
@@ -421,6 +422,19 @@ sub process_stats_file {
 	    } elsif ( /^\s*GC\s+time\s*(-*\d+\.\d\d)s\s*\(\s*(-*\d+\.\d\d)s elapsed\)/ ) {
 		$GcTime = $1; $GcElapsed = $2;
 	    }
+
+            if (/Generation (\d+):\s*\d+ collections,\s*\d+ parallel,\s*(-*\d+\.\d\d)s\s*,\s*(-*\d+\.\d\d)s elapsed/) {
+                if ($1 == 0) {
+                    $Gc0Time = $2; $Gc0Elapsed = $3;
+                } elsif ($1 == 1) {
+                    $Gc1Time = $2; $Gc1Elapsed = $3;
+                }
+            }
+
+            if (/work balance: ([0-9.]+)/) {
+                $Balance = $1;
+            }
+
 
 	    if ( /CPU GC counters/ ) {
 		# Counters that follow correspond to GC
@@ -502,6 +516,11 @@ sub process_stats_file {
     print STDERR "Warning: GcElapsed not found in stats file\n" unless defined($GcElapsed);
     print STDERR "Warning: total memory not found in stats file\n" unless defined($TotMem);
     print STDERR "Warning: GC work not found in stats file\n" unless defined($GCWork);
+    print STDERR "Warning: Gc0Time not found in stats file\n" unless defined($Gc0Time);
+    print STDERR "Warning: Gc0Elapsed not found in stats file\n" unless defined($Gc0Elapsed);
+    print STDERR "Warning: Gc1Time not found in stats file\n" unless defined($Gc1Time);
+    print STDERR "Warning: Gc1Elapsed not found in stats file\n" unless defined($Gc1Elapsed);
+    print STDERR "Warning: Balance not found in stats file\n" unless defined($Gc1Elapsed);
 
     # things we didn't necessarily expect to find
     $MaxResidency     = 0 unless defined($MaxResidency);
