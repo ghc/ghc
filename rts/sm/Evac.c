@@ -228,7 +228,7 @@ selector_chain:
         // save any space in any case, and updating with an indirection is
         // trickier in a non-collected gen: we would have to update the
         // mutable list.
-        if ((bd->gen_no > N) || (bd->flags & BF_EVACUATED)) {
+        if (bd->flags & BF_EVACUATED) {
             unchain_thunk_selectors(prev_thunk_selector, (StgClosure *)p);
             *q = (StgClosure *)p;
             return;

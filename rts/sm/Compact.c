@@ -83,11 +83,8 @@ thread (StgClosure **p)
     
     if (HEAP_ALLOCED(q)) {
 	bd = Bdescr(q); 
-	// a handy way to discover whether the ptr is into the
-	// compacted area of the old gen, is that the EVACUATED flag
-	// is zero (it's non-zero for all the other areas of live
-	// memory).
-	if ((bd->flags & BF_EVACUATED) == 0)
+
+	if (bd->flags & BF_COMPACTED)
         {
             iptr = *q;
             switch (GET_CLOSURE_TAG((StgClosure *)iptr))

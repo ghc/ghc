@@ -438,7 +438,6 @@ GarbageCollect ( rtsBool force_major_gc )
               
               prev = NULL;
               for (bd = ws->scavd_list; bd != NULL; bd = bd->link) {
-                  bd->flags &= ~BF_EVACUATED;	 // now from-space 
                   ws->step->n_words += bd->free - bd->start;
                   prev = bd;
               }
@@ -460,7 +459,6 @@ GarbageCollect ( rtsBool force_major_gc )
                       freeGroup(bd);
                       ws->n_part_blocks--;
                   } else {
-                      bd->flags &= ~BF_EVACUATED;	 // now from-space 
                       ws->step->n_words += bd->free - bd->start;
                       prev = bd;
                   }
@@ -543,7 +541,6 @@ GarbageCollect ( rtsBool force_major_gc )
 		// for a compacted step, just shift the new to-space
 		// onto the front of the now-compacted existing blocks.
 		for (bd = stp->blocks; bd != NULL; bd = bd->link) {
-		    bd->flags &= ~BF_EVACUATED;  // now from-space 
                     stp->n_words += bd->free - bd->start;
 		}
 		// tack the new blocks on the end of the existing blocks
@@ -585,10 +582,6 @@ GarbageCollect ( rtsBool force_major_gc )
 	  bd = next;
 	}
 
-	// update the count of blocks used by large objects
-	for (bd = stp->scavenged_large_objects; bd != NULL; bd = bd->link) {
-	  bd->flags &= ~BF_EVACUATED;
-	}
 	stp->large_objects  = stp->scavenged_large_objects;
 	stp->n_large_blocks = stp->n_scavenged_large_blocks;
 
@@ -601,7 +594,6 @@ GarbageCollect ( rtsBool force_major_gc )
 	 */
 	for (bd = stp->scavenged_large_objects; bd; bd = next) {
 	  next = bd->link;
-	  bd->flags &= ~BF_EVACUATED;
 	  dbl_link_onto(bd, &stp->large_objects);
 	}
 
@@ -1095,7 +1087,12 @@ init_collected_gen (nat g, nat n_threads)
 	stp->scavenged_large_objects = NULL;
 	stp->n_scavenged_large_blocks = 0;
 
-	// mark the large objects as not evacuated yet 
+	// mark the small objects as from-space
+	for (bd = stp->old_blocks; bd; bd = bd->link) {
+	    bd->flags &= ~BF_EVACUATED;
+	}
+
+	// mark the large objects as from-space
 	for (bd = stp->large_objects; bd; bd = bd->link) {
 	    bd->flags &= ~BF_EVACUATED;
 	}

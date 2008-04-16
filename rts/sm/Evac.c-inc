@@ -305,28 +305,18 @@ loop:
 
   bd = Bdescr((P_)q);
 
-  if (bd->gen_no > N) {
-      /* Can't evacuate this object, because it's in a generation
-       * older than the ones we're collecting.  Let's hope that it's
-       * in gct->evac_step or older, or we will have to arrange to track
-       * this pointer using the mutable list.
-       */
-      if (bd->step < gct->evac_step) {
-	  // nope 
-	  gct->failed_to_evac = rtsTrue;
-	  TICK_GC_FAILED_PROMOTION();
-      }
-      return;
-  }
-
   if ((bd->flags & (BF_LARGE | BF_COMPACTED | BF_EVACUATED)) != 0) {
 
-      /* pointer into to-space: just return it.  This normally
-       * shouldn't happen, but alllowing it makes certain things
-       * slightly easier (eg. the mutable list can contain the same
-       * object twice, for example).
-       */
+      // pointer into to-space: just return it.  It might be a pointer
+      // into a generation that we aren't collecting (> N), or it
+      // might just be a pointer into to-space.  The latter doesn't
+      // happen often, but allowing it makes certain things a bit
+      // easier; e.g. scavenging an object is idempotent, so it's OK to
+      // have an object on the mutable list multiple times.
       if (bd->flags & BF_EVACUATED) {
+          // We aren't copying this object, so we have to check
+          // whether it is already in the target generation.  (this is
+          // the write barrier).
 	  if (bd->step < gct->evac_step) {
 	      gct->failed_to_evac = rtsTrue;
 	      TICK_GC_FAILED_PROMOTION();

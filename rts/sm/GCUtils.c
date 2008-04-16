@@ -205,7 +205,6 @@ StgPtr
 alloc_todo_block (step_workspace *ws, nat size)
 {
     bdescr *bd, *hd, *tl;
-    StgWord32 flags;
 
     // Grab a part block if we have one, and it has enough room
     if (ws->part_list != NULL && 
@@ -217,15 +216,8 @@ alloc_todo_block (step_workspace *ws, nat size)
     }
     else
     {
-        // blocks in to-space in generations up to and including N
-        // get the BF_EVACUATED flag.
-        if (ws->step->gen_no <= N) {
-            flags = BF_EVACUATED;
-        } else {
-            flags = 0;
-        }
         allocBlocks_sync(4, &hd, &tl, 
-                         ws->step->gen_no, ws->step, flags);
+                         ws->step->gen_no, ws->step, BF_EVACUATED);
 
         tl->link = ws->part_list;
         ws->part_list = hd->link;

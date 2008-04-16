@@ -55,9 +55,6 @@ isAlive(StgClosure *p)
 
     // ignore closures in generations that we're not collecting. 
     bd = Bdescr((P_)q);
-    if (bd->gen_no > N) {
-	return p;
-    }
 
     // if it's a pointer into to-space, then we're done
     if (bd->flags & BF_EVACUATED) {
