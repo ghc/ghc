@@ -120,6 +120,9 @@ typedef struct gc_thread_ {
                                    //  during GC without accessing the block
                                    //   allocators spin lock. 
 
+    StgClosure* static_objects;      // live static objects
+    StgClosure* scavenged_static_objects;   // static objects scavenged so far
+
     lnat gc_count;                 // number of gc's this thread has done
 
     // --------------------
@@ -174,9 +177,6 @@ extern gc_thread **gc_threads;
 register gc_thread *gct __asm__("%rbx");
 // extern gc_thread *gct;  // this thread's gct TODO: make thread-local
 
-extern StgClosure* static_objects;
-extern StgClosure* scavenged_static_objects;
-
 extern bdescr *mark_stack_bdescr;
 extern StgPtr *mark_stack;
 extern StgPtr *mark_sp;
@@ -187,10 +187,6 @@ extern bdescr *oldgen_scan_bd;
 extern StgPtr  oldgen_scan;
 
 extern long copied;
-
-#ifdef THREADED_RTS
-extern SpinLock static_objects_sync;
-#endif
 
 #ifdef DEBUG
 extern nat mutlist_MUTVARS, mutlist_MUTARRS, mutlist_MVARS, mutlist_OTHERS;

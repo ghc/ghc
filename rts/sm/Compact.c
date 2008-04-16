@@ -999,7 +999,7 @@ compact(void)
     }
 
     // the static objects
-    thread_static(scavenged_static_objects);
+    thread_static(gct->scavenged_static_objects /* ToDo: ok? */);
 
     // the stable pointer table
     threadStablePtrTable((evac_fn)thread);

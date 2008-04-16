@@ -217,26 +217,39 @@ loop:
       switch (info->type) {
 
       case THUNK_STATIC:
-	  if (info->srt_bitmap != 0 &&
-	      *THUNK_STATIC_LINK((StgClosure *)q) == NULL) {
-	      ACQUIRE_SPIN_LOCK(&static_objects_sync);
+	  if (info->srt_bitmap != 0) {
 	      if (*THUNK_STATIC_LINK((StgClosure *)q) == NULL) {
-		  *THUNK_STATIC_LINK((StgClosure *)q) = static_objects;
-		  static_objects = (StgClosure *)q;
+#ifndef THREADED_RTS
+		  *THUNK_STATIC_LINK((StgClosure *)q) = gct->static_objects;
+		  gct->static_objects = (StgClosure *)q;
+#else
+                  StgPtr link;
+                  link = (StgPtr)cas((StgPtr)THUNK_STATIC_LINK((StgClosure *)q),
+                                     (StgWord)NULL,
+                                     (StgWord)gct->static_objects);
+                  if (link == NULL) {
+                      gct->static_objects = (StgClosure *)q;
+                  }
+#endif
 	      }
-	      RELEASE_SPIN_LOCK(&static_objects_sync);
 	  }
 	  return;
-	  
+
       case FUN_STATIC:
 	  if (info->srt_bitmap != 0 &&
 	      *FUN_STATIC_LINK((StgClosure *)q) == NULL) {
-	      ACQUIRE_SPIN_LOCK(&static_objects_sync);
-	      if (*FUN_STATIC_LINK((StgClosure *)q) == NULL) {
-		  *FUN_STATIC_LINK((StgClosure *)q) = static_objects;
-		  static_objects = (StgClosure *)q;
-	      }
-	      RELEASE_SPIN_LOCK(&static_objects_sync);
+#ifndef THREADED_RTS
+              *FUN_STATIC_LINK((StgClosure *)q) = gct->static_objects;
+              gct->static_objects = (StgClosure *)q;
+#else
+              StgPtr link;
+              link = (StgPtr)cas((StgPtr)FUN_STATIC_LINK((StgClosure *)q),
+                                 (StgWord)NULL,
+                                 (StgWord)gct->static_objects);
+              if (link == NULL) {
+                  gct->static_objects = (StgClosure *)q;
+              }
+#endif
 	  }
 	  return;
 	  
@@ -246,27 +259,40 @@ loop:
 	   * scavenge it later).
 	   */
 	  if (((StgIndStatic *)q)->saved_info == NULL) {
-	      ACQUIRE_SPIN_LOCK(&static_objects_sync);
 	      if (*IND_STATIC_LINK((StgClosure *)q) == NULL) {
-		  *IND_STATIC_LINK((StgClosure *)q) = static_objects;
-		  static_objects = (StgClosure *)q;
+#ifndef THREADED_RTS
+		  *IND_STATIC_LINK((StgClosure *)q) = gct->static_objects;
+		  gct->static_objects = (StgClosure *)q;
+#else
+                  StgPtr link;
+                  link = (StgPtr)cas((StgPtr)IND_STATIC_LINK((StgClosure *)q),
+                                     (StgWord)NULL,
+                                     (StgWord)gct->static_objects);
+                  if (link == NULL) {
+                      gct->static_objects = (StgClosure *)q;
+                  }
+#endif
 	      }
-	      RELEASE_SPIN_LOCK(&static_objects_sync);
 	  }
 	  return;
 	  
       case CONSTR_STATIC:
 	  if (*STATIC_LINK(info,(StgClosure *)q) == NULL) {
-	      ACQUIRE_SPIN_LOCK(&static_objects_sync);
-	      // re-test, after acquiring lock
-	      if (*STATIC_LINK(info,(StgClosure *)q) == NULL) {
-		  *STATIC_LINK(info,(StgClosure *)q) = static_objects;
-		  static_objects = (StgClosure *)q;
-	      }
-	      RELEASE_SPIN_LOCK(&static_objects_sync);
-	        /* I am assuming that static_objects pointers are not
-		 * written to other objects, and thus, no need to retag. */
-	  }
+#ifndef THREADED_RTS
+              *STATIC_LINK(info,(StgClosure *)q) = gct->static_objects;
+              gct->static_objects = (StgClosure *)q;
+#else
+              StgPtr link;
+              link = (StgPtr)cas((StgPtr)STATIC_LINK(info,(StgClosure *)q),
+                                 (StgWord)NULL,
+                                 (StgWord)gct->static_objects);
+              if (link == NULL) {
+                  gct->static_objects = (StgClosure *)q;
+              }
+#endif
+          }
+          /* I am assuming that static_objects pointers are not
+           * written to other objects, and thus, no need to retag. */
           return;
 	  
       case CONSTR_NOCAF_STATIC:

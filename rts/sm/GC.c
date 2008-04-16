@@ -90,11 +90,6 @@
  * We build up a static object list while collecting generations 0..N,
  * which is then appended to the static object list of generation N+1.
  */
-StgClosure* static_objects;      // live static objects
-StgClosure* scavenged_static_objects;   // static objects scavenged so far
-#ifdef THREADED_RTS
-SpinLock static_objects_sync;
-#endif
 
 /* N is the oldest generation being collected, where the generations
  * are numbered starting at 0.  A major GC (indicated by the major_gc
@@ -268,11 +263,6 @@ GarbageCollect ( rtsBool force_major_gc )
 
   // check stack sanity *before* GC (ToDo: check all threads) 
   IF_DEBUG(sanity, checkFreeListSanity());
-
-  /* Initialise the static object lists
-   */
-  static_objects = END_OF_STATIC_LIST;
-  scavenged_static_objects = END_OF_STATIC_LIST;
 
   // Initialise all the generations/steps that we're collecting.
   for (g = 0; g <= N; g++) {
@@ -629,12 +619,19 @@ GarbageCollect ( rtsBool force_major_gc )
 #ifdef PROFILING
   // resetStaticObjectForRetainerProfiling() must be called before
   // zeroing below.
-  resetStaticObjectForRetainerProfiling();
+  if (n_gc_threads > 1) {
+      barf("profiling is currently broken with multi-threaded GC");
+      // ToDo: fix the gct->scavenged_static_objects below
+  }
+  resetStaticObjectForRetainerProfiling(gct->scavenged_static_objects);
 #endif
 
   // zero the scavenged static object list 
   if (major_gc) {
-    zero_static_object_list(scavenged_static_objects);
+      nat i;
+      for (i = 0; i < n_gc_threads; i++) {
+          zero_static_object_list(gc_threads[i]->scavenged_static_objects);
+      }
   }
 
   // Reset the nursery
@@ -1357,6 +1354,8 @@ init_uncollected_gen (nat g, nat threads)
 static void
 init_gc_thread (gc_thread *t)
 {
+    t->static_objects = END_OF_STATIC_LIST;
+    t->scavenged_static_objects = END_OF_STATIC_LIST;
     t->evac_step = 0;
     t->failed_to_evac = rtsFalse;
     t->eager_promotion = rtsTrue;
@@ -1366,6 +1365,7 @@ init_gc_thread (gc_thread *t)
     t->no_work = 0;
     t->scav_global_work = 0;
     t->scav_local_work = 0;
+
 }
 
 /* -----------------------------------------------------------------------------

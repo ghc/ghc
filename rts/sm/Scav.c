@@ -1078,15 +1078,12 @@ scavenge_static(void)
 
   while (1) {
       
-    ACQUIRE_SPIN_LOCK(&static_objects_sync);
-    
     /* get the next static object from the list.  Remember, there might
      * be more stuff on this list after each evacuation...
      * (static_objects is a global)
      */
-    p = static_objects;
+    p = gct->static_objects;
     if (p == END_OF_STATIC_LIST) {
-    	  RELEASE_SPIN_LOCK(&static_objects_sync);
     	  break;
     }
     
@@ -1101,11 +1098,9 @@ scavenge_static(void)
     /* Take this object *off* the static_objects list,
      * and put it on the scavenged_static_objects list.
      */
-    static_objects = *STATIC_LINK(info,p);
-    *STATIC_LINK(info,p) = scavenged_static_objects;
-    scavenged_static_objects = p;
-    
-    RELEASE_SPIN_LOCK(&static_objects_sync);
+    gct->static_objects = *STATIC_LINK(info,p);
+    *STATIC_LINK(info,p) = gct->scavenged_static_objects;
+    gct->scavenged_static_objects = p;
     
     switch (info -> type) {
       
@@ -1528,8 +1523,8 @@ loop:
     work_to_do = rtsFalse;
 
     // scavenge static objects 
-    if (major_gc && static_objects != END_OF_STATIC_LIST) {
-	IF_DEBUG(sanity, checkStaticObjects(static_objects));
+    if (major_gc && gct->static_objects != END_OF_STATIC_LIST) {
+	IF_DEBUG(sanity, checkStaticObjects(gct->static_objects));
 	scavenge_static();
     }
     
@@ -1561,11 +1556,6 @@ any_work (void)
 
     write_barrier();
 
-    // scavenge static objects 
-    if (major_gc && static_objects != END_OF_STATIC_LIST) {
-	return rtsTrue;
-    }
-    
     // scavenge objects in compacted generation
     if (mark_stack_overflowed || oldgen_scan_bd != NULL ||
 	(mark_stack_bdescr != NULL && !mark_stack_empty())) {

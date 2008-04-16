@@ -1913,7 +1913,7 @@ computeRetainerSet( void )
  *    they are not taken into consideration in computing retainer sets.
  * -------------------------------------------------------------------------- */
 void
-resetStaticObjectForRetainerProfiling( void )
+resetStaticObjectForRetainerProfiling( StgClosure *static_objects )
 {
 #ifdef DEBUG_RETAINER
     nat count;
@@ -1923,7 +1923,7 @@ resetStaticObjectForRetainerProfiling( void )
 #ifdef DEBUG_RETAINER
     count = 0;
 #endif
-    p = scavenged_static_objects;
+    p = static_objects;
     while (p != END_OF_STATIC_LIST) {
 #ifdef DEBUG_RETAINER
 	count++;

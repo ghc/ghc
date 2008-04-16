@@ -18,7 +18,7 @@ extern void  initRetainerProfiling ( void );
 extern void  endRetainerProfiling  ( void );
 extern void  printRetainer         ( FILE *, retainer );
 extern void  retainerProfile       ( void );
-extern void  resetStaticObjectForRetainerProfiling ( void );
+extern void resetStaticObjectForRetainerProfiling( StgClosure *static_objects );
 
 extern StgWord RTS_VAR(flip);
 
