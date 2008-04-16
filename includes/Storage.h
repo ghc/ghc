@@ -536,16 +536,17 @@ extern void     resizeNurseries      ( nat blocks );
 extern void     resizeNurseriesFixed ( nat blocks );
 extern lnat     countNurseryBlocks   ( void );
 
+
 /* -----------------------------------------------------------------------------
    Functions from GC.c 
    -------------------------------------------------------------------------- */
 
-typedef void (*evac_fn)(StgClosure **);
+typedef void (*evac_fn)(void *user, StgClosure **root);
 
 extern void         threadPaused ( Capability *cap, StgTSO * );
 extern StgClosure * isAlive      ( StgClosure *p );
-extern void         markCAFs     ( evac_fn evac );
-extern void         GetRoots     ( evac_fn evac );
+extern void         markCAFs     ( evac_fn evac, void *user );
+extern void         GetRoots     ( evac_fn evac, void *user );
 
 /* -----------------------------------------------------------------------------
    Stats 'n' DEBUG stuff

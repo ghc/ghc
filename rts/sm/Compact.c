@@ -109,6 +109,12 @@ thread (StgClosure **p)
     }
 }
 
+static void
+thread_root (void *user STG_UNUSED, StgClosure **p)
+{
+    thread(p);
+}
+
 // This version of thread() takes a (void *), used to circumvent
 // warnings from gcc about pointer punning and strict aliasing.
 STATIC_INLINE void thread_ (void *p) { thread((StgClosure **)p); }
@@ -955,13 +961,13 @@ update_bkwd_compact( step *stp )
 }
 
 void
-compact(void)
+compact(StgClosure *static_objects)
 {
     nat g, s, blocks;
     step *stp;
 
     // 1. thread the roots
-    GetRoots((evac_fn)thread);
+    markCapabilities((evac_fn)thread_root, NULL);
 
     // the weak pointer lists...
     if (weak_ptr_list != NULL) {
@@ -999,13 +1005,13 @@ compact(void)
     }
 
     // the static objects
-    thread_static(gct->scavenged_static_objects /* ToDo: ok? */);
+    thread_static(static_objects /* ToDo: ok? */);
 
     // the stable pointer table
-    threadStablePtrTable((evac_fn)thread);
+    threadStablePtrTable((evac_fn)thread_root, NULL);
 
     // the CAF list (used by GHCi)
-    markCAFs((evac_fn)thread);
+    markCAFs((evac_fn)thread_root, NULL);
 
     // 2. update forward ptrs
     for (g = 0; g < RtsFlags.GcFlags.generations; g++) {

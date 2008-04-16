@@ -392,19 +392,19 @@ startSignalHandlers(Capability *cap)
 
 #if !defined(THREADED_RTS)
 void
-markSignalHandlers (evac_fn evac)
+markSignalHandlers (evac_fn evac, void *user)
 {
     StgPtr *p;
 
     p = next_pending_handler;
     while (p != pending_handler_buf) {
 	p--;
-	evac((StgClosure **)p);
+	evac(user, (StgClosure **)p);
     }
 }
 #else
 void
-markSignalHandlers (evac_fn evac STG_UNUSED)
+markSignalHandlers (evac_fn evac STG_UNUSED, void *user STG_UNUSED)
 {
 }
 #endif

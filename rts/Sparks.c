@@ -162,6 +162,74 @@ newSpark (StgRegTable *reg, StgClosure *p)
     return 1;
 }
 
+/* -----------------------------------------------------------------------------
+ * Mark all nodes pointed to by sparks in the spark queues (for GC) Does an
+ * implicit slide i.e. after marking all sparks are at the beginning of the
+ * spark pool and the spark pool only contains sparkable closures 
+ * -------------------------------------------------------------------------- */
+
+void
+markSparkQueue (evac_fn evac, void *user, Capability *cap)
+{ 
+    StgClosure **sparkp, **to_sparkp;
+    nat n, pruned_sparks; // stats only
+    StgSparkPool *pool;
+    
+    PAR_TICKY_MARK_SPARK_QUEUE_START();
+    
+    n = 0;
+    pruned_sparks = 0;
+    
+    pool = &(cap->r.rSparks);
+    
+    ASSERT_SPARK_POOL_INVARIANTS(pool);
+    
+#if defined(PARALLEL_HASKELL)
+    // stats only
+    n = 0;
+    pruned_sparks = 0;
+#endif
+	
+    sparkp = pool->hd;
+    to_sparkp = pool->hd;
+    while (sparkp != pool->tl) {
+        ASSERT(*sparkp!=NULL);
+        ASSERT(LOOKS_LIKE_CLOSURE_PTR(((StgClosure *)*sparkp)));
+        // ToDo?: statistics gathering here (also for GUM!)
+        if (closure_SHOULD_SPARK(*sparkp)) {
+            evac(user, sparkp);
+            *to_sparkp++ = *sparkp;
+            if (to_sparkp == pool->lim) {
+                to_sparkp = pool->base;
+            }
+            n++;
+        } else {
+            pruned_sparks++;
+        }
+        sparkp++;
+        if (sparkp == pool->lim) {
+            sparkp = pool->base;
+        }
+    }
+    pool->tl = to_sparkp;
+	
+    PAR_TICKY_MARK_SPARK_QUEUE_END(n);
+	
+#if defined(PARALLEL_HASKELL)
+    debugTrace(DEBUG_sched, 
+               "marked %d sparks and pruned %d sparks on [%x]",
+               n, pruned_sparks, mytid);
+#else
+    debugTrace(DEBUG_sched, 
+               "marked %d sparks and pruned %d sparks",
+               n, pruned_sparks);
+#endif
+    
+    debugTrace(DEBUG_sched,
+               "new spark queue len=%d; (hd=%p; tl=%p)\n",
+               sparkPoolSize(pool), pool->hd, pool->tl);
+}
+
 #else
 
 StgInt
@@ -170,6 +238,7 @@ newSpark (StgRegTable *reg STG_UNUSED, StgClosure *p STG_UNUSED)
     /* nothing */
     return 1;
 }
+
 
 #endif /* PARALLEL_HASKELL || THREADED_RTS */
 

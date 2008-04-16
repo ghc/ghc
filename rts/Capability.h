@@ -235,6 +235,10 @@ extern void grabCapability (Capability **pCap);
 // Free a capability on exit
 void freeCapability (Capability *cap);
 
+// FOr the GC:
+void markSomeCapabilities (evac_fn evac, void *user, nat i0, nat delta);
+void markCapabilities (evac_fn evac, void *user);
+
 /* -----------------------------------------------------------------------------
  * INLINE functions... private below here
  * -------------------------------------------------------------------------- */

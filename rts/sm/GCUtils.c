@@ -15,6 +15,7 @@
 #include "RtsFlags.h"
 #include "Storage.h"
 #include "GC.h"
+#include "GCThread.h"
 #include "GCUtils.h"
 #include "Printer.h"
 #include "Trace.h"

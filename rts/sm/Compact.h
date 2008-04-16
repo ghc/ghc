@@ -74,6 +74,6 @@ is_marked(StgPtr p, bdescr *bd)
     return (*bitmap_word & bit_mask);
 }
 
-void compact(void);
+extern void compact (StgClosure *static_objects);
 
 #endif /* GCCOMPACT_H */

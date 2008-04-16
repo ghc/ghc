@@ -15,6 +15,7 @@
 #include "Storage.h"
 #include "MarkWeak.h"
 #include "GC.h"
+#include "GCThread.h"
 #include "Evac.h"
 #include "Trace.h"
 #include "Schedule.h"

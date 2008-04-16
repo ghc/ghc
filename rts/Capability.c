@@ -759,3 +759,53 @@ freeCapability (Capability *cap) {
 #endif
 }
 
+/* ---------------------------------------------------------------------------
+   Mark everything directly reachable from the Capabilities.  When
+   using multiple GC threads, each GC thread marks all Capabilities
+   for which (c `mod` n == 0), for Capability c and thread n.
+   ------------------------------------------------------------------------ */
+
+void
+markSomeCapabilities (evac_fn evac, void *user, nat i0, nat delta)
+{
+    nat i;
+    Capability *cap;
+    Task *task;
+
+    // Each GC thread is responsible for following roots from the
+    // Capability of the same number.  There will usually be the same
+    // or fewer Capabilities as GC threads, but just in case there
+    // are more, we mark every Capability whose number is the GC
+    // thread's index plus a multiple of the number of GC threads.
+    for (i = i0; i < n_capabilities; i += delta) {
+	cap = &capabilities[i];
+	evac(user, (StgClosure **)(void *)&cap->run_queue_hd);
+	evac(user, (StgClosure **)(void *)&cap->run_queue_tl);
+#if defined(THREADED_RTS)
+	evac(user, (StgClosure **)(void *)&cap->wakeup_queue_hd);
+	evac(user, (StgClosure **)(void *)&cap->wakeup_queue_tl);
+#endif
+	for (task = cap->suspended_ccalling_tasks; task != NULL; 
+	     task=task->next) {
+	    debugTrace(DEBUG_sched,
+		       "evac'ing suspended TSO %lu", (unsigned long)task->suspended_tso->id);
+	    evac(user, (StgClosure **)(void *)&task->suspended_tso);
+	}
+
+#if defined(THREADED_RTS)
+        markSparkQueue (evac, user, cap);
+#endif
+    }
+    
+#if !defined(THREADED_RTS)
+    evac(user, (StgClosure **)(void *)&blocked_queue_hd);
+    evac(user, (StgClosure **)(void *)&blocked_queue_tl);
+    evac(user, (StgClosure **)(void *)&sleeping_queue);
+#endif 
+}
+
+void
+markCapabilities (evac_fn evac, void *user)
+{
+    markSomeCapabilities(evac, user, 0, 1);
+}

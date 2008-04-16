@@ -17,8 +17,6 @@
 #include "Profiling.h"
 #include "GetTime.h"
 #include "GC.h"
-#include "GCUtils.h"
-#include "Evac.h"
 
 #if USE_PAPI
 #include "Papi.h"

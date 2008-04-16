@@ -30,7 +30,6 @@
 #include "OSMem.h"
 #include "Trace.h"
 #include "GC.h"
-#include "GCUtils.h"
 #include "Evac.h"
 
 #include <stdlib.h>

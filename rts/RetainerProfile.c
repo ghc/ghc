@@ -1800,7 +1800,7 @@ inner_loop:
  *  Compute the retainer set for every object reachable from *tl.
  * -------------------------------------------------------------------------- */
 static void
-retainRoot( StgClosure **tl )
+retainRoot(void *user STG_UNUSED, StgClosure **tl)
 {
     StgClosure *c;
 
@@ -1837,7 +1837,7 @@ computeRetainerSet( void )
     RetainerSet tmpRetainerSet;
 #endif
 
-    GetRoots(retainRoot);	// for scheduler roots
+    markCapabilities(retainRoot, NULL);	// for scheduler roots
 
     // This function is called after a major GC, when key, value, and finalizer
     // all are guaranteed to be valid, or reachable.
@@ -1846,10 +1846,10 @@ computeRetainerSet( void )
     // for retainer profilng.
     for (weak = weak_ptr_list; weak != NULL; weak = weak->link)
 	// retainRoot((StgClosure *)weak);
-	retainRoot((StgClosure **)&weak);
+	retainRoot((StgClosure **)&weak, NULL);
 
     // Consider roots from the stable ptr table.
-    markStablePtrTable(retainRoot);
+    markStablePtrTable(retainRoot, NULL);
 
     // The following code resets the rs field of each unvisited mutable
     // object (computing sumOfNewCostExtra and updating costArray[] when

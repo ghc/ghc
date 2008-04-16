@@ -43,6 +43,7 @@
 #include "Papi.h"
 
 #include "GC.h"
+#include "GCThread.h"
 #include "Compact.h"
 #include "Evac.h"
 #include "Scav.h"
@@ -132,7 +133,7 @@ SpinLock recordMutableGen_sync;
    Static function declarations
    -------------------------------------------------------------------------- */
 
-static void mark_root               (StgClosure **root);
+static void mark_root               (void *user, StgClosure **root);
 static void zero_static_object_list (StgClosure* first_static);
 static nat  initialise_N            (rtsBool force_major_gc);
 static void alloc_gc_threads        (void);
@@ -322,15 +323,15 @@ GarbageCollect ( rtsBool force_major_gc )
 
   // follow roots from the CAF list (used by GHCi)
   gct->evac_step = 0;
-  markCAFs(mark_root);
+  markCAFs(mark_root, gct);
 
   // follow all the roots that the application knows about.
   gct->evac_step = 0;
-  GetRoots(mark_root);
+  markSomeCapabilities(mark_root, gct, gct->thread_index, n_gc_threads);
 
 #if defined(RTS_USER_SIGNALS)
   // mark the signal handlers (signals should be already blocked)
-  markSignalHandlers(mark_root);
+  markSignalHandlers(mark_root, gct);
 #endif
 
   // Mark the weak pointer list, and prepare to detect dead weak pointers.
@@ -338,7 +339,7 @@ GarbageCollect ( rtsBool force_major_gc )
   initWeakForGC();
 
   // Mark the stable pointer table.
-  markStablePtrTable(mark_root);
+  markStablePtrTable(mark_root, gct);
 
   /* -------------------------------------------------------------------------
    * Repeatedly scavenge all the areas we know about until there's no
@@ -389,7 +390,7 @@ GarbageCollect ( rtsBool force_major_gc )
   if (major_gc && oldest_gen->steps[0].is_compacted) {
       // save number of blocks for stats
       oldgen_saved_blocks = oldest_gen->steps[0].n_old_blocks;
-      compact();
+      compact(gct->scavenged_static_objects);
   }
 
   IF_DEBUG(sanity, checkGlobalTSOList(rtsFalse));
@@ -738,212 +739,6 @@ GarbageCollect ( rtsBool force_major_gc )
 }
 
 /* -----------------------------------------------------------------------------
- * Mark all nodes pointed to by sparks in the spark queues (for GC) Does an
- * implicit slide i.e. after marking all sparks are at the beginning of the
- * spark pool and the spark pool only contains sparkable closures 
- * -------------------------------------------------------------------------- */
-
-#ifdef THREADED_RTS
-static void
-markSparkQueue (evac_fn evac, Capability *cap)
-{ 
-    StgClosure **sparkp, **to_sparkp;
-    nat n, pruned_sparks; // stats only
-    StgSparkPool *pool;
-    
-    PAR_TICKY_MARK_SPARK_QUEUE_START();
-    
-    n = 0;
-    pruned_sparks = 0;
-    
-    pool = &(cap->r.rSparks);
-    
-    ASSERT_SPARK_POOL_INVARIANTS(pool);
-    
-#if defined(PARALLEL_HASKELL)
-    // stats only
-    n = 0;
-    pruned_sparks = 0;
-#endif
-	
-    sparkp = pool->hd;
-    to_sparkp = pool->hd;
-    while (sparkp != pool->tl) {
-        ASSERT(*sparkp!=NULL);
-        ASSERT(LOOKS_LIKE_CLOSURE_PTR(((StgClosure *)*sparkp)));
-        // ToDo?: statistics gathering here (also for GUM!)
-        if (closure_SHOULD_SPARK(*sparkp)) {
-            evac(sparkp);
-            *to_sparkp++ = *sparkp;
-            if (to_sparkp == pool->lim) {
-                to_sparkp = pool->base;
-            }
-            n++;
-        } else {
-            pruned_sparks++;
-        }
-        sparkp++;
-        if (sparkp == pool->lim) {
-            sparkp = pool->base;
-        }
-    }
-    pool->tl = to_sparkp;
-	
-    PAR_TICKY_MARK_SPARK_QUEUE_END(n);
-	
-#if defined(PARALLEL_HASKELL)
-    debugTrace(DEBUG_sched, 
-               "marked %d sparks and pruned %d sparks on [%x]",
-               n, pruned_sparks, mytid);
-#else
-    debugTrace(DEBUG_sched, 
-               "marked %d sparks and pruned %d sparks",
-               n, pruned_sparks);
-#endif
-    
-    debugTrace(DEBUG_sched,
-               "new spark queue len=%d; (hd=%p; tl=%p)\n",
-               sparkPoolSize(pool), pool->hd, pool->tl);
-}
-#endif
-
-/* ---------------------------------------------------------------------------
-   Where are the roots that we know about?
-
-        - all the threads on the runnable queue
-        - all the threads on the blocked queue
-        - all the threads on the sleeping queue
-	- all the thread currently executing a _ccall_GC
-        - all the "main threads"
-     
-   ------------------------------------------------------------------------ */
-
-void
-GetRoots( evac_fn evac )
-{
-    nat i;
-    Capability *cap;
-    Task *task;
-
-    // Each GC thread is responsible for following roots from the
-    // Capability of the same number.  There will usually be the same
-    // or fewer Capabilities as GC threads, but just in case there
-    // are more, we mark every Capability whose number is the GC
-    // thread's index plus a multiple of the number of GC threads.
-    for (i = gct->thread_index; i < n_capabilities; i += n_gc_threads) {
-	cap = &capabilities[i];
-	evac((StgClosure **)(void *)&cap->run_queue_hd);
-	evac((StgClosure **)(void *)&cap->run_queue_tl);
-#if defined(THREADED_RTS)
-	evac((StgClosure **)(void *)&cap->wakeup_queue_hd);
-	evac((StgClosure **)(void *)&cap->wakeup_queue_tl);
-#endif
-	for (task = cap->suspended_ccalling_tasks; task != NULL; 
-	     task=task->next) {
-	    debugTrace(DEBUG_sched,
-		       "evac'ing suspended TSO %lu", (unsigned long)task->suspended_tso->id);
-	    evac((StgClosure **)(void *)&task->suspended_tso);
-	}
-
-#if defined(THREADED_RTS)
-        markSparkQueue(evac,cap);
-#endif
-    }
-    
-#if !defined(THREADED_RTS)
-    evac((StgClosure **)(void *)&blocked_queue_hd);
-    evac((StgClosure **)(void *)&blocked_queue_tl);
-    evac((StgClosure **)(void *)&sleeping_queue);
-#endif 
-}
-
-/* -----------------------------------------------------------------------------
-   isAlive determines whether the given closure is still alive (after
-   a garbage collection) or not.  It returns the new address of the
-   closure if it is alive, or NULL otherwise.
-
-   NOTE: Use it before compaction only!
-         It untags and (if needed) retags pointers to closures.
-   -------------------------------------------------------------------------- */
-
-
-StgClosure *
-isAlive(StgClosure *p)
-{
-  const StgInfoTable *info;
-  bdescr *bd;
-  StgWord tag;
-  StgClosure *q;
-
-  while (1) {
-    /* The tag and the pointer are split, to be merged later when needed. */
-    tag = GET_CLOSURE_TAG(p);
-    q = UNTAG_CLOSURE(p);
-
-    ASSERT(LOOKS_LIKE_CLOSURE_PTR(q));
-    info = get_itbl(q);
-
-    // ignore static closures 
-    //
-    // ToDo: for static closures, check the static link field.
-    // Problem here is that we sometimes don't set the link field, eg.
-    // for static closures with an empty SRT or CONSTR_STATIC_NOCAFs.
-    //
-    if (!HEAP_ALLOCED(q)) {
-	return p;
-    }
-
-    // ignore closures in generations that we're not collecting. 
-    bd = Bdescr((P_)q);
-    if (bd->gen_no > N) {
-	return p;
-    }
-
-    // if it's a pointer into to-space, then we're done
-    if (bd->flags & BF_EVACUATED) {
-	return p;
-    }
-
-    // large objects use the evacuated flag
-    if (bd->flags & BF_LARGE) {
-	return NULL;
-    }
-
-    // check the mark bit for compacted steps
-    if ((bd->flags & BF_COMPACTED) && is_marked((P_)q,bd)) {
-	return p;
-    }
-
-    switch (info->type) {
-
-    case IND:
-    case IND_STATIC:
-    case IND_PERM:
-    case IND_OLDGEN:		// rely on compatible layout with StgInd 
-    case IND_OLDGEN_PERM:
-      // follow indirections 
-      p = ((StgInd *)q)->indirectee;
-      continue;
-
-    case EVACUATED:
-      // alive! 
-      return ((StgEvacuated *)q)->evacuee;
-
-    case TSO:
-      if (((StgTSO *)q)->what_next == ThreadRelocated) {
-	p = (StgClosure *)((StgTSO *)q)->link;
-	continue;
-      } 
-      return NULL;
-
-    default:
-      // dead. 
-      return NULL;
-    }
-  }
-}
-
-/* -----------------------------------------------------------------------------
    Figure out which generation to collect, initialise N and major_gc.
 
    Also returns the total number of blocks in generations that will be
@@ -1111,7 +906,7 @@ gc_thread_work (void)
 
     // Every thread evacuates some roots.
     gct->evac_step = 0;
-    GetRoots(mark_root);
+    markSomeCapabilities(mark_root, gct, gct->thread_index, n_gc_threads);
 
 loop:
     scavenge_loop();
@@ -1461,13 +1256,24 @@ init_gc_thread (gc_thread *t)
 }
 
 /* -----------------------------------------------------------------------------
-   Function we pass to GetRoots to evacuate roots.
+   Function we pass to evacuate roots.
    -------------------------------------------------------------------------- */
 
 static void
-mark_root(StgClosure **root)
+mark_root(void *user, StgClosure **root)
 {
-  evacuate(root);
+    // we stole a register for gct, but this function is called from
+    // *outside* the GC where the register variable is not in effect,
+    // so we need to save and restore it here.  NB. only call
+    // mark_root() from the main GC thread, otherwise gct will be
+    // incorrect.
+    gc_thread *saved_gct;
+    saved_gct = gct;
+    gct = user;
+    
+    evacuate(root);
+    
+    gct = saved_gct;
 }
 
 /* -----------------------------------------------------------------------------
@@ -1486,42 +1292,6 @@ zero_static_object_list(StgClosure* first_static)
     link = *STATIC_LINK(info, p);
     *STATIC_LINK(info,p) = NULL;
   }
-}
-
-/* -----------------------------------------------------------------------------
-   Reverting CAFs
-   -------------------------------------------------------------------------- */
-
-void
-revertCAFs( void )
-{
-    StgIndStatic *c;
-
-    for (c = (StgIndStatic *)revertible_caf_list; c != NULL; 
-	 c = (StgIndStatic *)c->static_link) 
-    {
-	SET_INFO(c, c->saved_info);
-	c->saved_info = NULL;
-	// could, but not necessary: c->static_link = NULL; 
-    }
-    revertible_caf_list = NULL;
-}
-
-void
-markCAFs( evac_fn evac )
-{
-    StgIndStatic *c;
-
-    for (c = (StgIndStatic *)caf_list; c != NULL; 
-	 c = (StgIndStatic *)c->static_link) 
-    {
-	evac(&c->indirectee);
-    }
-    for (c = (StgIndStatic *)revertible_caf_list; c != NULL; 
-	 c = (StgIndStatic *)c->static_link) 
-    {
-	evac(&c->indirectee);
-    }
 }
 
 /* ----------------------------------------------------------------------------

@@ -13,10 +13,6 @@
 
 #include "SMP.h"
 
-#ifdef THREADED_RTS
-extern SpinLock gc_alloc_block_sync;
-#endif
-
 bdescr *allocBlock_sync(void);
 void    freeChain_sync(bdescr *bd);
 

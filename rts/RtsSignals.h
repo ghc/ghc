@@ -73,7 +73,7 @@ extern void awaitUserSignals(void);
  * Evacuate the handler queue. _Assumes_ that console event delivery
  * has already been blocked.
  */
-extern void markSignalHandlers (evac_fn evac);
+extern void markSignalHandlers (evac_fn evac, void *user);
 
 #endif /* RTS_USER_SIGNALS */
 

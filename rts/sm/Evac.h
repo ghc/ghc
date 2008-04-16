@@ -31,7 +31,3 @@ REGPARM1 void evacuate  (StgClosure **p);
 REGPARM1 void evacuate1 (StgClosure **p);
 
 extern lnat thunk_selector_depth;
-
-#if defined(PROF_SPIN) && defined(THREADED_RTS)
-StgWord64 whitehole_spin;
-#endif

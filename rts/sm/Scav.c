@@ -16,6 +16,7 @@
 #include "Storage.h"
 #include "MBlock.h"
 #include "GC.h"
+#include "GCThread.h"
 #include "GCUtils.h"
 #include "Compact.h"
 #include "Evac.h"

@@ -16,6 +16,7 @@
 #include "MBlock.h"
 #include "Evac.h"
 #include "GC.h"
+#include "GCThread.h"
 #include "GCUtils.h"
 #include "Compact.h"
 #include "Prelude.h"

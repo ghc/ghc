@@ -323,7 +323,7 @@ enlargeStablePtrTable(void)
  * -------------------------------------------------------------------------- */
 
 void
-markStablePtrTable(evac_fn evac)
+markStablePtrTable(evac_fn evac, void *user)
 {
     snEntry *p, *end_stable_ptr_table;
     StgPtr q;
@@ -347,7 +347,7 @@ markStablePtrTable(evac_fn evac)
 
 	    // if the ref is non-zero, treat addr as a root
 	    if (p->ref != 0) {
-		evac((StgClosure **)&p->addr);
+		evac(user, (StgClosure **)&p->addr);
 	    }
 	}
     }
@@ -362,7 +362,7 @@ markStablePtrTable(evac_fn evac)
  * -------------------------------------------------------------------------- */
 
 void
-threadStablePtrTable( evac_fn evac )
+threadStablePtrTable( evac_fn evac, void *user )
 {
     snEntry *p, *end_stable_ptr_table;
     StgPtr q;
@@ -372,12 +372,12 @@ threadStablePtrTable( evac_fn evac )
     for (p = stable_ptr_table+1; p < end_stable_ptr_table; p++) {
 	
 	if (p->sn_obj != NULL) {
-	    evac((StgClosure **)&p->sn_obj);
+	    evac(user, (StgClosure **)&p->sn_obj);
 	}
 
 	q = p->addr;
 	if (q && (q < (P_)stable_ptr_table || q >= (P_)end_stable_ptr_table)) {
-	    evac((StgClosure **)&p->addr);
+	    evac(user, (StgClosure **)&p->addr);
 	}
     }
 }

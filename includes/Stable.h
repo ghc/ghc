@@ -59,8 +59,8 @@ extern void    exitStablePtrTable    ( void );
 extern void    enlargeStablePtrTable ( void );
 extern StgWord lookupStableName      ( StgPtr p );
 
-extern void    markStablePtrTable    ( evac_fn evac );
-extern void    threadStablePtrTable  ( evac_fn evac );
+extern void    markStablePtrTable    ( evac_fn evac, void *user );
+extern void    threadStablePtrTable  ( evac_fn evac, void *user );
 extern void    gcStablePtrTable      ( void );
 extern void    updateStablePtrTable  ( rtsBool full );
 
