@@ -134,7 +134,7 @@ SpinLock recordMutableGen_sync;
 
 static void mark_root               (StgClosure **root);
 static void zero_static_object_list (StgClosure* first_static);
-static void initialise_N            (rtsBool force_major_gc);
+static nat  initialise_N            (rtsBool force_major_gc);
 static void alloc_gc_threads        (void);
 static void init_collected_gen      (nat g, nat threads);
 static void init_uncollected_gen    (nat g, nat threads);
@@ -147,6 +147,7 @@ static void gc_thread_work          (void);
 static nat  inc_running             (void);
 static nat  dec_running             (void);
 static void wakeup_gc_threads       (nat n_threads);
+static void shutdown_gc_threads     (nat n_threads);
 
 #if 0 && defined(DEBUG)
 static void gcCAFs                  (void);
@@ -183,7 +184,7 @@ GarbageCollect ( rtsBool force_major_gc )
   lnat live, allocated;
   lnat oldgen_saved_blocks = 0;
   gc_thread *saved_gct;
-  nat g, s, t;
+  nat g, s, t, n;
 
   // necessary if we stole a callee-saves register for gct:
   saved_gct = gct;
@@ -228,7 +229,7 @@ GarbageCollect ( rtsBool force_major_gc )
 
   /* Figure out which generation to collect
    */
-  initialise_N(force_major_gc);
+  n = initialise_N(force_major_gc);
 
   /* Allocate + initialise the gc_thread structures.
    */
@@ -242,11 +243,13 @@ GarbageCollect ( rtsBool force_major_gc )
    * We don't try to parallelise minor GC.
    */
 #if defined(THREADED_RTS)
-  if (N == 0) {
+  if (n < (4*1024*1024 / BLOCK_SIZE)) {
       n_gc_threads = 1;
   } else {
       n_gc_threads = RtsFlags.ParFlags.gcThreads;
   }
+  trace(TRACE_gc|DEBUG_gc, "GC: %dk to collect, using %d thread(s)",
+        n * (BLOCK_SIZE / 1024), n_gc_threads);
 #else
   n_gc_threads = 1;
 #endif
@@ -264,6 +267,11 @@ GarbageCollect ( rtsBool force_major_gc )
 
   // check stack sanity *before* GC (ToDo: check all threads) 
   IF_DEBUG(sanity, checkFreeListSanity());
+
+  // Initialise all our gc_thread structures
+  for (t = 0; t < n_gc_threads; t++) {
+      init_gc_thread(gc_threads[t]);
+  }
 
   // Initialise all the generations/steps that we're collecting.
   for (g = 0; g <= N; g++) {
@@ -286,16 +294,6 @@ GarbageCollect ( rtsBool force_major_gc )
       mark_stack_bdescr = NULL;
   }
 
-  // Initialise all our gc_thread structures
-  for (t = 0; t < n_gc_threads; t++) {
-      init_gc_thread(gc_threads[t]);
-  }
-
-  // the main thread is running: this prevents any other threads from
-  // exiting prematurely, so we can start them now.
-  inc_running();
-  wakeup_gc_threads(n_gc_threads);
-
   // this is the main thread
   gct = gc_threads[0];
 
@@ -307,15 +305,21 @@ GarbageCollect ( rtsBool force_major_gc )
    * Also do them in reverse generation order, for the usual reason:
    * namely to reduce the likelihood of spurious old->new pointers.
    */
-  { 
-    for (g = RtsFlags.GcFlags.generations-1; g > N; g--) {
+  for (g = RtsFlags.GcFlags.generations-1; g > N; g--) {
       generations[g].saved_mut_list = generations[g].mut_list;
       generations[g].mut_list = allocBlock(); 
-        // mut_list always has at least one block.
-    }
-    for (g = RtsFlags.GcFlags.generations-1; g > N; g--) {
+      // mut_list always has at least one block.
+  }
+
+  // the main thread is running: this prevents any other threads from
+  // exiting prematurely, so we can start them now.
+  // NB. do this after the mutable lists have been saved above, otherwise
+  // the other GC threads will be writing into the old mutable lists.
+  inc_running();
+  wakeup_gc_threads(n_gc_threads);
+
+  for (g = RtsFlags.GcFlags.generations-1; g > N; g--) {
       scavenge_mutable_list(&generations[g]);
-    }
   }
 
   // follow roots from the CAF list (used by GHCi)
@@ -365,6 +369,8 @@ GarbageCollect ( rtsBool force_major_gc )
       // If we get to here, there's really nothing left to do.
       break;
   }
+
+  shutdown_gc_threads(n_gc_threads);
 
   // Update pointers from the Task list
   update_task_list();
@@ -901,27 +907,44 @@ isAlive(StgClosure *p)
 
 /* -----------------------------------------------------------------------------
    Figure out which generation to collect, initialise N and major_gc.
+
+   Also returns the total number of blocks in generations that will be
+   collected.
    -------------------------------------------------------------------------- */
 
-static void
+static nat
 initialise_N (rtsBool force_major_gc)
 {
-    nat g;
+    int g;
+    nat s, blocks, blocks_total;
+
+    blocks = 0;
+    blocks_total = 0;
 
     if (force_major_gc) {
-	N = RtsFlags.GcFlags.generations - 1;
-	major_gc = rtsTrue;
+        N = RtsFlags.GcFlags.generations - 1;
     } else {
-	N = 0;
-	for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-	    if (generations[g].steps[0].n_blocks +
-		generations[g].steps[0].n_large_blocks
-		>= generations[g].max_blocks) {
-		N = g;
-	    }
-	}
-	major_gc = (N == RtsFlags.GcFlags.generations-1);
+        N = 0;
     }
+
+    for (g = RtsFlags.GcFlags.generations - 1; g >= 0; g--) {
+        blocks = 0;
+        for (s = 0; s < generations[g].n_steps; s++) {
+            blocks += generations[g].steps[s].n_blocks;
+            blocks += generations[g].steps[s].n_large_blocks;
+        }
+        if (blocks >= generations[g].max_blocks) {
+            N = stg_max(N,g);
+        }
+        if ((nat)g <= N) {
+            blocks_total += blocks;
+        }
+    }
+
+    blocks_total += countNurseryBlocks();
+
+    major_gc = (N == RtsFlags.GcFlags.generations-1);
+    return blocks_total;
 }
 
 /* -----------------------------------------------------------------------------
@@ -1016,6 +1039,7 @@ inc_running (void)
     ACQUIRE_LOCK(&gc_running_mutex);
     n_running = ++gc_running_threads;
     RELEASE_LOCK(&gc_running_mutex);
+    ASSERT(n_running <= n_gc_threads);
     return n_running;
 }
 
@@ -1024,6 +1048,7 @@ dec_running (void)
 {
     nat n_running;
     ACQUIRE_LOCK(&gc_running_mutex);
+    ASSERT(n_gc_threads != 0);
     n_running = --gc_running_threads;
     RELEASE_LOCK(&gc_running_mutex);
     return n_running;
@@ -1082,13 +1107,13 @@ gc_thread_mainloop (void)
 
 	// Wait until we're told to wake up
 	ACQUIRE_LOCK(&gct->wake_mutex);
+	gct->wakeup = rtsFalse;
 	while (!gct->wakeup) {
 	    debugTrace(DEBUG_gc, "GC thread %d standing by...", 
 		       gct->thread_index);
 	    waitCondition(&gct->wake_cond, &gct->wake_mutex);
 	}
 	RELEASE_LOCK(&gct->wake_mutex);
-	gct->wakeup = rtsFalse;
 	if (gct->exit) break;
 
 #ifdef USE_PAPI
@@ -1153,6 +1178,26 @@ wakeup_gc_threads (nat n_threads USED_IF_THREADS)
 	gc_threads[i]->wakeup = rtsTrue;
 	signalCondition(&gc_threads[i]->wake_cond);
 	RELEASE_LOCK(&gc_threads[i]->wake_mutex);
+    }
+#endif
+}
+
+// After GC is complete, we must wait for all GC threads to enter the
+// standby state, otherwise they may still be executing inside
+// any_work(), and may even remain awake until the next GC starts.
+static void
+shutdown_gc_threads (nat n_threads USED_IF_THREADS)
+{
+#if defined(THREADED_RTS)
+    nat i;
+    rtsBool wakeup;
+    for (i=1; i < n_threads; i++) {
+        do {
+            ACQUIRE_LOCK(&gc_threads[i]->wake_mutex);
+            wakeup = gc_threads[i]->wakeup;
+            // wakeup is false while the thread is waiting
+            RELEASE_LOCK(&gc_threads[i]->wake_mutex);
+        } while (wakeup);
     }
 #endif
 }
