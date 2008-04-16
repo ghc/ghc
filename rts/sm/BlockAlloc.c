@@ -155,19 +155,18 @@ void initBlockAllocator(void)
    -------------------------------------------------------------------------- */
 
 STATIC_INLINE void
-initGroup(nat n, bdescr *head)
+initGroup(bdescr *head)
 {
   bdescr *bd;
-  nat i;
+  nat i, n;
 
-  if (n != 0) {
-    head->free   = head->start;
-    head->link   = NULL;
-    for (i=1, bd = head+1; i < n; i++, bd++) {
+  n = head->blocks;
+  head->free   = head->start;
+  head->link   = NULL;
+  for (i=1, bd = head+1; i < n; i++, bd++) {
       bd->free = 0;
       bd->blocks = 0;
       bd->link = head;
-    }
   }
 }
 
@@ -269,7 +268,7 @@ alloc_mega_group (nat mblocks)
             } else {
                 free_mblock_list = bd->link;
             }
-            initGroup(n, bd);
+            initGroup(bd);
             return bd;
         }
         else if (bd->blocks > n)
@@ -319,7 +318,7 @@ allocGroup (nat n)
     {
         bd = alloc_mega_group(BLOCKS_TO_MBLOCKS(n));
         // only the bdescrs of the first MB are required to be initialised
-        initGroup(BLOCKS_PER_MBLOCK, bd);
+        initGroup(bd);
         IF_DEBUG(sanity, checkFreeListSanity());
         return bd;
     }
@@ -341,10 +340,10 @@ allocGroup (nat n)
 
         bd = alloc_mega_group(1);
         bd->blocks = n;
-        initGroup(n,bd);		         // we know the group will fit
+        initGroup(bd);		         // we know the group will fit
         rem = bd + n;
         rem->blocks = BLOCKS_PER_MBLOCK-n;
-        initGroup(BLOCKS_PER_MBLOCK-n, rem); // init the slop
+        initGroup(rem); // init the slop
         n_alloc_blocks += rem->blocks;
         freeGroup(rem);      	         // add the slop on to the free list
         IF_DEBUG(sanity, checkFreeListSanity());
@@ -365,7 +364,7 @@ allocGroup (nat n)
     {
         barf("allocGroup: free list corrupted");
     }
-    initGroup(n, bd);		// initialise it
+    initGroup(bd);		// initialise it
     IF_DEBUG(sanity, checkFreeListSanity());
     ASSERT(bd->blocks == n);
     return bd;
