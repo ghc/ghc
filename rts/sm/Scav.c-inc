@@ -48,7 +48,7 @@ scavenge_block (bdescr *bd)
   step_workspace *ws;
 
   debugTrace(DEBUG_gc, "scavenging block %p (gen %d, step %d) @ %p",
-	     bd->start, bd->gen_no, bd->step->no, p);
+	     bd->start, bd->gen_no, bd->step->no, bd->u.scan);
 
   gct->scan_bd = bd;
   gct->evac_step = bd->step;
