@@ -35,6 +35,7 @@ allocBlock_sync(void)
 }
 
 
+#if 0
 static void
 allocBlocks_sync(nat n, bdescr **hd, bdescr **tl, 
                  nat gen_no, step *stp,
@@ -56,6 +57,7 @@ allocBlocks_sync(nat n, bdescr **hd, bdescr **tl,
     *tl = &bd[n-1];
     RELEASE_SPIN_LOCK(&gc_alloc_block_sync);
 }
+#endif
 
 void
 freeChain_sync(bdescr *bd)
@@ -204,7 +206,7 @@ todo_block_full (nat size, step_workspace *ws)
 StgPtr
 alloc_todo_block (step_workspace *ws, nat size)
 {
-    bdescr *bd, *hd, *tl;
+    bdescr *bd/*, *hd, *tl*/;
 
     // Grab a part block if we have one, and it has enough room
     if (ws->part_list != NULL && 
@@ -216,14 +218,22 @@ alloc_todo_block (step_workspace *ws, nat size)
     }
     else
     {
-        allocBlocks_sync(4, &hd, &tl, 
-                         ws->step->gen_no, ws->step, BF_EVACUATED);
+        // blocks in to-space get the BF_EVACUATED flag.
 
-        tl->link = ws->part_list;
-        ws->part_list = hd->link;
-        ws->n_part_blocks += 3;
+//        allocBlocks_sync(4, &hd, &tl, 
+//                         ws->step->gen_no, ws->step, BF_EVACUATED);
+//
+//        tl->link = ws->part_list;
+//        ws->part_list = hd->link;
+//        ws->n_part_blocks += 3;
+//
+//        bd = hd;
 
-        bd = hd;
+        bd = allocBlock_sync();
+        bd->step = ws->step;
+        bd->gen_no = ws->step->gen_no;
+        bd->flags = BF_EVACUATED;
+        bd->u.scan = bd->free = bd->start;
     }
 
     bd->link = NULL;
