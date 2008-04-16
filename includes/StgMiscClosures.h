@@ -547,9 +547,6 @@ RTS_FUN(newByteArrayzh_fast);
 RTS_FUN(newPinnedByteArrayzh_fast);
 RTS_FUN(newArrayzh_fast);
 
-RTS_FUN(decodeFloatzh_fast);
-RTS_FUN(decodeDoublezh_fast);
-
 RTS_FUN(newMutVarzh_fast);
 RTS_FUN(atomicModifyMutVarzh_fast);
 
