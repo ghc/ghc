@@ -552,6 +552,7 @@ StgInt TOTAL_CALLS=1;
   statsPrintf("  (SLOW_CALLS_" #arity ") %% of (TOTAL_CALLS) : %.1f%%\n", \
 	      SLOW_CALLS_##arity * 100.0/TOTAL_CALLS)
 
+extern lnat hw_alloc_blocks;
 
 void
 stat_exit(int alloc)
@@ -600,8 +601,9 @@ stat_exit(int alloc)
 	    ullong_format_string(MaxSlop*sizeof(W_), temp, rtsTrue/*commas*/);
 	    statsPrintf("%16s bytes maximum slop\n", temp);
 
-	    statsPrintf("%16ld MB total memory in use\n\n", 
-		    mblocks_allocated * MBLOCK_SIZE / (1024 * 1024));
+	    statsPrintf("%16ld MB total memory in use (%ld MB lost due to fragmentation)\n\n", 
+                        mblocks_allocated * MBLOCK_SIZE_W / (1024 * 1024 / sizeof(W_)),
+                        (mblocks_allocated * MBLOCK_SIZE_W - hw_alloc_blocks * BLOCK_SIZE_W) / (1024 * 1024 / sizeof(W_)));
 
 	    /* Print garbage collections in each gen */
 	    for (g = 0; g < RtsFlags.GcFlags.generations; g++) {

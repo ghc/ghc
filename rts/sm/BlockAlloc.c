@@ -69,44 +69,50 @@ static void  initMBlock(void *mblock);
 
   Free lists
   ~~~~~~~~~~
+
   Preliminaries:
-    - most allocations are for single blocks
-    - we cannot be dependent on address-space ordering; sometimes the
-      OS gives us new memory backwards in the address space, sometimes
-      forwards
-    - We want to avoid fragmentation in the free list
-    
+    - most allocations are for small blocks
+    - sometimes the OS gives us new memory backwards in the address
+      space, sometimes forwards, so we should not be biased towards
+      any particular layout in the address space
+    - We want to avoid fragmentation
+    - We want allocation and freeing to be O(1) or close.
+
   Coalescing trick: when a bgroup is freed (freeGroup()), we can check
-  whether it can be coalesced with othre free bgroups by checking the
-  bdescrs for the blocks on either side of it.  This means that:
+  whether it can be coalesced with other free bgroups by checking the
+  bdescrs for the blocks on either side of it.  This means that we can
+  coalesce in O(1) time.  Every free bgroup must have its head and tail
+  bdescrs initialised, the rest don't matter.
 
-    - freeGroup is O(1) if we coalesce with an existing free block
-      group.  Otherwise we have to insert in the free list, but since
-      most blocks are small and the free list is sorted by size, this
-      is usually quick.
-    - the free list must be double-linked, so we can insert into the
-      middle.
-    - every free group in the free list must have its head and tail
-      bdescrs initialised, the rest don't matter.
-    - we cannot play this trick with mblocks, because there is no
-      requirement that the bdescrs in the second and subsequent mblock
-      of an mgroup are initialised (the mgroup might be filled with a
-      large array, overwriting the bdescrs for example).
+  We keep the free list in buckets, using a heap-sort strategy.
+  Bucket N contains blocks with sizes 2^N - 2^(N+1)-1.  The list of
+  blocks in each bucket is doubly-linked, so that if a block is
+  coalesced we can easily remove it from its current free list.
 
-  So there are two free lists:
+  To allocate a new block of size S, grab a block from bucket
+  log2ceiling(S) (i.e. log2() rounded up), in which all blocks are at
+  least as big as S, and split it if necessary.  If there are no
+  blocks in that bucket, look at bigger buckets until a block is found
+  Allocation is therefore O(logN) time.
 
-    - free_list contains bgroups smaller than an mblock.
-       - it is doubly-linked
-       - sorted in *size* order: allocation is best-fit
-       - free bgroups are always fully coalesced
-       - we do the coalescing trick in freeGroup()
+  To free a block:
+    - coalesce it with neighbours.
+    - remove coalesced neighbour(s) from free list(s)
+    - add the new (coalesced) block to the front of the appropriate
+      bucket, given by log2(S) where S is the size of the block.
 
-    - free_mblock_list contains mgroups only
-       - it is singly-linked (no need to double-link)
-       - sorted in *address* order, so we can coalesce using the list
-       - allocation is best-fit by traversing the whole list: we don't
-         expect this list to be long, avoiding fragmentation is more
-         important. 
+  Free is O(1).
+
+  We cannot play this coalescing trick with mblocks, because there is
+  no requirement that the bdescrs in the second and subsequent mblock
+  of an mgroup are initialised (the mgroup might be filled with a
+  large array, overwriting the bdescrs for example).
+
+  So there is a separate free list for megablocks, sorted in *address*
+  order, so that we can coalesce.  Allocation in this list is best-fit
+  by traversing the whole list: we don't expect this list to be long,
+  and allocation/freeing of large blocks is rare; avoiding
+  fragmentation is more important than performance here.
 
   freeGroup() might end up moving a block from free_list to
   free_mblock_list, if after coalescing we end up with a full mblock.
@@ -115,9 +121,19 @@ static void  initMBlock(void *mblock);
 
   --------------------------------------------------------------------------- */
 
-static bdescr *free_list;
+#define MAX_FREE_LIST 9
+
+static bdescr *free_list[MAX_FREE_LIST];
 static bdescr *free_mblock_list;
 
+// free_list[i] contains blocks that are at least size 2^i, and at
+// most size 2^(i+1) - 1.  
+// 
+// To find the free list in which to place a block, use log_2(size).
+// To find a free block of the right size, use log_2_ceil(size).
+
+lnat n_alloc_blocks;   // currently allocated blocks
+lnat hw_alloc_blocks;  // high-water allocated blocks
 
 /* -----------------------------------------------------------------------------
    Initialisation
@@ -125,8 +141,13 @@ static bdescr *free_mblock_list;
 
 void initBlockAllocator(void)
 {
-    free_list = NULL;
+    nat i;
+    for (i=0; i < MAX_FREE_LIST; i++) {
+        free_list[i] = NULL;
+    }
     free_mblock_list = NULL;
+    n_alloc_blocks = 0;
+    hw_alloc_blocks = 0;
 }
 
 /* -----------------------------------------------------------------------------
@@ -150,69 +171,42 @@ initGroup(nat n, bdescr *head)
   }
 }
 
-// when a block has been shortened by allocGroup(), we need to push
-// the remaining chunk backwards in the free list in order to keep the
-// list sorted by size.
-static void
-free_list_push_backwards (bdescr *bd)
+// There are quicker non-loopy ways to do log_2, but we expect n to be
+// usually small, and MAX_FREE_LIST is also small, so the loop version
+// might well be the best choice here.
+STATIC_INLINE nat
+log_2_ceil(nat n)
 {
-    bdescr *p;
-
-    p = bd->u.back;
-    while (p != NULL && p->blocks > bd->blocks) {
-        p = p->u.back;
+    nat i, x;
+    x = 1;
+    for (i=0; i < MAX_FREE_LIST; i++) {
+        if (x >= n) return i;
+        x = x << 1;
     }
-    if (p != bd->u.back) {
-        dbl_link_remove(bd, &free_list);
-        if (p != NULL)
-            dbl_link_insert_after(bd, p);
-        else
-            dbl_link_onto(bd, &free_list);
-    }
+    return MAX_FREE_LIST;
 }
 
-// when a block has been coalesced by freeGroup(), we need to push the
-// remaining chunk forwards in the free list in order to keep the list
-// sorted by size.
-static void
-free_list_push_forwards (bdescr *bd)
+STATIC_INLINE nat
+log_2(nat n)
 {
-    bdescr *p;
-
-    p = bd;
-    while (p->link != NULL && p->link->blocks < bd->blocks) {
-        p = p->link;
+    nat i, x;
+    x = n;
+    for (i=0; i < MAX_FREE_LIST; i++) {
+        x = x >> 1;
+        if (x == 0) return i;
     }
-    if (p != bd) {
-        dbl_link_remove(bd, &free_list);
-        dbl_link_insert_after(bd, p);
-    }
+    return MAX_FREE_LIST;
 }
 
-static void
+STATIC_INLINE void
 free_list_insert (bdescr *bd)
 {
-    bdescr *p, *prev;
+    nat ln;
 
-    if (!free_list) {
-        dbl_link_onto(bd, &free_list);
-        return;
-    }
-
-    prev = NULL;
-    p = free_list;
-    while (p != NULL && p->blocks < bd->blocks) {
-        prev = p;
-        p = p->link;
-    }
-    if (prev == NULL)
-    {
-        dbl_link_onto(bd, &free_list);
-    }
-    else 
-    {
-        dbl_link_insert_after(bd, prev);
-    }
+    ASSERT(bd->blocks < BLOCKS_PER_MBLOCK);
+    ln = log_2(bd->blocks);
+    
+    dbl_link_onto(bd, &free_list[ln]);
 }
 
 
@@ -241,16 +235,18 @@ setup_tail (bdescr *bd)
 // Take a free block group bd, and split off a group of size n from
 // it.  Adjust the free list as necessary, and return the new group.
 static bdescr *
-split_free_block (bdescr *bd, nat n)
+split_free_block (bdescr *bd, nat n, nat ln)
 {
     bdescr *fg; // free group
 
     ASSERT(bd->blocks > n);
+    dbl_link_remove(bd, &free_list[ln]);
     fg = bd + bd->blocks - n; // take n blocks off the end
     fg->blocks = n;
     bd->blocks -= n;
     setup_tail(bd);
-    free_list_push_backwards(bd);
+    ln = log_2(bd->blocks);
+    dbl_link_onto(bd, &free_list[ln]);
     return fg;
 }
 
@@ -309,12 +305,16 @@ bdescr *
 allocGroup (nat n)
 {
     bdescr *bd, *rem;
+    nat ln;
 
     // Todo: not true in multithreaded GC, where we use allocBlock_sync().
     // ASSERT_SM_LOCK();
 
     if (n == 0) barf("allocGroup: requested zero blocks");
     
+    n_alloc_blocks += n;
+    if (n_alloc_blocks > hw_alloc_blocks) hw_alloc_blocks = n_alloc_blocks;
+
     if (n >= BLOCKS_PER_MBLOCK)
     {
         bd = alloc_mega_group(BLOCKS_TO_MBLOCKS(n));
@@ -324,33 +324,42 @@ allocGroup (nat n)
         return bd;
     }
     
-    // The free list is sorted by size, so we get best fit.
-    for (bd = free_list; bd != NULL; bd = bd->link)
-    {
-        if (bd->blocks == n)	        // exactly the right size!
-        {
-            dbl_link_remove(bd, &free_list);
-            initGroup(n, bd);		// initialise it
-            IF_DEBUG(sanity, checkFreeListSanity());
-            return bd;
-        }
-        if (bd->blocks >  n)            // block too big...
-        {                              
-            bd = split_free_block(bd, n);
-            initGroup(n, bd);		// initialise the new chunk
-            IF_DEBUG(sanity, checkFreeListSanity());
-            return bd;
-        }
+    ln = log_2_ceil(n);
+
+    while (free_list[ln] == NULL && ln < MAX_FREE_LIST) {
+        ln++;
     }
 
-    bd = alloc_mega_group(1);
-    bd->blocks = n;
-    initGroup(n,bd);		         // we know the group will fit
-    rem = bd + n;
-    rem->blocks = BLOCKS_PER_MBLOCK-n;
-    initGroup(BLOCKS_PER_MBLOCK-n, rem); // init the slop
-    freeGroup(rem);      	         // add the slop on to the free list
+    if (ln == MAX_FREE_LIST) {
+        bd = alloc_mega_group(1);
+        bd->blocks = n;
+        initGroup(n,bd);		         // we know the group will fit
+        rem = bd + n;
+        rem->blocks = BLOCKS_PER_MBLOCK-n;
+        initGroup(BLOCKS_PER_MBLOCK-n, rem); // init the slop
+        n_alloc_blocks += rem->blocks;
+        freeGroup(rem);      	         // add the slop on to the free list
+        IF_DEBUG(sanity, checkFreeListSanity());
+        return bd;
+    }
+
+    bd = free_list[ln];
+
+    if (bd->blocks == n)	        // exactly the right size!
+    {
+        dbl_link_remove(bd, &free_list[ln]);
+    }
+    else if (bd->blocks >  n)            // block too big...
+    {                              
+        bd = split_free_block(bd, n, ln);
+    }
+    else
+    {
+        barf("allocGroup: free list corrupted");
+    }
+    initGroup(n, bd);		// initialise it
     IF_DEBUG(sanity, checkFreeListSanity());
+    ASSERT(bd->blocks == n);
     return bd;
 }
 
@@ -438,12 +447,14 @@ free_mega_group (bdescr *mg)
 void
 freeGroup(bdescr *p)
 {
-  nat p_on_free_list = 0;
+  nat ln;
 
   // Todo: not true in multithreaded GC
   // ASSERT_SM_LOCK();
 
   ASSERT(p->free != (P_)-1);
+
+  n_alloc_blocks -= p->blocks;
 
   p->free = (void *)-1;  /* indicates that this block is free */
   p->step = NULL;
@@ -468,16 +479,14 @@ freeGroup(bdescr *p)
       if (next <= LAST_BDESCR(MBLOCK_ROUND_DOWN(p)) && next->free == (P_)-1)
       {
           p->blocks += next->blocks;
+          ln = log_2(next->blocks);
+          dbl_link_remove(next, &free_list[ln]);
           if (p->blocks == BLOCKS_PER_MBLOCK)
           {
-              dbl_link_remove(next, &free_list);
               free_mega_group(p);
               return;
           }
-          dbl_link_replace(p, next, &free_list);
           setup_tail(p);
-          free_list_push_forwards(p);
-          p_on_free_list = 1;
       }
   }
 
@@ -490,34 +499,20 @@ freeGroup(bdescr *p)
 
       if (prev->free == (P_)-1)
       {
+          ln = log_2(prev->blocks);
+          dbl_link_remove(prev, &free_list[ln]);
           prev->blocks += p->blocks;
           if (prev->blocks >= BLOCKS_PER_MBLOCK)
           {
-              if (p_on_free_list)
-              {
-                  dbl_link_remove(p, &free_list);
-              }
-              dbl_link_remove(prev, &free_list);
               free_mega_group(prev);
               return;
           }
-          else if (p_on_free_list)
-          {
-              // p was already coalesced forwards
-              dbl_link_remove(p, &free_list);
-          }
-          setup_tail(prev);
-          free_list_push_forwards(prev);
           p = prev;
-          p_on_free_list = 1;
       }
   }
       
-  if (!p_on_free_list)
-  {
-      setup_tail(p);
-      free_list_insert(p);
-  }
+  setup_tail(p);
+  free_list_insert(p);
 
   IF_DEBUG(sanity, checkFreeListSanity());
 }
@@ -624,39 +619,41 @@ void
 checkFreeListSanity(void)
 {
     bdescr *bd, *prev;
+    nat ln, min;
 
-    IF_DEBUG(block_alloc, debugBelch("free block list:\n"));
 
-    prev = NULL;
-    for (bd = free_list; bd != NULL; prev = bd, bd = bd->link)
-    {
-        IF_DEBUG(block_alloc,
-                 debugBelch("group at %p, length %ld blocks\n", 
-                            bd->start, (long)bd->blocks));
-        ASSERT(bd->blocks > 0 && bd->blocks < BLOCKS_PER_MBLOCK);
-        ASSERT(bd->link != bd); // catch easy loops
+    min = 1;
+    for (ln = 0; ln < MAX_FREE_LIST; ln++) {
+        IF_DEBUG(block_alloc, debugBelch("free block list [%d]:\n", ln));
 
-        check_tail(bd);
-
-        if (prev)
-            ASSERT(bd->u.back == prev);
-        else 
-            ASSERT(bd->u.back == NULL);
-
-        if (bd->link != NULL)
+        prev = NULL;
+        for (bd = free_list[ln]; bd != NULL; prev = bd, bd = bd->link)
         {
-            // make sure the list is sorted
-            ASSERT(bd->blocks <= bd->link->blocks);
-        }
+            IF_DEBUG(block_alloc,
+                     debugBelch("group at %p, length %ld blocks\n", 
+                                bd->start, (long)bd->blocks));
+            ASSERT(bd->free == (P_)-1);
+            ASSERT(bd->blocks > 0 && bd->blocks < BLOCKS_PER_MBLOCK);
+            ASSERT(bd->blocks >= min && bd->blocks <= (min*2 - 1));
+            ASSERT(bd->link != bd); // catch easy loops
 
-        {
-            bdescr *next;
-            next = bd + bd->blocks;
-            if (next <= LAST_BDESCR(MBLOCK_ROUND_DOWN(bd)))
+            check_tail(bd);
+
+            if (prev)
+                ASSERT(bd->u.back == prev);
+            else 
+                ASSERT(bd->u.back == NULL);
+
             {
-                ASSERT(next->free != (P_)-1);
+                bdescr *next;
+                next = bd + bd->blocks;
+                if (next <= LAST_BDESCR(MBLOCK_ROUND_DOWN(bd)))
+                {
+                    ASSERT(next->free != (P_)-1);
+                }
             }
         }
+        min = min << 1;
     }
 
     prev = NULL;
@@ -693,9 +690,12 @@ countFreeList(void)
 {
   bdescr *bd;
   lnat total_blocks = 0;
+  nat ln;
 
-  for (bd = free_list; bd != NULL; bd = bd->link) {
-      total_blocks += bd->blocks;
+  for (ln=0; ln < MAX_FREE_LIST; ln++) {
+      for (bd = free_list[ln]; bd != NULL; bd = bd->link) {
+          total_blocks += bd->blocks;
+      }
   }
   for (bd = free_mblock_list; bd != NULL; bd = bd->link) {
       total_blocks += BLOCKS_PER_MBLOCK * BLOCKS_TO_MBLOCKS(bd->blocks);
