@@ -152,6 +152,7 @@ typedef struct gc_thread_ {
 
     lnat copied;
     lnat any_work;
+    lnat no_work;
     lnat scav_global_work;
     lnat scav_local_work;
 

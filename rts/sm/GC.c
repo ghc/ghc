@@ -468,6 +468,7 @@ GarbageCollect ( rtsBool force_major_gc )
               trace(TRACE_gc,"thread %d:", i);
               trace(TRACE_gc,"   copied           %ld", gc_threads[i]->copied * sizeof(W_));
               trace(TRACE_gc,"   any_work         %ld", gc_threads[i]->any_work);
+              trace(TRACE_gc,"   no_work          %ld", gc_threads[i]->no_work);
               trace(TRACE_gc,"   scav_global_work %ld", gc_threads[i]->scav_global_work);
               trace(TRACE_gc,"   scav_local_work  %ld", gc_threads[i]->scav_local_work);
           }
@@ -1362,6 +1363,7 @@ init_gc_thread (gc_thread *t)
     t->thunk_selector_depth = 0;
     t->copied = 0;
     t->any_work = 0;
+    t->no_work = 0;
     t->scav_global_work = 0;
     t->scav_local_work = 0;
 }

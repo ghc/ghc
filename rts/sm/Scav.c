@@ -1582,5 +1582,7 @@ any_work (void)
         if (ws->stp->todos) return rtsTrue;
     }
 
+    gct->no_work++;
+
     return rtsFalse;
 }    
