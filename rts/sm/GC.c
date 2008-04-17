@@ -907,7 +907,7 @@ loop:
 	       gct->thread_index, r);
 
     while (gc_running_threads != 0) {
-        usleep(1);
+        // usleep(1);
 	if (any_work()) {
 	    inc_running();
 	    goto loop;
