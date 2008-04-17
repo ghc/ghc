@@ -206,6 +206,8 @@ extern void stackOverflow(void);
 
 extern void      __decodeDouble (MP_INT *man, I_ *_exp, StgDouble dbl);
 extern void      __decodeFloat  (MP_INT *man, I_ *_exp, StgFloat flt);
+extern void      __decodeDouble_2Int (I_ *man_high, I_ *man_low, I_ *exp, StgDouble dbl);
+extern void      __decodeFloat_Int (I_ *man, I_ *exp, StgFloat flt);
 
 #if defined(WANT_DOTNET_SUPPORT)
 #include "DNInvoke.h"

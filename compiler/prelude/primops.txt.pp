@@ -618,6 +618,13 @@ primop   DoubleDecodeOp   "decodeDouble#" GenPrimOp
     represent an {\tt Integer\#} holding the mantissa.}
    with out_of_line = True
 
+primop   DoubleDecode_2IntOp   "decodeDouble_2Int#" GenPrimOp    
+   Double# -> (# Int#, Int#, Int# #)
+   {Convert to arbitrary-precision integer.
+    First {\tt Int\#} in result is the high 32 bits of the mantissa, and the
+    second is the low 32. The third is the exponent.}
+   with out_of_line = True
+
 ------------------------------------------------------------------------
 section "Float#" 
 	{Operations on single-precision (32-bit) floating-point numbers.}
@@ -722,6 +729,12 @@ primop   FloatDecodeOp   "decodeFloat#" GenPrimOp
    {Convert to arbitrary-precision integer.
     First {\tt Int\#} in result is the exponent; second {\tt Int\#} and {\tt ByteArr\#}
     represent an {\tt Integer\#} holding the mantissa.}
+   with out_of_line = True
+
+primop   FloatDecode_IntOp   "decodeFloat_Int#" GenPrimOp
+   Float# -> (# Int#, Int# #)
+   {Convert to arbitrary-precision integer.
+    First {\tt Int\#} in result is the mantissa; second is the exponent.}
    with out_of_line = True
 
 ------------------------------------------------------------------------

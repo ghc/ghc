@@ -48,6 +48,7 @@ extern unsigned int n_capabilities;
 
 /* grimy low-level support functions defined in StgPrimFloat.c */
 extern StgDouble __encodeDouble (I_ size, StgByteArray arr, I_ e);
+extern StgDouble __2Int_encodeDouble (I_ j_high, I_ j_low, I_ e);
 extern StgDouble __int_encodeDouble (I_ j, I_ e);
 extern StgFloat  __encodeFloat (I_ size, StgByteArray arr, I_ e);
 extern StgFloat  __int_encodeFloat (I_ j, I_ e);

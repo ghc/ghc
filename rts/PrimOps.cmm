@@ -876,6 +876,23 @@ decodeFloatzh_fast
     RET_NNP(W_[mp_tmp_w], TO_W_(MP_INT__mp_size(mp_tmp1)), p);
 }
 
+decodeFloatzuIntzh_fast
+{ 
+    W_ p;
+    F_ arg;
+    FETCH_MP_TEMP(mp_tmp1);
+    FETCH_MP_TEMP(mp_tmp_w);
+    
+    /* arguments: F1 = Float# */
+    arg = F1;
+    
+    /* Perform the operation */
+    foreign "C" __decodeFloat_Int(mp_tmp1 "ptr", mp_tmp_w "ptr", arg) [];
+    
+    /* returns: (Int# (mantissa), Int# (exponent)) */
+    RET_NN(W_[mp_tmp1], W_[mp_tmp_w]);
+}
+
 #define DOUBLE_MANTISSA_SIZE SIZEOF_DOUBLE
 #define ARR_SIZE (SIZEOF_StgArrWords + DOUBLE_MANTISSA_SIZE)
 
@@ -903,6 +920,24 @@ decodeDoublezh_fast
     
     /* returns: (Int# (expn), Int#, ByteArray#) */
     RET_NNP(W_[mp_tmp_w], TO_W_(MP_INT__mp_size(mp_tmp1)), p);
+}
+
+decodeDoublezu2Intzh_fast
+{ 
+    D_ arg;
+    W_ p;
+    FETCH_MP_TEMP(mp_tmp1);
+    FETCH_MP_TEMP(mp_tmp2);
+    FETCH_MP_TEMP(mp_tmp_w);
+
+    /* arguments: D1 = Double# */
+    arg = D1;
+
+    /* Perform the operation */
+    foreign "C" __decodeDouble_2Int(mp_tmp1 "ptr", mp_tmp2 "ptr", mp_tmp_w "ptr", arg) [];
+    
+    /* returns: (Int# (mant high), Int# (mant low), Int# (expn)) */
+    RET_NNN(W_[mp_tmp1], W_[mp_tmp2], W_[mp_tmp_w]);
 }
 
 /* -----------------------------------------------------------------------------

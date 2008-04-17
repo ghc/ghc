@@ -526,7 +526,9 @@ RTS_FUN(int2Integerzh_fast);
 RTS_FUN(word2Integerzh_fast);
 
 RTS_FUN(decodeFloatzh_fast);
+RTS_FUN(decodeFloatzuIntzh_fast);
 RTS_FUN(decodeDoublezh_fast);
+RTS_FUN(decodeDoublezu2Intzh_fast);
 
 RTS_FUN(andIntegerzh_fast);
 RTS_FUN(orIntegerzh_fast);

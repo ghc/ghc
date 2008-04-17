@@ -537,6 +537,7 @@ typedef struct _RtsSymbolVal {
       SymX(addDLL)               		\
       GMP_SYMS					\
       SymX(__int_encodeDouble)			\
+      SymX(__2Int_encodeDouble)			\
       SymX(__int_encodeFloat)			\
       SymX(andIntegerzh_fast)			\
       SymX(atomicallyzh_fast)			\
@@ -556,6 +557,8 @@ typedef struct _RtsSymbolVal {
       SymX(createAdjustor)			\
       SymX(decodeDoublezh_fast)			\
       SymX(decodeFloatzh_fast)			\
+      SymX(decodeDoublezu2Intzh_fast)			\
+      SymX(decodeFloatzuIntzh_fast)			\
       SymX(defaultsHook)			\
       SymX(delayzh_fast)			\
       SymX(deRefWeakzh_fast)			\
