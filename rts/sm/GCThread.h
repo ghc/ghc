@@ -181,8 +181,35 @@ typedef struct gc_thread_ {
 extern nat n_gc_threads;
 
 extern gc_thread **gc_threads;
-register gc_thread *gct __asm__("%rbx");
-// extern gc_thread *gct;  // this thread's gct TODO: make thread-local
+
+/* -----------------------------------------------------------------------------
+   The gct variable is thread-local and points to the current thread's
+   gc_thread structure.  It is heavily accessed, so we try to put gct
+   into a global register variable if possible.
+   -------------------------------------------------------------------------- */
+
+#define GLOBAL_REG_DECL(type,name,reg) register type name REG(reg);
+
+#if defined(REG_Base)
+
+GLOBAL_REG_DECL(gc_thread*, gct, REG_Base)
+#define DECLARE_GCT /* nothing */
+
+#elif defined(REG_R1)
+
+GLOBAL_REG_DECL(gc_thread*, gct, REG_R1)
+#define DECLARE_GCT /* nothing */
+
+#elif defined(__GNUC__)
+
+extern __thread gc_thread* gct;
+#define DECLARE_GCT __thread gc_thread* gct;
+
+#else
+
+#error Cannot find a way to declare the thread-local gct
+
+#endif
 
 #endif // GCTHREAD_H
 
