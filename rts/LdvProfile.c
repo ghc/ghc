@@ -68,26 +68,27 @@ STATIC_INLINE nat
 processHeapClosureForDead( StgClosure *c )
 {
     nat size;
-    StgInfoTable *info;
+    const StgInfoTable *info;
 
     info = get_itbl(c);
 
-    if (info->type != EVACUATED) {
-	ASSERT(((LDVW(c) & LDV_CREATE_MASK) >> LDV_SHIFT) <= era &&
-	       ((LDVW(c) & LDV_CREATE_MASK) >> LDV_SHIFT) > 0);
-	ASSERT(((LDVW(c) & LDV_STATE_MASK) == LDV_STATE_CREATE) ||
-	       (
-		   (LDVW(c) & LDV_LAST_MASK) <= era &&
-		   (LDVW(c) & LDV_LAST_MASK) > 0
-		   ));
-    }
-
-    if (info->type == EVACUATED) {
+    info = c->header.info;
+    if (IS_FORWARDING_PTR(info)) {
 	// The size of the evacuated closure is currently stored in
 	// the LDV field.  See SET_EVACUAEE_FOR_LDV() in
 	// includes/StgLdvProf.h.
 	return LDVW(c);
     }
+    info = INFO_PTR_TO_STRUCT(info);
+
+    ASSERT(((LDVW(c) & LDV_CREATE_MASK) >> LDV_SHIFT) <= era &&
+           ((LDVW(c) & LDV_CREATE_MASK) >> LDV_SHIFT) > 0);
+    ASSERT(((LDVW(c) & LDV_STATE_MASK) == LDV_STATE_CREATE) ||
+           (
+               (LDVW(c) & LDV_LAST_MASK) <= era &&
+               (LDVW(c) & LDV_LAST_MASK) > 0
+               ));
+
 
     size = closure_sizeW(c);
 

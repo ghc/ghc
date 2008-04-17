@@ -409,14 +409,6 @@ INFO_TABLE(stg_TSO, 0,0,TSO, "TSO", "TSO")
 { foreign "C" barf("TSO object entered!") never returns; }
 
 /* ----------------------------------------------------------------------------
-   Evacuees are left behind by the garbage collector.  Any attempt to enter
-   one is a real bug.
-   ------------------------------------------------------------------------- */
-
-INFO_TABLE(stg_EVACUATED,1,0,EVACUATED,"EVACUATED","EVACUATED")
-{ foreign "C" barf("EVACUATED object entered!") never returns; }
-
-/* ----------------------------------------------------------------------------
    Weak pointers
 
    Live weak pointers have a special closure type.  Dead ones are just

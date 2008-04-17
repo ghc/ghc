@@ -1251,17 +1251,22 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
 	// discarding it.
     {
         nat type;
-        type = get_itbl(((StgUpdateFrame *)p)->updatee)->type;
-	if (type == IND) {
-	    ((StgUpdateFrame *)p)->updatee->header.info = 
-		(StgInfoTable *)&stg_IND_PERM_info;
-	} else if (type == IND_OLDGEN) {
-	    ((StgUpdateFrame *)p)->updatee->header.info = 
-		(StgInfoTable *)&stg_IND_OLDGEN_PERM_info;
-        }            
-	evacuate(&((StgUpdateFrame *)p)->updatee);
-	p += sizeofW(StgUpdateFrame);
-	continue;
+        const StgInfoTable *i;
+
+        i = ((StgUpdateFrame *)p)->updatee->header.info;
+        if (!IS_FORWARDING_PTR(i)) {
+            type = get_itbl(((StgUpdateFrame *)p)->updatee)->type;
+            if (type == IND) {
+                ((StgUpdateFrame *)p)->updatee->header.info = 
+                    (StgInfoTable *)&stg_IND_PERM_info;
+            } else if (type == IND_OLDGEN) {
+                ((StgUpdateFrame *)p)->updatee->header.info = 
+                    (StgInfoTable *)&stg_IND_OLDGEN_PERM_info;
+            }            
+            evacuate(&((StgUpdateFrame *)p)->updatee);
+            p += sizeofW(StgUpdateFrame);
+            continue;
+        }
     }
 
       // small bitmap (< 32 entries, or 64 on a 64-bit machine) 
@@ -1401,10 +1406,13 @@ scavenge_large (step_workspace *ws)
    Scavenge a block
    ------------------------------------------------------------------------- */
 
-#define PARALLEL_GC
-#include "Scav.c-inc"
 #undef PARALLEL_GC
 #include "Scav.c-inc"
+
+#ifdef THREADED_RTS
+#define PARALLEL_GC
+#include "Scav.c-inc"
+#endif
 
 /* ----------------------------------------------------------------------------
    Look for work to do.

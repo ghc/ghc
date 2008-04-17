@@ -626,7 +626,6 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
     case FETCH_ME_BQ:
     case RBH:
     case REMOTE_REF:
-    case EVACUATED:
     case INVALID_OBJECT:
     default:
 	barf("Invalid object *c in push()");
@@ -992,7 +991,6 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
 	case FETCH_ME_BQ:
 	case RBH:
 	case REMOTE_REF:
-	case EVACUATED:
 	case INVALID_OBJECT:
 	default:
 	    barf("Invalid object *c in pop()");
@@ -1157,7 +1155,6 @@ isRetainer( StgClosure *c )
     case FETCH_ME_BQ:
     case RBH:
     case REMOTE_REF:
-    case EVACUATED:
     case INVALID_OBJECT:
     default:
 	barf("Invalid object in isRetainer(): %d", get_itbl(c)->type);

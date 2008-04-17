@@ -76,11 +76,13 @@ alloc_for_copy (nat size, step *stp)
    The evacuate() code
    -------------------------------------------------------------------------- */
 
-#define PARALLEL_GC
-#include "Evac.c-inc"
-
 #undef PARALLEL_GC
 #include "Evac.c-inc"
+
+#ifdef THREADED_RTS
+#define PARALLEL_GC
+#include "Evac.c-inc"
+#endif
 
 /* -----------------------------------------------------------------------------
    Evacuate a large object
@@ -261,9 +263,10 @@ selector_chain:
         } while (info_ptr == (W_)&stg_WHITEHOLE_info);
 
         // make sure someone else didn't get here first...
-        if (INFO_PTR_TO_STRUCT(info_ptr)->type != THUNK_SELECTOR) {
+        if (IS_FORWARDING_PTR(p) || 
+            INFO_PTR_TO_STRUCT(info_ptr)->type != THUNK_SELECTOR) {
             // v. tricky now.  The THUNK_SELECTOR has been evacuated
-            // by another thread, and is now either EVACUATED or IND.
+            // by another thread, and is now either a forwarding ptr or IND.
             // We need to extract ourselves from the current situation
             // as cleanly as possible.
             //   - unlock the closure
@@ -298,7 +301,16 @@ selector_loop:
     // from-space during marking, for example.  We rely on the property
     // that evacuate() doesn't mind if it gets passed a to-space pointer.
 
-    info = get_itbl(selectee);
+    info = (StgInfoTable*)selectee->header.info;
+
+    if (IS_FORWARDING_PTR(info)) {
+        // We don't follow pointers into to-space; the constructor
+        // has already been evacuated, so we won't save any space
+        // leaks by evaluating this selector thunk anyhow.
+        goto bale_out;
+    }
+
+    info = INFO_PTR_TO_STRUCT(info);
     switch (info->type) {
       case WHITEHOLE:
 	  goto bale_out; // about to be evacuated by another thread (or a loop).
@@ -333,33 +345,38 @@ selector_loop:
               // evaluating until we find the real value, and then
               // update the whole chain to point to the value.
           val_loop:
-              info = get_itbl(UNTAG_CLOSURE(val));
-              switch (info->type) {
-              case IND:
-              case IND_PERM:
-              case IND_OLDGEN:
-              case IND_OLDGEN_PERM:
-              case IND_STATIC:
-                  val = ((StgInd *)val)->indirectee;
-                  goto val_loop;
-              case THUNK_SELECTOR:
-                  ((StgClosure*)p)->payload[0] = (StgClosure *)prev_thunk_selector;
-                  prev_thunk_selector = p;
-                  p = (StgSelector*)val;
-                  goto selector_chain;
-              default:
-                  ((StgClosure*)p)->payload[0] = (StgClosure *)prev_thunk_selector;
-                  prev_thunk_selector = p;
-
-                  *q = val;
-                  if (evac) evacuate(q);
-                  val = *q;
-                  // evacuate() cannot recurse through
-                  // eval_thunk_selector(), because we know val is not
-                  // a THUNK_SELECTOR.
-                  unchain_thunk_selectors(prev_thunk_selector, val);
-                  return;
+              info_ptr = (StgWord)UNTAG_CLOSURE(val)->header.info;
+              if (!IS_FORWARDING_PTR(info_ptr))
+              {
+                  info = INFO_PTR_TO_STRUCT(info_ptr);
+                  switch (info->type) {
+                  case IND:
+                  case IND_PERM:
+                  case IND_OLDGEN:
+                  case IND_OLDGEN_PERM:
+                  case IND_STATIC:
+                      val = ((StgInd *)val)->indirectee;
+                      goto val_loop;
+                  case THUNK_SELECTOR:
+                      ((StgClosure*)p)->payload[0] = (StgClosure *)prev_thunk_selector;
+                      prev_thunk_selector = p;
+                      p = (StgSelector*)val;
+                      goto selector_chain;
+                  default:
+                      break;
+                  }
               }
+              ((StgClosure*)p)->payload[0] = (StgClosure *)prev_thunk_selector;
+              prev_thunk_selector = p;
+
+              *q = val;
+              if (evac) evacuate(q);
+              val = *q;
+              // evacuate() cannot recurse through
+              // eval_thunk_selector(), because we know val is not
+              // a THUNK_SELECTOR.
+              unchain_thunk_selectors(prev_thunk_selector, val);
+              return;
           }
 
       case IND:
@@ -370,12 +387,6 @@ selector_loop:
           // Again, we might need to untag a constructor.
           selectee = UNTAG_CLOSURE( ((StgInd *)selectee)->indirectee );
 	  goto selector_loop;
-
-      case EVACUATED:
-	  // We don't follow pointers into to-space; the constructor
-	  // has already been evacuated, so we won't save any space
-	  // leaks by evaluating this selector thunk anyhow.
-	  goto bale_out;
 
       case THUNK_SELECTOR:
       {
@@ -432,7 +443,7 @@ bale_out:
     // check whether it was updated in the meantime.
     *q = (StgClosure *)p;
     if (evac) {
-        copy(q,(StgClosure *)p,THUNK_SELECTOR_sizeW(),bd->step->to);
+        copy(q,(const StgInfoTable *)info_ptr,(StgClosure *)p,THUNK_SELECTOR_sizeW(),bd->step->to);
     }
     unchain_thunk_selectors(prev_thunk_selector, *q);
     return;

@@ -82,7 +82,6 @@
 #define FETCH_ME                58
 #define FETCH_ME_BQ             59
 #define RBH                     60
-#define EVACUATED               61
 #define REMOTE_REF              62
 #define TVAR_WATCH_QUEUE        63
 #define INVARIANT_CHECK_QUEUE   64

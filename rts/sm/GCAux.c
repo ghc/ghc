@@ -70,7 +70,15 @@ isAlive(StgClosure *p)
 	return p;
     }
 
-    info = get_itbl(q);
+    info = q->header.info;
+
+    if (IS_FORWARDING_PTR(info)) {
+        // alive! 
+        return (StgClosure*)UN_FORWARDING_PTR(info);
+    }
+
+    info = INFO_PTR_TO_STRUCT(info);
+
     switch (info->type) {
 
     case IND:
@@ -81,10 +89,6 @@ isAlive(StgClosure *p)
       // follow indirections 
       p = ((StgInd *)q)->indirectee;
       continue;
-
-    case EVACUATED:
-      // alive! 
-      return ((StgEvacuated *)q)->evacuee;
 
     case TSO:
       if (((StgTSO *)q)->what_next == ThreadRelocated) {

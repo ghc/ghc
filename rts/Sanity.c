@@ -257,7 +257,13 @@ checkClosure( StgClosure* p )
 	ASSERT(!closure_STATIC(p));
     }
 
-    info = get_itbl(p);
+    info = p->header.info;
+
+    if (IS_FORWARDING_PTR(info)) {
+        barf("checkClosure: found EVACUATED closure %d", info->type);
+    }
+    info = INFO_PTR_TO_STRUCT(info);
+
     switch (info->type) {
 
     case MVAR_CLEAN:
@@ -506,10 +512,6 @@ checkClosure( StgClosure* p )
         return sizeofW(StgTRecHeader);
       }
       
-      
-    case EVACUATED:
-	    barf("checkClosure: found EVACUATED closure %d",
-		 info->type);
     default:
 	    barf("checkClosure (closure type %d)", info->type);
     }

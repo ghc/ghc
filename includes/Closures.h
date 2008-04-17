@@ -174,11 +174,6 @@ typedef struct {
 } StgStopFrame;  
 
 typedef struct {
-    StgHeader   header;
-    StgClosure *evacuee;
-} StgEvacuated;
-
-typedef struct {
   StgHeader header;
   StgWord data;
 } StgIntCharlikeClosure;

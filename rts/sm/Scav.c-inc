@@ -14,15 +14,19 @@
 // This file is #included into Scav.c, twice: firstly with PARALLEL_GC
 // defined, the second time without.
 
-#ifndef PARALLEL_GC
-#define scavenge_block(a) scavenge_block1(a)
-#define evacuate(a) evacuate1(a)
-#define recordMutableGen_GC(a,b) recordMutableGen(a,b)
+#if defined(THREADED_RTS) && !defined(PARALLEL_GC)
+#  define scavenge_block(a) scavenge_block1(a)
+#  define evacuate(a) evacuate1(a)
+#  define recordMutableGen_GC(a,b) recordMutableGen(a,b)
 #else
-#undef scavenge_block
-#undef evacuate
-#undef recordMutableGen_GC
+#  undef scavenge_block
+#  undef evacuate
+#  undef recordMutableGen_GC
+#  if !defined(THREADED_RTS)
+#    define scavenge_block1(a) scavenge_block(a)
+#  endif
 #endif
+
 
 static void scavenge_block (bdescr *bd);
 

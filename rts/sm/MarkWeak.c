@@ -96,6 +96,7 @@ traverseWeakPtrList(void)
   StgWeak *w, **last_w, *next_w;
   StgClosure *new;
   rtsBool flag = rtsFalse;
+  const StgInfoTable *info;
 
   switch (weak_stage) {
 
@@ -120,12 +121,14 @@ traverseWeakPtrList(void)
 	      continue;
 	  }
 	  
-	  switch (get_itbl(w)->type) {
-
-	  case EVACUATED:
-	      next_w = (StgWeak *)((StgEvacuated *)w)->evacuee;
+          info = w->header.info;
+          if (IS_FORWARDING_PTR(info)) {
+	      next_w = (StgWeak *)UN_FORWARDING_PTR(info);
 	      *last_w = next_w;
 	      continue;
+          }
+
+	  switch (INFO_PTR_TO_STRUCT(info)->type) {
 
 	  case WEAK:
 	      /* Now, check whether the key is reachable.
@@ -367,8 +370,9 @@ markWeakPtrList ( void )
   last_w = &weak_ptr_list;
   for (w = weak_ptr_list; w; w = w->link) {
       // w might be WEAK, EVACUATED, or DEAD_WEAK (actually CON_STATIC) here
-      ASSERT(w->header.info == &stg_DEAD_WEAK_info 
-	     || get_itbl(w)->type == WEAK || get_itbl(w)->type == EVACUATED);
+      ASSERT(IS_FORWARDING_PTR(w->header.info)
+             || w->header.info == &stg_DEAD_WEAK_info 
+	     || get_itbl(w)->type == WEAK);
       tmp = w;
       evacuate((StgClosure **)&tmp);
       *last_w = w;

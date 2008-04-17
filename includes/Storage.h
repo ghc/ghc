@@ -357,7 +357,7 @@ void dirty_MUT_VAR(StgRegTable *reg, StgClosure *p);
    -------------------------------------------------------------------------- */
 
 #define LOOKS_LIKE_INFO_PTR(p) \
-   (p && LOOKS_LIKE_INFO_PTR_NOT_NULL(p))
+    (p && (IS_FORWARDING_PTR(p) || LOOKS_LIKE_INFO_PTR_NOT_NULL(p)))
 
 #define LOOKS_LIKE_INFO_PTR_NOT_NULL(p) \
    (((StgInfoTable *)(INFO_PTR_TO_STRUCT(p)))->type != INVALID_OBJECT && \
@@ -591,5 +591,9 @@ extern StgWeak    * RTS_VAR(weak_ptr_list);
 extern StgClosure * RTS_VAR(caf_list);
 extern StgClosure * RTS_VAR(revertible_caf_list);
 extern StgTSO     * RTS_VAR(resurrected_threads);
+
+#define IS_FORWARDING_PTR(p) ((((StgWord)p) & 1) != 0)
+#define MK_FORWARDING_PTR(p) (((StgWord)p) | 1)
+#define UN_FORWARDING_PTR(p) (((StgWord)p) - 1)
 
 #endif /* STORAGE_H */
