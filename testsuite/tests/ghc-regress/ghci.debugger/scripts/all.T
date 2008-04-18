@@ -31,6 +31,7 @@ test('print029', expect_broken(1995), ghci_script, ['print029.script'])
 test('print030', expect_broken(1995), ghci_script, ['print030.script'])
 test('print031', expect_broken(1995), ghci_script, ['print031.script'])
 test('print032', expect_broken(1995), ghci_script, ['print032.script'])
+test('print033', expect_broken(2044), ghci_script, ['print033.script'])
 
 test('break001', normal, ghci_script, ['break001.script'])
 test('break002', normal, ghci_script, ['break002.script'])
