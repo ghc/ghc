@@ -891,6 +891,6 @@ zonkTerm = foldTerm idTermFoldM {
 -- Is this defined elsewhere?
 -- Generalize the type: find all free tyvars and wrap in the appropiate ForAll.
 sigmaType :: Type -> Type
-sigmaType ty = mkForAllTys (varSetElems$ tyVarsOfType (dropForAlls ty)) ty
+sigmaType ty = mkSigmaTy (varSetElems$ tyVarsOfType (dropForAlls ty)) [] ty
 
 
