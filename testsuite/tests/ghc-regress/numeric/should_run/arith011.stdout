@@ -7330,7 +7330,7 @@ complement 3 = -4
 -1 `shiftL` 1 = -2
 -1 `shiftL` 2 = -4
 -1 `shiftL` 3 = -8
--1 `shiftL` 32 = 0
+-1 `shiftL` 32 = -4294967296
 -1 `shiftL` 64 = 0
  
 0 `shiftL` 0 = 0
