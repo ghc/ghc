@@ -349,6 +349,9 @@ MakefileDeps=YES
 #------------------------------------------------------------------------------
 # Options for Libraries
 
+# Which directory (in libraries/) contains the integer library?
+INTEGER_LIBRARY=integer-gmp
+
 # What extra ways to build the libraries in
 # In addition to the normal sequential way, the default is to also build
 # profiled prelude libraries.
