@@ -11,14 +11,14 @@ test('derefnull',
              # SIGSEGV on Linux
      composes([exit_code(139),
              # SIGBUS on OX X
-             exit_code_if_platform(138, 'i386-apple-darwin'),
-             exit_code_if_platform(138, 'powerpc-apple-darwin'),
-             exit_code_if_platform(1, 'i386-unknown-mingw32')]),
+             if_platform('i386-apple-darwin',    exit_code(138)),
+             if_platform('powerpc-apple-darwin', exit_code(138)),
+             if_platform('i386-unknown-mingw32', exit_code(1))]),
      compile_and_run, [''])
 test('divbyzero',
              # SIGFPE on Linux
      compose(exit_code(136),
-             exit_code_if_platform(1, 'i386-unknown-mingw32')),
+             if_platform('i386-unknown-mingw32', exit_code(1))),
      compile_and_run, [''])
 
 test('outofmem', normal, run_command, ['$MAKE -s --no-print-directory outofmem'])

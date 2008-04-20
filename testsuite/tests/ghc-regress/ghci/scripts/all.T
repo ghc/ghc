@@ -33,7 +33,7 @@ test('ghci022', normal, ghci_script, ['ghci022.script'])
 
 test('ghci023', normal, ghci_script, ['ghci023.script'])
 execfile(in_testdir('ghci024.py')) # load function prepare024
-test('ghci024', compose(prepare024,expect_broken_if_platform(1845,"powerpc_apple_darwin")), ghci_script, ['ghci024.script'])
+test('ghci024', compose(prepare024, if_platform("powerpc_apple_darwin", expect_broken(1845))), ghci_script, ['ghci024.script'])
 test('ghci025', normal, ghci_script, ['ghci025.script'])
 test('ghci026', normal, ghci_script, ['ghci026.script'])
 

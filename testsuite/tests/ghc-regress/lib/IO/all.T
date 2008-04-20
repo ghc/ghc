@@ -1,6 +1,6 @@
 
 def expect_fail_if_windows(opts):
-   f = expect_fail_if_platform('i386-unknown-mingw32');
+   f = if_platform('i386-unknown-mingw32', expect_fail);
    return f(opts);
 
 test('IOError001', compose(omit_ways(['ghci']), set_stdin('IOError001.hs')),
@@ -82,7 +82,7 @@ clean(['readwrite001.inout'])
 test('readwrite002',
      composes([omit_ways(['ghci']), 
                set_stdin('readwrite002.hs'),
-               skip_if_platform('i386-unknown-mingw32') # see #1198
+               if_platform('i386-unknown-mingw32', skip) # see #1198
                ]),
      compile_and_run, ['-cpp'])
 clean(['readwrite002.inout'])

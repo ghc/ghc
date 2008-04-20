@@ -183,22 +183,6 @@ def _only_compiler_types( opts, compiler_types ):
 
 # -----
 
-def expect_fail_if_platform( plat ):
-   return lambda opts, p=plat: _expect_fail_if_platform(opts, p)
-
-def _expect_fail_if_platform( opts, plat ):
-    if config.platform == plat:
-	opts.expect = 'fail'
-
-def expect_broken_if_platform( bug, plat ):
-   return lambda opts, b=bug, p=plat: _expect_broken_if_platform(opts, b, p)
-
-def _expect_broken_if_platform( opts, bug, plat ):
-    if config.platform == plat:
-	opts.expect = 'fail'
-	
-# -----
-
 def expect_fail_if_compiler_type( compiler_type ):
    return lambda opts, c=compiler_type: _expect_fail_if_compiler_type(opts, c)
 
@@ -228,13 +212,6 @@ def exit_code( val ):
 
 def _exit_code( opts, v ):
     opts.exit_code = v
-
-def exit_code_if_platform( val, plat ):
-   return lambda opts, v=val, p=plat: _exit_code_if_platform(opts, v, p)
-
-def _exit_code_if_platform( opts, val, plat ):
-    if config.platform == plat:
-        opts.exit_code = val
 
 # -----
 
@@ -269,13 +246,12 @@ def skip_if_fast(opts):
 
 # -----
 
-def skip_if_platform( plat ):
-   return lambda opts, p=plat: _skip_if_platform(opts, p)
-
-def _skip_if_platform( opts, plat ):
+def if_platform( plat, f ):
     if config.platform == plat:
-	opts.skip = 1
-	
+        return f
+    else:
+        return normal
+
 # ---
 
 def if_compiler_lt( compiler, version, f ):

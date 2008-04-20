@@ -1,9 +1,9 @@
 test('echo001', set_stdin("echo001.hs"), compile_and_run, [''])
 
-test('hTell001', expect_fail_if_platform("i386-unknown-mingw32"), \
+test('hTell001', if_platform("i386-unknown-mingw32", expect_fail), \
 	compile_and_run, [''])
 
-test('hTell002', expect_fail_if_platform("i386-unknown-mingw32"), \
+test('hTell002', if_platform("i386-unknown-mingw32", expect_fail), \
 	compile_and_run, [''])
 
 test('performGC001', normal, compile_and_run, [''])
