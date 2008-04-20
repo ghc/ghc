@@ -252,6 +252,12 @@ def if_platform( plat, f ):
     else:
         return normal
 
+def if_os( os, f ):
+    if config.os == os:
+        return f
+    else:
+        return normal
+
 # ---
 
 def if_compiler_lt( compiler, version, f ):

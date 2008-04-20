@@ -106,6 +106,7 @@ RUNTEST_OPTS +=  \
 	-e config.hp2ps=\"$(HP2PS_ABS)\" \
 	-e config.gs=\"$(GS)\" \
 	-e config.platform=\"$(TARGETPLATFORM)\" \
+	-e config.os=\"$(TargetOS_CPP)\" \
 	-e config.wordsize=\"$(WORDSIZE)\" \
 	-e default_testopts.cleanup=\"$(CLEANUP)\" \
 	-e "if '$(USETHREADS)': config.use_threads=int($(USETHREADS))" \

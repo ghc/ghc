@@ -36,6 +36,7 @@ class TestConfig:
 
         # What platform are we running on?
         self.platform = ''
+        self.os = ''
 
         # What is the wordsize (in bits) of this platform?
         self.wordsize = ''

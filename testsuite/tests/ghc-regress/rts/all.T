@@ -8,17 +8,26 @@ test('testblockalloc', compose(c_src,
 # only GHCi triggers the bug, but we run the test all ways for completeness.
 test('bug1010', normal, compile_and_run, ['+RTS -c -RTS'])
 test('derefnull',
-             # SIGSEGV on Linux
-     composes([exit_code(139),
+     composes([
+             # SIGSEGV on Linux (which we make the default)
+             exit_code(139),
+             # Apparently the output can be different on different
+             # Linux setups, so just ignore it. As long as we get
+             # the right exit code we're OK.
+             if_os('linux', ignore_output),
              # SIGBUS on OX X
-             if_platform('i386-apple-darwin',    exit_code(138)),
-             if_platform('powerpc-apple-darwin', exit_code(138)),
+             if_os('darwin', exit_code(138)),
              if_platform('i386-unknown-mingw32', exit_code(1))]),
      compile_and_run, [''])
 test('divbyzero',
+     composes([
              # SIGFPE on Linux
-     compose(exit_code(136),
-             if_platform('i386-unknown-mingw32', exit_code(1))),
+             exit_code(136),
+             # Apparently the output can be different on different
+             # Linux setups, so just ignore it. As long as we get
+             # the right exit code we're OK.
+             if_os('linux', ignore_output),
+             if_platform('i386-unknown-mingw32', exit_code(1))]),
      compile_and_run, [''])
 
 test('outofmem', normal, run_command, ['$MAKE -s --no-print-directory outofmem'])
