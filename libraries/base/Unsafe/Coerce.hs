@@ -13,6 +13,9 @@
 -- type to any other type.  Needless to say, if you use this function,
 -- it is your responsibility to ensure that the old and new types have
 -- identical internal representations, in order to prevent runtime corruption.
+--
+-- 'unsafeCoerce' is just a trivial wrapper for 'unsafeCoerce#';
+-- see the latter for important documetation about correct usage.
 
 module Unsafe.Coerce (unsafeCoerce) where
 
