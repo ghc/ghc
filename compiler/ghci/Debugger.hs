@@ -81,8 +81,9 @@ pprintClosureCommand session bindThings force str = do
      --  Then, we extract a substitution,
      --  mapping the old tyvars to the reconstructed types.
        let reconstructed_type = termType term
-           subst = unifyRTTI (idType id) (reconstructed_type)
-       return (term',subst)
+       mb_subst <- withSession cms $ \hsc_env ->
+                      improveRTTIType hsc_env (idType id) (reconstructed_type)
+       return (term', fromMaybe emptyTvSubst mb_subst)
 
    tidyTermTyVars :: Session -> Term -> IO Term
    tidyTermTyVars (Session ref) t = do

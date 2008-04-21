@@ -31,7 +31,7 @@ module RtClosureInspect(
      termTyVars,
 --     unsafeDeepSeq, 
      cvReconstructType,
-     unifyRTTI, 
+     improveRTTIType,
      sigmaType,
      Closure(..),
      getClosureData,
@@ -55,7 +55,6 @@ import TcType
 import TcMType
 import TcUnify
 import TcEnv
-import Unify
 import DriverPhases
 import TyCon
 import Name
@@ -90,6 +89,7 @@ import Data.Sequence hiding (null, length, index, take, drop, splitAt, reverse)
 import Foreign
 import System.IO.Unsafe
 
+import System.IO
 ---------------------------------------------
 -- * A representation of semi evaluated Terms
 ---------------------------------------------
@@ -535,7 +535,7 @@ runTR hsc_env c = do
     Just x  -> return x
 
 runTR_maybe :: HscEnv -> TR a -> IO (Maybe a)
-runTR_maybe hsc_env = fmap snd . initTc hsc_env HsSrcFile False iNTERACTIVE
+runTR_maybe hsc_env = fmap snd . initTc hsc_env HsSrcFile False  iNTERACTIVE
 
 traceTR :: SDoc -> TR ()
 traceTR = liftTcM . traceTc
@@ -547,7 +547,7 @@ liftTcM :: TcM a -> TR a
 liftTcM = id
 
 newVar :: Kind -> TR TcType
-newVar = liftTcM . fmap mkTyVarTy . newFlexiTyVar
+newVar = liftTcM . fmap mkTyVarTy . newBoxyTyVar
 
 -- | Returns the instantiated type scheme ty', and the substitution sigma 
 --   such that sigma(ty') = ty 
@@ -562,7 +562,7 @@ instScheme ty | (tvs, _rho) <- tcSplitForAllTys ty = liftTcM$ do
 -- Before unification, congruenceNewtypes needs to
 -- do its magic.
 addConstraint :: TcType -> TcType -> TR ()
-addConstraint t1 t2  = congruenceNewtypes t1 t2 >>= uncurry unifyType 
+addConstraint t1 t2  = congruenceNewtypes t1 t2 >>= uncurry boxyUnify 
 		       >> return () -- TOMDO: what about the coercion?
 				    -- we should consider family instances 
 
@@ -762,26 +762,26 @@ cvReconstructType hsc_env max_depth mb_ty hval = runTR_maybe hsc_env $ do
                                      zip [0..] (filter isPointed subTtypes)]
       _ -> return []
 
-{-
- This helper computes the difference between a base type t and the 
- improved rtti_t computed by RTTI
- The main difference between RTTI types and their normal counterparts
- is that the former are _not_ polymorphic, thus polymorphism must
- be stripped. Syntactically, forall's must be stripped.
- We also remove predicates.
--}
-unifyRTTI :: Type -> Type -> TvSubst
-unifyRTTI ty rtti_ty = 
-    case mb_subst of
-      Just subst -> subst
-      Nothing    -> pprPanic "Failed to compute a RTTI substitution" 
-                             (ppr (ty, rtti_ty))
-     -- In addition, we strip newtypes too, since the reconstructed type might
-     --   not have recovered them all
-     -- TODO stripping newtypes shouldn't be necessary, test
-   where mb_subst = tcUnifyTys (const BindMe) 
-                               [rttiView ty]
-                               [rttiView rtti_ty]  
+-- Compute the difference between a base type and the type found by RTTI
+-- improveType <base_type> <rtti_type>
+-- The types can contain skolem type variables, which need to be treated as normal vars.
+-- In particular, we want them to unify with things.
+improveRTTIType :: HscEnv -> Type -> Type -> IO (Maybe TvSubst)
+improveRTTIType hsc_env ty rtti_ty = runTR_maybe hsc_env $ do
+    let (_,ty0)     = splitForAllTys ty
+        ty_tvs      = varSetElems $ tyVarsOfType ty0
+    let (_,rtti_ty0)= splitForAllTys rtti_ty
+        rtti_tvs    = varSetElems $ tyVarsOfType rtti_ty0
+    (ty_tvs',_,ty')<- tcInstType (mapM tcInstTyVar) (mkSigmaTy ty_tvs   [] ty0)
+    (_,_,rtti_ty') <- tcInstType (mapM tcInstTyVar) (mkSigmaTy rtti_tvs [] rtti_ty0)
+    boxyUnify rtti_ty' ty'
+    tvs1_contents  <- zonkTcTyVars ty_tvs'
+    let subst = uncurry zipTopTvSubst
+                  (unzip [(tv,ty) | tv <- ty_tvs, ty <- tvs1_contents
+                                  , getTyVar_maybe ty /= Just tv
+                                  , not(isTyVarTy ty)])
+--    liftIO $ hPutStrLn stderr $ showSDocDebug $ text "unify " <+> sep [ppr ty, ppr rtti_ty, equals, ppr subst ]
+    return subst
 
 -- Dealing with newtypes
 {-

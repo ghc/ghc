@@ -55,7 +55,7 @@ module Type (
 	splitTyConApp_maybe, splitTyConApp, 
         splitNewTyConApp_maybe, splitNewTyConApp,
 
-	repType, typePrimRep, coreView, tcView, kindView, rttiView,
+	repType, typePrimRep, coreView, tcView, kindView,
 
 	mkForAllTy, mkForAllTys, splitForAllTy_maybe, splitForAllTys, 
 	applyTy, applyTys, isForAllTy, dropForAlls,
@@ -186,16 +186,6 @@ tcView :: Type -> Maybe Type
 tcView (TyConApp tc tys) | Just (tenv, rhs, tys') <- tcExpandTyCon_maybe tc tys 
 			 = Just (mkAppTys (substTy (mkTopTvSubst tenv) rhs) tys')
 tcView _                 = Nothing
-
------------------------------------------------
-rttiView :: Type -> Type
--- Same, but for the RTTI system, which cannot deal with predicates nor polymorphism
-rttiView (ForAllTy _ ty) = rttiView ty
-rttiView (FunTy PredTy{} ty) = rttiView ty
-rttiView ty@TyConApp{} | Just ty' <- coreView ty 
-                           = rttiView ty'
-rttiView (TyConApp tc tys) = mkTyConApp tc (map rttiView tys)
-rttiView ty = ty
 
 -----------------------------------------------
 {-# INLINE kindView #-}

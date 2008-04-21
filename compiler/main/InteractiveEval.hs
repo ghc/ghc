@@ -616,10 +616,15 @@ rttiEnvironment hsc_env@HscEnv{hsc_IC=ic} = do
    tys <- reconstructType hsc_env 10 `mapM` incompletelyTypedIds
           -- map termType `fmap` (obtainTerm hsc_env False `mapM` incompletelyTypedIds)
    
-   let substs = [unifyRTTI ty ty' 
+   improvs <- sequence [improveRTTIType hsc_env ty ty'
                  | (ty, Just ty') <- zip (map idType incompletelyTypedIds) tys]
-       ic'    = foldr (flip substInteractiveContext) ic 
-                           (map skolemiseSubst substs)
+   let ic' = foldr (\mb_subst ic' ->
+                        maybe (WARN(True, text ("RTTI failed to calculate the "
+                                           ++  "improvement for a type")) ic')
+                              (substInteractiveContext ic' . skolemiseSubst)
+                              mb_subst)
+                   ic
+                   improvs
    return hsc_env{hsc_IC=ic'}
 
 skolemiseSubst :: TvSubst -> TvSubst
