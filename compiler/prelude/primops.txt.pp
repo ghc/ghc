@@ -1808,7 +1808,14 @@ pseudoop   "unsafeCoerce#"
            known to be empty.  Also, a {\tt newtype} of a type {\tt T} has the same representation
            at runtime as {\tt T}.
 
-        Other uses of {\tt unsafeCoerce\#} are undefined.
+        Other uses of {\tt unsafeCoerce\#} are undefined.  In particular, you should not use
+	{\tt unsafeCoerce\#} to cast a T to an algebraic data type D, unless T is also
+	an algebraic data type.  For example, do not cast {\tt Int->Int} to {\tt Bool}, even if
+        you later cast that {\tt Bool} back to {\tt Int->Int} before applying it.  The reasons
+        have to do with GHC's internal representation details (for the congnoscenti, data values
+	can be entered but function closures cannot).  If you want a safe type to cast things
+	to, use {\tt Any}, which is not an algebraic data type.
+	
         }
 
 -- NB. It is tempting to think that casting a value to a type that it doesn't have is safe
