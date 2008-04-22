@@ -123,11 +123,13 @@ ruleCantMatch :: [Maybe Name] -> [Maybe Name] -> Bool
 -- It's only a one-way match; unlike instance matching we 
 -- don't consider unification
 -- 
--- Notice that there is no case
---	ruleCantMatch (Just n1 : ts) (Nothing : as) = True
--- Reason: a local variable 'v' in the actuals might 
--- 	   have an unfolding which is a global.
---	   This quite often happens with case scrutinees.
+-- Notice that [_$_]
+--	ruleCantMatch [Nothing] [Just n2] = False
+--      Reason: a template variable can be instantiated by a constant
+-- Also:
+--	ruleCantMatch [Just n1] [Nothing] = False
+--      Reason: a local variable 'v' in the actuals might [_$_]
+
 ruleCantMatch (Just n1 : ts) (Just n2 : as) = n1 /= n2 || ruleCantMatch ts as
 ruleCantMatch (t       : ts) (a       : as) = ruleCantMatch ts as
 ruleCantMatch ts	     as		    = False
