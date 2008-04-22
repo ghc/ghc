@@ -143,6 +143,8 @@ pty (LeftCoercion t) =
     (pqname leftCoercion <+> paty t)
 pty (RightCoercion t) = 
     (pqname rightCoercion <+> paty t)
+pty (InstCoercion t1 t2) = 
+    (sep [pqname instCoercion, paty t1, paty t2])
 pty t = pbty t
 
 pappty (Tapp t1 t2) ts = pappty t1 (t2:ts)

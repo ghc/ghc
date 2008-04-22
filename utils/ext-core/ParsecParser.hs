@@ -109,21 +109,6 @@ coreQualifiedGen p = (try (do
    -- unqualified name
    (p >>= (\ res -> return (Nothing, res)))
 
-{-
-coreMaybeMname = optionMaybe coreMname
-
-coreRequiredQualifiedName = do
-  mname <- coreMname
-  theId <- identifier
-  return (Just mname, theId)
-
-coreMname = do
-  char '^'
-  nm <- try coreModuleName
-  symbol "."
-  return nm
--}
-
 coreAxiom :: Parser Axiom
 coreAxiom = parens (do
               coercionName <- coreQualifiedCon
@@ -204,7 +189,8 @@ coreBty = do
              Sym k     -> app k 1 maybeRest "sym"
              Unsafe k  -> app k 2 maybeRest "unsafe"
              LeftCo k  -> app k 1 maybeRest "left"
-             RightCo k -> app k 1 maybeRest "right")
+             RightCo k -> app k 1 maybeRest "right"
+             InstCo k  -> app k 2 maybeRest "inst")
                  where app k arity args _ | length args == arity = k args
                        app _ _ args err = 
                            primCoercionError (err ++ 
@@ -235,24 +221,26 @@ coreTcon =
                                     -- the "try"s are crucial; they force
                                     -- backtracking
            maybeCoercion <- choice [try symCo, try transCo, try unsafeCo,
-                                    try leftCo, rightCo]
+                                    try instCo, try leftCo, rightCo]
            return $ case maybeCoercion of
               TransC  -> Trans (\ [x,y] -> TransCoercion x y)
               SymC    -> Sym (\ [x] -> SymCoercion x)
               UnsafeC -> Unsafe (\ [x,y] -> UnsafeCoercion x y)
               LeftC   -> LeftCo (\ [x] -> LeftCoercion x)
-              RightC  -> RightCo (\ [x] -> RightCoercion x))
+              RightC  -> RightCo (\ [x] -> RightCoercion x)
+              InstC   -> InstCo (\ [x,y] -> InstCoercion x y))
     <|> (coreQualifiedCon >>= (return . ATy . Tcon))
 
-data CoercionTy = TransC | SymC | UnsafeC | LeftC | RightC
+data CoercionTy = TransC | InstC | SymC | UnsafeC | LeftC | RightC
 
-symCo, transCo, unsafeCo :: Parser CoercionTy
+symCo, transCo, unsafeCo, instCo, leftCo, rightCo :: Parser CoercionTy
 -- Would be better not to wire these in quite this way. Sigh
 symCo    = string "ghczmprim:GHCziPrim.sym"      >> return SymC
 transCo  = string "ghczmprim:GHCziPrim.trans"    >> return TransC 
 unsafeCo = string "ghczmprim:GHCziPrim.CoUnsafe" >> return UnsafeC
 leftCo   = string "ghczmprim:GHCziPrim.left"     >> return LeftC
 rightCo  = string "ghczmprim:GHCziPrim.right"    >> return RightC
+instCo   = string "ghczmprim:GHCziPrim.inst"    >> return InstC
 
 coreForallTy :: Parser Ty
 coreForallTy = do
@@ -270,7 +258,9 @@ coreKind = do
   return $ foldl Karrow hd maybeRest
 
 coreAtomicKind = try liftedKind <|> try unliftedKind 
-       <|> try openKind {- <|> try (parens equalityKind) -}
+       <|> try openKind <|> try (do
+                    (from,to) <- parens equalityKind
+                    return $ Keq from to)
        <|> try (parens coreKind)
 
 liftedKind = do
@@ -301,6 +291,7 @@ data ATyOp =
  | Unsafe ([Ty] -> Ty)
  | LeftCo ([Ty] -> Ty)
  | RightCo ([Ty] -> Ty)
+ | InstCo ([Ty] -> Ty)
 
 coreVdefGroups :: Parser [Vdefg]
 coreVdefGroups = option [] (do
@@ -461,11 +452,14 @@ intOrRatLit :: Parser CoreLit
 intOrRatLit = do
  -- Int and lit combined into one to avoid ambiguity.
  -- Argh....
-  lhs <- anIntLit
+  lhs <- intLit
   maybeRhs <- optionMaybe (symbol "%" >> anIntLit)
   case maybeRhs of
     Nothing  -> return $ Lint lhs
     Just rhs -> return $ Lrational (lhs % rhs)
+
+intLit :: Parser Integer
+intLit = anIntLit <|> parens anIntLit
 
 anIntLit :: Parser Integer
 anIntLit = do

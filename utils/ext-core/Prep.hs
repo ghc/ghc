@@ -20,11 +20,6 @@ import Check
 
 import Data.List
 
-primArgTys :: Env Var [Ty]
-primArgTys = efromlist (map f (etolist (venv_ primEnv)))
-  where f (v,t) = (v,atys)
-             where (_,atys,_) = splitTy t
-
 prepModule :: Menv -> Module -> Module
 prepModule globalEnv (Module mn tdefs vdefgs) = 
     Module mn tdefs vdefgs' 
@@ -76,24 +71,38 @@ prepModule globalEnv (Module mn tdefs vdefgs) =
     unwindApp env (App e1 e2) as = unwindApp env e1 (Left e2:as)
     unwindApp env (Appt e t) as  = unwindApp env e (Right t:as)
     unwindApp env (op@(Dcon qdc)) as = 
-        etaExpand (drop n atys) (rewindApp env op as)
+        -- possibly dubious to assume no type args
+        etaExpand [] (drop n atys) (rewindApp env op as)
         where (tbs,atys0,_) = splitTy (qlookup cenv_ eempty qdc)
 	      atys = map (substl (map fst tbs) ts) atys0
 	      ts = [t | Right t <- as]
               n = length [e | Left e <- as]
     unwindApp env (op@(Var(qv@(_,p)))) as | isPrimVar qv =
-	etaExpand (drop n atys) (rewindApp env op as)
-        where Just atys = elookup primArgTys p
+	etaExpand (snd (unzip extraTbs)) (drop n atys) (rewindApp env op as)
+        where -- TODO: avoid copying code. these two cases are the same
+
+              -- etaExpand needs to add the type arguments too! Bah!
+              (tbs, atys0, _) = (maybe (error "unwindApp") splitTy (elookup (venv_ primEnv) p))
+              n_args = length ts
+              (appliedTbs, extraTbs) = (take n_args tbs, drop n_args tbs)
+              atys = map (substl (map fst appliedTbs) ts) atys0
+              ts = [t | Right t <- as]
               n = length [e | Left e <- as]
     unwindApp env op as = rewindApp env op as
 
 
-    etaExpand :: [Ty] -> Exp -> Exp
-    etaExpand ts e = 
-         let args = [('$':(show i),t) | (i,t) <- zip [(1::Integer)..] ts] in
-	   foldr (\ (v,t) e -> Lam (Vb (v,t)) e)
-              (foldl (\ e (v,_) -> App e (Var (unqual v))) e args)
-              args
+    etaExpand :: [Kind] -> [Ty] -> Exp -> Exp
+    etaExpand ks ts e = 
+         -- what a pain
+         let tyArgs = [("$t_"++(show i),k) | (i, k) <- zip [(1::Integer)..] ks]   
+             termArgs = [ ('$':(show i),t) | (i,t) <- zip [(1::Integer)..] ts] in
+          foldr (\ (t1,k1) e -> Lam (Tb (t1,k1)) e)
+	   (foldr (\ (v,t) e -> Lam (Vb (v,t)) e)
+              (foldl (\ e (v,_) -> App e (Var (unqual v)))
+                 (foldl (\ e (tv,_) -> Appt e (Tvar tv))
+                   e tyArgs)
+              termArgs) termArgs)
+           tyArgs
 
     rewindApp _ e [] = e
     rewindApp env@(venv,tvenv) e1 (Left e2:as) | kindOfTy tvenv t `eqKind` Kunlifted && suspends e2 =

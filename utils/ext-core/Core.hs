@@ -60,6 +60,7 @@ data Ty
   | TransCoercion Ty Ty
   | SymCoercion Ty
   | UnsafeCoercion Ty Ty
+  | InstCoercion Ty Ty
   | LeftCoercion Ty
   | RightCoercion Ty
 
@@ -132,9 +133,9 @@ eqKind Kunlifted Kunlifted = True
 eqKind Kopen Kopen = True
 eqKind (Karrow k1 k2) (Karrow l1 l2) = k1 `eqKind` l1
                                    &&  k2 `eqKind` l2
-eqKind _ _ = False -- no Keq kind is ever equal to any other...
-                   -- maybe ok for now?
-
+eqKind (Keq t1 t2) (Keq u1 u2) = t1 == u1
+                              && t2 == u2
+eqKind _ _ = False
 
 splitTyConApp_maybe :: Ty -> Maybe (Qual Tcon,[Ty])
 splitTyConApp_maybe (Tvar _) = Nothing

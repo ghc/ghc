@@ -9,14 +9,19 @@ tjc April 2008:
 ==== Notes ====
 
 The checker should work on most programs. Bugs I'm aware of:
-1. GHC generates some questionable coercion applications involving
-   partially-applied function arrows (for details, see:
+1. There's some business I don't quite understand involving
+   coercions and subkinding (for details, see:
    http://www.haskell.org/pipermail/cvs-ghc/2008-April/041949.html)
    This shows up when typechecking a few of the library modules.
-
+   
 2. There's some weirdness involving funny character literals. This can
    be fixed by writing a new lexer for chars rather than using Parsec's
    built-in charLiteral lexer. But I haven't done that.
+
+3. When typechecking the ghc-prim:GHC.PrimopWrappers library module,
+   some declarations seem to have the wrong type signature (due to 
+   confusion between (forall (t::*) ...) and (forall (t::?) ...).)
+   This may be a GHC bug.
 
 Typechecking all the GHC libraries eats about a gig of heap and takes a
 long time. I blame Parsec. (Someone who was bored, or understood happy
