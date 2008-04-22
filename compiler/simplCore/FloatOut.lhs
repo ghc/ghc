@@ -316,15 +316,11 @@ floatExpr lvl (Note note@(SCC cc) expr)
 	  = Rec [(binder, mkSCC dupd_cc rhs) | (binder, rhs) <- pairs]
 
 floatExpr lvl (Note InlineMe expr)	-- Other than SCCs
-  = case floatExpr InlineCtxt expr of { (fs, floating_defns, expr') ->
-	-- There can be some floating_defns, arising from
-	-- ordinary lets that were there all the time.  It seems
-	-- more efficient to test once here than to avoid putting
-	-- them into floating_defns (which would mean testing for
-	-- inlineCtxt  at every let)
-    (fs, [], Note InlineMe (install floating_defns expr')) }
-	-- See Note [FloatOut inside INLINE] in SetLevels
-	-- I'm guessing that floating_dens should be empty
+  = (zeroStats, [], Note InlineMe (unTag expr))
+	-- Do no floating at all inside INLINE. [_$_]
+	-- The SetLevels pass did not clone the bindings, so it's
+	-- unsafe to do any floating, even if we dump the results
+	-- inside the Note (which is what we used to do).
 
 floatExpr lvl (Note note expr)	-- Other than SCCs
   = case (floatExpr lvl expr)    of { (fs, floating_defns, expr') ->
@@ -366,6 +362,22 @@ floatList f [] = (zeroStats, [], [])
 floatList f (a:as) = case f a		 of { (fs_a,  binds_a,  b)  ->
 		     case floatList f as of { (fs_as, binds_as, bs) ->
 		     (fs_a `add_stats` fs_as, binds_a ++ binds_as, b:bs) }}
+
+unTagBndr :: TaggedBndr tag -> CoreBndr
+unTagBndr (TB b _) = b
+
+unTag :: TaggedExpr tag -> CoreExpr
+unTag (Var v)  	  = Var v
+unTag (Lit l)  	  = Lit l
+unTag (Type ty)   = Type ty
+unTag (Note n e)  = Note n (unTag e)
+unTag (App e1 e2) = App (unTag e1) (unTag e2)
+unTag (Lam b e)   = Lam (unTagBndr b) (unTag e)
+unTag (Cast e co) = Cast (unTag e) co
+unTag (Let (Rec prs) e)    = Let (Rec [(unTagBndr b,unTag r) | (b, r) <- prs]) (unTag e)
+unTag (Let (NonRec b r) e) = Let (NonRec (unTagBndr b) (unTag r)) (unTag e)
+unTag (Case e b ty alts)   = Case (unTag e) (unTagBndr b) ty
+			          [(c, map unTagBndr bs, unTag r) | (c,bs,r) <- alts]
 \end{code}
 
 %************************************************************************
