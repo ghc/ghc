@@ -44,6 +44,8 @@ module StgSyn (
 #endif
     ) where
 
+#include "HsVersions.h"
+
 import CostCentre	( CostCentreStack, CostCentre )
 import VarSet		( IdSet, isEmptyVarSet )
 import Var		( isId )
