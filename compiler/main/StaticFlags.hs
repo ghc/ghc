@@ -278,69 +278,69 @@ unpacked_opts =
 -}
 
 opt_IgnoreDotGhci :: Bool
-opt_IgnoreDotGhci		= lookUp FSLIT("-ignore-dot-ghci")
+opt_IgnoreDotGhci		= lookUp (fsLit "-ignore-dot-ghci")
 
 -- debugging opts
 opt_SuppressUniques :: Bool
-opt_SuppressUniques		= lookUp  FSLIT("-dsuppress-uniques")
+opt_SuppressUniques		= lookUp  (fsLit "-dsuppress-uniques")
 opt_PprStyle_Debug :: Bool
-opt_PprStyle_Debug		= lookUp  FSLIT("-dppr-debug")
+opt_PprStyle_Debug		= lookUp  (fsLit "-dppr-debug")
 opt_PprUserLength :: Int
 opt_PprUserLength	        = lookup_def_int "-dppr-user-length" 5 --ToDo: give this a name
 
 -- profiling opts
 opt_AutoSccsOnAllToplevs :: Bool
-opt_AutoSccsOnAllToplevs	= lookUp  FSLIT("-fauto-sccs-on-all-toplevs")
+opt_AutoSccsOnAllToplevs	= lookUp  (fsLit "-fauto-sccs-on-all-toplevs")
 opt_AutoSccsOnExportedToplevs :: Bool
-opt_AutoSccsOnExportedToplevs	= lookUp  FSLIT("-fauto-sccs-on-exported-toplevs")
+opt_AutoSccsOnExportedToplevs	= lookUp  (fsLit "-fauto-sccs-on-exported-toplevs")
 opt_AutoSccsOnIndividualCafs :: Bool
-opt_AutoSccsOnIndividualCafs	= lookUp  FSLIT("-fauto-sccs-on-individual-cafs")
+opt_AutoSccsOnIndividualCafs	= lookUp  (fsLit "-fauto-sccs-on-individual-cafs")
 opt_SccProfilingOn :: Bool
-opt_SccProfilingOn		= lookUp  FSLIT("-fscc-profiling")
+opt_SccProfilingOn		= lookUp  (fsLit "-fscc-profiling")
 opt_DoTickyProfiling :: Bool
 opt_DoTickyProfiling            = WayTicky `elem` (unsafePerformIO $ readIORef v_Ways)
 
 -- Hpc opts
 opt_Hpc :: Bool
-opt_Hpc				= lookUp FSLIT("-fhpc")  
+opt_Hpc				= lookUp (fsLit "-fhpc")  
 
 -- language opts
 opt_DictsStrict :: Bool
-opt_DictsStrict			= lookUp  FSLIT("-fdicts-strict")
+opt_DictsStrict			= lookUp  (fsLit "-fdicts-strict")
 opt_IrrefutableTuples :: Bool
-opt_IrrefutableTuples		= lookUp  FSLIT("-firrefutable-tuples")
+opt_IrrefutableTuples		= lookUp  (fsLit "-firrefutable-tuples")
 opt_Parallel :: Bool
-opt_Parallel			= lookUp  FSLIT("-fparallel")
+opt_Parallel			= lookUp  (fsLit "-fparallel")
 
 -- optimisation opts
 opt_SpecInlineJoinPoints :: Bool
-opt_SpecInlineJoinPoints	= lookUp  FSLIT("-fspec-inline-join-points")
+opt_SpecInlineJoinPoints	= lookUp  (fsLit "-fspec-inline-join-points")
 opt_NoStateHack :: Bool
-opt_NoStateHack			= lookUp  FSLIT("-fno-state-hack")
+opt_NoStateHack			= lookUp  (fsLit "-fno-state-hack")
 opt_NoMethodSharing :: Bool
-opt_NoMethodSharing		= lookUp  FSLIT("-fno-method-sharing")
+opt_NoMethodSharing		= lookUp  (fsLit "-fno-method-sharing")
 opt_CprOff :: Bool
-opt_CprOff			= lookUp  FSLIT("-fcpr-off")
+opt_CprOff			= lookUp  (fsLit "-fcpr-off")
 	-- Switch off CPR analysis in the new demand analyser
 opt_MaxWorkerArgs :: Int
 opt_MaxWorkerArgs		= lookup_def_int "-fmax-worker-args" (10::Int)
 
 opt_GranMacros :: Bool
-opt_GranMacros			= lookUp  FSLIT("-fgransim")
+opt_GranMacros			= lookUp  (fsLit "-fgransim")
 opt_HiVersion :: Integer
 opt_HiVersion			= read (cProjectVersionInt ++ cProjectPatchLevel) :: Integer
 opt_HistorySize :: Int
 opt_HistorySize			= lookup_def_int "-fhistory-size" 20
 opt_OmitBlackHoling :: Bool
-opt_OmitBlackHoling		= lookUp  FSLIT("-dno-black-holing")
+opt_OmitBlackHoling		= lookUp  (fsLit "-dno-black-holing")
 
 -- Simplifier switches
 opt_SimplNoPreInlining :: Bool
-opt_SimplNoPreInlining		= lookUp  FSLIT("-fno-pre-inlining")
+opt_SimplNoPreInlining		= lookUp  (fsLit "-fno-pre-inlining")
 	-- NoPreInlining is there just to see how bad things
 	-- get if you don't do it!
 opt_SimplExcessPrecision :: Bool
-opt_SimplExcessPrecision	= lookUp  FSLIT("-fexcess-precision")
+opt_SimplExcessPrecision	= lookUp  (fsLit "-fexcess-precision")
 
 -- Unfolding control
 opt_UF_CreationThreshold :: Int
@@ -359,12 +359,12 @@ opt_PIC :: Bool
 #if darwin_TARGET_OS && x86_64_TARGET_ARCH
 opt_PIC                         = True
 #else
-opt_PIC                         = lookUp FSLIT("-fPIC")
+opt_PIC                         = lookUp (fsLit "-fPIC")
 #endif
 opt_Static :: Bool
-opt_Static			= lookUp  FSLIT("-static")
+opt_Static			= lookUp  (fsLit "-static")
 opt_Unregisterised :: Bool
-opt_Unregisterised		= lookUp  FSLIT("-funregisterised")
+opt_Unregisterised		= lookUp  (fsLit "-funregisterised")
 
 -- Derived, not a real option.  Determines whether we will be compiling
 -- info tables that reside just before the entry code, or with an
@@ -375,11 +375,11 @@ tablesNextToCode 		= not opt_Unregisterised
 		 		  && cGhcEnableTablesNextToCode == "YES"
 
 opt_EmitExternalCore :: Bool
-opt_EmitExternalCore		= lookUp  FSLIT("-fext-core")
+opt_EmitExternalCore		= lookUp  (fsLit "-fext-core")
 
 -- Include full span info in error messages, instead of just the start position.
 opt_ErrorSpans :: Bool
-opt_ErrorSpans			= lookUp FSLIT("-ferror-spans")
+opt_ErrorSpans			= lookUp (fsLit "-ferror-spans")
 
 
 -- object files and libraries to be linked in are collected here.
