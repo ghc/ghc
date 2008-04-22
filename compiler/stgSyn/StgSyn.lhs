@@ -59,7 +59,6 @@ import CoreSyn		( AltCon )
 import PprCore		( {- instances -} )
 import PrimOp		( PrimOp )
 import Outputable
-import Util             ( count )
 import Type             ( Type )
 import TyCon            ( TyCon )
 import UniqSet
@@ -418,10 +417,9 @@ The second flavour of right-hand-side is for constructors (simple but important)
 
 \begin{code}
 stgRhsArity :: StgRhs -> Int
-stgRhsArity (StgRhsClosure _ _ _ _ _ bndrs _) = count isId bndrs
-  -- The arity never includes type parameters, so
-  -- when keeping type arguments and binders in the Stg syntax 
-  -- (opt_RuntimeTypes) we have to fliter out the type binders.
+stgRhsArity (StgRhsClosure _ _ _ _ _ bndrs _) 
+  = ASSERT( all isId bndrs ) length bndrs
+  -- The arity never includes type parameters, but they should have gone by now
 stgRhsArity (StgRhsCon _ _ _) = 0
 \end{code}
 

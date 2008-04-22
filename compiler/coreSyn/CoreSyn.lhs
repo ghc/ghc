@@ -48,7 +48,6 @@ module CoreSyn (
 
 #include "HsVersions.h"
 
-import StaticFlags
 import CostCentre
 import Var
 import Type
@@ -591,23 +590,18 @@ coreExprCc _                   = noCostCentre
 %*									*
 %************************************************************************
 
+At one time we optionally carried type arguments through to runtime.
 @isRuntimeVar v@ returns if (Lam v _) really becomes a lambda at runtime,
 i.e. if type applications are actual lambdas because types are kept around
-at runtime.  
-
-Similarly isRuntimeArg.  
+at runtime.  Similarly isRuntimeArg.  
 
 \begin{code}
 isRuntimeVar :: Var -> Bool
-isRuntimeVar | opt_RuntimeTypes = \_ -> True
-	     | otherwise	= \v -> isId v
+isRuntimeVar = isId 
 
 isRuntimeArg :: CoreExpr -> Bool
-isRuntimeArg | opt_RuntimeTypes = \_ -> True
-	     | otherwise	= \e -> isValArg e
-\end{code}
+isRuntimeArg = isValArg
 
-\begin{code}
 isValArg :: Expr b -> Bool
 isValArg (Type _) = False
 isValArg _        = True

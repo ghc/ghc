@@ -35,7 +35,6 @@ import Maybes		( maybeToBool )
 import Name		( getOccName, isExternalName, nameOccName )
 import OccName		( occNameString, occNameFS )
 import BasicTypes       ( Arity )
-import StaticFlags	( opt_RuntimeTypes )
 import Module
 import Outputable
 import MonadUtils
@@ -463,14 +462,10 @@ coreToStgApp maybe_thunk_body f args = do
     let
 	n_val_args	 = valArgCount args
 	not_letrec_bound = not (isLetBound how_bound)
-	fun_fvs	 	 
-          = let fvs = singletonFVInfo f how_bound fun_occ in
+	fun_fvs = singletonFVInfo f how_bound fun_occ
             -- e.g. (f :: a -> int) (x :: a) 
             -- Here the free variables are "f", "x" AND the type variable "a"
             -- coreToStgArgs will deal with the arguments recursively
-            if opt_RuntimeTypes then
-	      fvs `unionFVInfo` tyvarFVInfo (tyVarsOfType (idType f))
-	    else fvs
 
 	-- Mostly, the arity info of a function is in the fn's IdInfo
 	-- But new bindings introduced by CoreSat may not have no
@@ -537,10 +532,7 @@ coreToStgArgs []
 
 coreToStgArgs (Type ty : args) = do     -- Type argument
     (args', fvs) <- coreToStgArgs args
-    if opt_RuntimeTypes then
-        return (StgTypeArg ty : args', fvs `unionFVInfo` tyvarFVInfo (tyVarsOfType ty))
-     else
-        return (args', fvs)
+    return (args', fvs)
 
 coreToStgArgs (arg : args) = do         -- Non-type argument
     (stg_args, args_fvs) <- coreToStgArgs args
@@ -1008,10 +1000,12 @@ singletonFVInfo id ImportBound info
 singletonFVInfo id how_bound info  = unitVarEnv id (id, how_bound, info)
 
 tyvarFVInfo :: TyVarSet -> FreeVarsInfo
-tyvarFVInfo tvs = foldVarSet add emptyFVInfo tvs
-        where
-	  add tv fvs = extendVarEnv fvs tv (tv, LambdaBound, noBinderInfo)
-		-- Type variables must be lambda-bound
+tyvarFVInfo tvs = emptyFVInfo	-- Type variables are not recorded
+-- Old code recorded free tyvars for when we supported runtime types:
+--    foldVarSet add emptyFVInfo tvs
+--        where
+--	  add tv fvs = extendVarEnv fvs tv (tv, LambdaBound, noBinderInfo)
+--		-- Type variables must be lambda-bound
 
 unionFVInfo :: FreeVarsInfo -> FreeVarsInfo -> FreeVarsInfo
 unionFVInfo fv1 fv2 = plusVarEnv_C plusFVInfo fv1 fv2
@@ -1023,10 +1017,7 @@ minusFVBinders :: [Id] -> FreeVarsInfo -> FreeVarsInfo
 minusFVBinders vs fv = foldr minusFVBinder fv vs
 
 minusFVBinder :: Id -> FreeVarsInfo -> FreeVarsInfo
-minusFVBinder v fv | isId v && opt_RuntimeTypes
-		   = (fv `delVarEnv` v) `unionFVInfo` 
-		     tyvarFVInfo (tyVarsOfType (idType v))
-		   | otherwise = fv `delVarEnv` v
+minusFVBinder v fv = fv `delVarEnv` v
 	-- When removing a binder, remember to add its type variables
 	-- c.f. CoreFVs.delBinderFV
 
@@ -1043,10 +1034,11 @@ lookupFVInfo fvs id
 			Just (_,_,info) -> info
 
 allFreeIds :: FreeVarsInfo -> [(Id,HowBound)]	-- Both top level and non-top-level Ids
-allFreeIds fvs = [(id,how_bound) | (id,how_bound,_) <- varEnvElts fvs, isId id]
+allFreeIds fvs = ASSERT( all (isId . fst) ids ) ids
+      where
+	ids = [(id,how_bound) | (id,how_bound,_) <- varEnvElts fvs]
 
 -- Non-top-level things only, both type variables and ids
--- (type variables only if opt_RuntimeTypes)
 getFVs :: FreeVarsInfo -> [Var]	
 getFVs fvs = [id | (id, how_bound, _) <- varEnvElts fvs, 
 		    not (topLevelBound how_bound) ]
@@ -1072,9 +1064,7 @@ check_eq_li li1 	  li2		= False
 Misc.
 \begin{code}
 filterStgBinders :: [Var] -> [Var]
-filterStgBinders bndrs
-  | opt_RuntimeTypes = bndrs
-  | otherwise	     = filter isId bndrs
+filterStgBinders bndrs = filter isId bndrs
 \end{code}
 
 

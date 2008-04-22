@@ -36,7 +36,6 @@ module StaticFlags (
 	opt_DictsStrict,
 	opt_IrrefutableTuples,
 	opt_Parallel,
-	opt_RuntimeTypes,
 
 	-- optimisation opts
 	opt_NoMethodSharing, 
@@ -334,8 +333,6 @@ opt_HistorySize :: Int
 opt_HistorySize			= lookup_def_int "-fhistory-size" 20
 opt_OmitBlackHoling :: Bool
 opt_OmitBlackHoling		= lookUp  FSLIT("-dno-black-holing")
-opt_RuntimeTypes :: Bool
-opt_RuntimeTypes		= lookUp  FSLIT("-fruntime-types")
 
 -- Simplifier switches
 opt_SimplNoPreInlining :: Bool

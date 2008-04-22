@@ -1550,9 +1550,6 @@ rhsIsStatic :: PackageId -> CoreExpr -> Bool
 --	   dynamic
 -- 
 --    c) don't look through unfolding of f in (f x).
---
--- When opt_RuntimeTypes is on, we keep type lambdas and treat
--- them as making the RHS re-entrant (non-updatable).
 
 rhsIsStatic _this_pkg rhs = is_static False rhs
   where
