@@ -15,7 +15,7 @@
 -- identical internal representations, in order to prevent runtime corruption.
 --
 -- 'unsafeCoerce' is just a trivial wrapper for 'unsafeCoerce#';
--- see the latter for important documetation about correct usage.
+-- see the latter for important documentation about correct usage.
 
 module Unsafe.Coerce (unsafeCoerce) where
 
