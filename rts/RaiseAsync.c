@@ -715,7 +715,7 @@ removeFromQueues(Capability *cap, StgTSO *tso)
     }
 
   default:
-    barf("removeFromQueues");
+    barf("removeFromQueues: %d", tso->why_blocked);
   }
 
  done:
@@ -788,7 +788,7 @@ removeFromQueues(Capability *cap, StgTSO *tso)
 #endif
 
   default:
-      barf("removeFromQueues");
+      barf("removeFromQueues: %d", tso->why_blocked);
   }
 
  done:
