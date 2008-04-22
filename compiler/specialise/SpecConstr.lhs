@@ -1320,7 +1320,9 @@ isValue env (Var v)
 	-- as well, for let-bound constructors!
 
 isValue env (Lam b e)
-  | isTyVar b = isValue env e
+  | isTyVar b = case isValue env e of
+		  Just _  -> Just LambdaVal
+		  Nothing -> Nothing
   | otherwise = Just LambdaVal
 
 isValue _env expr	-- Maybe it's a constructor application
