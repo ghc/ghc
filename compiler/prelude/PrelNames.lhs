@@ -36,13 +36,6 @@ Nota Bene: all Names defined in here should come from the base package
 
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module PrelNames (
 	Unique, Uniquable(..), hasKey, 	-- Re-exported for convenience
 
@@ -57,8 +50,7 @@ module PrelNames (
 #include "HsVersions.h"
 
 import Module
-import OccName	  ( dataName, tcName, clsName, varName, tvName, 
-		    mkOccNameFS, mkVarOccFS )
+import OccName
 import RdrName	  ( RdrName, nameRdrName, mkOrig, rdrNameOcc, mkUnqual )
 import Unique	  ( Unique, Uniquable(..), hasKey,
 		    mkPreludeMiscIdUnique, mkPreludeDataConUnique,
@@ -81,6 +73,7 @@ import FastString
 This *local* name is used by the interactive stuff
 
 \begin{code}
+itName :: Unique -> Name
 itName uniq = mkInternalName uniq (mkOccNameFS varName FSLIT("it")) noSrcSpan
 \end{code}
 
@@ -235,7 +228,16 @@ genericTyConNames = [crossTyConName, plusTyConName, genUnitTyConName]
 
 --MetaHaskell Extension Add a new module here
 \begin{code}
+pRELUDE :: Module
 pRELUDE		= mkBaseModule_ pRELUDE_NAME
+
+gHC_PRIM, gHC_BOOL, gHC_GENERICS, gHC_BASE, gHC_ENUM, gHC_SHOW, gHC_READ,
+    gHC_NUM, gHC_INTEGER, gHC_LIST, gHC_PARR, dATA_TUP, dATA_EITHER,
+    dATA_STRING, gHC_PACK, gHC_CONC, gHC_IO_BASE, gHC_ST, gHC_ARR,
+    gHC_STABLE, gHC_ADDR, gHC_PTR, gHC_ERR, gHC_REAL, gHC_FLOAT,
+    gHC_TOP_HANDLER, sYSTEM_IO, dYNAMIC, tYPEABLE, gENERICS, dOTNET,
+    rEAD_PREC, lEX, gHC_INT, gHC_WORD, mONAD, mONAD_FIX, aRROW,
+    gHC_DESUGAR, rANDOM, gHC_EXTS :: Module
 gHC_PRIM	= mkPrimModule FSLIT("GHC.Prim")   -- Primitive types and values
 gHC_BOOL	= mkPrimModule FSLIT("GHC.Bool")
 gHC_ORDERING	= mkPrimModule FSLIT("GHC.Ordering")
@@ -279,6 +281,7 @@ gHC_DESUGAR = mkBaseModule FSLIT("GHC.Desugar")
 rANDOM		= mkBaseModule FSLIT("System.Random")
 gHC_EXTS	= mkBaseModule FSLIT("GHC.Exts")
 
+mAIN, rOOT_MAIN :: Module
 mAIN	        = mkMainModule_ mAIN_NAME
 rOOT_MAIN	= mkMainModule FSLIT(":Main") -- Root module for initialisation 
 
@@ -286,9 +289,11 @@ rOOT_MAIN	= mkMainModule FSLIT(":Main") -- Root module for initialisation
 	-- use himself.  The z-encoding for ':' is "ZC", so the z-encoded
 	-- module name still starts with a capital letter, which keeps
 	-- the z-encoded version consistent.
+iNTERACTIVE, thFAKE :: Module
 iNTERACTIVE    = mkMainModule FSLIT(":Interactive")
 thFAKE         = mkMainModule FSLIT(":THFake")
 
+pRELUDE_NAME, mAIN_NAME :: ModuleName
 pRELUDE_NAME   = mkModuleNameFS FSLIT("Prelude")
 mAIN_NAME      = mkModuleNameFS FSLIT("Main")
 
@@ -332,6 +337,7 @@ mkTupleModule Unboxed _ = gHC_PRIM
 %************************************************************************
 
 \begin{code}
+main_RDR_Unqual    :: RdrName
 main_RDR_Unqual	= mkUnqual varName FSLIT("main")
 	-- We definitely don't want an Orig RdrName, because
 	-- main might, in principle, be imported into module Main
@@ -340,6 +346,8 @@ forall_tv_RDR, dot_tv_RDR :: RdrName
 forall_tv_RDR = mkUnqual tvName FSLIT("forall")
 dot_tv_RDR    = mkUnqual tvName FSLIT(".")
 
+eq_RDR, ge_RDR, ne_RDR, le_RDR, lt_RDR, gt_RDR, compare_RDR,
+    ltTag_RDR, eqTag_RDR, gtTag_RDR :: RdrName
 eq_RDR 			= nameRdrName eqName
 ge_RDR 			= nameRdrName geName
 ne_RDR 			= varQual_RDR  gHC_BASE FSLIT("/=")
@@ -351,61 +359,81 @@ ltTag_RDR		= dataQual_RDR gHC_ORDERING FSLIT("LT")
 eqTag_RDR		= dataQual_RDR gHC_ORDERING FSLIT("EQ")
 gtTag_RDR		= dataQual_RDR gHC_ORDERING FSLIT("GT")
 
+eqClass_RDR, numClass_RDR, ordClass_RDR, enumClass_RDR, monadClass_RDR
+    :: RdrName
 eqClass_RDR		= nameRdrName eqClassName
 numClass_RDR 		= nameRdrName numClassName
 ordClass_RDR 		= nameRdrName ordClassName
 enumClass_RDR		= nameRdrName enumClassName
 monadClass_RDR		= nameRdrName monadClassName
 
+map_RDR, append_RDR :: RdrName
 map_RDR 		= varQual_RDR gHC_BASE FSLIT("map")
 append_RDR 		= varQual_RDR gHC_BASE FSLIT("++")
 
+foldr_RDR, build_RDR, returnM_RDR, bindM_RDR, failM_RDR :: RdrName
 foldr_RDR 		= nameRdrName foldrName
 build_RDR 		= nameRdrName buildName
 returnM_RDR 		= nameRdrName returnMName
 bindM_RDR 		= nameRdrName bindMName
 failM_RDR 		= nameRdrName failMName
 
+and_RDR :: RdrName
 and_RDR			= nameRdrName andName
 
+left_RDR, right_RDR :: RdrName
 left_RDR		= nameRdrName leftDataConName
 right_RDR		= nameRdrName rightDataConName
 
+fromEnum_RDR, toEnum_RDR :: RdrName
 fromEnum_RDR		= varQual_RDR gHC_ENUM FSLIT("fromEnum")
 toEnum_RDR		= varQual_RDR gHC_ENUM FSLIT("toEnum")
 
+enumFrom_RDR, enumFromTo_RDR, enumFromThen_RDR, enumFromThenTo_RDR :: RdrName
 enumFrom_RDR		= nameRdrName enumFromName
 enumFromTo_RDR 		= nameRdrName enumFromToName
 enumFromThen_RDR	= nameRdrName enumFromThenName
 enumFromThenTo_RDR	= nameRdrName enumFromThenToName
 
+ratioDataCon_RDR, plusInteger_RDR, timesInteger_RDR :: RdrName
 ratioDataCon_RDR	= nameRdrName ratioDataConName
 plusInteger_RDR		= nameRdrName plusIntegerName
 timesInteger_RDR	= nameRdrName timesIntegerName
 
+ioDataCon_RDR :: RdrName
 ioDataCon_RDR		= nameRdrName ioDataConName
 
+eqString_RDR, unpackCString_RDR, unpackCStringFoldr_RDR,
+    unpackCStringUtf8_RDR :: RdrName
 eqString_RDR		= nameRdrName eqStringName
 unpackCString_RDR      	= nameRdrName unpackCStringName
 unpackCStringFoldr_RDR 	= nameRdrName unpackCStringFoldrName
 unpackCStringUtf8_RDR  	= nameRdrName unpackCStringUtf8Name
 
+newStablePtr_RDR, wordDataCon_RDR :: RdrName
 newStablePtr_RDR 	= nameRdrName newStablePtrName
 wordDataCon_RDR		= dataQual_RDR gHC_WORD FSLIT("W#")
 
+bindIO_RDR, returnIO_RDR :: RdrName
 bindIO_RDR	  	= nameRdrName bindIOName
 returnIO_RDR	  	= nameRdrName returnIOName
 
+fromInteger_RDR, fromRational_RDR, minus_RDR, times_RDR, plus_RDR :: RdrName
 fromInteger_RDR		= nameRdrName fromIntegerName
 fromRational_RDR	= nameRdrName fromRationalName
 minus_RDR		= nameRdrName minusName
 times_RDR		= varQual_RDR  gHC_NUM FSLIT("*")
 plus_RDR                = varQual_RDR gHC_NUM FSLIT("+")
 
+fromString_RDR :: RdrName
 fromString_RDR		= nameRdrName fromStringName
 
+compose_RDR :: RdrName
 compose_RDR		= varQual_RDR gHC_BASE FSLIT(".")
 
+not_RDR, getTag_RDR, succ_RDR, pred_RDR, minBound_RDR, maxBound_RDR,
+    range_RDR, inRange_RDR, index_RDR,
+    unsafeIndex_RDR, unsafeRangeSize_RDR :: RdrName
 not_RDR 		= varQual_RDR gHC_BASE FSLIT("not")
 getTag_RDR	 	= varQual_RDR gHC_BASE FSLIT("getTag")
 succ_RDR 		= varQual_RDR gHC_ENUM FSLIT("succ")
@@ -418,6 +446,8 @@ index_RDR		= varQual_RDR gHC_ARR FSLIT("index")
 unsafeIndex_RDR		= varQual_RDR gHC_ARR FSLIT("unsafeIndex")
 unsafeRangeSize_RDR	= varQual_RDR gHC_ARR FSLIT("unsafeRangeSize")
 
+readList_RDR, readListDefault_RDR, readListPrec_RDR, readListPrecDefault_RDR,
+    readPrec_RDR, parens_RDR, choose_RDR, lexP_RDR :: RdrName
 readList_RDR            = varQual_RDR gHC_READ FSLIT("readList")
 readListDefault_RDR     = varQual_RDR gHC_READ FSLIT("readListDefault")
 readListPrec_RDR        = varQual_RDR gHC_READ FSLIT("readListPrec")
@@ -427,15 +457,19 @@ parens_RDR              = varQual_RDR gHC_READ FSLIT("parens")
 choose_RDR              = varQual_RDR gHC_READ FSLIT("choose")
 lexP_RDR                = varQual_RDR gHC_READ FSLIT("lexP")
 
+punc_RDR, ident_RDR, symbol_RDR :: RdrName
 punc_RDR                = dataQual_RDR lEX FSLIT("Punc")
 ident_RDR               = dataQual_RDR lEX FSLIT("Ident")
 symbol_RDR              = dataQual_RDR lEX FSLIT("Symbol")
 
+step_RDR, alt_RDR, reset_RDR, prec_RDR :: RdrName
 step_RDR                = varQual_RDR  rEAD_PREC FSLIT("step")
 alt_RDR                 = varQual_RDR  rEAD_PREC FSLIT("+++") 
 reset_RDR               = varQual_RDR  rEAD_PREC FSLIT("reset")
 prec_RDR                = varQual_RDR  rEAD_PREC FSLIT("prec")
 
+showList_RDR, showList___RDR, showsPrec_RDR, showString_RDR,
+    showSpace_RDR, showParen_RDR :: RdrName
 showList_RDR            = varQual_RDR gHC_SHOW FSLIT("showList")
 showList___RDR          = varQual_RDR gHC_SHOW FSLIT("showList__")
 showsPrec_RDR           = varQual_RDR gHC_SHOW FSLIT("showsPrec") 
@@ -443,18 +477,23 @@ showString_RDR          = varQual_RDR gHC_SHOW FSLIT("showString")
 showSpace_RDR           = varQual_RDR gHC_SHOW FSLIT("showSpace") 
 showParen_RDR           = varQual_RDR gHC_SHOW FSLIT("showParen") 
 
+typeOf_RDR, mkTypeRep_RDR, mkTyConRep_RDR :: RdrName
 typeOf_RDR     = varQual_RDR tYPEABLE FSLIT("typeOf")
 mkTypeRep_RDR  = varQual_RDR tYPEABLE FSLIT("mkTyConApp")
 mkTyConRep_RDR = varQual_RDR tYPEABLE FSLIT("mkTyCon")
 
+undefined_RDR :: RdrName
 undefined_RDR = varQual_RDR gHC_ERR FSLIT("undefined")
 
+crossDataCon_RDR, inlDataCon_RDR, inrDataCon_RDR, genUnitDataCon_RDR :: RdrName
 crossDataCon_RDR   = dataQual_RDR gHC_GENERICS FSLIT(":*:")
 inlDataCon_RDR     = dataQual_RDR gHC_GENERICS FSLIT("Inl")
 inrDataCon_RDR     = dataQual_RDR gHC_GENERICS FSLIT("Inr")
 genUnitDataCon_RDR = dataQual_RDR gHC_GENERICS FSLIT("Unit")
 
 ----------------------
+varQual_RDR, tcQual_RDR, clsQual_RDR, dataQual_RDR
+    :: Module -> FastString -> RdrName
 varQual_RDR  mod str = mkOrig mod (mkOccNameFS varName str)
 tcQual_RDR   mod str = mkOrig mod (mkOccNameFS tcName str)
 clsQual_RDR  mod str = mkOrig mod (mkOccNameFS clsName str)
@@ -476,20 +515,26 @@ and it's convenient to write them all down in one place.
 
 
 \begin{code}
+runMainIOName :: Name
 runMainIOName = varQual gHC_TOP_HANDLER FSLIT("runMainIO") runMainKey
 
+orderingTyConName :: Name
 orderingTyConName = tcQual   gHC_ORDERING FSLIT("Ordering") orderingTyConKey
 
+eitherTyConName, leftDataConName, rightDataConName :: Name
 eitherTyConName	  = tcQual  dATA_EITHER FSLIT("Either") eitherTyConKey
 leftDataConName   = conName dATA_EITHER FSLIT("Left")   leftDataConKey
 rightDataConName  = conName dATA_EITHER FSLIT("Right")  rightDataConKey
 
 -- Generics
+crossTyConName, plusTyConName, genUnitTyConName :: Name
 crossTyConName     = tcQual   gHC_GENERICS FSLIT(":*:") crossTyConKey
 plusTyConName      = tcQual   gHC_GENERICS FSLIT(":+:") plusTyConKey
 genUnitTyConName   = tcQual   gHC_GENERICS FSLIT("Unit") genUnitTyConKey
 
 -- Base strings Strings
+unpackCStringName, unpackCStringAppendName, unpackCStringFoldrName,
+    unpackCStringUtf8Name, eqStringName, stringTyConName :: Name
 unpackCStringName       = varQual gHC_BASE FSLIT("unpackCString#") unpackCStringIdKey
 unpackCStringAppendName = varQual gHC_BASE FSLIT("unpackAppendCString#") unpackCStringAppendIdKey
 unpackCStringFoldrName  = varQual gHC_BASE FSLIT("unpackFoldrCString#") unpackCStringFoldrIdKey
@@ -498,9 +543,11 @@ eqStringName	 	= varQual gHC_BASE FSLIT("eqString")  eqStringIdKey
 stringTyConName         = tcQual  gHC_BASE FSLIT("String") stringTyConKey
 
 -- The 'inline' function
+inlineIdName :: Name
 inlineIdName	 	= varQual gHC_BASE FSLIT("inline") inlineIdKey
 
 -- Base classes (Eq, Ord, Functor)
+eqClassName, eqName, ordClassName, geName, functorClassName :: Name
 eqClassName	  = clsQual  gHC_BASE FSLIT("Eq")      eqClassKey
 eqName		  = methName gHC_BASE FSLIT("==")      eqClassOpKey
 ordClassName	  = clsQual  gHC_BASE FSLIT("Ord")     ordClassKey
@@ -508,6 +555,7 @@ geName		  = methName gHC_BASE FSLIT(">=")      geClassOpKey
 functorClassName  = clsQual  gHC_BASE FSLIT("Functor") functorClassKey
 
 -- Class Monad
+monadClassName, thenMName, bindMName, returnMName, failMName :: Name
 monadClassName	   = clsQual  gHC_BASE FSLIT("Monad")  monadClassKey
 thenMName	   = methName gHC_BASE FSLIT(">>")     thenMClassOpKey
 bindMName	   = methName gHC_BASE FSLIT(">>=")    bindMClassOpKey
@@ -515,9 +563,14 @@ returnMName	   = methName gHC_BASE FSLIT("return") returnMClassOpKey
 failMName	   = methName gHC_BASE FSLIT("fail")   failMClassOpKey
 
 -- Functions for GHC extensions
-groupWithName  = varQual gHC_EXTS FSLIT("groupWith") groupWithIdKey
+groupWithName :: Name
+groupWithName = varQual gHC_EXTS FSLIT("groupWith") groupWithIdKey
 
 -- Random PrelBase functions
+fromStringName, otherwiseIdName, foldrName, buildName, augmentName,
+    mapName, appendName, andName, orName, assertName,
+    breakpointName, breakpointCondName, breakpointAutoName,
+    opaqueTyConName :: Name
 fromStringName = methName dATA_STRING FSLIT("fromString") fromStringClassOpKey
 otherwiseIdName   = varQual gHC_BASE FSLIT("otherwise")  otherwiseIdKey
 foldrName	  = varQual gHC_BASE FSLIT("foldr")      foldrIdKey
@@ -533,16 +586,19 @@ breakpointCondName= varQual gHC_BASE FSLIT("breakpointCond") breakpointCondIdKey
 breakpointAutoName= varQual gHC_BASE FSLIT("breakpointAuto") breakpointAutoIdKey
 opaqueTyConName   = tcQual  gHC_BASE FSLIT("Opaque")   opaqueTyConKey
 
++breakpointJumpName :: Name
 breakpointJumpName
     = mkInternalName
         breakpointJumpIdKey
         (mkOccNameFS varName FSLIT("breakpointJump"))
         noSrcSpan
+breakpointCondJumpName :: Name
 breakpointCondJumpName
     = mkInternalName
         breakpointCondJumpIdKey
         (mkOccNameFS varName FSLIT("breakpointCondJump"))
         noSrcSpan
+breakpointAutoJumpName :: Name
 breakpointAutoJumpName
     = mkInternalName
         breakpointAutoJumpIdKey
@@ -550,10 +606,13 @@ breakpointAutoJumpName
         noSrcSpan
 
 -- PrelTup
+fstName, sndName :: Name
 fstName		  = varQual dATA_TUP FSLIT("fst") fstIdKey
 sndName		  = varQual dATA_TUP FSLIT("snd") sndIdKey
 
 -- Module PrelNum
+numClassName, fromIntegerName, minusName, negateName, plusIntegerName,
+    timesIntegerName, integerTyConName, smallIntegerName :: Name
 numClassName	  = clsQual  gHC_NUM FSLIT("Num") numClassKey
 fromIntegerName   = methName gHC_NUM FSLIT("fromInteger") fromIntegerClassOpKey
 minusName	  = methName gHC_NUM FSLIT("-") minusClassOpKey
@@ -564,6 +623,9 @@ integerTyConName  = tcQual   gHC_INTEGER FSLIT("Integer") integerTyConKey
 smallIntegerName = varQual gHC_INTEGER FSLIT("smallInteger") smallIntegerIdKey
 
 -- PrelReal types and classes
+rationalTyConName, ratioTyConName, ratioDataConName, realClassName,
+    integralClassName, realFracClassName, fractionalClassName,
+    fromRationalName :: Name
 rationalTyConName   = tcQual  gHC_REAL FSLIT("Rational") rationalTyConKey
 ratioTyConName	    = tcQual  gHC_REAL FSLIT("Ratio") ratioTyConKey
 ratioDataConName    = conName gHC_REAL FSLIT(":%") ratioDataConKey
@@ -574,13 +636,18 @@ fractionalClassName = clsQual gHC_REAL FSLIT("Fractional") fractionalClassKey
 fromRationalName    = methName gHC_REAL  FSLIT("fromRational") fromRationalClassOpKey
 
 -- PrelFloat classes
+floatingClassName, realFloatClassName :: Name
 floatingClassName  = clsQual  gHC_FLOAT FSLIT("Floating") floatingClassKey
 realFloatClassName = clsQual  gHC_FLOAT FSLIT("RealFloat") realFloatClassKey
 
 -- Class Ix
+ixClassName :: Name
 ixClassName = clsQual gHC_ARR FSLIT("Ix") ixClassKey
 
 -- Class Typeable
+typeableClassName, typeable1ClassName, typeable2ClassName,
+    typeable3ClassName, typeable4ClassName, typeable5ClassName,
+    typeable6ClassName, typeable7ClassName :: Name
 typeableClassName  = clsQual tYPEABLE FSLIT("Typeable") typeableClassKey
 typeable1ClassName = clsQual tYPEABLE FSLIT("Typeable1") typeable1ClassKey
 typeable2ClassName = clsQual tYPEABLE FSLIT("Typeable2") typeable2ClassKey
@@ -590,17 +657,22 @@ typeable5ClassName = clsQual tYPEABLE FSLIT("Typeable5") typeable5ClassKey
 typeable6ClassName = clsQual tYPEABLE FSLIT("Typeable6") typeable6ClassKey
 typeable7ClassName = clsQual tYPEABLE FSLIT("Typeable7") typeable7ClassKey
 
+typeableClassNames :: [Name]
 typeableClassNames = 	[ typeableClassName, typeable1ClassName, typeable2ClassName
 		 	, typeable3ClassName, typeable4ClassName, typeable5ClassName
 			, typeable6ClassName, typeable7ClassName ]
 
 -- Class Data
+dataClassName :: Name
 dataClassName = clsQual gENERICS FSLIT("Data") dataClassKey
 
 -- Error module
+assertErrorName    :: Name
 assertErrorName	  = varQual gHC_ERR FSLIT("assertError") assertErrorIdKey
 
 -- Enum module (Enum, Bounded)
+enumClassName, enumFromName, enumFromToName, enumFromThenName,
+    enumFromThenToName, boundedClassName :: Name
 enumClassName 	   = clsQual gHC_ENUM FSLIT("Enum") enumClassKey
 enumFromName	   = methName gHC_ENUM FSLIT("enumFrom") enumFromClassOpKey
 enumFromToName	   = methName gHC_ENUM FSLIT("enumFromTo") enumFromToClassOpKey
@@ -609,17 +681,24 @@ enumFromThenToName = methName gHC_ENUM FSLIT("enumFromThenTo") enumFromThenToCla
 boundedClassName   = clsQual gHC_ENUM FSLIT("Bounded") boundedClassKey
 
 -- List functions
+concatName, filterName, zipName :: Name
 concatName	  = varQual gHC_LIST FSLIT("concat") concatIdKey
 filterName	  = varQual gHC_LIST FSLIT("filter") filterIdKey
 zipName	   	  = varQual gHC_LIST FSLIT("zip") zipIdKey
 
 -- Class Show
+showClassName :: Name
 showClassName	  = clsQual gHC_SHOW FSLIT("Show")       showClassKey
 
 -- Class Read
+readClassName :: Name
 readClassName	   = clsQual gHC_READ FSLIT("Read") readClassKey
 
 -- parallel array types and functions
+enumFromToPName, enumFromThenToPName, nullPName, lengthPName,
+    singletonPName, replicatePName, mapPName, filterPName,
+    zipPName, crossMapPName, indexPName, toPName, bpermutePName,
+    bpermuteDftPName, indexOfPName :: Name
 enumFromToPName	   = varQual gHC_PARR FSLIT("enumFromToP") enumFromToPIdKey
 enumFromThenToPName= varQual gHC_PARR FSLIT("enumFromThenToP") enumFromThenToPIdKey
 nullPName	  = varQual gHC_PARR FSLIT("nullP")      	 nullPIdKey
@@ -637,6 +716,8 @@ bpermuteDftPName  = varQual gHC_PARR FSLIT("bpermuteDftP") bpermuteDftPIdKey
 indexOfPName      = varQual gHC_PARR FSLIT("indexOfP")     indexOfPIdKey
 
 -- IOBase things
+ioTyConName, ioDataConName, thenIOName, bindIOName, returnIOName,
+    failIOName :: Name
 ioTyConName	  = tcQual  gHC_IO_BASE FSLIT("IO") ioTyConKey
 ioDataConName     = conName gHC_IO_BASE FSLIT("IO") ioDataConKey
 thenIOName	  = varQual gHC_IO_BASE FSLIT("thenIO") thenIOIdKey
@@ -645,15 +726,19 @@ returnIOName	  = varQual gHC_IO_BASE FSLIT("returnIO") returnIOIdKey
 failIOName	  = varQual gHC_IO_BASE FSLIT("failIO") failIOIdKey
 
 -- IO things
+printName :: Name
 printName	  = varQual sYSTEM_IO FSLIT("print") printIdKey
 
 -- Int, Word, and Addr things
+int8TyConName, int16TyConName, int32TyConName, int64TyConName :: Name
 int8TyConName     = tcQual gHC_INT  FSLIT("Int8") int8TyConKey
 int16TyConName    = tcQual gHC_INT  FSLIT("Int16") int16TyConKey
 int32TyConName    = tcQual gHC_INT  FSLIT("Int32") int32TyConKey
 int64TyConName    = tcQual gHC_INT  FSLIT("Int64") int64TyConKey
 
 -- Word module
+word8TyConName, word16TyConName, word32TyConName, word64TyConName,
+    wordTyConName, wordDataConName :: Name
 word8TyConName    = tcQual  gHC_WORD FSLIT("Word8")  word8TyConKey
 word16TyConName   = tcQual  gHC_WORD FSLIT("Word16") word16TyConKey
 word32TyConName   = tcQual  gHC_WORD FSLIT("Word32") word32TyConKey
@@ -662,21 +747,26 @@ wordTyConName     = tcQual  gHC_WORD FSLIT("Word")   wordTyConKey
 wordDataConName   = conName gHC_WORD FSLIT("W#") wordDataConKey
 
 -- PrelPtr module
+ptrTyConName, funPtrTyConName :: Name
 ptrTyConName	  = tcQual   gHC_PTR FSLIT("Ptr") ptrTyConKey
 funPtrTyConName	  = tcQual   gHC_PTR FSLIT("FunPtr") funPtrTyConKey
 
 -- Foreign objects and weak pointers
+stablePtrTyConName, newStablePtrName :: Name
 stablePtrTyConName    = tcQual   gHC_STABLE FSLIT("StablePtr") stablePtrTyConKey
 newStablePtrName      = varQual  gHC_STABLE FSLIT("newStablePtr") newStablePtrIdKey
 
 -- PrelST module
+runSTRepName :: Name
 runSTRepName	   = varQual gHC_ST  FSLIT("runSTRep") runSTRepIdKey
 
 -- Recursive-do notation
+monadFixClassName, mfixName :: Name
 monadFixClassName  = clsQual mONAD_FIX FSLIT("MonadFix") monadFixClassKey
 mfixName	   = methName mONAD_FIX FSLIT("mfix") mfixIdKey
 
 -- Arrow notation
+arrAName, composeAName, firstAName, appAName, choiceAName, loopAName :: Name
 arrAName	   = varQual aRROW FSLIT("arr")	  arrAIdKey
 composeAName	   = varQual gHC_DESUGAR FSLIT(">>>") composeAIdKey
 firstAName	   = varQual aRROW FSLIT("first") firstAIdKey
@@ -685,15 +775,20 @@ choiceAName	   = varQual aRROW FSLIT("|||")	  choiceAIdKey
 loopAName	   = varQual aRROW FSLIT("loop")  loopAIdKey
 
 -- Other classes, needed for type defaulting
+monadPlusClassName, randomClassName, randomGenClassName,
+    isStringClassName :: Name
 monadPlusClassName  = clsQual mONAD FSLIT("MonadPlus")  monadPlusClassKey
 randomClassName     = clsQual rANDOM FSLIT("Random")    randomClassKey
 randomGenClassName  = clsQual rANDOM FSLIT("RandomGen") randomGenClassKey
 isStringClassName   = clsQual dATA_STRING FSLIT("IsString") isStringClassKey
 
 -- dotnet interop
+objectTyConName :: Name
 objectTyConName	    = tcQual   dOTNET FSLIT("Object") objectTyConKey
 	-- objectTyConName was "wTcQual", but that's gone now, and
 	-- I can't see why it was wired in anyway...
+unmarshalObjectName, marshalObjectName, marshalStringName,
+    unmarshalStringName, checkDotnetResName :: Name
 unmarshalObjectName = varQual  dOTNET FSLIT("unmarshalObject") unmarshalObjectIdKey
 marshalObjectName   = varQual  dOTNET FSLIT("marshalObject") marshalObjectIdKey
 marshalStringName   = varQual  dOTNET FSLIT("marshalString") marshalStringIdKey
@@ -710,20 +805,22 @@ checkDotnetResName  = varQual  dOTNET FSLIT("checkResult")     checkDotnetResNam
 All these are original names; hence mkOrig
 
 \begin{code}
+varQual, tcQual, clsQual :: Module -> FastString -> Unique -> Name
 varQual  = mk_known_key_name varName
 tcQual   = mk_known_key_name tcName
 clsQual  = mk_known_key_name clsName
 
-mk_known_key_name space mod str uniq 
-  = mkExternalName uniq mod (mkOccNameFS space str) noSrcSpan
+mk_known_key_name :: NameSpace -> Module -> FastString -> Unique -> Name
+mk_known_key_name space modu str unique 
+  = mkExternalName unique modu (mkOccNameFS space str) noSrcSpan
 
 conName :: Module -> FastString -> Unique -> Name
-conName mod occ uniq
-  = mkExternalName uniq mod (mkOccNameFS dataName occ) noSrcSpan
+conName modu occ unique
+  = mkExternalName unique modu (mkOccNameFS dataName occ) noSrcSpan
 
 methName :: Module -> FastString -> Unique -> Name
-methName mod occ uniq
-  = mkExternalName uniq mod (mkVarOccFS occ) noSrcSpan
+methName modu occ unique
+  = mkExternalName unique modu (mkVarOccFS occ) noSrcSpan
 \end{code}
 
 %************************************************************************
@@ -734,6 +831,10 @@ methName mod occ uniq
 --MetaHaskell extension hand allocate keys here
 
 \begin{code}
+boundedClassKey, enumClassKey, eqClassKey, floatingClassKey,
+    fractionalClassKey, integralClassKey, monadClassKey, dataClassKey,
+    functorClassKey, numClassKey, ordClassKey, readClassKey, realClassKey,
+    realFloatClassKey, realFracClassKey, showClassKey, ixClassKey :: Unique
 boundedClassKey		= mkPreludeClassUnique 1 
 enumClassKey		= mkPreludeClassUnique 2 
 eqClassKey		= mkPreludeClassUnique 3 
@@ -752,6 +853,9 @@ realFracClassKey	= mkPreludeClassUnique 16
 showClassKey		= mkPreludeClassUnique 17
 ixClassKey		= mkPreludeClassUnique 18
 
+typeableClassKey, typeable1ClassKey, typeable2ClassKey, typeable3ClassKey,
+    typeable4ClassKey, typeable5ClassKey, typeable6ClassKey, typeable7ClassKey
+    :: Unique
 typeableClassKey	= mkPreludeClassUnique 20
 typeable1ClassKey	= mkPreludeClassUnique 21
 typeable2ClassKey	= mkPreludeClassUnique 22
@@ -761,12 +865,15 @@ typeable5ClassKey	= mkPreludeClassUnique 25
 typeable6ClassKey	= mkPreludeClassUnique 26
 typeable7ClassKey	= mkPreludeClassUnique 27
 
+monadFixClassKey :: Unique
 monadFixClassKey	= mkPreludeClassUnique 28
 
+monadPlusClassKey, randomClassKey, randomGenClassKey :: Unique
 monadPlusClassKey	= mkPreludeClassUnique 30
 randomClassKey		= mkPreludeClassUnique 31
 randomGenClassKey	= mkPreludeClassUnique 32
 
+isStringClassKey :: Unique
 isStringClassKey	= mkPreludeClassUnique 33
 \end{code}
 
@@ -777,6 +884,15 @@ isStringClassKey	= mkPreludeClassUnique 33
 %************************************************************************
 
 \begin{code}
+addrPrimTyConKey, arrayPrimTyConKey, boolTyConKey, byteArrayPrimTyConKey,
+    charPrimTyConKey, charTyConKey, doublePrimTyConKey, doubleTyConKey,
+    floatPrimTyConKey, floatTyConKey, funTyConKey, intPrimTyConKey,
+    intTyConKey, int8TyConKey, int16TyConKey, int32PrimTyConKey,
+    int32TyConKey, int64PrimTyConKey, int64TyConKey, integerTyConKey,
+    listTyConKey, foreignObjPrimTyConKey, weakPrimTyConKey,
+    mutableArrayPrimTyConKey, mutableByteArrayPrimTyConKey,
+    orderingTyConKey, mVarPrimTyConKey, ratioTyConKey, rationalTyConKey,
+    realWorldTyConKey, stablePtrPrimTyConKey, stablePtrTyConKey :: Unique
 addrPrimTyConKey			= mkPreludeTyConUnique	1
 arrayPrimTyConKey			= mkPreludeTyConUnique	3
 boolTyConKey				= mkPreludeTyConUnique	4
@@ -810,9 +926,17 @@ realWorldTyConKey			= mkPreludeTyConUnique 34
 stablePtrPrimTyConKey			= mkPreludeTyConUnique 35
 stablePtrTyConKey			= mkPreludeTyConUnique 36
 
+anyPrimTyConKey, anyPrimTyCon1Key :: Unique
 anyPrimTyConKey				= mkPreludeTyConUnique 37
 anyPrimTyCon1Key			= mkPreludeTyConUnique 38
 
+statePrimTyConKey, stableNamePrimTyConKey, stableNameTyConKey,
+    mutVarPrimTyConKey, ioTyConKey,
+    wordPrimTyConKey, wordTyConKey, word8TyConKey, word16TyConKey,
+    word32PrimTyConKey, word32TyConKey, word64PrimTyConKey, word64TyConKey,
+    liftedConKey, unliftedConKey, anyBoxConKey, kindConKey, boxityConKey,
+    typeConKey, threadIdPrimTyConKey, bcoPrimTyConKey, ptrTyConKey,
+    funPtrTyConKey, tVarPrimTyConKey :: Unique
 statePrimTyConKey			= mkPreludeTyConUnique 50
 stableNamePrimTyConKey			= mkPreludeTyConUnique 51
 stableNameTyConKey		        = mkPreludeTyConUnique 52
@@ -839,23 +963,30 @@ funPtrTyConKey				= mkPreludeTyConUnique 75
 tVarPrimTyConKey		    	= mkPreludeTyConUnique 76
 
 -- Generic Type Constructors
+crossTyConKey, plusTyConKey, genUnitTyConKey :: Unique
 crossTyConKey		      		= mkPreludeTyConUnique 79
 plusTyConKey		      		= mkPreludeTyConUnique 80
 genUnitTyConKey				= mkPreludeTyConUnique 81
 
 -- Parallel array type constructor
+parrTyConKey :: Unique
 parrTyConKey				= mkPreludeTyConUnique 82
 
 -- dotnet interop
+objectTyConKey :: Unique
 objectTyConKey				= mkPreludeTyConUnique 83
 
+eitherTyConKey :: Unique
 eitherTyConKey				= mkPreludeTyConUnique 84
 
 -- Super Kinds constructors
+tySuperKindTyConKey, coSuperKindTyConKey :: Unique
 tySuperKindTyConKey                    = mkPreludeTyConUnique 85
 coSuperKindTyConKey                    = mkPreludeTyConUnique 86
 
 -- Kind constructors
+liftedTypeKindTyConKey, openTypeKindTyConKey, unliftedTypeKindTyConKey,
+    ubxTupleKindTyConKey, argTypeKindTyConKey :: Unique
 liftedTypeKindTyConKey                  = mkPreludeTyConUnique 87
 openTypeKindTyConKey                    = mkPreludeTyConUnique 88
 unliftedTypeKindTyConKey                = mkPreludeTyConUnique 89
@@ -863,6 +994,9 @@ ubxTupleKindTyConKey                    = mkPreludeTyConUnique 90
 argTypeKindTyConKey                     = mkPreludeTyConUnique 91
 
 -- Coercion constructors
+symCoercionTyConKey, transCoercionTyConKey, leftCoercionTyConKey,
+    rightCoercionTyConKey, instCoercionTyConKey, unsafeCoercionTyConKey
+    :: Unique
 symCoercionTyConKey                     = mkPreludeTyConUnique 93
 transCoercionTyConKey                   = mkPreludeTyConUnique 94
 leftCoercionTyConKey                    = mkPreludeTyConUnique 95
@@ -870,18 +1004,22 @@ rightCoercionTyConKey                   = mkPreludeTyConUnique 96
 instCoercionTyConKey                    = mkPreludeTyConUnique 97
 unsafeCoercionTyConKey                  = mkPreludeTyConUnique 98
 
+unknownTyConKey, unknown1TyConKey, unknown2TyConKey, unknown3TyConKey,
+    opaqueTyConKey :: Unique
 unknownTyConKey				= mkPreludeTyConUnique 99
 unknown1TyConKey			= mkPreludeTyConUnique 130
 unknown2TyConKey			= mkPreludeTyConUnique 131
 unknown3TyConKey			= mkPreludeTyConUnique 132
 opaqueTyConKey                          = mkPreludeTyConUnique 133
 
+stringTyConKey :: Unique
 stringTyConKey				= mkPreludeTyConUnique 134
 
 ---------------- Template Haskell -------------------
 --	USES TyConUniques 100-129
 -----------------------------------------------------
 
+unitTyConKey :: Unique
 unitTyConKey = mkTupleTyConUnique Boxed 0
 \end{code}
 
@@ -892,6 +1030,10 @@ unitTyConKey = mkTupleTyConUnique Boxed 0
 %************************************************************************
 
 \begin{code}
+charDataConKey, consDataConKey, doubleDataConKey, falseDataConKey,
+    floatDataConKey, intDataConKey, nilDataConKey, ratioDataConKey,
+    stableNameDataConKey, trueDataConKey, wordDataConKey,
+    ioDataConKey :: Unique
 charDataConKey				= mkPreludeDataConUnique  1
 consDataConKey				= mkPreludeDataConUnique  2
 doubleDataConKey			= mkPreludeDataConUnique  3
@@ -906,14 +1048,17 @@ wordDataConKey				= mkPreludeDataConUnique 16
 ioDataConKey				= mkPreludeDataConUnique 17
 
 -- Generic data constructors
+crossDataConKey, inlDataConKey, inrDataConKey, genUnitDataConKey :: Unique
 crossDataConKey		      		= mkPreludeDataConUnique 20
 inlDataConKey		      		= mkPreludeDataConUnique 21
 inrDataConKey		      		= mkPreludeDataConUnique 22
 genUnitDataConKey			= mkPreludeDataConUnique 23
 
 -- Data constructor for parallel arrays
+parrDataConKey :: Unique
 parrDataConKey				= mkPreludeDataConUnique 24
 
+leftDataConKey, rightDataConKey :: Unique
 leftDataConKey				= mkPreludeDataConUnique 25
 rightDataConKey				= mkPreludeDataConUnique 26
 \end{code}
@@ -925,6 +1070,17 @@ rightDataConKey				= mkPreludeDataConUnique 26
 %************************************************************************
 
 \begin{code}
+absentErrorIdKey, augmentIdKey, appendIdKey, buildIdKey, errorIdKey,
+    foldlIdKey, foldrIdKey, recSelErrorIdKey,
+    integerMinusOneIdKey, integerPlusOneIdKey,
+    integerPlusTwoIdKey, integerZeroIdKey,
+    int2IntegerIdKey, seqIdKey, irrefutPatErrorIdKey, eqStringIdKey,
+    noMethodBindingErrorIdKey, nonExhaustiveGuardsErrorIdKey,
+    runtimeErrorIdKey, parErrorIdKey, parIdKey, patErrorIdKey,
+    realWorldPrimIdKey, recConErrorIdKey, recUpdErrorIdKey,
+    traceIdKey,
+    unpackCStringUtf8IdKey, unpackCStringAppendIdKey,
+    unpackCStringFoldrIdKey, unpackCStringIdKey :: Unique
 absentErrorIdKey	      = mkPreludeMiscIdUnique  1
 augmentIdKey		      = mkPreludeMiscIdUnique  3
 appendIdKey		      = mkPreludeMiscIdUnique  4
@@ -956,6 +1112,11 @@ unpackCStringAppendIdKey      = mkPreludeMiscIdUnique 29
 unpackCStringFoldrIdKey	      = mkPreludeMiscIdUnique 30
 unpackCStringIdKey	      = mkPreludeMiscIdUnique 31
 
+unsafeCoerceIdKey, concatIdKey, filterIdKey, zipIdKey, bindIOIdKey,
+    returnIOIdKey, deRefStablePtrIdKey, newStablePtrIdKey,
+    smallIntegerIdKey, plusIntegerIdKey, timesIntegerIdKey,
+    printIdKey, failIOIdKey, nullAddrIdKey, voidArgIdKey,
+    fstIdKey, sndIdKey, otherwiseIdKey, assertIdKey, runSTRepIdKey :: Unique
 unsafeCoerceIdKey	      = mkPreludeMiscIdUnique 32
 concatIdKey		      = mkPreludeMiscIdUnique 33
 filterIdKey		      = mkPreludeMiscIdUnique 34
@@ -964,7 +1125,7 @@ bindIOIdKey		      = mkPreludeMiscIdUnique 36
 returnIOIdKey		      = mkPreludeMiscIdUnique 37
 deRefStablePtrIdKey	      = mkPreludeMiscIdUnique 38
 newStablePtrIdKey	      = mkPreludeMiscIdUnique 39
-smallIntegerIdKey			= mkPreludeMiscIdUnique  40
+smallIntegerIdKey	      = mkPreludeMiscIdUnique 40
 plusIntegerIdKey	      = mkPreludeMiscIdUnique 41
 timesIntegerIdKey	      = mkPreludeMiscIdUnique 42
 printIdKey		      = mkPreludeMiscIdUnique 43
@@ -977,15 +1138,20 @@ otherwiseIdKey		      = mkPreludeMiscIdUnique 51
 assertIdKey		      = mkPreludeMiscIdUnique 53
 runSTRepIdKey		      = mkPreludeMiscIdUnique 54
 
+rootMainKey, runMainKey :: Unique
 rootMainKey		      = mkPreludeMiscIdUnique 55
 runMainKey		      = mkPreludeMiscIdUnique 56
 
+andIdKey, orIdKey, thenIOIdKey, lazyIdKey, assertErrorIdKey :: Unique
 andIdKey		      = mkPreludeMiscIdUnique 57
 orIdKey			      = mkPreludeMiscIdUnique 58
 thenIOIdKey		      = mkPreludeMiscIdUnique 59
 lazyIdKey		      = mkPreludeMiscIdUnique 60
 assertErrorIdKey	      = mkPreludeMiscIdUnique 61
 
+breakpointIdKey, breakpointCondIdKey, breakpointAutoIdKey,
+    breakpointJumpIdKey, breakpointCondJumpIdKey,
+    breakpointAutoJumpIdKey :: Unique
 breakpointIdKey               = mkPreludeMiscIdUnique 62
 breakpointCondIdKey           = mkPreludeMiscIdUnique 63
 breakpointAutoIdKey           = mkPreludeMiscIdUnique 64
@@ -993,12 +1159,18 @@ breakpointJumpIdKey           = mkPreludeMiscIdUnique 65
 breakpointCondJumpIdKey       = mkPreludeMiscIdUnique 66
 breakpointAutoJumpIdKey       = mkPreludeMiscIdUnique 67
 
+inlineIdKey :: Unique
 inlineIdKey		      = mkPreludeMiscIdUnique 68
 
+mapIdKey, groupWithIdKey :: Unique
 mapIdKey		      = mkPreludeMiscIdUnique 69
 groupWithIdKey        = mkPreludeMiscIdUnique 70
 
 -- Parallel array functions
+singletonPIdKey, nullPIdKey, lengthPIdKey, replicatePIdKey, mapPIdKey,
+    filterPIdKey, zipPIdKey, crossMapPIdKey, indexPIdKey, toPIdKey,
+    enumFromToPIdKey, enumFromThenToPIdKey,
+    bpermutePIdKey, bpermuteDftPIdKey, indexOfPIdKey :: Unique
 singletonPIdKey               = mkPreludeMiscIdUnique 79
 nullPIdKey	              = mkPreludeMiscIdUnique 80
 lengthPIdKey		      = mkPreludeMiscIdUnique 81
@@ -1016,6 +1188,8 @@ bpermuteDftPIdKey	      = mkPreludeMiscIdUnique 92
 indexOfPIdKey		      = mkPreludeMiscIdUnique 93
 
 -- dotnet interop
+unmarshalObjectIdKey, marshalObjectIdKey, marshalStringIdKey,
+    unmarshalStringIdKey, checkDotnetResNameIdKey :: Unique
 unmarshalObjectIdKey          = mkPreludeMiscIdUnique 94
 marshalObjectIdKey            = mkPreludeMiscIdUnique 95
 marshalStringIdKey            = mkPreludeMiscIdUnique 96
@@ -1030,8 +1204,14 @@ during type checking.
 
 \begin{code}
 	-- Just a place holder for  unbound variables  produced by the renamer:
+unboundKey :: Unique
 unboundKey		      = mkPreludeMiscIdUnique 101 
 
+fromIntegerClassOpKey, minusClassOpKey, fromRationalClassOpKey,
+    enumFromClassOpKey, enumFromThenClassOpKey, enumFromToClassOpKey,
+    enumFromThenToClassOpKey, eqClassOpKey, geClassOpKey, negateClassOpKey,
+    failMClassOpKey, bindMClassOpKey, thenMClassOpKey, returnMClassOpKey
+    :: Unique
 fromIntegerClassOpKey	      = mkPreludeMiscIdUnique 102
 minusClassOpKey		      = mkPreludeMiscIdUnique 103
 fromRationalClassOpKey	      = mkPreludeMiscIdUnique 104
@@ -1048,9 +1228,12 @@ thenMClassOpKey		      = mkPreludeMiscIdUnique 114 -- (>>)
 returnMClassOpKey	      = mkPreludeMiscIdUnique 117
 
 -- Recursive do notation
+mfixIdKey :: Unique
 mfixIdKey	= mkPreludeMiscIdUnique 118
 
 -- Arrow notation
+arrAIdKey, composeAIdKey, firstAIdKey, appAIdKey, choiceAIdKey,
+    loopAIdKey :: Unique
 arrAIdKey	= mkPreludeMiscIdUnique 119
 composeAIdKey	= mkPreludeMiscIdUnique 120 -- >>>
 firstAIdKey	= mkPreludeMiscIdUnique 121
@@ -1058,6 +1241,7 @@ appAIdKey	= mkPreludeMiscIdUnique 122
 choiceAIdKey	= mkPreludeMiscIdUnique 123 --  |||
 loopAIdKey	= mkPreludeMiscIdUnique 124
 
+fromStringClassOpKey :: Unique
 fromStringClassOpKey	      = mkPreludeMiscIdUnique 125
 
 ---------------- Template Haskell -------------------
@@ -1073,6 +1257,7 @@ fromStringClassOpKey	      = mkPreludeMiscIdUnique 125
 %************************************************************************
 
 \begin{code}
+numericTyKeys :: [Unique]
 numericTyKeys = 
 	[ wordTyConKey
 	, intTyConKey
@@ -1094,6 +1279,7 @@ even though every numeric class has these two as a superclass,
 because the list of ambiguous dictionaries hasn't been simplified.
 
 \begin{code}
+numericClassKeys :: [Unique]
 numericClassKeys =
 	[ numClassKey
     	, realClassKey
@@ -1101,6 +1287,7 @@ numericClassKeys =
 	]
 	++ fractionalClassKeys
 
+fractionalClassKeys :: [Unique]
 fractionalClassKeys = 
     	[ fractionalClassKey
     	, floatingClassKey
@@ -1110,12 +1297,14 @@ fractionalClassKeys =
 
 	-- the strictness analyser needs to know about numeric types
 	-- (see SaAbsInt.lhs)
+needsDataDeclCtxtClassKeys :: [Unique]
 needsDataDeclCtxtClassKeys = -- see comments in TcDeriv
   	[ readClassKey
     	]
 
 -- The "standard classes" are used in defaulting (Haskell 98 report 4.3.4),
 -- and are: "classes defined in the Prelude or a standard library"
+standardClassKeys :: [Unique]
 standardClassKeys = derivableClassKeys ++ numericClassKeys
 		  ++ [randomClassKey, randomGenClassKey,
 		      functorClassKey, 
@@ -1128,6 +1317,7 @@ standardClassKeys = derivableClassKeys ++ numericClassKeys
 (@TcDeriv@).
 
 \begin{code}
+derivableClassKeys :: [Unique]
 derivableClassKeys
   = [ eqClassKey, ordClassKey, enumClassKey, ixClassKey,
       boundedClassKey, showClassKey, readClassKey ]
