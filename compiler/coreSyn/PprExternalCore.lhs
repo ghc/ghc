@@ -55,6 +55,7 @@ ptdef (Data tcon tbinds cdefs) =
   $$ indent (braces ((vcat (punctuate (char ';') (map pcdef cdefs)))))
 
 ptdef (Newtype tcon tbinds (coercion,tbs,k) rep) =
+-- TODO: I think this is kind of redundant now.
 -- Here we take apart the newtype tycon in order to get the newtype coercion,
 -- which needs to be represented in the External Core file because it's not
 -- straightforward to derive its definition from the newtype declaration alone.
@@ -107,7 +108,7 @@ paty (Tcon c) = pqname c
 paty t = parens (pty t)
 
 pbty (Tapp(Tapp(Tcon tc) t1) t2) | tc == tcArrow = parens(fsep [pbty t1, text "->",pty t2])
-pbty (Tapp t1 t2) = pappty t1 [t2] 
+pbty (Tapp t1 t2) = parens $ pappty t1 [t2] 
 pbty t = paty t
 
 pty (Tapp(Tapp(Tcon tc) t1) t2) | tc == tcArrow = fsep [pbty t1, text "->",pty t2]

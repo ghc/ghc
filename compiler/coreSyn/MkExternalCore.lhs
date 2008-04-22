@@ -63,9 +63,18 @@ mkExternalCore :: CgGuts -> C.Module
 -- not been injected, so we have to add them manually here
 -- We don't include the strange data-con *workers* because they are
 -- implicit in the data type declaration itself
-mkExternalCore (CgGuts {cg_module=this_mod, cg_tycons = tycons, cg_binds = binds})
-  = (C.Module mname tdefs (runCoreM (mapM (make_vdef True) binds) 
-                            this_mod))
+mkExternalCore (CgGuts {cg_module=this_mod, cg_tycons = tycons, 
+                        cg_binds = binds})
+ -- Note that we flatten binds at the top level:
+ -- every module is just a single recursive bag of declarations.
+ -- Rationale: since modules can be mutually recursive, 
+ -- there's not much reason to preserve dependency info within a module.
+  = C.Module mname tdefs (case flattenBinds binds of
+                          -- check for empty list so we don't create an
+                          -- empty Rec group
+                            [] -> []
+                            bs  -> [(runCoreM (make_vdef True
+                                      (Rec bs)) this_mod)])
   where
     mname  = make_mid this_mod
     tdefs  = foldr collect_tdefs [] tycons
@@ -261,7 +270,9 @@ make_kind _ = error "MkExternalCore died: make_kind"
 {- Id generation. -}
 
 make_id :: Bool -> Name -> C.Id
-make_id _is_var nm = (occNameString . nameOccName) nm
+-- include uniques for internal names in order to avoid name shadowing
+make_id _is_var nm = ((occNameString . nameOccName) nm)
+  ++ (if isInternalName nm then (show . nameUnique) nm else "")
 
 make_var_id :: Name -> C.Id
 make_var_id = make_id True
