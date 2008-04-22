@@ -74,7 +74,7 @@ This *local* name is used by the interactive stuff
 
 \begin{code}
 itName :: Unique -> Name
-itName uniq = mkInternalName uniq (mkOccNameFS varName FSLIT("it")) noSrcSpan
+itName uniq = mkInternalName uniq (mkOccNameFS varName (fsLit "it")) noSrcSpan
 \end{code}
 
 \begin{code}
@@ -238,64 +238,64 @@ gHC_PRIM, gHC_BOOL, gHC_GENERICS, gHC_BASE, gHC_ENUM, gHC_SHOW, gHC_READ,
     gHC_TOP_HANDLER, sYSTEM_IO, dYNAMIC, tYPEABLE, gENERICS, dOTNET,
     rEAD_PREC, lEX, gHC_INT, gHC_WORD, mONAD, mONAD_FIX, aRROW,
     gHC_DESUGAR, rANDOM, gHC_EXTS :: Module
-gHC_PRIM	= mkPrimModule FSLIT("GHC.Prim")   -- Primitive types and values
-gHC_BOOL	= mkPrimModule FSLIT("GHC.Bool")
-gHC_ORDERING	= mkPrimModule FSLIT("GHC.Ordering")
-gHC_GENERICS	= mkPrimModule FSLIT("GHC.Generics")
-gHC_BASE	= mkBaseModule FSLIT("GHC.Base")
-gHC_ENUM	= mkBaseModule FSLIT("GHC.Enum")
-gHC_SHOW	= mkBaseModule FSLIT("GHC.Show")
-gHC_READ	= mkBaseModule FSLIT("GHC.Read")
-gHC_NUM		= mkBaseModule FSLIT("GHC.Num")
-gHC_INTEGER	= mkIntegerModule FSLIT("GHC.Integer")
-gHC_LIST	= mkBaseModule FSLIT("GHC.List")
-gHC_PARR	= mkBaseModule FSLIT("GHC.PArr")
-dATA_TUP	= mkBaseModule FSLIT("Data.Tuple")
-dATA_EITHER	= mkBaseModule FSLIT("Data.Either")
-dATA_STRING	= mkBaseModule FSLIT("Data.String")
-gHC_PACK	= mkBaseModule FSLIT("GHC.Pack")
-gHC_CONC	= mkBaseModule FSLIT("GHC.Conc")
-gHC_IO_BASE	= mkBaseModule FSLIT("GHC.IOBase")
-gHC_ST		= mkBaseModule FSLIT("GHC.ST")
-gHC_ARR		= mkBaseModule FSLIT("GHC.Arr")
-gHC_STABLE	= mkBaseModule FSLIT("GHC.Stable")
-gHC_ADDR	= mkBaseModule FSLIT("GHC.Addr")
-gHC_PTR		= mkBaseModule FSLIT("GHC.Ptr")
-gHC_ERR		= mkBaseModule FSLIT("GHC.Err")
-gHC_REAL	= mkBaseModule FSLIT("GHC.Real")
-gHC_FLOAT	= mkBaseModule FSLIT("GHC.Float")
-gHC_TOP_HANDLER	= mkBaseModule FSLIT("GHC.TopHandler")
-sYSTEM_IO	= mkBaseModule FSLIT("System.IO")
-dYNAMIC		= mkBaseModule FSLIT("Data.Dynamic")
-tYPEABLE	= mkBaseModule FSLIT("Data.Typeable")
-gENERICS	= mkBaseModule FSLIT("Data.Generics.Basics")
-dOTNET		= mkBaseModule FSLIT("GHC.Dotnet")
-rEAD_PREC	= mkBaseModule FSLIT("Text.ParserCombinators.ReadPrec")
-lEX		    = mkBaseModule FSLIT("Text.Read.Lex")
-gHC_INT		= mkBaseModule FSLIT("GHC.Int")
-gHC_WORD	= mkBaseModule FSLIT("GHC.Word")
-mONAD		= mkBaseModule FSLIT("Control.Monad")
-mONAD_FIX	= mkBaseModule FSLIT("Control.Monad.Fix")
-aRROW		= mkBaseModule FSLIT("Control.Arrow")
-gHC_DESUGAR = mkBaseModule FSLIT("GHC.Desugar")
-rANDOM		= mkBaseModule FSLIT("System.Random")
-gHC_EXTS	= mkBaseModule FSLIT("GHC.Exts")
+gHC_PRIM	= mkPrimModule (fsLit "GHC.Prim")   -- Primitive types and values
+gHC_BOOL	= mkPrimModule (fsLit "GHC.Bool")
+gHC_ORDERING	= mkPrimModule (fsLit "GHC.Ordering")
+gHC_GENERICS	= mkPrimModule (fsLit "GHC.Generics")
+gHC_BASE	= mkBaseModule (fsLit "GHC.Base")
+gHC_ENUM	= mkBaseModule (fsLit "GHC.Enum")
+gHC_SHOW	= mkBaseModule (fsLit "GHC.Show")
+gHC_READ	= mkBaseModule (fsLit "GHC.Read")
+gHC_NUM		= mkBaseModule (fsLit "GHC.Num")
+gHC_INTEGER	= mkIntegerModule (fsLit "GHC.Integer")
+gHC_LIST	= mkBaseModule (fsLit "GHC.List")
+gHC_PARR	= mkBaseModule (fsLit "GHC.PArr")
+dATA_TUP	= mkBaseModule (fsLit "Data.Tuple")
+dATA_EITHER	= mkBaseModule (fsLit "Data.Either")
+dATA_STRING	= mkBaseModule (fsLit "Data.String")
+gHC_PACK	= mkBaseModule (fsLit "GHC.Pack")
+gHC_CONC	= mkBaseModule (fsLit "GHC.Conc")
+gHC_IO_BASE	= mkBaseModule (fsLit "GHC.IOBase")
+gHC_ST		= mkBaseModule (fsLit "GHC.ST")
+gHC_ARR		= mkBaseModule (fsLit "GHC.Arr")
+gHC_STABLE	= mkBaseModule (fsLit "GHC.Stable")
+gHC_ADDR	= mkBaseModule (fsLit "GHC.Addr")
+gHC_PTR		= mkBaseModule (fsLit "GHC.Ptr")
+gHC_ERR		= mkBaseModule (fsLit "GHC.Err")
+gHC_REAL	= mkBaseModule (fsLit "GHC.Real")
+gHC_FLOAT	= mkBaseModule (fsLit "GHC.Float")
+gHC_TOP_HANDLER	= mkBaseModule (fsLit "GHC.TopHandler")
+sYSTEM_IO	= mkBaseModule (fsLit "System.IO")
+dYNAMIC		= mkBaseModule (fsLit "Data.Dynamic")
+tYPEABLE	= mkBaseModule (fsLit "Data.Typeable")
+gENERICS	= mkBaseModule (fsLit "Data.Generics.Basics")
+dOTNET		= mkBaseModule (fsLit "GHC.Dotnet")
+rEAD_PREC	= mkBaseModule (fsLit "Text.ParserCombinators.ReadPrec")
+lEX		    = mkBaseModule (fsLit "Text.Read.Lex")
+gHC_INT		= mkBaseModule (fsLit "GHC.Int")
+gHC_WORD	= mkBaseModule (fsLit "GHC.Word")
+mONAD		= mkBaseModule (fsLit "Control.Monad")
+mONAD_FIX	= mkBaseModule (fsLit "Control.Monad.Fix")
+aRROW		= mkBaseModule (fsLit "Control.Arrow")
+gHC_DESUGAR = mkBaseModule (fsLit "GHC.Desugar")
+rANDOM		= mkBaseModule (fsLit "System.Random")
+gHC_EXTS	= mkBaseModule (fsLit "GHC.Exts")
 
 mAIN, rOOT_MAIN :: Module
 mAIN	        = mkMainModule_ mAIN_NAME
-rOOT_MAIN	= mkMainModule FSLIT(":Main") -- Root module for initialisation 
+rOOT_MAIN	= mkMainModule (fsLit ":Main") -- Root module for initialisation 
 
 	-- The ':xxx' makes a module name that the user can never
 	-- use himself.  The z-encoding for ':' is "ZC", so the z-encoded
 	-- module name still starts with a capital letter, which keeps
 	-- the z-encoded version consistent.
 iNTERACTIVE, thFAKE :: Module
-iNTERACTIVE    = mkMainModule FSLIT(":Interactive")
-thFAKE         = mkMainModule FSLIT(":THFake")
+iNTERACTIVE    = mkMainModule (fsLit ":Interactive")
+thFAKE         = mkMainModule (fsLit ":THFake")
 
 pRELUDE_NAME, mAIN_NAME :: ModuleName
-pRELUDE_NAME   = mkModuleNameFS FSLIT("Prelude")
-mAIN_NAME      = mkModuleNameFS FSLIT("Main")
+pRELUDE_NAME   = mkModuleNameFS (fsLit "Prelude")
+mAIN_NAME      = mkModuleNameFS (fsLit "Main")
 
 mkPrimModule :: FastString -> Module
 mkPrimModule m = mkModule primPackageId (mkModuleNameFS m)
@@ -338,26 +338,26 @@ mkTupleModule Unboxed _ = gHC_PRIM
 
 \begin{code}
 main_RDR_Unqual    :: RdrName
-main_RDR_Unqual	= mkUnqual varName FSLIT("main")
+main_RDR_Unqual	= mkUnqual varName (fsLit "main")
 	-- We definitely don't want an Orig RdrName, because
 	-- main might, in principle, be imported into module Main
 
 forall_tv_RDR, dot_tv_RDR :: RdrName
-forall_tv_RDR = mkUnqual tvName FSLIT("forall")
-dot_tv_RDR    = mkUnqual tvName FSLIT(".")
+forall_tv_RDR = mkUnqual tvName (fsLit "forall")
+dot_tv_RDR    = mkUnqual tvName (fsLit ".")
 
 eq_RDR, ge_RDR, ne_RDR, le_RDR, lt_RDR, gt_RDR, compare_RDR,
     ltTag_RDR, eqTag_RDR, gtTag_RDR :: RdrName
 eq_RDR 			= nameRdrName eqName
 ge_RDR 			= nameRdrName geName
-ne_RDR 			= varQual_RDR  gHC_BASE FSLIT("/=")
-le_RDR 			= varQual_RDR  gHC_BASE FSLIT("<=") 
-lt_RDR 			= varQual_RDR  gHC_BASE FSLIT("<") 
-gt_RDR 			= varQual_RDR  gHC_BASE FSLIT(">")  
-compare_RDR		= varQual_RDR  gHC_BASE FSLIT("compare") 
-ltTag_RDR		= dataQual_RDR gHC_ORDERING FSLIT("LT") 
-eqTag_RDR		= dataQual_RDR gHC_ORDERING FSLIT("EQ")
-gtTag_RDR		= dataQual_RDR gHC_ORDERING FSLIT("GT")
+ne_RDR 			= varQual_RDR  gHC_BASE (fsLit "/=")
+le_RDR 			= varQual_RDR  gHC_BASE (fsLit "<=") 
+lt_RDR 			= varQual_RDR  gHC_BASE (fsLit "<") 
+gt_RDR 			= varQual_RDR  gHC_BASE (fsLit ">")  
+compare_RDR		= varQual_RDR  gHC_BASE (fsLit "compare") 
+ltTag_RDR		= dataQual_RDR gHC_ORDERING (fsLit "LT") 
+eqTag_RDR		= dataQual_RDR gHC_ORDERING (fsLit "EQ")
+gtTag_RDR		= dataQual_RDR gHC_ORDERING (fsLit "GT")
 
 eqClass_RDR, numClass_RDR, ordClass_RDR, enumClass_RDR, monadClass_RDR
     :: RdrName
@@ -368,8 +368,8 @@ enumClass_RDR		= nameRdrName enumClassName
 monadClass_RDR		= nameRdrName monadClassName
 
 map_RDR, append_RDR :: RdrName
-map_RDR 		= varQual_RDR gHC_BASE FSLIT("map")
-append_RDR 		= varQual_RDR gHC_BASE FSLIT("++")
+map_RDR 		= varQual_RDR gHC_BASE (fsLit "map")
+append_RDR 		= varQual_RDR gHC_BASE (fsLit "++")
 
 foldr_RDR, build_RDR, returnM_RDR, bindM_RDR, failM_RDR :: RdrName
 foldr_RDR 		= nameRdrName foldrName
@@ -386,8 +386,8 @@ left_RDR		= nameRdrName leftDataConName
 right_RDR		= nameRdrName rightDataConName
 
 fromEnum_RDR, toEnum_RDR :: RdrName
-fromEnum_RDR		= varQual_RDR gHC_ENUM FSLIT("fromEnum")
-toEnum_RDR		= varQual_RDR gHC_ENUM FSLIT("toEnum")
+fromEnum_RDR		= varQual_RDR gHC_ENUM (fsLit "fromEnum")
+toEnum_RDR		= varQual_RDR gHC_ENUM (fsLit "toEnum")
 
 enumFrom_RDR, enumFromTo_RDR, enumFromThen_RDR, enumFromThenTo_RDR :: RdrName
 enumFrom_RDR		= nameRdrName enumFromName
@@ -412,7 +412,7 @@ unpackCStringUtf8_RDR  	= nameRdrName unpackCStringUtf8Name
 
 newStablePtr_RDR, wordDataCon_RDR :: RdrName
 newStablePtr_RDR 	= nameRdrName newStablePtrName
-wordDataCon_RDR		= dataQual_RDR gHC_WORD FSLIT("W#")
+wordDataCon_RDR		= dataQual_RDR gHC_WORD (fsLit "W#")
 
 bindIO_RDR, returnIO_RDR :: RdrName
 bindIO_RDR	  	= nameRdrName bindIOName
@@ -422,74 +422,74 @@ fromInteger_RDR, fromRational_RDR, minus_RDR, times_RDR, plus_RDR :: RdrName
 fromInteger_RDR		= nameRdrName fromIntegerName
 fromRational_RDR	= nameRdrName fromRationalName
 minus_RDR		= nameRdrName minusName
-times_RDR		= varQual_RDR  gHC_NUM FSLIT("*")
-plus_RDR                = varQual_RDR gHC_NUM FSLIT("+")
+times_RDR		= varQual_RDR  gHC_NUM (fsLit "*")
+plus_RDR                = varQual_RDR gHC_NUM (fsLit "+")
 
 fromString_RDR :: RdrName
 fromString_RDR		= nameRdrName fromStringName
 
 compose_RDR :: RdrName
-compose_RDR		= varQual_RDR gHC_BASE FSLIT(".")
+compose_RDR		= varQual_RDR gHC_BASE (fsLit ".")
 
 not_RDR, getTag_RDR, succ_RDR, pred_RDR, minBound_RDR, maxBound_RDR,
     range_RDR, inRange_RDR, index_RDR,
     unsafeIndex_RDR, unsafeRangeSize_RDR :: RdrName
-not_RDR 		= varQual_RDR gHC_BASE FSLIT("not")
-getTag_RDR	 	= varQual_RDR gHC_BASE FSLIT("getTag")
-succ_RDR 		= varQual_RDR gHC_ENUM FSLIT("succ")
-pred_RDR                = varQual_RDR gHC_ENUM FSLIT("pred")
-minBound_RDR            = varQual_RDR gHC_ENUM FSLIT("minBound")
-maxBound_RDR            = varQual_RDR gHC_ENUM FSLIT("maxBound")
-range_RDR               = varQual_RDR gHC_ARR FSLIT("range")
-inRange_RDR             = varQual_RDR gHC_ARR FSLIT("inRange")
-index_RDR		= varQual_RDR gHC_ARR FSLIT("index")
-unsafeIndex_RDR		= varQual_RDR gHC_ARR FSLIT("unsafeIndex")
-unsafeRangeSize_RDR	= varQual_RDR gHC_ARR FSLIT("unsafeRangeSize")
+not_RDR 		= varQual_RDR gHC_BASE (fsLit "not")
+getTag_RDR	 	= varQual_RDR gHC_BASE (fsLit "getTag")
+succ_RDR 		= varQual_RDR gHC_ENUM (fsLit "succ")
+pred_RDR                = varQual_RDR gHC_ENUM (fsLit "pred")
+minBound_RDR            = varQual_RDR gHC_ENUM (fsLit "minBound")
+maxBound_RDR            = varQual_RDR gHC_ENUM (fsLit "maxBound")
+range_RDR               = varQual_RDR gHC_ARR (fsLit "range")
+inRange_RDR             = varQual_RDR gHC_ARR (fsLit "inRange")
+index_RDR		= varQual_RDR gHC_ARR (fsLit "index")
+unsafeIndex_RDR		= varQual_RDR gHC_ARR (fsLit "unsafeIndex")
+unsafeRangeSize_RDR	= varQual_RDR gHC_ARR (fsLit "unsafeRangeSize")
 
 readList_RDR, readListDefault_RDR, readListPrec_RDR, readListPrecDefault_RDR,
     readPrec_RDR, parens_RDR, choose_RDR, lexP_RDR :: RdrName
-readList_RDR            = varQual_RDR gHC_READ FSLIT("readList")
-readListDefault_RDR     = varQual_RDR gHC_READ FSLIT("readListDefault")
-readListPrec_RDR        = varQual_RDR gHC_READ FSLIT("readListPrec")
-readListPrecDefault_RDR = varQual_RDR gHC_READ FSLIT("readListPrecDefault")
-readPrec_RDR            = varQual_RDR gHC_READ FSLIT("readPrec")
-parens_RDR              = varQual_RDR gHC_READ FSLIT("parens")
-choose_RDR              = varQual_RDR gHC_READ FSLIT("choose")
-lexP_RDR                = varQual_RDR gHC_READ FSLIT("lexP")
+readList_RDR            = varQual_RDR gHC_READ (fsLit "readList")
+readListDefault_RDR     = varQual_RDR gHC_READ (fsLit "readListDefault")
+readListPrec_RDR        = varQual_RDR gHC_READ (fsLit "readListPrec")
+readListPrecDefault_RDR = varQual_RDR gHC_READ (fsLit "readListPrecDefault")
+readPrec_RDR            = varQual_RDR gHC_READ (fsLit "readPrec")
+parens_RDR              = varQual_RDR gHC_READ (fsLit "parens")
+choose_RDR              = varQual_RDR gHC_READ (fsLit "choose")
+lexP_RDR                = varQual_RDR gHC_READ (fsLit "lexP")
 
 punc_RDR, ident_RDR, symbol_RDR :: RdrName
-punc_RDR                = dataQual_RDR lEX FSLIT("Punc")
-ident_RDR               = dataQual_RDR lEX FSLIT("Ident")
-symbol_RDR              = dataQual_RDR lEX FSLIT("Symbol")
+punc_RDR                = dataQual_RDR lEX (fsLit "Punc")
+ident_RDR               = dataQual_RDR lEX (fsLit "Ident")
+symbol_RDR              = dataQual_RDR lEX (fsLit "Symbol")
 
 step_RDR, alt_RDR, reset_RDR, prec_RDR :: RdrName
-step_RDR                = varQual_RDR  rEAD_PREC FSLIT("step")
-alt_RDR                 = varQual_RDR  rEAD_PREC FSLIT("+++") 
-reset_RDR               = varQual_RDR  rEAD_PREC FSLIT("reset")
-prec_RDR                = varQual_RDR  rEAD_PREC FSLIT("prec")
+step_RDR                = varQual_RDR  rEAD_PREC (fsLit "step")
+alt_RDR                 = varQual_RDR  rEAD_PREC (fsLit "+++") 
+reset_RDR               = varQual_RDR  rEAD_PREC (fsLit "reset")
+prec_RDR                = varQual_RDR  rEAD_PREC (fsLit "prec")
 
 showList_RDR, showList___RDR, showsPrec_RDR, showString_RDR,
     showSpace_RDR, showParen_RDR :: RdrName
-showList_RDR            = varQual_RDR gHC_SHOW FSLIT("showList")
-showList___RDR          = varQual_RDR gHC_SHOW FSLIT("showList__")
-showsPrec_RDR           = varQual_RDR gHC_SHOW FSLIT("showsPrec") 
-showString_RDR          = varQual_RDR gHC_SHOW FSLIT("showString")
-showSpace_RDR           = varQual_RDR gHC_SHOW FSLIT("showSpace") 
-showParen_RDR           = varQual_RDR gHC_SHOW FSLIT("showParen") 
+showList_RDR            = varQual_RDR gHC_SHOW (fsLit "showList")
+showList___RDR          = varQual_RDR gHC_SHOW (fsLit "showList__")
+showsPrec_RDR           = varQual_RDR gHC_SHOW (fsLit "showsPrec") 
+showString_RDR          = varQual_RDR gHC_SHOW (fsLit "showString")
+showSpace_RDR           = varQual_RDR gHC_SHOW (fsLit "showSpace") 
+showParen_RDR           = varQual_RDR gHC_SHOW (fsLit "showParen") 
 
 typeOf_RDR, mkTypeRep_RDR, mkTyConRep_RDR :: RdrName
-typeOf_RDR     = varQual_RDR tYPEABLE FSLIT("typeOf")
-mkTypeRep_RDR  = varQual_RDR tYPEABLE FSLIT("mkTyConApp")
-mkTyConRep_RDR = varQual_RDR tYPEABLE FSLIT("mkTyCon")
+typeOf_RDR     = varQual_RDR tYPEABLE (fsLit "typeOf")
+mkTypeRep_RDR  = varQual_RDR tYPEABLE (fsLit "mkTyConApp")
+mkTyConRep_RDR = varQual_RDR tYPEABLE (fsLit "mkTyCon")
 
 undefined_RDR :: RdrName
-undefined_RDR = varQual_RDR gHC_ERR FSLIT("undefined")
+undefined_RDR = varQual_RDR gHC_ERR (fsLit "undefined")
 
 crossDataCon_RDR, inlDataCon_RDR, inrDataCon_RDR, genUnitDataCon_RDR :: RdrName
-crossDataCon_RDR   = dataQual_RDR gHC_GENERICS FSLIT(":*:")
-inlDataCon_RDR     = dataQual_RDR gHC_GENERICS FSLIT("Inl")
-inrDataCon_RDR     = dataQual_RDR gHC_GENERICS FSLIT("Inr")
-genUnitDataCon_RDR = dataQual_RDR gHC_GENERICS FSLIT("Unit")
+crossDataCon_RDR   = dataQual_RDR gHC_GENERICS (fsLit ":*:")
+inlDataCon_RDR     = dataQual_RDR gHC_GENERICS (fsLit "Inl")
+inrDataCon_RDR     = dataQual_RDR gHC_GENERICS (fsLit "Inr")
+genUnitDataCon_RDR = dataQual_RDR gHC_GENERICS (fsLit "Unit")
 
 ----------------------
 varQual_RDR, tcQual_RDR, clsQual_RDR, dataQual_RDR
@@ -516,146 +516,146 @@ and it's convenient to write them all down in one place.
 
 \begin{code}
 runMainIOName :: Name
-runMainIOName = varQual gHC_TOP_HANDLER FSLIT("runMainIO") runMainKey
+runMainIOName = varQual gHC_TOP_HANDLER (fsLit "runMainIO") runMainKey
 
 orderingTyConName :: Name
-orderingTyConName = tcQual   gHC_ORDERING FSLIT("Ordering") orderingTyConKey
+orderingTyConName = tcQual   gHC_ORDERING (fsLit "Ordering") orderingTyConKey
 
 eitherTyConName, leftDataConName, rightDataConName :: Name
-eitherTyConName	  = tcQual  dATA_EITHER FSLIT("Either") eitherTyConKey
-leftDataConName   = conName dATA_EITHER FSLIT("Left")   leftDataConKey
-rightDataConName  = conName dATA_EITHER FSLIT("Right")  rightDataConKey
+eitherTyConName	  = tcQual  dATA_EITHER (fsLit "Either") eitherTyConKey
+leftDataConName   = conName dATA_EITHER (fsLit "Left")   leftDataConKey
+rightDataConName  = conName dATA_EITHER (fsLit "Right")  rightDataConKey
 
 -- Generics
 crossTyConName, plusTyConName, genUnitTyConName :: Name
-crossTyConName     = tcQual   gHC_GENERICS FSLIT(":*:") crossTyConKey
-plusTyConName      = tcQual   gHC_GENERICS FSLIT(":+:") plusTyConKey
-genUnitTyConName   = tcQual   gHC_GENERICS FSLIT("Unit") genUnitTyConKey
+crossTyConName     = tcQual   gHC_GENERICS (fsLit ":*:") crossTyConKey
+plusTyConName      = tcQual   gHC_GENERICS (fsLit ":+:") plusTyConKey
+genUnitTyConName   = tcQual   gHC_GENERICS (fsLit "Unit") genUnitTyConKey
 
 -- Base strings Strings
 unpackCStringName, unpackCStringAppendName, unpackCStringFoldrName,
     unpackCStringUtf8Name, eqStringName, stringTyConName :: Name
-unpackCStringName       = varQual gHC_BASE FSLIT("unpackCString#") unpackCStringIdKey
-unpackCStringAppendName = varQual gHC_BASE FSLIT("unpackAppendCString#") unpackCStringAppendIdKey
-unpackCStringFoldrName  = varQual gHC_BASE FSLIT("unpackFoldrCString#") unpackCStringFoldrIdKey
-unpackCStringUtf8Name   = varQual gHC_BASE FSLIT("unpackCStringUtf8#") unpackCStringUtf8IdKey
-eqStringName	 	= varQual gHC_BASE FSLIT("eqString")  eqStringIdKey
-stringTyConName         = tcQual  gHC_BASE FSLIT("String") stringTyConKey
+unpackCStringName       = varQual gHC_BASE (fsLit "unpackCString#") unpackCStringIdKey
+unpackCStringAppendName = varQual gHC_BASE (fsLit "unpackAppendCString#") unpackCStringAppendIdKey
+unpackCStringFoldrName  = varQual gHC_BASE (fsLit "unpackFoldrCString#") unpackCStringFoldrIdKey
+unpackCStringUtf8Name   = varQual gHC_BASE (fsLit "unpackCStringUtf8#") unpackCStringUtf8IdKey
+eqStringName	 	= varQual gHC_BASE (fsLit "eqString")  eqStringIdKey
+stringTyConName         = tcQual  gHC_BASE (fsLit "String") stringTyConKey
 
 -- The 'inline' function
 inlineIdName :: Name
-inlineIdName	 	= varQual gHC_BASE FSLIT("inline") inlineIdKey
+inlineIdName	 	= varQual gHC_BASE (fsLit "inline") inlineIdKey
 
 -- Base classes (Eq, Ord, Functor)
 eqClassName, eqName, ordClassName, geName, functorClassName :: Name
-eqClassName	  = clsQual  gHC_BASE FSLIT("Eq")      eqClassKey
-eqName		  = methName gHC_BASE FSLIT("==")      eqClassOpKey
-ordClassName	  = clsQual  gHC_BASE FSLIT("Ord")     ordClassKey
-geName		  = methName gHC_BASE FSLIT(">=")      geClassOpKey
-functorClassName  = clsQual  gHC_BASE FSLIT("Functor") functorClassKey
+eqClassName	  = clsQual  gHC_BASE (fsLit "Eq")      eqClassKey
+eqName		  = methName gHC_BASE (fsLit "==")      eqClassOpKey
+ordClassName	  = clsQual  gHC_BASE (fsLit "Ord")     ordClassKey
+geName		  = methName gHC_BASE (fsLit ">=")      geClassOpKey
+functorClassName  = clsQual  gHC_BASE (fsLit "Functor") functorClassKey
 
 -- Class Monad
 monadClassName, thenMName, bindMName, returnMName, failMName :: Name
-monadClassName	   = clsQual  gHC_BASE FSLIT("Monad")  monadClassKey
-thenMName	   = methName gHC_BASE FSLIT(">>")     thenMClassOpKey
-bindMName	   = methName gHC_BASE FSLIT(">>=")    bindMClassOpKey
-returnMName	   = methName gHC_BASE FSLIT("return") returnMClassOpKey
-failMName	   = methName gHC_BASE FSLIT("fail")   failMClassOpKey
+monadClassName	   = clsQual  gHC_BASE (fsLit "Monad")  monadClassKey
+thenMName	   = methName gHC_BASE (fsLit ">>")     thenMClassOpKey
+bindMName	   = methName gHC_BASE (fsLit ">>=")    bindMClassOpKey
+returnMName	   = methName gHC_BASE (fsLit "return") returnMClassOpKey
+failMName	   = methName gHC_BASE (fsLit "fail")   failMClassOpKey
 
 -- Functions for GHC extensions
 groupWithName :: Name
-groupWithName = varQual gHC_EXTS FSLIT("groupWith") groupWithIdKey
+groupWithName = varQual gHC_EXTS (fsLit "groupWith") groupWithIdKey
 
 -- Random PrelBase functions
 fromStringName, otherwiseIdName, foldrName, buildName, augmentName,
     mapName, appendName, andName, orName, assertName,
     breakpointName, breakpointCondName, breakpointAutoName,
     opaqueTyConName :: Name
-fromStringName = methName dATA_STRING FSLIT("fromString") fromStringClassOpKey
-otherwiseIdName   = varQual gHC_BASE FSLIT("otherwise")  otherwiseIdKey
-foldrName	  = varQual gHC_BASE FSLIT("foldr")      foldrIdKey
-buildName	  = varQual gHC_BASE FSLIT("build")      buildIdKey
-augmentName	  = varQual gHC_BASE FSLIT("augment")    augmentIdKey
-mapName       = varQual gHC_BASE FSLIT("map")        mapIdKey
-appendName	  = varQual gHC_BASE FSLIT("++")         appendIdKey
-andName		  = varQual gHC_BASE FSLIT("&&")	 andIdKey
-orName		  = varQual gHC_BASE FSLIT("||")	 orIdKey
-assertName        = varQual gHC_BASE FSLIT("assert")     assertIdKey
-breakpointName    = varQual gHC_BASE FSLIT("breakpoint") breakpointIdKey
-breakpointCondName= varQual gHC_BASE FSLIT("breakpointCond") breakpointCondIdKey
-breakpointAutoName= varQual gHC_BASE FSLIT("breakpointAuto") breakpointAutoIdKey
-opaqueTyConName   = tcQual  gHC_BASE FSLIT("Opaque")   opaqueTyConKey
+fromStringName = methName dATA_STRING (fsLit "fromString") fromStringClassOpKey
+otherwiseIdName   = varQual gHC_BASE (fsLit "otherwise")  otherwiseIdKey
+foldrName	  = varQual gHC_BASE (fsLit "foldr")      foldrIdKey
+buildName	  = varQual gHC_BASE (fsLit "build")      buildIdKey
+augmentName	  = varQual gHC_BASE (fsLit "augment")    augmentIdKey
+mapName       = varQual gHC_BASE (fsLit "map")        mapIdKey
+appendName	  = varQual gHC_BASE (fsLit "++")         appendIdKey
+andName		  = varQual gHC_BASE (fsLit "&&")	 andIdKey
+orName		  = varQual gHC_BASE (fsLit "||")	 orIdKey
+assertName        = varQual gHC_BASE (fsLit "assert")     assertIdKey
+breakpointName    = varQual gHC_BASE (fsLit "breakpoint") breakpointIdKey
+breakpointCondName= varQual gHC_BASE (fsLit "breakpointCond") breakpointCondIdKey
+breakpointAutoName= varQual gHC_BASE (fsLit "breakpointAuto") breakpointAutoIdKey
+opaqueTyConName   = tcQual  gHC_BASE (fsLit "Opaque")   opaqueTyConKey
 
 +breakpointJumpName :: Name
 breakpointJumpName
     = mkInternalName
         breakpointJumpIdKey
-        (mkOccNameFS varName FSLIT("breakpointJump"))
+        (mkOccNameFS varName (fsLit "breakpointJump"))
         noSrcSpan
 breakpointCondJumpName :: Name
 breakpointCondJumpName
     = mkInternalName
         breakpointCondJumpIdKey
-        (mkOccNameFS varName FSLIT("breakpointCondJump"))
+        (mkOccNameFS varName (fsLit "breakpointCondJump"))
         noSrcSpan
 breakpointAutoJumpName :: Name
 breakpointAutoJumpName
     = mkInternalName
         breakpointAutoJumpIdKey
-        (mkOccNameFS varName FSLIT("breakpointAutoJump"))
+        (mkOccNameFS varName (fsLit "breakpointAutoJump"))
         noSrcSpan
 
 -- PrelTup
 fstName, sndName :: Name
-fstName		  = varQual dATA_TUP FSLIT("fst") fstIdKey
-sndName		  = varQual dATA_TUP FSLIT("snd") sndIdKey
+fstName		  = varQual dATA_TUP (fsLit "fst") fstIdKey
+sndName		  = varQual dATA_TUP (fsLit "snd") sndIdKey
 
 -- Module PrelNum
 numClassName, fromIntegerName, minusName, negateName, plusIntegerName,
     timesIntegerName, integerTyConName, smallIntegerName :: Name
-numClassName	  = clsQual  gHC_NUM FSLIT("Num") numClassKey
-fromIntegerName   = methName gHC_NUM FSLIT("fromInteger") fromIntegerClassOpKey
-minusName	  = methName gHC_NUM FSLIT("-") minusClassOpKey
-negateName	  = methName gHC_NUM FSLIT("negate") negateClassOpKey
-plusIntegerName   = varQual  gHC_INTEGER FSLIT("plusInteger") plusIntegerIdKey
-timesIntegerName  = varQual  gHC_INTEGER FSLIT("timesInteger") timesIntegerIdKey
-integerTyConName  = tcQual   gHC_INTEGER FSLIT("Integer") integerTyConKey
-smallIntegerName = varQual gHC_INTEGER FSLIT("smallInteger") smallIntegerIdKey
+numClassName	  = clsQual  gHC_NUM (fsLit "Num") numClassKey
+fromIntegerName   = methName gHC_NUM (fsLit "fromInteger") fromIntegerClassOpKey
+minusName	  = methName gHC_NUM (fsLit "-") minusClassOpKey
+negateName	  = methName gHC_NUM (fsLit "negate") negateClassOpKey
+plusIntegerName   = varQual  gHC_INTEGER (fsLit "plusInteger") plusIntegerIdKey
+timesIntegerName  = varQual  gHC_INTEGER (fsLit "timesInteger") timesIntegerIdKey
+integerTyConName  = tcQual   gHC_INTEGER (fsLit "Integer") integerTyConKey
+smallIntegerName = varQual gHC_INTEGER (fsLit "smallInteger") smallIntegerIdKey
 
 -- PrelReal types and classes
 rationalTyConName, ratioTyConName, ratioDataConName, realClassName,
     integralClassName, realFracClassName, fractionalClassName,
     fromRationalName :: Name
-rationalTyConName   = tcQual  gHC_REAL FSLIT("Rational") rationalTyConKey
-ratioTyConName	    = tcQual  gHC_REAL FSLIT("Ratio") ratioTyConKey
-ratioDataConName    = conName gHC_REAL FSLIT(":%") ratioDataConKey
-realClassName	    = clsQual gHC_REAL FSLIT("Real") realClassKey
-integralClassName   = clsQual gHC_REAL FSLIT("Integral") integralClassKey
-realFracClassName   = clsQual gHC_REAL FSLIT("RealFrac") realFracClassKey
-fractionalClassName = clsQual gHC_REAL FSLIT("Fractional") fractionalClassKey
-fromRationalName    = methName gHC_REAL  FSLIT("fromRational") fromRationalClassOpKey
+rationalTyConName   = tcQual  gHC_REAL (fsLit "Rational") rationalTyConKey
+ratioTyConName	    = tcQual  gHC_REAL (fsLit "Ratio") ratioTyConKey
+ratioDataConName    = conName gHC_REAL (fsLit ":%") ratioDataConKey
+realClassName	    = clsQual gHC_REAL (fsLit "Real") realClassKey
+integralClassName   = clsQual gHC_REAL (fsLit "Integral") integralClassKey
+realFracClassName   = clsQual gHC_REAL (fsLit "RealFrac") realFracClassKey
+fractionalClassName = clsQual gHC_REAL (fsLit "Fractional") fractionalClassKey
+fromRationalName    = methName gHC_REAL  (fsLit "fromRational") fromRationalClassOpKey
 
 -- PrelFloat classes
 floatingClassName, realFloatClassName :: Name
-floatingClassName  = clsQual  gHC_FLOAT FSLIT("Floating") floatingClassKey
-realFloatClassName = clsQual  gHC_FLOAT FSLIT("RealFloat") realFloatClassKey
+floatingClassName  = clsQual  gHC_FLOAT (fsLit "Floating") floatingClassKey
+realFloatClassName = clsQual  gHC_FLOAT (fsLit "RealFloat") realFloatClassKey
 
 -- Class Ix
 ixClassName :: Name
-ixClassName = clsQual gHC_ARR FSLIT("Ix") ixClassKey
+ixClassName = clsQual gHC_ARR (fsLit "Ix") ixClassKey
 
 -- Class Typeable
 typeableClassName, typeable1ClassName, typeable2ClassName,
     typeable3ClassName, typeable4ClassName, typeable5ClassName,
     typeable6ClassName, typeable7ClassName :: Name
-typeableClassName  = clsQual tYPEABLE FSLIT("Typeable") typeableClassKey
-typeable1ClassName = clsQual tYPEABLE FSLIT("Typeable1") typeable1ClassKey
-typeable2ClassName = clsQual tYPEABLE FSLIT("Typeable2") typeable2ClassKey
-typeable3ClassName = clsQual tYPEABLE FSLIT("Typeable3") typeable3ClassKey
-typeable4ClassName = clsQual tYPEABLE FSLIT("Typeable4") typeable4ClassKey
-typeable5ClassName = clsQual tYPEABLE FSLIT("Typeable5") typeable5ClassKey
-typeable6ClassName = clsQual tYPEABLE FSLIT("Typeable6") typeable6ClassKey
-typeable7ClassName = clsQual tYPEABLE FSLIT("Typeable7") typeable7ClassKey
+typeableClassName  = clsQual tYPEABLE (fsLit "Typeable") typeableClassKey
+typeable1ClassName = clsQual tYPEABLE (fsLit "Typeable1") typeable1ClassKey
+typeable2ClassName = clsQual tYPEABLE (fsLit "Typeable2") typeable2ClassKey
+typeable3ClassName = clsQual tYPEABLE (fsLit "Typeable3") typeable3ClassKey
+typeable4ClassName = clsQual tYPEABLE (fsLit "Typeable4") typeable4ClassKey
+typeable5ClassName = clsQual tYPEABLE (fsLit "Typeable5") typeable5ClassKey
+typeable6ClassName = clsQual tYPEABLE (fsLit "Typeable6") typeable6ClassKey
+typeable7ClassName = clsQual tYPEABLE (fsLit "Typeable7") typeable7ClassKey
 
 typeableClassNames :: [Name]
 typeableClassNames = 	[ typeableClassName, typeable1ClassName, typeable2ClassName
@@ -664,136 +664,136 @@ typeableClassNames = 	[ typeableClassName, typeable1ClassName, typeable2ClassNam
 
 -- Class Data
 dataClassName :: Name
-dataClassName = clsQual gENERICS FSLIT("Data") dataClassKey
+dataClassName = clsQual gENERICS (fsLit "Data") dataClassKey
 
 -- Error module
 assertErrorName    :: Name
-assertErrorName	  = varQual gHC_ERR FSLIT("assertError") assertErrorIdKey
+assertErrorName	  = varQual gHC_ERR (fsLit "assertError") assertErrorIdKey
 
 -- Enum module (Enum, Bounded)
 enumClassName, enumFromName, enumFromToName, enumFromThenName,
     enumFromThenToName, boundedClassName :: Name
-enumClassName 	   = clsQual gHC_ENUM FSLIT("Enum") enumClassKey
-enumFromName	   = methName gHC_ENUM FSLIT("enumFrom") enumFromClassOpKey
-enumFromToName	   = methName gHC_ENUM FSLIT("enumFromTo") enumFromToClassOpKey
-enumFromThenName   = methName gHC_ENUM FSLIT("enumFromThen") enumFromThenClassOpKey
-enumFromThenToName = methName gHC_ENUM FSLIT("enumFromThenTo") enumFromThenToClassOpKey
-boundedClassName   = clsQual gHC_ENUM FSLIT("Bounded") boundedClassKey
+enumClassName 	   = clsQual gHC_ENUM (fsLit "Enum") enumClassKey
+enumFromName	   = methName gHC_ENUM (fsLit "enumFrom") enumFromClassOpKey
+enumFromToName	   = methName gHC_ENUM (fsLit "enumFromTo") enumFromToClassOpKey
+enumFromThenName   = methName gHC_ENUM (fsLit "enumFromThen") enumFromThenClassOpKey
+enumFromThenToName = methName gHC_ENUM (fsLit "enumFromThenTo") enumFromThenToClassOpKey
+boundedClassName   = clsQual gHC_ENUM (fsLit "Bounded") boundedClassKey
 
 -- List functions
 concatName, filterName, zipName :: Name
-concatName	  = varQual gHC_LIST FSLIT("concat") concatIdKey
-filterName	  = varQual gHC_LIST FSLIT("filter") filterIdKey
-zipName	   	  = varQual gHC_LIST FSLIT("zip") zipIdKey
+concatName	  = varQual gHC_LIST (fsLit "concat") concatIdKey
+filterName	  = varQual gHC_LIST (fsLit "filter") filterIdKey
+zipName	   	  = varQual gHC_LIST (fsLit "zip") zipIdKey
 
 -- Class Show
 showClassName :: Name
-showClassName	  = clsQual gHC_SHOW FSLIT("Show")       showClassKey
+showClassName	  = clsQual gHC_SHOW (fsLit "Show")       showClassKey
 
 -- Class Read
 readClassName :: Name
-readClassName	   = clsQual gHC_READ FSLIT("Read") readClassKey
+readClassName	   = clsQual gHC_READ (fsLit "Read") readClassKey
 
 -- parallel array types and functions
 enumFromToPName, enumFromThenToPName, nullPName, lengthPName,
     singletonPName, replicatePName, mapPName, filterPName,
     zipPName, crossMapPName, indexPName, toPName, bpermutePName,
     bpermuteDftPName, indexOfPName :: Name
-enumFromToPName	   = varQual gHC_PARR FSLIT("enumFromToP") enumFromToPIdKey
-enumFromThenToPName= varQual gHC_PARR FSLIT("enumFromThenToP") enumFromThenToPIdKey
-nullPName	  = varQual gHC_PARR FSLIT("nullP")      	 nullPIdKey
-lengthPName	  = varQual gHC_PARR FSLIT("lengthP")    	 lengthPIdKey
-singletonPName    = varQual gHC_PARR FSLIT("singletonP")         singletonPIdKey
-replicatePName	  = varQual gHC_PARR FSLIT("replicateP") 	 replicatePIdKey
-mapPName	  = varQual gHC_PARR FSLIT("mapP")       	 mapPIdKey
-filterPName	  = varQual gHC_PARR FSLIT("filterP")    	 filterPIdKey
-zipPName	  = varQual gHC_PARR FSLIT("zipP")       	 zipPIdKey
-crossMapPName	  = varQual gHC_PARR FSLIT("crossMapP")     	 crossMapPIdKey
-indexPName	  = varQual gHC_PARR FSLIT("!:")	       	 indexPIdKey
-toPName	          = varQual gHC_PARR FSLIT("toP")	       	 toPIdKey
-bpermutePName     = varQual gHC_PARR FSLIT("bpermuteP")    bpermutePIdKey
-bpermuteDftPName  = varQual gHC_PARR FSLIT("bpermuteDftP") bpermuteDftPIdKey
-indexOfPName      = varQual gHC_PARR FSLIT("indexOfP")     indexOfPIdKey
+enumFromToPName	   = varQual gHC_PARR (fsLit "enumFromToP") enumFromToPIdKey
+enumFromThenToPName= varQual gHC_PARR (fsLit "enumFromThenToP") enumFromThenToPIdKey
+nullPName	  = varQual gHC_PARR (fsLit "nullP")      	 nullPIdKey
+lengthPName	  = varQual gHC_PARR (fsLit "lengthP")    	 lengthPIdKey
+singletonPName    = varQual gHC_PARR (fsLit "singletonP")         singletonPIdKey
+replicatePName	  = varQual gHC_PARR (fsLit "replicateP") 	 replicatePIdKey
+mapPName	  = varQual gHC_PARR (fsLit "mapP")       	 mapPIdKey
+filterPName	  = varQual gHC_PARR (fsLit "filterP")    	 filterPIdKey
+zipPName	  = varQual gHC_PARR (fsLit "zipP")       	 zipPIdKey
+crossMapPName	  = varQual gHC_PARR (fsLit "crossMapP")     	 crossMapPIdKey
+indexPName	  = varQual gHC_PARR (fsLit "!:")	       	 indexPIdKey
+toPName	          = varQual gHC_PARR (fsLit "toP")	       	 toPIdKey
+bpermutePName     = varQual gHC_PARR (fsLit "bpermuteP")    bpermutePIdKey
+bpermuteDftPName  = varQual gHC_PARR (fsLit "bpermuteDftP") bpermuteDftPIdKey
+indexOfPName      = varQual gHC_PARR (fsLit "indexOfP")     indexOfPIdKey
 
 -- IOBase things
 ioTyConName, ioDataConName, thenIOName, bindIOName, returnIOName,
     failIOName :: Name
-ioTyConName	  = tcQual  gHC_IO_BASE FSLIT("IO") ioTyConKey
-ioDataConName     = conName gHC_IO_BASE FSLIT("IO") ioDataConKey
-thenIOName	  = varQual gHC_IO_BASE FSLIT("thenIO") thenIOIdKey
-bindIOName	  = varQual gHC_IO_BASE FSLIT("bindIO") bindIOIdKey
-returnIOName	  = varQual gHC_IO_BASE FSLIT("returnIO") returnIOIdKey
-failIOName	  = varQual gHC_IO_BASE FSLIT("failIO") failIOIdKey
+ioTyConName	  = tcQual  gHC_IO_BASE (fsLit "IO") ioTyConKey
+ioDataConName     = conName gHC_IO_BASE (fsLit "IO") ioDataConKey
+thenIOName	  = varQual gHC_IO_BASE (fsLit "thenIO") thenIOIdKey
+bindIOName	  = varQual gHC_IO_BASE (fsLit "bindIO") bindIOIdKey
+returnIOName	  = varQual gHC_IO_BASE (fsLit "returnIO") returnIOIdKey
+failIOName	  = varQual gHC_IO_BASE (fsLit "failIO") failIOIdKey
 
 -- IO things
 printName :: Name
-printName	  = varQual sYSTEM_IO FSLIT("print") printIdKey
+printName	  = varQual sYSTEM_IO (fsLit "print") printIdKey
 
 -- Int, Word, and Addr things
 int8TyConName, int16TyConName, int32TyConName, int64TyConName :: Name
-int8TyConName     = tcQual gHC_INT  FSLIT("Int8") int8TyConKey
-int16TyConName    = tcQual gHC_INT  FSLIT("Int16") int16TyConKey
-int32TyConName    = tcQual gHC_INT  FSLIT("Int32") int32TyConKey
-int64TyConName    = tcQual gHC_INT  FSLIT("Int64") int64TyConKey
+int8TyConName     = tcQual gHC_INT  (fsLit "Int8") int8TyConKey
+int16TyConName    = tcQual gHC_INT  (fsLit "Int16") int16TyConKey
+int32TyConName    = tcQual gHC_INT  (fsLit "Int32") int32TyConKey
+int64TyConName    = tcQual gHC_INT  (fsLit "Int64") int64TyConKey
 
 -- Word module
 word8TyConName, word16TyConName, word32TyConName, word64TyConName,
     wordTyConName, wordDataConName :: Name
-word8TyConName    = tcQual  gHC_WORD FSLIT("Word8")  word8TyConKey
-word16TyConName   = tcQual  gHC_WORD FSLIT("Word16") word16TyConKey
-word32TyConName   = tcQual  gHC_WORD FSLIT("Word32") word32TyConKey
-word64TyConName   = tcQual  gHC_WORD FSLIT("Word64") word64TyConKey
-wordTyConName     = tcQual  gHC_WORD FSLIT("Word")   wordTyConKey
-wordDataConName   = conName gHC_WORD FSLIT("W#") wordDataConKey
+word8TyConName    = tcQual  gHC_WORD (fsLit "Word8")  word8TyConKey
+word16TyConName   = tcQual  gHC_WORD (fsLit "Word16") word16TyConKey
+word32TyConName   = tcQual  gHC_WORD (fsLit "Word32") word32TyConKey
+word64TyConName   = tcQual  gHC_WORD (fsLit "Word64") word64TyConKey
+wordTyConName     = tcQual  gHC_WORD (fsLit "Word")   wordTyConKey
+wordDataConName   = conName gHC_WORD (fsLit "W#") wordDataConKey
 
 -- PrelPtr module
 ptrTyConName, funPtrTyConName :: Name
-ptrTyConName	  = tcQual   gHC_PTR FSLIT("Ptr") ptrTyConKey
-funPtrTyConName	  = tcQual   gHC_PTR FSLIT("FunPtr") funPtrTyConKey
+ptrTyConName	  = tcQual   gHC_PTR (fsLit "Ptr") ptrTyConKey
+funPtrTyConName	  = tcQual   gHC_PTR (fsLit "FunPtr") funPtrTyConKey
 
 -- Foreign objects and weak pointers
 stablePtrTyConName, newStablePtrName :: Name
-stablePtrTyConName    = tcQual   gHC_STABLE FSLIT("StablePtr") stablePtrTyConKey
-newStablePtrName      = varQual  gHC_STABLE FSLIT("newStablePtr") newStablePtrIdKey
+stablePtrTyConName    = tcQual   gHC_STABLE (fsLit "StablePtr") stablePtrTyConKey
+newStablePtrName      = varQual  gHC_STABLE (fsLit "newStablePtr") newStablePtrIdKey
 
 -- PrelST module
 runSTRepName :: Name
-runSTRepName	   = varQual gHC_ST  FSLIT("runSTRep") runSTRepIdKey
+runSTRepName	   = varQual gHC_ST  (fsLit "runSTRep") runSTRepIdKey
 
 -- Recursive-do notation
 monadFixClassName, mfixName :: Name
-monadFixClassName  = clsQual mONAD_FIX FSLIT("MonadFix") monadFixClassKey
-mfixName	   = methName mONAD_FIX FSLIT("mfix") mfixIdKey
+monadFixClassName  = clsQual mONAD_FIX (fsLit "MonadFix") monadFixClassKey
+mfixName	   = methName mONAD_FIX (fsLit "mfix") mfixIdKey
 
 -- Arrow notation
 arrAName, composeAName, firstAName, appAName, choiceAName, loopAName :: Name
-arrAName	   = varQual aRROW FSLIT("arr")	  arrAIdKey
-composeAName	   = varQual gHC_DESUGAR FSLIT(">>>") composeAIdKey
-firstAName	   = varQual aRROW FSLIT("first") firstAIdKey
-appAName	   = varQual aRROW FSLIT("app")	  appAIdKey
-choiceAName	   = varQual aRROW FSLIT("|||")	  choiceAIdKey
-loopAName	   = varQual aRROW FSLIT("loop")  loopAIdKey
+arrAName	   = varQual aRROW (fsLit "arr")	  arrAIdKey
+composeAName	   = varQual gHC_DESUGAR (fsLit ">>>") composeAIdKey
+firstAName	   = varQual aRROW (fsLit "first") firstAIdKey
+appAName	   = varQual aRROW (fsLit "app")	  appAIdKey
+choiceAName	   = varQual aRROW (fsLit "|||")	  choiceAIdKey
+loopAName	   = varQual aRROW (fsLit "loop")  loopAIdKey
 
 -- Other classes, needed for type defaulting
 monadPlusClassName, randomClassName, randomGenClassName,
     isStringClassName :: Name
-monadPlusClassName  = clsQual mONAD FSLIT("MonadPlus")  monadPlusClassKey
-randomClassName     = clsQual rANDOM FSLIT("Random")    randomClassKey
-randomGenClassName  = clsQual rANDOM FSLIT("RandomGen") randomGenClassKey
-isStringClassName   = clsQual dATA_STRING FSLIT("IsString") isStringClassKey
+monadPlusClassName  = clsQual mONAD (fsLit "MonadPlus")  monadPlusClassKey
+randomClassName     = clsQual rANDOM (fsLit "Random")    randomClassKey
+randomGenClassName  = clsQual rANDOM (fsLit "RandomGen") randomGenClassKey
+isStringClassName   = clsQual dATA_STRING (fsLit "IsString") isStringClassKey
 
 -- dotnet interop
 objectTyConName :: Name
-objectTyConName	    = tcQual   dOTNET FSLIT("Object") objectTyConKey
+objectTyConName	    = tcQual   dOTNET (fsLit "Object") objectTyConKey
 	-- objectTyConName was "wTcQual", but that's gone now, and
 	-- I can't see why it was wired in anyway...
 unmarshalObjectName, marshalObjectName, marshalStringName,
     unmarshalStringName, checkDotnetResName :: Name
-unmarshalObjectName = varQual  dOTNET FSLIT("unmarshalObject") unmarshalObjectIdKey
-marshalObjectName   = varQual  dOTNET FSLIT("marshalObject") marshalObjectIdKey
-marshalStringName   = varQual  dOTNET FSLIT("marshalString") marshalStringIdKey
-unmarshalStringName = varQual  dOTNET FSLIT("unmarshalString") unmarshalStringIdKey
-checkDotnetResName  = varQual  dOTNET FSLIT("checkResult")     checkDotnetResNameIdKey
+unmarshalObjectName = varQual  dOTNET (fsLit "unmarshalObject") unmarshalObjectIdKey
+marshalObjectName   = varQual  dOTNET (fsLit "marshalObject") marshalObjectIdKey
+marshalStringName   = varQual  dOTNET (fsLit "marshalString") marshalStringIdKey
+unmarshalStringName = varQual  dOTNET (fsLit "unmarshalString") unmarshalStringIdKey
+checkDotnetResName  = varQual  dOTNET (fsLit "checkResult")     checkDotnetResNameIdKey
 \end{code}
 
 %************************************************************************
