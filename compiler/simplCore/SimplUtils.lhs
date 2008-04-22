@@ -140,20 +140,20 @@ data ArgInfo
     }
 
 instance Outputable SimplCont where
-  ppr (Stop interesting)    	     = ptext SLIT("Stop") <> brackets (ppr interesting)
-  ppr (ApplyTo dup arg se cont)      = ((ptext SLIT("ApplyTo") <+> ppr dup <+> pprParendExpr arg)
+  ppr (Stop interesting)    	     = ptext (sLit "Stop") <> brackets (ppr interesting)
+  ppr (ApplyTo dup arg se cont)      = ((ptext (sLit "ApplyTo") <+> ppr dup <+> pprParendExpr arg)
 					  {-  $$ nest 2 (pprSimplEnv se) -}) $$ ppr cont
-  ppr (StrictBind b _ _ _ cont)      = (ptext SLIT("StrictBind") <+> ppr b) $$ ppr cont
-  ppr (StrictArg f _ _ cont)         = (ptext SLIT("StrictArg") <+> ppr f) $$ ppr cont
-  ppr (Select dup bndr alts se cont) = (ptext SLIT("Select") <+> ppr dup <+> ppr bndr) $$ 
+  ppr (StrictBind b _ _ _ cont)      = (ptext (sLit "StrictBind") <+> ppr b) $$ ppr cont
+  ppr (StrictArg f _ _ cont)         = (ptext (sLit "StrictArg") <+> ppr f) $$ ppr cont
+  ppr (Select dup bndr alts se cont) = (ptext (sLit "Select") <+> ppr dup <+> ppr bndr) $$ 
 				       (nest 4 (ppr alts)) $$ ppr cont 
-  ppr (CoerceIt co cont)	     = (ptext SLIT("CoerceIt") <+> ppr co) $$ ppr cont
+  ppr (CoerceIt co cont)	     = (ptext (sLit "CoerceIt") <+> ppr co) $$ ppr cont
 
 data DupFlag = OkToDup | NoDup
 
 instance Outputable DupFlag where
-  ppr OkToDup = ptext SLIT("ok")
-  ppr NoDup   = ptext SLIT("nodup")
+  ppr OkToDup = ptext (sLit "ok")
+  ppr NoDup   = ptext (sLit "nodup")
 
 
 
