@@ -231,12 +231,12 @@ genericTyConNames = [crossTyConName, plusTyConName, genUnitTyConName]
 pRELUDE :: Module
 pRELUDE		= mkBaseModule_ pRELUDE_NAME
 
-gHC_PRIM, gHC_BOOL, gHC_GENERICS, gHC_BASE, gHC_ENUM, gHC_SHOW, gHC_READ,
-    gHC_NUM, gHC_INTEGER, gHC_LIST, gHC_PARR, dATA_TUP, dATA_EITHER,
-    dATA_STRING, gHC_PACK, gHC_CONC, gHC_IO_BASE, gHC_ST, gHC_ARR,
-    gHC_STABLE, gHC_ADDR, gHC_PTR, gHC_ERR, gHC_REAL, gHC_FLOAT,
-    gHC_TOP_HANDLER, sYSTEM_IO, dYNAMIC, tYPEABLE, gENERICS, dOTNET,
-    rEAD_PREC, lEX, gHC_INT, gHC_WORD, mONAD, mONAD_FIX, aRROW,
+gHC_PRIM, gHC_BOOL, gHC_ORDERING, gHC_GENERICS, gHC_BASE, gHC_ENUM,
+    gHC_SHOW, gHC_READ, gHC_NUM, gHC_INTEGER, gHC_LIST, gHC_PARR,
+    dATA_TUP, dATA_EITHER, dATA_STRING, gHC_PACK, gHC_CONC, gHC_IO_BASE,
+    gHC_ST, gHC_ARR, gHC_STABLE, gHC_ADDR, gHC_PTR, gHC_ERR, gHC_REAL,
+    gHC_FLOAT, gHC_TOP_HANDLER, sYSTEM_IO, dYNAMIC, tYPEABLE, gENERICS,
+    dOTNET, rEAD_PREC, lEX, gHC_INT, gHC_WORD, mONAD, mONAD_FIX, aRROW,
     gHC_DESUGAR, rANDOM, gHC_EXTS :: Module
 gHC_PRIM	= mkPrimModule (fsLit "GHC.Prim")   -- Primitive types and values
 gHC_BOOL	= mkPrimModule (fsLit "GHC.Bool")
@@ -586,7 +586,7 @@ breakpointCondName= varQual gHC_BASE (fsLit "breakpointCond") breakpointCondIdKe
 breakpointAutoName= varQual gHC_BASE (fsLit "breakpointAuto") breakpointAutoIdKey
 opaqueTyConName   = tcQual  gHC_BASE (fsLit "Opaque")   opaqueTyConKey
 
-+breakpointJumpName :: Name
+breakpointJumpName :: Name
 breakpointJumpName
     = mkInternalName
         breakpointJumpIdKey
