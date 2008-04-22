@@ -36,7 +36,6 @@ coreModuleName = do
 
 corePackageName :: Parser Pname
 -- Package names can be lowercase or uppercase!
--- TODO: update docs
 corePackageName = identifier <|> upperName
 
 coreHierModuleNames :: Parser ([Id], Id)
@@ -81,11 +80,11 @@ coreNewtypeDecl = do
   reserved "newtype"
   tyCon  <- coreQualifiedCon
   whiteSpace
+  coercionName <- coreQualifiedCon
+  whiteSpace
   tBinds <- coreTbinds
-  symbol "^"
-  axiom <- coreAxiom
   tyRep  <- try coreTRep
-  return $ Newtype tyCon tBinds axiom tyRep
+  return $ Newtype tyCon coercionName tBinds tyRep
 
 coreQualifiedCon :: Parser (Mname, Id)
 coreQualifiedCon = coreQualifiedGen upperName
@@ -108,17 +107,6 @@ coreQualifiedGen p = (try (do
                   theId))) <|> 
    -- unqualified name
    (p >>= (\ res -> return (Nothing, res)))
-
-coreAxiom :: Parser Axiom
-coreAxiom = parens (do
-              coercionName <- coreQualifiedCon
-              whiteSpace
-              tbs <- coreTbinds
-              whiteSpace
-              symbol "::"
-              whiteSpace
-              coercionK <- try equalityKind <|> parens equalityKind
-              return (coercionName, tbs, coercionK))
 
 coreTbinds :: Parser [Tbind]
 coreTbinds = many coreTbind 
@@ -322,7 +310,7 @@ coreVdef = do
 coreAtomicExp :: Parser Exp
 coreAtomicExp = do
 -- For stupid reasons, the whiteSpace is necessary.
--- Without it, (pt coreAppExp "w ^a:B.C ") doesn't work.
+-- Without it, (pt coreAppExp "w a:B.C ") doesn't work.
   whiteSpace
   res <- choice [try coreDconOrVar,
                     try coreLit,

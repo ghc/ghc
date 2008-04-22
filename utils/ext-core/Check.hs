@@ -124,13 +124,12 @@ checkTdef0 (tcenv,tsenv) tdef = ch tdef
 	       tcenv' <- extendM NotTv tcenv (c, Kind k)
 	       return (tcenv',tsenv)
 	    where k = foldr Karrow Klifted (map snd tbs)
-	ch (Newtype (m,c) tbs ((_,coercion),cTbs,coercionKind) rhs) = 
+	ch (Newtype (m,c) coVar tbs rhs) = 
 	    do mn <- getMname
                requireModulesEq m mn "newtype declaration" tdef False
 	       tcenv' <- extendM NotTv tcenv (c, Kind k)
                -- add newtype axiom to env
-               tcenv'' <- extendM NotTv tcenv' 
-                  (coercion, Coercion $ DefinedCoercion cTbs coercionKind)
+               tcenv'' <- envPlusNewtype tcenv' (m,c) coVar tbs rhs
 	       tsenv' <- case rhs of
 			   Nothing -> return tsenv
 			   Just rep -> extendM NotTv tsenv (c,(map fst tbs,rep))
@@ -142,15 +141,30 @@ processTdef0NoChecking (tcenv,tsenv) tdef = ch tdef
       where 
 	ch (Data (_,c) tbs _) = (eextend tcenv (c, Kind k), tsenv)
 	    where k = foldr Karrow Klifted (map snd tbs)
-	ch (Newtype (_,c) tbs ((_,coercion),cTbs,coercionKind) rhs) = 
+	ch (Newtype tc@(_,c) coercion tbs rhs) = 
 	    let tcenv' = eextend tcenv (c, Kind k)
                 -- add newtype axiom to env
-                tcenv'' = eextend tcenv' 
-                  (coercion, Coercion $ DefinedCoercion cTbs coercionKind)
+                tcenv'' = case rhs of
+                            Just rep ->
+                              eextend tcenv' 
+                               (snd coercion, Coercion $ DefinedCoercion tbs
+                                (foldl Tapp (Tcon tc) (map Tvar (fst (unzip tbs))), rep))
+                            Nothing -> tcenv'
 	        tsenv' = maybe tsenv 
                   (\ rep -> eextend tsenv (c, (map fst tbs, rep))) rhs in
                (tcenv'', tsenv')
 	    where k = foldr Karrow Klifted (map snd tbs)
+
+envPlusNewtype :: Tcenv -> Qual Tcon -> Qual Tcon -> [Tbind] -> Maybe Ty 
+  -> CheckResult Tcenv
+envPlusNewtype tcenv tyCon coVar tbs rhs =
+  case rhs of
+    Nothing -> return tcenv
+    Just rep -> extendM NotTv tcenv 
+                  (snd coVar, Coercion $ DefinedCoercion tbs
+                            (foldl Tapp (Tcon tyCon) 
+                                       (map Tvar (fst (unzip tbs))),
+                                       rep))
     
 checkTdef :: Tcenv -> Cenv -> Tdef -> CheckResult Cenv
 checkTdef tcenv cenv = ch
@@ -173,17 +187,12 @@ checkTdef tcenv cenv = ch
 				  (foldr tArrow
 					  (foldl Tapp (Tcon (Just mn,c))
 						 (map (Tvar . fst) utbs)) ts) tbs
-         ch (tdef@(Newtype _ tbs (_, coTbs, (coLhs, coRhs)) (Just t))) =  
+         ch (tdef@(Newtype tc _ tbs (Just t))) =  
 	    do tvenv <- foldM (extendM Tv) eempty tbs
-	       k <- checkTy (tcenv,tvenv) t
-               -- Makes sure GHC is eta-expanding things properly
-               require (length tbs == length coTbs) $
-                 ("Arity mismatch between newtycon and newtype coercion: "
-                  ++ show tdef)
-               require (k `eqKind` Klifted) ("bad kind:\n" ++ show tdef)
-               axiomTvenv <- foldM (extendM Tv) eempty coTbs
-               kLhs <- checkTy (tcenv,axiomTvenv) coLhs
-               kRhs <- checkTy (tcenv,axiomTvenv) coRhs
+	       kRhs <- checkTy (tcenv,tvenv) t
+               require (kRhs `eqKind` Klifted) ("bad kind:\n" ++ show tdef)
+               kLhs <- checkTy (tcenv,tvenv) 
+                         (foldl Tapp (Tcon tc) (map Tvar (fst (unzip tbs))))
                require (kLhs `eqKind` kRhs) 
                   ("Kind mismatch in newtype axiom types: " ++ show tdef 
                     ++ " kinds: " ++

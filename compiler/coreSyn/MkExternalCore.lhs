@@ -84,14 +84,12 @@ collect_tdefs tcon tdefs
   | isAlgTyCon tcon = tdef: tdefs
   where
     tdef | isNewTyCon tcon = 
-                C.Newtype (qtc tcon) (map make_tbind tyvars) 
+                C.Newtype (qtc tcon) 
                   (case newTyConCo_maybe tcon of
-                     Just co -> (qtc co, 
-                        map make_tbind vs, 
-                        make_kind (mkCoKind l r))
-                       where (vs,l,r) = coercionAxiom co
+                     Just co -> qtc co
                      Nothing       -> pprPanic ("MkExternalCore: newtype tcon\
                                        should have a coercion: ") (ppr tcon))
+                  (map make_tbind tyvars) 
                    repclause 
          | otherwise = 
                 C.Data (qtc tcon) (map make_tbind tyvars) 
@@ -99,18 +97,6 @@ collect_tdefs tcon tdefs
          where repclause | isRecursiveTyCon tcon || isOpenTyCon tcon= Nothing
 		         | otherwise = Just (make_ty (snd (newTyConRhs tcon)))
     tyvars = tyConTyVars tcon
-    coercionAxiom co = 
-      case isCoercionTyCon_maybe co of
-        -- See Note [Newtype coercions] in 
-        -- types/TyCon
-        Just (arity,coKindFun) | (l,r) <- (coKindFun $ map mkTyVarTy vs) -> 
-             -- Here we eta-expand the newtype coercion,
-             -- which makes the ext-core typechecker somewhat simpler.
-            (tyvars,mkAppTys l extraVs,mkAppTys r extraVs)
-               where (vs, extraVs) = (take arity tyvars,
-                        map mkTyVarTy $ drop arity tyvars)
-        Nothing -> pprPanic "MkExternalCore: coercion tcon lacks a kind fun"
-                     (ppr tcon)
 
 collect_tdefs _ tdefs = tdefs
 

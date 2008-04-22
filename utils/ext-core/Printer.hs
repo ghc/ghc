@@ -66,14 +66,10 @@ ptdef (Data qtcon tbinds cdefs) =
   (text "%data" <+> pqname qtcon <+> (hsep (map ptbind tbinds)) <+> char '=')
   $$ indent (braces ((vcat (punctuate (char ';') (map pcdef cdefs)))))
 
-ptdef (Newtype qtcon tbinds (coercion,cTbs,k) tyopt) =
-  text "%newtype" <+> pqname qtcon <+> (hsep (map ptbind tbinds))
-    $$ indent (axiomclause $$ repclause)
-       where axiomclause = char '^' <+> parens (pqname coercion <+> 
-                                          (hsep (map ptbind cTbs)) <+>
-                                          text "::"
-                                      <+> peqkind k)
-	     repclause = case tyopt of
+ptdef (Newtype qtcon coercion tbinds tyopt) =
+  text "%newtype" <+> pqname qtcon <+> pqname coercion 
+    <+> (hsep (map ptbind tbinds)) $$ indent repclause
+       where repclause = case tyopt of
                            Just ty -> char '=' <+> pty ty 
                            Nothing -> empty
 

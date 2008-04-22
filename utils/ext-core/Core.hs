@@ -9,13 +9,14 @@ data Module
 
 data Tdef 
   = Data (Qual Tcon) [Tbind] [Cdef]
-  | Newtype (Qual Tcon) [Tbind] Axiom (Maybe Ty)
+    -- type constructor; coercion name; type arguments; type rep
+    -- If we have: (Newtype tc co tbs (Just t))
+    -- there is an implicit axiom:
+    --  co tbs :: tc tbs :=: t
+  | Newtype (Qual Tcon) (Qual Tcon) [Tbind] (Maybe Ty)
 
 data Cdef 
   = Constr (Qual Dcon) [Tbind] [Ty]
-
--- Newtype coercion
-type Axiom = (Qual Tcon, [Tbind], (Ty,Ty))
 
 data Vdefg 
   = Rec [Vdef]

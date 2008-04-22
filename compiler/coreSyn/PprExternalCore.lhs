@@ -54,22 +54,12 @@ ptdef (Data tcon tbinds cdefs) =
   (text "%data" <+> pqname tcon <+> (hsep (map ptbind tbinds)) <+> char '=')
   $$ indent (braces ((vcat (punctuate (char ';') (map pcdef cdefs)))))
 
-ptdef (Newtype tcon tbinds (coercion,tbs,k) rep) =
--- TODO: I think this is kind of redundant now.
--- Here we take apart the newtype tycon in order to get the newtype coercion,
--- which needs to be represented in the External Core file because it's not
--- straightforward to derive its definition from the newtype declaration alone.
--- At the same time, we need the newtype decl to declare the tycon itself.
--- Sigh.
-  text "%newtype" <+> pqname tcon <+> (hsep (map ptbind tbinds)) 
-    $$ indent (axiomclause $$ repclause)
-       where  axiomclause = char '^' 
-                 <+> parens (pqname coercion <+> (hsep (map ptbind tbs))
-                              <+> text "::"
-                              <+> pkind k)
-              repclause   = case rep of
-                              Just ty -> char '=' <+> pty ty 
-			      Nothing -> empty
+ptdef (Newtype tcon coercion tbinds rep) =
+  text "%newtype" <+> pqname tcon <+> pqname coercion 
+   <+> (hsep (map ptbind tbinds)) $$ indent repclause
+       where repclause = case rep of
+                           Just ty -> char '=' <+> pty ty 
+			   Nothing -> empty
              
 
 pcdef :: Cdef -> Doc
