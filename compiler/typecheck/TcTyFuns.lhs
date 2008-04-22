@@ -1152,7 +1152,7 @@ genericNormaliseInsts isWanted fun insts
 			      --        else
 			      -- 	  dict' = dict  `cast` co
 		          expr      = HsVar $ instToId source_dict
-		          cast_expr = HsWrap (WpCo st_co) expr
+		          cast_expr = HsWrap (WpCast st_co) expr
 			  rhs       = L (instLocSpan loc) cast_expr
 			  binds     = instToDictBind target_dict rhs
 		      -- return the new inst

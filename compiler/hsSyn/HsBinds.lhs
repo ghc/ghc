@@ -339,7 +339,7 @@ data HsWrapper
   | WpCompose HsWrapper HsWrapper	-- (\a1..an. []) `WpCompose` (\x1..xn. [])
 				--	= (\a1..an \x1..xn. [])
 
-  | WpCo Coercion		-- A cast:  [] `cast` co
+  | WpCast Coercion		-- A cast:  [] `cast` co
 				-- Guaranteedn not the identity coercion
 
   | WpApp Var			-- [] d		the 'd' is a type-class dictionary
@@ -361,7 +361,7 @@ pprHsWrapper it wrap =
     let 
         help it WpHole            = it
         help it (WpCompose f1 f2) = help (help it f2) f1
-        help it (WpCo co)     = sep [it, nest 2 (ptext SLIT("`cast`") <+> pprParendType co)]
+        help it (WpCast co)   = sep [it, nest 2 (ptext SLIT("`cast`") <+> pprParendType co)]
         help it (WpApp id)    = sep [it, nest 2 (ppr id)]
         help it (WpTyApp ty)  = sep [it, ptext SLIT("@") <+> pprParendType ty]
         help it (WpLam id)    = sep [ptext SLIT("\\") <> pprBndr LambdaBind id <> dot, it]

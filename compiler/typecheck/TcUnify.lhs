@@ -866,7 +866,7 @@ tc_sub_funs orig act_arg act_res exp_ib exp_arg exp_res
 	; wrapper1  <- wrapFunResCoercion [exp_arg] co_fn_res 
         ; let wrapper2 = case arg_coi of 
 				IdCo   -> idHsWrapper
-				ACo co -> WpCo $ FunTy co act_res
+				ACo co -> WpCast $ FunTy co act_res
 	; return (wrapper1 <.> wrapper2) }
 
 -----------------------------------

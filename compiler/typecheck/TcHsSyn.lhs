@@ -563,8 +563,8 @@ zonkCoFn env WpInline = return (env, WpInline)
 zonkCoFn env (WpCompose c1 c2) = do { (env1, c1') <- zonkCoFn env c1
 				    ; (env2, c2') <- zonkCoFn env1 c2
 				    ; return (env2, WpCompose c1' c2') }
-zonkCoFn env (WpCo co)      = do { co' <- zonkTcTypeToType env co
-				 ; return (env, WpCo co') }
+zonkCoFn env (WpCast co)    = do { co' <- zonkTcTypeToType env co
+				 ; return (env, WpCast co') }
 zonkCoFn env (WpLam id)     = do { id' <- zonkDictBndr env id
 				 ; let env1 = extendZonkEnv1 env id'
 				 ; return (env1, WpLam id') }

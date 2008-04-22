@@ -843,8 +843,8 @@ viewLExprEq (e1,_) (e2,_) =
         --        equating different ways of writing a coercion)
         wrap WpHole WpHole = True
         wrap (WpCompose w1 w2) (WpCompose w1' w2') = wrap w1 w1' && wrap w2 w2'
-        wrap (WpCo c) (WpCo c') = tcEqType c c'
-        wrap (WpApp d) (WpApp d') = d == d'
+        wrap (WpCast c)  (WpCast c')  = tcEqType c c'
+        wrap (WpApp d)   (WpApp d')   = d == d'
         wrap (WpTyApp t) (WpTyApp t') = tcEqType t t'
         -- Enhancement: could implement equality for more wrappers
         --   if it seems useful (lams and lets)

@@ -541,7 +541,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = NewTypeDerived })
     make_coercion cls_tycon initial_cls_inst_tys nt_tycon tc_args
 	| Just co_con <- newTyConCo_maybe nt_tycon
 	, let co = mkSymCoercion (mkTyConApp co_con tc_args)
-        = WpCo (mkTyConApp cls_tycon (initial_cls_inst_tys ++ [co]))
+        = WpCast (mkTyConApp cls_tycon (initial_cls_inst_tys ++ [co]))
         | otherwise	-- The newtype is transparent; no need for a cast
         = idHsWrapper
 

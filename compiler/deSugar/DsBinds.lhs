@@ -466,7 +466,7 @@ addDictScc _ rhs = return rhs
 dsCoercion :: HsWrapper -> DsM CoreExpr -> DsM CoreExpr
 dsCoercion WpHole 	     thing_inside = thing_inside
 dsCoercion (WpCompose c1 c2) thing_inside = dsCoercion c1 (dsCoercion c2 thing_inside)
-dsCoercion (WpCo co)     thing_inside = do { expr <- thing_inside
+dsCoercion (WpCast co)       thing_inside = do { expr <- thing_inside
 					       ; return (Cast expr co) }
 dsCoercion (WpLam id)        thing_inside = do { expr <- thing_inside
 					       ; return (Lam id expr) }

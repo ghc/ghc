@@ -497,7 +497,7 @@ tcExpr expr@(RecordUpd record_expr rbinds _ _ _) res_ty = do
 
 	-- Step 7: make a cast for the scrutinee, in the case that it's from a type family
     let scrut_co | Just co_con <- tyConFamilyCoercion_maybe tycon 
-		 = WpCo $ mkTyConApp co_con scrut_inst_tys
+		 = WpCast $ mkTyConApp co_con scrut_inst_tys
 		 | otherwise
 		 = idHsWrapper
 

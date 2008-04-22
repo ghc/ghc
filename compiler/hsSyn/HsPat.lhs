@@ -328,7 +328,7 @@ mkCoPat co pat ty
 
 mkCoPatCoI :: CoercionI -> Pat id -> Type -> Pat id
 mkCoPatCoI IdCo     pat _  = pat
-mkCoPatCoI (ACo co) pat ty = mkCoPat (WpCo co) pat ty
+mkCoPatCoI (ACo co) pat ty = mkCoPat (WpCast co) pat ty
 \end{code}
 
 

@@ -85,11 +85,11 @@ mkHsWrap co_fn e | isIdHsWrapper co_fn = e
 
 mkHsWrapCoI :: CoercionI -> HsExpr id -> HsExpr id
 mkHsWrapCoI IdCo     e = e
-mkHsWrapCoI (ACo co) e = mkHsWrap (WpCo co) e
+mkHsWrapCoI (ACo co) e = mkHsWrap (WpCast co) e
 
 coiToHsWrapper :: CoercionI -> HsWrapper
 coiToHsWrapper IdCo     = idHsWrapper
-coiToHsWrapper (ACo co) = WpCo co
+coiToHsWrapper (ACo co) = WpCast co
 
 mkHsLam :: [LPat id] -> LHsExpr id -> LHsExpr id
 mkHsLam pats body = mkHsPar (L (getLoc body) (HsLam matches))
