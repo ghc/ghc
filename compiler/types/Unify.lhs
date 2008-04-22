@@ -158,23 +158,19 @@ match menv subst ty1 ty2 | Just ty1' <- coreView ty1 = match menv subst ty1' ty2
 			 | Just ty2' <- coreView ty2 = match menv subst ty1 ty2'
 
 match menv subst (TyVarTy tv1) ty2
-  | tv1' `elemVarSet` me_tmpls menv
-  = case lookupVarEnv subst tv1' of
-	Nothing 	-- No existing binding
-	    | any (inRnEnvR rn_env) (varSetElems (tyVarsOfType ty2))
-	    -> Nothing	-- Occurs check
-	    | otherwise	
-	    -> do { subst1 <- match_kind menv subst tv1 ty2
-		  ; return (extendVarEnv subst1 tv1' ty2) }
-			-- Note [Matching kinds]
+  | Just ty1' <- lookupVarEnv subst tv1'	-- tv1' is already bound
+  = if tcEqTypeX (nukeRnEnvL rn_env) ty1' ty2
+	-- ty1 has no locally-bound variables, hence nukeRnEnvL
+	-- Note tcEqType...we are doing source-type matching here
+    then Just subst
+    else Nothing	-- ty2 doesn't match
 
-	Just ty1' 	-- There is an existing binding; check whether ty2 matches it
-	    | tcEqTypeX (nukeRnEnvL rn_env) ty1' ty2
-		-- ty1 has no locally-bound variables, hence nukeRnEnvL
-		-- Note tcEqType...we are doing source-type matching here
-	    -> Just subst
-	    | otherwise	-> Nothing	-- ty2 doesn't match
-	    
+  | tv1' `elemVarSet` me_tmpls menv
+  = if any (inRnEnvR rn_env) (varSetElems (tyVarsOfType ty2))
+    then Nothing	-- Occurs check
+    else do { subst1 <- match_kind menv subst tv1 ty2
+			-- Note [Matching kinds]
+	    ; return (extendVarEnv subst1 tv1' ty2) }
 
    | otherwise	-- tv1 is not a template tyvar
    = case ty2 of
