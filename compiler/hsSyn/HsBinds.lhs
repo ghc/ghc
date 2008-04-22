@@ -16,8 +16,6 @@ Datatype for: @BindGroup@, @Bind@, @Sig@, @Bind@.
 
 module HsBinds where
 
-#include "HsVersions.h"
-
 import {-# SOURCE #-} HsExpr ( HsExpr, pprExpr, LHsExpr,
 			       MatchGroup, pprFunBind,
 			       GRHSs, pprPatBind )
@@ -179,8 +177,8 @@ instance (OutputableBndr idL, OutputableBndr idR) => Outputable (HsValBindsLR id
 	pprValBindsForUser (unionManyBags (map snd sccs)) sigs
    where
      ppr_scc (rec_flag, binds) = pp_rec rec_flag <+> pprLHsBinds binds
-     pp_rec Recursive    = ptext SLIT("rec")
-     pp_rec NonRecursive = ptext SLIT("nonrec")
+     pp_rec Recursive    = ptext (sLit "rec")
+     pp_rec NonRecursive = ptext (sLit "nonrec")
 
 --  *not* pprLHsBinds because we don't want braces; 'let' and
 -- 'where' include a list of HsBindGroups and we don't want
@@ -276,7 +274,7 @@ ppr_monobind (FunBind { fun_id = fun, fun_infix = inf,
 
 ppr_monobind (AbsBinds { abs_tvs = tyvars, abs_dicts = dictvars, 
 			 abs_exports = exports, abs_binds = val_binds })
-     = sep [ptext SLIT("AbsBinds"),
+     = sep [ptext (sLit "AbsBinds"),
 	    brackets (interpp'SP tyvars),
 	    brackets (interpp'SP dictvars),
 	    brackets (sep (punctuate comma (map ppr_exp exports)))]
@@ -286,7 +284,7 @@ ppr_monobind (AbsBinds { abs_tvs = tyvars, abs_dicts = dictvars,
 		$$ pprLHsBinds val_binds )
   where
     ppr_exp (tvs, gbl, lcl, prags)
-	= vcat [ppr gbl <+> ptext SLIT("<=") <+> ppr tvs <+> ppr lcl,
+	= vcat [ppr gbl <+> ptext (sLit "<=") <+> ppr tvs <+> ppr lcl,
 	  	nest 2 (vcat (map (pprPrag gbl) prags))]
 \end{code}
 
@@ -354,20 +352,20 @@ data HsWrapper
 				-- (would be nicer to be core bindings)
 
 instance Outputable HsWrapper where 
-  ppr co_fn = pprHsWrapper (ptext SLIT("<>")) co_fn
+  ppr co_fn = pprHsWrapper (ptext (sLit "<>")) co_fn
 
 pprHsWrapper :: SDoc -> HsWrapper -> SDoc
 pprHsWrapper it wrap = 
     let 
         help it WpHole            = it
         help it (WpCompose f1 f2) = help (help it f2) f1
-        help it (WpCast co)   = sep [it, nest 2 (ptext SLIT("`cast`") <+> pprParendType co)]
+        help it (WpCast co)   = sep [it, nest 2 (ptext (sLit "`cast`") <+> pprParendType co)]
         help it (WpApp id)    = sep [it, nest 2 (ppr id)]
-        help it (WpTyApp ty)  = sep [it, ptext SLIT("@") <+> pprParendType ty]
-        help it (WpLam id)    = sep [ptext SLIT("\\") <> pprBndr LambdaBind id <> dot, it]
-        help it (WpTyLam tv)  = sep [ptext SLIT("/\\") <> pprBndr LambdaBind tv <> dot, it]
-        help it (WpLet binds) = sep [ptext SLIT("let") <+> braces (ppr binds), it]
-        help it WpInline      = sep [ptext SLIT("_inline_me_"), it]
+        help it (WpTyApp ty)  = sep [it, ptext (sLit "@") <+> pprParendType ty]
+        help it (WpLam id)    = sep [ptext (sLit "\\") <> pprBndr LambdaBind id <> dot, it]
+        help it (WpTyLam tv)  = sep [ptext (sLit "/\\") <> pprBndr LambdaBind tv <> dot, it]
+        help it (WpLet binds) = sep [ptext (sLit "let") <+> braces (ppr binds), it]
+        help it WpInline      = sep [ptext (sLit "_inline_me_"), it]
     in
       -- in debug mode, print the wrapper
       -- otherwise just print what's inside
@@ -531,11 +529,11 @@ isInlineLSig (L _ (InlineSig {})) = True
 isInlineLSig _                    = False
 
 hsSigDoc :: Sig name -> SDoc
-hsSigDoc (TypeSig {}) 		= ptext SLIT("type signature")
-hsSigDoc (SpecSig {})	 	= ptext SLIT("SPECIALISE pragma")
-hsSigDoc (InlineSig {})         = ptext SLIT("INLINE pragma")
-hsSigDoc (SpecInstSig {})	= ptext SLIT("SPECIALISE instance pragma")
-hsSigDoc (FixSig {}) 		= ptext SLIT("fixity declaration")
+hsSigDoc (TypeSig {}) 		= ptext (sLit "type signature")
+hsSigDoc (SpecSig {})	 	= ptext (sLit "SPECIALISE pragma")
+hsSigDoc (InlineSig {})         = ptext (sLit "INLINE pragma")
+hsSigDoc (SpecInstSig {})	= ptext (sLit "SPECIALISE instance pragma")
+hsSigDoc (FixSig {}) 		= ptext (sLit "fixity declaration")
 \end{code}
 
 Signature equality is used when checking for duplicate signatures
@@ -560,19 +558,19 @@ ppr_sig (TypeSig var ty)	  = pprVarSig (unLoc var) ty
 ppr_sig (FixSig fix_sig) 	  = ppr fix_sig
 ppr_sig (SpecSig var ty inl) 	  = pragBrackets (pprSpec var ty inl)
 ppr_sig (InlineSig var inl)       = pragBrackets (ppr inl <+> ppr var)
-ppr_sig (SpecInstSig ty) 	  = pragBrackets (ptext SLIT("SPECIALIZE instance") <+> ppr ty)
+ppr_sig (SpecInstSig ty) 	  = pragBrackets (ptext (sLit "SPECIALIZE instance") <+> ppr ty)
 
 instance Outputable name => Outputable (FixitySig name) where
   ppr (FixitySig name fixity) = sep [ppr fixity, ppr name]
 
 pragBrackets :: SDoc -> SDoc
-pragBrackets doc = ptext SLIT("{-#") <+> doc <+> ptext SLIT("#-}") 
+pragBrackets doc = ptext (sLit "{-#") <+> doc <+> ptext (sLit "#-}") 
 
 pprVarSig :: (Outputable id, Outputable ty) => id -> ty -> SDoc
 pprVarSig var ty = sep [ppr var <+> dcolon, nest 2 (ppr ty)]
 
 pprSpec :: (Outputable id, Outputable ty) => id -> ty -> InlineSpec -> SDoc
-pprSpec var ty inl = sep [ptext SLIT("SPECIALIZE") <+> ppr inl <+> pprVarSig var ty]
+pprSpec var ty inl = sep [ptext (sLit "SPECIALIZE") <+> ppr inl <+> pprVarSig var ty]
 
 pprPrag :: Outputable id => id -> LPrag -> SDoc
 pprPrag var (L _ (InlinePrag inl))        = ppr inl <+> ppr var
