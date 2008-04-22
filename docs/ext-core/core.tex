@@ -1,7 +1,7 @@
 \documentclass[10pt]{article}
 \usepackage{a4wide}
 \usepackage{code}
-
+\usepackage{natbib}
 
 \sloppy
 \setlength{\parskip}{0.5\baselineskip plus 0.2\baselineskip minus 0.1\baselineskip}
@@ -28,10 +28,17 @@
                            {\textbf{\textsl{Working note:}} \textsl{#1}}}
           \end{quote}}
 
+%% Can't have more than one paragraph in one of these boxes? WTF
+\newcommand{\tjc}[1]%
+        {\begin{quote}
+          \framebox{\parbox{.8 \linewidth}
+                           {\textbf{\textsl{tjc:}} \textsl{#1}}}
+          \end{quote}}
+
 \begin{document}
 
-\title{An External Representation for the GHC Core Language (DRAFT for GHC5.02)}
-\author{Andrew Tolmach ({\tt apt@cs.pdx.edu})\\and The GHC Team}
+\title{An External Representation for the GHC Core Language\\ (For GHC 6.10)}
+\author{Andrew Tolmach, Tim Chevalier ({\tt \{apt,tjc\}@cs.pdx.edu})\\and The GHC Team}
 
 \maketitle
 \makeatactive
@@ -39,86 +46,78 @@
 \abstract{
 This document provides a precise definition for the GHC Core language,
 so that it can be used to communicate between GHC and new stand-alone
-compilation tools such as back-ends or optimizers.
-The definition includes a formal grammar and an informal semantics.
-An executable typechecker and interpreter (in Haskell), 
-which formally embody the static and dynamic semantics,
-are available separately.
-
-Note: This is a draft document, which attempts to describe GHC's current
+compilation tools such as back-ends or optimizers.\footnote{This is a draft document, which attempts to describe GHC's current
 behavior as precisely as possible.  Working notes scattered throughout indicate
 areas where further work is needed.  Constructive comments are very welcome, 
 both on  the presentation, and on ways in which GHC could be improved in order
-to simplify the Core story.
+to simplify the Core story.} The definition includes a formal grammar and an informal semantics.
+An executable typechecker and interpreter (in Haskell), 
+which formally embody the static and dynamic semantics,
+are available separately.
 }
 
 \section{Introduction}
 
 The Glasgow Haskell Compiler (GHC) uses an intermediate language, called
-``Core,''  as its internal program representation during
-several key stages of compiling.
+``Core,''  as its internal program representation within the compiler's simplification phase.
 Core resembles a subset of Haskell, but with explicit type annotations
 in the style of the polymorphic lambda calculus (F$_\omega$).
-GHC's front end translates full Haskell 98 (plus some extensions) into
-well-typed Core, which is then repeatedly rewritten by the GHC optimizer.
-Ultimately, GHC translates Core into STG-machine code and then into
-C or native code.  The rationale for the design of Core and its use are discussed
-in existing papers~\cite{ghc-inliner,comp-by-trans-scp}, although the (two different)
-idealized versions of Core described therein differ in significant ways
-from the actual Core language in current GHC.
+
+GHC's front-end translates full Haskell 98 (plus some extensions) into Core. The GHC optimizer then repeatedly transforms Core programs while preserving their meaning. A ``Core Lint'' pass in GHC typechecks Core in between transformation passes (at least when the user enables linting by setting a compiler flag), verifying that transformations preserve type-correctness.\footnote{At least for source programs that do not use unsafe language extensions.} Finally, GHC's back-end translates Core into STG-machine code~\citep{stg-machine} and then into
+C or native code. 
+
+Two existing papers discuss the original rationale for the design and use of Core~\citep{ghc-inliner,comp-by-trans-scp}, although the (two different)
+idealized versions of Core described therein differ in significant ways from the actual Core language in current GHC. In particular, with the advent of GHC support for generalized algebraic datatypes (GADTs)~\citep{gadts} Core was extended beyond its previous F$_\omega$-style incarnation to support type equality constraints and safe coercions, and is now based on a system known as F$_C$~\citep{system-fc}.
+
 
 Researchers interested in writing just {\it part} of a Haskell compiler,
 such as a new back-end or a new optimizer pass, might like to make
 use of GHC to provide the other parts of the compiler.  For example, they
-might like to use GHC's front end to parse, desugar, and type-check source Haskell,
-then feeding the resulting code to their own back-end tool.
-Currently, they can only do this by linking their code into the
+might like to use GHC's front-end to parse, desugar, and type-check source Haskell,
+then feeding the resulting code to their own back-end tool. As another example, they might like to use Core as the target language for a front-end compiler of their own design, feeding externally synthesized Core into GHC in order to take advantage of GHC's optimizer, code generator, and run-time system. Without external Core, there are two ways to do this: link their code into the
 GHC executable, which is an arduous process (and essentially requires
-the new code to be written in Haskell).   It would be much easier for
-external developers if GHC could be made to produce Core files in
-an agreed-upon external format.  To allow the widest range of interoperability,
-the external format should be text-based; pragmatically, it should
-also be human-readable. (It may ultimately be desirable to use a
-standard interchange base format such as ASDL or XML.)
+the new code to be written in Haskell), or use the GHC API~\citep{ghc-api}, which is a cleaner way of doing the same thing (but also requires new code to be written in Haskell). 
 
-In the past, Core has had no rigorously defined external representation, although 
-by setting certain compiler flags, one can get a (rather ad-hoc) textual
-representation to be printed at various points in the compilation process;
-this is usually done to help debug the compiler.  To make Core fully useable
-a bi-directional communication format, it will be necssary to
+Toward the goal of making it easier for external developers to use GHC in a modular way, we present a precisely specified external format for Core files. The external format is text-based and human-readable, to promote interoperability and ease of use.
+
+In the past, Core has had no rigorously defined external representation, though GHC will print out an ad-hoc textual representation of Core if you set certain compiler flags; this representation is intended to be read by people who are debugging the compiler, not by other programs. Making Core into a machine-readable, bi-directional communication format requires:
 
 \begin{enumerate}
-\item define precisely the external format of Core;
+\item precisely specifying the external format of Core;
 
-\item modify GHC to produce external Core files, if so requested, at one or more
-useful points in the compilation sequence -- e.g., just before optimization,
-or just after;
+\item modifying GHC to generate external Core files (post-simplification; as always, users can control the exact transformations GHC does with command-line flags);
 
-\item modify GHC to accept external Core files in place of Haskell 
-source files, again at one or more useful points.
+\item modifying GHC to accept external Core files in place of Haskell 
+source files (users will also be able to control what GHC does to those files with command-line flags).
 
 \end{enumerate}
 
-The first two facilities will let one couple GHC's front-end (parser,
-type-checker, etc.), and optionally its optimizer, with new back-end tools.
-Adding the last facility will let one implement new Core-to-Core 
-transformations in an external tool and integrate them into GHC. It will also
+The first two facilities will let developers couple GHC's front-end (parser,
+type-checker, desugarer), and optionally its optimizer, with new back-end tools.
+The last facility will let developers write new Core-to-Core 
+transformations as an external tool and integrate them into GHC. It will also
 allow new front-ends to generate Core that can be fed into GHC's optimizer or 
-back end; however, because there are many (undocumented)
-idiosynracies in the way GHC produces Core from source Haskell, it will be hard
-for an external tool to produce Core that can be integrated with GHC-produced core 
-(e.g., for the Prelude), and we don't aim to support this.
+back-end.
+
+However, because there are many (undocumented)
+idiosyncracies in the way GHC produces Core from source Haskell, it will be hard
+for an external tool to produce Core that can be integrated with GHC-produced Core 
+(e.g., for the Prelude), and we don't aim to support this. Indeed, for the time being, we aim to support only the first two facilities and not the third: we define and implement Core as an external format that GHC can use to communicate with external back-end tools, and defer the larger task of extending GHC to support reading this external format back in.
 
 This document addresses the first requirement, a formal Core definition,
 by proposing  a formal grammar for an external representation of Core
-(Section~\ref{sec:external}, and 
-an informal semantics (Section~\ref{sec:informal}.
+(Section~\ref{sec:external}), and 
+an informal semantics (Section~\ref{sec:informal}).
 
-Beginning in GHC5.02, external Core (post-optimization) adhering to this definition
-can be generated using the compiler flag @-fext-core@.
+Support for generating external Core (post-optimization) was introduced in
+GHC 5.02.  The definition of external Core in this document reflects the version of
+external Core generated by the HEAD (unstable) branch of GHC as of April 21, 2008 (version 6.9), using the compiler flag
+@-fext-core@. We expect that GHC 6.10 will be consistent with this definition.
 
+GHC supports many type system extensions; the External Core printer built into GHC only supports some of them. However, External Core should be capable of representing any Haskell 98 program, and may be able to represent programs that require certain type system extensions as well.
+ 
 Formal static and dynamic semantics in the form of an executable typechecker and interpreter
-are available separately in the GHC source tree under @fptools/ghc/utils/ext-core@.
+are available separately in the GHC source tree\footnote{\url{http://darcs.haskell.org/ghc}} under @utils/ext-core@.
 
 \section{External Grammar of Core}
 \label{sec:external}
@@ -126,30 +125,28 @@ are available separately in the GHC source tree under @fptools/ghc/utils/ext-cor
 In designing the external grammar, we have tried to strike a balance among
 a number of competing goals, including easy parseability by machines,
 easy readability by humans, and adequate structural simplicity to 
-allow straightforward presentations of the semantics. This has inevitably
-led to certain compromise. In particular:
+allow straightforward presentations of the semantics. Thus, we had to make some compromises. Specifically:
 
 \begin{itemize}
-\item In order to avoid explosion of parentheses, various standard precedences
-and short-cuts are supported for expressions, types, and kinds; this led to the introduction
-of multiple non-terminals for each of these syntactic categories, which
-makes the concrete grammar longer and more complex than the underlying abstract syntax.
+\item In order to avoid explosion of parentheses, we support standard precedences
+and short-cuts for expressions, types, and kinds. Thus we had to introduce
+multiple non-terminals for each of these syntactic categories, and as a result,
+the concrete grammar is longer and more complex than the underlying abstract syntax.
 
-\item On the other hand, the grammar has been kept simpler by avoiding special syntax for 
-tuple types and terms; tuples (both boxed and unboxed) are treated 
+\item On the other hand, we have kept the grammar simpler by avoiding special syntax for 
+tuple types and terms. Tuples (both boxed and unboxed) are treated 
 as ordinary constructors. 
 
 \item All type abstractions and applications are given in full, even though
-some of them (e.g., for tuples) could be reconstructed; this permits Core to
-be parsed without the necessity of performing any type reconstruction.
-
-\item The syntax of identifiers is heavily restricted (essentially to just
-alphanumerics); this again makes Core easier to parse but harder to read.
-\end{itemize}
-
-\workingnote{These choices are certainly debatable.  In particular, keeping 
-type applications on tuples and case arms considerably increases the size of core files and
+some of them (e.g., for tuples) could be reconstructed; this means a parser for Core does not have to
+reconstruct types.\footnote{These choices are certainly debatable.  In particular, keeping 
+type applications on tuples and case arms considerably increases the size of Core files and
 makes them less human-readable, though it allows a Core parser to be simpler.}
+
+\item The syntax of identifiers is heavily restricted (to just
+alphanumerics and underscores); this again makes Core easier to parse but harder to read.
+
+\end{itemize}
 
 We use the following notational conventions for syntax:
 
@@ -161,15 +158,17 @@ We use the following notational conventions for syntax:
 @fibonacci@ & terminal syntax in typewriter font \\
 \end{tabular}
 
+\newpage
+
 {\it
 \begin{tabular}{lrclr}
 {\rm Module} &	 module &	 \derives &	 
-	\multicolumn{2}{l}{@\%module@ mident \many{tdef @;@} \many{\optional{@\%local@} vdefg @;@}} \\
+	\multicolumn{2}{l}{@\%module@ mident \many{tdef @;@} \many{vdefg @;@}} \\
 \\
-{\rm Type defn.} &	 tdef &	 \derives &	@%data@ qtycon \many{tbind} @=@ @{@ cdef \many{@;@ cdef} @}@ & {\rm algebraic type}\\
-   		 &	 &	 \orderives &	 @%newtype@ qtycon \many{tbind} \optional{@=@ ty} &	 {\rm newtype} \\
+{\rm Type defn.} &	 tdef &	 \derives &	@%data@ qtycon \many{tbind} @=@ @{@ \optional{cdef \many{@;@ cdef}} @}@ & {\rm algebraic type}\\
+   		 &	 &	 \orderives &	 @%newtype@ qtycon qtycon \many{tbind} \optional{@=@ ty} &	 {\rm newtype} \\
 \\
-{\rm Constr. defn.} &	cdef &	 \derives &	 qdcon \many{@\at@ tbind} \many{aty} \\
+{\rm Constr. defn.} &	cdef &	 \derives &	 qdcon \many{@\at@ tbind} \oneormore{aty} \\
 \\
 {\rm Value defn.}  &	vdefg &	 \derives &	 @%rec@ @{@ vdef \many{@;@ vdef} @}@ &			 {\rm recursive} \\
       		   &	&	 \orderives &	 vdef &	 						 {\rm non-recursive} \\
@@ -184,15 +183,18 @@ We use the following notational conventions for syntax:
 	         &	&	\orderives  &    aexp \oneormore{arg} & 				{\rm application}\\
 		 &	&	 \orderives &	 @\@ \oneormore{binder} @->@ exp &		 	{\rm abstraction}\\
 		 &	&	 \orderives &	 @%let@ vdefg @%in@ exp &	 			{\rm local definition}\\
-		 &	&	 \orderives &	 @%case@ exp @%of@ vbind @{@ alt \many{@;@ alt} @}@ &	{\rm case expression}\\
-		 &	&	 \orderives &	 @%coerce@ aty exp &					{\rm type coercion}\\
+		 &	&	 \orderives &	 @%case@ @(@aty@)@ exp @%of@ vbind @{@ alt \many{@;@ alt} @}@ &	{\rm case expression}\\
+		 &	&	 \orderives &	 @%cast@ exp aty &					{\rm type coercion}\\
 		 &	&	 \orderives &	 @%note@  @"@ \many{char} @"@ exp &			{\rm expression note}\\
-		 &	&	 \orderives &	 @%external@ @"@ \many{char} @"@ aty &			{\rm external reference}\\
+		 &	&	 \orderives &	 @%external ccall@ @"@ \many{char} @"@ aty &			{\rm external reference}\\
+	         &	&	 \orderives &	 @%dynexternal ccall@ aty &			{\rm external reference (dynamic)}\\
+                 &      &        \orderives &    @%label@ @"@ \many{char} @"@       &               {\rm external label}
+\\
 \\
 {\rm Argument}   &	arg & 	\derives &	 \at\ aty &						{\rm type argument}\\
 		 &	&	 \orderives &	 aexp &							{\rm value argument} \\
 \\
-{\rm Case alt.} &	alt &	 \derives &	qdcon  \many {@\at@ tbind} \many{vbind} @->@ exp &{\rm constructor alternative}\\
+{\rm Case alt.} &	alt &	 \derives &	qdcon \many {@\at@ tbind} \many{vbind} @->@ exp &{\rm constructor alternative}\\
 		&	&	 \orderives &	 lit @->@ exp &	 			{\rm literal alternative} \\
 		&	&	 \orderives &	 @%_@ @->@ exp & 				{\rm default alternative} \\
 \\
@@ -205,8 +207,8 @@ We use the following notational conventions for syntax:
 {\rm Value binder} & 	vbind & \derives &   @(@ var @::@ ty @)@ \\
 \\
 {\rm Literal} &	 lit &	 \derives &	 @(@ [@-@] \oneormore{digit} @::@ ty @)@ & {\rm integer} \\
-	    &	&	 \orderives &	 @(@ [@-@] \oneormore{digit} @.@ \oneormore{digit} @::@ ty @)@ & {\rm rational} \\
-	    &	&	 \orderives &	 @(@ @'@ char @'@ @::@ ty @)@ & {\rm character} \\
+	    &	&	 \orderives &	 @(@ [@-@] \oneormore{digit} @%@ \oneormore{digit} @::@ ty @)@ & {\rm rational} \\
+	    &	&	 \orderives &	 @(@ $'$ char $'$ @::@ ty @)@ & {\rm character} \\
 	    &	&	 \orderives &	 @(@ @"@ \many{char} @"@ @::@ ty @)@ & {\rm string} \\
 \\
 {\rm Character}  & char & \derives & \multicolumn{2}{l}{any ASCII character in range 0x20-0x7E except 0x22,0x27,0x5c}\\
@@ -221,30 +223,39 @@ We use the following notational conventions for syntax:
 \\
 {\rm Basic type} & bty  & \derives & 	aty  & 						{\rm atomic type}\\
 	          &      & \orderives & bty aty &	 				{\rm type application}\\
+        &     &        \orderives &   @ghczmprim:GHCziPrim.trans@ aty aty &           {\rm transitive coercion} \\
+        &     &        \orderives &   @ghczmprim:GHCziPrim.sym@ aty &                   {\rm symmetric coercion} \\
+        &     &        \orderives &   @ghczmprim:GHCziPrim.CoUnsafe@ aty aty &          {\rm unsafe coercion} \\
+        &     &        \orderives &   @ghczmprim:GHCziPrim.left@ aty &                  {\rm left coercion} \\
+        &     &        \orderives &   @ghczmprim:GHCziPrim.right@ aty &                 {\rm right coercion} \\
+        &     &        \orderives &   @ghczmprim:GHCziPrim.inst@ aty aty &             {\rm instantiation coercion} \\
 \\
 {\rm Type} &	 ty &	 \derives   & 	bty & 						{\rm basic type}\\
 	  &	&	 \orderives &	@%forall@ \oneormore{tbind} @.@ ty  &		{\rm type abstraction}\\
 	  &	&	 \orderives &	bty @->@ ty  &	 				{\rm arrow type construction} \\
-\\
+  \\
+
 {\rm Atomic kind} & akind & \derives &   @*@ &				{\rm lifted kind}\\
 		& 	& \orderives &	 @#@ &				{\rm unlifted kind}\\
 		& 	& \orderives &   @?@ &				{\rm open kind}\\
+                &    &        \orderives &    bty @:=:@ bty      &      {\rm equality kind} \\
 		& 	& \orderives &   @(@ kind @)@&			{\rm nested kind}\\
 \\
 {\rm Kind} &	kind &	 \derives &	 akind & 			{\rm atomic kind}\\
  	   &	&	 \orderives &	 akind @->@ kind 	 &	{\rm arrow kind} \\
 \\
-{\rm Identifier}	&	mident & \derives &uname &	{\rm module} \\
+{\rm Identifier}	&	mident & \derives & pname @:@ uname &	{\rm module} \\
 	&	tycon &	 \derives &	 uname &	 	{\rm type constr.}  \\
-	&	qtycon & \derives &	 mident @.@  tycon &	{\rm qualified type constr.} \\
+ 	&	qtycon & \derives &	 mident @.@  tycon &	{\rm qualified type constr.} \\
 	&	tyvar &	 \derives &	 lname &		{\rm type variable} \\
 	&	dcon &	 \derives &	 uname &	 	{\rm data constr.} \\
 	&	qdcon &	 \derives &	 mident @.@  dcon & 	{\rm qualified data constr.} \\
-	&	var &	 \derives &	 lname &		{\rm variable} \\
+        &	var &	 \derives &	 lname &		{\rm variable} \\
 	&	qvar &	 \derives &	 [ mident @.@ ] var &	{\rm optionally qualified variable} \\
 \\
 {\rm Name} 	&	lname  &  \derives & 	 lower \many{namechar} \\
  	&       uname &  \derives & 	 upper \many{namechar} & \\
+	&       pname &  \derives & 	 \oneormore{namechar} & \\
 	&	namechar & \derives &	 lower \orderives\  upper \orderives\  digit \orderives\  @'@ \\
 	&	lower &  \derives &      @a@ \orderives\  @b@ \orderives\  \ldots \orderives\  @z@ \orderives\  @_@ \\
 	&	upper &  \derives &      @A@ \orderives\  @B@ \orderives\  \ldots \orderives\  @Z@ \\
@@ -252,68 +263,65 @@ We use the following notational conventions for syntax:
 \\
 \end{tabular}
 }
-
-\workingnote{Should add some provision for comments.}
-
 \section{Informal Semantics}
 \label{sec:informal}
 
-Core resembles a explicitly-typed polymorphic lambda calculus (F$_\omega$), with the addition
+At the term level, Core resembles a explicitly-typed polymorphic lambda calculus (F$_\omega$), with the addition
 of local @let@ bindings, algebraic type definitions, constructors, and @case@ expressions,
-and primitive types, literals and operators.
-It is hoped that this makes it easy to obtain an informal understanding of Core programs
-without elaborate description.   This section therefore concentrates on the less obvious points.
+and primitive types, literals and operators. Its type system is richer than that of System F, supporting explicit type equality coercions and type functions.~\citep{system-fc}
+
+We hope no further elaboration is necessary to informally understand Core programs. Therefore, in this section we concentrate on the less obvious points.
 
 \subsection{Program Organization and Modules}
+\label{sec:modules}
 
 Core programs are organized into {\em modules}, corresponding directly to source-level Haskell modules.
-Each module has a identifying name {\it mident}.
+Each module has a identifying name {\it mident}. A module identifier consists of a {\it package name} followed by a module name, which may be hierarchical: for example, @base:GHC.Base@ is the module identifier for GHC's Base module. Its name is @Base@, and it lives in the @GHC@ hierarchy within the @base@ package. Section 5.8 of the GHC users' guide explains package names~\citep{ghc-user-guide}. In particular, note that a Core program may contain multiple modules with the same (possibly hierarchical) module name that differ in their package names. In some of the code examples that follow, we will omit package names and possibly full hierarchical module names from identifiers for brevity, but be aware that they are always required.
+
+A possible improvement to the Core syntax would be to add explicit import lists to Core modules, which could be used to specify abbrevations for long qualified names. This would make the code more human-readable.
 
 Each module may contain the following kinds of top-level declarations:
 \begin{itemize}
 \item Algebraic data type declarations, each defining a type constructor and one or more data constructors;
-\item Newtype declarations,  corresponding to Haskell @newtype@ declarations, each defining a type constructor; and
+\item Newtype declarations,  corresponding to Haskell @newtype@ declarations, each defining a type constructor and a coercion name; and
 \item Value declarations, defining the types and values of top-level variables.
 \end{itemize}
+
 No type constructor, data constructor, or top-level value may be declared more than once within a given module.
 All the type declarations are (potentially) mutually recursive. Value declarations must be
 in dependency order, with explicit grouping of mutually recursive declarations.
 
+
 Identifiers defined in top-level declarations may be {\it external} or {\it internal}.
 External identifiers can be referenced from any other module in
-the program, using conventional dot notation (e.g., @PrelBase.Bool@, @PrelBase.True@).  
+the program, using conventional dot notation (e.g., @base:GHC.Base.Bool@, @base:GHC.Base.True@).  
 Internal identifiers are visible only within the defining module.
 All type and data constructors are external, and are always defined and referenced using
-fully qualified names (with dots).  A top-level value is external if it is defined and referenced 
-using a fully qualified name with a dot (e.g., @MyModule.foo = ...@); otherwise, it is internal
+fully qualified names (with dots).  
+
+A top-level value is external if it is defined and referenced 
+using a fully qualified name with a dot (e.g., @main:MyModule.foo = ...@); otherwise, it is internal
 (e.g., @bar = ...@).  
-Note that the notion of external identifier does not necessarily coincide with that of ``exported''
-identifier in a Haskell source module: all constructors are external, even if not exported, and
-non-exported values may be external if they are referenced from potentially in-lineable exported values.
+Note that Core's notion of an external identifier does not necessarily coincide with that of ``exported''
+identifier in a Haskell source module. An identifier can be an external identifier in Core, but not be exported by the original Haskell source module.\footnote{Two examples of such identifiers are: data constructors, and values that potentially appear in an unfolding. For an example of the latter, consider @Main.foo = ... Main.bar ...@, where @Main.foo@ is inlineable. Since @bar@ appears in @foo@'s unfolding, it is defined and referenced with an external name, even if @bar@ was not exported by the original source module.} However, if an identifier was exported by the Haskell source module, it will appear as an external name in Core.
+
 Core modules have no explicit import or export lists. 
-Modules may be mutually recursive.
+Modules may be mutually recursive. Note that because of the latter fact, GHC currently prints out the top-level bindings for every module as a single recursive group, in order to avoid keeping track of dependencies between top-level values within a module. An external Core tool could reconstruct dependencies later, of course.
 
-\workingnote{But in the presence of inter-module recursion, is there much point in
-keeping track of recursive groups within modules? Options: (1) don't worry about it;
-(2) put all declarations in module (indeed whole program) into one huge recursive pot;
-(3) abandon general module recursion, and introduce some kind of import declaration to define the 
-types (only) of things from external modules that currently introduce module recursion.}
-
-There is also an implicitly-defined module @PrelGHC@, which exports the ``built-in'' types and values
+There is also an implicitly-defined module @ghc-prim:GHC.Prim@, which exports the ``built-in'' types and values
 that must be provided by any implementation of Core (including GHC).   Details of this
 module are in Section~\ref{sec:prims}.
 
 A Core {\em program} is a collection of distinctly-named modules that includes a module
-called @Main@ having an exported value called @main@ of type @PrelIOBase.IO a@ (for some type @a@).
+called @main:Main@ having an exported value called @main:ZCMain.main@ of type @base:GHC.IOBase.IO a@ (for some type @a@). (Note that the strangely named wrapper for @main@ is the one exception to the rule that qualified names defined within a module @m@ must have module name @m@.)
 
-Many modules of interest derive from library modules, such as @PrelBase@, which implement parts of
-the Haskell basis library.  In principle, these modules have no special status.  In practice, the
-requirement on the type of @Main.main@ implies that every program will contain a large subset of
-the Prelude library modules.
+Many Core programs will contain library modules, such as @base:GHC.Base@, which implement parts of the Haskell standard library.  In principle, these modules are ordinary Haskell modules, with no special status.  In practice, the requirement on the type of @main:Main.main@ implies that every program will contain a large subset of
+the standard library modules.
 
 \subsection{Namespaces}
+\label{sec:namespaces}
 
-There are five distinct name spaces: 
+There are five distinct namespaces: 
 \begin{enumerate}
 \item module identifiers (@mident@),
 \item type constructors (@tycon@),
@@ -321,16 +329,18 @@ There are five distinct name spaces:
 \item data constructors (@dcon@),
 \item term variables (@var@).
 \end{enumerate}  
+
 Spaces (1), (2+3), and (4+5) can be distinguished from each other by context.
-To distinguish (2) from (3) and (4) from (5), we require that 
-(both sorts of) constructors begin with an upper-case character
-and that (both sorts of) variables begin with a lower-case character (or @_@).
+To distinguish (2) from (3) and (4) from (5), we require that data and type constructors begin with an upper-case character, and that term and type variables begin with a lower-case character.
+
 Primitive types and operators are not syntactically distinguished.
 
-A given variable (type or term) may have multiple (local) definitions within a module.
-However, definitions never ``shadow'' one another; that is, the scope of the definition
-of a given variable never contains a redefinition of the same variable.  The only exception
-to this is that (necessarily closed) types labelling @%external@ expressions may contain 
+Primitive {\it coercion} operators, of which there are six, {\it are} syntactically distinguished in the grammar. This is because these coercions must be fully applied, and because distinguishing their applications in the syntax makes typechecking easier.
+
+A given variable (type or term) may have multiple definitions within a module.
+However, definitions of term variables never ``shadow'' one another: the scope of the definition
+of a given variable never contains a redefinition of the same variable. Type variables may be shadowed. Thus, if a term variable has multiple definitions within a module, all those definitions must be local (let-bound). The only exception
+to this rule is that (necessarily closed) types labelling @%external@ expressions may contain 
 @tyvar@ bindings that shadow outer bindings.
 
 Core generated by GHC makes heavy use of encoded names, in which the characters @Z@ and @z@ are
@@ -339,58 +349,72 @@ hash @#@ (@zh@), plus @+@ (@zp@), etc.  This is the same encoding used in @.hi@ 
 back-end of GHC itself, except that we sometimes change an initial @z@ to @Z@, or vice-versa, 
 in order to maintain case distinctions.
 
+Finally, note that hierarchical module names are z-encoded in Core: for example, @base:GHC.Base.foo@ is rendered as @base:GHCziBase.foo@. A parser may reconstruct the module hierarchy, or regard @GHCziBase@ as a flat name.
 \subsection{Types and Kinds}
+\label{sec:typesandkinds}
 
 In Core, all type abstractions and applications are explicit.  This make it easy to 
-typecheck any (closed) fragment.  An full executable typechecker is available separately.
+typecheck any (closed) fragment of Core code.  An full executable typechecker is available separately.
 
+\subsubsection{Types}
 Types are described by type expressions, which 
 are built from named type constructors and type variables
 using type application and universal quantification.  
 Each type constructor has a fixed arity $\geq 0$.  
 Because it is so widely used, there is
 special infix syntax for the fully-applied function type constructor (@->@).
-(The prefix identifier for this constructor is @PrelGHC.ZLzmzgZR@; this should
+(The prefix identifier for this constructor is @ghc-prim:GHC.Prim.ZLzmzgZR@; this should
 only appear in unapplied or partially applied form.)
+
 There are also a number of other primitive type constructors (e.g., @Intzh@) that
-are predefined in the @PrelGHC@ module, but have no special syntax.
-Additional type constructors are
-introduced by @%data@ and @%newtype@ declarations, as described below.
+are predefined in the @GHC.Prim@ module, but have no special syntax.
+@%data@ and @%newtype@ declarations introduce additional type constructors, as described below.
 Type constructors are distinguished solely by name.
 
-As described in the Haskell definition, it is necessary to distinguish 
-well-formed type-expressions by classifying them into different {\it kinds}.
-In particular, Core explicitly records the kind of every bound type variable.
-Base kinds (@*@,@#@, and @?@) represent actual types, i.e., those that can be assigned
-to term variables; all the nullary type constructors have one of these kinds.
-Non-nullary type constructors have higher kinds of the form $k_1 @->@ k_2$,
-where $k_1$ and $k_2$ are kinds.   For example, the function type constructor
-@->@ has kind @* -> (* -> *)@.  Since Haskell allows abstracting over type
-constructors, it is possible for type variables to have higher kinds; however,
-it is much more common for them to have kind @*@, so this is the default if
-the kind is omitted in a type binder.
+\subsubsection{Coercions}
 
-The three base kinds distinguish the {\it liftedness} of the types they classify:
-@*@ represents lifted types; @#@ represents unlifted types; and @?@ represents
-``open'' types, which may be either lifted or unlifted.  Of these, only @*@ ever
-appears in Core code generated from user code; the other two are needed to describe
-certain types in primitive (or otherwise specially-generated) code.
-Semantically, a type is lifted if and only if it has bottom as an element. 
-Operationally, lifted types may be represented by closures; hence, any unboxed
-value is necessarily unlifted.  
-In particular, no top-level identifier (except in @PrelGHC@) has a type of kind @#@ or @?@.
+A type may also be built using one of the primitive coercion operators, as described in Section~\ref{sec:namespaces}. For details on the meanings of these operators, see the System FC paper~\citep{system-fc}.
+
+\subsubsection{Kinds}
+As described in the Haskell definition, it is necessary to distinguish 
+well-formed type-expressions by classifying them into different {\it kinds}~\citep[41]{haskell98}.
+In particular, Core explicitly records the kind of every bound type variable. 
+
+In addition, Core's kind system includes equality kinds, as in System FC~\citep{system-fc}. An application of a built-in coercion, or of a user-defined coercion as introduced by a newtype declaration, has an equality kind.
+\subsubsection{Lifted and Unlifted Types}
+Semantically, a type is {\it lifted} if and only if it has bottom as an element. We need to distinguish them because operationally, terms with lifted types may be represented by closures; terms with unlifted types must not be represented by closures, which implies that any unboxed value is necessarily unlifted. We distinguish between lifted and unlifted types by ascribing them different kinds.
+
 Currently, all the primitive types are unlifted 
 (including a few boxed primitive types such as @ByteArrayzh@).
-The ideas behind the use of unboxed and unlifted types are described in ~\cite{pj:unboxed}.
+Peyton Jones and Launchbury~[\citeyear{pj:unboxed}] described the ideas behind unboxed and unlifted types.
 
+\subsubsection{Type Constructors; Base Kinds and Higher Kinds}
+Every type constructor has a kind, depending on its arity and whether it or its arguments are lifted.
+
+Term variables can only be assigned types that have base kinds: the base kinds are @*@,@#@, and @?@. The three base kinds distinguish the liftedness of the types they classify:
+@*@ represents lifted types; @#@ represents unlifted types; and @?@ is the ``open'' kind, representing a type that may be either lifted or unlifted. Of these, only @*@ ever
+appears in Core type declarations generated from user code; the other two are needed to describe
+certain types in primitive (or otherwise specially-generated) code (which, after optimization, could potentially appear anywhere).
+
+In particular, no top-level identifier (except in @ghc-prim:GHC.Prim@) has a type of kind @#@ or @?@.
+
+Nullary type constructors have base kinds: for example, the type @Int@ has kind @*@, and @Int#@ has kind @#@.
+
+Non-nullary type constructors have higher kinds: kinds that have the form $k_1 @->@ k_2$,
+where $k_1$ and $k_2$ are kinds.   For example, the function type constructor
+@->@ has kind @* -> (* -> *)@.  Since Haskell allows abstracting over type
+constructors, type variables may have higher kinds; however, much more commonly they have kind @*@, so that is the default if a type binder omits a kind.
+
+\subsubsection{Type Synonyms and Type Equivalence}
 There is no mechanism for defining type synonyms (corresponding to
 Haskell @type@ declarations).
+
 Type equivalence is just syntactic equivalence on type expressions
 (of base kinds) modulo:
 
 \begin{itemize} 
 \item alpha-renaming of variables bound in @%forall@ types;
-\item the identity $a$ @->@ $b$ $\equiv$ @PrelGHC.ZLzmzgZR@ $a$ $b$
+\item the identity $a$ @->@ $b$ $\equiv$ @ghc-prim:GHC.Prim.ZLzmzgZR@ $a$ $b$
 \item the substitution of representation types for {\it fully applied} instances of newtypes
 (see Section~\ref{sec:newtypes}).
 \end{itemize}
@@ -423,15 +447,14 @@ For a less conventional example illustrating the possibility of higher-order kin
 \begin{code}
 data A f a = MkA (f a)
 \end{code}
-might induce the core declaration
+might induce the Core declaration
 \begin{code}
-%data A (f::*->*) (a::*) = { MkA (f a) }
+%data A (f::*->*) a = { MkA (f a) }
 \end{code}
 which introduces the constructor
 \begin{code}
-MkA :: %forall (f::*->*) (a::*) . (f a) -> (A f) a
+MkA :: %forall (f::*->*) a . (f a) -> (A f) a
 \end{code}
-
 
 GHC (like some other Haskell implementations) supports an extension to Haskell98 
 for existential types such as 
@@ -454,12 +477,12 @@ Section~\ref{sec:exprs}.
 \subsection{Newtypes}
 \label{sec:newtypes}
 
-
 Each Core @%newtype@ declaration introduces a new type constructor and (usually) an associated
 representation type, corresponding to a source Haskell @newtype@
-declaration.  However, unlike in source Haskell, no data constructors are introduced.
-In fact, newtypes seldom appear in value types
-in Core programs, because GHC usually replaces them with their representation type.
+declaration. However, unlike in source Haskell, a @%newtype@ declaration does not introduce any data constructors.
+
+Each @%newtype@ declaration also introduces a new coercion (syntactically, just another type constructor) that implies an axiom equating the type constructor, applied to any type variables bound by the @%newtype@, to the representation type.
+
 For example, the Haskell fragment
 \begin{code}
 newtype U = MkU Bool
@@ -469,52 +492,17 @@ v = case u of
 \end{code}
 might induce the Core fragment
 \begin{code}
-%newtype U = Bool;
-u :: Bool = True;
-v :: Bool = 
-   %let b :: Bool = u
-   %in not b;
+%newtype U ZCCoU = Bool;
+u :: U = %cast (True)
+           ((sym ZCCoU));
+v :: Bool = not (%cast (u) ZCCoU);
 \end{code}
-The main purpose of including @%newtype@ declarations in Core is to permit checking of
-type expressions in which partially-applied newtype constructors are used to instantiate higher-kinded
-type variables.  For example:
-\begin{code}
-newtype W a = MkW (Bool -> a)
-data S k = MkS (k Bool)
-a :: S W = MkS (MkW(\x -> not x))
-\end{code}
-might generate this Core:
-\begin{code}
-%newtype W a = Bool -> a;
-%data S (k::(*->*)) = MkS (k Bool);
-a :: S W = MkS @ W (\(x::Bool) -> not x)
-\end{code}
-The type application @(S W)@ cannot be checked without a definition for @W@.
+
+The newtype declaration implies that the types {\tt U} and {\tt Bool} have equivalent representations, and the coercion axiom {\tt ZCCoU} provides evidence. Notice that in the body of {\tt u}, the boolean value {\tt True} is cast to type {\tt U} using the primitive symmetry rule applied to {\tt ZCCoU}: that is, using a coercion of kind {\tt Bool :=: U}. And in the body of {\tt v}, {\tt u} is cast back to type {\tt Bool} using the axiom {\tt ZCCoU}.
 
 Very rarely, source @newtype@ declarations may be (directly or indirectly) recursive. In such
-cases, it is not possible to subsitute the representation type for the new type;
-in fact, the representation type is omitted from the corresponding Core @%newtype@ declaration.
-Elements of the new
-type can only be created or examined by first explicitly coercing them from/to
-the representation type, using a @%coerce@ expression.  For example, the silly
-Haskell fragment
-\begin{code}
-newtype U = MkU (U -> Bool)
-u = MkU (\x -> True)
-v = case u of
-  MkU f -> f u
-\end{code}
-might induce the Core fragment
-\begin{code}
-%newtype U; 
-u :: U = %coerce U (\ (x::U) -> True);
-v :: Bool = 
-   %let f :: U -> Bool = %coerce (U -> Bool) u 
-   %in f u;
-\end{code}
-
-\workingnote{The treatment of newtypes is still very unattractive: acres of explanation for
-very rare phenomena.}
+cases, it is not possible to substitute the representation type for the new type;
+in fact, the representation type is omitted from the corresponding Core @%newtype@ declaration. Otherwise, recursive newtypes are handled in the same way as non-recursive newtypes.
 
 \subsection{Expression Forms}
 \label{sec:exprs}
@@ -524,11 +512,12 @@ Variables and data constructors are straightforward.
 Literal ({\it lit}) expressions consist of a literal value, in one of four different formats,
 and a (primitive) type annotation.   Only certain combinations of format and type
 are permitted; see Section~\ref{sec:prims}.  The character and string formats can describe only
-8-bit ASCII characters.  Moreover, because strings are interpreted as C-style null-terminated
-strings, they should not contain embedded nulls.
+8-bit ASCII characters.  
 
-Both value applications and type applications are made explicit, and similarly
-for value and type abstractions.  To tell them apart, type arguments in applications
+Moreover, because the operational semantics for Core interprets strings as C-style null-terminated
+strings, strings should not contain embedded nulls.
+
+In Core, value applications, type applications, value abstractions, and type abstractions are all explicit. To tell them apart, type arguments in applications
 and formal type arguments in abstractions are preceded by an \at\ symbol. (In abstractions,
 the \at\ plays essentially the same role as the more usual $\Lambda$ symbol.)
 For example, the Haskell source declaration
@@ -560,7 +549,7 @@ becomes
 \end{code}
 
 Local bindings, of a single variable or of a set of mutually recursive variables,
-are represented by @%let@ expressions in the usual way. 
+are represented by @%let@ expressions in the usual way. In Core, @%let@ is also significant it maps directly on to the STG language's @let@ construct: in STG, evaluating a @%let@ allocates closures for the variable(s) being bound~\citep[29]{stg-machine}.
 
 By far the most complicated expression form is @%case@.
 @%case@ expressions are permitted over values of any type, although they will normally
@@ -569,7 +558,7 @@ Evaluating a @%case@ forces the evaluation of the expression being
 tested (the ``scrutinee''). The value of the scrutinee is bound to the variable
 following the @%of@ keyword, which is in scope in all alternatives; 
 this is useful when the scrutinee is a non-atomic
-expression (see next example).
+expression (see next example). The scrutinee is preceded by the type of the entire @%case@ expression: that is, the result type that all of the @%case@ alternatives have (this is intended to make type reconstruction in the presence of type equality coercions easier).
 
 In an algebraic @%case@, all the case alternatives must be
 labeled with distinct data constructors from the algebraic type, followed by
@@ -585,7 +574,7 @@ case g x of
 \end{code}
 might induce the Core expression
 \begin{code}
-%case g x %of (t::Bintree a)
+%case ((Bintree a)) g x %of (t::Bintree a)
    Fork (l::Bintree a) (r::Bintree a) ->
       Fork @a r l
    Leaf (v::a) ->
@@ -613,194 +602,138 @@ In a @%case@ over literal alternatives,
 all the case alternatives must be distinct literals of the same primitive type.
 
 The list of alternatives may begin with a 
-default alternative labeled with an underscore (@%_@), which will be chosen if
-none of the other alternative match.  The default is optional except for a case
+default alternative labeled with an underscore (@%_@), whose right-hand side will be evaluated if
+none of the other alternatives match.  The default is optional except for in a case
 over a primitive type, or when there are no other alternatives.
 If the case is over neither an
-algebraic type nor a primitive type, the default alternative is the {\it only}
-one that can appear.
+algebraic type nor a primitive type, then the list of alternative must contain a default alternative and nothing else.
 For algebraic cases, the set of alternatives
 need not be exhaustive, even if no default is given; if alternatives are missing,
 this implies that GHC has deduced that they cannot occur. 
 
-The @%coerce@ expression is primarily used in conjunction with manipulation of
-newtypes, as described in Section~\ref{sec:newtypes}. 
-However, @%coerce@ is sometimes used for
-other purposes, e.g. to coerce the return type of a function (such as @error@)
-that is guaranteed never to return.  By their natures, uses of @%coerce@ cannot
-be independently justified, and must be taken on faith by a type-checker for Core.
+The @%cast@ expression takes an expression and a coercion:
+syntactically, the coercion is an arbitrary type, but it must have an
+equality kind. In an expression @(cast e co)@, if @e :: T@ and @co@
+has kind @T :=: U@, then the overall expression has type
+@U@~\citep{ghc-fc-commentary}. If @co@ has a non-coercion kind or a
+coercion whose left-hand side is not @T@, that is a type error. 
 
-A @%note@ expression is used to carry arbitrary internal information of interest to
-GHC.  The information must be encoded as a string.  Expression notes currently generated by GHC
+Note
+that unlike the @%coerce@ expression that existed in previous versions
+of Core, this means that @%cast@ is (almost) type-safe: the coercion
+argument provides evidence that can be verified by a
+typechecker. There are still unsafe @%cast@s, corresponding to the
+unsafe @%coerce@ construct that existed in old versions of Core,
+because there is a primitive @ghc-prim:GHC.Prim.CoUnsafe@ coercion type that
+can be used to cast arbitrary types to each other. GHC uses this for
+such purposes as coercing the return type of a function (such as
+error) which is guaranteed to never return:
+\begin{code}
+case (error "") of
+  True -> 1
+  False ->  2
+\end{code}
+becomes:
+\begin{code}
+    %cast (error @ Bool (ZMZN @ Char))
+    (GHC.Prim.CoUnsafe Bool Integer);
+\end{code}
+@%cast@ has no operational meaning and is only used in typechecking.
+
+@%cast@ is also used to manipulate newtypes, as described in Section~\ref{sec:newtypes}. 
+ 
+A @%note@ expression carries arbitrary internal information that GHC finds interesting. The information is encoded as a string.  Expression notes currently generated by GHC
 include the inlining pragma (@InlineMe@) and cost-center labels for profiling.
 
 A @%external@ expression denotes an external identifier, which has
-the indicated type (always expressed in terms of Haskell primitive types).
-\workingnote{The present syntax is sufficient for describing C functions and labels.
+the indicated type (always expressed in terms of Haskell primitive types).\footnote{External Core supports two kinds of external calls: \%external and \%dynexternal. Only the former is supported by the current set of stand-alone Core tools. In addition, there is a \%label construct which GHC may generate but which the Core tools do not support.}
+
+The present syntax for externals is sufficient for describing C functions and labels.
 Interfacing to other languages may require additional information or a different interpretation
-of the name string.}
+of the name string.
 
 
 \subsection{Expression Evaluation}  
+\label{sec:evaluation}
 
-The dynamic semantics of Core are defined on the type-erasure of the program;
-ie. we ignore all type abstractions and applications.  The denotational semantics
+The dynamic semantics of Core are defined on the type-erasure of the program: for example, we ignore all type abstractions and applications.  The denotational semantics of
 the resulting type-free program are just the conventional ones for a call-by-name
 language, in which expressions are only evaluated on demand.
 But Core is intended to be a call-by-{\it{need}} language, in which
 expressions are only evaluated {\it once}.  To express the sharing behavior
-of call-by-need, we give an operational model in the style of Launchbury.
+of call-by-need, we give an operational model in the style of Launchbury~\citep{launchbury93natural}.
+
 This section describes the model informally; a more formal semantics is
-separately available in the form of an executable interpreter.
+separately available as an executable interpreter.
 
 To simplify the semantics, we consider only ``well-behaved'' Core programs in which
 constructor and primitive applications are fully saturated, and in which
 non-trivial expresssions of unlifted kind (@#@) appear only as scrutinees
 in @%case@ expressions.  Any program can easily be put into this form;
-a separately available executable preprocessor illustrates how.
+a separately available preprocessor illustrates how.
 In the remainder of this section, we use ``Core'' to mean ``well-behaved'' Core.
 
 Evaluating a Core expression means reducing it to {\it weak-head normal form (WHNF)},
-i.e., a primitive value, lambda abstraction, or fully-applied data constructor.
-Evaluation of a program is evaluation of the expression @Main.main@.
+i.e., a primitive value, lambda abstraction, or fully-applied data constructor. To evaluate a program means evaluating the expression @Main.main@.
 
 To make sure that expression evaluation is shared, we
-make use of a {\it heap}, which can contain
+make use of a {\it heap}, which contains {\it heap entries}. A heap entry can be:
 \begin{itemize}
-\item {\em Thunks} representing suspended (i.e., as yet unevaluated) expressions.
+\item A {\em thunk}, representing an unevaluated expression, also known as a {\em suspension}.
 
-\item {\em WHNF}s representing the result of evaluating such thunks. Computations over
-primitive types are never suspended, so these results are always closures (representing
-lambda abstractions) or data constructions.
-\end{itemize}
-Thunks are allocated when it
-is necessary to suspend a computation whose result may be shared.
-This occurs when evaluating three different kinds of expressions:
-\begin{itemize}
-\item Value definitions at top-level or within a local @let@ expression.
-Here, the defining expressions are suspended and the defined names
-are bound to heap pointers to the suspensions.
-
-\item User function applications.  Here, the actual argument expression is
-suspended and the formal argument is bound to a heap pointer to the suspension.
-
-\item Constructor applications. Here, the actual argument expression is
-suspended and a heap pointer to the suspension is embedded in the constructed value.
+\item A {\em WHNF}, representing an evaluated expression. The result of evaluating a thunk is a WHNF. A WHNF is always a closure (corresponding to a lambda abstraction in the source program) or a data constructor application: computations over primitive types are never suspended.
 \end{itemize}
 
-As computation proceeds, copies of the heap pointer propagate. 
-When the computation is eventually forced, the heap entry is overwritten with the resulting
-WHNF, so all copies of the pointer now point to this WHNF.   Forcing occurs
+{\it Heap pointers} point to heap entries: the same heap pointer can point to either a thunk or a WHNF, because the run-time system overwrites thunks with WHNFs as computation proceeds.
+
+The suspended computation that a thunk represents might represent evaluating one of three different kinds of expression. The run-time system allocates a different kind of thunk depending on what kind of expression it is:
+\begin{itemize}
+\item A thunk for a value definition has a group of suspended defining expressions, along with a list of bindings between defined names and heap pointers to those suspensions. (A value definition may be a recursive group of definitions or a single non-recursive definition, and it may be top-level (global) or @let@-bound (local)).
+
+\item A thunk for a function application (where the function is user-defined) has a suspended actual argument expression, and a binding between the formal argument and a heap pointer to that suspension.
+
+\item A thunk for a constructor application has a suspended actual argument expression; the entire constructed value has a heap pointer to that suspension embedded in it.
+\end{itemize}
+
+As computation proceeds, copies of the heap pointer for a given thunk propagate through the executing program. 
+When another computation demands the result of that thunk, the run-time system computes the thunk's result, yielding a WHNF, and overwrites the heap entry for the thunk with the WHNF. Now, all copies of the heap pointer point to the new heap entry: a WHNF. Forcing occurs
 only in the context of
 \begin{itemize}
 \item evaluating the operator expression of an application; 
 
-\item evaluating the ``scrutinee'' of a @case@ expression; or 
+\item evaluating the scrutinee of a @case@ expression; or 
 
 \item evaluating an argument to a primitive or external function application
 \end{itemize}
 
-Ultimately, if there are no remaining pointers to the heap entry (whether suspended or evaluated),
-the entry can be garbage-collected; this is assumed to happen implicitly.
+When no pointers to a heap entry (whether it is a thunk or WHNF) remain, the garbage collector can reclaim the space it uses. We assume this happens implicitly.
 
-With the exception of functions, arrays, and mutable variables, the intention is that values of all primitive types
-should be held {\it unboxed}, i.e., not heap-allocated.  This causes no problems for laziness because all
-primitive types are {\it unlifted}.  Unboxed tuple types are not heap-allocated either.
+With the exception of functions, arrays, and mutable variables, we intend that values of all primitive types
+should be held {\it unboxed}: they should not be heap-allocated. This does not violate call-by-need semantics: all
+primitive types are {\it unlifted}, which means that values of those types must be evaluated strictly.  Unboxed tuple types are not heap-allocated either.
 
 Certain primitives and @%external@ functions cause side-effects to state threads or to the real world.
-Where the ordering of these side-effects matters, Core already forces this order
-by means of data dependencies on the psuedo-values representing the threads.
+Where the ordering of these side-effects matters, Core already forces this order with data dependencies on the pseudo-values representing the threads.
 
-The @raisezh@ and @handlezh@ primitives requires special support in an implementation, such as a handler stack; 
-again, real-world threading guarantees that they will execute in the correct order.
+An implementation must specially support the @raisezh@ and @handlezh@ primitives: for example, by using a handler stack.  
+Again, real-world threading guarantees that they will execute in the correct order.
 
 \section{Primitive Module}
 \label{sec:prims}
 
-This section describes the contents and informal semantics of the primitive module @PrimGHC@.
+The semantics of External Core rely on the contents and informal semantics of the primitive module @ghc-prim:GHC.Prim@.
 Nearly all the primitives are required in order to cover GHC's implementation of the Haskell98
 standard prelude; the only operators that can be completely omitted are those supporting the byte-code interpreter, 
 parallelism, and foreign objects.  Some of the concurrency primitives are needed, but can be
-given degenerate implementations if it desired to target a purely sequential backend; see Section~\ref{sec:sequential}.
+given degenerate implementations if it desired to target a purely sequential backend (see Section~\ref{sec:sequential}).
 
 In addition to these primitives, a large number of C library functions are required to implement
 the full standard Prelude, particularly to handle I/O and arithmetic on less usual types.
-% We list these separately in section~\ref{sec:ccalls}.
 
-\subsection{Types}
+For a full listing of the names and types of the primitive operators, see the GHC library documentation~\citep{ghcprim}.
 
-\begin{tabular}{|l|l|l|}
-\hline
-Type & Kind & Description \\
-\hline
-@ZLzmzgZR@ & @* -> * -> *@ & functions (@->@) \\
-@Z1H@ & @? -> #@    & unboxed 1-tuple \\
-@Z2H@	   & @? -> ? -> #@ & unboxed 2-tuple \\
-\ldots   & \ldots & \ldots \\
-@Z100H@	   & @? -> ? -> ? -> ... -> ? -> #@ & unboxed 100-tuple \\
-@Addrzh@    & @#@	   & machine address (pointer) \\
-@Charzh@	   & @#@	   & unicode character (31 bits) \\
-@Doublezh@  & @#@	   & double-precision float \\
-@Floatzh@   & @#@	   & float \\
-@Intzh@	   & @#@	   & int (30+ bits) \\
-@Int32zh@   & @#@	   & int (32 bits) \\
-@Int64zh@   & @#@	   & int (64 bits) \\
-@Wordzh@	   & @#@	   & unsigned word (30+ bits) \\
-@Word32zh@   & @#@	   & unsigned word (32 bits) \\
-@Word64zh@   & @#@	   & unsigned word (64 bits) \\
-@RealWorld@ & @*@          & pseudo-type for real world state \\
-@Statezh@    & @* -> #@     & mutable state \\
-@Arrayzh@   & @* -> #@     & immutable arrays \\
-@ByteArrayzh@   & @#@     & immutable byte arrays \\
-@MutableArrayzh@   & @* -> * -> #@     & mutable arrays \\
-@MutableByteArrayzh@   & @* -> #@     & mutable byte arrays \\
-@MutVarzh@ & @* -> * -> #@  & mutable variables \\
-@MVarzh@  & @* -> * -> #@  & synchronized mutable variables \\
-@Weakzh@  & @* -> #@      & weak pointers \\
-@StablePtrzh@ & @* -> #@  & stable pointers \\
-@ForeignObjzh@ & @#@	& foreign object \\
-@ThreadIdzh@ & @#@	 & thread id \\
-@ZCTCCallable@ & @? -> *@ & dictionaries for CCallable pseudo-class \\
-@ZCTCReturnable@ & @? -> *@ & dictionaries for CReturnable pseudo-class \\
-\hline
-\end{tabular}
 
-In addition, the types @PrelBase.Bool@ and @PrelBase.Unit@, which are non-primitive
-and are defined as ordinary algebraic types in module @PrelBase@, are used in
-the types of some operators in @PrelGHC@.
-
-The unboxed tuple types are quite special: they hold sets of values in an unlifted
-context, i.e., to be manipulated directly rather than being stored in the heap.  They can only
-appear in limited contexts in programs; in particular, they cannot be bound by a
-lambda abstraction or case alternative pattern. Note that they can hold either lifted
-or unlifted values.  The limitation to 100-tuples is an arbitrary one set by GHC.
-
-The type of arbitrary precision integers (@Integer@) is not primitive; it is made
-up of an ordinary primitive integer (@Intzh@) and a byte array (@ByteArrzh@).
-The components of an @Integer@ are passed to primitive operators as two separate
-arguments and returned as an unboxed pair.
-
-The @Statezh@ type constructor takes a dummy type argument that is used only 
-to distinguish different state {\it threads}~\cite{Launchbury94}.
-The @RealWorld@ type is used only as an argument to @Statezh@, and represents
-the thread of real-world state; it contains just the single value @realWorldzh@.
-The mutable data types @MutableArrayzh@,@MutableByteArrayzh@,@MutVarzh@
-take an initial type argument of the form @(Statezh@ $t$@)@ for some thread $t$.
-The synchronized mutable variable type constructor @MVarzh@ always takes an argument of type
-@Statezh RealWorld@.
-
-@Weakzh@ is the type of weak pointers.
-
-@StablePtrzh@ is the type of stable pointers, which are guaranteed not to move
-during garbage collections; these are useful in connection with foreign functions.
-
-@ForeignPtrzh@ is the type of foreign pointers.
-
-The dictionary types @ZCTCCallable@ and @ZCTCReturnable@ are just placeholders
-which can be represented by a void type;
-any code they appear in should be unreachable.
-
-\subsubsection{Non-concurrent Back End}
+\subsection{Non-concurrent Back End}
 \label{sec:sequential}
 
 The Haskell98 standard prelude doesn't include any concurrency support, but GHC's
@@ -848,87 +781,7 @@ string &  @Addrzh@  & Address of specified C-format string \\
 \hline
 \end{tabular}
 
-\subsection{Data Constructors}
-
-The only primitive data constructors are for unboxed tuples:
-
-\begin{tabular}{|l|l|l|}
-\hline
-Constructor & Type & Description \\
-\hline
-@ZdwZ1H@ & @%forall (a::?).a -> Z1H a@ & unboxed 1-tuple \\
-@ZdwZ2H@ & @%forall (a1::?) (a2::?).a1 -> a2 -> Z2H a1 a2@ & unboxed 2-tuple \\
-\ldots & \ldots & \ldots \\
-@ZdwZ100H@ & @%forall (a1::?) (a2::?)... (a100::?) .@ & \\
-& \ \ \ @a1 -> a2 -> ... -> a100 -> Z100H a1 a2 ... a100@ & unboxed 100-tuple \\
-\hline
-\end{tabular}
-
-\subsection{Values}
-
-Operators are (roughly) divided into collections according to the primary
-type on which they operate.
-
-\workingnote{How do primitives fail, e.g., on division by zero or
-attempting an invalid narrowing coercion?}
-
-\workingnote{The following primop descriptions are automatically generated.
-The exact set of primops and their types presented here 
-depends on the underlying word size at the time of generation; these
-were done for 32 bit words.  This is a bit stupid.
-More importantly, the word size has a big impact on just what gets produced
-in a Core file, but this isn't documented anywhere in the file itself.
-Perhaps there should be a global flag in the file?}
-
-\newcommand{\primoptions}[7]{{#1} {#2} {#3} {#4} {#5}}
-
-\newcommand{\primopsection}[2]{\subsubsection{#1}{#2}\vspace*{0.1in}}
-\newcommand{\primopdefaults}[1]{Unless otherwise noted, each primop has the following default characteristics: {#1}}
-
-\newcommand{\primopdesc}[8]{
-\par\noindent{\texttt{{{#3} :: {#6}}}}
-\\{#7} {#8}\\} 
-
-\newcommand{\primtypespec}[4]{
-\par\noindent{Primitive type: \texttt{{#2}}}
-\\{#3} {#4}\\}
-
-\newcommand{\pseudoopspec}[5]{
-\par\noindent{\texttt{{{#1} :: {#3}}}}
-\\{#4} {#5}\\}
-
-\input{prims.tex}
-
-\subsubsection{RealWorld}
-
-There is just one value of type @RealWorld@, namely @realWorldzh@. It is used
-only for dependency threading of side-effecting operations.
-
-\begin{thebibliography}{}
-
-\bibitem[Launchbury and {Peyton~Jones}, 1994]{Launchbury94}
-Launchbury, J. and {Peyton~Jones}, S. (1994).
-\newblock Lazy functional state threads.
-\newblock Technical report FP-94-05, Department of Computing Science,
-  University of Glasgow.
-
-\bibitem[{Peyton~Jones} and Launchbury, 1991]{pj:unboxed}
-{Peyton~Jones}, S. and Launchbury, J. (1991).
-\newblock Unboxed values as first class citizens.
-\newblock In {\em ACM Conference on Functional Programming and Computer
-  Architecture (FPCA'91)}, pages 636--666, Boston. ACM.
-
-\bibitem[{Peyton~Jones} and Marlow, 1999]{ghc-inliner}
-{Peyton~Jones}, S. and Marlow, S. (1999).
-\newblock Secrets of the {Glasgow Haskell Compiler} inliner.
-\newblock In {\em Workshop on Implementing Declarative Languages}, Paris,
-  France.
-
-\bibitem[Peyton~Jones and Santos, 1998]{comp-by-trans-scp}
-Peyton~Jones, S. and Santos, A. (1998).
-\newblock A transformation-based optimiser for {Haskell}.
-\newblock {\em Science of Computer Programming}, 32(1-3):3--47.
-
-\end{thebibliography}
+\bibliography{core}
+\bibliographystyle{abbrvnat}
 
 \end{document}
