@@ -391,15 +391,13 @@ addNonRec env id rhs
   = env { seFloats = seFloats env `addFlts` unitFloat (NonRec id rhs),
 	  seInScope = extendInScopeSet (seInScope env) id }
 
-extendFloats :: SimplEnv -> [OutBind] -> SimplEnv
+extendFloats :: SimplEnv -> OutBind -> SimplEnv
 -- Add these bindings to the floats, and extend the in-scope env too
-extendFloats env binds
-  = env { seFloats  = seFloats env `addFlts` new_floats,
+extendFloats env bind
+  = env { seFloats  = seFloats env `addFlts` unitFloat bind,
 	  seInScope = extendInScopeSetList (seInScope env) bndrs }
   where
-    bndrs = bindersOfBinds binds
-    new_floats = Floats (toOL binds) 
-			(foldr (andFF . classifyFF) FltLifted binds)
+    bndrs = bindersOf bind
 
 addFloats :: SimplEnv -> SimplEnv -> SimplEnv
 -- Add the floats for env2 to env1; 

@@ -23,7 +23,7 @@ module SimplUtils (
 	SimplCont(..), DupFlag(..), ArgInfo(..),
 	contIsDupable, contResultType, contIsTrivial, contArgs, dropArgs, 
 	countValArgs, countArgs, splitInlineCont,
-	mkBoringStop, mkLazyArgStop, mkRhsStop, contIsRhsOrArg,
+	mkBoringStop, mkLazyArgStop, contIsRhsOrArg,
 	interestingCallContext, interestingArgContext,
 
 	interestingArg, mkArgInfo,
@@ -50,6 +50,7 @@ import Var	( isCoVar )
 import NewDemand
 import SimplMonad
 import Type	hiding( substTy )
+import Coercion ( coercionKind )
 import TyCon
 import DataCon
 import Unify	( dataConCannotMatch )
@@ -93,7 +94,6 @@ Key points:
 \begin{code}
 data SimplCont	
   = Stop		-- An empty context, or hole, []     
-	OutType		-- Type of the result
 	CallCtxt	-- True <=> There is something interesting about
 			--          the context, and hence the inliner
 			--	    should be a bit keener (see interestingCallContext)
@@ -122,7 +122,7 @@ data SimplCont
 	SimplCont	
 
   | StrictArg 		-- e C
-	OutExpr OutType		-- e and its type
+	OutExpr			-- e 
 	CallCtxt		-- Whether *this* argument position is interesting
  	ArgInfo			-- Whether the function at the head of e has rules, etc
 	SimplCont		--     plus strictness flags for *further* args
@@ -140,11 +140,11 @@ data ArgInfo
     }
 
 instance Outputable SimplCont where
-  ppr (Stop ty _) 	 	     = ptext SLIT("Stop") <+> ppr ty
+  ppr (Stop interesting)    	     = ptext SLIT("Stop") <> brackets (ppr interesting)
   ppr (ApplyTo dup arg se cont)      = ((ptext SLIT("ApplyTo") <+> ppr dup <+> pprParendExpr arg)
 					  {-  $$ nest 2 (pprSimplEnv se) -}) $$ ppr cont
   ppr (StrictBind b _ _ _ cont)      = (ptext SLIT("StrictBind") <+> ppr b) $$ ppr cont
-  ppr (StrictArg f _ _ _ cont)       = (ptext SLIT("StrictArg") <+> ppr f) $$ ppr cont
+  ppr (StrictArg f _ _ cont)         = (ptext SLIT("StrictArg") <+> ppr f) $$ ppr cont
   ppr (Select dup bndr alts se cont) = (ptext SLIT("Select") <+> ppr dup <+> ppr bndr) $$ 
 				       (nest 4 (ppr alts)) $$ ppr cont 
   ppr (CoerceIt co cont)	     = (ptext SLIT("CoerceIt") <+> ppr co) $$ ppr cont
@@ -158,14 +158,11 @@ instance Outputable DupFlag where
 
 
 -------------------
-mkBoringStop :: OutType -> SimplCont
-mkBoringStop ty = Stop ty BoringCtxt
+mkBoringStop :: SimplCont
+mkBoringStop = Stop BoringCtxt
 
-mkLazyArgStop :: OutType -> CallCtxt -> SimplCont
-mkLazyArgStop ty cci = Stop ty cci
-
-mkRhsStop :: OutType -> SimplCont
-mkRhsStop ty = Stop ty BoringCtxt
+mkLazyArgStop :: CallCtxt -> SimplCont
+mkLazyArgStop cci = Stop cci
 
 -------------------
 contIsRhsOrArg (Stop {})       	 = True
@@ -189,13 +186,21 @@ contIsTrivial (CoerceIt _ cont) 	  = contIsTrivial cont
 contIsTrivial other			  = False
 
 -------------------
-contResultType :: SimplCont -> OutType
-contResultType (Stop to_ty _)	      	 = to_ty
-contResultType (StrictArg _ _ _ _ cont)  = contResultType cont
-contResultType (StrictBind _ _ _ _ cont) = contResultType cont
-contResultType (ApplyTo _ _ _ cont)   	 = contResultType cont
-contResultType (CoerceIt _ cont)      	 = contResultType cont
-contResultType (Select _ _ _ _ cont)  	 = contResultType cont
+contResultType :: SimplEnv -> OutType -> SimplCont -> OutType
+contResultType env ty cont
+  = go cont ty
+  where
+    subst_ty se ty = substTy (se `setInScope` env) ty
+
+    go (Stop {}) 		      ty = ty
+    go (CoerceIt co cont)	      ty = go cont (snd (coercionKind co))
+    go (StrictBind _ bs body se cont) ty = go cont (subst_ty se (exprType (mkLams bs body)))
+    go (StrictArg fn _ _ cont)        ty = go cont (funResultTy (exprType fn))
+    go (Select _ _ alts se cont)      ty = go cont (subst_ty se (coreAltsType alts))
+    go (ApplyTo _ arg se cont)        ty = go cont (apply_to_arg ty arg se)
+
+    apply_to_arg ty (Type ty_arg) se = applyTy ty (subst_ty se ty_arg)
+    apply_to_arg ty other	  se = funResultTy ty
 
 -------------------
 countValArgs :: SimplCont -> Int
@@ -231,13 +236,11 @@ splitInlineCont :: SimplCont -> Maybe (SimplCont, SimplCont)
 -- See test simpl017 (and Trac #1627) for a good example of why this is important
 
 splitInlineCont (ApplyTo dup (Type ty) se c)
-  | Just (c1, c2) <- splitInlineCont c 	        = Just (ApplyTo dup (Type ty) se c1, c2)
-splitInlineCont cont@(Stop ty _)  	     	= Just (mkBoringStop ty, cont)
-splitInlineCont cont@(StrictBind bndr _ _ se _) = Just (mkBoringStop (substTy se (idType bndr)), cont)
-splitInlineCont cont@(StrictArg _ fun_ty _ _ _) = Just (mkBoringStop (funArgTy fun_ty), cont)
+  | Just (c1, c2) <- splitInlineCont c = Just (ApplyTo dup (Type ty) se c1, c2)
+splitInlineCont cont@(Stop {})         = Just (mkBoringStop, cont)
+splitInlineCont cont@(StrictBind {})   = Just (mkBoringStop, cont)
+splitInlineCont cont@(StrictArg  {})   = Just (mkBoringStop, cont)
 splitInlineCont other				= Nothing
-	-- NB: the calculation of the type for mkBoringStop is an annoying
-	--     duplication of the same calucation in mkDupableCont
 \end{code}
 
 
@@ -326,9 +329,9 @@ interestingCallContext cont
 				-- seen (coerce f) x, where f has an INLINE prag,
 				-- So we have to give some motivation for inlining it
 
-    interesting (StrictArg _ _ cci _ _)	= cci
+    interesting (StrictArg _ cci _ _)	= cci
     interesting (StrictBind {})	  	= BoringCtxt
-    interesting (Stop ty cci)   	= cci
+    interesting (Stop cci)   		= cci
     interesting (CoerceIt _ cont) 	= interesting cont
 	-- If this call is the arg of a strict function, the context
 	-- is a bit interesting.  If we inline here, we may get useful
@@ -359,7 +362,7 @@ mkArgInfo fun n_val_args call_cont
 	    , ai_discs = vanilla_discounts }
   | otherwise
   = ArgInfo { ai_rules = interestingArgContext fun call_cont
-	    , ai_strs  = arg_stricts
+	    , ai_strs  = add_type_str (idType fun) arg_stricts
 	    , ai_discs = arg_discounts }
   where
     vanilla_discounts, arg_discounts :: [Int]
@@ -387,11 +390,27 @@ mkArgInfo fun n_val_args call_cont
 			map isStrictDmd demands		-- Finite => result is bottom
 		   else
 			map isStrictDmd demands ++ vanilla_stricts
-
 	       | otherwise
 	       -> WARN( True, text "More demands than arity" <+> ppr fun <+> ppr (idArity fun) 
 				<+> ppr n_val_args <+> ppr demands ) 
 		   vanilla_stricts	-- Not enough args, or no strictness
+
+    add_type_str :: Type -> [Bool] -> [Bool]
+    -- If the function arg types are strict, record that in the 'strictness bits'
+    -- No need to instantiate because unboxed types (which dominate the strict
+    -- types) can't instantiate type variables.
+    -- add_type_str is done repeatedly (for each call); might be better 
+    -- once-for-all in the function
+    -- But beware primops/datacons with no strictness
+    add_type_str fun_ty [] = []
+    add_type_str fun_ty strs		-- Look through foralls
+	| Just (tv, fun_ty') <- splitForAllTy_maybe fun_ty	-- Includes coercions
+	= add_type_str fun_ty' strs
+    add_type_str fun_ty (str:strs)	-- Add strict-type info
+	| Just (arg_ty, fun_ty') <- splitFunTy_maybe fun_ty
+	= (str || isStrictType arg_ty) : add_type_str fun_ty' strs
+    add_type_str fun_ty strs
+	= strs
 
 {- Note [Unsaturated functions]
   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -424,12 +443,12 @@ interestingArgContext :: Id -> SimplCont -> Bool
 interestingArgContext fn call_cont
   = idHasRules fn || go call_cont
   where
-    go (Select {})	       = False
-    go (ApplyTo {})	       = False
-    go (StrictArg _ _ cci _ _) = interesting cci
-    go (StrictBind {})	       = False	-- ??
-    go (CoerceIt _ c)	       = go c
-    go (Stop _ cci)            = interesting cci
+    go (Select {})	     = False
+    go (ApplyTo {})	     = False
+    go (StrictArg _ cci _ _) = interesting cci
+    go (StrictBind {})	     = False	-- ??
+    go (CoerceIt _ c)	     = go c
+    go (Stop cci)            = interesting cci
 
     interesting (ArgCtxt rules _) = rules
     interesting other		  = False
@@ -693,7 +712,7 @@ postInlineUnconditionally
     -> Bool
 postInlineUnconditionally env top_lvl bndr occ_info rhs unfolding
   | not active		   = False
-  | isLoopBreaker occ_info = False	-- If it's a loop-breaker of any kind, dont' inline
+  | isLoopBreaker occ_info = False	-- If it's a loop-breaker of any kind, don't inline
 					-- because it might be referred to "earlier"
   | isExportedId bndr      = False
   | exprIsTrivial rhs 	   = True
@@ -932,10 +951,10 @@ There are some particularly delicate points here:
   However for GlobalIds we can look at the arity; and for primops we
   must, since they have no unfolding.  
 
-* Regardless of whether 'f' is a vlaue, we always want to 
+* Regardless of whether 'f' is a value, we always want to 
   reduce (/\a -> f a) to f
   This came up in a RULE: foldr (build (/\a -> g a))
-  did not match 	   foldr (build (/\b -> ...something complex...))
+  did not match 	  foldr (build (/\b -> ...something complex...))
   The type checker can insert these eta-expanded versions,
   with both type and dictionary lambdas; hence the slightly 
   ad-hoc isDictId
@@ -1031,7 +1050,7 @@ Consider this:
 We'd like to float this to 
 	y1 = /\a. e1
 	y2 = /\a. e2
-	x = /\a. C (y1 a) (y2 a)
+	x  = /\a. C (y1 a) (y2 a)
 for the usual reasons: we want to inline x rather vigorously.
 
 You may think that this kind of thing is rare.  But in some programs it is
@@ -1440,29 +1459,14 @@ mkCase tries these things
 
 
 \begin{code}
-mkCase :: OutExpr -> OutId -> OutType
-       -> [OutAlt]		-- Increasing order
+mkCase :: OutExpr -> OutId -> [OutAlt]	-- Increasing order
        -> SimplM OutExpr
-
---------------------------------------------------
---	1. Check for empty alternatives
---------------------------------------------------
-
--- This isn't strictly an error.  It's possible that the simplifer might "see"
--- that an inner case has no accessible alternatives before it "sees" that the
--- entire branch of an outer case is inaccessible.  So we simply
--- put an error case here insteadd
-mkCase scrut case_bndr ty []
-  = pprTrace "mkCase: null alts" (ppr case_bndr <+> ppr scrut) $
-    return (mkApps (Var rUNTIME_ERROR_ID)
-		   [Type ty, Lit (mkStringLit "Impossible alternative")])
-
 
 --------------------------------------------------
 --	2. Identity case
 --------------------------------------------------
 
-mkCase scrut case_bndr ty alts	-- Identity case
+mkCase scrut case_bndr alts	-- Identity case
   | all identity_alt alts
   = do tick (CaseIdentity case_bndr)
        return (re_cast scrut)
@@ -1498,7 +1502,7 @@ mkCase scrut case_bndr ty alts	-- Identity case
 --------------------------------------------------
 --	Catch-all
 --------------------------------------------------
-mkCase scrut bndr ty alts = return (Case scrut bndr ty alts)
+mkCase scrut bndr alts = return (Case scrut bndr (coreAltsType alts) alts)
 \end{code}
 
 

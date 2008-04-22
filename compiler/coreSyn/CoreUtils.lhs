@@ -23,7 +23,7 @@ module CoreUtils (
 	findDefault, findAlt, isDefaultAlt, mergeAlts, trimConArgs,
 
 	-- Properties of expressions
-	exprType, coreAltType,
+	exprType, coreAltType, coreAltsType,
 	exprIsDupable, exprIsTrivial, exprIsCheap, 
 	exprIsHNF,exprOkForSpeculation, exprIsBig, 
 	exprIsConApp_maybe, exprIsBottom,
@@ -109,6 +109,10 @@ exprType other = pprTrace "exprType" (pprCoreExpr other) alphaTy
 
 coreAltType :: CoreAlt -> Type
 coreAltType (_,_,rhs) = exprType rhs
+
+coreAltsType :: [CoreAlt] -> Type
+coreAltsType (alt:_) = coreAltType alt
+coreAltsType []	     = panic "corAltsType"
 \end{code}
 
 @mkPiType@ makes a (->) type or a forall type, depending on whether
