@@ -57,8 +57,6 @@ import Control.Monad
 import Data.Array
 import Data.Char	( ord )
 import System.Exit
-
-#include "HsVersions.h"
 }
 
 %token
@@ -602,16 +600,16 @@ exprOp name args_code =
 
 exprMacros :: UniqFM ([CmmExpr] -> CmmExpr)
 exprMacros = listToUFM [
-  ( FSLIT("ENTRY_CODE"),   \ [x] -> entryCode x ),
-  ( FSLIT("INFO_PTR"),     \ [x] -> closureInfoPtr x ),
-  ( FSLIT("STD_INFO"),     \ [x] -> infoTable x ),
-  ( FSLIT("FUN_INFO"),     \ [x] -> funInfoTable x ),
-  ( FSLIT("GET_ENTRY"),    \ [x] -> entryCode (closureInfoPtr x) ),
-  ( FSLIT("GET_STD_INFO"), \ [x] -> infoTable (closureInfoPtr x) ),
-  ( FSLIT("GET_FUN_INFO"), \ [x] -> funInfoTable (closureInfoPtr x) ),
-  ( FSLIT("INFO_TYPE"),    \ [x] -> infoTableClosureType x ),
-  ( FSLIT("INFO_PTRS"),    \ [x] -> infoTablePtrs x ),
-  ( FSLIT("INFO_NPTRS"),   \ [x] -> infoTableNonPtrs x )
+  ( fsLit "ENTRY_CODE",   \ [x] -> entryCode x ),
+  ( fsLit "INFO_PTR",     \ [x] -> closureInfoPtr x ),
+  ( fsLit "STD_INFO",     \ [x] -> infoTable x ),
+  ( fsLit "FUN_INFO",     \ [x] -> funInfoTable x ),
+  ( fsLit "GET_ENTRY",    \ [x] -> entryCode (closureInfoPtr x) ),
+  ( fsLit "GET_STD_INFO", \ [x] -> infoTable (closureInfoPtr x) ),
+  ( fsLit "GET_FUN_INFO", \ [x] -> funInfoTable (closureInfoPtr x) ),
+  ( fsLit "INFO_TYPE",    \ [x] -> infoTableClosureType x ),
+  ( fsLit "INFO_PTRS",    \ [x] -> infoTablePtrs x ),
+  ( fsLit "INFO_NPTRS",   \ [x] -> infoTableNonPtrs x )
   ]
 
 -- we understand a subset of C-- primitives:
@@ -728,44 +726,44 @@ stmtMacro fun args_code = do
 
 stmtMacros :: UniqFM ([CmmExpr] -> Code)
 stmtMacros = listToUFM [
-  ( FSLIT("CCS_ALLOC"),		   \[words,ccs]  -> profAlloc words ccs ),
-  ( FSLIT("CLOSE_NURSERY"),	   \[]  -> emitCloseNursery ),
-  ( FSLIT("ENTER_CCS_PAP_CL"),     \[e] -> enterCostCentrePAP e ),
-  ( FSLIT("ENTER_CCS_THUNK"),      \[e] -> enterCostCentreThunk e ),
-  ( FSLIT("HP_CHK_GEN"),           \[words,liveness,reentry] -> 
+  ( fsLit "CCS_ALLOC",		   \[words,ccs]  -> profAlloc words ccs ),
+  ( fsLit "CLOSE_NURSERY",	   \[]  -> emitCloseNursery ),
+  ( fsLit "ENTER_CCS_PAP_CL",     \[e] -> enterCostCentrePAP e ),
+  ( fsLit "ENTER_CCS_THUNK",      \[e] -> enterCostCentreThunk e ),
+  ( fsLit "HP_CHK_GEN",           \[words,liveness,reentry] -> 
                                       hpChkGen words liveness reentry ),
-  ( FSLIT("HP_CHK_NP_ASSIGN_SP0"), \[e,f] -> hpChkNodePointsAssignSp0 e f ),
-  ( FSLIT("LOAD_THREAD_STATE"),    \[] -> emitLoadThreadState ),
-  ( FSLIT("LDV_ENTER"),            \[e] -> ldvEnter e ),
-  ( FSLIT("LDV_RECORD_CREATE"),    \[e] -> ldvRecordCreate e ),
-  ( FSLIT("OPEN_NURSERY"),	   \[]  -> emitOpenNursery ),
-  ( FSLIT("PUSH_UPD_FRAME"),	   \[sp,e] -> emitPushUpdateFrame sp e ),
-  ( FSLIT("SAVE_THREAD_STATE"),    \[] -> emitSaveThreadState ),
-  ( FSLIT("SET_HDR"),		   \[ptr,info,ccs] -> 
+  ( fsLit "HP_CHK_NP_ASSIGN_SP0", \[e,f] -> hpChkNodePointsAssignSp0 e f ),
+  ( fsLit "LOAD_THREAD_STATE",    \[] -> emitLoadThreadState ),
+  ( fsLit "LDV_ENTER",            \[e] -> ldvEnter e ),
+  ( fsLit "LDV_RECORD_CREATE",    \[e] -> ldvRecordCreate e ),
+  ( fsLit "OPEN_NURSERY",	   \[]  -> emitOpenNursery ),
+  ( fsLit "PUSH_UPD_FRAME",	   \[sp,e] -> emitPushUpdateFrame sp e ),
+  ( fsLit "SAVE_THREAD_STATE",    \[] -> emitSaveThreadState ),
+  ( fsLit "SET_HDR",		   \[ptr,info,ccs] -> 
 					emitSetDynHdr ptr info ccs ),
-  ( FSLIT("STK_CHK_GEN"),          \[words,liveness,reentry] -> 
+  ( fsLit "STK_CHK_GEN",          \[words,liveness,reentry] -> 
                                       stkChkGen words liveness reentry ),
-  ( FSLIT("STK_CHK_NP"),	   \[e] -> stkChkNodePoints e ),
-  ( FSLIT("TICK_ALLOC_PRIM"), 	   \[hdr,goods,slop] -> 
+  ( fsLit "STK_CHK_NP",	   \[e] -> stkChkNodePoints e ),
+  ( fsLit "TICK_ALLOC_PRIM", 	   \[hdr,goods,slop] -> 
 					tickyAllocPrim hdr goods slop ),
-  ( FSLIT("TICK_ALLOC_PAP"),       \[goods,slop] -> 
+  ( fsLit "TICK_ALLOC_PAP",       \[goods,slop] -> 
 					tickyAllocPAP goods slop ),
-  ( FSLIT("TICK_ALLOC_UP_THK"),    \[goods,slop] -> 
+  ( fsLit "TICK_ALLOC_UP_THK",    \[goods,slop] -> 
 					tickyAllocThunk goods slop ),
-  ( FSLIT("UPD_BH_UPDATABLE"),       \[] -> emitBlackHoleCode False ),
-  ( FSLIT("UPD_BH_SINGLE_ENTRY"),    \[] -> emitBlackHoleCode True ),
+  ( fsLit "UPD_BH_UPDATABLE",       \[] -> emitBlackHoleCode False ),
+  ( fsLit "UPD_BH_SINGLE_ENTRY",    \[] -> emitBlackHoleCode True ),
 
-  ( FSLIT("RET_P"),	\[a] ->       emitRetUT [(PtrArg,a)]),
-  ( FSLIT("RET_N"),	\[a] ->       emitRetUT [(NonPtrArg,a)]),
-  ( FSLIT("RET_PP"),	\[a,b] ->     emitRetUT [(PtrArg,a),(PtrArg,b)]),
-  ( FSLIT("RET_NN"),	\[a,b] ->     emitRetUT [(NonPtrArg,a),(NonPtrArg,b)]),
-  ( FSLIT("RET_NP"),	\[a,b] ->     emitRetUT [(NonPtrArg,a),(PtrArg,b)]),
-  ( FSLIT("RET_PPP"),	\[a,b,c] ->   emitRetUT [(PtrArg,a),(PtrArg,b),(PtrArg,c)]),
-  ( FSLIT("RET_NPP"),	\[a,b,c] ->   emitRetUT [(NonPtrArg,a),(PtrArg,b),(PtrArg,c)]),
-  ( FSLIT("RET_NNP"),	\[a,b,c] ->   emitRetUT [(NonPtrArg,a),(NonPtrArg,b),(PtrArg,c)]),
-  ( FSLIT("RET_NNN"),	\[a,b,c] -> emitRetUT [(NonPtrArg,a),(NonPtrArg,b),(NonPtrArg,c)]),
-  ( FSLIT("RET_NNNP"),	\[a,b,c,d] -> emitRetUT [(NonPtrArg,a),(NonPtrArg,b),(NonPtrArg,c),(PtrArg,d)]),
-  ( FSLIT("RET_NPNP"),	\[a,b,c,d] -> emitRetUT [(NonPtrArg,a),(PtrArg,b),(NonPtrArg,c),(PtrArg,d)])
+  ( fsLit "RET_P",	\[a] ->       emitRetUT [(PtrArg,a)]),
+  ( fsLit "RET_N",	\[a] ->       emitRetUT [(NonPtrArg,a)]),
+  ( fsLit "RET_PP",	\[a,b] ->     emitRetUT [(PtrArg,a),(PtrArg,b)]),
+  ( fsLit "RET_NN",	\[a,b] ->     emitRetUT [(NonPtrArg,a),(NonPtrArg,b)]),
+  ( fsLit "RET_NP",	\[a,b] ->     emitRetUT [(NonPtrArg,a),(PtrArg,b)]),
+  ( fsLit "RET_PPP",	\[a,b,c] ->   emitRetUT [(PtrArg,a),(PtrArg,b),(PtrArg,c)]),
+  ( fsLit "RET_NPP",	\[a,b,c] ->   emitRetUT [(NonPtrArg,a),(PtrArg,b),(PtrArg,c)]),
+  ( fsLit "RET_NNP",	\[a,b,c] ->   emitRetUT [(NonPtrArg,a),(NonPtrArg,b),(PtrArg,c)]),
+  ( fsLit "RET_NNN",  \[a,b,c] -> emitRetUT [(NonPtrArg,a),(NonPtrArg,b),(NonPtrArg,c)]),
+  ( fsLit "RET_NNNP",	\[a,b,c,d] -> emitRetUT [(NonPtrArg,a),(NonPtrArg,b),(NonPtrArg,c),(PtrArg,d)]),
+  ( fsLit "RET_NPNP",	\[a,b,c,d] -> emitRetUT [(NonPtrArg,a),(PtrArg,b),(NonPtrArg,c),(PtrArg,d)])
 
  ]
 
@@ -1084,9 +1082,9 @@ doSwitch mb_range scrut arms deflt
 -- knows about here.
 initEnv :: Env
 initEnv = listToUFM [
-  ( FSLIT("SIZEOF_StgHeader"), 
+  ( fsLit "SIZEOF_StgHeader", 
     Var (CmmLit (CmmInt (fromIntegral (fixedHdrSize * wORD_SIZE)) wordRep) )),
-  ( FSLIT("SIZEOF_StgInfoTable"),
+  ( fsLit "SIZEOF_StgInfoTable",
     Var (CmmLit (CmmInt (fromIntegral stdInfoTableSizeB) wordRep) ))
   ]
 
