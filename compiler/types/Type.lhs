@@ -1258,6 +1258,19 @@ extendTvSubstList (TvSubst in_scope env) tvs tys
 -- the types given; but it's just a thunk so with a bit of luck
 -- it'll never be evaluated
 
+-- Note [Generating the in-scope set for a substitution]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- If we want to substitute [a -> ty1, b -> ty2] I used to 
+-- think it was enough to generate an in-scope set that includes
+-- fv(ty1,ty2).  But that's not enough; we really should also take the
+-- free vars of the type we are substituting into!  Example:
+--	(forall b. (a,b,x)) [a -> List b]
+-- Then if we use the in-scope set {b}, there is a danger we will rename
+-- the forall'd variable to 'x' by mistake, getting this:
+--	(forall x. (List b, x, x)
+-- Urk!  This means looking at all the calls to mkOpenTvSubst....
+
+
 mkOpenTvSubst :: TvSubstEnv -> TvSubst
 mkOpenTvSubst env = TvSubst (mkInScopeSet (tyVarsOfTypes (varEnvElts env))) env
 
