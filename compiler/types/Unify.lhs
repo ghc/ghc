@@ -389,7 +389,7 @@ type InternalReft = TyVarEnv (Coercion, Type)
 
 instance Outputable Refinement where
   ppr (Reft _in_scope env)
-    = ptext SLIT("Refinement") <+>
+    = ptext (sLit "Refinement") <+>
         braces (ppr env)
 
 emptyRefinement :: Refinement
@@ -767,23 +767,23 @@ maybeErrToMaybe (Failed _)    = Nothing
 \begin{code}
 misMatch :: Type -> Type -> SDoc
 misMatch t1 t2
-  = ptext SLIT("Can't match types") <+> quotes (ppr t1) <+> 
-    ptext SLIT("and") <+> quotes (ppr t2)
+  = ptext (sLit "Can't match types") <+> quotes (ppr t1) <+> 
+    ptext (sLit "and") <+> quotes (ppr t2)
 
 lengthMisMatch :: [Type] -> [Type] -> SDoc
 lengthMisMatch tys1 tys2
-  = sep [ptext SLIT("Can't match unequal length lists"), 
+  = sep [ptext (sLit "Can't match unequal length lists"), 
 	 nest 2 (ppr tys1), nest 2 (ppr tys2) ]
 
 kindMisMatch :: TyVar -> Type -> SDoc
 kindMisMatch tv1 t2
-  = vcat [ptext SLIT("Can't match kinds") <+> quotes (ppr (tyVarKind tv1)) <+> 
-	    ptext SLIT("and") <+> quotes (ppr (typeKind t2)),
-	  ptext SLIT("when matching") <+> quotes (ppr tv1) <+> 
-		ptext SLIT("with") <+> quotes (ppr t2)]
+  = vcat [ptext (sLit "Can't match kinds") <+> quotes (ppr (tyVarKind tv1)) <+> 
+	    ptext (sLit "and") <+> quotes (ppr (typeKind t2)),
+	  ptext (sLit "when matching") <+> quotes (ppr tv1) <+> 
+		ptext (sLit "with") <+> quotes (ppr t2)]
 
 occursCheck :: TyVar -> Type -> SDoc
 occursCheck tv ty
-  = hang (ptext SLIT("Can't construct the infinite type"))
+  = hang (ptext (sLit "Can't construct the infinite type"))
        2 (ppr tv <+> equals <+> ppr ty)
 \end{code}

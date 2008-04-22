@@ -215,9 +215,9 @@ subFunTys error_herald n_pats res_ty thing_inside
 
     mk_msg res_ty n_actual 
       = error_herald <> comma $$ 
-	sep [ptext SLIT("but its type") <+> quotes (pprType res_ty), 
-	     if n_actual == 0 then ptext SLIT("has none") 
-	     else ptext SLIT("has only") <+> speakN n_actual]
+	sep [ptext (sLit "but its type") <+> quotes (pprType res_ty), 
+	     if n_actual == 0 then ptext (sLit "has none") 
+	     else ptext (sLit "has only") <+> speakN n_actual]
 \end{code}
 
 \begin{code}
@@ -880,7 +880,7 @@ wrapFunResCoercion arg_tys co_fn_res
   | null arg_tys	   
   = return co_fn_res
   | otherwise
-  = do	{ arg_ids <- newSysLocalIds FSLIT("sub") arg_tys
+  = do	{ arg_ids <- newSysLocalIds (fsLit "sub") arg_tys
 	; return (mkWpLams arg_ids <.> co_fn_res <.> mkWpApps arg_ids) }
 \end{code}
 
@@ -994,8 +994,8 @@ unifyTheta :: TcThetaType -> TcThetaType -> TcM [CoercionI]
 -- Acutal and expected types
 unifyTheta theta1 theta2
   = do	{ checkTc (equalLength theta1 theta2)
-		  (vcat [ptext SLIT("Contexts differ in length"),
-			 nest 2 $ parens $ ptext SLIT("Use -fglasgow-exts to allow this")])
+		  (vcat [ptext (sLit "Contexts differ in length"),
+			 nest 2 $ parens $ ptext (sLit "Use -fglasgow-exts to allow this")])
 	; uList unifyPred theta1 theta2 
         }
 
@@ -1057,10 +1057,10 @@ data Outer = Unify Bool TcType TcType
 	--		   for this particular ty1,ty2
 
 instance Outputable Outer where
-  ppr (Unify c ty1 ty2) = pp_c <+> pprParendType ty1 <+> ptext SLIT("~")
+  ppr (Unify c ty1 ty2) = pp_c <+> pprParendType ty1 <+> ptext (sLit "~")
 			       <+> pprParendType ty2
 	where
-	  pp_c = if c then ptext SLIT("Top") else ptext SLIT("NonTop")
+	  pp_c = if c then ptext (sLit "Top") else ptext (sLit "NonTop")
 	      
 
 -------------------------
@@ -1370,7 +1370,7 @@ uVar outer swapped tv1 nb2 ps_ty2 ty2
 			| otherwise = brackets (equals <+> ppr ty2)
 	; traceTc (text "uVar" <+> ppr outer <+> ppr swapped <+> 
 			sep [ppr tv1 <+> dcolon <+> ppr (tyVarKind tv1 ),
-				nest 2 (ptext SLIT(" <-> ")),
+				nest 2 (ptext (sLit " <-> ")),
 			     ppr ps_ty2 <+> dcolon <+> ppr (typeKind ty2) <+> expansion])
 	; details <- lookupTcTyVar tv1
 	; case details of
@@ -1740,9 +1740,9 @@ addSubCtxt orig actual_res_ty expected_res_ty thing_inside
 	   ; return (env2, message) }
 
     wrongArgsCtxt too_many_or_few fun
-      = ptext SLIT("Probable cause:") <+> quotes (ppr fun)
-	<+> ptext SLIT("is applied to") <+> text too_many_or_few 
-	<+> ptext SLIT("arguments")
+      = ptext (sLit "Probable cause:") <+> quotes (ppr fun)
+	<+> ptext (sLit "is applied to") <+> text too_many_or_few 
+	<+> ptext (sLit "arguments")
 
 ------------------
 unifyForAllCtxt tvs phi1 phi2 env
@@ -1751,8 +1751,8 @@ unifyForAllCtxt tvs phi1 phi2 env
     (env', tvs') = tidyOpenTyVars env tvs	-- NB: not tidyTyVarBndrs
     (env1, phi1') = tidyOpenType env' phi1
     (env2, phi2') = tidyOpenType env1 phi2
-    msg = vcat [ptext SLIT("When matching") <+> quotes (ppr (mkForAllTys tvs' phi1')),
-	        ptext SLIT("          and") <+> quotes (ppr (mkForAllTys tvs' phi2'))]
+    msg = vcat [ptext (sLit "When matching") <+> quotes (ppr (mkForAllTys tvs' phi1')),
+	        ptext (sLit "          and") <+> quotes (ppr (mkForAllTys tvs' phi2'))]
 \end{code}
 
 
@@ -1842,7 +1842,7 @@ kindSimpleKind orig_swapped orig_kind
      | isLiftedTypeKind k   = return liftedTypeKind
      | isUnliftedTypeKind k = return unliftedTypeKind
     go sw k@(TyVarTy _)	  = return k	-- KindVars are always simple
-    go swapped kind = failWithTc (ptext SLIT("Unexpected kind unification failure:")
+    go swapped kind = failWithTc (ptext (sLit "Unexpected kind unification failure:")
 				  <+> ppr orig_swapped <+> ppr orig_kind)
 	-- I think this can't actually happen
 
@@ -1851,7 +1851,7 @@ kindSimpleKind orig_swapped orig_kind
 
 ----------------
 kindOccurCheckErr tyvar ty
-  = hang (ptext SLIT("Occurs check: cannot construct the infinite kind:"))
+  = hang (ptext (sLit "Occurs check: cannot construct the infinite kind:"))
        2 (sep [ppr tyvar, char '=', ppr ty])
 \end{code}
 
@@ -1919,25 +1919,25 @@ checkExpectedKind ty act_kind exp_kind
                (env2, tidy_act_kind) = tidyKind env1 act_kind
 
                err | n_exp_as < n_act_as     -- E.g. [Maybe]
-                   = quotes (ppr ty) <+> ptext SLIT("is not applied to enough type arguments")
+                   = quotes (ppr ty) <+> ptext (sLit "is not applied to enough type arguments")
 
                      -- Now n_exp_as >= n_act_as. In the next two cases,
                      -- n_exp_as == 0, and hence so is n_act_as
                    | isLiftedTypeKind exp_kind && isUnliftedTypeKind act_kind
-                   = ptext SLIT("Expecting a lifted type, but") <+> quotes (ppr ty)
-                       <+> ptext SLIT("is unlifted")
+                   = ptext (sLit "Expecting a lifted type, but") <+> quotes (ppr ty)
+                       <+> ptext (sLit "is unlifted")
 
                    | isUnliftedTypeKind exp_kind && isLiftedTypeKind act_kind
-                   = ptext SLIT("Expecting an unlifted type, but") <+> quotes (ppr ty)
-                       <+> ptext SLIT("is lifted")
+                   = ptext (sLit "Expecting an unlifted type, but") <+> quotes (ppr ty)
+                       <+> ptext (sLit "is lifted")
 
                    | otherwise               -- E.g. Monad [Int]
-                   = ptext SLIT("Kind mis-match")
+                   = ptext (sLit "Kind mis-match")
 
-               more_info = sep [ ptext SLIT("Expected kind") <+>
+               more_info = sep [ ptext (sLit "Expected kind") <+>
                                      quotes (pprKind tidy_exp_kind) <> comma,
-                                 ptext SLIT("but") <+> quotes (ppr ty) <+>
-                                     ptext SLIT("has kind") <+> quotes (pprKind tidy_act_kind)]
+                                 ptext (sLit "but") <+> quotes (ppr ty) <+>
+                                     ptext (sLit "has kind") <+> quotes (pprKind tidy_act_kind)]
 
            failWithTcM (env2, err $$ more_info)
 \end{code}
@@ -2022,7 +2022,7 @@ bleatEscapedTvs globals sig_tvs zonked_tvs
 	; (env3, msgs) <- foldlM check (env2, []) (tidy_tvs `zip` tidy_zonked_tvs)
 	; failWithTcM (env3, main_msg $$ nest 2 (vcat msgs)) }
   where
-    main_msg = ptext SLIT("Inferred type is less polymorphic than expected")
+    main_msg = ptext (sLit "Inferred type is less polymorphic than expected")
 
     check (tidy_env, msgs) (sig_tv, zonked_tv)
       | not (zonked_tv `elemVarSet` globals) = return (tidy_env, msgs)
@@ -2033,18 +2033,18 @@ bleatEscapedTvs globals sig_tvs zonked_tvs
 -----------------------
 escape_msg sig_tv zonked_tv globs
   | notNull globs 
-  = vcat [sep [msg, ptext SLIT("is mentioned in the environment:")], 
+  = vcat [sep [msg, ptext (sLit "is mentioned in the environment:")], 
 	  nest 2 (vcat globs)]
   | otherwise
-  = msg <+> ptext SLIT("escapes")
+  = msg <+> ptext (sLit "escapes")
 	-- Sigh.  It's really hard to give a good error message
 	-- all the time.   One bad case is an existential pattern match.
 	-- We rely on the "When..." context to help.
   where
-    msg = ptext SLIT("Quantified type variable") <+> quotes (ppr sig_tv) <+> is_bound_to
+    msg = ptext (sLit "Quantified type variable") <+> quotes (ppr sig_tv) <+> is_bound_to
     is_bound_to 
 	| sig_tv == zonked_tv = empty
-	| otherwise = ptext SLIT("is unified with") <+> quotes (ppr zonked_tv) <+> ptext SLIT("which")
+	| otherwise = ptext (sLit "is unified with") <+> quotes (ppr zonked_tv) <+> ptext (sLit "which")
 \end{code}
 
 These two context are used with checkSigTyVars
@@ -2058,10 +2058,10 @@ sigCtxt id sig_tvs sig_theta sig_tau tidy_env = do
 	(env1, tidy_sig_tvs)    = tidyOpenTyVars tidy_env sig_tvs
 	(env2, tidy_sig_rho)	= tidyOpenType env1 (mkPhiTy sig_theta sig_tau)
 	(env3, tidy_actual_tau) = tidyOpenType env2 actual_tau
-	sub_msg = vcat [ptext SLIT("Signature type:    ") <+> pprType (mkForAllTys tidy_sig_tvs tidy_sig_rho),
-		        ptext SLIT("Type to generalise:") <+> pprType tidy_actual_tau
+	sub_msg = vcat [ptext (sLit "Signature type:    ") <+> pprType (mkForAllTys tidy_sig_tvs tidy_sig_rho),
+		        ptext (sLit "Type to generalise:") <+> pprType tidy_actual_tau
 		   ]
- 	msg = vcat [ptext SLIT("When trying to generalise the type inferred for") <+> quotes (ppr id),
+ 	msg = vcat [ptext (sLit "When trying to generalise the type inferred for") <+> quotes (ppr id),
 		    nest 2 sub_msg]
     
     return (env3, msg)

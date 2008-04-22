@@ -292,7 +292,7 @@ getSATInfo var = projectFromEnv $ \env -> lookupVarEnv (idSATInfo env) var
 
 newSATName :: Id -> Type -> SatM Id
 newSATName _ ty
-  = SatM $ \us env -> (mkSysLocal FSLIT("$sat") (uniqFromSupply us) ty, env)
+  = SatM $ \us env -> (mkSysLocal (fsLit "$sat") (uniqFromSupply us) ty, env)
 
 getArgLists :: CoreExpr -> ([Staticness Type], [Staticness Id])
 getArgLists expr
@@ -377,7 +377,7 @@ saTransform binder rhs = do
         -- top-level or exported somehow.)
         -- A better fix is to use binder directly but with the TopLevel
         -- tag (or Exported tag) modified.
-        fake_binder = mkSysLocal FSLIT("sat")
+        fake_binder = mkSysLocal (fsLit "sat")
                 (getUnique binder)
                 (idType binder)
         rec_body = mkLams non_static_args

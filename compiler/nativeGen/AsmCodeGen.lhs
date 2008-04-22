@@ -774,11 +774,11 @@ cmmExprConFold referenceKind expr
         CmmReg (CmmGlobal GCEnter1)
           | not opt_PIC
           -> cmmExprConFold referenceKind $
-             CmmLit (CmmLabel (mkRtsCodeLabel SLIT( "__stg_gc_enter_1"))) 
+             CmmLit (CmmLabel (mkRtsCodeLabel (sLit "__stg_gc_enter_1"))) 
         CmmReg (CmmGlobal GCFun)
           | not opt_PIC
           -> cmmExprConFold referenceKind $
-             CmmLit (CmmLabel (mkRtsCodeLabel SLIT( "__stg_gc_fun")))
+             CmmLit (CmmLabel (mkRtsCodeLabel (sLit "__stg_gc_fun")))
 #endif
 
         CmmReg (CmmGlobal mid)

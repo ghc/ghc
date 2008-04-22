@@ -714,7 +714,7 @@ pprASCII str
        do1 w = ptext (sLit "\t.byte\t") <> int (fromIntegral w)
 
 pprAlign bytes =
-	IF_ARCH_alpha(ptextSLIT(".align ") <> int pow2,
+	IF_ARCH_alpha(ptext (sLit ".align ") <> int pow2,
 	IF_ARCH_i386(ptext (sLit ".align ") <> int IF_OS_darwin(pow2,bytes),
 	IF_ARCH_x86_64(ptext (sLit ".align ") <> int IF_OS_darwin(pow2,bytes),
 	IF_ARCH_sparc(ptext (sLit ".align ") <> int bytes,

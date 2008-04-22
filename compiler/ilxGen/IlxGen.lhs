@@ -2206,7 +2206,7 @@ ilxPrimOpTable op
 	MakeStablePtrOp -> ty1_op (\ty1 -> ilxOpSeq [ilxOp "box", ty1, ilxOp "newobj void", repStablePtr {- ty1 -}, ilxOp "::.ctor(class [mscorlib]System.Object)"])
                  {-   a -> State# RealWorld -> (# State# RealWorld, StablePtr# a #) -}
 	MakeStableNameOp -> ty1_op (\ty1 -> ilxOpSeq [ilxOp "pop newobj void", repStableName {- ty1 -}, ilxOp "::.ctor()"])
-                        -- primOpInfo MakeStableNameOp = mkGenPrimOp SLIT("makeStableName#")  [alphaTyVar] [alphaTy, mkStatePrimTy realWorldTy] ((mkTupleTy Unboxed 2 [mkStatePrimTy realWorldTy, mkStableNamePrimTy alphaTy]))
+                        -- primOpInfo MakeStableNameOp = mkGenPrimOp (sLit "makeStableName#")  [alphaTyVar] [alphaTy, mkStatePrimTy realWorldTy] ((mkTupleTy Unboxed 2 [mkStatePrimTy realWorldTy, mkStableNamePrimTy alphaTy]))
 
         EqStableNameOp -> ty1_op (\ty1 -> ilxOp "ceq")
                -- [alphaTyVar] [mkStableNamePrimTy alphaTy, mkStableNamePrimTy alphaTy] (intPrimTy)

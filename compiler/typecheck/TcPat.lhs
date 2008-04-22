@@ -214,9 +214,9 @@ bindInstsOfPatId id thing_inside
 	; return (res, binds) }
 
 -------------------
-unBoxPatBndrType  ty name = unBoxArgType ty (ptext SLIT("The variable") <+> quotes (ppr name))
-unBoxWildCardType ty      = unBoxArgType ty (ptext SLIT("A wild-card pattern"))
-unBoxViewPatType  ty pat  = unBoxArgType ty (ptext SLIT("The view pattern") <+> ppr pat)
+unBoxPatBndrType  ty name = unBoxArgType ty (ptext (sLit "The variable") <+> quotes (ppr name))
+unBoxWildCardType ty      = unBoxArgType ty (ptext (sLit "A wild-card pattern"))
+unBoxViewPatType  ty pat  = unBoxArgType ty (ptext (sLit "The view pattern") <+> ppr pat)
 
 unBoxArgType :: BoxyType -> SDoc -> TcM TcType
 -- In addition to calling unbox, unBoxArgType ensures that the type is of ArgTypeKind; 
@@ -237,7 +237,7 @@ unBoxArgType ty pp_this
 	; unifyType ty' ty2
 	; return ty' }}
   where
-    msg = pp_this <+> ptext SLIT("cannot be bound to an unboxed tuple")
+    msg = pp_this <+> ptext (sLit "cannot be bound to an unboxed tuple")
 \end{code}
 
 
@@ -900,7 +900,7 @@ newLitInst orig lit res_ty	-- Make a LitInst
   = do 	{ loc <- getInstLoc orig
 	; res_tau <- zapToMonotype res_ty
 	; new_uniq <- newUnique
-	; let	lit_nm   = mkSystemVarName new_uniq FSLIT("lit")
+	; let	lit_nm   = mkSystemVarName new_uniq (fsLit "lit")
 		lit_inst = LitInst {tci_name = lit_nm, tci_lit = lit, 
 				    tci_ty = res_tau, tci_loc = loc}
 	; extendLIE lit_inst
@@ -980,7 +980,7 @@ patCtxt :: Pat Name -> Maybe Message	-- Not all patterns are worth pushing a con
 patCtxt (VarPat _)  = Nothing
 patCtxt (ParPat _)  = Nothing
 patCtxt (AsPat _ _) = Nothing
-patCtxt pat 	    = Just (hang (ptext SLIT("In the pattern:")) 
+patCtxt pat 	    = Just (hang (ptext (sLit "In the pattern:")) 
 			       4 (ppr pat))
 
 -----------------------------------------------
@@ -999,10 +999,10 @@ sigPatCtxt pats bound_tvs pat_tys body_ty tidy_env
 	      (env2, tidy_pat_tys) = tidyOpenTypes env1 pat_tys'
 	      (env3, tidy_body_ty) = tidyOpenType  env2 body_ty'
 	; return (env3,
-		 sep [ptext SLIT("When checking an existential match that binds"),
+		 sep [ptext (sLit "When checking an existential match that binds"),
 		      nest 4 (vcat (zipWith ppr_id show_ids tidy_tys)),
-		      ptext SLIT("The pattern(s) have type(s):") <+> vcat (map ppr tidy_pat_tys),
-		      ptext SLIT("The body has type:") <+> ppr tidy_body_ty
+		      ptext (sLit "The pattern(s) have type(s):") <+> vcat (map ppr tidy_pat_tys),
+		      ptext (sLit "The body has type:") <+> ppr tidy_body_ty
 		]) }
   where
     bound_ids = collectPatsBinders pats
@@ -1014,38 +1014,38 @@ sigPatCtxt pats bound_tvs pat_tys body_ty tidy_env
 
 badFieldCon :: DataCon -> Name -> SDoc
 badFieldCon con field
-  = hsep [ptext SLIT("Constructor") <+> quotes (ppr con),
-	  ptext SLIT("does not have field"), quotes (ppr field)]
+  = hsep [ptext (sLit "Constructor") <+> quotes (ppr con),
+	  ptext (sLit "does not have field"), quotes (ppr field)]
 
 polyPatSig :: TcType -> SDoc
 polyPatSig sig_ty
-  = hang (ptext SLIT("Illegal polymorphic type signature in pattern:"))
+  = hang (ptext (sLit "Illegal polymorphic type signature in pattern:"))
        2 (ppr sig_ty)
 
-badTypePat pat = ptext SLIT("Illegal type pattern") <+> ppr pat
+badTypePat pat = ptext (sLit "Illegal type pattern") <+> ppr pat
 
 existentialProcPat :: DataCon -> SDoc
 existentialProcPat con
-  = hang (ptext SLIT("Illegal constructor") <+> quotes (ppr con) <+> ptext SLIT("in a 'proc' pattern"))
-       2 (ptext SLIT("Proc patterns cannot use existentials or GADTs"))
+  = hang (ptext (sLit "Illegal constructor") <+> quotes (ppr con) <+> ptext (sLit "in a 'proc' pattern"))
+       2 (ptext (sLit "Proc patterns cannot use existentials or GADTs"))
 
 lazyPatErr pat tvs
   = failWithTc $
-    hang (ptext SLIT("A lazy (~) pattern cannot bind existential type variables"))
+    hang (ptext (sLit "A lazy (~) pattern cannot bind existential type variables"))
        2 (vcat (map pprSkolTvBinding tvs))
 
 nonRigidMatch con
-  =  hang (ptext SLIT("GADT pattern match in non-rigid context for") <+> quotes (ppr con))
-	2 (ptext SLIT("Solution: add a type signature"))
+  =  hang (ptext (sLit "GADT pattern match in non-rigid context for") <+> quotes (ppr con))
+	2 (ptext (sLit "Solution: add a type signature"))
 
 nonRigidResult res_ty
   = do	{ env0 <- tcInitTidyEnv
 	; let (env1, res_ty') = tidyOpenType env0 res_ty
-	      msg = hang (ptext SLIT("GADT pattern match with non-rigid result type")
+	      msg = hang (ptext (sLit "GADT pattern match with non-rigid result type")
 				<+> quotes (ppr res_ty'))
-		  	 2 (ptext SLIT("Solution: add a type signature"))
+		  	 2 (ptext (sLit "Solution: add a type signature"))
 	; failWithTcM (env1, msg) }
 
 inaccessibleAlt msg
-  = hang (ptext SLIT("Inaccessible case alternative:")) 2 msg
+  = hang (ptext (sLit "Inaccessible case alternative:")) 2 msg
 \end{code}

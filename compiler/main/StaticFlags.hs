@@ -137,7 +137,7 @@ static_flags :: [(String, OptKind IO)]
 --
 -- The common (PassFlag addOpt) action puts the static flag into the bunch of
 -- things that are searched up by the top-level definitions like
---	opt_foo = lookUp FSLIT("-dfoo")
+--	opt_foo = lookUp (fsLit "-dfoo")
 
 -- Note that ordering is important in the following list: any flag which
 -- is a prefix flag (i.e. HasArg, Prefix, OptPrefix, AnySuffix) will override

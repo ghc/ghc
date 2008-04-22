@@ -445,9 +445,9 @@ tick_demanded var (tot, demanded)
      else demanded)
 
 pp_stats (SaStats tlam dlam tc dc tlet dlet)
-      = hcat [ptext SLIT("Lambda vars: "), int (iBox dlam), char '/', int (iBox tlam),
-	      ptext SLIT("; Case vars: "), int (iBox dc),   char '/', int (iBox tc),
-	      ptext SLIT("; Let vars: "),  int (iBox dlet), char '/', int (iBox tlet)
+      = hcat [ptext (sLit "Lambda vars: "), int (iBox dlam), char '/', int (iBox tlam),
+	      ptext (sLit "; Case vars: "), int (iBox dc),   char '/', int (iBox tc),
+	      ptext (sLit "; Let vars: "),  int (iBox dlet), char '/', int (iBox tlet)
 	]
 
 #else /* OMIT_STRANAL_STATS */

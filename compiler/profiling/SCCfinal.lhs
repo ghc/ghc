@@ -280,7 +280,7 @@ boxHigherOrderArgs almost_expr args = do
       = do    -- make a trivial let-binding for the top-level function
         uniq <- getUniqueMM
         let
-            new_var = mkSysLocal FSLIT("sf") uniq var_type
+            new_var = mkSysLocal (fsLit "sf") uniq var_type
         return ( (new_var, old_var) : bindings, StgVarArg new_var )
       where
         var_type = idType old_var

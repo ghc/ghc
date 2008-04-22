@@ -99,10 +99,10 @@ data AbsVal = Top                -- Not a constructed product
 
 -- For pretty debugging
 instance Outputable AbsVal where
-  ppr Top       = ptext SLIT("Top")
-  ppr (Fun r)   = ptext SLIT("Fun->") <> (parens.ppr) r
-  ppr Tuple     = ptext SLIT("Tuple ")
-  ppr Bot       = ptext SLIT("Bot")
+  ppr Top       = ptext (sLit "Top")
+  ppr (Fun r)   = ptext (sLit "Fun->") <> (parens.ppr) r
+  ppr Tuple     = ptext (sLit "Tuple ")
+  ppr Bot       = ptext (sLit "Bot")
 
 
 -- lub takes the lowest upper bound of two abstract values, standard.

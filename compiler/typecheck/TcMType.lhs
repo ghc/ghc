@@ -348,9 +348,9 @@ unifyKindMisMatch ty1 ty2 = do
     ty1' <- zonkTcKind ty1
     ty2' <- zonkTcKind ty2
     let
-	msg = hang (ptext SLIT("Couldn't match kind"))
+	msg = hang (ptext (sLit "Couldn't match kind"))
 		   2 (sep [quotes (ppr ty1'), 
-			   ptext SLIT("against"), 
+			   ptext (sLit "against"), 
 			   quotes (ppr ty2')])
     failWithTc msg
 
@@ -358,8 +358,8 @@ unifyKindCtxt swapped tv1 ty2 tidy_env	-- not swapped => tv1 expected, ty2 infer
 	-- tv1 and ty2 are zonked already
   = return msg
   where
-    msg = (env2, ptext SLIT("When matching the kinds of") <+> 
-		 sep [quotes pp_expected <+> ptext SLIT("and"), quotes pp_actual])
+    msg = (env2, ptext (sLit "When matching the kinds of") <+> 
+		 sep [quotes pp_expected <+> ptext (sLit "and"), quotes pp_actual])
 
     (pp_expected, pp_actual) | swapped   = (pp2, pp1)
 		             | otherwise = (pp1, pp2)
@@ -382,7 +382,7 @@ occurCheckErr ty containingTy
 	      extra = sep [ppr tidy_ty1, char '=', ppr tidy_ty2]
 	; failWithTcM (env2, hang msg 2 extra) }
   where
-    msg = ptext SLIT("Occurs check: cannot construct the infinite type:")
+    msg = ptext (sLit "Occurs check: cannot construct the infinite type:")
 \end{code}
 
 %************************************************************************
@@ -395,7 +395,7 @@ occurCheckErr ty containingTy
 newCoVars :: [(TcType,TcType)] -> TcM [CoVar]
 newCoVars spec
   = do	{ us <- newUniqueSupply 
-	; return [ mkCoVar (mkSysTvName uniq FSLIT("co"))
+	; return [ mkCoVar (mkSysTvName uniq (fsLit "co"))
 			   (mkCoKind ty1 ty2)
 		 | ((ty1,ty2), uniq) <- spec `zip` uniqsFromSupply us] }
 
@@ -474,9 +474,9 @@ newMetaTyVar box_info kind
  	; ref <- newMutVar Flexi
 	; let name = mkSysTvName uniq fs 
 	      fs = case box_info of
-			BoxTv   -> FSLIT("t")
-			TauTv   -> FSLIT("t")
-			SigTv _ -> FSLIT("a")
+			BoxTv   -> fsLit "t"
+			TauTv   -> fsLit "t"
+			SigTv _ -> fsLit "a"
 		-- We give BoxTv and TauTv the same string, because
 		-- otherwise we get user-visible differences in error
 		-- messages, which are confusing.  If you want to see
@@ -1179,10 +1179,10 @@ check_arg_type rank ty
 	; checkTc (not (isUnLiftedType ty)) (unliftedArgErr ty) }
 
 ----------------------------------------
-forAllTyErr     ty = sep [ptext SLIT("Illegal polymorphic or qualified type:"), ppr ty]
-unliftedArgErr  ty = sep [ptext SLIT("Illegal unlifted type:"), ppr ty]
-ubxArgTyErr     ty = sep [ptext SLIT("Illegal unboxed tuple type as function argument:"), ppr ty]
-kindErr kind       = sep [ptext SLIT("Expecting an ordinary type, but found a type of kind"), ppr kind]
+forAllTyErr     ty = sep [ptext (sLit "Illegal polymorphic or qualified type:"), ppr ty]
+unliftedArgErr  ty = sep [ptext (sLit "Illegal unlifted type:"), ppr ty]
+ubxArgTyErr     ty = sep [ptext (sLit "Illegal unboxed tuple type as function argument:"), ppr ty]
+kindErr kind       = sep [ptext (sLit "Expecting an ordinary type, but found a type of kind"), ppr kind]
 \end{code}
 
 Note [Liberal type synonyms]
@@ -1239,11 +1239,11 @@ data SourceTyCtxt
   | InstThetaCtxt	-- Context of an instance decl
 			--	instance <S> => C [a] where ...
 		
-pprSourceTyCtxt (ClassSCCtxt c) = ptext SLIT("the super-classes of class") <+> quotes (ppr c)
-pprSourceTyCtxt SigmaCtxt       = ptext SLIT("the context of a polymorphic type")
-pprSourceTyCtxt (DataTyCtxt tc) = ptext SLIT("the context of the data type declaration for") <+> quotes (ppr tc)
-pprSourceTyCtxt InstThetaCtxt   = ptext SLIT("the context of an instance declaration")
-pprSourceTyCtxt TypeCtxt        = ptext SLIT("the context of a type")
+pprSourceTyCtxt (ClassSCCtxt c) = ptext (sLit "the super-classes of class") <+> quotes (ppr c)
+pprSourceTyCtxt SigmaCtxt       = ptext (sLit "the context of a polymorphic type")
+pprSourceTyCtxt (DataTyCtxt tc) = ptext (sLit "the context of the data type declaration for") <+> quotes (ppr tc)
+pprSourceTyCtxt InstThetaCtxt   = ptext (sLit "the context of an instance declaration")
+pprSourceTyCtxt TypeCtxt        = ptext (sLit "the context of a type")
 \end{code}
 
 \begin{code}
@@ -1277,7 +1277,7 @@ check_pred_ty dflags ctxt pred@(ClassP cls tys)
     arity      = classArity cls
     n_tys      = length tys
     arity_err  = arityErr "Class" class_name arity n_tys
-    how_to_allow = parens (ptext SLIT("Use -XFlexibleContexts to permit this"))
+    how_to_allow = parens (ptext (sLit "Use -XFlexibleContexts to permit this"))
 
 check_pred_ty dflags ctxt pred@(EqPred ty1 ty2)
   = do {	-- Equational constraints are valid in all contexts if type
@@ -1372,9 +1372,9 @@ checkAmbiguity forall_tyvars theta tau_tyvars
 		        not (ct_var `elemVarSet` extended_tau_vars)
 
 ambigErr pred
-  = sep [ptext SLIT("Ambiguous constraint") <+> quotes (pprPred pred),
-	 nest 4 (ptext SLIT("At least one of the forall'd type variables mentioned by the constraint") $$
-		 ptext SLIT("must be reachable from the type after the '=>'"))]
+  = sep [ptext (sLit "Ambiguous constraint") <+> quotes (pprPred pred),
+	 nest 4 (ptext (sLit "At least one of the forall'd type variables mentioned by the constraint") $$
+		 ptext (sLit "must be reachable from the type after the '=>'"))]
 \end{code}
     
 In addition, GHC insists that at least one type variable
@@ -1393,49 +1393,49 @@ checkFreeness forall_tyvars theta
     complain pred    = addErrTc (freeErr pred)
 
 freeErr pred
-  = sep [ ptext SLIT("All of the type variables in the constraint") <+> 
+  = sep [ ptext (sLit "All of the type variables in the constraint") <+> 
           quotes (pprPred pred)
-	, ptext SLIT("are already in scope") <+>
-          ptext SLIT("(at least one must be universally quantified here)")
+	, ptext (sLit "are already in scope") <+>
+          ptext (sLit "(at least one must be universally quantified here)")
 	, nest 4 $
-            ptext SLIT("(Use -XFlexibleContexts to lift this restriction)")
+            ptext (sLit "(Use -XFlexibleContexts to lift this restriction)")
         ]
 \end{code}
 
 \begin{code}
 checkThetaCtxt ctxt theta
-  = vcat [ptext SLIT("In the context:") <+> pprTheta theta,
-	  ptext SLIT("While checking") <+> pprSourceTyCtxt ctxt ]
+  = vcat [ptext (sLit "In the context:") <+> pprTheta theta,
+	  ptext (sLit "While checking") <+> pprSourceTyCtxt ctxt ]
 
-badPredTyErr sty = ptext SLIT("Illegal constraint") <+> pprPred sty
-eqPredTyErr  sty = ptext SLIT("Illegal equational constraint") <+> pprPred sty
+badPredTyErr sty = ptext (sLit "Illegal constraint") <+> pprPred sty
+eqPredTyErr  sty = ptext (sLit "Illegal equational constraint") <+> pprPred sty
 		   $$
-		   parens (ptext SLIT("Use -XTypeFamilies to permit this"))
-predTyVarErr pred  = sep [ptext SLIT("Non type-variable argument"),
-			  nest 2 (ptext SLIT("in the constraint:") <+> pprPred pred)]
-dupPredWarn dups   = ptext SLIT("Duplicate constraint(s):") <+> pprWithCommas pprPred (map head dups)
+		   parens (ptext (sLit "Use -XTypeFamilies to permit this"))
+predTyVarErr pred  = sep [ptext (sLit "Non type-variable argument"),
+			  nest 2 (ptext (sLit "in the constraint:") <+> pprPred pred)]
+dupPredWarn dups   = ptext (sLit "Duplicate constraint(s):") <+> pprWithCommas pprPred (map head dups)
 
 arityErr kind name n m
-  = hsep [ text kind, quotes (ppr name), ptext SLIT("should have"),
+  = hsep [ text kind, quotes (ppr name), ptext (sLit "should have"),
 	   n_arguments <> comma, text "but has been given", int m]
     where
-	n_arguments | n == 0 = ptext SLIT("no arguments")
-		    | n == 1 = ptext SLIT("1 argument")
-		    | True   = hsep [int n, ptext SLIT("arguments")]
+	n_arguments | n == 0 = ptext (sLit "no arguments")
+		    | n == 1 = ptext (sLit "1 argument")
+		    | True   = hsep [int n, ptext (sLit "arguments")]
 
 -----------------
 notMonoType ty
   = do	{ ty' <- zonkTcType ty
 	; env0 <- tcInitTidyEnv
 	; let (env1, tidy_ty) = tidyOpenType env0 ty'
-	      msg = ptext SLIT("Cannot match a monotype with") <+> quotes (ppr tidy_ty)
+	      msg = ptext (sLit "Cannot match a monotype with") <+> quotes (ppr tidy_ty)
 	; failWithTcM (env1, msg) }
 
 notMonoArgs ty
   = do	{ ty' <- zonkTcType ty
 	; env0 <- tcInitTidyEnv
 	; let (env1, tidy_ty) = tidyOpenType env0 ty'
-	      msg = ptext SLIT("Arguments of type synonym families must be monotypes") <+> quotes (ppr tidy_ty)
+	      msg = ptext (sLit "Arguments of type synonym families must be monotypes") <+> quotes (ppr tidy_ty)
 	; failWithTcM (env1, msg) }
 \end{code}
 
@@ -1508,7 +1508,7 @@ check_inst_head dflags clas tys
                 text "Use -XMultiParamTypeClasses if you want to allow more.")
 
 instTypeErr pp_ty msg
-  = sep [ptext SLIT("Illegal instance declaration for") <+> quotes pp_ty, 
+  = sep [ptext (sLit "Illegal instance declaration for") <+> quotes pp_ty, 
 	 nest 4 msg]
 \end{code}
 
@@ -1539,7 +1539,7 @@ checkValidInstance tyvars theta clas inst_tys
 	  	  (instTypeErr (pprClassPred clas inst_tys) msg)
 	}
   where
-    msg  = parens (vcat [ptext SLIT("the Coverage Condition fails for one of the functional dependencies;"),
+    msg  = parens (vcat [ptext (sLit "the Coverage Condition fails for one of the functional dependencies;"),
 			 undecidableMsg])
 \end{code}
 
@@ -1576,11 +1576,11 @@ checkInstTermination tys theta
       = Nothing
 
 predUndecErr pred msg = sep [msg,
-			nest 2 (ptext SLIT("in the constraint:") <+> pprPred pred)]
+			nest 2 (ptext (sLit "in the constraint:") <+> pprPred pred)]
 
-nomoreMsg = ptext SLIT("Variable occurs more often in a constraint than in the instance head")
-smallerMsg = ptext SLIT("Constraint is no smaller than the instance head")
-undecidableMsg = ptext SLIT("Use -fallow-undecidable-instances to permit this")
+nomoreMsg = ptext (sLit "Variable occurs more often in a constraint than in the instance head")
+smallerMsg = ptext (sLit "Constraint is no smaller than the instance head")
+undecidableMsg = ptext (sLit "Use -fallow-undecidable-instances to permit this")
 \end{code}
 
 
@@ -1715,22 +1715,22 @@ isTyFamFree = null . tyFamInsts
 -- Error messages
 
 tyFamInstInIndexErr ty
-  = hang (ptext SLIT("Illegal type family application in type instance") <> 
+  = hang (ptext (sLit "Illegal type family application in type instance") <> 
          colon) 4 $
       ppr ty
 
 polyTyErr ty 
-  = hang (ptext SLIT("Illegal polymorphic type in type instance") <> colon) 4 $
+  = hang (ptext (sLit "Illegal polymorphic type in type instance") <> colon) 4 $
       ppr ty
 
 famInstUndecErr ty msg 
   = sep [msg, 
-         nest 2 (ptext SLIT("in the type family application:") <+> 
+         nest 2 (ptext (sLit "in the type family application:") <+> 
                  pprType ty)]
 
-nestedMsg     = ptext SLIT("Nested type family application")
-nomoreVarMsg  = ptext SLIT("Variable occurs more often than in instance head")
-smallerAppMsg = ptext SLIT("Application is no smaller than the instance head")
+nestedMsg     = ptext (sLit "Nested type family application")
+nomoreVarMsg  = ptext (sLit "Variable occurs more often than in instance head")
+smallerAppMsg = ptext (sLit "Application is no smaller than the instance head")
 \end{code}
 
 

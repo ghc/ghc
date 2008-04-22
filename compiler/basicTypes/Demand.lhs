@@ -119,7 +119,7 @@ isPrim _      = False
 pprDemands :: [Demand] -> Bool -> SDoc
 pprDemands demands bot = hcat (map pprDemand demands) <> pp_bot
 		       where
-			 pp_bot | bot       = ptext SLIT("B")
+			 pp_bot | bot       = ptext (sLit "B")
 				| otherwise = empty
 
 
@@ -135,7 +135,7 @@ pprDemand (WwUnpack wu args)     = char ch <> parens (hcat (map pprDemand args))
 
 instance Outputable Demand where
     ppr (WwLazy False) = empty
-    ppr other_demand   = ptext SLIT("__D") <+> pprDemand other_demand
+    ppr other_demand   = ptext (sLit "__D") <+> pprDemand other_demand
 
 instance Show Demand where
     showsPrec p d = showsPrecSDoc p (ppr d)

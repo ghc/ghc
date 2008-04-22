@@ -87,12 +87,12 @@ mkAbsApproxFun d (AbsApproxFun ds val) = AbsApproxFun (d:ds) val
 mkAbsApproxFun d val	   	       = AbsApproxFun [d]    val
 
 instance Outputable AbsVal where
-    ppr AbsTop = ptext SLIT("AbsTop")
-    ppr AbsBot = ptext SLIT("AbsBot")
-    ppr (AbsProd prod) = hsep [ptext SLIT("AbsProd"), ppr prod]
-    ppr (AbsFun bndr_ty body) = ptext SLIT("AbsFun")
+    ppr AbsTop = ptext (sLit "AbsTop")
+    ppr AbsBot = ptext (sLit "AbsBot")
+    ppr (AbsProd prod) = hsep [ptext (sLit "AbsProd"), ppr prod]
+    ppr (AbsFun bndr_ty body) = ptext (sLit "AbsFun")
     ppr (AbsApproxFun demands val)
-      = ptext SLIT("AbsApprox") <+> brackets (interpp'SP demands) <+> ppr val
+      = ptext (sLit "AbsApprox") <+> brackets (interpp'SP demands) <+> ppr val
 \end{code}
 
 %-----------
