@@ -136,12 +136,24 @@ Absolutely all Ids are made by mkId.  It is just like Var.mkId,
 but in addition it pins free-tyvar-info onto the Id's type, 
 where it can easily be found.
 
+Note [Free type variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+At one time we cached the free type variables of the type of an Id
+at the root of the type in a TyNote.  The idea was to avoid repeating
+the free-type-variable calculation.  But it turned out to slow down
+the compiler overall. I don't quite know why; perhaps finding free
+type variables of an Id isn't all that common whereas applying a 
+substitution (which changes the free type variables) is more common.
+Anyway, we removed it in March 2008.
+
 \begin{code}
 mkLocalIdWithInfo :: Name -> Type -> IdInfo -> Id
 mkLocalIdWithInfo name ty info = Var.mkLocalId name ty info
+	-- Note [Free type variables]
 
 mkExportedLocalId :: Name -> Type -> Id
 mkExportedLocalId name ty = Var.mkExportedLocalId name ty vanillaIdInfo
+	-- Note [Free type variables]
 
 mkGlobalId :: GlobalIdDetails -> Name -> Type -> IdInfo -> Id
 mkGlobalId details name ty info = Var.mkGlobalId details name ty info

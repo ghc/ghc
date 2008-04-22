@@ -346,8 +346,9 @@ occAnalRec (CyclicSCC nodes) (body_usage, binds)
 
     tag_node :: UsageDetails -> Node Details -> (UsageDetails, Node Details)
 	-- (a) Tag the binders in the details with occ info
-	-- (b) Mark the binder with OccInfo saying "no preInlineUnconditionally" if
-	-- 	it is used in any rule (lhs or rhs) of the recursive group
+	-- (b) Mark the binder with "weak loop-breaker" OccInfo 
+	--	saying "no preInlineUnconditionally" if it is used
+	-- 	in any rule (lhs or rhs) of the recursive group
 	--      See Note [Weak loop breakers]
     tag_node usage (ND bndr rhs rhs_usage rhs_fvs, k, ks)
       = (usage `delVarEnv` bndr, (ND bndr2 rhs rhs_usage rhs_fvs, k, ks))
@@ -505,6 +506,12 @@ reOrderCycle (bind : binds)
 
         | is_con_app rhs = 2    -- Data types help with cases
                 -- Note [conapp]
+
+-- If an Id is marked "never inline" then it makes a great loop breaker
+-- The only reason for not checking that here is that it is rare
+-- and I've never seen a situation where it makes a difference,
+-- so it probably isn't worth the time to test on every binder
+--	| isNeverActive (idInlinePragma bndr) = -10
 
         | inlineCandidate bndr rhs = 1  -- Likely to be inlined
                 -- Note [Inline candidates]

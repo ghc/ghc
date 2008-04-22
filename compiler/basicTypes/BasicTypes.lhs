@@ -378,13 +378,25 @@ data OccInfo
  	!OneBranch
 	!InterestingCxt
 
-  | IAmALoopBreaker	-- Used by the occurrence analyser to mark loop-breakers
-			-- in a group of recursive definitions
+  | IAmALoopBreaker	-- Note [LoopBreaker OccInfo]
 	!RulesOnly	-- True <=> This is a weak or rules-only loop breaker
-			--  See OccurAnal Note [Weak loop breakers]
+			--  	    See OccurAnal Note [Weak loop breakers]
 
 type RulesOnly = Bool
 \end{code}
+
+Note [LoopBreaker OccInfo]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+An OccInfo of (IAmLoopBreaker False) is used by the occurrence 
+analyser in two ways:
+  (a) to mark loop-breakers in a group of recursive 
+      definitions (hence the name)
+  (b) to mark binders that must not be inlined in this phase
+      (perhaps it has a NOINLINE pragma)
+Things with (IAmLoopBreaker False) do not get an unfolding 
+pinned on to them, so they are completely opaque.
+
+See OccurAnal Note [Weak loop breakers] for (IAmLoopBreaker True).
 
 
 \begin{code}
