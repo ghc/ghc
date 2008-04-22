@@ -339,12 +339,19 @@ updateBinders local_rules binds
 				-- arising from specialisation pragmas
 \end{code}
 
-
-We must do some gentle simplification on the template (but not the RHS)
-of each rule.  The case that forced me to add this was the fold/build rule,
+Note [Simplifying the left-hand side of a RULE]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We must do some gentle simplification on the lhs (template) of each
+rule.  The case that forced me to add this was the fold/build rule,
 which without simplification looked like:
 	fold k z (build (/\a. g a))  ==>  ...
 This doesn't match unless you do eta reduction on the build argument.
+Similarly for a LHS like
+	augment g (build h) 
+we do not want to get
+	augment (\a. g a) (build h)
+otherwise we don't match when given an argument like
+	augment (\a. h a a) (build h)
 
 \begin{code}
 simplRule env rule@(BuiltinRule {})
@@ -375,10 +382,16 @@ simplExprGently :: SimplEnv -> CoreExpr -> SimplM CoreExpr
 --	alone leaves tons of crud.
 -- Used (a) for user expressions typed in at the interactive prompt
 --	(b) the LHS and RHS of a RULE
+--	(c) Template Haskell splices
 --
 -- The name 'Gently' suggests that the SimplifierMode is SimplGently,
 -- and in fact that is so.... but the 'Gently' in simplExprGently doesn't
 -- enforce that; it just simplifies the expression twice
+
+-- It's important that simplExprGently does eta reduction; see
+-- Note [Simplifying the left-hand side of a RULE] above.  The
+-- simplifier does indeed do eta reduction (it's in Simplify.completeLam)
+-- but only if -O is on.
 
 simplExprGently env expr = do
     expr1 <- simplExpr env (occurAnalyseExpr expr)
