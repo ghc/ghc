@@ -37,6 +37,8 @@ module InteractiveEval (
 
 #ifdef GHCI
 
+#include "HsVersions.h"
+
 import HscMain          hiding (compileExpr)
 import HscTypes
 import TcRnDriver
