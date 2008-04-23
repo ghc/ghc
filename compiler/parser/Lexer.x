@@ -376,23 +376,23 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
 -- when trying to be close to Haskell98
 <0> {
   -- Normal integral literals (:: Num a => a, from Integer)
-  @decimal			{ tok_num positive 0 0 decimal }
-  0[oO] @octal			{ tok_num positive 2 2 octal }
-  0[xX] @hexadecimal		{ tok_num positive 2 2 hexadecimal }
+  @decimal           { tok_num positive 0 0 decimal }
+  0[oO] @octal       { tok_num positive 2 2 octal }
+  0[xX] @hexadecimal { tok_num positive 2 2 hexadecimal }
 
   -- Normal rational literals (:: Fractional a => a, from Rational)
-  @floating_point		{ strtoken tok_float }
+  @floating_point    { strtoken tok_float }
 }
 
 <0> {
   -- Unboxed ints (:: Int#)
   -- It's simpler (and faster?) to give separate cases to the negatives,
   -- especially considering octal/hexadecimal prefixes.
-  @decimal \# / { ifExtension magicHashEnabled } { tok_primint positive 0 1 decimal }
-  0[oO] @octal \# / { ifExtension magicHashEnabled } { tok_primint positive 2 3 octal }
-  0[xX] @hexadecimal \# / { ifExtension magicHashEnabled } { tok_primint positive 2 3 hexadecimal }
-  @negative @decimal \# / { ifExtension magicHashEnabled } { tok_primint negative 1 2 decimal }
-  @negative 0[oO] @octal \# / { ifExtension magicHashEnabled } { tok_primint negative 3 4 octal }
+  @decimal                     \# / { ifExtension magicHashEnabled } { tok_primint positive 0 1 decimal }
+  0[oO] @octal                 \# / { ifExtension magicHashEnabled } { tok_primint positive 2 3 octal }
+  0[xX] @hexadecimal           \# / { ifExtension magicHashEnabled } { tok_primint positive 2 3 hexadecimal }
+  @negative @decimal           \# / { ifExtension magicHashEnabled } { tok_primint negative 1 2 decimal }
+  @negative 0[oO] @octal       \# / { ifExtension magicHashEnabled } { tok_primint negative 3 4 octal }
   @negative 0[xX] @hexadecimal \# / { ifExtension magicHashEnabled } { tok_primint negative 3 4 hexadecimal }
 
   -- Unboxed floats and doubles (:: Float#, :: Double#)
