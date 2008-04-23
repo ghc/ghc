@@ -37,6 +37,8 @@ type FieldExpQ      = Q FieldExp
 
 intPrimL    :: Integer -> Lit
 intPrimL    = IntPrimL
+wordPrimL    :: Integer -> Lit
+wordPrimL    = WordPrimL
 floatPrimL  :: Rational -> Lit
 floatPrimL  = FloatPrimL
 doublePrimL :: Rational -> Lit

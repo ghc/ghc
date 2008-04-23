@@ -28,7 +28,8 @@ module Language.Haskell.TH(
 	-- Library functions
 	InfoQ, ExpQ, DecQ, ConQ, TypeQ, CxtQ, MatchQ, ClauseQ, BodyQ, GuardQ,
 	StmtQ, RangeQ, StrictTypeQ, VarStrictTypeQ, PatQ, FieldPatQ,
-	intPrimL, floatPrimL, doublePrimL, integerL, charL, stringL, rationalL, 
+	intPrimL, wordPrimL, floatPrimL, doublePrimL, integerL, rationalL,
+	charL, stringL,
 	litP, varP, tupP, conP, infixP, tildeP, asP, wildP, recP, listP, sigP,
 	fieldPat,
 	bindS, letS, noBindS, parS, 

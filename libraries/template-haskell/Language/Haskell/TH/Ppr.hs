@@ -155,6 +155,7 @@ pprBody eq (NormalB e) = (if eq then text "=" else text "->") <+> ppr e
 pprLit :: Precedence -> Lit -> Doc
 pprLit i (IntPrimL x)    = parensIf (i > noPrec && x < 0)
                                     (integer x <> char '#')
+pprLit i (WordPrimL x)    = integer x <> text "##"
 pprLit i (FloatPrimL x)  = parensIf (i > noPrec && x < 0)
                                     (float (fromRational x) <> char '#')
 pprLit i (DoublePrimL x) = parensIf (i > noPrec && x < 0)

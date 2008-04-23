@@ -605,6 +605,7 @@ data Lit = CharL Char
                                 -- the moment. Maybe that doesn't matter?
          | RationalL Rational   -- Ditto
          | IntPrimL Integer
+         | WordPrimL Integer
          | FloatPrimL Rational
          | DoublePrimL Rational
     deriving( Show, Eq, Data, Typeable )
