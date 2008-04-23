@@ -57,6 +57,8 @@ import Control.Monad
 import Data.Array
 import Data.Char	( ord )
 import System.Exit
+
+#include "HsVersions.h"
 }
 
 %token
