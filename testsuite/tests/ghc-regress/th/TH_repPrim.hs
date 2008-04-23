@@ -3,7 +3,7 @@
 
 module Main where
 
-import GHC.Base
+import GHC.Exts
 import GHC.Float
 import Language.Haskell.TH
 import Text.PrettyPrint
@@ -11,6 +11,11 @@ import System.IO
 
 main :: IO ()
 main = do putStrLn $ show $ $( do e <- [| I# 20# |]
+                                  runIO $ putStrLn $ show e
+                                  runIO $ putStrLn $ pprint e
+				  runIO $ hFlush stdout
+                                  return e )
+          putStrLn $ show $ $( do e <- [| W# 32## |]
                                   runIO $ putStrLn $ show e
                                   runIO $ putStrLn $ pprint e
 				  runIO $ hFlush stdout
