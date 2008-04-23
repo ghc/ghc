@@ -455,6 +455,7 @@ cvtOverLit (StringL s)   = do { let { s' = mkFastString s }; force s'; return $ 
 
 cvtLit :: Lit -> CvtM HsLit
 cvtLit (IntPrimL i)    = do { force i; return $ HsIntPrim i }
+cvtLit (WordPrimL w)   = do { force w; return $ HsWordPrim w }
 cvtLit (FloatPrimL f)  = do { force f; return $ HsFloatPrim f }
 cvtLit (DoublePrimL f) = do { force f; return $ HsDoublePrim f }
 cvtLit (CharL c)       = do { force c; return $ HsChar c }

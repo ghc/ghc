@@ -474,6 +474,7 @@ newMethod inst_loc id tys = do
 shortCutIntLit :: Integer -> TcType -> Maybe (HsExpr TcId)
 shortCutIntLit i ty
   | isIntTy ty && inIntRange i = Just (HsLit (HsInt i))
+  | isWordTy ty && inWordRange i = Just (mkLit wordDataCon (HsWordPrim i))
   | isIntegerTy ty 	       = Just (HsLit (HsInteger i ty))
   | otherwise		       = shortCutFracLit (fromInteger i) ty
 	-- The 'otherwise' case is important
@@ -484,11 +485,13 @@ shortCutIntLit i ty
 
 shortCutFracLit :: Rational -> TcType -> Maybe (HsExpr TcId)
 shortCutFracLit f ty
-  | isFloatTy ty  = Just (mk_lit floatDataCon  (HsFloatPrim f))
-  | isDoubleTy ty = Just (mk_lit doubleDataCon (HsDoublePrim f))
+  | isFloatTy ty  = Just (mkLit floatDataCon  (HsFloatPrim f))
+  | isDoubleTy ty = Just (mkLit doubleDataCon (HsDoublePrim f))
   | otherwise     = Nothing
   where
-    mk_lit con lit = HsApp (nlHsVar (dataConWrapId con)) (nlHsLit lit)
+
+mkLit :: DataCon -> HsLit -> HsExpr Id
+mkLit con lit = HsApp (nlHsVar (dataConWrapId con)) (nlHsLit lit)
 
 shortCutStringLit :: FastString -> TcType -> Maybe (HsExpr TcId)
 shortCutStringLit s ty

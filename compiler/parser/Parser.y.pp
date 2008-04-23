@@ -316,6 +316,7 @@ incorrect.
  PRIMCHAR	{ L _ (ITprimchar   _) }
  PRIMSTRING	{ L _ (ITprimstring _) }
  PRIMINTEGER	{ L _ (ITprimint    _) }
+ PRIMWORD 	{ L _ (ITprimword  _) }
  PRIMFLOAT	{ L _ (ITprimfloat  _) }
  PRIMDOUBLE	{ L _ (ITprimdouble _) }
 
@@ -1862,6 +1863,7 @@ literal :: { Located HsLit }
 	: CHAR 			{ L1 $ HsChar       $ getCHAR $1 }
 	| STRING 		{ L1 $ HsString     $ getSTRING $1 }
 	| PRIMINTEGER		{ L1 $ HsIntPrim    $ getPRIMINTEGER $1 }
+	| PRIMWORD   		{ L1 $ HsWordPrim    $ getPRIMWORD $1 }
 	| PRIMCHAR		{ L1 $ HsCharPrim   $ getPRIMCHAR $1 }
 	| PRIMSTRING		{ L1 $ HsStringPrim $ getPRIMSTRING $1 }
 	| PRIMFLOAT		{ L1 $ HsFloatPrim  $ getPRIMFLOAT $1 }
@@ -1955,6 +1957,7 @@ getRATIONAL	(L _ (ITrational x)) = x
 getPRIMCHAR	(L _ (ITprimchar   x)) = x
 getPRIMSTRING	(L _ (ITprimstring x)) = x
 getPRIMINTEGER	(L _ (ITprimint    x)) = x
+getPRIMWORD	(L _ (ITprimword x)) = x
 getPRIMFLOAT	(L _ (ITprimfloat  x)) = x
 getPRIMDOUBLE	(L _ (ITprimdouble x)) = x
 getTH_ID_SPLICE (L _ (ITidEscape x)) = x

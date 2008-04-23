@@ -62,7 +62,7 @@ module TcType (
   tcEqType, tcEqTypes, tcEqPred, tcCmpType, tcCmpTypes, tcCmpPred, tcEqTypeX,
   eqKind, 
   isSigmaTy, isOverloadedTy, isRigidTy, isBoxyTy,
-  isDoubleTy, isFloatTy, isIntTy, isStringTy,
+  isDoubleTy, isFloatTy, isIntTy, isWordTy, isStringTy,
   isIntegerTy, isBoolTy, isUnitTy, isCharTy,
   isTauTy, isTauTyCon, tcIsTyVarTy, tcIsForAllTy, 
   isOpenSynTyConApp,
@@ -972,6 +972,7 @@ isFloatTy      = is_tc floatTyConKey
 isDoubleTy     = is_tc doubleTyConKey
 isIntegerTy    = is_tc integerTyConKey
 isIntTy        = is_tc intTyConKey
+isWordTy       = is_tc wordTyConKey
 isBoolTy       = is_tc boolTyConKey
 isUnitTy       = is_tc unitTyConKey
 isCharTy       = is_tc charTyConKey

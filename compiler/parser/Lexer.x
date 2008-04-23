@@ -385,7 +385,7 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
 }
 
 <0> {
-  -- Unboxed ints (:: Int#)
+  -- Unboxed ints (:: Int#) and words (:: Word#)
   -- It's simpler (and faster?) to give separate cases to the negatives,
   -- especially considering octal/hexadecimal prefixes.
   @decimal                     \# / { ifExtension magicHashEnabled } { tok_primint positive 0 1 decimal }
@@ -394,6 +394,10 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
   @negative @decimal           \# / { ifExtension magicHashEnabled } { tok_primint negative 1 2 decimal }
   @negative 0[oO] @octal       \# / { ifExtension magicHashEnabled } { tok_primint negative 3 4 octal }
   @negative 0[xX] @hexadecimal \# / { ifExtension magicHashEnabled } { tok_primint negative 3 4 hexadecimal }
+
+  @decimal                     \# \# / { ifExtension magicHashEnabled } { tok_primword 0 2 decimal }
+  0[oO] @octal                 \# \# / { ifExtension magicHashEnabled } { tok_primword 2 4 octal }
+  0[xX] @hexadecimal           \# \# / { ifExtension magicHashEnabled } { tok_primword 2 4 hexadecimal }
 
   -- Unboxed floats and doubles (:: Float#, :: Double#)
   -- prim_{float,double} work with signed literals
@@ -533,6 +537,7 @@ data Token
   | ITprimchar   Char
   | ITprimstring FastString
   | ITprimint    Integer
+  | ITprimword   Integer
   | ITprimfloat  Rational
   | ITprimdouble Rational
 
@@ -971,6 +976,7 @@ tok_integral itint transint transbuf translen (radix,char_to_int) span buf len =
 -- some conveniences for use with tok_integral
 tok_num = tok_integral ITinteger
 tok_primint = tok_integral ITprimint
+tok_primword = tok_integral ITprimword positive
 positive = id
 negative = negate
 decimal = (10,octDecDigit)

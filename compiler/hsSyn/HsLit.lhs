@@ -34,6 +34,7 @@ data HsLit
   | HsInt	    Integer		-- Genuinely an Int; arises from TcGenDeriv, 
 					--	and from TRANSLATION
   | HsIntPrim	    Integer		-- Unboxed Int
+  | HsWordPrim	    Integer		-- Unboxed Word
   | HsInteger	    Integer  Type	-- Genuinely an integer; arises only from TRANSLATION
 					-- 	(overloaded literals are done with HsOverLit)
   | HsRat	    Rational Type	-- Genuinely a rational; arises only from TRANSLATION
@@ -48,6 +49,7 @@ instance Eq HsLit where
   (HsStringPrim x1) == (HsStringPrim x2) = x1==x2
   (HsInt x1)	    == (HsInt x2)	 = x1==x2
   (HsIntPrim x1)    == (HsIntPrim x2)    = x1==x2
+  (HsWordPrim x1)   == (HsWordPrim x2)   = x1==x2
   (HsInteger x1 _)  == (HsInteger x2 _)  = x1==x2
   (HsRat x1 _)	    == (HsRat x2 _)      = x1==x2
   (HsFloatPrim x1)  == (HsFloatPrim x2)  = x1==x2
@@ -112,6 +114,7 @@ instance Outputable HsLit where
     ppr (HsFloatPrim f)	 = rational f <> char '#'
     ppr (HsDoublePrim d) = rational d <> text "##"
     ppr (HsIntPrim i)	 = integer i  <> char '#'
+    ppr (HsWordPrim w)	 = integer w  <> text "##"
 
 -- in debug mode, print the expression that it's resolved to, too
 instance OutputableBndr id => Outputable (HsOverLit id) where

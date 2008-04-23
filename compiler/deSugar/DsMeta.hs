@@ -1260,6 +1260,7 @@ repLiteral :: HsLit -> DsM (Core TH.Lit)
 repLiteral lit 
   = do lit' <- case lit of
                    HsIntPrim i    -> mk_integer i
+                   HsWordPrim w   -> mk_integer w
                    HsInt i        -> mk_integer i
                    HsFloatPrim r  -> mk_rational r
                    HsDoublePrim r -> mk_rational r
@@ -1273,6 +1274,7 @@ repLiteral lit
 		 HsInteger _ _  -> Just integerLName
 		 HsInt     _    -> Just integerLName
 		 HsIntPrim _    -> Just intPrimLName
+		 HsWordPrim _   -> Just wordPrimLName
 		 HsFloatPrim _  -> Just floatPrimLName
 		 HsDoublePrim _ -> Just doublePrimLName
 		 HsChar _       -> Just charLName
@@ -1368,7 +1370,7 @@ templateHaskellNames = [
     mkNameName, mkNameG_vName, mkNameG_dName, mkNameG_tcName, mkNameLName, 
 
     -- Lit
-    charLName, stringLName, integerLName, intPrimLName,
+    charLName, stringLName, integerLName, intPrimLName, wordPrimLName,
     floatPrimLName, doublePrimLName, rationalLName,
     -- Pat
     litPName, varPName, tupPName, conPName, tildePName, infixPName,
@@ -1473,6 +1475,7 @@ charLName       = libFun (fsLit "charL")       charLIdKey
 stringLName     = libFun (fsLit "stringL")     stringLIdKey
 integerLName    = libFun (fsLit "integerL")    integerLIdKey
 intPrimLName    = libFun (fsLit "intPrimL")    intPrimLIdKey
+wordPrimLName   = libFun (fsLit "wordPrimL")   wordPrimLIdKey
 floatPrimLName  = libFun (fsLit "floatPrimL")  floatPrimLIdKey
 doublePrimLName = libFun (fsLit "doublePrimL") doublePrimLIdKey
 rationalLName   = libFun (fsLit "rationalL")     rationalLIdKey
@@ -1658,9 +1661,10 @@ charLIdKey        = mkPreludeMiscIdUnique 210
 stringLIdKey      = mkPreludeMiscIdUnique 211
 integerLIdKey     = mkPreludeMiscIdUnique 212
 intPrimLIdKey     = mkPreludeMiscIdUnique 213
-floatPrimLIdKey   = mkPreludeMiscIdUnique 214
-doublePrimLIdKey  = mkPreludeMiscIdUnique 215
-rationalLIdKey    = mkPreludeMiscIdUnique 216
+wordPrimLIdKey    = mkPreludeMiscIdUnique 214
+floatPrimLIdKey   = mkPreludeMiscIdUnique 215
+doublePrimLIdKey  = mkPreludeMiscIdUnique 216
+rationalLIdKey    = mkPreludeMiscIdUnique 217
 
 -- data Pat = ...
 litPIdKey         = mkPreludeMiscIdUnique 220

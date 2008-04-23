@@ -28,6 +28,8 @@ module TysWiredIn (
 	intTyCon, intDataCon, intTyCon_RDR, intDataCon_RDR, intTyConName,
 	intTy,
 
+	wordTyCon, wordDataCon, wordTyConName, wordTy,
+
 	listTyCon, nilDataCon, consDataCon,
 	listTyCon_RDR, consDataCon_RDR, listTyConName,
 	mkListTy,
@@ -349,6 +351,16 @@ intTyCon :: TyCon
 intTyCon = pcNonRecDataTyCon intTyConName [] [intDataCon]
 intDataCon :: DataCon
 intDataCon = pcDataCon intDataConName [] [intPrimTy] intTyCon
+\end{code}
+
+\begin{code}
+wordTy :: Type
+wordTy = mkTyConTy wordTyCon 
+
+wordTyCon :: TyCon
+wordTyCon = pcNonRecDataTyCon wordTyConName [] [wordDataCon]
+wordDataCon :: DataCon
+wordDataCon = pcDataCon wordDataConName [] [wordPrimTy] wordTyCon
 \end{code}
 
 \begin{code}

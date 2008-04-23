@@ -118,6 +118,7 @@ hsLitType (HsString str)   = stringTy
 hsLitType (HsStringPrim s) = addrPrimTy
 hsLitType (HsInt i)	   = intTy
 hsLitType (HsIntPrim i)    = intPrimTy
+hsLitType (HsWordPrim w)   = wordPrimTy
 hsLitType (HsInteger i ty) = ty
 hsLitType (HsRat _ ty)	   = ty
 hsLitType (HsFloatPrim f)  = floatPrimTy

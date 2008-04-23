@@ -69,6 +69,7 @@ dsLit :: HsLit -> DsM CoreExpr
 dsLit (HsStringPrim s) = return (mkLit (MachStr s))
 dsLit (HsCharPrim   c) = return (mkLit (MachChar c))
 dsLit (HsIntPrim    i) = return (mkLit (MachInt i))
+dsLit (HsWordPrim   w) = return (mkLit (MachWord w))
 dsLit (HsFloatPrim  f) = return (mkLit (MachFloat f))
 dsLit (HsDoublePrim d) = return (mkLit (MachDouble d))
 
@@ -103,6 +104,7 @@ hsLitKey :: HsLit -> Literal
 -- It only works for primitive types and strings; 
 -- others have been removed by tidy
 hsLitKey (HsIntPrim     i) = mkMachInt  i
+hsLitKey (HsWordPrim    w) = mkMachWord w
 hsLitKey (HsCharPrim    c) = MachChar   c
 hsLitKey (HsStringPrim  s) = MachStr    s
 hsLitKey (HsFloatPrim   f) = MachFloat  f
@@ -128,7 +130,7 @@ hsOverLitKey (HsIsString s _ _)  False  = MachStr s
 \begin{code}
 tidyLitPat :: HsLit -> Pat Id
 -- Result has only the following HsLits:
---	HsIntPrim, HsCharPrim, HsFloatPrim
+--	HsIntPrim, HsWordPrim, HsCharPrim, HsFloatPrim
 --	HsDoublePrim, HsStringPrim, HsString
 --  * HsInteger, HsRat, HsInt can't show up in LitPats
 --  * We get rid of HsChar right here
@@ -145,6 +147,7 @@ tidyLitPat lit = LitPat lit
 tidyNPat :: HsOverLit Id -> Maybe (SyntaxExpr Id) -> SyntaxExpr Id -> Pat Id
 tidyNPat over_lit mb_neg eq 
   | isIntTy    (overLitType over_lit) = mk_con_pat intDataCon    (HsIntPrim int_val)
+  | isWordTy   (overLitType over_lit) = mk_con_pat wordDataCon   (HsWordPrim int_val)
   | isFloatTy  (overLitType over_lit) = mk_con_pat floatDataCon  (HsFloatPrim  rat_val)
   | isDoubleTy (overLitType over_lit) = mk_con_pat doubleDataCon (HsDoublePrim rat_val)
 --  | isStringTy lit_ty = mk_con_pat stringDataCon (HsStringPrim str_val)
