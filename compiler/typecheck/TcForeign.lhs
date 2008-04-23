@@ -25,6 +25,8 @@ module TcForeign
         , tcForeignExports
 	) where
 
+#include "HsVersions.h"
+
 import HsSyn
 
 import TcRnMonad

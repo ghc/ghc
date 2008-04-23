@@ -24,6 +24,8 @@ module PprMach (
 	pprInstr, pprSize, pprUserReg
   ) where
 
+#include "HsVersions.h"
+
 import Cmm
 import MachOp		( MachRep(..), wordRep, isFloatingRep )
 import MachRegs		-- may differ per-platform

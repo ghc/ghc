@@ -14,6 +14,8 @@ module PositionIndependentCode (
         initializePicBase
      ) where
 
+#include "HsVersions.h"
+
 {-
   This module handles generation of position independent code and
   dynamic-linking related issues for the native code generator.

@@ -33,6 +33,8 @@ module DriverPhases (
    isSourceFilename         -- :: FilePath -> Bool
  ) where
 
+#include "HsVersions.h"
+
 import Panic		( panic )
 import System.FilePath
 

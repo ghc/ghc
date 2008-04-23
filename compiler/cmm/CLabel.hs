@@ -111,6 +111,8 @@ module CLabel (
 	pprCLabel
     ) where
 
+#include "HsVersions.h"
+
 import StaticFlags
 import Packages
 import DataCon

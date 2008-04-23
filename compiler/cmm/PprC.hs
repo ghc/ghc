@@ -30,6 +30,8 @@ module PprC (
         pprStringInCStyle 
   ) where
 
+#include "HsVersions.h"
+
 -- Cmm stuff
 import Cmm
 import CLabel
