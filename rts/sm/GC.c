@@ -182,7 +182,6 @@ GarbageCollect ( rtsBool force_major_gc )
   bdescr *bd;
   step *stp;
   lnat live, allocated, max_copied, avg_copied, slop;
-  lnat oldgen_saved_blocks = 0;
   gc_thread *saved_gct;
   nat g, s, t, n;
 
@@ -391,14 +390,6 @@ GarbageCollect ( rtsBool force_major_gc )
 #endif
 
   // NO MORE EVACUATION AFTER THIS POINT!
-  // Finally: compaction of the oldest generation.
-  if (major_gc && oldest_gen->steps[0].is_compacted) {
-      // save number of blocks for stats
-      oldgen_saved_blocks = oldest_gen->steps[0].n_old_blocks;
-      compact(gct->scavenged_static_objects);
-  }
-
-  IF_DEBUG(sanity, checkGlobalTSOList(rtsFalse));
 
   // Two-space collector: free the old to-space.
   // g0s0->old_blocks is the old nursery
@@ -492,6 +483,13 @@ GarbageCollect ( rtsBool force_major_gc )
       }
   }
 
+  // Finally: compaction of the oldest generation.
+  if (major_gc && oldest_gen->steps[0].is_compacted) {
+      compact(gct->scavenged_static_objects);
+  }
+
+  IF_DEBUG(sanity, checkGlobalTSOList(rtsFalse));
+
   /* run through all the generations/steps and tidy up 
    */
   copied = 0;
@@ -555,19 +553,21 @@ GarbageCollect ( rtsBool force_major_gc )
 	if (!(g == 0 && s == 0 && RtsFlags.GcFlags.generations > 1)) {
 	    if (stp->is_compacted)
             {
-		// for a compacted step, just shift the new to-space
-		// onto the front of the now-compacted existing blocks.
-		for (bd = stp->blocks; bd != NULL; bd = bd->link) {
-                    stp->n_words += bd->free - bd->start;
-		}
 		// tack the new blocks on the end of the existing blocks
 		if (stp->old_blocks != NULL) {
 		    for (bd = stp->old_blocks; bd != NULL; bd = next) {
+                        stp->n_words += bd->free - bd->start;
+
 			// NB. this step might not be compacted next
 			// time, so reset the BF_COMPACTED flags.
 			// They are set before GC if we're going to
 			// compact.  (search for BF_COMPACTED above).
 			bd->flags &= ~BF_COMPACTED;
+
+                        // between GCs, all blocks in the heap except
+                        // for the nursery have the BF_EVACUATED flag set.
+                        bd->flags |= BF_EVACUATED;
+
 			next = bd->link;
 			if (next == NULL) {
 			    bd->link = stp->blocks;
