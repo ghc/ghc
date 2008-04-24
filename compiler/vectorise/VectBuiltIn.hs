@@ -241,6 +241,7 @@ preludeVars
     , mk gHC_PARR (fsLit "singletonP") nDP_COMBINATORS (fsLit "singletonPA")
     , mk gHC_PARR (fsLit "concatP")    nDP_COMBINATORS (fsLit "concatPA")
     , mk gHC_PARR (fsLit "+:+")        nDP_COMBINATORS (fsLit "appPA")
+    , mk gHC_PARR (fsLit "emptyP")     nDP_PARRAY (fsLit "emptyPA")
 
     , mk nDP_PRELUDE_INT  (fsLit "plus") nDP_PRELUDE_INT (fsLit "plusV")
     , mk nDP_PRELUDE_INT  (fsLit "minus") nDP_PRELUDE_INT (fsLit "minusV")
@@ -260,6 +261,7 @@ preludeVars
     , mk nDP_PRELUDE_DOUBLE  (fsLit "minus") nDP_PRELUDE_DOUBLE (fsLit "minusV")
     , mk nDP_PRELUDE_DOUBLE  (fsLit "mult")  nDP_PRELUDE_DOUBLE (fsLit "multV")
     , mk nDP_PRELUDE_DOUBLE  (fsLit "divide")  nDP_PRELUDE_DOUBLE (fsLit "divideV")
+    , mk nDP_PRELUDE_DOUBLE  (fsLit  "squareRoot")  nDP_PRELUDE_DOUBLE (fsLit "squareRootV")    
     , mk nDP_PRELUDE_DOUBLE  (fsLit "sumP")  nDP_PRELUDE_DOUBLE (fsLit "sumPA")
     , mk nDP_PRELUDE_DOUBLE  (fsLit "minIndexP") 
          nDP_PRELUDE_DOUBLE  (fsLit "minIndexPA")
@@ -277,6 +279,7 @@ preludeVars
     , mk nDP_PRELUDE_PARR (fsLit "fromPArrayP") nDP_PRELUDE_PARR (fsLit "fromPArrayPA")
     , mk nDP_PRELUDE_PARR (fsLit "toPArrayP") nDP_PRELUDE_PARR (fsLit "toPArrayPA")
     , mk nDP_PRELUDE_PARR (fsLit "fromNestedPArrayP") nDP_PRELUDE_PARR (fsLit "fromNestedPArrayPA")
+    , mk nDP_PRELUDE_PARR (fsLit "combineP")    nDP_COMBINATORS (fsLit "combine2PA")
     ]
   where
     mk = (,,,)
