@@ -452,11 +452,11 @@ int64ToIntegerzh_fast
    hi = TO_W_(val >> 32);
    lo = TO_W_(val);
 
-   if ( hi != 0 && hi != 0xFFFFFFFF )  { 
-       words_needed = 2;
-   } else { 
+   if ( hi == 0 || (hi == 0xFFFFFFFF && lo != 0) )  {
        // minimum is one word
        words_needed = 1;
+   } else { 
+       words_needed = 2;
    }
 
    ALLOC_PRIM( SIZEOF_StgArrWords + WDS(words_needed),
