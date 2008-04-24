@@ -169,9 +169,9 @@ newSpark (StgRegTable *reg, StgClosure *p)
  * -------------------------------------------------------------------------- */
 
 void
-markSparkQueue (evac_fn evac, void *user, Capability *cap)
+updateSparkQueue (Capability *cap)
 { 
-    StgClosure **sparkp, **to_sparkp;
+    StgClosure *spark, **sparkp, **to_sparkp;
     nat n, pruned_sparks; // stats only
     StgSparkPool *pool;
     
@@ -184,21 +184,15 @@ markSparkQueue (evac_fn evac, void *user, Capability *cap)
     
     ASSERT_SPARK_POOL_INVARIANTS(pool);
     
-#if defined(PARALLEL_HASKELL)
-    // stats only
-    n = 0;
-    pruned_sparks = 0;
-#endif
-	
     sparkp = pool->hd;
     to_sparkp = pool->hd;
     while (sparkp != pool->tl) {
         ASSERT(*sparkp!=NULL);
         ASSERT(LOOKS_LIKE_CLOSURE_PTR(((StgClosure *)*sparkp)));
         // ToDo?: statistics gathering here (also for GUM!)
-        if (closure_SHOULD_SPARK(*sparkp)) {
-            evac(user, sparkp);
-            *to_sparkp++ = *sparkp;
+        spark = isAlive(*sparkp);
+        if (spark != NULL && closure_SHOULD_SPARK(spark)) {
+            *to_sparkp++ = spark;
             if (to_sparkp == pool->lim) {
                 to_sparkp = pool->base;
             }
@@ -215,19 +209,30 @@ markSparkQueue (evac_fn evac, void *user, Capability *cap)
 	
     PAR_TICKY_MARK_SPARK_QUEUE_END(n);
 	
-#if defined(PARALLEL_HASKELL)
     debugTrace(DEBUG_sched, 
-               "marked %d sparks and pruned %d sparks on [%x]",
-               n, pruned_sparks, mytid);
-#else
-    debugTrace(DEBUG_sched, 
-               "marked %d sparks and pruned %d sparks",
+               "updated %d sparks and pruned %d sparks",
                n, pruned_sparks);
-#endif
     
     debugTrace(DEBUG_sched,
                "new spark queue len=%d; (hd=%p; tl=%p)\n",
                sparkPoolSize(pool), pool->hd, pool->tl);
+}
+
+void
+traverseSparkQueue (evac_fn evac, void *user, Capability *cap)
+{
+    StgClosure **sparkp;
+    StgSparkPool *pool;
+    
+    pool = &(cap->r.rSparks);
+    sparkp = pool->hd;
+    while (sparkp != pool->tl) {
+        evac(sparkp, user);
+        sparkp++;
+        if (sparkp == pool->lim) {
+            sparkp = pool->base;
+        }
+    }
 }
 
 #else

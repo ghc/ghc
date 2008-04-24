@@ -791,10 +791,6 @@ markSomeCapabilities (evac_fn evac, void *user, nat i0, nat delta)
 		       "evac'ing suspended TSO %lu", (unsigned long)task->suspended_tso->id);
 	    evac(user, (StgClosure **)(void *)&task->suspended_tso);
 	}
-
-#if defined(THREADED_RTS)
-        markSparkQueue (evac, user, cap);
-#endif
     }
     
 #if !defined(THREADED_RTS)
@@ -802,6 +798,34 @@ markSomeCapabilities (evac_fn evac, void *user, nat i0, nat delta)
     evac(user, (StgClosure **)(void *)&blocked_queue_tl);
     evac(user, (StgClosure **)(void *)&sleeping_queue);
 #endif 
+}
+
+// Sparks are not roots for GC, so we don't mark them in
+// markSomeCapabilities().  Instead, we traverse the spark queues
+// after GC and throw away any that are unreachable.
+void
+updateCapabilitiesPostGC (void)
+{
+#if defined(THREADED_RTS)
+    nat i;
+    for (i = 0; i < n_capabilities; i++) {
+        updateSparkQueue (&capabilities[i]);
+    }
+#endif // THREADED_RTS
+}
+
+// This function is used by the compacting GC to thread all the
+// pointers from spark queues.
+void
+traverseSparkQueues (evac_fn evac USED_IF_THREADS, void *user USED_IF_THREADS)
+{
+#if defined(THREADED_RTS)
+    nat i;
+    for (i = 0; i < n_capabilities; i++) {
+        traverseSparkQueue (evac, user, &capabilities[i]);
+    }
+#endif // THREADED_RTS
+
 }
 
 void

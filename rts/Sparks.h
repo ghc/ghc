@@ -9,12 +9,13 @@
 #ifndef SPARKS_H
 #define SPARKS_H
 
-#if defined(PARALLEL_HASKELL) || defined(THREADED_RTS)
+#if defined(THREADED_RTS)
 StgClosure * findSpark         (Capability *cap);
 void         initSparkPools    (void);
 void         freeSparkPool     (StgSparkPool *pool);
 void         createSparkThread (Capability *cap, StgClosure *p);
-void         markSparkQueue    (evac_fn evac, void *user, Capability *cap);
+void         updateSparkQueue  (Capability *cap);
+void         traverseSparkQueue(evac_fn evac, void *user, Capability *cap);
 
 INLINE_HEADER void     discardSparks  (StgSparkPool *pool);
 INLINE_HEADER nat      sparkPoolSize  (StgSparkPool *pool);
@@ -23,30 +24,6 @@ INLINE_HEADER rtsBool  emptySparkPool (StgSparkPool *pool);
 INLINE_HEADER void     discardSparksCap  (Capability *cap);
 INLINE_HEADER nat      sparkPoolSizeCap  (Capability *cap);
 INLINE_HEADER rtsBool  emptySparkPoolCap (Capability *cap);
-#endif
-
-#if defined(PARALLEL_HASKELL)
-StgTSO      *activateSpark (rtsSpark spark) ;
-rtsBool      add_to_spark_queue( StgClosure *closure, StgSparkPool *pool );
-void         markSparkQueue( void );
-nat          spark_queue_len( StgSparkPool *pool );
-void         disposeSpark( StgClosure *spark );
-#endif
-
-#if defined(GRAN)
-void      findLocalSpark (rtsEvent *event, rtsBool *found_res, rtsSparkQ *spark_res);
-rtsBool   activateSpark (rtsEvent *event, rtsSparkQ spark);
-rtsSpark *newSpark(StgClosure *node, nat name, nat gran_info, 
-		   nat size_info, nat par_info, nat local);
-void      add_to_spark_queue(rtsSpark *spark);
-rtsSpark *delete_from_sparkq (rtsSpark *spark, PEs p, rtsBool dispose_too);
-void 	  disposeSpark(rtsSpark *spark);
-void 	  disposeSparkQ(rtsSparkQ spark);
-void 	  print_spark(rtsSpark *spark);
-void      print_sparkq(PEs proc);
-void 	  print_sparkq_stats(void);
-nat  	  spark_queue_len(PEs proc);
-void      markSparkQueue(void);
 #endif
 
 /* -----------------------------------------------------------------------------

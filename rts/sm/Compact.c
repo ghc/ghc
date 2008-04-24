@@ -966,6 +966,9 @@ compact(StgClosure *static_objects)
     // 1. thread the roots
     markCapabilities((evac_fn)thread_root, NULL);
 
+    // spark queues
+    traverseSparkQueues((evac_fn)thread_root, NULL);
+
     // the weak pointer lists...
     if (weak_ptr_list != NULL) {
 	thread((void *)&weak_ptr_list);

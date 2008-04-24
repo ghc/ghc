@@ -238,6 +238,8 @@ void freeCapability (Capability *cap);
 // FOr the GC:
 void markSomeCapabilities (evac_fn evac, void *user, nat i0, nat delta);
 void markCapabilities (evac_fn evac, void *user);
+void updateCapabilitiesPostGC (void);
+void traverseSparkQueues (evac_fn evac, void *user);
 
 /* -----------------------------------------------------------------------------
  * INLINE functions... private below here
