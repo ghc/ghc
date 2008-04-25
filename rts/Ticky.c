@@ -30,8 +30,11 @@ static void printRegisteredCounterInfo (FILE *); /* fwd decl */
 void
 PrintTickyInfo(void)
 {
-  unsigned long i;
+  // XXX This is only used in commented out or #if FALSE'd out code currently:
+  // unsigned long i;
 
+/* XXX These are used only in an #if FALSE block below */
+#if FALSE
   unsigned long tot_allocs = /* total number of things allocated */
 	ALLOC_FUN_ctr + ALLOC_SE_THK_ctr + ALLOC_UP_THK_ctr + ALLOC_CON_ctr + ALLOC_TUP_ctr +
     	+ ALLOC_TSO_ctr + ALLOC_BH_ctr  + ALLOC_PAP_ctr + ALLOC_PRIM_ctr
@@ -66,6 +69,7 @@ PrintTickyInfo(void)
 
   unsigned long tot_wds = /* total words */
 	tot_adm_wds + tot_gds_wds + tot_slp_wds;
+#endif
 
   unsigned long tot_thk_enters = ENT_STATIC_THK_ctr + ENT_DYN_THK_ctr;
   unsigned long tot_con_enters = ENT_STATIC_CON_ctr + ENT_DYN_CON_ctr;
@@ -76,10 +80,13 @@ PrintTickyInfo(void)
   // This is the number of times we entered a function via some kind
   // of slow call.  It amounts to all the slow applications, not
   // counting those that were to too few arguments.
+  /*
+  XXX This us unused - can we delete it? -- IGL 2008-04-25
   unsigned long tot_fun_slow_enters = 
       SLOW_CALL_ctr - 
       SLOW_CALL_FUN_TOO_FEW_ctr -
       SLOW_CALL_PAP_TOO_FEW_ctr;
+  */
 
   unsigned long tot_known_calls =
       KNOWN_CALL_ctr + KNOWN_CALL_TOO_FEW_ARGS_ctr + 
