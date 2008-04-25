@@ -61,6 +61,7 @@ nDP_UARR,
   nDP_PRELUDE_PARR,
   nDP_PRELUDE_INT,
   nDP_PRELUDE_DOUBLE,
+  nDP_PRELUDE_BOOL,
   nDP_PRELUDE_TUPLE :: Module
 
 nDP_UARR        = mkNDPModule (fsLit "Data.Array.Parallel.Unlifted.Flat.UArr")
@@ -74,6 +75,7 @@ nDP_COMBINATORS = mkNDPModule (fsLit "Data.Array.Parallel.Lifted.Combinators")
 nDP_PRELUDE_PARR = mkNDPModule (fsLit "Data.Array.Parallel.Prelude.Base.PArr")
 nDP_PRELUDE_INT  = mkNDPModule (fsLit "Data.Array.Parallel.Prelude.Base.Int")
 nDP_PRELUDE_DOUBLE = mkNDPModule (fsLit "Data.Array.Parallel.Prelude.Base.Double")
+nDP_PRELUDE_BOOL = mkNDPModule (fsLit "Data.Array.Parallel.Prelude.Base.Bool")
 nDP_PRELUDE_TUPLE  = mkNDPModule (fsLit "Data.Array.Parallel.Prelude.Base.Tuple")
 
 data Builtins = Builtins {
@@ -247,7 +249,10 @@ preludeVars
     , mk nDP_PRELUDE_INT  (fsLit "minus") nDP_PRELUDE_INT (fsLit "minusV")
     , mk nDP_PRELUDE_INT  (fsLit "mult")  nDP_PRELUDE_INT (fsLit "multV")
     , mk nDP_PRELUDE_INT  (fsLit "intDiv")  nDP_PRELUDE_INT (fsLit "intDivV")
+    , mk nDP_PRELUDE_INT  (fsLit "intMod")  nDP_PRELUDE_INT (fsLit "intModV")
+    , mk nDP_PRELUDE_INT  (fsLit "intSquareRoot")  nDP_PRELUDE_INT (fsLit "intSquareRootV")
     , mk nDP_PRELUDE_INT  (fsLit "sumP")  nDP_PRELUDE_INT (fsLit "sumPA")
+    , mk nDP_PRELUDE_INT  (fsLit "enumFromToP")  nDP_PRELUDE_INT (fsLit "enumFromToPA")
     , mk nDP_PRELUDE_INT  (fsLit "upToP") nDP_PRELUDE_INT (fsLit "upToPA")
 
     , mk nDP_PRELUDE_INT  (fsLit "eq") nDP_PRELUDE_INT (fsLit "eqV")
@@ -274,6 +279,9 @@ preludeVars
     , mk nDP_PRELUDE_DOUBLE  (fsLit "lt") nDP_PRELUDE_DOUBLE (fsLit "ltV")
     , mk nDP_PRELUDE_DOUBLE  (fsLit "ge") nDP_PRELUDE_DOUBLE (fsLit "geV")
     , mk nDP_PRELUDE_DOUBLE  (fsLit "gt")  nDP_PRELUDE_DOUBLE (fsLit "gtV")
+
+    , mk nDP_PRELUDE_BOOL  (fsLit "andP")  nDP_PRELUDE_BOOL (fsLit "andPA")
+    , mk nDP_PRELUDE_BOOL  (fsLit "orP")  nDP_PRELUDE_BOOL (fsLit "orPA")
 
     -- FIXME: temporary
     , mk nDP_PRELUDE_PARR (fsLit "fromPArrayP") nDP_PRELUDE_PARR (fsLit "fromPArrayPA")
