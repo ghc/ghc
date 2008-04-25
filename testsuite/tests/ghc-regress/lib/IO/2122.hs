@@ -1,4 +1,4 @@
-{- 
+{-
 
 Before running this, check that /tmp/test does not exist and
 contain something important. Then do:
@@ -23,7 +23,8 @@ import Control.Monad
 import System.Directory
 import System.IO
 import System.Environment
-import System.Posix.IO
+-- Used by test2:
+-- import System.Posix.IO
 
 fp = "2122-test"
 
@@ -44,6 +45,7 @@ test causeFailure =
        removeFile fp
        writeFile fp (show [1..100]) `Prelude.catch` (\e -> error ("writeFile: " ++ show e))
 
+{-
 -- this version never fails (except in GHCi, if test has previously failed).
 -- probably because openFd does not try to lock the file
 test2 :: Bool -> IO ()
@@ -55,7 +57,9 @@ test2 causeFailure =
        closeFd fd1
        removeFile fp
        writeFile fp (show [1..100]) `Prelude.catch` (\e -> error ("writeFile: " ++ show e))
+-}
 
+{-
 -- fails sometimes when run repeated in GHCi, but seems fine with
 -- runhaskell or compiled
 test3 :: IO ()
@@ -68,3 +72,5 @@ test3 =
        print =<< hGetContents h2
        hClose h2
        hClose h1
+-}
+
