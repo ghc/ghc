@@ -4,7 +4,7 @@
 -- Copyright   :  Conor McBride and Ross Paterson 2005
 -- License     :  BSD-style (see the LICENSE file in the distribution)
 --
--- Maintainer  :  ross@soi.city.ac.uk
+-- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
 -- Portability :  portable
 --
