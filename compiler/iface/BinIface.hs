@@ -79,6 +79,13 @@ readBinIface_ checkHiWay traceBinIFaceReading hi_path nc = do
           = printer (text what <> text ": " <>
                      vcat [text "Wanted " <> ppr wanted <> text ",",
                            text "got    " <> ppr got])
+      errorOnMismatch :: (Eq a, Show a) => String -> a -> a -> IO ()
+      errorOnMismatch what wanted got
+            -- This will be caught by readIface which will emit an error
+            -- msg containing the iface module name.
+          = when (wanted /= got) $ throwDyn $ ProgramError
+                        (what ++ " (wanted " ++ show wanted
+                              ++ ", got "    ++ show got ++ ")")
   bh <- Binary.readBinMem hi_path
 
         -- Read the magic number to check that this really is a GHC .hi file
@@ -86,9 +93,8 @@ readBinIface_ checkHiWay traceBinIFaceReading hi_path nc = do
         --  GHC interface file format)
   magic <- get bh
   wantedGot "Magic" binaryInterfaceMagic magic
-  when (magic /= binaryInterfaceMagic) $
-        throwDyn (ProgramError (
-           "magic number mismatch: old/corrupt interface file?"))
+  errorOnMismatch "magic number mismatch: old/corrupt interface file?"
+      binaryInterfaceMagic magic
 
         -- Get the dictionary pointer.  We won't attempt to actually
         -- read the dictionary until we've done the version checks below,
@@ -101,22 +107,13 @@ readBinIface_ checkHiWay traceBinIFaceReading hi_path nc = do
   check_ver  <- get bh
   let our_ver = show opt_HiVersion
   wantedGot "Version" our_ver check_ver
-  when (check_ver /= our_ver) $
-        -- This will be caught by readIface which will emit an error
-        -- msg containing the iface module name.
-    throwDyn (ProgramError (
-        "mismatched interface file versions: expected "
-        ++ our_ver ++ ", found " ++ check_ver))
+  errorOnMismatch "mismatched interface file versions" our_ver check_ver
 
   check_way <- get bh
   way_descr <- getWayDescr
   wantedGot "Way" way_descr check_way
-  when (checkHiWay == CheckHiWay && check_way /= way_descr) $
-        -- This will be caught by readIface
-        -- which will emit an error msg containing the iface module name.
-     throwDyn (ProgramError (
-        "mismatched interface file ways: expected "
-        ++ way_descr ++ ", found " ++ check_way))
+  when (checkHiWay == CheckHiWay) $
+       errorOnMismatch "mismatched interface file ways" way_descr check_way
 
         -- Read the dictionary
         -- The next word in the file is a pointer to where the dictionary is
