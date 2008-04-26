@@ -81,21 +81,21 @@ readBinIface_ checkHiWay traceBinIFaceReading hi_path nc = do
                            text "got    " <> ppr got])
   bh <- Binary.readBinMem hi_path
 
-	-- Read the magic number to check that this really is a GHC .hi file
-	-- (This magic number does not change when we change 
-	--  GHC interface file format)
+        -- Read the magic number to check that this really is a GHC .hi file
+        -- (This magic number does not change when we change
+        --  GHC interface file format)
   magic <- get bh
   wantedGot "Magic" binaryInterfaceMagic magic
   when (magic /= binaryInterfaceMagic) $
-	throwDyn (ProgramError (
-	   "magic number mismatch: old/corrupt interface file?"))
+        throwDyn (ProgramError (
+           "magic number mismatch: old/corrupt interface file?"))
 
         -- Get the dictionary pointer.  We won't attempt to actually
         -- read the dictionary until we've done the version checks below,
         -- just in case this isn't a valid interface.  In retrospect the
         -- version should have come before the dictionary pointer, but this
         -- is the way it was done originally, and we can't change it now.
-  dict_p <- Binary.get bh	-- Get the dictionary ptr
+  dict_p <- Binary.get bh       -- Get the dictionary ptr
 
         -- Check the interface file version and ways.
   check_ver  <- get bh
@@ -115,26 +115,26 @@ readBinIface_ checkHiWay traceBinIFaceReading hi_path nc = do
         -- This will be caught by readIface
         -- which will emit an error msg containing the iface module name.
      throwDyn (ProgramError (
-  	"mismatched interface file ways: expected "
-  	++ way_descr ++ ", found " ++ check_way))
+        "mismatched interface file ways: expected "
+        ++ way_descr ++ ", found " ++ check_way))
 
-	-- Read the dictionary
-	-- The next word in the file is a pointer to where the dictionary is
-	-- (probably at the end of the file)
-  data_p <- tellBin bh		-- Remember where we are now
+        -- Read the dictionary
+        -- The next word in the file is a pointer to where the dictionary is
+        -- (probably at the end of the file)
+  data_p <- tellBin bh          -- Remember where we are now
   seekBin bh dict_p
   dict <- getDictionary bh
-  seekBin bh data_p		-- Back to where we were before
+  seekBin bh data_p             -- Back to where we were before
 
-	-- Initialise the user-data field of bh
+        -- Initialise the user-data field of bh
   ud <- newReadState dict
   bh <- return (setUserData bh ud)
-	
-  symtab_p <- Binary.get bh	-- Get the symtab ptr
-  data_p <- tellBin bh		-- Remember where we are now
+        
+  symtab_p <- Binary.get bh     -- Get the symtab ptr
+  data_p <- tellBin bh          -- Remember where we are now
   seekBin bh symtab_p
   (nc', symtab) <- getSymbolTable bh nc
-  seekBin bh data_p		-- Back to where we were before
+  seekBin bh data_p             -- Back to where we were before
   let ud = getUserData bh
   bh <- return $! setUserData bh ud{ud_symtab = symtab}
   iface <- get bh
