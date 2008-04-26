@@ -2118,7 +2118,11 @@ delayzh_fast
     W_ time;
     W_ divisor;
     (time) = foreign "C" getourtimeofday() [R1];
-    divisor = TO_W_(RtsFlags_MiscFlags_tickInterval(RtsFlags))*1000;
+    divisor = TO_W_(RtsFlags_MiscFlags_tickInterval(RtsFlags));
+    if (divisor == 0) {
+        divisor = 50;
+    }
+    divisor = divisor * 1000;
     target = ((R1 + divisor - 1) / divisor) /* divide rounding up */
            + time + 1; /* Add 1 as getourtimeofday rounds down */
     StgTSO_block_info(CurrentTSO) = target;
