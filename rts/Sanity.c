@@ -204,12 +204,13 @@ checkStackChunk( StgPtr sp, StgPtr stack_end )
 }
 
 static void
-checkPAP (StgClosure *fun, StgClosure** payload, StgWord n_args)
+checkPAP (StgClosure *tagged_fun, StgClosure** payload, StgWord n_args)
 { 
+    StgClosure *fun;
     StgClosure *p;
     StgFunInfoTable *fun_info;
     
-    fun = UNTAG_CLOSURE(fun);
+    fun = UNTAG_CLOSURE(tagged_fun);
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(fun));
     fun_info = get_fun_itbl(fun);
     
@@ -236,8 +237,8 @@ checkPAP (StgClosure *fun, StgClosure** payload, StgWord n_args)
 	break;
     }
 
-    ASSERT(fun_info->f.arity > TAG_MASK ? GET_CLOSURE_TAG(fun) == 1
-           : GET_CLOSURE_TAG(fun) == fun_info->f.arity);
+    ASSERT(fun_info->f.arity > TAG_MASK ? GET_CLOSURE_TAG(tagged_fun) == 1
+           : GET_CLOSURE_TAG(tagged_fun) == fun_info->f.arity);
 }
 
 
