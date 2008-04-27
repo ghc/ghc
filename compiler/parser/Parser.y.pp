@@ -1309,8 +1309,8 @@ exp10 :: { LHsExpr RdrName }
 
 scc_annot :: { Located FastString }
 	: '_scc_' STRING			{% (addWarning Opt_WarnDeprecations (getLoc $1) (text "_scc_ is deprecated; use an SCC pragma instead")) >>= \_ ->
-                                   (return $ LL $ getSTRING $2) }
-	| '{-# SCC' STRING '#-}'		{ LL $ getSTRING $2 }
+                                   ( do scc <- getSCC $2; return $ LL scc ) }
+	| '{-# SCC' STRING '#-}'		{% do scc <- getSCC $2; return $ LL scc }
 
 hpc_annot :: { Located (FastString,(Int,Int),(Int,Int)) }
 	: '{-# GENERATED' STRING INTEGER ':' INTEGER '-' INTEGER ':' INTEGER '#-}'
@@ -1968,6 +1968,14 @@ getDOCNEXT (L _ (ITdocCommentNext x)) = x
 getDOCPREV (L _ (ITdocCommentPrev x)) = x
 getDOCNAMED (L _ (ITdocCommentNamed x)) = x
 getDOCSECTION (L _ (ITdocSection n x)) = (n, x)
+
+getSCC :: Located Token -> P FastString
+getSCC lt = do let s = getSTRING lt
+                   err = "Spaces are not allowed in SCCs"
+               -- We probably actually want to be more restrictive than this
+               if ' ' `elem` unpackFS s
+                   then failSpanMsgP (getLoc lt) (text err)
+                   else return s
 
 -- Utilities for combining source spans
 comb2 :: Located a -> Located b -> SrcSpan
