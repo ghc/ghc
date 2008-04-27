@@ -229,6 +229,9 @@ helpText =
  "   :force <expr>               print <expr>, forcing unevaluated parts\n" ++
  "   :forward                    go forward in the history (after :back)\n" ++
  "   :history [<n>]              after :trace, show the execution history\n" ++
+ "   :list                       show the source code around current breakpoint\n" ++
+ "   :list identifier            show the source code for <identifier>\n" ++
+ "   :list [<module>] <line>     show the source code around line number <line>\n" ++
  "   :print [<name> ...]         prints a value without forcing its computation\n" ++
  "   :sprint [<name> ...]        simplifed version of :print\n" ++
  "   :step                       single-step after stopping at a breakpoint\n"++
