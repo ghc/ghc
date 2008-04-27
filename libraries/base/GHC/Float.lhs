@@ -292,7 +292,7 @@ instance  RealFloat Float  where
     isIEEE _         = True
 
 instance  Show Float  where
-    showsPrec   x = showSigned showFloat x
+    showsPrec   x = showSignedFloat showFloat x
     showList = showList__ (showsPrec 0) 
 \end{code}
 
@@ -433,7 +433,7 @@ instance  RealFloat Double  where
     isIEEE _            = True
 
 instance  Show Double  where
-    showsPrec   x = showSigned showFloat x
+    showsPrec   x = showSignedFloat showFloat x
     showList = showList__ (showsPrec 0) 
 \end{code}
 
@@ -947,4 +947,22 @@ foreign import ccall unsafe "isDoubleNegativeZero" isDoubleNegativeZero :: Doubl
 "realToFrac/Double->Float"  realToFrac   = double2Float
 "realToFrac/Double->Double" realToFrac   = id :: Double -> Double
     #-}
+\end{code}
+
+%*********************************************************
+%*                                                      *
+\subsection{Utils}
+%*                                                      *
+%*********************************************************
+
+\begin{code}
+showSignedFloat :: (RealFloat a)
+  => (a -> ShowS)       -- ^ a function that can show unsigned values
+  -> Int                -- ^ the precedence of the enclosing context
+  -> a                  -- ^ the value to show
+  -> ShowS
+showSignedFloat showPos p x
+   | x < 0 || isNegativeZero x
+       = showParen (p > 6) (showChar '-' . showPos (-x))
+   | otherwise = showPos x
 \end{code}
