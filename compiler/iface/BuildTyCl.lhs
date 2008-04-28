@@ -37,6 +37,7 @@ import Type
 import Coercion
 
 import TcRnMonad
+import Util		( count )
 import Outputable
 
 import Data.List
@@ -277,22 +278,31 @@ buildClass no_unf class_name tvs sc_theta fds ats sig_stuff tc_isrec
                                    op_tys
 				   rec_tycon
 
-	; sc_sel_names <- mapM (newImplicitBinder class_name . mkSuperDictSelOcc) 
-				[1..length (dataConDictTheta dict_con)]
+	; let n_value_preds   = count (not . isEqPred) sc_theta
+	      all_value_preds = n_value_preds == length sc_theta
+	      -- We only make selectors for the *value* superclasses, 
+	      -- not equality predicates 
+
+	; sc_sel_names <- mapM  (newImplicitBinder class_name . mkSuperDictSelOcc) 
+				[1..n_value_preds]
+        ; let sc_sel_ids = [mkDictSelId no_unf sc_name rec_clas | sc_name <- sc_sel_names]
 	      -- We number off the Dict superclass selectors, 1, 2, 3 etc so that we 
-	      -- can construct names for the selectors.  Thus
+	      -- can construct names for the selectors. Thus
 	      --      class (C a, C b) => D a b where ...
 	      -- gives superclass selectors
 	      --      D_sc1, D_sc2
 	      -- (We used to call them D_C, but now we can have two different
 	      --  superclasses both called C!)
-        ; let sc_sel_ids = [mkDictSelId no_unf sc_name rec_clas | sc_name <- sc_sel_names]
-
-		-- Use a newtype if the class constructor has exactly one field:
+	      --
+	
+	; let use_newtype = (n_value_preds + length sig_stuff == 1) && all_value_preds
+		-- Use a newtype if the data constructor has 
+		-- 	(a) exactly one value field
+		--	(b) no existential or equality-predicate fields
 		-- i.e. exactly one operation or superclass taken together
-		-- Watch out: the sc_theta includes equality predicates,
-		-- 	      which don't count for this purpose; hence dataConDictTheta
-	; rhs <- if ((length $ dataConDictTheta dict_con) + length sig_stuff) == 1
+		-- See note [Class newtypes and equality predicates]
+
+	; rhs <- if use_newtype
 		 then mkNewTyConRhs tycon_name rec_tycon dict_con
 		 else return (mkDataTyConRhs [dict_con])
 
@@ -319,4 +329,19 @@ buildClass no_unf class_name tvs sc_theta fds ats sig_stuff tc_isrec
 	})}
 \end{code}
 
+Note [Class newtypes and equality predicates]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+	class (a ~ F b) => C a b where
+	  op :: a -> b
+
+We cannot represent this by a newtype, even though it's not
+existential, and there's only one value field, because we do
+capture an equality predicate:
+
+	data C a b where
+	  MkC :: forall a b. (a ~ F b) => (a->b) -> C a b
+
+We need to access this equality predicate when we get passes a C
+dictionary.  See Trac #2238
 
