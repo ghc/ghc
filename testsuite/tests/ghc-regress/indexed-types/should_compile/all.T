@@ -106,3 +106,4 @@ test('GivenCheckTop', normal, compile, [''])
 
 test('Gentle', normal, compile, [''])
 test('T1981', normal, compile, [''])
+test('T2238', normal, compile, [''])
