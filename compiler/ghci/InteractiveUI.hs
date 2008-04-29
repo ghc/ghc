@@ -356,7 +356,8 @@ interactiveUI session srcs maybe_exprs = do
                    last_command = Nothing,
                    cmdqueue = [],
                    remembered_ctx = [],
-                   virtual_path   = cwd
+                   virtual_path   = cwd,
+                   ghc_e = isJust maybe_exprs
                  }
 
 #ifdef USE_EDITLINE
@@ -729,7 +730,7 @@ afterRunStmt step_here run_result = do
   flushInterpBuffers
   io installSignalHandlers
   b <- isOptionSet RevertCAFs
-  io (when b revertCAFs)
+  when b revertCAFs
 
   return (case run_result of GHC.RunOk _ -> True; _ -> False)
 
@@ -899,7 +900,7 @@ doWithArgs args cmd = enqueueCommands ["System.Environment.withArgs " ++
 
 addModule :: [FilePath] -> GHCi ()
 addModule files = do
-  io (revertCAFs)			-- always revert CAFs on load/add.
+  revertCAFs			-- always revert CAFs on load/add.
   files <- mapM expandPath files
   targets <- mapM (\m -> io (GHC.guessTarget m Nothing)) files
   session <- getSession
@@ -1098,7 +1099,7 @@ doLoad session retain_context prev_context howmuch = do
 
 afterLoad :: SuccessFlag -> Session -> Bool -> ([Module],[Module]) -> GHCi ()
 afterLoad ok session retain_context prev_context = do
-  io (revertCAFs)  -- always revert CAFs on load.
+  revertCAFs  -- always revert CAFs on load.
   discardTickArrays
   loaded_mod_summaries <- getLoadedModules session
   let loaded_mods = map GHC.ms_mod loaded_mod_summaries

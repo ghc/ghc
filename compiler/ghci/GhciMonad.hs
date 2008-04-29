@@ -77,7 +77,8 @@ data GHCiState = GHCiState
              -- were supposed to be in the context but currently had errors,
              -- but this was complicated.  Just replaying the :module commands
              -- seems to be the right thing.
-        virtual_path   :: FilePath
+        virtual_path   :: FilePath,
+        ghc_e :: Bool -- True if this is 'ghc -e' (or runghc)
      }
 
 data CtxtCmd
@@ -251,10 +252,11 @@ printTimes allocs psecs
 -----------------------------------------------------------------------------
 -- reverting CAFs
 	
-revertCAFs :: IO ()
+revertCAFs :: GHCi ()
 revertCAFs = do
-  rts_revertCAFs
-  turnOffBuffering
+  io $ rts_revertCAFs
+  s <- getGHCiState
+  when (not (ghc_e s)) $ io turnOffBuffering
 	-- Have to turn off buffering again, because we just 
 	-- reverted stdout, stderr & stdin to their defaults.
 
