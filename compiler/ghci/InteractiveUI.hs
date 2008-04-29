@@ -454,12 +454,8 @@ runGHCi paths maybe_exprs = do
                                    -- current progname in the exception text:
                                    -- <progname>: <exception>
                               io $ withProgName (progname st)
-                                   -- The "fast exit" part just calls exit()
-                                   -- directly instead of doing an orderly
-                                   -- runtime shutdown, otherwise the main
-                                   -- GHCi thread will complain about being
-                                   -- interrupted.
-                                 $ topHandlerFastExit e
+                                   -- this used to be topHandlerFastExit, see #2228
+                                 $ topHandler e
             runCommands' handle (return Nothing)
 
   -- and finally, exit
