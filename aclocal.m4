@@ -1,3 +1,15 @@
+    struct sigevent ev;
+    timer_t timer;
+    ev.sigev_notify = SIGEV_SIGNAL;
+    ev.sigev_signo  = SIGVTALRM;
+    if (timer_create(CLOCK_PROCESS_CPUTIME_ID, &ev, &timer) != 0) {
+       exit(1);
+    }
+#else
+    exit(1)
+#endif
+    exit(0);
+}
 # Extra autoconf macros for the Glasgow fptools
 #
 # To be a good autoconf citizen, names of local macros have prefixed with FP_ to
@@ -1031,10 +1043,19 @@ ProjectPatchLevel=`echo $ProjectPatchLevel | sed 's/\.//'`
 AC_SUBST([ProjectPatchLevel])
 ])# FP_SETUP_PROJECT_VERSION
 
+
+# Check for a working timer_create().  We need a pretty detailed check
+# here, because there exist partially-working implementations of
+# timer_create() in certain versions of Linux (see bug #1933).
+#
 AC_DEFUN([FP_CHECK_TIMER_CREATE],
   [AC_CACHE_CHECK([for a working timer_create(CLOCK_REALTIME)], 
     [fptools_cv_timer_create_works],
     [AC_TRY_RUN([
+#include <stdio.h>
+#ifdef HAVE_STDLIB_H
+#include <stdlib.h>
+#endif
 #ifdef HAVE_TIME_H
 #include <time.h>
 #endif
@@ -1044,19 +1065,87 @@ AC_DEFUN([FP_CHECK_TIMER_CREATE],
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
+
+static volatile int tock = 0;
+static void handler(int i)
+{
+   tock = 1;
+}
+
 int main(int argc, char *argv[])
 {
-#if HAVE_TIMER_CREATE && HAVE_TIMER_SETTIME
+
     struct sigevent ev;
     timer_t timer;
+    struct itimerspec it;
+    struct sigaction action;
+    int m,n,count = 0;
+
     ev.sigev_notify = SIGEV_SIGNAL;
     ev.sigev_signo  = SIGVTALRM;
+
+    action.sa_handler = handler;
+    action.sa_flags = 0;
+    sigemptyset(&action.sa_mask);
+    if (sigaction(SIGVTALRM, &action, NULL) == -1) {
+        fprintf(stderr,"SIGVTALRM problem\n");
+        exit(3);
+    }
+
     if (timer_create(CLOCK_PROCESS_CPUTIME_ID, &ev, &timer) != 0) {
+        fprintf(stderr,"No CLOCK_PROCESS_CPUTIME_ID timer\n");
        exit(1);
     }
-#else
-    exit(1)
-#endif
+
+    it.it_value.tv_sec = 0;
+    it.it_value.tv_nsec = 1;
+    it.it_interval = it.it_value;
+    if (timer_settime(timer, 0, &it, NULL) != 0) {
+        fprintf(stderr,"settime problem\n");
+        exit(4);
+    }
+
+    tock = 0;
+
+    for(n = 3; n < 20000; n++){
+        for(m = 2; m <= n/2; m++){
+            if (!(n%m)) count++;
+            if (tock) goto out;
+        }
+    }
+out:
+
+    if (!tock) {
+        fprintf(stderr,"no CLOCK_REALTIME signal\n");
+        exit(5);
+    }
+
+    timer_delete(timer);
+
+    if (timer_create(CLOCK_REALTIME, &ev, &timer) != 0) {
+        fprintf(stderr,"No CLOCK_REALTIME timer\n");
+        exit(2);
+    }
+
+    it.it_value.tv_sec = 0;
+    it.it_value.tv_nsec = 1;
+    it.it_interval = it.it_value;
+    if (timer_settime(timer, 0, &it, NULL) != 0) {
+        fprintf(stderr,"settime problem\n");
+        exit(4);
+    }
+
+    tock = 0;
+
+    usleep(300);
+
+    if (!tock) {
+        fprintf(stderr,"no CLOCK_REALTIME signal\n");
+        exit(5);
+    }
+
+    timer_delete(timer);
+
     exit(0);
 }
      ],
