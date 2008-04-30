@@ -826,7 +826,7 @@ makeRegMovementGraph adjusted_assig dest_assig
 	 = expandNode vreg src
 	 $ lookupWithDefaultUFM_Directly
            	dest_assig
-                (panic "RegisterAlloc.joinToTargets")
+                (panic "RegAllocLinear.makeRegMovementGraph")
 		vreg
 
    in	[ node 	| (vreg, src) <- ufmToList adjusted_assig
