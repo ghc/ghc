@@ -204,7 +204,7 @@ slurpConflicts live
 		= (consBag rsLiveEntry conflicts, moves)
 
 		| otherwise
-		= error "RegLiveness.slurpBlock: bad block"
+		= panic "RegLiveness.slurpBlock: bad block"
 
 	slurpLIs rsLive (conflicts, moves) []
 		= (consBag rsLive conflicts, moves)
@@ -557,7 +557,7 @@ livenessSCCs blockmap done
 	          concatMap tail $
 	          groupBy (\(a1, _) (a2, _) -> eq a1 a2) $
 	          iterate (\(a, _) -> f a b) $
-	          (a, error "RegLiveness.livenessSCCs")
+	          (a, panic "RegLiveness.livenessSCCs")
 
 
             linearLiveness :: BlockMap RegSet -> [NatBasicBlock]
