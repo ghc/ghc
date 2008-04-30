@@ -557,7 +557,7 @@ livenessSCCs blockmap done
 	          concatMap tail $
 	          groupBy (\(a1, _) (a2, _) -> eq a1 a2) $
 	          iterate (\(a, _) -> f a b) $
-	          (a, error "RegisterAlloc.livenessSCCs")
+	          (a, error "RegLiveness.livenessSCCs")
 
 
             linearLiveness :: BlockMap RegSet -> [NatBasicBlock]
