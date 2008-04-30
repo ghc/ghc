@@ -323,11 +323,11 @@ became out of date, and wrong information is worse than none.</para>
 
 <para>The Real Truth about what primitive types there are, and what operations
 work over those types, is held in the file
-<filename>fptools/ghc/compiler/prelude/primops.txt.pp</filename>.
+<filename>compiler/prelude/primops.txt.pp</filename>.
 This file is used directly to generate GHC's primitive-operation definitions, so
 it is always correct!  It is also intended for processing into text.</para>
 
-<para> Indeed,
+<para>Indeed,
 the result of such processing is part of the description of the 
  <ulink
       url="http://www.haskell.org/ghc/docs/papers/core.ps.gz">External
@@ -364,6 +364,20 @@ would use in C: <literal>Int&num;</literal> (long int),
 <literal>(+&num;)</literal> is addition on
 <literal>Int&num;</literal>s, and is the machine-addition that we all
 know and love&mdash;usually one instruction.
+</para>
+
+<para> For some primitive types we have special syntax for literals.
+Anything that would be an integer lexeme followed by a
+<literal>&num;</literal> is an <literal>Int&num;</literal> literal, e.g.
+<literal>32&num;</literal> and <literal>-0x3A&num;</literal>. Likewise,
+any non-negative integer literal followed by
+<literal>&num;&num;</literal> is a <literal>Word&num;</literal> literal.
+Likewise, any floating point literal followed by a
+<literal>&num;</literal> is a <literal>Float&num;</literal> literal, and
+followed by <literal>&num;&num;</literal> is a
+<literal>Double&num;</literal>. Finally, a string literal followed by a
+<literal>&num;</literal>, e.g. <literal>&quot;foo&quot;&num;</literal>,
+is a <literal>Addr&num;</literal> literal.
 </para>
 
 <para>
