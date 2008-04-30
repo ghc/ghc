@@ -33,7 +33,9 @@ module Control.Arrow (
                 -- * Arrow application
                 ArrowApply(..), ArrowMonad(..), leftApp,
                 -- * Feedback
-                ArrowLoop(..)
+                ArrowLoop(..),
+
+                (>>>), (<<<) -- reexported
         ) where
 
 import Prelude hiding (id,(.))
