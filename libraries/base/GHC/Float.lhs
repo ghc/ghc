@@ -946,10 +946,47 @@ foreign import ccall unsafe "isDoubleNegativeZero" isDoubleNegativeZero :: Doubl
 "realToFrac/Float->Double"  realToFrac   = float2Double
 "realToFrac/Double->Float"  realToFrac   = double2Float
 "realToFrac/Double->Double" realToFrac   = id :: Double -> Double
-"realToFrac/Int->Double"    realToFrac   = int2Double
-"realToFrac/Int->Float"     realToFrac   = int2Float
+"realToFrac/Int->Double"    realToFrac   = int2Double	-- See Note [realToFrac int-to-float]
+"realToFrac/Int->Float"     realToFrac   = int2Float	-- 	..ditto
     #-}
 \end{code}
+
+Note [realToFrac int-to-float]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Don found that the RULES for realToFrac/Int->Double and simliarly
+Float made a huge difference to some stream-fusion programs.  Here's
+an example
+  
+      import Data.Array.Vector
+  
+      n = 40000000
+  
+      main = do
+            let c = replicateU n (2::Double)
+                a = mapU realToFrac (enumFromToU 0 (n-1) ) :: UArr Double
+            print (sumU (zipWithU (*) c a))
+  
+Without the RULE we get this loop body:
+  
+      case $wtoRational sc_sY4 of ww_aM7 { (# ww1_aM9, ww2_aMa #) ->
+      case $wfromRat ww1_aM9 ww2_aMa of tpl_X1P { D# ipv_sW3 ->
+      Main.$s$wfold
+        (+# sc_sY4 1)
+        (+# wild_X1i 1)
+        (+## sc2_sY6 (*## 2.0 ipv_sW3))
+  
+And with the rule:
+  
+     Main.$s$wfold
+        (+# sc_sXT 1)
+        (+# wild_X1h 1)
+        (+## sc2_sXV (*## 2.0 (int2Double# sc_sXT)))
+  
+The running time of the program goes from 120 seconds to 0.198 seconds
+with the native backend, and 0.143 seconds with the C backend.
+  
+A few more details in Trac #2251, and the patch message 
+"Add RULES for realToFrac from Int".
 
 %*********************************************************
 %*                                                      *
