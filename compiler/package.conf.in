@@ -10,7 +10,6 @@ exposed-modules:
 	BasicTypes
 	BinIface
 	Binary
-	BitSet
 	Bitmap
 	BuildTyCl
 	ByteCodeAsm
@@ -91,7 +90,6 @@ exposed-modules:
         Encoding
 	FastString
 	FastTypes
-	FieldLabel
 	Finder
 	FiniteMap
 	FloatIn
@@ -179,7 +177,6 @@ exposed-modules:
 	RdrHsSyn
 	RdrName
 	RegAllocInfo
-	RegisterAlloc
 	RnBinds
 	RnEnv
 	RnExpr
