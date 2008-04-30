@@ -946,6 +946,8 @@ foreign import ccall unsafe "isDoubleNegativeZero" isDoubleNegativeZero :: Doubl
 "realToFrac/Float->Double"  realToFrac   = float2Double
 "realToFrac/Double->Float"  realToFrac   = double2Float
 "realToFrac/Double->Double" realToFrac   = id :: Double -> Double
+"realToFrac/Int->Double"    realToFrac   = int2Double
+"realToFrac/Int->Float"     realToFrac   = int2Float
     #-}
 \end{code}
 
