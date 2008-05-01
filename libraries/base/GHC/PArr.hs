@@ -242,9 +242,6 @@ singletonP             :: a -> [:a:]
 {-# INLINE singletonP #-}
 singletonP e = replicateP 1 e
   
-emptyP :: [:a:]
-emptyP = error "emptyP in GHC.PArr: not yet implemented"
-
 replicateP             :: Int -> a -> [:a:]
 {-# INLINE replicateP #-}
 replicateP n e  = runST (do
@@ -726,3 +723,6 @@ writeMPArr (MPArr n# marr#) (I# i#) e
 
 #endif /* __HADDOCK__ */
 
+emptyP:: [:a:]
+{- NOINLINE emptyP #-}
+emptyP = replicateP 0 undefined
