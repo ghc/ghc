@@ -5,6 +5,9 @@
 --
 
 
+{-# LANGUAGE DeriveDataTypeable #-}
+
+
 module Haddock.Exception (
   HaddockException,
   throwE

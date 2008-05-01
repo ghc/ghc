@@ -5,6 +5,10 @@
 -- (c) Simon Marlow 2003
 --
 
+
+{-# LANGUAGE PatternSignatures #-}
+
+
 module Haddock.Utils (
 
   -- * Misc utilities

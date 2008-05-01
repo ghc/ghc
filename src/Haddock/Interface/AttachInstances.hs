@@ -5,6 +5,9 @@
 --
 
 
+{-# LANGUAGE MagicHash #-}
+
+
 module Haddock.Interface.AttachInstances (attachInstances) where
 
 
