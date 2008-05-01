@@ -4,7 +4,10 @@
 -- (c) Simon Marlow 2003
 --
 
+
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# OPTIONS_HADDOCK hide #-}
+
 
 module Haddock.GHC.Utils where
 

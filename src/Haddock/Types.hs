@@ -5,6 +5,9 @@
 --
 
 
+{-# OPTIONS_HADDOCK hide #-}
+
+
 module Haddock.Types where
 
 
