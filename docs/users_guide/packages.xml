@@ -578,6 +578,26 @@ $ export GHC_PACKAGE_PATH=$HOME/.my-ghc-packages.conf:</screen>
       </varlistentry>
 
       <varlistentry>
+	<term><literal>ghc-pkg find-module <replaceable>M</replaceable> [<option>--simple-output</option>]</literal></term>
+	<listitem>
+    <para>This option lists registered packages exposing module 
+      <replaceable>M</replaceable>. Examples:</para>
+<screen>
+$ ghc-pkg find-module Var
+c:/fptools/validate/ghc/driver/package.conf.inplace:
+    (ghc-6.9.20080428)
+
+$ ghc-pkg find-module Data.Sequence
+c:/fptools/validate/ghc/driver/package.conf.inplace:
+    containers-0.1
+</screen>
+  <para>Otherwise, it behaves like <literal>ghc-pkg list</literal>,
+  including options.</para>
+	</listitem>
+      </varlistentry>
+
+
+      <varlistentry>
 	<term><literal>ghc-pkg latest <replaceable>P</replaceable></literal></term>
 	<listitem>
 	  <para>Prints the latest available version of package
@@ -597,13 +617,41 @@ $ export GHC_PACKAGE_PATH=$HOME/.my-ghc-packages.conf:</screen>
       </varlistentry>
 
       <varlistentry>
-	<term><literal>ghc-pkg field <replaceable>P</replaceable> <replaceable>field</replaceable></literal></term>
+	<term><literal>ghc-pkg field <replaceable>P</replaceable> <replaceable>field</replaceable>[,<replaceable>field</replaceable>]*</literal></term>
 	<listitem>
 	  <para>Show just a single field of the installed package description
-	    for <literal>P</literal>.</para>
+      for <literal>P</literal>. Multiple fields can be selected by separating 
+      them with commas</para>
 	</listitem>
       </varlistentry>
     </variablelist>
+
+    <para>
+      Substring matching is supported for <replaceable>M</replaceable> in
+      <literal>find-module</literal> and for <replaceable>P</replaceable> in
+      <literal>list</literal>, <literal>describe</literal>, and
+      <literal>field</literal>, where a <literal>'*'</literal> indicates open
+      substring ends (<literal>prefix*</literal>, <literal>*suffix</literal>,
+      <literal>*infix*</literal>). Examples (output omitted):
+    </para>
+    <screen>
+    -- list all regex-related packages
+    ghc-pkg list '*regex*' --ignore-case
+    -- list all string-related packages
+    ghc-pkg list '*string*' --ignore-case
+    -- list OpenGL-related packages
+    ghc-pkg list '*gl*' --ignore-case
+    -- list packages exporting modules in the Data hierarchy
+    ghc-pkg find-module 'Data.*'
+    -- list packages exporting Monad modules
+    ghc-pkg find-module '*Monad*'
+    -- list names and maintainers for all packages
+    ghc-pkg field '*' name,maintainer
+    -- list location of haddock htmls for all packages
+    ghc-pkg field '*' haddock-html
+    -- dump the whole database
+    ghc-pkg describe '*'
+    </screen>
 
     <para>Additionally, the following flags are accepted by
       <literal>ghc-pkg</literal>:</para>
