@@ -95,6 +95,7 @@ other-modules:
   Haddock.Backends.Hoogle
   Haddock.ModuleTree
   Haddock.Types
+  Haddock.DocName
   Haddock.Version
   Haddock.InterfaceFile        
   Haddock.Exception
