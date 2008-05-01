@@ -22,7 +22,8 @@ build-depends:
   pretty,
   containers,
   array
-extensions:           CPP, PatternGuards
+extensions:           CPP, PatternGuards, DeriveDataTypeable,
+                      PatternSignatures, MagicHash
 hs-source-dirs:       src
 exposed-modules:      Distribution.Haddock
 other-modules:
@@ -75,7 +76,8 @@ extra-source-files:
 executable:           haddock
 hs-source-dirs:       src
 main-is:              Main.hs
-extensions:           CPP, PatternGuards
+extensions:           CPP, PatternGuards, DeriveDataTypeable,
+                      PatternSignatures, MagicHash
 ghc-options:          -funbox-strict-fields -O2
 other-modules:
   Haddock.Interface
