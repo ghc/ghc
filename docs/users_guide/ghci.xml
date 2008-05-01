@@ -2667,6 +2667,22 @@ Prelude> :set -fno-glasgow-exts
     <literal>:set</literal> like this.  The changes won't take effect
     until the next <literal>:load</literal>, though.)</para>
 
+    <para>Once you have a library of GHCi macros, you may want
+    to source them from separate files, or you may want to source
+    your <filename>.ghci</filename> file into your running GHCi
+    session while debugging it</para>
+
+<screen>
+:def source readFile
+</screen>
+
+    <para>With this macro defined in your <filename>.ghci</filename> 
+    file, you can use <literal>:source file</literal> to read GHCi
+    commands from <literal>file</literal>. You can find (and contribute!-)
+    other suggestions for <filename>.ghci</filename> files on this Haskell
+    wiki page: <ulink
+      url="http://haskell.org/haskellwiki/GHC/GHCi">GHC/GHCi</ulink></para>
+
     <para>Two command-line options control whether the
     startup files files are read:</para>
 
