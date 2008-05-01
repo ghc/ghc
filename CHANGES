@@ -1,3 +1,16 @@
+Changes in version 2.1.0:
+
+  * Fix a bug that made links point to the defining module instead
+    of the "best" one (e.g Int pointing to GHC.Base instead of Data.Int)
+
+  * Fix a couple of smaller bugs
+
+  * The representation of DocName was changed in the library
+
+  * Add a flag --no-warnings for turning off warnings
+
+-----------------------------------------------------------------------------
+
 Changes in version 2.0.0.0:
 
   * The GHC API is used as the front-end
