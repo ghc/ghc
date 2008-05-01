@@ -89,7 +89,7 @@ __2Int_encodeDouble (I_ j_high, I_ j_low, I_ e)
   ASSERT(sizeof(int          ) == 4            );
 
   r = (StgDouble)((unsigned int)j_high);
-  r *= 4294967296; /* exp2f(32); */
+  r *= 4294967296.0; /* exp2f(32); */
   r += (StgDouble)((unsigned int)j_low);
   
   /* Now raise to the exponent */
