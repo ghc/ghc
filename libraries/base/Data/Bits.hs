@@ -202,16 +202,23 @@ instance Bits Int where
 
 #ifdef __GLASGOW_HASKELL__
     (I# x#) .&.   (I# y#)  = I# (word2Int# (int2Word# x# `and#` int2Word# y#))
+
     (I# x#) .|.   (I# y#)  = I# (word2Int# (int2Word# x# `or#`  int2Word# y#))
+
     (I# x#) `xor` (I# y#)  = I# (word2Int# (int2Word# x# `xor#` int2Word# y#))
+
     complement (I# x#)     = I# (word2Int# (int2Word# x# `xor#` int2Word# (-1#)))
+
     (I# x#) `shift` (I# i#)
         | i# >=# 0#        = I# (x# `iShiftL#` i#)
         | otherwise        = I# (x# `iShiftRA#` negateInt# i#)
+
+    -- Important for constant folding (May 2008):
+    {-# INLINE rotate #-}
     (I# x#) `rotate` (I# i#) =
         I# (word2Int# ((x'# `uncheckedShiftL#` i'#) `or#`
                        (x'# `uncheckedShiftRL#` (wsib -# i'#))))
-        where
+      where
         x'# = int2Word# x#
         i'# = word2Int# (int2Word# i# `and#` int2Word# (wsib -# 1#))
         wsib = WORD_SIZE_IN_BITS#   {- work around preprocessor problem (??) -}
