@@ -23,7 +23,6 @@ build-depends:
   containers,
   array
 extensions:           CPP, PatternGuards
-ghc-options:          -fglasgow-exts
 hs-source-dirs:       src
 exposed-modules:      Distribution.Haddock
 other-modules:
@@ -77,7 +76,7 @@ executable:           haddock
 hs-source-dirs:       src
 main-is:              Main.hs
 extensions:           CPP, PatternGuards
-ghc-options:          -fglasgow-exts -funbox-strict-fields -O2 -fasm
+ghc-options:          -funbox-strict-fields -O2
 other-modules:
   Haddock.Interface
   Haddock.Interface.Rename
