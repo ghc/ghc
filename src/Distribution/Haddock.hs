@@ -9,9 +9,11 @@ module Distribution.Haddock (
   readInterfaceFile,
   InterfaceFile(..),
   LinkEnv,
-  InstalledInterface(..)
+  InstalledInterface(..),
+  DocName(..)
 ) where
 
 
 import Haddock.InterfaceFile
 import Haddock.Types
+import Haddock.DocName
