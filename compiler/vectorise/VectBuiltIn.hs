@@ -251,8 +251,8 @@ preludeVars
     , mk nDP_PRELUDE_INT  (fsLit "intDiv")  nDP_PRELUDE_INT (fsLit "intDivV")
     , mk nDP_PRELUDE_INT  (fsLit "intMod")  nDP_PRELUDE_INT (fsLit "intModV")
     , mk nDP_PRELUDE_INT  (fsLit "intSquareRoot")  nDP_PRELUDE_INT (fsLit "intSquareRootV")
-    , mk nDP_PRELUDE_INT  (fsLit "sumP")  nDP_PRELUDE_INT (fsLit "sumPA")
-    , mk nDP_PRELUDE_INT  (fsLit "enumFromToP")  nDP_PRELUDE_INT (fsLit "enumFromToPA")
+    , mk gHC_PARR         (fsLit "sumP")  nDP_PRELUDE_INT (fsLit "sumPA")
+    , mk gHC_PARR         (fsLit "enumFromToP")  nDP_PRELUDE_INT (fsLit "enumFromToPA")
     , mk nDP_PRELUDE_INT  (fsLit "upToP") nDP_PRELUDE_INT (fsLit "upToPA")
 
     , mk nDP_PRELUDE_INT  (fsLit "eq") nDP_PRELUDE_INT (fsLit "eqV")
