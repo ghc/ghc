@@ -213,8 +213,7 @@ instance Bits Int where
         | i# >=# 0#        = I# (x# `iShiftL#` i#)
         | otherwise        = I# (x# `iShiftRA#` negateInt# i#)
 
-    -- Important for constant folding (May 2008):
-    {-# INLINE rotate #-}
+    {-# INLINE rotate #-} 	-- See Note [Constant folding for rotate]
     (I# x#) `rotate` (I# i#) =
         I# (word2Int# ((x'# `uncheckedShiftL#` i'#) `or#`
                        (x'# `uncheckedShiftRL#` (wsib -# i'#))))
@@ -328,3 +327,30 @@ fromInts = foldr catInt 0
 
 numInts = toInteger (maxBound::Int) - toInteger (minBound::Int) + 1
 #endif /* !__GLASGOW_HASKELL__ */
+
+{- 	Note [Constant folding for rotate]
+	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The INLINE on the Int instance of rotate enables it to be constant
+folded.  For example:
+     sumU . mapU (`rotate` 3) . replicateU 10000000 $ (7 :: Int)
+goes to:
+   Main.$wfold =
+     \ (ww_sO7 :: Int#) (ww1_sOb :: Int#) ->
+       case ww1_sOb of wild_XM {
+         __DEFAULT -> Main.$wfold (+# ww_sO7 56) (+# wild_XM 1);
+         10000000 -> ww_sO7
+whereas before it was left as a call to $wrotate.
+
+All other Bits instances seem to inline well enough on their
+own to enable constant folding; for example 'shift':
+     sumU . mapU (`shift` 3) . replicateU 10000000 $ (7 :: Int)
+ goes to:
+     Main.$wfold =
+       \ (ww_sOb :: Int#) (ww1_sOf :: Int#) ->
+         case ww1_sOf of wild_XM {
+           __DEFAULT -> Main.$wfold (+# ww_sOb 56) (+# wild_XM 1);
+           10000000 -> ww_sOb
+         }
+-} 
+     
+
