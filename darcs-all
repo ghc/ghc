@@ -62,6 +62,7 @@ sub darcs {
 }
 
 sub darcsall {
+    my @packages;
     darcs @_;
     for my $dir (@top_dirs) {
         if (-d $dir && -d "$dir/_darcs") {
@@ -71,12 +72,25 @@ sub darcsall {
             message "== $dir not present or not a repository; skipping";
         }
     }
-    for my $pkg (`cat libraries/boot-packages libraries/extra-packages`) {
-        chomp $pkg;
-        if (-d "libraries/$pkg") {
-            darcs (@_, "--repodir", "libraries/$pkg");
+    for my $path (<libraries/*/_darcs>) {
+        chomp $path;
+        if ($path =~ m#/(.*)/#) {
+            my $pkg = $1;
+            # bootstrapping.* are just copies of other repos; we don't
+            # update them directly.
+            if ($pkg !~ /bootstrapping/) {
+                darcs (@_, "--repodir", "libraries/$pkg");
+            }
         }
         else {
+            die "that pattern can't fail!";
+        }
+    }
+    @packages = `cat libraries/boot-packages`;
+    # @packages = `cat libraries/boot-packages libraries/extra-packages`;
+    for my $pkg (@packages) {
+        chomp $pkg;
+        if (! -d "libraries/$pkg") {
             warning("$pkg doesn't exist, use 'darcs-all get' to get it");
         }
     }
