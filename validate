@@ -49,7 +49,7 @@ else
 fi
 
 sh boot
-./configure $config_args
+./configure "--prefix=`pwd`/inst" $config_args
 
 make Validating=YES -j$threads
 fi # testsuite-only
