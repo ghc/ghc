@@ -378,7 +378,7 @@ module 	:: { Located (HsModule RdrName) }
                           Nothing)) }
 
 maybedocheader :: { (HaddockModInfo RdrName, Maybe (HsDoc RdrName)) }
-        : moduleheader            { (fst $1, snd $1) }
+        : moduleheader            { $1 }
         | {- empty -}             { (emptyHaddockModInfo, Nothing) }
 
 missing_module_keyword :: { () }
