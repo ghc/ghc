@@ -106,4 +106,4 @@ test('GivenCheckTop', normal, compile, [''])
 
 test('Gentle', normal, compile, [''])
 test('T1981', normal, compile, [''])
-test('T2238', normal, compile, [''])
+test('T2238', if_compiler_lt('ghc', '6.9', expect_fail), compile, [''])
