@@ -606,8 +606,8 @@ ty_decl :: { LTyClDecl RdrName }
 	| data_or_newtype tycl_hdr constrs deriving
 		{% do { let {(ctxt, tc, tvs, tparms) = unLoc $2}
                       ; checkTyVars tparms    -- no type pattern
-		      ; return $
-			  L (comb4 $1 $2 $3 $4)
+		      ; return $!
+			  sL (comb4 $1 $2 $3 $4)
 			           -- We need the location on tycl_hdr in case 
 				   -- constrs and deriving are both empty
 			    (mkTyData (unLoc $1) (ctxt, tc, tvs, Nothing) 
@@ -619,8 +619,8 @@ ty_decl :: { LTyClDecl RdrName }
 		 deriving
 		{% do { let {(ctxt, tc, tvs, tparms) = unLoc $2}
                       ; checkTyVars tparms    -- can have type pats
-		      ; return $
-			  L (comb4 $1 $2 $4 $5)
+		      ; return $!
+			  sL (comb4 $1 $2 $4 $5)
 			    (mkTyData (unLoc $1) (ctxt, tc, tvs, Nothing) 
 			      (unLoc $3) (reverse (unLoc $5)) (unLoc $6)) } }
 
