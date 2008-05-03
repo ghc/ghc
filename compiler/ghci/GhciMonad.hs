@@ -6,13 +6,6 @@
 --
 -----------------------------------------------------------------------------
 
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module GhciMonad where
 
 #include "HsVersions.h"
@@ -138,7 +131,7 @@ startGHCi g state = do ref <- newIORef state; unGHCi g ref
 
 instance Monad GHCi where
   (GHCi m) >>= k  =  GHCi $ \s -> m s >>= \a -> unGHCi (k a) s
-  return a  = GHCi $ \s -> return a
+  return a  = GHCi $ \_ -> return a
 
 instance Functor GHCi where
     fmap f m = m >>= return . f
@@ -147,22 +140,36 @@ ghciHandleDyn :: Typeable t => (t -> GHCi a) -> GHCi a -> GHCi a
 ghciHandleDyn h (GHCi m) = GHCi $ \s -> 
    Exception.catchDyn (m s) (\e -> unGHCi (h e) s)
 
+getGHCiState :: GHCi GHCiState
 getGHCiState   = GHCi $ \r -> readIORef r
+setGHCiState :: GHCiState -> GHCi ()
 setGHCiState s = GHCi $ \r -> writeIORef r s
 
 -- for convenience...
+getSession :: GHCi Session
 getSession = getGHCiState >>= return . session
+getPrelude :: GHCi Module
 getPrelude = getGHCiState >>= return . prelude
 
 GLOBAL_VAR(saved_sess, no_saved_sess, GHC.Session)
+
+no_saved_sess :: Session
 no_saved_sess = error "no saved_ses"
+
+saveSession :: GHCi ()
 saveSession = getSession >>= io . writeIORef saved_sess
+
+splatSavedSession :: GHCi ()
 splatSavedSession = io (writeIORef saved_sess no_saved_sess)
+
+restoreSession :: IO Session
 restoreSession = readIORef saved_sess
 
+getDynFlags :: GHCi DynFlags
 getDynFlags = do
   s <- getSession
   io (GHC.getSessionDynFlags s)
+setDynFlags :: DynFlags -> GHCi [PackageId]
 setDynFlags dflags = do 
   s <- getSession 
   io (GHC.setSessionDynFlags s dflags)
@@ -183,7 +190,7 @@ unsetOption opt
       setGHCiState (st{ options = filter (/= opt) (options st) })
 
 io :: IO a -> GHCi a
-io m = GHCi { unGHCi = \s -> m >>= return }
+io m = GHCi { unGHCi = \_ -> m >>= return }
 
 printForUser :: SDoc -> GHCi ()
 printForUser doc = do
@@ -302,7 +309,7 @@ initInterpBuffering session
       mb_stderr_ptr <- ObjLink.lookupSymbol "base_GHCziHandle_stderr_closure"
 
       let f ref (Just ptr) = writeIORef ref ptr
-          f ref Nothing    = panic "interactiveUI:setBuffering2"
+          f _   Nothing    = panic "interactiveUI:setBuffering2"
       zipWithM f [stdin_ptr,stdout_ptr,stderr_ptr]
                  [mb_stdin_ptr,mb_stdout_ptr,mb_stderr_ptr]
       return ()
