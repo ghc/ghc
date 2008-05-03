@@ -132,7 +132,7 @@ extendPPSet g blocks procPoints =
                      Nothing -> procPoints'
     where env = runDFA lattice $
                 do refine_f_anal forward g set_init_points
-                   allFacts
+                   getAllFacts
           set_init_points = mapM_ (\id -> setFact id ProcPoint)
                             (uniqSetToList procPoints)
           procPoints' = fold_blocks add emptyBlockSet g

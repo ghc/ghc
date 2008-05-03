@@ -691,10 +691,16 @@ instance (Outputable m, Outputable l) => Outputable (ZTail m l) where
 instance (Outputable m, Outputable l, LastNode l) => Outputable (LGraph m l) where
     ppr = pprLgraph
 
+instance (Outputable l) => Outputable (ZLast l) where
+    ppr = pprLast
+
 pprTail :: (Outputable m, Outputable l) => ZTail m l -> SDoc 
 pprTail (ZTail m t) = ppr m $$ ppr t
-pprTail (ZLast LastExit) = text "<exit>"
-pprTail (ZLast (LastOther l)) = ppr l
+pprTail (ZLast l) = ppr l
+
+pprLast :: (Outputable l) => ZLast l -> SDoc
+pprLast LastExit = text "<exit>"
+pprLast (LastOther l) = ppr l
 
 pprLgraph :: (Outputable m, Outputable l, LastNode l) => LGraph m l -> SDoc
 pprLgraph g = text "{" $$ nest 2 (vcat $ map pprBlock blocks) $$ text "}"

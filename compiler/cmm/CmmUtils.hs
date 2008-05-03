@@ -128,6 +128,7 @@ cmmOffsetExpr e byte_off = CmmMachOp (MO_Add (cmmExprRep e)) [e, byte_off]
 -- a later optimisation step on Cmm).
 --
 cmmOffset :: CmmExpr -> Int -> CmmExpr
+cmmOffset e                 0        = e
 cmmOffset (CmmReg reg)      byte_off = cmmRegOff reg byte_off
 cmmOffset (CmmRegOff reg m) byte_off = cmmRegOff reg (m+byte_off)
 cmmOffset (CmmLit lit)      byte_off = CmmLit (cmmOffsetLit lit byte_off)

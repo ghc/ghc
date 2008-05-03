@@ -3,13 +3,13 @@ module DFMonad
     ( DataflowLattice(..)
     , DataflowAnalysis
     , markFactsUnchanged, factsStatus, getFact, setFact, getExitFact, setExitFact
-                        , forgetFact, botFact, allFacts, factsEnv, checkFactMatch
+                        , forgetFact, botFact, setAllFacts, getAllFacts, factsEnv, checkFactMatch
     , addLastOutFact, bareLastOutFacts, forgetLastOutFacts
     , subAnalysis
 
     , DFA, runDFA
     , DFM, runDFM, liftAnal
-    , markGraphRewritten
+    , markGraphRewritten, graphWasRewritten
     , freshBlockId
     , liftUSM
     , module OptimizationFuel
@@ -123,11 +123,12 @@ class DataflowAnalysis m where
   addLastOutFact :: (BlockId, f) -> m f ()
   bareLastOutFacts :: m f [(BlockId, f)]
   forgetLastOutFacts :: m f ()
-  allFacts :: m f (BlockEnv f)
+  getAllFacts :: m f (BlockEnv f)
+  setAllFacts :: BlockEnv f -> m f ()
   factsEnv :: Monad (m f) => m f (BlockId -> f)
 
   lattice :: m f (DataflowLattice f)
-  factsEnv = do { map <- allFacts
+  factsEnv = do { map <- getAllFacts
                 ; bot <- botFact
                 ; return $ \id -> lookupBlockEnv map id `orElse` bot }
 
@@ -163,6 +164,10 @@ instance DataflowAnalysis DFA where
              let debug = if log then pprTrace else \_ _ a -> a
              in  debug name (pprSetFact "exit" old a join) $
                  ((), s { df_exit_fact = join, df_facts_change = SomeChange })
+  getAllFacts = DFA f
+    where f _ s = (df_facts s, s)
+  setAllFacts env = DFA f
+    where f _ s = ((), s { df_facts = env})
   botFact = DFA f
     where f lattice s = (fact_bot lattice, s)
   forgetFact id = DFA f 
@@ -173,15 +178,13 @@ instance DataflowAnalysis DFA where
     where f _ s = (df_last_outs s, s)
   forgetLastOutFacts = DFA f
     where f _ s = ((), s { df_last_outs = [] })
-  allFacts = DFA f
-    where f _ s = (df_facts s, s)
   checkFactMatch id a =
       do { fact <- lattice
          ; old_a <- getFact id
          ; case fact_add_to fact a old_a of
              TxRes NoChange _ -> return ()
              TxRes SomeChange new ->
-               do { facts <- allFacts
+               do { facts <- getAllFacts
                   ; pprPanic "checkFactMatch"
                             (f4sep [text (fact_name fact), text "at id" <+> ppr id,
                                     text "changed from", nest 4 (ppr old_a), text "to",
@@ -213,7 +216,8 @@ instance DataflowAnalysis DFM where
   addLastOutFact p    = liftAnal $ addLastOutFact p
   bareLastOutFacts    = liftAnal $ bareLastOutFacts
   forgetLastOutFacts  = liftAnal $ forgetLastOutFacts
-  allFacts            = liftAnal $ allFacts
+  getAllFacts         = liftAnal $ getAllFacts
+  setAllFacts env     = liftAnal $ setAllFacts env
   checkFactMatch id a = liftAnal $ checkFactMatch id a
 
   lattice             = liftAnal $ lattice
@@ -229,6 +233,10 @@ markGraphRewritten :: DFM f ()
 markGraphRewritten = DFM f
     where f _ s = ((), s {df_rewritten = SomeChange})
 
+graphWasRewritten :: DFM f ChangeFlag
+graphWasRewritten = DFM f
+    where f _ s = (df_rewritten s, s)
+                    
 freshBlockId :: String -> DFM f BlockId
 freshBlockId _s = liftUSM $ getUniqueUs >>= return . BlockId
 

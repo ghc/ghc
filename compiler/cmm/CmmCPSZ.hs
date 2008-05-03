@@ -1,4 +1,3 @@
-
 module CmmCPSZ (
   -- | Converts C-- with full proceedures and parameters
   -- to a CPS transformed C-- with the stack made manifest.
@@ -31,6 +30,9 @@ protoCmmCPSZ :: DynFlags -- ^ Dynamic flags: -dcmm-lint -ddump-cps-cmm
        -> CmmZ     -- ^ Input C-- with Proceedures
        -> IO CmmZ  -- ^ Output CPS transformed C--
 protoCmmCPSZ dflags (Cmm tops)
+  | not (dopt Opt_RunCPSZ dflags) 
+  = return (Cmm tops)                -- Only if -frun-cps
+  | otherwise
   = do	{ showPass dflags "CPSZ"
         ; u <- mkSplitUniqSupply 'p'
         ; pass_ref <- newIORef "unoptimized program" -- XXX see [Note global fuel]
@@ -58,13 +60,17 @@ cpsTop (CmmProc h l args g) =
     let procPoints = minimalProcPointSet (runTx cmmCfgOptsZ g)
         g' = addProcPointProtocols procPoints args g
         g'' = map_nodes id NotSpillOrReload id g'
+               -- Change types of middle nodes to allow spill/reload
     in do { u1 <- getUs; u2 <- getUs; u3 <- getUs
           ; entry <- getUniqueUs >>= return . BlockId
           ; return $ 
               do { g <- return g''
                  ; g <- dual_rewrite u1 dualLivenessWithInsertion g
+                           -- Insert spills at defns; reloads at return points
                  ; g <- insertLateReloads' u2 (extend g)
+                           -- Duplicate reloads just before uses
                  ; g <- dual_rewrite u3 removeDeadAssignmentsAndReloads (trim entry g)
+                           -- Remove redundant reloads (and any other redundant asst)
                  ; return $ CmmProc h l args $ map_nodes id spillAndReloadComments id g
                  }
           }

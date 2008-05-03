@@ -205,7 +205,8 @@ data AvailRegs = UniverseMinus RegSet
 
 
 availRegsLattice :: DataflowLattice AvailRegs
-availRegsLattice = DataflowLattice "register gotten from reloads" empty add True
+availRegsLattice = DataflowLattice "register gotten from reloads" empty add False
+                            -- last True <==> debugging on
     where empty = UniverseMinus emptyRegSet
           -- | compute in the Tx monad to track whether anything has changed
           add new old =
@@ -241,7 +242,7 @@ cmmAvailableReloads :: LGraph M Last -> BlockEnv AvailRegs
 cmmAvailableReloads g = env
     where env = runDFA availRegsLattice $
                 do run_f_anal avail_reloads_transfer (fact_bot availRegsLattice) g
-                   allFacts
+                   getAllFacts
 
 avail_reloads_transfer :: FAnalysis M Last AvailRegs
 avail_reloads_transfer = FComp "available-reloads analysis" first middle last exit

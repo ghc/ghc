@@ -8,26 +8,33 @@
 module ZipCfgCmmRep
   ( CmmZ, CmmTopZ, CmmGraph, CmmBlock, CmmAGraph, Middle(..), Last(..), Convention(..)
   , ValueDirection(..)
+  , pprCmmGraphLikeCmm
   )
 where
 
 import CmmExpr
 import Cmm ( GenCmm(..), GenCmmTop(..), CmmStatic, CmmInfo
            , CmmCallTarget(..), CmmActuals, CmmFormals, CmmHinted(..)
-           , CmmStmt(CmmSwitch) -- imported in order to call ppr
+           , CmmStmt(..) -- imported in order to call ppr on Switch and to
+                         -- implement pprCmmGraphLikeCmm
+           , CmmSafety(CmmSafe) -- for pprCmmGraphLikeCmm
+           , CmmReturnInfo(CmmMayReturn) -- for pprCmmGraphLikeCmm
            )
 import PprCmm()
 
 import CLabel
+import CmmZipUtil
 import ClosureInfo
 import FastString
 import ForeignCall
 import MachOp
+import qualified ZipCfg as Z
 import qualified ZipDataflow0 as DF
 import ZipCfg 
 import MkZipCfg
 import Util
 
+import UniqSet
 import Maybes
 import Outputable
 import Prelude hiding (zip, unzip, last)
@@ -200,7 +207,9 @@ debugPpr :: Bool
 debugPpr = debugIsOn
 
 pprMiddle :: Middle -> SDoc    
-pprMiddle stmt = (case stmt of
+pprMiddle stmt = pp_stmt <+> pp_debug
+ where
+   pp_stmt = case stmt of
 
     CopyIn conv args _ ->
         if null args then ptext (sLit "empty CopyIn")
@@ -243,17 +252,17 @@ pprMiddle stmt = (case stmt of
         hcat [ ptext (sLit "return via ")
              , ppr_target ra, parens (commafy $ map ppr args), semi ]
 
-  ) <>
-  if debugPpr then empty
-  else text " //" <+>
-       case stmt of
-         CopyIn {}     -> text "CopyIn"
-         CopyOut {}    -> text "CopyOut"
-         MidComment {} -> text "MidComment"
-         MidAssign {}  -> text "MidAssign"
-         MidStore {}   -> text "MidStore"
-         MidUnsafeCall  {} -> text "MidUnsafeCall"
-         MidAddToContext {} -> text "MidAddToContext"
+   pp_debug =
+     if not debugPpr then empty
+     else text " //" <+>
+          case stmt of
+            CopyIn {}     -> text "CopyIn"
+            CopyOut {}    -> text "CopyOut"
+            MidComment {} -> text "MidComment"
+            MidAssign {}  -> text "MidAssign"
+            MidStore {}   -> text "MidStore"
+            MidUnsafeCall  {} -> text "MidUnsafeCall"
+            MidAddToContext {} -> text "MidAddToContext"
 
 
 ppr_target :: CmmExpr -> SDoc
@@ -317,3 +326,114 @@ pprConvention (ConventionPrivate {}  ) = text "<private-convention>"
 
 commafy :: [SDoc] -> SDoc
 commafy xs = hsep $ punctuate comma xs
+
+
+----------------------------------------------------------------
+-- | The purpose of this function is to print a Cmm zipper graph "as if it were"
+-- a Cmm program.  The objective is dodgy, so it's unsurprising parts of the
+-- code are dodgy as well.
+
+pprCmmGraphLikeCmm :: CmmGraph -> SDoc
+pprCmmGraphLikeCmm g = vcat (swallow blocks)
+    where blocks = Z.postorder_dfs g
+          swallow :: [CmmBlock] -> [SDoc]
+          swallow [] = []
+          swallow (Z.Block id t : rest) = tail id [] Nothing t rest
+          tail id prev' out (Z.ZTail (CopyOut conv args) t) rest =
+              if isJust out then panic "multiple CopyOut nodes in one basic block"
+              else
+                  tail id (prev') (Just (conv, args)) t rest
+          tail id prev' out (Z.ZTail m t) rest = tail id (mid m : prev') out t rest
+          tail id prev' out (Z.ZLast Z.LastExit)      rest = exit id prev' out rest
+          tail id prev' out (Z.ZLast (Z.LastOther l)) rest = last id prev' out l rest
+          mid (CopyIn _ [] _) = text "// proc point (no parameters)"
+          mid m@(CopyIn {}) = ppr m <+> text "(proc point)"
+          mid m = ppr m
+          block' id prev'
+              | id == Z.lg_entry g, entry_has_no_pred =
+                            vcat (text "<entry>" : reverse prev')
+              | otherwise = hang (ppr id <> colon) 4 (vcat (reverse prev'))
+          last id prev' out l n =
+              let endblock stmt = block' id (stmt : prev') : swallow n in
+              case l of
+                LastBranch tgt ->
+                    case n of
+                      Z.Block id' t : bs
+                          | tgt == id', unique_pred id' 
+                          -> tail id prev' out t bs  -- optimize out redundant labels
+                      _ -> endblock (ppr $ CmmBranch tgt)
+                l@(LastCondBranch expr tid fid) ->
+                  let ft id = text "// fall through to " <> ppr id in
+                  case n of
+                    Z.Block id' t : bs
+                      | id' == fid, isNothing out ->
+                          tail id (ft fid : ppr (CmmCondBranch expr tid) : prev') Nothing t bs
+                      | id' == tid, Just e' <- maybeInvertCmmExpr expr, isNothing out->
+                          tail id (ft tid : ppr (CmmCondBranch e'   fid) : prev') Nothing t bs
+                    _ -> endblock $ with_out out l
+                l@(LastJump   {}) -> endblock $ with_out out l
+                l@(LastReturn {}) -> endblock $ with_out out l
+                l@(LastSwitch {}) -> endblock $ with_out out l
+                l@(LastCall _ Nothing) -> endblock $ with_out out l
+                l@(LastCall tgt (Just k))
+                   | Z.Block id' (Z.ZTail (CopyIn _ ress srt) t) : bs <- n,
+                     Just (conv, args) <- out,
+                     id' == k ->
+                         let call = CmmCall tgt' ress args (CmmSafe srt) CmmMayReturn
+                             tgt' = CmmCallee tgt (cconv_of_conv conv)
+                             ppcall = ppr call <+> parens (text "ret to" <+> ppr k)
+                         in if unique_pred k then
+                                tail id (ppcall : prev') Nothing t bs
+                            else
+                                endblock (ppcall)
+                   | Z.Block id' t : bs <- n, id' == k, unique_pred k,
+                     Just (conv, args) <- out,
+                     Just (ress, srt) <- findCopyIn t ->
+                         let call = CmmCall tgt' ress args (CmmSafe srt) CmmMayReturn
+                             tgt' = CmmCallee tgt (cconv_of_conv conv)
+                             delayed =
+                                 ptext (sLit "// delayed CopyIn follows previous call")
+                         in  tail id (delayed : ppr call : prev') Nothing t bs
+                   | otherwise -> endblock $ with_out out l
+          findCopyIn (Z.ZTail (CopyIn _ ress srt) _) = Just (ress, srt)
+          findCopyIn (Z.ZTail _ t) = findCopyIn t
+          findCopyIn (Z.ZLast _) = Nothing
+          exit id prev' out n = -- highly irregular (assertion violation?)
+              let endblock stmt = block' id (stmt : prev') : swallow n in
+              case out of Nothing -> endblock (text "// <exit>")
+                          Just (conv, args) -> endblock (ppr (CopyOut conv args) $$
+                                                         text "// <exit>")
+          preds = zipPreds g
+          entry_has_no_pred = case Z.lookupBlockEnv preds (Z.lg_entry g) of
+                                Nothing -> True
+                                Just s -> isEmptyUniqSet s
+          single_preds =
+              let add b single =
+                    let id = Z.blockId b
+                    in  case Z.lookupBlockEnv preds id of
+                          Nothing -> single
+                          Just s -> if sizeUniqSet s == 1 then
+                                        Z.extendBlockSet single id
+                                    else single
+              in  Z.fold_blocks add Z.emptyBlockSet g
+          unique_pred id = Z.elemBlockSet id single_preds
+          cconv_of_conv (ConventionStandard conv _) = conv
+          cconv_of_conv (ConventionPrivate {}) = CmmCallConv -- XXX totally bogus
+
+with_out :: Maybe (Convention, CmmActuals) -> Last -> SDoc
+with_out Nothing l = ptext (sLit "??no-arguments??") <+> ppr l
+with_out (Just (conv, args)) l = last l
+    where last (LastCall e k) =
+              hcat [ptext (sLit "... = foreign "),
+                    doubleQuotes(ppr conv), space,
+                    ppr_target e, parens ( commafy $ map ppr args ),
+                    ptext (sLit " \"safe\""),
+                    case k of Nothing -> ptext (sLit " never returns")
+                              Just _ -> empty,
+                    semi ]
+          last (LastReturn) = ppr (CmmReturn args)
+          last (LastJump e) = ppr (CmmJump e args)
+          last l = ppr (CopyOut conv args) $$ ppr l
+          ppr_target (CmmLit lit) = ppr lit
+          ppr_target fn'          = parens (ppr fn')
+          commafy xs = hsep $ punctuate comma xs

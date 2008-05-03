@@ -23,7 +23,7 @@ type M = ExtendWithSpills Middle
 
 foldConflicts :: (RegSet -> a -> a) -> a -> LGraph M Last -> a
 foldConflicts f z g =
-  let env = runDFA dualLiveLattice (run_b_anal dualLiveness g >> allFacts)
+  let env = runDFA dualLiveLattice (run_b_anal dualLiveness g >> getAllFacts)
       lookup id = lookupBlockEnv env id `orElse` fact_bot dualLiveLattice
       f' dual z = f (on_stack dual) z
   in  fold_edge_facts_b f' dualLiveness g lookup z

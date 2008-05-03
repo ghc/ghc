@@ -1,10 +1,3 @@
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 ----------------------------------------------------------------------------
 --
 -- Pretty-printing of Cmm as (a superset of) C--
@@ -92,6 +85,9 @@ instance Outputable CmmExpr where
 instance Outputable CmmReg where
     ppr e = pprReg e
 
+instance Outputable CmmLit where
+    ppr l = pprLit l
+
 instance Outputable LocalReg where
     ppr e = pprLocalReg e
 
@@ -145,12 +141,13 @@ instance Outputable CmmSafety where
 -- For ideas on how to refine it, they used to be printed in the
 -- style of C--'s 'stackdata' declaration, just inside the proc body,
 -- and were labelled with the procedure name ++ "_info".
-pprInfo (CmmInfo gc_target update_frame CmmNonInfoTable) =
+pprInfo :: CmmInfo -> SDoc
+pprInfo (CmmInfo _gc_target update_frame CmmNonInfoTable) =
     vcat [{-ptext (sLit "gc_target: ") <>
                 maybe (ptext (sLit "<none>")) pprBlockId gc_target,-}
           ptext (sLit "update_frame: ") <>
                 maybe (ptext (sLit "<none>")) pprUpdateFrame update_frame]
-pprInfo (CmmInfo gc_target update_frame
+pprInfo (CmmInfo _gc_target update_frame
          (CmmInfoTable (ProfilingInfo closure_type closure_desc) tag info)) =
     vcat [{-ptext (sLit "gc_target: ") <>
                 maybe (ptext (sLit "<none>")) pprBlockId gc_target,-}
@@ -161,12 +158,13 @@ pprInfo (CmmInfo gc_target update_frame
           ptext (sLit "tag: ") <> integer (toInteger tag),
           pprTypeInfo info]
 
+pprTypeInfo :: ClosureTypeInfo -> SDoc
 pprTypeInfo (ConstrInfo layout constr descr) =
     vcat [ptext (sLit "ptrs: ") <> integer (toInteger (fst layout)),
           ptext (sLit "nptrs: ") <> integer (toInteger (snd layout)),
           ptext (sLit "constructor: ") <> integer (toInteger constr),
           pprLit descr]
-pprTypeInfo (FunInfo layout srt fun_type arity args slow_entry) =
+pprTypeInfo (FunInfo layout srt fun_type arity _args slow_entry) =
     vcat [ptext (sLit "ptrs: ") <> integer (toInteger (fst layout)),
           ptext (sLit "nptrs: ") <> integer (toInteger (snd layout)),
           ptext (sLit "srt: ") <> ppr srt,
@@ -241,8 +239,22 @@ pprStmt stmt = case stmt of
                            CmmNeverReturns -> ptext (sLit " never returns"),
                semi ]
         where
-            target (CmmLit lit) = pprLit lit
-            target fn'          = parens (ppr fn')
+          ---- With the following three functions, I was going somewhere
+          ---- useful, but I don't remember where.  Probably making 
+          ---- emitted Cmm output look better. ---NR, 2 May 2008
+	  _pp_lhs | null results = empty
+		  | otherwise    = commafy (map ppr_ar results) <+> equals
+		-- Don't print the hints on a native C-- call
+	  ppr_ar arg = case cconv of
+			    CmmCallConv -> ppr (hintlessCmm arg)
+			    _   	-> doubleQuotes (ppr $ cmmHint arg) <+>
+                                           ppr (hintlessCmm arg)
+	  _pp_conv = case cconv of
+		      CmmCallConv -> empty
+		      _ -> ptext (sLit "foreign") <+> doubleQuotes (ppr cconv)
+
+          target (CmmLit lit) = pprLit lit
+          target fn'          = parens (ppr fn')
 
     CmmCall (CmmPrim op) results args safety ret ->
         pprStmt (CmmCall (CmmCallee (CmmLit lbl) CCallConv)
@@ -341,7 +353,7 @@ genSwitch expr maybe_ids
       snds a b = (snd a) == (snd b)
 
       caseify :: [(Int,Maybe BlockId)] -> SDoc
-      caseify ixs@((i,Nothing):_)
+      caseify ixs@((_,Nothing):_)
         = ptext (sLit "/* impossible: ") <> hcat (intersperse comma (map (int.fst) ixs))
 		<> ptext (sLit " */")
       caseify as 
@@ -379,9 +391,12 @@ pprExpr e
 -- a default conservative behaviour.
 
 -- %nonassoc '>=' '>' '<=' '<' '!=' '=='
+pprExpr1, pprExpr7, pprExpr8 :: CmmExpr -> SDoc
 pprExpr1 (CmmMachOp op [x,y]) | Just doc <- infixMachOp1 op
    = pprExpr7 x <+> doc <+> pprExpr7 y
 pprExpr1 e = pprExpr7 e
+
+infixMachOp1, infixMachOp7, infixMachOp8 :: MachOp -> Maybe SDoc
 
 infixMachOp1 (MO_Eq     _) = Just (ptext (sLit "=="))
 infixMachOp1 (MO_Ne     _) = Just (ptext (sLit "!="))
@@ -479,8 +494,9 @@ pprLit lit = case lit of
     CmmLabelDiffOff clbl1 clbl2 i -> pprCLabel clbl1 <> char '-'  
                                   <> pprCLabel clbl2 <> ppr_offset i
 
-pprLit1 lit@(CmmLabelOff clbl i) = parens (pprLit lit)
-pprLit1 lit                      = pprLit lit
+pprLit1 :: CmmLit -> SDoc
+pprLit1 lit@(CmmLabelOff {}) = parens (pprLit lit)
+pprLit1 lit                  = pprLit lit
 
 ppr_offset :: Int -> SDoc
 ppr_offset i
@@ -569,4 +585,4 @@ pprBlockId b = ppr $ getUnique b
 -----------------------------------------------------------------------------
 
 commafy :: [SDoc] -> SDoc
-commafy xs = hsep $ punctuate comma xs
+commafy xs = fsep $ punctuate comma xs

@@ -7,6 +7,7 @@ module OptimizationFuel
     , lastFuelPassInState, fuelExhaustedInState, fuelRemainingInState
     , fuelDecrementState
     , runFuel, runFuelIO, runFuelWithLastPass, fuelConsumingPass
+    , runWithInfiniteFuel
     , FuelMonad(..)
     )
 where
@@ -59,6 +60,8 @@ fuelConsumingPass name f = do fuel <- fuelRemaining
 
 runFuel             :: FuelMonad a -> FuelConsumer a
 runFuelWithLastPass :: FuelMonad a -> FuelConsumer (a, String)
+runWithInfiniteFuel :: FuelMonad a -> a
+
 
 runFuelIO :: IORef String -> IORef OptimizationFuel -> FuelMonad a -> IO a
 runFuelIO pass_ref fuel_ref (FuelMonad f) =
@@ -77,6 +80,8 @@ runFuel             (FuelMonad f) fuel = let (a, s) = f $ initialFuelState fuel
                                          in (a, fs_fuellimit s)
 runFuelWithLastPass (FuelMonad f) fuel = let (a, s) = f $ initialFuelState fuel
                                          in ((a, fs_lastpass s), fs_fuellimit s)
+
+runWithInfiniteFuel (FuelMonad f) = fst $ f $ initialFuelState $ tankFilledTo maxBound
 
 lastFuelPassInState :: FuelState -> String
 lastFuelPassInState = fs_lastpass

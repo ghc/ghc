@@ -34,6 +34,7 @@ module PprC (
 
 -- Cmm stuff
 import Cmm
+import PprCmm	()	-- Instances only
 import CLabel
 import MachOp
 import ForeignCall

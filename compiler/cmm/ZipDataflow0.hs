@@ -299,7 +299,7 @@ run dir name set_entry do_block b blocks =
          do { markFactsUnchanged
             ; b <- foldM trace_block b blocks
             ; changed <- factsStatus
-            ; facts <- allFacts
+            ; facts <- getAllFacts
             ; let depth = 0 -- was nesting depth
             ; ppIter depth n $
               case changed of
@@ -442,7 +442,7 @@ solve_graph_b comp fuel graph exit_fact =
       in do { fuel <-
                   run "backward" (bc_name comp) (return ()) set_block_fact fuel blocks
             ; a <- getFact (G.lg_entry graph)
-            ; facts <- allFacts
+            ; facts <- getAllFacts
             ; my_trace "Solution to graph after pass 1 is" (pprFacts graph facts a) $
               return (fuel, a) }
                
@@ -496,11 +496,11 @@ solve_and_rewrite_b_graph ::
 
 solve_and_rewrite_b comp fuel graph exit_fact =
   do { (_, a) <- solve_graph_b comp fuel graph exit_fact -- pass 1
-     ; facts <- allFacts
+     ; facts <- getAllFacts
      ; (fuel, g) <-                                           -- pass 2
        my_trace "Solution to graph after pass 1 is" (pprFacts graph facts) $
            backward_rewrite (comp_with_exit_b comp exit_fact) fuel graph 
-     ; facts <- allFacts
+     ; facts <- getAllFacts
      ; my_trace "Rewritten graph after pass 2 is" (pprFacts g facts) $
        return (fuel, a, g) }
   where
@@ -1079,10 +1079,10 @@ subAnalysis' :: (Monad (m f), DataflowAnalysis m, Outputable f) =>
                 m f a -> m f a
 subAnalysis' m =
     do { a <- subAnalysis $
-               do { a <- m; facts <- allFacts
+               do { a <- m; facts <- getAllFacts
                   ; my_trace "after sub-analysis facts are" (pprFacts facts) $
                     return a }
-       ; facts <- allFacts
+       ; facts <- getAllFacts
        ; my_trace "in parent analysis facts are" (pprFacts facts) $
          return a }
   where pprFacts env = nest 2 $ vcat $ map pprFact $ ufmToList env

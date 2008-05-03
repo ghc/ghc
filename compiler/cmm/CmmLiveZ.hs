@@ -41,7 +41,7 @@ type BlockEntryLiveness = BlockEnv CmmLive
 -----------------------------------------------------------------------------
 cmmLivenessZ :: CmmGraph -> BlockEntryLiveness
 cmmLivenessZ g = env
-    where env = runDFA liveLattice $ do { run_b_anal transfer g; allFacts }
+    where env = runDFA liveLattice $ do { run_b_anal transfer g; getAllFacts }
           transfer     = BComp "liveness analysis" exit last middle first
           exit         = emptyUniqSet
           first live _ = live
