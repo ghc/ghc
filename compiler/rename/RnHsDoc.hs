@@ -1,9 +1,3 @@
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
 
 module RnHsDoc ( rnHaddock, rnHsDoc, rnLHsDoc, rnMbLHsDoc ) where
 
@@ -37,16 +31,19 @@ rnMbHsDoc mb_doc = case mb_doc of
     return (Just doc')
   Nothing -> return Nothing
 
+rnMbLHsDoc :: Maybe (LHsDoc RdrName) -> RnM (Maybe (LHsDoc Name))
 rnMbLHsDoc mb_doc = case mb_doc of
   Just doc -> do
     doc' <- rnLHsDoc doc
     return (Just doc')
   Nothing -> return Nothing
 
+rnLHsDoc :: LHsDoc RdrName -> RnM (LHsDoc Name)
 rnLHsDoc (L pos doc) = do
   doc' <- rnHsDoc doc
   return (L pos doc')
 
+ids2string :: [RdrName] -> String
 ids2string []    = []
 ids2string (x:_) = show $ ppr x defaultUserStyle
 
