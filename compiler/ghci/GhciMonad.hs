@@ -190,7 +190,7 @@ unsetOption opt
       setGHCiState (st{ options = filter (/= opt) (options st) })
 
 io :: IO a -> GHCi a
-io m = GHCi { unGHCi = \_ -> m >>= return }
+io m = GHCi (\_ -> m)
 
 printForUser :: SDoc -> GHCi ()
 printForUser doc = do
