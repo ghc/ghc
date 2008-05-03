@@ -1,17 +1,10 @@
 -----------------------------------------------------------------------------
 --
--- GHCi's :ctags and :etags commands 
+-- GHCi's :ctags and :etags commands
 --
 -- (c) The GHC Team 2005-2007
 --
 -----------------------------------------------------------------------------
-
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
 
 module GhciTags (createCTagsFileCmd, createETagsFileCmd) where
 
@@ -120,27 +113,29 @@ collateAndWriteTags ETags file tagInfos = do -- etags style, Emacs/XEmacs
   tagGroups <- mapM tagFileGroup groups 
   IO.try (writeFile file $ concat tagGroups)
   where
-    tagFileGroup group@[] = throwDyn (CmdLineError "empty tag file group??")
+    tagFileGroup [] = throwDyn (CmdLineError "empty tag file group??")
     tagFileGroup group@((_,fileName,_,_):_) = do
       file <- readFile fileName -- need to get additional info from sources..
       let byLine (_,_,l1,_) (_,_,l2,_) = l1 <= l2
           sortedGroup = sortLe byLine group
           tags = unlines $ perFile sortedGroup 1 0 $ lines file
       return $ "\x0c\n" ++ fileName ++ "," ++ show (length tags) ++ "\n" ++ tags
-    perFile (tagInfo@(tag,file,lNo,colNo):tags) count pos (line:lines) | lNo>count =
+    perFile (tagInfo@(_tag, _file, lNo, _colNo):tags) count pos (line:lines)
+     | lNo > count =
       perFile (tagInfo:tags) (count+1) (pos+length line) lines
-    perFile (tagInfo@(tag,file,lNo,colNo):tags) count pos lines@(line:_) | lNo==count =
+    perFile (tagInfo@(_tag, _file, lNo, _colNo):tags) count pos lines@(line:_)
+     | lNo == count =
       showETag tagInfo line pos : perFile tags count pos lines
-    perFile tags count pos lines = []
+    perFile _ _ _ _ = []
 
 -- simple ctags format, for Vim et al
 showTag :: TagInfo -> String
-showTag (tag,file,lineNo,colNo)
+showTag (tag, file, lineNo, _colNo)
     =  tag ++ "\t" ++ file ++ "\t" ++ show lineNo
 
 -- etags format, for Emacs/XEmacs
 showETag :: TagInfo -> String -> Int -> String
-showETag (tag,file,lineNo,colNo) line charPos
+showETag (tag, _file, lineNo, colNo) line charPos
     =  take colNo line ++ tag
     ++ "\x7f" ++ tag
     ++ "\x01" ++ show lineNo
