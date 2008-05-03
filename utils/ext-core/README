@@ -1,10 +1,8 @@
 A set of example programs for handling external core format.
 
 In particular, typechecker and interpreter give a precise semantics.
-
-To build, run "make".
 ---------------------
-tjc April 2008:
+tjc April/May 2008:
 
 ==== Notes ====
 
@@ -21,14 +19,18 @@ The checker should work on most programs. Bugs I'm aware of:
 3. When typechecking the ghc-prim:GHC.PrimopWrappers library module,
    some declarations seem to have the wrong type signature (due to 
    confusion between (forall (t::*) ...) and (forall (t::?) ...).)
-   This may be a GHC bug.
+   This is because the ? kind is not expressible in Haskell.
 
 Typechecking all the GHC libraries eats about a gig of heap and takes a
 long time. I blame Parsec. (Someone who was bored, or understood happy
 better than I do, could update the old happy parser, which is still in the
 repo.)
 
-The interpreter is not working yet.
+The interpreter is also memory-hungry, but works for small programs
+that only do simple I/O (e.g., putStrLn is okay; not much more than that)
+and don't use Doubles or arrays. For example: exp3_8, gen_regexps, queens,
+primes, rfib, tak, wheel-sieve1, and wheel-sieve2, if modified so as not
+to take input or arguments.
 
 ==== Building ====
 

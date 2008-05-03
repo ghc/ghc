@@ -2,10 +2,12 @@ module Core where
 
 import Encoding
 
+import Data.Generics
 import List (elemIndex)
 
 data Module 
  = Module AnMname [Tdef] [Vdefg]
+  deriving (Data, Typeable)
 
 data Tdef 
   = Data (Qual Tcon) [Tbind] [Cdef]
@@ -14,15 +16,19 @@ data Tdef
     -- there is an implicit axiom:
     --  co tbs :: tc tbs :=: t
   | Newtype (Qual Tcon) (Qual Tcon) [Tbind] (Maybe Ty)
+ deriving (Data, Typeable)
 
 data Cdef 
   = Constr (Qual Dcon) [Tbind] [Ty]
+  deriving (Data, Typeable)
 
 data Vdefg 
   = Rec [Vdef]
   | Nonrec Vdef
+  deriving (Data, Typeable)
 
 newtype Vdef = Vdef (Qual Var,Ty,Exp)
+  deriving (Data, Typeable)
 
 data Exp 
   = Var (Qual Var)
@@ -36,15 +42,18 @@ data Exp
   | Cast Exp Ty
   | Note String Exp
   | External String Ty
+  deriving (Data, Typeable)
 
 data Bind 
   = Vb Vbind
   | Tb Tbind
+  deriving (Data, Typeable)
 
 data Alt 
   = Acon (Qual Dcon) [Tbind] [Vbind] Exp
   | Alit Lit Exp
   | Adefault Exp
+  deriving (Data, Typeable)
 
 type Vbind = (Var,Ty)
 type Tbind = (Tvar,Kind)
@@ -64,6 +73,7 @@ data Ty
   | InstCoercion Ty Ty
   | LeftCoercion Ty
   | RightCoercion Ty
+  deriving (Data, Typeable)
 
 data Kind 
   = Klifted
@@ -71,6 +81,7 @@ data Kind
   | Kopen
   | Karrow Kind Kind
   | Keq Ty Ty
+  deriving (Data, Typeable)
 
 -- A CoercionKind isn't really a Kind at all, but rather,
 -- corresponds to an arbitrary user-declared axiom.
@@ -92,13 +103,13 @@ data CoercionKind =
 data KindOrCoercion = Kind Kind | Coercion CoercionKind
   
 data Lit = Literal CoreLit Ty
-  deriving Eq   -- with nearlyEqualTy 
+  deriving (Data, Typeable, Eq)   -- with nearlyEqualTy 
 
 data CoreLit = Lint Integer
   | Lrational Rational
   | Lchar Char
   | Lstring String 
-  deriving Eq
+  deriving (Data, Typeable, Eq)
 
 -- Right now we represent module names as triples:
 -- (package name, hierarchical names, leaf name)
@@ -111,8 +122,9 @@ data CoreLit = Lint Integer
 
 type Mname = Maybe AnMname
 newtype AnMname = M (Pname, [Id], Id)
-  deriving (Eq, Ord)
-type Pname = Id
+  deriving (Eq, Ord, Data, Typeable)
+newtype Pname = P Id
+  deriving (Eq, Ord, Data, Typeable)
 type Var = Id
 type Tvar = Id
 type Tcon = Id
@@ -125,6 +137,9 @@ qual mn t = (Just mn, t)
 
 unqual :: t -> Qual t
 unqual = (,) Nothing
+
+getModule :: Qual t -> Mname
+getModule = fst
 
 type Id = String
 
@@ -184,16 +199,23 @@ errMname  = mkBaseMname "Err"
 mkBaseMname,mkPrimMname :: Id -> AnMname
 mkBaseMname mn = M (basePkg, ghcPrefix, mn)
 mkPrimMname mn = M (primPkg, ghcPrefix, mn)
-basePkg = "base"
-mainPkg = "main"
-primPkg = zEncodeString "ghc-prim"
+basePkg = P "base"
+mainPkg = P "main"
+primPkg = P $ zEncodeString "ghc-prim"
 ghcPrefix = ["GHC"]
 mainPrefix = []
 baseMname = mkBaseMname "Base"
 boolMname = mkPrimMname "Bool"
 mainVar = qual mainMname "main"
+wrapperMainVar = qual wrapperMainMname "main"
 mainMname = M (mainPkg, mainPrefix, "Main")
-wrapperMainMname = Just $ M (mainPkg, mainPrefix, "ZCMain")
+wrapperMainMname = M (mainPkg, mainPrefix, "ZCMain")
+wrapperMainAnMname = Just wrapperMainMname
+
+dcTrue :: Dcon
+dcTrue = "True"
+dcFalse :: Dcon
+dcFalse = "False"
 
 tcArrow :: Qual Tcon
 tcArrow = (Just primMname, "ZLzmzgZR")
@@ -201,6 +223,9 @@ tcArrow = (Just primMname, "ZLzmzgZR")
 tArrow :: Ty -> Ty -> Ty
 tArrow t1 t2 = Tapp (Tapp (Tcon tcArrow) t1) t2
 
+mkFunTy :: Ty -> Ty -> Ty
+mkFunTy randTy resultTy =
+  Tapp (Tapp (Tcon tcArrow) randTy) resultTy
 
 ktArrow :: Kind
 ktArrow = Karrow Kopen (Karrow Kopen Klifted)
@@ -243,4 +268,8 @@ dcUtupleTy n =
 utuple :: [Ty] -> [Exp] -> Exp
 utuple ts es = foldl App (foldl Appt (Dcon (dcUtuple (length es))) ts) es
 
-
+---- snarfed from GHC's CoreSyn
+flattenBinds :: [Vdefg] -> [Vdef]	-- Get all the lhs/rhs pairs
+flattenBinds (Nonrec vd : binds) = vd : flattenBinds binds
+flattenBinds (Rec prs1   : binds) = prs1 ++ flattenBinds binds
+flattenBinds []			  = []

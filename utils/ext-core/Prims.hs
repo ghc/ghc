@@ -4,9 +4,10 @@
    Most are defined in PrimEnv, which is automatically generated from
    GHC's primops.txt. -}
 
-module Prims(initialEnv, primEnv) where
+module Prims(initialEnv, primEnv, newPrimVars) where
 
 import Core
+import Encoding
 import Env
 import Check
 import PrimCoercions
@@ -30,13 +31,19 @@ primEnv = Envs {tcenv_=efromlist $ map (\ (t,k) -> (t,Kind k)) $
                    ++ ((snd tcArrow,ktArrow):primTcs)),
 		tsenv_=eempty,
 		cenv_=efromlist primDcs,
-		venv_=efromlist (opsState ++ primVals)}
+		venv_=efromlist (newPrimVars ++ opsState ++ primVals)}
 
 errorEnv :: Envs
 errorEnv = Envs {tcenv_=eempty,
 		 tsenv_=eempty,
 		 cenv_=eempty,
 		 venv_=efromlist errorVals}
+
+
+newPrimVars :: [(Id, Ty)]
+newPrimVars = map (\ (v, ty) -> (zEncodeString v, ty))
+  [("hPutChar#", mkFunTy tIntzh (mkFunTy tCharzh tIOUnit)),
+   ("isSpace#", mkFunTy tCharzh tBool)]
 
 
 primDcs :: [(Dcon,Ty)]
@@ -95,6 +102,8 @@ str2A, forallAA :: Ty
 str2A = Tforall ("a",Kopen) (tArrow tAddrzh (Tvar "a"))
 forallAA = Tforall ("a",Kopen) (Tvar "a")
 
+tBool :: Ty
+tBool = Tcon (Just boolMname, "Bool")
 tcChar :: Qual Tcon
 tcChar = bv "Char"
 tChar :: Ty
@@ -105,3 +114,11 @@ tList :: Ty -> Ty
 tList t = Tapp (Tcon tcList) t
 tString :: Ty
 tString = tList tChar
+tIntzh, tCharzh, tIOUnit :: Ty
+tIntzh = Tcon (primId "Int#")
+tCharzh = Tcon (primId "Char#")
+tIOUnit = Tapp (Tcon (Just (mkBaseMname "IOBase"), "IO")) 
+               (Tcon (bv "Z0T"))
+
+primId :: String -> Qual Id
+primId = pv . zEncodeString

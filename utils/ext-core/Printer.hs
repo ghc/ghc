@@ -85,7 +85,7 @@ pqname (m,v) = pmname m <> pname v
 pmname Nothing = empty
 pmname (Just m) = panmname m <> char '.'
 
-panmname (M (pkgName, parents, name)) =
+panmname (M (P pkgName, parents, name)) =
   let parentStrs = map pname parents in
          pname pkgName <> char ':' <>
          -- This is to be sure to not print out:

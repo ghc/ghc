@@ -1,4 +1,4 @@
-{-# OPTIONS -XPatternGuards #-}
+{-# OPTIONS -Wall -fno-warn-name-shadowing -XPatternGuards #-}
 {- 
 Interprets the subset of well-typed Core programs for which
 	(a) All constructor and primop applications are saturated
@@ -17,13 +17,17 @@ Just a sampling of primitive types and operators are included.
 
 module Interp ( evalProgram ) where
 
+import Control.Monad.Error
+import Control.Monad.State
+import Data.Char
+import Data.List
+
+import GHC.Exts hiding (Ptr)
+import System.IO
+
 import Core
-import Printer
-import Monad
 import Env
-import List
-import Char
-import Prims
+import Printer()
 
 data HeapValue = 
     Hconstr Dcon [Value]       -- constructed value (note: no qualifier needed!)
@@ -39,6 +43,10 @@ data Value =
   | Vutuple [Value]            -- unboxed tuples
   deriving (Show)
 
+instance Error Value where
+  -- TODO: ??
+  strMsg s = error s
+
 type Venv = Env Var Value       -- values of vars
 
 data PrimValue =                -- values of the (unboxed) primitive types
@@ -49,6 +57,7 @@ data PrimValue =                -- values of the (unboxed) primitive types
   | PFloatzh Rational		-- actually 32-bit 
   | PDoublezh Rational		-- actually 64-bit
 --  etc., etc.
+  | PString String
   deriving (Eq,Show)
 
 type Menv = Env AnMname Venv	-- modules
@@ -92,56 +101,66 @@ hempty = Heap 0 eempty
 
 type Exn = Value
 
-newtype Eval a = Eval (Heap -> (Heap,Either a Exn))
-
-instance Monad Eval where
-  (Eval m) >>= k = Eval (
-             \h -> case m h of
-                    (h',Left x) -> case k x of
-                                     Eval k' -> k' h'
-                    (h',Right exn) -> (h',Right exn))
-  return x = Eval (\h -> (h,Left x))
+type Eval a = ErrorT Exn (StateT Heap IO) a
 
 hallocateE :: HeapValue -> Eval Ptr
-hallocateE v = Eval (\ h -> 
-   let (h',p) = hallocate h v
-   in (h', Left p))
+hallocateE v = do
+  h <- get
+  let (h', p) = hallocate h v
+  put h'
+  return p
 
 hupdateE :: Ptr -> HeapValue -> Eval ()
-hupdateE p v = Eval (\h -> (hupdate h p v,Left ()))
+hupdateE p v = modify (\ h -> hupdate h p v)
 
 hlookupE :: Ptr -> Eval HeapValue
-hlookupE p =  Eval (\h -> (h,Left (hlookup h p)))
+hlookupE p =  get >>= (\h -> return (hlookup h p))
 
 hremoveE :: Ptr -> Eval ()
-hremoveE p = Eval (\h -> (hremove h p, Left ()))
+hremoveE p = modify (\h -> hremove h p)
 
 raiseE :: Exn -> Eval a
-raiseE exn = Eval (\h -> (h,Right exn))
+raiseE = throwError
 
-catchE :: Eval a -> (Exn -> Eval a) -> Eval a
-catchE (Eval m) f = Eval 
-                       (\h -> case m h of
-                               (h',Left x) -> (h',Left x)
-                               (h',Right exn) -> 
-                                       case f exn of
-                                         Eval f' -> f' h')
+catchE :: Show a => Eval a -> (Exn -> Eval a) -> Eval a
+catchE = catchError
 
-runE :: Eval a -> a
-runE (Eval f) = 
-  case f hempty of
-    (_,Left v) -> v
-    (_,Right exn) ->  error ("evaluation failed with uncaught exception: " ++ show exn)
-
+runE :: Eval a -> IO a
+runE m = do
+  resultOrError <- evalStateT (runErrorT m) hempty
+  case resultOrError of
+    Right v -> return v
+    Left exn -> error
+      ("evaluation failed with uncaught exception: " ++ show exn)
 
 {- Main entry point -}
-evalProgram :: [Module] -> Value
-evalProgram modules =
- runE(
-  do globalEnv <- foldM evalModule initialGlobalEnv modules
-     Vutuple [_,v] <- evalExp globalEnv eempty (App (Var mainVar) 
-                        (Var (qual primMname "realWorldzh")))
-     return v)
+-- TODO: This is in the IO monad because primitive I/O ops
+-- actually perform the IO. It might be better to model it
+-- instead (by having the interpreter return a ([Char] -> (Value, [Char])))
+evalProgram :: [Module] -> IO Value
+evalProgram modules = runE $ do
+     -- We do two passes: one to slurp in all the definitions *except*
+     -- for :Main.main, and then one to look for the Main module
+     -- and extract out just the :Main.main defn.
+     -- It's kind of annoying.
+     globalEnv' <- foldM evalModule initialGlobalEnv modules
+     globalEnv  <- evalModule globalEnv' (rootModule modules)
+     Vutuple [_,v] <- evalExp globalEnv eempty (App (Var wrapperMainVar)
+                       stateToken)
+     return v
+
+rootModule :: [Module] -> Module
+-- This looks for the Main module, and constructs
+-- a fake module containing only the defn of
+-- :Main.main.
+rootModule ms =
+  case find (\ (Module mn _ _) -> mn == mainMname) ms of
+    Just (Module _ _ [Rec bs]) ->
+        Module wrapperMainMname []
+          [Rec (filter isWrapperMainVdef bs)]
+    _ -> error "eval: missing main module"
+  where isWrapperMainVdef (Vdef (v,_,_)) | v == wrapperMainVar = True
+        isWrapperMainVdef _ = False
 
 {- Environments:
 
@@ -171,12 +190,12 @@ In evalExp:
 
 
 evalModule :: Menv -> Module -> Eval Menv
-evalModule globalEnv (Module mn tdefs vdefgs) = 
-  do (e_venv,l_venv) <- foldM evalVdef (eempty,eempty) vdefgs
+evalModule globalEnv (Module mn _ vdefgs) =
+  do (e_venv,_) <- foldM evalVdef (eempty,eempty) vdefgs
      return (eextend globalEnv (mn,e_venv))
   where
     evalVdef :: (Venv,Venv) -> Vdefg -> Eval (Venv,Venv)
-    evalVdef (e_env,l_env) (Nonrec(Vdef((m,x),t,e))) =
+    evalVdef (e_env,l_env) (Nonrec(Vdef((m,x),_,e))) =
      do p <- hallocateE (suspendExp l_env e)
 	let heaps =
                case m of
@@ -185,179 +204,190 @@ evalModule globalEnv (Module mn tdefs vdefgs) =
 	return heaps
     evalVdef (e_env,l_env) (Rec vdefs) =
       do l_vs0 <- mapM preallocate l_xs
-	 let l_env' = foldl eextend l_env (zip l_xs l_vs0)
+	 let l_env' = foldl eextend l_env (zip l_xs (map Vheap l_vs0))
 	 let l_hs = map (suspendExp l_env') l_es
 	 mapM_ reallocate (zip l_vs0 l_hs)
 	 let e_hs = map (suspendExp l_env') e_es
-	 e_vs <- mapM allocate e_hs
-	 let e_env' = foldl eextend e_env (zip e_xs e_vs)
+	 e_vs <- (liftM (map Vheap)) $ mapM allocate e_hs
+         let e_env' = foldl eextend e_env (zip e_xs e_vs)
 	 return (e_env',l_env')            
       where 
 	 (l_xs,l_es) = unzip [(x,e) | Vdef((Nothing,x),_,e) <- vdefs]
-	 (e_xs,e_es) = unzip [(x,e) | Vdef((Just m,x),_,e) <- vdefs]
+	 (e_xs,e_es) = unzip [(x,e) | Vdef ((Just _,x),_,e) <-
+                         -- Do not dump the defn for :Main.main into
+                         -- the environment for Main!
+                                       filter inHomeModule vdefs]
+         inHomeModule (Vdef ((Just m,_),_,_)) | m == mn = True
+         inHomeModule _ = False
 	 preallocate _ =
 	   do p <- hallocateE undefined
-	      return (Vheap p)
-	 reallocate (Vheap p0,h) =
+	      return p
+	 reallocate (p0,h) =
 	   hupdateE p0 h
 	 allocate h =
 	   do p <- hallocateE h
-	      return (Vheap p)
+	      return p
 
     suspendExp:: Venv -> Exp -> HeapValue
     suspendExp env (Lam (Vb(x,_)) e) = Hclos env' x e
        where env' = thin env (delete x (freevarsExp e))
     suspendExp env e = Hthunk env' e
        where env' = thin env (freevarsExp e)
-	
 
 evalExp :: Menv -> Venv -> Exp -> Eval Value
-evalExp globalEnv env (Var qv) =
-  let v = qlookup globalEnv env qv
-  in case v of 
-       Vheap p ->
-	  do z <- hlookupE p                                  -- can fail due to black-holing
-	     case z of
-	       Hthunk env' e -> 
-		 do hremoveE p                                -- black-hole
-		    w@(Vheap p') <- evalExp globalEnv env' e  -- result is guaranteed to be boxed!
-	            h <- hlookupE p'        
-		    hupdateE p h			
-	            return w
-	       _ -> return v                 -- return pointer to Hclos or Hconstr 
-       _ -> return v                         -- return Vimm or Vutuple
-evalExp globalEnv env (Lit l) = return (Vimm (evalLit l))
-evalExp globalEnv env (Dcon (_,c)) = 
-  do p <- hallocateE (Hconstr c [])
-     return (Vheap p)
+evalExp globalEnv env = eval
+  where eval (Var qv) = 
+          let v = qlookup globalEnv env qv
+          in case v of 
+               Vheap p -> do
+	         z <- hlookupE p                    -- can fail due to black-holing
+	         case z of
+	           Hthunk env' e -> do
+		     hremoveE p                     -- black-hole
+                     w <- evalExp globalEnv env' e  -- result is guaranteed to be boxed!
+                     case w of
+                       Vheap p' -> do
+   	                 h <- hlookupE p'
+		         hupdateE p h
+	                 return w
+                       _ -> error ("eval: w was not boxed: " ++ show w)
+	           _ -> return v -- return pointer to Hclos or Hconstr
+               _ -> return v     -- return Vimm or Vutuple
+        eval (Lit l) = return (Vimm (evalLit l))
+        eval (Dcon (_,c)) = do
+           p <- hallocateE (Hconstr c [])
+           return (Vheap p)
+        eval (App e1 e2) =
+          evalApp env e1 [e2]
+            where
+              evalApp :: Venv -> Exp -> [Exp] -> Eval Value
+              evalApp env (App e1 e2) es = evalApp env e1 (e2:es)
+              evalApp env (Dcon (qdc@(_,c))) es = 
+                  do vs <- suspendExps globalEnv env es
+	             if isUtupleDc qdc
+                       then
+	                 return (Vutuple vs)
+	               else
+	                 {- allocate a thunk -}
+     	                 do p <- hallocateE (Hconstr c vs)
+  	                    return (Vheap p)
+              evalApp env (Var(v@(_,p))) es | isPrimVar v =
+                 do vs <- evalExps globalEnv env es
+                    case (p,vs) of
+   	              ("raisezh",[exn]) -> raiseE exn
+	              ("catchzh",[body,handler,rws]) ->
+	                        catchE (apply body [rws])
+	                        (\exn -> apply handler [exn,rws])
+  	              _ -> evalPrimop p vs
+              evalApp env (External s _) es =
+                  do vs <- evalExps globalEnv env es
+	             evalExternal s vs
+              evalApp env (Appt e _) es     = evalApp env e es
+              evalApp env (Lam (Tb _) e) es = evalApp env e es
+              evalApp env (Cast e _) es     = evalApp env e es
+              evalApp env (Note _ e) es     = evalApp env e es
+              evalApp env e es = 
+          {- e must now evaluate to a closure -}
+                  do vs <- suspendExps globalEnv env es
+	             vop <- evalExp globalEnv env e
+                     apply vop vs
 
-evalExp globalEnv env (App e1 e2) = evalApp env e1 [e2] 
-  where
-    evalApp :: Venv -> Exp -> [Exp] -> Eval Value
-    evalApp env (App e1 e2) es = evalApp env e1 (e2:es)
-    evalApp env (op @(Dcon (qdc@(m,c)))) es = 
-      do vs <- suspendExps globalEnv env es
-	 if isUtupleDc qdc then
-	   return (Vutuple vs)
-	  else
-	    {- allocate a thunk -}
-     	    do p <- hallocateE (Hconstr c vs)
-  	       return (Vheap p)
-    evalApp env (op @ (Var(v@(_,p)))) es | isPrimVar v =
-      do vs <- evalExps globalEnv env es
-         case (p,vs) of
-   	   ("raisezh",[exn]) -> raiseE exn
-	   ("catchzh",[body,handler,rws]) -> 
-	      catchE (apply body [rws])
-	             (\exn -> apply handler [exn,rws])
-  	   _ -> evalPrimop p vs
-    evalApp env (External s _) es =
-      do vs <- evalExps globalEnv env es
-	 evalExternal s vs
-    evalApp env (Appt e _) es = evalApp env e es
-    evalApp env (Lam (Tb _) e) es = evalApp env e es
-    evalApp env (Cast e _) es = evalApp env e es
-    evalApp env (Note _ e) es = evalApp env e es
-    evalApp env e es = 
-      {- e must now evaluate to a closure -}
-      do vs <- suspendExps globalEnv env es
-	 vop <- evalExp globalEnv env e
-         apply vop vs
+              apply :: Value -> [Value] -> Eval Value
+              apply vop [] = return vop
+              apply (Vheap p) (v:vs) =
+                  do Hclos env' x b <- hlookupE p
+                     v' <- evalExp globalEnv (eextend env' (x,v)) b
+                     apply v' vs
+              apply _ _ = error ("apply: operator is not a closure")
 
-    apply :: Value -> [Value] -> Eval Value
-    apply vop [] = return vop
-    apply (Vheap p) (v:vs) =
-      do Hclos env' x b <- hlookupE p 
-         v' <- evalExp globalEnv (eextend env' (x,v)) b
-         apply v' vs
+        eval (Appt e _) = evalExp globalEnv env e
+        eval (Lam (Vb(x,_)) e) = do
+           p <- hallocateE (Hclos env' x e)
+           return (Vheap p)
+               where env' = thin env (delete x (freevarsExp e))
+        eval (Lam _ e) = evalExp globalEnv env e
+        eval (Let vdef e) =
+          do env' <- evalVdef globalEnv env vdef
+             evalExp globalEnv env' e
+            where
+              evalVdef :: Menv -> Venv -> Vdefg -> Eval Venv
+              evalVdef globalEnv env (Nonrec(Vdef((_,x),_,e))) =
+                  do v <- suspendExp globalEnv env e
+	             return (eextend env (x,v))
+              evalVdef globalEnv env (Rec vdefs) =
+                  do vs0 <- mapM preallocate xs
+	             let env' = foldl eextend env (zip xs (map Vheap vs0))
+	             vs <- suspendExps globalEnv env' es
+	             mapM_ reallocate (zip vs0 vs)
+	             return env'
+                  where 
+	            (xs,es) = unzip [(x,e) | Vdef((_,x),_,e) <- vdefs]
+	            preallocate _ = 
+                        do p <- hallocateE (Hconstr "UGH" [])
+	                   return p
+	            reallocate (p0,Vheap p) =
+	                do h <- hlookupE p
+	                   hupdateE p0 h
+                    reallocate (_,_) = error "reallocate: expected a heap value"
+        eval (Case e (x,_) _ alts) =
+            do z <- evalExp globalEnv env e
+               let env' = eextend env (x,z)
+               case z of
+                 Vheap p -> do
+	           h <- hlookupE p   -- can fail due to black-holing
+	           case h of
+	             Hconstr dcon vs -> evalDcAlt env' dcon vs (reverse alts)
+  	             _ ->               evalDefaultAlt env' alts
+                 Vutuple vs ->
+	             evalUtupleAlt env' vs (reverse alts)
+                 Vimm pv ->
+	             evalLitAlt env' pv (reverse alts)
+            where
+              evalDcAlt :: Venv -> Dcon -> [Value] -> [Alt] -> Eval Value
+              evalDcAlt env dcon vs = f
+                where
+	          f ((Acon (_,dcon') _ xs e):as) =
+	             if dcon == dcon' then
+	               evalExp globalEnv
+                         (foldl eextend env (zip (map fst xs) vs)) e
+	             else f as
+	          f [Adefault e] =
+	            evalExp globalEnv env e
+	          f _ = error $ "impossible Case-evalDcAlt"
 
+              evalUtupleAlt :: Venv -> [Value] -> [Alt] -> Eval Value
+              evalUtupleAlt env vs [Acon _ _ xs e] =
+                  evalExp globalEnv (foldl eextend env (zip (map fst xs) vs)) e
+              evalUtupleAlt _ _ _ = error ("impossible Case: evalUtupleAlt")
 
-evalExp globalEnv env (Appt e _) = evalExp globalEnv env e
-evalExp globalEnv env (Lam (Vb(x,_)) e) = 
-  do p <- hallocateE (Hclos env' x e)
-     return (Vheap p)
-  where env' = thin env (delete x (freevarsExp e)) 
-evalExp globalEnv env (Lam _ e) = evalExp globalEnv env e
-evalExp globalEnv env (Let vdef e) =
-  do env' <- evalVdef globalEnv env vdef
-     evalExp globalEnv env' e
-  where
-    evalVdef :: Menv -> Venv -> Vdefg -> Eval Venv
-    evalVdef globalEnv env (Nonrec(Vdef((m,x),t,e))) =
-      do v <- suspendExp globalEnv env e
-	 return (eextend env (x,v))
-    evalVdef globalEnv env (Rec vdefs) =
-      do vs0 <- mapM preallocate xs
-	 let env' = foldl eextend env (zip xs vs0) 
-	 vs <- suspendExps globalEnv env' es
-	 mapM_ reallocate (zip vs0 vs)
-	 return env'
-      where 
-	(xs,es) = unzip [(x,e) | Vdef((_,x),_,e) <- vdefs]
-	preallocate _ = 
-	  do p <- hallocateE (Hconstr "UGH" [])
-	     return (Vheap p)
-	reallocate (Vheap p0,Vheap p) =
-	  do h <- hlookupE p
-	     hupdateE p0 h
-	
-evalExp globalEnv env (Case e (x,_) _ alts) =  
-  do z <- evalExp globalEnv env e
-     let env' = eextend env (x,z)
-     case z of
-       Vheap p ->
-	 do h <- hlookupE p   -- can fail due to black-holing
-	    case h of
-	      Hconstr dcon vs -> evalDcAlt env' dcon vs (reverse alts)
-  	      _ -> evalDefaultAlt env' alts
-       Vutuple vs ->
-	 evalUtupleAlt env' vs (reverse alts)
-       Vimm pv ->
-	 evalLitAlt env' pv (reverse alts)
-  where
-    evalDcAlt :: Venv -> Dcon -> [Value] -> [Alt] -> Eval Value
-    evalDcAlt env dcon vs alts = 
-      f alts
-      where 
-	f ((Acon (_,dcon') _ xs e):as) =
-	  if dcon == dcon' then
-	    evalExp globalEnv (foldl eextend env (zip (map fst xs) vs)) e
-	  else f as
-	f [Adefault e] =
-	  evalExp globalEnv env e
-	f _ = error "impossible Case-evalDcAlt"
+              evalLitAlt :: Venv -> PrimValue -> [Alt] -> Eval Value
+              evalLitAlt env pv alts =
+                  f alts
+                      where 
+	                f ((Alit lit e):as) =
+	                    let pv' = evalLit lit
+	                    in if pv == pv' then
+	                           evalExp globalEnv env e
+                               else f as
+                        f [Adefault e] =
+	                    evalExp globalEnv env e
+	                f _ = error "impossible Case-evalLitAlt"
     
-    evalUtupleAlt :: Venv -> [Value] -> [Alt] -> Eval Value
-    evalUtupleAlt env vs [Acon _ _ xs e] = 
-       evalExp globalEnv (foldl eextend env (zip (map fst xs) vs)) e
+              evalDefaultAlt :: Venv -> [Alt] -> Eval Value
+              evalDefaultAlt env [Adefault e] = evalExp globalEnv env e
+              evalDefaultAlt _ _ = error "evalDefaultAlt: impossible case"
 
-    evalLitAlt :: Venv -> PrimValue -> [Alt] -> Eval Value
-    evalLitAlt env pv alts = 
-      f alts
-      where 
-	f ((Alit lit e):as) = 
-	  let pv' = evalLit lit 
-	  in if pv == pv' then
-	       evalExp globalEnv env e
-             else f as
-	f [Adefault e] =
-	  evalExp globalEnv env e
-	f _ = error "impossible Case-evalLitAlt"
-    
-    evalDefaultAlt :: Venv -> [Alt] -> Eval Value
-    evalDefaultAlt env [Adefault e] = evalExp globalEnv env e
-
-evalExp globalEnv env (Cast e _) = evalExp globalEnv env e
-evalExp globalEnv env (Note _ e) = evalExp globalEnv env e
-evalExp globalEnv env (External s t) = evalExternal s []
+        eval (Cast e _) = evalExp globalEnv env e
+        eval (Note _ e) = evalExp globalEnv env e
+        eval (External s _) = evalExternal s []
 
 evalExps :: Menv -> Venv -> [Exp] -> Eval [Value]
 evalExps globalEnv env = mapM (evalExp globalEnv env)
 
 suspendExp:: Menv -> Venv -> Exp -> Eval Value
 suspendExp globalEnv env (Var qv) = return (qlookup globalEnv env qv)
-suspendExp globalEnv env (Lit l) = return (Vimm (evalLit l))
-suspendExp globalEnv env (Lam (Vb(x,_)) e) = 
+suspendExp _ _ (Lit l) = return (Vimm (evalLit l))
+suspendExp _ env (Lam (Vb(x,_)) e) =
    do p <- hallocateE (Hclos env' x e)
       return (Vheap p)
    where env' = thin env (delete x (freevarsExp e))
@@ -365,8 +395,8 @@ suspendExp globalEnv env (Lam _ e) = suspendExp globalEnv env e
 suspendExp globalEnv env (Appt e _) = suspendExp globalEnv env e
 suspendExp globalEnv env (Cast e _) = suspendExp globalEnv env e
 suspendExp globalEnv env (Note _ e) = suspendExp globalEnv env e
-suspendExp globalEnv env (External s _) = evalExternal s []
-suspendExp globalEnv env e = 
+suspendExp _ _ (External s _) = evalExternal s []
+suspendExp _ env e =
    do p <- hallocateE (Hthunk env' e)
       return (Vheap p)
    where env' = thin env (freevarsExp e)
@@ -382,24 +412,143 @@ mlookup globalEnv  _         (Just m) =
       Nothing -> error ("Interp: undefined module name: " ++ show m)
 
 qlookup :: Menv -> Venv -> (Mname,Var) -> Value
-qlookup globalEnv env (m,k) =   
+qlookup globalEnv env (m,k) =
   case elookup (mlookup globalEnv env m) k of
     Just v -> v
     Nothing -> error ("undefined identifier: " ++ show m ++ "." ++ show k)
 
 evalPrimop :: Var -> [Value] -> Eval Value
-evalPrimop "zpzh" [Vimm (PIntzh i1),Vimm (PIntzh i2)] = return (Vimm (PIntzh (i1+i2)))
-evalPrimop "zmzh" [Vimm (PIntzh i1),Vimm (PIntzh i2)] = return (Vimm (PIntzh (i1-i2)))
-evalPrimop "ztzh" [Vimm (PIntzh i1),Vimm (PIntzh i2)] = return (Vimm (PIntzh (i1*i2)))
-evalPrimop "zgzh" [Vimm (PIntzh i1),Vimm (PIntzh i2)] = mkBool (i1 > i2)
-evalPrimop "remIntzh" [Vimm (PIntzh i1),Vimm (PIntzh i2)] = return (Vimm (PIntzh (i1 `rem` i2)))
+evalPrimop "zpzh"        = primIntBinop    (+)
+evalPrimop "zpzhzh"      = primDoubleBinop (+)
+evalPrimop "zmzh"        = primIntBinop    (-)
+evalPrimop "zmzhzh"      = primDoubleBinop (-)
+evalPrimop "ztzh"        = primIntBinop    (*)
+evalPrimop "ztzhzh"      = primDoubleBinop (*)
+evalPrimop "zgzh"        = primIntCmpOp    (>)
+evalPrimop "zlzh"        = primIntCmpOp    (<)
+evalPrimop "zlzhzh"      = primDoubleCmpOp (<)
+evalPrimop "zezezh"      = primIntCmpOp    (==)
+evalPrimop "zlzezh"      = primIntCmpOp    (<=)
+evalPrimop "zlzezhzh"    = primDoubleCmpOp (<=)
+evalPrimop "zgzezh"      = primIntCmpOp    (>=)
+evalPrimop "zszezh"      = primIntCmpOp    (/=)
+evalPrimop "zszhzh"      = primDoubleCmpOp (/=)
+evalPrimop "negateIntzh" = primIntUnop     (\ i -> -i)
+evalPrimop "quotIntzh"   = primIntBinop    quot
+evalPrimop "remIntzh"    = primIntBinop    rem
+evalPrimop "subIntCzh"   = primSubIntC
+evalPrimop "mulIntMayOflozh" = primIntBinop
+  (\ i j ->
+     case (fromIntegral i, fromIntegral j) of
+       (I# x, I# y) -> 
+         case x `mulIntMayOflo#` y of
+           k -> fromIntegral (I# k))
+evalPrimop "narrow32Intzh" = primIntUnop
+  (\ i ->
+     case fromIntegral i of
+       (I# j) -> case narrow32Int# j of
+                   k -> fromIntegral (I# k))
+evalPrimop "int2Doublezh" = primInt2Double 
+-- single-threaded, so, it's a no-op
+--evalPrimop "noDuplicatezh" [state] = return state
+evalPrimop "indexCharOffAddrzh" = primIndexChar
+evalPrimop "eqCharzh"           = primCharCmpOp (==)
+evalPrimop "leCharzh"           = primCharCmpOp (<) 
+evalPrimop "ordzh"              = primOrd 
+evalPrimop "chrzh"              = primChr
+evalPrimop "isSpacezh"          = primCharUnop isSpace
+evalPrimop "isAlphazh"          = primCharUnop isAlpha
+evalPrimop "hPutCharzh"         = primHPutChar
 -- etc.
-evalPrimop p vs = error ("undefined primop: " ++ p)
+evalPrimop p = error ("undefined primop: " ++ p)
+
+primIntUnop :: (Integer -> Integer) -> [Value] -> Eval Value
+primIntUnop op [Vimm (PIntzh i)] = return (Vimm (PIntzh (op i)))
+primIntUnop _ _ = error "primIntUnop: wrong number of arguments"
+
+primIntBinop :: (Integer -> Integer -> Integer) -> [Value] -> Eval Value
+primIntBinop op [Vimm (PIntzh i), Vimm (PIntzh j)] = 
+  return (Vimm (PIntzh (i `op` j)))
+primIntBinop _ _ = error "primIntBinop: wrong number of arguments"
+
+primDoubleBinop :: (Rational -> Rational -> Rational) -> [Value] -> Eval Value
+primDoubleBinop op [Vimm (PDoublezh i), Vimm (PDoublezh j)] = 
+  return (Vimm (PDoublezh (i `op` j)))
+primDoubleBinop _ _ = error "primDoubleBinop: wrong number of arguments"
+
+primIntCmpOp :: (Integer -> Integer -> Bool) -> [Value] -> Eval Value
+primIntCmpOp op [Vimm (PIntzh i), Vimm (PIntzh j)] = mkBool (i `op` j)
+primIntCmpOp _ _ = error "primIntCmpOp: wrong number of arguments"
+
+primDoubleCmpOp :: (Rational -> Rational -> Bool) -> [Value] -> Eval Value
+primDoubleCmpOp op [Vimm (PDoublezh i), Vimm (PDoublezh j)] = mkBool (i `op` j)
+primDoubleCmpOp _ _ = error "primDoubleCmpOp: wrong number of arguments"
+
+primCharCmpOp :: (Integer -> Integer -> Bool) -> [Value] -> Eval Value
+primCharCmpOp op [Vimm (PCharzh c), Vimm (PCharzh d)] = mkBool (c `op` d)
+primCharCmpOp _ _ = error "primCharCmpOp: wrong number of arguments"
+
+primSubIntC :: [Value] -> Eval Value
+primSubIntC [Vimm (PIntzh i1), Vimm (PIntzh i2)] =
+  case (fromIntegral i1, fromIntegral i2) of
+    (I# int1, I# int2) -> 
+       case (int1 `subIntC#` int2) of
+        (# res1, res2 #) -> 
+           return $ Vutuple [Vimm (PIntzh (fromIntegral (I# res1))),
+                             Vimm (PIntzh (fromIntegral (I# res2)))]
+primSubIntC _ = error "primSubIntC: wrong number of arguments"
+
+primInt2Double :: [Value] -> Eval Value
+primInt2Double [Vimm (PIntzh i)] =
+  return (Vimm (PDoublezh (fromIntegral i)))
+primInt2Double _ = error "primInt2Double: wrong number of arguments"
+
+primOrd :: [Value] -> Eval Value
+primOrd [Vimm (PCharzh c)] = return $ Vimm (PIntzh c)
+primOrd _ = error "primOrd: wrong number of arguments"
+
+primChr :: [Value] -> Eval Value
+primChr [Vimm (PIntzh c)] = return $ Vimm (PCharzh c)
+primChr _ = error "primChr: wrong number of arguments"
+
+primCharUnop :: (Char -> Bool) -> [Value] -> Eval Value
+primCharUnop op [Vimm (PCharzh c)] = mkBool (op (chr (fromIntegral c)))
+primCharUnop _ _ = error "primCharUnop: wrong number of arguments"
+
+primIndexChar :: [Value] -> Eval Value
+primIndexChar [(Vimm (PString s)), (Vimm (PIntzh i))] = 
+  -- String is supposed to be null-terminated, so if i == length(s),
+  -- we return null. (If i > length(s), emit nasal demons.)
+  return $ let len = fromIntegral $ length s in
+             if i < len 
+               then Vimm (PCharzh (fromIntegral (ord (s !! fromIntegral i))))
+               else if i == len
+                      then Vimm (PCharzh 0)
+                      else error "indexCharOffAddr#: index too large"
+primIndexChar _ = error "primIndexChar: wrong number of arguments"
+
+primHPutChar :: [Value] -> Eval Value
+primHPutChar [Vimm (PIntzh hdl), Vimm (PCharzh c)] =
+  liftIO (hPutChar 
+     (if hdl == 0
+        then stdin
+        else if hdl == 1
+               then stdout
+               else -- lol
+                 stderr) (chr (fromIntegral c))) >>
+  returnUnit
+primHPutChar _ = error "primHPutChar: wrong number of arguments"
 
 evalExternal :: String -> [Value] -> Eval Value
 -- etc.
-evalExternal s vs = error "evalExternal undefined for now"  -- etc.,etc.
-    
+evalExternal s _ = error $ "evalExternal undefined for now: " ++ show s  -- etc.,etc.
+
+returnUnit :: Eval Value
+returnUnit = do    
+  p <- hallocateE (Hclos eempty "_"
+         (App (App (Dcon (dcUtuple 2)) stateToken) unitCon))
+  return $ Vheap p
+
 evalLit :: Lit -> PrimValue
 evalLit (Literal l t) = 
     case l of
@@ -410,28 +559,34 @@ evalLit (Literal l t) =
       Lrational r | (Tcon(_,"Floatzh"))  <- t -> PFloatzh r
       Lrational r | (Tcon(_,"Doublezh")) <- t -> PDoublezh r
       Lchar c | (Tcon(_,"Charzh")) <- t       -> PCharzh (toEnum (ord c))
-      Lstring s | (Tcon(_,"Addrzh")) <- t     -> PAddrzh 0	 -- should really be address of non-heap copy of C-format string s
+      Lstring s | (Tcon(_,"Addrzh")) <- t     -> PString s
+          -- should really be address of non-heap copy of C-format string s
+          -- tjc: I am ignoring this comment
+      _ -> error ("evalLit: strange combination of literal "
+             ++ show l ++ " and type " ++ show t)
 
 {- Utilities -}
 
+mkBool :: Bool -> Eval Value
 mkBool True = 
-  do p <- hallocateE (Hconstr "ZdwTrue" [])
+  do p <- hallocateE (Hconstr "True" [])
      return (Vheap p)
 mkBool False = 
-  do p <- hallocateE (Hconstr "ZdwFalse" [])
+  do p <- hallocateE (Hconstr "False" [])
      return (Vheap p)
-    
+
+thin :: Ord a => Env a b -> [a] -> Env a b    
 thin env vars = efilter env (`elem` vars)
 
 {- Return the free non-external variables in an expression. -}
 
 freevarsExp :: Exp -> [Var]
 freevarsExp (Var (Nothing,v)) = [v]
-freevarsExp (Var qv) = []
+freevarsExp (Var _) = []
 freevarsExp (Dcon _) = []
 freevarsExp (Lit _) = []
 freevarsExp (App e1 e2) = freevarsExp e1 `union` freevarsExp e2
-freevarsExp (Appt e t) = freevarsExp e
+freevarsExp (Appt e _) = freevarsExp e
 freevarsExp (Lam (Vb(v,_)) e) = delete v (freevarsExp e)
 freevarsExp (Lam _ e) = freevarsExp e
 freevarsExp (Let vdefg e) = freevarsVdefg vdefg `union` freevarsExp e
@@ -447,6 +602,8 @@ freevarsExp (Cast e _) = freevarsExp e
 freevarsExp (Note _ e) =  freevarsExp e
 freevarsExp (External _ _) = []
 
+stateToken :: Exp
+stateToken = Var (qual primMname "realWorldzh")
 
-
-
+unitCon :: Exp
+unitCon = Dcon (qual baseMname "Z0T")

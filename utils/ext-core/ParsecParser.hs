@@ -36,7 +36,7 @@ coreModuleName = do
 
 corePackageName :: Parser Pname
 -- Package names can be lowercase or uppercase!
-corePackageName = identifier <|> upperName
+corePackageName = (identifier <|> upperName) >>= (return . P)
 
 coreHierModuleNames :: Parser ([Id], Id)
 coreHierModuleNames = do

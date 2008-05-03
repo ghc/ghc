@@ -280,7 +280,7 @@ checkVdefg top_level (tcenv,tsenv,tvenv,cenv) (e_venv,l_venv) vdefg = do
     
 vdefIsMainWrapper :: AnMname -> Mname -> Bool
 vdefIsMainWrapper enclosing defining = 
-   enclosing == mainMname && defining == wrapperMainMname
+   enclosing == mainMname && defining == wrapperMainAnMname
 
 checkExpr :: AnMname -> Menv -> [Tdef] -> Venv -> Tvenv 
                -> Exp -> Ty

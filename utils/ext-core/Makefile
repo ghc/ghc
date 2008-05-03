@@ -1,5 +1,8 @@
-all:	Check.hs Core.hs Driver.hs Env.hs Interp.hs ParsecParser.hs ParseGlue.hs Prep.hs PrimCoercions.hs Prims.hs Printer.hs
+all:	extcorelibs Check.hs Core.hs Driver.hs Env.hs Interp.hs ParsecParser.hs ParseGlue.hs Prep.hs PrimCoercions.hs Prims.hs Printer.hs
 	ghc -O2 --make -fglasgow-exts -o Driver Driver.hs
+
+extcorelibs:
+	$(MAKE) -C lib/GHC_ExtCore
 
 # Run this when the primops.txt file changes
 prims:  ../../compiler/prelude/primops.txt
