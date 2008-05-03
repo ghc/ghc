@@ -23,7 +23,6 @@ module VarEnv (
 	extendInScopeSet, extendInScopeSetList, extendInScopeSetSet, 
 	modifyInScopeSet,
 	getInScopeVars, lookupInScope, elemInScopeSet, uniqAway, 
-	mapInScopeSet,
 
 	-- RnEnv2 and its operations
 	RnEnv2, mkRnEnv2, rnBndr2, rnBndrs2, rnOccL, rnOccR, inRnEnvL, inRnEnvR,
@@ -91,9 +90,6 @@ modifyInScopeSet (InScope in_scope n) old_v new_v = InScope (extendVarEnv in_sco
 
 delInScopeSet :: InScopeSet -> Var -> InScopeSet
 delInScopeSet (InScope in_scope n) v = InScope (in_scope `delVarEnv` v) n
-
-mapInScopeSet :: (Var -> Var) -> InScopeSet -> InScopeSet
-mapInScopeSet f (InScope in_scope n) = InScope (mapVarEnv f in_scope) n
 
 elemInScopeSet :: Var -> InScopeSet -> Bool
 elemInScopeSet v (InScope in_scope _) = v `elemVarEnv` in_scope
