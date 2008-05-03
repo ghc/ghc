@@ -10,13 +10,6 @@ general, all of these functions return a renamed thing, and a set of
 free variables.
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module RnPat (-- main entry points
               rnPatsAndThen_LocalRightwards, rnBindPat,
 
@@ -39,9 +32,9 @@ module RnPat (-- main entry points
 
 -- ENH: thin imports to only what is necessary for patterns
 
-import {-# SOURCE #-} RnExpr( rnLExpr, rnStmts)
+import {-# SOURCE #-} RnExpr ( rnLExpr )
 #ifdef GHCI
-import {-# SOURCE #-} TcSplice( runQuasiQuotePat )
+import {-# SOURCE #-} TcSplice ( runQuasiQuotePat )
 #endif 	/* GHCI */
 
 #include "HsVersions.h"
@@ -49,42 +42,18 @@ import {-# SOURCE #-} TcSplice( runQuasiQuotePat )
 import HsSyn            
 import TcRnMonad
 import RnEnv
-import HscTypes         ( availNames )
-import RnTypes		( rnHsTypeFVs, 
-			  mkOpFormRn, mkOpAppRn, mkNegAppRn, checkSectionPrec, mkConOpPatRn
-			   )
+import RnTypes
 import DynFlags		( DynFlag(..) )
-import BasicTypes	( FixityDirection(..) )
-import SrcLoc           ( SrcSpan )
-import PrelNames	( thFAKE, hasKey, assertIdKey, assertErrorName,
-			  loopAName, choiceAName, appAName, arrAName, composeAName, firstAName,
-			  negateName, thenMName, bindMName, failMName,
-                        eqClassName, integralClassName, geName, eqName,
-		  	  negateName, minusName, lengthPName, indexPName,
-			  plusIntegerName, fromIntegerName, timesIntegerName,
-			  ratioDataConName, fromRationalName, fromStringName, mkUnboundName )
+import PrelNames
 import Constants	( mAX_TUPLE_SIZE )
-import Name		( Name, nameOccName, nameModule_maybe, getOccName, nameSrcSpan )
-import OccName		( occEnvElts )
+import Name
 import NameSet
-import LazyUniqFM
-import RdrName          ( RdrName, GlobalRdrElt(..), Provenance(..),
-                          extendLocalRdrEnv, lookupLocalRdrEnv, hideSomeUnquals,
-                          mkRdrUnqual, nameRdrName, gre_name, globalRdrEnvElts, isLocalGRE )
-import LoadIface	( loadInterfaceForName )
-import UniqSet		( emptyUniqSet )
-import List		( nub )
-import Util		( isSingleton )
+import RdrName
 import ListSetOps	( removeDups, minusList )
-import Maybes		( expectJust )
 import Outputable
-import SrcLoc		( Located(..), unLoc, getLoc, cmpLocated, noLoc )
+import SrcLoc
 import FastString
 import Literal		( inIntRange, inCharRange )
-import List		( unzip4 )
-import Bag            (foldrBag)
-
-import ErrUtils       (Message)
 \end{code}
 
 
@@ -261,7 +230,7 @@ rnLPatAndThen var@(NM varf) (L loc p) cont =
       
          LitPat lit -> do { rnLit lit; lcont (LitPat lit) }
 
-         NPat lit mb_neg eq ->
+         NPat lit mb_neg _eq ->
            do { (lit', fvs1) <- rnOverLit lit
 	      ;	(mb_neg', fvs2) <- case mb_neg of
 			             Nothing -> return (Nothing, emptyFVs)
@@ -331,6 +300,8 @@ rnLPatAndThen var@(NM varf) (L loc p) cont =
 	      ; (res, fvs2) <- lcont (TypePat name')
 	      ; return (res, fvs1 `plusFV` fvs2) }
 
+         p -> pprPanic "rnLPatAndThen" (ppr p)
+
 
 -- helper for renaming constructor patterns
 rnConPatAndThen :: NameMaker
@@ -367,14 +338,17 @@ data RnHsRecFieldsChoice a = Constructor (Located Name) (RdrName -> a)
                            | Pattern  (Located Name) (RdrName -> a)
                            | Update
 
+choiceToMessage :: RnHsRecFieldsChoice t -> String
 choiceToMessage (Constructor _ _) = "construction"
 choiceToMessage (Pattern _ _) = "pattern"
 choiceToMessage Update = "update"
 
+doDotDot :: RnHsRecFieldsChoice t -> Maybe (Located Name, RdrName -> t)
 doDotDot (Constructor a b) = Just (a,b)
 doDotDot (Pattern a b) = Just (a,b)
 doDotDot Update        = Nothing
 
+getChoiceName :: RnHsRecFieldsChoice field -> Maybe (Located Name)
 getChoiceName (Constructor n _) = Just n
 getChoiceName (Pattern n _) = Just n
 getChoiceName (Update) = Nothing
@@ -463,11 +437,14 @@ rnHsRecFieldsAndThen choice rn_thing (HsRecFields fields dd) cont =
                                       \ fields2 -> 
                                           cont (HsRecFields (fields1 ++ fields2) dd)
 
+needFlagDotDot :: String -> SDoc
 needFlagDotDot str = vcat [ptext (sLit "Illegal `..' in record") <+> text str,
 			  ptext (sLit "Use -XRecordWildCards to permit this")]
 
+badDotDot :: String -> SDoc
 badDotDot str = ptext (sLit "You cannot use `..' in record") <+> text str
 
+badPun :: Located RdrName -> SDoc
 badPun fld = vcat [ptext (sLit "Illegal use of punning for field") <+> quotes (ppr fld),
 		   ptext (sLit "Use -XRecordPuns to permit this")]
 
@@ -526,8 +503,9 @@ are made available.
 \begin{code}
 rnLit :: HsLit -> RnM ()
 rnLit (HsChar c) = checkErr (inCharRange c) (bogusCharError c)
-rnLit other	 = return ()
+rnLit _ = return ()
 
+rnOverLit :: HsOverLit t -> RnM (HsOverLit Name, FreeVars)
 rnOverLit (HsIntegral i _ _) = do
     (from_integer_name, fvs) <- lookupSyntaxName fromIntegerName
     if inIntRange i then
@@ -597,18 +575,22 @@ checkTupSize tup_size
 		 nest 2 (parens (ptext (sLit "max size is") <+> int mAX_TUPLE_SIZE)),
 		 nest 2 (ptext (sLit "Workaround: use nested tuples or define a data type"))])
 
+patSigErr :: Outputable a => a -> SDoc
 patSigErr ty
   =  (ptext (sLit "Illegal signature in pattern:") <+> ppr ty)
 	$$ nest 4 (ptext (sLit "Use -XPatternSignatures to permit it"))
 
+dupFieldErr :: String -> RdrName -> SDoc
 dupFieldErr str dup
   = hsep [ptext (sLit "duplicate field name"), 
           quotes (ppr dup),
 	  ptext (sLit "in record"), text str]
 
+bogusCharError :: Char -> SDoc
 bogusCharError c
   = ptext (sLit "character literal out of range: '\\") <> char c  <> char '\''
 
+badViewPat :: Pat RdrName -> SDoc
 badViewPat pat = vcat [ptext (sLit "Illegal view pattern: ") <+> ppr pat,
                        ptext (sLit "Use -XViewPatterns to enable view patterns")]
 
