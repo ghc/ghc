@@ -63,7 +63,7 @@ cgForeignCall results fcall stg_args live
 	  	    | (stg_arg, (rep,expr)) <- stg_args `zip` reps_n_amodes, 
 	               nonVoidArg rep]
 
-	arg_hints = zipWith CmmHinted
+	arg_hints = zipWith CmmKinded
                       arg_exprs (map (typeHint.stgArgType) stg_args)
   -- in
   emitForeignCall results fcall arg_hints live
@@ -72,7 +72,7 @@ cgForeignCall results fcall stg_args live
 emitForeignCall
 	:: CmmFormals	-- where to put the results
 	-> ForeignCall		-- the op
-	-> [CmmHinted CmmExpr] -- arguments
+	-> [CmmKinded CmmExpr] -- arguments
 	-> StgLiveVars	-- live vars, in case we need to save them
 	-> Code
 
@@ -86,14 +86,14 @@ emitForeignCall results (CCall (CCallSpec target cconv safety)) args live
 	= case target of
 	   StaticTarget lbl -> (args, CmmLit (CmmLabel 
 					(mkForeignLabel lbl call_size False)))
-	   DynamicTarget    ->  case args of (CmmHinted fn _):rest -> (rest, fn)
+	   DynamicTarget    ->  case args of (CmmKinded fn _):rest -> (rest, fn)
 
 	-- in the stdcall calling convention, the symbol needs @size appended
 	-- to it, where size is the total number of bytes of arguments.  We
 	-- attach this info to the CLabel here, and the CLabel pretty printer
 	-- will generate the suffix when the label is printed.
       call_size
-	| StdCallConv <- cconv = Just (sum (map (arg_size.cmmExprRep.hintlessCmm) args))
+	| StdCallConv <- cconv = Just (sum (map (arg_size.cmmExprRep.kindlessCmm) args))
 	| otherwise            = Nothing
 
 	-- ToDo: this might not be correct for 64-bit API
@@ -108,7 +108,7 @@ emitForeignCall'
 	:: Safety
 	-> CmmFormals	-- where to put the results
 	-> CmmCallTarget	-- the op
-	-> [CmmHinted CmmExpr] -- arguments
+	-> [CmmKinded CmmExpr] -- arguments
 	-> Maybe [GlobalReg]	-- live vars, in case we need to save them
         -> C_SRT                -- the SRT of the calls continuation
         -> CmmReturnInfo
@@ -137,13 +137,13 @@ emitForeignCall' safety results target args vols srt ret
     -- and the CPS will will be the one to convert that
     -- to this sequence of three CmmUnsafe calls.
     stmtC (CmmCall (CmmCallee suspendThread CCallConv) 
-			[ CmmHinted id PtrHint ]
-			[ CmmHinted (CmmReg (CmmGlobal BaseReg)) PtrHint ] 
+			[ CmmKinded id PtrHint ]
+			[ CmmKinded (CmmReg (CmmGlobal BaseReg)) PtrHint ] 
 			CmmUnsafe ret)
     stmtC (CmmCall temp_target results temp_args CmmUnsafe ret)
     stmtC (CmmCall (CmmCallee resumeThread CCallConv) 
-			[ CmmHinted new_base PtrHint ]
-			[ CmmHinted (CmmReg (CmmLocal id)) PtrHint ]
+			[ CmmKinded new_base PtrHint ]
+			[ CmmKinded (CmmReg (CmmLocal id)) PtrHint ]
 			CmmUnsafe ret)
     -- Assign the result to BaseReg: we
     -- might now have a different Capability!
@@ -163,9 +163,9 @@ resumeThread  = CmmLit (CmmLabel (mkRtsCodeLabel (sLit "resumeThread")))
 -- This is a HACK; really it should be done in the back end, but
 -- it's easier to generate the temporaries here.
 load_args_into_temps = mapM arg_assign_temp
-  where arg_assign_temp (CmmHinted e hint) = do
+  where arg_assign_temp (CmmKinded e hint) = do
 	   tmp <- maybe_assign_temp e
-	   return (CmmHinted tmp hint)
+	   return (CmmKinded tmp hint)
 	
 load_target_into_temp (CmmCallee expr conv) = do 
   tmp <- maybe_assign_temp expr

@@ -165,7 +165,7 @@ cgCase (StgOpApp op@(StgFCallOp fcall _) args _)
 	-- exactly like the cgInlinePrimOp case for unboxed tuple alts..
 	{ res_tmps <- mapFCs bindNewToTemp non_void_res_ids
 	; let res_hints = map (typeHint.idType) non_void_res_ids
-	; cgForeignCall (zipWith CmmHinted res_tmps res_hints) fcall args live_in_alts
+	; cgForeignCall (zipWith CmmKinded res_tmps res_hints) fcall args live_in_alts
 	; cgExpr rhs }
   where
    (_, res_ids, _, rhs) = head alts

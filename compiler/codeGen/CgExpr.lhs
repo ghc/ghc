@@ -133,13 +133,13 @@ cgExpr (StgOpApp (StgFCallOp fcall _) stg_args res_ty) = do
                  then assignPtrTemp arg
                  else assignNonPtrTemp arg
                      | (arg, stg_arg) <- arg_exprs]
-    let	arg_hints = zipWith CmmHinted arg_tmps (map (typeHint.stgArgType) stg_args)
+    let	arg_hints = zipWith CmmKinded arg_tmps (map (typeHint.stgArgType) stg_args)
     {-
 	Now, allocate some result regs.
     -}
     (res_reps,res_regs,res_hints)  <- newUnboxedTupleRegs res_ty
     ccallReturnUnboxedTuple (zip res_reps (map (CmmReg . CmmLocal) res_regs)) $
-	emitForeignCall (zipWith CmmHinted res_regs res_hints) fcall 
+	emitForeignCall (zipWith CmmKinded res_regs res_hints) fcall 
 	   arg_hints emptyVarSet{-no live vars-}
       
 -- tagToEnum# is special: we need to pull the constructor out of the table,

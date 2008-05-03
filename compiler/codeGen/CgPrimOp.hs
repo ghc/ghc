@@ -122,10 +122,10 @@ emitPrimOp [res] ParOp [arg] live
 	-- later, we might want to inline it.
     vols <- getVolatileRegs live
     emitForeignCall' PlayRisky
-	[CmmHinted res NoHint]
+	[CmmKinded res NoHint]
     	(CmmCallee newspark CCallConv) 
-	[   (CmmHinted (CmmReg (CmmGlobal BaseReg)) PtrHint)
-          , (CmmHinted arg PtrHint)  ] 
+	[   (CmmKinded (CmmReg (CmmGlobal BaseReg)) PtrHint)
+          , (CmmKinded arg PtrHint)  ] 
 	(Just vols)
         NoC_SRT -- No SRT b/c we do PlayRisky
         CmmMayReturn
@@ -143,8 +143,8 @@ emitPrimOp [] WriteMutVarOp [mutv,var] live
 		[{-no results-}]
 		(CmmCallee (CmmLit (CmmLabel mkDirty_MUT_VAR_Label))
 			 CCallConv)
-		[   (CmmHinted (CmmReg (CmmGlobal BaseReg)) PtrHint)
-                  , (CmmHinted mutv PtrHint)  ]
+		[   (CmmKinded (CmmReg (CmmGlobal BaseReg)) PtrHint)
+                  , (CmmKinded mutv PtrHint)  ]
 		(Just vols)
                 NoC_SRT -- No SRT b/c we do PlayRisky
                 CmmMayReturn
@@ -349,9 +349,9 @@ emitPrimOp [res] op args live
    | Just prim <- callishOp op
    = do vols <- getVolatileRegs live
 	emitForeignCall' PlayRisky
-	   [CmmHinted res NoHint] 
+	   [CmmKinded res NoHint] 
 	   (CmmPrim prim) 
-	   [CmmHinted a NoHint | a<-args]  -- ToDo: hints?
+	   [CmmKinded a NoHint | a<-args]  -- ToDo: hints?
 	   (Just vols)
            NoC_SRT -- No SRT b/c we do PlayRisky
            CmmMayReturn

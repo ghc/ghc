@@ -348,7 +348,7 @@ makeContinuationEntries formats
     case lookup ident formats of
       Nothing -> block
       Just (ContFormat formals srt is_gc) ->
-          BrokenBlock ident (ContinuationEntry (map hintlessCmm formals) srt is_gc)
+          BrokenBlock ident (ContinuationEntry (map kindlessCmm formals) srt is_gc)
                       stmts targets exit
 
 adaptBlockToFormat :: [(BlockId, ContFormat)]
@@ -378,7 +378,7 @@ adaptBlockToFormat formats unique
                        target formals actuals srt ret is_gc
 
       adaptor_block = mk_adaptor_block adaptor_ident
-                  (ContinuationEntry (map hintlessCmm formals) srt is_gc)
+                  (ContinuationEntry (map kindlessCmm formals) srt is_gc)
                   next format_formals
       adaptor_ident = BlockId unique
 
@@ -390,8 +390,8 @@ adaptBlockToFormat formats unique
                          (CmmLit (CmmLabel (mkReturnPtLabel (getUnique next))))
                          (map formal_to_actual format_formals)
 
-                formal_to_actual (CmmHinted reg hint)
-                     = (CmmHinted (CmmReg (CmmLocal reg)) hint)
+                formal_to_actual (CmmKinded reg hint)
+                     = (CmmKinded (CmmReg (CmmLocal reg)) hint)
                 -- TODO: Check if NoHint is right.  We're
                 -- jumping to a C-- function not a foreign one
                 -- so it might always be right.

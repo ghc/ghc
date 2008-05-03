@@ -14,7 +14,7 @@ where
 
 import CmmExpr
 import Cmm ( GenCmm(..), GenCmmTop(..), CmmStatic, CmmInfo
-           , CmmCallTarget(..), CmmActuals, CmmFormals, CmmHinted(..)
+           , CmmCallTarget(..), CmmActuals, CmmFormals, CmmKinded(..)
            , CmmStmt(..) -- imported in order to call ppr on Switch and to
                          -- implement pprCmmGraphLikeCmm
            , CmmSafety(CmmSafe) -- for pprCmmGraphLikeCmm
@@ -213,12 +213,12 @@ pprMiddle stmt = pp_stmt <+> pp_debug
 
     CopyIn conv args _ ->
         if null args then ptext (sLit "empty CopyIn")
-        else commafy (map pprHinted args) <+> equals <+>
+        else commafy (map pprKinded args) <+> equals <+>
              ptext (sLit "foreign") <+> doubleQuotes(ppr conv) <+> ptext (sLit "...")
 
     CopyOut conv args ->
         ptext (sLit "next, pass") <+> doubleQuotes(ppr conv) <+>
-        parens (commafy (map pprHinted args))
+        parens (commafy (map pprKinded args))
 
     --  // text
     MidComment s -> text "//" <+> ftext s
@@ -270,11 +270,11 @@ ppr_target t@(CmmLit _) = ppr t
 ppr_target fn'          = parens (ppr fn')
 
 
-pprHinted :: Outputable a => CmmHinted a -> SDoc
-pprHinted (CmmHinted a NoHint)     = ppr a
-pprHinted (CmmHinted a PtrHint)    = doubleQuotes (text "address") <+> ppr a
-pprHinted (CmmHinted a SignedHint) = doubleQuotes (text "signed")  <+> ppr a
-pprHinted (CmmHinted a FloatHint)  = doubleQuotes (text "float")   <+> ppr a
+pprKinded :: Outputable a => CmmKinded a -> SDoc
+pprKinded (CmmKinded a NoHint)     = ppr a
+pprKinded (CmmKinded a PtrHint)    = doubleQuotes (text "address") <+> ppr a
+pprKinded (CmmKinded a SignedHint) = doubleQuotes (text "signed")  <+> ppr a
+pprKinded (CmmKinded a FloatHint)  = doubleQuotes (text "float")   <+> ppr a
 
 pprLast :: Last -> SDoc    
 pprLast stmt = (case stmt of

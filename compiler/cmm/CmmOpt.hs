@@ -155,7 +155,7 @@ inlineStmt u a (CmmCall target regs es srt ret)
    = CmmCall (infn target) regs es' srt ret
    where infn (CmmCallee fn cconv) = CmmCallee fn cconv
 	 infn (CmmPrim p) = CmmPrim p
-	 es' = [ (CmmHinted (inlineExpr u a e) hint) | (CmmHinted e hint) <- es ]
+	 es' = [ (CmmKinded (inlineExpr u a e) hint) | (CmmKinded e hint) <- es ]
 inlineStmt u a (CmmCondBranch e d) = CmmCondBranch (inlineExpr u a e) d
 inlineStmt u a (CmmSwitch e d) = CmmSwitch (inlineExpr u a e) d
 inlineStmt u a (CmmJump e d) = CmmJump (inlineExpr u a e) d

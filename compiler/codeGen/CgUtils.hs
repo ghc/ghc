@@ -333,24 +333,24 @@ emitIfThenElse cond then_part else_part
        ; labelC join_id
        }
 
-emitRtsCall :: LitString -> [CmmHinted CmmExpr] -> Bool -> Code
+emitRtsCall :: LitString -> [CmmKinded CmmExpr] -> Bool -> Code
 emitRtsCall fun args safe = emitRtsCall' [] fun args Nothing safe
    -- The 'Nothing' says "save all global registers"
 
-emitRtsCallWithVols :: LitString -> [CmmHinted CmmExpr] -> [GlobalReg] -> Bool -> Code
+emitRtsCallWithVols :: LitString -> [CmmKinded CmmExpr] -> [GlobalReg] -> Bool -> Code
 emitRtsCallWithVols fun args vols safe
    = emitRtsCall' [] fun args (Just vols) safe
 
 emitRtsCallWithResult :: LocalReg -> MachHint -> LitString
-	-> [CmmHinted CmmExpr] -> Bool -> Code
+	-> [CmmKinded CmmExpr] -> Bool -> Code
 emitRtsCallWithResult res hint fun args safe
-   = emitRtsCall' [CmmHinted res hint] fun args Nothing safe
+   = emitRtsCall' [CmmKinded res hint] fun args Nothing safe
 
 -- Make a call to an RTS C procedure
 emitRtsCall'
    :: CmmFormals
    -> LitString
-   -> [CmmHinted CmmExpr]
+   -> [CmmKinded CmmExpr]
    -> Maybe [GlobalReg]
    -> Bool -- True <=> CmmSafe call
    -> Code

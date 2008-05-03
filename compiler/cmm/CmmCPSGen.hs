@@ -227,7 +227,7 @@ continuationToProc (max_stack, update_frame_size, formats) stack_use uniques
                                 foreignCall call_uniques (CmmPrim target)
                                             results arguments
 
-formal_to_actual reg = CmmHinted (CmmReg (CmmLocal reg)) NoHint
+formal_to_actual reg = CmmKinded (CmmReg (CmmLocal reg)) NoHint
 
 foreignCall :: [Unique] -> CmmCallTarget -> CmmFormals -> CmmActuals -> [CmmStmt]
 foreignCall uniques call results arguments =
@@ -235,14 +235,14 @@ foreignCall uniques call results arguments =
     saveThreadState ++
     caller_save ++
     [CmmCall (CmmCallee suspendThread CCallConv)
-		 [ CmmHinted id PtrHint ]
-		 [ CmmHinted (CmmReg (CmmGlobal BaseReg)) PtrHint ]
+		 [ CmmKinded id PtrHint ]
+		 [ CmmKinded (CmmReg (CmmGlobal BaseReg)) PtrHint ]
 		 CmmUnsafe
                  CmmMayReturn,
      CmmCall call results new_args CmmUnsafe CmmMayReturn,
      CmmCall (CmmCallee resumeThread CCallConv)
-                 [ CmmHinted new_base PtrHint ]
-		 [ CmmHinted (CmmReg (CmmLocal id)) PtrHint ]
+                 [ CmmKinded new_base PtrHint ]
+		 [ CmmKinded (CmmReg (CmmLocal id)) PtrHint ]
 		 CmmUnsafe
                  CmmMayReturn,
      -- Assign the result to BaseReg: we
@@ -250,7 +250,7 @@ foreignCall uniques call results arguments =
      CmmAssign (CmmGlobal BaseReg) (CmmReg (CmmLocal new_base))] ++
     caller_load ++
     loadThreadState tso_unique ++
-    [CmmJump (CmmReg spReg) (map (formal_to_actual . hintlessCmm) results)]
+    [CmmJump (CmmReg spReg) (map (formal_to_actual . kindlessCmm) results)]
     where
       (_, arg_stmts, new_args) =
           loadArgsIntoTemps argument_uniques arguments
@@ -362,12 +362,12 @@ tail_call spRel target arguments
   = store_arguments ++ adjust_sp_reg spRel ++ jump where
     store_arguments =
         [stack_put spRel expr offset
-         | ((CmmHinted expr _), StackParam offset) <- argument_formats] ++
+         | ((CmmKinded expr _), StackParam offset) <- argument_formats] ++
         [global_put expr global
-         | ((CmmHinted expr _), RegisterParam global) <- argument_formats]
+         | ((CmmKinded expr _), RegisterParam global) <- argument_formats]
     jump = [CmmJump target arguments]
 
-    argument_formats = assignArguments (cmmExprRep . hintlessCmm) arguments
+    argument_formats = assignArguments (cmmExprRep . kindlessCmm) arguments
 
 adjust_sp_reg spRel =
     if spRel == 0

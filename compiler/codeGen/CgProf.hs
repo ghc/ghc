@@ -267,7 +267,7 @@ enterCostCentreThunk closure =
   ifProfiling $ do 
     stmtC $ CmmStore curCCSAddr (costCentreFrom closure)
 
-enter_ccs_fun stack = emitRtsCall (sLit "EnterFunCCS") [CmmHinted stack PtrHint] False
+enter_ccs_fun stack = emitRtsCall (sLit "EnterFunCCS") [CmmKinded stack PtrHint] False
 			-- ToDo: vols
 
 enter_ccs_fsub = enteringPAP 0
@@ -415,8 +415,8 @@ emitSetCCC cc
 pushCostCentre :: LocalReg -> CmmExpr -> CostCentre -> Code
 pushCostCentre result ccs cc
   = emitRtsCallWithResult result PtrHint
-	(sLit "PushCostCentre") [CmmHinted ccs PtrHint, 
-				CmmHinted (CmmLit (mkCCostCentre cc)) PtrHint]
+	(sLit "PushCostCentre") [CmmKinded ccs PtrHint, 
+				CmmKinded (CmmLit (mkCCostCentre cc)) PtrHint]
         False
 
 bumpSccCount :: CmmExpr -> CmmStmt

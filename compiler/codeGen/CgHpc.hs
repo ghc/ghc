@@ -73,15 +73,15 @@ initHpc this_mod (HpcInfo tickCount hashNo)
   = do { id <- newNonPtrTemp wordRep -- TODO FIXME NOW
        ; emitForeignCall'
                PlayRisky
-               [CmmHinted id NoHint]
+               [CmmKinded id NoHint]
                (CmmCallee
                  (CmmLit $ CmmLabel $ mkForeignLabel mod_alloc Nothing False)
                   CCallConv
                )
-               [ CmmHinted (mkLblExpr mkHpcModuleNameLabel) PtrHint
-               , CmmHinted (word32 tickCount) NoHint
-               , CmmHinted (word32 hashNo)    NoHint
-               , CmmHinted (CmmLit $ CmmLabel $ mkHpcTicksLabel $ this_mod) PtrHint
+               [ CmmKinded (mkLblExpr mkHpcModuleNameLabel) PtrHint
+               , CmmKinded (word32 tickCount) NoHint
+               , CmmKinded (word32 hashNo)    NoHint
+               , CmmKinded (CmmLit $ CmmLabel $ mkHpcTicksLabel $ this_mod) PtrHint
                ]
                (Just [])
                NoC_SRT -- No SRT b/c we PlayRisky

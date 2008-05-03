@@ -197,10 +197,10 @@ loadArgsIntoTemps :: [Unique]
                   -> CmmActuals
                   -> ([Unique], [CmmStmt], CmmActuals)
 loadArgsIntoTemps uniques [] = (uniques, [], [])
-loadArgsIntoTemps uniques ((CmmHinted e hint):args) =
+loadArgsIntoTemps uniques ((CmmKinded e hint):args) =
     (uniques'',
      new_stmts ++ remaining_stmts,
-     (CmmHinted new_e hint) : remaining_e)
+     (CmmKinded new_e hint) : remaining_e)
     where
       (uniques', new_stmts, new_e) = maybeAssignTemp uniques e
       (uniques'', remaining_stmts, remaining_e) =

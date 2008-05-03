@@ -18,7 +18,7 @@ module Cmm (
         CmmReturnInfo(..),
 	CmmStmt(..), CmmActual, CmmActuals, CmmFormal, CmmFormals, CmmKind,
         CmmFormalsWithoutKinds, CmmFormalWithoutKind,
-        CmmHinted(..),
+        CmmKinded(..),
         CmmSafety(..),
 	CmmCallTarget(..),
 	CmmStatic(..), Section(..),
@@ -241,10 +241,10 @@ data CmmStmt
       CmmActuals         -- with these return values.
 
 type CmmKind   = MachHint
-data CmmHinted a = CmmHinted { hintlessCmm :: a, cmmHint :: CmmKind }
+data CmmKinded a = CmmKinded { kindlessCmm :: a, cmmKind :: CmmKind }
                          deriving (Eq)
-type CmmActual = CmmHinted CmmExpr
-type CmmFormal = CmmHinted LocalReg
+type CmmActual = CmmKinded CmmExpr
+type CmmFormal = CmmKinded LocalReg
 type CmmActuals = [CmmActual]
 type CmmFormals = [CmmFormal]
 type CmmFormalWithoutKind   = LocalReg
@@ -253,8 +253,8 @@ type CmmFormalsWithoutKinds = [CmmFormalWithoutKind]
 data CmmSafety      = CmmUnsafe | CmmSafe C_SRT
 
 -- | enable us to fold used registers over 'CmmActuals' and 'CmmFormals'
-instance UserOfLocalRegs a => UserOfLocalRegs (CmmHinted a) where
-  foldRegsUsed f set (CmmHinted a _) = foldRegsUsed f set a
+instance UserOfLocalRegs a => UserOfLocalRegs (CmmKinded a) where
+  foldRegsUsed f set (CmmKinded a _) = foldRegsUsed f set a
 
 instance UserOfLocalRegs CmmStmt where
   foldRegsUsed f set s = stmt s set
@@ -276,8 +276,8 @@ instance UserOfLocalRegs CmmCallTarget where
 
 --just look like a tuple, since it was a tuple before
 -- ... is that a good idea? --Isaac Dupree
-instance (Outputable a) => Outputable (CmmHinted a) where
-  ppr (CmmHinted a k) = ppr (a, k)
+instance (Outputable a) => Outputable (CmmKinded a) where
+  ppr (CmmKinded a k) = ppr (a, k)
 
 {-
 Discussion

@@ -246,9 +246,9 @@ pprStmt stmt = case stmt of
 		  | otherwise    = commafy (map ppr_ar results) <+> equals
 		-- Don't print the hints on a native C-- call
 	  ppr_ar arg = case cconv of
-			    CmmCallConv -> ppr (hintlessCmm arg)
-			    _   	-> doubleQuotes (ppr $ cmmHint arg) <+>
-                                           ppr (hintlessCmm arg)
+			    CmmCallConv -> ppr (kindlessCmm arg)
+			    _   	-> doubleQuotes (ppr $ cmmKind arg) <+>
+                                           ppr (kindlessCmm arg)
 	  _pp_conv = case cconv of
 		      CmmCallConv -> empty
 		      _ -> ptext (sLit "foreign") <+> doubleQuotes (ppr cconv)
@@ -294,7 +294,7 @@ genCondBranch expr ident =
 --
 --     jump foo(a, b, c);
 --
-genJump :: CmmExpr -> [CmmHinted CmmExpr] -> SDoc
+genJump :: CmmExpr -> [CmmKinded CmmExpr] -> SDoc
 genJump expr args = 
 
     hcat [ ptext (sLit "jump")
@@ -305,21 +305,21 @@ genJump expr args =
                     CmmLoad (CmmReg _) _ -> pprExpr expr 
                     _ -> parens (pprExpr expr)
          , space
-         , parens  ( commafy $ map pprHinted args )
+         , parens  ( commafy $ map pprKinded args )
          , semi ]
 
-pprHinted :: Outputable a => (CmmHinted a) -> SDoc
-pprHinted (CmmHinted a NoHint)     = ppr a
-pprHinted (CmmHinted a PtrHint)    = quotes(text "address") <+> ppr a
-pprHinted (CmmHinted a SignedHint) = quotes(text "signed")  <+> ppr a
-pprHinted (CmmHinted a FloatHint)  = quotes(text "float")   <+> ppr a
+pprKinded :: Outputable a => (CmmKinded a) -> SDoc
+pprKinded (CmmKinded a NoHint)     = ppr a
+pprKinded (CmmKinded a PtrHint)    = quotes(text "address") <+> ppr a
+pprKinded (CmmKinded a SignedHint) = quotes(text "signed")  <+> ppr a
+pprKinded (CmmKinded a FloatHint)  = quotes(text "float")   <+> ppr a
 
 -- --------------------------------------------------------------------------
 -- Return from a function. [1], Section 6.8.2 of version 1.128
 --
 --     return (a, b, c);
 --
-genReturn :: [CmmHinted CmmExpr] -> SDoc
+genReturn :: [CmmKinded CmmExpr] -> SDoc
 genReturn args = 
 
     hcat [ ptext (sLit "return")
