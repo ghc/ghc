@@ -4,13 +4,6 @@
 \section[RnHsSyn]{Specialisations of the @HsSyn@ syntax for the renamer}
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module RnHsSyn(
         -- Names
         charTyCon_name, listTyCon_name, parrTyCon_name, tupleTyCon_name,
@@ -66,16 +59,16 @@ extractHsTyNames ty
     get (HsAppTy ty1 ty2)      = getl ty1 `unionNameSets` getl ty2
     get (HsListTy ty)          = unitNameSet listTyCon_name `unionNameSets` getl ty
     get (HsPArrTy ty)          = unitNameSet parrTyCon_name `unionNameSets` getl ty
-    get (HsTupleTy con tys)    = extractHsTyNames_s tys
+    get (HsTupleTy _ tys)      = extractHsTyNames_s tys
     get (HsFunTy ty1 ty2)      = getl ty1 `unionNameSets` getl ty2
     get (HsPredTy p)           = extractHsPredTyNames p
     get (HsOpTy ty1 op ty2)    = getl ty1 `unionNameSets` getl ty2 `unionNameSets` unitNameSet (unLoc op)
     get (HsParTy ty)           = getl ty
     get (HsBangTy _ ty)        = getl ty
-    get (HsNumTy n)            = emptyNameSet
+    get (HsNumTy _)            = emptyNameSet
     get (HsTyVar tv)           = unitNameSet tv
     get (HsSpliceTy _)         = emptyNameSet   -- Type splices mention no type variables
-    get (HsKindSig ty k)       = getl ty
+    get (HsKindSig ty _)       = getl ty
     get (HsForAllTy _ tvs
                     ctxt ty)   = (extractHsCtxtTyNames ctxt
                                          `unionNameSets` getl ty)
@@ -92,11 +85,12 @@ extractHsCtxtTyNames (L _ ctxt)
 
 -- You don't import or export implicit parameters,
 -- so don't mention the IP names
+extractHsPredTyNames :: HsPred Name -> NameSet
 extractHsPredTyNames (HsClassP cls tys)
   = unitNameSet cls `unionNameSets` extractHsTyNames_s tys
 extractHsPredTyNames (HsEqualP ty1 ty2)
   = extractHsTyNames ty1 `unionNameSets` extractHsTyNames ty2
-extractHsPredTyNames (HsIParam n ty)
+extractHsPredTyNames (HsIParam _ ty)
   = extractHsTyNames ty
 \end{code}
 
@@ -121,12 +115,14 @@ In all cases this is set up for interface-file declarations:
 hsSigsFVs :: [LSig Name] -> FreeVars
 hsSigsFVs sigs = plusFVs (map (hsSigFVs.unLoc) sigs)
 
-hsSigFVs (TypeSig v ty)     = extractHsTyNames ty
-hsSigFVs (SpecInstSig ty)   = extractHsTyNames ty
-hsSigFVs (SpecSig v ty inl) = extractHsTyNames ty
-hsSigFVs other              = emptyFVs
+hsSigFVs :: Sig Name -> FreeVars
+hsSigFVs (TypeSig _ ty)   = extractHsTyNames ty
+hsSigFVs (SpecInstSig ty) = extractHsTyNames ty
+hsSigFVs (SpecSig _ ty _) = extractHsTyNames ty
+hsSigFVs _                = emptyFVs
 
 ----------------
+conDeclFVs :: LConDecl Name -> FreeVars
 conDeclFVs (L _ (ConDecl { con_qvars = tyvars, con_cxt = context,
                            con_details = details, con_res = res_ty}))
   = delFVs (map hsLTyVarName tyvars) $
@@ -134,12 +130,14 @@ conDeclFVs (L _ (ConDecl { con_qvars = tyvars, con_cxt = context,
     conDetailsFVs details         `plusFV`
     conResTyFVs res_ty
 
+conResTyFVs :: ResType Name -> FreeVars
 conResTyFVs ResTyH98       = emptyFVs
 conResTyFVs (ResTyGADT ty) = extractHsTyNames ty
 
 conDetailsFVs :: HsConDeclDetails Name -> FreeVars
 conDetailsFVs details = plusFVs (map bangTyFVs (hsConDeclArgTys details))
 
+bangTyFVs :: LHsType Name -> FreeVars
 bangTyFVs bty = extractHsTyNames (getBangType bty)
 \end{code}
 
@@ -161,5 +159,5 @@ maybeGenericMatch :: LMatch Name -> Maybe (HsType Name, LMatch Name)
 maybeGenericMatch (L loc (Match (L _ (TypePat (L _ ty)) : pats) sig_ty grhss))
   = Just (ty, L loc (Match pats sig_ty grhss))
 
-maybeGenericMatch other_match = Nothing
+maybeGenericMatch _ = Nothing
 \end{code}
