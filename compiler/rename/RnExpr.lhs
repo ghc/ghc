@@ -92,13 +92,8 @@ rnExprs ls = rnExprs' ls emptyUniqSet
     let
 	acc' = acc `plusFV` fvExpr
     in
-    (grubby_seqNameSet acc' rnExprs') exprs acc'	`thenM` \ (exprs', fvExprs) ->
+    acc' `seq` rnExprs' exprs acc' `thenM` \ (exprs', fvExprs) ->
     returnM (expr':exprs', fvExprs)
-
--- Grubby little function to do "seq" on namesets; replace by proper seq when GHC can do seq
-grubby_seqNameSet :: UniqSet Name -> a -> a
-grubby_seqNameSet ns result | isEmptyUniqSet ns = result
-			    | otherwise    = result
 \end{code}
 
 Variables. We look up the variable and return the resulting name. 
