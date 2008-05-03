@@ -4,13 +4,6 @@
 \section[RnNames]{Extracting imported and top-level names in scope}
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module RnNames (
 	rnImports, getLocalNonValBinders,
 	rnExports, extendGlobalRdrEnvRn,
@@ -20,11 +13,7 @@ module RnNames (
 #include "HsVersions.h"
 
 import DynFlags
-import HsSyn		( IE(..), ieName, ImportDecl(..), LImportDecl,
-			  ForeignDecl(..), HsGroup(..), HsValBindsLR(..),
-			  Sig(..), collectHsBindLocatedBinders, tyClDeclNames,
-			  instDeclATs, isFamInstDecl,
-			  LIE )
+import HsSyn
 import RnEnv
 import RnHsDoc          ( rnHsDoc )
 import IfaceEnv		( ifaceExportNames )
@@ -35,7 +24,6 @@ import PrelNames
 import Module
 import Name
 import NameEnv
-import LazyUniqFM
 import NameSet
 import OccName
 import HscTypes
@@ -45,7 +33,7 @@ import Maybes
 import SrcLoc
 import FiniteMap
 import ErrUtils
-import BasicTypes	( DeprecTxt, Fixity )
+import BasicTypes	( DeprecTxt )
 import DriverPhases	( isHsBoot )
 import Util
 import FastString
@@ -234,7 +222,7 @@ rnImportDecl this_mod (L loc (ImportDecl loc_imp_mod_name want_boot
 	-- True <=> import M ()
 	import_all = case imp_details of
 			Just (is_hiding, ls) -> not is_hiding && null ls	
-			other 		     -> False
+			_ 		     -> False
 
 	imports   = ImportAvails { 
 			imp_mods     = unitModuleEnv imp_mod (imp_mod, [(qual_mod_name, import_all, loc)]),
@@ -248,7 +236,7 @@ rnImportDecl this_mod (L loc (ImportDecl loc_imp_mod_name want_boot
     ifOptM Opt_WarnDeprecations	(
        case deprecs of	
 	  DeprecAll txt -> addWarn (moduleDeprec imp_mod_name txt)
-	  other	        -> return ()
+	  _    	        -> return ()
      )
 
     let new_imp_decl = L loc (ImportDecl loc_imp_mod_name want_boot
@@ -257,6 +245,7 @@ rnImportDecl this_mod (L loc (ImportDecl loc_imp_mod_name want_boot
     return (new_imp_decl, gbl_env, imports, mi_hpc iface)
     )
 
+warnRedundantSourceImport :: ModuleName -> SDoc
 warnRedundantSourceImport mod_name
   = ptext (sLit "Unnecessary {-# SOURCE #-} in the import of module")
           <+> quotes (ppr mod_name)
@@ -323,7 +312,7 @@ extendGlobalRdrEnvRn shadowP avails new_fixities
   where
     gres = gresFromAvails LocalDef avails
 
-    extend envs@(cur_rdr_env, cur_fix_env) gre
+    extend envs@(cur_rdr_env, _cur_fix_env) gre
 	= let gres = lookupGlobalRdrEnv cur_rdr_env (nameOccName (gre_name gre)) 
           in case filter isLocalGRE gres of -- Check for existing *local* defns 
                   dup_gre:_ -> do { addDupDeclErr (gre_name dup_gre) (gre_name gre)
@@ -372,6 +361,7 @@ getLocalNonValBinders group
   = do 	{ gbl_env <- getGblEnv
 	; get_local_binders gbl_env group }
 
+get_local_binders :: TcGblEnv -> HsGroup RdrName -> RnM [GenAvailInfo Name]
 get_local_binders gbl_env (HsGroup {hs_valds  = ValBindsIn _ val_sigs,
 				    hs_tyclds = tycl_decls, 
 				    hs_instds = inst_decls,
@@ -411,7 +401,7 @@ get_local_binders gbl_env (HsGroup {hs_valds  = ValBindsIn _ val_sigs,
     inst_ats inst_decl 
 	= mapM new_tc (instDeclATs (unLoc inst_decl))
 
-getLocalDeclBinders _ _ = panic "getLocalDeclBinders"	-- ValBindsOut can't happen
+get_local_binders _ g = pprPanic "get_local_binders" (ppr g)
 \end{code}
 
 
@@ -431,8 +421,7 @@ filterImports :: ModIface
 	      -> [AvailInfo]    		-- What's available
 	      -> RnM (Maybe (Bool, [LIE Name]), -- Import spec w/ Names
 		      GlobalRdrEnv)		-- Same again, but in GRE form
-			
-filterImports iface decl_spec Nothing all_avails
+filterImports _ decl_spec Nothing all_avails
   = return (Nothing, mkGlobalRdrEnv (gresFromAvails prov all_avails))
   where
     prov = Imported [ImpSpec { is_decl = decl_spec, is_item = ImpAll }]
@@ -486,6 +475,7 @@ filterImports iface decl_spec (Just (want_hiding, import_items)) all_avails
 	      (parent, subs) = if p1 == name then (p2, subs1) else (p1, subs2)
 	    in
 	    (name, AvailTC name subs, Just parent)
+        combine x y = pprPanic "filterImports/combine" (ppr x $$ ppr y)
 
     lookup_lie :: Bool -> LIE RdrName -> TcRn [(LIE Name, AvailInfo)]
     lookup_lie opt_typeFamilies (L loc ieRdr)
@@ -499,7 +489,7 @@ filterImports iface decl_spec (Just (want_hiding, import_items)) all_avails
         where
                 -- Warn when importing T(..) if T was exported abstractly
             checkDodgyImport stuff
-                | IEThingAll n <- ieRdr, (_, AvailTC _ [one]):_ <- stuff
+                | IEThingAll n <- ieRdr, (_, AvailTC _ [_]):_ <- stuff
                 = ifOptM Opt_WarnDodgyImports (addWarn (dodgyImportWarn n))
                 -- NB. use the RdrName for reporting the warning
             checkDodgyImport _
@@ -554,7 +544,7 @@ filterImports iface decl_spec (Just (want_hiding, import_items)) all_avails
                    return [mkIEThingAbs nameAvail]
 
          IEThingWith tc ns -> do
-            (name, AvailTC name2 subnames, mb_parent) <- lookup_name tc
+            (name, AvailTC _ subnames, mb_parent) <- lookup_name tc
 	    let 
 	      env         = mkOccEnv [(nameOccName s, s) | s <- subnames]
 	      mb_children = map (lookupOccEnv env . rdrNameOcc) ns
@@ -581,7 +571,7 @@ filterImports iface decl_spec (Just (want_hiding, import_items)) all_avails
 
       where
         mkIEThingAbs (n, av, Nothing    ) = (IEThingAbs n, trimAvail av n) 
-	mkIEThingAbs (n, av, Just parent) = (IEThingAbs n, AvailTC parent [n]) 
+        mkIEThingAbs (n, _,  Just parent) = (IEThingAbs n, AvailTC parent [n]) 
 
 
 catMaybeErr :: [MaybeErr err a] -> [a]
@@ -617,17 +607,18 @@ mkUnitAvail me (ParentIs p) 		 = AvailTC p  [me]
 mkUnitAvail me NoParent | isTyConName me = AvailTC me [me]
 			| otherwise	 = Avail me
 
-plusAvail (Avail n1)	   (Avail n2)	    = Avail n1
-plusAvail (AvailTC n1 ns1) (AvailTC n2 ns2) = AvailTC n2 (ns1 `unionLists` ns2)
+plusAvail :: GenAvailInfo Name -> GenAvailInfo Name -> GenAvailInfo Name
+plusAvail (Avail n1)      (Avail _)        = Avail n1
+plusAvail (AvailTC _ ns1) (AvailTC n2 ns2) = AvailTC n2 (ns1 `unionLists` ns2)
 plusAvail a1 a2 = pprPanic "RnEnv.plusAvail" (hsep [ppr a1,ppr a2])
 
 availParent :: Name -> AvailInfo -> Parent
-availParent n (Avail _) 		 = NoParent
-availParent n (AvailTC m ms) | n==m      = NoParent
-			     | otherwise = ParentIs m
+availParent _ (Avail _)                 = NoParent
+availParent n (AvailTC m _) | n == m    = NoParent
+                            | otherwise = ParentIs m
 
 trimAvail :: AvailInfo -> Name -> AvailInfo
-trimAvail (Avail n)      m = Avail n
+trimAvail (Avail n)      _ = Avail n
 trimAvail (AvailTC n ns) m = ASSERT( m `elem` ns) AvailTC n [m]
 
 -- | filters 'AvailInfo's by the given predicate
@@ -650,8 +641,8 @@ gresFromIE decl_spec (L loc ie, avail)
   = gresFromAvail prov_fn avail
   where
     is_explicit = case ie of
-		    IEThingAll name -> \n -> n==name
-		    other	    -> \n -> True
+		    IEThingAll name -> \n -> n == name
+		    _    	    -> \_ -> True
     prov_fn name = Imported [imp_spec]
 	where
 	  imp_spec  = ImpSpec { is_decl = decl_spec, is_item = item_spec }
@@ -661,7 +652,7 @@ mkChildEnv :: [GlobalRdrElt] -> NameEnv [Name]
 mkChildEnv gres = foldr add emptyNameEnv gres
     where
 	add (GRE { gre_name = n, gre_par = ParentIs p }) env = extendNameEnv_C (++) env p [n]
-	add other_gre					 env = env
+	add _                                            env = env
 
 findChildren :: NameEnv [Name] -> Name -> [Name]
 findChildren env n = lookupNameEnv env n `orElse` []
@@ -740,6 +731,7 @@ type ExportAccum	-- The type of the accumulating parameter of
 	[AvailInfo])	        -- The accumulated exported stuff
 				--   Not nub'd!
 
+emptyExportAccum :: ExportAccum
 emptyExportAccum = ([], emptyOccEnv, []) 
 
 type ExportOccMap = OccEnv (Name, IE RdrName)
@@ -794,7 +786,7 @@ exports_from_avail :: Maybe [LIE RdrName]
                    -> Module
                    -> RnM (Maybe [LIE Name], [AvailInfo])
 
-exports_from_avail Nothing rdr_env imports this_mod
+exports_from_avail Nothing rdr_env _imports _this_mod
  = -- The same as (module M) where M is the current module name,
    -- so that's how we handle it.
    let
@@ -909,7 +901,7 @@ exports_from_avail (Just rdr_items) rdr_env imports this_mod
                                               (text "in export list"))
                         return (IEThingWith name names, AvailTC name (name:names))
 
-    lookup_ie ie = panic "lookup_ie"	-- Other cases covered earlier
+    lookup_ie _ = panic "lookup_ie"	-- Other cases covered earlier
 
     -------------
     lookup_doc_ie :: IE RdrName -> RnM (IE Name)
@@ -918,9 +910,10 @@ exports_from_avail (Just rdr_items) rdr_env imports this_mod
     lookup_doc_ie (IEDoc doc)       = do rn_doc <- rnHsDoc doc
 				         return (IEDoc rn_doc)
     lookup_doc_ie (IEDocNamed str)  = return (IEDocNamed str)
-    lookup_doc_ie ie = panic "lookup_doc_ie"	-- Other cases covered earlier
+    lookup_doc_ie _ = panic "lookup_doc_ie"	-- Other cases covered earlier
 
 
+isDoc :: IE RdrName -> Bool
 isDoc (IEDoc _)      = True
 isDoc (IEDocNamed _) = True
 isDoc (IEGroup _ _)  = True
@@ -1013,7 +1006,7 @@ finishDeprecations dflags mod_deprec tcg_env
 	  extra | imp_mod == moduleName name_mod = empty
 		| otherwise = ptext (sLit ", but defined in") <+> ppr name_mod
 
-    check hpt pit ok_gre = return ()	-- Local, or not used, or not deprectated
+    check _ _ _ = return ()	-- Local, or not used, or not deprectated
 	    -- The Imported pattern-match: don't deprecate locally defined names
 	    -- For a start, we may be exporting a deprecated thing
 	    -- Also we may use a deprecated thing in the defn of another
@@ -1113,7 +1106,7 @@ reportUnusedNames export_decls gbl_env
     unused_imports :: [GlobalRdrElt]	
     unused_imports = mapCatMaybes unused_imp defined_but_not_used
     unused_imp :: GlobalRdrElt -> Maybe GlobalRdrElt	-- Result has trimmed Imported provenances
-    unused_imp gre@(GRE {gre_prov = LocalDef}) = Nothing
+    unused_imp (GRE {gre_prov = LocalDef}) = Nothing
     unused_imp gre@(GRE {gre_prov = Imported imp_specs}) 
 	| null trimmed_specs = Nothing
 	| otherwise	     = Just (gre {gre_prov = Imported trimmed_specs})
@@ -1150,7 +1143,7 @@ reportUnusedNames export_decls gbl_env
     add_name gre@(GRE {gre_prov = Imported (imp_spec:_)}) acc 
 	= addToFM_C plusAvailEnv acc 
 		    (importSpecModule imp_spec) (unitAvailEnv (greAvail gre))
-    add_name gre acc = acc	-- Local
+    add_name _ acc = acc	-- Local
 
 	-- Modules mentioned as 'module M' in the export list
     expall_mods = case export_decls of
@@ -1268,7 +1261,7 @@ warnDuplicateImports gres
 	-- either import would change the qualified names in scope (M.x, N.x)
 	-- But if the qualified names aren't used, the import is indeed redundant
 	-- Sadly we don't know that.  Oh well.
-    covers red_imp@(ImpSpec { is_decl = red_decl, is_item = red_item }) 
+    covers red_imp@(ImpSpec { is_decl = red_decl }) 
 	   cov_imp@(ImpSpec { is_decl = cov_decl, is_item = cov_item })
 	| red_loc == cov_loc
   	= False		-- Ignore diagonal elements
@@ -1352,6 +1345,7 @@ printMinimalImports imps
 %************************************************************************
 
 \begin{code}
+badImportItemErr :: ModIface -> ImpDeclSpec -> IE RdrName -> SDoc
 badImportItemErr iface decl_spec ie
   = sep [ptext (sLit "Module"), quotes (ppr (is_mod decl_spec)), source_import,
 	 ptext (sLit "does not export"), quotes (ppr ie)]
@@ -1359,20 +1353,26 @@ badImportItemErr iface decl_spec ie
     source_import | mi_boot iface = ptext (sLit "(hi-boot interface)")
 		  | otherwise     = empty
 
+illegalImportItemErr :: SDoc
 illegalImportItemErr = ptext (sLit "Illegal import item")
 
+dodgyImportWarn :: RdrName -> SDoc
 dodgyImportWarn item = dodgyMsg (ptext (sLit "import")) item
+dodgyExportWarn :: Name -> SDoc
 dodgyExportWarn item = dodgyMsg (ptext (sLit "export")) item
 
+dodgyMsg :: OutputableBndr n => SDoc -> n -> SDoc
 dodgyMsg kind tc
   = sep [ ptext (sLit "The") <+> kind <+> ptext (sLit "item") <+> quotes (ppr (IEThingAll tc)),
 	  ptext (sLit "suggests that") <+> quotes (ppr tc) <+> ptext (sLit "has constructors or class methods,"),
 	  ptext (sLit "but it has none") ]
-	  
+
+exportItemErr :: IE RdrName -> SDoc
 exportItemErr export_item
   = sep [ ptext (sLit "The export item") <+> quotes (ppr export_item),
 	  ptext (sLit "attempts to export constructors or class methods that are not visible here") ]
 
+typeItemErr :: Name -> SDoc -> SDoc
 typeItemErr name wherestr
   = sep [ ptext (sLit "Using 'type' tag on") <+> quotes (ppr name) <+> wherestr,
 	  ptext (sLit "Use -XTypeFamilies to enable this extension") ]
@@ -1409,11 +1409,13 @@ addDupDeclErr name_a name_b
 		  | otherwise				  = (name_a,name_b)
 	-- Report the error at the later location
 
+dupExportWarn :: OccName -> IE RdrName -> IE RdrName -> SDoc
 dupExportWarn occ_name ie1 ie2
   = hsep [quotes (ppr occ_name), 
           ptext (sLit "is exported by"), quotes (ppr ie1),
           ptext (sLit "and"),            quotes (ppr ie2)]
 
+dupModuleExport :: ModuleName -> SDoc
 dupModuleExport mod
   = hsep [ptext (sLit "Duplicate"),
 	  quotes (ptext (sLit "Module") <+> ppr mod), 
@@ -1424,13 +1426,16 @@ moduleNotImported mod
   = ptext (sLit "The export item `module") <+> ppr mod <>
     ptext (sLit "' is not imported")
 
+nullModuleExport :: ModuleName -> SDoc
 nullModuleExport mod
   = ptext (sLit "The export item `module") <+> ppr mod <> ptext (sLit "' exports nothing")
 
+moduleDeprec :: ModuleName -> DeprecTxt -> SDoc
 moduleDeprec mod txt
   = sep [ ptext (sLit "Module") <+> quotes (ppr mod) <+> ptext (sLit "is deprecated:"), 
 	  nest 4 (ppr txt) ]	  
 
+implicitPreludeWarn :: SDoc
 implicitPreludeWarn
   = ptext (sLit "Module `Prelude' implicitly imported")
 \end{code}
