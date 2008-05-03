@@ -544,7 +544,7 @@ lambdas.  So it seems simmpler not to check at all, and that is why
 check_e is commented out.
 	
 \begin{code}
-checkValidRule :: FastString -> [Name] -> LHsExpr Name -> NameSet -> RnM [()]
+checkValidRule :: FastString -> [Name] -> LHsExpr Name -> NameSet -> RnM ()
 checkValidRule rule_name ids lhs' fv_lhs'
   = do 	{ 	-- Check for the form of the LHS
 	  case (validRuleLhs ids lhs') of
@@ -553,7 +553,7 @@ checkValidRule rule_name ids lhs' fv_lhs'
 
 		-- Check that LHS vars are all bound
 	; let bad_vars = [var | var <- ids, not (var `elemNameSet` fv_lhs')]
-	; mappM (addErr . badRuleVar rule_name) bad_vars }
+	; mapM_ (addErr . badRuleVar rule_name) bad_vars }
 
 validRuleLhs :: [Name] -> LHsExpr Name -> Maybe (HsExpr Name)
 -- Nothing => OK
