@@ -11,13 +11,6 @@ Primarily, this module consists of an interface to the C-land dynamic linker.
 \begin{code}
 {-# OPTIONS -#include "Linker.h" #-}
 
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module ObjLink ( 
    initObjLinker,	 -- :: IO ()
    loadDLL,		 -- :: String -> IO (Maybe String)
@@ -28,10 +21,9 @@ module ObjLink (
    resolveObjs  	 -- :: IO SuccessFlag
   )  where
 
-import Panic		( panic )
+import Panic
 import BasicTypes	( SuccessFlag, successIf )
 import Config		( cLeadingUnderscore )
-import Outputable
 
 import Control.Monad    ( when )
 import Foreign.C
