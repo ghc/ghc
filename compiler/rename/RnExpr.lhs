@@ -10,13 +10,6 @@ general, all of these functions return a renamed thing, and a set of
 free variables.
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module RnExpr (
 	rnLExpr, rnExpr, rnStmts
    ) where
@@ -33,32 +26,28 @@ import RnBinds   ( rnLocalBindsAndThen, rnValBindsLHS, rnValBindsRHS,
 import HsSyn
 import TcRnMonad
 import RnEnv
-import HscTypes         ( availNames )
 import RnTypes		( rnHsTypeFVs, 
 			  mkOpFormRn, mkOpAppRn, mkNegAppRn, checkSectionPrec)
 import RnPat            (rnQuasiQuote, rnOverLit, rnPatsAndThen_LocalRightwards, rnBindPat,
                          localRecNameMaker, rnLit,
 			 rnHsRecFields_Con, rnHsRecFields_Update, checkTupSize)
-import RdrName      ( mkRdrUnqual )
 import DynFlags		( DynFlag(..) )
 import BasicTypes	( FixityDirection(..) )
-import SrcLoc           ( SrcSpan )
 import PrelNames	( thFAKE, hasKey, assertIdKey, assertErrorName,
 			  loopAName, choiceAName, appAName, arrAName, composeAName, firstAName,
 			  negateName, thenMName, bindMName, failMName, groupWithName )
 
-import Name		( Name, nameOccName, nameModule, nameIsLocalOrFrom )
+import Name
 import NameSet
-import LazyUniqFM
-import RdrName		( RdrName, extendLocalRdrEnv, lookupLocalRdrEnv, hideSomeUnquals )
+import RdrName
 import LoadIface	( loadInterfaceForName )
-import UniqSet		( isEmptyUniqSet, emptyUniqSet )
+import UniqSet
 import List		( nub )
 import Util		( isSingleton )
 import ListSetOps	( removeDups )
 import Maybes		( expectJust )
 import Outputable
-import SrcLoc		( Located(..), unLoc, getLoc, noLoc )
+import SrcLoc
 import FastString
 
 import List		( unzip4 )
@@ -79,9 +68,6 @@ returnM = return
 
 mappM :: (Monad m) => (a -> m b) -> [a] -> m [b]
 mappM = mapM
-
-mappM_ :: (Monad m) => (a -> m b) -> [a] -> m ()
-mappM_ = mapM_
 
 checkM :: Monad m => Bool -> m () -> m ()
 checkM = unless
@@ -110,6 +96,7 @@ rnExprs ls = rnExprs' ls emptyUniqSet
     returnM (expr':exprs', fvExprs)
 
 -- Grubby little function to do "seq" on namesets; replace by proper seq when GHC can do seq
+grubby_seqNameSet :: UniqSet Name -> a -> a
 grubby_seqNameSet ns result | isEmptyUniqSet ns = result
 			    | otherwise    = result
 \end{code}
@@ -195,14 +182,14 @@ rnExpr e@(HsBracket br_body)
     rnBracket br_body		`thenM` \ (body', fvs_e) ->
     returnM (HsBracket body', fvs_e)
 
-rnExpr e@(HsSpliceE splice)
+rnExpr (HsSpliceE splice)
   = rnSplice splice 		`thenM` \ (splice', fvs) ->
     returnM (HsSpliceE splice', fvs)
 
 #ifndef GHCI
 rnExpr e@(HsQuasiQuoteE _) = pprPanic "Cant do quasiquotation without GHCi" (ppr e)
 #else
-rnExpr e@(HsQuasiQuoteE qq)
+rnExpr (HsQuasiQuoteE qq)
   = rnQuasiQuote qq 		`thenM` \ (qq', fvs_qq) ->
     runQuasiQuoteExpr qq'	`thenM` \ (L _ expr') ->
     rnExpr expr'		`thenM` \ (expr'', fvs_expr) ->
@@ -246,7 +233,7 @@ rnExpr (HsLet binds expr)
     rnLExpr expr			 `thenM` \ (expr',fvExpr) ->
     returnM (HsLet binds' expr', fvExpr)
 
-rnExpr e@(HsDo do_or_lc stmts body _)
+rnExpr (HsDo do_or_lc stmts body _)
   = do 	{ ((stmts', body'), fvs) <- rnStmts do_or_lc stmts $
 				    rnLExpr body
 	; return (HsDo do_or_lc stmts' body' placeHolderType, fvs) }
@@ -259,7 +246,7 @@ rnExpr (ExplicitPArr _ exps)
   = rnExprs exps		 	`thenM` \ (exps', fvs) ->
     returnM  (ExplicitPArr placeHolderType exps', fvs)
 
-rnExpr e@(ExplicitTuple exps boxity)
+rnExpr (ExplicitTuple exps boxity)
   = checkTupSize (length exps)			`thenM_`
     rnExprs exps	 			`thenM` \ (exps', fvs) ->
     returnM (ExplicitTuple exps' boxity, fvs)
@@ -371,13 +358,14 @@ rnExpr other = pprPanic "rnExpr: unexpected expression" (ppr other)
 %************************************************************************
 
 \begin{code}
+rnCmdArgs :: [LHsCmdTop RdrName] -> RnM ([LHsCmdTop Name], FreeVars)
 rnCmdArgs [] = returnM ([], emptyFVs)
 rnCmdArgs (arg:args)
   = rnCmdTop arg	`thenM` \ (arg',fvArg) ->
     rnCmdArgs args	`thenM` \ (args',fvArgs) ->
     returnM (arg':args', fvArg `plusFV` fvArgs)
 
-
+rnCmdTop :: LHsCmdTop RdrName -> RnM (LHsCmdTop Name, FreeVars)
 rnCmdTop = wrapLocFstM rnCmdTop'
  where
   rnCmdTop' (HsCmdTop cmd _ _ _) 
@@ -429,6 +417,7 @@ convertOpFormsCmd (HsDo ctxt stmts body ty)
 -- caught by the type checker)
 convertOpFormsCmd c = c
 
+convertOpFormsStmt :: StmtLR id id -> StmtLR id id
 convertOpFormsStmt (BindStmt pat cmd _ _)
   = BindStmt pat (convertOpFormsLCmd cmd) noSyntaxExpr noSyntaxExpr
 convertOpFormsStmt (ExprStmt cmd _ _)
@@ -437,14 +426,17 @@ convertOpFormsStmt (RecStmt stmts lvs rvs es binds)
   = RecStmt (map (fmap convertOpFormsStmt) stmts) lvs rvs es binds
 convertOpFormsStmt stmt = stmt
 
+convertOpFormsMatch :: MatchGroup id -> MatchGroup id
 convertOpFormsMatch (MatchGroup ms ty)
   = MatchGroup (map (fmap convert) ms) ty
  where convert (Match pat mty grhss)
 	  = Match pat mty (convertOpFormsGRHSs grhss)
 
+convertOpFormsGRHSs :: GRHSs id -> GRHSs id
 convertOpFormsGRHSs (GRHSs grhss binds)
   = GRHSs (map convertOpFormsGRHS grhss) binds
 
+convertOpFormsGRHS :: Located (GRHS id) -> Located (GRHS id)
 convertOpFormsGRHS = fmap convert
  where 
    convert (GRHS stmts cmd) = GRHS stmts (convertOpFormsLCmd cmd)
@@ -459,59 +451,66 @@ methodNamesLCmd = methodNamesCmd . unLoc
 
 methodNamesCmd :: HsCmd Name -> CmdNeeds
 
-methodNamesCmd cmd@(HsArrApp _arrow _arg _ HsFirstOrderApp _rtl)
+methodNamesCmd (HsArrApp _arrow _arg _ HsFirstOrderApp _rtl)
   = emptyFVs
-methodNamesCmd cmd@(HsArrApp _arrow _arg _ HsHigherOrderApp _rtl)
+methodNamesCmd (HsArrApp _arrow _arg _ HsHigherOrderApp _rtl)
   = unitFV appAName
-methodNamesCmd cmd@(HsArrForm {}) = emptyFVs
+methodNamesCmd (HsArrForm {}) = emptyFVs
 
 methodNamesCmd (HsPar c) = methodNamesLCmd c
 
-methodNamesCmd (HsIf p c1 c2)
+methodNamesCmd (HsIf _ c1 c2)
   = methodNamesLCmd c1 `plusFV` methodNamesLCmd c2 `addOneFV` choiceAName
 
-methodNamesCmd (HsLet b c) = methodNamesLCmd c
+methodNamesCmd (HsLet _ c) = methodNamesLCmd c
 
-methodNamesCmd (HsDo sc stmts body ty) 
+methodNamesCmd (HsDo _ stmts body _) 
   = methodNamesStmts stmts `plusFV` methodNamesLCmd body
 
-methodNamesCmd (HsApp c e) = methodNamesLCmd c
+methodNamesCmd (HsApp c _) = methodNamesLCmd c
 
 methodNamesCmd (HsLam match) = methodNamesMatch match
 
-methodNamesCmd (HsCase scrut matches)
+methodNamesCmd (HsCase _ matches)
   = methodNamesMatch matches `addOneFV` choiceAName
 
-methodNamesCmd other = emptyFVs
+methodNamesCmd _ = emptyFVs
    -- Other forms can't occur in commands, but it's not convenient 
    -- to error here so we just do what's convenient.
    -- The type checker will complain later
 
 ---------------------------------------------------
+methodNamesMatch :: MatchGroup Name -> FreeVars
 methodNamesMatch (MatchGroup ms _)
   = plusFVs (map do_one ms)
  where 
-    do_one (L _ (Match pats sig_ty grhss)) = methodNamesGRHSs grhss
+    do_one (L _ (Match _ _ grhss)) = methodNamesGRHSs grhss
 
 -------------------------------------------------
 -- gaw 2004
-methodNamesGRHSs (GRHSs grhss binds) = plusFVs (map methodNamesGRHS grhss)
+methodNamesGRHSs :: GRHSs Name -> FreeVars
+methodNamesGRHSs (GRHSs grhss _) = plusFVs (map methodNamesGRHS grhss)
 
 -------------------------------------------------
-methodNamesGRHS (L _ (GRHS stmts rhs)) = methodNamesLCmd rhs
+
+methodNamesGRHS :: Located (GRHS Name) -> CmdNeeds
+methodNamesGRHS (L _ (GRHS _ rhs)) = methodNamesLCmd rhs
 
 ---------------------------------------------------
+methodNamesStmts :: [Located (StmtLR Name Name)] -> FreeVars
 methodNamesStmts stmts = plusFVs (map methodNamesLStmt stmts)
 
 ---------------------------------------------------
+methodNamesLStmt :: Located (StmtLR Name Name) -> FreeVars
 methodNamesLStmt = methodNamesStmt . unLoc
 
+methodNamesStmt :: StmtLR Name Name -> FreeVars
 methodNamesStmt (ExprStmt cmd _ _)     = methodNamesLCmd cmd
-methodNamesStmt (BindStmt pat cmd _ _) = methodNamesLCmd cmd
+methodNamesStmt (BindStmt _ cmd _ _) = methodNamesLCmd cmd
 methodNamesStmt (RecStmt stmts _ _ _ _)
   = methodNamesStmts stmts `addOneFV` loopAName
-methodNamesStmt (LetStmt b)  = emptyFVs
-methodNamesStmt (ParStmt ss) = emptyFVs
+methodNamesStmt (LetStmt _)  = emptyFVs
+methodNamesStmt (ParStmt _) = emptyFVs
 methodNamesStmt (TransformStmt _ _ _) = emptyFVs
 methodNamesStmt (GroupStmt _ _) = emptyFVs
    -- ParStmt, TransformStmt and GroupStmt can't occur in commands, but it's not convenient to error 
@@ -526,6 +525,7 @@ methodNamesStmt (GroupStmt _ _) = emptyFVs
 %************************************************************************
 
 \begin{code}
+rnArithSeq :: ArithSeqInfo RdrName -> RnM (ArithSeqInfo Name, FreeVars)
 rnArithSeq (From expr)
  = rnLExpr expr 	`thenM` \ (expr', fvExpr) ->
    returnM (From expr', fvExpr)
@@ -555,6 +555,7 @@ rnArithSeq (FromThenTo expr1 expr2 expr3)
 %************************************************************************
 
 \begin{code}
+rnBracket :: HsBracket RdrName -> RnM (HsBracket Name, FreeVars)
 rnBracket (VarBr n) = do { name <- lookupOccRn n
 			 ; this_mod <- getModule
 			 ; checkM (nameIsLocalOrFrom this_mod name) $	-- Reason: deprecation checking asumes the
@@ -567,7 +568,7 @@ rnBracket (VarBr n) = do { name <- lookupOccRn n
 rnBracket (ExpBr e) = do { (e', fvs) <- rnLExpr e
 			 ; return (ExpBr e', fvs) }
 
-rnBracket (PatBr p) = do { addErr (ptext (sLit "Tempate Haskell pattern brackets are not supported yet"));
+rnBracket (PatBr _) = do { addErr (ptext (sLit "Tempate Haskell pattern brackets are not supported yet"));
                            failM }
 
 rnBracket (TypBr t) = do { (t', fvs) <- rnHsTypeFVs doc t
@@ -624,7 +625,7 @@ rnNormalStmts :: HsStmtContext Name -> [LStmt RdrName]
 -- Used for cases *other* than recursive mdo
 -- Implements nested scopes
 
-rnNormalStmts ctxt [] thing_inside 
+rnNormalStmts _ [] thing_inside 
   = do { (thing, fvs) <- thing_inside
 	; return (([],thing), fvs) } 
 
@@ -638,7 +639,7 @@ rnStmt :: HsStmtContext Name -> Stmt RdrName
        -> RnM (thing, FreeVars)
        -> RnM ((Stmt Name, thing), FreeVars)
 
-rnStmt ctxt (ExprStmt expr _ _) thing_inside
+rnStmt _ (ExprStmt expr _ _) thing_inside
   = do	{ (expr', fv_expr) <- rnLExpr expr
 	; (then_op, fvs1)  <- lookupSyntaxName thenMName
 	; (thing, fvs2)    <- thing_inside
@@ -686,7 +687,7 @@ rnStmt ctxt (TransformStmt (stmts, _) usingExpr maybeByExpr) thing_inside = do
     
     (usingExpr', fv_usingExpr) <- rnLExpr usingExpr
     ((stmts', binders, (maybeByExpr', thing)), fvs) <- 
-        rnNormalStmtsAndFindUsedBinders (TransformStmtCtxt ctxt) stmts $ \unshadowed_bndrs -> do
+        rnNormalStmtsAndFindUsedBinders (TransformStmtCtxt ctxt) stmts $ \_unshadowed_bndrs -> do
             (maybeByExpr', fv_maybeByExpr)  <- rnMaybeLExpr maybeByExpr
             (thing, fv_thing)               <- thing_inside
             
@@ -790,7 +791,9 @@ rnNormalStmtsAndFindUsedBinders ctxt stmts thing_inside = do
     -- Flatten the tuple returned by the above call a bit!
     return ((stmts', used_bndrs, inner_thing), fvs)
 
-
+rnParallelStmts :: HsStmtContext Name -> [([LStmt RdrName], [RdrName])]
+                -> RnM (thing, FreeVars)
+                -> RnM (([([LStmt Name], [Name])], thing), FreeVars)
 rnParallelStmts ctxt segs thing_inside = do
         orig_lcl_env <- getLocalRdrEnv
         go orig_lcl_env [] segs
@@ -874,8 +877,6 @@ rnMDoStmts stmts thing_inside
 	    (stmts', fvs) = segsToStmts grouped_segs fvs_later
 
 	; return ((stmts', thing), fvs) }
-  where
-    doc = text "In a recursive mdo-expression"
 
 ---------------------------------------------
 
@@ -903,9 +904,10 @@ rn_rec_stmts_and_then s cont
 	; return (res, fvs) }}
 
 -- get all the fixity decls in any Let stmt
+collectRecStmtsFixities :: [LStmtLR RdrName RdrName] -> [LFixitySig RdrName]
 collectRecStmtsFixities l = 
     foldr (\ s -> \acc -> case s of 
-                            (L loc (LetStmt (HsValBinds (ValBindsIn _ sigs)))) -> 
+                            (L _ (LetStmt (HsValBinds (ValBindsIn _ sigs)))) -> 
                                 foldr (\ sig -> \ acc -> case sig of 
                                                            (L loc (FixSig s)) -> (L loc s) : acc
                                                            _ -> acc) acc sigs
@@ -920,7 +922,7 @@ rn_rec_stmt_lhs :: MiniFixityEnv
                    -- so we don't bother to compute it accurately in the other cases
                 -> RnM [(LStmtLR Name RdrName, FreeVars)]
 
-rn_rec_stmt_lhs fix_env (L loc (ExprStmt expr a b)) = return [(L loc (ExprStmt expr a b), 
+rn_rec_stmt_lhs _ (L loc (ExprStmt expr a b)) = return [(L loc (ExprStmt expr a b), 
                                                        -- this is actually correct
                                                        emptyFVs)]
 
@@ -931,7 +933,7 @@ rn_rec_stmt_lhs fix_env (L loc (BindStmt pat expr a b))
       return [(L loc (BindStmt pat' expr a b),
                fv_pat)]
 
-rn_rec_stmt_lhs fix_env (L loc (LetStmt binds@(HsIPBinds _)))
+rn_rec_stmt_lhs _ (L _ (LetStmt binds@(HsIPBinds _)))
   = do	{ addErr (badIpBinds (ptext (sLit "an mdo expression")) binds)
 	; failM }
 
@@ -942,7 +944,7 @@ rn_rec_stmt_lhs fix_env (L loc (LetStmt (HsValBinds binds)))
                  emptyFVs
                  )]
 
-rn_rec_stmt_lhs fix_env (L loc (RecStmt stmts _ _ _ _))	-- Flatten Rec inside Rec
+rn_rec_stmt_lhs fix_env (L _ (RecStmt stmts _ _ _ _))	-- Flatten Rec inside Rec
     = rn_rec_stmts_lhs fix_env stmts
 
 rn_rec_stmt_lhs _ stmt@(L _ (ParStmt _))	-- Syntactically illegal in mdo
@@ -953,7 +955,10 @@ rn_rec_stmt_lhs _ stmt@(L _ (TransformStmt _ _ _))	-- Syntactically illegal in m
   
 rn_rec_stmt_lhs _ stmt@(L _ (GroupStmt _ _))	-- Syntactically illegal in mdo
   = pprPanic "rn_rec_stmt" (ppr stmt)
-  
+
+rn_rec_stmt_lhs _ (L _ (LetStmt EmptyLocalBinds))
+  = panic "rn_rec_stmt LetStmt EmptyLocalBinds"
+
 rn_rec_stmts_lhs :: MiniFixityEnv
                  -> [LStmt RdrName] 
                  -> RnM [(LStmtLR Name RdrName, FreeVars)]
@@ -974,13 +979,13 @@ rn_rec_stmt :: [Name] -> LStmtLR Name RdrName -> FreeVars -> RnM [Segment (LStmt
 	-- Rename a Stmt that is inside a RecStmt (or mdo)
 	-- Assumes all binders are already in scope
 	-- Turns each stmt into a singleton Stmt
-rn_rec_stmt all_bndrs (L loc (ExprStmt expr _ _)) _
+rn_rec_stmt _ (L loc (ExprStmt expr _ _)) _
   = rnLExpr expr `thenM` \ (expr', fvs) ->
     lookupSyntaxName thenMName	`thenM` \ (then_op, fvs1) ->
     returnM [(emptyNameSet, fvs `plusFV` fvs1, emptyNameSet,
 	      L loc (ExprStmt expr' then_op placeHolderType))]
 
-rn_rec_stmt all_bndrs (L loc (BindStmt pat' expr _ _)) fv_pat
+rn_rec_stmt _ (L loc (BindStmt pat' expr _ _)) fv_pat
   = rnLExpr expr		`thenM` \ (expr', fv_expr) ->
     lookupSyntaxName bindMName	`thenM` \ (bind_op, fvs1) ->
     lookupSyntaxName failMName	`thenM` \ (fail_op, fvs2) ->
@@ -991,7 +996,7 @@ rn_rec_stmt all_bndrs (L loc (BindStmt pat' expr _ _)) fv_pat
     returnM [(bndrs, fvs, bndrs `intersectNameSet` fvs,
 	      L loc (BindStmt pat' expr' bind_op fail_op))]
 
-rn_rec_stmt all_bndrs (L loc (LetStmt binds@(HsIPBinds _))) _
+rn_rec_stmt _ (L _ (LetStmt binds@(HsIPBinds _))) _
   = do	{ addErr (badIpBinds (ptext (sLit "an mdo expression")) binds)
 	; failM }
 
@@ -1003,17 +1008,20 @@ rn_rec_stmt all_bndrs (L loc (LetStmt (HsValBinds binds'))) _ = do
 	    emptyNameSet, L loc (LetStmt (HsValBinds binds')))]
 
 -- no RecStmt case becuase they get flattened above when doing the LHSes
-rn_rec_stmt all_bndrs stmt@(L loc (RecStmt stmts _ _ _ _)) _	
+rn_rec_stmt _ stmt@(L _ (RecStmt _ _ _ _ _)) _	
   = pprPanic "rn_rec_stmt: RecStmt" (ppr stmt)
 
-rn_rec_stmt all_bndrs stmt@(L _ (ParStmt _)) _	-- Syntactically illegal in mdo
+rn_rec_stmt _ stmt@(L _ (ParStmt _)) _	-- Syntactically illegal in mdo
   = pprPanic "rn_rec_stmt: ParStmt" (ppr stmt)
 
-rn_rec_stmt all_bndrs stmt@(L _ (TransformStmt _ _ _)) _	-- Syntactically illegal in mdo
+rn_rec_stmt _ stmt@(L _ (TransformStmt _ _ _)) _	-- Syntactically illegal in mdo
   = pprPanic "rn_rec_stmt: TransformStmt" (ppr stmt)
 
-rn_rec_stmt all_bndrs stmt@(L _ (GroupStmt _ _)) _	-- Syntactically illegal in mdo
+rn_rec_stmt _ stmt@(L _ (GroupStmt _ _)) _	-- Syntactically illegal in mdo
   = pprPanic "rn_rec_stmt: GroupStmt" (ppr stmt)
+
+rn_rec_stmt _ (L _ (LetStmt EmptyLocalBinds)) _
+  = panic "rn_rec_stmt: LetStmt EmptyLocalBinds"
 
 rn_rec_stmts :: [Name] -> [(LStmtLR Name RdrName, FreeVars)] -> RnM [Segment (LStmt Name)]
 rn_rec_stmts bndrs stmts = mappM (uncurry (rn_rec_stmt bndrs)) stmts	`thenM` \ segs_s ->
@@ -1170,7 +1178,7 @@ checkRecStmt ctxt	  = addErr msg
 
 ---------
 checkParStmt :: HsStmtContext Name -> RnM ()
-checkParStmt ctxt 
+checkParStmt _
   = do	{ parallel_list_comp <- doptM Opt_ParallelListComp
 	; checkErr parallel_list_comp msg }
   where
@@ -1191,10 +1199,12 @@ checkTransformStmt ctxt = addErr msg
     msg = ptext (sLit "Illegal transform or grouping in") <+> pprStmtContext ctxt
     
 ---------
+patSynErr :: HsExpr RdrName -> RnM (HsExpr Name, FreeVars)
 patSynErr e = do { addErr (sep [ptext (sLit "Pattern syntax in expression context:"),
 			 	nest 4 (ppr e)])
 		 ; return (EWildPat, emptyFVs) }
 
+badIpBinds :: Outputable a => SDoc -> a -> SDoc
 badIpBinds what binds
   = hang (ptext (sLit "Implicit-parameter bindings illegal in") <+> what)
 	 2 (ppr binds)
