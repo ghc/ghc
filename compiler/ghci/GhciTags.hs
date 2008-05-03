@@ -120,12 +120,9 @@ collateAndWriteTags ETags file tagInfos = do -- etags style, Emacs/XEmacs
           sortedGroup = sortLe byLine group
           tags = unlines $ perFile sortedGroup 1 0 $ lines file
       return $ "\x0c\n" ++ fileName ++ "," ++ show (length tags) ++ "\n" ++ tags
-    perFile (tagInfo@(_tag, _file, lNo, _colNo):tags) count pos (line:lines)
-     | lNo > count =
-      perFile (tagInfo:tags) (count+1) (pos+length line) lines
-    perFile (tagInfo@(_tag, _file, lNo, _colNo):tags) count pos lines@(line:_)
-     | lNo == count =
-      showETag tagInfo line pos : perFile tags count pos lines
+    perFile (tagInfo@(_tag, _file, lNo, _colNo):tags) count pos lines@(line:lines')
+     | lNo >  count = perFile (tagInfo:tags) (count+1) (pos+length line) lines'
+     | lNo == count = showETag tagInfo line pos : perFile tags count pos lines
     perFile _ _ _ _ = []
 
 -- simple ctags format, for Vim et al
