@@ -4,17 +4,10 @@
 \section[RnEnv]{Environment manipulation for the renamer monad}
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module RnEnv ( 
 	newTopSrcBinder, lookupFamInstDeclBndr,
 	lookupLocatedBndrRn, lookupBndrRn, lookupBndrRn_maybe,
-	lookupLocatedTopBndrRn, lookupTopBndrRn, lookupBndrRn_maybe,
+	lookupLocatedTopBndrRn, lookupTopBndrRn,
 	lookupLocatedOccRn, lookupOccRn, 
 	lookupLocatedGlobalOccRn, lookupGlobalOccRn,
 	lookupLocalDataTcNames, lookupSrcOcc_maybe,
@@ -44,9 +37,7 @@ module RnEnv (
 
 import LoadIface	( loadInterfaceForName, loadSrcInterface )
 import IfaceEnv		( lookupOrig, newGlobalBinder, newIPName )
-import HsSyn		( FixitySig(..), HsExpr(..), SyntaxExpr, SyntaxTable,
-			  LHsTyVarBndr, LHsType, 
-			  Fixity, hsLTyVarLocNames, replaceTyVarName )
+import HsSyn
 import RdrHsSyn		( extractHsTyRdrTyVars )
 import RdrName
 import HscTypes		( availNames, ModIface(..), FixItem(..), lookupFixity)
@@ -64,8 +55,7 @@ import PrelNames	( mkUnboundName, rOOT_MAIN, iNTERACTIVE,
 			  consDataConKey, hasKey, forall_tv_RDR )
 import UniqSupply
 import BasicTypes	( IPName, mapIPName, Fixity )
-import SrcLoc		( SrcSpan, srcSpanStart, Located(..), eqLocated, unLoc,
-			  srcLocSpan, getLoc, combineSrcSpans, isOneLineSpan )
+import SrcLoc
 import Outputable
 import Util
 import Maybes
@@ -271,8 +261,8 @@ lookupInstDeclBndr :: Name -> Located RdrName -> RnM (Located Name)
 lookupInstDeclBndr cls rdr = lookup_located_sub_bndr is_op doc rdr
   where
     doc = ptext (sLit "method of class") <+> quotes (ppr cls)
-    is_op gre@(GRE {gre_par = ParentIs n}) = n == cls
-    is_op other			           = False
+    is_op (GRE {gre_par = ParentIs n}) = n == cls
+    is_op _                            = False
 
 -----------------------------------------------
 lookupRecordBndr :: Maybe (Located Name) -> Located RdrName -> RnM (Located Name)
@@ -321,6 +311,7 @@ lookup_located_sub_bndr :: (GlobalRdrElt -> Bool)
 lookup_located_sub_bndr is_good doc rdr_name
   = wrapLocM (lookup_sub_bndr is_good doc) rdr_name
 
+lookup_sub_bndr :: (GlobalRdrElt -> Bool) -> SDoc -> RdrName -> RnM Name
 lookup_sub_bndr is_good doc rdr_name
   | isUnqual rdr_name	-- Find all the things the rdr-name maps to
   = do	{		-- and pick the one with the right parent name
@@ -625,7 +616,7 @@ lookupFixityRn name
 
 ---------------
 lookupTyFixityRn :: Located Name -> RnM Fixity
-lookupTyFixityRn (L loc n) = lookupFixityRn n
+lookupTyFixityRn (L _ n) = lookupFixityRn n
 
 ---------------
 lookupLocalDataTcNames :: RdrName -> RnM [Name]
@@ -901,6 +892,7 @@ checkShadowedNames doc_str (global_env,local_env) loc_rdr_names
 
 \begin{code}
 -- A useful utility
+mapFvRn :: (a -> RnM (b, FreeVars)) -> [a] -> RnM ([b], FreeVars)
 mapFvRn f xs = mappM f xs	`thenM` \ stuff ->
 	       let
 		  (ys, fvs_s) = unzip stuff
@@ -954,9 +946,11 @@ check_unused flag bound_names used_names
 
 -------------------------
 --	Helpers
+warnUnusedGREs :: [GlobalRdrElt] -> RnM ()
 warnUnusedGREs gres 
  = warnUnusedBinds [(n,p) | GRE {gre_name = n, gre_prov = p} <- gres]
 
+warnUnusedLocals :: [Name] -> RnM ()
 warnUnusedLocals names
  = warnUnusedBinds [(n,LocalDef) | n<-names]
 
@@ -984,6 +978,7 @@ warnUnusedName (name, Imported is)
 	   pp_mod = quotes (ppr (importSpecModule spec))
 	   msg = ptext (sLit "Imported from") <+> pp_mod <+> ptext (sLit "but not used")
 
+addUnusedWarning :: Name -> SrcSpan -> SDoc -> RnM ()
 addUnusedWarning name span msg
   = addWarnAt span $
     sep [msg <> colon, 
@@ -992,6 +987,7 @@ addUnusedWarning name span msg
 \end{code}
 
 \begin{code}
+addNameClashErrRn :: RdrName -> [GlobalRdrElt] -> RnM ()
 addNameClashErrRn rdr_name names
   = addErr (vcat [ptext (sLit "Ambiguous occurrence") <+> quotes (ppr rdr_name),
 		  ptext (sLit "It could refer to") <+> vcat (msg1 : msgs)])
@@ -1001,12 +997,14 @@ addNameClashErrRn rdr_name names
     msgs = [ptext (sLit "    or") <+> mk_ref np | np <- nps]
     mk_ref gre = quotes (ppr (gre_name gre)) <> comma <+> pprNameProvenance gre
 
+shadowedNameWarn :: SDoc -> OccName -> [SDoc] -> SDoc
 shadowedNameWarn doc occ shadowed_locs
   = sep [ptext (sLit "This binding for") <+> quotes (ppr occ)
 	    <+> ptext (sLit "shadows the existing binding") <> plural shadowed_locs,
 	 nest 2 (vcat shadowed_locs)]
     $$ doc
 
+unknownNameErr :: RdrName -> SDoc
 unknownNameErr rdr_name
   = vcat [ hang (ptext (sLit "Not in scope:")) 
 	      2 (pprNonVarNameSpace (occNameSpace (rdrNameOcc rdr_name))
@@ -1017,10 +1015,12 @@ unknownNameErr rdr_name
 	  = ptext (sLit "Perhaps you intended to use -XRankNTypes or similar flag")
 	  | otherwise = empty
 
+unknownSubordinateErr :: SDoc -> RdrName -> SDoc
 unknownSubordinateErr doc op	-- Doc is "method of class" or 
 				-- "field of constructor"
   = quotes (ppr op) <+> ptext (sLit "is not a (visible)") <+> doc
 
+badOrigBinding :: RdrName -> SDoc
 badOrigBinding name
   = ptext (sLit "Illegal binding of built-in syntax:") <+> ppr (rdrNameOcc name)
 	-- The rdrNameOcc is because we don't want to print Prelude.(,)
@@ -1038,6 +1038,7 @@ dupNamesErr get_loc descriptor names
 	      | otherwise = ptext (sLit "Bound at:") <+> 
 			    vcat (map ppr (sortLe (<=) locs))
 
+badQualBndrErr :: RdrName -> SDoc
 badQualBndrErr rdr_name
   = ptext (sLit "Qualified name in binding position:") <+> ppr rdr_name
 \end{code}
