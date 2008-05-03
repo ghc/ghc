@@ -11,33 +11,33 @@
 --     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
 -- for details
 
-module RnHsSyn( 
-	-- Names
-	charTyCon_name, listTyCon_name, parrTyCon_name, tupleTyCon_name,
-	extractHsTyVars, extractHsTyNames, extractHsTyNames_s, 
-	extractFunDepNames, extractHsCtxtTyNames, extractHsPredTyNames,
+module RnHsSyn(
+        -- Names
+        charTyCon_name, listTyCon_name, parrTyCon_name, tupleTyCon_name,
+        extractHsTyVars, extractHsTyNames, extractHsTyNames_s,
+        extractFunDepNames, extractHsCtxtTyNames, extractHsPredTyNames,
 
-	-- Free variables
-	hsSigsFVs, hsSigFVs, conDeclFVs, bangTyFVs,
-	
-	maybeGenericMatch
+        -- Free variables
+        hsSigsFVs, hsSigFVs, conDeclFVs, bangTyFVs,
+
+        maybeGenericMatch
   ) where
 
 #include "HsVersions.h"
 
 import HsSyn
-import Class		( FunDep )
-import TysWiredIn	( tupleTyCon, listTyCon, parrTyCon, charTyCon )
-import Name		( Name, getName, isTyVarName )
+import Class            ( FunDep )
+import TysWiredIn       ( tupleTyCon, listTyCon, parrTyCon, charTyCon )
+import Name             ( Name, getName, isTyVarName )
 import NameSet
-import BasicTypes	( Boxity )
-import SrcLoc		( Located(..), unLoc )
+import BasicTypes       ( Boxity )
+import SrcLoc           ( Located(..), unLoc )
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Free variables}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 These free-variable finders returns tycons and classes too.
@@ -68,19 +68,19 @@ extractHsTyNames ty
     get (HsPArrTy ty)          = unitNameSet parrTyCon_name `unionNameSets` getl ty
     get (HsTupleTy con tys)    = extractHsTyNames_s tys
     get (HsFunTy ty1 ty2)      = getl ty1 `unionNameSets` getl ty2
-    get (HsPredTy p)	       = extractHsPredTyNames p
+    get (HsPredTy p)           = extractHsPredTyNames p
     get (HsOpTy ty1 op ty2)    = getl ty1 `unionNameSets` getl ty2 `unionNameSets` unitNameSet (unLoc op)
     get (HsParTy ty)           = getl ty
     get (HsBangTy _ ty)        = getl ty
     get (HsNumTy n)            = emptyNameSet
-    get (HsTyVar tv)	       = unitNameSet tv
-    get (HsSpliceTy _)         = emptyNameSet	-- Type splices mention no type variables
+    get (HsTyVar tv)           = unitNameSet tv
+    get (HsSpliceTy _)         = emptyNameSet   -- Type splices mention no type variables
     get (HsKindSig ty k)       = getl ty
-    get (HsForAllTy _ tvs 
-		    ctxt ty)   = (extractHsCtxtTyNames ctxt
-					 `unionNameSets` getl ty)
-					    `minusNameSet`
-				  mkNameSet (hsLTyVarNames tvs)
+    get (HsForAllTy _ tvs
+                    ctxt ty)   = (extractHsCtxtTyNames ctxt
+                                         `unionNameSets` getl ty)
+                                            `minusNameSet`
+                                  mkNameSet (hsLTyVarNames tvs)
     get (HsDocTy ty _)         = getl ty
 
 extractHsTyNames_s  :: [LHsType Name] -> NameSet
@@ -102,19 +102,19 @@ extractHsPredTyNames (HsIParam n ty)
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Free variables of declarations}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 Return the Names that must be in scope if we are to use this declaration.
 In all cases this is set up for interface-file declarations:
-	- for class decls we ignore the bindings
-	- for instance decls likewise, plus the pragmas
-	- for rule decls, we ignore HsRules
+        - for class decls we ignore the bindings
+        - for instance decls likewise, plus the pragmas
+        - for rule decls, we ignore HsRules
         - for data decls, we ignore derivings
 
-	*** See "THE NAMING STORY" in HsDecls ****
+        *** See "THE NAMING STORY" in HsDecls ****
 
 \begin{code}
 ----------------
@@ -124,14 +124,14 @@ hsSigsFVs sigs = plusFVs (map (hsSigFVs.unLoc) sigs)
 hsSigFVs (TypeSig v ty)     = extractHsTyNames ty
 hsSigFVs (SpecInstSig ty)   = extractHsTyNames ty
 hsSigFVs (SpecSig v ty inl) = extractHsTyNames ty
-hsSigFVs other		    = emptyFVs
+hsSigFVs other              = emptyFVs
 
 ----------------
-conDeclFVs (L _ (ConDecl { con_qvars = tyvars, con_cxt = context, 
-			   con_details = details, con_res = res_ty}))
+conDeclFVs (L _ (ConDecl { con_qvars = tyvars, con_cxt = context,
+                           con_details = details, con_res = res_ty}))
   = delFVs (map hsLTyVarName tyvars) $
     extractHsCtxtTyNames context  `plusFV`
-    conDetailsFVs details	  `plusFV`
+    conDetailsFVs details         `plusFV`
     conResTyFVs res_ty
 
 conResTyFVs ResTyH98       = emptyFVs
@@ -145,9 +145,9 @@ bangTyFVs bty = extractHsTyNames (getBangType bty)
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{A few functions on generic defintions
-%*									*
+%*                                                                      *
 %************************************************************************
 
 These functions on generics are defined over Matches Name, which is
