@@ -215,9 +215,9 @@ regUsage instr = case instr of
     GABS   sz src dst	-> mkRU [src] [dst]
     GNEG   sz src dst	-> mkRU [src] [dst]
     GSQRT  sz src dst	-> mkRU [src] [dst]
-    GSIN   sz src dst	-> mkRU [src] [dst]
-    GCOS   sz src dst	-> mkRU [src] [dst]
-    GTAN   sz src dst	-> mkRU [src] [dst]
+    GSIN   sz _ _ src dst	-> mkRU [src] [dst]
+    GCOS   sz _ _ src dst	-> mkRU [src] [dst]
+    GTAN   sz _ _ src dst	-> mkRU [src] [dst]
 #endif
 
 #if x86_64_TARGET_ARCH
@@ -599,9 +599,9 @@ patchRegs instr env = case instr of
     GABS sz src dst	-> GABS sz (env src) (env dst)
     GNEG sz src dst	-> GNEG sz (env src) (env dst)
     GSQRT sz src dst	-> GSQRT sz (env src) (env dst)
-    GSIN sz src dst	-> GSIN sz (env src) (env dst)
-    GCOS sz src dst	-> GCOS sz (env src) (env dst)
-    GTAN sz src dst	-> GTAN sz (env src) (env dst)
+    GSIN sz l1 l2 src dst	-> GSIN sz l1 l2 (env src) (env dst)
+    GCOS sz l1 l2 src dst	-> GCOS sz l1 l2 (env src) (env dst)
+    GTAN sz l1 l2 src dst	-> GTAN sz l1 l2 (env src) (env dst)
 #endif
 
 #if x86_64_TARGET_ARCH

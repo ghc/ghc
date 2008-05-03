@@ -1504,17 +1504,12 @@ pprInstr g@(GNEG sz src dst)
 pprInstr g@(GSQRT sz src dst)
    = pprG g (hcat [gtab, gpush src 0, text " ; fsqrt"] $$ 
              hcat [gtab, gcoerceto sz, gpop dst 1])
-pprInstr g@(GSIN sz src dst)
-   = pprG g (hcat [gtab, gpush src 0, text " ; fsin"] $$ 
-             hcat [gtab, gcoerceto sz, gpop dst 1])
-pprInstr g@(GCOS sz src dst)
-   = pprG g (hcat [gtab, gpush src 0, text " ; fcos"] $$ 
-             hcat [gtab, gcoerceto sz, gpop dst 1])
-pprInstr g@(GTAN sz src dst)
-   = pprG g (hcat [gtab, text "ffree %st(6) ; ",
-                   gpush src 0, text " ; fptan ; ", 
-                   text " fstp %st(0)"] $$
-             hcat [gtab, gcoerceto sz, gpop dst 1])
+pprInstr g@(GSIN sz l1 l2 src dst)
+   = pprG g (pprTrigOp "fsin" False l1 l2 src dst sz)
+pprInstr g@(GCOS sz l1 l2 src dst)
+   = pprG g (pprTrigOp "fcos" False l1 l2 src dst sz)
+pprInstr g@(GTAN sz l1 l2 src dst)
+   = pprG g (pprTrigOp "fptan" True l1 l2 src dst sz)
 
 -- In the translations for GADD, GMUL, GSUB and GDIV,
 -- the first two cases are mere optimisations.  The otherwise clause
@@ -1585,6 +1580,48 @@ pprInstr GFREE
             ptext (sLit "\tffree %st(4) ;ffree %st(5) ;ffree %st(6) ;ffree %st(7)") 
           ]
 
+pprTrigOp :: String -> Bool -> CLabel -> CLabel -> Reg -> Reg -> MachRep -> Doc
+pprTrigOp op -- fsin, fcos or fptan
+          isTan -- we need a couple of extra steps if we're doing tan
+          l1 l2 -- internal labels for us to use
+          src dst sz
+    = -- We'll be needing %eax later on
+      hcat [gtab, text "pushl %eax;"] $$
+      -- tan is going to use an extra space on the FP stack
+      (if isTan then hcat [gtab, text "ffree %st(6)"] else empty) $$
+      -- First put the value in %st(0) and try to apply the op to it
+      hcat [gpush src 0, text ("; " ++ op)] $$
+      -- Now look to see if C2 was set (overflow, |value| >= 2^63)
+      hcat [gtab, text "fnstsw %ax"] $$
+      hcat [gtab, text "test   $0x400,%eax"] $$
+      -- If we were in bounds then jump to the end
+      hcat [gtab, text "je     " <> pprCLabel_asm l1] $$
+      -- Otherwise we need to shrink the value. Start by
+      -- loading pi, doubleing it (by adding it to itself),
+      -- and then swapping pi with the value, so the value we
+      -- want to apply op to is in %st(0) again
+      hcat [gtab, text "ffree %st(7); fldpi"] $$
+      hcat [gtab, text "fadd   %st(0),%st"] $$
+      hcat [gtab, text "fxch   %st(1)"] $$
+      -- Now we have a loop in which we make the value smaller,
+      -- see if it's small enough, and loop if not
+      (pprCLabel_asm l2 <> char ':') $$
+      hcat [gtab, text "fprem1"] $$
+      -- My Debian libc uses fstsw here for the tan code, but I can't
+      -- see any reason why it should need to be different for tan.
+      hcat [gtab, text "fnstsw %ax"] $$
+      hcat [gtab, text "test   $0x400,%eax"] $$
+      hcat [gtab, text "jne    " <> pprCLabel_asm l2] $$
+      hcat [gtab, text "fstp   %st(1)"] $$
+      hcat [gtab, text op] $$
+      (pprCLabel_asm l1 <> char ':') $$
+      -- Pop the 1.0 tan gave us
+      (if isTan then hcat [gtab, text "fstp %st(0)"] else empty) $$
+      -- Restore %eax
+      hcat [gtab, text "popl %eax;"] $$
+      -- And finally make the result the right size
+      hcat [gtab, gcoerceto sz, gpop dst 1]
+
 --------------------------
 
 -- coerce %st(0) to the specified size
@@ -1626,9 +1663,9 @@ pprGInstr (GCMP co src dst) = pprCondRegReg (sLit "gcmp_") F64 co src dst
 pprGInstr (GABS sz src dst) = pprSizeRegReg (sLit "gabs") sz src dst
 pprGInstr (GNEG sz src dst) = pprSizeRegReg (sLit "gneg") sz src dst
 pprGInstr (GSQRT sz src dst) = pprSizeRegReg (sLit "gsqrt") sz src dst
-pprGInstr (GSIN sz src dst) = pprSizeRegReg (sLit "gsin") sz src dst
-pprGInstr (GCOS sz src dst) = pprSizeRegReg (sLit "gcos") sz src dst
-pprGInstr (GTAN sz src dst) = pprSizeRegReg (sLit "gtan") sz src dst
+pprGInstr (GSIN sz _ _ src dst) = pprSizeRegReg (sLit "gsin") sz src dst
+pprGInstr (GCOS sz _ _ src dst) = pprSizeRegReg (sLit "gcos") sz src dst
+pprGInstr (GTAN sz _ _ src dst) = pprSizeRegReg (sLit "gtan") sz src dst
 
 pprGInstr (GADD sz src1 src2 dst) = pprSizeRegRegReg (sLit "gadd") sz src1 src2 dst
 pprGInstr (GSUB sz src1 src2 dst) = pprSizeRegRegReg (sLit "gsub") sz src1 src2 dst

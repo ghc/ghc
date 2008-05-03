@@ -3050,18 +3050,20 @@ genCCall (CmmPrim MO_WriteBarrier) _ _ = return nilOL
 
 -- we only cope with a single result for foreign calls
 genCCall (CmmPrim op) [CmmKinded r _] args = do
+  l1 <- getNewLabelNat
+  l2 <- getNewLabelNat
   case op of
 	MO_F32_Sqrt -> actuallyInlineFloatOp F32  (GSQRT F32) args
 	MO_F64_Sqrt -> actuallyInlineFloatOp F64 (GSQRT F64) args
 	
-	MO_F32_Sin  -> actuallyInlineFloatOp F32  (GSIN F32) args
-	MO_F64_Sin  -> actuallyInlineFloatOp F64 (GSIN F64) args
+	MO_F32_Sin  -> actuallyInlineFloatOp F32  (GSIN F32 l1 l2) args
+	MO_F64_Sin  -> actuallyInlineFloatOp F64 (GSIN F64 l1 l2) args
 	
-	MO_F32_Cos  -> actuallyInlineFloatOp F32  (GCOS F32) args
-	MO_F64_Cos  -> actuallyInlineFloatOp F64 (GCOS F64) args
+	MO_F32_Cos  -> actuallyInlineFloatOp F32  (GCOS F32 l1 l2) args
+	MO_F64_Cos  -> actuallyInlineFloatOp F64 (GCOS F64 l1 l2) args
 	
-	MO_F32_Tan  -> actuallyInlineFloatOp F32  (GTAN F32) args
-	MO_F64_Tan  -> actuallyInlineFloatOp F64 (GTAN F64) args
+	MO_F32_Tan  -> actuallyInlineFloatOp F32  (GTAN F32 l1 l2) args
+	MO_F64_Tan  -> actuallyInlineFloatOp F64 (GTAN F64 l1 l2) args
 	
 	other_op    -> outOfLineFloatOp op r args
  where

@@ -483,9 +483,9 @@ bit or 64 bit precision.
      	| GABS	      MachRep Reg Reg -- src, dst
     	| GNEG	      MachRep Reg Reg -- src, dst
     	| GSQRT	      MachRep Reg Reg -- src, dst
-    	| GSIN	      MachRep Reg Reg -- src, dst
-    	| GCOS	      MachRep Reg Reg -- src, dst
-    	| GTAN	      MachRep Reg Reg -- src, dst
+    	| GSIN	      MachRep CLabel CLabel Reg Reg -- src, dst
+    	| GCOS	      MachRep CLabel CLabel Reg Reg -- src, dst
+    	| GTAN	      MachRep CLabel CLabel Reg Reg -- src, dst
 	
         | GFREE         -- do ffree on all x86 regs; an ugly hack
 #endif
@@ -583,7 +583,7 @@ is_G_instr instr
 	GSUB _ _ _ _ -> True; GMUL _ _ _ _ -> True
     	GCMP _ _ _ -> True; GABS _ _ _ -> True
     	GNEG _ _ _ -> True; GSQRT _ _ _ -> True
-        GSIN _ _ _ -> True; GCOS _ _ _ -> True; GTAN _ _ _ -> True
+        GSIN _ _ _ _ _ -> True; GCOS _ _ _ _ _ -> True; GTAN _ _ _ _ _ -> True
         GFREE -> panic "is_G_instr: GFREE (!)"
         other -> False
 #endif /* i386_TARGET_ARCH */
