@@ -6,13 +6,6 @@
 Loading interface files
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module LoadIface (
 	loadInterface, loadInterfaceForName, loadWiredInHomeIface, 
 	loadSrcInterface, loadSysInterface, loadOrphanModules, 
@@ -48,7 +41,6 @@ import NameEnv
 import MkId
 import Module
 import OccName
-import SrcLoc
 import Maybes
 import ErrUtils
 import Finder
@@ -63,7 +55,6 @@ import FastString
 import Control.Monad
 import Data.List
 import Data.Maybe
-import Data.IORef
 \end{code}
 
 
@@ -207,7 +198,7 @@ loadInterface doc_str mod from
 			-- The (src_imp == mi_boot iface) test checks that the already-loaded
 			-- interface isn't a boot iface.  This can conceivably happen,
 			-- if an earlier import had a before we got to real imports.   I think.
-	    other -> do {
+	    _ -> do {
 
           let { hi_boot_file = case from of
 				ImportByUser usr_boot -> usr_boot
@@ -309,6 +300,7 @@ loadInterface doc_str mod from
 	; return (Succeeded final_iface)
     }}}}
 
+badDepMsg :: Module -> SDoc
 badDepMsg mod 
   = hang (ptext (sLit "Interface file inconsistency:"))
        2 (sep [ptext (sLit "home-package module") <+> quotes (ppr mod) <+> ptext (sLit "is needed,"), 
@@ -477,11 +469,6 @@ findAndReadIface doc_str mod hi_boot_file
 	; mb_found <- liftIO (findExactModule hsc_env mod)
 	; case mb_found of {
               
-	      err | notFound err -> do
-		{ traceIf (ptext (sLit "...not found"))
-		; dflags <- getDOpts
-		; return (Failed (cannotFindInterface dflags 
-					(moduleName mod) err)) } ;
 	      Found loc mod -> do 
 
 	-- Found file, so read it
@@ -502,10 +489,14 @@ findAndReadIface doc_str mod hi_boot_file
 		| otherwise ->
 		  return (Succeeded (iface, file_path))
 			-- Don't forget to fill in the package name...
-	}}}}
-
-notFound (Found _ _) = False
-notFound _ = True
+	}}
+	    ; err -> do
+		{ traceIf (ptext (sLit "...not found"))
+		; dflags <- getDOpts
+		; return (Failed (cannotFindInterface dflags 
+					(moduleName mod) err)) }
+        }
+        }
 \end{code}
 
 @readIface@ tries just the one file.
@@ -516,9 +507,8 @@ readIface :: Module -> FilePath -> IsBootInterface
 	-- Failed err    <=> file not found, or unreadable, or illegible
 	-- Succeeded iface <=> successfully found and parsed 
 
-readIface wanted_mod file_path is_hi_boot_file
-  = do	{ dflags <- getDOpts
-        ; res <- tryMostM $
+readIface wanted_mod file_path _
+  = do	{ res <- tryMostM $
                  readBinIface CheckHiWay QuietBinIFaceReading file_path
 	; case res of
 	    Right iface 
@@ -725,6 +715,7 @@ pprVectInfo (IfaceVectInfo { ifaceVectInfoVar        = vars
   , ptext (sLit "vectorised reused tycons:") <+> hsep (map ppr tyconsReuse)
   ]
 
+pprDeprecs :: Deprecations -> SDoc
 pprDeprecs NoDeprecs	    = empty
 pprDeprecs (DeprecAll txt)  = ptext (sLit "Deprecate all") <+> doubleQuotes (ftext txt)
 pprDeprecs (DeprecSome prs) = ptext (sLit "Deprecate") <+> vcat (map pprDeprec prs)
@@ -740,6 +731,7 @@ pprDeprecs (DeprecSome prs) = ptext (sLit "Deprecate") <+> vcat (map pprDeprec p
 %*********************************************************
 
 \begin{code}
+badIfaceFile :: String -> SDoc -> SDoc
 badIfaceFile file err
   = vcat [ptext (sLit "Bad interface file:") <+> text file, 
 	  nest 4 err]
@@ -755,6 +747,7 @@ hiModuleNameMismatchWarn requested_mod read_mod =
    	 , ppr read_mod
   	 ]
 
+wrongIfaceModErr :: ModIface -> Module -> String -> SDoc
 wrongIfaceModErr iface mod_name file_path 
   = sep [ptext (sLit "Interface file") <+> iface_file,
          ptext (sLit "contains module") <+> quotes (ppr (mi_module iface)) <> comma,
@@ -766,6 +759,7 @@ wrongIfaceModErr iface mod_name file_path
 	]
   where iface_file = doubleQuotes (text file_path)
 
+homeModError :: Module -> ModLocation -> SDoc
 homeModError mod location
   = ptext (sLit "attempting to use module ") <> quotes (ppr mod)
     <> (case ml_hs_file location of
