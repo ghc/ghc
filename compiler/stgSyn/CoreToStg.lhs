@@ -7,13 +7,6 @@ And, as we have the info in hand, we may convert some lets to
 let-no-escapes.
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module CoreToStg ( coreToStg, coreExprToStg ) where
 
 #include "HsVersions.h"
@@ -159,7 +152,7 @@ coreTopBindsToStg
     -> [CoreBind]
     -> (IdEnv HowBound, FreeVarsInfo, [StgBinding])
 
-coreTopBindsToStg this_pkg env [] = (env, emptyFVInfo, [])
+coreTopBindsToStg _        env [] = (env, emptyFVInfo, [])
 coreTopBindsToStg this_pkg env (b:bs)
   = (env2, fvs2, b':bs')
   where
@@ -216,6 +209,7 @@ coreTopBindToStg this_pkg env body_fvs (Rec pairs)
 -- what CoreToStg has figured out about the binding's SRT.  The
 -- CafInfo will be exact in all cases except when CorePrep has
 -- floated out a binding, in which case it will be approximate.
+consistentCafInfo :: Id -> GenStgBinding Var Id -> Bool
 consistentCafInfo id bind
   | occNameFS (nameOccName (idName id)) == fsLit "sat"
   = safe
@@ -254,7 +248,7 @@ mkTopStgRhs is_static rhs_fvs srt binder_info (StgLam _ bndrs body)
 		  srt
 		  bndrs body
 	
-mkTopStgRhs is_static rhs_fvs srt binder_info (StgConApp con args)
+mkTopStgRhs is_static _ _ _ (StgConApp con args)
   | is_static	 -- StgConApps can be updatable (see isCrossDllConApp)
   = StgRhsCon noCCS con args
 
@@ -318,15 +312,15 @@ coreToStgExpr (Note (SCC cc) expr) = do
     (expr2, fvs, escs) <- coreToStgExpr expr
     return (StgSCC cc expr2, fvs, escs)
 
-coreToStgExpr (Case (Var id) _bndr ty [(DEFAULT,[],expr)])
+coreToStgExpr (Case (Var id) _bndr _ty [(DEFAULT,[],expr)])
   | Just (TickBox m n) <- isTickBoxOp_maybe id = do
     (expr2, fvs, escs) <- coreToStgExpr expr
     return (StgTick m n expr2, fvs, escs)
 
-coreToStgExpr (Note other_note expr)
+coreToStgExpr (Note _ expr)
   = coreToStgExpr expr
 
-coreToStgExpr (Cast expr co)
+coreToStgExpr (Cast expr _)
   = coreToStgExpr expr
 
 -- Cases require a little more real work.
@@ -355,7 +349,7 @@ coreToStgExpr (Case scrut bndr _ alts) = do
 
 	-- We tell the scrutinee that everything 
 	-- live in the alts is live in it, too.
-    (scrut2, scrut_fvs, scrut_escs, scrut_lv_info)
+    (scrut2, scrut_fvs, _scrut_escs, scrut_lv_info)
        <- setVarsLiveInCont alts_lv_info $ do
             (scrut2, scrut_fvs, scrut_escs) <- coreToStgExpr scrut
             scrut_lv_info <- freeVarsToLiveVars scrut_fvs
@@ -404,9 +398,12 @@ coreToStgExpr (Let bind body) = do
           )
 
     return (new_let, fvs, escs)
+
+coreToStgExpr e = pprPanic "coreToStgExpr" (ppr e)
 \end{code}
 
 \begin{code}
+mkStgAltType :: Id -> [CoreAlt] -> AltType
 mkStgAltType bndr alts
   = case splitTyConApp_maybe (repType (idType bndr)) of
 	Just (tc,_) | isUnboxedTupleTyCon tc -> UbxTupAlt tc
@@ -455,7 +452,7 @@ coreToStgApp
 	-> LneM (StgExpr, FreeVarsInfo, EscVarsSet)
 
 
-coreToStgApp maybe_thunk_body f args = do
+coreToStgApp _ f args = do
     (args', args_fvs) <- coreToStgArgs args
     how_bound <- lookupVarLne f
 
@@ -530,13 +527,13 @@ coreToStgArgs :: [CoreArg] -> LneM ([StgArg], FreeVarsInfo)
 coreToStgArgs []
   = return ([], emptyFVInfo)
 
-coreToStgArgs (Type ty : args) = do     -- Type argument
+coreToStgArgs (Type _ : args) = do     -- Type argument
     (args', fvs) <- coreToStgArgs args
     return (args', fvs)
 
 coreToStgArgs (arg : args) = do         -- Non-type argument
     (stg_args, args_fvs) <- coreToStgArgs args
-    (arg', arg_fvs, escs) <- coreToStgExpr arg
+    (arg', arg_fvs, _escs) <- coreToStgExpr arg
     let
 	fvs = args_fvs `unionFVInfo` arg_fvs
 	stg_arg = case arg' of
@@ -708,7 +705,6 @@ coreToStgRhs :: FreeVarsInfo		-- Free var info for the scope of the binding
 
 coreToStgRhs scope_fv_info binders (bndr, rhs) = do
     (new_rhs, rhs_fvs, rhs_escs) <- coreToStgExpr rhs
-    env <- getEnvLne
     lv_info <- freeVarsToLiveVars (binders `minusFVBinders` rhs_fvs)
     return (mkStgRhs rhs_fvs (mkSRT lv_info) bndr_info new_rhs,
             rhs_fvs, lv_info, rhs_escs)
@@ -717,8 +713,7 @@ coreToStgRhs scope_fv_info binders (bndr, rhs) = do
 
 mkStgRhs :: FreeVarsInfo -> SRT -> StgBinderInfo -> StgExpr -> StgRhs
 
-mkStgRhs rhs_fvs srt binder_info (StgConApp con args)
-  = StgRhsCon noCCS con args
+mkStgRhs _ _ _ (StgConApp con args) = StgRhsCon noCCS con args
 
 mkStgRhs rhs_fvs srt binder_info (StgLam _ bndrs body)
   = StgRhsClosure noCCS binder_info
@@ -827,12 +822,14 @@ data LetInfo
 			-- itself is always a member of
 			-- the dynamic set of its own LiveInfo
 
+isLetBound :: HowBound -> Bool
 isLetBound (LetBound _ _) = True
-isLetBound other 	  = False
+isLetBound _              = False
 
-topLevelBound ImportBound	  = True
+topLevelBound :: HowBound -> Bool
+topLevelBound ImportBound         = True
 topLevelBound (LetBound TopLet _) = True
-topLevelBound other		  = False
+topLevelBound _                   = False
 \end{code}
 
 For a let(rec)-bound variable, x, we record LiveInfo, the set of
@@ -884,7 +881,7 @@ initLne env m = unLneM m env emptyLiveInfo
 {-# INLINE returnLne #-}
 
 returnLne :: a -> LneM a
-returnLne e = LneM $ \env lvs_cont -> e
+returnLne e = LneM $ \_ _ -> e
 
 thenLne :: LneM a -> (a -> LneM b) -> LneM b
 thenLne m k = LneM $ \env lvs_cont
@@ -904,11 +901,11 @@ Functions specific to this monad:
 
 \begin{code}
 getVarsLiveInCont :: LneM LiveInfo
-getVarsLiveInCont = LneM $ \env lvs_cont -> lvs_cont
+getVarsLiveInCont = LneM $ \_env lvs_cont -> lvs_cont
 
 setVarsLiveInCont :: LiveInfo -> LneM a -> LneM a
 setVarsLiveInCont new_lvs_cont expr
-   =    LneM $   \env lvs_cont
+   =    LneM $   \env _lvs_cont
    -> unLneM expr env new_lvs_cont
 
 extendVarEnvLne :: [(Id, HowBound)] -> LneM a -> LneM a
@@ -917,10 +914,7 @@ extendVarEnvLne ids_w_howbound expr
    -> unLneM expr (extendVarEnvList env ids_w_howbound) lvs_cont
 
 lookupVarLne :: Id -> LneM HowBound
-lookupVarLne v = LneM $ \env lvs_cont -> lookupBinding env v
-
-getEnvLne :: LneM (IdEnv HowBound)
-getEnvLne = LneM $ \env lvs_cont -> env
+lookupVarLne v = LneM $ \env _lvs_cont -> lookupBinding env v
 
 lookupBinding :: IdEnv HowBound -> Id -> HowBound
 lookupBinding env v = case lookupVarEnv env v of
@@ -935,7 +929,7 @@ lookupBinding env v = case lookupVarEnv env v of
 freeVarsToLiveVars :: FreeVarsInfo -> LneM LiveInfo
 freeVarsToLiveVars fvs = LneM freeVarsToLiveVars'
  where
-  freeVarsToLiveVars' env live_in_cont = live_info
+  freeVarsToLiveVars' _env live_in_cont = live_info
    where
     live_info    = foldr unionLiveInfo live_in_cont lvs_from_fvs
     lvs_from_fvs = map do_one (allFreeIds fvs)
@@ -999,14 +993,6 @@ singletonFVInfo id ImportBound info
    | otherwise         		   = emptyVarEnv
 singletonFVInfo id how_bound info  = unitVarEnv id (id, how_bound, info)
 
-tyvarFVInfo :: TyVarSet -> FreeVarsInfo
-tyvarFVInfo tvs = emptyFVInfo	-- Type variables are not recorded
--- Old code recorded free tyvars for when we supported runtime types:
---    foldVarSet add emptyFVInfo tvs
---        where
---	  add tv fvs = extendVarEnv fvs tv (tv, LambdaBound, noBinderInfo)
---		-- Type variables must be lambda-bound
-
 unionFVInfo :: FreeVarsInfo -> FreeVarsInfo -> FreeVarsInfo
 unionFVInfo fv1 fv2 = plusVarEnv_C plusFVInfo fv1 fv2
 
@@ -1046,19 +1032,24 @@ getFVs fvs = [id | (id, how_bound, _) <- varEnvElts fvs,
 getFVSet :: FreeVarsInfo -> VarSet
 getFVSet fvs = mkVarSet (getFVs fvs)
 
+plusFVInfo :: (Var, HowBound, StgBinderInfo)
+           -> (Var, HowBound, StgBinderInfo)
+           -> (Var, HowBound, StgBinderInfo)
 plusFVInfo (id1,hb1,info1) (id2,hb2,info2)
   = ASSERT (id1 == id2 && hb1 `check_eq_how_bound` hb2)
     (id1, hb1, combineStgBinderInfo info1 info2)
 
 -- The HowBound info for a variable in the FVInfo should be consistent
+check_eq_how_bound :: HowBound -> HowBound -> Bool
 check_eq_how_bound ImportBound 	      ImportBound 	 = True
 check_eq_how_bound LambdaBound 	      LambdaBound 	 = True
 check_eq_how_bound (LetBound li1 ar1) (LetBound li2 ar2) = ar1 == ar2 && check_eq_li li1 li2
-check_eq_how_bound hb1		      hb2		 = False
+check_eq_how_bound _                  _                  = False
 
+check_eq_li :: LetInfo -> LetInfo -> Bool
 check_eq_li (NestedLet _) (NestedLet _) = True
 check_eq_li TopLet        TopLet        = True
-check_eq_li li1 	  li2		= False
+check_eq_li _             _             = False
 \end{code}
 
 Misc.
@@ -1070,12 +1061,13 @@ filterStgBinders bndrs = filter isId bndrs
 
 \begin{code}
 	-- Ignore all notes except SCC
+myCollectBinders :: Expr Var -> ([Var], Expr Var)
 myCollectBinders expr
   = go [] expr
   where
     go bs (Lam b e)          = go (b:bs) e
     go bs e@(Note (SCC _) _) = (reverse bs, e) 
-    go bs (Cast e co)        = go bs e
+    go bs (Cast e _)         = go bs e
     go bs (Note _ e)         = go bs e
     go bs e	             = (reverse bs, e)
 
@@ -1087,15 +1079,15 @@ myCollectArgs expr
   where
     go (Var v)          as = (v, as)
     go (App f a) as        = go f (a:as)
-    go (Note (SCC _) e) as = pprPanic "CoreToStg.myCollectArgs" (ppr expr)
-    go (Cast e co)      as = go e as
-    go (Note n e)       as = go e as
-    go _		as = pprPanic "CoreToStg.myCollectArgs" (ppr expr)
+    go (Note (SCC _) _) _  = pprPanic "CoreToStg.myCollectArgs" (ppr expr)
+    go (Cast e _)       as = go e as
+    go (Note _ e)       as = go e as
+    go _                _  = pprPanic "CoreToStg.myCollectArgs" (ppr expr)
 \end{code}
 
 \begin{code}
 stgArity :: Id -> HowBound -> Arity
-stgArity f (LetBound _ arity) = arity
+stgArity _ (LetBound _ arity) = arity
 stgArity f ImportBound	      = idArity f
-stgArity f LambdaBound        = 0
+stgArity _ LambdaBound        = 0
 \end{code}
