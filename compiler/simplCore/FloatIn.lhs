@@ -12,13 +12,6 @@ case, so that we don't allocate things, save them on the stack, and
 then discover that they aren't needed in the chosen branch.
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module FloatIn ( floatInwards ) where
 
 #include "HsVersions.h"
@@ -29,10 +22,11 @@ import CoreUtils	( exprIsHNF, exprIsDupable )
 import CoreLint		( showPass, endPass )
 import CoreFVs		( CoreExprWithFVs, freeVars, freeVarsOf, idRuleVars )
 import Id		( isOneShotBndr )
-import Var		( Id, idType )
+import Var
 import Type		( isUnLiftedType )
 import VarSet
 import Util		( zipEqual, zipWithEqual, count )
+import UniqFM
 import Outputable
 \end{code}
 
@@ -149,7 +143,7 @@ fiExpr to_drop (_, AnnType ty) = ASSERT( null to_drop )
 fiExpr to_drop (_, AnnCast expr co)
   = Cast (fiExpr to_drop expr) co	-- Just float in past coercion
 
-fiExpr to_drop (_, AnnLit lit) = Lit lit
+fiExpr _ (_, AnnLit lit) = Lit lit
 \end{code}
 
 Applications: we do float inside applications, mainly because we
@@ -213,7 +207,7 @@ We don't float lets inwards past an SCC.
 	cc, change current cc to the new one and float binds into expr.
 
 \begin{code}
-fiExpr to_drop (_, AnnNote note@(SCC cc) expr)
+fiExpr to_drop (_, AnnNote note@(SCC _) expr)
   = 	-- Wimp out for now
     mkCoLets' to_drop (Note note (fiExpr [] expr))
 
@@ -355,12 +349,13 @@ fiExpr to_drop (_, AnnCase scrut case_bndr ty alts)
     scrut_fvs    = freeVarsOf scrut
     alts_fvs     = map alt_fvs alts
     all_alts_fvs = unionVarSets alts_fvs
-    alt_fvs (con, args, rhs) = foldl delVarSet (freeVarsOf rhs) (case_bndr:args)
+    alt_fvs (_con, args, rhs) = foldl delVarSet (freeVarsOf rhs) (case_bndr:args)
 				-- Delete case_bndr and args from free vars of rhs 
 				-- to get free vars of alt
 
     fi_alt to_drop (con, args, rhs) = (con, args, fiExpr to_drop rhs)
 
+noFloatIntoRhs :: AnnExpr' Var (UniqFM Var) -> Bool
 noFloatIntoRhs (AnnNote InlineMe _) = True
 noFloatIntoRhs (AnnLam b _)   	    = not (is_one_shot b)
 	-- IMPORTANT: don't say 'True' for a RHS with a one-shot lambda at the top.
@@ -374,6 +369,7 @@ noFloatIntoRhs (AnnLam b _)   	    = not (is_one_shot b)
 
 noFloatIntoRhs rhs = exprIsHNF (deAnnotate' rhs)	-- We'd just float right back out again...
 
+is_one_shot :: Var -> Bool
 is_one_shot b = isId b && isOneShotBndr b
 \end{code}
 
@@ -416,8 +412,8 @@ sepBindsByDropPoint
 
 type DropBox = (FreeVarsSet, FloatingBinds)
 
-sepBindsByDropPoint is_case drop_pts []
-  = [] : [[] | p <- drop_pts]	-- cut to the chase scene; it happens
+sepBindsByDropPoint _is_case drop_pts []
+  = [] : [[] | _ <- drop_pts]	-- cut to the chase scene; it happens
 
 sepBindsByDropPoint is_case drop_pts floaters
   = go floaters (map (\fvs -> (fvs, [])) (emptyVarSet : drop_pts))
@@ -435,7 +431,7 @@ sepBindsByDropPoint is_case drop_pts floaters
 	  -- "here" means the group of bindings dropped at the top of the fork
 
 	  (used_here : used_in_flags) = [ any (`elemVarSet` fvs) (bindersOf bind)
-					| (fvs, drops) <- drop_boxes]
+					| (fvs, _) <- drop_boxes]
 
 	  drop_here = used_here || not can_push
 
@@ -468,6 +464,8 @@ sepBindsByDropPoint is_case drop_pts floaters
 	  insert_maybe box True  = insert box
 	  insert_maybe box False = box
 
+    go _ _ = panic "sepBindsByDropPoint/go"
+
 
 floatedBindsFVs :: FloatingBinds -> FreeVarsSet
 floatedBindsFVs binds = unionVarSets (map snd binds)
@@ -476,6 +474,7 @@ mkCoLets' :: FloatingBinds -> CoreExpr -> CoreExpr
 mkCoLets' to_drop e = foldl (flip (Let . fst)) e to_drop
 	-- Remember to_drop is in *reverse* dependency order
 
+bindIsDupable :: Bind CoreBndr -> Bool
 bindIsDupable (Rec prs)    = all (exprIsDupable . snd) prs
-bindIsDupable (NonRec b r) = exprIsDupable r
+bindIsDupable (NonRec _ r) = exprIsDupable r
 \end{code}
