@@ -83,6 +83,7 @@ import Data.Char
 -- Unicode TODO: put isSymbol in libcompat
 #if !defined(__GLASGOW_HASKELL__) || __GLASGOW_HASKELL__ > 604
 #else
+isSymbol :: a -> Bool
 isSymbol = const False
 #endif
 
