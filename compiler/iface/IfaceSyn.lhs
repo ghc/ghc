@@ -4,13 +4,6 @@
 %
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module IfaceSyn (
 	module IfaceType,		-- Re-export all this
 
@@ -420,7 +413,8 @@ ifaceDeclSubBndrs (IfaceSyn {ifName = tc_occ,
 ifaceDeclSubBndrs _ = []
 
 -- coercion for data/newtype family instances
-famInstCo Nothing  baseOcc = []
+famInstCo :: Maybe (IfaceTyCon, [IfaceType]) -> OccName -> [OccName]
+famInstCo Nothing  _       = []
 famInstCo (Just _) baseOcc = [mkInstTyCoOcc baseOcc]
 
 ----------------------------- Printing IfaceDecl ------------------------------
@@ -428,6 +422,7 @@ famInstCo (Just _) baseOcc = [mkInstTyCoOcc baseOcc]
 instance Outputable IfaceDecl where
   ppr = pprIfaceDecl
 
+pprIfaceDecl :: IfaceDecl -> SDoc
 pprIfaceDecl (IfaceId {ifName = var, ifType = ty, ifIdInfo = info})
   = sep [ ppr var <+> dcolon <+> ppr ty, 
 	  nest 2 (ppr info) ]
@@ -467,10 +462,14 @@ pprIfaceDecl (IfaceClass {ifCtxt = context, ifName = clas, ifTyVars = tyvars,
 	        sep (map ppr ats),
 		sep (map ppr sigs)])
 
+pprRec :: RecFlag -> SDoc
 pprRec isrec = ptext (sLit "RecFlag") <+> ppr isrec
+
+pprGen :: Bool -> SDoc
 pprGen True  = ptext (sLit "Generics: yes")
 pprGen False = ptext (sLit "Generics: no")
 
+pprFamily :: Maybe (IfaceTyCon, [IfaceType]) -> SDoc
 pprFamily Nothing        = ptext (sLit "FamilyInstance: none")
 pprFamily (Just famInst) = ptext (sLit "FamilyInstance:") <+> ppr famInst
 
@@ -482,9 +481,10 @@ pprIfaceDeclHead context thing tyvars
   = hsep [pprIfaceContext context, parenSymOcc thing (ppr thing), 
 	  pprIfaceTvBndrs tyvars]
 
-pp_condecls tc IfAbstractTyCon  = ptext (sLit "{- abstract -}")
+pp_condecls :: OccName -> IfaceConDecls -> SDoc
+pp_condecls _  IfAbstractTyCon  = ptext (sLit "{- abstract -}")
 pp_condecls tc (IfNewTyCon c)   = equals <+> pprIfaceConDecl tc c
-pp_condecls tc IfOpenDataTyCon  = empty
+pp_condecls _  IfOpenDataTyCon  = empty
 pp_condecls tc (IfDataTyCon cs) = equals <+> sep (punctuate (ptext (sLit " |"))
 							     (map (pprIfaceConDecl tc) cs))
 
@@ -554,15 +554,15 @@ pprIfaceExpr :: (SDoc -> SDoc) -> IfaceExpr -> SDoc
 	-- The function adds parens in context that need
 	-- an atomic value (e.g. function args)
 
-pprIfaceExpr add_par (IfaceLcl v)       = ppr v
-pprIfaceExpr add_par (IfaceExt v)       = ppr v
-pprIfaceExpr add_par (IfaceLit l)       = ppr l
-pprIfaceExpr add_par (IfaceFCall cc ty) = braces (ppr cc <+> ppr ty)
-pprIfaceExpr add_par (IfaceTick m ix)   = braces (text "tick" <+> ppr m <+> ppr ix)
-pprIfaceExpr add_par (IfaceType ty)     = char '@' <+> pprParendIfaceType ty
+pprIfaceExpr _       (IfaceLcl v)       = ppr v
+pprIfaceExpr _       (IfaceExt v)       = ppr v
+pprIfaceExpr _       (IfaceLit l)       = ppr l
+pprIfaceExpr _       (IfaceFCall cc ty) = braces (ppr cc <+> ppr ty)
+pprIfaceExpr _       (IfaceTick m ix)   = braces (text "tick" <+> ppr m <+> ppr ix)
+pprIfaceExpr _       (IfaceType ty)     = char '@' <+> pprParendIfaceType ty
 
 pprIfaceExpr add_par app@(IfaceApp _ _) = add_par (pprIfaceApp app [])
-pprIfaceExpr add_par (IfaceTuple c as)  = tupleParens c (interpp'SP as)
+pprIfaceExpr _       (IfaceTuple c as)  = tupleParens c (interpp'SP as)
 
 pprIfaceExpr add_par e@(IfaceLam _ _)   
   = add_par (sep [char '\\' <+> sep (map ppr bndrs) <+> arrow,
@@ -584,7 +584,7 @@ pprIfaceExpr add_par (IfaceCase scrut bndr ty alts)
 			<+> ppr bndr <+> char '{',
   		  nest 2 (sep (map ppr_alt alts)) <+> char '}'])
 
-pprIfaceExpr add_par (IfaceCast expr co)
+pprIfaceExpr _       (IfaceCast expr co)
   = sep [pprIfaceExpr parens expr,
 	 nest 2 (ptext (sLit "`cast`")),
 	 pprParendIfaceType co]
@@ -603,17 +603,21 @@ pprIfaceExpr add_par (IfaceLet (IfaceRec pairs) body)
 
 pprIfaceExpr add_par (IfaceNote note body) = add_par (ppr note <+> pprIfaceExpr parens body)
 
+ppr_alt :: (IfaceConAlt, [FastString], IfaceExpr) -> SDoc
 ppr_alt (con, bs, rhs) = sep [ppr_con_bs con bs, 
 			      arrow <+> pprIfaceExpr noParens rhs]
 
+ppr_con_bs :: IfaceConAlt -> [FastString] -> SDoc
 ppr_con_bs (IfaceTupleAlt tup_con) bs = tupleParens tup_con (interpp'SP bs)
 ppr_con_bs con bs		      = ppr con <+> hsep (map ppr bs)
   
+ppr_bind :: (IfaceLetBndr, IfaceExpr) -> SDoc
 ppr_bind (IfLetBndr b ty info, rhs) 
   = sep [hang (ppr b <+> dcolon <+> ppr ty) 2 (ppr info),
 	 equals <+> pprIfaceExpr noParens rhs]
 
 ------------------
+pprIfaceApp :: IfaceExpr -> [SDoc] -> SDoc
 pprIfaceApp (IfaceApp fun arg) args = pprIfaceApp fun (nest 2 (pprIfaceExpr parens arg) : args)
 pprIfaceApp fun	 	       args = sep (pprIfaceExpr parens fun : args)
 
@@ -625,11 +629,11 @@ instance Outputable IfaceNote where
 
 
 instance Outputable IfaceConAlt where
-    ppr IfaceDefault	  = text "DEFAULT"
+    ppr IfaceDefault      = text "DEFAULT"
     ppr (IfaceLitAlt l)   = ppr l
     ppr (IfaceDataAlt d)  = ppr d
-    ppr (IfaceTupleAlt b) = panic "ppr IfaceConAlt" 
-	-- IfaceTupleAlt is handled by the case-alternative printer
+    ppr (IfaceTupleAlt _) = panic "ppr IfaceConAlt" 
+    -- IfaceTupleAlt is handled by the case-alternative printer
 
 ------------------
 instance Outputable IfaceIdInfo where
@@ -687,10 +691,10 @@ zapEq (EqBut _) = Equal
 zapEq other	= other
 
 (&&&) :: IfaceEq -> IfaceEq -> IfaceEq
-Equal       &&& x 	    = x
-NotEqual    &&& x	    = NotEqual
+Equal       &&& x           = x
+NotEqual    &&& _           = NotEqual
 EqBut nms   &&& Equal       = EqBut nms
-EqBut nms   &&& NotEqual    = NotEqual
+EqBut _     &&& NotEqual    = NotEqual
 EqBut nms1  &&& EqBut nms2  = EqBut (nms1 `unionNameSets` nms2)
 
 -- This function is the core of the EqBut stuff
@@ -793,12 +797,15 @@ _		        `eqIfTc_fam` _               = NotEqual
 
 
 -----------------------
+eqIfInst :: IfaceInst -> IfaceInst -> IfaceEq
 eqIfInst d1 d2 = bool (ifDFun d1 == ifDFun d2 && ifOFlag d1 == ifOFlag d2)
 -- All other changes are handled via the version info on the dfun
 
+eqIfFamInst :: IfaceFamInst -> IfaceFamInst -> IfaceEq
 eqIfFamInst d1 d2 = bool (ifFamInstTyCon d1 == ifFamInstTyCon d2)
 -- All other changes are handled via the version info on the tycon
 
+eqIfRule :: IfaceRule -> IfaceRule -> IfaceEq
 eqIfRule (IfaceRule n1 a1 bs1 f1 es1 rhs1 o1)
 	 (IfaceRule n2 a2 bs2 f2 es2 rhs2 o2)
        = bool (n1==n2 && a1==a2 && o1 == o2) &&&
@@ -808,14 +815,16 @@ eqIfRule (IfaceRule n1 a1 bs1 f1 es1 rhs1 o1)
 		-- zapEq: for the LHSs, ignore the EqBut part
          eq_ifaceExpr env rhs1 rhs2)
 
+eq_hsCD :: EqEnv -> IfaceConDecls -> IfaceConDecls -> IfaceEq
 eq_hsCD env (IfDataTyCon c1) (IfDataTyCon c2) 
   = eqListBy (eq_ConDecl env) c1 c2
 
 eq_hsCD env (IfNewTyCon c1)  (IfNewTyCon c2)  = eq_ConDecl env c1 c2
-eq_hsCD env IfAbstractTyCon  IfAbstractTyCon  = Equal
-eq_hsCD env IfOpenDataTyCon  IfOpenDataTyCon  = Equal
-eq_hsCD env d1		     d2		      = NotEqual
+eq_hsCD _   IfAbstractTyCon  IfAbstractTyCon  = Equal
+eq_hsCD _   IfOpenDataTyCon  IfOpenDataTyCon  = Equal
+eq_hsCD _   _                _                = NotEqual
 
+eq_ConDecl :: EqEnv -> IfaceConDecl -> IfaceConDecl -> IfaceEq
 eq_ConDecl env c1 c2
   = bool (ifConOcc c1     == ifConOcc c2 && 
 	  ifConInfix c1   == ifConInfix c2 && 
@@ -826,9 +835,14 @@ eq_ConDecl env c1 c2
 	eq_ifContext env (ifConCtxt c1) (ifConCtxt c2) &&&
 	eq_ifTypes env (ifConArgTys c1) (ifConArgTys c2)))
 
+eq_hsFD :: EqEnv
+        -> ([FastString], [FastString])
+        -> ([FastString], [FastString])
+        -> IfaceEq
 eq_hsFD env (ns1,ms1) (ns2,ms2)
   = eqListBy (eqIfOcc env) ns1 ns2 &&& eqListBy (eqIfOcc env) ms1 ms2
 
+eq_cls_sig :: EqEnv -> IfaceClassOp -> IfaceClassOp -> IfaceEq
 eq_cls_sig env (IfaceClassOp n1 dm1 ty1) (IfaceClassOp n2 dm2 ty2)
   = bool (n1==n2 && dm1 == dm2) &&& eq_ifType env ty1 ty2
 \end{code}
@@ -836,10 +850,12 @@ eq_cls_sig env (IfaceClassOp n1 dm1 ty1) (IfaceClassOp n2 dm2 ty2)
 
 \begin{code}
 -----------------
-eqIfIdInfo NoInfo	 NoInfo	       = Equal
+eqIfIdInfo :: IfaceIdInfo -> IfaceIdInfo -> GenIfaceEq Name
+eqIfIdInfo NoInfo        NoInfo        = Equal
 eqIfIdInfo (HasInfo is1) (HasInfo is2) = eqListBy eq_item is1 is2
-eqIfIdInfo i1 		 i2 = NotEqual
+eqIfIdInfo _             _             = NotEqual
 
+eq_item :: IfaceInfoItem -> IfaceInfoItem -> IfaceEq
 eq_item (HsInline a1)	   (HsInline a2)      = bool (a1 == a2)
 eq_item (HsArity a1)	   (HsArity a2)	      = bool (a1 == a2)
 eq_item (HsStrictness s1)  (HsStrictness s2)  = bool (s1 == s2)
@@ -851,10 +867,10 @@ eq_item _ _ = NotEqual
 -----------------
 eq_ifaceExpr :: EqEnv -> IfaceExpr -> IfaceExpr -> IfaceEq
 eq_ifaceExpr env (IfaceLcl v1)	      (IfaceLcl v2)	   = eqIfOcc env v1 v2
-eq_ifaceExpr env (IfaceExt v1)	      (IfaceExt v2)	   = eqIfExt v1 v2
-eq_ifaceExpr env (IfaceLit l1)        (IfaceLit l2) 	   = bool (l1 == l2)
+eq_ifaceExpr _   (IfaceExt v1)	      (IfaceExt v2)	   = eqIfExt v1 v2
+eq_ifaceExpr _   (IfaceLit l1)        (IfaceLit l2) 	   = bool (l1 == l2)
 eq_ifaceExpr env (IfaceFCall c1 ty1)  (IfaceFCall c2 ty2)  = bool (c1==c2) &&& eq_ifType env ty1 ty2
-eq_ifaceExpr env (IfaceTick m1 ix1)   (IfaceTick m2 ix2)   = bool (m1==m2) &&& bool (ix1 == ix2)
+eq_ifaceExpr _   (IfaceTick m1 ix1)   (IfaceTick m2 ix2)   = bool (m1==m2) &&& bool (ix1 == ix2)
 eq_ifaceExpr env (IfaceType ty1)      (IfaceType ty2)	   = eq_ifType env ty1 ty2
 eq_ifaceExpr env (IfaceTuple n1 as1)  (IfaceTuple n2 as2)  = bool (n1==n2) &&& eqListBy (eq_ifaceExpr env) as1 as2
 eq_ifaceExpr env (IfaceLam b1 body1)  (IfaceLam b2 body2)  = eq_ifBndr env b1 b2 (\env -> eq_ifaceExpr env body1 body2)
@@ -881,7 +897,7 @@ eq_ifaceExpr env (IfaceLet (IfaceRec as1) x1) (IfaceLet (IfaceRec as2) x2)
     (bs2,rs2) = unzip as2
 
 
-eq_ifaceExpr env _ _ = NotEqual
+eq_ifaceExpr _ _ _ = NotEqual
 
 -----------------
 eq_ifaceConAlt :: IfaceConAlt -> IfaceConAlt -> Bool
@@ -893,37 +909,43 @@ eq_ifaceConAlt _ _ = False
 
 -----------------
 eq_ifaceNote :: EqEnv -> IfaceNote -> IfaceNote -> IfaceEq
-eq_ifaceNote env (IfaceSCC c1)    (IfaceSCC c2)        = bool (c1==c2)
-eq_ifaceNote env IfaceInlineMe    IfaceInlineMe        = Equal
-eq_ifaceNote env (IfaceCoreNote s1) (IfaceCoreNote s2) = bool (s1==s2)
-eq_ifaceNote env _ _ = NotEqual
+eq_ifaceNote _   (IfaceSCC c1)    (IfaceSCC c2)        = bool (c1==c2)
+eq_ifaceNote _   IfaceInlineMe    IfaceInlineMe        = Equal
+eq_ifaceNote _   (IfaceCoreNote s1) (IfaceCoreNote s2) = bool (s1==s2)
+eq_ifaceNote _   _ _ = NotEqual
 \end{code}
 
 \begin{code}
 ---------------------
+eqIfType :: IfaceType -> IfaceType -> IfaceEq
 eqIfType t1 t2 = eq_ifType emptyEqEnv t1 t2
 
 -------------------
+eq_ifType :: EqEnv -> IfaceType -> IfaceType -> IfaceEq
 eq_ifType env (IfaceTyVar n1)         (IfaceTyVar n2)         = eqIfOcc env n1 n2
 eq_ifType env (IfaceAppTy s1 t1)      (IfaceAppTy s2 t2)      = eq_ifType env s1 s2 &&& eq_ifType env t1 t2
 eq_ifType env (IfacePredTy st1)       (IfacePredTy st2)       = eq_ifPredType env st1 st2
 eq_ifType env (IfaceTyConApp tc1 ts1) (IfaceTyConApp tc2 ts2) = tc1 `eqIfTc` tc2 &&& eq_ifTypes env ts1 ts2
 eq_ifType env (IfaceForAllTy tv1 t1)  (IfaceForAllTy tv2 t2)  = eq_ifTvBndr env tv1 tv2 (\env -> eq_ifType env t1 t2)
 eq_ifType env (IfaceFunTy s1 t1)      (IfaceFunTy s2 t2)      = eq_ifType env s1 s2 &&& eq_ifType env t1 t2
-eq_ifType env _ _ = NotEqual
+eq_ifType _ _ _ = NotEqual
 
 -------------------
+eq_ifTypes :: EqEnv -> [IfaceType] -> [IfaceType] -> IfaceEq
 eq_ifTypes env = eqListBy (eq_ifType env)
 
 -------------------
+eq_ifContext :: EqEnv -> [IfacePredType] -> [IfacePredType] -> IfaceEq
 eq_ifContext env a b = eqListBy (eq_ifPredType env) a b
 
 -------------------
+eq_ifPredType :: EqEnv -> IfacePredType -> IfacePredType -> IfaceEq
 eq_ifPredType env (IfaceClassP c1 tys1) (IfaceClassP c2 tys2) = c1 `eqIfExt` c2 &&&  eq_ifTypes env tys1 tys2
 eq_ifPredType env (IfaceIParam n1 ty1) (IfaceIParam n2 ty2)   = bool (n1 == n2) &&& eq_ifType env ty1 ty2
-eq_ifPredType env _ _ = NotEqual
+eq_ifPredType _   _ _ = NotEqual
 
 -------------------
+eqIfTc :: IfaceTyCon -> IfaceTyCon -> IfaceEq
 eqIfTc (IfaceTc tc1) (IfaceTc tc2) = tc1 `eqIfExt` tc2
 eqIfTc IfaceIntTc    IfaceIntTc	   = Equal
 eqIfTc IfaceCharTc   IfaceCharTc   = Equal
@@ -976,6 +998,8 @@ eq_ifBndr _ _ _ _ = NotEqual
 eq_ifTvBndr env (v1, k1) (v2, k2) k = eq_ifType env k1 k2 &&& k (extendEqEnv env v1 v2)
 eq_ifIdBndr env (v1, t1) (v2, t2) k = eq_ifType env t1 t2 &&& k (extendEqEnv env v1 v2)
 
+eq_ifLetBndr :: EqEnv -> IfaceLetBndr -> IfaceLetBndr -> (EqEnv -> IfaceEq)
+             -> IfaceEq
 eq_ifLetBndr env (IfLetBndr v1 t1 i1) (IfLetBndr v2 t2 i2) k 
   = eq_ifType env t1 t2 &&& eqIfIdInfo i1 i2 &&& k (extendEqEnv env v1 v2)
 
@@ -988,19 +1012,21 @@ eq_ifTvBndrs 	= eq_bndrs_with eq_ifTvBndr
 eq_ifNakedBndrs = eq_bndrs_with eq_ifNakedBndr
 eq_ifLetBndrs   = eq_bndrs_with eq_ifLetBndr
 
-eq_bndrs_with eq env []       []       k = k env
+-- eq_bndrs_with :: (a -> a -> IfaceEq) -> ExtEnv a
+eq_bndrs_with :: ExtEnv a -> ExtEnv [a]
+eq_bndrs_with _  env []       []       k = k env
 eq_bndrs_with eq env (b1:bs1) (b2:bs2) k = eq env b1 b2 (\env -> eq_bndrs_with eq env bs1 bs2 k)
-eq_bndrs_with eq env _	      _	       _ = NotEqual
+eq_bndrs_with _  _   _	      _	       _ = NotEqual
 \end{code}
 
 \begin{code}
 eqListBy :: (a->a->IfaceEq) -> [a] -> [a] -> IfaceEq
-eqListBy eq []     []     = Equal
+eqListBy _  []     []     = Equal
 eqListBy eq (x:xs) (y:ys) = eq x y &&& eqListBy eq xs ys
-eqListBy eq xs     ys     = NotEqual
+eqListBy _  _      _      = NotEqual
 
 eqMaybeBy :: (a->a->IfaceEq) -> Maybe a -> Maybe a -> IfaceEq
-eqMaybeBy eq Nothing Nothing   = Equal
+eqMaybeBy _  Nothing  Nothing  = Equal
 eqMaybeBy eq (Just x) (Just y) = eq x y
-eqMaybeBy eq x        y        = NotEqual
+eqMaybeBy _  _        _        = NotEqual
 \end{code}
