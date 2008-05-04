@@ -4,13 +4,6 @@
 \section[SimplUtils]{The simplifier utilities}
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module SimplUtils (
 	-- Rebuilding
 	mkLam, mkCase, prepareAlts, bindCaseBndr,
@@ -41,9 +34,7 @@ import qualified CoreSubst
 import PprCore
 import CoreFVs
 import CoreUtils
-import Literal	
 import CoreUnfold
-import MkId
 import Name
 import Id
 import Var	( isCoVar )
@@ -52,7 +43,6 @@ import SimplMonad
 import Type	hiding( substTy )
 import Coercion ( coercionKind )
 import TyCon
-import DataCon
 import Unify	( dataConCannotMatch )
 import VarSet
 import BasicTypes
@@ -141,11 +131,11 @@ data ArgInfo
 
 instance Outputable SimplCont where
   ppr (Stop interesting)    	     = ptext (sLit "Stop") <> brackets (ppr interesting)
-  ppr (ApplyTo dup arg se cont)      = ((ptext (sLit "ApplyTo") <+> ppr dup <+> pprParendExpr arg)
+  ppr (ApplyTo dup arg _ cont)       = ((ptext (sLit "ApplyTo") <+> ppr dup <+> pprParendExpr arg)
 					  {-  $$ nest 2 (pprSimplEnv se) -}) $$ ppr cont
   ppr (StrictBind b _ _ _ cont)      = (ptext (sLit "StrictBind") <+> ppr b) $$ ppr cont
   ppr (StrictArg f _ _ cont)         = (ptext (sLit "StrictArg") <+> ppr f) $$ ppr cont
-  ppr (Select dup bndr alts se cont) = (ptext (sLit "Select") <+> ppr dup <+> ppr bndr) $$ 
+  ppr (Select dup bndr alts _ cont)  = (ptext (sLit "Select") <+> ppr dup <+> ppr bndr) $$ 
 				       (nest 4 (ppr alts)) $$ ppr cont 
   ppr (CoerceIt co cont)	     = (ptext (sLit "CoerceIt") <+> ppr co) $$ ppr cont
 
@@ -165,25 +155,26 @@ mkLazyArgStop :: CallCtxt -> SimplCont
 mkLazyArgStop cci = Stop cci
 
 -------------------
-contIsRhsOrArg (Stop {})       	 = True
-contIsRhsOrArg (StrictBind {}) 	 = True
-contIsRhsOrArg (StrictArg {})  	 = True
-contIsRhsOrArg other	         = False
+contIsRhsOrArg :: SimplCont -> Bool
+contIsRhsOrArg (Stop {})       = True
+contIsRhsOrArg (StrictBind {}) = True
+contIsRhsOrArg (StrictArg {})  = True
+contIsRhsOrArg _               = False
 
 -------------------
 contIsDupable :: SimplCont -> Bool
-contIsDupable (Stop {})     		 = True
+contIsDupable (Stop {})                  = True
 contIsDupable (ApplyTo  OkToDup _ _ _)   = True
 contIsDupable (Select   OkToDup _ _ _ _) = True
 contIsDupable (CoerceIt _ cont)          = contIsDupable cont
-contIsDupable other	  	         = False
+contIsDupable _                          = False
 
 -------------------
 contIsTrivial :: SimplCont -> Bool
-contIsTrivial (Stop {})			  = True
+contIsTrivial (Stop {})                   = True
 contIsTrivial (ApplyTo _ (Type _) _ cont) = contIsTrivial cont
-contIsTrivial (CoerceIt _ cont) 	  = contIsTrivial cont
-contIsTrivial other			  = False
+contIsTrivial (CoerceIt _ cont)           = contIsTrivial cont
+contIsTrivial _                           = False
 
 -------------------
 contResultType :: SimplEnv -> OutType -> SimplCont -> OutType
@@ -192,25 +183,25 @@ contResultType env ty cont
   where
     subst_ty se ty = substTy (se `setInScope` env) ty
 
-    go (Stop {}) 		      ty = ty
-    go (CoerceIt co cont)	      ty = go cont (snd (coercionKind co))
-    go (StrictBind _ bs body se cont) ty = go cont (subst_ty se (exprType (mkLams bs body)))
-    go (StrictArg fn _ _ cont)        ty = go cont (funResultTy (exprType fn))
-    go (Select _ _ alts se cont)      ty = go cont (subst_ty se (coreAltsType alts))
+    go (Stop {})                      ty = ty
+    go (CoerceIt co cont)             _  = go cont (snd (coercionKind co))
+    go (StrictBind _ bs body se cont) _  = go cont (subst_ty se (exprType (mkLams bs body)))
+    go (StrictArg fn _ _ cont)        _  = go cont (funResultTy (exprType fn))
+    go (Select _ _ alts se cont)      _  = go cont (subst_ty se (coreAltsType alts))
     go (ApplyTo _ arg se cont)        ty = go cont (apply_to_arg ty arg se)
 
     apply_to_arg ty (Type ty_arg) se = applyTy ty (subst_ty se ty_arg)
-    apply_to_arg ty other	  se = funResultTy ty
+    apply_to_arg ty _             _  = funResultTy ty
 
 -------------------
 countValArgs :: SimplCont -> Int
-countValArgs (ApplyTo _ (Type ty) se cont) = countValArgs cont
-countValArgs (ApplyTo _ val_arg   se cont) = 1 + countValArgs cont
-countValArgs other			   = 0
+countValArgs (ApplyTo _ (Type _) _ cont) = countValArgs cont
+countValArgs (ApplyTo _ _        _ cont) = 1 + countValArgs cont
+countValArgs _                           = 0
 
 countArgs :: SimplCont -> Int
-countArgs (ApplyTo _ arg se cont) = 1 + countArgs cont
-countArgs other			  = 0
+countArgs (ApplyTo _ _ _ cont) = 1 + countArgs cont
+countArgs _                    = 0
 
 contArgs :: SimplCont -> ([OutExpr], SimplCont)
 -- Uses substitution to turn each arg into an OutExpr
@@ -240,7 +231,7 @@ splitInlineCont (ApplyTo dup (Type ty) se c)
 splitInlineCont cont@(Stop {})         = Just (mkBoringStop, cont)
 splitInlineCont cont@(StrictBind {})   = Just (mkBoringStop, cont)
 splitInlineCont cont@(StrictArg  {})   = Just (mkBoringStop, cont)
-splitInlineCont other				= Nothing
+splitInlineCont _                      = Nothing
 \end{code}
 
 
@@ -268,7 +259,7 @@ interestingArg (Note _ a)	 = interestingArg a
 --                        Lit lit -> True
 --                        _       -> False
 
-interestingArg other	         = True
+interestingArg _                 = True
 	-- Consider 	let x = 3 in f x
 	-- The substitution will contain (x -> ContEx 3), and we want to
 	-- to say that x is an interesting argument.
@@ -370,7 +361,7 @@ mkArgInfo fun n_val_args call_cont
     arg_discounts = case idUnfolding fun of
 			CoreUnfolding _ _ _ _ (UnfoldIfGoodArgs _ discounts _ _)
 			      -> discounts ++ vanilla_discounts
-			other -> vanilla_discounts
+			_     -> vanilla_discounts
 
     vanilla_stricts, arg_stricts :: [Bool]
     vanilla_stricts  = repeat False
@@ -402,14 +393,14 @@ mkArgInfo fun n_val_args call_cont
     -- add_type_str is done repeatedly (for each call); might be better 
     -- once-for-all in the function
     -- But beware primops/datacons with no strictness
-    add_type_str fun_ty [] = []
+    add_type_str _ [] = []
     add_type_str fun_ty strs		-- Look through foralls
-	| Just (tv, fun_ty') <- splitForAllTy_maybe fun_ty	-- Includes coercions
+	| Just (_, fun_ty') <- splitForAllTy_maybe fun_ty	-- Includes coercions
 	= add_type_str fun_ty' strs
     add_type_str fun_ty (str:strs)	-- Add strict-type info
 	| Just (arg_ty, fun_ty') <- splitFunTy_maybe fun_ty
 	= (str || isStrictType arg_ty) : add_type_str fun_ty' strs
-    add_type_str fun_ty strs
+    add_type_str _ strs
 	= strs
 
 {- Note [Unsaturated functions]
@@ -451,7 +442,7 @@ interestingArgContext fn call_cont
     go (Stop cci)            = interesting cci
 
     interesting (ArgCtxt rules _) = rules
-    interesting other		  = False
+    interesting _                 = False
 \end{code}
 
 
@@ -616,7 +607,7 @@ preInlineUnconditionally env top_lvl bndr rhs
   | otherwise = case idOccInfo bndr of
 		  IAmDead	     	     -> True	-- Happens in ((\x.1) v)
 	  	  OneOcc in_lam True int_cxt -> try_once in_lam int_cxt
-		  other 		     -> False
+		  _                          -> False
   where
     phase = getMode env
     active = case phase of
@@ -649,14 +640,14 @@ preInlineUnconditionally env top_lvl bndr rhs
 	-- canInlineInLam => free vars of rhs are (Once in_lam) or Many,
 	-- so substituting rhs inside a lambda doesn't change the occ info.
 	-- Sadly, not quite the same as exprIsHNF.
-    canInlineInLam (Lit l)		= True
+    canInlineInLam (Lit _)		= True
     canInlineInLam (Lam b e)		= isRuntimeVar b || canInlineInLam e
     canInlineInLam (Note _ e)		= canInlineInLam e
     canInlineInLam _			= False
 
     early_phase = case phase of
 			SimplPhase 0 _ -> False
-			other	       -> True
+			_    	       -> True
 -- If we don't have this early_phase test, consider
 --	x = length [1,2,3]
 -- The full laziness pass carefully floats all the cons cells to
@@ -729,7 +720,7 @@ postInlineUnconditionally env top_lvl bndr occ_info rhs unfolding
 	--	   True  -> case x of ...
 	--	   False -> case x of ...
 	-- I'm not sure how important this is in practice
-      OneOcc in_lam one_br int_cxt	-- OneOcc => no code-duplication issue
+      OneOcc in_lam _one_br int_cxt	-- OneOcc => no code-duplication issue
 	->     smallEnoughToInline unfolding	-- Small enough to dup
 			-- ToDo: consider discount on smallEnoughToInline if int_cxt is true
 			--
@@ -760,7 +751,7 @@ postInlineUnconditionally env top_lvl bndr occ_info rhs unfolding
 			-- Here x isn't mentioned in the RHS, so we don't want to
 			-- create the (dead) let-binding  let x = (a,b) in ...
 
-      other -> False
+      _ -> False
 
 -- Here's an example that we don't handle well:
 --	let f = if b then Left (\x.BIG) else Right (\y.BIG)
@@ -984,6 +975,7 @@ tryEtaReduce bndrs body
 	| isLocalId fun       = isEvaldUnfolding (idUnfolding fun)
 	| isDataConWorkId fun = True
 	| isGlobalId fun      = idArity fun > 0
+        | otherwise           = panic "tryEtaReduce/ok_fun_id"
 
     ok_lam v = isTyVar v || isDictId v
 
@@ -1327,12 +1319,12 @@ prepareAlts env scrut case_bndr' alts
 
     imposs_cons = case scrut of
 		    Var v -> otherCons (idUnfolding v)
-		    other -> []
+		    _     -> []
 
     impossible_alt :: CoreAlt -> Bool
     impossible_alt (con, _, _) | con `elem` imposs_cons = True
     impossible_alt (DataAlt con, _, _) = dataConCannotMatch inst_tys con
-    impossible_alt alt		       = False
+    impossible_alt _                   = False
 
 
 --------------------------------------------------
@@ -1340,7 +1332,7 @@ prepareAlts env scrut case_bndr' alts
 --------------------------------------------------
 combineIdenticalAlts :: OutId -> [InAlt] -> SimplM [InAlt]
 
-combineIdenticalAlts case_bndr alts@((con1,bndrs1,rhs1) : con_alts)
+combineIdenticalAlts case_bndr ((_con1,bndrs1,rhs1) : con_alts)
   | all isDeadBinder bndrs1,			-- Remember the default 
     length filtered_alts < length con_alts	-- alternative comes first
 	-- Also Note [Dead binders]
@@ -1348,9 +1340,9 @@ combineIdenticalAlts case_bndr alts@((con1,bndrs1,rhs1) : con_alts)
 	; return ((DEFAULT, [], rhs1) : filtered_alts) }
   where
     filtered_alts	 = filter keep con_alts
-    keep (con,bndrs,rhs) = not (all isDeadBinder bndrs && rhs `cheapEqExpr` rhs1)
+    keep (_con,bndrs,rhs) = not (all isDeadBinder bndrs && rhs `cheapEqExpr` rhs1)
 
-combineIdenticalAlts case_bndr alts = return alts
+combineIdenticalAlts _ alts = return alts
 
 -------------------------------------------------------------------------
 --			Prepare the default alternative
@@ -1368,7 +1360,7 @@ prepareDefault :: DynFlags
 					-- And becuase case-merging can cause many to show up
 
 -------	Merge nested cases ----------
-prepareDefault dflags env outer_bndr bndr_ty imposs_cons (Just deflt_rhs)
+prepareDefault dflags env outer_bndr _bndr_ty imposs_cons (Just deflt_rhs)
   | dopt Opt_CaseMerge dflags
   , Case (Var inner_scrut_var) inner_bndr _ inner_alts <- deflt_rhs
   , DoneId inner_scrut_var' <- substId env inner_scrut_var
@@ -1400,7 +1392,7 @@ prepareDefault dflags env outer_bndr bndr_ty imposs_cons (Just deflt_rhs)
 
 
 --------- Fill in known constructor -----------
-prepareDefault dflags env case_bndr (Just (tycon, inst_tys)) imposs_cons (Just deflt_rhs)
+prepareDefault _ _ case_bndr (Just (tycon, inst_tys)) imposs_cons (Just deflt_rhs)
   | 	-- This branch handles the case where we are 
 	-- scrutinisng an algebraic data type
     isAlgTyCon tycon		-- It's a data type, tuple, or unboxed tuples.  
@@ -1431,13 +1423,13 @@ prepareDefault dflags env case_bndr (Just (tycon, inst_tys)) imposs_cons (Just d
                               dataConRepInstPat us con inst_tys
                     ; return [(DataAlt con, ex_tvs ++ co_tvs ++ arg_ids, deflt_rhs)] }
 
-	two_or_more -> return [(DEFAULT, [], deflt_rhs)]
+	_ -> return [(DEFAULT, [], deflt_rhs)]
 
 --------- Catch-all cases -----------
-prepareDefault dflags env case_bndr bndr_ty imposs_cons (Just deflt_rhs)
+prepareDefault _dflags _env _case_bndr _bndr_ty _imposs_cons (Just deflt_rhs)
   = return [(DEFAULT, [], deflt_rhs)]
 
-prepareDefault dflags env case_bndr bndr_ty imposs_cons Nothing
+prepareDefault _dflags _env _case_bndr _bndr_ty _imposs_cons Nothing
   = return []	-- No default branch
 \end{code}
 
@@ -1477,7 +1469,7 @@ mkCase scrut case_bndr alts	-- Identity case
     check_eq (LitAlt lit') _    (Lit lit) = lit == lit'
     check_eq (DataAlt con) args rhs       = rhs `cheapEqExpr` mkConApp con (arg_tys ++ varsToCoreExprs args)
 					 || rhs `cheapEqExpr` Var case_bndr
-    check_eq con args rhs = False
+    check_eq _ _ _ = False
 
     arg_tys = map Type (tyConAppArgs (idType case_bndr))
 
@@ -1495,7 +1487,7 @@ mkCase scrut case_bndr alts	-- Identity case
 
     re_cast scrut = case head alts of
 			(_,_,Cast _ co) -> Cast scrut co
-			other	        -> scrut
+			_    	        -> scrut
 
 
 
@@ -1511,7 +1503,8 @@ its dead, because it often is, and occasionally these mkCase transformations
 cascade rather nicely.
 
 \begin{code}
+bindCaseBndr :: Id -> CoreExpr -> CoreExpr -> CoreExpr
 bindCaseBndr bndr rhs body
   | isDeadBinder bndr = body
-  | otherwise	      = bindNonRec bndr rhs body
+  | otherwise         = bindNonRec bndr rhs body
 \end{code}
