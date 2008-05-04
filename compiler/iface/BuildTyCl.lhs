@@ -4,13 +4,6 @@
 %
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module BuildTyCl (
 	buildSynTyCon, buildAlgTyCon, buildDataCon,
 	buildClass,
@@ -26,7 +19,6 @@ import TcRnMonad
 import DataCon
 import Var
 import VarSet
-import TysWiredIn
 import BasicTypes
 import Name
 import OccName
@@ -218,6 +210,7 @@ buildDataCon src_name declared_infix arg_stricts field_lbls
 -- the type variables mentioned in the arg_tys
 -- ToDo: Or functionally dependent on?  
 --	 This whole stupid theta thing is, well, stupid.
+mkDataConStupidTheta :: TyCon -> [Type] -> [TyVar] -> [PredType]
 mkDataConStupidTheta tycon arg_tys univ_tvs
   | null stupid_theta = []	-- The common case
   | otherwise 	      = filter in_arg_tys stupid_theta
