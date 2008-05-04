@@ -32,7 +32,7 @@ import UniqSupply
 import DynFlags		( SimplifierSwitch(..), DynFlags, DynFlag(..), dopt )
 import StaticFlags	( opt_PprStyle_Debug, opt_HistorySize )
 import Maybes		( expectJust )
-import FiniteMap	( FiniteMap, emptyFM, isEmptyFM, lookupFM, addToFM, plusFM_C, fmToList )
+import FiniteMap	( FiniteMap, emptyFM, lookupFM, addToFM, plusFM_C, fmToList )
 import FastString
 import Outputable
 import FastTypes
@@ -205,15 +205,8 @@ isZeroSimplCount (SimplCount { ticks = 0 }) = True
 isZeroSimplCount _    			    = False
 
 doFreeTick tick sc@SimplCount { details = dts } 
-  = dts' `seqFM` sc { details = dts' }
-  where
-    dts' = dts `addTick` tick 
+  = sc { details = dts `addTick` tick }
 doFreeTick _ sc = sc 
-
--- Gross hack to persuade GHC 3.03 to do this important seq
-seqFM :: FiniteMap key elt -> t -> t
-seqFM fm x | isEmptyFM fm = x
-	   | otherwise    = x
 
 doTick tick sc@SimplCount { ticks = tks, details = dts, n_log = nl, log1 = l1 }
   | nl >= opt_HistorySize = sc1 { n_log = 1, log1 = [tick], log2 = l1 }
