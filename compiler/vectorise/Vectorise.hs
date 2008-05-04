@@ -129,8 +129,7 @@ tryConvert var vect_var rhs
 vectBndr :: Var -> VM VVar
 vectBndr v
   = do
-      vty <- vectType (idType v)
-      lty <- mkPArrayType vty
+      (vty, lty) <- vectAndLiftType (idType v)
       let vv = v `Id.setIdType` vty
           lv = v `Id.setIdType` lty
       updLEnv (mapTo vv lv)
@@ -342,26 +341,23 @@ type CoreAltWithFVs = AnnAlt Id VarSet
 -- FIXME: this is too lazy
 vectAlgCase tycon ty_args scrut bndr ty [(DEFAULT, [], body)]
   = do
-      vscrut <- vectExpr scrut
-      vty    <- vectType ty
-      lty    <- mkPArrayType vty
+      vscrut         <- vectExpr scrut
+      (vty, lty)     <- vectAndLiftType ty
       (vbndr, vbody) <- vectBndrIn bndr (vectExpr body)
       return $ vCaseDEFAULT vscrut vbndr vty lty vbody
 
 vectAlgCase tycon ty_args scrut bndr ty [(DataAlt dc, [], body)]
   = do
-      vscrut <- vectExpr scrut
-      vty    <- vectType ty
-      lty    <- mkPArrayType vty
+      vscrut         <- vectExpr scrut
+      (vty, lty)     <- vectAndLiftType ty
       (vbndr, vbody) <- vectBndrIn bndr (vectExpr body)
       return $ vCaseDEFAULT vscrut vbndr vty lty vbody
 
 vectAlgCase tycon ty_args scrut bndr ty [(DataAlt dc, bndrs, body)]
   = do
-      vect_tc <- maybeV (lookupTyCon tycon)
-      vty <- vectType ty
-      lty <- mkPArrayType vty
-      vexpr <- vectExpr scrut
+      vect_tc    <- maybeV (lookupTyCon tycon)
+      (vty, lty) <- vectAndLiftType ty
+      vexpr      <- vectExpr scrut
       (vbndr, (vbndrs, vbody)) <- vect_scrut_bndr
                                 . vectBndrsIn bndrs
                                 $ vectExpr body
@@ -379,10 +375,8 @@ vectAlgCase tycon ty_args scrut bndr ty [(DataAlt dc, bndrs, body)]
 
 vectAlgCase tycon ty_args scrut bndr ty alts
   = do
-      vect_tc <- maybeV (lookupTyCon tycon)
-      vty               <- vectType ty
-      lty               <- mkPArrayType vty
-
+      vect_tc     <- maybeV (lookupTyCon tycon)
+      (vty, lty)  <- vectAndLiftType ty
       repr        <- mkRepr vect_tc
       shape_bndrs <- arrShapeVars repr
       (len, sel, indices) <- arrSelector repr (map Var shape_bndrs)

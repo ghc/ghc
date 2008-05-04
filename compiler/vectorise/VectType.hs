@@ -5,7 +5,7 @@
 --     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
 -- for details
 
-module VectType ( vectTyCon, vectType, vectTypeEnv,
+module VectType ( vectTyCon, vectAndLiftType, vectType, vectTypeEnv,
                   mkRepr, arrShapeTys, arrShapeVars, arrSelector,
                   PAInstance, buildPADict,
                   fromVect )
@@ -29,7 +29,7 @@ import InstEnv           ( Instance, mkLocalInstance, instanceDFunId )
 import OccName
 import MkId
 import BasicTypes        ( StrictnessMark(..), OverlapFlag(..), boolToRecFlag )
-import Var               ( Var )
+import Var               ( Var, TyVar )
 import Id                ( mkWildId )
 import Name              ( Name, getOccName )
 import NameEnv
@@ -64,6 +64,20 @@ vectTyCon tc
                     -- FIXME: just for now
                     Nothing  -> pprTrace "ccTyCon:" (ppr tc) $ return tc
 
+vectAndLiftType :: Type -> VM (Type, Type)
+vectAndLiftType ty | Just ty' <- coreView ty = vectAndLiftType ty'
+vectAndLiftType ty
+  = do
+      mdicts   <- mapM paDictArgType tyvars
+      let dicts = [dict | Just dict <- mdicts]
+      vmono_ty <- vectType mono_ty
+      lmono_ty <- mkPArrayType vmono_ty
+      return (abstractType tyvars dicts vmono_ty,
+              abstractType tyvars dicts lmono_ty)
+  where
+    (tyvars, mono_ty) = splitForAllTys ty
+
+
 vectType :: Type -> VM Type
 vectType ty | Just ty' <- coreView ty = vectType ty'
 vectType (TyVarTy tv) = return $ TyVarTy tv
@@ -75,7 +89,7 @@ vectType ty@(ForAllTy _ _)
   = do
       mdicts   <- mapM paDictArgType tyvars
       mono_ty' <- vectType mono_ty
-      return $ tyvars `mkForAllTys` ([dict | Just dict <- mdicts] `mkFunTys` mono_ty')
+      return $ abstractType tyvars [dict | Just dict <- mdicts] mono_ty'
   where
     (tyvars, mono_ty) = splitForAllTys ty
 
@@ -83,6 +97,9 @@ vectType ty = pprPanic "vectType:" (ppr ty)
 
 vectAndBoxType :: Type -> VM Type
 vectAndBoxType ty = vectType ty >>= boxType
+
+abstractType :: [TyVar] -> [Type] -> Type -> Type
+abstractType tyvars dicts = mkForAllTys tyvars . mkFunTys dicts
 
 -- ----------------------------------------------------------------------------
 -- Boxing
