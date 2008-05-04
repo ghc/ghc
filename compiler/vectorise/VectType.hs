@@ -708,9 +708,9 @@ buildFromArrPRepr repr vect_tc prepr_tc arr_tc
 
     from_repr _ _ _ _ _ _ = panic "buildFromArrPRepr/from_repr"
 
-    from_prod prod@(ProdRepr { prod_components = tys
-                             , prod_arr_tycon  = tycon
-                             , prod_arr_data_con = data_con })
+    from_prod (ProdRepr { prod_components = tys
+                        , prod_arr_tycon  = tycon
+                        , prod_arr_data_con = data_con })
               expr
               shape_vars
               repr_vars
@@ -719,7 +719,6 @@ buildFromArrPRepr repr vect_tc prepr_tc arr_tc
       = do
           let scrut    = unwrapFamInstScrut tycon tys expr
               scrut_ty = mkTyConApp tycon tys
-          _ty <- arrReprType prod
 
           return $ Case scrut (mkWildId scrut_ty) res_ty
                    [(DataAlt data_con, shape_vars ++ repr_vars, body)]
