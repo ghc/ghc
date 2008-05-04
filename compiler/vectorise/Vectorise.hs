@@ -1,9 +1,3 @@
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
 
 module Vectorise( vectorise )
 where
@@ -26,29 +20,20 @@ import DataCon
 import TyCon
 import Type
 import FamInstEnv           ( extendFamInstEnvList )
-import InstEnv              ( extendInstEnvList )
 import Var
 import VarEnv
 import VarSet
-import Name                 ( Name, mkSysTvName, getName )
-import NameEnv
 import Id
-import MkId                 ( unwrapFamInstScrut )
 import OccName
-import Module               ( Module )
 
-import DsMonad hiding (mapAndUnzipM)
-import DsUtils              ( mkCoreTup, mkCoreTupTy )
+import DsMonad
 
 import Literal              ( Literal, mkMachInt )
-import PrelNames
 import TysWiredIn
-import TysPrim              ( intPrimTy )
-import BasicTypes           ( Boxity(..) )
 
 import Outputable
 import FastString
-import Control.Monad        ( liftM, liftM2, zipWithM, mapAndUnzipM )
+import Control.Monad        ( liftM, liftM2, zipWithM )
 import Data.List            ( sortBy, unzip4 )
 
 vectorise :: HscEnv -> UniqSupply -> RuleBase -> ModGuts
@@ -163,14 +148,6 @@ vectBndrNewIn v fs p
       x  <- p
       return (vv, x)
 
-vectBndrIn' :: Var -> (VVar -> VM a) -> VM (VVar, a)
-vectBndrIn' v p
-  = localV
-  $ do
-      vv <- vectBndr v
-      x  <- p vv
-      return (vv, x)
-
 vectBndrsIn :: [Var] -> VM a -> VM ([VVar], a)
 vectBndrsIn vs p
   = localV
@@ -268,7 +245,7 @@ vectExpr (_, AnnCase scrut bndr ty alts)
   where
     scrut_ty = exprType (deAnnotate scrut)
 
-vectExpr (_, AnnCase expr bndr ty alts)
+vectExpr (_, AnnCase _ _ _ _)
   = panic "vectExpr: case"
 
 vectExpr (_, AnnLet (AnnNonRec bndr rhs) body)
@@ -320,9 +297,7 @@ vectLam fvs bs body
 
 vectTyAppExpr :: CoreExprWithFVs -> [Type] -> VM VExpr
 vectTyAppExpr (_, AnnVar v) tys = vectPolyVar v tys
-vectTyAppExpr e tys = pprPanic "vectTyAppExpr" (ppr $ deAnnotate e)
-
-type CoreAltWithFVs = AnnAlt Id VarSet
+vectTyAppExpr e _ = pprPanic "vectTyAppExpr" (ppr $ deAnnotate e)
 
 -- We convert
 --
@@ -339,21 +314,24 @@ type CoreAltWithFVs = AnnAlt Id VarSet
 --
 
 -- FIXME: this is too lazy
-vectAlgCase tycon ty_args scrut bndr ty [(DEFAULT, [], body)]
+vectAlgCase :: TyCon -> [Type] -> CoreExprWithFVs -> Var -> Type
+            -> [(AltCon, [Var], CoreExprWithFVs)]
+            -> VM VExpr
+vectAlgCase _tycon _ty_args scrut bndr ty [(DEFAULT, [], body)]
   = do
       vscrut         <- vectExpr scrut
       (vty, lty)     <- vectAndLiftType ty
       (vbndr, vbody) <- vectBndrIn bndr (vectExpr body)
       return $ vCaseDEFAULT vscrut vbndr vty lty vbody
 
-vectAlgCase tycon ty_args scrut bndr ty [(DataAlt dc, [], body)]
+vectAlgCase _tycon _ty_args scrut bndr ty [(DataAlt _, [], body)]
   = do
       vscrut         <- vectExpr scrut
       (vty, lty)     <- vectAndLiftType ty
       (vbndr, vbody) <- vectBndrIn bndr (vectExpr body)
       return $ vCaseDEFAULT vscrut vbndr vty lty vbody
 
-vectAlgCase tycon ty_args scrut bndr ty [(DataAlt dc, bndrs, body)]
+vectAlgCase tycon _ty_args scrut bndr ty [(DataAlt dc, bndrs, body)]
   = do
       vect_tc    <- maybeV (lookupTyCon tycon)
       (vty, lty) <- vectAndLiftType ty
@@ -362,7 +340,7 @@ vectAlgCase tycon ty_args scrut bndr ty [(DataAlt dc, bndrs, body)]
                                 . vectBndrsIn bndrs
                                 $ vectExpr body
 
-      (vscrut, arr_tc, arg_tys) <- mkVScrut (vVar vbndr)
+      (vscrut, arr_tc, _arg_tys) <- mkVScrut (vVar vbndr)
       vect_dc <- maybeV (lookupDataCon dc)
       let [arr_dc] = tyConDataCons arr_tc
       repr <- mkRepr vect_tc
@@ -373,7 +351,7 @@ vectAlgCase tycon ty_args scrut bndr ty [(DataAlt dc, bndrs, body)]
     vect_scrut_bndr | isDeadBinder bndr = vectBndrNewIn bndr (fsLit "scrut")
                     | otherwise         = vectBndrIn bndr
 
-vectAlgCase tycon ty_args scrut bndr ty alts
+vectAlgCase tycon _ty_args scrut bndr ty alts
   = do
       vect_tc     <- maybeV (lookupTyCon tycon)
       (vty, lty)  <- vectAndLiftType ty
@@ -385,7 +363,7 @@ vectAlgCase tycon ty_args scrut bndr ty alts
       let (vect_dcs, vect_bndrss, lift_bndrss, vbodies) = unzip4 valts
 
       vexpr <- vectExpr scrut
-      (vscrut, arr_tc, arg_tys) <- mkVScrut (vVar vbndr)
+      (vscrut, arr_tc, _arg_tys) <- mkVScrut (vVar vbndr)
       let [arr_dc] = tyConDataCons arr_tc
 
       let (vect_scrut,  lift_scrut)  = vscrut
@@ -411,6 +389,7 @@ vectAlgCase tycon ty_args scrut bndr ty alts
     cmp DEFAULT       DEFAULT       = EQ
     cmp DEFAULT       _             = LT
     cmp _             DEFAULT       = GT
+    cmp _             _             = panic "vectAlgCase/cmp"
 
     proc_alt sel vty lty (DataAlt dc, bndrs, body)
       = do
@@ -423,6 +402,7 @@ vectAlgCase tycon ty_args scrut bndr ty alts
              $ vectExpr body
 
           return (vect_dc, vect_bndrs, lift_bndrs, vbody)
+    proc_alt _ _ _ _ = panic "vectAlgCase/proc_alt"
 
     vect_alt_bndrs [] p
       = do
