@@ -6,13 +6,6 @@
 Pattern-matching literal patterns
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module MatchLit ( dsLit, dsOverLit, hsLitKey, hsOverLitKey,
 		  tidyLitPat, tidyNPat, 
 		  matchLiterals, matchNPlusKPats, matchNPats ) where
@@ -87,6 +80,7 @@ dsLit (HsRat r ty) = do
         = case tcSplitTyConApp ty of
                 (tycon, [i_ty]) -> ASSERT(isIntegerTy i_ty && tycon `hasKey` ratioTyConKey)
                                    (head (tyConDataCons tycon), i_ty)
+                x -> pprPanic "dsLit" (ppr x)
 
 dsOverLit :: HsOverLit Id -> DsM CoreExpr
 -- Post-typechecker, the SyntaxExpr field of an OverLit contains 
@@ -110,14 +104,16 @@ hsLitKey (HsStringPrim  s) = MachStr    s
 hsLitKey (HsFloatPrim   f) = MachFloat  f
 hsLitKey (HsDoublePrim  d) = MachDouble d
 hsLitKey (HsString s)	   = MachStr    s
+hsLitKey l                 = pprPanic "hsLitKey" (ppr l)
 
-hsOverLitKey :: HsOverLit a -> Bool -> Literal
+hsOverLitKey :: OutputableBndr a => HsOverLit a -> Bool -> Literal
 -- Ditto for HsOverLit; the boolean indicates to negate
-hsOverLitKey (HsIntegral i _ _) False   = MachInt i
-hsOverLitKey (HsIntegral i _ _) True    = MachInt (-i)
+hsOverLitKey (HsIntegral i _ _)   False = MachInt i
+hsOverLitKey (HsIntegral i _ _)   True  = MachInt (-i)
 hsOverLitKey (HsFractional r _ _) False = MachFloat r
 hsOverLitKey (HsFractional r _ _) True  = MachFloat (-r)
-hsOverLitKey (HsIsString s _ _)  False  = MachStr s
+hsOverLitKey (HsIsString s _ _)   False = MachStr s
+hsOverLitKey l                    _     = pprPanic "hsOverLitKey" (ppr l)
 -- negated string should never happen
 \end{code}
 
@@ -160,21 +156,26 @@ tidyNPat over_lit mb_neg eq
 		(Nothing, 	       _)   -> over_lit
 		(Just _,  HsIntegral i s ty)   -> HsIntegral   (-i) s ty
 		(Just _,  HsFractional f s ty) -> HsFractional (-f) s ty
+		(Just _,  HsIsString {})       -> panic "tidyNPat/neg_lit HsIsString"
 			     
     int_val :: Integer
     int_val = case neg_lit of
 		HsIntegral   i _ _ -> i
-		HsFractional f _ _ -> panic "tidyNPat"
+		HsFractional {}    -> panic "tidyNPat/int_val HsFractional"
+		HsIsString   {}    -> panic "tidyNPat/int_val HsIsString"
 	
     rat_val :: Rational
     rat_val = case neg_lit of
 		HsIntegral   i _ _ -> fromInteger i
 		HsFractional f _ _ -> f
+		HsIsString   {}    -> panic "tidyNPat/rat_val HsIsString"
 	
+{-
     str_val :: FastString
     str_val = case neg_lit of
 		HsIsString   s _ _ -> s
 		_                  -> error "tidyNPat"
+-}
 \end{code}
 
 
@@ -218,6 +219,9 @@ matchLiterals (var:vars) ty sub_groups
 	= do { lit    <- mkStringExprFS s
 	     ; let pred = mkApps (Var eq_str) [Var var, lit]
 	     ; return (mkGuardedMatchResult pred mr) }
+    wrap_str_guard _ (l, _) = pprPanic "matchLiterals/wrap_str_guard" (ppr l)
+
+matchLiterals [] _ _ = panic "matchLiterals []"
 \end{code}
 
 
@@ -234,6 +238,7 @@ matchNPats vars ty groups
   = do {  match_results <- mapM (matchOneNPat vars ty) groups
 	; return (foldr1 combineMatchResults match_results) }
 
+matchOneNPat :: [Id] -> Type -> [EquationInfo] -> DsM MatchResult
 matchOneNPat (var:vars) ty (eqn1:eqns)	-- All for the same literal
   = do	{ let NPat lit mb_neg eq_chk = firstPat eqn1
 	; lit_expr <- dsOverLit lit
@@ -245,6 +250,7 @@ matchOneNPat (var:vars) ty (eqn1:eqns)	-- All for the same literal
 	; let pred_expr = mkApps eq_expr [Var var, neg_lit]
 	; match_result <- match vars ty (shiftEqns (eqn1:eqns))
 	; return (mkGuardedMatchResult pred_expr match_result) }
+matchOneNPat vars _ eqns = pprPanic "matchOneNPat" (ppr (vars, eqns))
 \end{code}
 
 
@@ -267,8 +273,8 @@ We generate:
 
 \begin{code}
 matchNPlusKPats :: [Id] -> Type -> [EquationInfo] -> DsM MatchResult
-	-- All NPlusKPats, for the *same* literal k
-matchNPlusKPats all_vars@(var:vars) ty (eqn1:eqns)
+-- All NPlusKPats, for the *same* literal k
+matchNPlusKPats (var:vars) ty (eqn1:eqns)
   = do	{ let NPlusKPat (L _ n1) lit ge minus = firstPat eqn1
 	; ge_expr     <- dsExpr ge
 	; minus_expr  <- dsExpr minus
@@ -285,4 +291,7 @@ matchNPlusKPats all_vars@(var:vars) ty (eqn1:eqns)
     shift n1 eqn@(EqnInfo { eqn_pats = NPlusKPat (L _ n) _ _ _ : pats })
 	= (wrapBind n n1, eqn { eqn_pats = pats })
 	-- The wrapBind is a no-op for the first equation
+    shift _ e = pprPanic "matchNPlusKPats/shift" (ppr e)
+
+matchNPlusKPats vars _ eqns = pprPanic "matchNPlusKPats" (ppr (vars, eqns))
 \end{code}
