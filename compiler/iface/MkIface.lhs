@@ -4,13 +4,6 @@
 %
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module MkIface ( 
         mkUsedNames,
         mkDependencies,
@@ -211,6 +204,7 @@ import DynFlags
 import VarEnv
 import Var
 import Name
+import RdrName
 import NameEnv
 import NameSet
 import OccName
@@ -220,7 +214,6 @@ import Unique
 import ErrUtils
 import Digraph
 import SrcLoc
-import PackageConfig    hiding ( Version )
 import Outputable
 import BasicTypes       hiding ( SuccessFlag(..) )
 import LazyUniqFM
@@ -320,8 +313,6 @@ mkDependencies
                 --  on M.hi-boot, and hence that we should do the hi-boot consistency 
                 --  check.)
 
-        dir_imp_mods = imp_mods imports
-
                 -- Modules don't compare lexicographically usually, 
                 -- but we want them to do so here.
         le_mod :: Module -> Module -> Bool         
@@ -343,6 +334,12 @@ mkDependencies
                 -- sort to get into canonical order
 
 
+mkIface_ :: HscEnv -> Maybe ModIface -> Module -> IsBootInterface
+         -> NameSet -> Dependencies -> GlobalRdrEnv
+         -> NameEnv FixItem -> Deprecations -> HpcInfo
+         -> ModuleEnv (Module, [(ModuleName, Bool, SrcSpan)])
+         -> ModDetails
+         -> IO (ModIface, Bool)
 mkIface_ hsc_env maybe_old_iface 
          this_mod is_boot used_names deps rdr_env fix_env src_deprecs hpc_info
          dir_imp_mods
@@ -509,7 +506,7 @@ addVersionInfo
             SDoc,	   -- Differences
             Maybe SDoc) -- Warnings about orphans
 
-addVersionInfo ver_fn Nothing new_iface new_decls
+addVersionInfo _ Nothing new_iface new_decls
 -- No old interface, so definitely write a new one!
   = (new_iface { mi_orphan = not (null orph_insts && null orph_rules)
                , mi_finsts = not . null $ mi_fam_insts new_iface
@@ -593,7 +590,7 @@ addVersionInfo ver_fn (Just old_iface@(ModIface {
  		     pp_change no_deprec_change "Deprecations" empty,
  		     pp_change no_other_changes  "Usages" empty,
 		     pp_decl_diffs]
-    pp_change True  what info = empty
+    pp_change True  _    _    = empty
     pp_change False what info = text what <+> ptext (sLit "changed") <+> info
 
     -------------------
@@ -639,7 +636,7 @@ addVersionInfo ver_fn (Just old_iface@(ModIface {
     eq_indirects (IfaceData {ifName = tc_occ, ifCons = cons})
 	= same_insts tc_occ &&& same_fixity tc_occ &&&	-- The TyCon can have a fixity too
 	  eq_ind_occs (map ifConOcc (visibleIfConDecls cons))
-    eq_indirects other = Equal	-- Synonyms and foreign declarations
+    eq_indirects _ = Equal	-- Synonyms and foreign declarations
 
     eq_ind_occ :: OccName -> IfaceEq	-- For class ops and Ids; check fixity and rules
     eq_ind_occ occ = same_fixity occ &&& same_rules occ
@@ -679,11 +676,12 @@ addVersionInfo ver_fn (Just old_iface@(ModIface {
 			 ptext (sLit "New:") <+> ppr new_decl]
 			| otherwise 
 			-> ppr occ <+> ptext (sLit "only in new interface")
-		    other -> pprPanic "MkIface.show_change" (ppr occ)
+		    _ -> pprPanic "MkIface.show_change" (ppr occ)
 	
     pp_orphs = pprOrphans new_orph_insts new_orph_rules
 
 
+pprOrphans :: [IfaceInst] -> [IfaceRule] -> Maybe SDoc
 pprOrphans insts rules
   | null insts && null rules = Nothing
   | otherwise
@@ -746,7 +744,7 @@ computeChangedOccs ver_fn this_module old_usages eq_info
 	    | node@(occ, iface_eq) <- local_eq_infos
 	    , let occs = case iface_eq of
 			   EqBut occ_set -> occSetElts occ_set
-			   other -> [] ]
+			   _ -> [] ]
 
     -- Changes in declarations
     add_changes :: OccSet -> SCC (OccName, OccIfaceEq) -> OccSet
@@ -758,26 +756,26 @@ computeChangedOccs ver_fn this_module old_usages eq_info
         	-- One of this group has changed
 	= extendOccSetList so_far occs
         where (occs, iface_eqs) = unzip pairs
-    add_changes so_far other = so_far
+    add_changes so_far _ = so_far
 
 type OccIfaceEq = GenIfaceEq OccName
 
 changedWrt :: OccSet -> OccIfaceEq -> Bool
-changedWrt so_far Equal        = False
-changedWrt so_far NotEqual     = True
+changedWrt _      Equal        = False
+changedWrt _      NotEqual     = True
 changedWrt so_far (EqBut kids) = so_far `intersectsOccSet` kids
 
 changedWrtNames :: OccSet -> IfaceEq -> Bool
-changedWrtNames so_far Equal        = False
-changedWrtNames so_far NotEqual     = True
+changedWrtNames _      Equal        = False
+changedWrtNames _      NotEqual     = True
 changedWrtNames so_far (EqBut kids) = 
   so_far `intersectsOccSet` mkOccSet (map nameOccName (nameSetToList kids))
 
 and_occifeq :: OccIfaceEq -> OccIfaceEq -> OccIfaceEq
 Equal       `and_occifeq` x 	    = x
-NotEqual    `and_occifeq` x	    = NotEqual
+NotEqual    `and_occifeq` _	    = NotEqual
 EqBut nms   `and_occifeq` Equal       = EqBut nms
-EqBut nms   `and_occifeq` NotEqual    = NotEqual
+EqBut _     `and_occifeq` NotEqual    = NotEqual
 EqBut nms1  `and_occifeq` EqBut nms2  = EqBut (nms1 `unionOccSets` nms2)
 
 ----------------------
@@ -996,6 +994,8 @@ checkOldIface hsc_env mod_summary source_unchanged maybe_iface
 	  check_old_iface hsc_env mod_summary source_unchanged maybe_iface
      }
 
+check_old_iface :: HscEnv -> ModSummary -> Bool -> Maybe ModIface
+                -> IfG (Bool, Maybe ModIface)
 check_old_iface hsc_env mod_summary source_unchanged maybe_iface
  =  do 	-- CHECK WHETHER THE SOURCE HAS CHANGED
     { when (not source_unchanged)
@@ -1042,6 +1042,7 @@ check their versions.
 
 \begin{code}
 type RecompileRequired = Bool
+upToDate, outOfDate :: Bool
 upToDate  = False	-- Recompile not required
 outOfDate = True	-- Recompile required
 
@@ -1149,7 +1150,7 @@ checkModUsage this_pkg (Usage { usg_name = mod_name, usg_mod = old_mod_vers,
 	-- Instead, get an Either back which we can test
 
     case mb_iface of {
-	Failed exn ->  (out_of_date (sep [ptext (sLit "Can't find version number for module"), 
+	Failed _ ->  (out_of_date (sep [ptext (sLit "Can't find version number for module"), 
 				       ppr mod_name]));
 		-- Couldn't find or parse a module mentioned in the
 		-- old interface file.  Don't complain -- it might just be that
@@ -1190,6 +1191,7 @@ checkModUsage this_pkg (Usage { usg_name = mod_name, usg_mod = old_mod_vers,
     }
 
 ------------------------
+checkModuleVersion :: Version -> Version -> IfG Bool
 checkModuleVersion old_mod_vers new_mod_vers
   | new_mod_vers == old_mod_vers
   = up_to_date (ptext (sLit "Module version unchanged"))
@@ -1199,10 +1201,14 @@ checkModuleVersion old_mod_vers new_mod_vers
 		     old_mod_vers new_mod_vers
 
 ------------------------
-checkExportList Nothing  new_vers = upToDate
+checkExportList :: Maybe Version -> Version -> Bool
+checkExportList Nothing  _        = upToDate
 checkExportList (Just v) new_vers = v /= new_vers
 
 ------------------------
+checkEntityUsage :: (OccName -> Maybe (OccName, Version))
+                 -> (OccName, Version)
+                 -> IfG Bool
 checkEntityUsage new_vers (name,old_vers)
   = case new_vers name of
 
@@ -1215,8 +1221,11 @@ checkEntityUsage new_vers (name,old_vers)
 	  | otherwise	 	 -> out_of_date_vers (ptext (sLit "  Out of date:") <+> ppr name)
 						     old_vers new_vers
 
+up_to_date, out_of_date :: SDoc -> IfG Bool
 up_to_date  msg = traceHiDiffs msg >> return upToDate
 out_of_date msg = traceHiDiffs msg >> return outOfDate
+
+out_of_date_vers :: SDoc -> Version -> Version -> IfG Bool
 out_of_date_vers msg old_vers new_vers 
   = out_of_date (hsep [msg, ppr old_vers, ptext (sLit "->"), ppr new_vers])
 
@@ -1341,12 +1350,13 @@ tyThingToIfaceDecl (ADataCon dc)
  = pprPanic "toIfaceDecl" (ppr dc)	-- Should be trimmed out earlier
 
 
+getFS :: NamedThing a => a -> FastString
 getFS x = occNameFS (getOccName x)
 
 --------------------------
 instanceToIfaceInst :: Instance -> IfaceInst
-instanceToIfaceInst ispec@(Instance { is_dfun = dfun_id, is_flag = oflag,
-				      is_cls = cls_name, is_tcs = mb_tcs })
+instanceToIfaceInst (Instance { is_dfun = dfun_id, is_flag = oflag,
+                                is_cls = cls_name, is_tcs = mb_tcs })
   = ASSERT( cls_name == className cls )
     IfaceInst { ifDFun    = dfun_name,
 		ifOFlag   = oflag,
@@ -1374,18 +1384,19 @@ instanceToIfaceInst ispec@(Instance { is_dfun = dfun_id, is_flag = oflag,
 				-- that is not in the "determined" arguments
     mb_ns | null fds   = [choose_one arg_names]
 	  | otherwise  = map do_one fds
-    do_one (ltvs,rtvs) = choose_one [ns | (tv,ns) <- tvs `zip` arg_names
-					, not (tv `elem` rtvs)]
+    do_one (_ltvs, rtvs) = choose_one [ns | (tv,ns) <- tvs `zip` arg_names
+                                          , not (tv `elem` rtvs)]
 
     choose_one :: [NameSet] -> Maybe OccName
     choose_one nss = case nameSetToList (unionManyNameSets nss) of
-			[]     -> Nothing
-			(n:ns) -> Just (nameOccName n)
+			[]      -> Nothing
+			(n : _) -> Just (nameOccName n)
 
 --------------------------
 famInstToIfaceFamInst :: FamInst -> IfaceFamInst
-famInstToIfaceFamInst fi@(FamInst { fi_tycon = tycon,
-					    fi_fam = fam, fi_tcs = mb_tcs })
+famInstToIfaceFamInst (FamInst { fi_tycon = tycon,
+                                 fi_fam = fam,
+                                 fi_tcs = mb_tcs })
   = IfaceFamInst { ifFamInstTyCon  = toIfaceTyCon tycon
 		 , ifFamInstFam    = fam
 		 , ifFamInstTys    = map do_rough mb_tcs }
@@ -1394,6 +1405,7 @@ famInstToIfaceFamInst fi@(FamInst { fi_tycon = tycon,
     do_rough (Just n) = Just (toIfaceTyCon_name n)
 
 --------------------------
+toIfaceLetBndr :: Id -> IfaceLetBndr
 toIfaceLetBndr id  = IfLetBndr (occNameFS (getOccName id))
 			       (toIfaceType (idType id)) 
 			       prag_info
@@ -1462,7 +1474,7 @@ toIfaceIdInfo id_info
 
 --------------------------
 coreRuleToIfaceRule :: Module -> CoreRule -> IfaceRule
-coreRuleToIfaceRule mod (BuiltinRule { ru_fn = fn})
+coreRuleToIfaceRule _ (BuiltinRule { ru_fn = fn})
   = pprTrace "toHsRule: builtin" (ppr fn) $
     bogusIfaceRule fn
 
@@ -1491,8 +1503,8 @@ coreRuleToIfaceRule mod (Rule { ru_name = name, ru_fn = fn,
 		-- exprsFreeNames finds only External names
 
     orph = case filter (nameIsLocalOrFrom mod) lhs_names of
-			(n:ns) -> Just (nameOccName n)
-			[]     -> Nothing
+			(n : _) -> Just (nameOccName n)
+			[]      -> Nothing
 
 bogusIfaceRule :: Name -> IfaceRule
 bogusIfaceRule id_name
@@ -1513,18 +1525,23 @@ toIfaceExpr (Cast e co)   = IfaceCast (toIfaceExpr e) (toIfaceType co)
 toIfaceExpr (Note n e)    = IfaceNote (toIfaceNote n) (toIfaceExpr e)
 
 ---------------------
+toIfaceNote :: Note -> IfaceNote
 toIfaceNote (SCC cc)      = IfaceSCC cc
 toIfaceNote InlineMe      = IfaceInlineMe
 toIfaceNote (CoreNote s)  = IfaceCoreNote s
 
 ---------------------
+toIfaceBind :: Bind Id -> IfaceBinding
 toIfaceBind (NonRec b r) = IfaceNonRec (toIfaceLetBndr b) (toIfaceExpr r)
 toIfaceBind (Rec prs)    = IfaceRec [(toIfaceLetBndr b, toIfaceExpr r) | (b,r) <- prs]
 
 ---------------------
+toIfaceAlt :: (AltCon, [Var], CoreExpr)
+           -> (IfaceConAlt, [FastString], IfaceExpr)
 toIfaceAlt (c,bs,r) = (toIfaceCon c, map getFS bs, toIfaceExpr r)
 
 ---------------------
+toIfaceCon :: AltCon -> IfaceConAlt
 toIfaceCon (DataAlt dc) | isTupleTyCon tc = IfaceTupleAlt (tupleTyConBoxity tc)
 	   		| otherwise       = IfaceDataAlt (getName dc)
 	   		where
@@ -1534,6 +1551,7 @@ toIfaceCon (LitAlt l) = IfaceLitAlt l
 toIfaceCon DEFAULT    = IfaceDefault
 
 ---------------------
+toIfaceApp :: Expr CoreBndr -> [Arg CoreBndr] -> IfaceExpr
 toIfaceApp (App f a) as = toIfaceApp f (a:as)
 toIfaceApp (Var v) as
   = case isDataConWorkId_maybe v of
@@ -1546,10 +1564,11 @@ toIfaceApp (Var v) as
 	    tup_args  = map toIfaceExpr val_args
 	    tc	      = dataConTyCon dc
 
-        other -> mkIfaceApps (toIfaceVar v) as
+        _ -> mkIfaceApps (toIfaceVar v) as
 
 toIfaceApp e as = mkIfaceApps (toIfaceExpr e) as
 
+mkIfaceApps :: IfaceExpr -> [CoreExpr] -> IfaceExpr
 mkIfaceApps f as = foldl (\f a -> IfaceApp f (toIfaceExpr a)) f as
 
 ---------------------
