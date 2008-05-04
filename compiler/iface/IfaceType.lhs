@@ -6,13 +6,6 @@
 This module defines interface types and binders
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module IfaceType (
 	IfaceType(..), IfaceKind, IfacePredType(..), IfaceTyCon(..),
 	IfaceContext, IfaceBndr(..), IfaceTvBndr, IfaceIdBndr, IfaceCoercion,
@@ -143,13 +136,15 @@ The precedence levels are:
 \end{description}
 
 \begin{code}
-tOP_PREC    = (0 :: Int)  -- type   in ParseIface.y
-fUN_PREC    = (1 :: Int)  -- btype  in ParseIface.y
-tYCON_PREC  = (2 :: Int)  -- atype  in ParseIface.y
+tOP_PREC, fUN_PREC, tYCON_PREC :: Int
+tOP_PREC    = 0 -- type   in ParseIface.y
+fUN_PREC    = 1 -- btype  in ParseIface.y
+tYCON_PREC  = 2 -- atype  in ParseIface.y
 
 noParens :: SDoc -> SDoc
 noParens pp = pp
 
+maybeParen :: Int -> Int -> SDoc -> SDoc
 maybeParen ctxt_prec inner_prec pretty
   | ctxt_prec < inner_prec = pretty
   | otherwise		   = parens pretty
@@ -166,6 +161,7 @@ instance Outputable IfaceBndr where
 pprIfaceBndrs :: [IfaceBndr] -> SDoc
 pprIfaceBndrs bs = sep (map ppr bs)
 
+pprIfaceIdBndr :: (FastString, IfaceType) -> SDoc
 pprIfaceIdBndr (name, ty) = hsep [ppr name, dcolon, ppr ty]
 
 pprIfaceTvBndr :: IfaceTvBndr -> SDoc
@@ -189,9 +185,9 @@ pprParendIfaceType = ppr_ty tYCON_PREC
 
 
 ppr_ty :: Int -> IfaceType -> SDoc
-ppr_ty ctxt_prec (IfaceTyVar tyvar)     = ppr tyvar
+ppr_ty _         (IfaceTyVar tyvar)     = ppr tyvar
 ppr_ty ctxt_prec (IfaceTyConApp tc tys) = ppr_tc_app ctxt_prec tc tys
-ppr_ty ctxt_prec (IfacePredTy st)       = ppr st
+ppr_ty _         (IfacePredTy st)       = ppr st
 
 	-- Function types
 ppr_ty ctxt_prec (IfaceFunTy ty1 ty2)
@@ -222,10 +218,11 @@ pprIfaceForAllPart tvs ctxt doc
 	    | otherwise = ptext (sLit "forall") <+> pprIfaceTvBndrs tvs <> dot
 
 -------------------
-ppr_tc_app ctxt_prec tc 	 []   = ppr_tc tc
-ppr_tc_app ctxt_prec IfaceListTc [ty] = brackets   (pprIfaceType ty)
-ppr_tc_app ctxt_prec IfacePArrTc [ty] = pabrackets (pprIfaceType ty)
-ppr_tc_app ctxt_prec (IfaceTupTc bx arity) tys
+ppr_tc_app :: Int -> IfaceTyCon -> [IfaceType] -> SDoc
+ppr_tc_app _         tc 	 []   = ppr_tc tc
+ppr_tc_app _         IfaceListTc [ty] = brackets   (pprIfaceType ty)
+ppr_tc_app _         IfacePArrTc [ty] = pabrackets (pprIfaceType ty)
+ppr_tc_app _         (IfaceTupTc bx arity) tys
   | arity == length tys 
   = tupleParens bx (sep (punctuate comma (map pprIfaceType tys)))
 ppr_tc_app ctxt_prec tc tys 
@@ -255,10 +252,12 @@ pprIfaceContext :: IfaceContext -> SDoc
 pprIfaceContext []     = empty
 pprIfaceContext theta = ppr_preds theta <+> ptext (sLit "=>")
 
+ppr_preds :: [IfacePredType] -> SDoc
 ppr_preds [pred] = ppr pred	-- No parens
 ppr_preds preds  = parens (sep (punctuate comma (map ppr preds))) 
 			 
 -------------------
+pabrackets :: SDoc -> SDoc
 pabrackets p = ptext (sLit "[:") <> p <> ptext (sLit ":]")
 \end{code}
 
@@ -270,14 +269,19 @@ pabrackets p = ptext (sLit "[:") <> p <> ptext (sLit ":]")
 
 \begin{code}
 ----------------
+toIfaceTvBndr :: TyVar -> (FastString, IfaceType)
 toIfaceTvBndr tyvar   = (occNameFS (getOccName tyvar), toIfaceKind (tyVarKind tyvar))
+toIfaceIdBndr :: Id -> (FastString, IfaceType)
 toIfaceIdBndr id      = (occNameFS (getOccName id),    toIfaceType (idType id))
+toIfaceTvBndrs :: [TyVar] -> [(FastString, IfaceType)]
 toIfaceTvBndrs tyvars = map toIfaceTvBndr tyvars
 
+toIfaceBndr :: Var -> IfaceBndr
 toIfaceBndr var
   | isId var  = IfaceIdBndr (toIfaceIdBndr var)
   | otherwise = IfaceTvBndr (toIfaceTvBndr var)
 
+toIfaceKind :: Type -> IfaceType
 toIfaceKind = toIfaceType
 
 ---------------------
@@ -332,9 +336,11 @@ toIfaceWiredInTyCon tc nm
   | otherwise		            = IfaceTc nm
 
 ----------------
+toIfaceTypes :: [Type] -> [IfaceType]
 toIfaceTypes ts = map toIfaceType ts
 
 ----------------
+toIfacePred :: PredType -> IfacePredType
 toIfacePred (ClassP cls ts) = 
   IfaceClassP (getName cls) (toIfaceTypes ts)
 toIfacePred (IParam ip t) = 
