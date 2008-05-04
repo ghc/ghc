@@ -6,13 +6,6 @@
 Type checking of type signatures in interface files
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module TcIface ( 
 	tcImportDecl, checkWiredInTyCon, tcHiBootIface, typecheckIface, 
 	tcIfaceDecl, tcIfaceInst, tcIfaceFamInst, tcIfaceRules,
@@ -59,6 +52,7 @@ import SrcLoc
 import DynFlags
 import Util
 import FastString
+import BasicTypes (Arity)
 
 import Control.Monad
 import Data.List
@@ -153,7 +147,7 @@ importDecl name
 	; mb_iface <- loadInterface nd_doc (nameModule name) ImportBySystem
 	; case mb_iface of {
 		Failed err_msg  -> return (Failed err_msg) ;
-		Succeeded iface -> do
+		Succeeded _ -> do
 
 	-- Now look it up again; this time we should find it
 	{ eps <- getEps	
@@ -264,7 +258,7 @@ tcHiBootIface hsc_src mod
 		  ; case lookupUFM hpt (moduleName mod) of
 		      Just info | mi_boot (hm_iface info) 
 				-> return (hm_details info)
-		      other -> return emptyModDetails }
+		      _ -> return emptyModDetails }
 	  else do
 
 	-- OK, so we're in one-shot mode.  
@@ -362,7 +356,7 @@ tcIfaceDecl ignore_prags (IfaceId {ifName = occ_name, ifType = iface_type, ifIdI
 	; info <- tcIdInfo ignore_prags name ty info
 	; return (AnId (mkVanillaGlobal name ty info)) }
 
-tcIfaceDecl ignore_prags 
+tcIfaceDecl _
 	    (IfaceData {ifName = occ_name, 
 			ifTyVars = tv_bndrs, 
 			ifCtxt = ctxt, ifGadtSyntax = gadt_syn,
@@ -391,7 +385,7 @@ tcIfaceDecl ignore_prags
 	; return (ATyCon tycon)
     }}
 
-tcIfaceDecl ignore_prags 
+tcIfaceDecl _
 	    (IfaceSyn {ifName = occ_name, ifTyVars = tv_bndrs, 
 		       ifOpenSyn = isOpen, ifSynRhs = rdr_rhs_ty,
 		       ifFamInst = mb_family})
@@ -455,12 +449,13 @@ tcIfaceDecl ignore_prags
      ATyCon (setTyConArgPoss tycon poss)
    setTyThingPoss _		  _ = panic "TcIface.setTyThingPoss"
 
-tcIfaceDecl ignore_prags (IfaceForeign {ifName = rdr_name, ifExtName = ext_name})
+tcIfaceDecl _ (IfaceForeign {ifName = rdr_name, ifExtName = ext_name})
   = do	{ name <- lookupIfaceTop rdr_name
 	; return (ATyCon (mkForeignTyCon name ext_name 
 					 liftedTypeKind 0)) }
 
-tcIfaceDataCons tycon_name tycon tc_tyvars if_cons
+tcIfaceDataCons :: Name -> TyCon -> [TyVar] -> IfaceConDecls -> IfL AlgTyConRhs
+tcIfaceDataCons tycon_name tycon _ if_cons
   = case if_cons of
 	IfAbstractTyCon	 -> return mkAbstractTyConRhs
 	IfOpenDataTyCon	 -> return mkOpenDataTyConRhs
@@ -501,6 +496,7 @@ tcIfaceDataCons tycon_name tycon tc_tyvars if_cons
 	}
     mk_doc con_name = ptext (sLit "Constructor") <+> ppr con_name
 
+tcIfaceEqSpec :: [(OccName, IfaceType)] -> IfL [(TyVar, Type)]
 tcIfaceEqSpec spec
   = mapM do_item spec
   where
@@ -519,8 +515,7 @@ tcIfaceEqSpec spec
 \begin{code}
 tcIfaceInst :: IfaceInst -> IfL Instance
 tcIfaceInst (IfaceInst { ifDFun = dfun_occ, ifOFlag = oflag,
-			 ifInstCls = cls, ifInstTys = mb_tcs,
-			 ifInstOrph = orph })
+			 ifInstCls = cls, ifInstTys = mb_tcs })
   = do	{ dfun    <- forkM (ptext (sLit "Dict fun") <+> ppr dfun_occ) $
 		     tcIfaceExtId dfun_occ
         ; let mb_tcs' = map (fmap ifaceTyConName) mb_tcs
@@ -558,8 +553,7 @@ tcIfaceRules ignore_prags if_rules
 
 tcIfaceRule :: IfaceRule -> IfL CoreRule
 tcIfaceRule (IfaceRule {ifRuleName = name, ifActivation = act, ifRuleBndrs = bndrs,
-			ifRuleHead = fn, ifRuleArgs = args, ifRuleRhs = rhs,
-			ifRuleOrph = orph })
+			ifRuleHead = fn, ifRuleArgs = args, ifRuleRhs = rhs })
   = do	{ ~(bndrs', args', rhs') <- 
 		-- Typecheck the payload lazily, in the hope it'll never be looked at
 		forkM (ptext (sLit "Rule") <+> ftext name) $
@@ -585,9 +579,9 @@ tcIfaceRule (IfaceRule {ifRuleName = name, ifActivation = act, ifRuleBndrs = bnd
 	-- to write them out in coreRuleToIfaceRule
     ifTopFreeName :: IfaceExpr -> Maybe Name
     ifTopFreeName (IfaceType (IfaceTyConApp tc _ )) = Just (ifaceTyConName tc)
-    ifTopFreeName (IfaceApp f a)                    = ifTopFreeName f
+    ifTopFreeName (IfaceApp f _)                    = ifTopFreeName f
     ifTopFreeName (IfaceExt n)                      = Just n
-    ifTopFreeName other                             = Nothing
+    ifTopFreeName _                                 = Nothing
 \end{code}
 
 
@@ -695,6 +689,7 @@ tcIfaceType (IfaceTyConApp tc ts) = do { tc' <- tcIfaceTyCon tc; ts' <- tcIfaceT
 tcIfaceType (IfaceForAllTy tv t)  = bindIfaceTyVar tv $ \ tv' -> do { t' <- tcIfaceType t; return (ForAllTy tv' t') }
 tcIfaceType (IfacePredTy st)      = do { st' <- tcIfacePredType st; return (PredTy st') }
 
+tcIfaceTypes :: [IfaceType] -> IfL [Type]
 tcIfaceTypes tys = mapM tcIfaceType tys
 
 -----------------------------------------
@@ -800,6 +795,9 @@ tcIfaceExpr (IfaceNote note expr) = do
         IfaceCoreNote n   -> return (Note (CoreNote n) expr')
 
 -------------------------
+tcIfaceAlt :: CoreExpr -> (TyCon, [Type])
+           -> (IfaceConAlt, [FastString], IfaceExpr)
+           -> IfL (AltCon, [TyVar], CoreExpr)
 tcIfaceAlt _ _ (IfaceDefault, names, rhs)
   = ASSERT( null names ) do
     rhs' <- tcIfaceExpr rhs
@@ -819,11 +817,13 @@ tcIfaceAlt scrut (tycon, inst_tys) (IfaceDataAlt data_occ, arg_strs, rhs)
 	       (failIfM (ppr scrut $$ ppr con $$ ppr tycon $$ ppr (tyConDataCons tycon)))
 	; tcIfaceDataAlt con inst_tys arg_strs rhs }
 		  
-tcIfaceAlt _ (tycon, inst_tys) (IfaceTupleAlt boxity, arg_occs, rhs)
+tcIfaceAlt _ (tycon, inst_tys) (IfaceTupleAlt _boxity, arg_occs, rhs)
   = ASSERT( isTupleTyCon tycon )
     do	{ let [data_con] = tyConDataCons tycon
 	; tcIfaceDataAlt data_con inst_tys arg_occs rhs }
 
+tcIfaceDataAlt :: DataCon -> [Type] -> [FastString] -> IfaceExpr
+               -> IfL (AltCon, [TyVar], CoreExpr)
 tcIfaceDataAlt con inst_tys arg_strs rhs
   = do	{ us <- newUniqueSupply
 	; let uniqs = uniqsFromSupply us
@@ -899,6 +899,7 @@ tcIdInfo ignore_prags name ty info
 \end{code}
 
 \begin{code}
+tcWorkerInfo :: Type -> IdInfo -> Name -> Arity -> IfL IdInfo
 tcWorkerInfo ty info wkr arity
   = do 	{ mb_wkr_id <- forkM_maybe doc (tcIfaceExtId wkr)
 
@@ -982,7 +983,7 @@ tcIfaceGlobal name
 			Nothing	   -> pprPanic "tcIfaceGlobal (local): not found:"  
 						(ppr name $$ ppr type_env) }
 
-	  ; other -> do
+	  ; _ -> do
 
 	{ (eps,hpt) <- getEpsAndHpt
  	; dflags <- getDOpts
@@ -1040,7 +1041,7 @@ tcIfaceTyCon (IfaceTc name)     = do { thing <- tcIfaceGlobal name
     check_tc tc
      | debugIsOn = case toIfaceTyCon tc of
                    IfaceTc _ -> tc
-                   other     -> pprTrace "check_tc" (ppr tc) tc
+                   _         -> pprTrace "check_tc" (ppr tc) tc
      | otherwise = tc
 -- we should be okay just returning Kind constructors without extra loading
 tcIfaceTyCon IfaceLiftedTypeKindTc   = return liftedTypeKindTyCon
@@ -1064,13 +1065,13 @@ tcIfaceDataCon :: Name -> IfL DataCon
 tcIfaceDataCon name = do { thing <- tcIfaceGlobal name
 		 	 ; case thing of
 				ADataCon dc -> return dc
-				other   -> pprPanic "tcIfaceExtDC" (ppr name$$ ppr thing) }
+				_       -> pprPanic "tcIfaceExtDC" (ppr name$$ ppr thing) }
 
 tcIfaceExtId :: Name -> IfL Id
 tcIfaceExtId name = do { thing <- tcIfaceGlobal name
 		       ; case thing of
 			  AnId id -> return id
-			  other   -> pprPanic "tcIfaceExtId" (ppr name$$ ppr thing) }
+			  _       -> pprPanic "tcIfaceExtId" (ppr name$$ ppr thing) }
 \end{code}
 
 %************************************************************************
@@ -1097,6 +1098,7 @@ bindIfaceBndrs (b:bs) thing_inside
     thing_inside (b':bs')
 
 -----------------------
+tcIfaceLetBndr :: IfaceLetBndr -> IfL Id
 tcIfaceLetBndr (IfLetBndr fs ty info)
   = do	{ name <- newIfaceName (mkVarOccFS fs)
 	; ty' <- tcIfaceType ty
