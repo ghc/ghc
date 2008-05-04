@@ -14,7 +14,6 @@ module BuildTyCl (
 #include "HsVersions.h"
 
 import IfaceEnv
-import TcRnMonad
 
 import DataCon
 import Var
