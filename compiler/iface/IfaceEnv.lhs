@@ -1,13 +1,6 @@
 (c) The University of Glasgow 2002-2006
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module IfaceEnv (
 	newGlobalBinder, newIPName, newImplicitBinder, 
 	lookupIfaceTop,
@@ -195,7 +188,7 @@ newIPName occ_name_ip = do
 
 \begin{code}
 lookupOrigNameCache :: OrigNameCache -> Module -> OccName -> Maybe Name
-lookupOrigNameCache nc mod occ
+lookupOrigNameCache _ mod occ
   | mod == dATA_TUP || mod == gHC_PRIM,		-- Boxed tuples from one, 
     Just tup_info <- isTupleOcc_maybe occ	-- unboxed from the other
   = 	-- Special case for tuples; there are too many
