@@ -78,6 +78,9 @@ data EquationInfo
   = EqnInfo { eqn_pats :: [Pat Id],    	-- The patterns for an eqn
 	      eqn_rhs  :: MatchResult }	-- What to do after match
 
+instance Outputable EquationInfo where
+    ppr (EqnInfo pats _) = ppr pats
+
 type DsWrapper = CoreExpr -> CoreExpr
 idDsWrapper :: DsWrapper
 idDsWrapper e = e
