@@ -4,13 +4,6 @@
 \section[StgLint]{A ``lint'' pass to check for Stg correctness}
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module StgLint ( lintStgBindings ) where
 
 import StgSyn
@@ -25,12 +18,13 @@ import Literal          ( literalType )
 import Maybes
 import Name             ( getSrcLoc )
 import ErrUtils         ( Message, mkLocMessage )
+import TypeRep
 import Type             ( mkFunTys, splitFunTys, splitTyConApp_maybe,
                           isUnLiftedType, isTyVarTy, dropForAlls, Type
                         )
 import TyCon            ( isAlgTyCon, isNewTyCon, tyConDataCons )
 import Util             ( zipEqual, equalLength )
-import SrcLoc           ( srcLocSpan )
+import SrcLoc
 import Outputable
 import FastString
 import Control.Monad
@@ -89,7 +83,9 @@ lintStgBindings whodunnit binds
 lintStgArg :: StgArg -> LintM (Maybe Type)
 lintStgArg (StgLitArg lit) = return (Just (literalType lit))
 lintStgArg (StgVarArg v)   = lintStgVar v
+lintStgArg a               = pprPanic "lintStgArg" (ppr a)
 
+lintStgVar :: Id -> LintM (Maybe Kind)
 lintStgVar v = do checkInScope v
                   return (Just (idType v))
 \end{code}
@@ -107,6 +103,7 @@ lintStgBinds (StgRec pairs)
   where
     binders = [b | (b,_) <- pairs]
 
+lint_binds_help :: (Id, StgRhs) -> LintM ()
 lint_binds_help (binder, rhs)
   = addLoc (RhsOf binder) $ do
         -- Check the rhs
@@ -166,7 +163,7 @@ lintStgExpr e@(StgConApp con args) = runMaybeT $ do
 lintStgExpr (StgOpApp (StgFCallOp _ _) args res_ty) = runMaybeT $ do
         -- We don't have enough type information to check
         -- the application; ToDo
-    maybe_arg_tys <- mapM (MaybeT . lintStgArg) args
+    _maybe_arg_tys <- mapM (MaybeT . lintStgArg) args
     return res_ty
 
 lintStgExpr e@(StgOpApp (StgPrimOp op) args _) = runMaybeT $ do
@@ -220,6 +217,7 @@ lintStgExpr e@(StgCase scrut _ _ bndr _ alts_type alts) = runMaybeT $ do
                         Just (bndr_tc, _) -> checkL (tc == bndr_tc) bad_bndr
                         Nothing           -> addErrL bad_bndr
 
+lintStgExpr e = pprPanic "lintStgExpr" (ppr e)
 
 lintStgAlts :: [StgAlt]
             -> Type               -- Type of scrutinee
@@ -237,6 +235,7 @@ lintStgAlts alts scrut_ty = do
         where
           check ty = checkTys first_ty ty (mkCaseAltMsg alts)
 
+lintAlt :: Type -> (AltCon, [Id], [Bool], StgExpr) -> LintM (Maybe Type)
 lintAlt _ (DEFAULT, _, _, rhs)
  = lintStgExpr rhs
 
@@ -292,6 +291,7 @@ data LintLocInfo
   | LambdaBodyOf [Id]   -- The lambda-binder
   | BodyOfLetRec [Id]   -- One of the binders
 
+dumpLoc :: LintLocInfo -> (SrcSpan, SDoc)
 dumpLoc (RhsOf v) =
   (srcLocSpan (getSrcLoc v), ptext (sLit " [RHS of ") <> pp_binders [v] <> char ']' )
 dumpLoc (LambdaBodyOf bs) =
@@ -418,7 +418,7 @@ checkInScope id = LintM $ \loc scope errs
         ((), errs)
 
 checkTys :: Type -> Type -> Message -> LintM ()
-checkTys ty1 ty2 msg = LintM $ \loc scope errs
+checkTys _ty1 _ty2 _msg = LintM $ \_loc _scope errs
  -> -- if (ty1 == ty2) then
     ((), errs)
     -- else ((), addErr errs msg loc)
@@ -426,12 +426,12 @@ checkTys ty1 ty2 msg = LintM $ \loc scope errs
 
 \begin{code}
 mkCaseAltMsg :: [StgAlt] -> Message
-mkCaseAltMsg alts
+mkCaseAltMsg _alts
   = ($$) (text "In some case alternatives, type of alternatives not all same:")
             (empty) -- LATER: ppr alts
 
 mkDefltMsg :: Id -> Message
-mkDefltMsg bndr
+mkDefltMsg _bndr
   = ($$) (ptext (sLit "Binder of a case expression doesn't match type of scrutinee:"))
             (panic "mkDefltMsg")
 
@@ -489,6 +489,7 @@ mkRhsMsg binder ty
               hsep [ptext (sLit "Rhs type:"), ppr ty]
              ]
 
+mkUnLiftedTyMsg :: Id -> StgRhs -> SDoc
 mkUnLiftedTyMsg binder rhs
   = (ptext (sLit "Let(rec) binder") <+> quotes (ppr binder) <+>
      ptext (sLit "has unlifted type") <+> quotes (ppr (idType binder)))
