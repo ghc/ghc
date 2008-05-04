@@ -4,13 +4,6 @@
 \section[LiberateCase]{Unroll recursion to allow evals to be lifted from a loop}
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module LiberateCase ( liberateCase ) where
 
 #include "HsVersions.h"
@@ -142,7 +135,7 @@ liberateCase hsc_env _ _ guts
 			{- no specific flag for dumping -} 
 	; return (zeroSimplCount dflags, guts { mg_binds = binds' }) }
   where
-    do_prog env [] = []
+    do_prog _   [] = []
     do_prog env (bind:binds) = bind' : do_prog env' binds
 			     where
 			       (env', bind') = libCaseBind env bind
@@ -166,7 +159,7 @@ libCaseBind env (NonRec binder rhs)
 libCaseBind env (Rec pairs)
   = (env_body, Rec pairs')
   where
-    (binders, rhss) = unzip pairs
+    (binders, _rhss) = unzip pairs
 
     env_body = addBinders env binders
 
@@ -208,9 +201,9 @@ libCase :: LibCaseEnv
 	-> CoreExpr
 	-> CoreExpr
 
-libCase env (Var v)		= libCaseId env v
-libCase env (Lit lit)		= Lit lit
-libCase env (Type ty)		= Type ty
+libCase env (Var v)             = libCaseId env v
+libCase _   (Lit lit)           = Lit lit
+libCase _   (Type ty)           = Type ty
 libCase env (App fun arg)       = App (libCase env fun) (libCase env arg)
 libCase env (Note note body)    = Note note (libCase env body)
 libCase env (Cast e co)         = Cast (libCase env e) co
@@ -229,8 +222,10 @@ libCase env (Case scrut bndr ty alts)
     env_alts = addBinders (mk_alt_env scrut) [bndr]
     mk_alt_env (Var scrut_var) = addScrutedVar env scrut_var
     mk_alt_env (Cast scrut _)  = mk_alt_env scrut	-- Note [Scrutinee with cast]
-    mk_alt_env otehr	       = env
+    mk_alt_env _    	       = env
 
+libCaseAlt :: LibCaseEnv -> (AltCon, [CoreBndr], CoreExpr)
+                         -> (AltCon, [CoreBndr], CoreExpr)
 libCaseAlt env (con,args,rhs) = (con, args, libCase (addBinders env args) rhs)
 \end{code}
 
@@ -384,6 +379,7 @@ initEnv dflags
 		 lc_rec_env = emptyVarEnv,
 		 lc_scruts = [] }
 
+bombOutSize :: LibCaseEnv -> Maybe Int
 bombOutSize = lc_size
 \end{code}
 
