@@ -4,13 +4,6 @@
 \section[SimplMonad]{The simplifier Monad}
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module SimplMonad (
 	-- The monad
 	SimplM,
@@ -38,7 +31,6 @@ import Rules		( RuleBase )
 import UniqSupply
 import DynFlags		( SimplifierSwitch(..), DynFlags, DynFlag(..), dopt )
 import StaticFlags	( opt_PprStyle_Debug, opt_HistorySize )
-import Unique		( Unique )
 import Maybes		( expectJust )
 import FiniteMap	( FiniteMap, emptyFM, isEmptyFM, lookupFM, addToFM, plusFM_C, fmToList )
 import FastString
@@ -93,7 +85,7 @@ instance Monad SimplM where
    return = returnSmpl
 
 returnSmpl :: a -> SimplM a
-returnSmpl e = SM (\ st_env us sc -> (e, us, sc))
+returnSmpl e = SM (\_st_env us sc -> (e, us, sc))
 
 thenSmpl  :: SimplM a -> (a -> SimplM b) -> SimplM b
 thenSmpl_ :: SimplM a -> SimplM b -> SimplM b
@@ -124,15 +116,15 @@ thenSmpl_ m k
 \begin{code}
 instance MonadUnique SimplM where
     getUniqueSupplyM
-       = SM (\st_env us sc -> case splitUniqSupply us of
+       = SM (\_st_env us sc -> case splitUniqSupply us of
                                 (us1, us2) -> (us1, us2, sc))
 
     getUniqueM
-       = SM (\st_env us sc -> case splitUniqSupply us of
+       = SM (\_st_env us sc -> case splitUniqSupply us of
                                 (us1, us2) -> (uniqFromSupply us1, us2, sc))
 
     getUniquesM
-        = SM (\st_env us sc -> case splitUniqSupply us of
+        = SM (\_st_env us sc -> case splitUniqSupply us of
                                 (us1, us2) -> (uniqsFromSupply us1, us2, sc))
 
 getDOptsSmpl :: SimplM DynFlags
@@ -158,22 +150,23 @@ newId fs ty = do uniq <- getUniqueM
 
 \begin{code}
 getSimplCount :: SimplM SimplCount
-getSimplCount = SM (\st_env us sc -> (sc, us, sc))
+getSimplCount = SM (\_st_env us sc -> (sc, us, sc))
 
 tick :: Tick -> SimplM ()
 tick t 
-   = SM (\st_env us sc -> let sc' = doTick t sc 
-			  in sc' `seq` ((), us, sc'))
+   = SM (\_st_env us sc -> let sc' = doTick t sc 
+                           in sc' `seq` ((), us, sc'))
 
 freeTick :: Tick -> SimplM ()
 -- Record a tick, but don't add to the total tick count, which is
 -- used to decide when nothing further has happened
 freeTick t 
-   = SM (\st_env us sc -> let sc' = doFreeTick t sc
-			  in sc' `seq` ((), us, sc'))
+   = SM (\_st_env us sc -> let sc' = doFreeTick t sc
+                           in sc' `seq` ((), us, sc'))
 \end{code}
 
 \begin{code}
+verboseSimplStats :: Bool
 verboseSimplStats = opt_PprStyle_Debug		-- For now, anyway
 
 zeroSimplCount	   :: DynFlags -> SimplCount
@@ -209,25 +202,26 @@ zeroSimplCount dflags
 
 isZeroSimplCount VerySimplZero    	    = True
 isZeroSimplCount (SimplCount { ticks = 0 }) = True
-isZeroSimplCount other			    = False
+isZeroSimplCount _    			    = False
 
 doFreeTick tick sc@SimplCount { details = dts } 
   = dts' `seqFM` sc { details = dts' }
   where
     dts' = dts `addTick` tick 
-doFreeTick tick sc = sc 
+doFreeTick _ sc = sc 
 
 -- Gross hack to persuade GHC 3.03 to do this important seq
+seqFM :: FiniteMap key elt -> t -> t
 seqFM fm x | isEmptyFM fm = x
 	   | otherwise    = x
 
-doTick tick sc@SimplCount { ticks = tks, details = dts, n_log = nl, log1 = l1, log2 = l2 }
+doTick tick sc@SimplCount { ticks = tks, details = dts, n_log = nl, log1 = l1 }
   | nl >= opt_HistorySize = sc1 { n_log = 1, log1 = [tick], log2 = l1 }
   | otherwise		  = sc1 { n_log = nl+1, log1 = tick : l1 }
   where
     sc1 = sc { ticks = tks+1, details = dts `addTick` tick }
 
-doTick tick sc = VerySimplNonZero	-- The very simple case
+doTick _ _ = VerySimplNonZero -- The very simple case
 
 
 -- Don't use plusFM_C because that's lazy, and we want to 
@@ -250,7 +244,7 @@ plusSimplCount sc1@(SimplCount { ticks = tks1, details = dts1 })
 	     | otherwise       = sc2
 
 plusSimplCount VerySimplZero VerySimplZero = VerySimplZero
-plusSimplCount sc1	     sc2	   = VerySimplNonZero
+plusSimplCount _             _             = VerySimplNonZero
 
 pprSimplCount VerySimplZero    = ptext (sLit "Total ticks: ZERO!")
 pprSimplCount VerySimplNonZero = ptext (sLit "Total ticks: NON-ZERO!")
@@ -279,11 +273,13 @@ pprTickCounts ((tick1,n1):ticks)
     same_tick (tick2,_) = tickToTag tick2 == tick1_tag
     tot_n		= sum [n | (_,n) <- real_these]
 
+pprTCDetails :: [(Tick, Int)] -> SDoc
 pprTCDetails ticks@((tick,_):_)
   | verboseSimplStats || isRuleFired tick
   = nest 4 (vcat [int n <+> pprTickCts tick | (tick,n) <- ticks])
   | otherwise
   = empty
+pprTCDetails [] = panic "pprTCDetails []"
 \end{code}
 
 %************************************************************************
@@ -317,14 +313,17 @@ data Tick
   | BottomFound		
   | SimplifierDone		-- Ticked at each iteration of the simplifier
 
+isRuleFired :: Tick -> Bool
 isRuleFired (RuleFired _) = True
-isRuleFired other	  = False
+isRuleFired _             = False
 
 instance Outputable Tick where
   ppr tick = text (tickString tick) <+> pprTickCts tick
 
 instance Eq Tick where
-  a == b = case a `cmpTick` b of { EQ -> True; other -> False }
+  a == b = case a `cmpTick` b of
+           EQ -> True
+           _ -> False
 
 instance Ord Tick where
   compare = cmpTick
@@ -383,7 +382,7 @@ pprTickCts (AltMerge v)			= ppr v
 pprTickCts (CaseElim v)			= ppr v
 pprTickCts (CaseIdentity v)		= ppr v
 pprTickCts (FillInCaseDefault v)	= ppr v
-pprTickCts other			= empty
+pprTickCts _    			= empty
 
 cmpTick :: Tick -> Tick -> Ordering
 cmpTick a b = case (tickToTag a `compare` tickToTag b) of
@@ -409,7 +408,7 @@ cmpEqTick (AltMerge a)			(AltMerge b)			= a `compare` b
 cmpEqTick (CaseElim a)			(CaseElim b)			= a `compare` b
 cmpEqTick (CaseIdentity a)		(CaseIdentity b)		= a `compare` b
 cmpEqTick (FillInCaseDefault a)		(FillInCaseDefault b)		= a `compare` b
-cmpEqTick other1			other2				= EQ
+cmpEqTick _     			_     				= EQ
 \end{code}
 
 
@@ -458,7 +457,7 @@ isAmongSimpl on_switches		-- Switches mentioned later occur *earlier*
     	then switches_so_far
 	else switch : switches_so_far
       where
-	sw `is_elem` []     = False
+	_  `is_elem` []     = False
 	sw `is_elem` (s:ss) = (tagOf_SimplSwitch sw) ==# (tagOf_SimplSwitch s)
 			    || sw `is_elem` ss
 \end{code}
@@ -497,11 +496,13 @@ instance Ord SimplifierSwitch where
     a <= b  = tagOf_SimplSwitch a <=# tagOf_SimplSwitch b
 
 
+tagOf_SimplSwitch :: SimplifierSwitch -> FastInt
 tagOf_SimplSwitch (MaxSimplifierIterations _)	= _ILIT(1)
 tagOf_SimplSwitch NoCaseOfCase			= _ILIT(2)
 
 -- If you add anything here, be sure to change lAST_SIMPL_SWITCH_TAG, too!
 
+lAST_SIMPL_SWITCH_TAG :: Int
 lAST_SIMPL_SWITCH_TAG = 2
 \end{code}
 
