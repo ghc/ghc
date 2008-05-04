@@ -56,6 +56,16 @@ data Ty
   | Tcon (Qual Tcon)
   | Tapp Ty Ty
   | Tforall Tbind Ty 
+-- We distinguish primitive coercions
+-- (represented in GHC by wired-in names), because
+-- External Core treats them specially, so we have
+-- to print them out with special syntax.
+  | TransCoercion Ty Ty
+  | SymCoercion Ty
+  | UnsafeCoercion Ty Ty
+  | InstCoercion Ty Ty
+  | LeftCoercion Ty
+  | RightCoercion Ty
 
 data Kind 
   = Klifted

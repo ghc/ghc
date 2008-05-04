@@ -222,13 +222,12 @@ coreTcon =
 data CoercionTy = TransC | InstC | SymC | UnsafeC | LeftC | RightC
 
 symCo, transCo, unsafeCo, instCo, leftCo, rightCo :: Parser CoercionTy
--- Would be better not to wire these in quite this way. Sigh
-symCo    = string "ghczmprim:GHCziPrim.sym"      >> return SymC
-transCo  = string "ghczmprim:GHCziPrim.trans"    >> return TransC 
-unsafeCo = string "ghczmprim:GHCziPrim.CoUnsafe" >> return UnsafeC
-leftCo   = string "ghczmprim:GHCziPrim.left"     >> return LeftC
-rightCo  = string "ghczmprim:GHCziPrim.right"    >> return RightC
-instCo   = string "ghczmprim:GHCziPrim.inst"    >> return InstC
+symCo    = string "%sym"    >> return SymC
+transCo  = string "%trans"  >> return TransC
+unsafeCo = string "%unsafe" >> return UnsafeC
+leftCo   = string "%left"   >> return LeftC
+rightCo  = string "%right"  >> return RightC
+instCo   = string "%inst"   >> return InstC
 
 coreForallTy :: Parser Ty
 coreForallTy = do

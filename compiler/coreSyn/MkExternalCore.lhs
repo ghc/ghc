@@ -225,8 +225,8 @@ make_ty' (TyVarTy tv)    	 = C.Tvar (make_var_id (tyVarName tv))
 make_ty' (AppTy t1 t2) 		 = C.Tapp (make_ty t1) (make_ty t2)
 make_ty' (FunTy t1 t2) 		 = make_ty (TyConApp funTyCon [t1,t2])
 make_ty' (ForAllTy tv t) 	 = C.Tforall (make_tbind tv) (make_ty t)
-make_ty' (TyConApp tc ts) 	 = foldl C.Tapp (C.Tcon (qtc tc)) 
-					 (map make_ty ts)
+make_ty' (TyConApp tc ts) 	 = make_tyConApp tc ts
+
 -- Newtypes are treated just like any other type constructor; not expanded
 -- Reason: predTypeRep does substitution and, while substitution deals
 -- 	   correctly with name capture, it's only correct if you see the uniques!
@@ -241,6 +241,25 @@ make_ty' (TyConApp tc ts) 	 = foldl C.Tapp (C.Tcon (qtc tc))
 
 make_ty' (PredTy p)	= make_ty (predTypeRep p)
 
+make_tyConApp :: TyCon -> [Type] -> C.Ty
+make_tyConApp tc [t1, t2] | tc == transCoercionTyCon =
+  C.TransCoercion (make_ty t1) (make_ty t2)
+make_tyConApp tc [t]      | tc == symCoercionTyCon =
+  C.SymCoercion (make_ty t)
+make_tyConApp tc [t1, t2] | tc == unsafeCoercionTyCon =
+  C.UnsafeCoercion (make_ty t1) (make_ty t2)
+make_tyConApp tc [t]      | tc == leftCoercionTyCon =
+  C.LeftCoercion (make_ty t)
+make_tyConApp tc [t]      | tc == rightCoercionTyCon =
+  C.RightCoercion (make_ty t)
+make_tyConApp tc [t1, t2] | tc == instCoercionTyCon =
+  C.InstCoercion (make_ty t1) (make_ty t2)
+-- this fails silently if we have an application
+-- of a wired-in coercion tycon to the wrong number of args.
+-- Not great...
+make_tyConApp tc ts =
+  foldl C.Tapp (C.Tcon (qtc tc)) 
+	    (map make_ty ts)
 
 
 make_kind :: Kind -> C.Kind

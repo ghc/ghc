@@ -5,12 +5,11 @@
 \begin{code}
 module PprExternalCore () where
 
-import ExternalCore
 import Encoding
+import ExternalCore
 
 import Pretty
 import Char
-
 
 instance Show Module where
   showsPrec _ m = shows (pmodule m)
@@ -103,6 +102,18 @@ pbty t = paty t
 
 pty (Tapp(Tapp(Tcon tc) t1) t2) | tc == tcArrow = fsep [pbty t1, text "->",pty t2]
 pty (Tforall tb t) = text "%forall" <+> pforall [tb] t
+pty (TransCoercion t1 t2) =
+  sep [text "%trans", paty t1, paty t2]
+pty (SymCoercion t) =
+  sep [text "%sym", paty t]
+pty (UnsafeCoercion t1 t2) =
+  sep [text "%unsafe", paty t1, paty t2]
+pty (LeftCoercion t) =
+  sep [text "%left", paty t]
+pty (RightCoercion t) =
+  sep [text "%right", paty t]
+pty (InstCoercion t1 t2) =
+  sep [text "%inst", paty t1, paty t2]
 pty t = pbty t
 
 pappty :: Ty -> [Ty] -> Doc
