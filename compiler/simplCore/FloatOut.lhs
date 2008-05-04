@@ -6,13 +6,6 @@
 ``Long-distance'' floating of bindings towards the top level.
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module FloatOut ( floatOutwards ) where
 
 import CoreSyn
@@ -149,6 +142,7 @@ floatOutwards float_sws dflags us pgm
     pp_not True  = empty
     pp_not False = text "not"
 
+floatTopBind :: LevelledBind -> (FloatStats, [CoreBind])
 floatTopBind bind
   = case (floatBind bind) of { (fs, floats) ->
     (fs, floatsToBinds floats)
@@ -269,11 +263,11 @@ floatExpr lvl (App e a)
     case (floatRhs lvl a) 	of { (fsa, floats_a, a') ->
     (fse `add_stats` fsa, floats_e ++ floats_a, App e' a') }}
 
-floatExpr lvl lam@(Lam _ _)
+floatExpr _ lam@(Lam _ _)
   = let
 	(bndrs_w_lvls, body) = collectBinders lam
 	bndrs		     = [b | TB b _ <- bndrs_w_lvls]
-	lvls		     = [l | TB b l <- bndrs_w_lvls]
+	lvls		     = [l | TB _ l <- bndrs_w_lvls]
 
 	-- For the all-tyvar case we are prepared to pull 
 	-- the lets out, to implement the float-out-of-big-lambda
@@ -313,9 +307,9 @@ floatExpr lvl (Note note@(SCC cc) expr)
 	ann_bind (Rec pairs)
 	  = Rec [(binder, mkSCC dupd_cc rhs) | (binder, rhs) <- pairs]
 
-floatExpr lvl (Note InlineMe expr)	-- Other than SCCs
+floatExpr _ (Note InlineMe expr)	-- Other than SCCs
   = (zeroStats, [], Note InlineMe (unTag expr))
-	-- Do no floating at all inside INLINE. [_$_]
+	-- Do no floating at all inside INLINE.
 	-- The SetLevels pass did not clone the bindings, so it's
 	-- unsafe to do any floating, even if we dump the results
 	-- inside the Note (which is what we used to do).
@@ -331,7 +325,7 @@ floatExpr lvl (Cast expr co)
 floatExpr lvl (Let (NonRec (TB bndr bndr_lvl) rhs) body)
   | isUnLiftedType (idType bndr)	-- Treat unlifted lets just like a case
 				-- I.e. floatExpr for rhs, floatCaseAlt for body
-  = case floatExpr lvl rhs	    of { (fs, rhs_floats, rhs') ->
+  = case floatExpr lvl rhs	    of { (_, rhs_floats, rhs') ->
     case floatCaseAlt bndr_lvl body of { (fs, body_floats, body') ->
     (fs, rhs_floats ++ body_floats, Let (NonRec bndr rhs') body') }}
 
@@ -356,7 +350,7 @@ floatExpr lvl (Case scrut (TB case_bndr case_lvl) ty alts)
 
 
 floatList :: (a -> (FloatStats, FloatBinds, b)) -> [a] -> (FloatStats, FloatBinds, [b])
-floatList f [] = (zeroStats, [], [])
+floatList _ [] = (zeroStats, [], [])
 floatList f (a:as) = case f a		 of { (fs_a,  binds_a,  b)  ->
 		     case floatList f as of { (fs_as, binds_as, bs) ->
 		     (fs_a `add_stats` fs_as, binds_a ++ binds_as, b:bs) }}
@@ -393,15 +387,20 @@ data FloatStats
 	Int  -- Number of non-top-floats * lambda groups they've been past
 	Int  -- Number of lambda (groups) seen
 
+get_stats :: FloatStats -> (Int, Int, Int)
 get_stats (FlS a b c) = (a, b, c)
 
+zeroStats :: FloatStats
 zeroStats = FlS 0 0 0
 
+sum_stats :: [FloatStats] -> FloatStats
 sum_stats xs = foldr add_stats zeroStats xs
 
+add_stats :: FloatStats -> FloatStats -> FloatStats
 add_stats (FlS a1 b1 c1) (FlS a2 b2 c2)
   = FlS (a1 + a2) (b1 + b2) (c1 + c2)
 
+add_to_stats :: FloatStats -> [(Level, Bind CoreBndr)] -> FloatStats
 add_to_stats (FlS a b c) floats
   = FlS (a + length top_floats) (b + length other_floats) (c + 1)
   where
@@ -418,8 +417,10 @@ add_to_stats (FlS a b c) floats
 %************************************************************************
 
 \begin{code}
-getBindLevel (NonRec (TB _ lvl) _)      = lvl
+getBindLevel :: Bind (TaggedBndr Level) -> Level
+getBindLevel (NonRec (TB _ lvl) _)       = lvl
 getBindLevel (Rec (((TB _ lvl), _) : _)) = lvl
+getBindLevel (Rec [])                    = panic "getBindLevel Rec []"
 \end{code}
 
 \begin{code}
@@ -436,7 +437,7 @@ partitionByMajorLevel ctxt_lvl defns
   = partition float_further defns
   where
 	-- Float it if we escape a value lambda, or if we get to the top level
-    float_further (my_lvl, bind) = my_lvl `ltMajLvl` ctxt_lvl || isTopLvl my_lvl
+    float_further (my_lvl, _) = my_lvl `ltMajLvl` ctxt_lvl || isTopLvl my_lvl
 	-- The isTopLvl part says that if we can get to the top level, say "yes" anyway
 	-- This means that 
 	--	x = f e
