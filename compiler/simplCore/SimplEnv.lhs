@@ -4,13 +4,6 @@
 \section[SimplMonad]{The simplifier Monad}
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module SimplEnv (
 	InId, InBind, InExpr, InAlt, InArg, InType, InBndr,
 	OutId, OutTyVar, OutBind, OutExpr, OutAlt, OutArg, OutType, OutBndr,
@@ -49,7 +42,6 @@ module SimplEnv (
 import SimplMonad
 import IdInfo
 import CoreSyn
-import Rules
 import CoreUtils
 import CostCentre
 import Var
@@ -63,7 +55,6 @@ import Type hiding		( substTy, substTyVarBndr )
 import Coercion
 import BasicTypes	
 import DynFlags
-import Util
 import MonadUtils
 import Outputable
 import FastString
@@ -144,7 +135,7 @@ data SimplSR
 instance Outputable SimplSR where
   ppr (DoneEx e) = ptext (sLit "DoneEx") <+> ppr e
   ppr (DoneId v) = ptext (sLit "DoneId") <+> ppr v
-  ppr (ContEx tv id e) = vcat [ptext (sLit "ContEx") <+> ppr e {-,
+  ppr (ContEx _tv _id e) = vcat [ptext (sLit "ContEx") <+> ppr e {-,
 				ppr (filter_env tv), ppr (filter_env id) -}]
 	-- where
 	-- fvs = exprFreeVars e
@@ -352,7 +343,7 @@ instance Outputable FloatFlag where
 andFF :: FloatFlag -> FloatFlag -> FloatFlag
 andFF FltCareful _ 	    = FltCareful
 andFF FltOkSpec  FltCareful = FltCareful
-andFF FltOkSpec  flt	    = FltOkSpec
+andFF FltOkSpec  _  	    = FltOkSpec
 andFF FltLifted  flt	    = flt
 
 classifyFF :: CoreBind -> FloatFlag
@@ -420,7 +411,7 @@ addRecFloats :: SimplEnv -> SimplEnv -> SimplEnv
 -- This is all very specific to the way recursive bindings are
 -- handled; see Simplify.simplRecBind
 addRecFloats env1 env2@(SimplEnv {seFloats = Floats bs ff})
-  = ASSERT2( case ff of { FltLifted -> True; other -> False }, ppr (fromOL bs) )
+  = ASSERT2( case ff of { FltLifted -> True; _ -> False }, ppr (fromOL bs) )
     env2 {seFloats = seFloats env1 `addFlts` unitFloat (Rec (flattenBinds (fromOL bs)))}
 
 wrapFloats :: SimplEnv -> OutExpr -> OutExpr
@@ -473,6 +464,7 @@ substId (SimplEnv { seInScope = in_scope, seIdSubst = ids }) v
 	-- Get the most up-to-date thing from the in-scope set
 	-- Even though it isn't in the substitution, it may be in
 	-- the in-scope set with better IdInfo
+refine :: InScopeSet -> Var -> Var
 refine in_scope v = case lookupInScope in_scope v of
 			 Just v' -> v'
 			 Nothing -> WARN( True, ppr v ) v	-- This is an error!
@@ -483,8 +475,8 @@ lookupRecBndr :: SimplEnv -> InId -> OutId
 lookupRecBndr (SimplEnv { seInScope = in_scope, seIdSubst = ids }) v
   = case lookupVarEnv ids v of
 	Just (DoneId v) -> v
-	Just res	-> pprPanic "lookupRecBndr" (ppr v)
-	Nothing		-> refine in_scope v
+	Just _ -> pprPanic "lookupRecBndr" (ppr v)
+	Nothing -> refine in_scope v
 \end{code}
 
 
@@ -543,7 +535,7 @@ simplNonRecBndr env id
 ---------------
 simplRecBndrs :: SimplEnv -> [InBndr] -> SimplM SimplEnv
 -- Recursive let binders
-simplRecBndrs env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst }) ids
+simplRecBndrs env@(SimplEnv {}) ids
   = do	{ let (env1, ids1) = mapAccumL substIdBndr env ids
 	; seqIds ids1 `seq` return env1 }
 
@@ -665,7 +657,7 @@ addBndrRules env in_id out_id
 
 ------------------
 substIdType :: SimplEnv -> Id -> Id
-substIdType env@(SimplEnv { seInScope = in_scope,  seTvSubst = tv_env}) id
+substIdType (SimplEnv { seInScope = in_scope,  seTvSubst = tv_env}) id
   | isEmptyVarEnv tv_env || isEmptyVarSet (tyVarsOfType old_ty) = id
   | otherwise	= Id.setIdType id (Type.substTy (TvSubst in_scope tv_env) old_ty)
 		-- The tyVarsOfType is cheaper than it looks
@@ -676,14 +668,14 @@ substIdType env@(SimplEnv { seInScope = in_scope,  seTvSubst = tv_env}) id
 
 ------------------
 substUnfolding :: SimplEnv -> Unfolding -> Unfolding
-substUnfolding env NoUnfolding     	       = NoUnfolding
-substUnfolding env (OtherCon cons) 	       = OtherCon cons
+substUnfolding _   NoUnfolding     	       = NoUnfolding
+substUnfolding _   (OtherCon cons) 	       = OtherCon cons
 substUnfolding env (CompulsoryUnfolding rhs)   = CompulsoryUnfolding (substExpr env rhs)
 substUnfolding env (CoreUnfolding rhs t v w g) = CoreUnfolding (substExpr env rhs) t v w g
 
 ------------------
 substWorker :: SimplEnv -> WorkerInfo -> WorkerInfo
-substWorker env NoWorker = NoWorker
+substWorker _   NoWorker = NoWorker
 substWorker env wkr_info = CoreSubst.substWorker (mkCoreSubst env) wkr_info
 \end{code}
 
