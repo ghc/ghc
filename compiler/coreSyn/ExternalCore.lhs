@@ -10,7 +10,7 @@ data Module
 
 data Tdef 
   = Data (Qual Tcon) [Tbind] [Cdef]
-  | Newtype (Qual Tcon) (Qual Tcon) [Tbind] (Maybe Ty)
+  | Newtype (Qual Tcon) (Qual Tcon) [Tbind] Ty
 
 data Cdef 
   = Constr (Qual Dcon) [Tbind] [Ty]

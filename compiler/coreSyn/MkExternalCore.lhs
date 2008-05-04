@@ -90,12 +90,10 @@ collect_tdefs tcon tdefs
                      Nothing       -> pprPanic ("MkExternalCore: newtype tcon\
                                        should have a coercion: ") (ppr tcon))
                   (map make_tbind tyvars) 
-                   repclause 
+                  (make_ty (snd (newTyConRhs tcon)))
          | otherwise = 
                 C.Data (qtc tcon) (map make_tbind tyvars) 
                    (map make_cdef (tyConDataCons tcon)) 
-         where repclause | isRecursiveTyCon tcon || isOpenTyCon tcon= Nothing
-		         | otherwise = Just (make_ty (snd (newTyConRhs tcon)))
     tyvars = tyConTyVars tcon
 
 collect_tdefs _ tdefs = tdefs

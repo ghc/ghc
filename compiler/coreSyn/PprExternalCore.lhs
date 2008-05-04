@@ -56,10 +56,7 @@ ptdef (Data tcon tbinds cdefs) =
 ptdef (Newtype tcon coercion tbinds rep) =
   text "%newtype" <+> pqname tcon <+> pqname coercion 
    <+> (hsep (map ptbind tbinds)) $$ indent repclause
-       where repclause = case rep of
-                           Just ty -> char '=' <+> pty ty 
-			   Nothing -> empty
-             
+       where repclause = char '=' <+> pty rep
 
 pcdef :: Cdef -> Doc
 pcdef (Constr dcon tbinds tys)  =
