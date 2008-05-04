@@ -6,13 +6,6 @@
 Desugaring foreign calls
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module DsCCall 
 	( dsCCall
 	, mkFCall
@@ -29,6 +22,7 @@ import CoreSyn
 import DsMonad
 
 import CoreUtils
+import Var
 import Id
 import MkId
 import Maybes
@@ -140,7 +134,7 @@ unboxArg arg
   = return (arg, \body -> body)
 
   -- Recursive newtypes
-  | Just(rep_ty, co) <- splitNewTypeRepCo_maybe arg_ty
+  | Just(_rep_ty, co) <- splitNewTypeRepCo_maybe arg_ty
   = unboxArg (mkCoerce co arg)
       
   -- Booleans
@@ -177,7 +171,7 @@ unboxArg arg
     (arg3_tycon ==  byteArrayPrimTyCon ||
      arg3_tycon ==  mutableByteArrayPrimTyCon)
   = do case_bndr <- newSysLocalDs arg_ty
-       vars@[l_var, r_var, arr_cts_var] <- newSysLocalsDs data_con_arg_tys
+       vars@[_l_var, _r_var, arr_cts_var] <- newSysLocalsDs data_con_arg_tys
        return (Var arr_cts_var,
                \ body -> Case arg case_bndr (exprType body) [(DataAlt data_con,vars,body)]
               )
@@ -201,7 +195,7 @@ unboxArg arg
                         , arg
                         , Lam prim_string body
                         ])
-  | Just (tc, [arg_ty]) <- splitTyConApp_maybe arg_ty,
+  | Just (tc, [_]) <- splitTyConApp_maybe arg_ty,
     tyConName tc == objectTyConName
     -- Object; dotnet only
   = do unpack_id <- dsLookupGlobalId marshalObjectName
@@ -298,7 +292,7 @@ boxResult augment mbTopCon result_ty
 
 	; return (realWorldStatePrimTy `mkFunTy` ccall_res_ty, wrap) }
 
-boxResult augment mbTopCon result_ty
+boxResult augment _mbTopCon result_ty
   = do -- It isn't IO, so do unsafePerformIO
        -- It's not conveniently available, so we inline it
        res <- resultWrapper result_ty
@@ -310,10 +304,13 @@ boxResult augment mbTopCon result_ty
                                      [the_alt]
        return (realWorldStatePrimTy `mkFunTy` ccall_res_ty, wrap)
   where
-    return_result state [ans] = ans
-    return_result _ _ = panic "return_result: expected single result"
+    return_result _ [ans] = ans
+    return_result _ _     = panic "return_result: expected single result"
 
 
+mk_alt :: (Expr Var -> [Expr Var] -> Expr Var)
+       -> (Maybe Type, Expr Var -> Expr Var)
+       -> DsM (Type, (AltCon, [Id], Expr Var))
 mk_alt return_result (Nothing, wrap_result)
   = do -- The ccall returns ()
        state_id <- newSysLocalDs realWorldStatePrimTy
@@ -369,7 +366,7 @@ resultWrapper result_ty
 
   -- Base case 2: the unit type ()
   | Just (tc,_) <- maybe_tc_app, tc `hasKey` unitTyConKey
-  = return (Nothing, \e -> Var unitDataConId)
+  = return (Nothing, \_ -> Var unitDataConId)
 
   -- Base case 3: the boolean type
   | Just (tc,_) <- maybe_tc_app, tc `hasKey` boolTyConKey
@@ -410,7 +407,7 @@ resultWrapper result_ty
                  \ e -> App (Var pack_id) e)
 
     -- Objects; 'dotnet' only.
-  | Just (tc, [arg_ty]) <- maybe_tc_app, 
+  | Just (tc, [_]) <- maybe_tc_app, 
     tyConName tc == objectTyConName
   = do pack_id <- dsLookupGlobalId unmarshalObjectName
        return (Just addrPrimTy,
