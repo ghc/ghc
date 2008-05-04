@@ -1,9 +1,3 @@
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
 
 -- 
 --  (c) The University of Glasgow 2002-2006
@@ -32,11 +26,9 @@ import UniqFM
 import UniqSupply
 import CostCentre
 import StaticFlags
-import PackageConfig
 import Panic
 import Binary
 import SrcLoc
-import Util
 import ErrUtils
 import Config
 import FastMutInt
@@ -193,15 +185,17 @@ writeBinIface dflags hi_path mod_iface = do
 	-- And send the result to the file
   writeBinMem bh hi_path
 
-initBinMemSize       = (1024*1024) :: Int
+initBinMemSize :: Int
+initBinMemSize = 1024 * 1024
 
 -- The *host* architecture version:
 #include "MachDeps.h"
 
+binaryInterfaceMagic :: Word32
 #if   WORD_SIZE_IN_BITS == 32
-binaryInterfaceMagic = 0x1face :: Word32
+binaryInterfaceMagic = 0x1face
 #elif WORD_SIZE_IN_BITS == 64
-binaryInterfaceMagic = 0x1face64 :: Word32
+binaryInterfaceMagic = 0x1face64
 #endif
   
 -- -----------------------------------------------------------------------------
@@ -231,7 +225,7 @@ fromOnDiskName
    -> NameCache
    -> OnDiskName
    -> (NameCache, Name)
-fromOnDiskName arr nc (pid, mod_name, occ) =
+fromOnDiskName _ nc (pid, mod_name, occ) =
   let 
         mod   = mkModule pid mod_name
         cache = nsNames nc
@@ -250,7 +244,7 @@ fromOnDiskName arr nc (pid, mod_name, occ) =
         }
 
 serialiseName :: BinHandle -> Name -> UniqFM (Int,Name) -> IO ()
-serialiseName bh name symtab = do
+serialiseName bh name _ = do
   let mod = nameModule name
   put_ bh (modulePackageId mod, moduleName mod, nameOccName name)
 
@@ -862,6 +856,7 @@ instance Binary IfacePredType where
 	      2 -> do ac <- get bh
 		      ad <- get bh
 		      return (IfaceEqPred ac ad)
+	      _ -> panic ("get IfacePredType " ++ show h)
 
 -------------------------------------------------------------------------
 --		IfaceExpr and friends
@@ -962,6 +957,7 @@ instance Binary IfaceExpr where
               12 -> do m <- get bh
                        ix <- get bh
                        return (IfaceTick m ix)
+              _ -> panic ("get IfaceExpr " ++ show h)
 
 instance Binary IfaceConAlt where
     put_ bh IfaceDefault = do
@@ -1068,6 +1064,7 @@ instance Binary IfaceNote where
 	      3 -> do return IfaceInlineMe
               4 -> do ac <- get bh
                       return (IfaceCoreNote ac)
+              _ -> panic ("get IfaceNote " ++ show h)
 
 -------------------------------------------------------------------------
 --		IfaceDecl and friends
@@ -1085,7 +1082,7 @@ instance Binary IfaceDecl where
 	    put_ bh (occNameFS name)
 	    put_ bh ty
 	    put_ bh idinfo
-    put_ bh (IfaceForeign ae af) = 
+    put_ _ (IfaceForeign _ _) = 
 	error "Binary.put_(IfaceDecl): IfaceForeign"
     put_ bh (IfaceData a1 a2 a3 a4 a5 a6 a7 a8) = do
 	    putByte bh 2
@@ -1185,6 +1182,7 @@ instance Binary OverlapFlag where
 		  0 -> return NoOverlap
 		  1 -> return OverlapOk
 		  2 -> return Incoherent
+		  _ -> panic ("get OverlapFlag " ++ show h)
 
 instance Binary IfaceConDecls where
     put_ bh IfAbstractTyCon = putByte bh 0
