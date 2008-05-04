@@ -1,13 +1,7 @@
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
 
 module VectType ( vectTyCon, vectAndLiftType, vectType, vectTypeEnv,
                   mkRepr, arrShapeTys, arrShapeVars, arrSelector,
-                  PAInstance, buildPADict,
+                  buildPADict,
                   fromVect )
 where
 
@@ -25,10 +19,9 @@ import Type
 import TypeRep
 import Coercion
 import FamInstEnv        ( FamInst, mkLocalFamInst )
-import InstEnv           ( Instance, mkLocalInstance, instanceDFunId )
 import OccName
 import MkId
-import BasicTypes        ( StrictnessMark(..), OverlapFlag(..), boolToRecFlag )
+import BasicTypes        ( StrictnessMark(..), boolToRecFlag )
 import Var               ( Var, TyVar )
 import Id                ( mkWildId )
 import Name              ( Name, getOccName )
@@ -120,13 +113,6 @@ boxType ty = return ty
 
 type TyConGroup = ([TyCon], UniqSet TyCon)
 
-data PAInstance = PAInstance {
-                    painstDFun      :: Var
-                  , painstOrigTyCon :: TyCon
-                  , painstVectTyCon :: TyCon
-                  , painstArrTyCon  :: TyCon
-                  }
-
 vectTypeEnv :: TypeEnv -> VM (TypeEnv, [FamInst], [(Var, CoreExpr)])
 vectTypeEnv env
   = do
@@ -163,10 +149,6 @@ vectTypeEnv env
     groups = tyConGroups tycons
 
     mk_map env = listToUFM_Directly [(u, getUnique n /= u) | (u,n) <- nameEnvUniqueElts env]
-
-    keep_tc tc = let dcs = tyConDataCons tc
-                 in
-                 defTyCon tc tc >> zipWithM_ defDataCon dcs dcs
 
 
 vectTyConDecls :: [TyCon] -> VM [TyCon]
@@ -207,6 +189,7 @@ vectAlgTyConRhs (DataTyCon { data_cons = data_cons
       return $ DataTyCon { data_cons = data_cons'
                          , is_enum   = is_enum
                          }
+vectAlgTyConRhs _ = panic "vectAlgTyConRhs"
 
 vectDataCon :: DataCon -> VM DataCon
 vectDataCon dc
@@ -291,6 +274,7 @@ voidRepr
                , void_bottom = Var var
                }
 
+{-
 enumRepr :: VM Repr
 enumRepr
   = do
@@ -305,6 +289,7 @@ enumRepr
                , enum_arr_tycon    = arr_tycon
                , enum_arr_data_con = arr_data_con
                }
+-}
 
 unboxedProductRepr :: [Type] -> VM Repr
 unboxedProductRepr []   = voidRepr
@@ -406,6 +391,7 @@ replicateSumShape len tag
 arrSelector :: Repr -> [CoreExpr] -> VM (CoreExpr, CoreExpr, CoreExpr)
 arrSelector (SumRepr {})  [len, sel, is] = return (len, sel, is)
 arrSelector (EnumRepr {}) [len, sel, is] = return (len, sel, is)
+arrSelector _             _              = panic "arrSelector"
 
 emptyArrRepr :: Repr -> VM [CoreExpr]
 emptyArrRepr (SumRepr { sum_components = prods })
@@ -418,7 +404,7 @@ emptyArrRepr (IdRepr ty)
   = liftM singleton $ emptyPA ty
 emptyArrRepr (VoidRepr { void_tycon = tycon })
   = liftM singleton $ emptyPA (mkTyConApp tycon [])
-emptyArrRepr (EnumRepr { enum_tycon = tycon })
+emptyArrRepr (EnumRepr {})
   = return []
 
 arrReprTys :: Repr -> VM [Type]
@@ -511,6 +497,8 @@ buildToPRepr repr vect_tc prepr_tc _
     to_unboxed (VoidRepr { void_bottom = bottom })
       = return ([], bottom)
 
+    to_unboxed _ = panic "buildToPRepr/to_unboxed"
+
 
 buildFromPRepr :: Repr -> TyCon -> TyCon -> TyCon -> VM CoreExpr
 buildFromPRepr repr vect_tc prepr_tc _
@@ -571,8 +559,10 @@ buildFromPRepr repr vect_tc prepr_tc _
     from_unboxed (IdRepr _) con expr
        = return $ con `App` expr
 
-    from_unboxed (VoidRepr {}) con expr
+    from_unboxed (VoidRepr {}) con _
        = return con
+
+    from_unboxed _ _ _ = panic "buildFromPRepr/from_unboxed"
 
 buildToArrPRepr :: Repr -> TyCon -> TyCon -> TyCon -> VM CoreExpr
 buildToArrPRepr repr vect_tc prepr_tc arr_tc
@@ -606,7 +596,7 @@ buildToArrPRepr repr vect_tc prepr_tc arr_tc
 
     [arr_dc] = tyConDataCons arr_tc
 
-    to_repr shape_vars@(len_var : _)
+    to_repr shape_vars@(_ : _)
             repr_vars
             (SumRepr { sum_components   = prods
                      , sum_arr_tycon    = tycon
@@ -637,6 +627,8 @@ buildToArrPRepr repr vect_tc prepr_tc arr_tc
                . mkConApp data_con
                 $ map Var shape_vars
 
+    to_repr _ _ _ = panic "buildToArrPRepr/to_repr"
+
     to_prod repr_vars@(r : _)
             (ProdRepr { prod_components   = tys@(ty : _)
                       , prod_arr_tycon    = tycon
@@ -647,8 +639,9 @@ buildToArrPRepr repr vect_tc prepr_tc arr_tc
                  . mkConApp data_con
                  $ map Type tys ++ len : map Var repr_vars
 
-    to_prod [var] (IdRepr ty)   = return (Var var)
+    to_prod [var] (IdRepr _)    = return (Var var)
     to_prod [var] (VoidRepr {}) = return (Var var)
+    to_prod _     _             = panic "buildToArrPRepr/to_prod"
 
 
 buildFromArrPRepr :: Repr -> TyCon -> TyCon -> TyCon -> VM CoreExpr
@@ -708,9 +701,12 @@ buildFromArrPRepr repr vect_tc prepr_tc arr_tc
 
               from_prod prod (Var var) shape_vars repr_vars res_ty
                 =<< go prods rss vars body
+        go _ _ _ _ = panic "buildFromArrPRepr/go"
 
     from_repr repr expr shape_vars [repr_vars] res_ty body
       = from_prod repr expr shape_vars repr_vars res_ty body
+
+    from_repr _ _ _ _ _ _ = panic "buildFromArrPRepr/from_repr"
 
     from_prod prod@(ProdRepr { prod_components = tys
                              , prod_arr_tycon  = tycon
@@ -723,7 +719,7 @@ buildFromArrPRepr repr vect_tc prepr_tc arr_tc
       = do
           let scrut    = unwrapFamInstScrut tycon tys expr
               scrut_ty = mkTyConApp tycon tys
-          ty <- arrReprType prod
+          _ty <- arrReprType prod
 
           return $ Case scrut (mkWildId scrut_ty) res_ty
                    [(DataAlt data_con, shape_vars ++ repr_vars, body)]
@@ -741,21 +737,23 @@ buildFromArrPRepr repr vect_tc prepr_tc arr_tc
         return $ Case scrut (mkWildId scrut_ty) res_ty
                  [(DataAlt data_con, shape_vars, body)]
 
-    from_prod (IdRepr ty)
+    from_prod (IdRepr _)
               expr
-              shape_vars
+              _shape_vars
               [repr_var]
-              res_ty
+              _res_ty
               body
       = return $ Let (NonRec repr_var expr) body
 
     from_prod (VoidRepr {})
               expr
-              shape_vars
+              _shape_vars
               [repr_var]
-              res_ty
+              _res_ty
               body
       = return $ Let (NonRec repr_var expr) body
+
+    from_prod _ _ _ _ _ _ = panic "buildFromArrPRepr/from_prod"
 
 buildPRDictRepr :: Repr -> VM CoreExpr
 buildPRDictRepr (VoidRepr { void_tycon = tycon })
@@ -859,12 +857,6 @@ buildTyConBindings orig_tc vect_tc prepr_tc arr_tc dfun
       dict <- buildPADict repr vect_tc prepr_tc arr_tc dfun
       binds <- takeHoisted
       return $ (dfun, dict) : binds
-  where
-    orig_dcs = tyConDataCons orig_tc
-    vect_dcs = tyConDataCons vect_tc
-    [arr_dc] = tyConDataCons arr_tc
-
-    repr_tys = map dataConRepArgTys vect_dcs
 
 vectDataConWorkers :: Repr -> TyCon -> TyCon -> TyCon
                    -> VM ()
@@ -916,7 +908,7 @@ vectDataConWorkers repr orig_tc vect_tc arr_tc
           units <- replicatePA len (Var unitDataConId)
           return [units]
 
-    mk_arr_repr len arrs = return arrs
+    mk_arr_repr _ arrs = return arrs
 
     def_worker data_con arg_tys mk_body
       = do
@@ -933,7 +925,7 @@ vectDataConWorkers repr orig_tc vect_tc arr_tc
         orig_worker = dataConWorkId data_con
 
 buildPADict :: Repr -> TyCon -> TyCon -> TyCon -> Var -> VM CoreExpr
-buildPADict repr vect_tc prepr_tc arr_tc dfun
+buildPADict repr vect_tc prepr_tc arr_tc _
   = polyAbstract tvs $ \abstract ->
     do
       meth_binds <- mapM (mk_method repr) paMethods
@@ -954,6 +946,7 @@ buildPADict repr vect_tc prepr_tc arr_tc dfun
           var  <- newLocalVar name (exprType body)
           return (var, mkInlineMe body)
 
+paMethods :: [(FastString, Repr -> TyCon -> TyCon -> TyCon -> VM CoreExpr)]
 paMethods = [(fsLit "toPRepr",      buildToPRepr),
              (fsLit "fromPRepr",    buildFromPRepr),
              (fsLit "toArrPRepr",   buildToArrPRepr),
@@ -971,7 +964,7 @@ paMethods = [(fsLit "toPRepr",      buildToPRepr),
 classifyTyCons :: UniqFM Bool -> [TyConGroup] -> ([TyCon], [TyCon])
 classifyTyCons = classify [] []
   where
-    classify conv keep cs [] = (conv, keep)
+    classify conv keep _  [] = (conv, keep)
     classify conv keep cs ((tcs, ds) : rs)
       | can_convert && must_convert
         = classify (tcs ++ conv) keep (cs `addListToUFM` [(tc,True) | tc <- tcs]) rs
@@ -1007,7 +1000,7 @@ tyConsOfTyCon
 tyConsOfType :: Type -> UniqSet TyCon
 tyConsOfType ty
   | Just ty' <- coreView ty    = tyConsOfType ty'
-tyConsOfType (TyVarTy v)       = emptyUniqSet
+tyConsOfType (TyVarTy _)       = emptyUniqSet
 tyConsOfType (TyConApp tc tys) = extend (tyConsOfTypes tys)
   where
     extend | isUnLiftedTyCon tc
@@ -1052,7 +1045,7 @@ identityConv (TyConApp tycon tys)
   = do
       mapM_ identityConv tys
       identityConvTyCon tycon
-identityConv ty = noV
+identityConv _ = noV
 
 identityConvTyCon :: TyCon -> VM ()
 identityConvTyCon tc
