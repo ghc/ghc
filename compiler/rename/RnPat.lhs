@@ -266,7 +266,7 @@ rnLPatAndThen var@(NM varf) (L loc p) cont =
 	      ; return (res, fvs_res `plusFV` fv_expr) }
 
 #ifndef GHCI
-         pat@(QuasiQuotePat _) -> pprPanic "Can't do QuasiQuotePat without GHCi" (ppr p)
+         (QuasiQuotePat _) -> pprPanic "Can't do QuasiQuotePat without GHCi" (ppr p)
 #else
          QuasiQuotePat qq -> do
              (qq', _) <- rnQuasiQuote qq

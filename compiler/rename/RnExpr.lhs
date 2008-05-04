@@ -28,9 +28,7 @@ import TcRnMonad
 import RnEnv
 import RnTypes		( rnHsTypeFVs, 
 			  mkOpFormRn, mkOpAppRn, mkNegAppRn, checkSectionPrec)
-import RnPat            (rnQuasiQuote, rnOverLit, rnPatsAndThen_LocalRightwards, rnBindPat,
-                         localRecNameMaker, rnLit,
-			 rnHsRecFields_Con, rnHsRecFields_Update, checkTupSize)
+import RnPat
 import DynFlags		( DynFlag(..) )
 import BasicTypes	( FixityDirection(..) )
 import PrelNames	( thFAKE, hasKey, assertIdKey, assertErrorName,
