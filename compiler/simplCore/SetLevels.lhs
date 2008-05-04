@@ -42,13 +42,6 @@
   the scrutinee of the case, and we can inline it.  
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module SetLevels (
 	setLevels, 
 
@@ -71,9 +64,7 @@ import Id		( Id, idType, mkSysLocal, isOneShotLambda,
 			  zapDemandIdInfo, transferPolyIdInfo,
 			  idSpecialisation, idWorkerInfo, setIdInfo
 			)
-import IdInfo		( workerExists, vanillaIdInfo, isEmptySpecInfo,
-                          setNewStrictnessInfo, newStrictnessInfo,
-			  setArityInfo, arityInfo )
+import IdInfo
 import Var
 import VarSet
 import VarEnv
@@ -159,14 +150,15 @@ the worker at all.
 type LevelledExpr  = TaggedExpr Level
 type LevelledBind  = TaggedBind Level
 
+tOP_LEVEL, iNLINE_CTXT :: Level
 tOP_LEVEL   = Level 0 0
 iNLINE_CTXT = InlineCtxt
 
 incMajorLvl :: Level -> Level
 -- For InlineCtxt we ignore any inc's; we don't want
 -- to do any floating at all; see notes above
-incMajorLvl InlineCtxt		= InlineCtxt
-incMajorLvl (Level major minor) = Level (major+1) 0
+incMajorLvl InlineCtxt      = InlineCtxt
+incMajorLvl (Level major _) = Level (major + 1) 0
 
 incMinorLvl :: Level -> Level
 incMinorLvl InlineCtxt		= InlineCtxt
@@ -180,33 +172,33 @@ maxLvl l1@(Level maj1 min1) l2@(Level maj2 min2)
   | otherwise					   = l2
 
 ltLvl :: Level -> Level -> Bool
-ltLvl any_lvl	 InlineCtxt  = False
+ltLvl _          InlineCtxt  = False
 ltLvl InlineCtxt (Level _ _) = True
 ltLvl (Level maj1 min1) (Level maj2 min2)
   = (maj1 < maj2) || (maj1 == maj2 && min1 < min2)
 
 ltMajLvl :: Level -> Level -> Bool
     -- Tells if one level belongs to a difft *lambda* level to another
-ltMajLvl any_lvl	InlineCtxt     = False
-ltMajLvl InlineCtxt	(Level maj2 _) = 0 < maj2
+ltMajLvl _              InlineCtxt     = False
+ltMajLvl InlineCtxt     (Level maj2 _) = 0 < maj2
 ltMajLvl (Level maj1 _) (Level maj2 _) = maj1 < maj2
 
 isTopLvl :: Level -> Bool
 isTopLvl (Level 0 0) = True
-isTopLvl other	     = False
+isTopLvl _           = False
 
 isInlineCtxt :: Level -> Bool
 isInlineCtxt InlineCtxt = True
-isInlineCtxt other	= False
+isInlineCtxt _          = False
 
 instance Outputable Level where
   ppr InlineCtxt      = text "<INLINE>"
   ppr (Level maj min) = hcat [ char '<', int maj, char ',', int min, char '>' ]
 
 instance Eq Level where
-  InlineCtxt	    == InlineCtxt	 = True
-  (Level maj1 min1) == (Level maj2 min2) = maj1==maj2 && min1==min2
-  l1		    == l2		 = False
+  InlineCtxt        == InlineCtxt        = True
+  (Level maj1 min1) == (Level maj2 min2) = maj1 == maj2 && min1 == min2
+  _                 == _                 = False
 \end{code}
 
 
@@ -238,6 +230,7 @@ setLevels float_lams binds us
 
     init_env = initialEnv float_lams
 
+lvlTopBind :: LevelEnv -> Bind Id -> LvlM (LevelledBind, LevelEnv)
 lvlTopBind env (NonRec binder rhs)
   = lvlBind TopLevel tOP_LEVEL env (AnnNonRec binder (freeVars rhs))
 					-- Rhs can have no free vars!
@@ -275,9 +268,9 @@ don't want @lvlExpr@ to turn the scrutinee of the @case@ into an MFE
 If there were another lambda in @r@'s rhs, it would get level-2 as well.
 
 \begin{code}
-lvlExpr _ _ (_, AnnType ty)   = return (Type ty)
+lvlExpr _ _ (  _, AnnType ty) = return (Type ty)
 lvlExpr _ env (_, AnnVar v)   = return (lookupVar env v)
-lvlExpr _ env (_, AnnLit lit) = return (Lit lit)
+lvlExpr _ _   (_, AnnLit lit) = return (Lit lit)
 
 lvlExpr ctxt_lvl env (_, AnnApp fun arg) = do
     fun' <- lvl_fun fun
@@ -286,11 +279,11 @@ lvlExpr ctxt_lvl env (_, AnnApp fun arg) = do
   where
 -- gaw 2004
     lvl_fun (_, AnnCase _ _ _ _) = lvlMFE True ctxt_lvl env fun
-    lvl_fun other 	       = lvlExpr ctxt_lvl env fun
+    lvl_fun _                    = lvlExpr ctxt_lvl env fun
 	-- We don't do MFE on partial applications generally,
 	-- but we do if the function is big and hairy, like a case
 
-lvlExpr ctxt_lvl env (_, AnnNote InlineMe expr) = do
+lvlExpr _ env (_, AnnNote InlineMe expr) = do
 -- Don't float anything out of an InlineMe; hence the iNLINE_CTXT
     expr' <- lvlExpr iNLINE_CTXT env expr
     return (Note InlineMe expr')
@@ -310,7 +303,7 @@ lvlExpr ctxt_lvl env (_, AnnCast expr co) = do
 -- Why not?  Because partial applications are fairly rare, and splitting
 -- lambdas makes them more expensive.
 
-lvlExpr ctxt_lvl env expr@(_, AnnLam bndr rhs) = do
+lvlExpr ctxt_lvl env expr@(_, AnnLam {}) = do
     new_body <- lvlMFE True new_lvl new_env body
     return (mkLams new_bndrs new_body)
   where 
@@ -379,7 +372,7 @@ lvlMFE ::  Bool			-- True <=> strict context [body of case or let]
 	-> CoreExprWithFVs	-- input expression
 	-> LvlM LevelledExpr	-- Result expression
 
-lvlMFE strict_ctxt ctxt_lvl env (_, AnnType ty)
+lvlMFE _ _ _ (_, AnnType ty)
   = return (Type ty)
 
 
@@ -571,6 +564,8 @@ lvlBind top_lvl ctxt_lvl env (AnnRec pairs)
 ----------------------------------------------------
 -- Three help functons for the type-abstraction case
 
+lvlFloatRhs :: [CoreBndr] -> Level -> LevelEnv -> CoreExprWithFVs
+            -> UniqSM (Expr (TaggedBndr Level))
 lvlFloatRhs abs_vars dest_lvl env rhs = do
     rhs' <- lvlExpr rhs_lvl rhs_env rhs
     return (mkLams abs_vars_w_lvls rhs')
@@ -643,9 +638,9 @@ isFunction :: CoreExprWithFVs -> Bool
 -- variables.  We certainly only want to do it for values, and not for
 -- constructors.  So the simple thing is just to look for lambdas
 isFunction (_, AnnLam b e) | isId b    = True
-			   | otherwise = isFunction e
-isFunction (_, AnnNote n e)            = isFunction e
-isFunction other 		       = False
+                           | otherwise = isFunction e
+isFunction (_, AnnNote _ e)            = isFunction e
+isFunction _                           = False
 \end{code}
 
 
@@ -718,33 +713,37 @@ extendLvlEnv (float_lams, lvl_env, subst, id_env) prs
 
 -- extendCaseBndrLvlEnv adds the mapping case-bndr->scrut-var if it can
 -- (see point 4 of the module overview comment)
+extendCaseBndrLvlEnv :: LevelEnv -> Expr (TaggedBndr Level) -> Var -> Level
+                     -> LevelEnv
 extendCaseBndrLvlEnv (float_lams, lvl_env, subst, id_env) (Var scrut_var) case_bndr lvl
   = (float_lams,
      extendVarEnv lvl_env case_bndr lvl,
      extendIdSubst subst case_bndr (Var scrut_var),
      extendVarEnv id_env case_bndr ([scrut_var], Var scrut_var))
      
-extendCaseBndrLvlEnv env scrut case_bndr lvl
+extendCaseBndrLvlEnv env _scrut case_bndr lvl
   = extendLvlEnv          env [TB case_bndr lvl]
 
+extendPolyLvlEnv :: Level -> LevelEnv -> [Var] -> [(Var, Var)] -> LevelEnv
 extendPolyLvlEnv dest_lvl (float_lams, lvl_env, subst, id_env) abs_vars bndr_pairs
   = (float_lams,
      foldl add_lvl   lvl_env bndr_pairs,
      foldl add_subst subst   bndr_pairs,
      foldl add_id    id_env  bndr_pairs)
   where
-     add_lvl   env (v,v') = extendVarEnv env v' dest_lvl
-     add_subst env (v,v') = extendIdSubst env v (mkVarApps (Var v') abs_vars)
-     add_id    env (v,v') = extendVarEnv env v ((v':abs_vars), mkVarApps (Var v') abs_vars)
+     add_lvl   env (_, v') = extendVarEnv env v' dest_lvl
+     add_subst env (v, v') = extendIdSubst env v (mkVarApps (Var v') abs_vars)
+     add_id    env (v, v') = extendVarEnv env v ((v':abs_vars), mkVarApps (Var v') abs_vars)
 
+extendCloneLvlEnv :: Level -> LevelEnv -> Subst -> [(Var, Var)] -> LevelEnv
 extendCloneLvlEnv lvl (float_lams, lvl_env, _, id_env) new_subst bndr_pairs
   = (float_lams,
      foldl add_lvl   lvl_env bndr_pairs,
      new_subst,
      foldl add_id    id_env  bndr_pairs)
   where
-     add_lvl   env (v,v') = extendVarEnv env v' lvl
-     add_id    env (v,v') = extendVarEnv env v ([v'], Var v')
+     add_lvl env (_, v') = extendVarEnv env v' lvl
+     add_id  env (v, v') = extendVarEnv env v ([v'], Var v')
 
 
 maxIdLevel :: LevelEnv -> VarSet -> Level
@@ -764,7 +763,7 @@ maxIdLevel (_, lvl_env,_,id_env) var_set
 lookupVar :: LevelEnv -> Id -> LevelledExpr
 lookupVar (_, _, _, id_env) v = case lookupVarEnv id_env v of
 				       Just (_, expr) -> expr
-				       other	      -> Var v
+				       _    	      -> Var v
 
 abstractVars :: Level -> LevelEnv -> VarSet -> [Var]
 	-- Find the variables in fvs, free vars of the target expresion,
@@ -783,7 +782,7 @@ abstractVars dest_lvl (_, lvl_env, _, id_env) fvs
     v1 `le` v2 = case (is_tv v1, is_tv v2) of
 		   (True, False) -> True
 		   (False, True) -> False
-		   other	 -> v1 <= v2	-- Same family
+		   _    	 -> v1 <= v2	-- Same family
 
     is_tv v = isTyVar v && not (isCoVar v)
 
@@ -830,11 +829,13 @@ absVarsOf id_env v
 \begin{code}
 type LvlM result = UniqSM result
 
-initLvl		= initUs_
+initLvl :: UniqSupply -> UniqSM a -> a
+initLvl = initUs_
 \end{code}
 
 
 \begin{code}
+newPolyBndrs :: Level -> LevelEnv -> [Var] -> [Id] -> UniqSM (LevelEnv, [Id])
 newPolyBndrs dest_lvl env abs_vars bndrs = do
     uniqs <- getUniquesM
     let new_bndrs = zipWith mk_poly_bndr bndrs uniqs
@@ -857,7 +858,7 @@ newLvlVar str vars body_ty = do
 -- to the rules inside each Id.  Grr.  But it matters.
 
 cloneVar :: TopLevelFlag -> LevelEnv -> Id -> Level -> Level -> LvlM (LevelEnv, Id)
-cloneVar TopLevel env v ctxt_lvl dest_lvl
+cloneVar TopLevel env v _ _
   = return (env, v)	-- Don't clone top level things
 cloneVar NotTopLevel env@(_,_,subst,_) v ctxt_lvl dest_lvl
   = ASSERT( isId v ) do
@@ -869,7 +870,7 @@ cloneVar NotTopLevel env@(_,_,subst,_) v ctxt_lvl dest_lvl
     return (env', v2)
 
 cloneRecVars :: TopLevelFlag -> LevelEnv -> [Id] -> Level -> Level -> LvlM (LevelEnv, [Id])
-cloneRecVars TopLevel env vs ctxt_lvl dest_lvl 
+cloneRecVars TopLevel env vs _ _
   = return (env, vs)	-- Don't clone top level things
 cloneRecVars NotTopLevel env@(_,_,subst,_) vs ctxt_lvl dest_lvl
   = ASSERT( all isId vs ) do
@@ -883,6 +884,7 @@ cloneRecVars NotTopLevel env@(_,_,subst,_) vs ctxt_lvl dest_lvl
 	-- VERY IMPORTANT: we must zap the demand info 
 	-- if the thing is going to float out past a lambda,
 	-- or if it's going to top level (where things can't be strict)
+zap_demand :: Level -> Level -> Id -> Id
 zap_demand dest_lvl ctxt_lvl id
   | ctxt_lvl == dest_lvl,
     not (isTopLvl dest_lvl) = id	-- Stays, and not going to top level
