@@ -491,6 +491,9 @@ pprCmdArg (HsCmdTop cmd@(L _ (HsArrForm _ Nothing [])) _ _ _)
 pprCmdArg (HsCmdTop cmd _ _ _)
   = parens (ppr_lexpr cmd)
 
+instance OutputableBndr id => Outputable (HsCmdTop id) where
+    ppr = pprCmdArg
+
 -- Put a var in backquotes if it's not an operator already
 pprInfix :: Outputable name => name -> SDoc
 pprInfix v | isOperator ppr_v = ppr_v

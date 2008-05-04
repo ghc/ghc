@@ -6,13 +6,6 @@
 Desugaring arrow commands
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module DsArrows ( dsProcExpr ) where
 
 #include "HsVersions.h"
@@ -38,14 +31,14 @@ import CoreSyn
 import CoreFVs
 import CoreUtils
 
-import Id
 import Name
+import Var
 import PrelInfo
 import DataCon
 import TysWiredIn
 import BasicTypes
 import PrelNames
-import Util
+import Outputable
 
 import VarSet
 import SrcLoc
@@ -251,7 +244,7 @@ dsProcExpr
 dsProcExpr pat (L _ (HsCmdTop cmd [] cmd_ty ids)) = do
     meth_ids <- mkCmdEnv ids
     let locals = mkVarSet (collectPatBinders pat)
-    (core_cmd, free_vars, env_ids) <- dsfixCmd meth_ids locals [] cmd_ty cmd
+    (core_cmd, _free_vars, env_ids) <- dsfixCmd meth_ids locals [] cmd_ty cmd
     let env_ty = mkBigCoreVarTupTy env_ids
     fail_expr <- mkFailExpr ProcExpr env_ty
     var <- selectSimpleMatchVarL pat
@@ -261,6 +254,7 @@ dsProcExpr pat (L _ (HsCmdTop cmd [] cmd_ty ids)) = do
                     (Lam var match_code)
                     core_cmd
     return (bindCmdEnv meth_ids proc_code)
+dsProcExpr _ c = pprPanic "dsProcExpr" (ppr c)
 \end{code}
 
 Translation of command judgements of the form
@@ -268,6 +262,8 @@ Translation of command judgements of the form
 	A | xs |- c :: [ts] t
 
 \begin{code}
+dsLCmd :: DsCmdEnv -> IdSet -> [Id] -> [Type] -> Type -> LHsCmd Id
+       -> DsM (CoreExpr, IdSet)
 dsLCmd ids local_vars env_ids stack res_ty cmd
   = dsCmd ids local_vars env_ids stack res_ty (unLoc cmd)
 
@@ -294,7 +290,6 @@ dsCmd ids local_vars env_ids stack res_ty
     let
         (a_arg_ty, _res_ty') = tcSplitAppTy arrow_ty
         (_a_ty, arg_ty) = tcSplitAppTy a_arg_ty
-        env_ty = mkBigCoreVarTupTy env_ids
     core_arrow <- dsLExpr arrow
     core_arg   <- dsLExpr arg
     stack_ids  <- mapM newSysLocalDs stack
@@ -320,7 +315,6 @@ dsCmd ids local_vars env_ids stack res_ty
     let
         (a_arg_ty, _res_ty') = tcSplitAppTy arrow_ty
         (_a_ty, arg_ty) = tcSplitAppTy a_arg_ty
-        env_ty = mkBigCoreVarTupTy env_ids
     
     core_arrow <- dsLExpr arrow
     core_arg   <- dsLExpr arg
@@ -538,7 +532,7 @@ dsCmd ids local_vars env_ids stack res_ty (HsLet binds body) = do
         defined_vars = mkVarSet (map unLoc (collectLocalBinders binds))
         local_vars' = local_vars `unionVarSet` defined_vars
     
-    (core_body, free_vars, env_ids') <- dsfixCmd ids local_vars' stack res_ty body
+    (core_body, _free_vars, env_ids') <- dsfixCmd ids local_vars' stack res_ty body
     stack_ids <- mapM newSysLocalDs stack
     -- build a new environment, plus the stack, using the let bindings
     core_binds <- dsLocalBinds binds (buildEnvStack env_ids' stack_ids)
@@ -572,6 +566,8 @@ dsCmd ids local_vars env_ids stack res_ty (HsTick ix vars expr) = do
     (expr1,id_set) <- dsLCmd ids local_vars env_ids stack res_ty expr
     expr2 <- mkTickBox ix vars expr1
     return (expr2,id_set)
+
+dsCmd _ _ _ _ _ c = pprPanic "dsCmd" (ppr c)
 
 --	A | ys |- c :: [ts] t	(ys <= xs)
 --	---------------------
@@ -642,7 +638,7 @@ dsCmdDo ids local_vars env_ids res_ty (stmt:stmts) body = do
     let
         bound_vars = mkVarSet (map unLoc (collectLStmtBinders stmt))
         local_vars' = local_vars `unionVarSet` bound_vars
-    (core_stmts, fv_stmts, env_ids') <- fixDs (\ ~(_,_,env_ids') -> do
+    (core_stmts, _, env_ids') <- fixDs (\ ~(_,_,env_ids') -> do
         (core_stmts, fv_stmts) <- dsCmdDo ids local_vars' env_ids' res_ty stmts body
         return (core_stmts, fv_stmts, varSetElems fv_stmts))
     (core_stmt, fv_stmt) <- dsCmdLStmt ids local_vars env_ids env_ids' stmt
@@ -659,6 +655,8 @@ A statement maps one local environment to another, and is represented
 as an arrow from one tuple type to another.  A statement sequence is
 translated to a composition of such arrows.
 \begin{code}
+dsCmdLStmt :: DsCmdEnv -> IdSet -> [Id] -> [Id] -> LStmt Id
+           -> DsM (CoreExpr, IdSet)
 dsCmdLStmt ids local_vars env_ids out_ids cmd
   = dsCmdStmt ids local_vars env_ids out_ids (unLoc cmd)
 
@@ -784,7 +782,7 @@ dsCmdStmt ids local_vars env_ids out_ids (LetStmt binds) = do
 --			first (loop (arr (\((ys1),~(ys2)) -> (ys)) >>> ss)) >>>
 --			arr (\((xs1),(xs2)) -> (xs')) >>> ss'
 
-dsCmdStmt ids local_vars env_ids out_ids (RecStmt stmts later_ids rec_ids rhss binds) = do
+dsCmdStmt ids local_vars env_ids out_ids (RecStmt stmts later_ids rec_ids rhss _binds) = do
     let         -- ToDo: ****** binds not desugared; ROSS PLEASE FIX ********
         env2_id_set = mkVarSet out_ids `minusVarSet` mkVarSet later_ids
         env2_ids = varSetElems env2_id_set
@@ -831,10 +829,14 @@ dsCmdStmt ids local_vars env_ids out_ids (RecStmt stmts later_ids rec_ids rhss b
 
     return (core_body, env1_id_set `unionVarSet` env2_id_set)
 
+dsCmdStmt _ _ _ _ s = pprPanic "dsCmdStmt" (ppr s)
+
 --	loop (arr (\ ((env1_ids), ~(rec_ids)) -> (env_ids)) >>>
 --	      ss >>>
 --	      arr (\ (out_ids) -> ((later_ids),(rhss))) >>>
 
+dsRecCmd :: DsCmdEnv -> VarSet -> [LStmt Id] -> [Var] -> [Var] -> [HsExpr Id]
+         -> DsM (CoreExpr, VarSet, [Var])
 dsRecCmd ids local_vars stmts later_ids rec_ids rhss = do
     let
         rec_id_set = mkVarSet rec_ids
@@ -924,7 +926,7 @@ dsCmdStmts ids local_vars env_ids out_ids (stmt:stmts) = do
     let
         bound_vars = mkVarSet (map unLoc (collectLStmtBinders stmt))
         local_vars' = local_vars `unionVarSet` bound_vars
-    (core_stmts, fv_stmts, env_ids') <- dsfixCmdStmts ids local_vars' out_ids stmts
+    (core_stmts, _fv_stmts, env_ids') <- dsfixCmdStmts ids local_vars' out_ids stmts
     (core_stmt, fv_stmt) <- dsCmdLStmt ids local_vars env_ids env_ids' stmt
     return (do_compose ids
                 (mkBigCoreVarTupTy env_ids)
@@ -933,6 +935,8 @@ dsCmdStmts ids local_vars env_ids out_ids (stmt:stmts) = do
                 core_stmt
                 core_stmts,
               fv_stmt)
+
+dsCmdStmts _ _ _ _ [] = panic "dsCmdStmts []"
 
 \end{code}
 
@@ -949,6 +953,7 @@ matchSimplys [] _ctxt [] result_expr _fail_expr = return result_expr
 matchSimplys (exp:exps) ctxt (pat:pats) result_expr fail_expr = do
     match_code <- matchSimplys exps ctxt pats result_expr fail_expr
     matchSimply exp ctxt pat match_code fail_expr
+matchSimplys _ _ _ _ _ = panic "matchSimplys"
 \end{code}
 
 List of leaf expressions, with set of variables bound in each
@@ -976,7 +981,7 @@ replaceLeavesMatch
 	-> LMatch Id	-- the matches of a case command
 	-> ([LHsExpr Id],-- remaining leaf expressions
 	    LMatch Id)	-- updated match
-replaceLeavesMatch res_ty leaves (L loc (Match pat mt (GRHSs grhss binds)))
+replaceLeavesMatch _res_ty leaves (L loc (Match pat mt (GRHSs grhss binds)))
   = let
 	(leaves', grhss') = mapAccumL replaceLeavesGRHS leaves grhss
     in
@@ -987,8 +992,9 @@ replaceLeavesGRHS
 	-> LGRHS Id	-- rhss of a case command
 	-> ([LHsExpr Id],-- remaining leaf expressions
 	    LGRHS Id)	-- updated GRHS
-replaceLeavesGRHS (leaf:leaves) (L loc (GRHS stmts rhs))
+replaceLeavesGRHS (leaf:leaves) (L loc (GRHS stmts _))
   = (leaves, L loc (GRHS stmts leaf))
+replaceLeavesGRHS [] _ = panic "replaceLeavesGRHS []"
 \end{code}
 
 Balanced fold of a non-empty list.
@@ -1023,19 +1029,20 @@ See comments in HsUtils for why the other version does not include
 these bindings.
 
 \begin{code}
-collectPatBinders :: LPat a -> [a]
+collectPatBinders :: OutputableBndr a => LPat a -> [a]
 collectPatBinders pat = map unLoc (collectLocatedPatBinders pat)
 
-collectLocatedPatBinders :: LPat a -> [Located a]
+collectLocatedPatBinders :: OutputableBndr a => LPat a -> [Located a]
 collectLocatedPatBinders pat = collectl pat []
 
-collectPatsBinders :: [LPat a] -> [a]
+collectPatsBinders :: OutputableBndr a => [LPat a] -> [a]
 collectPatsBinders pats = map unLoc (collectLocatedPatsBinders pats)
 
-collectLocatedPatsBinders :: [LPat a] -> [Located a]
+collectLocatedPatsBinders :: OutputableBndr a => [LPat a] -> [Located a]
 collectLocatedPatsBinders pats = foldr collectl [] pats
 
 ---------------------
+collectl :: OutputableBndr a => LPat a -> [Located a] -> [Located a]
 collectl (L l pat) bndrs
   = go pat
   where
@@ -1052,7 +1059,7 @@ collectl (L l pat) bndrs
     go (PArrPat pats _)           = foldr collectl bndrs pats
     go (TuplePat pats _ _)        = foldr collectl bndrs pats
 
-    go (ConPatIn c ps)            = foldr collectl bndrs (hsConPatArgs ps)
+    go (ConPatIn _ ps)            = foldr collectl bndrs (hsConPatArgs ps)
     go (ConPatOut {pat_args=ps, pat_binds=ds}) =
                                     collectHsBindLocatedBinders ds
                                     ++ foldr collectl bndrs (hsConPatArgs ps)
@@ -1062,6 +1069,7 @@ collectl (L l pat) bndrs
 
     go (SigPatIn pat _)           = collectl pat bndrs
     go (SigPatOut pat _)          = collectl pat bndrs
-    go (TypePat ty)               = bndrs
-    go (CoPat _ pat ty)           = collectl (noLoc pat) bndrs
+    go (TypePat _)                = bndrs
+    go (CoPat _ pat _)            = collectl (noLoc pat) bndrs
+    go p                          = pprPanic "collectl/go" (ppr p)
 \end{code}
