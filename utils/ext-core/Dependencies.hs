@@ -1,25 +1,9 @@
 {-# OPTIONS -Wall #-}
-{- 
-   Besides computing dependencies between External Core modules,
-   this module encapsulates some magic regarding overridden modules.
-
-   In the interpreter, we use "overridden" versions of certain
-   standard GHC library modules in order to avoid implementing
-   more primitives than we need to implement to run simple programs.
-   So, during the dependency-finding process (which, because the
-   dependency-finder maintains a module cache to make sure no 
-   module is loaded/parsed more than once), references to overridden
-   modules are resolved to references to modules in our simplified
-   version of the standard library.
-
-   It's kind of ugly.
--}
 module Dependencies(getDependencies) where
 
 import Core
 import Encoding
 import ParsecParser
-import Prims
 
 import Control.Monad.State
 import Data.Generics
@@ -47,10 +31,14 @@ getDependencies ms =
               -- so we ignore the FilePath deps.
               ds <- go getDeps lefts (map Left) (map Right ms)
               return (f, ds)) ms)
-    (_,t,_) <- get
+    (_,t,c) <- get
     let modNames = nub $ concat (snd (unzip (leftsPairs (M.toList t))))
-    (liftM catMaybes) $ mapM findModuleP (map Left modNames))
+                       
+    res1 <- (liftM catMaybes) $ mapM findModuleP (map Left modNames)
+    return $ res1 `unionByFirst`
+               (snd (unzip (M.toList c))))
    (last ms, M.empty, M.empty)
+      where unionByFirst = unionBy (\ (f,_) (g,_) -> f == g)
 
 go :: (Show a, Show b, Eq b, MonadIO m) =>
   (a -> m [b]) -> ([a] -> [b]) -> ([b] -> [a]) -> [a] -> m [b]
@@ -73,7 +61,7 @@ tyRef  _ = []
 
 getDeps :: Either AnMname FilePath -> DepM [AnMname]
 getDeps mn = do
-          (a,t,b) <- get
+          (_,t,_) <- get
           case M.lookup mn t of
             Just ds -> return ds
             Nothing -> do
@@ -81,12 +69,13 @@ getDeps mn = do
               case maybeM of
                 Nothing -> return []
                 Just m@(Module mname _ _) -> do
-                  let ds =   (everything union ([] `mkQ` varRef) m)
+                  let ds = (everything union ([] `mkQ` varRef) m)
                             `union` (everything union ([] `mkQ` tyRef) m) in do
-                  put (a, M.insert mn ds t, b)
+                  liftIO $ putStrLn (show mn ++ " : " ++ show ds)
+                  (a1,t1,b1) <- get
                   -- in case we were given a filepath, register the
                   -- module name too
-                  put (a, M.insert (Left mname) ds t, b)
+                  put (a1, M.insert mn ds (M.insert (Left mname) ds t1), b1)
                   return ds
 
 findModule :: Either AnMname FilePath -> DepM (Maybe Module)
@@ -97,8 +86,6 @@ findModule x = do
    _          -> return Nothing
 
 findModuleP :: Either AnMname FilePath -> DepM (Maybe (FilePath, Module))
-findModuleP (Left mn) | mn `elem` wiredInModules = 
-  findWiredInModule mn >>= (return . Just)
 findModuleP (Left mn) | mn == wrapperMainMname || mn == mainMname = do
   (f,_,_) <- get
   findModuleP (Right f)
@@ -114,13 +101,6 @@ tryFindModule k = do
     Just p -> return p
     Nothing -> findModuleNotCached k
 
--- This function encapsulates all the business with overriden modules.
--- The story is that if an "overridden" module exists for the given
--- module, then we parse it in and rewrite all occurrences of the "base-extcore"
--- package name inside it to "base". We have to do this b/c when compiling
--- the overridden modules, we gave the package name "base-extcore", because
--- GHC gets unhappy if we try to make it part of the "base" package.
--- Was that clear? (No.)
 findModuleNotCached :: Either AnMname FilePath -> DepM (FilePath, Module)
 findModuleNotCached (Left m@(M (P pkgName, encHier, encLeafName))) = do
       let hier = map zDecodeString encHier
@@ -129,46 +109,36 @@ findModuleNotCached (Left m@(M (P pkgName, encHier, encLeafName))) = do
                      ++ map (dirs (zDecodeString pkgName:hier) leafName) searchPath in do
       match <- liftIO $ findM doesFileExist possibleFiles
       case match of
-         Just fp -> findModule' Nothing fp
+         Just fp -> findModule' fp
          Nothing -> error ("findModule: failed to find dependency " ++ show m
                       ++ " tried " ++ show possibleFiles)
-findModuleNotCached (Right fp) = findModule' Nothing fp
+findModuleNotCached (Right fp) = findModule' fp
 
 dirs :: [String] -> String -> FilePath -> FilePath
 dirs modulePath leafName dir = dir </> 
                  (foldr (</>) (addExtension leafName "hcr") modulePath)
 
-findWiredInModule :: AnMname -> DepM (FilePath, Module)
-findWiredInModule m@(M (pn, encHier, encLeafName)) =
-   findModule' (Just munged) (wiredInFileName m)
-     where hier = map zDecodeString encHier
-           leafName = zDecodeString encLeafName
-           munged = 
-             M (pn, map (\ p -> if p == "GHC_ExtCore" then "GHC" else p) hier,
-                 leafName)
-
-findModule' :: Mname -> FilePath -> DepM (FilePath, Module)
-findModule' trueName fp = do
+findModule' :: FilePath -> DepM (FilePath, Module)
+findModule' fp = do
           res <- liftIO $ parseCore fp
           case res of
             Left _   -> error ("findModule: error parsing dependency " ++ fp)
-            Right parsedMod -> do
-                let resultMod@(Module mn _ _) = 
-                      case trueName of
-                        Just _ -> mungePackageName parsedMod
-                        Nothing -> parsedMod
-                cacheModule mn fp resultMod
-                return (fp, resultMod)
+            Right parsedMod@(Module mn _ _) -> do
+                cacheModule mn fp parsedMod
+                return (fp, parsedMod)
 
 cacheModule :: AnMname -> FilePath -> Module -> DepM ()
 cacheModule mn fp m = modify (\ (a, b, cache) ->
                            (a, b, M.insert (Left mn) (fp, m)
                                     (M.insert (Right fp) (fp, m)
-                                       cache)))
+                                    cache)))
 
 searchPath :: [FilePath]
 searchPath = overriddenDir:["../../libraries/",
-              "../../libraries/integer-gmp/"]
+             -- kludgy: we wouldn't need these if we parsed the
+             -- package.conf file, but for now, we are too lazy
+              "../../libraries/integer-gmp/",
+              "../../libraries/array/"]
 
 overriddenDir :: FilePath
 overriddenDir = "./lib/"
@@ -189,34 +159,9 @@ leftsPairs = foldr leftsPairs' []
   where leftsPairs' ((Left x), y) xs = (x, y):xs
         leftsPairs' _             xs = xs
 
-mungePackageName :: Module -> Module
--- for now: just substitute "base-extcore" for "base"
--- and "GHC" for "GHC_ExtCore" in every module name
-mungePackageName m@(Module mn _ _) = everywhere (mkT mungeMname)
-    (everywhere (mkT mungePname) 
-       (everywhere (mkT mungeVarName) m))
-  where mungePname (P s) | s == zEncodeString overriddenPname =
-           (P "base")
-        mungePname p = p
-        -- rewrite uses of fake primops
-        mungeVarName (Var (Just mn', v))
-          | mn' == mn && v `elem` (fst (unzip newPrimVars)) =
-            Var (Just primMname, v)
-        mungeVarName e = e
-
-mungeMname :: AnMname -> AnMname
-mungeMname (M (pname, (hd:rest), leaf)) 
-  | zDecodeString hd == "GHC_ExtCore" =
-          (M (pname, ("GHC":rest), leaf))
-mungeMname mn = mn
-
-overriddenPname :: String
-overriddenPname = "base-extcore"
-
-wiredInModules :: [AnMname]
-wiredInModules =
-  map (\ m -> (mkBaseMname m)) ["Handle", "IO", "Unicode"]
-
-wiredInFileName :: AnMname -> FilePath
-wiredInFileName (M (_,_,leafName)) =
-  "./lib/GHC_ExtCore/" </> leafName `addExtension` "hcr"
+{-
+rightsPairs :: [(Either a b, c)] -> [(b, c)]
+rightsPairs = foldr rightsPairs' []
+  where rightsPairs' ((Right x), y) xs = (x, y):xs
+        rightsPairs' _             xs = xs
+-}

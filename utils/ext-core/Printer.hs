@@ -69,9 +69,7 @@ ptdef (Data qtcon tbinds cdefs) =
 ptdef (Newtype qtcon coercion tbinds tyopt) =
   text "%newtype" <+> pqname qtcon <+> pqname coercion 
     <+> (hsep (map ptbind tbinds)) $$ indent repclause
-       where repclause = case tyopt of
-                           Just ty -> char '=' <+> pty ty 
-                           Nothing -> empty
+       where repclause = char '=' <+> pty tyopt
 
 pcdef (Constr qdcon tbinds tys)  =
   (pqname qdcon) <+> (sep [hsep (map pattbind tbinds),sep (map paty tys)])

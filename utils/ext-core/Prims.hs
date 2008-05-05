@@ -29,13 +29,11 @@ primEnv = Envs {tcenv_=efromlist $ map (\ (t,k) -> (t,Kind k)) $
                    (snd tcMutableByteArrayzh, ktMutableByteArrayzh)] ++
                  ([(snd $ tcUtuple n, ktUtuple n) | n <- [1..maxUtuple]] 
                    ++ ((snd tcArrow,ktArrow):primTcs)),
-		tsenv_=eempty,
 		cenv_=efromlist primDcs,
 		venv_=efromlist (newPrimVars ++ opsState ++ primVals)}
 
 errorEnv :: Envs
 errorEnv = Envs {tcenv_=eempty,
-		 tsenv_=eempty,
 		 cenv_=eempty,
 		 venv_=efromlist errorVals}
 

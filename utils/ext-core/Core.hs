@@ -15,7 +15,7 @@ data Tdef
     -- If we have: (Newtype tc co tbs (Just t))
     -- there is an implicit axiom:
     --  co tbs :: tc tbs :=: t
-  | Newtype (Qual Tcon) (Qual Tcon) [Tbind] (Maybe Ty)
+  | Newtype (Qual Tcon) (Qual Tcon) [Tbind] Ty
  deriving (Data, Typeable)
 
 data Cdef 
@@ -103,7 +103,7 @@ data CoercionKind =
 data KindOrCoercion = Kind Kind | Coercion CoercionKind
   
 data Lit = Literal CoreLit Ty
-  deriving (Data, Typeable, Eq)   -- with nearlyEqualTy 
+  deriving (Data, Typeable, Eq)
 
 data CoreLit = Lint Integer
   | Lrational Rational
@@ -163,10 +163,11 @@ splitTyConApp_maybe (Tapp rator rand) =
                        Tcon tc -> Just (tc,[rand])
                        _       -> Nothing
 splitTyConApp_maybe t@(Tforall _ _) = Nothing
-           
-{- Doesn't expand out fully applied newtype synonyms
-   (for which an environment is needed). -}
-nearlyEqualTy t1 t2 =  eqTy [] [] t1 t2 
+
+-- This used to be called nearlyEqualTy, but now that
+-- we don't need to expand newtypes anymore, it seems
+-- like equality to me!
+equalTy t1 t2 =  eqTy [] [] t1 t2 
   where eqTy e1 e2 (Tvar v1) (Tvar v2) =
 	     case (elemIndex v1 e1,elemIndex v2 e2) of
                (Just i1, Just i2) -> i1 == i2
@@ -178,7 +179,7 @@ nearlyEqualTy t1 t2 =  eqTy [] [] t1 t2
         eqTy e1 e2 (Tforall (tv1,tk1) t1) (Tforall (tv2,tk2) t2) =
 	      tk1 `eqKind` tk2 && eqTy (tv1:e1) (tv2:e2) t1 t2 
 	eqTy _ _ _ _ = False
-instance Eq Ty where (==) = nearlyEqualTy
+instance Eq Ty where (==) = equalTy
 
 
 subKindOf :: Kind -> Kind -> Bool

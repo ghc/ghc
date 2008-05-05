@@ -13,7 +13,7 @@ prims:  ../../compiler/prelude/primops.txt
 
 # The following assumes that you've built all the GHC libs with -fext-core...
 libtest: all
-	./Driver `find ../../libraries -print | grep .hcr$$ | grep -v bootstrapping`
+	./Driver -n `find ../../libraries -print | grep .hcr$$ | grep -v bootstrapping`
 
 # ...or built all the nofib programs with -fext-core.
 nofibtest: all

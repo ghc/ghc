@@ -437,6 +437,7 @@ evalPrimop "negateIntzh" = primIntUnop     (\ i -> -i)
 evalPrimop "quotIntzh"   = primIntBinop    quot
 evalPrimop "remIntzh"    = primIntBinop    rem
 evalPrimop "subIntCzh"   = primSubIntC
+evalPrimop "addIntCzh"   = primAddIntC
 evalPrimop "mulIntMayOflozh" = primIntBinop
   (\ i j ->
      case (fromIntegral i, fromIntegral j) of
@@ -489,14 +490,20 @@ primCharCmpOp op [Vimm (PCharzh c), Vimm (PCharzh d)] = mkBool (c `op` d)
 primCharCmpOp _ _ = error "primCharCmpOp: wrong number of arguments"
 
 primSubIntC :: [Value] -> Eval Value
-primSubIntC [Vimm (PIntzh i1), Vimm (PIntzh i2)] =
+primSubIntC vs = carryOp subIntC# vs
+
+primAddIntC :: [Value] -> Eval Value
+primAddIntC vs = carryOp addIntC# vs
+
+carryOp :: (Int# -> Int# -> (# Int#, Int# #)) -> [Value] -> Eval Value
+carryOp op [Vimm (PIntzh i1), Vimm (PIntzh i2)] =
   case (fromIntegral i1, fromIntegral i2) of
     (I# int1, I# int2) -> 
-       case (int1 `subIntC#` int2) of
+       case (int1 `op` int2) of
         (# res1, res2 #) -> 
            return $ Vutuple [Vimm (PIntzh (fromIntegral (I# res1))),
                              Vimm (PIntzh (fromIntegral (I# res2)))]
-primSubIntC _ = error "primSubIntC: wrong number of arguments"
+carryOp _ _ = error "carryOp: wrong number of arguments"
 
 primInt2Double :: [Value] -> Eval Value
 primInt2Double [Vimm (PIntzh i)] =

@@ -141,12 +141,10 @@ coreCdef = do
   tys         <- sepBy coreAtySaturated whiteSpace
   return $ Constr dataConName tBinds tys
 
-coreTRep :: Parser (Maybe Ty)
+coreTRep :: Parser Ty
 -- note that the "=" is inside here since if there's
 -- no rhs for the newtype, there's no "="
-coreTRep = optionMaybe (do
-              symbol "=" 
-              try coreType)
+coreTRep = symbol "=" >> try coreType
 
 coreType :: Parser Ty
 coreType = coreForallTy <|> (do
