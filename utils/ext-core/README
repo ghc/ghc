@@ -4,6 +4,12 @@ In particular, typechecker and interpreter give a precise semantics.
 ---------------------
 tjc April/May 2008:
 
+==== Documentation ====
+
+Documentation for the External Core format lives under docs/ext-core in the
+GHC tree. If you are building from HEAD, do not rely on the version of the
+External Core documentation that lives in haskell.org -- it is obsolete!
+
 ==== Notes ====
 
 The checker should work on most programs. Bugs (and infelicities) 
