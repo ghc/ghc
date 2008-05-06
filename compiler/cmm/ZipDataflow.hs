@@ -650,7 +650,7 @@ backward_sol check_maybe return_graph = back
             }
    in fixed_point
 
-bwd_pure_anal :: (DebugNodes m l, Outputable a)
+bwd_pure_anal :: (DebugNodes m l, LastNode l, Outputable a)
              => PassName
              -> BlockEnv a
              -> BackwardTransfers m l a
