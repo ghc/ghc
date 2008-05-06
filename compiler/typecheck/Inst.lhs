@@ -6,13 +6,6 @@
 The @Inst@ type: dictionaries or method instances
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module Inst ( 
 	Inst, 
 
@@ -57,7 +50,7 @@ module Inst (
 #include "HsVersions.h"
 
 import {-# SOURCE #-}	TcExpr( tcPolyExpr )
-import {-# SOURCE #-}	TcUnify( boxyUnify, unifyType )
+import {-# SOURCE #-}	TcUnify( boxyUnify {- , unifyType -} )
 
 import FastString
 import HsSyn
@@ -139,6 +132,7 @@ instType imp@(ImplicInst {})      = mkImplicTy (tci_tyvars imp) (tci_given imp)
 -- instType i@(EqInst {tci_co = co}) = eitherEqInst i TyVarTy id
 instType (EqInst {tci_left = ty1, tci_right = ty2}) = mkPredTy (EqPred ty1 ty2)
 
+mkImplicTy :: [TyVar] -> [Inst] -> [Inst] -> Type
 mkImplicTy tvs givens wanteds	-- The type of an implication constraint
   = ASSERT( all isAbstractableInst givens )
     -- pprTrace "mkImplicTy" (ppr givens) $
@@ -152,10 +146,12 @@ mkImplicTy tvs givens wanteds	-- The type of an implication constraint
       else
   	mkTupleTy Boxed (length dict_wanteds) (map instType dict_wanteds)
 
+dictPred :: Inst -> TcPredType
 dictPred (Dict {tci_pred = pred}) = pred
 dictPred (EqInst {tci_left=ty1,tci_right=ty2}) = EqPred ty1 ty2
 dictPred inst		          = pprPanic "dictPred" (ppr inst)
 
+getDictClassTys :: Inst -> (Class, [Type])
 getDictClassTys (Dict {tci_pred = pred}) = getClassPredTys pred
 getDictClassTys inst		         = pprPanic "getDictClassTys" (ppr inst)
 
@@ -165,6 +161,7 @@ getDictClassTys inst		         = pprPanic "getDictClassTys" (ppr inst)
 -- Leaving these in is really important for the call to fdPredsOfInsts
 -- in TcSimplify.inferLoop, because the result is fed to 'grow',
 -- which is supposed to be conservative
+fdPredsOfInst :: Inst -> [TcPredType]
 fdPredsOfInst (Dict {tci_pred = pred}) 	     = [pred]
 fdPredsOfInst (Method {tci_theta = theta})   = theta
 fdPredsOfInst (ImplicInst {tci_given = gs, 
@@ -175,9 +172,10 @@ fdPredsOfInst (EqInst {})		     = []
 fdPredsOfInsts :: [Inst] -> [PredType]
 fdPredsOfInsts insts = concatMap fdPredsOfInst insts
 
+isInheritableInst :: Inst -> Bool
 isInheritableInst (Dict {tci_pred = pred})     = isInheritablePred pred
 isInheritableInst (Method {tci_theta = theta}) = all isInheritablePred theta
-isInheritableInst other			       = True
+isInheritableInst _                            = True
 
 
 ---------------------------------
@@ -190,7 +188,7 @@ ipNamesOfInsts insts = [n | inst <- insts, n <- ipNamesOfInst inst]
 
 ipNamesOfInst (Dict {tci_pred = IParam n _}) = [ipNameName n]
 ipNamesOfInst (Method {tci_theta = theta})   = [ipNameName n | IParam n _ <- theta]
-ipNamesOfInst other		    	     = []
+ipNamesOfInst _                              = []
 
 ---------------------------------
 tyVarsOfInst :: Inst -> TcTyVarSet
@@ -206,7 +204,9 @@ tyVarsOfInst (ImplicInst {tci_tyvars = tvs, tci_given = givens, tci_wanted = wan
 		-- Remember the free tyvars of a coercion
 tyVarsOfInst (EqInst {tci_left = ty1, tci_right = ty2}) = tyVarsOfType ty1 `unionVarSet` tyVarsOfType ty2
 
+tyVarsOfInsts :: [Inst] -> VarSet
 tyVarsOfInsts insts = foldr (unionVarSet . tyVarsOfInst) emptyVarSet insts
+tyVarsOfLIE :: Bag Inst -> VarSet
 tyVarsOfLIE   lie   = tyVarsOfInsts (lieToList lie)
 
 
@@ -228,39 +228,40 @@ isAbstractableInst inst = isDict inst || isEqInst inst
 
 isEqInst :: Inst -> Bool
 isEqInst (EqInst {}) = True
-isEqInst other       = False
+isEqInst _           = False
 
 isDict :: Inst -> Bool
 isDict (Dict {}) = True
-isDict other	 = False
+isDict _         = False
 
 isClassDict :: Inst -> Bool
 isClassDict (Dict {tci_pred = pred}) = isClassPred pred
-isClassDict other	    	     = False
+isClassDict _                        = False
 
 isTyVarDict :: Inst -> Bool
 isTyVarDict (Dict {tci_pred = pred}) = isTyVarClassPred pred
-isTyVarDict other	    	     = False
+isTyVarDict _                        = False
 
 isIPDict :: Inst -> Bool
 isIPDict (Dict {tci_pred = pred}) = isIPPred pred
-isIPDict other		 	  = False
+isIPDict _                        = False
 
+isImplicInst :: Inst -> Bool
 isImplicInst (ImplicInst {}) = True
-isImplicInst other 	     = False
+isImplicInst _               = False
 
 isMethod :: Inst -> Bool
 isMethod (Method {}) = True
-isMethod other	     = False
+isMethod _           = False
 
 isMethodFor :: TcIdSet -> Inst -> Bool
 isMethodFor ids (Method {tci_oid = id}) = id `elemVarSet` ids
-isMethodFor ids inst			= False
+isMethodFor _   _                       = False
 
 isMethodOrLit :: Inst -> Bool
 isMethodOrLit (Method {})  = True
 isMethodOrLit (LitInst {}) = True
-isMethodOrLit other        = False
+isMethodOrLit _            = False
 \end{code}
 
 
@@ -326,7 +327,7 @@ instCallDicts :: InstLoc -> TcThetaType -> TcM HsWrapper
 -- into the LIE, and returns a HsWrapper to enclose the call site.
 -- This is the key place where equality predicates 
 -- are unleashed into the world
-instCallDicts loc [] = return idHsWrapper
+instCallDicts _ [] = return idHsWrapper
 
 -- instCallDicts loc (EqPred ty1 ty2 : preds)
 --   = do  { unifyType ty1 ty2	-- For now, we insist that they unify right away 
@@ -355,7 +356,7 @@ instCallDicts loc (pred : preds)
 
 -------------
 cloneDict :: Inst -> TcM Inst
-cloneDict dict@(Dict nm ty loc) = do { uniq <- newUnique
+cloneDict dict@(Dict nm _ _) = do { uniq <- newUnique
 				     ; return (dict {tci_name = setNameUnique nm uniq}) }
 cloneDict eq@(EqInst {})	= return eq
 cloneDict other = pprPanic "cloneDict" (ppr other)
@@ -374,7 +375,7 @@ newIPDict orig ip_name ty = do
         name = mkPredName uniq inst_loc pred 
 	dict = Dict {tci_name = name, tci_pred = pred, tci_loc = inst_loc}
     
-    return (mapIPName (\n -> instToId dict) ip_name, dict)
+    return (mapIPName (\_ -> instToId dict) ip_name, dict)
 \end{code}
 
 
@@ -415,6 +416,7 @@ newMethodFromName origin ty name = do
     extendLIE inst
     return (instToId inst)
 
+newMethodWithGivenTy :: InstOrigin -> Id -> [Type] -> TcRn TcId
 newMethodWithGivenTy orig id tys = do
     loc <- getInstLoc orig
     inst <- newMethod loc id tys
@@ -457,6 +459,7 @@ checkKind tv ty
 
 
 ---------------------------
+newMethod :: InstLoc -> Id -> [Type] -> TcRn Inst
 newMethod inst_loc id tys = do
     new_uniq <- newUnique
     let
@@ -482,8 +485,8 @@ mkOverLit (HsFractional r)
 mkOverLit (HsIsString s) = return (HsString s)
 
 isHsVar :: HsExpr Name -> Name -> Bool
-isHsVar (HsVar f) g = f==g
-isHsVar other 	  g = False
+isHsVar (HsVar f) g = f == g
+isHsVar _     	  _ = False
 \end{code}
 
 
@@ -531,6 +534,7 @@ zonkInst eqinst@(EqInst {tci_left = ty1, tci_right = ty2})
        ; return (eqinst {tci_co = co', tci_left= ty1', tci_right = ty2' })
        }
 
+zonkInsts :: [Inst] -> TcRn [Inst]
 zonkInsts insts = mapM zonkInst insts
 \end{code}
 
@@ -566,7 +570,7 @@ pprInsts insts = brackets (interpp'SP insts)
 
 pprInst, pprInstInFull :: Inst -> SDoc
 -- Debugging: print the evidence :: type
-pprInst i@(EqInst {tci_left = ty1, tci_right = ty2, tci_co = co}) 
+pprInst i@(EqInst {tci_left = ty1, tci_right = ty2}) 
 	= eitherEqInst i
 		(\covar -> text "Wanted" <+> ppr (TyVarTy covar) <+> dcolon <+> ppr (EqPred ty1 ty2))
 		(\co    -> text "Given"  <+> ppr co              <+> dcolon <+> ppr (EqPred ty1 ty2))
@@ -687,21 +691,25 @@ getOverlapFlag
 			   
 	; return overlap_flag }
 
+traceDFuns :: [Instance] -> TcRn ()
 traceDFuns ispecs
   = traceTc (hang (text "Adding instances:") 2 (vcat (map pp ispecs)))
   where
     pp ispec = ppr (instanceDFunId ispec) <+> colon <+> ppr ispec
 	-- Print the dfun name itself too
 
+funDepErr :: Instance -> [Instance] -> TcRn ()
 funDepErr ispec ispecs
   = addDictLoc ispec $
     addErr (hang (ptext (sLit "Functional dependencies conflict between instance declarations:"))
 	       2 (pprInstances (ispec:ispecs)))
+dupInstErr :: Instance -> Instance -> TcRn ()
 dupInstErr ispec dup_ispec
   = addDictLoc ispec $
     addErr (hang (ptext (sLit "Duplicate instance declarations:"))
 	       2 (pprInstances [ispec, dup_ispec]))
 
+addDictLoc :: Instance -> TcRn a -> TcRn a
 addDictLoc ispec thing_inside
   = setSrcSpan (mkSrcSpan loc loc) thing_inside
   where
@@ -835,6 +843,7 @@ lookupPred pred@(ClassP clas tys)
 lookupPred (IParam {}) = return Nothing	-- Implicit parameters
 lookupPred (EqPred {}) = panic "lookupPred EqPred"
 
+record_dfun_usage :: Id -> TcRn ()
 record_dfun_usage dfun_id 
   = do	{ hsc_env <- getTopEnv
 	; let  dfun_name = idName dfun_id
@@ -916,6 +925,8 @@ tcSyntaxName orig ty (std_nm, user_nm_expr) = do
      expr <- tcPolyExpr (L span user_nm_expr) sigma1
      return (std_nm, unLoc expr)
 
+syntaxNameCtxt :: HsExpr Name -> InstOrigin -> Type -> TidyEnv
+               -> TcRn (TidyEnv, SDoc)
 syntaxNameCtxt name orig ty tidy_env = do
     inst_loc <- getInstLoc orig
     let
@@ -956,6 +967,7 @@ eitherEqInst (EqInst {tci_co = either_co}) withWanted withGiven
 	= case either_co of
 		Left  covar -> withWanted covar
 		Right co    -> withGiven  co
+eitherEqInst i _ _ = pprPanic "eitherEqInst" (ppr i)
 
 mkEqInsts :: [PredType] -> [Either TcTyVar Coercion] -> TcM [Inst]
 mkEqInsts preds cos = zipWithM mkEqInst preds cos
@@ -971,12 +983,14 @@ mkEqInst (EqPred ty1 ty2) co
 	     ; return inst
 	     }
 	where mkName uniq src_span = mkInternalName uniq (mkVarOcc "co") src_span
+mkEqInst pred _ = pprPanic "mkEqInst" (ppr pred)
 
 mkWantedEqInst :: PredType -> TcM Inst
 mkWantedEqInst pred@(EqPred ty1 ty2)
   = do { cotv <- newMetaCoVar ty1 ty2
        ; mkEqInst pred (Left cotv)
        }
+mkWantedEqInst pred = pprPanic "mkWantedEqInst" (ppr pred)
 
 -- type inference:
 --	We want to promote the wanted EqInst to a given EqInst
@@ -992,6 +1006,7 @@ finalizeEqInst wanted@(EqInst {tci_left = ty1, tci_right = ty2, tci_name = name}
 	     ; let given = wanted { tci_co = mkGivenCo $ TyVarTy var }
 	     ; return given
              }
+finalizeEqInst i = pprPanic "finalizeEqInst" (ppr i)
 
 writeWantedCoercion 
 	:: Inst 	-- wanted EqInst
