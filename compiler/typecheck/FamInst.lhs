@@ -1,13 +1,6 @@
 The @FamInst@ type: family instance heads
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module FamInst ( 
         checkFamInstConsistency, tcExtendLocalFamInstEnv
     ) where
@@ -180,7 +173,7 @@ checkForConflicts inst_envs famInst
 		         Nothing        -> panic "FamInst.checkForConflicts"
 		         Just (tc, tys) -> tc `mkTyConApp` tys
              }
-       ; (tvs', _, tau') <- tcInstSkolType FamInstSkol ty
+       ; (_, _, tau') <- tcInstSkolType FamInstSkol ty
 
        ; let (fam, tys') = tcSplitTyConApp tau'
 
@@ -208,11 +201,13 @@ checkForConflicts inst_envs famInst
         rhs1   = substTy subst $ synTyConType tycon1
         rhs2   = substTy subst $ synTyConType tycon2
 
+conflictInstErr :: FamInst -> FamInst -> TcRn ()
 conflictInstErr famInst conflictingFamInst
   = addFamInstLoc famInst $
     addErr (hang (ptext (sLit "Conflicting family instance declarations:"))
 	       2 (pprFamInsts [famInst, conflictingFamInst]))
 
+addFamInstLoc :: FamInst -> TcRn a -> TcRn a
 addFamInstLoc famInst thing_inside
   = setSrcSpan (mkSrcSpan loc loc) thing_inside
   where
