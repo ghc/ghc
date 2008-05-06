@@ -9,13 +9,6 @@ This module is an extension of @HsSyn@ syntax, for use in the type
 checker.
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module TcHsSyn (
 	mkHsConApp, mkHsDictLet, mkHsApp,
 	hsLitType, hsLPatType, hsPatType, 
@@ -97,36 +90,38 @@ mkVanillaTuplePat pats box
 hsLPatType :: OutPat Id -> Type
 hsLPatType (L _ pat) = hsPatType pat
 
-hsPatType (ParPat pat)		    = hsLPatType pat
-hsPatType (WildPat ty)		    = ty
-hsPatType (VarPat var)		    = idType var
-hsPatType (VarPatOut var _)	    = idType var
-hsPatType (BangPat pat)		    = hsLPatType pat
-hsPatType (LazyPat pat)		    = hsLPatType pat
-hsPatType (LitPat lit)		    = hsLitType lit
-hsPatType (AsPat var pat)	    = idType (unLoc var)
-hsPatType (ViewPat expr pat ty)     = ty
-hsPatType (ListPat _ ty)	    = mkListTy ty
-hsPatType (PArrPat _ ty)	    = mkPArrTy ty
-hsPatType (TuplePat pats box ty)    = ty
-hsPatType (ConPatOut{ pat_ty = ty })= ty
-hsPatType (SigPatOut pat ty)	    = ty
-hsPatType (NPat lit _ _)	    = overLitType lit
-hsPatType (NPlusKPat id _ _ _)      = idType (unLoc id)
-hsPatType (CoPat _ _ ty)	    = ty
+hsPatType :: Pat Id -> Type
+hsPatType (ParPat pat)                = hsLPatType pat
+hsPatType (WildPat ty)                = ty
+hsPatType (VarPat var)                = idType var
+hsPatType (VarPatOut var _)           = idType var
+hsPatType (BangPat pat)               = hsLPatType pat
+hsPatType (LazyPat pat)               = hsLPatType pat
+hsPatType (LitPat lit)                = hsLitType lit
+hsPatType (AsPat var _)               = idType (unLoc var)
+hsPatType (ViewPat _ _ ty)            = ty
+hsPatType (ListPat _ ty)              = mkListTy ty
+hsPatType (PArrPat _ ty)              = mkPArrTy ty
+hsPatType (TuplePat _ _ ty)           = ty
+hsPatType (ConPatOut { pat_ty = ty }) = ty
+hsPatType (SigPatOut _ ty)            = ty
+hsPatType (NPat lit _ _)              = overLitType lit
+hsPatType (NPlusKPat id _ _ _)        = idType (unLoc id)
+hsPatType (CoPat _ _ ty)              = ty
+hsPatType p                           = pprPanic "hsPatType" (ppr p)
 
 hsLitType :: HsLit -> TcType
-hsLitType (HsChar c)       = charTy
-hsLitType (HsCharPrim c)   = charPrimTy
-hsLitType (HsString str)   = stringTy
-hsLitType (HsStringPrim s) = addrPrimTy
-hsLitType (HsInt i)	   = intTy
-hsLitType (HsIntPrim i)    = intPrimTy
-hsLitType (HsWordPrim w)   = wordPrimTy
-hsLitType (HsInteger i ty) = ty
-hsLitType (HsRat _ ty)	   = ty
-hsLitType (HsFloatPrim f)  = floatPrimTy
-hsLitType (HsDoublePrim d) = doublePrimTy
+hsLitType (HsChar _)       = charTy
+hsLitType (HsCharPrim _)   = charPrimTy
+hsLitType (HsString _)     = stringTy
+hsLitType (HsStringPrim _) = addrPrimTy
+hsLitType (HsInt _)        = intTy
+hsLitType (HsIntPrim _)    = intPrimTy
+hsLitType (HsWordPrim _)   = wordPrimTy
+hsLitType (HsInteger _ ty) = ty
+hsLitType (HsRat _ ty)     = ty
+hsLitType (HsFloatPrim _)  = floatPrimTy
+hsLitType (HsDoublePrim _) = doublePrimTy
 \end{code}
 
 Overloaded literals. Here mainly becuase it uses isIntTy etc
@@ -201,6 +196,7 @@ data ZonkEnv = ZonkEnv	(TcType -> TcM Type) 	-- How to zonk a type
 	-- Maps an Id to its zonked version; both have the same Name
 	-- Is only consulted lazily; hence knot-tying
 
+emptyZonkEnv :: ZonkEnv
 emptyZonkEnv = ZonkEnv zonkTypeZapping emptyVarEnv
 
 extendZonkEnv :: ZonkEnv -> [Id] -> ZonkEnv
@@ -233,10 +229,11 @@ zonkIdOcc :: ZonkEnv -> TcId -> Id
 --
 -- Even without template splices, in module Main, the checking of
 -- 'main' is done as a separate chunk.
-zonkIdOcc (ZonkEnv zonk_ty env) id 
+zonkIdOcc (ZonkEnv _zonk_ty env) id 
   | isLocalVar id = lookupVarEnv env id `orElse` id
   | otherwise	  = id
 
+zonkIdOccs :: ZonkEnv -> [TcId] -> [Id]
 zonkIdOccs env ids = map (zonkIdOcc env) ids
 
 -- zonkIdBndr is used *after* typechecking to get the Id's type
@@ -253,6 +250,7 @@ zonkDictBndrs :: ZonkEnv -> [Var] -> TcM [Var]
 -- "Dictionary" binders can be coercion variables or dictionary variables
 zonkDictBndrs env ids = mappM (zonkDictBndr env) ids
 
+zonkDictBndr :: ZonkEnv -> Var -> TcM Var
 zonkDictBndr env var | isTyVar var = return var
 		     | otherwise   = zonkIdBndr env var
 
@@ -305,8 +303,8 @@ zonkLocalBinds env (HsIPBinds (IPBinds binds dict_binds))
 
 ---------------------------------------------
 zonkValBinds :: ZonkEnv -> HsValBinds TcId -> TcM (ZonkEnv, HsValBinds Id)
-zonkValBinds env bs@(ValBindsIn _ _) 
-  = panic "zonkValBinds"	-- Not in typechecker output
+zonkValBinds _ (ValBindsIn _ _) 
+  = panic "zonkValBinds" -- Not in typechecker output
 zonkValBinds env (ValBindsOut binds sigs) 
   = do 	{ (env1, new_binds) <- go env binds
 	; return (env1, ValBindsOut new_binds sigs) }
@@ -432,7 +430,7 @@ zonkExpr env (HsLit (HsRat f ty))
   = zonkTcTypeToType env ty	   `thenM` \ new_ty  ->
     returnM (HsLit (HsRat f new_ty))
 
-zonkExpr env (HsLit lit)
+zonkExpr _ (HsLit lit)
   = returnM (HsLit lit)
 
 zonkExpr env (HsOverLit lit)
@@ -455,7 +453,7 @@ zonkExpr env (HsBracketOut body bs)
     zonk_b (n,e) = zonkLExpr env e	`thenM` \ e' ->
 		   returnM (n,e')
 
-zonkExpr env (HsSpliceE s) = WARN( True, ppr s )	-- Should not happen
+zonkExpr _ (HsSpliceE s) = WARN( True, ppr s ) -- Should not happen
 			     returnM (HsSpliceE s)
 
 zonkExpr env (OpApp e1 op fixity e2)
@@ -536,7 +534,7 @@ zonkExpr env (ExprWithTySigOut e ty)
   = do { e' <- zonkLExpr env e
        ; return (ExprWithTySigOut e' ty) }
 
-zonkExpr env (ExprWithTySig _ _) = panic "zonkExpr env:ExprWithTySig"
+zonkExpr _ (ExprWithTySig _ _) = panic "zonkExpr env:ExprWithTySig"
 
 zonkExpr env (ArithSeq expr info)
   = zonkExpr env expr		`thenM` \ new_expr ->
@@ -583,11 +581,12 @@ zonkExpr env (HsWrap co_fn expr)
     zonkExpr env1 expr	`thenM` \ new_expr ->
     return (HsWrap new_co_fn new_expr)
 
-zonkExpr env other = pprPanic "zonkExpr" (ppr other)
+zonkExpr _ expr = pprPanic "zonkExpr" (ppr expr)
 
 zonkCmdTop :: ZonkEnv -> LHsCmdTop TcId -> TcM (LHsCmdTop Id)
 zonkCmdTop env cmd = wrapLocM (zonk_cmd_top env) cmd
 
+zonk_cmd_top :: ZonkEnv -> HsCmdTop TcId -> TcM (HsCmdTop Id)
 zonk_cmd_top env (HsCmdTop cmd stack_tys ty ids)
   = zonkLExpr env cmd	    		`thenM` \ new_cmd ->
     zonkTcTypeToTypes env stack_tys	`thenM` \ new_stack_tys ->
@@ -620,7 +619,7 @@ zonkCoFn env (WpLet bs)     = do { (env1, bs') <- zonkRecMonoBinds env bs
 zonkDo :: ZonkEnv -> HsStmtContext Name -> HsStmtContext Name
 -- Only used for 'do', so the only Ids are in a MDoExpr table
 zonkDo env (MDoExpr tbl) = MDoExpr (mapSnd (zonkIdOcc env) tbl)
-zonkDo env do_or_lc      = do_or_lc
+zonkDo _   do_or_lc      = do_or_lc
 
 -------------------------------------------------------------------------
 zonkOverLit :: ZonkEnv -> HsOverLit TcId -> TcM (HsOverLit Id)
@@ -736,7 +735,8 @@ zonkStmt env (BindStmt pat expr bind_op fail_op)
 	; new_fail <- zonkExpr env fail_op
 	; return (env1, BindStmt new_pat new_expr new_bind new_fail) }
 
-zonkMaybeLExpr env Nothing = return Nothing
+zonkMaybeLExpr :: ZonkEnv -> Maybe (LHsExpr TcId) -> TcM (Maybe (LHsExpr Id))
+zonkMaybeLExpr _   Nothing  = return Nothing
 zonkMaybeLExpr env (Just e) = (zonkLExpr env e) >>= (return . Just)
 
 
@@ -770,6 +770,7 @@ zonkPat :: ZonkEnv -> OutPat TcId -> TcM (ZonkEnv, OutPat Id)
 -- to the right)
 zonkPat env pat = wrapLocSndM (zonk_pat env) pat
 
+zonk_pat :: ZonkEnv -> Pat TcId -> TcM (ZonkEnv, Pat Id)
 zonk_pat env (ParPat p)
   = do	{ (env', p') <- zonkPat env p
   	; return (env', ParPat p') }
@@ -859,9 +860,13 @@ zonk_pat env (CoPat co_fn pat ty)
        ; ty' <- zonkTcTypeToType env'' ty
        ; return (env'', CoPat co_fn' (unLoc pat') ty') }
 
-zonk_pat env pat = pprPanic "zonk_pat" (ppr pat)
+zonk_pat _ pat = pprPanic "zonk_pat" (ppr pat)
 
 ---------------------------
+zonkConStuff :: ZonkEnv
+             -> HsConDetails (OutPat TcId) (HsRecFields id (OutPat TcId))
+             -> TcM (ZonkEnv,
+                     HsConDetails (OutPat Id) (HsRecFields id (OutPat Id)))
 zonkConStuff env (PrefixCon pats)
   = do	{ (env', pats') <- zonkPats env pats
 	; return (env', PrefixCon pats') }
@@ -878,6 +883,7 @@ zonkConStuff env (RecCon (HsRecFields rpats dd))
 	-- Field selectors have declared types; hence no zonking
 
 ---------------------------
+zonkPats :: ZonkEnv -> [OutPat TcId] -> TcM (ZonkEnv, [OutPat Id])
 zonkPats env []		= return (env, [])
 zonkPats env (pat:pats) = do { (env1, pat') <- zonkPat env pat
 		     ; (env', pats') <- zonkPats env1 pats
@@ -896,9 +902,9 @@ zonkForeignExports :: ZonkEnv -> [LForeignDecl TcId] -> TcM [LForeignDecl Id]
 zonkForeignExports env ls = mappM (wrapLocM (zonkForeignExport env)) ls
 
 zonkForeignExport :: ZonkEnv -> ForeignDecl TcId -> TcM (ForeignDecl Id)
-zonkForeignExport env (ForeignExport i hs_ty spec) =
+zonkForeignExport env (ForeignExport i _hs_ty spec) =
    returnM (ForeignExport (fmap (zonkIdOcc env) i) undefined spec)
-zonkForeignExport env for_imp 
+zonkForeignExport _ for_imp 
   = returnM for_imp	-- Foreign imports don't need zonking
 \end{code}
 
@@ -950,6 +956,7 @@ zonkRule env (HsRule name act (vars{-::[RuleBndr TcId]-}) lhs fv_lhs rhs fv_rhs)
 	| isId (unLoc v) = wrapLocM (zonkIdBndr env)   v
 	| otherwise      = ASSERT( isImmutableTyVar (unLoc v) )
 			   return v
+   zonk_bndr (RuleBndrSig {}) = panic "zonk_bndr RuleBndrSig"
 \end{code}
 
 
