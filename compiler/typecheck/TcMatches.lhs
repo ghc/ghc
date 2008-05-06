@@ -6,13 +6,6 @@
 TcMatches: Typecheck some @Matches@
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module TcMatches ( tcMatchesFun, tcGRHSsPat, tcMatchesCase, tcMatchLambda,
 		   matchCtxt, TcMatchCtxt(..), 
 		   tcStmts, tcDoStmts, tcBody,
@@ -261,7 +254,7 @@ tcDoStmts ctxt@(MDoExpr _) stmts body res_ty
             mkHsWrapCoI coi 
               (HsDo (MDoExpr (names `zip` insts)) stmts' body' res_ty') }
 
-tcDoStmts ctxt stmts body res_ty = pprPanic "tcDoStmts" (pprStmtContext ctxt)
+tcDoStmts ctxt _ _ _ = pprPanic "tcDoStmts" (pprStmtContext ctxt)
 
 tcBody :: LHsExpr Name -> BoxyRhoType -> TcM (LHsExpr TcId)
 tcBody body res_ty
@@ -296,7 +289,7 @@ tcStmts :: HsStmtContext Name
 -- Note the higher-rank type.  stmt_chk is applied at different
 -- types in the equations for tcStmts
 
-tcStmts ctxt stmt_chk [] res_ty thing_inside
+tcStmts _ _ [] res_ty thing_inside
   = do	{ thing <- thing_inside res_ty
 	; return ([], thing) }
 
@@ -320,17 +313,17 @@ tcStmts ctxt stmt_chk (L loc stmt : stmts) res_ty thing_inside
 --------------------------------
 --	Pattern guards
 tcGuardStmt :: TcStmtChecker
-tcGuardStmt ctxt (ExprStmt guard _ _) res_ty thing_inside
+tcGuardStmt _ (ExprStmt guard _ _) res_ty thing_inside
   = do	{ guard' <- tcMonoExpr guard boolTy
 	; thing  <- thing_inside res_ty
 	; return (ExprStmt guard' noSyntaxExpr boolTy, thing) }
 
-tcGuardStmt ctxt (BindStmt pat rhs _ _) res_ty thing_inside
+tcGuardStmt _ (BindStmt pat rhs _ _) res_ty thing_inside
   = do	{ (rhs', rhs_ty) <- tcInferRho rhs
 	; (pat', thing)  <- tcLamPat pat rhs_ty res_ty thing_inside
 	; return (BindStmt pat' rhs' noSyntaxExpr noSyntaxExpr, thing) }
 
-tcGuardStmt ctxt stmt res_ty thing_inside
+tcGuardStmt _ stmt _ _
   = pprPanic "tcGuardStmt: unexpected Stmt" (ppr stmt)
 
 
@@ -341,14 +334,14 @@ tcLcStmt :: TyCon	-- The list/Parray type constructor ([] or PArray)
 	 -> TcStmtChecker
 
 -- A generator, pat <- rhs
-tcLcStmt m_tc ctxt (BindStmt pat rhs _ _) res_ty thing_inside 
+tcLcStmt m_tc _ (BindStmt pat rhs _ _) res_ty thing_inside
  = do	{ (rhs', pat_ty) <- withBox liftedTypeKind $ \ ty ->
 			    tcMonoExpr rhs (mkTyConApp m_tc [ty])
 	; (pat', thing)  <- tcLamPat pat pat_ty res_ty thing_inside
 	; return (BindStmt pat' rhs' noSyntaxExpr noSyntaxExpr, thing) }
 
 -- A boolean guard
-tcLcStmt m_tc ctxt (ExprStmt rhs _ _) res_ty thing_inside
+tcLcStmt _ _ (ExprStmt rhs _ _) res_ty thing_inside
   = do	{ rhs'  <- tcMonoExpr rhs boolTy
 	; thing <- thing_inside res_ty
 	; return (ExprStmt rhs' noSyntaxExpr boolTy, thing) }
@@ -384,7 +377,7 @@ tcLcStmt m_tc ctxt (ParStmt bndr_stmts_s) elt_ty thing_inside
 
     loop ((stmts, names) : pairs)
       = do { (stmts', (ids, pairs', thing))
-		<- tcStmts ctxt (tcLcStmt m_tc) stmts elt_ty $ \ elt_ty' ->
+		<- tcStmts ctxt (tcLcStmt m_tc) stmts elt_ty $ \ _elt_ty' ->
 		   do { ids <- tcLookupLocalIds names
 		      ; (pairs', thing) <- loop pairs
 		      ; return (ids, pairs', thing) }
@@ -453,7 +446,7 @@ tcLcStmt m_tc ctxt (GroupStmt (stmts, bindersMap) groupByClause) elt_ty thing_in
         associateNewBinder :: TcId -> Name -> TcId
         associateNewBinder oldBinder newBinder = mkLocalId newBinder (mkTyConApp m_tc [idType oldBinder])
     
-tcLcStmt m_tc ctxt stmt elt_ty thing_inside
+tcLcStmt _ _ stmt _ _
   = pprPanic "tcLcStmt: unexpected Stmt" (ppr stmt)
         
 --------------------------------
@@ -462,7 +455,7 @@ tcLcStmt m_tc ctxt stmt elt_ty thing_inside
 
 tcDoStmt :: TcStmtChecker
 
-tcDoStmt ctxt (BindStmt pat rhs bind_op fail_op) res_ty thing_inside
+tcDoStmt _ (BindStmt pat rhs bind_op fail_op) res_ty thing_inside
   = do	{ (rhs', rhs_ty) <- tcInferRho rhs
 		-- We should use type *inference* for the RHS computations, 
                 -- becuase of GADTs. 
@@ -493,7 +486,7 @@ tcDoStmt ctxt (BindStmt pat rhs bind_op fail_op) res_ty thing_inside
 	; return (BindStmt pat' rhs' bind_op' fail_op', thing) }
 
 
-tcDoStmt ctxt (ExprStmt rhs then_op _) res_ty thing_inside
+tcDoStmt _ (ExprStmt rhs then_op _) res_ty thing_inside
   = do	{ (rhs', rhs_ty) <- tcInferRho rhs
 
   	-- Deal with rebindable syntax; (>>) :: rhs_ty -> new_res_ty -> res_ty
@@ -505,12 +498,12 @@ tcDoStmt ctxt (ExprStmt rhs then_op _) res_ty thing_inside
 	; thing <- thing_inside new_res_ty
 	; return (ExprStmt rhs' then_op' rhs_ty, thing) }
 
-tcDoStmt ctxt (RecStmt {}) res_ty thing_inside
+tcDoStmt ctxt (RecStmt {}) _ _
   = failWithTc (ptext (sLit "Illegal 'rec' stmt in") <+> pprStmtContext ctxt)
 	-- This case can't be caught in the renamer
 	-- see RnExpr.checkRecStmt
 
-tcDoStmt ctxt stmt res_ty thing_inside
+tcDoStmt _ stmt _ _
   = pprPanic "tcDoStmt: unexpected Stmt" (ppr stmt)
 
 --------------------------------
@@ -521,12 +514,12 @@ tcDoStmt ctxt stmt res_ty thing_inside
 
 tcMDoStmt :: (LHsExpr Name -> TcM (LHsExpr TcId, TcType))	-- RHS inference
 	  -> TcStmtChecker
-tcMDoStmt tc_rhs ctxt (BindStmt pat rhs bind_op fail_op) res_ty thing_inside
+tcMDoStmt tc_rhs _ (BindStmt pat rhs _ _) res_ty thing_inside
   = do	{ (rhs', pat_ty) <- tc_rhs rhs
 	; (pat', thing)  <- tcLamPat pat pat_ty res_ty thing_inside
 	; return (BindStmt pat' rhs' noSyntaxExpr noSyntaxExpr, thing) }
 
-tcMDoStmt tc_rhs ctxt (ExprStmt rhs then_op _) res_ty thing_inside
+tcMDoStmt tc_rhs _ (ExprStmt rhs _ _) res_ty thing_inside
   = do	{ (rhs', elt_ty) <- tc_rhs rhs
 	; thing 	 <- thing_inside res_ty
 	; return (ExprStmt rhs' noSyntaxExpr elt_ty, thing) }
@@ -536,7 +529,7 @@ tcMDoStmt tc_rhs ctxt (RecStmt stmts laterNames recNames _ _) res_ty thing_insid
 	; let rec_ids = zipWith mkLocalId recNames rec_tys
 	; tcExtendIdEnv rec_ids			$ do
     	{ (stmts', (later_ids, rec_rets))
-		<- tcStmts ctxt (tcMDoStmt tc_rhs) stmts res_ty	$ \ res_ty' -> 
+		<- tcStmts ctxt (tcMDoStmt tc_rhs) stmts res_ty	$ \ _res_ty' ->
 			-- ToDo: res_ty not really right
 		   do { rec_rets <- zipWithM tc_ret recNames rec_tys
 		      ; later_ids <- tcLookupLocalIds laterNames
@@ -560,7 +553,7 @@ tcMDoStmt tc_rhs ctxt (RecStmt stmts laterNames recNames _ _) res_ty thing_insid
 	     ; co_fn <- tcSubExp DoOrigin (idType poly_id) mono_ty
 	     ; return (mkHsWrap co_fn (HsVar poly_id)) }
 
-tcMDoStmt tc_rhs ctxt stmt res_ty thing_inside
+tcMDoStmt _ _ stmt _ _
   = pprPanic "tcMDoStmt: unexpected Stmt" (ppr stmt)
 
 \end{code}
@@ -590,13 +583,15 @@ checkArgs fun (MatchGroup (match1:matches) _)
 
     args_in_match :: LMatch Name -> Int
     args_in_match (L _ (Match pats _ _)) = length pats
-checkArgs fun other = panic "TcPat.checkArgs"	-- Matches always non-empty
+checkArgs _ _ = panic "TcPat.checkArgs" -- Matches always non-empty
 \end{code}
 
 \begin{code}
+matchCtxt :: HsMatchContext Name -> Match Name -> SDoc
 matchCtxt ctxt match  = hang (ptext (sLit "In") <+> pprMatchContext ctxt <> colon) 
 			   4 (pprMatch ctxt match)
 
+stmtCtxt :: HsStmtContext Name -> StmtLR Name Name -> SDoc
 stmtCtxt ctxt stmt = hang (ptext (sLit "In a stmt of") <+> pprStmtContext ctxt <> colon)
 		  	4 (ppr stmt)
 \end{code}
