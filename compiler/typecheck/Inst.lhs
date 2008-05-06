@@ -832,7 +832,8 @@ lookupPred pred@(ClassP clas tys)
 			; return Nothing }
 	}}
 
-lookupPred ip_pred = return Nothing	-- Implicit parameters
+lookupPred (IParam {}) = return Nothing	-- Implicit parameters
+lookupPred (EqPred {}) = panic "lookupPred EqPred"
 
 record_dfun_usage dfun_id 
   = do	{ hsc_env <- getTopEnv
