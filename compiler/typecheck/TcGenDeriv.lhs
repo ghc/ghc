@@ -11,13 +11,6 @@ This module is nominally ``subordinate'' to @TcDeriv@, which is the
 This is where we do all the grimy bindings' generation.
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module TcGenDeriv (
 	DerivAuxBind(..), DerivAuxBinds, isDupAux,
 
@@ -72,10 +65,10 @@ data DerivAuxBind		-- Please add these auxiliary top-level bindings
   | GenMaxTag  TyCon		-- ...and maxTag
 
 isDupAux :: DerivAuxBind -> DerivAuxBind -> Bool
-isDupAux (GenCon2Tag tc1) (GenCon2Tag tc2) = tc1==tc2
-isDupAux (GenTag2Con tc1) (GenTag2Con tc2) = tc1==tc2
-isDupAux (GenMaxTag tc1)  (GenMaxTag tc2)  = tc1==tc2
-isDupAux b1               b2               = False
+isDupAux (GenCon2Tag tc1) (GenCon2Tag tc2) = tc1 == tc2
+isDupAux (GenTag2Con tc1) (GenTag2Con tc2) = tc1 == tc2
+isDupAux (GenMaxTag tc1)  (GenMaxTag tc2)  = tc1 == tc2
+isDupAux _                _                = False
 \end{code}
 
 
@@ -1045,9 +1038,10 @@ wrapOpBackquotes s | isSym s   = s
 		   | otherwise = '`' : s ++ "`"
 
 isSym :: String -> Bool
-isSym ""     = False
-isSym (c:cs) = startsVarSym c || startsConSym c
+isSym ""      = False
+isSym (c : _) = startsVarSym c || startsConSym c
 
+mk_showString_app :: String -> LHsExpr RdrName
 mk_showString_app str = nlHsApp (nlHsVar showString_RDR) (nlHsLit (mkHsString str))
 \end{code}
 
@@ -1148,7 +1142,7 @@ gen_Data_binds :: FixityEnv
 	       -> TyCon 
 	       -> (LHsBinds RdrName,	-- The method bindings
 		   DerivAuxBinds)	-- Auxiliary bindings
-gen_Data_binds fix_env tycon
+gen_Data_binds _ tycon
   = (listToBag [gfoldl_bind, gunfold_bind, toCon_bind, dataTypeOf_bind],
 		-- Auxiliary definitions: the data type and constructors
      DerivAuxBind datatype_bind : map mk_con_bind data_cons)
@@ -1237,6 +1231,8 @@ gen_Data_binds fix_env tycon
 	  fixity | is_infix  = infix_RDR
 		 | otherwise = prefix_RDR
 
+gfoldl_RDR, gunfold_RDR, toConstr_RDR, dataTypeOf_RDR, mkConstr_RDR,
+    mkDataType_RDR, conIndex_RDR, prefix_RDR, infix_RDR :: RdrName
 gfoldl_RDR     = varQual_RDR gENERICS (fsLit "gfoldl")
 gunfold_RDR    = varQual_RDR gENERICS (fsLit "gunfold")
 toConstr_RDR   = varQual_RDR gENERICS (fsLit "toConstr")
@@ -1344,6 +1340,7 @@ careful_compare_Case :: -- checks for primitive types...
 	  -> LHsExpr RdrName -> LHsExpr RdrName
 	  -> LHsExpr RdrName
 
+cmp_eq_Expr :: LHsExpr RdrName -> LHsExpr RdrName -> LHsExpr RdrName
 cmp_eq_Expr a b = nlHsApp (nlHsApp (nlHsVar cmp_eq_RDR) a) b
 	-- Was: compare_gen_Case cmp_eq_RDR
 
@@ -1384,7 +1381,7 @@ assoc_ty_id :: String		-- The class involved
 	    -> [(Type,a)]	-- The table
 	    -> Type		-- The type
 	    -> a		-- The result of the lookup
-assoc_ty_id cls_str tycon tbl ty 
+assoc_ty_id cls_str _ tbl ty 
   | null res = pprPanic "Error in deriving:" (text "Can't derive" <+> text cls_str <+> 
 					      text "for primitive type" <+> ppr ty)
   | otherwise = head res
@@ -1411,6 +1408,7 @@ lt_op_tbl =
     ,(doublePrimTy,	DoubleLtOp)
     ]
 
+box_con_tbl :: [(Type, RdrName)]
 box_con_tbl =
     [(charPrimTy,	getRdrName charDataCon)
     ,(intPrimTy,	getRdrName intDataCon)
@@ -1437,7 +1435,7 @@ eq_Expr tycon ty a b = genOpApp a eq_op b
 
 \begin{code}
 untag_Expr :: TyCon -> [( RdrName,  RdrName)] -> LHsExpr RdrName -> LHsExpr RdrName
-untag_Expr tycon [] expr = expr
+untag_Expr _ [] expr = expr
 untag_Expr tycon ((untag_this, put_tag_here) : more) expr
   = nlHsCase (nlHsPar (nlHsVarApps (con2tag_RDR tycon) [untag_this])) {-of-}
       [mkSimpleHsAlt (nlVarPat put_tag_here) (untag_Expr tycon more expr)]
@@ -1476,15 +1474,18 @@ nested_compose_Expr (e:es)
 
 -- impossible_Expr is used in case RHSs that should never happen.
 -- We generate these to keep the desugarer from complaining that they *might* happen!
+impossible_Expr :: LHsExpr RdrName
 impossible_Expr = nlHsApp (nlHsVar error_RDR) (nlHsLit (mkHsString "Urk! in TcGenDeriv"))
 
 -- illegal_Expr is used when signalling error conditions in the RHS of a derived
 -- method. It is currently only used by Enum.{succ,pred}
+illegal_Expr :: String -> String -> String -> LHsExpr RdrName
 illegal_Expr meth tp msg = 
    nlHsApp (nlHsVar error_RDR) (nlHsLit (mkHsString (meth ++ '{':tp ++ "}: " ++ msg)))
 
 -- illegal_toEnum_tag is an extended version of illegal_Expr, which also allows you
 -- to include the value of a_RDR in the error string.
+illegal_toEnum_tag :: String -> RdrName -> LHsExpr RdrName
 illegal_toEnum_tag tp maxtag =
    nlHsApp (nlHsVar error_RDR) 
            (nlHsApp (nlHsApp (nlHsVar append_RDR)
@@ -1502,15 +1503,19 @@ illegal_toEnum_tag tp maxtag =
 					(nlHsVar maxtag))
 					(nlHsLit (mkHsString ")"))))))
 
+parenify :: LHsExpr RdrName -> LHsExpr RdrName
 parenify e@(L _ (HsVar _)) = e
 parenify e	           = mkHsPar e
 
 -- genOpApp wraps brackets round the operator application, so that the
 -- renamer won't subsequently try to re-associate it. 
+genOpApp :: LHsExpr RdrName -> RdrName -> LHsExpr RdrName -> LHsExpr RdrName
 genOpApp e1 op e2 = nlHsPar (nlHsOpApp e1 op e2)
 \end{code}
 
 \begin{code}
+a_RDR, b_RDR, c_RDR, d_RDR, k_RDR, z_RDR, ah_RDR, bh_RDR, ch_RDR, dh_RDR,
+    cmp_eq_RDR :: RdrName
 a_RDR		= mkVarUnqual (fsLit "a")
 b_RDR		= mkVarUnqual (fsLit "b")
 c_RDR		= mkVarUnqual (fsLit "c")
@@ -1523,10 +1528,13 @@ ch_RDR		= mkVarUnqual (fsLit "c#")
 dh_RDR		= mkVarUnqual (fsLit "d#")
 cmp_eq_RDR	= mkVarUnqual (fsLit "cmp_eq")
 
+as_RDRs, bs_RDRs, cs_RDRs :: [RdrName]
 as_RDRs		= [ mkVarUnqual (mkFastString ("a"++show i)) | i <- [(1::Int) .. ] ]
 bs_RDRs		= [ mkVarUnqual (mkFastString ("b"++show i)) | i <- [(1::Int) .. ] ]
 cs_RDRs		= [ mkVarUnqual (mkFastString ("c"++show i)) | i <- [(1::Int) .. ] ]
 
+a_Expr, b_Expr, c_Expr, ltTag_Expr, eqTag_Expr, gtTag_Expr,
+    false_Expr, true_Expr :: LHsExpr RdrName
 a_Expr		= nlHsVar a_RDR
 b_Expr		= nlHsVar b_RDR
 c_Expr		= nlHsVar c_RDR
@@ -1536,6 +1544,7 @@ gtTag_Expr	= nlHsVar gtTag_RDR
 false_Expr	= nlHsVar false_RDR
 true_Expr	= nlHsVar true_RDR
 
+a_Pat, b_Pat, c_Pat, d_Pat, k_Pat, z_Pat :: LPat RdrName
 a_Pat		= nlVarPat a_RDR
 b_Pat		= nlVarPat b_RDR
 c_Pat		= nlVarPat c_RDR
@@ -1543,12 +1552,13 @@ d_Pat		= nlVarPat d_RDR
 k_Pat		= nlVarPat k_RDR
 z_Pat		= nlVarPat z_RDR
 
-con2tag_RDR, tag2con_RDR, maxtag_RDR :: TyCon ->  RdrName
+con2tag_RDR, tag2con_RDR, maxtag_RDR :: TyCon -> RdrName
 -- Generates Orig s RdrName, for the binding positions
 con2tag_RDR tycon = mk_tc_deriv_name tycon "con2tag_"
 tag2con_RDR tycon = mk_tc_deriv_name tycon "tag2con_"
 maxtag_RDR  tycon = mk_tc_deriv_name tycon "maxtag_"
 
+mk_tc_deriv_name :: TyCon -> [Char] -> RdrName
 mk_tc_deriv_name tycon str 
   = mkDerivedRdrName tc_name mk_occ
   where
@@ -1562,8 +1572,11 @@ s RdrName for PrimOps.  Can't be done in PrelNames, because PrimOp imports
 PrelNames, so PrelNames can't import PrimOp.
 
 \begin{code}
+primOpRdrName :: PrimOp -> RdrName
 primOpRdrName op = getRdrName (primOpId op)
 
+minusInt_RDR, eqInt_RDR, ltInt_RDR, geInt_RDR, leInt_RDR,
+    tagToEnum_RDR :: RdrName
 minusInt_RDR  = primOpRdrName IntSubOp
 eqInt_RDR     = primOpRdrName IntEqOp
 ltInt_RDR     = primOpRdrName IntLtOp
@@ -1571,5 +1584,6 @@ geInt_RDR     = primOpRdrName IntGeOp
 leInt_RDR     = primOpRdrName IntLeOp
 tagToEnum_RDR = primOpRdrName TagToEnumOp
 
+error_RDR :: RdrName
 error_RDR = getRdrName eRROR_ID
 \end{code}
