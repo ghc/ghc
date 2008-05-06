@@ -19,6 +19,7 @@
 -- any warnings in the module. See
 --     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
 -- for details
+-- The kludge is only needed in this module because of trac #2267.
 
 module DsMeta( dsBracket, 
 	       templateHaskellNames, qTyConName, nameTyConName,
