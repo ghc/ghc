@@ -3,13 +3,6 @@
 %
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module TcRnMonad(
 	module TcRnMonad,
 	module TcRnTypes,
@@ -28,7 +21,6 @@ import TcType
 import InstEnv
 import FamInstEnv
 
-import Coercion
 import Var
 import Id
 import VarSet
@@ -340,13 +332,13 @@ newSysLocalIds fs tys
 %************************************************************************
 
 \begin{code}
-traceTc, traceRn :: SDoc -> TcRn ()
+traceTc, traceRn, traceSplice :: SDoc -> TcRn ()
 traceRn      = traceOptTcRn Opt_D_dump_rn_trace
 traceTc      = traceOptTcRn Opt_D_dump_tc_trace
 traceSplice  = traceOptTcRn Opt_D_dump_splices
 
 
-traceIf :: SDoc -> TcRnIf m n ()	
+traceIf, traceHiDiffs :: SDoc -> TcRnIf m n ()
 traceIf      = traceOptIf Opt_D_dump_if_trace
 traceHiDiffs = traceOptIf Opt_D_dump_hi_diffs
 
@@ -513,7 +505,7 @@ checkErr ok msg = unless ok (addErr msg)
 
 warnIf :: Bool -> Message -> TcRn ()
 warnIf True  msg = addWarn msg
-warnIf False msg = return ()
+warnIf False _   = return ()
 
 addMessages :: Messages -> TcRn ()
 addMessages (m_warns, m_errs)
@@ -545,7 +537,7 @@ try_m thing
   = do { mb_r <- tryM thing ;
 	 case mb_r of 
 	     Left exn -> do { traceTc (exn_msg exn); return mb_r }
-	     Right r  -> return mb_r }
+	     Right _  -> return mb_r }
   where
     exn_msg exn = text "tryTc/recoverM recovering from" <+> text (showException exn)
 
@@ -557,7 +549,7 @@ recoverM :: TcRn r 	-- Recovery action; do this if the main one fails
 recoverM recover thing 
   = do { mb_res <- try_m thing ;
 	 case mb_res of
-	   Left exn  -> recover
+	   Left _    -> recover
 	   Right res -> return res }
 
 
@@ -565,7 +557,7 @@ recoverM recover thing
 mapAndRecoverM :: (a -> TcRn b) -> [a] -> TcRn [b]
 -- Drop elements of the input that fail, so the result
 -- list can be shorter than the argument list
-mapAndRecoverM f []     = return []
+mapAndRecoverM _ []     = return []
 mapAndRecoverM f (x:xs) = do { mb_r <- tryM (f x)
 			     ; rs <- mapAndRecoverM f xs
 			     ; return (case mb_r of
@@ -585,7 +577,7 @@ tryTc m
 	res  <- try_m (setErrsVar errs_var m) ; 
 	msgs <- readMutVar errs_var ;
 	return (msgs, case res of
-			    Left exn  -> Nothing
+			    Left _  -> Nothing
 			    Right val -> Just val)
 	-- The exception is always the IOEnv built-in
 	-- in exception; see IOEnv.failM
@@ -699,7 +691,7 @@ maybeAddErrCtxt (Just msg) thing_inside = addErrCtxt msg thing_inside
 maybeAddErrCtxt Nothing    thing_inside = thing_inside
 
 popErrCtxt :: TcM a -> TcM a
-popErrCtxt = updCtxt (\ msgs -> case msgs of { [] -> []; (m:ms) -> ms })
+popErrCtxt = updCtxt (\ msgs -> case msgs of { [] -> []; (_ : ms) -> ms })
 
 getInstLoc :: InstOrigin -> TcM InstLoc
 getInstLoc origin
@@ -710,7 +702,7 @@ addInstCtxt :: InstLoc -> TcM a -> TcM a
 -- Add the SrcSpan and context from the first Inst in the list
 -- 	(they all have similar locations)
 addInstCtxt (InstLoc _ src_loc ctxt) thing_inside
-  = setSrcSpan src_loc (updCtxt (\ old_ctxt -> ctxt) thing_inside)
+  = setSrcSpan src_loc (updCtxt (\_ -> ctxt) thing_inside)
 \end{code}
 
     The addErrTc functions add an error message, but do not cause failure.
@@ -744,7 +736,7 @@ failWithTcM local_and_msg
   = addErrTcM local_and_msg >> failM
 
 checkTc :: Bool -> Message -> TcM ()	     -- Check that the boolean is true
-checkTc True  err = return ()
+checkTc True  _   = return ()
 checkTc False err = failWithTc err
 \end{code}
 
@@ -795,17 +787,22 @@ tcInitTidyEnv
  	Other helper functions
 
 \begin{code}
+add_err_tcm :: TidyEnv -> Message -> SrcSpan
+            -> [TidyEnv -> TcM (TidyEnv, SDoc)]
+            -> TcM ()
 add_err_tcm tidy_env err_msg loc ctxt
  = do { ctxt_msgs <- do_ctxt tidy_env ctxt ;
 	addLongErrAt loc err_msg (vcat (ctxt_to_use ctxt_msgs)) }
 
-do_ctxt tidy_env []
+do_ctxt :: TidyEnv -> [TidyEnv -> TcM (TidyEnv, SDoc)] -> TcM [SDoc]
+do_ctxt _ []
  = return []
 do_ctxt tidy_env (c:cs)
  = do {	(tidy_env', m) <- c tidy_env  ;
 	ms	       <- do_ctxt tidy_env' cs  ;
 	return (m:ms) }
 
+ctxt_to_use :: [SDoc] -> [SDoc]
 ctxt_to_use ctxt | opt_PprStyle_Debug = ctxt
 		 | otherwise	      = take 3 ctxt
 \end{code}
