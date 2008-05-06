@@ -6,7 +6,7 @@
 TcSplice: Template Haskell splices
 
 \begin{code}
-{-# OPTIONS -w #-}
+{-# OPTIONS -fno-warn-unused-imports -fno-warn-unused-binds #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and fix
 -- any warnings in the module. See
@@ -46,7 +46,6 @@ import OccName
 import Var
 import Module
 import TcRnMonad
-import IfaceEnv
 import Class
 import TyCon
 import DataCon
@@ -60,8 +59,6 @@ import ErrUtils
 import SrcLoc
 import Outputable
 import Unique
-import DynFlags
-import PackageConfig
 import Maybe
 import BasicTypes
 import Panic
@@ -72,7 +69,6 @@ import qualified Language.Haskell.TH as TH
 import qualified Language.Haskell.TH.Syntax as TH
 
 import GHC.Exts		( unsafeCoerce#, Int#, Int(..) )
-import Control.Monad	( liftM )
 import qualified Control.Exception  as Exception( userErrors )
 \end{code}
 
@@ -170,11 +166,11 @@ runQuasiQuoteExpr :: HsQuasiQuote Name -> TcM (LHsExpr RdrName)
 runQuasiQuotePat  :: HsQuasiQuote Name -> TcM (LPat RdrName)
 
 #ifndef GHCI
-tcSpliceExpr n e ty = pprPanic "Cant do tcSpliceExpr without GHCi" (ppr e)
-tcSpliceDecls e     = pprPanic "Cant do tcSpliceDecls without GHCi" (ppr e)
+tcSpliceExpr _ e _ = pprPanic "Cant do tcSpliceExpr without GHCi" (ppr e)
+tcSpliceDecls e    = pprPanic "Cant do tcSpliceDecls without GHCi" (ppr e)
 
-runQuasiQuoteExpr q  = pprPanic "Cant do runQuasiQuoteExpr without GHCi" (ppr q)
-runQuasiQuotePat  q  = pprPanic "Cant do runQuasiQuotePat without GHCi" (ppr q)
+runQuasiQuoteExpr q = pprPanic "Cant do runQuasiQuoteExpr without GHCi" (ppr q)
+runQuasiQuotePat  q = pprPanic "Cant do runQuasiQuotePat without GHCi" (ppr q)
 #else
 \end{code}
 
@@ -234,23 +230,23 @@ tc_bracket use_lvl (VarBr name) 	-- Note [Quoting names]
 		| otherwise
 		-> do { checkTc (use_lvl == bind_lvl)
 				(quotedNameStageErr name) }
-	    other -> pprPanic "th_bracket" (ppr name)
+	    _ -> pprPanic "th_bracket" (ppr name)
 
 	; tcMetaTy nameTyConName 	-- Result type is Var (not Q-monadic)
 	}
 
-tc_bracket use_lvl (ExpBr expr) 
+tc_bracket _ (ExpBr expr) 
   = do	{ any_ty <- newFlexiTyVarTy liftedTypeKind
 	; tcMonoExpr expr any_ty
 	; tcMetaTy expQTyConName }
 	-- Result type is Expr (= Q Exp)
 
-tc_bracket use_lvl (TypBr typ) 
+tc_bracket _ (TypBr typ) 
   = do	{ tcHsSigType ExprSigCtxt typ
 	; tcMetaTy typeQTyConName }
 	-- Result type is Type (= Q Typ)
 
-tc_bracket use_lvl (DecBr decls)
+tc_bracket _ (DecBr decls)
   = do	{  tcTopSrcDecls emptyModDetails decls
 	-- Typecheck the declarations, dicarding the result
 	-- We'll get all that stuff later, when we splice it in
@@ -261,9 +257,10 @@ tc_bracket use_lvl (DecBr decls)
 	-- Result type is Q [Dec]
     }
 
-tc_bracket use_lvl (PatBr _)
+tc_bracket _ (PatBr _)
   = failWithTc (ptext (sLit "Tempate Haskell pattern brackets are not supported yet"))
 
+quotedNameStageErr :: Name -> SDoc
 quotedNameStageErr v 
   = sep [ ptext (sLit "Stage error: the non-top-level quoted name") <+> ppr (VarBr v)
 	, ptext (sLit "must be used at the same stage at which is is bound")]
@@ -307,6 +304,8 @@ tcSpliceExpr (HsSplice name expr) res_ty
       writeMutVar ps_var ((name,expr') : ps)
 
       return (panic "tcSpliceExpr")	-- The returned expression is ignored
+
+     ; Splice {} -> panic "tcSpliceExpr Splice"
      }} 
 
 -- tcTopSplice used to have this:
@@ -334,7 +333,7 @@ tcTopSplice expr res_ty = do
 
         -- Rename it, but bale out if there are errors
         -- otherwise the type checker just gives more spurious errors
-    (exp3, fvs) <- checkNoErrs (rnLExpr expr2)
+    (exp3, _fvs) <- checkNoErrs (rnLExpr expr2)
 
     tcMonoExpr exp3 res_ty
 
@@ -393,7 +392,7 @@ runQuasiQuote :: Outputable hs_syn
               -> Name			-- Name of th_syn type  
               -> (SrcSpan -> th_syn -> Either Message hs_syn)
               -> TcM hs_syn
-runQuasiQuote (HsQuasiQuote name quoter q_span quote) quote_selector desc meta_ty convert
+runQuasiQuote (HsQuasiQuote _name quoter q_span quote) quote_selector desc meta_ty convert
   = do	{ -- Check that the quoter is not locally defined, otherwise the TH
           -- machinery will not be able to run the quasiquote.
         ; this_mod <- getModule
@@ -430,6 +429,7 @@ runQuasiQuoteExpr quasiquote
 runQuasiQuotePat quasiquote
     = runQuasiQuote quasiquote quotePatName "pattern" patQTyConName convertToPat
 
+quoteStageError :: Name -> SDoc
 quoteStageError quoter
   = sep [ptext (sLit "GHC stage restriction:") <+> ppr quoter,
          nest 2 (ptext (sLit "is used in a quasiquote, and must be imported, not defined locally"))]
@@ -472,7 +472,9 @@ kcSpliceType (HsSplice name hs_expr)
 	-- but $(h 4) :: forall a.a 	i.e. any kind
 	; kind <- newKindVar
 	; return (panic "kcSpliceType", kind)	-- The returned type is ignored
-    }}}}}
+    }
+        ; Splice {} -> panic "kcSpliceType Splice"
+    }}}}
 
 kcTopSpliceType :: LHsExpr Name -> TcM (LHsType Name, TcKind)
 kcTopSpliceType expr
@@ -522,12 +524,6 @@ tcSpliceDecls expr
 	  	     zonked_q_expr 
 		     (ppr (getLoc expr) $$ (vcat (map ppr decls)))
 	; return decls }
-
-  where handleErrors :: [Either a Message] -> TcM [a]
-        handleErrors [] = return []
-        handleErrors (Left x:xs) = liftM (x:) (handleErrors xs)
-        handleErrors (Right m:xs) = do addErrTc m
-                                       handleErrors xs
 \end{code}
 
 
@@ -687,9 +683,11 @@ showSplice what before after = do
 				    text "======>",
 				    nest 2 after])])
 
+illegalBracket :: ThStage -> SDoc
 illegalBracket level
   = ptext (sLit "Illegal bracket at level") <+> ppr level
 
+illegalSplice :: ThStage -> SDoc
 illegalSplice level
   = ptext (sLit "Illegal splice at level") <+> ppr level
 
@@ -718,6 +716,7 @@ reify th_name
     ppr_ns (TH.Name _ (TH.NameG TH.DataName _pkg _mod)) = text "data"
     ppr_ns (TH.Name _ (TH.NameG TH.TcClsName _pkg _mod)) = text "tc"
     ppr_ns (TH.Name _ (TH.NameG TH.VarName _pkg _mod)) = text "var"
+    ppr_ns _ = panic "reify/ppr_ns"
 
 lookupThName :: TH.Name -> TcM Name
 lookupThName th_name@(TH.Name occ flavour)
@@ -789,7 +788,7 @@ reifyThing (AGlobal (AnId id))
 	; let v = reifyName id
 	; case globalIdDetails id of
 	    ClassOpId cls    -> return (TH.ClassOpI v ty (reifyName cls) fix)
-	    other	     -> return (TH.VarI     v ty Nothing fix)
+	    _                -> return (TH.VarI     v ty Nothing fix)
     }
 
 reifyThing (AGlobal (ATyCon tc))  = reifyTyCon tc
@@ -811,6 +810,8 @@ reifyThing (ATyVar tv ty)
   = do	{ ty1 <- zonkTcType ty
 	; ty2 <- reifyType ty1
 	; return (TH.TyVarI (reifyName tv) ty2) }
+
+reifyThing (AThing {}) = panic "reifyThing AThing"
 
 ------------------------------
 reifyTyCon :: TyCon -> TcM TH.Info
@@ -879,7 +880,11 @@ reifyType ty@(ForAllTy _ _) = do { cxt' <- reifyCxt cxt;
 				 ; return (TH.ForallT (reifyTyVars tvs) cxt' tau') }
 			    where
 				(tvs, cxt, tau) = tcSplitSigmaTy ty
+reifyType (PredTy {}) = panic "reifyType PredTy"
+
+reifyTypes :: [Type] -> TcM [TH.Type]
 reifyTypes = mapM reifyType
+reifyCxt :: [PredType] -> TcM [TH.Type]
 reifyCxt   = mapM reifyPred
 
 reifyFunDep :: ([TyVar], [TyVar]) -> TH.FunDep
@@ -895,6 +900,7 @@ reify_tc_app tc tys = do { tys' <- reifyTypes tys
 reifyPred :: TypeRep.PredType -> TcM TH.Type
 reifyPred (ClassP cls tys) = reify_tc_app (reifyName cls) tys
 reifyPred p@(IParam _ _)   = noTH (sLit "implicit parameters") (ppr p)
+reifyPred (EqPred {})      = panic "reifyPred EqPred"
 
 
 ------------------------------
