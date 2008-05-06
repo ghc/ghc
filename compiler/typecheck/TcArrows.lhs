@@ -5,13 +5,6 @@
 Typecheck arrow notation
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module TcArrows ( tcProc ) where
 
 import {-# SOURCE #-}	TcExpr( tcMonoExpr, tcInferRho )
@@ -117,6 +110,7 @@ tcCmd env (L loc expr) res_ty
 	{ expr' <- tc_cmd env expr res_ty
 	; return (L loc expr') }
 
+tc_cmd :: CmdEnv -> HsExpr Name -> (CmdStack, TcTauType) -> TcM (HsExpr TcId)
 tc_cmd env (HsPar cmd) res_ty
   = do	{ cmd' <- tcCmd env cmd res_ty
 	; return (HsPar cmd') }
@@ -184,7 +178,7 @@ tc_cmd env cmd@(HsApp fun arg) (cmd_stk, res_ty)
 -------------------------------------------
 -- 		Lambda
 
-tc_cmd env cmd@(HsLam (MatchGroup [L mtch_loc (match@(Match pats maybe_rhs_sig grhss))] _))
+tc_cmd env cmd@(HsLam (MatchGroup [L mtch_loc (match@(Match pats _maybe_rhs_sig grhss))] _))
        (cmd_stk, res_ty)
   = addErrCtxt (matchCtxt match_ctxt match)	$
 
@@ -220,7 +214,7 @@ tc_cmd env cmd@(HsLam (MatchGroup [L mtch_loc (match@(Match pats maybe_rhs_sig g
 -------------------------------------------
 -- 		Do notation
 
-tc_cmd env cmd@(HsDo do_or_lc stmts body ty) (cmd_stk, res_ty)
+tc_cmd env cmd@(HsDo do_or_lc stmts body _ty) (cmd_stk, res_ty)
   = do 	{ checkTc (null cmd_stk) (nonEmptyCmdStkErr cmd)
 	; (stmts', body') <- tcStmts do_or_lc tc_stmt stmts res_ty $
 			     tcGuardedCmd env body []
@@ -245,7 +239,6 @@ tc_cmd env cmd@(HsDo do_or_lc stmts body ty) (cmd_stk, res_ty)
 tc_cmd env cmd@(HsArrForm expr fixity cmd_args) (cmd_stk, res_ty)	
   = addErrCtxt (cmdCtxt cmd)	$
     do	{ cmds_w_tys <- zipWithM new_cmd_ty cmd_args [1..]
-	; span       <- getSrcSpanM
 	; [w_tv]     <- tcInstSkolTyVars ArrowSkol [alphaTyVar]
 	; let w_ty = mkTyVarTy w_tv 	-- Just a convenient starting point
 
@@ -310,13 +303,13 @@ tc_cmd env cmd@(HsArrForm expr fixity cmd_args) (cmd_stk, res_ty)
 		      (w,ss) = unscramble t  
 		   in (w, s:ss)
 				    
-	    other -> (ty, [])
+	    _ -> (ty, [])
 
 -----------------------------------------------------------------
 --		Base case for illegal commands
 -- This is where expressions that aren't commands get rejected
 
-tc_cmd env cmd _
+tc_cmd _ cmd _
   = failWithTc (vcat [ptext (sLit "The expression"), nest 2 (ppr cmd), 
 		      ptext (sLit "was found where an arrow command was expected")])
 \end{code}
@@ -330,6 +323,7 @@ tc_cmd env cmd _
 
 
 \begin{code}
+mkPairTy :: Type -> Type -> Type
 mkPairTy t1 t2 = mkTyConApp pairTyCon [t1,t2]
 
 arrowTyConKind :: Kind		--  *->*->*
@@ -344,19 +338,24 @@ arrowTyConKind = mkArrowKinds [liftedTypeKind, liftedTypeKind] liftedTypeKind
 %************************************************************************
 
 \begin{code}
+cmdCtxt :: HsExpr Name -> SDoc
 cmdCtxt cmd = ptext (sLit "In the command:") <+> ppr cmd
 
+caseScrutCtxt :: LHsExpr Name -> SDoc
 caseScrutCtxt cmd
   = hang (ptext (sLit "In the scrutinee of a case command:")) 4 (ppr cmd)
 
+nonEmptyCmdStkErr :: HsExpr Name -> SDoc
 nonEmptyCmdStkErr cmd
   = hang (ptext (sLit "Non-empty command stack at command:"))
 	 4 (ppr cmd)
 
+kappaUnderflow :: HsExpr Name -> SDoc
 kappaUnderflow cmd
   = hang (ptext (sLit "Command stack underflow at command:"))
 	 4 (ppr cmd)
 
+badFormFun :: Int -> TcType -> SDoc
 badFormFun i tup_ty'
  = hang (ptext (sLit "The type of the") <+> speakNth i <+> ptext (sLit "argument of a command form has the wrong shape"))
 	4 (ptext (sLit "Argument type:") <+> ppr tup_ty')
