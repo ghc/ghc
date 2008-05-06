@@ -122,8 +122,6 @@ exposed-modules:
 	IlxGen
 	Inst
 	InstEnv
-	Java
-	JavaGen
 	InteractiveUI
 	Lexer
 	LexCore
@@ -170,7 +168,6 @@ exposed-modules:
 	PprTyThing
 	PrelInfo
 	PrelNames
-	PrintJava
 	PrelRules
 	Pretty
 	PrimOp
