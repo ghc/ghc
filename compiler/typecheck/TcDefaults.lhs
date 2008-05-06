@@ -5,13 +5,6 @@
 \section[TcDefaults]{Typechecking \tr{default} declarations}
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module TcDefaults ( tcDefaults ) where
 
 import HsSyn
@@ -48,7 +41,7 @@ tcDefaults []
 	-- one group, only for the next group to ignore them and install
 	-- defaultDefaultTys
 
-tcDefaults [L locn (DefaultDecl [])]
+tcDefaults [L _ (DefaultDecl [])]
   = return (Just [])		-- Default declaration specifying no types
 
 tcDefaults [L locn (DefaultDecl mono_tys)]
@@ -69,6 +62,7 @@ tcDefaults decls@(L locn (DefaultDecl _) : _)
     failWithTc (dupDefaultDeclErr decls)
 
 
+tc_default_ty :: [Class] -> LHsType Name -> TcM Type
 tc_default_ty deflt_clss hs_ty 
  = do	{ ty <- tcHsSigType DefaultDeclCtxt hs_ty
 	; checkTc (isTauTy ty) (polyDefErr hs_ty)
@@ -85,17 +79,22 @@ check_instance ty cls
   = do	{ (_, mb_res) <- tryTc (tcSimplifyDefault [mkClassPred cls [ty]])
 	; return (isJust mb_res) }
     
+defaultDeclCtxt :: SDoc
 defaultDeclCtxt = ptext (sLit "When checking the types in a default declaration")
 
+dupDefaultDeclErr :: [Located (DefaultDecl Name)] -> SDoc
 dupDefaultDeclErr (L _ (DefaultDecl _) : dup_things)
   = hang (ptext (sLit "Multiple default declarations"))
       4  (vcat (map pp dup_things))
   where
     pp (L locn (DefaultDecl _)) = ptext (sLit "here was another default declaration") <+> ppr locn
+dupDefaultDeclErr [] = panic "dupDefaultDeclErr []"
 
+polyDefErr :: LHsType Name -> SDoc
 polyDefErr ty 
   = hang (ptext (sLit "Illegal polymorphic type in default declaration") <> colon) 4 (ppr ty) 
 
+badDefaultTy :: Type -> [Class] -> SDoc
 badDefaultTy ty deflt_clss
   = hang (ptext (sLit "The default type") <+> quotes (ppr ty) <+> ptext (sLit "is not an instance of"))
        2 (foldr1 (\a b -> a <+> ptext (sLit "or") <+> b) (map (quotes. ppr) deflt_clss))
