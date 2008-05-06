@@ -706,7 +706,7 @@ checkAPat loc e = case e of
    
    -- n+k patterns
    OpApp (L nloc (HsVar n)) (L _ (HsVar plus)) _ 
-	(L _ (HsOverLit lit@(HsIntegral _ _ _)))
+	 (L _ (HsOverLit lit@(OverLit {ol_val = HsIntegral {}})))
    		      | plus == plus_RDR
    		      -> return (mkNPlusKPat (L nloc n) lit)
    

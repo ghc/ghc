@@ -41,6 +41,7 @@ import {-# SOURCE #-} TcSplice ( runQuasiQuotePat )
 
 import HsSyn            
 import TcRnMonad
+import TcHsSyn		( hsOverLitName )
 import RnEnv
 import RnTypes
 import DynFlags		( DynFlag(..) )
@@ -53,7 +54,7 @@ import ListSetOps	( removeDups, minusList )
 import Outputable
 import SrcLoc
 import FastString
-import Literal		( inIntRange, inCharRange )
+import Literal		( inCharRange )
 \end{code}
 
 
@@ -506,37 +507,38 @@ rnLit (HsChar c) = checkErr (inCharRange c) (bogusCharError c)
 rnLit _ = return ()
 
 rnOverLit :: HsOverLit t -> RnM (HsOverLit Name, FreeVars)
-rnOverLit (HsIntegral i _ _) = do
-    (from_integer_name, fvs) <- lookupSyntaxName fromIntegerName
-    if inIntRange i then
-        return (HsIntegral i from_integer_name placeHolderType, fvs)
-     else let
-	extra_fvs = mkFVs [plusIntegerName, timesIntegerName]
-	-- Big integer literals are built, using + and *, 
-	-- out of small integers (DsUtils.mkIntegerLit)
-	-- [NB: plusInteger, timesInteger aren't rebindable... 
-	--	they are used to construct the argument to fromInteger, 
-	--	which is the rebindable one.]
-        in
-        return (HsIntegral i from_integer_name placeHolderType, fvs `plusFV` extra_fvs)
-
-rnOverLit (HsFractional i _ _) = do
-    (from_rat_name, fvs) <- lookupSyntaxName fromRationalName
-    let
-	extra_fvs = mkFVs [ratioDataConName, plusIntegerName, timesIntegerName]
-	-- We have to make sure that the Ratio type is imported with
-	-- its constructor, because literals of type Ratio t are
-	-- built with that constructor.
-	-- The Rational type is needed too, but that will come in
-	-- as part of the type for fromRational.
-	-- The plus/times integer operations may be needed to construct the numerator
-	-- and denominator (see DsUtils.mkIntegerLit)
-    return (HsFractional i from_rat_name placeHolderType, fvs `plusFV` extra_fvs)
-
-rnOverLit (HsIsString s _ _) = do
-    (from_string_name, fvs) <- lookupSyntaxName fromStringName
-    return (HsIsString s from_string_name placeHolderType, fvs)
+rnOverLit lit@(OverLit {ol_val=val})
+  = do	{ let std_name = hsOverLitName val
+	; (from_thing_name, fvs) <- lookupSyntaxName std_name
+	; let rebindable = case from_thing_name of
+				HsVar v -> v /= std_name
+				_	-> panic "rnOverLit"
+	; return (lit { ol_witness = from_thing_name
+		      , ol_rebindable = rebindable }, fvs) }
 \end{code}
+
+----------------------------------------------------------------
+-- Old code returned extra free vars need in desugarer
+-- but that is no longer necessary, I believe
+--     if inIntRange i then
+--        return (HsIntegral i from_integer_name placeHolderType, fvs)
+--     else let
+--	extra_fvs = mkFVs [plusIntegerName, timesIntegerName]
+-- Big integer literals are built, using + and *, 
+-- out of small integers (DsUtils.mkIntegerLit)
+-- [NB: plusInteger, timesInteger aren't rebindable... 
+--	they are used to construct the argument to fromInteger, 
+--	which is the rebindable one.]
+
+-- (HsFractional i _ _) = do
+--	extra_fvs = mkFVs [ratioDataConName, plusIntegerName, timesIntegerName]
+-- We have to make sure that the Ratio type is imported with
+-- its constructor, because literals of type Ratio t are
+-- built with that constructor.
+-- The Rational type is needed too, but that will come in
+-- as part of the type for fromRational.
+-- The plus/times integer operations may be needed to construct the numerator
+-- and denominator (see DsUtils.mkIntegerLit)
 
 %************************************************************************
 %*									*

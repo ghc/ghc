@@ -23,9 +23,8 @@ module Inst (
 
 	newDictBndr, newDictBndrs, newDictBndrsO,
 	instCall, instStupidTheta,
-	cloneDict, 
-	shortCutFracLit, shortCutIntLit, shortCutStringLit, newIPDict, 
-	newMethod, newMethodFromName, newMethodWithGivenTy, 
+	cloneDict, mkOverLit,
+	newIPDict, newMethod, newMethodFromName, newMethodWithGivenTy, 
 	tcInstClassOp, 
 	tcSyntaxName, isHsVar,
 
@@ -471,51 +470,16 @@ newMethod inst_loc id tys = do
 \end{code}
 
 \begin{code}
-shortCutIntLit :: Integer -> TcType -> Maybe (HsExpr TcId)
-shortCutIntLit i ty
-  | isIntTy ty && inIntRange i = Just (HsLit (HsInt i))
-  | isWordTy ty && inWordRange i = Just (mkLit wordDataCon (HsWordPrim i))
-  | isIntegerTy ty 	       = Just (HsLit (HsInteger i ty))
-  | otherwise		       = shortCutFracLit (fromInteger i) ty
-	-- The 'otherwise' case is important
-	-- Consider (3 :: Float).  Syntactically it looks like an IntLit,
-	-- so we'll call shortCutIntLit, but of course it's a float
-	-- This can make a big difference for programs with a lot of
-	-- literals, compiled without -O
+mkOverLit :: OverLitVal -> TcM HsLit
+mkOverLit (HsIntegral i) 
+  = do	{ integer_ty <- tcMetaTy integerTyConName
+	; return (HsInteger i integer_ty) }
 
-shortCutFracLit :: Rational -> TcType -> Maybe (HsExpr TcId)
-shortCutFracLit f ty
-  | isFloatTy ty  = Just (mkLit floatDataCon  (HsFloatPrim f))
-  | isDoubleTy ty = Just (mkLit doubleDataCon (HsDoublePrim f))
-  | otherwise     = Nothing
-  where
+mkOverLit (HsFractional r)
+  = do	{ rat_ty <- tcMetaTy rationalTyConName
+	; return (HsRat r rat_ty) }
 
-mkLit :: DataCon -> HsLit -> HsExpr Id
-mkLit con lit = HsApp (nlHsVar (dataConWrapId con)) (nlHsLit lit)
-
-shortCutStringLit :: FastString -> TcType -> Maybe (HsExpr TcId)
-shortCutStringLit s ty
-  | isStringTy ty 			-- Short cut for String
-  = Just (HsLit (HsString s))
-  | otherwise = Nothing
-
-mkIntegerLit :: Integer -> TcM (LHsExpr TcId)
-mkIntegerLit i = do
-    integer_ty <- tcMetaTy integerTyConName
-    span <- getSrcSpanM
-    return (L span $ HsLit (HsInteger i integer_ty))
-
-mkRatLit :: Rational -> TcM (LHsExpr TcId)
-mkRatLit r = do
-    rat_ty <- tcMetaTy rationalTyConName
-    span <- getSrcSpanM
-    return (L span $ HsLit (HsRat r rat_ty))
-
-mkStrLit :: FastString -> TcM (LHsExpr TcId)
-mkStrLit s = do
-    --string_ty <- tcMetaTy stringTyConName
-    span <- getSrcSpanM
-    return (L span $ HsLit (HsString s))
+mkOverLit (HsIsString s) = return (HsString s)
 
 isHsVar :: HsExpr Name -> Name -> Bool
 isHsVar (HsVar f) g = f==g
@@ -783,41 +747,27 @@ lookupSimpleInst (Method {tci_oid = id, tci_tys = tys, tci_theta = theta, tci_lo
 -- [Same shortcut as in newOverloadedLit, but we
 --  may have done some unification by now] 		
 
-lookupSimpleInst (LitInst {tci_lit = HsIntegral i from_integer_name _, tci_ty = ty, tci_loc = loc})
-  | Just expr <- shortCutIntLit i ty
-  = return (GenInst [] (noLoc expr))
-  | otherwise
-  = ASSERT( from_integer_name `isHsVar` fromIntegerName ) do	-- A LitInst invariant
-    from_integer <- tcLookupId fromIntegerName
-    method_inst <- tcInstClassOp loc from_integer [ty]
-    integer_lit <- mkIntegerLit i
-    return (GenInst [method_inst]
-		     (mkHsApp (L (instLocSpan loc)
-			   	 (HsVar (instToId method_inst))) integer_lit))
-
-lookupSimpleInst (LitInst {tci_lit = HsFractional f from_rat_name _, tci_ty = ty, tci_loc = loc})
-  | Just expr <- shortCutFracLit f ty
-  = return (GenInst [] (noLoc expr))
+lookupSimpleInst (LitInst { tci_lit = lit@OverLit { ol_val = lit_val
+					          , ol_rebindable = rebindable }
+			  , tci_ty = ty, tci_loc = iloc})
+#ifdef DEBUG
+  | rebindable = panic "lookupSimpleInst" 		-- A LitInst invariant
+#endif
+  | Just witness <- shortCutLit lit_val ty
+  = do	{ let lit' = lit { ol_witness = witness, ol_type = ty }
+	; return (GenInst [] (L loc (HsOverLit lit'))) }
 
   | otherwise
-  = ASSERT( from_rat_name `isHsVar` fromRationalName ) do	-- A LitInst invariant
-    from_rational <- tcLookupId fromRationalName
-    method_inst <- tcInstClassOp loc from_rational [ty]
-    rat_lit <- mkRatLit f
-    return (GenInst [method_inst] (mkHsApp (L (instLocSpan loc) 
-					       (HsVar (instToId method_inst))) rat_lit))
-
-lookupSimpleInst (LitInst {tci_lit = HsIsString s from_string_name _, tci_ty = ty, tci_loc = loc})
-  | Just expr <- shortCutStringLit s ty
-  = return (GenInst [] (noLoc expr))
-  | otherwise
-  = ASSERT( from_string_name `isHsVar` fromStringName ) do	-- A LitInst invariant
-    from_string <- tcLookupId fromStringName
-    method_inst <- tcInstClassOp loc from_string [ty]
-    string_lit <- mkStrLit s
-    return (GenInst [method_inst]
-		     (mkHsApp (L (instLocSpan loc)
-			   	 (HsVar (instToId method_inst))) string_lit))
+  = do	{ hs_lit <- mkOverLit lit_val
+	; from_thing <- tcLookupId (hsOverLitName lit_val)
+		  -- Not rebindable, so hsOverLitName is the right thing
+    	; method_inst <- tcInstClassOp iloc from_thing [ty]
+	; let witness = HsApp (L loc (HsVar (instToId method_inst))) 
+			      (L loc (HsLit hs_lit))
+	      lit' = lit { ol_witness = witness, ol_type = ty }
+	; return (GenInst [method_inst] (L loc (HsOverLit lit'))) }
+  where
+    loc = instLocSpan iloc
 
 --------------------- Dictionaries ------------------------
 lookupSimpleInst (Dict {tci_pred = pred, tci_loc = loc})

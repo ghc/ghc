@@ -848,63 +848,37 @@ tcOverloadedLit :: InstOrigin
 		 -> HsOverLit Name
 		 -> BoxyRhoType
 		 -> TcM (HsOverLit TcId)
-tcOverloadedLit orig lit@(HsIntegral i fi _) res_ty
-  | not (fi `isHsVar` fromIntegerName)	-- Do not generate a LitInst for rebindable syntax.  
+tcOverloadedLit orig lit@(OverLit { ol_val = val, ol_rebindable = rebindable
+				  , ol_witness = meth_name }) res_ty
+  | rebindable
+	-- Do not generate a LitInst for rebindable syntax.  
 	-- Reason: If we do, tcSimplify will call lookupInst, which
 	--	   will call tcSyntaxName, which does unification, 
 	--	   which tcSimplify doesn't like
 	-- ToDo: noLoc sadness
-  = do	{ integer_ty <- tcMetaTy integerTyConName
-	; fi' <- tcSyntaxOp orig fi (mkFunTy integer_ty res_ty)
-	; return (HsIntegral i (HsApp (noLoc fi') (nlHsLit (HsInteger i integer_ty))) res_ty) }
-
-  | Just expr <- shortCutIntLit i res_ty 
-  = return (HsIntegral i expr res_ty)
-
-  | otherwise
-  = do 	{ expr <- newLitInst orig lit res_ty
-	; return (HsIntegral i expr res_ty) }
-
-tcOverloadedLit orig lit@(HsFractional r fr _) res_ty
-  | not (fr `isHsVar` fromRationalName)	-- c.f. HsIntegral case
-  = do	{ rat_ty <- tcMetaTy rationalTyConName
-	; fr' <- tcSyntaxOp orig fr (mkFunTy rat_ty res_ty)
+  = do	{ hs_lit <- mkOverLit val
+	; let lit_ty = hsLitType hs_lit
+	; fi' <- tcSyntaxOp orig meth_name (mkFunTy lit_ty res_ty)
 	 	-- Overloaded literals must have liftedTypeKind, because
 	 	-- we're instantiating an overloaded function here,
 	 	-- whereas res_ty might be openTypeKind. This was a bug in 6.2.2
 		-- However this'll be picked up by tcSyntaxOp if necessary
-	; return (HsFractional r (HsApp (noLoc fr') (nlHsLit (HsRat r rat_ty))) res_ty) }
+	; let witness = HsApp (noLoc fi') (noLoc (HsLit hs_lit))
+	; return (lit { ol_witness = witness, ol_type = res_ty }) }
 
-  | Just expr <- shortCutFracLit r res_ty 
-  = return (HsFractional r expr res_ty)
-
-  | otherwise
-  = do 	{ expr <- newLitInst orig lit res_ty
-	; return (HsFractional r expr res_ty) }
-
-tcOverloadedLit orig lit@(HsIsString s fr _) res_ty
-  | not (fr `isHsVar` fromStringName)	-- c.f. HsIntegral case
-  = do	{ str_ty <- tcMetaTy stringTyConName
-	; fr' <- tcSyntaxOp orig fr (mkFunTy str_ty res_ty)
-	; return (HsIsString s (HsApp (noLoc fr') (nlHsLit (HsString s))) res_ty) }
-
-  | Just expr <- shortCutStringLit s res_ty 
-  = return (HsIsString s expr res_ty)
+  | Just expr <- shortCutLit val res_ty 
+  = return (lit { ol_witness = expr, ol_type = res_ty })
 
   | otherwise
-  = do 	{ expr <- newLitInst orig lit res_ty
-	; return (HsIsString s expr res_ty) }
-
-newLitInst :: InstOrigin -> HsOverLit Name -> BoxyRhoType -> TcM (HsExpr TcId)
-newLitInst orig lit res_ty	-- Make a LitInst
   = do 	{ loc <- getInstLoc orig
 	; res_tau <- zapToMonotype res_ty
 	; new_uniq <- newUnique
 	; let	lit_nm   = mkSystemVarName new_uniq (fsLit "lit")
 		lit_inst = LitInst {tci_name = lit_nm, tci_lit = lit, 
 				    tci_ty = res_tau, tci_loc = loc}
+		witness = HsVar (instToId lit_inst)
 	; extendLIE lit_inst
-	; return (HsVar (instToId lit_inst)) }
+	; return (lit { ol_witness = witness, ol_type = res_ty }) }
 \end{code}
 
 

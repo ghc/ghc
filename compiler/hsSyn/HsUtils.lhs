@@ -142,9 +142,13 @@ mkBindStmt :: LPat idL -> LHsExpr idR -> StmtLR idL idR
 mkRecStmt  :: [LStmtLR idL idR] -> StmtLR idL idR
 
 
-mkHsIntegral   i       = HsIntegral   i  noSyntaxExpr
-mkHsFractional f       = HsFractional f  noSyntaxExpr
-mkHsIsString   s       = HsIsString   s  noSyntaxExpr
+mkHsIntegral   i       = OverLit (HsIntegral   i)  noRebindableInfo noSyntaxExpr
+mkHsFractional f       = OverLit (HsFractional f)  noRebindableInfo noSyntaxExpr
+mkHsIsString   s       = OverLit (HsIsString   s)  noRebindableInfo noSyntaxExpr
+
+noRebindableInfo :: Bool
+noRebindableInfo = error "noRebindableInfo" 	-- Just another placeholder; 
+
 mkHsDo ctxt stmts body = HsDo ctxt stmts body placeHolderType
 
 mkNPat lit neg     = NPat lit neg noSyntaxExpr

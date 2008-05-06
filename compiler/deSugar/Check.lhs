@@ -433,11 +433,11 @@ get_lit :: Pat id -> Maybe HsLit
 -- Get a representative HsLit to stand for the OverLit
 -- It doesn't matter which one, because they will only be compared
 -- with other HsLits gotten in the same way
-get_lit (LitPat lit)			 = Just lit
-get_lit (NPat (HsIntegral i   _ _) mb _) = Just (HsIntPrim   (mb_neg mb i))
-get_lit (NPat (HsFractional f _ _) mb _) = Just (HsFloatPrim (mb_neg mb f))
-get_lit (NPat (HsIsString s   _ _)  _ _) = Just (HsStringPrim s)
-get_lit _                                = Nothing
+get_lit (LitPat lit)				          = Just lit
+get_lit (NPat (OverLit { ol_val = HsIntegral i})    mb _) = Just (HsIntPrim   (mb_neg mb i))
+get_lit (NPat (OverLit { ol_val = HsFractional f }) mb _) = Just (HsFloatPrim (mb_neg mb f))
+get_lit (NPat (OverLit { ol_val = HsIsString s })   _  _) = Just (HsStringPrim s)
+get_lit _                                	          = Nothing
 
 mb_neg :: Num a => Maybe b -> a -> a
 mb_neg Nothing  v = v

@@ -20,7 +20,8 @@ module TcHsSyn (
 	mkHsConApp, mkHsDictLet, mkHsApp,
 	hsLitType, hsLPatType, hsPatType, 
 	mkHsAppTy, mkSimpleHsAlt,
-	nlHsIntLit, mkVanillaTuplePat,
+	nlHsIntLit, mkVanillaTuplePat, 
+	shortCutLit, hsOverLitName,
 	
 	mkArbitraryType,	-- Put this elsewhere?
 
@@ -40,16 +41,19 @@ import HsSyn	-- oodles of it
 import Id
 
 import TcRnMonad
+import PrelNames
 import Type
 import TcType
 import TcMType
 import TysPrim
 import TysWiredIn
 import TyCon
+import DataCon
 import Name
 import Var
 import VarSet
 import VarEnv
+import Literal
 import BasicTypes
 import Maybes
 import Unique
@@ -125,6 +129,40 @@ hsLitType (HsFloatPrim f)  = floatPrimTy
 hsLitType (HsDoublePrim d) = doublePrimTy
 \end{code}
 
+Overloaded literals. Here mainly becuase it uses isIntTy etc
+
+\begin{code}
+shortCutLit :: OverLitVal -> TcType -> Maybe (HsExpr TcId)
+shortCutLit (HsIntegral i) ty
+  | isIntTy ty && inIntRange i   = Just (HsLit (HsInt i))
+  | isWordTy ty && inWordRange i = Just (mkLit wordDataCon (HsWordPrim i))
+  | isIntegerTy ty 	       	 = Just (HsLit (HsInteger i ty))
+  | otherwise		       	 = shortCutLit (HsFractional (fromInteger i)) ty
+	-- The 'otherwise' case is important
+	-- Consider (3 :: Float).  Syntactically it looks like an IntLit,
+	-- so we'll call shortCutIntLit, but of course it's a float
+	-- This can make a big difference for programs with a lot of
+	-- literals, compiled without -O
+
+shortCutLit (HsFractional f) ty
+  | isFloatTy ty  = Just (mkLit floatDataCon  (HsFloatPrim f))
+  | isDoubleTy ty = Just (mkLit doubleDataCon (HsDoublePrim f))
+  | otherwise     = Nothing
+
+shortCutLit (HsIsString s) ty
+  | isStringTy ty = Just (HsLit (HsString s))
+  | otherwise     = Nothing
+
+mkLit :: DataCon -> HsLit -> HsExpr Id
+mkLit con lit = HsApp (nlHsVar (dataConWrapId con)) (nlHsLit lit)
+
+------------------------------
+hsOverLitName :: OverLitVal -> Name
+-- Get the canonical 'fromX' name for a particular OverLitVal
+hsOverLitName (HsIntegral {})   = fromIntegerName
+hsOverLitName (HsFractional {}) = fromRationalName
+hsOverLitName (HsIsString {})   = fromStringName
+\end{code}
 
 %************************************************************************
 %*									*
@@ -586,17 +624,10 @@ zonkDo env do_or_lc      = do_or_lc
 
 -------------------------------------------------------------------------
 zonkOverLit :: ZonkEnv -> HsOverLit TcId -> TcM (HsOverLit Id)
-zonkOverLit env ol = 
-    let 
-        zonkedStuff = do ty' <- zonkTcTypeToType env (overLitType ol)
-                         e' <- zonkExpr env (overLitExpr ol)
-                         return (e', ty')
-        ru f (x, y) = return (f x y)
-    in
-      case ol of 
-        (HsIntegral i _ _)   -> ru (HsIntegral i) =<< zonkedStuff
-        (HsFractional r _ _) -> ru (HsFractional r) =<< zonkedStuff
-        (HsIsString s _ _)   -> ru (HsIsString s) =<< zonkedStuff
+zonkOverLit env lit@(OverLit { ol_witness = e, ol_type = ty })
+  = do	{ ty' <- zonkTcTypeToType env ty
+	; e' <- zonkExpr env e
+ 	; return (lit { ol_witness = e', ol_type = ty' }) }
 
 -------------------------------------------------------------------------
 zonkArithSeq :: ZonkEnv -> ArithSeqInfo TcId -> TcM (ArithSeqInfo Id)

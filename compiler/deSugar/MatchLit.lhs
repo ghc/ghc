@@ -19,10 +19,12 @@ import DsMonad
 import DsUtils
 
 import HsSyn
+
 import Id
 import CoreSyn
 import TyCon
 import DataCon
+import TcHsSyn	( shortCutLit )
 import TcType
 import Type
 import PrelNames
@@ -85,10 +87,20 @@ dsLit (HsRat r ty) = do
 dsOverLit :: HsOverLit Id -> DsM CoreExpr
 -- Post-typechecker, the SyntaxExpr field of an OverLit contains 
 -- (an expression for) the literal value itself
-dsOverLit (HsIntegral   _ lit _) = dsExpr lit
-dsOverLit (HsFractional _ lit _) = dsExpr lit
-dsOverLit (HsIsString   _ lit _) = dsExpr lit
+dsOverLit (OverLit { ol_val = val, ol_rebindable = rebindable 
+		   , ol_witness = witness, ol_type = ty })
+  | not rebindable
+  , Just expr <- shortCutLit val ty = dsExpr expr	-- Note [Literal short cut]
+  | otherwise			    = dsExpr witness
 \end{code}
+
+Note [Literal short cut]
+~~~~~~~~~~~~~~~~~~~~~~~~
+The type checker tries to do this short-cutting as early as possible, but 
+becuase of unification etc, more information is available to the desugarer.
+And where it's possible to generate the correct literal right away, it's
+much better do do so.
+
 
 \begin{code}
 hsLitKey :: HsLit -> Literal
@@ -108,13 +120,14 @@ hsLitKey l                 = pprPanic "hsLitKey" (ppr l)
 
 hsOverLitKey :: OutputableBndr a => HsOverLit a -> Bool -> Literal
 -- Ditto for HsOverLit; the boolean indicates to negate
-hsOverLitKey (HsIntegral i _ _)   False = MachInt i
-hsOverLitKey (HsIntegral i _ _)   True  = MachInt (-i)
-hsOverLitKey (HsFractional r _ _) False = MachFloat r
-hsOverLitKey (HsFractional r _ _) True  = MachFloat (-r)
-hsOverLitKey (HsIsString s _ _)   False = MachStr s
-hsOverLitKey l                    _     = pprPanic "hsOverLitKey" (ppr l)
--- negated string should never happen
+hsOverLitKey (OverLit { ol_val = l }) neg = litValKey l neg
+
+litValKey :: OverLitVal -> Bool -> Literal
+litValKey (HsIntegral i)   False = MachInt i
+litValKey (HsIntegral i)   True  = MachInt (-i)
+litValKey (HsFractional r) False = MachFloat r
+litValKey (HsFractional r) True  = MachFloat (-r)
+litValKey (HsIsString s)   neg   = ASSERT( not neg) MachStr s
 \end{code}
 
 %************************************************************************
@@ -141,41 +154,43 @@ tidyLitPat lit = LitPat lit
 
 ----------------
 tidyNPat :: HsOverLit Id -> Maybe (SyntaxExpr Id) -> SyntaxExpr Id -> Pat Id
-tidyNPat over_lit mb_neg eq 
-  | isIntTy    (overLitType over_lit) = mk_con_pat intDataCon    (HsIntPrim int_val)
-  | isWordTy   (overLitType over_lit) = mk_con_pat wordDataCon   (HsWordPrim int_val)
-  | isFloatTy  (overLitType over_lit) = mk_con_pat floatDataCon  (HsFloatPrim  rat_val)
-  | isDoubleTy (overLitType over_lit) = mk_con_pat doubleDataCon (HsDoublePrim rat_val)
+tidyNPat over_lit@(OverLit val False _ ty) mb_neg eq 
+	-- Take short cuts only if the literal is not using rebindable syntax
+  | isIntTy    ty = mk_con_pat intDataCon    (HsIntPrim int_val)
+  | isWordTy   ty = mk_con_pat wordDataCon   (HsWordPrim int_val)
+  | isFloatTy  ty = mk_con_pat floatDataCon  (HsFloatPrim  rat_val)
+  | isDoubleTy ty = mk_con_pat doubleDataCon (HsDoublePrim rat_val)
 --  | isStringTy lit_ty = mk_con_pat stringDataCon (HsStringPrim str_val)
-  | otherwise	      = NPat over_lit mb_neg eq
   where
     mk_con_pat :: DataCon -> HsLit -> Pat Id
-    mk_con_pat con lit = unLoc (mkPrefixConPat con [noLoc $ LitPat lit] (overLitType over_lit))
+    mk_con_pat con lit = unLoc (mkPrefixConPat con [noLoc $ LitPat lit] ty)
 
-    neg_lit = case (mb_neg, over_lit) of
-		(Nothing, 	       _)   -> over_lit
-		(Just _,  HsIntegral i s ty)   -> HsIntegral   (-i) s ty
-		(Just _,  HsFractional f s ty) -> HsFractional (-f) s ty
-		(Just _,  HsIsString {})       -> panic "tidyNPat/neg_lit HsIsString"
+    neg_val = case (mb_neg, val) of
+		(Nothing, 	       _) -> val
+		(Just _,  HsIntegral   i) -> HsIntegral   (-i)
+		(Just _,  HsFractional f) -> HsFractional (-f)
+		(Just _,  HsIsString _)	  -> panic "tidyNPat"
 			     
     int_val :: Integer
-    int_val = case neg_lit of
-		HsIntegral   i _ _ -> i
-		HsFractional {}    -> panic "tidyNPat/int_val HsFractional"
-		HsIsString   {}    -> panic "tidyNPat/int_val HsIsString"
+    int_val = case neg_val of
+		HsIntegral i -> i
+		_ -> panic "tidyNPat"
 	
     rat_val :: Rational
-    rat_val = case neg_lit of
-		HsIntegral   i _ _ -> fromInteger i
-		HsFractional f _ _ -> f
-		HsIsString   {}    -> panic "tidyNPat/rat_val HsIsString"
+    rat_val = case neg_val of
+		HsIntegral   i -> fromInteger i
+		HsFractional f -> f
+		_ -> panic "tidyNPat"
 	
 {-
     str_val :: FastString
-    str_val = case neg_lit of
-		HsIsString   s _ _ -> s
-		_                  -> error "tidyNPat"
+    str_val = case val of
+		HsIsString s -> s
+		_ -> panic "tidyNPat"
 -}
+
+tidyNPat over_lit mb_neg eq 
+  = NPat over_lit mb_neg eq
 \end{code}
 
 

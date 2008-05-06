@@ -57,48 +57,62 @@ instance Eq HsLit where
   _                 == _                 = False
 
 data HsOverLit id 	-- An overloaded literal
-  = HsIntegral   !Integer    (SyntaxExpr id)  PostTcType	-- Integer-looking literals;
-  | HsFractional !Rational   (SyntaxExpr id)  PostTcType	-- Frac-looking literals
-  | HsIsString   !FastString (SyntaxExpr id)  PostTcType	-- String-looking literals
-  -- Before type checking, the SyntaxExpr is 'fromInteger' or 'fromRational'
-  -- After type checking, it is (fromInteger 3) or lit_78; that is,
-  -- the expression that should replace the literal.
-  -- This is unusual, because we're replacing 'fromInteger' with a call 
-  -- to fromInteger.  Reason: it allows commoning up of the fromInteger
-  -- calls, which wouldn't be possible if the desguarar made the application
-  --
-  -- The PostTcType in each branch records the type the overload literal is
-  -- found to have.
+  = OverLit {
+	ol_val :: OverLitVal, 
+	ol_rebindable :: Bool,		-- True <=> rebindable syntax
+					-- False <=> standard syntax
+	ol_witness :: SyntaxExpr id,	-- Note [Overloaded literal witnesses]
+	ol_type :: PostTcType }
 
-overLitExpr :: HsOverLit id -> SyntaxExpr id
-overLitExpr (HsIntegral _ e _) = e
-overLitExpr (HsFractional _ e _) = e
-overLitExpr (HsIsString _ e _) = e
+data OverLitVal
+  = HsIntegral   !Integer   	-- Integer-looking literals;
+  | HsFractional !Rational   	-- Frac-looking literals
+  | HsIsString   !FastString 	-- String-looking literals
 
-overLitType :: HsOverLit id -> PostTcType
-overLitType (HsIntegral _ _ t) = t
-overLitType (HsFractional _ _ t) = t
-overLitType (HsIsString _ _ t) = t
+overLitType :: HsOverLit a -> Type
+overLitType = ol_type
+\end{code}
 
+Note [Overloaded literal witnesses]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*Before* type checking, the SyntaxExpr in an HsOverLit is the
+name of the coercion function, 'fromInteger' or 'fromRational'.
+*After* type checking, it is a witness for the literal, such as
+	(fromInteger 3) or lit_78
+This witness should replace the literal.
 
+This dual role is unusual, because we're replacing 'fromInteger' with 
+a call to fromInteger.  Reason: it allows commoning up of the fromInteger
+calls, which wouldn't be possible if the desguarar made the application
+
+The PostTcType in each branch records the type the overload literal is
+found to have.
+
+\begin{code}
 -- Comparison operations are needed when grouping literals
 -- for compiling pattern-matching (module MatchLit)
 instance Eq (HsOverLit id) where
-  (HsIntegral i1 _ _)   == (HsIntegral i2 _ _)   = i1 == i2
-  (HsFractional f1 _ _) == (HsFractional f2 _ _) = f1 == f2
-  (HsIsString s1 _ _)   == (HsIsString s2 _ _)   = s1 == s2
-  _                     == _                     = False
+  (OverLit {ol_val = val1}) == (OverLit {ol_val=val2}) = val1 == val2
+
+instance Eq OverLitVal where
+  (HsIntegral i1)   == (HsIntegral i2)   = i1 == i2
+  (HsFractional f1) == (HsFractional f2) = f1 == f2
+  (HsIsString s1)   == (HsIsString s2)   = s1 == s2
+  _                 == _                 = False
 
 instance Ord (HsOverLit id) where
-  compare (HsIntegral i1 _ _)   (HsIntegral i2 _ _)   = i1 `compare` i2
-  compare (HsIntegral _ _ _)    (HsFractional _ _ _)  = LT
-  compare (HsIntegral _ _ _)    (HsIsString _ _ _)    = LT
-  compare (HsFractional f1 _ _) (HsFractional f2 _ _) = f1 `compare` f2
-  compare (HsFractional _ _ _)  (HsIntegral _ _ _)    = GT
-  compare (HsFractional _ _ _)  (HsIsString _ _ _)    = LT
-  compare (HsIsString s1 _ _)   (HsIsString s2 _ _)   = s1 `compare` s2
-  compare (HsIsString _ _ _)    (HsIntegral _ _ _)    = GT
-  compare (HsIsString _ _ _)    (HsFractional _ _ _)  = GT
+  compare (OverLit {ol_val=val1}) (OverLit {ol_val=val2}) = val1 `compare` val2
+
+instance Ord OverLitVal where
+  compare (HsIntegral i1)   (HsIntegral i2)   = i1 `compare` i2
+  compare (HsIntegral _)    (HsFractional _)  = LT
+  compare (HsIntegral _)    (HsIsString _)    = LT
+  compare (HsFractional f1) (HsFractional f2) = f1 `compare` f2
+  compare (HsFractional _)  (HsIntegral _)    = GT
+  compare (HsFractional _)  (HsIsString _)    = LT
+  compare (HsIsString s1)   (HsIsString s2)   = s1 `compare` s2
+  compare (HsIsString _)    (HsIntegral _)    = GT
+  compare (HsIsString _)    (HsFractional _)  = GT
 \end{code}
 
 \begin{code}
@@ -118,7 +132,11 @@ instance Outputable HsLit where
 
 -- in debug mode, print the expression that it's resolved to, too
 instance OutputableBndr id => Outputable (HsOverLit id) where
-  ppr (HsIntegral i e _)   = integer i <+> (ifPprDebug (parens (pprExpr e)))
-  ppr (HsFractional f e _) = rational f <+> (ifPprDebug (parens (pprExpr e)))
-  ppr (HsIsString s e _)   = pprHsString s <+> (ifPprDebug (parens (pprExpr e)))
+  ppr (OverLit {ol_val=val, ol_witness=witness}) 
+	= ppr val <+> (ifPprDebug (parens (pprExpr witness)))
+
+instance Outputable OverLitVal where
+  ppr (HsIntegral i)   = integer i 
+  ppr (HsFractional f) = rational f
+  ppr (HsIsString s)   = pprHsString s
 \end{code}
