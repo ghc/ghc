@@ -119,7 +119,6 @@ exposed-modules:
 	IfaceEnv
 	IfaceSyn
 	IfaceType
-	IlxGen
 	Inst
 	InstEnv
 	InteractiveUI
