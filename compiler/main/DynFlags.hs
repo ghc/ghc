@@ -873,9 +873,10 @@ getCoreToDo dflags
 	    MaxSimplifierIterations max_iter
 	]
 
-    core_todo = 
+    core_todo =
      if opt_level == 0 then
-       [simpl_phase 0 ["final"] max_iter]
+       [runWhen vectorisation (CoreDoPasses [ simpl_gently, CoreDoVectorisation ]),
+        simpl_phase 0 ["final"] max_iter]
      else {- opt_level >= 1 -} [ 
 
     -- We want to do the static argument transform before full laziness as it
