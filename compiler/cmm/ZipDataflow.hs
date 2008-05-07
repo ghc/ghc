@@ -233,7 +233,7 @@ lgraphToGraph (LGraph eid blocks) =
 
 class (Outputable m, Outputable l, LastNode l, Outputable (LGraph m l)) => DebugNodes m l
 
-fwd_pure_anal :: (DebugNodes m l, Outputable a)
+fwd_pure_anal :: (DebugNodes m l, LastNode l, Outputable a)
              => PassName
              -> BlockEnv a
              -> ForwardTransfers m l a
