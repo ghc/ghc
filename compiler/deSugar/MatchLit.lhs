@@ -154,7 +154,7 @@ tidyLitPat lit = LitPat lit
 
 ----------------
 tidyNPat :: HsOverLit Id -> Maybe (SyntaxExpr Id) -> SyntaxExpr Id -> Pat Id
-tidyNPat over_lit@(OverLit val False _ ty) mb_neg eq 
+tidyNPat (OverLit val False _ ty) mb_neg _
 	-- Take short cuts only if the literal is not using rebindable syntax
   | isIntTy    ty = mk_con_pat intDataCon    (HsIntPrim int_val)
   | isWordTy   ty = mk_con_pat wordDataCon   (HsWordPrim int_val)

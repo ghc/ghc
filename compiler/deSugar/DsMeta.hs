@@ -1303,6 +1303,7 @@ repOverloadedLiteral (OverLit { ol_val = val})
 	-- the smart constructor 'TH.Syntax.rationalL' uses it in its type,
 	-- and rationalL is sucked in when any TH stuff is used
 
+mk_lit :: OverLitVal -> DsM HsLit
 mk_lit (HsIntegral i)   = mk_integer  i
 mk_lit (HsFractional f) = mk_rational f
 mk_lit (HsIsString s)   = mk_string   s
