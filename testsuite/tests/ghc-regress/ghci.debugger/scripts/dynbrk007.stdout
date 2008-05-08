@@ -8,4 +8,4 @@ Stopped at dynbrk007.hs:5:8-15
 _result :: Maybe Integer = _
 Stopped at dynbrk007.hs:6:3-10
 _result :: Maybe Int = _
-i :: Int = _
+i :: Int = 1

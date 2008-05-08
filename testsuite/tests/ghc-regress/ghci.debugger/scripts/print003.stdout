@@ -11,5 +11,5 @@ t :: Opaque = O (_ : _)
 ()
 t = O (Just [(_t4::a),(_t5::a)] : (_t6::[Maybe [a]]))
 ()
-t = O (Just [1,1] : (_t7::[Maybe [Integer]]))
-_t7 :: [Maybe [Integer]]
+t = O (Just [1,(_t7::Integer)] : (_t8::[Maybe [Integer]]))
+_t7 :: Integer
