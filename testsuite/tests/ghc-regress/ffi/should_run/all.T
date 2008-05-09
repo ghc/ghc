@@ -22,7 +22,9 @@ clean(['ffi002_c.o'])
 
 test('ffi003', normal, compile_and_run, [''])
 
-test('ffi004', normal, compile_and_run, [''])
+# ffi004 calls printf, which is not supported (the FFI spec says that
+# calling varargs functions is deprecated).  It stopped working in GHC 6.9.
+test('ffi004', skip, compile_and_run, [''])
 
 # skip this test for now: it is non-portable due to the use of literal values
 # instead of CPP symbols for the flag arguments to open().
