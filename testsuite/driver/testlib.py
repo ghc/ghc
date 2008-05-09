@@ -1193,10 +1193,11 @@ def genGSCmd(psfile):
 def gsNotWorking():
     global gs_working 
     print "GhostScript not available for hp2ps tests"
-    gs_working = 0;
 
 global gs_working
-if config.gs != '':
+gs_working = 0
+if config.have_profiling:
+  if config.gs != '':
     resultGood = runCmdExitCode(genGSCmd(config.confdir + '/good.ps'));
     if resultGood == 0:
         resultBad = runCmdExitCode(genGSCmd(config.confdir + '/bad.ps'));
@@ -1207,7 +1208,7 @@ if config.gs != '':
             gsNotWorking();
     else:
         gsNotWorking();
-else:
+  else:
     gsNotWorking();
 
 def rm_no_fail( file ):
