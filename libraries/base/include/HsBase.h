@@ -732,5 +732,8 @@ INLINE void *    __hscore_from_intptr (intptr_t n)  { return (void *)n; }
 INLINE uintptr_t __hscore_to_uintptr  (void *p)     { return (uintptr_t)p; }
 INLINE intptr_t  __hscore_to_intptr   (void *p)     { return (intptr_t)p; }
 
+void errorBelch2(const char*s, char *t);
+void debugBelch2(const char*s, char *t);
+
 #endif /* __HSBASE_H__ */
 

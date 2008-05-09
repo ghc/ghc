@@ -41,7 +41,9 @@ putTraceMsg msg = do
      withCString msg  $ \cmsg ->
       debugBelch cfmt cmsg
 
-foreign import ccall unsafe "RtsMessages.h debugBelch"
+-- don't use debugBelch() directly, because we cannot call varargs functions
+-- using the FFI.
+foreign import ccall unsafe "HsBase.h debugBelch2"
    debugBelch :: CString -> CString -> IO ()
 #endif
 

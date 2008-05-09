@@ -581,7 +581,9 @@ uncaughtExceptionHandler = unsafePerformIO (newIORef defaultHandler)
           withCString msg $ \cmsg ->
             errorBelch cfmt cmsg
 
-foreign import ccall unsafe "RtsMessages.h errorBelch"
+-- don't use errorBelch() directly, because we cannot call varargs functions
+-- using the FFI.
+foreign import ccall unsafe "HsBase.h errorBelch2"
    errorBelch :: CString -> CString -> IO ()
 
 setUncaughtExceptionHandler :: (Exception -> IO ()) -> IO ()

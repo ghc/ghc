@@ -7,3 +7,12 @@
 #define INLINE
 #include "HsBase.h"
 
+void errorBelch2(const char*s, char *t)
+{
+    return errorBelch(s,t);
+}
+
+void debugBelch2(const char*s, char *t)
+{
+    return debugBelch(s,t);
+}
