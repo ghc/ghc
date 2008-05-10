@@ -758,9 +758,7 @@ lookupSimpleInst (Method {tci_oid = id, tci_tys = tys, tci_theta = theta, tci_lo
 lookupSimpleInst (LitInst { tci_lit = lit@OverLit { ol_val = lit_val
 					          , ol_rebindable = rebindable }
 			  , tci_ty = ty, tci_loc = iloc})
-#ifdef DEBUG
-  | rebindable = panic "lookupSimpleInst" 		-- A LitInst invariant
-#endif
+  | debugIsOn && rebindable = panic "lookupSimpleInst" -- A LitInst invariant
   | Just witness <- shortCutLit lit_val ty
   = do	{ let lit' = lit { ol_witness = witness, ol_type = ty }
 	; return (GenInst [] (L loc (HsOverLit lit'))) }
