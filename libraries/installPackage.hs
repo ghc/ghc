@@ -1,5 +1,7 @@
 
 import Distribution.PackageDescription
+import Distribution.PackageDescription.Parse
+import Distribution.ReadE
 import Distribution.Simple
 import Distribution.Simple.Configure
 import Distribution.Simple.LocalBuildInfo
@@ -29,10 +31,7 @@ main
 
 mkVerbosity :: [String] -> Verbosity
 mkVerbosity [] = normal
-mkVerbosity ['-':'v':v] = let m = case v of
-                                      "" -> Nothing
-                                      _ -> Just v
-                          in flagToVerbosity m
+mkVerbosity ['-':'v':v] = readEOrFail flagToVerbosity v
 mkVerbosity args = error ("Bad arguments: " ++ show args)
 
 doRegisterInplace :: Verbosity -> IO ()
@@ -63,11 +62,11 @@ doInstall verbosity ghcpkg ghcpkgconf destdir topdir
               copyto = if null destdir then NoCopyDest else CopyTo destdir
               copyFlags = defaultCopyFlags {
                               copyDest = toFlag copyto,
-                              copyVerbose = toFlag verbosity
+                              copyVerbosity = toFlag verbosity
                           }
               registerFlags = defaultRegisterFlags {
                                   regPackageDB = toFlag GlobalPackageDB,
-                                  regVerbose = toFlag verbosity,
+                                  regVerbosity = toFlag verbosity,
                                   regGenScript = toFlag $ False,
                                   regInPlace = toFlag $ False
                               }

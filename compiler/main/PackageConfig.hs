@@ -8,7 +8,7 @@ module PackageConfig (
 	
 	-- * The PackageConfig type: information about a package
 	PackageConfig,
-	InstalledPackageInfo_(..), showPackageId,
+	InstalledPackageInfo_(..), display,
 	Version(..),
 	PackageIdentifier(..),
 	defaultPackageConfig,
@@ -16,9 +16,10 @@ module PackageConfig (
 
 #include "HsVersions.h"
 
-import Module 
+import Module
 import Distribution.InstalledPackageInfo
 import Distribution.Package
+import Distribution.Text
 import Distribution.Version
 import Distribution.Compat.ReadP ( readP_to_S )
 
@@ -45,14 +46,14 @@ defaultPackageConfig = emptyInstalledPackageInfo
 -- A PackageId is a string of the form <pkg>-<version>.
 
 mkPackageId :: PackageIdentifier -> PackageId
-mkPackageId = stringToPackageId . showPackageId
+mkPackageId = stringToPackageId . display
 
 packageConfigId :: PackageConfig -> PackageId
 packageConfigId = mkPackageId . package
 
 unpackPackageId :: PackageId -> Maybe PackageIdentifier
 unpackPackageId p
-  = case [ pid | (pid,"") <- readP_to_S parsePackageId str ] of
+  = case [ pid | (pid,"") <- readP_to_S parse str ] of
         []      -> Nothing
         (pid:_) -> Just pid
   where str = packageIdString p

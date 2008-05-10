@@ -47,8 +47,8 @@ import Panic
 import Outputable
 
 import System.Environment ( getEnv )
-import Distribution.InstalledPackageInfo
-import Distribution.Package
+import Distribution.InstalledPackageInfo hiding (depends)
+import Distribution.Package hiding (depends)
 import Distribution.Version
 import FastString
 import ErrUtils         ( debugTraceMsg, putMsg, Message )
@@ -317,7 +317,7 @@ matchingPackages str pkgs
         -- A package named on the command line can either include the
 	-- version, or just the name if it is unambiguous.
 	matches str p
-		=  str == showPackageId (package p)
+		=  str == display (package p)
 		|| str == pkgName (package p)
 
 pickPackages :: [PackageConfig] -> [String] -> [PackageConfig]
@@ -346,9 +346,9 @@ hideOldPackages dflags pkgs = mapM maybe_hide pkgs
 	   | (p' : _) <- later_versions = do
 		debugTraceMsg dflags 2 $
 		   (ptext (sLit "hiding package") <+> 
-                    text (showPackageId (package p)) <+>
+                    text (display (package p)) <+>
 		    ptext (sLit "to avoid conflict with later version") <+>
-		    text (showPackageId (package p')))
+		    text (display (package p')))
 		return (p {exposed=False})
 	   | otherwise = return p
 	  where myname = pkgName (package p)
@@ -417,7 +417,7 @@ findWiredInPackages dflags pkgs preload this_package = do
 			    ptext (sLit "wired-in package ")
 				 <> text wired_pkg
 				 <> ptext (sLit " mapped to ")
-				 <> text (showPackageId (package pkg))
+				 <> text (display (package pkg))
 			return (Just (package pkg))
 
 
@@ -485,7 +485,7 @@ elimDanglingDeps dflags pkgs ignored = go [] pkgs'
         debugTraceMsg dflags 2 $
              (ptext (sLit "package") <+> pprPkg p <+> 
                   ptext (sLit "will be ignored due to missing or recursive dependencies:") $$ 
-	      nest 2 (hsep (map (text.showPackageId) deps)))
+	      nest 2 (hsep (map (text.display) deps)))
 
 -- -----------------------------------------------------------------------------
 -- When all the command-line options are in, we can process our package
@@ -574,7 +574,7 @@ mkModuleMap pkg_db = foldr extend_modmap emptyUFM pkgids
 	        hidden_mods  = hiddenModules pkg
 
 pprPkg :: PackageConfig -> SDoc
-pprPkg p = text (showPackageId (package p))
+pprPkg p = text (display (package p))
 
 -- -----------------------------------------------------------------------------
 -- Extracting information from the packages in scope
@@ -714,8 +714,8 @@ dumpPackages dflags
 	putMsg dflags $
 	      vcat (map (text.showInstalledPackageInfo.to_ipi) (eltsUFM pkg_map))
  where
-  to_ipi pkgconf@InstalledPackageInfo_{ exposedModules = e,
-                                        hiddenModules = h } = 
+  to_ipi pkgconf@(InstalledPackageInfo { exposedModules = e,
+                                         hiddenModules = h }) = 
     pkgconf{ exposedModules = map moduleNameString e,
              hiddenModules  = map moduleNameString h }
 \end{code}
