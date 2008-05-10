@@ -69,11 +69,9 @@ import Module
 import Coercion
 import HscTypes
 import CoreFVs
-import DataCon
 import Id
 import Name
 import NameSet
-import Literal
 import Var      ( Var, TyVar )
 import qualified Var
 import VarEnv
@@ -89,8 +87,6 @@ import Util
 import Unique
 import Outputable
 import Data.List
-import TypeRep
-import Class
 
 import Control.Monad
 \end{code}
