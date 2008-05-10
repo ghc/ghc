@@ -16,10 +16,11 @@
 module Main (main) where
 
 import Version ( version, targetOS, targetARCH )
-import Distribution.InstalledPackageInfo
+import Distribution.InstalledPackageInfo hiding (depends)
 import Distribution.Compat.ReadP
 import Distribution.ParseUtils
 import Distribution.Package
+import Distribution.Text
 import Distribution.Version
 import System.FilePath
 import System.Cmd       ( rawSystem )
@@ -36,7 +37,7 @@ import Data.Maybe
 
 import Data.Char ( isSpace, toLower )
 import Control.Monad
-import System.Directory ( doesDirectoryExist, getDirectoryContents, 
+import System.Directory ( doesDirectoryExist, getDirectoryContents,
                           doesFileExist, renameFile, removeFile )
 import System.Exit ( exitWith, ExitCode(..) )
 import System.Environment ( getArgs, getProgName, getEnv )
@@ -321,7 +322,7 @@ readGlobPkgId str = parseCheck parseGlobPackageId str "package identifier"
 
 parseGlobPackageId :: ReadP r PackageIdentifier
 parseGlobPackageId =
-  parsePackageId
+  parse
      +++
   (do n <- parsePackageName; string "-*"
       return (PackageIdentifier{ pkgName = n, pkgVersion = globVersion }))
@@ -569,11 +570,11 @@ listPackages flags mPackageName mModuleName = do
                    | isBrokenPackage p pkg_map = braces doc
                    | exposed p = doc
                    | otherwise = parens doc
-                   where doc = text (showPackageId (package p))
+                   where doc = text (display (package p))
 
         show_simple db_stack = do
           let showPkg = if FlagNamesOnly `elem` flags then pkgName
-                                                      else showPackageId
+                                                      else display
               pkgs = map showPkg $ sortBy compPkgIdVer $
                           map package (concatMap snd db_stack)
           when (not (null pkgs)) $ 
@@ -589,7 +590,7 @@ latestPackage flags pkgid = do
   show_pkg (sortBy compPkgIdVer (map package ps))
   where
     show_pkg [] = die "no matches"
-    show_pkg pids = hPutStrLn stdout (showPackageId (last pids))
+    show_pkg pids = hPutStrLn stdout (display (last pids))
 
 -- -----------------------------------------------------------------------------
 -- Describe
@@ -608,7 +609,7 @@ findPackages db_stack pkgarg
         ps -> return ps
   where
         all_pkgs = concat (map snd db_stack)
-        pkg_msg (Id pkgid)           = showPackageId pkgid
+        pkg_msg (Id pkgid)           = display pkgid
         pkg_msg (Substring pkgpat _) = "matching "++pkgpat
 
 matches :: PackageIdentifier -> PackageIdentifier -> Bool
@@ -618,7 +619,7 @@ pid `matches` pid'
 
 matchesPkg :: PackageArg -> InstalledPackageInfo -> Bool
 (Id pid)        `matchesPkg` pkg = pid `matches` package pkg
-(Substring _ m) `matchesPkg` pkg = m (showPackageId (package pkg))
+(Substring _ m) `matchesPkg` pkg = m (display (package pkg))
 
 compPkgIdVer :: PackageIdentifier -> PackageIdentifier -> Ordering
 compPkgIdVer p1 p2 = pkgVersion p1 `compare` pkgVersion p2
@@ -678,7 +679,7 @@ toField "hs_libraries"    = Just $ strList . hsLibraries
 toField "extra_libraries" = Just $ strList . extraLibraries
 toField "include_dirs"    = Just $ strList . includeDirs
 toField "c_includes"      = Just $ strList . includes
-toField "package_deps"    = Just $ strList . map showPackageId. depends
+toField "package_deps"    = Just $ strList . map display. depends
 toField "extra_cc_opts"   = Just $ strList . ccOptions
 toField "extra_ld_opts"   = Just $ strList . ldOptions
 toField "framework_dirs"  = Just $ strList . frameworkDirs
@@ -708,11 +709,11 @@ checkConsistency flags = do
   show_func | FlagSimpleOutput `elem` flags = show_simple
             | otherwise = show_normal
   show_simple (pid,deps) =
-    text (showPackageId pid) <> colon
-      <+> fsep (punctuate comma (map (text . showPackageId) deps))
+    text (display pid) <> colon
+      <+> fsep (punctuate comma (map (text . display) deps))
   show_normal (pid,deps) =
-    text "package" <+> text (showPackageId pid) <+> text "has missing dependencies:"
-      $$ nest 4 (fsep (punctuate comma (map (text . showPackageId) deps)))
+    text "package" <+> text (display pid) <+> text "has missing dependencies:"
+      $$ nest 4 (fsep (punctuate comma (map (text . display) deps)))
 
 missingPackageDeps :: InstalledPackageInfo
                    -> [(PackageIdentifier, InstalledPackageInfo)]
@@ -805,8 +806,8 @@ validatePackageConfig pkg db_stack auto_ghci_libs update force = do
 -- we check that the package id can be parsed properly here.
 checkPackageId :: InstalledPackageInfo -> IO ()
 checkPackageId ipi =
-  let str = showPackageId (package ipi) in
-  case [ x | (x,ys) <- readP_to_S parsePackageId str, all isSpace ys ] of
+  let str = display (package ipi) in
+  case [ x :: PackageIdentifier | (x,ys) <- readP_to_S parse str, all isSpace ys ] of
     [_] -> return ()
     []  -> die ("invalid package identifier: " ++ str)
     _   -> die ("ambiguous package identifier: " ++ str)
@@ -820,16 +821,16 @@ checkDuplicates db_stack pkg update force = do
   -- Check whether this package id already exists in this DB
   --
   when (not update && (pkgid `elem` map package pkgs)) $
-       die ("package " ++ showPackageId pkgid ++ " is already installed")
+       die ("package " ++ display pkgid ++ " is already installed")
 
   let
-        uncasep = map toLower . showPackageId
+        uncasep = map toLower . display
         dups = filter ((== uncasep pkgid) . uncasep) (map package pkgs)
 
   when (not update && not (null dups)) $ dieOrForceAll force $
         "Package names may be treated case-insensitively in the future.\n"++
-        "Package " ++ showPackageId pkgid ++
-        " overlaps with: " ++ unwords (map showPackageId dups)
+        "Package " ++ display pkgid ++
+        " overlaps with: " ++ unwords (map display dups)
 
 
 checkDir :: Force -> String -> IO ()
@@ -845,7 +846,7 @@ checkDir force d
 checkDep :: PackageDBStack -> Force -> PackageIdentifier -> IO ()
 checkDep db_stack force pkgid
   | pkgid `elem` pkgids || (not real_version && name_exists) = return ()
-  | otherwise = dieOrForceAll force ("dependency " ++ showPackageId pkgid
+  | otherwise = dieOrForceAll force ("dependency " ++ display pkgid
                                         ++ " doesn't exist")
   where
         -- for backwards compat, we treat 0.0 as a special version,
