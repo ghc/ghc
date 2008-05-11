@@ -1019,7 +1019,7 @@ linkPackage dflags pkg
 	let dlls = [ dll | DLL dll    <- classifieds ]
 	    objs = [ obj | Object obj <- classifieds ]
 
-	maybePutStr dflags ("Loading package " ++ showPackageId (package pkg) ++ " ... ")
+	maybePutStr dflags ("Loading package " ++ display (package pkg) ++ " ... ")
 
 	-- See comments with partOfGHCi
 	when (pkgName (package pkg) `notElem` partOfGHCi) $ do
@@ -1043,7 +1043,7 @@ linkPackage dflags pkg
         maybePutStr dflags "linking ... "
         ok <- resolveObjs
 	if succeeded ok then maybePutStrLn dflags "done."
-	      else throwDyn (InstallationError ("unable to load package `" ++ showPackageId (package pkg) ++ "'"))
+	      else throwDyn (InstallationError ("unable to load package `" ++ display (package pkg) ++ "'"))
 
 load_dyn dirs dll = do r <- loadDynamic dirs dll
 		       case r of
