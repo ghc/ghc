@@ -11,6 +11,10 @@ import Distribution.Simple.Utils
 import Distribution.Verbosity
 import System.Environment
 
+-- XXX This will need to be changed
+distPref :: FilePath
+distPref = defaultDistPref
+
 main :: IO ()
 main
   = do args <- getArgs
@@ -136,7 +140,7 @@ replaceTopdir _ p = p
 -- Get the build info, merging the setup-config and buildinfo files.
 getConfig :: Verbosity -> IO LocalBuildInfo
 getConfig verbosity = do
-    lbi <- getPersistBuildConfig
+    lbi <- getPersistBuildConfig distPref
     maybe_infoFile <- defaultHookedPackageDesc
     case maybe_infoFile of
         Nothing -> return lbi
