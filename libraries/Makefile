@@ -246,11 +246,7 @@ FLAGGED_CONFIGURE_ARGS = $(subst $(space)',\
                                  $(space)--configure-option=',\
                                  $(space)$(CONFIGURE_ARGS))
 
-$(foreach SUBDIR,$(SUBDIRS), \
-		  stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).$(SUBDIR)): \
-stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).%: %/setup/Setup
-	-$(RM) -f stamp/configure.library.*.$* $*/unbuildable
-	( cd $* && setup/Setup configure \
+ALL_CONFIGURE_FLAGS = \
 	           $(CONFIGURE_OPTS) \
 	           --prefix=/NONEXISTANT \
 	           --bindir=/NONEXISTANT \
@@ -268,7 +264,13 @@ stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).%: %/setup/Setup
 	           --haddock-options="--use-contents=../index.html \
 	                           --use-index=../doc-index.html" \
 	           $(FLAGGED_CONFIGURE_ARGS) \
-	           --configure-option=--with-cc=$(CC) ) \
+	           --configure-option=--with-cc=$(CC)
+
+$(foreach SUBDIR,$(SUBDIRS), \
+		  stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).$(SUBDIR)): \
+stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).%: %/setup/Setup
+	-$(RM) -f stamp/configure.library.*.$* $*/unbuildable
+	( cd $* && setup/Setup configure $(ALL_CONFIGURE_FLAGS) ) \
 	      && touch $@ || touch $*/unbuildable
 # We don't touch $@ if configure failed as we would prefer to try
 # configuring it next time round, rather than assuming it'll still fail.
