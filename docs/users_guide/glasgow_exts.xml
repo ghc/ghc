@@ -6781,7 +6781,7 @@ infeasible in most interesting cases.  The responsibility is entirely the progra
 terminating.  For example:
 
 <programlisting>
-  "loop"        forall x,y.  f x y = f y x
+  "loop"        forall x y.  f x y = f y x
 </programlisting>
 
 This rule will cause the compiler to go into an infinite loop.
