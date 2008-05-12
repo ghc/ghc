@@ -1234,7 +1234,7 @@ WAY_thr_debug_NAME=threaded
 WAY_thr_debug_HC_OPTS=-optc-DTHREADED_RTS -optc-DDEBUG
 
 # Way 'thr_debug_p':
-WAY_thr_debug_p_NAME=threaded
+WAY_thr_debug_p_NAME=threaded debug profiling
 WAY_thr_debug_p_HC_OPTS=-optc-DTHREADED_RTS -optc-DDEBUG -prof
 
 # Way 'dyn': build dynamic shared libraries
