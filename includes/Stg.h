@@ -31,6 +31,9 @@
  */
 #ifndef IN_STG_CODE
 # define IN_STG_CODE 1
+# define _ISOC99_SOURCE
+// Turn on C99 for .hc code.  This gives us the INFINITY and NAN
+// constants from math.h, which we occasionally need to use in .hc (#1861)
 #endif
 
 #if IN_STG_CODE == 0

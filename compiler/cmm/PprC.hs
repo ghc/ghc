@@ -395,7 +395,16 @@ pprMachOpApp' mop args
 pprLit :: CmmLit -> SDoc
 pprLit lit = case lit of
     CmmInt i rep      -> pprHexVal i rep
-    CmmFloat f rep     -> parens (machRepCType rep) <> (rational f)
+
+    CmmFloat f rep     -> parens (machRepCType rep) <> str
+        where d = fromRational f :: Double
+              str | isInfinite d && d < 0 = ptext (sLit "-INFINITY")
+                  | isInfinite d          = ptext (sLit "INFINITY")
+                  | isNaN d               = ptext (sLit "NAN")
+                  | otherwise             = text (show d)
+                -- these constants come from <math.h>
+                -- see #1861
+
     CmmLabel clbl      -> mkW_ <> pprCLabelAddr clbl
     CmmLabelOff clbl i -> mkW_ <> pprCLabelAddr clbl <> char '+' <> int i
     CmmLabelDiffOff clbl1 clbl2 i
