@@ -203,25 +203,44 @@ pprStmt stmt = case stmt of
 	where
 	  rep = cmmExprRep src
 
-    CmmCall (CmmCallee fn cconv) results args safety _ret ->
+    CmmCall (CmmCallee fn cconv) results args safety ret ->
         maybe_proto $$
 	pprCall ppr_fn cconv results args safety
 	where
-        ppr_fn = parens (cCast (pprCFunType (char '*') cconv results args) fn)
+        cast_fn = parens (cCast (pprCFunType (char '*') cconv results args) fn)
+
+        real_fun_proto lbl = char ';' <> 
+                        pprCFunType (pprCLabel lbl) cconv results args <> 
+                        noreturn_attr <> semi
+
+        data_proto lbl = ptext (sLit ";EI_(") <> 
+                         pprCLabel lbl <> char ')' <> semi
+
+        noreturn_attr = case ret of
+                          CmmNeverReturns -> text "__attribute__ ((noreturn))"
+                          CmmMayReturn    -> empty
 
         -- See wiki:Commentary/Compiler/Backends/PprC#Prototypes
-    	maybe_proto = 
+    	(maybe_proto, ppr_fn) = 
             case fn of
-	      CmmLit (CmmLabel lbl) | not (isMathFun lbl) -> 
-                  ptext (sLit ";EI_(") <+> pprCLabel lbl <> char ')' <> semi
-                        -- we declare all called functions as data labels,
-                        -- and then cast them to the right type when calling.
-                        -- This is because the label might already have a 
-                        -- declaration as a data label in the same file,
-                        -- e.g. Foreign.Marshal.Alloc declares 'free' as
-                        -- both a data label and a function label.
+	      CmmLit (CmmLabel lbl) 
+                | StdCallConv <- cconv -> (real_fun_proto lbl, pprCLabel lbl)
+                        -- stdcall functions must be declared with
+                        -- a function type, otherwise the C compiler
+                        -- doesn't add the @n suffix to the label.  We
+                        -- can't add the @n suffix ourselves, because
+                        -- it isn't valid C.
+                | CmmNeverReturns <- ret -> (real_fun_proto lbl, pprCLabel lbl)
+                | not (isMathFun lbl) -> (data_proto lbl, cast_fn)
+                        -- we declare all other called functions as
+                        -- data labels, and then cast them to the
+                        -- right type when calling.  This is because
+                        -- the label might already have a declaration
+                        -- as a data label in the same file,
+                        -- e.g. Foreign.Marshal.Alloc declares 'free'
+                        -- as both a data label and a function label.
 	      _ -> 
-                   empty {- no proto -}
+                   (empty {- no proto -}, cast_fn)
 			-- for a dynamic call, no declaration is necessary.
 
     CmmCall (CmmPrim op) results args safety _ret ->
