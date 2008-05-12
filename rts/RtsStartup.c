@@ -499,7 +499,7 @@ hs_exit_(rtsBool wait_foreign)
     // Originally, this was in report_ccs_profiling().  Now, retainer
     // profiling might tack some extra stuff on to the end of this file
     // during endProfiling().
-    fclose(prof_file);
+    if (prof_file != NULL) fclose(prof_file);
 #endif
 
 #if defined(TICKY_TICKY)

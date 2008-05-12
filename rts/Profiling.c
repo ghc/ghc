@@ -268,34 +268,44 @@ ccsSetSelected( CostCentreStack *ccs )
 static void
 initProfilingLogFile(void)
 {
-    /* Initialise the log file name */
-    prof_filename = arenaAlloc(prof_arena, strlen(prog_name) + 6);
-    sprintf(prof_filename, "%s.prof", prog_name);
-
-    /* open the log file */
-    if ((prof_file = fopen(prof_filename, "w")) == NULL) {
-	debugBelch("Can't open profiling report file %s\n", prof_filename);
-	RtsFlags.CcFlags.doCostCentres = 0;
-        // The following line was added by Sung; retainer/LDV profiling may need
-        // two output files, i.e., <program>.prof/hp.
-        if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_RETAINER)
-            RtsFlags.ProfFlags.doHeapProfile = 0;
-	return;
+    if (RtsFlags.CcFlags.doCostCentres == 0 && 
+        RtsFlags.ProfFlags.doHeapProfile != HEAP_BY_RETAINER)
+    {
+        /* No need for the <prog>.prof file */
+        prof_filename = NULL;
+        prof_file = NULL;
     }
+    else
+    {
+        /* Initialise the log file name */
+        prof_filename = arenaAlloc(prof_arena, strlen(prog_name) + 6);
+        sprintf(prof_filename, "%s.prof", prog_name);
 
-    if (RtsFlags.CcFlags.doCostCentres == COST_CENTRES_XML) {
-	/* dump the time, and the profiling interval */
-	fprintf(prof_file, "\"%s\"\n", time_str());
-	fprintf(prof_file, "\"%d ms\"\n", RtsFlags.MiscFlags.tickInterval);
-	
-	/* declare all the cost centres */
-	{
-	    CostCentre *cc;
-	    for (cc = CC_LIST; cc != NULL; cc = cc->link) {
-		fprintf(prof_file, "%d %ld \"%s\" \"%s\"\n",
-			CC_UQ, cc->ccID, cc->label, cc->module);
-	    }
-	}
+        /* open the log file */
+        if ((prof_file = fopen(prof_filename, "w")) == NULL) {
+            debugBelch("Can't open profiling report file %s\n", prof_filename);
+            RtsFlags.CcFlags.doCostCentres = 0;
+            // The following line was added by Sung; retainer/LDV profiling may need
+            // two output files, i.e., <program>.prof/hp.
+            if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_RETAINER)
+                RtsFlags.ProfFlags.doHeapProfile = 0;
+            return;
+        }
+
+        if (RtsFlags.CcFlags.doCostCentres == COST_CENTRES_XML) {
+            /* dump the time, and the profiling interval */
+            fprintf(prof_file, "\"%s\"\n", time_str());
+            fprintf(prof_file, "\"%d ms\"\n", RtsFlags.MiscFlags.tickInterval);
+            
+            /* declare all the cost centres */
+            {
+                CostCentre *cc;
+                for (cc = CC_LIST; cc != NULL; cc = cc->link) {
+                    fprintf(prof_file, "%d %ld \"%s\" \"%s\"\n",
+                            CC_UQ, cc->ccID, cc->label, cc->module);
+                }
+            }
+        }
     }
     
     if (RtsFlags.ProfFlags.doHeapProfile) {
