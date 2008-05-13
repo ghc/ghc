@@ -202,7 +202,12 @@ zipWith4Equal msg _ _  _  _  _  =  panic ("zipWith4Equal: unequal lists:"++msg)
 
 zipLazy :: [a] -> [b] -> [(a,b)]
 zipLazy []     _       = []
-zipLazy (x:xs) ~(y:ys) = (x,y) : zipLazy xs ys
+-- We want to write this, but with GHC 6.4 we get a warning, so it
+-- doesn't validate:
+-- zipLazy (x:xs) ~(y:ys) = (x,y) : zipLazy xs ys
+-- so we write this instead:
+zipLazy (x:xs) zs = let y : ys = zs
+                    in (x,y) : zipLazy xs ys
 \end{code}
 
 
