@@ -448,6 +448,9 @@ forward_rew check_maybe return_graph = forw
                   ; a <- finish
                   ; return (a, g, fuel)
                   }
+          inner_rew :: DFM a b
+                    -> a -> Graph m l -> Fuel
+                    -> DFM a (b, Graph m l, Fuel)
           inner_rew = case depth of RewriteShallow -> don't_rewrite
                                     RewriteDeep -> rewrite emptyBlockEnv
           fixed_pt_and_fuel =
