@@ -32,7 +32,7 @@ import TysPrim           ( intPrimTy )
 import Unique
 import UniqFM
 import UniqSet
-import Util              ( singleton )
+import Util
 import Digraph           ( SCC(..), stronglyConnComp )
 
 import Outputable
@@ -154,11 +154,8 @@ vectTypeEnv env
 vectTyConDecls :: [TyCon] -> VM [TyCon]
 vectTyConDecls tcs = fixV $ \tcs' ->
   do
-    mapM_ (uncurry defTyCon) (lazy_zip tcs tcs')
+    mapM_ (uncurry defTyCon) (zipLazy tcs tcs')
     mapM vectTyConDecl tcs
-  where
-    lazy_zip [] _ = []
-    lazy_zip (x:xs) ~(y:ys) = (x,y) : lazy_zip xs ys
 
 vectTyConDecl :: TyCon -> VM TyCon
 vectTyConDecl tc
