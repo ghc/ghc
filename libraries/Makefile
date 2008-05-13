@@ -163,12 +163,15 @@ boot: $(BOOTSTRAP_STAMPS) ifBuildable/ifBuildable \
 
 # We ought to be depending on %/Setup.*hs, but make makes that difficult.
 
+# -fffi is only needed for GHC 6.4 at the time of writing
+CABAL_GHC_FLAGS = -Wall -cpp -fffi
+
 $(foreach SUBDIR,$(SUBDIRS),$(SUBDIR)/setup/Setup): \
 %/setup/Setup: $(BOOTSTRAP_STAMPS)
 	-$(RM) -rf $*/setup
 	mkdir $*/setup
 	$(CP) $*/Setup.*hs $*/setup
-	cd $*/setup && $(GHC) -Wall -cpp --make Setup.*hs -o Setup \
+	cd $*/setup && $(GHC) $(CABAL_GHC_FLAGS) --make Setup.*hs -o Setup \
 	                      $(BOOTSTRAP_INC_2_UP)
 
 installPackage/installPackage: installPackage.hs $(BOOTSTRAP_STAMPS)
@@ -176,11 +179,11 @@ installPackage/installPackage: installPackage.hs $(BOOTSTRAP_STAMPS)
 	mkdir installPackage
 	$(CP) installPackage.hs installPackage/
 ifeq "$(stage)" "2"
-	cd installPackage && ../$(HC) -Wall -cpp \
+	cd installPackage && ../$(HC) $(CABAL_GHC_FLAGS) \
 	                            --make installPackage -o installPackage \
 	                            $(BOOTSTRAP_INC_1_UP) $(DEPLOYMENT_OPTS)
 else
-	cd installPackage && $(GHC) -Wall -cpp \
+	cd installPackage && $(GHC) $(CABAL_GHC_FLAGS) \
 	                            --make installPackage -o installPackage \
 	                            $(BOOTSTRAP_INC_1_UP)
 endif
