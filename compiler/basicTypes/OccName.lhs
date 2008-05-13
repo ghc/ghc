@@ -25,8 +25,10 @@ module OccName (
 	setOccNameSpace,
 
 	-- ** Derived OccNames
+        isDerivedOccName,
 	mkDataConWrapperOcc, mkWorkerOcc, mkDefaultMethodOcc,
-	mkDerivedTyConOcc, mkNewTyCoOcc,
+	mkDerivedTyConOcc, mkNewTyCoOcc, 
+        mkCon2TagOcc, mkTag2ConOcc, mkMaxTagOcc,
   	mkClassTyConOcc, mkClassDataConOcc, mkDictOcc, mkIPOcc, 
  	mkSpecOcc, mkForeignExportOcc, mkGenOcc1, mkGenOcc2,
 	mkDataTOcc, mkDataCOcc, mkDataConWorkerOcc,
@@ -428,7 +430,6 @@ Here's our convention for splitting up the interface file name space:
 
 This knowledge is encoded in the following functions.
 
-
 @mk_deriv@ generates an @OccName@ from the prefix and a string.
 NB: The string must already be encoded!
 
@@ -439,6 +440,13 @@ mk_deriv :: NameSpace
 	 -> OccName
 
 mk_deriv occ_sp sys_prefix str = mkOccName occ_sp (sys_prefix ++ str)
+
+isDerivedOccName :: OccName -> Bool
+isDerivedOccName occ = 
+   case occNameString occ of
+     '$':c:_ | isAlphaNum c -> True
+     ':':c:_ | isAlphaNum c -> True
+     _other                 -> False
 \end{code}
 
 \begin{code}
@@ -446,7 +454,8 @@ mkDataConWrapperOcc, mkWorkerOcc, mkDefaultMethodOcc, mkDerivedTyConOcc,
   	mkClassTyConOcc, mkClassDataConOcc, mkDictOcc, mkIPOcc, 
  	mkSpecOcc, mkForeignExportOcc, mkGenOcc1, mkGenOcc2,
 	mkDataTOcc, mkDataCOcc, mkDataConWorkerOcc, mkNewTyCoOcc,
-	mkInstTyCoOcc, mkEqPredCoOcc,
+	mkInstTyCoOcc, mkEqPredCoOcc, 
+        mkCon2TagOcc, mkTag2ConOcc, mkMaxTagOcc,
 	mkVectOcc, mkVectTyConOcc, mkVectDataConOcc, mkVectIsoOcc,
 	mkPArrayTyConOcc, mkPArrayDataConOcc, mkPReprTyConOcc, mkPADFunOcc
    :: OccName -> OccName
@@ -466,6 +475,11 @@ mkForeignExportOcc  = mk_simple_deriv varName  "$f"
 mkNewTyCoOcc        = mk_simple_deriv tcName  ":Co"
 mkInstTyCoOcc       = mk_simple_deriv tcName  ":CoF"     -- derived from rep ty
 mkEqPredCoOcc	    = mk_simple_deriv tcName  "$co"
+
+-- used in derived instances
+mkCon2TagOcc        = mk_simple_deriv varName  "$con2tag_"
+mkTag2ConOcc        = mk_simple_deriv varName  "$tag2con_"
+mkMaxTagOcc         = mk_simple_deriv varName  "$maxtag_"
 
 -- Generic derivable classes
 mkGenOcc1           = mk_simple_deriv varName  "$gfrom"

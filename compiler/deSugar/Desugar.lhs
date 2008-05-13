@@ -38,7 +38,9 @@ import SrcLoc
 import Maybes
 import FastString
 import Coverage
+
 import Data.IORef
+import Data.Char
 \end{code}
 
 %************************************************************************
@@ -149,12 +151,14 @@ mkAutoScc mod exports
   | not opt_SccProfilingOn 	-- No profiling
   = NoSccs		
   | opt_AutoSccsOnAllToplevs 	-- Add auto-scc on all top-level things
-  = AddSccs mod (\_ -> True)
+  = AddSccs mod (\id -> not $ isDerivedOccName $ getOccName id)
+    -- See #1641.  This is pretty yucky, but I can't see a better way
+    -- to identify compiler-generated Ids, and at least this should
+    -- catch them all.
   | opt_AutoSccsOnExportedToplevs	-- Only on exported things
   = AddSccs mod (\id -> idName id `elemNameSet` exports)
   | otherwise
   = NoSccs
-
 
 deSugarExpr :: HscEnv
 	    -> Module -> GlobalRdrEnv -> TypeEnv 

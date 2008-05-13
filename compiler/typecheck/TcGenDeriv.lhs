@@ -1554,18 +1554,12 @@ z_Pat		= nlVarPat z_RDR
 
 con2tag_RDR, tag2con_RDR, maxtag_RDR :: TyCon -> RdrName
 -- Generates Orig s RdrName, for the binding positions
-con2tag_RDR tycon = mk_tc_deriv_name tycon "con2tag_"
-tag2con_RDR tycon = mk_tc_deriv_name tycon "tag2con_"
-maxtag_RDR  tycon = mk_tc_deriv_name tycon "maxtag_"
+con2tag_RDR tycon = mk_tc_deriv_name tycon mkCon2TagOcc
+tag2con_RDR tycon = mk_tc_deriv_name tycon mkTag2ConOcc
+maxtag_RDR  tycon = mk_tc_deriv_name tycon mkMaxTagOcc
 
-mk_tc_deriv_name :: TyCon -> [Char] -> RdrName
-mk_tc_deriv_name tycon str 
-  = mkDerivedRdrName tc_name mk_occ
-  where
-    tc_name = tyConName tycon
-    mk_occ tc_occ = mkVarOccFS (mkFastString new_str)
-		  where
-		    new_str = str ++ occNameString tc_occ ++ "#"
+mk_tc_deriv_name :: TyCon -> (OccName -> OccName) -> RdrName
+mk_tc_deriv_name tycon fun  = mkDerivedRdrName (tyConName tycon) fun
 \end{code}
 
 s RdrName for PrimOps.  Can't be done in PrelNames, because PrimOp imports
