@@ -247,22 +247,22 @@ FLAGGED_CONFIGURE_ARGS = $(subst $(space)',\
                                  $(space)$(CONFIGURE_ARGS))
 
 ifeq "$(Windows)" "YES"
-NONEXISTANT=c:/NONEXISTANT
+NONEXISTENT=c:/NONEXISTENT
 else
-NONEXISTANT=/NONEXISTANT
+NONEXISTENT=/NONEXISTENT
 endif
 
 ALL_CONFIGURE_FLAGS = \
 	           $(CONFIGURE_OPTS) \
-	           --prefix=$(NONEXISTANT) \
-	           --bindir=$(NONEXISTANT) \
-	           --libdir=$(NONEXISTANT) \
+	           --prefix=$(NONEXISTENT) \
+	           --bindir=$(NONEXISTENT) \
+	           --libdir=$(NONEXISTENT) \
 	           --libsubdir='$$pkgid' \
-	           --libexecdir=$(NONEXISTANT) \
-	           --datadir=$(NONEXISTANT) \
-	           --docdir=$(NONEXISTANT) \
-			   --haddockdir=$(NONEXISTANT) \
-	           --htmldir=$(NONEXISTANT) \
+	           --libexecdir=$(NONEXISTENT) \
+	           --datadir=$(NONEXISTENT) \
+	           --docdir=$(NONEXISTENT) \
+			   --haddockdir=$(NONEXISTENT) \
+	           --htmldir=$(NONEXISTENT) \
 	           --with-compiler=../../compiler/stage1/ghc-inplace \
 	           --with-hc-pkg=../../utils/ghc-pkg/ghc-pkg-inplace \
 	           --with-hsc2hs=../../utils/hsc2hs/hsc2hs-inplace \
