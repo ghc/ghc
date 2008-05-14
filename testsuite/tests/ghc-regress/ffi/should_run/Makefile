@@ -5,3 +5,7 @@ include $(TOP)/mk/test.mk
 ffi018_ghci_setup :
 	cp ffi018_c.c ffi018_ghci_c.c
 	$(TEST_HC) -c ffi018_ghci_c.c
+
+1288_ghci_setup :
+	cp 1288_c.c 1288_ghci_c.c
+	$(TEST_HC) -c 1288_ghci_c.c
