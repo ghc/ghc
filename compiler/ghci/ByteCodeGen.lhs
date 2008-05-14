@@ -950,9 +950,10 @@ generateCCall d0 s p (CCallSpec target cconv _) fn args_r_to_l
      code_n_reps <- pargs d0 args_r_to_l
      let
          (pushs_arg, a_reps_pushed_r_to_l) = unzip code_n_reps
+         a_reps_sizeW = sum (map primRepSizeW a_reps_pushed_r_to_l)
 
          push_args    = concatOL pushs_arg
-         d_after_args = d0 + sum (map primRepSizeW a_reps_pushed_r_to_l)
+         d_after_args = d0 + a_reps_sizeW
          a_reps_pushed_RAW
             | null a_reps_pushed_r_to_l || head a_reps_pushed_r_to_l /= VoidRep
             = panic "ByteCodeGen.generateCCall: missing or invalid World token?"
@@ -1009,8 +1010,18 @@ generateCCall d0 s p (CCallSpec target cconv _) fn args_r_to_l
                  DynamicTarget
                     -> return (False, panic "ByteCodeGen.generateCCall(dyn)")
                  StaticTarget target
-                    -> do res <- ioToBc (lookupStaticPtr target)
+                    -> do res <- ioToBc (lookupStaticPtr stdcall_adj_target)
                           return (True, res)
+                   where
+                      stdcall_adj_target
+#ifdef mingw32_TARGET_OS
+                          | StdCallConv <- cconv
+                          = mkFastString (unpackFS target ++ '@':show size)
+#endif
+                          | otherwise
+                          = target
+                      size = a_reps_sizeW * wORD_SIZE
+
      -- in
      (is_static, static_target_addr) <- get_target_info
      let
