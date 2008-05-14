@@ -1,4 +1,4 @@
-{-# OPTIONS -Wall -fno-warn-name-shadowing -XPatternGuards #-}
+{-# OPTIONS -Wall -fno-warn-name-shadowing -XPatternGuards -fglasgow-exts #-}
 {- 
 Interprets the subset of well-typed Core programs for which
 	(a) All constructor and primop applications are saturated
@@ -15,7 +15,7 @@ The only major omission is garbage collection.
 Just a sampling of primitive types and operators are included.
 -}
 
-module Interp ( evalProgram ) where
+module Language.Core.Interp ( evalProgram ) where
 
 import Control.Monad.Error
 import Control.Monad.State
@@ -25,9 +25,9 @@ import Data.List
 import GHC.Exts hiding (Ptr)
 import System.IO
 
-import Core
-import Env
-import Printer()
+import Language.Core.Core
+import Language.Core.Env
+import Language.Core.Printer()
 
 data HeapValue = 
     Hconstr Dcon [Value]       -- constructed value (note: no qualifier needed!)

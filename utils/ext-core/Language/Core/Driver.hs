@@ -1,4 +1,5 @@
 {-# OPTIONS -Wall #-}
+
 {- A simple driver that loads, typechecks, prepares, re-typechecks, and interprets the 
     GHC standard Prelude modules and an application module called Main. 
 
@@ -55,8 +56,8 @@ options =
    Option ['n'] ["no-deps"] (NoArg NoDeps) "don't compute dependencies automatically"
   ]
 
-process :: Bool -> (Menv,[Module]) -> (FilePath, Module)
-             -> IO (Menv,[Module])
+process :: Bool -> (Check.Menv,[Module]) -> (FilePath, Module)
+             -> IO (Check.Menv,[Module])
 process _ (senv,modules) p@(f,m) | isLib p && not typecheckLibs = do
   -- if it's a library and we set typecheckLibs to False:
   -- prep, but don't typecheck
@@ -82,7 +83,7 @@ process doTest (senv,modules) (f, m@(Module mn _ _)) = catch (do
                      ++ " while processing " ++ f)
            return (senv, modules)
 
-prepM :: Menv -> Module -> FilePath -> IO Module
+prepM :: Check.Menv -> Module -> FilePath -> IO Module
 prepM senv' m _f = do
   let m' = prepModule senv' m
   --writeFile (f </> ".prepped") (show m')

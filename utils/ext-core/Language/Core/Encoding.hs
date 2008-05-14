@@ -1,4 +1,6 @@
-module Encoding where
+{-# OPTIONS -fno-warn-name-shadowing #-}
+
+module Language.Core.Encoding where
 
 import Data.Char
 import Numeric

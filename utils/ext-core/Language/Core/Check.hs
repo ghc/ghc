@@ -1,19 +1,19 @@
 {-# OPTIONS -Wall -fno-warn-name-shadowing #-}
-module Check(
+module Language.Core.Check(
   checkModule, envsModule,
   checkExpr, checkType, 
   primCoercionError, 
   Menv, Venv, Tvenv, Envs(..),
   CheckRes(..), splitTy, substl) where
 
-import Maybe
-import Control.Monad.Reader
+import Language.Core.Core
+import Language.Core.Printer()
+import Language.Core.PrimEnv
+import Language.Core.Env
 
-import Core
-import Printer()
-import List
-import Env
-import PrimEnv
+import Control.Monad.Reader
+import Data.List
+import Data.Maybe
 
 {- Checking is done in a simple error monad.  In addition to
    allowing errors to be captured, this makes it easy to guarantee

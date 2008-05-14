@@ -3,7 +3,7 @@
   Sadly it doesn't seem to matter much. --tjc
 -}
 
-module Env (Env,
+module Language.Core.Env (Env,
 	    eempty,
 	    elookup,
 	    eextend,
@@ -15,7 +15,6 @@ module Env (Env,
 where
 
 import qualified Data.Map as M
-import Data.List
 
 data Env a b = Env (M.Map a b)
  deriving Show
@@ -45,5 +44,5 @@ eremove :: (Eq a, Ord a)  => Env a b -> a -> Env a b
 eremove (Env l) k = Env (M.delete k l)
 
 efilter :: Ord a => Env a b -> (a -> Bool) -> Env a b
-efilter (Env l) p = Env (M.filterWithKey (\ k a -> p k) l)
+efilter (Env l) p = Env (M.filterWithKey (\ k _ -> p k) l)
 

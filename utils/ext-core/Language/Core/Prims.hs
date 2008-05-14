@@ -4,15 +4,14 @@
    Most are defined in PrimEnv, which is automatically generated from
    GHC's primops.txt. -}
 
-module Prims(initialEnv, primEnv, newPrimVars) where
+module Language.Core.Prims(initialEnv, primEnv, newPrimVars) where
 
-import Core
-import Encoding
-import Env
-import Check
-import PrimCoercions
-
-import PrimEnv
+import Language.Core.Core
+import Language.Core.Encoding
+import Language.Core.Env
+import Language.Core.Check
+import Language.Core.PrimCoercions
+import Language.Core.PrimEnv
 
 initialEnv :: Menv
 initialEnv = efromlist [(primMname,primEnv),

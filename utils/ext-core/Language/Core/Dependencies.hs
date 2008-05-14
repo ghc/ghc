@@ -1,9 +1,8 @@
-{-# OPTIONS -Wall #-}
-module Dependencies(getDependencies) where
+module Language.Core.Dependencies(getDependencies) where
 
-import Core
-import Encoding
-import ParsecParser
+import Language.Core.Core
+import Language.Core.Encoding
+import Language.Core.ParsecParser
 
 import Control.Monad.State
 import Data.Generics

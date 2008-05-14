@@ -1,16 +1,17 @@
 {-# OPTIONS -Wall -fno-warn-missing-signatures #-}
 
-module ParsecParser (parseCore) where
+module Language.Core.ParsecParser (parseCore) where
 
-import Core
-import ParseGlue
-import Check
-import PrimCoercions
+import Language.Core.Core
+import Language.Core.Check
+import Language.Core.Encoding
+import Language.Core.PrimCoercions
 
 import Text.ParserCombinators.Parsec
 import qualified Text.ParserCombinators.Parsec.Token as P
 import Text.ParserCombinators.Parsec.Language
 import Data.Char
+import Data.List
 import Data.Ratio
 
 parseCore :: FilePath -> IO (Either ParseError Module)
@@ -490,6 +491,21 @@ defaultAlt = do
   symbol "->"
   rhs <- coreFullExp
   return $ Adefault rhs
+----------------
+-- ugh
+splitModuleName mn = 
+   let decoded = zDecodeString mn
+       -- Triple ugh.
+       -- We re-encode the individual parts so that:
+       -- main:Foo_Bar.Quux.baz
+       -- prints as:
+       -- main:FoozuBarziQuux.baz
+       -- and not:
+       -- main:Foo_BarziQuux.baz
+       parts   = map zEncodeString $ filter (notElem '.') $ groupBy 
+                   (\ c1 c2 -> c1 /= '.' && c2 /= '.') 
+                 decoded in
+     (take (length parts - 1) parts, last parts)
 ----------------
 extCore = P.makeTokenParser extCoreDef
 

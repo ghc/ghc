@@ -54,11 +54,20 @@ running "make" under libraries/.
 Then you need to edit Driver.hs and change "baseDir" to point to your GHC
 libraries directory.
 
-Once you've done that:
-1. make prims (to generate the primops file)
-2. make
-3. make nofibtest (to run the parser/checker on all nofib programs...
+Once you've done that, the ext-core library can be built in the usual
+Cabal manner:
+1. runhaskell Setup.lhs configure
+2. runhaskell Setup.lhs build
+3. runhaskell Setup.lhs install
+
+Then, you can build the example Driver program with:
+  ghc -package extcore Driver.hs -o Driver
+
+And finally, you can use the included Makefile to run tests:
+
+  make nofibtest (to run the parser/checker on all nofib programs...
    for example.)
+  make libtest (to typecheck all the libraries)
 
 Tested with GHC 6.8.2. I make no claims of portability.
 

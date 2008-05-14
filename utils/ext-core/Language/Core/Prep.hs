@@ -9,16 +9,15 @@ After these preprocessing steps, Core can be interpreted (or given an operationa
 -}
 
 
-module Prep where
+module Language.Core.Prep where
 
 import Data.Either
-
-import Prims
-import Core
-import Env
-import Check
-
 import Data.List
+
+import Language.Core.Prims
+import Language.Core.Core
+import Language.Core.Env
+import Language.Core.Check
 
 prepModule :: Menv -> Module -> Module
 prepModule globalEnv (Module mn tdefs vdefgs) = 

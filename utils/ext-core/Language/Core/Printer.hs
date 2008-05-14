@@ -1,13 +1,13 @@
 {-# OPTIONS -Werror -Wall -fno-warn-missing-signatures #-}
 
-module Printer where
+module Language.Core.Printer where
 
 import Text.PrettyPrint.HughesPJ
-import Char
+import Data.Char
 
-import Core
-import Encoding
-import PrimCoercions
+import Language.Core.Core
+import Language.Core.Encoding
+import Language.Core.PrimCoercions
 
 instance Show Module where
   showsPrec _ m = shows (pmodule m)

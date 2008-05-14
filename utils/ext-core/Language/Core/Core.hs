@@ -1,9 +1,10 @@
-module Core where
+{-# OPTIONS -fno-warn-missing-signatures #-}
+module Language.Core.Core where
 
-import Encoding
+import Language.Core.Encoding
 
 import Data.Generics
-import List (elemIndex)
+import Data.List (elemIndex)
 
 data Module 
  = Module AnMname [Tdef] [Vdefg]
@@ -162,22 +163,25 @@ splitTyConApp_maybe (Tapp rator rand) =
       Nothing     -> case rator of
                        Tcon tc -> Just (tc,[rand])
                        _       -> Nothing
-splitTyConApp_maybe t@(Tforall _ _) = Nothing
+splitTyConApp_maybe (Tforall _ _) = Nothing
+-- coercions
+splitTyConApp_maybe _ = Nothing
 
 -- This used to be called nearlyEqualTy, but now that
 -- we don't need to expand newtypes anymore, it seems
 -- like equality to me!
+equalTy :: Ty -> Ty -> Bool
 equalTy t1 t2 =  eqTy [] [] t1 t2 
   where eqTy e1 e2 (Tvar v1) (Tvar v2) =
 	     case (elemIndex v1 e1,elemIndex v2 e2) of
                (Just i1, Just i2) -> i1 == i2
                (Nothing, Nothing)  -> v1 == v2
                _ -> False
-	eqTy e1 e2 (Tcon c1) (Tcon c2) = c1 == c2
+	eqTy _ _ (Tcon c1) (Tcon c2) = c1 == c2
         eqTy e1 e2 (Tapp t1a t1b) (Tapp t2a t2b) =
 	      eqTy e1 e2 t1a t2a && eqTy e1 e2 t1b t2b
-        eqTy e1 e2 (Tforall (tv1,tk1) t1) (Tforall (tv2,tk2) t2) =
-	      tk1 `eqKind` tk2 && eqTy (tv1:e1) (tv2:e2) t1 t2 
+        eqTy e1 e2 (Tforall (tv1,tk1) b1) (Tforall (tv2,tk2) b2) =
+	      tk1 `eqKind` tk2 && eqTy (tv1:e1) (tv2:e2) b1 b2 
 	eqTy _ _ _ _ = False
 instance Eq Ty where (==) = equalTy
 

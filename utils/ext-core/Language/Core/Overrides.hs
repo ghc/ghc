@@ -11,12 +11,12 @@
 
    It's kind of ugly.
 -}
-module Overrides (override) where
+module Language.Core.Overrides (override) where
 
-import Core
-import Encoding
-import ParsecParser
-import Prims
+import Language.Core.Core
+import Language.Core.Encoding
+import Language.Core.ParsecParser
+import Language.Core.Prims
 
 import Data.Generics
 import System.FilePath

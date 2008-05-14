@@ -1,6 +1,6 @@
 {-# OPTIONS -Wall -fno-warn-missing-signatures #-}
-module PrimCoercions where
-import Core
+module Language.Core.PrimCoercions where
+import Language.Core.Core
 
 -- Stuff the parser needs to know about
 
