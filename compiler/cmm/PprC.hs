@@ -828,7 +828,8 @@ pprExternDecl :: Bool -> CLabel -> SDoc
 pprExternDecl in_srt lbl
   -- do not print anything for "known external" things
   | not (needsCDecl lbl) = empty
-  | otherwise		    = 
+  | Just sz <- foreignLabelStdcallInfo lbl = stdcall_decl sz
+  | otherwise =
 	hcat [ visibility, label_type (labelType lbl), 
 	       lparen, pprCLabel lbl, text ");" ]
  where
@@ -839,6 +840,13 @@ pprExternDecl in_srt lbl
      | externallyVisibleCLabel lbl = char 'E'
      | otherwise		   = char 'I'
 
+  -- If the label we want to refer to is a stdcall function (on Windows) then
+  -- we must generate an appropriate prototype for it, so that the C compiler will
+  -- add the @n suffix to the label (#2276)
+  stdcall_decl sz =
+        ptext (sLit "extern __attribute__((stdcall)) void ") <> pprCLabel lbl
+        <> parens (commafy (replicate (sz `quot` wORD_SIZE) (machRepCType wordRep)))
+        <> semi
 
 type TEState = (UniqSet LocalReg, FiniteMap CLabel ())
 newtype TE a = TE { unTE :: TEState -> (a, TEState) }

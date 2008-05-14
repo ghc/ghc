@@ -33,6 +33,7 @@ import Literal
 import Module
 import Name
 import Type
+import TyCon
 import Coercion
 import TcType
 
@@ -143,15 +144,35 @@ dsCImport :: Id
 	  -> CCallConv
 	  -> Safety
 	  -> DsM ([Binding], SDoc, SDoc)
-dsCImport id (CLabel cid) _ _ = do
-   (resTy, foRhs) <- resultWrapper (idType id)
+dsCImport id (CLabel cid) cconv _ = do
+   let ty = idType id
+   (resTy, foRhs) <- resultWrapper ty
    ASSERT(fromJust resTy `coreEqType` addrPrimTy)    -- typechecker ensures this
-    let rhs = foRhs (mkLit (MachLabel cid Nothing)) in
+    let
+        rhs = foRhs (mkLit (MachLabel cid stdcall_info))
+        stdcall_info = fun_type_arg_stdcall_info cconv ty
+    in
     return ([(id, rhs)], empty, empty)
+
 dsCImport id (CFunction target) cconv safety
   = dsFCall id (CCall (CCallSpec target cconv safety))
 dsCImport id CWrapper cconv _
   = dsFExportDynamic id cconv
+
+-- For stdcall labels, if the type was a FunPtr or newtype thereof,
+-- then we need to calculate the size of the arguments in order to add
+-- the @n suffix to the label.
+fun_type_arg_stdcall_info :: CCallConv -> Type -> Maybe Int
+fun_type_arg_stdcall_info StdCallConv ty
+  | Just (tc,[arg_ty]) <- splitTyConApp_maybe (repType ty),
+    tyConUnique tc == funPtrTyConKey
+  = let
+       (_tvs,sans_foralls)            = tcSplitForAllTys arg_ty
+       (fe_arg_tys, orig_res_ty)      = tcSplitFunTys sans_foralls
+    in 
+        Just $ sum (map (machRepByteWidth . typeMachRep . getPrimTyOf) fe_arg_tys)
+fun_type_arg_stdcall_info _other_conv _
+  = Nothing
 \end{code}
 
 

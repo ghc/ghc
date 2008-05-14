@@ -90,6 +90,7 @@ module CLabel (
 
 	mkForeignLabel,
         addLabelSize,
+        foreignLabelStdcallInfo,
 
 	mkCCLabel, mkCCSLabel,
 
@@ -371,6 +372,10 @@ addLabelSize (ForeignLabel str _ is_dynamic) sz
   = ForeignLabel str (Just sz) is_dynamic
 addLabelSize label _
   = label
+
+foreignLabelStdcallInfo :: CLabel -> Maybe Int
+foreignLabelStdcallInfo (ForeignLabel _ info _) = info
+foreignLabelStdcallInfo _lbl = Nothing
 
 	-- Cost centres etc.
 
