@@ -1040,10 +1040,7 @@ def check_hp_ok(name):
 
     hp2psResult = runCmdExitCode(hp2psCmd)
 
-    if config.platform == 'i386-unknown-mingw32':
-        actual_ps_file = qualify(name, 'exe.ps')
-    else:   
-        actual_ps_file = qualify(name, 'ps')
+    actual_ps_file = qualify(name, 'ps')
     
     if(hp2psResult == 0):
         if (os.path.exists(actual_ps_file)):
