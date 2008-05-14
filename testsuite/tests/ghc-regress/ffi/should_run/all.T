@@ -17,8 +17,8 @@ test('fed001', compose(only_compiler_types(['ghc']),
 
 # Omit GHCi for these two, as they use foreign export
 test('ffi001', omit_ways(['ghci']), compile_and_run, [''])
-test('ffi002', omit_ways(['ghci']), compile_and_run, ['ffi002_c.c -no-hs-main'])
-clean(['ffi002_c.o'])
+test('ffi002', [ omit_ways(['ghci']), extra_clean(['ffi002_c.o']) ],
+               compile_and_run, ['ffi002_c.c -no-hs-main'])
 
 test('ffi003', normal, compile_and_run, [''])
 
@@ -86,8 +86,8 @@ test('ffi013', expect_fail_for(['extcore','optextcore']), compile_and_run, [''])
 test('ffi014', only_ways(['threaded']), compile_and_run, ['ffi014_cbits.c'])
 
 # GHCi can't handle the separate C file (ToDo: fix this somehow)
-test('ffi015', omit_ways(['ghci']), compile_and_run, ['ffi015_cbits.c'])
-clean(['ffi015_cbits.o'])
+test('ffi015', [ omit_ways(['ghci']), extra_clean(['ffi015_cbits.o']) ],
+               compile_and_run, ['ffi015_cbits.c'])
 
 # GHCi can't handle foreign import "&"
 test('ffi016', omit_ways(['ghci']), compile_and_run, [''])
@@ -95,12 +95,14 @@ test('ffi016', omit_ways(['ghci']), compile_and_run, [''])
 test('ffi017', normal, compile_and_run, [''])
 # There's a dependency between these next two lines as the ghci way needs
 # the .o file the other ways make
-test('ffi018', omit_ways(['ghci']), compile_and_run, ['ffi018_c.c'])
-clean(['ffi018_c.o'])
+test('ffi018', [ omit_ways(['ghci']), extra_clean(['ffi018_c.o']) ],
+               compile_and_run, ['ffi018_c.c'])
 
-runCmd('$MAKE --no-print-directory -C ' + getTestDir() + ' ffi018_ghci_setup')
-test('ffi018', only_ways(['ghci']), compile_and_run, ['ffi018_ghci_c.o'])
-clean(['ffi018_ghci_c.o'])
+test('ffi018', [ only_ways(['ghci']),
+                 cmd_prefix('$MAKE --no-print-directory -C ' + getTestDir() +
+                            ' ffi018_ghci_setup && '),
+                 extra_clean(['ffi018_ghci_c.o']) ],
+               compile_and_run, ['ffi018_ghci_c.o'])
 
 test('ffi019', normal, compile_and_run, [''])
 
