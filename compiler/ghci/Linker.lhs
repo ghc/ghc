@@ -31,6 +31,7 @@ module Linker ( HValue, getHValue, showLinkerState,
 
 #include "HsVersions.h"
 
+import LoadIface
 import ObjLink
 import ByteCodeLink
 import ByteCodeItbls
@@ -60,6 +61,7 @@ import StaticFlags
 import ErrUtils
 import DriverPhases
 import SrcLoc
+import qualified Maybes
 import UniqSet
 import Constants
 import FastString
@@ -553,10 +555,10 @@ getLinkDeps :: HscEnv -> HomePackageTable -> PackageIfaceTable
 getLinkDeps hsc_env hpt pit maybe_normal_osuf span mods
 -- Find all the packages and linkables that a set of modules depends on
  = do {	pls <- readIORef v_PersistentLinkerState ;
-	let {
 	-- 1.  Find the dependent home-pkg-modules/packages from each iface
-	    (mods_s, pkgs_s) = follow_deps mods emptyUniqSet emptyUniqSet;
+        (mods_s, pkgs_s) <- follow_deps mods emptyUniqSet emptyUniqSet;
 
+	let {
 	-- 2.  Exclude ones already linked
 	--	Main reason: avoid findModule calls in get_linkable
 	    mods_needed = mods_s `minusList` linked_mods     ;
@@ -585,41 +587,45 @@ getLinkDeps hsc_env hpt pit maybe_normal_osuf span mods
     follow_deps :: [Module]             -- modules to follow
                 -> UniqSet ModuleName         -- accum. module dependencies
                 -> UniqSet PackageId          -- accum. package dependencies
-                -> ([ModuleName], [PackageId]) -- result
+                -> IO ([ModuleName], [PackageId]) -- result
     follow_deps []     acc_mods acc_pkgs
-        = (uniqSetToList acc_mods, uniqSetToList acc_pkgs)
+        = return (uniqSetToList acc_mods, uniqSetToList acc_pkgs)
     follow_deps (mod:mods) acc_mods acc_pkgs
-        | pkg /= this_pkg
-        = follow_deps mods acc_mods (addOneToUniqSet acc_pkgs' pkg)
-        | mi_boot iface
-        = link_boot_mod_error mod
-	| otherwise
-        = follow_deps (map (mkModule this_pkg) boot_deps' ++ mods) acc_mods' acc_pkgs'
-      where
-        pkg   = modulePackageId mod
-        iface = get_iface mod
-	deps  = mi_deps iface
+        = do
+          mb_iface <- initIfaceCheck hsc_env $
+                        loadInterface msg mod (ImportByUser False)
+          iface <- case mb_iface of
+        	    Maybes.Failed err      -> ghcError (ProgramError (showSDoc err))
+	            Maybes.Succeeded iface -> return iface
 
-	pkg_deps = dep_pkgs deps
-        (boot_deps, mod_deps) = partitionWith is_boot (dep_mods deps)
-                where is_boot (m,True)  = Left m
-                      is_boot (m,False) = Right m
+          when (mi_boot iface) $ link_boot_mod_error mod
 
-        boot_deps' = filter (not . (`elementOfUniqSet` acc_mods)) boot_deps
-        acc_mods'  = addListToUniqSet acc_mods (moduleName mod : mod_deps)
-        acc_pkgs'  = addListToUniqSet acc_pkgs pkg_deps
+          let
+            pkg = modulePackageId mod
+            deps  = mi_deps iface
+
+            pkg_deps = dep_pkgs deps
+            (boot_deps, mod_deps) = partitionWith is_boot (dep_mods deps)
+                    where is_boot (m,True)  = Left m
+                          is_boot (m,False) = Right m
+
+            boot_deps' = filter (not . (`elementOfUniqSet` acc_mods)) boot_deps
+            acc_mods'  = addListToUniqSet acc_mods (moduleName mod : mod_deps)
+            acc_pkgs'  = addListToUniqSet acc_pkgs pkg_deps
+          --
+          if pkg /= this_pkg
+             then follow_deps mods acc_mods (addOneToUniqSet acc_pkgs' pkg)
+             else follow_deps (map (mkModule this_pkg) boot_deps' ++ mods)
+                              acc_mods' acc_pkgs'
+        where
+            msg = text "need to link module" <+> ppr mod <+>
+                  text "due to use of Template Haskell"
 
 
     link_boot_mod_error mod = 
         throwDyn (ProgramError (showSDoc (
             text "module" <+> ppr mod <+> 
             text "cannot be linked; it is only available as a boot module")))
-
-    get_iface mod = case lookupIfaceByModule dflags hpt pit mod of
-			    Just iface -> iface
-			    Nothing    -> pprPanic "getLinkDeps" (no_iface mod)
-    no_iface mod = ptext (sLit "No iface for") <+> ppr mod
-	-- This one is a GHC bug
 
     no_obj mod = dieWith span $
 		     ptext (sLit "cannot find object file for module ") <> 
