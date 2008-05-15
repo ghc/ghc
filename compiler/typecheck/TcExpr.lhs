@@ -314,7 +314,9 @@ tcExpr in_expr@(ExplicitPArr _ exprs) res_ty	-- maybe empty
 -- 	   The scrutinee should have a rigid type if x,y do
 -- The general scheme is the same as in tcIdApp
 tcExpr (ExplicitTuple exprs boxity) res_ty
-  = do	{ tvs <- newBoxyTyVars [argTypeKind | e <- exprs]
+  = do	{ let kind = case boxity of { Boxed   -> liftedTypeKind
+				    ; Unboxed -> argTypeKind }
+	; tvs <- newBoxyTyVars [kind | e <- exprs]
 	; let tup_tc     = tupleTyCon boxity (length exprs)
 	      tup_res_ty = mkTyConApp tup_tc (mkTyVarTys tvs)
 	; checkWiredInTyCon tup_tc	-- Ensure instances are available
