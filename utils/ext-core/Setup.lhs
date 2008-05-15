@@ -28,6 +28,10 @@ Mostly snarfed from ghc-prim's Setup.hs.
 \begin{code}
 type Hook a = PackageDescription -> LocalBuildInfo -> UserHooks -> a -> IO ()
 
+
+-- Hack: If PrimEnv.hs exists *and* genprimopcode or
+-- primops.txt doesn't exist, don't rebuild PrimEnv.hs
+
 build_primitive_sources :: Hook a -> Hook a
 build_primitive_sources f pd lbi uhs x
  = do when (compilerFlavor (compiler lbi) == GHC) $ do
@@ -37,10 +41,14 @@ build_primitive_sources f pd lbi uhs x
                                   "primops.txt"]
               primhs = joinPath ["Language", "Core", "PrimEnv.hs"]
               primhs_tmp = addExtension primhs "tmp"
-          maybeExit $ system (genprimopcode ++ " --make-ext-core-source < "
+          primEnvExists <- doesFileExist primhs
+          genprimopcodeExists <- doesFileExist genprimopcode
+          primopsExists <- doesFileExist primops
+          unless (primEnvExists && !genprimopcodeExists && !primopsExists) do
+             maybeExit $ system (genprimopcode ++ " --make-ext-core-source < "
                            ++ primops ++ " > " ++ primhs_tmp)
-          maybeUpdateFile primhs_tmp primhs
-          maybeExit $ system ("make -C lib/GHC_ExtCore")
+             maybeUpdateFile primhs_tmp primhs
+             maybeExit $ system ("make -C lib/GHC_ExtCore")
       f pd lbi uhs x
 
 -- Replace a file only if the new version is different from the old.
