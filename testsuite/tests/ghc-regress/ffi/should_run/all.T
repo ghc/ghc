@@ -99,8 +99,7 @@ test('ffi018', [ omit_ways(['ghci']), extra_clean(['ffi018_c.o']) ],
                compile_and_run, ['ffi018_c.c'])
 
 test('ffi018', [ only_ways(['ghci']),
-                 cmd_prefix('$MAKE --no-print-directory -C ' + getTestDir() +
-                            ' ffi018_ghci_setup && '),
+                 cmd_prefix('$MAKE ffi018_ghci_setup && '),
                  extra_clean(['ffi018_ghci_c.o']) ],
                compile_and_run, ['ffi018_ghci_c.o'])
 
