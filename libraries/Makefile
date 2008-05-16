@@ -311,6 +311,7 @@ build.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
 	if ifBuildable/ifBuildable $*; then \
 	  cd $* && \
 	  setup/Setup build $(addprefix --ghc-option=,$(GhcLibHcOpts)); \
+	  ../installPackage/installPackage register --inplace; \
 	fi
 
 .PHONY: doc html
