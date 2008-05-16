@@ -1154,6 +1154,7 @@ nonExhaustiveGuardsErrorName
 \end{code}
 
 \begin{code}
+------------------------------------------------
 -- unsafeCoerce# :: forall a b. a -> b
 unsafeCoerceId
   = pcMiscPrelId unsafeCoerceName ty info
@@ -1167,17 +1168,23 @@ unsafeCoerceId
     rhs = mkLams [openAlphaTyVar,openBetaTyVar,x] $
           Cast (Var x) (mkUnsafeCoercion openAlphaTy openBetaTy)
 
+------------------------------------------------
+nullAddrId :: Id
 -- nullAddr# :: Addr#
 -- The reason is is here is because we don't provide 
 -- a way to write this literal in Haskell.
-nullAddrId 
-  = pcMiscPrelId nullAddrName addrPrimTy info
+nullAddrId = pcMiscPrelId nullAddrName addrPrimTy info
   where
     info = noCafIdInfo `setUnfoldingInfo` 
            mkCompulsoryUnfolding (Lit nullAddrLit)
 
-seqId
-  = pcMiscPrelId seqName ty info
+------------------------------------------------
+seqId :: Id
+-- 'seq' is very special.  See notes with
+--	See DsUtils.lhs Note [Desugaring seq (1)] and
+--			Note [Desugaring seq (2)] and
+-- Fixity is set in LoadIface.ghcPrimIface
+seqId = pcMiscPrelId seqName ty info
   where
     info = noCafIdInfo `setUnfoldingInfo` mkCompulsoryUnfolding rhs
            
@@ -1187,6 +1194,8 @@ seqId
     [x,y] = mkTemplateLocals [alphaTy, openBetaTy]
     rhs = mkLams [alphaTyVar,openBetaTyVar,x,y] (Case (Var x) x openBetaTy [(DEFAULT, [], Var y)])
 
+------------------------------------------------
+lazyId :: Id
 -- lazy :: forall a?. a? -> a?   (i.e. works for unboxed types too)
 -- Used to lazify pseq:         pseq a b = a `seq` lazy b
 -- 
@@ -1198,8 +1207,7 @@ seqId
 --      (see WorkWrap.wwExpr)   
 -- We could use inline phases to do this, but that would be vulnerable to changes in 
 -- phase numbering....we must inline precisely after strictness analysis.
-lazyId
-  = pcMiscPrelId lazyIdName ty info
+lazyId = pcMiscPrelId lazyIdName ty info
   where
     info = noCafIdInfo
     ty  = mkForAllTys [alphaTyVar] (mkFunTy alphaTy alphaTy)

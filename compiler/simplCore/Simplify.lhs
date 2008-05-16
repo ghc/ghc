@@ -1265,15 +1265,18 @@ inlined.
 
 Note [no-case-of-case]
 ~~~~~~~~~~~~~~~~~~~~~~
-There is a time we *don't* want to do that, namely when
--fno-case-of-case is on.  This happens in the first simplifier pass,
-and enhances full laziness.  Here's the bad case:
-        f = \ y -> ...(case x of I# v -> ...(case x of ...) ... )
-If we eliminate the inner case, we trap it inside the I# v -> arm,
-which might prevent some full laziness happening.  I've seen this
-in action in spectral/cichelli/Prog.hs:
-         [(m,n) | m <- [1..max], n <- [1..max]]
-Hence the check for NoCaseOfCase.
+We *used* to suppress the binder-swap in case expressoins when 
+-fno-case-of-case is on.  Old remarks:
+    "This happens in the first simplifier pass,
+    and enhances full laziness.  Here's the bad case:
+            f = \ y -> ...(case x of I# v -> ...(case x of ...) ... )
+    If we eliminate the inner case, we trap it inside the I# v -> arm,
+    which might prevent some full laziness happening.  I've seen this
+    in action in spectral/cichelli/Prog.hs:
+             [(m,n) | m <- [1..max], n <- [1..max]]
+    Hence the check for NoCaseOfCase."
+However, now the full-laziness pass itself reverses the binder-swap, so this
+check is no longer necessary.
 
 Note [Suppressing the case binder-swap]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1495,9 +1498,9 @@ simplCaseBinder env0 scrut0 case_bndr0 alts
 
 
     improve_case_bndr env scrut case_bndr
-        | switchIsOn (getSwitchChecker env) NoCaseOfCase
-                -- See Note [no-case-of-case]
-        = (env, case_bndr)
+        -- See Note [no-case-of-case]
+	--  | switchIsOn (getSwitchChecker env) NoCaseOfCase
+	--  = (env, case_bndr)
 
         | otherwise     -- Failed try; see Note [Suppressing the case binder-swap]
                         --     not (isEvaldUnfolding (idUnfolding v))
