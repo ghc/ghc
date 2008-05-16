@@ -1072,6 +1072,13 @@ static void handler(int i)
    tock = 1;
 }
 
+static void timeout(int i)
+{
+  // timer_settime() has been known to hang, so just in case
+  // we install a 1-second timeout (see #2257)
+  exit(99);
+}
+
 int main(int argc, char *argv[])
 {
 
@@ -1091,6 +1098,15 @@ int main(int argc, char *argv[])
         fprintf(stderr,"SIGVTALRM problem\n");
         exit(3);
     }
+
+    action.sa_handler = timeout;
+    action.sa_flags = 0;
+    sigemptyset(&action.sa_mask);
+    if (sigaction(SIGALRM, &action, NULL) == -1) {
+      fprintf(stderr,"SIGALRM problem\n");
+      exit(3);
+    }
+    alarm(1);
 
     if (timer_create(CLOCK_PROCESS_CPUTIME_ID, &ev, &timer) != 0) {
         fprintf(stderr,"No CLOCK_PROCESS_CPUTIME_ID timer\n");
@@ -1116,7 +1132,7 @@ int main(int argc, char *argv[])
 out:
 
     if (!tock) {
-        fprintf(stderr,"no CLOCK_REALTIME signal\n");
+        fprintf(stderr,"no CLOCK_PROCESS_CPUTIME_ID signal\n");
         exit(5);
     }
 
@@ -1128,7 +1144,7 @@ out:
     }
 
     it.it_value.tv_sec = 0;
-    it.it_value.tv_nsec = 1;
+    it.it_value.tv_nsec = 1000000;
     it.it_interval = it.it_value;
     if (timer_settime(timer, 0, &it, NULL) != 0) {
         fprintf(stderr,"settime problem\n");
