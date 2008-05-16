@@ -40,7 +40,6 @@ import FastString
 import Coverage
 
 import Data.IORef
-import Data.Char
 \end{code}
 
 %************************************************************************
