@@ -13,8 +13,8 @@ my $ignore_failure = 0;
 my $checked_out = 0;
 # --boot-only says we only want to push bootlibs, not extralibs
 my $boot_only = 0;
-# --push or --pull?
-my $push_pull = "push";
+# --push or --pull or --send?
+my $push_pull_send = "push";
 
 sub message {
     if ($verbose) {
@@ -34,7 +34,7 @@ sub darcs {
 }
 
 sub darcs_push {
-    darcs ($push_pull, "--no-set-default", @_);
+    darcs ($push_pull_send, "--no-set-default", @_);
 }
 
 sub pushall {
@@ -87,10 +87,13 @@ sub main {
                 $boot_only = 1;
             }
             elsif ($arg eq "--push") {
-                $push_pull = "push";
+                $push_pull_send = "push";
             }
             elsif ($arg eq "--pull") {
-                $push_pull = "pull";
+                $push_pull_send = "pull";
+            }
+            elsif ($arg eq "--send") {
+                $push_pull_send = "send";
             }
             else {
                 $reporoot = $arg;
