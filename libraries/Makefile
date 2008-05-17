@@ -303,7 +303,7 @@ make.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
 	  setup/Setup makefile -f GNUmakefile; \
 	  cmp -s GNUmakefile GNUmakefile.tmp && mv GNUmakefile.tmp GNUmakefile; \
 	  $(MAKE) $(MFLAGS) && \
-	  ../installPackage/installPackage register --inplace; \
+	  setup/Setup register --inplace; \
 	fi
 
 # Hack for ndp, as described above
@@ -316,7 +316,7 @@ build.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
 	if ifBuildable/ifBuildable $*; then \
 	  cd $* && \
 	  setup/Setup build $(addprefix --ghc-option=,$(GhcLibHcOpts)); \
-	  ../installPackage/installPackage register --inplace; \
+	  setup/Setup register --inplace; \
 	fi
 
 .PHONY: doc html

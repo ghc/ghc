@@ -19,9 +19,6 @@ main :: IO ()
 main
   = do args <- getArgs
        case args of
-           "register" : "--inplace" :args' ->
-               let verbosity = mkVerbosity args'
-               in doRegisterInplace verbosity
            "install" : ghcpkg : ghcpkgconf : destdir : topdir :
                     iprefix : ibindir : ilibdir : ilibexecdir : idynlibdir :
                     idatadir : idocdir : ihtmldir : ihaddockdir :
@@ -37,23 +34,6 @@ mkVerbosity :: [String] -> Verbosity
 mkVerbosity [] = normal
 mkVerbosity ['-':'v':v] = readEOrFail flagToVerbosity v
 mkVerbosity args = error ("Bad arguments: " ++ show args)
-
-doRegisterInplace :: Verbosity -> IO ()
-doRegisterInplace verbosity =
-       do lbi <- getConfig verbosity
-          let registerFlags = defaultRegisterFlags { regInPlace = toFlag True }
-              pd = localPkgDescr lbi
-              pd_reg = if pkgName (package pd) == "ghc-prim"
-                       then case library pd of
-                            Just lib ->
-                                let ems = "GHC.Prim" : exposedModules lib
-                                    lib' = lib { exposedModules = ems }
-                                in pd { library = Just lib' }
-                            Nothing ->
-                                error "Expected a library, but none found"
-                       else pd
-          (regHook simpleUserHooks) pd_reg lbi simpleUserHooks registerFlags
-          return ()
 
 doInstall :: Verbosity -> FilePath -> FilePath -> FilePath -> FilePath
           -> FilePath -> FilePath -> FilePath -> FilePath -> FilePath
