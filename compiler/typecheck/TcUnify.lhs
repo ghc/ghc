@@ -84,7 +84,7 @@ tcInfer tc_infer = withBox openTypeKind tc_infer
 %************************************************************************
 
 \begin{code}
-subFunTys :: SDoc  -- Somthing like "The function f has 3 arguments"
+subFunTys :: SDoc  -- Something like "The function f has 3 arguments"
                    -- or "The abstraction (\x.e) takes 1 argument"
           -> Arity              -- Expected # of args
           -> BoxyRhoType        -- res_ty
