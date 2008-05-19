@@ -268,6 +268,21 @@ ccsSetSelected( CostCentreStack *ccs )
 static void
 initProfilingLogFile(void)
 {
+    char *prog;
+
+    prog = arenaAlloc(prof_arena, strlen(prog_name) + 1);
+    strcpy(prog, prog_name);
+#ifdef mingw32_HOST_OS
+    // on Windows, drop the .exe suffix if there is one
+    {
+        char *suff;
+        suff = strrchr(prog,'.');
+        if (suff != NULL && !strcmp(suff,".exe")) {
+            *suff = '\0';
+        }
+    }
+#endif
+
     if (RtsFlags.CcFlags.doCostCentres == 0 && 
         RtsFlags.ProfFlags.doHeapProfile != HEAP_BY_RETAINER)
     {
@@ -278,8 +293,8 @@ initProfilingLogFile(void)
     else
     {
         /* Initialise the log file name */
-        prof_filename = arenaAlloc(prof_arena, strlen(prog_name) + 6);
-        sprintf(prof_filename, "%s.prof", prog_name);
+        prof_filename = arenaAlloc(prof_arena, strlen(prog) + 6);
+        sprintf(prof_filename, "%s.prof", prog);
 
         /* open the log file */
         if ((prof_file = fopen(prof_filename, "w")) == NULL) {
@@ -310,9 +325,9 @@ initProfilingLogFile(void)
     
     if (RtsFlags.ProfFlags.doHeapProfile) {
 	/* Initialise the log file name */
-	hp_filename = arenaAlloc(prof_arena, strlen(prog_name) + 6);
-	sprintf(hp_filename, "%s.hp", prog_name);
-	
+	hp_filename = arenaAlloc(prof_arena, strlen(prog) + 6);
+	sprintf(hp_filename, "%s.hp", prog);
+
 	/* open the log file */
 	if ((hp_file = fopen(hp_filename, "w")) == NULL) {
 	    debugBelch("Can't open profiling report file %s\n", 

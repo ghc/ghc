@@ -147,7 +147,6 @@ nextarg: ;
 	DropSuffix(pathName, ".hp");
 #if defined(_MSC_VER) || defined(__MINGW32__) || defined(_WIN32)
 	DropSuffix(pathName, ".exe");
-        pathName = copystring2(pathName,".exe");
 #endif
 	baseName = copystring(Basename(pathName));
         
