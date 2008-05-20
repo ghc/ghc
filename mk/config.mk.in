@@ -231,8 +231,8 @@ GhcHcOpts=-Rghc-timing
 # These are placed later on the command line, and may therefore
 # override options from $(GhcHcOpts).
 GhcStage1HcOpts=
-GhcStage2HcOpts=
-GhcStage3HcOpts=
+GhcStage2HcOpts=-O2
+GhcStage3HcOpts=-O2
 
 GhcProfiled=NO
 GhcDebugged=NO
@@ -394,7 +394,7 @@ GhcThreaded = $(if $(findstring thr,$(GhcRTSWays)),YES,NO)
 # -dcore-lint or -H32m.  The ones that are *essential* are wired into
 # the build system.
 #
-# 	-O is pretty desirable, otherwise no inlining of prelude
+# 	-O(2) is pretty desirable, otherwise no inlining of prelude
 #		things (incl "+") happens when compiling with this compiler
 #
 #	-fgenerics switches on generation of support code for 
@@ -402,7 +402,7 @@ GhcThreaded = $(if $(findstring thr,$(GhcRTSWays)),YES,NO)
 #		but we switch it on for the libraries so that we generate
 #		the code in case someone importing wants it
 
-GhcLibHcOpts=-O -Rghc-timing -fgenerics
+GhcLibHcOpts=-O2 -Rghc-timing -fgenerics
 
 # Win32 only: Enable the RTS and libraries to be built as DLLs
 DLLized=@EnableWin32DLLs@
@@ -684,7 +684,7 @@ INSTALL_DIR     = $(MKDIRHIER)
 #
 #	SRC_HC_OPTS += -O
 
-SRC_HC_OPTS += -H16m -O
+SRC_HC_OPTS += -H32m -O
 
 # These flags make flex 8-bit
 SRC_FLEX_OPTS	+= -8
