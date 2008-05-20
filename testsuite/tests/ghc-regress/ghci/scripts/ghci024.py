@@ -172,6 +172,7 @@ other dynamic, non-language, flag settings:
   -fno-do-eta-reduction
   -fno-case-merge
   -fno-unbox-strict-fields
+  -fmethod-sharing
   -fno-dicts-cheap
   -fno-excess-precision
   -f%(mangling)sasm-mangling
