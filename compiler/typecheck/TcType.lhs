@@ -15,13 +15,6 @@ The "tc" prefix is for "TypeChecker", because the type checker
 is the principal client.
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module TcType (
   --------------------------------
   -- Types 
@@ -381,7 +374,7 @@ kindVarRef tc =
   ASSERT ( isTcTyVar tc )
   case tcTyVarDetails tc of
     MetaTv TauTv ref -> ref
-    other            -> pprPanic "kindVarRef" (ppr tc)
+    _                -> pprPanic "kindVarRef" (ppr tc)
 
 mkKindVar :: Unique -> IORef MetaDetails -> KindVar
 mkKindVar u r 
@@ -524,39 +517,40 @@ isExistentialTyVar tv 	-- Existential type variable, bound by a pattern
   = ASSERT( isTcTyVar tv )
     case tcTyVarDetails tv of
 	SkolemTv (PatSkol {}) -> True
-	other 		      -> False
+	_                     -> False
 
 isMetaTyVar tv 
   = ASSERT2( isTcTyVar tv, ppr tv )
     case tcTyVarDetails tv of
 	MetaTv _ _ -> True
-	other      -> False
+	_          -> False
 
 isBoxyTyVar tv 
   = ASSERT( isTcTyVar tv )
     case tcTyVarDetails tv of
 	MetaTv BoxTv _ -> True
-	other          -> False
+	_              -> False
 
+isSigTyVar :: Var -> Bool
 isSigTyVar tv 
   = ASSERT( isTcTyVar tv )
     case tcTyVarDetails tv of
 	MetaTv (SigTv _) _ -> True
-	other              -> False
+	_                  -> False
 
 metaTvRef :: TyVar -> IORef MetaDetails
 metaTvRef tv 
   = ASSERT2( isTcTyVar tv, ppr tv )
     case tcTyVarDetails tv of
 	MetaTv _ ref -> ref
-	other	   -> pprPanic "metaTvRef" (ppr tv)
+	_          -> pprPanic "metaTvRef" (ppr tv)
 
 isFlexi, isIndirect :: MetaDetails -> Bool
-isFlexi Flexi 	  = True
-isFlexi other     = False
+isFlexi Flexi = True
+isFlexi _     = False
 
 isIndirect (Indirect _) = True
-isIndirect other        = False
+isIndirect _            = False
 
 isRuntimeUnk :: TyVar -> Bool
 isRuntimeUnk x | isTcTyVar x
@@ -594,8 +588,8 @@ isTauTy (TyVarTy tv)	 = ASSERT( not (isTcTyVar tv && isBoxyTyVar tv) )
 isTauTy (TyConApp tc tys) = all isTauTy tys && isTauTyCon tc
 isTauTy (AppTy a b)	  = isTauTy a && isTauTy b
 isTauTy (FunTy a b)	  = isTauTy a && isTauTy b
-isTauTy (PredTy p)	  = True		-- Don't look through source types
-isTauTy other		  = False
+isTauTy (PredTy _)	  = True		-- Don't look through source types
+isTauTy _    		  = False
 
 
 isTauTyCon :: TyCon -> Bool
@@ -631,7 +625,7 @@ getDFunTyKey ty | Just ty' <- tcView ty = getDFunTyKey ty'
 getDFunTyKey (TyVarTy tv)    = getOccName tv
 getDFunTyKey (TyConApp tc _) = getOccName tc
 getDFunTyKey (AppTy fun _)   = getDFunTyKey fun
-getDFunTyKey (FunTy arg _)   = getOccName funTyCon
+getDFunTyKey (FunTy _ _)     = getOccName funTyCon
 getDFunTyKey (ForAllTy _ t)  = getDFunTyKey t
 getDFunTyKey ty		     = pprPanic "getDFunTyKey" (pprType ty)
 -- PredTy shouldn't happen
@@ -657,24 +651,25 @@ tcSplitForAllTys :: Type -> ([TyVar], Type)
 tcSplitForAllTys ty = split ty ty []
    where
      split orig_ty ty tvs | Just ty' <- tcView ty = split orig_ty ty' tvs
-     split orig_ty (ForAllTy tv ty) tvs 
+     split _ (ForAllTy tv ty) tvs 
        | not (isCoVar tv) = split ty ty (tv:tvs)
-     split orig_ty t tvs = (reverse tvs, orig_ty)
+     split orig_ty _ tvs = (reverse tvs, orig_ty)
 
+tcIsForAllTy :: Type -> Bool
 tcIsForAllTy ty | Just ty' <- tcView ty = tcIsForAllTy ty'
-tcIsForAllTy (ForAllTy tv ty) = not (isCoVar tv)
-tcIsForAllTy t		      = False
+tcIsForAllTy (ForAllTy tv _) = not (isCoVar tv)
+tcIsForAllTy _               = False
 
 tcSplitPhiTy :: Type -> (ThetaType, Type)
 tcSplitPhiTy ty = split ty ty []
  where
   split orig_ty ty tvs | Just ty' <- tcView ty = split orig_ty ty' tvs
 
-  split orig_ty (ForAllTy tv ty) ts
+  split _       (ForAllTy tv ty) ts
         | isCoVar tv = split ty ty (coVarPred tv : ts)
-  split orig_ty (FunTy arg res) ts 
+  split _        (FunTy arg res) ts 
 	| Just p <- tcSplitPredTy_maybe arg = split res res (p:ts)
-  split orig_ty ty		ts = (reverse ts, orig_ty)
+  split orig_ty _               ts = (reverse ts, orig_ty)
 
 tcSplitSigmaTy :: Type -> ([TyVar], ThetaType, Type)
 tcSplitSigmaTy ty = case tcSplitForAllTys ty of
@@ -695,7 +690,7 @@ tcMultiSplitSigmaTy
 
 tcMultiSplitSigmaTy sigma
   = case (tcSplitSigmaTy sigma) of
-	([],[],ty) -> ([], sigma)
+	([], [], _) -> ([], sigma)
 	(tvs, theta, ty) -> case tcMultiSplitSigmaTy ty of
 				(pairs, rest) -> ((tvs,theta):pairs, rest)
 
@@ -722,7 +717,7 @@ tcSplitTyConApp_maybe (FunTy arg res)   = Just (funTyCon, [arg,res])
 	-- Newtypes are opaque, so they may be split
 	-- However, predicates are not treated
 	-- as tycon applications by the type checker
-tcSplitTyConApp_maybe other	      	= Nothing
+tcSplitTyConApp_maybe _                 = Nothing
 
 -----------------------
 tcSplitFunTys :: Type -> ([Type], Type)
@@ -735,7 +730,7 @@ tcSplitFunTys ty = case tcSplitFunTy_maybe ty of
 tcSplitFunTy_maybe :: Type -> Maybe (Type, Type)
 tcSplitFunTy_maybe ty | Just ty' <- tcView ty           = tcSplitFunTy_maybe ty'
 tcSplitFunTy_maybe (FunTy arg res) | not (isPredTy arg) = Just (arg, res)
-tcSplitFunTy_maybe other	  			= Nothing
+tcSplitFunTy_maybe _                                    = Nothing
 	-- Note the (not (isPredTy arg)) guard
 	-- Consider	(?x::Int) => Bool
 	-- We don't want to treat this as a function type!
@@ -759,8 +754,13 @@ tcSplitFunTysN ty n_args
   | otherwise
   = ([], ty)
 
+tcSplitFunTy :: Type -> (Type, Type)
 tcSplitFunTy  ty = expectJust "tcSplitFunTy" (tcSplitFunTy_maybe ty)
+
+tcFunArgTy :: Type -> Type
 tcFunArgTy    ty = fst (tcSplitFunTy ty)
+
+tcFunResultTy :: Type -> Type
 tcFunResultTy ty = snd (tcSplitFunTy ty)
 
 -----------------------
@@ -784,8 +784,8 @@ tcSplitAppTys ty
 -----------------------
 tcGetTyVar_maybe :: Type -> Maybe TyVar
 tcGetTyVar_maybe ty | Just ty' <- tcView ty = tcGetTyVar_maybe ty'
-tcGetTyVar_maybe (TyVarTy tv) 	= Just tv
-tcGetTyVar_maybe other	        = Nothing
+tcGetTyVar_maybe (TyVarTy tv)   = Just tv
+tcGetTyVar_maybe _              = Nothing
 
 tcGetTyVar :: String -> Type -> TyVar
 tcGetTyVar msg ty = expectJust msg (tcGetTyVar_maybe ty)
@@ -805,7 +805,7 @@ tcSplitDFunHead :: Type -> (Class, [Type])
 tcSplitDFunHead tau  
   = case tcSplitPredTy_maybe tau of 
 	Just (ClassP clas tys) -> (clas, tys)
-	other -> panic "tcSplitDFunHead"
+	_ -> panic "tcSplitDFunHead"
 
 tcInstHeadTyNotSynonym :: Type -> Bool
 -- Used in Haskell-98 mode, for the argument types of an instance head
@@ -813,7 +813,7 @@ tcInstHeadTyNotSynonym :: Type -> Bool
 -- are transparent, so we need a special function here
 tcInstHeadTyNotSynonym ty
   = case ty of
-        TyConApp tc tys -> not (isSynTyCon tc)
+        TyConApp tc _ -> not (isSynTyCon tc)
         _ -> True
 
 tcInstHeadTyAppAllTyVars :: Type -> Bool
@@ -823,7 +823,7 @@ tcInstHeadTyAppAllTyVars ty
   = case ty of
 	TyConApp _ tys  -> ok tys
 	FunTy arg res   -> ok [arg, res]
-	other		-> False
+	_               -> False
   where
 	-- Check that all the types are type variables,
 	-- and that each is distinct
@@ -832,7 +832,7 @@ tcInstHeadTyAppAllTyVars ty
 	     tvs = mapCatMaybes get_tv tys
 
     get_tv (TyVarTy tv)  = Just tv	-- through synonyms
-    get_tv other  	 = Nothing
+    get_tv _             = Nothing
 \end{code}
 
 
@@ -848,34 +848,36 @@ tcSplitPredTy_maybe :: Type -> Maybe PredType
    -- Returns Just for predicates only
 tcSplitPredTy_maybe ty | Just ty' <- tcView ty = tcSplitPredTy_maybe ty'
 tcSplitPredTy_maybe (PredTy p)    = Just p
-tcSplitPredTy_maybe other	  = Nothing
-	
+tcSplitPredTy_maybe _             = Nothing
+
 predTyUnique :: PredType -> Unique
-predTyUnique (IParam n _)      = getUnique (ipNameName n)
-predTyUnique (ClassP clas tys) = getUnique clas
-predTyUnique (EqPred a b)      = pprPanic "predTyUnique" (ppr (EqPred a b))
+predTyUnique (IParam n _)    = getUnique (ipNameName n)
+predTyUnique (ClassP clas _) = getUnique clas
+predTyUnique (EqPred a b)    = pprPanic "predTyUnique" (ppr (EqPred a b))
 \end{code}
 
 
 --------------------- Dictionary types ---------------------------------
 
 \begin{code}
+mkClassPred :: Class -> [Type] -> PredType
 mkClassPred clas tys = ClassP clas tys
 
 isClassPred :: PredType -> Bool
-isClassPred (ClassP clas tys) = True
-isClassPred other	      = False
+isClassPred (ClassP _ _) = True
+isClassPred _            = False
 
-isTyVarClassPred (ClassP clas tys) = all tcIsTyVarTy tys
-isTyVarClassPred other		   = False
+isTyVarClassPred :: PredType -> Bool
+isTyVarClassPred (ClassP _ tys) = all tcIsTyVarTy tys
+isTyVarClassPred _              = False
 
 getClassPredTys_maybe :: PredType -> Maybe (Class, [Type])
 getClassPredTys_maybe (ClassP clas tys) = Just (clas, tys)
-getClassPredTys_maybe _		        = Nothing
+getClassPredTys_maybe _                 = Nothing
 
 getClassPredTys :: PredType -> (Class, [Type])
 getClassPredTys (ClassP clas tys) = (clas, tys)
-getClassPredTys other = panic "getClassPredTys"
+getClassPredTys _ = panic "getClassPredTys"
 
 mkDictTy :: Class -> [Type] -> Type
 mkDictTy clas tys = mkPredTy (ClassP clas tys)
@@ -883,7 +885,7 @@ mkDictTy clas tys = mkPredTy (ClassP clas tys)
 isDictTy :: Type -> Bool
 isDictTy ty | Just ty' <- tcView ty = isDictTy ty'
 isDictTy (PredTy p) = isClassPred p
-isDictTy other	    = False
+isDictTy _          = False
 \end{code}
 
 --------------------- Implicit parameters ---------------------------------
@@ -891,7 +893,7 @@ isDictTy other	    = False
 \begin{code}
 isIPPred :: PredType -> Bool
 isIPPred (IParam _ _) = True
-isIPPred other	      = False
+isIPPred _            = False
 
 isInheritablePred :: PredType -> Bool
 -- Can be inherited by a context.  For example, consider
@@ -904,7 +906,7 @@ isInheritablePred :: PredType -> Bool
 -- which can be free in g's rhs, and shared by both calls to g
 isInheritablePred (ClassP _ _) = True
 isInheritablePred (EqPred _ _) = True
-isInheritablePred other	       = False
+isInheritablePred _            = False
 \end{code}
 
 --------------------- Equality predicates ---------------------------------
@@ -950,24 +952,26 @@ any foralls.  E.g.
 \begin{code}
 isSigmaTy :: Type -> Bool
 isSigmaTy ty | Just ty' <- tcView ty = isSigmaTy ty'
-isSigmaTy (ForAllTy tyvar ty) = True
-isSigmaTy (FunTy a b)	      = isPredTy a
-isSigmaTy _		      = False
+isSigmaTy (ForAllTy _ _) = True
+isSigmaTy (FunTy a _)    = isPredTy a
+isSigmaTy _              = False
 
 isOverloadedTy :: Type -> Bool
 isOverloadedTy ty | Just ty' <- tcView ty = isOverloadedTy ty'
-isOverloadedTy (ForAllTy tyvar ty) = isOverloadedTy ty
-isOverloadedTy (FunTy a b)	   = isPredTy a
-isOverloadedTy _		   = False
+isOverloadedTy (ForAllTy _ ty) = isOverloadedTy ty
+isOverloadedTy (FunTy a _)     = isPredTy a
+isOverloadedTy _               = False
 
 isPredTy :: Type -> Bool	-- Belongs in TcType because it does 
 				-- not look through newtypes, or predtypes (of course)
 isPredTy ty | Just ty' <- tcView ty = isPredTy ty'
-isPredTy (PredTy sty)  = True
-isPredTy _	       = False
+isPredTy (PredTy _) = True
+isPredTy _          = False
 \end{code}
 
 \begin{code}
+isFloatTy, isDoubleTy, isIntegerTy, isIntTy, isWordTy, isBoolTy,
+    isUnitTy, isCharTy :: Type -> Bool
 isFloatTy      = is_tc floatTyConKey
 isDoubleTy     = is_tc doubleTyConKey
 isIntegerTy    = is_tc integerTyConKey
@@ -977,10 +981,11 @@ isBoolTy       = is_tc boolTyConKey
 isUnitTy       = is_tc unitTyConKey
 isCharTy       = is_tc charTyConKey
 
+isStringTy :: Type -> Bool
 isStringTy ty
   = case tcSplitTyConApp_maybe ty of
       Just (tc, [arg_ty]) -> tc == listTyCon && isCharTy arg_ty
-      other		  -> False
+      _                   -> False
 
 is_tc :: Unique -> Type -> Bool
 -- Newtypes are opaque to this
@@ -1018,7 +1023,7 @@ tcTyVarsOfType :: Type -> TcTyVarSet
 -- (Types.tyVarsOfTypes finds all free TyVars)
 tcTyVarsOfType (TyVarTy tv)	    = if isTcTyVar tv then unitVarSet tv
 						      else emptyVarSet
-tcTyVarsOfType (TyConApp tycon tys) = tcTyVarsOfTypes tys
+tcTyVarsOfType (TyConApp _ tys)     = tcTyVarsOfTypes tys
 tcTyVarsOfType (PredTy sty)	    = tcTyVarsOfPred sty
 tcTyVarsOfType (FunTy arg res)	    = tcTyVarsOfType arg `unionVarSet` tcTyVarsOfType res
 tcTyVarsOfType (AppTy fun arg)	    = tcTyVarsOfType fun `unionVarSet` tcTyVarsOfType arg
@@ -1076,7 +1081,7 @@ exactTyVarsOfType ty
   where
     go ty | Just ty' <- tcView ty = go ty'	-- This is the key line
     go (TyVarTy tv)         	  = unitVarSet tv
-    go (TyConApp tycon tys) 	  = exactTyVarsOfTypes tys
+    go (TyConApp _ tys)     	  = exactTyVarsOfTypes tys
     go (PredTy ty)	    	  = go_pred ty
     go (FunTy arg res)	    	  = go arg `unionVarSet` go res
     go (AppTy fun arg)	    	  = go fun `unionVarSet` go arg
@@ -1099,15 +1104,16 @@ end of the compiler.
 
 \begin{code}
 tyClsNamesOfType :: Type -> NameSet
-tyClsNamesOfType (TyVarTy tv)		    = emptyNameSet
+tyClsNamesOfType (TyVarTy _)		    = emptyNameSet
 tyClsNamesOfType (TyConApp tycon tys)	    = unitNameSet (getName tycon) `unionNameSets` tyClsNamesOfTypes tys
-tyClsNamesOfType (PredTy (IParam n ty))     = tyClsNamesOfType ty
+tyClsNamesOfType (PredTy (IParam _ ty))     = tyClsNamesOfType ty
 tyClsNamesOfType (PredTy (ClassP cl tys))   = unitNameSet (getName cl) `unionNameSets` tyClsNamesOfTypes tys
 tyClsNamesOfType (PredTy (EqPred ty1 ty2))  = tyClsNamesOfType ty1 `unionNameSets` tyClsNamesOfType ty2
 tyClsNamesOfType (FunTy arg res)	    = tyClsNamesOfType arg `unionNameSets` tyClsNamesOfType res
 tyClsNamesOfType (AppTy fun arg)	    = tyClsNamesOfType fun `unionNameSets` tyClsNamesOfType arg
-tyClsNamesOfType (ForAllTy tyvar ty)	    = tyClsNamesOfType ty
+tyClsNamesOfType (ForAllTy _ ty)	    = tyClsNamesOfType ty
 
+tyClsNamesOfTypes :: [Type] -> NameSet
 tyClsNamesOfTypes tys = foldr (unionNameSets . tyClsNamesOfType) emptyNameSet tys
 
 tyClsNamesOfDFunHead :: Type -> NameSet
@@ -1119,7 +1125,7 @@ tyClsNamesOfDFunHead :: Type -> NameSet
 --	even if Foo *is* locally defined
 tyClsNamesOfDFunHead dfun_ty 
   = case tcSplitSigmaTy dfun_ty of
-	(tvs,_,head_ty) -> tyClsNamesOfType head_ty
+	(_, _, head_ty) -> tyClsNamesOfType head_ty
 \end{code}
 
 
@@ -1155,7 +1161,7 @@ tcSplitIOType_maybe ty
 		Nothing		    -> Nothing
 		Just (tc, ty', co2) -> Just (tc, ty', co1 `mkTransCoI` co2)
 
-	other -> Nothing
+	_ -> Nothing
 
 isFFITy :: Type -> Bool
 -- True for any TyCon that can possibly be an arg or result of an FFI call
@@ -1200,6 +1206,7 @@ isFFIDotnetTy dflags ty
 	--     it no longer does so.  May need to adjust isFFIDotNetTy
 	--     if we do want to look through newtypes.
 
+isFFIDotnetObjTy :: Type -> Bool
 isFFIDotnetObjTy ty
   = checkRepTyCon check_tc t_ty
   where
@@ -1278,7 +1285,7 @@ legalFEResultTyCon tc
 
 legalOutgoingTyCon :: DynFlags -> Safety -> TyCon -> Bool
 -- Checks validity of types going from Haskell -> external world
-legalOutgoingTyCon dflags safety tc
+legalOutgoingTyCon dflags _ tc
   = marshalableTyCon dflags tc
 
 legalFFITyCon :: TyCon -> Bool
@@ -1286,15 +1293,17 @@ legalFFITyCon :: TyCon -> Bool
 legalFFITyCon tc
   = isUnLiftedTyCon tc || boxedMarshalableTyCon tc || tc == unitTyCon
 
+marshalableTyCon :: DynFlags -> TyCon -> Bool
 marshalableTyCon dflags tc
   =  (dopt Opt_UnliftedFFITypes dflags 
       && isUnLiftedTyCon tc
       && not (isUnboxedTupleTyCon tc)
       && case tyConPrimRep tc of	-- Note [Marshalling VoidRep]
 	   VoidRep -> False
-	   other   -> True)
+	   _       -> True)
   || boxedMarshalableTyCon tc
 
+boxedMarshalableTyCon :: TyCon -> Bool
 boxedMarshalableTyCon tc
    = getUnique tc `elem` [ intTyConKey, int8TyConKey, int16TyConKey
 			 , int32TyConKey, int64TyConKey
