@@ -31,18 +31,227 @@ import UniqSupply
 import Control.Monad
 import Maybe
 
+{- 
+
+This module implements two useful tools:
+
+  1. An iterative solver for dataflow problems
+
+  2. The combined dataflow-analysis-and-transformation framework
+     described by Lerner, Grove, and Chambers in their excellent
+     2002 POPL paper (http://tinyurl.com/3zycbr or 
+     http://tinyurl.com/3pnscd).
+
+Each tool comes in two flavors: one for forward dataflow problems
+and one for backward dataflow problems.
+
+We quote the paper above:
+
+  Dataflow analyses can have mutually beneficial interactions.
+  Previous efforts to exploit these interactions have either
+  (1) iteratively performed each individual analysis until no
+  further improvements are discovered or (2) developed "super-
+  analyses" that manually combine conceptually separate anal-
+  yses. We have devised a new approach that allows anal-
+  yses to be defined independently while still enabling them
+  to be combined automatically and profitably. Our approach
+  avoids the loss of precision associated with iterating indi-
+  vidual analyses and the implementation difficulties of man-
+  ually writing a super-analysis.    
+
+The key idea is to provide at each CFG node not only a dataflow
+transfer function but also a rewriting function that has the option to
+replace the node with a new (possibly empty) graph.  The rewriting
+function takes a dataflow fact as input, and the fact is used to
+justify any rewriting.  For example, in a backward problem, the fact
+that variable x is dead can be used to justify rewriting node
+  x := e
+to the empty graph.  In a forward problem, the fact that x == 7 can
+be used to justify rewriting node
+  y := x + 1
+to 
+  y := 8
+which in turn will be analyzed and produce a new fact:
+x == 7 and y == 8.
+
+In its most general form, this module takes as input graph, transfer
+equations, rewrites, and an initial set of dataflow facts, and
+iteratively computes a new graph and a new set of dataflow facts such
+that
+  * The set of facts is a fixed point of the transfer equations
+  * The graph has been rewritten as much as is consistent with
+    the given facts and requested rewriting depth (see below)
+N.B. 'A set of facts' is shorthand for 'A finite map from CFG label to fact'.
+
+The types of transfer equations, rewrites, and fixed points are
+different for forward and backward problems.  To avoid cluttering the
+name space with two versions of every names, other names such as
+zdfSolveFrom are overloaded to work in both forward or backward
+directions.  This design decision is based on experience with the
+predecessor module, now called ZipDataflow0 and destined for the bit bucket.
+
+
+This module is deliberately very abstract.  It is a completely general
+framework and well-nigh impossible to understand in isolation.  The
+cautious reader will begin with some concrete examples in the form of
+clients.  NR recommends
+
+  CmmLiveZ             A simple liveness analysis
+
+  CmmSpillReload.removeDeadAssignmentsAndReloads
+                       A piece of spaghetti to pull on, which leads to
+                         - a two-part liveness analysis that tracks
+                           variables live in registers and live on the stack
+                         - elimination of assignments to dead variables
+                         - elimination of redundant reloads
+
+Even hearty souls should avoid the CmmProcPointZ client, at least for
+the time being.
+
+-}   
+
+
+{- ============ TRANSFER FUNCTIONS AND REWRITES =========== -}
+
+-- | For a backward transfer, you're given the fact on a node's 
+-- outedge and you compute the fact on the inedge.  Facts have type 'a'.
+-- A last node may have multiple outedges, each pointing to a labelled
+-- block, so instead of a fact it is given a mapping from BlockId to fact.
+
+data BackwardTransfers middle last a = BackwardTransfers
+    { bt_first_in  :: a              -> BlockId -> a
+    , bt_middle_in :: a              -> middle  -> a
+    , bt_last_in   :: (BlockId -> a) -> last    -> a
+    } 
+
+-- | For a forward transfer, you're given the fact on a node's 
+-- inedge and you compute the fact on the outedge. Because a last node
+-- may have multiple outedges, each pointing to a labelled
+-- block, so instead of a fact it produces a list of (BlockId, fact) pairs.
+
+data ForwardTransfers middle last a = ForwardTransfers
+    { ft_first_out  :: a -> BlockId -> a
+    , ft_middle_out :: a -> middle  -> a
+    , ft_last_outs  :: a -> last    -> LastOutFacts a
+    , ft_exit_out   :: a            -> a
+    } 
+
+newtype LastOutFacts a = LastOutFacts [(BlockId, a)] 
+  -- ^ These are facts flowing out of a last node to the node's successors.
+  -- They are either to be set (if they pertain to the graph currently
+  -- under analysis) or propagated out of a sub-analysis
+
+
+-- | A backward rewrite takes the same inputs as a backward transfer,
+-- but instead of producing a fact, it produces a replacement graph or Nothing.
+-- The type of the replacement graph is given as a type parameter 'g'
+-- of kind * -> * -> *.  This design offers great flexibility to clients, 
+-- but it might be worth simplifying this module by replacing this type
+-- parameter with AGraph everywhere (SLPJ 19 May 2008).
+
+data BackwardRewrites middle last a g = BackwardRewrites
+    { br_first  :: a              -> BlockId -> Maybe (g middle last)
+    , br_middle :: a              -> middle  -> Maybe (g middle last)
+    , br_last   :: (BlockId -> a) -> last    -> Maybe (g middle last)
+    , br_exit   ::                              Maybe (g middle last)
+    } 
+
+-- | A forward rewrite takes the same inputs as a forward transfer,
+-- but instead of producing a fact, it produces a replacement graph or Nothing.
+
+data ForwardRewrites middle last a g = ForwardRewrites
+    { fr_first  :: a -> BlockId -> Maybe (g middle last)
+    , fr_middle :: a -> middle  -> Maybe (g middle last)
+    , fr_last   :: a -> last    -> Maybe (g middle last)
+    , fr_exit   :: a            -> Maybe (g middle last)
+    } 
+
+{- ===================== FIXED POINTS =================== -}
+
+-- | The result of combined analysis and transformation is a 
+-- solution to the set of dataflow equations together with a 'contained value'.
+-- This solution is a member of type class 'FixedPoint', which is parameterized by
+--   * middle and last nodes 'm' and 'l'
+--   * data flow fact 'fact'
+--   * the type 'a' of the contained value
+--
+-- In practice, the contained value 'zdfFpContents' is either a
+-- rewritten graph, when rewriting, or (), when solving without
+-- rewriting.  A function 'zdfFpMap' allows a client to change 
+-- the contents without changing other values.
+--
+-- To save space, we provide the solution 'zdfFpFacts' as a mapping
+-- from BlockId to fact; if necessary, facts on edges can be
+-- reconstructed using the transfer functions; this functionality is
+-- intended to be included as the 'zdfDecoratedGraph', but the code
+-- has not yet been implemented.
+--
+-- The solution may also includes a fact 'zdfFpOuputFact', which is
+-- not associated with any label:
+--   * for a backward problem, this is the fact at entry
+--   * for a forward problem, this is the fact at the distinguished exit node,
+--     if such a node is present
+--
+-- For a forward problem only, the solution includes 'zdfFpLastOuts',
+-- which is the set of facts on edges leaving the graph.
+--
+-- The flag 'zdfGraphChanged' tells whether the engine did any rewriting.
+
+class FixedPoint fp where
+    zdfFpContents     :: fp m l fact a -> a
+    zdfFpFacts        :: fp m l fact a -> BlockEnv fact
+    zdfFpOutputFact   :: fp m l fact a -> fact  -- entry for backward; exit for forward
+    zdfDecoratedGraph :: fp m l fact a -> Graph (fact, m) (fact, l)
+    zdfGraphChanged   :: fp m l fact a -> ChangeFlag
+    zdfFpMap          :: (a -> b) -> (fp m l fact a -> fp m l fact b)
+
+-- | The class 'FixedPoint' has two instances: one for forward problems and
+-- one for backward problems.  The 'CommonFixedPoint' defines all fields 
+-- common to both.  (The instance declarations are uninteresting and appear below.)
+
+data CommonFixedPoint m l fact a = FP
+    { fp_facts     :: BlockEnv fact
+    , fp_out       :: fact  -- entry for backward; exit for forward
+    , fp_changed   :: ChangeFlag
+    , fp_dec_graph :: Graph (fact, m) (fact, l)
+    , fp_contents  :: a
+    }
+
+-- | The common fixed point is sufficient for a backward problem.
+type BackwardFixedPoint = CommonFixedPoint
+
+-- | A forward problem needs the common fields, plus the facts on the outedges.
+data ForwardFixedPoint m l fact a = FFP
+    { ffp_common    :: CommonFixedPoint m l fact a
+    , zdfFpLastOuts :: LastOutFacts fact
+    }
+
+
+{- ============== SOLVING AND REWRITING ============== -}
 
 type PassName = String
-type Fuel = OptimizationFuel
 
-data RewritingDepth = RewriteShallow | RewriteDeep
--- When a transformation proposes to rewrite a node, 
--- you can either ask the system to
---  * "shallow": accept the new graph, analyse it without further rewriting
---  * "deep": recursively analyse-and-rewrite the new graph
-
------------------------------
--- zdfSolveFrom is a pure analysis with no rewriting
+-- | zdfSolveFrom is an overloaded name that resolves to a pure
+-- analysis with no rewriting.  It has only two instances: forward and
+-- backward.  Since it needs no rewrites, the type parameters of the
+-- class are transfer functions and the fixed point.
+--
+--
+-- An iterative solver normally starts with the bottom fact at every
+-- node, but it can be useful in other contexts as well.  For this
+-- reason the initial set of facts (at labelled blocks only) is a
+-- parameter to the solver.  
+--
+-- The constraints on the type signature exist purely for debugging;
+-- they make it possible to prettyprint nodes and facts.  The parameter of
+-- type 'PassName' is also used just for debugging.
+--
+-- Note that the result is a fixed point with no contents, that is,
+-- the contents have type ().
+-- 
+-- The intent of the rest of the type signature should be obvious.
+-- If not, place a skype call to norman-ramsey or complain bitterly
+-- to norman-ramsey@acm.org.
 
 class DataflowSolverDirection transfers fixedpt where
   zdfSolveFrom   :: (DebugNodes m l, Outputable a)
@@ -61,56 +270,50 @@ instance DataflowSolverDirection ForwardTransfers ForwardFixedPoint
 instance DataflowSolverDirection BackwardTransfers BackwardFixedPoint
   where zdfSolveFrom = solve_b
 
-data ForwardTransfers middle last a = ForwardTransfers
-    { ft_first_out  :: a -> BlockId -> a
-    , ft_middle_out :: a -> middle  -> a
-    , ft_last_outs  :: a -> last    -> LastOutFacts a
-    , ft_exit_out   :: a            -> a
-    } 
 
-newtype LastOutFacts a = LastOutFacts [(BlockId, a)] 
-  -- ^ These are facts flowing out of a last node to the node's successors.
-  -- They are either to be set (if they pertain to the graph currently
-  -- under analysis) or propagated out of a sub-analysis
-
-data BackwardTransfers middle last a = BackwardTransfers
-    { bt_first_in  :: a              -> BlockId -> a
-    , bt_middle_in :: a              -> middle  -> a
-    , bt_last_in   :: (BlockId -> a) -> last    -> a
-    } 
-
-data CommonFixedPoint m l fact a = FP
-    { fp_facts     :: BlockEnv fact
-    , fp_out       :: fact  -- entry for backward; exit for forward
-    , fp_changed   :: ChangeFlag
-    , fp_dec_graph :: Graph (fact, m) (fact, l)
-    , fp_contents  :: a
-    }
-
-type BackwardFixedPoint = CommonFixedPoint
-
-data ForwardFixedPoint m l fact a = FFP
-    { ffp_common    :: CommonFixedPoint m l fact a
-    , zdfFpLastOuts :: LastOutFacts fact
-    }
-
------------------------------
--- zdfRewriteFrom is an interleaved analysis and transformation
+-- | zdfRewriteFrom is an overloaded name that resolves to an
+-- interleaved analysis and transformation.  It too is instantiated in
+-- forward and backward directions.
+-- 
+-- The type parameters of the class include not only transfer
+-- functions and the fixed point but also rewrites and the type
+-- constructor (here called 'graph') for making rewritten graphs.  As
+-- above, in the definitoins of the rewrites, it might simplify
+-- matters if 'graph' were replaced with 'AGraph'.
+--
+-- The type signature of 'zdfRewriteFrom' is that of 'zdfSolveFrom'
+-- with additional parameters and a different result.  Of course the
+-- rewrites are an additional parameter, but there are further
+-- parameters which reflect the fact that rewriting consumes both
+-- OptimizationFuel and Uniqs.
+--
+-- The result type is changed to reflect fuel consumption, and also
+-- the resulting fixed point containts a rewritten graph.
+--
+-- John Dias is going to improve the management of Uniqs and Fuel so
+-- that it doesn't make us sick to look at the types.
 
 class DataflowSolverDirection transfers fixedpt =>
       DataflowDirection transfers fixedpt rewrites 
 			(graph :: * -> * -> *) where
   zdfRewriteFrom :: (DebugNodes m l, Outputable a)
-                 => RewritingDepth
-                 -> BlockEnv a
+                 => RewritingDepth      -- whether to rewrite a rewritten graph
+                 -> BlockEnv a          -- initial facts (unbound == botton)
                  -> PassName
                  -> DataflowLattice a
                  -> transfers m l a
                  -> rewrites m l a graph
-                 -> a                 -- fact flowing in (at entry or exit)
+                 -> a                   -- fact flowing in (at entry or exit)
                  -> Graph m l
                  -> UniqSupply
                  -> FuelMonad (fixedpt m l a (Graph m l))
+
+data RewritingDepth = RewriteShallow | RewriteDeep
+-- When a transformation proposes to rewrite a node, 
+-- you can either ask the system to
+--  * "shallow": accept the new graph, analyse it without further rewriting
+--  * "deep": recursively analyse-and-rewrite the new graph
+
 
 -- There are currently four instances, but there could be more
 --	forward, backward (instantiates transfers, fixedpt, rewrites)
@@ -128,28 +331,8 @@ instance DataflowDirection BackwardTransfers BackwardFixedPoint BackwardRewrites
 instance DataflowDirection BackwardTransfers BackwardFixedPoint BackwardRewrites AGraph
   where zdfRewriteFrom = rewrite_b_agraph
 
-data ForwardRewrites middle last a g = ForwardRewrites
-    { fr_first  :: a -> BlockId -> Maybe (g middle last)
-    , fr_middle :: a -> middle  -> Maybe (g middle last)
-    , fr_last   :: a -> last    -> Maybe (g middle last)
-    , fr_exit   :: a            -> Maybe (g middle last)
-    } 
 
-data BackwardRewrites middle last a g = BackwardRewrites
-    { br_first  :: a              -> BlockId -> Maybe (g middle last)
-    , br_middle :: a              -> middle  -> Maybe (g middle last)
-    , br_last   :: (BlockId -> a) -> last    -> Maybe (g middle last)
-    , br_exit   ::                              Maybe (g middle last)
-    } 
-
-class FixedPoint fp where
-    zdfFpFacts        :: fp m l fact a -> BlockEnv fact
-    zdfFpOutputFact   :: fp m l fact a -> fact  -- entry for backward; exit for forward
-    zdfGraphChanged   :: fp m l fact a -> ChangeFlag
-    zdfDecoratedGraph :: fp m l fact a -> Graph (fact, m) (fact, l)
-    zdfFpContents     :: fp m l fact a -> a
-    zdfFpMap          :: (a -> b) -> (fp m l fact a -> fp m l fact b)
-
+{- =================== IMPLEMENTATIONS ===================== -}
 
 
 -----------------------------------------------------------
@@ -280,6 +463,7 @@ fwd_pure_anal name env transfers in_fact g =
 
 -----------------------------------------------------------------------
 
+type Fuel = OptimizationFuel
 
 {-# INLINE forward_sol #-}
 forward_sol
