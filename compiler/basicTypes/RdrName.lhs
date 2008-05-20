@@ -29,7 +29,7 @@ module RdrName (
 	lookupGlobalRdrEnv, extendGlobalRdrEnv,
 	pprGlobalRdrEnv, globalRdrEnvElts,
 	lookupGRE_RdrName, lookupGRE_Name, getGRE_NameQualifier_maybes,
-        hideSomeUnquals,
+        hideSomeUnquals, findLocalDupsRdrEnv,
 
 	-- GlobalRdrElt, Provenance, ImportSpec
 	GlobalRdrElt(..), isLocalGRE, unQualOK, qualSpecOK, unQualSpecOK,
@@ -462,6 +462,27 @@ mkGlobalRdrEnv gres
     add gre env = extendOccEnv_C (foldr insertGRE) env 
 				 (nameOccName (gre_name gre)) 
 				 [gre]
+
+findLocalDupsRdrEnv :: GlobalRdrEnv -> [OccName] -> (GlobalRdrEnv, [[Name]])
+-- For each OccName, see if there are multiple LocalDef definitions
+-- for it.  If so, remove all but one (to suppress subsequent error messages)
+-- and return a list of the duplicate bindings
+findLocalDupsRdrEnv rdr_env occs 
+  = go rdr_env [] occs
+  where
+    go rdr_env dups [] = (rdr_env, dups)
+    go rdr_env dups (occ:occs)
+      = case filter isLocalGRE gres of
+	  []       -> WARN( True, ppr occ <+> ppr rdr_env ) 
+		      go rdr_env dups occs	-- Weird!  No binding for occ
+	  [_]      -> go rdr_env dups occs	-- The common case
+	  dup_gres -> go (extendOccEnv rdr_env occ (head dup_gres : nonlocal_gres))
+   		         (map gre_name dup_gres : dups)
+			 occs
+      where
+        gres = lookupOccEnv rdr_env occ `orElse` []
+	nonlocal_gres = filterOut isLocalGRE gres
+
 
 insertGRE :: GlobalRdrElt -> [GlobalRdrElt] -> [GlobalRdrElt]
 insertGRE new_g [] = [new_g]

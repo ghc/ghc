@@ -304,30 +304,28 @@ extendGlobalRdrEnvRn shadowP avails new_fixities
 	      (rdr_env2, lcl_env2) | shadowP   = (rdr_env1, lcl_env1)
 				   | otherwise = (rdr_env,  lcl_env)
 
-	; (rdr_env', fix_env') <- foldlM extend (rdr_env2, fix_env) gres
+	      rdr_env3 = foldl extendGlobalRdrEnv rdr_env2 gres
+	      fix_env' = foldl extend_fix_env     fix_env  gres
+	      (rdr_env', dups) = findLocalDupsRdrEnv rdr_env3 new_occs
+
+	      gbl_env' = gbl_env { tcg_rdr_env = rdr_env', tcg_fix_env = fix_env' }
+	      
+	; mapM_ addDupDeclErr dups
 	
-	; let gbl_env' = gbl_env { tcg_rdr_env = rdr_env', tcg_fix_env = fix_env' }
 	; traceRn (text "extendGlobalRdrEnvRn" <+> (ppr new_fixities $$ ppr fix_env $$ ppr fix_env'))
 	; return (gbl_env', lcl_env2) }
   where
     gres = gresFromAvails LocalDef avails
 
-    extend envs@(cur_rdr_env, _cur_fix_env) gre
-	= let gres = lookupGlobalRdrEnv cur_rdr_env (nameOccName (gre_name gre)) 
-          in case filter isLocalGRE gres of -- Check for existing *local* defns 
-                  dup_gre:_ -> do { addDupDeclErr (gre_name dup_gre) (gre_name gre)
-	                          ; return envs }
-                  [] -> return (simple_extend envs gre)
-
-    simple_extend (rdr_env, fix_env) gre 
-      = (extendGlobalRdrEnv rdr_env gre, fix_env')
-      where
      	--  If there is a fixity decl for the gre, add it to the fixity env
+    extend_fix_env fix_env gre 
+      | Just (L _ fi) <- lookupFsEnv new_fixities (occNameFS occ)
+      = extendNameEnv fix_env name (FixItem occ fi)
+      | otherwise
+      = fix_env
+      where
 	name = gre_name gre
         occ  = nameOccName name
-        fix_env' = case lookupFsEnv new_fixities (occNameFS occ) of
-                     Nothing       -> fix_env
-                     Just (L _ fi) -> extendNameEnv fix_env name (FixItem occ fi)
 \end{code}
 
 @getLocalDeclBinders@ returns the names for an @HsDecl@.  It's
@@ -1398,16 +1396,16 @@ exportClashErr global_env name1 name2 ie1 ie2
                                    then (name1, ie1, name2, ie2)
                                    else (name2, ie2, name1, ie1)
 
-addDupDeclErr :: Name -> Name -> TcRn ()
-addDupDeclErr name_a name_b
-  = addErrAt (srcLocSpan loc2) $
-    vcat [ptext (sLit "Multiple declarations of") <+> quotes (ppr name1),
-	  ptext (sLit "Declared at:") <+> vcat [ppr (nameSrcLoc name1), ppr loc2]]
-  where
-    loc2 = nameSrcLoc name2
-    (name1,name2) | nameSrcLoc name_a > nameSrcLoc name_b = (name_b,name_a)
-		  | otherwise				  = (name_a,name_b)
+addDupDeclErr :: [Name] -> TcRn ()
+addDupDeclErr []
+  = panic "addDupDeclErr: empty list"
+addDupDeclErr names@(name : _)
+  = addErrAt (getSrcSpan (last sorted_names)) $
 	-- Report the error at the later location
+    vcat [ptext (sLit "Multiple declarations of") <+> quotes (ppr name),
+	  ptext (sLit "Declared at:") <+> vcat (map (ppr . nameSrcLoc) sorted_names)]
+  where
+    sorted_names = sortWith nameSrcLoc names
 
 dupExportWarn :: OccName -> IE RdrName -> IE RdrName -> SDoc
 dupExportWarn occ_name ie1 ie2
