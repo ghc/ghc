@@ -1186,6 +1186,7 @@ dynamic_flags = [
 	------ Optimisation flags ------------------------------------------
   ,  ( "O"	, NoArg (upd (setOptLevel 1)))
   ,  ( "Onot"	, NoArg (upd (setOptLevel 0))) -- deprecated
+  ,  ( "Odph"   , NoArg (upd setDPHOpt))
   ,  ( "O"	, OptIntSuffix (\mb_n -> upd (setOptLevel (mb_n `orElse` 1))))
 		-- If the number is missing, use 1
 
@@ -1579,6 +1580,24 @@ setOptLevel n dflags
 	    -- putStr "warning: -O conflicts with --interactive; -O ignored.\n"
    | otherwise
 	= updOptLevel n dflags
+
+
+-- -Odph is equivalent to
+--
+--    -O2                               optimise as much as possible
+--    -fno-method-sharing               sharing specialisation defeats fusion
+--                                      sometimes
+--    -fdicts-cheap                     always inline dictionaries
+--    -fmax-simplifier-iterations20     this is necessary sometimes
+--    -fno-spec-constr-threshold        run SpecConstr even for big loops
+--
+setDPHOpt :: DynFlags -> DynFlags
+setDPHOpt dflags = setOptLevel 2 (dflags { maxSimplIterations  = 20
+                                         , specConstrThreshold = Nothing
+                                         })
+                   `dopt_set`   Opt_DictsCheap
+                   `dopt_unset` Opt_MethodSharing
+
 
 
 setMainIs :: String -> DynP ()
