@@ -687,6 +687,10 @@ INLINE int __hscore_fstat(int fd, struct_stat *buf) {
 	return (fstat(fd,buf));
 }
 
+INLINE int __hscore_mkstemp(char *filetemplate) {
+    return (mkstemp(filetemplate));
+}
+
 // select-related stuff
 
 #if !defined(__MINGW32__)
