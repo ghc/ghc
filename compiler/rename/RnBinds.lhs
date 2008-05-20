@@ -28,11 +28,11 @@ import RnPat          (rnPatsAndThen_LocalRightwards, rnBindPat,
                        patSigErr)
                       
 import RnEnv
+import PrelNames	( mkUnboundName )
 import DynFlags	( DynFlag(..) )
 import Name
 import NameEnv
 import NameSet
-import PrelNames	( isUnboundName )
 import RdrName		( RdrName, rdrNameOcc )
 import SrcLoc
 import ListSetOps	( findDupsEq )
@@ -41,8 +41,8 @@ import Digraph		( SCC(..), stronglyConnComp )
 import Bag
 import Outputable
 import FastString
+import Data.List	( partition )
 import Maybes		( orElse )
-import Util		( filterOut )
 import Monad		( foldM, unless )
 \end{code}
 
@@ -189,7 +189,7 @@ rnTopBindsBoot :: HsValBindsLR Name RdrName -> RnM (HsValBinds Name, DefUses)
 -- Return a single HsBindGroup with empty binds and renamed signatures
 rnTopBindsBoot (ValBindsIn mbinds sigs)
   = do	{ checkErr (isEmptyLHsBinds mbinds) (bindsInHsBootFile mbinds)
-	; sigs' <- renameSigs okHsBootSig sigs
+	; sigs' <- renameSigs Nothing okHsBootSig sigs
 	; return (ValBindsOut [] sigs', usesOnly (hsSigsFVs sigs')) }
 rnTopBindsBoot b = pprPanic "rnTopBindsBoot" (ppr b)
 \end{code}
@@ -299,10 +299,10 @@ rnValBindsLHSFromDoc topP _original_bndrs doc (ValBindsIn mbinds sigs) = do
      return $ ValBindsIn mbinds' sigs
 rnValBindsLHSFromDoc _ _ _ b = pprPanic "rnValBindsLHSFromDoc" (ppr b)
 
--- assumes the LHS vars are in scope
--- general version used both from the top-level and for local things
+-- General version used both from the top-level and for local things
+-- Assumes the LHS vars are in scope
 --
--- does not bind the local fixity declarations
+-- Does not bind the local fixity declarations
 rnValBindsRHSGen :: (FreeVars -> FreeVars)  -- for trimming free var sets
                      -- The trimming function trims the free vars we attach to a
                      -- binding so that it stays reasonably small
@@ -310,19 +310,16 @@ rnValBindsRHSGen :: (FreeVars -> FreeVars)  -- for trimming free var sets
                  -> HsValBindsLR Name RdrName
                  -> RnM (HsValBinds Name, DefUses)
 
-rnValBindsRHSGen trim _bound_names (ValBindsIn mbinds sigs) = do
+rnValBindsRHSGen trim bound_names (ValBindsIn mbinds sigs) = do
    -- rename the sigs
    env <- getGblEnv
    traceRn (ptext (sLit "Rename sigs") <+> ppr (tcg_rdr_env env))
-   sigs' <- rename_sigs sigs
+   sigs' <- renameSigs (Just (mkNameSet bound_names)) okBindSig sigs
    -- rename the RHSes
    binds_w_dus <- mapBagM (rnBind (mkSigTvFn sigs') trim) mbinds
    let (anal_binds, anal_dus) = depAnalBinds binds_w_dus
        (valbind', valbind'_dus) = (ValBindsOut anal_binds sigs',
                                    usesOnly (hsSigsFVs sigs') `plusDU` anal_dus)
-   -- We do the check-sigs after renaming the bindings,
-   -- so that we have convenient access to the binders
-   check_sigs (okBindSig (duDefs anal_dus)) sigs'                       
    return (valbind', valbind'_dus)
 
 rnValBindsRHSGen _ _ b = pprPanic "rnValBindsRHSGen" (ppr b)
@@ -677,41 +674,26 @@ rnMethodBind _ _ _ b = pprPanic "rnMethodBind" (ppr b)
 \begin{enumerate}
 \item more than one sig for one thing;
 \item signatures given for things not bound here;
-\item with suitably flaggery, that all top-level things have type signatures.
 \end{enumerate}
 %
 At the moment we don't gather free-var info from the types in
 signatures.  We'd only need this if we wanted to report unused tyvars.
 
 \begin{code}
-renameSigs :: (LSig Name -> Bool) -> [LSig RdrName] -> RnM [LSig Name]
+renameSigs :: Maybe NameSet		-- If (Just ns) complain if the sig isn't for one of ns
+	   -> (Sig RdrName -> Bool) 	-- Complain about the wrong kind of signature if this is False
+	   -> [LSig RdrName]
+	   -> RnM [LSig Name]
 -- Renames the signatures and performs error checks
-renameSigs ok_sig sigs
-  = do	{ sigs' <- rename_sigs sigs
-	; check_sigs ok_sig sigs'
-	; return sigs' }
+renameSigs mb_names ok_sig sigs 
+  = do	{ let (good_sigs, bad_sigs) = partition (ok_sig . unLoc) sigs
+	; mapM_ unknownSigErr bad_sigs			-- Misplaced
+	; mapM_ dupSigDeclErr (findDupsEq eqHsSig sigs)	-- Duplicate
+	; sigs' <- mapM (wrapLocM (renameSig mb_names)) good_sigs
+	; return sigs' } 
 
 ----------------------
-rename_sigs :: [LSig RdrName] -> RnM [LSig Name]
-rename_sigs sigs = mapM (wrapLocM renameSig) sigs
-
-----------------------
-check_sigs :: (LSig Name -> Bool) -> [LSig Name] -> RnM ()
--- Used for class and instance decls, as well as regular bindings
-check_sigs ok_sig sigs = do
-	-- Check for (a) duplicate signatures
-	--           (b) signatures for things not in this group = do
-    traceRn (text "SIGS" <+> ppr sigs)
-    mapM_ unknownSigErr (filter (not . ok_sig) sigs')
-    mapM_ dupSigDeclErr (findDupsEq eqHsSig sigs')
-  where
-	-- Don't complain about an unbound name again
-    sigs' = filterOut bad_name sigs
-    bad_name sig = case sigName sig of
-			Just n -> isUnboundName n
-			_      -> False
-
--- We use lookupLocatedSigOccRn in the signatures, which is a little bit unsatisfactory
+-- We use lookupSigOccRn in the signatures, which is a little bit unsatisfactory
 -- because this won't work for:
 --	instance Foo T where
 --	  {-# INLINE op #-}
@@ -720,29 +702,77 @@ check_sigs ok_sig sigs = do
 -- is in scope.  (I'm assuming that Baz.op isn't in scope unqualified.)
 -- Doesn't seem worth much trouble to sort this.
 
-renameSig :: Sig RdrName -> RnM (Sig Name)
--- FixitSig is renamed elsewhere.
-renameSig (TypeSig v ty) = do
-    new_v <- lookupLocatedSigOccRn v
-    new_ty <- rnHsSigType (quotes (ppr v)) ty
-    return (TypeSig new_v new_ty)
+renameSig :: Maybe NameSet -> Sig RdrName -> RnM (Sig Name)
+-- FixitySig is renamed elsewhere.
+renameSig mb_names sig@(TypeSig v ty)
+  = do	{ new_v <- lookupSigOccRn mb_names sig v
+	; new_ty <- rnHsSigType (quotes (ppr v)) ty
+	; return (TypeSig new_v new_ty) }
 
-renameSig (SpecInstSig ty) = do
-    new_ty <- rnLHsType (text "A SPECIALISE instance pragma") ty
-    return (SpecInstSig new_ty)
+renameSig _ (SpecInstSig ty)
+  = do	{ new_ty <- rnLHsType (text "A SPECIALISE instance pragma") ty
+	; return (SpecInstSig new_ty) }
 
-renameSig (SpecSig v ty inl) = do
-    new_v <- lookupLocatedSigOccRn v
-    new_ty <- rnHsSigType (quotes (ppr v)) ty
-    return (SpecSig new_v new_ty inl)
+renameSig mb_names sig@(SpecSig v ty inl)
+  = do	{ new_v <- lookupSigOccRn mb_names sig v
+	; new_ty <- rnHsSigType (quotes (ppr v)) ty
+	; return (SpecSig new_v new_ty inl) }
 
-renameSig (InlineSig v s) = do
-    new_v <- lookupLocatedSigOccRn v
-    return (InlineSig new_v s)
+renameSig mb_names sig@(InlineSig v s)
+  = do	{ new_v <- lookupSigOccRn mb_names sig v
+	; return (InlineSig new_v s) }
 
-renameSig (FixSig (FixitySig v f)) = do
-    new_v <- lookupLocatedSigOccRn v
-    return (FixSig (FixitySig new_v f))
+renameSig mb_names sig@(FixSig (FixitySig v f))
+  = do	{ new_v <- lookupSigOccRn mb_names sig v
+	; return (FixSig (FixitySig new_v f)) }
+
+-- lookupSigOccRn is used for type signatures and pragmas
+-- Is this valid?
+--   module A
+--	import M( f )
+--	f :: Int -> Int
+--	f x = x
+-- It's clear that the 'f' in the signature must refer to A.f
+-- The Haskell98 report does not stipulate this, but it will!
+-- So we must treat the 'f' in the signature in the same way
+-- as the binding occurrence of 'f', using lookupBndrRn
+--
+-- However, consider this case:
+--	import M( f )
+--	f :: Int -> Int
+--	g x = x
+-- We don't want to say 'f' is out of scope; instead, we want to
+-- return the imported 'f', so that later on the reanamer will
+-- correctly report "misplaced type sig".
+
+lookupSigOccRn :: Maybe NameSet -> Sig RdrName -> Located RdrName -> RnM (Located Name)
+lookupSigOccRn mb_names sig (L loc v)
+  = do 	{ mb_n <- lookupBndrRn_maybe v
+	; case mb_n of {
+	    Just n  -> case mb_names of {
+			Nothing 		     -> return (L loc n) ;
+			Just ns | n `elemNameSet` ns -> return (L loc n) 
+				| otherwise -> bale_out_with local_msg } ;
+		          
+	    Nothing -> do
+    	{ mb_n <- lookupGreRn_maybe v
+	; case mb_n of
+	    Just _  -> bale_out_with import_msg
+	    Nothing -> bale_out_with empty
+	} }}
+  where
+    bale_out_with msg 
+	= do { addErr (sep [ ptext (sLit "The") <+> hsSigDoc sig
+				<+> ptext (sLit "for") <+> quotes (ppr v)
+			   , nest 2 $ ptext (sLit "lacks an accompanying binding")]
+		       $$ nest 2 msg)
+	     ; return (L loc (mkUnboundName v)) }
+
+    local_msg = parens $ ptext (sLit "The")  <+> hsSigDoc sig <+> ptext (sLit "must be given where")
+			 <+> quotes (ppr v) <+> ptext (sLit "is declared")
+
+    import_msg = parens $ ptext (sLit "You cannot give a") <+> hsSigDoc sig
+			  <+> ptext (sLit "an imported value")
 \end{code}
 
 
@@ -833,7 +863,7 @@ rnGRHS' ctxt (GRHS guards rhs)
 %************************************************************************
 
 \begin{code}
-dupSigDeclErr :: [LSig Name] -> RnM ()
+dupSigDeclErr :: [LSig RdrName] -> RnM ()
 dupSigDeclErr sigs@(L loc sig : _)
   = addErrAt loc $
 	vcat [ptext (sLit "Duplicate") <+> what_it_is <> colon,
@@ -843,22 +873,10 @@ dupSigDeclErr sigs@(L loc sig : _)
     ppr_sig (L loc sig) = ppr loc <> colon <+> ppr sig
 dupSigDeclErr [] = panic "dupSigDeclErr"
 
-unknownSigErr :: LSig Name -> RnM ()
+unknownSigErr :: LSig RdrName -> RnM ()
 unknownSigErr (L loc sig)
-  = do	{ mod <- getModule
-	; addErrAt loc $
-		vcat [sep [ptext (sLit "Misplaced") <+> what_it_is <> colon, ppr sig],
-		      extra_stuff mod sig] }
-  where
-    what_it_is = hsSigDoc sig
-    extra_stuff mod  (TypeSig (L _ n) _)
-	| nameIsLocalOrFrom mod n
-	= ptext (sLit "The type signature must be given where")
-		<+> quotes (ppr n) <+> ptext (sLit "is declared")
-	| otherwise
-	= ptext (sLit "You cannot give a type signature for an imported value")
-
-    extra_stuff _ _ = empty
+  = addErrAt loc $
+    sep [ptext (sLit "Misplaced") <+> hsSigDoc sig <> colon, ppr sig]
 
 methodBindErr :: HsBindLR RdrName RdrName -> SDoc
 methodBindErr mbind

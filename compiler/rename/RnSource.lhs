@@ -427,9 +427,10 @@ rnSrcInstDecl (InstDecl inst_ty mbinds uprags ats)
 	-- But the (unqualified) method names are in scope
     let 
 	binders = collectHsBindBinders mbinds'
-	ok_sig  = okInstDclSig (mkNameSet binders)
+	bndr_set = mkNameSet binders
     in
-    bindLocalNames binders (renameSigs ok_sig uprags)	`thenM` \ uprags' ->
+    bindLocalNames binders 
+	(renameSigs (Just bndr_set) okInstDclSig uprags)	`thenM` \ uprags' ->
 
     returnM (InstDecl inst_ty' mbinds' uprags' ats',
 	     meth_fvs `plusFV` at_fvs
@@ -731,7 +732,7 @@ rnTyClDecl (ClassDecl {tcdCtxt = context, tcdLName = cname,
 	     { context' <- rnContext cls_doc context
 	     ; fds' <- rnFds cls_doc fds
 	     ; (ats', ats_fvs) <- rnATs ats
-	     ; sigs' <- renameSigs okClsDclSig sigs
+	     ; sigs' <- renameSigs Nothing okClsDclSig sigs
 	     ; return   (tyvars', context', fds', ats', ats_fvs, sigs') }
 
 	-- No need to check for duplicate associated type decls

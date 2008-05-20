@@ -86,7 +86,7 @@ data HsBindLR idL idR
 -- Reason 1: Special case for type inference: see TcBinds.tcMonoBinds
 --
 -- Reason 2: instance decls can only have FunBinds, which is convenient
---	     If you change this, you'll need tochange e.g. rnMethodBinds
+--	     If you change this, you'll need to change e.g. rnMethodBinds
 
 -- But note that the form	f :: a->a = ...
 -- parses as a pattern binding, just like
@@ -465,25 +465,22 @@ isSpecPrag _             = False
 \end{code}
 
 \begin{code}
-okBindSig :: NameSet -> LSig Name -> Bool
-okBindSig ns sig = sigForThisGroup ns sig
+okBindSig :: Sig a -> Bool
+okBindSig _ = True
 
-okHsBootSig :: LSig Name -> Bool
-okHsBootSig (L _ (TypeSig  _ _)) = True
-okHsBootSig (L _ (FixSig _)) 	 = True
-okHsBootSig _                    = False
+okHsBootSig :: Sig a -> Bool
+okHsBootSig (TypeSig  _ _) = True
+okHsBootSig (FixSig _) 	   = True
+okHsBootSig _              = False
 
-okClsDclSig :: LSig Name -> Bool
-okClsDclSig (L _ (SpecInstSig _)) = False
-okClsDclSig _                     = True        -- All others OK
+okClsDclSig :: Sig a -> Bool
+okClsDclSig (SpecInstSig _) = False
+okClsDclSig _               = True        -- All others OK
 
-okInstDclSig :: NameSet -> LSig Name -> Bool
-okInstDclSig ns lsig@(L _ sig) = ok ns sig
-  where
-    ok _  (TypeSig _ _)   = False
-    ok _  (FixSig _)      = False
-    ok _  (SpecInstSig _) = True
-    ok ns _               = sigForThisGroup ns lsig
+okInstDclSig :: Sig a -> Bool
+okInstDclSig (TypeSig _ _)   = False
+okInstDclSig (FixSig _)      = False
+okInstDclSig _ 	             = True
 
 sigForThisGroup :: NameSet -> LSig Name -> Bool
 sigForThisGroup ns sig
@@ -539,7 +536,7 @@ hsSigDoc (FixSig {}) 		= ptext (sLit "fixity declaration")
 Signature equality is used when checking for duplicate signatures
 
 \begin{code}
-eqHsSig :: LSig Name -> LSig Name -> Bool
+eqHsSig :: Eq a => LSig a -> LSig a -> Bool
 eqHsSig (L _ (FixSig (FixitySig n1 _))) (L _ (FixSig (FixitySig n2 _))) = unLoc n1 == unLoc n2
 eqHsSig (L _ (TypeSig n1 _))         	(L _ (TypeSig n2 _))            = unLoc n1 == unLoc n2
 eqHsSig (L _ (InlineSig n1 _))          (L _ (InlineSig n2 _))          = unLoc n1 == unLoc n2
