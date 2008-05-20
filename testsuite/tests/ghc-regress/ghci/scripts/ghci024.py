@@ -15,8 +15,8 @@ def prepare024( opts ):
   for l in packages.splitlines():
     if re.match('^Loading package',l): 
       packagelist += [re.sub(r'^Loading package (\S*) .*$',r'\1',l)]
-  packagelist.reverse()
   packagelist += ['rts']
+  packagelist.sort()
 
   if config.unregisterised :
     mangling = 'no-'
@@ -230,8 +230,8 @@ active language flags:
 active package flags: none
 packages currently loaded:
   base
-  integer
   ghc-prim
+  integer
   rts
 -- :set -package ghc
 active package flags:
