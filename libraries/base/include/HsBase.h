@@ -687,9 +687,11 @@ INLINE int __hscore_fstat(int fd, struct_stat *buf) {
 	return (fstat(fd,buf));
 }
 
+#if !defined(__MINGW32__)
 INLINE int __hscore_mkstemp(char *filetemplate) {
     return (mkstemp(filetemplate));
 }
+#endif
 
 #if !defined(__MINGW32__) && !defined(irix_HOST_OS)
 INLINE int __hscore_getrlimit(int resource, struct rlimit *rlim) {
