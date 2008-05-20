@@ -785,7 +785,8 @@ instFun orig fun subst tv_theta_prs
 	; doStupidChecks fun ty_theta_prs'
 
 		-- Now do normal instantiation
-	; result <- go True fun ty_theta_prs' 
+        ; method_sharing <- doptM Opt_MethodSharing
+	; result <- go method_sharing True fun ty_theta_prs' 
 	; traceTc (text "instFun result" <+> ppr result)
 	; return result
 	}
@@ -793,24 +794,24 @@ instFun orig fun subst tv_theta_prs
     subst_pr (tvs, theta) 
 	= (substTyVars subst tvs, substTheta subst theta)
 
-    go _ fun [] = do {traceTc (text "go _ fun [] returns" <+> ppr fun) ; return fun }
+    go _ _ fun [] = do {traceTc (text "go _ _ fun [] returns" <+> ppr fun) ; return fun }
 
-    go True (HsVar fun_id) ((tys,theta) : prs)
-	| want_method_inst theta
+    go method_sharing True (HsVar fun_id) ((tys,theta) : prs)
+	| want_method_inst method_sharing theta
 	= do { traceTc (text "go (HsVar fun_id) ((tys,theta) : prs) | want_method_inst theta")
 	     ; meth_id <- newMethodWithGivenTy orig fun_id tys
-	     ; go False (HsVar meth_id) prs }
+	     ; go method_sharing False (HsVar meth_id) prs }
 		-- Go round with 'False' to prevent further use
 		-- of newMethod: see Note [Multiple instantiation]
 
-    go _ fun ((tys, theta) : prs)
+    go method_sharing _ fun ((tys, theta) : prs)
 	= do { co_fn <- instCall orig tys theta
 	     ; traceTc (text "go yields co_fn" <+> ppr co_fn)
-	     ; go False (HsWrap co_fn fun) prs }
+	     ; go method_sharing False (HsWrap co_fn fun) prs }
 
 	-- See Note [No method sharing]
-    want_method_inst theta =  not (null theta)	-- Overloaded
-		   	   && not opt_NoMethodSharing
+    want_method_inst method_sharing theta =  not (null theta)	-- Overloaded
+		   	                  && method_sharing
 \end{code}
 
 Note [Multiple instantiation]

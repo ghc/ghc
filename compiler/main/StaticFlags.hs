@@ -38,7 +38,6 @@ module StaticFlags (
 	opt_Parallel,
 
 	-- optimisation opts
-	opt_NoMethodSharing, 
 	opt_NoStateHack,
 	opt_SpecInlineJoinPoints,
 	opt_CprOff,
@@ -317,8 +316,6 @@ opt_SpecInlineJoinPoints :: Bool
 opt_SpecInlineJoinPoints	= lookUp  (fsLit "-fspec-inline-join-points")
 opt_NoStateHack :: Bool
 opt_NoStateHack			= lookUp  (fsLit "-fno-state-hack")
-opt_NoMethodSharing :: Bool
-opt_NoMethodSharing		= lookUp  (fsLit "-fno-method-sharing")
 opt_CprOff :: Bool
 opt_CprOff			= lookUp  (fsLit "-fcpr-off")
 	-- Switch off CPR analysis in the new demand analyser

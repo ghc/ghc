@@ -248,6 +248,7 @@ data DynFlag
    | Opt_DoEtaReduction
    | Opt_CaseMerge
    | Opt_UnboxStrictFields
+   | Opt_MethodSharing
    | Opt_DictsCheap
    | Opt_RewriteRules
    | Opt_Vectorise
@@ -554,6 +555,8 @@ defaultDynFlags =
 
             Opt_ImplicitPrelude,
             Opt_MonomorphismRestriction,
+
+            Opt_MethodSharing,
 
             Opt_DoAsmMangling,
 
@@ -1271,6 +1274,7 @@ fFlags = [
   ( "do-eta-reduction",                 Opt_DoEtaReduction ),
   ( "case-merge",                       Opt_CaseMerge ),
   ( "unbox-strict-fields",              Opt_UnboxStrictFields ),
+  ( "method-sharing",                   Opt_MethodSharing ),
   ( "dicts-cheap",                      Opt_DictsCheap ),
   ( "excess-precision",                 Opt_ExcessPrecision ),
   ( "asm-mangling",                     Opt_DoAsmMangling ),
