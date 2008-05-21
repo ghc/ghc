@@ -15,7 +15,7 @@ Typechecking class declarations
 
 module TcClassDcl ( tcClassSigs, tcClassDecl2, 
 		    getGenericInstances, 
-		    MethodSpec, tcMethodBind, mkMethodBind, 
+		    MethodSpec, tcMethodBind, mkMethId,
 		    tcAddDeclCtxt, badMethodErr, badATErr, omittedATWarn
 		  ) where
 
@@ -162,67 +162,9 @@ tcClassSig dm_env (L loc (TypeSig (L _ op_name) op_hs_ty))
 
 %************************************************************************
 %*									*
-\subsection[Default methods]{Default methods}
+		Class Declarations
 %*									*
 %************************************************************************
-
-The default methods for a class are each passed a dictionary for the
-class, so that they get access to the other methods at the same type.
-So, given the class decl
-\begin{verbatim}
-class Foo a where
-	op1 :: a -> Bool
-	op2 :: Ord b => a -> b -> b -> b
-
-	op1 x = True
-	op2 x y z = if (op1 x) && (y < z) then y else z
-\end{verbatim}
-we get the default methods:
-\begin{verbatim}
-defm.Foo.op1 :: forall a. Foo a => a -> Bool
-defm.Foo.op1 = /\a -> \dfoo -> \x -> True
-
-defm.Foo.op2 :: forall a. Foo a => forall b. Ord b => a -> b -> b -> b
-defm.Foo.op2 = /\ a -> \ dfoo -> /\ b -> \ dord -> \x y z ->
-		  if (op1 a dfoo x) && (< b dord y z) then y else z
-\end{verbatim}
-
-When we come across an instance decl, we may need to use the default
-methods:
-\begin{verbatim}
-instance Foo Int where {}
-\end{verbatim}
-gives
-\begin{verbatim}
-const.Foo.Int.op1 :: Int -> Bool
-const.Foo.Int.op1 = defm.Foo.op1 Int dfun.Foo.Int
-
-const.Foo.Int.op2 :: forall b. Ord b => Int -> b -> b -> b
-const.Foo.Int.op2 = defm.Foo.op2 Int dfun.Foo.Int
-
-dfun.Foo.Int :: Foo Int
-dfun.Foo.Int = (const.Foo.Int.op1, const.Foo.Int.op2)
-\end{verbatim}
-Notice that, as with method selectors above, we assume that dictionary
-application is curried, so there's no need to mention the Ord dictionary
-in const.Foo.Int.op2 (or the type variable).
-
-\begin{verbatim}
-instance Foo a => Foo [a] where {}
-
-dfun.Foo.List :: forall a. Foo a -> Foo [a]
-dfun.Foo.List
-  = /\ a -> \ dfoo_a ->
-    let rec
-	op1 = defm.Foo.op1 [a] dfoo_list
-	op2 = defm.Foo.op2 [a] dfoo_list
-	dfoo_list = (op1, op2)
-    in
-	dfoo_list
-\end{verbatim}
-
-@tcClassDecls2@ generates bindings for polymorphic default methods
-(generic default methods have by now turned into instance declarations)
 
 \begin{code}
 tcClassDecl2 :: LTyClDecl Name		-- The class declaration
@@ -270,11 +212,13 @@ tcDefMeth origin clas tyvars binds_in sig_fn prag_fn sel_id
 	        cls_pred    = mkClassPred clas inst_tys
 		local_dm_id = mkDefaultMethodId dm_name dm_ty
 
-	; (_, meth_info) <- mkMethodBind origin clas inst_tys binds_in (sel_id, DefMeth)
 	; loc <- getInstLoc origin
 	; this_dict <- newDictBndr loc cls_pred
-	; (defm_bind, insts_needed) <- getLIE (tcMethodBind tyvars [cls_pred] [this_dict]
-							    sig_fn prag_fn meth_info)
+	; (_, meth_id) <- mkMethId origin clas sel_id inst_tys
+	; (defm_bind, insts_needed) <- getLIE $
+		tcMethodBind origin tyvars [cls_pred] this_dict []
+			     sig_fn prag_fn binds_in
+			     (sel_id, DefMeth) meth_id
     
 	; addErrCtxt (defltMethCtxt clas) $ do
     
@@ -292,14 +236,13 @@ tcDefMeth origin clas tyvars binds_in sig_fn prag_fn sel_id
 	-- We'll have an inline pragma on the local binding, made by tcMethodBind
 	-- but that's not enough; we want one on the global default method too
 	-- Specialisations, on the other hand, belong on the thing inside only, I think
-	; let (_,dm_inst_id,_) = meth_info
-	      sel_name	       = idName sel_id
+	; let sel_name	       = idName sel_id
 	      inline_prags     = filter isInlineLSig (prag_fn sel_name)
-	; prags <- tcPrags dm_inst_id inline_prags
+	; prags <- tcPrags meth_id inline_prags
 
 	; let full_bind = AbsBinds  tyvars
 		    		    [instToId this_dict]
-		    		    [(tyvars, local_dm_id, dm_inst_id, prags)]
+		    		    [(tyvars, local_dm_id, meth_id, prags)]
 		    		    (dict_binds `unionBags` defm_bind)
 	; return (noLoc full_bind, [local_dm_id]) }}
 
@@ -325,23 +268,80 @@ type MethodSpec = (Id, 			-- Global selector Id
 		   LHsBind Name)	-- Binding for the method
 
 tcMethodBind 
-	:: [TcTyVar]		-- Skolemised type variables for the
+	:: InstOrigin
+	-> [TcTyVar]		-- Skolemised type variables for the
 				--  	enclosing class/instance decl. 
 				--  	They'll be signature tyvars, and we
 				--  	want to check that they don't get bound
 				-- Also they are scoped, so we bring them into scope
 				-- Always equal the range of the type envt
 	-> TcThetaType		-- Available theta; it's just used for the error message
-	-> [Inst]		-- Available from context, used to simplify constraints 
-				-- 	from the method body
+	-> Inst			-- Current dictionary (this_dict)
+	-> [Inst]		-- Other stuff available from context, used to simplify 
+				--   constraints from the method body (exclude this_dict)
 	-> TcSigFun		-- For scoped tyvars, indexed by sel_name
 	-> TcPragFun		-- Pragmas (e.g. inline pragmas), indexed by sel_name
-	-> MethodSpec		-- Details of this method
+        -> LHsBinds Name	-- Method binding (pick the right one from in here)
+	-> ClassOpItem
+	-> TcId			-- The method Id
 	-> TcM (LHsBinds Id)
 
-tcMethodBind inst_tyvars inst_theta avail_insts sig_fn prag_fn
-	     (sel_id, meth_id, meth_bind)
-  = recoverM (return emptyLHsBinds) $ do
+tcMethodBind origin inst_tyvars inst_theta 
+	     this_dict extra_insts 
+	     sig_fn prag_fn meth_binds
+	     (sel_id, dm_info) meth_id
+  | Just user_bind <- find_bind sel_name meth_name meth_binds
+  = 		-- If there is a user-supplied method binding, typecheck it
+    tc_method_bind inst_tyvars inst_theta (this_dict:extra_insts) 
+		   sig_fn prag_fn
+		   sel_id meth_id user_bind
+
+  | otherwise	-- The user didn't supply a method binding, so we have to make 
+		-- up a default binding, in a way depending on the default-method info
+  = case dm_info of
+      NoDefMeth -> do	{ warn <- doptM Opt_WarnMissingMethods		
+                        ; warnTc (isInstDecl origin  
+				   && warn   -- Warn only if -fwarn-missing-methods
+				   && reportIfUnused (getOccName sel_id))
+					     -- Don't warn about _foo methods
+			         (omittedMethodWarn sel_id) 
+			; return (unitBag $ L loc (VarBind meth_id error_rhs)) }
+
+      DefMeth ->   do	{	-- An polymorphic default method
+				-- Might not be imported, but will be an OrigName
+			  dm_name <- lookupImportedName (mkDefMethRdrName sel_id)
+			; dm_id   <- tcLookupId dm_name
+				-- Note [Default methods in instances]
+			; return (unitBag $ L loc (VarBind meth_id (mk_dm_app dm_id))) }
+
+      GenDefMeth -> ASSERT( isInstDecl origin )	-- We never get here from a class decl
+    		    do	{ meth_bind <- mkGenericDefMethBind clas inst_tys sel_id meth_name
+			; tc_method_bind inst_tyvars inst_theta (this_dict:extra_insts) 
+					 sig_fn prag_fn
+					 sel_id meth_id meth_bind }
+
+  where
+    meth_name = idName meth_id
+    sel_name  = idName sel_id
+    loc       = getSrcSpan meth_id
+    (clas, inst_tys) = getDictClassTys this_dict
+
+    this_dict_id = instToId this_dict
+    error_id     = L loc (HsVar nO_METHOD_BINDING_ERROR_ID) 
+    error_id_app = mkLHsWrap (WpTyApp (idType meth_id)) error_id
+    error_rhs    = mkHsApp error_id_app $ L loc $
+	    	   HsLit (HsStringPrim (mkFastString error_msg))
+    error_msg    = showSDoc (hcat [ppr loc, text "|", ppr sel_id ])
+
+    mk_dm_app dm_id	-- dm tys inst_dict
+	= mkLHsWrap (WpApp this_dict_id `WpCompose` mkWpTyApps inst_tys) 
+		    (L loc (HsVar dm_id))
+
+
+---------------------------
+tc_method_bind inst_tyvars inst_theta avail_insts sig_fn prag_fn
+	      sel_id meth_id meth_bind
+  = recoverM (return emptyLHsBinds) $
 	-- If anything fails, recover returning no bindings.
 	-- This is particularly useful when checking the default-method binding of
 	-- a class decl. If we don't recover, we don't add the default method to
@@ -349,78 +349,50 @@ tcMethodBind inst_tyvars inst_theta avail_insts sig_fn prag_fn
 
     	-- Check the bindings; first adding inst_tyvars to the envt
 	-- so that we don't quantify over them in nested places
+
+    do	{ let sel_name  = idName sel_id
+              meth_name = idName meth_id
+              meth_sig_fn name = ASSERT( name == meth_name ) sig_fn sel_name
+		-- The meth_bind metions the meth_name, but sig_fn is indexed by sel_name
+
+	; ((meth_bind, mono_bind_infos), meth_lie)
+	       <- tcExtendTyVarEnv inst_tyvars      $
+	          tcExtendIdEnv [meth_id]           $ -- In scope for tcInstSig
+	          addErrCtxt (methodCtxt sel_id)    $
+	          getLIE                            $
+	          tcMonoBinds [meth_bind] meth_sig_fn Recursive
+
+		-- Now do context reduction.   We simplify wrt both the local tyvars
+		-- and the ones of the class/instance decl, so that there is
+		-- no problem with
+		--	class C a where
+		--	  op :: Eq a => a -> b -> a
+		--
+		-- We do this for each method independently to localise error messages
+
+	; let [(_, Just sig, local_meth_id)] = mono_bind_infos
+	      loc = sig_loc sig
+
+	; addErrCtxtM (sigCtxt sel_id inst_tyvars inst_theta (idType meth_id)) $ do
+	{ meth_dicts <- newDictBndrs loc (sig_theta sig)
+	; let meth_tvs   = sig_tvs sig
+              all_tyvars = meth_tvs ++ inst_tyvars
+              all_insts  = avail_insts ++ meth_dicts
+
+	; lie_binds <- tcSimplifyCheck loc all_tyvars all_insts meth_lie
+
+	; checkSigTyVars all_tyvars
 	
-    let sel_name = idName sel_id
-	meth_sig_fn meth_name = ASSERT( meth_name == idName meth_id ) sig_fn sel_name
-	-- The meth_bind metions the meth_name, but sig_fn is indexed by sel_name
-
-    ((meth_bind, mono_bind_infos), meth_lie)
-       <- tcExtendTyVarEnv inst_tyvars      $
-          tcExtendIdEnv [meth_id]           $ -- In scope for tcInstSig
-          addErrCtxt (methodCtxt sel_id)    $
-          getLIE                            $
-          tcMonoBinds [meth_bind] meth_sig_fn Recursive
-
-	-- Now do context reduction.   We simplify wrt both the local tyvars
-	-- and the ones of the class/instance decl, so that there is
-	-- no problem with
-	--	class C a where
-	--	  op :: Eq a => a -> b -> a
-	--
-	-- We do this for each method independently to localise error messages
-
-    let
-	[(_, Just sig, local_meth_id)] = mono_bind_infos
-	loc = sig_loc sig
-
-    addErrCtxtM (sigCtxt sel_id inst_tyvars inst_theta (idType meth_id)) $ do
-     meth_dicts <- newDictBndrs loc (sig_theta sig)
-     let
-	meth_tvs   = sig_tvs sig
-	all_tyvars = meth_tvs ++ inst_tyvars
-	all_insts  = avail_insts ++ meth_dicts
-
-     lie_binds <- tcSimplifyCheck loc all_tyvars all_insts meth_lie
-
-     checkSigTyVars all_tyvars
-
-     prags <- tcPrags meth_id (prag_fn sel_name)
-     let
-	poly_meth_bind = noLoc $ AbsBinds meth_tvs
+	; prags <- tcPrags meth_id (prag_fn sel_name)
+	; let poly_meth_bind = noLoc $ AbsBinds meth_tvs
 				  (map instToId meth_dicts)
      				  [(meth_tvs, meth_id, local_meth_id, prags)]
 				  (lie_binds `unionBags` meth_bind)
 
-     return (unitBag poly_meth_bind)
+	; return (unitBag poly_meth_bind) }}
 
 
-mkMethodBind :: InstOrigin
-	     -> Class -> [TcType]	-- Class and instance types
-	     -> LHsBinds Name	-- Method binding (pick the right one from in here)
-	     -> ClassOpItem
-	     -> TcM (Maybe Inst,		-- Method inst
-		     MethodSpec)
--- Find the binding for the specified method, or make
--- up a suitable default method if it isn't there
-
-mkMethodBind origin clas inst_tys meth_binds (sel_id, dm_info) = do
-    (mb_inst, meth_id) <- mkMethId origin clas sel_id inst_tys
-    let
-	meth_name  = idName meth_id
-
-	-- Figure out what method binding to use
-	-- If the user suppplied one, use it, else construct a default one
-    loc <- getSrcSpanM
-    meth_bind
-       <- case find_bind (idName sel_id) meth_name meth_binds of
-             Just user_bind -> return user_bind
-             Nothing        -> do
-                rhs <- mkDefMethRhs origin clas inst_tys sel_id loc dm_info
-                     -- Not infix decl
-                return (noLoc $ mkFunBind (noLoc meth_name) [mkSimpleMatch [] rhs])
-
-    return (mb_inst, (sel_id, meth_id, meth_bind))
-
+---------------------------
 mkMethId :: InstOrigin -> Class 
 	 -> Id -> [TcType]	-- Selector, and instance types
 	 -> TcM (Maybe Inst, Id)
@@ -463,58 +435,26 @@ mkMethId origin clas sel_id inst_tys
 
 	return (Nothing, meth_id)
 
-     -- The user didn't supply a method binding, 
-     -- so we have to make up a default binding
-     -- The RHS of a default method depends on the default-method info
-mkDefMethRhs origin clas inst_tys sel_id loc DefMeth = do
-     -- An polymorphic default method
-    dm_name <- lookupImportedName (mkDefMethRdrName sel_id)
-	-- Might not be imported, but will be an OrigName
-    traceRn (text "mkDefMeth" <+> ppr dm_name)
-    return (nlHsVar dm_name)
+---------------------------
+-- The renamer just puts the selector ID as the binder in the method binding
+-- but we must use the method name; so we substitute it here.  Crude but simple.
+find_bind :: Name -> Name 	-- Selector and method name
+          -> LHsBinds Name 		-- A group of bindings
+	  -> Maybe (LHsBind Name)	-- The binding, with meth_name replacing sel_name
+find_bind sel_name meth_name binds
+  = foldlBag mplus Nothing (mapBag f binds)
+  where 
+	f (L loc1 bind@(FunBind { fun_id = L loc2 op_name })) | op_name == sel_name
+		 = Just (L loc1 (bind { fun_id = L loc2 meth_name }))
+	f _other = Nothing
 
-mkDefMethRhs origin clas inst_tys sel_id loc NoDefMeth = do
-	-- No default method
-	-- Warn only if -fwarn-missing-methods
-    warn <- doptM Opt_WarnMissingMethods
-    warnTc (isInstDecl origin
-	   && warn
-	   && reportIfUnused (getOccName sel_id))
-   	   (omittedMethodWarn sel_id)
-    return error_rhs
-  where
-    error_rhs  = noLoc $ HsLam (mkMatchGroup [mkSimpleMatch wild_pats simple_rhs])
-    simple_rhs = nlHsApp (nlHsVar (getName nO_METHOD_BINDING_ERROR_ID)) 
-	    	       (nlHsLit (HsStringPrim (mkFastString error_msg)))
-    error_msg = showSDoc (hcat [ppr loc, text "|", ppr sel_id ])
-
-	-- When the type is of form t1 -> t2 -> t3
-	-- make a default method like (\ _ _ -> noMethBind "blah")
-	-- rather than simply        (noMethBind "blah")
-	-- Reason: if t1 or t2 are higher-ranked types we get n
-	--	   silly ambiguity messages.
-	-- Example:	f :: (forall a. Eq a => a -> a) -> Int
-	--		f = error "urk"
-	-- Here, tcSub tries to force (error "urk") to have the right type,
-	-- thus:	f = \(x::forall a. Eq a => a->a) -> error "urk" (x t)
-	-- where 't' is fresh ty var.  This leads directly to "ambiguous t".
-	-- 
-	-- NB: technically this changes the meaning of the default-default
-	--     method slightly, because `seq` can see the lambdas.  Oh well.
-    (_,_,tau1)    = tcSplitSigmaTy (idType sel_id)
-    (_,_,tau2)    = tcSplitSigmaTy tau1
-	-- Need two splits because the  selector can have a type like
-	-- 	forall a. Foo a => forall b. Eq b => ...
-    (arg_tys, _) = tcSplitFunTys tau2
-    wild_pats	 = [nlWildPat | ty <- arg_tys]
-
-mkDefMethRhs origin clas inst_tys sel_id loc GenDefMeth 
+---------------------------
+mkGenericDefMethBind clas inst_tys sel_id meth_name
   = 	-- A generic default method
     	-- If the method is defined generically, we can only do the job if the
 	-- instance declaration is for a single-parameter type class with
 	-- a type constructor applied to type arguments in the instance decl
 	-- 	(checkTc, so False provokes the error)
-    ASSERT( isInstDecl origin )	-- We never get here from a class decl
     do	{ checkTc (isJust maybe_tycon)
 	 	  (badGenericInstance sel_id (notSimple inst_tys))
 	; checkTc (tyConHasGenerics tycon)
@@ -527,7 +467,7 @@ mkDefMethRhs origin clas inst_tys sel_id loc GenDefMeth
 
 		-- Rename it before returning it
 	; (rn_rhs, _) <- rnLExpr rhs
-	; return rn_rhs }
+        ; return (noLoc $ mkFunBind (noLoc meth_name) [mkSimpleMatch [] rn_rhs]) }
   where
     rhs = mkGenericRhs sel_id clas_tyvar tycon
 
@@ -535,9 +475,9 @@ mkDefMethRhs origin clas inst_tys sel_id loc GenDefMeth
 	  -- case we require that the instance decl is for a single-parameter
 	  -- type class with type variable arguments:
 	  --	instance (...) => C (T a b)
-    clas_tyvar    = ASSERT (not (null (classTyVars clas))) head (classTyVars clas)
-    Just tycon	  = maybe_tycon
-    maybe_tycon   = case inst_tys of 
+    clas_tyvar  = ASSERT (not (null (classTyVars clas))) head (classTyVars clas)
+    Just tycon	= maybe_tycon
+    maybe_tycon = case inst_tys of 
 			[ty] -> case tcSplitTyConApp_maybe ty of
 				  Just (tycon, arg_tys) | all tcIsTyVarTy arg_tys -> Just tycon
 				  other						  -> Nothing
@@ -548,16 +488,73 @@ isInstDecl (SigOrigin (ClsSkol _)) = False
 \end{code}
 
 
-\begin{code}
--- The renamer just puts the selector ID as the binder in the method binding
--- but we must use the method name; so we substitute it here.  Crude but simple.
-find_bind sel_name meth_name binds
-  = foldlBag mplus Nothing (mapBag f binds)
-  where 
-	f (L loc1 bind@(FunBind { fun_id = L loc2 op_name })) | op_name == sel_name
-		 = Just (L loc1 (bind { fun_id = L loc2 meth_name }))
-	f _other = Nothing
-\end{code}
+Note [Default methods]
+~~~~~~~~~~~~~~~~~~~~~~~
+The default methods for a class are each passed a dictionary for the
+class, so that they get access to the other methods at the same type.
+So, given the class decl
+
+    class Foo a where
+	op1 :: a -> Bool
+	op2 :: forall b. Ord b => a -> b -> b -> b
+
+	op1 x = True
+	op2 x y z = if (op1 x) && (y < z) then y else z
+
+we get the default methods:
+
+    $dmop1 :: forall a. Foo a => a -> Bool
+    $dmop1 = /\a -> \dfoo -> \x -> True
+
+    $dmop2 :: forall a. Foo a => forall b. Ord b => a -> b -> b -> b
+    $dmop2 = /\ a -> \ dfoo -> /\ b -> \ dord -> \x y z ->
+       		  if (op1 a dfoo x) && (< b dord y z) then y else z
+
+When we come across an instance decl, we may need to use the default methods:
+
+    instance Foo Int where {}
+
+    $dFooInt :: Foo Int
+    $dFooInt = MkFoo ($dmop1 Int $dFooInt) 
+		     ($dmop2 Int $dFooInt)
+
+Notice that, as with method selectors above, we assume that dictionary
+application is curried, so there's no need to mention the Ord dictionary
+in the application of $dmop2.
+
+   instance Foo a => Foo [a] where {}
+
+   $dFooList :: forall a. Foo a -> Foo [a]
+   $dFooList = /\ a -> \ dfoo_a ->
+	      let rec
+		op1 = defm.Foo.op1 [a] dfoo_list
+		op2 = defm.Foo.op2 [a] dfoo_list
+		dfoo_list = MkFoo ($dmop1 [a] dfoo_list)
+				  ($dmop2 [a] dfoo_list)
+	      in
+	      dfoo_list
+
+Note [Default methods in instances]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this
+
+   class Baz v x where
+      foo :: x -> x
+      foo y = y
+
+   instance Baz Int Int
+
+From the class decl we get
+
+   $dmfoo :: forall v x. Baz v x => x -> x
+
+Notice that the type is ambiguous.  That's fine, though. The instance decl generates
+
+   $dBazIntInt = MkBaz ($dmfoo Int Int $dBazIntInt)
+
+BUT this does mean we must generate the dictionary translation directly, rather
+than generating source-code and type-checking it.  That was the bug ing
+Trac #1061. In any case it's less work to generate the translated version!
 
 
 %************************************************************************

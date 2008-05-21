@@ -626,10 +626,10 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = VanillaInst monobinds uprags })
         wanted_sc_insts = wanted_sc_eqs   ++ sc_dicts
         given_sc_eqs    = map (updateEqInstCoercion (mkGivenCo . TyVarTy . fromWantedCo "tcInstDecl2") ) wanted_sc_eqs
         given_sc_insts  = given_sc_eqs   ++ sc_dicts
-        avail_insts     = [this_dict] ++ dfun_insts ++ given_sc_insts
+        avail_insts     = dfun_insts ++ given_sc_insts
 
     (meth_ids, meth_binds) <- tcMethods origin clas inst_tyvars'
-                                 dfun_theta' inst_tys' avail_insts
+                                 dfun_theta' inst_tys' this_dict avail_insts
                                  op_items monobinds uprags
 
     -- Figure out bindings for the superclass context
@@ -697,7 +697,7 @@ mkMetaCoVars = mapM eqPredToCoVar
     eqPredToCoVar _                = panic "TcInstDcls.mkMetaCoVars"
 
 tcMethods origin clas inst_tyvars' dfun_theta' inst_tys'
-          avail_insts op_items monobinds uprags = do
+          this_dict extra_insts op_items monobinds uprags = do
     -- Check that all the method bindings come from this class
     let
         sel_names = [idName sel_id | (sel_id, _) <- op_items]
@@ -707,9 +707,9 @@ tcMethods origin clas inst_tyvars' dfun_theta' inst_tys'
 
     -- Make the method bindings
     let
-        mk_method_bind = mkMethodBind origin clas inst_tys' monobinds
+        mk_method_id (sel_id, _) = mkMethId origin clas sel_id inst_tys'
 
-    (meth_insts, meth_infos) <- mapAndUnzipM mk_method_bind op_items
+    (meth_insts, meth_ids) <- mapAndUnzipM mk_method_id op_items
 
         -- And type check them
         -- It's really worth making meth_insts available to the tcMethodBind
@@ -742,14 +742,14 @@ tcMethods origin clas inst_tyvars' dfun_theta' inst_tys'
         -- looks like 'op at Int'.  But they are not the same.
     let
         prag_fn        = mkPragFun uprags
-        all_insts      = avail_insts ++ catMaybes meth_insts
+        all_insts      = extra_insts ++ catMaybes meth_insts
         sig_fn n       = Just []        -- No scoped type variables, but every method has
                                         -- a type signature, in effect, so that we check
                                         -- the method has the right type
-        tc_method_bind = tcMethodBind inst_tyvars' dfun_theta' all_insts sig_fn prag_fn
-        meth_ids       = [meth_id | (_,meth_id,_) <- meth_infos]
+        tc_method_bind = tcMethodBind origin inst_tyvars' dfun_theta' this_dict 
+				      all_insts sig_fn prag_fn monobinds
 
-    meth_binds_s <- mapM tc_method_bind meth_infos
+    meth_binds_s <- zipWithM tc_method_bind op_items meth_ids
 
     return (meth_ids, unionManyBags meth_binds_s)
 \end{code}
