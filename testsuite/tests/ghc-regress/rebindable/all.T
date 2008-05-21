@@ -15,7 +15,7 @@ test('rebindable5', normal, compile_and_run, [''])
 
 # rebindable6 has become expected failures
 # following Trac #1537
-test('rebindable6', normal, compile_fail, [''])
+test('rebindable6', if_compiler_lt('ghc', '6.9', skip), compile_fail, [''])
 
 test('rebindable7', normal, compile_and_run, [''])
 test('rebindable8', if_compiler_lt('ghc', '6.9', expect_broken(1537)),

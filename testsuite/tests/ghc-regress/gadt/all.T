@@ -67,7 +67,7 @@ test('set', normal, compile, [''])
 
 test('scoped', expect_broken(1823), compile, [''])
 
-test('gadt-escape1', normal, compile_fail, [''])
+test('gadt-escape1', if_compiler_lt('ghc', '6.9', skip), compile_fail, [''])
 
 # New ones from Dimitrios
 
