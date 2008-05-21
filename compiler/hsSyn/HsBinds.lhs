@@ -338,7 +338,7 @@ data HsWrapper
 				--	= (\a1..an \x1..xn. [])
 
   | WpCast Coercion		-- A cast:  [] `cast` co
-				-- Guaranteedn not the identity coercion
+				-- Guaranteed not the identity coercion
 
   | WpApp Var			-- [] d		the 'd' is a type-class dictionary
   | WpTyApp Type		-- [] t		the 't' is a type or corecion
