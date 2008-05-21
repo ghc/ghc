@@ -1,2 +1,3 @@
 
-mod67.hs:3:0: Not in scope:  `f'
+mod67.hs:3:0:
+    The type signature for `f' lacks an accompanying binding

@@ -1,2 +1,4 @@
 
-rnfail025.hs:3:0: Not in scope: `sig_without_a_defn'
+rnfail025.hs:3:0:
+    The type signature for `sig_without_a_defn'
+      lacks an accompanying binding

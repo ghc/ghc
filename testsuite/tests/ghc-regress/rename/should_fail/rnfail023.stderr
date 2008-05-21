@@ -1,6 +1,9 @@
 
-rnfail023.hs:7:0: Not in scope: `f'
+rnfail023.hs:7:0:
+    The type signature for `f' lacks an accompanying binding
 
-rnfail023.hs:8:11: Not in scope: `f'
+rnfail023.hs:8:0:
+    The INLINE pragma for `f' lacks an accompanying binding
 
-rnfail023.hs:14:6: Not in scope: `g'
+rnfail023.hs:14:6:
+    The type signature for `g' lacks an accompanying binding
