@@ -9,13 +9,6 @@ This stuff is only used for source-code decls; it's recorded in interface
 files for imported data types.
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module TcTyDecls(
         calcRecFlags,
         calcClassCycles, calcSynCycles
@@ -252,7 +245,7 @@ calcRecFlags boot_details tyclss
         = concatMap (mk_nt_edges1 nt) (tcTyConsOfType (new_tc_rhs nt))
                         -- tyConsOfType looks through synonyms
 
-    mk_nt_edges1 nt tc
+    mk_nt_edges1 _ tc
         | tc `elem` new_tycons = [tc]           -- Loop
                 -- At this point we know that either it's a local *data* type,
                 -- or it's imported.  Either way, it can't form part of a newtype cycle
@@ -280,11 +273,13 @@ calcRecFlags boot_details tyclss
                 -- or it's imported.  Either way, it can't form part of a cycle
         | otherwise = []
 
+new_tc_rhs :: TyCon -> Type
 new_tc_rhs tc = snd (newTyConRhs tc)    -- Ignore the type variables
 
+getTyCon :: TyThing -> TyCon
 getTyCon (ATyCon tc) = tc
 getTyCon (AClass cl) = classTyCon cl
-getTyCon other       = panic "getTyCon"
+getTyCon _           = panic "getTyCon"
 
 findLoopBreakers :: [(TyCon, [TyCon])] -> [Name]
 -- Finds a set of tycons that cut all loops
@@ -310,14 +305,14 @@ tcTyConsOfType ty
   where
      go :: Type -> NameEnv TyCon  -- The NameEnv does duplicate elim
      go ty | Just ty' <- tcView ty = go ty'
-     go (TyVarTy v)                = emptyNameEnv
+     go (TyVarTy _)                = emptyNameEnv
      go (TyConApp tc tys)          = go_tc tc tys
      go (AppTy a b)                = go a `plusNameEnv` go b
      go (FunTy a b)                = go a `plusNameEnv` go b
      go (PredTy (IParam _ ty))     = go ty
      go (PredTy (ClassP cls tys))  = go_tc (classTyCon cls) tys
      go (ForAllTy _ ty)            = go ty
-     go other                      = panic "tcTyConsOfType"
+     go _                          = panic "tcTyConsOfType"
 
      go_tc tc tys = extendNameEnv (go_s tys) (tyConName tc) tc
      go_s tys = foldr (plusNameEnv . go) emptyNameEnv tys
