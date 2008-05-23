@@ -1160,7 +1160,8 @@ dynamic_flags = [
   ,  ( "ddump-mod-cycles",     	 setDumpFlag Opt_D_dump_mod_cycles)
   ,  ( "ddump-view-pattern-commoning", setDumpFlag Opt_D_dump_view_pattern_commoning)
   ,  ( "ddump-to-file",          setDumpFlag Opt_DumpToFile)
-  ,  ( "ddump-hi-diffs",         NoArg (setDynFlag Opt_D_dump_hi_diffs))
+  ,  ( "ddump-hi-diffs",         setDumpFlag Opt_D_dump_hi_diffs)
+
   ,  ( "dcore-lint",       	 NoArg (setDynFlag Opt_DoCoreLinting))
   ,  ( "dstg-lint",        	 NoArg (setDynFlag Opt_DoStgLinting))
   ,  ( "dcmm-lint",		 NoArg (setDynFlag Opt_DoCmmLinting))
@@ -1485,9 +1486,16 @@ unSetDynFlag f = upd (\dfs -> dopt_unset dfs f)
 --------------------------
 setDumpFlag :: DynFlag -> OptKind DynP
 setDumpFlag dump_flag 
-  = NoArg (setDynFlag Opt_ForceRecomp >> setDynFlag dump_flag)
+  | force_recomp   = NoArg (setDynFlag Opt_ForceRecomp >> setDynFlag dump_flag)
+  | otherwise      = NoArg (setDynFlag dump_flag)
+  where
 	-- Whenver we -ddump, switch off the recompilation checker,
 	-- else you don't see the dump!
+        -- However, certain dumpy-things are really interested in what's going
+        -- on during recompilation checking, so in those cases we
+        -- don't want to turn it off.
+   force_recomp = dump_flag `notElem` [Opt_D_dump_if_trace, 
+                                       Opt_D_dump_hi_diffs]
 
 setVerboseCore2Core :: DynP ()
 setVerboseCore2Core = do setDynFlag Opt_ForceRecomp
