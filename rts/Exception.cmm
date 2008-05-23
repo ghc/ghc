@@ -73,6 +73,14 @@ INFO_TABLE_RET( stg_unblockAsyncExceptionszh_ret, RET_SMALL )
          */
         Sp_adj(1);
 #endif
+        STK_CHK_GEN( WDS(2), R1_PTR, stg_unblockAsyncExceptionszh_ret_info);
+        Sp_adj(-2);
+        Sp(1) = R1;
+#ifdef REG_R1
+        Sp(0) = stg_gc_unpt_r1_info;
+#else
+        Sp(0) = stg_ut_1_0_unreg_info;
+#endif
         SAVE_THREAD_STATE();
         (r) = foreign "C" maybePerformBlockedException (MyCapability() "ptr", 
     					              CurrentTSO "ptr") [R1];
