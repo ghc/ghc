@@ -74,8 +74,10 @@ ifeq "$(GhcLibsWithObjectIO)" "YES"
 SUBDIRS += $(wildcard ObjectIO)
 endif
 SUBDIRS += $(wildcard parallel)
-SUBDIRS += $(wildcard ndp)
+SUBDIRS_BUILD += $(wildcard ndp)
 endif
+
+SUBDIRS += $(SUBDIRS_BUILD)
 
 # -----------------------------------------------------------------------------
 
@@ -293,9 +295,9 @@ stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).%: %/setup/Setup
 # needs to be done.  However, we're careful not to overwrite GNUmakefile
 # if it hasn't changed, so that dependency-generation isn't forced
 # every time.
-# I doubt that the makefile way will work with ndp, so filter it out and use
-# a rule below to call build.library.ndp instead
-$(foreach SUBDIR,$(filter-out ndp,$(SUBDIRS)),make.library.$(SUBDIR)):\
+# Packages in $(SUBDIRS_BUILD) need to use the build.* rules instead of
+# make.*, so filter them out and use an alternate rule below instead.
+$(foreach SUBDIR,$(filter-out $(SUBDIRS_BUILD),$(SUBDIRS)),make.library.$(SUBDIR)):\
 make.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
                 %/setup/Setup ifBuildable/ifBuildable installPackage/installPackage
 	if $(IFBUILDABLE) $*; then \
@@ -310,8 +312,9 @@ make.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
 
 MAKEFILE_LOCAL = $(FPTOOLS_TOP_ABS)/libraries/Makefile.local
 
-# Hack for ndp, as described above
-make.library.ndp: build.library.ndp
+# Alternate rule, as described above
+$(foreach SUBDIR,$(SUBDIRS_BUILD),make.library.$(SUBDIR)):\
+make.library.%: build.library.%
 
 # Build the library using 'setup build' (not the default)
 $(foreach SUBDIR,$(SUBDIRS),build.library.$(SUBDIR)):\
