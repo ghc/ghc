@@ -141,8 +141,7 @@ endif
 
 BOOTSTRAP_LIBS = Cabal filepath
 BOOTSTRAP_STAMPS = $(addprefix stamp/bootstrapping.,$(BOOTSTRAP_LIBS))
-BOOTSTRAP_INC_1_UP = -DCABAL_VERSION=1,3 $(addprefix -i../bootstrapping.,$(BOOTSTRAP_LIBS))
-BOOTSTRAP_INC_2_UP = -DCABAL_VERSION=1,3 $(addprefix -i../../bootstrapping.,$(BOOTSTRAP_LIBS))
+BOOTSTRAP_INC = -DCABAL_VERSION=1,3 $(addprefix -i$(FPTOOLS_TOP_ABS)/libraries/bootstrapping.,$(BOOTSTRAP_LIBS))
 DEPLOYMENT_OPTS = $(addprefix -optc, $(MACOSX_DEPLOYMENT_CC_OPTS)) \
 		  $(addprefix -optl, $(MACOSX_DEPLOYMENT_LD_OPTS))
 
@@ -172,7 +171,7 @@ $(foreach SUBDIR,$(SUBDIRS),$(SUBDIR)/setup/Setup): \
 	mkdir $*/setup
 	$(CP) $*/Setup.*hs $*/setup
 	cd $*/setup && $(GHC) $(CABAL_GHC_FLAGS) --make Setup.*hs -o Setup \
-	                      $(BOOTSTRAP_INC_2_UP)
+	                      $(BOOTSTRAP_INC)
 
 installPackage/installPackage: installPackage.hs $(BOOTSTRAP_STAMPS)
 	-$(RM) -rf installPackage
@@ -181,11 +180,11 @@ installPackage/installPackage: installPackage.hs $(BOOTSTRAP_STAMPS)
 ifeq "$(stage)" "2"
 	cd installPackage && ../$(HC) $(CABAL_GHC_FLAGS) \
 	                            --make installPackage -o installPackage \
-	                            $(BOOTSTRAP_INC_1_UP) $(DEPLOYMENT_OPTS)
+	                            $(BOOTSTRAP_INC) $(DEPLOYMENT_OPTS)
 else
 	cd installPackage && $(GHC) $(CABAL_GHC_FLAGS) \
 	                            --make installPackage -o installPackage \
-	                            $(BOOTSTRAP_INC_1_UP)
+	                            $(BOOTSTRAP_INC)
 endif
 # TODO: The conditional is yucky, but we need to be able to build with stage1
 #       for bindists and as installPackages/ has no Makefile, it seems hard
@@ -201,6 +200,8 @@ ifeq "$(stage)" "2"
 else
 	cd ifBuildable && $(GHC) -Wall --make ifBuildable -o ifBuildable
 endif
+
+IFBUILDABLE=ifBuildable/ifBuildable $(FPTOOLS_TOP_ABS)/libraries/boot-packages
 
 $(BOOTSTRAP_STAMPS): stamp/bootstrapping.%:
 	$(RM) -rf bootstrapping.$*
@@ -266,12 +267,12 @@ ALL_CONFIGURE_FLAGS = \
 	           --docdir=$(NONEXISTENT) \
 			   --haddockdir=$(NONEXISTENT) \
 	           --htmldir=$(NONEXISTENT) \
-	           --with-compiler=../../compiler/stage1/ghc-inplace \
-	           --with-hc-pkg=../../utils/ghc-pkg/ghc-pkg-inplace \
-	           --with-hsc2hs=../../utils/hsc2hs/hsc2hs-inplace \
+	           --with-compiler=$(FPTOOLS_TOP_ABS)/compiler/stage1/ghc-inplace \
+	           --with-hc-pkg=$(FPTOOLS_TOP_ABS)/utils/ghc-pkg/ghc-pkg-inplace \
+	           --with-hsc2hs=$(FPTOOLS_TOP_ABS)/utils/hsc2hs/hsc2hs-inplace \
 	           --with-ld=$(LD) \
 	           --haddock-options="--use-contents=../index.html \
-	                           --use-index=../doc-index.html" \
+	                              --use-index=../doc-index.html" \
 	           $(FLAGGED_CONFIGURE_ARGS) \
 	           --configure-option=--with-cc=$(CC)
 
@@ -279,6 +280,7 @@ $(foreach SUBDIR,$(SUBDIRS), \
 		  stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).$(SUBDIR)): \
 stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).%: %/setup/Setup
 	-$(RM) -f stamp/configure.library.*.$* $*/unbuildable
+	$(MKDIRHIER) `dirname $@`
 	( cd $* && setup/Setup configure $(ALL_CONFIGURE_FLAGS) ) \
 	      && touch $@ || touch $*/unbuildable
 # We don't touch $@ if configure failed as we would prefer to try
@@ -296,15 +298,17 @@ stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).%: %/setup/Setup
 $(foreach SUBDIR,$(filter-out ndp,$(SUBDIRS)),make.library.$(SUBDIR)):\
 make.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
                 %/setup/Setup ifBuildable/ifBuildable installPackage/installPackage
-	if ifBuildable/ifBuildable $*; then \
+	if $(IFBUILDABLE) $*; then \
 	  cd $* && \
-	  cmp -s ../Makefile.local Makefile.local || cp ../Makefile.local .; \
+	  cmp -s $(MAKEFILE_LOCAL) Makefile.local || cp $(MAKEFILE_LOCAL) .; \
 	  mv GNUmakefile GNUmakefile.tmp; \
 	  setup/Setup makefile -f GNUmakefile; \
 	  cmp -s GNUmakefile GNUmakefile.tmp && mv GNUmakefile.tmp GNUmakefile; \
 	  $(MAKE) $(MFLAGS) && \
 	  setup/Setup register --inplace; \
 	fi
+
+MAKEFILE_LOCAL = $(FPTOOLS_TOP_ABS)/libraries/Makefile.local
 
 # Hack for ndp, as described above
 make.library.ndp: build.library.ndp
@@ -313,7 +317,7 @@ make.library.ndp: build.library.ndp
 $(foreach SUBDIR,$(SUBDIRS),build.library.$(SUBDIR)):\
 build.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
                  %/setup/Setup ifBuildable/ifBuildable
-	if ifBuildable/ifBuildable $*; then \
+	if $(IFBUILDABLE) $*; then \
 	  cd $* && \
 	  setup/Setup build $(addprefix --ghc-option=,$(GhcLibHcOpts)); \
 	  setup/Setup register --inplace; \
@@ -334,14 +338,14 @@ endif
 $(foreach SUBDIR,$(SUBDIRS),doc.library.$(SUBDIR)):\
 doc.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
                %/setup/Setup ifBuildable/ifBuildable
-	if ifBuildable/ifBuildable $*; then \
+	if $(IFBUILDABLE) $*; then \
 	  cd $* && setup/Setup haddock --html-location='../$$pkg' \
 	                               $(CABAL_HADDOCK_FLAGS); \
 	fi
 ifneq "$(HSCOLOUR)" ""
 # We use */src rather than $*/src due to the $(INTEGER_LIBRARY)/integer
 # mismatch
-	if ifBuildable/ifBuildable $*; then cp hscolour.css $*/dist/doc/html/*/src/; fi
+	if $(IFBUILDABLE) $*; then cp hscolour.css $*/dist/doc/html/*/src/; fi
 endif
 
 .PHONY: distclean clean clean.library.%
@@ -398,9 +402,9 @@ install-docs:
 
 $(foreach SUBDIR,$(SUBDIRS),install.library.$(SUBDIR)): \
 install.library.%: installPackage/installPackage ifBuildable/ifBuildable
-	if ifBuildable/ifBuildable $*; then \
+	if $(IFBUILDABLE) $*; then \
 	  cd $* && \
-	  ../installPackage/installPackage install '$(GHC_PKG_PROG)' '$(DESTDIR)$(libdir)/package.conf' '$(DESTDIR)' '$(prefix)' '$(iprefix)' '$(ibindir)' '$(ilibdir)' '$(ilibexecdir)' '$(idynlibdir)' '$(idatadir)' '$(idocdir)' '$(ihtmldir)' '$(ihaddockdir)' ; \
+	  $(FPTOOLS_TOP_ABS)/libraries/installPackage/installPackage install '$(GHC_PKG_PROG)' '$(DESTDIR)$(libdir)/package.conf' '$(DESTDIR)' '$(prefix)' '$(iprefix)' '$(ibindir)' '$(ilibdir)' '$(ilibexecdir)' '$(idynlibdir)' '$(idatadir)' '$(idocdir)' '$(ihtmldir)' '$(ihaddockdir)' ; \
 	fi
 
 .PHONY: binary-dist binary-dist.library.%
@@ -422,7 +426,7 @@ endif
 
 $(foreach SUBDIR,$(SUBDIRS),binary-dist.library.$(SUBDIR)): \
 binary-dist.library.%:
-	if ifBuildable/ifBuildable $*; then \
+	if $(IFBUILDABLE) $*; then \
 	  $(MKDIRHIER) $(BIN_DIST_LIBDIR)/$*; \
 	  cd $* && \
 	  cp    $*.cabal      $(BIN_DIST_LIBDIR)/$* && \

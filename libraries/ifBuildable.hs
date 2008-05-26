@@ -12,24 +12,25 @@ import System.IO
 main :: IO ()
 main = do args <- getArgs
           case args of
-              [package] ->
-                  doit package
+              [bootPackagesFile, package] ->
+                  doit bootPackagesFile package
               _ ->
-                  error "Syntax: ifBuildable <package>"
+                  error "Syntax: ifBuildable <boot-packages-file> <package>"
 
-doit :: String -> IO ()
-doit package
+doit :: FilePath -> String -> IO ()
+doit bootPackagesFile package
  = do setCurrentDirectory package
       unbuildable <- doesFileExist "unbuildable"
       if not unbuildable
          then exitWith ExitSuccess
-         else do mustBeBuildables <- getMustBeBuildablePackages
+         else do mustBeBuildables <- getMustBeBuildables bootPackagesFile
                  if package `elem` mustBeBuildables
                      then exitWith ExitSuccess
                      else do hPutStrLn stderr "Warning: Package is unbuildable"
                              exitWith (ExitFailure 1)
 
-getMustBeBuildablePackages :: IO [String]
-getMustBeBuildablePackages
- = do xs <- readFile "../boot-packages"
+getMustBeBuildables :: FilePath -> IO [String]
+getMustBeBuildables bootPackagesFile
+ = do xs <- readFile bootPackagesFile
       return $ filter ("editline" /=) $ lines xs
+
