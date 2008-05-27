@@ -56,6 +56,7 @@ test('rnfail051', if_compiler_lt('ghc', '6.9', skip), compile_fail, [''])
 test('rnfail052', normal, compile_fail, [''])
 test('rnfail053', normal, compile_fail, [''])
 test('rnfail054', normal, compile_fail, [''])
+test('rnfail055', normal, multimod_compile_fail, ['RnFail055','-v0'])
 
 test('rn_dup', normal, compile_fail, [''])
 
