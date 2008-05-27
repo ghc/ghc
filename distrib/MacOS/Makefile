@@ -71,7 +71,7 @@ PACKAGEMAKER=/Developer/usr/bin/packagemaker
 #   and permissions for all files (as well as prevent correct setting of those
 #   for files that are not in the content list).
 framework-pkg:
-	-chmod -R u+w $(DSTROOT)
+	-chmod -fR u+w $(DSTROOT)
 	-$(RM) -rf $(DSTROOT)
 	mkdir -p $(TOOLS_SYSTEM)
 	cp installer-scripts/Uninstaller $(TOOLS_SYSTEM)
