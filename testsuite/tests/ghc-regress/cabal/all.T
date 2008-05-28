@@ -1,6 +1,10 @@
 setTestOpts(compose(alone,only_compiler_types(['ghc'])))
 
-test('ghcpkg01', compose(ignore_output, skip_if_fast), run_command, ['$MAKE ghcpkg01'])
+test('ghcpkg01',
+     composes([ignore_output,
+               skip_if_fast,
+               if_compiler_lt('ghc', '6.9', skip)]),
+     run_command, ['$MAKE ghcpkg01'])
 clean(['local.package.conf', 'local.package.conf.old'])
 test('ghcpkg02', compose(ignore_output, skip_if_fast), run_command, ['$MAKE ghcpkg02'])
 clean(['package.conf.copy', 'package.conf.copy.old'])
