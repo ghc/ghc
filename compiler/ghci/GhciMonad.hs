@@ -20,6 +20,7 @@ import HscTypes
 import SrcLoc
 import Module
 import ObjLink
+import Linker
 import StaticFlags
 
 import Data.Maybe
@@ -295,11 +296,8 @@ GLOBAL_VAR(stderr_ptr, error "no stderr_ptr", Ptr ())
 initInterpBuffering :: GHC.Session -> IO ()
 initInterpBuffering session
  = do -- make sure these are linked
-      mb_hval1 <- GHC.compileExpr session "System.IO.stdout"
-      mb_hval2 <- GHC.compileExpr session "System.IO.stderr"
-      mb_hval3 <- GHC.compileExpr session "System.IO.stdin"
-      when (any isNothing [mb_hval1,mb_hval2,mb_hval3]) $
-        panic "interactiveUI:setBuffering"
+      dflags <- GHC.getSessionDynFlags session
+      initDynLinker dflags
 
         -- ToDo: we should really look up these names properly, but
         -- it's a fiddle and not all the bits are exposed via the GHC
