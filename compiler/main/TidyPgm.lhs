@@ -310,7 +310,7 @@ tidyProgram hsc_env
 		"Tidy Core Rules"
 		(pprRules tidy_rules)
 
-        ; let dir_imp_mods = map fst (moduleEnvElts dir_imps)
+        ; let dir_imp_mods = moduleEnvKeys dir_imps
 
 	; return (CgGuts { cg_module   = mod, 
 			   cg_tycons   = alg_tycons,

@@ -216,7 +216,7 @@ deSugarModule hsc_env mod_summary tc_result
 makeSimpleIface :: HscEnv -> Maybe ModIface -> TcGblEnv -> ModDetails
                 -> IO (ModIface,Bool)
 makeSimpleIface hsc_env maybe_old_iface tc_result details = do
-  mkIfaceTc hsc_env maybe_old_iface details tc_result
+  mkIfaceTc hsc_env (fmap mi_iface_hash maybe_old_iface) details tc_result
 
 -- | Make a 'ModDetails' from the results of typechecking.  Used when
 -- typechecking only, as opposed to full compilation.
@@ -548,7 +548,7 @@ hscSimpleIface tc_result
        details <- mkBootModDetailsTc hsc_env tc_result
        (new_iface, no_change) 
            <- {-# SCC "MkFinalIface" #-}
-              mkIfaceTc hsc_env maybe_old_iface details tc_result
+              mkIfaceTc hsc_env (fmap mi_iface_hash maybe_old_iface) details tc_result
        -- And the answer is ...
        dumpIfaceStats hsc_env
        return (new_iface, no_change, details, tc_result)
@@ -573,7 +573,8 @@ hscNormalIface simpl_result
 	    -- until after code output
        (new_iface, no_change)
 		<- {-# SCC "MkFinalIface" #-}
-		   mkIface hsc_env maybe_old_iface details simpl_result
+		   mkIface hsc_env (fmap mi_iface_hash maybe_old_iface)
+                         details simpl_result
 	-- Emit external core
        -- This should definitely be here and not after CorePrep,
        -- because CorePrep produces unqualified constructor wrapper declarations,

@@ -40,16 +40,13 @@ import {-# SOURCE #-} TypeRep( TyThing )
 import OccName
 import Module
 import SrcLoc
-import UniqFM
 import Unique
 import Maybes
 import Binary
-import FastMutInt
 import FastTypes
 import FastString
 import Outputable
 
-import Data.IORef
 import Data.Array
 \end{code}
 
@@ -309,20 +306,9 @@ instance NamedThing Name where
 
 \begin{code}
 instance Binary Name where
-   put_ bh name = do
-      case getUserData bh of { 
-        UserData { ud_symtab_map = symtab_map_ref,
-                   ud_symtab_next = symtab_next } -> do
-         symtab_map <- readIORef symtab_map_ref
-         case lookupUFM symtab_map name of
-           Just (off,_) -> put_ bh off
-           Nothing -> do
-              off <- readFastMutInt symtab_next
-              writeFastMutInt symtab_next (off+1)
-              writeIORef symtab_map_ref
-                  $! addToUFM symtab_map name (off,name)
-              put_ bh off          
-     }
+   put_ bh name =
+      case getUserData bh of 
+        UserData{ ud_put_name = put_name } -> put_name bh name
 
    get bh = do
         i <- get bh

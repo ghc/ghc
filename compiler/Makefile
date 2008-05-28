@@ -572,7 +572,7 @@ SRC_MKDEPENDC_OPTS += -I$(GHC_INCLUDE_DIR)
 
 SRC_HC_OPTS += \
   -cpp -fglasgow-exts -fno-generics -Rghc-timing \
-  -I. -Iparser
+  -I. -Iparser -Iutil
 
 # Omitted: 	-I$(GHC_INCLUDE_DIR)
 # We should have -I$(GHC_INCLUDE_DIR) in SRC_HC_OPTS, 

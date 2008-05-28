@@ -20,11 +20,13 @@ module Binary
 --   closeBin,
 
    seekBin,
+   seekBy,
    tellBin,
    castBin,
 
    writeBinMem,
    readBinMem,
+   fingerprintBinMem,
 
    isEOFBin,
 
@@ -47,7 +49,7 @@ module Binary
 
    UserData(..), getUserData, setUserData,
    newReadState, newWriteState,
-   putDictionary, getDictionary,
+   putDictionary, getDictionary, putFS,
   ) where
 
 #include "HsVersions.h"
@@ -57,21 +59,19 @@ module Binary
 
 import {-# SOURCE #-} Name (Name)
 import FastString
-import Unique
 import Panic
 import UniqFM
 import FastMutInt
 import Util
+import Fingerprint
 
 import Foreign
-import Data.Array.IO
 import Data.Array
 import Data.Bits
 import Data.Int
 import Data.Word
 import Data.IORef
 import Data.Char                ( ord, chr )
-import Data.Array.Base          ( unsafeRead, unsafeWrite )
 import Control.Monad            ( when )
 import System.IO as IO
 import System.IO.Unsafe         ( unsafeInterleaveIO )
@@ -92,7 +92,7 @@ import System.IO                ( openBinaryFile )
 openBinaryFile f mode = openFileEx f (BinaryMode mode)
 #endif
 
-type BinArray = IOUArray Int Word8
+type BinArray = ForeignPtr Word8
 
 ---------------------------------------------------------------
 -- BinHandle
@@ -168,7 +168,7 @@ openBinMem :: Int -> IO BinHandle
 openBinMem size
  | size <= 0 = error "Data.Binary.openBinMem: size must be >= 0"
  | otherwise = do
-   arr <- newArray_ (0,size-1)
+   arr <- mallocForeignPtrBytes size
    arr_r <- newIORef arr
    ix_r <- newFastMutInt
    writeFastMutInt ix_r 0
@@ -190,6 +190,20 @@ seekBin h@(BinMem _ ix_r sz_r _) (BinPtr p) = do
         then do expandBin h p; writeFastMutInt ix_r p
         else writeFastMutInt ix_r p
 
+seekBy :: BinHandle -> Int -> IO ()
+seekBy (BinIO _ ix_r h) off = do
+  ix <- readFastMutInt ix_r
+  let ix' = ix + off
+  writeFastMutInt ix_r ix'
+  hSeek h AbsoluteSeek (fromIntegral ix')
+seekBy h@(BinMem _ ix_r sz_r _) off = do
+  sz <- readFastMutInt sz_r
+  ix <- readFastMutInt ix_r
+  let ix' = ix + off
+  if (ix' >= sz)
+        then do expandBin h ix'; writeFastMutInt ix_r ix'
+        else writeFastMutInt ix_r ix'
+
 isEOFBin :: BinHandle -> IO Bool
 isEOFBin (BinMem _ ix_r sz_r _) = do
   ix <- readFastMutInt ix_r
@@ -203,7 +217,7 @@ writeBinMem (BinMem _ ix_r _ arr_r) fn = do
   h <- openBinaryFile fn WriteMode
   arr <- readIORef arr_r
   ix  <- readFastMutInt ix_r
-  hPutArray h arr ix
+  withForeignPtr arr $ \p -> hPutBuf h p ix
   hClose h
 
 readBinMem :: FilePath -> IO BinHandle
@@ -212,10 +226,10 @@ readBinMem filename = do
   h <- openBinaryFile filename ReadMode
   filesize' <- hFileSize h
   let filesize = fromIntegral filesize'
-  arr <- newArray_ (0,filesize-1)
-  count <- hGetArray h arr filesize
-  when (count /= filesize)
-       (error ("Binary.readBinMem: only read " ++ show count ++ " bytes"))
+  arr <- mallocForeignPtrBytes (filesize*2)
+  count <- withForeignPtr arr $ \p -> hGetBuf h p filesize
+  when (count /= filesize) $
+       error ("Binary.readBinMem: only read " ++ show count ++ " bytes")
   hClose h
   arr_r <- newIORef arr
   ix_r <- newFastMutInt
@@ -224,15 +238,23 @@ readBinMem filename = do
   writeFastMutInt sz_r filesize
   return (BinMem noUserData ix_r sz_r arr_r)
 
+fingerprintBinMem :: BinHandle -> IO Fingerprint
+fingerprintBinMem (BinIO _ _ _) = error "Binary.md5BinMem: not a memory handle"
+fingerprintBinMem (BinMem _ ix_r _ arr_r) = do
+  arr <- readIORef arr_r
+  ix <- readFastMutInt ix_r
+  withForeignPtr arr $ \p -> fingerprintData p ix
+
 -- expand the size of the array to include a specified offset
 expandBin :: BinHandle -> Int -> IO ()
 expandBin (BinMem _ _ sz_r arr_r) off = do
    sz <- readFastMutInt sz_r
    let sz' = head (dropWhile (<= off) (iterate (* 2) sz))
    arr <- readIORef arr_r
-   arr' <- newArray_ (0,sz'-1)
-   sequence_ [ unsafeRead arr i >>= unsafeWrite arr' i
-             | i <- [ 0 .. sz-1 ] ]
+   arr' <- mallocForeignPtrBytes sz'
+   withForeignPtr arr $ \old ->
+     withForeignPtr arr' $ \new ->
+       copyBytes new old sz 
    writeFastMutInt sz_r sz'
    writeIORef arr_r arr'
    when debugIsOn $
@@ -253,7 +275,7 @@ putWord8 h@(BinMem _ ix_r sz_r arr_r) w = do
         then do expandBin h ix
                 putWord8 h w
         else do arr <- readIORef arr_r
-                unsafeWrite arr ix w
+                withForeignPtr arr $ \p -> pokeByteOff p ix w
                 writeFastMutInt ix_r (ix+1)
                 return ()
 putWord8 (BinIO _ ix_r h) w = do
@@ -269,7 +291,7 @@ getWord8 (BinMem _ ix_r sz_r arr_r) = do
     when (ix >= sz) $
         ioError (mkIOError eofErrorType "Data.Binary.getWord8" Nothing Nothing)
     arr <- readIORef arr_r
-    w <- unsafeRead arr ix
+    w <- withForeignPtr arr $ \p -> peekByteOff p ix
     writeFastMutInt ix_r (ix+1)
     return w
 getWord8 (BinIO _ ix_r h) = do
@@ -581,43 +603,26 @@ data UserData =
         ud_symtab :: SymbolTable,
 
         -- for *serialising* only:
-        ud_dict_next :: !FastMutInt, -- The next index to use
-        ud_dict_map  :: !(IORef (UniqFM (Int,FastString))),
-                                -- indexed by FastString
-
-        ud_symtab_next :: !FastMutInt, -- The next index to use
-        ud_symtab_map  :: !(IORef (UniqFM (Int,Name)))
-                                -- indexed by Name
+        ud_put_name :: BinHandle -> Name       -> IO (),
+        ud_put_fs   :: BinHandle -> FastString -> IO ()
    }
 
 newReadState :: Dictionary -> IO UserData
 newReadState dict = do
-  dict_next <- newFastMutInt
-  dict_map <- newIORef (undef "dict_map")
-  symtab_next <- newFastMutInt
-  symtab_map <- newIORef (undef "symtab_map")
-  return UserData { ud_dict = dict,
-                    ud_symtab = undef "symtab",
-                    ud_dict_next = dict_next,
-                    ud_dict_map = dict_map,
-                    ud_symtab_next = symtab_next,
-                    ud_symtab_map = symtab_map
+  return UserData { ud_dict     = dict,
+                    ud_symtab   = undef "symtab",
+                    ud_put_name = undef "put_name",
+                    ud_put_fs   = undef "put_fs"
                    }
 
-newWriteState :: IO UserData
-newWriteState = do
-  dict_next <- newFastMutInt
-  writeFastMutInt dict_next 0
-  dict_map <- newIORef emptyUFM
-  symtab_next <- newFastMutInt
-  writeFastMutInt symtab_next 0
-  symtab_map <- newIORef emptyUFM
-  return UserData { ud_dict = undef "dict",
-                    ud_symtab = undef "symtab",
-                    ud_dict_next = dict_next,
-                    ud_dict_map = dict_map,
-                    ud_symtab_next = symtab_next,
-                    ud_symtab_map = symtab_map
+newWriteState :: (BinHandle -> Name       -> IO ()) 
+              -> (BinHandle -> FastString -> IO ())
+              -> IO UserData
+newWriteState put_name put_fs = do
+  return UserData { ud_dict     = undef "dict",
+                    ud_symtab   = undef "symtab",
+                    ud_put_name = put_name,
+                    ud_put_fs   = put_fs
                    }
 
 noUserData :: a
@@ -693,20 +698,16 @@ getFS bh = do
 
 instance Binary FastString where
   put_ bh f =
-    case getUserData bh of {
-        UserData { ud_dict_next = j_r,
-                   ud_dict_map = out_r} -> do
-    out <- readIORef out_r
-    let uniq = getUnique f
-    case lookupUFM out uniq of
-        Just (j, _)  -> put_ bh j
-        Nothing -> do
-           j <- readFastMutInt j_r
-           put_ bh j
-           writeFastMutInt j_r (j + 1)
-           writeIORef out_r $! addToUFM out uniq (j, f)
-    }
+    case getUserData bh of
+        UserData { ud_put_fs = put_fs } -> put_fs bh f
 
   get bh = do
         j <- get bh
         return $! (ud_dict (getUserData bh) ! j)
+
+-- Here to avoid loop
+
+instance Binary Fingerprint where
+  put_ h (Fingerprint w1 w2) = do put_ h w1; put_ h w2
+  get  h = do w1 <- get h; w2 <- get h; return (Fingerprint w1 w2)
+

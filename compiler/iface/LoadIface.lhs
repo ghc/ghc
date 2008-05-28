@@ -51,6 +51,7 @@ import BinIface
 import Panic
 import Util
 import FastString
+import Fingerprint
 
 import Control.Monad
 import Data.List
@@ -323,7 +324,7 @@ addDeclsToPTE :: PackageTypeEnv -> [(Name,TyThing)] -> PackageTypeEnv
 addDeclsToPTE pte things = extendNameEnvList pte things
 
 loadDecls :: Bool
-	  -> [(Version, IfaceDecl)]
+	  -> [(Fingerprint, IfaceDecl)]
 	  -> IfL [(Name,TyThing)]
 loadDecls ignore_prags ver_decls
    = do { mod <- getIfModule
@@ -333,7 +334,7 @@ loadDecls ignore_prags ver_decls
 
 loadDecl :: Bool		    -- Don't load pragmas into the decl pool
 	 -> Module
-	  -> (Version, IfaceDecl)
+	  -> (Fingerprint, IfaceDecl)
 	  -> IfL [(Name,TyThing)]   -- The list can be poked eagerly, but the
 				    -- TyThings are forkM'd thunks
 loadDecl ignore_prags mod (_version, decl)
@@ -616,13 +617,16 @@ pprModIface :: ModIface -> SDoc
 -- Show a ModIface
 pprModIface iface
  = vcat [ ptext (sLit "interface")
-		<+> ppr (mi_module iface) <+> pp_boot 
-		<+> ppr (mi_mod_vers iface) <+> pp_sub_vers
+		<+> ppr (mi_module iface) <+> pp_boot
 		<+> (if mi_orphan iface then ptext (sLit "[orphan module]") else empty)
 		<+> (if mi_finsts iface then ptext (sLit "[family instance module]") else empty)
 		<+> (if mi_hpc    iface then ptext (sLit "[hpc]") else empty)
 		<+> integer opt_HiVersion
-		<+> ptext (sLit "where")
+        , nest 2 (text "interface hash:" <+> ppr (mi_iface_hash iface))
+        , nest 2 (text "ABI hash:" <+> ppr (mi_mod_hash iface))
+        , nest 2 (text "export-list hash:" <+> ppr (mi_exp_hash iface))
+        , nest 2 (text "orphan hash:" <+> ppr (mi_orphan_hash iface))
+        , nest 2 (ptext (sLit "where"))
 	, vcat (map pprExport (mi_exports iface))
 	, pprDeps (mi_deps iface)
 	, vcat (map pprUsage (mi_usages iface))
@@ -637,12 +641,6 @@ pprModIface iface
   where
     pp_boot | mi_boot iface = ptext (sLit "[boot]")
 	    | otherwise     = empty
-
-    exp_vers  = mi_exp_vers iface
-    rule_vers = mi_rule_vers iface
-
-    pp_sub_vers | exp_vers == initialVersion && rule_vers == initialVersion = empty
-		| otherwise = brackets (ppr exp_vers <+> ppr rule_vers)
 \end{code}
 
 When printing export lists, we print like this:
@@ -666,16 +664,16 @@ pprExport (mod, items)
     pp_export names = braces (hsep (map ppr names))
 
 pprUsage :: Usage -> SDoc
-pprUsage usage
-  = hsep [ptext (sLit "import"), ppr (usg_name usage), 
-	  int (usg_mod usage), 
-	  pp_export_version (usg_exports usage),
-	  int (usg_rules usage),
-	  pp_versions (usg_entities usage) ]
-  where
-    pp_versions nvs = hsep [ ppr n <+> int v | (n,v) <- nvs ]
-    pp_export_version Nothing  = empty
-    pp_export_version (Just v) = int v
+pprUsage usage@UsagePackageModule{}
+  = hsep [ptext (sLit "import"), ppr (usg_mod usage), 
+	  ppr (usg_mod_hash usage)]
+pprUsage usage@UsageHomeModule{}
+  = hsep [ptext (sLit "import"), ppr (usg_mod_name usage), 
+	  ppr (usg_mod_hash usage)] $$
+    nest 2 (
+	maybe empty (\v -> text "exports: " <> ppr v) (usg_exports usage) $$
+        vcat [ ppr n <+> ppr v | (n,v) <- usg_entities usage ]
+        )
 
 pprDeps :: Dependencies -> SDoc
 pprDeps (Deps { dep_mods = mods, dep_pkgs = pkgs, dep_orphs = orphs,
@@ -690,13 +688,9 @@ pprDeps (Deps { dep_mods = mods, dep_pkgs = pkgs, dep_orphs = orphs,
     ppr_boot True  = text "[boot]"
     ppr_boot False = empty
 
-pprIfaceDecl :: (Version, IfaceDecl) -> SDoc
+pprIfaceDecl :: (Fingerprint, IfaceDecl) -> SDoc
 pprIfaceDecl (ver, decl)
-  = ppr_vers ver <+> ppr decl
-  where
-	-- Print the version for the decl
-    ppr_vers v | v == initialVersion = empty
-	       | otherwise	     = int v
+  = ppr ver $$ nest 2 (ppr decl)
 
 pprFixities :: [(OccName, Fixity)] -> SDoc
 pprFixities []    = empty

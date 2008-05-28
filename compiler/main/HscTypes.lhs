@@ -32,7 +32,7 @@ module HscTypes (
 	icPrintUnqual, mkPrintUnqualified, extendInteractiveContext,
         substInteractiveContext,
 
-	ModIface(..), mkIfaceDepCache, mkIfaceVerCache, mkIfaceFixCache,
+	ModIface(..), mkIfaceDepCache, mkIfaceHashCache, mkIfaceFixCache,
 	emptyIfaceDepCache,
 
 	FixityEnv, FixItem(..), lookupFixity, emptyFixityEnv,
@@ -101,8 +101,7 @@ import PrelNames	( gHC_PRIM )
 import Packages hiding ( Version(..) )
 import DynFlags		( DynFlags(..), isOneShot, HscTarget (..) )
 import DriverPhases	( HscSource(..), isHsBoot, hscSourceString, Phase )
-import BasicTypes	( Version, initialVersion, IPName, 
-			  Fixity, defaultFixity, DeprecTxt )
+import BasicTypes	( IPName, Fixity, defaultFixity, DeprecTxt )
 import IfaceSyn
 import FiniteMap	( FiniteMap )
 import CoreSyn		( CoreRule )
@@ -114,6 +113,7 @@ import LazyUniqFM		( lookupUFM, eltsUFM, emptyUFM )
 import UniqSupply	( UniqSupply )
 import FastString
 import StringBuffer	( StringBuffer )
+import Fingerprint
 
 import System.FilePath
 import System.Time	( ClockTime )
@@ -408,7 +408,8 @@ the declarations into a single indexed map in the @PersistentRenamerState@.
 data ModIface 
    = ModIface {
         mi_module   :: !Module,
-        mi_mod_vers :: !Version,	    -- Module version: changes when anything changes
+        mi_iface_hash :: !Fingerprint,      -- Hash of the whole interface
+        mi_mod_hash :: !Fingerprint,	    -- Hash of the ABI only
 
         mi_orphan   :: !WhetherHasOrphans,  -- Whether this module has orphans
         mi_finsts   :: !WhetherHasFamInst,  -- Whether module has family insts
@@ -420,7 +421,7 @@ data ModIface
 
 		-- Usages; kept sorted so that it's easy to decide
 		-- whether to write a new iface file (changing usages
-		-- doesn't affect the version of this module)
+		-- doesn't affect the hash of this module)
         mi_usages   :: [Usage],
 		-- NOT STRICT!  we read this field lazily from the interface file
 		-- It is *only* consulted by the recompilation checker
@@ -428,7 +429,7 @@ data ModIface
 		-- Exports
 		-- Kept sorted by (mod,occ), to make version comparisons easier
         mi_exports  :: ![IfaceExport],
-        mi_exp_vers :: !Version,	-- Version number of export list
+        mi_exp_hash :: !Fingerprint,	-- Hash of export list
 
 		-- Fixities
         mi_fixities :: [(OccName,Fixity)],
@@ -439,11 +440,11 @@ data ModIface
 		-- NOT STRICT!  we read this field lazily from the interface file
 
 		-- Type, class and variable declarations
-		-- The version of an Id changes if its fixity or deprecations change
+		-- The hash of an Id changes if its fixity or deprecations change
 		--	(as well as its type of course)
 		-- Ditto data constructors, class operations, except that 
-		-- the version of the parent class/tycon changes
-	mi_decls :: [(Version,IfaceDecl)],	-- Sorted
+		-- the hash of the parent class/tycon changes
+	mi_decls :: [(Fingerprint,IfaceDecl)],	-- Sorted
 
         mi_globals  :: !(Maybe GlobalRdrEnv),
 		-- Binds all the things defined at the top level in
@@ -464,7 +465,7 @@ data ModIface
 	mi_insts     :: [IfaceInst],			-- Sorted
 	mi_fam_insts :: [IfaceFamInst],			-- Sorted
 	mi_rules     :: [IfaceRule],			-- Sorted
-	mi_rule_vers :: !Version,	-- Version number for rules and 
+	mi_orphan_hash :: !Fingerprint,	-- Hash for orphan rules and 
 					-- instances (for classes and families)
 					-- combined
 
@@ -476,9 +477,9 @@ data ModIface
 		-- and are not put into the interface file
 	mi_dep_fn  :: Name -> Maybe DeprecTxt,	-- Cached lookup for mi_deprecs
 	mi_fix_fn  :: OccName -> Fixity,	-- Cached lookup for mi_fixities
-	mi_ver_fn  :: OccName -> Maybe (OccName, Version),
+	mi_hash_fn :: OccName -> Maybe (OccName, Fingerprint),
                         -- Cached lookup for mi_decls
-			-- The Nothing in mi_ver_fn means that the thing
+			-- The Nothing in mi_hash_fn means that the thing
 			-- isn't in decls. It's useful to know that when
 			-- seeing if we are up to date wrt the old interface
                         -- The 'OccName' is the parent of the name, if it has one.
@@ -512,7 +513,7 @@ emptyModDetails = ModDetails { md_types = emptyTypeEnv,
 -- being compiled right now.  Once it is compiled, a ModIface and 
 -- ModDetails are extracted and the ModGuts is dicarded.
 
-type ImportedMods = ModuleEnv (Module, [(ModuleName, Bool, SrcSpan)])
+type ImportedMods = ModuleEnv [(ModuleName, Bool, SrcSpan)]
 
 data ModGuts
   = ModGuts {
@@ -635,14 +636,15 @@ data ForeignStubs = NoStubs
 emptyModIface :: Module -> ModIface
 emptyModIface mod
   = ModIface { mi_module   = mod,
-	       mi_mod_vers = initialVersion,
+	       mi_iface_hash = fingerprint0,
+	       mi_mod_hash = fingerprint0,
 	       mi_orphan   = False,
 	       mi_finsts   = False,
 	       mi_boot	   = False,
 	       mi_deps     = noDependencies,
 	       mi_usages   = [],
 	       mi_exports  = [],
-	       mi_exp_vers = initialVersion,
+	       mi_exp_hash = fingerprint0,
 	       mi_fixities = [],
 	       mi_deprecs  = NoDeprecs,
 	       mi_insts     = [],
@@ -650,12 +652,12 @@ emptyModIface mod
 	       mi_rules     = [],
 	       mi_decls     = [],
 	       mi_globals   = Nothing,
-	       mi_rule_vers = initialVersion,
+	       mi_orphan_hash = fingerprint0,
                mi_vect_info = noIfaceVectInfo,
-	       mi_dep_fn = emptyIfaceDepCache,
-	       mi_fix_fn = emptyIfaceFixCache,
-	       mi_ver_fn = emptyIfaceVerCache,
-	       mi_hpc    = False
+	       mi_dep_fn    = emptyIfaceDepCache,
+	       mi_fix_fn    = emptyIfaceFixCache,
+	       mi_hash_fn   = emptyIfaceHashCache,
+	       mi_hpc       = False
     }		
 \end{code}
 
@@ -965,6 +967,23 @@ tyThingId (ADataCon dc) = dataConWrapId dc
 tyThingId other         = pprPanic "tyThingId" (pprTyThing other)
 \end{code}
 
+\begin{code}
+mkIfaceHashCache :: [(Fingerprint,IfaceDecl)]
+                 -> (OccName -> Maybe (OccName, Fingerprint))
+mkIfaceHashCache pairs 
+  = \occ -> lookupOccEnv env occ
+  where
+    env = foldr add_decl emptyOccEnv pairs
+    add_decl (v,d) env0 = foldr add_imp env1 (ifaceDeclSubBndrs d)
+      where
+          decl_name = ifName d
+          env1 = extendOccEnv env0 decl_name (decl_name, v)
+          add_imp bndr env = extendOccEnv env bndr (decl_name, v)
+
+emptyIfaceHashCache :: OccName -> Maybe (OccName, Fingerprint)
+emptyIfaceHashCache _occ = Nothing
+\end{code}
+
 %************************************************************************
 %*									*
 \subsection{Auxiliary types}
@@ -975,21 +994,6 @@ These types are defined here because they are mentioned in ModDetails,
 but they are mostly elaborated elsewhere
 
 \begin{code}
-mkIfaceVerCache :: [(Version,IfaceDecl)]
-                -> (OccName -> Maybe (OccName, Version))
-mkIfaceVerCache pairs 
-  = \occ -> lookupOccEnv env occ
-  where
-    env = foldr add_decl emptyOccEnv pairs
-    add_decl (v,d) env0 = foldr add_imp env1 (ifaceDeclSubBndrs d)
-      where
-          decl_name = ifName d
-          env1 = extendOccEnv env0 decl_name (decl_name, v)
-          add_imp bndr env = extendOccEnv env bndr (decl_name, v)
-
-emptyIfaceVerCache :: OccName -> Maybe (OccName, Version)
-emptyIfaceVerCache _occ = Nothing
-
 ------------------ Deprecations -------------------------
 data Deprecations
   = NoDeprecs
@@ -1146,26 +1150,29 @@ noDependencies :: Dependencies
 noDependencies = Deps [] [] [] []
  	  
 data Usage
-  = Usage { usg_name     :: ModuleName,			-- Name of the module
-	    usg_mod      :: Version,			-- Module version
-	    usg_entities :: [(OccName,Version)],	-- Sorted by occurrence name
-                -- NB. usages are for parent names only, eg. tycon but not constructors.
-	    usg_exports  :: Maybe Version,		-- Export-list version, if we depend on it
-	    usg_rules    :: Version 			-- Orphan-rules version (for non-orphan
-							-- modules this will always be initialVersion)
-    }	    deriving( Eq )
-	-- This type doesn't let you say "I imported f but none of the rules in
-	-- the module". If you use anything in the module you get its rule version
-	-- So if the rules change, you'll recompile, even if you don't use them.
-	-- This is easy to implement, and it's safer: you might not have used the rules last
-	-- time round, but if someone has added a new rule you might need it this time
-
+  = UsagePackageModule {
+        usg_mod      :: Module,
+        usg_mod_hash :: Fingerprint
+    }
+  | UsageHomeModule {
+        usg_mod_name :: ModuleName,		-- Name of the module
+	usg_mod_hash :: Fingerprint,		-- Module fingerprint
+                                                -- (optimisation only)
+	usg_entities :: [(OccName,Fingerprint)],
+           	-- Sorted by occurrence name.
+            -- NB. usages are for parent names only, 
+            -- eg. tycon but not constructors.
+	usg_exports  :: Maybe Fingerprint
+            -- Export-list fingerprint, if we depend on it
+    }
+    deriving( Eq )
 	-- The export list field is (Just v) if we depend on the export list:
 	--	i.e. we imported the module directly, whether or not we
-	--	     enumerated the things we imported, or just imported everything
+	--	     enumerated the things we imported, or just imported 
+        --           everything
 	-- We need to recompile if M's exports change, because 
-	-- if the import was	import M, 	we might now have a name clash in the 
-	--					importing module.
+	-- if the import was	import M, 	we might now have a name clash
+        --                                      in the importing module.
 	-- if the import was	import M(x)	M might no longer export x
 	-- The only way we don't depend on the export list is if we have
 	--			import M()
@@ -1210,7 +1217,7 @@ data ExternalPackageState
 		-- (below), not in the mi_decls fields of the iPIT.  
 		-- What _is_ in the iPIT is:
 		--	* The Module 
-		--	* Version info
+		--	* Fingerprint info
 		--	* Its exports
 		--	* Fixities
 		--	* Deprecations

@@ -15,10 +15,9 @@ module IfaceSyn (
 	-- Misc
         ifaceDeclSubBndrs, visibleIfConDecls,
 
-	-- Equality
-	GenIfaceEq(..), IfaceEq, (&&&), bool, eqListBy, eqMaybeBy,
-	eqIfDecl, eqIfInst, eqIfFamInst, eqIfRule, checkBootDecl,
-	
+        -- Free Names
+        freeNamesIfDecl, freeNamesIfRule,
+
 	-- Pretty printing
 	pprIfaceExpr, pprIfaceDeclHead 
     ) where
@@ -30,8 +29,6 @@ import IfaceType
 
 import NewDemand
 import Class
-import UniqFM
-import UniqSet
 import NameSet 
 import Name
 import CostCentre
@@ -46,7 +43,6 @@ import Data.List
 import Data.Maybe
 
 infixl 3 &&&
-infix  4 `eqIfExt`, `eqIfIdInfo`, `eqIfType`
 \end{code}
 
 
@@ -648,385 +644,128 @@ instance Outputable IfaceInfoItem where
   ppr (HsStrictness str) = ptext (sLit "Strictness:") <+> pprIfaceStrictSig str
   ppr HsNoCafRefs	 = ptext (sLit "HasNoCafRefs")
   ppr (HsWorker w a)	 = ptext (sLit "Worker:") <+> ppr w <+> int a
-\end{code}
 
 
-%************************************************************************
-%*									*
-	Equality, for interface file version generaion only
-%*									*
-%************************************************************************
+-- -----------------------------------------------------------------------------
+-- Finding the Names in IfaceSyn
 
-Equality over IfaceSyn returns an IfaceEq, not a Bool.  The new
-constructor is EqBut, which gives the set of things whose version must
-be equal for the whole thing to be equal.  So the key function is
-eqIfExt, which compares Names.
+-- This is used for dependency analysis in MkIface, so that we
+-- fingerprint a declaration before the things that depend on it.  It
+-- is specific to interface-file fingerprinting in the sense that we
+-- don't collect *all* Names: for example, the DFun of an instance is
+-- recorded textually rather than by its fingerprint when
+-- fingerprinting the instance, so DFuns are not dependencies.
 
-Of course, equality is also done modulo alpha conversion.
+freeNamesIfDecl :: IfaceDecl -> NameSet
+freeNamesIfDecl (IfaceId _s t i) = 
+  freeNamesIfType t &&&
+  freeNamesIfIdInfo i
+freeNamesIfDecl IfaceForeign{} = 
+  emptyNameSet
+freeNamesIfDecl d@IfaceData{} =
+  freeNamesIfTcFam (ifFamInst d) &&&
+  freeNamesIfContext (ifCtxt d) &&&
+  freeNamesIfConDecls (ifCons d)
+freeNamesIfDecl d@IfaceSyn{} =
+  freeNamesIfType    (ifSynRhs d) &&&
+  freeNamesIfTcFam (ifFamInst d)
+freeNamesIfDecl d@IfaceClass{} =
+  freeNamesIfContext (ifCtxt d) &&&
+  freeNamesIfDecls   (ifATs d) &&&
+  fnList freeNamesIfClsSig (ifSigs d)
 
-\begin{code}
-data GenIfaceEq a
-  = Equal 		-- Definitely exactly the same
-  | NotEqual		-- Definitely different
-  | EqBut (UniqSet a)   -- The same provided these things have not changed
-
-type IfaceEq = GenIfaceEq Name
-
-instance Outputable a => Outputable (GenIfaceEq a) where
-  ppr Equal          = ptext (sLit "Equal")
-  ppr NotEqual       = ptext (sLit "NotEqual")
-  ppr (EqBut occset) = ptext (sLit "EqBut") <+> ppr (uniqSetToList occset)
-
-bool :: Bool -> IfaceEq
-bool True  = Equal
-bool False = NotEqual
-
-toBool :: IfaceEq -> Bool
-toBool Equal     = True
-toBool (EqBut _) = True
-toBool NotEqual  = False
-
-zapEq :: IfaceEq -> IfaceEq	-- Used to forget EqBut information
-zapEq (EqBut _) = Equal
-zapEq other	= other
-
-(&&&) :: IfaceEq -> IfaceEq -> IfaceEq
-Equal       &&& x           = x
-NotEqual    &&& _           = NotEqual
-EqBut nms   &&& Equal       = EqBut nms
-EqBut _     &&& NotEqual    = NotEqual
-EqBut nms1  &&& EqBut nms2  = EqBut (nms1 `unionNameSets` nms2)
-
--- This function is the core of the EqBut stuff
--- ASSUMPTION: The left-hand argument is the NEW CODE, and hence
--- any Names in the left-hand arg have the correct parent in them.
-eqIfExt :: Name -> Name -> IfaceEq
-eqIfExt name1 name2 
-  | name1 == name2 = EqBut (unitNameSet name1)
-  | otherwise      = NotEqual
-
----------------------
-checkBootDecl :: IfaceDecl 	-- The boot decl
-	      -> IfaceDecl	-- The real decl
-	      -> Bool		-- True <=> compatible
-checkBootDecl (IfaceId s1 t1 _) (IfaceId s2 t2 _)
-  = ASSERT( s1==s2 ) toBool (t1 `eqIfType` t2)
-
-checkBootDecl d1@(IfaceForeign {}) d2@(IfaceForeign {})
-  = ASSERT (ifName d1 == ifName d2 ) ifExtName d1 == ifExtName d2
-
-checkBootDecl d1@(IfaceSyn {}) d2@(IfaceSyn {})
-  = ASSERT( ifName d1 == ifName d2 )
-    toBool $ eqWith (ifTyVars d1) (ifTyVars d2) $ \ env -> 
-          eq_ifType env (ifSynRhs d1) (ifSynRhs d2)
-
-checkBootDecl d1@(IfaceData {}) d2@(IfaceData {})
--- We don't check the recursion flags because the boot-one is
--- recursive, to be conservative, but the real one may not be.
--- I'm not happy with the way recursive flags are dealt with.
-  = ASSERT( ifName d1    == ifName d2 ) 
-    toBool $ eqWith (ifTyVars d1) (ifTyVars d2) $ \ env -> 
-	eq_ifContext env (ifCtxt d1) (ifCtxt d2) &&& 
-	case ifCons d1 of
-	    IfAbstractTyCon -> Equal
-	    cons1	    -> eq_hsCD env cons1 (ifCons d2)
-
-checkBootDecl d1@(IfaceClass {}) d2@(IfaceClass {})
-  = ASSERT( ifName d1 == ifName d2 )
-    toBool $ eqWith (ifTyVars d1) (ifTyVars d2) $ \ env -> 
-	  eqListBy (eq_hsFD env)    (ifFDs d1)  (ifFDs d2) &&&
-	  case (ifCtxt d1, ifSigs d1) of
-	     ([], [])      -> Equal
-	     (cxt1, sigs1) -> eq_ifContext env cxt1 (ifCtxt d2)  &&&
-			      eqListBy (eq_cls_sig env) sigs1 (ifSigs d2)
-
-checkBootDecl _ _ = False	-- default case
-
----------------------
-eqIfDecl :: IfaceDecl -> IfaceDecl -> IfaceEq
-eqIfDecl (IfaceId s1 t1 i1) (IfaceId s2 t2 i2)
-  = bool (s1 == s2) &&& (t1 `eqIfType` t2) &&& (i1 `eqIfIdInfo` i2)
-
-eqIfDecl d1@(IfaceForeign {}) d2@(IfaceForeign {})
-  = bool (ifName d1 == ifName d2 && ifExtName d1 == ifExtName d2)
-
-eqIfDecl d1@(IfaceData {}) d2@(IfaceData {})
-  = bool (ifName d1    == ifName d2 && 
-	  ifRec d1     == ifRec   d2 && 
-	  ifGadtSyntax d1 == ifGadtSyntax   d2 && 
-	  ifGeneric d1 == ifGeneric d2) &&&
-    ifFamInst d1 `eqIfTc_fam` ifFamInst d2 &&&
-    eqWith (ifTyVars d1) (ifTyVars d2) (\ env -> 
-	    eq_ifContext env (ifCtxt d1) (ifCtxt d2) &&& 
-    	    eq_hsCD env (ifCons d1) (ifCons d2) 
-	)
-	-- The type variables of the data type do not scope
-	-- over the constructors (any more), but they do scope
-	-- over the stupid context in the IfaceConDecls
-
-eqIfDecl d1@(IfaceSyn {}) d2@(IfaceSyn {})
-  = bool (ifName d1 == ifName d2) &&&
-    ifFamInst d1 `eqIfTc_fam` ifFamInst d2 &&&
-    eqWith (ifTyVars d1) (ifTyVars d2) (\ env -> 
-          eq_ifType env (ifSynRhs d1) (ifSynRhs d2)
-        )
-
-eqIfDecl d1@(IfaceClass {}) d2@(IfaceClass {})
-  = bool (ifName d1 == ifName d2 && 
-	  ifRec d1  == ifRec  d2) &&&
-    eqWith (ifTyVars d1) (ifTyVars d2) (\ env -> 
-   	  eq_ifContext env (ifCtxt d1) (ifCtxt d2)  &&&
-	  eqListBy (eq_hsFD env)    (ifFDs d1)  (ifFDs d2) &&&
-	  eqListBy eqIfDecl         (ifATs d1)  (ifATs d2) &&&
-	  eqListBy (eq_cls_sig env) (ifSigs d1) (ifSigs d2)
-       )
-
-eqIfDecl _ _ = NotEqual	-- default case
-
--- Helper
-eqWith :: [IfaceTvBndr] -> [IfaceTvBndr] -> (EqEnv -> IfaceEq) -> IfaceEq
-eqWith = eq_ifTvBndrs emptyEqEnv
-
-eqIfTc_fam :: Maybe (IfaceTyCon, [IfaceType]) 
-           -> Maybe (IfaceTyCon, [IfaceType])
-           -> IfaceEq
-Nothing             `eqIfTc_fam` Nothing             = Equal
-(Just (fam1, tys1)) `eqIfTc_fam` (Just (fam2, tys2)) = 
-  fam1 `eqIfTc` fam2 &&& eqListBy eqIfType tys1 tys2
-_		        `eqIfTc_fam` _               = NotEqual
-
-
------------------------
-eqIfInst :: IfaceInst -> IfaceInst -> IfaceEq
-eqIfInst d1 d2 = bool (ifDFun d1 == ifDFun d2 && ifOFlag d1 == ifOFlag d2)
--- All other changes are handled via the version info on the dfun
-
-eqIfFamInst :: IfaceFamInst -> IfaceFamInst -> IfaceEq
-eqIfFamInst d1 d2 = bool (ifFamInstTyCon d1 == ifFamInstTyCon d2)
 -- All other changes are handled via the version info on the tycon
+freeNamesIfTcFam :: Maybe (IfaceTyCon, [IfaceType]) -> NameSet
+freeNamesIfTcFam (Just (tc,tys)) = 
+  freeNamesIfTc tc &&& fnList freeNamesIfType tys
+freeNamesIfTcFam Nothing =
+  emptyNameSet
 
-eqIfRule :: IfaceRule -> IfaceRule -> IfaceEq
-eqIfRule (IfaceRule n1 a1 bs1 f1 es1 rhs1 o1)
-	 (IfaceRule n2 a2 bs2 f2 es2 rhs2 o2)
-       = bool (n1==n2 && a1==a2 && o1 == o2) &&&
-	 f1 `eqIfExt` f2 &&&
-         eq_ifBndrs emptyEqEnv bs1 bs2 (\env -> 
-	 zapEq (eqListBy (eq_ifaceExpr env) es1 es2) &&&
-		-- zapEq: for the LHSs, ignore the EqBut part
-         eq_ifaceExpr env rhs1 rhs2)
+freeNamesIfContext :: IfaceContext -> NameSet
+freeNamesIfContext = fnList freeNamesIfPredType
 
-eq_hsCD :: EqEnv -> IfaceConDecls -> IfaceConDecls -> IfaceEq
-eq_hsCD env (IfDataTyCon c1) (IfDataTyCon c2) 
-  = eqListBy (eq_ConDecl env) c1 c2
+freeNamesIfDecls :: [IfaceDecl] -> NameSet
+freeNamesIfDecls = fnList freeNamesIfDecl
 
-eq_hsCD env (IfNewTyCon c1)  (IfNewTyCon c2)  = eq_ConDecl env c1 c2
-eq_hsCD _   IfAbstractTyCon  IfAbstractTyCon  = Equal
-eq_hsCD _   IfOpenDataTyCon  IfOpenDataTyCon  = Equal
-eq_hsCD _   _                _                = NotEqual
+freeNamesIfClsSig :: IfaceClassOp -> NameSet
+freeNamesIfClsSig (IfaceClassOp _n _dm ty) = freeNamesIfType ty
 
-eq_ConDecl :: EqEnv -> IfaceConDecl -> IfaceConDecl -> IfaceEq
-eq_ConDecl env c1 c2
-  = bool (ifConOcc c1     == ifConOcc c2 && 
-	  ifConInfix c1   == ifConInfix c2 && 
-	  ifConStricts c1 == ifConStricts c2 && 
-	  ifConFields c1  == ifConFields c2) &&&
-    eq_ifTvBndrs env (ifConUnivTvs c1) (ifConUnivTvs c2) (\ env ->
-    eq_ifTvBndrs env (ifConExTvs c1) (ifConExTvs c2) (\ env ->
-	eq_ifContext env (ifConCtxt c1) (ifConCtxt c2) &&&
-	eq_ifTypes env (ifConArgTys c1) (ifConArgTys c2)))
+freeNamesIfConDecls :: IfaceConDecls -> NameSet
+freeNamesIfConDecls (IfDataTyCon c) = fnList freeNamesIfConDecl c
+freeNamesIfConDecls (IfNewTyCon c)  = freeNamesIfConDecl c
+freeNamesIfConDecls _               = emptyNameSet
 
-eq_hsFD :: EqEnv
-        -> ([FastString], [FastString])
-        -> ([FastString], [FastString])
-        -> IfaceEq
-eq_hsFD env (ns1,ms1) (ns2,ms2)
-  = eqListBy (eqIfOcc env) ns1 ns2 &&& eqListBy (eqIfOcc env) ms1 ms2
+freeNamesIfConDecl :: IfaceConDecl -> NameSet
+freeNamesIfConDecl c = 
+  freeNamesIfContext (ifConCtxt c) &&& 
+  fnList freeNamesIfType (ifConArgTys c) &&&
+  fnList freeNamesIfType (map snd (ifConEqSpec c)) -- equality constraints
 
-eq_cls_sig :: EqEnv -> IfaceClassOp -> IfaceClassOp -> IfaceEq
-eq_cls_sig env (IfaceClassOp n1 dm1 ty1) (IfaceClassOp n2 dm2 ty2)
-  = bool (n1==n2 && dm1 == dm2) &&& eq_ifType env ty1 ty2
-\end{code}
+freeNamesIfPredType :: IfacePredType -> NameSet
+freeNamesIfPredType (IfaceClassP cl tys) = 
+   unitNameSet cl &&& fnList freeNamesIfType tys
+freeNamesIfPredType (IfaceIParam _n ty) =
+   freeNamesIfType ty
+freeNamesIfPredType (IfaceEqPred ty1 ty2) =
+   freeNamesIfType ty1 &&& freeNamesIfType ty2
 
+freeNamesIfType :: IfaceType -> NameSet
+freeNamesIfType (IfaceTyVar _)        = emptyNameSet
+freeNamesIfType (IfaceAppTy s t)      = freeNamesIfType s &&& freeNamesIfType t
+freeNamesIfType (IfacePredTy st)      = freeNamesIfPredType st
+freeNamesIfType (IfaceTyConApp tc ts) = 
+   freeNamesIfTc tc &&& fnList freeNamesIfType ts
+freeNamesIfType (IfaceForAllTy _tv t)  = freeNamesIfType t
+freeNamesIfType (IfaceFunTy s t)      = freeNamesIfType s &&& freeNamesIfType t
 
-\begin{code}
------------------
-eqIfIdInfo :: IfaceIdInfo -> IfaceIdInfo -> GenIfaceEq Name
-eqIfIdInfo NoInfo        NoInfo        = Equal
-eqIfIdInfo (HasInfo is1) (HasInfo is2) = eqListBy eq_item is1 is2
-eqIfIdInfo _             _             = NotEqual
+freeNamesIfIdInfo :: IfaceIdInfo -> NameSet
+freeNamesIfIdInfo NoInfo = emptyNameSet
+freeNamesIfIdInfo (HasInfo i) = fnList freeNamesItem i
 
-eq_item :: IfaceInfoItem -> IfaceInfoItem -> IfaceEq
-eq_item (HsInline a1)	   (HsInline a2)      = bool (a1 == a2)
-eq_item (HsArity a1)	   (HsArity a2)	      = bool (a1 == a2)
-eq_item (HsStrictness s1)  (HsStrictness s2)  = bool (s1 == s2)
-eq_item (HsUnfold u1)   (HsUnfold u2)         = eq_ifaceExpr emptyEqEnv u1 u2
-eq_item HsNoCafRefs        HsNoCafRefs	      = Equal
-eq_item (HsWorker wkr1 a1) (HsWorker wkr2 a2) = bool (a1==a2) &&& (wkr1 `eqIfExt` wkr2)
-eq_item _ _ = NotEqual
+freeNamesItem :: IfaceInfoItem -> NameSet
+freeNamesItem (HsUnfold u)     = freeNamesIfExpr u
+freeNamesItem (HsWorker wkr _) = unitNameSet wkr
+freeNamesItem _                = emptyNameSet
 
------------------
-eq_ifaceExpr :: EqEnv -> IfaceExpr -> IfaceExpr -> IfaceEq
-eq_ifaceExpr env (IfaceLcl v1)	      (IfaceLcl v2)	   = eqIfOcc env v1 v2
-eq_ifaceExpr _   (IfaceExt v1)	      (IfaceExt v2)	   = eqIfExt v1 v2
-eq_ifaceExpr _   (IfaceLit l1)        (IfaceLit l2) 	   = bool (l1 == l2)
-eq_ifaceExpr env (IfaceFCall c1 ty1)  (IfaceFCall c2 ty2)  = bool (c1==c2) &&& eq_ifType env ty1 ty2
-eq_ifaceExpr _   (IfaceTick m1 ix1)   (IfaceTick m2 ix2)   = bool (m1==m2) &&& bool (ix1 == ix2)
-eq_ifaceExpr env (IfaceType ty1)      (IfaceType ty2)	   = eq_ifType env ty1 ty2
-eq_ifaceExpr env (IfaceTuple n1 as1)  (IfaceTuple n2 as2)  = bool (n1==n2) &&& eqListBy (eq_ifaceExpr env) as1 as2
-eq_ifaceExpr env (IfaceLam b1 body1)  (IfaceLam b2 body2)  = eq_ifBndr env b1 b2 (\env -> eq_ifaceExpr env body1 body2)
-eq_ifaceExpr env (IfaceApp f1 a1)     (IfaceApp f2 a2)	   = eq_ifaceExpr env f1 f2 &&& eq_ifaceExpr env a1 a2
-eq_ifaceExpr env (IfaceCast e1 co1)   (IfaceCast e2 co2)   = eq_ifaceExpr env e1 e2 &&& eq_ifType env co1 co2
-eq_ifaceExpr env (IfaceNote n1 r1)    (IfaceNote n2 r2)    = eq_ifaceNote env n1 n2 &&& eq_ifaceExpr env r1 r2
+freeNamesIfExpr :: IfaceExpr -> NameSet
+freeNamesIfExpr (IfaceExt v)	  = unitNameSet v
+freeNamesIfExpr (IfaceFCall _ ty) = freeNamesIfType ty
+freeNamesIfExpr (IfaceType ty)    = freeNamesIfType ty
+freeNamesIfExpr (IfaceTuple _ as) = fnList freeNamesIfExpr as
+freeNamesIfExpr (IfaceLam _ body) = freeNamesIfExpr body
+freeNamesIfExpr (IfaceApp f a)    = freeNamesIfExpr f &&& freeNamesIfExpr a
+freeNamesIfExpr (IfaceCast e co)  = freeNamesIfExpr e &&& freeNamesIfType co
+freeNamesIfExpr (IfaceNote _n r)   = freeNamesIfExpr r
 
-eq_ifaceExpr env (IfaceCase s1 b1 ty1 as1) (IfaceCase s2 b2 ty2 as2)
-  = eq_ifaceExpr env s1 s2 &&&
-    eq_ifType env ty1 ty2 &&&
-    eq_ifNakedBndr env b1 b2 (\env -> eqListBy (eq_ifaceAlt env) as1 as2)
+freeNamesIfExpr (IfaceCase s _ ty alts)
+  = freeNamesIfExpr s &&& freeNamesIfType ty &&& fnList freeNamesIfaceAlt alts
   where
-    eq_ifaceAlt env (c1,bs1,r1) (c2,bs2,r2)
-	= bool (eq_ifaceConAlt c1 c2) &&& 
-	  eq_ifNakedBndrs env bs1 bs2 (\env -> eq_ifaceExpr env r1 r2)
+    -- no need to look at the constructor, because we'll already have its
+    -- parent recorded by the type on the case expression.
+    freeNamesIfaceAlt (_con,_bs,r) = freeNamesIfExpr r
 
-eq_ifaceExpr env (IfaceLet (IfaceNonRec b1 r1) x1) (IfaceLet (IfaceNonRec b2 r2) x2)
-  = eq_ifaceExpr env r1 r2 &&& eq_ifLetBndr env b1 b2 (\env -> eq_ifaceExpr env x1 x2)
+freeNamesIfExpr (IfaceLet (IfaceNonRec _bndr r) x)
+  = freeNamesIfExpr r &&& freeNamesIfExpr x
 
-eq_ifaceExpr env (IfaceLet (IfaceRec as1) x1) (IfaceLet (IfaceRec as2) x2)
-  = eq_ifLetBndrs env bs1 bs2 (\env -> eqListBy (eq_ifaceExpr env) rs1 rs2 &&& eq_ifaceExpr env x1 x2)
-  where
-    (bs1,rs1) = unzip as1
-    (bs2,rs2) = unzip as2
+freeNamesIfExpr (IfaceLet (IfaceRec as) x)
+  = fnList freeNamesIfExpr (map snd as) &&& freeNamesIfExpr x
+
+freeNamesIfExpr _ = emptyNameSet
 
 
-eq_ifaceExpr _ _ _ = NotEqual
+freeNamesIfTc :: IfaceTyCon -> NameSet
+freeNamesIfTc (IfaceTc tc) = unitNameSet tc
+-- ToDo: shouldn't we include IfaceIntTc & co.?
+freeNamesIfTc _ = emptyNameSet
 
------------------
-eq_ifaceConAlt :: IfaceConAlt -> IfaceConAlt -> Bool
-eq_ifaceConAlt IfaceDefault	  IfaceDefault		= True
-eq_ifaceConAlt (IfaceDataAlt n1)  (IfaceDataAlt n2)	= n1==n2
-eq_ifaceConAlt (IfaceTupleAlt c1) (IfaceTupleAlt c2)	= c1==c2
-eq_ifaceConAlt (IfaceLitAlt l1)	  (IfaceLitAlt l2)	= l1==l2
-eq_ifaceConAlt _ _ = False
+freeNamesIfRule :: IfaceRule -> NameSet
+freeNamesIfRule (IfaceRule _n _a _bs f es rhs _o)
+  = unitNameSet f &&& fnList freeNamesIfExpr es &&& freeNamesIfExpr rhs
 
------------------
-eq_ifaceNote :: EqEnv -> IfaceNote -> IfaceNote -> IfaceEq
-eq_ifaceNote _   (IfaceSCC c1)    (IfaceSCC c2)        = bool (c1==c2)
-eq_ifaceNote _   IfaceInlineMe    IfaceInlineMe        = Equal
-eq_ifaceNote _   (IfaceCoreNote s1) (IfaceCoreNote s2) = bool (s1==s2)
-eq_ifaceNote _   _ _ = NotEqual
-\end{code}
+-- helpers
+(&&&) :: NameSet -> NameSet -> NameSet
+(&&&) = unionNameSets
 
-\begin{code}
----------------------
-eqIfType :: IfaceType -> IfaceType -> IfaceEq
-eqIfType t1 t2 = eq_ifType emptyEqEnv t1 t2
-
--------------------
-eq_ifType :: EqEnv -> IfaceType -> IfaceType -> IfaceEq
-eq_ifType env (IfaceTyVar n1)         (IfaceTyVar n2)         = eqIfOcc env n1 n2
-eq_ifType env (IfaceAppTy s1 t1)      (IfaceAppTy s2 t2)      = eq_ifType env s1 s2 &&& eq_ifType env t1 t2
-eq_ifType env (IfacePredTy st1)       (IfacePredTy st2)       = eq_ifPredType env st1 st2
-eq_ifType env (IfaceTyConApp tc1 ts1) (IfaceTyConApp tc2 ts2) = tc1 `eqIfTc` tc2 &&& eq_ifTypes env ts1 ts2
-eq_ifType env (IfaceForAllTy tv1 t1)  (IfaceForAllTy tv2 t2)  = eq_ifTvBndr env tv1 tv2 (\env -> eq_ifType env t1 t2)
-eq_ifType env (IfaceFunTy s1 t1)      (IfaceFunTy s2 t2)      = eq_ifType env s1 s2 &&& eq_ifType env t1 t2
-eq_ifType _ _ _ = NotEqual
-
--------------------
-eq_ifTypes :: EqEnv -> [IfaceType] -> [IfaceType] -> IfaceEq
-eq_ifTypes env = eqListBy (eq_ifType env)
-
--------------------
-eq_ifContext :: EqEnv -> [IfacePredType] -> [IfacePredType] -> IfaceEq
-eq_ifContext env a b = eqListBy (eq_ifPredType env) a b
-
--------------------
-eq_ifPredType :: EqEnv -> IfacePredType -> IfacePredType -> IfaceEq
-eq_ifPredType env (IfaceClassP c1 tys1) (IfaceClassP c2 tys2) = c1 `eqIfExt` c2 &&&  eq_ifTypes env tys1 tys2
-eq_ifPredType env (IfaceIParam n1 ty1) (IfaceIParam n2 ty2)   = bool (n1 == n2) &&& eq_ifType env ty1 ty2
-eq_ifPredType _   _ _ = NotEqual
-
--------------------
-eqIfTc :: IfaceTyCon -> IfaceTyCon -> IfaceEq
-eqIfTc (IfaceTc tc1) (IfaceTc tc2) = tc1 `eqIfExt` tc2
-eqIfTc IfaceIntTc    IfaceIntTc	   = Equal
-eqIfTc IfaceCharTc   IfaceCharTc   = Equal
-eqIfTc IfaceBoolTc   IfaceBoolTc   = Equal
-eqIfTc IfaceListTc   IfaceListTc   = Equal
-eqIfTc IfacePArrTc   IfacePArrTc   = Equal
-eqIfTc (IfaceTupTc bx1 ar1) (IfaceTupTc bx2 ar2) = bool (bx1==bx2 && ar1==ar2)
-eqIfTc IfaceLiftedTypeKindTc   IfaceLiftedTypeKindTc   = Equal
-eqIfTc IfaceOpenTypeKindTc     IfaceOpenTypeKindTc     = Equal
-eqIfTc IfaceUnliftedTypeKindTc IfaceUnliftedTypeKindTc = Equal
-eqIfTc IfaceUbxTupleKindTc     IfaceUbxTupleKindTc     = Equal
-eqIfTc IfaceArgTypeKindTc      IfaceArgTypeKindTc      = Equal
-eqIfTc _		       _		       = NotEqual
-\end{code}
-
------------------------------------------------------------
-	Support code for equality checking
------------------------------------------------------------
-
-\begin{code}
-------------------------------------
-type EqEnv = UniqFM FastString	-- Tracks the mapping from L-variables to R-variables
-
-eqIfOcc :: EqEnv -> FastString -> FastString -> IfaceEq
-eqIfOcc env n1 n2 = case lookupUFM env n1 of
-			Just n1 -> bool (n1 == n2)
-			Nothing -> bool (n1 == n2)
-
-extendEqEnv :: EqEnv -> FastString -> FastString -> EqEnv
-extendEqEnv env n1 n2 | n1 == n2  = env
-		      | otherwise = addToUFM env n1 n2
-
-emptyEqEnv :: EqEnv
-emptyEqEnv = emptyUFM
-
-------------------------------------
-type ExtEnv bndr = EqEnv -> bndr -> bndr -> (EqEnv -> IfaceEq) -> IfaceEq
-
-eq_ifNakedBndr :: ExtEnv FastString
-eq_ifBndr      :: ExtEnv IfaceBndr
-eq_ifTvBndr    :: ExtEnv IfaceTvBndr
-eq_ifIdBndr    :: ExtEnv IfaceIdBndr
-
-eq_ifNakedBndr env n1 n2 k = k (extendEqEnv env n1 n2)
-
-eq_ifBndr env (IfaceIdBndr b1) (IfaceIdBndr b2) k = eq_ifIdBndr env b1 b2 k
-eq_ifBndr env (IfaceTvBndr b1) (IfaceTvBndr b2) k = eq_ifTvBndr env b1 b2 k
-eq_ifBndr _ _ _ _ = NotEqual
-
-eq_ifTvBndr env (v1, k1) (v2, k2) k = eq_ifType env k1 k2 &&& k (extendEqEnv env v1 v2)
-eq_ifIdBndr env (v1, t1) (v2, t2) k = eq_ifType env t1 t2 &&& k (extendEqEnv env v1 v2)
-
-eq_ifLetBndr :: EqEnv -> IfaceLetBndr -> IfaceLetBndr -> (EqEnv -> IfaceEq)
-             -> IfaceEq
-eq_ifLetBndr env (IfLetBndr v1 t1 i1) (IfLetBndr v2 t2 i2) k 
-  = eq_ifType env t1 t2 &&& eqIfIdInfo i1 i2 &&& k (extendEqEnv env v1 v2)
-
-eq_ifBndrs   	:: ExtEnv [IfaceBndr]
-eq_ifLetBndrs 	:: ExtEnv [IfaceLetBndr]
-eq_ifTvBndrs 	:: ExtEnv [IfaceTvBndr]
-eq_ifNakedBndrs :: ExtEnv [FastString]
-eq_ifBndrs   	= eq_bndrs_with eq_ifBndr
-eq_ifTvBndrs 	= eq_bndrs_with eq_ifTvBndr
-eq_ifNakedBndrs = eq_bndrs_with eq_ifNakedBndr
-eq_ifLetBndrs   = eq_bndrs_with eq_ifLetBndr
-
--- eq_bndrs_with :: (a -> a -> IfaceEq) -> ExtEnv a
-eq_bndrs_with :: ExtEnv a -> ExtEnv [a]
-eq_bndrs_with _  env []       []       k = k env
-eq_bndrs_with eq env (b1:bs1) (b2:bs2) k = eq env b1 b2 (\env -> eq_bndrs_with eq env bs1 bs2 k)
-eq_bndrs_with _  _   _	      _	       _ = NotEqual
-\end{code}
-
-\begin{code}
-eqListBy :: (a->a->IfaceEq) -> [a] -> [a] -> IfaceEq
-eqListBy _  []     []     = Equal
-eqListBy eq (x:xs) (y:ys) = eq x y &&& eqListBy eq xs ys
-eqListBy _  _      _      = NotEqual
-
-eqMaybeBy :: (a->a->IfaceEq) -> Maybe a -> Maybe a -> IfaceEq
-eqMaybeBy _  Nothing  Nothing  = Equal
-eqMaybeBy eq (Just x) (Just y) = eq x y
-eqMaybeBy _  _        _        = NotEqual
+fnList :: (a -> NameSet) -> [a] -> NameSet
+fnList f = foldr (&&&) emptyNameSet . map f
 \end{code}

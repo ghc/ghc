@@ -42,6 +42,7 @@ module Module
 	modulePackageId, moduleName,
 	pprModule,
 	mkModule,
+        stableModuleCmp,
 
 	-- * The ModuleLocation type
 	ModLocation(..),
@@ -71,6 +72,7 @@ import FiniteMap
 import LazyUniqFM
 import FastString
 import Binary
+import Util
 
 import System.FilePath
 \end{code}
@@ -182,6 +184,7 @@ mkModuleNameFS s = ModuleName s
 moduleNameSlashes :: ModuleName -> String
 moduleNameSlashes = dots_to_slashes . moduleNameString
   where dots_to_slashes = map (\c -> if c == '.' then pathSeparator else c)
+
 \end{code}
 
 %************************************************************************
@@ -205,8 +208,13 @@ instance Binary Module where
   put_ bh (Module p n) = put_ bh p >> put_ bh n
   get bh = do p <- get bh; n <- get bh; return (Module p n)
 
-instance Uniquable PackageId where
- getUnique pid = getUnique (packageIdFS pid)
+-- This gives a stable ordering, as opposed to the Ord instance which
+-- gives an ordering based on the Uniques of the components, which may
+-- not be stable from run to run of the compiler.
+stableModuleCmp :: Module -> Module -> Ordering
+stableModuleCmp (Module p1 n1) (Module p2 n2) 
+   = (packageIdFS  p1 `compare` packageIdFS  p2) `thenCmp`
+     (moduleNameFS n1 `compare` moduleNameFS n2)
 
 mkModule :: PackageId -> ModuleName -> Module
 mkModule = Module
@@ -235,8 +243,16 @@ pprPackagePrefix p mod = getPprStyle doc
 %************************************************************************
 
 \begin{code}
-newtype PackageId = PId FastString deriving( Eq, Ord )  -- includes the version
+newtype PackageId = PId FastString deriving( Eq )  -- includes the version
     -- here to avoid module loops with PackageConfig
+
+instance Uniquable PackageId where
+ getUnique pid = getUnique (packageIdFS pid)
+
+-- Note: *not* a stable lexicographic ordering, a faster unique-based
+-- ordering.
+instance Ord PackageId where
+  nm1 `compare` nm2 = getUnique nm1 `compare` getUnique nm2
 
 instance Outputable PackageId where
    ppr pid = text (packageIdString pid)

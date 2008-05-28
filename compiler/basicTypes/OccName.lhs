@@ -5,6 +5,7 @@
 
 \begin{code}
 module OccName (
+        mk_deriv,
 	-- * The NameSpace type; abstact
 	NameSpace, tcName, clsName, tcClsName, dataName, varName, 
 	tvName, srcDataName,

@@ -32,7 +32,9 @@ import SrcLoc
 import ErrUtils
 import Config
 import FastMutInt
+import Unique
 import Outputable
+import FastString
 
 import Data.List
 import Data.Word
@@ -149,7 +151,19 @@ writeBinIface dflags hi_path mod_iface = do
   put_ bh symtab_p_p
 
 	-- Make some intial state
-  ud <- newWriteState
+  symtab_next <- newFastMutInt
+  writeFastMutInt symtab_next 0
+  symtab_map <- newIORef emptyUFM
+  let bin_symtab = BinSymbolTable {
+                      bin_symtab_next = symtab_next,
+                      bin_symtab_map  = symtab_map }
+  dict_next_ref <- newFastMutInt
+  writeFastMutInt dict_next_ref 0
+  dict_map_ref <- newIORef emptyUFM
+  let bin_dict = BinDictionary {
+                      bin_dict_next = dict_next_ref,
+                      bin_dict_map  = dict_map_ref }
+  ud <- newWriteState (putName bin_symtab) (putFastString bin_dict)
 
 	-- Put the main thing, 
   bh <- return $ setUserData bh ud
@@ -161,8 +175,8 @@ writeBinIface dflags hi_path mod_iface = do
   seekBin bh symtab_p		-- Seek back to the end of the file
 
         -- Write the symbol table itself
-  symtab_next <- readFastMutInt (ud_symtab_next ud)
-  symtab_map  <- readIORef (ud_symtab_map  ud)
+  symtab_next <- readFastMutInt symtab_next
+  symtab_map  <- readIORef symtab_map
   putSymbolTable bh symtab_next symtab_map
   debugTraceMsg dflags 3 (text "writeBinIface:" <+> int symtab_next 
                                 <+> text "Names")
@@ -176,8 +190,8 @@ writeBinIface dflags hi_path mod_iface = do
   seekBin bh dict_p		-- Seek back to the end of the file
 
 	-- Write the dictionary itself
-  dict_next <- readFastMutInt (ud_dict_next ud)
-  dict_map  <- readIORef (ud_dict_map  ud)
+  dict_next <- readFastMutInt dict_next_ref
+  dict_map  <- readIORef dict_map_ref
   putDictionary bh dict_next dict_map
   debugTraceMsg dflags 3 (text "writeBinIface:" <+> int dict_next
                                  <+> text "dict entries")
@@ -248,6 +262,51 @@ serialiseName bh name _ = do
   let mod = nameModule name
   put_ bh (modulePackageId mod, moduleName mod, nameOccName name)
 
+
+putName :: BinSymbolTable -> BinHandle -> Name -> IO ()
+putName BinSymbolTable{ 
+            bin_symtab_map = symtab_map_ref,
+            bin_symtab_next = symtab_next }    bh name
+  = do
+    symtab_map <- readIORef symtab_map_ref
+    case lookupUFM symtab_map name of
+      Just (off,_) -> put_ bh off
+      Nothing -> do
+         off <- readFastMutInt symtab_next
+         writeFastMutInt symtab_next (off+1)
+         writeIORef symtab_map_ref
+             $! addToUFM symtab_map name (off,name)
+         put_ bh off          
+
+
+data BinSymbolTable = BinSymbolTable {
+        bin_symtab_next :: !FastMutInt, -- The next index to use
+        bin_symtab_map  :: !(IORef (UniqFM (Int,Name)))
+                                -- indexed by Name
+  }
+
+
+putFastString :: BinDictionary -> BinHandle -> FastString -> IO ()
+putFastString BinDictionary { bin_dict_next = j_r,
+                              bin_dict_map  = out_r}  bh f
+  = do
+    out <- readIORef out_r
+    let uniq = getUnique f
+    case lookupUFM out uniq of
+        Just (j, _)  -> put_ bh j
+        Nothing -> do
+           j <- readFastMutInt j_r
+           put_ bh j
+           writeFastMutInt j_r (j + 1)
+           writeIORef out_r $! addToUFM out uniq (j, f)
+
+
+data BinDictionary = BinDictionary {
+        bin_dict_next :: !FastMutInt, -- The next index to use
+        bin_dict_map  :: !(IORef (UniqFM (Int,FastString)))
+                                -- indexed by FastString
+  }
+
 -- -----------------------------------------------------------------------------
 -- All the binary instances
 
@@ -300,70 +359,74 @@ instance Binary ModIface where
    put_ bh (ModIface {
 		 mi_module    = mod,
 		 mi_boot      = is_boot,
-		 mi_mod_vers  = mod_vers,
+		 mi_iface_hash= iface_hash,
+		 mi_mod_hash  = mod_hash,
 		 mi_orphan    = orphan,
 		 mi_finsts    = hasFamInsts,
 		 mi_deps      = deps,
 		 mi_usages    = usages,
 		 mi_exports   = exports,
-		 mi_exp_vers  = exp_vers,
+		 mi_exp_hash  = exp_hash,
 		 mi_fixities  = fixities,
 		 mi_deprecs   = deprecs,
 		 mi_decls     = decls,
 		 mi_insts     = insts,
 		 mi_fam_insts = fam_insts,
 		 mi_rules     = rules,
-		 mi_rule_vers = rule_vers,
+		 mi_orphan_hash = orphan_hash,
                  mi_vect_info = vect_info,
 		 mi_hpc       = hpc_info }) = do
 	put_ bh mod
 	put_ bh is_boot
-	put_ bh mod_vers
+	put_ bh iface_hash
+	put_ bh mod_hash
 	put_ bh orphan
 	put_ bh hasFamInsts
 	lazyPut bh deps
 	lazyPut bh usages
 	put_ bh exports
-	put_ bh exp_vers
+	put_ bh exp_hash
 	put_ bh fixities
 	lazyPut bh deprecs
         put_ bh decls
 	put_ bh insts
 	put_ bh fam_insts
 	lazyPut bh rules
-	put_ bh rule_vers
+	put_ bh orphan_hash
         put_ bh vect_info
 	put_ bh hpc_info
 
    get bh = do
 	mod_name  <- get bh
 	is_boot   <- get bh
-	mod_vers  <- get bh
+	iface_hash <- get bh
+	mod_hash  <- get bh
 	orphan    <- get bh
 	hasFamInsts <- get bh
 	deps	  <- lazyGet bh
 	usages	  <- {-# SCC "bin_usages" #-} lazyGet bh
 	exports	  <- {-# SCC "bin_exports" #-} get bh
-	exp_vers  <- get bh
+	exp_hash  <- get bh
 	fixities  <- {-# SCC "bin_fixities" #-} get bh
 	deprecs   <- {-# SCC "bin_deprecs" #-} lazyGet bh
         decls 	  <- {-# SCC "bin_tycldecls" #-} get bh
 	insts     <- {-# SCC "bin_insts" #-} get bh
 	fam_insts <- {-# SCC "bin_fam_insts" #-} get bh
 	rules	  <- {-# SCC "bin_rules" #-} lazyGet bh
-	rule_vers <- get bh
+	orphan_hash <- get bh
         vect_info <- get bh
         hpc_info  <- get bh
 	return (ModIface {
 		 mi_module    = mod_name,
 		 mi_boot      = is_boot,
-		 mi_mod_vers  = mod_vers,
+		 mi_iface_hash = iface_hash,
+		 mi_mod_hash  = mod_hash,
 		 mi_orphan    = orphan,
 		 mi_finsts    = hasFamInsts,
 		 mi_deps      = deps,
 		 mi_usages    = usages,
 		 mi_exports   = exports,
-		 mi_exp_vers  = exp_vers,
+		 mi_exp_hash  = exp_hash,
 		 mi_fixities  = fixities,
 		 mi_deprecs   = deprecs,
 		 mi_decls     = decls,
@@ -371,13 +434,13 @@ instance Binary ModIface where
 		 mi_insts     = insts,
 		 mi_fam_insts = fam_insts,
 		 mi_rules     = rules,
-		 mi_rule_vers = rule_vers,
+		 mi_orphan_hash = orphan_hash,
                  mi_vect_info = vect_info,
 		 mi_hpc       = hpc_info,
 			-- And build the cached values
 		 mi_dep_fn    = mkIfaceDepCache deprecs,
 		 mi_fix_fn    = mkIfaceFixCache fixities,
-		 mi_ver_fn    = mkIfaceVerCache decls })
+		 mi_hash_fn   = mkIfaceHashCache decls })
 
 getWayDescr :: IO String
 getWayDescr = do
@@ -421,22 +484,31 @@ instance (Binary name) => Binary (GenAvailInfo name) where
 		      return (AvailTC ab ac)
 
 instance Binary Usage where
-    put_ bh usg	= do 
-	put_ bh (usg_name     usg)
-	put_ bh (usg_mod      usg)
+    put_ bh usg@UsagePackageModule{} = do 
+        putByte bh 0
+	put_ bh (usg_mod usg)
+	put_ bh (usg_mod_hash usg)
+    put_ bh usg@UsageHomeModule{} = do 
+        putByte bh 1
+	put_ bh (usg_mod_name usg)
+	put_ bh (usg_mod_hash usg)
 	put_ bh (usg_exports  usg)
 	put_ bh (usg_entities usg)
-	put_ bh (usg_rules    usg)
 
     get bh = do
-	nm    <- get bh
-	mod   <- get bh
-	exps  <- get bh
-	ents  <- get bh
-	rules <- get bh
-	return (Usage {	usg_name = nm, usg_mod = mod,
-			usg_exports = exps, usg_entities = ents,
-			usg_rules = rules })
+        h <- getByte bh
+        case h of
+          0 -> do
+            nm    <- get bh
+            mod   <- get bh
+            return UsagePackageModule { usg_mod = nm, usg_mod_hash = mod }
+          _ -> do
+            nm    <- get bh
+            mod   <- get bh
+            exps  <- get bh
+            ents  <- get bh
+            return UsageHomeModule { usg_mod_name = nm, usg_mod_hash = mod,
+                            usg_exports = exps, usg_entities = ents }
 
 instance Binary Deprecations where
     put_ bh NoDeprecs     = putByte bh 0

@@ -1635,7 +1635,8 @@ showPackages = do
   pkg_ids <- fmap (preloadPackages . pkgState) getDynFlags
   io $ putStrLn $ showSDoc $ vcat $
     text "packages currently loaded:" 
-    : map (nest 2 . text . packageIdString) (sort pkg_ids)
+    : map (nest 2 . text . packageIdString) 
+               (sortBy (compare `on` packageIdFS) pkg_ids)
   where showFlag (ExposePackage p) = text $ "  -package " ++ p
         showFlag (HidePackage p)   = text $ "  -hide-package " ++ p
         showFlag (IgnorePackage p) = text $ "  -ignore-package " ++ p

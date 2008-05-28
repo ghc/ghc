@@ -87,7 +87,7 @@ module Type (
 
 	-- Comparison
 	coreEqType, tcEqType, tcEqTypes, tcCmpType, tcCmpTypes, 
-	tcEqPred, tcCmpPred, tcEqTypeX, tcPartOfType, tcPartOfPred,
+	tcEqPred, tcEqPredX, tcCmpPred, tcEqTypeX, tcPartOfType, tcPartOfPred,
 
 	-- Seq
 	seqType, seqTypes,
@@ -1017,6 +1017,9 @@ tcCmpTypes tys1 tys2 = cmpTypes tys1 tys2
 
 tcEqPred :: PredType -> PredType -> Bool
 tcEqPred p1 p2 = isEqual $ cmpPred p1 p2
+
+tcEqPredX :: RnEnv2 -> PredType -> PredType -> Bool
+tcEqPredX env p1 p2 = isEqual $ cmpPredX env p1 p2
 
 tcCmpPred :: PredType -> PredType -> Ordering
 tcCmpPred p1 p2 = cmpPred p1 p2

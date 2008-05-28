@@ -97,6 +97,14 @@ install::
 endif
 endif
 
+# hsc2hs-inplace is needed to 'make boot' in compiler.
+# Do a recursive 'make all' after generating dependencies, because this
+# will work with 'make -j'.
+ifneq "$(BootingFromHc)" "YES"
+boot :: depend
+	$(MAKE) all
+endif
+
 # -----------------------------------------------------------------------------
 
 override datadir=$(libdir)

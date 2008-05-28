@@ -7,7 +7,10 @@
 \begin{code}
 module FastMutInt(
 	FastMutInt, newFastMutInt,
-	readFastMutInt, writeFastMutInt
+	readFastMutInt, writeFastMutInt,
+
+	FastMutPtr, newFastMutPtr,
+	readFastMutPtr, writeFastMutPtr
   ) where
 
 #ifdef __GLASGOW_HASKELL__
@@ -19,6 +22,7 @@ module FastMutInt(
 
 import GHC.Base
 import GHC.IOBase
+import GHC.Ptr
 
 #else /* ! __GLASGOW_HASKELL__ */
 
@@ -29,6 +33,10 @@ import Data.IORef
 newFastMutInt :: IO FastMutInt
 readFastMutInt :: FastMutInt -> IO Int
 writeFastMutInt :: FastMutInt -> Int -> IO ()
+
+newFastMutPtr :: IO FastMutPtr
+readFastMutPtr :: FastMutPtr -> IO (Ptr a)
+writeFastMutPtr :: FastMutPtr -> Ptr a -> IO ()
 \end{code}
 
 \begin{code}
@@ -46,6 +54,21 @@ readFastMutInt (FastMutInt arr) = IO $ \s ->
 
 writeFastMutInt (FastMutInt arr) (I# i) = IO $ \s ->
   case writeIntArray# arr 0# i s of { s ->
+  (# s, () #) }
+
+data FastMutPtr = FastMutPtr (MutableByteArray# RealWorld)
+
+newFastMutPtr = IO $ \s ->
+  case newByteArray# size s of { (# s, arr #) ->
+  (# s, FastMutPtr arr #) }
+  where I# size = SIZEOF_VOID_P
+
+readFastMutPtr (FastMutPtr arr) = IO $ \s ->
+  case readAddrArray# arr 0# s of { (# s, i #) ->
+  (# s, Ptr i #) }
+
+writeFastMutPtr (FastMutPtr arr) (Ptr i) = IO $ \s ->
+  case writeAddrArray# arr 0# i s of { s ->
   (# s, () #) }
 #else /* ! __GLASGOW_HASKELL__ */
 --maybe someday we could use
@@ -67,6 +90,23 @@ readFastMutInt (FastMutInt ioRefInt) = readIORef ioRefInt
 
 -- FastMutInt is strict in the value it contains.
 writeFastMutInt (FastMutInt ioRefInt) i = i `seq` writeIORef ioRefInt i
+
+
+newtype FastMutPtr = FastMutPtr (IORef (Ptr ()))
+
+-- If any default value was chosen, it surely would be 0,
+-- so we will use that since IORef requires a default value.
+-- Or maybe it would be more interesting to package an error,
+-- assuming nothing relies on being able to read a bogus Ptr?
+-- That could interfere with its strictness for smart optimizers
+-- (are they allowed to optimize a 'newtype' that way?) ...
+-- Well, maybe that can be added (in DEBUG?) later.
+newFastMutPtr = fmap FastMutPtr (newIORef (castPtr nullPtr))
+
+readFastMutPtr (FastMutPtr ioRefPtr) = readIORef ioRefPtr
+
+-- FastMutPtr is strict in the value it contains.
+writeFastMutPtr (FastMutPtr ioRefPtr) i = i `seq` writeIORef ioRefPtr i
 #endif
 \end{code}
 

@@ -66,6 +66,7 @@ import PprCore
 import CoreSyn
 import ErrUtils
 import Id
+import VarEnv
 import Var
 import Module
 import LazyUniqFM
@@ -78,10 +79,12 @@ import SrcLoc
 import HscTypes
 import ListSetOps
 import Outputable
+import DataCon
+import Type
+import Class
 
 #ifdef GHCI
 import Linker
-import DataCon
 import TcHsType
 import TcMType
 import TcMatches
@@ -103,6 +106,7 @@ import Bag
 import Control.Monad
 import Data.Maybe	( isJust )
 
+#include "HsVersions.h"
 \end{code}
 
 
@@ -251,8 +255,7 @@ tcRnImports hsc_env this_mod import_decls
 
 		-- Check type-familily consistency
 	; traceRn (text "rn1: checking family instance consistency")
-	; let { dir_imp_mods = map (\ (mod, _) -> mod) 
-			     . moduleEnvElts 
+	; let { dir_imp_mods = moduleEnvKeys
 			     . imp_mods 
 			     $ imports }
 	; checkFamInstConsistency (imp_finsts imports) dir_imp_mods ;
@@ -550,6 +553,7 @@ checkHiBootIface
             --	      be the equivalent to the dfun bindings returned for class
             --	      instances?  We can't easily equate tycons...
 
+        ; failIfErrsM
 	; return tcg_env' }
   where
     check_export boot_avail	-- boot_avail is exported by the boot iface
@@ -560,7 +564,8 @@ checkHiBootIface
 
 	-- Check that the actual module exports the same thing
       | not (null missing_names)
-      = addErrTc (missingBootThing (head missing_names) "exported by")
+      = addErrAt (nameSrcSpan (head missing_names)) 
+                 (missingBootThing (head missing_names) "exported by")
 
 	-- If the boot module does not *define* the thing, we are done
 	-- (it simply re-exports it, and names match, so nothing further to do)
@@ -568,13 +573,14 @@ checkHiBootIface
 
 	-- Check that the actual module also defines the thing, and 
 	-- then compare the definitions
-      | Just real_thing <- lookupTypeEnv local_type_env name
-      = do { let boot_decl = tyThingToIfaceDecl (fromJust mb_boot_thing)
-	         real_decl = tyThingToIfaceDecl real_thing
-	   ; checkTc (checkBootDecl boot_decl real_decl)
-		     (bootMisMatch real_thing boot_decl real_decl) }
-		-- The easiest way to check compatibility is to convert to
-		-- iface syntax, where we already have good comparison functions
+      | Just real_thing <- lookupTypeEnv local_type_env name,
+        Just boot_thing <- mb_boot_thing
+      = when (not (checkBootDecl boot_thing real_thing))
+            $ addErrAt (nameSrcSpan (getName boot_thing))
+                       (let boot_decl = tyThingToIfaceDecl 
+                                               (fromJust mb_boot_thing)
+                            real_decl = tyThingToIfaceDecl real_thing
+                        in bootMisMatch real_thing boot_decl real_decl)
 
       | otherwise
       = addErrTc (missingBootThing name "defined in")
@@ -603,6 +609,103 @@ checkHiBootIface
 	  boot_inst_ty = idType boot_dfun
 	  local_boot_dfun = Id.mkExportedLocalId (idName boot_dfun) boot_inst_ty
 
+
+-- This has to compare the TyThing from the .hi-boot file to the TyThing
+-- in the current source file.  We must be careful to allow alpha-renaming
+-- where appropriate, and also the boot declaration is allowed to omit
+-- constructors and class methods.
+--
+-- See rnfail055 for a good test of this stuff.
+
+checkBootDecl :: TyThing -> TyThing -> Bool
+
+checkBootDecl (AnId id1) (AnId id2)
+  = ASSERT(id1 == id2) 
+    (idType id1 `tcEqType` idType id2)
+
+checkBootDecl (ATyCon tc1) (ATyCon tc2)
+  | isSynTyCon tc1 && isSynTyCon tc2
+  = ASSERT(tc1 == tc2)
+    let tvs1 = tyConTyVars tc1; tvs2 = tyConTyVars tc2
+        env = rnBndrs2 env0 tvs1 tvs2
+
+        eqSynRhs (OpenSynTyCon k1 _) (OpenSynTyCon k2 _)
+            = tcEqTypeX env k1 k2
+        eqSynRhs (SynonymTyCon t1) (SynonymTyCon t2)
+            = tcEqTypeX env t1 t2
+    in
+    equalLength tvs1 tvs2 &&
+    eqSynRhs (synTyConRhs tc1) (synTyConRhs tc2)
+
+  | isAlgTyCon tc1 && isAlgTyCon tc2
+  = ASSERT(tc1 == tc2)
+    eqListBy tcEqPred (tyConStupidTheta tc1) (tyConStupidTheta tc2)
+    && eqAlgRhs (algTyConRhs tc1) (algTyConRhs tc2)
+
+  | isForeignTyCon tc1 && isForeignTyCon tc2
+  = tyConExtName tc1 == tyConExtName tc2
+  where 
+        env0 = mkRnEnv2 emptyInScopeSet
+
+        eqAlgRhs AbstractTyCon _ = True
+        eqAlgRhs OpenTyCon{} OpenTyCon{} = True
+        eqAlgRhs tc1@DataTyCon{} tc2@DataTyCon{} =
+            eqListBy eqCon (data_cons tc1) (data_cons tc2)
+        eqAlgRhs tc1@NewTyCon{} tc2@NewTyCon{} =
+            eqCon (data_con tc1) (data_con tc2)
+        eqAlgRhs _ _ = False
+
+        eqCon c1 c2
+          =  dataConName c1 == dataConName c2
+          && dataConIsInfix c1 == dataConIsInfix c2
+          && dataConStrictMarks c1 == dataConStrictMarks c2
+          && dataConFieldLabels c1 == dataConFieldLabels c2
+          && let tvs1 = dataConUnivTyVars c1 ++ dataConExTyVars c1
+                 tvs2 = dataConUnivTyVars c2 ++ dataConExTyVars c2
+                 env = rnBndrs2 env0 tvs1 tvs2
+             in
+              equalLength tvs1 tvs2 &&              
+              eqListBy (tcEqPredX env)
+                        (dataConEqTheta c1 ++ dataConDictTheta c1)
+                        (dataConEqTheta c2 ++ dataConDictTheta c2) &&
+              eqListBy (tcEqTypeX env)
+                        (dataConOrigArgTys c1)
+                        (dataConOrigArgTys c2)
+
+checkBootDecl (AClass c1)  (AClass c2)
+  = let 
+       (clas_tyvars1, clas_fds1, sc_theta1, _, _, op_stuff1) 
+          = classExtraBigSig c1
+       (clas_tyvars2, clas_fds2, sc_theta2, _, _, op_stuff2) 
+          = classExtraBigSig c2
+
+       env0 = mkRnEnv2 emptyInScopeSet
+       env = rnBndrs2 env0 clas_tyvars1 clas_tyvars2
+
+       eqSig (id1, def_meth1) (id2, def_meth2)
+         = idName id1 == idName id2 &&
+           tcEqTypeX env op_ty1 op_ty2
+         where
+	  (_, rho_ty1) = splitForAllTys (idType id1)
+	  op_ty1 = funResultTy rho_ty1
+	  (_, rho_ty2) = splitForAllTys (idType id2)
+          op_ty2 = funResultTy rho_ty2
+
+       eqFD (as1,bs1) (as2,bs2) = 
+         eqListBy (tcEqTypeX env) (mkTyVarTys as1) (mkTyVarTys as2) &&
+         eqListBy (tcEqTypeX env) (mkTyVarTys bs1) (mkTyVarTys bs2)
+    in
+       equalLength clas_tyvars1 clas_tyvars2 &&
+       eqListBy eqFD clas_fds1 clas_fds2 &&
+       (null sc_theta1 && null op_stuff1
+        ||
+        eqListBy (tcEqPredX env) sc_theta1 sc_theta2 &&
+        eqListBy eqSig op_stuff1 op_stuff2)
+
+checkBootDecl (ADataCon dc1) (ADataCon dc2)
+  = pprPanic "checkBootDecl" (ppr dc1)
+
+checkBootDecl _ _ = False -- probably shouldn't happen
 
 ----------------
 missingBootThing thing what

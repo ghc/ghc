@@ -363,6 +363,17 @@ lintCoreExpr e@(Case scrut var alt_ty alts) =
   do { scrut_ty <- lintCoreExpr scrut
      ; alt_ty   <- lintTy alt_ty  
      ; var_ty   <- lintTy (idType var)	
+
+     ; let mb_tc_app = splitTyConApp_maybe (idType var)
+     ; case mb_tc_app of 
+         Just (tycon, _)
+              | debugIsOn &&
+                isAlgTyCon tycon && 
+                null (tyConDataCons tycon) -> 
+                  pprTrace "case binder's type has no constructors" (ppr e)
+                      $ return ()
+         _otherwise -> return ()
+
 	-- Don't use lintIdBndr on var, because unboxed tuple is legitimate
 
      ; subst <- getTvSubst 

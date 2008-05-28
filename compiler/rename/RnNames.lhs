@@ -225,7 +225,7 @@ rnImportDecl this_mod (L loc (ImportDecl loc_imp_mod_name want_boot
 			_ 		     -> False
 
 	imports   = ImportAvails { 
-			imp_mods     = unitModuleEnv imp_mod (imp_mod, [(qual_mod_name, import_all, loc)]),
+			imp_mods     = unitModuleEnv imp_mod [(qual_mod_name, import_all, loc)],
 			imp_orphs    = orphans,
 			imp_finsts   = finsts,
 			imp_dep_mods = mkModDeps dependent_mods,
@@ -805,7 +805,7 @@ exports_from_avail (Just rdr_items) rdr_env imports this_mod
     kids_env = mkChildEnv (globalRdrEnvElts rdr_env)
 
     imported_modules = [ qual_name
-                       | (_, xs) <- moduleEnvElts $ imp_mods imports,
+                       | xs <- moduleEnvElts $ imp_mods imports,
                          (qual_name, _, _) <- xs ]
 
     exports_from_item :: ExportAccum -> LIE RdrName -> RnM ExportAccum
@@ -1176,7 +1176,7 @@ reportUnusedNames export_decls gbl_env
 
     direct_import_mods :: [(Module, [(ModuleName, Bool, SrcSpan)])]
 	-- See the type of the imp_mods for this triple
-    direct_import_mods = moduleEnvElts (imp_mods imports)
+    direct_import_mods = fmToList (imp_mods imports)
 
     -- unused_imp_mods are the directly-imported modules 
     -- that are not mentioned in minimal_imports1

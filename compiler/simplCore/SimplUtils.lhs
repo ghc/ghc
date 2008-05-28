@@ -1425,6 +1425,10 @@ prepareDefault _ _ case_bndr (Just (tycon, inst_tys)) imposs_cons (Just deflt_rh
 
 	_ -> return [(DEFAULT, [], deflt_rhs)]
 
+  | debugIsOn, isAlgTyCon tycon, [] <- tyConDataCons tycon
+  = pprTrace "prepareDefault" (ppr case_bndr <+> ppr tycon <+> ppr deflt_rhs)
+        $ return [(DEFAULT, [], deflt_rhs)]
+
 --------- Catch-all cases -----------
 prepareDefault _dflags _env _case_bndr _bndr_ty _imposs_cons (Just deflt_rhs)
   = return [(DEFAULT, [], deflt_rhs)]

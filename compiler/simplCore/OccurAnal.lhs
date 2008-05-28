@@ -497,14 +497,14 @@ reOrderCycle (bind : binds)
         | workerExists (idWorkerInfo bndr)      = 10
                 -- Note [Worker inline loop]
 
-        | exprIsTrivial rhs        = 4  -- Practically certain to be inlined
+        | exprIsTrivial rhs        = 5  -- Practically certain to be inlined
                 -- Used to have also: && not (isExportedId bndr)
                 -- But I found this sometimes cost an extra iteration when we have
                 --      rec { d = (a,b); a = ...df...; b = ...df...; df = d }
                 -- where df is the exported dictionary. Then df makes a really
                 -- bad choice for loop breaker
 
-        | is_con_app rhs = 2    -- Data types help with cases
+        | is_con_app rhs = 3    -- Data types help with cases
                 -- Note [conapp]
 
 -- If an Id is marked "never inline" then it makes a great loop breaker
@@ -513,8 +513,11 @@ reOrderCycle (bind : binds)
 -- so it probably isn't worth the time to test on every binder
 --	| isNeverActive (idInlinePragma bndr) = -10
 
-        | inlineCandidate bndr rhs = 1  -- Likely to be inlined
+        | inlineCandidate bndr rhs = 2  -- Likely to be inlined
                 -- Note [Inline candidates]
+
+        | not (neverUnfold (idUnfolding bndr)) = 1
+                -- the Id has some kind of unfolding
 
         | otherwise = 0
 
