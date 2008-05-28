@@ -127,7 +127,13 @@ test('conc059', compose(only_compiler_types(['ghc']),
 	compile_and_run, ['conc059_c.c'])
 clean(['conc059_c.o'])
 
-test('conc064', exit_code(1), compile_and_run, [''])
+test('conc064',
+     compose(exit_code(1),
+             # This test sometimes just exits successfully
+             # when run the threaded2 way. Punting on
+             # diagnosing/fixing it.
+             if_compiler_lt('ghc', '6.9', omit_ways(['threaded2']))),
+     compile_and_run, [''])
 
 test('conc065', ignore_output, compile_and_run, [''])
 test('conc066', ignore_output, compile_and_run, [''])
