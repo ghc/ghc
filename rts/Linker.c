@@ -2306,6 +2306,8 @@ ocGetNames_PEi386 ( ObjectCode* oc )
           && 0 != strcmp(".ctors", sectab_i->Name)
           /* ignore section generated from .ident */
           && 0!= strcmp("/4", sectab_i->Name)
+	  /* ignore unknown section that appeared in gcc 3.4.5(?) */
+          && 0!= strcmp(".reloc", sectab_i->Name)
          ) {
          errorBelch("Unknown PEi386 section name `%s' (while processing: %s)", sectab_i->Name, oc->fileName);
          return 0;
