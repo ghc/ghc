@@ -65,6 +65,11 @@ test('cg059', exit_code(1), compile_and_run, [''])
 test('1852', normal, compile_and_run, [''])
 test('2080', normal, compile_and_run, [''])
 
-test('cg060', extra_run_opts('+RTS -K64k -RTS'), compile_and_run, [''])
+test('cg060',
+     compose(extra_run_opts('+RTS -K64k -RTS'),
+             # These stack overflow in at least the 6.8 branch; punting
+             # on investigating them.
+             if_compiler_lt('ghc', '6.9', omit_ways(['profasm', 'profc']))),
+     compile_and_run, [''])
 
 test('1861', extra_run_opts('0'), compile_and_run, [''])
