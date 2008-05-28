@@ -62,6 +62,11 @@ isAlive(StgClosure *p)
 
     // large objects use the evacuated flag
     if (bd->flags & BF_LARGE) {
+        if (get_itbl(q)->type == TSO &&
+            ((StgTSO *)p)->what_next == ThreadRelocated) {
+            p = (StgClosure *)((StgTSO *)p)->_link;
+            continue;
+        }
 	return NULL;
     }
 
