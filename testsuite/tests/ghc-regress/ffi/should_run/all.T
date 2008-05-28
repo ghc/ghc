@@ -98,7 +98,8 @@ test('ffi017', normal, compile_and_run, [''])
 test('ffi018', [ omit_ways(['ghci']), extra_clean(['ffi018_c.o']) ],
                compile_and_run, ['ffi018_c.c'])
 
-test('ffi018', [ only_ways(['ghci']),
+test('ffi018', [ if_compiler_lt('ghc', '6.9', skip),
+                 only_ways(['ghci']),
                  cmd_prefix('$MAKE ffi018_ghci_setup && '),
                  extra_clean(['ffi018_ghci_c.o']) ],
                compile_and_run, ['ffi018_ghci_c.o'])
