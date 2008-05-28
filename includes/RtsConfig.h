@@ -24,7 +24,7 @@
 /*
  * Whether the runtime system will use libbfd for debugging purposes.
  */
-#if defined(DEBUG) && defined(HAVE_BFD_H) && !defined(_WIN32) && !defined(PAR) && !defined(GRAN)
+#if defined(DEBUG) && defined(HAVE_BFD_H) && defined(HAVE_LIBBFD) && !defined(_WIN32) && !defined(PAR) && !defined(GRAN)
 #define USING_LIBBFD 1
 #endif
 
