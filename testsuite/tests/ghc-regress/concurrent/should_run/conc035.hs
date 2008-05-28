@@ -14,6 +14,9 @@ trapHandler inVar caughtVar =
   (trapExc inVar caughtVar)
 
 trapExc :: MVar Int -> MVar () -> E.Exception -> IO ()
+-- If we have been killed then we are done
+trapExc inVar caughtVar (E.AsyncException E.ThreadKilled) = return ()
+-- Otherwise...
 trapExc inVar caughtVar e =
   do putStrLn ("Exception: " ++ show e)
      putMVar caughtVar ()
@@ -39,4 +42,7 @@ main = do
 	-- in takeMVar, and thereby become interruptible, at which point
 	-- it will receive the second exception.
   takeMVar caughtVar
+  -- Running the GHCi way complains that tid is blocked indefinitely if
+  -- it still exists, so kill it.
+  killThread tid
   putStrLn "All done"
