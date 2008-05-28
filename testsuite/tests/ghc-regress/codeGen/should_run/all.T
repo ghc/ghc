@@ -54,7 +54,7 @@ test('cg054', normal, compile_and_run, [''])
 test('cg055', normal, compile_and_run, [''])
 test('cg056', normal, compile_and_run, [''])
 
-test('cg057', composes([expect_broken(948),
+test('cg057', composes([if_compiler_gt('ghc', '6.9', expect_broken(948)),
                         only_ways(['prof','profasm']),
                         extra_run_opts('+RTS -xc')]),
      compile_and_run, [''])
