@@ -40,7 +40,7 @@ PACKAGE_NAME = GHC-$(ProjectVersion)-$(TargetArch_CPP).pkg
 
 # Determine arguments that should be passed to ./configure from within Xcode
 #
-# By default, we pass whatever was used whne the present tree was configured.
+# By default, we pass whatever was used when the present tree was configured.
 # The user can override this by setting XCODE_EXTRA_CONFIGURE_ARGS.  If
 # MACOSX_DEPLOYMENT_TARGET is set, the target is added to whatever arguments
 # are passed.
@@ -50,6 +50,13 @@ XCODE_EXTRA_CONFIGURE_ARGS = $(shell echo $(CONFIGURE_ARGS))
 endif
 ifneq "$(MACOSX_DEPLOYMENT_TARGET)" ""
 XCODE_EXTRA_CONFIGURE_ARGS += --with-macosx-deployment-target=$(MACOSX_DEPLOYMENT_TARGET)
+endif
+
+# Determine whether we need to pass a "-target" option to packagemaker
+#
+# If a deployment target has been set, we use the same target for packagemaker.
+ifneq "$(MACOSX_DEPLOYMENT_TARGET)" ""
+PACKAGEMAKER_TARGET = -target $(MACOSX_DEPLOYMENT_TARGET)
 endif
 
 # Xcode's installation build product location (this is where the GHC.framework
@@ -81,7 +88,8 @@ framework-pkg:
 	 	   FRAMEWORK_VERSION=$(FRAMEWORK_VERSION)\
 		   CURRENT_LIBRARY_VERSION=$(FRAMEWORK_VERSION)
 	-$(RM) -f GHC-system.pmdoc/*-contents.xml
-	$(PACKAGEMAKER) -v --doc GHC-system.pmdoc -o $(TOP)/$(PACKAGE_NAME)
+	$(PACKAGEMAKER) -v --doc GHC-system.pmdoc\
+			$(PACKAGEMAKER_TARGET) -o $(TOP)/$(PACKAGE_NAME)
 
 # Instead of making 'binary-dist' a Makefile dependency, we let xcodebuild call
 # 'make binary-dist'.  This has the advantage that xcode knows the framework
