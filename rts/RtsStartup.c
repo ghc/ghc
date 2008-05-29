@@ -330,7 +330,9 @@ hs_add_root(void (*init_root)(void))
 {
     bdescr *bd;
     nat init_sp;
-    Capability *cap = &MainCapability;
+    Capability *cap;
+
+    cap = rts_lock();
 
     if (hs_init_count <= 0) {
 	barf("hs_add_root() must be called after hs_init()");
@@ -356,6 +358,8 @@ hs_add_root(void (*init_root)(void))
     // This must be done after module initialisation.
     // ToDo: make this work in the presence of multiple hs_add_root()s.
     initProfiling2();
+
+    rts_unlock(cap);
 
     // ditto.
 #if defined(THREADED_RTS)
