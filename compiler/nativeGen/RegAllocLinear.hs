@@ -88,6 +88,7 @@ module RegAllocLinear (
 
 #include "HsVersions.h"
 
+import BlockId
 import MachRegs
 import MachInstrs
 import RegAllocInfo

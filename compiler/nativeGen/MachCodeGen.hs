@@ -32,6 +32,7 @@ import PositionIndependentCode
 import RegAllocInfo ( mkBranchInstr )
 
 -- Our intermediate code:
+import BlockId
 import PprCmm		( pprExpr )
 import Cmm
 import MachOp

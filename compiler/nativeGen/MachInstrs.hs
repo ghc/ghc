@@ -43,6 +43,7 @@ module MachInstrs (
 
 #include "HsVersions.h"
 
+import BlockId
 import MachRegs
 import Cmm
 import MachOp		( MachRep(..) )

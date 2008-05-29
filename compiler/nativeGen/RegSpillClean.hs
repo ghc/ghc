@@ -29,6 +29,7 @@ module RegSpillClean (
 )
 where
 
+import BlockId
 import RegLiveness
 import RegAllocInfo
 import MachRegs

@@ -25,7 +25,7 @@ module NCGMonad (
   
 #include "HsVersions.h"
 
-import Cmm		( BlockId(..) )
+import BlockId
 import CLabel		( CLabel, mkAsmTempLabel )
 import MachRegs
 import MachOp		( MachRep )

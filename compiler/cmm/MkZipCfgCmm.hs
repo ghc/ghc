@@ -19,16 +19,16 @@ where
 
 #include "HsVersions.h"
 
+import BlockId
 import CmmExpr
 import Cmm ( GenCmm(..), GenCmmTop(..), CmmStatic, CmmInfo
            , CmmCallTarget(..), CmmActuals, CmmFormals, CmmFormalsWithoutKinds
            , CmmKinded (..)
            )
-import MachOp (MachHint(..))
+import MachOp (MachHint(..), wordRep)
 import ZipCfgCmmRep hiding (CmmGraph, CmmAGraph, CmmBlock, CmmZ, CmmTopZ)
   -- ^ to make this module more self-contained, these definitions are duplicated below
 import PprCmm()
-import StackSlot
 
 import ClosureInfo
 import FastString
@@ -62,10 +62,10 @@ mkFinalCall  :: CmmExpr -> CCallConv -> CmmActuals -> CmmAGraph
 mkAddToContext :: CmmExpr -> [CmmExpr] -> CmmAGraph
 
 ---------- Control transfer
-mkJump       	:: CmmExpr -> CmmActuals -> CmmAGraph
-mkCbranch    	:: CmmExpr -> BlockId -> BlockId -> CmmAGraph
-mkSwitch     	:: CmmExpr -> [Maybe BlockId] -> CmmAGraph
-mkReturn     	:: CmmActuals -> CmmAGraph
+mkJump       	:: Area    -> CmmExpr -> CmmActuals -> CmmAGraph
+mkCbranch    	:: CmmExpr -> BlockId -> BlockId    -> CmmAGraph
+mkSwitch     	:: CmmExpr -> [Maybe BlockId]       -> CmmAGraph
+mkReturn     	:: Area    -> CmmActuals            -> CmmAGraph
 
 mkCmmIfThenElse :: CmmExpr -> CmmAGraph -> CmmAGraph -> CmmAGraph
 mkCmmIfThen     :: CmmExpr -> CmmAGraph -> CmmAGraph
@@ -105,23 +105,22 @@ mkSwitch e tbl            = mkLast   $ LastSwitch e tbl
 mkUnsafeCall tgt results actuals = mkMiddle $ MidUnsafeCall tgt results actuals
 mkAddToContext ra actuals        = mkMiddle $ MidAddToContext ra actuals
 
---cmmArgConv :: Convention
 cmmResConv :: Convention
---cmmArgConv = ConventionStandard CmmCallConv Arguments
-cmmResConv = ConventionStandard CmmCallConv Arguments
+cmmResConv = ConventionStandard CmmCallConv Results
 
-copyIn :: Convention -> StackArea -> CmmFormals -> [Middle]
+copyIn :: Convention -> Area -> CmmFormals -> [Middle]
 copyIn _ area formals = reverse $ snd $ foldl ci (1, []) formals
   where ci (n, ms) v = (n+1, MidAssign (CmmLocal $ kindlessCmm v)
-                                       (CmmReg $ CmmStack $ StackSlot area n) : ms)
+                                       (CmmLoad (CmmStackSlot area n) wordRep) : ms)
 
-copyOut :: Convention -> StackArea -> CmmActuals -> [Middle]
-copyOut _ area actuals = moveSP : reverse (snd $ foldl co (1, []) actuals)
-  where moveSP = MidAssign spReg $ CmmReg $ CmmStack $ outgoingSlot area
-        co (n, ms) v = (n+1, MidAssign (CmmStack $ StackSlot area n) 
-                                       (kindlessCmm v) : ms)
-mkEntry :: BlockId -> Convention -> CmmFormalsWithoutKinds -> [Middle]
-mkEntry entryId conv formals = copyIn conv (mkStackArea entryId [] $ Just fs) fs
+copyOut :: Convention -> Area -> CmmActuals -> [Middle]
+copyOut conv area actuals = moveSP conv $ snd $ foldl co (1, []) actuals
+  where moveSP (ConventionStandard _ Arguments) args =
+           MidAssign spReg (outgoingSlot area) : reverse args
+        moveSP _ args = reverse $ MidAssign spReg (outgoingSlot area) : args
+        co (n, ms) v = (n+1, MidStore (CmmStackSlot area n) (kindlessCmm v) : ms)
+mkEntry :: Area -> Convention -> CmmFormalsWithoutKinds -> [Middle]
+mkEntry area conv formals = copyIn conv area fs
   where fs = map (\f -> CmmKinded f NoHint) formals
 
 -- I'm not sure how to get the calling conventions right yet,
@@ -129,31 +128,32 @@ mkEntry entryId conv formals = copyIn conv (mkStackArea entryId [] $ Just fs) fs
 -- Simon's patch is applied.
 -- For now, I apply a bogus calling convention: all arguments go on the
 -- stack, using the same amount of stack space.
-lastWithArgs :: Convention -> CmmActuals -> Maybe CmmFormals -> (BlockId -> Last) ->
-                CmmAGraph
-lastWithArgs conv actuals formals toLast =
-  withFreshLabel "call successor" $ \k ->
-    let area = mkStackArea k actuals formals
-    in (mkMiddles $ copyOut conv area actuals) <*>
-       -- adjust the sp
-       mkLast (toLast k) <*>
-       case formals of
-         Just formals -> mkLabel k <*> (mkMiddles $ copyIn conv area formals)
-         Nothing      -> emptyAGraph
+lastWithArgs' :: BlockId -> Area -> Convention -> CmmActuals -> Maybe CmmFormals ->
+                 (BlockId -> Last) -> CmmAGraph
+lastWithArgs' k area conv actuals formals toLast =
+  (mkMiddles $ copyOut conv area actuals) <*>
+  -- adjust the sp
+  mkLast (toLast k) <*>
+  case formals of
+    Just formals -> mkLabel k <*> (mkMiddles $ copyIn conv area formals)
+    Nothing      -> emptyAGraph
+lastWithArgs :: Convention -> CmmActuals -> Maybe CmmFormals -> (BlockId -> Last) -> CmmAGraph
+lastWithArgs c a f l =
+  withFreshLabel "call successor" $ \k -> lastWithArgs' k (mkCallArea k a f) c a f l
+
 always :: a -> b -> a
 always x _ = x
 
-mkJump e actuals = lastWithArgs cmmResConv actuals Nothing $ always $ LastJump e
-mkReturn actuals = lastWithArgs cmmResConv actuals Nothing $ always LastReturn
---mkJump e actuals = mkMiddle (CopyOut cmmArgConv actuals) <*> mkLast (LastJump e)
---mkReturn actuals = mkMiddle (CopyOut cmmResConv actuals) <*> mkLast LastReturn
+-- The area created for the jump and return arguments is the same area as the
+-- procedure entry.
+mkJump   area e actuals =
+  lastWithArgs' (areaId area) area cmmResConv actuals Nothing $ always $ LastJump e
+mkReturn area   actuals =
+  lastWithArgs' (areaId area) area cmmResConv actuals Nothing $ always LastReturn
 
 mkFinalCall f conv actuals =
   lastWithArgs (ConventionStandard conv Arguments) actuals Nothing
       $ always $ LastCall f Nothing --mkFinalCall  f conv actuals =
---    mkMiddle (CopyOut (ConventionStandard conv Arguments) actuals) <*>
---    mkLast   (LastCall f Nothing)
---
 
 mkCmmCall f results actuals srt = mkCall f CmmCallConv results actuals srt
 
@@ -161,9 +161,3 @@ mkCmmCall f results actuals srt = mkCall f CmmCallConv results actuals srt
 mkCall f conv results actuals _ =
   lastWithArgs (ConventionStandard conv Arguments) actuals (Just results)
         $ \k -> LastCall f (Just k)
---mkCall f conv results actuals srt = 
---    withFreshLabel "call successor" $ \k ->
---      mkMiddle (CopyOut (ConventionStandard conv Arguments) actuals) <*>
---      mkLast (LastCall f (Just k)) <*>
---      mkLabel k <*>
---      mkMiddle (CopyIn (ConventionStandard conv Results) results srt)

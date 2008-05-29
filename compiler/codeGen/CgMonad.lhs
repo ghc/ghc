@@ -70,6 +70,7 @@ import {-# SOURCE #-} CgBindery ( CgBindings, nukeVolatileBinds )
 
 import DynFlags
 import PackageConfig
+import BlockId
 import Cmm
 import CmmUtils
 import CLabel

@@ -13,6 +13,7 @@ module CmmCPS (
 
 #include "HsVersions.h"
 
+import BlockId
 import Cmm
 import CmmLint
 import PprCmm

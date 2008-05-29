@@ -7,13 +7,13 @@ module CmmLiveZ
     ) 
 where
 
+import BlockId
 import CmmExpr
 import CmmTx
 import DFMonad
 import Monad
 import PprCmm()
 import PprCmmZ()
-import StackSlot
 import ZipCfg
 import ZipDataflow
 import ZipCfgCmmRep

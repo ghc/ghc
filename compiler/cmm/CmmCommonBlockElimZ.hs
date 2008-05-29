@@ -4,6 +4,7 @@ module CmmCommonBlockElimZ
 where
 
 
+import BlockId
 import Cmm hiding (blockId)
 import CmmExpr
 import Prelude hiding (iterate, zip, unzip)
@@ -89,13 +90,13 @@ hash_block (Block _ t) = hash_tail t 0
         hash_mid   (CopyOut _ as) = hash_as as
         hash_reg   (CmmLocal l) = hash_local l
         hash_reg   (CmmGlobal _)    = 19
-        hash_reg   (CmmStack _)    = 13
         hash_local (LocalReg _ _ _) = 117
         hash_e (CmmLit l) = hash_lit l
         hash_e (CmmLoad e _) = 67 + hash_e e
         hash_e (CmmReg r) = hash_reg r
         hash_e (CmmMachOp _ es) = hash_lst hash_e es -- pessimal - no operator check
         hash_e (CmmRegOff r i) = hash_reg r + i
+        hash_e (CmmStackSlot _ _) = 13
         hash_lit (CmmInt i _) = fromInteger i
         hash_lit (CmmFloat r _) = truncate r
         hash_lit (CmmLabel _) = 119 -- ugh

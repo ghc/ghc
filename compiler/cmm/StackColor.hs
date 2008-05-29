@@ -1,6 +1,7 @@
 
 module StackColor where
 
+import BlockId
 import StackPlacements
 import qualified GraphColor as Color
 import CmmExpr
@@ -8,7 +9,6 @@ import CmmSpillReload
 import DFMonad
 import qualified GraphOps
 import MachOp
-import StackSlot
 import ZipCfg
 import ZipCfgCmmRep
 import ZipDataflow

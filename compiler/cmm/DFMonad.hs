@@ -12,10 +12,10 @@ module DFMonad
     )
 where
 
+import BlockId
 import CmmTx
 import PprCmm()
 import OptimizationFuel
-import StackSlot
 
 import Control.Monad
 import Maybes

@@ -4,12 +4,12 @@ module PprCmmZ
     )
 where
 
+import BlockId
 import Cmm
 import CmmExpr
 import ForeignCall
 import PprCmm
 import Outputable
-import StackSlot
 import qualified ZipCfgCmmRep as G
 import qualified ZipCfg as Z
 import CmmZipUtil

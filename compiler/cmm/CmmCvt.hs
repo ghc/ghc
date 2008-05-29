@@ -4,6 +4,7 @@ module CmmCvt
   ( cmmToZgraph, cmmOfZgraph )
 where
 
+import BlockId
 import Cmm
 import CmmExpr
 import MkZipCfg
@@ -36,7 +37,7 @@ cmmOfZgraph = cmmMapGraph  ofZgraph
 toZgraph :: String -> CmmFormalsWithoutKinds -> ListGraph CmmStmt -> UniqSM CmmGraph
 toZgraph _ _ (ListGraph []) = lgraphOfAGraph emptyAGraph
 toZgraph fun_name args g@(ListGraph (BasicBlock id ss : other_blocks)) = 
-           labelAGraph id $ mkMiddles (mkEntry id undefined args) <*>
+           labelAGraph id $ mkMiddles (mkEntry area undefined args) <*>
                             mkStmts ss <*> foldr addBlock emptyAGraph other_blocks
   where addBlock (BasicBlock id ss) g = mkLabel id   <*> mkStmts ss <*> g
         mkStmts (CmmNop        : ss)  = mkNop        <*> mkStmts ss 
@@ -60,12 +61,28 @@ toZgraph fun_name args g@(ListGraph (BasicBlock id ss : other_blocks)) =
         mkLast (CmmCall (CmmPrim {}) _ _ _ CmmNeverReturns) =
             panic "Call to CmmPrim never returns?!"
         mkLast (CmmSwitch scrutinee table) = mkSwitch scrutinee table
-        mkLast (CmmJump tgt args)          = mkJump tgt args
-        mkLast (CmmReturn ress)            = mkReturn ress
+        mkLast (CmmJump tgt args)          = mkJump   area tgt args
+        mkLast (CmmReturn ress)            = mkReturn area ress
         mkLast (CmmBranch tgt)             = mkBranch tgt
         mkLast (CmmCall _f (_:_) _args _ CmmNeverReturns) =
                    panic "Call never returns but has results?!"
         mkLast _ = panic "fell off end of block"
+        -- The entry, jump, and return areas should be the same.
+        -- This code is horrible, but there's no point trying to fix it until we've figured
+        -- out our interface for calling conventions.
+        -- All return statements are required to use return areas of equal size.
+        -- This isn't necessarily required to write correct programs, but it's sane.
+        area = case foldr retBlock (retStmts ss Nothing) other_blocks of
+                 Just (as, _)  -> mkCallArea id as $ Just args
+                 Nothing       -> mkCallArea id [] $ Just args
+        retBlock (BasicBlock _ ss) z = retStmts ss z
+        retStmts [CmmReturn ress] z@(Just (_, n)) =
+          if size ress == n then z
+          else panic "return statements in C-- procs must return the same results"
+        retStmts [CmmReturn ress] Nothing  = Just (ress, size ress)
+        retStmts (_ : rst) z = retStmts rst z
+        retStmts [] z = z
+        size args = areaSize $ mkCallArea id args Nothing
 
 ofZgraph :: CmmGraph -> ListGraph CmmStmt
 ofZgraph g = ListGraph $ swallow blocks

@@ -36,8 +36,9 @@ where
 
 #include "HsVersions.h"
 
+import BlockId ( BlockId, BlockEnv, emptyBlockEnv, lookupBlockEnv, extendBlockEnv
+               , BlockSet, emptyBlockSet, elemBlockSet, extendBlockSet)
 import CmmExpr ( UserOfLocalRegs(..) ) --for an instance
-import StackSlot
 
 import Outputable hiding (empty)
 import Panic

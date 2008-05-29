@@ -26,6 +26,7 @@ module PprMach (
 
 #include "HsVersions.h"
 
+import BlockId
 import Cmm
 import MachOp		( MachRep(..), wordRep, isFloatingRep )
 import MachRegs		-- may differ per-platform

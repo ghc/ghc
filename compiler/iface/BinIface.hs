@@ -73,6 +73,12 @@ readBinIface_ checkHiWay traceBinIFaceReading hi_path nc = do
           = printer (text what <> text ": " <>
                      vcat [text "Wanted " <> ppr wanted <> text ",",
                            text "got    " <> ppr got])
+
+      errorOnMismatch' :: (Eq a, Show a) => String -> a -> a -> IO () -> IO ()
+      errorOnMismatch' what wanted got io
+           = do when (wanted /= got) $ io
+                errorOnMismatch what wanted got
+
       errorOnMismatch :: (Eq a, Show a) => String -> a -> a -> IO ()
       errorOnMismatch what wanted got
             -- This will be caught by readIface which will emit an error

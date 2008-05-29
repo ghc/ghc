@@ -14,6 +14,7 @@ module CmmLive (
 
 #include "HsVersions.h"
 
+import BlockId
 import Cmm
 import Dataflow
 

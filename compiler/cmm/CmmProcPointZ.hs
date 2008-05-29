@@ -8,6 +8,7 @@ where
 
 import Prelude hiding (zip, unzip, last)
 
+import BlockId
 import CLabel
 --import ClosureInfo
 import Cmm hiding (blockId)
@@ -17,7 +18,6 @@ import CmmLiveZ
 import CmmTx
 import DFMonad
 import FiniteMap
-import ForeignCall -- used in protocol for the entry point
 import MachOp (MachHint(NoHint))
 import Maybes
 import MkZipCfgCmm hiding (CmmBlock, CmmGraph)
@@ -25,7 +25,6 @@ import Monad
 import Name
 import Outputable
 import Panic
-import StackSlot
 import UniqFM
 import UniqSet
 import UniqSupply
@@ -230,7 +229,7 @@ algorithm would be just as good, so that's what we do.
 
 -}
 
-data Protocol = Protocol Convention CmmFormals StackArea
+data Protocol = Protocol Convention CmmFormals Area
   deriving Eq
 instance Outputable Protocol where
   ppr (Protocol c fs a) = text "Protocol" <+> ppr c <+> ppr fs <+> ppr a
@@ -239,9 +238,8 @@ instance Outputable Protocol where
 -- points that are relevant to the optimization explained above.
 -- The others are assigned by 'add_unassigned', which is not yet clever.
 
-addProcPointProtocols :: ProcPointSet -> ProcPointSet -> CmmFormalsWithoutKinds ->
-                         CmmGraph -> FuelMonad CmmGraph
-addProcPointProtocols callPPs procPoints formals g =
+addProcPointProtocols :: ProcPointSet -> ProcPointSet -> CmmGraph -> FuelMonad CmmGraph
+addProcPointProtocols callPPs procPoints g =
   do liveness <- cmmLivenessZ g
      (protos, g') <- return $ optimize_calls liveness g
      blocks'' <- add_CopyOuts protos procPoints g'
@@ -286,12 +284,8 @@ addProcPointProtocols callPPs procPoints formals g =
           maybe_add_proto :: CmmBlock -> BlockEnv Protocol -> BlockEnv Protocol
           maybe_add_proto (Block id (ZTail (CopyIn c fs _srt) _)) env =
               extendBlockEnv env id (Protocol c fs $ toArea id fs)
-          maybe_add_proto (Block id _) env | id == lg_entry g =
-              extendBlockEnv env id (Protocol stdArgConvention hfs $ toArea id hfs)
           maybe_add_proto _ env = env
-          toArea id fs = mkStackArea id fs $ Just fs
-          hfs = map (\x -> CmmKinded x NoHint) formals
-          stdArgConvention = ConventionStandard CmmCallConv Arguments
+          toArea id fs = mkCallArea id fs $ Just fs
 
 -- | For now, following a suggestion by Ben Lippmeier, we pass all
 -- live variables as arguments, hoping that a clever register
@@ -313,7 +307,7 @@ pass_live_vars_as_args liveness procPoints protos = protos'
                                     panic ("no liveness at block " ++ show id)
                              formals = map (\x -> CmmKinded x NoHint) $ uniqSetToList live
                              prot = Protocol ConventionPrivate formals $
-                                             mkStackArea id formals $ Just formals
+                                             mkCallArea id formals $ Just formals
                          in  extendBlockEnv protos id prot
 
 
@@ -343,10 +337,10 @@ add_CopyOuts :: BlockEnv Protocol -> ProcPointSet -> CmmGraph ->
 add_CopyOuts protos procPoints g = fold_blocks maybe_insert_CopyOut (return emptyBlockEnv) g
     where maybe_insert_CopyOut :: CmmBlock -> FuelMonad (BlockEnv CmmBlock) ->
                                   FuelMonad (BlockEnv CmmBlock)
-          maybe_insert_CopyOut b@(Block bid _) blocks =
+          maybe_insert_CopyOut b@(Block bid _) blocks | bid == lg_entry g = skip b blocks 
+          maybe_insert_CopyOut b blocks =
             case last $ unzip b of
-              LastOther (LastCall _ _) -> -- skip calls (copy out done by callee)
-                 blocks >>= (\bmap -> return $ extendBlockEnv bmap bid b)
+              LastOther (LastCall _ _) -> skip b blocks -- copy out done by callee
               _ -> maybe_insert_CopyOut' b blocks
           maybe_insert_CopyOut' b blocks = fold_succs trySucc b init >>= finish
             where init = blocks >>= (\bmap -> return (b, bmap))
@@ -364,6 +358,8 @@ add_CopyOuts protos procPoints g = fold_blocks maybe_insert_CopyOut (return empt
                        (b, bs)   <- insertBetween b m succId
                        return $ (b, foldl (flip insertBlock) bmap bs)
                   finish (b@(Block bid _), bmap) = return $ extendBlockEnv bmap bid b
+          skip b@(Block bid _) bs = bs >>= (\bmap -> return $ extendBlockEnv bmap bid b)
+
 
 
 -- Input invariant: A block should only be reachable from a single ProcPoint.

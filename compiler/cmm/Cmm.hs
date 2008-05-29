@@ -23,14 +23,11 @@ module Cmm (
 	CmmCallTarget(..),
 	CmmStatic(..), Section(..),
         module CmmExpr,
-
-        BlockId(..), mkBlockId,
-        BlockEnv, emptyBlockEnv, lookupBlockEnv, extendBlockEnv, mkBlockEnv,
-        BlockSet, emptyBlockSet, elemBlockSet, extendBlockSet,
   ) where
 
 #include "HsVersions.h"
 
+import BlockId
 import CmmExpr
 import MachOp
 import CLabel
@@ -42,10 +39,6 @@ import FastString
 
 import Data.Word
 
-import StackSlot (	BlockId(..), mkBlockId
-                 , BlockEnv, emptyBlockEnv, lookupBlockEnv, extendBlockEnv, mkBlockEnv
-                 , BlockSet, emptyBlockSet, elemBlockSet, extendBlockSet
-                 )
 
 -- A [[BlockId]] is a local label.
 -- Local labels must be unique within an entire compilation unit, not
@@ -276,7 +269,6 @@ instance UserOfLocalRegs CmmCallTarget where
 
 instance DefinerOfLocalRegs a => DefinerOfLocalRegs (CmmKinded a) where
   foldRegsDefd f z (CmmKinded x _) = foldRegsDefd f z x
-
 
 --just look like a tuple, since it was a tuple before
 -- ... is that a good idea? --Isaac Dupree

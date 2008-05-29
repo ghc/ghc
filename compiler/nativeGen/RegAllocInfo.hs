@@ -35,6 +35,7 @@ module RegAllocInfo (
 
 #include "HsVersions.h"
 
+import BlockId
 import Cmm
 import CLabel
 import MachOp           ( MachRep(..), wordRep )

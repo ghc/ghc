@@ -15,6 +15,7 @@ module CmmSpillReload
   )
 where
 
+import BlockId
 import CmmExpr
 import CmmTx
 import CmmLiveZ
@@ -22,7 +23,6 @@ import DFMonad
 import MkZipCfg
 import OptimizationFuel
 import PprCmm()
-import StackSlot
 import ZipCfg
 import ZipCfgCmmRep
 import ZipDataflow
@@ -151,19 +151,19 @@ gen, kill :: UserOfLocalRegs a => a -> RegSet -> RegSet
 gen  a live = foldRegsUsed extendRegSet      live a
 kill a live = foldRegsUsed delOneFromUniqSet live a
 
-insertSpillAndReloadRewrites :: BlockSet -> BackwardRewrites M Last DualLive Graph
+insertSpillAndReloadRewrites :: BlockSet -> BackwardRewrites M Last DualLive
 insertSpillAndReloadRewrites procPoints = BackwardRewrites first middle last exit
     where middle = middleInsertSpillsAndReloads
           last   = \_ _ -> Nothing
           exit = Nothing
           first live id =
             if elemBlockSet id procPoints && not (isEmptyUniqSet reloads) then
-              Just $ graphOfMiddles $ [Reload reloads]
+              Just $ mkMiddles $ [Reload reloads]
             else Nothing
               where reloads = in_regs live
 
 
-middleInsertSpillsAndReloads :: DualLive -> M -> Maybe (Graph M Last)
+middleInsertSpillsAndReloads :: DualLive -> M -> Maybe (AGraph M Last)
 middleInsertSpillsAndReloads _ (Spill _)  = Nothing
 middleInsertSpillsAndReloads _ (Reload _) = Nothing
 middleInsertSpillsAndReloads live m@(NotSpillOrReload nsr) = middle nsr
@@ -171,7 +171,7 @@ middleInsertSpillsAndReloads live m@(NotSpillOrReload nsr) = middle nsr
             if reg `elemRegSet` on_stack live then -- must spill
                 my_trace "Spilling" (f4sep [text "spill" <+> ppr reg,
                                             text "after", ppr m]) $
-                Just $ graphOfMiddles [m, Spill $ mkRegSet [reg]]
+                Just $ mkMiddles [m, Spill $ mkRegSet [reg]]
             else
                 Nothing
         middle (CopyIn _ formals _) = 
@@ -192,31 +192,26 @@ middleInsertSpillsAndReloads live m@(NotSpillOrReload nsr) = middle nsr
                                                  ppr (Reload regs' :: M),
                                                  ppr (Spill needs_spilling :: M),
                                                  text "after", ppr m]) $
-                    Just $ graphOfMiddles (m : code')
+                    Just $ mkMiddles (m : code')
         middle _ = Nothing
                       
 -- | For conversion back to vanilla C--
 
-elimSpillAndReload :: StackSlotMap -> LGraph M l -> FuelMonad (StackSlotMap, LGraph Middle l)
-elimSpillAndReload slots g = fold_blocks block (return (slots, [])) g >>= toGraph
-  where toGraph (slots, l) = return (slots, of_block_list (lg_entry g) l)
-        block (Block id t) z =
-          do (slots, blocks) <- z
-             (slots, t)      <- tail t slots
-             return (slots, Block id t : blocks)
-        tail (ZLast l)   slots = return (slots, ZLast l)
-        tail (ZTail m t) slots =
-          do (slots, t) <- tail t slots
-             middle m t slots
-        middle (Spill  regs) t slots = foldUniqSet spill  (return (slots, t)) regs
-        middle (Reload regs) t slots = foldUniqSet reload (return (slots, t)) regs
-        middle (NotSpillOrReload m) t slots = return (slots, ZTail m t)
-        move f r z = do let reg = CmmLocal r
-                        (slots, t) <- z
-                        (slots, slot) <- getSlot slots reg
-                        return (slots, ZTail (f (CmmStack slot) reg) t)
-        spill  = move (\ slot reg -> MidAssign slot (CmmReg reg))
-        reload = move (\ slot reg -> MidAssign reg  (CmmReg slot))
+elimSpillAndReload :: StackSlotMap -> LGraph M l -> (StackSlotMap, LGraph Middle l)
+elimSpillAndReload slots g = toGraph $ fold_blocks block ((slots, [])) g
+  where toGraph (slots, l) = (slots, of_block_list (lg_entry g) l)
+        block (Block id t) (slots, blocks) =
+          lift (\ t' -> Block id t' : blocks) $ tail t slots
+        tail (ZLast l)   slots = (slots, ZLast l)
+        tail (ZTail m t) slots = middle m $ tail t slots
+        middle (NotSpillOrReload m) (slots, t) = (slots, ZTail m t)
+        middle (Spill  regs)        z          = foldUniqSet spill  z regs
+        middle (Reload regs)        z          = foldUniqSet reload z regs
+        move f r (slots, t) =
+          lift (\ slot -> ZTail (f slot (CmmLocal r)) t) $ getSlot slots r
+        spill  = move (\ slot reg -> MidStore  slot (CmmReg reg))
+        reload = move (\ slot reg -> MidAssign reg slot)
+        lift f (slots, x) = (slots, f x)
 
 
 ----------------------------------------------------------------
@@ -334,15 +329,15 @@ insertLateReloads' g = liftM zdfFpContents $ (res :: LateReloadFix)
           bot = fact_bot availRegsLattice
           rewrites = ForwardRewrites first middle last exit
           first _ _ = Nothing
-          middle :: AvailRegs -> M -> Maybe (Graph M Last)
-          last   :: AvailRegs -> Last -> Maybe (Graph M Last)
+          middle :: AvailRegs -> M -> Maybe (AGraph M Last)
+          last   :: AvailRegs -> Last -> Maybe (AGraph M Last)
           middle avail m = maybe_reload_before avail m (ZTail m (ZLast LastExit))
           last avail l   = maybe_reload_before avail l (ZLast (LastOther l))
           exit _ = Nothing
           maybe_reload_before avail node tail =
               let used = filterRegsUsed (elemAvail avail) node
               in  if isEmptyUniqSet used then Nothing
-                  else Just $ graphOfZTail $ ZTail (Reload used) tail
+                  else Just $ mkZTail $ ZTail (Reload used) tail
           
 removeDeadAssignmentsAndReloads :: BlockSet -> (Graph M Last) -> FuelMonad (Graph M Last)
 removeDeadAssignmentsAndReloads procPoints g =
@@ -356,18 +351,18 @@ removeDeadAssignmentsAndReloads procPoints g =
            middle = middleRemoveDeads
            first _ _ = Nothing
 
-middleRemoveDeads :: DualLive -> M -> Maybe (Graph M Last)
+middleRemoveDeads :: DualLive -> M -> Maybe (AGraph M Last)
 middleRemoveDeads _ (Spill _)  = Nothing
 middleRemoveDeads live (Reload s) =
     if sizeUniqSet worth_reloading < sizeUniqSet s then
-        Just $ if isEmptyUniqSet worth_reloading then emptyGraph
-               else graphOfMiddles [Reload worth_reloading]
+        Just $ if isEmptyUniqSet worth_reloading then emptyAGraph
+               else mkMiddles [Reload worth_reloading]
     else
         Nothing
   where worth_reloading = intersectUniqSets s (in_regs live)
 middleRemoveDeads live (NotSpillOrReload m) = middle m 
   where middle (MidAssign (CmmLocal reg') _)
-               | not (reg' `elemRegSet` in_regs live) = Just emptyGraph
+               | not (reg' `elemRegSet` in_regs live) = Just emptyAGraph
         middle _ = Nothing
                       
 

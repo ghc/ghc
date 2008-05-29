@@ -5,24 +5,17 @@ module OptimizationFuel
     , FuelConsumer
     , FuelUsingMonad, FuelState
     , lastFuelPass, fuelExhausted, fuelRemaining, fuelDecrement, fuelDec1
-    --, lastFuelPassInState , fuelExhaustedInState, fuelRemainingInState
-    --, fuelDecrementState
-    --, runFuel
-    , runFuelIO
-    --, runFuelWithLastPass
-    , fuelConsumingPass
+    , runFuelIO, fuelConsumingPass
     , FuelMonad
     , liftUniq
     , lGraphOfGraph -- needs to be able to create a unique ID...
     )
 where
 
-import StackSlot
+import BlockId
 import ZipCfg
-
 --import GHC.Exts (State#)
 import Panic
-
 import Data.IORef
 import Monad
 import StaticFlags (opt_Fuel)
@@ -139,28 +132,3 @@ lGraphOfGraph :: Graph m l -> FuelMonad (LGraph m l)
 lGraphOfGraph (Graph tail blocks) =
   do entry <- liftM BlockId $ getUniqueM
      return $ LGraph entry (insertBlock (Block entry tail) blocks)
-
-
--- JD: I'm not sure what NR's plans are for the following code.
--- Perhaps these functions will be useful in the future, or perhaps I've made
--- them obsoltete.
-
---initialFuelState :: OptimizationFuel -> FuelState
---initialFuelState fuel = FuelState fuel "unoptimized program"
---runFuel             :: FuelMonad a -> FuelConsumer a
---runFuelWithLastPass :: FuelMonad a -> FuelConsumer (a, String)
-
---runFuel             (FuelMonad f) fuel = let (a, s) = f $ initialFuelState fuel
---                                         in (a, fs_fuellimit s)
---runFuelWithLastPass (FuelMonad f) fuel = let (a, s) = f $ initialFuelState fuel
---                                         in ((a, fs_lastpass s), fs_fuellimit s)
-
--- lastFuelPassInState :: FuelState -> String
--- lastFuelPassInState = fs_lastpass
-
--- fuelExhaustedInState :: FuelState -> Bool
--- fuelExhaustedInState = canRewriteWithFuel . fs_fuellimit
-
--- fuelRemainingInState :: FuelState -> OptimizationFuel
--- fuelRemainingInState = fs_fuellimit
-

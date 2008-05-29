@@ -11,6 +11,7 @@ module CmmProcPoint (
 
 #include "HsVersions.h"
 
+import BlockId
 import Cmm
 import CmmBrokenBlock
 import Dataflow

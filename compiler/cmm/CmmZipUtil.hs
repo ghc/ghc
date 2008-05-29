@@ -4,8 +4,8 @@ module CmmZipUtil
   , givesUniquePredecessorTo
   )
 where
+import BlockId
 import Prelude hiding (last, unzip)
-import StackSlot
 import ZipCfg
 
 import Maybes

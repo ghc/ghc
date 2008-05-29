@@ -33,6 +33,7 @@ module PprC (
 #include "HsVersions.h"
 
 -- Cmm stuff
+import BlockId
 import Cmm
 import PprCmm	()	-- Instances only
 import CLabel

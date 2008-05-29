@@ -16,6 +16,7 @@ module CmmLint (
   cmmLint, cmmLintTop
   ) where
 
+import BlockId
 import Cmm
 import CLabel
 import MachOp

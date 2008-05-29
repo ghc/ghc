@@ -5,6 +5,7 @@ module CmmCPSZ (
   protoCmmCPSZ
 ) where
 
+import BlockId
 import Cmm
 import CmmCommonBlockElimZ
 import CmmContFlowOpt
@@ -53,14 +54,13 @@ cpsTop _ p@(CmmData {}) = return p
 cpsTop hsc_env (CmmProc h l args g) =
     do dump Opt_D_dump_cmmz "Pre Proc Points Added"  g
        let callPPs = callProcPoints g
-       procPoints <- run $ minimalProcPointSet callPPs (runTx cmmCfgOptsZ g)
-       let varSlots = emptyFM
        g <- return $ map_nodes id NotSpillOrReload id g
                -- Change types of middle nodes to allow spill/reload
        g     <- dual_rewrite Opt_D_dump_cmmz "spills and reloads"
-                             (dualLivenessWithInsertion emptyBlockSet) g
-       (varSlots, g) <- trim g >>= run . elimSpillAndReload varSlots
-       g <- run $ addProcPointProtocols callPPs procPoints args g
+                             (dualLivenessWithInsertion callPPs) g
+       (varSlots, g) <- trim g >>= return . elimSpillAndReload emptyFM
+       procPoints <- run $ minimalProcPointSet callPPs (runTx cmmCfgOptsZ g)
+       g <- run $ addProcPointProtocols callPPs procPoints g
        dump Opt_D_dump_cmmz "Post Proc Points Added" g
        g <- return $ map_nodes id NotSpillOrReload id g
                -- Change types of middle nodes to allow spill/reload
@@ -72,7 +72,7 @@ cpsTop hsc_env (CmmProc h l args g) =
        g     <- trim g >>= dual_rewrite Opt_D_dump_cmmz "Dead Assignment Elimination"
                                         (removeDeadAssignmentsAndReloads procPoints)
                     -- Remove redundant reloads (and any other redundant asst)
-       (_, g) <- trim g >>= run . elimSpillAndReload varSlots
+       (_, g) <- trim g >>= return . elimSpillAndReload varSlots
        gs    <- run $ splitAtProcPoints args l procPoints g
        gs `seq` dump Opt_D_dump_cmmz "Pre common block elimination" g
        g     <- return $ elimCommonBlocks g

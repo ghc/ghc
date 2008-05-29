@@ -13,6 +13,7 @@ module CmmCPSGen (
   ContinuationFormat(..),
 ) where
 
+import BlockId
 import Cmm
 import CLabel
 import CmmBrokenBlock -- Data types only

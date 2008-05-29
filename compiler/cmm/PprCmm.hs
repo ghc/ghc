@@ -37,8 +37,8 @@ module PprCmm
     )
 where
 
+import BlockId
 import Cmm
-import CmmExpr
 import CmmUtils
 import MachOp
 import CLabel
@@ -90,6 +90,9 @@ instance Outputable CmmLit where
 
 instance Outputable LocalReg where
     ppr e = pprLocalReg e
+
+instance Outputable Area where
+    ppr e = pprArea e
 
 instance Outputable GlobalReg where
     ppr e = pprGlobalReg e
@@ -435,7 +438,8 @@ pprExpr9 e =
         CmmLit    lit       -> pprLit1 lit
         CmmLoad   expr rep  -> ppr rep <> brackets( ppr expr )
         CmmReg    reg       -> ppr reg
-        CmmRegOff reg off   -> parens (ppr reg <+> char '+' <+> int off)
+        CmmRegOff  reg off  -> parens (ppr reg <+> char '+' <+> int off)
+        CmmStackSlot a off  -> parens (ppr a   <+> char '+' <+> int off)
 	CmmMachOp mop args  -> genMachOp mop args
 
 genMachOp :: MachOp -> [CmmExpr] -> SDoc
@@ -525,7 +529,6 @@ pprReg r
     = case r of
         CmmLocal  local  -> pprLocalReg  local
         CmmGlobal global -> pprGlobalReg global
-        CmmStack  slot   -> ppr slot
 
 --
 -- We only print the type of the local reg if it isn't wordRep
@@ -539,6 +542,12 @@ pprLocalReg (LocalReg uniq rep follow)
   ptr = if follow == GCKindNonPtr
                 then empty
                 else doubleQuotes (text "ptr")
+
+-- Stack areas
+pprArea :: Area -> SDoc
+pprArea (RegSlot r)    = hcat [ text "slot<", ppr r, text ">" ]
+pprArea (CallArea id n n') =
+  hcat [ text "callslot<", ppr id, char '+', ppr n, char '/', ppr n', text ">" ]
 
 -- needs to be kept in syn with Cmm.hs.GlobalReg
 --

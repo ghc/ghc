@@ -6,10 +6,10 @@ module CmmContFlowOpt
     )
 where
 
+import BlockId
 import Cmm
 import CmmTx
 import qualified ZipCfg as G
-import StackSlot
 import ZipCfgCmmRep
 
 import Maybes

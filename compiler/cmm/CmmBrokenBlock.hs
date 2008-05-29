@@ -20,6 +20,7 @@ module CmmBrokenBlock (
 
 #include "HsVersions.h"
 
+import BlockId
 import Cmm
 import CmmUtils
 import CLabel

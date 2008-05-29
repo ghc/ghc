@@ -12,9 +12,9 @@
 module ZipCfgExtras
   ()
 where
+import BlockId
 import Maybes
 import Panic
-import StackSlot
 import ZipCfg
 
 import Prelude hiding (zip, unzip, last)

@@ -30,6 +30,7 @@ module RegLiveness (
 
   ) where
 
+import BlockId
 import MachRegs
 import MachInstrs
 import PprMach

@@ -53,6 +53,7 @@ module CgUtils (
 #include "HsVersions.h"
 #include "../includes/MachRegs.h"
 
+import BlockId
 import CgMonad
 import TyCon
 import DataCon

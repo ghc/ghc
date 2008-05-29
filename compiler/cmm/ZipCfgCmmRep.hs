@@ -12,6 +12,7 @@ module ZipCfgCmmRep
   )
 where
 
+import BlockId
 import CmmExpr
 import Cmm ( GenCmm(..), GenCmmTop(..), CmmStatic, CmmInfo
            , CmmCallTarget(..), CmmActuals, CmmFormals, CmmKinded(..)
@@ -28,7 +29,6 @@ import ClosureInfo
 import FastString
 import ForeignCall
 import MachOp
-import StackSlot
 import qualified ZipCfg as Z
 import qualified ZipDataflow as DF
 import ZipCfg 

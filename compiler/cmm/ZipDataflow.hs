@@ -17,10 +17,10 @@ module ZipDataflow
     )
 where
 
+import BlockId
 import CmmTx
 import DFMonad
 import MkZipCfg
-import StackSlot
 import ZipCfg
 import qualified ZipCfg as G
 
@@ -150,21 +150,21 @@ newtype LastOutFacts a = LastOutFacts [(BlockId, a)]
 -- but it might be worth simplifying this module by replacing this type
 -- parameter with AGraph everywhere (SLPJ 19 May 2008).
 
-data BackwardRewrites middle last a g = BackwardRewrites
-    { br_first  :: a              -> BlockId -> Maybe (g middle last)
-    , br_middle :: a              -> middle  -> Maybe (g middle last)
-    , br_last   :: (BlockId -> a) -> last    -> Maybe (g middle last)
-    , br_exit   ::                              Maybe (g middle last)
+data BackwardRewrites middle last a = BackwardRewrites
+    { br_first  :: a              -> BlockId -> Maybe (AGraph middle last)
+    , br_middle :: a              -> middle  -> Maybe (AGraph middle last)
+    , br_last   :: (BlockId -> a) -> last    -> Maybe (AGraph middle last)
+    , br_exit   ::                              Maybe (AGraph middle last)
     } 
 
 -- | A forward rewrite takes the same inputs as a forward transfer,
 -- but instead of producing a fact, it produces a replacement graph or Nothing.
 
-data ForwardRewrites middle last a g = ForwardRewrites
-    { fr_first  :: a -> BlockId -> Maybe (g middle last)
-    , fr_middle :: a -> middle  -> Maybe (g middle last)
-    , fr_last   :: a -> last    -> Maybe (g middle last)
-    , fr_exit   :: a            -> Maybe (g middle last)
+data ForwardRewrites middle last a = ForwardRewrites
+    { fr_first  :: a -> BlockId -> Maybe (AGraph middle last)
+    , fr_middle :: a -> middle  -> Maybe (AGraph middle last)
+    , fr_last   :: a -> last    -> Maybe (AGraph middle last)
+    , fr_exit   :: a            -> Maybe (AGraph middle last)
     } 
 
 {- ===================== FIXED POINTS =================== -}
@@ -295,15 +295,14 @@ instance DataflowSolverDirection BackwardTransfers BackwardFixedPoint
 -- that it doesn't make us sick to look at the types.
 
 class DataflowSolverDirection transfers fixedpt =>
-      DataflowDirection transfers fixedpt rewrites 
-			(graph :: * -> * -> *) where
+      DataflowDirection transfers fixedpt rewrites where
   zdfRewriteFrom :: (DebugNodes m l, Outputable a)
                  => RewritingDepth      -- whether to rewrite a rewritten graph
                  -> BlockEnv a          -- initial facts (unbound == botton)
                  -> PassName
                  -> DataflowLattice a
                  -> transfers m l a
-                 -> rewrites m l a graph
+                 -> rewrites m l a
                  -> a                   -- fact flowing in (at entry or exit)
                  -> Graph m l
                  -> FuelMonad (fixedpt m l a (Graph m l))
@@ -319,16 +318,10 @@ data RewritingDepth = RewriteShallow | RewriteDeep
 --	forward, backward (instantiates transfers, fixedpt, rewrites)
 --	Graph, AGraph     (instantiates graph)
 
-instance DataflowDirection ForwardTransfers ForwardFixedPoint ForwardRewrites Graph
-  where zdfRewriteFrom = rewrite_f_graph
-
-instance DataflowDirection ForwardTransfers ForwardFixedPoint ForwardRewrites AGraph
+instance DataflowDirection ForwardTransfers ForwardFixedPoint ForwardRewrites
   where zdfRewriteFrom = rewrite_f_agraph
 
-instance DataflowDirection BackwardTransfers BackwardFixedPoint BackwardRewrites Graph
-  where zdfRewriteFrom = rewrite_b_graph
-
-instance DataflowDirection BackwardTransfers BackwardFixedPoint BackwardRewrites AGraph
+instance DataflowDirection BackwardTransfers BackwardFixedPoint BackwardRewrites
   where zdfRewriteFrom = rewrite_b_agraph
 
 
@@ -349,38 +342,20 @@ solve_f         :: (DebugNodes m l, Outputable a)
 solve_f env name lattice transfers in_fact g =
    runDFM lattice $ fwd_pure_anal name env transfers in_fact g
     
-rewrite_f_graph  :: (DebugNodes m l, Outputable a)
-                 => RewritingDepth
-                 -> BlockEnv a
-                 -> PassName
-                 -> DataflowLattice a
-                 -> ForwardTransfers m l a
-                 -> ForwardRewrites m l a Graph
-                 -> a                 -- fact flowing in (at entry or exit)
-                 -> Graph m l
-                 -> FuelMonad (ForwardFixedPoint m l a (Graph m l))
-rewrite_f_graph depth start_facts name lattice transfers rewrites in_fact g =
-    runDFM lattice $
-    do fuel <- fuelRemaining
-       (fp, fuel') <- forward_rew maybeRewriteWithFuel return depth start_facts name
-                      transfers rewrites in_fact g fuel
-       fuelDecrement name fuel fuel'
-       return fp
-
 rewrite_f_agraph :: (DebugNodes m l, Outputable a)
                  => RewritingDepth
                  -> BlockEnv a
                  -> PassName
                  -> DataflowLattice a
                  -> ForwardTransfers m l a
-                 -> ForwardRewrites m l a AGraph
+                 -> ForwardRewrites  m l a
                  -> a                 -- fact flowing in (at entry or exit)
                  -> Graph m l
                  -> FuelMonad (ForwardFixedPoint m l a (Graph m l))
 rewrite_f_agraph depth start_facts name lattice transfers rewrites in_fact g =
     runDFM lattice $
     do fuel <- fuelRemaining
-       (fp, fuel') <- forward_rew maybeRewriteWithFuel areturn depth start_facts name
+       (fp, fuel') <- forward_rew maybeRewriteWithFuel depth start_facts name
                       transfers rewrites in_fact g fuel
        fuelDecrement name fuel fuel'
        return fp
@@ -424,10 +399,9 @@ fwd_pure_anal name env transfers in_fact g =
     do (fp, _) <- anal_f name env transfers panic_rewrites in_fact g panic_fuel
        return fp
   where -- definitiely a case of "I love lazy evaluation"
-    anal_f = forward_sol (\_ _ -> Nothing) panic_return panic_depth
+    anal_f = forward_sol (\_ _ -> Nothing) panic_depth
     panic_rewrites = panic "pure analysis asked for a rewrite function"
     panic_fuel     = panic "pure analysis asked for fuel"
-    panic_return   = panic "pure analysis tried to return a rewritten graph"
     panic_depth    = panic "pure analysis asked for a rewrite depth"
 
 -----------------------------------------------------------------------
@@ -463,32 +437,29 @@ type Fuel = OptimizationFuel
 
 {-# INLINE forward_sol #-}
 forward_sol
-        :: forall m l g a . 
+        :: forall m l a . 
            (DebugNodes m l, LastNode l, Outputable a)
         => (forall a . Fuel -> Maybe a -> Maybe a)
 		-- Squashes proposed rewrites if there is
 		-- no more fuel; OR if we are doing a pure
 		-- analysis, so totally ignore the rewrite
 		-- ie. For pure-analysis the fn is (\_ _ -> Nothing)
-        -> (g m l -> DFM a (Graph m l))  
-		-- Transforms the kind of graph 'g' wanted by the
-		-- client (in ForwardRewrites) to the kind forward_sol likes
         -> RewritingDepth	-- Shallow/deep
         -> PassName
         -> BlockEnv a		-- Initial set of facts
         -> ForwardTransfers m l a
-        -> ForwardRewrites m l a g
+        -> ForwardRewrites m l a
         -> a			-- Entry fact
         -> Graph m l
         -> Fuel
         -> DFM a (ForwardFixedPoint m l a (), Fuel)
-forward_sol check_maybe return_graph = forw
+forward_sol check_maybe = forw
  where
   forw :: RewritingDepth
        -> PassName
        -> BlockEnv a
        -> ForwardTransfers m l a
-       -> ForwardRewrites m l a g
+       -> ForwardRewrites m l a
        -> a
        -> Graph m l
        -> Fuel
@@ -508,7 +479,7 @@ forward_sol check_maybe return_graph = forw
                       case check_maybe fuel $ fr_first rewrites idfact id of
                         Nothing -> solve_tail (ft_first_out transfers idfact id) tail fuel
                         Just g ->
-                          do g <- return_graph g
+                          do g <- areturn g
                              (a, fuel) <- subAnalysis' $
                                case rewrite of
                                  RewriteDeep -> solve getExitFact idfact g (oneLessFuel fuel)
@@ -530,7 +501,7 @@ forward_sol check_maybe return_graph = forw
          case check_maybe fuel $ fr_middle rewrites in' m of
            Nothing -> solve_tail (ft_middle_out transfers in' m) t fuel
            Just g ->
-             do { g <- return_graph g
+             do { g <- areturn g
                 ; (a, fuel) <- subAnalysis' $
                      case rewrite of
                        RewriteDeep -> solve getExitFact in' g (oneLessFuel fuel)
@@ -545,7 +516,7 @@ forward_sol check_maybe return_graph = forw
                          LastExit -> do { setExitFact (ft_exit_out transfers in')
                                         ; return (LastOutFacts [], fuel) }
            Just g ->
-             do { g <- return_graph g
+             do { g <- areturn g
                 ; (last_outs :: LastOutFacts a, fuel) <- subAnalysis' $
                     case rewrite of
                       RewriteDeep -> solve lastOutFacts in' g (oneLessFuel fuel)
@@ -583,27 +554,26 @@ mk_set_or_save is_local (LastOutFacts l) = mapM_ set_or_save_one l
 
 {-# INLINE forward_rew #-}
 forward_rew
-        :: forall m l g a . 
+        :: forall m l a . 
            (DebugNodes m l, LastNode l, Outputable a)
         => (forall a . Fuel -> Maybe a -> Maybe a)
-        -> (g m l -> DFM a (Graph m l))  -- option on what to rewrite
         -> RewritingDepth
         -> BlockEnv a
         -> PassName
         -> ForwardTransfers m l a
-        -> ForwardRewrites m l a g
+        -> ForwardRewrites m l a
         -> a
         -> Graph m l
         -> Fuel
         -> DFM a (ForwardFixedPoint m l a (Graph m l), Fuel)
-forward_rew check_maybe return_graph = forw
+forward_rew check_maybe = forw
   where
-    solve = forward_sol check_maybe return_graph
+    solve = forward_sol check_maybe
     forw :: RewritingDepth
          -> BlockEnv a
          -> PassName
          -> ForwardTransfers m l a
-         -> ForwardRewrites m l a g
+         -> ForwardRewrites m l a
          -> a
          -> Graph m l
          -> Fuel
@@ -653,7 +623,7 @@ forward_rew check_maybe return_graph = forw
                                              t rewritten fuel
                                ; rewrite_blocks bs rewritten fuel }
                  Just g  -> do { markGraphRewritten
-                               ; g <- return_graph g
+                               ; g <- areturn g
                                ; (outfact, g, fuel) <- inner_rew getExitFact a g fuel
                                ; let (blocks, h) = splice_head' (ZFirst id) g
                                ; (rewritten, fuel) <-
@@ -666,7 +636,7 @@ forward_rew check_maybe return_graph = forw
               Nothing -> rew_tail (G.ZHead head m) (ft_middle_out transfers in' m) t
                          rewritten fuel
               Just g -> do { markGraphRewritten
-                           ; g <- return_graph g
+                           ; g <- areturn g
                            ; (a, g, fuel) <- inner_rew getExitFact in' g fuel
                            ; let (blocks, h) = G.splice_head' head g
                            ; rew_tail h a t (blocks `plusUFM` rewritten) fuel
@@ -677,7 +647,7 @@ forward_rew check_maybe return_graph = forw
               Nothing -> do check_facts in' l
                             return (insertBlock (zipht h (G.ZLast l)) rewritten, fuel)
               Just g -> do { markGraphRewritten
-                           ; g <- return_graph g
+                           ; g <- areturn g
                            ; ((), g, fuel) <- inner_rew (return ()) in' g fuel
                            ; let g' = G.splice_head_only' h g
                            ; return (G.lg_blocks g' `plusUFM` rewritten, fuel)
@@ -690,7 +660,6 @@ forward_rew check_maybe return_graph = forw
           check_facts _ LastExit = return []
       in  fixed_pt_and_fuel
 
---lastOutFacts :: (DataflowAnalysis m, Monad (m f)) => m f (LastOutFacts f)
 lastOutFacts :: DFM f (LastOutFacts f)
 lastOutFacts = bareLastOutFacts >>= return . LastOutFacts
 
@@ -708,38 +677,20 @@ solve_b env name lattice transfers exit_fact g =
    runDFM lattice $ bwd_pure_anal name env transfers g exit_fact
     
 
-rewrite_b_graph  :: (DebugNodes m l, Outputable a)
-                 => RewritingDepth
-                 -> BlockEnv a
-                 -> PassName
-                 -> DataflowLattice a
-                 -> BackwardTransfers m l a
-                 -> BackwardRewrites m l a Graph
-                 -> a                 -- fact flowing in at exit
-                 -> Graph m l
-                 -> FuelMonad (BackwardFixedPoint m l a (Graph m l))
-rewrite_b_graph depth start_facts name lattice transfers rewrites exit_fact g =
-    runDFM lattice $
-    do fuel <- fuelRemaining
-       (fp, fuel') <- backward_rew maybeRewriteWithFuel return depth start_facts name
-                      transfers rewrites g exit_fact fuel
-       fuelDecrement name fuel fuel'
-       return fp
-
 rewrite_b_agraph :: (DebugNodes m l, Outputable a)
                  => RewritingDepth
                  -> BlockEnv a
                  -> PassName
                  -> DataflowLattice a
                  -> BackwardTransfers m l a
-                 -> BackwardRewrites m l a AGraph
+                 -> BackwardRewrites m l a
                  -> a                 -- fact flowing in at exit
                  -> Graph m l
                  -> FuelMonad (BackwardFixedPoint m l a (Graph m l))
 rewrite_b_agraph depth start_facts name lattice transfers rewrites exit_fact g =
     runDFM lattice $
     do fuel <- fuelRemaining
-       (fp, fuel') <- backward_rew maybeRewriteWithFuel areturn depth start_facts name
+       (fp, fuel') <- backward_rew maybeRewriteWithFuel depth start_facts name
                       transfers rewrites g exit_fact fuel
        fuelDecrement name fuel fuel'
        return fp
@@ -748,26 +699,25 @@ rewrite_b_agraph depth start_facts name lattice transfers rewrites exit_fact g =
 
 {-# INLINE backward_sol #-}
 backward_sol
-        :: forall m l g a . 
+        :: forall m l a . 
            (DebugNodes m l, LastNode l, Outputable a)
         => (forall a . Fuel -> Maybe a -> Maybe a)
-        -> (g m l -> DFM a (Graph m l))  -- option on what to rewrite
         -> RewritingDepth
         -> PassName
         -> BlockEnv a
         -> BackwardTransfers m l a
-        -> BackwardRewrites m l a g
+        -> BackwardRewrites m l a
         -> Graph m l
         -> a
         -> Fuel
         -> DFM a (BackwardFixedPoint m l a (), Fuel)
-backward_sol check_maybe return_graph = back
+backward_sol check_maybe = back
  where
   back :: RewritingDepth
        -> PassName
        -> BlockEnv a
        -> BackwardTransfers m l a
-       -> BackwardRewrites m l a g
+       -> BackwardRewrites m l a
        -> Graph m l
        -> a
        -> Fuel
@@ -778,13 +728,13 @@ backward_sol check_maybe return_graph = back
            do { fp <- bwd_pure_anal name emptyBlockEnv transfers g out
               ; return $ zdfFpOutputFact fp }
 
-       subsolve :: g m l -> a -> Fuel -> DFM a (a, Fuel)
+       subsolve :: AGraph m l -> a -> Fuel -> DFM a (a, Fuel)
        subsolve =
          case rewrite of
            RewriteDeep    -> \g a fuel ->
-               subAnalysis' $ do { g <- return_graph g; solve g a (oneLessFuel fuel) }
+               subAnalysis' $ do { g <- areturn g; solve g a (oneLessFuel fuel) }
            RewriteShallow -> \g a fuel ->
-               subAnalysis' $ do { g <- return_graph g; a <- anal_b g a
+               subAnalysis' $ do { g <- areturn g; a <- anal_b g a
                                  ; return (a, oneLessFuel fuel) }
 
        solve :: Graph m l -> a -> Fuel -> DFM a (a, Fuel)
@@ -848,10 +798,9 @@ bwd_pure_anal name env transfers g exit_fact =
     do (fp, _) <- anal_b name env transfers panic_rewrites g exit_fact panic_fuel
        return fp
   where -- another case of "I love lazy evaluation"
-    anal_b = backward_sol (\_ _ -> Nothing) panic_return panic_depth
+    anal_b = backward_sol (\_ _ -> Nothing) panic_depth
     panic_rewrites = panic "pure analysis asked for a rewrite function"
     panic_fuel     = panic "pure analysis asked for fuel"
-    panic_return   = panic "pure analysis tried to return a rewritten graph"
     panic_depth    = panic "pure analysis asked for a rewrite depth"
 
 
@@ -859,27 +808,26 @@ bwd_pure_anal name env transfers g exit_fact =
 
 {-# INLINE backward_rew #-}
 backward_rew
-        :: forall m l g a . 
+        :: forall m l a . 
            (DebugNodes m l, LastNode l, Outputable a)
         => (forall a . Fuel -> Maybe a -> Maybe a)
-        -> (g m l -> DFM a (Graph m l))  -- option on what to rewrite
         -> RewritingDepth
         -> BlockEnv a
         -> PassName
         -> BackwardTransfers m l a
-        -> BackwardRewrites m l a g
+        -> BackwardRewrites m l a
         -> Graph m l
         -> a
         -> Fuel
         -> DFM a (BackwardFixedPoint m l a (Graph m l), Fuel)
-backward_rew check_maybe return_graph = back
+backward_rew check_maybe = back
   where
-    solve = backward_sol check_maybe return_graph
+    solve = backward_sol check_maybe
     back :: RewritingDepth
          -> BlockEnv a
          -> PassName
          -> BackwardTransfers m l a
-         -> BackwardRewrites m l a g
+         -> BackwardRewrites m l a
          -> Graph m l
          -> a
          -> Fuel
@@ -930,7 +878,7 @@ backward_rew check_maybe return_graph = back
               Nothing -> propagate check fuel h (last_in env l) (ZLast l) rewritten
               Just g ->
                 do { markGraphRewritten
-                   ; g <- return_graph g
+                   ; g <- areturn g
                    ; (a, g, fuel) <- inner_rew g exit_fact fuel
                    ; let G.Graph t new_blocks = g
                    ; let rewritten' = new_blocks `plusUFM` rewritten
@@ -946,7 +894,7 @@ backward_rew check_maybe return_graph = back
                 propagate check fuel h (bt_middle_in transfers a m) (ZTail m tail) rewritten
               Just g  ->
                 do { markGraphRewritten
-                   ; g <- return_graph g
+                   ; g <- areturn g
                    ; my_trace "With Facts" (ppr a) $ return ()
                    ; my_trace "  Rewrote middle node"
                                              (f4sep [ppr m, text "to", pprGraph g]) $
@@ -961,7 +909,7 @@ backward_rew check_maybe return_graph = back
                             ; return (insertBlock (Block id tail) rewritten, fuel) }
               Just g ->
                 do { markGraphRewritten
-                   ; g <- return_graph g
+                   ; g <- areturn g
                    ; my_trace "Rewrote first node"
                      (f4sep [ppr id <> colon, text "to", pprGraph g]) $ return ()
                    ; (a, g, fuel) <- inner_rew g a fuel

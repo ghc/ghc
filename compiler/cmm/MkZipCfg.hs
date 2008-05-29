@@ -9,7 +9,7 @@ module MkZipCfg
     )
 where
 
-import StackSlot
+import BlockId (BlockId(..), emptyBlockEnv)
 import ZipCfg
 
 import Outputable
