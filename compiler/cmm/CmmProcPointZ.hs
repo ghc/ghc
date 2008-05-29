@@ -1,29 +1,37 @@
 
 module CmmProcPointZ
-    ( minimalProcPointSet
+    ( callProcPoints, minimalProcPointSet
     , addProcPointProtocols
+    , splitAtProcPoints
     )
 where
 
-import Prelude hiding (zip, unzip)
+import Prelude hiding (zip, unzip, last)
 
-import ClosureInfo
+import CLabel
+--import ClosureInfo
 import Cmm hiding (blockId)
 import CmmExpr
 import CmmContFlowOpt
 import CmmLiveZ
 import CmmTx
 import DFMonad
+import FiniteMap
 import ForeignCall -- used in protocol for the entry point
 import MachOp (MachHint(NoHint))
 import Maybes
+import MkZipCfgCmm hiding (CmmBlock, CmmGraph)
+import Monad
+import Name
 import Outputable
 import Panic
+import StackSlot
 import UniqFM
 import UniqSet
+import UniqSupply
 import ZipCfg
 import ZipCfgCmmRep
-import ZipDataflow0
+import ZipDataflow
 
 -- Compute a minimal set of proc points for a control-flow graph.
 
@@ -111,8 +119,8 @@ lattice = DataflowLattice "direct proc-point reachability" unreached add_to Fals
 --------------------------------------------------
 -- transfer equations
 
-forward :: FAnalysis Middle Last Status
-forward = FComp "proc-point reachability" first middle last exit
+forward :: ForwardTransfers Middle Last Status
+forward = ForwardTransfers first middle last exit
     where first ProcPoint id = ReachedBy $ unitUniqSet id
           first  x _ = x
           middle x _ = x
@@ -120,39 +128,57 @@ forward = FComp "proc-point reachability" first middle last exit
           last x l = LastOutFacts $ map (\id -> (id, x)) (succs l)
           exit x   = x
                 
-minimalProcPointSet :: CmmGraph -> ProcPointSet
-minimalProcPointSet g = extendPPSet g (postorder_dfs g) entryPoint
-    where entryPoint = unitUniqSet (lg_entry g)
+-- It is worth distinguishing two sets of proc points:
+-- those that are induced by calls in the original graph
+-- and those that are introduced because they're reachable from multiple proc points.
+callProcPoints      :: CmmGraph -> ProcPointSet
+minimalProcPointSet :: ProcPointSet -> CmmGraph -> FuelMonad ProcPointSet
 
-extendPPSet :: CmmGraph -> [CmmBlock] -> ProcPointSet -> ProcPointSet
+callProcPoints g = fold_blocks add entryPoint g
+  where entryPoint = unitUniqSet (lg_entry g)
+        add b set = case last $ unzip b of
+                      LastOther (LastCall _ (Just k)) -> extendBlockSet set k
+                      _ -> set
+
+minimalProcPointSet callProcPoints g = extendPPSet g (postorder_dfs g) callProcPoints
+
+type PPFix = FuelMonad (ForwardFixedPoint Middle Last Status ())
+
+procPointAnalysis :: ProcPointSet -> CmmGraph -> FuelMonad PPFix
+procPointAnalysis procPoints g =
+  let addPP env id = extendBlockEnv env id ProcPoint
+      initProcPoints = foldl addPP emptyBlockEnv (uniqSetToList procPoints)
+  in runDFM lattice $ -- init with old facts and solve
+       return $ (zdfSolveFrom initProcPoints "proc-point reachability" lattice
+                              forward (fact_bot lattice) $ graphOfLGraph g :: PPFix)
+
+extendPPSet :: CmmGraph -> [CmmBlock] -> ProcPointSet -> FuelMonad ProcPointSet
 extendPPSet g blocks procPoints =
-    case newPoint of Just id ->
-                       if elemBlockSet id procPoints' then panic "added old proc pt"
-                       else extendPPSet g blocks (extendBlockSet procPoints' id)
-                     Nothing -> procPoints'
-    where env = runDFA lattice $
-                do refine_f_anal forward g set_init_points
-                   getAllFacts
-          set_init_points = mapM_ (\id -> setFact id ProcPoint)
-                            (uniqSetToList procPoints)
-          procPoints' = fold_blocks add emptyBlockSet g
-          add block pps = let id = blockId block
-                          in  case lookupBlockEnv env id of
-                                Just ProcPoint -> extendBlockSet pps id
-                                _ -> pps
-                                     
-          newPoint = listToMaybe (mapMaybe ppSuccessor blocks)
-          ppSuccessor b@(Block id _) =
-              let nreached id = case lookupBlockEnv env id `orElse` panic "no ppt" of
-                                  ProcPoint -> 1
-                                  ReachedBy ps -> sizeUniqSet ps
-                  my_nreached = nreached id
-                  -- | Looking for a successor of b that is reached by
-                  -- more proc points than b and is not already a proc
-                  -- point.  If found, it can become a proc point.
-                  newId succ_id = not (elemBlockSet succ_id procPoints') &&
-                                  nreached succ_id > my_nreached
-              in  listToMaybe $ filter newId $ succs b
+    do res <- procPointAnalysis procPoints g
+       env <- liftM zdfFpFacts res
+       let add block pps = let id = blockId block
+                           in  case lookupBlockEnv env id of
+                                 Just ProcPoint -> extendBlockSet pps id
+                                 _ -> pps
+           procPoints' = fold_blocks add emptyBlockSet g
+           newPoint = listToMaybe (mapMaybe ppSuccessor blocks)
+           ppSuccessor b@(Block id _) =
+               let nreached id = case lookupBlockEnv env id `orElse` panic "no ppt" of
+                                   ProcPoint -> 1
+                                   ReachedBy ps -> sizeUniqSet ps
+                   my_nreached = nreached id
+                   -- | Looking for a successor of b that is reached by
+                   -- more proc points than b and is not already a proc
+                   -- point.  If found, it can become a proc point.
+                   newId succ_id = not (elemBlockSet succ_id procPoints') &&
+                                   nreached succ_id > my_nreached
+               in  listToMaybe $ filter newId $ succs b
+       case newPoint of Just id ->
+                          if elemBlockSet id procPoints' then panic "added old proc pt"
+                          else extendPPSet g blocks (extendBlockSet procPoints' id)
+                        Nothing -> return procPoints'
+
+
                                     
 
 ------------------------------------------------------------------------
@@ -204,21 +230,28 @@ algorithm would be just as good, so that's what we do.
 
 -}
 
-data Protocol = Protocol Convention CmmFormals
+data Protocol = Protocol Convention CmmFormals StackArea
   deriving Eq
+instance Outputable Protocol where
+  ppr (Protocol c fs a) = text "Protocol" <+> ppr c <+> ppr fs <+> ppr a
 
 -- | Function 'optimize_calls' chooses protocols only for those proc
 -- points that are relevant to the optimization explained above.
 -- The others are assigned by 'add_unassigned', which is not yet clever.
 
-addProcPointProtocols :: ProcPointSet -> CmmFormalsWithoutKinds -> CmmGraph -> CmmGraph
-addProcPointProtocols procPoints formals g =
-       snd $ add_unassigned procPoints $ optimize_calls g
-    where optimize_calls g =  -- see Note [Separate Adams optimization]
+addProcPointProtocols :: ProcPointSet -> ProcPointSet -> CmmFormalsWithoutKinds ->
+                         CmmGraph -> FuelMonad CmmGraph
+addProcPointProtocols callPPs procPoints formals g =
+  do liveness <- cmmLivenessZ g
+     (protos, g') <- return $ optimize_calls liveness g
+     blocks'' <- add_CopyOuts protos procPoints g'
+     return $ LGraph (lg_entry g) blocks''
+    where optimize_calls liveness g =  -- see Note [Separate Adams optimization]
               let (protos, blocks') =
                       fold_blocks maybe_add_call (init_protocols, emptyBlockEnv) g
-                  g' = LGraph (lg_entry g) (add_CopyIns protos blocks')
-              in  (protos, runTx removeUnreachableBlocksZ g')
+                  protos' = add_unassigned liveness procPoints protos
+                  g'  = LGraph (lg_entry g) $ add_CopyIns callPPs protos' blocks'
+              in  (protos', runTx removeUnreachableBlocksZ g')
           maybe_add_call :: CmmBlock -> (BlockEnv Protocol, BlockEnv CmmBlock)
                          -> (BlockEnv Protocol, BlockEnv CmmBlock)
           -- ^ If the block is a call whose continuation goes to a proc point
@@ -228,7 +261,7 @@ addProcPointProtocols procPoints formals g =
               case goto_end $ unzip block of
                 (h, LastOther (LastCall tgt (Just k)))
                     | Just proto <- lookupBlockEnv protos k,
-                      Just pee <- jumpsToProcPoint k
+                      Just pee   <- jumpsToProcPoint k
                     -> let newblock =
                                zipht h (tailOfLast (LastCall tgt (Just pee)))
                            changed_blocks   = insertBlock newblock blocks
@@ -252,55 +285,165 @@ addProcPointProtocols procPoints formals g =
           init_protocols = fold_blocks maybe_add_proto emptyBlockEnv g
           maybe_add_proto :: CmmBlock -> BlockEnv Protocol -> BlockEnv Protocol
           maybe_add_proto (Block id (ZTail (CopyIn c fs _srt) _)) env =
-              extendBlockEnv env id (Protocol c fs)
+              extendBlockEnv env id (Protocol c fs $ toArea id fs)
           maybe_add_proto (Block id _) env | id == lg_entry g =
-              extendBlockEnv env id (Protocol stdArgConvention hinted_formals)
+              extendBlockEnv env id (Protocol stdArgConvention hfs $ toArea id hfs)
           maybe_add_proto _ env = env
-          hinted_formals = map (\x -> CmmKinded x NoHint) formals
+          toArea id fs = mkStackArea id fs $ Just fs
+          hfs = map (\x -> CmmKinded x NoHint) formals
           stdArgConvention = ConventionStandard CmmCallConv Arguments
 
 -- | For now, following a suggestion by Ben Lippmeier, we pass all
 -- live variables as arguments, hoping that a clever register
 -- allocator might help.
 
-add_unassigned
-    :: ProcPointSet -> (BlockEnv Protocol, CmmGraph) -> (BlockEnv Protocol, CmmGraph) 
+add_unassigned :: BlockEnv CmmLive -> ProcPointSet -> BlockEnv Protocol ->
+                  BlockEnv Protocol
 add_unassigned = pass_live_vars_as_args
 
-pass_live_vars_as_args
-    :: ProcPointSet -> (BlockEnv Protocol, CmmGraph) -> (BlockEnv Protocol, CmmGraph) 
-pass_live_vars_as_args procPoints (protos, g) = (protos', g')
-  where liveness = cmmLivenessZ g
-        protos' = foldUniqSet addLiveVars protos procPoints
+pass_live_vars_as_args :: BlockEnv CmmLive -> ProcPointSet ->
+                          BlockEnv Protocol -> BlockEnv Protocol
+pass_live_vars_as_args liveness procPoints protos = protos'
+  where protos' = foldUniqSet addLiveVars protos procPoints
         addLiveVars :: BlockId -> BlockEnv Protocol -> BlockEnv Protocol
         addLiveVars id protos =
             case lookupBlockEnv protos id of
-              Just _ -> protos
+              Just _  -> protos
               Nothing -> let live = lookupBlockEnv liveness id `orElse`
-                                    emptyRegSet -- XXX there's a bug lurking!
-                                    -- panic ("no liveness at block " ++ show id)
+                                    panic ("no liveness at block " ++ show id)
                              formals = map (\x -> CmmKinded x NoHint) $ uniqSetToList live
-                         in  extendBlockEnv protos id (Protocol ConventionPrivate formals)
-        g' = g { lg_blocks = add_CopyIns protos' (lg_blocks g) }
+                             prot = Protocol ConventionPrivate formals $
+                                             mkStackArea id formals $ Just formals
+                         in  extendBlockEnv protos id prot
 
 
--- | Add a CopyIn node to each block that has a protocol but lacks the
--- appropriate CopyIn node.
+-- | Add copy-in instructions to each proc point that did not arise from a call
+-- instruction. (Proc-points that arise from calls already have their copy-in instructions.)
 
-add_CopyIns :: BlockEnv Protocol -> BlockEnv CmmBlock -> BlockEnv CmmBlock
-add_CopyIns protos = mapUFM (maybe_insert_CopyIn protos)
-    where maybe_insert_CopyIn :: BlockEnv Protocol -> CmmBlock -> CmmBlock
-          maybe_insert_CopyIn protos b@(Block id t) =
+add_CopyIns :: ProcPointSet -> BlockEnv Protocol -> BlockEnv CmmBlock -> BlockEnv CmmBlock
+add_CopyIns callPPs protos = mapUFM maybe_insert_CopyIns
+    where maybe_insert_CopyIns :: CmmBlock -> CmmBlock
+          maybe_insert_CopyIns b@(Block id t) | not $ elementOfUniqSet id callPPs =
             case lookupBlockEnv protos id of
               Nothing -> b
-              Just (Protocol c fs) ->
+              Just (Protocol c fs area) ->
                   case t of
-                    ZTail (CopyIn c' fs' _) _ ->
-                      if c == c' && fs == fs' then b
-                      else panic ("mismatched protocols for block " ++ show id)
-                    _ -> Block id (ZTail (CopyIn c fs NoC_SRT) t)
+                    --ZTail (CopyIn c' fs' _) _ ->
+                    --  if c == c' && fs == fs' then b
+                    --  else panic ("mismatched protocols for block " ++ show id)
+                    _ -> Block id -- (ZTail (CopyIn c fs NoC_SRT) t)
+                           $ foldr ZTail t (copyIn c area fs)
+          maybe_insert_CopyIns b = b
 
--- XXX also need to add the relevant CopyOut nodes!!!
+-- | Add a CopyOut node before each procpoint.
+-- If the predecessor is a call, then the CopyOut should already exist (in the callee).
+
+add_CopyOuts :: BlockEnv Protocol -> ProcPointSet -> CmmGraph ->
+                FuelMonad (BlockEnv CmmBlock)
+add_CopyOuts protos procPoints g = fold_blocks maybe_insert_CopyOut (return emptyBlockEnv) g
+    where maybe_insert_CopyOut :: CmmBlock -> FuelMonad (BlockEnv CmmBlock) ->
+                                  FuelMonad (BlockEnv CmmBlock)
+          maybe_insert_CopyOut b@(Block bid _) blocks =
+            case last $ unzip b of
+              LastOther (LastCall _ _) -> -- skip calls (copy out done by callee)
+                 blocks >>= (\bmap -> return $ extendBlockEnv bmap bid b)
+              _ -> maybe_insert_CopyOut' b blocks
+          maybe_insert_CopyOut' b blocks = fold_succs trySucc b init >>= finish
+            where init = blocks >>= (\bmap -> return (b, bmap))
+                  trySucc succId z =
+                    if elemBlockSet succId procPoints then
+                      case lookupBlockEnv protos succId of
+                        Nothing -> z
+                        Just (Protocol c fs area) ->
+                          insert z succId $ copyOut c area $ map fetch fs
+                          -- CopyOut c $ map fetch fs
+                    else z
+                  fetch k = k {kindlessCmm = CmmReg $ CmmLocal $ kindlessCmm k}
+                  insert z succId m =
+                    do (b, bmap) <- z
+                       (b, bs)   <- insertBetween b m succId
+                       return $ (b, foldl (flip insertBlock) bmap bs)
+                  finish (b@(Block bid _), bmap) = return $ extendBlockEnv bmap bid b
+
+
+-- Input invariant: A block should only be reachable from a single ProcPoint.
+-- If you want to duplicate blocks, do it before this gets called.
+splitAtProcPoints :: CmmFormalsWithoutKinds -> CLabel -> ProcPointSet ->
+                     CmmGraph -> FuelMonad [CmmGraph]
+splitAtProcPoints formals entry_label procPoints g@(LGraph entry _) =
+  do let layout = layout_stack formals g
+     pprTrace "stack layout" (ppr layout) $ return () 
+     res <- procPointAnalysis procPoints g
+     procMap <- liftM zdfFpFacts res
+     let addBlock b@(Block bid _) graphEnv =
+               case lookupBlockEnv procMap bid of
+                 Just ProcPoint -> add graphEnv bid bid b
+                 Just (ReachedBy set) ->
+                   case uniqSetToList set of
+                     []   -> graphEnv
+                     [id] -> add graphEnv id bid b 
+                     _ -> panic "Each block should be reachable from only one ProcPoint"
+                 Nothing -> panic "block not reached by a proc point?"
+         add graphEnv procId bid b = extendBlockEnv graphEnv procId graph'
+               where graph  = lookupBlockEnv graphEnv procId `orElse` emptyBlockEnv
+                     graph' = extendBlockEnv graph bid b
+     graphEnv <- return $ fold_blocks addBlock emptyBlockEnv g
+     -- Build a map from proc point BlockId to labels for their new procedures
+     let add_label map pp = clabel pp >>= (\l -> return $ (pp, l) : map) 
+         clabel procPoint = if procPoint == entry then return entry_label
+                            else getUniqueM >>= return . to_label
+         to_label u = mkEntryLabel (mkFCallName u "procpoint")
+     procLabels <- foldM add_label [] (uniqSetToList procPoints)
+     -- In each new graph, add blocks jumping off to the new procedures,
+     -- and replace branches to procpoints with branches to the jump-off blocks
+     let add_jump_block (env, bs) (pp, l) =
+           do bid <- liftM mkBlockId getUniqueM
+              let b = Block bid (ZLast (LastOther (LastJump $ CmmLit $ CmmLabel l)))
+              return $ (extendBlockEnv env pp bid, b : bs)
+         add_jumps newGraphEnv (guniq, blockEnv) =
+           do (jumpEnv, jumpBlocks) <- foldM add_jump_block (emptyBlockEnv, []) procLabels
+              let ppId = mkBlockId guniq
+                  LGraph _ blockEnv' = replaceLabelsZ jumpEnv $ LGraph ppId blockEnv
+                  blockEnv'' = foldl (flip insertBlock) blockEnv' jumpBlocks
+              return $ extendBlockEnv newGraphEnv ppId $
+                       runTx cmmCfgOptsZ $ LGraph ppId blockEnv''
+     _ <- return $ replaceLabelsZ
+     graphEnv <- foldM add_jumps emptyBlockEnv $ ufmToList graphEnv
+     return $ pprTrace "procLabels" (ppr procLabels) $
+              pprTrace "splitting graphs" (ppr graphEnv) $ [g]
+
+------------------------------------------------------------------------
+--                    Stack Layout (completely bogus for now)         --
+------------------------------------------------------------------------
+
+-- At some point, we'll do stack layout properly.
+-- But for now, we can move forward on generating code by just producing
+-- a brain dead layout, giving a separate slot to every variable,
+-- and (incorrectly) assuming that all parameters are passed on the stack.
+
+-- For now, variables are placed at explicit offsets from a virtual
+-- frame pointer.
+-- We may want to use abstract stack slots at some point.
+data Placement = VFPMinus Int
+
+instance Outputable Placement where
+  ppr (VFPMinus k) = text "VFP - " <> int k
+
+-- Build a map from registers to stack locations.
+-- Return that map along with the offset to the end of the block
+-- containing local registers.
+layout_stack ::CmmFormalsWithoutKinds -> CmmGraph ->
+               (Int, FiniteMap LocalReg Placement, FiniteMap LocalReg Placement)
+layout_stack formals g = (ix', incomingMap, localMap)
+    where (ix, incomingMap) = foldl (flip place) (1, emptyFM) formals -- IGNORES CC'S
+                 -- 1 leaves space for the return infotable
+          (ix', localMap) = foldUniqSet place (ix, emptyFM) regs
+          place r (ix, map) = (ix', addToFM map r $ VFPMinus ix') where ix' = ix + 1
+          regs = fold_blocks (fold_fwd_block (\_ y -> y) add addL) emptyRegSet g
+          add  x y = foldRegsDefd extendRegSet y x
+          addL (LastOther l) z = add l z
+          addL LastExit      z = z
+
 
 ----------------------------------------------------------------
 

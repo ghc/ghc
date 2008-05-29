@@ -131,6 +131,8 @@ stmtToInstrs stmt = case stmt of
     CmmCondBranch arg id  -> genCondJump id arg
     CmmSwitch arg ids     -> genSwitch arg ids
     CmmJump arg params	  -> genJump arg
+    CmmReturn params	  ->
+      panic "stmtToInstrs: return statement should have been cps'd away"
 
 -- -----------------------------------------------------------------------------
 -- General things for putting together code sequences

@@ -7,8 +7,8 @@
 
 module ZipCfgCmmRep
   ( CmmZ, CmmTopZ, CmmGraph, CmmBlock, CmmAGraph, Middle(..), Last(..), Convention(..)
-  , ValueDirection(..)
-  , pprCmmGraphLikeCmm
+  , ValueDirection(..), CmmBackwardFixedPoint, CmmForwardFixedPoint
+  , insertBetween, pprCmmGraphLikeCmm
   )
 where
 
@@ -28,36 +28,41 @@ import ClosureInfo
 import FastString
 import ForeignCall
 import MachOp
+import StackSlot
 import qualified ZipCfg as Z
-import qualified ZipDataflow0 as DF
+import qualified ZipDataflow as DF
 import ZipCfg 
 import MkZipCfg
 import Util
 
-import UniqSet
 import Maybes
+import Monad
 import Outputable
 import Prelude hiding (zip, unzip, last)
+import UniqSet
+import UniqSupply
 
 ----------------------------------------------------------------------
 ----- Type synonyms and definitions
 
-type CmmGraph  = LGraph Middle Last
-type CmmAGraph = AGraph Middle Last
-type CmmBlock  = Block  Middle Last
-type CmmZ      = GenCmm    CmmStatic CmmInfo CmmGraph
-type CmmTopZ   = GenCmmTop CmmStatic CmmInfo CmmGraph
+type CmmGraph                = LGraph Middle Last
+type CmmAGraph               = AGraph Middle Last
+type CmmBlock                = Block  Middle Last
+type CmmZ                    = GenCmm    CmmStatic CmmInfo CmmGraph
+type CmmTopZ                 = GenCmmTop CmmStatic CmmInfo CmmGraph
+type CmmBackwardFixedPoint a = DF.BackwardFixedPoint Middle Last a ()
+type CmmForwardFixedPoint  a = DF.ForwardFixedPoint  Middle Last a ()
 
 data Middle
   = MidComment FastString
 
   | MidAssign CmmReg CmmExpr     -- Assign to register
 
-  | MidStore CmmExpr CmmExpr     -- Assign to memory location.  Size is
+  | MidStore  CmmExpr CmmExpr    -- Assign to memory location.  Size is
                                  -- given by cmmExprRep of the rhs.
 
   | MidUnsafeCall                -- An "unsafe" foreign call;
-     CmmCallTarget               -- just a fat machine instructoin
+     CmmCallTarget               -- just a fat machine instruction
      CmmFormals                  -- zero or more results
      CmmActuals                  -- zero or more arguments
 
@@ -84,6 +89,7 @@ data Middle
               -- matching 'CopyOut' in the same basic block.
               -- As above, '[CmmKind]' will migrate into the foreign calling
               -- convention, leaving the actuals as '[CmmExpr]'.
+  deriving Eq
 
 data Last
   = LastBranch BlockId  -- Goto another block in the same procedure
@@ -134,6 +140,53 @@ Middle node in the basic block in which it occurs.
 -}
 
 ----------------------------------------------------------------------
+----- Splicing between blocks
+-- Given a middle node, a block, and a successor BlockId,
+-- we can insert the middle node between the block and the successor.
+-- We return the updated block and a list of new blocks that must be added
+-- to the graph.
+-- The semantics is a bit tricky. We consider cases on the last node:
+-- o For a branch, we can just insert before the branch,
+--   but sometimes the optimizer does better if we actually insert
+--   a fresh basic block, enabling some common blockification.
+-- o For a conditional branch, switch statement, or call, we must insert
+--   a new basic block.
+-- o For a jump, or return, this operation is impossible.
+
+insertBetween :: MonadUnique m => CmmBlock -> [Middle] -> BlockId -> m (CmmBlock, [CmmBlock])
+insertBetween b ms succId = insert $ goto_end $ unzip b
+  where insert (h, LastOther (LastBranch bid)) =
+          if bid == succId then
+            do (bid', bs) <- newBlocks
+               return (zipht h $ ZLast $ LastOther (LastBranch bid'), bs)
+          else panic "tried to insert between non-adjacent blocks"
+        insert (h, LastOther (LastCondBranch c t f)) =
+          do (t', tbs) <- if t == succId then newBlocks else return $ (t, [])
+             (f', fbs) <- if f == succId then newBlocks else return $ (f, [])
+             return (zipht h $ ZLast $ LastOther (LastCondBranch c t' f'), tbs ++ fbs)
+        insert (h, LastOther (LastCall e (Just k))) =
+          if k == succId then
+            do (id', bs) <- newBlocks
+               return (zipht h $ ZLast $ LastOther (LastCall e (Just id')), bs)
+          else panic "tried to insert between non-adjacent blocks"
+        insert (_, LastOther (LastCall _ Nothing)) =
+          panic "cannot insert after non-returning call"
+        insert (h, LastOther (LastSwitch e ks)) =
+          do (ids, bs) <- mapAndUnzipM mbNewBlocks ks
+             return (zipht h $ ZLast $ LastOther (LastSwitch e ids), join bs)
+        insert (_, LastOther LastReturn)   = panic "cannot insert after return"
+        insert (_, LastOther (LastJump _)) = panic "cannot insert after jump"
+        insert (_, LastExit) = panic "cannot insert after exit"
+        newBlocks = do id <- liftM BlockId $ getUniqueM
+                       return $ (id, [Block id $
+                                   foldr ZTail (ZLast (LastOther (LastBranch succId))) ms])
+        mbNewBlocks (Just k) = if k == succId then liftM lift newBlocks
+                               else return (Just k, [])
+        mbNewBlocks Nothing  = return (Nothing, [])
+        lift (id, bs) = (Just id, bs)
+
+
+----------------------------------------------------------------------
 ----- Instance declarations for control flow
 
 instance HavingSuccessors Last where
@@ -180,7 +233,7 @@ instance UserOfLocalRegs Middle where
             fold f z m = foldRegsUsed f z m  -- avoid monomorphism restriction
 
 instance UserOfLocalRegs Last where
-    foldRegsUsed f z m = last m
+    foldRegsUsed f z l = last l
       where last (LastReturn)           = z
             last (LastJump e)           = foldRegsUsed f z e
             last (LastBranch _id)       = z
@@ -188,6 +241,25 @@ instance UserOfLocalRegs Last where
             last (LastCondBranch e _ _) = foldRegsUsed f z e
             last (LastSwitch e _tbl)    = foldRegsUsed f z e
 
+instance DefinerOfLocalRegs Middle where
+    foldRegsDefd f z m = middle m
+      where middle (MidComment {})       = z
+            middle (MidAssign _lhs _)    = fold f z _lhs
+            middle (MidStore _ _)        = z
+            middle (MidUnsafeCall _ _ _) = z
+            middle (MidAddToContext _ _) = z
+            middle (CopyIn _ _formals _) = fold f z _formals
+            middle (CopyOut _ _)         = z
+            fold f z m = foldRegsDefd f z m  -- avoid monomorphism restriction
+
+instance DefinerOfLocalRegs Last where
+    foldRegsDefd _ z l = last l
+      where last (LastReturn)           = z
+            last (LastJump _)           = z
+            last (LastBranch _)         = z
+            last (LastCall _ _)         = z
+            last (LastCondBranch _ _ _) = z
+            last (LastSwitch _ _)       = z
 
 ----------------------------------------------------------------------
 ----- Instance declarations for prettyprinting (avoids recursive imports)
@@ -217,7 +289,7 @@ pprMiddle stmt = pp_stmt <+> pp_debug
              ptext (sLit "foreign") <+> doubleQuotes(ppr conv) <+> ptext (sLit "...")
 
     CopyOut conv args ->
-        ptext (sLit "next, pass") <+> doubleQuotes(ppr conv) <+>
+        ptext (sLit "PreCopyOut: next, pass") <+> doubleQuotes(ppr conv) <+>
         parens (commafy (map pprKinded args))
 
     --  // text
@@ -404,19 +476,19 @@ pprCmmGraphLikeCmm g = vcat (swallow blocks)
                           Just (conv, args) -> endblock (ppr (CopyOut conv args) $$
                                                          text "// <exit>")
           preds = zipPreds g
-          entry_has_no_pred = case Z.lookupBlockEnv preds (Z.lg_entry g) of
+          entry_has_no_pred = case lookupBlockEnv preds (Z.lg_entry g) of
                                 Nothing -> True
                                 Just s -> isEmptyUniqSet s
           single_preds =
               let add b single =
                     let id = Z.blockId b
-                    in  case Z.lookupBlockEnv preds id of
+                    in  case lookupBlockEnv preds id of
                           Nothing -> single
                           Just s -> if sizeUniqSet s == 1 then
-                                        Z.extendBlockSet single id
+                                        extendBlockSet single id
                                     else single
-              in  Z.fold_blocks add Z.emptyBlockSet g
-          unique_pred id = Z.elemBlockSet id single_preds
+              in  Z.fold_blocks add emptyBlockSet g
+          unique_pred id = elemBlockSet id single_preds
           cconv_of_conv (ConventionStandard conv _) = conv
           cconv_of_conv (ConventionPrivate {}) = CmmCallConv -- XXX totally bogus
 

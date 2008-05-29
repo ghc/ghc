@@ -5,6 +5,7 @@ module CmmZipUtil
   )
 where
 import Prelude hiding (last, unzip)
+import StackSlot
 import ZipCfg
 
 import Maybes

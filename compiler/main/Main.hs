@@ -30,6 +30,7 @@ import InteractiveUI	( interactiveUI, ghciWelcomeMsg )
 
 -- Various other random stuff that we need
 import Config
+import HscTypes
 import Packages		( dumpPackages )
 import DriverPhases	( Phase(..), isSourceFilename, anyHsc,
 			  startPhase, isHaskellSrcFilename )
@@ -137,7 +138,8 @@ main =
 
   -- we've finished manipulating the DynFlags, update the session
   GHC.setSessionDynFlags session dflags
-  dflags <- GHC.getSessionDynFlags session
+  dflags  <- GHC.getSessionDynFlags session
+  hsc_env <- GHC.sessionHscEnv      session
 
   let
      -- To simplify the handling of filepaths, we normalise all filepaths right 
@@ -172,7 +174,7 @@ main =
     ShowInterface f        -> doShowIface dflags f
     DoMake                 -> doMake session srcs
     DoMkDependHS           -> doMkDependHS session (map fst srcs)
-    StopBefore p           -> oneShot dflags p srcs
+    StopBefore p           -> oneShot hsc_env p srcs
     DoInteractive          -> interactiveUI session srcs Nothing
     DoEval exprs           -> interactiveUI session srcs $ Just $ reverse exprs
 
@@ -431,8 +433,8 @@ doMake sess srcs  = do
 	haskellish (_,Just phase) = 
 	  phase `notElem` [As, Cc, CmmCpp, Cmm, StopLn]
 
-    dflags <- GHC.getSessionDynFlags sess
-    o_files <- mapM (compileFile dflags StopLn) non_hs_srcs
+    hsc_env <- GHC.sessionHscEnv sess
+    o_files <- mapM (compileFile hsc_env StopLn) non_hs_srcs
     mapM_ (consIORef v_Ld_inputs) (reverse o_files)
 
     targets <- mapM (uncurry GHC.guessTarget) hs_srcs

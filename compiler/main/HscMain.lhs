@@ -84,6 +84,7 @@ import CmmParse		( parseCmmFile )
 import CmmCPS
 import CmmCPSZ
 import CmmInfo
+import OptimizationFuel ( initOptFuelState )
 import CmmCvt
 import CmmTx
 import CmmContFlowOpt
@@ -123,16 +124,18 @@ newHscEnv dflags
 	; us      <- mkSplitUniqSupply 'r'
 	; nc_var  <- newIORef (initNameCache us knownKeyNames)
 	; fc_var  <- newIORef emptyUFM
-	; mlc_var  <- newIORef emptyModuleEnv
+	; mlc_var <- newIORef emptyModuleEnv
+        ; optFuel <- initOptFuelState
 	; return (HscEnv { hsc_dflags = dflags,
 			   hsc_targets = [],
 			   hsc_mod_graph = [],
-			   hsc_IC     = emptyInteractiveContext,
-			   hsc_HPT    = emptyHomePackageTable,
-			   hsc_EPS    = eps_var,
-			   hsc_NC     = nc_var,
-			   hsc_FC     = fc_var,
-			   hsc_MLC    = mlc_var,
+			   hsc_IC      = emptyInteractiveContext,
+			   hsc_HPT     = emptyHomePackageTable,
+			   hsc_EPS     = eps_var,
+			   hsc_NC      = nc_var,
+			   hsc_FC      = fc_var,
+			   hsc_MLC     = mlc_var,
+			   hsc_OptFuel = optFuel,
                            hsc_global_rdr_env = emptyGlobalRdrEnv,
                            hsc_global_type_env = emptyNameEnv } ) }
 			
@@ -657,7 +660,7 @@ hscCompile cgguts
                               dir_imps cost_centre_info
                               stg_binds hpc_info
          --- Optionally run experimental Cmm transformations ---
-         cmms <- optionallyConvertAndOrCPS dflags cmms
+         cmms <- optionallyConvertAndOrCPS hsc_env cmms
                  -- ^ unless certain dflags are on, the identity function
          ------------------  Code output -----------------------
          rawcmms <- cmmToRawCmm cmms
@@ -703,13 +706,14 @@ hscInteractive _ = panic "GHC not compiled with interpreter"
 
 ------------------------------
 
-hscCmmFile :: DynFlags -> FilePath -> IO Bool
-hscCmmFile dflags filename = do
+hscCmmFile :: HscEnv -> FilePath -> IO Bool
+hscCmmFile hsc_env filename = do
+  dflags <- return $ hsc_dflags hsc_env
   maybe_cmm <- parseCmmFile dflags filename
   case maybe_cmm of
     Nothing -> return False
     Just cmm -> do
-        cmms <- optionallyConvertAndOrCPS dflags [cmm]
+        cmms <- optionallyConvertAndOrCPS hsc_env [cmm]
         rawCmms <- cmmToRawCmm cmms
 	codeOutput dflags no_mod no_loc NoStubs [] rawCmms
 	return True
@@ -719,11 +723,12 @@ hscCmmFile dflags filename = do
                               ml_hi_file  = panic "hscCmmFile: no hi file",
                               ml_obj_file = panic "hscCmmFile: no obj file" }
 
-optionallyConvertAndOrCPS :: DynFlags -> [Cmm] -> IO [Cmm]
-optionallyConvertAndOrCPS dflags cmms =
-    do   --------  Optionally convert to and from zipper ------
+optionallyConvertAndOrCPS :: HscEnv -> [Cmm] -> IO [Cmm]
+optionallyConvertAndOrCPS hsc_env cmms =
+    do let dflags = hsc_dflags hsc_env
+        --------  Optionally convert to and from zipper ------
        cmms <- if dopt Opt_ConvertToZipCfgAndBack dflags
-               then mapM (testCmmConversion dflags) cmms
+               then mapM (testCmmConversion hsc_env) cmms
                else return cmms
          ---------  Optionally convert to CPS (MDA) -----------
        cmms <- if not (dopt Opt_ConvertToZipCfgAndBack dflags) &&
@@ -733,9 +738,10 @@ optionallyConvertAndOrCPS dflags cmms =
        return cmms
 
 
-testCmmConversion :: DynFlags -> Cmm -> IO Cmm
-testCmmConversion dflags cmm =
-    do showPass dflags "CmmToCmm"
+testCmmConversion :: HscEnv -> Cmm -> IO Cmm
+testCmmConversion hsc_env cmm =
+    do let dflags = hsc_dflags hsc_env
+       showPass dflags "CmmToCmm"
        dumpIfSet_dyn dflags Opt_D_dump_cvt_cmm "C-- pre-conversion" (ppr cmm)
        --continuationC <- cmmCPS dflags abstractC >>= cmmToRawCmm
        us <- mkSplitUniqSupply 'C'
@@ -743,7 +749,7 @@ testCmmConversion dflags cmm =
        let cvtm = do g <- cmmToZgraph cmm
                      return $ cfopts g
        let zgraph = initUs_ us cvtm
-       cps_zgraph <- protoCmmCPSZ dflags zgraph
+       cps_zgraph <- protoCmmCPSZ hsc_env zgraph
        let chosen_graph = if dopt Opt_RunCPSZ dflags then cps_zgraph else zgraph
        dumpIfSet_dyn dflags Opt_D_dump_cmmz "C-- Zipper Graph" (ppr chosen_graph)
        showPass dflags "Convert from Z back to Cmm"

@@ -1,23 +1,48 @@
 module OptimizationFuel
-    ( OptimizationFuel, canRewriteWithFuel, maybeRewriteWithFuel, oneLessFuel
+    ( OptimizationFuel ,  canRewriteWithFuel, maybeRewriteWithFuel, oneLessFuel
+    , OptFuelState, initOptFuelState --, setTotalFuel
     , tankFilledTo, diffFuel
     , FuelConsumer
     , FuelUsingMonad, FuelState
-    , lastFuelPass, fuelExhausted, fuelRemaining, fuelDecrement
-    , lastFuelPassInState, fuelExhaustedInState, fuelRemainingInState
-    , fuelDecrementState
-    , runFuel, runFuelIO, runFuelWithLastPass, fuelConsumingPass
-    , runWithInfiniteFuel
-    , FuelMonad(..)
+    , lastFuelPass, fuelExhausted, fuelRemaining, fuelDecrement, fuelDec1
+    --, lastFuelPassInState , fuelExhaustedInState, fuelRemainingInState
+    --, fuelDecrementState
+    --, runFuel
+    , runFuelIO
+    --, runFuelWithLastPass
+    , fuelConsumingPass
+    , FuelMonad
+    , liftUniq
+    , lGraphOfGraph -- needs to be able to create a unique ID...
     )
 where
+
+import StackSlot
+import ZipCfg
 
 --import GHC.Exts (State#)
 import Panic
 
 import Data.IORef
+import Monad
+import StaticFlags (opt_Fuel)
+import UniqSupply
 
 #include "HsVersions.h"
+
+
+-- We limit the number of transactions executed using a record of flags
+-- stored in an HscEnv. The flags store the name of the last optimization
+-- pass and the amount of optimization fuel remaining.
+data OptFuelState =
+  OptFuelState { pass_ref :: IORef String
+               , fuel_ref :: IORef OptimizationFuel
+               }
+initOptFuelState :: IO OptFuelState
+initOptFuelState =
+  do pass_ref' <- newIORef "unoptimized program"
+     fuel_ref' <- newIORef (tankFilledTo opt_Fuel)
+     return OptFuelState {pass_ref = pass_ref', fuel_ref = fuel_ref'}
 
 type FuelConsumer a = OptimizationFuel -> (a, OptimizationFuel)
 
@@ -50,7 +75,7 @@ diffFuel _ _ = 0
 #endif
 
 data FuelState = FuelState { fs_fuellimit :: OptimizationFuel, fs_lastpass :: String }
-newtype FuelMonad a = FuelMonad (FuelState -> (a, FuelState))
+newtype FuelMonad a = FuelMonad (FuelState -> UniqSM (a, FuelState))
 
 fuelConsumingPass :: String -> FuelConsumer a -> FuelMonad a
 fuelConsumingPass name f = do fuel <- fuelRemaining
@@ -58,39 +83,47 @@ fuelConsumingPass name f = do fuel <- fuelRemaining
                               fuelDecrement name fuel fuel'
                               return a
 
-runFuel             :: FuelMonad a -> FuelConsumer a
-runFuelWithLastPass :: FuelMonad a -> FuelConsumer (a, String)
-runWithInfiniteFuel :: FuelMonad a -> a
+runFuelIO :: OptFuelState -> FuelMonad a -> IO a
+runFuelIO fs (FuelMonad f) =
+    do pass <- readIORef (pass_ref fs)
+       fuel <- readIORef (fuel_ref fs)
+       u    <- mkSplitUniqSupply 'u'
+       let (a, FuelState fuel' pass') = initUs_ u $ f (FuelState fuel pass)
+       writeIORef (pass_ref fs) pass'
+       writeIORef (fuel_ref fs) fuel'
+       return a
 
+instance Monad FuelMonad where
+  FuelMonad f >>= k = FuelMonad (\s -> do (a, s') <- f s
+                                          let FuelMonad f' = k a in (f' s'))
+  return a = FuelMonad (\s -> return (a, s))
 
-runFuelIO :: IORef String -> IORef OptimizationFuel -> FuelMonad a -> IO a
-runFuelIO pass_ref fuel_ref (FuelMonad f) =
-    do { pass <- readIORef pass_ref
-       ; fuel <- readIORef fuel_ref
-       ; let (a, FuelState fuel' pass') = f (FuelState fuel pass)
-       ; writeIORef pass_ref pass'
-       ; writeIORef fuel_ref fuel'
-       ; return a
-       }
+instance MonadUnique FuelMonad where
+    getUniqueSupplyM = liftUniq getUniqueSupplyM
+    getUniqueM       = liftUniq getUniqueM
+    getUniquesM      = liftUniq getUniquesM
+liftUniq :: UniqSM x -> FuelMonad x
+liftUniq x = FuelMonad (\s -> x >>= (\u -> return (u, s)))
 
-initialFuelState :: OptimizationFuel -> FuelState
-initialFuelState fuel = FuelState fuel "unoptimized program"
+class Monad m => FuelUsingMonad m where
+  fuelRemaining :: m OptimizationFuel
+  fuelDecrement :: String -> OptimizationFuel -> OptimizationFuel -> m ()
+  fuelDec1      :: m ()
+  fuelExhausted :: m Bool
+  lastFuelPass  :: m String
 
-runFuel             (FuelMonad f) fuel = let (a, s) = f $ initialFuelState fuel
-                                         in (a, fs_fuellimit s)
-runFuelWithLastPass (FuelMonad f) fuel = let (a, s) = f $ initialFuelState fuel
-                                         in ((a, fs_lastpass s), fs_fuellimit s)
+instance FuelUsingMonad FuelMonad where
+  fuelRemaining = extract fs_fuellimit
+  lastFuelPass  = extract fs_lastpass
+  fuelExhausted = extract $ not . canRewriteWithFuel . fs_fuellimit
+  fuelDecrement p f f' = FuelMonad (\s -> return ((), fuelDecrementState p f f' s))
+  fuelDec1      = FuelMonad f 
+     where f s = if canRewriteWithFuel (fs_fuellimit s) then
+                    return ((), s { fs_fuellimit = oneLessFuel (fs_fuellimit s) })
+                 else panic "Tried to use exhausted fuel supply"
 
-runWithInfiniteFuel (FuelMonad f) = fst $ f $ initialFuelState $ tankFilledTo maxBound
-
-lastFuelPassInState :: FuelState -> String
-lastFuelPassInState = fs_lastpass
-
-fuelExhaustedInState :: FuelState -> Bool
-fuelExhaustedInState = canRewriteWithFuel . fs_fuellimit
-
-fuelRemainingInState :: FuelState -> OptimizationFuel
-fuelRemainingInState = fs_fuellimit
+extract :: (FuelState -> a) -> FuelMonad a
+extract f = FuelMonad (\s -> return (f s, s))
 
 fuelDecrementState
     :: String -> OptimizationFuel -> OptimizationFuel -> FuelState -> FuelState
@@ -101,24 +134,33 @@ fuelDecrementState new_optimizer old new s =
                    concat ["lost track of ", new_optimizer, "'s transactions"]
         optimizer = if diffFuel old new > 0 then new_optimizer else fs_lastpass s
 
-class Monad m => FuelUsingMonad m where
-  fuelRemaining :: m OptimizationFuel
-  fuelDecrement :: String -> OptimizationFuel -> OptimizationFuel -> m ()
-  fuelExhausted :: m Bool
-  lastFuelPass  :: m String
-  
+-- lGraphOfGraph is here because we need uniques to implement it.
+lGraphOfGraph :: Graph m l -> FuelMonad (LGraph m l)
+lGraphOfGraph (Graph tail blocks) =
+  do entry <- liftM BlockId $ getUniqueM
+     return $ LGraph entry (insertBlock (Block entry tail) blocks)
 
-instance Monad FuelMonad where
-  FuelMonad f >>= k = FuelMonad (\s -> let (a, s') = f s
-                                           FuelMonad f' = k a
-                                       in  f' s')
-  return a = FuelMonad (\s -> (a, s))
 
-instance FuelUsingMonad FuelMonad where
-  fuelRemaining = extract fuelRemainingInState
-  lastFuelPass  = extract lastFuelPassInState
-  fuelExhausted = extract fuelExhaustedInState
-  fuelDecrement p f f' = FuelMonad (\s -> ((), fuelDecrementState p f f' s))
+-- JD: I'm not sure what NR's plans are for the following code.
+-- Perhaps these functions will be useful in the future, or perhaps I've made
+-- them obsoltete.
 
-extract :: (FuelState -> a) -> FuelMonad a
-extract f = FuelMonad (\s -> (f s, s))
+--initialFuelState :: OptimizationFuel -> FuelState
+--initialFuelState fuel = FuelState fuel "unoptimized program"
+--runFuel             :: FuelMonad a -> FuelConsumer a
+--runFuelWithLastPass :: FuelMonad a -> FuelConsumer (a, String)
+
+--runFuel             (FuelMonad f) fuel = let (a, s) = f $ initialFuelState fuel
+--                                         in (a, fs_fuellimit s)
+--runFuelWithLastPass (FuelMonad f) fuel = let (a, s) = f $ initialFuelState fuel
+--                                         in ((a, fs_lastpass s), fs_fuellimit s)
+
+-- lastFuelPassInState :: FuelState -> String
+-- lastFuelPassInState = fs_lastpass
+
+-- fuelExhaustedInState :: FuelState -> Bool
+-- fuelExhaustedInState = canRewriteWithFuel . fs_fuellimit
+
+-- fuelRemainingInState :: FuelState -> OptimizationFuel
+-- fuelRemainingInState = fs_fuellimit
+

@@ -14,6 +14,7 @@ module ZipCfgExtras
 where
 import Maybes
 import Panic
+import StackSlot
 import ZipCfg
 
 import Prelude hiding (zip, unzip, last)
@@ -37,7 +38,7 @@ splice_focus_exit  :: FGraph m l -> LGraph m l -> FGraph m l
 _unused :: ()
 _unused = all `seq` ()
     where all = ( exit, focusp, unfocus {- , splice_focus_entry, splice_focus_exit -}
-                , fold_fwd_block, foldM_fwd_block (\_ a -> Just a)
+                , foldM_fwd_block (\_ a -> Just a)
                 )
 
 unfocus (FGraph e bz bs) = LGraph e (insertBlock (zip bz) bs)
@@ -59,14 +60,6 @@ splice_focus_exit (FGraph eid (ZBlock head tail) blocks) g =
   let (g', head') = splice_head head g in
   FGraph eid (ZBlock head' tail) (plusUFM (lg_blocks g') blocks)
 -}
-
--- | Fold from first to last
-fold_fwd_block ::
-  (BlockId -> a -> a) -> (m -> a -> a) -> (ZLast l -> a -> a) ->
-  Block m l -> a -> a
-fold_fwd_block first middle last (Block id t) z = tail t (first id z)
-    where tail (ZTail m t) z = tail t (middle m z)
-          tail (ZLast l)   z = last l z
 
 -- | iterate from first to last
 foldM_fwd_block ::

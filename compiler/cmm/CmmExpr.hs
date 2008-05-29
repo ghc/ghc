@@ -5,16 +5,22 @@ module CmmExpr
     , CmmLit(..), cmmLitRep
     , LocalReg(..), localRegRep, localRegGCFollow, GCKind(..)
     , GlobalReg(..), globalRegRep, spReg, hpReg, spLimReg, nodeReg, node
-    , UserOfLocalRegs, foldRegsUsed, filterRegsUsed
+    , DefinerOfLocalRegs, UserOfLocalRegs, foldRegsDefd, foldRegsUsed, filterRegsUsed
     , RegSet, emptyRegSet, elemRegSet, extendRegSet, deleteFromRegSet, mkRegSet
             , plusRegSet, minusRegSet, timesRegSet
+    , StackSlotMap, getSlot
     )
 where
 
 import CLabel
+import FiniteMap
 import MachOp
+import Monad
+import Panic
+import StackSlot
 import Unique
 import UniqSet
+import UniqSupply
 
 -----------------------------------------------------------------------------
 --		CmmExpr
@@ -36,7 +42,8 @@ data CmmExpr
 data CmmReg 
   = CmmLocal  LocalReg
   | CmmGlobal GlobalReg
-  deriving( Eq )
+  | CmmStack  StackSlot
+  deriving( Eq, Ord )
 
 data CmmLit
   = CmmInt Integer  MachRep
@@ -61,6 +68,9 @@ data CmmLit
 
 instance Eq LocalReg where
   (LocalReg u1 _ _) == (LocalReg u2 _ _) = u1 == u2
+
+instance Ord LocalReg where
+  compare (LocalReg u1 _ _) (LocalReg u2 _ _) = compare u1 u2
 
 instance Uniquable LocalReg where
   getUnique (LocalReg uniq _ _) = uniq
@@ -106,11 +116,33 @@ plusRegSet       = unionUniqSets
 timesRegSet      = intersectUniqSets
 
 -----------------------------------------------------------------------------
+--    Stack slots
+-----------------------------------------------------------------------------
+
+mkVarSlot :: Unique -> CmmReg -> StackSlot
+mkVarSlot id r = StackSlot (mkStackArea (mkBlockId id) [r] Nothing) 0
+
+-- Usually, we either want to lookup a variable's spill slot in an environment
+-- or else allocate it and add it to the environment.
+-- For a variable, we just need a single area of the appropriate size.
+type StackSlotMap = FiniteMap CmmReg StackSlot
+getSlot :: MonadUnique m => StackSlotMap -> CmmReg -> m (StackSlotMap, StackSlot)
+getSlot map r = case lookupFM map r of
+                  Just s  -> return (map, s)
+                  Nothing -> do id <- getUniqueM
+                                let s = mkVarSlot id r
+                                return (addToFM map r s, s)
+
+
+-----------------------------------------------------------------------------
 --    Register-use information for expressions and other types 
 -----------------------------------------------------------------------------
 
 class UserOfLocalRegs a where
   foldRegsUsed :: (b -> LocalReg -> b) -> b -> a -> b
+
+class DefinerOfLocalRegs a where
+  foldRegsDefd :: (b -> LocalReg -> b) -> b -> a -> b
 
 filterRegsUsed :: UserOfLocalRegs e => (LocalReg -> Bool) -> e -> RegSet
 filterRegsUsed p e =
@@ -120,9 +152,18 @@ filterRegsUsed p e =
 instance UserOfLocalRegs CmmReg where
     foldRegsUsed f z (CmmLocal reg) = f z reg
     foldRegsUsed _ z (CmmGlobal _)  = z
+    foldRegsUsed _ z (CmmStack _)  = z
+
+instance DefinerOfLocalRegs CmmReg where
+    foldRegsDefd f z (CmmLocal reg) = f z reg
+    foldRegsDefd _ z (CmmGlobal _)  = z
+    foldRegsDefd _ z (CmmStack _)  = z
 
 instance UserOfLocalRegs LocalReg where
     foldRegsUsed f z r = f z r
+
+instance DefinerOfLocalRegs LocalReg where
+    foldRegsDefd f z r = f z r
 
 instance UserOfLocalRegs RegSet where
     foldRegsUsed f = foldUniqSet (flip f)
@@ -139,6 +180,10 @@ instance UserOfLocalRegs a => UserOfLocalRegs [a] where
   foldRegsUsed _ set [] = set
   foldRegsUsed f set (x:xs) = foldRegsUsed f (foldRegsUsed f set x) xs
 
+instance DefinerOfLocalRegs a => DefinerOfLocalRegs [a] where
+  foldRegsDefd _ set [] = set
+  foldRegsDefd f set (x:xs) = foldRegsDefd f (foldRegsDefd f set x) xs
+
 -----------------------------------------------------------------------------
 --		MachRep
 -----------------------------------------------------------------------------
@@ -153,8 +198,9 @@ cmmExprRep (CmmMachOp op _)  = resultRepOfMachOp op
 cmmExprRep (CmmRegOff reg _) = cmmRegRep reg
 
 cmmRegRep :: CmmReg -> MachRep
-cmmRegRep (CmmLocal  reg) 	= localRegRep reg
+cmmRegRep (CmmLocal  reg) = localRegRep reg
 cmmRegRep (CmmGlobal reg)	= globalRegRep reg
+cmmRegRep (CmmStack  _)	  = panic "cmmRegRep not yet defined on stack slots"
 
 localRegRep :: LocalReg -> MachRep
 localRegRep (LocalReg _ rep _) = rep
@@ -214,7 +260,7 @@ data GlobalReg
   -- from platform to platform (see module PositionIndependentCode).
   | PicBaseReg
 
-  deriving( Eq , Show )
+  deriving( Eq, Ord, Show )
 
 -- convenient aliases
 spReg, hpReg, spLimReg, nodeReg :: CmmReg

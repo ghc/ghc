@@ -6,6 +6,7 @@ where
 
 import Cmm
 import CmmExpr
+import MkZipCfg
 import MkZipCfgCmm hiding (CmmGraph)
 import ZipCfgCmmRep -- imported for reverse conversion
 import CmmZipUtil
@@ -14,6 +15,7 @@ import PprCmmZ()
 import qualified ZipCfg as G
 
 import FastString
+import Monad
 import Outputable
 import Panic
 import UniqSet
@@ -24,14 +26,18 @@ import Maybe
 cmmToZgraph :: GenCmm d h (ListGraph CmmStmt) -> UniqSM (GenCmm d h CmmGraph)
 cmmOfZgraph :: GenCmm d h (CmmGraph)          ->         GenCmm d h (ListGraph CmmStmt)
 
-cmmToZgraph = cmmMapGraphM toZgraph
+cmmToZgraph (Cmm tops) = liftM Cmm $ mapM mapTop tops
+  where mapTop (CmmProc h l args g) =
+          toZgraph (showSDoc $ ppr l) args g >>= return . CmmProc h l args
+        mapTop (CmmData s ds) = return $ CmmData s ds
 cmmOfZgraph = cmmMapGraph  ofZgraph
 
 
-toZgraph :: String -> ListGraph CmmStmt -> UniqSM CmmGraph
-toZgraph _ (ListGraph []) = lgraphOfAGraph emptyAGraph
-toZgraph fun_name g@(ListGraph (BasicBlock id ss : other_blocks)) = 
-           labelAGraph id $ mkStmts ss <*> foldr addBlock emptyAGraph other_blocks
+toZgraph :: String -> CmmFormalsWithoutKinds -> ListGraph CmmStmt -> UniqSM CmmGraph
+toZgraph _ _ (ListGraph []) = lgraphOfAGraph emptyAGraph
+toZgraph fun_name args g@(ListGraph (BasicBlock id ss : other_blocks)) = 
+           labelAGraph id $ mkMiddles (mkEntry id undefined args) <*>
+                            mkStmts ss <*> foldr addBlock emptyAGraph other_blocks
   where addBlock (BasicBlock id ss) g = mkLabel id   <*> mkStmts ss <*> g
         mkStmts (CmmNop        : ss)  = mkNop        <*> mkStmts ss 
         mkStmts (CmmComment s  : ss)  = mkComment s  <*> mkStmts ss
@@ -102,7 +108,7 @@ ofZgraph g = ListGraph $ swallow blocks
                         -> tail id prev' out t bs -- optimize out redundant labels
                     _ -> if isNothing out then endblock (CmmBranch tgt)
                          else pprPanic "can't convert LGraph with pending CopyOut"
-                                  (ppr g)
+                                  (text "target" <+> ppr tgt <+> ppr g)
               LastCondBranch expr tid fid ->
                 if isJust out then pprPanic "CopyOut before conditional branch" (ppr g)
                 else
@@ -156,13 +162,13 @@ ofZgraph g = ListGraph $ swallow blocks
           single_preds =
               let add b single =
                     let id = G.blockId b
-                    in  case G.lookupBlockEnv preds id of
+                    in  case lookupBlockEnv preds id of
                           Nothing -> single
                           Just s -> if sizeUniqSet s == 1 then
-                                        G.extendBlockSet single id
+                                        extendBlockSet single id
                                     else single
-              in  G.fold_blocks add G.emptyBlockSet g
-          unique_pred id = G.elemBlockSet id single_preds
+              in  G.fold_blocks add emptyBlockSet g
+          unique_pred id = elemBlockSet id single_preds
           call_succs = 
               let add b succs =
                       case G.last (G.unzip b) of

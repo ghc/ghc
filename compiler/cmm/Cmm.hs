@@ -42,10 +42,10 @@ import FastString
 
 import Data.Word
 
-import ZipCfg (	BlockId(..), mkBlockId
-              , BlockEnv, emptyBlockEnv, lookupBlockEnv, extendBlockEnv, mkBlockEnv
-              , BlockSet, emptyBlockSet, elemBlockSet, extendBlockSet
-              )
+import StackSlot (	BlockId(..), mkBlockId
+                 , BlockEnv, emptyBlockEnv, lookupBlockEnv, extendBlockEnv, mkBlockEnv
+                 , BlockSet, emptyBlockSet, elemBlockSet, extendBlockSet
+                 )
 
 -- A [[BlockId]] is a local label.
 -- Local labels must be unique within an entire compilation unit, not
@@ -274,6 +274,10 @@ instance UserOfLocalRegs CmmCallTarget where
     foldRegsUsed f set (CmmCallee e _) = foldRegsUsed f set e
     foldRegsUsed _ set (CmmPrim {})    = set
 
+instance DefinerOfLocalRegs a => DefinerOfLocalRegs (CmmKinded a) where
+  foldRegsDefd f z (CmmKinded x _) = foldRegsDefd f z x
+
+
 --just look like a tuple, since it was a tuple before
 -- ... is that a good idea? --Isaac Dupree
 instance (Outputable a) => Outputable (CmmKinded a) where
@@ -334,6 +338,7 @@ data CmmCallTarget
   | CmmPrim		-- Call a "primitive" (eg. sin, cos)
 	CallishMachOp		-- These might be implemented as inline
 				-- code by the backend.
+  deriving Eq
 
 -----------------------------------------------------------------------------
 --		Static Data

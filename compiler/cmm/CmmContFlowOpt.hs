@@ -1,15 +1,21 @@
 
 module CmmContFlowOpt
     ( runCmmOpts, cmmCfgOpts, cmmCfgOptsZ
-    , branchChainElimZ, removeUnreachableBlocksZ
+    , branchChainElimZ, removeUnreachableBlocksZ, predMap
+    , replaceLabelsZ
     )
 where
 
 import Cmm
 import CmmTx
 import qualified ZipCfg as G
+import StackSlot
 import ZipCfgCmmRep
+
 import Maybes
+import Monad
+import Panic
+import Prelude hiding (unzip, zip)
 import Util
 import UniqFM
 
@@ -23,7 +29,8 @@ cmmCfgOpts  :: Tx (ListGraph CmmStmt)
 cmmCfgOptsZ :: Tx CmmGraph
 
 cmmCfgOpts  = branchChainElim  -- boring, but will get more exciting later
-cmmCfgOptsZ = branchChainElimZ `seqTx` removeUnreachableBlocksZ
+cmmCfgOptsZ =
+  branchChainElimZ `seqTx` blockConcatZ `seqTx` removeUnreachableBlocksZ
         -- Here branchChainElim can ultimately be replaced
         -- with a more exciting combination of optimisations
 
@@ -82,15 +89,15 @@ branchChainElimZ g@(G.LGraph eid _)
                 else
                     Nothing
         in  mapMaybe loop_to lone_branch_blocks
-    lookup id = G.lookupBlockEnv env id `orElse` id 
+    lookup id = lookupBlockEnv env id `orElse` id 
 
-isLoneBranchZ :: CmmBlock -> Either (G.BlockId, G.BlockId) CmmBlock
+isLoneBranchZ :: CmmBlock -> Either (BlockId, BlockId) CmmBlock
 isLoneBranchZ (G.Block id (G.ZLast (G.LastOther (LastBranch target))))
     | id /= target  = Left (id,target)
 isLoneBranchZ other = Right other
    -- ^ An infinite loop is not a link in a branch chain!
 
-replaceLabelsZ :: BlockEnv G.BlockId -> CmmGraph -> CmmGraph
+replaceLabelsZ :: BlockEnv BlockId -> CmmGraph -> CmmGraph
 replaceLabelsZ env = replace_eid . G.map_nodes id id last
   where
     replace_eid (G.LGraph eid blocks) = G.LGraph (lookup eid) blocks
@@ -99,7 +106,43 @@ replaceLabelsZ env = replace_eid . G.map_nodes id id last
     last (LastSwitch e tbl)           = LastSwitch e (map (fmap lookup) tbl)
     last (LastCall tgt (Just id))     = LastCall tgt (Just $ lookup id) 
     last exit_jump_return             = exit_jump_return
-    lookup id = G.lookupBlockEnv env id `orElse` id 
+    lookup id = lookupBlockEnv env id `orElse` id 
+
+----------------------------------------------------------------
+-- Build a map from a block to its set of predecessors. Very useful.
+predMap :: G.LastNode l => G.LGraph m l -> BlockEnv BlockSet
+predMap g = G.fold_blocks add_preds emptyBlockEnv g -- find the back edges
+  where add_preds b env = foldl (add b) env (G.succs b)
+        add (G.Block bid _) env b' =
+          extendBlockEnv env b' $
+                extendBlockSet (lookupBlockEnv env b' `orElse` emptyBlockSet) bid
+----------------------------------------------------------------
+blockConcatZ  :: Tx CmmGraph
+-- If a block B branches to a label L, and L has no other predecessors,
+-- then we can splice the block starting with L onto the end of B.
+-- Because this optmization can be inhibited by unreachable blocks,
+-- we bundle it with a pass that drops unreachable blocks.
+-- Order matters, so we work bottom up (reverse postorder DFS).
+-- Note: This optimization does _not_ subsume branch chain elimination.
+blockConcatZ = removeUnreachableBlocksZ  `seqTx` blockConcatZ'
+blockConcatZ' :: Tx CmmGraph
+blockConcatZ' g@(G.LGraph eid blocks) = tx $ G.LGraph eid blocks'
+  where (changed, blocks') = foldr maybe_concat (False, blocks) $ G.postorder_dfs g
+        maybe_concat b@(G.Block bid _) (changed, blocks') =
+          let unchanged = (changed, extendBlockEnv blocks' bid b)
+          in case G.goto_end $ G.unzip b of
+               (h, G.LastOther (LastBranch b')) ->
+                  if num_preds b' == 1 then
+                    (True, extendBlockEnv blocks' bid $ splice blocks' h b')
+                  else unchanged
+               _ -> unchanged
+        num_preds bid = liftM sizeBlockSet (lookupBlockEnv backEdges bid) `orElse` 0
+        backEdges = predMap g
+        splice blocks' h bid' =
+          case lookupBlockEnv blocks' bid' of
+            Just (G.Block _ t) -> G.zip $ G.ZBlock h t
+            Nothing -> panic "unknown successor block"
+        tx = if changed then aTx else noTx
 ----------------------------------------------------------------
 mkClosureBlockEnv :: [(BlockId, BlockId)] -> BlockEnv BlockId
 mkClosureBlockEnv blocks = mkBlockEnv $ map follow blocks

@@ -102,6 +102,7 @@ import Packages hiding ( Version(..) )
 import DynFlags		( DynFlags(..), isOneShot, HscTarget (..) )
 import DriverPhases	( HscSource(..), isHsBoot, hscSourceString, Phase )
 import BasicTypes	( IPName, Fixity, defaultFixity, DeprecTxt )
+import OptimizationFuel	( OptFuelState )
 import IfaceSyn
 import FiniteMap	( FiniteMap )
 import CoreSyn		( CoreRule )
@@ -199,6 +200,11 @@ data HscEnv
 	hsc_MLC  :: {-# UNPACK #-} !(IORef ModLocationCache),
 		-- The finder's cache.  This caches the location of modules,
 		-- so we don't have to search the filesystem multiple times.
+
+        hsc_OptFuel :: OptFuelState,
+                -- Settings to control the use of optimization fuel:
+                -- by limiting the number of transformations,
+                -- we can use binary search to help find compiler bugs.
 
         hsc_global_rdr_env :: GlobalRdrEnv,
         hsc_global_type_env :: TypeEnv

@@ -8,9 +8,10 @@ import CmmSpillReload
 import DFMonad
 import qualified GraphOps
 import MachOp
+import StackSlot
 import ZipCfg
 import ZipCfgCmmRep
-import ZipDataflow0
+import ZipDataflow
 
 import Maybes
 import Panic
@@ -20,19 +21,36 @@ import Data.List
 
 type M = ExtendWithSpills Middle
 
+fold_edge_facts_b ::
+  LastNode l => (DualLive -> a -> a) -> BackwardTransfers m l DualLive -> LGraph m l
+                                     -> (BlockId -> DualLive) -> a -> a
+fold_edge_facts_b f comp graph env z =
+    foldl fold_block_facts z (postorder_dfs graph)
+  where
+    fold_block_facts z b =              
+      let (h, l) = goto_end (ZipCfg.unzip b) 
+          last_in _ LastExit = fact_bot dualLiveLattice
+          last_in env (LastOther l) = bt_last_in comp env l
+      in head_fold h (last_in env l) z
+    head_fold (ZHead h m) out z = head_fold h (bt_middle_in comp out m) (f out z)
+    head_fold (ZFirst id) out z = f (bt_first_in comp out id) (f out z)
 
-foldConflicts :: (RegSet -> a -> a) -> a -> LGraph M Last -> a
+foldConflicts :: (RegSet -> a -> a) -> a -> LGraph M Last -> FuelMonad a
 foldConflicts f z g =
-  let env = runDFA dualLiveLattice (run_b_anal dualLiveness g >> getAllFacts)
-      lookup id = lookupBlockEnv env id `orElse` fact_bot dualLiveLattice
-      f' dual z = f (on_stack dual) z
-  in  fold_edge_facts_b f' dualLiveness g lookup z
+  do env <- dualLiveness emptyBlockSet $ graphOfLGraph g
+     let lookup id = lookupBlockEnv env id `orElse` fact_bot dualLiveLattice
+         f' dual z = f (on_stack dual) z
+     return $ fold_edge_facts_b f' (dualLiveTransfers emptyBlockSet) g lookup z
+  --let env = runDFA dualLiveLattice (run_b_anal dualLiveness g >> getAllFacts)
+  --    lookup id = lookupBlockEnv env id `orElse` fact_bot dualLiveLattice
+  --    f' dual z = f (on_stack dual) z
+  --in  fold_edge_facts_b f' dualLiveness g lookup z
 
 
 type IGraph = Color.Graph LocalReg SlotClass StackPlacement
 type ClassCount = [(SlotClass, Int)]
 
-buildIGraphAndCounts :: LGraph M Last -> (IGraph, ClassCount)
+buildIGraphAndCounts :: LGraph M Last -> FuelMonad (IGraph, ClassCount)
 buildIGraphAndCounts g = igraph_and_counts
     where igraph_and_counts = foldConflicts add (Color.initGraph, zero) g
           zero = map (\c -> (c, 0)) allSlotClasses

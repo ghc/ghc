@@ -9,6 +9,7 @@ module MkZipCfg
     )
 where
 
+import StackSlot
 import ZipCfg
 
 import Outputable
@@ -164,9 +165,9 @@ catAGraphs :: [AGraph m l] -> AGraph m l
 -- splicing operation <*>, are constant-time operations.
 
 emptyAGraph :: AGraph m l
-mkLabel     :: LastNode l =>
+mkLabel     :: (LastNode l) =>
                BlockId -> AGraph m l              -- graph contains the label
-mkMiddle    :: m       -> AGraph m l              -- graph contains the node
+mkMiddle    :: m -> AGraph m l   -- graph contains the node
 mkLast      :: (Outputable m, Outputable l, LastNode l) =>
                l       -> AGraph m l              -- graph contains the node
 
@@ -195,9 +196,11 @@ outOfLine :: (LastNode l, Outputable m, Outputable l)
 
 
 -- below for convenience
-mkMiddles ::                                             [m]       -> AGraph m l
-mkZTail   :: (Outputable m, Outputable l, LastNode l) => ZTail m l -> AGraph m l
-mkBranch  :: (Outputable m, Outputable l, LastNode l) => BlockId   -> AGraph m l
+mkMiddles :: [m] -> AGraph m l
+mkZTail   :: (Outputable m, Outputable l, LastNode l) =>
+  ZTail m l -> AGraph m l
+mkBranch  :: (Outputable m, Outputable l, LastNode l) =>
+  BlockId   -> AGraph m l
 
 -- | For the structured control-flow constructs, a condition is
 -- represented as a function that takes as arguments the labels to
@@ -226,8 +229,8 @@ mkWhileDo    :: (Outputable m, Outputable l, LastNode l)
 -- in the number of basic blocks.  The conversion is also monadic
 -- because it may require the allocation of fresh, unique labels.
 
-graphOfAGraph  ::            AGraph m l -> UniqSM (Graph  m l)
-lgraphOfAGraph ::            AGraph m l -> UniqSM (LGraph m l)
+graphOfAGraph  :: AGraph m l -> UniqSM (Graph  m l)
+lgraphOfAGraph :: AGraph m l -> UniqSM (LGraph m l)
   -- ^ allocate a fresh label for the entry point
 labelAGraph    :: BlockId -> AGraph m l -> UniqSM (LGraph m l)
   -- ^ use the given BlockId as the label of the entry point
@@ -301,7 +304,7 @@ withFreshLabel name ofId = AGraph f
                  f' g
 
 withUnique ofU = AGraph f
-  where f g = do u <- getUniqueUs
+  where f g = do u <- getUniqueM
                  let AGraph f' = ofU u
                  f' g
 
@@ -358,5 +361,5 @@ Emitting a Branch at this point is fine:
 -- a string.  
 
 freshBlockId :: String -> UniqSM BlockId
-freshBlockId _ = do { u <- getUniqueUs; return $ BlockId u }
+freshBlockId _ = do { u <- getUniqueM; return $ BlockId u }
 

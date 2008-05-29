@@ -9,6 +9,7 @@ import CmmExpr
 import ForeignCall
 import PprCmm
 import Outputable
+import StackSlot
 import qualified ZipCfgCmmRep as G
 import qualified ZipCfg as Z
 import CmmZipUtil
@@ -93,19 +94,19 @@ pprCmmGraphLikeCmm g = vcat (swallow blocks)
                           Just (conv, args) -> endblock (ppr (G.CopyOut conv args) $$
                                                          text "// <exit>")
           preds = zipPreds g
-          entry_has_no_pred = case Z.lookupBlockEnv preds (Z.lg_entry g) of
+          entry_has_no_pred = case lookupBlockEnv preds (Z.lg_entry g) of
                                 Nothing -> True
                                 Just s -> isEmptyUniqSet s
           single_preds =
               let add b single =
                     let id = Z.blockId b
-                    in  case Z.lookupBlockEnv preds id of
+                    in  case lookupBlockEnv preds id of
                           Nothing -> single
                           Just s -> if sizeUniqSet s == 1 then
-                                        Z.extendBlockSet single id
+                                        extendBlockSet single id
                                     else single
-              in  Z.fold_blocks add Z.emptyBlockSet g
-          unique_pred id = Z.elemBlockSet id single_preds
+              in  Z.fold_blocks add emptyBlockSet g
+          unique_pred id = elemBlockSet id single_preds
           cconv_of_conv (G.ConventionStandard conv _) = conv
           cconv_of_conv (G.ConventionPrivate {}) = CmmCallConv -- XXX totally bogus
 

@@ -1,4 +1,3 @@
-{-# OPTIONS -w #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and fix
 -- any warnings in the module. See
@@ -53,6 +52,7 @@ lintCmmTop (CmmProc _ lbl _ (ListGraph blocks))
 lintCmmTop (CmmData {})
   = return ()
 
+lintCmmBlock :: BlockSet -> GenBasicBlock CmmStmt -> CmmLint ()
 lintCmmBlock labels (BasicBlock id stmts)
   = addLintInfo (text "in basic block " <> ppr (getUnique id)) $
 	mapM_ (lintCmmStmt labels) stmts
@@ -85,6 +85,7 @@ lintCmmExpr expr =
   return (cmmExprRep expr)
 
 -- Check for some common byte/word mismatches (eg. Sp + 1)
+cmmCheckMachOp   :: MachOp -> [CmmExpr] -> CmmLint MachRep
 cmmCheckMachOp  op args@[CmmReg reg, CmmLit (CmmInt i _)]
   | isWordOffsetReg reg && isOffsetOp op && i `rem` fromIntegral wORD_SIZE /= 0
   = cmmLintDubiousWordOffset (CmmMachOp op args)
@@ -97,17 +98,20 @@ cmmCheckMachOp op@(MO_U_Conv from to) args
 cmmCheckMachOp op _args
   = return (resultRepOfMachOp op)
 
+isWordOffsetReg  :: CmmReg -> Bool
 isWordOffsetReg (CmmGlobal Sp) = True
 -- No warnings for unaligned arithmetic, which is used to tag dynamic constructor closures.
 --isWordOffsetReg (CmmGlobal Hp) = True
 isWordOffsetReg _ = False
 
+isOffsetOp :: MachOp -> Bool
 isOffsetOp (MO_Add _) = True
 isOffsetOp (MO_Sub _) = True
 isOffsetOp _ = False
 
 -- This expression should be an address from which a word can be loaded:
 -- check for funny-looking sub-word offsets.
+cmmCheckWordAddress :: CmmExpr -> CmmLint ()
 cmmCheckWordAddress e@(CmmMachOp op [arg, CmmLit (CmmInt i _)])
   | isOffsetOp op && notNodeReg arg && i `rem` fromIntegral wORD_SIZE /= 0
   = cmmLintDubiousWordOffset e
@@ -119,6 +123,7 @@ cmmCheckWordAddress _
 
 -- No warnings for unaligned arithmetic with the node register,
 -- which is used to extract fields from tagged constructor closures.
+notNodeReg :: CmmExpr -> Bool
 notNodeReg (CmmReg reg) | reg == nodeReg = False
 notNodeReg _                             = True
 
@@ -155,6 +160,7 @@ lintTarget (CmmCallee e _) = lintCmmExpr e >> return ()
 lintTarget (CmmPrim {})    = return ()
 
 
+checkCond :: CmmExpr -> CmmLint ()
 checkCond (CmmMachOp mop _) | isComparisonMachOp mop = return ()
 checkCond expr = cmmLintErr (hang (text "expression is not a conditional:") 2
 				    (ppr expr))

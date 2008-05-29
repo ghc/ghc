@@ -69,10 +69,10 @@ import System.Environment
 -- We return the augmented DynFlags, because they contain the result
 -- of slurping in the OPTIONS pragmas
 
-preprocess :: DynFlags -> (FilePath, Maybe Phase) -> IO (DynFlags, FilePath)
-preprocess dflags (filename, mb_phase) =
+preprocess :: HscEnv -> (FilePath, Maybe Phase) -> IO (DynFlags, FilePath)
+preprocess hsc_env (filename, mb_phase) =
   ASSERT2(isJust mb_phase || isHaskellSrcFilename filename, text filename) 
-  runPipeline anyHsc dflags (filename, mb_phase) 
+  runPipeline anyHsc hsc_env (filename, mb_phase) 
         Nothing Temporary Nothing{-no ModLocation-}
 
 -- ---------------------------------------------------------------------------
@@ -94,7 +94,7 @@ compile :: HscEnv
         -> Maybe Linkable               -- old linkable, if we have one
         -> IO (Maybe HomeModInfo)       -- the complete HomeModInfo, if successful
 
-compile hsc_env summary mod_index nmods mb_old_iface maybe_old_linkable
+compile hsc_env0 summary mod_index nmods mb_old_iface maybe_old_linkable
  = do
    let dflags0     = ms_hspp_opts summary
        this_mod    = ms_mod summary
@@ -115,6 +115,7 @@ compile hsc_env summary mod_index nmods mb_old_iface maybe_old_linkable
                      d -> d
        old_paths   = includePaths dflags0
        dflags      = dflags0 { includePaths = current_dir : old_paths }
+       hsc_env     = hsc_env0 {hsc_dflags = dflags}
 
    -- Figure out what lang we're generating
    let hsc_lang = hscMaybeAdjustTarget dflags StopLn src_flavour (hscTarget dflags)
@@ -127,16 +128,16 @@ compile hsc_env summary mod_index nmods mb_old_iface maybe_old_linkable
    let dflags' = dflags { hscTarget = hsc_lang,
 				hscOutName = output_fn,
 				extCoreName = basename ++ ".hcr" }
+   let hsc_env' = hsc_env { hsc_dflags = dflags' }
 
    -- -no-recomp should also work with --make
    let force_recomp = dopt Opt_ForceRecomp dflags
        source_unchanged = isJust maybe_old_linkable && not force_recomp
-       hsc_env' = hsc_env { hsc_dflags = dflags' }
        object_filename = ml_obj_file location
 
    let getStubLinkable False = return []
        getStubLinkable True
-           = do stub_o <- compileStub dflags' this_mod location
+           = do stub_o <- compileStub hsc_env' this_mod location
                 return [ DotO stub_o ]
 
        handleBatch HscNoRecomp
@@ -158,7 +159,7 @@ compile hsc_env summary mod_index nmods mb_old_iface maybe_old_linkable
                             -> return ([], ms_hs_date summary)
                           -- We're in --make mode: finish the compilation pipeline.
                           _other
-                            -> do runPipeline StopLn dflags (output_fn,Nothing)
+                            -> do runPipeline StopLn hsc_env' (output_fn,Nothing)
                                               (Just basename)
                                               Persistent
                                               (Just location)
@@ -229,14 +230,14 @@ compile hsc_env summary mod_index nmods mb_old_iface maybe_old_linkable
 -- -odir obj, we would get obj/src/A_stub.o, which is wrong; we want
 -- obj/A_stub.o.
 
-compileStub :: DynFlags -> Module -> ModLocation -> IO FilePath
-compileStub dflags mod location = do
+compileStub :: HscEnv -> Module -> ModLocation -> IO FilePath
+compileStub hsc_env mod location = do
 	let (o_base, o_ext) = splitExtension (ml_obj_file location)
 	    stub_o = (o_base ++ "_stub") <.> o_ext
 
 	-- compile the _stub.c file w/ gcc
-	let (stub_c,_,_) = mkStubPaths dflags (moduleName mod) location
-	runPipeline StopLn dflags (stub_c,Nothing)  Nothing
+	let (stub_c,_,_) = mkStubPaths (hsc_dflags hsc_env) (moduleName mod) location
+	runPipeline StopLn hsc_env (stub_c,Nothing)  Nothing
 		(SpecificFile stub_o) Nothing{-no ModLocation-}
 
 	return stub_o
@@ -338,18 +339,19 @@ panicBadLink other = panic ("link: GHC not built to link this way: " ++
 -- -----------------------------------------------------------------------------
 -- Compile files in one-shot mode.
 
-oneShot :: DynFlags -> Phase -> [(String, Maybe Phase)] -> IO ()
-oneShot dflags stop_phase srcs = do
-  o_files <- mapM (compileFile dflags stop_phase) srcs
-  doLink dflags stop_phase o_files
+oneShot :: HscEnv -> Phase -> [(String, Maybe Phase)] -> IO ()
+oneShot hsc_env stop_phase srcs = do
+  o_files <- mapM (compileFile hsc_env stop_phase) srcs
+  doLink (hsc_dflags hsc_env) stop_phase o_files
 
-compileFile :: DynFlags -> Phase -> (FilePath, Maybe Phase) -> IO FilePath
-compileFile dflags stop_phase (src, mb_phase) = do
+compileFile :: HscEnv -> Phase -> (FilePath, Maybe Phase) -> IO FilePath
+compileFile hsc_env stop_phase (src, mb_phase) = do
    exists <- doesFileExist src
    when (not exists) $ 
    	throwDyn (CmdLineError ("does not exist: " ++ src))
    
    let
+        dflags = hsc_dflags hsc_env
 	split     = dopt Opt_SplitObjs dflags
 	mb_o_file = outputFile dflags
 	ghc_link  = ghcLink dflags	-- Set by -c or -no-link
@@ -367,7 +369,7 @@ compileFile dflags stop_phase (src, mb_phase) = do
 			As | split -> SplitAs
                         _          -> stop_phase
 
-   (_, out_file) <- runPipeline stop_phase' dflags
+   (_, out_file) <- runPipeline stop_phase' hsc_env
 			  (src, mb_phase) Nothing output 
                           Nothing{-no ModLocation-}
    return out_file
@@ -414,16 +416,16 @@ data PipelineOutput
 
 runPipeline
   :: Phase		        -- When to stop
-  -> DynFlags		        -- Dynamic flags
+  -> HscEnv                     -- Compilation environment
   -> (FilePath,Maybe Phase)     -- Input filename (and maybe -x suffix)
   -> Maybe FilePath             -- original basename (if different from ^^^)
   -> PipelineOutput	        -- Output filename
   -> Maybe ModLocation          -- A ModLocation, if this is a Haskell module
   -> IO (DynFlags, FilePath)	-- (final flags, output filename)
 
-runPipeline stop_phase dflags0 (input_fn, mb_phase) mb_basename output maybe_loc
+runPipeline stop_phase hsc_env0 (input_fn, mb_phase) mb_basename output maybe_loc
   = do
-  let
+  let dflags0 = hsc_dflags hsc_env0
       (input_basename, suffix) = splitExtension input_fn
       suffix' = drop 1 suffix -- strip off the .
       basename | Just b <- mb_basename = b
@@ -431,6 +433,7 @@ runPipeline stop_phase dflags0 (input_fn, mb_phase) mb_basename output maybe_loc
 
       -- Decide where dump files should go based on the pipeline output
       dflags = dflags0 { dumpPrefix = Just (basename ++ ".") }
+      hsc_env = hsc_env0 {hsc_dflags = dflags}
 
 	-- If we were given a -x flag, then use that phase to start from
       start_phase = fromMaybe (startPhase suffix') mb_phase
@@ -453,7 +456,7 @@ runPipeline stop_phase dflags0 (input_fn, mb_phase) mb_basename output maybe_loc
 
   -- Execute the pipeline...
   (dflags', output_fn, maybe_loc) <- 
-	pipeLoop dflags start_phase stop_phase input_fn 
+	pipeLoop hsc_env start_phase stop_phase input_fn 
 	  	 basename suffix' get_output_fn maybe_loc
 
   -- Sometimes, a compilation phase doesn't actually generate any output
@@ -474,18 +477,18 @@ runPipeline stop_phase dflags0 (input_fn, mb_phase) mb_basename output maybe_loc
 
 
 
-pipeLoop :: DynFlags -> Phase -> Phase 
+pipeLoop :: HscEnv -> Phase -> Phase 
 	 -> FilePath  -> String -> Suffix
 	 -> (DynFlags -> Phase -> Maybe ModLocation -> IO FilePath)
 	 -> Maybe ModLocation
 	 -> IO (DynFlags, FilePath, Maybe ModLocation)
 
-pipeLoop dflags phase stop_phase 
+pipeLoop hsc_env phase stop_phase 
 	 input_fn orig_basename orig_suff 
 	 orig_get_output_fn maybe_loc
 
   | phase `eqPhase` stop_phase		  -- All done
-  = return (dflags, input_fn, maybe_loc)
+  = return (hsc_dflags hsc_env, input_fn, maybe_loc)
 
   | not (phase `happensBefore` stop_phase)
 	-- Something has gone wrong.  We'll try to cover all the cases when
@@ -496,11 +499,12 @@ pipeLoop dflags phase stop_phase
 	   " but I wanted to stop at phase " ++ show stop_phase)
 
   | otherwise 
-  = do	{ (next_phase, dflags', maybe_loc, output_fn)
-		<- runPhase phase stop_phase dflags orig_basename 
-			    orig_suff input_fn orig_get_output_fn maybe_loc
-	; pipeLoop dflags' next_phase stop_phase output_fn
-		   orig_basename orig_suff orig_get_output_fn maybe_loc }
+  = do (next_phase, dflags', maybe_loc, output_fn)
+          <- runPhase phase stop_phase hsc_env orig_basename 
+                      orig_suff input_fn orig_get_output_fn maybe_loc
+       let hsc_env' = hsc_env {hsc_dflags = dflags'}
+       pipeLoop hsc_env' next_phase stop_phase output_fn
+                orig_basename orig_suff orig_get_output_fn maybe_loc
 
 getOutputFilename
   :: Phase -> PipelineOutput -> String
@@ -563,7 +567,7 @@ getOutputFilename stop_phase output basename
 
 runPhase :: Phase	-- Do this phase first
 	 -> Phase	-- Stop just before this phase
-	 -> DynFlags
+	 -> HscEnv
 	 -> String	-- basename of original input source
 	 -> String	-- its extension
 	 -> FilePath	-- name of file which contains the input to this phase.
@@ -582,8 +586,9 @@ runPhase :: Phase	-- Do this phase first
 -------------------------------------------------------------------------------
 -- Unlit phase 
 
-runPhase (Unlit sf) _stop dflags _basename _suff input_fn get_output_fn maybe_loc
+runPhase (Unlit sf) _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
   = do
+       let dflags = hsc_dflags hsc_env
        output_fn <- get_output_fn dflags (Cpp sf) maybe_loc
 
        let unlit_flags = getOpts dflags opt_L
@@ -606,8 +611,9 @@ runPhase (Unlit sf) _stop dflags _basename _suff input_fn get_output_fn maybe_lo
 -- Cpp phase : (a) gets OPTIONS out of file
 --	       (b) runs cpp if necessary
 
-runPhase (Cpp sf) _stop dflags0 basename suff input_fn get_output_fn maybe_loc
-  = do src_opts <- getOptionsFromFile input_fn
+runPhase (Cpp sf) _stop hsc_env basename suff input_fn get_output_fn maybe_loc
+  = do let dflags0 = hsc_dflags hsc_env
+       src_opts <- getOptionsFromFile input_fn
        (dflags,unhandled_flags) <- parseDynamicFlags dflags0 (map unLoc src_opts)
        checkProcessArgsResult unhandled_flags (basename <.> suff)
 
@@ -623,8 +629,9 @@ runPhase (Cpp sf) _stop dflags0 basename suff input_fn get_output_fn maybe_loc
 -------------------------------------------------------------------------------
 -- HsPp phase 
 
-runPhase (HsPp sf) _stop dflags basename suff input_fn get_output_fn maybe_loc
-  = do if not (dopt Opt_Pp dflags) then
+runPhase (HsPp sf) _stop hsc_env basename suff input_fn get_output_fn maybe_loc
+  = do let dflags = hsc_dflags hsc_env
+       if not (dopt Opt_Pp dflags) then
            -- no need to preprocess, just pass input file along
 	   -- to the next phase of the pipeline.
           return (Hsc sf, dflags, maybe_loc, input_fn)
@@ -646,8 +653,9 @@ runPhase (HsPp sf) _stop dflags basename suff input_fn get_output_fn maybe_loc
 
 -- Compilation of a single module, in "legacy" mode (_not_ under
 -- the direction of the compilation manager).
-runPhase (Hsc src_flavour) stop dflags0 basename suff input_fn get_output_fn _maybe_loc 
+runPhase (Hsc src_flavour) stop hsc_env basename suff input_fn get_output_fn _maybe_loc 
  = do	-- normal Hsc mode, not mkdependHS
+        let dflags0 = hsc_dflags hsc_env
 
   -- we add the current directory (i.e. the directory in which
   -- the .hs files resides) to the include path, since this is
@@ -738,10 +746,10 @@ runPhase (Hsc src_flavour) stop dflags0 basename suff input_fn get_output_fn _ma
 			       hscOutName = output_fn,
 			       extCoreName = basename ++ ".hcr" }
 
-	hsc_env <- newHscEnv dflags'
+        let hsc_env' = hsc_env {hsc_dflags = dflags'}
 
   -- Tell the finder cache about this module
-	mod <- addHomeModuleToFinder hsc_env mod_name location4
+	mod <- addHomeModuleToFinder hsc_env' mod_name location4
 
   -- Make the ModSummary to hand to hscMain
 	let
@@ -757,7 +765,7 @@ runPhase (Hsc src_flavour) stop dflags0 basename suff input_fn get_output_fn _ma
 					ms_srcimps   = src_imps }
 
   -- run the compiler!
-	mbResult <- hscCompileOneShot hsc_env
+	mbResult <- hscCompileOneShot hsc_env'
 			  mod_summary source_unchanged 
 			  Nothing	-- No iface
                           Nothing       -- No "module i of n" progress info
@@ -772,7 +780,7 @@ runPhase (Hsc src_flavour) stop dflags0 basename suff input_fn get_output_fn _ma
                     return (StopLn, dflags', Just location4, o_file)
           Just (HscRecomp hasStub)
               -> do when hasStub $
-                         do stub_o <- compileStub dflags' mod location4
+                         do stub_o <- compileStub hsc_env' mod location4
                             consIORef v_Ld_inputs stub_o
                     -- In the case of hs-boot files, generate a dummy .o-boot 
                     -- stamp file for the benefit of Make
@@ -783,14 +791,16 @@ runPhase (Hsc src_flavour) stop dflags0 basename suff input_fn get_output_fn _ma
 -----------------------------------------------------------------------------
 -- Cmm phase
 
-runPhase CmmCpp _stop dflags _basename _suff input_fn get_output_fn maybe_loc
+runPhase CmmCpp _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
   = do
+       let dflags = hsc_dflags hsc_env
        output_fn <- get_output_fn dflags Cmm maybe_loc
        doCpp dflags False{-not raw-} True{-include CC opts-} input_fn output_fn	
        return (Cmm, dflags, maybe_loc, output_fn)
 
-runPhase Cmm stop dflags basename _ input_fn get_output_fn maybe_loc
+runPhase Cmm stop hsc_env basename _ input_fn get_output_fn maybe_loc
   = do
+        let dflags = hsc_dflags hsc_env
 	let hsc_lang = hscMaybeAdjustTarget dflags stop HsSrcFile (hscTarget dflags)
 	let next_phase = hscNextPhase dflags HsSrcFile hsc_lang
 	output_fn <- get_output_fn dflags next_phase maybe_loc
@@ -798,8 +808,9 @@ runPhase Cmm stop dflags basename _ input_fn get_output_fn maybe_loc
         let dflags' = dflags { hscTarget = hsc_lang,
 			       hscOutName = output_fn,
 			       extCoreName = basename ++ ".hcr" }
+        let hsc_env' = hsc_env {hsc_dflags = dflags'}
 
-	ok <- hscCmmFile dflags' input_fn
+	ok <- hscCmmFile hsc_env' input_fn
 
 	when (not ok) $ throwDyn (PhaseFailed "cmm" (ExitFailure 1))
 
@@ -811,9 +822,10 @@ runPhase Cmm stop dflags basename _ input_fn get_output_fn maybe_loc
 -- we don't support preprocessing .c files (with -E) now.  Doing so introduces
 -- way too many hacks, and I can't say I've ever used it anyway.
 
-runPhase cc_phase _stop dflags _basename _suff input_fn get_output_fn maybe_loc
+runPhase cc_phase _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
    | cc_phase `eqPhase` Cc || cc_phase `eqPhase` Ccpp || cc_phase `eqPhase` HCc
-   = do	let cc_opts = getOpts dflags opt_c
+   = do	let dflags = hsc_dflags hsc_env
+        let cc_opts = getOpts dflags opt_c
 	    hcc = cc_phase `eqPhase` HCc
 
        	let cmdline_include_paths = includePaths dflags
@@ -931,8 +943,9 @@ runPhase cc_phase _stop dflags _basename _suff input_fn get_output_fn maybe_loc
 -----------------------------------------------------------------------------
 -- Mangle phase
 
-runPhase Mangle _stop dflags _basename _suff input_fn get_output_fn maybe_loc
-   = do let mangler_opts = getOpts dflags opt_m
+runPhase Mangle _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
+   = do let dflags = hsc_dflags hsc_env
+        let mangler_opts = getOpts dflags opt_m
 
 #if i386_TARGET_ARCH
         machdep_opts <- return [ show (stolen_x86_regs dflags) ]
@@ -957,9 +970,10 @@ runPhase Mangle _stop dflags _basename _suff input_fn get_output_fn maybe_loc
 -----------------------------------------------------------------------------
 -- Splitting phase
 
-runPhase SplitMangle _stop dflags _basename _suff input_fn _get_output_fn maybe_loc
+runPhase SplitMangle _stop hsc_env _basename _suff input_fn _get_output_fn maybe_loc
   = do  -- tmp_pfx is the prefix used for the split .s files
 	-- We also use it as the file to contain the no. of split .s files (sigh)
+        let dflags = hsc_dflags hsc_env
 	split_s_prefix <- SysTools.newTempName dflags "split"
 	let n_files_fn = split_s_prefix
 
@@ -984,8 +998,9 @@ runPhase SplitMangle _stop dflags _basename _suff input_fn _get_output_fn maybe_
 -----------------------------------------------------------------------------
 -- As phase
 
-runPhase As _stop dflags _basename _suff input_fn get_output_fn maybe_loc
-  = do	let as_opts =  getOpts dflags opt_a
+runPhase As _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
+  = do	let dflags = hsc_dflags hsc_env
+        let as_opts =  getOpts dflags opt_a
         let cmdline_include_paths = includePaths dflags
 
 	output_fn <- get_output_fn dflags StopLn maybe_loc
@@ -1016,8 +1031,9 @@ runPhase As _stop dflags _basename _suff input_fn get_output_fn maybe_loc
 	return (StopLn, dflags, maybe_loc, output_fn)
 
 
-runPhase SplitAs _stop dflags _basename _suff _input_fn get_output_fn maybe_loc
+runPhase SplitAs _stop hsc_env _basename _suff _input_fn get_output_fn maybe_loc
   = do
+        let dflags = hsc_dflags hsc_env
         output_fn <- get_output_fn dflags StopLn maybe_loc
 
         let base_o = dropExtension output_fn

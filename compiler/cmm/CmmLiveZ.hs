@@ -7,13 +7,15 @@ module CmmLiveZ
     ) 
 where
 
-import Cmm
 import CmmExpr
 import CmmTx
 import DFMonad
+import Monad
 import PprCmm()
 import PprCmmZ()
-import ZipDataflow0
+import StackSlot
+import ZipCfg
+import ZipDataflow
 import ZipCfgCmmRep
 
 import Maybes
@@ -39,14 +41,14 @@ type BlockEntryLiveness = BlockEnv CmmLive
 -----------------------------------------------------------------------------
 -- | Calculated liveness info for a CmmGraph
 -----------------------------------------------------------------------------
-cmmLivenessZ :: CmmGraph -> BlockEntryLiveness
-cmmLivenessZ g = env
-    where env = runDFA liveLattice $ do { run_b_anal transfer g; getAllFacts }
-          transfer     = BComp "liveness analysis" exit last middle first
-          exit         = emptyUniqSet
-          first live _ = live
-          middle       = flip middleLiveness
-          last         = flip lastLiveness
+cmmLivenessZ :: CmmGraph -> FuelMonad BlockEntryLiveness
+cmmLivenessZ g = liftM zdfFpFacts $ (res :: FuelMonad (CmmBackwardFixedPoint CmmLive))
+  where res = zdfSolveFrom emptyBlockEnv "liveness analysis" liveLattice transfers
+                           emptyUniqSet (graphOfLGraph g)
+        transfers = BackwardTransfers first middle last
+        first live _ = live
+        middle       = flip middleLiveness
+        last         = flip lastLiveness
 
 -- | The transfer equations use the traditional 'gen' and 'kill'
 -- notations, which should be familiar from the dragon book.

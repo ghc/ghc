@@ -6,6 +6,7 @@ module CmmCPSZ (
 ) where
 
 import Cmm
+import CmmCommonBlockElimZ
 import CmmContFlowOpt
 import CmmProcPointZ
 import CmmSpillReload
@@ -14,67 +15,78 @@ import DFMonad
 import PprCmmZ()
 import ZipCfg hiding (zip, unzip)
 import ZipCfgCmmRep
-import ZipDataflow0
 
 import DynFlags
 import ErrUtils
+import FiniteMap
+import HscTypes
+import Monad
 import Outputable
 import UniqSupply
-
-import Data.IORef
 
 -----------------------------------------------------------------------------
 -- |Top level driver for the CPS pass
 -----------------------------------------------------------------------------
-protoCmmCPSZ :: DynFlags -- ^ Dynamic flags: -dcmm-lint -ddump-cps-cmm
-       -> CmmZ     -- ^ Input C-- with Proceedures
-       -> IO CmmZ  -- ^ Output CPS transformed C--
-protoCmmCPSZ dflags (Cmm tops)
-  | not (dopt Opt_RunCPSZ dflags) 
+protoCmmCPSZ :: HscEnv -- Compilation env including
+                       -- dynamic flags: -dcmm-lint -ddump-cps-cmm
+             -> CmmZ     -- Input C-- with Proceedures
+             -> IO CmmZ  -- Output CPS transformed C--
+protoCmmCPSZ hsc_env (Cmm tops)
+  | not (dopt Opt_RunCPSZ (hsc_dflags hsc_env))
   = return (Cmm tops)                -- Only if -frun-cps
   | otherwise
-  = do	{ showPass dflags "CPSZ"
-        ; u <- mkSplitUniqSupply 'p'
-        ; pass_ref <- newIORef "unoptimized program" -- XXX see [Note global fuel]
-        ; fuel_ref <- newIORef (tankFilledTo maxBound) -- XXX see [Note global fuel]
-        ; let txtops = initUs_ u $ mapM cpsTop tops
-        ; tops <- runFuelIO pass_ref fuel_ref (sequence txtops)
-	; dumpIfSet_dyn dflags Opt_D_dump_cps_cmm "CPS Cmm" (ppr (Cmm tops))
-        ; return $ Cmm tops
-        }
+  = do	let dflags = hsc_dflags hsc_env
+        showPass dflags "CPSZ"
+        tops <- mapM (cpsTop hsc_env) tops
+        dumpIfSet_dyn dflags Opt_D_dump_cps_cmm "Post CPS Cmm" (ppr (Cmm tops))
+        return $ Cmm tops
 
 {- [Note global fuel]
 ~~~~~~~~~~~~~~~~~~~~~
-In a correct world, the identity and the last pass would be stored in
-mutable reference cells associated with an 'HscEnv' and would be
-global to one compiler session.  Unfortunately the 'HscEnv' is not
-plumbed sufficiently close to this function; only the DynFlags are
-plumbed here.  One day the plumbing will be extended, in which case
-this pass will use the global 'pass_ref' and 'fuel_ref' instead of the
-bogus facsimiles in place here.
+The identity and the last pass are stored in
+mutable reference cells in an 'HscEnv' and are
+global to one compiler session.
 -}
 
-cpsTop :: CmmTopZ -> UniqSM (FuelMonad CmmTopZ)
-cpsTop p@(CmmData {}) = return (return p)
-cpsTop (CmmProc h l args g) =
-    let procPoints = minimalProcPointSet (runTx cmmCfgOptsZ g)
-        g' = addProcPointProtocols procPoints args g
-        g'' = map_nodes id NotSpillOrReload id g'
+cpsTop :: HscEnv -> CmmTopZ -> IO CmmTopZ
+cpsTop _ p@(CmmData {}) = return p
+cpsTop hsc_env (CmmProc h l args g) =
+    do dump Opt_D_dump_cmmz "Pre Proc Points Added"  g
+       let callPPs = callProcPoints g
+       procPoints <- run $ minimalProcPointSet callPPs (runTx cmmCfgOptsZ g)
+       let varSlots = emptyFM
+       g <- return $ map_nodes id NotSpillOrReload id g
                -- Change types of middle nodes to allow spill/reload
-    in do { u1 <- getUs; u2 <- getUs; u3 <- getUs
-          ; entry <- getUniqueUs >>= return . BlockId
-          ; return $ 
-              do { g <- return g''
-                 ; g <- dual_rewrite u1 dualLivenessWithInsertion g
-                           -- Insert spills at defns; reloads at return points
-                 ; g <- insertLateReloads' u2 (extend g)
-                           -- Duplicate reloads just before uses
-                 ; g <- dual_rewrite u3 removeDeadAssignmentsAndReloads (trim entry g)
-                           -- Remove redundant reloads (and any other redundant asst)
-                 ; return $ CmmProc h l args $ map_nodes id spillAndReloadComments id g
-                 }
-          }
-  where dual_rewrite u pass g = runDFM u dualLiveLattice $ b_rewrite pass g
-        extend (LGraph eid blocks) = Graph (ZLast $ mkBranchNode eid) blocks
-        trim _ (Graph (ZLast (LastOther (LastBranch id))) blocks) = LGraph id blocks
-        trim e (Graph tail blocks) = LGraph e (insertBlock (Block e tail) blocks)
+       g     <- dual_rewrite Opt_D_dump_cmmz "spills and reloads"
+                             (dualLivenessWithInsertion emptyBlockSet) g
+       (varSlots, g) <- trim g >>= run . elimSpillAndReload varSlots
+       g <- run $ addProcPointProtocols callPPs procPoints args g
+       dump Opt_D_dump_cmmz "Post Proc Points Added" g
+       g <- return $ map_nodes id NotSpillOrReload id g
+               -- Change types of middle nodes to allow spill/reload
+       g     <- dual_rewrite Opt_D_dump_cmmz "spills and reloads"
+                             (dualLivenessWithInsertion procPoints) g
+                    -- Insert spills at defns; reloads at return points
+       g     <- run $ insertLateReloads' g -- Duplicate reloads just before uses
+       dump Opt_D_dump_cmmz "Post late reloads" g
+       g     <- trim g >>= dual_rewrite Opt_D_dump_cmmz "Dead Assignment Elimination"
+                                        (removeDeadAssignmentsAndReloads procPoints)
+                    -- Remove redundant reloads (and any other redundant asst)
+       (_, g) <- trim g >>= run . elimSpillAndReload varSlots
+       gs    <- run $ splitAtProcPoints args l procPoints g
+       gs `seq` dump Opt_D_dump_cmmz "Pre common block elimination" g
+       g     <- return $ elimCommonBlocks g
+       dump Opt_D_dump_cmmz "Post common block elimination" g
+       return $ CmmProc h l args (runTx cmmCfgOptsZ g)
+  where dflags = hsc_dflags hsc_env
+        dump f txt g = dumpIfSet_dyn dflags f txt (ppr g)
+        run = runFuelIO (hsc_OptFuel hsc_env)
+        dual_rewrite flag txt pass g =
+          do dump flag ("Pre " ++ txt)  g
+             g <- run $ pass (graphOfLGraph g) >>= lGraphOfGraph
+             dump flag ("Post " ++ txt) $ g
+             return $ graphOfLGraph g
+        trim (Graph (ZLast (LastOther (LastBranch id))) blocks) = return $ LGraph id blocks
+        trim (Graph tail blocks) =
+          do entry <- liftM BlockId $ run $ getUniqueM
+             return $ LGraph entry (insertBlock (Block entry tail) blocks)

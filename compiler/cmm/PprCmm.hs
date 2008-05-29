@@ -523,8 +523,9 @@ pprStatic s = case s of
 pprReg :: CmmReg -> SDoc
 pprReg r 
     = case r of
-        CmmLocal  local  -> pprLocalReg local
+        CmmLocal  local  -> pprLocalReg  local
         CmmGlobal global -> pprGlobalReg global
+        CmmStack  slot   -> ppr slot
 
 --
 -- We only print the type of the local reg if it isn't wordRep

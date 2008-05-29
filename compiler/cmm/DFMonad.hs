@@ -1,17 +1,13 @@
-
 module DFMonad
-    ( DataflowLattice(..)
-    , DataflowAnalysis
+    ( DataflowLattice(..) , DataflowAnalysis
     , markFactsUnchanged, factsStatus, getFact, setFact, getExitFact, setExitFact
-                        , forgetFact, botFact, setAllFacts, getAllFacts, factsEnv, checkFactMatch
-    , addLastOutFact, bareLastOutFacts, forgetLastOutFacts
+                        , forgetFact, botFact, setAllFacts, getAllFacts, factsEnv
+    , addLastOutFact, bareLastOutFacts, forgetLastOutFacts, checkFactMatch
     , subAnalysis
 
-    , DFA, runDFA
-    , DFM, runDFM, liftAnal
+    , DFM, runDFM, liftToDFM
     , markGraphRewritten, graphWasRewritten
     , freshBlockId
-    , liftUSM
     , module OptimizationFuel
     )
 where
@@ -19,14 +15,13 @@ where
 import CmmTx
 import PprCmm()
 import OptimizationFuel
-import ZipCfg
+import StackSlot
 
+import Control.Monad
 import Maybes
 import Outputable
 import UniqFM
 import UniqSupply
-
-import Control.Monad
 
 {-
 
@@ -60,51 +55,34 @@ data DataflowLattice a = DataflowLattice  {
 }
 
 
--- There are two monads here:
---   1. DFA, the monad of analysis, which never changes anything
---   2. DFM, the monad of combined analysis and transformation,
---      which needs a UniqSupply and may consume transactions
-
-data DFAState f = DFAState { df_facts :: BlockEnv f
-                           , df_exit_fact :: f
-                           , df_last_outs :: [(BlockId, f)]
-                           , df_facts_change :: ChangeFlag
-                           }
-
-
-data DFState f = DFState { df_uniqs :: UniqSupply
-                         , df_rewritten :: ChangeFlag
-                         , df_astate :: DFAState f
-                         , df_fstate :: FuelState
+-- DFM is the monad of combined analysis and transformation,
+-- which needs a UniqSupply and may consume optimization fuel
+-- DFM is defined using a monad transformer, DFM', which is the general
+-- case of DFM, parameterized over any monad.
+-- In practice, we apply DFM' to the FuelMonad, which provides optimization fuel and
+-- the unique supply.
+data DFState f = DFState { df_rewritten    :: ChangeFlag
+                         , df_facts        :: BlockEnv f
+                         , df_exit_fact    :: f
+                         , df_last_outs    :: [(BlockId, f)]
+                         , df_facts_change :: ChangeFlag
                          }
 
-newtype DFA fact a = DFA  (DataflowLattice fact -> DFAState fact -> (a, DFAState fact))
-newtype DFM fact a = DFM  (DataflowLattice fact -> DFState  fact -> (a, DFState  fact))
+newtype DFM' m fact a = DFM' (DataflowLattice fact -> DFState  fact
+                                                   -> m (a, DFState  fact))
+type DFM fact a = DFM' FuelMonad fact a
 
 
-liftAnal :: DFA f a -> DFM f a
-liftAnal (DFA f) = DFM f'
-    where f' l s = let (a, anal) = f l (df_astate s)
-                   in  (a, s {df_astate = anal})
-
-initDFAState :: f -> DFAState f
-initDFAState bot = DFAState emptyBlockEnv bot [] NoChange
-
-runDFA :: DataflowLattice f -> DFA f a -> a
-runDFA lattice (DFA f) = fst $ f lattice (initDFAState $ fact_bot lattice)
-
-runDFM :: UniqSupply -> DataflowLattice f -> DFM f a -> FuelMonad a
-runDFM uniqs lattice (DFM f) = FuelMonad (\s -> 
-    let (a, s') = f lattice $ DFState uniqs NoChange dfa_state s
-    in  (a, df_fstate s'))
-  where dfa_state = initDFAState (fact_bot lattice)
+runDFM :: Monad m => DataflowLattice f -> DFM' m f a -> m a
+runDFM lattice (DFM' f) =
+  (f lattice $ DFState NoChange emptyBlockEnv (fact_bot lattice)[] NoChange)
+  >>= return . fst
 
 class DataflowAnalysis m where
   markFactsUnchanged :: m f ()   -- ^ Useful for starting a new iteration
   factsStatus :: m f ChangeFlag
   subAnalysis :: m f a -> m f a  -- ^ Do a new analysis and then throw away
-                                 -- *all* the related state.  Even the Uniques
-                                 -- will be reused.
+                                 -- *all* the related state.
 
   getFact :: BlockId -> m f f
   setFact :: Outputable f => BlockId -> f -> m f ()
@@ -132,52 +110,57 @@ class DataflowAnalysis m where
                 ; bot <- botFact
                 ; return $ \id -> lookupBlockEnv map id `orElse` bot }
 
-instance DataflowAnalysis DFA where
-  markFactsUnchanged = DFA f
-    where f _ s = ((), s {df_facts_change = NoChange}) 
-  factsStatus = DFA f'
-    where f' _ s = (df_facts_change s, s)
-  subAnalysis (DFA f) = DFA f'
-    where f' l s = let (a, _) = f l (subAnalysisState s) in (a, s)
-  getFact id = DFA get
-    where get lattice s = (lookupBlockEnv (df_facts s) id `orElse` fact_bot lattice, s)
-  setFact id a =
-    do old <- getFact id
-       DataflowLattice { fact_add_to = add_fact
-                       , fact_name = name, fact_do_logging = log } <- lattice
-       case add_fact a old of
-         TxRes NoChange _ -> return ()
-         TxRes SomeChange join -> DFA $ \_ s ->
-             let facts' = extendBlockEnv (df_facts s) id join
-                 debug = if log then pprTrace else \_ _ a -> a
-             in  debug name (pprSetFact id old a join) $
-                 ((), s { df_facts = facts', df_facts_change = SomeChange })
-  getExitFact = DFA get
-    where get _ s = (df_exit_fact s, s)
+instance Monad m => DataflowAnalysis (DFM' m) where
+  markFactsUnchanged = DFM' f
+    where f _ s = return ((), s {df_facts_change = NoChange}) 
+  factsStatus = DFM' f'
+    where f' _ s = return (df_facts_change s, s)
+  subAnalysis (DFM' f) = DFM' f'
+    where f' l s = do (a, _) <- f l (subAnalysisState s)
+                      return (a, s)
+  getFact id = DFM' get
+    where get lattice s =
+            return (lookupBlockEnv (df_facts s) id `orElse` fact_bot lattice, s)
+  setFact id a = DFM' set
+    where set (DataflowLattice name bot add_fact log) s =
+            case add_fact a old of
+                 TxRes NoChange _ -> if initialized then return ((), s) else update old old
+                 TxRes SomeChange join -> update join old
+              where (old, initialized) =
+                      case lookupBlockEnv (df_facts s) id of
+                        Just f  -> (f,   True)
+                        Nothing -> (bot, False)
+                    update join old =
+                      let facts' = extendBlockEnv (df_facts s) id join
+                          debug = if log then pprTrace else \_ _ a -> a
+                      in  debug name (pprSetFact id old a join) $
+                          return ((), s { df_facts = facts', df_facts_change = SomeChange })
+  getExitFact = DFM' get
+    where get _ s = return (df_exit_fact s, s)
   setExitFact a =
     do old <- getExitFact
        DataflowLattice { fact_add_to = add_fact
                        , fact_name = name, fact_do_logging = log } <- lattice
        case add_fact a old of
          TxRes NoChange _ -> return ()
-         TxRes SomeChange join -> DFA $ \_ s ->
+         TxRes SomeChange join -> DFM' $ \_ s ->
              let debug = if log then pprTrace else \_ _ a -> a
              in  debug name (pprSetFact "exit" old a join) $
-                 ((), s { df_exit_fact = join, df_facts_change = SomeChange })
-  getAllFacts = DFA f
-    where f _ s = (df_facts s, s)
-  setAllFacts env = DFA f
-    where f _ s = ((), s { df_facts = env})
-  botFact = DFA f
-    where f lattice s = (fact_bot lattice, s)
-  forgetFact id = DFA f 
-    where f _ s = ((), s { df_facts = delFromUFM (df_facts s) id })
-  addLastOutFact pair = DFA f
-    where f _ s = ((), s { df_last_outs = pair : df_last_outs s })
-  bareLastOutFacts = DFA f
-    where f _ s = (df_last_outs s, s)
-  forgetLastOutFacts = DFA f
-    where f _ s = ((), s { df_last_outs = [] })
+                 return ((), s { df_exit_fact = join, df_facts_change = SomeChange })
+  getAllFacts = DFM' f
+    where f _ s = return (df_facts s, s)
+  setAllFacts env = DFM' f
+    where f _ s = return ((), s { df_facts = env})
+  botFact = DFM' f
+    where f lattice s = return (fact_bot lattice, s)
+  forgetFact id = DFM' f 
+    where f _ s = return ((), s { df_facts = delFromUFM (df_facts s) id })
+  addLastOutFact pair = DFM' f
+    where f _ s = return ((), s { df_last_outs = pair : df_last_outs s })
+  bareLastOutFacts = DFM' f
+    where f _ s = return (df_last_outs s, s)
+  forgetLastOutFacts = DFM' f
+    where f _ s = return ((), s { df_last_outs = [] })
   checkFactMatch id a =
       do { fact <- lattice
          ; old_a <- getFact id
@@ -196,76 +179,44 @@ instance DataflowAnalysis DFA where
     where pprFacts env = vcat (map pprFact (ufmToList env))
           pprFact (id, a) = hang (ppr id <> colon) 4 (ppr a)
 
-  lattice = DFA f
-    where f l s = (l, s)
+  lattice = DFM' f
+    where f l s = return (l, s)
 
-subAnalysisState :: DFAState f -> DFAState f
+subAnalysisState :: DFState f -> DFState f
 subAnalysisState s = s {df_facts_change = NoChange}
 
 
-instance DataflowAnalysis DFM where
-  markFactsUnchanged  = liftAnal $ markFactsUnchanged
-  factsStatus         = liftAnal $ factsStatus
-  subAnalysis         = dfmSubAnalysis
-  getFact id          = liftAnal $ getFact id
-  setFact id new      = liftAnal $ setFact id new
-  getExitFact         = liftAnal $ getExitFact 
-  setExitFact new     = liftAnal $ setExitFact new
-  botFact             = liftAnal $ botFact
-  forgetFact id       = liftAnal $ forgetFact id
-  addLastOutFact p    = liftAnal $ addLastOutFact p
-  bareLastOutFacts    = liftAnal $ bareLastOutFacts
-  forgetLastOutFacts  = liftAnal $ forgetLastOutFacts
-  getAllFacts         = liftAnal $ getAllFacts
-  setAllFacts env     = liftAnal $ setAllFacts env
-  checkFactMatch id a = liftAnal $ checkFactMatch id a
-
-  lattice             = liftAnal $ lattice
-
-dfmSubAnalysis :: DFM f a -> DFM f a
-dfmSubAnalysis (DFM f) = DFM f'
-    where f' l s = let s' = s { df_astate = subAnalysisState (df_astate s) }
-                       (a, _) = f l s'
-                   in  (a, s)
-
-
-markGraphRewritten :: DFM f ()
-markGraphRewritten = DFM f
-    where f _ s = ((), s {df_rewritten = SomeChange})
+markGraphRewritten :: Monad m => DFM' m f ()
+markGraphRewritten = DFM' f
+    where f _ s = return ((), s {df_rewritten = SomeChange})
 
 graphWasRewritten :: DFM f ChangeFlag
-graphWasRewritten = DFM f
-    where f _ s = (df_rewritten s, s)
+graphWasRewritten = DFM' f
+    where f _ s = return (df_rewritten s, s)
                     
 freshBlockId :: String -> DFM f BlockId
-freshBlockId _s = liftUSM $ getUniqueUs >>= return . BlockId
+freshBlockId _s = getUniqueM >>= return . BlockId
 
-liftUSM :: UniqSM a -> DFM f a
-liftUSM uc = DFM f
-    where f _ s = let (a, us') = initUs (df_uniqs s) uc
-                  in (a, s {df_uniqs = us'})
+instance Monad m => Monad (DFM' m f) where
+  DFM' f >>= k = DFM' (\l s -> do (a, s') <- f l s
+                                  let DFM' f' = k a in f' l s')
+  return a = DFM' (\_ s -> return (a, s))
 
-instance Monad (DFA f) where
-  DFA f >>= k = DFA (\l s -> let (a, s') = f l s
-                                 DFA f' = k a
-                             in  f' l s')
-  return a = DFA (\_ s -> (a, s))
+instance FuelUsingMonad (DFM' FuelMonad f) where
+  fuelRemaining = liftToDFM' fuelRemaining
+  lastFuelPass  = liftToDFM' lastFuelPass
+  fuelExhausted = liftToDFM' fuelExhausted
+  fuelDecrement p f f' = liftToDFM' (fuelDecrement p f f')
+  fuelDec1      = liftToDFM' fuelDec1
+instance MonadUnique (DFM' FuelMonad f) where
+    getUniqueSupplyM = liftToDFM' getUniqueSupplyM
+    getUniqueM       = liftToDFM' getUniqueM
+    getUniquesM      = liftToDFM' getUniquesM
 
-instance Monad (DFM f) where
-  DFM f >>= k = DFM (\l s -> let (a, s') = f l s
-                                 DFM f' = k a
-                             in  f' l s')
-  return a = DFM (\_ s -> (a, s))
-
-instance FuelUsingMonad (DFM f) where
-  fuelRemaining = extract fuelRemainingInState
-  lastFuelPass  = extract lastFuelPassInState
-  fuelExhausted = extract fuelExhaustedInState
-  fuelDecrement p f f' = DFM (\_ s -> ((), s { df_fstate = fs' s }))
-    where fs' s = fuelDecrementState p f f' $ df_fstate s
-
-extract :: (FuelState -> a) -> DFM f a
-extract f = DFM (\_ s -> (f $ df_fstate s, s))
+liftToDFM' :: Monad m => m x -> DFM' m f x
+liftToDFM' m = DFM' (\ _ s -> m >>= (\a -> return (a, s)))
+liftToDFM :: FuelMonad x -> DFM f x
+liftToDFM m = DFM' (\ _ s -> m >>= (\a -> return (a, s)))
 
 
 pprSetFact :: (Show a, Outputable f) => a -> f -> f -> f -> SDoc

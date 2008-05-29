@@ -1772,7 +1772,7 @@ summariseFile hsc_env old_summaries file mb_phase maybe_buf
    	let dflags = hsc_dflags hsc_env
 
 	(dflags', hspp_fn, buf)
-	    <- preprocessFile dflags file mb_phase maybe_buf
+	    <- preprocessFile hsc_env file mb_phase maybe_buf
 
         (srcimps,the_imps, L _ mod_name) <- getImports dflags' buf hspp_fn file
 
@@ -1893,7 +1893,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod) maybe_buf exc
       = do
 	-- Preprocess the source file and get its imports
 	-- The dflags' contains the OPTIONS pragmas
-	(dflags', hspp_fn, buf) <- preprocessFile dflags src_fn Nothing maybe_buf
+	(dflags', hspp_fn, buf) <- preprocessFile hsc_env src_fn Nothing maybe_buf
         (srcimps, the_imps, L mod_loc mod_name) <- getImports dflags' buf hspp_fn src_fn
 
 	when (mod_name /= wanted_mod) $
@@ -1923,16 +1923,17 @@ getObjTimestamp location is_boot
 	       else modificationTimeIfExists (ml_obj_file location)
 
 
-preprocessFile :: DynFlags -> FilePath -> Maybe Phase -> Maybe (StringBuffer,ClockTime)
+preprocessFile :: HscEnv -> FilePath -> Maybe Phase -> Maybe (StringBuffer,ClockTime)
   -> IO (DynFlags, FilePath, StringBuffer)
-preprocessFile dflags src_fn mb_phase Nothing
+preprocessFile hsc_env src_fn mb_phase Nothing
   = do
-	(dflags', hspp_fn) <- preprocess dflags (src_fn, mb_phase)
+	(dflags', hspp_fn) <- preprocess hsc_env (src_fn, mb_phase)
 	buf <- hGetStringBuffer hspp_fn
 	return (dflags', hspp_fn, buf)
 
-preprocessFile dflags src_fn mb_phase (Just (buf, _time))
+preprocessFile hsc_env src_fn mb_phase (Just (buf, _time))
   = do
+        let dflags = hsc_dflags hsc_env
 	-- case we bypass the preprocessing stage?
 	let 
 	    local_opts = getOptions buf src_fn

@@ -52,6 +52,9 @@ module StaticFlags (
 	opt_UF_KeenessFactor,
 	opt_UF_DearOp,
 
+	-- Optimization fuel controls
+	opt_Fuel,
+
 	-- Related to linking
 	opt_PIC,
 	opt_Static,
@@ -162,6 +165,7 @@ static_flags = [
   ,  ( "dppr-debug",        PassFlag addOpt )
   ,  ( "dsuppress-uniques", PassFlag addOpt )
   ,  ( "dppr-user-length",  AnySuffix addOpt )
+  ,  ( "dopt-fuel",         AnySuffix addOpt )
       -- rest of the debugging flags are dynamic
 
 	--------- Profiling --------------------------------------------------
@@ -282,10 +286,12 @@ opt_IgnoreDotGhci		= lookUp (fsLit "-ignore-dot-ghci")
 -- debugging opts
 opt_SuppressUniques :: Bool
 opt_SuppressUniques		= lookUp  (fsLit "-dsuppress-uniques")
-opt_PprStyle_Debug :: Bool
+opt_PprStyle_Debug  :: Bool
 opt_PprStyle_Debug		= lookUp  (fsLit "-dppr-debug")
-opt_PprUserLength :: Int
+opt_PprUserLength   :: Int
 opt_PprUserLength	        = lookup_def_int "-dppr-user-length" 5 --ToDo: give this a name
+opt_Fuel            :: Int
+opt_Fuel                        = lookup_def_int "-dopt-fuel" maxBound
 
 -- profiling opts
 opt_AutoSccsOnAllToplevs :: Bool
@@ -352,6 +358,8 @@ opt_UF_KeenessFactor		= lookup_def_float "-funfolding-keeness-factor"	   (1.5::F
 opt_UF_DearOp :: Int
 opt_UF_DearOp   = ( 4 :: Int)
 
+
+-- Related to linking
 opt_PIC :: Bool
 #if darwin_TARGET_OS && x86_64_TARGET_ARCH
 opt_PIC                         = True

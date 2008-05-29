@@ -1,10 +1,8 @@
 module ZipCfg
     ( 	-- These data types and names are carefully thought out
-      BlockId(..), mkBlockId 	-- ToDo: BlockId should be abstract, but it isn't yet
-    , BlockEnv, emptyBlockEnv, lookupBlockEnv, extendBlockEnv, insertBlock, mkBlockEnv
-    , BlockSet, emptyBlockSet, elemBlockSet, extendBlockSet, mkBlockSet
-    , Graph(..), LGraph(..), FGraph(..)
+      Graph(..), LGraph(..), FGraph(..)
     , Block(..), ZBlock(..), ZHead(..), ZTail(..), ZLast(..)
+    , insertBlock
     , HavingSuccessors, succs, fold_succs
     , LastNode, mkBranchNode, isBranchNode, branchNodeTarget
 
@@ -13,10 +11,11 @@ module ZipCfg
     , blockId, zip, unzip, last, goto_end, zipht, tailOfLast
     , splice_tail, splice_head, splice_head_only', splice_head'
     , of_block_list, to_block_list
+    , graphOfLGraph
     , map_blocks, map_nodes, mapM_blocks
     , postorder_dfs, postorder_dfs_from, postorder_dfs_from_except
     , fold_layout
-    , fold_blocks
+    , fold_blocks, fold_fwd_block
     , translate
 
     , pprLgraph, pprGraph
@@ -29,7 +28,7 @@ module ZipCfg
     , entry, exit, focus, focusp, unfocus
     , ht_to_block, ht_to_last, 
     , splice_focus_entry, splice_focus_exit
-    , fold_fwd_block, foldM_fwd_block
+    , foldM_fwd_block
     -}
 
     )
@@ -38,10 +37,10 @@ where
 #include "HsVersions.h"
 
 import CmmExpr ( UserOfLocalRegs(..) ) --for an instance
+import StackSlot
 
 import Outputable hiding (empty)
 import Panic
-import Unique
 import UniqFM
 import UniqSet
 
@@ -238,6 +237,11 @@ splice_head_only' :: ZHead m -> Graph m l -> LGraph m l
 of_block_list :: BlockId -> [Block m l] -> LGraph m l  -- N log N
 to_block_list :: LGraph m l -> [Block m l]  -- N log N
 
+-- | Conversion from LGraph to Graph
+graphOfLGraph :: LastNode l => LGraph m l -> Graph m l
+graphOfLGraph (LGraph eid blocks) = Graph (ZLast $ mkBranchNode eid) blocks
+
+
 -- | Traversal: 'postorder_dfs' returns a list of blocks reachable
 -- from the entry node.  This list has the following property:
 --
@@ -272,6 +276,10 @@ fold_layout ::
 -- 'ZipCfgExtras' module provides a monadic version, which we
 -- haven't needed (else it would be here).
 fold_blocks :: (Block m l -> a -> a) -> a -> LGraph m l -> a
+
+-- | Fold from first to last
+fold_fwd_block ::
+  (BlockId -> a -> a) -> (m -> a -> a) -> (ZLast l -> a -> a) -> Block m l -> a -> a
 
 map_nodes :: (BlockId -> BlockId) -> (m -> m') -> (l -> l') -> LGraph m l -> LGraph m' l'
    -- mapping includes the entry id!
@@ -506,6 +514,9 @@ mapM_blocks f (LGraph eid blocks) = blocks' >>= return . LGraph eid
                     (return emptyBlockEnv) blocks
 
 fold_blocks f z (LGraph _ blocks) = foldUFM f z blocks
+fold_fwd_block first middle last (Block id t) z = tail t (first id z)
+    where tail (ZTail m t) z = tail t (middle m z)
+          tail (ZLast l)   z = last l z
 
 of_block_list e blocks = LGraph e $ foldr insertBlock emptyBlockEnv blocks 
 to_block_list (LGraph _ blocks) = eltsUFM blocks
@@ -632,54 +643,6 @@ translate txm txl (LGraph eid blocks) =
         return $ insertBlock (zipht h (ZLast LastExit)) blocks'
 
 ----------------------------------------------------------------
---- Block Ids, their environments, and their sets
-
-{- Note [Unique BlockId]
-~~~~~~~~~~~~~~~~~~~~~~~~
-Although a 'BlockId' is a local label, for reasons of implementation,
-'BlockId's must be unique within an entire compilation unit.  The reason
-is that each local label is mapped to an assembly-language label, and in
-most assembly languages allow, a label is visible throughout the enitre
-compilation unit in which it appears.
--}
-
-newtype BlockId = BlockId Unique
-  deriving (Eq,Ord)
-
-instance Uniquable BlockId where
-  getUnique (BlockId u) = u
-
-mkBlockId :: Unique -> BlockId
-mkBlockId uniq = BlockId uniq
-
-instance Show BlockId where
-  show (BlockId u) = show u
-
-instance Outputable BlockId where
-  ppr = ppr . getUnique
-
-
-type BlockEnv a = UniqFM {- BlockId -} a
-emptyBlockEnv :: BlockEnv a
-emptyBlockEnv = emptyUFM
-lookupBlockEnv :: BlockEnv a -> BlockId -> Maybe a
-lookupBlockEnv = lookupUFM
-extendBlockEnv :: BlockEnv a -> BlockId -> a -> BlockEnv a
-extendBlockEnv = addToUFM
-mkBlockEnv :: [(BlockId,a)] -> BlockEnv a
-mkBlockEnv = listToUFM
-
-type BlockSet = UniqSet BlockId
-emptyBlockSet :: BlockSet
-emptyBlockSet = emptyUniqSet
-elemBlockSet :: BlockId -> BlockSet -> Bool
-elemBlockSet = elementOfUniqSet
-extendBlockSet :: BlockSet -> BlockId -> BlockSet
-extendBlockSet = addOneToUniqSet
-mkBlockSet :: [BlockId] -> BlockSet
-mkBlockSet = mkUniqSet
-
-----------------------------------------------------------------
 ---- Prettyprinting
 ----------------------------------------------------------------
 
@@ -688,8 +651,14 @@ mkBlockSet = mkUniqSet
 instance (Outputable m, Outputable l) => Outputable (ZTail m l) where
     ppr = pprTail
 
+instance (Outputable m, Outputable l, LastNode l) => Outputable (Graph m l) where
+    ppr = pprGraph
+
 instance (Outputable m, Outputable l, LastNode l) => Outputable (LGraph m l) where
     ppr = pprLgraph
+
+instance (Outputable m, Outputable l, LastNode l) => Outputable (Block m l) where
+    ppr = pprBlock
 
 instance (Outputable l) => Outputable (ZLast l) where
     ppr = pprLast
@@ -702,14 +671,15 @@ pprLast :: (Outputable l) => ZLast l -> SDoc
 pprLast LastExit = text "<exit>"
 pprLast (LastOther l) = ppr l
 
+pprBlock :: (Outputable m, Outputable l, LastNode l) => Block m l -> SDoc
+pprBlock (Block id tail) = ppr id <> colon $$ ppr tail
+
 pprLgraph :: (Outputable m, Outputable l, LastNode l) => LGraph m l -> SDoc
-pprLgraph g = text "{" $$ nest 2 (vcat $ map pprBlock blocks) $$ text "}"
-    where pprBlock (Block id tail) = ppr id <> colon $$ ppr tail
-          blocks = postorder_dfs g
+pprLgraph g = text "{" $$ nest 2 (vcat $ map ppr blocks) $$ text "}"
+    where blocks = postorder_dfs g
 
 pprGraph :: (Outputable m, Outputable l, LastNode l) => Graph m l -> SDoc
 pprGraph (Graph tail blockenv) =
-        text "{" $$ nest 2 (ppr tail $$ (vcat $ map pprBlock blocks)) $$ text "}"
-    where pprBlock (Block id tail) = ppr id <> colon $$ ppr tail
-          blocks = postorder_dfs_from blockenv tail
+        text "{" $$ nest 2 (ppr tail $$ (vcat $ map ppr blocks)) $$ text "}"
+    where blocks = postorder_dfs_from blockenv tail
 
