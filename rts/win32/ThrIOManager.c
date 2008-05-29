@@ -67,8 +67,8 @@ readIOManagerEvent (void)
 #if defined(THREADED_RTS)
     HsWord32 res;
 
-    ACQUIRE_LOCK(&event_buf_mutex);
     if (io_manager_event != INVALID_HANDLE_VALUE) {
+        ACQUIRE_LOCK(&event_buf_mutex);
         if (next_event == 0) {
             res = 0; // no event to return
         } else {
@@ -80,10 +80,10 @@ readIOManagerEvent (void)
                 }
             }
         }
+        RELEASE_LOCK(&event_buf_mutex);
     } else {
         res = 0;
     }
-    RELEASE_LOCK(&event_buf_mutex);
     // debugBelch("readIOManagerEvent: %d\n", res);
     return res;
 #else
@@ -96,8 +96,8 @@ sendIOManagerEvent (HsWord32 event)
 {
 #if defined(THREADED_RTS)
     // debugBelch("sendIOManagerEvent: %d\n", event);
-    ACQUIRE_LOCK(&event_buf_mutex);
     if (io_manager_event != INVALID_HANDLE_VALUE) {
+        ACQUIRE_LOCK(&event_buf_mutex);
         if (next_event == EVENT_BUFSIZ) {
             errorBelch("event buffer overflowed; event dropped");
         } else {
@@ -107,8 +107,8 @@ sendIOManagerEvent (HsWord32 event)
             }        
             event_buf[next_event++] = (StgWord32)event;
         }
+        RELEASE_LOCK(&event_buf_mutex);
     }
-    RELEASE_LOCK(&event_buf_mutex);
 #endif
 }    
 
