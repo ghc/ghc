@@ -206,6 +206,10 @@ data HscEnv
                 -- by limiting the number of transformations,
                 -- we can use binary search to help find compiler bugs.
 
+        hsc_type_env_var :: Maybe (Module, IORef TypeEnv),
+                -- Used for one-shot compilation only, to initialise
+                -- the IfGblEnv.  See TcRnTypes.TcGblEnv.tcg_type_env_var
+
         hsc_global_rdr_env :: GlobalRdrEnv,
         hsc_global_type_env :: TypeEnv
  }

@@ -136,6 +136,7 @@ newHscEnv dflags
 			   hsc_FC      = fc_var,
 			   hsc_MLC     = mlc_var,
 			   hsc_OptFuel = optFuel,
+                           hsc_type_env_var = Nothing,
                            hsc_global_rdr_env = emptyGlobalRdrEnv,
                            hsc_global_type_env = emptyNameEnv } ) }
 			
@@ -335,7 +336,19 @@ type Compiler result =  HscEnv
 
 -- Compile Haskell, boot and extCore in OneShot mode.
 hscCompileOneShot :: Compiler HscStatus
-hscCompileOneShot
+hscCompileOneShot hsc_env mod_summary src_changed mb_old_iface mb_i_of_n
+  = do
+     -- One-shot mode needs a knot-tying mutable variable for interface files.
+     -- See TcRnTypes.TcGblEnv.tcg_type_env_var.
+    type_env_var <- newIORef emptyNameEnv
+    let 
+       mod = ms_mod mod_summary
+       hsc_env' = hsc_env{ hsc_type_env_var = Just (mod, type_env_var) }
+    ---
+    hscCompilerOneShot' hsc_env' mod_summary src_changed mb_old_iface mb_i_of_n
+
+hscCompilerOneShot' :: Compiler HscStatus
+hscCompilerOneShot'
    = hscCompiler norecompOneShot oneShotMsg (genComp backend boot_backend)
    where
      backend inp  = hscSimplify inp >>= hscNormalIface >>= hscWriteIface >>= hscOneShot

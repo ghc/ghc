@@ -69,11 +69,13 @@ initTc :: HscEnv
 initTc hsc_env hsc_src keep_rn_syntax mod do_this
  = do { errs_var     <- newIORef (emptyBag, emptyBag) ;
       	tvs_var      <- newIORef emptyVarSet ;
-	type_env_var <- newIORef emptyNameEnv ;
 	dfuns_var    <- newIORef emptyNameSet ;
 	keep_var     <- newIORef emptyNameSet ;
 	th_var	     <- newIORef False ;
 	dfun_n_var   <- newIORef 1 ;
+	type_env_var <- case hsc_type_env_var hsc_env of {
+                           Just (_mod, te_var) -> return te_var ;
+                           Nothing             -> newIORef emptyNameEnv } ;
       	let {
 	     maybe_rn_syntax empty_val
 		| keep_rn_syntax = Just empty_val
@@ -951,9 +953,11 @@ initIfaceCheck :: HscEnv -> IfG a -> IO a
 -- Used when checking the up-to-date-ness of the old Iface
 -- Initialise the environment with no useful info at all
 initIfaceCheck hsc_env do_this
- = do	{ let gbl_env = IfGblEnv { if_rec_types = Nothing }
-	; initTcRnIf 'i' hsc_env gbl_env () do_this
-    }
+ = do let rec_types = case hsc_type_env_var hsc_env of
+                         Just (mod,var) -> Just (mod, readMutVar var)
+                         Nothing        -> Nothing
+          gbl_env = IfGblEnv { if_rec_types = rec_types }
+      initTcRnIf 'i' hsc_env gbl_env () do_this
 
 initIfaceTc :: ModIface 
  	    -> (TcRef TypeEnv -> IfL a) -> TcRnIf gbl lcl a
