@@ -6624,6 +6624,11 @@ Here is an example:
     #-}
 </programlisting>
 </para>
+<para>
+Use the debug flag <option>-ddump-simpl-stats</option> to see what rules fired.
+If you need more information, then <option>-ddump-rule-firings</option> shows you
+each individual rule firing in detail.
+</para>
 
 <sect2>
 <title>Syntax</title>
@@ -6841,35 +6846,30 @@ not be substituted, and the rule would not fire.
 <listitem>
 
 <para>
- In the earlier phases of compilation, GHC inlines <emphasis>nothing
-that appears on the LHS of a rule</emphasis>, because once you have substituted
-for something you can't match against it (given the simple minded
-matching).  So if you write the rule
-
+Ordinary inlining happens at the same time as rule rewriting, which may lead to unexpected
+results.  Consider this (artificial) example
 <programlisting>
-        "map/map"       forall f,g.  map f . map g = map (f.g)
+f x = x
+{-# RULES "f" f True = False #-}
+
+g y = f y
+
+h z = g True
 </programlisting>
-
-this <emphasis>won't</emphasis> match the expression <literal>map f (map g xs)</literal>.
-It will only match something written with explicit use of ".".
-Well, not quite.  It <emphasis>will</emphasis> match the expression
-
+Since <literal>f</literal>'s right-hand side is small, it is inlined into <literal>g</literal>,
+to give
 <programlisting>
-wibble f g xs
+g y = y
 </programlisting>
-
-where <function>wibble</function> is defined:
-
-<programlisting>
-wibble f g = map f . map g
-</programlisting>
-
-because <function>wibble</function> will be inlined (it's small).
-
-Later on in compilation, GHC starts inlining even things on the
-LHS of rules, but still leaves the rules enabled.  This inlining
-policy is controlled by the per-simplification-pass flag <option>-finline-phase</option><emphasis>n</emphasis>.
-
+Now <literal>g</literal> is inlined into <literal>h</literal>, but <literal>f</literal>'s RULE has
+no chance to fire.  
+If instead GHC had first inlined <literal>g</literal> into <literal>h</literal> then there
+would have been a better chance that <literal>f</literal>'s RULE might fire.  
+</para>
+<para>
+The way to get predictable behaviour is to use a NOINLINE 
+pragma on <literal>f</literal>, to ensure
+that it is not inlined until its RULEs have had a chance to fire.
 </para>
 </listitem>
 <listitem>
