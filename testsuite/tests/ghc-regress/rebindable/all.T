@@ -24,4 +24,5 @@ test('rebindable9', expect_broken(1537), compile, [''])
 
 # Tests from Oleg
 test('DoRestrictedM', normal, compile, [''])
-test('DoParamM', reqlib('mtl'), compile_fail, [''])
+test('DoParamM', compose(if_compiler_lt('ghc', '6.9', skip), reqlib('mtl')),
+     compile_fail, [''])
