@@ -6220,15 +6220,8 @@ Assertion failures can be caught, see the documentation for the
 
 <programlisting>
 key_function :: Int -> String -> (Bool, Double)
-
-#ifdef __GLASGOW_HASKELL__
 {-# INLINE key_function #-}
-#endif
 </programlisting>
-
-	<para>(You don't need to do the C pre-processor carry-on
-        unless you're going to stick the code through HBC&mdash;it
-        doesn't like <literal>INLINE</literal> pragmas.)</para>
 
         <para>The major effect of an <literal>INLINE</literal> pragma
         is to declare a function's &ldquo;cost&rdquo; to be very low.
@@ -6253,6 +6246,16 @@ It's going to be inlined wholesale instead.
 All of these effects are aimed at ensuring that what gets inlined is
 exactly what you asked for, no more and no less.
 </para>
+<para>GHC ensures that inlining cannot go on forever: every mutually-recursive
+group is cut by one or more <emphasis>loop breakers</emphasis> that is never inlined
+(see <ulink url="http://research.microsoft.com/%7Esimonpj/Papers/inlining/index.htm">
+Secrets of the GHC inliner, JFP 12(4) July 2002</ulink>).
+GHC tries not to select a function with an INLINE pragma as a loop breaker, but
+when there is no choice even an INLINE function can be selected, in which case
+the INLINE pragma is ignored.
+For example, for a self-recursive function, the loop breaker can only be the function
+itself, so an INLINE pragma is always ignored.</para>
+
 	<para>Syntactically, an <literal>INLINE</literal> pragma for a
         function can be put anywhere its type signature could be
         put.</para>
@@ -6265,14 +6268,18 @@ exactly what you asked for, no more and no less.
         <literal>UniqueSupply</literal> monad code, we have:</para>
 
 <programlisting>
-#ifdef __GLASGOW_HASKELL__
 {-# INLINE thenUs #-}
 {-# INLINE returnUs #-}
-#endif
 </programlisting>
 
 	<para>See also the <literal>NOINLINE</literal> pragma (<xref
         linkend="noinline-pragma"/>).</para>
+
+	<para>Note: the HBC compiler doesn't like <literal>INLINE</literal> pragmas,
+	  so if you want your code to be HBC-compatible you'll have to surround
+	  the pragma with C pre-processor directives 
+	  <literal>#ifdef __GLASGOW_HASKELL__</literal>...<literal>#endif</literal>.</para>
+
       </sect3>
 
       <sect3 id="noinline-pragma">
