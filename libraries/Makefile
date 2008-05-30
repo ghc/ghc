@@ -75,6 +75,10 @@ SUBDIRS += $(wildcard ObjectIO)
 endif
 SUBDIRS += $(wildcard parallel)
 SUBDIRS_BUILD += $(wildcard ndp)
+SUBDIRS_BUILD += $(wildcard dph/dph-base)
+SUBDIRS_BUILD += $(wildcard dph/dph-prim-seq)
+SUBDIRS_BUILD += $(wildcard dph/dph-prim-par)
+SUBDIRS_BUILD += $(wildcard dph/dph)
 endif
 
 SUBDIRS += $(SUBDIRS_BUILD)
