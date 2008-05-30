@@ -832,7 +832,7 @@ getCoreToDo dflags
     liberate_case = dopt Opt_LiberateCase dflags
     rule_check    = ruleCheck dflags
     vectorisation = dopt Opt_Vectorise dflags
-    static_args   = dopt Opt_StaticArgumentTransformation dflags
+    -- static_args   = dopt Opt_StaticArgumentTransformation dflags
 
     maybe_rule_check phase = runMaybe rule_check (CoreDoRuleCheck phase)
 
@@ -886,7 +886,8 @@ getCoreToDo dflags
     -- may expose extra opportunities to float things outwards. However, to fix
     -- up the output of the transformation we need at do at least one simplify
     -- after this before anything else
-	    runWhen static_args CoreDoStaticArgs,
+	    -- runWhen static_args CoreDoStaticArgs,
+            -- XXX disabled, see #2321
 
 	-- initial simplify: mk specialiser happy: minimum effort please
         simpl_gently,
