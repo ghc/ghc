@@ -408,11 +408,15 @@ odd             =  not . even
 (^) :: (Num a, Integral b) => a -> b -> a
 x0 ^ y0 | y0 < 0    = error "Negative exponent"
         | y0 == 0   = 1
-        | otherwise = f x0 y0 1
-    where -- x0 ^ y0 = (x ^ y) * z
-          f x y z | even y = f (x * x) (y `quot` 2) z
+        | otherwise = f x0 y0
+    where -- f : x0 ^ y0 = x ^ y
+          f x y | even y    = f (x * x) (y `quot` 2)
+                | y == 1    = x
+                | otherwise = g (x * x) ((y - 1) `quot` 2) x
+          -- g : x0 ^ y0 = (x ^ y) * z
+          g x y z | even y = g (x * x) (y `quot` 2) z
                   | y == 1 = x * z
-                  | otherwise = f (x * x) ((y - 1) `quot` 2) (x * z)
+                  | otherwise = g (x * x) ((y - 1) `quot` 2) (x * z)
 
 -- | raise a number to an integral power
 {-# SPECIALISE (^^) ::
