@@ -50,7 +50,7 @@ errorInteger = Positive errorPositive
 errorPositive :: Positive
 errorPositive = Some 47## None -- Random number
 
-data Integer = Positive Positive | Negative Positive | Naught
+data Integer = Positive !Positive | Negative !Positive | Naught
 
 smallInteger :: Int# -> Integer
 smallInteger i = if i >=# 0# then wordToInteger (int2Word# i)
@@ -380,7 +380,7 @@ hashInteger _ = 42#
 type Positive = Digits
 type Positives = List Positive
 
-data Digits = Some Digit Digits
+data Digits = Some !Digit !Digits
             | None
 type Digit = Word#
 
