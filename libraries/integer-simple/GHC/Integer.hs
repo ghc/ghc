@@ -159,7 +159,7 @@ has infinitely many 1s, but x has a finite number of digits, so andDigits
 will return a finite result.
 -}
 Positive x `andInteger` Negative y = let y' = twosComplementPositive y
-                                         z = x `andDigits` y'
+                                         z = y' `andDigitsOnes` x
                                      in digitsToInteger z
 Negative x `andInteger` Positive y = Positive y `andInteger` Negative x
 {-
@@ -201,7 +201,7 @@ x | -y = - (twosComplement (x | twosComplement y))
 -}
 Positive x `orInteger` Negative y = let x' = flipBits x
                                         y' = y `minusPositive` onePositive
-                                        z = x' `andDigits` y'
+                                        z = x' `andDigitsOnes` y'
                                         z' = succPositive z
                                     in digitsToNegativeInteger z'
 Negative x `orInteger` Positive y = Positive y `orInteger` Negative x
@@ -249,17 +249,15 @@ Negative x `xorInteger` Negative y = let x' = x `minusPositive` onePositive
 complementInteger :: Integer -> Integer
 complementInteger x = negativeOneInteger `minusInteger` x
 
--- Requires a finite Positive.
--- Returns an infinite Positive.
-twosComplementPositive :: Positive -> Positive
-twosComplementPositive p = succPositive (flipBits p)
+twosComplementPositive :: Positive -> DigitsOnes
+twosComplementPositive p = flipBits (p `minusPositive` onePositive)
 
--- Requires a finite Positive.
--- Returns an infinite Positive.
-flipBits :: Positive -> Positive
-flipBits None = let ones = Some (fullBound Unit) ones
-         in ones
-flipBits (Some w ws) = Some (not# w) (flipBits ws)
+flipBits :: Digits -> DigitsOnes
+flipBits ds = DigitsOnes (flipBitsDigits ds)
+
+flipBitsDigits :: Digits -> Digits
+flipBitsDigits None = None
+flipBitsDigits (Some w ws) = Some (not# w) (flipBitsDigits ws)
 
 negateInteger :: Integer -> Integer
 negateInteger (Positive p) = Negative p
@@ -659,6 +657,18 @@ andDigits :: Digits -> Digits -> Digits
 andDigits _             None          = None
 andDigits None          _             = None
 andDigits (Some w1 ws1) (Some w2 ws2) = Some (w1 `and#` w2) (andDigits ws1 ws2)
+
+-- DigitsOnes is just like Digits, only None is really 0xFFFFFFF...,
+-- i.e. ones off to infinity. This makes sense when we want to "and"
+-- a DigitOnes with a Digits, as the latter will bound the size of the
+-- result.
+newtype DigitsOnes = DigitsOnes Digits
+
+andDigitsOnes :: DigitsOnes -> Digits -> Digits
+andDigitsOnes _             None          = None
+andDigitsOnes (DigitsOnes None)          ws2           = ws2
+andDigitsOnes (DigitsOnes (Some w1 ws1)) (Some w2 ws2)
+    = Some (w1 `and#` w2) (andDigitsOnes (DigitsOnes ws1) ws2)
 
 orDigits :: Digits -> Digits -> Digits
 orDigits None          ds            = ds
