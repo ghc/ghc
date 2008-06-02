@@ -63,6 +63,7 @@
     SpLim = cap->r.rCurrentTSO->stack + RESERVED_STACK_WORDS;
 
 #define SAVE_STACK_POINTERS			\
+    ASSERT(Sp > SpLim); \
     cap->r.rCurrentTSO->sp = Sp
 
 #define RETURN_TO_SCHEDULER(todo,retcode)	\
@@ -548,6 +549,16 @@ do_apply:
 	    if (get_itbl(UNTAG_CLOSURE(pap->fun))->type != BCO) {
 		goto defer_apply_to_sched;
 	    }
+
+            // Stack check: we're about to unpack the PAP onto the
+            // stack.  The (+1) is for the (arity < n) case, where we
+            // also need space for an extra info pointer.
+            if (Sp - (pap->n_args + 1) < SpLim) {
+                Sp -= 2;
+                Sp[1] = (W_)tagged_obj;
+                Sp[0] = (W_)&stg_enter_info;
+                RETURN_TO_SCHEDULER(ThreadInterpret, StackOverflow);
+            }
 
 	    Sp++;
 	    arity = pap->arity;
