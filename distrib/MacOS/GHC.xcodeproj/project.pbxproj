@@ -15,8 +15,7 @@
 		089C1667FE841158C02AAC07 /* English */ = {isa = PBXFileReference; fileEncoding = 10; lastKnownFileType = text.plist.strings; name = English; path = English.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		8D07F2C70486CC7A007CD1D0 /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		8D07F2C80486CC7A007CD1D0 /* GHC.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = GHC.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		E72A15EE0D54ADB90059C234 /* GHC.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = GHC.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		E72A15EF0D54ADB90059C234 /* Info copy.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Info copy.plist"; sourceTree = "<group>"; };
+		E7D5AE720DF3CEE3001262D2 /* GHC.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = GHC.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -24,7 +23,7 @@
 			isa = PBXGroup;
 			children = (
 				8D07F2C80486CC7A007CD1D0 /* GHC.framework */,
-				E72A15EE0D54ADB90059C234 /* GHC.framework */,
+				E7D5AE720DF3CEE3001262D2 /* GHC.framework */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -52,7 +51,6 @@
 			children = (
 				8D07F2C70486CC7A007CD1D0 /* Info.plist */,
 				089C1666FE841158C02AAC07 /* InfoPlist.strings */,
-				E72A15EF0D54ADB90059C234 /* Info copy.plist */,
 			);
 			name = Resources;
 			sourceTree = "<group>";
@@ -100,7 +98,7 @@
 			name = "GHC-systemwide";
 			productInstallPath = "$(HOME)/Library/Frameworks";
 			productName = GHC;
-			productReference = E72A15EE0D54ADB90059C234 /* GHC.framework */;
+			productReference = E7D5AE720DF3CEE3001262D2 /* GHC.framework */;
 			productType = "com.apple.product-type.framework";
 		};
 /* End PBXNativeTarget section */
@@ -253,29 +251,6 @@
 			};
 			name = Release;
 		};
-		E72A15EC0D54ADB90059C234 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				COPY_PHASE_STRIP = NO;
-				DYLIB_COMPATIBILITY_VERSION = 1;
-				DYLIB_CURRENT_VERSION = 1;
-				FRAMEWORK_VERSION = A;
-				GCC_DYNAMIC_NO_PIC = NO;
-				GCC_ENABLE_FIX_AND_CONTINUE = YES;
-				GCC_MODEL_TUNING = G5;
-				GCC_OPTIMIZATION_LEVEL = 0;
-				GCC_PRECOMPILE_PREFIX_HEADER = YES;
-				GCC_PREFIX_HEADER = GHC_Prefix.pch;
-				INFOPLIST_FILE = "/Users/chak/Code/ghc/distrib/MacOS/Info copy.plist";
-				INSTALL_PATH = "$(HOME)/Library/Frameworks";
-				LIBRARY_STYLE = DYNAMIC;
-				MACH_O_TYPE = mh_dylib;
-				PRODUCT_NAME = GHC;
-				WRAPPER_EXTENSION = framework;
-				ZERO_LINK = YES;
-			};
-			name = Debug;
-		};
 		E72A15ED0D54ADB90059C234 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -290,7 +265,7 @@
 				GCC_MODEL_TUNING = G5;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = GHC_Prefix.pch;
-				INFOPLIST_FILE = "/Users/chak/Code/ghc/distrib/MacOS/Info copy.plist";
+				INFOPLIST_FILE = Info.plist;
 				INSTALL_PATH = /Library/Frameworks;
 				LIBRARY_STYLE = DYNAMIC;
 				MACH_O_TYPE = mh_dylib;
@@ -324,7 +299,6 @@
 		E72A15EB0D54ADB90059C234 /* Build configuration list for PBXNativeTarget "GHC-systemwide" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				E72A15EC0D54ADB90059C234 /* Debug */,
 				E72A15ED0D54ADB90059C234 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
