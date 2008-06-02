@@ -172,7 +172,7 @@ tcRnModule hsc_env hsc_src save_rn_syntax
 	tcg_env <- finishDeprecations (hsc_dflags hsc_env) mod_deprec tcg_env ;
 
 		-- Process the export list
-       traceRn (text "rn4a: before exports");
+        traceRn (text "rn4a: before exports");
 	tcg_env <- rnExports (isJust maybe_mod) export_ies tcg_env ;
 	traceRn (text "rn4b: after exportss") ;
 
