@@ -30,6 +30,7 @@ import CgCallConv
 import CgClosure
 import CostCentre
 
+import BlockId
 import Cmm
 import PprCmm
 import CmmUtils
