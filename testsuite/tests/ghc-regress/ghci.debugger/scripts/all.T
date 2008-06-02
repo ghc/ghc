@@ -24,7 +24,7 @@ test('print022', if_compiler_lt('ghc','6.9', skip), ghci_script, ['print022.scri
 test('print023', normal, ghci_script, ['print023.script'])
 test('print024', normal, ghci_script, ['print024.script'])
 test('print025', normal, ghci_script, ['print025.script'])
-test('print026', normal, ghci_script, ['print026.script'])
+test('print026', if_compiler_lt('ghc','6.9', skip), ghci_script, ['print026.script'])
 test('print027', normal, ghci_script, ['print027.script'])
 test('print028', if_compiler_lt('ghc','6.9', namebase('print028-6.8')), ghci_script, ['print028.script'])
 test('print029', expect_broken(1995), ghci_script, ['print029.script'])
