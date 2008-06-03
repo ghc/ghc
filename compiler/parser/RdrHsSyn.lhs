@@ -689,7 +689,7 @@ checkAPat loc e = case e of
  	| bang == bang_RDR 
 	-> do { bang_on <- extension bangPatEnabled
 	      ; if bang_on then checkLPat e >>= (return . BangPat)
-		else parseError loc "Illegal bang-pattern (use -fbang-patterns)" }
+		else parseError loc "Illegal bang-pattern (use -XBangPatterns)" }
 
    ELazyPat e	      -> checkLPat e >>= (return . LazyPat)
    EAsPat n e	      -> checkLPat e >>= (return . AsPat n)
