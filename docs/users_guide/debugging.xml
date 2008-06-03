@@ -435,14 +435,18 @@
       </varlistentry>
 
       <varlistentry>
-	<term>
-          <option>-dshow-unused-imports</option>
-          <indexterm><primary><option>-dshow-unused-imports</option></primary></indexterm>
+        <term>
+          <option>-dno-debug-output</option>
+          <indexterm><primary><option>-dno-debug-output</option></primary></indexterm>
         </term>
-	<listitem>
-	  <para>Have the renamer report what imports does not
-	contribute.</para>
-	</listitem>
+        <listitem>
+          <para>Suppress any unsolicited debugging output.  When GHC
+            has been built with the <literal>DEBUG</literal> option it
+            occasionally emits debug output of interest to developers.
+            The extra output can confuse the testing framework and
+            cause bogus test failures, so this flag is provided to
+            turn it off.</para>
+        </listitem>
       </varlistentry>
     </variablelist>
   </sect2>

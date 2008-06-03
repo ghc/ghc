@@ -2214,6 +2214,12 @@
 	      <entry>-</entry>
 	    </row>
 	    <row>
+	      <entry><option>-dno-debug-output</option></entry>
+	      <entry>Suppress unsolicited debugging output</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
 	      <entry><option>-dppr-debug</option></entry>
 	      <entry>Turn on debug printing (more verbose)</entry>
 	      <entry>static</entry>

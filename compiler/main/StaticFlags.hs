@@ -21,6 +21,7 @@ module StaticFlags (
 	opt_PprUserLength,
 	opt_SuppressUniques,
 	opt_PprStyle_Debug,
+        opt_NoDebugOutput,
 
 	-- profiling opts
 	opt_AutoSccsOnAllToplevs,
@@ -166,6 +167,7 @@ static_flags = [
   ,  ( "dsuppress-uniques", PassFlag addOpt )
   ,  ( "dppr-user-length",  AnySuffix addOpt )
   ,  ( "dopt-fuel",         AnySuffix addOpt )
+  ,  ( "dno-debug-output",  PassFlag addOpt )
       -- rest of the debugging flags are dynamic
 
 	--------- Profiling --------------------------------------------------
@@ -289,6 +291,9 @@ opt_PprUserLength   :: Int
 opt_PprUserLength	        = lookup_def_int "-dppr-user-length" 5 --ToDo: give this a name
 opt_Fuel            :: Int
 opt_Fuel                        = lookup_def_int "-dopt-fuel" maxBound
+opt_NoDebugOutput   :: Bool
+opt_NoDebugOutput               = lookUp  (fsLit "-dno-debug-output")
+
 
 -- profiling opts
 opt_AutoSccsOnAllToplevs :: Bool

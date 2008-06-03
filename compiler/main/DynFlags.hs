@@ -152,6 +152,7 @@ data DynFlag
    | Opt_D_dump_view_pattern_commoning
    | Opt_D_faststring_stats
    | Opt_DumpToFile			-- ^ Append dump output to files instead of stdout.
+   | Opt_D_no_debug_output
    | Opt_DoCoreLinting
    | Opt_DoStgLinting
    | Opt_DoCmmLinting

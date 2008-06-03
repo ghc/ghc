@@ -53,7 +53,7 @@ module Outputable (
 import {-# SOURCE #-} 	Module( Module, ModuleName, moduleName )
 import {-# SOURCE #-} 	OccName( OccName )
 
-import StaticFlags	( opt_PprStyle_Debug, opt_PprUserLength )
+import StaticFlags
 import FastString
 import FastTypes
 import qualified Pretty
@@ -622,7 +622,9 @@ pprPanic    = pprAndThen panic		-- Throw an exn saying "bug in GHC"
 
 pprPgmError = pprAndThen pgmError	-- Throw an exn saying "bug in pgm being compiled"
 					--	(used for unusual pgm errors)
-pprTrace    = pprAndThen trace
+pprTrace str doc x
+   | opt_NoDebugOutput = x
+   | otherwise         = pprAndThen trace str doc x
 
 pprPanicFastInt :: String -> SDoc -> FastInt
 pprPanicFastInt heading pretty_msg = panicFastInt (show (doc PprDebug))
@@ -644,6 +646,7 @@ assertPprPanic file line msg
 		    msg]
 
 warnPprTrace :: Bool -> String -> Int -> SDoc -> a -> a
+warnPprTrace _     _file _line _msg x | opt_NoDebugOutput = x
 warnPprTrace False _file _line _msg x = x
 warnPprTrace True   file  line  msg x
   = trace (show (doc PprDebug)) x
