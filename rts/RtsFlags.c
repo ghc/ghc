@@ -447,7 +447,7 @@ usage_text[] = {
 "",
 #endif /* DEBUG */
 #if defined(THREADED_RTS) && !defined(NOSMP)
-"  -N<n>     Use <n> OS threads (default: 1)",
+"  -N<n>     Use <n> OS threads (default: 1) (also sets -g)",
 "  -g<n>     Use <n> OS threads for GC (default: 1)",
 "  -qm       Don't automatically migrate threads between CPUs",
 "  -qw       Migrate a thread to the current CPU when it is woken up",
@@ -1121,10 +1121,18 @@ error = rtsTrue;
 		if (rts_argv[arg][2] != '\0') {
 		    RtsFlags.ParFlags.nNodes
 		      = strtol(rts_argv[arg]+2, (char **) NULL, 10);
+                    // set -g at the same time as -N by default
+		    RtsFlags.ParFlags.gcThreads = RtsFlags.ParFlags.nNodes;
 		    if (RtsFlags.ParFlags.nNodes <= 0) {
 		      errorBelch("bad value for -N");
 		      error = rtsTrue;
 		    }
+#if defined(PROFILING)
+                    if (RtsFlags.ParFlags.nNodes > 1) {
+                        errorBelch("bad option %s: only -N1 is supported with profiling", rts_argv[arg]);
+		      error = rtsTrue;
+                    }
+#endif
 		}
 		) break;
 
@@ -1137,12 +1145,6 @@ error = rtsTrue;
 		      errorBelch("bad value for -g");
 		      error = rtsTrue;
 		    }
-#if defined(PROFILING)
-                    if (RtsFlags.ParFlags.nNodes > 1) {
-                        errorBelch("bad option %s: only -N1 is supported with profiling", rts_argv[arg]);
-		      error = rtsTrue;
-                    }
-#endif
 		}
 		) break;
 
