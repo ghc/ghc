@@ -693,6 +693,21 @@ stat_exit(int alloc)
 #if USE_PAPI
             papi_stats_report();
 #endif
+#if defined(THREADED_RTS) && defined(PROF_SPIN)
+            {
+                nat g, s;
+                
+                statsPrintf("recordMutableGen_sync: %"FMT_Word64"\n", recordMutableGen_sync.spin);
+                statsPrintf("gc_alloc_block_sync: %"FMT_Word64"\n", gc_alloc_block_sync.spin);
+                statsPrintf("whitehole_spin: %"FMT_Word64"\n", whitehole_spin);
+                for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+                    for (s = 0; s < generations[g].n_steps; s++) {
+                        statsPrintf("gen[%d].steps[%d].sync_todo: %"FMT_Word64"\n", g, s, generations[g].steps[s].sync_todo.spin);
+                        statsPrintf("gen[%d].steps[%d].sync_large_objects: %"FMT_Word64"\n", g, s, generations[g].steps[s].sync_large_objects.spin);
+                    }
+                }
+            }
+#endif
 	}
 
 	if (RtsFlags.GcFlags.giveStats == ONELINE_GC_STATS) {
@@ -709,22 +724,6 @@ stat_exit(int alloc)
 		    TICK_TO_DBL(MutUserTime), TICK_TO_DBL(MutElapsedTime),
 		    TICK_TO_DBL(GC_tot_time), TICK_TO_DBL(GCe_tot_time));
 	}
-
-#if defined(THREADED_RTS) && defined(PROF_SPIN)
-        {
-            nat g, s;
-            
-            statsPrintf("recordMutableGen_sync: %"FMT_Word64"\n", recordMutableGen_sync.spin);
-            statsPrintf("gc_alloc_block_sync: %"FMT_Word64"\n", gc_alloc_block_sync.spin);
-            statsPrintf("whitehole_spin: %"FMT_Word64"\n", whitehole_spin);
-            for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-                for (s = 0; s < generations[g].n_steps; s++) {
-                    statsPrintf("gen[%d].steps[%d].sync_todo: %"FMT_Word64"\n", g, s, generations[g].steps[s].sync_todo.spin);
-                    statsPrintf("gen[%d].steps[%d].sync_large_objects: %"FMT_Word64"\n", g, s, generations[g].steps[s].sync_large_objects.spin);
-                }
-            }
-        }
-#endif
 
 	statsFlush();
 	statsClose();
