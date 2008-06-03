@@ -767,8 +767,6 @@ ifeq "$(stage)" "1"
 include $(GHC_COMPAT_DIR)/compat.mk
 endif
 
-SRC_LD_OPTS += -no-link-chk
-
 ifeq "$(GhcUnregisterised)" "NO"
 ifeq "$(HOSTPLATFORM)" "ia64-unknown-linux"
 # needed for generating proper relocation in large binaries: trac #856
