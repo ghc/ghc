@@ -553,6 +553,22 @@ resizeNurseries (nat blocks)
     resizeNurseriesFixed(blocks / n_nurseries);
 }
 
+
+/* -----------------------------------------------------------------------------
+   move_TSO is called to update the TSO structure after it has been
+   moved from one place to another.
+   -------------------------------------------------------------------------- */
+
+void
+move_TSO (StgTSO *src, StgTSO *dest)
+{
+    ptrdiff_t diff;
+
+    // relocate the stack pointer... 
+    diff = (StgPtr)dest - (StgPtr)src; // In *words* 
+    dest->sp = (StgPtr)dest->sp + diff;
+}
+
 /* -----------------------------------------------------------------------------
    The allocate() interface
 

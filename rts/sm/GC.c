@@ -895,6 +895,39 @@ dec_running (void)
     return n_running;
 }
 
+static rtsBool
+any_work (void)
+{
+    int s;
+    step_workspace *ws;
+
+    gct->any_work++;
+
+    write_barrier();
+
+    // scavenge objects in compacted generation
+    if (mark_stack_overflowed || oldgen_scan_bd != NULL ||
+	(mark_stack_bdescr != NULL && !mark_stack_empty())) {
+	return rtsTrue;
+    }
+    
+    // Check for global work in any step.  We don't need to check for
+    // local work, because we have already exited scavenge_loop(),
+    // which means there is no local work for this thread.
+    for (s = total_steps-1; s >= 0; s--) {
+        if (s == 0 && RtsFlags.GcFlags.generations > 1) { 
+            continue; 
+        }
+        ws = &gct->steps[s];
+        if (ws->todo_large_objects) return rtsTrue;
+        if (ws->step->todos) return rtsTrue;
+    }
+
+    gct->no_work++;
+
+    return rtsFalse;
+}    
+
 static void
 scavenge_until_all_done (void)
 {
@@ -903,7 +936,16 @@ scavenge_until_all_done (void)
     debugTrace(DEBUG_gc, "GC thread %d working", gct->thread_index);
 
 loop:
+#if defined(THREADED_RTS)
+    if (n_gc_threads > 1) {
+        scavenge_loop();
+    } else {
+        scavenge_loop1();
+    }
+#else
     scavenge_loop();
+#endif
+
     // scavenge_loop() only exits when there's no work to do
     r = dec_running();
     

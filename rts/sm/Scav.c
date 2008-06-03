@@ -32,101 +32,12 @@ static void scavenge_large_bitmap (StgPtr p,
 				   StgLargeBitmap *large_bitmap, 
 				   nat size );
 
-
-/* Similar to scavenge_large_bitmap(), but we don't write back the
- * pointers we get back from evacuate().
- */
-static void
-scavenge_large_srt_bitmap( StgLargeSRT *large_srt )
-{
-    nat i, b, size;
-    StgWord bitmap;
-    StgClosure **p;
-    
-    b = 0;
-    bitmap = large_srt->l.bitmap[b];
-    size   = (nat)large_srt->l.size;
-    p      = (StgClosure **)large_srt->srt;
-    for (i = 0; i < size; ) {
-	if ((bitmap & 1) != 0) {
-	    evacuate(p);
-	}
-	i++;
-	p++;
-	if (i % BITS_IN(W_) == 0) {
-	    b++;
-	    bitmap = large_srt->l.bitmap[b];
-	} else {
-	    bitmap = bitmap >> 1;
-	}
-    }
-}
-
-/* evacuate the SRT.  If srt_bitmap is zero, then there isn't an
- * srt field in the info table.  That's ok, because we'll
- * never dereference it.
- */
-STATIC_INLINE void
-scavenge_srt (StgClosure **srt, nat srt_bitmap)
-{
-  nat bitmap;
-  StgClosure **p;
-
-  bitmap = srt_bitmap;
-  p = srt;
-
-  if (bitmap == (StgHalfWord)(-1)) {  
-      scavenge_large_srt_bitmap( (StgLargeSRT *)srt );
-      return;
-  }
-
-  while (bitmap != 0) {
-      if ((bitmap & 1) != 0) {
-#if defined(__PIC__) && defined(mingw32_TARGET_OS)
-	  // Special-case to handle references to closures hiding out in DLLs, since
-	  // double indirections required to get at those. The code generator knows
-	  // which is which when generating the SRT, so it stores the (indirect)
-	  // reference to the DLL closure in the table by first adding one to it.
-	  // We check for this here, and undo the addition before evacuating it.
-	  // 
-	  // If the SRT entry hasn't got bit 0 set, the SRT entry points to a
-	  // closure that's fixed at link-time, and no extra magic is required.
-	  if ( (unsigned long)(*srt) & 0x1 ) {
-	      evacuate(stgCast(StgClosure**,(stgCast(unsigned long, *srt) & ~0x1)));
-	  } else {
-	      evacuate(p);
-	  }
-#else
-	  evacuate(p);
+#if defined(THREADED_RTS) && !defined(PARALLEL_GC)
+# define evacuate(a) evacuate1(a)
+# define recordMutableGen_GC(a,b) recordMutableGen(a,b)
+# define scavenge_loop(a) scavenge_loop1(a)
+# define scavenge_mutable_list(g) scavenge_mutable_list1(g)
 #endif
-      }
-      p++;
-      bitmap = bitmap >> 1;
-  }
-}
-
-
-STATIC_INLINE void
-scavenge_thunk_srt(const StgInfoTable *info)
-{
-    StgThunkInfoTable *thunk_info;
-
-    if (!major_gc) return;
-
-    thunk_info = itbl_to_thunk_itbl(info);
-    scavenge_srt((StgClosure **)GET_SRT(thunk_info), thunk_info->i.srt_bitmap);
-}
-
-STATIC_INLINE void
-scavenge_fun_srt(const StgInfoTable *info)
-{
-    StgFunInfoTable *fun_info;
-
-    if (!major_gc) return;
-  
-    fun_info = itbl_to_fun_itbl(info);
-    scavenge_srt((StgClosure **)GET_FUN_SRT(fun_info), fun_info->i.srt_bitmap);
-}
 
 /* -----------------------------------------------------------------------------
    Scavenge a TSO.
@@ -282,6 +193,532 @@ scavenge_AP (StgAP *ap)
     return scavenge_PAP_payload (ap->fun, ap->payload, ap->n_args);
 }
 
+/* -----------------------------------------------------------------------------
+   Scavenge SRTs
+   -------------------------------------------------------------------------- */
+
+/* Similar to scavenge_large_bitmap(), but we don't write back the
+ * pointers we get back from evacuate().
+ */
+static void
+scavenge_large_srt_bitmap( StgLargeSRT *large_srt )
+{
+    nat i, b, size;
+    StgWord bitmap;
+    StgClosure **p;
+    
+    b = 0;
+    bitmap = large_srt->l.bitmap[b];
+    size   = (nat)large_srt->l.size;
+    p      = (StgClosure **)large_srt->srt;
+    for (i = 0; i < size; ) {
+	if ((bitmap & 1) != 0) {
+	    evacuate(p);
+	}
+	i++;
+	p++;
+	if (i % BITS_IN(W_) == 0) {
+	    b++;
+	    bitmap = large_srt->l.bitmap[b];
+	} else {
+	    bitmap = bitmap >> 1;
+	}
+    }
+}
+
+/* evacuate the SRT.  If srt_bitmap is zero, then there isn't an
+ * srt field in the info table.  That's ok, because we'll
+ * never dereference it.
+ */
+STATIC_INLINE void
+scavenge_srt (StgClosure **srt, nat srt_bitmap)
+{
+  nat bitmap;
+  StgClosure **p;
+
+  bitmap = srt_bitmap;
+  p = srt;
+
+  if (bitmap == (StgHalfWord)(-1)) {  
+      scavenge_large_srt_bitmap( (StgLargeSRT *)srt );
+      return;
+  }
+
+  while (bitmap != 0) {
+      if ((bitmap & 1) != 0) {
+#if defined(__PIC__) && defined(mingw32_TARGET_OS)
+	  // Special-case to handle references to closures hiding out in DLLs, since
+	  // double indirections required to get at those. The code generator knows
+	  // which is which when generating the SRT, so it stores the (indirect)
+	  // reference to the DLL closure in the table by first adding one to it.
+	  // We check for this here, and undo the addition before evacuating it.
+	  // 
+	  // If the SRT entry hasn't got bit 0 set, the SRT entry points to a
+	  // closure that's fixed at link-time, and no extra magic is required.
+	  if ( (unsigned long)(*srt) & 0x1 ) {
+	      evacuate(stgCast(StgClosure**,(stgCast(unsigned long, *srt) & ~0x1)));
+	  } else {
+	      evacuate(p);
+	  }
+#else
+	  evacuate(p);
+#endif
+      }
+      p++;
+      bitmap = bitmap >> 1;
+  }
+}
+
+
+STATIC_INLINE void
+scavenge_thunk_srt(const StgInfoTable *info)
+{
+    StgThunkInfoTable *thunk_info;
+
+    if (!major_gc) return;
+
+    thunk_info = itbl_to_thunk_itbl(info);
+    scavenge_srt((StgClosure **)GET_SRT(thunk_info), thunk_info->i.srt_bitmap);
+}
+
+STATIC_INLINE void
+scavenge_fun_srt(const StgInfoTable *info)
+{
+    StgFunInfoTable *fun_info;
+
+    if (!major_gc) return;
+  
+    fun_info = itbl_to_fun_itbl(info);
+    scavenge_srt((StgClosure **)GET_FUN_SRT(fun_info), fun_info->i.srt_bitmap);
+}
+
+/* -----------------------------------------------------------------------------
+   Scavenge a block from the given scan pointer up to bd->free.
+
+   evac_step is set by the caller to be either zero (for a step in a
+   generation < N) or G where G is the generation of the step being
+   scavenged.  
+
+   We sometimes temporarily change evac_step back to zero if we're
+   scavenging a mutable object where eager promotion isn't such a good
+   idea.  
+   -------------------------------------------------------------------------- */
+
+static void
+scavenge_block (bdescr *bd)
+{
+  StgPtr p, q;
+  StgInfoTable *info;
+  step *saved_evac_step;
+  rtsBool saved_eager_promotion;
+  step_workspace *ws;
+
+  debugTrace(DEBUG_gc, "scavenging block %p (gen %d, step %d) @ %p",
+	     bd->start, bd->gen_no, bd->step->no, bd->u.scan);
+
+  gct->scan_bd = bd;
+  gct->evac_step = bd->step;
+  saved_evac_step = gct->evac_step;
+  saved_eager_promotion = gct->eager_promotion;
+  gct->failed_to_evac = rtsFalse;
+
+  ws = &gct->steps[bd->step->abs_no];
+
+  p = bd->u.scan;
+  
+  // we might be evacuating into the very object that we're
+  // scavenging, so we have to check the real bd->free pointer each
+  // time around the loop.
+  while (p < bd->free || (bd == ws->todo_bd && p < ws->todo_free)) {
+
+    ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
+    info = get_itbl((StgClosure *)p);
+    
+    ASSERT(gct->thunk_selector_depth == 0);
+
+    q = p;
+    switch (info->type) {
+
+    case MVAR_CLEAN:
+    case MVAR_DIRTY:
+    { 
+	StgMVar *mvar = ((StgMVar *)p);
+	gct->eager_promotion = rtsFalse;
+	evacuate((StgClosure **)&mvar->head);
+	evacuate((StgClosure **)&mvar->tail);
+	evacuate((StgClosure **)&mvar->value);
+	gct->eager_promotion = saved_eager_promotion;
+
+	if (gct->failed_to_evac) {
+	    mvar->header.info = &stg_MVAR_DIRTY_info;
+	} else {
+	    mvar->header.info = &stg_MVAR_CLEAN_info;
+	}
+	p += sizeofW(StgMVar);
+	break;
+    }
+
+    case FUN_2_0:
+	scavenge_fun_srt(info);
+	evacuate(&((StgClosure *)p)->payload[1]);
+	evacuate(&((StgClosure *)p)->payload[0]);
+	p += sizeofW(StgHeader) + 2;
+	break;
+
+    case THUNK_2_0:
+	scavenge_thunk_srt(info);
+	evacuate(&((StgThunk *)p)->payload[1]);
+	evacuate(&((StgThunk *)p)->payload[0]);
+	p += sizeofW(StgThunk) + 2;
+	break;
+
+    case CONSTR_2_0:
+	evacuate(&((StgClosure *)p)->payload[1]);
+	evacuate(&((StgClosure *)p)->payload[0]);
+	p += sizeofW(StgHeader) + 2;
+	break;
+	
+    case THUNK_1_0:
+	scavenge_thunk_srt(info);
+	evacuate(&((StgThunk *)p)->payload[0]);
+	p += sizeofW(StgThunk) + 1;
+	break;
+	
+    case FUN_1_0:
+	scavenge_fun_srt(info);
+    case CONSTR_1_0:
+	evacuate(&((StgClosure *)p)->payload[0]);
+	p += sizeofW(StgHeader) + 1;
+	break;
+	
+    case THUNK_0_1:
+	scavenge_thunk_srt(info);
+	p += sizeofW(StgThunk) + 1;
+	break;
+	
+    case FUN_0_1:
+	scavenge_fun_srt(info);
+    case CONSTR_0_1:
+	p += sizeofW(StgHeader) + 1;
+	break;
+	
+    case THUNK_0_2:
+	scavenge_thunk_srt(info);
+	p += sizeofW(StgThunk) + 2;
+	break;
+	
+    case FUN_0_2:
+	scavenge_fun_srt(info);
+    case CONSTR_0_2:
+	p += sizeofW(StgHeader) + 2;
+	break;
+	
+    case THUNK_1_1:
+	scavenge_thunk_srt(info);
+	evacuate(&((StgThunk *)p)->payload[0]);
+	p += sizeofW(StgThunk) + 2;
+	break;
+
+    case FUN_1_1:
+	scavenge_fun_srt(info);
+    case CONSTR_1_1:
+	evacuate(&((StgClosure *)p)->payload[0]);
+	p += sizeofW(StgHeader) + 2;
+	break;
+	
+    case FUN:
+	scavenge_fun_srt(info);
+	goto gen_obj;
+
+    case THUNK:
+    {
+	StgPtr end;
+
+	scavenge_thunk_srt(info);
+	end = (P_)((StgThunk *)p)->payload + info->layout.payload.ptrs;
+	for (p = (P_)((StgThunk *)p)->payload; p < end; p++) {
+	    evacuate((StgClosure **)p);
+	}
+	p += info->layout.payload.nptrs;
+	break;
+    }
+	
+    gen_obj:
+    case CONSTR:
+    case WEAK:
+    case STABLE_NAME:
+    {
+	StgPtr end;
+
+	end = (P_)((StgClosure *)p)->payload + info->layout.payload.ptrs;
+	for (p = (P_)((StgClosure *)p)->payload; p < end; p++) {
+	    evacuate((StgClosure **)p);
+	}
+	p += info->layout.payload.nptrs;
+	break;
+    }
+
+    case BCO: {
+	StgBCO *bco = (StgBCO *)p;
+	evacuate((StgClosure **)&bco->instrs);
+	evacuate((StgClosure **)&bco->literals);
+	evacuate((StgClosure **)&bco->ptrs);
+	p += bco_sizeW(bco);
+	break;
+    }
+
+    case IND_PERM:
+      if (bd->gen_no != 0) {
+#ifdef PROFILING
+        // @LDV profiling
+        // No need to call LDV_recordDead_FILL_SLOP_DYNAMIC() because an 
+        // IND_OLDGEN_PERM closure is larger than an IND_PERM closure.
+        LDV_recordDead((StgClosure *)p, sizeofW(StgInd));
+#endif        
+        // 
+        // Todo: maybe use SET_HDR() and remove LDV_RECORD_CREATE()?
+        //
+	SET_INFO(((StgClosure *)p), &stg_IND_OLDGEN_PERM_info);
+
+        // We pretend that p has just been created.
+        LDV_RECORD_CREATE((StgClosure *)p);
+      }
+	// fall through 
+    case IND_OLDGEN_PERM:
+	evacuate(&((StgInd *)p)->indirectee);
+	p += sizeofW(StgInd);
+	break;
+
+    case MUT_VAR_CLEAN:
+    case MUT_VAR_DIRTY:
+	gct->eager_promotion = rtsFalse;
+	evacuate(&((StgMutVar *)p)->var);
+	gct->eager_promotion = saved_eager_promotion;
+
+	if (gct->failed_to_evac) {
+	    ((StgClosure *)q)->header.info = &stg_MUT_VAR_DIRTY_info;
+	} else {
+	    ((StgClosure *)q)->header.info = &stg_MUT_VAR_CLEAN_info;
+	}
+	p += sizeofW(StgMutVar);
+	break;
+
+    case CAF_BLACKHOLE:
+    case SE_CAF_BLACKHOLE:
+    case SE_BLACKHOLE:
+    case BLACKHOLE:
+	p += BLACKHOLE_sizeW();
+	break;
+
+    case THUNK_SELECTOR:
+    { 
+	StgSelector *s = (StgSelector *)p;
+	evacuate(&s->selectee);
+	p += THUNK_SELECTOR_sizeW();
+	break;
+    }
+
+    // A chunk of stack saved in a heap object
+    case AP_STACK:
+    {
+	StgAP_STACK *ap = (StgAP_STACK *)p;
+
+	evacuate(&ap->fun);
+	scavenge_stack((StgPtr)ap->payload, (StgPtr)ap->payload + ap->size);
+	p = (StgPtr)ap->payload + ap->size;
+	break;
+    }
+
+    case PAP:
+	p = scavenge_PAP((StgPAP *)p);
+	break;
+
+    case AP:
+	p = scavenge_AP((StgAP *)p);
+	break;
+
+    case ARR_WORDS:
+	// nothing to follow 
+	p += arr_words_sizeW((StgArrWords *)p);
+	break;
+
+    case MUT_ARR_PTRS_CLEAN:
+    case MUT_ARR_PTRS_DIRTY:
+	// follow everything 
+    {
+	StgPtr next;
+
+	// We don't eagerly promote objects pointed to by a mutable
+	// array, but if we find the array only points to objects in
+	// the same or an older generation, we mark it "clean" and
+	// avoid traversing it during minor GCs.
+	gct->eager_promotion = rtsFalse;
+	next = p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
+	for (p = (P_)((StgMutArrPtrs *)p)->payload; p < next; p++) {
+	    evacuate((StgClosure **)p);
+	}
+	gct->eager_promotion = saved_eager_promotion;
+
+	if (gct->failed_to_evac) {
+	    ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_DIRTY_info;
+	} else {
+	    ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_CLEAN_info;
+	}
+
+	gct->failed_to_evac = rtsTrue; // always put it on the mutable list.
+	break;
+    }
+
+    case MUT_ARR_PTRS_FROZEN:
+    case MUT_ARR_PTRS_FROZEN0:
+	// follow everything 
+    {
+	StgPtr next;
+
+	next = p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
+	for (p = (P_)((StgMutArrPtrs *)p)->payload; p < next; p++) {
+	    evacuate((StgClosure **)p);
+	}
+
+	// If we're going to put this object on the mutable list, then
+	// set its info ptr to MUT_ARR_PTRS_FROZEN0 to indicate that.
+	if (gct->failed_to_evac) {
+	    ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_FROZEN0_info;
+	} else {
+	    ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_FROZEN_info;
+	}
+	break;
+    }
+
+    case TSO:
+    { 
+	StgTSO *tso = (StgTSO *)p;
+        scavengeTSO(tso);
+	p += tso_sizeW(tso);
+	break;
+    }
+
+    case TVAR_WATCH_QUEUE:
+      {
+	StgTVarWatchQueue *wq = ((StgTVarWatchQueue *) p);
+	gct->evac_step = 0;
+	evacuate((StgClosure **)&wq->closure);
+	evacuate((StgClosure **)&wq->next_queue_entry);
+	evacuate((StgClosure **)&wq->prev_queue_entry);
+	gct->evac_step = saved_evac_step;
+	gct->failed_to_evac = rtsTrue; // mutable
+	p += sizeofW(StgTVarWatchQueue);
+	break;
+      }
+
+    case TVAR:
+      {
+	StgTVar *tvar = ((StgTVar *) p);
+	gct->evac_step = 0;
+	evacuate((StgClosure **)&tvar->current_value);
+	evacuate((StgClosure **)&tvar->first_watch_queue_entry);
+	gct->evac_step = saved_evac_step;
+	gct->failed_to_evac = rtsTrue; // mutable
+	p += sizeofW(StgTVar);
+	break;
+      }
+
+    case TREC_HEADER:
+      {
+        StgTRecHeader *trec = ((StgTRecHeader *) p);
+        gct->evac_step = 0;
+	evacuate((StgClosure **)&trec->enclosing_trec);
+	evacuate((StgClosure **)&trec->current_chunk);
+	evacuate((StgClosure **)&trec->invariants_to_check);
+	gct->evac_step = saved_evac_step;
+	gct->failed_to_evac = rtsTrue; // mutable
+	p += sizeofW(StgTRecHeader);
+        break;
+      }
+
+    case TREC_CHUNK:
+      {
+	StgWord i;
+	StgTRecChunk *tc = ((StgTRecChunk *) p);
+	TRecEntry *e = &(tc -> entries[0]);
+	gct->evac_step = 0;
+	evacuate((StgClosure **)&tc->prev_chunk);
+	for (i = 0; i < tc -> next_entry_idx; i ++, e++ ) {
+	  evacuate((StgClosure **)&e->tvar);
+	  evacuate((StgClosure **)&e->expected_value);
+	  evacuate((StgClosure **)&e->new_value);
+	}
+	gct->evac_step = saved_evac_step;
+	gct->failed_to_evac = rtsTrue; // mutable
+	p += sizeofW(StgTRecChunk);
+	break;
+      }
+
+    case ATOMIC_INVARIANT:
+      {
+        StgAtomicInvariant *invariant = ((StgAtomicInvariant *) p);
+        gct->evac_step = 0;
+	evacuate(&invariant->code);
+	evacuate((StgClosure **)&invariant->last_execution);
+	gct->evac_step = saved_evac_step;
+	gct->failed_to_evac = rtsTrue; // mutable
+	p += sizeofW(StgAtomicInvariant);
+        break;
+      }
+
+    case INVARIANT_CHECK_QUEUE:
+      {
+        StgInvariantCheckQueue *queue = ((StgInvariantCheckQueue *) p);
+        gct->evac_step = 0;
+	evacuate((StgClosure **)&queue->invariant);
+	evacuate((StgClosure **)&queue->my_execution);
+	evacuate((StgClosure **)&queue->next_queue_entry);
+	gct->evac_step = saved_evac_step;
+	gct->failed_to_evac = rtsTrue; // mutable
+	p += sizeofW(StgInvariantCheckQueue);
+        break;
+      }
+
+    default:
+	barf("scavenge: unimplemented/strange closure type %d @ %p", 
+	     info->type, p);
+    }
+
+    /*
+     * We need to record the current object on the mutable list if
+     *  (a) It is actually mutable, or 
+     *  (b) It contains pointers to a younger generation.
+     * Case (b) arises if we didn't manage to promote everything that
+     * the current object points to into the current generation.
+     */
+    if (gct->failed_to_evac) {
+	gct->failed_to_evac = rtsFalse;
+	if (bd->gen_no > 0) {
+	    recordMutableGen_GC((StgClosure *)q, &generations[bd->gen_no]);
+	}
+    }
+  }
+
+  if (p > bd->free)  {
+      gct->copied += ws->todo_free - bd->free;
+      bd->free = p;
+  }
+
+  debugTrace(DEBUG_gc, "   scavenged %ld bytes",
+             (unsigned long)((bd->free - bd->u.scan) * sizeof(W_)));
+
+  // update stats: this is a block that has been scavenged
+  gct->scanned += bd->free - bd->u.scan;
+  bd->u.scan = bd->free;
+
+  if (bd != ws->todo_bd) {
+      // we're not going to evac any more objects into
+      // this block, so push it now.
+      push_scanned_block(bd, ws);
+  }
+
+  gct->scan_bd = NULL;
+}
 /* -----------------------------------------------------------------------------
    Scavenge everything on the mark stack.
 
@@ -1403,18 +1840,6 @@ scavenge_large (step_workspace *ws)
 }
 
 /* ----------------------------------------------------------------------------
-   Scavenge a block
-   ------------------------------------------------------------------------- */
-
-#undef PARALLEL_GC
-#include "Scav.c-inc"
-
-#ifdef THREADED_RTS
-#define PARALLEL_GC
-#include "Scav.c-inc"
-#endif
-
-/* ----------------------------------------------------------------------------
    Look for work to do.
 
    We look for the oldest step that has either a todo block that can
@@ -1459,11 +1884,7 @@ loop:
         // scavenge everything up to the free pointer.
         if (ws->todo_bd->u.scan < ws->todo_free)
         {
-            if (n_gc_threads == 1) {
-                scavenge_block1(ws->todo_bd);
-            } else {
-                scavenge_block(ws->todo_bd);
-            }
+            scavenge_block(ws->todo_bd);
             did_something = rtsTrue;
             break;
         }
@@ -1476,11 +1897,7 @@ loop:
         }
 
         if ((bd = grab_todo_block(ws)) != NULL) {
-            if (n_gc_threads == 1) {
-                scavenge_block1(bd);
-            } else {
-                scavenge_block(bd);
-            }
+            scavenge_block(bd);
             did_something = rtsTrue;
             break;
         }
@@ -1530,35 +1947,3 @@ loop:
     if (work_to_do) goto loop;
 }
 
-rtsBool
-any_work (void)
-{
-    int s;
-    step_workspace *ws;
-
-    gct->any_work++;
-
-    write_barrier();
-
-    // scavenge objects in compacted generation
-    if (mark_stack_overflowed || oldgen_scan_bd != NULL ||
-	(mark_stack_bdescr != NULL && !mark_stack_empty())) {
-	return rtsTrue;
-    }
-    
-    // Check for global work in any step.  We don't need to check for
-    // local work, because we have already exited scavenge_loop(),
-    // which means there is no local work for this thread.
-    for (s = total_steps-1; s >= 0; s--) {
-        if (s == 0 && RtsFlags.GcFlags.generations > 1) { 
-            continue; 
-        }
-        ws = &gct->steps[s];
-        if (ws->todo_large_objects) return rtsTrue;
-        if (ws->step->todos) return rtsTrue;
-    }
-
-    gct->no_work++;
-
-    return rtsFalse;
-}    

@@ -12,5 +12,9 @@
  * ---------------------------------------------------------------------------*/
 
 void    scavenge_loop (void);
-rtsBool any_work (void);
 void    scavenge_mutable_list (generation *g);
+
+#ifdef THREADED_RTS
+void    scavenge_loop1 (void);
+void    scavenge_mutable_list1 (generation *g);
+#endif

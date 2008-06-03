@@ -397,6 +397,20 @@ endif
 # -O3 helps unroll some loops (especially in copy() with a constant argument).
 sm/Evac_HC_OPTS += -optc-funroll-loops
 
+ifneq "$(findstring thr, $(way))" ""
+EXTRA_SRCS += sm/Evac_thr.c sm/Scav_thr.c
+
+sm/Evac_thr.c : sm/Evac.c
+	cp $< $@
+sm/Scav_thr.c : sm/Scav.c
+	cp $< $@
+
+sm/Evac_thr_HC_OPTS += -optc-DPARALLEL_GC
+sm/Scav_thr_HC_OPTS += -optc-DPARALLEL_GC
+else
+EXCLUDED_SRCS += sm/Evac_thr.c sm/Scav_thr.c
+endif
+
 # Without this, thread_obj will not be inlined (at least on x86 with GCC 4.1.0)
 sm/Compact_HC_OPTS += -optc-finline-limit=2500
 
