@@ -105,7 +105,7 @@ typedef struct step_workspace_ {
    GC thread object
 
    Every GC thread has one of these. It contains all the step specific
-   workspaces and other GC thread loacl information. At some later
+   workspaces and other GC thread local information. At some later
    point it maybe useful to move this other into the TLS store of the
    GC threads
    ------------------------------------------------------------------------- */
@@ -185,7 +185,13 @@ extern gc_thread **gc_threads;
 /* -----------------------------------------------------------------------------
    The gct variable is thread-local and points to the current thread's
    gc_thread structure.  It is heavily accessed, so we try to put gct
-   into a global register variable if possible.
+   into a global register variable if possible; if we don't have a
+   register then use gcc's __thread extension to create a thread-local
+   variable.
+
+   Even on x86 where registers are scarce, it is worthwhile using a
+   register variable here: I measured about a 2-5% slowdown with the
+   __thread version.
    -------------------------------------------------------------------------- */
 
 #define GLOBAL_REG_DECL(type,name,reg) register type name REG(reg);
