@@ -46,7 +46,7 @@ CONFIG       = $(CONFIGDIR)/$(COMPILER)
 ifneq "$(stage)" ""
 TEST_HC = $(GHC_STAGE$(stage)_ABS)
 else
-TEST_HC = $(GHC_STAGE1_ABS)
+TEST_HC = $(GHC_STAGE2_ABS)
 endif
 
 GHC_PKG = $(GHC_PKG_ABS)
