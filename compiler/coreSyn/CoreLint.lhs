@@ -370,7 +370,8 @@ lintCoreExpr e@(Case scrut var alt_ty alts) =
               | debugIsOn &&
                 isAlgTyCon tycon && 
                 null (tyConDataCons tycon) -> 
-                  pprTrace "case binder's type has no constructors" (ppr e)
+                  pprTrace "Lint warning: case binder's type has no constructors" (ppr var <+> ppr (idType var))
+			-- This can legitimately happen for type families
                       $ return ()
          _otherwise -> return ()
 

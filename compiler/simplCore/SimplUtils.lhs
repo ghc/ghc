@@ -1426,7 +1426,8 @@ prepareDefault _ _ case_bndr (Just (tycon, inst_tys)) imposs_cons (Just deflt_rh
 	_ -> return [(DEFAULT, [], deflt_rhs)]
 
   | debugIsOn, isAlgTyCon tycon, [] <- tyConDataCons tycon
-  = pprTrace "prepareDefault" (ppr case_bndr <+> ppr tycon <+> ppr deflt_rhs)
+  = pprTrace "prepareDefault" (ppr case_bndr <+> ppr tycon)
+	-- This can legitimately happen for type families
         $ return [(DEFAULT, [], deflt_rhs)]
 
 --------- Catch-all cases -----------
