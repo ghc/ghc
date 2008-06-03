@@ -104,3 +104,6 @@ def get_compiler_info():
           and ghc_with_profiling == 1 \
           and ghc_with_threaded_rts == 1:
         config.run_ways.append('profthreaded')
+
+    if version_ge(config.compiler_version, '6.9'):
+        config.compiler_always_flags.append('-dno-debug-output')
