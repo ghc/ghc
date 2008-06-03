@@ -1908,7 +1908,7 @@ reduceList env@(RedEnv {red_stack = (n,stk)}) wanteds state
   = do	{ traceTc (text "reduceList " <+> (ppr wanteds $$ ppr state))
 	; dopts <- getDOpts
 	; when (debugIsOn && (n > 8)) $ do
-		dumpTcRn (hang (ptext (sLit "Interesting! Context reduction stack depth") <+> int n) 
+		debugDumpTcRn (hang (ptext (sLit "Interesting! Context reduction stack depth") <+> int n) 
 			     2 (ifPprDebug (nest 2 (pprStack stk))))
 	; if n >= ctxtStkDepth dopts then
 	    failWithTc (reduceDepthErr n stk)
