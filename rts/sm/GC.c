@@ -128,6 +128,8 @@ long copied;        // *words* copied & scavenged during this GC
 SpinLock recordMutableGen_sync;
 #endif
 
+DECLARE_GCT
+
 /* -----------------------------------------------------------------------------
    Static function declarations
    -------------------------------------------------------------------------- */
