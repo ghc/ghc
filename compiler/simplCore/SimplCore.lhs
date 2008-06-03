@@ -493,15 +493,13 @@ simplifyPgm mode switches hsc_env us imp_rule_base guts
 	-- iteration_no is the number of the iteration we are
 	-- about to begin, with '1' for the first
       | iteration_no > max_iterations	-- Stop if we've run out of iterations
-      = do {
-	    when (debugIsOn && (max_iterations > 2)) $
-		    hPutStr stderr ("NOTE: Simplifier still going after " ++ 
-				show max_iterations ++ 
-			    	" iterations; bailing out.  Size = " ++ show (coreBindsSize binds) ++ "\n" )
+      =  WARN(debugIsOn && (max_iterations > 2),
+                text ("Simplifier still going after " ++
+				show max_iterations ++
+			    	" iterations; bailing out.  Size = " ++ show (coreBindsSize binds) ++ "\n" ))
 		-- Subtract 1 from iteration_no to get the
 		-- number of iterations we actually completed
-	    ; return ("Simplifier bailed out", iteration_no - 1, counts, binds)
-	}
+	    return ("Simplifier bailed out", iteration_no - 1, counts, binds)
 
       -- Try and force thunks off the binds; significantly reduces
       -- space usage, especially with -O.  JRS, 000620.
