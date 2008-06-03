@@ -2335,7 +2335,7 @@ open_stats_file (
 {
     FILE *f = NULL;
 
-    if (strequal(rts_argv[arg]+2, "stderr")) { /* use debugBelch */
+    if (strequal(rts_argv[arg]+2, "stderr") || strequal(rts_argv[arg]+2, "-")) {
         f = NULL; /* NULL means use debugBelch */
     } else {
 	if (rts_argv[arg][2] != '\0') {  /* stats file specified */
