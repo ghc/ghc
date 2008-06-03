@@ -178,9 +178,6 @@ static_flags = [
   ,  ( "no-auto"	, NoArg (removeOpt "-fauto-sccs-on-exported-toplevs") )
   ,  ( "no-caf-all"	, NoArg (removeOpt "-fauto-sccs-on-individual-cafs") )
 
-	------- Miscellaneous -----------------------------------------------
-  ,  ( "no-link-chk"    , NoArg (return ()) ) -- ignored for backwards compat
-
 	----- Linker --------------------------------------------------------
   ,  ( "static" 	, PassFlag addOpt )
   ,  ( "dynamic"        , NoArg (removeOpt "-static") )
