@@ -82,7 +82,12 @@ framework-pkg:
 	-$(RM) -rf $(DSTROOT)
 	mkdir -p $(TOOLS_SYSTEM)
 	cp installer-scripts/Uninstaller $(TOOLS_SYSTEM)
-	xcodebuild -target GHC-systemwide clean build install\
+	xcodebuild -target GHC-systemwide clean build\
+		   CURRENT_PROJECT_VERSION=$(CURRENT_PROJECT_VERSION)\
+	    	   SHORT_VERSION_STRING=$(SHORT_VERSION_STRING)\
+	 	   FRAMEWORK_VERSION=$(FRAMEWORK_VERSION)\
+		   CURRENT_LIBRARY_VERSION=$(FRAMEWORK_VERSION)
+	xcodebuild -target GHC-systemwide install\
 		   CURRENT_PROJECT_VERSION=$(CURRENT_PROJECT_VERSION)\
 	    	   SHORT_VERSION_STRING=$(SHORT_VERSION_STRING)\
 	 	   FRAMEWORK_VERSION=$(FRAMEWORK_VERSION)\
