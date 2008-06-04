@@ -310,7 +310,7 @@ end:
     // the number of words we have to shift down is less than the
     // number of stack words we squeeze away by doing so.
     if (RtsFlags.GcFlags.squeezeUpdFrames == rtsTrue &&
-	((weight <= 4 && words_to_squeeze > 0) || weight < words_to_squeeze)) {
+	((weight <= 5 && words_to_squeeze > 0) || weight < words_to_squeeze)) {
 	stackSqueeze(tso, (StgPtr)frame);
     }
 }
