@@ -34,7 +34,7 @@ clean(['Memo.hi', 'Memo.o'])
 test('packedstring001', normal, compile_and_run, ['-package packedstring'])
 
 test('stableptr001', compose(skip_if_fast,extra_run_opts('+RTS -K8m -RTS')), compile_and_run, [''])
-test('stableptr003', if_compiler_ge('ghc','6.9', expect_broken(2175)), compile_and_run, [''])
+test('stableptr003', normal, compile_and_run, [''])
 test('stableptr004', extra_run_opts('+RTS -K4m -RTS'), compile_and_run, [''])
 test('stableptr005', normal, compile_and_run, [''])
 
