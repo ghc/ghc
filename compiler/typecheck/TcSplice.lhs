@@ -720,25 +720,29 @@ reify th_name
 
 lookupThName :: TH.Name -> TcM Name
 lookupThName th_name@(TH.Name occ flavour)
-  =  do { let rdr_name = thRdrName guessed_ns occ_str flavour
-
-	-- Repeat much of lookupOccRn, becase we want
-	-- to report errors in a TH-relevant way
-	; rdr_env <- getLocalRdrEnv
-	; case lookupLocalRdrEnv rdr_env rdr_name of
-	    Just name -> return name
-	    Nothing | not (isSrcRdrName rdr_name)	-- Exact, Orig
-		    -> lookupImportedName rdr_name
-		    | otherwise				-- Unqual, Qual
-		    -> do { mb_name <- lookupSrcOcc_maybe rdr_name
-			  ; case mb_name of
-			      Just name -> return name
-			      Nothing   -> failWithTc (notInScope th_name) }
-	}
+  =  do { mb_ns <- mapM lookup [ thRdrName gns occ_str flavour 
+			       | gns <- guessed_nss]
+	; case catMaybes mb_ns of
+	    []    -> failWithTc (notInScope th_name)
+	    (n:_) -> return n }	-- Pick the first that works
+				-- E.g. reify (mkName "A") will pick the class A
+				-- 	in preference to the data constructor A
   where
-	-- guessed_ns is the name space guessed from looking at the TH name
-    guessed_ns | isLexCon (mkFastString occ_str) = OccName.dataName
-	       | otherwise			 = OccName.varName
+    lookup rdr_name
+	= do { 	-- Repeat much of lookupOccRn, becase we want
+		-- to report errors in a TH-relevant way
+	     ; rdr_env <- getLocalRdrEnv
+  	     ; case lookupLocalRdrEnv rdr_env rdr_name of
+		 Just name -> return (Just name)
+	         Nothing | not (isSrcRdrName rdr_name)	-- Exact, Orig
+		         -> do { name <- lookupImportedName rdr_name
+			       ; return (Just name) }
+		    	 | otherwise			-- Unqual, Qual
+		    	 -> lookupSrcOcc_maybe rdr_name }
+
+	-- guessed_ns are the name spaces guessed from looking at the TH name
+    guessed_nss | isLexCon (mkFastString occ_str) = [OccName.tcName,  OccName.dataName]
+	        | otherwise			  = [OccName.varName, OccName.tvName]
     occ_str = TH.occString occ
 
 tcLookupTh :: Name -> TcM TcTyThing
