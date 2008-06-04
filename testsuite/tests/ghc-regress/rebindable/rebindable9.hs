@@ -5,7 +5,12 @@
 module Foo where
 import qualified Prelude
 import Prelude hiding (Monad(..))
-import Control.Monad.Identity (Identity(..))
+
+newtype Identity a = Identity { runIdentity :: a }
+
+instance Prelude.Monad Identity where
+    return a = Identity a
+    m >>= k  = k (runIdentity m)
 
 class Bind m1 m2 m3 | m1 m2 -> m3 where 
   (>>=) :: m1 a -> (a -> m2 b) -> m3 b
