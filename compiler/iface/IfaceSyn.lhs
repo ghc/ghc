@@ -663,13 +663,16 @@ freeNamesIfDecl (IfaceId _s t i) =
 freeNamesIfDecl IfaceForeign{} = 
   emptyNameSet
 freeNamesIfDecl d@IfaceData{} =
+  freeNamesIfTvBndrs (ifTyVars d) &&&
   freeNamesIfTcFam (ifFamInst d) &&&
   freeNamesIfContext (ifCtxt d) &&&
   freeNamesIfConDecls (ifCons d)
 freeNamesIfDecl d@IfaceSyn{} =
+  freeNamesIfTvBndrs (ifTyVars d) &&&
   freeNamesIfType    (ifSynRhs d) &&&
   freeNamesIfTcFam (ifFamInst d)
 freeNamesIfDecl d@IfaceClass{} =
+  freeNamesIfTvBndrs (ifTyVars d) &&&
   freeNamesIfContext (ifCtxt d) &&&
   freeNamesIfDecls   (ifATs d) &&&
   fnList freeNamesIfClsSig (ifSigs d)
@@ -697,6 +700,8 @@ freeNamesIfConDecls _               = emptyNameSet
 
 freeNamesIfConDecl :: IfaceConDecl -> NameSet
 freeNamesIfConDecl c = 
+  freeNamesIfTvBndrs (ifConUnivTvs c) &&&
+  freeNamesIfTvBndrs (ifConExTvs c) &&&
   freeNamesIfContext (ifConCtxt c) &&& 
   fnList freeNamesIfType (ifConArgTys c) &&&
   fnList freeNamesIfType (map snd (ifConEqSpec c)) -- equality constraints
@@ -715,8 +720,16 @@ freeNamesIfType (IfaceAppTy s t)      = freeNamesIfType s &&& freeNamesIfType t
 freeNamesIfType (IfacePredTy st)      = freeNamesIfPredType st
 freeNamesIfType (IfaceTyConApp tc ts) = 
    freeNamesIfTc tc &&& fnList freeNamesIfType ts
-freeNamesIfType (IfaceForAllTy _tv t)  = freeNamesIfType t
+freeNamesIfType (IfaceForAllTy tv t)  =
+   freeNamesIfTvBndr tv &&& freeNamesIfType t
 freeNamesIfType (IfaceFunTy s t)      = freeNamesIfType s &&& freeNamesIfType t
+
+freeNamesIfTvBndrs :: [IfaceTvBndr] -> NameSet
+freeNamesIfTvBndrs = fnList freeNamesIfTvBndr
+
+freeNamesIfTvBndr :: IfaceTvBndr -> NameSet
+freeNamesIfTvBndr (_fs,k) = freeNamesIfType k
+    -- kinds can have Names inside, when the Kind is an equality predicate
 
 freeNamesIfIdInfo :: IfaceIdInfo -> NameSet
 freeNamesIfIdInfo NoInfo = emptyNameSet
