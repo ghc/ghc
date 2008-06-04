@@ -195,9 +195,11 @@ removeIndirections(StgClosure* p)
          get_itbl(q)->type == IND_OLDGEN ||
          get_itbl(q)->type == IND_PERM ||
          get_itbl(q)->type == IND_OLDGEN_PERM ) {
+      q = ((StgInd *)q)->indirectee;
       tag = GET_CLOSURE_TAG(q);
-      q = UNTAG_CLOSURE(((StgInd *)q)->indirectee);
+      q = UNTAG_CLOSURE(q);
   }
+
   return TAG_CLOSURE(tag,q);
 }
 
