@@ -9,11 +9,17 @@ import Data.Word
 
 -- importing functions
 
-foreign import stdcall        "m" m_stdcall :: StablePtr a -> IO (StablePtr b)
-foreign import ccall   unsafe "m" m_ccall   :: ByteArray# -> IO Int
+-- We can't import the same function using both stdcall and ccall
+-- calling conventions in the same file when compiling via C (this is a
+-- restriction in the C backend caused by the need to emit a prototype
+-- for stdcall functions).
+foreign import stdcall        "p" m_stdcall :: StablePtr a -> IO (StablePtr b)
+foreign import ccall   unsafe "q" m_ccall   :: ByteArray# -> IO Int
 
-foreign import stdcall "sin" my_sin :: Double -> IO Double
-foreign import stdcall "cos" my_cos :: Double -> IO Double
+-- We can't redefine the calling conventions of certain functions (those from
+-- math.h).
+foreign import stdcall "my_sin" my_sin :: Double -> IO Double
+foreign import stdcall "my_cos" my_cos :: Double -> IO Double
 
 foreign import stdcall "m1" m8  :: IO Int8
 foreign import stdcall "m2" m16 :: IO Int16
