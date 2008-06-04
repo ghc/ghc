@@ -1116,3 +1116,15 @@ matchContextErrString (StmtCtxt (MDoExpr _))     = "'mdo' expression"
 matchContextErrString (StmtCtxt ListComp)        = "list comprehension"
 matchContextErrString (StmtCtxt PArrComp)        = "array comprehension"
 \end{code}
+
+\begin{code}
+pprMatchInCtxt :: (OutputableBndr idL, OutputableBndr idR)
+	       => HsMatchContext idL -> Match idR -> SDoc
+pprMatchInCtxt ctxt match  = hang (ptext (sLit "In") <+> pprMatchContext ctxt <> colon) 
+			     4 (pprMatch ctxt match)
+
+pprStmtInCtxt :: (OutputableBndr idL, OutputableBndr idR)
+   	       => HsStmtContext idL -> StmtLR idL idR -> SDoc
+pprStmtInCtxt ctxt stmt = hang (ptext (sLit "In a stmt of") <+> pprStmtContext ctxt <> colon)
+		    	  4 (ppr stmt)
+\end{code}

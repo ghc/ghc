@@ -180,7 +180,7 @@ tc_cmd env cmd@(HsApp fun arg) (cmd_stk, res_ty)
 
 tc_cmd env cmd@(HsLam (MatchGroup [L mtch_loc (match@(Match pats _maybe_rhs_sig grhss))] _))
        (cmd_stk, res_ty)
-  = addErrCtxt (matchCtxt match_ctxt match)	$
+  = addErrCtxt (pprMatchInCtxt match_ctxt match)	$
 
     do	{ 	-- Check the cmd stack is big enough
 	; checkTc (lengthAtLeast cmd_stk n_pats)

@@ -7,7 +7,7 @@ TcMatches: Typecheck some @Matches@
 
 \begin{code}
 module TcMatches ( tcMatchesFun, tcGRHSsPat, tcMatchesCase, tcMatchLambda,
-		   matchCtxt, TcMatchCtxt(..), 
+		   TcMatchCtxt(..), 
 		   tcStmts, tcDoStmts, tcBody,
 		   tcDoStmt, tcMDoStmt, tcGuardStmt
        ) where
@@ -164,17 +164,15 @@ tcMatch ctxt pat_tys rhs_ty match
       = tcGRHSs ctxt grhss rhs_ty	-- No result signature
 
 	-- Result type sigs are no longer supported
-    tc_grhss ctxt (Just res_sig) grhss rhs_ty
-      = do { addErr (ptext (sLit "Ignoring (deprecated) result type signature")
-			<+> ppr res_sig)
-    	   ; tcGRHSs ctxt grhss rhs_ty }
+    tc_grhss _ (Just {}) _ _
+      = panic "tc_ghrss"  	-- Rejected by renamer
 
 	-- For (\x -> e), tcExpr has already said "In the expresssion \x->e"
 	-- so we don't want to add "In the lambda abstraction \x->e"
     add_match_ctxt match thing_inside
 	= case mc_what ctxt of
 	    LambdaExpr -> thing_inside
-	    m_ctxt     -> addErrCtxt (matchCtxt m_ctxt match) thing_inside
+	    m_ctxt     -> addErrCtxt (pprMatchInCtxt m_ctxt match) thing_inside
 
 -------------
 tcGRHSs :: TcMatchCtxt -> GRHSs Name -> BoxyRhoType
@@ -303,7 +301,7 @@ tcStmts ctxt stmt_chk (L loc (LetStmt binds) : stmts) res_ty thing_inside
 tcStmts ctxt stmt_chk (L loc stmt : stmts) res_ty thing_inside
   = do 	{ (stmt', (stmts', thing)) <- 
 		setSrcSpan loc		 		$
-    		addErrCtxt (stmtCtxt ctxt stmt)		$
+    		addErrCtxt (pprStmtInCtxt ctxt stmt)	$
 		stmt_chk ctxt stmt res_ty		$ \ res_ty' ->
 		popErrCtxt 				$
 		tcStmts ctxt stmt_chk stmts res_ty'	$
@@ -586,12 +584,3 @@ checkArgs fun (MatchGroup (match1:matches) _)
 checkArgs _ _ = panic "TcPat.checkArgs" -- Matches always non-empty
 \end{code}
 
-\begin{code}
-matchCtxt :: HsMatchContext Name -> Match Name -> SDoc
-matchCtxt ctxt match  = hang (ptext (sLit "In") <+> pprMatchContext ctxt <> colon) 
-			   4 (pprMatch ctxt match)
-
-stmtCtxt :: HsStmtContext Name -> StmtLR Name Name -> SDoc
-stmtCtxt ctxt stmt = hang (ptext (sLit "In a stmt of") <+> pprStmtContext ctxt <> colon)
-		  	4 (ppr stmt)
-\end{code}

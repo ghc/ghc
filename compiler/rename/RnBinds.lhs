@@ -22,10 +22,10 @@ import HsSyn
 import RdrHsSyn
 import RnHsSyn
 import TcRnMonad
-import RnTypes        ( rnHsSigType, rnLHsType, rnHsTypeFVs,checkPrecMatch)
+import RnTypes        ( rnHsSigType, rnLHsType, checkPrecMatch)
 import RnPat          (rnPatsAndThen_LocalRightwards, rnBindPat,
-                       NameMaker, localRecNameMaker, topRecNameMaker, applyNameMaker, 
-                       patSigErr)
+                       NameMaker, localRecNameMaker, topRecNameMaker, applyNameMaker
+                      )
                       
 import RnEnv
 import PrelNames	( mkUnboundName )
@@ -792,31 +792,27 @@ rnMatch :: HsMatchContext Name -> LMatch RdrName -> RnM (LMatch Name, FreeVars)
 rnMatch ctxt  = wrapLocFstM (rnMatch' ctxt)
 
 rnMatch' :: HsMatchContext Name -> Match RdrName -> RnM (Match Name, FreeVars)
-rnMatch' ctxt (Match pats maybe_rhs_sig grhss)
-  = 
-	-- Deal with the rhs type signature
-    bindPatSigTyVarsFV rhs_sig_tys	$ do
-    opt_PatternSignatures <- doptM Opt_PatternSignatures
-    (maybe_rhs_sig', ty_fvs) <-
-      case maybe_rhs_sig of
-        Nothing -> return (Nothing, emptyFVs)
-        Just ty | opt_PatternSignatures -> do (ty', ty_fvs) <- rnHsTypeFVs doc_sig ty
-                                              return (Just ty', ty_fvs)
-                | otherwise             -> do addLocErr ty patSigErr
-                                              return (Nothing, emptyFVs)
+rnMatch' ctxt match@(Match pats maybe_rhs_sig grhss)
+  = do 	{ 	-- Result type signatures are no longer supported
+	  case maybe_rhs_sig of	
+	        Nothing -> return ()
+	        Just ty -> addLocErr ty (resSigErr ctxt match)
 
-       -- Now the main event
-       -- note that there are no local ficity decls for matches
-    rnPatsAndThen_LocalRightwards ctxt pats	$ \ pats' -> do
-      (grhss', grhss_fvs) <- rnGRHSs ctxt grhss
 
-      return (Match pats' maybe_rhs_sig' grhss', grhss_fvs `plusFV` ty_fvs)
+	       -- Now the main event
+	       -- note that there are no local ficity decls for matches
+	; rnPatsAndThen_LocalRightwards ctxt pats	$ \ pats' -> do
+	{ (grhss', grhss_fvs) <- rnGRHSs ctxt grhss
+
+	; return (Match pats' Nothing grhss', grhss_fvs) }}
 	-- The bindPatSigTyVarsFV and rnPatsAndThen will remove the bound FVs
   where
-     rhs_sig_tys =  case maybe_rhs_sig of
-			Nothing -> []
-			Just ty -> [ty]
-     doc_sig = text "In a result type-signature"
+
+resSigErr :: HsMatchContext Name -> Match RdrName -> HsType RdrName -> SDoc 
+resSigErr ctxt match ty
+   = vcat [ ptext (sLit "Illegal result type signature") <+> quotes (ppr ty)
+	  , nest 2 $ ptext (sLit "Result signatures are no longer supported in pattern matches")
+ 	  , pprMatchInCtxt ctxt match ]
 \end{code}
 
 
