@@ -1,0 +1,7 @@
+
+T2310.hs:5:21:
+    Illegal result type signature `a'
+      Result signatures are no longer supported in pattern matches
+    In a lambda abstraction: \ x :: a -> (x :: a)
+
+T2310.hs:5:38: Not in scope: `co'

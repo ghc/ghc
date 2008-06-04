@@ -59,4 +59,5 @@ test('rnfail054', normal, compile_fail, [''])
 test('rnfail055', if_compiler_lt('ghc', '6.9', skip), multimod_compile_fail, ['RnFail055','-v0'])
 
 test('rn_dup', normal, compile_fail, [''])
+test('T2310', normal, compile_fail, [''])
 
