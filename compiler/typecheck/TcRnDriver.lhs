@@ -82,6 +82,7 @@ import Outputable
 import DataCon
 import Type
 import Class
+import Data.List ( sortBy )
 
 #ifdef GHCI
 import Linker
@@ -1470,8 +1471,16 @@ pprTcGblEnv (TcGblEnv { tcg_type_env  = type_env,
 	 , ppr_fam_insts fam_insts
 	 , vcat (map ppr rules)
 	 , ppr_gen_tycons (typeEnvTyCons type_env)
-	 , ptext (sLit "Dependent modules:") <+> ppr (eltsUFM (imp_dep_mods imports))
-	 , ptext (sLit "Dependent packages:") <+> ppr (imp_dep_pkgs imports)]
+	 , ptext (sLit "Dependent modules:") <+> 
+		ppr (sortBy cmp_mp $ eltsUFM (imp_dep_mods imports))
+	 , ptext (sLit "Dependent packages:") <+> 
+		ppr (sortBy stablePackageIdCmp $ imp_dep_pkgs imports)]
+  where		-- The two uses of sortBy are just to reduce unnecessary
+		-- wobbling in testsuite output
+    cmp_mp (mod_name1, is_boot1) (mod_name2, is_boot2)
+	= (mod_name1 `stableModuleNameCmp` mod_name2)
+		  `thenCmp`	
+	  (is_boot1 `compare` is_boot2)
 
 pprModGuts :: ModGuts -> SDoc
 pprModGuts (ModGuts { mg_types = type_env,

@@ -19,6 +19,7 @@ module Module
         moduleNameSlashes,
 	mkModuleName,
 	mkModuleNameFS,
+	stableModuleNameCmp,
 
         -- * The PackageId type
         PackageId,
@@ -26,6 +27,7 @@ module Module
         packageIdFS,
         stringToPackageId,
         packageIdString,
+	stablePackageIdCmp,
 
 	-- * Wired-in PackageIds
 	primPackageId,
@@ -161,6 +163,10 @@ instance Binary ModuleName where
   put_ bh (ModuleName fs) = put_ bh fs
   get bh = do fs <- get bh; return (ModuleName fs)
 
+stableModuleNameCmp :: ModuleName -> ModuleName -> Ordering
+-- Compare lexically, not by unique
+stableModuleNameCmp n1 n2 = moduleNameFS n1 `compare` moduleNameFS n2
+
 pprModuleName :: ModuleName -> SDoc
 pprModuleName (ModuleName nm) = 
     getPprStyle $ \ sty ->
@@ -184,7 +190,6 @@ mkModuleNameFS s = ModuleName s
 moduleNameSlashes :: ModuleName -> String
 moduleNameSlashes = dots_to_slashes . moduleNameString
   where dots_to_slashes = map (\c -> if c == '.' then pathSeparator else c)
-
 \end{code}
 
 %************************************************************************
@@ -213,8 +218,8 @@ instance Binary Module where
 -- not be stable from run to run of the compiler.
 stableModuleCmp :: Module -> Module -> Ordering
 stableModuleCmp (Module p1 n1) (Module p2 n2) 
-   = (packageIdFS  p1 `compare` packageIdFS  p2) `thenCmp`
-     (moduleNameFS n1 `compare` moduleNameFS n2)
+   = (p1 `stablePackageIdCmp`  p2) `thenCmp`
+     (n1 `stableModuleNameCmp` n2)
 
 mkModule :: PackageId -> ModuleName -> Module
 mkModule = Module
@@ -253,6 +258,9 @@ instance Uniquable PackageId where
 -- ordering.
 instance Ord PackageId where
   nm1 `compare` nm2 = getUnique nm1 `compare` getUnique nm2
+
+stablePackageIdCmp :: PackageId -> PackageId -> Ordering
+stablePackageIdCmp p1 p2 = packageIdFS p1 `compare` packageIdFS p2
 
 instance Outputable PackageId where
    ppr pid = text (packageIdString pid)
