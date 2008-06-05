@@ -114,21 +114,15 @@ Outstanding issues:
     --   may well be happening...);
 
 
-Note [Type lets]
-~~~~~~~~~~~~~~~~
+Note [Linting type lets]
+~~~~~~~~~~~~~~~~~~~~~~~~
 In the desugarer, it's very very convenient to be able to say (in effect)
-	let a = Int in <body>
-That is, use a type let.  (See notes just below for why we want this.)
+	let a = Type Int in <body>
+That is, use a type let.   See Note [Type let] in CoreSyn.
 
-We don't have type lets in Core, so the desugarer uses type lambda
-	(/\a. <body>) Int
-However, in the lambda form, we'd get lint errors from:
-	(/\a. let x::a = 4 in <body>) Int
-because (x::a) doesn't look compatible with (4::Int).
-
-So (HACK ALERT) the Lint phase does type-beta reduction "on the fly",
-as it were.  It carries a type substitution (in this example [a -> Int])
-and applies this substitution before comparing types.  The functin
+However, when linting <body> we need to remember that a=Int, else we might
+reject a correct program.  So we carry a type substitution (in this example 
+[a -> Int]) and apply this substitution before comparing types.  The functin
 	lintTy :: Type -> LintM Type
 returns a substituted type; that's the only reason it returns anything.
 
@@ -138,33 +132,6 @@ to the type of the binding variable.  lintBinders does this.
 For Ids, the type-substituted Id is added to the in_scope set (which 
 itself is part of the TvSubst we are carrying down), and when we
 find an occurence of an Id, we fetch it from the in-scope set.
-
-
-Why we need type let
-~~~~~~~~~~~~~~~~~~~~
-It's needed when dealing with desugarer output for GADTs. Consider
-  data T = forall a. T a (a->Int) Bool
-   f :: T -> ... -> 
-   f (T x f True)  = <e1>
-   f (T y g False) = <e2>
-After desugaring we get
-	f t b = case t of 
-		  T a (x::a) (f::a->Int) (b:Bool) ->
-		    case b of 
-			True -> <e1>
-			False -> (/\b. let y=x; g=f in <e2>) a
-And for a reason I now forget, the ...<e2>... can mention a; so 
-we want Lint to know that b=a.  Ugh.
-
-I tried quite hard to make the necessity for this go away, by changing the 
-desugarer, but the fundamental problem is this:
-	
-	T a (x::a) (y::Int) -> let fail::a = ...
-			       in (/\b. ...(case ... of       
-						True  -> x::b
-					 	False -> fail)
-				  ) a
-Now the inner case look as though it has incompatible branches.
 
 
 \begin{code}
@@ -279,6 +246,8 @@ lintCoreExpr :: CoreExpr -> LintM OutType
 -- The returned type has the substitution from the monad 
 -- already applied to it:
 --	lintCoreExpr e subst = exprType (subst e)
+--
+-- The returned "type" can be a kind, if the expression is (Type ty)
 
 lintCoreExpr (Var var)
   = do	{ checkL (not (var == oneTupleDataConId))
@@ -307,6 +276,20 @@ lintCoreExpr (Cast expr co)
 lintCoreExpr (Note _ expr)
   = lintCoreExpr expr
 
+lintCoreExpr (Let (NonRec tv (Type ty)) body)
+  =	-- See Note [Type let] in CoreSyn
+    do	{ checkL (isTyVar tv) (mkKindErrMsg tv ty)	-- Not quite accurate
+	; ty' <- lintTy ty
+        ; kind' <- lintTy (tyVarKind tv)
+        ; let tv' = setTyVarKind tv kind'
+        ; checkKinds tv' ty'              
+		-- Now extend the substitution so we 
+		-- take advantage of it in the body
+        ; addLoc (BodyOfLetRec [tv]) $
+	  addInScopeVars [tv'] $
+          extendSubstL tv' ty' $
+   	  lintCoreExpr body }
+
 lintCoreExpr (Let (NonRec bndr rhs) body)
   = do	{ lintSingleBinding NotTopLevel NonRecursive (bndr,rhs)
 	; addLoc (BodyOfLetRec [bndr])
@@ -318,29 +301,6 @@ lintCoreExpr (Let (Rec pairs) body)
 	; addLoc (BodyOfLetRec bndrs) (lintCoreExpr body) }
   where
     bndrs = map fst pairs
-
-lintCoreExpr e@(App fun (Type ty))
--- See Note [Type let] above
-  = addLoc (AnExpr e) $
-    go fun [ty]
-  where
-    go (App fun (Type ty)) tys
-	= do { go fun (ty:tys) }
-    go (Lam tv body) (ty:tys)
-	= do  { checkL (isTyVar tv) (mkKindErrMsg tv ty)	-- Not quite accurate
-	      ; ty' <- lintTy ty 
-              ; let kind = tyVarKind tv
-              ; kind' <- lintTy kind
-              ; let tv' = setTyVarKind tv kind'
-	      ; checkKinds tv' ty'              
-		-- Now extend the substitution so we 
-		-- take advantage of it in the body
-	      ; addInScopeVars [tv'] $
-	        extendSubstL tv' ty' $
-		go body tys }
-    go fun tys
-	= do  { fun_ty <- lintCoreExpr fun
-	      ; lintCoreArgs fun_ty (map Type tys) }
 
 lintCoreExpr e@(App fun arg)
   = do	{ fun_ty <- lintCoreExpr fun
@@ -392,8 +352,9 @@ lintCoreExpr e@(Case scrut var alt_ty alts) =
   where
     pass_var f = f var
 
-lintCoreExpr e@(Type _)
-  = addErrL (mkStrangeTyMsg e)
+lintCoreExpr (Type ty)
+  = do { ty' <- lintTy ty
+       ; return (typeKind ty') }
 \end{code}
 
 %************************************************************************
@@ -607,6 +568,7 @@ lintAndScopeId id linterF
 
 lintTy :: InType -> LintM OutType
 -- Check the type, and apply the substitution to it
+-- See Note [Linting type lets]
 -- ToDo: check the kind structure of the type
 lintTy ty 
   = do	{ ty' <- applySubst ty
@@ -957,8 +919,4 @@ dupVars :: [[Var]] -> Message
 dupVars vars
   = hang (ptext (sLit "Duplicate variables brought into scope"))
        2 (ppr vars)
-
-mkStrangeTyMsg :: CoreExpr -> Message
-mkStrangeTyMsg e
-  = ptext (sLit "Type where expression expected:") <+> ppr e
 \end{code}

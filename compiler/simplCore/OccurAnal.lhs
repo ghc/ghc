@@ -84,7 +84,10 @@ occAnalBind :: OccEnv
                 [CoreBind])
 
 occAnalBind env (NonRec binder rhs) body_usage
-  | not (binder `usedIn` body_usage)            -- It's not mentioned
+  | isTyVar binder			-- A type let; we don't gather usage info
+  = (body_usage, [NonRec binder rhs])
+
+  | not (binder `usedIn` body_usage)    -- It's not mentioned
   = (body_usage, [])
 
   | otherwise                   -- It's mentioned in the body

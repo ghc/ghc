@@ -20,9 +20,8 @@ module CoreSyn (
 	isTyVar, isId, cmpAltCon, cmpAlt, ltAlt,
 	bindersOf, bindersOfBinds, rhssOfBind, rhssOfAlts, 
 	collectBinders, collectTyBinders, collectValBinders, collectTyAndValBinders,
-	collectArgs, 
-	coreExprCc,
-	flattenBinds, 
+	collectArgs, coreExprCc,
+	mkTyBind, flattenBinds, 
 
 	isValArg, isTypeArg, valArgCount, valBndrCount, isRuntimeArg, isRuntimeVar,
 
@@ -150,11 +149,22 @@ Invariant: The list of alternatives is ALWAYS EXHAUSTIVE,
 
 
 Note [CoreSyn let goal]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
 * The simplifier tries to ensure that if the RHS of a let is a constructor
   application, its arguments are trivial, so that the constructor can be
   inlined vigorously.
 
+
+Note [Type let]
+~~~~~~~~~~~~~~~
+We allow a *non-recursive* let to bind a type variable, thus
+	Let (NonRec tv (Type ty)) body
+This can be very convenient for postponing type substitutions until
+the next run of the simplifier.
+
+At the moment, the rest of the compiler only deals with type-let
+in a Let expression, rather than at top level.  We may want to revist
+this choice.
 
 \begin{code}
 data Note
@@ -501,6 +511,11 @@ mkCast e co = Cast e co
 %************************************************************************
 
 \begin{code}
+mkTyBind :: TyVar -> Type -> CoreBind
+mkTyBind tv ty      = NonRec tv (Type ty)
+	-- Note [Type let]
+	-- A non-recursive let can bind a type variable
+
 bindersOf  :: Bind b -> [b]
 bindersOf (NonRec binder _) = [binder]
 bindersOf (Rec pairs)       = [binder | (binder, _) <- pairs]

@@ -864,14 +864,7 @@ simplLam :: SimplEnv -> [InId] -> InExpr -> SimplCont
 
 simplLam env [] body cont = simplExprF env body cont
 
-        -- Type-beta reduction
-simplLam env (bndr:bndrs) body (ApplyTo _ (Type ty_arg) arg_se cont)
-  = ASSERT( isTyVar bndr )
-    do  { tick (BetaReduction bndr)
-        ; ty_arg' <- simplType (arg_se `setInScope` env) ty_arg
-        ; simplLam (extendTvSubst env bndr ty_arg') bndrs body cont }
-
-        -- Ordinary beta reduction
+        -- Beta reduction
 simplLam env (bndr:bndrs) body (ApplyTo _ arg arg_se cont)
   = do  { tick (BetaReduction bndr)
         ; simplNonRecE env bndr (arg, arg_se) (bndrs, body) cont }
@@ -904,9 +897,11 @@ simplNonRecE :: SimplEnv
 -- Why?  Because of the binder-occ-info-zapping done before
 --       the call to simplLam in simplExprF (Lam ...)
 
-	-- First deal with type lets: let a = Type ty in b
+	-- First deal with type applications and type lets
+	--   (/\a. e) (Type ty)   and   (let a = Type ty in e)
 simplNonRecE env bndr (Type ty_arg, rhs_se) (bndrs, body) cont
-  = do	{ ty_arg' <- simplType (rhs_se `setInScope` env) ty_arg
+  = ASSERT( isTyVar bndr )
+    do	{ ty_arg' <- simplType (rhs_se `setInScope` env) ty_arg
 	; simplLam (extendTvSubst env bndr ty_arg') bndrs body cont }
 
 simplNonRecE env bndr (rhs, rhs_se) (bndrs, body) cont

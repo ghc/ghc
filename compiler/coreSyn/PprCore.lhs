@@ -250,6 +250,8 @@ instance OutputableBndr Var where
 
 pprCoreBinder :: BindingSite -> Var -> SDoc
 pprCoreBinder LetBind binder
+  | isTyVar binder = pprTypedBinder binder
+  | otherwise
   = vcat [sig, pprIdDetails binder, pragmas]
   where
     sig     = pprTypedBinder binder

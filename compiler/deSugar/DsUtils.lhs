@@ -347,10 +347,10 @@ wrapBinds [] e = e
 wrapBinds ((new,old):prs) e = wrapBind new old (wrapBinds prs e)
 
 wrapBind :: Var -> Var -> CoreExpr -> CoreExpr
-wrapBind new old body
+wrapBind new old body	-- Can deal with term variables *or* type variables
   | new==old    = body
-  | isTyVar new = App (Lam new body) (Type (mkTyVarTy old))
-  | otherwise   = Let (NonRec new (Var old)) body
+  | isTyVar new = Let (mkTyBind new (mkTyVarTy old)) body
+  | otherwise   = Let (NonRec new (Var old))         body
 
 seqVar :: Var -> CoreExpr -> CoreExpr
 seqVar var body = Case (Var var) var (exprType body)
