@@ -61,6 +61,7 @@ import InstEnv
 import FunDeps
 import TcMType
 import TcType
+import DsUtils
 import Type
 import TypeRep
 import Class
@@ -76,7 +77,6 @@ import Var      ( Var, TyVar )
 import qualified Var
 import VarEnv
 import VarSet
-import TysWiredIn
 import PrelNames
 import BasicTypes
 import SrcLoc
@@ -137,10 +137,7 @@ mkImplicTy tvs givens wanteds	-- The type of an implication constraint
     in 
       mkForAllTys tvs $ 
       mkPhiTy (map dictPred givens) $
-      if isSingleton dict_wanteds then
-  	instType (head dict_wanteds) 
-      else
-  	mkTupleTy Boxed (length dict_wanteds) (map instType dict_wanteds)
+      mkBigCoreTupTy (map instType dict_wanteds)
 
 dictPred :: Inst -> TcPredType
 dictPred (Dict {tci_pred = pred}) = pred
