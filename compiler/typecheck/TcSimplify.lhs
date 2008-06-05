@@ -33,6 +33,7 @@ import {-# SOURCE #-} TcUnify( unifyType )
 import HsSyn
 
 import TcRnMonad
+import TcHsSyn	( hsLPatType )
 import Inst
 import TcEnv
 import InstEnv
@@ -40,6 +41,7 @@ import TcType
 import TcMType
 import TcIface
 import TcTyFuns
+import DsUtils	-- Big-tuple functions
 import TypeRep
 import Var
 import Name
@@ -1006,16 +1008,15 @@ makeImplicationBind loc all_tvs
 	      (eq_irreds, dict_irreds) = partition isEqInst irreds
               n_dict_irreds = length dict_irreds
 	      dict_irred_ids = map instToId dict_irreds
-	      tup_ty = mkTupleTy Boxed n_dict_irreds (map idType dict_irred_ids)
-	      pat = TuplePat (map nlVarPat dict_irred_ids) Boxed tup_ty
+	      lpat = mkBigLHsPatTup (map (L span . VarPat) dict_irred_ids)
 	      rhs = L span (mkHsWrap co (HsVar (instToId implic_inst)))
 	      co  = mkWpApps (map instToId dict_givens)
 		    <.> mkWpTyApps eq_tyvar_cos
 		    <.> mkWpTyApps (mkTyVarTys all_tvs)
 	      bind | [dict_irred_id] <- dict_irred_ids  = VarBind dict_irred_id rhs
-		   | otherwise        = PatBind { pat_lhs = L span pat, 
+		   | otherwise        = PatBind { pat_lhs = lpat, 
 				                  pat_rhs = unguardedGRHSs rhs, 
-				      	          pat_rhs_ty = tup_ty,
+				      	          pat_rhs_ty = hsLPatType lpat,
 				      	          bind_fvs = placeHolderNames }
 	; traceTc $ text "makeImplicationBind" <+> ppr implic_inst
 	; return ([implic_inst], unitBag (L span bind)) 
@@ -2187,16 +2188,15 @@ reduceImplication env
 		      <.> WpLet (binds `unionBags` bind)
 		wrap_inline | null dict_ids = idHsWrapper
 			    | otherwise	    = WpInline
-		rhs = mkHsWrap co payload
+		rhs = mkLHsWrap co payload
 	        loc = instLocSpan inst_loc
-		payload | [dict_wanted] <- dict_wanteds = HsVar (instToId dict_wanted)
-			| otherwise = ExplicitTuple (map (L loc . HsVar . instToId) dict_wanteds) Boxed
+		payload = mkBigLHsTup (map (L loc . HsVar . instToId) dict_wanteds)
 
 	
 	; traceTc (vcat [text "reduceImplication" <+> ppr name,
 			 ppr simpler_implic_insts,
 			 text "->" <+> ppr rhs])
-	; return (unitBag (L loc (VarBind (instToId orig_implic) (L loc rhs))),
+	; return (unitBag (L loc (VarBind (instToId orig_implic) rhs)),
 		  simpler_implic_insts)
   	} 
     }

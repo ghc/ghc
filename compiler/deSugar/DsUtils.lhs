@@ -797,17 +797,18 @@ mkLHsVarTup ids  = mkLHsTup (map nlHsVar ids)
 mkLHsTup :: [LHsExpr Id] -> LHsExpr Id
 mkLHsTup []     = nlHsVar unitDataConId
 mkLHsTup [lexp] = lexp
-mkLHsTup lexps  = noLoc $ ExplicitTuple lexps Boxed
-
+mkLHsTup lexps  = L (getLoc (head lexps)) $ 
+		  ExplicitTuple lexps Boxed
 
 -- Smart constructors for source tuple patterns
 mkLHsVarPatTup :: [Id] -> LPat Id
 mkLHsVarPatTup bs  = mkLHsPatTup (map nlVarPat bs)
 
 mkLHsPatTup :: [LPat Id] -> LPat Id
+mkLHsPatTup []     = noLoc $ mkVanillaTuplePat [] Boxed
 mkLHsPatTup [lpat] = lpat
-mkLHsPatTup lpats  = noLoc $ mkVanillaTuplePat lpats Boxed -- Handles the case where lpats = [] gracefully
-
+mkLHsPatTup lpats  = L (getLoc (head lpats)) $ 
+		     mkVanillaTuplePat lpats Boxed
 
 -- The Big equivalents for the source tuple expressions
 mkBigLHsVarTup :: [Id] -> LHsExpr Id
@@ -823,7 +824,6 @@ mkBigLHsVarPatTup bs = mkBigLHsPatTup (map nlVarPat bs)
 
 mkBigLHsPatTup :: [LPat Id] -> LPat Id
 mkBigLHsPatTup = mkBigTuple mkLHsPatTup
-
 \end{code}
 
 
