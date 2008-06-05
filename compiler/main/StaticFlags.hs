@@ -39,6 +39,7 @@ module StaticFlags (
 	opt_Parallel,
 
 	-- optimisation opts
+	opt_DsMultiTyVar,
 	opt_NoStateHack,
 	opt_SpecInlineJoinPoints,
 	opt_CprOff,
@@ -320,8 +321,13 @@ opt_Parallel :: Bool
 opt_Parallel			= lookUp  (fsLit "-fparallel")
 
 -- optimisation opts
+opt_DsMultiTyVar :: Bool
+opt_DsMultiTyVar		= not (lookUp (fsLit "-fno-ds-multi-tyvar"))
+	-- On by default
+
 opt_SpecInlineJoinPoints :: Bool
 opt_SpecInlineJoinPoints	= lookUp  (fsLit "-fspec-inline-join-points")
+
 opt_NoStateHack :: Bool
 opt_NoStateHack			= lookUp  (fsLit "-fno-state-hack")
 opt_CprOff :: Bool
@@ -410,6 +416,7 @@ isStaticFlag f =
 	"dno-black-holing",
 	"fno-method-sharing",
 	"fno-state-hack",
+	"fno-ds-multi-tyvar",
 	"fruntime-types",
 	"fno-pre-inlining",
 	"fexcess-precision",

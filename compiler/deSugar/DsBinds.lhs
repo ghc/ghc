@@ -46,7 +46,8 @@ import Maybes
 import Bag
 import BasicTypes hiding ( TopLevel )
 import FastString
-import Util		( mapSnd )
+import StaticFlags	( opt_DsMultiTyVar )
+import Util		( mapSnd, mapAndUnzip, lengthExceeds )
 
 import Control.Monad
 import Data.List
@@ -103,40 +104,120 @@ dsHsBind _ rest (PatBind { pat_lhs = pat, pat_rhs = grhss, pat_rhs_ty = ty }) = 
     sel_binds <- mkSelectorBinds pat body_expr
     return (sel_binds ++ rest)
 
--- Note [Rules and inlining]
--- Common special case: no type or dictionary abstraction
--- This is a bit less trivial than you might suppose
--- The naive way woudl be to desguar to something like
---	f_lcl = ...f_lcl...	-- The "binds" from AbsBinds
---	M.f = f_lcl		-- Generated from "exports"
--- But we don't want that, because if M.f isn't exported,
--- it'll be inlined unconditionally at every call site (its rhs is 
--- trivial).  That would be ok unless it has RULES, which would 
--- thereby be completely lost.  Bad, bad, bad.
---
--- Instead we want to generate
---	M.f = ...f_lcl...
---	f_lcl = M.f
--- Now all is cool. The RULES are attached to M.f (by SimplCore), 
--- and f_lcl is rapidly inlined away.
---
--- This does not happen in the same way to polymorphic binds,
--- because they desugar to
---	M.f = /\a. let f_lcl = ...f_lcl... in f_lcl
--- Although I'm a bit worried about whether full laziness might
--- float the f_lcl binding out and then inline M.f at its call site
+{-  Note [Rules and inlining]
+    ~~~~~~~~~~~~~~~~~~~~~~~~~
+    Common special case: no type or dictionary abstraction
+    This is a bit less trivial than you might suppose
+    The naive way woudl be to desguar to something like
+    	f_lcl = ...f_lcl...	-- The "binds" from AbsBinds
+    	M.f = f_lcl		-- Generated from "exports"
+    But we don't want that, because if M.f isn't exported,
+    it'll be inlined unconditionally at every call site (its rhs is 
+    trivial).  That would be ok unless it has RULES, which would 
+    thereby be completely lost.  Bad, bad, bad.
+
+    Instead we want to generate
+    	M.f = ...f_lcl...
+    	f_lcl = M.f
+    Now all is cool. The RULES are attached to M.f (by SimplCore), 
+    and f_lcl is rapidly inlined away.
+
+    This does not happen in the same way to polymorphic binds,
+    because they desugar to
+    	M.f = /\a. let f_lcl = ...f_lcl... in f_lcl
+    Although I'm a bit worried about whether full laziness might
+    float the f_lcl binding out and then inline M.f at its call site -}
 
 dsHsBind auto_scc rest (AbsBinds [] [] exports binds)
   = do	{ core_prs <- ds_lhs_binds NoSccs binds
 	; let env = mkABEnv exports
-	      do_one (lcl_id, rhs) | Just (gbl_id, prags) <- lookupVarEnv env lcl_id
+	      do_one (lcl_id, rhs) | Just (_, gbl_id, _, prags) <- lookupVarEnv env lcl_id
 				   = addInlinePrags prags gbl_id $
 				     addAutoScc auto_scc gbl_id rhs
 				   | otherwise = (lcl_id, rhs)
 	      locals'  = [(lcl_id, Var gbl_id) | (_, gbl_id, lcl_id, _) <- exports]
+			-- Note [Rules and inlining]
 	; return (map do_one core_prs ++ locals' ++ rest) }
 		-- No Rec needed here (contrast the other AbsBinds cases)
 		-- because we can rely on the enclosing dsBind to wrap in Rec
+
+
+{- Note [Abstracting over tyvars only]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   When abstracting over type variable only (not dictionaries), we don't really need to
+   built a tuple and select from it, as we do in the general case. Instead we can take
+
+	AbsBinds [a,b] [ ([a,b], fg, fl, _),
+ 		         ([b],   gg, gl, _) ]
+		{ fl = e1
+		  gl = e2
+		   h = e3 }
+
+   and desugar it to
+
+	fg = /\ab. let B in e1
+	gg = /\b. let a = () in let B in S(e2)
+	h  = /\ab. let B in e3
+
+  where B is the *non-recursive* binding
+	fl = fg a b
+	gl = gg b
+	h  = h a b 
+  
+  Notice (a) g has a different number of type variables to f, so we must
+	     use the mkArbitraryType thing to fill in the gaps.  
+	     We use a type-let to do that.
+
+	 (b) The local variable h isn't in the exports, and rather than
+	     clone a fresh copy we simply replace h by (h a b).  
+
+	 (c) The result is *still* quadratic-sized if there are a lot of
+	     small bindings.  So if there are more than some small
+	     number (10), we filter the binding set B by the free
+	     variables of the particular RHS.  Tiresome.
+
+  Why got to this trouble?  It's a common case, and it removes the
+  quadratic-sized tuple desugaring.  Less clutter, hopefullly faster
+  compilation, especially in a case where there are a *lot* of
+  bindings.
+-}
+
+
+dsHsBind auto_scc rest (AbsBinds tyvars [] exports binds)
+  | opt_DsMultiTyVar	-- This (static) debug flag just lets us
+			-- switch on and off this optimisation to
+			-- see if it has any impact; it is on by default
+  = 	-- Note [Abstracting over tyvars only]
+    do	{ core_prs <- ds_lhs_binds NoSccs binds
+	; arby_env <- mkArbitraryTypeEnv tyvars exports
+	; let (lg_binds, core_prs') = mapAndUnzip do_one core_prs
+	      bndrs = mkVarSet (map fst core_prs)
+
+	      add_lets | core_prs `lengthExceeds` 10 = add_some
+		       | otherwise	             = mkLets lg_binds
+	      add_some rhs = mkLets [ NonRec b r | NonRec b r <- lg_binds
+				    , b `elemVarSet` fvs] rhs
+		where
+		  fvs = exprSomeFreeVars (`elemVarSet` bndrs) rhs
+
+	      env = mkABEnv exports
+
+	      do_one (lcl_id, rhs) 
+		| Just (id_tvs, gbl_id, _, prags) <- lookupVarEnv env lcl_id
+		= (NonRec lcl_id (mkTyApps (Var gbl_id) (mkTyVarTys id_tvs)),
+		   addInlinePrags prags gbl_id $
+		   addAutoScc auto_scc gbl_id  $
+		   mkLams id_tvs $
+		   mkLets [ NonRec tv (Type (lookupVarEnv_NF arby_env tv))
+		          | tv <- tyvars, not (tv `elem` id_tvs)] $
+	           add_lets rhs)
+		| otherwise
+		= (NonRec lcl_id (mkTyApps (Var non_exp_gbl_id) (mkTyVarTys tyvars)),
+		   (non_exp_gbl_id, mkLams tyvars (add_lets rhs)))
+		where
+		  non_exp_gbl_id = setIdType lcl_id (mkForAllTys tyvars (idType lcl_id))
+						  
+	; return (core_prs' ++ rest) }
 
 	-- Another common case: one exported variable
 	-- Non-recursive bindings come through this way
@@ -161,7 +242,7 @@ dsHsBind auto_scc rest
 dsHsBind auto_scc rest (AbsBinds all_tyvars dicts exports binds)
   = do	{ core_prs <- ds_lhs_binds NoSccs binds
 	; let env = mkABEnv exports
-	      do_one (lcl_id,rhs) | Just (gbl_id, prags) <- lookupVarEnv env lcl_id
+	      do_one (lcl_id,rhs) | Just (_, gbl_id, _, prags) <- lookupVarEnv env lcl_id
 			          = addInlinePrags prags lcl_id $
 				    addAutoScc auto_scc gbl_id rhs
 				  | otherwise = (lcl_id,rhs)
@@ -206,11 +287,10 @@ dsHsBind auto_scc rest (AbsBinds all_tyvars dicts exports binds)
 	; return ((poly_tup_id, poly_tup_expr) : 
 		    (concat export_binds_s ++ rest)) }
 
-mkABEnv :: [([TyVar], Id, Id, [LPrag])] -> VarEnv (Id, [LPrag])
+mkABEnv :: [([TyVar], Id, Id, [LPrag])] -> VarEnv ([TyVar], Id, Id, [LPrag])
 -- Takes the exports of a AbsBinds, and returns a mapping
---	lcl_id -> (gbl_id, prags)
-mkABEnv exports = mkVarEnv [ (lcl_id, (gbl_id, prags)) 
-			   | (_, gbl_id, lcl_id, prags) <- exports]
+--	lcl_id -> (tyvars, gbl_id, lcl_id, prags)
+mkABEnv exports = mkVarEnv [ (lcl_id, export) | export@(_, _, lcl_id, _) <- exports]
 
 
 dsSpec :: [TyVar] -> [DictId] -> [TyVar]
@@ -304,6 +384,23 @@ dsSpec all_tvs dicts tvs poly_id mono_id mono_bind
     decomp_msg = hang (ptext (sLit "Specialisation too complicated to desugar; ignored"))
 		    2 (ppr spec_expr)
 
+mkArbitraryTypeEnv :: [TyVar] -> [([TyVar], a, b, c)] -> DsM (TyVarEnv Type)
+-- If any of the tyvars is missing from any of the lists in 
+-- the second arg, return a binding in the result
+mkArbitraryTypeEnv tyvars exports
+  = go emptyVarEnv exports
+  where
+    go env [] = return env
+    go env ((ltvs, _, _, _) : exports)
+	= do { env' <- foldlM extend env [tv | tv <- tyvars
+					, not (tv `elem` ltvs)
+					, not (tv `elemVarEnv` env)]
+	     ; go env' exports }
+
+    extend env tv = do { ty <- dsMkArbitraryType tv
+		       ; return (extendVarEnv env tv ty) }
+
+
 dsMkArbitraryType :: TcTyVar -> DsM Type
 dsMkArbitraryType tv = mkArbitraryType warn tv
   where
@@ -372,12 +469,17 @@ decomposeRuleLhs lhs
 
 simpleSubst :: IdEnv CoreExpr -> CoreExpr -> CoreExpr
 -- Similar to CoreSubst.substExpr, except that 
--- (a) takes no account of capture; dictionary bindings use new names
--- (b) can have a GlobalId (imported) in its domain
+-- (a) Takes no account of capture; at this point there is no shadowing
+-- (b) Can have a GlobalId (imported) in its domain
 -- (c) Ids only; no types are substituted
+-- (d) Does not insist (as does CoreSubst.lookupIdSubst) that the 
+--     in-scope set mentions all LocalIds mentioned in the argument of the subst
 --
--- (b) is the reason we can't use CoreSubst... and it's no longer relevant
--- 	so really we should replace simpleSubst 
+-- (b) and (d) are the reasons we can't use CoreSubst
+-- 
+-- (I had a note that (b) is "no longer relevant", and indeed it doesn't
+--  look relevant here. Perhaps there was another caller of simpleSubst.)
+
 simpleSubst subst expr
   = go expr
   where
