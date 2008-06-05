@@ -2237,12 +2237,29 @@ We can satisfy the (C Int) from the superclass of D, so we don't want
 to float the (C Int) out, even though it mentions no type variable in
 the constraints!
 
+One more example: the constraint
+	class C a => D a b
+	instance (C a, E c) => E (a,c)
+
+	constraint: forall b. D Int b => E (Int,c)
+
+You might think that the (D Int b) can't possibly contribute
+to solving (E (Int,c)), since the latter mentions 'c'.  But 
+in fact it can, because solving the (E (Int,c)) constraint needs 
+dictionaries
+	C Int, E c
+and the (C Int) can be satisfied from the superclass of (D Int b).
+So we must still not float (E (Int,c)) out.
+
+To think about: special cases for unary type classes?
+
 Note [Pruning the givens in an implication constraint]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose we are about to form the implication constraint
 	forall tvs.  Eq a => Ord b
 The (Eq a) cannot contribute to the (Ord b), because it has no access to
 the type variable 'b'.  So we could filter out the (Eq a) from the givens.
+But BE CAREFUL of the examples above in [Freeness and implications].
 
 Doing so would be a bit tidier, but all the implication constraints get
 simplified away by the optimiser, so it's no great win.   So I don't take
