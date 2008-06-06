@@ -6,13 +6,6 @@
 TcSimplify
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module TcSimplify (
 	tcSimplifyInfer, tcSimplifyInferCheck,
 	tcSimplifyCheck, tcSimplifyRestricted,
@@ -42,7 +35,6 @@ import TcMType
 import TcIface
 import TcTyFuns
 import DsUtils	-- Big-tuple functions
-import TypeRep
 import Var
 import Name
 import NameSet
@@ -56,14 +48,12 @@ import ErrUtils
 import BasicTypes
 import VarSet
 import VarEnv
-import Module
 import FiniteMap
 import Bag
 import Outputable
 import Maybes
 import ListSetOps
 import Util
-import UniqSet
 import SrcLoc
 import DynFlags
 import FastString
@@ -891,7 +881,9 @@ isFreeWhenChecking qtvs ips inst
   && isFreeWrtIPs    ips inst
 -}
 
+isFreeWrtTyVars :: VarSet -> Inst -> Bool
 isFreeWrtTyVars qtvs inst = tyVarsOfInst inst `disjointVarSet` qtvs
+isFreeWrtIPs :: NameSet -> Inst -> Bool
 isFreeWrtIPs     ips inst = not (any (`elemNameSet` ips) (ipNamesOfInst inst))
 \end{code}
 
@@ -1005,8 +997,7 @@ makeImplicationBind loc all_tvs
 					 tci_given = (eq_givens ++ dict_givens),
 					 tci_wanted = irreds, tci_loc = loc }
 	; let   -- only create binder for dict_irreds
-	      (eq_irreds, dict_irreds) = partition isEqInst irreds
-              n_dict_irreds = length dict_irreds
+	      (_, dict_irreds) = partition isEqInst irreds
 	      dict_irred_ids = map instToId dict_irreds
 	      lpat = mkBigLHsPatTup (map (L span . VarPat) dict_irred_ids)
 	      rhs = L span (mkHsWrap co (HsVar (instToId implic_inst)))
@@ -1032,7 +1023,7 @@ tryHardCheckLoop doc wanteds
        ; return (irreds,binds)
        }
   where
-    try_me inst = ReduceMe AddSCs
+    try_me _ = ReduceMe AddSCs
 	-- Here's the try-hard bit
 
 -----------------------------------------------------------
@@ -1232,7 +1223,7 @@ tcSimplifySuperClasses loc givens sc_wanteds
 	; return binds1 }
   where
     env = mkRedEnv (pprInstLoc loc) try_me givens
-    try_me inst = ReduceMe NoSCs
+    try_me _ = ReduceMe NoSCs
 	-- Like tryHardCheckLoop, but with NoSCs
 \end{code}
 
@@ -1365,7 +1356,7 @@ tcSimplifyRestricted doc top_lvl bndrs tau_tvs wanteds
 	-- BUT do no improvement!  See Plan D above
 	-- HOWEVER, some unification may take place, if we instantiate
 	-- 	    a method Inst with an equality constraint
-	; let env = mkNoImproveRedEnv doc (\i -> ReduceMe AddSCs)
+	; let env = mkNoImproveRedEnv doc (\_ -> ReduceMe AddSCs)
 	; (_imp, _binds, constrained_dicts, elim_skolems) 
             <- reduceContext env wanteds'
         ; elim_skolems
@@ -1775,7 +1766,7 @@ reduceContext env wanteds
                                                             given_dicts0
 
           -- 5. Build the Avail mapping from "given_dicts"
-	; (init_state, extra_givens) <- getLIE $ do 
+	; (init_state, _) <- getLIE $ do 
 		{ init_state <- foldlM addGiven emptyAvails given_dicts
 		; return init_state
                 }
@@ -1890,8 +1881,11 @@ unifyEqns eqns
            mapM_ (unif_pr tenv) pairs
     unif_pr tenv (ty1,ty2) =  unifyType (substTy tenv ty1) (substTy tenv ty2)
 
-pprEquationDoc (eqn, (p1,w1), (p2,w2)) = vcat [pprEquation eqn, nest 2 (ppr p1), nest 2 (ppr p2)]
+pprEquationDoc :: (Equation, (PredType, SDoc), (PredType, SDoc)) -> SDoc
+pprEquationDoc (eqn, (p1, _), (p2, _)) = vcat [pprEquation eqn, nest 2 (ppr p1), nest 2 (ppr p2)]
 
+mkEqnMsg :: (TcPredType, SDoc) -> (TcPredType, SDoc) -> TidyEnv
+         -> TcM (TidyEnv, SDoc)
 mkEqnMsg (pred1,from1) (pred2,from2) tidy_env
   = do	{ pred1' <- zonkTcPredType pred1; pred2' <- zonkTcPredType pred2
 	; let { pred1'' = tidyPred tidy_env pred1'; pred2'' = tidyPred tidy_env pred2' }
@@ -1921,9 +1915,10 @@ reduceList env@(RedEnv {red_stack = (n,stk)}) wanteds state
 			 ; go ws state' }
 
     -- Base case: we're done!
+reduce :: RedEnv -> Inst -> Avails -> TcM Avails
 reduce env wanted avails
     -- It's the same as an existing inst, or a superclass thereof
-  | Just avail <- findAvail avails wanted
+  | Just _ <- findAvail avails wanted
   = do { traceTc (text "reduce: found " <+> ppr wanted)
        ; return avails
        }
@@ -1963,7 +1958,7 @@ reduce env wanted avails
       = do { res <- lookupSimpleInst wanted
 	   ; case res of
 	        GenInst [] rhs -> addWanted AddSCs avails wanted rhs []
-	        other	       -> do_this_otherwise avails wanted }
+	        _              -> do_this_otherwise avails wanted }
 \end{code}
 
 
@@ -2054,7 +2049,7 @@ contributing clauses.
 \begin{code}
 ---------------------------------------------
 reduceInst :: RedEnv -> Avails -> Inst -> TcM (Avails, LookupInstResult)
-reduceInst env avails other_inst
+reduceInst _ avails other_inst
   = do	{ result <- lookupSimpleInst other_inst
 	; return (avails, result) }
 \end{code}
@@ -2125,7 +2120,7 @@ reduceImplication env
 		      	   	  tci_tyvars = tvs,
 		      	   	  tci_given = extra_givens, tci_wanted = wanteds })
   = do	{ 	-- Solve the sub-problem
-	; let try_me inst = ReduceMe AddSCs  -- Note [Freeness and implications]
+	; let try_me _ = ReduceMe AddSCs  -- Note [Freeness and implications]
 	      env' = env { red_givens = extra_givens ++ red_givens env
 			 , red_doc = sep [ptext (sLit "reduceImplication for") 
                                             <+> ppr name,
@@ -2200,6 +2195,7 @@ reduceImplication env
 		  simpler_implic_insts)
   	} 
     }
+reduceImplication _ i = pprPanic "reduceImplication" (ppr i)
 \end{code}
 
 Note [Always inline implication constraints]
@@ -2297,6 +2293,7 @@ data AvailHow
 instance Outputable Avails where
   ppr = pprAvails
 
+pprAvails :: Avails -> SDoc
 pprAvails (Avails imp avails)
   = vcat [ ptext (sLit "Avails") <> (if imp then ptext (sLit "[improved]") else empty)
 	 , nest 2 $ braces $ 
@@ -2341,11 +2338,8 @@ extendAvails avails@(Avails imp env) inst avail
 availsInsts :: Avails -> [Inst]
 availsInsts (Avails _ avails) = keysFM avails
 
-availsImproved (Avails imp _) = imp
-
-updateImprovement :: Avails -> Avails -> Avails
--- (updateImprovement a1 a2) sets a1's improvement flag from a2
-updateImprovement (Avails _ avails1) (Avails imp2 _) = Avails imp2 avails1
+_availsImproved :: Avails -> ImprovementDone
+_availsImproved (Avails imp _) = imp
 \end{code}
 
 Extracting the bindings from a bunch of Avails.
@@ -2373,7 +2367,7 @@ extractResults (Avails _ avails) wanteds
 	-> DoneEnv	-- Has an entry for each inst in the above three sets
 	-> [Inst]	-- Wanted
 	-> TcM (TcDictBinds, [Inst], [Inst])
-    go binds bound_dicts irreds done [] 
+    go binds bound_dicts irreds _ [] 
       = return (binds, bound_dicts, irreds)
 
     go binds bound_dicts irreds done (w:ws)
@@ -2455,7 +2449,7 @@ addAvailAndSCs want_scs avails inst avail
     -- Watch out, though.  Since the avails may contain loops 
     -- (see Note [RECURSIVE DICTIONARIES]), so we need to track the ones we've seen so far
     findAllDeps so_far (Rhs _ kids) = foldl find_all so_far kids
-    findAllDeps so_far other	    = so_far
+    findAllDeps so_far _            = so_far
 
     find_all :: IdSet -> Inst -> IdSet
     find_all so_far kid
@@ -2495,7 +2489,7 @@ addSCs is_loop avails dict
     is_given :: Inst -> Bool
     is_given sc_dict = case findAvail avails sc_dict of
 			  Just (Given _) -> True	-- Given is cheaper than superclass selection
-			  other		 -> False	
+			  _              -> False
 
 -- From the a set of insts obtain all equalities that (transitively) occur in
 -- superclass contexts of class constraints (aka the ancestor equalities). 
@@ -2559,6 +2553,7 @@ tcSimplifyInteractive wanteds
 
 -- The TcLclEnv should be valid here, solely to improve
 -- error message generation for the monomorphism restriction
+tc_simplify_top :: SDoc -> Bool -> [Inst] -> TcM (Bag (LHsBind TcId))
 tc_simplify_top doc interactive wanteds
   = do	{ dflags <- getDOpts
 	; wanteds <- zonkInsts wanteds
@@ -2568,7 +2563,7 @@ tc_simplify_top doc interactive wanteds
 	; (irreds1, binds1) <- tryHardCheckLoop doc1 wanteds
 --	; (irreds1, binds1) <- gentleInferLoop doc1 wanteds
 	; traceTc (text "tc_simplify_top 1: " <+> ppr irreds1)
-	; (irreds2, binds2) <- approximateImplications doc2 (\d -> True) irreds1
+	; (irreds2, binds2) <- approximateImplications doc2 (\_ -> True) irreds1
 	; traceTc (text "tc_simplify_top 2: " <+> ppr irreds2)
 
 		-- Use the defaulting rules to do extra unification
@@ -2736,7 +2731,7 @@ getDefaultTys extended_deflts ovl_strings
 		  opt_deflt ovl_strings string_ty) } } }
   where
     opt_deflt True  ty = [ty]
-    opt_deflt False ty = []
+    opt_deflt False _  = []
 \end{code}
 
 Note [Default unitTy]
@@ -2853,7 +2848,7 @@ groupErrs :: ([Inst] -> TcM ())	-- Deal with one group
 -- Group together insts with the same origin
 -- We want to report them together in error messages
 
-groupErrs report_err [] 
+groupErrs _ [] 
   = return ()
 groupErrs report_err (inst:insts)
   = do	{ do_one (inst:friends)
@@ -2873,7 +2868,7 @@ addInstLoc :: [Inst] -> Message -> Message
 addInstLoc insts msg = msg $$ nest 2 (pprInstArising (head insts))
 
 addTopIPErrs :: [Name] -> [Inst] -> TcM ()
-addTopIPErrs bndrs [] 
+addTopIPErrs _ [] 
   = return ()
 addTopIPErrs bndrs ips
   = do	{ dflags <- getDOpts
@@ -2916,6 +2911,7 @@ reportNoInstances
 reportNoInstances tidy_env mb_what insts 
   = groupErrs (report_no_instances tidy_env mb_what) insts
 
+report_no_instances :: TidyEnv -> Maybe (InstLoc, [Inst]) -> [Inst] -> TcM ()
 report_no_instances tidy_env mb_what insts
   = do { inst_envs <- tcGetInstEnvs
        ; let (implics, insts1)  = partition isImplicInst insts
@@ -2947,7 +2943,7 @@ report_no_instances tidy_env mb_what insts
 		-- The case of exactly one match and no unifiers means a
 		-- successful lookup.  That can't happen here, because dicts
 		-- only end up here if they didn't match in Inst.lookupInst
-		([m],[])
+		([_],[])
 		 | debugIsOn -> pprPanic "reportNoInstance" (ppr wanted)
 		res -> Right (mk_overlap_msg wanted res)
 	  where
@@ -3009,6 +3005,7 @@ report_no_instances tidy_env mb_what insts
 	show_fixes (f:fs) = sep [ptext (sLit "Possible fix:"), 
 				 nest 2 (vcat (f : map (ptext (sLit "or") <+>) fs))]
 
+addTopAmbigErrs :: [Inst] -> TcRn ()
 addTopAmbigErrs dicts
 -- Divide into groups that share a common set of ambiguous tyvars
   = ifErrsM (return ()) $	-- Only report ambiguity if no other errors happened
@@ -3068,6 +3065,7 @@ monomorphism_fix dflags
            else empty]	-- Only suggest adding "-fno-monomorphism-restriction"
 			-- if it is not already set!
     
+warnDefault :: [(Inst, Class, Var)] -> Type -> TcM ()
 warnDefault ups default_ty = do
     warn_flag <- doptM Opt_WarnTypeDefaults
     addInstCtxt (instLoc (head (dicts))) (warnTc warn_flag warn_msg)
@@ -3080,10 +3078,12 @@ warnDefault ups default_ty = do
 				quotes (ppr default_ty),
 		      pprDictsInFull tidy_dicts]
 
+reduceDepthErr :: Int -> [Inst] -> SDoc
 reduceDepthErr n stack
   = vcat [ptext (sLit "Context reduction stack overflow; size =") <+> int n,
 	  ptext (sLit "Use -fcontext-stack=N to increase stack size to N"),
 	  nest 4 (pprStack stack)]
 
+pprStack :: [Inst] -> SDoc
 pprStack stack = vcat (map pprInstInFull stack)
 \end{code}
