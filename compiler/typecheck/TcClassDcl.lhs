@@ -676,8 +676,8 @@ eqPatType :: HsType Name -> HsType Name -> Bool
 -- A very simple equality function, only for 
 -- type patterns in generic function definitions.
 eqPatType (HsTyVar v1)       (HsTyVar v2)    	= v1==v2
-eqPatType (HsAppTy s1 t1)    (HsAppTy s2 t2) 	= s1 `eqPatLType` s2 && t2 `eqPatLType` t2
-eqPatType (HsOpTy s1 op1 t1) (HsOpTy s2 op2 t2) = s1 `eqPatLType` s2 && t2 `eqPatLType` t2 && unLoc op1 == unLoc op2
+eqPatType (HsAppTy s1 t1)    (HsAppTy s2 t2) 	= s1 `eqPatLType` s2 && t1 `eqPatLType` t2
+eqPatType (HsOpTy s1 op1 t1) (HsOpTy s2 op2 t2) = s1 `eqPatLType` s2 && t1 `eqPatLType` t2 && unLoc op1 == unLoc op2
 eqPatType (HsNumTy n1)	     (HsNumTy n2)	= n1 == n2
 eqPatType (HsParTy t1)	     t2			= unLoc t1 `eqPatType` t2
 eqPatType t1		     (HsParTy t2)	= t1 `eqPatType` unLoc t2
