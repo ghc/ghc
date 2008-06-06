@@ -984,6 +984,11 @@ AC_CACHE_CHECK([for extra options to pass gcc when compiling via C], [fp_cv_gcc_
      )],
      [])
   ;;
+  sparc-*-solaris2) 
+    FP_COMPARE_VERSIONS([$fp_gcc_version], [-ge], [4.2],
+      [fp_cv_gcc_extra_opts="$fp_cv_gcc_extra_opts -fno-toplevel-reorder"],
+      [])
+  ;;
  esac
 ])
 AC_SUBST([GccExtraViaCOpts],$fp_cv_gcc_extra_opts)
