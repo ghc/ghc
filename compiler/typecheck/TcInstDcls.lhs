@@ -6,13 +6,6 @@
 TcInstDecls: Typechecking instance declarations
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module TcInstDcls ( tcInstDecls1, tcInstDecls2 ) where
 
 import HsSyn
@@ -217,6 +210,7 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
     isAssocFamily (Just _             ) = panic "isAssocFamily: no tycon?!?"
     isAssocFamily Nothing               = False
 
+assocInClassErr :: Name -> SDoc
 assocInClassErr name =
   ptext (sLit "Associated type") <+> quotes (ppr name) <+>
   ptext (sLit "must be inside a class instance")
@@ -241,7 +235,7 @@ tcLocalInstDecl1 :: LInstDecl Name
         -- Type-check all the stuff before the "where"
         --
         -- We check for respectable instance type, and context
-tcLocalInstDecl1 decl@(L loc (InstDecl poly_ty binds uprags ats))
+tcLocalInstDecl1 (L loc (InstDecl poly_ty binds uprags ats))
   = -- Prime error recovery, set source location
     recoverM (return ([], []))          $
     setSrcSpan loc                      $
@@ -300,7 +294,7 @@ tcLocalInstDecl1 decl@(L loc (InstDecl poly_ty binds uprags ats))
            ; mapM_ (checkIndexes clas inst_tys) ats
            }
 
-    checkIndexes _    _        (hsAT, Nothing)             =
+    checkIndexes _    _        (_, Nothing)             =
       return () -- skip, we already had an error here
     checkIndexes clas inst_tys (hsAT, Just (ATyCon tycon)) =
 -- !!!TODO: check that this does the Right Thing for indexed synonyms, too!
@@ -494,7 +488,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = NewTypeDerived })
                 -- inst_head_ty is a PredType
 
         ; let (cls, cls_inst_tys) = tcSplitDFunHead inst_head_ty
-              (class_tyvars, sc_theta, _, op_items) = classBigSig cls
+              (class_tyvars, sc_theta, _, _) = classBigSig cls
               cls_tycon = classTyCon cls
               sc_theta' = substTheta (zipOpenTvSubst class_tyvars cls_inst_tys) sc_theta
 
@@ -699,6 +693,10 @@ mkMetaCoVars = mapM eqPredToCoVar
     eqPredToCoVar (EqPred ty1 ty2) = newMetaCoVar ty1 ty2
     eqPredToCoVar _                = panic "TcInstDcls.mkMetaCoVars"
 
+tcMethods :: InstOrigin -> Class -> [TcTyVar] -> TcThetaType -> [TcType]
+          -> Inst -> [Inst] -> [(Id, DefMeth)] -> LHsBindsLR Name Name
+          -> [LSig Name]
+          -> TcM ([Id], Bag (LHsBind Id))
 tcMethods origin clas inst_tyvars' dfun_theta' inst_tys'
           this_dict extra_insts op_items monobinds uprags = do
     -- Check that all the method bindings come from this class
@@ -746,7 +744,7 @@ tcMethods origin clas inst_tyvars' dfun_theta' inst_tys'
     let
         prag_fn        = mkPragFun uprags
         all_insts      = extra_insts ++ catMaybes meth_insts
-        sig_fn n       = Just []        -- No scoped type variables, but every method has
+        sig_fn _       = Just []        -- No scoped type variables, but every method has
                                         -- a type signature, in effect, so that we check
                                         -- the method has the right type
         tc_method_bind = tcMethodBind origin inst_tyvars' dfun_theta' this_dict 
@@ -856,29 +854,36 @@ simplified: only zeze2 is extracted and its body is simplified.
 %************************************************************************
 
 \begin{code}
+instDeclCtxt1 :: LHsType Name -> SDoc
 instDeclCtxt1 hs_inst_ty
   = inst_decl_ctxt (case unLoc hs_inst_ty of
                         HsForAllTy _ _ _ (L _ (HsPredTy pred)) -> ppr pred
                         HsPredTy pred                    -> ppr pred
-                        other                            -> ppr hs_inst_ty)     -- Don't expect this
+                        _                                -> ppr hs_inst_ty)     -- Don't expect this
+instDeclCtxt2 :: Type -> SDoc
 instDeclCtxt2 dfun_ty
   = inst_decl_ctxt (ppr (mkClassPred cls tys))
   where
     (_,_,cls,tys) = tcSplitDFunTy dfun_ty
 
+inst_decl_ctxt :: SDoc -> SDoc
 inst_decl_ctxt doc = ptext (sLit "In the instance declaration for") <+> quotes doc
 
+superClassCtxt :: SDoc
 superClassCtxt = ptext (sLit "When checking the super-classes of an instance declaration")
 
+atInstCtxt :: Name -> SDoc
 atInstCtxt name = ptext (sLit "In the associated type instance for") <+>
                   quotes (ppr name)
 
+mustBeVarArgErr :: Type -> SDoc
 mustBeVarArgErr ty =
   sep [ ptext (sLit "Arguments that do not correspond to a class parameter") <+>
         ptext (sLit "must be variables")
       , ptext (sLit "Instead of a variable, found") <+> ppr ty
       ]
 
+wrongATArgErr :: Type -> Type -> SDoc
 wrongATArgErr ty instTy =
   sep [ ptext (sLit "Type indexes must match class instance head")
       , ptext (sLit "Found") <+> ppr ty <+> ptext (sLit "but expected") <+>
