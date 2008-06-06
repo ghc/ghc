@@ -6,13 +6,6 @@
 TcRules: Typechecking transformation rules
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module TcRules ( tcRules ) where
 
 import HsSyn
@@ -93,7 +86,7 @@ tcRule (HsRule name act vars lhs fv_lhs rhs fv_rhs)
 		    (mkHsDictLet lhs_binds lhs') fv_lhs
 		    (mkHsDictLet rhs_binds rhs') fv_rhs)
 
-
+tcRuleBndrs :: [RuleBndr Name] -> ([Id] -> TcM a) -> TcM a
 tcRuleBndrs [] thing_inside = thing_inside []
 tcRuleBndrs (RuleBndr var : vars) thing_inside
   = do 	{ ty <- newFlexiTyVarTy openTypeKind
@@ -113,6 +106,7 @@ tcRuleBndrs (RuleBndrSig var rn_ty : vars) thing_inside
 	  tcExtendIdEnv [id] $
 	  tcRuleBndrs vars (\ids -> thing_inside (id:ids)) }
 
+ruleCtxt :: FastString -> SDoc
 ruleCtxt name = ptext (sLit "When checking the transformation rule") <+> 
 		doubleQuotes (ftext name)
 \end{code}
