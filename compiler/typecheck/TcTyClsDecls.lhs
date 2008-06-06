@@ -259,11 +259,14 @@ tcFamInstDecl (L loc decl)
        ; checkTc type_families $ badFamInstDecl (tcdLName decl)
        ; checkTc (not is_boot) $ badBootFamInstDeclErr
 
-	 -- perform kind and type checking
-       ; tcFamInstDecl1 decl
+	 -- Perform kind and type checking
+       ; tc <- tcFamInstDecl1 decl
+       ; checkValidTyCon tc	-- Remember to check validity;
+				-- no recursion to worry about here
+       ; return (Just (ATyCon tc))
        }
 
-tcFamInstDecl1 :: TyClDecl Name -> TcM (Maybe TyThing)   -- Nothing if error
+tcFamInstDecl1 :: TyClDecl Name -> TcM TyCon
 
   -- "type instance"
 tcFamInstDecl1 (decl@TySynonym {tcdLName = L loc tc_name})
@@ -292,10 +295,8 @@ tcFamInstDecl1 (decl@TySynonym {tcdLName = L loc tc_name})
 
          -- (4) construct representation tycon
        ; rep_tc_name <- newFamInstTyConName tc_name loc
-       ; tycon <- buildSynTyCon rep_tc_name t_tvs (SynonymTyCon t_rhs) 
-                                (Just (family, t_typats))
-
-       ; return $ Just (ATyCon tycon)
+       ; buildSynTyCon rep_tc_name t_tvs (SynonymTyCon t_rhs) 
+                       (Just (family, t_typats))
        }}
 
   -- "newtype instance" and "data instance"
@@ -338,7 +339,7 @@ tcFamInstDecl1 (decl@TyData {tcdND = new_or_data, tcdLName = L loc tc_name,
          -- (4) construct representation tycon
        ; rep_tc_name <- newFamInstTyConName tc_name loc
        ; let ex_ok = True	-- Existentials ok for type families!
-       ; tycon <- fixM (\ tycon -> do 
+       ; fixM (\ tycon -> do 
 	     { data_cons <- mapM (addLocM (tcConDecl unbox_strict ex_ok tycon t_tvs))
 				  k_cons
 	     ; tc_rhs <-
@@ -354,9 +355,6 @@ tcFamInstDecl1 (decl@TyData {tcdND = new_or_data, tcdLName = L loc tc_name,
                  -- dependency.  (2) They are always valid loop breakers as
                  -- they involve a coercion.
 	     })
-
-         -- construct result
-       ; return $ Just (ATyCon tycon)
        }}
        where
 	 h98_syntax = case cons of 	-- All constructors have same shape

@@ -465,9 +465,29 @@ baleOut :: Message -> TcM (Maybe a)
 baleOut err = do { addErrTc err;  return Nothing }
 \end{code}
 
-Auxiliary lookup wrapper which requires that looked up family instances are
-not type instances.  If called with a vanilla tycon, the old type application
-is simply returned.
+Note [Looking up family instances for deriving]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+tcLookupFamInstExact is an auxiliary lookup wrapper which requires
+that looked-up family instances exist.  If called with a vanilla
+tycon, the old type application is simply returned.
+
+If we have
+  data instance F () = ... deriving Eq
+  data instance F () = ... deriving Eq
+then tcLookupFamInstExact will be confused by the two matches;
+but that can't happen because tcInstDecls1 doesn't call tcDeriving
+if there are any overlaps.
+
+There are two other things that might go wrong with the lookup.
+First, we might see a standalone deriving clause
+	deriving Eq (F ())
+when there is no data instance F () in scope. 
+
+Note that it's OK to have
+  data instance F [a] = ...
+  deriving Eq (F [(a,b)])
+where the match is not exact; the same holds for ordinary data types
+with standalone deriving declrations.
 
 \begin{code}
 tcLookupFamInstExact :: TyCon -> [Type] -> TcM (TyCon, [Type])
@@ -477,18 +497,14 @@ tcLookupFamInstExact tycon tys
   | otherwise
   = do { maybeFamInst <- tcLookupFamInst tycon tys
        ; case maybeFamInst of
-           Nothing                     -> famInstNotFound tycon tys False
-           Just famInst@(_, rep_tys)
-             | not variable_only_subst -> famInstNotFound tycon tys True
-             | otherwise               -> return famInst
-             where
-               tvs		    = map (Type.getTyVar 
-                                             "TcDeriv.tcLookupFamInstExact") 
-					  rep_tys
-	       variable_only_subst  = all Type.isTyVarTy rep_tys &&
-				      sizeVarSet (mkVarSet tvs) == length tvs
-					-- renaming may have no repetitions
+           Nothing      -> famInstNotFound tycon tys
+           Just famInst -> return famInst
        }
+
+famInstNotFound :: TyCon -> [Type] -> TcM a
+famInstNotFound tycon tys 
+  = failWithTc (ptext (sLit "No family instance for")
+			<+> quotes (pprTypeApp tycon (ppr tycon) tys))
 \end{code}
 
 
@@ -1182,12 +1198,4 @@ badDerivedPred pred
   = vcat [ptext (sLit "Can't derive instances where the instance context mentions"),
 	  ptext (sLit "type variables that are not data type parameters"),
 	  nest 2 (ptext (sLit "Offending constraint:") <+> ppr pred)]
-
-famInstNotFound :: TyCon -> [Type] -> Bool -> TcM a
-famInstNotFound tycon tys notExact
-  = failWithTc (msg <+> quotes (pprTypeApp tycon (ppr tycon) tys))
-  where
-    msg = ptext $ if notExact
-		  then sLit "No family instance exactly matching"
-		  else sLit "More than one family instance for"
 \end{code}

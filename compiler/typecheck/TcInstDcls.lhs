@@ -187,6 +187,9 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
                 -- decl, so it needs to know about all the instances possible
                 -- NB: class instance declarations can contain derivings as
                 --     part of associated data type declarations
+	 failIfErrsM		-- If the addInsts stuff gave any errors, don't
+				-- try the deriving stuff, becuase that may give
+				-- more errors still
        ; (deriv_inst_info, deriv_binds) <- tcDeriving tycl_decls inst_decls
                                                       deriv_decls
        ; addInsts deriv_inst_info   $ do {
