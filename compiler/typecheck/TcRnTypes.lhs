@@ -3,13 +3,6 @@
 % (c) The GRASP Project, Glasgow University, 1992-2002
 %
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module TcRnTypes(
 	TcRnIf, TcRn, TcM, RnM,	IfM, IfL, IfG, -- The monad is opaque outside this module
 	TcRef,
@@ -49,7 +42,6 @@ module TcRnTypes(
 
 import HsSyn hiding (LIE)
 import HscTypes
-import Packages
 import Type
 import Coercion
 import TcType
@@ -73,7 +65,6 @@ import Util
 import Bag
 import Outputable
 import ListSetOps
-import FiniteMap
 import FastString
 
 import Data.Maybe
@@ -743,22 +734,23 @@ instance Ord Inst where
 
 instance Eq Inst where
   (==) i1 i2 = case i1 `cmpInst` i2 of
-	         EQ    -> True
-		 other -> False
+               EQ -> True
+               _  -> False
 
+cmpInst :: Inst -> Inst -> Ordering
 cmpInst d1@(Dict {}) 	d2@(Dict {})	= tci_pred d1 `tcCmpPred` tci_pred d2
-cmpInst (Dict {})	other 		= LT
+cmpInst (Dict {})       _               = LT
 
 cmpInst (Method {}) 	(Dict {})	= GT
 cmpInst m1@(Method {}) 	m2@(Method {})	= (tci_oid m1 `compare` tci_oid m2) `thenCmp`
 					  (tci_tys m1 `tcCmpTypes` tci_tys m2)
-cmpInst (Method {})  	other		= LT
+cmpInst (Method {})     _               = LT
 
 cmpInst (LitInst {})	(Dict {}) 	= GT
 cmpInst (LitInst {})	(Method {})	= GT
 cmpInst l1@(LitInst {})	l2@(LitInst {})	= (tci_lit l1 `compare` tci_lit l2) `thenCmp`
 					  (tci_ty l1 `tcCmpType` tci_ty l2)
-cmpInst (LitInst {})  	other		= LT
+cmpInst (LitInst {})    _               = LT
 
 	-- Implication constraints are compared by *name*
 	-- not by type; that is, we make no attempt to do CSE on them
@@ -766,7 +758,7 @@ cmpInst (ImplicInst {})    (Dict {})	      = GT
 cmpInst (ImplicInst {})    (Method {})	      = GT
 cmpInst (ImplicInst {})    (LitInst {})	      = GT
 cmpInst i1@(ImplicInst {}) i2@(ImplicInst {}) = tci_name i1 `compare` tci_name i2
-cmpInst (ImplicInst {})    other	      = LT
+cmpInst (ImplicInst {})    _                  = LT
 
 	-- same for Equality constraints
 cmpInst (EqInst {})    (Dict {})	      = GT
@@ -787,15 +779,31 @@ cmpInst i1@(EqInst {}) i2@(EqInst {})         = tci_name i1 `compare` tci_name i
 -- FIXME: Rename this. It clashes with (Located (IE ...))
 type LIE = Bag Inst
 
-isEmptyLIE	  = isEmptyBag
-emptyLIE          = emptyBag
-unitLIE inst 	  = unitBag inst
-mkLIE insts	  = listToBag insts
-plusLIE lie1 lie2 = lie1 `unionBags` lie2
-plusLIEs lies	  = unionManyBags lies
-lieToList	  = bagToList
-listToLIE	  = listToBag
+isEmptyLIE :: LIE -> Bool
+isEmptyLIE = isEmptyBag
 
+emptyLIE :: LIE
+emptyLIE = emptyBag
+
+unitLIE :: Inst -> LIE
+unitLIE inst = unitBag inst
+
+mkLIE :: [Inst] -> LIE
+mkLIE insts = listToBag insts
+
+plusLIE :: LIE -> LIE -> LIE
+plusLIE lie1 lie2 = lie1 `unionBags` lie2
+
+plusLIEs :: [LIE] -> LIE
+plusLIEs lies = unionManyBags lies
+
+lieToList :: LIE -> [Inst]
+lieToList = bagToList
+
+listToLIE :: [Inst] -> LIE
+listToLIE = listToBag
+
+consLIE :: Inst -> LIE -> LIE
 consLIE inst lie  = lie `snocBag` inst
 -- Putting the new Inst at the *end* of the bag is a half-hearted attempt
 -- to ensure that we tend to report the *leftmost* type-constraint error
@@ -904,4 +912,5 @@ instance Outputable InstOrigin where
     ppr (ImplicOrigin doc)    = doc
     ppr (SigOrigin info)      = pprSkolInfo info
     ppr EqOrigin	      = ptext (sLit "a type equality")
+    ppr InstSigOrigin         = panic "ppr InstSigOrigin"
 \end{code}
