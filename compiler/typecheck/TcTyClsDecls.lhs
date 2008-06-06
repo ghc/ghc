@@ -6,13 +6,6 @@
 TcTyClsDecls: Typecheck type and class declarations
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module TcTyClsDecls (
 	tcTyAndClassDecls, tcFamInstDecl
     ) where
@@ -155,7 +148,7 @@ tcTyAndClassDecls boot_details allDecls
 	; checkCycleErrs decls
 	; mod <- getModule
 	; traceTc (text "tcTyAndCl" <+> ppr mod)
-	; (syn_tycons, alg_tyclss) <- fixM (\ ~(rec_syn_tycons, rec_alg_tyclss) ->
+	; (syn_tycons, alg_tyclss) <- fixM (\ ~(_rec_syn_tycons, rec_alg_tyclss) ->
 	  do	{ let {	-- Seperate ordinary synonyms from all other type and
 			-- class declarations and add all associated type
 			-- declarations from type classes.  The latter is
@@ -359,7 +352,9 @@ tcFamInstDecl1 (decl@TyData {tcdND = new_or_data, tcdLName = L loc tc_name,
        where
 	 h98_syntax = case cons of 	-- All constructors have same shape
 			L _ (ConDecl { con_res = ResTyGADT _ }) : _ -> False
-			other -> True
+			_ -> True
+
+tcFamInstDecl1 d = pprPanic "tcFamInstDecl1" (ppr d)
 
 -- Kind checking of indexed types
 -- -
@@ -434,6 +429,8 @@ include the kinds of associated families into the construction of the
 initial kind environment.  (This is handled by `allDecls').
 
 \begin{code}
+kcTyClDecls :: [LTyClDecl Name] -> [Located (TyClDecl Name)]
+            -> TcM ([LTyClDecl Name], [Located (TyClDecl Name)])
 kcTyClDecls syn_decls alg_decls
   = do	{ 	-- First extend the kind env with each data type, class, and
 		-- indexed type, mapping them to a type variable
@@ -484,7 +481,7 @@ getInitialKind decl
     mk_res_kind (TyData   { tcdKindSig = Just kind }) = return kind
 	-- On GADT-style declarations we allow a kind signature
 	--	data T :: *->* where { ... }
-    mk_res_kind other = return liftedTypeKind
+    mk_res_kind _ = return liftedTypeKind
 
 
 ----------------
@@ -502,7 +499,7 @@ kcSynDecls (group : groups)
 kcSynDecl :: SCC (LTyClDecl Name) 
 	   -> TcM (LTyClDecl Name, 	-- Kind-annotated decls
 		   (Name,TcKind))	-- Kind bindings
-kcSynDecl (AcyclicSCC ldecl@(L loc decl))
+kcSynDecl (AcyclicSCC (L loc decl))
   = tcAddDeclCtxt decl	$
     kcHsTyVars (tcdTyVars decl) (\ k_tvs ->
     do { traceTc (text "kcd1" <+> ppr (unLoc (tcdLName decl)) <+> brackets (ppr (tcdTyVars decl)) 
@@ -517,7 +514,9 @@ kcSynDecl (CyclicSCC decls)
   = do { recSynErr decls; failM }	-- Fail here to avoid error cascade
 					-- of out-of-scope tycons
 
+kindedTyVarKind :: LHsTyVarBndr Name -> Kind
 kindedTyVarKind (L _ (KindedTyVar _ k)) = k
+kindedTyVarKind x = pprPanic "kindedTyVarKind" (ppr x)
 
 ------------------------------------------------------------------------
 kcTyClDecl :: TyClDecl Name -> TcM (TyClDecl Name)
@@ -533,8 +532,7 @@ kcTyClDecl decl@(TyFamily {})
 
 kcTyClDecl decl@(ClassDecl {tcdCtxt = ctxt, tcdSigs = sigs, tcdATs = ats})
   = kcTyClDeclBody decl	$ \ tvs' ->
-    do	{ is_boot <- tcIsHsBoot
-	; ctxt' <- kcHsContext ctxt	
+    do	{ ctxt' <- kcHsContext ctxt	
 	; ats'  <- mapM (wrapLocM (kcFamilyDecl tvs')) ats
 	; sigs' <- mapM (wrapLocM kc_sig) sigs
 	; return (decl {tcdTyVars = tvs', tcdCtxt = ctxt', tcdSigs = sigs',
@@ -547,6 +545,8 @@ kcTyClDecl decl@(ClassDecl {tcdCtxt = ctxt, tcdSigs = sigs, tcdATs = ats})
 kcTyClDecl decl@(ForeignType {})
   = return decl
 
+kcTyClDecl (TySynonym {}) = panic "kcTyClDecl TySynonym"
+
 kcTyClDeclBody :: TyClDecl Name
 	       -> ([LHsTyVarBndr Name] -> TcM a)
 	       -> TcM a
@@ -558,7 +558,9 @@ kcTyClDeclBody :: TyClDecl Name
 kcTyClDeclBody decl thing_inside
   = tcAddDeclCtxt decl		$
     do 	{ tc_ty_thing <- tcLookupLocated (tcdLName decl)
-	; let tc_kind	 = case tc_ty_thing of { AThing k -> k }
+	; let tc_kind	 = case tc_ty_thing of
+                           AThing k -> k
+                           _ -> pprPanic "kcTyClDeclBody" (ppr tc_ty_thing)
 	      (kinds, _) = splitKindFunTys tc_kind
 	      hs_tvs 	 = tcdTyVars decl
 	      kinded_tvs = ASSERT( length kinds >= length hs_tvs )
@@ -607,6 +609,7 @@ kcDataDecl decl@(TyData {tcdND = new_or_data, tcdCtxt = ctxt, tcdCons = cons})
 	-- Can't allow an unlifted type for newtypes, because we're effectively
 	-- going to remove the constructor while coercing it to a lifted type.
 	-- And newtypes can't be bang'd
+kcDataDecl d _ = pprPanic "kcDataDecl" (ppr d)
 
 -- Kind check a family declaration or type family default declaration.
 --
@@ -623,9 +626,11 @@ kcFamilyDecl classTvs decl@(TyFamily {tcdKind = kind})
     unifyClassParmKinds (L _ (KindedTyVar n k))
       | Just classParmKind <- lookup n classTyKinds = unifyKind k classParmKind
       | otherwise                                   = return ()
+    unifyClassParmKinds x = pprPanic "kcFamilyDecl/unifyClassParmKinds" (ppr x)
     classTyKinds = [(n, k) | L _ (KindedTyVar n k) <- classTvs]
-kcFamilyDecl _ decl@(TySynonym {})              -- type family defaults
+kcFamilyDecl _ (TySynonym {})              -- type family defaults
   = panic "TcTyClsDecls.kcFamilyDecl: not implemented yet"
+kcFamilyDecl _ d = pprPanic "kcFamilyDecl" (ppr d)
 \end{code}
 
 
@@ -644,6 +649,7 @@ tcSynDecls (decl : decls)
        ; return (syn_tc : syn_tcs) }
 
   -- "type"
+tcSynDecl :: TyClDecl Name -> TcM TyThing
 tcSynDecl
   (TySynonym {tcdLName = L _ tc_name, tcdTyVars = tvs, tcdSynRhs = rhs_ty})
   = tcTyVarBndrs tvs		$ \ tvs' -> do 
@@ -652,6 +658,7 @@ tcSynDecl
     ; tycon <- buildSynTyCon tc_name tvs' (SynonymTyCon rhs_ty') Nothing
     ; return (ATyCon tycon) 
     }
+tcSynDecl d = pprPanic "tcSynDecl" (ppr d)
 
 --------------------
 tcTyClDecl :: (Name -> RecFlag) -> TyClDecl Name -> TcM [TyThing]
@@ -660,6 +667,7 @@ tcTyClDecl calc_isrec decl
   = tcAddDeclCtxt decl (tcTyClDecl1 calc_isrec decl)
 
   -- "type family" declarations
+tcTyClDecl1 :: (Name -> RecFlag) -> TyClDecl Name -> TcM [TyThing]
 tcTyClDecl1 _calc_isrec 
   (TyFamily {tcdFlavour = TypeFamily, 
 	     tcdLName = L _ tc_name, tcdTyVars = tvs, tcdKind = Just kind})
@@ -754,7 +762,7 @@ tcTyClDecl1 calc_isrec
     is_rec   = calc_isrec tc_name
     h98_syntax = case cons of 	-- All constructors have same shape
 			L _ (ConDecl { con_res = ResTyGADT _ }) : _ -> False
-			other -> True
+			_ -> True
 
 tcTyClDecl1 calc_isrec 
   (ClassDecl {tcdLName = L _ class_name, tcdTyVars = tvs, 
@@ -801,9 +809,11 @@ tcTyClDecl1 calc_isrec
       ATyCon (setTyConArgPoss tycon poss)
     setTyThingPoss _		  _ = panic "TcTyClsDecls.setTyThingPoss"
 
-tcTyClDecl1 calc_isrec 
+tcTyClDecl1 _
   (ForeignType {tcdLName = L _ tc_name, tcdExtName = tc_ext_name})
   = return [ATyCon (mkForeignTyCon tc_name tc_ext_name liftedTypeKind 0)]
+
+tcTyClDecl1 _ d = pprPanic "tcTyClDecl1" (ppr d)
 
 -----------------------------------
 tcConDecl :: Bool 		-- True <=> -funbox-strict_fields
@@ -878,7 +888,7 @@ tcResultType _ tc_tvs dc_tvs (ResTyGADT res_ty)
   where
   	-- choose_univs uses the res_ty itself if it's a type variable
 	-- and hasn't already been used; otherwise it uses one of the tc_tvs
-    choose_univs used tc_tvs []
+    choose_univs _ tc_tvs []
 	= ASSERT( null tc_tvs ) []
     choose_univs used (tc_tv:tc_tvs) (res_ty:res_tys) 
 	| Just tv <- tcGetTyVar_maybe res_ty, not (tv `elem` used)
@@ -891,6 +901,7 @@ tcResultType _ tc_tvs dc_tvs (ResTyGADT res_ty)
 	-- interface files and general confusion.  So rename
 	-- the tc_tvs, since they are not used yet (no 
 	-- consequential renaming needed)
+    choose_univs _ _ _ = panic "tcResultType/choose_univs"
     init_occ_env     = initTidyOccEnv (map getOccName dc_tvs)
     (_, tidy_tc_tvs) = mapAccumL tidy_one init_occ_env tc_tvs
     tidy_one env tv  = (env', setTyVarName tv (tidyNameOcc name occ'))
@@ -919,7 +930,7 @@ chooseBoxingStrategy unbox_strict_fields arg_ty bang
 	HsStrict | unbox_strict_fields 
                    && can_unbox arg_ty 		    -> MarkedUnboxed
 	HsUnbox  | can_unbox arg_ty		    -> MarkedUnboxed
-	other					    -> MarkedStrict
+	_                                           -> MarkedStrict
   where
     -- we can unbox if the type is a chain of newtypes with a product tycon
     -- at the end
@@ -972,6 +983,7 @@ checkValidTyCl decl
 	; case thing of
 	    ATyCon tc -> checkValidTyCon tc
 	    AClass cl -> checkValidClass cl 
+            _ -> panic "checkValidTyCl"
 	; traceTc (text "Done validity of" <+> ppr thing)	
 	}
 
@@ -1023,7 +1035,7 @@ checkValidTyCon tc
     -- result type against other candidates' types BOTH WAYS ROUND.
     -- If they magically agrees, take the substitution and
     -- apply them to the latter ones, and see if they match perfectly.
-    check_fields fields@((label, con1) : other_fields)
+    check_fields ((label, con1) : other_fields)
 	-- These fields all have the same name, but are from
 	-- different constructors in the data type
 	= recoverM (return ()) $ mapM_ checkOne other_fields
@@ -1042,7 +1054,10 @@ checkValidTyCon tc
 		(tvs2, _, _, res2) = dataConSig con2
 	   	ts2 = mkVarSet tvs2
                 fty2 = dataConFieldType con2 label
+    check_fields [] = panic "checkValidTyCon/check_fields []"
 
+checkFieldCompat :: Name -> DataCon -> DataCon -> TyVarSet
+                 -> Type -> Type -> Type -> Type -> TcM ()
 checkFieldCompat fld con1 con2 tvs1 res1 res2 fty1 fty2
   = do	{ checkTc (isJust mb_subst1) (resultTypeMisMatch fld con1 con2)
 	; checkTc (isJust mb_subst2) (fieldTypeMisMatch fld con1 con2) }
@@ -1150,44 +1165,56 @@ checkValidClass cls
 
 
 ---------------------------------------------------------------------
+resultTypeMisMatch :: Name -> DataCon -> DataCon -> SDoc
 resultTypeMisMatch field_name con1 con2
   = vcat [sep [ptext (sLit "Constructors") <+> ppr con1 <+> ptext (sLit "and") <+> ppr con2, 
 		ptext (sLit "have a common field") <+> quotes (ppr field_name) <> comma],
 	  nest 2 $ ptext (sLit "but have different result types")]
+
+fieldTypeMisMatch :: Name -> DataCon -> DataCon -> SDoc
 fieldTypeMisMatch field_name con1 con2
   = sep [ptext (sLit "Constructors") <+> ppr con1 <+> ptext (sLit "and") <+> ppr con2, 
 	 ptext (sLit "give different types for field"), quotes (ppr field_name)]
 
+dataConCtxt :: Outputable a => a -> SDoc
 dataConCtxt con = ptext (sLit "In the definition of data constructor") <+> quotes (ppr con)
 
+classOpCtxt :: Var -> Type -> SDoc
 classOpCtxt sel_id tau = sep [ptext (sLit "When checking the class method:"),
 			      nest 2 (ppr sel_id <+> dcolon <+> ppr tau)]
 
+nullaryClassErr :: Class -> SDoc
 nullaryClassErr cls
   = ptext (sLit "No parameters for class")  <+> quotes (ppr cls)
 
+classArityErr :: Class -> SDoc
 classArityErr cls
   = vcat [ptext (sLit "Too many parameters for class") <+> quotes (ppr cls),
 	  parens (ptext (sLit "Use -XMultiParamTypeClasses to allow multi-parameter classes"))]
 
+classFunDepsErr :: Class -> SDoc
 classFunDepsErr cls
   = vcat [ptext (sLit "Fundeps in class") <+> quotes (ppr cls),
 	  parens (ptext (sLit "Use -XFunctionalDependencies to allow fundeps"))]
 
+noClassTyVarErr :: Class -> Var -> SDoc
 noClassTyVarErr clas op
   = sep [ptext (sLit "The class method") <+> quotes (ppr op),
 	 ptext (sLit "mentions none of the type variables of the class") <+> 
 		ppr clas <+> hsep (map ppr (classTyVars clas))]
 
+genericMultiParamErr :: Class -> SDoc
 genericMultiParamErr clas
   = ptext (sLit "The multi-parameter class") <+> quotes (ppr clas) <+> 
     ptext (sLit "cannot have generic methods")
 
+badGenericMethodType :: Name -> Kind -> SDoc
 badGenericMethodType op op_ty
   = hang (ptext (sLit "Generic method type is too complex"))
        4 (vcat [ppr op <+> dcolon <+> ppr op_ty,
 		ptext (sLit "You can only use type variables, arrows, lists, and tuples")])
 
+recSynErr :: [LTyClDecl Name] -> TcRn ()
 recSynErr syn_decls
   = setSrcSpan (getLoc (head sorted_decls)) $
     addErr (sep [ptext (sLit "Cycle in type synonym declarations:"),
@@ -1196,6 +1223,7 @@ recSynErr syn_decls
     sorted_decls = sortLocated syn_decls
     ppr_decl (L loc decl) = ppr loc <> colon <+> ppr decl
 
+recClsErr :: [Located (TyClDecl Name)] -> TcRn ()
 recClsErr cls_decls
   = setSrcSpan (getLoc (head sorted_decls)) $
     addErr (sep [ptext (sLit "Cycle in class declarations (via superclasses):"),
@@ -1209,73 +1237,90 @@ sortLocated things = sortLe le things
   where
     le (L l1 _) (L l2 _) = l1 <= l2
 
+badDataConTyCon :: DataCon -> SDoc
 badDataConTyCon data_con
   = hang (ptext (sLit "Data constructor") <+> quotes (ppr data_con) <+>
 		ptext (sLit "returns type") <+> quotes (ppr (dataConTyCon data_con)))
        2 (ptext (sLit "instead of its parent type"))
 
+badGadtDecl :: Name -> SDoc
 badGadtDecl tc_name
   = vcat [ ptext (sLit "Illegal generalised algebraic data declaration for") <+> quotes (ppr tc_name)
 	 , nest 2 (parens $ ptext (sLit "Use -XGADTs to allow GADTs")) ]
 
+badExistential :: Located Name -> SDoc
 badExistential con_name
   = hang (ptext (sLit "Data constructor") <+> quotes (ppr con_name) <+>
 		ptext (sLit "has existential type variables, or a context"))
        2 (parens $ ptext (sLit "Use -XExistentialQuantification or -XGADTs to allow this"))
 
+badStupidTheta :: Name -> SDoc
 badStupidTheta tc_name
   = ptext (sLit "A data type declared in GADT style cannot have a context:") <+> quotes (ppr tc_name)
 
+newtypeConError :: Name -> Int -> SDoc
 newtypeConError tycon n
   = sep [ptext (sLit "A newtype must have exactly one constructor,"),
 	 nest 2 $ ptext (sLit "but") <+> quotes (ppr tycon) <+> ptext (sLit "has") <+> speakN n ]
 
+newtypeExError :: DataCon -> SDoc
 newtypeExError con
   = sep [ptext (sLit "A newtype constructor cannot have an existential context,"),
 	 nest 2 $ ptext (sLit "but") <+> quotes (ppr con) <+> ptext (sLit "does")]
 
+newtypeStrictError :: DataCon -> SDoc
 newtypeStrictError con
   = sep [ptext (sLit "A newtype constructor cannot have a strictness annotation,"),
 	 nest 2 $ ptext (sLit "but") <+> quotes (ppr con) <+> ptext (sLit "does")]
 
+newtypePredError :: DataCon -> SDoc
 newtypePredError con
   = sep [ptext (sLit "A newtype constructor must have a return type of form T a1 ... an"),
 	 nest 2 $ ptext (sLit "but") <+> quotes (ppr con) <+> ptext (sLit "does not")]
 
+newtypeFieldErr :: DataCon -> Int -> SDoc
 newtypeFieldErr con_name n_flds
   = sep [ptext (sLit "The constructor of a newtype must have exactly one field"), 
 	 nest 2 $ ptext (sLit "but") <+> quotes (ppr con_name) <+> ptext (sLit "has") <+> speakN n_flds]
 
+badSigTyDecl :: Name -> SDoc
 badSigTyDecl tc_name
   = vcat [ ptext (sLit "Illegal kind signature") <+>
 	   quotes (ppr tc_name)
 	 , nest 2 (parens $ ptext (sLit "Use -XKindSignatures to allow kind signatures")) ]
 
+badFamInstDecl :: Outputable a => a -> SDoc
 badFamInstDecl tc_name
   = vcat [ ptext (sLit "Illegal family instance for") <+>
 	   quotes (ppr tc_name)
 	 , nest 2 (parens $ ptext (sLit "Use -XTypeFamilies to allow indexed type families")) ]
 
+badGadtIdxTyDecl :: Name -> SDoc
 badGadtIdxTyDecl tc_name
   = vcat [ ptext (sLit "Illegal generalised algebraic data declaration for") <+>
 	   quotes (ppr tc_name)
 	 , nest 2 (parens $ ptext (sLit "Family instances can not yet use GADT declarations")) ]
 
+tooManyParmsErr :: Located Name -> SDoc
 tooManyParmsErr tc_name
   = ptext (sLit "Family instance has too many parameters:") <+> 
     quotes (ppr tc_name)
 
+tooFewParmsErr :: Arity -> SDoc
 tooFewParmsErr arity
   = ptext (sLit "Family instance has too few parameters; expected") <+> 
     ppr arity
 
+wrongNumberOfParmsErr :: Arity -> SDoc
 wrongNumberOfParmsErr exp_arity
   = ptext (sLit "Number of parameters must match family declaration; expected")
     <+> ppr exp_arity
 
+badBootFamInstDeclErr :: SDoc
 badBootFamInstDeclErr = 
   ptext (sLit "Illegal family instance in hs-boot file")
 
+wrongKindOfFamily :: TyCon -> SDoc
 wrongKindOfFamily family =
   ptext (sLit "Wrong category of family instance; declaration was for a") <+>
   kindOfFamily
@@ -1284,6 +1329,7 @@ wrongKindOfFamily family =
 		 | isAlgTyCon family = ptext (sLit "data type")
 		 | otherwise = pprPanic "wrongKindOfFamily" (ppr family)
 
+emptyConDeclsErr :: Name -> SDoc
 emptyConDeclsErr tycon
   = sep [quotes (ppr tycon) <+> ptext (sLit "has no constructors"),
 	 nest 2 $ ptext (sLit "(-XEmptyDataDecls permits this)")]
