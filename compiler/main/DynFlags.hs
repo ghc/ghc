@@ -1863,5 +1863,7 @@ compilerInfo = [("Project name",                cProjectName),
                 ("Tables next to code",         cGhcEnableTablesNextToCode),
                 ("Win32 DLLs",                  cEnableWin32DLLs),
                 ("RTS ways",                    cGhcRTSWays),
-                ("Leading underscore",          cLeadingUnderscore)]
+                ("Leading underscore",          cLeadingUnderscore),
+                ("Debug on",                    show debugIsOn)
+               ]
 
