@@ -65,3 +65,4 @@ test('tcrun040', normal, compile_and_run, [''])
 
 test('church', normal, compile_and_run, [''])
 test('testeq2', normal, compile_and_run, [''])
+test('T1624', normal, compile_and_run, [''])
