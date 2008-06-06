@@ -5,13 +5,6 @@
 \section[TcMonoType]{Typechecking user-specified @MonoTypes@}
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module TcHsType (
 	tcHsSigType, tcHsDeriv, 
 	tcHsInstHead, tcHsQuantifiedType,
@@ -176,10 +169,12 @@ tcHsQuantifiedType tv_names hs_ty
 tcHsDeriv :: LHsType Name -> TcM ([TyVar], Class, [Type])
 tcHsDeriv = addLocM (tc_hs_deriv [])
 
+tc_hs_deriv :: [LHsTyVarBndr Name] -> HsType Name
+            -> TcM ([TyVar], Class, [Type])
 tc_hs_deriv tv_names (HsPredTy (HsClassP cls_name hs_tys))
   = kcHsTyVars tv_names 		$ \ tv_names' ->
     do	{ cls_kind <- kcClass cls_name
-	; (tys, res_kind) <- kcApps cls_kind (ppr cls_name) hs_tys
+	; (tys, _res_kind) <- kcApps cls_kind (ppr cls_name) hs_tys
 	; tcTyVarBndrs tv_names'	$ \ tyvars ->
     do	{ arg_tys <- dsHsTypes tys
 	; cls <- tcLookupClass cls_name
@@ -214,8 +209,8 @@ tcHsKindedType hs_ty = dsHsType hs_ty
 
 tcHsBangType :: LHsType Name -> TcM Type
 -- Permit a bang, but discard it
-tcHsBangType (L span (HsBangTy b ty)) = tcHsKindedType ty
-tcHsBangType ty 		      = tcHsKindedType ty
+tcHsBangType (L _ (HsBangTy _ ty)) = tcHsKindedType ty
+tcHsBangType ty                    = tcHsKindedType ty
 
 tcHsKindedContext :: LHsContext Name -> TcM ThetaType
 -- Used when we are expecting a ClassContext (i.e. no implicit params)
@@ -260,7 +255,7 @@ kcCheckHsType (L span ty) exp_kind
 	; return (L span ty') }
   where
 	-- Wrap a context around only if we want to show that contexts.  
-    add_ctxt (HsPredTy p)		 thing = thing
+    add_ctxt (HsPredTy _) thing = thing
 	-- Omit invisble ones and ones user's won't grok (HsPred p).
     add_ctxt (HsForAllTy _ _ (L _ []) _) thing = thing
 	-- Omit wrapping if the theta-part is empty
@@ -294,6 +289,7 @@ kcHsType ty = wrapLocFstM kc_hs_type ty
 --
 -- The translated type has explicitly-kinded type-variable binders
 
+kc_hs_type :: HsType Name -> TcM (HsType Name, TcKind)
 kc_hs_type (HsParTy ty) = do
    (ty', kind) <- kcHsType ty
    return (HsParTy ty', kind)
@@ -330,12 +326,12 @@ kc_hs_type (HsFunTy ty1 ty2) = do
     ty2' <- kcTypeType ty2
     return (HsFunTy ty1' ty2', liftedTypeKind)
 
-kc_hs_type ty@(HsOpTy ty1 op ty2) = do
+kc_hs_type (HsOpTy ty1 op ty2) = do
     op_kind <- addLocM kcTyVar op
     ([ty1',ty2'], res_kind) <- kcApps op_kind (ppr op) [ty1,ty2]
     return (HsOpTy ty1' op ty2', res_kind)
 
-kc_hs_type ty@(HsAppTy ty1 ty2) = do
+kc_hs_type (HsAppTy ty1 ty2) = do
     (fun_ty', fun_kind) <- kcHsType fun_ty
     ((arg_ty':arg_tys'), res_kind) <- kcApps fun_kind (ppr fun_ty) arg_tys
     return (foldl mk_app (HsAppTy fun_ty' arg_ty') arg_tys', res_kind)
@@ -347,7 +343,7 @@ kc_hs_type ty@(HsAppTy ty1 ty2) = do
 						-- the application; they are
 						-- never used 
 
-kc_hs_type ty@(HsPredTy (HsEqualP _ _))
+kc_hs_type (HsPredTy (HsEqualP _ _))
   = wrongEqualityErr
 
 kc_hs_type (HsPredTy pred) = do
@@ -420,16 +416,16 @@ kcHsPred pred = do	-- Checks that the result is of kind liftedType
 kc_pred :: HsPred Name -> TcM (HsPred Name, TcKind)	
 	-- Does *not* check for a saturated
 	-- application (reason: used from TcDeriv)
-kc_pred pred@(HsIParam name ty)
+kc_pred (HsIParam name ty)
   = do { (ty', kind) <- kcHsType ty
        ; return (HsIParam name ty', kind)
        }
-kc_pred pred@(HsClassP cls tys)
+kc_pred (HsClassP cls tys)
   = do { kind <- kcClass cls
        ; (tys', res_kind) <- kcApps kind (ppr cls) tys
        ; return (HsClassP cls tys', res_kind)
        }
-kc_pred pred@(HsEqualP ty1 ty2)
+kc_pred (HsEqualP ty1 ty2)
   = do { (ty1', kind1) <- kcHsType ty1
 --       ; checkExpectedKind ty1 kind1 liftedTypeKind
        ; (ty2', kind2) <- kcHsType ty2
@@ -448,7 +444,7 @@ kcTyVar name = do	-- Could be a tyvar or a tycon
         ATyVar _ ty             -> return (typeKind ty)
         AThing kind             -> return kind
         AGlobal (ATyCon tc)     -> return (tyConKind tc)
-        other                   -> wrongThingErr "type" thing name
+        _                       -> wrongThingErr "type" thing name
 
 kcClass :: Name -> TcM TcKind
 kcClass cls = do	-- Must be a class
@@ -456,7 +452,7 @@ kcClass cls = do	-- Must be a class
     case thing of
         AThing kind             -> return kind
         AGlobal (AClass cls)    -> return (tyConKind (classTyCon cls))
-        other                   -> wrongThingErr "class" thing cls
+        _                       -> wrongThingErr "class" thing cls
 \end{code}
 
 
@@ -481,7 +477,8 @@ dsHsType :: LHsType Name -> TcM Type
 -- All HsTyVarBndrs in the intput type are kind-annotated
 dsHsType ty = ds_type (unLoc ty)
 
-ds_type ty@(HsTyVar name)
+ds_type :: HsType Name -> TcM Type
+ds_type ty@(HsTyVar _)
   = ds_app ty []
 
 ds_type (HsParTy ty)		-- Remove the parentheses markers
@@ -490,7 +487,7 @@ ds_type (HsParTy ty)		-- Remove the parentheses markers
 ds_type ty@(HsBangTy _ _)	-- No bangs should be here
   = failWithTc (ptext (sLit "Unexpected strictness annotation:") <+> ppr ty)
 
-ds_type (HsKindSig ty k)
+ds_type (HsKindSig ty _)
   = dsHsType ty	-- Kind checking done already
 
 ds_type (HsListTy ty) = do
@@ -532,7 +529,7 @@ ds_type (HsPredTy pred) = do
     pred' <- dsHsPred pred
     return (mkPredTy pred')
 
-ds_type full_ty@(HsForAllTy exp tv_names ctxt ty)
+ds_type (HsForAllTy _ tv_names ctxt ty)
   = tcTyVarBndrs tv_names               $ \ tyvars -> do
     theta <- mapM dsHsLPred (unLoc ctxt)
     tau <- dsHsType ty
@@ -543,6 +540,7 @@ ds_type (HsSpliceTy {}) = panic "ds_type: HsSpliceTy"
 ds_type (HsDocTy ty _)  -- Remove the doc comment
   = dsHsType ty
 
+dsHsTypes :: [LHsType Name] -> TcM [Type]
 dsHsTypes arg_tys = mapM dsHsType arg_tys
 \end{code}
 
@@ -558,16 +556,16 @@ ds_app ty tys = do
     arg_tys <- dsHsTypes tys
     case ty of
 	HsTyVar fun -> ds_var_app fun arg_tys
-	other	    -> do fun_ty <- ds_type ty
+	_           -> do fun_ty <- ds_type ty
                           return (mkAppTys fun_ty arg_tys)
 
 ds_var_app :: Name -> [Type] -> TcM Type
 ds_var_app name arg_tys = do
     thing <- tcLookup name
     case thing of
-	ATyVar _ ty 	    -> return (mkAppTys ty arg_tys)
+	ATyVar _ ty         -> return (mkAppTys ty arg_tys)
 	AGlobal (ATyCon tc) -> return (mkTyConApp tc arg_tys)
-	other		    -> wrongThingErr "type" thing name
+	_                   -> wrongThingErr "type" thing name
 \end{code}
 
 
@@ -578,12 +576,13 @@ Contexts
 dsHsLPred :: LHsPred Name -> TcM PredType
 dsHsLPred pred = dsHsPred (unLoc pred)
 
-dsHsPred pred@(HsClassP class_name tys)
+dsHsPred :: HsPred Name -> TcM PredType
+dsHsPred (HsClassP class_name tys)
   = do { arg_tys <- dsHsTypes tys
        ; clas <- tcLookupClass class_name
        ; return (ClassP clas arg_tys)
        }
-dsHsPred pred@(HsEqualP ty1 ty2)
+dsHsPred (HsEqualP ty1 ty2)
   = do { arg_ty1 <- dsHsType ty1
        ; arg_ty2 <- dsHsType ty2
        ; return (EqPred arg_ty1 arg_ty2)
@@ -606,22 +605,24 @@ tcLHsConResTy (L span res_ty)
 		    ; thing <- tcLookup tc_name
 		    ; case thing of
 		        AGlobal (ATyCon tc) -> return (tc, args')
-		        other -> failWithTc (badGadtDecl res_ty) }
-	   other -> failWithTc (badGadtDecl res_ty)
+		        _ -> failWithTc (badGadtDecl res_ty) }
+	   _ -> failWithTc (badGadtDecl res_ty)
   where
 	-- We can't call dsHsType on res_ty, and then do tcSplitTyConApp_maybe
 	-- because that causes a black hole, and for good reason.  Building
 	-- the type means expanding type synonyms, and we can't do that
 	-- inside the "knot".  So we have to work by steam.
-    get_args (HsAppTy (L _ fun) arg) 	  args = get_args fun (arg:args)
-    get_args (HsParTy (L _ ty)) 	  args = get_args ty  args
-    get_args (HsOpTy ty1 (L span tc) ty2) args = (HsTyVar tc, ty1:ty2:args)
-    get_args ty  	     		  args = (ty, args)
+    get_args (HsAppTy (L _ fun) arg)   args = get_args fun (arg:args)
+    get_args (HsParTy (L _ ty))        args = get_args ty  args
+    get_args (HsOpTy ty1 (L _ tc) ty2) args = (HsTyVar tc, ty1:ty2:args)
+    get_args ty                        args = (ty, args)
 
+badGadtDecl :: HsType Name -> SDoc
 badGadtDecl ty
   = hang (ptext (sLit "Malformed constructor result type:"))
        2 (ppr ty)
 
+typeCtxt :: HsType Name -> SDoc
 typeCtxt ty = ptext (sLit "In the type") <+> quotes (ppr ty)
 \end{code}
 
@@ -782,7 +783,7 @@ tcPatSig ctxt sig res_ty
 		-- So we just have an ASSERT here
 	; let in_pat_bind = case ctxt of
 				BindPatSigCtxt -> True
-				other	       -> False
+				_              -> False
 	; ASSERT( not in_pat_bind || null sig_tvs ) return ()
 
 	  	-- Check that pat_ty is rigid
@@ -807,7 +808,7 @@ tcPatSig ctxt sig res_ty
 	; return (res_ty, tv_binds)
 	} }
   where
-    check in_scope []		 = return ()
+    check _ [] = return ()
     check in_scope ((n,ty):rest) = do { check_one in_scope n ty
 				      ; check ((n,ty):in_scope) rest }
 
@@ -839,26 +840,29 @@ pprHsSigCtxt ctxt hs_ty = vcat [ ptext (sLit "In") <+> pprUserTypeCtxt ctxt <> c
     pp_sig (FunSigCtxt n)  = pp_n_colon n
     pp_sig (ConArgCtxt n)  = pp_n_colon n
     pp_sig (ForSigCtxt n)  = pp_n_colon n
-    pp_sig other	   = ppr (unLoc hs_ty)
+    pp_sig _               = ppr (unLoc hs_ty)
 
     pp_n_colon n = ppr n <+> dcolon <+> ppr (unLoc hs_ty)
 
-
+wobblyPatSig :: [Var] -> SDoc
 wobblyPatSig sig_tvs
   = hang (ptext (sLit "A pattern type signature cannot bind scoped type variables") 
 		<+> pprQuotedList sig_tvs)
        2 (ptext (sLit "unless the pattern has a rigid type context"))
 		
+scopedNonVar :: Name -> Type -> SDoc
 scopedNonVar n ty
   = vcat [sep [ptext (sLit "The scoped type variable") <+> quotes (ppr n),
 	       nest 2 (ptext (sLit "is bound to the type") <+> quotes (ppr ty))],
 	  nest 2 (ptext (sLit "You can only bind scoped type variables to type variables"))]
 
-dupInScope n n' ty
+dupInScope :: Name -> Name -> Type -> SDoc
+dupInScope n n' _
   = hang (ptext (sLit "The scoped type variables") <+> quotes (ppr n) <+> ptext (sLit "and") <+> quotes (ppr n'))
        2 (vcat [ptext (sLit "are bound to the same type (variable)"),
 		ptext (sLit "Distinct scoped type variables must be distinct")])
 
+wrongEqualityErr :: TcM (HsType Name, TcKind)
 wrongEqualityErr
   = failWithTc (text "Equality predicate used as a type")
 \end{code}
