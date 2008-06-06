@@ -9,13 +9,6 @@ This module contains monadic operations over types that contain
 mutable type variables
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module TcMType (
   TcTyVar, TcKind, TcType, TcTauType, TcThetaType, TcTyVarSet,
 
@@ -58,7 +51,7 @@ module TcMType (
   zonkType, zonkTcPredType, 
   zonkTcTyVar, zonkTcTyVars, zonkTcTyVarsAndFV, zonkSigTyVar,
   zonkQuantifiedTyVar, zonkQuantifiedTyVars,
-  zonkTcType, zonkTcTypes, zonkTcClassConstraints, zonkTcThetaType,
+  zonkTcType, zonkTcTypes, zonkTcThetaType,
   zonkTcKindToKind, zonkTcKind, zonkTopTyVar,
 
   readKindVar, writeKindVar
@@ -79,6 +72,7 @@ import Var
 import TcRnMonad          -- TcType, amongst others
 import FunDeps
 import Name
+import VarEnv
 import VarSet
 import ErrUtils
 import DynFlags
@@ -90,7 +84,7 @@ import SrcLoc
 import Outputable
 import FastString
 
-import Control.Monad	( when, unless )
+import Control.Monad
 import Data.List	( (\\) )
 \end{code}
 
@@ -160,6 +154,7 @@ updateMeta tv1 ref1 ty2
 	}
 
 ----------------
+checkKinds :: Bool -> TyVar -> Type -> TcM ()
 checkKinds swapped tv1 ty2
 -- We're about to unify a type variable tv1 with a non-tyvar-type ty2.
 -- ty2 has been zonked at this stage, which ensures that
@@ -234,7 +229,7 @@ checkTauTvUpdate orig_tv orig_ty
 		-- NB the mkAppTy; we might have instantiated a
 		-- type variable to a type constructor, so we need
 		-- to pull the TyConApp to the top.
-    go (ForAllTy tv ty) = notMonoType orig_ty		-- (b)
+    go (ForAllTy _ _) = notMonoType orig_ty		-- (b)
 
     go (TyVarTy tv)
 	| orig_tv == tv = return $ Left False           -- (a)
@@ -259,7 +254,7 @@ checkTauTvUpdate orig_tv orig_ty
 		  Flexi -> case box of
 				BoxTv -> do { ty <- fillBoxWithTau tv ref
                                             ; return $ Right ty }
-				other -> return $ Right (TyVarTy tv)
+				_     -> return $ Right (TyVarTy tv)
 	     }
 
 	-- go_syn is called for synonyms only
@@ -268,7 +263,7 @@ checkTauTvUpdate orig_tv orig_ty
 	| not (isTauTyCon tc)
 	= notMonoType orig_ty	-- (b) again
 	| otherwise
-	= do { (msgs, mb_tys') <- tryTc (mapM go tys)
+	= do { (_msgs, mb_tys') <- tryTc (mapM go tys)
 	     ; case mb_tys' of
 
                 -- we had a type error => forall in type parameters
@@ -344,6 +339,7 @@ Rather, we should bind t to () (= non_var_ty2).
 Error mesages in case of kind mismatch.
 
 \begin{code}
+unifyKindMisMatch :: TcKind -> TcKind -> TcM ()
 unifyKindMisMatch ty1 ty2 = do
     ty1' <- zonkTcKind ty1
     ty2' <- zonkTcKind ty2
@@ -354,6 +350,7 @@ unifyKindMisMatch ty1 ty2 = do
 			   quotes (ppr ty2')])
     failWithTc msg
 
+unifyKindCtxt :: Bool -> TyVar -> Type -> TidyEnv -> TcM (TidyEnv, SDoc)
 unifyKindCtxt swapped tv1 ty2 tidy_env	-- not swapped => tv1 expected, ty2 inferred
 	-- tv1 and ty2 are zonked already
   = return msg
@@ -520,8 +517,8 @@ writeMetaTyVar tyvar ty
     do	{ ASSERTM2( do { details <- readMetaTyVar tyvar; return (isFlexi details) }, ppr tyvar )
 	; writeMutVar (metaTvRef tyvar) (Indirect ty) }
   where
-    k1 = tyVarKind tyvar
-    k2 = typeKind ty
+    _k1 = tyVarKind tyvar
+    _k2 = typeKind ty
 \end{code}
 
 
@@ -712,11 +709,6 @@ zonkTcType ty = zonkType (\ tv -> return (TyVarTy tv)) ty
 
 zonkTcTypes :: [TcType] -> TcM [TcType]
 zonkTcTypes tys = mapM zonkTcType tys
-
-zonkTcClassConstraints cts = mapM zonk cts
-    where zonk (clas, tys) = do
-              new_tys <- zonkTcTypes tys
-              return (clas, new_tys)
 
 zonkTcThetaType :: TcThetaType -> TcM TcThetaType
 zonkTcThetaType theta = mapM zonkTcPredType theta
@@ -1024,12 +1016,12 @@ checkValidType ctxt ty = do
 	actual_kind = typeKind ty
 
 	kind_ok = case ctxt of
-			TySynCtxt _  -> True	-- Any kind will do
-			ResSigCtxt   -> isSubOpenTypeKind 	 actual_kind
-			ExprSigCtxt  -> isSubOpenTypeKind 	 actual_kind
+			TySynCtxt _  -> True -- Any kind will do
+			ResSigCtxt   -> isSubOpenTypeKind actual_kind
+			ExprSigCtxt  -> isSubOpenTypeKind actual_kind
 			GenPatCtxt   -> isLiftedTypeKind actual_kind
 			ForSigCtxt _ -> isLiftedTypeKind actual_kind
-			other	     -> isSubArgTypeKind    actual_kind
+			_            -> isSubArgTypeKind actual_kind
 	
 	ubx_tup = case ctxt of
 	              TySynCtxt _ | unboxed -> UT_Ok
@@ -1094,16 +1086,16 @@ check_type rank ubx_tup ty
 --	{-# SPECIALISE instance Ord Char #-}
 -- The Right Thing would be to fix the way that SPECIALISE instance pragmas
 -- are handled, but the quick thing is just to permit PredTys here.
-check_type rank ubx_tup (PredTy sty)
+check_type _ _ (PredTy sty)
   = do	{ dflags <- getDOpts
 	; check_pred_ty dflags TypeCtxt sty }
 
-check_type rank ubx_tup (TyVarTy _)       = return ()
-check_type rank ubx_tup ty@(FunTy arg_ty res_ty)
+check_type _ _ (TyVarTy _) = return ()
+check_type rank _ (FunTy arg_ty res_ty)
   = do	{ check_type (decRank rank) UT_NotOk arg_ty
 	; check_type rank 	    UT_Ok    res_ty }
 
-check_type rank ubx_tup (AppTy ty1 ty2)
+check_type rank _ (AppTy ty1 ty2)
   = do	{ check_arg_type rank ty1
 	; check_arg_type rank ty2 }
 
@@ -1144,13 +1136,17 @@ check_type rank ubx_tup ty@(TyConApp tc tys)
   = mapM_ (check_arg_type rank) tys
 
   where
-    ubx_tup_ok ub_tuples_allowed = case ubx_tup of { UT_Ok -> ub_tuples_allowed; other -> False }
+    ubx_tup_ok ub_tuples_allowed = case ubx_tup of
+                                   UT_Ok -> ub_tuples_allowed
+                                   _     -> False
 
     n_args    = length tys
     tc_arity  = tyConArity tc
 
     arity_msg   = arityErr "Type synonym" (tyConName tc) tc_arity n_args
     ubx_tup_msg = ubxArgTyErr ty
+
+check_type _ _ ty = pprPanic "check_type" (ppr ty)
 
 ----------------------------------------
 check_arg_type :: Rank -> Type -> TcM ()
@@ -1179,9 +1175,12 @@ check_arg_type rank ty
 	; checkTc (not (isUnLiftedType ty)) (unliftedArgErr ty) }
 
 ----------------------------------------
+forAllTyErr, unliftedArgErr, ubxArgTyErr :: Type -> SDoc
 forAllTyErr     ty = sep [ptext (sLit "Illegal polymorphic or qualified type:"), ppr ty]
 unliftedArgErr  ty = sep [ptext (sLit "Illegal unlifted type:"), ppr ty]
 ubxArgTyErr     ty = sep [ptext (sLit "Illegal unboxed tuple type as function argument:"), ppr ty]
+
+kindErr :: Kind -> SDoc
 kindErr kind       = sep [ptext (sLit "Expecting an ordinary type, but found a type of kind"), ppr kind]
 \end{code}
 
@@ -1239,6 +1238,7 @@ data SourceTyCtxt
   | InstThetaCtxt	-- Context of an instance decl
 			--	instance <S> => C [a] where ...
 		
+pprSourceTyCtxt :: SourceTyCtxt -> SDoc
 pprSourceTyCtxt (ClassSCCtxt c) = ptext (sLit "the super-classes of class") <+> quotes (ppr c)
 pprSourceTyCtxt SigmaCtxt       = ptext (sLit "the context of a polymorphic type")
 pprSourceTyCtxt (DataTyCtxt tc) = ptext (sLit "the context of the data type declaration for") <+> quotes (ppr tc)
@@ -1252,7 +1252,8 @@ checkValidTheta ctxt theta
   = addErrCtxt (checkThetaCtxt ctxt theta) (check_valid_theta ctxt theta)
 
 -------------------------
-check_valid_theta ctxt []
+check_valid_theta :: SourceTyCtxt -> [PredType] -> TcM ()
+check_valid_theta _ []
   = return ()
 check_valid_theta ctxt theta = do
     dflags <- getDOpts
@@ -1279,7 +1280,7 @@ check_pred_ty dflags ctxt pred@(ClassP cls tys)
     arity_err  = arityErr "Class" class_name arity n_tys
     how_to_allow = parens (ptext (sLit "Use -XFlexibleContexts to permit this"))
 
-check_pred_ty dflags ctxt pred@(EqPred ty1 ty2)
+check_pred_ty dflags _ pred@(EqPred ty1 ty2)
   = do {	-- Equational constraints are valid in all contexts if type
 		-- families are permitted
        ; checkTc (dopt Opt_TypeFamilies dflags) (eqPredTyErr pred)
@@ -1289,7 +1290,7 @@ check_pred_ty dflags ctxt pred@(EqPred ty1 ty2)
        ; check_mono_type ty2
        }
 
-check_pred_ty dflags SigmaCtxt (IParam _ ty) = check_mono_type ty
+check_pred_ty _ SigmaCtxt (IParam _ ty) = check_mono_type ty
 	-- Implicit parameters only allowed in type
 	-- signatures; not in instance decls, superclasses etc
 	-- The reason for not allowing implicit params in instances is a bit
@@ -1301,7 +1302,7 @@ check_pred_ty dflags SigmaCtxt (IParam _ ty) = check_mono_type ty
 	-- instance decl would show up two uses of ?x.
 
 -- Catch-all
-check_pred_ty dflags ctxt sty = failWithTc (badPredTyErr sty)
+check_pred_ty _ _ sty = failWithTc (badPredTyErr sty)
 
 -------------------------
 check_class_pred_tys :: DynFlags -> SourceTyCtxt -> [Type] -> Bool
@@ -1311,12 +1312,13 @@ check_class_pred_tys dflags ctxt tys
 	InstThetaCtxt -> flexible_contexts || undecidable_ok || all tcIsTyVarTy tys
 				-- Further checks on head and theta in
 				-- checkInstTermination
-	other	      -> flexible_contexts || all tyvar_head tys
+	_             -> flexible_contexts || all tyvar_head tys
   where
     flexible_contexts = dopt Opt_FlexibleContexts dflags
     undecidable_ok = dopt Opt_UndecidableInstances dflags
 
 -------------------------
+tyvar_head :: Type -> Bool
 tyvar_head ty			-- Haskell 98 allows predicates of form 
   | tcIsTyVarTy ty = True	-- 	C (a ty1 .. tyn)
   | otherwise			-- where a is a type variable
@@ -1371,6 +1373,7 @@ checkAmbiguity forall_tyvars theta tau_tyvars
     ambig_var ct_var  = (ct_var `elem` forall_tyvars) &&
 		        not (ct_var `elemVarSet` extended_tau_vars)
 
+ambigErr :: PredType -> SDoc
 ambigErr pred
   = sep [ptext (sLit "Ambiguous constraint") <+> quotes (pprPred pred),
 	 nest 4 (ptext (sLit "At least one of the forall'd type variables mentioned by the constraint") $$
@@ -1383,6 +1386,7 @@ in each constraint is in V.  So we disallow a type like
 even in a scope where b is in scope.
 
 \begin{code}
+checkFreeness :: [Var] -> [PredType] -> TcM ()
 checkFreeness forall_tyvars theta
   = do	{ flexible_contexts <- doptM Opt_FlexibleContexts
 	; unless flexible_contexts $ mapM_ complain (filter is_free theta) }
@@ -1392,6 +1396,7 @@ checkFreeness forall_tyvars theta
     bound_var ct_var = ct_var `elem` forall_tyvars
     complain pred    = addErrTc (freeErr pred)
 
+freeErr :: PredType -> SDoc
 freeErr pred
   = sep [ ptext (sLit "All of the type variables in the constraint") <+> 
           quotes (pprPred pred)
@@ -1403,18 +1408,22 @@ freeErr pred
 \end{code}
 
 \begin{code}
+checkThetaCtxt :: SourceTyCtxt -> ThetaType -> SDoc
 checkThetaCtxt ctxt theta
   = vcat [ptext (sLit "In the context:") <+> pprTheta theta,
 	  ptext (sLit "While checking") <+> pprSourceTyCtxt ctxt ]
 
+badPredTyErr, eqPredTyErr, predTyVarErr :: PredType -> SDoc
 badPredTyErr sty = ptext (sLit "Illegal constraint") <+> pprPred sty
 eqPredTyErr  sty = ptext (sLit "Illegal equational constraint") <+> pprPred sty
 		   $$
 		   parens (ptext (sLit "Use -XTypeFamilies to permit this"))
 predTyVarErr pred  = sep [ptext (sLit "Non type-variable argument"),
 			  nest 2 (ptext (sLit "in the constraint:") <+> pprPred pred)]
+dupPredWarn :: [[PredType]] -> SDoc
 dupPredWarn dups   = ptext (sLit "Duplicate constraint(s):") <+> pprWithCommas pprPred (map head dups)
 
+arityErr :: Outputable a => String -> a -> Int -> Int -> SDoc
 arityErr kind name n m
   = hsep [ text kind, quotes (ppr name), ptext (sLit "should have"),
 	   n_arguments <> comma, text "but has been given", int m]
@@ -1424,6 +1433,7 @@ arityErr kind name n m
 		    | True   = hsep [int n, ptext (sLit "arguments")]
 
 -----------------
+notMonoType :: TcType -> TcM a
 notMonoType ty
   = do	{ ty' <- zonkTcType ty
 	; env0 <- tcInitTidyEnv
@@ -1431,6 +1441,7 @@ notMonoType ty
 	      msg = ptext (sLit "Cannot match a monotype with") <+> quotes (ppr tidy_ty)
 	; failWithTcM (env1, msg) }
 
+notMonoArgs :: TcType -> TcM a
 notMonoArgs ty
   = do	{ ty' <- zonkTcType ty
 	; env0 <- tcInitTidyEnv
@@ -1473,6 +1484,7 @@ checkValidInstHead ty	-- Should be a source type
     return (clas, tys)
     }}
 
+check_inst_head :: DynFlags -> Class -> [Type] -> TcM ()
 check_inst_head dflags clas tys
 	-- If GlasgowExts then check at least one isn't a type variable
   = do checkTc (dopt Opt_TypeSynonymInstances dflags ||
@@ -1507,6 +1519,7 @@ check_inst_head dflags clas tys
                 text "Only one type can be given in an instance head." $$
                 text "Use -XMultiParamTypeClasses if you want to allow more.")
 
+instTypeErr :: SDoc -> SDoc -> SDoc
 instTypeErr pp_ty msg
   = sep [ptext (sLit "Illegal instance declaration for") <+> quotes pp_ty, 
 	 nest 4 msg]
@@ -1575,9 +1588,11 @@ checkInstTermination tys theta
       | otherwise
       = Nothing
 
+predUndecErr :: PredType -> SDoc -> SDoc
 predUndecErr pred msg = sep [msg,
 			nest 2 (ptext (sLit "in the constraint:") <+> pprPred pred)]
 
+nomoreMsg, smallerMsg, undecidableMsg :: SDoc
 nomoreMsg = ptext (sLit "Variable occurs more often in a constraint than in the instance head")
 smallerMsg = ptext (sLit "Constraint is no smaller than the instance head")
 undecidableMsg = ptext (sLit "Use -fallow-undecidable-instances to permit this")
@@ -1644,9 +1659,9 @@ Allow constraints which consist only of type variables, with no repeats.
 
 \begin{code}
 validDerivPred :: PredType -> Bool
-validDerivPred (ClassP cls tys) = hasNoDups fvs && sizeTypes tys == length fvs
-				where fvs = fvTypes tys
-validDerivPred otehr		= False
+validDerivPred (ClassP _ tys) = hasNoDups fvs && sizeTypes tys == length fvs
+                              where fvs = fvTypes tys
+validDerivPred _              = False
 \end{code}
 
 %************************************************************************
@@ -1714,20 +1729,24 @@ isTyFamFree = null . tyFamInsts
 
 -- Error messages
 
+tyFamInstInIndexErr :: Type -> SDoc
 tyFamInstInIndexErr ty
   = hang (ptext (sLit "Illegal type family application in type instance") <> 
          colon) 4 $
       ppr ty
 
+polyTyErr :: Type -> SDoc
 polyTyErr ty 
   = hang (ptext (sLit "Illegal polymorphic type in type instance") <> colon) 4 $
       ppr ty
 
+famInstUndecErr :: Type -> SDoc -> SDoc
 famInstUndecErr ty msg 
   = sep [msg, 
          nest 2 (ptext (sLit "in the type family application:") <+> 
                  pprType ty)]
 
+nestedMsg, nomoreVarMsg, smallerAppMsg :: SDoc
 nestedMsg     = ptext (sLit "Nested type family application")
 nomoreVarMsg  = ptext (sLit "Variable occurs more often than in instance head")
 smallerAppMsg = ptext (sLit "Application is no smaller than the instance head")
