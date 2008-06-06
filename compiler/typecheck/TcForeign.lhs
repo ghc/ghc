@@ -12,13 +12,6 @@ is restricted to what the outside world understands (read C), and this
 module checks to see if a foreign declaration has got a legal type.
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module TcForeign 
 	( 
 	  tcForeignImports
@@ -93,11 +86,13 @@ tcFImport fo@(ForeignImport (L loc nm) hs_ty imp_decl)
    -- can't use sig_ty here because it :: Type and we need HsType Id
    -- hence the undefined
    return (id, ForeignImport (L loc id) undefined imp_decl')
+tcFImport d = pprPanic "tcFImport" (ppr d)
 \end{code}
 
 
 ------------ Checking types for foreign import ----------------------
 \begin{code}
+tcCheckFIType :: Type -> [Type] -> Type -> ForeignImport -> TcM ForeignImport
 tcCheckFIType _ arg_tys res_ty (DNImport spec) = do
     checkCg checkDotnet
     dflags <- getDOpts
@@ -114,7 +109,7 @@ tcCheckFIType _ arg_tys res_ty (DNImport spec) = do
        _ -> return ()
     return (DNImport (withDNTypes spec (map toDNType arg_tys) (toDNType res_ty)))
 
-tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport _ _ _ _ (CLabel _)) = do
+tcCheckFIType sig_ty _ _ idecl@(CImport _ _ _ _ (CLabel _)) = do
     checkCg checkCOrAsm
     check (isFFILabelTy sig_ty) (illegalForeignTyErr empty sig_ty)
     return idecl
@@ -134,7 +129,7 @@ tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv _ _ _ CWrapper) = do
                         checkFEDArgs arg1_tys
                   where
                      (arg1_tys, res1_ty) = tcSplitFunTys arg1_ty
-        other -> addErrTc (illegalForeignTyErr empty sig_ty)
+        _ -> addErrTc (illegalForeignTyErr empty sig_ty)
     return idecl
 
 tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv safety _ _ (CFunction target))
@@ -163,9 +158,11 @@ tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv safety _ _ (CFunction t
 
 -- This makes a convenient place to check
 -- that the C identifier is valid for C
+checkCTarget :: CCallTarget -> TcM ()
 checkCTarget (StaticTarget str) = do
     checkCg checkCOrAsmOrDotNetOrInterp
     check (isCLabelString str) (badCName str)
+checkCTarget DynamicTarget = panic "checkCTarget DynamicTarget"
 \end{code}
 
 On an Alpha, with foreign export dynamic, due to a giant hack when
@@ -177,6 +174,8 @@ The check is needed for both via-C and native-code routes
 
 \begin{code}
 #include "nativeGen/NCG.h"
+
+checkFEDArgs :: [Type] -> TcM ()
 #if alpha_TARGET_ARCH
 checkFEDArgs arg_tys
   = check (integral_args <= 32) err
@@ -186,7 +185,7 @@ checkFEDArgs arg_tys
 			  primRepHint prim_rep /= FloatHint ]
     err = ptext (sLit "On Alpha, I can only handle 32 bytes of non-floating-point arguments to foreign export dynamic")
 #else
-checkFEDArgs arg_tys = return ()
+checkFEDArgs _ = return ()
 #endif
 \end{code}
 
@@ -239,11 +238,13 @@ tcFExport fo@(ForeignExport (L loc nm) hs_ty spec) =
 	bind = L loc (VarBind id rhs)
 
    return (bind, ForeignExport (L loc id) undefined spec)
+tcFExport d = pprPanic "tcFExport" (ppr d)
 \end{code}
 
 ------------ Checking argument types for foreign export ----------------------
 
 \begin{code}
+tcCheckFEType :: Type -> ForeignExport -> TcM ()
 tcCheckFEType sig_ty (CExport (CExportStatic str _)) = do
     check (isCLabelString str) (badCName str)
     checkForeignArgs isFFIExternalTy arg_tys
@@ -253,6 +254,7 @@ tcCheckFEType sig_ty (CExport (CExportStatic str _)) = do
       -- the structure of the foreign type.
     (_, t_ty) = tcSplitForAllTys sig_ty
     (arg_tys, res_ty) = tcSplitFunTys t_ty
+tcCheckFEType _ d = pprPanic "tcCheckFEType" (ppr d)
 \end{code}
 
 
@@ -277,12 +279,13 @@ checkForeignArgs pred tys
 --
 checkForeignRes :: Bool -> (Type -> Bool) -> Type -> TcM ()
 
+nonIOok, mustBeIO :: Bool
 nonIOok  = True
 mustBeIO = False
 
 checkForeignRes non_io_result_ok pred_res_ty ty
 	-- (IO t) is ok, and so is any newtype wrapping thereof
-  | Just (io, res_ty, _) <- tcSplitIOType_maybe ty,
+  | Just (_, res_ty, _) <- tcSplitIOType_maybe ty,
     pred_res_ty res_ty
   = return ()
  
@@ -292,36 +295,41 @@ checkForeignRes non_io_result_ok pred_res_ty ty
 \end{code}
 
 \begin{code}
+checkDotnet :: HscTarget -> Maybe SDoc
 #if defined(mingw32_TARGET_OS)
 checkDotnet HscC   = Nothing
 checkDotnet _      = Just (text "requires C code generation (-fvia-C)")
 #else
-checkDotnet other  = Just (text "requires .NET support (-filx or win32)")
+checkDotnet _      = Just (text "requires .NET support (-filx or win32)")
 #endif
 
+checkCOrAsm :: HscTarget -> Maybe SDoc
 checkCOrAsm HscC   = Nothing
 checkCOrAsm HscAsm = Nothing
-checkCOrAsm other  
+checkCOrAsm _
    = Just (text "requires via-C or native code generation (-fvia-C)")
 
+checkCOrAsmOrInterp :: HscTarget -> Maybe SDoc
 checkCOrAsmOrInterp HscC           = Nothing
 checkCOrAsmOrInterp HscAsm         = Nothing
 checkCOrAsmOrInterp HscInterpreted = Nothing
-checkCOrAsmOrInterp other  
+checkCOrAsmOrInterp _
    = Just (text "requires interpreted, C or native code generation")
 
+checkCOrAsmOrDotNetOrInterp :: HscTarget -> Maybe SDoc
 checkCOrAsmOrDotNetOrInterp HscC           = Nothing
 checkCOrAsmOrDotNetOrInterp HscAsm         = Nothing
 checkCOrAsmOrDotNetOrInterp HscInterpreted = Nothing
-checkCOrAsmOrDotNetOrInterp other  
+checkCOrAsmOrDotNetOrInterp _
    = Just (text "requires interpreted, C or native code generation")
 
+checkCg :: (HscTarget -> Maybe SDoc) -> TcM ()
 checkCg check = do
    dflags <- getDOpts
    let target = hscTarget dflags
    case target of
      HscNothing -> return ()
-     otherwise  ->
+     _ ->
        case check target of
 	 Nothing  -> return ()
 	 Just err -> addErrTc (text "Illegal foreign declaration:" <+> err)
@@ -337,6 +345,7 @@ checkCConv StdCallConv = return ()
 #else
 checkCConv StdCallConv = addErrTc (text "calling convention not supported on this architecture: stdcall")
 #endif
+checkCConv CmmCallConv = panic "checkCConv CmmCallConv"
 \end{code}
 
 Warnings
@@ -346,12 +355,14 @@ check :: Bool -> Message -> TcM ()
 check True _	   = return ()
 check _    the_err = addErrTc the_err
 
+illegalForeignTyErr :: SDoc -> Type -> SDoc
 illegalForeignTyErr arg_or_res ty
   = hang (hsep [ptext (sLit "Unacceptable"), arg_or_res, 
                 ptext (sLit "type in foreign declaration:")])
 	 4 (hsep [ppr ty])
 
 -- Used for 'arg_or_res' argument to illegalForeignTyErr
+argument, result :: SDoc
 argument = text "argument"
 result   = text "result"
 
@@ -359,11 +370,13 @@ badCName :: CLabelString -> Message
 badCName target 
    = sep [quotes (ppr target) <+> ptext (sLit "is not a valid C identifier")]
 
+foreignDeclCtxt :: ForeignDecl Name -> SDoc
 foreignDeclCtxt fo
   = hang (ptext (sLit "When checking declaration:"))
          4 (ppr fo)
 
-illegalDNMethodSig 
+illegalDNMethodSig :: SDoc
+illegalDNMethodSig
   = ptext (sLit "'This pointer' expected as last argument")
 
 \end{code}
