@@ -2533,9 +2533,27 @@ The syntax is identical to that of an ordinary instance declaration apart from (
 You must supply a context (in the example the context is <literal>(Eq a)</literal>), 
 exactly as you would in an ordinary instance declaration.
 (In contrast the context is inferred in a <literal>deriving</literal> clause 
-attached to a data type declaration.) These <literal>deriving instance</literal>
-rules obey the same rules concerning form and termination as ordinary instance declarations,
-controlled by the same flags; see <xref linkend="instance-decls"/>. </para>
+attached to a data type declaration.) 
+
+A <literal>deriving instance</literal> declaration
+must obey the same rules concerning form and termination as ordinary instance declarations,
+controlled by the same flags; see <xref linkend="instance-decls"/>.
+</para>
+<para>
+Unlike a <literal>deriving</literal>
+declaration attached to a <literal>data</literal> declaration, the instance can be more specific
+than the data type (assuming you also use 
+<literal>-XFlexibleInstances</literal>, <xref linkend="instance-rules"/>).  Consider
+for example
+<programlisting>
+  data Foo a = Bar a | Baz String
+
+  deriving instance Eq a => Eq (Foo [a])
+  deriving instance Eq a => Eq (Foo (Maybe a))
+</programlisting>
+This will generate a derived instance for <literal>(Foo [a])</literal> and <literal>(Foo (Maybe a))</literal>,
+but other types such as <literal>(Foo (Int,Bool))</literal> will not be an instance of <literal>Eq</literal>.
+</para>
 
 <para>The stand-alone syntax is generalised for newtypes in exactly the same
 way that ordinary <literal>deriving</literal> clauses are generalised (<xref linkend="newtype-deriving"/>).
