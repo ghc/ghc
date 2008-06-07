@@ -227,6 +227,8 @@ render flags interfaces installedIfaces = do
                 maybe_contents_url maybe_index_url
     copyHtmlBits odir libdir css_file
 
+  when (Flag_Hoogle `elem` flags) $ do
+    ppHoogle packageName visibleIfaces odir
 
 -------------------------------------------------------------------------------
 -- Reading and dumping interface files
