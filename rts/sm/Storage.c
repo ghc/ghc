@@ -1308,6 +1308,9 @@ memInventory (rtsBool show)
 #define MB(n) (((n) * BLOCK_SIZE_W) / ((1024*1024)/sizeof(W_)))
 
   leak = live_blocks + free_blocks != mblocks_allocated * BLOCKS_PER_MBLOCK;
+
+  ASSERT(n_alloc_blocks == live_blocks);
+
   if (show || leak)
   {
       if (leak) { 

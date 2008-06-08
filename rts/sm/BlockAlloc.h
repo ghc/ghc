@@ -16,4 +16,7 @@ extern void checkFreeListSanity(void);
 nat         countFreeList(void);
 #endif
 
+lnat n_alloc_blocks;   // currently allocated blocks
+lnat hw_alloc_blocks;  // high-water allocated blocks
+
 #endif /* BLOCK_ALLOC_H */

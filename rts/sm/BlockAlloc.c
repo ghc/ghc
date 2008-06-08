@@ -306,23 +306,30 @@ allocGroup (nat n)
     bdescr *bd, *rem;
     nat ln;
 
-    // Todo: not true in multithreaded GC, where we use allocBlock_sync().
-    // ASSERT_SM_LOCK();
-
     if (n == 0) barf("allocGroup: requested zero blocks");
     
-    n_alloc_blocks += n;
-    if (n_alloc_blocks > hw_alloc_blocks) hw_alloc_blocks = n_alloc_blocks;
-
     if (n >= BLOCKS_PER_MBLOCK)
     {
-        bd = alloc_mega_group(BLOCKS_TO_MBLOCKS(n));
+        nat mblocks;
+
+        mblocks = BLOCKS_TO_MBLOCKS(n);
+
+        // n_alloc_blocks doesn't count the extra blocks we get in a
+        // megablock group.
+        n_alloc_blocks += mblocks * BLOCKS_PER_MBLOCK;
+        if (n_alloc_blocks > hw_alloc_blocks) hw_alloc_blocks = n_alloc_blocks;
+
+        bd = alloc_mega_group(mblocks);
         // only the bdescrs of the first MB are required to be initialised
         initGroup(bd);
+
         IF_DEBUG(sanity, checkFreeListSanity());
         return bd;
     }
     
+    n_alloc_blocks += n;
+    if (n_alloc_blocks > hw_alloc_blocks) hw_alloc_blocks = n_alloc_blocks;
+
     ln = log_2_ceil(n);
 
     while (free_list[ln] == NULL && ln < MAX_FREE_LIST) {
@@ -461,8 +468,6 @@ freeGroup(bdescr *p)
 
   ASSERT(p->free != (P_)-1);
 
-  n_alloc_blocks -= p->blocks;
-
   p->free = (void *)-1;  /* indicates that this block is free */
   p->step = NULL;
   p->gen_no = 0;
@@ -473,11 +478,20 @@ freeGroup(bdescr *p)
 
   if (p->blocks >= BLOCKS_PER_MBLOCK)
   {
+      nat mblocks;
+
+      mblocks = BLOCKS_TO_MBLOCKS(p->blocks);
       // If this is an mgroup, make sure it has the right number of blocks
-      ASSERT(p->blocks == MBLOCK_GROUP_BLOCKS(BLOCKS_TO_MBLOCKS(p->blocks)));
+      ASSERT(p->blocks == MBLOCK_GROUP_BLOCKS(mblocks));
+
+      n_alloc_blocks -= mblocks * BLOCKS_PER_MBLOCK;
+
       free_mega_group(p);
       return;
   }
+
+  ASSERT(n_alloc_blocks >= p->blocks);
+  n_alloc_blocks -= p->blocks;
 
   // coalesce forwards
   {
