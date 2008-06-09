@@ -2819,6 +2819,8 @@ threadStackUnderflow (Task *task STG_UNUSED, StgTSO *tso)
 
     bd = Bdescr((StgPtr)tso);
     new_bd = splitLargeBlock(bd, new_tso_size_w / BLOCK_SIZE_W);
+    new_bd->free = bd->free;
+    bd->free = bd->start + TSO_STRUCT_SIZEW;
 
     new_tso = (StgTSO *)new_bd->start;
     memcpy(new_tso,tso,TSO_STRUCT_SIZE);
