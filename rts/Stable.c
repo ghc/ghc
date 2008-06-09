@@ -218,6 +218,9 @@ lookupStableName_(StgPtr p)
    */
   p = (StgPtr)removeIndirections((StgClosure*)p);
 
+  // register the untagged pointer.  This just makes things simpler.
+  p = (StgPtr)UNTAG_CLOSURE((StgClosure*)p);
+
   sn_tmp = lookupHashTable(addrToStableHash,(W_)p);
   sn = (StgWord)sn_tmp;
   
