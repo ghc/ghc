@@ -147,6 +147,7 @@ void initRtsFlagsDefaults(void)
 #endif
     RtsFlags.GcFlags.compact            = rtsFalse;
     RtsFlags.GcFlags.compactThreshold   = 30.0;
+    RtsFlags.GcFlags.sweep              = rtsFalse;
 #ifdef RTS_GTK_FRONTPANEL
     RtsFlags.GcFlags.frontpanel         = rtsFalse;
 #endif
@@ -353,6 +354,7 @@ usage_text[] = {
 "  -c<n>    Auto-enable compaction of the oldest generation when live data is",
 "           at least <n>% of the maximum heap size set with -M (default: 30%)",
 "  -c       Enable compaction for all major collections",
+"  -w       Use mark-region for the oldest generation (experimental)",
 #if defined(THREADED_RTS)
 "  -I<sec>  Perform full GC after <sec> idle time (default: 0.3, 0 == off)",
 #endif
@@ -749,6 +751,10 @@ error = rtsTrue;
 		      RtsFlags.GcFlags.compact = rtsTrue;
 		  }
 		  break;
+
+              case 'w':
+		RtsFlags.GcFlags.sweep = rtsTrue;
+		break;
 
 	      case 'F':
 	        RtsFlags.GcFlags.oldGenFactor = atof(rts_argv[arg]+2);

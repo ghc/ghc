@@ -84,7 +84,7 @@ thread (StgClosure **p)
     if (HEAP_ALLOCED(q)) {
 	bd = Bdescr(q); 
 
-	if (bd->flags & BF_COMPACTED)
+	if (bd->flags & BF_MARKED)
         {
             iptr = *q;
             switch (GET_CLOSURE_TAG((StgClosure *)iptr))

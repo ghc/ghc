@@ -39,6 +39,8 @@ struct GC_FLAGS {
     rtsBool compact;		/* True <=> "compact all the time" */
     double  compactThreshold;
 
+    rtsBool sweep;		/* use "mostly mark-sweep" instead of copying
+                                 * for the oldest generation */
     rtsBool ringBell;
     rtsBool frontpanel;
 

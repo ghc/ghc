@@ -55,7 +55,6 @@
 typedef struct step_ {
     unsigned int         no;		// step number in this generation
     unsigned int         abs_no;	// absolute step number
-    int                  is_compacted;	// compact this step? (old gen only)
 
     struct generation_ * gen;		// generation this step belongs to
     unsigned int         gen_no;        // generation number (cached)
@@ -87,8 +86,12 @@ typedef struct step_ {
                                         //    and scavenged_large_objects
 #endif
 
+    int          mark;			// mark (not copy)? (old gen only)
+    int          compact;		// compact (not sweep)? (old gen only)
+
     bdescr *     old_blocks;	        // bdescr of first from-space block
     unsigned int n_old_blocks;		// number of blocks in from-space
+    unsigned int live_estimate;         // for sweeping: estimate of live data
     
     bdescr *     todos;		        // blocks waiting to be scavenged
     bdescr *     todos_last;

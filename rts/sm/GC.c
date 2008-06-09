@@ -49,6 +49,7 @@
 #include "GCUtils.h"
 #include "MarkWeak.h"
 #include "Sparks.h"
+#include "Sweep.h"
 
 #include <string.h> // for memset()
 #include <unistd.h>
@@ -288,10 +289,13 @@ GarbageCollect ( rtsBool force_major_gc )
   /* Allocate a mark stack if we're doing a major collection.
    */
   if (major_gc) {
-      mark_stack_bdescr = allocGroup(MARK_STACK_BLOCKS);
+      nat mark_stack_blocks;
+      mark_stack_blocks = stg_max(MARK_STACK_BLOCKS, 
+                                  oldest_gen->steps[0].n_old_blocks / 100);
+      mark_stack_bdescr = allocGroup(mark_stack_blocks);
       mark_stack = (StgPtr *)mark_stack_bdescr->start;
       mark_sp    = mark_stack;
-      mark_splim = mark_stack + (MARK_STACK_BLOCKS * BLOCK_SIZE_W);
+      mark_splim = mark_stack + (mark_stack_blocks * BLOCK_SIZE_W);
   } else {
       mark_stack_bdescr = NULL;
   }
@@ -485,9 +489,12 @@ GarbageCollect ( rtsBool force_major_gc )
       }
   }
 
-  // Finally: compaction of the oldest generation.
-  if (major_gc && oldest_gen->steps[0].is_compacted) {
-      compact(gct->scavenged_static_objects);
+  // Finally: compact or sweep the oldest generation.
+  if (major_gc && oldest_gen->steps[0].mark) {
+      if (oldest_gen->steps[0].compact) 
+          compact(gct->scavenged_static_objects);
+      else
+          sweep(&oldest_gen->steps[0]);
   }
 
   IF_DEBUG(sanity, checkGlobalTSOList(rtsFalse));
@@ -542,7 +549,7 @@ GarbageCollect ( rtsBool force_major_gc )
     }
 
     for (s = 0; s < generations[g].n_steps; s++) {
-      bdescr *next;
+      bdescr *next, *prev;
       stp = &generations[g].steps[s];
 
       // for generations we collected... 
@@ -553,29 +560,48 @@ GarbageCollect ( rtsBool force_major_gc )
 	 * freed blocks will probaby be quickly recycled.
 	 */
 	if (!(g == 0 && s == 0 && RtsFlags.GcFlags.generations > 1)) {
-	    if (stp->is_compacted)
+	    if (stp->mark)
             {
 		// tack the new blocks on the end of the existing blocks
 		if (stp->old_blocks != NULL) {
+
+                    prev = NULL;
 		    for (bd = stp->old_blocks; bd != NULL; bd = next) {
-                        stp->n_words += bd->free - bd->start;
 
-			// NB. this step might not be compacted next
-			// time, so reset the BF_COMPACTED flags.
-			// They are set before GC if we're going to
-			// compact.  (search for BF_COMPACTED above).
-			bd->flags &= ~BF_COMPACTED;
+                        next = bd->link;
 
-                        // between GCs, all blocks in the heap except
-                        // for the nursery have the BF_EVACUATED flag set.
-                        bd->flags |= BF_EVACUATED;
+                        if (!(bd->flags & BF_MARKED))
+                        {
+                            if (prev == NULL) {
+                                stp->old_blocks = next;
+                            } else {
+                                prev->link = next;
+                            }
+                            freeGroup(bd);
+                            stp->n_old_blocks--;
+                        }
+                        else
+                        {
+                            stp->n_words += bd->free - bd->start;
 
-			next = bd->link;
-			if (next == NULL) {
-			    bd->link = stp->blocks;
-			}
+                            // NB. this step might not be compacted next
+                            // time, so reset the BF_MARKED flags.
+                            // They are set before GC if we're going to
+                            // compact.  (search for BF_MARKED above).
+                            bd->flags &= ~BF_MARKED;
+                            
+                            // between GCs, all blocks in the heap except
+                            // for the nursery have the BF_EVACUATED flag set.
+                            bd->flags |= BF_EVACUATED;
+
+                            prev = bd;
+                        }
 		    }
-		    stp->blocks = stp->old_blocks;
+
+                    if (prev != NULL) {
+                        prev->link = stp->blocks;
+                        stp->blocks = stp->old_blocks;
+                    }
 		}
 		// add the new blocks to the block tally
 		stp->n_blocks += stp->n_old_blocks;
@@ -1144,6 +1170,7 @@ init_collected_gen (nat g, nat n_threads)
 	stp->blocks       = NULL;
 	stp->n_blocks     = 0;
 	stp->n_words      = 0;
+	stp->live_estimate = 0;
 
 	// we don't have any to-be-scavenged blocks yet
 	stp->todos = NULL;
@@ -1165,7 +1192,7 @@ init_collected_gen (nat g, nat n_threads)
 	}
 
 	// for a compacted step, we need to allocate the bitmap
-	if (stp->is_compacted) {
+	if (stp->mark) {
 	    nat bitmap_size; // in bytes
 	    bdescr *bitmap_bdescr;
 	    StgWord *bitmap;
@@ -1190,12 +1217,14 @@ init_collected_gen (nat g, nat n_threads)
 		    bd->u.bitmap = bitmap;
 		    bitmap += BLOCK_SIZE_W / (sizeof(W_)*BITS_PER_BYTE);
 		    
-		    // Also at this point we set the BF_COMPACTED flag
+		    // Also at this point we set the BF_MARKED flag
 		    // for this block.  The invariant is that
-		    // BF_COMPACTED is always unset, except during GC
+		    // BF_MARKED is always unset, except during GC
 		    // when it is set on those blocks which will be
 		    // compacted.
-		    bd->flags |= BF_COMPACTED;
+                    if (!(bd->flags & BF_FRAGMENTED)) {
+                        bd->flags |= BF_MARKED;
+                    }
 		}
 	    }
 	}
@@ -1425,13 +1454,18 @@ resize_generations (void)
     nat g;
 
     if (major_gc && RtsFlags.GcFlags.generations > 1) {
-	nat live, size, min_alloc;
+	nat live, size, min_alloc, words;
 	nat max  = RtsFlags.GcFlags.maxHeapSize;
 	nat gens = RtsFlags.GcFlags.generations;
 	
 	// live in the oldest generations
-	live = (oldest_gen->steps[0].n_words + BLOCK_SIZE_W - 1) / BLOCK_SIZE_W+
-	    oldest_gen->steps[0].n_large_blocks;
+        if (oldest_gen->steps[0].live_estimate != 0) {
+            words = oldest_gen->steps[0].live_estimate;
+        } else {
+            words = oldest_gen->steps[0].n_words;
+        }
+        live = (words + BLOCK_SIZE_W - 1) / BLOCK_SIZE_W +
+            oldest_gen->steps[0].n_large_blocks;
 	
 	// default max size for all generations except zero
 	size = stg_max(live * RtsFlags.GcFlags.oldGenFactor,
@@ -1448,12 +1482,18 @@ resize_generations (void)
 	     (max > 0 &&
 	      oldest_gen->steps[0].n_blocks > 
 	      (RtsFlags.GcFlags.compactThreshold * max) / 100))) {
-	    oldest_gen->steps[0].is_compacted = 1;
+	    oldest_gen->steps[0].mark = 1;
+	    oldest_gen->steps[0].compact = 1;
 //	  debugBelch("compaction: on\n", live);
 	} else {
-	    oldest_gen->steps[0].is_compacted = 0;
+	    oldest_gen->steps[0].mark = 0;
+	    oldest_gen->steps[0].compact = 0;
 //	  debugBelch("compaction: off\n", live);
 	}
+
+        if (RtsFlags.GcFlags.sweep) {
+	    oldest_gen->steps[0].mark = 1;
+        }
 
 	// if we're going to go over the maximum heap size, reduce the
 	// size of the generations accordingly.  The calculation is
@@ -1468,7 +1508,7 @@ resize_generations (void)
 		heapOverflow();
 	    }
 	    
-	    if (oldest_gen->steps[0].is_compacted) {
+	    if (oldest_gen->steps[0].compact) {
 		if ( (size + (size - 1) * (gens - 2) * 2) + min_alloc > max ) {
 		    size = (max - min_alloc) / ((gens - 1) * 2 - 1);
 		}

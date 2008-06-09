@@ -21,6 +21,7 @@
 #include "Compact.h"
 #include "Prelude.h"
 #include "LdvProfile.h"
+#include "Trace.h"
 
 #if defined(PROF_SPIN) && defined(THREADED_RTS) && defined(PARALLEL_GC)
 StgWord64 whitehole_spin = 0;
@@ -383,7 +384,7 @@ loop:
 
   bd = Bdescr((P_)q);
 
-  if ((bd->flags & (BF_LARGE | BF_COMPACTED | BF_EVACUATED)) != 0) {
+  if ((bd->flags & (BF_LARGE | BF_MARKED | BF_EVACUATED)) != 0) {
 
       // pointer into to-space: just return it.  It might be a pointer
       // into a generation that we aren't collecting (> N), or it
@@ -419,17 +420,16 @@ loop:
       /* If the object is in a step that we're compacting, then we
        * need to use an alternative evacuate procedure.
        */
-      if (bd->flags & BF_COMPACTED) {
-	  if (!is_marked((P_)q,bd)) {
-	      mark((P_)q,bd);
-	      if (mark_stack_full()) {
-		  mark_stack_overflowed = rtsTrue;
-		  reset_mark_stack();
-	      }
-	      push_mark_stack((P_)q);
-	  }
-	  return;
+      if (!is_marked((P_)q,bd)) {
+          mark((P_)q,bd);
+          if (mark_stack_full()) {
+              debugTrace(DEBUG_gc,"mark stack overflowed");
+              mark_stack_overflowed = rtsTrue;
+              reset_mark_stack();
+          }
+          push_mark_stack((P_)q);
       }
+      return;
   }
       
   stp = bd->step->to;
@@ -828,7 +828,7 @@ selector_chain:
         // (scavenge_mark_stack doesn't deal with IND).  BEWARE!  This
         // bit is very tricky to get right.  If you make changes
         // around here, test by compiling stage 3 with +RTS -c -RTS.
-        if (bd->flags & BF_COMPACTED) {
+        if (bd->flags & BF_MARKED) {
             // must call evacuate() to mark this closure if evac==rtsTrue
             *q = (StgClosure *)p;
             if (evac) evacuate(q);

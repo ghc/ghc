@@ -87,6 +87,7 @@ initStep (step *stp, int g, int s)
     stp->blocks = NULL;
     stp->n_blocks = 0;
     stp->n_words = 0;
+    stp->live_estimate = 0;
     stp->old_blocks = NULL;
     stp->n_old_blocks = 0;
     stp->gen = &generations[g];
@@ -95,7 +96,8 @@ initStep (step *stp, int g, int s)
     stp->n_large_blocks = 0;
     stp->scavenged_large_objects = NULL;
     stp->n_scavenged_large_blocks = 0;
-    stp->is_compacted = 0;
+    stp->mark = 0;
+    stp->compact = 0;
     stp->bitmap = NULL;
 #ifdef THREADED_RTS
     initSpinLock(&stp->sync_todo);
@@ -230,11 +232,13 @@ initStorage( void )
   }
   
   /* The oldest generation has one step. */
-  if (RtsFlags.GcFlags.compact) {
+  if (RtsFlags.GcFlags.compact || RtsFlags.GcFlags.sweep) {
       if (RtsFlags.GcFlags.generations == 1) {
-	  errorBelch("WARNING: compaction is incompatible with -G1; disabled");
+	  errorBelch("WARNING: compact/sweep is incompatible with -G1; disabled");
       } else {
-	  oldest_gen->steps[0].is_compacted = 1;
+	  oldest_gen->steps[0].mark = 1;
+          if (RtsFlags.GcFlags.compact)
+              oldest_gen->steps[0].compact = 1;
       }
   }
 
@@ -1032,6 +1036,7 @@ countOccupied(bdescr *bd)
 
     words = 0;
     for (; bd != NULL; bd = bd->link) {
+        ASSERT(bd->free <= bd->start + bd->blocks * BLOCK_SIZE_W);
         words += bd->free - bd->start;
     }
     return words;
@@ -1079,14 +1084,27 @@ calcNeeded(void)
 	for (s = 0; s < generations[g].n_steps; s++) {
 	    if (g == 0 && s == 0) { continue; }
 	    stp = &generations[g].steps[s];
+
+            // we need at least this much space
+            needed += stp->n_blocks + stp->n_large_blocks;
+
+            // any additional space needed to collect this gen next time?
 	    if (g == 0 || // always collect gen 0
                 (generations[g].steps[0].n_blocks +
                  generations[g].steps[0].n_large_blocks 
-                 > generations[g].max_blocks
-                 && stp->is_compacted == 0)) {
-		needed += 2 * stp->n_blocks + stp->n_large_blocks;
-	    } else {
-		needed += stp->n_blocks + stp->n_large_blocks;
+                 > generations[g].max_blocks)) {
+                // we will collect this gen next time
+                if (stp->mark) {
+                    //  bitmap:
+                    needed += stp->n_blocks / BITS_IN(W_);
+                    //  mark stack:
+                    needed += stp->n_blocks / 100;
+                }
+                if (stp->compact) {
+                    continue; // no additional space needed for compaction
+                } else {
+                    needed += stp->n_blocks;
+                }
 	    }
 	}
     }
