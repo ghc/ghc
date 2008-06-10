@@ -6,13 +6,6 @@
 TcPat: Typechecking patterns
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module TcPat ( tcLetPat, tcLamPat, tcLamPats, tcProcPat, tcOverloadedLit,
 	       addDataConStupidTheta, badFieldCon, polyPatSig ) where
 
@@ -32,6 +25,7 @@ import TcSimplify
 import TcEnv
 import TcMType
 import TcType
+import VarEnv
 import VarSet
 import TcUnify
 import TcHsType
@@ -41,7 +35,6 @@ import Coercion
 import StaticFlags
 import TyCon
 import DataCon
-import DynFlags
 import PrelNames
 import BasicTypes hiding (SuccessFlag(..))
 import SrcLoc
@@ -98,14 +91,16 @@ tcLamPats pats tys res_ty thing_inside
   = tc_lam_pats LamPat (zipEqual "tcLamPats" pats tys)
 	        res_ty thing_inside
 
-tcLamPat :: LPat Name -> BoxySigmaType 
-      	 -> BoxyRhoType		    -- Result type
-      	 -> (BoxyRhoType -> TcM a)  -- Checker for body, given its result type
-      	 -> TcM (LPat TcId, a)
-
-tcProcPat = tc_lam_pat ProcPat
+tcLamPat, tcProcPat :: LPat Name -> BoxySigmaType 
+                    -> BoxyRhoType             -- Result type
+                    -> (BoxyRhoType -> TcM a)  -- Checker for body, given
+                                               -- its result type
+                    -> TcM (LPat TcId, a)
 tcLamPat  = tc_lam_pat LamPat
+tcProcPat = tc_lam_pat ProcPat
 
+tc_lam_pat :: PatCtxt -> LPat Name -> BoxySigmaType -> BoxyRhoType
+           -> (BoxyRhoType -> TcM a) -> TcM (LPat TcId, a)
 tc_lam_pat ctxt pat pat_ty res_ty thing_inside
   = do	{ ([pat'],thing) <- tc_lam_pats ctxt [(pat, pat_ty)] res_ty thing_inside
 	; return (pat', thing) }
@@ -144,7 +139,7 @@ tcCheckExistentialPat :: [LPat TcId]		-- Patterns (just for error message)
 -- 	f (C g) x = g x
 -- Here, result_ty will be simply Int, but expected_ty is (C -> a -> Int).
 
-tcCheckExistentialPat pats [] pat_tys body_ty
+tcCheckExistentialPat _ [] _ _
   = return ()	-- Short cut for case when there are no existentials
 
 tcCheckExistentialPat pats ex_tvs pat_tys body_ty
@@ -166,7 +161,7 @@ data PatCtxt
 
 patSigCtxt :: PatState -> UserTypeCtxt
 patSigCtxt (PS { pat_ctxt = LetPat _ }) = BindPatSigCtxt
-patSigCtxt other			= LamPatSigCtxt
+patSigCtxt _                            = LamPatSigCtxt
 \end{code}
 
 
@@ -214,8 +209,13 @@ bindInstsOfPatId id thing_inside
 	; return (res, binds) }
 
 -------------------
+unBoxPatBndrType :: BoxyType -> Name -> TcM TcType
 unBoxPatBndrType  ty name = unBoxArgType ty (ptext (sLit "The variable") <+> quotes (ppr name))
+
+unBoxWildCardType :: BoxyType -> TcM TcType
 unBoxWildCardType ty      = unBoxArgType ty (ptext (sLit "A wild-card pattern"))
+
+unBoxViewPatType :: BoxyType -> Pat Name -> TcM TcType
 unBoxViewPatType  ty pat  = unBoxArgType ty (ptext (sLit "The view pattern") <+> ppr pat)
 
 unBoxArgType :: BoxyType -> SDoc -> TcM TcType
@@ -427,7 +427,7 @@ tc_pat pstate (SigPatIn pat sig_ty) pat_ty thing_inside
 			      tc_lpat pat inner_ty pstate thing_inside
 	; return (SigPatOut pat' inner_ty, tvs, res) }
 
-tc_pat pstate pat@(TypePat ty) pat_ty thing_inside
+tc_pat _ pat@(TypePat _) _ _
   = failWithTc (badTypePat pat)
 
 ------------------------
@@ -474,7 +474,7 @@ tc_pat pstate (TuplePat pats boxity _) pat_ty thing_inside
 
 ------------------------
 -- Data constructors
-tc_pat pstate pat_in@(ConPatIn (L con_span con_name) arg_pats) pat_ty thing_inside
+tc_pat pstate (ConPatIn (L con_span con_name) arg_pats) pat_ty thing_inside
   = do	{ data_con <- tcLookupDataCon con_name
 	; let tycon = dataConTyCon data_con
 	; tcConPat pstate con_span data_con tycon pat_ty arg_pats thing_inside }
@@ -486,7 +486,6 @@ tc_pat pstate (LitPat simple_lit) pat_ty thing_inside
 	; coi <- boxyUnify lit_ty pat_ty
 			-- coi is of kind: lit_ty ~ pat_ty
 	; res <- thing_inside pstate
-	; span <- getSrcSpanM
 			-- pattern coercions have to
 			-- be of kind: pat_ty ~ lit_ty
 			-- hence, sym coi
@@ -495,7 +494,7 @@ tc_pat pstate (LitPat simple_lit) pat_ty thing_inside
 
 ------------------------
 -- Overloaded patterns: n, and n+k
-tc_pat pstate pat@(NPat over_lit mb_neg eq) pat_ty thing_inside
+tc_pat pstate (NPat over_lit mb_neg eq) pat_ty thing_inside
   = do	{ let orig = LiteralOrigin over_lit
 	; lit'    <- tcOverloadedLit orig over_lit pat_ty
 	; eq'     <- tcSyntaxOp orig eq (mkFunTys [pat_ty, pat_ty] boolTy)
@@ -508,7 +507,7 @@ tc_pat pstate pat@(NPat over_lit mb_neg eq) pat_ty thing_inside
 	; res <- thing_inside pstate
 	; return (NPat lit' mb_neg' eq', [], res) }
 
-tc_pat pstate pat@(NPlusKPat (L nm_loc name) lit ge minus) pat_ty thing_inside
+tc_pat pstate (NPlusKPat (L nm_loc name) lit ge minus) pat_ty thing_inside
   = do	{ bndr_id <- setSrcSpan nm_loc (tcPatBndr pstate name pat_ty)
  	; let pat_ty' = idType bndr_id
 	      orig    = LiteralOrigin lit
@@ -647,7 +646,7 @@ tcConPat pstate con_span data_con tycon pat_ty arg_pats thing_inside
 
 	  else do   -- The general case, with existential, and local equality 
                     -- constraints
-	{ checkTc (case pat_ctxt pstate of { ProcPat -> False; other -> True })
+	{ checkTc (case pat_ctxt pstate of { ProcPat -> False; _ -> True })
 		  (existentialProcPat data_con)
 
           -- Need to test for rigidity if *any* constraints in theta as class
@@ -744,9 +743,6 @@ tcConArgs data_con arg_tys (InfixCon p1 p2) pstate thing_inside
 	; return (InfixCon p1' p2', tvs, res) }
   where
     con_arity  = dataConSourceArity data_con
-
-tcConArgs data_con other_args (InfixCon p1 p2) pstate thing_inside
-  = pprPanic "tcConArgs" (ppr data_con)	-- InfixCon always has two arguments
 
 tcConArgs data_con arg_tys (RecCon (HsRecFields rpats dd)) pstate thing_inside
   = do	{ (rpats', tvs, res) <- tcMultiple tc_field rpats pstate thing_inside
@@ -959,6 +955,7 @@ patCtxt pat 	    = Just (hang (ptext (sLit "In the pattern:"))
 
 -----------------------------------------------
 
+existentialExplode :: LPat Name -> SDoc
 existentialExplode pat
   = hang (vcat [text "My brain just exploded.",
 	        text "I can't handle pattern bindings for existentially-quantified constructors.",
@@ -966,6 +963,8 @@ existentialExplode pat
 		text "In the binding group for"])
 	4 (ppr pat)
 
+sigPatCtxt :: [LPat Var] -> [Var] -> [TcType] -> TcType -> TidyEnv
+           -> TcM (TidyEnv, SDoc)
 sigPatCtxt pats bound_tvs pat_tys body_ty tidy_env 
   = do	{ pat_tys' <- mapM zonkTcType pat_tys
 	; body_ty' <- zonkTcType body_ty
@@ -996,6 +995,7 @@ polyPatSig sig_ty
   = hang (ptext (sLit "Illegal polymorphic type signature in pattern:"))
        2 (ppr sig_ty)
 
+badTypePat :: Pat Name -> SDoc
 badTypePat pat = ptext (sLit "Illegal type pattern") <+> ppr pat
 
 existentialProcPat :: DataCon -> SDoc
@@ -1003,15 +1003,18 @@ existentialProcPat con
   = hang (ptext (sLit "Illegal constructor") <+> quotes (ppr con) <+> ptext (sLit "in a 'proc' pattern"))
        2 (ptext (sLit "Proc patterns cannot use existentials or GADTs"))
 
-lazyPatErr pat tvs
+lazyPatErr :: Pat name -> [TcTyVar] -> TcM ()
+lazyPatErr _ tvs
   = failWithTc $
     hang (ptext (sLit "A lazy (~) pattern cannot bind existential type variables"))
        2 (vcat (map pprSkolTvBinding tvs))
 
+nonRigidMatch :: DataCon -> SDoc
 nonRigidMatch con
   =  hang (ptext (sLit "GADT pattern match in non-rigid context for") <+> quotes (ppr con))
 	2 (ptext (sLit "Solution: add a type signature"))
 
+nonRigidResult :: Type -> TcM a
 nonRigidResult res_ty
   = do	{ env0 <- tcInitTidyEnv
 	; let (env1, res_ty') = tidyOpenType env0 res_ty
@@ -1019,7 +1022,4 @@ nonRigidResult res_ty
 				<+> quotes (ppr res_ty'))
 		  	 2 (ptext (sLit "Solution: add a type signature"))
 	; failWithTcM (env1, msg) }
-
-inaccessibleAlt msg
-  = hang (ptext (sLit "Inaccessible case alternative:")) 2 msg
 \end{code}
