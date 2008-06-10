@@ -1,18 +1,16 @@
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
 
 module LexCore where
 
 import ParserCoreUtils
+import Panic
 import Char
 import Numeric
 
+isNameChar :: Char -> Bool
 isNameChar c = isAlpha c || isDigit c || (c == '_') || (c == '\'')
 	       || (c == '$') || (c == '-') || (c == '.')
+
+isKeywordChar :: Char -> Bool
 isKeywordChar c = isAlpha c || (c == '_') 
 
 lexer :: (Token -> P a) -> P a 
@@ -49,30 +47,35 @@ lexer cont (';':cs) 	= cont TKsemicolon cs
 lexer cont (':':cs)     = cont TKcolon cs
 -- 20060420 Likewise does it create identifiers starting with dollar. jds
 lexer cont ('$':cs)     = lexName cont TKname ('$':cs)
-lexer cont (c:cs) 	= failP "invalid character" [c]
+lexer _    (c:_)        = failP "invalid character" [c]
 
-
-
+lexChar :: (Token -> String -> Int -> ParseResult a) -> String -> Int
+        -> ParseResult a
 lexChar cont ('\\':'x':h1:h0:'\'':cs)
-	| isHexEscape [h1,h0] =  cont (TKchar (hexToChar h1 h0)) cs
-lexChar cont ('\\':cs) 	 = failP "invalid char character" ('\\':(take 10 cs))
-lexChar cont ('\'':cs) 	 = failP "invalid char character" ['\'']
-lexChar cont ('\"':cs) 	 = failP "invalid char character" ['\"']
-lexChar cont (c:'\'':cs) = cont (TKchar c) cs
+    | isHexEscape [h1,h0] = cont (TKchar (hexToChar h1 h0)) cs
+lexChar _    ('\\':cs)    = failP "invalid char character" ('\\':(take 10 cs))
+lexChar _    ('\'':_)     = failP "invalid char character" ['\'']
+lexChar _    ('\"':_)     = failP "invalid char character" ['\"']
+lexChar cont (c:'\'':cs)  = cont (TKchar c) cs
+lexChar _    cs           = panic ("lexChar: " ++ show cs)
 
-
+lexString :: String -> (Token -> [Char] -> Int -> ParseResult a)
+          -> String -> Int -> ParseResult a
 lexString s cont ('\\':'x':h1:h0:cs) 
-	| isHexEscape [h1,h0] = lexString (s++[hexToChar h1 h0]) cont cs
-lexString s cont ('\\':cs) = failP "invalid string character" ['\\']
-lexString s cont ('\'':cs) = failP "invalid string character" ['\'']
+    | isHexEscape [h1,h0]  = lexString (s++[hexToChar h1 h0]) cont cs
+lexString _ _    ('\\':_)  = failP "invalid string character" ['\\']
+lexString _ _    ('\'':_)  = failP "invalid string character" ['\'']
 lexString s cont ('\"':cs) = cont (TKstring s) cs
-lexString s cont (c:cs) = lexString (s++[c]) cont cs
+lexString s cont (c:cs)    = lexString (s++[c]) cont cs
+lexString _ _    []        = panic "lexString []"
 
+isHexEscape :: String -> Bool
 isHexEscape = all (\c -> isHexDigit c && (isDigit c || isLower c))
 
+hexToChar :: Char -> Char -> Char
 hexToChar h1 h0 = chr (digitToInt h1 * 16 + digitToInt h0)
 
-
+lexNum :: (Token -> String -> a) -> String -> a
 lexNum cont cs =
   case cs of
      ('-':cs) -> f (-1) cs
@@ -86,9 +89,12 @@ lexNum cont cs =
 		-- a bit complicated, use the Haskell 98 library function
           (digits,rest) -> cont (TKinteger (sgn * (read digits))) rest
 
+lexName :: (a -> String -> b) -> (String -> a) -> String -> b
 lexName cont cstr cs = cont (cstr name) rest
    where (name,rest) = span isNameChar cs
 
+lexKeyword :: (Token -> [Char] -> Int -> ParseResult a) -> String -> Int
+           -> ParseResult a
 lexKeyword cont cs = 
    case span isKeywordChar cs of
       ("module",rest) -> cont TKmodule rest
