@@ -1,13 +1,6 @@
 Character classification
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module Ctype
 	( is_ident	-- Char# -> Bool
 	, is_symbol	-- Char# -> Bool
@@ -27,6 +20,7 @@ module Ctype
 import Data.Int		( Int32 )
 import Data.Bits	( Bits((.&.)) )
 import Data.Char	( ord, chr )
+import Panic
 \end{code}
 
 Bit masks
@@ -50,7 +44,8 @@ at the big case below.
 is_ctype :: Int -> Char -> Bool
 is_ctype mask c = (fromIntegral (charType c) .&. fromIntegral mask) /= (0::Int32)
 
-is_ident, is_symbol, is_any, is_space, is_lower, is_upper, is_digit :: Char -> Bool
+is_ident, is_symbol, is_any, is_space, is_lower, is_upper, is_digit,
+    is_alphanum :: Char -> Bool
 is_ident  = is_ctype cIdent
 is_symbol = is_ctype cSymbol
 is_any    = is_ctype cAny
@@ -71,14 +66,17 @@ hexDigit c | is_digit c = ord c - ord '0'
 octDecDigit :: Char -> Int
 octDecDigit c = ord c - ord '0'
 
+is_hexdigit :: Char -> Bool
 is_hexdigit c
 	=  is_digit c 
 	|| (c >= 'a' && c <= 'f')
 	|| (c >= 'A' && c <= 'F')
 
+is_octdigit :: Char -> Bool
 is_octdigit c = c >= '0' && c <= '7'
 
-to_lower c 
+to_lower :: Char -> Char
+to_lower c
   | c >=  'A' && c <= 'Z' = chr (ord c - (ord 'A' - ord 'a'))
   | otherwise = c
 \end{code}
@@ -345,4 +343,5 @@ charType c = case c of
    '\253' -> cAny + cIdent  + cLower   -- ý
    '\254' -> cAny + cIdent  + cLower   -- þ
    '\255' -> cAny + cIdent  + cLower   -- ÿ
+   _ -> panic ("charType: " ++ show c)
 \end{code}
