@@ -33,7 +33,7 @@ clean(['hIsEOF002.out'])
 # hReady is broken for files (always returns False) on Unix platforms
 # (bug #1063) , but is broken in a different way on Windows (always
 # returns True) (bug #1198).
-test('hReady001', expect_broken_if_compiler_type(1063, 'ghc'), compile_and_run, ['-cpp'])
+test('hReady001', if_compiler_type('ghc', expect_broken(1063)), compile_and_run, ['-cpp'])
 
 test('hSeek001', normal, compile_and_run, [''])
 test('hSeek002', normal, compile_and_run, ['-cpp'])
@@ -61,18 +61,18 @@ test('openFile002',  exit_code(1), compile_and_run, [''])
 test('openFile003',  normal, compile_and_run, [''])
 test('openFile004',  normal, compile_and_run, [''])
 clean(['openFile004.out'])
-test('openFile005',  compose(expect_fail_if_compiler_type('hugs'),
+test('openFile005',  compose(if_compiler_type('hugs', expect_fail),
 			expect_fail_if_windows), compile_and_run, [''])
 clean(['openFile005.out1', 'openFile005.out2'])
 test('openFile006',  normal, compile_and_run, [''])
 clean(['openFile006.out'])
-test('openFile007',  compose(expect_fail_if_compiler_type('hugs'),
+test('openFile007',  compose(if_compiler_type('hugs', expect_fail),
 			expect_fail_if_windows), compile_and_run, [''])
 clean(['openFile007.out'])
 test('openFile008', cmd_prefix('ulimit -n 1024; '), compile_and_run, [''])
 
 test('putStr001',    normal, compile_and_run, [''])
-test('readFile001',  compose(expect_fail_if_compiler_type('hugs'),
+test('readFile001',  compose(if_compiler_type('hugs', expect_fail),
 			expect_fail_if_windows), compile_and_run, [''])
 clean(['readFile001.out'])
 test('readwrite001', normal, compile_and_run, ['-cpp'])

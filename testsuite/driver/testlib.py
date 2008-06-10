@@ -183,22 +183,6 @@ def _only_compiler_types( opts, compiler_types ):
 
 # -----
 
-def expect_fail_if_compiler_type( compiler_type ):
-   return lambda opts, c=compiler_type: _expect_fail_if_compiler_type(opts, c)
-
-def _expect_fail_if_compiler_type( opts, compiler_type ):
-    if config.compiler_type == compiler_type:
-	opts.expect = 'fail'
-
-def expect_broken_if_compiler_type( bug, compiler_type ):
-   return lambda opts, b=bug, c=compiler_type: _expect_broken_if_compiler_type(opts, b, c)
-
-def _expect_broken_if_compiler_type( opts, bug, compiler_type ):
-    if config.compiler_type == compiler_type:
-	opts.expect = 'fail'
-
-# -----
-
 def set_stdin( file ):
    return lambda opts, f=file: _set_stdin(opts, f);
 
@@ -259,6 +243,12 @@ def if_os( os, f ):
         return normal
 
 # ---
+
+def if_compiler_type( compiler, f ):
+    if config.compiler_type == compiler:
+        return f
+    else:
+        return normal
 
 def if_compiler_lt( compiler, version, f ):
     if config.compiler_type == compiler and \
