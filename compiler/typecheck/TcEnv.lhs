@@ -3,13 +3,6 @@
 %
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module TcEnv(
 	TyThing(..), TcTyThing(..), TcId,
 
@@ -71,7 +64,6 @@ import FamInstEnv
 import DataCon
 import TyCon
 import TypeRep
-import Coercion
 import Class
 import Name
 import PrelNames
@@ -156,21 +148,21 @@ tcLookupDataCon name = do
     thing <- tcLookupGlobal name
     case thing of
 	ADataCon con -> return con
-	other	     -> wrongThingErr "data constructor" (AGlobal thing) name
+	_            -> wrongThingErr "data constructor" (AGlobal thing) name
 
 tcLookupClass :: Name -> TcM Class
 tcLookupClass name = do
     thing <- tcLookupGlobal name
     case thing of
 	AClass cls -> return cls
-	other	   -> wrongThingErr "class" (AGlobal thing) name
-	
+	_          -> wrongThingErr "class" (AGlobal thing) name
+
 tcLookupTyCon :: Name -> TcM TyCon
 tcLookupTyCon name = do
     thing <- tcLookupGlobal name
     case thing of
 	ATyCon tc -> return tc
-	other	  -> wrongThingErr "type constructor" (AGlobal thing) name
+	_         -> wrongThingErr "type constructor" (AGlobal thing) name
 
 tcLookupLocatedGlobalId :: Located Name -> TcM Id
 tcLookupLocatedGlobalId = addLocM tcLookupId
@@ -208,7 +200,7 @@ tcLookupFamInst tycon tys
        ; case lookupFamInstEnv instEnv tycon tys of
 	   [(fam_inst, rep_tys)] -> return $ Just (famInstTyCon fam_inst, 
                                                    rep_tys)
-	   other                 -> return Nothing
+	   _                     -> return Nothing
        }
 \end{code}
 
@@ -267,7 +259,7 @@ tcLookupTyVar name = do
     thing <- tcLookup name
     case thing of
 	ATyVar _ ty -> return (tcGetTyVar "tcLookupTyVar" ty)
-	other	    -> pprPanic "tcLookupTyVar" (ppr name)
+	_           -> pprPanic "tcLookupTyVar" (ppr name)
 
 tcLookupId :: Name -> TcM Id
 -- Used when we aren't interested in the binding level, nor refinement. 
@@ -279,7 +271,7 @@ tcLookupId name = do
     case thing of
         ATcId { tct_id = id} -> return id
         AGlobal (AnId id)    -> return id
-        other                -> pprPanic "tcLookupId" (ppr name)
+        _                    -> pprPanic "tcLookupId" (ppr name)
 
 tcLookupLocalIds :: [Name] -> TcM [TcId]
 -- We expect the variables to all be bound, and all at
@@ -292,7 +284,7 @@ tcLookupLocalIds ns = do
 	= case lookupNameEnv lenv name of
 		Just (ATcId { tct_id = id, tct_level = lvl1 }) 
 			-> ASSERT( lvl == lvl1 ) id
-		other	-> pprPanic "tcLookupLocalIds" (ppr name)
+		_ -> pprPanic "tcLookupLocalIds" (ppr name)
 
 lclEnvElts :: TcLclEnv -> [TcTyThing]
 lclEnvElts env = nameEnvElts (tcl_env env)
@@ -431,6 +423,8 @@ findGlobals tvs tidy_env = do
     ignore_it ty = tvs `disjointVarSet` tyVarsOfType ty
 
 -----------------------
+find_thing :: (TcType -> Bool) -> TidyEnv -> TcTyThing
+           -> TcM (TidyEnv, Maybe SDoc)
 find_thing ignore_it tidy_env (ATcId { tct_id = id }) = do
     id_ty <- zonkTcType  (idType id)
     if ignore_it id_ty then
@@ -470,6 +464,7 @@ find_thing _ _ thing = pprPanic "find_thing" (ppr thing)
 %************************************************************************
 
 \begin{code}
+tc_extend_gtvs :: IORef VarSet -> VarSet -> TcM (IORef VarSet)
 tc_extend_gtvs gtvs extra_global_tvs = do
     global_tvs <- readMutVar gtvs
     newMutVar (global_tvs `unionVarSet` extra_global_tvs)
@@ -624,8 +619,10 @@ data InstBindings
 				-- witness dictionary is identical to the argument 
 				-- dictionary.  Hence no bindings, no pragmas.
 
+pprInstInfo :: InstInfo -> SDoc
 pprInstInfo info = vcat [ptext (sLit "InstInfo:") <+> ppr (idType (iDFunId info))]
 
+pprInstInfoDetails :: InstInfo -> SDoc
 pprInstInfoDetails info = pprInstInfo info $$ nest 2 (details (iBinds info))
   where
     details (VanillaInst b _) = pprLHsBinds b
@@ -633,7 +630,8 @@ pprInstInfoDetails info = pprInstInfo info $$ nest 2 (details (iBinds info))
 
 simpleInstInfoClsTy :: InstInfo -> (Class, Type)
 simpleInstInfoClsTy info = case instanceHead (iSpec info) of
-			  (_, _, cls, [ty]) -> (cls, ty)
+                           (_, _, cls, [ty]) -> (cls, ty)
+                           _ -> panic "simpleInstInfoClsTy"
 
 simpleInstInfoTy :: InstInfo -> Type
 simpleInstInfoTy info = snd (simpleInstInfoClsTy info)
@@ -689,12 +687,14 @@ pprBinders :: [Name] -> SDoc
 pprBinders [bndr] = quotes (ppr bndr)
 pprBinders bndrs  = pprWithCommas ppr bndrs
 
+notFound :: Name -> TcGblEnv -> TcM TyThing
 notFound name env
   = failWithTc (vcat[ptext (sLit "GHC internal error:") <+> quotes (ppr name) <+> 
                      ptext (sLit "is not in scope during type checking, but it passed the renamer"),
                      ptext (sLit "tcg_type_env of environment:") <+> ppr (tcg_type_env env)]
                     )
 
+wrongThingErr :: String -> TcTyThing -> Name -> TcM a
 wrongThingErr expected thing name
   = failWithTc (pprTcTyThingCategory thing <+> quotes (ppr name) <+> 
 		ptext (sLit "used as a") <+> text expected)
