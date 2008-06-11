@@ -257,8 +257,6 @@ $(CONFIG_HS) : $(FPTOOLS_TOP)/mk/config.mk
 	@echo "cLdIsGNULd            = \"$(LdIsGNULd)\"" >> $(CONFIG_HS)
 	@echo "cLD_X		     :: String" >> $(CONFIG_HS)
 	@echo "cLD_X		     = \"$(LD_X)\"" >> $(CONFIG_HS)
-	@echo "cPROJECT_DIR          :: String" >> $(CONFIG_HS)
-	@echo "cPROJECT_DIR          = \"$(PROJECT_DIR)\"" >> $(CONFIG_HS)
 	@echo "cGHC_DRIVER_DIR_REL   :: String" >> $(CONFIG_HS)
 	@echo "cGHC_DRIVER_DIR_REL   = \"$(GHC_DRIVER_DIR_REL)\"" >> $(CONFIG_HS)
 	@echo "cGHC_TOUCHY_PGM       :: String" >> $(CONFIG_HS)
