@@ -90,7 +90,7 @@ RUNTEST_OPTS += -e ghc_with_smp=0
 endif
 
 ifneq "$(THREADS)" ""
-RUNTEST_OPTS += --thread=$(THREADS)
+RUNTEST_OPTS += --threads=$(THREADS)
 else
 USETHREADS=0
 endif
