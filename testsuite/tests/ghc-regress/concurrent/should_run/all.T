@@ -118,7 +118,6 @@ test('conc042', only_compiler_types(['ghc']), compile_and_run, [''])
 test('conc043', only_compiler_types(['ghc']), compile_and_run, [''])
 test('conc044', only_compiler_types(['ghc']), compile_and_run, [''])
 test('conc045', only_compiler_types(['ghc']), compile_and_run, [''])
-test('conc051', normal, compile_and_run, [''])
 
 test('conc058', only_compiler_types(['ghc']), compile_and_run, [''])
 
