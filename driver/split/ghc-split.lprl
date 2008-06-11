@@ -34,7 +34,6 @@ sub split_asm_file {
     &collectDyldStuff_darwin() if $TargetPlatform =~ /-apple-darwin/;
 
     $octr = 0;	# output file counter
-    $* = 1; 	# multi-line matches are OK
 
     %LocalConstant = (); # we have to subvert C compiler's commoning-up of constants...
 
@@ -48,7 +47,7 @@ sub split_asm_file {
 
     # lie about where this stuff came from
     # Note the \Q: this ignores regex meta-chars in $Tmp_prefix.
-    $prologue_stuff =~ s/\Q"$Tmp_prefix.c"/"$ifile_root.hc"/g;
+    $prologue_stuff =~ s/\Q"$Tmp_prefix.c"/"$ifile_root.hc"/gm;
 
     while ( $_ ne '' ) { # not EOF
 	$octr++;
@@ -66,7 +65,7 @@ sub split_asm_file {
 
     $NoOfSplitFiles = $octr;
 
-    if ($pieces[$NoOfSplitFiles] =~ /(\n[ \t]*\.section[ \t]+\.note\.GNU-stack,[^\n]*\n)/) {
+    if ($pieces[$NoOfSplitFiles] =~ /(\n[ \t]*\.section[ \t]+\.note\.GNU-stack,[^\n]*\n)/m) {
         $note_gnu_stack = $1;
         for $octr (1..($NoOfSplitFiles - 1)) {
             $pieces[$octr] .= $note_gnu_stack;
@@ -94,15 +93,15 @@ sub collectExports_hppa { # Note: HP-PA only
     %LocalExport = (); # NB: global table
 
     while(<TMPI>) {
-	if (/^\s+\.EXPORT\s+([^,]+),.*\n/) {
+	if (/^\s+\.EXPORT\s+([^,]+),.*\n/m) {
 	    local($label) = $1;
 	    local($body)  = "\t.IMPORT $label";
-	    if (/,DATA/) { 
+	    if (/,DATA/m) { 
 		$body .= ",DATA\n"; 
 	    } else { 
 		$body .= ",CODE\n"; 
 	    }
-	    $label =~ s/\$/\\\$/g;
+	    $label =~ s/\$/\\\$/gm;
 	    $LocalExport{$label} = $body;
 	}
     }
@@ -116,7 +115,7 @@ sub collectExports_mips { # Note: MIPS only
     $UNDEFINED_FUNS = ''; # NB: global table
 
     while(<TMPI>) {
-	$UNDEFINED_FUNS .= $_ if /^\t\.globl\s+\S+ \.\S+\n/;
+	$UNDEFINED_FUNS .= $_ if /^\t\.globl\s+\S+ \.\S+\n/m;
 	# just save 'em all
     }
 
@@ -138,10 +137,10 @@ sub collectDyldStuff_darwin {
     
     while ( 1 ) {
 	$_ = <TMPI>;
-	if ( $_ eq '' || (/^L(_.+)\$.+:/ && !(/^L(.*)\$stub_binder:/))) {
+	if ( $_ eq '' || (/^L(_.+)\$.+:/m && !(/^L(.*)\$stub_binder:/m))) {
 	    if ( $label ne '' ) {
 		$DyldChunksDefined{$label} .= $section . $alignment . $chunk_label . $ chunk;
-		if( $section =~ s/\.data/\.non_lazy_symbol_pointer/ ) {
+		if( $section =~ s/\.data/\.non_lazy_symbol_pointer/m ) {
 		    $chunk = "\t.indirect_symbol $label\n\t.long 0\n";
 		}
 		$DyldChunks{$label} .= $section . $alignment . $chunk_label . $chunk;
@@ -155,16 +154,16 @@ sub collectDyldStuff_darwin {
 	    $section = $cur_section;
 	    $alignment = $cur_alignment;
 	    print STDERR "label: $label\n" if $Dump_asm_splitting_info;
-	} elsif ( /^\s*\.(symbol_stub|picsymbol_stub|lazy_symbol_pointer|non_lazy_symbol_pointer|data|section __IMPORT,.*|section __DATA, __la_sym_ptr(2|3),lazy_symbol_pointers)/ ) {
+	} elsif ( /^\s*\.(symbol_stub|picsymbol_stub|lazy_symbol_pointer|non_lazy_symbol_pointer|data|section __IMPORT,.*|section __DATA, __la_sym_ptr(2|3),lazy_symbol_pointers)/m ) {
 	    $cur_section = $_;
 	    printf STDERR "section: $cur_section\n" if $Dump_asm_splitting_info;
 	    $cur_alignment = ''
-	} elsif ( /^\s*\.section\s+__TEXT,__symbol_stub1,symbol_stubs,pure_instructions,\d+/ ) {
+	} elsif ( /^\s*\.section\s+__TEXT,__symbol_stub1,symbol_stubs,pure_instructions,\d+/m ) {
 	    $cur_section = $_;
 	    printf STDERR "section: $cur_section\n" if $Dump_asm_splitting_info;
                 # always make sure we align things
 	    $cur_alignment = '\t.align 2'
-	} elsif ( /^\s*\.align.*/ ) { 
+	} elsif ( /^\s*\.align.*/m ) { 
 	    $cur_alignment = $_;
 	    printf STDERR "alignment: $cur_alignment\n" if $Dump_asm_splitting_info;
 	} else {
@@ -179,7 +178,7 @@ sub ReadTMPIUpToAMarker {
     local($str, $count) = @_; # already read bits
 
     
-    for ( $_ = <TMPI>; $_ ne '' && ! /_?__stg_split_marker/; $_ = <TMPI> ) {
+    for ( $_ = <TMPI>; $_ ne '' && ! /_?__stg_split_marker/m; $_ = <TMPI> ) {
 	$str .= $_;
     }
     # if not EOF, then creep forward until next "real" line
@@ -190,26 +189,26 @@ sub ReadTMPIUpToAMarker {
     # Note that the assembler mangler will already have eliminated this code
     # if it's been invoked (which it probably has).
 
-    while ($_ ne '' && (/_?__stg_split_marker/
-		     || /^L[^C].*:$/
-		     || /^\.stab/
-		     || /\t\.proc/
-		     || /\t\.stabd/
-		     || /\t\.even/
-		     || /\tunlk a6/
-		     || /^\t!#PROLOGUE/
-		     || /\t\.prologue/
-		     || /\t\.frame/
+    while ($_ ne '' && (/_?__stg_split_marker/m
+		     || /^L[^C].*:$/m
+		     || /^\.stab/m
+		     || /\t\.proc/m
+		     || /\t\.stabd/m
+		     || /\t\.even/m
+		     || /\tunlk a6/m
+		     || /^\t!#PROLOGUE/m
+		     || /\t\.prologue/m
+		     || /\t\.frame/m
                      # || /\t\.end/ NOT!  Let the split_marker regexp catch it
                      # || /\t\.ent/ NOT!  Let the split_marker regexp catch it
-		     || /^\s+(save|retl?|restore|nop)/)) {
+		     || /^\s+(save|retl?|restore|nop)/m)) {
 	$_ = <TMPI>;
     }
 
     print STDERR "### BLOCK:$count:\n$str" if $Dump_asm_splitting_info;
 
     # return str
-    $str =~ tr/\r//d if $TargetPlatform =~ /-mingw32$/; # in case Perl doesn't convert line endings
+    $str =~ tr/\r//d if $TargetPlatform =~ /-mingw32$/m; # in case Perl doesn't convert line endings
     $str;
 }
 \end{code}
@@ -223,16 +222,16 @@ sub process_asm_block {
     local($str) = @_;
 
     return(&process_asm_block_darwin($str))
-                            if $TargetPlatform =~ /-apple-darwin/;
-    return(&process_asm_block_m68k($str))  if $TargetPlatform =~ /^m68k-/;
-    return(&process_asm_block_sparc($str)) if $TargetPlatform =~ /^sparc-/;
-    return(&process_asm_block_iX86($str))  if $TargetPlatform =~ /^i[34]86-/;
-    return(&process_asm_block_x86_64($str))  if $TargetPlatform =~ /^x86_64-/;
-    return(&process_asm_block_alpha($str)) if $TargetPlatform =~ /^alpha-/;
-    return(&process_asm_block_hppa($str))  if $TargetPlatform =~ /^hppa/;
-    return(&process_asm_block_mips($str))   if $TargetPlatform =~ /^mips-/;
+                            if $TargetPlatform =~ /-apple-darwin/m;
+    return(&process_asm_block_m68k($str))  if $TargetPlatform =~ /^m68k-/m;
+    return(&process_asm_block_sparc($str)) if $TargetPlatform =~ /^sparc-/m;
+    return(&process_asm_block_iX86($str))  if $TargetPlatform =~ /^i[34]86-/m;
+    return(&process_asm_block_x86_64($str))  if $TargetPlatform =~ /^x86_64-/m;
+    return(&process_asm_block_alpha($str)) if $TargetPlatform =~ /^alpha-/m;
+    return(&process_asm_block_hppa($str))  if $TargetPlatform =~ /^hppa/m;
+    return(&process_asm_block_mips($str))   if $TargetPlatform =~ /^mips-/m;
     return(&process_asm_block_powerpc_linux($str))
-                            if $TargetPlatform =~ /^powerpc-[^-]+-linux/;
+                            if $TargetPlatform =~ /^powerpc-[^-]+-linux/m;
 
     # otherwise...
     &tidy_up_and_die(1,"$Pgm: no process_asm_block for $TargetPlatform\n");
@@ -243,17 +242,17 @@ sub process_asm_block_sparc {
 
     # strip the marker
     if ( $OptimiseC ) {
-	$str =~ s/_?__stg_split_marker.*:\n//;
+	$str =~ s/_?__stg_split_marker.*:\n//m;
     } else {
-	$str =~ s/(\.text\n\t\.align .\n)\t\.global\s+.*_?__stg_split_marker.*\n\t\.proc.*\n/$1/;
-	$str =~ s/(\t\.align .\n)\t\.global\s+.*_?__stg_split_marker.*\n\t\.proc.*\n/$1/;
+	$str =~ s/(\.text\n\t\.align .\n)\t\.global\s+.*_?__stg_split_marker.*\n\t\.proc.*\n/$1/m;
+	$str =~ s/(\t\.align .\n)\t\.global\s+.*_?__stg_split_marker.*\n\t\.proc.*\n/$1/m;
     }
 
     # make sure the *.hc filename gets saved; not just ghc*.c (temp name)
-    $str =~ s/^\.stabs "(ghc\d+\.c)"/.stabs "$ifile_root.hc"/g; # HACK HACK
+    $str =~ s/^\.stabs "(ghc\d+\.c)"/.stabs "$ifile_root.hc"/gm; # HACK HACK
 
     # remove/record any literal constants defined here
-    while ( $str =~ /(\t\.align .\n\.?(L?LC\d+):\n(\t\.asci[iz].*\n)+)/ ) {
+    while ( $str =~ /(\t\.align .\n\.?(L?LC\d+):\n(\t\.asci[iz].*\n)+)/m ) {
 	local($label) = $2;
 	local($body)  = $1;
 
@@ -262,12 +261,12 @@ sub process_asm_block_sparc {
 
 	$LocalConstant{$label} = $body;
 	
-	$str =~ s/\t\.align .\n\.?LL?C\d+:\n(\t\.asci[iz].*\n)+//;
+	$str =~ s/\t\.align .\n\.?LL?C\d+:\n(\t\.asci[iz].*\n)+//m;
     }
 
     # inject definitions for any local constants now used herein
     foreach $k (keys %LocalConstant) {
-	if ( $str =~ /\b$k\b/ ) {
+	if ( $str =~ /\b$k\b/m ) {
 	    $str = $LocalConstant{$k} . $str;
 	}
     }
@@ -282,14 +281,14 @@ sub process_asm_block_m68k {
 
     # strip the marker
 
-    $str =~ s/(\.text\n\t\.even\n)\t\.globl\s+.*_?__stg_split_marker.*\n/$1/;
-    $str =~ s/(\t\.even\n)\t\.globl\s+.*_?__stg_split_marker.*\n/$1/;
+    $str =~ s/(\.text\n\t\.even\n)\t\.globl\s+.*_?__stg_split_marker.*\n/$1/m;
+    $str =~ s/(\t\.even\n)\t\.globl\s+.*_?__stg_split_marker.*\n/$1/m;
 
     # it seems prudent to stick on one of these:
     $str = "\.text\n\t.even\n" . $str;
 
     # remove/record any literal constants defined here
-    while ( $str =~ /((LC\d+):\n\t\.ascii.*\n)/ ) {
+    while ( $str =~ /((LC\d+):\n\t\.ascii.*\n)/m ) {
 	local($label) = $2;
 	local($body)  = $1;
 
@@ -298,12 +297,12 @@ sub process_asm_block_m68k {
 
 	$LocalConstant{$label} = $body;
 	
-	$str =~ s/LC\d+:\n\t\.ascii.*\n//;
+	$str =~ s/LC\d+:\n\t\.ascii.*\n//m;
     }
 
     # inject definitions for any local constants now used herein
     foreach $k (keys %LocalConstant) {
-	if ( $str =~ /\b$k\b/ ) {
+	if ( $str =~ /\b$k\b/m ) {
 	    $str = $LocalConstant{$k} . $str;
 	}
     }
@@ -318,13 +317,13 @@ sub process_asm_block_alpha {
 
     # strip the marker
     if ( $OptimiseC ) {
-	$str =~ s/_?__stg_split_marker.*:\n//;
+	$str =~ s/_?__stg_split_marker.*:\n//m;
     } else {
-	$str =~ s/(\t\.align .\n)\t\.globl\s+.*_?__stg_split_marker.*\n\t\.ent.*\n/$1/;
+	$str =~ s/(\t\.align .\n)\t\.globl\s+.*_?__stg_split_marker.*\n\t\.ent.*\n/$1/m;
     }
 
     # remove/record any literal constants defined here
-    while ( $str =~ /(\.rdata\n\t\.align \d\n)?(\$(C\d+):\n\t\..*\n)/ ) {
+    while ( $str =~ /(\.rdata\n\t\.align \d\n)?(\$(C\d+):\n\t\..*\n)/m ) {
 	local($label) = $3;
 	local($body)  = $2;
 
@@ -333,12 +332,12 @@ sub process_asm_block_alpha {
 
 	$LocalConstant{$label} = ".rdata\n\t.align 3\n" . $body . "\t.text\n";
 	
-	$str =~ s/(\.rdata\n\t\.align \d\n)?\$C\d+:\n\t\..*\n//;
+	$str =~ s/(\.rdata\n\t\.align \d\n)?\$C\d+:\n\t\..*\n//m;
     }
 
     # inject definitions for any local constants now used herein
     foreach $k (keys %LocalConstant) {
-	if ( $str =~ /\$\b$k\b/ ) {
+	if ( $str =~ /\$\b$k\b/m ) {
 	    $str = $LocalConstant{$k} . $str;
 	}
     }
@@ -346,7 +345,7 @@ sub process_asm_block_alpha {
     # Slide the dummy direct return code into the vtbl .ent/.end block,
     # to keep the label fixed if it's the last thing in a module, and
     # to avoid having any anonymous text that the linker will complain about
-    $str =~ s/(\t\.end [A-Za-z0-9_]+)\n\t# nop/\tnop\n$1/g;
+    $str =~ s/(\t\.end [A-Za-z0-9_]+)\n\t# nop/\tnop\n$1/gm;
 
     print STDERR "### STRIPPED BLOCK (alpha):\n$str" if $Dump_asm_splitting_info;
 
@@ -358,8 +357,8 @@ sub process_asm_block_iX86 {
 
     # strip the marker
 
-    $str =~ s/(\.text\n\t\.align .(,0x90)?\n)\.globl\s+.*_?__stg_split_marker.*\n/$1/;
-    $str =~ s/(\t\.align .(,0x90)?\n)\.globl\s+.*_?__stg_split_marker.*\n/$1/;
+    $str =~ s/(\.text\n\t\.align .(,0x90)?\n)\.globl\s+.*_?__stg_split_marker.*\n/$1/m;
+    $str =~ s/(\t\.align .(,0x90)?\n)\.globl\s+.*_?__stg_split_marker.*\n/$1/m;
 
     # it seems prudent to stick on one of these:
     $str = "\.text\n\t.align 4\n" . $str;
@@ -369,10 +368,10 @@ sub process_asm_block_iX86 {
     # http://bugs6.perl.org/rt2/Ticket/Display.html?id=1760 and illustrated
     # by the seg fault of perl -e '("x\n" x 5000) =~ /(.*\n)+/'
     # -- ccshan 2002-09-05]
-    while ( ($str =~ /((?:^|\.)(LC\d+):\n(\t\.(ascii|string).*\n|\s*\.byte.*\n){1,100})/ )) {
+    while ( ($str =~ /((?:^|\.)(LC\d+):\n(\t\.(ascii|string).*\n|\s*\.byte.*\n){1,100})/m )) {
 	local($label) = $2;
 	local($body)  = $1;
-	local($prefix, $suffix, $*) = ($`, $', 0);
+	local($prefix, $suffix) = ($`, $');
 
 	&tidy_up_and_die(1,"Local constant label $label already defined!\n")
 	    if $LocalConstant{$label};
@@ -387,7 +386,7 @@ sub process_asm_block_iX86 {
 
     # inject definitions for any local constants now used herein
     foreach $k (keys %LocalConstant) {
-	if ( $str =~ /\b$k\b/ ) {
+	if ( $str =~ /\b$k\b/m ) {
 	    $str = $LocalConstant{$k} . $str;
 	}
     }
@@ -407,10 +406,10 @@ sub process_asm_block_x86_64 {
     # http://bugs6.perl.org/rt2/Ticket/Display.html?id=1760 and illustrated
     # by the seg fault of perl -e '("x\n" x 5000) =~ /(.*\n)+/'
     # -- ccshan 2002-09-05]
-    while ( ($str =~ /((?:^|\.)(LC\d+):\n(\t\.(ascii|string).*\n|\s*\.byte.*\n){1,100})/ )) {
+    while ( ($str =~ /((?:^|\.)(LC\d+):\n(\t\.(ascii|string).*\n|\s*\.byte.*\n){1,100})/m )) {
 	local($label) = $2;
 	local($body)  = $1;
-	local($prefix, $suffix, $*) = ($`, $', 0);
+	local($prefix, $suffix) = ($`, $');
 
 	&tidy_up_and_die(1,"Local constant label $label already defined!\n")
 	    if $LocalConstant{$label};
@@ -425,7 +424,7 @@ sub process_asm_block_x86_64 {
 
     # inject definitions for any local constants now used herein
     foreach $k (keys %LocalConstant) {
-	if ( $str =~ /\b$k\b/ ) {
+	if ( $str =~ /\b$k\b/m ) {
 	    $str = $LocalConstant{$k} . $str;
 	}
     }
@@ -441,22 +440,22 @@ sub process_asm_block_hppa {
     local($str) = @_;
 
     # strip the marker
-    $str =~ s/___stg_split_marker.*\n//;
+    $str =~ s/___stg_split_marker.*\n//m;
 
     # remove/record any imports defined here
-    while ( $str =~ /^(\s+\.IMPORT\s.*\n)/ ) {
+    while ( $str =~ /^(\s+\.IMPORT\s.*\n)/m ) {
 	$Imports .= $1;
 
-	$str =~ s/^\s+\.IMPORT.*\n//;
+	$str =~ s/^\s+\.IMPORT.*\n//m;
     }
 
     # remove/record any literal constants defined here
-    while ( $str =~ /^(\s+\.align.*\n(L\$C\d+)\n(\s.*\n)+); end literal\n/ ) {
+    while ( $str =~ /^(\s+\.align.*\n(L\$C\d+)\n(\s.*\n)+); end literal\n/m ) {
 	local($label) = $2;
 	local($body)  = $1;
 	local($prefix) = $`;
 	local($suffix) = $';
-	$label =~ s/\$/\\\$/g;
+	$label =~ s/\$/\\\$/gm;
 
 	&tidy_up_and_die(1,"Local constant label $label already defined!\n")
 	    if $LocalConstant{$label};
@@ -468,14 +467,14 @@ sub process_asm_block_hppa {
 
     # inject definitions for any local constants now used herein
     foreach $k (keys %LocalConstant) {
-	if ( $str =~ /\b$k\b/ ) {
+	if ( $str =~ /\b$k\b/m ) {
 	    $str = $LocalConstant{$k} . $str;
 	}
     }
 
     # inject required imports for local exports in other chunks
     foreach $k (keys %LocalExport) {
-	if ( $str =~ /\b$k\b/ && ! /EXPORT\s+$k\b/ ) {
+	if ( $str =~ /\b$k\b/m && ! /EXPORT\s+$k\b/m ) {
 	    $str = $LocalExport{$k} . $str;
 	}
     }
@@ -496,13 +495,13 @@ sub process_asm_block_mips {
 
     # strip the marker
     if ( $OptimiseC ) {
-	$str =~ s/_?__stg_split_marker.*:\n//;
+	$str =~ s/_?__stg_split_marker.*:\n//m;
     } else {
-	$str =~ s/(\t\.align .\n)\t\.globl\s+.*_?__stg_split_marker.*\n\t\.ent.*\n/$1/;
+	$str =~ s/(\t\.align .\n)\t\.globl\s+.*_?__stg_split_marker.*\n\t\.ent.*\n/$1/m;
     }
 
     # remove/record any literal constants defined here
-    while ( $str =~ /(\t\.rdata\n\t\.align \d\n)?^(\$(LC\d+):\n(\t\.byte\t.*\n)+)/ ) {
+    while ( $str =~ /(\t\.rdata\n\t\.align \d\n)?^(\$(LC\d+):\n(\t\.byte\t.*\n)+)/m ) {
 	local($label) = $3;
 	local($body)  = $2;
 
@@ -511,12 +510,12 @@ sub process_asm_block_mips {
 
 	$LocalConstant{$label} = "\t.rdata\n\t.align 2\n" . $body . "\t.text\n";
 	
-	$str =~ s/(\t\.rdata\n\t\.align \d\n)?\$LC\d+:\n(\t\.byte\t.*\n)+//;
+	$str =~ s/(\t\.rdata\n\t\.align \d\n)?\$LC\d+:\n(\t\.byte\t.*\n)+//m;
     }
 
     # inject definitions for any local constants now used herein
     foreach $k (keys %LocalConstant) {
-	if ( $str =~ /\$\b$k\b/ ) {
+	if ( $str =~ /\$\b$k\b/m ) {
 	    $str = $LocalConstant{$k} . $str;
 	}
     }
@@ -524,7 +523,7 @@ sub process_asm_block_mips {
     # Slide the dummy direct return code into the vtbl .ent/.end block,
     # to keep the label fixed if it's the last thing in a module, and
     # to avoid having any anonymous text that the linker will complain about
-    $str =~ s/(\t\.end [A-Za-z0-9_]+)\n\t# nop/\tnop\n$1/g;
+    $str =~ s/(\t\.end [A-Za-z0-9_]+)\n\t# nop/\tnop\n$1/gm;
 
     $str .= $UNDEFINED_FUNS; # pin on gratuitiously-large amount of info
 
@@ -542,12 +541,12 @@ sub process_asm_block_darwin {
     local($dyld_stuff) = '';
 
     # strip the marker
-    $str =~ s/___stg_split_marker.*\n//;
+    $str =~ s/___stg_split_marker.*\n//m;
 
-    $str =~ s/L_.*\$.*:\n(.|\n)*//;
+    $str =~ s/L_.*\$.*:\n(.|\n)*//m;
 
     # remove/record any literal constants defined here
-    while ( $str =~ s/^(\s+.const.*\n\s+\.align.*\n(LC\d+):\n(\s\.(byte|short|long|fill|space|ascii).*\n)+)// ) {
+    while ( $str =~ s/^(\s+.const.*\n\s+\.align.*\n(LC\d+):\n(\s\.(byte|short|long|fill|space|ascii).*\n)+)//m ) {
 	local($label) = $2;
 	local($body)  = $1;
 
@@ -559,14 +558,14 @@ sub process_asm_block_darwin {
 
     # inject definitions for any local constants now used herein
     foreach $k (keys %LocalConstant) {
-	if ( $str =~ /\b$k(\b|\[)/ ) {
+	if ( $str =~ /\b$k(\b|\[)/m ) {
 	    $str = $LocalConstant{$k} . $str;
 	}
     }
     
     foreach $k (keys %DyldChunks) {
-	if ( $str =~ /\bL$k\$/ ) {
-	    if ( $str =~ /^$k:$/ ) {
+	if ( $str =~ /\bL$k\$/m ) {
+	    if ( $str =~ /^$k:$/m ) {
 		$dyld_stuff .= $DyldChunksDefined{$k};
 	    } else {
 		$dyld_stuff .= $DyldChunks{$k};
@@ -587,10 +586,10 @@ sub process_asm_block_powerpc_linux {
     local($str) = @_;
 
     # strip the marker
-    $str =~ s/__stg_split_marker.*\n//;
+    $str =~ s/__stg_split_marker.*\n//m;
 
     # remove/record any literal constants defined here
-    while ( $str =~ s/^(\s+.section\s+\.rodata\n\s+\.align.*\n(\.LC\d+):\n(\s\.(byte|short|long|quad|2byte|4byte|8byte|fill|space|ascii|string).*\n)+)// ) {
+    while ( $str =~ s/^(\s+.section\s+\.rodata\n\s+\.align.*\n(\.LC\d+):\n(\s\.(byte|short|long|quad|2byte|4byte|8byte|fill|space|ascii|string).*\n)+)//m ) {
 	local($label) = $2;
 	local($body)  = $1;
 
@@ -602,7 +601,7 @@ sub process_asm_block_powerpc_linux {
 
     # inject definitions for any local constants now used herein
     foreach $k (keys %LocalConstant) {
-	if ( $str =~ /[\s,]$k\b/ ) {
+	if ( $str =~ /[\s,]$k\b/m ) {
 	    $str = $LocalConstant{$k} . $str;
 	}
     }
