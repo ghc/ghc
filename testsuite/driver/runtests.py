@@ -10,6 +10,7 @@ import sys
 import os
 import string
 import getopt
+import platform
 import time
 
 from testutil import *
@@ -79,7 +80,17 @@ for opt,arg in opts:
         config.compile_ways = filter(neq(arg), config.compile_ways)
 
     if opt == '--threads':
-        config.threads = int(arg)
+        # Trac #1558 says threads don't work in python 2.4.4, but do
+        # in 2.5.2. Probably >= 2.5 is sufficient, but let's be
+        # conservative here.
+        (maj, min, pat) = platform.python_version_tuple()
+        maj = int(maj)
+        min = int(min)
+        pat = int(pat)
+        if (maj, min, pat) >= (2, 5, 2):
+            config.threads = int(arg)
+        else:
+            print "Warning: Ignoring request to use threads as python version < 2.5.2"
 
 # This has to come after arg parsing as the args can change the compiler
 get_compiler_info()
