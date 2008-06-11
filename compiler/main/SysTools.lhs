@@ -15,29 +15,29 @@
 -- for details
 
 module SysTools (
-	-- Initialisation
-	initSysTools,
+        -- Initialisation
+        initSysTools,
 
-	-- Interface to system tools
-	runUnlit, runCpp, runCc, -- [Option] -> IO ()
-	runPp,                   -- [Option] -> IO ()
-	runMangle, runSplit,	 -- [Option] -> IO ()
-	runAs, runLink,		 -- [Option] -> IO ()
-	runMkDLL,
+        -- Interface to system tools
+        runUnlit, runCpp, runCc, -- [Option] -> IO ()
+        runPp,                   -- [Option] -> IO ()
+        runMangle, runSplit,     -- [Option] -> IO ()
+        runAs, runLink,          -- [Option] -> IO ()
+        runMkDLL,
         runWindres,
 
-	touch,			-- String -> String -> IO ()
-	copy,
+        touch,                  -- String -> String -> IO ()
+        copy,
         copyWithHeader,
         getExtraViaCOpts,
-	
-	-- Temporary-file management
-	setTmpDir,
-	newTempName,
-	cleanTempDirs, cleanTempFiles, cleanTempFilesExcept,
-	addFilesToClean,
 
-	Option(..)
+        -- Temporary-file management
+        setTmpDir,
+        newTempName,
+        cleanTempDirs, cleanTempFiles, cleanTempFilesExcept,
+        addFilesToClean,
+
+        Option(..)
 
  ) where
 
@@ -69,18 +69,18 @@ import Data.List
 import qualified System.Posix.Internals
 #else /* Must be Win32 */
 import Foreign
-import CString		( CString, peekCString )
+import CString          ( CString, peekCString )
 #endif
 
-import System.Process	( runInteractiveProcess, getProcessExitCode )
+import System.Process   ( runInteractiveProcess, getProcessExitCode )
 import Control.Concurrent( forkIO, newChan, readChan, writeChan )
 import FastString
 import SrcLoc           ( SrcLoc, mkSrcLoc, noSrcSpan, mkSrcSpan )
 \end{code}
 
 
-		The configuration story
-		~~~~~~~~~~~~~~~~~~~~~~~
+                The configuration story
+                ~~~~~~~~~~~~~~~~~~~~~~~
 
 GHC needs various support files (library packages, RTS etc), plus
 various auxiliary programs (cp, gcc, etc).  It finds these in one
@@ -92,7 +92,7 @@ of two places:
 
 * When running *in-place* in a build tree, GHC finds most of this support
   stuff in the build tree.  The path to the build tree is, again passed
-  to GHC via -B. 
+  to GHC via -B.
 
 GHC tells which of the two is the case by seeing whether package.conf
 is in TopDir [installed] or in TopDir/ghc/driver [inplace] (what a hack).
@@ -105,16 +105,16 @@ file containing variables whose value is figured out by the build system.
 
 Config.hs contains two sorts of things
 
-  cGCC, 	The *names* of the programs
-  cCPP		  e.g.  cGCC = gcc
-  cUNLIT	        cCPP = gcc -E
-  etc		They do *not* include paths
-				
+  cGCC,         The *names* of the programs
+  cCPP            e.g.  cGCC = gcc
+  cUNLIT                cCPP = gcc -E
+  etc           They do *not* include paths
+
 
   cUNLIT_DIR_REL   The *path* to the directory containing unlit, split etc
   cSPLIT_DIR_REL   *relative* to the root of the build tree,
-		   for use when running *in-place* in a build tree (only)
-		
+                   for use when running *in-place* in a build tree (only)
+
 
 
 ---------------------------------------------
@@ -137,180 +137,180 @@ Package
 Which would have the advantage that we get to collect together in one
 place the path-specific package stuff with the path-specific tool
 stuff.
-		End of NOTES
+                End of NOTES
 ---------------------------------------------
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Initialisation}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
-initSysTools :: Maybe String	-- Maybe TopDir path (without the '-B' prefix)
+initSysTools :: Maybe String    -- Maybe TopDir path (without the '-B' prefix)
 
-	     -> DynFlags
-	     -> IO DynFlags	-- Set all the mutable variables above, holding 
-				--	(a) the system programs
-				--	(b) the package-config file
-				--	(c) the GHC usage message
+             -> DynFlags
+             -> IO DynFlags     -- Set all the mutable variables above, holding
+                                --      (a) the system programs
+                                --      (b) the package-config file
+                                --      (c) the GHC usage message
 
 
 initSysTools mbMinusB dflags
   = do  { (am_installed, top_dir) <- findTopDir mbMinusB
-		-- top_dir
-		-- 	for "installed" this is the root of GHC's support files
-		--	for "in-place" it is the root of the build tree
-		-- NB: top_dir is assumed to be in standard Unix
-		-- format, '/' separated
+                -- top_dir
+                --      for "installed" this is the root of GHC's support files
+                --      for "in-place" it is the root of the build tree
+                -- NB: top_dir is assumed to be in standard Unix
+                -- format, '/' separated
 
-	; let installed, installed_bin :: FilePath -> FilePath
+        ; let installed, installed_bin :: FilePath -> FilePath
               installed_bin pgm   =  top_dir </> pgm
-	      installed     file  =  top_dir </> file
-	      inplace dir   pgm   =  top_dir </> dir </> pgm
+              installed     file  =  top_dir </> file
+              inplace dir   pgm   =  top_dir </> dir </> pgm
 
-	; let pkgconfig_path
-		| am_installed = installed "package.conf"
-		| otherwise    = inplace cGHC_DRIVER_DIR_REL "package.conf.inplace"
+        ; let pkgconfig_path
+                | am_installed = installed "package.conf"
+                | otherwise    = inplace cGHC_DRIVER_DIR_REL "package.conf.inplace"
 
-	      ghc_usage_msg_path
-		| am_installed = installed "ghc-usage.txt"
-		| otherwise    = inplace cGHC_DRIVER_DIR_REL "ghc-usage.txt"
+              ghc_usage_msg_path
+                | am_installed = installed "ghc-usage.txt"
+                | otherwise    = inplace cGHC_DRIVER_DIR_REL "ghc-usage.txt"
 
-	      ghci_usage_msg_path
-		| am_installed = installed "ghci-usage.txt"
-		| otherwise    = inplace cGHC_DRIVER_DIR_REL "ghci-usage.txt"
+              ghci_usage_msg_path
+                | am_installed = installed "ghci-usage.txt"
+                | otherwise    = inplace cGHC_DRIVER_DIR_REL "ghci-usage.txt"
 
-		-- For all systems, unlit, split, mangle are GHC utilities
-		-- architecture-specific stuff is done when building Config.hs
-	      unlit_path
-		| am_installed = installed_bin cGHC_UNLIT_PGM
-		| otherwise    = inplace cGHC_UNLIT_DIR_REL cGHC_UNLIT_PGM
+                -- For all systems, unlit, split, mangle are GHC utilities
+                -- architecture-specific stuff is done when building Config.hs
+              unlit_path
+                | am_installed = installed_bin cGHC_UNLIT_PGM
+                | otherwise    = inplace cGHC_UNLIT_DIR_REL cGHC_UNLIT_PGM
 
-		-- split and mangle are Perl scripts
-	      split_script
-		| am_installed = installed_bin cGHC_SPLIT_PGM
-		| otherwise    = inplace cGHC_SPLIT_DIR_REL cGHC_SPLIT_PGM
+                -- split and mangle are Perl scripts
+              split_script
+                | am_installed = installed_bin cGHC_SPLIT_PGM
+                | otherwise    = inplace cGHC_SPLIT_DIR_REL cGHC_SPLIT_PGM
 
-	      mangle_script
-		| am_installed = installed_bin cGHC_MANGLER_PGM
-		| otherwise    = inplace cGHC_MANGLER_DIR_REL cGHC_MANGLER_PGM
+              mangle_script
+                | am_installed = installed_bin cGHC_MANGLER_PGM
+                | otherwise    = inplace cGHC_MANGLER_DIR_REL cGHC_MANGLER_PGM
 
               windres_path
-		| am_installed = installed_bin "bin/windres"
-		| otherwise    = "windres"
+                | am_installed = installed_bin "bin/windres"
+                | otherwise    = "windres"
 
-	; let dflags0 = defaultDynFlags
+        ; let dflags0 = defaultDynFlags
 
         ; tmpdir <- getTemporaryDirectory
         ; let dflags1 = setTmpDir tmpdir dflags0
 
-	-- Check that the package config exists
-	; config_exists <- doesFileExist pkgconfig_path
-	; when (not config_exists) $
-	     throwDyn (InstallationError 
-		         ("Can't find package.conf as " ++ pkgconfig_path))
+        -- Check that the package config exists
+        ; config_exists <- doesFileExist pkgconfig_path
+        ; when (not config_exists) $
+             throwDyn (InstallationError
+                         ("Can't find package.conf as " ++ pkgconfig_path))
 
 #if defined(mingw32_HOST_OS)
-	--		WINDOWS-SPECIFIC STUFF
-	-- On Windows, gcc and friends are distributed with GHC,
-	-- 	so when "installed" we look in TopDir/bin
-	-- When "in-place" we look wherever the build-time configure 
-	--	script found them
-	-- When "install" we tell gcc where its specs file + exes are (-B)
-	--	and also some places to pick up include files.  We need
-	--	to be careful to put all necessary exes in the -B place
-	--	(as, ld, cc1, etc) since if they don't get found there, gcc
-	--	then tries to run unadorned "as", "ld", etc, and will
-	--	pick up whatever happens to be lying around in the path,
-	--	possibly including those from a cygwin install on the target,
-	--	which is exactly what we're trying to avoid.
-	; let gcc_b_arg = Option ("-B" ++ installed "gcc-lib/")
-	      (gcc_prog,gcc_args)
-		| am_installed = (installed_bin "gcc", [gcc_b_arg])
-		| otherwise    = (cGCC, [])
-		-- The trailing "/" is absolutely essential; gcc seems
-		-- to construct file names simply by concatenating to
-		-- this -B path with no extra slash We use "/" rather
-		-- than "\\" because otherwise "\\\" is mangled
-		-- later on; although gcc_args are in NATIVE format,
-		-- gcc can cope
-		--	(see comments with declarations of global variables)
+        --              WINDOWS-SPECIFIC STUFF
+        -- On Windows, gcc and friends are distributed with GHC,
+        --      so when "installed" we look in TopDir/bin
+        -- When "in-place" we look wherever the build-time configure
+        --      script found them
+        -- When "install" we tell gcc where its specs file + exes are (-B)
+        --      and also some places to pick up include files.  We need
+        --      to be careful to put all necessary exes in the -B place
+        --      (as, ld, cc1, etc) since if they don't get found there, gcc
+        --      then tries to run unadorned "as", "ld", etc, and will
+        --      pick up whatever happens to be lying around in the path,
+        --      possibly including those from a cygwin install on the target,
+        --      which is exactly what we're trying to avoid.
+        ; let gcc_b_arg = Option ("-B" ++ installed "gcc-lib/")
+              (gcc_prog,gcc_args)
+                | am_installed = (installed_bin "gcc", [gcc_b_arg])
+                | otherwise    = (cGCC, [])
+                -- The trailing "/" is absolutely essential; gcc seems
+                -- to construct file names simply by concatenating to
+                -- this -B path with no extra slash We use "/" rather
+                -- than "\\" because otherwise "\\\" is mangled
+                -- later on; although gcc_args are in NATIVE format,
+                -- gcc can cope
+                --      (see comments with declarations of global variables)
 
-	      perl_path | am_installed = installed_bin cGHC_PERL
-		        | otherwise    = cGHC_PERL
+              perl_path | am_installed = installed_bin cGHC_PERL
+                        | otherwise    = cGHC_PERL
 
-	-- 'touch' is a GHC util for Windows, and similarly unlit, mangle
-	; let touch_path  | am_installed = installed_bin cGHC_TOUCHY_PGM
-		       	  | otherwise    = inplace cGHC_TOUCHY_DIR_REL cGHC_TOUCHY_PGM
+        -- 'touch' is a GHC util for Windows, and similarly unlit, mangle
+        ; let touch_path  | am_installed = installed_bin cGHC_TOUCHY_PGM
+                          | otherwise    = inplace cGHC_TOUCHY_DIR_REL cGHC_TOUCHY_PGM
 
-	-- On Win32 we don't want to rely on #!/bin/perl, so we prepend 
-	-- a call to Perl to get the invocation of split and mangle
-	; let (split_prog,  split_args)  = (perl_path, [Option split_script])
-	      (mangle_prog, mangle_args) = (perl_path, [Option mangle_script])
+        -- On Win32 we don't want to rely on #!/bin/perl, so we prepend
+        -- a call to Perl to get the invocation of split and mangle
+        ; let (split_prog,  split_args)  = (perl_path, [Option split_script])
+              (mangle_prog, mangle_args) = (perl_path, [Option mangle_script])
 
-	; let (mkdll_prog, mkdll_args)
-	        | am_installed = 
-		    (installed "gcc-lib/" </> cMKDLL,
-		     [ Option "--dlltool-name",
-		       Option (installed "gcc-lib/" </> "dlltool"),
-		       Option "--driver-name",
-		       Option gcc_prog, gcc_b_arg ])
-		| otherwise    = (cMKDLL, [])
+        ; let (mkdll_prog, mkdll_args)
+                | am_installed =
+                    (installed "gcc-lib/" </> cMKDLL,
+                     [ Option "--dlltool-name",
+                       Option (installed "gcc-lib/" </> "dlltool"),
+                       Option "--driver-name",
+                       Option gcc_prog, gcc_b_arg ])
+                | otherwise    = (cMKDLL, [])
 #else
-	--		UNIX-SPECIFIC STUFF
-	-- On Unix, the "standard" tools are assumed to be
-	-- in the same place whether we are running "in-place" or "installed"
-	-- That place is wherever the build-time configure script found them.
-	; let   gcc_prog   = cGCC
-		gcc_args   = []
-		touch_path = "touch"
-		mkdll_prog = panic "Can't build DLLs on a non-Win32 system"
-		mkdll_args = []
+        --              UNIX-SPECIFIC STUFF
+        -- On Unix, the "standard" tools are assumed to be
+        -- in the same place whether we are running "in-place" or "installed"
+        -- That place is wherever the build-time configure script found them.
+        ; let   gcc_prog   = cGCC
+                gcc_args   = []
+                touch_path = "touch"
+                mkdll_prog = panic "Can't build DLLs on a non-Win32 system"
+                mkdll_args = []
 
-	-- On Unix, scripts are invoked using the '#!' method.  Binary
-	-- installations of GHC on Unix place the correct line on the front
-	-- of the script at installation time, so we don't want to wire-in
-	-- our knowledge of $(PERL) on the host system here.
-	; let (split_prog,  split_args)  = (split_script,  [])
-	      (mangle_prog, mangle_args) = (mangle_script, [])
+        -- On Unix, scripts are invoked using the '#!' method.  Binary
+        -- installations of GHC on Unix place the correct line on the front
+        -- of the script at installation time, so we don't want to wire-in
+        -- our knowledge of $(PERL) on the host system here.
+        ; let (split_prog,  split_args)  = (split_script,  [])
+              (mangle_prog, mangle_args) = (mangle_script, [])
 #endif
 
-	-- cpp is derived from gcc on all platforms
+        -- cpp is derived from gcc on all platforms
         -- HACK, see setPgmP below. We keep 'words' here to remember to fix
         -- Config.hs one day.
-        ; let cpp_path  = (gcc_prog, gcc_args ++ 
-			   (Option "-E"):(map Option (words cRAWCPP_FLAGS)))
+        ; let cpp_path  = (gcc_prog, gcc_args ++
+                           (Option "-E"):(map Option (words cRAWCPP_FLAGS)))
 
-	-- For all systems, copy and remove are provided by the host
-	-- system; architecture-specific stuff is done when building Config.hs
-	; let	cp_path = cGHC_CP
-	
-	-- Other things being equal, as and ld are simply gcc
-	; let	(as_prog,as_args)  = (gcc_prog,gcc_args)
-		(ld_prog,ld_args)  = (gcc_prog,gcc_args)
+        -- For all systems, copy and remove are provided by the host
+        -- system; architecture-specific stuff is done when building Config.hs
+        ; let   cp_path = cGHC_CP
 
-	; return dflags1{
+        -- Other things being equal, as and ld are simply gcc
+        ; let   (as_prog,as_args)  = (gcc_prog,gcc_args)
+                (ld_prog,ld_args)  = (gcc_prog,gcc_args)
+
+        ; return dflags1{
                         ghcUsagePath = ghc_usage_msg_path,
                         ghciUsagePath = ghci_usage_msg_path,
                         topDir  = top_dir,
                         systemPackageConfig = pkgconfig_path,
-			pgm_L	= unlit_path,
-			pgm_P	= cpp_path,
-			pgm_F	= "",
-			pgm_c	= (gcc_prog,gcc_args),
-			pgm_m	= (mangle_prog,mangle_args),
-			pgm_s   = (split_prog,split_args),
-			pgm_a   = (as_prog,as_args),
-			pgm_l	= (ld_prog,ld_args),
-			pgm_dll = (mkdll_prog,mkdll_args),
+                        pgm_L   = unlit_path,
+                        pgm_P   = cpp_path,
+                        pgm_F   = "",
+                        pgm_c   = (gcc_prog,gcc_args),
+                        pgm_m   = (mangle_prog,mangle_args),
+                        pgm_s   = (split_prog,split_args),
+                        pgm_a   = (as_prog,as_args),
+                        pgm_l   = (ld_prog,ld_args),
+                        pgm_dll = (mkdll_prog,mkdll_args),
                         pgm_T   = touch_path,
                         pgm_sysman = top_dir ++ "/ghc/rts/parallel/SysMan",
                         pgm_windres = windres_path
-        		-- Hans: this isn't right in general, but you can 
-        		-- elaborate it in the same way as the others
+                        -- Hans: this isn't right in general, but you can
+                        -- elaborate it in the same way as the others
                 }
-	}
+        }
 
 #if defined(mingw32_HOST_OS)
 foreign import stdcall unsafe "GetTempPathA" getTempPath :: Int -> CString -> IO Int32
@@ -319,20 +319,20 @@ foreign import stdcall unsafe "GetTempPathA" getTempPath :: Int -> CString -> IO
 
 \begin{code}
 -- Find TopDir
--- 	for "installed" this is the root of GHC's support files
---	for "in-place" it is the root of the build tree
+--      for "installed" this is the root of GHC's support files
+--      for "in-place" it is the root of the build tree
 --
 -- Plan of action:
 -- 1. Set proto_top_dir
---	if there is no given TopDir path, get the directory 
---	where GHC is running (only on Windows)
+--      if there is no given TopDir path, get the directory
+--      where GHC is running (only on Windows)
 --
 -- 2. If package.conf exists in proto_top_dir, we are running
---	installed; and TopDir = proto_top_dir
+--      installed; and TopDir = proto_top_dir
 --
 -- 3. Otherwise we are running in-place, so
---	proto_top_dir will be /...stuff.../ghc/compiler
---	Set TopDir to /...stuff..., which is the root of the build tree
+--      proto_top_dir will be /...stuff.../ghc/compiler
+--      Set TopDir to /...stuff..., which is the root of the build tree
 --
 -- This is very gruesome indeed
 
@@ -343,7 +343,7 @@ findTopDir :: Maybe String   -- Maybe TopDir path (without the '-B' prefix).
 findTopDir mbMinusB
   = do { top_dir <- get_proto
         -- Discover whether we're running in a build tree or in an installation,
-	-- by looking for the package configuration file.
+        -- by looking for the package configuration file.
        ; am_installed <- doesFileExist (top_dir </> "package.conf")
 
        ; return (am_installed, top_dir)
@@ -354,7 +354,7 @@ findTopDir mbMinusB
                   Just minusb -> return (normalise minusb)
                   Nothing
                       -> do maybe_exec_dir <- getBaseDir -- Get directory of executable
-		            case maybe_exec_dir of       -- (only works on Windows; 
+                            case maybe_exec_dir of       -- (only works on Windows;
                                                          --  returns Nothing on Unix)
                               Nothing  -> throwDyn (InstallationError "missing -B<dir> option")
                               Just dir -> return dir
@@ -362,32 +362,32 @@ findTopDir mbMinusB
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Running an external program}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 
 \begin{code}
 runUnlit :: DynFlags -> [Option] -> IO ()
-runUnlit dflags args = do 
+runUnlit dflags args = do
   let p = pgm_L dflags
   runSomething dflags "Literate pre-processor" p args
 
 runCpp :: DynFlags -> [Option] -> IO ()
-runCpp dflags args =   do 
+runCpp dflags args =   do
   let (p,args0) = pgm_P dflags
       args1 = args0 ++ args
   mb_env <- getGccEnv args1
   runSomethingFiltered dflags id  "C pre-processor" p args1 mb_env
 
 runPp :: DynFlags -> [Option] -> IO ()
-runPp dflags args =   do 
+runPp dflags args =   do
   let p = pgm_F dflags
   runSomething dflags "Haskell pre-processor" p args
 
 runCc :: DynFlags -> [Option] -> IO ()
-runCc dflags args =   do 
+runCc dflags args =   do
   let (p,args0) = pgm_c dflags
       args1 = args0 ++ args
   mb_env <- getGccEnv args1
@@ -450,7 +450,7 @@ xs `isContainedIn` ys = any (xs `isPrefixOf`) (tails ys)
 -- a bug in gcc on Windows Vista where it can't find its auxiliary
 -- binaries (see bug #1110).
 getGccEnv :: [Option] -> IO (Maybe [(String,String)])
-getGccEnv opts = 
+getGccEnv opts =
 #if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ < 603
   return Nothing
 #else
@@ -462,32 +462,32 @@ getGccEnv opts =
   (b_dirs, _) = partitionWith get_b_opt opts
 
   get_b_opt (Option ('-':'B':dir)) = Left dir
-  get_b_opt other = Right other  
+  get_b_opt other = Right other
 
-  mangle_path (path,paths) | map toUpper path == "PATH" 
+  mangle_path (path,paths) | map toUpper path == "PATH"
         = (path, '\"' : head b_dirs ++ "\";" ++ paths)
   mangle_path other = other
 #endif
 
 runMangle :: DynFlags -> [Option] -> IO ()
-runMangle dflags args = do 
+runMangle dflags args = do
   let (p,args0) = pgm_m dflags
   runSomething dflags "Mangler" p (args0++args)
 
 runSplit :: DynFlags -> [Option] -> IO ()
-runSplit dflags args = do 
+runSplit dflags args = do
   let (p,args0) = pgm_s dflags
   runSomething dflags "Splitter" p (args0++args)
 
 runAs :: DynFlags -> [Option] -> IO ()
-runAs dflags args = do 
+runAs dflags args = do
   let (p,args0) = pgm_a dflags
       args1 = args0 ++ args
   mb_env <- getGccEnv args1
   runSomethingFiltered dflags id "Assembler" p args1 mb_env
 
 runLink :: DynFlags -> [Option] -> IO ()
-runLink dflags args = do 
+runLink dflags args = do
   let (p,args0) = pgm_l dflags
       args1 = args0 ++ args
   mb_env <- getGccEnv args1
@@ -505,9 +505,9 @@ runWindres dflags args = do
   let (gcc,gcc_args) = pgm_c dflags
       windres        = pgm_windres dflags
   mb_env <- getGccEnv gcc_args
-  runSomethingFiltered dflags id "Windres" windres 
+  runSomethingFiltered dflags id "Windres" windres
         -- we must tell windres where to find gcc: it might not be on PATH
-        (Option ("--preprocessor=" ++ 
+        (Option ("--preprocessor=" ++
                  unwords (map quote (gcc : map showOpt gcc_args ++
                                      ["-E", "-xc", "-DRC_INVOKED"])))
         -- -- use-temp-file is required for windres to interpret the
@@ -536,7 +536,7 @@ copyWithHeader dflags purpose maybe_header from to = do
 
   h <- openFile to WriteMode
   ls <- readFile from -- inefficient, but it'll do for now.
-	    	      -- ToDo: speed up via slurping.
+                      -- ToDo: speed up via slurping.
   maybe (return ()) (hPutStr h) maybe_header
   hPutStr h ls
   hClose h
@@ -548,9 +548,9 @@ getExtraViaCOpts dflags = do
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Managing temporary files
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -629,27 +629,27 @@ addFilesToClean files = mapM_ (consIORef v_FilesToClean) files
 removeTmpDirs :: DynFlags -> [FilePath] -> IO ()
 removeTmpDirs dflags ds
   = traceCmd dflags "Deleting temp dirs"
-	     ("Deleting: " ++ unwords ds)
-	     (mapM_ (removeWith dflags removeDirectory) ds)
+             ("Deleting: " ++ unwords ds)
+             (mapM_ (removeWith dflags removeDirectory) ds)
 
 removeTmpFiles :: DynFlags -> [FilePath] -> IO ()
 removeTmpFiles dflags fs
   = warnNon $
-    traceCmd dflags "Deleting temp files" 
-	     ("Deleting: " ++ unwords deletees)
-	     (mapM_ (removeWith dflags removeFile) deletees)
+    traceCmd dflags "Deleting temp files"
+             ("Deleting: " ++ unwords deletees)
+             (mapM_ (removeWith dflags removeFile) deletees)
   where
      -- Flat out refuse to delete files that are likely to be source input
      -- files (is there a worse bug than having a compiler delete your source
      -- files?)
-     -- 
+     --
      -- Deleting source files is a sign of a bug elsewhere, so prominently flag
      -- the condition.
     warnNon act
      | null non_deletees = act
      | otherwise         = do
         putMsg dflags (text "WARNING - NOT deleting source files:" <+> hsep (map text non_deletees))
-	act
+        act
 
     (non_deletees, deletees) = partition isHaskellUserSrcFilename fs
 
@@ -668,14 +668,14 @@ removeWith dflags remover f = remover f `IO.catch`
 -- Running an external program
 
 runSomething :: DynFlags
-	     -> String		-- For -v message
-	     -> String		-- Command name (possibly a full path)
-				-- 	assumed already dos-ified
-	     -> [Option]	-- Arguments
-				--	runSomething will dos-ify them
-	     -> IO ()
+             -> String          -- For -v message
+             -> String          -- Command name (possibly a full path)
+                                --      assumed already dos-ified
+             -> [Option]        -- Arguments
+                                --      runSomething will dos-ify them
+             -> IO ()
 
-runSomething dflags phase_name pgm args = 
+runSomething dflags phase_name pgm args =
   runSomethingFiltered dflags id phase_name pgm args Nothing
 
 runSomethingFiltered
@@ -685,32 +685,32 @@ runSomethingFiltered
 runSomethingFiltered dflags filter_fn phase_name pgm args mb_env = do
   let real_args = filter notNull (map showOpt args)
   traceCmd dflags phase_name (unwords (pgm:real_args)) $ do
-  (exit_code, doesn'tExist) <- 
+  (exit_code, doesn'tExist) <-
      IO.catch (do
          rc <- builderMainLoop dflags filter_fn pgm real_args mb_env
-	 case rc of
-	   ExitSuccess{} -> return (rc, False)
-	   ExitFailure n 
+         case rc of
+           ExitSuccess{} -> return (rc, False)
+           ExitFailure n
              -- rawSystem returns (ExitFailure 127) if the exec failed for any
              -- reason (eg. the program doesn't exist).  This is the only clue
              -- we have, but we need to report something to the user because in
              -- the case of a missing program there will otherwise be no output
              -- at all.
-	    | n == 127  -> return (rc, True)
-	    | otherwise -> return (rc, False))
-		-- Should 'rawSystem' generate an IO exception indicating that
-		-- 'pgm' couldn't be run rather than a funky return code, catch
-		-- this here (the win32 version does this, but it doesn't hurt
-		-- to test for this in general.)
-              (\ err -> 
-	        if IO.isDoesNotExistError err 
+            | n == 127  -> return (rc, True)
+            | otherwise -> return (rc, False))
+                -- Should 'rawSystem' generate an IO exception indicating that
+                -- 'pgm' couldn't be run rather than a funky return code, catch
+                -- this here (the win32 version does this, but it doesn't hurt
+                -- to test for this in general.)
+              (\ err ->
+                if IO.isDoesNotExistError err
 #if defined(mingw32_HOST_OS) && __GLASGOW_HASKELL__ < 604
-		-- the 'compat' version of rawSystem under mingw32 always
-		-- maps 'errno' to EINVAL to failure.
-		   || case (ioeGetErrorType err ) of { InvalidArgument{} -> True ; _ -> False}
+                -- the 'compat' version of rawSystem under mingw32 always
+                -- maps 'errno' to EINVAL to failure.
+                   || case (ioeGetErrorType err ) of { InvalidArgument{} -> True ; _ -> False}
 #endif
-	         then return (ExitFailure 1, True)
-	         else IO.ioError err)
+                 then return (ExitFailure 1, True)
+                 else IO.ioError err)
   case (doesn'tExist, exit_code) of
      (True, _)        -> throwDyn (InstallationError ("could not execute: " ++ pgm))
      (_, ExitSuccess) -> return ()
@@ -753,9 +753,9 @@ builderMainLoop dflags filter_fn pgm real_args mb_env = do
                    else return Nothing
       case mb_code of
         Just code -> loop chan hProcess t (p-1) code
-	Nothing 
-	  | t > 0 -> do 
-	      msg <- readChan chan
+        Nothing
+          | t > 0 -> do
+              msg <- readChan chan
               case msg of
                 BuildMsg msg -> do
                   log_action dflags SevInfo noSrcSpan defaultUserStyle msg
@@ -769,37 +769,37 @@ builderMainLoop dflags filter_fn pgm real_args mb_env = do
 
 readerProc chan hdl filter_fn =
     (do str <- hGetContents hdl
-        loop (linesPlatform (filter_fn str)) Nothing) 
+        loop (linesPlatform (filter_fn str)) Nothing)
     `finally`
        writeChan chan EOF
-	-- ToDo: check errors more carefully
-	-- ToDo: in the future, the filter should be implemented as
-	-- a stream transformer.
+        -- ToDo: check errors more carefully
+        -- ToDo: in the future, the filter should be implemented as
+        -- a stream transformer.
     where
-	loop []     Nothing    = return ()	
-	loop []     (Just err) = writeChan chan err
-	loop (l:ls) in_err     =
-		case in_err of
-		  Just err@(BuildError srcLoc msg)
-		    | leading_whitespace l -> do
-			loop ls (Just (BuildError srcLoc (msg $$ text l)))
-		    | otherwise -> do
-			writeChan chan err
-			checkError l ls
-		  Nothing -> do
-			checkError l ls
+        loop []     Nothing    = return ()
+        loop []     (Just err) = writeChan chan err
+        loop (l:ls) in_err     =
+                case in_err of
+                  Just err@(BuildError srcLoc msg)
+                    | leading_whitespace l -> do
+                        loop ls (Just (BuildError srcLoc (msg $$ text l)))
+                    | otherwise -> do
+                        writeChan chan err
+                        checkError l ls
+                  Nothing -> do
+                        checkError l ls
 
-	checkError l ls
-	   = case parseError l of
-		Nothing -> do
-		    writeChan chan (BuildMsg (text l))
-		    loop ls Nothing
-		Just (file, lineNum, colNum, msg) -> do
-		    let srcLoc = mkSrcLoc (mkFastString file) lineNum colNum
-		    loop ls (Just (BuildError srcLoc (text msg)))
+        checkError l ls
+           = case parseError l of
+                Nothing -> do
+                    writeChan chan (BuildMsg (text l))
+                    loop ls Nothing
+                Just (file, lineNum, colNum, msg) -> do
+                    let srcLoc = mkSrcLoc (mkFastString file) lineNum colNum
+                    loop ls (Just (BuildError srcLoc (text msg)))
 
-	leading_whitespace []    = False
-	leading_whitespace (x:_) = isSpace x
+        leading_whitespace []    = False
+        leading_whitespace (x:_) = isSpace x
 
 parseError :: String -> Maybe (String, Int, Int, String)
 parseError s0 = case breakColon s0 of
@@ -839,44 +839,44 @@ traceCmd :: DynFlags -> String -> String -> IO () -> IO ()
 -- a) trace the command (at two levels of verbosity)
 -- b) don't do it at all if dry-run is set
 traceCmd dflags phase_name cmd_line action
- = do	{ let verb = verbosity dflags
-	; showPass dflags phase_name
-	; debugTraceMsg dflags 3 (text cmd_line)
-	; hFlush stderr
-	
-	   -- Test for -n flag
-	; unless (dopt Opt_DryRun dflags) $ do {
+ = do   { let verb = verbosity dflags
+        ; showPass dflags phase_name
+        ; debugTraceMsg dflags 3 (text cmd_line)
+        ; hFlush stderr
 
-	   -- And run it!
-	; action `IO.catch` handle_exn verb
-	}}
+           -- Test for -n flag
+        ; unless (dopt Opt_DryRun dflags) $ do {
+
+           -- And run it!
+        ; action `IO.catch` handle_exn verb
+        }}
   where
     handle_exn verb exn = do { debugTraceMsg dflags 2 (char '\n')
-			     ; debugTraceMsg dflags 2 (ptext (sLit "Failed:") <+> text cmd_line <+> text (show exn))
-	          	     ; throwDyn (PhaseFailed phase_name (ExitFailure 1)) }
+                             ; debugTraceMsg dflags 2 (ptext (sLit "Failed:") <+> text cmd_line <+> text (show exn))
+                             ; throwDyn (PhaseFailed phase_name (ExitFailure 1)) }
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Support code}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
 -----------------------------------------------------------------------------
--- Define	getBaseDir     :: IO (Maybe String)
+-- Define       getBaseDir     :: IO (Maybe String)
 
 getBaseDir :: IO (Maybe String)
 #if defined(mingw32_HOST_OS)
 -- Assuming we are running ghc, accessed by path  $()/bin/ghc.exe,
 -- return the path $(stuff).  Note that we drop the "bin/" directory too.
 getBaseDir = do let len = (2048::Int) -- plenty, PATH_MAX is 512 under Win32.
-		buf <- mallocArray len
-		ret <- getModuleFileName nullPtr buf len
-		if ret == 0 then free buf >> return Nothing
-		            else do s <- peekCString buf
-				    free buf
-				    return (Just (rootDir s))
+                buf <- mallocArray len
+                ret <- getModuleFileName nullPtr buf len
+                if ret == 0 then free buf >> return Nothing
+                            else do s <- peekCString buf
+                                    free buf
+                                    return (Just (rootDir s))
   where
     rootDir s = case splitFileName $ normalise s of
                 (d, "ghc.exe") ->
@@ -905,7 +905,7 @@ linesPlatform :: String -> [String]
 linesPlatform ls = lines ls
 #else
 linesPlatform "" = []
-linesPlatform xs = 
+linesPlatform xs =
   case lineBreak xs of
     (as,xs1) -> as : linesPlatform xs1
   where
