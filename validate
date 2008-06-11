@@ -54,8 +54,7 @@ sh boot
 make Validating=YES -j$threads
 fi # testsuite-only
 
-# ToDo: use THREADS=$threads, see #1558
-make Validating=YES -C testsuite/tests/ghc-regress fast stage=2 CLEANUP=1 2>&1 | tee testlog
+make Validating=YES -C testsuite/tests/ghc-regress fast stage=2 CLEANUP=1 THREADS=$threads 2>&1 | tee testlog
 
 echo "-------------------------------------------------------------------"
 if
