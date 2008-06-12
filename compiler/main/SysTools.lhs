@@ -311,10 +311,6 @@ initSysTools mbMinusB dflags
                         -- elaborate it in the same way as the others
                 }
         }
-
-#if defined(mingw32_HOST_OS)
-foreign import stdcall unsafe "GetTempPathA" getTempPath :: Int -> CString -> IO Int32
-#endif
 \end{code}
 
 \begin{code}
