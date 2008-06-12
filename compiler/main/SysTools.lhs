@@ -211,45 +211,57 @@ initSysTools mbMinusB dflags
              throwDyn (InstallationError
                          ("Can't find package.conf as " ++ pkgconfig_path))
 
-#if defined(mingw32_HOST_OS)
-        --              WINDOWS-SPECIFIC STUFF
         -- On Windows, gcc and friends are distributed with GHC,
         --      so when "installed" we look in TopDir/bin
-        -- When "in-place" we look wherever the build-time configure
-        --      script found them
-        -- When "install" we tell gcc where its specs file + exes are (-B)
-        --      and also some places to pick up include files.  We need
-        --      to be careful to put all necessary exes in the -B place
-        --      (as, ld, cc1, etc) since if they don't get found there, gcc
-        --      then tries to run unadorned "as", "ld", etc, and will
-        --      pick up whatever happens to be lying around in the path,
-        --      possibly including those from a cygwin install on the target,
-        --      which is exactly what we're trying to avoid.
-        ; let gcc_b_arg = Option ("-B" ++ installed "gcc-lib/")
+        -- When "in-place", or when not on Windows, we look wherever
+        --      the build-time configure script found them
+        ; let
+              -- The trailing "/" is absolutely essential; gcc seems
+              -- to construct file names simply by concatenating to
+              -- this -B path with no extra slash We use "/" rather
+              -- than "\\" because otherwise "\\\" is mangled
+              -- later on; although gcc_args are in NATIVE format,
+              -- gcc can cope
+              --      (see comments with declarations of global variables)
+              gcc_b_arg = Option ("-B" ++ installed "gcc-lib/")
               (gcc_prog,gcc_args)
-                | am_installed = (installed_bin "gcc", [gcc_b_arg])
-                | otherwise    = (cGCC, [])
-                -- The trailing "/" is absolutely essential; gcc seems
-                -- to construct file names simply by concatenating to
-                -- this -B path with no extra slash We use "/" rather
-                -- than "\\" because otherwise "\\\" is mangled
-                -- later on; although gcc_args are in NATIVE format,
-                -- gcc can cope
-                --      (see comments with declarations of global variables)
-
-              perl_path | am_installed = installed_bin cGHC_PERL
-                        | otherwise    = cGHC_PERL
-
-        -- 'touch' is a GHC util for Windows, and similarly unlit, mangle
-        ; let touch_path  | am_installed = installed_bin cGHC_TOUCHY_PGM
-                          | otherwise    = inplace cGHC_TOUCHY_DIR_REL cGHC_TOUCHY_PGM
-
-        -- On Win32 we don't want to rely on #!/bin/perl, so we prepend
-        -- a call to Perl to get the invocation of split and mangle
-        ; let (split_prog,  split_args)  = (perl_path, [Option split_script])
-              (mangle_prog, mangle_args) = (perl_path, [Option mangle_script])
-
-        ; let (mkdll_prog, mkdll_args)
+                | isWindowsHost && am_installed
+                    -- We tell gcc where its specs file + exes are (-B)
+                    -- and also some places to pick up include files.  We need
+                    -- to be careful to put all necessary exes in the -B place
+                    -- (as, ld, cc1, etc) since if they don't get found there,
+                    -- gcc then tries to run unadorned "as", "ld", etc, and
+                    -- will pick up whatever happens to be lying around in
+                    -- the path, possibly including those from a cygwin
+                    -- install on the target, which is exactly what we're
+                    -- trying to avoid.
+                    = (installed_bin "gcc", [gcc_b_arg])
+                | otherwise = (cGCC, [])
+              perl_path
+                | isWindowsHost && am_installed = installed_bin cGHC_PERL
+                | otherwise = cGHC_PERL
+              -- 'touch' is a GHC util for Windows
+              touch_path
+                | isWindowsHost
+                    = if am_installed
+                      then installed_bin cGHC_TOUCHY_PGM
+                      else inplace cGHC_TOUCHY_DIR_REL cGHC_TOUCHY_PGM
+                | otherwise = "touch"
+              -- On Win32 we don't want to rely on #!/bin/perl, so we prepend
+              -- a call to Perl to get the invocation of split and mangle.
+              -- On Unix, scripts are invoked using the '#!' method.  Binary
+              -- installations of GHC on Unix place the correct line on the
+              -- front of the script at installation time, so we don't want
+              -- to wire-in our knowledge of $(PERL) on the host system here.
+              (split_prog,  split_args)
+                | isWindowsHost = (perl_path,    [Option split_script])
+                | otherwise     = (split_script, [])
+              (mangle_prog, mangle_args)
+                | isWindowsHost = (perl_path,   [Option mangle_script])
+                | otherwise     = (mangle_script, [])
+              (mkdll_prog, mkdll_args)
+                | not isWindowsHost
+                    = panic "Can't build DLLs on a non-Win32 system"
                 | am_installed =
                     (installed "gcc-lib/" </> cMKDLL,
                      [ Option "--dlltool-name",
@@ -257,24 +269,6 @@ initSysTools mbMinusB dflags
                        Option "--driver-name",
                        Option gcc_prog, gcc_b_arg ])
                 | otherwise    = (cMKDLL, [])
-#else
-        --              UNIX-SPECIFIC STUFF
-        -- On Unix, the "standard" tools are assumed to be
-        -- in the same place whether we are running "in-place" or "installed"
-        -- That place is wherever the build-time configure script found them.
-        ; let   gcc_prog   = cGCC
-                gcc_args   = []
-                touch_path = "touch"
-                mkdll_prog = panic "Can't build DLLs on a non-Win32 system"
-                mkdll_args = []
-
-        -- On Unix, scripts are invoked using the '#!' method.  Binary
-        -- installations of GHC on Unix place the correct line on the front
-        -- of the script at installation time, so we don't want to wire-in
-        -- our knowledge of $(PERL) on the host system here.
-        ; let (split_prog,  split_args)  = (split_script,  [])
-              (mangle_prog, mangle_args) = (mangle_script, [])
-#endif
 
         -- cpp is derived from gcc on all platforms
         -- HACK, see setPgmP below. We keep 'words' here to remember to fix

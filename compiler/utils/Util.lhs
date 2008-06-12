@@ -6,7 +6,7 @@
 
 \begin{code}
 module Util (
-        debugIsOn,
+        debugIsOn, isWindowsHost,
 
         -- general list processing
         zipEqual, zipWithEqual, zipWith3Equal, zipWith4Equal,
@@ -106,7 +106,7 @@ infixr 9 `thenCmp`
 
 %************************************************************************
 %*                                                                      *
-\subsection{-DDEBUG}
+\subsection{Is DEBUG on, are we on Windows?}
 %*                                                                      *
 %************************************************************************
 
@@ -116,6 +116,13 @@ debugIsOn :: Bool
 debugIsOn = True
 #else
 debugIsOn = False
+#endif
+
+isWindowsHost :: Bool
+#ifdef mingw32_HOST_OS
+isWindowsHost = True
+#else
+isWindowsHost = False
 #endif
 \end{code}
 
