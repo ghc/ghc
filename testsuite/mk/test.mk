@@ -91,8 +91,6 @@ endif
 
 ifneq "$(THREADS)" ""
 RUNTEST_OPTS += --threads=$(THREADS)
-else
-USETHREADS=0
 endif
 
 RUNTEST_OPTS +=  \
@@ -109,7 +107,6 @@ RUNTEST_OPTS +=  \
 	-e config.os=\"$(TargetOS_CPP)\" \
 	-e config.wordsize=\"$(WORDSIZE)\" \
 	-e default_testopts.cleanup=\"$(CLEANUP)\" \
-	-e "if '$(USETHREADS)': config.use_threads=int($(USETHREADS))" \
 	-e config.timeout="int($(TIMEOUT)) or config.timeout" \
 	-e config.timeout_prog=\"$(TOP)/timeout/timeout\" \
 	-e config.exeext=\"$(exeext)\" \

@@ -86,7 +86,7 @@ class TestConfig:
         
         # threads
         self.threads = 1
-        self.use_threads = 1
+        self.use_threads = 0
 
 global config
 config = TestConfig()

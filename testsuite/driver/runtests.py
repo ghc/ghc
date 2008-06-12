@@ -89,6 +89,7 @@ for opt,arg in opts:
         pat = int(pat)
         if (maj, min, pat) >= (2, 5, 2):
             config.threads = int(arg)
+            config.use_threads = 1
         else:
             print "Warning: Ignoring request to use threads as python version < 2.5.2"
 
