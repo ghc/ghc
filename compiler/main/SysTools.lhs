@@ -7,13 +7,6 @@
 -----------------------------------------------------------------------------
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module SysTools (
         -- Initialisation
         initSysTools,
@@ -73,7 +66,7 @@ import CString          ( CString, peekCString )
 #endif
 
 import System.Process   ( runInteractiveProcess, getProcessExitCode )
-import Control.Concurrent( forkIO, newChan, readChan, writeChan )
+import Control.Concurrent
 import FastString
 import SrcLoc           ( SrcLoc, mkSrcLoc, noSrcSpan, mkSrcSpan )
 \end{code}
@@ -156,7 +149,7 @@ initSysTools :: Maybe String    -- Maybe TopDir path (without the '-B' prefix)
                                 --      (c) the GHC usage message
 
 
-initSysTools mbMinusB dflags
+initSysTools mbMinusB _
   = do  { (am_installed, top_dir) <- findTopDir mbMinusB
                 -- top_dir
                 --      for "installed" this is the root of GHC's support files
@@ -275,10 +268,6 @@ initSysTools mbMinusB dflags
         -- Config.hs one day.
         ; let cpp_path  = (gcc_prog, gcc_args ++
                            (Option "-E"):(map Option (words cRAWCPP_FLAGS)))
-
-        -- For all systems, copy and remove are provided by the host
-        -- system; architecture-specific stuff is done when building Config.hs
-        ; let   cp_path = cGHC_CP
 
         -- Other things being equal, as and ld are simply gcc
         ; let   (as_prog,as_args)  = (gcc_prog,gcc_args)
@@ -706,8 +695,9 @@ runSomethingFiltered dflags filter_fn phase_name pgm args mb_env = do
      (_, ExitSuccess) -> return ()
      _                -> throwDyn (PhaseFailed phase_name exit_code)
 
-
-
+builderMainLoop :: DynFlags -> (String -> String) -> FilePath
+                -> [String] -> Maybe [(String, String)]
+                -> IO ExitCode
 #if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ < 603
 builderMainLoop dflags filter_fn pgm real_args mb_env = do
   rawSystem pgm real_args
@@ -736,7 +726,7 @@ builderMainLoop dflags filter_fn pgm real_args mb_env = do
     -- for all of these to happen (status==3).
     -- ToDo: we should really have a contingency plan in case any of
     -- the threads dies, such as a timeout.
-    loop chan hProcess 0 0 exitcode = return exitcode
+    loop _    _        0 0 exitcode = return exitcode
     loop chan hProcess t p exitcode = do
       mb_code <- if p > 0
                    then getProcessExitCode hProcess
@@ -757,6 +747,7 @@ builderMainLoop dflags filter_fn pgm real_args mb_env = do
                   loop chan hProcess (t-1) p exitcode
           | otherwise -> loop chan hProcess t p exitcode
 
+readerProc :: Chan BuildMessage -> Handle -> (String -> String) -> IO ()
 readerProc chan hdl filter_fn =
     (do str <- hGetContents hdl
         loop (linesPlatform (filter_fn str)) Nothing)
@@ -778,6 +769,7 @@ readerProc chan hdl filter_fn =
                         checkError l ls
                   Nothing -> do
                         checkError l ls
+                  _ -> panic "readerProc/loop"
 
         checkError l ls
            = case parseError l of
@@ -822,6 +814,7 @@ data BuildMessage
   | EOF
 #endif
 
+showOpt :: Option -> String
 showOpt (FileOption pre f) = pre ++ f
 showOpt (Option s)  = s
 
@@ -841,9 +834,9 @@ traceCmd dflags phase_name cmd_line action
         ; action `IO.catch` handle_exn verb
         }}
   where
-    handle_exn verb exn = do { debugTraceMsg dflags 2 (char '\n')
-                             ; debugTraceMsg dflags 2 (ptext (sLit "Failed:") <+> text cmd_line <+> text (show exn))
-                             ; throwDyn (PhaseFailed phase_name (ExitFailure 1)) }
+    handle_exn _verb exn = do { debugTraceMsg dflags 2 (char '\n')
+                              ; debugTraceMsg dflags 2 (ptext (sLit "Failed:") <+> text cmd_line <+> text (show exn))
+                              ; throwDyn (PhaseFailed phase_name (ExitFailure 1)) }
 \end{code}
 
 %************************************************************************
