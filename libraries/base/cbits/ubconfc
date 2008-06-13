@@ -153,8 +153,8 @@ function dumpblock()
 	updist=up-self
 	lowdist=low-self
 	titledist=title-self
-	rule="GENCAT_"cat", NUMCAT_"cat", "((convpos==1)?
-				("1, " updist ", " lowdist ", " titledist):
+	rule="GENCAT_"cat", NUMCAT_"cat", "((convpos==1)?                   \
+				("1, " updist ", " lowdist ", " titledist): \
 				("0, 0, 0, 0"))
 	if(cats[cat]=="")
 	{
@@ -329,7 +329,7 @@ int p(int c) \\
 { \\
 	const struct _convrule_ *rule=getrule(convchars,NUM_CONVBLOCKS,c);\\
 	if(rule==&nullrule) return c;\\
-	return c+rule->##to;\\
+	return c+rule->to;\\
 }
 
 caseconv(u_towupper,updist)
