@@ -11,7 +11,7 @@ module Ctype
 	, is_digit	-- Char# -> Bool
 	, is_alphanum   -- Char# -> Bool
 
-	, is_hexdigit, is_octdigit
+	, is_decdigit, is_hexdigit, is_octdigit
 	, hexDigit, octDecDigit
 	) where
 
@@ -60,15 +60,19 @@ Utils
 
 \begin{code}
 hexDigit :: Char -> Int
-hexDigit c | is_digit c = ord c - ord '0'
-           | otherwise  = ord (to_lower c) - ord 'a' + 10
+hexDigit c | is_decdigit c = ord c - ord '0'
+           | otherwise     = ord (to_lower c) - ord 'a' + 10
 
 octDecDigit :: Char -> Int
 octDecDigit c = ord c - ord '0'
 
+is_decdigit :: Char -> Bool
+is_decdigit c
+	=  c >= '0' && c <= '9'
+
 is_hexdigit :: Char -> Bool
 is_hexdigit c
-	=  is_digit c 
+	=  is_decdigit c 
 	|| (c >= 'a' && c <= 'f')
 	|| (c >= 'A' && c <= 'F')
 
