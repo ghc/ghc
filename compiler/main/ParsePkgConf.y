@@ -1,5 +1,5 @@
 {
-{-# OPTIONS -w #-}
+{-# OPTIONS -fno-warn-unused-binds -fno-warn-unused-matches -fno-warn-missing-signatures #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and fix
 -- any warnings in the module. See
@@ -61,7 +61,7 @@ field	:: { PackageConfig -> PackageConfig }
 	: VARID '=' pkgid
 		{% case unpackFS $1 of
 		        "package"     -> return (\p -> p{package = $3})
-			_other        -> happyError
+			_             -> happyError
 		}
 
 	| VARID '=' STRING		{ id }
@@ -102,13 +102,13 @@ field	:: { PackageConfig -> PackageConfig }
 	        "haddockHTMLs"      -> p{haddockHTMLs      = map unpackFS $3}
 	        "depends"     	    -> p{depends = []}
 			-- empty list only, non-empty handled below
-		other -> p
+		_ -> p
 	}
 
 	| VARID '=' pkgidlist
 		{% case unpackFS $1 of
 		        "depends"     -> return (\p -> p{depends = $3})
-			_other        -> happyError
+			_             -> happyError
 		}
 
 pkgid	:: { PackageIdentifier }
