@@ -230,13 +230,12 @@ dataConInfoPtrToName x = do
    -}
 
    getConDescAddress :: Ptr StgInfoTable -> IO (Ptr Word8)
-   getConDescAddress ptr = do
-#ifdef GHCI_TABLES_NEXT_TO_CODE
+   getConDescAddress ptr
+    | ghciTablesNextToCode = do
        offsetToString <- peek $ ptr `plusPtr` (- wORD_SIZE)
        return $ (ptr `plusPtr` stdInfoTableSizeB) `plusPtr` (fromIntegral (offsetToString :: StgWord))
-#else
+    | otherwise =
        peek $ intPtrToPtr $ (ptrToIntPtr ptr) + fromIntegral stdInfoTableSizeB
-#endif
 
    -- parsing names is a little bit fiddly because we have a string in the form: 
    -- pkg:A.B.C.foo, and we want to split it into three parts: ("pkg", "A.B.C", "foo").

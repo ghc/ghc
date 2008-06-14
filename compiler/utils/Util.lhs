@@ -6,7 +6,8 @@
 
 \begin{code}
 module Util (
-        debugIsOn, isWindowsHost, isWindowsTarget, isDarwinTarget,
+        debugIsOn, ghciTablesNextToCode,
+        isWindowsHost, isWindowsTarget, isDarwinTarget,
 
         -- general list processing
         zipEqual, zipWithEqual, zipWith3Equal, zipWith4Equal,
@@ -116,6 +117,13 @@ debugIsOn :: Bool
 debugIsOn = True
 #else
 debugIsOn = False
+#endif
+
+ghciTablesNextToCode :: Bool
+#ifdef GHCI_TABLES_NEXT_TO_CODE
+ghciTablesNextToCode = True
+#else
+ghciTablesNextToCode = False
 #endif
 
 isWindowsHost :: Bool
