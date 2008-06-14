@@ -28,7 +28,7 @@ test('Simple23', normal, compile, [''])
 test('ind1', normal, compile, [''])
 test('ind2', normal, multimod_compile, ['ind2', '-v0'])
 test('impexp', normal, multimod_compile, 
-     ['Imp', '-Wnot -no-hs-main -no-link'])
+     ['Imp', '-w -no-hs-main -c'])
 clean(['Ind2_help.hi', 'Ind2_help.o', 'Exp.hi', 'Imp.o'])
 
 test('ATLoop', normal, multimod_compile, ['ATLoop','-v0'])
