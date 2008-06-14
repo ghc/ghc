@@ -37,7 +37,7 @@ import DriverPhases	( Phase(..), isSourceFilename, anyHsc,
 import StaticFlags
 import DynFlags
 import BasicTypes	( failed )
-import ErrUtils		( putMsg )
+import ErrUtils
 import FastString
 import Outputable
 import Util
@@ -78,10 +78,10 @@ main =
         mbMinusB | null minusB_args = Nothing
                  | otherwise = Just (drop 2 (last minusB_args))
 
-  argv2 <- parseStaticFlags argv1
+  (argv2, staticFlagWarnings) <- parseStaticFlags argv1
 
   -- 2. Parse the "mode" flags (--make, --interactive etc.)
-  (cli_mode, argv3) <- parseModeFlags argv2
+  (cli_mode, argv3, modeFlagWarnings) <- parseModeFlags argv2
 
   -- If all we want to do is to show the version number then do it
   -- now, before we start a GHC session etc.
@@ -129,7 +129,12 @@ main =
 
 	-- The rest of the arguments are "dynamic"
 	-- Leftover ones are presumably files
-  (dflags, fileish_args) <- GHC.parseDynamicFlags dflags1 argv3
+  (dflags, fileish_args, dynamicFlagWarnings) <- GHC.parseDynamicFlags dflags1 argv3
+
+  let flagWarnings = staticFlagWarnings
+                  ++ modeFlagWarnings
+                  ++ dynamicFlagWarnings
+  handleFlagWarnings dflags flagWarnings
 
 	-- make sure we clean up after ourselves
   GHC.defaultCleanupHandler dflags $ do
@@ -355,13 +360,13 @@ isCompManagerMode _             = False
 -- -----------------------------------------------------------------------------
 -- Parsing the mode flag
 
-parseModeFlags :: [String] -> IO (CmdLineMode, [String])
+parseModeFlags :: [String] -> IO (CmdLineMode, [String], [String])
 parseModeFlags args = do
-  let ((leftover, errs), (mode, _, flags)) = 
+  let ((leftover, errs, warns), (mode, _, flags)) = 
 	 runCmdLine (processArgs mode_flags args) (StopBefore StopLn, "", []) 
   when (not (null errs)) $ do
     throwDyn (UsageError (unlines errs))
-  return (mode, flags ++ leftover)
+  return (mode, flags ++ leftover, warns)
 
 type ModeM = CmdLineP (CmdLineMode, String, [String])
   -- mode flags sometimes give rise to new DynFlags (eg. -C, see below)
@@ -371,32 +376,49 @@ mode_flags :: [Flag ModeM]
 mode_flags =
   [  ------- help / version ----------------------------------------------
     Flag "?"                    (PassFlag (setMode ShowUsage))
+         Supported
   , Flag "-help"                (PassFlag (setMode ShowUsage))
+         Supported
   , Flag "-print-libdir"        (PassFlag (setMode PrintLibdir))
+         Supported
   , Flag "V"                    (PassFlag (setMode ShowVersion))
+         Supported
   , Flag "-version"             (PassFlag (setMode ShowVersion))
+         Supported
   , Flag "-numeric-version"     (PassFlag (setMode ShowNumVersion))
+         Supported
   , Flag "-info"                (PassFlag (setMode ShowInfo))
+         Supported
   , Flag "-supported-languages" (PassFlag (setMode ShowSupportedLanguages))
+         Supported
 
       ------- interfaces ----------------------------------------------------
   , Flag "-show-iface"  (HasArg (\f -> setMode (ShowInterface f)
                                                "--show-iface"))
+         Supported
 
       ------- primary modes ------------------------------------------------
   , Flag "M"            (PassFlag (setMode DoMkDependHS))
+         Supported
   , Flag "E"            (PassFlag (setMode (StopBefore anyHsc)))
+         Supported
   , Flag "C"            (PassFlag (\f -> do setMode (StopBefore HCc) f
                                             addFlag "-fvia-C"))
+         Supported
   , Flag "S"            (PassFlag (setMode (StopBefore As)))
+         Supported
   , Flag "-make"        (PassFlag (setMode DoMake))
+         Supported
   , Flag "-interactive" (PassFlag (setMode DoInteractive))
+         Supported
   , Flag "e"            (HasArg   (\s -> updateMode (updateDoEval s) "-e"))
+         Supported
 
        -- -fno-code says to stop after Hsc but don't generate any code.
   , Flag "fno-code"     (PassFlag (\f -> do setMode (StopBefore HCc) f
                                             addFlag "-fno-code"
                                             addFlag "-no-recomp"))
+         Supported
   ]
 
 setMode :: CmdLineMode -> String -> ModeM ()

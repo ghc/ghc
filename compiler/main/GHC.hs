@@ -255,10 +255,7 @@ import FiniteMap
 import Panic
 import Digraph
 import Bag		( unitBag, listToBag )
-import ErrUtils		( Severity(..), showPass, fatalErrorMsg, debugTraceMsg,
-			  mkPlainErrMsg, printBagOfErrors, printBagOfWarnings,
-			  WarnMsg )
-import qualified ErrUtils
+import ErrUtils
 import Util
 import StringBuffer	( StringBuffer, hGetStringBuffer )
 import Outputable
@@ -1938,8 +1935,9 @@ preprocessFile hsc_env src_fn mb_phase (Just (buf, _time))
 	let 
 	    local_opts = getOptions dflags buf src_fn
 	--
-	(dflags', _errs) <- parseDynamicFlags dflags (map unLoc local_opts)
+	(dflags', _errs, warns) <- parseDynamicFlags dflags (map unLoc local_opts)
         -- XXX: shouldn't we be reporting the errors?
+        handleFlagWarnings dflags' warns
 
 	let
 	    needs_preprocessing

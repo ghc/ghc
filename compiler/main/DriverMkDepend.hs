@@ -398,14 +398,20 @@ depEndMarker   = "# DO NOT DELETE: End of Haskell dependencies"
 dep_opts :: [Flag IO]
 dep_opts =
    [ Flag "s"                 (SepArg (consIORef v_Dep_suffixes))
+          Supported
    , Flag "f"                 (SepArg (writeIORef v_Dep_makefile))
+          Supported
    , Flag "w"                 (NoArg (writeIORef v_Dep_warnings False))
+          Supported
 
    , Flag "-include-prelude"  (NoArg (writeIORef v_Dep_include_pkg_deps True))
-        -- -include-prelude is the old name for -include-pkg-deps, kept around
-        -- for backward compatibility, but undocumented
+          (Deprecated "Use --include-pkg-deps instead")
 
    , Flag "-include-pkg-deps" (NoArg (writeIORef v_Dep_include_pkg_deps True))
+          Supported
    , Flag "-exclude-module="  (Prefix (consIORef v_Dep_exclude_mods . mkModuleName))
+          Supported
    , Flag "x"                 (Prefix (consIORef v_Dep_exclude_mods . mkModuleName))
+          Supported
    ]
+

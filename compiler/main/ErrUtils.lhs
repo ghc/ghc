@@ -13,6 +13,7 @@ module ErrUtils (
 	Messages, errorsFound, emptyMessages,
 	mkErrMsg, mkWarnMsg, mkPlainErrMsg, mkLongErrMsg,
 	printErrorsAndWarnings, printBagOfErrors, printBagOfWarnings,
+    handleFlagWarnings,
 
 	ghcExit,
 	doIfSet, doIfSet_dyn, 
@@ -174,7 +175,16 @@ printBagOfWarnings dflags bag_of_warns
 		EQ -> True
 		GT -> False
 
-
+handleFlagWarnings :: DynFlags -> [String] -> IO ()
+handleFlagWarnings _ [] = return ()
+handleFlagWarnings dflags warns
+ = do -- It would be nicer if warns :: [Message], but that has circular
+      -- import problems.
+      let warns' = map text warns
+      mapM_ (log_action dflags SevWarning noSrcSpan defaultUserStyle) warns'
+      when (dopt Opt_WarnIsError dflags) $
+          do errorMsg dflags $ text "\nFailing due to -Werror.\n"
+             exitWith (ExitFailure 1)
 
 ghcExit :: DynFlags -> Int -> IO ()
 ghcExit dflags val

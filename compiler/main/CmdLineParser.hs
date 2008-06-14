@@ -12,7 +12,7 @@
 module CmdLineParser (
         processArgs, OptKind(..),
         CmdLineP(..), getCmdLineState, putCmdLineState,
-        Flag(..),
+        Flag(..), Deprecated(..),
   ) where
 
 #include "HsVersions.h"
@@ -20,9 +20,14 @@ module CmdLineParser (
 import Util
 import Panic
 
-data Flag m = Flag { flagName :: String,        -- flag, without the leading -
-                     flagOptKind :: (OptKind m) -- What to do if we see it
-                   }
+data Flag m = Flag
+    {
+        flagName :: String,           -- flag, without the leading -
+        flagOptKind :: (OptKind m),   -- what to do if we see it
+        flagDeprecated :: Deprecated  -- is the flag deprecated?
+    }
+
+data Deprecated = Supported | Deprecated String
 
 data OptKind m                      -- Suppose the flag is -f
  = NoArg (m ())                     -- -f all by itself
@@ -42,23 +47,29 @@ processArgs :: Monad m
             -> [String]              -- args
             -> m (
                   [String],  -- spare args
-                  [String]   -- errors
+                  [String],  -- errors
+                  [String]   -- warnings
                  )
-processArgs spec args = process spec args [] []
+processArgs spec args = process spec args [] [] []
   where
-    process _spec [] spare errs =
-      return (reverse spare, reverse errs)
+    process _spec [] spare errs warns =
+      return (reverse spare, reverse errs, reverse warns)
 
-    process spec (dash_arg@('-':arg):args) spare errs =
+    process spec (dash_arg@('-' : arg) : args) spare errs warns =
       case findArg spec arg of
-        Just (rest,action) ->
-           case processOneArg action rest arg args of
-             Left err            -> process spec args spare (err:errs)
-             Right (action,rest) -> action >> process spec rest spare errs
-        Nothing -> process spec args (dash_arg:spare) errs
+        Just (rest, action, deprecated) ->
+           let warns' = case deprecated of
+                        Deprecated warning ->
+                            (dash_arg ++ " is deprecated: " ++ warning) : warns
+                        Supported -> warns
+           in case processOneArg action rest arg args of
+              Left err            -> process spec args spare (err:errs) warns'
+              Right (action,rest) -> do action
+                                        process spec rest spare errs warns'
+        Nothing -> process spec args (dash_arg : spare) errs warns
 
-    process spec (arg:args) spare errs =
-      process spec args (arg:spare) errs
+    process spec (arg : args) spare errs warns =
+      process spec args (arg : spare) errs warns
 
 
 processOneArg :: OptKind m -> String -> String -> [String]
@@ -99,9 +110,9 @@ processOneArg action rest arg args
         AnySuffixPred _ f -> Right (f dash_arg, args)
 
 
-findArg :: [Flag m] -> String -> Maybe (String, OptKind m)
+findArg :: [Flag m] -> String -> Maybe (String, OptKind m, Deprecated)
 findArg spec arg
-  = case [ (removeSpaces rest, optKind)
+  = case [ (removeSpaces rest, optKind, flagDeprecated flag)
          | flag <- spec,
            let optKind = flagOptKind flag,
            Just rest <- [maybePrefixMatch (flagName flag) arg],

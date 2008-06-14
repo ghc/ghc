@@ -93,12 +93,12 @@ import Data.List
 -----------------------------------------------------------------------------
 -- Static flags
 
-parseStaticFlags :: [String] -> IO [String]
+parseStaticFlags :: [String] -> IO ([String], [String])
 parseStaticFlags args = do
   ready <- readIORef v_opt_C_ready
   when ready $ throwDyn (ProgramError "Too late for parseStaticFlags: call it before newSession")
 
-  (leftover, errs) <- processArgs static_flags args
+  (leftover, errs, warns1) <- processArgs static_flags args
   when (not (null errs)) $ throwDyn (UsageError (unlines errs))
 
     -- deal with the way flags: the way (eg. prof) gives rise to
@@ -109,7 +109,7 @@ parseStaticFlags args = do
   let unreg_flags | cGhcUnregisterised == "YES" = unregFlags
 		  | otherwise = []
 
-  (more_leftover, errs) <- processArgs static_flags (unreg_flags ++ way_flags)
+  (more_leftover, errs, warns2) <- processArgs static_flags (unreg_flags ++ way_flags)
 
     -- see sanity code in staticOpts
   writeIORef v_opt_C_ready True
@@ -128,7 +128,8 @@ parseStaticFlags args = do
                   | otherwise                = []
 
   when (not (null errs)) $ ghcError (UsageError (unlines errs))
-  return (excess_prec++cg_flags++more_leftover++leftover)
+  return (excess_prec ++ cg_flags ++ more_leftover ++ leftover,
+          warns1 ++ warns2)
 
 initStaticOpts :: IO ()
 initStaticOpts = writeIORef v_opt_C_ready True
@@ -149,54 +150,65 @@ static_flags :: [Flag IO]
 
 static_flags = [
         ------- GHCi -------------------------------------------------------
-    Flag "ignore-dot-ghci" (PassFlag addOpt)
-  , Flag "read-dot-ghci"   (NoArg (removeOpt "-ignore-dot-ghci"))
+    Flag "ignore-dot-ghci" (PassFlag addOpt) Supported
+  , Flag "read-dot-ghci"   (NoArg (removeOpt "-ignore-dot-ghci")) Supported
 
         ------- ways --------------------------------------------------------
-  , Flag "prof"           (NoArg (addWay WayProf))
-  , Flag "ticky"          (NoArg (addWay WayTicky))
-  , Flag "parallel"       (NoArg (addWay WayPar))
-  , Flag "gransim"        (NoArg (addWay WayGran))
-  , Flag "smp"            (NoArg (addWay WayThreaded)) -- backwards compat.
-  , Flag "debug"          (NoArg (addWay WayDebug))
-  , Flag "ndp"            (NoArg (addWay WayNDP))
-  , Flag "threaded"       (NoArg (addWay WayThreaded))
+  , Flag "prof"           (NoArg (addWay WayProf)) Supported
+  , Flag "ticky"          (NoArg (addWay WayTicky)) Supported
+  , Flag "parallel"       (NoArg (addWay WayPar)) Supported
+  , Flag "gransim"        (NoArg (addWay WayGran)) Supported
+  , Flag "smp"            (NoArg (addWay WayThreaded))
+         (Deprecated "Use -threaded instead")
+  , Flag "debug"          (NoArg (addWay WayDebug)) Supported
+  , Flag "ndp"            (NoArg (addWay WayNDP)) Supported
+  , Flag "threaded"       (NoArg (addWay WayThreaded)) Supported
         -- ToDo: user ways
 
         ------ Debugging ----------------------------------------------------
-  , Flag "dppr-debug"        (PassFlag addOpt)
-  , Flag "dsuppress-uniques" (PassFlag addOpt)
-  , Flag "dppr-user-length"  (AnySuffix addOpt)
-  , Flag "dopt-fuel"         (AnySuffix addOpt)
-  , Flag "dno-debug-output"  (PassFlag addOpt)
+  , Flag "dppr-debug"        (PassFlag addOpt) Supported
+  , Flag "dsuppress-uniques" (PassFlag addOpt) Supported
+  , Flag "dppr-user-length"  (AnySuffix addOpt) Supported
+  , Flag "dopt-fuel"         (AnySuffix addOpt) Supported
+  , Flag "dno-debug-output"  (PassFlag addOpt) Supported
       -- rest of the debugging flags are dynamic
 
         --------- Profiling --------------------------------------------------
   , Flag "auto-all"       (NoArg (addOpt "-fauto-sccs-on-all-toplevs"))
+         Supported
   , Flag "auto"           (NoArg (addOpt "-fauto-sccs-on-exported-toplevs"))
+         Supported
   , Flag "caf-all"        (NoArg (addOpt "-fauto-sccs-on-individual-cafs"))
+         Supported
          -- "ignore-sccs"  doesn't work  (ToDo)
 
   , Flag "no-auto-all"    (NoArg (removeOpt "-fauto-sccs-on-all-toplevs"))
+         Supported
   , Flag "no-auto"        (NoArg (removeOpt "-fauto-sccs-on-exported-toplevs"))
+         Supported
   , Flag "no-caf-all"     (NoArg (removeOpt "-fauto-sccs-on-individual-cafs"))
+         Supported
 
         ----- Linker --------------------------------------------------------
-  , Flag "static"         (PassFlag addOpt)
-  , Flag "dynamic"        (NoArg (removeOpt "-static"))
-  , Flag "rdynamic"       (NoArg (return ())) -- ignored for compat w/ gcc
+  , Flag "static"         (PassFlag addOpt) Supported
+  , Flag "dynamic"        (NoArg (removeOpt "-static")) Supported
+    -- ignored for compat w/ gcc:
+  , Flag "rdynamic"       (NoArg (return ())) Supported
 
         ----- RTS opts ------------------------------------------------------
   , Flag "H"              (HasArg (setHeapSize . fromIntegral . decodeSize))
-  , Flag "Rghc-timing"    (NoArg  (enableTimingStats))
+         Supported
+  , Flag "Rghc-timing"    (NoArg  (enableTimingStats)) Supported
 
         ------ Compiler flags -----------------------------------------------
         -- All other "-fno-<blah>" options cancel out "-f<blah>" on the hsc cmdline
   , Flag "fno-"
          (PrefixPred (\s -> isStaticFlag ("f"++s)) (\s -> removeOpt ("-f"++s)))
+         Supported
 
         -- Pass all remaining "-f<blah>" options to hsc
   , Flag "f"                      (AnySuffixPred (isStaticFlag) addOpt)
+         Supported
   ]
 
 addOpt :: String -> IO ()

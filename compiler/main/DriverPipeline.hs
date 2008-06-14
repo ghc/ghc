@@ -614,7 +614,8 @@ runPhase (Unlit sf) _stop hsc_env _basename _suff input_fn get_output_fn maybe_l
 runPhase (Cpp sf) _stop hsc_env basename suff input_fn get_output_fn maybe_loc
   = do let dflags0 = hsc_dflags hsc_env
        src_opts <- getOptionsFromFile dflags0 input_fn
-       (dflags,unhandled_flags) <- parseDynamicFlags dflags0 (map unLoc src_opts)
+       (dflags, unhandled_flags, warns) <- parseDynamicFlags dflags0 (map unLoc src_opts)
+       handleFlagWarnings dflags warns
        checkProcessArgsResult unhandled_flags (basename <.> suff)
 
        if not (dopt Opt_Cpp dflags) then
