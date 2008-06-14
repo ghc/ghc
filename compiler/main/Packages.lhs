@@ -231,7 +231,7 @@ readPackageConfig
    :: DynFlags -> PackageConfigMap -> FilePath -> IO PackageConfigMap
 readPackageConfig dflags pkg_map conf_file = do
   debugTraceMsg dflags 2 (text "Using package config file:" <+> text conf_file)
-  proto_pkg_configs <- loadPackageConfig conf_file
+  proto_pkg_configs <- loadPackageConfig dflags conf_file
   let top_dir = topDir dflags
       pkg_configs1 = mungePackagePaths top_dir proto_pkg_configs
       pkg_configs2 = maybeHidePackages dflags pkg_configs1

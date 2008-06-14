@@ -149,11 +149,11 @@ strs	:: { [FastString] }
 happyError :: P a
 happyError = srcParseFail
 
-loadPackageConfig :: FilePath -> IO [PackageConfig]
-loadPackageConfig conf_filename = do
+loadPackageConfig :: DynFlags -> FilePath -> IO [PackageConfig]
+loadPackageConfig dflags conf_filename = do
    buf <- hGetStringBuffer conf_filename
    let loc  = mkSrcLoc (mkFastString conf_filename) 1 0
-   case unP parse (mkPState buf loc defaultDynFlags) of
+   case unP parse (mkPState buf loc dflags) of
 	PFailed span err -> 
            throwDyn (InstallationError (showSDoc (mkLocMessage span err)))
 
