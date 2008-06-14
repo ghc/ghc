@@ -447,13 +447,14 @@ preloadLib dflags lib_paths framework_paths lib_spec
                       Nothing -> maybePutStrLn dflags "done"
                       Just mm -> preloadFailed mm lib_paths lib_spec
 
-#ifdef darwin_TARGET_OS
 	  Framework framework
+           | isDarwinTarget
              -> do maybe_errstr <- loadFramework framework_paths framework
                    case maybe_errstr of
                       Nothing -> maybePutStrLn dflags "done"
                       Just mm -> preloadFailed mm framework_paths lib_spec
-#endif
+           | otherwise -> panic "preloadLib Framework"
+
   where
     preloadFailed :: String -> [String] -> LibrarySpec -> IO ()
     preloadFailed sys_errmsg paths spec
@@ -1052,10 +1053,10 @@ load_dyn dirs dll = do r <- loadDynamic dirs dll
 			 Nothing  -> return ()
 			 Just err -> throwDyn (CmdLineError ("can't load .so/.DLL for: " 
                                  			      ++ dll ++ " (" ++ err ++ ")" ))
-#ifndef darwin_TARGET_OS
-loadFrameworks pkg = return ()
-#else
-loadFrameworks pkg = mapM_ load frameworks
+
+loadFrameworks pkg
+ | isDarwinTarget = mapM_ load frameworks
+ | otherwise = return ()
   where
     fw_dirs    = Packages.frameworkDirs pkg
     frameworks = Packages.frameworks pkg
@@ -1065,7 +1066,6 @@ loadFrameworks pkg = mapM_ load frameworks
 		    Nothing  -> return ()
 		    Just err -> throwDyn (CmdLineError ("can't load framework: " 
                                			        ++ fw ++ " (" ++ err ++ ")" ))
-#endif
 
 -- Try to find an object file for a given library in the given paths.
 -- If it isn't present, we assume it's a dynamic library.
@@ -1117,20 +1117,16 @@ loadDynamic paths rootname
   where
     mk_dll_path dir = dir </> mkSOName rootname
 
-#if defined(darwin_TARGET_OS)
-mkSOName root = ("lib" ++ root) <.> "dylib"
-#elif defined(mingw32_TARGET_OS)
--- Win32 DLLs have no .dll extension here, because addDLL tries
--- both foo.dll and foo.drv
-mkSOName root = root
-#else
-mkSOName root = ("lib" ++ root) <.> "so"
-#endif
+mkSOName root
+ | isDarwinTarget  = ("lib" ++ root) <.> "dylib"
+ | isWindowsTarget = -- Win32 DLLs have no .dll extension here, because
+                     -- addDLL tries both foo.dll and foo.drv
+                     root
+ | otherwise       = ("lib" ++ root) <.> "so"
 
 -- Darwin / MacOS X only: load a framework
 -- a framework is a dynamic library packaged inside a directory of the same
 -- name. They are searched for in different paths than normal libraries.
-#ifdef darwin_TARGET_OS
 loadFramework extraPaths rootname
    = do { either_dir <- Control.Exception.try getHomeDirectory
         ; let homeFrameworkPath = case either_dir of
@@ -1147,7 +1143,6 @@ loadFramework extraPaths rootname
      mk_fwk dir = dir </> (rootname ++ ".framework/" ++ rootname)
         -- sorry for the hardcoded paths, I hope they won't change anytime soon:
      defaultFrameworkPaths = ["/Library/Frameworks", "/System/Library/Frameworks"]
-#endif
 \end{code}
 
 %************************************************************************
