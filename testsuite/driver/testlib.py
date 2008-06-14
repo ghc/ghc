@@ -556,9 +556,9 @@ def run_command( name, way, cmd ):
 # GHCi tests
 
 def ghci_script( name, way, script ):
-    # filter out -no-recomp from compiler_always_flags, becuase we're
+    # filter out -fforce-recomp from compiler_always_flags, because we're
     # actually testing the recompilation behaviour in the GHCi tests.
-    flags = filter(lambda f: f != '-no-recomp', config.compiler_always_flags)
+    flags = filter(lambda f: f != '-fforce-recomp', config.compiler_always_flags)
     flags.append(getTestOpts().extra_hc_opts)
 
     # We pass HC and HC_OPTS as environment variables, so that the
@@ -1123,7 +1123,7 @@ def if_verbose( n, str ):
 # Guess flags suitable for the compiler.
 def guess_compiler_flags():
    if config.compiler_type == 'ghc':
-       return ['-no-recomp', '-dcore-lint']
+       return ['-fforce-recomp', '-dcore-lint']
    elif config.compiler_type == 'nhc':
        return ['-an-nhc-specific-flag']
    else:
