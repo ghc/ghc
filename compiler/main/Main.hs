@@ -363,11 +363,11 @@ parseModeFlags args = do
     throwDyn (UsageError (unlines errs))
   return (mode, flags ++ leftover)
 
-type ModeM a = CmdLineP (CmdLineMode, String, [String]) a
+type ModeM = CmdLineP (CmdLineMode, String, [String])
   -- mode flags sometimes give rise to new DynFlags (eg. -C, see below)
   -- so we collect the new ones and return them.
 
-mode_flags :: [Flag (CmdLineP (CmdLineMode, String, [String]))]
+mode_flags :: [Flag ModeM]
 mode_flags =
   [  ------- help / version ----------------------------------------------
     Flag "?"                    (PassFlag (setMode ShowUsage))
