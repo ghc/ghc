@@ -251,7 +251,7 @@ lookUp     sw = sw `elem` packed_static_opts
 -- (lookup_str "foo") looks for the flag -foo=X or -fooX, 
 -- and returns the string X
 lookup_str sw 
-   = case firstJust (map (startsWith sw) staticFlags) of
+   = case firstJust (map (maybePrefixMatch sw) staticFlags) of
 	Just ('=' : str) -> Just str
 	Just str         -> Just str
 	Nothing		 -> Nothing	
@@ -450,19 +450,6 @@ isStaticFlag f =
 	"funfolding-fun-discount",
 	"funfolding-keeness-factor"
      ]
-
-
-
--- Misc functions for command-line options
-
-startsWith :: String -> String -> Maybe String
--- startsWith pfx (pfx++rest) = Just rest
-
-startsWith []     str = Just str
-startsWith (c:cs) (s:ss)
-  = if c /= s then Nothing else startsWith cs ss
-startsWith  _	  []  = Nothing
-
 
 -----------------------------------------------------------------------------
 -- convert sizes like "3.5M" into integers
