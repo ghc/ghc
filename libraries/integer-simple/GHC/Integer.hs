@@ -109,31 +109,50 @@ twoToTheThirtytwoInteger :: Integer
 twoToTheThirtytwoInteger = Positive twoToTheThirtytwoPositive
 
 encodeDoubleInteger :: Integer -> Int# -> Double#
-encodeDoubleInteger (!i) (!j)
- = encodeDouble# (toInt# (i `quotInteger` twoToTheThirtytwoInteger))
-                 (toInt# i)
-                 j
+encodeDoubleInteger (Positive ds0) e0 = f 0.0## ds0 e0
+    where f !acc None        (!_) = acc
+          f !acc (Some d ds) !e   = f (acc +## encodeDouble# d e)
+                                      ds
+                                      -- XXX We assume that this adding to e
+                                      -- isn't going to overflow
+                                      (e +# WORD_SIZE_IN_BITS#)
+encodeDoubleInteger (Negative ds) e
+    = negateDouble# (encodeDoubleInteger (Positive ds) e)
+encodeDoubleInteger Naught _ = 0.0##
 
-foreign import ccall unsafe "__2Int_encodeDouble"
-        encodeDouble# :: Int# -> Int# -> Int# -> Double#
+foreign import ccall unsafe "__word_encodeDouble"
+        encodeDouble# :: Word# -> Int# -> Double#
 
 encodeFloatInteger :: Integer -> Int# -> Float#
-encodeFloatInteger (!i) (!j) = encodeFloat# (toInt# i) j
+encodeFloatInteger (Positive ds0) e0 = f 0.0# ds0 e0
+    where f !acc None        (!_) = acc
+          f !acc (Some d ds) !e   = f (acc `plusFloat#` encodeFloat# d e)
+                                      ds
+                                      -- XXX We assume that this adding to e
+                                      -- isn't going to overflow
+                                      (e +# WORD_SIZE_IN_BITS#)
+encodeFloatInteger (Negative ds) e
+    = negateFloat# (encodeFloatInteger (Positive ds) e)
+encodeFloatInteger Naught _ = 0.0#
 
-foreign import ccall unsafe "__int_encodeFloat"
-    encodeFloat# :: Int# -> Int# -> Float#
+foreign import ccall unsafe "__word_encodeFloat"
+    encodeFloat# :: Word# -> Int# -> Float#
 
 decodeFloatInteger :: Float# -> (# Integer, Int# #)
 decodeFloatInteger f = case decodeFloat_Int# f of
                        (# mant, exp #) -> (# smallInteger mant, exp #)
 
+-- XXX This could be optimised better, by either (word-size dependent)
+-- using single 64bit value for the mantissa, or doing the multiplication
+-- by just building the Digits directly
 decodeDoubleInteger :: Double# -> (# Integer, Int# #)
 decodeDoubleInteger d
  = case decodeDouble_2Int# d of
-   (# mant_high#, mant_low#, exp# #) ->
-       (# (smallInteger mant_high# `timesInteger` twoToTheThirtytwoInteger)
-              `plusInteger` wordToInteger (int2Word# mant_low#),
-          exp# #)
+   (# mantSign, mantHigh, mantLow, exp #) ->
+       (# (smallInteger mantSign) `timesInteger`
+          (  (wordToInteger mantHigh `timesInteger` twoToTheThirtytwoInteger)
+             `plusInteger` wordToInteger mantLow),
+          exp #)
 
 doubleFromInteger :: Integer -> Double#
 doubleFromInteger Naught = 0.0##
