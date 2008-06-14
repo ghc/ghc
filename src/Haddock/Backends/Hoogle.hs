@@ -86,12 +86,8 @@ ppData :: TyClDecl Name -> [String]
 ppData x = showData x{tcdCons=[],tcdDerivs=Nothing} :
            concatMap (ppCtor x . unL) (tcdCons x)
     where
-        showData = unwords . f . words . out
-        
-        -- note: tcdND always seems to not match NewType (BUG?)
-        f ("data":xs) | tcdND x == NewType = f ("newtype":xs)
-        f xs | ["="] `isSuffixOf` xs = init xs
-        f xs = xs
+        -- GHC gives out "data Bar =", we want to delete the equals
+        showData = reverse . dropWhile (`elem` " =") . reverse . out
 
 
 ppCtor :: TyClDecl Name -> ConDecl Name -> [String]
