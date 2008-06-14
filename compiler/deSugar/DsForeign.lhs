@@ -6,13 +6,6 @@
 Desugaring foreign declarations (see also DsCCall).
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module DsForeign ( dsForeigns ) where
 
 #include "HsVersions.h"
@@ -36,6 +29,7 @@ import Type
 import TyCon
 import Coercion
 import TcType
+import Var
 
 import HscTypes
 import ForeignCall
@@ -97,6 +91,8 @@ dsForeigns fos = do
    do_decl (ForeignExport (L _ id) _ (CExport (CExportStatic ext_nm cconv))) = do
       (h, c, _, _) <- dsFExport id (idType id) ext_nm cconv False
       return (h, c, [id], [])
+
+   do_decl d = pprPanic "dsForeigns/do_decl" (ppr d)
 \end{code}
 
 
@@ -128,7 +124,7 @@ because it exposes the boxing to the call site.
 dsFImport :: Id
 	  -> ForeignImport
 	  -> DsM ([Binding], SDoc, SDoc)
-dsFImport id (CImport cconv safety header lib spec) = do
+dsFImport id (CImport cconv safety _ _ spec) = do
     (ids, h, c) <- dsCImport id spec cconv safety
     return (ids, h, c)
 
@@ -167,8 +163,8 @@ fun_type_arg_stdcall_info StdCallConv ty
   | Just (tc,[arg_ty]) <- splitTyConApp_maybe (repType ty),
     tyConUnique tc == funPtrTyConKey
   = let
-       (_tvs,sans_foralls)            = tcSplitForAllTys arg_ty
-       (fe_arg_tys, orig_res_ty)      = tcSplitFunTys sans_foralls
+       (_tvs,sans_foralls)        = tcSplitForAllTys arg_ty
+       (fe_arg_tys, _orig_res_ty) = tcSplitFunTys sans_foralls
     in 
         Just $ sum (map (machRepByteWidth . typeMachRep . getPrimTyOf) fe_arg_tys)
 fun_type_arg_stdcall_info _other_conv _
@@ -183,6 +179,7 @@ fun_type_arg_stdcall_info _other_conv _
 %************************************************************************
 
 \begin{code}
+dsFCall :: Id -> ForeignCall -> DsM ([(Id, Expr TyVar)], SDoc, SDoc)
 dsFCall fn_id fcall = do
     let
         ty                   = idType fn_id
@@ -208,7 +205,6 @@ dsFCall fn_id fcall = do
 
         augmentResultDs
           | forDotnet = do
-                err_res <- newSysLocalDs addrPrimTy
                 return (\ (mb_res_ty, resWrap) ->
                               case mb_res_ty of
                                 Nothing -> (Just (mkTyConApp (tupleTyCon Unboxed 1)
@@ -288,7 +284,7 @@ dsFExport fn_id ty ext_name cconv isDyn=  do
     (res_ty,             -- t
      is_IO_res_ty) <-    -- Bool
         case tcSplitIOType_maybe orig_res_ty of
-           Just (ioTyCon, res_ty, co) -> return (res_ty, True)
+           Just (_ioTyCon, res_ty, _co) -> return (res_ty, True)
                    -- The function already returns IO t
                    -- ToDo: what about the coercion?
            Nothing                    -> return (orig_res_ty, False) 
@@ -480,6 +476,7 @@ mkFExportCBits c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
   pprCconv = case cc of
 		CCallConv   -> empty
 		StdCallConv -> text (ccallConvAttribute cc)
+                CmmCallConv -> panic "mkFExportCBits/pprCconv CmmCallConv"
 
   header_bits = ptext (sLit "extern") <+> fun_proto <> semi
 
@@ -592,6 +589,7 @@ foreignExportInitialiser hs_fn =
 -- this information to hand, but we know what GHC's conventions
 -- are for passing around the primitive Haskell types, so we
 -- use that instead.  I hope the two coincide --SDM
+typeMachRep :: Type -> MachRep
 typeMachRep ty = argMachRep (typeCgRep ty)
 
 mkHObj :: Type -> SDoc
@@ -610,6 +608,8 @@ showFFIType t = getOccString (getName tc)
 	    Just (tc,_) -> tc
 	    Nothing	-> pprPanic "showFFIType" (ppr t)
 
+insertRetAddr :: CCallConv -> [(SDoc, SDoc, Type, MachRep)]
+                           -> [(SDoc, SDoc, Type, MachRep)]
 #if !defined(x86_64_TARGET_ARCH)
 insertRetAddr CCallConv args = ret_addr_arg : args
 insertRetAddr _ args = args
@@ -623,10 +623,11 @@ insertRetAddr CCallConv args = go 0 args
 	 go n (arg@(_,_,_,rep):args)
 	  | I64 <- rep = arg : go (n+1) args
 	  | otherwise  = arg : go n     args
-	 go n [] = []
+	 go _ [] = []
 insertRetAddr _ args = args
 #endif
 
+ret_addr_arg :: (SDoc, SDoc, Type, MachRep)
 ret_addr_arg = (text "original_return_addr", text "void*", undefined, 
 		typeMachRep addrPrimTy)
 
