@@ -6,13 +6,6 @@
 Printing of Core syntax
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module PprCore (
 	pprCoreExpr, pprParendExpr,
 	pprCoreBinding, pprCoreBindings, pprCoreAlt,
@@ -72,8 +65,10 @@ instance OutputableBndr b => Outputable (Expr b) where
 %************************************************************************
 
 \begin{code}
+pprTopBinds :: OutputableBndr a => [Bind a] -> SDoc
 pprTopBinds binds = vcat (map pprTopBind binds)
 
+pprTopBind :: OutputableBndr a => Bind a -> SDoc
 pprTopBind (NonRec binder expr)
  = ppr_binding (binder,expr) $$ text ""
 
@@ -113,8 +108,8 @@ ppr_expr :: OutputableBndr b => (SDoc -> SDoc) -> Expr b -> SDoc
 
 ppr_expr add_par (Type ty)  = add_par (ptext (sLit "TYPE") <+> ppr ty)	-- Wierd
 	           
-ppr_expr add_par (Var name) = ppr name
-ppr_expr add_par (Lit lit)  = ppr lit
+ppr_expr _       (Var name) = ppr name
+ppr_expr _       (Lit lit)  = ppr lit
 
 ppr_expr add_par (Cast expr co) 
   = add_par $
@@ -132,7 +127,7 @@ ppr_expr add_par expr@(Lam _ _)
     hang (ptext (sLit "\\") <+> sep (map (pprBndr LambdaBind) bndrs) <+> arrow)
 	 2 (pprCoreExpr body)
 
-ppr_expr add_par expr@(App fun arg)
+ppr_expr add_par expr@(App {})
   = case collectArgs expr of { (fun, args) -> 
     let
 	pp_args     = sep (map pprArg args)
@@ -149,9 +144,9 @@ ppr_expr add_par expr@(App fun arg)
 			     tc	       = dataConTyCon dc
 			     saturated = val_args `lengthIs` idArity f
 
-		   other -> add_par (hang (ppr f) 2 pp_args)
+		   _ -> add_par (hang (ppr f) 2 pp_args)
 
-	other -> add_par (hang (pprParendExpr fun) 2 pp_args)
+	_ -> add_par (hang (pprParendExpr fun) 2 pp_args)
     }
 
 ppr_expr add_par (Case expr var ty [(con,args,rhs)])
@@ -222,10 +217,12 @@ ppr_expr add_par (Note (CoreNote s) expr)
     sep [sep [ptext (sLit "__core_note"), pprHsString (mkFastString s)],
          pprParendExpr expr]
 
+pprCoreAlt :: OutputableBndr a => (AltCon, [a] , Expr a) -> SDoc
 pprCoreAlt (con, args, rhs) 
   = hang (ppr_case_pat con args) 2 (pprCoreExpr rhs)
 
-ppr_case_pat con@(DataAlt dc) args
+ppr_case_pat :: OutputableBndr a => AltCon -> [a] -> SDoc
+ppr_case_pat (DataAlt dc) args
   | isTupleTyCon tc
   = tupleParens (tupleTyConBoxity tc) (hsep (punctuate comma (map ppr_bndr args))) <+> arrow
   where
@@ -237,6 +234,7 @@ ppr_case_pat con args
   where
     ppr_bndr = pprBndr CaseBind
 
+pprArg :: OutputableBndr a => Expr a -> SDoc
 pprArg (Type ty) = ptext (sLit "@") <+> pprParendType ty
 pprArg expr      = pprParendExpr expr
 \end{code}
@@ -268,10 +266,12 @@ pprCoreBinder CaseBind bndr
     else
 	pprUntypedBinder bndr
 
+pprUntypedBinder :: Var -> SDoc
 pprUntypedBinder binder
   | isTyVar binder = ptext (sLit "@") <+> ppr binder	-- NB: don't print kind
   | otherwise      = pprIdBndr binder
 
+pprTypedBinder :: Var -> SDoc
 pprTypedBinder binder
   | isTyVar binder  = ptext (sLit "@") <+> pprTyVarBndr binder
   | otherwise	    = pprIdBndr binder <+> dcolon <+> pprType (idType binder)
@@ -289,8 +289,10 @@ pprTyVarBndr tyvar
 
 -- pprIdBndr does *not* print the type
 -- When printing any Id binder in debug mode, we print its inline pragma and one-shot-ness
+pprIdBndr :: Id -> SDoc
 pprIdBndr id = ppr id <+> pprIdBndrInfo (idInfo id)
 
+pprIdBndrInfo :: IdInfo -> SDoc
 pprIdBndrInfo info 
   = megaSeqIdInfo info `seq` doc -- The seq is useful for poking on black holes
   where
@@ -321,7 +323,7 @@ pprIdDetails id | isGlobalId id     = ppr (globalIdDetails id)
 		| otherwise	    = empty
 
 ppIdInfo :: Id -> IdInfo -> SDoc
-ppIdInfo b info
+ppIdInfo _ info
   = brackets $
     vcat [  ppArityInfo a,
 	    ppWorkerInfo (workerInfo info),
