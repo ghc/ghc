@@ -1,11 +1,4 @@
 
-{-# OPTIONS -fno-warn-missing-fields #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 -----------------------------------------------------------------------------
 --
 -- Dynamic flags
@@ -546,7 +539,28 @@ defaultDynFlags =
         packageFlags            = [],
         pkgDatabase             = Nothing,
         pkgState                = panic "no package state yet: call GHC.setSessionDynFlags",
-  haddockOptions = Nothing,
+        wayNames                = panic "defaultDynFlags: No wayNames",
+        buildTag                = panic "defaultDynFlags: No buildTag",
+        rtsBuildTag             = panic "defaultDynFlags: No rtsBuildTag",
+        -- initSysTools fills all these in
+        ghcUsagePath            = panic "defaultDynFlags: No ghciUsagePath",
+        ghciUsagePath           = panic "defaultDynFlags: No ghciUsagePath",
+        topDir                  = panic "defaultDynFlags: No topDir",
+        systemPackageConfig     = panic "defaultDynFlags: No systemPackageConfig",
+        pgm_L                   = panic "defaultDynFlags: No pgm_L",
+        pgm_P                   = panic "defaultDynFlags: No pgm_P",
+        pgm_F                   = panic "defaultDynFlags: No pgm_F",
+        pgm_c                   = panic "defaultDynFlags: No pgm_c",
+        pgm_m                   = panic "defaultDynFlags: No pgm_m",
+        pgm_s                   = panic "defaultDynFlags: No pgm_s",
+        pgm_a                   = panic "defaultDynFlags: No pgm_a",
+        pgm_l                   = panic "defaultDynFlags: No pgm_l",
+        pgm_dll                 = panic "defaultDynFlags: No pgm_dll",
+        pgm_T                   = panic "defaultDynFlags: No pgm_T",
+        pgm_sysman              = panic "defaultDynFlags: No pgm_sysman",
+        pgm_windres             = panic "defaultDynFlags: No pgm_windres",
+        -- end of initSysTools values
+        haddockOptions = Nothing,
         flags = [
             Opt_ReadUserPackageConf,
 
