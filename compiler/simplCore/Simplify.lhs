@@ -36,7 +36,6 @@ import BasicTypes       ( TopLevelFlag(..), isTopLevel,
 import Maybes           ( orElse )
 import Data.List        ( mapAccumL )
 import Outputable
-import MonadUtils
 import FastString
 \end{code}
 
@@ -351,21 +350,10 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
                      do { tick LetFloatFromLet
                         ; (poly_binds, body3) <- abstractFloats tvs' body_env2 body2
                         ; rhs' <- mkLam tvs' body3
-                        ; env' <- foldlM add_poly_bind env poly_binds
+                        ; let env' = foldl (addPolyBind top_lvl) env poly_binds
                         ; return (env', rhs') }
 
         ; completeBind env' top_lvl bndr bndr1 rhs' }
-  where
-    add_poly_bind env (NonRec poly_id rhs)
-	= completeBind env top_lvl poly_id poly_id rhs
-		-- completeBind adds the new binding in the
-		-- proper way (ie complete with unfolding etc),
-		-- and extends the in-scope set
-    add_poly_bind env bind@(Rec _)
-	= return (extendFloats env bind)
-		-- Hack: letrecs are more awkward, so we extend "by steam"
-		-- without adding unfoldings etc.  At worst this leads to
-		-- more simplifier iterations
 \end{code}
 
 A specialised variant of simplNonRec used when the RHS is already simplified,
@@ -571,10 +559,57 @@ completeBind env top_lvl old_bndr new_bndr new_rhs
         -- Use the substitution to make quite, quite sure that the
         -- substitution will happen, since we are going to discard the binding
 
-  |  otherwise
-  = let
+  | otherwise
+  = return (addNonRecWithUnf env new_bndr new_rhs unfolding wkr)
+  where
+    unfolding | omit_unfolding = NoUnfolding
+	      | otherwise      = mkUnfolding  (isTopLevel top_lvl) new_rhs
+    old_info    = idInfo old_bndr
+    occ_info    = occInfo old_info
+    wkr		= substWorker env (workerInfo old_info)
+    omit_unfolding = isNonRuleLoopBreaker occ_info || not (activeInline env old_bndr)
+
+-----------------
+addPolyBind :: TopLevelFlag -> SimplEnv -> OutBind -> SimplEnv
+-- Add a new binding to the environment, complete with its unfolding
+-- but *do not* do postInlineUnconditionally, because we have already
+-- processed some of the scope of the binding
+-- We still want the unfolding though.  Consider
+--	let 
+--	      x = /\a. let y = ... in Just y
+--	in body
+-- Then we float the y-binding out (via abstractFloats and addPolyBind)
+-- but 'x' may well then be inlined in 'body' in which case we'd like the 
+-- opportunity to inline 'y' too.
+
+addPolyBind top_lvl env (NonRec poly_id rhs)
+  = addNonRecWithUnf env poly_id rhs unfolding NoWorker
+  where
+    unfolding | not (activeInline env poly_id) = NoUnfolding
+	      | otherwise		       = mkUnfolding (isTopLevel top_lvl) rhs
+		-- addNonRecWithInfo adds the new binding in the
+		-- proper way (ie complete with unfolding etc),
+		-- and extends the in-scope set
+
+addPolyBind _ env bind@(Rec _) = extendFloats env bind
+		-- Hack: letrecs are more awkward, so we extend "by steam"
+		-- without adding unfoldings etc.  At worst this leads to
+		-- more simplifier iterations
+
+-----------------
+addNonRecWithUnf :: SimplEnv
+             	  -> OutId -> OutExpr        -- New binder and RHS
+		  -> Unfolding -> WorkerInfo -- and unfolding
+             	  -> SimplEnv
+-- Add suitable IdInfo to the Id, add the binding to the floats, and extend the in-scope set
+addNonRecWithUnf env new_bndr rhs unfolding wkr
+  = final_id `seq`      -- This seq forces the Id, and hence its IdInfo,
+	                -- and hence any inner substitutions
+    addNonRec env final_id rhs
+	-- The addNonRec adds it to the in-scope set too
+  where
         --      Arity info
-        new_bndr_info = idInfo new_bndr `setArityInfo` exprArity new_rhs
+        new_bndr_info = idInfo new_bndr `setArityInfo` exprArity rhs
 
         --      Unfolding info
         -- Add the unfolding *only* for non-loop-breakers
@@ -598,26 +633,12 @@ completeBind env top_lvl old_bndr new_bndr new_rhs
         -- (for example) be no longer strictly demanded.
         -- The solution here is a bit ad hoc...
         info_w_unf = new_bndr_info `setUnfoldingInfo` unfolding
-                                   `setWorkerInfo`    worker_info
+				   `setWorkerInfo`    wkr
 
-        final_info | omit_unfolding             = new_bndr_info
-                   | isEvaldUnfolding unfolding = zapDemandInfo info_w_unf `orElse` info_w_unf
+        final_info | isEvaldUnfolding unfolding = zapDemandInfo info_w_unf `orElse` info_w_unf
                    | otherwise                  = info_w_unf
-
+	
         final_id = new_bndr `setIdInfo` final_info
-    in
-                -- These seqs forces the Id, and hence its IdInfo,
-                -- and hence any inner substitutions
-    final_id                                    `seq`
-    -- pprTrace "Binding" (ppr final_id <+> ppr unfolding) $
-    return (addNonRec env final_id new_rhs)
-	-- The addNonRec adds it to the in-scope set too
-  where
-    unfolding      = mkUnfolding (isTopLevel top_lvl) new_rhs
-    worker_info    = substWorker env (workerInfo old_info)
-    omit_unfolding = isNonRuleLoopBreaker occ_info || not (activeInline env old_bndr)
-    old_info       = idInfo old_bndr
-    occ_info       = occInfo old_info
 \end{code}
 
 
@@ -1890,7 +1911,7 @@ mkDupableAlt env case_bndr' (con, bndrs', rhs')
                 join_rhs  = mkLams really_final_bndrs rhs'
                 join_call = mkApps (Var join_bndr) final_args
 
-        ; return (addNonRec env join_bndr join_rhs, (con, bndrs', join_call)) }
+        ; return (addPolyBind NotTopLevel env (NonRec join_bndr join_rhs), (con, bndrs', join_call)) }
                 -- See Note [Duplicated env]
 \end{code}
 
