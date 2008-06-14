@@ -366,7 +366,7 @@ cvtl e = wrapL (cvt e)
     cvt (AppE x y)     = do { x' <- cvtl x; y' <- cvtl y; return $ HsApp x' y' }
     cvt (LamE ps e)    = do { ps' <- cvtPats ps; e' <- cvtl e 
 			    ; return $ HsLam (mkMatchGroup [mkSimpleMatch ps' e']) }
-    cvt (TupE [e])     = cvt e
+    cvt (TupE [e])     = cvt e	-- Singleton tuples treated like nothing (just parens)
     cvt (TupE es)      = do { es' <- mapM cvtl es; return $ ExplicitTuple es' Boxed }
     cvt (CondE x y z)  = do { x' <- cvtl x; y' <- cvtl y; z' <- cvtl z
 			    ; return $ HsIf x' y' z' }
@@ -514,10 +514,13 @@ cvtPred ty
 	    _       -> failWith (ptext (sLit "Malformed predicate") <+> text (TH.pprint ty)) }
 
 cvtType :: TH.Type -> CvtM (LHsType RdrName)
-cvtType ty = do { (head, tys') <- split_ty_app ty
-		; case head of
-		    TupleT n | length tys' == n -> returnL (HsTupleTy Boxed tys')
-		             | n == 0    -> mk_apps (HsTyVar (getRdrName unitTyCon)) tys'
+cvtType ty = do { (head_ty, tys') <- split_ty_app ty
+		; case head_ty of
+		    TupleT n | length tys' == n 	-- Saturated
+			     -> if n==1 then return (head tys')	-- Singleton tuples treated 
+								-- like nothing (ie just parens)
+					else returnL (HsTupleTy Boxed tys')
+		             | n == 1    -> failWith (ptext (sLit "Illegal 1-tuple type constructor"))
 		             | otherwise -> mk_apps (HsTyVar (getRdrName (tupleTyCon Boxed n))) tys'
 		    ArrowT | [x',y'] <- tys' -> returnL (HsFunTy x' y')
 		    ListT  | [x']    <- tys' -> returnL (HsListTy x')
@@ -531,8 +534,9 @@ cvtType ty = do { (head, tys') <- split_ty_app ty
 		    _       -> failWith (ptext (sLit "Malformed type") <+> text (show ty))
 	     }
   where
-    mk_apps head []       = returnL head
-    mk_apps head (ty:tys) = do { head' <- returnL head; mk_apps (HsAppTy head' ty) tys }
+    mk_apps head_ty []       = returnL head_ty
+    mk_apps head_ty (ty:tys) = do { head_ty' <- returnL head_ty
+				  ; mk_apps (HsAppTy head_ty' ty) tys }
 
 split_ty_app :: TH.Type -> CvtM (TH.Type, [LHsType RdrName])
 split_ty_app ty = go ty []
