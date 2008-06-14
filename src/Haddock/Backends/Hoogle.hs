@@ -56,7 +56,11 @@ dropComment [] = []
 
 
 out :: Outputable a => a -> String
-out = unwords . map (dropWhile isSpace) . lines . showSDocUnqual . ppr
+out = f . unwords . map (dropWhile isSpace) . lines . showSDocUnqual . ppr
+    where
+        f xs | " <document comment>" `isPrefixOf` xs = f $ drop 19 xs
+        f (x:xs) = x : f xs
+        f [] = []
 
 
 typeSig :: String -> [String] -> String
