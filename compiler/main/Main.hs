@@ -367,36 +367,36 @@ type ModeM a = CmdLineP (CmdLineMode, String, [String]) a
   -- mode flags sometimes give rise to new DynFlags (eg. -C, see below)
   -- so we collect the new ones and return them.
 
-mode_flags :: [(String, OptKind (CmdLineP (CmdLineMode, String, [String])))]
+mode_flags :: [Flag (CmdLineP (CmdLineMode, String, [String]))]
 mode_flags =
   [  ------- help / version ----------------------------------------------
-     ( "?"                   , PassFlag (setMode ShowUsage))
-  ,  ( "-help"               , PassFlag (setMode ShowUsage))
-  ,  ( "-print-libdir"       , PassFlag (setMode PrintLibdir))
-  ,  ( "V"                   , PassFlag (setMode ShowVersion))
-  ,  ( "-version"            , PassFlag (setMode ShowVersion))
-  ,  ( "-numeric-version"    , PassFlag (setMode ShowNumVersion))
-  ,  ( "-info"               , PassFlag (setMode ShowInfo))
-  ,  ( "-supported-languages", PassFlag (setMode ShowSupportedLanguages))
+    Flag "?"                    (PassFlag (setMode ShowUsage))
+  , Flag "-help"                (PassFlag (setMode ShowUsage))
+  , Flag "-print-libdir"        (PassFlag (setMode PrintLibdir))
+  , Flag "V"                    (PassFlag (setMode ShowVersion))
+  , Flag "-version"             (PassFlag (setMode ShowVersion))
+  , Flag "-numeric-version"     (PassFlag (setMode ShowNumVersion))
+  , Flag "-info"                (PassFlag (setMode ShowInfo))
+  , Flag "-supported-languages" (PassFlag (setMode ShowSupportedLanguages))
 
       ------- interfaces ----------------------------------------------------
-  ,  ( "-show-iface"     , HasArg (\f -> setMode (ShowInterface f)
-                                                 "--show-iface"))
+  , Flag "-show-iface"  (HasArg (\f -> setMode (ShowInterface f)
+                                               "--show-iface"))
 
       ------- primary modes ------------------------------------------------
-  ,  ( "M"              , PassFlag (setMode DoMkDependHS))
-  ,  ( "E"              , PassFlag (setMode (StopBefore anyHsc)))
-  ,  ( "C"              , PassFlag (\f -> do setMode (StopBefore HCc) f
-                                             addFlag "-fvia-C"))
-  ,  ( "S"              , PassFlag (setMode (StopBefore As)))
-  ,  ( "-make"          , PassFlag (setMode DoMake))
-  ,  ( "-interactive"   , PassFlag (setMode DoInteractive))
-  ,  ( "e"              , HasArg   (\s -> updateMode (updateDoEval s) "-e"))
+  , Flag "M"            (PassFlag (setMode DoMkDependHS))
+  , Flag "E"            (PassFlag (setMode (StopBefore anyHsc)))
+  , Flag "C"            (PassFlag (\f -> do setMode (StopBefore HCc) f
+                                            addFlag "-fvia-C"))
+  , Flag "S"            (PassFlag (setMode (StopBefore As)))
+  , Flag "-make"        (PassFlag (setMode DoMake))
+  , Flag "-interactive" (PassFlag (setMode DoInteractive))
+  , Flag "e"            (HasArg   (\s -> updateMode (updateDoEval s) "-e"))
 
        -- -fno-code says to stop after Hsc but don't generate any code.
-  ,  ( "fno-code"       , PassFlag (\f -> do setMode (StopBefore HCc) f
-                                             addFlag "-fno-code"
-                                             addFlag "-no-recomp"))
+  , Flag "fno-code"     (PassFlag (\f -> do setMode (StopBefore HCc) f
+                                            addFlag "-fno-code"
+                                            addFlag "-no-recomp"))
   ]
 
 setMode :: CmdLineMode -> String -> ModeM ()

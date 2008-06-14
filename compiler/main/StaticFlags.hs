@@ -133,7 +133,7 @@ parseStaticFlags args = do
 initStaticOpts :: IO ()
 initStaticOpts = writeIORef v_opt_C_ready True
 
-static_flags :: [(String, OptKind IO)]
+static_flags :: [Flag IO]
 -- All the static flags should appear in this list.  It describes how each
 -- static flag should be processed.  Two main purposes:
 -- (a) if a command-line flag doesn't appear in the list, GHC can complain
@@ -148,55 +148,55 @@ static_flags :: [(String, OptKind IO)]
 -- flags further down the list with the same prefix.
 
 static_flags = [
-	------- GHCi -------------------------------------------------------
-     ( "ignore-dot-ghci", PassFlag addOpt )
-  ,  ( "read-dot-ghci"  , NoArg (removeOpt "-ignore-dot-ghci") )
+        ------- GHCi -------------------------------------------------------
+    Flag "ignore-dot-ghci" (PassFlag addOpt)
+  , Flag "read-dot-ghci"   (NoArg (removeOpt "-ignore-dot-ghci"))
 
-	------- ways --------------------------------------------------------
-  ,  ( "prof"		, NoArg (addWay WayProf) )
-  ,  ( "ticky"		, NoArg (addWay WayTicky) )
-  ,  ( "parallel"	, NoArg (addWay WayPar) )
-  ,  ( "gransim"	, NoArg (addWay WayGran) )
-  ,  ( "smp"		, NoArg (addWay WayThreaded) ) -- backwards compat.
-  ,  ( "debug"		, NoArg (addWay WayDebug) )
-  ,  ( "ndp"		, NoArg (addWay WayNDP) )
-  ,  ( "threaded"	, NoArg (addWay WayThreaded) )
- 	-- ToDo: user ways
+        ------- ways --------------------------------------------------------
+  , Flag "prof"           (NoArg (addWay WayProf))
+  , Flag "ticky"          (NoArg (addWay WayTicky))
+  , Flag "parallel"       (NoArg (addWay WayPar))
+  , Flag "gransim"        (NoArg (addWay WayGran))
+  , Flag "smp"            (NoArg (addWay WayThreaded)) -- backwards compat.
+  , Flag "debug"          (NoArg (addWay WayDebug))
+  , Flag "ndp"            (NoArg (addWay WayNDP))
+  , Flag "threaded"       (NoArg (addWay WayThreaded))
+        -- ToDo: user ways
 
-	------ Debugging ----------------------------------------------------
-  ,  ( "dppr-debug",        PassFlag addOpt )
-  ,  ( "dsuppress-uniques", PassFlag addOpt )
-  ,  ( "dppr-user-length",  AnySuffix addOpt )
-  ,  ( "dopt-fuel",         AnySuffix addOpt )
-  ,  ( "dno-debug-output",  PassFlag addOpt )
+        ------ Debugging ----------------------------------------------------
+  , Flag "dppr-debug"        (PassFlag addOpt)
+  , Flag "dsuppress-uniques" (PassFlag addOpt)
+  , Flag "dppr-user-length"  (AnySuffix addOpt)
+  , Flag "dopt-fuel"         (AnySuffix addOpt)
+  , Flag "dno-debug-output"  (PassFlag addOpt)
       -- rest of the debugging flags are dynamic
 
-	--------- Profiling --------------------------------------------------
-  ,  ( "auto-all"	, NoArg (addOpt "-fauto-sccs-on-all-toplevs") )
-  ,  ( "auto"		, NoArg (addOpt "-fauto-sccs-on-exported-toplevs") )
-  ,  ( "caf-all"	, NoArg (addOpt "-fauto-sccs-on-individual-cafs") )
+        --------- Profiling --------------------------------------------------
+  , Flag "auto-all"       (NoArg (addOpt "-fauto-sccs-on-all-toplevs"))
+  , Flag "auto"           (NoArg (addOpt "-fauto-sccs-on-exported-toplevs"))
+  , Flag "caf-all"        (NoArg (addOpt "-fauto-sccs-on-individual-cafs"))
          -- "ignore-sccs"  doesn't work  (ToDo)
 
-  ,  ( "no-auto-all"	, NoArg (removeOpt "-fauto-sccs-on-all-toplevs") )
-  ,  ( "no-auto"	, NoArg (removeOpt "-fauto-sccs-on-exported-toplevs") )
-  ,  ( "no-caf-all"	, NoArg (removeOpt "-fauto-sccs-on-individual-cafs") )
+  , Flag "no-auto-all"    (NoArg (removeOpt "-fauto-sccs-on-all-toplevs"))
+  , Flag "no-auto"        (NoArg (removeOpt "-fauto-sccs-on-exported-toplevs"))
+  , Flag "no-caf-all"     (NoArg (removeOpt "-fauto-sccs-on-individual-cafs"))
 
-	----- Linker --------------------------------------------------------
-  ,  ( "static" 	, PassFlag addOpt )
-  ,  ( "dynamic"        , NoArg (removeOpt "-static") )
-  ,  ( "rdynamic"       , NoArg (return ()) ) -- ignored for compat w/ gcc
+        ----- Linker --------------------------------------------------------
+  , Flag "static"         (PassFlag addOpt)
+  , Flag "dynamic"        (NoArg (removeOpt "-static"))
+  , Flag "rdynamic"       (NoArg (return ())) -- ignored for compat w/ gcc
 
-	----- RTS opts ------------------------------------------------------
-  ,  ( "H"                 , HasArg (setHeapSize . fromIntegral . decodeSize) )
-  ,  ( "Rghc-timing"	   , NoArg  (enableTimingStats) )
+        ----- RTS opts ------------------------------------------------------
+  , Flag "H"              (HasArg (setHeapSize . fromIntegral . decodeSize))
+  , Flag "Rghc-timing"    (NoArg  (enableTimingStats))
 
         ------ Compiler flags -----------------------------------------------
-	-- All other "-fno-<blah>" options cancel out "-f<blah>" on the hsc cmdline
-  ,  ( "fno-",			PrefixPred (\s -> isStaticFlag ("f"++s))
-				    (\s -> removeOpt ("-f"++s)) )
+        -- All other "-fno-<blah>" options cancel out "-f<blah>" on the hsc cmdline
+  , Flag "fno-"
+         (PrefixPred (\s -> isStaticFlag ("f"++s)) (\s -> removeOpt ("-f"++s)))
 
-	-- Pass all remaining "-f<blah>" options to hsc
-  ,  ( "f", 			AnySuffixPred (isStaticFlag) addOpt )
+        -- Pass all remaining "-f<blah>" options to hsc
+  , Flag "f"                      (AnySuffixPred (isStaticFlag) addOpt)
   ]
 
 addOpt :: String -> IO ()

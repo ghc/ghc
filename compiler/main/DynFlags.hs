@@ -1008,7 +1008,7 @@ getStgToDo dflags
 
 allFlags :: [String]
 allFlags = map ('-':) $
-           [ name | (name, optkind) <- dynamic_flags, ok optkind ] ++
+           [ flagName flag | flag <- dynamic_flags, ok (flagOptKind flag) ] ++
            map ("fno-"++) flags ++
            map ("f"++) flags ++
            map ("X"++) xs ++
@@ -1018,240 +1018,246 @@ allFlags = map ('-':) $
           flags = map fst fFlags
           xs = map fst xFlags
 
-dynamic_flags :: [(String, OptKind DynP)]
+dynamic_flags :: [Flag DynP]
 dynamic_flags = [
-     ( "n"              , NoArg  (setDynFlag Opt_DryRun) )
-  ,  ( "cpp"            , NoArg  (setDynFlag Opt_Cpp))
-  ,  ( "F"              , NoArg  (setDynFlag Opt_Pp))
-  ,  ( "#include"       , HasArg (addCmdlineHCInclude) )
-  ,  ( "v"              , OptIntSuffix setVerbosity )
+    Flag "n"              (NoArg  (setDynFlag Opt_DryRun))
+  , Flag "cpp"            (NoArg  (setDynFlag Opt_Cpp))
+  , Flag "F"              (NoArg  (setDynFlag Opt_Pp))
+  , Flag "#include"       (HasArg (addCmdlineHCInclude))
+  , Flag "v"              (OptIntSuffix setVerbosity)
 
         ------- Specific phases  --------------------------------------------
-  ,  ( "pgmL"           , HasArg (upd . setPgmL) )
-  ,  ( "pgmP"           , HasArg (upd . setPgmP) )
-  ,  ( "pgmF"           , HasArg (upd . setPgmF) )
-  ,  ( "pgmc"           , HasArg (upd . setPgmc) )
-  ,  ( "pgmm"           , HasArg (upd . setPgmm) )
-  ,  ( "pgms"           , HasArg (upd . setPgms) )
-  ,  ( "pgma"           , HasArg (upd . setPgma) )
-  ,  ( "pgml"           , HasArg (upd . setPgml) )
-  ,  ( "pgmdll"         , HasArg (upd . setPgmdll) )
-  ,  ( "pgmwindres"     , HasArg (upd . setPgmwindres) )
+  , Flag "pgmL"           (HasArg (upd . setPgmL))
+  , Flag "pgmP"           (HasArg (upd . setPgmP))
+  , Flag "pgmF"           (HasArg (upd . setPgmF))
+  , Flag "pgmc"           (HasArg (upd . setPgmc))
+  , Flag "pgmm"           (HasArg (upd . setPgmm))
+  , Flag "pgms"           (HasArg (upd . setPgms))
+  , Flag "pgma"           (HasArg (upd . setPgma))
+  , Flag "pgml"           (HasArg (upd . setPgml))
+  , Flag "pgmdll"         (HasArg (upd . setPgmdll))
+  , Flag "pgmwindres"     (HasArg (upd . setPgmwindres))
 
-  ,  ( "optL"           , HasArg (upd . addOptL) )
-  ,  ( "optP"           , HasArg (upd . addOptP) )
-  ,  ( "optF"           , HasArg (upd . addOptF) )
-  ,  ( "optc"           , HasArg (upd . addOptc) )
-  ,  ( "optm"           , HasArg (upd . addOptm) )
-  ,  ( "opta"           , HasArg (upd . addOpta) )
-  ,  ( "optl"           , HasArg (upd . addOptl) )
-  ,  ( "optdep"         , HasArg (upd . addOptdep) )
-  ,  ( "optwindres"     , HasArg (upd . addOptwindres) )
+  , Flag "optL"           (HasArg (upd . addOptL))
+  , Flag "optP"           (HasArg (upd . addOptP))
+  , Flag "optF"           (HasArg (upd . addOptF))
+  , Flag "optc"           (HasArg (upd . addOptc))
+  , Flag "optm"           (HasArg (upd . addOptm))
+  , Flag "opta"           (HasArg (upd . addOpta))
+  , Flag "optl"           (HasArg (upd . addOptl))
+  , Flag "optdep"         (HasArg (upd . addOptdep))
+  , Flag "optwindres"     (HasArg (upd . addOptwindres))
 
-  ,  ( "split-objs"     , NoArg (if can_split
-                                    then setDynFlag Opt_SplitObjs
-                                    else return ()) )
+  , Flag "split-objs"
+         (NoArg (if can_split then setDynFlag Opt_SplitObjs else return ()))
 
         -------- Linking ----------------------------------------------------
-  ,  ( "c"              , NoArg (upd $ \d -> d{ ghcLink=NoLink } ))
-  ,  ( "no-link"        , NoArg (upd $ \d -> d{ ghcLink=NoLink } )) -- Dep.
-  ,  ( "shared"         , NoArg (upd $ \d -> d{ ghcLink=LinkDynLib } ))
-  ,  ( "dynload"        , HasArg (upd . parseDynLibLoaderMode))
+  , Flag "c"              (NoArg (upd $ \d -> d{ ghcLink=NoLink } ))
+  , Flag "no-link"        (NoArg (upd $ \d -> d{ ghcLink=NoLink } )) -- Dep.
+  , Flag "shared"         (NoArg (upd $ \d -> d{ ghcLink=LinkDynLib } ))
+  , Flag "dynload"        (HasArg (upd . parseDynLibLoaderMode))
 
         ------- Libraries ---------------------------------------------------
-  ,  ( "L"              , Prefix addLibraryPath )
-  ,  ( "l"              , AnySuffix (\s -> do upd (addOptl s)))
+  , Flag "L"              (Prefix addLibraryPath )
+  , Flag "l"              (AnySuffix (\s -> do upd (addOptl s)))
 
         ------- Frameworks --------------------------------------------------
         -- -framework-path should really be -F ...
-  ,  ( "framework-path" , HasArg addFrameworkPath )
-  ,  ( "framework"      , HasArg (upd . addCmdlineFramework) )
+  , Flag "framework-path" (HasArg addFrameworkPath )
+  , Flag "framework"      (HasArg (upd . addCmdlineFramework))
 
         ------- Output Redirection ------------------------------------------
-  ,  ( "odir"           , HasArg (upd . setObjectDir))
-  ,  ( "o"              , SepArg (upd . setOutputFile . Just))
-  ,  ( "ohi"            , HasArg (upd . setOutputHi   . Just ))
-  ,  ( "osuf"           , HasArg (upd . setObjectSuf))
-  ,  ( "hcsuf"          , HasArg (upd . setHcSuf))
-  ,  ( "hisuf"          , HasArg (upd . setHiSuf))
-  ,  ( "hidir"          , HasArg (upd . setHiDir))
-  ,  ( "tmpdir"         , HasArg (upd . setTmpDir))
-  ,  ( "stubdir"        , HasArg (upd . setStubDir))
-  ,  ( "ddump-file-prefix", HasArg (upd . setDumpPrefixForce . Just))
+  , Flag "odir"           (HasArg (upd . setObjectDir))
+  , Flag "o"              (SepArg (upd . setOutputFile . Just))
+  , Flag "ohi"            (HasArg (upd . setOutputHi   . Just ))
+  , Flag "osuf"           (HasArg (upd . setObjectSuf))
+  , Flag "hcsuf"          (HasArg (upd . setHcSuf))
+  , Flag "hisuf"          (HasArg (upd . setHiSuf))
+  , Flag "hidir"          (HasArg (upd . setHiDir))
+  , Flag "tmpdir"         (HasArg (upd . setTmpDir))
+  , Flag "stubdir"        (HasArg (upd . setStubDir))
+  , Flag "ddump-file-prefix" (HasArg (upd . setDumpPrefixForce . Just))
 
         ------- Keeping temporary files -------------------------------------
      -- These can be singular (think ghc -c) or plural (think ghc --make)
-  ,  ( "keep-hc-file"    , NoArg (setDynFlag Opt_KeepHcFiles))
-  ,  ( "keep-hc-files"   , NoArg (setDynFlag Opt_KeepHcFiles))
-  ,  ( "keep-s-file"     , NoArg (setDynFlag Opt_KeepSFiles))
-  ,  ( "keep-s-files"    , NoArg (setDynFlag Opt_KeepSFiles))
-  ,  ( "keep-raw-s-file" , NoArg (setDynFlag Opt_KeepRawSFiles))
-  ,  ( "keep-raw-s-files", NoArg (setDynFlag Opt_KeepRawSFiles))
+  , Flag "keep-hc-file"     (NoArg (setDynFlag Opt_KeepHcFiles))
+  , Flag "keep-hc-files"    (NoArg (setDynFlag Opt_KeepHcFiles))
+  , Flag "keep-s-file"      (NoArg (setDynFlag Opt_KeepSFiles))
+  , Flag "keep-s-files"     (NoArg (setDynFlag Opt_KeepSFiles))
+  , Flag "keep-raw-s-file"  (NoArg (setDynFlag Opt_KeepRawSFiles))
+  , Flag "keep-raw-s-files" (NoArg (setDynFlag Opt_KeepRawSFiles))
      -- This only makes sense as plural
-  ,  ( "keep-tmp-files"  , NoArg (setDynFlag Opt_KeepTmpFiles))
+  , Flag "keep-tmp-files"   (NoArg (setDynFlag Opt_KeepTmpFiles))
 
         ------- Miscellaneous ----------------------------------------------
-  ,  ( "no-hs-main"     , NoArg (setDynFlag Opt_NoHsMain))
-  ,  ( "main-is"        , SepArg setMainIs )
-  ,  ( "haddock"        , NoArg (setDynFlag Opt_Haddock) )
-  ,  ( "haddock-opts"   , HasArg (upd . addHaddockOpts))
-  ,  ( "hpcdir"         , SepArg setOptHpcDir )
+  , Flag "no-hs-main"     (NoArg (setDynFlag Opt_NoHsMain))
+  , Flag "main-is"        (SepArg setMainIs )
+  , Flag "haddock"        (NoArg (setDynFlag Opt_Haddock))
+  , Flag "haddock-opts"   (HasArg (upd . addHaddockOpts))
+  , Flag "hpcdir"         (SepArg setOptHpcDir)
 
         ------- recompilation checker (DEPRECATED, use -fforce-recomp) -----
-  ,  ( "recomp"         , NoArg (unSetDynFlag Opt_ForceRecomp) )
-  ,  ( "no-recomp"      , NoArg (setDynFlag   Opt_ForceRecomp) )
+  , Flag "recomp"         (NoArg (unSetDynFlag Opt_ForceRecomp))
+  , Flag "no-recomp"      (NoArg (setDynFlag   Opt_ForceRecomp))
 
         ------- Packages ----------------------------------------------------
-  ,  ( "package-conf"   , HasArg extraPkgConf_ )
-  ,  ( "no-user-package-conf", NoArg (unSetDynFlag Opt_ReadUserPackageConf) )
-  ,  ( "package-name"   , HasArg (upd . setPackageName) )
-  ,  ( "package"        , HasArg exposePackage )
-  ,  ( "hide-package"   , HasArg hidePackage )
-  ,  ( "hide-all-packages", NoArg (setDynFlag Opt_HideAllPackages) )
-  ,  ( "ignore-package" , HasArg ignorePackage )
-  ,  ( "syslib"         , HasArg exposePackage )  -- for compatibility
+  , Flag "package-conf"   (HasArg extraPkgConf_)
+  , Flag "no-user-package-conf" (NoArg (unSetDynFlag Opt_ReadUserPackageConf))
+  , Flag "package-name"   (HasArg (upd . setPackageName))
+  , Flag "package"        (HasArg exposePackage)
+  , Flag "hide-package"   (HasArg hidePackage)
+  , Flag "hide-all-packages" (NoArg (setDynFlag Opt_HideAllPackages))
+  , Flag "ignore-package" (HasArg ignorePackage)
+  , Flag "syslib"         (HasArg exposePackage)  -- for compatibility
 
         ------ HsCpp opts ---------------------------------------------------
-  ,  ( "D",             AnySuffix (upd . addOptP) )
-  ,  ( "U",             AnySuffix (upd . addOptP) )
+  , Flag "D"              (AnySuffix (upd . addOptP))
+  , Flag "U"              (AnySuffix (upd . addOptP))
 
         ------- Include/Import Paths ----------------------------------------
-  ,  ( "I"              , Prefix    addIncludePath)
-  ,  ( "i"              , OptPrefix addImportPath )
+  , Flag "I"              (Prefix    addIncludePath)
+  , Flag "i"              (OptPrefix addImportPath )
 
         ------ Debugging ----------------------------------------------------
-  ,  ( "dstg-stats",    NoArg (setDynFlag Opt_StgStats))
+  , Flag "dstg-stats"     (NoArg (setDynFlag Opt_StgStats))
 
-  ,  ( "ddump-cmm",              setDumpFlag Opt_D_dump_cmm)
-  ,  ( "ddump-cmmz",             setDumpFlag Opt_D_dump_cmmz)
-  ,  ( "ddump-cmmz-pretty",      setDumpFlag Opt_D_dump_cmmz_pretty)
-  ,  ( "ddump-cps-cmm",          setDumpFlag Opt_D_dump_cps_cmm)
-  ,  ( "ddump-cvt-cmm",          setDumpFlag Opt_D_dump_cvt_cmm)
-  ,  ( "ddump-asm",              setDumpFlag Opt_D_dump_asm)
-  ,  ( "ddump-asm-native",       setDumpFlag Opt_D_dump_asm_native)
-  ,  ( "ddump-asm-liveness",     setDumpFlag Opt_D_dump_asm_liveness)
-  ,  ( "ddump-asm-coalesce",     setDumpFlag Opt_D_dump_asm_coalesce)
-  ,  ( "ddump-asm-regalloc",     setDumpFlag Opt_D_dump_asm_regalloc)
-  ,  ( "ddump-asm-conflicts",    setDumpFlag Opt_D_dump_asm_conflicts)
-  ,  ( "ddump-asm-regalloc-stages",
-                                 setDumpFlag Opt_D_dump_asm_regalloc_stages)
-  ,  ( "ddump-asm-stats",        setDumpFlag Opt_D_dump_asm_stats)
-  ,  ( "ddump-cpranal",          setDumpFlag Opt_D_dump_cpranal)
-  ,  ( "ddump-deriv",            setDumpFlag Opt_D_dump_deriv)
-  ,  ( "ddump-ds",               setDumpFlag Opt_D_dump_ds)
-  ,  ( "ddump-flatC",            setDumpFlag Opt_D_dump_flatC)
-  ,  ( "ddump-foreign",          setDumpFlag Opt_D_dump_foreign)
-  ,  ( "ddump-inlinings",        setDumpFlag Opt_D_dump_inlinings)
-  ,  ( "ddump-rule-firings",     setDumpFlag Opt_D_dump_rule_firings)
-  ,  ( "ddump-occur-anal",       setDumpFlag Opt_D_dump_occur_anal)
-  ,  ( "ddump-parsed",           setDumpFlag Opt_D_dump_parsed)
-  ,  ( "ddump-rn",               setDumpFlag Opt_D_dump_rn)
-  ,  ( "ddump-simpl",            setDumpFlag Opt_D_dump_simpl)
-  ,  ( "ddump-simpl-iterations", setDumpFlag Opt_D_dump_simpl_iterations)
-  ,  ( "ddump-simpl-phases",     OptPrefix setDumpSimplPhases)
-  ,  ( "ddump-spec",             setDumpFlag Opt_D_dump_spec)
-  ,  ( "ddump-prep",             setDumpFlag Opt_D_dump_prep)
-  ,  ( "ddump-stg",              setDumpFlag Opt_D_dump_stg)
-  ,  ( "ddump-stranal",          setDumpFlag Opt_D_dump_stranal)
-  ,  ( "ddump-tc",               setDumpFlag Opt_D_dump_tc)
-  ,  ( "ddump-types",            setDumpFlag Opt_D_dump_types)
-  ,  ( "ddump-rules",            setDumpFlag Opt_D_dump_rules)
-  ,  ( "ddump-cse",              setDumpFlag Opt_D_dump_cse)
-  ,  ( "ddump-worker-wrapper",   setDumpFlag Opt_D_dump_worker_wrapper)
-  ,  ( "ddump-rn-trace",         setDumpFlag Opt_D_dump_rn_trace)
-  ,  ( "ddump-if-trace",         setDumpFlag Opt_D_dump_if_trace)
-  ,  ( "ddump-tc-trace",         setDumpFlag Opt_D_dump_tc_trace)
-  ,  ( "ddump-splices",          setDumpFlag Opt_D_dump_splices)
-  ,  ( "ddump-rn-stats",         setDumpFlag Opt_D_dump_rn_stats)
-  ,  ( "ddump-opt-cmm",          setDumpFlag Opt_D_dump_opt_cmm)
-  ,  ( "ddump-simpl-stats",      setDumpFlag Opt_D_dump_simpl_stats)
-  ,  ( "ddump-bcos",             setDumpFlag Opt_D_dump_BCOs)
-  ,  ( "dsource-stats",          setDumpFlag Opt_D_source_stats)
-  ,  ( "dverbose-core2core",     NoArg setVerboseCore2Core)
-  ,  ( "dverbose-stg2stg",       setDumpFlag Opt_D_verbose_stg2stg)
-  ,  ( "ddump-hi",               setDumpFlag Opt_D_dump_hi)
-  ,  ( "ddump-minimal-imports",  setDumpFlag Opt_D_dump_minimal_imports)
-  ,  ( "ddump-vect",             setDumpFlag Opt_D_dump_vect)
-  ,  ( "ddump-hpc",              setDumpFlag Opt_D_dump_hpc)
-  ,  ( "ddump-mod-cycles",       setDumpFlag Opt_D_dump_mod_cycles)
-  ,  ( "ddump-view-pattern-commoning", setDumpFlag Opt_D_dump_view_pattern_commoning)
-  ,  ( "ddump-to-file",          setDumpFlag Opt_DumpToFile)
-  ,  ( "ddump-hi-diffs",         setDumpFlag Opt_D_dump_hi_diffs)
+  , Flag "ddump-cmm"               (setDumpFlag Opt_D_dump_cmm)
+  , Flag "ddump-cmmz"              (setDumpFlag Opt_D_dump_cmmz)
+  , Flag "ddump-cmmz-pretty"       (setDumpFlag Opt_D_dump_cmmz_pretty)
+  , Flag "ddump-cps-cmm"           (setDumpFlag Opt_D_dump_cps_cmm)
+  , Flag "ddump-cvt-cmm"           (setDumpFlag Opt_D_dump_cvt_cmm)
+  , Flag "ddump-asm"               (setDumpFlag Opt_D_dump_asm)
+  , Flag "ddump-asm-native"        (setDumpFlag Opt_D_dump_asm_native)
+  , Flag "ddump-asm-liveness"      (setDumpFlag Opt_D_dump_asm_liveness)
+  , Flag "ddump-asm-coalesce"      (setDumpFlag Opt_D_dump_asm_coalesce)
+  , Flag "ddump-asm-regalloc"      (setDumpFlag Opt_D_dump_asm_regalloc)
+  , Flag "ddump-asm-conflicts"     (setDumpFlag Opt_D_dump_asm_conflicts)
+  , Flag "ddump-asm-regalloc-stages"
+                                 (setDumpFlag Opt_D_dump_asm_regalloc_stages)
+  , Flag "ddump-asm-stats"         (setDumpFlag Opt_D_dump_asm_stats)
+  , Flag "ddump-cpranal"           (setDumpFlag Opt_D_dump_cpranal)
+  , Flag "ddump-deriv"             (setDumpFlag Opt_D_dump_deriv)
+  , Flag "ddump-ds"                (setDumpFlag Opt_D_dump_ds)
+  , Flag "ddump-flatC"             (setDumpFlag Opt_D_dump_flatC)
+  , Flag "ddump-foreign"           (setDumpFlag Opt_D_dump_foreign)
+  , Flag "ddump-inlinings"         (setDumpFlag Opt_D_dump_inlinings)
+  , Flag "ddump-rule-firings"      (setDumpFlag Opt_D_dump_rule_firings)
+  , Flag "ddump-occur-anal"        (setDumpFlag Opt_D_dump_occur_anal)
+  , Flag "ddump-parsed"            (setDumpFlag Opt_D_dump_parsed)
+  , Flag "ddump-rn"                (setDumpFlag Opt_D_dump_rn)
+  , Flag "ddump-simpl"             (setDumpFlag Opt_D_dump_simpl)
+  , Flag "ddump-simpl-iterations"  (setDumpFlag Opt_D_dump_simpl_iterations)
+  , Flag "ddump-simpl-phases"      (OptPrefix setDumpSimplPhases)
+  , Flag "ddump-spec"              (setDumpFlag Opt_D_dump_spec)
+  , Flag "ddump-prep"              (setDumpFlag Opt_D_dump_prep)
+  , Flag "ddump-stg"               (setDumpFlag Opt_D_dump_stg)
+  , Flag "ddump-stranal"           (setDumpFlag Opt_D_dump_stranal)
+  , Flag "ddump-tc"                (setDumpFlag Opt_D_dump_tc)
+  , Flag "ddump-types"             (setDumpFlag Opt_D_dump_types)
+  , Flag "ddump-rules"             (setDumpFlag Opt_D_dump_rules)
+  , Flag "ddump-cse"               (setDumpFlag Opt_D_dump_cse)
+  , Flag "ddump-worker-wrapper"    (setDumpFlag Opt_D_dump_worker_wrapper)
+  , Flag "ddump-rn-trace"          (setDumpFlag Opt_D_dump_rn_trace)
+  , Flag "ddump-if-trace"          (setDumpFlag Opt_D_dump_if_trace)
+  , Flag "ddump-tc-trace"          (setDumpFlag Opt_D_dump_tc_trace)
+  , Flag "ddump-splices"           (setDumpFlag Opt_D_dump_splices)
+  , Flag "ddump-rn-stats"          (setDumpFlag Opt_D_dump_rn_stats)
+  , Flag "ddump-opt-cmm"           (setDumpFlag Opt_D_dump_opt_cmm)
+  , Flag "ddump-simpl-stats"       (setDumpFlag Opt_D_dump_simpl_stats)
+  , Flag "ddump-bcos"              (setDumpFlag Opt_D_dump_BCOs)
+  , Flag "dsource-stats"           (setDumpFlag Opt_D_source_stats)
+  , Flag "dverbose-core2core"      (NoArg setVerboseCore2Core)
+  , Flag "dverbose-stg2stg"        (setDumpFlag Opt_D_verbose_stg2stg)
+  , Flag "ddump-hi"                (setDumpFlag Opt_D_dump_hi)
+  , Flag "ddump-minimal-imports"   (setDumpFlag Opt_D_dump_minimal_imports)
+  , Flag "ddump-vect"              (setDumpFlag Opt_D_dump_vect)
+  , Flag "ddump-hpc"               (setDumpFlag Opt_D_dump_hpc)
+  , Flag "ddump-mod-cycles"        (setDumpFlag Opt_D_dump_mod_cycles)
+  , Flag "ddump-view-pattern-commoning" (setDumpFlag Opt_D_dump_view_pattern_commoning)
+  , Flag "ddump-to-file"           (setDumpFlag Opt_DumpToFile)
+  , Flag "ddump-hi-diffs"          (setDumpFlag Opt_D_dump_hi_diffs)
 
-  ,  ( "dcore-lint",             NoArg (setDynFlag Opt_DoCoreLinting))
-  ,  ( "dstg-lint",              NoArg (setDynFlag Opt_DoStgLinting))
-  ,  ( "dcmm-lint",              NoArg (setDynFlag Opt_DoCmmLinting))
-  ,  ( "dasm-lint",              NoArg (setDynFlag Opt_DoAsmLinting))
-  ,  ( "dshow-passes",           NoArg (do setDynFlag Opt_ForceRecomp
-                                           setVerbosity (Just 2)) )
-  ,  ( "dfaststring-stats",      NoArg (setDynFlag Opt_D_faststring_stats))
+  , Flag "dcore-lint"              (NoArg (setDynFlag Opt_DoCoreLinting))
+  , Flag "dstg-lint"               (NoArg (setDynFlag Opt_DoStgLinting))
+  , Flag "dcmm-lint"               (NoArg (setDynFlag Opt_DoCmmLinting))
+  , Flag "dasm-lint"               (NoArg (setDynFlag Opt_DoAsmLinting))
+  , Flag "dshow-passes"
+         (NoArg (do setDynFlag Opt_ForceRecomp
+                    setVerbosity (Just 2)))
+  , Flag "dfaststring-stats"       (NoArg (setDynFlag Opt_D_faststring_stats))
 
         ------ Machine dependant (-m<blah>) stuff ---------------------------
 
-  ,  ( "monly-2-regs",  NoArg (upd (\s -> s{stolen_x86_regs = 2}) ))
-  ,  ( "monly-3-regs",  NoArg (upd (\s -> s{stolen_x86_regs = 3}) ))
-  ,  ( "monly-4-regs",  NoArg (upd (\s -> s{stolen_x86_regs = 4}) ))
+  , Flag "monly-2-regs" (NoArg (upd (\s -> s{stolen_x86_regs = 2}) ))
+  , Flag "monly-3-regs" (NoArg (upd (\s -> s{stolen_x86_regs = 3}) ))
+  , Flag "monly-4-regs" (NoArg (upd (\s -> s{stolen_x86_regs = 4}) ))
 
      ------ Warning opts -------------------------------------------------
-  ,  ( "W"     , NoArg (mapM_ setDynFlag   minusWOpts)    )
-  ,  ( "Werror", NoArg (setDynFlag         Opt_WarnIsError) )
-  ,  ( "Wwarn" , NoArg (unSetDynFlag       Opt_WarnIsError) )
-  ,  ( "Wall"  , NoArg (mapM_ setDynFlag   minusWallOpts) )
-  ,  ( "Wnot"  , NoArg (mapM_ unSetDynFlag minusWallOpts) ) -- DEPRECATED
-  ,  ( "w"     , NoArg (mapM_ unSetDynFlag minuswRemovesOpts) )
+  , Flag "W"      (NoArg (mapM_ setDynFlag   minusWOpts))
+  , Flag "Werror" (NoArg (setDynFlag         Opt_WarnIsError))
+  , Flag "Wwarn"  (NoArg (unSetDynFlag       Opt_WarnIsError))
+  , Flag "Wall"   (NoArg (mapM_ setDynFlag   minusWallOpts))
+  , Flag "Wnot"   (NoArg (mapM_ unSetDynFlag minusWallOpts)) -- DEPRECATED
+  , Flag "w"      (NoArg (mapM_ unSetDynFlag minuswRemovesOpts))
 
         ------ Optimisation flags ------------------------------------------
-  ,  ( "O"      , NoArg (upd (setOptLevel 1)))
-  ,  ( "Onot"   , NoArg (upd (setOptLevel 0))) -- deprecated
-  ,  ( "Odph"   , NoArg (upd setDPHOpt))
-  ,  ( "O"      , OptIntSuffix (\mb_n -> upd (setOptLevel (mb_n `orElse` 1))))
+  , Flag "O"      (NoArg (upd (setOptLevel 1)))
+  , Flag "Onot"   (NoArg (upd (setOptLevel 0))) -- deprecated
+  , Flag "Odph"   (NoArg (upd setDPHOpt))
+  , Flag "O"      (OptIntSuffix (\mb_n -> upd (setOptLevel (mb_n `orElse` 1))))
                 -- If the number is missing, use 1
 
-  ,  ( "fsimplifier-phases",         IntSuffix (\n ->
-                upd (\dfs -> dfs{ simplPhases = n })) )
-  ,  ( "fmax-simplifier-iterations", IntSuffix (\n ->
-                upd (\dfs -> dfs{ maxSimplIterations = n })) )
+  , Flag "fsimplifier-phases"
+         (IntSuffix (\n -> upd (\dfs -> dfs{ simplPhases = n })))
+  , Flag "fmax-simplifier-iterations"
+         (IntSuffix (\n -> upd (\dfs -> dfs{ maxSimplIterations = n })))
 
-  ,  ( "fspec-constr-threshold",      IntSuffix (\n ->
-                upd (\dfs -> dfs{ specConstrThreshold = Just n })))
-  ,  ( "fno-spec-constr-threshold",   NoArg (
-                upd (\dfs -> dfs{ specConstrThreshold = Nothing })))
-  ,  ( "fspec-constr-count",          IntSuffix (\n ->
-                upd (\dfs -> dfs{ specConstrCount = Just n })))
-  ,  ( "fno-spec-constr-count",   NoArg (
-                upd (\dfs -> dfs{ specConstrCount = Nothing })))
-  ,  ( "fliberate-case-threshold",    IntSuffix (\n ->
-                upd (\dfs -> dfs{ liberateCaseThreshold = Just n })))
-  ,  ( "fno-liberate-case-threshold", NoArg (
-                upd (\dfs -> dfs{ liberateCaseThreshold = Nothing })))
+  , Flag "fspec-constr-threshold"
+         (IntSuffix (\n -> upd (\dfs -> dfs{ specConstrThreshold = Just n })))
+  , Flag "fno-spec-constr-threshold"
+         (NoArg (upd (\dfs -> dfs{ specConstrThreshold = Nothing })))
+  , Flag "fspec-constr-count"
+         (IntSuffix (\n -> upd (\dfs -> dfs{ specConstrCount = Just n })))
+  , Flag "fno-spec-constr-count"
+         (NoArg (upd (\dfs -> dfs{ specConstrCount = Nothing })))
+  , Flag "fliberate-case-threshold"
+         (IntSuffix (\n -> upd (\dfs -> dfs{ liberateCaseThreshold = Just n })))
+  , Flag "fno-liberate-case-threshold"
+         (NoArg (upd (\dfs -> dfs{ liberateCaseThreshold = Nothing })))
 
-  ,  ( "frule-check",     SepArg (\s -> upd (\dfs -> dfs{ ruleCheck = Just s })))
-  ,  ( "fcontext-stack" , IntSuffix $ \n -> upd $ \dfs -> dfs{ ctxtStkDepth = n })
+  , Flag "frule-check"
+         (SepArg (\s -> upd (\dfs -> dfs{ ruleCheck = Just s })))
+  , Flag "fcontext-stack"
+         (IntSuffix $ \n -> upd $ \dfs -> dfs{ ctxtStkDepth = n })
 
         ------ Compiler flags -----------------------------------------------
 
-  ,  ( "fasm",             NoArg (setObjTarget HscAsm) )
-  ,  ( "fvia-c",           NoArg (setObjTarget HscC) )
-  ,  ( "fvia-C",           NoArg (setObjTarget HscC) )
+  , Flag "fasm"             (NoArg (setObjTarget HscAsm))
+  , Flag "fvia-c"           (NoArg (setObjTarget HscC))
+  , Flag "fvia-C"           (NoArg (setObjTarget HscC))
 
-  ,  ( "fno-code",         NoArg (setTarget HscNothing))
-  ,  ( "fbyte-code",       NoArg (setTarget HscInterpreted) )
-  ,  ( "fobject-code",     NoArg (setTarget defaultHscTarget) )
+  , Flag "fno-code"         (NoArg (setTarget HscNothing))
+  , Flag "fbyte-code"       (NoArg (setTarget HscInterpreted))
+  , Flag "fobject-code"     (NoArg (setTarget defaultHscTarget))
 
-  ,  ( "fglasgow-exts",    NoArg (mapM_ setDynFlag   glasgowExtsFlags) )
-  ,  ( "fno-glasgow-exts", NoArg (mapM_ unSetDynFlag glasgowExtsFlags) )
+  , Flag "fglasgow-exts"    (NoArg (mapM_ setDynFlag   glasgowExtsFlags))
+  , Flag "fno-glasgow-exts" (NoArg (mapM_ unSetDynFlag glasgowExtsFlags))
 
      -- the rest of the -f* and -fno-* flags
-  ,  ( "f",                PrefixPred (isFlag   fFlags)
-                           (\f -> setDynFlag   (getFlag   fFlags f)) )
-  ,  ( "f",                PrefixPred (isPrefFlag "no-" fFlags)
-                           (\f -> unSetDynFlag (getPrefFlag "no-" fFlags f)) )
+  , Flag "f"
+         (PrefixPred (isFlag   fFlags)
+                     (\f -> setDynFlag   (getFlag   fFlags f)))
+  , Flag "f"
+         (PrefixPred (isPrefFlag "no-" fFlags)
+                     (\f -> unSetDynFlag (getPrefFlag "no-" fFlags f)))
 
      -- the -X* and -XNo* flags
-  ,  ( "X",                PrefixPred (isFlag   xFlags)
-                           (\f -> setDynFlag   (getFlag   xFlags f)) )
-  ,  ( "X",                PrefixPred (isPrefFlag "No" xFlags)
-                           (\f -> unSetDynFlag (getPrefFlag "No" xFlags f)) )
+  , Flag "X"
+         (PrefixPred (isFlag   xFlags)
+                     (\f -> setDynFlag   (getFlag   xFlags f)))
+  , Flag "X"
+         (PrefixPred (isPrefFlag "No" xFlags)
+                     (\f -> unSetDynFlag (getPrefFlag "No" xFlags f)))
  ]
 
 -- these -f<blah> flags can all be reversed with -fno-<blah>

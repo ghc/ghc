@@ -11,13 +11,18 @@
 
 module CmdLineParser (
         processArgs, OptKind(..),
-        CmdLineP(..), getCmdLineState, putCmdLineState
+        CmdLineP(..), getCmdLineState, putCmdLineState,
+        Flag(..),
   ) where
 
 #include "HsVersions.h"
 
 import Util
 import Panic
+
+data Flag m = Flag { flagName :: String,        -- flag, without the leading -
+                     flagOptKind :: (OptKind m) -- What to do if we see it
+                   }
 
 data OptKind m                      -- Suppose the flag is -f
  = NoArg (m ())                     -- -f all by itself
@@ -33,7 +38,7 @@ data OptKind m                      -- Suppose the flag is -f
  | AnySuffixPred (String -> Bool) (String -> m ())
 
 processArgs :: Monad m
-            => [(String, OptKind m)] -- cmdline parser spec
+            => [Flag m] -- cmdline parser spec
             -> [String]              -- args
             -> m (
                   [String],  -- spare args
@@ -94,12 +99,13 @@ processOneArg action rest arg args
         AnySuffixPred _ f -> Right (f dash_arg, args)
 
 
-findArg :: [(String,OptKind a)] -> String -> Maybe (String,OptKind a)
+findArg :: [Flag m] -> String -> Maybe (String, OptKind m)
 findArg spec arg
-  = case [ (removeSpaces rest, k)
-         | (pat,k)   <- spec,
-           Just rest <- [maybePrefixMatch pat arg],
-           arg_ok k rest arg ]
+  = case [ (removeSpaces rest, optKind)
+         | flag <- spec,
+           let optKind = flagOptKind flag,
+           Just rest <- [maybePrefixMatch (flagName flag) arg],
+           arg_ok optKind rest arg ]
     of
         []      -> Nothing
         (one:_) -> Just one
