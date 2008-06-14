@@ -397,13 +397,12 @@ reallyInitDynLinker dflags
 	; classified_ld_inputs <- mapM classifyLdInput cmdline_ld_inputs
 
 	   	-- (e) Link any MacOS frameworks
-#ifdef darwin_TARGET_OS	
-	; let framework_paths = frameworkPaths dflags
-	; let frameworks      = cmdlineFrameworks dflags
-#else
-	; let frameworks      = []
-	; let framework_paths = []
-#endif
+	; let framework_paths
+               | isDarwinTarget = frameworkPaths dflags
+               | otherwise      = []
+	; let frameworks
+               | isDarwinTarget = cmdlineFrameworks dflags
+               | otherwise      = []
 		-- Finally do (c),(d),(e)	
         ; let cmdline_lib_specs = [ l | Just l <- classified_ld_inputs ]
 			       ++ map DLL       minus_ls 
@@ -950,11 +949,8 @@ data LibrarySpec
 -- used by lookupSymbol.  So we must call addDLL for each library 
 -- just to get the DLL handle into the list.
 partOfGHCi
-#          if defined(mingw32_TARGET_OS) || defined(darwin_TARGET_OS)
-           = [ ]
-#          else
-           = [ "base", "haskell98", "template-haskell", "editline" ]
-#          endif
+ | isWindowsTarget || isDarwinTarget = []
+ | otherwise = [ "base", "haskell98", "template-haskell", "editline" ]
 
 showLS (Object nm)    = "(static) " ++ nm
 showLS (DLL nm)       = "(dynamic) " ++ nm
