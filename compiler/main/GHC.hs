@@ -351,8 +351,8 @@ newSession mb_top_dir = do
   installSignalHandlers
 
   initStaticOpts
-  dflags0 <- initSysTools mb_top_dir defaultDynFlags
-  dflags  <- initDynFlags dflags0
+  dflags0 <- initDynFlags defaultDynFlags
+  dflags <- initSysTools mb_top_dir dflags0
   env <- newHscEnv dflags
   ref <- newIORef env
   return (Session ref)

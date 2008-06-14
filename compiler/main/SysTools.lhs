@@ -149,7 +149,7 @@ initSysTools :: Maybe String    -- Maybe TopDir path (without the '-B' prefix)
                                 --      (c) the GHC usage message
 
 
-initSysTools mbMinusB _
+initSysTools mbMinusB dflags0
   = do  { (am_installed, top_dir) <- findTopDir mbMinusB
                 -- top_dir
                 --      for "installed" this is the root of GHC's support files
@@ -192,8 +192,6 @@ initSysTools mbMinusB _
               windres_path
                 | am_installed = installed_bin "bin/windres"
                 | otherwise    = "windres"
-
-        ; let dflags0 = defaultDynFlags
 
         ; tmpdir <- getTemporaryDirectory
         ; let dflags1 = setTmpDir tmpdir dflags0
