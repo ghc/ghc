@@ -14,13 +14,6 @@ necessary.
 \begin{code}
 {-# OPTIONS -optc-DNON_POSIX_SOURCE -#include "Linker.h" #-}
 
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module Linker ( HValue, getHValue, showLinkerState,
 		linkExpr, unload, withExtendedLinkEnv,
                 extendLinkEnv, deleteFromLinkEnv,
@@ -127,7 +120,7 @@ data PersistentLinkerState
      }
 
 emptyPLS :: DynFlags -> PersistentLinkerState
-emptyPLS dflags = PersistentLinkerState { 
+emptyPLS _ = PersistentLinkerState { 
 			closure_env = emptyNameEnv,
 			itbl_env    = emptyNameEnv,
 			pkgs_loaded = init_pkgs,
@@ -375,6 +368,7 @@ initDynLinker dflags
 			  ; reallyInitDynLinker dflags }
 	}
 
+reallyInitDynLinker :: DynFlags -> IO ()
 reallyInitDynLinker dflags
   = do  {  -- Initialise the linker state
 	; writeIORef v_PersistentLinkerState (emptyPLS dflags)
@@ -465,7 +459,7 @@ preloadLib dflags lib_paths framework_paths lib_spec
             give_up
     
     -- Not interested in the paths in the static case.
-    preload_static paths name
+    preload_static _paths name
        = do b <- doesFileExist name
             if not b then return False
                      else loadObj name >> return True
@@ -526,6 +520,7 @@ linkExpr hsc_env span root_ul_bco
 	-- All wired-in names are in the base package, which we link
 	-- by default, so we can safely ignore them here.
  
+dieWith :: SrcSpan -> Message -> IO a
 dieWith span msg = throwDyn (ProgramError (showSDoc (mkLocMessage span msg)))
 
 
@@ -538,6 +533,7 @@ checkNonStdWay dflags srcspan = do
 	then failNonStd srcspan
 	else return (Just default_osuf)
 
+failNonStd :: SrcSpan -> IO (Maybe String)
 failNonStd srcspan = dieWith srcspan $
   ptext (sLit "Dynamic linking required, but this is a non-standard build (eg. prof).") $$
   ptext (sLit "You need to build the program twice: once the normal way, and then") $$
@@ -551,7 +547,7 @@ getLinkDeps :: HscEnv -> HomePackageTable -> PackageIfaceTable
 	    -> IO ([Linkable], [PackageId])	-- ... then link these first
 -- Fails with an IO exception if it can't find enough files
 
-getLinkDeps hsc_env hpt pit maybe_normal_osuf span mods
+getLinkDeps hsc_env hpt _ maybe_normal_osuf span mods
 -- Find all the packages and linkables that a set of modules depends on
  = do {	pls <- readIORef v_PersistentLinkerState ;
 	-- 1.  Find the dependent home-pkg-modules/packages from each iface
@@ -670,6 +666,7 @@ getLinkDeps hsc_env hpt pit maybe_normal_osuf span mods
 			  ptext (sLit "cannot find normal object file ")
 				<> quotes (text new_file) $$ while_linking_expr
 		   else return (DotO new_file)
+	    adjust_ul _ _ = panic "adjust_ul"
 \end{code}
 
 
@@ -707,17 +704,16 @@ partitionLinkable li
          li_uls_bco = filter isInterpretable li_uls
      in 
          case (li_uls_obj, li_uls_bco) of
-            (objs@(_:_), bcos@(_:_)) 
-               -> [li{linkableUnlinked=li_uls_obj}, li{linkableUnlinked=li_uls_bco}]
-            other
-               -> [li]
+            (_:_, _:_) -> [li {linkableUnlinked=li_uls_obj},
+                           li {linkableUnlinked=li_uls_bco}]
+            _ -> [li]
 
 findModuleLinkable_maybe :: [Linkable] -> Module -> Maybe Linkable
 findModuleLinkable_maybe lis mod
    = case [LM time nm us | LM time nm us <- lis, nm == mod] of
         []   -> Nothing
         [li] -> Just li
-        many -> pprPanic "findModuleLinkable" (ppr mod)
+        _    -> pprPanic "findModuleLinkable" (ppr mod)
 
 linkableInSet :: Linkable -> [Linkable] -> Bool
 linkableInSet l objs_loaded =
@@ -800,8 +796,8 @@ dynLinkBCOs bcos
 	    gce	      = closure_env pls
             final_ie  = foldr plusNameEnv (itbl_env pls) ies
 
-        (final_gce, linked_bcos) <- linkSomeBCOs True final_ie gce ul_bcos
-		-- What happens to these linked_bcos?
+        (final_gce, _linked_bcos) <- linkSomeBCOs True final_ie gce ul_bcos
+		-- XXX What happens to these linked_bcos?
 
 	let pls2 = pls1 { closure_env = final_gce,
 			  itbl_env    = final_ie }
@@ -883,7 +879,7 @@ unload_wkr :: DynFlags
 -- Does the core unload business
 -- (the wrapper blocks exceptions and deals with the PLS get and put)
 
-unload_wkr dflags linkables pls
+unload_wkr _ linkables pls
   = do	let (objs_to_keep, bcos_to_keep) = partition isObjectLinkable linkables
 
 	objs_loaded' <- filterM (maybeUnload objs_to_keep) (objs_loaded pls)
@@ -948,10 +944,12 @@ data LibrarySpec
 -- of DLL handles that rts/Linker.c maintains, and that in turn is 
 -- used by lookupSymbol.  So we must call addDLL for each library 
 -- just to get the DLL handle into the list.
+partOfGHCi :: [String]
 partOfGHCi
  | isWindowsTarget || isDarwinTarget = []
  | otherwise = [ "base", "haskell98", "template-haskell", "editline" ]
 
+showLS :: LibrarySpec -> String
 showLS (Object nm)    = "(static) " ++ nm
 showLS (DLL nm)       = "(dynamic) " ++ nm
 showLS (DLLPath nm)   = "(dynamic) " ++ nm
@@ -1047,12 +1045,14 @@ linkPackage dflags pkg
 	if succeeded ok then maybePutStrLn dflags "done."
 	      else throwDyn (InstallationError ("unable to load package `" ++ display (package pkg) ++ "'"))
 
+load_dyn :: [FilePath] -> FilePath -> IO ()
 load_dyn dirs dll = do r <- loadDynamic dirs dll
 		       case r of
 			 Nothing  -> return ()
 			 Just err -> throwDyn (CmdLineError ("can't load .so/.DLL for: " 
                                  			      ++ dll ++ " (" ++ err ++ ")" ))
 
+loadFrameworks :: InstalledPackageInfo_ ModuleName -> IO ()
 loadFrameworks pkg
  | isDarwinTarget = mapM_ load frameworks
  | otherwise = return ()
@@ -1079,14 +1079,14 @@ locateOneObj dirs lib
 	    Nothing	  -> 
                 do { mb_lib_path <- findFile mk_dyn_lib_path dirs
                    ; case mb_lib_path of
-                       Just lib_path -> return (DLL (lib ++ "-ghc" ++ cProjectVersion))
-                       Nothing       -> return (DLL lib) }}		-- We assume
+                       Just _  -> return (DLL (lib ++ "-ghc" ++ cProjectVersion))
+                       Nothing -> return (DLL lib) }} -- We assume
  | otherwise
     -- When the GHC package was compiled as dynamic library (=__PIC__ set),
     -- we search for .so libraries first.
   = do	{ mb_lib_path <- findFile mk_dyn_lib_path dirs
 	; case mb_lib_path of
-	    Just lib_path -> return (DLL (lib ++ "-ghc" ++ cProjectVersion))
+	    Just _ -> return (DLL (lib ++ "-ghc" ++ cProjectVersion))
 	    Nothing	  ->
                 do { mb_obj_path <- findFile mk_obj_path dirs
                    ; case mb_obj_path of
@@ -1100,6 +1100,7 @@ locateOneObj dirs lib
 -- Loading a dyanmic library (dlopen()-ish on Unix, LoadLibrary-ish on Win32)
 
 -- return Nothing == success, else Just error message from dlopen
+loadDynamic :: [FilePath] -> FilePath -> IO (Maybe String)
 loadDynamic paths rootname
   = do	{ mb_dll <- findFile mk_dll_path paths
 	; case mb_dll of
@@ -1110,6 +1111,7 @@ loadDynamic paths rootname
   where
     mk_dll_path dir = dir </> mkSOName rootname
 
+mkSOName :: FilePath -> FilePath
 mkSOName root
  | isDarwinTarget  = ("lib" ++ root) <.> "dylib"
  | isWindowsTarget = -- Win32 DLLs have no .dll extension here, because
@@ -1120,6 +1122,7 @@ mkSOName root
 -- Darwin / MacOS X only: load a framework
 -- a framework is a dynamic library packaged inside a directory of the same
 -- name. They are searched for in different paths than normal libraries.
+loadFramework :: [FilePath] -> FilePath -> IO (Maybe String)
 loadFramework extraPaths rootname
    = do { either_dir <- Control.Exception.try getHomeDirectory
         ; let homeFrameworkPath = case either_dir of
@@ -1148,7 +1151,7 @@ loadFramework extraPaths rootname
 findFile :: (FilePath -> FilePath)	-- Maps a directory path to a file path
 	 -> [FilePath]			-- Directories to look in
 	 -> IO (Maybe FilePath)		-- The first file path to match
-findFile mk_file_path [] 
+findFile _ [] 
   = return Nothing
 findFile mk_file_path (dir:dirs)
   = do	{ let file_path = mk_file_path dir
@@ -1160,9 +1163,11 @@ findFile mk_file_path (dir:dirs)
 \end{code}
 
 \begin{code}
+maybePutStr :: DynFlags -> String -> IO ()
 maybePutStr dflags s | verbosity dflags > 0 = putStr s
 		     | otherwise	    = return ()
 
+maybePutStrLn :: DynFlags -> String -> IO ()
 maybePutStrLn dflags s | verbosity dflags > 0 = putStrLn s
 		       | otherwise	      = return ()
 \end{code}
