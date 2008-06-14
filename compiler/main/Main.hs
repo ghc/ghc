@@ -129,21 +129,21 @@ main =
 
 	-- The rest of the arguments are "dynamic"
 	-- Leftover ones are presumably files
-  (dflags, fileish_args, dynamicFlagWarnings) <- GHC.parseDynamicFlags dflags1 argv3
+  (dflags2, fileish_args, dynamicFlagWarnings) <- GHC.parseDynamicFlags dflags1 argv3
 
   let flagWarnings = staticFlagWarnings
                   ++ modeFlagWarnings
                   ++ dynamicFlagWarnings
-  handleFlagWarnings dflags flagWarnings
+  handleFlagWarnings dflags2 flagWarnings
 
 	-- make sure we clean up after ourselves
-  GHC.defaultCleanupHandler dflags $ do
+  GHC.defaultCleanupHandler dflags2 $ do
 
-  showBanner cli_mode dflags
+  showBanner cli_mode dflags2
 
   -- we've finished manipulating the DynFlags, update the session
-  GHC.setSessionDynFlags session dflags
-  dflags  <- GHC.getSessionDynFlags session
+  GHC.setSessionDynFlags session dflags2
+  dflags3 <- GHC.getSessionDynFlags session
   hsc_env <- GHC.sessionHscEnv      session
 
   let
@@ -158,32 +158,32 @@ main =
   mapM_ (consIORef v_Ld_inputs) (reverse objs)
 
 	---------------- Display configuration -----------
-  when (verbosity dflags >= 4) $
-	dumpPackages dflags
+  when (verbosity dflags3 >= 4) $
+	dumpPackages dflags3
 
-  when (verbosity dflags >= 3) $ do
+  when (verbosity dflags3 >= 3) $ do
 	hPutStrLn stderr ("Hsc static flags: " ++ unwords staticFlags)
 
 	---------------- Final sanity checking -----------
-  checkOptions cli_mode dflags srcs objs
+  checkOptions cli_mode dflags3 srcs objs
 
   ---------------- Do the business -----------
   let alreadyHandled = panic (show cli_mode ++
                               " should already have been handled")
   case cli_mode of
-    ShowUsage              -> showGhcUsage dflags cli_mode
-    PrintLibdir            -> putStrLn (topDir dflags)
+    ShowUsage              -> showGhcUsage dflags3 cli_mode
+    PrintLibdir            -> putStrLn (topDir dflags3)
     ShowSupportedLanguages -> alreadyHandled
     ShowVersion            -> alreadyHandled
     ShowNumVersion         -> alreadyHandled
-    ShowInterface f        -> doShowIface dflags f
+    ShowInterface f        -> doShowIface dflags3 f
     DoMake                 -> doMake session srcs
     DoMkDependHS           -> doMkDependHS session (map fst srcs)
     StopBefore p           -> oneShot hsc_env p srcs
     DoInteractive          -> interactiveUI session srcs Nothing
     DoEval exprs           -> interactiveUI session srcs $ Just $ reverse exprs
 
-  dumpFinalStats dflags
+  dumpFinalStats dflags3
   exitWith ExitSuccess
 
 #ifndef GHCI
@@ -362,11 +362,11 @@ isCompManagerMode _             = False
 
 parseModeFlags :: [String] -> IO (CmdLineMode, [String], [String])
 parseModeFlags args = do
-  let ((leftover, errs, warns), (mode, _, flags)) = 
+  let ((leftover, errs, warns), (mode, _, flags')) =
 	 runCmdLine (processArgs mode_flags args) (StopBefore StopLn, "", []) 
   when (not (null errs)) $ do
     throwDyn (UsageError (unlines errs))
-  return (mode, flags ++ leftover, warns)
+  return (mode, flags' ++ leftover, warns)
 
 type ModeM = CmdLineP (CmdLineMode, String, [String])
   -- mode flags sometimes give rise to new DynFlags (eg. -C, see below)
@@ -430,16 +430,16 @@ updateDoEval expr _              = DoEval [expr]
 
 updateMode :: (CmdLineMode -> CmdLineMode) -> String -> ModeM ()
 updateMode f flag = do
-  (old_mode, old_flag, flags) <- getCmdLineState
+  (old_mode, old_flag, flags') <- getCmdLineState
   if notNull old_flag && flag /= old_flag
       then throwDyn (UsageError
                ("cannot use `" ++ old_flag ++ "' with `" ++ flag ++ "'"))
-      else putCmdLineState (f old_mode, flag, flags)
+      else putCmdLineState (f old_mode, flag, flags')
 
 addFlag :: String -> ModeM ()
 addFlag s = do
-  (m, f, flags) <- getCmdLineState
-  putCmdLineState (m, f, s:flags)
+  (m, f, flags') <- getCmdLineState
+  putCmdLineState (m, f, s:flags')
 
 
 -- ----------------------------------------------------------------------------
