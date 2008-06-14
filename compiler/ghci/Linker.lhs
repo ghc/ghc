@@ -901,7 +901,7 @@ unload_wkr dflags linkables pls
   where
     maybeUnload :: [Linkable] -> Linkable -> IO Bool
     maybeUnload keep_linkables lnk
-      | linkableInSet lnk linkables = return True
+      | linkableInSet lnk keep_linkables = return True
       | otherwise		    
       = do mapM_ unloadObj [f | DotO f <- linkableUnlinked lnk]
 		-- The components of a BCO linkable may contain
