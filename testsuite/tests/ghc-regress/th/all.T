@@ -8,6 +8,7 @@ setTestOpts(only_compiler_types(['ghc']))
 setTestOpts(only_ways(['normal','ghci']))
 
 test('TH_mkName', normal, compile, ['-v0'])
+test('TH_1tuple', normal, compile_fail, ['-v0'])
 
 test('TH_repE1', normal, compile, [''])
 test('TH_repE2', normal, compile_and_run, [''])
