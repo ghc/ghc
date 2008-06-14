@@ -626,7 +626,7 @@ endif
 #	The standard suffix rule for compiling a Haskell file
 #	adds these flags to the command line
 
-# There used to be a -no-recomp flag on PrimOp, but why?
+# There used to be a -fforce-recomp flag on PrimOp, but why?
 # It's an expensive module to recompile!
 prelude/PrimOp_HC_OPTS 		= -H80m
 
@@ -1042,7 +1042,7 @@ endif
 # careful to recompile stuff you need if you reconfigure or change HsVersions.h.
 
 # Aargh, these don't work properly anyway, because GHC's recompilation checker
-# just reports "compilation NOT required".  Do we have to add -no-recomp for each
+# just reports "compilation NOT required".  Do we have to add -fforce-recomp for each
 # of these .hs files?  I haven't done anything about this yet.
 
 $(odir)/codeGen/Bitmap.$(way_)o		:  ../includes/MachDeps.h

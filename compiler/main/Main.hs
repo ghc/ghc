@@ -417,7 +417,7 @@ mode_flags =
        -- -fno-code says to stop after Hsc but don't generate any code.
   , Flag "fno-code"     (PassFlag (\f -> do setMode (StopBefore HCc) f
                                             addFlag "-fno-code"
-                                            addFlag "-no-recomp"))
+                                            addFlag "-fforce-recomp"))
          Supported
   ]
 

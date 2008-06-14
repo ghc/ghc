@@ -96,7 +96,7 @@ SRC_CC_OPTS += -I$(FPTOOLS_TOP)/libraries/base/cbits -I$(FPTOOLS_TOP)/libraries/
 # Make the #includes in the stubs independent of the current location
 SRC_HC_OPTS += -I$(FPTOOLS_TOP)/libraries
 
-SRC_HC_OPTS +=  -fglasgow-exts -no-recomp
+SRC_HC_OPTS +=  -fglasgow-exts -fforce-recomp
 
 ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 Compat/Directory_HC_OPTS += -\#include shlobj.h

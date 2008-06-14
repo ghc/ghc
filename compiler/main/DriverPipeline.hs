@@ -130,7 +130,7 @@ compile hsc_env0 summary mod_index nmods mb_old_iface maybe_old_linkable
 				extCoreName = basename ++ ".hcr" }
    let hsc_env' = hsc_env { hsc_dflags = dflags' }
 
-   -- -no-recomp should also work with --make
+   -- -fforce-recomp should also work with --make
    let force_recomp = dopt Opt_ForceRecomp dflags
        source_unchanged = isJust maybe_old_linkable && not force_recomp
        object_filename = ml_obj_file location
@@ -295,7 +295,7 @@ link LinkBinary dflags batch_attempt_linking hpt
 
         -- if the modification time on the executable is later than the
         -- modification times on all of the objects, then omit linking
-        -- (unless the -no-recomp flag was given).
+        -- (unless the -fforce-recomp flag was given).
         e_exe_time <- IO.try $ getModificationTime exe_file
         extra_ld_inputs <- readIORef v_Ld_inputs
         extra_times <- mapM (IO.try . getModificationTime) extra_ld_inputs
