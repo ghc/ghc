@@ -60,7 +60,7 @@ processArgs spec args = process spec args [] [] []
         Just (rest, action, deprecated) ->
            let warns' = case deprecated of
                         Deprecated warning ->
-                            (dash_arg ++ " is deprecated: " ++ warning) : warns
+                            ("Warning: " ++ dash_arg ++ " is deprecated: " ++ warning) : warns
                         Supported -> warns
            in case processOneArg action rest arg args of
               Left err            -> process spec args spare (err:errs) warns'
