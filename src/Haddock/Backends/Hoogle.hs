@@ -18,6 +18,7 @@ import GHC hiding ((<.>))
 import SrcLoc
 import Outputable
 
+import Control.Monad
 import Data.Char
 import Data.List
 import Data.Maybe
@@ -36,7 +37,8 @@ ppHoogle maybe_package ifaces odir = do
 
 
 ppModule :: Interface -> [String]
-ppModule iface = ["", "module " ++ moduleString (ifaceMod iface)] ++
+ppModule iface = "" : doc (ifaceDoc iface) ++
+                 ["module " ++ moduleString (ifaceMod iface)] ++
                  concatMap ppExport (ifaceExportItems iface) ++
                  concatMap ppInstance (ifaceInstances iface)
 
@@ -65,7 +67,7 @@ typeSig name flds = name ++ " :: " ++ concat (intersperse " -> " flds)
 -- How to print each export
 
 ppExport :: ExportItem Name -> [String]
-ppExport (ExportDecl name decl _ _) = f $ unL decl
+ppExport (ExportDecl name decl dc _) = doc dc ++ f (unL decl)
     where
         f (TyClD d@TyData{}) = ppData d
         f (TyClD d@ClassDecl{}) = ppClass d
@@ -73,6 +75,7 @@ ppExport (ExportDecl name decl _ _) = f $ unL decl
 ppExport _ = []
 
 
+-- note: does not yet output documentation for class methods
 ppClass :: TyClDecl Name -> [String]
 ppClass x = out x{tcdSigs=[]} :
             map (indent . out) (tcdSigs x)
@@ -91,15 +94,28 @@ ppData x = showData x{tcdCons=[],tcdDerivs=Nothing} :
 
 
 ppCtor :: TyClDecl Name -> ConDecl Name -> [String]
-ppCtor dat con = f $ con_details con
+ppCtor dat con = ldoc (con_doc con) ++ f (con_details con)
     where
         f (PrefixCon args) = [typeSig name $ map out args ++ [resType]]
         f (InfixCon a1 a2) = f $ PrefixCon [a1,a2]
-        f (RecCon recs) = f (PrefixCon $ map cd_fld_type recs) ++
-                          [out (unL $ cd_fld_name r) `typeSig` [resType, out $ cd_fld_type r] | r <- recs]
+        f (RecCon recs) = f (PrefixCon $ map cd_fld_type recs) ++ concat
+                          [ldoc (cd_fld_doc r) ++
+                           [out (unL $ cd_fld_name r) `typeSig` [resType, out $ cd_fld_type r]]
+                          | r <- recs]
 
         name = out $ unL $ con_name con
 
         resType = case con_res con of
             ResTyH98 -> unwords $ out (tcdLName dat) : map out (tcdTyVars dat)
             ResTyGADT x -> out $ unL x
+
+
+---------------------------------------------------------------------
+-- How to show documentation
+
+ldoc :: Maybe (LHsDoc Name) -> [String]
+ldoc = doc . liftM unL
+
+doc :: Maybe (HsDoc Name) -> [String]
+doc Nothing = []
+doc (Just d) = [] -- can add here, if wanted
