@@ -637,8 +637,8 @@ parser/Parser_HC_OPTS 		+= -fno-warn-incomplete-patterns
 # Careful optimisation of the parser: we don't want to throw everything
 # at it, because that takes too long and doesn't buy much, but we do want
 # to inline certain key external functions, so we instruct GHC not to
-# throw away inlinings as it would normally do in -Onot mode:
-parser/Parser_HC_OPTS		+= -Onot -fno-ignore-interface-pragmas
+# throw away inlinings as it would normally do in -O0 mode:
+parser/Parser_HC_OPTS		+= -O0 -fno-ignore-interface-pragmas
 
 ifeq "$(HOSTPLATFORM)" "hppa1.1-hp-hpux9"
 rename/RnMonad_HC_OPTS 		=  -O2 -O2-for-C
