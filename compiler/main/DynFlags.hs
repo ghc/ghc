@@ -1104,9 +1104,9 @@ dynamic_flags = [
 
         ------- recompilation checker --------------------------------------
   , Flag "recomp"         (NoArg (unSetDynFlag Opt_ForceRecomp))
-         (Deprecated "Use -fforce-recomp instead")
-  , Flag "no-recomp"      (NoArg (setDynFlag   Opt_ForceRecomp))
          (Deprecated "Use -fno-force-recomp instead")
+  , Flag "no-recomp"      (NoArg (setDynFlag   Opt_ForceRecomp))
+         (Deprecated "Use -fforce-recomp instead")
 
         ------- Packages ----------------------------------------------------
   , Flag "package-conf"   (HasArg extraPkgConf_) Supported
