@@ -615,7 +615,7 @@ endif
 SRC_HC_OPTS += -ignore-package lang
 
 SRC_CC_OPTS += -Iparser -I. -O
-SRC_HC_OPTS += -recomp $(GhcHcOpts) $(GhcStage$(stage)HcOpts)
+SRC_HC_OPTS += $(GhcHcOpts) $(GhcStage$(stage)HcOpts)
 SRC_HC_OPTS += -H16M
 
 ifeq "$(BootingFromHc)" "YES"
