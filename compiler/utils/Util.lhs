@@ -6,7 +6,7 @@
 
 \begin{code}
 module Util (
-        debugIsOn, ghciTablesNextToCode,
+        debugIsOn, ghciTablesNextToCode, picIsOn,
         isWindowsHost, isWindowsTarget, isDarwinTarget,
 
         -- general list processing
@@ -124,6 +124,13 @@ ghciTablesNextToCode :: Bool
 ghciTablesNextToCode = True
 #else
 ghciTablesNextToCode = False
+#endif
+
+picIsOn :: Bool
+#ifdef __PIC__
+picIsOn = True
+#else
+picIsOn = False
 #endif
 
 isWindowsHost :: Bool
