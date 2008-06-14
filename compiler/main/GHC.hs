@@ -239,7 +239,7 @@ import CoreSyn
 import TidyPgm
 import DriverPipeline
 import DriverPhases	( HscSource(..), Phase(..), isHaskellSrcFilename, startPhase )
-import HeaderInfo	( getImports, getOptions )
+import HeaderInfo
 import Finder
 import HscMain
 import HscTypes
@@ -1935,8 +1935,8 @@ preprocessFile hsc_env src_fn mb_phase (Just (buf, _time))
 	let 
 	    local_opts = getOptions dflags buf src_fn
 	--
-	(dflags', _errs, warns) <- parseDynamicFlags dflags (map unLoc local_opts)
-        -- XXX: shouldn't we be reporting the errors?
+	(dflags', leftovers, warns) <- parseDynamicFlags dflags (map unLoc local_opts)
+        checkProcessArgsResult leftovers src_fn
         handleFlagWarnings dflags' warns
 
 	let

@@ -17,7 +17,8 @@
 
 module HeaderInfo ( getImports
                   , getOptionsFromFile, getOptions
-                  , optionsErrorMsgs ) where
+                  , optionsErrorMsgs,
+                    checkProcessArgsResult ) where
 
 #include "HsVersions.h"
 
@@ -185,6 +186,19 @@ getOptions' dflags buf filename
                            POk _      t@(L _ ITeof) -> [(buffer state,t)]
                            POk state' t -> (buffer state,t):lexAll state'
                            _ -> [(buffer state,L (last_loc state) ITeof)]
+
+-----------------------------------------------------------------------------
+-- Complain about non-dynamic flags in OPTIONS pragmas
+
+checkProcessArgsResult :: [String] -> FilePath -> IO ()
+checkProcessArgsResult flags filename
+  = do when (notNull flags) (throwDyn (ProgramError (
+          showSDoc (hang (text filename <> char ':')
+                      4 (text "unknown flags in  {-# OPTIONS #-} pragma:" <+>
+                          hsep (map text flags)))
+        )))
+
+-----------------------------------------------------------------------------
 
 checkExtension :: Located FastString -> Located String
 checkExtension (L l ext)

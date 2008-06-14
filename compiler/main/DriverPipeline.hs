@@ -1214,17 +1214,6 @@ mk_pvm_wrapper_script pvm_executable pvm_executable_base sysMan = unlines $
  ]
 
 -----------------------------------------------------------------------------
--- Complain about non-dynamic flags in OPTIONS pragmas
-
-checkProcessArgsResult :: [String] -> FilePath -> IO ()
-checkProcessArgsResult flags filename
-  = do when (notNull flags) (throwDyn (ProgramError (
-	  showSDoc (hang (text filename <> char ':')
-		      4 (text "unknown flags in  {-# OPTIONS #-} pragma:" <+>
-			  hsep (map text flags)))
-	)))
-
------------------------------------------------------------------------------
 -- Look for the /* GHC_PACKAGES ... */ comment at the top of a .hc file
 
 getHCFilePackages :: FilePath -> IO [PackageId]
