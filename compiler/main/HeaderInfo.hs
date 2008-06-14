@@ -93,9 +93,10 @@ getImpMod (ImportDecl located_mod _ _ _ _) = located_mod
 --------------------------------------------------------------
 
 
-getOptionsFromFile :: FilePath            -- input file
+getOptionsFromFile :: DynFlags
+                   -> FilePath            -- input file
                    -> IO [Located String] -- options, if any
-getOptionsFromFile filename
+getOptionsFromFile dflags filename
     = Control.Exception.bracket
 	      (openBinaryFile filename ReadMode)
               (hClose)
@@ -106,7 +107,7 @@ getOptionsFromFile filename
           loop handle buf
               | len buf == 0 = return []
               | otherwise
-              = case getOptions' buf filename of
+              = case getOptions' dflags buf filename of
                   (Nothing, opts) -> return opts
                   (Just buf', opts) -> do nextBlock <- hGetStringBufferBlock handle blockSize
                                           newBuf <- appendStringBuffers buf' nextBlock
@@ -115,22 +116,23 @@ getOptionsFromFile filename
                                              else do opts' <- loop handle newBuf
                                                      return (opts++opts')
 
-getOptions :: StringBuffer -> FilePath -> [Located String]
-getOptions buf filename
-    = case getOptions' buf filename of
+getOptions :: DynFlags -> StringBuffer -> FilePath -> [Located String]
+getOptions dflags buf filename
+    = case getOptions' dflags buf filename of
         (_,opts) -> opts
 
 -- The token parser is written manually because Happy can't
 -- return a partial result when it encounters a lexer error.
 -- We want to extract options before the buffer is passed through
 -- CPP, so we can't use the same trick as 'getImports'.
-getOptions' :: StringBuffer         -- Input buffer
+getOptions' :: DynFlags
+            -> StringBuffer         -- Input buffer
             -> FilePath             -- Source file. Used for msgs only.
             -> ( Maybe StringBuffer -- Just => we can use more input
                , [Located String]   -- Options.
                )
-getOptions' buf filename
-    = parseToks (lexAll (pragState buf loc))
+getOptions' dflags buf filename
+    = parseToks (lexAll (pragState dflags buf loc))
     where loc  = mkSrcLoc (mkFastString filename) 1 0
 
           getToken (_buf,L _loc tok) = tok

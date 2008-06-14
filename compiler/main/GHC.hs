@@ -1936,7 +1936,7 @@ preprocessFile hsc_env src_fn mb_phase (Just (buf, _time))
         let dflags = hsc_dflags hsc_env
 	-- case we bypass the preprocessing stage?
 	let 
-	    local_opts = getOptions buf src_fn
+	    local_opts = getOptions dflags buf src_fn
 	--
 	(dflags', _errs) <- parseDynamicFlags dflags (map unLoc local_opts)
         -- XXX: shouldn't we be reporting the errors?

@@ -1597,14 +1597,12 @@ qqEnabled        flags = testBit flags qqBit
 
 -- PState for parsing options pragmas
 --
-pragState :: StringBuffer -> SrcLoc -> PState
-pragState buf loc  = 
+pragState :: DynFlags -> StringBuffer -> SrcLoc -> PState
+pragState dynflags buf loc =
   PState {
-      buffer	      = buf,
+      buffer        = buf,
       messages      = emptyMessages,
-      -- XXX defaultDynFlags is not right, but we don't have a real
-      -- dflags handy
-      dflags        = defaultDynFlags,
+      dflags        = dynflags,
       last_loc      = mkSrcSpan loc loc,
       last_offs     = 0,
       last_len      = 0,
