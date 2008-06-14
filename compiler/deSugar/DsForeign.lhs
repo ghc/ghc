@@ -619,7 +619,9 @@ insertRetAddr _ args = args
 -- need to flush a register argument to the stack (See rts/Adjustor.c for
 -- details).
 insertRetAddr CCallConv args = go 0 args
-  where  go 6 args = ret_addr_arg : args
+  where  go :: Int -> [(SDoc, SDoc, Type, MachRep)]
+                   -> [(SDoc, SDoc, Type, MachRep)]
+         go 6 args = ret_addr_arg : args
 	 go n (arg@(_,_,_,rep):args)
 	  | I64 <- rep = arg : go (n+1) args
 	  | otherwise  = arg : go n     args
