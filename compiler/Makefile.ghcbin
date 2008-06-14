@@ -19,6 +19,7 @@ endif
 
 EXCLUDED_C_SRCS += ghc-inplace.c
 
+SRC_HC_OPTS += -Wall
 SRC_HC_OPTS += -package ghc
 SRC_HC_OPTS += -Istage$(stage)
 SRC_HC_OPTS += \
