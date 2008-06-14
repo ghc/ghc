@@ -1,9 +1,3 @@
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
 
 -----------------------------------------------------------------------------
 --
@@ -29,7 +23,6 @@ import qualified SysTools
 import Module
 import Digraph          ( SCC(..) )
 import Finder           ( findImportedModule, FindResult(..) )
-import Util             ( global, consIORef )
 import Outputable
 import Panic
 import SrcLoc
@@ -179,7 +172,7 @@ processDeps :: Session
 --
 -- For {-# SOURCE #-} imports the "hi" will be "hi-boot".
 
-processDeps session excl_mods hdl (CyclicSCC nodes)
+processDeps _ _ _ (CyclicSCC nodes)
   =     -- There shouldn't be any cycles; report them
     throwDyn (ProgramError (showSDoc $ GHC.cyclicModuleErr nodes))
 
@@ -228,12 +221,12 @@ findDependency  :: HscEnv
                 -> IsBootInterface      -- Source import
                 -> Bool                 -- Record dependency on package modules
                 -> IO (Maybe FilePath)  -- Interface file file
-findDependency hsc_env src imp is_boot include_pkg_deps
+findDependency hsc_env _ imp is_boot _include_pkg_deps
   = do  {       -- Find the module; this will be fast because
                 -- we've done it once during downsweep
           r <- findImportedModule hsc_env imp Nothing
         ; case r of
-            Found loc mod
+            Found loc _
                 -- Home package: just depend on the .hi or hi-boot file
                 | isJust (ml_hs_file loc)
                 -> return (Just (addBootSuffix_maybe is_boot (ml_hi_file loc)))
@@ -376,7 +369,7 @@ pprCycle summaries = pp_group (CyclicSCC summaries)
           mod_str = moduleNameString (moduleName (ms_mod summary))
 
     pp_imps :: SDoc -> [Located ModuleName] -> SDoc
-    pp_imps what [] = empty
+    pp_imps _    [] = empty
     pp_imps what lms
         = case [m | L _ m <- lms, m `elem` cycle_mods] of
             [] -> empty
@@ -396,11 +389,13 @@ GLOBAL_VAR(v_Dep_exclude_mods,          [], [ModuleName]);
 GLOBAL_VAR(v_Dep_suffixes,              [], [String]);
 GLOBAL_VAR(v_Dep_warnings,              True, Bool);
 
+depStartMarker, depEndMarker :: String
 depStartMarker = "# DO NOT DELETE: Beginning of Haskell dependencies"
 depEndMarker   = "# DO NOT DELETE: End of Haskell dependencies"
 
 -- for compatibility with the old mkDependHS, we accept options of the form
 -- -optdep-f -optdep.depend, etc.
+dep_opts :: [(String, OptKind IO)]
 dep_opts =
    [ (  "s",                    SepArg (consIORef v_Dep_suffixes) )
    , (  "f",                    SepArg (writeIORef v_Dep_makefile) )
