@@ -537,8 +537,10 @@ typedef struct _RtsSymbolVal {
       SymX(addDLL)               		\
       GMP_SYMS					\
       SymX(__int_encodeDouble)			\
+      SymX(__word_encodeDouble)			\
       SymX(__2Int_encodeDouble)			\
       SymX(__int_encodeFloat)			\
+      SymX(__word_encodeFloat)			\
       SymX(andIntegerzh_fast)			\
       SymX(atomicallyzh_fast)			\
       SymX(barf)				\

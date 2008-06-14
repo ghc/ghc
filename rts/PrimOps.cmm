@@ -928,16 +928,20 @@ decodeDoublezu2Intzh_fast
     W_ p;
     FETCH_MP_TEMP(mp_tmp1);
     FETCH_MP_TEMP(mp_tmp2);
-    FETCH_MP_TEMP(mp_tmp_w);
+    FETCH_MP_TEMP(mp_result1);
+    FETCH_MP_TEMP(mp_result2);
 
     /* arguments: D1 = Double# */
     arg = D1;
 
     /* Perform the operation */
-    foreign "C" __decodeDouble_2Int(mp_tmp1 "ptr", mp_tmp2 "ptr", mp_tmp_w "ptr", arg) [];
-    
-    /* returns: (Int# (mant high), Int# (mant low), Int# (expn)) */
-    RET_NNN(W_[mp_tmp1], W_[mp_tmp2], W_[mp_tmp_w]);
+    foreign "C" __decodeDouble_2Int(mp_tmp1 "ptr", mp_tmp2 "ptr",
+                                    mp_result1 "ptr", mp_result2 "ptr",
+                                    arg) [];
+
+    /* returns:
+       (Int# (mant sign), Word# (mant high), Word# (mant low), Int# (expn)) */
+    RET_NNNN(W_[mp_tmp1], W_[mp_tmp2], W_[mp_result1], W_[mp_result2]);
 }
 
 /* -----------------------------------------------------------------------------

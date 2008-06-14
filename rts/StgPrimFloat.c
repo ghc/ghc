@@ -103,6 +103,21 @@ __2Int_encodeDouble (I_ j_high, I_ j_low, I_ e)
   return r;
 }
 
+/* Special version for words */
+StgDouble
+__word_encodeDouble (W_ j, I_ e)
+{
+  StgDouble r;
+  
+  r = (StgDouble)j;
+  
+  /* Now raise to the exponent */
+  if ( r != 0.0 ) /* Lennart suggests this avoids a bug in MIPS's ldexp */
+    r = ldexp(r, e);
+  
+  return r;
+}
+
 /* Special version for small Integers */
 StgDouble
 __int_encodeDouble (I_ j, I_ e)
@@ -159,6 +174,21 @@ __int_encodeFloat (I_ j, I_ e)
   /* sign is encoded in the size */
   if (j < 0)
     r = -r;
+  
+  return r;
+}
+
+/* Special version for small positive Integers */
+StgFloat
+__word_encodeFloat (W_ j, I_ e)
+{
+  StgFloat r;
+  
+  r = (StgFloat)j;
+  
+  /* Now raise to the exponent */
+  if ( r != 0.0 ) /* Lennart suggests this avoids a bug in MIPS's ldexp */
+    r = ldexp(r, e);
   
   return r;
 }
@@ -226,7 +256,7 @@ __decodeDouble (MP_INT *man, I_ *exp, StgDouble dbl)
 }
 
 void
-__decodeDouble_2Int (I_ *man_high, I_ *man_low, I_ *exp, StgDouble dbl)
+__decodeDouble_2Int (I_ *man_sign, W_ *man_high, W_ *man_low, I_ *exp, StgDouble dbl)
 {
     /* Do some bit fiddling on IEEE */
     unsigned int low, high; 	     	/* assuming 32 bit ints */
@@ -266,9 +296,7 @@ __decodeDouble_2Int (I_ *man_high, I_ *man_low, I_ *exp, StgDouble dbl)
         *exp = (I_) iexp;
 	*man_low = low;
 	*man_high = high;
-	if (sign < 0) {
-	    *man_high = - *man_high;
-        }
+	*man_sign = (sign < 0) ? -1 : 1;
     }
 }
 

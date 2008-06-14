@@ -619,10 +619,11 @@ primop   DoubleDecodeOp   "decodeDouble#" GenPrimOp
    with out_of_line = True
 
 primop   DoubleDecode_2IntOp   "decodeDouble_2Int#" GenPrimOp    
-   Double# -> (# Int#, Int#, Int# #)
+   Double# -> (# Int#, Word#, Word#, Int# #)
    {Convert to arbitrary-precision integer.
-    First {\tt Int\#} in result is the high 32 bits of the mantissa, and the
-    second is the low 32. The third is the exponent.}
+    First component of the result is -1 or 1, indicating the sign of the
+    mantissa. The next two are the high and low 32 bits of the mantissa
+    respectively, and the last is the exponent.}
    with out_of_line = True
 
 ------------------------------------------------------------------------
