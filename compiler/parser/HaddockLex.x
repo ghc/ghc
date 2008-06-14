@@ -128,7 +128,7 @@ tokenise str = let toks = go ('\n', eofHack str) para in {-trace (show toks)-} t
 	  case alexScan inp sc of
 		AlexEOF -> []
 		AlexError _ -> error "lexical error"
-		AlexSkip  inp' len     -> go inp' sc
+		AlexSkip  inp' _       -> go inp' sc
 		AlexToken inp' len act -> act (take len str) sc (\sc -> go inp' sc)
 
 -- NB. we add a final \n to the string, (see comment in the beginning of line
@@ -136,16 +136,16 @@ tokenise str = let toks = go ('\n', eofHack str) para in {-trace (show toks)-} t
 eofHack str = str++"\n"
 
 andBegin  :: Action -> StartCode -> Action
-andBegin act new_sc = \str sc cont -> act str new_sc cont
+andBegin act new_sc = \str _ cont -> act str new_sc cont
 
 token :: Token -> Action
-token t = \str sc cont -> t : cont sc
+token t = \_ sc cont -> t : cont sc
 
 strtoken :: (String -> Token) -> Action
 strtoken t = \str sc cont -> t str : cont sc
 
 begin :: StartCode -> Action
-begin sc = \str _ cont -> cont sc
+begin sc = \_ _ cont -> cont sc
 
 -- -----------------------------------------------------------------------------
 -- Lex a string as a Haskell identifier
@@ -161,7 +161,6 @@ strToHsQNames :: String -> Maybe [RdrName]
 strToHsQNames str0 = 
   let buffer = unsafePerformIO (stringToStringBuffer str0)
       pstate = mkPState buffer noSrcLoc defaultDynFlags
-      lex = lexer (\t -> return t)
       result = unP parseIdentifier pstate 
   in case result of 
        POk _ name -> Just [unLoc name] 
