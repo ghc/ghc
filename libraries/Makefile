@@ -168,8 +168,7 @@ boot: $(BOOTSTRAP_STAMPS) ifBuildable/ifBuildable \
 
 # We ought to be depending on %/Setup.*hs, but make makes that difficult.
 
-# -fffi is only needed for GHC 6.4 at the time of writing
-CABAL_GHC_FLAGS = -Wall -cpp -fffi
+CABAL_GHC_FLAGS = -Wall
 
 $(foreach SUBDIR,$(SUBDIRS),$(SUBDIR)/setup/Setup): \
 %/setup/Setup: $(BOOTSTRAP_STAMPS)
