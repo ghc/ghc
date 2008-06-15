@@ -1411,8 +1411,8 @@ setCmd ""
           | otherwise     = text "  " <> text "-fno-" <> text str
         (ghciFlags,others)  = partition (\(_,f)->f `elem` flags) 
                                         DynFlags.fFlags
-        nonLanguageDynFlags = filter (\(_,f)->not $ f `elem` map snd xFlags) 
-                                     others
+        nonLanguageDynFlags = filterOut (\(_,f) -> f `elem` languageOptions)
+                                        others
         flags = [Opt_PrintExplicitForalls
                 ,Opt_PrintBindResult
                 ,Opt_BreakOnException
@@ -1648,7 +1648,7 @@ showLanguages = do
    dflags <- getDynFlags
    io $ putStrLn $ showSDoc $ vcat $
       text "active language flags:" :
-      [text ("  -X" ++ str) | (str,f) <- DynFlags.xFlags, dopt f dflags]
+      [text ("  -X" ++ str) | (str, f, _) <- DynFlags.xFlags, dopt f dflags]
 
 -- -----------------------------------------------------------------------------
 -- Completion

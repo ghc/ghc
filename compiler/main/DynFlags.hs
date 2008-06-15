@@ -49,7 +49,7 @@ module DynFlags (
 
         -- misc stuff
         machdepCCOpts, picCCOpts,
-    supportedLanguages,
+    supportedLanguages, languageOptions,
     compilerInfo,
   ) where
 
@@ -1011,12 +1011,11 @@ allFlags = map ('-':) $
            [ flagName flag | flag <- dynamic_flags, ok (flagOptKind flag) ] ++
            map ("fno-"++) flags ++
            map ("f"++) flags ++
-           map ("X"++) xs ++
-           map ("XNo"++) xs
+           map ("X"++) supportedLanguages ++
+           map ("XNo"++) supportedLanguages
     where ok (PrefixPred _ _) = False
           ok _ = True
           flags = map fst fFlags
-          xs = map fst xFlags
 
 dynamic_flags :: [Flag DynP]
 dynamic_flags = [
@@ -1349,17 +1348,22 @@ dynamic_flags = [
          (PrefixPred (isPrefFlag "no-" fFlags)
                      (\f -> unSetDynFlag (getPrefFlag "no-" fFlags f)))
          Supported
-
-     -- the -X* and -XNo* flags
-  , Flag "X"
-         (PrefixPred (isFlag   xFlags)
-                     (\f -> setDynFlag   (getFlag   xFlags f)))
-         Supported
-  , Flag "X"
-         (PrefixPred (isPrefFlag "No" xFlags)
-                     (\f -> unSetDynFlag (getPrefFlag "No" xFlags f)))
-         Supported
  ]
+ ++ -- -X*
+    map xFlagToFlag xFlags
+ ++ -- -XNo*
+    map xNoFlagToFlag xFlags
+
+xFlagToFlag :: (String, DynFlag, Deprecated) -> Flag DynP
+xFlagToFlag = xMaybeFlagToFlag setDynFlag
+
+xNoFlagToFlag :: (String, DynFlag, Deprecated) -> Flag DynP
+xNoFlagToFlag = xMaybeFlagToFlag unSetDynFlag
+
+xMaybeFlagToFlag :: (DynFlag -> DynP ()) -> (String, DynFlag, Deprecated)
+                 -> Flag DynP
+xMaybeFlagToFlag f (name, dynflag, deprecated)
+    = Flag ('X' : name) (NoArg (f dynflag)) deprecated
 
 -- these -f<blah> flags can all be reversed with -fno-<blah>
 
@@ -1453,66 +1457,72 @@ fFlags = [
   ]
 
 supportedLanguages :: [String]
-supportedLanguages = map fst xFlags
+supportedLanguages = [ name | (name, _, _) <- xFlags ]
+
+-- This may contain duplicates
+languageOptions :: [DynFlag]
+languageOptions = [ dynFlag | (_, dynFlag, _) <- xFlags ]
 
 -- These -X<blah> flags can all be reversed with -XNo<blah>
-xFlags :: [(String, DynFlag)]
+xFlags :: [(String, DynFlag, Deprecated)]
 xFlags = [
-  ( "CPP",                              Opt_Cpp ),
-  ( "PatternGuards",                    Opt_PatternGuards ),
-  ( "UnicodeSyntax",                    Opt_UnicodeSyntax ),
-  ( "MagicHash",                        Opt_MagicHash ),
-  ( "PolymorphicComponents",            Opt_PolymorphicComponents ),
-  ( "ExistentialQuantification",        Opt_ExistentialQuantification ),
-  ( "KindSignatures",                   Opt_KindSignatures ),
-  ( "PatternSignatures",                Opt_PatternSignatures ),
-  ( "EmptyDataDecls",                   Opt_EmptyDataDecls ),
-  ( "ParallelListComp",                 Opt_ParallelListComp ),
-  ( "TransformListComp",                Opt_TransformListComp ),
-  ( "ForeignFunctionInterface",         Opt_ForeignFunctionInterface ),
-  ( "UnliftedFFITypes",                 Opt_UnliftedFFITypes ),
-  ( "LiberalTypeSynonyms",              Opt_LiberalTypeSynonyms ),
-  ( "Rank2Types",                       Opt_Rank2Types ),
-  ( "RankNTypes",                       Opt_RankNTypes ),
-  ( "ImpredicativeTypes",               Opt_ImpredicativeTypes ),
-  ( "TypeOperators",                    Opt_TypeOperators ),
-  ( "RecursiveDo",                      Opt_RecursiveDo ),
-  ( "Arrows",                           Opt_Arrows ),
-  ( "PArr",                             Opt_PArr ),
-  ( "TemplateHaskell",                  Opt_TemplateHaskell ),
-  ( "QuasiQuotes",                      Opt_QuasiQuotes ),
-  ( "Generics",                         Opt_Generics ),
+  ( "CPP",                              Opt_Cpp, Supported ),
+  ( "PatternGuards",                    Opt_PatternGuards, Supported ),
+  ( "UnicodeSyntax",                    Opt_UnicodeSyntax, Supported ),
+  ( "MagicHash",                        Opt_MagicHash, Supported ),
+  ( "PolymorphicComponents",            Opt_PolymorphicComponents, Supported ),
+  ( "ExistentialQuantification",        Opt_ExistentialQuantification, Supported ),
+  ( "KindSignatures",                   Opt_KindSignatures, Supported ),
+  ( "PatternSignatures",                Opt_PatternSignatures, Supported ),
+  ( "EmptyDataDecls",                   Opt_EmptyDataDecls, Supported ),
+  ( "ParallelListComp",                 Opt_ParallelListComp, Supported ),
+  ( "TransformListComp",                Opt_TransformListComp, Supported ),
+  ( "ForeignFunctionInterface",         Opt_ForeignFunctionInterface, Supported ),
+  ( "UnliftedFFITypes",                 Opt_UnliftedFFITypes, Supported ),
+  ( "LiberalTypeSynonyms",              Opt_LiberalTypeSynonyms, Supported ),
+  ( "Rank2Types",                       Opt_Rank2Types, Supported ),
+  ( "RankNTypes",                       Opt_RankNTypes, Supported ),
+  ( "ImpredicativeTypes",               Opt_ImpredicativeTypes, Supported ),
+  ( "TypeOperators",                    Opt_TypeOperators, Supported ),
+  ( "RecursiveDo",                      Opt_RecursiveDo, Supported ),
+  ( "Arrows",                           Opt_Arrows, Supported ),
+  ( "PArr",                             Opt_PArr, Supported ),
+  ( "TemplateHaskell",                  Opt_TemplateHaskell, Supported ),
+  ( "QuasiQuotes",                      Opt_QuasiQuotes, Supported ),
+  ( "Generics",                         Opt_Generics, Supported ),
   -- On by default:
-  ( "ImplicitPrelude",                  Opt_ImplicitPrelude ),
-  ( "RecordWildCards",                  Opt_RecordWildCards ),
-  ( "RecordPuns",                       Opt_RecordPuns ),
-  ( "DisambiguateRecordFields",         Opt_DisambiguateRecordFields ),
-  ( "OverloadedStrings",                Opt_OverloadedStrings ),
-  ( "GADTs",                            Opt_GADTs ),
-  ( "ViewPatterns",                     Opt_ViewPatterns),
-  ( "TypeFamilies",                     Opt_TypeFamilies ),
-  ( "BangPatterns",                     Opt_BangPatterns ),
+  ( "ImplicitPrelude",                  Opt_ImplicitPrelude, Supported ),
+  ( "RecordWildCards",                  Opt_RecordWildCards, Supported ),
+  ( "NamedFieldPuns",                   Opt_RecordPuns, Supported ),
+  ( "RecordPuns",                       Opt_RecordPuns,
+    Deprecated "Use the NamedFieldPuns language instead" ),
+  ( "DisambiguateRecordFields",         Opt_DisambiguateRecordFields, Supported ),
+  ( "OverloadedStrings",                Opt_OverloadedStrings, Supported ),
+  ( "GADTs",                            Opt_GADTs, Supported ),
+  ( "ViewPatterns",                     Opt_ViewPatterns, Supported ),
+  ( "TypeFamilies",                     Opt_TypeFamilies, Supported ),
+  ( "BangPatterns",                     Opt_BangPatterns, Supported ),
   -- On by default:
-  ( "MonomorphismRestriction",          Opt_MonomorphismRestriction ),
+  ( "MonomorphismRestriction",          Opt_MonomorphismRestriction, Supported ),
   -- On by default (which is not strictly H98):
-  ( "MonoPatBinds",                     Opt_MonoPatBinds ),
-  ( "RelaxedPolyRec",                   Opt_RelaxedPolyRec),
-  ( "ExtendedDefaultRules",             Opt_ExtendedDefaultRules ),
-  ( "ImplicitParams",                   Opt_ImplicitParams ),
-  ( "ScopedTypeVariables",              Opt_ScopedTypeVariables ),
-  ( "UnboxedTuples",                    Opt_UnboxedTuples ),
-  ( "StandaloneDeriving",               Opt_StandaloneDeriving ),
-  ( "DeriveDataTypeable",               Opt_DeriveDataTypeable ),
-  ( "TypeSynonymInstances",             Opt_TypeSynonymInstances ),
-  ( "FlexibleContexts",                 Opt_FlexibleContexts ),
-  ( "FlexibleInstances",                Opt_FlexibleInstances ),
-  ( "ConstrainedClassMethods",          Opt_ConstrainedClassMethods ),
-  ( "MultiParamTypeClasses",            Opt_MultiParamTypeClasses ),
-  ( "FunctionalDependencies",           Opt_FunctionalDependencies ),
-  ( "GeneralizedNewtypeDeriving",       Opt_GeneralizedNewtypeDeriving ),
-  ( "OverlappingInstances",             Opt_OverlappingInstances ),
-  ( "UndecidableInstances",             Opt_UndecidableInstances ),
-  ( "IncoherentInstances",              Opt_IncoherentInstances )
+  ( "MonoPatBinds",                     Opt_MonoPatBinds, Supported ),
+  ( "RelaxedPolyRec",                   Opt_RelaxedPolyRec, Supported ),
+  ( "ExtendedDefaultRules",             Opt_ExtendedDefaultRules, Supported ),
+  ( "ImplicitParams",                   Opt_ImplicitParams, Supported ),
+  ( "ScopedTypeVariables",              Opt_ScopedTypeVariables, Supported ),
+  ( "UnboxedTuples",                    Opt_UnboxedTuples, Supported ),
+  ( "StandaloneDeriving",               Opt_StandaloneDeriving, Supported ),
+  ( "DeriveDataTypeable",               Opt_DeriveDataTypeable, Supported ),
+  ( "TypeSynonymInstances",             Opt_TypeSynonymInstances, Supported ),
+  ( "FlexibleContexts",                 Opt_FlexibleContexts, Supported ),
+  ( "FlexibleInstances",                Opt_FlexibleInstances, Supported ),
+  ( "ConstrainedClassMethods",          Opt_ConstrainedClassMethods, Supported ),
+  ( "MultiParamTypeClasses",            Opt_MultiParamTypeClasses, Supported ),
+  ( "FunctionalDependencies",           Opt_FunctionalDependencies, Supported ),
+  ( "GeneralizedNewtypeDeriving",       Opt_GeneralizedNewtypeDeriving, Supported ),
+  ( "OverlappingInstances",             Opt_OverlappingInstances, Supported ),
+  ( "UndecidableInstances",             Opt_UndecidableInstances, Supported ),
+  ( "IncoherentInstances",              Opt_IncoherentInstances, Supported )
   ]
 
 impliedFlags :: [(DynFlag, [DynFlag])]
