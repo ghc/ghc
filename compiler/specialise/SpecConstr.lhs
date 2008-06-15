@@ -796,7 +796,7 @@ scExpr' env (Case scrut b ty alts)
 	   ; let (usg', arg_occs) = lookupOccs usg bs'
 		 scrut_occ = case con of
 				DataAlt dc -> ScrutOcc (unitUFM dc arg_occs)
-				_ofther	   -> ScrutOcc emptyUFM
+				_      	   -> ScrutOcc emptyUFM
 	   ; return (usg', scrut_occ, (con,bs',rhs')) }
 
 scExpr' env (Let (NonRec bndr rhs) body)
