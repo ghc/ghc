@@ -28,7 +28,7 @@ import TyCon		( TyCon, tyConFamilySize, isDataTyCon, tyConDataCons )
 import Constants	( mIN_PAYLOAD_SIZE, wORD_SIZE )
 import CgHeapery	( mkVirtHeapOffsets )
 import FastString	( FastString(..) )
-import Util             ( lengthIs, listLengthCmp )
+import Util
 import Outputable
 
 import Foreign
@@ -54,10 +54,8 @@ newtype ItblPtr = ItblPtr (Ptr ()) deriving Show
 
 itblCode :: ItblPtr -> Ptr ()
 itblCode (ItblPtr ptr)
-   = (castPtr ptr)
-#ifdef GHCI_TABLES_NEXT_TO_CODE
-                 `plusPtr` conInfoTableSizeB
-#endif
+ | ghciTablesNextToCode = castPtr ptr `plusPtr` conInfoTableSizeB
+ | otherwise            = castPtr ptr
 
 -- XXX bogus
 conInfoTableSizeB = 3 * wORD_SIZE
