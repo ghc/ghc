@@ -881,10 +881,10 @@
 	      <entry><option>-XNoRecordWildCards</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-XRecordPuns</option></entry>
+	      <entry><option>-XNamedFieldPuns</option></entry>
 	      <entry>Enable <link linkend="record-puns">record puns</link>.</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-XNoRecordPuns</option></entry>
+	      <entry><option>-XNoNamedFieldPuns</option></entry>
 	    </row>
 	    <row>
 	      <entry><option>-XDisambiguateRecordFields</option></entry>
@@ -1009,6 +1009,13 @@
 	    <entry>warn about uses of functions &amp; types that are deprecated</entry>
 	    <entry>dynamic</entry>
 	    <entry><option>-fno-warn-deprecations</option></entry>
+	  </row>
+
+	  <row>
+	    <entry><option>-fwarn-deprecated-flags</option></entry>
+	    <entry>warn about uses of commandline flags that are deprecated</entry>
+	    <entry>dynamic</entry>
+	    <entry><option>-fno-warn-deprecated-flags</option></entry>
 	  </row>
 
 	  <row>

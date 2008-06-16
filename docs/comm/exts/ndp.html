@@ -32,8 +32,8 @@
 
     <h2>More Sugar: Special Syntax for Array Comprehensions</h2>
     <p>
-      The option <code>-fparr</code>, which is a dynamic hsc option that can
-      be reversed with <code>-fno-parr</code>, enables special syntax for
+      The option <code>-XParr</code>, which is a dynamic hsc option that can
+      be reversed with <code>-XNoParr</code>, enables special syntax for
       parallel arrays, which is not essential to using parallel arrays, but
       makes for significantly more concise programs.  The switch works by
       making the lexical analyser (located in <a
@@ -326,7 +326,7 @@ mapFilterP :: (a -> Maybe b) -> [:a:] -> [:b:]</pre>
       flattening (just like profiling does), there is a <em>compiler way</em>
       <code>"ndp"</code>, which can be selected using the way option code
       <code>-ndp</code>.  This option will automagically select
-      <code>-fparr</code> and <code>-fflatten</code>. 
+      <code>-XParr</code> and <code>-fflatten</code>. 
 
     <h4><code>FlattenMonad</code></h4>
     <p>

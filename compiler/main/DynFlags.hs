@@ -71,7 +71,7 @@ import Constants        ( mAX_CONTEXT_REDUCTION_DEPTH )
 import Panic            ( panic, GhcException(..) )
 import UniqFM           ( UniqFM )
 import Util
-import Maybes           ( orElse, fromJust )
+import Maybes           ( orElse )
 import SrcLoc           ( SrcSpan )
 import Outputable
 import {-# SOURCE #-} ErrUtils ( Severity(..), Message, mkLocMessage )
@@ -169,6 +169,7 @@ data DynFlag
    | Opt_WarnUnusedImports
    | Opt_WarnUnusedMatches
    | Opt_WarnDeprecations
+   | Opt_WarnDeprecatedFlags
    | Opt_WarnDodgyImports
    | Opt_WarnOrphans
    | Opt_WarnTabs
@@ -742,6 +743,7 @@ optLevelFlags
 standardWarnings :: [DynFlag]
 standardWarnings
     = [ Opt_WarnDeprecations,
+        Opt_WarnDeprecatedFlags,
         Opt_WarnOverlappingPatterns,
         Opt_WarnMissingFields,
         Opt_WarnMissingMethods,
@@ -1015,7 +1017,7 @@ allFlags = map ('-':) $
            map ("XNo"++) supportedLanguages
     where ok (PrefixPred _ _) = False
           ok _ = True
-          flags = map fst fFlags
+          flags = [ name | (name, _, _) <- fFlags ]
 
 dynamic_flags :: [Flag DynP]
 dynamic_flags = [
@@ -1336,124 +1338,115 @@ dynamic_flags = [
          Supported
   , Flag "fno-glasgow-exts" (NoArg (mapM_ unSetDynFlag glasgowExtsFlags))
          Supported
-
-     -- XXX We need to flatten these:
-
-     -- the rest of the -f* and -fno-* flags
-  , Flag "f"
-         (PrefixPred (isFlag   fFlags)
-                     (\f -> setDynFlag   (getFlag   fFlags f)))
-         Supported
-  , Flag "f"
-         (PrefixPred (isPrefFlag "no-" fFlags)
-                     (\f -> unSetDynFlag (getPrefFlag "no-" fFlags f)))
-         Supported
  ]
- ++ -- -X*
-    map xFlagToFlag xFlags
- ++ -- -XNo*
-    map xNoFlagToFlag xFlags
+ ++ map (mkFlag True  "f"    setDynFlag  ) fFlags
+ ++ map (mkFlag False "fno-" unSetDynFlag) fFlags
+ ++ map (mkFlag True  "X"    setDynFlag  ) xFlags
+ ++ map (mkFlag False "XNo"  unSetDynFlag) xFlags
 
-xFlagToFlag :: (String, DynFlag, Deprecated) -> Flag DynP
-xFlagToFlag = xMaybeFlagToFlag setDynFlag
+mkFlag :: Bool -- True => turn it on, False => turn it off
+       -> String
+       -> (DynFlag -> DynP ())
+       -> (String, DynFlag, Bool -> Deprecated)
+       -> Flag DynP
+mkFlag turnOn flagPrefix f (name, dynflag, deprecated)
+    = Flag (flagPrefix ++ name) (NoArg (f dynflag)) (deprecated turnOn)
 
-xNoFlagToFlag :: (String, DynFlag, Deprecated) -> Flag DynP
-xNoFlagToFlag = xMaybeFlagToFlag unSetDynFlag
-
-xMaybeFlagToFlag :: (DynFlag -> DynP ()) -> (String, DynFlag, Deprecated)
-                 -> Flag DynP
-xMaybeFlagToFlag f (name, dynflag, deprecated)
-    = Flag ('X' : name) (NoArg (f dynflag)) deprecated
+deprecatedForLanguage :: String -> Bool -> Deprecated
+deprecatedForLanguage lang turnOn =
+    Deprecated ("Use the " ++ prefix ++ lang ++ " language instead")
+    where prefix = if turnOn then "" else "No"
 
 -- these -f<blah> flags can all be reversed with -fno-<blah>
 
-fFlags :: [(String, DynFlag)]
+fFlags :: [(String, DynFlag, Bool -> Deprecated)]
 fFlags = [
-  ( "warn-dodgy-imports",               Opt_WarnDodgyImports ),
-  ( "warn-duplicate-exports",           Opt_WarnDuplicateExports ),
-  ( "warn-hi-shadowing",                Opt_WarnHiShadows ),
-  ( "warn-implicit-prelude",            Opt_WarnImplicitPrelude ),
-  ( "warn-incomplete-patterns",         Opt_WarnIncompletePatterns ),
-  ( "warn-incomplete-record-updates",   Opt_WarnIncompletePatternsRecUpd ),
-  ( "warn-missing-fields",              Opt_WarnMissingFields ),
-  ( "warn-missing-methods",             Opt_WarnMissingMethods ),
-  ( "warn-missing-signatures",          Opt_WarnMissingSigs ),
-  ( "warn-name-shadowing",              Opt_WarnNameShadowing ),
-  ( "warn-overlapping-patterns",        Opt_WarnOverlappingPatterns ),
-  ( "warn-simple-patterns",             Opt_WarnSimplePatterns ),
-  ( "warn-type-defaults",               Opt_WarnTypeDefaults ),
-  ( "warn-monomorphism-restriction",    Opt_WarnMonomorphism ),
-  ( "warn-unused-binds",                Opt_WarnUnusedBinds ),
-  ( "warn-unused-imports",              Opt_WarnUnusedImports ),
-  ( "warn-unused-matches",              Opt_WarnUnusedMatches ),
-  ( "warn-deprecations",                Opt_WarnDeprecations ),
-  ( "warn-orphans",                     Opt_WarnOrphans ),
-  ( "warn-tabs",                        Opt_WarnTabs ),
-  ( "print-explicit-foralls",           Opt_PrintExplicitForalls ),
-  ( "strictness",                       Opt_Strictness ),
-  ( "static-argument-transformation",   Opt_StaticArgumentTransformation ),
-  ( "full-laziness",                    Opt_FullLaziness ),
-  ( "liberate-case",                    Opt_LiberateCase ),
-  ( "spec-constr",                      Opt_SpecConstr ),
-  ( "cse",                              Opt_CSE ),
-  ( "ignore-interface-pragmas",         Opt_IgnoreInterfacePragmas ),
-  ( "omit-interface-pragmas",           Opt_OmitInterfacePragmas ),
-  ( "do-lambda-eta-expansion",          Opt_DoLambdaEtaExpansion ),
-  ( "ignore-asserts",                   Opt_IgnoreAsserts ),
-  ( "do-eta-reduction",                 Opt_DoEtaReduction ),
-  ( "case-merge",                       Opt_CaseMerge ),
-  ( "unbox-strict-fields",              Opt_UnboxStrictFields ),
-  ( "method-sharing",                   Opt_MethodSharing ),
-  ( "dicts-cheap",                      Opt_DictsCheap ),
-  ( "excess-precision",                 Opt_ExcessPrecision ),
-  ( "asm-mangling",                     Opt_DoAsmMangling ),
-  ( "print-bind-result",                Opt_PrintBindResult ),
-  ( "force-recomp",                     Opt_ForceRecomp ),
-  ( "hpc-no-auto",                      Opt_Hpc_No_Auto ),
-  ( "rewrite-rules",                    Opt_RewriteRules ),
-  ( "break-on-exception",               Opt_BreakOnException ),
-  ( "break-on-error",                   Opt_BreakOnError ),
-  ( "print-evld-with-show",             Opt_PrintEvldWithShow ),
-  ( "print-bind-contents",              Opt_PrintBindContents ),
-  ( "run-cps",                          Opt_RunCPSZ ),
-  ( "convert-to-zipper-and-back",       Opt_ConvertToZipCfgAndBack),
-  ( "vectorise",                        Opt_Vectorise ),
-  ( "regs-graph",                       Opt_RegsGraph),
-  ( "regs-iterative",                   Opt_RegsIterative),
-  -- Deprecated in favour of -XTemplateHaskell:
-  ( "th",                               Opt_TemplateHaskell ),
-  -- Deprecated in favour of -XForeignFunctionInterface:
-  ( "fi",                               Opt_ForeignFunctionInterface ),
-  -- Deprecated in favour of -XForeignFunctionInterface:
-  ( "ffi",                              Opt_ForeignFunctionInterface ),
-  -- Deprecated in favour of -XArrows:
-  ( "arrows",                           Opt_Arrows ),
-  -- Deprecated in favour of -XGenerics:
-  ( "generics",                         Opt_Generics ),
-  -- Deprecated in favour of -XImplicitPrelude:
-  ( "implicit-prelude",                 Opt_ImplicitPrelude ),
-  -- Deprecated in favour of -XBangPatterns:
-  ( "bang-patterns",                    Opt_BangPatterns ),
-  -- Deprecated in favour of -XMonomorphismRestriction:
-  ( "monomorphism-restriction",         Opt_MonomorphismRestriction ),
-  -- Deprecated in favour of -XMonoPatBinds:
-  ( "mono-pat-binds",                   Opt_MonoPatBinds ),
-  -- Deprecated in favour of -XExtendedDefaultRules:
-  ( "extended-default-rules",           Opt_ExtendedDefaultRules ),
-  -- Deprecated in favour of -XImplicitParams:
-  ( "implicit-params",                  Opt_ImplicitParams ),
-  -- Deprecated in favour of -XScopedTypeVariables:
-  ( "scoped-type-variables",            Opt_ScopedTypeVariables ),
-  -- Deprecated in favour of -XPArr:
-  ( "parr",                             Opt_PArr ),
-  -- Deprecated in favour of -XOverlappingInstances:
-  ( "allow-overlapping-instances",      Opt_OverlappingInstances ),
-  -- Deprecated in favour of -XUndecidableInstances:
-  ( "allow-undecidable-instances",      Opt_UndecidableInstances ),
-  -- Deprecated in favour of -XIncoherentInstances:
-  ( "allow-incoherent-instances",       Opt_IncoherentInstances ),
-  ( "gen-manifest",                     Opt_GenManifest ),
-  ( "embed-manifest",                   Opt_EmbedManifest )
+  ( "warn-dodgy-imports",               Opt_WarnDodgyImports, const Supported ),
+  ( "warn-duplicate-exports",           Opt_WarnDuplicateExports, const Supported ),
+  ( "warn-hi-shadowing",                Opt_WarnHiShadows, const Supported ),
+  ( "warn-implicit-prelude",            Opt_WarnImplicitPrelude, const Supported ),
+  ( "warn-incomplete-patterns",         Opt_WarnIncompletePatterns, const Supported ),
+  ( "warn-incomplete-record-updates",   Opt_WarnIncompletePatternsRecUpd, const Supported ),
+  ( "warn-missing-fields",              Opt_WarnMissingFields, const Supported ),
+  ( "warn-missing-methods",             Opt_WarnMissingMethods, const Supported ),
+  ( "warn-missing-signatures",          Opt_WarnMissingSigs, const Supported ),
+  ( "warn-name-shadowing",              Opt_WarnNameShadowing, const Supported ),
+  ( "warn-overlapping-patterns",        Opt_WarnOverlappingPatterns, const Supported ),
+  ( "warn-simple-patterns",             Opt_WarnSimplePatterns, const Supported ),
+  ( "warn-type-defaults",               Opt_WarnTypeDefaults, const Supported ),
+  ( "warn-monomorphism-restriction",    Opt_WarnMonomorphism, const Supported ),
+  ( "warn-unused-binds",                Opt_WarnUnusedBinds, const Supported ),
+  ( "warn-unused-imports",              Opt_WarnUnusedImports, const Supported ),
+  ( "warn-unused-matches",              Opt_WarnUnusedMatches, const Supported ),
+  ( "warn-deprecations",                Opt_WarnDeprecations, const Supported ),
+  ( "warn-deprecated-flags",            Opt_WarnDeprecatedFlags, const Supported ),
+  ( "warn-orphans",                     Opt_WarnOrphans, const Supported ),
+  ( "warn-tabs",                        Opt_WarnTabs, const Supported ),
+  ( "print-explicit-foralls",           Opt_PrintExplicitForalls, const Supported ),
+  ( "strictness",                       Opt_Strictness, const Supported ),
+  ( "static-argument-transformation",   Opt_StaticArgumentTransformation, const Supported ),
+  ( "full-laziness",                    Opt_FullLaziness, const Supported ),
+  ( "liberate-case",                    Opt_LiberateCase, const Supported ),
+  ( "spec-constr",                      Opt_SpecConstr, const Supported ),
+  ( "cse",                              Opt_CSE, const Supported ),
+  ( "ignore-interface-pragmas",         Opt_IgnoreInterfacePragmas, const Supported ),
+  ( "omit-interface-pragmas",           Opt_OmitInterfacePragmas, const Supported ),
+  ( "do-lambda-eta-expansion",          Opt_DoLambdaEtaExpansion, const Supported ),
+  ( "ignore-asserts",                   Opt_IgnoreAsserts, const Supported ),
+  ( "do-eta-reduction",                 Opt_DoEtaReduction, const Supported ),
+  ( "case-merge",                       Opt_CaseMerge, const Supported ),
+  ( "unbox-strict-fields",              Opt_UnboxStrictFields, const Supported ),
+  ( "method-sharing",                   Opt_MethodSharing, const Supported ),
+  ( "dicts-cheap",                      Opt_DictsCheap, const Supported ),
+  ( "excess-precision",                 Opt_ExcessPrecision, const Supported ),
+  ( "asm-mangling",                     Opt_DoAsmMangling, const Supported ),
+  ( "print-bind-result",                Opt_PrintBindResult, const Supported ),
+  ( "force-recomp",                     Opt_ForceRecomp, const Supported ),
+  ( "hpc-no-auto",                      Opt_Hpc_No_Auto, const Supported ),
+  ( "rewrite-rules",                    Opt_RewriteRules, const Supported ),
+  ( "break-on-exception",               Opt_BreakOnException, const Supported ),
+  ( "break-on-error",                   Opt_BreakOnError, const Supported ),
+  ( "print-evld-with-show",             Opt_PrintEvldWithShow, const Supported ),
+  ( "print-bind-contents",              Opt_PrintBindContents, const Supported ),
+  ( "run-cps",                          Opt_RunCPSZ, const Supported ),
+  ( "convert-to-zipper-and-back",       Opt_ConvertToZipCfgAndBack, const Supported ),
+  ( "vectorise",                        Opt_Vectorise, const Supported ),
+  ( "regs-graph",                       Opt_RegsGraph, const Supported ),
+  ( "regs-iterative",                   Opt_RegsIterative, const Supported ),
+  ( "th",                               Opt_TemplateHaskell,
+    deprecatedForLanguage "TemplateHaskell" ),
+  ( "fi",                               Opt_ForeignFunctionInterface,
+    deprecatedForLanguage "ForeignFunctionInterface" ),
+  ( "ffi",                              Opt_ForeignFunctionInterface,
+    deprecatedForLanguage "ForeignFunctionInterface" ),
+  ( "arrows",                           Opt_Arrows,
+    deprecatedForLanguage "Arrows" ),
+  ( "generics",                         Opt_Generics,
+    deprecatedForLanguage "Generics" ),
+  ( "implicit-prelude",                 Opt_ImplicitPrelude,
+    deprecatedForLanguage "ImplicitPrelude" ),
+  ( "bang-patterns",                    Opt_BangPatterns,
+    deprecatedForLanguage "BangPatterns" ),
+  ( "monomorphism-restriction",         Opt_MonomorphismRestriction,
+    deprecatedForLanguage "MonomorphismRestriction" ),
+  ( "mono-pat-binds",                   Opt_MonoPatBinds,
+    deprecatedForLanguage "MonoPatBinds" ),
+  ( "extended-default-rules",           Opt_ExtendedDefaultRules,
+    deprecatedForLanguage "ExtendedDefaultRules" ),
+  ( "implicit-params",                  Opt_ImplicitParams,
+    deprecatedForLanguage "ImplicitParams" ),
+  ( "scoped-type-variables",            Opt_ScopedTypeVariables,
+    deprecatedForLanguage "ScopedTypeVariables" ),
+  ( "parr",                             Opt_PArr,
+    deprecatedForLanguage "PArr" ),
+  ( "allow-overlapping-instances",      Opt_OverlappingInstances,
+    deprecatedForLanguage "OverlappingInstances" ),
+  ( "allow-undecidable-instances",      Opt_UndecidableInstances,
+    deprecatedForLanguage "UndecidableInstances" ),
+  ( "allow-incoherent-instances",       Opt_IncoherentInstances,
+    deprecatedForLanguage "IncoherentInstances" ),
+  ( "gen-manifest",                     Opt_GenManifest, const Supported ),
+  ( "embed-manifest",                   Opt_EmbedManifest, const Supported )
   ]
 
 supportedLanguages :: [String]
@@ -1464,65 +1457,65 @@ languageOptions :: [DynFlag]
 languageOptions = [ dynFlag | (_, dynFlag, _) <- xFlags ]
 
 -- These -X<blah> flags can all be reversed with -XNo<blah>
-xFlags :: [(String, DynFlag, Deprecated)]
+xFlags :: [(String, DynFlag, Bool -> Deprecated)]
 xFlags = [
-  ( "CPP",                              Opt_Cpp, Supported ),
-  ( "PatternGuards",                    Opt_PatternGuards, Supported ),
-  ( "UnicodeSyntax",                    Opt_UnicodeSyntax, Supported ),
-  ( "MagicHash",                        Opt_MagicHash, Supported ),
-  ( "PolymorphicComponents",            Opt_PolymorphicComponents, Supported ),
-  ( "ExistentialQuantification",        Opt_ExistentialQuantification, Supported ),
-  ( "KindSignatures",                   Opt_KindSignatures, Supported ),
-  ( "PatternSignatures",                Opt_PatternSignatures, Supported ),
-  ( "EmptyDataDecls",                   Opt_EmptyDataDecls, Supported ),
-  ( "ParallelListComp",                 Opt_ParallelListComp, Supported ),
-  ( "TransformListComp",                Opt_TransformListComp, Supported ),
-  ( "ForeignFunctionInterface",         Opt_ForeignFunctionInterface, Supported ),
-  ( "UnliftedFFITypes",                 Opt_UnliftedFFITypes, Supported ),
-  ( "LiberalTypeSynonyms",              Opt_LiberalTypeSynonyms, Supported ),
-  ( "Rank2Types",                       Opt_Rank2Types, Supported ),
-  ( "RankNTypes",                       Opt_RankNTypes, Supported ),
-  ( "ImpredicativeTypes",               Opt_ImpredicativeTypes, Supported ),
-  ( "TypeOperators",                    Opt_TypeOperators, Supported ),
-  ( "RecursiveDo",                      Opt_RecursiveDo, Supported ),
-  ( "Arrows",                           Opt_Arrows, Supported ),
-  ( "PArr",                             Opt_PArr, Supported ),
-  ( "TemplateHaskell",                  Opt_TemplateHaskell, Supported ),
-  ( "QuasiQuotes",                      Opt_QuasiQuotes, Supported ),
-  ( "Generics",                         Opt_Generics, Supported ),
+  ( "CPP",                              Opt_Cpp, const Supported ),
+  ( "PatternGuards",                    Opt_PatternGuards, const Supported ),
+  ( "UnicodeSyntax",                    Opt_UnicodeSyntax, const Supported ),
+  ( "MagicHash",                        Opt_MagicHash, const Supported ),
+  ( "PolymorphicComponents",            Opt_PolymorphicComponents, const Supported ),
+  ( "ExistentialQuantification",        Opt_ExistentialQuantification, const Supported ),
+  ( "KindSignatures",                   Opt_KindSignatures, const Supported ),
+  ( "PatternSignatures",                Opt_PatternSignatures, const Supported ),
+  ( "EmptyDataDecls",                   Opt_EmptyDataDecls, const Supported ),
+  ( "ParallelListComp",                 Opt_ParallelListComp, const Supported ),
+  ( "TransformListComp",                Opt_TransformListComp, const Supported ),
+  ( "ForeignFunctionInterface",         Opt_ForeignFunctionInterface, const Supported ),
+  ( "UnliftedFFITypes",                 Opt_UnliftedFFITypes, const Supported ),
+  ( "LiberalTypeSynonyms",              Opt_LiberalTypeSynonyms, const Supported ),
+  ( "Rank2Types",                       Opt_Rank2Types, const Supported ),
+  ( "RankNTypes",                       Opt_RankNTypes, const Supported ),
+  ( "ImpredicativeTypes",               Opt_ImpredicativeTypes, const Supported ),
+  ( "TypeOperators",                    Opt_TypeOperators, const Supported ),
+  ( "RecursiveDo",                      Opt_RecursiveDo, const Supported ),
+  ( "Arrows",                           Opt_Arrows, const Supported ),
+  ( "PArr",                             Opt_PArr, const Supported ),
+  ( "TemplateHaskell",                  Opt_TemplateHaskell, const Supported ),
+  ( "QuasiQuotes",                      Opt_QuasiQuotes, const Supported ),
+  ( "Generics",                         Opt_Generics, const Supported ),
   -- On by default:
-  ( "ImplicitPrelude",                  Opt_ImplicitPrelude, Supported ),
-  ( "RecordWildCards",                  Opt_RecordWildCards, Supported ),
-  ( "NamedFieldPuns",                   Opt_RecordPuns, Supported ),
+  ( "ImplicitPrelude",                  Opt_ImplicitPrelude, const Supported ),
+  ( "RecordWildCards",                  Opt_RecordWildCards, const Supported ),
+  ( "NamedFieldPuns",                   Opt_RecordPuns, const Supported ),
   ( "RecordPuns",                       Opt_RecordPuns,
-    Deprecated "Use the NamedFieldPuns language instead" ),
-  ( "DisambiguateRecordFields",         Opt_DisambiguateRecordFields, Supported ),
-  ( "OverloadedStrings",                Opt_OverloadedStrings, Supported ),
-  ( "GADTs",                            Opt_GADTs, Supported ),
-  ( "ViewPatterns",                     Opt_ViewPatterns, Supported ),
-  ( "TypeFamilies",                     Opt_TypeFamilies, Supported ),
-  ( "BangPatterns",                     Opt_BangPatterns, Supported ),
+    deprecatedForLanguage "NamedFieldPuns" ),
+  ( "DisambiguateRecordFields",         Opt_DisambiguateRecordFields, const Supported ),
+  ( "OverloadedStrings",                Opt_OverloadedStrings, const Supported ),
+  ( "GADTs",                            Opt_GADTs, const Supported ),
+  ( "ViewPatterns",                     Opt_ViewPatterns, const Supported ),
+  ( "TypeFamilies",                     Opt_TypeFamilies, const Supported ),
+  ( "BangPatterns",                     Opt_BangPatterns, const Supported ),
   -- On by default:
-  ( "MonomorphismRestriction",          Opt_MonomorphismRestriction, Supported ),
+  ( "MonomorphismRestriction",          Opt_MonomorphismRestriction, const Supported ),
   -- On by default (which is not strictly H98):
-  ( "MonoPatBinds",                     Opt_MonoPatBinds, Supported ),
-  ( "RelaxedPolyRec",                   Opt_RelaxedPolyRec, Supported ),
-  ( "ExtendedDefaultRules",             Opt_ExtendedDefaultRules, Supported ),
-  ( "ImplicitParams",                   Opt_ImplicitParams, Supported ),
-  ( "ScopedTypeVariables",              Opt_ScopedTypeVariables, Supported ),
-  ( "UnboxedTuples",                    Opt_UnboxedTuples, Supported ),
-  ( "StandaloneDeriving",               Opt_StandaloneDeriving, Supported ),
-  ( "DeriveDataTypeable",               Opt_DeriveDataTypeable, Supported ),
-  ( "TypeSynonymInstances",             Opt_TypeSynonymInstances, Supported ),
-  ( "FlexibleContexts",                 Opt_FlexibleContexts, Supported ),
-  ( "FlexibleInstances",                Opt_FlexibleInstances, Supported ),
-  ( "ConstrainedClassMethods",          Opt_ConstrainedClassMethods, Supported ),
-  ( "MultiParamTypeClasses",            Opt_MultiParamTypeClasses, Supported ),
-  ( "FunctionalDependencies",           Opt_FunctionalDependencies, Supported ),
-  ( "GeneralizedNewtypeDeriving",       Opt_GeneralizedNewtypeDeriving, Supported ),
-  ( "OverlappingInstances",             Opt_OverlappingInstances, Supported ),
-  ( "UndecidableInstances",             Opt_UndecidableInstances, Supported ),
-  ( "IncoherentInstances",              Opt_IncoherentInstances, Supported )
+  ( "MonoPatBinds",                     Opt_MonoPatBinds, const Supported ),
+  ( "RelaxedPolyRec",                   Opt_RelaxedPolyRec, const Supported ),
+  ( "ExtendedDefaultRules",             Opt_ExtendedDefaultRules, const Supported ),
+  ( "ImplicitParams",                   Opt_ImplicitParams, const Supported ),
+  ( "ScopedTypeVariables",              Opt_ScopedTypeVariables, const Supported ),
+  ( "UnboxedTuples",                    Opt_UnboxedTuples, const Supported ),
+  ( "StandaloneDeriving",               Opt_StandaloneDeriving, const Supported ),
+  ( "DeriveDataTypeable",               Opt_DeriveDataTypeable, const Supported ),
+  ( "TypeSynonymInstances",             Opt_TypeSynonymInstances, const Supported ),
+  ( "FlexibleContexts",                 Opt_FlexibleContexts, const Supported ),
+  ( "FlexibleInstances",                Opt_FlexibleInstances, const Supported ),
+  ( "ConstrainedClassMethods",          Opt_ConstrainedClassMethods, const Supported ),
+  ( "MultiParamTypeClasses",            Opt_MultiParamTypeClasses, const Supported ),
+  ( "FunctionalDependencies",           Opt_FunctionalDependencies, const Supported ),
+  ( "GeneralizedNewtypeDeriving",       Opt_GeneralizedNewtypeDeriving, const Supported ),
+  ( "OverlappingInstances",             Opt_OverlappingInstances, const Supported ),
+  ( "UndecidableInstances",             Opt_UndecidableInstances, const Supported ),
+  ( "IncoherentInstances",              Opt_IncoherentInstances, const Supported )
   ]
 
 impliedFlags :: [(DynFlag, [DynFlag])]
@@ -1566,25 +1559,6 @@ glasgowExtsFlags = [
            , Opt_PatternSignatures
            , Opt_GeneralizedNewtypeDeriving
            , Opt_TypeFamilies ]
-
-------------------
-isFlag :: [(String,a)] -> String -> Bool
-isFlag flags f = any (\(ff,_) -> ff == f) flags
-
-isPrefFlag :: String -> [(String,a)] -> String -> Bool
-isPrefFlag pref flags no_f
-  | Just f <- maybePrefixMatch pref no_f = isFlag flags f
-  | otherwise                            = False
-
-------------------
-getFlag :: [(String,a)] -> String -> a
-getFlag flags f = case [ opt | (ff, opt) <- flags, ff == f] of
-                      (o:_)  -> o
-                      []     -> panic ("get_flag " ++ f)
-
-getPrefFlag :: String -> [(String,a)] -> String -> a
-getPrefFlag pref flags f = getFlag flags (fromJust (maybePrefixMatch pref f))
--- We should only be passed flags which match the prefix
 
 -- -----------------------------------------------------------------------------
 -- Parsing the dynamic flags.

@@ -504,8 +504,8 @@ data Token
   | ITvocurly
   | ITvccurly
   | ITobrack
-  | ITopabrack			-- [:, for parallel arrays with -fparr
-  | ITcpabrack			-- :], for parallel arrays with -fparr
+  | ITopabrack			-- [:, for parallel arrays with -XParr
+  | ITcpabrack			-- :], for parallel arrays with -XParr
   | ITcbrack
   | IToparen
   | ITcparen
@@ -1550,7 +1550,7 @@ getLexState :: P Int
 getLexState = P $ \s@PState{ lex_state=ls:_ } -> POk s ls
 
 -- for reasons of efficiency, flags indicating language extensions (eg,
--- -fglasgow-exts or -fparr) are represented by a bitmap stored in an unboxed
+-- -fglasgow-exts or -XParr) are represented by a bitmap stored in an unboxed
 -- integer
 
 genericsBit, ffiBit, parrBit :: Int

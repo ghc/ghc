@@ -649,7 +649,7 @@ way_details =
 	, "-package concurrent" ]),
 
     (WayNDP, Way  "ndp" False "Nested data parallelism"
-	[ "-fparr"
+	[ "-XParr"
 	, "-fvectorise"]),
 
     (WayUser_a,  Way  "a"  False "User way 'a'"  ["$WAY_a_REAL_OPTS"]),	

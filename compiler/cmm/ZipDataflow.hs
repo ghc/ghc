@@ -1,5 +1,5 @@
 {-# LANGUAGE MultiParamTypeClasses, ScopedTypeVariables #-}
-{-# OPTIONS -fno-allow-overlapping-instances -fglasgow-exts #-}
+{-# OPTIONS -fglasgow-exts #-}
 -- -fglagow-exts for kind signatures
 
 module ZipDataflow

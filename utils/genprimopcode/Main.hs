@@ -465,9 +465,9 @@ gen_latex_doc (Info defaults entries)
 
 gen_wrappers :: Info -> String
 gen_wrappers (Info _ entries)
-   = "{-# OPTIONS -fno-implicit-prelude #-}\n" 
+   = "{-# LANGUAGE NoImplicitPrelude #-}\n" 
 	-- Dependencies on Prelude must be explicit in libraries/base, but we
-	-- don't need the Prelude here so we add -fno-implicit-prelude.
+	-- don't need the Prelude here so we add NoImplicitPrelude.
      ++ "module GHC.PrimopWrappers where\n" 
      ++ "import qualified GHC.Prim\n" 
      ++ unlines (map f (filter (not.dodgy) (filter is_primop entries)))

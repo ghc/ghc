@@ -842,6 +842,7 @@ ghc -c Foo.hs</screen>
     program.  These are:
     <option>-fwarn-overlapping-patterns</option>,
     <option>-fwarn-deprecations</option>,
+    <option>-fwarn-deprecated-flags</option>,
     <option>-fwarn-duplicate-exports</option>,
     <option>-fwarn-missing-fields</option>, and
     <option>-fwarn-missing-methods</option>.  The following flags are
@@ -931,6 +932,19 @@ ghc -c Foo.hs</screen>
       </varlistentry>
 
       <varlistentry>
+	<term><option>-fwarn-deprecated-flags</option>:</term>
+	<listitem>
+	  <indexterm><primary><option>-fwarn-deprecated-flags</option></primary>
+	  </indexterm>
+	  <indexterm><primary>deprecated-flags</primary></indexterm>
+	  <para>Causes a warning to be emitted when a deprecated
+	  commandline flag is used.</para>
+
+	  <para>This option is on by default.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
 	<term><option>-fwarn-dodgy-imports</option>:</term>
 	<listitem>
 	  <indexterm><primary><option>-fwarn-dodgy-imports</option></primary>
@@ -982,11 +996,11 @@ ghc -c Foo.hs</screen>
           imported.  This happens unless either the Prelude module is
           explicitly imported with an <literal>import ... Prelude ...</literal>
           line, or this implicit import is disabled (either by
-          <option>-fno-implicit-prelude</option> or a
+          <option>-XNoImplicitPrelude</option> or a
           <literal>LANGUAGE NoImplicitPrelude</literal> pragma).</para>
 
           <para>Note that no warning is given for syntax that implicitly
-          refers to the Prelude, even if <option>-fno-implicit-prelude</option>
+          refers to the Prelude, even if <option>-XNoImplicitPrelude</option>
           would change whether it refers to the Prelude.
           For example, no warning is given when
           <literal>368</literal> means

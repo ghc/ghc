@@ -176,8 +176,13 @@ printBagOfWarnings dflags bag_of_warns
 		GT -> False
 
 handleFlagWarnings :: DynFlags -> [String] -> IO ()
-handleFlagWarnings _ [] = return ()
 handleFlagWarnings dflags warns
+ = when (dopt Opt_WarnDeprecatedFlags dflags)
+        (handleFlagWarnings' dflags warns)
+
+handleFlagWarnings' :: DynFlags -> [String] -> IO ()
+handleFlagWarnings' _ [] = return ()
+handleFlagWarnings' dflags warns
  = do -- It would be nicer if warns :: [Message], but that has circular
       -- import problems.
       let warns' = map text warns

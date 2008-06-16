@@ -2,7 +2,7 @@
 
 -- Replacement for GHC.Unicode module
 
-{-# OPTIONS -fno-implicit-prelude #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# OPTIONS -#include "WCsubst.h" #-}
 {-# OPTIONS_HADDOCK hide #-}
 -----------------------------------------------------------------------------

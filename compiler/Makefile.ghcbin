@@ -23,7 +23,7 @@ SRC_HC_OPTS += -Wall
 SRC_HC_OPTS += -package ghc
 SRC_HC_OPTS += -Istage$(stage)
 SRC_HC_OPTS += \
-  -cpp -fglasgow-exts -fno-generics -Rghc-timing \
+  -cpp -fglasgow-exts -XNoGenerics -Rghc-timing \
   -I. -IcodeGen -InativeGen -Iparser
 SRC_HC_OPTS += $(GhcHcOpts) $(GhcStage$(stage)HcOpts)
 ifeq "$(TargetOS_CPP)" "openbsd"

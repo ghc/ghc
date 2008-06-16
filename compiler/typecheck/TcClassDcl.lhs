@@ -794,7 +794,7 @@ notSimple inst_tys
 notGeneric :: TyCon -> SDoc
 notGeneric tycon
   = vcat [ptext (sLit "because the instance type constructor") <+> quotes (ppr tycon) <+> 
-	  ptext (sLit "was not compiled with -fgenerics")]
+	  ptext (sLit "was not compiled with -XGenerics")]
 
 badGenericInstanceType :: LHsBinds Name -> SDoc
 badGenericInstanceType binds

@@ -447,7 +447,7 @@ badDotDot str = ptext (sLit "You cannot use `..' in record") <+> text str
 
 badPun :: Located RdrName -> SDoc
 badPun fld = vcat [ptext (sLit "Illegal use of punning for field") <+> quotes (ppr fld),
-		   ptext (sLit "Use -XRecordPuns to permit this")]
+		   ptext (sLit "Use -XNamedFieldPuns to permit this")]
 
 
 -- wrappers

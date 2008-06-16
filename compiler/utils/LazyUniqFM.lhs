@@ -11,7 +11,8 @@ Basically, the things need to be in class @Uniquable@, and we use the
 @getUnique@ method to grab their @Uniques@.
 
 \begin{code}
-{-# OPTIONS -Wall -fno-warn-name-shadowing -Werror -fallow-undecidable-instances #-}
+{-# OPTIONS -Wall -fno-warn-name-shadowing -Werror #-}
+{-# LANGUAGE UndecidableInstances #-}
 module LazyUniqFM (
 	UniqFM,   	-- abstract type
 

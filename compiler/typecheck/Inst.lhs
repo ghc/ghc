@@ -401,7 +401,7 @@ newMethodFromName :: InstOrigin -> BoxyRhoType -> Name -> TcM TcId
 newMethodFromName origin ty name = do
     id <- tcLookupId name
 	-- Use tcLookupId not tcLookupGlobalId; the method is almost
-	-- always a class op, but with -fno-implicit-prelude GHC is
+	-- always a class op, but with -XNoImplicitPrelude GHC is
 	-- meant to find whatever thing is in scope, and that may
 	-- be an ordinary function. 
     loc <- getInstLoc origin
@@ -862,7 +862,7 @@ tcGetInstEnvs = do { eps <- getEps; env <- getGblEnv;
 %*									*
 %************************************************************************
 
-Suppose we are doing the -fno-implicit-prelude thing, and we encounter
+Suppose we are doing the -XNoImplicitPrelude thing, and we encounter
 a do-expression.  We have to find (>>) in the current environment, which is
 done by the rename. Then we have to check that it has the same type as
 Control.Monad.(>>).  Or, more precisely, a compatible type. One 'customer' had

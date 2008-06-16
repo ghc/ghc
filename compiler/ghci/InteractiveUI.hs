@@ -1406,12 +1406,12 @@ setCmd ""
           vcat (text "other dynamic, non-language, flag settings:" 
                :map (flagSetting dflags) nonLanguageDynFlags)
           ))
-  where flagSetting dflags (str,f)
+  where flagSetting dflags (str, f, _)
           | dopt f dflags = text "  " <> text "-f"    <> text str
           | otherwise     = text "  " <> text "-fno-" <> text str
-        (ghciFlags,others)  = partition (\(_,f)->f `elem` flags) 
+        (ghciFlags,others)  = partition (\(_, f, _) -> f `elem` flags)
                                         DynFlags.fFlags
-        nonLanguageDynFlags = filterOut (\(_,f) -> f `elem` languageOptions)
+        nonLanguageDynFlags = filterOut (\(_, f, _) -> f `elem` languageOptions)
                                         others
         flags = [Opt_PrintExplicitForalls
                 ,Opt_PrintBindResult
@@ -1689,7 +1689,7 @@ completeWord w start end = do
                                      (s,r') = span isBreak r
                                  in (n,w):words' isBreak (n+length w+length s) r'
           -- In a Haskell expression we want to parse 'a-b' as three words
-          -- where a compiler flag (ie. -fno-monomorphism-restriction) should
+          -- where a compiler flag (e.g. -ddump-simpl) should
           -- only be a single word.
           selectWord [] = (0,w)
           selectWord ((offset,x):xs)

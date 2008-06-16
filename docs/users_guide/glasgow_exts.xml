@@ -1410,7 +1410,7 @@ records from different modules that use the same field name.
 </title>
 
 <para>
-Record puns are enabled by the flag <literal>-XRecordPuns</literal>.
+Record puns are enabled by the flag <literal>-XNamedFieldPuns</literal>.
 </para>
 
 <para>
@@ -3269,7 +3269,7 @@ corresponding type in the instance declaration.
 These restrictions ensure that context reduction terminates: each reduction
 step makes the problem smaller by at least one
 constructor.  Both the Paterson Conditions and the Coverage Condition are lifted 
-if you give the <option>-fallow-undecidable-instances</option> 
+if you give the <option>-XUndecidableInstances</option> 
 flag (<xref linkend="undecidable-instances"/>).
 You can find lots of background material about the reason for these
 restrictions in the paper <ulink

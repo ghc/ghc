@@ -1595,7 +1595,7 @@ predUndecErr pred msg = sep [msg,
 nomoreMsg, smallerMsg, undecidableMsg :: SDoc
 nomoreMsg = ptext (sLit "Variable occurs more often in a constraint than in the instance head")
 smallerMsg = ptext (sLit "Constraint is no smaller than the instance head")
-undecidableMsg = ptext (sLit "Use -fallow-undecidable-instances to permit this")
+undecidableMsg = ptext (sLit "Use -XUndecidableInstances to permit this")
 \end{code}
 
 
@@ -1635,7 +1635,7 @@ should have only type-variable constraints.
 
 Here is another example:
 	data Fix f = In (f (Fix f)) deriving( Eq )
-Here, if we are prepared to allow -fallow-undecidable-instances we
+Here, if we are prepared to allow -XUndecidableInstances we
 could derive the instance
 	instance Eq (f (Fix f)) => Eq (Fix f)
 but this is so delicate that I don't think it should happen inside
@@ -1672,7 +1672,7 @@ validDerivPred _              = False
 
 \begin{code}
 -- Check that a "type instance" is well-formed (which includes decidability
--- unless -fallow-undecidable-instances is given).
+-- unless -XUndecidableInstances is given).
 --
 checkValidTypeInst :: [Type] -> Type -> TcM ()
 checkValidTypeInst typats rhs

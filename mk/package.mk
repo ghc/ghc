@@ -129,12 +129,12 @@ SRC_HC_OPTS 	+= $(GhcLibHcOpts)
 SRC_HC_OPTS     += $(patsubst %, -package %, $(PACKAGE_DEPS))
 endif
 
-#	-fgenerics switches on generation of support code for 
+#	-XGenerics switches on generation of support code for 
 #		derivable type classes.  This is now off by default,
 #		but we switch it on for the libraries so that we generate
 #		the code in case someone importing wants it.
 ifeq "$(NON_HS_PACKAGE)" ""
-SRC_HC_OPTS	+= -fgenerics
+SRC_HC_OPTS	+= -XGenerics
 endif
 
 ifndef LIBRARY

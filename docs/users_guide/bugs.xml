@@ -98,7 +98,7 @@ main = do args &lt;- getArgs
 
       <para>GHC's typechecker makes all pattern bindings monomorphic
       by default; this behaviour can be disabled with
-      <option>-fno-mono-pat-binds</option>.  See <xref
+      <option>-XNoMonoPatBinds</option>.  See <xref
       linkend="options-language" />.</para>
     </sect3>
       

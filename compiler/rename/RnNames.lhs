@@ -926,7 +926,7 @@ isModuleExported implicit_prelude mod (GRE { gre_name = name, gre_prov = prov })
 	-- They just clutter up the environment (esp tuples), and the parser
 	-- will generate Exact RdrNames for them, so the cluttered
 	-- envt is no use.  To avoid doing this filter all the time,
-	-- we use -fno-implicit-prelude as a clue that the filter is
+	-- we use -XNoImplicitPrelude as a clue that the filter is
 	-- worth while.  Really, it's only useful for GHC.Base and GHC.Tuple.
 	--
 	-- It's worth doing because it makes the environment smaller for
@@ -1038,7 +1038,7 @@ a) It might be a WiredInName; in that case we may not load
    its interface (although we could).
 
 b) It might be GHC.Real.fromRational, or GHC.Num.fromInteger
-   These are seen as "used" by the renamer (if -fno-implicit-prelude) 
+   These are seen as "used" by the renamer (if -XNoImplicitPrelude) 
    is on), but the typechecker may discard their uses 
    if in fact the in-scope fromRational is GHC.Read.fromRational,
    (see tcPat.tcOverloadedLit), and the typechecker sees that the type 

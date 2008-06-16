@@ -90,6 +90,10 @@ space=$(empty) $(empty)
 
 # -----------------------------------------------------------------------------
 
+ifeq "$(ghc_ge_609)" "YES"
+GhcLibHcOpts += -fno-warn-deprecated-flags
+endif
+
 ifeq "$(RelocatableBuild)" "YES"
 # On Windows we want to make moveable bindists, but we need to tell
 # ghc-pkg where the haddock docs are. Therefore we completely ignore

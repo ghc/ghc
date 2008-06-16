@@ -971,7 +971,7 @@ inferInstanceContexts oflag infer_specs
     iterate_deriv :: Int -> [ThetaType] -> TcM [DerivSpec]
     iterate_deriv n current_solns
       | n > 20 	-- Looks as if we are in an infinite loop
-		-- This can happen if we have -fallow-undecidable-instances
+		-- This can happen if we have -XUndecidableInstances
 		-- (See TcSimplify.tcSimplifyDeriv.)
       = pprPanic "solveDerivEqns: probable loop" 
 		 (vcat (map pprDerivSpec infer_specs) $$ ppr current_solns)

@@ -55,7 +55,7 @@
           example, if it picks up a non-standard
           <filename>Prelude.hi</filename> file, pretty terrible things
           will happen.  If you turn on
-          <option>-fno-implicit-prelude</option><indexterm><primary>-fno-implicit-prelude
+          <option>-XNoImplicitPrelude</option><indexterm><primary>-XNoImplicitPrelude
           option</primary></indexterm>, the compiler will almost
           surely die, unless you know what you are doing.</para>
 

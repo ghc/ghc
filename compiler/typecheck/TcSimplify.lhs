@@ -2670,7 +2670,7 @@ disambiguate doc interactive dflags insts
 	| extended_defaulting = any isInteractiveClass clss
 	| otherwise 	      = all is_std_class clss && (any is_num_class clss)
 
- 	-- In interactive mode, or with -fextended-default-rules,
+ 	-- In interactive mode, or with -XExtendedDefaultRules,
 	-- we default Show a to Show () to avoid graututious errors on "show []"
    isInteractiveClass cls 
 	= is_num_class cls || (classKey cls `elem` [showClassKey, eqClassKey, ordClassKey])
@@ -2736,7 +2736,7 @@ getDefaultTys extended_deflts ovl_strings
 
 Note [Default unitTy]
 ~~~~~~~~~~~~~~~~~~~~~
-In interative mode (or with -fextended-default-rules) we add () as the first type we
+In interative mode (or with -XExtendedDefaultRules) we add () as the first type we
 try when defaulting.  This has very little real impact, except in the following case.
 Consider: 
 	Text.Printf.printf "hello"
@@ -2962,7 +2962,7 @@ report_no_instances tidy_env mb_what insts
 		ASSERT( not (null unifiers) )
 		parens (vcat [ptext (sLit "The choice depends on the instantiation of") <+>
 	    		         quotes (pprWithCommas ppr (varSetElems (tyVarsOfInst dict))),
-			      ptext (sLit "To pick the first instance above, use -fallow-incoherent-instances"),
+			      ptext (sLit "To pick the first instance above, use -XIncoherentInstances"),
 			      ptext (sLit "when compiling the other instance declarations")])]
       where
     	ispecs = [ispec | (ispec, _) <- matches]
@@ -3061,8 +3061,8 @@ monomorphism_fix dflags
   = ptext (sLit "Probable fix:") <+> vcat
 	[ptext (sLit "give these definition(s) an explicit type signature"),
 	 if dopt Opt_MonomorphismRestriction dflags
-           then ptext (sLit "or use -fno-monomorphism-restriction")
-           else empty]	-- Only suggest adding "-fno-monomorphism-restriction"
+           then ptext (sLit "or use -XNoMonomorphismRestriction")
+           else empty]	-- Only suggest adding "-XNoMonomorphismRestriction"
 			-- if it is not already set!
     
 warnDefault :: [(Inst, Class, Var)] -> Type -> TcM ()
