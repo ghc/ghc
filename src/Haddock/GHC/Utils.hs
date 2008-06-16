@@ -13,6 +13,7 @@ module Haddock.GHC.Utils where
 
 
 import Data.Char
+import Data.Version
 import qualified Data.Map as Map
 
 import GHC
@@ -27,7 +28,15 @@ moduleString :: Module -> String
 moduleString = moduleNameString . moduleName 
 
 
+-- return the name of the package, with version info
 modulePkgStr = packageIdString . modulePackageId
+
+
+-- return the (name,version) of the package
+modulePkgInfo mod = case unpackPackageId pkg of
+                        Nothing -> (packageIdString pkg, "")
+                        Just x -> (pkgName x, showVersion (pkgVersion x))
+    where pkg = modulePackageId mod
 
 
 mkModuleNoPkg :: String -> Module
