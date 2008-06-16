@@ -1,4 +1,4 @@
-{-# OPTIONS -fffi #-}
+{-# LANGUAGE ForeignFunctionInterface #-}
 
 -- !!! returning a Bool from a foreign export confused GHCi 6.0.1.
 

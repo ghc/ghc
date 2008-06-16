@@ -1,6 +1,6 @@
 
-{-# OPTIONS -fglasgow-exts -fth -fallow-undecidable-instances #-}
-
+{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE TemplateHaskell, UndecidableInstances #-}
 
 module TH_spliceDecl4_Lib(
   instanceIncrSelfTuple,

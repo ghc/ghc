@@ -1,4 +1,4 @@
-{-# OPTIONS -farrows #-}
+{-# LANGUAGE Arrows #-}
 
 -- Toy lambda-calculus interpreter from John Hughes's arrows paper (s5)
 

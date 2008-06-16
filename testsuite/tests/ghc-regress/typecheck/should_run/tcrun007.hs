@@ -1,4 +1,5 @@
-{-# OPTIONS -fglasgow-exts -fgenerics #-}
+{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE Generics #-}
 
 -- !!! Test generics
 module Main where

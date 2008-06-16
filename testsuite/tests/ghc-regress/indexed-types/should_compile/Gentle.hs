@@ -1,4 +1,5 @@
-{-# OPTIONS -fglasgow-exts -fallow-overlapping-instances -fallow-undecidable-instances #-}
+{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE OverlappingInstances, UndecidableInstances #-}
 
 -- Rather exotic example posted to Haskell mailing list 17 Oct 07
 -- It concerns context reduction and functional dependencies

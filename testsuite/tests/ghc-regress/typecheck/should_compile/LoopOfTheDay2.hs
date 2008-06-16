@@ -1,5 +1,5 @@
 {-# OPTIONS -fglasgow-exts #-}
-{-# OPTIONS -fallow-undecidable-instances #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 -- Compilation loops in GHC 6.2!
 -- While LoopOfTheDay1.hs did compile and work,

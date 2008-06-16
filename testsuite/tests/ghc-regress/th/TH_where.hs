@@ -1,4 +1,4 @@
-{-# OPTIONS -fth #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Main where
 

@@ -1,4 +1,5 @@
-{-# OPTIONS -fglasgow-exts -fallow-undecidable-instances #-}
+{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 -- This tests an aspect of functional dependencies, revealing a bug in GHC 6.0.1
 -- discovered by Martin Sulzmann

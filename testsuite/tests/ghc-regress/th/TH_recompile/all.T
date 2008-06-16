@@ -1,5 +1,5 @@
 def f(opts):
-  opts.extra_hc_opts = '-fth -package template-haskell'
+  opts.extra_hc_opts = '-XTemplateHaskell -package template-haskell'
   if (ghc_with_interpreter == 0):
 	opts.skip = 1
 

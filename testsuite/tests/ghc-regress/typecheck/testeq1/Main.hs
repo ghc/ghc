@@ -1,6 +1,5 @@
 {-# OPTIONS -fglasgow-exts #-}
-{-# OPTIONS -fallow-overlapping-instances #-}
-{-# OPTIONS -fallow-undecidable-instances #-}
+{-# LANGUAGE OverlappingInstances, UndecidableInstances #-}
 
 --
 -- Test case adopted from the HList library

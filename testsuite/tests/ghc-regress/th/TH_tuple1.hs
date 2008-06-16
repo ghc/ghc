@@ -1,4 +1,4 @@
-{-# OPTIONS -fth #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 -- Test the use of tupleDataName, tupleTypeName
 

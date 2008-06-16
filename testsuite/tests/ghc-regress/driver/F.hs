@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fffi #-}
+{-# LANGUAGE ForeignFunctionInterface #-}
 module TestStub where
 foreign export ccall f :: Int -> Int
 f :: Int -> Int

@@ -2,6 +2,6 @@ TH_genEx.hs:1:0:
     TH_genEx.hs:1:0: Splicing declarations
 	genAny (reify 'MyInterface)
       ======>
-	TH_genEx.hs:12:2-29
+	TH_genEx.hs:13:2-29
 	data AnyMyInterface1111
 	    = forall a. (TH_genEx.MyInterface a) => AnyMyInterface1111 a

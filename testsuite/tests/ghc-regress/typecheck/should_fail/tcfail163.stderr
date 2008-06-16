@@ -1,5 +1,5 @@
 
-tcfail163.hs:11:0:
+tcfail163.hs:12:0:
     Generic method type is too complex
 	match :: forall k.
 		 (ChurchEncode k) =>

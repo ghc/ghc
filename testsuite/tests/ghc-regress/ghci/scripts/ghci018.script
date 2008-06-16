@@ -1,4 +1,4 @@
-:set -fth
+:set -XTemplateHaskell
 :m + Language.Haskell.TH
 $( do runIO $ putStrLn "Q"; [| 'x' |] )
 

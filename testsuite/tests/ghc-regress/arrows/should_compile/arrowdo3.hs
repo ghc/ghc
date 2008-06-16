@@ -1,4 +1,4 @@
-{-# OPTIONS -farrows #-}
+{-# LANGUAGE Arrows #-}
 
 -- test for out-size tuples: takes a _long_ time to compile
 

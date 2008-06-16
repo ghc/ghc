@@ -1,4 +1,5 @@
-{-# OPTIONS -fglasgow-exts -fallow-undecidable-instances #-}
+{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 -- This is a rather complicated program that uses functional 
 -- dependencies to do Peano arithmetic.

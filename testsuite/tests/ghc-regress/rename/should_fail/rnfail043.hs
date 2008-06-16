@@ -1,4 +1,4 @@
-{-# OPTIONS -fth #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 -- Duplicate bindings introduced one at a time with TH
 module ShouldFail where

@@ -1,4 +1,5 @@
-{-# OPTIONS -fffi -fglasgow-exts #-}
+{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE ForeignFunctionInterface #-}
 
 -- Trac #1037 
 

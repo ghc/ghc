@@ -1,4 +1,4 @@
-{-# OPTIONS -fno-implicit-prelude #-}
+{-# OPTIONS -XNoImplicitPrelude #-}
 
 -- This one crashed GHC 6.6 in lookupDeprec
 -- See Trac #1128

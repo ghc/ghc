@@ -1,4 +1,5 @@
-{-# OPTIONS -fglasgow-exts -fallow-undecidable-instances #-}
+{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 -- TypeVal.hs: dependent types, here we come!
 module TypeVal where

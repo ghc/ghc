@@ -1,6 +1,6 @@
 -- implicit params availability in breakpoints
 
-:set -fimplicit-params
+:set -XImplicitParams
 :l break015.hs
 :b f
 g 5

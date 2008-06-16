@@ -1,4 +1,5 @@
-{-# OPTIONS_GHC -fffi -#include "ffi015_cbits.h" #-}
+{-# OPTIONS_GHC -#include "ffi015_cbits.h" #-}
+{-# LANGUAGE ForeignFunctionInterface #-}
 
 import Foreign
 import Foreign.C

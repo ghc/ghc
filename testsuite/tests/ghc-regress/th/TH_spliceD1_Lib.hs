@@ -1,4 +1,5 @@
-{-# OPTIONS -fth #-}
+{-# LANGUAGE TemplateHaskell #-}
+
 module TH_spliceD1_Lib where
 import Language.Haskell.TH
 

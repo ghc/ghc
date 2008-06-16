@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fffi #-}
+{-# LANGUAGE ForeignFunctionInterface #-}
 module B.F where
 foreign export ccall f :: Int -> Int
 f :: Int -> Int

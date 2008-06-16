@@ -1,4 +1,5 @@
-{-# OPTIONS -fglasgow-exts -fallow-overlapping-instances -fallow-undecidable-instances #-}
+{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE OverlappingInstances, UndecidableInstances #-}
 
 -- Tests context reduction for existentials
 

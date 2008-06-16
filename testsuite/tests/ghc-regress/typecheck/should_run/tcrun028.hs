@@ -1,4 +1,5 @@
-{-# OPTIONS -fglasgow-exts -fallow-undecidable-instances -dcore-lint #-}
+{-# OPTIONS -fglasgow-exts -dcore-lint #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 -- This is a rather exotic functional-dependency test.
 -- It crashed GHC 5.04.3 with a core-lint error, because

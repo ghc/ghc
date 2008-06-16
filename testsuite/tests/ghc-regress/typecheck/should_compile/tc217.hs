@@ -1,4 +1,5 @@
-{-# OPTIONS_GHC -fglasgow-exts -fallow-undecidable-instances -w #-}
+{-# OPTIONS_GHC -fglasgow-exts -w #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module ShouldCompile where
 

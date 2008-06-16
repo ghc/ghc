@@ -1,4 +1,4 @@
--- The instance decl is illegal without -fallow-undecidable-instances
+-- The instance decl is illegal without UndecidableInstances
 
 module ShouldFail where
 

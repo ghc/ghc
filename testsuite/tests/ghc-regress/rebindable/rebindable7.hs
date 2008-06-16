@@ -1,4 +1,4 @@
-{-# OPTIONS -fno-implicit-prelude #-}
+{-# OPTIONS -XNoImplicitPrelude #-}
 
 -- This one tests rebindable syntax for do-notation
 

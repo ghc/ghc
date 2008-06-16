@@ -1,4 +1,5 @@
-{-# OPTIONS -fth  -ddump-splices -XExistentialQuantification #-}
+{-# OPTIONS -ddump-splices -XExistentialQuantification #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module TH_genEx where
 

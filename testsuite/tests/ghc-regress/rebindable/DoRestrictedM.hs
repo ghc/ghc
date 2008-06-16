@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts -fno-implicit-prelude #-}
+{-# OPTIONS -fglasgow-exts -XNoImplicitPrelude #-}
 
 -- Tests of the do-notation for the restricted monads
 -- We demonstrate that all ordinary monads are restricted monads,

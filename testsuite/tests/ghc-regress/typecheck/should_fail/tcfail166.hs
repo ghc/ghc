@@ -1,4 +1,4 @@
--- Without -fscoped-type-variables, this should fail
+-- Without -XScopedTypeVariables, this should fail
 
 module ShouldFail where
 

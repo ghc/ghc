@@ -1,4 +1,4 @@
-{-# OPTIONS -fno-mono-pat-binds #-}
+{-# LANGUAGE NoMonoPatBinds #-}
 	-- Disable experimetal monomorphic pattern bindings
 
 -- Nasty test for type signatures

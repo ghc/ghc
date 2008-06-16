@@ -1,4 +1,4 @@
-{-# OPTIONS -fimplicit-params #-}
+{-# LANGUAGE ImplicitParams #-}
 
 module ShouldCompile where
 

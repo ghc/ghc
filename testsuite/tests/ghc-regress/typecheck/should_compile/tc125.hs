@@ -1,5 +1,6 @@
-{-# OPTIONS_GHC -fglasgow-exts -fallow-undecidable-instances #-}
--- -fallow-undecidable-instanced now needed because the Coverage Condition fails
+{-# OPTIONS_GHC -fglasgow-exts #-}
+{-# LANGUAGE UndecidableInstances #-}
+-- UndecidableInstances now needed because the Coverage Condition fails
 
 -- !!! Functional dependency test. Hugs [Apr 2001] fails to typecheck this
 -- We should infer this type for foo

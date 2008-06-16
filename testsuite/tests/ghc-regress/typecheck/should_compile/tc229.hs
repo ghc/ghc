@@ -3,7 +3,7 @@
 --             type variables
 
 {-# OPTIONS_GHC -fglasgow-exts #-}
-{-# OPTIONS_GHC -fallow-undecidable-instances #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module Problem where
 

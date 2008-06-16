@@ -1,4 +1,5 @@
-{-# OPTIONS -farrows -fglasgow-exts #-}
+{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE Arrows #-}
 
 -- Simple expression parser
 -- (uses do-notation and operators)

@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fth #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 -- Test for sane reporting on TH code giving up.
 

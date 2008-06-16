@@ -1,5 +1,6 @@
 
-{-# OPTIONS -fth #-}
+{-# LANGUAGE TemplateHaskell #-}
+
 module ModuleB where
 
 import ModuleC

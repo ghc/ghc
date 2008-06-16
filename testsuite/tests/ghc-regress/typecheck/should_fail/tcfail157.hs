@@ -1,8 +1,8 @@
 {-# OPTIONS -fglasgow-exts #-}
--- NB: *no* -fallow-undecidable-instances
+-- NB: *no* UndecidableInstances
 
 -- This one (due to Oleg) made 6.4.1 go into a loop in the typechecker,
--- despite the lack of -fallow-undecidable-instances
+-- despite the lack of UndecidableInstances
 --
 -- The example corresponds to a type function (realized as a class E 
 -- with functional dependencies) in the context of an instance. 

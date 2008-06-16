@@ -1,4 +1,4 @@
-{-# OPTIONS -farrows #-}
+{-# LANGUAGE Arrows #-}
 
 -- Homogeneous (or depth-preserving) functions over perfectly balanced trees.
 

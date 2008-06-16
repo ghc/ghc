@@ -1,4 +1,4 @@
-{-# OPTIONS -fbang-patterns #-}
+{-# OPTIONS -XBangPatterns #-}
 
 -- Various bang-pattern and lazy-pattern tests
 

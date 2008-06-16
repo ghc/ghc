@@ -1,4 +1,4 @@
-{-# OPTIONS -fallow-undecidable-instances #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 -- Test recursive dictionaries
 

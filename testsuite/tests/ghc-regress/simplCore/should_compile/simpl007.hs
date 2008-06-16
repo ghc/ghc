@@ -1,4 +1,5 @@
-{-# OPTIONS -fglasgow-exts -fallow-undecidable-instances -fallow-overlapping-instances #-}
+{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE OverlappingInstances, UndecidableInstances #-}
 
 -- module Formula where
 module Main where

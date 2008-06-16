@@ -1,4 +1,4 @@
-{-# OPTIONS -fth #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 -- Two sliced declarations bind the same variable.
 -- This test checks that there's a reasonable error message

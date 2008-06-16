@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fffi #-}
+{-# LANGUAGE ForeignFunctionInterface #-}
 -- !!! test that exporting the same thing multiple times works.
 module ShouldCompile where
 

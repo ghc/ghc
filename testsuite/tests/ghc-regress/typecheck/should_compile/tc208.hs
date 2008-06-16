@@ -1,4 +1,5 @@
-{-# OPTIONS -fglasgow-exts -fimplicit-params #-}
+{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE ImplicitParams #-}
 
 -- This program failed to typecheck in an early version of
 -- GHC with impredicative polymorphism, but it was fixed by

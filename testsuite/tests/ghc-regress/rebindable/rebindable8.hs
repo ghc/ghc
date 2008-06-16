@@ -1,4 +1,4 @@
-{-# OPTIONS -fno-implicit-prelude -fglasgow-exts #-}
+{-# OPTIONS -XNoImplicitPrelude -fglasgow-exts #-}
 
 -- Trac #1537
 

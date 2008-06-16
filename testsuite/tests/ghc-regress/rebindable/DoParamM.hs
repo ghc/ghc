@@ -1,4 +1,4 @@
-{-# OPTIONS -fno-implicit-prelude #-}
+{-# OPTIONS -XNoImplicitPrelude #-}
 -- Haskell98!
 
 -- Tests of the do-notation for the parameterized monads

@@ -1,5 +1,6 @@
-{-# OPTIONS_GHC -fglasgow-exts -fallow-undecidable-instances #-}
--- -fallow-undecidable-instanced now needed because the Coverage Condition fails
+{-# OPTIONS_GHC -fglasgow-exts #-}
+{-# LANGUAGE UndecidableInstances #-}
+-- UndecidableInstances now needed because the Coverage Condition fails
 
 -- !!! Functional dependencies
 -- This one gave another fail in tcReadMutVar

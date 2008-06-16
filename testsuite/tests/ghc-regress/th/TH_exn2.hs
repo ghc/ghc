@@ -1,4 +1,4 @@
-{-# OPTIONS -fth #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 -- Test error message when the code in a splice
 -- fails in a lazy fashion (e.g. a (head [])

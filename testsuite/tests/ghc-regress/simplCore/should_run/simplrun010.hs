@@ -1,4 +1,5 @@
-{-# OPTIONS_GHC -fffi -fglasgow-exts #-}
+{-# OPTIONS_GHC -fglasgow-exts #-}
+{-# LANGUAGE ForeignFunctionInterface #-}
 
 -- From trac #1947
 

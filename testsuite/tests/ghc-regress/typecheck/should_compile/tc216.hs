@@ -1,4 +1,5 @@
-{-# OPTIONS_GHC -fallow-undecidable-instances -fglasgow-exts #-}
+{-# OPTIONS_GHC -fglasgow-exts #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 -- Test for trac #816
 -- GHC's typechecker loops when trying to type this, resulting in a

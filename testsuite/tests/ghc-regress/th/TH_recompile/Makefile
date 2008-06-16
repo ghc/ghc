@@ -14,9 +14,9 @@ clean:
 TH_recompile:
 	$(MAKE) clean
 	cp Sub1.hs Sub.hs
-	ghc -v0 --make -fth Main.hs -o test
+	ghc -v0 --make -XTemplateHaskell Main.hs -o test
 	cp Sub2.hs Sub.hs
-	ghc -v0 --make -fth Main.hs -o test2
+	ghc -v0 --make -XTemplateHaskell Main.hs -o test2
 	./test
 	./test2
 

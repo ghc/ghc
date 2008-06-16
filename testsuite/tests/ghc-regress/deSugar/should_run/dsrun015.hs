@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -XRecordWildCards -XRecordPuns #-}
+{-# OPTIONS_GHC -XRecordWildCards -XNamedFieldPuns #-}
 
 -- This is a very partial test of the record-wildcard extension
 -- but better than nothing

@@ -1,5 +1,6 @@
-{-# OPTIONS -fglasgow-exts -fallow-undecidable-instances #-}
--- -fallow-undecidable-instances because 'b' appears in the context but not the head
+{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE UndecidableInstances #-}
+-- UndecidableInstances because 'b' appears in the context but not the head
 
 module ShouldCompile where
 

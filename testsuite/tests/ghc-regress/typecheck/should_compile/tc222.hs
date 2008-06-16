@@ -1,4 +1,5 @@
-{-# OPTIONS -fglasgow-exts -fimplicit-params #-}
+{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE ImplicitParams #-}
 
 -- Tests impredivative polymorphism with left-to-right
 -- flow information; see the uses of "$"

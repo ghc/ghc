@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fffi -cpp #-}
+{-# LANGUAGE CPP, ForeignFunctionInterface #-}
 module Test where
 
 import Control.Concurrent

@@ -1,5 +1,5 @@
 {-# OPTIONS -fglasgow-exts #-}
-{-# OPTIONS -fallow-undecidable-instances #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 --
 -- Test case adopted from the HList library

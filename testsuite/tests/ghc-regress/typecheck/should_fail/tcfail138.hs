@@ -1,5 +1,6 @@
-{-# OPTIONS -fglasgow-exts -fallow-undecidable-instances #-}
--- -fallow-undecidable-instances because (L a b) is no smaller than (C a b)
+{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE UndecidableInstances #-}
+-- UndecidableInstances because (L a b) is no smaller than (C a b)
 
 -- This one shows up another rather subtle functional-dependecy
 -- case.  The error is:

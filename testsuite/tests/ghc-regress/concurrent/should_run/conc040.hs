@@ -1,4 +1,4 @@
-{-# OPTIONS -fffi #-}
+{-# LANGUAGE ForeignFunctionInterface #-}
 
 import Foreign
 import Data.IORef

@@ -1,4 +1,5 @@
-{-# OPTIONS -fglasgow-exts -fallow-overlapping-instances #-}
+{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE OverlappingInstances #-}
 
 module ShouldFail where
 

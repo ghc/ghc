@@ -1,4 +1,5 @@
-{-# OPTIONS -fglasgow-exts -fallow-overlapping-instances #-}
+{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE OverlappingInstances #-}
 
 {-  With "hugs -98 +o test.hs" gives me:
     ERROR "test.hs":8 - Cannot justify constraints in instance member binding

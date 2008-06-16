@@ -1,6 +1,6 @@
 
 def ffi( opts ):
-  opts.extra_hc_opts = '-fffi -optc-Wno-implicit'
+  opts.extra_hc_opts = '-XForeignFunctionInterface -optc-Wno-implicit'
 
 setTestOpts(ffi)
 

@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts -fno-implicit-prelude #-}
+{-# OPTIONS -fglasgow-exts -XNoImplicitPrelude #-}
 
 module Main where
 	{

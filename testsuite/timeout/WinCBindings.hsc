@@ -1,4 +1,4 @@
-{-# OPTIONS -cpp -fffi #-}
+{-# LANGUAGE CPP, ForeignFunctionInterface #-}
 
 module WinCBindings where
 

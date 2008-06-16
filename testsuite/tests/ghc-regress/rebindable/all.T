@@ -1,5 +1,5 @@
 # These tests try test the rebindable-syntax feature of GHC,
-# which you get when you use -fno-implicit-prelude
+# which you get when you use -XNoImplicitPrelude
 #
 # Written by Ashley Yakeley
 

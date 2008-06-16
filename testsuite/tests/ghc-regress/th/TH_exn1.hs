@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fth #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 -- Test error message when the code in a splice
 -- fails in an immediate fashion (e.g. with a

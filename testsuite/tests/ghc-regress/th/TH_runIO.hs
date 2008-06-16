@@ -1,4 +1,4 @@
-{-# OPTIONS -fth #-} 
+{-# LANGUAGE TemplateHaskell #-}
 
 -- See Trac #1678
 

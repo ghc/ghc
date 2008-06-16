@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fth #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 -- Tickles a GHC 6.4 buglet
 
