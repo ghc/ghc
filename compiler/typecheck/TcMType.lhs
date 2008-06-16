@@ -1054,7 +1054,7 @@ nonZeroRank _        = True
 
 ----------------------------------------
 data UbxTupFlag = UT_Ok	| UT_NotOk
-	-- The "Ok" version means "ok if -fglasgow-exts is on"
+	-- The "Ok" version means "ok if UnboxedTuples is on"
 
 ----------------------------------------
 check_mono_type :: Type -> TcM ()	-- No foralls anywhere
