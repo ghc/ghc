@@ -1,5 +1,5 @@
 \begin{code}
-{-# OPTIONS -fno-implicit-prelude #-}
+{-# OPTIONS_GHC -XNoImplicitPrelude #-}
 module GHC.TopHandler ( reportError, reportStackOverflow ) where
 
 import GHC.Exception ( Exception )

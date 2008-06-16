@@ -1,5 +1,5 @@
 \begin{code}
-{-# OPTIONS_GHC -fno-implicit-prelude -funbox-strict-fields #-}
+{-# OPTIONS_GHC -XNoImplicitPrelude -funbox-strict-fields #-}
 {-# OPTIONS_HADDOCK hide #-}
 -----------------------------------------------------------------------------
 -- |
@@ -51,7 +51,7 @@ import GHC.Arr  -- to derive Ix class
 import GHC.Enum -- to derive Enum class
 import GHC.STRef
 import GHC.Base
---  import GHC.Num      -- To get fromInteger etc, needed because of -fno-implicit-prelude
+--  import GHC.Num      -- To get fromInteger etc, needed because of -XNoImplicitPrelude
 import Data.Maybe  ( Maybe(..) )
 import GHC.Show
 import GHC.List

@@ -62,7 +62,7 @@ GHC.Float       Classes: Floating, RealFloat
 Other Prelude modules are much easier with fewer complex dependencies.
 
 \begin{code}
-{-# OPTIONS_GHC -fno-implicit-prelude #-}
+{-# OPTIONS_GHC -XNoImplicitPrelude #-}
 {-# OPTIONS_HADDOCK hide #-}
 -----------------------------------------------------------------------------
 -- |

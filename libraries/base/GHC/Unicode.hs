@@ -1,4 +1,4 @@
-{-# OPTIONS -fno-implicit-prelude #-}
+{-# OPTIONS_GHC -XNoImplicitPrelude #-}
 {-# OPTIONS -#include "WCsubst.h" #-}
 {-# OPTIONS_HADDOCK hide #-}
 -----------------------------------------------------------------------------

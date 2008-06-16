@@ -1,5 +1,5 @@
 \begin{code}
-{-# OPTIONS_GHC -fno-implicit-prelude #-}
+{-# OPTIONS_GHC -XNoImplicitPrelude #-}
 {-# OPTIONS_HADDOCK hide #-}
 -----------------------------------------------------------------------------
 -- |

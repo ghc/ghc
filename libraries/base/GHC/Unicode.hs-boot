@@ -1,4 +1,4 @@
-{-# OPTIONS -fno-implicit-prelude #-}
+{-# OPTIONS_GHC -XNoImplicitPrelude #-}
 
 module GHC.Unicode where
 import GHC.Base( Char, Bool )

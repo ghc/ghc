@@ -1,5 +1,5 @@
 
-{-# OPTIONS -fno-implicit-prelude #-}
+{-# OPTIONS_GHC -XNoImplicitPrelude #-}
 
 module Foreign.Storable where
 

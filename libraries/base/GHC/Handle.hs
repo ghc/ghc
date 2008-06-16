@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fno-implicit-prelude -#include "HsBase.h" #-}
+{-# OPTIONS_GHC -XNoImplicitPrelude -#include "HsBase.h" #-}
 {-# OPTIONS_HADDOCK hide #-}
 
 #undef DEBUG_DUMP

@@ -1,4 +1,5 @@
-{-# OPTIONS_GHC -fparr -funbox-strict-fields #-}
+{-# OPTIONS_GHC -funbox-strict-fields #-}
+{-# LANGUAGE PArr #-}
 
 -----------------------------------------------------------------------------
 -- |
