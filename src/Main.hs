@@ -203,7 +203,10 @@ render flags interfaces installedIfaces = do
     allVisibleIfaces = map toInstalledIface visibleIfaces
                        ++ installedIfaces
     
-    packageStr       = (Just . modulePkgStr . ifaceMod . head) visibleIfaces
+    packageMod       = ifaceMod (head visibleIfaces)
+    packageStr       = Just (modulePkgStr packageMod)
+    (pkgName,pkgVer) = modulePkgInfo packageMod
+
  
   when (Flag_GenIndex `elem` flags) $ do
     ppHtmlIndex odir title packageStr maybe_html_help_format
@@ -228,7 +231,7 @@ render flags interfaces installedIfaces = do
     copyHtmlBits odir libdir css_file
 
   when (Flag_Hoogle `elem` flags) $ do
-    ppHoogle packageStr visibleIfaces odir
+    ppHoogle pkgName pkgVer visibleIfaces odir
 
 -------------------------------------------------------------------------------
 -- Reading and dumping interface files
