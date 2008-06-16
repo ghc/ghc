@@ -1,5 +1,5 @@
 
-{-# OPTIONS_GHC -fno-implicit-prelude #-}
+{-# OPTIONS_GHC -XNoImplicitPrelude #-}
 
 module GHC.Ordering where
 
