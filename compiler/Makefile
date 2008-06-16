@@ -598,12 +598,8 @@ SRC_HC_OPTS += -package Win32
 PKG_DEPENDS += Win32
 endif
 else
-ifeq "$(bootstrapped) $(ghc_ge_601)" "NO NO"
-SRC_HC_OPTS += -package posix
-else
 SRC_HC_OPTS += -package unix
 PKG_DEPENDS += unix
-endif
 endif
 
 # We use the Cabal package in stages 2/3 only; in stage 1 we're using
