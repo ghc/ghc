@@ -644,8 +644,6 @@ ifeq "$(HOSTPLATFORM)" "hppa1.1-hp-hpux9"
 rename/RnMonad_HC_OPTS 		=  -O2 -O2-for-C
 endif
 
-utils/Digraph_HC_OPTS		= -fglasgow-exts 
-
 # basicTypes/SrcLoc_HC_OPTS	= -funbox-strict-fields
 
 # We always optimise some low-level modules, otherwise performance of
