@@ -243,10 +243,10 @@ GarbageCollect ( rtsBool force_major_gc )
   start_gc_threads();
 
   /* How many threads will be participating in this GC?
-   * We don't try to parallelise minor GC.
+   * We don't try to parallelise minor GC, or mark/compact/sweep GC.
    */
 #if defined(THREADED_RTS)
-  if (n < (4*1024*1024 / BLOCK_SIZE)) {
+  if (n < (4*1024*1024 / BLOCK_SIZE) || oldest_gen->steps[0].mark) {
       n_gc_threads = 1;
   } else {
       n_gc_threads = RtsFlags.ParFlags.gcThreads;
