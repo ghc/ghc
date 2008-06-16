@@ -148,7 +148,7 @@ of type @r@, then the result type withing generic folding is @r -> r@.
 So the result of folding is a function to which we finally pass the
 right unit.
 
-With the @-fglasgow-exts@ option, GHC can generate instances of the
+With the @-XDeriveDataTypeable@ option, GHC can generate instances of the
 'Data' class automatically.  For example, given the declaration
 
 > data T a b = C1 a b | C2 deriving (Typeable, Data)

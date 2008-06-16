@@ -530,8 +530,8 @@ The Unit type is here because virtually any program needs it (whereas
 some programs may get away without consulting GHC.Tup).  Furthermore,
 the renamer currently *always* asks for () to be in scope, so that
 ccalls can use () as their default type; so when compiling GHC.Base we
-need ().  (We could arrange suck in () only if -fglasgow-exts, but putting
-it here seems more direct.)
+need ().  (We could arrange suck in () only if -XForeignFunctionInterface,
+but putting it here seems more direct.)
 
 \begin{code}
 -- | The unit datatype @()@ has one non-undefined member, the nullary
