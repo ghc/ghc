@@ -7,4 +7,4 @@ f c = g c
 
 g :: e -> e
 g c = c
-  where p = foldr (f c) [] []
+  where p = f (1 :: Int)
