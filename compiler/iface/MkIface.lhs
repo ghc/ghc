@@ -562,6 +562,13 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
                         snd (lookupOccEnv local_env (getOccName name)
                            `orElse` pprPanic "urk! lookup local fingerprint" 
                                        (ppr name)) -- (undefined,fingerprint0))
+                -- This panic indicates that we got the dependency
+                -- analysis wrong, because we needed a fingerprint for
+                -- an entity that wasn't in the environment.  To debug
+                -- it, turn the panic into a trace, uncomment the
+                -- pprTraces below, run the compile again, and inspect
+                -- the output and the generated .hi file with
+                -- --show-iface.
             in 
             put_ bh hash
 
@@ -609,15 +616,19 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
    (local_env, decls_w_hashes) <- 
        foldM fingerprint_group (emptyOccEnv, []) groups
 
+   -- when calculating fingerprints, we always need to use canonical
+   -- ordering for lists of things.  In particular, the mi_deps has various
+   -- lists of modules and suchlike, so put these all in canonical order:
+   let sorted_deps = sortDependencies (mi_deps iface0)
+
    -- the export hash of a module depends on the orphan hashes of the
    -- orphan modules below us in the dependeny tree.  This is the way
    -- that changes in orphans get propagated all the way up the
    -- dependency tree.  We only care about orphan modules in the current
    -- package, because changes to orphans outside this package will be
    -- tracked by the usage on the ABI hash of package modules that we import.
-   let orph_mods = sortBy (compare `on` (moduleNameFS.moduleName))
-                        . filter ((== this_pkg) . modulePackageId)
-                        $ dep_orphs (mi_deps iface0)
+   let orph_mods = filter ((== this_pkg) . modulePackageId)
+                   $ dep_orphs sorted_deps
    dep_orphan_hashes <- getOrphanHashes hsc_env orph_mods
 
    orphan_hash <- computeFingerprint dflags (mk_put_name local_env)
@@ -652,7 +663,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
    iface_hash <- computeFingerprint dflags putNameLiterally
                       (mod_hash, 
                        mi_usages iface0,
-                       mi_deps iface0,
+                       sorted_deps,
                        mi_hpc iface0)
 
    let
@@ -697,6 +708,13 @@ getOrphanHashes hsc_env mods = do
   --
   return (map get_orph_hash mods)
 
+
+sortDependencies :: Dependencies -> Dependencies
+sortDependencies d
+ = Deps { dep_mods   = sortBy (compare `on` (moduleNameFS.fst)) (dep_mods d),
+          dep_pkgs   = sortBy (compare `on` packageIdFS)  (dep_pkgs d),
+          dep_orphs  = sortBy stableModuleCmp (dep_orphs d),
+          dep_finsts = sortBy stableModuleCmp (dep_finsts d) }
 
 -- The ABI of a declaration consists of:
      -- the full name of the identifier (inc. module and package, because
