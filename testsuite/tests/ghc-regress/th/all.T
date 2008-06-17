@@ -40,7 +40,7 @@ test('TH_reifyDecl2', normal, compile, ['-v0'])
 
 test('TH_reifyType1', normal, compile, [''])
 test('TH_reifyType2', normal, compile, [''])
-test('TH_reifyMkName', normal, compile, [''])
+test('TH_reifyMkName', if_compiler_lt('ghc', '6.9', expect_fail), compile, [''])
 
 test('TH_spliceDecl1', normal, compile, ['-v0'])
 test('TH_spliceDecl2', normal, compile, ['-v0'])
