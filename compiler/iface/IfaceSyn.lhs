@@ -727,9 +727,16 @@ freeNamesIfType (IfaceFunTy s t)      = freeNamesIfType s &&& freeNamesIfType t
 freeNamesIfTvBndrs :: [IfaceTvBndr] -> NameSet
 freeNamesIfTvBndrs = fnList freeNamesIfTvBndr
 
+freeNamesIfBndr :: IfaceBndr -> NameSet
+freeNamesIfBndr (IfaceIdBndr b) = freeNamesIfIdBndr b
+freeNamesIfBndr (IfaceTvBndr b) = freeNamesIfTvBndr b
+
 freeNamesIfTvBndr :: IfaceTvBndr -> NameSet
 freeNamesIfTvBndr (_fs,k) = freeNamesIfType k
     -- kinds can have Names inside, when the Kind is an equality predicate
+
+freeNamesIfIdBndr :: IfaceIdBndr -> NameSet
+freeNamesIfIdBndr = freeNamesIfTvBndr
 
 freeNamesIfIdInfo :: IfaceIdInfo -> NameSet
 freeNamesIfIdInfo NoInfo = emptyNameSet
@@ -772,8 +779,11 @@ freeNamesIfTc (IfaceTc tc) = unitNameSet tc
 freeNamesIfTc _ = emptyNameSet
 
 freeNamesIfRule :: IfaceRule -> NameSet
-freeNamesIfRule (IfaceRule _n _a _bs f es rhs _o)
-  = unitNameSet f &&& fnList freeNamesIfExpr es &&& freeNamesIfExpr rhs
+freeNamesIfRule (IfaceRule _n _a bs f es rhs _o)
+  = unitNameSet f &&&
+    fnList freeNamesIfBndr bs &&&
+    fnList freeNamesIfExpr es &&&
+    freeNamesIfExpr rhs
 
 -- helpers
 (&&&) :: NameSet -> NameSet -> NameSet
