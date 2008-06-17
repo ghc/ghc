@@ -26,7 +26,7 @@ test('Simple16', expect_fail, compile_fail, [''])
 test('TyFamArity1', normal, compile_fail, [''])
 test('TyFamArity2', normal, compile_fail, [''])
 test('TyFamUndec', normal, compile_fail, [''])
-test('T2334', normal, compile_fail, [''])
+test('T2334', if_compiler_lt('ghc', '6.9', expect_fail), compile_fail, [''])
 
 test('GADTwrong1', if_compiler_lt('ghc', '6.9', expect_fail), compile_fail, [''])
 
