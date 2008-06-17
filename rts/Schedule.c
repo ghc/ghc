@@ -550,8 +550,6 @@ schedule (Capability *initialCapability, Task *task)
     }
 #endif
 
-    cap->r.rCurrentTSO = t;
-    
     /* context switches are initiated by the timer signal, unless
      * the user specified "context switch as often as possible", with
      * +RTS -C0
@@ -562,6 +560,11 @@ schedule (Capability *initialCapability, Task *task)
     }
 	 
 run_thread:
+
+    // CurrentTSO is the thread to run.  t might be different if we
+    // loop back to run_thread, so make sure to set CurrentTSO after
+    // that.
+    cap->r.rCurrentTSO = t;
 
     debugTrace(DEBUG_sched, "-->> running thread %ld %s ...", 
 			      (long)t->id, whatNext_strs[t->what_next]);
