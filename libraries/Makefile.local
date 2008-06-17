@@ -15,7 +15,20 @@ GHC := $(SAVE_GHC)
 AR  := $(SAVE_AR)
 LD  := $(SAVE_LD)
 
+# We want all warnings on
+GhcLibHcOpts += -Wall
+
+# Cabal has problems with deprecated flag warnings, as it needs to pass
+# deprecated flags in pragmas in order to support older GHCs. Thus for
+# now at least we just disable them completely.
 GhcLibHcOpts += -fno-warn-deprecated-flags
+
+ifeq "$(filter-out array-% base-% bytestring-% Cabal-% containers-% directory-% editline-% filepath-% ghc-prim-% haskell98-% hpc-% integer-gmp-% old-locale-% old-time-% packedstring-% pretty-% process-% random-% template-haskell-% unix-% Win32-%,$(package))" ""
+# XXX We are one of the above list, i.e. we are a package that is not
+# yet warning-clean. Thus turn warnings off for now so that validate
+# goes through.
+GhcLibHcOpts += -w
+endif
 
 # Now add flags from the GHC build system to the Cabal build:
 GHC_CC_OPTS += $(addprefix -optc, $(MACOSX_DEPLOYMENT_CC_OPTS))
