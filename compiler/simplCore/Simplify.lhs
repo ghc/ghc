@@ -1827,11 +1827,13 @@ mkDupableCont env (ApplyTo _ arg se cont)
         ; let app_cont = ApplyTo OkToDup arg'' (zapSubstEnv env') dup_cont
         ; return (env'', app_cont, nodup_cont) }
 
-mkDupableCont env cont@(Select _ _ [(_, bs, _rhs)] _ _)
+mkDupableCont env cont@(Select _ case_bndr [(_, bs, _rhs)] _ _)
 --  See Note [Single-alternative case]
 --  | not (exprIsDupable rhs && contIsDupable case_cont)
 --  | not (isDeadBinder case_bndr)
-  | all isDeadBinder bs         -- InIds
+  | all isDeadBinder bs  -- InIds
+    && not (isUnLiftedType (idType case_bndr))
+    -- Note [Single-alternative-unlifted]
   = return (env, mkBoringStop, cont)
 
 mkDupableCont env (Select _ case_bndr alts se cont)
@@ -2080,3 +2082,37 @@ Other choices:
      When x is inlined into its full context, we find that it was a bad
      idea to have pushed the outer case inside the (...) case.
 
+Note [Single-alternative-unlifted]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Here's another single-alternative where we really want to do case-of-case:
+
+data Mk1 = Mk1 Int#
+data Mk1 = Mk2 Int#
+
+M1.f =
+    \r [x_s74 y_s6X]
+        case
+            case y_s6X of tpl_s7m {
+              M1.Mk1 ipv_s70 -> ipv_s70;
+              M1.Mk2 ipv_s72 -> ipv_s72;
+            }
+        of
+        wild_s7c
+        { __DEFAULT ->
+              case
+                  case x_s74 of tpl_s7n {
+                    M1.Mk1 ipv_s77 -> ipv_s77;
+                    M1.Mk2 ipv_s79 -> ipv_s79;
+                  }
+              of
+              wild1_s7b
+              { __DEFAULT -> ==# [wild1_s7b wild_s7c];
+              };
+        };
+
+So the outer case is doing *nothing at all*, other than serving as a
+join-point.  In this case we really want to do case-of-case and decide
+whether to use a real join point or just duplicate the continuation.
+
+Hence: check whether the case binder's type is unlifted, because then
+the outer case is *not* a seq.
