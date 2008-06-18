@@ -22,6 +22,7 @@ import Control.Monad
 import Data.Char
 import Data.List
 import Data.Maybe
+import qualified Data.Set as Set
 import System.FilePath
 
 
@@ -43,8 +44,12 @@ ppHoogle package version ifaces odir = do
 ppModule :: Interface -> [String]
 ppModule iface = "" : doc (ifaceDoc iface) ++
                  ["module " ++ moduleString (ifaceMod iface)] ++
-                 concatMap ppExport (ifaceExportItems iface) ++
+                 concatMap ppExport exported ++
                  concatMap ppInstance (ifaceInstances iface)
+    where
+        locals = Set.fromList $ ifaceLocals iface
+        exported = [i | i@(ExportDecl{expItemName=name}) <- ifaceExportItems iface
+                      , name `Set.member` locals]
 
 
 ---------------------------------------------------------------------
