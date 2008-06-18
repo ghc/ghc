@@ -376,15 +376,19 @@ findWiredInPackages dflags pkgs preload this_package = do
   -- their canonical names (eg. base-1.0 ==> base).
   --
   let
-        wired_in_pkgids = [ primPackageId,
-                            integerPackageId,
-                            basePackageId,
-                            rtsPackageId,
-                            haskell98PackageId,
-                            thPackageId,
-                            ndpPackageId ]
+        wired_in_pkgids :: [(PackageId, [String])]
+        wired_in_pkgids = [ (primPackageId, [""]),
+                            (integerPackageId, [""]),
+                            (basePackageId, [""]),
+                            (rtsPackageId, [""]),
+                            (haskell98PackageId, [""]),
+                            (thPackageId, [""]),
+                            (ndpPackageId, ["-seq", "-par"]) ]
 
-	wired_in_names = map packageIdString wired_in_pkgids
+        matches :: PackageConfig -> (PackageId, [String]) -> Bool
+        pc `matches` (pid, suffixes)
+            = pkgName (package pc) `elem`
+              (map (packageIdString pid ++) suffixes)
 
 	-- find which package corresponds to each wired-in package
 	-- delete any other packages with the same name
@@ -396,46 +400,53 @@ findWiredInPackages dflags pkgs preload this_package = do
         -- version.  To override the default choice, -hide-package
         -- could be used to hide newer versions.
         --
-	findWiredInPackage :: [PackageConfig] -> String
-			   -> IO (Maybe PackageIdentifier)
+	findWiredInPackage :: [PackageConfig] -> (PackageId, [String])
+			   -> IO (Maybe (PackageIdentifier, PackageId))
 	findWiredInPackage pkgs wired_pkg =
-           let all_ps = [ p | p <- pkgs, pkgName (package p) == wired_pkg ] in
+           let all_ps = [ p | p <- pkgs, p `matches` wired_pkg ] in
 	   case filter exposed all_ps of
 		[] -> case all_ps of
                         []   -> notfound
                         many -> pick (head (sortByVersion many))
 		many  -> pick (head (sortByVersion many))
           where
+                suffixes = snd wired_pkg
                 notfound = do
 			  debugTraceMsg dflags 2 $
 			    ptext (sLit "wired-in package ")
-				 <> text wired_pkg
+				 <> ppr (fst wired_pkg)
+                                 <> (if null suffixes
+                                     then empty
+                                     else text (show suffixes))
 				 <> ptext (sLit " not found.")
 			  return Nothing
+		pick :: InstalledPackageInfo_ ModuleName
+                     -> IO (Maybe (PackageIdentifier, PackageId))
                 pick pkg = do
                         debugTraceMsg dflags 2 $
 			    ptext (sLit "wired-in package ")
-				 <> text wired_pkg
+				 <> ppr (fst wired_pkg)
 				 <> ptext (sLit " mapped to ")
 				 <> text (display (package pkg))
-			return (Just (package pkg))
+			return (Just (package pkg, fst wired_pkg))
 
 
-  mb_wired_in_ids <- mapM (findWiredInPackage pkgs) wired_in_names
+  mb_wired_in_ids <- mapM (findWiredInPackage pkgs) wired_in_pkgids
   let 
         wired_in_ids = catMaybes mb_wired_in_ids
 
-	deleteOtherWiredInPackages pkgs = filter ok pkgs
-	  where ok p = pkgName (package p) `notElem` wired_in_names
-                     || package p `elem` wired_in_ids
+	deleteOtherWiredInPackages pkgs = filterOut bad pkgs
+	  where bad p = any (p `matches`) wired_in_pkgids
+                     && package p `notElem` map fst wired_in_ids
 
 	updateWiredInDependencies pkgs = map upd_pkg pkgs
 	  where upd_pkg p = p{ package = upd_pid (package p),
 			       depends = map upd_pid (depends p) }
 
-	upd_pid pid = case filter (== pid) wired_in_ids of
+	upd_pid pid = case filter ((== pid) . fst) wired_in_ids of
 				[] -> pid
-				(x:_) -> x{ pkgVersion = Version [] [] }
+				((x, y):_) -> x{ pkgName = packageIdString y,
+                                                 pkgVersion = Version [] [] }
 
         pkgs1 = deleteOtherWiredInPackages pkgs
 
