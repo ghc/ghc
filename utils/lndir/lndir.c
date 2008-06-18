@@ -43,6 +43,8 @@ in this Software without prior written authorization from the X Consortium.
         %  lndir ../X
 */
 
+#define NeedVarargsPrototypes 1
+
 #include "lndir-Xos.h"
 #include <stdlib.h>
 #include <stdio.h>
