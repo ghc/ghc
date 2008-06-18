@@ -1580,7 +1580,7 @@ static StgClosure *read_current_value(StgTRecHeader *trec STG_UNUSED, StgTVar *t
 StgClosure *stmReadTVar(Capability *cap,
                         StgTRecHeader *trec, 
 			StgTVar *tvar) {
-  StgTRecHeader *entry_in;
+  StgTRecHeader *entry_in = NULL;
   StgClosure *result = NULL;
   TRecEntry *entry = NULL;
   TRACE("%p : stmReadTVar(%p)", trec, tvar);
@@ -1623,7 +1623,7 @@ void stmWriteTVar(Capability *cap,
 		  StgTVar *tvar, 
 		  StgClosure *new_value) {
 
-  StgTRecHeader *entry_in;
+  StgTRecHeader *entry_in = NULL;
   TRecEntry *entry = NULL;
   TRACE("%p : stmWriteTVar(%p, %p)", trec, tvar, new_value);
   ASSERT (trec != NO_TREC);
