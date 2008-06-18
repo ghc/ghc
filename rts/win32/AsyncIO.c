@@ -275,7 +275,7 @@ start:
 	    unsigned int rID = completedTable[i].reqID;
 	    
 	    prev = NULL;
-	    for(tso = blocked_queue_hd ; tso != END_TSO_QUEUE; prev = tso, tso = tso->link) {
+	    for(tso = blocked_queue_hd ; tso != END_TSO_QUEUE; prev = tso, tso = tso->_link) {
 	
 		switch(tso->why_blocked) {
 		case BlockedOnRead:
@@ -290,16 +290,16 @@ start:
 			
 			/* Drop the matched TSO from blocked_queue */
 			if (prev) {
-			    prev->link = tso->link;
+			    setTSOLink(&MainCapability, prev, tso->_link);
 			} else {
-			    blocked_queue_hd = tso->link;
+			    blocked_queue_hd = tso->_link;
 			}
 			if (blocked_queue_tl == tso) {
 			    blocked_queue_tl = prev ? prev : END_TSO_QUEUE;
 			}
 		    
 			/* Terminates the run queue + this inner for-loop. */
-			tso->link = END_TSO_QUEUE;
+			tso->_link = END_TSO_QUEUE;
 			tso->why_blocked = NotBlocked;
 			pushOnRunQueue(&MainCapability, tso);
 			break;
