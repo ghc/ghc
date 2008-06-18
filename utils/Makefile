@@ -3,13 +3,13 @@ include $(TOP)/mk/boilerplate.mk
 
 ifeq "$(DOING_BIN_DIST)" "YES"
 # We're doing a binary-dist, descend into a subset of the dirs.
-SUBDIRS = mkdirhier ghc-pkg hasktags hp2ps hsc2hs parallel prof unlit runghc hpc pwd
+SUBDIRS = mkdirhier ghc-pkg hasktags hp2ps hsc2hs parallel unlit runghc hpc pwd
 else
 ifeq "$(BootingFromHc)" "YES"
 SUBDIRS = mkdependC mkdirhier runstdtest genapply genprimopcode ghc-pkg unlit
 else
 SUBDIRS = mkdependC mkdirhier runstdtest ghc-pkg hasktags hp2ps hsc2hs \
-	  parallel prof unlit genprimopcode genapply runghc hpc pwd
+	  parallel unlit genprimopcode genapply runghc hpc pwd
 endif
 ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 # lndir doesn't build on Windows
