@@ -76,7 +76,7 @@ sweep(step *step)
           freed,
           blocks == 0 ? 0 : (freed * 100) / blocks,
           fragd, 
-          (blocks - freed) == 0 ? 0 : ((live / BLOCK_SIZE_W) * 100) / (blocks - freed));
+          (unsigned long)((blocks - freed) == 0 ? 0 : ((live / BLOCK_SIZE_W) * 100) / (blocks - freed)));
 
     ASSERT(countBlocks(step->old_blocks) == step->n_old_blocks);
 }

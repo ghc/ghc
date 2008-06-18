@@ -179,7 +179,8 @@ todo_block_full (nat size, step_workspace *ws)
             step *stp;
             stp = ws->step;
             trace(TRACE_gc|DEBUG_gc, "push todo block %p (%ld words), step %d, n_todos: %d", 
-                  bd->start, bd->free - bd->u.scan, stp->abs_no, stp->n_todos);
+                  bd->start, (unsigned long)(bd->free - bd->u.scan),
+                  stp->abs_no, stp->n_todos);
             // ToDo: use buffer_todo
             ACQUIRE_SPIN_LOCK(&stp->sync_todo);
             if (stp->todos_last == NULL) {
