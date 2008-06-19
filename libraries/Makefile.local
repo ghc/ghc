@@ -23,7 +23,7 @@ GhcLibHcOpts += -Wall
 # now at least we just disable them completely.
 GhcLibHcOpts += -fno-warn-deprecated-flags
 
-ifeq "$(filter-out array-% base-% directory-% editline-% filepath-% ghc-prim-% hpc-% integer-gmp-% old-time-% packedstring-% pretty-% process-% unix-% Win32-%,$(package))" ""
+ifeq "$(filter-out array-% base-% directory-% editline-% filepath-% ghc-prim-% hpc-% integer-gmp-% packedstring-% pretty-% process-% unix-% Win32-%,$(package))" ""
 # XXX We are one of the above list, i.e. we are a package that is not
 # yet warning-clean. Thus turn warnings off for now so that validate
 # goes through.
