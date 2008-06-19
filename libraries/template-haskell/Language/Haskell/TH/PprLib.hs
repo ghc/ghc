@@ -125,8 +125,8 @@ pprName' ni n@(Name o (NameU _))
  = PprM $ \s@(fm, i@(I# i'))
         -> let (n', s') = case Map.lookup n fm of
                          Just d -> (d, s)
-                         Nothing -> let n' = Name o (NameU i')
-                                    in (n', (Map.insert n n' fm, i + 1))
+                         Nothing -> let n'' = Name o (NameU i')
+                                    in (n'', (Map.insert n n'' fm, i + 1))
            in (HPJ.text $ showName' ni n', s')
 pprName' ni n = text $ showName' ni n
 
@@ -208,9 +208,9 @@ hang d1 n d2 = do d1' <- d1
                   return (HPJ.hang d1' n d2')
 
 -- punctuate uses the same definition as Text.PrettyPrint.HughesPJ
-punctuate p []     = []
+punctuate _ []     = []
 punctuate p (d:ds) = go d ds
                    where
-                     go d [] = [d]
-                     go d (e:es) = (d <> p) : go e es
+                     go d' [] = [d']
+                     go d' (e:es) = (d' <> p) : go e es
 

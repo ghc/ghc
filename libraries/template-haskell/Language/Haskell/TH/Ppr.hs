@@ -62,10 +62,11 @@ instance Ppr Info where
       = vcat [ppr_sig v ty, pprFixity v fix, 
               case mb_d of { Nothing -> empty; Just d -> ppr d }]
 
+ppr_sig :: Name -> Type -> Doc
 ppr_sig v ty = ppr v <+> text "::" <+> ppr ty
 
 pprFixity :: Name -> Fixity -> Doc
-pprFixity v f | f == defaultFixity = empty
+pprFixity _ f | f == defaultFixity = empty
 pprFixity v (Fixity i d) = ppr_fix d <+> int i <+> ppr v
     where ppr_fix InfixR = text "infixr"
           ppr_fix InfixL = text "infixl"
@@ -155,7 +156,7 @@ pprBody eq (NormalB e) = (if eq then text "=" else text "->") <+> ppr e
 pprLit :: Precedence -> Lit -> Doc
 pprLit i (IntPrimL x)    = parensIf (i > noPrec && x < 0)
                                     (integer x <> char '#')
-pprLit i (WordPrimL x)    = integer x <> text "##"
+pprLit _ (WordPrimL x)    = integer x <> text "##"
 pprLit i (FloatPrimL x)  = parensIf (i > noPrec && x < 0)
                                     (float (fromRational x) <> char '#')
 pprLit i (DoublePrimL x) = parensIf (i > noPrec && x < 0)

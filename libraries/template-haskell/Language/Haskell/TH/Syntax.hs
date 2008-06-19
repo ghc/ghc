@@ -102,9 +102,9 @@ instance Quasi IO where
   qReport True  msg = hPutStrLn stderr ("Template Haskell error: " ++ msg)
   qReport False msg = hPutStrLn stderr ("Template Haskell error: " ++ msg)
 
-  qReify v     = badIO "reify"
+  qReify _     = badIO "reify"
   qLocation    = badIO "currentLocation"
-  qRecover a b = badIO "recover"	-- Maybe we could fix this?
+  qRecover _ _ = badIO "recover" -- Maybe we could fix this?
 
   qRunIO m = m
   
@@ -354,11 +354,14 @@ instance Data NameFlavour where
      toConstr (NameG _ _ _) = con_NameG
      dataTypeOf _ = ty_NameFlavour
 
+con_NameS, con_NameQ, con_NameU, con_NameL, con_NameG :: Generics.Constr
 con_NameS = mkConstr ty_NameFlavour "NameS" [] Generics.Prefix
 con_NameQ = mkConstr ty_NameFlavour "NameQ" [] Generics.Prefix
 con_NameU = mkConstr ty_NameFlavour "NameU" [] Generics.Prefix
 con_NameL = mkConstr ty_NameFlavour "NameL" [] Generics.Prefix
 con_NameG = mkConstr ty_NameFlavour "NameG" [] Generics.Prefix
+
+ty_NameFlavour :: Generics.DataType
 ty_NameFlavour = mkDataType "Language.Haskell.TH.Syntax.NameFlavour"
                             [con_NameS, con_NameQ, con_NameU,
                              con_NameL, con_NameG]
@@ -375,9 +378,9 @@ nameBase :: Name -> String
 nameBase (Name occ _) = occString occ
 
 nameModule :: Name -> Maybe String
-nameModule (Name _ (NameQ m))   = Just (modString m)
+nameModule (Name _ (NameQ m))     = Just (modString m)
 nameModule (Name _ (NameG _ _ m)) = Just (modString m)
-nameModule other_name		= Nothing
+nameModule _                      = Nothing
 
 mkName :: String -> Name
 -- The string can have a '.', thus "Foo.baz",
@@ -411,8 +414,8 @@ mkNameL :: String -> Uniq -> Name	-- Only used internally
 mkNameL s (I# u) = Name (mkOccName s) (NameL u)
 
 mkNameG :: NameSpace -> String -> String -> String -> Name	-- Used for 'x etc, but not available
-mkNameG ns pkg mod occ 					-- to the programmer
-  = Name (mkOccName occ) (NameG ns (mkPkgName pkg) (mkModName mod))
+mkNameG ns pkg modu occ 					-- to the programmer
+  = Name (mkOccName occ) (NameG ns (mkPkgName pkg) (mkModName modu))
 
 mkNameG_v, mkNameG_tc, mkNameG_d :: String -> String -> String -> Name
 mkNameG_v  = mkNameG VarName
@@ -432,18 +435,18 @@ instance Eq NameFlavour where
 instance Ord NameFlavour where
 	-- NameS < NameQ < NameU < NameL < NameG
   NameS `compare` NameS = EQ
-  NameS `compare` other = LT
+  NameS `compare` _     = LT
 
   (NameQ _)  `compare` NameS      = GT
   (NameQ m1) `compare` (NameQ m2) = m1 `compare` m2
-  (NameQ _)  `compare` other      = LT
+  (NameQ _)  `compare` _          = LT
 
   (NameU _)  `compare` NameS      = GT
   (NameU _)  `compare` (NameQ _)  = GT
   (NameU u1) `compare` (NameU u2) | u1  <# u2 = LT
 				  | u1 ==# u2 = EQ
 				  | otherwise = GT
-  (NameU _)  `compare` other = LT
+  (NameU _)  `compare` _     = LT
 
   (NameL _)  `compare` NameS      = GT
   (NameL _)  `compare` (NameQ _)  = GT
@@ -451,12 +454,12 @@ instance Ord NameFlavour where
   (NameL u1) `compare` (NameL u2) | u1  <# u2 = LT
 				  | u1 ==# u2 = EQ
 				  | otherwise = GT
-  (NameL _)  `compare` other      = LT
+  (NameL _)  `compare` _          = LT
 
   (NameG ns1 p1 m1) `compare` (NameG ns2 p2 m2) = (ns1 `compare` ns2) `thenCmp`
                                             (p1 `compare` p2) `thenCmp`
 					    (m1 `compare` m2) 
-  (NameG _ _ _)    `compare` other	  = GT
+  (NameG _ _ _)    `compare` _ = GT
 
 data NameIs = Alone | Applied | Infix
 
@@ -481,11 +484,11 @@ showName' ni nm
 	-- We may well want to distinguish them in the end.
 	-- Ditto NameU and NameL
         nms = case nm of
-                    Name occ NameS          -> occString occ
-                    Name occ (NameQ m)      -> modString m ++ "." ++ occString occ
-                    Name occ (NameG ns p m) -> modString m ++ "." ++ occString occ
-                    Name occ (NameU u)      -> occString occ ++ "_" ++ show (I# u)
-                    Name occ (NameL u)      -> occString occ ++ "_" ++ show (I# u)
+                    Name occ NameS         -> occString occ
+                    Name occ (NameQ m)     -> modString m ++ "." ++ occString occ
+                    Name occ (NameG _ _ m) -> modString m ++ "." ++ occString occ
+                    Name occ (NameU u)     -> occString occ ++ "_" ++ show (I# u)
+                    Name occ (NameL u)     -> occString occ ++ "_" ++ show (I# u)
 
         pnam = classify nms
 
@@ -513,6 +516,7 @@ tupleTypeName 0 = mk_tup_name 0 TcClsName
 tupleTypeName 1 = error "tupleTypeName 1"
 tupleTypeName n = mk_tup_name (n-1) TcClsName 
 
+mk_tup_name :: Int -> NameSpace -> Name
 mk_tup_name n_commas space
   = Name occ (NameG space (mkPkgName "base") tup_mod)
   where
@@ -752,5 +756,5 @@ cmpEq _  = False
 
 thenCmp :: Ordering -> Ordering -> Ordering
 thenCmp EQ o2 = o2
-thenCmp o1 o2 = o1
+thenCmp o1 _  = o1
 

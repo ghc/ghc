@@ -15,7 +15,7 @@ dataToQa  ::  forall a k q. Data a
           =>  (Name -> k)
           ->  (Lit -> Q q)
           ->  (k -> [Q q] -> Q q)
-          ->  (forall a . Data a => a -> Maybe (Q q))
+          ->  (forall b . Data b => b -> Maybe (Q q))
           ->  a
           ->  Q q
 dataToQa mkCon mkLit appCon antiQ t =
@@ -50,7 +50,7 @@ dataToQa mkCon mkLit appCon antiQ t =
 -- | 'dataToExpQ' converts a value to a 'Q Exp' representation of the same
 -- value. It takes a function to handle type-specific cases.
 dataToExpQ  ::  Data a
-            =>  (forall a . Data a => a -> Maybe (Q Exp))
+            =>  (forall b . Data b => b -> Maybe (Q Exp))
             ->  a
             ->  Q Exp
 dataToExpQ = dataToQa conE litE (foldl appE)
@@ -58,7 +58,7 @@ dataToExpQ = dataToQa conE litE (foldl appE)
 -- | 'dataToPatQ' converts a value to a 'Q Pat' representation of the same
 -- value. It takes a function to handle type-specific cases.
 dataToPatQ  ::  Data a
-            =>  (forall a . Data a => a -> Maybe (Q Pat))
+            =>  (forall b . Data b => b -> Maybe (Q Pat))
             ->  a
             ->  Q Pat
 dataToPatQ = dataToQa id litP conP
