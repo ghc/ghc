@@ -182,7 +182,7 @@ static char *type_names[] = {
  * the band to which this closure's heap space is attributed in the
  * heap profile.
  * ------------------------------------------------------------------------- */
-STATIC_INLINE void *
+static void *
 closureIdentity( StgClosure *p )
 {
     switch (RtsFlags.ProfFlags.doHeapProfile) {

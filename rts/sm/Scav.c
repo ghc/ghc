@@ -140,7 +140,7 @@ scavenge_arg_block (StgFunInfoTable *fun_info, StgClosure **args)
     return p;
 }
 
-STATIC_INLINE StgPtr
+STATIC_INLINE GNUC_ATTR_HOT StgPtr
 scavenge_PAP_payload (StgClosure *fun, StgClosure **payload, StgWord size)
 {
     StgPtr p;
@@ -179,7 +179,7 @@ scavenge_PAP_payload (StgClosure *fun, StgClosure **payload, StgWord size)
     return p;
 }
 
-STATIC_INLINE StgPtr
+STATIC_INLINE GNUC_ATTR_HOT StgPtr
 scavenge_PAP (StgPAP *pap)
 {
     evacuate(&pap->fun);
@@ -230,7 +230,7 @@ scavenge_large_srt_bitmap( StgLargeSRT *large_srt )
  * srt field in the info table.  That's ok, because we'll
  * never dereference it.
  */
-STATIC_INLINE void
+STATIC_INLINE GNUC_ATTR_HOT void
 scavenge_srt (StgClosure **srt, nat srt_bitmap)
 {
   nat bitmap;
@@ -270,7 +270,7 @@ scavenge_srt (StgClosure **srt, nat srt_bitmap)
 }
 
 
-STATIC_INLINE void
+STATIC_INLINE GNUC_ATTR_HOT void
 scavenge_thunk_srt(const StgInfoTable *info)
 {
     StgThunkInfoTable *thunk_info;
@@ -281,7 +281,7 @@ scavenge_thunk_srt(const StgInfoTable *info)
     scavenge_srt((StgClosure **)GET_SRT(thunk_info), thunk_info->i.srt_bitmap);
 }
 
-STATIC_INLINE void
+STATIC_INLINE GNUC_ATTR_HOT void
 scavenge_fun_srt(const StgInfoTable *info)
 {
     StgFunInfoTable *fun_info;
@@ -304,7 +304,7 @@ scavenge_fun_srt(const StgInfoTable *info)
    idea.  
    -------------------------------------------------------------------------- */
 
-static void
+static GNUC_ATTR_HOT void
 scavenge_block (bdescr *bd)
 {
   StgPtr p, q;

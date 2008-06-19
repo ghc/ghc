@@ -9,6 +9,9 @@
 #ifndef SMPCLOSUREOPS_H
 #define SMPCLOSUREOPS_H
 
+EXTERN_INLINE StgInfoTable *lockClosure(StgClosure *p);
+EXTERN_INLINE void unlockClosure(StgClosure *p, const StgInfoTable *info);
+
 #if defined(THREADED_RTS)
 
 /* -----------------------------------------------------------------------------
@@ -19,16 +22,9 @@
 
 #define SPIN_COUNT 4000
 
-#ifdef KEEP_LOCKCLOSURE
 // We want a callable copy of lockClosure() so that we can refer to it
 // from .cmm files compiled using the native codegen.
-extern StgInfoTable *lockClosure(StgClosure *p);
-INLINE_ME
-#else
-INLINE_HEADER
-#endif
-StgInfoTable *
-lockClosure(StgClosure *p)
+EXTERN_INLINE StgInfoTable *lockClosure(StgClosure *p)
 {
     StgWord info;
     do {
@@ -41,8 +37,7 @@ lockClosure(StgClosure *p)
     } while (1);
 }
 
-INLINE_HEADER void
-unlockClosure(StgClosure *p, const StgInfoTable *info)
+EXTERN_INLINE void unlockClosure(StgClosure *p, const StgInfoTable *info)
 {
     // This is a strictly ordered write, so we need a write_barrier():
     write_barrier();
@@ -51,21 +46,23 @@ unlockClosure(StgClosure *p, const StgInfoTable *info)
 
 #else /* !THREADED_RTS */
 
-INLINE_HEADER StgInfoTable *
+EXTERN_INLINE StgInfoTable *
 lockClosure(StgClosure *p)
 { return (StgInfoTable *)p->header.info; }
 
-INLINE_HEADER void
+EXTERN_INLINE void
 unlockClosure(StgClosure *p STG_UNUSED, const StgInfoTable *info STG_UNUSED)
 { /* nothing */ }
 
 #endif /* THREADED_RTS */
 
 // Handy specialised versions of lockClosure()/unlockClosure()
-INLINE_HEADER void lockTSO(StgTSO *tso)
+EXTERN_INLINE void lockTSO(StgTSO *tso);
+EXTERN_INLINE void lockTSO(StgTSO *tso)
 { lockClosure((StgClosure *)tso); }
 
-INLINE_HEADER void unlockTSO(StgTSO *tso)
+EXTERN_INLINE void unlockTSO(StgTSO *tso);
+EXTERN_INLINE void unlockTSO(StgTSO *tso)
 { unlockClosure((StgClosure*)tso, (const StgInfoTable *)&stg_TSO_info); }
 
 #endif /* SMPCLOSUREOPS_H */

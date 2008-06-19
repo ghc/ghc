@@ -86,7 +86,7 @@ alloc_for_copy (nat size, step *stp)
    The evacuate() code
    -------------------------------------------------------------------------- */
 
-STATIC_INLINE void
+STATIC_INLINE GNUC_ATTR_HOT void
 copy_tag(StgClosure **p, const StgInfoTable *info, 
          StgClosure *src, nat size, step *stp, StgWord tag)
 {
@@ -218,7 +218,7 @@ spin:
 
 
 /* Copy wrappers that don't tag the closure after copying */
-STATIC_INLINE void
+STATIC_INLINE GNUC_ATTR_HOT void
 copy(StgClosure **p, const StgInfoTable *info, 
      StgClosure *src, nat size, step *stp)
 {
@@ -267,7 +267,7 @@ copy(StgClosure **p, const StgInfoTable *info,
    extra reads/writes than we save.
    ------------------------------------------------------------------------- */
 
-REGPARM1 void
+REGPARM1 GNUC_ATTR_HOT void 
 evacuate(StgClosure **p)
 {
   bdescr *bd = NULL;

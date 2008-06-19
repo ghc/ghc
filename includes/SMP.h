@@ -41,7 +41,7 @@
  * Used for locking closures during updates (see lockClosure() below)
  * and the MVar primops.
  */
-INLINE_HEADER StgWord xchg(StgPtr p, StgWord w);
+EXTERN_INLINE StgWord xchg(StgPtr p, StgWord w);
 
 /* 
  * Compare-and-swap.  Atomically does this:
@@ -52,13 +52,13 @@ INLINE_HEADER StgWord xchg(StgPtr p, StgWord w);
  *    return r;
  * }
  */
-INLINE_HEADER StgWord cas(StgVolatilePtr p, StgWord o, StgWord n);
+EXTERN_INLINE StgWord cas(StgVolatilePtr p, StgWord o, StgWord n);
 
 /*
  * Prevents write operations from moving across this call in either
  * direction.
  */ 
-INLINE_HEADER void write_barrier(void);
+EXTERN_INLINE void write_barrier(void);
 
 /* ----------------------------------------------------------------------------
    Implementations
@@ -67,7 +67,7 @@ INLINE_HEADER void write_barrier(void);
  * NB: the xchg instruction is implicitly locked, so we do not need
  * a lock prefix here. 
  */
-INLINE_HEADER StgWord
+EXTERN_INLINE StgWord
 xchg(StgPtr p, StgWord w)
 {
     StgWord result;
@@ -106,7 +106,7 @@ xchg(StgPtr p, StgWord w)
  * CMPXCHG - the single-word atomic compare-and-exchange instruction.  Used 
  * in the STM implementation.
  */
-INLINE_HEADER StgWord
+EXTERN_INLINE StgWord
 cas(StgVolatilePtr p, StgWord o, StgWord n)
 {
 #if i386_HOST_ARCH || x86_64_HOST_ARCH
@@ -159,7 +159,7 @@ cas(StgVolatilePtr p, StgWord o, StgWord n)
  * control in C, and optionally a memory barrier instruction on CPUs
  * that require it (not x86 or x86_64).
  */
-INLINE_HEADER void
+EXTERN_INLINE void
 write_barrier(void) {
 #if i386_HOST_ARCH || x86_64_HOST_ARCH
     __asm__ __volatile__ ("" : : : "memory");

@@ -75,20 +75,40 @@
 
 /*
  * 'Portable' inlining:
- * INLINE_HEADER is for inline functions in header files
+ * INLINE_HEADER is for inline functions in header files (macros)
  * STATIC_INLINE is for inline functions in source files
+ * EXTERN_INLINE is for functions that we want to inline sometimes
  */
 #if defined(__GNUC__) || defined( __INTEL_COMPILER)
+
 # define INLINE_HEADER static inline
 # define INLINE_ME inline
 # define STATIC_INLINE INLINE_HEADER
+
+# if defined(KEEP_INLINES)
+#  define EXTERN_INLINE inline
+# else
+#  define EXTERN_INLINE extern inline
+# endif
+
 #elif defined(_MSC_VER)
+
 # define INLINE_HEADER __inline static
 # define INLINE_ME __inline
 # define STATIC_INLINE INLINE_HEADER
+
+# if defined(KEEP_INLINES)
+#  define EXTERN_INLINE __inline
+# else
+#  define EXTERN_INLINE __inline extern
+# endif
+
 #else
+
 # error "Don't know how to inline functions with your C compiler."
+
 #endif
+
 
 /*
  * GCC attributes
@@ -103,6 +123,12 @@
 #define GNUC3_ATTRIBUTE(at) __attribute__((at))
 #else
 #define GNUC3_ATTRIBUTE(at)
+#endif
+
+#if __GNUC__ > 4 || __GNUC__ == 4 && __GNUC_MINOR__ >= 3
+#define GNUC_ATTR_HOT __attribute__((hot))
+#else
+#define GNUC_ATTR_HOT /* nothing */
 #endif
 
 #define STG_UNUSED    GNUC3_ATTRIBUTE(__unused__)
