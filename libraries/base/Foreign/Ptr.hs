@@ -67,7 +67,7 @@ import Foreign.C.Types
 #endif
 
 import Data.Bits
-import Data.Typeable    ( Typeable(..), mkTyCon, mkTyConApp )
+import Data.Typeable
 import Foreign.Storable ( Storable(..) )
 
 #ifdef __NHC__

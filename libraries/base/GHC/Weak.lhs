@@ -21,7 +21,7 @@ module GHC.Weak where
 import GHC.Base
 import Data.Maybe
 import GHC.IOBase       ( IO(..), unIO )
-import Data.Typeable    ( Typeable1(..), mkTyCon, mkTyConApp )
+import Data.Typeable
 
 {-|
 A weak pointer object with a key and a value.  The value has type @v@.

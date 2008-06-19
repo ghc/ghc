@@ -15,6 +15,7 @@
 #define TYPEABLE_H
 
 #define INSTANCE_TYPEABLE0(tycon,tcname,str) \
+tcname :: TyCon; \
 tcname = mkTyCon str; \
 instance Typeable tycon where { typeOf _ = mkTyConApp tcname [] }
 
@@ -24,14 +25,17 @@ instance Typeable tycon where { typeOf _ = mkTyConApp tcname [] }
 --  // defined in Data.Typeable.
 
 #define INSTANCE_TYPEABLE1(tycon,tcname,str) \
+tcname :: TyCon; \
 tcname = mkTyCon str; \
 instance Typeable1 tycon where { typeOf1 _ = mkTyConApp tcname [] }
 
 #define INSTANCE_TYPEABLE2(tycon,tcname,str) \
+tcname :: TyCon; \
 tcname = mkTyCon str; \
 instance Typeable2 tycon where { typeOf2 _ = mkTyConApp tcname [] }
 
 #define INSTANCE_TYPEABLE3(tycon,tcname,str) \
+tcname :: TyCon; \
 tcname = mkTyCon str; \
 instance Typeable3 tycon where { typeOf3 _ = mkTyConApp tcname [] }
 
