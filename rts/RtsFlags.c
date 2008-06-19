@@ -359,9 +359,9 @@ usage_text[] = {
 "  -I<sec>  Perform full GC after <sec> idle time (default: 0.3, 0 == off)",
 #endif
 "",
-"  -t<file> One-line GC statistics  (default file: <program>.stat)",
-"  -s<file> Summary  GC statistics  (with -Sstderr going to stderr)",
-"  -S<file> Detailed GC statistics",
+"  -t[<file>] One-line GC statistics (if <file> omitted, uses stderr)",
+"  -s[<file>] Summary  GC statistics (if <file> omitted, uses stderr)",
+"  -S[<file>] Detailed GC statistics (if <file> omitted, uses stderr)",
 #ifdef RTS_GTK_FRONTPANEL
 "  -f       Display front panel (requires X11 & GTK+)",
 #endif
@@ -918,7 +918,7 @@ error = rtsTrue;
 		{ 
 		    int r;
 		    r = open_stats_file(arg, *argc, argv,
-					*rts_argc, rts_argv, STAT_FILENAME_FMT,
+					*rts_argc, rts_argv, NULL,
 					&RtsFlags.GcFlags.statsFile);
 		    if (r == -1) { error = rtsTrue; }
 		}
@@ -2343,16 +2343,17 @@ open_stats_file (
 {
     FILE *f = NULL;
 
-    if (strequal(rts_argv[arg]+2, "stderr") || strequal(rts_argv[arg]+2, "-")) {
+    if (strequal(rts_argv[arg]+2, "stderr")
+        || (FILENAME_FMT == NULL && rts_argv[arg][2] == '\0')) {
         f = NULL; /* NULL means use debugBelch */
     } else {
-	if (rts_argv[arg][2] != '\0') {  /* stats file specified */
-	    f = fopen(rts_argv[arg]+2,"w");
-	} else {
-	    char stats_filename[STATS_FILENAME_MAXLEN]; /* default <program>.<ext> */
-	    sprintf(stats_filename, FILENAME_FMT, argv[0]);
-	    f = fopen(stats_filename,"w");
-	}
+        if (rts_argv[arg][2] != '\0') {  /* stats file specified */
+            f = fopen(rts_argv[arg]+2,"w");
+        } else {
+            char stats_filename[STATS_FILENAME_MAXLEN]; /* default <program>.<ext> */
+            sprintf(stats_filename, FILENAME_FMT, argv[0]);
+            f = fopen(stats_filename,"w");
+        }
 	if (f == NULL) {
 	    errorBelch("Can't open stats file %s\n", rts_argv[arg]+2);
 	    return -1;
