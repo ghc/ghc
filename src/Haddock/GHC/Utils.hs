@@ -29,18 +29,18 @@ moduleString = moduleNameString . moduleName
 
 
 -- return the name of the package, with version info
-modulePkgStr = packageIdString . modulePackageId
+modulePackageString = packageIdString . modulePackageId
 
 
 -- return the (name,version) of the package
-modulePkgInfo mod = case unpackPackageId pkg of
-                        Nothing -> (packageIdString pkg, "")
-                        Just x -> (pkgName x, showVersion (pkgVersion x))
+modulePackageInfo mod = case unpackPackageId pkg of
+                          Nothing -> (packageIdString pkg, "")
+                          Just x -> (pkgName x, showVersion (pkgVersion x))
     where pkg = modulePackageId mod
 
 
-mkModuleNoPkg :: String -> Module
-mkModuleNoPkg str = mkModule (stringToPackageId "") (mkModuleName str)
+mkModuleNoPackage :: String -> Module
+mkModuleNoPackage str = mkModule (stringToPackageId "") (mkModuleName str)
 
 
 instance (Outputable a, Outputable b) => Outputable (Map.Map a b) where

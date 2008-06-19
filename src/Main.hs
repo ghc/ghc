@@ -204,8 +204,8 @@ render flags interfaces installedIfaces = do
                        ++ installedIfaces
     
     packageMod       = ifaceMod (head visibleIfaces)
-    packageStr       = Just (modulePkgStr packageMod)
-    (pkgName,pkgVer) = modulePkgInfo packageMod
+    packageStr       = Just (modulePackageString packageMod)
+    (pkgName,pkgVer) = modulePackageInfo packageMod
 
  
   when (Flag_GenIndex `elem` flags) $ do
