@@ -1738,7 +1738,7 @@ f "2"    = 2
     parallelism.</para>
     
     <sect2 id="parallel-options">
-      <title>Options to enable SMP parallelism</title>
+      <title>Options for SMP parallelism</title>
 
       <para>In order to make use of multiple CPUs, your program must be
 	linked with the <option>-threaded</option> option (see <xref
@@ -1752,19 +1752,60 @@ f "2"    = 2
 	    <para><indexterm><primary><option>-N<replaceable>x</replaceable></option></primary><secondary>RTS option</secondary></indexterm>
 	      Use <replaceable>x</replaceable> simultaneous threads when
 	      running the program.  Normally <replaceable>x</replaceable>
-	      should be chosen to match the number of CPU cores on the machine.
-	      There is no means (currently) by which this value may vary after
-	      the program has started.</para> 
-	    
-	    <para>For example, on a dual-core machine we would probably use
+	      should be chosen to match the number of CPU cores on the
+	      machine<footnote><para>Whether hyperthreading cores should be counted or not is an
+	      open question; please feel free to experiment and let us know what
+	          results you find.</para></footnote>.  For example,
+	      on a dual-core machine we would probably use
 	      <literal>+RTS -N2 -RTS</literal>.</para>
 	    
-	    <para>Whether hyperthreading cores should be counted or not is an
-	      open question; please feel free to experiment and let us know what
-	      results you find.</para>
+            <para>Setting <option>-N</option> also has the effect of
+	      setting <option>-g</option> (the number of OS threads to
+	      use for garbage collection) to the same value.</para>
+
+            <para>There is no means (currently) by which this value
+	      may vary after the program has started.</para>
 	  </listitem>
 	</varlistentry>
       </variablelist>
+
+      <para>The following options affect the way the runtime schedules
+      threads on CPUs:</para>
+
+      <variablelist>
+	<varlistentry>
+	  <term><option>-qm</option></term>
+          <indexterm><primary><option>-qm</option></primary><secondary>RTS
+          option</secondary></indexterm>
+	  <listitem>
+            <para>Disable automatic migration for load balancing.
+            Normally the runtime will automatically try to schedule
+            threads across the available CPUs to make use of idle
+            CPUs; this option disables that behaviour.  It is probably
+            only of use if you are explicitly scheduling threads onto
+            CPUs with <literal>GHC.Conc.forkOnIO</literal>.</para>
+          </listitem>
+        </varlistentry>
+	<varlistentry>
+	  <term><option>-qw</option></term>
+          <indexterm><primary><option>-qw</option></primary><secondary>RTS
+          option</secondary></indexterm>
+	  <listitem>
+            <para>Migrate a thread to the current CPU when it is woken
+            up.  Normally when a thread is woken up after being
+            blocked it will be scheduled on the CPU it was running on
+            last; this option allows the thread to immediately migrate
+            to the CPU that unblocked it.</para> 
+ 
+            <para>The rationale for allowing this eager migration is
+            that it tends to move threads that are communicating with
+            each other onto the same CPU; however there are
+            pathalogical situations where it turns out to be a poor
+            strategy.  Depending on the communication pattern in your
+            program, it may or may not be a good idea.</para>
+          </listitem>
+        </varlistentry>
+       </variablelist>
     </sect2>
       
     <sect2>
