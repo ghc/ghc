@@ -30,6 +30,8 @@ dataToQa mkCon mkLit appCon antiQ t =
                 mkLit $ rationalL (toRational n)
             StringConstr (c:_) ->
                 mkLit $ charL c
+            StringConstr [] ->
+                fail "StringConstr with no name"
         where
           constr :: Constr
           constr = toConstr t
