@@ -332,7 +332,7 @@ allocGroup (nat n)
 
     ln = log_2_ceil(n);
 
-    while (free_list[ln] == NULL && ln < MAX_FREE_LIST) {
+    while (ln < MAX_FREE_LIST && free_list[ln] == NULL) {
         ln++;
     }
 
