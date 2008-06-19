@@ -1770,7 +1770,7 @@ f "2"    = 2
     <sect2>
       <title>Hints for using SMP parallelism</title>
 
-      <para>Add the <literal>-sstderr</literal> RTS option when
+      <para>Add the <literal>-s</literal> RTS option when
 	running the program to see timing stats, which will help to tell you
 	whether your program got faster by using more CPUs or not.  If the user
 	time is greater than

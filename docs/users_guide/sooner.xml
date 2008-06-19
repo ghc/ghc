@@ -32,7 +32,7 @@ should go here!</para>
           garbage collection for GHC, which means less compilation
           time.  If you use the <option>-Rghc-timing</option> option,
           you'll get a garbage-collector report.  (Again, you can use
-          the cheap-and-nasty <option>+RTS -Sstderr -RTS</option>
+          the cheap-and-nasty <option>+RTS -S -RTS</option>
           option to send the GC stats straight to standard
           error.)</para>
 
@@ -511,13 +511,13 @@ Use <literal>strip</literal> on your executables.
 
 <para>
 &ldquo;I think I have a space leak&hellip;&rdquo; Re-run your program
-with <option>+RTS -Sstderr</option>, and remove all doubt!  (You'll
+with <option>+RTS -S</option>, and remove all doubt!  (You'll
 see the heap usage get bigger and bigger&hellip;)
 &lsqb;Hmmm&hellip;this might be even easier with the
 <option>-G1</option> RTS option; so&hellip; <command>./a.out +RTS
--Sstderr -G1</command>...]
+-S -G1</command>...]
 <indexterm><primary>-G RTS option</primary></indexterm>
-<indexterm><primary>-Sstderr RTS option</primary></indexterm>
+<indexterm><primary>-S RTS option</primary></indexterm>
 </para>
 
 <para>

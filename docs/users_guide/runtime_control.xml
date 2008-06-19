@@ -436,46 +436,35 @@
       </varlistentry>
 
       <varlistentry>
+        <term>
+          <option>-t</option><optional><replaceable>file</replaceable></optional>
+          <indexterm><primary><option>-t</option></primary><secondary>RTS option</secondary></indexterm>
+        </term>
 	<term>
-          <option>-s</option><replaceable>file</replaceable>
+          <option>-s</option><optional><replaceable>file</replaceable></optional>
           <indexterm><primary><option>-s</option></primary><secondary>RTS option</secondary></indexterm>
         </term>
 	<term>
-          <option>-S</option><replaceable>file</replaceable>
+          <option>-S</option><optional><replaceable>file</replaceable></optional>
           <indexterm><primary><option>-S</option></primary><secondary>RTS option</secondary></indexterm>
         </term>
 	<listitem>
-	  <para>Write modest (<option>-s</option>) or verbose
-          (<option>-S</option>) garbage-collector statistics into file
-          <replaceable>file</replaceable>. The default
-          <replaceable>file</replaceable> is
-          <filename><replaceable>program</replaceable>.stat</filename>. The
-          <replaceable>file</replaceable> <constant>stderr</constant>
-          is treated specially, with the output really being sent to
-          <constant>stderr</constant>.</para>
+	  <para>These options produce runtime-system statistics, such
+	  as the amount of time spent executing the program and in the
+	  garbage collector, the amount of memory allocated, the
+	  maximum size of the heap, and so on.  The three
+	  variants give different levels of detail:
+	  <option>-t</option> produces a single line of output in the
+	  same format as GHC's <option>-Rghc-timing</option> option,
+	  <option>-s</option> produces a more detailed summary at the
+	  end of the program, and <option>-S</option> additionally
+	  produces information about each and every garbage
+	  collection.</para>
 
-	  <para>This option is useful for watching how the storage
-          manager adjusts the heap size based on the current amount of
-          live data.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term>
-          <option>-t<replaceable>file</replaceable></option>
-          <indexterm><primary><option>-t</option></primary><secondary>RTS option</secondary></indexterm>
-        </term>
-	<listitem>
-	  <para>Write a one-line GC stats summary after running the
-	  program.  This output is in the same format as that produced
-	  by the <option>-Rghc-timing</option> option.</para>
-
-	  <para>As with <option>-s</option>, the default
-          <replaceable>file</replaceable> is
-          <filename><replaceable>program</replaceable>.stat</filename>. The
-          <replaceable>file</replaceable> <constant>stderr</constant>
-          is treated specially, with the output really being sent to
-          <constant>stderr</constant>.</para>
+          <para>The output is placed in
+          <replaceable>file</replaceable>.  If
+          <replaceable>file</replaceable> is omitted, then the output
+          is sent to <constant>stderr</constant>.</para>
 	</listitem>
       </varlistentry>
     </variablelist>
