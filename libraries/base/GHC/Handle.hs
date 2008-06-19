@@ -546,42 +546,52 @@ cases are wrong here.  The cases that are wrong:
     but that leaves a small race window where the data can be read
     from the file descriptor before we issue our blocking read().
   * readRawBufferNoBlock for a blocking FD
+
+NOTE [2363]:
+
+In the threaded RTS we could just make safe calls to read()/write()
+for file descriptors in blocking mode without worrying about blocking
+other threads, but the problem with this is that the thread will be
+uninterruptible while it is blocked in the foreign call.  See #2363.
+So now we always call fdReady() before reading, and if fdReady
+indicates that there's no data, we call threadWaitRead.
+
 -}
 
 readRawBuffer :: String -> FD -> Bool -> RawBuffer -> Int -> CInt -> IO CInt
 readRawBuffer loc fd is_nonblock buf off len
-  | is_nonblock  = unsafe_read
-  | threaded     = safe_read
+  | is_nonblock  = unsafe_read -- unsafe is ok, it can't block
   | otherwise    = do r <- throwErrnoIfMinus1 loc 
-                                (fdReady (fromIntegral fd) 0 0 False)
+                                (unsafe_fdReady (fromIntegral fd) 0 0 False)
                       if r /= 0
-                        then unsafe_read
-                        else do threadWaitRead (fromIntegral fd); unsafe_read
+                        then read
+                        else do threadWaitRead (fromIntegral fd); read
   where
     do_read call = throwErrnoIfMinus1RetryMayBlock loc call 
                             (threadWaitRead (fromIntegral fd))
+    read        = if threaded then safe_read else unsafe_read
     unsafe_read = do_read (read_rawBuffer fd buf off len)
     safe_read   = do_read (safe_read_rawBuffer fd buf off len)
 
 readRawBufferPtr :: String -> FD -> Bool -> Ptr CChar -> Int -> CInt -> IO CInt
 readRawBufferPtr loc fd is_nonblock buf off len
-  | is_nonblock  = unsafe_read
-  | threaded     = safe_read
+  | is_nonblock  = unsafe_read -- unsafe is ok, it can't block
   | otherwise    = do r <- throwErrnoIfMinus1 loc 
-                                (fdReady (fromIntegral fd) 0 0 False)
+                                (unsafe_fdReady (fromIntegral fd) 0 0 False)
                       if r /= 0 
-                        then unsafe_read
-                        else do threadWaitRead (fromIntegral fd); unsafe_read
+                        then read
+                        else do threadWaitRead (fromIntegral fd); read
   where
-        do_read call = throwErrnoIfMinus1RetryMayBlock loc call 
-                                (threadWaitRead (fromIntegral fd))
-        unsafe_read = do_read (read_off fd buf off len)
-        safe_read   = do_read (safe_read_off fd buf off len)
+    do_read call = throwErrnoIfMinus1RetryMayBlock loc call 
+                            (threadWaitRead (fromIntegral fd))
+    read        = if threaded then safe_read else unsafe_read
+    unsafe_read = do_read (read_off fd buf off len)
+    safe_read   = do_read (safe_read_off fd buf off len)
 
 readRawBufferNoBlock :: String -> FD -> Bool -> RawBuffer -> Int -> CInt -> IO CInt
 readRawBufferNoBlock loc fd is_nonblock buf off len
-  | is_nonblock  = unsafe_read
-  | otherwise    = do r <- fdReady (fromIntegral fd) 0 0 False
+  | is_nonblock  = unsafe_read -- unsafe is ok, it can't block
+  | otherwise    = do r <- unsafe_fdReady (fromIntegral fd) 0 0 False
                       if r /= 0 then safe_read
                                 else return 0
        -- XXX see note [nonblock]
@@ -592,8 +602,8 @@ readRawBufferNoBlock loc fd is_nonblock buf off len
 
 readRawBufferPtrNoBlock :: String -> FD -> Bool -> Ptr CChar -> Int -> CInt -> IO CInt
 readRawBufferPtrNoBlock loc fd is_nonblock buf off len
-  | is_nonblock  = unsafe_read
-  | otherwise    = do r <- fdReady (fromIntegral fd) 0 0 False
+  | is_nonblock  = unsafe_read -- unsafe is ok, it can't block
+  | otherwise    = do r <- unsafe_fdReady (fromIntegral fd) 0 0 False
                       if r /= 0 then safe_read
                                 else return 0
        -- XXX see note [nonblock]
@@ -604,29 +614,29 @@ readRawBufferPtrNoBlock loc fd is_nonblock buf off len
 
 writeRawBuffer :: String -> FD -> Bool -> RawBuffer -> Int -> CInt -> IO CInt
 writeRawBuffer loc fd is_nonblock buf off len
-  | is_nonblock = unsafe_write
-  | threaded    = safe_write
-  | otherwise   = do r <- fdReady (fromIntegral fd) 1 0 False
+  | is_nonblock = unsafe_write -- unsafe is ok, it can't block
+  | otherwise   = do r <- unsafe_fdReady (fromIntegral fd) 1 0 False
                      if r /= 0 
-                        then safe_write
-                        else do threadWaitWrite (fromIntegral fd); unsafe_write
+                        then write
+                        else do threadWaitWrite (fromIntegral fd); write
   where  
     do_write call = throwErrnoIfMinus1RetryMayBlock loc call
                         (threadWaitWrite (fromIntegral fd)) 
+    write        = if threaded then safe_write else unsafe_write
     unsafe_write = do_write (write_rawBuffer fd buf off len)
     safe_write   = do_write (safe_write_rawBuffer (fromIntegral fd) buf off len)
 
 writeRawBufferPtr :: String -> FD -> Bool -> Ptr CChar -> Int -> CInt -> IO CInt
 writeRawBufferPtr loc fd is_nonblock buf off len
-  | is_nonblock = unsafe_write
-  | threaded    = safe_write
-  | otherwise   = do r <- fdReady (fromIntegral fd) 1 0 False
+  | is_nonblock = unsafe_write -- unsafe is ok, it can't block
+  | otherwise   = do r <- unsafe_fdReady (fromIntegral fd) 1 0 False
                      if r /= 0 
-                        then safe_write
-                        else do threadWaitWrite (fromIntegral fd); unsafe_write
+                        then write
+                        else do threadWaitWrite (fromIntegral fd); write
   where
     do_write call = throwErrnoIfMinus1RetryMayBlock loc call
                         (threadWaitWrite (fromIntegral fd)) 
+    write         = if threaded then safe_write else unsafe_write
     unsafe_write  = do_write (write_off fd buf off len)
     safe_write    = do_write (safe_write_off (fromIntegral fd) buf off len)
 
@@ -644,6 +654,9 @@ foreign import ccall unsafe "__hscore_PrelHandle_write"
 
 foreign import ccall safe "fdReady"
   fdReady :: CInt -> CInt -> CInt -> Bool -> IO CInt
+
+foreign import ccall unsafe "fdReady"
+  unsafe_fdReady :: CInt -> CInt -> CInt -> Bool -> IO CInt
 
 #else /* mingw32_HOST_OS.... */
 
