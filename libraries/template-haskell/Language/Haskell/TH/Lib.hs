@@ -424,6 +424,7 @@ rename (RecP nm fs) = do { pairs <- mapM rename ps; g(combine pairs) }
           (ss,ps) = unzip fs
 rename (ListP pats) = do { pairs <- mapM rename pats; g(combine pairs) }
    where g (es,ps) = return (es,ListP ps)
+rename (SigP {}) = fail "rename: Don't know how to do SigP yet"
 
 genpat :: Pat -> Q ((Name -> ExpQ), Pat)
 genpat p = do { (env,p2) <- rename p; return (alpha env,p2) }
