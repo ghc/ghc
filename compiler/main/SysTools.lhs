@@ -52,7 +52,7 @@ import System.Exit
 import System.Environment
 import System.FilePath
 import System.IO
-import SYSTEM_IO_ERROR as IO
+import System.IO.Error as IO
 import System.Directory
 import Data.Char
 import Data.Maybe

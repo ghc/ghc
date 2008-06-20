@@ -53,7 +53,7 @@ import GHC.Exts		( Int(..) )
 import System.Directory
 import System.FilePath
 import System.IO
-import SYSTEM_IO_ERROR as IO
+import System.IO.Error as IO
 import Control.Monad
 import Data.List	( isSuffixOf )
 import Data.Maybe

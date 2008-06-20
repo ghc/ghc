@@ -22,12 +22,6 @@ you will screw up the layout where they are used in case expressions!
  * settings for the target plat instead). */
 #include "../includes/ghcautoconf.h"
 
-#if !defined(__GLASGOW_HASKELL__) || __GLASGOW_HASKELL__ >= 602
-#define SYSTEM_IO_ERROR System.IO.Error
-#else
-#define SYSTEM_IO_ERROR System.IO
-#endif
-
 /* Global variables may not work in other Haskell implementations,
  * but we need them currently! so the conditional on GLASGOW won't do. */
 #if defined(__GLASGOW_HASKELL__) || !defined(__GLASGOW_HASKELL__)

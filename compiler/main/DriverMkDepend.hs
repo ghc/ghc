@@ -38,7 +38,7 @@ import System.Exit      ( ExitCode(..), exitWith )
 import System.Directory
 import System.FilePath
 import System.IO
-import SYSTEM_IO_ERROR  ( isEOFError )
+import System.IO.Error  ( isEOFError )
 import Control.Monad    ( when )
 import Data.Maybe       ( isJust )
 

@@ -94,7 +94,7 @@ import FastTypes
 #endif
 
 import Control.Monad    ( unless )
-import SYSTEM_IO_ERROR as IO ( catch, isDoesNotExistError )
+import System.IO.Error as IO ( catch, isDoesNotExistError )
 import System.Directory ( doesDirectoryExist, createDirectory,
                           getModificationTime )
 import System.FilePath hiding ( searchPathSeparator )
