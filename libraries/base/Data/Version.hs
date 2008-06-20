@@ -37,7 +37,7 @@ import Prelude -- necessary to get dependencies right
 -- of GHC.  In which case, we might need to pick up ReadP from 
 -- Distribution.Compat.ReadP, because the version in 
 -- Text.ParserCombinators.ReadP doesn't have all the combinators we need.
-#if __GLASGOW_HASKELL__ >= 603 || __HUGS__ || __NHC__
+#if __GLASGOW_HASKELL__ || __HUGS__ || __NHC__
 import Text.ParserCombinators.ReadP
 #else
 import Distribution.Compat.ReadP
@@ -45,8 +45,6 @@ import Distribution.Compat.ReadP
 
 #if !__GLASGOW_HASKELL__
 import Data.Typeable    ( Typeable, TyCon, mkTyCon, mkTyConApp )
-#elif __GLASGOW_HASKELL__ < 602
-import Data.Dynamic     ( Typeable(..), TyCon, mkTyCon, mkAppTy )
 #else
 import Data.Typeable    ( Typeable )
 #endif
@@ -99,7 +97,7 @@ data Version =
                 -- on the entity that this version applies to.
         }
   deriving (Read,Show
-#if __GLASGOW_HASKELL__ >= 602
+#if __GLASGOW_HASKELL__
         ,Typeable
 #endif
         )
@@ -110,12 +108,6 @@ versionTc = mkTyCon "Version"
 
 instance Typeable Version where
   typeOf _ = mkTyConApp versionTc []
-#elif __GLASGOW_HASKELL__ < 602
-versionTc :: TyCon
-versionTc = mkTyCon "Version"
-
-instance Typeable Version where
-  typeOf _ = mkAppTy versionTc []
 #endif
 
 instance Eq Version where
@@ -140,7 +132,7 @@ showVersion (Version branch tags)
 
 -- | A parser for versions in the format produced by 'showVersion'.
 --
-#if __GLASGOW_HASKELL__ >= 603 || __HUGS__
+#if __GLASGOW_HASKELL__ || __HUGS__
 parseVersion :: ReadP Version
 #elif __NHC__
 parseVersion :: ReadPN r Version
