@@ -79,17 +79,7 @@ import GHC.Real                 ( Ratio(..) )
 import GHC.Exts
 import GHC.IOBase               ( IO(..) )
 import GHC.Word                 ( Word8(..) )
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ < 601
--- openFileEx is available from the lang package, but we want to
--- be independent of hslibs libraries.
-import GHC.Handle               ( openFileEx, IOModeEx(..) )
-#else
 import System.IO                ( openBinaryFile )
-#endif
-
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ < 601
-openBinaryFile f mode = openFileEx f (BinaryMode mode)
-#endif
 
 type BinArray = ForeignPtr Word8
 

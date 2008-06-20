@@ -46,17 +46,6 @@ import System.Exit
 import System.IO
 import Data.List
 
-#if !defined(__GLASGOW_HASKELL__) || __GLASGOW_HASKELL__ >= 601
-  -- already imported above
---import System.IO		( openBinaryFile )
-#else
-import IOExts                   ( openFileEx, IOModeEx(..) )
-#endif
-
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ < 601
-openBinaryFile fp mode = openFileEx fp (BinaryMode mode)
-#endif
-
 getImports :: DynFlags -> StringBuffer -> FilePath -> FilePath
     -> IO ([Located ModuleName], [Located ModuleName], Located ModuleName)
 getImports dflags buf filename source_filename = do

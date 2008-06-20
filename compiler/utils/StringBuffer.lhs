@@ -49,15 +49,7 @@ import System.IO                ( hGetBuf, hFileSize,IOMode(ReadMode), hClose
 
 import GHC.Exts
 
-#if !defined(__GLASGOW_HASKELL__) || __GLASGOW_HASKELL__ >= 601
 import System.IO                ( openBinaryFile )
-#else
-import IOExts                   ( openFileEx, IOModeEx(..) )
-#endif
-
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ < 601
-openBinaryFile fp mode = openFileEx fp (BinaryMode mode)
-#endif
 
 -- -----------------------------------------------------------------------------
 -- The StringBuffer type

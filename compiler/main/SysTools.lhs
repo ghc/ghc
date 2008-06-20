@@ -428,9 +428,6 @@ xs `isContainedIn` ys = any (xs `isPrefixOf`) (tails ys)
 -- binaries (see bug #1110).
 getGccEnv :: [Option] -> IO (Maybe [(String,String)])
 getGccEnv opts =
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ < 603
-  return Nothing
-#else
   if null b_dirs
      then return Nothing
      else do env <- getEnvironment
@@ -444,7 +441,6 @@ getGccEnv opts =
   mangle_path (path,paths) | map toUpper path == "PATH"
         = (path, '\"' : head b_dirs ++ "\";" ++ paths)
   mangle_path other = other
-#endif
 
 runMangle :: DynFlags -> [Option] -> IO ()
 runMangle dflags args = do
@@ -681,11 +677,6 @@ runSomethingFiltered dflags filter_fn phase_name pgm args mb_env = do
                 -- to test for this in general.)
               (\ err ->
                 if IO.isDoesNotExistError err
-#if defined(mingw32_HOST_OS) && __GLASGOW_HASKELL__ < 604
-                -- the 'compat' version of rawSystem under mingw32 always
-                -- maps 'errno' to EINVAL to failure.
-                   || case (ioeGetErrorType err ) of { InvalidArgument{} -> True ; _ -> False}
-#endif
                  then return (ExitFailure 1, True)
                  else IO.ioError err)
   case (doesn'tExist, exit_code) of
@@ -696,10 +687,6 @@ runSomethingFiltered dflags filter_fn phase_name pgm args mb_env = do
 builderMainLoop :: DynFlags -> (String -> String) -> FilePath
                 -> [String] -> Maybe [(String, String)]
                 -> IO ExitCode
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ < 603
-builderMainLoop dflags filter_fn pgm real_args mb_env = do
-  rawSystem pgm real_args
-#else
 builderMainLoop dflags filter_fn pgm real_args mb_env = do
   chan <- newChan
   (hStdIn, hStdOut, hStdErr, hProcess) <- runInteractiveProcess pgm real_args Nothing mb_env
@@ -810,7 +797,6 @@ data BuildMessage
   = BuildMsg   !SDoc
   | BuildError !SrcLoc !SDoc
   | EOF
-#endif
 
 showOpt :: Option -> String
 showOpt (FileOption pre f) = pre ++ f

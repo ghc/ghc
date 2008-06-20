@@ -573,10 +573,6 @@ pokeCAString ptr str =
   in
   go str 0
 
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 602
-peekCAStringLen = peekCStringLen
-#endif
-
 {-# NOINLINE sLit #-}
 sLit :: String -> LitString
 sLit x  = mkLitString x

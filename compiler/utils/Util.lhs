@@ -405,16 +405,6 @@ isn'tIn msg x ys
 # endif /* DEBUG */
 \end{code}
 
-foldl1' was added in GHC 6.4
-
-\begin{code}
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ < 604
-foldl1'          :: (a -> a -> a) -> [a] -> a
-foldl1' f (x:xs) =  foldl' f x xs
-foldl1' _ []     =  panic "foldl1'"
-#endif
-\end{code}
-
 %************************************************************************
 %*                                                                      *
 \subsubsection[Utils-Carsten-mergesort]{A mergesort from Carsten}

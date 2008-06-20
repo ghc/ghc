@@ -31,7 +31,7 @@ import FastTypes
 import System.Posix.Signals
 #endif /* mingw32_HOST_OS */
 
-#if defined(mingw32_HOST_OS) && __GLASGOW_HASKELL__ >= 603
+#if defined(mingw32_HOST_OS)
 import GHC.ConsoleHandler
 #endif
 
@@ -116,18 +116,11 @@ showGhcException (Panic s)
 	         ++ s ++ "\n\n"
 	         ++ "Please report this as a GHC bug:  http://www.haskell.org/ghc/reportabug\n")
 
-myMkTyConApp :: TyCon -> [TypeRep] -> TypeRep
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ < 603
-myMkTyConApp = mkAppTy
-#else 
-myMkTyConApp = mkTyConApp
-#endif
-
 ghcExceptionTc :: TyCon
 ghcExceptionTc = mkTyCon "GhcException"
 {-# NOINLINE ghcExceptionTc #-}
 instance Typeable GhcException where
-  typeOf _ = myMkTyConApp ghcExceptionTc []
+  typeOf _ = mkTyConApp ghcExceptionTc []
 \end{code}
 
 Panics and asserts.
@@ -198,7 +191,7 @@ installSignalHandlers = do
   installHandler sigQUIT (Catch interrupt) Nothing 
   installHandler sigINT  (Catch interrupt) Nothing
   return ()
-#elif __GLASGOW_HASKELL__ >= 603
+#else
   -- GHC 6.3+ has support for console events on Windows
   -- NOTE: running GHCi under a bash shell for some reason requires
   -- you to press Ctrl-Break rather than Ctrl-C to provoke
@@ -210,8 +203,6 @@ installSignalHandlers = do
 
   installHandler (Catch sig_handler)
   return ()
-#else
-  return () -- nothing
 #endif
 
 {-# NOINLINE interruptTargetThread #-}
