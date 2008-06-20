@@ -1,5 +1,5 @@
 %
-% (c) The University of Glasgow 2006
+% (c) The University of Glasgow 2006-2008
 % (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
 %
 
@@ -22,28 +22,19 @@ module MkIface (
 \end{code}
 
 	-----------------------------------------------
-		MkIface.lhs deals with versioning
+        	Recompilation checking
 	-----------------------------------------------
 
-Here's the fingerprint-related info in an interface file
+A complete description of how recompilation checking works can be
+found in the wiki commentary:
 
-  module Foo xxxxxxxxxxxxxxxx  -- module fingerprint
-             yyyyyyyyyyyyyyyy  -- export list fingerprint
-             zzzzzzzzzzzzzzzz  -- rule fingerprint
-    Usages: 	-- Version info for what this compilation of Foo imported
-	Baz xxxxxxxxxxxxxxxx	-- Module version
-	    [yyyyyyyyyyyyyyyy]	-- The export-list version
-                                -- ( if Foo depended on it)
-	    (g,zzzzzzzzzzzzzzzz) -- Function and its version
-	    (T,wwwwwwwwwwwwwwww) -- Type and its version
+ http://hackage.haskell.org/trac/ghc/wiki/Commentary/Compiler/RecompilationAvoidance
 
-    <fingerprint> f :: Int -> Int {- Unfolding: \x -> Wib.t x -}
-	
-	-----------------------------------------------
-			Basic idea
-	-----------------------------------------------
+Please read the above page for a top-down description of how this all
+works.  Notes below cover specific issues related to the implementation.
 
 Basic idea: 
+
   * In the mi_usages information in an interface, we record the 
     fingerprint of each free variable of the module
 
@@ -55,128 +46,6 @@ Basic idea:
 
   * In checkOldIface we compare the mi_usages for the module with
     the actual fingerprint for all each thing recorded in mi_usages
-
-Fixities
-~~~~~~~~
-We count A.f as changing if its fixity changes
-
-Rules
-~~~~~
-If a rule changes, we want to recompile any module that might be
-affected by that rule.  For non-orphan rules, this is relatively easy.
-If module M defines f, and a rule for f, just arrange that the fingerprint
-for M.f changes if any of the rules for M.f change.  Any module
-that does not depend on M.f can't be affected by the rule-change
-either.
-
-Orphan rules (ones whose 'head function' is not defined in M) are
-harder.  Here's what we do.
-
-  * We have a per-module orphan-rule fingerprint which changes if 
-    any orphan rule changes. (It's unaffected by non-orphan rules.)
-
-  * We record usage info for any orphan module 'below' this one,
-    giving the orphan-rule fingerprint.  We recompile if this 
-    changes. 
-
-The net effect is that if an orphan rule changes, we recompile every
-module above it.  That's very conservative, but it's devilishly hard
-to know what it might affect, so we just have to be conservative.
-
-Instance decls
-~~~~~~~~~~~~~~
-In an iface file we have
-     module A where
-	instance Eq a => Eq [a]  =  dfun29
-	dfun29 :: ... 
-
-We have a fingerprint for dfun29, covering its unfolding
-etc. Suppose we are compiling a module M that imports A only
-indirectly.  If typechecking M uses this instance decl, we record the
-dependency on A.dfun29 as if it were a free variable of the module
-(via the tcg_inst_usages accumulator).  That means that A will appear
-in M's usage list.  If the shape of the instance declaration changes,
-then so will dfun29's fingerprint, triggering a recompilation.
-
-Adding an instance declaration, or changing an instance decl that is
-not currently used, is more tricky.  (This really only makes a
-difference when we have overlapping instance decls, because then the
-new instance decl might kick in to override the old one.)  We handle
-this in a very similar way that we handle rules above.
-
-  * For non-orphan instance decls, identify one locally-defined tycon/class
-    mentioned in the decl.  Treat the instance decl as part of the defn of that
-    tycon/class, so that if the shape of the instance decl changes, so does the
-    tycon/class; that in turn will force recompilation of anything that uses
-    that tycon/class.
-
-  * For orphan instance decls, act the same way as for orphan rules.
-    Indeed, we use the same global orphan-rule version number.
-
-mkUsageInfo
-~~~~~~~~~~~
-mkUsageInfo figures out what the ``usage information'' for this
-moudule is; that is, what it must record in its interface file as the
-things it uses.  
-
-We produce a line for every module B below the module, A, currently being
-compiled:
-	import B <n> ;
-to record the fact that A does import B indirectly.  This is used to decide
-to look for B.hi rather than B.hi-boot when compiling a module that
-imports A.  This line says that A imports B, but uses nothing in it.
-So we'll get an early bale-out when compiling A if B's fingerprint changes.
-
-The usage information records:
-
-\begin{itemize}
-\item	(a) anything reachable from its body code
-\item	(b) any module exported with a @module Foo@
-\item   (c) anything reachable from an exported item
-\end{itemize}
-
-Why (b)?  Because if @Foo@ changes then this module's export list
-will change, so we must recompile this module at least as far as
-making a new interface file --- but in practice that means complete
-recompilation.
-
-Why (c)?  Consider this:
-\begin{verbatim}
-	module A( f, g ) where	|	module B( f ) where
-	  import B( f )		|	  f = h 3
-	  g = ...		|	  h = ...
-\end{verbatim}
-
-Here, @B.f@ isn't used in A.  Should we nevertheless record @B.f@ in
-@A@'s usages?  Our idea is that we aren't going to touch A.hi if it is
-*identical* to what it was before.  If anything about @B.f@ changes
-than anyone who imports @A@ should be recompiled in case they use
-@B.f@ (they'll get an early exit if they don't).  So, if anything
-about @B.f@ changes we'd better make sure that something in A.hi
-changes, and the convenient way to do that is to record the version
-number @B.f@ in A.hi in the usage list.  If B.f changes that'll force a
-complete recompiation of A, which is overkill but it's the only way to 
-write a new, slightly different, A.hi.
-
-But the example is tricker.  Even if @B.f@ doesn't change at all,
-@B.h@ may do so, and this change may not be reflected in @f@'s version
-number.  But with -O, a module that imports A must be recompiled if
-@B.h@ changes!  So A must record a dependency on @B.h@.  So we treat
-the occurrence of @B.f@ in the export list *just as if* it were in the
-code of A, and thereby haul in all the stuff reachable from it.
-
-	*** Conclusion: if A mentions B.f in its export list,
-	    behave just as if A mentioned B.f in its source code,
-	    and slurp in B.f and all its transitive closure ***
-
-[NB: If B was compiled with -O, but A isn't, we should really *still*
-haul in all the unfoldings for B, in case the module that imports A *is*
-compiled with -O.  I think this is the case.]
-
-SimonM [30/11/2007]: I believe the above is all out of date; the
-current implementation doesn't do it this way.  Instead, when any of
-the dependencies of a declaration changes, the version of the
-declaration itself changes.
 
 \begin{code}
 #include "HsVersions.h"
@@ -793,11 +662,12 @@ declExtras fix_fn rule_env inst_env decl
         n = ifName decl
         id_extras occ = (fix_fn occ, lookupOccEnvL rule_env occ)
 
--- When hashing an instance, we omit the DFun.  This is because if a
--- DFun is used it will already have a separate entry in the usages
--- list, and we don't want changes to the DFun to cause the hash of
--- the instnace to change - that would cause unnecessary changes to
--- orphans, for example.
+--
+-- When hashing an instance, we hash only its structure, not the
+-- fingerprints of the things it mentions.  See the section on instances
+-- in the commentary,
+--    http://hackage.haskell.org/trac/ghc/wiki/Commentary/Compiler/RecompilationAvoidance
+--
 newtype IfaceInstABI = IfaceInstABI IfaceInst
 
 instance Binary IfaceInstABI where
