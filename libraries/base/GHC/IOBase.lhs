@@ -43,7 +43,9 @@ module GHC.IOBase(
     Exception(..), ArithException(..), AsyncException(..), ArrayException(..),
     stackOverflow, heapOverflow, ioException, 
     IOError, IOException(..), IOErrorType(..), ioError, userError,
-    ExitCode(..) 
+    ExitCode(..),
+    -- The RTS calls this
+    nonTermination,
   ) where
 
 import GHC.ST
@@ -57,7 +59,7 @@ import GHC.Show
 import GHC.List
 import GHC.Read
 import Foreign.C.Types (CInt)
-import {-# SOURCE #-} GHC.Exception ( throwIO )
+import {-# SOURCE #-} GHC.Exception ( SomeException, toException, throwIO )
 
 #ifndef __HADDOCK__
 import {-# SOURCE #-} Data.Typeable     ( showsTypeRep )
@@ -711,6 +713,9 @@ data Exception
         -- fields are missing from some of the constructors.  The
         -- 'String' argument gives the location of the
         -- record update in the source program.
+
+nonTermination :: SomeException
+nonTermination = toException NonTermination
 
 -- |The type of arithmetic exceptions
 data ArithException

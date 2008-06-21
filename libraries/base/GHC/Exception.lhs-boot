@@ -8,8 +8,12 @@ import {-# SOURCE #-} qualified GHC.IOBase as IOB
 
 class Exception e
 
+data SomeException
+
 instance Exception IOB.Exception
 
 throwIO :: Exception e => e -> IOB.IO a
+
+toException :: Exception e => e -> SomeException
 \end{code}
 
