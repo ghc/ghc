@@ -68,7 +68,7 @@ import Compat.Unicode	( GeneralCategory(..), generalCategory, isPrint, isUpper )
 }
 
 $unispace    = \x05 -- Trick Alex into handling Unicode. See alexGetChar.
-$whitechar   = [\ \n\r\f\v\xa0 $unispace]
+$whitechar   = [\ \n\r\f\v $unispace]
 $white_no_nl = $whitechar # \n
 $tab         = \t
 
@@ -78,16 +78,16 @@ $decdigit  = $ascdigit -- for now, should really be $digit (ToDo)
 $digit     = [$ascdigit $unidigit]
 
 $special   = [\(\)\,\;\[\]\`\{\}]
-$ascsymbol = [\!\#\$\%\&\*\+\.\/\<\=\>\?\@\\\^\|\-\~ \xa1-\xbf \xd7 \xf7]
+$ascsymbol = [\!\#\$\%\&\*\+\.\/\<\=\>\?\@\\\^\|\-\~]
 $unisymbol = \x04 -- Trick Alex into handling Unicode. See alexGetChar.
 $symbol    = [$ascsymbol $unisymbol] # [$special \_\:\"\']
 
 $unilarge  = \x01 -- Trick Alex into handling Unicode. See alexGetChar.
-$asclarge  = [A-Z \xc0-\xd6 \xd8-\xde]
+$asclarge  = [A-Z]
 $large     = [$asclarge $unilarge]
 
 $unismall  = \x02 -- Trick Alex into handling Unicode. See alexGetChar.
-$ascsmall  = [a-z \xdf-\xf6 \xf8-\xff]
+$ascsmall  = [a-z]
 $small     = [$ascsmall $unismall \_]
 
 $unigraphic = \x06 -- Trick Alex into handling Unicode. See alexGetChar.
@@ -1218,7 +1218,7 @@ lex_char c inp = do
       c | isAny c -> do setInput inp; return c
       _other -> lit_error
 
-isAny c | c > '\xff' = isPrint c
+isAny c | c > '\x7f' = isPrint c
 	| otherwise  = is_any c
 
 lex_escape :: P Char
@@ -1486,7 +1486,7 @@ alexGetChar (AI loc ofs s)
 
 	adj_c 
 	  | c <= '\x06' = non_graphic
-	  | c <= '\xff' = c
+	  | c <= '\x7f' = c
           -- Alex doesn't handle Unicode, so when Unicode
           -- character is encoutered we output these values
           -- with the actual character value hidden in the state.
