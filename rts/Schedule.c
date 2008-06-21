@@ -1021,7 +1021,7 @@ scheduleDetectDeadlock (Capability *cap, Task *task)
 	    case BlockedOnException:
 	    case BlockedOnMVar:
 		throwToSingleThreaded(cap, task->tso, 
-				      (StgClosure *)NonTermination_closure);
+				      (StgClosure *)nonTermination_closure);
 		return;
 	    default:
 		barf("deadlock: main thread blocked in a strange way");
@@ -3156,7 +3156,7 @@ resurrectThreads (StgTSO *threads)
 	    break;
 	case BlockedOnBlackHole:
 	    throwToSingleThreaded(cap, tso,
-				  (StgClosure *)NonTermination_closure);
+				  (StgClosure *)nonTermination_closure);
 	    break;
 	case BlockedOnSTM:
 	    throwToSingleThreaded(cap, tso,

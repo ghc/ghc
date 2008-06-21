@@ -128,7 +128,7 @@ HC_BOOT_LD_OPTS += \
    -u "$(UNDERSCORE)base_GHCziPack_unpackCString_closure" \
    -u "$(UNDERSCORE)base_GHCziIOBase_stackOverflow_closure" \
    -u "$(UNDERSCORE)base_GHCziIOBase_heapOverflow_closure" \
-   -u "$(UNDERSCORE)base_GHCziIOBase_NonTermination_closure" \
+   -u "$(UNDERSCORE)base_GHCziIOBase_nonTermination_closure" \
    -u "$(UNDERSCORE)base_GHCziIOBase_BlockedOnDeadMVar_closure" \
    -u "$(UNDERSCORE)base_GHCziIOBase_Deadlock_closure" \
    -u "$(UNDERSCORE)base_GHCziWeak_runFinalizzerBatch_closure" \

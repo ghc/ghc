@@ -39,7 +39,7 @@ PRELUDE_CLOSURE(base_GHCziIOBase_stackOverflow_closure);
 PRELUDE_CLOSURE(base_GHCziIOBase_heapOverflow_closure);
 PRELUDE_CLOSURE(base_GHCziIOBase_BlockedOnDeadMVar_closure);
 PRELUDE_CLOSURE(base_GHCziIOBase_BlockedIndefinitely_closure);
-PRELUDE_CLOSURE(base_GHCziIOBase_NonTermination_closure);
+PRELUDE_CLOSURE(base_GHCziIOBase_nonTermination_closure);
 PRELUDE_CLOSURE(base_GHCziIOBase_NestedAtomically_closure);
 
 PRELUDE_CLOSURE(base_GHCziConc_ensureIOManagerIsRunning_closure);
@@ -89,7 +89,7 @@ PRELUDE_INFO(base_GHCziStable_StablePtr_con_info);
 #define heapOverflow_closure      DLL_IMPORT_DATA_REF(base_GHCziIOBase_heapOverflow_closure)
 #define BlockedOnDeadMVar_closure DLL_IMPORT_DATA_REF(base_GHCziIOBase_BlockedOnDeadMVar_closure)
 #define BlockedIndefinitely_closure DLL_IMPORT_DATA_REF(base_GHCziIOBase_BlockedIndefinitely_closure)
-#define NonTermination_closure    DLL_IMPORT_DATA_REF(base_GHCziIOBase_NonTermination_closure)
+#define nonTermination_closure    DLL_IMPORT_DATA_REF(base_GHCziIOBase_nonTermination_closure)
 #define NestedAtomically_closure  DLL_IMPORT_DATA_REF(base_GHCziIOBase_NestedAtomically_closure)
 
 #define Czh_static_info           DLL_IMPORT_DATA_REF(base_GHCziBase_Czh_static_info)
