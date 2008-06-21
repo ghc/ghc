@@ -3,7 +3,9 @@
 
 module Data.Typeable where
 
+import Data.Maybe
 import GHC.Base
+import {-# SOURCE #-} GHC.IOBase
 import GHC.Show
 
 data TypeRep
@@ -13,6 +15,10 @@ mkTyCon      :: String -> TyCon
 mkTyConApp   :: TyCon -> [TypeRep] -> TypeRep
 showsTypeRep :: TypeRep -> ShowS
 
+cast :: (Typeable a, Typeable b) => a -> Maybe b
+
 class Typeable a where
   typeOf :: a -> TypeRep
+
+instance Typeable Exception
 

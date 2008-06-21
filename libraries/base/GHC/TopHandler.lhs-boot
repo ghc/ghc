@@ -2,8 +2,7 @@
 {-# OPTIONS_GHC -XNoImplicitPrelude #-}
 module GHC.TopHandler ( reportError, reportStackOverflow ) where
 
-import GHC.Exception ( Exception )
-import GHC.IOBase    ( IO )
+import GHC.IOBase    ( IO, Exception )
 
 reportError :: Exception -> IO a
 reportStackOverflow :: IO a

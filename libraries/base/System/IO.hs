@@ -490,7 +490,7 @@ openTempFile' loc tmp_dir template binary = do
          -- as any exceptions etc will only be able to report the
          -- fd currently
          h <- fdToHandle fd
-                `ExceptionBase.catchException` \e -> do c_close fd; throw e
+                `ExceptionBase.catchAny` \e -> do c_close fd; throw e
          return (filepath, h)
 #endif
       where
@@ -562,7 +562,7 @@ bracket
 bracket before after thing =
   block (do
     a <- before
-    r <- catchException
+    r <- catchAny
            (unblock (thing a))
            (\e -> do { after a; throw e })
     after a

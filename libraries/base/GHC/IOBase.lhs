@@ -41,7 +41,7 @@ module GHC.IOBase(
 
         -- Exceptions
     Exception(..), ArithException(..), AsyncException(..), ArrayException(..),
-    stackOverflow, heapOverflow, throw, throwIO, ioException, 
+    stackOverflow, heapOverflow, ioException, 
     IOError, IOException(..), IOErrorType(..), ioError, userError,
     ExitCode(..) 
   ) where
@@ -57,6 +57,7 @@ import GHC.Show
 import GHC.List
 import GHC.Read
 import Foreign.C.Types (CInt)
+import {-# SOURCE #-} GHC.Exception ( throwIO )
 
 #ifndef __HADDOCK__
 import {-# SOURCE #-} Data.Typeable     ( showsTypeRep )
@@ -839,34 +840,8 @@ data ExitCode
                 -- may be prohibited (e.g. 0 on a POSIX-compliant system).
   deriving (Eq, Ord, Read, Show)
 
--- --------------------------------------------------------------------------
--- Primitive throw
-
--- | Throw an exception.  Exceptions may be thrown from purely
--- functional code, but may only be caught within the 'IO' monad.
-throw :: Exception -> a
-throw exception = raise# exception
-
--- | A variant of 'throw' that can be used within the 'IO' monad.
---
--- Although 'throwIO' has a type that is an instance of the type of 'throw', the
--- two functions are subtly different:
---
--- > throw e   `seq` x  ===> throw e
--- > throwIO e `seq` x  ===> x
---
--- The first example will cause the exception @e@ to be raised,
--- whereas the second one won\'t.  In fact, 'throwIO' will only cause
--- an exception to be raised when it is used within the 'IO' monad.
--- The 'throwIO' variant should be used in preference to 'throw' to
--- raise an exception within the 'IO' monad because it guarantees
--- ordering with respect to other 'IO' operations, whereas 'throw'
--- does not.
-throwIO         :: Exception -> IO a
-throwIO err     =  IO $ raiseIO# err
-
 ioException     :: IOException -> IO a
-ioException err =  IO $ raiseIO# (IOException err)
+ioException err = throwIO (IOException err)
 
 -- | Raise an 'IOError' in the 'IO' monad.
 ioError         :: IOError -> IO a 

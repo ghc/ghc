@@ -50,6 +50,7 @@ module Control.Exception (
 
         -- ** The @catch@ functions
         catch,     -- :: IO a -> (Exception -> IO a) -> IO a
+        catchAny,
         catchJust, -- :: (Exception -> Maybe b) -> IO a -> (b -> IO a) -> IO a
 
         -- ** The @handle@ functions
@@ -128,7 +129,8 @@ module Control.Exception (
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base         ( assert )
-import GHC.Exception    as ExceptionBase hiding (catch)
+import GHC.IOBase
+import GHC.Exception    as ExceptionBase hiding (Exception, catch)
 import GHC.Conc         ( throwTo, ThreadId )
 import Data.IORef       ( IORef, newIORef, readIORef, writeIORef )
 import Foreign.C.String ( CString, withCString )
@@ -596,7 +598,7 @@ uncaughtExceptionHandler = unsafePerformIO (newIORef defaultHandler)
    where
       defaultHandler :: Exception -> IO ()
       defaultHandler ex = do
-         (hFlush stdout) `catchException` (\ _ -> return ())
+         (hFlush stdout) `catchAny` (\ _ -> return ())
          let msg = case ex of
                Deadlock    -> "no threads to run:  infinite loop or deadlock?"
                ErrorCall s -> s

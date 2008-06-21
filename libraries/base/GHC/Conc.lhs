@@ -121,7 +121,7 @@ import GHC.Base         ( Int(..) )
 import GHC.Read         ( Read )
 import GHC.Enum         ( Enum )
 #endif
-import GHC.Exception
+import GHC.Exception    ( catchException, catchAny, throw, block, unblock )
 import GHC.Pack         ( packCString# )
 import GHC.Ptr          ( Ptr(..), plusPtr, FunPtr(..) )
 import GHC.STRef
@@ -662,7 +662,7 @@ withMVar :: MVar a -> (a -> IO b) -> IO b
 withMVar m io = 
   block $ do
     a <- takeMVar m
-    b <- catchException (unblock (io a))
+    b <- catchAny (unblock (io a))
             (\e -> do putMVar m a; throw e)
     putMVar m a
     return b

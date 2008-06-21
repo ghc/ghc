@@ -33,7 +33,7 @@ import Control.Concurrent.MVar
 import Foreign
 import Foreign.C
 import GHC.IOBase
-import GHC.Exception
+import GHC.Exception    ( catchException )
 import GHC.Prim
 import GHC.Conc
 import GHC.Weak
@@ -182,8 +182,8 @@ foreign import ccall unsafe "stackOverflow"
 -- an infinite loop).
 cleanUp :: IO ()
 cleanUp = do
-  hFlush stdout `catchException` \_ -> return ()
-  hFlush stderr `catchException` \_ -> return ()
+  hFlush stdout `catchAny` \_ -> return ()
+  hFlush stderr `catchAny` \_ -> return ()
 
 cleanUpAndExit :: Int -> IO a
 cleanUpAndExit r = do cleanUp; safeExit r

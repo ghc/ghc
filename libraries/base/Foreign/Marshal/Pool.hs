@@ -47,7 +47,7 @@ module Foreign.Marshal.Pool (
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base              ( Int, Monad(..), (.), not )
 import GHC.Err               ( undefined )
-import GHC.Exception         ( block, unblock, throw, catchException )
+import GHC.Exception         ( block, unblock, throw, catchException, catchAny )
 import GHC.IOBase            ( IO, IORef, newIORef, readIORef, writeIORef, )
 import GHC.List              ( elem, length )
 import GHC.Num               ( Num(..) )
@@ -98,7 +98,7 @@ withPool :: (Pool -> IO b) -> IO b
 withPool act =   -- ATTENTION: cut-n-paste from Control.Exception below!
    block (do
       pool <- newPool
-      val <- catchException
+      val <- catchAny
                 (unblock (act pool))
                 (\e -> do freePool pool; throw e)
       freePool pool

@@ -73,7 +73,7 @@ import GHC.Base
 import GHC.Read         ( Read )
 import GHC.List
 import GHC.IOBase
-import GHC.Exception
+import GHC.Exception    ( block, catchException, catchAny, throw, throwIO )
 import GHC.Enum
 import GHC.Num          ( Integer(..), Num(..) )
 import GHC.Show
@@ -345,7 +345,7 @@ handleFinalizer fp m = do
   handle_ <- takeMVar m
   case haType handle_ of
       ClosedHandle -> return ()
-      _ -> do flushWriteBufferOnly handle_ `catchException` \_ -> return ()
+      _ -> do flushWriteBufferOnly handle_ `catchAny` \_ -> return ()
                 -- ignore errors and async exceptions, and close the
                 -- descriptor anyway...
               hClose_handle_ handle_
@@ -905,7 +905,7 @@ openFile' filepath mode binary =
     stat@(fd_type,_,_) <- fdStat fd
 
     h <- fdToHandle_stat fd (Just stat) False filepath mode binary
-            `catchException` \e -> do c_close fd; throw e
+            `catchAny` \e -> do c_close fd; throw e
         -- NB. don't forget to close the FD if fdToHandle' fails, otherwise
         -- this FD leaks.
         -- ASSERT: if we just created the file, then fdToHandle' won't fail
@@ -1144,6 +1144,7 @@ hClose_help handle_ =
       _ -> do flushWriteBufferOnly handle_ -- interruptible
               hClose_handle_ handle_
 
+hClose_handle_ :: Handle__ -> IO (Handle__, Maybe Exception)
 hClose_handle_ handle_ = do
     let fd = haFD handle_
 

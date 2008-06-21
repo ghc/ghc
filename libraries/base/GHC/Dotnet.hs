@@ -24,6 +24,7 @@ module GHC.Dotnet
 
 import GHC.Prim
 import GHC.Base
+import GHC.Exception
 import GHC.IO
 import GHC.IOBase
 import GHC.Ptr

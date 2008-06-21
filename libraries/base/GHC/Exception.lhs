@@ -18,18 +18,51 @@
 -- #hide
 module GHC.Exception
         ( module GHC.Exception,
-          Exception(..), AsyncException(..),
-          IOException(..), ArithException(..), ArrayException(..),
-          throw, throwIO, ioError )
+          throwIO, ioError )
   where
 
+import Data.Maybe
+import {-# SOURCE #-} Data.Typeable
 import GHC.Base
-import GHC.IOBase
+import GHC.IOBase hiding (Exception)
+import qualified GHC.IOBase
+import GHC.Show
 \end{code}
 
 %*********************************************************
 %*                                                      *
-\subsection{Primitive catch}
+\subsection{Exceptions}
+%*                                                      *
+%*********************************************************
+
+\begin{code}
+data SomeException = forall e . Exception e => SomeException e
+    deriving Typeable
+
+instance Show SomeException where
+    showsPrec p (SomeException e) = showsPrec p e
+
+class (Typeable e, Show e) => Exception e where
+    toException   :: e -> SomeException
+    fromException :: SomeException -> Maybe e
+
+    toException = SomeException
+    fromException (SomeException e) = cast e
+
+instance Exception SomeException where
+    toException se = se
+    fromException = Just
+\end{code}
+
+For now at least, make the monolithic Exception type an instance.
+
+\begin{code}
+instance Exception GHC.IOBase.Exception
+\end{code}
+
+%*********************************************************
+%*                                                      *
+\subsection{Primitive catch and throw}
 %*                                                      *
 %*********************************************************
 
@@ -46,8 +79,15 @@ Now catch# has type
 have to work around that in the definition of catchException below).
 
 \begin{code}
-catchException :: IO a -> (Exception -> IO a) -> IO a
-catchException (IO m) k =  IO $ \s -> catch# m (\ex -> unIO (k ex)) s
+catchException :: Exception e => IO a -> (e -> IO a) -> IO a
+catchException (IO io) handler = IO $ catch# io handler'
+    where handler' e = case fromException e of
+                       Just e' -> unIO (handler e')
+                       Nothing -> raise# e
+
+catchAny :: IO a -> (forall e . Exception e => e -> IO a) -> IO a
+catchAny (IO io) handler = IO $ catch# io handler'
+    where handler' (SomeException e) = unIO (handler e)
 
 -- | The 'catch' function establishes a handler that receives any 'IOError'
 -- raised in the action protected by 'catch'.  An 'IOError' is caught by
@@ -71,6 +111,29 @@ catch           :: IO a -> (IOError -> IO a) -> IO a
 catch m k       =  catchException m handler
   where handler (IOException err)   = k err
         handler other               = throw other
+
+-- | Throw an exception.  Exceptions may be thrown from purely
+-- functional code, but may only be caught within the 'IO' monad.
+throw :: Exception e => e -> a
+throw e = raise# (toException e)
+
+-- | A variant of 'throw' that can be used within the 'IO' monad.
+--
+-- Although 'throwIO' has a type that is an instance of the type of 'throw', the
+-- two functions are subtly different:
+--
+-- > throw e   `seq` x  ===> throw e
+-- > throwIO e `seq` x  ===> x
+--
+-- The first example will cause the exception @e@ to be raised,
+-- whereas the second one won\'t.  In fact, 'throwIO' will only cause
+-- an exception to be raised when it is used within the 'IO' monad.
+-- The 'throwIO' variant should be used in preference to 'throw' to
+-- raise an exception within the 'IO' monad because it guarantees
+-- ordering with respect to other 'IO' operations, whereas 'throw'
+-- does not.
+throwIO :: Exception e => e -> IO a
+throwIO e = IO (raiseIO# (toException e))
 \end{code}
 
 
