@@ -98,7 +98,6 @@ endif
 endif
 
 stage1 : $(GCC_LIB_DEP) check-packages
-	$(MAKE) -C utils mostlyclean
 	$(MAKE) -C utils/mkdependC boot
 	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
 	for i in $(SUBDIRS_BUILD); do \
@@ -128,14 +127,8 @@ stage1 : $(GCC_LIB_DEP) check-packages
 # compiler of all utils that get installed and of all extra support binaries
 # includes in binary dists.
 stage2 : check-packages
-	$(MAKE) -C utils mostlyclean
-	$(MAKE) -C utils stage=2
 	$(MAKE) -C compiler boot stage=2
 	$(MAKE) -C compiler stage=2
-	$(RM) -f libraries/ifBuildable/ifBuildable
-	$(MAKE) -C libraries stage=2 ifBuildable/ifBuildable
-	$(RM) -f libraries/installPackage/installPackage
-	$(MAKE) -C libraries stage=2 installPackage/installPackage
 
 
 stage3 : check-packages
