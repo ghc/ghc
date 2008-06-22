@@ -19,6 +19,9 @@ module GHC.Exts
         Char(..),
         Ptr(..), FunPtr(..),
 
+        -- * The maximum tuple size
+        maxTupleSize,
+
         -- * Primitive operations
         module GHC.Prim,
         shiftL#, shiftRL#, iShiftL#, iShiftRA#, iShiftRL#,
@@ -53,6 +56,10 @@ import GHC.Float
 import GHC.Ptr
 import Data.String
 import Data.List
+
+-- XXX This should really be in Data.Tuple, where the definitions are
+maxTupleSize :: Int
+maxTupleSize = 62
 
 -- | The 'Down' type allows you to reverse sort order conveniently.  A value of type
 -- @'Down' a@ contains a value of type @a@ (represented as @'Down' a@).
