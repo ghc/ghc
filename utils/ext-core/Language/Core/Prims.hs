@@ -18,14 +18,7 @@ initialEnv = efromlist [(primMname,primEnv),
 		     (errMname,errorEnv)]
 
 primEnv :: Envs
--- Tediously, we add defs for ByteArray# etc. because these are
--- declared as ByteArr# (etc.) in primops.txt, and GHC has
--- ByteArray# etc. wired-in.
--- At least this is better than when all primops were wired-in here.
-primEnv = Envs {tcenv_=efromlist $ map (\ (t,k) -> (t,Kind k)) $ 
-                  [(snd tcByteArrayzh,ktByteArrayzh), 
-                   (snd tcMutableArrayzh, ktMutableArrayzh),
-                   (snd tcMutableByteArrayzh, ktMutableByteArrayzh)] ++
+primEnv = Envs {tcenv_=efromlist $ map (\ (t,k) -> (t,Kind k))
                  ([(snd $ tcUtuple n, ktUtuple n) | n <- [1..maxUtuple]] 
                    ++ ((snd tcArrow,ktArrow):primTcs)),
 		cenv_=efromlist primDcs,
@@ -53,20 +46,6 @@ tRWS = tStatezh tRealWorld
 opsState :: [(Var, Ty)]
 opsState = [
   ("realWorldzh", tRWS)]
-
-{- Arrays -}
-
-tcByteArrayzh, tcMutableArrayzh, tcMutableByteArrayzh :: Qual Tcon
-ktByteArrayzh, ktMutableArrayzh, ktMutableByteArrayzh :: Kind
-
-tcByteArrayzh = pvz "ByteArray"
-ktByteArrayzh = Kunlifted
-
-tcMutableArrayzh = pvz "MutableArray"
-ktMutableArrayzh = Karrow Klifted (Karrow Klifted Kunlifted)
-
-tcMutableByteArrayzh = pvz "MutableByteArray"
-ktMutableByteArrayzh = Karrow Klifted Kunlifted
 
 {- Real world and state. -}
 

@@ -113,8 +113,8 @@ section "The word size story."
 	 primops are fixed, but their {\it types} vary according to
 	 the value of {\tt WORD\_SIZE\_IN\_BITS}. For example, if word
 	 size is at least 32 bits then an operator like
-	 \texttt{indexInt32Array\#} has type {\tt ByteArr\# -> Int\#
-	 -> Int\#}; otherwise it has type {\tt ByteArr\# -> Int\# ->
+	 \texttt{indexInt32Array\#} has type {\tt ByteArray\# -> Int\#
+	 -> Int\#}; otherwise it has type {\tt ByteArray\# -> Int\# ->
 	 Int32\#}.  This approach confines the necessary {\tt
 	 \#if}-defs to this file; no conditional compilation is needed
 	 in the files that expose these primops.
@@ -251,7 +251,7 @@ primop   Int2FloatOp   "int2Float#"      GenPrimOp  Int# -> Float#
 primop   Int2DoubleOp   "int2Double#"          GenPrimOp  Int# -> Double#
 
 primop   Int2IntegerOp    "int2Integer#"
-   GenPrimOp Int# -> (# Int#, ByteArr# #)
+   GenPrimOp Int# -> (# Int#, ByteArray# #)
    with out_of_line = True
 
 primop   ISllOp   "uncheckedIShiftL#" GenPrimOp  Int# -> Int# -> Int#
@@ -306,7 +306,7 @@ primop   SrlOp   "uncheckedShiftRL#"   GenPrimOp   Word# -> Int# -> Word#
 primop   Word2IntOp   "word2Int#"   GenPrimOp   Word# -> Int#
 
 primop   Word2IntegerOp   "word2Integer#"   GenPrimOp 
-   Word# -> (# Int#, ByteArr# #)
+   Word# -> (# Int#, ByteArray# #)
    with out_of_line = True
 
 primop   WordGtOp   "gtWord#"   Compare   Word# -> Word# -> Bool
@@ -340,7 +340,7 @@ section "Int32#"
 primtype Int32#
 
 primop   Int32ToIntegerOp   "int32ToInteger#" GenPrimOp 
-   Int32# -> (# Int#, ByteArr# #)
+   Int32# -> (# Int#, ByteArray# #)
    with out_of_line = True
 
 
@@ -354,7 +354,7 @@ section "Word32#"
 primtype Word32#
 
 primop   Word32ToIntegerOp   "word32ToInteger#" GenPrimOp
-   Word32# -> (# Int#, ByteArr# #)
+   Word32# -> (# Int#, ByteArray# #)
    with out_of_line = True
 
 
@@ -372,7 +372,7 @@ section "Int64#"
 primtype Int64#
 
 primop   Int64ToIntegerOp   "int64ToInteger#" GenPrimOp 
-   Int64# -> (# Int#, ByteArr# #)
+   Int64# -> (# Int#, ByteArray# #)
    with out_of_line = True
 
 ------------------------------------------------------------------------
@@ -385,7 +385,7 @@ section "Word64#"
 primtype Word64#
 
 primop   Word64ToIntegerOp   "word64ToInteger#" GenPrimOp
-   Word64# -> (# Int#, ByteArr# #)
+   Word64# -> (# Int#, ByteArray# #)
    with out_of_line = True
 
 #endif
@@ -395,7 +395,7 @@ section "Integer#"
 	{Operations on arbitrary-precision integers. These operations are 
 implemented via the GMP package. An integer is represented as a pair
 consisting of an {\tt Int\#} representing the number of 'limbs' in use and
-the sign, and a {\tt ByteArr\#} containing the 'limbs' themselves.  Such pairs
+the sign, and a {\tt ByteArray\#} containing the 'limbs' themselves.  Such pairs
 are returned as unboxed pairs, but must be passed as separate
 components.
 
@@ -406,103 +406,103 @@ primops are omitted.}
 #ifndef ILX
 
 primop   IntegerAddOp   "plusInteger#" GenPrimOp   
-   Int# -> ByteArr# -> Int# -> ByteArr# -> (# Int#, ByteArr# #)
+   Int# -> ByteArray# -> Int# -> ByteArray# -> (# Int#, ByteArray# #)
    with commutable = True
         out_of_line = True
 
 primop   IntegerSubOp   "minusInteger#" GenPrimOp  
-   Int# -> ByteArr# -> Int# -> ByteArr# -> (# Int#, ByteArr# #)
+   Int# -> ByteArray# -> Int# -> ByteArray# -> (# Int#, ByteArray# #)
    with out_of_line = True
 
 primop   IntegerMulOp   "timesInteger#" GenPrimOp   
-   Int# -> ByteArr# -> Int# -> ByteArr# -> (# Int#, ByteArr# #)
+   Int# -> ByteArray# -> Int# -> ByteArray# -> (# Int#, ByteArray# #)
    with commutable = True
         out_of_line = True
 
 primop   IntegerGcdOp   "gcdInteger#" GenPrimOp    
-   Int# -> ByteArr# -> Int# -> ByteArr# -> (# Int#, ByteArr# #)
+   Int# -> ByteArray# -> Int# -> ByteArray# -> (# Int#, ByteArray# #)
    {Greatest common divisor.}
    with commutable = True
         out_of_line = True
 
 primop   IntegerIntGcdOp   "gcdIntegerInt#" GenPrimOp
-   Int# -> ByteArr# -> Int# -> Int#
+   Int# -> ByteArray# -> Int# -> Int#
    {Greatest common divisor, where second argument is an ordinary {\tt Int\#}.}
    with out_of_line = True
 
 primop   IntegerDivExactOp   "divExactInteger#" GenPrimOp
-   Int# -> ByteArr# -> Int# -> ByteArr# -> (# Int#, ByteArr# #)
+   Int# -> ByteArray# -> Int# -> ByteArray# -> (# Int#, ByteArray# #)
    {Divisor is guaranteed to be a factor of dividend.}
    with out_of_line = True
 
 primop   IntegerQuotOp   "quotInteger#" GenPrimOp
-   Int# -> ByteArr# -> Int# -> ByteArr# -> (# Int#, ByteArr# #)
+   Int# -> ByteArray# -> Int# -> ByteArray# -> (# Int#, ByteArray# #)
    {Rounds towards zero.}
    with out_of_line = True
 
 primop   IntegerRemOp   "remInteger#" GenPrimOp
-   Int# -> ByteArr# -> Int# -> ByteArr# -> (# Int#, ByteArr# #)
+   Int# -> ByteArray# -> Int# -> ByteArray# -> (# Int#, ByteArray# #)
    {Satisfies \texttt{plusInteger\# (timesInteger\# (quotInteger\# x y) y) (remInteger\# x y) == x}.}
    with out_of_line = True
 
 primop   IntegerCmpOp   "cmpInteger#"   GenPrimOp  
-   Int# -> ByteArr# -> Int# -> ByteArr# -> Int#
+   Int# -> ByteArray# -> Int# -> ByteArray# -> Int#
    {Returns -1,0,1 according as first argument is less than, equal to, or greater than second argument.}
    with needs_wrapper = True
         out_of_line = True
 
 primop   IntegerCmpIntOp   "cmpIntegerInt#" GenPrimOp
-   Int# -> ByteArr# -> Int# -> Int#
+   Int# -> ByteArray# -> Int# -> Int#
    {Returns -1,0,1 according as first argument is less than, equal to, or greater than second argument, which
    is an ordinary Int\#.}
    with needs_wrapper = True
         out_of_line = True
 
 primop   IntegerQuotRemOp   "quotRemInteger#" GenPrimOp
-   Int# -> ByteArr# -> Int# -> ByteArr# -> (# Int#, ByteArr#, Int#, ByteArr# #)
+   Int# -> ByteArray# -> Int# -> ByteArray# -> (# Int#, ByteArray#, Int#, ByteArray# #)
    {Compute quot and rem simulaneously.}
    with can_fail = True
         out_of_line = True
 
 primop   IntegerDivModOp    "divModInteger#"  GenPrimOp
-   Int# -> ByteArr# -> Int# -> ByteArr# -> (# Int#, ByteArr#, Int#, ByteArr# #)
+   Int# -> ByteArray# -> Int# -> ByteArray# -> (# Int#, ByteArray#, Int#, ByteArray# #)
    {Compute div and mod simultaneously, where div rounds towards negative infinity
     and\texttt{(q,r) = divModInteger\#(x,y)} implies \texttt{plusInteger\# (timesInteger\# q y) r = x}.}
    with can_fail = True
         out_of_line = True
 
 primop   Integer2IntOp   "integer2Int#"    GenPrimOp
-   Int# -> ByteArr# -> Int#
+   Int# -> ByteArray# -> Int#
    with needs_wrapper = True
         out_of_line = True
 
 primop   Integer2WordOp   "integer2Word#"   GenPrimOp
-   Int# -> ByteArr# -> Word#
+   Int# -> ByteArray# -> Word#
    with needs_wrapper = True
         out_of_line = True
 
 #if WORD_SIZE_IN_BITS < 32
 primop   IntegerToInt32Op   "integerToInt32#" GenPrimOp
-   Int# -> ByteArr# -> Int32#
+   Int# -> ByteArray# -> Int32#
 
 primop   IntegerToWord32Op   "integerToWord32#" GenPrimOp
-   Int# -> ByteArr# -> Word32#
+   Int# -> ByteArray# -> Word32#
 #endif
 
 primop   IntegerAndOp  "andInteger#" GenPrimOp
-   Int# -> ByteArr# -> Int# -> ByteArr# -> (# Int#, ByteArr# #)
+   Int# -> ByteArray# -> Int# -> ByteArray# -> (# Int#, ByteArray# #)
    with out_of_line = True
 
 primop   IntegerOrOp  "orInteger#" GenPrimOp
-   Int# -> ByteArr# -> Int# -> ByteArr# -> (# Int#, ByteArr# #)
+   Int# -> ByteArray# -> Int# -> ByteArray# -> (# Int#, ByteArray# #)
    with out_of_line = True
 
 primop   IntegerXorOp  "xorInteger#" GenPrimOp
-   Int# -> ByteArr# -> Int# -> ByteArr# -> (# Int#, ByteArr# #)
+   Int# -> ByteArray# -> Int# -> ByteArray# -> (# Int#, ByteArray# #)
    with out_of_line = True
 
 primop   IntegerComplementOp  "complementInteger#" GenPrimOp
-   Int# -> ByteArr# -> (# Int#, ByteArr# #)
+   Int# -> ByteArray# -> (# Int#, ByteArray# #)
    with out_of_line = True
 
 #endif /* ndef ILX */
@@ -612,9 +612,9 @@ primop   DoublePowerOp   "**##" Dyadic
    with needs_wrapper = True
 
 primop   DoubleDecodeOp   "decodeDouble#" GenPrimOp    
-   Double# -> (# Int#, Int#, ByteArr# #)
+   Double# -> (# Int#, Int#, ByteArray# #)
    {Convert to arbitrary-precision integer.
-    First {\tt Int\#} in result is the exponent; second {\tt Int\#} and {\tt ByteArr\#}
+    First {\tt Int\#} in result is the exponent; second {\tt Int\#} and {\tt ByteArray\#}
     represent an {\tt Integer\#} holding the mantissa.}
    with out_of_line = True
 
@@ -726,9 +726,9 @@ primop   FloatPowerOp   "powerFloat#"      Dyadic
 primop   Float2DoubleOp   "float2Double#" GenPrimOp  Float# -> Double#
 
 primop   FloatDecodeOp   "decodeFloat#" GenPrimOp
-   Float# -> (# Int#, Int#, ByteArr# #)
+   Float# -> (# Int#, Int#, ByteArray# #)
    {Convert to arbitrary-precision integer.
-    First {\tt Int\#} in result is the exponent; second {\tt Int\#} and {\tt ByteArr\#}
+    First {\tt Int\#} in result is the exponent; second {\tt Int\#} and {\tt ByteArray\#}
     represent an {\tt Integer\#} holding the mantissa.}
    with out_of_line = True
 
@@ -745,10 +745,10 @@ section "Arrays"
 
 primtype Array# a
 
-primtype MutArr# s a
+primtype MutableArray# s a
 
 primop  NewArrayOp "newArray#" GenPrimOp
-   Int# -> a -> State# s -> (# State# s, MutArr# s a #)
+   Int# -> a -> State# s -> (# State# s, MutableArray# s a #)
    {Create a new mutable array of specified size (in bytes),
     in the specified state thread,
     with each element containing the specified initial value.}
@@ -756,14 +756,14 @@ primop  NewArrayOp "newArray#" GenPrimOp
    out_of_line = True
 
 primop  SameMutableArrayOp "sameMutableArray#" GenPrimOp
-   MutArr# s a -> MutArr# s a -> Bool
+   MutableArray# s a -> MutableArray# s a -> Bool
 
 primop  ReadArrayOp "readArray#" GenPrimOp
-   MutArr# s a -> Int# -> State# s -> (# State# s, a #)
+   MutableArray# s a -> Int# -> State# s -> (# State# s, a #)
    {Read from specified index of mutable array. Result is not yet evaluated.}
 
 primop  WriteArrayOp "writeArray#" GenPrimOp
-   MutArr# s a -> Int# -> a -> State# s -> State# s
+   MutableArray# s a -> Int# -> a -> State# s -> State# s
    {Write to specified index of mutable array.}
    with
    has_side_effects = True
@@ -774,13 +774,13 @@ primop  IndexArrayOp "indexArray#" GenPrimOp
     an unboxed singleton; the result itself is not yet evaluated.}
 
 primop  UnsafeFreezeArrayOp "unsafeFreezeArray#" GenPrimOp
-   MutArr# s a -> State# s -> (# State# s, Array# a #)
+   MutableArray# s a -> State# s -> (# State# s, Array# a #)
    {Make a mutable array immutable, without copying.}
    with
    has_side_effects = True
 
 primop  UnsafeThawArrayOp  "unsafeThawArray#" GenPrimOp
-   Array# a -> State# s -> (# State# s, MutArr# s a #)
+   Array# a -> State# s -> (# State# s, MutableArray# s a #)
    {Make an immutable array mutable, without copying.}
    with
    out_of_line = True
@@ -799,205 +799,205 @@ section "Byte Arrays"
 
 ------------------------------------------------------------------------
 
-primtype ByteArr#
+primtype ByteArray#
 
-primtype MutByteArr# s
+primtype MutableByteArray# s
 
 primop  NewByteArrayOp_Char "newByteArray#" GenPrimOp
-   Int# -> State# s -> (# State# s, MutByteArr# s #)
+   Int# -> State# s -> (# State# s, MutableByteArray# s #)
    {Create a new mutable byte array of specified size (in bytes), in
     the specified state thread.}
    with out_of_line = True
 
 primop  NewPinnedByteArrayOp_Char "newPinnedByteArray#" GenPrimOp
-   Int# -> State# s -> (# State# s, MutByteArr# s #)
+   Int# -> State# s -> (# State# s, MutableByteArray# s #)
    {Create a mutable byte array that the GC guarantees not to move.}
    with out_of_line = True
 
 primop  ByteArrayContents_Char "byteArrayContents#" GenPrimOp
-   ByteArr# -> Addr#
+   ByteArray# -> Addr#
    {Intended for use with pinned arrays; otherwise very unsafe!}
 
 primop  SameMutableByteArrayOp "sameMutableByteArray#" GenPrimOp
-   MutByteArr# s -> MutByteArr# s -> Bool
+   MutableByteArray# s -> MutableByteArray# s -> Bool
 
 primop  UnsafeFreezeByteArrayOp "unsafeFreezeByteArray#" GenPrimOp
-   MutByteArr# s -> State# s -> (# State# s, ByteArr# #)
+   MutableByteArray# s -> State# s -> (# State# s, ByteArray# #)
    {Make a mutable byte array immutable, without copying.}
    with
    has_side_effects = True
 
 primop  SizeofByteArrayOp "sizeofByteArray#" GenPrimOp  
-   ByteArr# -> Int#
+   ByteArray# -> Int#
 
 primop  SizeofMutableByteArrayOp "sizeofMutableByteArray#" GenPrimOp
-   MutByteArr# s -> Int#
+   MutableByteArray# s -> Int#
 
 
 primop IndexByteArrayOp_Char "indexCharArray#" GenPrimOp
-   ByteArr# -> Int# -> Char#
+   ByteArray# -> Int# -> Char#
    {Read 8-bit character; offset in bytes.}
 
 primop IndexByteArrayOp_WideChar "indexWideCharArray#" GenPrimOp
-   ByteArr# -> Int# -> Char#
+   ByteArray# -> Int# -> Char#
    {Read 31-bit character; offset in 4-byte words.}
 
 primop IndexByteArrayOp_Int "indexIntArray#" GenPrimOp
-   ByteArr# -> Int# -> Int#
+   ByteArray# -> Int# -> Int#
 
 primop IndexByteArrayOp_Word "indexWordArray#" GenPrimOp
-   ByteArr# -> Int# -> Word#
+   ByteArray# -> Int# -> Word#
 
 primop IndexByteArrayOp_Addr "indexAddrArray#" GenPrimOp
-   ByteArr# -> Int# -> Addr#
+   ByteArray# -> Int# -> Addr#
 
 primop IndexByteArrayOp_Float "indexFloatArray#" GenPrimOp
-   ByteArr# -> Int# -> Float#
+   ByteArray# -> Int# -> Float#
 
 primop IndexByteArrayOp_Double "indexDoubleArray#" GenPrimOp
-   ByteArr# -> Int# -> Double#
+   ByteArray# -> Int# -> Double#
 
 primop IndexByteArrayOp_StablePtr "indexStablePtrArray#" GenPrimOp
-   ByteArr# -> Int# -> StablePtr# a
+   ByteArray# -> Int# -> StablePtr# a
 
 primop IndexByteArrayOp_Int8 "indexInt8Array#" GenPrimOp
-   ByteArr# -> Int# -> Int#
+   ByteArray# -> Int# -> Int#
 
 primop IndexByteArrayOp_Int16 "indexInt16Array#" GenPrimOp
-   ByteArr# -> Int# -> Int#
+   ByteArray# -> Int# -> Int#
 
 primop IndexByteArrayOp_Int32 "indexInt32Array#" GenPrimOp
-   ByteArr# -> Int# -> INT32
+   ByteArray# -> Int# -> INT32
 
 primop IndexByteArrayOp_Int64 "indexInt64Array#" GenPrimOp
-   ByteArr# -> Int# -> INT64
+   ByteArray# -> Int# -> INT64
 
 primop IndexByteArrayOp_Word8 "indexWord8Array#" GenPrimOp
-   ByteArr# -> Int# -> Word#
+   ByteArray# -> Int# -> Word#
 
 primop IndexByteArrayOp_Word16 "indexWord16Array#" GenPrimOp
-   ByteArr# -> Int# -> Word#
+   ByteArray# -> Int# -> Word#
 
 primop IndexByteArrayOp_Word32 "indexWord32Array#" GenPrimOp
-   ByteArr# -> Int# -> WORD32
+   ByteArray# -> Int# -> WORD32
 
 primop IndexByteArrayOp_Word64 "indexWord64Array#" GenPrimOp
-   ByteArr# -> Int# -> WORD64
+   ByteArray# -> Int# -> WORD64
 
 primop  ReadByteArrayOp_Char "readCharArray#" GenPrimOp
-   MutByteArr# s -> Int# -> State# s -> (# State# s, Char# #)
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, Char# #)
    {Read 8-bit character; offset in bytes.}
 
 primop  ReadByteArrayOp_WideChar "readWideCharArray#" GenPrimOp
-   MutByteArr# s -> Int# -> State# s -> (# State# s, Char# #)
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, Char# #)
    {Read 31-bit character; offset in 4-byte words.}
 
 primop  ReadByteArrayOp_Int "readIntArray#" GenPrimOp
-   MutByteArr# s -> Int# -> State# s -> (# State# s, Int# #)
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, Int# #)
 
 primop  ReadByteArrayOp_Word "readWordArray#" GenPrimOp
-   MutByteArr# s -> Int# -> State# s -> (# State# s, Word# #)
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, Word# #)
 
 primop  ReadByteArrayOp_Addr "readAddrArray#" GenPrimOp
-   MutByteArr# s -> Int# -> State# s -> (# State# s, Addr# #)
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, Addr# #)
 
 primop  ReadByteArrayOp_Float "readFloatArray#" GenPrimOp
-   MutByteArr# s -> Int# -> State# s -> (# State# s, Float# #)
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, Float# #)
 
 primop  ReadByteArrayOp_Double "readDoubleArray#" GenPrimOp
-   MutByteArr# s -> Int# -> State# s -> (# State# s, Double# #)
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, Double# #)
 
 primop  ReadByteArrayOp_StablePtr "readStablePtrArray#" GenPrimOp
-   MutByteArr# s -> Int# -> State# s -> (# State# s, StablePtr# a #)
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, StablePtr# a #)
 
 primop  ReadByteArrayOp_Int8 "readInt8Array#" GenPrimOp
-   MutByteArr# s -> Int# -> State# s -> (# State# s, Int# #)
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, Int# #)
 
 primop  ReadByteArrayOp_Int16 "readInt16Array#" GenPrimOp
-   MutByteArr# s -> Int# -> State# s -> (# State# s, Int# #)
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, Int# #)
 
 primop  ReadByteArrayOp_Int32 "readInt32Array#" GenPrimOp
-   MutByteArr# s -> Int# -> State# s -> (# State# s, INT32 #)
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, INT32 #)
 
 primop  ReadByteArrayOp_Int64 "readInt64Array#" GenPrimOp
-   MutByteArr# s -> Int# -> State# s -> (# State# s, INT64 #)
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, INT64 #)
 
 primop  ReadByteArrayOp_Word8 "readWord8Array#" GenPrimOp
-   MutByteArr# s -> Int# -> State# s -> (# State# s, Word# #)
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, Word# #)
 
 primop  ReadByteArrayOp_Word16 "readWord16Array#" GenPrimOp
-   MutByteArr# s -> Int# -> State# s -> (# State# s, Word# #)
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, Word# #)
 
 primop  ReadByteArrayOp_Word32 "readWord32Array#" GenPrimOp
-   MutByteArr# s -> Int# -> State# s -> (# State# s, WORD32 #)
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, WORD32 #)
 
 primop  ReadByteArrayOp_Word64 "readWord64Array#" GenPrimOp
-   MutByteArr# s -> Int# -> State# s -> (# State# s, WORD64 #)
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, WORD64 #)
 
 primop  WriteByteArrayOp_Char "writeCharArray#" GenPrimOp
-   MutByteArr# s -> Int# -> Char# -> State# s -> State# s
+   MutableByteArray# s -> Int# -> Char# -> State# s -> State# s
    {Write 8-bit character; offset in bytes.}
    with has_side_effects = True
 
 primop  WriteByteArrayOp_WideChar "writeWideCharArray#" GenPrimOp
-   MutByteArr# s -> Int# -> Char# -> State# s -> State# s
+   MutableByteArray# s -> Int# -> Char# -> State# s -> State# s
    {Write 31-bit character; offset in 4-byte words.}
    with has_side_effects = True
 
 primop  WriteByteArrayOp_Int "writeIntArray#" GenPrimOp
-   MutByteArr# s -> Int# -> Int# -> State# s -> State# s
+   MutableByteArray# s -> Int# -> Int# -> State# s -> State# s
    with has_side_effects = True
 
 primop  WriteByteArrayOp_Word "writeWordArray#" GenPrimOp
-   MutByteArr# s -> Int# -> Word# -> State# s -> State# s
+   MutableByteArray# s -> Int# -> Word# -> State# s -> State# s
    with has_side_effects = True
 
 primop  WriteByteArrayOp_Addr "writeAddrArray#" GenPrimOp
-   MutByteArr# s -> Int# -> Addr# -> State# s -> State# s
+   MutableByteArray# s -> Int# -> Addr# -> State# s -> State# s
    with has_side_effects = True
 
 primop  WriteByteArrayOp_Float "writeFloatArray#" GenPrimOp
-   MutByteArr# s -> Int# -> Float# -> State# s -> State# s
+   MutableByteArray# s -> Int# -> Float# -> State# s -> State# s
    with has_side_effects = True
 
 primop  WriteByteArrayOp_Double "writeDoubleArray#" GenPrimOp
-   MutByteArr# s -> Int# -> Double# -> State# s -> State# s
+   MutableByteArray# s -> Int# -> Double# -> State# s -> State# s
    with has_side_effects = True
 
 primop  WriteByteArrayOp_StablePtr "writeStablePtrArray#" GenPrimOp
-   MutByteArr# s -> Int# -> StablePtr# a -> State# s -> State# s
+   MutableByteArray# s -> Int# -> StablePtr# a -> State# s -> State# s
    with has_side_effects = True
 
 primop  WriteByteArrayOp_Int8 "writeInt8Array#" GenPrimOp
-   MutByteArr# s -> Int# -> Int# -> State# s -> State# s
+   MutableByteArray# s -> Int# -> Int# -> State# s -> State# s
    with has_side_effects = True
 
 primop  WriteByteArrayOp_Int16 "writeInt16Array#" GenPrimOp
-   MutByteArr# s -> Int# -> Int# -> State# s -> State# s
+   MutableByteArray# s -> Int# -> Int# -> State# s -> State# s
    with has_side_effects = True
 
 primop  WriteByteArrayOp_Int32 "writeInt32Array#" GenPrimOp
-   MutByteArr# s -> Int# -> INT32 -> State# s -> State# s
+   MutableByteArray# s -> Int# -> INT32 -> State# s -> State# s
    with has_side_effects = True
 
 primop  WriteByteArrayOp_Int64 "writeInt64Array#" GenPrimOp
-   MutByteArr# s -> Int# -> INT64 -> State# s -> State# s
+   MutableByteArray# s -> Int# -> INT64 -> State# s -> State# s
    with has_side_effects = True
 
 primop  WriteByteArrayOp_Word8 "writeWord8Array#" GenPrimOp
-   MutByteArr# s -> Int# -> Word# -> State# s -> State# s
+   MutableByteArray# s -> Int# -> Word# -> State# s -> State# s
    with has_side_effects = True
 
 primop  WriteByteArrayOp_Word16 "writeWord16Array#" GenPrimOp
-   MutByteArr# s -> Int# -> Word# -> State# s -> State# s
+   MutableByteArray# s -> Int# -> Word# -> State# s -> State# s
    with has_side_effects = True
 
 primop  WriteByteArrayOp_Word32 "writeWord32Array#" GenPrimOp
-   MutByteArr# s -> Int# -> WORD32 -> State# s -> State# s
+   MutableByteArray# s -> Int# -> WORD32 -> State# s -> State# s
    with has_side_effects = True
 
 primop  WriteByteArrayOp_Word64 "writeWord64Array#" GenPrimOp
-   MutByteArr# s -> Int# -> WORD64 -> State# s -> State# s
+   MutableByteArray# s -> Int# -> WORD64 -> State# s -> State# s
    with has_side_effects = True
 
 ------------------------------------------------------------------------
@@ -1698,13 +1698,13 @@ primop   MkApUpd0_Op "mkApUpd0#" GenPrimOp
    out_of_line = True
 
 primop  NewBCOOp "newBCO#" GenPrimOp
-   ByteArr# -> ByteArr# -> Array# a -> Int# -> ByteArr# -> State# s -> (# State# s, BCO# #)
+   ByteArray# -> ByteArray# -> Array# a -> Int# -> ByteArray# -> State# s -> (# State# s, BCO# #)
    with
    has_side_effects = True
    out_of_line      = True
 
 primop  UnpackClosureOp "unpackClosure#" GenPrimOp
-   a -> (# Addr#, Array# b, ByteArr# #)
+   a -> (# Addr#, Array# b, ByteArray# #)
    with
    out_of_line = True
 

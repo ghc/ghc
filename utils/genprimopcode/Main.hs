@@ -279,10 +279,6 @@ gen_ext_core_source entries =
 
         -- more hacks. might be better to do this on the ext-core side,
         -- as per earlier comment
-        qualify _ tc | tc == "ByteArr#" = qualify True "ByteArray#"
-        qualify _ tc | tc == "MutArr#" = qualify True "MutableArray#"
-        qualify _ tc | tc == "MutByteArr#" = 
-                     qualify True "MutableByteArray#"
         qualify _ tc | tc == "Bool" = "Just boolMname" ++ ", " 
                                                 ++ ze True tc
         qualify _ tc | tc == "()"  = "Just baseMname" ++ ", "
@@ -604,7 +600,7 @@ ppType (TyApp "Word64#"     []) = "word64PrimTy"
 ppType (TyApp "Addr#"       []) = "addrPrimTy"
 ppType (TyApp "Float#"      []) = "floatPrimTy"
 ppType (TyApp "Double#"     []) = "doublePrimTy"
-ppType (TyApp "ByteArr#"    []) = "byteArrayPrimTy"
+ppType (TyApp "ByteArray#"  []) = "byteArrayPrimTy"
 ppType (TyApp "RealWorld"   []) = "realWorldTy"
 ppType (TyApp "ThreadId#"   []) = "threadIdPrimTy"
 ppType (TyApp "ForeignObj#" []) = "foreignObjPrimTy"
@@ -619,10 +615,10 @@ ppType (TyVar "o")               = "openAlphaTy"
 ppType (TyApp "State#" [x])      = "mkStatePrimTy " ++ ppType x
 ppType (TyApp "MutVar#" [x,y])   = "mkMutVarPrimTy " ++ ppType x 
                                    ++ " " ++ ppType y
-ppType (TyApp "MutArr#" [x,y])   = "mkMutableArrayPrimTy " ++ ppType x 
-                                   ++ " " ++ ppType y
+ppType (TyApp "MutableArray#" [x,y]) = "mkMutableArrayPrimTy " ++ ppType x
+                                    ++ " " ++ ppType y
 
-ppType (TyApp "MutByteArr#" [x]) = "mkMutableByteArrayPrimTy " 
+ppType (TyApp "MutableByteArray#" [x]) = "mkMutableByteArrayPrimTy " 
                                    ++ ppType x
 
 ppType (TyApp "Array#" [x])      = "mkArrayPrimTy " ++ ppType x
