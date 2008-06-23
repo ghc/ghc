@@ -2,7 +2,8 @@
 
 import Control.Concurrent (forkIO, threadDelay)
 import Control.Concurrent.MVar (putMVar, takeMVar, newEmptyMVar)
-import Control.Exception (try)
+import Control.Exception (ignoreExceptions, catchAny, throw, catch)
+import Control.OldException (Exception(ExitException), catch)
 import Data.Maybe (isNothing)
 import System.Cmd (system)
 import System.Environment (getArgs)
@@ -45,12 +46,12 @@ run secs cmd = do
         forkIO (do threadDelay (secs * 1000000)
                    putMVar m Nothing
                )
-        forkIO (do try (do pid <- systemSession cmd
+        forkIO (ignoreExceptions (do
+                           pid <- systemSession cmd
                            ph <- mkProcessHandle pid
                            putMVar mp (pid,ph)
                            r <- waitForProcess ph
-                           putMVar m (Just r))
-                   return ())
+                           putMVar m (Just r)))
 
         (pid,ph) <- takeMVar mp
         r <- takeMVar m
@@ -73,7 +74,7 @@ systemSession cmd =
    -- more threads.
 
 killProcess pid ph = do
-  try (signalProcessGroup sigTERM pid)
+  ignoreExceptions (signalProcessGroup sigTERM pid)
   checkReallyDead 10
   where
     checkReallyDead 0 = hPutStrLn stderr "checkReallyDead: Giving up"
@@ -81,7 +82,7 @@ killProcess pid ph = do
       do threadDelay (3*100000) -- 3/10 sec
          m <- getProcessExitCode ph
          when (isNothing m) $ do
-             try (signalProcessGroup sigKILL pid)
+             ignoreExceptions (signalProcessGroup sigKILL pid)
              checkReallyDead n
 
 #else

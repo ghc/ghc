@@ -98,7 +98,7 @@ table2 nm op xs ys = do
            ]
   putStrLn "#"
  where
-  op' x y = do s <- Control.Exception.catch (evaluate (show (op x y))) 
+  op' x y = do s <- Control.Exception.catchAny (evaluate (show (op x y))) 
 					    (return . show)
 	       putStrLn (show x ++ " " ++ nm ++ " " ++ show y ++ " = " ++ s)
 
