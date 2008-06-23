@@ -10,6 +10,10 @@ SRC_HC_OPTS += $(addprefix -optc, $(MACOSX_DEPLOYMENT_CC_OPTS))
 SRC_LD_OPTS += $(addprefix -optl, $(MACOSX_DEPLOYMENT_LD_OPTS))
 endif
 
+ifeq "$(ghc_ge_605)" "NO"
+SRC_HC_OPTS += -cpp
+endif
+
 # We have two version: the inplace version compiled by the bootstrap compiler
 #   and the install version compiled by the stage 1 compiler
 ifeq "$(stage)" "2"

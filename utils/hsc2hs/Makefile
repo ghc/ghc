@@ -14,6 +14,10 @@ SRC_HC_OPTS += $(addprefix -optc, $(MACOSX_DEPLOYMENT_CC_OPTS))
 SRC_LD_OPTS += $(addprefix -optl, $(MACOSX_DEPLOYMENT_LD_OPTS))
 endif
 
+ifeq "$(ghc_ge_605)" "NO"
+SRC_HC_OPTS += -cpp
+endif
+
 # This causes libghccompat.a to be used:
 include $(GHC_COMPAT_DIR)/compat.mk
 

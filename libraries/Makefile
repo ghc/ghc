@@ -173,6 +173,9 @@ boot: $(BOOTSTRAP_STAMPS) ifBuildable/ifBuildable \
 # We ought to be depending on %/Setup.*hs, but make makes that difficult.
 
 CABAL_GHC_FLAGS = -Wall
+ifeq "$(ghc_ge_605)" "NO"
+CABAL_GHC_FLAGS += -cpp
+endif
 
 $(foreach SUBDIR,$(SUBDIRS),$(SUBDIR)/setup/Setup): \
 %/setup/Setup: $(BOOTSTRAP_STAMPS)
