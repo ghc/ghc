@@ -67,6 +67,19 @@ import Prelude
 default ()              -- Double isn't available yet
 
 #ifdef __GLASGOW_HASKELL__
+instance Eq () where
+    () == () = True
+    () /= () = False
+
+instance Ord () where
+    () <= () = True
+    () <  () = False
+    () >= () = True
+    () >  () = False
+    max () () = ()
+    min () () = ()
+    compare () () = EQ
+
 data (,) a b = (,) a b deriving (Eq, Ord)
 data (,,) a b c = (,,) a b c deriving (Eq, Ord)
 data (,,,) a b c d = (,,,) a b c d deriving (Eq, Ord)
