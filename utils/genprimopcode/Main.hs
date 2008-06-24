@@ -146,24 +146,14 @@ gen_hs_source (Info defaults entries) =
 
 	   spec o = comm ++ decl
 	     where decl = case o of
-			PrimOpSpec { name = n, ty = t }	  -> wrapOp n ++ " :: " ++ pty t
-			PseudoOpSpec { name = n, ty = t } -> wrapOp n ++ " :: " ++ pty t
-			PrimTypeSpec { ty = t }	  -> "data " ++ pty t
+			PrimOpSpec { name = n, ty = t }	  -> wrapOp n ++ " :: " ++ pprTy t
+			PseudoOpSpec { name = n, ty = t } -> wrapOp n ++ " :: " ++ pprTy t
+			PrimTypeSpec { ty = t }	  -> "data " ++ pprTy t
 			Section { } -> ""
 
 		   comm = case (desc o) of
 		   	[] -> ""
 			d -> "\n" ++ (unlines $ map ("-- " ++ ) $ lines $ unlatex $ escape $ "|" ++ d)
-
-		   pty (TyF t1 t2) = pbty t1 ++ " -> " ++ pty t2
-		   pty t	   = pbty t
-
-		   pbty (TyApp tc ts) = tc ++ (concat (map (' ':) (map paty ts)))
-		   pbty (TyUTup ts)   = "(# " ++ (concat (intersperse "," (map pty ts))) ++ " #)"
-		   pbty t	      = paty t
-
-		   paty (TyVar tv)	= tv
-		   paty t		= "(" ++ pty t ++ ")"
 
 	   wrapOp nm | isAlpha (head nm) = nm
 		     | otherwise	 = "(" ++ nm ++ ")"
@@ -183,6 +173,19 @@ gen_hs_source (Info defaults entries) =
 	   escape = concatMap (\c -> if c `elem` special then '\\':c:[] else c:[])
 	   	where special = "/'`\"@<"
 
+pprTy = pty
+    where
+          pty (TyF t1 t2) = pbty t1 ++ " -> " ++ pty t2
+          pty t      = pbty t
+          pbty (TyApp tc ts) = tc ++ concat (map (' ' :) (map paty ts))
+          pbty (TyUTup ts)   = "(# "
+                            ++ concat (intersperse "," (map pty ts))
+                            ++ " #)"
+          pbty t             = paty t
+
+          paty (TyVar tv)    = tv
+          paty t             = "(" ++ pty t ++ ")"
+--
 -- Generates the type environment that the stand-alone External Core tools use.
 gen_ext_core_source :: [Entry] -> String
 gen_ext_core_source entries =
@@ -461,18 +464,26 @@ gen_latex_doc (Info defaults entries)
 
 gen_wrappers :: Info -> String
 gen_wrappers (Info _ entries)
-   = "{-# LANGUAGE NoImplicitPrelude #-}\n" 
+   = "{-# LANGUAGE NoImplicitPrelude, UnboxedTuples #-}\n"
 	-- Dependencies on Prelude must be explicit in libraries/base, but we
 	-- don't need the Prelude here so we add NoImplicitPrelude.
      ++ "module GHC.PrimopWrappers where\n" 
      ++ "import qualified GHC.Prim\n" 
-     ++ unlines (map f (filter (not.dodgy) (filter is_primop entries)))
+     ++ "import GHC.Bool (Bool)\n"
+     ++ "import GHC.Prim (" ++ types ++ ")\n"
+     ++ unlines (concatMap f specs)
      where
+        specs = filter (not.dodgy) (filter is_primop entries)
+        tycons = foldr union [] $ map (tyconsIn . ty) specs
+        tycons' = filter (`notElem` ["()", "Bool"]) tycons
+        types = concat $ intersperse ", " tycons'
         f spec = let args = map (\n -> "a" ++ show n) [1 .. arity (ty spec)]
                      src_name = wrap (name spec)
-                 in "{-# NOINLINE " ++ src_name ++ " #-}\n" ++ 
-                    src_name ++ " " ++ unwords args 
-                     ++ " = (GHC.Prim." ++ name spec ++ ") " ++ unwords args
+                     lhs = src_name ++ " " ++ unwords args
+                     rhs = "(GHC.Prim." ++ name spec ++ ") " ++ unwords args
+                 in ["{-# NOINLINE " ++ src_name ++ " #-}",
+                     src_name ++ " :: " ++ pprTy (ty spec),
+                     lhs ++ " = " ++ rhs]
         wrap nm | isLower (head nm) = nm
                 | otherwise = "(" ++ nm ++ ")"
 
@@ -653,6 +664,12 @@ tvsIn (TyF t1 t2)    = tvsIn t1 ++ tvsIn t2
 tvsIn (TyApp _ tys)  = concatMap tvsIn tys
 tvsIn (TyVar tv)     = [tv]
 tvsIn (TyUTup tys)   = concatMap tvsIn tys
+
+tyconsIn :: Ty -> [TyCon]
+tyconsIn (TyF t1 t2)    = tyconsIn t1 `union` tyconsIn t2
+tyconsIn (TyApp tc tys) = foldr union [tc] $ map tyconsIn tys
+tyconsIn (TyVar _)      = []
+tyconsIn (TyUTup tys)   = foldr union [] $ map tyconsIn tys
 
 arity :: Ty -> Int
 arity = length . fst . flatTys
