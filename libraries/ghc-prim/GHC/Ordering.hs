@@ -4,7 +4,7 @@
 module GHC.Ordering where
 
 -- We need Inl etc behind the scenes for the Ordering definition
-import GHC.Generics
+import GHC.Generics ()
 
 default ()
 

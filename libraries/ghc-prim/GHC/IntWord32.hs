@@ -24,10 +24,9 @@ module GHC.IntWord32 (
 #endif
  ) where
 
+#if WORD_SIZE_IN_BITS < 32
 import GHC.Bool
 import GHC.Prim
-
-#if WORD_SIZE_IN_BITS < 32
 
 foreign import unsafe "stg_eqWord32"      eqWord32#      :: Word32# -> Word32# -> Bool
 foreign import unsafe "stg_neWord32"      neWord32#      :: Word32# -> Word32# -> Bool
