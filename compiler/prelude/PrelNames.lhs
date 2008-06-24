@@ -231,7 +231,7 @@ genericTyConNames = [crossTyConName, plusTyConName, genUnitTyConName]
 pRELUDE :: Module
 pRELUDE		= mkBaseModule_ pRELUDE_NAME
 
-gHC_PRIM, gHC_BOOL, gHC_ORDERING, gHC_GENERICS, gHC_BASE, gHC_ENUM,
+gHC_PRIM, gHC_BOOL, gHC_UNIT, gHC_ORDERING, gHC_GENERICS, gHC_BASE, gHC_ENUM,
     gHC_SHOW, gHC_READ, gHC_NUM, gHC_INTEGER, gHC_LIST, gHC_PARR,
     dATA_TUP, dATA_EITHER, dATA_STRING, gHC_PACK, gHC_CONC, gHC_IO_BASE,
     gHC_ST, gHC_ARR, gHC_STABLE, gHC_ADDR, gHC_PTR, gHC_ERR, gHC_REAL,
@@ -239,6 +239,7 @@ gHC_PRIM, gHC_BOOL, gHC_ORDERING, gHC_GENERICS, gHC_BASE, gHC_ENUM,
     dOTNET, rEAD_PREC, lEX, gHC_INT, gHC_WORD, mONAD, mONAD_FIX, aRROW,
     gHC_DESUGAR, rANDOM, gHC_EXTS :: Module
 gHC_PRIM	= mkPrimModule (fsLit "GHC.Prim")   -- Primitive types and values
+gHC_UNIT	= mkPrimModule (fsLit "GHC.Unit")
 gHC_BOOL	= mkPrimModule (fsLit "GHC.Bool")
 gHC_ORDERING	= mkPrimModule (fsLit "GHC.Ordering")
 gHC_GENERICS	= mkPrimModule (fsLit "GHC.Generics")
@@ -324,7 +325,7 @@ mkMainModule_ m = mkModule mainPackageId m
 
 \begin{code}
 mkTupleModule :: Boxity -> Arity -> Module
-mkTupleModule Boxed   0 = gHC_BASE
+mkTupleModule Boxed   0 = gHC_UNIT
 mkTupleModule Boxed   _ = dATA_TUP
 mkTupleModule Unboxed _ = gHC_PRIM
 \end{code}
