@@ -393,9 +393,11 @@ deriveStandalone (L loc (DerivDecl deriv_ty))
               <+> text "theta:" <+> ppr theta
               <+> text "tau:" <+> ppr tau)
        ; (cls, inst_tys) <- checkValidInstHead tau
+       ; checkValidInstance tvs theta cls inst_tys
+		-- C.f. TcInstDcls.tcLocalInstDecl1
+
        ; let cls_tys = take (length inst_tys - 1) inst_tys
              inst_ty = last inst_tys
-
        ; traceTc (text "standalone deriving;"
               <+> text "class:" <+> ppr cls
               <+> text "class types:" <+> ppr cls_tys
@@ -432,24 +434,24 @@ mkEqnHelp :: InstOrigin -> [TyVar] -> Class -> [Type] -> Type
           -> TcRn (Maybe EarlyDerivSpec)
 mkEqnHelp orig tvs cls cls_tys tc_app mtheta
   | Just (tycon, tc_args) <- tcSplitTyConApp_maybe tc_app
-  = do	{
+  , isAlgTyCon tycon	-- Check for functions, primitive types etc
+  = do	{ (rep_tc, rep_tc_args) <- tcLookupFamInstExact tycon tc_args
+	          -- Be careful to test rep_tc here: in the case of families, 
+	          -- we want to check the instance tycon, not the family tycon
+
 	-- For standalone deriving (mtheta /= Nothing), 
 	-- check that all the data constructors are in scope
 	-- By this time we know that the thing is algebraic
 	--	because we've called checkInstHead in derivingStandalone
-	  rdr_env <- getGlobalRdrEnv
-	; let hidden_data_cons = filter not_in_scope (tyConDataCons tycon)
-	      not_in_scope dc = null (lookupGRE_Name rdr_env (dataConName dc))
-	; checkTc (isNothing mtheta || null hidden_data_cons) 
+	; rdr_env <- getGlobalRdrEnv
+	; let hidden_data_cons = isAbstractTyCon rep_tc || any not_in_scope (tyConDataCons rep_tc)
+	      not_in_scope dc  = null (lookupGRE_Name rdr_env (dataConName dc))
+	; checkTc (isNothing mtheta || not hidden_data_cons) 
 		  (derivingHiddenErr tycon)
 
 	; mayDeriveDataTypeable <- doptM Opt_DeriveDataTypeable
 	; newtype_deriving <- doptM Opt_GeneralizedNewtypeDeriving
 
-	; (rep_tc, rep_tc_args) <- tcLookupFamInstExact tycon tc_args
-
-          -- Be careful to test rep_tc here: in the case of families, we want
-          -- to check the instance tycon, not the family tycon
 	; if isDataTyCon rep_tc then
 		mkDataTypeEqn orig mayDeriveDataTypeable tvs cls cls_tys 
 			      tycon tc_args rep_tc rep_tc_args mtheta
@@ -459,7 +461,7 @@ mkEqnHelp orig tvs cls cls_tys tc_app mtheta
 			     tycon tc_args rep_tc rep_tc_args mtheta }
   | otherwise
   = baleOut (derivingThingErr cls cls_tys tc_app
-		(ptext (sLit "Last argument of the instance must be a type application")))
+	    (ptext (sLit "The last argument of the instance must be a data or newtype application")))
 
 baleOut :: Message -> TcM (Maybe a)
 baleOut err = do { addErrTc err;  return Nothing }
