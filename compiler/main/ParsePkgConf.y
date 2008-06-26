@@ -10,6 +10,7 @@ module ParsePkgConf( loadPackageConfig ) where
 
 #include "HsVersions.h"
 
+import Distribution.Package hiding ( depends )
 import PackageConfig
 import Lexer
 import Module
@@ -112,9 +113,15 @@ field	:: { PackageConfig -> PackageConfig }
 		}
 
 pkgid	:: { PackageIdentifier }
-	: CONID '{' VARID '=' STRING ',' VARID '=' version '}'
-			{ PackageIdentifier{ pkgName = unpackFS $5, 
-					     pkgVersion = $9 } }
+	: CONID '{' VARID '=' CONID STRING ',' VARID '=' version '}'
+            {% case unpackFS $5 of
+               "PackageName" ->
+                   return $ PackageIdentifier {
+                                pkgName = PackageName (unpackFS $6),
+                                pkgVersion = $10
+                            }
+               _ -> happyError
+            }
 
 version :: { Version }
 	: CONID '{' VARID '=' intlist ',' VARID '=' strlist '}'

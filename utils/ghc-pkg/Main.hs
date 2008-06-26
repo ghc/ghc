@@ -324,7 +324,8 @@ parseGlobPackageId :: ReadP r PackageIdentifier
 parseGlobPackageId =
   parse
      +++
-  (do n <- parsePackageName; string "-*"
+  (do n <- parse
+      string "-*"
       return (PackageIdentifier{ pkgName = n, pkgVersion = globVersion }))
 
 -- globVersion means "all versions"
@@ -573,7 +574,7 @@ listPackages flags mPackageName mModuleName = do
                    where doc = text (display (package p))
 
         show_simple db_stack = do
-          let showPkg = if FlagNamesOnly `elem` flags then pkgName
+          let showPkg = if FlagNamesOnly `elem` flags then display . pkgName
                                                       else display
               pkgs = map showPkg $ sortBy compPkgIdVer $
                           map package (concatMap snd db_stack)

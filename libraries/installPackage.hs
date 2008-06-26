@@ -60,7 +60,7 @@ doInstall verbosity ghcpkg ghcpkgconf destdir topdir
               -- This is an almighty hack. We need to register
               -- ghc-prim:GHC.Prim, but it doesn't exist, get built, get
               -- haddocked, get copied, etc.
-              pd_reg = if pkgName (package pd) == "ghc-prim"
+              pd_reg = if packageName pd == PackageName "ghc-prim"
                        then case library pd of
                             Just lib ->
                                 let ems = "GHC.Prim" : exposedModules lib

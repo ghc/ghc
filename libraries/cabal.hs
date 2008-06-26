@@ -31,7 +31,7 @@ main = do
             Just Simple    -> Simple.defaultMainArgs                     args
             Just Make      -> Make.defaultMainArgs                       args
             Just Configure -> defaultMainWithHooksArgs autoconfUserHooks args
-            _ | pkgName (package pd) == "Cabal" ->
+            _ | packageName pd == PackageName "Cabal" ->
                               -- Cabal is special...*sigh*
                               Simple.defaultMainArgs                     args
               | otherwise  -> die "cabal: Don't know what to do!"

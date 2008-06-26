@@ -318,7 +318,7 @@ matchingPackages str pkgs
 	-- version, or just the name if it is unambiguous.
 	matches str p
 		=  str == display (package p)
-		|| str == pkgName (package p)
+		|| str == display (pkgName (package p))
 
 pickPackages :: [PackageConfig] -> [String] -> [PackageConfig]
 pickPackages pkgs strs = 
@@ -387,7 +387,7 @@ findWiredInPackages dflags pkgs preload this_package = do
 
         matches :: PackageConfig -> (PackageId, [String]) -> Bool
         pc `matches` (pid, suffixes)
-            = pkgName (package pc) `elem`
+            = display (pkgName (package pc)) `elem`
               (map (packageIdString pid ++) suffixes)
 
 	-- find which package corresponds to each wired-in package
@@ -445,7 +445,7 @@ findWiredInPackages dflags pkgs preload this_package = do
 
 	upd_pid pid = case filter ((== pid) . fst) wired_in_ids of
 				[] -> pid
-				((x, y):_) -> x{ pkgName = packageIdString y,
+				((x, y):_) -> x{ pkgName = PackageName (packageIdString y),
                                                  pkgVersion = Version [] [] }
 
         pkgs1 = deleteOtherWiredInPackages pkgs

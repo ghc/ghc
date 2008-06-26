@@ -72,6 +72,8 @@ import System.FilePath
 import System.IO
 import System.Directory
 
+import Distribution.Package hiding (depends)
+
 import Control.Exception
 import Data.Maybe
 \end{code}
@@ -944,10 +946,11 @@ data LibrarySpec
 -- of DLL handles that rts/Linker.c maintains, and that in turn is 
 -- used by lookupSymbol.  So we must call addDLL for each library 
 -- just to get the DLL handle into the list.
-partOfGHCi :: [String]
+partOfGHCi :: [PackageName]
 partOfGHCi
  | isWindowsTarget || isDarwinTarget = []
- | otherwise = [ "base", "haskell98", "template-haskell", "editline" ]
+ | otherwise = map PackageName
+                   ["base", "haskell98", "template-haskell", "editline"]
 
 showLS :: LibrarySpec -> String
 showLS (Object nm)    = "(static) " ++ nm
@@ -1022,7 +1025,7 @@ linkPackage dflags pkg
 	maybePutStr dflags ("Loading package " ++ display (package pkg) ++ " ... ")
 
 	-- See comments with partOfGHCi
-	when (pkgName (package pkg) `notElem` partOfGHCi) $ do
+	when (packageName pkg `notElem` partOfGHCi) $ do
 	    loadFrameworks pkg
             -- When a library A needs symbols from a library B, the order in
             -- extra_libraries/extra_ld_opts is "-lA -lB", because that's the
