@@ -171,7 +171,7 @@ ifeq "$(ghc_ge_605)" "NO"
 CABAL_GHC_FLAGS += -cpp
 endif
 
-BOOTSTRAPPING_FLAGS = $(CABAL_GHC_FLAGS) -DCABAL_VERSION=1,3 -odir $(HERE_ABS)/bootstrapping -hidir bootstrapping -i$(HERE_ABS)/Cabal -i$(HERE_ABS)/filepath
+BOOTSTRAPPING_FLAGS = $(CABAL_GHC_FLAGS) -DCABAL_VERSION=1,3 -odir $(HERE_ABS)/bootstrapping -hidir $(HERE_ABS)/bootstrapping -i$(HERE_ABS)/Cabal -i$(HERE_ABS)/filepath
 
 # We use -main-is so that GHC doesn't get confused and think
 # Main.hi/Main.o from cabal belongs to ghc-prim/Setup, or vice-versa.
