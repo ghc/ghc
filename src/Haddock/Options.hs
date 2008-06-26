@@ -91,7 +91,7 @@ options :: Bool -> [OptDescr Flag]
 options backwardsCompat =
   [
    Option ['B']  []     (ReqArg Flag_GhcLibDir "DIR")
-	"path to the GHC lib dir, e.g /usr/lib/ghc",
+	"path to the GHC lib dir, to override the default path",
    Option ['o']  ["odir"]     (ReqArg Flag_OutputDir "DIR")
 	"directory in which to put the output files",
    Option ['l']  ["lib"]         (ReqArg Flag_Lib "DIR") 

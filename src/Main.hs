@@ -34,6 +34,7 @@ import System.Exit
 import System.Environment
 
 import GHC
+import GHC.Paths
 import DynFlags
 import Bag
 import Util (handleDyn)
@@ -111,8 +112,12 @@ main = handleTopExceptions $ do
 
   if not (null fileArgs)
     then do
+
+      let libDir
+            | Just dir <- getGhcLibDir flags = dir
+            | otherwise = libdir -- from GHC.Paths
+
       -- initialize GHC
-      libDir <- getGhcLibDir flags
       (session, dynflags) <- startGhc libDir (ghcFlags flags)
 
       -- get packages supplied with --read-interface
@@ -275,8 +280,8 @@ dumpInterfaceFile ifaces homeLinks flags =
 
 getGhcLibDir flags =
   case [ dir | Flag_GhcLibDir dir <- flags ] of
-    [] -> throwE "no GHC lib dir specified"
-    xs -> return $ last xs
+    [] -> Nothing
+    xs -> Just $ last xs
 
 
 handleEasyFlags flags fileArgs = do

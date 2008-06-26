@@ -10,11 +10,8 @@ import Text.Regex
 
 
 main = do
-  args <- getArgs
-  when (null args) $ error "You must give the path to the GHC lib dir as an argument"  
   putStrLn "Running tests..."
-  let libdir = head args
-  test libdir
+  test
   putStrLn "All tests passed!"
 
 
@@ -43,11 +40,11 @@ check modules = do
         putStrLn $ "Pass: " ++ mod ++ " (no .ref file)"
  
 
-test libdir = do
+test = do
   contents <- getDirectoryContents "tests"
   let mods = filter ((==) ".hs" . takeExtension) contents
   let outdir = "output"
   let mods' = map ("tests" </>) mods
-  code <- system $ printf "haddock -B %s -w -o %s -h --optghc=-fglasgow-exts --optghc=-w %s" libdir outdir (unwords mods')
+  code <- system $ printf "haddock -w -o %s -h --optghc=-fglasgow-exts --optghc=-w %s" outdir (unwords mods')
   unless (code == ExitSuccess) $ error "Haddock run failed! Exiting."
   check mods
