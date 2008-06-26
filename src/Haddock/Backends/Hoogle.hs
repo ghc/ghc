@@ -12,9 +12,7 @@ module Haddock.Backends.Hoogle (
   ) where
 
 
-import Haddock.Types
 import Haddock.GHC
-import Haddock.GHC.Utils
 import GHC hiding ((<.>))
 import SrcLoc
 import Outputable
@@ -140,11 +138,109 @@ ppCtor dat con = ldoc (con_doc con) ++ f (con_details con)
 
 
 ---------------------------------------------------------------------
--- How to show documentation
+-- DOCUMENTATION
 
 ldoc :: Maybe (LHsDoc Name) -> [String]
 ldoc = doc . liftM unL
 
 doc :: Maybe (HsDoc Name) -> [String]
 doc Nothing = []
-doc (Just d) = [] -- can add here, if wanted
+doc (Just d) = "" : zipWith (++) ("-- | " : repeat "--   ") (showTags $ markup markupTag d)
+
+
+data Tag = TagL Char [Tags] | TagP Tags | TagPre Tags | TagInline String Tags | Str String
+           deriving Show
+
+type Tags = [Tag]
+
+box f x = [f x]
+str a = [Str a]
+
+-- TODO:
+-- want things like paragraph, pre etc to be handled by blank lines in the source document
+-- and things like \n and \t converted away
+-- much like blogger in HTML mode
+-- everything else wants to be included as tags, neatly nested for some (ul,li,ol)
+-- or inlne for others (a,i,tt)
+-- entities (&,>,<) should always be appropriately escaped
+
+markupTag :: DocMarkup Name [Tag]
+markupTag = Markup {
+  markupParagraph     = box TagP,
+  markupEmpty         = str "",
+  markupString        = str,
+  markupAppend        = (++),
+  markupIdentifier    = box (TagInline "a") . str . out . head,
+  markupModule        = box (TagInline "a") . str,
+  markupEmphasis      = box (TagInline "i"),
+  markupMonospaced    = box (TagInline "tt"),
+  markupUnorderedList = box (TagL 'u'),
+  markupOrderedList   = box (TagL 'o'),
+  markupDefList       = box (TagL 'u') . map (\(a,b) -> TagInline "b" a : Str " " : b),
+  markupCodeBlock     = box TagPre,
+  markupURL           = box (TagInline "a") . str,
+  markupAName         = const $ str ""
+  }
+
+
+showTags :: [Tag] -> [String]
+showTags = concat . intersperse [""] . map showBlock
+    where
+
+
+showBlock :: Tag -> [String]
+showBlock (TagP xs) = showInline xs
+showBlock (TagL t xs) = ['<':t:"l>"] ++ mid ++ ['<':'/':t:">"]
+    where mid = concatMap (showInline . box (TagInline "li")) xs
+showBlock (TagPre xs) = ["<pre>"] ++ showPre xs ++ ["</pre>"]
+showBlock x = showInline [x]
+
+
+asInline (TagP xs) = xs
+asInline (TagPre xs) = [TagInline "pre" xs]
+asInline (TagL t xs) = [TagInline (t:"l") $ map (TagInline "li") xs]
+asInline x = [x]
+
+
+showInline :: [Tag] -> [String]
+showInline = unwordsWrap 70 . words . concatMap f
+    where
+        fs = concatMap f
+        f (Str x) = escape x
+        f (TagInline s xs) = "<"++s++">" ++ fs xs ++ "</"++s++">"
+        f x = fs $ asInline x
+
+
+showPre :: [Tag] -> [String]
+showPre = trimFront . trimLines . lines . concatMap f
+    where
+        trimLines = dropWhile null . reverse . dropWhile null . reverse
+        trimFront xs = map (drop i) xs
+            where
+                ns = [length a | x <- xs, let (a,b) = span isSpace x, b /= ""]
+                i = if null ns then 0 else minimum ns
+
+        fs = concatMap f
+        f (Str x) = escape x
+        f (TagInline s xs) = "<"++s++">" ++ fs xs ++ "</"++s++">"
+        f x = fs $ asInline x
+
+
+unwordsWrap :: Int -> [String] -> [String]
+unwordsWrap n = f n []
+    where
+        f i s [] = [g s | s /= []]
+        f i s (x:xs) | nx > i = g s : f (n - nx - 1) [x] xs
+                     | otherwise = f (i - nx - 1) (x:s) xs
+            where nx = length x
+
+        g = unwords . reverse
+
+
+escape :: String -> String
+escape = concatMap f
+    where
+        f '<' = "&lt;"
+        f '>' = "&gt;"
+        f '&' = "&amp;"
+        f x = [x]
