@@ -59,7 +59,6 @@ ppModule iface = "" : doc (ifaceDoc iface) ++
 ---------------------------------------------------------------------
 -- Utility functions
 
-indent = (++) "    "
 unL (L _ x) = x
 reL = L undefined
 
