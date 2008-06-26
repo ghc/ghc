@@ -190,7 +190,7 @@ showTags = concat . intersperse [""] . map showBlock
 
 showBlock :: Tag -> [String]
 showBlock (TagP xs) = showInline xs
-showBlock (TagL t xs) = ['<':t:"l>"] ++ mid ++ ['<':'/':t:">"]
+showBlock (TagL t xs) = ['<':t:"l>"] ++ mid ++ ['<':'/':t:"l>"]
     where mid = concatMap (showInline . box (TagInline "li")) xs
 showBlock (TagPre xs) = ["<pre>"] ++ showPre xs ++ ["</pre>"]
 showBlock x = showInline [x]
