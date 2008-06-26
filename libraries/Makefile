@@ -149,11 +149,8 @@ ifneq "$(HSCOLOUR)" ""
 CONFIGURE_OPTS += --with-hscolour=$(HSCOLOUR)
 endif
 
-BOOTSTRAP_LIBS = Cabal filepath
-BOOTSTRAP_STAMPS = $(addprefix stamp/bootstrapping.,$(BOOTSTRAP_LIBS))
-BOOTSTRAP_INC = -DCABAL_VERSION=1,3 $(addprefix -i$(FPTOOLS_TOP_ABS)/libraries/bootstrapping.,$(BOOTSTRAP_LIBS))
 DEPLOYMENT_OPTS = $(addprefix -optc, $(MACOSX_DEPLOYMENT_CC_OPTS)) \
-		  $(addprefix -optl, $(MACOSX_DEPLOYMENT_LD_OPTS))
+                  $(addprefix -optl, $(MACOSX_DEPLOYMENT_LD_OPTS))
 
 .PHONY: subdirs
 
@@ -162,45 +159,38 @@ subdirs:
 
 .PHONY: boot
 
-boot: $(BOOTSTRAP_STAMPS) ifBuildable/ifBuildable \
-	  $(foreach SUBDIR,$(SUBDIRS),$(SUBDIR)/setup/Setup) \
-	  installPackage/installPackage
+boot: ifBuildable/ifBuildable cabal ghc-prim/Setup
 
-# We build the Setup program in a setup subdirectory to stop it trying
-# to use bits of base and Cabal when we build those packages.
-# This also makes it slightly easier to clean.
+HERE_ABS=$(FPTOOLS_TOP_ABS)/libraries
 
-# We ought to be depending on %/Setup.*hs, but make makes that difficult.
+IFBUILDABLE=ifBuildable/ifBuildable $(HERE_ABS)/boot-packages
+CABAL=$(HERE_ABS)/cabal
 
 CABAL_GHC_FLAGS = -Wall
 ifeq "$(ghc_ge_605)" "NO"
 CABAL_GHC_FLAGS += -cpp
 endif
 
-$(foreach SUBDIR,$(SUBDIRS),$(SUBDIR)/setup/Setup): \
-%/setup/Setup: $(BOOTSTRAP_STAMPS)
-	-$(RM) -rf $*/setup
-	mkdir $*/setup
-	$(CP) $*/Setup.*hs $*/setup
-	cd $*/setup && $(GHC) $(CABAL_GHC_FLAGS) --make Setup.*hs -o Setup \
-	                      $(BOOTSTRAP_INC)
+BOOTSTRAPPING_FLAGS = $(CABAL_GHC_FLAGS) -DCABAL_VERSION=1,3 -odir $(HERE_ABS)/bootstrapping -hidir bootstrapping -i$(HERE_ABS)/Cabal -i$(HERE_ABS)/filepath
 
-installPackage/installPackage: installPackage.hs $(BOOTSTRAP_STAMPS)
+# We use -main-is so that GHC doesn't get confused and think
+# Main.hi/Main.o from cabal belongs to ghc-prim/Setup, or vice-versa.
+cabal: cabal.hs
+	$(GHC) $(BOOTSTRAPPING_FLAGS) --make cabal -o cabal -main-is Cabal
+
+# ghc-prim/Setup doesn't really depend on cabal, but pretending that it
+# does sequentialises building the two of them, which is nice given
+# they're sharing -odir and -hidir.
+ghc-prim/Setup: ghc-prim/Setup.hs cabal
+	cd ghc-prim && $(GHC) $(BOOTSTRAPPING_FLAGS) --make Setup -o Setup
+
+installPackage/installPackage: installPackage.hs
 	-$(RM) -rf installPackage
 	mkdir installPackage
 	$(CP) installPackage.hs installPackage/
-ifeq "$(stage)" "2"
-	cd installPackage && ../$(HC) $(CABAL_GHC_FLAGS) \
-	                            --make installPackage -o installPackage \
-	                            $(BOOTSTRAP_INC) $(DEPLOYMENT_OPTS)
-else
-	cd installPackage && $(GHC) $(CABAL_GHC_FLAGS) \
-	                            --make installPackage -o installPackage \
-	                            $(BOOTSTRAP_INC)
-endif
-# TODO: The conditional is yucky, but we need to be able to build with stage1
-#       for bindists and as installPackages/ has no Makefile, it seems hard
-#	to make this nicer.
+	cd installPackage && $(FPTOOLS_TOP_ABS)/compiler/stage1/ghc-inplace \
+	                         --make installPackage -o installPackage \
+	                         $(DEPLOYMENT_OPTS)
 
 ifBuildable/ifBuildable: ifBuildable.hs
 	-$(RM) -rf ifBuildable
@@ -212,15 +202,6 @@ ifeq "$(stage)" "2"
 else
 	cd ifBuildable && $(GHC) -Wall --make ifBuildable -o ifBuildable
 endif
-
-IFBUILDABLE=ifBuildable/ifBuildable $(FPTOOLS_TOP_ABS)/libraries/boot-packages
-
-$(BOOTSTRAP_STAMPS): stamp/bootstrapping.%:
-	$(RM) -rf bootstrapping.$*
-	$(CP) -R $* bootstrapping.$*
-	$(FIND) bootstrapping.$* \( -name "*.o" -o -name "*.hi" \) \
-	                         -exec $(RM) -f {} \;
-	touch $@
 
 .PHONY: all build configure
 
@@ -241,8 +222,8 @@ remake.library.%: clean.library.% make.library.%
 
 # NB. we're depending on make chasing dependencies from left to right here.
 # This bit goes wrong with 'make -j'.
-build: $(foreach SUBDIR,$(SUBDIRS),make.library.$(SUBDIR))
-build: installPackage/installPackage
+build: $(foreach SUBDIR,$(SUBDIRS),make.library.$(SUBDIR)) \
+       installPackage/installPackage
 
 configure: $(foreach SUBDIR,$(SUBDIRS), \
              stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).$(SUBDIR))
@@ -290,10 +271,10 @@ ALL_CONFIGURE_FLAGS = \
 
 $(foreach SUBDIR,$(SUBDIRS), \
 		  stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).$(SUBDIR)): \
-stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).%: %/setup/Setup
+stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).%: cabal
 	-$(RM) -f stamp/configure.library.*.$* $*/unbuildable
 	$(MKDIRHIER) `dirname $@`
-	( cd $* && setup/Setup configure $(ALL_CONFIGURE_FLAGS) ) \
+	( cd $* && $(CABAL) configure $(ALL_CONFIGURE_FLAGS) ) \
 	      && touch $@ || touch $*/unbuildable
 # We don't touch $@ if configure failed as we would prefer to try
 # configuring it next time round, rather than assuming it'll still fail.
@@ -309,15 +290,15 @@ stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).%: %/setup/Setup
 # make.*, so filter them out and use an alternate rule below instead.
 $(foreach SUBDIR,$(filter-out $(SUBDIRS_BUILD),$(SUBDIRS)),make.library.$(SUBDIR)):\
 make.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
-                %/setup/Setup ifBuildable/ifBuildable installPackage/installPackage
+                cabal ifBuildable/ifBuildable
 	if $(IFBUILDABLE) $*; then \
 	  cd $* && \
 	  cmp -s $(MAKEFILE_LOCAL) Makefile.local || cp $(MAKEFILE_LOCAL) .; \
 	  mv GNUmakefile GNUmakefile.tmp; \
-	  setup/Setup makefile -f GNUmakefile; \
+	  $(CABAL) makefile -f GNUmakefile; \
 	  cmp -s GNUmakefile GNUmakefile.tmp && mv GNUmakefile.tmp GNUmakefile; \
 	  $(MAKE) $(MFLAGS) && \
-	  setup/Setup register --inplace; \
+	  $(CABAL) register --inplace; \
 	fi
 
 MAKEFILE_LOCAL = $(FPTOOLS_TOP_ABS)/libraries/Makefile.local
@@ -329,11 +310,11 @@ make.library.%: build.library.%
 # Build the library using 'setup build' (not the default)
 $(foreach SUBDIR,$(SUBDIRS),build.library.$(SUBDIR)):\
 build.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
-                 %/setup/Setup ifBuildable/ifBuildable
+                 cabal ifBuildable/ifBuildable
 	if $(IFBUILDABLE) $*; then \
 	  cd $* && \
-	  setup/Setup build $(addprefix --ghc-option=,$(GhcLibHcOpts)); \
-	  setup/Setup register --inplace; \
+	  $(CABAL) build $(addprefix --ghc-option=,$(GhcLibHcOpts)); \
+	  $(CABAL) register --inplace; \
 	fi
 
 .PHONY: doc html
@@ -350,10 +331,10 @@ endif
 
 $(foreach SUBDIR,$(SUBDIRS),doc.library.$(SUBDIR)):\
 doc.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
-               %/setup/Setup ifBuildable/ifBuildable
+               cabal ifBuildable/ifBuildable
 	if $(IFBUILDABLE) $*; then \
-	  cd $* && setup/Setup haddock --html-location='../$$pkg' \
-	                               $(CABAL_HADDOCK_FLAGS); \
+	  cd $* && $(CABAL) haddock --html-location='../$$pkg' \
+	                            $(CABAL_HADDOCK_FLAGS); \
 	fi
 ifneq "$(HSCOLOUR)" ""
 # We use */src rather than $*/src due to the $(INTEGER_LIBRARY)/integer
@@ -366,8 +347,8 @@ endif
 distclean: clean
 
 clean: $(foreach SUBDIR,$(SUBDIRS),clean.library.$(SUBDIR))
-	$(RM) -f stamp/bootstrapping.*
-	$(RM) -rf bootstrapping.*
+	$(RM) -rf bootstrapping/*
+	$(RM) -f cabal
 	$(RM) -rf ifBuildable
 	$(RM) -rf installPackage
 	$(RM) -f libraries.txt index.html doc-index.html doc-index*.html
@@ -379,8 +360,8 @@ distclean:
 $(foreach SUBDIR,$(SUBDIRS),clean.library.$(SUBDIR)): \
 clean.library.%:
 	$(RM) -f stamp/configure.library.*.$* $*/unbuildable
-	-cd $* && setup/Setup clean
-	$(RM) -rf $*/setup
+	-cd $* && $(CABAL) clean
+	$(RM) -f $*/Setup $*/Setup.exe $*/Setup.hi $*/Setup.o
 	$(RM) $*/GNUmakefile $*/Makefile.local
 endif
 
@@ -424,7 +405,8 @@ install.library.%: installPackage/installPackage ifBuildable/ifBuildable
 
 BIN_DIST_LIBDIR=$(BIN_DIST_DIR)/libraries
 
-binary-dist: $(foreach SUBDIR,$(SUBDIRS),binary-dist.library.$(SUBDIR))
+binary-dist: $(foreach SUBDIR,$(SUBDIRS),binary-dist.library.$(SUBDIR)) \
+             installPackage/installPackage
 	mkdir                               $(BIN_DIST_LIBDIR)/installPackage
 	cp 	  installPackage/installPackage $(BIN_DIST_LIBDIR)/installPackage
 	mkdir                               $(BIN_DIST_LIBDIR)/ifBuildable
