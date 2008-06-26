@@ -91,7 +91,7 @@ options :: Bool -> [OptDescr Flag]
 options backwardsCompat =
   [
    Option ['B']  []     (ReqArg Flag_GhcLibDir "DIR")
-	"path to the GHC lib dir, to override the default path",
+	"path to a GHC lib dir, to override the default path",
    Option ['o']  ["odir"]     (ReqArg Flag_OutputDir "DIR")
 	"directory in which to put the output files",
    Option ['l']  ["lib"]         (ReqArg Flag_Lib "DIR") 
@@ -148,7 +148,7 @@ options backwardsCompat =
     Option [] ["hide"] (ReqArg Flag_HideModule "MODULE")
 	"behave as if MODULE has the hide attribute",
     Option [] ["optghc"] (ReqArg Flag_OptGhc "OPTION")
- 	"Forward option to GHC",
+ 	"option to be forwarded to GHC",
     Option []  ["ghc-version"]  (NoArg Flag_GhcVersion)
 	"output GHC version in numeric format",
     Option ['w'] ["no-warnings"] (NoArg Flag_NoWarnings) "turn off all warnings"
