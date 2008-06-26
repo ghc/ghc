@@ -207,8 +207,10 @@ showInline = unwordsWrap 70 . words . concatMap f
     where
         fs = concatMap f
         f (Str x) = escape x
-        f (TagInline s xs) = "<"++s++">" ++ fs xs ++ "</"++s++">"
+        f (TagInline s xs) = "<"++s++">" ++ (if s == "li" then trim else id) (fs xs) ++ "</"++s++">"
         f x = fs $ asInline x
+
+        trim = dropWhile isSpace . reverse . dropWhile isSpace . reverse
 
 
 showPre :: [Tag] -> [String]
