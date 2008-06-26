@@ -88,6 +88,8 @@ ppExport (ExportDecl decl dc _) = doc dc ++ f (unL decl)
     where
         f (TyClD d@TyData{}) = ppData d
         f (TyClD d@ClassDecl{}) = ppClass d
+        f (ForD (ForeignImport name typ _)) = [out $ SigD $ TypeSig name typ]
+        f (ForD (ForeignExport name typ _)) = [out $ SigD $ TypeSig name typ]
         f decl = [out decl]
 ppExport _ = []
 
