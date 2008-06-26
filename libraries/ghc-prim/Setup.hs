@@ -16,15 +16,15 @@ import System.Directory
 import Control.Exception (try)
 
 main :: IO ()
-main = do let hooks = defaultUserHooks {
+main = do let hooks = simpleUserHooks {
                   regHook = addPrimModule
-                          $ regHook defaultUserHooks,
+                          $ regHook simpleUserHooks,
                   buildHook = build_primitive_sources
-                            $ buildHook defaultUserHooks,
+                            $ buildHook simpleUserHooks,
                   makefileHook = build_primitive_sources
-                               $ makefileHook defaultUserHooks,
+                               $ makefileHook simpleUserHooks,
                   haddockHook = build_primitive_sources
-                               $ haddockHook defaultUserHooks }
+                               $ haddockHook simpleUserHooks }
           defaultMainWithHooks hooks
 
 type Hook a = PackageDescription -> LocalBuildInfo -> UserHooks -> a -> IO ()
