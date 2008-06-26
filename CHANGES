@@ -1,3 +1,7 @@
+Changes in version 2.2.0:
+
+  * It is not longer required to specify the path to GHC's lib dir
+
 Changes in version 2.1.0:
 
   * Fix a bug that made links point to the defining module instead
