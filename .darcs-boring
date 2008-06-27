@@ -55,7 +55,7 @@
 ^libraries/haskell98(/|$)
 ^libraries/hpc(/|$)
 ^libraries/html(/|$)
-^libraries/integer-gmp(/|$)
+^libraries/integer-.*(/|$)
 ^libraries/old-locale(/|$)
 ^libraries/old-time(/|$)
 ^libraries/monads(/|$)
@@ -79,8 +79,9 @@
 ^libraries/unix(/|$)
 ^libraries/xhtml(/|$)
 # Other library bits that get generated:
-^libraries/bootstrapping\.
+^libraries/bootstrapping/
 ^libraries/stamp/
+^libraries/cabal$
 ^libraries/ifBuildable(/|$)
 ^libraries/installPackage(/|$)
 ^libraries/index.html
@@ -98,6 +99,7 @@
 \.hi-boot$
 \.o-boot$
 \.p_o$
+\.t_o$
 \.debug_o$
 \.thr_o$
 \.thr_p_o$
@@ -154,6 +156,8 @@
 ^compiler/stage1($|/)
 ^compiler/stage2($|/)
 ^compiler/stage3($|/)
+^compiler/utils/Fingerprint.hs$
+^compiler/utils/Fingerprint_hsc.c$
 ^mk/build.mk$
 ^mk/validate.mk$
 ^mk/config.h.in$
@@ -174,7 +178,8 @@ package.conf.installed$
 ^docs/man/ghc.1$
 ^extra-gcc-opts$
 # ignore scripts like push-monk
-^push-*
+^push-
+^pull-
 # Common log file names; testlog is made by validate
 ^testlog
 ^log
@@ -186,14 +191,18 @@ package.conf.installed$
 ^utils/genprimopcode/genprimopcode$
 ^utils/ghc-pkg/Version.hs$
 ^utils/ghc-pkg/ghc-pkg-inplace$
+^utils/ghc-pkg/ghc-pkg-inplace.bin$
 ^utils/ghc-pkg/ghc-pkg-inplace.hs$
 ^utils/ghc-pkg/ghc-pkg.bin$
 ^utils/hasktags/hasktags$
+^utils/hasktags/hasktags-inplace$
 ^utils/hp2ps/hp2ps$
 ^utils/hpc/HpcParser.hs$
 ^utils/hpc/hpc$
+^utils/hpc/hpc-inplace$
 ^utils/hsc2hs/hsc2hs-bin$
 ^utils/hsc2hs/hsc2hs-inplace$
+^utils/hsc2hs/hsc2hs-inplace.bin$
 ^utils/hsc2hs/hsc2hs-inplace.hs$
 ^utils/lndir/lndir$
 ^utils/mkdependC/mkdependC$
@@ -201,7 +210,9 @@ package.conf.installed$
 ^utils/prof/cgprof/cgprof$
 ^utils/prof/ghcprof-inplace$
 ^utils/pwd/pwd$
+^utils/pwd/pwd-inplace$
 ^utils/runghc/runghc$
+^utils/runghc/runghc-inplace$
 ^utils/runghc/runhaskell$
 ^utils/runstdtest/runstdtest$
 ^utils/unlit/unlit$
@@ -221,4 +232,7 @@ package.conf.installed$
 ^includes/ghcplatform.h$
 ^includes/mkDerivedConstantsHdr$
 ^includes/mkGHCConstants$
+^libffi/build($|/)
+^libffi/ffi.h$
+^libffi/stamp.ffi.static$
 
