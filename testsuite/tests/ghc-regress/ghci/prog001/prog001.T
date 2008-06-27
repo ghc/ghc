@@ -1,3 +1,2 @@
-test('prog001', normal, ghci_script, ['prog001.script'])
-clean(['D.hi', 'D.o'])
+test('prog001', extra_clean(['D.hs']), ghci_script, ['prog001.script'])
 

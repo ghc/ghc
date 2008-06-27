@@ -33,7 +33,12 @@ test('ghci022', normal, ghci_script, ['ghci022.script'])
 
 test('ghci023', normal, ghci_script, ['ghci023.script'])
 execfile(in_testdir('ghci024.py')) # load function prepare024
-test('ghci024', compose(prepare024, if_platform("powerpc-apple-darwin", expect_broken(1845))), ghci_script, ['ghci024.script'])
+test('ghci024',
+     [prepare024,
+      if_platform("powerpc-apple-darwin", expect_broken(1845)),
+      extra_clean(['ghci024.stdout'])],
+     ghci_script,
+     ['ghci024.script'])
 test('ghci025', normal, ghci_script, ['ghci025.script'])
 test('ghci026', normal, ghci_script, ['ghci026.script'])
 
@@ -44,4 +49,8 @@ test('ghci030', normal, ghci_script, ['ghci030.script'])
 test('ghci031', expect_broken(2138), ghci_script, ['ghci031.script'])
 test('ghci032', if_compiler_lt('ghc', '6.9', skip), ghci_script, ['ghci032.script'])
 
-test('1914', normal, ghci_script, ['1914.script'])
+test('1914',
+     extra_clean(['T1914A.hs', 'T1914B.hs']),
+     ghci_script,
+     ['1914.script'])
+

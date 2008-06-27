@@ -93,15 +93,14 @@ test('ffi015', [ omit_ways(['ghci']), extra_clean(['ffi015_cbits.o']) ],
 test('ffi016', omit_ways(['ghci']), compile_and_run, [''])
 
 test('ffi017', normal, compile_and_run, [''])
-# There's a dependency between these next two lines as the ghci way needs
-# the .o file the other ways make
+
 test('ffi018', [ omit_ways(['ghci']), extra_clean(['ffi018_c.o']) ],
                compile_and_run, ['ffi018_c.c'])
 
 test('ffi018', [ if_compiler_lt('ghc', '6.9', skip),
                  only_ways(['ghci']),
                  cmd_prefix('$MAKE ffi018_ghci_setup && '),
-                 extra_clean(['ffi018_ghci_c.o']) ],
+                 extra_clean(['ffi018_ghci_c.c', 'ffi018_ghci_c.o']) ],
                compile_and_run, ['ffi018_ghci_c.o'])
 
 test('ffi019', normal, compile_and_run, [''])
