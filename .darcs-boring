@@ -166,6 +166,8 @@
 ^mk/stamp-h$
 (^|/)autom4te.cache($|/)
 ^rts/AutoApply.*cmm$
+^rts/sm/Evac_thr.c$
+^rts/sm/Scav_thr.c$
 package.conf.inplace$
 package.conf.installed$
 (^|/)config.log$
