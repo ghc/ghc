@@ -1,1 +1,4 @@
-test('recomp003', ignore_output, run_command, ['$MAKE recomp003'])
+test('recomp003',
+     extra_clean(['Char.hs', 'err']),
+     run_command,
+     ['$MAKE -s --no-print-directory recomp003'])
