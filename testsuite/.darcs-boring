@@ -56,6 +56,9 @@ _o$
 [0-9][0-9][0-9]$
 _stub.[hc]$
 ^timeout/timeout$
+^timeout/TimeMe$
+^timeout/WinCBindings.hs$
+^timeout/WinCBindings_hsc.c$
 ^mk/wordsize.mk$
 ^utils/pwd$
 
