@@ -5,7 +5,15 @@
 #
 # Based on Noah Friedman's mkinstalldirs..
 #
+
+quiet=no
 errs=0
+
+if [ "$1" = "-q" ]
+then
+    shift
+    quiet=yes
+fi
 
 for f in $*; do
     parts=`echo ":$f" | sed -ne 's/^:\//#/;s/^://;s/\// /g;s/^#/\//;p'`
@@ -17,7 +25,10 @@ for f in $*; do
         esac
 
         if test ! -d "$path"; then
-           echo "mkdir $path" 1>&2
+           if [ "$quiet" = "no" ]
+           then
+               echo "mkdir $path" 1>&2
+           fi
 
            mkdir "$path" || lasterr=$?
 	   
