@@ -189,6 +189,7 @@ test('tcfail197', if_compiler_lt('ghc', '6.9', skip), compile_fail, [''])
 test('tcfail198', normal, compile_fail, [''])
 test('tcfail199', normal, compile_fail, [''])
 test('tcfail200', if_compiler_lt('ghc', '6.9', skip), compile_fail, [''])
+test('tcfail201', normal, compile_fail, [''])
 
 test('T1899', normal, compile_fail, [''])
 test('T2126', normal, compile_fail, [''])
