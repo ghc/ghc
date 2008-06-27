@@ -55,3 +55,7 @@ _o$
 \.normalised$
 [0-9][0-9][0-9]$
 _stub.[hc]$
+^timeout/timeout$
+^mk/wordsize.mk$
+^utils/pwd$
+
