@@ -13,5 +13,4 @@ test('trace001', normal, compile_and_run, [''])
 
 test('hGetBuf001', normal, compile_and_run, [''])
 test('hPutBuf001', normal, compile_and_run, [''])
-test('hPutBuf002', normal, compile_and_run, [''])
-clean(['hPutBuf002.out'])
+test('hPutBuf002', extra_clean(['hPutBuf002.out']), compile_and_run, [''])

@@ -1,6 +1,6 @@
 module Main where
 
-import Memo	( memo )
+import Memo2 ( memo )
 import List	( genericLength, genericReplicate )
 import System	( getArgs )
 

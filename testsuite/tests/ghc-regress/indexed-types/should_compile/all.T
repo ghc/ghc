@@ -26,13 +26,19 @@ test('Simple22', normal, compile, [''])
 test('Simple23', normal, compile, [''])
 
 test('ind1', normal, compile, [''])
-test('ind2', normal, multimod_compile, ['ind2', '-v0'])
-test('impexp', normal, multimod_compile, 
+test('ind2',
+     extra_clean(['Ind2_help.hi', 'Ind2_help.o', 'Exp.hi', 'Imp.o']),
+     multimod_compile,
+     ['ind2', '-v0'])
+test('impexp',
+     extra_clean(['Ind2_help.hi', 'Ind2_help.o', 'Exp.hi', 'Imp.o']),
+     multimod_compile, 
      ['Imp', '-w -no-hs-main -c'])
-clean(['Ind2_help.hi', 'Ind2_help.o', 'Exp.hi', 'Imp.o'])
 
-test('ATLoop', normal, multimod_compile, ['ATLoop','-v0'])
-clean(['ATLoop_Help.o','ATLoop_Help.hi'])
+test('ATLoop',
+     extra_clean(['ATLoop_Help.o','ATLoop_Help.hi']),
+     multimod_compile,
+     ['ATLoop','-v0'])
 
 test('Deriving', normal, compile, [''])
 test('DerivingNewType', expect_fail, compile, [''])
@@ -41,8 +47,10 @@ test('Records', normal, compile, [''])
 # The point about this test is that it compiles NewTyCo1 and NewTyCo2
 # *separately*
 #
-test('NewTyCo', normal, run_command, ['$MAKE -s --no-print-directory NewTyCo'])
-clean(['NewTyCo1.o', 'NewTyCo1.hi', 'NewTyCo2.o', 'NewTyCo2.hi'])
+test('NewTyCo',
+     extra_clean(['NewTyCo1.o', 'NewTyCo1.hi', 'NewTyCo2.o', 'NewTyCo2.hi']),
+     run_command,
+     ['$MAKE -s --no-print-directory NewTyCo'])
 
 test('Infix', normal, compile, [''])
 test('Kind', normal, compile, [''])

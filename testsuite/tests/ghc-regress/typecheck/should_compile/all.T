@@ -176,15 +176,19 @@ test('tc169', normal, compile, [''])
 # we run one way only, so we can be sure to have the right kind
 # of interface file for the second part of the test.
 test('Tc170_Aux', compose(no_clean, only_ways(['optc','optasm'])), compile, [''])
-test('tc170', only_ways(['optc','optasm']), compile, [''])
-clean(['Tc170_Aux.comp.stderr', 'Tc170_Aux.hi', 'Tc170_Aux.o'])
+test('tc170',
+     [only_ways(['optc','optasm']),
+      extra_clean(['Tc170_Aux.comp.stderr', 'Tc170_Aux.hi', 'Tc170_Aux.o'])],
+     compile, [''])
 
 test('tc171', normal, compile, [''])
 test('tc172', normal, compile, [''])
 
 # The point about this test is that it compiles Tc173a and Tc173b *separately*
-test('tc173', normal, run_command, ['$MAKE -s --no-print-directory tc173'])
-clean(['Tc173a.hi', 'Tc173a.o', 'Tc173b.hi', 'Tc173b.o'])
+test('tc173',
+     extra_clean(['Tc173a.hi', 'Tc173a.o', 'Tc173b.hi', 'Tc173b.o']),
+     run_command,
+     ['$MAKE -s --no-print-directory tc173'])
 
 test('tc174', only_compiler_types(['ghc']), compile, [''])
 test('tc175', normal, compile, [''])

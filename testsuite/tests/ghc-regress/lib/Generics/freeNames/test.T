@@ -1,8 +1,7 @@
 setTestOpts(only_compiler_types(['ghc']))
 
 test( 'freeNames',
-      normal,
+      extra_clean(['FunDatatypes.hi', 'FunDatatypes.o', 'Main.hi', 'Main.o']),
       multimod_compile_and_run,
       ['Main','']
     )
-clean(['FunDatatypes.hi', 'FunDatatypes.o', 'Main.hi', 'Main.o'])

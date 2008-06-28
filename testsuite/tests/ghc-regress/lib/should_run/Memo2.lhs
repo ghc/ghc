@@ -7,7 +7,7 @@
 \begin{code}
 {-# OPTIONS -fglasgow-exts -cpp #-}
 
-module Memo
+module Memo2
 	{-# DEPRECATED "This module is unmaintained, and will disappear soon" #-}
 #ifndef __PARALLEL_HASKELL__
 	( memo  	-- :: (a -> b) -> a -> b

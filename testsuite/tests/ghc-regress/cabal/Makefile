@@ -96,10 +96,8 @@ LOCAL_GHC_PKG1750 = $(GHC_PKG_INPLACE) -f $(PKGCONF1750)
 COPY_PACKAGE_CONF = package.conf.copy
 GHC_PKG_COPY = $(GHC_PKG_INPLACE) --global-conf=$(COPY_PACKAGE_CONF)
 
-copy :
+ghcpkg02:
 	cp $(GHC_DRIVER_DIR)/package.conf.inplace $(COPY_PACKAGE_CONF)
-
-ghcpkg02 : copy
 	for i in `$(GHC_PKG_COPY) list --global --simple-output`; do \
 		echo Updating $$i; \
 		$(GHC_PKG_COPY) describe --global $$i | $(GHC_PKG_COPY) update --global --force -; \

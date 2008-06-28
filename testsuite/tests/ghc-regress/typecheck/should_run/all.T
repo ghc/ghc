@@ -41,8 +41,8 @@ test('tcrun021', expect_fail_for(['extcore','optextcore']),
 test('tcrun022', compose(omit_ways(['ghci']),only_compiler_types(['ghc'])), compile_and_run, ['-O -fglasgow-exts'])
 test('tcrun023', normal, compile_and_run, ['-O'])
 test('tcrun024', normal, compile_and_run, ['-O'])
-test('tcrun025', normal, multimod_compile_and_run, ['tcrun025',''])
-clean(['TcRun025_B.hi', 'TcRun025_B.o'])
+test('tcrun025', extra_clean(['TcRun025_B.hi', 'TcRun025_B.o']),
+     multimod_compile_and_run, ['tcrun025',''])
 test('tcrun026', normal, compile_fail, [''])
 test('tcrun027', normal, compile_and_run, [''])
 # Doesn't work with External Core due to datatype with no constructors
@@ -57,8 +57,10 @@ test('tcrun035', only_compiler_types(['ghc']), compile_and_run, [''])
 test('tcrun036', only_compiler_types(['ghc']), compile_and_run, [''])
 test('tcrun037', only_compiler_types(['ghc']), compile_and_run, [''])
 
-test('tcrun038', normal, multimod_compile_and_run, ['tcrun038',''])
-clean(['TcRun038_B.hi', 'TcRun038_B.o'])
+test('tcrun038',
+     extra_clean(['TcRun038_B.hi', 'TcRun038_B.o']),
+     multimod_compile_and_run,
+     ['tcrun038',''])
 
 test('tcrun039', only_compiler_types(['ghc']), compile_and_run, [''])
 test('tcrun040', normal, compile_and_run, [''])

@@ -7,22 +7,21 @@ test('ghcpkg01',
                if_compiler_lt('ghc', '6.9', skip)]),
      run_command,
      ['$MAKE -s --no-print-directory ghcpkg01'])
-clean(['local.package.conf', 'local.package.conf.old'])
-test('ghcpkg02', skip_if_fast, run_command,
+test('ghcpkg02',
+     [skip_if_fast,
+      extra_clean(['package.conf.copy', 'package.conf.copy.old'])],
+     run_command,
      ['$MAKE -s --no-print-directory ghcpkg02'])
-clean(['package.conf.copy', 'package.conf.copy.old'])
 test('ghcpkg03',
      extra_clean(['local03.package.conf',
                   'local03.package.conf.old']),
      run_command,
      ['$MAKE -s --no-print-directory ghcpkg03'])
-clean(['local.package.conf', 'local.package.conf.old'])
 test('ghcpkg04',
      extra_clean(['local04.package.conf',
                   'local04.package.conf.old']),
      run_command,
      ['$MAKE -s --no-print-directory ghcpkg04'])
-clean(['local.package.conf', 'local.package.conf.old'])
 
 # Test that we *can* compile a module that also belongs to a package
 # (this was disallowed in GHC 6.4 and earlier)

@@ -6,7 +6,6 @@ def f(opts):
 setTestOpts(f)
 
 test('ghciprog004',
-     normal,
+     extra_clean(['ctest.c', 'ctest.o']),
      run_command,
      ['$MAKE -s --no-print-directory ghciprog004'])
-clean(['ctest.c', 'ctest.o'])

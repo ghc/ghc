@@ -1,6 +1,6 @@
 module Main(main) where
 
-import Memo
+import Memo1
 
 testMemo = do
    let keys = [ [1..n] | n <- [1..1000] ]

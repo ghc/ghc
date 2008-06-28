@@ -23,17 +23,24 @@ test('list001'	,	skip_if_fast, compile_and_run, [''])
 test('list002', skip_if_fast, compile_and_run, [''])
 test('list003', skip_if_fast, compile_and_run, [''])
 
-test('memo001', compose(skip_if_fast,extra_run_opts('+RTS -A10k -RTS')), \
-	multimod_compile_and_run, ['memo001',''])
-clean(['Memo.hi', 'Memo.o'])
+test('memo001',
+     [skip_if_fast,
+      extra_run_opts('+RTS -A10k -RTS'),
+      extra_clean(['Memo1.hi', 'Memo1.o'])],
+     multimod_compile_and_run,
+     ['memo001',''])
 
-test('memo002', compose(skip_if_fast,extra_run_opts('20')), \
+test('memo002',
+     [skip_if_fast,
+      extra_run_opts('20'),
+      extra_clean(['Memo2.hi', 'Memo2.o'])],
 	multimod_compile_and_run, ['memo002',''])
-clean(['Memo.hi', 'Memo.o'])
 
 test('packedstring001', normal, compile_and_run, ['-package packedstring'])
 
-test('stableptr001', compose(skip_if_fast,extra_run_opts('+RTS -K8m -RTS')), compile_and_run, [''])
+test('stableptr001',
+     [skip_if_fast, extra_run_opts('+RTS -K8m -RTS')],
+     compile_and_run, [''])
 test('stableptr003', normal, compile_and_run, [''])
 test('stableptr004', extra_run_opts('+RTS -K4m -RTS'), compile_and_run, [''])
 test('stableptr005', normal, compile_and_run, [''])

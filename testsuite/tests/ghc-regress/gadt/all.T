@@ -19,8 +19,10 @@ test('gadt14', normal, compile, [''])
 test('gadt15', normal, compile, [''])
 test('gadt16', normal, compile, [''])
 
-test('gadt17', normal, run_command, ['$MAKE -s --no-print-directory gadt17'])
-clean(['Gadt17_help.hi', 'Gadt17_help.o'])
+test('gadt17',
+     extra_clean(['Gadt17_help.hi', 'Gadt17_help.o']),
+     run_command,
+     ['$MAKE -s --no-print-directory gadt17'])
 
 test('gadt18', normal, compile, [''])
 test('gadt19', normal, compile, [''])
@@ -29,8 +31,10 @@ test('gadt21', if_compiler_lt('ghc','6.9', namebase('gadt21-6.8')),
      compile_fail, [''])
 test('gadt22', normal, compile, [''])
 
-test('gadt23', normal, run_command, ['$MAKE -s --no-print-directory gadt23'])
-clean(['Gadt23_AST.hi', 'Gadt23_AST.o'])
+test('gadt23',
+     extra_clean(['Gadt23_AST.hi', 'Gadt23_AST.o']),
+     run_command,
+     ['$MAKE -s --no-print-directory gadt23'])
 
 test('gadt24', normal, compile, [''])
 

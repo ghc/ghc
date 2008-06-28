@@ -25,15 +25,24 @@ test('TH_spliceE5', normal, multimod_compile_and_run, ['TH_spliceE5', '-v0'])
 # profiling (-osuf p_o) because this is necessary when mixing
 # profiling w/ TH.  Furthermore we must have built the program the
 # normal way first, so this is a bit of a hack.
-test('TH_spliceE5_prof', compose(req_profiling, omit_ways(['ghci'])), multimod_compile_and_run, ['TH_spliceE5', '-v0 -prof -auto-all -osuf p_o'])
-clean(['TH_spliceE5_Lib.p_o', 'TH_spliceE5_Lib.hi', 'TH_spliceE5_Lib.o',
-       'TH_spliceE5.hi', 'TH_spliceE5.p_o'])
+test('TH_spliceE5_prof',
+     [req_profiling,
+      omit_ways(['ghci']),
+      extra_clean(['TH_spliceE5_Lib.p_o', 'TH_spliceE5_Lib.hi',
+                   'TH_spliceE5_Lib.o',
+                   'TH_spliceE5.hi', 'TH_spliceE5.p_o'])],
+     multimod_compile_and_run,
+     ['TH_spliceE5', '-v0 -prof -auto-all -osuf p_o'])
 
-test('TH_spliceD1', normal, multimod_compile_fail, ['TH_spliceD1', '-v0'])
-clean(['TH_spliceD1_Lib.hi', 'TH_spliceD1_Lib.o'])
+test('TH_spliceD1',
+     extra_clean(['TH_spliceD1_Lib.hi', 'TH_spliceD1_Lib.o']),
+     multimod_compile_fail,
+     ['TH_spliceD1', '-v0'])
 
-test('TH_spliceD2', normal, multimod_compile, ['TH_spliceD2', '-v0'])
-clean(['TH_spliceD2_Lib.hi', 'TH_spliceD2_Lib.o'])
+test('TH_spliceD2',
+     extra_clean(['TH_spliceD2_Lib.hi', 'TH_spliceD2_Lib.o']),
+     multimod_compile,
+     ['TH_spliceD2', '-v0'])
 
 test('TH_reifyDecl1', normal, compile, ['-v0'])
 test('TH_reifyDecl2', normal, compile, ['-v0'])
@@ -44,10 +53,14 @@ test('TH_reifyMkName', if_compiler_lt('ghc', '6.9', expect_fail), compile, [''])
 
 test('TH_spliceDecl1', normal, compile, ['-v0'])
 test('TH_spliceDecl2', normal, compile, ['-v0'])
-test('TH_spliceDecl3', normal, multimod_compile, ['TH_spliceDecl3', '-v0'])
-clean(['TH_spliceDecl3_Lib.hi', 'TH_spliceDecl3_Lib.o'])
-test('TH_spliceDecl4', normal, multimod_compile, ['TH_spliceDecl4', '-v0'])
-clean(['TH_spliceDecl4_Lib.hi', 'TH_spliceDecl4_Lib.o'])
+test('TH_spliceDecl3',
+     extra_clean(['TH_spliceDecl3_Lib.hi', 'TH_spliceDecl3_Lib.o']),
+     multimod_compile,
+     ['TH_spliceDecl3', '-v0'])
+test('TH_spliceDecl4',
+     extra_clean(['TH_spliceDecl4_Lib.hi', 'TH_spliceDecl4_Lib.o']),
+     multimod_compile,
+     ['TH_spliceDecl4', '-v0'])
 
 test('TH_spliceE1', normal, compile_and_run, [''])
 test('TH_spliceExpr1', normal, compile, ['-v0'])
@@ -60,8 +73,10 @@ test('TH_bracket3', normal, compile, [''])
 
 test('TH_class1', normal, compile, ['-v0'])
 test('TH_tuple1', normal, compile, ['-v0'])
-test('TH_genEx', normal, multimod_compile, ['TH_genEx', '-v0'])
-clean(['TH_genExLib.hi', 'TH_genExLib.o'])
+test('TH_genEx',
+     extra_clean(['TH_genExLib.hi', 'TH_genExLib.o']),
+     multimod_compile,
+     ['TH_genEx', '-v0'])
 
 test('TH_where', normal, compile_and_run, [''])
 

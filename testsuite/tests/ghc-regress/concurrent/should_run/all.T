@@ -121,10 +121,12 @@ test('conc045', only_compiler_types(['ghc']), compile_and_run, [''])
 
 test('conc058', only_compiler_types(['ghc']), compile_and_run, [''])
 
-test('conc059', compose(only_compiler_types(['ghc']),
-			only_ways(['threaded1','threaded2'])),
-	compile_and_run, ['conc059_c.c'])
-clean(['conc059_c.o'])
+test('conc059',
+     [only_compiler_types(['ghc']),
+      only_ways(['threaded1','threaded2']),
+      extra_clean(['conc059_c.o'])],
+     compile_and_run,
+     ['conc059_c.c'])
 
 test('conc064',
      compose(exit_code(1),

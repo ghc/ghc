@@ -1,3 +1,4 @@
-test('rename.prog003', normal, multimod_compile_fail, \
-  ['B', '-v0'])
-clean(['A.hi', 'A.o'])
+test('rename.prog003',
+     extra_clean(['A.hi', 'A.o']),
+     multimod_compile_fail,
+     ['B', '-v0'])

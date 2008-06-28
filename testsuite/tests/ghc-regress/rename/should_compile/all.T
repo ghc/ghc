@@ -3,17 +3,29 @@
 test('rn003', normal, compile, [''])
 test('rn005', normal, compile, [''])
 test('rn006', normal, compile, [''])
-test('rn009', only_compiler_types(['ghc']), multimod_compile, ['rn009', '-v0'])
-clean(['Imp10Aux.hi', 'Imp10Aux.o'])
+test('rn009',
+     [only_compiler_types(['ghc']),
+      extra_clean(['Imp10Aux.hi', 'Imp10Aux.o'])],
+     multimod_compile,
+     ['rn009', '-v0'])
 # rn10 tests the same things as 009,011,012
 #test('rn010', only_compiler_types(['ghc']), multimod_compile, ['rn010', '-v0'])
-test('rn011', only_compiler_types(['ghc']), multimod_compile, ['rn011', '-v0'])
-clean(['Imp100Aux.hi', 'Imp100Aux.o'])
-test('rn012', only_compiler_types(['ghc']), multimod_compile, ['rn012', '-v0'])
-clean(['Imp500Aux.hi', 'Imp500Aux.o'])
+test('rn011',
+     [only_compiler_types(['ghc']),
+      extra_clean(['Imp100Aux.hi', 'Imp100Aux.o'])],
+     multimod_compile,
+     ['rn011', '-v0'])
+test('rn012',
+     [only_compiler_types(['ghc']),
+      extra_clean(['Imp500Aux.hi', 'Imp500Aux.o'])],
+     multimod_compile,
+     ['rn012', '-v0'])
 test('rn013', normal, compile, [''])
-test('rn017', only_compiler_types(['ghc']), multimod_compile, ['rn017', '-v0'])
-clean(['RnAux017.hi', 'RnAux017.o'])
+test('rn017',
+     [only_compiler_types(['ghc']),
+      extra_clean(['RnAux017.hi', 'RnAux017.o'])],
+     multimod_compile,
+     ['rn017', '-v0'])
 test('rn019', normal, compile, [''])
 test('rn020', normal, compile, [''])
 test('rn022', normal, compile, [''])
@@ -39,36 +51,44 @@ test('rn039', if_compiler_lt('ghc', '6.9', namebase('rn039-6.8')),
               compile, [''])
 test('rn040', normal, compile, ['-fwarn-unused-binds -fwarn-unused-matches'])
 test('rn041', normal, compile, [''])
-test('rn042', normal, multimod_compile, ['rn042', '-v0'])
-clean(['Rn042_A.hi', 'Rn042_A.o'])
-test('rn043', normal, multimod_compile, ['rn043', '-v0'])
-clean(['Rn043_A.hi', 'Rn043_A.o', 'Rn043_B.hi', 'Rn043_B.o'])
-test('rn044', normal, multimod_compile, ['rn044', '-v0'])
-clean(['Rn043_A.hi', 'Rn043_A.o', 'Rn043_B.hi', 'Rn043_B.o'])
+test('rn042',
+     extra_clean(['Rn042_A.hi', 'Rn042_A.o']),
+     multimod_compile,
+     ['rn042', '-v0'])
+test('rn043',
+     extra_clean(['Rn043_A.hi', 'Rn043_A.o', 'Rn043_B.hi', 'Rn043_B.o']),
+     multimod_compile, ['rn043', '-v0'])
+test('rn044',
+     extra_clean(['Rn043_A.hi', 'Rn043_A.o', 'Rn043_B.hi', 'Rn043_B.o']),
+     multimod_compile, ['rn044', '-v0'])
 test('rn045', normal, compile, [''])
 test('rn046', normal, compile, ['-W'])
 test('rn047', normal, compile, ['-W'])
 test('rn048', normal, compile, ['-W'])
 test('rn049', normal, compile, ['-W'])
 
-test('rn050', normal, multimod_compile, ['rn050', '-v0'])
-clean(['Rn050_A.hi', 'Rn050_A.o'])
+test('rn050',
+     extra_clean(['Rn050_A.hi', 'Rn050_A.o']),
+     multimod_compile, ['rn050', '-v0'])
 
 test('rn051', normal, compile, [''])
 
-test('rn052', normal, multimod_compile, ['rn052', '-v0'])
-clean(['Rn052Aux.hi', 'Rn052Aux.o'])
+test('rn052',
+     extra_clean(['Rn052Aux.hi', 'Rn052Aux.o']),
+     multimod_compile, ['rn052', '-v0'])
 
-test('rn053', normal, multimod_compile, ['rn053', '-v0'])
-clean(['Rn053_A.hi', 'Rn053_A.o', 'Rn053_B.hi', 'Rn053_B.o'])
+test('rn053',
+     extra_clean(['Rn053_A.hi', 'Rn053_A.o', 'Rn053_B.hi', 'Rn053_B.o']),
+     multimod_compile, ['rn053', '-v0'])
 
 test('rn054', normal, compile, [''])
 test('rn055', normal, compile, [''])
 test('rn056', normal, compile, [''])
 test('rn057', normal, compile, [''])
 test('rn058', normal, compile, [''])
-test('rn059', normal, multimod_compile, ['rn059', '-v0'])
-clean(['Rn059_A.hi', 'Rn059_A.o', 'Rn059_B.hi', 'Rn059_B.o'])
+test('rn059',
+     extra_clean(['Rn059_A.hi', 'Rn059_A.o', 'Rn059_B.hi', 'Rn059_B.o']),
+     multimod_compile, ['rn059', '-v0'])
 test('rn060', normal, compile, [''])
 test('rn061', normal, compile, [''])
 test('rn062', normal, compile, [''])

@@ -4,6 +4,9 @@
 def set_opts( opts ):
   opts.expect = 'fail'
 
-test('okeefe_neural', compose(skip_if_fast,set_opts), multimod_compile_and_run, \
-	['Main', '-package lang +RTS -M64m -RTS'])
-clean(['Main.hi'])
+test('okeefe_neural',
+     [skip_if_fast,
+      set_opts,
+      extra_clean(['Main.hi'])],
+     multimod_compile_and_run,
+     ['Main', '-package lang +RTS -M64m -RTS'])
