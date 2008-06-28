@@ -7,5 +7,14 @@
 # for throwTo.  It has shown up several bugs that were not caught by the 
 # other concurrency tests.
 
-test('concprog001', skip_if_fast, multimod_compile_and_run, ['Mult',''])
-clean_o_hi()
+test('concprog001',
+     [skip_if_fast,
+      extra_clean(['Arithmetic.hi', 'Arithmetic.o',
+                   'Converter.hi',  'Converter.o',
+                   'Mult.hi',       'Mult.o',
+                   'Stream.hi',     'Stream.o',
+                   'Thread.hi',     'Thread.o',
+                   'Trit.hi',       'Trit.o',
+                   'Utilities.hi',  'Utilities.o'])],
+     multimod_compile_and_run,
+     ['Mult',''])

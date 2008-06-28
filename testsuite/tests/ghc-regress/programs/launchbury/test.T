@@ -1,4 +1,6 @@
 
-test('launchbury', skip_if_fast, multimod_compile_and_run, ['Main', ''])
-clean_o_hi()
+test('launchbury',
+     [skip_if_fast, extra_clean(['Main.hi', 'Main.o'])],
+     multimod_compile_and_run,
+     ['Main', ''])
 

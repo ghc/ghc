@@ -1,6 +1,14 @@
 
-test('andy_cherry', compose(skip_if_fast,extra_run_opts('.')), \
-	multimod_compile_and_run, \
-	['Main', '-cpp'])
-clean_o_hi()
+test('andy_cherry',
+     [skip_if_fast,
+      extra_clean(['DataTypes.hi',   'DataTypes.o',
+                   'GenUtils.hi',    'GenUtils.o',
+                   'Interp.hi',      'Interp.o',
+                   'InterpUtils.hi', 'InterpUtils.o',
+                   'Main.hi',        'Main.o',
+                   'Parser.hi',      'Parser.o',
+                   'PrintTEX.hi',    'PrintTEX.o']),
+      extra_run_opts('.')],
+     multimod_compile_and_run,
+     ['Main', '-cpp'])
 

@@ -5,8 +5,22 @@ if config.platform.startswith('i386-') and \
        config.platform != 'i386-unknown-openbsd':
     setTestOpts(expect_fail_for(['hpc','optasm','profasm','threaded2','profthreaded']))
 
-test('galois_raytrace', \
-	compose(skip_if_fast, reqlib('parsec')), \
-	multimod_compile_and_run, \
-	['Main','-package parsec'])
-clean_o_hi()
+test('galois_raytrace',
+     [skip_if_fast,
+      extra_clean(['CSG.hi',           'CSG.o',
+                   'Construct.hi',     'Construct.o',
+                   'Data.hi',          'Data.o',
+                   'Eval.hi',          'Eval.o',
+                   'Geometry.hi',      'Geometry.o',
+                   'Illumination.hi',  'Illumination.o',
+                   'Intersections.hi', 'Intersections.o',
+                   'Interval.hi',      'Interval.o',
+                   'Main.hi',          'Main.o',
+                   'Misc.hi',          'Misc.o',
+                   'Parse.hi',         'Parse.o',
+                   'Primitives.hi',    'Primitives.o',
+                   'Surface.hi',       'Surface.o']),
+      reqlib('parsec')],
+     multimod_compile_and_run,
+     ['Main','-package parsec'])
+

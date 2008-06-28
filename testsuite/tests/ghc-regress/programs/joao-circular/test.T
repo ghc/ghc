@@ -1,2 +1,11 @@
-test('joao-circular', compose(skip_if_fast,extra_run_opts('inp 40')), multimod_compile_and_run, ['Main', '-O'])
-clean_o_hi()
+test('joao-circular',
+     [skip_if_fast,
+      extra_clean(['Data_Lazy.hi',         'Data_Lazy.o',
+                   'Funcs_Lexer.hi',       'Funcs_Lexer.o',
+                   'Funcs_Parser_Lazy.hi', 'Funcs_Parser_Lazy.o',
+                   'LrcPrelude.hi',        'LrcPrelude.o',
+                   'Main.hi',              'Main.o',
+                   'Visfun_Lazy.hi',       'Visfun_Lazy.o']),
+      extra_run_opts('inp 40')],
+     multimod_compile_and_run,
+     ['Main', '-O'])
