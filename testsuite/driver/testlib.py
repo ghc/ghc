@@ -444,6 +444,7 @@ def test_common_work (name, opts, func, args):
 
     clean(map (lambda suff: name + suff,
               ['', '.exe', '.genscript',
+               '.stderr.normalised',        '.stdout.normalised',
                '.run.stderr',            '.run.stdout',
                '.run.stderr.normalised', '.run.stdout.normalised',
                '.comp.stderr',            '.comp.stdout',
