@@ -465,9 +465,14 @@ def clean_full_paths(names):
     if getTestOpts().cleanup != '':
         for name in names:
             try:
+                # Remove files...
                 os.remove(name)
             except OSError:
-                pass
+                try:
+                    # ... and empty directories
+                    os.rmdir(name)
+                except OSError:
+                    pass
 
 def do_test(name, way, func, args):
     full_name = name + '(' + way + ')'
