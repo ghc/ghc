@@ -65,13 +65,13 @@ LOCAL_GHC_PKG04 = $(GHC_PKG_INPLACE) -f $(PKGCONF04)
 
 # Test that importing a module exposed by two packages reports a conflict
 ghcpkg04 :
-	@rm -f $(PKGCONF04)
-	@echo "[]" >$(PKGCONF04)
-	@$(LOCAL_GHC_PKG04) register --force test.pkg >/dev/null 2>&1 
-	@$(LOCAL_GHC_PKG04) update --force test5.pkg >/dev/null 2>&1 
-	@$(LOCAL_GHC_PKG04) expose testpkg-1.2.3.4  >/dev/null 2>&1
+	rm -f $(PKGCONF04)
+	echo "[]" >$(PKGCONF04)
+	$(LOCAL_GHC_PKG04) register --force test.pkg >/dev/null 2>&1 
+	$(LOCAL_GHC_PKG04) update --force test5.pkg >/dev/null 2>&1 
+	$(LOCAL_GHC_PKG04) expose testpkg-1.2.3.4  >/dev/null 2>&1
 	@: # testpkg-1.2.3.4 and newtestpkg-2.0 are both exposed now
-	@$(TEST_HC) -package-conf $(PKGCONF04) -c ghcpkg04.hs || true
+	$(TEST_HC) -package-conf $(PKGCONF04) -c ghcpkg04.hs || true
 
 PKGCONF1750=local1750.package.conf
 LOCAL_GHC_PKG1750 = $(GHC_PKG_INPLACE) -f $(PKGCONF1750)

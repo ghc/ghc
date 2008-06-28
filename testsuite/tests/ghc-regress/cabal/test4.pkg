@@ -15,4 +15,3 @@ hidden-modules:
 import-dirs:
 library-dirs:
 hs-libraries: 
-depends: base, Cabal, testpkg-2.0

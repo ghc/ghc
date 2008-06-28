@@ -41,7 +41,7 @@ test('Records', normal, compile, [''])
 # The point about this test is that it compiles NewTyCo1 and NewTyCo2
 # *separately*
 #
-test('NewTyCo', ignore_output, run_command, ['$MAKE NewTyCo'])
+test('NewTyCo', normal, run_command, ['$MAKE -s --no-print-directory NewTyCo'])
 clean(['NewTyCo1.o', 'NewTyCo1.hi', 'NewTyCo2.o', 'NewTyCo2.hi'])
 
 test('Infix', normal, compile, [''])

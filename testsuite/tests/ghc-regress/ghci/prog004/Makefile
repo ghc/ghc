@@ -8,4 +8,4 @@ ghciprog004:
 	@rm -f ctest.o
 	echo "int foo(){}" >ctest.c
 	$(CC) -g -c ctest.c
-	echo ":q" | $(TEST_HC) --interactive ctest.o
+	echo ":q" | $(TEST_HC) -v0 --interactive ctest.o

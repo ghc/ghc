@@ -15,110 +15,164 @@ def cleanall():
         rawSystem(['rm', '-rf', in_testdir('obj')])
         rawSystem(['rm', '-rf', in_testdir('stub')])
 
-test('driver011', ignore_output, run_command, ['$MAKE test011'])
+test('driver011', normal, run_command,
+     ['$MAKE -s --no-print-directory test011'])
 cleanall()
-test('driver012', ignore_output, run_command, ['$MAKE test012'])
+test('driver012', normal, run_command,
+     ['$MAKE -s --no-print-directory test012'])
 cleanall()
-test('driver013', ignore_output, run_command, ['$MAKE test013'])
+test('driver013', normal, run_command,
+     ['$MAKE -s --no-print-directory test013'])
 cleanall()
-test('driver014', ignore_output, run_command, ['$MAKE test014'])
+test('driver014', extra_clean(['A014.hi', 'obj014/A014.o', 'obj014']),
+     run_command,
+     ['$MAKE -s --no-print-directory test014'])
+test('driver015', extra_clean(['A015.o', 'hi015/A015.hi', 'hi015']),
+     run_command,
+     ['$MAKE -s --no-print-directory test015'])
+test('driver016', normal, run_command,
+     ['$MAKE -s --no-print-directory test016'])
 cleanall()
-test('driver015', ignore_output, run_command, ['$MAKE test015'])
+test('driver017', normal, run_command,
+     ['$MAKE -s --no-print-directory test017'])
 cleanall()
-test('driver016', ignore_output, run_command, ['$MAKE test016'])
+test('driver018',
+     extra_clean(['F018.hi', 'F018_stub.c', 'F018_stub.h',
+                  'obj018/TestStub018.o', 'obj018/TestStub018_stub.o',
+                  'obj018']),
+     run_command,
+     ['$MAKE -s --no-print-directory test018'])
+test('driver021', normal, run_command,
+     ['$MAKE -s --no-print-directory test021'])
 cleanall()
-test('driver017', ignore_output, run_command, ['$MAKE test017'])
+test('driver022', normal, run_command,
+     ['$MAKE -s --no-print-directory test022'])
 cleanall()
-test('driver018', ignore_output, run_command, ['$MAKE test018'])
+test('driver023', normal, run_command,
+     ['$MAKE -s --no-print-directory test023'])
 cleanall()
-test('driver021', ignore_output, run_command, ['$MAKE test021'])
+test('driver024',
+     extra_clean(['obj024/B/C024.o', 'obj024/B', 'obj024']),
+     run_command,
+     ['$MAKE -s --no-print-directory test024'])
+test('driver024a', normal, run_command,
+     ['$MAKE -s --no-print-directory test024a'])
 cleanall()
-test('driver022', ignore_output, run_command, ['$MAKE test022'])
+test('driver025', normal, run_command,
+     ['$MAKE -s --no-print-directory test025'])
 cleanall()
-test('driver023', ignore_output, run_command, ['$MAKE test023'])
+test('driver026', normal, run_command,
+     ['$MAKE -s --no-print-directory test026'])
 cleanall()
-test('driver024', ignore_output, run_command, ['$MAKE test024'])
+test('driver027', normal, run_command,
+     ['$MAKE -s --no-print-directory test027'])
 cleanall()
-test('driver024a', ignore_output, run_command, ['$MAKE test024a'])
+test('driver028', normal, run_command,
+     ['$MAKE -s --no-print-directory test028'])
 cleanall()
-test('driver025', ignore_output, run_command, ['$MAKE test025'])
+test('driver031', normal, run_command,
+     ['$MAKE -s --no-print-directory test031'])
 cleanall()
-test('driver026', ignore_output, run_command, ['$MAKE test026'])
+test('driver032', normal, run_command,
+     ['$MAKE -s --no-print-directory test032'])
 cleanall()
-test('driver027', ignore_output, run_command, ['$MAKE test027'])
+test('driver033', normal, run_command,
+     ['$MAKE -s --no-print-directory test033'])
 cleanall()
-test('driver028', ignore_output, run_command, ['$MAKE test028'])
+test('driver034', normal, run_command,
+     ['$MAKE -s --no-print-directory test034'])
 cleanall()
-test('driver031', ignore_output, run_command, ['$MAKE test031'])
+test('driver035', normal, run_command,
+     ['$MAKE -s --no-print-directory test035'])
 cleanall()
-test('driver032', ignore_output, run_command, ['$MAKE test032'])
+test('driver041', normal, run_command,
+     ['$MAKE -s --no-print-directory test041'])
 cleanall()
-test('driver033', ignore_output, run_command, ['$MAKE test033'])
+test('driver042', normal, run_command,
+     ['$MAKE -s --no-print-directory test042'])
 cleanall()
-test('driver034', ignore_output, run_command, ['$MAKE test034'])
+test('driver043', normal, run_command,
+     ['$MAKE -s --no-print-directory test043'])
 cleanall()
-test('driver035', ignore_output, run_command, ['$MAKE test035'])
+test('driver044', normal, run_command,
+     ['$MAKE -s --no-print-directory test044'])
 cleanall()
-test('driver041', ignore_output, run_command, ['$MAKE test041'])
+test('driver045', normal, run_command,
+     ['$MAKE -s --no-print-directory test045'])
 cleanall()
-test('driver042', ignore_output, run_command, ['$MAKE test042'])
+test('driver051', normal, run_command,
+     ['$MAKE -s --no-print-directory test051'])
 cleanall()
-test('driver043', ignore_output, run_command, ['$MAKE test043'])
+test('driver052', normal, run_command,
+     ['$MAKE -s --no-print-directory test052'])
 cleanall()
-test('driver044', ignore_output, run_command, ['$MAKE test044'])
-cleanall()
-test('driver045', ignore_output, run_command, ['$MAKE test045'])
-cleanall()
-test('driver051', ignore_output, run_command, ['$MAKE test051'])
-cleanall()
-test('driver052', ignore_output, run_command, ['$MAKE test052'])
-cleanall()
-test('driver053', ignore_output, run_command, ['$MAKE test053'])
-cleanall()
-
-test('driver060', ignore_output, run_command, ['$MAKE test060'])
-cleanall()
-test('driver061', ignore_output, run_command, ['$MAKE test061'])
-cleanall()
-test('driver061a.1', ignore_output, run_command, ['$MAKE test061a.1'])
-cleanall()
-test('driver061a.2', ignore_output, run_command, ['$MAKE test061a.2'])
-cleanall()
-
-test('driver062.1', ignore_output, run_command, ['$MAKE test062.1'])
-cleanall()
-test('driver062.2', ignore_output, run_command, ['$MAKE test062.2'])
-cleanall()
-test('driver062.3', ignore_output, run_command, ['$MAKE test062.3'])
-cleanall()
-test('driver062.4', ignore_output, run_command, ['$MAKE test062.4'])
-cleanall()
-test('driver062.5', ignore_output, run_command, ['$MAKE test062.5'])
-cleanall()
-
-test('driver063', normal, run_command, ['$MAKE -s --no-print-directory test063'])
-cleanall()
-test('driver064', ignore_output, run_command, ['$MAKE test064'])
-cleanall()
-test('driver065', ignore_output, run_command, ['$MAKE test065'])
-cleanall()
-test('driver066', ignore_output, run_command, ['$MAKE test066'])
-cleanall()
-test('driver067', ignore_output, run_command, ['$MAKE test067'])
-cleanall()
-test('driver068', ignore_output, run_command, ['$MAKE test068'])
-cleanall()
-test('driver069', ignore_output, run_command, ['$MAKE test069'])
-cleanall()
-test('driver070', ignore_output, run_command, ['$MAKE test070'])
-cleanall()
-test('driver071', ignore_output, run_command, ['$MAKE test071'])
+test('driver053', normal, run_command,
+     ['$MAKE -s --no-print-directory test053'])
 cleanall()
 
-test('driver080', ignore_output, run_command, ['$MAKE test080'])
+test('driver060', normal, run_command,
+     ['$MAKE -s --no-print-directory test060'])
+cleanall()
+test('driver061', normal, run_command,
+     ['$MAKE -s --no-print-directory test061'])
+cleanall()
+test('driver061a.1', normal, run_command,
+     ['$MAKE -s --no-print-directory test061a.1'])
+cleanall()
+test('driver061a.2', normal, run_command,
+     ['$MAKE -s --no-print-directory test061a.2'])
 cleanall()
 
-test('driver200', ignore_output, run_command, ['$MAKE test200'])
+test('driver062.1', normal, run_command,
+     ['$MAKE -s --no-print-directory test062.1'])
+cleanall()
+test('driver062.2', normal, run_command,
+     ['$MAKE -s --no-print-directory test062.2'])
+cleanall()
+test('driver062.3', normal, run_command,
+     ['$MAKE -s --no-print-directory test062.3'])
+cleanall()
+test('driver062.4', normal, run_command,
+     ['$MAKE -s --no-print-directory test062.4'])
+cleanall()
+test('driver062.5', normal, run_command,
+     ['$MAKE -s --no-print-directory test062.5'])
+cleanall()
+
+test('driver063', normal, run_command,
+     ['$MAKE -s --no-print-directory test063'])
+cleanall()
+test('driver064', normal, run_command,
+     ['$MAKE -s --no-print-directory test064'])
+cleanall()
+test('driver065', normal, run_command,
+     ['$MAKE -s --no-print-directory test065'])
+cleanall()
+test('driver066', normal, run_command,
+     ['$MAKE -s --no-print-directory test066'])
+cleanall()
+test('driver067', normal, run_command,
+     ['$MAKE -s --no-print-directory test067'])
+cleanall()
+test('driver068', normal, run_command,
+     ['$MAKE -s --no-print-directory test068'])
+cleanall()
+test('driver069', normal, run_command,
+     ['$MAKE -s --no-print-directory test069'])
+cleanall()
+test('driver070', normal, run_command,
+     ['$MAKE -s --no-print-directory test070'])
+cleanall()
+test('driver071', normal, run_command,
+     ['$MAKE -s --no-print-directory test071'])
+cleanall()
+
+test('driver080', normal, run_command,
+     ['$MAKE -s --no-print-directory test080'])
+cleanall()
+
+test('driver200', normal, run_command,
+     ['$MAKE -s --no-print-directory test200'])
 cleanall()
 
 test('pragma001', expect_broken(1736), compile, [''])
