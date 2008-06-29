@@ -29,7 +29,7 @@ test('ghcpkg04',
 test('pkg01', normal, compile, [''])
 
 test('1750',
-     extra_clean(['1750.hs',
+     extra_clean(['1750.hs', '1750.out',
                   'local1750.package.conf',
                   'local1750.package.conf.old']),
      run_command, ['$MAKE -s --no-print-directory 1750'])

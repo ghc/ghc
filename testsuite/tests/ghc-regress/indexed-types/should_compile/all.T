@@ -27,16 +27,16 @@ test('Simple23', normal, compile, [''])
 
 test('ind1', normal, compile, [''])
 test('ind2',
-     extra_clean(['Ind2_help.hi', 'Ind2_help.o', 'Exp.hi', 'Imp.o']),
+     extra_clean(['Ind2_help.hi', 'Ind2_help.o']),
      multimod_compile,
      ['ind2', '-v0'])
 test('impexp',
-     extra_clean(['Ind2_help.hi', 'Ind2_help.o', 'Exp.hi', 'Imp.o']),
+     extra_clean(['Exp.hi', 'Exp.o', 'Imp.hi', 'Imp.o']),
      multimod_compile, 
      ['Imp', '-w -no-hs-main -c'])
 
 test('ATLoop',
-     extra_clean(['ATLoop_Help.o','ATLoop_Help.hi']),
+     extra_clean(['ATLoop_help.o','ATLoop_help.hi']),
      multimod_compile,
      ['ATLoop','-v0'])
 

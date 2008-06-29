@@ -52,7 +52,7 @@ test('driver023', normal, run_command,
      ['$MAKE -s --no-print-directory test023'])
 cleanall()
 test('driver024',
-     extra_clean(['obj024/B/C024.o', 'obj024/B', 'obj024']),
+     extra_clean(['B/C024.hi', 'obj024/B/C024.o', 'obj024/B', 'obj024']),
      run_command,
      ['$MAKE -s --no-print-directory test024'])
 test('driver024a', normal, run_command,

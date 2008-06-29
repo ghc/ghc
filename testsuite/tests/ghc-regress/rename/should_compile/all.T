@@ -5,25 +5,29 @@ test('rn005', normal, compile, [''])
 test('rn006', normal, compile, [''])
 test('rn009',
      [only_compiler_types(['ghc']),
-      extra_clean(['Imp10Aux.hi', 'Imp10Aux.o'])],
+      extra_clean(['Imp10Aux.hi',      'Imp10Aux.o',
+                   'Imp10Aux.hi-boot', 'Imp10Aux.o-boot'])],
      multimod_compile,
      ['rn009', '-v0'])
 # rn10 tests the same things as 009,011,012
 #test('rn010', only_compiler_types(['ghc']), multimod_compile, ['rn010', '-v0'])
 test('rn011',
      [only_compiler_types(['ghc']),
-      extra_clean(['Imp100Aux.hi', 'Imp100Aux.o'])],
+      extra_clean(['Imp100Aux.hi',      'Imp100Aux.o',
+                   'Imp100Aux.hi-boot', 'Imp100Aux.o-boot'])],
      multimod_compile,
      ['rn011', '-v0'])
 test('rn012',
      [only_compiler_types(['ghc']),
-      extra_clean(['Imp500Aux.hi', 'Imp500Aux.o'])],
+      extra_clean(['Imp500Aux.hi',      'Imp500Aux.o',
+                   'Imp500Aux.hi-boot', 'Imp500Aux.o-boot'])],
      multimod_compile,
      ['rn012', '-v0'])
 test('rn013', normal, compile, [''])
 test('rn017',
      [only_compiler_types(['ghc']),
-      extra_clean(['RnAux017.hi', 'RnAux017.o'])],
+      extra_clean(['RnAux017.hi',      'RnAux017.o',
+                   'RnAux017.hi-boot', 'RnAux017.o-boot'])],
      multimod_compile,
      ['rn017', '-v0'])
 test('rn019', normal, compile, [''])
@@ -94,7 +98,11 @@ test('rn061', normal, compile, [''])
 test('rn062', normal, compile, [''])
 test('rn063', if_compiler_lt('ghc', '6.9', expect_fail), compile, [''])
 test('rn064', normal, compile, [''])
-test('rn065', if_compiler_lt('ghc', '6.9', expect_fail), multimod_compile, ['rn065', '-v0'])
+test('rn065',
+     [if_compiler_lt('ghc', '6.9', expect_fail),
+      extra_clean(['Rn065A.hi', 'Rn065A.o'])],
+     multimod_compile,
+     ['rn065', '-v0'])
 
 test('T1972', if_compiler_lt('ghc', '6.9', expect_fail), compile, [''])
 test('T2205', normal, compile, [''])

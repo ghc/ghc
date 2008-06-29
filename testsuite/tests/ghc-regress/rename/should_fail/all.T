@@ -49,7 +49,10 @@ test('rnfail043', skip_if_no_ghci, compile_fail, ['-v0'])
 test('rnfail044', normal, compile_fail, [''])
 test('rnfail045', normal, compile_fail, [''])
 test('rnfail046', normal, compile_fail, [''])
-test('rnfail047', normal, multimod_compile_fail, ['rnfail047', '-v0'])
+test('rnfail047',
+     extra_clean(['RnFail047_A.hi-boot', 'RnFail047_A.o-boot']),
+     multimod_compile_fail,
+     ['rnfail047', '-v0'])
 test('rnfail048', normal, compile_fail, [''])
 test('rnfail049', if_compiler_lt('ghc', '6.9', skip), compile_fail, [''])
 test('rnfail050', if_compiler_lt('ghc', '6.9', skip), compile_fail, [''])
@@ -57,7 +60,12 @@ test('rnfail051', if_compiler_lt('ghc', '6.9', skip), compile_fail, [''])
 test('rnfail052', normal, compile_fail, [''])
 test('rnfail053', normal, compile_fail, [''])
 test('rnfail054', normal, compile_fail, [''])
-test('rnfail055', if_compiler_lt('ghc', '6.9', skip), multimod_compile_fail, ['RnFail055','-v0'])
+test('rnfail055',
+     [if_compiler_lt('ghc', '6.9', skip),
+      extra_clean(['RnFail055.hi-boot', 'RnFail055.o-boot',
+                   'RnFail055_aux.hi',  'RnFail055_aux.o'])],
+     multimod_compile_fail,
+     ['RnFail055','-v0'])
 
 test('rn_dup', normal, compile_fail, [''])
 test('T2310', if_compiler_lt('ghc', '6.9', expect_fail), compile_fail, [''])
