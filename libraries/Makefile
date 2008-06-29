@@ -159,12 +159,12 @@ subdirs:
 
 .PHONY: boot
 
-boot: ifBuildable/ifBuildable cabal ghc-prim/Setup
+boot: ifBuildable/ifBuildable cabal-bin ghc-prim/Setup
 
 HERE_ABS=$(FPTOOLS_TOP_ABS)/libraries
 
 IFBUILDABLE=ifBuildable/ifBuildable $(HERE_ABS)/boot-packages
-CABAL=$(HERE_ABS)/cabal
+CABAL=$(HERE_ABS)/cabal-bin
 
 CABAL_GHC_FLAGS = -Wall
 ifeq "$(ghc_ge_605)" "NO"
@@ -175,13 +175,13 @@ BOOTSTRAPPING_FLAGS = $(CABAL_GHC_FLAGS) -DCABAL_VERSION=1,3 -odir $(HERE_ABS)/b
 
 # We use -main-is so that GHC doesn't get confused and think
 # Main.hi/Main.o from cabal belongs to ghc-prim/Setup, or vice-versa.
-cabal: cabal.hs
-	$(GHC) $(BOOTSTRAPPING_FLAGS) --make cabal -o cabal -main-is Cabal
+cabal-bin: cabal-bin.hs
+	$(GHC) $(BOOTSTRAPPING_FLAGS) --make cabal-bin -o cabal-bin -main-is Cabal
 
-# ghc-prim/Setup doesn't really depend on cabal, but pretending that it
+# ghc-prim/Setup doesn't really depend on cabal-bin, but pretending that it
 # does sequentialises building the two of them, which is nice given
 # they're sharing -odir and -hidir.
-ghc-prim/Setup: ghc-prim/Setup.hs cabal
+ghc-prim/Setup: ghc-prim/Setup.hs cabal-bin
 	cd ghc-prim && $(GHC) $(BOOTSTRAPPING_FLAGS) --make Setup -o Setup
 
 installPackage/installPackage: installPackage.hs
@@ -271,7 +271,7 @@ ALL_CONFIGURE_FLAGS = \
 
 $(foreach SUBDIR,$(SUBDIRS), \
 		  stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).$(SUBDIR)): \
-stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).%: cabal
+stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).%: cabal-bin
 	-$(RM) -f stamp/configure.library.*.$* $*/unbuildable
 	$(MKDIRHIER) `dirname $@`
 	( cd $* && $(CABAL) configure $(ALL_CONFIGURE_FLAGS) ) \
@@ -290,7 +290,7 @@ stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).%: cabal
 # make.*, so filter them out and use an alternate rule below instead.
 $(foreach SUBDIR,$(filter-out $(SUBDIRS_BUILD),$(SUBDIRS)),make.library.$(SUBDIR)):\
 make.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
-                cabal ifBuildable/ifBuildable
+                cabal-bin ifBuildable/ifBuildable
 	if $(IFBUILDABLE) $*; then \
 	  cd $* && \
 	  cmp -s $(MAKEFILE_LOCAL) Makefile.local || cp $(MAKEFILE_LOCAL) .; \
@@ -310,7 +310,7 @@ make.library.%: build.library.%
 # Build the library using 'setup build' (not the default)
 $(foreach SUBDIR,$(SUBDIRS),build.library.$(SUBDIR)):\
 build.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
-                 cabal ifBuildable/ifBuildable
+                 cabal-bin ifBuildable/ifBuildable
 	if $(IFBUILDABLE) $*; then \
 	  cd $* && \
 	  $(CABAL) build $(addprefix --ghc-option=,$(GhcLibHcOpts)); \
@@ -331,7 +331,7 @@ endif
 
 $(foreach SUBDIR,$(SUBDIRS),doc.library.$(SUBDIR)):\
 doc.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
-               cabal ifBuildable/ifBuildable
+               cabal-bin ifBuildable/ifBuildable
 	if $(IFBUILDABLE) $*; then \
 	  cd $* && $(CABAL) haddock --html-location='../$$pkg' \
 	                            $(CABAL_HADDOCK_FLAGS); \
@@ -348,7 +348,7 @@ distclean: clean
 
 clean: $(foreach SUBDIR,$(SUBDIRS),clean.library.$(SUBDIR))
 	$(RM) -rf bootstrapping/*
-	$(RM) -f cabal
+	$(RM) -f cabal-bin
 	$(RM) -rf ifBuildable
 	$(RM) -rf installPackage
 	$(RM) -f libraries.txt index.html doc-index.html doc-index*.html
