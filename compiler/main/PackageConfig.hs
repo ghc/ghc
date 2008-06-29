@@ -12,22 +12,26 @@ module PackageConfig (
 	Version(..),
 	PackageIdentifier(..),
 	defaultPackageConfig,
+    packageConfigToInstalledPackageInfo,
+    installedPackageInfoToPackageConfig,
   ) where
 
 #include "HsVersions.h"
 
+import Data.Maybe
 import Module
 import Distribution.InstalledPackageInfo
+import Distribution.ModuleName
 import Distribution.Package
 import Distribution.Text
 import Distribution.Version
-import Distribution.Compat.ReadP ( readP_to_S )
+import Distribution.Compat.ReadP
 
 -- -----------------------------------------------------------------------------
 -- Our PackageConfig type is just InstalledPackageInfo from Cabal.  Later we
 -- might need to extend it with some GHC-specific stuff, but for now it's fine.
 
-type PackageConfig = InstalledPackageInfo_ ModuleName
+type PackageConfig = InstalledPackageInfo_ Module.ModuleName
 defaultPackageConfig :: PackageConfig
 defaultPackageConfig = emptyInstalledPackageInfo
 
@@ -57,3 +61,21 @@ unpackPackageId p
         []      -> Nothing
         (pid:_) -> Just pid
   where str = packageIdString p
+
+packageConfigToInstalledPackageInfo :: PackageConfig -> InstalledPackageInfo
+packageConfigToInstalledPackageInfo
+    (pkgconf@(InstalledPackageInfo { exposedModules = e,
+                                     hiddenModules = h })) =
+        pkgconf{ exposedModules = map convert e,
+                 hiddenModules  = map convert h }
+    where convert :: Module.ModuleName -> Distribution.ModuleName.ModuleName
+          convert = fromJust . simpleParse . moduleNameString
+
+installedPackageInfoToPackageConfig :: InstalledPackageInfo -> PackageConfig
+installedPackageInfoToPackageConfig
+    (pkgconf@(InstalledPackageInfo { exposedModules = e,
+                                     hiddenModules = h })) =
+        pkgconf{ exposedModules = map convert e,
+                 hiddenModules  = map convert h }
+    where convert :: Distribution.ModuleName.ModuleName -> Module.ModuleName
+          convert = mkModuleName . display

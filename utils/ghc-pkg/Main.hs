@@ -445,7 +445,7 @@ getPkgDatabases modify flags = do
 readParseDatabase :: PackageDBName -> IO (PackageDBName,PackageDB)
 readParseDatabase filename = do
   str <- readFile filename `Exception.catch` \_ -> return emptyPackageConfig
-  let packages = read str
+  let packages = map convertPackageInfoIn $ read str
   Exception.evaluate packages
     `Exception.catch` \e->
         die ("error while parsing " ++ filename ++ ": " ++ show e)
@@ -555,7 +555,7 @@ listPackages flags mPackageName mModuleName = do
                         EQ -> pkgVersion p1 `compare` pkgVersion p2
                    where (p1,p2) = (package pkg1, package pkg2)
 
-      match `exposedInPkg` pkg = any match (exposedModules pkg)
+      match `exposedInPkg` pkg = any match (map display $ exposedModules pkg)
 
       pkg_map = map (\p -> (package p, p)) $ concatMap snd db_stack
       show_func = if simple_output then show_simple else mapM_ (show_normal pkg_map)
@@ -735,6 +735,23 @@ isBrokenPackage pkg pkg_map
 -- -----------------------------------------------------------------------------
 -- Manipulating package.conf files
 
+type InstalledPackageInfoString = InstalledPackageInfo_ String
+
+convertPackageInfoOut :: InstalledPackageInfo -> InstalledPackageInfoString
+convertPackageInfoOut
+    (pkgconf@(InstalledPackageInfo { exposedModules = e,
+                                     hiddenModules = h })) =
+        pkgconf{ exposedModules = map display e,
+                 hiddenModules  = map display h }
+
+convertPackageInfoIn :: InstalledPackageInfoString -> InstalledPackageInfo
+convertPackageInfoIn
+    (pkgconf@(InstalledPackageInfo { exposedModules = e,
+                                     hiddenModules = h })) =
+        pkgconf{ exposedModules = map convert e,
+                 hiddenModules  = map convert h }
+    where convert = fromJust . simpleParse
+
 writeNewConfig :: FilePath -> [InstalledPackageInfo] -> IO ()
 writeNewConfig filename packages = do
   hPutStr stdout "Writing new package config file... "
@@ -743,7 +760,8 @@ writeNewConfig filename packages = do
       if isPermissionError e
       then die (filename ++ ": you don't have permission to modify this file")
       else ioError e
-  let shown = concat $ intersperse ",\n " $ map show packages
+  let shown = concat $ intersperse ",\n "
+                     $ map (show . convertPackageInfoOut) packages
       fileContents = "[" ++ shown ++ "\n]"
   hPutStrLn h fileContents
   hClose h

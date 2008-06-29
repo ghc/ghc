@@ -1,4 +1,5 @@
 
+import Data.Maybe
 import Distribution.PackageDescription
 import Distribution.PackageDescription.Parse
 import Distribution.ReadE
@@ -8,6 +9,7 @@ import Distribution.Simple.LocalBuildInfo
 import Distribution.Simple.Program
 import Distribution.Simple.Setup
 import Distribution.Simple.Utils
+import Distribution.Text
 import Distribution.Verbosity
 import System.Environment
 
@@ -63,7 +65,8 @@ doInstall verbosity ghcpkg ghcpkgconf destdir topdir
               pd_reg = if packageName pd == PackageName "ghc-prim"
                        then case library pd of
                             Just lib ->
-                                let ems = "GHC.Prim" : exposedModules lib
+                                let ems = fromJust (simpleParse "GHC.Prim")
+                                        : exposedModules lib
                                     lib' = lib { exposedModules = ems }
                                 in pd { library = Just lib' }
                             Nothing ->

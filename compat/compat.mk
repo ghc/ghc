@@ -43,6 +43,7 @@ SRC_MKDEPENDHS_OPTS += \
 	-optdep--exclude-module=Distribution.GetOpt \
 	-optdep--exclude-module=Distribution.InstalledPackageInfo \
 	-optdep--exclude-module=Distribution.License \
+	-optdep--exclude-module=Distribution.ModuleName \
 	-optdep--exclude-module=Distribution.Package \
 	-optdep--exclude-module=Distribution.ParseUtils \
 	-optdep--exclude-module=Distribution.Compiler \

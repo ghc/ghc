@@ -49,6 +49,7 @@ import Outputable
 import System.Environment ( getEnv )
 import Distribution.InstalledPackageInfo hiding (depends)
 import Distribution.Package hiding (depends)
+import Distribution.Text
 import Distribution.Version
 import FastString
 import ErrUtils         ( debugTraceMsg, putMsg, Message )
@@ -723,10 +724,7 @@ dumpPackages :: DynFlags -> IO ()
 dumpPackages dflags
   = do  let pkg_map = pkgIdMap (pkgState dflags)
 	putMsg dflags $
-	      vcat (map (text.showInstalledPackageInfo.to_ipi) (eltsUFM pkg_map))
- where
-  to_ipi pkgconf@(InstalledPackageInfo { exposedModules = e,
-                                         hiddenModules = h }) = 
-    pkgconf{ exposedModules = map moduleNameString e,
-             hiddenModules  = map moduleNameString h }
+              vcat (map (text . showInstalledPackageInfo
+                              . packageConfigToInstalledPackageInfo)
+                        (eltsUFM pkg_map))
 \end{code}
