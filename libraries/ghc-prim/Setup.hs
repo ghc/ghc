@@ -5,10 +5,12 @@ module Main (main) where
 
 import Control.Monad
 import Data.List
+import Data.Maybe
 import Distribution.PackageDescription
 import Distribution.Simple
 import Distribution.Simple.LocalBuildInfo
 import Distribution.Simple.Utils
+import Distribution.Text
 import System.Cmd
 import System.FilePath
 import System.Exit
@@ -42,7 +44,7 @@ addPrimModuleToPD :: PackageDescription -> PackageDescription
 addPrimModuleToPD pd =
     case library pd of
     Just lib ->
-        let ems = "GHC.Prim" : exposedModules lib
+        let ems = fromJust (simpleParse "GHC.Prim") : exposedModules lib
             lib' = lib { exposedModules = ems }
         in pd { library = Just lib' }
     Nothing ->
