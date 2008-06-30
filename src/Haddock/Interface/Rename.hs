@@ -295,10 +295,9 @@ renameDecl d = case d of
 
 
 renameTyClD d = case d of
-  ForeignType _ _ _ -> error "renameTyClD" -- I'm guessing these can't be exported
- -- ForeignType name a b -> do
- --   name' <- renameL name
- --   return (ForeignType name' a b)
+  ForeignType name a b -> do
+    name' <- renameL name
+    return (ForeignType name' a b)
 
   TyData x lcontext lname ltyvars _ k cons _ -> do
     lcontext' <- renameLContext lcontext
