@@ -294,6 +294,9 @@ renameDecl d = case d of
   _ -> error "renameDecl"
 
 
+renameLTyClD (L loc d) = return . L loc =<< renameTyClD d 
+
+
 renameTyClD d = case d of
   ForeignType lname a b -> do
     lname' <- renameL lname
@@ -303,8 +306,6 @@ renameTyClD d = case d of
     lname'   <- renameL lname
     ltyvars' <- mapM renameLTyVarBndr ltyvars
     return (TyFamily flav lname' ltyvars' kind)
-
-  
 
   TyData x lcontext lname ltyvars typats k cons _ -> do
     lcontext' <- renameLContext lcontext
@@ -322,14 +323,15 @@ renameTyClD d = case d of
     -- We skip type patterns here as well.
     return (TySynonym (keepL lname) ltyvars' typats' ltype')
 
-  ClassDecl lcontext lname ltyvars lfundeps lsigs _ _ _ -> do
+  ClassDecl lcontext lname ltyvars lfundeps lsigs _ ats _ -> do
     lcontext' <- renameLContext lcontext
+    lname'    <- renameL lname
     ltyvars'  <- mapM renameLTyVarBndr ltyvars
     lfundeps' <- mapM renameLFunDep lfundeps 
     lsigs'    <- mapM renameLSig lsigs
+    ats'      <- mapM renameLTyClD ats
     -- we don't need the default methods or the already collected doc entities
-    -- we skip the ATs for now.
-    return (ClassDecl lcontext' (keepL lname) ltyvars' lfundeps' lsigs' emptyBag [] [])
+    return (ClassDecl lcontext' lname' ltyvars' lfundeps' lsigs' emptyBag ats' [])
  
   where
     renameLCon (L loc con) = return . L loc =<< renameCon con
