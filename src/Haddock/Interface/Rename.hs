@@ -295,9 +295,14 @@ renameDecl d = case d of
 
 
 renameTyClD d = case d of
-  ForeignType name a b -> do
-    name' <- renameL name
-    return (ForeignType name' a b)
+  ForeignType lname a b -> do
+    lname' <- renameL lname
+    return (ForeignType lname' a b)
+
+  TyFamily flav lname ltyvars kind -> do
+    lname'   <- renameL lname
+    ltyvars' <- mapM renameLTyVarBndr ltyvars
+    return (TyFamily flav lname' ltyvars' kind)
 
   TyData x lcontext lname ltyvars _ k cons _ -> do
     lcontext' <- renameLContext lcontext
