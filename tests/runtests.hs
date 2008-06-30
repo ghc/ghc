@@ -3,6 +3,7 @@ import System.Environment
 import System.FilePath
 import System.Exit
 import System.Directory
+import System.Process
 import Data.List
 import Control.Monad
 import Text.Printf
@@ -45,6 +46,9 @@ test = do
   let mods = filter ((==) ".hs" . takeExtension) contents
   let outdir = "output"
   let mods' = map ("tests" </>) mods
-  code <- system $ printf "haddock -w -o %s -h --optghc=-fglasgow-exts --optghc=-w %s" outdir (unwords mods')
+  handle <- runProcess "../dist/build/haddock/haddock" (["-w", "-o", outdir, "-h", "--optghc=-fglasgow-exts", "--optghc=-w"] ++ mods') Nothing (Just [("HADDOCK_DATA_DIR", "../.")]) Nothing Nothing Nothing
+  code <- waitForProcess handle
+
+--  code <- system $ printf "haddock -w -o %s -h --optghc=-fglasgow-exts --optghc=-w %s" outdir (unwords mods')
   unless (code == ExitSuccess) $ error "Haddock run failed! Exiting."
   check mods
