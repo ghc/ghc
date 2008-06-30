@@ -304,19 +304,23 @@ renameTyClD d = case d of
     ltyvars' <- mapM renameLTyVarBndr ltyvars
     return (TyFamily flav lname' ltyvars' kind)
 
-  TyData x lcontext lname ltyvars _ k cons _ -> do
+  
+
+  TyData x lcontext lname ltyvars typats k cons _ -> do
     lcontext' <- renameLContext lcontext
+    lname'    <- renameL lname
     ltyvars'  <- mapM renameLTyVarBndr ltyvars
+    typats'   <- mapM (mapM renameLType) typats
     cons'     <- mapM renameLCon cons
     -- I don't think we need the derivings, so we return Nothing
-    -- We skip the type patterns too. TODO: find out what they are :-)
-    return (TyData x lcontext' (keepL lname) ltyvars' Nothing k cons' Nothing) 
+    return (TyData x lcontext' lname' ltyvars' typats' k cons' Nothing) 
  
-  TySynonym lname ltyvars typat ltype -> do
+  TySynonym lname ltyvars typats ltype -> do
     ltyvars' <- mapM renameLTyVarBndr ltyvars
     ltype'   <- renameLType ltype
+    typats'  <- mapM (mapM renameLType) typats
     -- We skip type patterns here as well.
-    return (TySynonym (keepL lname) ltyvars' Nothing ltype')
+    return (TySynonym (keepL lname) ltyvars' typats' ltype')
 
   ClassDecl lcontext lname ltyvars lfundeps lsigs _ _ _ -> do
     lcontext' <- renameLContext lcontext
