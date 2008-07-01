@@ -29,6 +29,7 @@ import Outputable
 import Util
 import FastString
 
+import Data.List	( nubBy )
 import Data.Maybe	( isJust )
 \end{code}
 
@@ -469,7 +470,8 @@ badFunDeps :: [Instance] -> Class
 	   -> TyVarSet -> [Type]	-- Proposed new instance type
 	   -> [Instance]
 badFunDeps cls_insts clas ins_tv_set ins_tys 
-  = [ ispec | fd <- fds,	-- fds is often empty
+  = nubBy eq_inst $
+    [ ispec | fd <- fds,	-- fds is often empty, so do this first!
 	      let trimmed_tcs = trimRoughMatchTcs clas_tvs fd rough_tcs,
 	      ispec@(Instance { is_tcs = inst_tcs, is_tvs = tvs, 
 				is_tys = tys }) <- cls_insts,
@@ -482,6 +484,13 @@ badFunDeps cls_insts clas ins_tv_set ins_tys
   where
     (clas_tvs, fds) = classTvsFds clas
     rough_tcs = roughMatchTcs ins_tys
+    eq_inst i1 i2 = instanceDFunId i1 == instanceDFunId i2
+	-- An single instance may appear twice in the un-nubbed conflict list
+	-- because it may conflict with more than one fundep.  E.g.
+	--	class C a b c | a -> b, a -> c
+	--	instance C Int Bool Bool
+	--	instance C Int Char Char
+	-- The second instance conflicts with the first by *both* fundeps
 
 trimRoughMatchTcs :: [TyVar] -> FunDep TyVar -> [Maybe Name] -> [Maybe Name]
 -- Computing rough_tcs for a particular fundep
