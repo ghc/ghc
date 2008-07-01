@@ -1,7 +1,7 @@
 
-drvfail004.hs:5:0:
+drvfail004.hs:8:11:
     No instance for (Eq (Foo a b))
       arising from the 'deriving' clause of a data type declaration
-                   at drvfail004.hs:(5,0)-(8,13)
+                   at drvfail004.hs:8:11-13
     Possible fix: add an instance declaration for (Eq (Foo a b))
     When deriving the instance for (Ord (Foo a b))

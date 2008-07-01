@@ -1,5 +1,5 @@
 
-drvfail014.hs:8:0:
+drvfail014.hs:8:27:
     Use deriving( Typeable ) on a data type declaration
     In the data type declaration for `T1'
 

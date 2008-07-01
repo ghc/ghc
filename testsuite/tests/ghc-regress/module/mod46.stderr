@@ -1,6 +1,7 @@
 
-mod46.hs:4:0:
+mod46.hs:4:9:
     No instance for (Eq T)
-      arising from the superclasses of an instance declaration at mod46.hs:4:0
+      arising from the superclasses of an instance declaration
+                   at mod46.hs:4:9-13
     Possible fix: add an instance declaration for (Eq T)
     In the instance declaration for `Ord T'

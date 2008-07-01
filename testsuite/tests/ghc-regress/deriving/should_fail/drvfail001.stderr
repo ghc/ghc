@@ -1,7 +1,7 @@
 
-drvfail001.hs:15:0:
+drvfail001.hs:16:18:
     No instance for (Show (f (f a)))
       arising from the 'deriving' clause of a data type declaration
-		   at drvfail001.hs:(15,0)-(16,21)
+                   at drvfail001.hs:16:18-21
     Possible fix: add an instance declaration for (Show (f (f a)))
     When deriving the instance for (Show (SM f a))

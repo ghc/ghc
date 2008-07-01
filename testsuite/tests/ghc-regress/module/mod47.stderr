@@ -1,8 +1,8 @@
 
-mod47.hs:6:0:
+mod47.hs:6:9:
     Could not deduce (Num a) from the context (Eq a, Enum a)
       arising from the superclasses of an instance declaration
-		   at mod47.hs:6:0
+                   at mod47.hs:6:9-33
     Possible fix:
       add (Num a) to the context of the instance declaration
     In the instance declaration for `Bar [a]'

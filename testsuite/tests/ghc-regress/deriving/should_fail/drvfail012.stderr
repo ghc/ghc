@@ -1,7 +1,7 @@
 
-drvfail012.hs:5:0:
+drvfail012.hs:5:32:
     No instance for (Eq (Ego a))
       arising from the 'deriving' clause of a data type declaration
-		   at drvfail012.hs:5:0-35
+                   at drvfail012.hs:5:32-34
     Possible fix: add an instance declaration for (Eq (Ego a))
     When deriving the instance for (Ord (Ego a))

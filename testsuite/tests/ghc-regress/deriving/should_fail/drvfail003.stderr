@@ -1,7 +1,7 @@
 
-drvfail003.hs:13:0:
+drvfail003.hs:16:55:
     No instance for (Show (v (v a)))
       arising from the 'deriving' clause of a data type declaration
-		   at drvfail003.hs:(13,0)-(16,58)
+                   at drvfail003.hs:16:55-58
     Possible fix: add an instance declaration for (Show (v (v a)))
     When deriving the instance for (Show (Square_ v w a))
