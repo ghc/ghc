@@ -174,14 +174,20 @@ readTix(void) {
 
 static void hpc_init(void) {
   char *hpc_tixdir;
+  char *hpc_tixfile;
   if (hpc_inited != 0) {
     return;
   }
   hpc_inited = 1;
   hpc_pid    = getpid();
   hpc_tixdir = getenv("HPCTIXDIR");
+  hpc_tixfile = getenv("HPCTIXFILE");
 
-  if (hpc_tixdir != NULL) {
+  /* XXX Check results of mallocs/strdups, and check we are requesting
+         enough bytes */
+  if (hpc_tixfile != NULL) {
+    tixFilename = strdup(hpc_tixfile);
+  } else if (hpc_tixdir != NULL) {
     /* Make sure the directory is present;
      * conditional code for mkdir lifted from lndir.c
      */
