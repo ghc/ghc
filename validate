@@ -6,13 +6,18 @@
 #   --testsuite-only: don't build the compiler, just run
 #                     the test suite
 #   --hpc:            build stage2 with -fhpc, and see how much of the
-#                     compiler the test suite covers
+#                     compiler the test suite covers.
+#                     2008-07-01: 63% slower than the default.
+#   --fast:           Default. Opposite to --slow.
+#   --slow:           Build stage2 with -DDEBUG.
+#                     2008-07-01: 14% slower than the default.
 
 set -e
 
 no_clean=0
 testsuite_only=0
-hpc=0
+hpc=NO
+slow=NO
 
 while [ $# -gt 0 ]
 do
@@ -24,7 +29,13 @@ do
         testsuite_only=1
         ;;
     --hpc)
-        hpc=1
+        hpc=YES
+        ;;
+    --slow)
+        slow=YES
+        ;;
+    --fast)
+        slow=NO
         ;;
     *)
         echo "Bad argument: $1" >&2
@@ -59,15 +70,10 @@ sh boot
 
 thisdir=`utils/pwd/pwd forwardslash`
 
-if [ "$hpc" = 1 ]
-then
-    hpcflags="ValidateHpcFlags=-fhpc -hpcdir $thisdir/testsuite/hpc_output/"
-fi
-
-make Validating=YES -j$threads ${hpcflags+"$hpcflags"}
+make Validating=YES -j$threads ValidateHpc=$hpc ValidateSlow=$slow
 fi # testsuite-only
 
-if [ "$hpc" = 1 ]
+if [ "$hpc" = YES ]
 then
     # XXX With threads we'd need to give a different tix file to each thread
     #     and then sum them up at the end
@@ -79,7 +85,7 @@ fi
 
 make Validating=YES -C testsuite/tests/ghc-regress fast stage=2 CLEANUP=1 THREADS=$threads 2>&1 | tee testlog
 
-if [ "$hpc" = 1 ]
+if [ "$hpc" = YES ]
 then
     utils/hpc/hpc markup --hpcdir=. --srcdir=compiler --srcdir=testsuite/hpc_output --destdir=testsuite/hpc_output testsuite/hpc_output/ghc.tix
 fi
