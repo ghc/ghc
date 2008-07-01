@@ -37,6 +37,7 @@ module VectMonad (
 import VectBuiltIn
 
 import HscTypes
+import Module        ( dphSeqPackageId )
 import CoreSyn
 import TyCon
 import DataCon
@@ -253,6 +254,9 @@ closedV p = do
 liftDs :: DsM a -> VM a
 liftDs p = VM $ \_ genv lenv -> do { x <- p; return (Yes genv lenv x) }
 
+liftBuiltinDs :: (Builtins -> DsM a) -> VM a
+liftBuiltinDs p = VM $ \bi genv lenv -> do { x <- p bi; return (Yes genv lenv x)}
+
 builtin :: (Builtins -> a) -> VM a
 builtin f = VM $ \bi genv lenv -> return (Yes genv lenv (f bi))
 
@@ -378,10 +382,10 @@ defDataCon dc dc' = updGEnv $ \env ->
   env { global_datacons = extendNameEnv (global_datacons env) (dataConName dc) dc' }
 
 lookupPrimPArray :: TyCon -> VM (Maybe TyCon)
-lookupPrimPArray = liftDs . primPArray
+lookupPrimPArray = liftBuiltinDs . primPArray
 
 lookupPrimMethod :: TyCon -> String -> VM (Maybe Var)
-lookupPrimMethod tycon = liftDs . primMethod tycon
+lookupPrimMethod tycon = liftBuiltinDs . primMethod tycon
 
 lookupTyConPA :: TyCon -> VM (Maybe Var)
 lookupTyConPA tc = readGEnv $ \env -> lookupNameEnv (global_pa_funs env) (tyConName tc)
@@ -487,7 +491,7 @@ initV hsc_env guts info p
 
     go =
       do
-        builtins       <- initBuiltins
+        builtins       <- initBuiltins dphSeqPackageId
         builtin_vars   <- initBuiltinVars builtins
         builtin_tycons <- initBuiltinTyCons builtins
         let builtin_datacons = initBuiltinDataCons builtins

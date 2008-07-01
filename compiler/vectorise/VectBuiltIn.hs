@@ -48,36 +48,42 @@ mAX_NDP_SUM = 3
 mAX_NDP_COMBINE :: Int
 mAX_NDP_COMBINE = 2
 
-mkNDPModule :: FastString -> Module
-mkNDPModule m = mkModule ndpPackageId (mkModuleNameFS m)
+data Modules = Modules {
+                   dph_PArray :: Module
+                 , dph_Repr :: Module
+                 , dph_Closure :: Module
+                 , dph_Unboxed :: Module
+                 , dph_Instances :: Module
+                 , dph_Combinators :: Module
+                 , dph_Prelude_PArr :: Module
+                 , dph_Prelude_Int :: Module
+                 , dph_Prelude_Double :: Module
+                 , dph_Prelude_Bool :: Module
+                 , dph_Prelude_Tuple :: Module
+               }
 
-nDP_PARRAY,
-  nDP_REPR,
-  nDP_CLOSURE,
-  nDP_UNBOXED,
-  nDP_INSTANCES,
-  nDP_COMBINATORS,
-  nDP_PRELUDE_PARR,
-  nDP_PRELUDE_INT,
-  nDP_PRELUDE_DOUBLE,
-  nDP_PRELUDE_BOOL,
-  nDP_PRELUDE_TUPLE :: Module
+dph_Modules :: PackageId -> Modules
+dph_Modules pkg = Modules {
+    dph_PArray         = mk (fsLit "Data.Array.Parallel.Lifted.PArray")
+  , dph_Repr           = mk (fsLit "Data.Array.Parallel.Lifted.Repr")
+  , dph_Closure        = mk (fsLit "Data.Array.Parallel.Lifted.Closure")
+  , dph_Unboxed        = mk (fsLit "Data.Array.Parallel.Lifted.Unboxed")
+  , dph_Instances      = mk (fsLit "Data.Array.Parallel.Lifted.Instances")
+  , dph_Combinators    = mk (fsLit "Data.Array.Parallel.Lifted.Combinators")
 
-nDP_PARRAY      = mkNDPModule (fsLit "Data.Array.Parallel.Lifted.PArray")
-nDP_REPR        = mkNDPModule (fsLit "Data.Array.Parallel.Lifted.Repr")
-nDP_CLOSURE     = mkNDPModule (fsLit "Data.Array.Parallel.Lifted.Closure")
-nDP_UNBOXED     = mkNDPModule (fsLit "Data.Array.Parallel.Lifted.Unboxed")
-nDP_INSTANCES   = mkNDPModule (fsLit "Data.Array.Parallel.Lifted.Instances")
-nDP_COMBINATORS = mkNDPModule (fsLit "Data.Array.Parallel.Lifted.Combinators")
+  , dph_Prelude_PArr   = mk (fsLit "Data.Array.Parallel.Prelude.Base.PArr")
+  , dph_Prelude_Int    = mk (fsLit "Data.Array.Parallel.Prelude.Base.Int")
+  , dph_Prelude_Double = mk (fsLit "Data.Array.Parallel.Prelude.Base.Double")
+  , dph_Prelude_Bool   = mk (fsLit "Data.Array.Parallel.Prelude.Base.Bool")
+  , dph_Prelude_Tuple  = mk (fsLit "Data.Array.Parallel.Prelude.Base.Tuple")
+  }
+  where
+    mk = mkModule pkg . mkModuleNameFS
 
-nDP_PRELUDE_PARR = mkNDPModule (fsLit "Data.Array.Parallel.Prelude.Base.PArr")
-nDP_PRELUDE_INT  = mkNDPModule (fsLit "Data.Array.Parallel.Prelude.Base.Int")
-nDP_PRELUDE_DOUBLE = mkNDPModule (fsLit "Data.Array.Parallel.Prelude.Base.Double")
-nDP_PRELUDE_BOOL = mkNDPModule (fsLit "Data.Array.Parallel.Prelude.Base.Bool")
-nDP_PRELUDE_TUPLE  = mkNDPModule (fsLit "Data.Array.Parallel.Prelude.Base.Tuple")
 
 data Builtins = Builtins {
-                  parrayTyCon      :: TyCon
+                  dphModules       :: Modules
+                , parrayTyCon      :: TyCon
                 , paTyCon          :: TyCon
                 , paDataCon        :: DataCon
                 , preprTyCon       :: TyCon
@@ -123,42 +129,42 @@ combinePAVar n bi
   | n >= 2 && n <= mAX_NDP_COMBINE = combinePAVars bi ! n
   | otherwise = pprPanic "combinePAVar" (ppr n)
 
-initBuiltins :: DsM Builtins
-initBuiltins
+initBuiltins :: PackageId -> DsM Builtins
+initBuiltins pkg
   = do
-      parrayTyCon  <- externalTyCon nDP_PARRAY (fsLit "PArray")
-      paTyCon      <- externalTyCon nDP_PARRAY (fsLit "PA")
+      parrayTyCon  <- externalTyCon dph_PArray (fsLit "PArray")
+      paTyCon      <- externalTyCon dph_PArray (fsLit "PA")
       let [paDataCon] = tyConDataCons paTyCon
-      preprTyCon   <- externalTyCon nDP_PARRAY (fsLit "PRepr")
-      prTyCon      <- externalTyCon nDP_PARRAY (fsLit "PR")
+      preprTyCon   <- externalTyCon dph_PArray (fsLit "PRepr")
+      prTyCon      <- externalTyCon dph_PArray (fsLit "PR")
       let [prDataCon] = tyConDataCons prTyCon
-      intPrimArrayTy <- externalType nDP_UNBOXED (fsLit "PArray_Int#")
-      closureTyCon <- externalTyCon nDP_CLOSURE (fsLit ":->")
+      intPrimArrayTy <- externalType dph_Unboxed (fsLit "PArray_Int#")
+      closureTyCon <- externalTyCon dph_Closure (fsLit ":->")
 
-      voidTyCon    <- externalTyCon nDP_REPR (fsLit "Void")
-      wrapTyCon    <- externalTyCon nDP_REPR (fsLit "Wrap")
-      enumerationTyCon <- externalTyCon nDP_REPR (fsLit "Enumeration")
-      sum_tcs <- mapM (externalTyCon nDP_REPR)
+      voidTyCon    <- externalTyCon dph_Repr (fsLit "Void")
+      wrapTyCon    <- externalTyCon dph_Repr (fsLit "Wrap")
+      enumerationTyCon <- externalTyCon dph_Repr (fsLit "Enumeration")
+      sum_tcs <- mapM (externalTyCon dph_Repr)
                       [mkFastString ("Sum" ++ show i) | i <- [2..mAX_NDP_SUM]]
 
       let sumTyCons = listArray (2, mAX_NDP_SUM) sum_tcs
 
-      voidVar          <- externalVar nDP_REPR (fsLit "void")
-      mkPRVar          <- externalVar nDP_PARRAY (fsLit "mkPR")
-      mkClosureVar     <- externalVar nDP_CLOSURE (fsLit "mkClosure")
-      applyClosureVar  <- externalVar nDP_CLOSURE (fsLit "$:")
-      mkClosurePVar    <- externalVar nDP_CLOSURE (fsLit "mkClosureP")
-      applyClosurePVar <- externalVar nDP_CLOSURE (fsLit "$:^")
-      replicatePAIntPrimVar <- externalVar nDP_UNBOXED (fsLit "replicatePA_Int#")
-      upToPAIntPrimVar <- externalVar nDP_UNBOXED (fsLit "upToPA_Int#")
-      selectPAIntPrimVar <- externalVar nDP_UNBOXED (fsLit "selectPA_Int#")
-      truesPABoolPrimVar <- externalVar nDP_UNBOXED (fsLit "truesPA_Bool#")
-      lengthPAVar      <- externalVar nDP_PARRAY (fsLit "lengthPA#")
-      replicatePAVar   <- externalVar nDP_PARRAY (fsLit "replicatePA#")
-      emptyPAVar       <- externalVar nDP_PARRAY (fsLit "emptyPA")
-      packPAVar        <- externalVar nDP_PARRAY (fsLit "packPA#")
+      voidVar          <- externalVar dph_Repr (fsLit "void")
+      mkPRVar          <- externalVar dph_PArray (fsLit "mkPR")
+      mkClosureVar     <- externalVar dph_Closure (fsLit "mkClosure")
+      applyClosureVar  <- externalVar dph_Closure (fsLit "$:")
+      mkClosurePVar    <- externalVar dph_Closure (fsLit "mkClosureP")
+      applyClosurePVar <- externalVar dph_Closure (fsLit "$:^")
+      replicatePAIntPrimVar <- externalVar dph_Unboxed (fsLit "replicatePA_Int#")
+      upToPAIntPrimVar <- externalVar dph_Unboxed (fsLit "upToPA_Int#")
+      selectPAIntPrimVar <- externalVar dph_Unboxed (fsLit "selectPA_Int#")
+      truesPABoolPrimVar <- externalVar dph_Unboxed (fsLit "truesPA_Bool#")
+      lengthPAVar      <- externalVar dph_PArray (fsLit "lengthPA#")
+      replicatePAVar   <- externalVar dph_PArray (fsLit "replicatePA#")
+      emptyPAVar       <- externalVar dph_PArray (fsLit "emptyPA")
+      packPAVar        <- externalVar dph_PArray (fsLit "packPA#")
 
-      combines <- mapM (externalVar nDP_PARRAY)
+      combines <- mapM (externalVar dph_PArray)
                        [mkFastString ("combine" ++ show i ++ "PA#")
                           | i <- [2..mAX_NDP_COMBINE]]
       let combinePAVars = listArray (2, mAX_NDP_COMBINE) combines
@@ -167,7 +173,8 @@ initBuiltins
                               newUnique
 
       return $ Builtins {
-                 parrayTyCon      = parrayTyCon
+                 dphModules       = modules
+               , parrayTyCon      = parrayTyCon
                , paTyCon          = paTyCon
                , paDataCon        = paDataCon
                , preprTyCon       = preprTyCon
@@ -196,13 +203,22 @@ initBuiltins
                , combinePAVars    = combinePAVars
                , liftingContext   = liftingContext
                }
+  where
+    modules@(Modules {
+               dph_PArray         = dph_PArray
+             , dph_Repr           = dph_Repr
+             , dph_Closure        = dph_Closure
+             , dph_Unboxed        = dph_Unboxed
+             })
+      = dph_Modules pkg
+
 
 initBuiltinVars :: Builtins -> DsM [(Var, Var)]
-initBuiltinVars _
+initBuiltinVars (Builtins { dphModules = modules })
   = do
-      uvars <- zipWithM externalVar umods ufs
-      vvars <- zipWithM externalVar vmods vfs
-      cvars <- zipWithM externalVar cmods cfs
+      uvars <- zipWithM externalVar (map ($ modules) umods) ufs
+      vvars <- zipWithM externalVar (map ($ modules) vmods) vfs
+      cvars <- zipWithM externalVar (map ($ modules) cmods) cfs
       return $ [(v,v) | v <- map dataConWorkId defaultDataConWorkers]
                ++ zip (map dataConWorkId cons) cvars
                ++ zip uvars vvars
@@ -214,72 +230,72 @@ initBuiltinVars _
 defaultDataConWorkers :: [DataCon]
 defaultDataConWorkers = [trueDataCon, falseDataCon, unitDataCon]
 
-preludeDataCons :: [(DataCon, Module, FastString)]
+preludeDataCons :: [(DataCon, Modules -> Module, FastString)]
 preludeDataCons
-  = [mk_tup n nDP_PRELUDE_TUPLE (mkFastString $ "tup" ++ show n) | n <- [2..3]]
+  = [mk_tup n dph_Prelude_Tuple (mkFastString $ "tup" ++ show n) | n <- [2..3]]
   where
     mk_tup n mod name = (tupleCon Boxed n, mod, name)
 
-preludeVars :: [(Module, FastString, Module, FastString)]
+preludeVars :: [(Modules -> Module, FastString, Modules -> Module, FastString)]
 preludeVars
   = [
-      mk gHC_PARR (fsLit "mapP")       nDP_COMBINATORS (fsLit "mapPA")
-    , mk gHC_PARR (fsLit "zipWithP")   nDP_COMBINATORS (fsLit "zipWithPA")
-    , mk gHC_PARR (fsLit "zipP")       nDP_COMBINATORS (fsLit "zipPA")
-    , mk gHC_PARR (fsLit "unzipP")     nDP_COMBINATORS (fsLit "unzipPA")
-    , mk gHC_PARR (fsLit "filterP")    nDP_COMBINATORS (fsLit "filterPA")
-    , mk gHC_PARR (fsLit "lengthP")    nDP_COMBINATORS (fsLit "lengthPA")
-    , mk gHC_PARR (fsLit "replicateP") nDP_COMBINATORS (fsLit "replicatePA")
-    , mk gHC_PARR (fsLit "!:")         nDP_COMBINATORS (fsLit "indexPA")
-    , mk gHC_PARR (fsLit "crossMapP")  nDP_COMBINATORS (fsLit "crossMapPA")
-    , mk gHC_PARR (fsLit "singletonP") nDP_COMBINATORS (fsLit "singletonPA")
-    , mk gHC_PARR (fsLit "concatP")    nDP_COMBINATORS (fsLit "concatPA")
-    , mk gHC_PARR (fsLit "+:+")        nDP_COMBINATORS (fsLit "appPA")
-    , mk gHC_PARR (fsLit "emptyP")     nDP_PARRAY (fsLit "emptyPA")
+      mk (const gHC_PARR) (fsLit "mapP")       dph_Combinators (fsLit "mapPA")
+    , mk (const gHC_PARR) (fsLit "zipWithP")   dph_Combinators (fsLit "zipWithPA")
+    , mk (const gHC_PARR) (fsLit "zipP")       dph_Combinators (fsLit "zipPA")
+    , mk (const gHC_PARR) (fsLit "unzipP")     dph_Combinators (fsLit "unzipPA")
+    , mk (const gHC_PARR) (fsLit "filterP")    dph_Combinators (fsLit "filterPA")
+    , mk (const gHC_PARR) (fsLit "lengthP")    dph_Combinators (fsLit "lengthPA")
+    , mk (const gHC_PARR) (fsLit "replicateP") dph_Combinators (fsLit "replicatePA")
+    , mk (const gHC_PARR) (fsLit "!:")         dph_Combinators (fsLit "indexPA")
+    , mk (const gHC_PARR) (fsLit "crossMapP")  dph_Combinators (fsLit "crossMapPA")
+    , mk (const gHC_PARR) (fsLit "singletonP") dph_Combinators (fsLit "singletonPA")
+    , mk (const gHC_PARR) (fsLit "concatP")    dph_Combinators (fsLit "concatPA")
+    , mk (const gHC_PARR) (fsLit "+:+")        dph_Combinators (fsLit "appPA")
+    , mk (const gHC_PARR) (fsLit "emptyP")     dph_PArray (fsLit "emptyPA")
 
-    , mk nDP_PRELUDE_INT  (fsLit "plus") nDP_PRELUDE_INT (fsLit "plusV")
-    , mk nDP_PRELUDE_INT  (fsLit "minus") nDP_PRELUDE_INT (fsLit "minusV")
-    , mk nDP_PRELUDE_INT  (fsLit "mult")  nDP_PRELUDE_INT (fsLit "multV")
-    , mk nDP_PRELUDE_INT  (fsLit "intDiv")  nDP_PRELUDE_INT (fsLit "intDivV")
-    , mk nDP_PRELUDE_INT  (fsLit "intMod")  nDP_PRELUDE_INT (fsLit "intModV")
-    , mk nDP_PRELUDE_INT  (fsLit "intSquareRoot")  nDP_PRELUDE_INT (fsLit "intSquareRootV")
-    , mk nDP_PRELUDE_INT  (fsLit "intSumP")  nDP_PRELUDE_INT (fsLit "intSumPA")
-    , mk nDP_PRELUDE_INT  (fsLit "enumFromToP")  nDP_PRELUDE_INT (fsLit "enumFromToPA")
-    , mk nDP_PRELUDE_INT  (fsLit "upToP") nDP_PRELUDE_INT (fsLit "upToPA")
+    , mk dph_Prelude_Int  (fsLit "plus") dph_Prelude_Int (fsLit "plusV")
+    , mk dph_Prelude_Int  (fsLit "minus") dph_Prelude_Int (fsLit "minusV")
+    , mk dph_Prelude_Int  (fsLit "mult")  dph_Prelude_Int (fsLit "multV")
+    , mk dph_Prelude_Int  (fsLit "intDiv")  dph_Prelude_Int (fsLit "intDivV")
+    , mk dph_Prelude_Int  (fsLit "intMod")  dph_Prelude_Int (fsLit "intModV")
+    , mk dph_Prelude_Int  (fsLit "intSquareRoot")  dph_Prelude_Int (fsLit "intSquareRootV")
+    , mk dph_Prelude_Int  (fsLit "intSumP")  dph_Prelude_Int (fsLit "intSumPA")
+    , mk dph_Prelude_Int  (fsLit "enumFromToP")  dph_Prelude_Int (fsLit "enumFromToPA")
+    , mk dph_Prelude_Int  (fsLit "upToP") dph_Prelude_Int (fsLit "upToPA")
 
-    , mk nDP_PRELUDE_INT  (fsLit "eq") nDP_PRELUDE_INT (fsLit "eqV")
-    , mk nDP_PRELUDE_INT  (fsLit "neq") nDP_PRELUDE_INT (fsLit "neqV")
-    , mk nDP_PRELUDE_INT  (fsLit "le")  nDP_PRELUDE_INT (fsLit "leV")
-    , mk nDP_PRELUDE_INT  (fsLit "lt") nDP_PRELUDE_INT (fsLit "ltV")
-    , mk nDP_PRELUDE_INT  (fsLit "ge") nDP_PRELUDE_INT (fsLit "geV")
-    , mk nDP_PRELUDE_INT  (fsLit "gt")  nDP_PRELUDE_INT (fsLit "gtV")
+    , mk dph_Prelude_Int  (fsLit "eq") dph_Prelude_Int (fsLit "eqV")
+    , mk dph_Prelude_Int  (fsLit "neq") dph_Prelude_Int (fsLit "neqV")
+    , mk dph_Prelude_Int  (fsLit "le")  dph_Prelude_Int (fsLit "leV")
+    , mk dph_Prelude_Int  (fsLit "lt") dph_Prelude_Int (fsLit "ltV")
+    , mk dph_Prelude_Int  (fsLit "ge") dph_Prelude_Int (fsLit "geV")
+    , mk dph_Prelude_Int  (fsLit "gt")  dph_Prelude_Int (fsLit "gtV")
 
-    , mk nDP_PRELUDE_DOUBLE  (fsLit "plus") nDP_PRELUDE_DOUBLE (fsLit "plusV")
-    , mk nDP_PRELUDE_DOUBLE  (fsLit "minus") nDP_PRELUDE_DOUBLE (fsLit "minusV")
-    , mk nDP_PRELUDE_DOUBLE  (fsLit "mult")  nDP_PRELUDE_DOUBLE (fsLit "multV")
-    , mk nDP_PRELUDE_DOUBLE  (fsLit "divide")  nDP_PRELUDE_DOUBLE (fsLit "divideV")
-    , mk nDP_PRELUDE_DOUBLE  (fsLit  "squareRoot")  nDP_PRELUDE_DOUBLE (fsLit "squareRootV")    
-    , mk nDP_PRELUDE_DOUBLE  (fsLit "doubleSumP")  nDP_PRELUDE_DOUBLE (fsLit "doubleSumPA")
-    , mk nDP_PRELUDE_DOUBLE  (fsLit "minIndexP") 
-         nDP_PRELUDE_DOUBLE  (fsLit "minIndexPA")
-    , mk nDP_PRELUDE_DOUBLE  (fsLit "maxIndexP")
-         nDP_PRELUDE_DOUBLE  (fsLit "maxIndexPA")
+    , mk dph_Prelude_Double  (fsLit "plus") dph_Prelude_Double (fsLit "plusV")
+    , mk dph_Prelude_Double  (fsLit "minus") dph_Prelude_Double (fsLit "minusV")
+    , mk dph_Prelude_Double  (fsLit "mult")  dph_Prelude_Double (fsLit "multV")
+    , mk dph_Prelude_Double  (fsLit "divide")  dph_Prelude_Double (fsLit "divideV")
+    , mk dph_Prelude_Double  (fsLit  "squareRoot")  dph_Prelude_Double (fsLit "squareRootV")    
+    , mk dph_Prelude_Double  (fsLit "doubleSumP")  dph_Prelude_Double (fsLit "doubleSumPA")
+    , mk dph_Prelude_Double  (fsLit "minIndexP") 
+         dph_Prelude_Double  (fsLit "minIndexPA")
+    , mk dph_Prelude_Double  (fsLit "maxIndexP")
+         dph_Prelude_Double  (fsLit "maxIndexPA")
 
-    , mk nDP_PRELUDE_DOUBLE  (fsLit "eq") nDP_PRELUDE_DOUBLE (fsLit "eqV")
-    , mk nDP_PRELUDE_DOUBLE  (fsLit "neq") nDP_PRELUDE_DOUBLE (fsLit "neqV")
-    , mk nDP_PRELUDE_DOUBLE  (fsLit "le")  nDP_PRELUDE_DOUBLE (fsLit "leV")
-    , mk nDP_PRELUDE_DOUBLE  (fsLit "lt") nDP_PRELUDE_DOUBLE (fsLit "ltV")
-    , mk nDP_PRELUDE_DOUBLE  (fsLit "ge") nDP_PRELUDE_DOUBLE (fsLit "geV")
-    , mk nDP_PRELUDE_DOUBLE  (fsLit "gt")  nDP_PRELUDE_DOUBLE (fsLit "gtV")
+    , mk dph_Prelude_Double  (fsLit "eq") dph_Prelude_Double (fsLit "eqV")
+    , mk dph_Prelude_Double  (fsLit "neq") dph_Prelude_Double (fsLit "neqV")
+    , mk dph_Prelude_Double  (fsLit "le")  dph_Prelude_Double (fsLit "leV")
+    , mk dph_Prelude_Double  (fsLit "lt") dph_Prelude_Double (fsLit "ltV")
+    , mk dph_Prelude_Double  (fsLit "ge") dph_Prelude_Double (fsLit "geV")
+    , mk dph_Prelude_Double  (fsLit "gt")  dph_Prelude_Double (fsLit "gtV")
 
-    , mk nDP_PRELUDE_BOOL  (fsLit "andP")  nDP_PRELUDE_BOOL (fsLit "andPA")
-    , mk nDP_PRELUDE_BOOL  (fsLit "orP")  nDP_PRELUDE_BOOL (fsLit "orPA")
+    , mk dph_Prelude_Bool  (fsLit "andP")  dph_Prelude_Bool (fsLit "andPA")
+    , mk dph_Prelude_Bool  (fsLit "orP")  dph_Prelude_Bool (fsLit "orPA")
 
     -- FIXME: temporary
-    , mk nDP_PRELUDE_PARR (fsLit "fromPArrayP") nDP_PRELUDE_PARR (fsLit "fromPArrayPA")
-    , mk nDP_PRELUDE_PARR (fsLit "toPArrayP") nDP_PRELUDE_PARR (fsLit "toPArrayPA")
-    , mk nDP_PRELUDE_PARR (fsLit "fromNestedPArrayP") nDP_PRELUDE_PARR (fsLit "fromNestedPArrayPA")
-    , mk nDP_PRELUDE_PARR (fsLit "combineP")    nDP_COMBINATORS (fsLit "combine2PA")
+    , mk dph_Prelude_PArr (fsLit "fromPArrayP") dph_Prelude_PArr (fsLit "fromPArrayPA")
+    , mk dph_Prelude_PArr (fsLit "toPArrayP") dph_Prelude_PArr (fsLit "toPArrayPA")
+    , mk dph_Prelude_PArr (fsLit "fromNestedPArrayP") dph_Prelude_PArr (fsLit "fromNestedPArrayPA")
+    , mk dph_Prelude_PArr (fsLit "combineP")    dph_Combinators (fsLit "combine2PA")
     ]
   where
     mk = (,,,)
@@ -287,7 +303,7 @@ preludeVars
 initBuiltinTyCons :: Builtins -> DsM [(Name, TyCon)]
 initBuiltinTyCons bi
   = do
-      -- parr <- externalTyCon nDP_PRELUDE_PARR (fsLit "PArr")
+      -- parr <- externalTyCon dph_Prelude_PArr (fsLit "PArr")
       return $ (tyConName funTyCon, closureTyCon bi)
              : (parrTyConName,      parrayTyCon bi)
 
@@ -317,16 +333,16 @@ initBuiltinPAs :: Builtins -> DsM [(Name, Var)]
 initBuiltinPAs = initBuiltinDicts . builtinPAs
 
 builtinPAs :: Builtins -> [(Name, Module, FastString)]
-builtinPAs bi
+builtinPAs bi@(Builtins { dphModules = mods })
   = [
-      mk (tyConName $ closureTyCon bi)  nDP_CLOSURE     (fsLit "dPA_Clo")
-    , mk (tyConName $ voidTyCon bi)     nDP_REPR        (fsLit "dPA_Void")
-    , mk (tyConName $ parrayTyCon bi)   nDP_INSTANCES   (fsLit "dPA_PArray")
-    , mk unitTyConName                  nDP_INSTANCES   (fsLit "dPA_Unit")
+      mk (tyConName $ closureTyCon bi)  (dph_Closure   mods) (fsLit "dPA_Clo")
+    , mk (tyConName $ voidTyCon bi)     (dph_Repr      mods) (fsLit "dPA_Void")
+    , mk (tyConName $ parrayTyCon bi)   (dph_Instances mods) (fsLit "dPA_PArray")
+    , mk unitTyConName                  (dph_Instances mods) (fsLit "dPA_Unit")
 
-    , mk intTyConName                   nDP_INSTANCES   (fsLit "dPA_Int")
-    , mk doubleTyConName                nDP_INSTANCES   (fsLit "dPA_Double")
-    , mk boolTyConName                  nDP_INSTANCES   (fsLit "dPA_Bool")
+    , mk intTyConName                   (dph_Instances mods) (fsLit "dPA_Int")
+    , mk doubleTyConName                (dph_Instances mods) (fsLit "dPA_Double")
+    , mk boolTyConName                  (dph_Instances mods) (fsLit "dPA_Bool")
     ]
     ++ tups
   where
@@ -334,24 +350,24 @@ builtinPAs bi
 
     tups = map mk_tup [2..mAX_NDP_PROD]
     mk_tup n = mk (tyConName $ tupleTyCon Boxed n)
-                  nDP_INSTANCES
+                  (dph_Instances mods)
                   (mkFastString $ "dPA_" ++ show n)
 
 initBuiltinPRs :: Builtins -> DsM [(Name, Var)]
 initBuiltinPRs = initBuiltinDicts . builtinPRs
 
 builtinPRs :: Builtins -> [(Name, Module, FastString)]
-builtinPRs bi =
+builtinPRs bi@(Builtins { dphModules = mods }) =
   [
-    mk (tyConName unitTyCon)          nDP_REPR      (fsLit "dPR_Unit")
-  , mk (tyConName $ voidTyCon bi)     nDP_REPR      (fsLit "dPR_Void")
-  , mk (tyConName $ wrapTyCon bi)     nDP_REPR      (fsLit "dPR_Wrap")
-  , mk (tyConName $ enumerationTyCon bi) nDP_REPR   (fsLit "dPR_Enumeration")
-  , mk (tyConName $ closureTyCon bi)  nDP_CLOSURE   (fsLit "dPR_Clo")
+    mk (tyConName   unitTyCon)           (dph_Repr mods)    (fsLit "dPR_Unit")
+  , mk (tyConName $ voidTyCon        bi) (dph_Repr mods)    (fsLit "dPR_Void")
+  , mk (tyConName $ wrapTyCon        bi) (dph_Repr mods)    (fsLit "dPR_Wrap")
+  , mk (tyConName $ enumerationTyCon bi) (dph_Repr mods)    (fsLit "dPR_Enumeration")
+  , mk (tyConName $ closureTyCon     bi) (dph_Closure mods) (fsLit "dPR_Clo")
 
     -- temporary
-  , mk intTyConName          nDP_INSTANCES (fsLit "dPR_Int")
-  , mk doubleTyConName       nDP_INSTANCES (fsLit "dPR_Double")
+  , mk intTyConName          (dph_Instances mods) (fsLit "dPR_Int")
+  , mk doubleTyConName       (dph_Instances mods) (fsLit "dPR_Double")
   ]
 
   ++ map mk_sum  [2..mAX_NDP_SUM]
@@ -359,10 +375,10 @@ builtinPRs bi =
   where
     mk name mod fs = (name, mod, fs)
 
-    mk_sum n = (tyConName $ sumTyCon n bi, nDP_REPR,
+    mk_sum n = (tyConName $ sumTyCon n bi, dph_Repr mods,
                 mkFastString ("dPR_Sum" ++ show n))
 
-    mk_prod n = (tyConName $ prodTyCon n bi, nDP_REPR,
+    mk_prod n = (tyConName $ prodTyCon n bi, dph_Repr mods,
                  mkFastString ("dPR_" ++ show n))
 
 initBuiltinBoxedTyCons :: Builtins -> DsM [(Name, TyCon)]
@@ -390,19 +406,21 @@ unitTyConName :: Name
 unitTyConName = tyConName unitTyCon
 
 
-primMethod :: TyCon -> String -> DsM (Maybe Var)
-primMethod tycon method
+primMethod :: TyCon -> String -> Builtins -> DsM (Maybe Var)
+primMethod  tycon method (Builtins { dphModules = mods })
   | Just suffix <- lookupNameEnv prim_ty_cons (tyConName tycon)
   = liftM Just
-  $ dsLookupGlobalId =<< lookupOrig nDP_UNBOXED (mkVarOcc $ method ++ suffix)
+  $ dsLookupGlobalId =<< lookupOrig (dph_Unboxed mods)
+                                    (mkVarOcc $ method ++ suffix)
 
   | otherwise = return Nothing
 
-primPArray :: TyCon -> DsM (Maybe TyCon)
-primPArray tycon
+primPArray :: TyCon -> Builtins -> DsM (Maybe TyCon)
+primPArray tycon (Builtins { dphModules = mods })
   | Just suffix <- lookupNameEnv prim_ty_cons (tyConName tycon)
   = liftM Just
-  $ dsLookupTyCon =<< lookupOrig nDP_UNBOXED (mkOccName tcName $ "PArray" ++ suffix)
+  $ dsLookupTyCon =<< lookupOrig (dph_Unboxed mods)
+                                 (mkOccName tcName $ "PArray" ++ suffix)
 
   | otherwise = return Nothing
 
