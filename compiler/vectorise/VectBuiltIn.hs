@@ -1,5 +1,5 @@
 module VectBuiltIn (
-  Builtins(..), sumTyCon, prodTyCon, uarrTy, intPrimArrayTy,
+  Builtins(..), sumTyCon, prodTyCon,
   combinePAVar,
   initBuiltins, initBuiltinVars, initBuiltinTyCons, initBuiltinDataCons,
   initBuiltinPAs, initBuiltinPRs,
@@ -25,7 +25,7 @@ import Type            ( Type, mkTyConApp )
 import TysPrim
 import TysWiredIn      ( unitTyCon, unitDataCon,
                          tupleTyCon, tupleCon,
-                         intTyCon, intTyConName, intTy,
+                         intTyCon, intTyConName,
                          doubleTyCon, doubleTyConName,
                          boolTyCon, boolTyConName, trueDataCon, falseDataCon,
                          parrTyConName )
@@ -51,8 +51,7 @@ mAX_NDP_COMBINE = 2
 mkNDPModule :: FastString -> Module
 mkNDPModule m = mkModule ndpPackageId (mkModuleNameFS m)
 
-nDP_UARR,
-  nDP_PARRAY,
+nDP_PARRAY,
   nDP_REPR,
   nDP_CLOSURE,
   nDP_UNBOXED,
@@ -64,7 +63,6 @@ nDP_UARR,
   nDP_PRELUDE_BOOL,
   nDP_PRELUDE_TUPLE :: Module
 
-nDP_UARR        = mkNDPModule (fsLit "Data.Array.Parallel.Unlifted.Flat.UArr")
 nDP_PARRAY      = mkNDPModule (fsLit "Data.Array.Parallel.Lifted.PArray")
 nDP_REPR        = mkNDPModule (fsLit "Data.Array.Parallel.Lifted.Repr")
 nDP_CLOSURE     = mkNDPModule (fsLit "Data.Array.Parallel.Lifted.Closure")
@@ -85,7 +83,7 @@ data Builtins = Builtins {
                 , preprTyCon       :: TyCon
                 , prTyCon          :: TyCon
                 , prDataCon        :: DataCon
-                , uarrTyCon        :: TyCon
+                , intPrimArrayTy   :: Type
                 , voidTyCon        :: TyCon
                 , wrapTyCon        :: TyCon
                 , enumerationTyCon :: TyCon
@@ -108,12 +106,6 @@ data Builtins = Builtins {
                 , combinePAVars    :: Array Int Var
                 , liftingContext   :: Var
                 }
-
-uarrTy :: Type -> Builtins -> Type
-uarrTy ty bi = mkTyConApp (uarrTyCon bi) [ty]
-
-intPrimArrayTy :: Builtins -> Type
-intPrimArrayTy = uarrTy intTy
 
 sumTyCon :: Int -> Builtins -> TyCon
 sumTyCon n bi
@@ -140,7 +132,7 @@ initBuiltins
       preprTyCon   <- externalTyCon nDP_PARRAY (fsLit "PRepr")
       prTyCon      <- externalTyCon nDP_PARRAY (fsLit "PR")
       let [prDataCon] = tyConDataCons prTyCon
-      uarrTyCon    <- externalTyCon nDP_UARR   (fsLit "UArr")
+      intPrimArrayTy <- externalType nDP_UNBOXED (fsLit "PArray_Int#")
       closureTyCon <- externalTyCon nDP_CLOSURE (fsLit ":->")
 
       voidTyCon    <- externalTyCon nDP_REPR (fsLit "Void")
@@ -181,7 +173,7 @@ initBuiltins
                , preprTyCon       = preprTyCon
                , prTyCon          = prTyCon
                , prDataCon        = prDataCon
-               , uarrTyCon        = uarrTyCon
+               , intPrimArrayTy   = intPrimArrayTy
                , voidTyCon        = voidTyCon
                , wrapTyCon        = wrapTyCon
                , enumerationTyCon = enumerationTyCon
@@ -387,6 +379,12 @@ externalVar mod fs
 externalTyCon :: Module -> FastString -> DsM TyCon
 externalTyCon mod fs
   = dsLookupTyCon =<< lookupOrig mod (mkOccNameFS tcName fs)
+
+externalType :: Module -> FastString -> DsM Type
+externalType mod fs
+  = do
+      tycon <- externalTyCon mod fs
+      return $ mkTyConApp tycon []
 
 unitTyConName :: Name
 unitTyConName = tyConName unitTyCon
