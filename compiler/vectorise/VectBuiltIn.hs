@@ -214,44 +214,50 @@ initBuiltins pkg
 
 
 initBuiltinVars :: Builtins -> DsM [(Var, Var)]
-initBuiltinVars (Builtins { dphModules = modules })
+initBuiltinVars (Builtins { dphModules = mods })
   = do
-      uvars <- zipWithM externalVar (map ($ modules) umods) ufs
-      vvars <- zipWithM externalVar (map ($ modules) vmods) vfs
-      cvars <- zipWithM externalVar (map ($ modules) cmods) cfs
+      uvars <- zipWithM externalVar umods ufs
+      vvars <- zipWithM externalVar vmods vfs
+      cvars <- zipWithM externalVar cmods cfs
       return $ [(v,v) | v <- map dataConWorkId defaultDataConWorkers]
                ++ zip (map dataConWorkId cons) cvars
                ++ zip uvars vvars
   where
-    (umods, ufs, vmods, vfs) = unzip4 preludeVars
+    (umods, ufs, vmods, vfs) = unzip4 (preludeVars mods)
 
-    (cons, cmods, cfs) = unzip3 preludeDataCons
+    (cons, cmods, cfs) = unzip3 (preludeDataCons mods)
 
 defaultDataConWorkers :: [DataCon]
 defaultDataConWorkers = [trueDataCon, falseDataCon, unitDataCon]
 
-preludeDataCons :: [(DataCon, Modules -> Module, FastString)]
-preludeDataCons
+preludeDataCons :: Modules -> [(DataCon, Module, FastString)]
+preludeDataCons (Modules { dph_Prelude_Tuple = dph_Prelude_Tuple })
   = [mk_tup n dph_Prelude_Tuple (mkFastString $ "tup" ++ show n) | n <- [2..3]]
   where
     mk_tup n mod name = (tupleCon Boxed n, mod, name)
 
-preludeVars :: [(Modules -> Module, FastString, Modules -> Module, FastString)]
-preludeVars
+preludeVars :: Modules -> [(Module, FastString, Module, FastString)]
+preludeVars (Modules { dph_Combinators    = dph_Combinators
+                     , dph_PArray         = dph_PArray
+                     , dph_Prelude_Int    = dph_Prelude_Int
+                     , dph_Prelude_Double = dph_Prelude_Double
+                     , dph_Prelude_Bool   = dph_Prelude_Bool 
+                     , dph_Prelude_PArr   = dph_Prelude_PArr
+                     })
   = [
-      mk (const gHC_PARR) (fsLit "mapP")       dph_Combinators (fsLit "mapPA")
-    , mk (const gHC_PARR) (fsLit "zipWithP")   dph_Combinators (fsLit "zipWithPA")
-    , mk (const gHC_PARR) (fsLit "zipP")       dph_Combinators (fsLit "zipPA")
-    , mk (const gHC_PARR) (fsLit "unzipP")     dph_Combinators (fsLit "unzipPA")
-    , mk (const gHC_PARR) (fsLit "filterP")    dph_Combinators (fsLit "filterPA")
-    , mk (const gHC_PARR) (fsLit "lengthP")    dph_Combinators (fsLit "lengthPA")
-    , mk (const gHC_PARR) (fsLit "replicateP") dph_Combinators (fsLit "replicatePA")
-    , mk (const gHC_PARR) (fsLit "!:")         dph_Combinators (fsLit "indexPA")
-    , mk (const gHC_PARR) (fsLit "crossMapP")  dph_Combinators (fsLit "crossMapPA")
-    , mk (const gHC_PARR) (fsLit "singletonP") dph_Combinators (fsLit "singletonPA")
-    , mk (const gHC_PARR) (fsLit "concatP")    dph_Combinators (fsLit "concatPA")
-    , mk (const gHC_PARR) (fsLit "+:+")        dph_Combinators (fsLit "appPA")
-    , mk (const gHC_PARR) (fsLit "emptyP")     dph_PArray (fsLit "emptyPA")
+      mk gHC_PARR (fsLit "mapP")       dph_Combinators (fsLit "mapPA")
+    , mk gHC_PARR (fsLit "zipWithP")   dph_Combinators (fsLit "zipWithPA")
+    , mk gHC_PARR (fsLit "zipP")       dph_Combinators (fsLit "zipPA")
+    , mk gHC_PARR (fsLit "unzipP")     dph_Combinators (fsLit "unzipPA")
+    , mk gHC_PARR (fsLit "filterP")    dph_Combinators (fsLit "filterPA")
+    , mk gHC_PARR (fsLit "lengthP")    dph_Combinators (fsLit "lengthPA")
+    , mk gHC_PARR (fsLit "replicateP") dph_Combinators (fsLit "replicatePA")
+    , mk gHC_PARR (fsLit "!:")         dph_Combinators (fsLit "indexPA")
+    , mk gHC_PARR (fsLit "crossMapP")  dph_Combinators (fsLit "crossMapPA")
+    , mk gHC_PARR (fsLit "singletonP") dph_Combinators (fsLit "singletonPA")
+    , mk gHC_PARR (fsLit "concatP")    dph_Combinators (fsLit "concatPA")
+    , mk gHC_PARR (fsLit "+:+")        dph_Combinators (fsLit "appPA")
+    , mk gHC_PARR (fsLit "emptyP")     dph_PArray (fsLit "emptyPA")
 
     , mk dph_Prelude_Int  (fsLit "plus") dph_Prelude_Int (fsLit "plusV")
     , mk dph_Prelude_Int  (fsLit "minus") dph_Prelude_Int (fsLit "minusV")
