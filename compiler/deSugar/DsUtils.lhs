@@ -168,8 +168,8 @@ mk_val_app (Var f `App` Type ty1 `App` Type _ `App` arg1) arg2 _ res_ty
   = Case arg1 case_bndr res_ty [(DEFAULT,[],arg2)]
   where
     case_bndr = case arg1 of
-		   Var v1 -> v1	-- Note [Desugaring seq (2)]
-		   _      -> mkWildId ty1
+		   Var v1 | isLocalId v1 -> v1	-- Note [Desugaring seq (2) and (3)]
+		   _   			 -> mkWildId ty1
 
 mk_val_app fun arg arg_ty _	-- See Note [CoreSyn let/app invariant]
   | not (isUnLiftedType arg_ty) || exprOkForSpeculation arg
@@ -220,7 +220,7 @@ the seq, by re-introducing the space leak:
 We can try to avoid doing this by ensuring that the binder-swap in the
 case happens, so we get his at an early stage:
    case chp of chp2 { I# -> ...chp2... }
-But this is fragile.  The real culprit is the source program.  Perhpas we
+But this is fragile.  The real culprit is the source program.  Perhaps we
 should have said explicitly
    let !chp2 = chp in ...chp2...
 
@@ -233,6 +233,15 @@ Notice the shadowing of the case binder! And now all is well.
 
 The reason it's a hack is because if you define mySeq=seq, the hack
 won't work on mySeq.  
+
+Note [Desugaring seq (3)] cf Trac #2409
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The isLocalId ensures that we don't turn 
+	True `seq` e
+into
+	case True of True { ... }
+which stupidly tries to bind the datacon 'True'. 
+
 
 %************************************************************************
 %*									*
