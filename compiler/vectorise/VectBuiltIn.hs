@@ -39,14 +39,14 @@ import Data.Array
 import Control.Monad   ( liftM, zipWithM )
 import Data.List       ( unzip4 )
 
-mAX_NDP_PROD :: Int
-mAX_NDP_PROD = 5
+mAX_DPH_PROD :: Int
+mAX_DPH_PROD = 5
 
-mAX_NDP_SUM :: Int
-mAX_NDP_SUM = 3
+mAX_DPH_SUM :: Int
+mAX_DPH_SUM = 3
 
-mAX_NDP_COMBINE :: Int
-mAX_NDP_COMBINE = 2
+mAX_DPH_COMBINE :: Int
+mAX_DPH_COMBINE = 2
 
 data Modules = Modules {
                    dph_PArray :: Module
@@ -115,18 +115,18 @@ data Builtins = Builtins {
 
 sumTyCon :: Int -> Builtins -> TyCon
 sumTyCon n bi
-  | n >= 2 && n <= mAX_NDP_SUM = sumTyCons bi ! n
+  | n >= 2 && n <= mAX_DPH_SUM = sumTyCons bi ! n
   | otherwise = pprPanic "sumTyCon" (ppr n)
 
 prodTyCon :: Int -> Builtins -> TyCon
 prodTyCon n bi
   | n == 1                      = wrapTyCon bi
-  | n >= 0 && n <= mAX_NDP_PROD = tupleTyCon Boxed n
+  | n >= 0 && n <= mAX_DPH_PROD = tupleTyCon Boxed n
   | otherwise = pprPanic "prodTyCon" (ppr n)
 
 combinePAVar :: Int -> Builtins -> Var
 combinePAVar n bi
-  | n >= 2 && n <= mAX_NDP_COMBINE = combinePAVars bi ! n
+  | n >= 2 && n <= mAX_DPH_COMBINE = combinePAVars bi ! n
   | otherwise = pprPanic "combinePAVar" (ppr n)
 
 initBuiltins :: PackageId -> DsM Builtins
@@ -145,9 +145,9 @@ initBuiltins pkg
       wrapTyCon    <- externalTyCon dph_Repr (fsLit "Wrap")
       enumerationTyCon <- externalTyCon dph_Repr (fsLit "Enumeration")
       sum_tcs <- mapM (externalTyCon dph_Repr)
-                      [mkFastString ("Sum" ++ show i) | i <- [2..mAX_NDP_SUM]]
+                      [mkFastString ("Sum" ++ show i) | i <- [2..mAX_DPH_SUM]]
 
-      let sumTyCons = listArray (2, mAX_NDP_SUM) sum_tcs
+      let sumTyCons = listArray (2, mAX_DPH_SUM) sum_tcs
 
       voidVar          <- externalVar dph_Repr (fsLit "void")
       mkPRVar          <- externalVar dph_PArray (fsLit "mkPR")
@@ -166,8 +166,8 @@ initBuiltins pkg
 
       combines <- mapM (externalVar dph_PArray)
                        [mkFastString ("combine" ++ show i ++ "PA#")
-                          | i <- [2..mAX_NDP_COMBINE]]
-      let combinePAVars = listArray (2, mAX_NDP_COMBINE) combines
+                          | i <- [2..mAX_DPH_COMBINE]]
+      let combinePAVars = listArray (2, mAX_DPH_COMBINE) combines
 
       liftingContext <- liftM (\u -> mkSysLocal (fsLit "lc") u intPrimTy)
                               newUnique
@@ -348,7 +348,7 @@ builtinPAs bi@(Builtins { dphModules = mods })
   where
     mk name mod fs = (name, mod, fs)
 
-    tups = map mk_tup [2..mAX_NDP_PROD]
+    tups = map mk_tup [2..mAX_DPH_PROD]
     mk_tup n = mk (tyConName $ tupleTyCon Boxed n)
                   (dph_Instances mods)
                   (mkFastString $ "dPA_" ++ show n)
@@ -370,8 +370,8 @@ builtinPRs bi@(Builtins { dphModules = mods }) =
   , mk doubleTyConName       (dph_Instances mods) (fsLit "dPR_Double")
   ]
 
-  ++ map mk_sum  [2..mAX_NDP_SUM]
-  ++ map mk_prod [2..mAX_NDP_PROD]
+  ++ map mk_sum  [2..mAX_DPH_SUM]
+  ++ map mk_prod [2..mAX_DPH_PROD]
   where
     mk name mod fs = (name, mod, fs)
 
