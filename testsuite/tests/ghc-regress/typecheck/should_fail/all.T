@@ -193,3 +193,4 @@ test('tcfail201', normal, compile_fail, [''])
 
 test('T1899', normal, compile_fail, [''])
 test('T2126', normal, compile_fail, [''])
+test('T2307', normal, compile_fail, [''])
