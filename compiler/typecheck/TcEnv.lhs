@@ -600,43 +600,43 @@ But local instance decls includes
 as well as explicit user written ones.
 
 \begin{code}
-data InstInfo
+data InstInfo a
   = InstInfo {
       iSpec  :: Instance,		-- Includes the dfun id.  Its forall'd type 
-      iBinds :: InstBindings		-- variables scope over the stuff in InstBindings!
+      iBinds :: InstBindings a		-- variables scope over the stuff in InstBindings!
     }
 
-iDFunId :: InstInfo -> DFunId
+iDFunId :: InstInfo a -> DFunId
 iDFunId info = instanceDFunId (iSpec info)
 
-data InstBindings
+data InstBindings a
   = VanillaInst 		-- The normal case
-	(LHsBinds Name)		-- Bindings for the instance methods
-	[LSig Name]		-- User pragmas recorded for generating 
+	(LHsBinds a)		-- Bindings for the instance methods
+	[LSig a]		-- User pragmas recorded for generating 
 				-- specialised instances
 
   | NewTypeDerived              -- Used for deriving instances of newtypes, where the
 				-- witness dictionary is identical to the argument 
 				-- dictionary.  Hence no bindings, no pragmas.
 
-pprInstInfo :: InstInfo -> SDoc
+pprInstInfo :: InstInfo a -> SDoc
 pprInstInfo info = vcat [ptext (sLit "InstInfo:") <+> ppr (idType (iDFunId info))]
 
-pprInstInfoDetails :: InstInfo -> SDoc
+pprInstInfoDetails :: OutputableBndr a => InstInfo a -> SDoc
 pprInstInfoDetails info = pprInstInfo info $$ nest 2 (details (iBinds info))
   where
     details (VanillaInst b _) = pprLHsBinds b
     details NewTypeDerived    = text "Derived from the representation type"
 
-simpleInstInfoClsTy :: InstInfo -> (Class, Type)
+simpleInstInfoClsTy :: InstInfo a -> (Class, Type)
 simpleInstInfoClsTy info = case instanceHead (iSpec info) of
                            (_, _, cls, [ty]) -> (cls, ty)
                            _ -> panic "simpleInstInfoClsTy"
 
-simpleInstInfoTy :: InstInfo -> Type
+simpleInstInfoTy :: InstInfo a -> Type
 simpleInstInfoTy info = snd (simpleInstInfoClsTy info)
 
-simpleInstInfoTyCon :: InstInfo -> TyCon
+simpleInstInfoTyCon :: InstInfo a -> TyCon
   -- Gets the type constructor for a simple instance declaration,
   -- i.e. one of the form 	instance (...) => C (T a b c) where ...
 simpleInstInfoTyCon inst = tcTyConAppTyCon (simpleInstInfoTy inst)

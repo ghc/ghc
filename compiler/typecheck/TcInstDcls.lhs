@@ -136,7 +136,7 @@ tcInstDecls1    -- Deal with both source-code and imported instance decls
    -> [LInstDecl Name]          -- Source code instance decls
    -> [LDerivDecl Name]         -- Source code stand-alone deriving decls
    -> TcM (TcGblEnv,            -- The full inst env
-           [InstInfo],          -- Source-code instance decls to process;
+           [InstInfo Name],     -- Source-code instance decls to process;
                                 -- contains all dfuns for this module
            HsValBinds Name)     -- Supporting bindings for derived instances
 
@@ -215,7 +215,7 @@ assocInClassErr name =
   ptext (sLit "Associated type") <+> quotes (ppr name) <+>
   ptext (sLit "must be inside a class instance")
 
-addInsts :: [InstInfo] -> TcM a -> TcM a
+addInsts :: [InstInfo Name] -> TcM a -> TcM a
 addInsts infos thing_inside
   = tcExtendLocalInstEnv (map iSpec infos) thing_inside
 
@@ -230,7 +230,7 @@ addFamInsts tycons thing_inside
 
 \begin{code}
 tcLocalInstDecl1 :: LInstDecl Name
-                 -> TcM ([InstInfo], [TyThing]) -- [] if there was an error
+                 -> TcM ([InstInfo Name], [TyThing]) -- [] if there was an error
         -- A source-file instance declaration
         -- Type-check all the stuff before the "where"
         --
@@ -238,7 +238,7 @@ tcLocalInstDecl1 :: LInstDecl Name
 tcLocalInstDecl1 (L loc (InstDecl poly_ty binds uprags ats))
   = -- Prime error recovery, set source location
     recoverM (return ([], []))          $
-    setSrcSpan loc                      $
+    setSrcSpan loc		        $
     addErrCtxt (instDeclCtxt1 poly_ty)  $
 
     do  { is_boot <- tcIsHsBoot
@@ -258,7 +258,8 @@ tcLocalInstDecl1 (L loc (InstDecl poly_ty binds uprags ats))
 
         -- Finally, construct the Core representation of the instance.
         -- (This no longer includes the associated types.)
-        ; dfun_name <- newDFunName clas inst_tys loc
+        ; dfun_name <- newDFunName clas inst_tys (getLoc poly_ty)
+		-- Dfun location is that of instance *header*
         ; overlap_flag <- getOverlapFlag
         ; let (eq_theta,dict_theta) = partition isEqPred theta
               theta'         = eq_theta ++ dict_theta
@@ -371,7 +372,7 @@ tcLocalInstDecl1 (L loc (InstDecl poly_ty binds uprags ats))
 %************************************************************************
 
 \begin{code}
-tcInstDecls2 :: [LTyClDecl Name] -> [InstInfo]
+tcInstDecls2 :: [LTyClDecl Name] -> [InstInfo Name]
              -> TcM (LHsBinds Id, TcLclEnv)
 -- (a) From each class declaration,
 --      generate any default-method bindings
@@ -457,7 +458,7 @@ is the @dfun_theta@ below.
 
 
 \begin{code}
-tcInstDecl2 :: InstInfo -> TcM (LHsBinds Id)
+tcInstDecl2 :: InstInfo Name -> TcM (LHsBinds Id)
 -- Returns a binding for the dfun
 
 ------------------------
@@ -582,7 +583,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = VanillaInst monobinds uprags })
         dfun_id    = instanceDFunId ispec
         rigid_info = InstSkol
         inst_ty    = idType dfun_id
-        loc        = srcLocSpan (getSrcLoc dfun_id)
+        loc        = getSrcSpan dfun_id
     in
          -- Prime error recovery
     recoverM (return emptyLHsBinds)             $

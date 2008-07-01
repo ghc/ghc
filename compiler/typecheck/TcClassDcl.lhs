@@ -594,7 +594,7 @@ gives rise to the instance declarations
 
 
 \begin{code}
-getGenericInstances :: [LTyClDecl Name] -> TcM [InstInfo] 
+getGenericInstances :: [LTyClDecl Name] -> TcM [InstInfo Name] 
 getGenericInstances class_decls
   = do	{ gen_inst_infos <- mapM (addLocM get_generics) class_decls
 	; let { gen_inst_info = concat gen_inst_infos }
@@ -609,7 +609,7 @@ getGenericInstances class_decls
 	         (vcat (map pprInstInfoDetails gen_inst_info)))	
 	; return gen_inst_info }}
 
-get_generics :: TyClDecl Name -> TcM [InstInfo]
+get_generics :: TyClDecl Name -> TcM [InstInfo Name]
 get_generics decl@(ClassDecl {tcdLName = class_name, tcdMeths = def_methods})
   | null generic_binds
   = return [] -- The comon case: no generic default methods
@@ -634,7 +634,7 @@ get_generics decl@(ClassDecl {tcdLName = class_name, tcdMeths = def_methods})
 	--
 	-- The class should be unary, which is why simpleInstInfoTyCon should be ok
     let
-	tc_inst_infos :: [(TyCon, InstInfo)]
+	tc_inst_infos :: [(TyCon, InstInfo Name)]
 	tc_inst_infos = [(simpleInstInfoTyCon i, i) | i <- inst_infos]
 
 	bad_groups = [group | group <- equivClassesByUniq get_uniq tc_inst_infos,
@@ -695,7 +695,7 @@ eqPatType _ _ = False
 ---------------------------------
 mkGenericInstance :: Class
 		  -> (HsType Name, LHsBinds Name)
-		  -> TcM InstInfo
+		  -> TcM (InstInfo Name)
 
 mkGenericInstance clas (hs_ty, binds) = do
   -- Make a generic instance declaration
@@ -805,7 +805,7 @@ missingGenericInstances :: [Name] -> SDoc
 missingGenericInstances missing
   = ptext (sLit "Missing type patterns for") <+> pprQuotedList missing
 	  
-dupGenericInsts :: [(TyCon, InstInfo)] -> SDoc
+dupGenericInsts :: [(TyCon, InstInfo a)] -> SDoc
 dupGenericInsts tc_inst_infos
   = vcat [ptext (sLit "More than one type pattern for a single generic type constructor:"),
 	  nest 4 (vcat (map ppr_inst_ty tc_inst_infos)),

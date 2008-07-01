@@ -166,8 +166,8 @@ tcHsQuantifiedType tv_names hs_ty
     	; return (tvs, ty) } }
 
 -- Used for the deriving(...) items
-tcHsDeriv :: LHsType Name -> TcM ([TyVar], Class, [Type])
-tcHsDeriv = addLocM (tc_hs_deriv [])
+tcHsDeriv :: HsType Name -> TcM ([TyVar], Class, [Type])
+tcHsDeriv = tc_hs_deriv []
 
 tc_hs_deriv :: [LHsTyVarBndr Name] -> HsType Name
             -> TcM ([TyVar], Class, [Type])

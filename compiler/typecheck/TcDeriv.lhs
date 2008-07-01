@@ -262,7 +262,7 @@ when the dict is constructed in TcInstDcls.tcInstDecl2
 tcDeriving  :: [LTyClDecl Name]  -- All type constructors
             -> [LInstDecl Name]  -- All instance declarations
             -> [LDerivDecl Name] -- All stand-alone deriving declarations
-	    -> TcM ([InstInfo],		-- The generated "instance decls"
+	    -> TcM ([InstInfo Name],	-- The generated "instance decls"
 		    HsValBinds Name)	-- Extra generated top-level bindings
 
 tcDeriving tycl_decls inst_decls deriv_decls
@@ -273,18 +273,17 @@ tcDeriving tycl_decls inst_decls deriv_decls
 
 	; overlap_flag <- getOverlapFlag
 	; let (infer_specs, given_specs) = splitEithers early_specs
-	; (insts1, aux_binds1) <- mapAndUnzipM (genInst overlap_flag) given_specs
+	; insts1 <- mapM (genInst overlap_flag) given_specs
 
-	; final_specs <- extendLocalInstEnv (map iSpec insts1) $
+	; final_specs <- extendLocalInstEnv (map (iSpec . fst) insts1) $
 			 inferInstanceContexts overlap_flag infer_specs
 
-	; (insts2, aux_binds2) <- mapAndUnzipM (genInst overlap_flag) final_specs
+	; insts2 <- mapM (genInst overlap_flag) final_specs
 
 	; is_boot <- tcIsHsBoot
-	; rn_binds <- makeAuxBinds is_boot tycl_decls
-				   (concat aux_binds1 ++ concat aux_binds2)
-
-	; let inst_info = insts1 ++ insts2
+		 -- Generate the generic to/from functions from each type declaration
+	; gen_binds <- mkGenericBinds is_boot
+	; (inst_info, rn_binds) <- renameDeriv is_boot gen_binds (insts1 ++ insts2)
 
 	; dflags <- getDOpts
 	; liftIO (dumpIfSet_dyn dflags Opt_D_dump_deriv "Derived instances"
@@ -292,49 +291,77 @@ tcDeriving tycl_decls inst_decls deriv_decls
 
 	; return (inst_info, rn_binds) }
   where
-    ddump_deriving :: [InstInfo] -> HsValBinds Name -> SDoc
+    ddump_deriving :: [InstInfo Name] -> HsValBinds Name -> SDoc
     ddump_deriving inst_infos extra_binds
       = vcat (map pprInstInfoDetails inst_infos) $$ ppr extra_binds
 
-makeAuxBinds :: Bool -> [LTyClDecl Name] -> DerivAuxBinds -> TcM (HsValBinds Name)
-makeAuxBinds is_boot tycl_decls deriv_aux_binds
-  | is_boot	-- If we are compiling a hs-boot file, 
-		-- don't generate any derived bindings
-  = return emptyValBindsOut
+renameDeriv :: Bool -> LHsBinds RdrName
+	    -> [(InstInfo RdrName, DerivAuxBinds)]
+ 	    -> TcM ([InstInfo Name], HsValBinds Name)
+renameDeriv is_boot gen_binds insts
+  | is_boot	-- If we are compiling a hs-boot file, don't generate any derived bindings
+		-- The inst-info bindings will all be empty, but it's easier to
+		-- just use rn_inst_info to change the type appropriately
+  = do	{ rn_inst_infos <- mapM rn_inst_info inst_infos	
+	; return (rn_inst_infos, emptyValBindsOut) }
 
   | otherwise
-  = do	{ let aux_binds = listToBag (map genAuxBind (rm_dups [] deriv_aux_binds))
-		-- Generate any extra not-one-inst-decl-specific binds, 
+  = discardWarnings $ 	 -- Discard warnings about unused bindings etc
+    do	{ (rn_gen, dus_gen) <- setOptM Opt_PatternSignatures $	-- Type signatures in patterns 
+								-- are used in the generic binds
+			       rnTopBinds (ValBindsIn gen_binds [])
+	; keepAliveSetTc (duDefs dus_gen)	-- Mark these guys to be kept alive
+
+		-- Generate and rename any extra not-one-inst-decl-specific binds, 
 		-- notably "con2tag" and/or "tag2con" functions.  
+		-- Bring those names into scope before renaming the instances themselves
+	; loc <- getSrcSpanM	-- Generic loc for shared bindings
+	; let aux_binds = listToBag $ map (genAuxBind loc) $ 
+			  rm_dups [] $ concat deriv_aux_binds
+	; rn_aux_lhs <- rnTopBindsLHS emptyFsEnv (ValBindsIn aux_binds [])
+	; let aux_names =  map unLoc (collectHsValBinders rn_aux_lhs)
 
-	-- Generate the generic to/from functions from each type declaration
-	; gen_binds <- mkGenericBinds tycl_decls
+	; bindLocalNames aux_names $ 
+    do	{ (rn_aux, _dus) <- rnTopBindsRHS aux_names rn_aux_lhs
+	; rn_inst_infos <- mapM rn_inst_info inst_infos
+	; return (rn_inst_infos, rn_aux `plusHsValBinds` rn_gen) } }
 
-	-- Rename these extra bindings, discarding warnings about unused bindings etc
-	-- Type signatures in patterns are used in the generic binds
-	; discardWarnings $
-          setOptM Opt_PatternSignatures $
-          do	{ (rn_deriv, _dus1) <- rnTopBinds (ValBindsIn aux_binds [])
-		; (rn_gen, dus_gen) <- rnTopBinds (ValBindsIn gen_binds [])
-		; keepAliveSetTc (duDefs dus_gen)	-- Mark these guys to
-							-- be kept alive
-		; return (rn_deriv `plusHsValBinds` rn_gen) } }
   where
+    (inst_infos, deriv_aux_binds) = unzip insts
+    
 	-- Remove duplicate requests for auxilliary bindings
     rm_dups acc [] = acc
     rm_dups acc (b:bs) | any (isDupAux b) acc = rm_dups acc bs
     		       | otherwise	      = rm_dups (b:acc) bs
 
+
+    rn_inst_info (InstInfo { iSpec = inst, iBinds = NewTypeDerived })
+	= return (InstInfo { iSpec = inst, iBinds = NewTypeDerived })
+
+    rn_inst_info (InstInfo { iSpec = inst, iBinds = VanillaInst binds sigs })
+	= 	-- Bring the right type variables into 
+		-- scope (yuk), and rename the method binds
+	   ASSERT( null sigs )
+	   bindLocalNames (map Var.varName tyvars) $
+ 	   do { (rn_binds, _fvs) <- rnMethodBinds clas_nm (\_ -> []) [] binds
+	      ; return (InstInfo { iSpec = inst, iBinds = VanillaInst rn_binds [] }) }
+	where
+	  (tyvars,_,clas,_) = instanceHead inst
+	  clas_nm  	    = className clas
+
 -----------------------------------------
-mkGenericBinds :: [LTyClDecl Name] -> TcM (LHsBinds RdrName)
-mkGenericBinds tycl_decls
-  = do	{ tcs <- mapM tcLookupTyCon 
-			[ tc_name | 
-			  L _ (TyData { tcdLName = L _ tc_name }) <- tycl_decls]
-		-- We are only interested in the data type declarations
+mkGenericBinds :: Bool -> TcM (LHsBinds RdrName)
+mkGenericBinds is_boot
+  | is_boot 
+  = return emptyBag
+  | otherwise
+  = do	{ gbl_env <- getGblEnv
+	; let tcs = typeEnvTyCons (tcg_type_env gbl_env)
 	; return (unionManyBags [ mkTyConGenericBinds tc | 
 				  tc <- tcs, tyConHasGenerics tc ]) }
-		-- And then only in the ones whose 'has-generics' flag is on
+		-- We are only interested in the data type declarations,
+		-- and then only in the ones whose 'has-generics' flag is on
+		-- The predicate tyConHasGenerics finds both of these
 \end{code}
 
 
@@ -407,11 +434,11 @@ deriveStandalone (L loc (DerivDecl deriv_ty))
 
 ------------------------------------------------------------------
 deriveTyData :: (LHsType Name, LTyClDecl Name) -> TcM (Maybe EarlyDerivSpec)
-deriveTyData (deriv_pred, L loc decl@(TyData { tcdLName = L _ tycon_name, 
-					       tcdTyVars = tv_names, 
-				    	       tcdTyPats = ty_pats }))
-  = setSrcSpan loc                   $
-    tcAddDeclCtxt decl		     $
+deriveTyData (L loc deriv_pred, L _ decl@(TyData { tcdLName = L _ tycon_name, 
+					           tcdTyVars = tv_names, 
+				    	           tcdTyPats = ty_pats }))
+  = setSrcSpan loc     $	-- Use the location of the 'deriving' item
+    tcAddDeclCtxt decl $
     do	{ let hs_ty_args = ty_pats `orElse` map (nlHsTyVar . hsLTyVarName) tv_names
 	      hs_app     = nlHsTyConApp tycon_name hs_ty_args
 		-- We get kinding info for the tyvars by typechecking (T a b)
@@ -712,7 +739,8 @@ std_class_via_iso clas	-- These standard classes can be derived for a newtype
 
 new_dfun_name :: Class -> TyCon -> TcM Name
 new_dfun_name clas tycon 	-- Just a simple wrapper
-  = newDFunName clas [mkTyConApp tycon []] (getSrcSpan tycon)
+  = do { loc <- getSrcSpanM	-- The location of the instance decl, not of the tycon
+	; newDFunName clas [mkTyConApp tycon []] loc }
 	-- The type passed to newDFunName is only used to generate
 	-- a suitable string; hence the empty type arg list
 \end{code}
@@ -868,9 +896,10 @@ mkNewTypeEqn orig mayDeriveDataTypeable newtype_deriving tvs
 	right_arity = length cls_tys + 1 == classArity cls
 
 		-- Never derive Read,Show,Typeable,Data this way 
-	non_iso_classes = [readClassKey, showClassKey, typeableClassKey, dataClassKey]
+	non_iso_class cls = className cls `elem` ([readClassName, showClassName, dataClassName] ++
+					  	  typeableClassNames)
 	can_derive_via_isomorphism
-	   =  not (getUnique cls `elem` non_iso_classes)
+	   =  not (non_iso_class cls)
 	   && right_arity 			-- Well kinded;
 						-- eg not: newtype T ... deriving( ST )
 						--	because ST needs *2* type params
@@ -1111,50 +1140,41 @@ the renamer.  What a great hack!
 -- Representation tycons differ from the tycon in the instance signature in
 -- case of instances for indexed families.
 --
-genInst :: OverlapFlag -> DerivSpec -> TcM (InstInfo, DerivAuxBinds)
+genInst :: OverlapFlag -> DerivSpec -> TcM (InstInfo RdrName, DerivAuxBinds)
 genInst oflag spec
   | ds_newtype spec
   = return (InstInfo { iSpec = mkInstance1 oflag spec 
 		     , iBinds = NewTypeDerived }, [])
 
   | otherwise
-  = do	{ fix_env <- getFixityEnv
-	; let
-	    inst		    = mkInstance1 oflag spec
-	    (tyvars,_,clas,[ty])    = instanceHead inst
-	    clas_nm		    = className clas
-	    (visible_tycon, tyArgs) = tcSplitTyConApp ty 
+  = do	{ let loc		      = getSrcSpan (ds_name spec)
+	      inst		      = mkInstance1 oflag spec
+   	      (_,_,clas,[ty])         = instanceHead inst
+	      (visible_tycon, tyArgs) = tcSplitTyConApp ty 
 
           -- In case of a family instance, we need to use the representation
           -- tycon (after all, it has the data constructors)
         ; (tycon, _) <- tcLookupFamInstExact visible_tycon tyArgs
-	; let (meth_binds, aux_binds) = genDerivBinds clas fix_env tycon
-
-	-- Bring the right type variables into 
-	-- scope, and rename the method binds
-	-- It's a bit yukky that we return *renamed* InstInfo, but
-	-- *non-renamed* auxiliary bindings
-	; (rn_meth_binds, _fvs) <- discardWarnings $ 
-				   bindLocalNames (map Var.varName tyvars) $
-			 	   rnMethodBinds clas_nm (\_ -> []) [] meth_binds
+	; fix_env <- getFixityEnv
+	; let (meth_binds, aux_binds) = genDerivBinds loc fix_env clas tycon
 
 	-- Build the InstInfo
 	; return (InstInfo { iSpec = inst, 
-		  	     iBinds = VanillaInst rn_meth_binds [] },
+		  	     iBinds = VanillaInst meth_binds [] },
 		  aux_binds)
         }
 
-genDerivBinds :: Class -> FixityEnv -> TyCon -> (LHsBinds RdrName, DerivAuxBinds)
-genDerivBinds clas fix_env tycon
+genDerivBinds :: SrcSpan -> FixityEnv -> Class -> TyCon -> (LHsBinds RdrName, DerivAuxBinds)
+genDerivBinds loc fix_env clas tycon
   | className clas `elem` typeableClassNames
-  = (gen_Typeable_binds tycon, [])
+  = (gen_Typeable_binds loc tycon, [])
 
   | otherwise
   = case assocMaybe gen_list (getUnique clas) of
-	Just gen_fn -> gen_fn tycon
+	Just gen_fn -> gen_fn loc tycon
 	Nothing	    -> pprPanic "genDerivBinds: bad derived class" (ppr clas)
   where
-    gen_list :: [(Unique, TyCon -> (LHsBinds RdrName, DerivAuxBinds))]
+    gen_list :: [(Unique, SrcSpan -> TyCon -> (LHsBinds RdrName, DerivAuxBinds))]
     gen_list = [(eqClassKey,       gen_Eq_binds)
  	       ,(ordClassKey,      gen_Ord_binds)
  	       ,(enumClassKey,     gen_Enum_binds)
@@ -1162,7 +1182,7 @@ genDerivBinds clas fix_env tycon
  	       ,(ixClassKey,       gen_Ix_binds)
  	       ,(showClassKey,     gen_Show_binds fix_env)
  	       ,(readClassKey,     gen_Read_binds fix_env)
-	       ,(dataClassKey,     gen_Data_binds fix_env)
+	       ,(dataClassKey,     gen_Data_binds)
  	       ]
 \end{code}
 
