@@ -37,6 +37,8 @@ module Module
 	haskell98PackageId,
 	thPackageId,
         ndpPackageId,
+        dphSeqPackageId,
+        dphParPackageId,
 	mainPackageId,
 
 	-- * The Module type
@@ -312,6 +314,8 @@ rtsPackageId	   = fsToPackageId (fsLit "rts")
 haskell98PackageId = fsToPackageId (fsLit "haskell98")
 thPackageId        = fsToPackageId (fsLit "template-haskell")
 ndpPackageId       = fsToPackageId (fsLit "ndp")
+dphSeqPackageId    = fsToPackageId (fsLit "dph-seq")
+dphParPackageId    = fsToPackageId (fsLit "dph-par")
 
 -- This is the package Id for the program.  It is the default package
 -- Id if you don't specify a package name.  We don't add this prefix

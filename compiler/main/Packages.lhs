@@ -384,6 +384,8 @@ findWiredInPackages dflags pkgs preload this_package = do
                             (rtsPackageId, [""]),
                             (haskell98PackageId, [""]),
                             (thPackageId, [""]),
+                            (dphSeqPackageId, [""]),
+                            (dphParPackageId, [""]),
                             (ndpPackageId, ["-seq", "-par"]) ]
 
         matches :: PackageConfig -> (PackageId, [String]) -> Bool
