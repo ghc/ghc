@@ -34,5 +34,5 @@ main = do
             _ | packageName pd == PackageName "Cabal" ->
                               -- Cabal is special...*sigh*
                               Simple.defaultMainArgs                     args
-              | otherwise  -> die "cabal: Don't know what to do!"
+              | otherwise  -> die "Don't know what to do!"
 
