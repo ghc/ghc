@@ -1027,7 +1027,7 @@ ppDataDecl summary links instances x loc mbDoc dataDecl
               (ppShortDataDecl summary links loc mbDoc dataDecl)
   
   | otherwise
-      = (if validTable then (</>) else const) dataHeader $
+      = (if validTable then (</>) else const) header $
 	      tda [theclass "body"] << vanillaTable << (
 		      datadoc </> 
 		      constrBit </>
@@ -1044,9 +1044,8 @@ ppDataDecl summary links instances x loc mbDoc dataDecl
     cons      = tcdCons dataDecl
     resTy     = (con_res . unLoc . head) cons 
       
-    dataHeader = 
-      (if summary then declBox else topDeclBox links loc name)
-      ((ppDataHeader summary dataDecl) <+> whereBit)
+    header = topDeclBox links loc name (ppDataHeader summary dataDecl
+             <+> whereBit)
 
     whereBit 
       | null cons = empty 
