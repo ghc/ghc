@@ -23,6 +23,7 @@ module DynFlags (
         Option(..),
         DynLibLoader(..),
         fFlags, xFlags,
+        DPHBackend(..),
 
         -- Configuration of the core-to-core and stg-to-stg phases
         CoreToDo(..),
@@ -310,6 +311,8 @@ data DynFlags = DynFlags {
   mainFunIs             :: Maybe String,
   ctxtStkDepth          :: Int,         -- Typechecker context stack depth
 
+  dphBackend            :: DPHBackend,
+
   thisPackage           :: PackageId,
 
   -- ways
@@ -500,6 +503,8 @@ defaultDynFlags =
         mainModIs               = mAIN,
         mainFunIs               = Nothing,
         ctxtStkDepth            = mAX_CONTEXT_REDUCTION_DEPTH,
+
+        dphBackend              = DPHPar,
 
         thisPackage             = mainPackageId,
 
@@ -807,7 +812,7 @@ data CoreToDo           -- These are diff core-to-core passes,
   | CoreCSE
   | CoreDoRuleCheck Int{-CompilerPhase-} String -- Check for non-application of rules
                                                 -- matching this string
-  | CoreDoVectorisation
+  | CoreDoVectorisation DPHBackend
   | CoreDoNothing                -- Useful when building up
   | CoreDoPasses [CoreToDo]      -- lists of these things
 
@@ -848,7 +853,6 @@ getCoreToDo dflags
     spec_constr   = dopt Opt_SpecConstr dflags
     liberate_case = dopt Opt_LiberateCase dflags
     rule_check    = ruleCheck dflags
-    vectorisation = dopt Opt_Vectorise dflags
     static_args   = dopt Opt_StaticArgumentTransformation dflags
 
     maybe_rule_check phase = runMaybe rule_check (CoreDoRuleCheck phase)
@@ -860,6 +864,11 @@ getCoreToDo dflags
             ],
             maybe_rule_check phase
           ]
+
+    vectorisation
+      = runWhen (dopt Opt_Vectorise dflags)
+        $ CoreDoPasses [ simpl_gently, CoreDoVectorisation (dphBackend dflags) ]
+
 
                 -- By default, we have 2 phases before phase 0.
 
@@ -895,7 +904,7 @@ getCoreToDo dflags
 
     core_todo =
      if opt_level == 0 then
-       [runWhen vectorisation (CoreDoPasses [ simpl_gently, CoreDoVectorisation ]),
+       [vectorisation,
         simpl_phase 0 ["final"] max_iter]
      else {- opt_level >= 1 -} [
 
@@ -905,12 +914,12 @@ getCoreToDo dflags
     -- after this before anything else
         runWhen static_args (CoreDoPasses [ simpl_gently, CoreDoStaticArgs ]),
 
-        -- initial simplify: mk specialiser happy: minimum effort please
-        simpl_gently,
-
         -- We run vectorisation here for now, but we might also try to run
         -- it later
-        runWhen vectorisation (CoreDoPasses [ CoreDoVectorisation, simpl_gently ]),
+        vectorisation,
+
+        -- initial simplify: mk specialiser happy: minimum effort please
+        simpl_gently,
 
         -- Specialisation is best done before full laziness
         -- so that overloaded functions have all their dictionary lambdas manifest
@@ -1323,6 +1332,15 @@ dynamic_flags = [
          (IntSuffix $ \n -> upd $ \dfs -> dfs{ ctxtStkDepth = n })
          Supported
 
+        ------ DPH flags ----------------------------------------------------
+
+  , Flag "fdph-seq"
+         (NoArg (upd (setDPHBackend DPHSeq)))
+         Supported
+  , Flag "fdph-par"
+         (NoArg (upd (setDPHBackend DPHPar)))
+         Supported
+
         ------ Compiler flags -----------------------------------------------
 
   , Flag "fasm"             (NoArg (setObjTarget HscAsm)) Supported
@@ -1711,6 +1729,11 @@ setDPHOpt dflags = setOptLevel 2 (dflags { maxSimplIterations  = 20
                    `dopt_set`   Opt_DictsCheap
                    `dopt_unset` Opt_MethodSharing
 
+data DPHBackend = DPHPar
+                | DPHSeq
+
+setDPHBackend :: DPHBackend -> DynFlags -> DynFlags
+setDPHBackend backend dflags = dflags { dphBackend = backend }
 
 
 setMainIs :: String -> DynP ()

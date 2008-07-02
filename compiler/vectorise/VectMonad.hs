@@ -37,7 +37,7 @@ module VectMonad (
 import VectBuiltIn
 
 import HscTypes
-import Module        ( dphSeqPackageId )
+import Module           ( PackageId )
 import CoreSyn
 import TyCon
 import DataCon
@@ -479,8 +479,8 @@ lookupFamInst tycon tys
                       (ppr $ mkTyConApp tycon tys)
        }
 
-initV :: HscEnv -> ModGuts -> VectInfo -> VM a -> IO (Maybe (VectInfo, a))
-initV hsc_env guts info p
+initV :: PackageId -> HscEnv -> ModGuts -> VectInfo -> VM a -> IO (Maybe (VectInfo, a))
+initV pkg hsc_env guts info p
   = do
       Just r <- initDs hsc_env (mg_module guts)
                                (mg_rdr_env guts)
@@ -491,7 +491,7 @@ initV hsc_env guts info p
 
     go =
       do
-        builtins       <- initBuiltins dphSeqPackageId
+        builtins       <- initBuiltins pkg
         builtin_vars   <- initBuiltinVars builtins
         builtin_tycons <- initBuiltinTyCons builtins
         let builtin_datacons = initBuiltinDataCons builtins

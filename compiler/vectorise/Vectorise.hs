@@ -10,6 +10,7 @@ import VectCore
 import DynFlags
 import HscTypes
 
+import Module               ( dphSeqPackageId, dphParPackageId )
 import CoreLint             ( showPass, endPass )
 import CoreSyn
 import CoreUtils
@@ -36,18 +37,22 @@ import FastString
 import Control.Monad        ( liftM, liftM2, zipWithM )
 import Data.List            ( sortBy, unzip4 )
 
-vectorise :: HscEnv -> UniqSupply -> RuleBase -> ModGuts
+vectorise :: DPHBackend -> HscEnv -> UniqSupply -> RuleBase -> ModGuts
           -> IO (SimplCount, ModGuts)
-vectorise hsc_env _ _ guts
+vectorise backend hsc_env _ _ guts
   = do
       showPass dflags "Vectorisation"
       eps <- hscEPS hsc_env
       let info = hptVectInfo hsc_env `plusVectInfo` eps_vect_info eps
-      Just (info', guts') <- initV hsc_env guts info (vectModule guts)
+      Just (info', guts') <- initV (backendPackage backend) hsc_env guts info
+                                   (vectModule guts)
       endPass dflags "Vectorisation" Opt_D_dump_vect (mg_binds guts')
       return (zeroSimplCount dflags, guts' { mg_vect_info = info' })
   where
     dflags = hsc_dflags hsc_env
+
+    backendPackage DPHSeq  = dphSeqPackageId
+    backendPackage DPHPar  = dphParPackageId
 
 vectModule :: ModGuts -> VM ModGuts
 vectModule guts
