@@ -76,6 +76,7 @@ endif
 SUBDIRS += $(wildcard parallel)
 SUBDIRS_BUILD += $(wildcard ndp)
 SUBDIRS_BUILD += $(wildcard dph/dph-base)
+SUBDIRS_BUILD += $(wildcard dph/dph-prim-interface)
 SUBDIRS_BUILD += $(wildcard dph/dph-prim-seq)
 SUBDIRS_BUILD += $(wildcard dph/dph-prim-par)
 SUBDIRS_BUILD += $(wildcard dph/dph)
