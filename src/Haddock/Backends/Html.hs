@@ -664,8 +664,9 @@ doDecl summary links x (L loc d) mbDoc instances docMap = doDecl d
       ppFunSig summary links loc mbDoc (docNameOrig n) t
     doDecl (ForD d) = ppFor summary links loc mbDoc d
 
-    doTyClD d0@(TyData {}) = ppDataDecl summary links instances x loc mbDoc d0
-    doTyClD d0@(TySynonym {}) = ppTySyn summary links loc mbDoc d0
+    doTyClD d0@(TyFamily {})  = ppTyFamily  summary links x loc mbDoc d0
+    doTyClD d0@(TyData {})    = ppDataDecl  summary links instances x loc mbDoc d0
+    doTyClD d0@(TySynonym {}) = ppTySyn     summary links loc mbDoc d0
     doTyClD d0@(ClassDecl {}) = ppClassDecl summary links instances x loc mbDoc docMap d0
 
 
@@ -753,6 +754,79 @@ ppTyNames = map ppTyName
 
 
 --------------------------------------------------------------------------------
+-- Type families
+--------------------------------------------------------------------------------
+
+
+ppTyFamHeader :: Bool -> TyClDecl DocName -> Html
+ppTyFamHeader summary decl =
+
+  (case tcdFlavour decl of
+     TypeFamily -> keyword "type family" 
+     DataFamily -> keyword "data family") <+> 
+
+  ppTyClBinderWithVars summary decl <+>
+
+  case tcdKind decl of
+    Just kind -> dcolon <+> ppKind kind 
+    Nothing -> empty
+
+
+ppTyFamily :: Bool -> LinksInfo -> Name -> SrcSpan -> Maybe (HsDoc DocName) -> 
+              TyClDecl DocName -> HtmlTable
+ppTyFamily summary links name loc mbDoc decl
+  
+  | summary = declWithDoc summary links loc name mbDoc 
+              (ppShortTyFamilyDecl summary links loc mbDoc decl)
+  
+  | otherwise
+      = (if validTable then (</>) else const) header $
+	      tda [theclass "body"] << vanillaTable << (
+		      doc </> 
+		      instancesBit
+        )
+  where
+    header = topDeclBox links loc name (ppTyFamHeader summary decl)
+
+    doc = case mbDoc of
+      Just d -> ndocBox (docToHtml d)
+      Nothing -> Html.emptyTable
+
+    instId = collapseId name
+
+    instancesBit
+      | null instances = Html.emptyTable
+      | otherwise 
+        = instHdr instId </>
+	  tda [theclass "body"] << 
+          collapsed thediv instId (
+            spacedTable1 << (
+              aboves (map (declBox . ppInstHead) instances)
+            )
+          )
+
+    instances = []
+
+    validTable = isJust mbDoc || not (null instances)
+
+
+ppShortTyFamilyDecl :: Bool -> LinksInfo -> SrcSpan -> 
+                   Maybe (HsDoc DocName) -> TyClDecl DocName -> Html
+ppShortTyFamilyDecl summary links loc mbDoc decl = empty
+
+
+--------------------------------------------------------------------------------
+-- TyClDecl helpers
+--------------------------------------------------------------------------------
+
+
+-- | Print a type family / newtype / data / class binder and its variables 
+ppTyClBinderWithVars :: Bool -> TyClDecl DocName -> Html
+ppTyClBinderWithVars summ decl = 
+  ppAppDocNameNames summ (unLoc $ tcdLName decl) (tyvarNames $ tcdTyVars decl)
+
+
+--------------------------------------------------------------------------------
 -- Type applications
 --------------------------------------------------------------------------------
 
@@ -763,8 +837,8 @@ ppAppNameTypes n ts = ppTypeApp n ts ppDocName ppParendType
 
 
 -- | Print an application of a DocName and a list of Names 
-ppDataClassHead :: Bool -> DocName -> [Name] -> Html
-ppDataClassHead summ n ns = 
+ppAppDocNameNames :: Bool -> DocName -> [Name] -> Html
+ppAppDocNameNames summ n ns = 
   ppTypeApp n ns (ppBinder summ . docNameOcc) ppTyName
 
 
@@ -818,7 +892,7 @@ ppPred (HsIParam (IPName n) t)
 ppClassHdr summ lctxt n tvs fds = 
   keyword "class" 
   <+> (if not . null . unLoc $ lctxt then ppLContext lctxt else empty)
-  <+> ppDataClassHead summ n (tyvarNames $ tvs)
+  <+> ppAppDocNameNames summ n (tyvarNames $ tvs)
 	<+> ppFds fds
 
 ppFds fds =
@@ -1157,7 +1231,7 @@ ppDataHeader summary decl
     -- context
     ppLContext (tcdCtxt decl) <+>
     -- T a b c ..., or a :+: b
-    ppDataClassHead summary (unLoc $ tcdLName decl) (tyvarNames $ tcdTyVars decl)
+    ppTyClBinderWithVars summary decl
 
 
 -- ----------------------------------------------------------------------------
