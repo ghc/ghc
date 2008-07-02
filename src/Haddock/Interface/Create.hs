@@ -151,7 +151,7 @@ sortByLoc = map unLoc . sortBy (comparing getLoc)
 
 -- | Get all the entities in a class. The entities are sorted by their 
 -- SrcLoc.
-getClassEntities tcd = sortByLoc (docs ++ meths ++ sigs)
+getClassEntities tcd = sortByLoc (docs ++ meths ++ sigs ++ ats)
   where
     docs = [ L l (DocEntity d) | L l d <- tcdDocs tcd ]
 
@@ -163,6 +163,8 @@ getClassEntities tcd = sortByLoc (docs ++ meths ++ sigs)
     -- TODO: fixities
     sigs = [ L l $ DeclEntity name | L l (TypeSig (L _ name) _) <- tcdSigs tcd ]
 
+    ats = [ L l $ DeclEntity name | L l at <- tcdATs tcd
+                                  , let L _ name = tcdLName at ] 
 
 -- | Get all the top level entities in a module. The entities are sorted by
 -- their SrcLoc.

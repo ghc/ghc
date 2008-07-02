@@ -30,7 +30,7 @@ import Control.Exception     ( bracket )
 import Control.Monad         ( when, unless )
 import Data.Char             ( isUpper, toUpper )
 import Data.List             ( sortBy )
-import Data.Maybe            ( fromJust, isJust, mapMaybe, fromMaybe )
+import Data.Maybe
 import Foreign.Marshal.Alloc ( allocaBytes )
 import System.IO             ( IOMode(..), hClose, hGetBuf, hPutBuf, openFile )
 import Data.Map              ( Map )
@@ -664,7 +664,7 @@ doDecl summary links x (L loc d) mbDoc instances docMap = doDecl d
       ppFunSig summary links loc mbDoc (docNameOrig n) t
     doDecl (ForD d) = ppFor summary links loc mbDoc d
 
-    doTyClD d0@(TyFamily {})  = ppTyFamily  summary links x loc mbDoc d0
+    doTyClD d0@(TyFamily {})  = ppTyFam     summary False links loc mbDoc d0
     doTyClD d0@(TyData {})    = ppDataDecl  summary links instances x loc mbDoc d0
     doTyClD d0@(TySynonym {}) = ppTySyn     summary links loc mbDoc d0
     doTyClD d0@(ClassDecl {}) = ppClassDecl summary links instances x loc mbDoc docMap d0
@@ -758,12 +758,17 @@ ppTyNames = map ppTyName
 --------------------------------------------------------------------------------
 
 
-ppTyFamHeader :: Bool -> TyClDecl DocName -> Html
-ppTyFamHeader summary decl =
+ppTyFamHeader :: Bool -> Bool -> TyClDecl DocName -> Html
+ppTyFamHeader summary associated decl =
 
   (case tcdFlavour decl of
-     TypeFamily -> keyword "type family" 
-     DataFamily -> keyword "data family") <+> 
+     TypeFamily
+       | associated -> keyword "type"
+       | otherwise  -> keyword "type family"
+     DataFamily
+       | associated -> keyword "data"
+       | otherwise  -> keyword "data family"
+  ) <+>
 
   ppTyClBinderWithVars summary decl <+>
 
@@ -772,21 +777,22 @@ ppTyFamHeader summary decl =
     Nothing -> empty
 
 
-ppTyFamily :: Bool -> LinksInfo -> Name -> SrcSpan -> Maybe (HsDoc DocName) -> 
+ppTyFam :: Bool -> Bool -> LinksInfo -> SrcSpan -> Maybe (HsDoc DocName) ->
               TyClDecl DocName -> HtmlTable
-ppTyFamily summary links name loc mbDoc decl
+ppTyFam summary associated links loc mbDoc decl
   
   | summary = declWithDoc summary links loc name mbDoc 
-              (ppShortTyFamilyDecl summary links loc mbDoc decl)
+              (ppTyFamHeader True associated decl)
   
-  | otherwise
-      = (if validTable then (</>) else const) header $
-	      tda [theclass "body"] << vanillaTable << (
-		      doc </> 
-		      instancesBit
-        )
+  | associated, isJust mbDoc         = header </> bodyBox << doc 
+  | associated                       = header 
+  | null instances, isNothing mbDoc  = header
+  | otherwise                        = header </> bodyBox << (doc </> instancesBit)
+
   where
-    header = topDeclBox links loc name (ppTyFamHeader summary decl)
+    name = docNameOrig . tcdName $ decl
+
+    header = topDeclBox links loc name (ppTyFamHeader summary associated decl)
 
     doc = case mbDoc of
       Just d -> ndocBox (docToHtml d)
@@ -805,14 +811,22 @@ ppTyFamily summary links name loc mbDoc decl
             )
           )
 
+    -- TODO: get the instances
     instances = []
 
-    validTable = isJust mbDoc || not (null instances)
 
+--------------------------------------------------------------------------------
+-- Associated Types
+--------------------------------------------------------------------------------
+    
 
-ppShortTyFamilyDecl :: Bool -> LinksInfo -> SrcSpan -> 
-                   Maybe (HsDoc DocName) -> TyClDecl DocName -> Html
-ppShortTyFamilyDecl summary links loc mbDoc decl = empty
+ppAssocType :: Bool -> LinksInfo -> DocMap -> LTyClDecl DocName -> HtmlTable
+ppAssocType summ links docMap (L loc decl) = 
+  case decl of
+    TyFamily  {} -> ppTyFam summ True links loc doc decl
+    TySynonym {} -> ppTySyn summ links loc doc decl
+  where
+    doc = Map.lookup (docNameOrig $ tcdName decl) docMap
 
 
 --------------------------------------------------------------------------------
@@ -854,9 +868,9 @@ ppTypeApp n ts@(t1:t2:rest) ppDN ppT
 ppTypeApp n ts ppDN ppT = ppDN n <+> hsep (map ppT ts)
 
 
---------------------------------------------------------------------------------
+-------------------------------------------------------------------------------
 -- Contexts 
---------------------------------------------------------------------------------
+-------------------------------------------------------------------------------
 
 ppLContext        = ppContext        . unLoc
 ppLContextNoArrow = ppContextNoArrow . unLoc
@@ -886,8 +900,10 @@ ppPred (HsIParam (IPName n) t)
   = toHtml "?" +++ ppDocName n <+> dcolon <+> ppLType t
 
 
--- -----------------------------------------------------------------------------
+-------------------------------------------------------------------------------
 -- Class declarations
+-------------------------------------------------------------------------------
+
 
 ppClassHdr summ lctxt n tvs fds = 
   keyword "class" 
@@ -908,33 +924,31 @@ ppShortClassDecl summary links (ClassDecl lctxt lname tvs fds sigs _ ats _) loc 
     then (if summary then declBox else topDeclBox links loc nm) hdr
     else (if summary then declBox else topDeclBox links loc nm) (hdr <+> keyword "where")
 	    </> 
-           (tda [theclass "body"] << 
-	     vanillaTable << 
-         aboves ([ ppAT summary at | L _ at <- ats ] ++
-	        [ ppFunSig summary links loc mbDoc n typ
-		          | L _ (TypeSig (L _ fname) (L _ typ)) <- sigs
-              , let n = docNameOrig fname, let mbDoc = Map.lookup n docMap ])
-          )
+      (
+				bodyBox <<
+					aboves
+					(
+						map (ppAssocType summary links docMap) ats ++
+
+						[ ppFunSig summary links loc mbDoc n typ
+						| L _ (TypeSig (L _ fname) (L _ typ)) <- sigs
+						, let n = docNameOrig fname, let mbDoc = Map.lookup n docMap ] 
+
+					)
+				)
   where
     hdr = ppClassHdr summary lctxt (unLoc lname) tvs fds
     nm  = docNameOrig . unLoc $ lname
     
-    ppAT summary at = case at of
-      TyData {} -> topDeclBox links loc nm (ppDataHeader summary at)
-      _ -> error "associated type synonyms or type families not supported yet"
 
--- we skip ATs for now
+
 ppClassDecl :: Ord key => Bool -> LinksInfo -> [InstHead DocName] -> key -> SrcSpan ->
                           Maybe (HsDoc DocName) -> DocMap -> TyClDecl DocName -> 
                           HtmlTable
 ppClassDecl summary links instances orig_c loc mbDoc docMap
-	decl@(ClassDecl lctxt lname ltyvars lfds lsigs _ _ _)
+	decl@(ClassDecl lctxt lname ltyvars lfds lsigs _ ats _)
   | summary = ppShortClassDecl summary links decl loc docMap
-  | otherwise
-    = classheader </>
-      tda [theclass "body"] << vanillaTable << (
-        classdoc </> methodsBit </> instancesBit
-      )
+  | otherwise = classheader </> bodyBox << (classdoc </> body </> instancesBit)
   where 
     classheader
       | null lsigs = topDeclBox links loc nm hdr
@@ -949,15 +963,18 @@ ppClassDecl summary links instances orig_c loc mbDoc docMap
       Nothing -> Html.emptyTable
       Just d -> ndocBox (docToHtml d)
 
-    methodsBit
-      | null lsigs = Html.emptyTable
-      | otherwise  = 
-        s8 </> methHdr </>
-        tda [theclass "body"] << vanillaTable << (
-          abovesSep s8 [ ppFunSig summary links loc mbDoc (docNameOrig n) typ
-                           | L _ (TypeSig (L _ n) (L _ typ)) <- lsigs
-                           , let mbDoc = Map.lookup (docNameOrig n) docMap ]
-        )
+    body
+      | null lsigs, null ats = Html.emptyTable
+      | null ats  = s8 </> methHdr </> bodyBox << methodTable
+      | otherwise = s8 </> atHdr </> bodyBox << atTable </> 
+                    s8 </> methHdr </> bodyBox << methodTable 
+ 
+    methodTable =
+      abovesSep s8 [ ppFunSig summary links loc doc (docNameOrig n) typ
+                   | L _ (TypeSig (L _ n) (L _ typ)) <- lsigs
+                   , let doc = Map.lookup (docNameOrig n) docMap ]
+
+    atTable = abovesSep s8 $ map (ppAssocType summary links docMap) ats
 
     instId = collapseId nm
     instancesBit
@@ -1599,6 +1616,9 @@ maybeRDocBox (Just ldoc) = rdocBox (docToHtml (unLoc ldoc))
 topButBox :: Html -> HtmlTable
 topButBox html = tda [theclass "topbut"] << html
 
+bodyBox :: Html -> HtmlTable
+bodyBox html = tda [theclass "body"] << vanillaTable << html
+
 -- a vanilla table has width 100%, no border, no padding, no spacing
 -- a narrow table is the same but without width 100%.
 vanillaTable, narrowTable :: Html -> Html
@@ -1613,6 +1633,7 @@ spacedTable5 = table ! [theclass "vanilla",  cellspacing 5, cellpadding 0]
 constrHdr, methHdr :: HtmlTable
 constrHdr  = tda [ theclass "section4" ] << toHtml "Constructors"
 methHdr    = tda [ theclass "section4" ] << toHtml "Methods"
+atHdr      = tda [ theclass "section4" ] << toHtml "Associated Types"
 
 instHdr :: String -> HtmlTable
 instHdr id = 
