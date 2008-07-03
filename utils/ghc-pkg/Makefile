@@ -33,6 +33,8 @@ ifeq "$(ghc_ge_607)" "YES"
 SRC_HC_OPTS += -package containers
 endif
 
+SRC_HC_OPTS += -package Cabal
+
 # On Windows, ghc-pkg is a standalone program
 # ($bindir/ghc-pkg.exe), whereas on Unix it needs a wrapper script
 # to pass the appropriate flag to the real binary

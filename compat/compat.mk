@@ -14,9 +14,6 @@ SRC_HC_OPTS += -DUSING_COMPAT
 SRC_HC_OPTS += -i$(GHC_COMPAT_DIR)
 SRC_LD_OPTS += -L$(GHC_COMPAT_DIR) -lghccompat
 
-# Do *not* use the installed Cabal:
-SRC_HC_OPTS += -ignore-package Cabal
-
 ifeq "$(ghc_ge_607)" "YES"
 SRC_HC_OPTS += -package directory
 SRC_HC_OPTS += -package pretty
@@ -37,22 +34,6 @@ endif
 # from mkDependHS.
 SRC_MKDEPENDHS_OPTS += \
 	-optdep--exclude-module=Compat.Unicode \
-	-optdep--exclude-module=Distribution.Compat.FilePath \
-	-optdep--exclude-module=Distribution.Compat.ReadP \
-	-optdep--exclude-module=Distribution.Extension \
-	-optdep--exclude-module=Distribution.GetOpt \
-	-optdep--exclude-module=Distribution.InstalledPackageInfo \
-	-optdep--exclude-module=Distribution.License \
-	-optdep--exclude-module=Distribution.ModuleName \
-	-optdep--exclude-module=Distribution.Package \
-	-optdep--exclude-module=Distribution.ParseUtils \
-	-optdep--exclude-module=Distribution.Compiler \
-	-optdep--exclude-module=Distribution.Version \
-	-optdep--exclude-module=Distribution.ReadE \
-	-optdep--exclude-module=Distribution.Text \
-	-optdep--exclude-module=System.FilePath \
-	-optdep--exclude-module=System.FilePath.Posix \
-	-optdep--exclude-module=System.FilePath.Windows \
 	-optdep--exclude-module=Trace.Hpc.Mix \
 	-optdep--exclude-module=Trace.Hpc.Tix \
 	-optdep--exclude-module=Trace.Hpc.Util

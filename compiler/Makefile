@@ -602,12 +602,8 @@ SRC_HC_OPTS += -package unix
 PKG_DEPENDS += unix
 endif
 
-# We use the Cabal package in stages 2/3 only; in stage 1 we're using
-# the libcompat library which provides the Cabal modules.
-ifneq "$(stage)" "1"
 SRC_HC_OPTS += -package Cabal
 PKG_DEPENDS += Cabal
-endif
 
 # Ignore lang, to avoid potential clash with the Generics module if
 # lang happens to be a dependency of some exposed package in the local

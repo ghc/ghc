@@ -4,13 +4,6 @@ include $(TOP)/mk/boilerplate.mk
 ALL_DIRS = \
 	Data \
 	Compat \
-	Distribution \
-	Distribution/Compat \
-	Distribution/Simple \
-	Language/Haskell \
-	System \
-	System/FilePath \
-	System/Directory \
 	Trace/Hpc \
 	cbits
 
@@ -60,14 +53,6 @@ SRC_CC_OPTS += -D__GHC_PATCHLEVEL__=$(GhcPatchLevel)
 # This module shouldn't be compiled itself, only #included into other files
 EXCLUDED_SRCS += System/FilePath/Internal.hs
 
-ifneq "$(ghc_ge_607)" "YES"
-# GHC 6.3+ has Cabal, but we're replacing it:
-SRC_HC_OPTS += -ignore-package Cabal
-
-# only GHC 6.3+ has -ignore-package
-SRC_HC_OPTS += -ignore-package filepath
-endif
-
 ifeq "$(ghc_ge_607)" "YES"
 SRC_HC_OPTS += -package directory
 SRC_HC_OPTS += -package pretty
@@ -76,15 +61,6 @@ endif
 # Some explicit dependencies, needed because ghc -M can't discover the
 # true dependencies of these stub files.
 System/Directory/Internals.$(way_)o : $(FPTOOLS_TOP)/libraries/directory/System/Directory/Internals.hs
-Distribution/Compat/ReadP.$(way_) : $(FPTOOLS_TOP)/libraries/Cabal/Distribution/Compat/ReadP.hs
-Distribution/GetOpt.$(way_)o    : $(FPTOOLS_TOP)/libraries/Cabal/Distribution/GetOpt.hs
-Distribution/InstalledPackageInfo.$(way_)o :  $(FPTOOLS_TOP)/libraries/Cabal/Distribution/InstalledPackageInfo.hs
-Distribution/License.$(way_)o :  $(FPTOOLS_TOP)/libraries/Cabal/Distribution/License.hs
-Distribution/Package.$(way_)o :  $(FPTOOLS_TOP)/libraries/Cabal/Distribution/Package.hs
-Distribution/ParseUtils.$(way_)o :  $(FPTOOLS_TOP)/libraries/Cabal/Distribution/ParseUtils.hs
-Distribution/Compiler.$(way_)o :  $(FPTOOLS_TOP)/libraries/Cabal/Distribution/Compiler.hs
-Distribution/Version.$(way_)o :  $(FPTOOLS_TOP)/libraries/Cabal/Distribution/Version.hs
-Language/Haskell/Extension.$(way_)o :  $(FPTOOLS_TOP)/libraries/Cabal/Language/Haskell/Extension.hs
 Trace/Hpc/Mix.$(way_)o :  $(FPTOOLS_TOP)/libraries/hpc/Trace/Hpc/Mix.hs
 Trace/Hpc/Util.$(way_)o :  $(FPTOOLS_TOP)/libraries/hpc/Trace/Hpc/Util.hs
 Trace/Hpc/Tix.$(way_)o :  $(FPTOOLS_TOP)/libraries/hpc/Trace/Hpc/Tix.hs
