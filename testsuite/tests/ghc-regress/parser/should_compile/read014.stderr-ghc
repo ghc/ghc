@@ -5,23 +5,23 @@ read014.hs:4:0:
 
 read014.hs:4:4: Warning: Defined but not used: `x'
 
-read014.hs:6:0:
+read014.hs:6:9:
     Warning: No explicit method nor default method for `+'
 	     In the instance declaration for `Num (a, b)'
 
-read014.hs:6:0:
+read014.hs:6:9:
     Warning: No explicit method nor default method for `*'
 	     In the instance declaration for `Num (a, b)'
 
-read014.hs:6:0:
+read014.hs:6:9:
     Warning: No explicit method nor default method for `abs'
 	     In the instance declaration for `Num (a, b)'
 
-read014.hs:6:0:
+read014.hs:6:9:
     Warning: No explicit method nor default method for `signum'
 	     In the instance declaration for `Num (a, b)'
 
-read014.hs:6:0:
+read014.hs:6:9:
     Warning: No explicit method nor default method for `fromInteger'
 	     In the instance declaration for `Num (a, b)'
 
