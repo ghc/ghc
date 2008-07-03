@@ -688,7 +688,7 @@ AC_ARG_WITH(gcc,
        if test "${OSTYPE}" != "msys"
          then
          # Canonicalise to <drive>:/path/to/gcc
-         withval=`cygpath -w ${withval} | sed -e 's@\\\\@/@g' `
+         withval=`cygpath -m ${withval}`
        fi
  fi;
  CC="$withval"
@@ -708,7 +708,7 @@ AC_ARG_WITH(ld,
        if test "${OSTYPE}" != "msys"
          then
          # Canonicalise to <drive>:/path/to/ld
-         withval=`cygpath -w ${withval} | sed -e 's@\\\\@/@g' `
+         withval=`cygpath -m ${withval}`
        fi
  fi;
  LD=$withval
@@ -961,7 +961,7 @@ if test "x$HostPlatform" = "xi386-unknown-mingw32"
        if test "${OSTYPE}" != "msys"
          then
          # Canonicalise to <drive>:/path/to/gcc
-         HSCOLOUR=`cygpath -w ${HSCOLOUR} | sed -e 's@\\\\@/@g' `
+         HSCOLOUR=`cygpath -m ${HSCOLOUR}`
        fi
 fi
 
