@@ -644,6 +644,14 @@ AC_ARG_WITH([ghc],
     AC_PATH_PROG([GHC], [ghc])
   fi
   WithGhc="$GHC"])
+# GHC is passed to Cabal, so we need a native path
+if test "x$HostPlatform"  = "xi386-unknown-mingw32" && \
+   test "${OSTYPE}"      != "msys"                  && \
+   test "${WithGhc}"     != ""
+then
+    # Canonicalise to <drive>:/path/to/ghc
+    WithGhc=`cygpath -m ${WithGhc}`
+fi
 AC_SUBST([WithGhc])
 
 AC_ARG_WITH(hc,
