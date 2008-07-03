@@ -306,7 +306,8 @@ packageIdString = unpackFS . packageIdFS
 
 integerPackageId, primPackageId,
   basePackageId, rtsPackageId, haskell98PackageId,
-  thPackageId, ndpPackageId, mainPackageId  :: PackageId
+  thPackageId, ndpPackageId, dphSeqPackageId, dphParPackageId,
+  mainPackageId  :: PackageId
 primPackageId      = fsToPackageId (fsLit "ghc-prim")
 integerPackageId   = fsToPackageId (fsLit "integer")
 basePackageId      = fsToPackageId (fsLit "base")
