@@ -352,6 +352,8 @@ endif
 distclean: clean
 
 clean: $(foreach SUBDIR,$(SUBDIRS),clean.library.$(SUBDIR))
+	-cd filepath && $(CABAL) clean --distpref=dist-bootstrapping
+	-cd Cabal    && $(CABAL) clean --distpref=dist-bootstrapping
 	$(RM) -rf bootstrapping/*
 	$(RM) -f bootstrapping.conf     bootstrapping.conf.old
 	$(RM) -f bootstrapping.conf.tmp bootstrapping.conf.tmp.old
@@ -368,7 +370,6 @@ $(foreach SUBDIR,$(SUBDIRS),clean.library.$(SUBDIR)): \
 clean.library.%:
 	$(RM) -f stamp/configure.library.*.$* $*/unbuildable
 	-cd $* && $(CABAL) clean
-	-cd $* && $(CABAL) clean --distpref=dist-bootstrapping
 	$(RM) -f $*/Setup $*/Setup.exe $*/Setup.hi $*/Setup.o
 	$(RM) $*/GNUmakefile $*/Makefile.local
 endif
