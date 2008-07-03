@@ -683,13 +683,12 @@ AC_ARG_WITH(gcc,
 [AC_HELP_STRING([--with-gcc=ARG],
         [Use ARG as the path to GCC  [default=autodetect]])],
 [WhatGccIsCalled="$withval"
- if test "x$HostPlatform" = "xi386-unknown-mingw32"
-    then
-       if test "${OSTYPE}" != "msys"
-         then
-         # Canonicalise to <drive>:/path/to/gcc
-         withval=`cygpath -m ${withval}`
-       fi
+ if test "x$HostPlatform"  = "xi386-unknown-mingw32" && \
+    test "${OSTYPE}"      != "msys"                  && \
+    test "${withval}"     != ""
+ then
+     # Canonicalise to <drive>:/path/to/gcc
+     withval=`cygpath -m ${withval}`
  fi;
  CC="$withval"
  export CC
@@ -703,13 +702,12 @@ dnl --------------------------------------------------------------
 AC_ARG_WITH(ld,
 [AC_HELP_STRING([--with-ld=ARG],
         [Use ARG as the path to LD  [default=autodetect]])],
-[if test "x$HostPlatform" = "xi386-unknown-mingw32"
-    then
-       if test "${OSTYPE}" != "msys"
-         then
-         # Canonicalise to <drive>:/path/to/ld
-         withval=`cygpath -m ${withval}`
-       fi
+[if test "x$HostPlatform"  = "xi386-unknown-mingw32" && \
+    test "${OSTYPE}"      != "msys"                  && \
+    test "${withval}"     != ""
+ then
+     # Canonicalise to <drive>:/path/to/ld
+     withval=`cygpath -m ${withval}`
  fi;
  LD=$withval
  FP_PROG_LD([$LD])
@@ -956,13 +954,12 @@ AC_PATH_PROGS(TarCmd,gtar tar,tar)
 
 AC_PATH_PROG(HSCOLOUR,HsColour)
 # HsColour is passed to Cabal, so we need a native path
-if test "x$HostPlatform" = "xi386-unknown-mingw32"
-    then
-       if test "${OSTYPE}" != "msys"
-         then
-         # Canonicalise to <drive>:/path/to/gcc
-         HSCOLOUR=`cygpath -m ${HSCOLOUR}`
-       fi
+if test "x$HostPlatform"  = "xi386-unknown-mingw32" && \
+   test "${OSTYPE}"      != "msys"                  && \
+   test "${HSCOLOUR}"    != ""
+then
+    # Canonicalise to <drive>:/path/to/gcc
+    HSCOLOUR=`cygpath -m ${HSCOLOUR}`
 fi
 
 dnl ** check for DocBook toolchain
