@@ -150,6 +150,18 @@ ifneq "$(HSCOLOUR)" ""
 CONFIGURE_OPTS += --with-hscolour=$(HSCOLOUR)
 endif
 
+ifneq "$(ALEX)" ""
+CONFIGURE_OPTS += --with-alex=$(ALEX)
+endif
+
+ifneq "$(HADDOCK)" ""
+CONFIGURE_OPTS += --with-haddock=$(HADDOCK)
+endif
+
+ifneq "$(HAPPY)" ""
+CONFIGURE_OPTS += --with-happy=$(HAPPY)
+endif
+
 DEPLOYMENT_OPTS = $(addprefix -optc, $(MACOSX_DEPLOYMENT_CC_OPTS)) \
                   $(addprefix -optl, $(MACOSX_DEPLOYMENT_LD_OPTS))
 
