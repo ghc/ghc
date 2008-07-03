@@ -467,7 +467,7 @@ SRC_DIST_DIRS += mk docs distrib bindisttest $(filter-out docs distrib libraries
 SRC_DIST_FILES += \
 	configure.ac config.guess config.sub configure \
 	aclocal.m4 README ANNOUNCE HACKING LICENSE Makefile install-sh \
-	ghc.spec.in extra-gcc-opts.in VERSION boot
+	ghc.spec.in ghc.spec extra-gcc-opts.in VERSION boot
 
 # -----------------------------------------------------------------------------
 # Source distributions
@@ -557,7 +557,7 @@ hc-file-bundle :
 CLEAN_FILES += hc-files-to-go *-hc.tar.gz
 
 DIST_CLEAN_FILES += config.cache config.status mk/config.h mk/stamp-h \
-	ghc.spec docs/users_guide/ug-book.xml extra-gcc-opts
+	docs/users_guide/ug-book.xml extra-gcc-opts
 
 # don't clean config.mk: it's needed when cleaning stuff later on
 LATE_DIST_CLEAN_FILES += mk/config.mk 
