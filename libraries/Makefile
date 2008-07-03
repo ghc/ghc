@@ -180,11 +180,11 @@ cabal-bin: cabal-bin.hs
 bootstrapping.conf: cabal-bin
 	echo "[]" > $@.tmp
 	-cd filepath && $(CABAL) clean     --distpref=dist-bootstrapping
-	cd filepath && $(CABAL) configure --distpref=dist-bootstrapping --with-compiler=$(GHC) --package-db=$@.tmp
+	cd filepath && $(CABAL) configure --distpref=dist-bootstrapping --with-compiler=$(GHC) --package-db=$(HERE_ABS)/$@.tmp
 	cd filepath && $(CABAL) build     --distpref=dist-bootstrapping
 	cd filepath && $(CABAL) install   --distpref=dist-bootstrapping --inplace
 	-cd Cabal    && $(CABAL) clean     --distpref=dist-bootstrapping
-	cd Cabal    && $(CABAL) configure --distpref=dist-bootstrapping --with-compiler=$(GHC) --package-db=$@.tmp
+	cd Cabal    && $(CABAL) configure --distpref=dist-bootstrapping --with-compiler=$(GHC) --package-db=$(HERE_ABS)/$@.tmp
 	cd Cabal    && $(CABAL) build     --distpref=dist-bootstrapping
 	cd Cabal    && $(CABAL) install   --distpref=dist-bootstrapping --inplace
 	mv $@.tmp $@
@@ -355,7 +355,7 @@ clean: $(foreach SUBDIR,$(SUBDIRS),clean.library.$(SUBDIR))
 	$(RM) -rf bootstrapping/*
 	$(RM) -f bootstrapping.conf     bootstrapping.conf.old
 	$(RM) -f bootstrapping.conf.tmp bootstrapping.conf.tmp.old
-	$(RM) -f cabal-bin
+	$(RM) -f cabal-bin cabal-bin.exe
 	$(RM) -rf ifBuildable
 	$(RM) -rf installPackage
 	$(RM) -f libraries.txt index.html doc-index.html doc-index*.html
