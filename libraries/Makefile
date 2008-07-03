@@ -158,14 +158,11 @@ DEPLOYMENT_OPTS = $(addprefix -optc, $(MACOSX_DEPLOYMENT_CC_OPTS)) \
 subdirs:
 	@echo $(SUBDIRS)
 
-.PHONY: boot
-
-boot: ifBuildable/ifBuildable cabal-bin ghc-prim/Setup
-
 HERE_ABS=$(FPTOOLS_TOP_ABS)/libraries
 
 IFBUILDABLE=ifBuildable/ifBuildable $(HERE_ABS)/boot-packages
-CABAL=$(HERE_ABS)/cabal-bin
+CABAL=$(HERE_ABS)/cabal-bin $(GHC) $(BOOTSTRAPPING_CONF)
+BOOTSTRAPPING_CONF=$(HERE_ABS)/bootstrapping.conf
 
 CABAL_GHC_FLAGS = -Wall
 ifeq "$(ghc_ge_605)" "NO"
@@ -174,16 +171,24 @@ endif
 
 BOOTSTRAPPING_FLAGS = $(CABAL_GHC_FLAGS) -DCABAL_VERSION=1,3 -odir $(HERE_ABS)/bootstrapping -hidir $(HERE_ABS)/bootstrapping -i$(HERE_ABS)/Cabal -i$(HERE_ABS)/filepath
 
-# We use -main-is so that GHC doesn't get confused and think
-# Main.hi/Main.o from cabal belongs to ghc-prim/Setup, or vice-versa.
-cabal-bin: cabal-bin.hs
-	$(GHC) $(BOOTSTRAPPING_FLAGS) --make cabal-bin -o cabal-bin -main-is Cabal
+.PHONY: boot
 
-# ghc-prim/Setup doesn't really depend on cabal-bin, but pretending that it
-# does sequentialises building the two of them, which is nice given
-# they're sharing -odir and -hidir.
-ghc-prim/Setup: ghc-prim/Setup.hs cabal-bin
-	cd ghc-prim && $(GHC) $(BOOTSTRAPPING_FLAGS) --make Setup -o Setup
+boot: ifBuildable/ifBuildable cabal-bin $(BOOTSTRAPPING_CONF)
+
+cabal-bin: cabal-bin.hs
+	$(GHC) $(BOOTSTRAPPING_FLAGS) --make cabal-bin -o cabal-bin
+
+$(BOOTSTRAPPING_CONF): cabal-bin
+	echo "[]" > $@.tmp
+	-cd filepath && $(CABAL) clean     --distpref=dist-bootstrapping
+	cd filepath && $(CABAL) configure --distpref=dist-bootstrapping --with-compiler=$(GHC) --package-db=$@.tmp
+	cd filepath && $(CABAL) build     --distpref=dist-bootstrapping
+	cd filepath && $(CABAL) install   --distpref=dist-bootstrapping --inplace
+	-cd Cabal    && $(CABAL) clean     --distpref=dist-bootstrapping
+	cd Cabal    && $(CABAL) configure --distpref=dist-bootstrapping --with-compiler=$(GHC) --package-db=$@.tmp
+	cd Cabal    && $(CABAL) build     --distpref=dist-bootstrapping
+	cd Cabal    && $(CABAL) install   --distpref=dist-bootstrapping --inplace
+	mv $@.tmp $@
 
 installPackage/installPackage: installPackage.hs
 	-$(RM) -rf installPackage
@@ -349,6 +354,8 @@ distclean: clean
 
 clean: $(foreach SUBDIR,$(SUBDIRS),clean.library.$(SUBDIR))
 	$(RM) -rf bootstrapping/*
+	$(RM) -f bootstrapping.conf     bootstrapping.conf.old
+	$(RM) -f bootstrapping.conf.tmp bootstrapping.conf.tmp.old
 	$(RM) -f cabal-bin
 	$(RM) -rf ifBuildable
 	$(RM) -rf installPackage
@@ -362,6 +369,7 @@ $(foreach SUBDIR,$(SUBDIRS),clean.library.$(SUBDIR)): \
 clean.library.%:
 	$(RM) -f stamp/configure.library.*.$* $*/unbuildable
 	-cd $* && $(CABAL) clean
+	-cd $* && $(CABAL) clean --distpref=dist-bootstrapping
 	$(RM) -f $*/Setup $*/Setup.exe $*/Setup.hi $*/Setup.o
 	$(RM) $*/GNUmakefile $*/Makefile.local
 endif

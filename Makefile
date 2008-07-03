@@ -98,6 +98,7 @@ endif
 endif
 
 stage1 : $(GCC_LIB_DEP) check-packages
+	$(MAKE) -C libraries boot
 	$(MAKE) -C utils/mkdependC boot
 	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
 	for i in $(SUBDIRS_BUILD); do \
@@ -116,7 +117,6 @@ stage1 : $(GCC_LIB_DEP) check-packages
 	  $(MAKE) --no-print-directory -C $$i $(MFLAGS) all; \
 	  if [ $$? -eq 0 -o $$x_on_err -eq 0 ] ;  then true; else exit 1; fi; \
 	done
-	$(MAKE) -C libraries boot
 	$(MAKE) -C libraries all
 
 # When making distributions (i.e., whether with binary-dist or using the 

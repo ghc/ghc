@@ -1,5 +1,5 @@
 
-module Cabal (main) where
+module Main (main) where
 
 import Data.Maybe
 import Distribution.PackageDescription
@@ -19,9 +19,16 @@ setupProg = "./Setup"
 
 main :: IO ()
 main = do
+    unprocessedArgs <- getArgs
     let verbosity = verbose
+    case unprocessedArgs of
+        ghc : packageConf : args ->
+            doit verbosity ghc packageConf args
+        _ -> die "Bad args"
+
+doit :: Verbosity -> FilePath -> FilePath -> [String] -> IO ()
+doit verbosity ghc packageConf args = do
     exists <- doesFileExist setupProg
-    args <- getArgs
     if exists then rawSystemExit verbosity setupProg args
               else do
         gpdFile <- defaultPackageDesc verbosity
@@ -34,5 +41,11 @@ main = do
             _ | packageName pd == PackageName "Cabal" ->
                               -- Cabal is special...*sigh*
                               Simple.defaultMainArgs                     args
-              | otherwise  -> die "Don't know what to do!"
+              | otherwise  -> runSetup verbosity ghc packageConf args
+
+runSetup :: Verbosity -> FilePath -> FilePath -> [String] -> IO ()
+runSetup verbosity ghc packageConf args = do
+    rawSystemExit verbosity ghc ["-package-conf", packageConf,
+                                 "--make", "Setup", "-o", "Setup"]
+    rawSystemExit verbosity "./Setup" args
 
