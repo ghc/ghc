@@ -494,16 +494,16 @@ badFunDeps cls_insts clas ins_tv_set ins_tys
 
 trimRoughMatchTcs :: [TyVar] -> FunDep TyVar -> [Maybe Name] -> [Maybe Name]
 -- Computing rough_tcs for a particular fundep
---	class C a b c | a -> b where ... 
+--     class C a b c | a -> b where ...
 -- For each instance .... => C ta tb tc
--- we want to match only on the types ta, tc; so our
+-- we want to match only on the type ta; so our
 -- rough-match thing must similarly be filtered.  
--- Hence, we Nothing-ise the tb type right here
-trimRoughMatchTcs clas_tvs (_,rtvs) mb_tcs
+-- Hence, we Nothing-ise the tb and tc types right here
+trimRoughMatchTcs clas_tvs (ltvs, _) mb_tcs
   = zipWith select clas_tvs mb_tcs
   where
-    select clas_tv mb_tc | clas_tv `elem` rtvs = Nothing
-			 | otherwise	       = mb_tc
+    select clas_tv mb_tc | clas_tv `elem` ltvs = mb_tc
+                         | otherwise           = Nothing
 \end{code}
 
 
