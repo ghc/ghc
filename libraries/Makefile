@@ -161,8 +161,7 @@ subdirs:
 HERE_ABS=$(FPTOOLS_TOP_ABS)/libraries
 
 IFBUILDABLE=ifBuildable/ifBuildable $(HERE_ABS)/boot-packages
-CABAL=$(HERE_ABS)/cabal-bin $(GHC) $(BOOTSTRAPPING_CONF)
-BOOTSTRAPPING_CONF=$(HERE_ABS)/bootstrapping.conf
+CABAL=$(HERE_ABS)/cabal-bin $(GHC) $(HERE_ABS)/bootstrapping.conf
 
 CABAL_GHC_FLAGS = -Wall
 ifeq "$(ghc_ge_605)" "NO"
@@ -173,12 +172,12 @@ BOOTSTRAPPING_FLAGS = $(CABAL_GHC_FLAGS) -DCABAL_VERSION=1,3 -odir $(HERE_ABS)/b
 
 .PHONY: boot
 
-boot: ifBuildable/ifBuildable cabal-bin $(BOOTSTRAPPING_CONF)
+boot: ifBuildable/ifBuildable cabal-bin bootstrapping.conf
 
 cabal-bin: cabal-bin.hs
 	$(GHC) $(BOOTSTRAPPING_FLAGS) --make cabal-bin -o cabal-bin
 
-$(BOOTSTRAPPING_CONF): cabal-bin
+bootstrapping.conf: cabal-bin
 	echo "[]" > $@.tmp
 	-cd filepath && $(CABAL) clean     --distpref=dist-bootstrapping
 	cd filepath && $(CABAL) configure --distpref=dist-bootstrapping --with-compiler=$(GHC) --package-db=$@.tmp
