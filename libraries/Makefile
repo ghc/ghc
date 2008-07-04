@@ -192,11 +192,11 @@ cabal-bin: cabal-bin.hs
 bootstrapping.conf: cabal-bin
 	echo "[]" > $@.tmp
 	-cd filepath && $(CABAL) clean     --distpref=dist-bootstrapping
-	cd filepath && $(CABAL) configure --distpref=dist-bootstrapping --with-compiler=$(GHC) --package-db=$(HERE_ABS)/$@.tmp
+	cd filepath && $(CABAL) configure --distpref=dist-bootstrapping --with-compiler=$(GHC) --with-hc-pkg=$(GHC_PKG) --package-db=$(HERE_ABS)/$@.tmp
 	cd filepath && $(CABAL) build     --distpref=dist-bootstrapping
 	cd filepath && $(CABAL) install   --distpref=dist-bootstrapping --inplace
 	-cd Cabal    && $(CABAL) clean     --distpref=dist-bootstrapping
-	cd Cabal    && $(CABAL) configure --distpref=dist-bootstrapping --with-compiler=$(GHC) --package-db=$(HERE_ABS)/$@.tmp
+	cd Cabal    && $(CABAL) configure --distpref=dist-bootstrapping --with-compiler=$(GHC) --with-hc-pkg=$(GHC_PKG) --package-db=$(HERE_ABS)/$@.tmp
 	cd Cabal    && $(CABAL) build     --distpref=dist-bootstrapping
 	cd Cabal    && $(CABAL) install   --distpref=dist-bootstrapping --inplace
 	mv $@.tmp $@
