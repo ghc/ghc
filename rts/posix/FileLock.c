@@ -10,6 +10,7 @@
 #include "Hash.h"
 #include "FileLock.h"
 #include "RtsUtils.h"
+#include "OSThreads.h"
 
 #include <unistd.h>
 #include <sys/stat.h>
@@ -27,6 +28,10 @@ typedef struct {
 // by FD without needing to fstat() again.
 static HashTable *obj_hash;
 static HashTable *fd_hash;
+
+#ifdef THREADED_RTS
+static Mutex file_lock_mutex;
+#endif
 
 static int cmpLocks(StgWord w1, StgWord w2)
 {
@@ -67,6 +72,8 @@ lockFile(int fd, dev_t dev, ino_t ino, int for_writing)
 {
     Lock key, *lock;
 
+    ACQUIRE_LOCK(&file_lock_mutex);
+
     key.device = dev;
     key.inode  = ino;
 
@@ -80,16 +87,19 @@ lockFile(int fd, dev_t dev, ino_t ino, int for_writing)
         lock->readers = for_writing ? -1 : 1;
         insertHashTable(obj_hash, (StgWord)lock, (void *)lock);
         insertHashTable(fd_hash, fd, lock);
+        RELEASE_LOCK(&file_lock_mutex);
         return 0;
     }
     else
     {
         // single-writer/multi-reader locking:
         if (for_writing || lock->readers < 0) {
+            RELEASE_LOCK(&file_lock_mutex);
             return -1;
         }
         insertHashTable(fd_hash, fd, lock);
         lock->readers++;
+        RELEASE_LOCK(&file_lock_mutex);
         return 0;
     }
 }
@@ -99,11 +109,14 @@ unlockFile(int fd)
 {
     Lock *lock;
 
+    ACQUIRE_LOCK(&file_lock_mutex);
+
     lock = lookupHashTable(fd_hash, fd);
     if (lock == NULL) {
         // errorBelch("unlockFile: fd %d not found", fd); 
         // This is normal: we didn't know when calling unlockFile
         // whether this FD referred to a locked file or not.
+        RELEASE_LOCK(&file_lock_mutex);
         return 1;
     }
 
@@ -118,5 +131,7 @@ unlockFile(int fd)
         stgFree(lock);
     }
     removeHashTable(fd_hash, fd, NULL);
+
+    RELEASE_LOCK(&file_lock_mutex);
     return 0;
 }
