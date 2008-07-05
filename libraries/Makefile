@@ -37,6 +37,7 @@ show:
 # for paths and arguments to tools etc, and those set in mk/build.mk.
 TOP=..
 include $(TOP)/mk/boilerplate.mk
+include $(TOP)/mk/cabal-flags.mk
 
 SUBDIRS  = ghc-prim $(INTEGER_LIBRARY) base array packedstring
 SUBDIRS += containers bytestring old-locale old-time filepath directory
@@ -145,22 +146,6 @@ CONFIGURE_OPTS += --enable-split-objs
 CONFIGURE_STAMP_EXTRAS := $(CONFIGURE_STAMP_EXTRAS)-splitting
 endif
 
-ifneq "$(HSCOLOUR)" ""
-CONFIGURE_OPTS += --with-hscolour=$(HSCOLOUR)
-endif
-
-ifneq "$(ALEX)" ""
-CONFIGURE_OPTS += --with-alex=$(ALEX)
-endif
-
-ifneq "$(HADDOCK)" ""
-CONFIGURE_OPTS += --with-haddock=$(HADDOCK)
-endif
-
-ifneq "$(HAPPY)" ""
-CONFIGURE_OPTS += --with-happy=$(HAPPY)
-endif
-
 DEPLOYMENT_OPTS = $(addprefix -optc, $(MACOSX_DEPLOYMENT_CC_OPTS)) \
                   $(addprefix -optl, $(MACOSX_DEPLOYMENT_LD_OPTS))
 
@@ -250,15 +235,6 @@ configure: $(foreach SUBDIR,$(SUBDIRS), \
 # We should depend on %/%.cabal here (and in other rules), but make
 # makes that difficult.
 
-# We put non-existant paths in when configuring, as we require that
-# builds don't depend on these paths when making bindists.
-
-# We rely on all the CONFIGURE_ARGS being quoted with '...', and there
-# being no 's inside the values.
-FLAGGED_CONFIGURE_ARGS = $(subst $(space)',\
-                                 $(space)--configure-option=',\
-                                 $(space)$(CONFIGURE_ARGS))
-
 ifeq "$(Windows)" "YES"
 NONEXISTENT=c:/NONEXISTENT
 else
@@ -266,24 +242,10 @@ NONEXISTENT=/NONEXISTENT
 endif
 
 ALL_CONFIGURE_FLAGS = \
-	           $(CONFIGURE_OPTS) \
-	           --prefix=$(NONEXISTENT) \
-	           --bindir=$(NONEXISTENT) \
-	           --libdir=$(NONEXISTENT) \
-	           --libsubdir='$$pkgid' \
-	           --libexecdir=$(NONEXISTENT) \
-	           --datadir=$(NONEXISTENT) \
-	           --docdir=$(NONEXISTENT) \
-			   --haddockdir=$(NONEXISTENT) \
-	           --htmldir=$(NONEXISTENT) \
-	           --with-compiler=$(FPTOOLS_TOP_ABS)/compiler/stage1/ghc-inplace \
-	           --with-hc-pkg=$(FPTOOLS_TOP_ABS)/utils/ghc-pkg/ghc-pkg-inplace \
-	           --with-hsc2hs=$(FPTOOLS_TOP_ABS)/utils/hsc2hs/hsc2hs-inplace \
-	           --with-ld=$(LD) \
+               $(INSTALL_CONFIGURE_FLAGS) \
 	           --haddock-options="--use-contents=../index.html \
 	                              --use-index=../doc-index.html" \
-	           $(FLAGGED_CONFIGURE_ARGS) \
-	           --configure-option=--with-cc=$(CC)
+	           $(CONFIGURE_OPTS)
 
 $(foreach SUBDIR,$(SUBDIRS), \
 		  stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).$(SUBDIR)): \
@@ -329,7 +291,7 @@ build.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
                  cabal-bin ifBuildable/ifBuildable
 	if $(IFBUILDABLE) $*; then \
 	  cd $* && \
-	  $(CABAL) build $(addprefix --ghc-option=,$(GhcLibHcOpts)); \
+	  $(CABAL) build $(BUILD_FLAGS); \
 	  $(CABAL) register --inplace; \
 	fi
 

@@ -20,9 +20,23 @@ Description:
 	http://www.haskell.org/ghc/docs/latest/html/users_guide/hsc2hs.html
 Category: Development
 Data-Files: template-hsc.h
+build-type: Simple
+cabal-version: >=1.2
 
-Executable: hsc2hs
-Main-Is: Main.hs
--- needed for ReadP (used by Data.Version)
-Hugs-Options: -98
-Extensions: CPP, ForeignFunctionInterface
+Flag base3
+  Description: Choose the new smaller, split-up base package.
+
+Executable hsc2hs
+    Main-Is: Main.hs
+    -- needed for ReadP (used by Data.Version)
+    Hugs-Options: -98
+    Extensions: CPP, ForeignFunctionInterface
+    if flag(base3)
+        Build-Depends: base       >= 3   && < 4,
+                       directory  >= 1   && < 1.1,
+                       process    >= 1   && < 1.1,
+                       haskell98
+    else
+        Build-Depends: base < 3,
+                       haskell98
+

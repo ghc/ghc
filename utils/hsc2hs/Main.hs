@@ -579,8 +579,7 @@ output flags name toks = do
 
     linker <- case [l | Linker l <- flags] of
         []  -> locateGhc compiler
-        [l] -> return l
-        _   -> onlyOne "linker"
+        ls  -> return (last ls)
 
     writeFile cProgName $
         concatMap outFlagHeaderCProg flags++
