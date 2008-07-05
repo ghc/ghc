@@ -58,6 +58,9 @@ import System                   ( system )
 #endif
 #endif
 
+import Distribution.Text
+import qualified Paths_hsc2hs
+
 version :: String
 version = "hsc2hs version 0.66\n"
 
@@ -137,7 +140,10 @@ main = do
 			    case mb_path of
 			      Nothing   -> return id
 			      Just path -> do
-				let templ = path ++ "/template-hsc.h"
+                              -- Euch, this is horrible. Unfortunately
+                              -- Paths_hsc2hs isn't too useful for a
+                              -- relocatable binary, though.
+				let templ = path ++ "/hsc2hs-" ++ display Paths_hsc2hs.version ++ "/template-hsc.h"
 				flg <- doesFileExist templ
 				if flg
 				 then return ((Template templ):)

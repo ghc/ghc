@@ -53,6 +53,7 @@ INPLACE_CONFIGURE_FLAGS = \
     --prefix=`$(TOP)/utils/pwd/pwd forwardslash`/install-inplace \
     --with-compiler=$(GHC) \
     --with-hc-pkg=$(GHC_PKG) \
+	--package-db $(FPTOOLS_TOP_ABS)/libraries/bootstrapping.conf \
     $(COMMON_CONFIGURE_FLAGS)
 
 # XXX

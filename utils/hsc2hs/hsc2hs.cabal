@@ -34,9 +34,8 @@ Executable hsc2hs
     if flag(base3)
         Build-Depends: base       >= 3   && < 4,
                        directory  >= 1   && < 1.1,
-                       process    >= 1   && < 1.1,
-                       haskell98
+                       process    >= 1   && < 1.1
     else
-        Build-Depends: base < 3,
-                       haskell98
+        Build-Depends: base < 3
+    Build-Depends: haskell98, Cabal
 

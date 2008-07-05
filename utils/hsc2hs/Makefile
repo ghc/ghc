@@ -3,7 +3,9 @@ TOP=../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/cabal-flags.mk
 
-SRC_HC_OPTS      += -Wall
+# XXX We would like to turn thsi on, but Cabal generates paths files
+#     that are not -Wall clean!
+# SRC_HC_OPTS      += -Wall
 
 CABAL = $(FPTOOLS_TOP_ABS)/libraries/cabal-bin \
             $(GHC) $(FPTOOLS_TOP_ABS)/libraries/bootstrapping.conf
