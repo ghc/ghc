@@ -575,8 +575,7 @@ output flags name toks = do
 	-- (called hsc2hs-inplace, generated from hsc2hs.sh)
     compiler <- case [c | Compiler c <- flags] of
         []  -> locateGhc "ghc"
-        [c] -> return c
-        _   -> onlyOne "compiler"
+        cs  -> return (last cs)
 
     linker <- case [l | Linker l <- flags] of
         []  -> locateGhc compiler
