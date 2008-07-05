@@ -43,13 +43,11 @@ else
 BUILD_SHARED=no
 endif
 
-boot :: stamp.gmp.static
 BINDIST_STAMPS = stamp.gmp.static
 INSTALL_HEADERS += gmp.h
 INSTALL_LIBS += libgmp.a
 
 ifeq "$(BUILD_SHARED)" "yes"
-boot :: stamp.gmp.shared
 BINDIST_STAMPS += stamp.gmp.shared
 INSTALL_LIBS += libgmp.dll.a
 INSTALL_PROGS += libgmp-3.dll

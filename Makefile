@@ -67,9 +67,9 @@ include $(TOP)/mk/boilerplate.mk
 
 # We can't 'make boot' in libraries until stage1 is built
 ifeq "$(BootingFromHc)" "YES"
-SUBDIRS_BUILD = gmp libffi includes rts compat compiler docs utils driver
+SUBDIRS_BUILD = libffi includes rts compat compiler docs utils driver
 else
-SUBDIRS_BUILD = gmp libffi includes compat utils driver docs compiler rts libraries/Cabal/doc
+SUBDIRS_BUILD = libffi includes compat utils driver docs compiler rts libraries/Cabal/doc
 endif
 
 SUBDIRS = gmp libffi includes compat utils driver docs rts libraries compiler libraries/Cabal/doc
@@ -99,6 +99,7 @@ endif
 
 stage1 : $(GCC_LIB_DEP) check-packages
 	$(MAKE) -C libraries boot
+	$(MAKE) -C gmp       boot
 	$(MAKE) -C utils/mkdependC boot
 	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
 	for i in $(SUBDIRS_BUILD); do \
