@@ -306,6 +306,15 @@ dnl
 AC_DEFUN([FPTOOLS_ALEX],
 [
 AC_PATH_PROG(AlexCmd,alex,)
+# Alex is passed to Cabal, so we need a native path
+if test "x$HostPlatform"  = "xi386-unknown-mingw32" && \
+   test "${OSTYPE}"      != "msys"                  && \
+   test "${AlexCmd}"     != ""
+then
+    # Canonicalise to <drive>:/path/to/gcc
+    AlexCmd=`cygpath -m ${AlexCmd}`
+fi
+
 AC_CACHE_CHECK([for version of alex], fptools_cv_alex_version,
 changequote(, )dnl
 [if test x"$AlexCmd" != x; then
