@@ -297,6 +297,15 @@ dnl Darn, I forgot to make Haddock print out its version number when
 dnl invoked with -v.  We could try generating some HTML and grepping
 dnl through that to find the version number, but I think we'll make
 dnl do without it for now.
+# Haddock is passed to Cabal, so we need a native path
+if test "x$HostPlatform"  = "xi386-unknown-mingw32" && \
+   test "${OSTYPE}"      != "msys"                  && \
+   test "${HaddockCmd}"  != ""
+then
+    # Canonicalise to <drive>:/path/to/gcc
+    HaddockCmd=`cygpath -m ${HaddockCmd}`
+    AC_MSG_NOTICE([normalized haddock command to $HaddockCmd])
+fi
 ])
 
 dnl
