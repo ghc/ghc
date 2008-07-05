@@ -268,6 +268,16 @@ dnl for a happy source tree and point the build system at that instead.
 dnl
 AC_DEFUN([FPTOOLS_HAPPY],
 [AC_PATH_PROG(HappyCmd,happy,)
+# Happy is passed to Cabal, so we need a native path
+if test "x$HostPlatform"  = "xi386-unknown-mingw32" && \
+   test "${OSTYPE}"      != "msys"                  && \
+   test "${HappyCmd}"    != ""
+then
+    # Canonicalise to <drive>:/path/to/gcc
+    HappyCmd=`cygpath -m ${HappyCmd}`
+    AC_MSG_NOTICE([normalized happy command to $HappyCmd])
+fi
+
 AC_CACHE_CHECK([for version of happy], fptools_cv_happy_version,
 changequote(, )dnl
 [if test x"$HappyCmd" != x; then
