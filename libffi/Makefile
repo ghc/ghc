@@ -39,13 +39,11 @@ else
 BUILD_SHARED=no
 endif
 
-boot :: stamp.ffi.static
 BINDIST_STAMPS = stamp.ffi.static
 INSTALL_HEADERS += ffi.h
 INSTALL_LIBS += libffi.a
 
 ifeq "$(BUILD_SHARED)" "yes"
-boot :: stamp.ffi.shared
 BINDIST_STAMPS += stamp.ffi.shared
 INSTALL_LIBS += libffi.dll.a
 INSTALL_PROGS += libffi-3.dll
