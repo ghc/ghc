@@ -125,12 +125,14 @@ appendStringBuffers sb1 sb2
          withForeignPtr newBuf $ \ptr ->
           withForeignPtr (buf sb1) $ \sb1Ptr ->
            withForeignPtr (buf sb2) $ \sb2Ptr ->
-             do copyArray (sb1Ptr `advancePtr` cur sb1) ptr (calcLen sb1)
-                copyArray (sb2Ptr `advancePtr` cur sb2) (ptr `advancePtr` cur sb1) (calcLen sb2)
+             do copyArray ptr (sb1Ptr `advancePtr` cur sb1) sb1_len
+                copyArray (ptr `advancePtr` sb1_len) (sb2Ptr `advancePtr` cur sb2) sb2_len
                 pokeArray (ptr `advancePtr` size) [0,0,0]
                 return (StringBuffer newBuf size 0)
-    where calcLen sb = len sb - cur sb
-          size = calcLen sb1 + calcLen sb2
+    where sb1_len = calcLen sb1
+          sb2_len = calcLen sb2
+          calcLen sb = len sb - cur sb
+          size =  sb1_len + sb2_len
 
 stringToStringBuffer :: String -> IO StringBuffer
 stringToStringBuffer str = do
