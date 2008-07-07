@@ -980,7 +980,7 @@ tcIfaceGlobal name
 	  	{ type_env <- setLclEnv () get_type_env		-- yuk
 		; case lookupNameEnv type_env name of
 			Just thing -> return thing
-			Nothing	   -> pprPanic "tcIfaceGlobal (local): not found:"  
+			Nothing	  -> pprPanic "tcIfaceGlobal (local): not found:"  
 						(ppr name $$ ppr type_env) }
 
 	  ; _ -> do
