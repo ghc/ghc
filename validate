@@ -8,6 +8,7 @@
 #   --hpc:            build stage2 with -fhpc, and see how much of the
 #                     compiler the test suite covers.
 #                     2008-07-01: 63% slower than the default.
+#                     HTML generated here: testsuite/hpc_output/hpc_index.html
 #   --fast:           Default. Opposite to --slow.
 #   --slow:           Build stage2 with -DDEBUG.
 #                     2008-07-01: 14% slower than the default.
