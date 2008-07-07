@@ -175,5 +175,6 @@ test('driver200', normal, run_command,
      ['$MAKE -s --no-print-directory test200'])
 cleanall()
 
-test('pragma001', expect_broken(1736), compile, [''])
+test('pragma001', if_compiler_lt('ghc','6.9',expect_broken(1736)), compile, [''])
+test('pragma002', if_compiler_lt('ghc','6.9',expect_broken(1736)), compile, [''])
 
