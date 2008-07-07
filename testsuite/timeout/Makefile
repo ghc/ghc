@@ -2,6 +2,8 @@ TOP = ..
 include $(TOP)/mk/boilerplate.mk
 
 HC = $(GHC_INPLACE)
+BOOTSTRAPPING_PACKAGE_CONF_HC_OPTS=
+
 MKDEPENDHS = $(GHC_INPLACE)
 SRC_HC_OPTS += -threaded
 EXCLUDED_SRCS += TimeMe.hs
