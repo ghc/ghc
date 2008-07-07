@@ -179,7 +179,7 @@ checkTauTvUpdate :: TcTyVar -> TcType -> TcM (Maybe TcType)
 --    (checkTauTvUpdate tv ty)
 -- We are about to update the TauTv tv with ty.
 -- Check (a) that tv doesn't occur in ty (occurs check)
---	 (b) that ty is a monotype
+--       (b) that ty is a monotype
 -- Furthermore, in the interest of (b), if you find an
 -- empty box (BoxTv that is Flexi), fill it in with a TauTv
 -- 
@@ -218,7 +218,7 @@ checkTauTvUpdate orig_tv orig_ty
 	| isSynTyCon tc  = go_syn tc tys
 	| otherwise	 = do { tys' <- mapM go tys
                               ; return $ occurs (TyConApp tc) tys' }
-    go (PredTy p)	 = do { p' <- go_pred p
+    go (PredTy p)	      = do { p' <- go_pred p
                               ; return $ occurs1 PredTy p' }
     go (FunTy arg res)   = do { arg' <- go arg
                               ; res' <- go res
