@@ -71,8 +71,8 @@ collectInstances modules filterNames
   where
     allInstances = concat (map ifaceInstances modules)
     classInstPairs = [ (is_cls inst, [instanceHead inst]) | 
-                       inst <- allInstances, Just n <- nub (is_tcs inst), 
-                       n `elem` filterNames ]
+                       inst <- allInstances, Just n <- nub (is_tcs inst) ]
+                    --   n `elem` filterNames ]
     tyInstPairs = [ (tycon, [instanceHead inst]) | inst <- allInstances, 
                     Just tycon <- nub (is_tcs inst) ]    
 
