@@ -150,7 +150,7 @@ mkBootModDetails hsc_env exports type_env insts fam_insts
 
 tidyBootTypeEnv :: NameSet -> TypeEnv -> TypeEnv
 tidyBootTypeEnv exports type_env 
-  = tidyTypeEnv True exports type_env final_ids
+  = tidyTypeEnv True False exports type_env final_ids
   where
 	-- Find the LocalIds in the type env that are exported
 	-- Make them into GlobalIds, and tidy their types
@@ -253,8 +253,7 @@ RHSs, so that they print nicely in interfaces.
 
 \begin{code}
 tidyProgram :: HscEnv -> ModGuts -> IO (CgGuts, ModDetails)
-tidyProgram hsc_env
-                (ModGuts {      mg_module = mod, mg_exports = exports, 
+tidyProgram hsc_env  (ModGuts { mg_module = mod, mg_exports = exports, 
 				mg_types = type_env, 
 				mg_insts = insts, mg_fam_insts = fam_insts,
 				mg_binds = binds, 
@@ -270,6 +269,7 @@ tidyProgram hsc_env
 	; showPass dflags "Tidy Core"
 
 	; let { omit_prags = dopt Opt_OmitInterfacePragmas dflags
+	      ; th	   = dopt Opt_TemplateHaskell      dflags
 	      ; ext_ids = findExternalIds omit_prags binds
 	      ; ext_rules 
 		   | omit_prags = []
@@ -288,8 +288,8 @@ tidyProgram hsc_env
 	; let { export_set = availsToNameSet exports
 	      ; final_ids  = [ id | id <- bindersOfBinds tidy_binds, 
 				    isExternalName (idName id)]
-              ; tidy_type_env = tidyTypeEnv omit_prags export_set type_env 
-					    final_ids
+              ; tidy_type_env = tidyTypeEnv omit_prags th export_set
+					    type_env final_ids
 	      ; tidy_insts    = tidyInstances (lookup_dfun tidy_type_env) insts
 		-- A DFunId will have a binding in tidy_binds, and so
 		-- will now be in final_env, replete with IdInfo
@@ -337,7 +337,9 @@ lookup_dfun type_env dfun_id
 	_other -> pprPanic "lookup_dfun" (ppr dfun_id)
 
 --------------------------
-tidyTypeEnv :: Bool -> NameSet -> TypeEnv -> [Id] -> TypeEnv
+tidyTypeEnv :: Bool 	-- Compiling without -O, so omit prags
+	    -> Bool	-- Template Haskell is on
+	    -> NameSet -> TypeEnv -> [Id] -> TypeEnv
 
 -- The competed type environment is gotten from
 --	Dropping any wired-in things, and then
@@ -351,10 +353,10 @@ tidyTypeEnv :: Bool -> NameSet -> TypeEnv -> [Id] -> TypeEnv
 -- This truncates the type environment to include only the 
 -- exported Ids and things needed from them, which saves space
 
-tidyTypeEnv omit_prags exports type_env final_ids
-  = let type_env1 = filterNameEnv keep_it type_env
+tidyTypeEnv th omit_prags exports type_env final_ids 
+ = let  type_env1 = filterNameEnv keep_it type_env
 	type_env2 = extendTypeEnvWithIds type_env1 final_ids
-	type_env3 | omit_prags = mapNameEnv (trimThing exports) type_env2
+	type_env3 | omit_prags = mapNameEnv (trimThing th exports) type_env2
 		  | otherwise  = type_env2
     in 
     type_env3
@@ -371,18 +373,30 @@ isWiredInThing :: TyThing -> Bool
 isWiredInThing thing = isWiredInName (getName thing)
 
 --------------------------
-trimThing :: NameSet -> TyThing -> TyThing
+trimThing :: Bool -> NameSet -> TyThing -> TyThing
 -- Trim off inessentials, for boot files and no -O
-trimThing exports (ATyCon tc)
-   | not (mustExposeTyCon exports tc)
-   = ATyCon (makeTyConAbstract tc)
+trimThing th exports (ATyCon tc)
+   | not th && not (mustExposeTyCon exports tc)
+   = ATyCon (makeTyConAbstract tc)	-- Note [Trimming and Template Haskell]
 
-trimThing _exports (AnId id)
+trimThing _th _exports (AnId id)
    | not (isImplicitId id) 
    = AnId (id `setIdInfo` vanillaIdInfo)
 
-trimThing _exports other_thing 
+trimThing _th _exports other_thing 
   = other_thing
+
+
+{- Note [Trimming and Template Haskell]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider (Trac #2386) this
+	module M(T, makeOne) where
+	  data T = Yay String
+	  makeOne = [| Yay "Yep" |]
+Notice that T is exported abstractly, but makeOne effectively exports it too!
+A module that splices in $(makeOne) will then look for a declartion of Yay,
+so it'd better be there.  Hence, brutally but simply, we switch off type
+constructor trimming if TH is enabled in this module. -}
 
 
 mustExposeTyCon :: NameSet	-- Exports
