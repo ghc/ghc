@@ -102,3 +102,6 @@ test('TH_ghci1', normal, ghci_script, ['TH_ghci1.script'])
 
 test('TH_scope', normal, compile, [''])
 
+test('T2386', extra_clean(['T2386_Lib.hi', 'T2386_Lib.o']),
+	      run_command,
+	      ['$MAKE -s --no-print-directory T2386'] )
