@@ -1507,7 +1507,7 @@ uMetaVar :: Outer
 -- tv1 is an un-filled-in meta type variable (maybe boxy, maybe tau)
 -- ty2 is not a type variable
 
-uMetaVar _ swapped tv1 BoxTv ref1 ps_ty2 _
+uMetaVar outer swapped tv1 BoxTv ref1 ps_ty2 ty2
   =     -- tv1 is a BoxTv.  So we must unbox ty2, to ensure
         -- that any boxes in ty2 are filled with monotypes
         --
@@ -1516,15 +1516,21 @@ uMetaVar _ swapped tv1 BoxTv ref1 ps_ty2 _
         -- it does, the unbox operation will fill it, and the debug code
         -- checks for that.
     do { final_ty <- unBox ps_ty2
-       ; when debugIsOn $ do
-           { meta_details <- readMutVar ref1
-           ; case meta_details of
-                 Indirect ty -> WARN( True, ppr tv1 <+> ppr ty )
-                                return () -- This really should *not* happen
-                 Flexi -> return ()
-           }
-        ; checkUpdateMeta swapped tv1 ref1 final_ty
-        ; return IdCo
+       ; meta_details <- readMutVar ref1
+       ; case meta_details of
+                 Indirect _ ->   -- This *can* happen due to an occurs check,
+			    -- just as it can in checkTauTvUpdate in the next
+			    -- equation of uMetaVar; see Trac #2414
+			    -- Note [Occurs check]
+			-- Go round again.  Probably there's an immediate
+			-- error, but maybe not (a type function might discard
+			-- its argument).  Next time round we'll end up in the
+			-- TauTv case of uMetaVar.
+		   uVar outer swapped tv1 False ps_ty2 ty2
+			-- Setting for nb2::InBox is irrelevant
+
+                 Flexi -> do { checkUpdateMeta swapped tv1 ref1 final_ty
+			; return IdCo }
         }
 
 uMetaVar outer swapped tv1 _ ref1 ps_ty2 _
@@ -1538,6 +1544,18 @@ uMetaVar outer swapped tv1 _ ref1 ps_ty2 _
                  ; return IdCo
                  }
         }
+
+{- Note [Occurs check]
+   ~~~~~~~~~~~~~~~~~~~
+An eager occurs check is made in checkTauTvUpdate, deferring tricky
+cases by calling defer_unification (see notes with
+checkTauTvUpdate). An occurs check can also (and does) happen in the
+BoxTv case, but unBox doesn't check for occurrences, and in any case
+doesn't have the type-function-related complexity that
+checkTauTvUpdate has.  So we content ourselves with spotting the potential
+occur check (by the fact that tv1 is now filled), and going round again.
+Next time round we'll get the TauTv case of uMetaVar.
+-}
 
 ----------------
 uUnfilledVars :: Outer
