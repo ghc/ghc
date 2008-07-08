@@ -60,11 +60,7 @@ import Data.Char 	( chr, ord, isSpace )
 import Data.Ratio
 import Debug.Trace
 
-#if __GLASGOW_HASKELL__ >= 605
-import Data.Char 	( GeneralCategory(..), generalCategory, isPrint, isUpper )
-#else
-import Compat.Unicode	( GeneralCategory(..), generalCategory, isPrint, isUpper )
-#endif
+import Unicode ( GeneralCategory(..), generalCategory, isPrint, isUpper )
 }
 
 $unispace    = \x05 -- Trick Alex into handling Unicode. See alexGetChar.

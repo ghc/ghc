@@ -164,7 +164,7 @@ ifeq "$(ghc_ge_605)" "NO"
 CABAL_GHC_FLAGS += -cpp
 endif
 
-BOOTSTRAPPING_FLAGS = $(CABAL_GHC_FLAGS) -DCABAL_VERSION=1,3 -odir $(HERE_ABS)/bootstrapping -hidir $(HERE_ABS)/bootstrapping -i$(HERE_ABS)/Cabal -i$(HERE_ABS)/filepath
+BOOTSTRAPPING_FLAGS = $(CABAL_GHC_FLAGS) -DCABAL_VERSION=1,3 -odir $(HERE_ABS)/bootstrapping -hidir $(HERE_ABS)/bootstrapping -i$(HERE_ABS)/Cabal -i$(HERE_ABS)/filepath -i$(HERE_ABS)/hpc
 
 .PHONY: boot
 
@@ -183,6 +183,10 @@ bootstrapping.conf: cabal-bin
 	cd Cabal    && $(CABAL) configure --distpref=dist-bootstrapping --with-compiler=$(GHC) --with-hc-pkg=$(GHC_PKG) --package-db=$(HERE_ABS)/$@.tmp
 	cd Cabal    && $(CABAL) build     --distpref=dist-bootstrapping
 	cd Cabal    && $(CABAL) install   --distpref=dist-bootstrapping --inplace
+	-cd hpc    && $(CABAL) clean     --distpref=dist-bootstrapping
+	cd hpc    && $(CABAL) configure --distpref=dist-bootstrapping --with-compiler=$(GHC) --with-hc-pkg=$(GHC_PKG) --package-db=$(HERE_ABS)/$@.tmp
+	cd hpc    && $(CABAL) build     --distpref=dist-bootstrapping
+	cd hpc    && $(CABAL) install   --distpref=dist-bootstrapping --inplace
 	mv $@.tmp $@
 
 installPackage/installPackage: installPackage.hs
@@ -327,6 +331,7 @@ distclean: clean
 clean: $(foreach SUBDIR,$(SUBDIRS),clean.library.$(SUBDIR))
 	-cd filepath && $(CABAL) clean --distpref=dist-bootstrapping
 	-cd Cabal    && $(CABAL) clean --distpref=dist-bootstrapping
+	-cd hpc      && $(CABAL) clean --distpref=dist-bootstrapping
 	$(RM) -rf bootstrapping/*
 	$(RM) -f bootstrapping.conf     bootstrapping.conf.old
 	$(RM) -f bootstrapping.conf.tmp bootstrapping.conf.tmp.old

@@ -20,8 +20,7 @@ endif
 INSTALL_PROGS  += $(HS_PROG)
 HPC_LIB         = $(TOP)/libraries/hpc
 
-include $(GHC_COMPAT_DIR)/compat.mk
-SRC_HC_OPTS += $(PACKAGE_HPC) -cpp 
+SRC_HC_OPTS += -package hpc -cpp 
 
 ifeq "$(ghc_ge_607)" "YES"
 SRC_HC_OPTS += -package containers

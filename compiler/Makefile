@@ -483,9 +483,12 @@ endif
 # the interpreter is supported on this platform.
 
 ifeq "$(bootstrapped)" "YES"
-SRC_HC_OPTS += -package hpc -package bytestring
-PKG_DEPENDS += hpc bytestring
+SRC_HC_OPTS += -package bytestring
+PKG_DEPENDS += bytestring
 endif
+
+SRC_HC_OPTS += -package hpc
+PKG_DEPENDS += hpc
 
 ifeq "$(GhcWithInterpreter) $(bootstrapped)" "YES YES"
 
@@ -755,13 +758,6 @@ primop-usage.hs-incl: prelude/primops.txt
 
 #-----------------------------------------------------------------------------
 # 		Linking
-
-# Include libghccompat in stage1 only.  In stage2 onwards, all these
-# libraries will be available from the main libraries.
-
-ifeq "$(stage)" "1"
-include $(GHC_COMPAT_DIR)/compat.mk
-endif
 
 ifeq "$(GhcUnregisterised)" "NO"
 ifeq "$(HOSTPLATFORM)" "ia64-unknown-linux"
@@ -1089,12 +1085,8 @@ ifneq "$(BootingFromHc)" "YES"
 	$(MKDEPENDHS) -M -optdep-f -optdep.depend-BASE $(foreach way,$(WAYS),-optdep-s -optdep$(way)) $(foreach obj,$(MKDEPENDHS_OBJ_SUFFICES),-osuf $(obj)) $(MKDEPENDHS_OPTS) $(filter-out -split-objs, $(MKDEPENDHS_HC_OPTS)) $(HS_SRCS)
 endif
 	$(MKDEPENDC) -f .depend-BASE $(MKDEPENDC_OPTS) $(foreach way,$(WAYS),-s $(way)) -- $(CC_OPTS) -- $(C_SRCS) 
-	$(PERL) -pe 'binmode(stdin); binmode(stdout); s@(\S*[._]o)@stage$(stage)/$$1@g; s@(\S*[._]hi)@stage$(stage)/$$1@g; s@^.*/compat.*$$@@g;' <.depend-BASE >.depend-$(stage)
+	$(PERL) -pe 'binmode(stdin); binmode(stdout); s@(\S*[._]o)@stage$(stage)/$$1@g; s@(\S*[._]hi)@stage$(stage)/$$1@g;' <.depend-BASE >.depend-$(stage)
 # The binmode stuff tells perl not to add stupid ^M's to the output
-#
-# The /lib/compat replacement is to workaround a bug in the
-# -optdep--exclude-module flag in GHC 6.4.  It is not required for any
-# other version of GHC, but doesn't do any harm.
 
 ifeq "$(MakefileDeps)" "YES"
 $(CONFIG_HS) : Makefile

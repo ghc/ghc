@@ -1,5 +1,5 @@
 {-# OPTIONS -cpp #-}
-module Compat.Unicode (
+module Unicode (
     GeneralCategory(..), generalCategory, isPrint, isUpper
   ) where
 
@@ -55,7 +55,10 @@ generalCategory c = toEnum $ fromIntegral $ wgencat $ fromIntegral $ ord c
 foreign import ccall unsafe "u_gencat"
   wgencat :: CInt -> CInt
 
+isPrint :: Char -> Bool
 isPrint c = iswprint (fromIntegral (ord c)) /= 0
+
+isUpper :: Char -> Bool
 isUpper c = iswupper (fromIntegral (ord c)) /= 0
 
 foreign import ccall unsafe "u_iswprint"

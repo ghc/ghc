@@ -67,12 +67,12 @@ include $(TOP)/mk/boilerplate.mk
 
 # We can't 'make boot' in libraries until stage1 is built
 ifeq "$(BootingFromHc)" "YES"
-SUBDIRS_BUILD = includes rts compat compiler docs utils driver
+SUBDIRS_BUILD = includes rts compiler docs utils driver
 else
-SUBDIRS_BUILD = includes compat utils driver docs compiler rts libraries/Cabal/doc
+SUBDIRS_BUILD = includes utils driver docs compiler rts libraries/Cabal/doc
 endif
 
-SUBDIRS = gmp libffi includes compat utils driver docs rts libraries compiler libraries/Cabal/doc
+SUBDIRS = gmp libffi includes utils driver docs rts libraries compiler libraries/Cabal/doc
 
 # Sanity check that all the boot libraries are in the tree, to catch
 # failure to run darcs-all.
@@ -312,7 +312,6 @@ binary-dist-pre::
 	echo 'include $$(TOP)/mk/package.mk' >  $(BIN_DIST_DIR)/mk/target.mk
 	echo 'include $$(TOP)/mk/install.mk' >> $(BIN_DIST_DIR)/mk/target.mk
 	echo 'include $$(TOP)/mk/recurse.mk' >> $(BIN_DIST_DIR)/mk/target.mk
-	echo ''                              >  $(BIN_DIST_DIR)/mk/compat.mk
 	cp mk/package.mk $(BIN_DIST_DIR)/mk/
 	cp mk/install.mk $(BIN_DIST_DIR)/mk/
 	cp mk/recurse.mk $(BIN_DIST_DIR)/mk/
@@ -533,7 +532,6 @@ hc-file-bundle :
 	$(LN_S) . ghc-$(ProjectVersion)
 	$(FIND) ghc-$(ProjectVersion)/compiler \
 	     ghc-$(ProjectVersion)/utils \
-	     ghc-$(ProjectVersion)/compat \
 	     ghc-$(ProjectVersion)/libraries -follow \
 	  \( -name "*.hc" -o -name "*_hsc.[ch]" -o -name "*_stub.[ch]" \) -print > hc-files-to-go
 	for f in `$(FIND) ghc-$(ProjectVersion)/compiler ghc-$(ProjectVersion)/utils ghc-$(ProjectVersion)/libraries -name "*.hsc" -follow -print` ""; do \
