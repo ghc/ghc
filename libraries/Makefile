@@ -253,7 +253,8 @@ ALL_CONFIGURE_FLAGS = \
 
 $(foreach SUBDIR,$(SUBDIRS), \
 		  stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).$(SUBDIR)): \
-stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).%: cabal-bin
+stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).%: cabal-bin \
+                                                          bootstrapping.conf
 	-$(RM) -f stamp/configure.library.*.$* $*/unbuildable
 	$(MKDIRHIER) `dirname $@`
 	( cd $* && $(CABAL) configure $(ALL_CONFIGURE_FLAGS) ) \
@@ -272,7 +273,7 @@ stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).%: cabal-bin
 # make.*, so filter them out and use an alternate rule below instead.
 $(foreach SUBDIR,$(filter-out $(SUBDIRS_BUILD),$(SUBDIRS)),make.library.$(SUBDIR)):\
 make.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
-                cabal-bin ifBuildable/ifBuildable
+                cabal-bin ifBuildable/ifBuildable bootstrapping.conf
 	if $(IFBUILDABLE) $*; then \
 	  cd $* && \
 	  cmp -s $(MAKEFILE_LOCAL) Makefile.local || cp $(MAKEFILE_LOCAL) .; \
@@ -292,7 +293,7 @@ make.library.%: build.library.%
 # Build the library using 'setup build' (not the default)
 $(foreach SUBDIR,$(SUBDIRS),build.library.$(SUBDIR)):\
 build.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
-                 cabal-bin ifBuildable/ifBuildable
+                 cabal-bin ifBuildable/ifBuildable bootstrapping.conf
 	if $(IFBUILDABLE) $*; then \
 	  cd $* && \
 	  $(CABAL) build $(BUILD_FLAGS); \
@@ -313,7 +314,7 @@ endif
 
 $(foreach SUBDIR,$(SUBDIRS),doc.library.$(SUBDIR)):\
 doc.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
-               cabal-bin ifBuildable/ifBuildable
+               cabal-bin ifBuildable/ifBuildable bootstrapping.conf
 	if $(IFBUILDABLE) $*; then \
 	  cd $* && $(CABAL) haddock --html-location='../$$pkg' \
 	                            $(CABAL_HADDOCK_FLAGS); \
