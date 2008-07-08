@@ -429,24 +429,9 @@ stg_sig_install(StgInt sig STG_UNUSED,
  * We like to shutdown nicely after receiving a SIGINT, write out the
  * stats, write profiling info, close open files and flush buffers etc.
  * -------------------------------------------------------------------------- */
-#ifdef SMP
-pthread_t startup_guy;
-#endif
-
 static void
 shutdown_handler(int sig STG_UNUSED)
 {
-#ifdef SMP
-    // if I'm a worker thread, send this signal to the guy who
-    // originally called startupHaskell().  Since we're handling
-    // the signal, it won't be a "send to all threads" type of signal
-    // (according to the POSIX threads spec).
-    if (pthread_self() != startup_guy) {
-	pthread_kill(startup_guy, sig);
-	return;
-    }
-#endif
-
     // If we're already trying to interrupt the RTS, terminate with
     // extreme prejudice.  So the first ^C tries to exit the program
     // cleanly, and the second one just kills it.
@@ -476,10 +461,6 @@ void
 initDefaultHandlers()
 {
     struct sigaction action,oact;
-
-#ifdef SMP
-    startup_guy = pthread_self();
-#endif
 
     // install the SIGINT handler
     action.sa_handler = shutdown_handler;
