@@ -2279,6 +2279,35 @@
 ></TABLE
 ></TD
 ></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="section4"
+><IMG SRC="minus.gif" CLASS="coll" ONCLICK="toggle(this,'i:D')" ALT="show/hide"
+> Instances</TD
+></TR
+><TR
+><TD CLASS="body"
+><DIV ID="i:D" STYLE="display:block;"
+><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+><A HREF="Test.html#t%3AD"
+>D</A
+> Float</TD
+></TR
+><TR
+><TD CLASS="decl"
+><A HREF="Test.html#t%3AD"
+>D</A
+> Int</TD
+></TR
+></TABLE
+></DIV
+></TD
+></TR
 ></TABLE
 ></TD
 ></TR
