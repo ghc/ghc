@@ -458,7 +458,7 @@ shutdown_handler(int sig STG_UNUSED)
  * doesn't seem to do so.
  * -------------------------------------------------------------------------- */
 void
-initDefaultHandlers()
+initDefaultHandlers(void)
 {
     struct sigaction action,oact;
 
