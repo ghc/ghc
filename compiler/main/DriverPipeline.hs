@@ -390,8 +390,8 @@ doLink dflags stop_phase o_files
    -- Always link in the haskell98 package for static linking.  Other
    -- packages have to be specified via the -package flag.
     link_pkgs
-     | dopt Opt_LinkHaskell98 dflags = [haskell98PackageId]
-     | otherwise                     = []
+     | dopt Opt_AutoLinkPackages dflags = [haskell98PackageId]
+     | otherwise                        = []
 
 
 -- ---------------------------------------------------------------------------
