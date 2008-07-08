@@ -1,8 +1,0 @@
-module TcUnify where
-
--- This boot file exists only to tie the knot between
---		TcUnify and TcSimplify
-
-unifyType :: TcType.TcTauType -> TcType.TcTauType -> TcRnTypes.TcM Coercion.CoercionI
-zapToMonotype :: TcType.BoxyType -> TcRnTypes.TcM TcType.TcTauType
-boxyUnify :: TcType.BoxyType -> TcType.BoxyType -> TcRnTypes.TcM Coercion.CoercionI

@@ -1,3 +1,0 @@
-module CgExpr where
-
-cgExpr :: StgSyn.StgExpr -> CgMonad.Code

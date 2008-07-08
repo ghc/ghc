@@ -1,5 +1,0 @@
-module CoreSyn where
-
--- Needed by Var.lhs
-data Expr b
-type CoreExpr = Expr Var.Var

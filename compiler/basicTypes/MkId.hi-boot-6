@@ -1,5 +1,0 @@
-module MkId where
-
-mkDataConIds :: Name.Name -> Name.Name -> DataCon.DataCon -> DataCon.DataConIds
-
-

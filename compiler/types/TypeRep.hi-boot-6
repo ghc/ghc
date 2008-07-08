@@ -1,8 +1,0 @@
-module TypeRep where
-
-data Type
-data PredType
-data TyThing
-type Kind = Type
-isCoercionKind :: Kind -> GHC.Base.Bool
-

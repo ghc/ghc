@@ -1,5 +1,0 @@
-module DataCon where
-
-data DataCon
-dataConName :: DataCon -> Name.Name
-isVanillaDataCon :: DataCon -> GHC.Base.Bool

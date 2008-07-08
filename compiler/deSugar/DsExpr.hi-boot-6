@@ -1,6 +1,0 @@
-module DsExpr where
-
-dsExpr :: HsExpr.HsExpr Var.Id -> DsMonad.DsM CoreSyn.CoreExpr
-dsLExpr :: HsExpr.LHsExpr Var.Id -> DsMonad.DsM CoreSyn.CoreExpr
-dsLocalBinds :: HsBinds.HsLocalBinds Var.Id -> CoreSyn.CoreExpr -> DsMonad.DsM CoreSyn.CoreExpr
-dsValBinds   :: HsBinds.HsValBinds Var.Id   -> CoreSyn.CoreExpr -> DsMonad.DsM CoreSyn.CoreExpr
