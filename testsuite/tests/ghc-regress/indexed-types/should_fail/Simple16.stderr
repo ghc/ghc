@@ -1,0 +1,6 @@
+
+Simple16.hs:10:11:
+    Couldn't match expected type `p a' against inferred type `F ()'
+    In the first argument of `foo', namely `(undefined :: F ())'
+    In the expression: foo (undefined :: F ())
+    In the definition of `bar': bar = foo (undefined :: F ())

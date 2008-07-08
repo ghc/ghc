@@ -9,5 +9,7 @@ data Pair p  where
 
 foo :: a
 foo = case Pair () () of
+   -- this works:
+   -- case Pair () () : Pair ((), ()) of
         Pair x y -> undefined
 

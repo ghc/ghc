@@ -70,14 +70,12 @@ test('GADT12', expect_fail, compile, [''])
 
 test('Class1', normal, compile, [''])
 test('Class2', normal, compile, [''])
-test('Class3', expect_fail, compile, [''])
+test('Class3', if_compiler_lt('ghc', '6.9', expect_fail), compile, [''])
 
 test('Refl', normal, compile, [''])
 test('Refl2', normal, compile, [''])
 
 test('Rules1', normal, compile, [''])
-
-test('RankN1', expect_fail, compile, [''])
 
 test('Numerals', normal, compile, [''])
 
