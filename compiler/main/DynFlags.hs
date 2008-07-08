@@ -275,7 +275,7 @@ data DynFlag
    | Opt_EmbedManifest
    | Opt_RunCPSZ
    | Opt_ConvertToZipCfgAndBack
-   | Opt_LinkHaskell98
+   | Opt_AutoLinkPackages
 
    -- keeping stuff
    | Opt_KeepHiDiffs
@@ -569,7 +569,7 @@ defaultDynFlags =
         -- end of initSysTools values
         haddockOptions = Nothing,
         flags = [
-            Opt_LinkHaskell98,
+            Opt_AutoLinkPackages,
             Opt_ReadUserPackageConf,
 
             Opt_MonoPatBinds,   -- Experimentally, I'm making this non-standard
@@ -1107,7 +1107,7 @@ dynamic_flags = [
   , Flag "keep-tmp-files"   (NoArg (setDynFlag Opt_KeepTmpFiles)) Supported
 
         ------- Miscellaneous ----------------------------------------------
-  , Flag "no-link-haskell98" (NoArg (unSetDynFlag Opt_LinkHaskell98)) Supported
+  , Flag "no-auto-link-packages" (NoArg (unSetDynFlag Opt_AutoLinkPackages)) Supported
   , Flag "no-hs-main"     (NoArg (setDynFlag Opt_NoHsMain)) Supported
   , Flag "main-is"        (SepArg setMainIs ) Supported
   , Flag "haddock"        (NoArg (setDynFlag Opt_Haddock)) Supported

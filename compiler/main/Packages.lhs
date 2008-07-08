@@ -548,8 +548,10 @@ mkPackageState dflags orig_pkg_db preload0 this_package = do
   let pkg_db = extendPackageConfigMap emptyPackageConfigMap pkgs
 
       -- add base & rts to the preload packages
-      basicLinkedPackages = filter (flip elemUFM pkg_db)
-				 [basePackageId,rtsPackageId]
+      basicLinkedPackages
+       | dopt Opt_AutoLinkPackages dflags
+          = filter (flip elemUFM pkg_db) [basePackageId, rtsPackageId]
+       | otherwise = []
       -- but in any case remove the current package from the set of
       -- preloaded packages so that base/rts does not end up in the
       -- set up preloaded package when we are just building it

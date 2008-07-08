@@ -967,7 +967,7 @@ SRC_HSC2HS_OPTS += $(addprefix --cflag=,$(filter-out -O,$(SRC_CC_OPTS)))
 SRC_HSC2HS_OPTS += --cc=$(CC)
 SRC_HSC2HS_OPTS += --ld=$(CC)
 SRC_HSC2HS_OPTS += --cflag=-D__GLASGOW_HASKELL__=$(ProjectVersionInt)
-SRC_HSC2HS_OPTS += --lflag=-no-link-haskell98
+SRC_HSC2HS_OPTS += --lflag=-no-auto-link-packages
 SRC_HSC2HS_OPTS += -I$(GHC_INCLUDE_DIR_ABS)
 SRC_HSC2HS_OPTS += -I$(FPTOOLS_TOP_ABS)/gmp/gmpbuild
 
