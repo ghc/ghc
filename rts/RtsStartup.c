@@ -71,6 +71,9 @@
 #ifdef HAVE_SIGNAL_H
 #include <signal.h>
 #endif
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
 
 #if USE_PAPI
 #include "Papi.h"
@@ -383,6 +386,8 @@ hs_exit_(rtsBool wait_foreign)
     /* start timing the shutdown */
     stat_startExit();
     
+    OnExitHook();
+
 #if defined(RTS_USER_SIGNALS)
     if (RtsFlags.MiscFlags.install_signal_handlers) {
         freeSignalHandlers();
@@ -439,6 +444,9 @@ hs_exit_(rtsBool wait_foreign)
     /* global statistics in parallel system */
     PAR_TICKY_PAR_END();
 #endif
+
+    // uninstall signal handlers
+    resetDefaultHandlers();
 
     /* stop timing the shutdown, we're about to print stats */
     stat_endExit();
@@ -528,10 +536,10 @@ shutdownHaskell(void)
 void
 shutdownHaskellAndExit(int n)
 {
-    if (hs_init_count == 1) {
-	OnExitHook();
-	hs_exit_(rtsFalse);
-        // we're about to exit(), no need to wait for foreign calls to return.
+    // we're about to exit(), no need to wait for foreign calls to return.
+    hs_exit_(rtsFalse);
+
+    if (hs_init_count == 0) {
 #if defined(PAR)
 	/* really exit (stg_exit() would call shutdownParallelSystem() again) */
 	exit(n);
@@ -540,6 +548,15 @@ shutdownHaskellAndExit(int n)
 #endif
     }
 }
+
+#ifndef mingw32_HOST_OS
+void
+shutdownHaskellAndSignal(int sig)
+{
+    hs_exit_(rtsFalse);
+    kill(getpid(),sig);
+}
+#endif
 
 /* 
  * called from STG-land to exit the program

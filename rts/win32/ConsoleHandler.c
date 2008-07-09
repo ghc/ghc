@@ -119,6 +119,12 @@ void initDefaultHandlers(void)
     }
 }
 
+void resetDefaultHandlers(void)
+{
+    if ( !SetConsoleCtrlHandler(shutdown_handler, FALSE) ) {
+	errorBelch("warning: failed to uninstall default console handler");
+    }
+}
 
 /*
  * Function: blockUserSignals()

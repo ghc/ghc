@@ -174,6 +174,7 @@ typedef struct _RtsSymbolVal {
 
 #if !defined (mingw32_HOST_OS)
 #define RTS_POSIX_ONLY_SYMBOLS                  \
+      SymX(shutdownHaskellAndSignal)		\
       Sym(lockFile)                             \
       Sym(unlockFile)                           \
       SymX(signal_handlers)			\

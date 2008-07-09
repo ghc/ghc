@@ -45,6 +45,10 @@ extern void setProgArgv            ( int argc, char *argv[] );
 extern void getFullProgArgv        ( int *argc, char **argv[] );
 extern void setFullProgArgv        ( int argc, char *argv[] );
 
+#ifndef mingw32_HOST_OS
+extern void shutdownHaskellAndSignal (int sig);
+#endif
+
 /* exit() override */
 extern void (*exitFn)(int);
 

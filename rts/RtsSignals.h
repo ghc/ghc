@@ -40,6 +40,7 @@ extern void initUserSignals(void);
  * Ctrl+C handler that shuts down the RTS in an orderly manner.
  */
 extern void initDefaultHandlers(void);
+extern void resetDefaultHandlers(void);
 
 extern void freeSignalHandlers(void);
 

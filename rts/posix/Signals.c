@@ -496,6 +496,33 @@ initDefaultHandlers(void)
 #ifdef alpha_HOST_ARCH
     ieee_set_fp_control(0);
 #endif
+
+    // ignore SIGPIPE; see #1619
+    action.sa_handler = SIG_IGN;
+    sigemptyset(&action.sa_mask);
+    action.sa_flags = 0;
+    if (sigaction(SIGPIPE, &action, &oact) != 0) {
+	sysErrorBelch("warning: failed to install SIGPIPE handler");
+    }
+}
+
+void
+resetDefaultHandlers(void)
+{
+    struct sigaction action;
+
+    action.sa_handler = SIG_DFL;
+    sigemptyset(&action.sa_mask);
+    action.sa_flags = 0;
+
+    // restore SIGINT
+    if (sigaction(SIGINT, &action, NULL) != 0) {
+	sysErrorBelch("warning: failed to uninstall SIGINT handler");
+    }
+    // restore SIGPIPE
+    if (sigaction(SIGPIPE, &action, NULL) != 0) {
+	sysErrorBelch("warning: failed to uninstall SIGPIPE handler");
+    }
 }
 
 void
