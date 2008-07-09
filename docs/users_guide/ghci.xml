@@ -202,12 +202,12 @@ Ok, modules loaded: Main.
     very often, and use the interpreter for the code being actively
     developed.</para>
 
-    <para>When loading up source files with <literal>:load</literal>,
-    GHCi looks for any corresponding compiled object files, and will
-    use one in preference to interpreting the source if possible.  For
-    example, suppose we have a 4-module program consisting of modules
-    A, B, C, and D.  Modules B and C both import D only,
-    and A imports both B &amp; C:</para>
+    <para>When loading up source modules with <literal>:load</literal>,
+    GHCi normally looks for any corresponding compiled object files,
+    and will use one in preference to interpreting the source if
+    possible.  For example, suppose we have a 4-module program
+    consisting of modules A, B, C, and D.  Modules B and C both import
+    D only, and A imports both B &amp; C:</para>
 <screen>
       A
      / \
@@ -298,6 +298,17 @@ Compiling A                ( A.hs, interpreted )
 Ok, modules loaded: A, B, C, D.
 </screen>
 
+    <para>The automatic loading of object files can sometimes lead to
+    confusion, because non-exported top-level definitions of a module
+    are only available for use in expressions at the prompt when the
+    module is interpreted (see <xref linkend="ghci-scope" />).  For
+    this reason, if you ask GHCi to load a filename rather than a
+    module name (e.g. <literal>:load Main.hs</literal> rather than
+    <literal>:load Main</literal>) then any existing object file will
+    be ignored and the module will be interpreted rather than
+    compiled.  Using <literal>-fobject-code</literal> disables this
+    behaviour (see <xref linkend="ghci-obj" />).</para>
+
     <para>HINT: since GHCi will only use a compiled object file if it
     can be sure that the compiled version is up-to-date, a good technique
     when working on a large program is to occasionally run
@@ -306,7 +317,6 @@ Ok, modules loaded: A, B, C, D.
     interpreter.  As you modify code, the changed modules will be
     interpreted, but the rest of the project will remain
     compiled.</para>
-
   </sect1>
 
   <sect1 id="interactive-evaluation">
@@ -537,10 +547,14 @@ Compiling Main             ( Main.hs, interpreted )
       scopes from multiple modules, in any mixture of
       <literal>*</literal> and non-<literal>*</literal> forms.  GHCi
       combines the scopes from all of these modules to form the scope
-      that is in effect at the prompt.  For technical reasons, GHCi
-      can only support the <literal>*</literal>-form for modules which
-      are interpreted, so compiled modules and package modules can
-      only contribute their exports to the current scope.</para>
+      that is in effect at the prompt.</para>
+
+      <para>NOTE: for technical reasons, GHCi can only support the
+      <literal>*</literal>-form for modules that are interpreted.
+      Compiled modules and package modules can only contribute their
+      exports to the current scope.  This is why GHCi will always
+      interpret, not compile, a module if you specify its filename
+      rather than its module name to <literal>:load</literal>.</para>
 
       <para>The scope is manipulated using the
       <literal>:module</literal> command.  For example, if the current

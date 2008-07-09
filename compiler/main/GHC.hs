@@ -1757,7 +1757,10 @@ summariseFile hsc_env old_summaries file mb_phase maybe_buf
 
 	if ms_hs_date old_summary == src_timestamp 
 	   then do -- update the object-file timestamp
-		  obj_timestamp <- getObjTimestamp location False
+        	  obj_timestamp <-
+                    if isObjectTarget (hscTarget (hsc_dflags hsc_env)) -- #1205
+                        then getObjTimestamp location False
+                        else return Nothing
 		  return old_summary{ ms_obj_date = obj_timestamp }
 	   else
 		new_summary
@@ -1785,7 +1788,12 @@ summariseFile hsc_env old_summaries file mb_phase maybe_buf
 			   Nothing    -> getModificationTime file
 			-- getMofificationTime may fail
 
-	obj_timestamp <- modificationTimeIfExists (ml_obj_file location)
+        -- when the user asks to load a source file by name, we only
+        -- use an object file if -fobject-code is on.  See #1205.
+	obj_timestamp <-
+            if isObjectTarget (hscTarget (hsc_dflags hsc_env))
+                then modificationTimeIfExists (ml_obj_file location)
+                else return Nothing
 
         return (ModSummary { ms_mod = mod, ms_hsc_src = HsSrcFile,
 			     ms_location = location,
