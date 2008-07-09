@@ -1492,7 +1492,7 @@ alexGetChar (AI loc ofs s)
 		  LowercaseLetter       -> lower
 		  TitlecaseLetter       -> upper
 		  ModifierLetter        -> other_graphic
-		  OtherLetter           -> other_graphic
+		  OtherLetter           -> lower -- see #1103
 		  NonSpacingMark        -> other_graphic
 		  SpacingCombiningMark  -> other_graphic
 		  EnclosingMark         -> other_graphic
