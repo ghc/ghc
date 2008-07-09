@@ -87,6 +87,7 @@ module TcType (
   isFFIDotnetTy,       -- :: DynFlags -> Type -> Bool
   isFFIDotnetObjTy,    -- :: Type -> Bool
   isFFITy,	       -- :: Type -> Bool
+  isFunPtrTy,          -- :: Type -> Bool
   tcSplitIOType_maybe, -- :: Type -> Maybe Type  
   toDNType,            -- :: Type -> DNType
 
@@ -1212,6 +1213,9 @@ isFFIDotnetObjTy ty
   where
    (_, t_ty) = tcSplitForAllTys ty
    check_tc tc = getName tc == objectTyConName
+
+isFunPtrTy :: Type -> Bool
+isFunPtrTy = checkRepTyConKey [funPtrTyConKey]
 
 toDNType :: Type -> DNType
 toDNType ty

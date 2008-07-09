@@ -154,6 +154,7 @@ tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv safety _ _ (CFunction t
       dflags <- getDOpts
       checkForeignArgs (isFFIArgumentTy dflags safety) arg_tys
       checkForeignRes nonIOok (isFFIImportResultTy dflags) res_ty
+      checkMissingAmpersand dflags arg_tys res_ty
       return idecl
 
 -- This makes a convenient place to check
@@ -163,6 +164,14 @@ checkCTarget (StaticTarget str) = do
     checkCg checkCOrAsmOrDotNetOrInterp
     check (isCLabelString str) (badCName str)
 checkCTarget DynamicTarget = panic "checkCTarget DynamicTarget"
+
+checkMissingAmpersand :: DynFlags -> [Type] -> Type -> TcM ()
+checkMissingAmpersand dflags arg_tys res_ty
+  | null arg_tys && isFunPtrTy res_ty &&
+    dopt Opt_WarnDodgyForeignImports dflags
+  = addWarn (ptext (sLit "possible missing & in foreign import of FunPtr"))
+  | otherwise
+  = return ()
 \end{code}
 
 On an Alpha, with foreign export dynamic, due to a giant hack when

@@ -844,8 +844,10 @@ ghc -c Foo.hs</screen>
     <option>-fwarn-deprecations</option>,
     <option>-fwarn-deprecated-flags</option>,
     <option>-fwarn-duplicate-exports</option>,
-    <option>-fwarn-missing-fields</option>, and
-    <option>-fwarn-missing-methods</option>.  The following flags are
+    <option>-fwarn-missing-fields</option>,
+    <option>-fwarn-missing-methods</option>, and
+    <option>-fwarn-dodgy-foreign-imports</option>.  The following
+    flags are
     simple ways to select standard &ldquo;packages&rdquo; of warnings:
     </para>
 
@@ -941,6 +943,30 @@ ghc -c Foo.hs</screen>
 	  commandline flag is used.</para>
 
 	  <para>This option is on by default.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><option>-fwarn-dodgy-foreign-imports</option>:</term>
+	<listitem>
+	  <indexterm><primary><option>-fwarn-dodgy-foreign-imports</option></primary>
+	  </indexterm>
+	  <para>Causes a warning to be emitted for foreign imports of
+	  the following form:</para>
+<programlisting>
+foreign import "f" f :: FunPtr t
+</programlisting>
+          <para>on the grounds that it probably should be</para>
+<programlisting>
+foreign import "&amp;f" f :: FunPtr t
+</programlisting>
+          <para>The first form declares that `f` is a (pure) C
+          function that takes no arguments and returns a pointer to a
+          C function with type `t`, whereas the second form declares
+          that `f` itself is a C function with type `t`.  The first
+          declaration is usually a mistake, and one that is hard to
+          debug because it results in a crash, hence this
+          warning.</para>
 	</listitem>
       </varlistentry>
 

@@ -174,6 +174,7 @@ data DynFlag
    | Opt_WarnDodgyImports
    | Opt_WarnOrphans
    | Opt_WarnTabs
+   | Opt_WarnDodgyForeignImports
 
    -- language opts
    | Opt_OverlappingInstances
@@ -754,7 +755,8 @@ standardWarnings
         Opt_WarnOverlappingPatterns,
         Opt_WarnMissingFields,
         Opt_WarnMissingMethods,
-        Opt_WarnDuplicateExports
+        Opt_WarnDuplicateExports,
+        Opt_WarnDodgyForeignImports
       ]
 
 minusWOpts :: [DynFlag]
@@ -1381,6 +1383,7 @@ deprecatedForLanguage lang turnOn =
 
 fFlags :: [(String, DynFlag, Bool -> Deprecated)]
 fFlags = [
+  ( "warn-dodgy-foreign-imports",       Opt_WarnDodgyForeignImports, const Supported ),
   ( "warn-dodgy-imports",               Opt_WarnDodgyImports, const Supported ),
   ( "warn-duplicate-exports",           Opt_WarnDuplicateExports, const Supported ),
   ( "warn-hi-shadowing",                Opt_WarnHiShadows, const Supported ),
