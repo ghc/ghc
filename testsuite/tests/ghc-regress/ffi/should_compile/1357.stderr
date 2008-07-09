@@ -1,0 +1,3 @@
+
+1357.hs:5:0:
+    Warning: possible missing & in foreign import of FunPtr
