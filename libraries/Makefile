@@ -70,9 +70,6 @@ SUBDIRS += $(wildcard ALUT)
 SUBDIRS += $(wildcard stm)
 SUBDIRS += $(wildcard xhtml)
 SUBDIRS += $(wildcard cgi)
-ifeq "$(GhcLibsWithObjectIO)" "YES"
-SUBDIRS += $(wildcard ObjectIO)
-endif
 SUBDIRS += $(wildcard parallel)
 SUBDIRS_BUILD += $(wildcard ndp)
 SUBDIRS_BUILD += $(wildcard dph/dph-base)

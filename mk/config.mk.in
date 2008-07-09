@@ -442,10 +442,6 @@ SplitObjs=$(strip $(if $(filter $(TargetArch_CPP),i386 x86_64 powerpc sparc),\
 # Math library
 LIBM=@LIBM@
 
-# Build the ObjectIO ?
-#
-GhcLibsWithObjectIO=@GhcLibsWithObjectIO@
-
 # .NET interop support?
 #
 DotnetSupport=@DotnetSupport@

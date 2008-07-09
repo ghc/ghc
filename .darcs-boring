@@ -33,7 +33,6 @@
 ^libraries/HUnit(/|$)
 ^libraries/HaXml(/|$)
 ^libraries/Japi(/|$)
-^libraries/ObjectIO(/|$)
 ^libraries/OpenAL(/|$)
 ^libraries/OpenGL(/|$)
 ^libraries/QuickCheck(/|$)

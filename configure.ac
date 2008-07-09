@@ -807,21 +807,6 @@ dnl if test x"$EnableWin32DLLs" = "xYES" ; then
 dnl  AC_DEFINE(HAVE_WIN32_DLL_SUPPORT)
 dnl fi
 
-dnl ** Enable the building of the ObjectIO?
-dnl --------------------------------------------------------------
-AC_ARG_ENABLE(objectio,
-[AC_HELP_STRING([--enable-objectio],
-[Build ObjectIO, a portable GUI library for Haskell. [default=no]])],
-[ if test x"$enableval" = x"yes"; then
-        GhcLibsWithObjectIO=YES
-  else
-        GhcLibsWithObjectIO=NO
-  fi
-],
-[GhcLibsWithObjectIO=NO]
-)
-AC_SUBST(GhcLibsWithObjectIO)
-
 dnl ** .NET interop support?
 dnl --------------------------------------------------------------
 AC_ARG_ENABLE(dotnet,
