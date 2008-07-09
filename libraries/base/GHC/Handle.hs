@@ -562,7 +562,7 @@ readRawBuffer :: String -> FD -> Bool -> RawBuffer -> Int -> CInt -> IO CInt
 readRawBuffer loc fd is_nonblock buf off len
   | is_nonblock  = unsafe_read -- unsafe is ok, it can't block
   | otherwise    = do r <- throwErrnoIfMinus1 loc 
-                                (unsafe_fdReady (fromIntegral fd) 0 0 False)
+                                (unsafe_fdReady (fromIntegral fd) 0 0 0)
                       if r /= 0
                         then read
                         else do threadWaitRead (fromIntegral fd); read
@@ -577,7 +577,7 @@ readRawBufferPtr :: String -> FD -> Bool -> Ptr CChar -> Int -> CInt -> IO CInt
 readRawBufferPtr loc fd is_nonblock buf off len
   | is_nonblock  = unsafe_read -- unsafe is ok, it can't block
   | otherwise    = do r <- throwErrnoIfMinus1 loc 
-                                (unsafe_fdReady (fromIntegral fd) 0 0 False)
+                                (unsafe_fdReady (fromIntegral fd) 0 0 0)
                       if r /= 0 
                         then read
                         else do threadWaitRead (fromIntegral fd); read
@@ -591,7 +591,7 @@ readRawBufferPtr loc fd is_nonblock buf off len
 readRawBufferNoBlock :: String -> FD -> Bool -> RawBuffer -> Int -> CInt -> IO CInt
 readRawBufferNoBlock loc fd is_nonblock buf off len
   | is_nonblock  = unsafe_read -- unsafe is ok, it can't block
-  | otherwise    = do r <- unsafe_fdReady (fromIntegral fd) 0 0 False
+  | otherwise    = do r <- unsafe_fdReady (fromIntegral fd) 0 0 0
                       if r /= 0 then safe_read
                                 else return 0
        -- XXX see note [nonblock]
@@ -603,7 +603,7 @@ readRawBufferNoBlock loc fd is_nonblock buf off len
 readRawBufferPtrNoBlock :: String -> FD -> Bool -> Ptr CChar -> Int -> CInt -> IO CInt
 readRawBufferPtrNoBlock loc fd is_nonblock buf off len
   | is_nonblock  = unsafe_read -- unsafe is ok, it can't block
-  | otherwise    = do r <- unsafe_fdReady (fromIntegral fd) 0 0 False
+  | otherwise    = do r <- unsafe_fdReady (fromIntegral fd) 0 0 0
                       if r /= 0 then safe_read
                                 else return 0
        -- XXX see note [nonblock]
@@ -615,7 +615,7 @@ readRawBufferPtrNoBlock loc fd is_nonblock buf off len
 writeRawBuffer :: String -> FD -> Bool -> RawBuffer -> Int -> CInt -> IO CInt
 writeRawBuffer loc fd is_nonblock buf off len
   | is_nonblock = unsafe_write -- unsafe is ok, it can't block
-  | otherwise   = do r <- unsafe_fdReady (fromIntegral fd) 1 0 False
+  | otherwise   = do r <- unsafe_fdReady (fromIntegral fd) 1 0 0
                      if r /= 0 
                         then write
                         else do threadWaitWrite (fromIntegral fd); write
@@ -629,7 +629,7 @@ writeRawBuffer loc fd is_nonblock buf off len
 writeRawBufferPtr :: String -> FD -> Bool -> Ptr CChar -> Int -> CInt -> IO CInt
 writeRawBufferPtr loc fd is_nonblock buf off len
   | is_nonblock = unsafe_write -- unsafe is ok, it can't block
-  | otherwise   = do r <- unsafe_fdReady (fromIntegral fd) 1 0 False
+  | otherwise   = do r <- unsafe_fdReady (fromIntegral fd) 1 0 0
                      if r /= 0 
                         then write
                         else do threadWaitWrite (fromIntegral fd); write
@@ -652,11 +652,8 @@ foreign import ccall unsafe "__hscore_PrelHandle_write"
 foreign import ccall unsafe "__hscore_PrelHandle_write"
    write_off :: CInt -> Ptr CChar -> Int -> CInt -> IO CInt
 
-foreign import ccall safe "fdReady"
-  fdReady :: CInt -> CInt -> CInt -> Bool -> IO CInt
-
 foreign import ccall unsafe "fdReady"
-  unsafe_fdReady :: CInt -> CInt -> CInt -> Bool -> IO CInt
+  unsafe_fdReady :: CInt -> CInt -> CInt -> CInt -> IO CInt
 
 #else /* mingw32_HOST_OS.... */
 

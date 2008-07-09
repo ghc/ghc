@@ -96,17 +96,24 @@ import Control.Exception as Exception
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Conc         ( ThreadId(..), myThreadId, killThread, yield,
-                          threadDelay, threadWaitRead, threadWaitWrite,
-                          forkIO, childHandler )
+                          threadDelay, forkIO, childHandler )
+import qualified GHC.Conc
 import GHC.TopHandler   ( reportStackOverflow, reportError )
 import GHC.IOBase       ( IO(..) )
 import GHC.IOBase       ( unsafeInterleaveIO )
 import GHC.IOBase       ( newIORef, readIORef, writeIORef )
 import GHC.Base
 
+import System.Posix.Types ( Fd )
 import Foreign.StablePtr
 import Foreign.C.Types  ( CInt )
 import Control.Monad    ( when )
+
+#ifdef mingw32_HOST_OS
+import Foreign.C
+import System.IO
+import GHC.Handle
+#endif
 #endif
 
 #ifdef __HUGS__
@@ -409,6 +416,63 @@ runInUnboundThread action = do
         else action
 
 #endif /* __GLASGOW_HASKELL__ */
+
+-- ---------------------------------------------------------------------------
+-- threadWaitRead/threadWaitWrite
+
+-- | Block the current thread until data is available to read on the
+-- given file descriptor (GHC only).
+threadWaitRead :: Fd -> IO ()
+threadWaitRead fd
+#ifdef mingw32_HOST_OS
+  -- we have no IO manager implementing threadWaitRead on Windows.
+  -- fdReady does the right thing, but we have to call it in a
+  -- separate thread, otherwise threadWaitRead won't be interruptible,
+  -- and this only works with -threaded.
+  | threaded  = withThread (waitFd fd 0)
+  | otherwise = case fd of
+                  0 -> do hWaitForInput stdin (-1); return ()
+                        -- hWaitForInput does work properly, but we can only
+                        -- do this for stdin since we know its FD.
+                  _ -> error "threadWaitRead requires -threaded on Windows, or use System.IO.hWaitForInput"
+#else
+  = GHC.Conc.threadWaitRead fd
+#endif
+
+-- | Block the current thread until data can be written to the
+-- given file descriptor (GHC only).
+threadWaitWrite :: Fd -> IO ()
+threadWaitWrite fd
+#ifdef mingw32_HOST_OS
+  | threaded  = withThread (waitFd fd 1)
+  | otherwise = error "threadWaitWrite requires -threaded on Windows"
+#else
+  = GHC.Conc.threadWaitWrite fd
+#endif
+
+#ifdef mingw32_HOST_OS
+foreign import ccall unsafe "rtsSupportsBoundThreads" threaded :: Bool
+
+withThread :: IO a -> IO a
+withThread io = do
+  m <- newEmptyMVar
+  forkIO $ try io >>= putMVar m
+  x <- takeMVar m
+  case x of
+    Right a -> return a
+    Left e  -> throwIO e
+
+waitFd :: Fd -> CInt -> IO ()
+waitFd fd write = do
+   throwErrnoIfMinus1 "fdReady" $
+        fdReady (fromIntegral fd) write (fromIntegral iNFINITE) 0
+   return ()
+
+iNFINITE = 0xFFFFFFFF :: CInt -- urgh
+
+foreign import ccall safe "fdReady"
+  fdReady :: CInt -> CInt -> CInt -> CInt -> IO CInt
+#endif
 
 -- ---------------------------------------------------------------------------
 -- More docs
