@@ -547,6 +547,7 @@ typedef struct _RtsSymbolVal {
       SymX(barf)				\
       SymX(debugBelch)				\
       SymX(errorBelch)				\
+      SymX(asyncExceptionsBlockedzh_fast)	\
       SymX(blockAsyncExceptionszh_fast)		\
       SymX(catchzh_fast)			\
       SymX(catchRetryzh_fast)			\

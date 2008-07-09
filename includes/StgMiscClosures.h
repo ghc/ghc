@@ -579,6 +579,7 @@ RTS_FUN(forkzh_fast);
 RTS_FUN(forkOnzh_fast);
 RTS_FUN(yieldzh_fast);
 RTS_FUN(killThreadzh_fast);
+RTS_FUN(asyncExceptionsBlockedzh_fast);
 RTS_FUN(blockAsyncExceptionszh_fast);
 RTS_FUN(unblockAsyncExceptionszh_fast);
 RTS_FUN(myThreadIdzh_fast);

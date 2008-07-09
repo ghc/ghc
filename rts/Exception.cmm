@@ -200,6 +200,15 @@ unblockAsyncExceptionszh_fast
     jump stg_ap_v_fast;
 }
 
+asyncExceptionsBlockedzh_fast
+{
+    /* args: none */
+    if ((TO_W_(StgTSO_flags(CurrentTSO)) & TSO_BLOCKEX) != 0) {
+        RET_N(1);
+    } else {
+        RET_N(0);
+    }
+}
 
 killThreadzh_fast
 {

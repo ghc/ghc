@@ -1279,6 +1279,11 @@ primop  UnblockAsyncExceptionsOp "unblockAsyncExceptions#" GenPrimOp
    with
    out_of_line = True
 
+primop  AsyncExceptionsBlockedOp "asyncExceptionsBlocked#" GenPrimOp
+        State# RealWorld -> (# State# RealWorld, Int# #)
+   with
+   out_of_line = True
+
 ------------------------------------------------------------------------
 section "STM-accessible Mutable Variables"
 ------------------------------------------------------------------------
