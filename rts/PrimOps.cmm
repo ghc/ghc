@@ -1570,6 +1570,7 @@ takeMVarzh_fast
 	StgTSO_block_info(CurrentTSO)  = mvar;
 	StgMVar_tail(mvar) = CurrentTSO;
 	
+        R1 = mvar;
 	jump stg_block_takemvar;
   }
 
@@ -1697,13 +1698,14 @@ tryTakeMVarzh_fast
 
 putMVarzh_fast
 {
-    W_ mvar, info, tso;
+    W_ mvar, val, info, tso;
 
     /* args: R1 = MVar, R2 = value */
     mvar = R1;
+    val  = R2;
 
 #if defined(THREADED_RTS)
-    ("ptr" info) = foreign "C" lockClosure(mvar "ptr") [R2];
+    ("ptr" info) = foreign "C" lockClosure(mvar "ptr") [];
 #else
     info = GET_INFO(mvar);
 #endif
@@ -1725,6 +1727,8 @@ putMVarzh_fast
 	StgTSO_block_info(CurrentTSO)  = mvar;
 	StgMVar_tail(mvar) = CurrentTSO;
 	
+        R1 = mvar;
+        R2 = val;
 	jump stg_block_putmvar;
     }
   
