@@ -139,6 +139,7 @@ GHCi-specific dynamic flag settings:
   -fno-break-on-error
   -fno-print-evld-with-show
 other dynamic, non-language, flag settings:
+  -fwarn-dodgy-foreign-imports
   -fno-warn-dodgy-imports
   -fwarn-duplicate-exports
   -fno-warn-hi-shadowing
