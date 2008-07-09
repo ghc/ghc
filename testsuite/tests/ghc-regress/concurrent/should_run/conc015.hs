@@ -12,6 +12,7 @@ import Control.Exception
 
 main = do
   main_thread <- myThreadId
+  print =<< blocked
   m <- newEmptyMVar
   m2 <- newEmptyMVar
   forkIO (do takeMVar m
@@ -22,14 +23,15 @@ main = do
   ( do
     block (do
 	putMVar m ()
+        print =<< blocked
 	sum [1..10000] `seq` -- give 'foo' a chance to be raised
-  	  (unblock (myDelay 500000))
+  	  (unblock (do print =<< blocked; myDelay 500000))
 		`Control.Exception.catch` (\e -> putStrLn ("caught1: " ++ show e))
      )
     takeMVar m2
    )
     `Control.Exception.catch`
-    (\e -> putStrLn ("caught2: " ++ show e))
+    (\e -> do print =<< blocked; putStrLn ("caught2: " ++ show e))
 
 -- compensate for the fact that threadDelay is non-interruptible
 -- on Windows with the threaded RTS in 6.6.
