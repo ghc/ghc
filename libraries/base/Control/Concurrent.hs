@@ -342,10 +342,19 @@ foreign import ccall forkOS_createThread
 failNonThreaded = fail $ "RTS doesn't support multiple OS threads "
                        ++"(use ghc -threaded when linking)"
 
-forkOS action
+forkOS action0
     | rtsSupportsBoundThreads = do
         mv <- newEmptyMVar
-        let action_plus = Exception.catch action childHandler
+        b <- Exception.blocked
+        let
+            -- async exceptions are blocked in the child if they are blocked
+            -- in the parent, as for forkIO (see #1048). forkOS_createThread
+            -- creates a thread with exceptions blocked by default.
+            action1 | b = action0
+                    | otherwise = unblock action0
+
+            action_plus = Exception.catch action1 childHandler
+
         entry <- newStablePtr (myThreadId >>= putMVar mv >> action_plus)
         err <- forkOS_createThread entry
         when (err /= 0) $ fail "Cannot create OS thread."
