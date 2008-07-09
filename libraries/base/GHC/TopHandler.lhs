@@ -37,6 +37,9 @@ import GHC.Exception
 import GHC.Prim
 import GHC.Conc
 import GHC.Weak
+#ifdef mingw32_HOST_OS
+import GHC.ConsoleHandler
+#endif
 
 -- | 'runMainIO' is wrapped around 'Main.main' (or whatever main is
 -- called in the program).  It catches otherwise uncaught exceptions,
@@ -59,7 +62,7 @@ runMainIO main =
 
 install_interrupt_handler :: IO () -> IO ()
 #ifdef mingw32_HOST_OS
-install_interrupt_handler handler = 
+install_interrupt_handler handler = do
   GHC.ConsoleHandler.installHandler $
      Catch $ \event -> 
         case event of
@@ -67,6 +70,7 @@ install_interrupt_handler handler =
            Break    -> handler
            Close    -> handler
            _ -> return ()
+  return ()
 #else
 #include "Signals.h"
 -- specialised version of System.Posix.Signals.installHandler, which

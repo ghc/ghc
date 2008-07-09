@@ -38,7 +38,7 @@ import GHC.IOBase
 import GHC.Conc
 import GHC.Handle
 import Data.Typeable
-import Control.Concurrent
+import Control.Concurrent.MVar
 
 data Handler
  = Default
