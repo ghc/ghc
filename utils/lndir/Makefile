@@ -15,7 +15,3 @@ DESTDIR=$(INSTBINDIR)
 
 include $(TOP)/mk/target.mk
 
-# Win32: cygwin supports symlinks, so make sure we
-#        don't feed in the mingw flags here. In other
-#        words, lndir.exe is a cygwin-based app.
-CC_OPTS := $(filter-out -mno-cygwin,$(CC_OPTS))

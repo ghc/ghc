@@ -56,38 +56,6 @@ AC_DEFUN([FP_EVAL_STDERR],
 ])# FP_EVAL_STDERR
 
 
-# FP_CHECK_FLAG(FLAG, [ACTION-IF-SUPPORTED], [ACTION-IF-NOT-SUPPORTED])
-# ---------------------------------------------------------------------
-# Check to see whether the compiler for the current language supports a
-# particular option.
-#
-# Implementation note: When given an unkown option, GCC issues an warning on
-# stderr only, but returns an exit value of 0 nevertheless. Consequently we have
-# to check stderr *and* the exit value.
-#
-# Used by ghc.
-AC_DEFUN([FP_CHECK_FLAG],
-[AC_LANG_COMPILER_REQUIRE()dnl
-AC_LANG_CASE([C],          [fp_compiler="$CC"  m4_pushdef([fp_Flags], [CFLAGS])],
-             [C++],        [fp_compiler="$CXX" m4_pushdef([fp_Flags], [CXXFLAGS])],
-             [Fortran 77], [fp_compiler="$F77" m4_pushdef([fp_Flags], [FFLAGS])])
-m4_pushdef([fp_Cache], [fp_cv_[]fp_Flags[]AS_TR_SH([$1])])[]dnl
-AC_CACHE_CHECK([whether $fp_compiler accepts $1], [fp_Cache],
-[AC_LANG_CONFTEST([AC_LANG_PROGRAM()])
-fp_save_flags="$fp_Flags"
-fp_Flags="$fp_Flags $1"
-fp_Cache=no
-if FP_EVAL_STDERR([$ac_compile conftest.$ac_ext]) >/dev/null; then
-  test -s conftest.err || fp_Cache=yes
-fi
-fp_Flags="$fp_save_flags"
-rm -f conftest.err conftest.$ac_ext])
-AS_IF([test $fp_Cache = yes], [$2], [$3])[]dnl
-m4_popdef([fp_Cache])[]dnl
-m4_popdef([fp_Flags])[]dnl
-])# FP_CHECK_FLAG
-
-
 # FP_PROG_CONTEXT_DIFF
 # --------------------
 # Figure out how to do context diffs. Sets the output variable ContextDiffCmd.

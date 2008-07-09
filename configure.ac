@@ -917,10 +917,6 @@ AC_PROG_CPP
 dnl ** Without optimization some INLINE trickery fails for GHCi
 SRC_CC_OPTS="-O"
 
-dnl ** Try to add -mno-cygwin to the C compiler options
-FP_CHECK_FLAG([-mno-cygwin], [
-SRC_CC_OPTS="-mno-cygwin $SRC_CC_OPTS"
-CPPFLAGS="-mno-cygwin $CPPFLAGS"])
 AC_SUBST(SRC_CC_OPTS)
 
 dnl ** figure out how to do context diffs

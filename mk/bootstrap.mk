@@ -39,10 +39,6 @@ PLATFORM_CC_OPTS += -static
 PLATFORM_HC_BOOT_CC_OPTS += -finhibit-size-directive
 endif
 
-ifeq "$(mingw32_TARGET_OS)" "1"
-PLATFORM_CC_OPTS += -mno-cygwin
-endif
-
 ifeq "$(alpha_TARGET_ARCH)" "1"
 PLATFORM_CC_OPTS += -static -w
 PLATFORM_HC_BOOT_CC_OPTS += -mieee

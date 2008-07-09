@@ -1901,7 +1901,6 @@ machdepCCOpts _dflags
                sta = opt_Static
            in
                     ( [ if sta then "-DDONT_WANT_WIN32_DLL_SUPPORT" else ""
---                    , if "mingw32" `isSuffixOf` cTARGETPLATFORM then "-mno-cygwin" else ""
                       ],
                       [ "-fno-defer-pop",
                         "-fomit-frame-pointer",

@@ -53,11 +53,6 @@ i[[3456]]86-*-cygwin*)
 	TargetPlatform=i386-unknown-cygwin32;;
 i[[3456]]86-*-mingw32*)
 	exeext='.exe'
-	# We assume you're using mingw32 via the gcc that comes
-	# with cygwin, and not the native port, so let's augment
-	# the gcc command-line used here with -mno-cygwin -mwin32
-	# to arrange for good things to happen.
-	CFLAGS="-mno-cygwin -mwin32 $CFLAGS"
 	TargetPlatform=i386-unknown-mingw32
 	;;
 i[[3456]]86-apple-darwin*)

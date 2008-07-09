@@ -700,7 +700,7 @@ SRC_LINT_OPTS		+= -axz -DLINT $(SRC_CPP_OPTS)
 WAY$(_way)_LINT_OPTS	+= WAY$(_way)_CPP_OPTS
 
 # Default fptools options for dllwrap.
-SRC_BLD_DLL_OPTS += -mno-cygwin --target=i386-mingw32
+SRC_BLD_DLL_OPTS += --target=i386-mingw32
 
 # Flags for CPP when running GreenCard on .pgc files
 GC_CPP_OPTS += -P -E -x c -traditional -D__GLASGOW_HASKELL__

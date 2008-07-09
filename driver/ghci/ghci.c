@@ -18,7 +18,7 @@
  * To compile:
  *
  *   MSVC:    cl /o ghci.exe /c ghciwrap.c
- *   mingw:   gcc -mno-cygwin -o ghci.exe ghciwrap.c
+ *   mingw:   gcc -o ghci.exe ghciwrap.c
  *
  * If you want to associate your own icon with the wrapper,
  * here's how to do it:
@@ -35,7 +35,7 @@
  *   * Add the resulting .res file to the link line of the wrapper:
  *
  *     MSVC:    cl /o ghci.exe /c ghciwrap.c ghci.res
- *     mingw:   gcc -mno-cygwin -o ghci.exe ghciwrap.c ghci.res
+ *     mingw:   gcc -o ghci.exe ghciwrap.c ghci.res
  *
  */
 
