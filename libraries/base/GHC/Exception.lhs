@@ -106,6 +106,12 @@ unblock :: IO a -> IO a
 
 block (IO io) = IO $ blockAsyncExceptions# io
 unblock (IO io) = IO $ unblockAsyncExceptions# io
+
+-- | returns True if asynchronous exceptions are blocked in the
+-- current thread.
+blocked :: IO Bool
+blocked = IO $ \s -> case asyncExceptionsBlocked# s of
+                        (# s', i #) -> (# s', i /=# 0# #)
 \end{code}
 
 \begin{code}

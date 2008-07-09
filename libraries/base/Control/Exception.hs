@@ -98,6 +98,7 @@ module Control.Exception (
 
         block,          -- :: IO a -> IO a
         unblock,        -- :: IO a -> IO a
+        blocked,        -- :: IO Bool
 
         -- *** Applying @block@ to an exception handler
 
@@ -183,6 +184,8 @@ block   :: IO a -> IO a
 block    = id
 unblock :: IO a -> IO a
 unblock  = id
+blocked :: IO Bool
+blocked  = False
 
 assert :: Bool -> a -> a
 assert True  x = x
