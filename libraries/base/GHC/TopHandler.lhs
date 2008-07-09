@@ -22,21 +22,80 @@ module GHC.TopHandler (
    reportStackOverflow, reportError,
   ) where
 
+#include "HsBaseConfig.h"
+
 import Prelude
 
 import System.IO
 import Control.Exception
+import Control.Concurrent.MVar
 
-import Foreign.C        ( CInt )
+import Foreign
+import Foreign.C
 import GHC.IOBase
 import GHC.Exception
-import GHC.Prim (unsafeCoerce#)
+import GHC.Prim
+import GHC.Conc
+import GHC.Weak
 
 -- | 'runMainIO' is wrapped around 'Main.main' (or whatever main is
 -- called in the program).  It catches otherwise uncaught exceptions,
 -- and also flushes stdout\/stderr before exiting.
 runMainIO :: IO a -> IO a
-runMainIO main = (do a <- main; cleanUp; return a) `catchException` topHandler
+runMainIO main = 
+    do 
+      main_thread_id <- myThreadId
+      weak_tid <- mkWeakThreadId main_thread_id
+      install_interrupt_handler $ do
+           m <- deRefWeak weak_tid 
+           case m of
+               Nothing  -> return ()
+               Just tid -> throwTo tid (AsyncException UserInterrupt)
+      a <- main
+      cleanUp
+      return a
+    `catchException`
+      topHandler
+
+install_interrupt_handler :: IO () -> IO ()
+#ifdef mingw32_HOST_OS
+install_interrupt_handler handler = 
+  GHC.ConsoleHandler.installHandler $
+     Catch $ \event -> 
+        case event of
+           ControlC -> handler
+           Break    -> handler
+           Close    -> handler
+           _ -> return ()
+#else
+#include "Signals.h"
+-- specialised version of System.Posix.Signals.installHandler, which
+-- isn't available here.
+install_interrupt_handler handler = do
+   let sig = CONST_SIGINT :: CInt
+   withMVar signalHandlerLock $ \_ ->
+     alloca $ \p_sp -> do
+       sptr <- newStablePtr handler
+       poke p_sp sptr
+       stg_sig_install sig STG_SIG_RST p_sp nullPtr
+       return ()
+
+foreign import ccall unsafe
+  stg_sig_install
+	:: CInt				-- sig no.
+	-> CInt				-- action code (STG_SIG_HAN etc.)
+	-> Ptr (StablePtr (IO ()))	-- (in, out) Haskell handler
+	-> Ptr ()			-- (in, out) blocked
+	-> IO CInt			-- (ret) action code
+#endif
+
+-- make a weak pointer to a ThreadId: holding the weak pointer doesn't
+-- keep the thread alive and prevent it from being identified as
+-- deadlocked.  Vitally important for the main thread.
+mkWeakThreadId :: ThreadId -> IO (Weak ThreadId)
+mkWeakThreadId t@(ThreadId t#) = IO $ \s ->
+   case mkWeak# t# t (unsafeCoerce# 0#) s of 
+      (# s1, w #) -> (# s1, Weak w #)
 
 -- | 'runIO' is wrapped around every @foreign export@ and @foreign
 -- import \"wrapper\"@ to mop up any uncaught exceptions.  Thus, the
@@ -89,6 +148,8 @@ real_handler exit exn =
            reportStackOverflow
            exit 2
 
+        AsyncException UserInterrupt  -> exitInterrupted
+
         -- only the main thread gets ExitException exceptions
         ExitException ExitSuccess     -> exit 0
         ExitException (ExitFailure n) -> exit n
@@ -127,6 +188,19 @@ cleanUpAndExit r = do cleanUp; safeExit r
 -- compiler doesn't let us declare that as the result type of a foreign export.
 safeExit :: Int -> IO a
 safeExit r = unsafeCoerce# (shutdownHaskellAndExit $ fromIntegral r)
+
+exitInterrupted :: IO a
+exitInterrupted = 
+#ifdef mingw32_HOST_OS
+  safeExit 252
+#else
+  -- we must exit via the default action for SIGINT, so that the
+  -- parent of this process can take appropriate action (see #2301)
+  unsafeCoerce# (shutdownHaskellAndSignal CONST_SIGINT)
+
+foreign import ccall "shutdownHaskellAndSignal"
+  shutdownHaskellAndSignal :: CInt -> IO ()
+#endif
 
 -- NOTE: shutdownHaskellAndExit must be called "safe", because it *can*
 -- re-enter Haskell land through finalizers.
