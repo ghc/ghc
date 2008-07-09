@@ -1,0 +1,15 @@
+
+T1900.hs:11:12:
+    No instance for (Num ())
+      arising from the literal `1' at T1900.hs:11:12
+    Possible fix: add an instance declaration for (Num ())
+    In the second argument of `(+)', namely `1'
+    In the expression: (+ 1)
+    In the definition of `trans': trans = (+ 1)
+
+T1900.hs:14:21:
+    Couldn't match expected type `Depend s'
+           against inferred type `Depend s1'
+    In the first argument of `trans', namely `d'
+    In the second argument of `(==)', namely `trans d'
+    In the expression: d == trans d

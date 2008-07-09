@@ -87,3 +87,5 @@ test('gadt-escape1', if_compiler_lt('ghc', '6.9', skip), compile_fail, [''])
 
 test('Session', normal, compile_and_run, [''])
 test('CasePrune', normal, compile_and_run, [''])
+
+test('T1999', expect_fail, compile, [''])
