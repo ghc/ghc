@@ -491,6 +491,9 @@ rts_evalStableIO (Capability *cap, HsStablePtr s, /*out*/HsStablePtr *ret)
     
     p = (StgClosure *)deRefStablePtr(s);
     tso = createStrictIOThread(cap, RtsFlags.GcFlags.initialStkSize, p);
+    // async exceptions are always blocked by default in the created
+    // thread.  See #1048.
+    tso->flags |= TSO_BLOCKEX | TSO_INTERRUPTIBLE;
     cap = scheduleWaitThread(tso,&r,cap);
     stat = rts_getSchedStatus(cap);
 
