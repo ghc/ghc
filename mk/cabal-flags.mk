@@ -35,6 +35,12 @@ endif
 COMMON_CONFIGURE_FLAGS += $(FLAGGED_CONFIGURE_ARGS) \
                           --configure-option=--with-cc=$(CC)
 
+ifeq "$(Windows)" "YES"
+NONEXISTENT=c:/NONEXISTENT
+else
+NONEXISTENT=/NONEXISTENT
+endif
+
 # We put non-existant paths in when configuring things that we plan to
 # install, as we require that builds don't depend on these paths when
 # making bindists.

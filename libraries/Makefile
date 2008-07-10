@@ -235,12 +235,6 @@ configure: $(foreach SUBDIR,$(SUBDIRS), \
 # We should depend on %/%.cabal here (and in other rules), but make
 # makes that difficult.
 
-ifeq "$(Windows)" "YES"
-NONEXISTENT=c:/NONEXISTENT
-else
-NONEXISTENT=/NONEXISTENT
-endif
-
 ALL_CONFIGURE_FLAGS = \
                $(INSTALL_CONFIGURE_FLAGS) \
 	           --haddock-options="--use-contents=../index.html \
