@@ -7,9 +7,6 @@ include $(TOP)/mk/cabal-flags.mk
 #     that are not -Wall clean!
 # SRC_HC_OPTS      += -Wall
 
-CABAL = $(FPTOOLS_TOP_ABS)/libraries/cabal-bin \
-            $(GHC) $(FPTOOLS_TOP_ABS)/libraries/bootstrapping.conf
-
 ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 INSTALL_FLAGS =
 else

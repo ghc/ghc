@@ -2,6 +2,9 @@
 nothing=
 space=$(nothing) $(nothing)
 
+LIBRARIES_ABS = $(FPTOOLS_TOP_ABS)/libraries
+CABAL = $(LIBRARIES_ABS)/cabal-bin $(GHC) $(LIBRARIES_ABS)/bootstrapping.conf
+
 # We rely on all the CONFIGURE_ARGS being quoted with '...', and there
 # being no 's inside the values.
 FLAGGED_CONFIGURE_ARGS = $(subst $(space)',\
