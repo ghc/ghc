@@ -77,8 +77,8 @@ count :
 #  There are other plausible designs that might work, but each has different
 #  problems:
 #
-#  - using -odir and -hidir: GHC <= 4.08 doesn't support -hidir, and
-#    anyway -odir puts all the objects in one directory (strips off the
+#  - using -odir and -hidir:
+#    -odir puts all the objects in one directory (strips off the
 #    subdirectory part), which eventually forces us to use VPATH to find
 #    the sources.  I have a really bad feeling about VPATH.
 #
