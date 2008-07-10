@@ -39,6 +39,9 @@ module GHC.Conc
         , yield         -- :: IO ()
         , labelThread   -- :: ThreadId -> String -> IO ()
 
+        , ThreadStatus(..), BlockReason(..)
+        , threadStatus  -- :: ThreadId -> IO ThreadStatus
+
         -- * Waiting
         , threadDelay           -- :: Int -> IO ()
         , registerDelay         -- :: Int -> IO (TVar Bool)
@@ -343,6 +346,53 @@ pseq  x y = x `seq` lazy y
 {-# INLINE par  #-}
 par :: a -> b -> b
 par  x y = case (par# x) of { _ -> lazy y }
+
+
+data BlockReason
+  = BlockedOnMVar
+        -- ^blocked on on 'MVar'
+  | BlockedOnBlackHole
+        -- ^blocked on a computation in progress by another thread
+  | BlockedOnException
+        -- ^blocked in 'throwTo'
+  | BlockedOnSTM
+        -- ^blocked in 'retry' in an STM transaction
+  | BlockedOnForeignCall
+        -- ^currently in a foreign call
+  | BlockedOnOther
+        -- ^blocked on some other resource.  Without @-threaded@,
+        -- I/O and 'threadDelay' show up as 'BlockedOnOther', with @-threaded@
+        -- they show up as 'BlockedOnMVar'.
+  deriving (Eq,Ord,Show)
+
+-- | The current status of a thread
+data ThreadStatus
+  = ThreadRunning
+        -- ^the thread is currently runnable or running
+  | ThreadFinished
+        -- ^the thread has finished
+  | ThreadBlocked  BlockReason
+        -- ^the thread is blocked on some resource
+  | ThreadDied
+        -- ^the thread received an uncaught exception
+  deriving (Eq,Ord,Show)
+
+threadStatus :: ThreadId -> IO ThreadStatus
+threadStatus (ThreadId t) = IO $ \s ->
+   case threadStatus# t s of
+     (# s', stat #) -> (# s', mk_stat (I# stat) #)
+   where
+        -- NB. keep these in sync with includes/Constants.h
+     mk_stat 0  = ThreadRunning
+     mk_stat 1  = ThreadBlocked BlockedOnMVar
+     mk_stat 2  = ThreadBlocked BlockedOnBlackHole
+     mk_stat 3  = ThreadBlocked BlockedOnException
+     mk_stat 7  = ThreadBlocked BlockedOnSTM
+     mk_stat 11 = ThreadBlocked BlockedOnForeignCall
+     mk_stat 12 = ThreadBlocked BlockedOnForeignCall
+     mk_stat 16 = ThreadFinished
+     mk_stat 17 = ThreadDied
+     mk_stat _  = ThreadBlocked BlockedOnOther
 \end{code}
 
 
