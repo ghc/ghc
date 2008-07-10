@@ -52,9 +52,6 @@ count :
 #  - for stage N, object files and .hi files are placed inside 
 #    the directory stageN, in subdirectories as per the sources.
 #
-#  - .hi-boot files are *linked* into the stageN tree, because in GHC 5.05+
-#    the .hi-boot file must reside in the same place as the .hi file.
-#
 #  - we use explicit -o and -ohi options to direct the output from C & 
 #    Haskell compilations.
 #
@@ -122,18 +119,6 @@ boot :: stage_dirs
 # PS: 'ln -s foo baz' takes 'foo' relative to the path to 'baz'
 #     whereas 'cp foo baz' treats the two paths independently.
 #     Hence the "../.." in the ln command line
-ifeq "$(UsingHsBoot)" "NO"
-ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
-	for i in */*hi-boot*; do \
-	    cp -u -f $$i stage$(stage)/$$i; \
-	done
-else
-	for i in */*hi-boot*; do \
-	    ($(RM) -f stage$(stage)/$$i \
-	       && $(LN_S) ../../$$i stage$(stage)/$$i) || true ; \
-	done
-endif
-endif
 
 ifeq "$(stage)" "1"
 HC=$(GHC)
