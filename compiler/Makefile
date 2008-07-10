@@ -571,8 +571,6 @@ ifeq "$(BootingFromHc)" "YES"
 SRC_CC_OPTS += -D__GLASGOW_HASKELL__=$(ProjectVersionInt)
 endif
 
-# basicTypes/SrcLoc_HC_OPTS	= -funbox-strict-fields
-
 # ---- Profiling ----
 #simplCore/Simplify_HC_OPTS = -auto-all
 #simplCore/SimplEnv_HC_OPTS = -auto-all
