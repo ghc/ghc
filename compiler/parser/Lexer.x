@@ -31,6 +31,8 @@
 -- Note that Alex itself generates code with with some unused bindings and
 -- without type signatures, so removing the flag might not be possible.
 
+{-# OPTIONS_GHC -funbox-strict-fields #-}
+
 module Lexer (
    Token(..), lexer, pragState, mkPState, PState(..),
    P(..), ParseResult(..), getSrcLoc, 

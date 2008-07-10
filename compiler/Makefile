@@ -669,8 +669,6 @@ ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 main/SysTools_HC_OPTS		+= '-\#include <windows.h>' '-\#include <process.h>'
 endif
 
-parser/Lexer_HC_OPTS += -funbox-strict-fields
-
 # ghc_strlen percolates through so many modules that it is easier to get its
 # prototype via a global option instead of a myriad of per-file OPTIONS
 SRC_HC_OPTS += '-\#include "cutils.h"'
