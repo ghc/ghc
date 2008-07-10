@@ -571,10 +571,6 @@ ifeq "$(BootingFromHc)" "YES"
 SRC_CC_OPTS += -D__GLASGOW_HASKELL__=$(ProjectVersionInt)
 endif
 
-ifeq "$(HOSTPLATFORM)" "hppa1.1-hp-hpux9"
-rename/RnMonad_HC_OPTS 		=  -O2 -O2-for-C
-endif
-
 # basicTypes/SrcLoc_HC_OPTS	= -funbox-strict-fields
 
 # ---- Profiling ----
