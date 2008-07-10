@@ -647,7 +647,6 @@ endif
 
 # We always optimise some low-level modules, otherwise performance of
 # a non-optimised compiler is severely affected.
-main/BinIface_HC_OPTS		+= -O
 utils/Binary_HC_OPTS		+= -O -funbox-strict-fields
 utils/FastMutInt_HC_OPTS	+= -O
 utils/Encoding_HC_OPTS		+= -O
