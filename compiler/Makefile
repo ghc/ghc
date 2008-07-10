@@ -110,15 +110,6 @@ endif
 endif
 
 boot :: stage_dirs
-# On Windows, we can't use symbolic links for the -hi-boot files
-# because GHC itself is a Mingw program and does not understand
-# symbolic links.  So we have to copy the files instead of link them.
-# That means that if you modify a .hi-boot file in Windows, you
-# have to to say 'make boot' again.
-#
-# PS: 'ln -s foo baz' takes 'foo' relative to the path to 'baz'
-#     whereas 'cp foo baz' treats the two paths independently.
-#     Hence the "../.." in the ln command line
 
 ifeq "$(stage)" "1"
 HC=$(GHC)
