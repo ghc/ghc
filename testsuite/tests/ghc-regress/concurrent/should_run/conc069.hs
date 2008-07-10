@@ -2,7 +2,7 @@ import Control.Concurrent
 import Control.Exception
 
 main = do
-  stat
+  -- stat -- main thread is not bound in GHCi
   m <- newEmptyMVar
   forkIO (do stat; putMVar m ())
   takeMVar m
