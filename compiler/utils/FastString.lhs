@@ -2,6 +2,10 @@
 % (c) The University of Glasgow, 1997-2006
 %
 \begin{code}
+{-# OPTIONS_GHC -O -funbox-strict-fields #-}
+-- We always optimise this, otherwise performance of a non-optimised
+-- compiler is severely affected
+
 {-
 FastString:     A compact, hash-consed, representation of character strings.
                 Comparison is O(1), and you can get a Unique from them.

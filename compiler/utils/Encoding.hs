@@ -1,3 +1,7 @@
+{-# OPTIONS_GHC -O #-}
+-- We always optimise this, otherwise performance of a non-optimised
+-- compiler is severely affected
+
 -- -----------------------------------------------------------------------------
 --
 -- (c) The University of Glasgow, 1997-2006

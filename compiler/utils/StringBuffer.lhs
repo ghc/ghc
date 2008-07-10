@@ -6,6 +6,10 @@
 Buffers for scanning string input stored in external arrays.
 
 \begin{code}
+{-# OPTIONS_GHC -O -funbox-strict-fields #-}
+-- We always optimise this, otherwise performance of a non-optimised
+-- compiler is severely affected
+
 module StringBuffer
        (
         StringBuffer(..),

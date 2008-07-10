@@ -1,10 +1,14 @@
+\begin{code}
 {-# OPTIONS -cpp #-}
+{-# OPTIONS_GHC -O #-}
+-- We always optimise this, otherwise performance of a non-optimised
+-- compiler is severely affected
+
 --
 -- (c) The University of Glasgow 2002-2006
 --
 -- Unboxed mutable Ints
 
-\begin{code}
 module FastMutInt(
 	FastMutInt, newFastMutInt,
 	readFastMutInt, writeFastMutInt,

@@ -1,4 +1,8 @@
 {-# OPTIONS -cpp #-}
+{-# OPTIONS_GHC -O -funbox-strict-fields #-}
+-- We always optimise this, otherwise performance of a non-optimised
+-- compiler is severely affected
+
 --
 -- (c) The University of Glasgow 2002-2006
 --
