@@ -156,7 +156,6 @@ type Tags = [Tag]
 box f x = [f x]
 str a = [Str a]
 
--- TODO:
 -- want things like paragraph, pre etc to be handled by blank lines in the source document
 -- and things like \n and \t converted away
 -- much like blogger in HTML mode
