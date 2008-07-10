@@ -361,7 +361,7 @@ data BlockReason
         -- ^currently in a foreign call
   | BlockedOnOther
         -- ^blocked on some other resource.  Without @-threaded@,
-        -- I/O and 'threadDelay' show up as 'BlockedOnOther', with @-threaded@
+        -- I\/O and 'threadDelay' show up as 'BlockedOnOther', with @-threaded@
         -- they show up as 'BlockedOnMVar'.
   deriving (Eq,Ord,Show)
 
