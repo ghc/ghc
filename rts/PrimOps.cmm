@@ -1740,7 +1740,7 @@ putMVarzh_fast
 
 	/* actually perform the takeMVar */
 	tso = StgMVar_head(mvar);
-	PerformTake(tso, R2);
+	PerformTake(tso, val);
         if (TO_W_(StgTSO_flags(tso)) & TSO_DIRTY == 0) {
             foreign "C" dirty_TSO(MyCapability() "ptr", tso "ptr") [];
         }
@@ -1763,7 +1763,7 @@ putMVarzh_fast
     else
     {
 	/* No further takes, the MVar is now full. */
-	StgMVar_value(mvar) = R2;
+	StgMVar_value(mvar) = val;
 
 #if defined(THREADED_RTS)
     	unlockClosure(mvar, stg_MVAR_DIRTY_info);
