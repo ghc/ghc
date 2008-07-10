@@ -571,24 +571,6 @@ ifeq "$(BootingFromHc)" "YES"
 SRC_CC_OPTS += -D__GLASGOW_HASKELL__=$(ProjectVersionInt)
 endif
 
-# 	Special flags for particular modules
-#	The standard suffix rule for compiling a Haskell file
-#	adds these flags to the command line
-
-# There used to be a -fforce-recomp flag on PrimOp, but why?
-# It's an expensive module to recompile!
-prelude/PrimOp_HC_OPTS 		= -H80m
-
-
-main/ParsePkgConf_HC_OPTS	+= -fno-warn-incomplete-patterns
-parser/Parser_HC_OPTS 		+= -fno-warn-incomplete-patterns
-
-# Careful optimisation of the parser: we don't want to throw everything
-# at it, because that takes too long and doesn't buy much, but we do want
-# to inline certain key external functions, so we instruct GHC not to
-# throw away inlinings as it would normally do in -O0 mode:
-parser/Parser_HC_OPTS		+= -O0 -fno-ignore-interface-pragmas
-
 ifeq "$(HOSTPLATFORM)" "hppa1.1-hp-hpux9"
 rename/RnMonad_HC_OPTS 		=  -O2 -O2-for-C
 endif

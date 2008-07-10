@@ -8,6 +8,14 @@
 -- ---------------------------------------------------------------------------
 
 {
+{-# OPTIONS_GHC -O0 -fno-ignore-interface-pragmas #-}
+{-
+Careful optimisation of the parser: we don't want to throw everything
+at it, because that takes too long and doesn't buy much, but we do want
+to inline certain key external functions, so we instruct GHC not to
+throw away inlinings as it would normally do in -O0 mode.
+-}
+
 {-# OPTIONS -w #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and fix

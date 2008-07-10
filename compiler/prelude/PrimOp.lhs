@@ -4,6 +4,7 @@
 \section[PrimOp]{Primitive operations (machine-level)}
 
 \begin{code}
+{-# OPTIONS_GHC -H80m #-}
 {-# OPTIONS -fno-warn-unused-binds #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and fix
