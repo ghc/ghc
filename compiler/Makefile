@@ -160,12 +160,7 @@ odir=stage$(stage)
 
 SRC_HC_OPTS += $(patsubst %, -i$(odir)/%, $(ALL_DIRS))
 
-SRC_HC_OPTS += -Wall -fno-warn-name-shadowing
-# Turn off orphan warnings, but only if the flag exists (i.e. not if we
-# are building stage 1 and using GHC < 6.3).
-ifneq "$(stage)" "1 NO"
-SRC_HC_OPTS += -fno-warn-orphans
-endif
+SRC_HC_OPTS += -Wall -fno-warn-name-shadowing -fno-warn-orphans
 
 HS_OBJS = $(patsubst %, $(odir)/%, $(addsuffix .$(way_)o,$(basename $(HS_SRCS))))
 C_OBJS = $(patsubst %, $(odir)/%, $(addsuffix .$(way_)o,$(basename $(C_SRCS))))
