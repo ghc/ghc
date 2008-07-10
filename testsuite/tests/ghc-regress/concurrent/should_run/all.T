@@ -11,6 +11,9 @@ test('conc006', normal, compile_and_run, [''])
 test('conc027', normal, compile_and_run, [''])
 test('conc051', normal, compile_and_run, [''])
 test('conc069', only_ways(['ghci','threaded1','threaded2']), compile_and_run, [''])
+# this test gives slightly different results for non-threaded ways, so omit
+# those for now.
+test('conc070', only_ways(['ghci','threaded1','threaded2']), compile_and_run, [''])
 
 # -----------------------------------------------------------------------------
 # These tests we only do for a full run
