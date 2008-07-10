@@ -1531,6 +1531,11 @@ primop  NoDuplicateOp "noDuplicate#" GenPrimOp
    with
    out_of_line = True
 
+primop  ThreadStatusOp "threadStatus#" GenPrimOp
+   ThreadId# -> State# RealWorld -> (# State# RealWorld, Int# #)
+   with
+   out_of_line = True
+
 ------------------------------------------------------------------------
 section "Weak pointers"
 ------------------------------------------------------------------------

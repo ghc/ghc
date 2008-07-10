@@ -768,6 +768,7 @@ typedef struct _RtsSymbolVal {
       SymX(stg_upd_frame_info)			\
       SymX(suspendThread)			\
       SymX(takeMVarzh_fast)			\
+      SymX(threadStatuszh_fast)			\
       SymX(timesIntegerzh_fast)			\
       SymX(tryPutMVarzh_fast)			\
       SymX(tryTakeMVarzh_fast)			\

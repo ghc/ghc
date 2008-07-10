@@ -585,6 +585,7 @@ RTS_FUN(unblockAsyncExceptionszh_fast);
 RTS_FUN(myThreadIdzh_fast);
 RTS_FUN(labelThreadzh_fast);
 RTS_FUN(isCurrentThreadBoundzh_fast);
+RTS_FUN(threadStatuszh_fast);
 
 RTS_FUN(mkWeakzh_fast);
 RTS_FUN(finalizzeWeakzh_fast);

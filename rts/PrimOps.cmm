@@ -1034,6 +1034,39 @@ isCurrentThreadBoundzh_fast
   RET_N(r);
 }
 
+threadStatuszh_fast
+{
+    /* args: R1 :: ThreadId# */
+    W_ tso;
+    W_ why_blocked;
+    W_ what_next;
+    W_ ret;
+
+    tso = R1;
+    loop:
+      if (TO_W_(StgTSO_what_next(tso)) == ThreadRelocated) {
+          tso = StgTSO__link(tso);
+          goto loop;
+      }
+
+    what_next   = TO_W_(StgTSO_what_next(tso));
+    why_blocked = TO_W_(StgTSO_why_blocked(tso));
+    // Note: these two reads are not atomic, so they might end up
+    // being inconsistent.  It doesn't matter, since we
+    // only return one or the other.  If we wanted to return the
+    // contents of block_info too, then we'd have to do some synchronisation.
+
+    if (what_next == ThreadComplete) {
+        ret = 16;  // NB. magic, matches up with GHC.Conc.threadStatus
+    } else {
+        if (what_next == ThreadKilled) {
+            ret = 17;
+        } else {
+            ret = why_blocked;
+        }
+    }
+    RET_N(ret);
+}
 
 /* -----------------------------------------------------------------------------
  * TVar primitives
