@@ -263,12 +263,6 @@ $(CONFIG_HS) : $(FPTOOLS_TOP)/mk/config.mk
 	@echo "cGHC_CP               = \"$(GHC_CP)\"" >> $(CONFIG_HS)
 	@echo "cGHC_PERL             :: String" >> $(CONFIG_HS)
 	@echo "cGHC_PERL             = \"$(GHC_PERL)\"" >> $(CONFIG_HS)
-ifeq ($(GhcWithIlx),YES)
-	@echo "cILX2IL               :: String" >> $(CONFIG_HS)
-	@echo "cILX2IL               = \"$(ILX2IL)\"" >> $(CONFIG_HS)
-	@echo "cILASM                :: String" >> $(CONFIG_HS)
-	@echo "cILASM                = \"$(ILASM)\"" >> $(CONFIG_HS)
-endif
 	@echo "cEnableWin32DLLs      :: String" >> $(CONFIG_HS)
 	@echo "cEnableWin32DLLs      = \"$(EnableWin32DLLs)\"" >> $(CONFIG_HS)
 	@echo "cCONTEXT_DIFF         :: String" >> $(CONFIG_HS)
@@ -423,11 +417,6 @@ ifeq ($(GhcWithNativeCodeGen),YES)
 ALL_DIRS += nativeGen
 else
 SRC_HC_OPTS += -DOMIT_NATIVE_CODEGEN
-endif
-
-ifeq ($(GhcWithIlx),YES)
-ALL_DIRS += ilxGen
-SRC_HC_OPTS += -DILX
 endif
 
 ifeq ($(GhcWithJavaGen),YES)
