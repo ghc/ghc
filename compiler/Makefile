@@ -583,11 +583,6 @@ endif
 # Disaster!  Then the hc file sees the GHC 5.02 (or whatever)
 # include files.   For the moment we've reverted to using
 # an explicit path in the .hs sources
-#
-# For the benefit of <5.00 compilers, do include GHC_INCLUDE_DIR
-# when generating dependencies. (=> it gets passed onto mkdependHS,
-# which needs it).
-SRC_MKDEPENDHS_OPTS += -I$(GHC_INCLUDE_DIR)
 
 # We need System.Posix (or Posix when ghc < 6.2)
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
