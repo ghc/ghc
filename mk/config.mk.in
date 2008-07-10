@@ -277,9 +277,6 @@ GhcWithNativeCodeGen=$(strip\
     $(if $(filter YESYESNO,\
 		  $(OsSupportsNCG)$(ArchSupportsNCG)$(GhcUnregisterised)),YES,NO))
 
-# Include support for generating Java
-GhcWithJavaGen=NO
-
 HaveLibDL = @HaveLibDL@
 
 # ArchSupportsSMP should be set iff there is support for that arch in

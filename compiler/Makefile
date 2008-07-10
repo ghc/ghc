@@ -419,11 +419,6 @@ else
 SRC_HC_OPTS += -DOMIT_NATIVE_CODEGEN
 endif
 
-ifeq ($(GhcWithJavaGen),YES)
-ALL_DIRS += javaGen
-SRC_HC_OPTS += -DJAVA
-endif
-
 ifeq "$(BootingFromHc)" "YES"
 # HC files are always from a self-booted compiler
 bootstrapped = YES
