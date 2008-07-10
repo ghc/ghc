@@ -75,7 +75,12 @@ out = f . unwords . map (dropWhile isSpace) . lines . showSDocUnqual . ppr
 
 
 typeSig :: String -> [String] -> String
-typeSig name flds = name ++ " :: " ++ concat (intersperse " -> " flds)
+typeSig name flds = operator name ++ " :: " ++ concat (intersperse " -> " flds)
+
+
+operator :: String -> String
+operator (x:xs) | not (isAlphaNum x) && x `notElem` " ([{" = "(" ++ x:xs ++ ")"
+operator x = x
 
 
 ---------------------------------------------------------------------
@@ -117,7 +122,12 @@ ppData x = showData x{tcdCons=[],tcdDerivs=Nothing} :
            concatMap (ppCtor x . unL) (tcdCons x)
     where
         -- GHC gives out "data Bar =", we want to delete the equals
-        showData = reverse . dropWhile (`elem` " =") . reverse . out
+        -- also writes data : a b, when we want data (:) a b
+        showData x = unwords $ map f $ if last xs == "=" then init xs else xs
+            where
+                xs = words $ out x
+                nam = out $ tcdLName x
+                f x = if x == nam then operator nam else x
 
 
 ppCtor :: TyClDecl Name -> ConDecl Name -> [String]
@@ -133,7 +143,7 @@ ppCtor dat con = ldoc (con_doc con) ++ f (con_details con)
         name = out $ unL $ con_name con
 
         resType = case con_res con of
-            ResTyH98 -> unwords $ out (tcdLName dat) : map out (tcdTyVars dat)
+            ResTyH98 -> unwords $ operator (out (tcdLName dat)) : map out (tcdTyVars dat)
             ResTyGADT x -> out $ unL x
 
 
