@@ -3,7 +3,7 @@ TOP=../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/cabal-flags.mk
 
-# XXX We would like to turn thsi on, but Cabal generates paths files
+# XXX We would like to turn this on, but Cabal generates paths files
 #     that are not -Wall clean!
 # SRC_HC_OPTS      += -Wall
 
