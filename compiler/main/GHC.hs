@@ -542,7 +542,7 @@ data LoadHowMuch
 -- attempt to load up to this target.  If no Module is supplied,
 -- then try to load all targets.
 load :: Session -> LoadHowMuch -> IO SuccessFlag
-load s@(Session ref) how_much
+load s how_much
    = do 
 	-- Dependency analysis first.  Note that this fixes the module graph:
 	-- even if we don't get a fully successful upsweep, the full module
@@ -550,15 +550,8 @@ load s@(Session ref) how_much
 	-- were successfully loaded by inspecting the Session's HPT.
 	mb_graph <- depanal s [] False
 	case mb_graph of
-	   Just mod_graph -> catchingFailure $ load2 s how_much mod_graph
+	   Just mod_graph -> load2 s how_much mod_graph
 	   Nothing        -> return Failed
-    where catchingFailure f = f `Exception.catch` \e -> do
-              hsc_env <- readIORef ref
-              -- trac #1565 / test ghci021:
-              -- let bindings may explode if we try to use them after
-              -- failing to reload
-              writeIORef ref $! hsc_env{ hsc_IC = emptyInteractiveContext }
-              throw e
 
 load2 :: Session -> LoadHowMuch -> [ModSummary] -> IO SuccessFlag
 load2 s@(Session ref) how_much mod_graph = do
@@ -577,6 +570,21 @@ load2 s@(Session ref) how_much mod_graph = do
 	    bad_boot_mods = [s 	      | s <- mod_graph, isBootSummary s,
 					not (ms_mod_name s `elem` all_home_mods)]
 	ASSERT( null bad_boot_mods ) return ()
+
+        -- check that the module given in HowMuch actually exists, otherwise
+        -- topSortModuleGraph will bomb later.
+        let checkHowMuch (LoadUpTo m)           = checkMod m
+            checkHowMuch (LoadDependenciesOf m) = checkMod m
+            checkHowMuch _ = id
+
+            checkMod m and_then
+                | m `elem` all_home_mods = and_then
+                | otherwise = do 
+                        errorMsg dflags (text "no such module:" <+> 
+                                         quotes (ppr m))
+                        return Failed
+
+        checkHowMuch how_much $ do
 
         -- mg2_with_srcimps drops the hi-boot nodes, returning a 
 	-- graph with cycles.  Among other things, it is used for
@@ -602,6 +610,12 @@ load2 s@(Session ref) how_much mod_graph = do
 				stable_mods
 
 	evaluate pruned_hpt
+
+        -- before we unload anything, make sure we don't leave an old
+        -- interactive context around pointing to dead bindings.  Also,
+        -- write the pruned HPT to allow the old HPT to be GC'd.
+        writeIORef ref $! hsc_env{ hsc_IC = emptyInteractiveContext,
+                                   hsc_HPT = pruned_hpt }
 
 	debugTraceMsg dflags 2 (text "Stable obj:" <+> ppr stable_obj $$
 				text "Stable BCO:" <+> ppr stable_bco)
