@@ -236,7 +236,9 @@ configure: $(foreach SUBDIR,$(SUBDIRS), \
 # makes that difficult.
 
 ALL_CONFIGURE_FLAGS = \
-               $(INSTALL_CONFIGURE_FLAGS) \
+               $(INSTALL_DIRS_CONFIGURE_FLAGS) \
+               $(USE_STAGE1_CONFIGURE_FLAGS) \
+               $(COMMON_CONFIGURE_FLAGS) \
 	           --haddock-options="--use-contents=../index.html \
 	                              --use-index=../doc-index.html" \
 	           $(CONFIGURE_OPTS)

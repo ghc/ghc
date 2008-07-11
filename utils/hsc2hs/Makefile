@@ -14,14 +14,20 @@ INSTALL_FLAGS = --enable-shell-wrappers
 endif
 
 boot:
-	$(CABAL) configure --distpref dist-inplace $(INPLACE_CONFIGURE_FLAGS)
+	$(CABAL) configure --distpref dist-inplace \
+	                   $(INPLACE_DIRS_CONFIGURE_FLAGS) \
+	                   $(USE_BOOT_CONFIGURE_FLAGS) \
+	                   $(COMMON_CONFIGURE_FLAGS)
 	$(CABAL) build     --distpref dist-inplace $(BUILD_FLAGS)
 	$(CABAL) install   --distpref dist-inplace $(INSTALL_FLAGS)
 
 ifneq "$(NO_INSTALL_HSC2HS)" "YES"
 # XXX
 #all:
-#	$(CABAL) configure --distpref dist-install $(INSTALL_CONFIGURE_FLAGS)
+#	$(CABAL) configure --distpref dist-install \
+#	                   $(INPLACE_DIRS_CONFIGURE_FLAGS) \
+#	                   $(USE_STAGE1_CONFIGURE_FLAGS) \
+#	                   $(COMMON_CONFIGURE_FLAGS)
 #	$(CABAL) build     --distpref dist-install $(BUILD_FLAGS)
 endif
 

@@ -44,7 +44,7 @@ endif
 # We put non-existant paths in when configuring things that we plan to
 # install, as we require that builds don't depend on these paths when
 # making bindists.
-INSTALL_CONFIGURE_FLAGS = \
+INSTALL_DIRS_CONFIGURE_FLAGS = \
     --prefix=$(NONEXISTENT) \
     --bindir=$(NONEXISTENT) \
     --libdir=$(NONEXISTENT) \
@@ -52,18 +52,20 @@ INSTALL_CONFIGURE_FLAGS = \
     --datadir=$(NONEXISTENT) \
     --docdir=$(NONEXISTENT) \
     --haddockdir=$(NONEXISTENT) \
-    --htmldir=$(NONEXISTENT) \
+    --htmldir=$(NONEXISTENT)
+
+INPLACE_DIRS_CONFIGURE_FLAGS = \
+    --prefix=`$(TOP)/utils/pwd/pwd forwardslash`/install-inplace
+
+USE_STAGE1_CONFIGURE_FLAGS = \
     --with-compiler=$(FPTOOLS_TOP_ABS)/compiler/stage1/ghc-inplace \
     --with-hc-pkg=$(FPTOOLS_TOP_ABS)/utils/ghc-pkg/ghc-pkg-inplace \
-    --with-hsc2hs=$(HSC2HS_INPLACE) \
-    $(COMMON_CONFIGURE_FLAGS)
+    --with-hsc2hs=$(HSC2HS_INPLACE)
 
-INPLACE_CONFIGURE_FLAGS = \
-    --prefix=`$(TOP)/utils/pwd/pwd forwardslash`/install-inplace \
+USE_BOOT_CONFIGURE_FLAGS = \
     --with-compiler=$(GHC) \
     --with-hc-pkg=$(GHC_PKG) \
-	--package-db $(FPTOOLS_TOP_ABS)/libraries/bootstrapping.conf \
-    $(COMMON_CONFIGURE_FLAGS)
+	--package-db $(FPTOOLS_TOP_ABS)/libraries/bootstrapping.conf
 
 # XXX
 #    --bindir='$$prefix/bin' \
