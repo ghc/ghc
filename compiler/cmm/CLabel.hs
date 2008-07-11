@@ -500,8 +500,16 @@ isMathFun (ForeignLabel fs _ _) = fs `elem` math_funs
         (fsLit "cosf"),   (fsLit "tanf"),  (fsLit "sinhf"),
         (fsLit "coshf"),  (fsLit "tanhf"), (fsLit "asinf"),
         (fsLit "acosf"),  (fsLit "atanf"), (fsLit "logf"),
-        (fsLit "expf"),   (fsLit "sqrtf")
-   ]
+        (fsLit "expf"),   (fsLit "sqrtf"), (fsLit "frexp"),
+        (fsLit "modf"),   (fsLit "ilogb"), (fsLit "copysign"),
+        (fsLit "remainder"), (fsLit "nextafter"), (fsLit "logb"),
+        (fsLit "cbrt"),   (fsLit "atanh"), (fsLit "asinh"),
+        (fsLit "acosh"),  (fsLit "lgamma"),(fsLit "hypot"),
+        (fsLit "erfc"),   (fsLit "erf"),   (fsLit "trunc"),
+        (fsLit "round"),  (fsLit "fmod"),  (fsLit "floor"),
+        (fsLit "fabs"),   (fsLit "ceil"),  (fsLit "log10"),
+        (fsLit "ldexp"),  (fsLit "atan2"), (fsLit "rint")
+    ]
 isMathFun _ = False
 
 -- -----------------------------------------------------------------------------
