@@ -83,7 +83,7 @@ import Control.Monad    ( when )
 
 import Data.Char
 import System.FilePath
-import System.IO        ( hPutStrLn, stderr )
+import System.IO        ( stderr, hPutChar )
 
 -- -----------------------------------------------------------------------------
 -- DynFlags
@@ -595,9 +595,14 @@ defaultDynFlags =
 
         log_action = \severity srcSpan style msg ->
                         case severity of
-                          SevInfo  -> hPutStrLn stderr (show (msg style))
-                          SevFatal -> hPutStrLn stderr (show (msg style))
-                          _        -> hPutStrLn stderr ('\n':show ((mkLocMessage srcSpan msg) style))
+                          SevInfo  -> printErrs (msg style)
+                          SevFatal -> printErrs (msg style)
+                          _        -> do 
+                                hPutChar stderr '\n'
+                                printErrs ((mkLocMessage srcSpan msg) style)
+                     -- careful (#2302): printErrs prints in UTF-8, whereas
+                     -- converting to string first and using hPutStr would
+                     -- just emit the low 8 bits of each unicode char.
       }
 
 {-
