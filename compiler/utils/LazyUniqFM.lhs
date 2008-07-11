@@ -12,7 +12,6 @@ Basically, the things need to be in class @Uniquable@, and we use the
 
 \begin{code}
 {-# OPTIONS -Wall -fno-warn-name-shadowing -Werror #-}
-{-# LANGUAGE UndecidableInstances #-}
 module LazyUniqFM (
 	UniqFM,   	-- abstract type
 
@@ -180,7 +179,7 @@ data Lazy a = Lazy { fromLazy :: a }
 
 newtype UniqFM ele = MkUniqFM (S.UniqFM (Lazy ele))
 
-instance Outputable (S.UniqFM (Lazy a)) => Outputable (UniqFM a) where
+instance Outputable a => Outputable (UniqFM a) where
     ppr (MkUniqFM fm) = ppr fm
 
 instance Outputable a => Outputable (Lazy a) where

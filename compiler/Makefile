@@ -599,10 +599,6 @@ endif
 # prototype via a global option instead of a myriad of per-file OPTIONS
 SRC_HC_OPTS += '-\#include "cutils.h"'
 
-ifeq "$(ghc_ge_605)" "NO"
-utils/LazyUniqFM_HC_OPTS += -fallow-undecidable-instances
-endif
-
 # ----------------------------------------------------------------------------
 #		Generate supporting stuff for prelude/PrimOp.lhs 
 #		from prelude/primops.txt
