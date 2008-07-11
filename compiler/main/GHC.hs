@@ -390,16 +390,25 @@ guessOutputFile :: Session -> IO ()
 guessOutputFile s = modifySession s $ \env ->
     let dflags = hsc_dflags env
         mod_graph = hsc_mod_graph env
-        mainModuleSrcPath, guessedName :: Maybe String
+        mainModuleSrcPath :: Maybe String
         mainModuleSrcPath = do
             let isMain = (== mainModIs dflags) . ms_mod
             [ms] <- return (filter isMain mod_graph)
             ml_hs_file (ms_location ms)
-        guessedName = fmap dropExtension mainModuleSrcPath
+        name = fmap dropExtension mainModuleSrcPath
+
+#if defined(mingw32_HOST_OS)
+        -- we must add the .exe extention unconditionally here, otherwise
+        -- when name has an extension of its own, the .exe extension will
+        -- not be added by DriverPipeline.exeFileName.  See #2248
+        name_exe = name <.> "exe"
+#else
+        name_exe = name
+#endif
     in
     case outputFile dflags of
         Just _ -> env
-        Nothing -> env { hsc_dflags = dflags { outputFile = guessedName } }
+        Nothing -> env { hsc_dflags = dflags { outputFile = name_exe } }
 
 -- -----------------------------------------------------------------------------
 -- Targets
