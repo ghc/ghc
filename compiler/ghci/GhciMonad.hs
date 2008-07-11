@@ -1,3 +1,6 @@
+{-# OPTIONS -fno-cse #-}
+-- -fno-cse is needed for GLOBAL_VAR's to behave properly
+
 -----------------------------------------------------------------------------
 --
 -- Monadery code used in InteractiveUI

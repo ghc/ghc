@@ -576,18 +576,6 @@ endif
 #simplCore/SimplEnv_HC_OPTS = -auto-all
 #simplCore/SimplUtils_HC_OPTS = -auto-all
 
-# CSE interacts badly with top-level IORefs (reportedly in DriverState and
-# DriverMkDepend), causing some of them to be commoned up.  We have a fix for
-# this in 5.00+, but earlier versions of the compiler will need CSE turned off.
-# To be on the safe side, we disable CSE in *all* modules with top-level IORefs.
-ghci/InteractiveUI_HC_OPTS	= -fno-cse
-main/CmdLineOpts_HC_OPTS	= -fno-cse
-main/DriverMkDepend_HC_OPTS	= -fno-cse
-main/DriverPipeline_HC_OPTS	= -fno-cse
-main/Finder_HC_OPTS		= -fno-cse
-main/SysTools_HC_OPTS		= -fno-cse
-main/StaticFlags_HC_OPTS	= -fno-cse
-
 # The #include is vital for the via-C route, else the C
 # compiler doesn't realise that the stcall foreign imports are indeed
 # stdcall, and doesn't generate the Foo@8 name for them
