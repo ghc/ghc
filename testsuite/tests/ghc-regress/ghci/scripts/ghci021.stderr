@@ -1,2 +1,2 @@
 
-<interactive>:1:0: Not in scope: `f'
+<no location info>: no such module: `ThisDoesNotExist'
