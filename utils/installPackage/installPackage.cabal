@@ -1,0 +1,28 @@
+Name: installPackage
+-- XXX
+Version: 1.0
+Copyright: XXX
+License: BSD3
+-- XXX License-File: LICENSE
+Author: XXX
+Maintainer: XXX
+Synopsis: XXX
+Description:
+	XXX
+Category: XXX
+build-type: Simple
+cabal-version: >=1.2
+
+--Flag base3
+--  Description: Choose the new smaller, split-up base package.
+
+Executable installPackage
+    Main-Is: installPackage.hs
+    Build-Depends: base, Cabal
+--  if flag(base3)
+--      Build-Depends: base       >= 3   && < 4,
+--                     directory  >= 1   && < 1.1,
+--                     process    >= 1   && < 1.1
+--  else
+--      Build-Depends: base < 3
+

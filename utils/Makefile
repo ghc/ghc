@@ -9,7 +9,7 @@ ifeq "$(BootingFromHc)" "YES"
 SUBDIRS = mkdependC mkdirhier runstdtest genapply genprimopcode ghc-pkg unlit
 else
 SUBDIRS = mkdependC mkdirhier runstdtest ghc-pkg hasktags hp2ps hsc2hs \
-	  parallel unlit genprimopcode genapply runghc hpc pwd
+	  installPackage parallel unlit genprimopcode genapply runghc hpc pwd
 endif
 ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 # lndir doesn't build on Windows

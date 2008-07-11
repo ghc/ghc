@@ -185,14 +185,6 @@ bootstrapping.conf: cabal-bin
 	cd hpc    && $(CABAL) install   --distpref=dist-bootstrapping --inplace
 	mv $@.tmp $@
 
-installPackage/installPackage: installPackage.hs
-	-$(RM) -rf installPackage
-	mkdir installPackage
-	$(CP) installPackage.hs installPackage/
-	cd installPackage && $(FPTOOLS_TOP_ABS)/compiler/stage1/ghc-inplace \
-	                         --make installPackage -o installPackage \
-	                         $(DEPLOYMENT_OPTS)
-
 ifBuildable/ifBuildable: ifBuildable.hs
 	-$(RM) -rf ifBuildable
 	mkdir ifBuildable
@@ -223,8 +215,7 @@ remake.library.%: clean.library.% make.library.%
 
 # NB. we're depending on make chasing dependencies from left to right here.
 # This bit goes wrong with 'make -j'.
-build: $(foreach SUBDIR,$(SUBDIRS),make.library.$(SUBDIR)) \
-       installPackage/installPackage
+build: $(foreach SUBDIR,$(SUBDIRS),make.library.$(SUBDIR))
 
 configure: $(foreach SUBDIR,$(SUBDIRS), \
              stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).$(SUBDIR))
@@ -330,7 +321,6 @@ clean: $(foreach SUBDIR,$(SUBDIRS),clean.library.$(SUBDIR))
 	$(RM) -f bootstrapping.conf.tmp bootstrapping.conf.tmp.old
 	$(RM) -f cabal-bin cabal-bin.exe
 	$(RM) -rf ifBuildable
-	$(RM) -rf installPackage
 	$(RM) -f libraries.txt index.html doc-index.html doc-index*.html
 	$(RM) -f haddock* *.gif
 
@@ -375,20 +365,17 @@ install-docs:
 # overridden when installing a bindist.
 
 $(foreach SUBDIR,$(SUBDIRS),install.library.$(SUBDIR)): \
-install.library.%: installPackage/installPackage ifBuildable/ifBuildable
+install.library.%: ifBuildable/ifBuildable
 	if $(IFBUILDABLE) $*; then \
 	  cd $* && \
-	  $(FPTOOLS_TOP_ABS)/libraries/installPackage/installPackage install '$(GHC_PKG_PROG)' '$(DESTDIR)$(libdir)/package.conf' '$(DESTDIR)' '$(prefix)' '$(iprefix)' '$(ibindir)' '$(ilibdir)' '$(ilibexecdir)' '$(idynlibdir)' '$(idatadir)' '$(idocdir)' '$(ihtmldir)' '$(ihaddockdir)' ; \
+	  $(FPTOOLS_TOP_ABS)/utils/installPackage/install-inplace/bin/installPackage install '$(GHC_PKG_PROG)' '$(DESTDIR)$(libdir)/package.conf' '$(DESTDIR)' '$(prefix)' '$(iprefix)' '$(ibindir)' '$(ilibdir)' '$(ilibexecdir)' '$(idynlibdir)' '$(idatadir)' '$(idocdir)' '$(ihtmldir)' '$(ihaddockdir)' ; \
 	fi
 
 .PHONY: binary-dist binary-dist.library.%
 
 BIN_DIST_LIBDIR=$(BIN_DIST_DIR)/libraries
 
-binary-dist: $(foreach SUBDIR,$(SUBDIRS),binary-dist.library.$(SUBDIR)) \
-             installPackage/installPackage
-	mkdir                               $(BIN_DIST_LIBDIR)/installPackage
-	cp 	  installPackage/installPackage $(BIN_DIST_LIBDIR)/installPackage
+binary-dist: $(foreach SUBDIR,$(SUBDIRS),binary-dist.library.$(SUBDIR))
 	mkdir                               $(BIN_DIST_LIBDIR)/ifBuildable
 	cp 	  ifBuildable/ifBuildable       $(BIN_DIST_LIBDIR)/ifBuildable
 	cp    Makefile                      $(BIN_DIST_LIBDIR)
