@@ -2,7 +2,10 @@ TOP = ..
 include $(TOP)/mk/boilerplate.mk
 
 HC = $(GHC_INPLACE)
+# These are required to stop the build system adding -package-conf
+# bootstrapping.mk, which only makes sense when $(HC)==$(GHC)
 BOOTSTRAPPING_PACKAGE_CONF_HC_OPTS=
+BOOTSTRAPPING_PACKAGE_CONF_MKDEPENDHS_OPTS=
 
 MKDEPENDHS = $(GHC_INPLACE)
 SRC_HC_OPTS += -threaded
