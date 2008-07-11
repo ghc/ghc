@@ -35,6 +35,9 @@ endif
 COMMON_CONFIGURE_FLAGS += $(FLAGGED_CONFIGURE_ARGS) \
                           --configure-option=--with-cc=$(CC)
 
+COMMON_CONFIGURE_FLAGS += $(shell [ -e $(HSC2HS_INPLACE) ] && \
+                                  echo --with-hsc2hs=$(HSC2HS_INPLACE) )
+
 ifeq "$(Windows)" "YES"
 NONEXISTENT=c:/NONEXISTENT
 else
@@ -59,8 +62,7 @@ INPLACE_DIRS_CONFIGURE_FLAGS = \
 
 USE_STAGE1_CONFIGURE_FLAGS = \
     --with-compiler=$(FPTOOLS_TOP_ABS)/compiler/stage1/ghc-inplace \
-    --with-hc-pkg=$(FPTOOLS_TOP_ABS)/utils/ghc-pkg/ghc-pkg-inplace \
-    --with-hsc2hs=$(HSC2HS_INPLACE)
+    --with-hc-pkg=$(FPTOOLS_TOP_ABS)/utils/ghc-pkg/ghc-pkg-inplace
 
 USE_BOOT_CONFIGURE_FLAGS = \
     --with-compiler=$(GHC) \
