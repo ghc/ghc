@@ -616,6 +616,41 @@ Prelude IO>
       </para>
 
       <sect3>
+        <title><literal>:module</literal> and
+        <literal>:load</literal></title>
+
+        <para>It might seem that <literal>:module</literal> and
+        <literal>:load</literal> do similar things: you can use both
+        to bring a module into scope.  However, there is a clear
+        difference.  GHCi is concerned with two sets of modules:</para>
+
+        <itemizedlist>
+          <listitem>
+            <para>The set of modules that are
+              currently <emphasis>loaded</emphasis>.  This set is
+              modified
+              by <literal>:load</literal>, <literal>:add</literal>
+              and <literal>:reload</literal>.
+            </para>
+          </listitem>
+          <listitem>
+            <para>The set of modules that are currently <emphasis>in
+                scope</emphasis> at the prompt.  This set is modified
+              by <literal>:module</literal>, and it is also set
+              automatically
+                after <literal>:load</literal>, <literal>:add</literal>,
+              and <literal>:reload</literal>.</para>
+          </listitem>
+        </itemizedlist>
+
+        <para>You cannot add a module to the scope if it is not
+          loaded.  This is why trying to
+          use <literal>:module</literal> to load a new module results
+          in the message &ldquo;<literal>module M is not
+            loaded</literal>&rdquo;.</para>
+      </sect3>
+
+      <sect3>
 	<title>Qualified names</title>
 
 	<para>To make life slightly easier, the GHCi prompt also
