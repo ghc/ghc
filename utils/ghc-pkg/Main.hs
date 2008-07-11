@@ -189,6 +189,11 @@ usageHeader prog = substProg prog $
   "    Extract the specified field of the package description for the\n" ++
   "    specified package. Accepts comma-separated multiple fields.\n" ++
   "\n" ++
+  "  $p dump\n" ++
+  "    Dump the registered description for every package.  This is like\n" ++
+  "    \"ghc-pkg describe '*'\", except that it is intended to be used\n" ++
+  "    by tools that parse the results, rather than humans.\n" ++
+  "\n" ++
   " Substring matching is supported for {module} in find-module and\n" ++
   " for {pkg} in list, describe, and field, where a '*' indicates\n" ++
   " open substring ends (prefix*, *suffix, *infix*).\n" ++
@@ -304,6 +309,10 @@ runit cli nonopts = do
                                       (splitFields fields)
     ["check"] -> do
         checkConsistency cli
+
+    ["dump"] -> do
+        dumpPackages cli
+
     [] -> do
         die ("missing command\n" ++
                 usageInfo (usageHeader prog) flags)
@@ -350,6 +359,9 @@ type PackageDB      = [InstalledPackageInfo]
 type PackageDBStack = [(PackageDBName,PackageDB)]
         -- A stack of package databases.  Convention: head is the topmost
         -- in the stack.  Earlier entries override later one.
+
+allPackagesInStack :: PackageDBStack -> [InstalledPackageInfo]
+allPackagesInStack = concatMap snd
 
 getPkgDatabases :: Bool -> [Flag] -> IO PackageDBStack
 getPkgDatabases modify flags = do
@@ -557,7 +569,7 @@ listPackages flags mPackageName mModuleName = do
 
       match `exposedInPkg` pkg = any match (map display $ exposedModules pkg)
 
-      pkg_map = map (\p -> (package p, p)) $ concatMap snd db_stack
+      pkg_map = map (\p -> (package p, p)) $ allPackagesInStack db_stack
       show_func = if simple_output then show_simple else mapM_ (show_normal pkg_map)
 
   show_func (reverse db_stack_sorted)
@@ -577,7 +589,7 @@ listPackages flags mPackageName mModuleName = do
           let showPkg = if FlagNamesOnly `elem` flags then display . pkgName
                                                       else display
               pkgs = map showPkg $ sortBy compPkgIdVer $
-                          map package (concatMap snd db_stack)
+                          map package (allPackagesInStack db_stack)
           when (not (null pkgs)) $ 
              hPutStrLn stdout $ concat $ intersperse " " pkgs
 
@@ -600,7 +612,15 @@ describePackage :: [Flag] -> PackageArg -> IO ()
 describePackage flags pkgarg = do
   db_stack <- getPkgDatabases False flags
   ps <- findPackages db_stack pkgarg
-  mapM_ (putStrLn . showInstalledPackageInfo) ps
+  doDump ps
+
+dumpPackages :: [Flag] -> IO ()
+dumpPackages flags = do
+  db_stack <- getPkgDatabases False flags
+  doDump (allPackagesInStack db_stack)
+
+doDump :: [InstalledPackageInfo] -> IO ()
+doDump = mapM_ putStrLn . intersperse "---" . map showInstalledPackageInfo
 
 -- PackageId is can have globVersion for the version
 findPackages :: PackageDBStack -> PackageArg -> IO [InstalledPackageInfo]
@@ -609,7 +629,7 @@ findPackages db_stack pkgarg
         []  -> die ("cannot find package " ++ pkg_msg pkgarg)
         ps -> return ps
   where
-        all_pkgs = concat (map snd db_stack)
+        all_pkgs = allPackagesInStack db_stack
         pkg_msg (Id pkgid)           = display pkgid
         pkg_msg (Substring pkgpat _) = "matching "++pkgpat
 
@@ -699,7 +719,7 @@ checkConsistency flags = do
   db_stack <- getPkgDatabases True flags
          -- check behaves like modify for the purposes of deciding which
          -- databases to use, because ordering is important.
-  let pkgs = map (\p -> (package p, p)) $ concatMap snd db_stack
+  let pkgs = map (\p -> (package p, p)) $ allPackagesInStack db_stack
       broken_pkgs = do
         (pid, p) <- pkgs
         let broken_deps = missingPackageDeps p pkgs
@@ -875,7 +895,7 @@ checkDep db_stack force pkgid
         name_exists = any (\p -> pkgName (package p) == name) all_pkgs
         name = pkgName pkgid
 
-        all_pkgs = concat (map snd db_stack)
+        all_pkgs = allPackagesInStack db_stack
         pkgids = map package all_pkgs
 
 realVersion :: PackageIdentifier -> Bool

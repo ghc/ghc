@@ -613,6 +613,10 @@ c:/fptools/validate/ghc/driver/package.conf.inplace:
 	    <literal>InstalledPackageInfo</literal>, the same as the input file
 	    format for <literal>ghc-pkg register</literal>.  See <xref
 	      linkend="installed-pkg-info" /> for details.</para>
+
+          <para>If the pattern matches multiple packages, the
+            description for each package is emitted, separated by the
+            string <literal>---</literal> on a line by itself.</para>
 	</listitem>
       </varlistentry>
 
@@ -623,6 +627,23 @@ c:/fptools/validate/ghc/driver/package.conf.inplace:
       for <literal>P</literal>. Multiple fields can be selected by separating 
       them with commas</para>
 	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><literal>ghc-pkg dump</literal></term>
+        <listitem>
+          <para>Emit the full description of every package, in the
+            form of an <literal>InstalledPackageInfo</literal>.
+            Multiple package descriptions are separated by the
+            string <literal>---</literal> on a line by itself.</para>
+
+          <para>This is almost the same as <literal>ghc-pkg describe '*'</literal>, except that <literal>ghc-pkg dump</literal>
+            is intended for use by tools that parse the results, so
+            for example where <literal>ghc-pkg describe '*'</literal>
+            will emit an error if it can't find any packages that
+            match the pattern, <literal>ghc-pkg dump</literal> will
+            simply emit nothing.</para>
+        </listitem>
       </varlistentry>
     </variablelist>
 
