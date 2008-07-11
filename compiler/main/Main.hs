@@ -46,7 +46,6 @@ import Panic
 -- Standard Haskell libraries
 import Control.Exception ( throwDyn )
 import System.IO
-import System.Directory	( doesDirectoryExist )
 import System.Environment
 import System.Exit
 import System.FilePath
@@ -285,11 +284,7 @@ checkOptions cli_mode dflags srcs objs = do
 -- 
 verifyOutputFiles :: DynFlags -> IO ()
 verifyOutputFiles dflags = do
-  let odir = objectDir dflags
-  when (isJust odir) $ do
-     let dir = fromJust odir
-     flg <- doesDirectoryExist dir
-     when (not flg) (nonExistentDir "-odir" dir)
+  -- not -odir: we create the directory for -odir if it doesn't exist (#2278).
   let ofile = outputFile dflags
   when (isJust ofile) $ do
      let fn = fromJust ofile
