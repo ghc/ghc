@@ -2235,7 +2235,7 @@ findModule s mod_name maybe_pkg = withSession s $ \hsc_env ->
 	  case res of
 	    Found _ m | modulePackageId m /= this_pkg -> return m
 		      | otherwise -> throwDyn (CmdLineError (showSDoc $
-					text "module" <+> pprModule m <+>
+					text "module" <+> quotes (ppr (moduleName m)) <+>
 					text "is not loaded"))
 	    err -> let msg = cannotFindModule dflags mod_name err in
 		   throwDyn (CmdLineError (showSDoc msg))
