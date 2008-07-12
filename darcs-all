@@ -78,11 +78,7 @@ sub darcsall {
         chomp $path;
         if ($path =~ m#/(.*)/#) {
             my $pkg = $1;
-            # bootstrapping.* are just copies of other repos; we don't
-            # update them directly.
-            if ($pkg !~ /bootstrapping/) {
-                darcs (@_, "--repodir", "libraries/$pkg");
-            }
+            darcs (@_, "--repodir", "libraries/$pkg");
         }
         else {
             die "that pattern can't fail!";
