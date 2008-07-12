@@ -195,6 +195,7 @@ active language flags:
   -XMonoPatBinds
 -- :set -fglasgow-exts
 active language flags:
+  -XPostfixOperators
   -XPatternGuards
   -XUnicodeSyntax
   -XMagicHash
