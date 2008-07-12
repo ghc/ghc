@@ -13,10 +13,6 @@ import Distribution.Text
 import Distribution.Verbosity
 import System.Environment
 
--- XXX This will need to be changed
-distPref :: FilePath
-distPref = defaultDistPref
-
 main :: IO ()
 main
   = do args <- getArgs
@@ -25,28 +21,42 @@ main
                     iprefix : ibindir : ilibdir : ilibexecdir : idynlibdir :
                     idatadir : idocdir : ihtmldir : ihaddockdir :
                     args' ->
-               let verbosity = mkVerbosity args'
-               in doInstall verbosity ghcpkg ghcpkgconf destdir topdir
-                            iprefix ibindir ilibdir ilibexecdir idynlibdir idatadir
-                            idocdir ihtmldir ihaddockdir
+               case parseArgs args' of
+                   (verbosity, distPref, enableShellWrappers) ->
+                       doInstall verbosity distPref enableShellWrappers
+                                 ghcpkg ghcpkgconf destdir topdir
+                                 iprefix ibindir ilibdir ilibexecdir
+                                 idynlibdir idatadir idocdir ihtmldir
+                                 ihaddockdir
            _ ->
                error ("Bad arguments: " ++ show args)
 
-mkVerbosity :: [String] -> Verbosity
-mkVerbosity [] = normal
-mkVerbosity ['-':'v':v] = readEOrFail flagToVerbosity v
-mkVerbosity args = error ("Bad arguments: " ++ show args)
+-- XXX We should really make Cabal do the hardwork here
+parseArgs :: [String]
+          -> (Verbosity, -- verbosity
+              FilePath,  -- dist prefix
+              Bool)      -- enable shell wrappers?
+parseArgs = f normal defaultDistPref False
+    where f v dp esw (('-':'v':val):args)
+              = f (readEOrFail flagToVerbosity val) dp esw args
+          f v _  esw ("--distpref":dp:args) = f v dp esw args
+          f v dp _   ("--enable-shell-wrappers":args) = f v dp True args
+          f v dp esw [] = (v, dp, esw)
+          f _ _  _   args = error ("Bad arguments: " ++ show args)
 
-doInstall :: Verbosity -> FilePath -> FilePath -> FilePath -> FilePath
+doInstall :: Verbosity -> FilePath -> Bool
+          -> FilePath -> FilePath -> FilePath -> FilePath
           -> FilePath -> FilePath -> FilePath -> FilePath -> FilePath
           -> FilePath -> FilePath -> FilePath -> FilePath
           -> IO ()
-doInstall verbosity ghcpkg ghcpkgconf destdir topdir
+doInstall verbosity distPref enableShellWrappers
+     ghcpkg ghcpkgconf destdir topdir
      iprefix ibindir ilibdir ilibexecdir idynlibdir idatadir
      idocdir ihtmldir ihaddockdir =
        do let userHooks = simpleUserHooks
               copyto = if null destdir then NoCopyDest else CopyTo destdir
               copyFlags = defaultCopyFlags {
+                              copyUseWrapper = toFlag enableShellWrappers,
                               copyDest = toFlag copyto,
                               copyVerbosity = toFlag verbosity
                           }
@@ -56,7 +66,7 @@ doInstall verbosity ghcpkg ghcpkgconf destdir topdir
                                   regGenScript = toFlag $ False,
                                   regInPlace = toFlag $ False
                               }
-          lbi <- getConfig verbosity
+          lbi <- getConfig verbosity distPref
           let pd = localPkgDescr lbi
               i = installDirTemplates lbi
               -- This is an almighty hack. We need to register
@@ -121,8 +131,8 @@ replaceTopdir topdir ('$':'h':'t':'t':'p':'t':'o':'p':'d':'i':'r':p)
 replaceTopdir _ p = p
 
 -- Get the build info, merging the setup-config and buildinfo files.
-getConfig :: Verbosity -> IO LocalBuildInfo
-getConfig verbosity = do
+getConfig :: Verbosity -> FilePath -> IO LocalBuildInfo
+getConfig verbosity distPref = do
     lbi <- getPersistBuildConfig distPref
     maybe_infoFile <- defaultHookedPackageDesc
     case maybe_infoFile of
