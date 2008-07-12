@@ -129,7 +129,7 @@ data Interface = Interface {
   -- | The Haddock options for this module (prune, ignore-exports, etc)
   ifaceOptions         :: [DocOption],
 
-  ifaceExportedDeclMap :: Map Name (LHsDecl Name),
+  ifaceDeclMap         :: Map Name (LHsDecl Name),
   ifaceDocMap          :: Map Name (HsDoc Name),  
   ifaceRnDocMap        :: Map Name (HsDoc DocName),
 

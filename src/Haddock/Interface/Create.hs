@@ -60,8 +60,8 @@ createInterface ghcMod flags modMap = do
       subNames      = allSubNames group
       localNames    = entityNames_ ++ subNames
       subMap        = mkSubMap group
-      expDeclMap    = mkDeclMap (ghcExportedNames ghcMod) group
-      localDeclMap  = mkDeclMap entityNames_ group
+--      declMap       = mkDeclMap entityNames_ group
+      declMap       = mkDeclMap localNames group
       docMap        = mkDocMap group 
       ignoreExps    = Flag_IgnoreAllExports `elem` flags
       exportedNames = ghcExportedNames ghcMod
@@ -69,10 +69,10 @@ createInterface ghcMod flags modMap = do
 
   visibleNames <- mkVisibleNames mod modMap localNames 
                                  (ghcNamesInScope ghcMod) 
-                                 subMap exports opts localDeclMap 
+                                 subMap exports opts declMap 
 
   exportItems <- mkExportItems modMap mod (ghcExportedNames ghcMod)
-                               expDeclMap localDeclMap subMap entities 
+                               declMap subMap entities 
                                opts exports ignoreExps docMap 
 
   -- prune the export list to just those declarations that have
@@ -98,7 +98,7 @@ createInterface ghcMod flags modMap = do
     ifaceEnv             = origEnv, 
     ifaceExports         = exportedNames,
     ifaceVisibleExports  = visibleNames, 
-    ifaceExportedDeclMap = expDeclMap,
+    ifaceDeclMap         = declMap,
     ifaceInstances       = ghcInstances ghcMod
   }
 
@@ -344,7 +344,6 @@ mkExportItems
   :: ModuleMap
   -> Module			-- this module
   -> [Name]			-- exported names (orig)
-  -> Map Name (LHsDecl Name) -- maps exported names to declarations
   -> Map Name (LHsDecl Name) -- maps local names to declarations
   -> Map Name [Name]	-- sub-map for this module
   -> [Entity]	-- entities in the current module
@@ -354,7 +353,7 @@ mkExportItems
   -> Map Name (HsDoc Name)
   -> ErrMsgM [ExportItem Name]
 
-mkExportItems modMap this_mod exported_names exportedDeclMap localDeclMap sub_map entities
+mkExportItems modMap this_mod exported_names declMap sub_map entities
               opts maybe_exps ignore_all_exports docMap
   | isNothing maybe_exps || ignore_all_exports || OptIgnoreExports `elem` opts
     = everything_local_exported
@@ -363,7 +362,7 @@ mkExportItems modMap this_mod exported_names exportedDeclMap localDeclMap sub_ma
       return (concat exps)
   where
     everything_local_exported =  -- everything exported
-      return (fullContentsOfThisModule this_mod entities localDeclMap docMap)
+      return (fullContentsOfThisModule this_mod entities declMap docMap)
    
     packageId = modulePackageId this_mod
 
@@ -393,7 +392,7 @@ mkExportItems modMap this_mod exported_names exportedDeclMap localDeclMap sub_ma
 		       | otherwise       = allSubsOfName modMap t
 
     fullContentsOf m  
-	| m == this_mod = return (fullContentsOfThisModule this_mod entities localDeclMap docMap)
+	| m == this_mod = return (fullContentsOfThisModule this_mod entities declMap docMap)
 	| otherwise = 
 	   case Map.lookup m modMap of
 	     Just iface
@@ -405,10 +404,10 @@ mkExportItems modMap this_mod exported_names exportedDeclMap localDeclMap sub_ma
     findDecl :: Name -> (Maybe (LHsDecl Name), Maybe (HsDoc Name))
     findDecl n | not (isExternalName n) = error "This shouldn't happen"
     findDecl n 
-	| m == this_mod = (Map.lookup n exportedDeclMap, Map.lookup n docMap)
+	| m == this_mod = (Map.lookup n declMap, Map.lookup n docMap)
 	| otherwise = 
 	   case Map.lookup m modMap of
-		Just iface -> (Map.lookup n (ifaceExportedDeclMap iface), 
+		Just iface -> (Map.lookup n (ifaceDeclMap iface), 
                       Map.lookup n (ifaceDocMap iface))
 		Nothing -> (Nothing, Nothing)
       where
