@@ -222,6 +222,7 @@ data DynFlag
    | Opt_TransformListComp
    | Opt_GeneralizedNewtypeDeriving
    | Opt_RecursiveDo
+   | Opt_PostfixOperators
    | Opt_PatternGuards
    | Opt_LiberalTypeSynonyms
    | Opt_Rank2Types
@@ -1483,6 +1484,7 @@ languageOptions = [ dynFlag | (_, dynFlag, _) <- xFlags ]
 xFlags :: [(String, DynFlag, Bool -> Deprecated)]
 xFlags = [
   ( "CPP",                              Opt_Cpp, const Supported ),
+  ( "PostfixOperators",                 Opt_PostfixOperators, const Supported ),
   ( "PatternGuards",                    Opt_PatternGuards, const Supported ),
   ( "UnicodeSyntax",                    Opt_UnicodeSyntax, const Supported ),
   ( "MagicHash",                        Opt_MagicHash, const Supported ),
@@ -1570,6 +1572,7 @@ glasgowExtsFlags = [
            , Opt_PolymorphicComponents
            , Opt_ExistentialQuantification
            , Opt_UnicodeSyntax
+           , Opt_PostfixOperators
            , Opt_PatternGuards
            , Opt_LiberalTypeSynonyms
            , Opt_RankNTypes

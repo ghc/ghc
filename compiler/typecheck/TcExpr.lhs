@@ -223,18 +223,34 @@ tcExpr in_expr@(OpApp arg1 lop@(L loc op) fix arg2) res_ty
 --	\ x -> e op x,
 -- or
 --	\ x -> op e x,
--- or just
+-- or, if PostfixOperators is enabled, just
 -- 	op e
 --
--- We treat it as similar to the latter, so we don't
+-- With PostfixOperators we don't
 -- actually require the function to take two arguments
 -- at all.  For example, (x `not`) means (not x);
--- you get postfix operators!  Not really Haskell 98
--- I suppose, but it's less work and kind of useful.
+-- you get postfix operators!  Not Haskell 98,
+-- but it's less work and kind of useful.
 
 tcExpr in_expr@(SectionL arg1 lop@(L loc op)) res_ty
-  = do 	{ (op', [arg1']) <- tcApp op 1 (tcArgs lop [arg1]) res_ty
-	; return (SectionL arg1' (L loc op')) }
+  = do dflags <- getDOpts
+       if dopt Opt_PostfixOperators dflags
+           then do (op', [arg1']) <- tcApp op 1 (tcArgs lop [arg1]) res_ty
+                   return (SectionL arg1' (L loc op'))
+           else do (co_fn, (op', arg1'))
+                       <- subFunTys doc 1 res_ty
+                        $ \ [arg2_ty'] res_ty' ->
+                              tcApp op 2 (tc_args arg2_ty') res_ty'
+                   return (mkHsWrap co_fn (SectionL arg1' (L loc op')))
+  where
+    doc = ptext (sLit "The section") <+> quotes (ppr in_expr)
+		<+> ptext (sLit "takes one argument")
+    tc_args arg2_ty' qtvs qtys [arg1_ty, arg2_ty] 
+	= do { boxyUnify arg2_ty' (substTyWith qtvs qtys arg2_ty)
+	     ; arg1' <- tcArg lop 2 arg1 qtvs qtys arg1_ty 
+	     ; qtys' <- mapM refineBox qtys	-- c.f. tcArgs 
+	     ; return (qtys', arg1') }
+    tc_args _ _ _ _ = panic "tcExpr SectionL"
 
 -- Right sections, equivalent to \ x -> x `op` expr, or
 --	\ x -> op x expr
