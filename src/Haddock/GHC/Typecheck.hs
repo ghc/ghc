@@ -75,6 +75,7 @@ mkGhcModule (mod, file, checkedMod) dynflags = GhcModule {
   ghcGroup          = group,
   ghcMbExports      = mbExports,
   ghcExportedNames  = modInfoExports modInfo,
+  ghcDefinedNames   = map getName $ modInfoTyThings modInfo,
   ghcNamesInScope   = fromJust $ modInfoTopLevelScope modInfo, 
   ghcInstances      = modInfoInstances modInfo
 }

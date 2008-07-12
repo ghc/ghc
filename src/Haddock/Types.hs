@@ -100,6 +100,7 @@ data GhcModule = GhcModule {
    ghcGroup          :: HsGroup Name,
    ghcMbExports      :: Maybe [LIE Name],
    ghcExportedNames  :: [Name],
+   ghcDefinedNames   :: [Name],
    ghcNamesInScope   :: [Name],
    ghcInstances      :: [Instance]
 }

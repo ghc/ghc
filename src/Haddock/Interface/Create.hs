@@ -57,10 +57,8 @@ createInterface ghcMod flags modMap = do
       entities      = (nubBy sameName . getTopEntities) group
       exports       = fmap (reverse . map unLoc) (ghcMbExports ghcMod)
       entityNames_  = entityNames entities
-      subNames      = allSubNames group
-      localNames    = entityNames_ ++ subNames
+      localNames    = ghcDefinedNames ghcMod
       subMap        = mkSubMap group
---      declMap       = mkDeclMap entityNames_ group
       declMap       = mkDeclMap localNames group
       docMap        = mkDocMap group 
       ignoreExps    = Flag_IgnoreAllExports `elem` flags
@@ -255,11 +253,6 @@ mkDocMap group = Map.fromList (topDeclDocs ++ classMethDocs ++ recordFieldDocs)
                         ConDeclField lname _ (Just (L _ doc)) <- fields ]
 
        
-allSubNames :: HsGroup Name -> [Name]
-allSubNames group = 
-  concat [ tail (map unLoc (tyClDeclNames tycld)) | L _ tycld <- hs_tyclds group ]
-
-
 mkSubMap :: HsGroup Name -> Map Name [Name]
 mkSubMap group = Map.fromList [ (name, subs) | L _ tycld <- hs_tyclds group,
  let name:subs = map unLoc (tyClDeclNames tycld) ]
