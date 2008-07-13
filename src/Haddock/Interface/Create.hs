@@ -34,8 +34,6 @@ import TyCon
 import PrelNames
 import Bag
 import HscTypes
-import Util (handleDyn)
-import ErrUtils (printBagOfErrors)
 
 
 -- | Process the data in the GhcModule to produce an interface.
