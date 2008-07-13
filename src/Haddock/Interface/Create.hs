@@ -36,8 +36,6 @@ import Bag
 import HscTypes
 import Util (handleDyn)
 import ErrUtils (printBagOfErrors)
-import FastString
-#define FSLIT(x) (mkFastString# (x#))
 
 
 -- | Process the data in the GhcModule to produce an interface.
