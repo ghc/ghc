@@ -157,6 +157,7 @@ The predicate we use is TcEnv.thTopLevelId.
 %************************************************************************
 
 \begin{code}
+tcBracket     :: HsBracket Name -> BoxyRhoType -> TcM (LHsExpr TcId)
 tcSpliceDecls :: LHsExpr Name -> TcM [LHsDecl RdrName]
 tcSpliceExpr  :: HsSplice Name -> BoxyRhoType -> TcM (HsExpr TcId)
 kcSpliceType  :: HsSplice Name -> TcM (HsType Name, TcKind)
@@ -166,8 +167,10 @@ runQuasiQuoteExpr :: HsQuasiQuote Name -> TcM (LHsExpr RdrName)
 runQuasiQuotePat  :: HsQuasiQuote Name -> TcM (LPat RdrName)
 
 #ifndef GHCI
-tcSpliceExpr _ e _ = pprPanic "Cant do tcSpliceExpr without GHCi" (ppr e)
-tcSpliceDecls e    = pprPanic "Cant do tcSpliceDecls without GHCi" (ppr e)
+tcBracket     x _ = pprPanic "Cant do tcBracket without GHCi"     (ppr x)
+tcSpliceExpr  e   = pprPanic "Cant do tcSpliceExpr without GHCi"  (ppr e)
+tcSpliceDecls x   = pprPanic "Cant do tcSpliceDecls without GHCi" (ppr x)
+kcSpliceType  x   = pprPanic "Cant do kcSpliceType without GHCi"  (ppr x)
 
 runQuasiQuoteExpr q = pprPanic "Cant do runQuasiQuoteExpr without GHCi" (ppr q)
 runQuasiQuotePat  q = pprPanic "Cant do runQuasiQuotePat without GHCi" (ppr q)
@@ -193,7 +196,6 @@ Desugared:	f = do { s7 <- g Int 3
 		       ; return (ConE "Data.Maybe.Just" s7) }
 
 \begin{code}
-tcBracket :: HsBracket Name -> BoxyRhoType -> TcM (LHsExpr TcId)
 tcBracket brack res_ty = do
    level <- getStage
    case bracketOK level of {

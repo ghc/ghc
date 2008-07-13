@@ -441,10 +441,7 @@ ppr_expr (HsSpliceE s)       = pprSplice s
 ppr_expr (HsBracket b)       = pprHsBracket b
 ppr_expr (HsBracketOut e []) = ppr e
 ppr_expr (HsBracketOut e ps) = ppr e $$ ptext (sLit "pending") <+> ppr ps
-ppr_expr (HsQuasiQuoteE (HsQuasiQuote name quoter _ quote)) 
-    = char '$' <> brackets (ppr name) <>
-      ptext (sLit "[:") <> ppr quoter <> ptext (sLit "|") <>
-      ppr quote <> ptext (sLit "|]")
+ppr_expr (HsQuasiQuoteE qq)  = ppr qq
 
 ppr_expr (HsProc pat (L _ (HsCmdTop cmd _ _ _)))
   = hsep [ptext (sLit "proc"), ppr pat, ptext (sLit "->"), ppr cmd]

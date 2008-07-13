@@ -210,6 +210,15 @@ data HsQuasiQuote id = HsQuasiQuote
 		       id
 		       SrcSpan
 		       FastString
+
+instance OutputableBndr id => Outputable (HsQuasiQuote id) where
+    ppr = ppr_qq
+
+ppr_qq :: OutputableBndr id => HsQuasiQuote id -> SDoc
+ppr_qq (HsQuasiQuote name quoter _ quote) =
+    char '$' <> brackets (ppr name) <>
+    ptext (sLit "[:") <> ppr quoter <> ptext (sLit "|") <>
+    ppr quote <> ptext (sLit "|]")
 \end{code}
 
 
