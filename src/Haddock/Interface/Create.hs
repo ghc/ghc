@@ -54,7 +54,7 @@ createInterface ghcMod flags modMap = do
       localNames    = ghcDefinedNames ghcMod
       subMap        = mkSubMap group
       decls         = topDecls group
-      declMap       = mkDeclMap' decls
+      declMap       = mkDeclMap decls
       ignoreExps    = Flag_IgnoreAllExports `elem` flags
       exportedNames = ghcExportedNames ghcMod
       origEnv       = Map.fromList [ (nameOccName n, n) | n <- exportedNames ]
@@ -130,9 +130,9 @@ parseOption other = tell ["Unrecognised option: " ++ other] >> return Nothing
 -- documentation declarations.
 -- Subordinate names are mapped to the parent declaration, but with the doc
 -- for the subordinate declaration.
-mkDeclMap' decls = Map.fromList [ (n, (L loc d, doc)) | (L loc d, doc) <- decls 
-                                , (n, doc) <- (declName d, doc) : subordinates d
-                                , notDocOrInstance d ]
+mkDeclMap decls = Map.fromList [ (n, (L loc d, doc)) | (L loc d, doc) <- decls 
+                               , (n, doc) <- (declName d, doc) : subordinates d
+                               , notDocOrInstance d ]
 
 
 notDocOrInstance (InstD _) = False
@@ -177,7 +177,6 @@ declsFromClass class_ = docs ++ defs ++ sigs ++ ats
     ats  = decls tcdATs TyClD class_
 
 
-declName :: HsDecl Name -> Name
 declName (TyClD d) = tcdName d
 declName (ForD (ForeignImport n _ _)) = unLoc n
 -- we have normal sigs only (since they are taken from ValBindsOut)
