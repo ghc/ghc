@@ -74,6 +74,17 @@ endif
 
 SUBDIRS = gmp libffi includes utils driver docs rts libraries compiler libraries/Cabal/doc
 
+check-all: check-tools check-packages
+
+check-tools:
+	@:
+ifeq "$(HADDOCK_DOCS)" "YES"
+ifeq "$(HADDOCK)"      ""
+	echo "Couldn't find haddock" >&2
+	exit 1
+endif
+endif
+
 # Sanity check that all the boot libraries are in the tree, to catch
 # failure to run darcs-all.
 check-packages :
@@ -97,7 +108,7 @@ GCC_LIB_DEP = stamp.inplace-gcc-lib
 endif
 endif
 
-stage1 : $(GCC_LIB_DEP) check-packages
+stage1 : $(GCC_LIB_DEP) check-all
 	$(MAKE) -C libraries boot
 	$(MAKE) -C gmp       all
 	$(MAKE) -C libffi    all
@@ -128,12 +139,12 @@ stage1 : $(GCC_LIB_DEP) check-packages
 # an example.  Thus, we explicitly build a second version with the stage 1 
 # compiler of all utils that get installed and of all extra support binaries
 # includes in binary dists.
-stage2 : check-packages
+stage2 : check-all
 	$(MAKE) -C compiler boot stage=2
 	$(MAKE) -C compiler stage=2
 
 
-stage3 : check-packages
+stage3 : check-all
 	$(MAKE) -C compiler boot stage=3
 	$(MAKE) -C compiler stage=3
 
