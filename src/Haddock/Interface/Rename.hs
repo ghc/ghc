@@ -38,7 +38,8 @@ renameInterface renamingEnv warnings mod =
   let localEnv = foldl fn renamingEnv (ifaceVisibleExports mod)
         where fn env name = Map.insert name (ifaceMod mod) env
       
-      docs = Map.toList (ifaceDocMap mod)
+      docMap = Map.map (\(_, doc) -> doc) $ ifaceDeclMap mod
+      docs   = [ (n, doc) | (n, Just doc) <- Map.toList docMap ]
       renameMapElem (k,d) = do d' <- renameDoc d; return (k, d') 
 
       -- rename names in the exported declarations to point to things that

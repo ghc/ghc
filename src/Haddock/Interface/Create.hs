@@ -54,13 +54,11 @@ createInterface ghcMod flags modMap = do
         | otherwise = opts0
 
   let group         = ghcGroup ghcMod
-      entities      = (nubBy sameName . getTopEntities) group
       exports       = fmap (reverse . map unLoc) (ghcMbExports ghcMod)
-      entityNames_  = entityNames entities
       localNames    = ghcDefinedNames ghcMod
       subMap        = mkSubMap group
-      declMap       = mkDeclMap localNames group
-      docMap        = mkDocMap group 
+      decls         = topDecls group
+      declMap       = mkDeclMap' decls
       ignoreExps    = Flag_IgnoreAllExports `elem` flags
       exportedNames = ghcExportedNames ghcMod
       origEnv       = Map.fromList [ (nameOccName n, n) | n <- exportedNames ]
@@ -70,8 +68,7 @@ createInterface ghcMod flags modMap = do
                                  subMap exports opts declMap 
 
   exportItems <- mkExportItems modMap mod (ghcExportedNames ghcMod)
-                               declMap subMap entities 
-                               opts exports ignoreExps docMap 
+                               decls declMap subMap opts exports ignoreExps
 
   -- prune the export list to just those declarations that have
   -- documentation, if the 'prune' option is on.
@@ -88,7 +85,6 @@ createInterface ghcMod flags modMap = do
     ifaceRnDoc           = Nothing,
     ifaceOptions         = opts,
     ifaceLocals          = localNames,
-    ifaceDocMap          = docMap,
     ifaceRnDocMap        = Map.empty,
     ifaceSubMap          = subMap,
     ifaceExportItems     = prunedExportItems,
@@ -129,78 +125,110 @@ parseOption other = tell ["Unrecognised option: " ++ other] >> return Nothing
 
 
 --------------------------------------------------------------------------------
--- Source code entities
--- 
--- An entity is a Haskell declaration or a Haddock comment. We need to extract
--- entities out of classes and top levels since we need them in the interface. 
+-- Extract declarations
 --------------------------------------------------------------------------------
 
 
-data Entity = DocEntity (DocDecl Name) | DeclEntity Name
-data LEntity = Located Entity
+-- | Make a map from names to declarations with documentation. The map excludes
+-- all kinds of instance declarations (including type family instances) and
+-- documentation declarations.
+-- Subordinate names are mapped to the parent declaration, but with the doc
+-- for the subordinate declaration.
+mkDeclMap' decls = Map.fromList [ (n, (L loc d, doc)) | (L loc d, doc) <- decls 
+                                , (n, doc) <- (declName d, doc) : subordinates d
+                                , notDocOrInstance d ]
 
-sameName (DocEntity _) _ = False
-sameName (DeclEntity _) (DocEntity _) = False
-sameName (DeclEntity a) (DeclEntity b) = a == b
+
+notDocOrInstance (InstD _) = False
+notDocOrInstance (TyClD (d@TyData {}))
+  | Just _ <- tcdTyPats d = False
+notDocOrInstance (TyClD (d@TySynonym {}))
+  | Just _ <- tcdTyPats d = False
+notDocOrInstance (DocD _) = False
+notDocOrInstance _        = True
 
 
-sortByLoc = map unLoc . sortBy (comparing getLoc)
+subordinates (TyClD d) = classDataSubs d
+subordinates _ = []
 
 
--- | Get all the entities in a class. The entities are sorted by their 
--- SrcLoc.
-getClassEntities tcd = sortByLoc (docs ++ meths ++ sigs ++ ats)
+classDataSubs :: TyClDecl Name -> [(Name, Maybe (HsDoc Name))]
+classDataSubs decl
+  | isClassDecl decl = classMeths
+  | isDataDecl  decl = recordFields
+  | otherwise        = []
   where
-    docs = [ L l (DocEntity d) | L l d <- tcdDocs tcd ]
+    classMeths   = [ (declName d, doc) | (L _ d, doc) <- classDecls decl ]
+    recordFields = [ (unLoc lname, fmap unLoc doc) |
+                     ConDeclField lname _ doc <- fields ]
+    cons         = [ con | L _ con <- tcdCons decl ]
+    fields       = concat [ fields | RecCon fields <- map con_details cons]
 
-    meths = 
-      let bindings = bagToList (tcdMeths tcd)
-          bindingName = unLoc . fun_id
-      in [ L l (DeclEntity (bindingName b)) | L l b <- bindings ] 
 
-    -- TODO: fixities
-    sigs = [ L l $ DeclEntity name | L l (TypeSig (L _ name) _) <- tcdSigs tcd ]
-
-    ats = [ L l $ DeclEntity name | L l at <- tcdATs tcd
-                                  , let L _ name = tcdLName at ] 
-
--- | Get all the top level entities in a module. The entities are sorted by
--- their SrcLoc.
-getTopEntities :: HsGroup Name -> [Entity]
-getTopEntities group = sortByLoc (docs ++ declarations)
+-- All the sub declarations of a class (except default methods), ordered by
+-- source location, with documentation attached if it exists. 
+classDecls = filter notDef . collectDocs . sortByLoc . declsFromClass
   where
-    docs = [ L l (DocEntity d) | L l d <- hs_docs group ]
+    notDef (L _ (ValD _), _) = False
+    notDef _                 = True  
 
-    declarations = [ L l (DeclEntity n) | (l, n) <- valds ++ tyclds ++ fords ]
-      where
-        valds = let ValBindsOut _ sigs = hs_valds group 
-             -- we just use the sigs here for now.
-             -- TODO: collect from the bindings as well 
-             -- (needed for docs to work for inferred entities)
-                in [ (l, fromJust (sigNameNoLoc s)) | L l s <- sigs, 
-                      isVanillaLSig (L l s) ] -- TODO: document fixity decls
-        tyclds = [ (l, tcdName t) | L l t <- hs_tyclds group ]
-        fords  = [ (l, forName f) | L l f <- hs_fords group ]  
-          where
-            forName (ForeignImport name _ _) = unLoc name
-            forName (ForeignExport name _ _) = unLoc name
+
+declsFromClass class_ = docs ++ defs ++ sigs ++ ats
+  where 
+    docs = decls tcdDocs DocD class_
+    defs = decls (bagToList . tcdMeths) ValD class_
+    sigs = decls tcdSigs SigD class_
+    ats  = decls tcdATs TyClD class_
+
+
+declName :: HsDecl Name -> Name
+declName (TyClD d) = tcdName d
+declName (ForD (ForeignImport n _ _)) = unLoc n
+-- we have normal sigs only (since they are taken from ValBindsOut)
+declName (SigD sig) = fromJust $ sigNameNoLoc sig
+
+
+-- All the top-level declarations of a module, ordered by source location,
+-- with documentation attached if it exists
+topDecls :: HsGroup Name -> [(LHsDecl Name, Maybe (HsDoc Name))] 
+topDecls = collectDocs . sortByLoc . declsFromGroup
+
+
+-- | Pick out the declarations that we want from a group
+declsFromGroup :: HsGroup Name -> [LHsDecl Name] 
+declsFromGroup group = 
+  decls hs_tyclds TyClD group ++
+  decls hs_fords  ForD  group ++
+  decls hs_docs   DocD  group ++
+  decls (sigs . hs_valds) SigD group
+  where
+    sigs (ValBindsOut _ x) = x
+
+
+-- | Takes a field of declarations from a data structure and creates HsDecls
+-- using the given constructor
+decls field con struct = [ L loc (con decl) | L loc decl <- field struct ]
+
+
+-- | Sort by source location
+sortByLoc = sortBy (comparing getLoc)
 
 
 --------------------------------------------------------------------------------
 -- Collect docs
 --
 -- To be able to attach the right Haddock comment to the right declaration,
--- we sort the entities by their SrcLoc and "collect" the docs for each 
+-- we sort the declarations by their SrcLoc and "collect" the docs for each 
 -- declaration.
 --------------------------------------------------------------------------------
 
 
--- | Collect the docs and attach them to the right name
-collectDocs :: [Entity] -> [(Name, HsDoc Name)]
-collectDocs entities = collect Nothing DocEmpty entities
+-- | Collect the docs and attach them to the right declaration
+collectDocs :: [LHsDecl Name] -> [(LHsDecl Name, Maybe (HsDoc Name))]
+collectDocs decls = collect Nothing DocEmpty decls
 
 
-collect :: Maybe Entity -> HsDoc Name -> [Entity] -> [(Name, HsDoc Name)]
+collect :: Maybe (LHsDecl Name) -> HsDoc Name -> [LHsDecl Name] -> [(LHsDecl Name, Maybe (HsDoc Name))]
 collect d doc_so_far [] =
    case d of
         Nothing -> []
@@ -208,126 +236,36 @@ collect d doc_so_far [] =
 
 collect d doc_so_far (e:es) =
   case e of
-    DocEntity (DocCommentNext str) ->
+    L _ (DocD (DocCommentNext str)) ->
       case d of
         Nothing -> collect d (docAppend doc_so_far str) es
         Just d0 -> finishedDoc d0 doc_so_far (collect Nothing str es)
 
-    DocEntity (DocCommentPrev str) -> collect d (docAppend doc_so_far str) es
+    L _ (DocD (DocCommentPrev str)) -> collect d (docAppend doc_so_far str) es
 
     _ -> case d of
       Nothing -> collect (Just e) doc_so_far es
       Just d0
-        | sameName d0 e -> collect d doc_so_far es  
+        | sameDecl d0 e -> collect d doc_so_far es  
         | otherwise -> finishedDoc d0 doc_so_far (collect (Just e) DocEmpty es)
 
 
-finishedDoc :: Entity -> HsDoc Name -> [(Name, HsDoc Name)] -> 
-               [(Name, HsDoc Name)]
-finishedDoc d DocEmpty rest = rest
-finishedDoc (DeclEntity name) doc rest = (name, doc) : rest
+finishedDoc :: LHsDecl Name -> HsDoc Name -> [(LHsDecl Name, Maybe (HsDoc Name))] -> 
+               [(LHsDecl Name, Maybe (HsDoc Name))]
+finishedDoc d DocEmpty rest = (d, Nothing) : rest
+finishedDoc d doc rest | notDocDecl d = (d, Just doc) : rest
+  where
+    notDocDecl (L _ (DocD _)) = False
+    notDocDecl _              = True
 finishedDoc _ _ rest = rest
 
 
--------------------------------------------------------------------------------
--- 
--------------------------------------------------------------------------------
-
-
--- This map includes everything that can be exported separately,
--- that means: top declarations, class methods and record selectors
--- TODO: merge this with mkDeclMap and the extractXXX functions 
-mkDocMap :: HsGroup Name -> Map Name (HsDoc Name)
-mkDocMap group = Map.fromList (topDeclDocs ++ classMethDocs ++ recordFieldDocs)
-  where
-    tyclds    = map unLoc (hs_tyclds group)
-    classes   = filter isClassDecl tyclds 
-    datadecls = filter isDataDecl tyclds
-    constrs   = [ con | d <- datadecls, L _ con <- tcdCons d ]
-    fields    = concat [ fields | RecCon fields <- map con_details constrs]
-
-    topDeclDocs   = collectDocs (getTopEntities group)
-    classMethDocs = concatMap (collectDocs . getClassEntities) classes
-
-    recordFieldDocs = [ (unLoc lname, doc) | 
-                        ConDeclField lname _ (Just (L _ doc)) <- fields ]
+sameDecl d1 d2 = getLoc d1 == getLoc d2
 
        
 mkSubMap :: HsGroup Name -> Map Name [Name]
 mkSubMap group = Map.fromList [ (name, subs) | L _ tycld <- hs_tyclds group,
  let name:subs = map unLoc (tyClDeclNames tycld) ]
-
-
-mkDeclMap :: [Name] -> HsGroup Name -> Map Name (LHsDecl Name) 
-mkDeclMap names group = Map.fromList [ (n,d)  | (n,Just d) <- maybeDecls ]
-  where 
-  maybeDecls = [ (name, getDeclFromGroup group name) | name <- names ]
-
-
-entityNames :: [Entity] -> [Name]
-entityNames entities = [ name | DeclEntity name <- entities ] 
-{-
-getValSig :: Name -> HsValBinds Name -> TypeEnv -> Maybe (LSig Name)
-getValSig name (ValBindsOut recsAndBinds _) typEnv = case matchingBinds of
-  [bind] -> -- OK we have found a binding that matches. Now look up the
-            -- type, even though it may be present in the ValBindsOut
-            let tything = lookupTypeEnv typeEnv name       
-  _ -> Nothing
-  where 
-    binds = snd $ unzip recsAndBinds 
-    matchingBinds = Bag.filter matchesName binds
-    matchesName (L _ bind) = fun_id bind == name
-getValSig _ _ _ = error "getValSig"
--}
-
-
-getDeclFromGroup :: HsGroup Name -> Name -> Maybe (LHsDecl Name)
-getDeclFromGroup group name = 
-  case catMaybes [ getDeclFromVals  (hs_valds  group), 
-                   getDeclFromTyCls (hs_tyclds group),
-                   getDeclFromFors  (hs_fords  group) ] of
-    [decl] -> Just decl
-    _ -> Nothing
-  where 
-    getDeclFromVals (ValBindsOut _ lsigs) = case matching of 
-      [lsig] -> Just (L (getLoc lsig) (SigD (unLoc lsig)))
-      _      -> Nothing
-     where 
-        matching = [ s | s@(L l (TypeSig (L _ n) _)) <- lsigs, n == name ]
-
-    getDeclFromVals _ = error "getDeclFromVals: illegal input"
-
-{-    getDeclFromVals (ValBindsOut recsAndbinds _) = 
-      let binds = snd $ unzip recsAndBinds 
-          matchingBinds = Bag.filter matchesName binds
-          matchesName (L _ bind) = fun_id bind == name
-      in case matchingBinds of 
-        [bind] -> -- OK we have found a binding that matches. Now look up the
-                  -- type, even though it may be present in the ValBindsOut
-                  
-        _ -> Nothing
-     where 
-        matching = [ lsig | lsig <- lsigs, let Just n = sigName lsig, n == name ]
-    getDeclFromVals _ = error "getDeclFromVals: illegal input"
-  -}    
-    getDeclFromTyCls ltycls = case matching of 
-      [ltycl] -> Just (L (getLoc ltycl) (TyClD (unLoc ltycl)))
-      _       -> Nothing
-      where
-        matching = [ fmap makeVanillaClass ltycl | ltycl <- ltycls,
-                     name `elem` (map unLoc . tyClDeclNames . unLoc $ ltycl)]
-          where 
-            makeVanillaClass tycl
-              | isClassDecl tycl = tycl { tcdSigs = filter isVanillaLSig (tcdSigs tycl) }
-              | otherwise = tycl
- 
-    getDeclFromFors lfors = case matching of 
-      [for] -> Just (L (getLoc for) (ForD (unLoc for)))
-      _      -> Nothing
-      where
-        matching = [ for | for <- lfors, forName (unLoc for) == name ]
-        forName (ForeignExport n _ _) = unLoc n
-        forName (ForeignImport n _ _) = unLoc n
 
 
 -- | Build the list of items that will become the documentation, from the
@@ -337,17 +275,16 @@ mkExportItems
   :: ModuleMap
   -> Module			-- this module
   -> [Name]			-- exported names (orig)
-  -> Map Name (LHsDecl Name) -- maps local names to declarations
+  -> [(LHsDecl Name, Maybe (HsDoc Name))]
+  -> Map Name (LHsDecl Name, Maybe (HsDoc Name)) -- maps local names to declarations
   -> Map Name [Name]	-- sub-map for this module
-  -> [Entity]	-- entities in the current module
   -> [DocOption]
   -> Maybe [IE Name]
   -> Bool				-- --ignore-all-exports flag
-  -> Map Name (HsDoc Name)
   -> ErrMsgM [ExportItem Name]
 
-mkExportItems modMap this_mod exported_names declMap sub_map entities
-              opts maybe_exps ignore_all_exports docMap
+mkExportItems modMap this_mod exported_names decls declMap sub_map
+              opts maybe_exps ignore_all_exports
   | isNothing maybe_exps || ignore_all_exports || OptIgnoreExports `elem` opts
     = everything_local_exported
   | Just specs <- maybe_exps = do 
@@ -355,7 +292,7 @@ mkExportItems modMap this_mod exported_names declMap sub_map entities
       return (concat exps)
   where
     everything_local_exported =  -- everything exported
-      return (fullContentsOfThisModule this_mod entities declMap docMap)
+      return (fullContentsOfThisModule this_mod decls)
    
     packageId = modulePackageId this_mod
 
@@ -366,15 +303,15 @@ mkExportItems modMap this_mod exported_names declMap sub_map entities
     lookupExport (IEModuleContents m)  = fullContentsOf (mkModule packageId m)
     lookupExport (IEGroup lev doc)     = return [ ExportGroup lev "" doc ]
     lookupExport (IEDoc doc)           = return [ ExportDoc doc ] 
-    lookupExport (IEDocNamed str)
-	= do r <- findNamedDoc str entities
-	     case r of
-		Nothing -> return []
-		Just found -> return [ ExportDoc found ]
+    lookupExport (IEDocNamed str) = do
+      r <- findNamedDoc str (map (unLoc . fst) decls)
+      case r of
+        Nothing -> return []
+        Just found -> return [ ExportDoc found ]
  
     declWith :: Name -> ErrMsgM [ ExportItem Name ]
     declWith t
-	| (Just decl, maybeDoc) <- findDecl t
+	| Just (decl, maybeDoc) <- findDecl t
         = return [ ExportDecl t (restrictTo subs (extractDecl t mdl decl)) maybeDoc [] ]
 	| otherwise
 	= return []
@@ -385,7 +322,7 @@ mkExportItems modMap this_mod exported_names declMap sub_map entities
 		       | otherwise       = allSubsOfName modMap t
 
     fullContentsOf m  
-	| m == this_mod = return (fullContentsOfThisModule this_mod entities declMap docMap)
+	| m == this_mod = return (fullContentsOfThisModule this_mod decls)
 	| otherwise = 
 	   case Map.lookup m modMap of
 	     Just iface
@@ -394,28 +331,22 @@ mkExportItems modMap this_mod exported_names declMap sub_map entities
 		| otherwise -> return [ ExportModule m ]
 	     Nothing -> return [] -- already emitted a warning in visibleNames
 
-    findDecl :: Name -> (Maybe (LHsDecl Name), Maybe (HsDoc Name))
-    findDecl n | not (isExternalName n) = error "This shouldn't happen"
+    findDecl :: Name -> Maybe (LHsDecl Name, Maybe (HsDoc Name))
     findDecl n 
-	| m == this_mod = (Map.lookup n declMap, Map.lookup n docMap)
-	| otherwise = 
-	   case Map.lookup m modMap of
-		Just iface -> (Map.lookup n (ifaceDeclMap iface), 
-                      Map.lookup n (ifaceDocMap iface))
-		Nothing -> (Nothing, Nothing)
+	    | m == this_mod = Map.lookup n declMap
+      | otherwise = case Map.lookup m modMap of
+                      Just iface -> Map.lookup n (ifaceDeclMap iface) 
+                      Nothing -> Nothing
       where
         m = nameModule n
 
 
-fullContentsOfThisModule :: Module -> [Entity] -> Map Name (LHsDecl Name) ->
-                            Map Name (HsDoc Name) -> [ExportItem Name]
-fullContentsOfThisModule module_ entities declMap docMap 
-  = catMaybes (map mkExportItem entities)
-  where 
-    mkExportItem (DocEntity (DocGroup lev doc)) = Just (ExportGroup lev "" doc)
-    mkExportItem (DeclEntity name) = fmap mkExport (Map.lookup name declMap) 
-      where mkExport decl = ExportDecl name decl (Map.lookup name docMap) []
-    mkExportItem _ = Nothing
+fullContentsOfThisModule :: Module -> [(LHsDecl Name, Maybe (HsDoc Name))] -> [ExportItem Name]
+fullContentsOfThisModule module_ decls = catMaybes (map mkExportItem decls)
+  where
+    mkExportItem (L _ (DocD (DocGroup lev doc)), _) = Just $ ExportGroup lev "" doc
+    mkExportItem (decl, doc) = Just $ ExportDecl (declName (unLoc decl)) decl doc []
+--    mkExportItem _ = Nothing -- TODO: see if this is really needed
 
 
 -- | Sometimes the declaration we want to export is not the "main" declaration:
@@ -493,7 +424,7 @@ mkVisibleNames :: Module
              -> Map Name [Name]
              -> Maybe [IE Name]
              -> [DocOption]
-             -> Map Name (LHsDecl Name)
+             -> Map Name (LHsDecl Name, Maybe (HsDoc Name))
              -> ErrMsgM [Name]
 
 mkVisibleNames mdl modMap localNames scope subMap maybeExps opts declMap 
@@ -552,12 +483,13 @@ allSubsOfName modMap name
 
 -- Named documentation
 
-findNamedDoc :: String -> [Entity] -> ErrMsgM (Maybe (HsDoc Name))
-findNamedDoc name entities = search entities 
-	where search [] = do
-		tell ["Cannot find documentation for: $" ++ name]
-		return Nothing
-	      search ((DocEntity (DocCommentNamed name' doc)):rest) 
-			| name == name' = return (Just doc)
-		   	| otherwise = search rest
-	      search (_other_decl : rest) = search rest
+findNamedDoc :: String -> [HsDecl Name] -> ErrMsgM (Maybe (HsDoc Name))
+findNamedDoc name decls = search decls
+	where
+    search [] = do
+		  tell ["Cannot find documentation for: $" ++ name]
+		  return Nothing
+    search ((DocD (DocCommentNamed name' doc)):rest) 
+      | name == name' = return (Just doc)
+      | otherwise = search rest
+    search (_other_decl : rest) = search rest
