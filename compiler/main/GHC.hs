@@ -401,7 +401,7 @@ guessOutputFile s = modifySession s $ \env ->
         -- we must add the .exe extention unconditionally here, otherwise
         -- when name has an extension of its own, the .exe extension will
         -- not be added by DriverPipeline.exeFileName.  See #2248
-        name_exe = name <.> "exe"
+        name_exe = fmap (<.> "exe") name
 #else
         name_exe = name
 #endif
