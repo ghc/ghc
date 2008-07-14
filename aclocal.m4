@@ -1,15 +1,3 @@
-    struct sigevent ev;
-    timer_t timer;
-    ev.sigev_notify = SIGEV_SIGNAL;
-    ev.sigev_signo  = SIGVTALRM;
-    if (timer_create(CLOCK_PROCESS_CPUTIME_ID, &ev, &timer) != 0) {
-       exit(1);
-    }
-#else
-    exit(1)
-#endif
-    exit(0);
-}
 # Extra autoconf macros for the Glasgow fptools
 #
 # To be a good autoconf citizen, names of local macros have prefixed with FP_ to
