@@ -994,7 +994,7 @@ spaces n | n <=# _ILIT(0) = ""
 
 \begin{code}
 pprCols :: Int
-pprCols = 120 -- could make configurable
+pprCols = 100 -- could make configurable
 
 -- NB. printDoc prints FastStrings in UTF-8: hPutFS below does no decoding.
 -- This is what we usually want, because the IO library has no encoding
