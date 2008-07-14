@@ -1681,8 +1681,7 @@ checkValidTypeInst typats rhs
        ; mapM_ checkTyFamFreeness typats
 
          -- the right-hand side is a tau type
-       ; checkTc (isTauTy rhs) $ 
-	   polyTyErr rhs
+       ; checkValidMonoType rhs
 
          -- we have a decidable instance unless otherwise permitted
        ; undecidable_ok <- doptM Opt_UndecidableInstances
@@ -1733,11 +1732,6 @@ tyFamInstInIndexErr :: Type -> SDoc
 tyFamInstInIndexErr ty
   = hang (ptext (sLit "Illegal type family application in type instance") <> 
          colon) 4 $
-      ppr ty
-
-polyTyErr :: Type -> SDoc
-polyTyErr ty 
-  = hang (ptext (sLit "Illegal polymorphic type in type instance") <> colon) 4 $
       ppr ty
 
 famInstUndecErr :: Type -> SDoc -> SDoc

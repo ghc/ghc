@@ -286,8 +286,7 @@ tcFamInstDecl1 (decl@TySynonym {tcdLName = L loc tc_name})
        ; t_typats <- mapM tcHsKindedType k_typats
        ; t_rhs    <- tcHsKindedType k_rhs
 
-         -- (3) check that 
-         --     - check the well-formedness of the instance
+         -- (3) check the well-formedness of the instance
        ; checkValidTypeInst t_typats t_rhs
 
          -- (4) construct representation tycon
