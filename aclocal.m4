@@ -1154,7 +1154,7 @@ out:
 
     tock = 0;
 
-    usleep(300);
+    usleep(3000);
 
     if (!tock) {
         fprintf(stderr,"no CLOCK_REALTIME signal\n");
