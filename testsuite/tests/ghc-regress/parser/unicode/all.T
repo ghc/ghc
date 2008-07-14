@@ -18,3 +18,4 @@ test('unicode001', normal, compile_and_run, [''])
 
 test('1744', normal, compile_and_run, [''])
 test('1103', normal, compile, [''])
+test('2302', only_ways(['normal']), compile_fail, [''])
