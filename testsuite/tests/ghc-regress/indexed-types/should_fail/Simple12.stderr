@@ -1,4 +1,4 @@
 
 Simple12.hs:8:0:
-    Illegal polymorphic type in type instance: forall a. [a]
+    Illegal polymorphic or qualified type: forall a. [a]
     In the type synonym instance declaration for `C'
