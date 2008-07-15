@@ -1486,22 +1486,26 @@ checkValidInstHead ty	-- Should be a source type
 
 check_inst_head :: DynFlags -> Class -> [Type] -> TcM ()
 check_inst_head dflags clas tys
-	-- If GlasgowExts then check at least one isn't a type variable
-  = do checkTc (dopt Opt_TypeSynonymInstances dflags ||
-                all tcInstHeadTyNotSynonym tys)
-               (instTypeErr (pprClassPred clas tys) head_type_synonym_msg)
-       checkTc (dopt Opt_FlexibleInstances dflags ||
-                all tcInstHeadTyAppAllTyVars tys)
-               (instTypeErr (pprClassPred clas tys) head_type_args_tyvars_msg)
-       checkTc (dopt Opt_MultiParamTypeClasses dflags ||
-                isSingleton tys)
-               (instTypeErr (pprClassPred clas tys) head_one_type_msg)
-       mapM_ check_mono_type tys
+  = do { -- If GlasgowExts then check at least one isn't a type variable
+       ; checkTc (dopt Opt_TypeSynonymInstances dflags ||
+                  all tcInstHeadTyNotSynonym tys)
+                 (instTypeErr (pprClassPred clas tys) head_type_synonym_msg)
+       ; checkTc (dopt Opt_FlexibleInstances dflags ||
+                  all tcInstHeadTyAppAllTyVars tys)
+                 (instTypeErr (pprClassPred clas tys) head_type_args_tyvars_msg)
+       ; checkTc (dopt Opt_MultiParamTypeClasses dflags ||
+                  isSingleton tys)
+                 (instTypeErr (pprClassPred clas tys) head_one_type_msg)
+         -- May not contain type family applications
+       ; mapM_ checkTyFamFreeness tys
+
+       ; mapM_ check_mono_type tys
 	-- For now, I only allow tau-types (not polytypes) in 
 	-- the head of an instance decl.  
 	-- 	E.g.  instance C (forall a. a->a) is rejected
 	-- One could imagine generalising that, but I'm not sure
 	-- what all the consequences might be
+       }
 
   where
     head_type_synonym_msg = parens (
@@ -1719,7 +1723,7 @@ checkFamInst lhsTys famInsts
 checkTyFamFreeness :: Type -> TcM ()
 checkTyFamFreeness ty
   = checkTc (isTyFamFree ty) $
-      tyFamInstInIndexErr ty
+      tyFamInstIllegalErr ty
 
 -- Check that a type does not contain any type family applications.
 --
@@ -1728,9 +1732,9 @@ isTyFamFree = null . tyFamInsts
 
 -- Error messages
 
-tyFamInstInIndexErr :: Type -> SDoc
-tyFamInstInIndexErr ty
-  = hang (ptext (sLit "Illegal type family application in type instance") <> 
+tyFamInstIllegalErr :: Type -> SDoc
+tyFamInstIllegalErr ty
+  = hang (ptext (sLit "Illegal type synonym family application in instance") <> 
          colon) 4 $
       ppr ty
 
