@@ -351,86 +351,29 @@ int main(int argc, char *argv[])
 
       <indexterm><primary>C calls, function headers</primary></indexterm>
 
-      <para>When generating C (using the <option>-fvia-C</option>
-      flag), one can assist the C compiler in detecting type
-      errors by using the <option>-&num;include</option> directive
-      (<xref linkend="options-C-compiler"/>) to provide
-      <filename>.h</filename> files containing function
-      headers.</para>
+      <para>C functions are normally declared using prototypes in a C
+        header file.  Earlier versions of GHC (6.8.3 and
+        earlier) <literal>&num;include</literal>d the header file in
+        the C source file generated from the Haskell code, and the C
+        compiler could therefore check that the C function being
+        called via the FFI was being called at the right type.</para>
 
-      <para>For example,</para>
-
-<programlisting>
-#include "HsFFI.h"
-
-void         initialiseEFS (HsInt size);
-HsInt        terminateEFS (void);
-HsForeignObj emptyEFS(void);
-HsForeignObj updateEFS (HsForeignObj a, HsInt i, HsInt x);
-HsInt        lookupEFS (HsForeignObj a, HsInt i);
-</programlisting>
-
-      <para>The types <literal>HsInt</literal>,
-      <literal>HsForeignObj</literal> etc. are described in the H98 FFI
-      Addendum.</para>
-
-      <para>Note that this approach is only
-      <emphasis>essential</emphasis> for returning
-      <literal>float</literal>s (or if <literal>sizeof(int) !=
-      sizeof(int *)</literal> on your architecture) but is a Good
-      Thing for anyone who cares about writing solid code.  You're
-      crazy not to do it.</para>
-
-<para>
-What if you are importing a module from another package, and
-a cross-module inlining exposes a foreign call that needs a supporting
-<option>-&num;include</option>?  If the imported module is from the same package as
-the module being compiled, you should supply all the <option>-&num;include</option>
-that you supplied when compiling the imported module.  If the imported module comes
-from another package, you won't necessarily know what the appropriate 
-<option>-&num;include</option> options are; but they should be in the package 
-configuration, which GHC knows about.  So if you are building a package using
-        Cabal, remember to put all those include files in the package
-        description (see the <literal>includes</literal> field in the Cabal
-        documentation).</para>
-
-<para>
-It is also possible, according the FFI specification, to put the 
-<option>-&num;include</option> option in the foreign import 
-declaration itself:
-<programlisting>
-  foreign import "foo.h f" f :: Int -> IO Int
-</programlisting>
-When compiling this module, GHC will generate a C file that includes
-the specified <option>-&num;include</option>.  However, GHC
-<emphasis>disables</emphasis> cross-module inlining for such foreign
-calls, because it doesn't transport the <option>-&num;include</option>
-information across module boundaries.  (There is no fundamental reason for this;
-it was just tiresome to implement.  The wrapper, which unboxes the arguments
-etc, is still inlined across modules.)  So if you want the foreign call itself
-to be inlined across modules, use the command-line and package-configuration
-<option>-&num;include</option> mechanism.
-</para>
-
-      <sect3 id="finding-header-files">
-	<title>Finding Header files</title>
-
-	<para>Header files named by the <option>-&num;include</option>
-	option or in a <literal>foreign import</literal> declaration
-	are searched for using the C compiler's usual search path.
-	You can add directories to this search path using the
-	<option>-I</option> option (see <xref
-	linkend="c-pre-processor"/>).</para>
-
-	<para>Note: header files are ignored unless compiling via C.
-	If you had been compiling your code using the native code
-	generator (the default) and suddenly switch to compiling via
-	C, then you can get unexpected errors about missing include
-	files.  Compiling via C is enabled automatically when certain
-	options are given (eg. <option>-O</option> and
-	<option>-prof</option> both enable
-	<option>-fvia-C</option>).</para>
-      </sect3>
+      <para>GHC no longer includes external header files when
+        compiling via C, so this checking is not performed.  The
+        change was made for compatibility with the native code backend
+        (<literal>-fasm</literal>) and to comply strictly with the FFI
+        specification, which requires that FFI calls are not subject
+        to macro expansion and other CPP conversions that may be
+        applied when using C header files.  This approach also
+        simplifies the inlining of foreign calls across module and
+        package boundaries: there's no need for the header file to be
+        available when compiling an inlined version of a foreign call,
+        so the compiler is free to inline foreign calls in any
+        context.</para>
+        
+      <para>The <literal>-&num;include</literal> option is now
+        deprecated, and the <literal>include-files</literal> field
+        in a Cabal package specification is ignored.</para>
 
     </sect2>
 
