@@ -180,16 +180,20 @@ userErrors      :: Exception -> Maybe String
 userErrors (UserError _ s) = Just s
 userErrors  _              = Nothing
 
+assert :: Bool -> a -> a
+assert True  x = x
+assert False _ = throw (UserError "" "Assertion failed")
+#endif
+
+#ifndef __GLASGOW_HASKELL__
+-- Dummy definitions for implementations lacking asynchonous exceptions
+
 block   :: IO a -> IO a
 block    = id
 unblock :: IO a -> IO a
 unblock  = id
 blocked :: IO Bool
-blocked  = False
-
-assert :: Bool -> a -> a
-assert True  x = x
-assert False _ = throw (UserError "" "Assertion failed")
+blocked  = return False
 #endif
 
 -----------------------------------------------------------------------------
