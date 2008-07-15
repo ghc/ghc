@@ -1005,6 +1005,8 @@ scheduleDetectDeadlock (Capability *cap, Task *task)
 
 	    // either we have threads to run, or we were interrupted:
 	    ASSERT(!emptyRunQueue(cap) || sched_state >= SCHED_INTERRUPTING);
+
+            return;
 	}
 #endif
 
