@@ -1,8 +1,8 @@
 
 Simple13.hs:9:0:
-    Illegal type family application in type instance: [C a]
+    Illegal type synonym family application in instance: [C a]
     In the data type instance declaration for `D'
 
 Simple13.hs:13:0:
-    Illegal type family application in type instance: [C a]
+    Illegal type synonym family application in instance: [C a]
     In the type synonym instance declaration for `E'

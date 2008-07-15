@@ -29,6 +29,7 @@ test('TyFamUndec', normal, compile_fail, [''])
 test('T2334', if_compiler_lt('ghc', '6.9', expect_fail), compile_fail, [''])
 test('T1900', if_compiler_lt('ghc', '6.9', expect_fail), compile_fail, [''])
 test('T2157', if_compiler_lt('ghc', '6.9', expect_fail), compile_fail, [''])
+test('T2203a', if_compiler_lt('ghc', '6.9', expect_fail), compile_fail, [''])
 
 test('GADTwrong1', if_compiler_lt('ghc', '6.9', expect_fail), compile_fail, [''])
 
