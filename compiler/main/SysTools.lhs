@@ -163,9 +163,12 @@ initSysTools mbMinusB dflags0
         ; let installed, installed_bin :: FilePath -> FilePath
               installed_bin pgm  = top_dir </> pgm
               installed     file = top_dir </> file
+              inplaceUpDirs
+               | isWindowsHost = 2
+               | otherwise     = 4
               inplace dir   pgm  = let real_top_dir = foldr (</>) ""
                                                     $ reverse
-                                                    $ drop 4
+                                                    $ drop inplaceUpDirs
                                                     $ reverse
                                                     $ splitDirectories top_dir
                                    in real_top_dir </> dir </> pgm
