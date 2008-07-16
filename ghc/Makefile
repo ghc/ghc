@@ -33,9 +33,21 @@ clean distclean::
 	$(RM) -rf stage1-inplace
 	$(RM) -rf stage2-inplace
 
+# XXX Eugh, can we do this better? The problem is making extra-gcc-opts
+# infdable on both Linux and Windows. I guess this will go away when we
+# drop the mangler?
+ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
+SET_DATA_SUBDIR = --datasubdir=.
+INPLACE_DATA_DIR = '$$prefix'
+else
+SET_DATA_SUBDIR =
+INPLACE_DATA_DIR = '$$prefix/data'
+endif
+
 build.stage1:
 	$(CABAL) configure --distpref dist-stage1 \
 	                   --flags=-ghci \
+	                   $(SET_DATA_SUBDIR) \
 	                   $(INSTALL_DIRS_CONFIGURE_FLAGS) \
 	                   $(USE_BOOT_CONFIGURE_FLAGS) \
 	                   $(COMMON_CONFIGURE_FLAGS)
@@ -47,7 +59,7 @@ build.stage1:
 	                   '$$prefix/lib' \
 	                   '$$prefix/libexec' \
 	                   '$$prefix/dynlib' \
-	                   '$$prefix/data' \
+	                   $(INPLACE_DATA_DIR) \
 	                   '$$prefix/doc' \
 	                   '$$prefix/html' \
 	                   '$$prefix/haddock' \
@@ -77,6 +89,7 @@ endif
 
 build.stage2:
 	$(CABAL) configure --distpref dist-stage2 \
+	                   $(SET_DATA_SUBDIR) \
 	                   $(CONFIGURE_FLAGS_STAGE2) \
 	                   $(INSTALL_DIRS_CONFIGURE_FLAGS) \
 	                   $(USE_STAGE1_CONFIGURE_FLAGS) \
@@ -89,7 +102,7 @@ build.stage2:
 	                   '$$prefix/lib' \
 	                   '$$prefix/libexec' \
 	                   '$$prefix/dynlib' \
-	                   '$$prefix/data' \
+	                   $(INPLACE_DATA_DIR) \
 	                   '$$prefix/doc' \
 	                   '$$prefix/html' \
 	                   '$$prefix/haddock' \
