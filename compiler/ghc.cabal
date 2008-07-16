@@ -61,6 +61,10 @@ Library
         CPP-Options: -DGHCI
         Include-Dirs: ../libffi/build/include
 
+    -- GHC 6.4.2 needs to be able to find WCsubst.c, which needs to be
+    -- able to find WCsubst.h
+    Include-Dirs: ../libraries/base/cbits, ../libraries/base/include
+
     Extensions: CPP, MagicHash, UnboxedTuples, PatternGuards,
                 ForeignFunctionInterface, EmptyDataDecls,
                 TypeSynonymInstances, MultiParamTypeClasses,
