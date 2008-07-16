@@ -59,6 +59,7 @@ clean distclean::
 	$(RM) -f prelude/primops.txt
 	$(RM) -f $(PRIMOP_BITS)
 	$(RM) -f $(CONFIG_HS)
+	$(RM) -f parser/Parser.y
 
 ifeq "$(GhcWithInterpreter)" "YES"
 CONFIGURE_FLAGS_STAGE2 += --flags=ghci
@@ -140,7 +141,10 @@ ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 # stdcall, and doesn't generate the Foo@8 name for them
 # As it's only important for older compilers we don't need to do anything
 # for stage2+.
-CONFIGURE_FLAGS_STAGE1 += --ghc-options='-\#include <windows.h> -\#include <process.h>'
+CONFIGURE_FLAGS_STAGE1 += --ghc-option='-\#include'    \
+                          --ghc-option='"<windows.h>"' \
+                          --ghc-option='-\#include'    \
+                          --ghc-option='"<process.h>"'
 endif
 
 # ghc_strlen percolates through so many modules that it is easier to get its
@@ -188,6 +192,8 @@ boot :: stage_dirs
 # into Config.hs, whence they can be compiled and used by GHC itself
 
 boot :: $(CONFIG_HS)
+
+boot :: parser/Parser.y
 
 $(CONFIG_HS) : $(FPTOOLS_TOP)/mk/config.mk
 	@$(RM) -f $(CONFIG_HS)
