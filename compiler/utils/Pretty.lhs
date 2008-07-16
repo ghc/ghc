@@ -152,6 +152,10 @@ Relative to John's original paper, there are the following new features:
 
 
 \begin{code}
+{-# OPTIONS -fno-warn-unused-imports #-}
+-- XXX GHC 6.9 seems to be confused by unpackCString# being used only in
+--     a RULE
+
 module Pretty (
         Doc,            -- Abstract
         Mode(..), TextDetails(..),

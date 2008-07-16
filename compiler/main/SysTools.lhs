@@ -161,9 +161,14 @@ initSysTools mbMinusB dflags0
                 -- format, '/' separated
 
         ; let installed, installed_bin :: FilePath -> FilePath
-              installed_bin pgm   =  top_dir </> pgm
-              installed     file  =  top_dir </> file
-              inplace dir   pgm   =  top_dir </> dir </> pgm
+              installed_bin pgm  = top_dir </> pgm
+              installed     file = top_dir </> file
+              inplace dir   pgm  = let real_top_dir = foldr (</>) ""
+                                                    $ reverse
+                                                    $ drop 4
+                                                    $ reverse
+                                                    $ splitDirectories top_dir
+                                   in real_top_dir </> dir </> pgm
 
         ; let pkgconfig_path
                 | am_installed = installed "package.conf"

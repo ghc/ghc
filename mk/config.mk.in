@@ -346,8 +346,6 @@ BuildingGranSim=$(subst mg,YES,$(filter mg,$(WAYS)))
 
 HscIfaceFileVersion=6
 
-MakefileDeps=YES
-
 #------------------------------------------------------------------------------
 # Options for Libraries
 
@@ -713,7 +711,7 @@ GC_CPP_OPTS += -P -E -x c -traditional -D__GLASGOW_HASKELL__
 
 GHC_UTILS_DIR_REL	= utils
 GHC_INCLUDE_DIR_REL	= includes
-GHC_COMPILER_DIR_REL	= compiler
+GHC_COMPILER_DIR_REL = ghc
 GHC_RTS_DIR_REL	   	= rts
 GHC_UTILS_DIR_REL 	= utils
 GHC_DRIVER_DIR_REL	= driver
@@ -790,6 +788,7 @@ GHC_TOUCHY_DIR_ABS	= $(FPTOOLS_TOP_ABS)/$(GHC_TOUCHY_DIR_REL)
 GHC_PKG_DIR_ABS		= $(FPTOOLS_TOP_ABS)/$(GHC_PKG_DIR_REL)
 GHC_GENPRIMOP_DIR_ABS	= $(FPTOOLS_TOP_ABS)/$(GHC_GENPRIMOP_DIR_REL)
 GHC_GENAPPLY_DIR_ABS	= $(FPTOOLS_TOP_ABS)/$(GHC_GENAPPLY_DIR_REL)
+GHC_COMPILER_DIR_ABS	= $(FPTOOLS_TOP_ABS)/$(GHC_COMPILER_DIR_REL)
 
 GHC_MANGLER_DIR_ABS	= $(FPTOOLS_TOP_ABS)/$(GHC_MANGLER_DIR_REL)
 GHC_SYSMAN_DIR_ABS	= $(FPTOOLS_TOP_ABS)/$(GHC_SYSMAN_DIR_REL)
@@ -872,10 +871,12 @@ NHC		= @NHC@
 # places (eg. it's handy to have a nofib & a ghc build in the same
 # tree).  We can refer to "this ghc" as $(GHC_INPLACE):
 
-GHC_INPLACE 	= $(GHC_COMPILER_DIR)/ghc-inplace
-GHC_STAGE1 	= $(GHC_COMPILER_DIR)/stage1/ghc-inplace -no-user-package-conf
-GHC_STAGE2 	= $(GHC_COMPILER_DIR)/stage2/ghc-inplace -no-user-package-conf
-GHC_STAGE3 	= $(GHC_COMPILER_DIR)/stage3/ghc-inplace -no-user-package-conf
+GHC_INPLACE = $(GHC_STAGE1)
+GHC_STAGE1  = $(GHC_COMPILER_DIR_ABS)/stage1-inplace/bin/ghc
+GHC_STAGE2  = $(GHC_COMPILER_DIR_ABS)/stage2-inplace/bin/ghc
+GHC_STAGE3  = $(GHC_COMPILER_DIR_ABS)/stage3-inplace/bin/ghc
+# XXX All those used to have -no-user-package-conf, but then we can't
+# pass them to Cabal
 
 BOOTSTRAPPING_CONF = $(FPTOOLS_TOP_ABS)/libraries/bootstrapping.conf
 
@@ -957,12 +958,6 @@ SRC_CC_OPTS += -G0
 endif
 
 SRC_HSC2HS_OPTS += $(addprefix --cflag=,$(filter-out -O,$(SRC_CC_OPTS)))
-SRC_HSC2HS_OPTS += --cc=$(CC)
-SRC_HSC2HS_OPTS += --ld=$(CC)
-SRC_HSC2HS_OPTS += --cflag=-D__GLASGOW_HASKELL__=$(ProjectVersionInt)
-SRC_HSC2HS_OPTS += --lflag=-no-auto-link-packages
-SRC_HSC2HS_OPTS += -I$(GHC_INCLUDE_DIR_ABS)
-SRC_HSC2HS_OPTS += -I$(FPTOOLS_TOP_ABS)/gmp/gmpbuild
 
 # Given
 #   foo bar

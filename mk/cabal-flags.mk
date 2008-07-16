@@ -3,7 +3,10 @@ nothing=
 space=$(nothing) $(nothing)
 
 LIBRARIES_ABS = $(FPTOOLS_TOP_ABS)/libraries
+UTILS_ABS     = $(FPTOOLS_TOP_ABS)/utils
 CABAL = $(LIBRARIES_ABS)/cabal-bin $(GHC) $(LIBRARIES_ABS)/bootstrapping.conf
+INSTALL_PACKAGE = \
+    $(UTILS_ABS)/installPackage/install-inplace/bin/installPackage
 
 # We rely on all the CONFIGURE_ARGS being quoted with '...', and there
 # being no 's inside the values.
@@ -61,8 +64,10 @@ INPLACE_DIRS_CONFIGURE_FLAGS = \
     --prefix=`$(TOP)/utils/pwd/pwd forwardslash`/install-inplace
 
 USE_STAGE1_CONFIGURE_FLAGS = \
-    --with-compiler=$(FPTOOLS_TOP_ABS)/compiler/stage1/ghc-inplace \
-    --with-hc-pkg=$(FPTOOLS_TOP_ABS)/utils/ghc-pkg/ghc-pkg-inplace
+    --with-compiler=$(GHC_STAGE1) \
+    --with-hc-pkg=$(FPTOOLS_TOP_ABS)/utils/ghc-pkg/ghc-pkg-inplace \
+    $(addprefix --cc-option=,$(MACOSX_DEPLOYMENT_CC_OPTS)) \
+    $(addprefix --ld-option=,$(MACOSX_DEPLOYMENT_LD_OPTS))
 
 USE_BOOT_CONFIGURE_FLAGS = \
     --with-compiler=$(GHC) \

@@ -6,7 +6,7 @@
 
 \begin{code}
 module Util (
-        debugIsOn, ghciTablesNextToCode, picIsOn,
+        ghciSupported, debugIsOn, ghciTablesNextToCode, picIsOn,
         isWindowsHost, isWindowsTarget, isDarwinTarget,
 
         -- general list processing
@@ -107,11 +107,18 @@ infixr 9 `thenCmp`
 
 %************************************************************************
 %*                                                                      *
-\subsection{Is DEBUG on, are we on Windows?}
+\subsection{Is DEBUG on, are we on Windows, etc?}
 %*                                                                      *
 %************************************************************************
 
 \begin{code}
+ghciSupported :: Bool
+#ifdef GHCI
+ghciSupported = True
+#else
+ghciSupported = False
+#endif
+
 debugIsOn :: Bool
 #ifdef DEBUG
 debugIsOn = True

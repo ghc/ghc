@@ -31,8 +31,5 @@ GhcLibHcOpts += -w
 endif
 
 # Now add flags from the GHC build system to the Cabal build:
-GHC_CC_OPTS += $(addprefix -optc, $(MACOSX_DEPLOYMENT_CC_OPTS))
 GHC_OPTS    += $(SRC_HC_OPTS)
 GHC_OPTS    += $(GhcLibHcOpts)
-GHC_OPTS    += $(addprefix -optc, $(MACOSX_DEPLOYMENT_CC_OPTS))
-LIB_LD_OPTS += $(addprefix -optl, $(MACOSX_DEPLOYMENT_LD_OPTS))

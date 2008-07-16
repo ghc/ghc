@@ -143,9 +143,6 @@ CONFIGURE_OPTS += --enable-split-objs
 CONFIGURE_STAMP_EXTRAS := $(CONFIGURE_STAMP_EXTRAS)-splitting
 endif
 
-DEPLOYMENT_OPTS = $(addprefix -optc, $(MACOSX_DEPLOYMENT_CC_OPTS)) \
-                  $(addprefix -optl, $(MACOSX_DEPLOYMENT_LD_OPTS))
-
 .PHONY: subdirs
 
 subdirs:
@@ -160,7 +157,10 @@ ifeq "$(ghc_ge_605)" "NO"
 CABAL_GHC_FLAGS += -cpp
 endif
 
-BOOTSTRAPPING_FLAGS = $(CABAL_GHC_FLAGS) -DCABAL_VERSION=1,3 -odir $(HERE_ABS)/bootstrapping -hidir $(HERE_ABS)/bootstrapping -i$(HERE_ABS)/Cabal -i$(HERE_ABS)/filepath -i$(HERE_ABS)/hpc
+# Euch, hideous hack:
+CABAL_VERSION = $(shell grep "^Version:" Cabal/Cabal.cabal | sed -e "s/^Version: //" -e 's/\./,/g')
+
+BOOTSTRAPPING_FLAGS = $(CABAL_GHC_FLAGS) -DCABAL_VERSION=$(CABAL_VERSION) -odir $(HERE_ABS)/bootstrapping -hidir $(HERE_ABS)/bootstrapping -i$(HERE_ABS)/Cabal -i$(HERE_ABS)/filepath -i$(HERE_ABS)/hpc
 
 .PHONY: boot
 
@@ -190,8 +190,7 @@ ifBuildable/ifBuildable: ifBuildable.hs
 	mkdir ifBuildable
 	$(CP) ifBuildable.hs ifBuildable/
 ifeq "$(stage)" "2"
-	cd ifBuildable && ../$(HC) -Wall --make ifBuildable -o ifBuildable \
-	   	       	         $(DEPLOYMENT_OPTS)
+	cd ifBuildable && ../$(HC) -Wall --make ifBuildable -o ifBuildable
 else
 	cd ifBuildable && $(GHC) -Wall --make ifBuildable -o ifBuildable
 endif
@@ -368,7 +367,7 @@ $(foreach SUBDIR,$(SUBDIRS),install.library.$(SUBDIR)): \
 install.library.%: ifBuildable/ifBuildable
 	if $(IFBUILDABLE) $*; then \
 	  cd $* && \
-	  $(FPTOOLS_TOP_ABS)/utils/installPackage/install-inplace/bin/installPackage install '$(GHC_PKG_PROG)' '$(DESTDIR)$(libdir)/package.conf' '$(DESTDIR)' '$(prefix)' '$(iprefix)' '$(ibindir)' '$(ilibdir)' '$(ilibexecdir)' '$(idynlibdir)' '$(idatadir)' '$(idocdir)' '$(ihtmldir)' '$(ihaddockdir)' ; \
+	  $(INSTALL_PACKAGE) install '$(GHC_PKG_PROG)' '$(DESTDIR)$(libdir)/package.conf' '$(DESTDIR)' '$(prefix)' '$(iprefix)' '$(ibindir)' '$(ilibdir)' '$(ilibexecdir)' '$(idynlibdir)' '$(idatadir)' '$(idocdir)' '$(ihtmldir)' '$(ihaddockdir)' ; \
 	fi
 
 .PHONY: binary-dist binary-dist.library.%

@@ -67,12 +67,12 @@ include $(TOP)/mk/boilerplate.mk
 
 # We can't 'make boot' in libraries until stage1 is built
 ifeq "$(BootingFromHc)" "YES"
-SUBDIRS_BUILD = includes rts compiler docs utils driver
+SUBDIRS_BUILD = includes rts compiler ghc docs utils driver
 else
-SUBDIRS_BUILD = includes utils driver docs compiler rts libraries/Cabal/doc
+SUBDIRS_BUILD = includes utils driver docs compiler ghc rts libraries/Cabal/doc
 endif
 
-SUBDIRS = gmp libffi includes utils driver docs rts libraries compiler libraries/Cabal/doc
+SUBDIRS = gmp libffi includes utils driver docs rts compiler ghc libraries libraries/Cabal/doc
 
 check-all: check-tools check-packages
 
@@ -142,6 +142,7 @@ stage1 : $(GCC_LIB_DEP) check-all
 stage2 : check-all
 	$(MAKE) -C compiler boot stage=2
 	$(MAKE) -C compiler stage=2
+	$(MAKE) -C ghc      stage=2
 
 
 stage3 : check-all

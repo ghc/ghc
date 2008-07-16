@@ -1,0 +1,2 @@
+
+$executablename -B$datadir -dynload wrapped ${1+"$@"}

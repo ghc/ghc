@@ -1,0 +1,40 @@
+Name: ghc-bin
+-- XXX Version number!
+Version: 6.9
+Copyright: XXX
+-- License: XXX
+-- License-File: XXX
+Author: XXX
+Maintainer: glasgow-haskell-users@haskell.org
+Homepage: http://www.haskell.org/ghc/
+Synopsis: XXX
+Description:
+        XXX
+Category: XXX
+Data-Dir: ..
+Data-Files: extra-gcc-opts
+Build-Type: Simple
+Cabal-Version: >= 1.2
+
+Flag base3
+    Description: Choose the new smaller, split-up base package.
+
+Flag ghci
+    Description: Build GHCi support.
+
+Executable ghc
+    Main-Is: Main.hs
+    if flag(base3)
+        Build-Depends: base       >= 3   && < 4,
+                       directory  >= 1   && < 1.1
+    else
+        Build-Depends: base < 3
+    Build-Depends: base, ghc
+    Build-Depends: filepath >= 1 && < 1.2
+
+    GHC-Options: -Wall
+    if flag(ghci)
+        CPP-Options: -DGHCI
+
+    Extensions: CPP, PatternGuards
+
