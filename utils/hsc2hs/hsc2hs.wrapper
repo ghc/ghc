@@ -10,4 +10,4 @@ for arg do
     esac
 done
 
-$executablename $tflag $HSC2HS_EXTRA "$@"
+exec $executablename $tflag $HSC2HS_EXTRA ${1+"$@"}
