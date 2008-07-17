@@ -13,8 +13,7 @@ else
 INSTALL_FLAGS = --enable-shell-wrappers
 endif
 
-boot:
-	@:
+boot:: boot.stage.$(stage)
 
 all:: build.stage.$(stage)
 
@@ -73,12 +72,14 @@ CONFIGURE_FLAGS_STAGE3 += $(USE_STAGE2_CONFIGURE_FLAGS)
 # It works because installPackage doesn't actually use ghc-pkg, as there's
 # no library to register
 
-build.stage.%:
+boot.stage.%:
 	$(CABAL) configure --distpref dist-stage$* \
 	                   $(SET_DATA_SUBDIR) \
 	                   $(INSTALL_DIRS_CONFIGURE_FLAGS) \
 	                   $(CONFIGURE_FLAGS_STAGE$*) \
 	                   $(COMMON_CONFIGURE_FLAGS)
+
+build.stage.%:
 	$(CABAL) build     --distpref dist-stage$* $(BUILD_FLAGS)
 	$(INSTALL_PACKAGE) install '$(GHC_PKG_PROG)' 'XXX/package.conf' "" \
 	                   $(FPTOOLS_TOP_ABS)/ghc/stage$*-inplace \

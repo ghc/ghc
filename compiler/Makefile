@@ -40,6 +40,8 @@ PRIMOP_BITS = primop-data-decl.hs-incl        \
               primop-strictness.hs-incl       \
               primop-primop-info.hs-incl
 
+boot:: boot.stage.$(stage)
+
 all:: build.stage.$(stage)
 
 stage1 ::
@@ -160,7 +162,7 @@ CONFIGURE_FLAGS_STAGE1 += $(USE_BOOT_CONFIGURE_FLAGS)
 CONFIGURE_FLAGS_STAGE2 += $(USE_STAGE1_CONFIGURE_FLAGS)
 CONFIGURE_FLAGS_STAGE3 += $(USE_STAGE2_CONFIGURE_FLAGS)
 
-build.stage.%: $(PRIMOP_BITS)
+boot.stage.%:
 	$(CABAL) configure --distpref dist-stage$* \
 	                   $(CONFIGURE_FLAGS_STAGE$*) \
 	                   $(INSTALL_DIRS_CONFIGURE_FLAGS) \
@@ -168,6 +170,8 @@ build.stage.%: $(PRIMOP_BITS)
 	                   --ghc-option=-DSTAGE=$*
 	$(RM) -f Makefile-stage$*
 	$(CABAL) makefile  --distpref dist-stage$* -f Makefile-stage$*
+
+build.stage.%: $(PRIMOP_BITS)
 	$(MAKE) -f Makefile-stage$* stage=$*
 	$(CABAL) register  --distpref dist-stage$* --inplace
 
