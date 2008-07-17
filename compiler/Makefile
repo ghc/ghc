@@ -40,7 +40,7 @@ PRIMOP_BITS = primop-data-decl.hs-incl        \
               primop-strictness.hs-incl       \
               primop-primop-info.hs-incl
 
-all:: build.stage$(stage)
+all:: build.stage.$(stage)
 
 stage1 ::
 	$(MAKE) stage=1
@@ -60,6 +60,11 @@ clean distclean::
 	$(RM) -f $(PRIMOP_BITS)
 	$(RM) -f $(CONFIG_HS)
 	$(RM) -f parser/Parser.y
+
+CONFIGURE_FLAGS_STAGE1 += --flags=stage1
+CONFIGURE_FLAGS_STAGE2 += --flags=-stage1
+
+CONFIGURE_FLAGS_STAGE1 += --flags=-ghci
 
 ifeq "$(GhcWithInterpreter)" "YES"
 CONFIGURE_FLAGS_STAGE2 += --flags=ghci
@@ -118,20 +123,17 @@ endif
 ifeq "$(GhcWithNativeCodeGen)" "NO"
 # XXX This should logically be a CPP option, but there doesn't seem to
 # be a flag for that
-CONFIGURE_FLAGS_STAGE1 += --ghc-option=-DOMIT_NATIVE_CODEGEN
-CONFIGURE_FLAGS_STAGE2 += --ghc-option=-DOMIT_NATIVE_CODEGEN
+COMMON_CONFIGURE_FLAGS += --ghc-option=-DOMIT_NATIVE_CODEGEN
 endif
 
 ifeq "$(TargetOS_CPP)" "openbsd"
-CONFIGURE_FLAGS_STAGE1 += --ld-options="-Xlinker -E"
-CONFIGURE_FLAGS_STAGE2 += --ld-options="-Xlinker -E"
+COMMON_CONFIGURE_FLAGS += --ld-options="-Xlinker -E"
 endif
 
 ifeq "$(GhcUnregisterised)" "NO"
 ifeq "$(HOSTPLATFORM)" "ia64-unknown-linux"
 # needed for generating proper relocation in large binaries: trac #856
-CONFIGURE_FLAGS_STAGE1 += --ld-option=-Wl,--relax
-CONFIGURE_FLAGS_STAGE2 += --ld-option=-Wl,--relax
+COMMON_CONFIGURE_FLAGS += --ld-option=-Wl,--relax
 endif
 endif
 
@@ -153,32 +155,21 @@ endif
 # stage 2+.
 CONFIGURE_FLAGS_STAGE1 += --ghc-options='-\#include "cutils.h"'
 
-build.stage1: $(PRIMOP_BITS)
-	$(CABAL) configure --distpref dist-stage1 \
-	                   $(CONFIGURE_FLAGS_STAGE1) \
-	                   $(INSTALL_DIRS_CONFIGURE_FLAGS) \
-	                   $(USE_BOOT_CONFIGURE_FLAGS) \
-	                   $(COMMON_CONFIGURE_FLAGS) \
-	                   --flags=-ghci \
-	                   --flags=stage1 \
-	                   --ghc-option=-DSTAGE=1
-	$(RM) -f Makefile-stage1
-	$(CABAL) makefile  --distpref dist-stage1 -f Makefile-stage1
-	$(MAKE) -f Makefile-stage1 stage=1
-	$(CABAL) register  --distpref dist-stage1 --inplace
+CONFIGURE_FLAGS_STAGE3 = $(CONFIGURE_FLAGS_STAGE2)
+CONFIGURE_FLAGS_STAGE1 += $(USE_BOOT_CONFIGURE_FLAGS)
+CONFIGURE_FLAGS_STAGE2 += $(USE_STAGE1_CONFIGURE_FLAGS)
+CONFIGURE_FLAGS_STAGE3 += $(USE_STAGE2_CONFIGURE_FLAGS)
 
-build.stage2: $(PRIMOP_BITS)
-	$(CABAL) configure --distpref dist-stage2 \
-	                   $(CONFIGURE_FLAGS_STAGE2) \
+build.stage.%: $(PRIMOP_BITS)
+	$(CABAL) configure --distpref dist-stage$* \
+	                   $(CONFIGURE_FLAGS_STAGE$*) \
 	                   $(INSTALL_DIRS_CONFIGURE_FLAGS) \
-	                   $(USE_STAGE1_CONFIGURE_FLAGS) \
 	                   $(COMMON_CONFIGURE_FLAGS) \
-	                   --flags=-stage1 \
-	                   --ghc-option=-DSTAGE=2
-	$(RM) -f Makefile-stage2
-	$(CABAL) makefile  --distpref dist-stage2 -f Makefile-stage2
-	$(MAKE) -f Makefile-stage2 stage=2
-	$(CABAL) register  --distpref dist-stage2 --inplace
+	                   --ghc-option=-DSTAGE=$*
+	$(RM) -f Makefile-stage$*
+	$(CABAL) makefile  --distpref dist-stage$* -f Makefile-stage$*
+	$(MAKE) -f Makefile-stage$* stage=$*
+	$(CABAL) register  --distpref dist-stage$* --inplace
 
 stage_dirs :
 	$(MKDIRHIER) stage$(stage)

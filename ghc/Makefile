@@ -16,7 +16,7 @@ endif
 boot:
 	@:
 
-all:: build.stage$(stage)
+all:: build.stage.$(stage)
 
 stage1 ::
 	$(MAKE) stage=1
@@ -44,27 +44,7 @@ SET_DATA_SUBDIR =
 INPLACE_DATA_DIR = '$$prefix/data'
 endif
 
-build.stage1:
-	$(CABAL) configure --distpref dist-stage1 \
-	                   --flags=-ghci \
-	                   $(SET_DATA_SUBDIR) \
-	                   $(INSTALL_DIRS_CONFIGURE_FLAGS) \
-	                   $(USE_BOOT_CONFIGURE_FLAGS) \
-	                   $(COMMON_CONFIGURE_FLAGS)
-	$(CABAL) build     --distpref dist-stage1 $(BUILD_FLAGS)
-	$(INSTALL_PACKAGE) install '$(GHC_PKG_PROG)' 'XXX/package.conf' "" \
-	                   $(FPTOOLS_TOP_ABS)/ghc/stage1-inplace \
-	                   $(FPTOOLS_TOP_ABS)/ghc/stage1-inplace \
-	                   '$$prefix/bin' \
-	                   '$$prefix/lib' \
-	                   '$$prefix/libexec' \
-	                   '$$prefix/dynlib' \
-	                   $(INPLACE_DATA_DIR) \
-	                   '$$prefix/doc' \
-	                   '$$prefix/html' \
-	                   '$$prefix/haddock' \
-	                   --distpref dist-stage1 \
-	                   $(INSTALL_FLAGS)
+CONFIGURE_FLAGS_STAGE1 += --flags=-ghci
 
 ifeq "$(GhcWithInterpreter)" "YES"
 CONFIGURE_FLAGS_STAGE2 += --flags=ghci
@@ -83,21 +63,26 @@ ifeq "$(GhcThreaded)" "YES"
 CONFIGURE_FLAGS_STAGE2 += --ghc-option=-threaded
 endif
 
-# XXX In stage2 we should really use the inplace ghc-pkg
+CONFIGURE_FLAGS_STAGE3 = $(CONFIGURE_FLAGS_STAGE2)
+
+CONFIGURE_FLAGS_STAGE1 += $(USE_BOOT_CONFIGURE_FLAGS)
+CONFIGURE_FLAGS_STAGE2 += $(USE_STAGE1_CONFIGURE_FLAGS)
+CONFIGURE_FLAGS_STAGE3 += $(USE_STAGE2_CONFIGURE_FLAGS)
+
+# XXX In stage2+ we should really use the inplace ghc-pkg
 # It works because installPackage doesn't actually use ghc-pkg, as there's
 # no library to register
 
-build.stage2:
-	$(CABAL) configure --distpref dist-stage2 \
+build.stage.%:
+	$(CABAL) configure --distpref dist-stage$* \
 	                   $(SET_DATA_SUBDIR) \
-	                   $(CONFIGURE_FLAGS_STAGE2) \
 	                   $(INSTALL_DIRS_CONFIGURE_FLAGS) \
-	                   $(USE_STAGE1_CONFIGURE_FLAGS) \
+	                   $(CONFIGURE_FLAGS_STAGE$*) \
 	                   $(COMMON_CONFIGURE_FLAGS)
-	$(CABAL) build     --distpref dist-stage2 $(BUILD_FLAGS)
+	$(CABAL) build     --distpref dist-stage$* $(BUILD_FLAGS)
 	$(INSTALL_PACKAGE) install '$(GHC_PKG_PROG)' 'XXX/package.conf' "" \
-	                   $(FPTOOLS_TOP_ABS)/ghc/stage2-inplace \
-	                   $(FPTOOLS_TOP_ABS)/ghc/stage2-inplace \
+	                   $(FPTOOLS_TOP_ABS)/ghc/stage$*-inplace \
+	                   $(FPTOOLS_TOP_ABS)/ghc/stage$*-inplace \
 	                   '$$prefix/bin' \
 	                   '$$prefix/lib' \
 	                   '$$prefix/libexec' \
@@ -106,7 +91,7 @@ build.stage2:
 	                   '$$prefix/doc' \
 	                   '$$prefix/html' \
 	                   '$$prefix/haddock' \
-	                   --distpref dist-stage2 \
+	                   --distpref dist-stage$* \
 	                   $(INSTALL_FLAGS)
 
 # XXX fix:

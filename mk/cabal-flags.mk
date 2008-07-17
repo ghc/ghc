@@ -63,25 +63,23 @@ INSTALL_DIRS_CONFIGURE_FLAGS = \
 INPLACE_DIRS_CONFIGURE_FLAGS = \
     --prefix=`$(TOP)/utils/pwd/pwd forwardslash`/install-inplace
 
-USE_STAGE1_CONFIGURE_FLAGS = \
-    --with-compiler=$(GHC_STAGE1) \
-    --with-hc-pkg=$(FPTOOLS_TOP_ABS)/utils/ghc-pkg/ghc-pkg-inplace \
-    $(addprefix --cc-option=,$(MACOSX_DEPLOYMENT_CC_OPTS)) \
-    $(addprefix --ld-option=,$(MACOSX_DEPLOYMENT_LD_OPTS))
-
 USE_BOOT_CONFIGURE_FLAGS = \
     --with-compiler=$(GHC) \
     --with-hc-pkg=$(GHC_PKG) \
 	--package-db $(FPTOOLS_TOP_ABS)/libraries/bootstrapping.conf
 
-# XXX
-#    --bindir='$$prefix/bin' \
-#    --libdir='$$prefix/lib' \
-#    --libexecdir='$$prefix/libexec' \
-#    --datadir='$$prefix/data' \
-#    --docdir='$$prefix/doc' \
-#    --haddockdir='$$prefix/haddock' \
-#    --htmldir='$$prefix/html' \
+USE_STAGE_CONFIGURE_FLAGS = \
+    --with-hc-pkg=$(FPTOOLS_TOP_ABS)/utils/ghc-pkg/ghc-pkg-inplace \
+    $(addprefix --cc-option=,$(MACOSX_DEPLOYMENT_CC_OPTS)) \
+    $(addprefix --ld-option=,$(MACOSX_DEPLOYMENT_LD_OPTS))
+
+USE_STAGE1_CONFIGURE_FLAGS = \
+    --with-compiler=$(GHC_STAGE1) \
+    $(USE_STAGE_CONFIGURE_FLAGS)
+
+USE_STAGE2_CONFIGURE_FLAGS = \
+    --with-compiler=$(GHC_STAGE2) \
+    $(USE_STAGE_CONFIGURE_FLAGS)
 
 BUILD_FLAGS = $(addprefix --ghc-option=,$(SRC_HC_OPTS))
 
