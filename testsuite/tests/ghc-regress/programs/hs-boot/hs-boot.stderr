@@ -1,5 +1,2 @@
 
 B.hs:5:22: Warning: {-# SOURCE #-} unnecessary in import of  `A'
-
-B.hs:5:0:
-    Warning: Unnecessary {-# SOURCE #-} in the import of module `A'
