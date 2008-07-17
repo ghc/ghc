@@ -136,7 +136,7 @@ extendPackageConfigMap pkg_map new_pkgs
   where add pkg_map p = addToUFM pkg_map (packageConfigId p) p
 
 getPackageDetails :: PackageState -> PackageId -> PackageConfig
-getPackageDetails dflags ps = expectJust "getPackageDetails" (lookupPackage (pkgIdMap dflags) ps)
+getPackageDetails ps pid = expectJust "getPackageDetails" (lookupPackage (pkgIdMap ps) pid)
 
 -- ----------------------------------------------------------------------------
 -- Loading the package config files and building up the package state
