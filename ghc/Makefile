@@ -94,6 +94,15 @@ build.stage.%:
 	                   --distpref dist-stage$* \
 	                   $(INSTALL_FLAGS)
 
+# XXX For now we always install the stage 2 compiler
+install:
+	$(INSTALL_PACKAGE) install UNUSED UNUSED '$(DESTDIR)' '$(prefix)' \
+	                   '$(prefix)' '$(bindir)' '$(libdir)'            \
+                       '$(libexecdir)' '$(dynlibdir)' '$(datadir)'    \
+                       '$(docdir)' '$(htmldir)' '$(haddockdir)'       \
+	                   --distpref dist-stage2                         \
+	                   $(INSTALL_FLAGS)
+
 # XXX fix:
 #binary-dist:
 #	$(INSTALL_DIR)                      $(BIN_DIST_DIR)/utils/hsc2hs
