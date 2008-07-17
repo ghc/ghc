@@ -67,9 +67,9 @@ include $(TOP)/mk/boilerplate.mk
 
 # We can't 'make boot' in libraries until stage1 is built
 ifeq "$(BootingFromHc)" "YES"
-SUBDIRS_BUILD = includes rts compiler ghc docs utils driver
+SUBDIRS_BUILD = includes compiler docs utils driver
 else
-SUBDIRS_BUILD = includes utils driver docs compiler ghc rts libraries/Cabal/doc
+SUBDIRS_BUILD = includes utils driver docs compiler libraries/Cabal/doc
 endif
 
 SUBDIRS = gmp libffi includes utils driver docs rts compiler ghc libraries libraries/Cabal/doc
@@ -113,6 +113,7 @@ stage1 : $(GCC_LIB_DEP) check-all
 	$(MAKE) -C gmp       all
 	$(MAKE) -C libffi    all
 	$(MAKE) -C utils/mkdependC boot
+	$(MAKE) -C utils with-bootstrapping-compiler
 	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
 	for i in $(SUBDIRS_BUILD); do \
 	  echo "------------------------------------------------------------------------"; \
@@ -130,7 +131,12 @@ stage1 : $(GCC_LIB_DEP) check-all
 	  $(MAKE) --no-print-directory -C $$i $(MFLAGS) all; \
 	  if [ $$? -eq 0 -o $$x_on_err -eq 0 ] ;  then true; else exit 1; fi; \
 	done
+	$(MAKE) -C ghc stage=1 boot
+	$(MAKE) -C ghc stage=1
+	$(MAKE) -C rts boot
+	$(MAKE) -C rts
 	$(MAKE) -C libraries all
+	$(MAKE) -C utils with-stage-1
 
 # When making distributions (i.e., whether with binary-dist or using the 
 # vanilla install target to create an installer package), we can have problems
@@ -140,14 +146,16 @@ stage1 : $(GCC_LIB_DEP) check-all
 # compiler of all utils that get installed and of all extra support binaries
 # includes in binary dists.
 stage2 : check-all
-	$(MAKE) -C compiler boot stage=2
+	$(MAKE) -C compiler stage=2 boot
 	$(MAKE) -C compiler stage=2
+	$(MAKE) -C ghc      stage=2 boot
 	$(MAKE) -C ghc      stage=2
 
-
 stage3 : check-all
-	$(MAKE) -C compiler boot stage=3
+	$(MAKE) -C compiler stage=3 boot
 	$(MAKE) -C compiler stage=3
+	$(MAKE) -C ghc      stage=3 boot
+	$(MAKE) -C ghc      stage=3
 
 bootstrap  : bootstrap2
 

@@ -53,11 +53,11 @@ boot ::
 	$(MAKE) -C genprimopcode
 endif
 
-boot ::
+with-bootstrapping-compiler:
 	$(MAKE) -C hsc2hs with-bootstrapping-compiler
 
 ifneq "$(NO_INSTALL_HSC2HS)" "YES"
-all ::
+with-stage-1:
 	$(MAKE) -C hsc2hs with-stage-1
 
 install ::
