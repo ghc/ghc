@@ -40,10 +40,6 @@ PRIMOP_BITS = primop-data-decl.hs-incl        \
               primop-strictness.hs-incl       \
               primop-primop-info.hs-incl
 
-boot :: $(CONFIG_HS)
-
-boot :: parser/Parser.y
-
 boot:: boot.stage.$(stage)
 
 all:: build.stage.$(stage)
@@ -166,7 +162,7 @@ CONFIGURE_FLAGS_STAGE1 += $(USE_BOOT_CONFIGURE_FLAGS)
 CONFIGURE_FLAGS_STAGE2 += $(USE_STAGE1_CONFIGURE_FLAGS)
 CONFIGURE_FLAGS_STAGE3 += $(USE_STAGE2_CONFIGURE_FLAGS)
 
-boot.stage.%:
+boot.stage.%: $(PRIMOP_BITS) $(CONFIG_HS) parser/Parser.y
 	$(CABAL) configure --distpref dist-stage$* \
 	                   $(CONFIGURE_FLAGS_STAGE$*) \
 	                   $(INSTALL_DIRS_CONFIGURE_FLAGS) \
@@ -175,7 +171,7 @@ boot.stage.%:
 	$(RM) -f Makefile-stage$*
 	$(CABAL) makefile  --distpref dist-stage$* -f Makefile-stage$*
 
-build.stage.%: $(PRIMOP_BITS)
+build.stage.%:
 	$(MAKE) -f Makefile-stage$* stage=$*
 	$(CABAL) register  --distpref dist-stage$* --inplace
 
