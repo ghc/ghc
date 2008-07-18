@@ -3,23 +3,25 @@ include $(TOP)/mk/boilerplate.mk
 
 ifeq "$(DOING_BIN_DIST)" "YES"
 # We're doing a binary-dist, descend into a subset of the dirs.
-SUBDIRS = mkdirhier hp2ps parallel unlit pwd
+SUBDIRS = mkdirhier hp2ps parallel unlit
 else
 ifeq "$(BootingFromHc)" "YES"
 SUBDIRS = mkdependC mkdirhier runstdtest genapply genprimopcode unlit
 else
 SUBDIRS = mkdependC mkdirhier runstdtest hp2ps \
-	  parallel unlit genprimopcode genapply pwd
+	  parallel unlit genprimopcode genapply
 endif
-ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
-# lndir doesn't build on Windows
-SUBDIRS += lndir
-endif
+#ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+## lndir doesn't build on Windows
+#SUBDIRS += lndir
+#endif
 endif
 
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 SUBDIRS += touchy
 endif
+
+# XXX pwd and lndir building disabled for now
 
 # Utils that we don't build by default:
 #	nofib-analyse
