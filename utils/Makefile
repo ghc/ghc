@@ -9,7 +9,7 @@ ifeq "$(BootingFromHc)" "YES"
 SUBDIRS = mkdependC mkdirhier runstdtest genapply genprimopcode unlit
 else
 SUBDIRS = mkdependC mkdirhier runstdtest hp2ps \
-	  installPackage parallel unlit genprimopcode genapply runghc hpc pwd
+	  parallel unlit genprimopcode genapply runghc hpc pwd
 endif
 ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 # lndir doesn't build on Windows
@@ -53,9 +53,9 @@ boot ::
 	$(MAKE) -C genprimopcode
 endif
 
-WITH_BOOTSTRAPPING_COMPILER = ghc-pkg hsc2hs
+WITH_BOOTSTRAPPING_COMPILER = installPackage ghc-pkg hsc2hs
 
-WITH_STAGE1 = ghc-pkg hasktags
+WITH_STAGE1 = installPackage ghc-pkg hasktags
 ifneq "$(NO_INSTALL_HSC2HS)" "YES"
 WITH_STAGE1 += hsc2hs
 endif
