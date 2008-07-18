@@ -3,12 +3,12 @@ include $(TOP)/mk/boilerplate.mk
 
 ifeq "$(DOING_BIN_DIST)" "YES"
 # We're doing a binary-dist, descend into a subset of the dirs.
-SUBDIRS = mkdirhier hasktags hp2ps parallel unlit runghc hpc pwd
+SUBDIRS = mkdirhier hp2ps parallel unlit runghc hpc pwd
 else
 ifeq "$(BootingFromHc)" "YES"
 SUBDIRS = mkdependC mkdirhier runstdtest genapply genprimopcode unlit
 else
-SUBDIRS = mkdependC mkdirhier runstdtest hasktags hp2ps \
+SUBDIRS = mkdependC mkdirhier runstdtest hp2ps \
 	  installPackage parallel unlit genprimopcode genapply runghc hpc pwd
 endif
 ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
@@ -55,10 +55,13 @@ endif
 
 WITH_BOOTSTRAPPING_COMPILER = ghc-pkg hsc2hs
 
-WITH_STAGE1 = ghc-pkg
+WITH_STAGE1 = ghc-pkg hasktags
 ifneq "$(NO_INSTALL_HSC2HS)" "YES"
 WITH_STAGE1 += hsc2hs
 endif
+
+# sort removes duplicates - we don't actually care about the order
+WITH_EITHER = $(sort $(WITH_BOOTSTRAPPING_COMPILER) $(WITH_STAGE1))
 
 with-bootstrapping-compiler: \
     $(foreach P,$(WITH_BOOTSTRAPPING_COMPILER),with-bootstrapping-compiler.$P)
