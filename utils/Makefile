@@ -3,12 +3,12 @@ include $(TOP)/mk/boilerplate.mk
 
 ifeq "$(DOING_BIN_DIST)" "YES"
 # We're doing a binary-dist, descend into a subset of the dirs.
-SUBDIRS = mkdirhier ghc-pkg hasktags hp2ps parallel unlit runghc hpc pwd
+SUBDIRS = mkdirhier hasktags hp2ps parallel unlit runghc hpc pwd
 else
 ifeq "$(BootingFromHc)" "YES"
-SUBDIRS = mkdependC mkdirhier runstdtest genapply genprimopcode ghc-pkg unlit
+SUBDIRS = mkdependC mkdirhier runstdtest genapply genprimopcode unlit
 else
-SUBDIRS = mkdependC mkdirhier runstdtest ghc-pkg hasktags hp2ps \
+SUBDIRS = mkdependC mkdirhier runstdtest hasktags hp2ps \
 	  installPackage parallel unlit genprimopcode genapply runghc hpc pwd
 endif
 ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
@@ -53,14 +53,29 @@ boot ::
 	$(MAKE) -C genprimopcode
 endif
 
-with-bootstrapping-compiler:
-	$(MAKE) -C hsc2hs with-bootstrapping-compiler
+WITH_BOOTSTRAPPING_COMPILER = ghc-pkg hsc2hs
 
+WITH_STAGE1 = ghc-pkg
 ifneq "$(NO_INSTALL_HSC2HS)" "YES"
-with-stage-1:
-	$(MAKE) -C hsc2hs with-stage-1
-
-install ::
-	$(MAKE) -C hsc2hs install
+WITH_STAGE1 += hsc2hs
 endif
+
+with-bootstrapping-compiler: \
+    $(foreach P,$(WITH_BOOTSTRAPPING_COMPILER),with-bootstrapping-compiler.$P)
+
+with-stage-1: $(foreach P,$(WITH_STAGE1),with-stage-1.$P)
+
+install:: $(foreach P,$(WITH_STAGE1),install.$P)
+
+$(foreach P,$(WITH_BOOTSTRAPPING_COMPILER),with-bootstrapping-compiler.$P): \
+with-bootstrapping-compiler.%:
+	$(MAKE) -C $* with-bootstrapping-compiler
+
+$(foreach P,$(WITH_STAGE1),with-stage-1.$P): \
+with-stage-1.%:
+	$(MAKE) -C $* with-stage-1
+
+$(foreach P,$(WITH_STAGE1),install.$P): \
+install.%:
+	$(MAKE) -C $* install
 

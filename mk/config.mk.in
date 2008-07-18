@@ -625,10 +625,7 @@ ifacedir		= $(libdir)
 #     (NOTE: configure script setting is ignored).
 libexecdir		= $(libdir)
 
-# This is a bit of a lie, as this is a wrapper rather than the program
-# itself. However, it means that we don't have to worry about Windows
-# and non-Windows having different extensions.
-GHC_PKG_PROG = $(FPTOOLS_TOP_ABS)/$(GHC_PKG_DIR_REL)/ghc-pkg-inplace
+GHC_PKG_PROG = $(FPTOOLS_TOP_ABS)/$(GHC_PKG_DIR_REL)/install-inplace/bin/ghc-pkg
 
 #-----------------------------------------------------------------------------
 # install configuration
@@ -809,7 +806,6 @@ GHC_TOUCHY_PGM		= touchy$(exeext)
 GHC_MANGLER_PGM		= ghc-asm
 GHC_SPLIT_PGM		= ghc-split
 GHC_SYSMAN_PGM 		= SysMan
-GHC_PKG_INPLACE_PGM	= ghc-pkg-inplace
 GHC_GENPRIMOP_PGM	= genprimopcode
 GHC_GENAPPLY_PGM	= genapply
 GHC_MKDEPENDC_PGM 	= mkdependC
@@ -834,7 +830,7 @@ HSC2HS_INPLACE		= $(GHC_HSC2HS_DIR)/install-inplace/bin/$(GHC_HSC2HS_INPLACE_PGM
 MANGLER			= $(GHC_MANGLER_DIR)/$(GHC_MANGLER_PGM)
 SPLIT			= $(GHC_SPLIT_DIR)/$(GHC_SPLIT_PGM)
 SYSMAN 			= $(GHC_SYSMAN_DIR)/$(GHC_SYSMAN_PGM)
-GHC_PKG_INPLACE		= $(GHC_PKG_DIR)/$(GHC_PKG_INPLACE_PGM)
+GHC_PKG_INPLACE		= $(GHC_PKG_PROG)
 GENPRIMOP		= $(GHC_GENPRIMOP_DIR)/$(GHC_GENPRIMOP_PGM)
 GENAPPLY		= $(GHC_GENAPPLY_DIR)/$(GHC_GENAPPLY_PGM)
 MKDEPENDC 		= $(GHC_MKDEPENDC_DIR)/$(GHC_MKDEPENDC_PGM)

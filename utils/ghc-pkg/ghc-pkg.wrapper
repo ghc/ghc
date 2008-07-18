@@ -1,0 +1,4 @@
+
+PKGCONF=$datadir/package.conf
+exec $executablename --global-conf $PKGCONF ${1+"$@"}
+

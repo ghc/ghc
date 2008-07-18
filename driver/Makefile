@@ -9,13 +9,15 @@ include $(TOP)/mk/boilerplate.mk
 
 SUBDIRS = mangler split ghc ghci
 
-boot all :: package.conf.inplace package.conf
+INPLACE_DATA_DIR = $(FPTOOLS_TOP_ABS)/inplace-datadir
+INPLACE_PKG_CONF = $(INPLACE_DATA_DIR)/package.conf
+# Used to signal that we are inplace, as opposed to installed:
+INPLACE_FILE     = $(INPLACE_DATA_DIR)/inplace
 
-package.conf.inplace :
-	echo "[]" > $@
-
-package.conf :
-	echo "[]" > $@
+boot all ::
+	$(MKDIRHIER) $(INPLACE_DATA_DIR)
+	test -e $(INPLACE_PKG_CONF) || echo "[]" > $(INPLACE_PKG_CONF)
+	touch $(INPLACE_FILE)
 
 override datadir = $(libdir)
 INSTALL_DATAS += package.conf ghc-usage.txt ghci-usage.txt

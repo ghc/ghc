@@ -32,16 +32,8 @@ clean distclean::
 	$(RM) -rf stage1-inplace
 	$(RM) -rf stage2-inplace
 
-# XXX Eugh, can we do this better? The problem is making extra-gcc-opts
-# infdable on both Linux and Windows. I guess this will go away when we
-# drop the mangler?
-ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
-SET_DATA_SUBDIR = --datasubdir=.
-INPLACE_DATA_DIR = '$$prefix'
-else
-SET_DATA_SUBDIR =
-INPLACE_DATA_DIR = '$$prefix/data'
-endif
+# XXX This should be defined somewhere more central
+INPLACE_DATA_DIR = $(FPTOOLS_TOP_ABS)/inplace-datadir
 
 CONFIGURE_FLAGS_STAGE1 += --flags=-ghci
 
@@ -74,7 +66,6 @@ CONFIGURE_FLAGS_STAGE3 += $(USE_STAGE2_CONFIGURE_FLAGS)
 
 boot.stage.%:
 	$(CABAL) configure --distpref dist-stage$* \
-	                   $(SET_DATA_SUBDIR) \
 	                   $(INSTALL_DIRS_CONFIGURE_FLAGS) \
 	                   $(CONFIGURE_FLAGS_STAGE$*) \
 	                   $(COMMON_CONFIGURE_FLAGS)
@@ -88,7 +79,7 @@ build.stage.%:
 	                   '$$prefix/lib' \
 	                   '$$prefix/libexec' \
 	                   '$$prefix/dynlib' \
-	                   $(INPLACE_DATA_DIR) \
+	                   '$(INPLACE_DATA_DIR)' \
 	                   '$$prefix/doc' \
 	                   '$$prefix/html' \
 	                   '$$prefix/haddock' \

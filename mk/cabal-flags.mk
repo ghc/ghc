@@ -56,12 +56,15 @@ INSTALL_DIRS_CONFIGURE_FLAGS = \
     --libdir=$(NONEXISTENT) \
     --libexecdir=$(NONEXISTENT) \
     --datadir=$(NONEXISTENT) \
+    --datasubdir=. \
     --docdir=$(NONEXISTENT) \
     --haddockdir=$(NONEXISTENT) \
     --htmldir=$(NONEXISTENT)
 
 INPLACE_DIRS_CONFIGURE_FLAGS = \
-    --prefix=`$(TOP)/utils/pwd/pwd forwardslash`/install-inplace
+    --prefix=`$(FPTOOLS_TOP_ABS)/utils/pwd/pwd forwardslash`/install-inplace \
+    --datadir=$(FPTOOLS_TOP_ABS)/inplace-datadir \
+    --datasubdir=.
 
 USE_BOOT_CONFIGURE_FLAGS = \
     --with-compiler=$(GHC) \
@@ -69,7 +72,7 @@ USE_BOOT_CONFIGURE_FLAGS = \
 	--package-db $(FPTOOLS_TOP_ABS)/libraries/bootstrapping.conf
 
 USE_STAGE_CONFIGURE_FLAGS = \
-    --with-hc-pkg=$(FPTOOLS_TOP_ABS)/utils/ghc-pkg/ghc-pkg-inplace \
+    --with-hc-pkg=$(GHC_PKG_INPLACE) \
     $(addprefix --cc-option=,$(MACOSX_DEPLOYMENT_CC_OPTS)) \
     $(addprefix --ld-option=,$(MACOSX_DEPLOYMENT_LD_OPTS))
 

@@ -364,14 +364,14 @@ allPackagesInStack :: PackageDBStack -> [InstalledPackageInfo]
 allPackagesInStack = concatMap snd
 
 getPkgDatabases :: Bool -> [Flag] -> IO PackageDBStack
-getPkgDatabases modify flags = do
+getPkgDatabases modify my_flags = do
   -- first we determine the location of the global package config.  On Windows,
   -- this is found relative to the ghc-pkg.exe binary, whereas on Unix the
   -- location is passed to the binary using the --global-config flag by the
   -- wrapper script.
   let err_msg = "missing --global-conf option, location of global package.conf unknown\n"
   global_conf <-
-     case [ f | FlagGlobalConfig f <- flags ] of
+     case [ f | FlagGlobalConfig f <- my_flags ] of
         [] -> do mb_dir <- getExecDir "/bin/ghc-pkg.exe"
                  case mb_dir of
                         Nothing  -> die err_msg
@@ -416,7 +416,7 @@ getPkgDatabases modify flags = do
         -- This is the database we modify by default.
       virt_global_conf = last env_stack
 
-  let db_flags = [ f | Just f <- map is_db_flag flags ]
+  let db_flags = [ f | Just f <- map is_db_flag my_flags ]
          where is_db_flag FlagUser       = Just user_conf
                is_db_flag FlagGlobal     = Just virt_global_conf
                is_db_flag (FlagConfig f) = Just f
@@ -440,7 +440,7 @@ getPkgDatabases modify flags = do
                 -- stack, unless any of them are present in the stack
                 -- already.
                 flag_stack = filter (`notElem` env_stack)
-                                [ f | FlagConfig f <- reverse flags ]
+                                [ f | FlagConfig f <- reverse my_flags ]
                                 ++ env_stack
 
                 modifying f
@@ -475,8 +475,8 @@ registerPackage :: FilePath
                 -> Bool              -- update
                 -> Force
                 -> IO ()
-registerPackage input flags auto_ghci_libs update force = do
-  db_stack <- getPkgDatabases True flags
+registerPackage input my_flags auto_ghci_libs update force = do
+  db_stack <- getPkgDatabases True my_flags
   let
         db_to_operate_on = my_head "db" db_stack
         db_filename      = fst db_to_operate_on
@@ -522,15 +522,15 @@ hidePackage :: PackageIdentifier ->  [Flag] -> IO ()
 hidePackage = modifyPackage (\p -> [p{exposed=False}])
 
 unregisterPackage :: PackageIdentifier ->  [Flag] -> IO ()
-unregisterPackage = modifyPackage (\p -> [])
+unregisterPackage = modifyPackage (\_ -> [])
 
 modifyPackage
   :: (InstalledPackageInfo -> [InstalledPackageInfo])
   -> PackageIdentifier
   -> [Flag]
   -> IO ()
-modifyPackage fn pkgid flags  = do
-  db_stack <- getPkgDatabases True{-modify-} flags
+modifyPackage fn pkgid my_flags  = do
+  db_stack <- getPkgDatabases True{-modify-} my_flags
   let ((db_name, pkgs) : _) = db_stack
   ps <- findPackages [(db_name,pkgs)] (Id pkgid)
   let pids = map package ps
@@ -545,9 +545,9 @@ modifyPackage fn pkgid flags  = do
 -- Listing packages
 
 listPackages ::  [Flag] -> Maybe PackageArg -> Maybe (String->Bool) -> IO ()
-listPackages flags mPackageName mModuleName = do
-  let simple_output = FlagSimpleOutput `elem` flags
-  db_stack <- getPkgDatabases False flags
+listPackages my_flags mPackageName mModuleName = do
+  let simple_output = FlagSimpleOutput `elem` my_flags
+  db_stack <- getPkgDatabases False my_flags
   let db_stack_filtered -- if a package is given, filter out all other packages
         | Just this <- mPackageName =
             map (\(conf,pkgs) -> (conf, filter (this `matchesPkg`) pkgs))
@@ -586,8 +586,8 @@ listPackages flags mPackageName mModuleName = do
                    where doc = text (display (package p))
 
         show_simple db_stack = do
-          let showPkg = if FlagNamesOnly `elem` flags then display . pkgName
-                                                      else display
+          let showPkg = if FlagNamesOnly `elem` my_flags then display . pkgName
+                                                         else display
               pkgs = map showPkg $ sortBy compPkgIdVer $
                           map package (allPackagesInStack db_stack)
           when (not (null pkgs)) $ 
@@ -597,8 +597,8 @@ listPackages flags mPackageName mModuleName = do
 -- Prints the highest (hidden or exposed) version of a package
 
 latestPackage ::  [Flag] -> PackageIdentifier -> IO ()
-latestPackage flags pkgid = do
-  db_stack <- getPkgDatabases False flags
+latestPackage my_flags pkgid = do
+  db_stack <- getPkgDatabases False my_flags
   ps <- findPackages db_stack (Id pkgid)
   show_pkg (sortBy compPkgIdVer (map package ps))
   where
@@ -609,14 +609,14 @@ latestPackage flags pkgid = do
 -- Describe
 
 describePackage :: [Flag] -> PackageArg -> IO ()
-describePackage flags pkgarg = do
-  db_stack <- getPkgDatabases False flags
+describePackage my_flags pkgarg = do
+  db_stack <- getPkgDatabases False my_flags
   ps <- findPackages db_stack pkgarg
   doDump ps
 
 dumpPackages :: [Flag] -> IO ()
-dumpPackages flags = do
-  db_stack <- getPkgDatabases False flags
+dumpPackages my_flags = do
+  db_stack <- getPkgDatabases False my_flags
   doDump (allPackagesInStack db_stack)
 
 doDump :: [InstalledPackageInfo] -> IO ()
@@ -649,8 +649,8 @@ compPkgIdVer p1 p2 = pkgVersion p1 `compare` pkgVersion p2
 -- Field
 
 describeField :: [Flag] -> PackageArg -> [String] -> IO ()
-describeField flags pkgarg fields = do
-  db_stack <- getPkgDatabases False flags
+describeField my_flags pkgarg fields = do
+  db_stack <- getPkgDatabases False my_flags
   fns <- toFields fields
   ps <- findPackages db_stack pkgarg
   let top_dir = takeDirectory (fst (last db_stack))
@@ -715,8 +715,8 @@ strList = show
 -- Check: Check consistency of installed packages
 
 checkConsistency :: [Flag] -> IO ()
-checkConsistency flags = do
-  db_stack <- getPkgDatabases True flags
+checkConsistency my_flags = do
+  db_stack <- getPkgDatabases True my_flags
          -- check behaves like modify for the purposes of deciding which
          -- databases to use, because ordering is important.
   let pkgs = map (\p -> (package p, p)) $ allPackagesInStack db_stack
@@ -727,7 +727,7 @@ checkConsistency flags = do
         return (pid, broken_deps)
   mapM_ (putStrLn . render . show_func) broken_pkgs
   where
-  show_func | FlagSimpleOutput `elem` flags = show_simple
+  show_func | FlagSimpleOutput `elem` my_flags = show_simple
             | otherwise = show_normal
   show_simple (pid,deps) =
     text (display pid) <> colon
@@ -747,7 +747,7 @@ missingPackageDeps pkg pkg_map =
 isBrokenPackage :: InstalledPackageInfo -> [(PackageIdentifier, InstalledPackageInfo)] -> Bool
 isBrokenPackage pkg pkg_map
    = not . null $ missingPackageDeps pkg (filter notme pkg_map)
-   where notme (p,ipi) = package pkg /= p
+   where notme (p, _ipi) = package pkg /= p
         -- remove p from the database when we invoke missingPackageDeps,
         -- because we want mutually recursive groups of package to show up
         -- as broken. (#1750)
@@ -988,7 +988,7 @@ okInModuleName c
 -- expanding environment variables in the package configuration
 
 expandEnvVars :: String -> Force -> IO String
-expandEnvVars str force = go str ""
+expandEnvVars str0 force = go str0 ""
  where
    go "" acc = return $! reverse acc
    go ('$':'{':str) acc | (var, '}':rest) <- break close str
@@ -1039,8 +1039,8 @@ dieForcible :: String -> IO ()
 dieForcible s = die (s ++ " (use --force to override)")
 
 my_head :: String -> [a] -> a
-my_head s [] = error s
-my_head s (x:xs) = x
+my_head s []      = error s
+my_head _ (x : _) = x
 
 -----------------------------------------
 -- Cut and pasted from ghc/compiler/main/SysTools

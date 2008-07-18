@@ -163,19 +163,14 @@ initSysTools mbMinusB dflags0
         ; let installed, installed_bin :: FilePath -> FilePath
               installed_bin pgm  = top_dir </> pgm
               installed     file = top_dir </> file
-              inplaceUpDirs
-               | isWindowsHost = 2
-               | otherwise     = 4
-              inplace dir   pgm  = let real_top_dir = foldr (</>) ""
-                                                    $ reverse
-                                                    $ drop inplaceUpDirs
-                                                    $ reverse
-                                                    $ splitDirectories top_dir
-                                   in real_top_dir </> dir </> pgm
+              real_top_dir
+               | isWindowsHost = top_dir </> ".." </> ".."
+               | otherwise     = top_dir </> ".."
+              inplace dir   pgm  = real_top_dir </> dir </> pgm
 
         ; let pkgconfig_path
                 | am_installed = installed "package.conf"
-                | otherwise    = inplace cGHC_DRIVER_DIR_REL "package.conf.inplace"
+                | otherwise    = inplace "inplace-datadir" "package.conf"
 
               ghc_usage_msg_path
                 | am_installed = installed "ghc-usage.txt"
@@ -331,10 +326,10 @@ findTopDir :: Maybe String   -- Maybe TopDir path (without the '-B' prefix).
 findTopDir mbMinusB
   = do { top_dir <- get_proto
         -- Discover whether we're running in a build tree or in an installation,
-        -- by looking for the package configuration file.
-       ; am_installed <- doesFileExist (top_dir </> "package.conf")
+        -- by looking for a file we use for that purpose
+       ; am_inplace <- doesFileExist (top_dir </> "inplace")
 
-       ; return (am_installed, top_dir)
+       ; return (not am_inplace, top_dir)
        }
   where
     -- get_proto returns a Unix-format path (relying on getBaseDir to do so too)
