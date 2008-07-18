@@ -18,6 +18,7 @@ Flag base3
 
 Executable hpc
     Main-Is: Hpc.hs
+    Other-Modules: HpcParser
     if flag(base3)
         Build-Depends: base       >= 3   && < 4,
                        directory  >= 1   && < 1.1,
