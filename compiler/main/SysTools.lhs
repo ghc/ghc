@@ -325,11 +325,14 @@ findTopDir :: Maybe String   -- Maybe TopDir path (without the '-B' prefix).
 
 findTopDir mbMinusB
   = do { top_dir <- get_proto
-        -- Discover whether we're running in a build tree or in an installation,
-        -- by looking for a file we use for that purpose
-       ; am_inplace <- doesFileExist (top_dir </> "inplace")
+       ; exists1 <- doesFileExist (top_dir </> "package.conf")
+       ; exists2 <- doesFileExist (top_dir </> "inplace")
+       ; let amInplace = not exists1 -- On Windows, package.conf doesn't exist
+                                     -- when we are inplace
+                      || exists2 -- On Linux, the presence of inplace signals
+                                 -- that we are inplace
 
-       ; return (not am_inplace, top_dir)
+       ; return (not amInplace, top_dir)
        }
   where
     -- get_proto returns a Unix-format path (relying on getBaseDir to do so too)
@@ -522,7 +525,13 @@ copyWithHeader dflags purpose maybe_header from to = do
 
 getExtraViaCOpts :: DynFlags -> IO [String]
 getExtraViaCOpts dflags = do
-  f <- readFile (topDir dflags </> "extra-gcc-opts")
+  (am_installed, top_dir) <- findTopDir (Just (topDir dflags))
+  let top_dir'
+       -- XXX Euch:
+       | isWindowsHost && not am_installed
+          = top_dir </> ".." </> ".." </> "inplace-datadir"
+       | otherwise = top_dir
+  f <- readFile (top_dir' </> "extra-gcc-opts")
   return (words f)
 \end{code}
 
