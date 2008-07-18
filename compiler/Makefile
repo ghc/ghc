@@ -40,6 +40,10 @@ PRIMOP_BITS = primop-data-decl.hs-incl        \
               primop-strictness.hs-incl       \
               primop-primop-info.hs-incl
 
+boot :: $(CONFIG_HS)
+
+boot :: parser/Parser.y
+
 boot:: boot.stage.$(stage)
 
 all:: build.stage.$(stage)
@@ -185,10 +189,6 @@ boot :: stage_dirs
 #
 # The 'echo' commands simply spit the values of various make variables
 # into Config.hs, whence they can be compiled and used by GHC itself
-
-boot :: $(CONFIG_HS)
-
-boot :: parser/Parser.y
 
 $(CONFIG_HS) : $(FPTOOLS_TOP)/mk/config.mk
 	@$(RM) -f $(CONFIG_HS)
