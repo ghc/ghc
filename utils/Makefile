@@ -65,12 +65,18 @@ endif
 # sort removes duplicates - we don't actually care about the order
 WITH_EITHER = $(sort $(WITH_BOOTSTRAPPING_COMPILER) $(WITH_STAGE1))
 
+clean:: $(foreach P,$(WITH_EITHER),clean.$P)
+
 with-bootstrapping-compiler: \
     $(foreach P,$(WITH_BOOTSTRAPPING_COMPILER),with-bootstrapping-compiler.$P)
 
 with-stage-1: $(foreach P,$(WITH_STAGE1),with-stage-1.$P)
 
 install:: $(foreach P,$(WITH_STAGE1),install.$P)
+
+$(foreach P,$(WITH_EITHER),clean.$P): \
+clean.%:
+	$(MAKE) -C $* clean
 
 $(foreach P,$(WITH_BOOTSTRAPPING_COMPILER),with-bootstrapping-compiler.$P): \
 with-bootstrapping-compiler.%:

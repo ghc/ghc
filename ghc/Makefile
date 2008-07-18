@@ -65,33 +65,35 @@ CONFIGURE_FLAGS_STAGE3 += $(USE_STAGE2_CONFIGURE_FLAGS)
 # no library to register
 
 boot.stage.%:
-	$(CABAL) configure --distpref dist-stage$* \
+	$(CABAL) configure --distpref dist-stage$*         \
 	                   $(INSTALL_DIRS_CONFIGURE_FLAGS) \
-	                   $(CONFIGURE_FLAGS_STAGE$*) \
-	                   $(COMMON_CONFIGURE_FLAGS) \
-	                   --datasubdir=. \
+	                   $(CONFIGURE_FLAGS_STAGE$*)      \
+	                   $(COMMON_CONFIGURE_FLAGS)       \
+	                   --libsubdir=.                   \
+	                   --datadir='$$libdir'            \
+	                   --datasubdir=.
 
 build.stage.%:
 	$(CABAL) build     --distpref dist-stage$* $(BUILD_FLAGS)
 	$(INSTALL_PACKAGE) install '$(GHC_PKG_PROG)' 'XXX/package.conf' "" \
-	                   $(FPTOOLS_TOP_ABS)/ghc/stage$*-inplace \
-	                   $(FPTOOLS_TOP_ABS)/ghc/stage$*-inplace \
-	                   '$$prefix/bin' \
-	                   '$$prefix/lib' \
-	                   '$$prefix/libexec' \
-	                   '$$prefix/dynlib' \
-	                   '$(INPLACE_DATA_DIR)' \
-	                   '$$prefix/doc' \
-	                   '$$prefix/html' \
-	                   '$$prefix/haddock' \
-	                   --distpref dist-stage$* \
+	                   $(FPTOOLS_TOP_ABS)/ghc/stage$*-inplace          \
+	                   $(FPTOOLS_TOP_ABS)/ghc/stage$*-inplace          \
+	                   '$$prefix/bin'                                  \
+	                   '$(INPLACE_DATA_DIR)'                           \
+	                   '$$prefix/libexec'                              \
+	                   '$$prefix/dynlib'                               \
+	                   '$(INPLACE_DATA_DIR)'                           \
+	                   '$$prefix/doc'                                  \
+	                   '$$prefix/html'                                 \
+	                   '$$prefix/haddock'                              \
+	                   --distpref dist-stage$*                         \
 	                   $(INSTALL_FLAGS)
 
 # XXX For now we always install the stage 2 compiler
 install:
 	$(INSTALL_PACKAGE) install UNUSED UNUSED '$(DESTDIR)' '$(prefix)' \
 	                   '$(prefix)' '$(bindir)' '$(libdir)'            \
-                       '$(libexecdir)' '$(dynlibdir)' '$(datadir)'    \
+                       '$(libexecdir)' '$(dynlibdir)' '$(libdir)'     \
                        '$(docdir)' '$(htmldir)' '$(haddockdir)'       \
 	                   --distpref dist-stage2                         \
 	                   $(INSTALL_FLAGS)

@@ -175,6 +175,10 @@ build.stage.%:
 	$(MAKE) -f Makefile-stage$* stage=$*
 	$(CABAL) register  --distpref dist-stage$* --inplace
 
+# XXX We ought to actually install the (stage 2) library
+install:
+	@:
+
 stage_dirs :
 	$(MKDIRHIER) stage$(stage)
 
