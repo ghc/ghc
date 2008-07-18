@@ -5,9 +5,6 @@ include $(TOP)/mk/cabal-flags.mk
 
 SRC_HC_OPTS += -Wall
 
-# XXX From old Makefile:
-# SRC_HC_OPTS += -cpp -Wall -fno-warn-name-shadowing -fno-warn-unused-matches
-
 ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 INSTALL_FLAGS =
 else
