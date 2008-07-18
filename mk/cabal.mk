@@ -20,10 +20,11 @@ endif
 default all: with-bootstrapping-compiler
 
 with-bootstrapping-compiler:
-	$(CABAL) configure --distpref dist-inplace         \
-	                   $(INPLACE_DIRS_CONFIGURE_FLAGS) \
-	                   $(USE_BOOT_CONFIGURE_FLAGS)     \
-	                   $(COMMON_CONFIGURE_FLAGS)
+	$(CABAL) configure --distpref dist-inplace          \
+	                   $(INPLACE_DIRS_CONFIGURE_FLAGS)  \
+	                   $(USE_BOOT_CONFIGURE_FLAGS)      \
+	                   $(COMMON_CONFIGURE_FLAGS)        \
+	                   $(EXTRA_INPLACE_CONFIGURE_FLAGS)
 	$(CABAL) build     --distpref dist-inplace $(BUILD_FLAGS)
 	$(CABAL) install   --distpref dist-inplace $(INSTALL_FLAGS)
 
@@ -31,7 +32,8 @@ with-stage-1:
 	$(CABAL) configure --distpref dist-install         \
 	                   $(INSTALL_DIRS_CONFIGURE_FLAGS) \
 	                   $(USE_STAGE1_CONFIGURE_FLAGS)   \
-	                   $(COMMON_CONFIGURE_FLAGS)
+	                   $(COMMON_CONFIGURE_FLAGS)       \
+	                   $(EXTRA_STAGE1_CONFIGURE_FLAGS)
 	$(CABAL) build     --distpref dist-install $(BUILD_FLAGS)
 
 install:

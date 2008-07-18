@@ -56,15 +56,16 @@ INSTALL_DIRS_CONFIGURE_FLAGS = \
     --libdir=$(NONEXISTENT) \
     --libexecdir=$(NONEXISTENT) \
     --datadir=$(NONEXISTENT) \
-    --datasubdir=. \
     --docdir=$(NONEXISTENT) \
     --haddockdir=$(NONEXISTENT) \
     --htmldir=$(NONEXISTENT)
 
-INPLACE_DIRS_CONFIGURE_FLAGS = \
-    --prefix=`$(FPTOOLS_TOP_ABS)/utils/pwd/pwd forwardslash`/install-inplace \
+INPLACE_GHC_DATADIR_CONFIGURE_FLAGS = \
     --datadir=$(FPTOOLS_TOP_ABS)/inplace-datadir \
     --datasubdir=.
+
+INPLACE_DIRS_CONFIGURE_FLAGS = \
+    --prefix=`$(FPTOOLS_TOP_ABS)/utils/pwd/pwd forwardslash`/install-inplace
 
 USE_BOOT_CONFIGURE_FLAGS = \
     --with-compiler=$(GHC) \

@@ -68,7 +68,8 @@ boot.stage.%:
 	$(CABAL) configure --distpref dist-stage$* \
 	                   $(INSTALL_DIRS_CONFIGURE_FLAGS) \
 	                   $(CONFIGURE_FLAGS_STAGE$*) \
-	                   $(COMMON_CONFIGURE_FLAGS)
+	                   $(COMMON_CONFIGURE_FLAGS) \
+	                   --datasubdir=. \
 
 build.stage.%:
 	$(CABAL) build     --distpref dist-stage$* $(BUILD_FLAGS)

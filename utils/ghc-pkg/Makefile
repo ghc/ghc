@@ -2,6 +2,7 @@
 TOP=../..
 ENABLE_SHELL_WRAPPERS = YES
 EXTRA_CLEAN = Version.hs
+EXTRA_INPLACE_CONFIGURE_FLAGS = $(INPLACE_GHC_DATADIR_CONFIGURE_FLAGS)
 
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/cabal.mk
