@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fwarn-deprecations #-}
+{-# OPTIONS_GHC -fwarn-warnings-deprecations #-}
 
 -- Test deprecation of constructors and class ops
 
