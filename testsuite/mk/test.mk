@@ -30,7 +30,6 @@ endif
 export MAKE
 
 # ghastly hack, because the driver requires that $tool be an absolute path name.
-GHC_PKG_ABS     = $(GHC_PKG_DIR_ABS)/ghc-pkg-inplace
 HP2PS_ABS	= $(GHC_HP2PS_DIR_ABS)/hp2ps
 GS = gs
 
@@ -46,7 +45,7 @@ else
 TEST_HC = $(GHC_STAGE2)
 endif
 
-GHC_PKG = $(GHC_PKG_ABS)
+GHC_PKG = $(GHC_PKG_INPLACE)
 
 RUNTEST_OPTS =
 
