@@ -375,7 +375,16 @@ getPkgDatabases modify my_flags = do
         [] -> do mb_dir <- getExecDir "/bin/ghc-pkg.exe"
                  case mb_dir of
                         Nothing  -> die err_msg
-                        Just dir -> return (dir </> "package.conf")
+                        Just dir ->
+                            do let path1 = dir </> "package.conf"
+                                   path2 = dir </> ".." </> ".." </> ".."
+                                               </> "inplace-datadir"
+                                               </> "package.conf"
+                               exists1 <- doesFileExist path1
+                               exists2 <- doesFileExist path2
+                               if exists1 then return path1
+                                   else if exists2 then return path2
+                                   else die "Can't find package.conf"
         fs -> return (last fs)
 
   let global_conf_dir = global_conf ++ ".d"
