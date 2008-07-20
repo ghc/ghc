@@ -1566,7 +1566,7 @@ bangPatBit = 8	-- Tells the parser to understand bang-patterns
 		-- (doesn't affect the lexer)
 tyFamBit   = 9	-- indexed type families: 'family' keyword and kind sigs
 haddockBit = 10 -- Lex and parse Haddock comments
-magicHashBit = 11 -- # in both functions and operators
+magicHashBit = 11 -- "#" in both functions and operators
 kindSigsBit = 12 -- Kind signatures on type variables
 recursiveDoBit = 13 -- mdo
 unicodeSyntaxBit = 14 -- the forall symbol, arrow symbols, etc
