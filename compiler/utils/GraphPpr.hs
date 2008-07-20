@@ -58,9 +58,9 @@ dumpNode node
 dotGraph 
 	:: ( Uniquable k
 	   , Outputable k, Outputable cls, Outputable color)
-	=> (color -> SDoc)		-- | What graphviz color to use for each node color
-					--	It's usually safe to return X11 style colors here,
-					--	ie "red", "green" etc or a hex triplet #aaff55 etc
+	=> (color -> SDoc)  -- ^ What graphviz color to use for each node color
+			    --	It's usually safe to return X11 style colors here,
+			    --	ie "red", "green" etc or a hex triplet #aaff55 etc
 	-> Triv k cls color
 	-> Graph k cls color -> SDoc
 

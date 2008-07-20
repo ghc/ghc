@@ -168,7 +168,7 @@ tryUser action = tryJust tc_errors action
   where 
 	tc_errors e@(Exception.IOException ioe) | isUserError ioe = Just e
 	tc_errors _other = Nothing
-\end{code}	
+\end{code}
 
 Standard signal handlers for catching ^C, which just throw an
 exception in the target thread.  The current target thread is
