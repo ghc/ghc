@@ -646,7 +646,7 @@ cvObtainTerm hsc_env bound force mb_ty hval = runTR hsc_env $ do
                   (signatureType,_) <- instScheme(dataConRepType dc) 
                   addConstraint myType signatureType
             subTermsP <- sequence $ drop extra_args 
-                                 -- ^^^  all extra arguments are pointed
+                                -- \^^^  all extra arguments are pointed
                   [ appArr (go (pred bound) tv t) (ptrs clos) i
                    | (i,tv,t) <- zip3 [0..] subTermTvs subTtypesP]
             let unboxeds   = extractUnboxed subTtypesNP clos
