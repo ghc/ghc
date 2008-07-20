@@ -1,15 +1,15 @@
-*********************************************************************************
-*                                                                               *
-*       John Hughes's and Simon Peyton Jones's Pretty Printer Combinators       *
-*                                                                               *
-*               based on "The Design of a Pretty-printing Library"              *
-*               in Advanced Functional Programming,                             *
-*               Johan Jeuring and Erik Meijer (eds), LNCS 925                   *
-*               http://www.cs.chalmers.se/~rjmh/Papers/pretty.ps                *
-*                                                                               *
-*               Heavily modified by Simon Peyton Jones, Dec 96                  *
-*                                                                               *
-*********************************************************************************
+%*********************************************************************************
+%*                                                                               *
+%*       John Hughes's and Simon Peyton Jones's Pretty Printer Combinators       *
+%*                                                                               *
+%*               based on "The Design of a Pretty-printing Library"              *
+%*               in Advanced Functional Programming,                             *
+%*               Johan Jeuring and Erik Meijer (eds), LNCS 925                   *
+%*               http://www.cs.chalmers.se/~rjmh/Papers/pretty.ps                *
+%*                                                                               *
+%*               Heavily modified by Simon Peyton Jones, Dec 96                  *
+%*                                                                               *
+%*********************************************************************************
 
 Version 3.0     28 May 1997
   * Cured massive performance bug.  If you write
@@ -211,11 +211,11 @@ infixl 5 $$, $+$
 \end{code}
 
 
-*********************************************************
-*                                                       *
+%*********************************************************
+%*                                                       *
 \subsection{The interface}
-*                                                       *
-*********************************************************
+%*                                                       *
+%*********************************************************
 
 The primitive @Doc@ values
 
@@ -298,11 +298,11 @@ data Mode = PageMode            -- Normal
 \end{code}
 
 
-*********************************************************
-*                                                       *
+%*********************************************************
+%*                                                       *
 \subsection{The @Doc@ calculus}
-*                                                       *
-*********************************************************
+%*                                                       *
+%*********************************************************
 
 The @Doc@ combinators satisfy the following laws:
 \begin{verbatim}
@@ -336,8 +336,8 @@ Laws for nest
 <n5>    nest k empty            = empty
 <n6>    x <> nest k y           = x <> y, if x non-empty
 
-** Note the side condition on <n6>!  It is this that
-** makes it OK for empty to be a left unit for <>.
+ - Note the side condition on <n6>!  It is this that
+   makes it OK for empty to be a left unit for <>.
 
 Miscellaneous
 ~~~~~~~~~~~~~
@@ -377,11 +377,11 @@ But it doesn't work, for if x=empty, we would have
 
 
 
-*********************************************************
-*                                                       *
+%*********************************************************
+%*                                                       *
 \subsection{Simple derived definitions}
-*                                                       *
-*********************************************************
+%*                                                       *
+%*********************************************************
 
 \begin{code}
 semi  = char ';'
@@ -427,11 +427,11 @@ punctuate p (d:ds) = go d ds
 \end{code}
 
 
-*********************************************************
-*                                                       *
+%*********************************************************
+%*                                                       *
 \subsection{The @Doc@ data type}
-*                                                       *
-*********************************************************
+%*                                                       *
+%*********************************************************
 
 A @Doc@ represents a {\em set} of layouts.  A @Doc@ with
 no occurrences of @Union@ or @NoDoc@ represents just one layout.
@@ -540,11 +540,11 @@ Notice the difference between
 
 
 
-*********************************************************
-*                                                       *
+%*********************************************************
+%*                                                       *
 \subsection{@empty@, @text@, @nest@, @union@}
-*                                                       *
-*********************************************************
+%*                                                       *
+%*********************************************************
 
 \begin{code}
 empty = Empty
@@ -584,11 +584,11 @@ mkUnion Empty _ = Empty
 mkUnion p q     = p `union_` q
 \end{code}
 
-*********************************************************
-*                                                       *
+%*********************************************************
+%*                                                       *
 \subsection{Vertical composition @$$@}
-*                                                       *
-*********************************************************
+%*                                                       *
+%*********************************************************
 
 
 \begin{code}
@@ -637,11 +637,11 @@ nilAboveNest g k q           | (not g) && (k ># _ILIT(0))        -- No newline i
 \end{code}
 
 
-*********************************************************
-*                                                       *
+%*********************************************************
+%*                                                       *
 \subsection{Horizontal composition @<>@}
-*                                                       *
-*********************************************************
+%*                                                       *
+%*********************************************************
 
 \begin{code}
 p <>  q = Beside p False q
@@ -679,11 +679,11 @@ nilBeside g p          | g         = textBeside_ space_text (_ILIT(1)) p
                        | otherwise = p
 \end{code}
 
-*********************************************************
-*                                                       *
+%*********************************************************
+%*                                                       *
 \subsection{Separate, @sep@, Hughes version}
-*                                                       *
-*********************************************************
+%*                                                       *
+%*********************************************************
 
 \begin{code}
 -- Specification: sep ps  = oneLiner (hsep ps)
@@ -732,11 +732,11 @@ sepNB g Empty k ys        = oneLiner (nilBeside g (reduceDoc rest))
 sepNB g p k ys            = sep1 g p k ys
 \end{code}
 
-*********************************************************
-*                                                       *
+%*********************************************************
+%*                                                       *
 \subsection{@fill@}
-*                                                       *
-*********************************************************
+%*                                                       *
+%*********************************************************
 
 \begin{code}
 fsep = fill True
@@ -782,11 +782,11 @@ fillNB g p k ys            = fill1 g p k ys
 \end{code}
 
 
-*********************************************************
-*                                                       *
+%*********************************************************
+%*                                                       *
 \subsection{Selecting the best layout}
-*                                                       *
-*********************************************************
+%*                                                       *
+%*********************************************************
 
 \begin{code}
 best :: Int             -- Line length
@@ -873,11 +873,11 @@ oneLiner _                   = panic "oneLiner: Unhandled case"
 
 
 
-*********************************************************
-*                                                       *
+%*********************************************************
+%*                                                       *
 \subsection{Displaying the best layout}
-*                                                       *
-*********************************************************
+%*                                                       *
+%*********************************************************
 
 
 \begin{code}
