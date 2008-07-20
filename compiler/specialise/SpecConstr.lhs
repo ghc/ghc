@@ -498,9 +498,9 @@ data ScEnv = SCE { sc_size  :: Maybe Int,	-- Size threshold
 
 ---------------------
 -- As we go, we apply a substitution (sc_subst) to the current term
-type InExpr = CoreExpr		-- *Before* applying the subst
+type InExpr = CoreExpr		-- _Before_ applying the subst
 
-type OutExpr = CoreExpr		-- *After* applying the subst
+type OutExpr = CoreExpr		-- _After_ applying the subst
 type OutId   = Id
 type OutVar  = Var
 
@@ -509,7 +509,7 @@ type HowBoundEnv = VarEnv HowBound	-- Domain is OutVars
 
 ---------------------
 type ValueEnv = IdEnv Value		-- Domain is OutIds
-data Value    = ConVal AltCon [CoreArg]	-- *Saturated* constructors
+data Value    = ConVal AltCon [CoreArg]	-- _Saturated_ constructors
 	      | LambdaVal		-- Inlinable lambdas or PAPs
 
 instance Outputable Value where
@@ -707,7 +707,7 @@ combineOccs :: [ArgOcc] -> [ArgOcc] -> [ArgOcc]
 combineOccs xs ys = zipWithEqual "combineOccs" combineOcc xs ys
 
 setScrutOcc :: ScEnv -> ScUsage -> OutExpr -> ArgOcc -> ScUsage
--- *Overwrite* the occurrence info for the scrutinee, if the scrutinee 
+-- _Overwrite_ the occurrence info for the scrutinee, if the scrutinee
 -- is a variable, and an interesting variable
 setScrutOcc env usg (Cast e _) occ = setScrutOcc env usg e occ
 setScrutOcc env usg (Note _ e) occ = setScrutOcc env usg e occ
@@ -1028,9 +1028,9 @@ specialise env bind_calls (fn, arg_bndrs, body, arg_occs)
 				ptext (sLit "Specialisations:") <+> ppr (pats ++ [p | OS p _ _ _ <- specs])])
 			 return (nullUsage, spec_info)
 
-	    _normal_case -> do
-				
-	{ (spec_usgs, new_specs) <- mapAndUnzipM (spec_one env fn arg_bndrs body)
+	    _normal_case -> do {
+
+	  (spec_usgs, new_specs) <- mapAndUnzipM (spec_one env fn arg_bndrs body)
 					         (pats `zip` [spec_count..])
 
 	; let spec_usg = combineUsages spec_usgs
