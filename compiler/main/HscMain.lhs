@@ -674,7 +674,7 @@ hscCompile cgguts
                               stg_binds hpc_info
          --- Optionally run experimental Cmm transformations ---
          cmms <- optionallyConvertAndOrCPS hsc_env cmms
-                 -- ^ unless certain dflags are on, the identity function
+                 -- unless certain dflags are on, the identity function
          ------------------  Code output -----------------------
          rawcmms <- cmmToRawCmm cmms
          (_stub_h_exists, stub_c_exists)

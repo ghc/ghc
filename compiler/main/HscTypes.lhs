@@ -381,7 +381,7 @@ data FindResult
   | NoPackage PackageId
 	-- the requested package was not found
   | FoundMultiple [PackageId]
-	-- *error*: both in multiple packages
+	-- _error_: both in multiple packages
   | PackageHidden PackageId
 	-- for an explicit source import: the package containing the module is
 	-- not exposed.
@@ -556,12 +556,12 @@ data ModGuts
 	-- this module, rather than for *just* this module.  
 	-- Reason: when looking up an instance we don't want to have to
 	--	  look at each module in the home package in turn
-	mg_inst_env     :: InstEnv,	 -- Class instance enviroment fro
-					 -- *home-package* modules (including
-					 -- this one); c.f. tcg_inst_env
-	mg_fam_inst_env :: FamInstEnv	 -- Type-family instance enviroment
-					 -- for *home-package* modules (including
-					 -- this one); c.f. tcg_fam_inst_env
+	mg_inst_env     :: InstEnv,
+        -- ^ Class instance enviroment from /home-package/ modules (including
+	-- this one); c.f. tcg_inst_env
+	mg_fam_inst_env :: FamInstEnv
+        -- ^ Type-family instance enviroment for /home-package/ modules
+	-- (including this one); c.f. tcg_fam_inst_env
     }
 
 -- A CoreModule consists of just the fields of a ModGuts that are needed for

@@ -1781,7 +1781,7 @@ summariseFile hsc_env old_summaries file mb_phase maybe_buf
 	if ms_hs_date old_summary == src_timestamp 
 	   then do -- update the object-file timestamp
         	  obj_timestamp <-
-                    if isObjectTarget (hscTarget (hsc_dflags hsc_env)) -- #1205
+                    if isObjectTarget (hscTarget (hsc_dflags hsc_env)) -- bug #1205
                         then getObjTimestamp location False
                         else return Nothing
 		  return old_summary{ ms_obj_date = obj_timestamp }
@@ -1897,7 +1897,6 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod) maybe_buf exc
 			-- Drop external-pkg
 			ASSERT(modulePackageId mod /= thisPackage dflags)
 			return Nothing
-		where
 			
 	     err -> noModError dflags loc wanted_mod err
 			-- Not found

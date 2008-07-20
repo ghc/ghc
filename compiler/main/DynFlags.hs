@@ -646,7 +646,7 @@ setObjectDir  f d = d{ objectDir  = Just f}
 setHiDir      f d = d{ hiDir      = Just f}
 setStubDir    f d = d{ stubDir    = Just f, includePaths = f : includePaths d }
   -- -stubdir D adds an implicit -I D, so that gcc can find the _stub.h file
-  -- #included from the .hc file when compiling with -fvia-C.
+  -- \#included from the .hc file when compiling with -fvia-C.
 
 setObjectSuf  f d = d{ objectSuf  = f}
 setHiSuf      f d = d{ hiSuf      = f}

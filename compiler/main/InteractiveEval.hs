@@ -317,11 +317,10 @@ foreign import ccall "&rts_breakpoint_io_action"
 -- thread doesn't die when it receives the exception... "this thread
 -- is not responding".
 -- 
--- Careful here: there may be ^C exceptions flying around, so we start
--- the new thread blocked (forkIO inherits block from the parent,
--- #1048), and unblock only while we execute the user's code.  We
--- can't afford to lose the final putMVar, otherwise deadlock
--- ensues. (#1583, #1922, #1946)
+-- Careful here: there may be ^C exceptions flying around, so we start the new
+-- thread blocked (forkIO inherits block from the parent, #1048), and unblock
+-- only while we execute the user's code.  We can't afford to lose the final
+-- putMVar, otherwise deadlock ensues. (#1583, #1922, #1946)
 sandboxIO :: DynFlags -> MVar Status -> IO [HValue] -> IO Status
 sandboxIO dflags statusMVar thing =
    block $ do  -- fork starts blocked
@@ -810,12 +809,12 @@ moduleIsInterpreted s modl = withSession s $ \h ->
 getInfo :: Session -> Name -> IO (Maybe (TyThing,Fixity,[Instance]))
 getInfo s name 
   = withSession s $ \hsc_env -> 
-    do	{ mb_stuff <- tcRnGetInfo hsc_env name
-	; case mb_stuff of
-	    Nothing -> return Nothing
-	    Just (thing, fixity, ispecs) -> do
-	{ let rdr_env = ic_rn_gbl_env (hsc_IC hsc_env)
-	; return (Just (thing, fixity, filter (plausible rdr_env) ispecs)) } }
+    do mb_stuff <- tcRnGetInfo hsc_env name
+       case mb_stuff of
+         Nothing -> return Nothing
+         Just (thing, fixity, ispecs) -> do
+           let rdr_env = ic_rn_gbl_env (hsc_IC hsc_env)
+           return (Just (thing, fixity, filter (plausible rdr_env) ispecs))
   where
     plausible rdr_env ispec	-- Dfun involving only names that are in ic_rn_glb_env
 	= all ok $ nameSetToList $ tyClsNamesOfType $ idType $ instanceDFunId ispec
