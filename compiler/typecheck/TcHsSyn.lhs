@@ -1045,10 +1045,10 @@ mkArbitraryType :: (SrcSpan -> SDoc -> TcRnIf g l a)	-- How to complain
 -- to use when generating a warning
 mkArbitraryType warn tv 
   | liftedTypeKind `isSubKind` kind 		-- The vastly common case
-   = return anyPrimTy			
-  | eqKind kind (tyConKind anyPrimTyCon1) 	--  *->*
+  = return anyPrimTy
+  | eqKind kind (tyConKind anyPrimTyCon1) 	-- @*->*@
   = return (mkTyConApp anyPrimTyCon1 [])	--     No tuples this size
-  | all isLiftedTypeKind args 			-- *-> ... ->*->*
+  | all isLiftedTypeKind args 			-- @*-> ... ->*->*@
   , isLiftedTypeKind res			--    Horrible hack to make less use 
   = return (mkTyConApp tup_tc [])		--    of mkAnyPrimTyCon
   | otherwise

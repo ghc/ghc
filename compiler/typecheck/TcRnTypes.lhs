@@ -234,9 +234,9 @@ type RecFieldEnv = NameEnv [Name]	-- Maps a constructor name *in this module*
 					-- to the fields for that constructor
 	-- This is used when dealing with ".." notation in record 
 	-- construction and pattern matching.
-	-- The FieldEnv deals *only* with constructors defined in
-	-- *thie* module.  For imported modules, we get the same info
-	-- from the TypeEnv
+	-- The FieldEnv deals *only* with constructors defined in *thie*
+	-- module.  For imported modules, we get the same info from the
+	-- TypeEnv
 \end{code}
 
 %************************************************************************

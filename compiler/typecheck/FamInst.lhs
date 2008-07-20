@@ -187,9 +187,9 @@ checkForConflicts inst_envs famInst
 	   conflictInstErr famInst (head conflicts)
        }
   where
-      -- * In the case of data family instances, any overlap is fundamentally a 
+      -- - In the case of data family instances, any overlap is fundamentally a
       --   conflict (as these instances imply injective type mappings).
-      -- * In the case of type family instances, overlap is admitted as long as 
+      -- - In the case of type family instances, overlap is admitted as long as
       --   the right-hand sides of the overlapping rules coincide under the
       --   overlap substitution.  We require that they are syntactically equal;
       --   anything else would be difficult to test for at this stage.

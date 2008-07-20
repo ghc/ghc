@@ -91,34 +91,36 @@ we reduce the (C a b1) constraint from the call of f to (D a b1).
 
 Here is a more complicated example:
 
-| > class Foo a b | a->b
-| >
-| > class Bar a b | a->b
-| >
-| > data Obj = Obj
-| >
-| > instance Bar Obj Obj
-| >
-| > instance (Bar a b) => Foo a b
-| >
-| > foo:: (Foo a b) => a -> String
-| > foo _ = "works"
-| >
-| > runFoo:: (forall a b. (Foo a b) => a -> w) -> w
-| > runFoo f = f Obj
-| 
-| *Test> runFoo foo
-| 
-| <interactive>:1:
-|     Could not deduce (Bar a b) from the context (Foo a b)
-|       arising from use of `foo' at <interactive>:1
-|     Probable fix:
-|         Add (Bar a b) to the expected type of an expression
-|     In the first argument of `runFoo', namely `foo'
-|     In the definition of `it': it = runFoo foo
-| 
-| Why all of the sudden does GHC need the constraint Bar a b? The
-| function foo didn't ask for that... 
+@
+  > class Foo a b | a->b
+  >
+  > class Bar a b | a->b
+  >
+  > data Obj = Obj
+  >
+  > instance Bar Obj Obj
+  >
+  > instance (Bar a b) => Foo a b
+  >
+  > foo:: (Foo a b) => a -> String
+  > foo _ = "works"
+  >
+  > runFoo:: (forall a b. (Foo a b) => a -> w) -> w
+  > runFoo f = f Obj
+
+  *Test> runFoo foo
+
+  <interactive>:1:
+      Could not deduce (Bar a b) from the context (Foo a b)
+        arising from use of `foo' at <interactive>:1
+      Probable fix:
+          Add (Bar a b) to the expected type of an expression
+      In the first argument of `runFoo', namely `foo'
+      In the definition of `it': it = runFoo foo
+
+  Why all of the sudden does GHC need the constraint Bar a b? The
+  function foo didn't ask for that...
+@
 
 The trouble is that to type (runFoo foo), GHC has to solve the problem:
 
@@ -1771,7 +1773,7 @@ reduceContext env wanteds
 		; return init_state
                 }
 
-	-- *** ToDo: what to do with the "extra_givens"?  For the
+	-- !!! ToDo: what to do with the "extra_givens"?  For the
 	-- moment I'm simply discarding them, which is probably wrong
 
           -- 6. Solve the *wanted* *dictionary* constraints (not implications)

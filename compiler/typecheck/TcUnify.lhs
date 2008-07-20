@@ -1930,7 +1930,7 @@ checkExpectedKind ty act_kind exp_kind
   | otherwise = do
     (_errs, mb_r) <- tryTc (unifyKind exp_kind act_kind)
     case mb_r of
-        Just _  -> return () ;  -- Unification succeeded
+        Just _  -> return ()  -- Unification succeeded
         Nothing -> do
 
         -- So there's definitely an error

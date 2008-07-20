@@ -860,7 +860,6 @@ checkDistinctTyVars sig_tvs
                          <+> ptext (sLit "is unified with another quantified type variable") 
                          <+> quotes (ppr tidy_tv2)
             ; failWithTcM (env2, msg) }
-       where
 \end{code}
 
 
