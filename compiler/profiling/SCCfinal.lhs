@@ -5,22 +5,21 @@
 
 This is now a sort-of-normal STG-to-STG pass (WDP 94/06), run by stg2stg.
 
-* Traverses the STG program collecting the cost centres. These are
-  required to declare the cost centres at the start of code
-  generation.
+ - Traverses the STG program collecting the cost centres. These are required
+   to declare the cost centres at the start of code generation.
 
-  Note: because of cross-module unfolding, some of these cost centres
-  may be from other modules.  But will still have to give them
-  "extern" declarations.
+   Note: because of cross-module unfolding, some of these cost centres may be
+   from other modules.  But will still have to give them "extern"
+   declarations.
 
-* Puts on CAF cost-centres if the user has asked for individual CAF
-  cost-centres.
+ - Puts on CAF cost-centres if the user has asked for individual CAF
+   cost-centres.
 
-* Ditto for individual DICT cost-centres.
+ - Ditto for individual DICT cost-centres.
 
-* Boxes top-level inherited functions passed as arguments.
+ - Boxes top-level inherited functions passed as arguments.
 
-* "Distributes" given cost-centres to all as-yet-unmarked RHSs.
+ - "Distributes" given cost-centres to all as-yet-unmarked RHSs.
 
 \begin{code}
 module SCCfinal ( stgMassageForProfiling ) where
