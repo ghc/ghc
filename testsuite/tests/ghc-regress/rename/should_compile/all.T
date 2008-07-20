@@ -104,6 +104,10 @@ test('rn065',
      multimod_compile,
      ['rn065', '-v0'])
 
+test('rn066',
+     extra_clean(['Rn066_A.hi', 'Rn066_A.o']),
+     multimod_compile, ['rn066', '-v0'])
+
 test('T1972', if_compiler_lt('ghc', '6.9', expect_fail), compile, [''])
 test('T2205', normal, compile, [''])
 
