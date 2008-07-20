@@ -57,10 +57,10 @@ import Data.List
 
 \begin{code}
 data Subst 
-  = Subst InScopeSet	-- Variables in in scope (both Ids and TyVars)
-			-- *after* applying the substitution
-	  IdSubstEnv	-- Substitution for Ids
-	  TvSubstEnv	-- Substitution for TyVars
+  = Subst InScopeSet  -- Variables in in scope (both Ids and TyVars) /after/
+                      -- applying the substitution
+          IdSubstEnv  -- Substitution for Ids
+          TvSubstEnv  -- Substitution for TyVars
 
 	-- INVARIANT 1: The (domain of the) in-scope set is a superset
 	-- 	        of the free vars of the range of the substitution
@@ -337,7 +337,7 @@ substIdBndr rec_subst subst@(Subst in_scope env tvs) old_id
 
     no_change = id1 == old_id
 	-- See Note [Extending the Subst]
-	-- *not* necessary to check mb_new_info and no_type_change
+	-- it's /not/ necessary to check mb_new_info and no_type_change
 \end{code}
 
 Now a variant that unconditionally allocates a new unique.

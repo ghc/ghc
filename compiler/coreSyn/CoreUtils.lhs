@@ -997,8 +997,8 @@ arityType :: DynFlags -> CoreExpr -> ArityType
 
 arityType dflags (Note _ e) = arityType dflags e
 --	Not needed any more: etaExpand is cleverer
---  | ok_note n = arityType dflags e
---  | otherwise = ATop
+-- removed: | ok_note n = arityType dflags e
+-- removed: | otherwise = ATop
 
 arityType dflags (Cast e _) = arityType dflags e
 
@@ -1118,7 +1118,6 @@ etaExpand n us expr ty
   | manifestArity expr >= n = expr		-- The no-op case
   | otherwise 		    
   = eta_expand n us expr ty
-  where
 
 -- manifestArity sees how many leading value lambdas there are
 manifestArity :: CoreExpr -> Arity
@@ -1439,7 +1438,7 @@ hashExpr :: CoreExpr -> Int
 hashExpr e = fromIntegral (hash_expr (1,emptyVarEnv) e .&. 0x7fffffff)
              -- UniqFM doesn't like negative Ints
 
-type HashEnv = (Int, VarEnv Int)	-- Hash code for bound variables
+type HashEnv = (Int, VarEnv Int)  -- ^ Hash code for bound variables
 
 hash_expr :: HashEnv -> CoreExpr -> Word32
 -- Word32, because we're expecting overflows here, and overflowing

@@ -626,7 +626,7 @@ data LintLocInfo
   | LambdaBodyOf Id	-- The lambda-binder
   | BodyOfLetRec [Id]	-- One of the binders
   | CaseAlt CoreAlt	-- Case alternative
-  | CasePat CoreAlt	-- *Pattern* of the case alternative
+  | CasePat CoreAlt	-- The *pattern* of the case alternative
   | AnExpr CoreExpr	-- Some expression
   | ImportedUnfolding SrcLoc -- Some imported unfolding (ToDo: say which)
   | TopLevelBindings
