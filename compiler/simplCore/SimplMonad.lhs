@@ -101,9 +101,9 @@ thenSmpl_ m k
 		(_, us1, sc1) -> unSM k st_env us1 sc1)
 
 -- TODO: this specializing is not allowed
-{-# -- SPECIALIZE mapM         :: (a -> SimplM b) -> [a] -> SimplM [b] #-}
-{-# -- SPECIALIZE mapAndUnzipM :: (a -> SimplM (b, c)) -> [a] -> SimplM ([b],[c]) #-}
-{-# -- SPECIALIZE mapAccumLM   :: (acc -> b -> SimplM (acc,c)) -> acc -> [b] -> SimplM (acc, [c]) #-}
+-- {-# SPECIALIZE mapM         :: (a -> SimplM b) -> [a] -> SimplM [b] #-}
+-- {-# SPECIALIZE mapAndUnzipM :: (a -> SimplM (b, c)) -> [a] -> SimplM ([b],[c]) #-}
+-- {-# SPECIALIZE mapAccumLM   :: (acc -> b -> SimplM (acc,c)) -> acc -> [b] -> SimplM (acc, [c]) #-}
 \end{code}
 
 

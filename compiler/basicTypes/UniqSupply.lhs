@@ -190,9 +190,9 @@ mapUs f (x:xs)
 \end{code}
 
 \begin{code}
-{-# -- SPECIALIZE mapM          :: (a -> UniqSM b) -> [a] -> UniqSM [b] #-}
-{-# -- SPECIALIZE mapAndUnzipM  :: (a -> UniqSM (b,c))   -> [a] -> UniqSM ([b],[c]) #-}
-{-# -- SPECIALIZE mapAndUnzip3M :: (a -> UniqSM (b,c,d)) -> [a] -> UniqSM ([b],[c],[d]) #-}
+-- {-# SPECIALIZE mapM          :: (a -> UniqSM b) -> [a] -> UniqSM [b] #-}
+-- {-# SPECIALIZE mapAndUnzipM  :: (a -> UniqSM (b,c))   -> [a] -> UniqSM ([b],[c]) #-}
+-- {-# SPECIALIZE mapAndUnzip3M :: (a -> UniqSM (b,c,d)) -> [a] -> UniqSM ([b],[c],[d]) #-}
 
 lazyMapUs :: (a -> UniqSM b) -> [a] -> UniqSM [b]
 lazyMapUs _ []     = returnUs []
