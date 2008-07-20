@@ -161,6 +161,7 @@ other dynamic, non-language, flag settings:
   -fwarn-deprecated-flags
   -fno-warn-orphans
   -fno-warn-tabs
+  -fwarn-unrecognised-pragmas
   -fno-strictness
   -fno-static-argument-transformation
   -fno-full-laziness
