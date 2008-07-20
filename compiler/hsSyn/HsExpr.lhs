@@ -160,7 +160,7 @@ data HsExpr id
   | RecordUpd   (LHsExpr id)
                 (HsRecordBinds id)
                 [DataCon]          -- Filled in by the type checker to the
-                                   -- *non-empty* list of DataCons that have
+                                   -- _non-empty_ list of DataCons that have
                                    -- all the upd'd fields
                 [PostTcType]       -- Argument types of *input* record type
                 [PostTcType]       --              and  *output* record type
@@ -198,7 +198,7 @@ data HsExpr id
   | HsBracketOut (HsBracket Name)       -- Output of the type checker is
                                         -- the *original*
                  [PendingSplice]        -- renamed expression, plus
-                                        -- *typechecked* splices to be
+                                        -- _typechecked_ splices to be
                                         -- pasted back in by the desugarer
 
   | HsSpliceE (HsSplice id)

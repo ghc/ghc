@@ -146,7 +146,7 @@ cvtTop (InstanceD tys ty decs)
 	; L loc pred' <- cvtPred ty
 	; inst_ty' <- returnL $ mkImplicitHsForAllTy ctxt' (L loc (HsPredTy pred'))
 	; returnL $ InstD (InstDecl inst_ty' binds' sigs' [])
-						       -- ^^no ATs in TH
+					-- no ATs in TH   ^^
 	}
 
 cvtTop (ForeignD ford) = do { ford' <- cvtForD ford; returnL $ ForD ford' }
