@@ -525,7 +525,7 @@ tcIfaceFamInst :: IfaceFamInst -> IfL FamInst
 tcIfaceFamInst (IfaceFamInst { ifFamInstTyCon = tycon, 
 			       ifFamInstFam = fam, ifFamInstTys = mb_tcs })
 --	{ tycon'  <- forkM (ptext (sLit "Inst tycon") <+> ppr tycon) $
--- ^^^this line doesn't work, but vvv this does => CPP in Haskell = evil!
+-- the above line doesn't work, but this below does => CPP in Haskell = evil!
     = do tycon'  <- forkM (text ("Inst tycon") <+> ppr tycon) $
                     tcIfaceTyCon tycon
          let mb_tcs' = map (fmap ifaceTyConName) mb_tcs

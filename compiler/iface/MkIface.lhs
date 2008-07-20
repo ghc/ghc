@@ -1116,13 +1116,13 @@ needInterface mod continue
 	-- Instead, get an Either back which we can test
 
     case mb_iface of
-	Failed _ ->  (out_of_date (sep [ptext (sLit "Couldn't load interface for module"), 
-				       ppr mod]));
-		-- Couldn't find or parse a module mentioned in the
-		-- old interface file.  Don't complain: it might
-		-- just be that the current module doesn't need that
-		-- import and it's been deleted
-	Succeeded iface -> continue iface
+      Failed _ ->  (out_of_date (sep [ptext (sLit "Couldn't load interface for module"),
+                                      ppr mod]))
+                  -- Couldn't find or parse a module mentioned in the
+                  -- old interface file.  Don't complain: it might
+                  -- just be that the current module doesn't need that
+                  -- import and it's been deleted
+      Succeeded iface -> continue iface
 
 
 checkModUsage :: PackageId ->Usage -> IfG RecompileRequired

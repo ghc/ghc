@@ -408,7 +408,7 @@ loadDecl ignore_prags mod (_version, decl)
         -- All a bit too finely-balanced for my liking.
 
         -- This mini-env and lookup function mediates between the
-        -- *Name*s n and the map from *OccName*s to the implicit TyThings
+        --'Name's n and the map from 'OccName's to the implicit TyThings
 	; let mini_env = mkOccEnv [(getOccName t, t) | t <- implicitTyThings thing]
 	      lookup n = case lookupOccEnv mini_env (getOccName n) of
 			   Just thing -> thing
