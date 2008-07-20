@@ -303,7 +303,7 @@ emitPushUpdateFrame frame_addr updatee = do
 
 off_updatee :: ByteOff
 off_updatee = fixedHdrSize*wORD_SIZE + oFFSET_StgUpdateFrame_updatee
-\end{code}			
+\end{code}
 
 
 %************************************************************************

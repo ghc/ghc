@@ -598,7 +598,8 @@ getCallMethod name (LFCon con) n_args
     ReturnCon con
 
 getCallMethod name (LFThunk _ _ updatable std_form_info is_fun) n_args
-  | is_fun 	-- *Might* be a function, so we must "call" it (which is always safe)
+  | is_fun 	-- it *might* be a function, so we must "call" it (which is
+                -- always safe)
   = SlowCall	-- We cannot just enter it [in eval/apply, the entry code
 		-- is the fast-entry code]
 
