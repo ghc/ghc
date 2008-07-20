@@ -14,6 +14,7 @@ module Haddock.Backends.Hoogle (
 
 import Haddock.Types
 import Haddock.GHC
+import Haddock.GHC.Utils
 import GHC hiding ((<.>))
 import SrcLoc
 import Outputable
@@ -48,8 +49,11 @@ ppModule iface = "" : doc (ifaceDoc iface) ++
                  concatMap ppInstance (ifaceInstances iface)
     where
         locals = Set.fromList $ ifaceLocals iface
-        exported = [i | i@(ExportDecl{expItemName=name}) <- ifaceExportItems iface
-                      , name `Set.member` locals]
+        exported = [i | i@(ExportDecl{expItemDecl=decl}) <- ifaceExportItems iface
+                      , isLocal (unLoc decl)]
+        isLocal decl
+          | Just name <- getMainDeclBinder decl = name `Set.member` locals
+          | otherwise = False
 
 
 ---------------------------------------------------------------------
