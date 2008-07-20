@@ -541,15 +541,15 @@ mkErrorAppDs err_id ty msg = do
 \end{code}
 
 
-*************************************************************
+%************************************************************************
 %*									*
 \subsection{Making literals}
 %*									*
 %************************************************************************
 
 \begin{code}
-mkCharExpr     :: Char	     -> CoreExpr      -- Returns	C# c :: Int
-mkIntExpr      :: Integer    -> CoreExpr      -- Returns	I# i :: Int
+mkCharExpr     :: Char	     -> CoreExpr      -- Returns @C# c :: Int@
+mkIntExpr      :: Integer    -> CoreExpr      -- Returns @I# i :: Int@
 mkIntegerExpr  :: Integer    -> DsM CoreExpr  -- Result :: Integer
 mkStringExpr   :: String     -> DsM CoreExpr  -- Result :: String
 mkStringExprFS :: FastString -> DsM CoreExpr  -- Result :: String

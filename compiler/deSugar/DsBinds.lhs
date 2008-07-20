@@ -346,9 +346,9 @@ dsSpec all_tvs dicts tvs poly_id mono_id mono_bind
 	  case mb_lhs of
 	    Nothing -> do { warnDs decomp_msg; return Nothing }
 
-	    Just (_, args) -> do
-	
-	{ f_body <- fix_up (Let mono_bind (Var mono_id))
+	    Just (_, args) -> do {
+
+	  f_body <- fix_up (Let mono_bind (Var mono_id))
 
 	; let	  local_poly  = setIdNotExported poly_id
 			-- Very important to make the 'f' non-exported,
