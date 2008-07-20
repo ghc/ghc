@@ -322,7 +322,7 @@ lookupFamInstDeclBndr :: Module -> Located RdrName -> RnM Name
 lookupFamInstDeclBndr mod lrdr_name@(L _ rdr_name)
   = do { mb_gre <- lookupGreRn_maybe rdr_name
        ; case mb_gre of
-           Just gre -> returnM (gre_name gre) ;
+           Just gre -> returnM (gre_name gre)
 	   Nothing  -> newTopSrcBinder mod lrdr_name }
 
 --------------------------------------------------

@@ -896,7 +896,7 @@ rnFamily (tydecl@TyFamily {tcdFlavour = flavour,
 			   tcdLName = tycon, tcdTyVars = tyvars}) 
         bindIdxVars =
       do { checkM (isDataFlavour flavour                      -- for synonyms,
-		   || not (null tyvars)) $ addErr needOneIdx  -- #indexes >= 1
+		   || not (null tyvars)) $ addErr needOneIdx  -- no. of indexes >= 1
 	 ; bindIdxVars (family_doc tycon) tyvars $ \tyvars' -> do {
 	 ; tycon' <- lookupLocatedTopBndrRn tycon
 	 ; returnM (TyFamily {tcdFlavour = flavour, tcdLName = tycon', 
