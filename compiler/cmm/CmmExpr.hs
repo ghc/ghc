@@ -97,13 +97,13 @@ maybeInvertCmmExpr _ = Nothing
 data GCKind = GCKindPtr | GCKindNonPtr deriving (Eq)
 
 data LocalReg
-  = LocalReg
-      !Unique   -- ^ Identifier
-      MachRep   -- ^ Type
-      GCKind      -- ^ Should the GC follow as a pointer
+  = LocalReg !Unique MachRep GCKind
+    -- ^ Parameters:
+    --   1. Identifier
+    --   2. Type
+    --   3. Should the GC follow as a pointer
 
--- | Sets of local registers
-
+--  Sets of local registers
 type RegSet              =  UniqSet LocalReg
 emptyRegSet             :: RegSet
 elemRegSet              :: LocalReg -> RegSet -> Bool

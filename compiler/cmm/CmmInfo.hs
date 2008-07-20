@@ -78,7 +78,7 @@ mkInfoTable :: Unique -> CmmTop -> [RawCmmTop]
 mkInfoTable uniq (CmmData sec dat) = [CmmData sec dat]
 mkInfoTable uniq (CmmProc (CmmInfo _ _ info) entry_label arguments blocks) =
     case info of
-      -- | Code without an info table.  Easy.
+      -- Code without an info table.  Easy.
       CmmNonInfoTable -> [CmmProc [] entry_label arguments blocks]
 
       CmmInfoTable (ProfilingInfo ty_prof cl_prof) type_tag type_info ->
@@ -86,7 +86,7 @@ mkInfoTable uniq (CmmProc (CmmInfo _ _ info) entry_label arguments blocks) =
               ty_prof' = makeRelativeRefTo info_label ty_prof
               cl_prof' = makeRelativeRefTo info_label cl_prof
           in case type_info of
-          -- | A function entry point.
+          -- A function entry point.
           FunInfo (ptrs, nptrs) srt fun_type fun_arity pap_bitmap slow_entry ->
               mkInfoTableAndCode info_label std_info fun_extra_bits entry_label
                                  arguments blocks
@@ -104,7 +104,7 @@ mkInfoTable uniq (CmmProc (CmmInfo _ _ info) entry_label arguments blocks) =
               (srt_label, srt_bitmap) = mkSRTLit info_label srt
               layout = packHalfWordsCLit ptrs nptrs
 
-          -- | A constructor.
+          -- A constructor.
           ConstrInfo (ptrs, nptrs) con_tag descr ->
               mkInfoTableAndCode info_label std_info [con_name] entry_label
                                  arguments blocks
@@ -113,7 +113,7 @@ mkInfoTable uniq (CmmProc (CmmInfo _ _ info) entry_label arguments blocks) =
                 con_name = makeRelativeRefTo info_label descr
                 layout = packHalfWordsCLit ptrs nptrs
 
-          -- | A thunk.
+          -- A thunk.
           ThunkInfo (ptrs, nptrs) srt ->
               mkInfoTableAndCode info_label std_info srt_label entry_label
                                  arguments blocks
@@ -122,7 +122,7 @@ mkInfoTable uniq (CmmProc (CmmInfo _ _ info) entry_label arguments blocks) =
                 (srt_label, srt_bitmap) = mkSRTLit info_label srt
                 layout = packHalfWordsCLit ptrs nptrs
 
-          -- | A selector thunk.
+          -- A selector thunk.
           ThunkSelectorInfo offset srt ->
               mkInfoTableAndCode info_label std_info [{- no SRT -}] entry_label
                                  arguments blocks
@@ -200,9 +200,11 @@ mkSRTLit info_label (C_SRT lbl off bitmap) =
 -- TODO: combine with CgCallConv.mkLiveness (see comment there)
 mkLiveness :: Unique
            -> [Maybe LocalReg]
-           -> (CmmLit,           -- ^ The bitmap (literal value or label)
-               [RawCmmTop],      -- ^ Large bitmap CmmData if needed
-               ClosureTypeTag)   -- ^ rET_SMALL or rET_BIG
+           -> (CmmLit, [RawCmmTop], ClosureTypeTag)
+              -- ^ Returns:
+              --   1. The bitmap (literal value or label)
+              --   2. Large bitmap CmmData if needed
+              --   3. rET_SMALL or rET_BIG
 mkLiveness uniq live =
   if length bits > mAX_SMALL_BITMAP_SIZE
     -- does not fit in one word

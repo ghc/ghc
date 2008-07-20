@@ -58,7 +58,7 @@ branchChainElim (ListGraph blocks)
 isLoneBranch :: CmmBasicBlock -> Either (BlockId, BlockId) CmmBasicBlock
 isLoneBranch (BasicBlock id [CmmBranch target]) | id /= target = Left (id, target)
 isLoneBranch other_block                                       = Right other_block
-   -- ^ An infinite loop is not a link in a branch chain!
+   -- An infinite loop is not a link in a branch chain!
 
 replaceLabels :: BlockEnv BlockId -> CmmBasicBlock -> CmmBasicBlock
 replaceLabels env (BasicBlock id stmts)
@@ -95,7 +95,7 @@ isLoneBranchZ :: CmmBlock -> Either (BlockId, BlockId) CmmBlock
 isLoneBranchZ (G.Block id (G.ZLast (G.LastOther (LastBranch target))))
     | id /= target  = Left (id,target)
 isLoneBranchZ other = Right other
-   -- ^ An infinite loop is not a link in a branch chain!
+   -- An infinite loop is not a link in a branch chain!
 
 replaceLabelsZ :: BlockEnv BlockId -> CmmGraph -> CmmGraph
 replaceLabelsZ env = replace_eid . G.map_nodes id id last

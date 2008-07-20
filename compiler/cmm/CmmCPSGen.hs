@@ -58,7 +58,7 @@ data Continuation info =
                        -- Right <=> Function or Proc point
      CLabel            -- Used to generate both info & entry labels
      CmmFormalsWithoutKinds        -- Argument locals live on entry (C-- procedure params)
-     Bool              -- ^ True <=> GC block so ignore stack size
+     Bool              -- True <=> GC block so ignore stack size
      [BrokenBlock]     -- Code, may be empty.  The first block is
                        -- the entry point.  The order is otherwise initially 
                        -- unimportant, but at some point the code gen will
@@ -177,12 +177,12 @@ continuationToProc (max_stack, update_frame_size, formats) stack_use uniques
             main_stmts =
                 case entry of
                   FunctionEntry _ _ _ ->
-                      -- Ugh, the statements for an update frame must come
-                      -- *after* the GC check that was added at the beginning
-                      -- of the CPS pass.  So we have do edit the statements
-                      -- a bit.  This depends on the knowledge that the
-                      -- statements in the first block are only the GC check.
-                      -- That's fragile but it works for now.
+                      -- The statements for an update frame must come /after/
+                      -- the GC check that was added at the beginning of the
+                      -- CPS pass.  So we have do edit the statements a bit.
+                      -- This depends on the knowledge that the statements in
+                      -- the first block are only the GC check.  That's
+                      -- fragile but it works for now.
                       gc_stmts ++ stmts ++ update_stmts ++ postfix_stmts
                   ControlEntry -> stmts ++ postfix_stmts
                   ContinuationEntry _ _ _ -> stmts ++ postfix_stmts
