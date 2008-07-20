@@ -248,6 +248,8 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
 	$whitechar* (NO(T?)INLINE|no(t?)inline)
 					{ token (ITspec_inline_prag False) }
   "{-#" $whitechar* (SOURCE|source)	{ token ITsource_prag }
+  "{-#" $whitechar* (WARNING|warning)
+  					{ token ITwarning_prag }
   "{-#" $whitechar* (DEPRECATED|deprecated)
   					{ token ITdeprecated_prag }
   "{-#" $whitechar* (SCC|scc)		{ token ITscc_prag }
@@ -466,6 +468,7 @@ data Token
   | ITspec_inline_prag Bool	-- SPECIALISE INLINE (or NOINLINE)
   | ITsource_prag
   | ITrules_prag
+  | ITwarning_prag
   | ITdeprecated_prag
   | ITline_prag
   | ITscc_prag

@@ -1005,10 +1005,10 @@
 	  </row>
 
 	  <row>
-	    <entry><option>-fwarn-deprecations</option></entry>
-	    <entry>warn about uses of functions &amp; types that are deprecated</entry>
+	    <entry><option>-fwarn-warnings-deprecations</option></entry>
+	    <entry>warn about uses of functions &amp; types that have warnings or deprecated pragmas</entry>
 	    <entry>dynamic</entry>
-	    <entry><option>-fno-warn-deprecations</option></entry>
+	    <entry><option>-fno-warn-warnings-deprecations</option></entry>
 	  </row>
 
 	  <row>

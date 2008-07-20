@@ -19,7 +19,7 @@ module BasicTypes(
 
 	Arity, 
 	
-	DeprecTxt,
+	WarningTxt(..),
 
 	Fixity(..), FixityDirection(..),
 	defaultFixity, maxPrecedence, 
@@ -95,7 +95,14 @@ initialVersion = 1
 
 
 \begin{code}
-type DeprecTxt = FastString	-- reason/explanation for deprecation
+-- reason/explanation from a WARNING or DEPRECATED pragma
+data WarningTxt = WarningTxt FastString
+                | DeprecatedTxt FastString
+    deriving Eq
+
+instance Outputable WarningTxt where
+    ppr (WarningTxt    w) =                        doubleQuotes (ftext w)
+    ppr (DeprecatedTxt d) = text "Deprecated:" <+> doubleQuotes (ftext d)
 \end{code}
 
 %************************************************************************

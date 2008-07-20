@@ -636,7 +636,7 @@ pprModIface iface
 	, vcat (map ppr (mi_fam_insts iface))
 	, vcat (map ppr (mi_rules iface))
         , pprVectInfo (mi_vect_info iface)
-	, pprDeprecs (mi_deprecs iface)
+	, ppr (mi_warns iface)
  	]
   where
     pp_boot | mi_boot iface = ptext (sLit "[boot]")
@@ -709,12 +709,15 @@ pprVectInfo (IfaceVectInfo { ifaceVectInfoVar        = vars
   , ptext (sLit "vectorised reused tycons:") <+> hsep (map ppr tyconsReuse)
   ]
 
-pprDeprecs :: Deprecations -> SDoc
-pprDeprecs NoDeprecs	    = empty
-pprDeprecs (DeprecAll txt)  = ptext (sLit "Deprecate all") <+> doubleQuotes (ftext txt)
-pprDeprecs (DeprecSome prs) = ptext (sLit "Deprecate") <+> vcat (map pprDeprec prs)
-			    where
-			      pprDeprec (name, txt) = ppr name <+> doubleQuotes (ftext txt)
+instance Outputable Warnings where
+    ppr = pprWarns
+
+pprWarns :: Warnings -> SDoc
+pprWarns NoWarnings	    = empty
+pprWarns (WarnAll txt)  = ptext (sLit "Warn all") <+> ppr txt
+pprWarns (WarnSome prs) = ptext (sLit "Warnings")
+                        <+> vcat (map pprWarning prs)
+    where pprWarning (name, txt) = ppr name <+> ppr txt
 \end{code}
 
 

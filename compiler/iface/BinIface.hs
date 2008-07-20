@@ -373,7 +373,7 @@ instance Binary ModIface where
 		 mi_exports   = exports,
 		 mi_exp_hash  = exp_hash,
 		 mi_fixities  = fixities,
-		 mi_deprecs   = deprecs,
+		 mi_warns     = warns,
 		 mi_decls     = decls,
 		 mi_insts     = insts,
 		 mi_fam_insts = fam_insts,
@@ -392,7 +392,7 @@ instance Binary ModIface where
 	put_ bh exports
 	put_ bh exp_hash
 	put_ bh fixities
-	lazyPut bh deprecs
+	lazyPut bh warns
         put_ bh decls
 	put_ bh insts
 	put_ bh fam_insts
@@ -413,7 +413,7 @@ instance Binary ModIface where
 	exports	  <- {-# SCC "bin_exports" #-} get bh
 	exp_hash  <- get bh
 	fixities  <- {-# SCC "bin_fixities" #-} get bh
-	deprecs   <- {-# SCC "bin_deprecs" #-} lazyGet bh
+	warns     <- {-# SCC "bin_warns" #-} lazyGet bh
         decls 	  <- {-# SCC "bin_tycldecls" #-} get bh
 	insts     <- {-# SCC "bin_insts" #-} get bh
 	fam_insts <- {-# SCC "bin_fam_insts" #-} get bh
@@ -433,7 +433,7 @@ instance Binary ModIface where
 		 mi_exports   = exports,
 		 mi_exp_hash  = exp_hash,
 		 mi_fixities  = fixities,
-		 mi_deprecs   = deprecs,
+		 mi_warns     = warns,
 		 mi_decls     = decls,
 		 mi_globals   = Nothing,
 		 mi_insts     = insts,
@@ -443,7 +443,7 @@ instance Binary ModIface where
                  mi_vect_info = vect_info,
 		 mi_hpc       = hpc_info,
 			-- And build the cached values
-		 mi_dep_fn    = mkIfaceDepCache deprecs,
+		 mi_warn_fn   = mkIfaceWarnCache warns,
 		 mi_fix_fn    = mkIfaceFixCache fixities,
 		 mi_hash_fn   = mkIfaceHashCache decls })
 
@@ -515,23 +515,39 @@ instance Binary Usage where
             return UsageHomeModule { usg_mod_name = nm, usg_mod_hash = mod,
                             usg_exports = exps, usg_entities = ents }
 
-instance Binary Deprecations where
-    put_ bh NoDeprecs     = putByte bh 0
-    put_ bh (DeprecAll t) = do
-	    putByte bh 1
-	    put_ bh t
-    put_ bh (DeprecSome ts) = do
-	    putByte bh 2
-	    put_ bh ts
+instance Binary Warnings where
+    put_ bh NoWarnings     = putByte bh 0
+    put_ bh (WarnAll t) = do
+            putByte bh 1
+            put_ bh t
+    put_ bh (WarnSome ts) = do
+            putByte bh 2
+            put_ bh ts
 
     get bh = do
-	    h <- getByte bh
-	    case h of
-	      0 -> return NoDeprecs
-	      1 -> do aa <- get bh
-		      return (DeprecAll aa)
-	      _ -> do aa <- get bh
-		      return (DeprecSome aa)
+            h <- getByte bh
+            case h of
+              0 -> return NoWarnings
+              1 -> do aa <- get bh
+                      return (WarnAll aa)
+              _ -> do aa <- get bh
+                      return (WarnSome aa)
+
+instance Binary WarningTxt where
+    put_ bh (WarningTxt w) = do
+            putByte bh 0
+            put_ bh w
+    put_ bh (DeprecatedTxt d) = do
+            putByte bh 1
+            put_ bh d
+
+    get bh = do
+            h <- getByte bh
+            case h of
+              0 -> do w <- get bh
+                      return (WarningTxt w)
+              _ -> do d <- get bh
+                      return (DeprecatedTxt d)
 
 -------------------------------------------------------------------------
 --		Types from: BasicTypes

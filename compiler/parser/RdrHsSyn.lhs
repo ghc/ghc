@@ -347,8 +347,8 @@ add gp@(HsGroup {hs_defds  = ts})  l (DefD d) ds
   = addl (gp { hs_defds = L l d : ts }) ds
 add gp@(HsGroup {hs_fords  = ts}) l (ForD d) ds
   = addl (gp { hs_fords = L l d : ts }) ds
-add gp@(HsGroup {hs_depds  = ts})  l (DeprecD d) ds
-  = addl (gp { hs_depds = L l d : ts }) ds
+add gp@(HsGroup {hs_warnds  = ts})  l (WarningD d) ds
+  = addl (gp { hs_warnds = L l d : ts }) ds
 add gp@(HsGroup {hs_ruleds  = ts}) l (RuleD d) ds
   = addl (gp { hs_ruleds = L l d : ts }) ds
 

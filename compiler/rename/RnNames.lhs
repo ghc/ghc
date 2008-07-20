@@ -7,7 +7,7 @@
 module RnNames (
 	rnImports, getLocalNonValBinders,
 	rnExports, extendGlobalRdrEnvRn,
-	reportUnusedNames, finishDeprecations,
+	reportUnusedNames, finishWarnings,
     ) where
 
 #include "HsVersions.h"
@@ -33,7 +33,7 @@ import Maybes
 import SrcLoc
 import FiniteMap
 import ErrUtils
-import BasicTypes	( DeprecTxt )
+import BasicTypes	( WarningTxt(..) )
 import DriverPhases	( isHsBoot )
 import Util
 import FastString
@@ -143,7 +143,7 @@ rnImportDecl this_mod (L loc (ImportDecl loc_imp_mod_name want_boot
 
     let
 	imp_mod	   = mi_module iface
-	deprecs	   = mi_deprecs iface
+	warns	   = mi_warns iface
 	orph_iface = mi_orphan iface 
 	has_finsts = mi_finsts iface 
 	deps 	   = mi_deps iface
@@ -233,10 +233,10 @@ rnImportDecl this_mod (L loc (ImportDecl loc_imp_mod_name want_boot
                    }
 
 	-- Complain if we import a deprecated module
-    ifOptM Opt_WarnDeprecations	(
-       case deprecs of	
-	  DeprecAll txt -> addWarn (moduleDeprec imp_mod_name txt)
-	  _    	        -> return ()
+    ifOptM Opt_WarnWarningsDeprecations	(
+       case warns of	
+	  WarnAll txt -> addWarn (moduleWarn imp_mod_name txt)
+	  _    	      -> return ()
      )
 
     let new_imp_decl = L loc (ImportDecl loc_imp_mod_name want_boot
@@ -966,23 +966,23 @@ check_occs ie occs names
 %*********************************************************
 
 \begin{code}
-finishDeprecations :: DynFlags -> Maybe DeprecTxt 
-		   -> TcGblEnv -> RnM TcGblEnv
--- (a) Report usasge of deprecated imports
--- (b) If the whole module is deprecated, update tcg_deprecs
--- 		All this happens only once per module
-finishDeprecations dflags mod_deprec tcg_env
+finishWarnings :: DynFlags -> Maybe WarningTxt 
+               -> TcGblEnv -> RnM TcGblEnv
+-- (a) Report usage of imports that are deprecated or have other warnings
+-- (b) If the whole module is warned about or deprecated, update tcg_warns
+--     All this happens only once per module
+finishWarnings dflags mod_warn tcg_env
   = do	{ (eps,hpt) <- getEpsAndHpt
-	; ifOptM Opt_WarnDeprecations	$
+	; ifOptM Opt_WarnWarningsDeprecations $
 	  mapM_ (check hpt (eps_PIT eps)) all_gres
 		-- By this time, typechecking is complete, 
 		-- so the PIT is fully populated
 
-	-- Deal with a module deprecation; it overrides all existing deprecs
-	; let new_deprecs = case mod_deprec of
-				Just txt -> DeprecAll txt
-				Nothing  -> tcg_deprecs tcg_env
-	; return (tcg_env { tcg_deprecs = new_deprecs }) }
+	-- Deal with a module deprecation; it overrides all existing warns
+	; let new_warns = case mod_warn of
+				Just txt -> WarnAll txt
+				Nothing  -> tcg_warns tcg_env
+	; return (tcg_env { tcg_warns = new_warns }) }
   where
     used_names = allUses (tcg_dus tcg_env) 
 	-- Report on all deprecated uses; hence allUses
@@ -992,7 +992,7 @@ finishDeprecations dflags mod_deprec tcg_env
       | name `elemNameSet` used_names
       ,	Just deprec_txt <- lookupImpDeprec dflags hpt pit gre
       = addWarnAt (importSpecLoc imp_spec)
-		  (sep [ptext (sLit "Deprecated use of") <+> 
+		  (sep [ptext (sLit "In the use of") <+> 
 			pprNonVarNameSpace (occNameSpace (nameOccName name)) <+> 
 		 	quotes (ppr name),
 		      (parens imp_msg) <> colon,
@@ -1013,13 +1013,13 @@ finishDeprecations dflags mod_deprec tcg_env
 	    -- interface
 
 lookupImpDeprec :: DynFlags -> HomePackageTable -> PackageIfaceTable 
-	        -> GlobalRdrElt -> Maybe DeprecTxt
+	        -> GlobalRdrElt -> Maybe WarningTxt
 -- The name is definitely imported, so look in HPT, PIT
 lookupImpDeprec dflags hpt pit gre
   = case lookupIfaceByModule dflags hpt pit (nameModule name) of
-	Just iface -> mi_dep_fn iface name `mplus` 	-- Bleat if the thing, *or
+	Just iface -> mi_warn_fn iface name `mplus` 	-- Bleat if the thing, *or
 		      case gre_par gre of	
-			ParentIs p -> mi_dep_fn iface p	-- its parent*, is deprec'd
+			ParentIs p -> mi_warn_fn iface p	-- its parent*, is warn'd
 			NoParent   -> Nothing
 
 	Nothing -> Nothing	-- See Note [Used names with interface not loaded]
@@ -1428,10 +1428,14 @@ nullModuleExport :: ModuleName -> SDoc
 nullModuleExport mod
   = ptext (sLit "The export item `module") <+> ppr mod <> ptext (sLit "' exports nothing")
 
-moduleDeprec :: ModuleName -> DeprecTxt -> SDoc
-moduleDeprec mod txt
-  = sep [ ptext (sLit "Module") <+> quotes (ppr mod) <+> ptext (sLit "is deprecated:"), 
-	  nest 4 (ppr txt) ]	  
+moduleWarn :: ModuleName -> WarningTxt -> SDoc
+moduleWarn mod (WarningTxt txt)
+  = sep [ ptext (sLit "Module") <+> quotes (ppr mod) <> ptext (sLit ":"), 
+          nest 4 (ppr txt) ]
+moduleWarn mod (DeprecatedTxt txt)
+  = sep [ ptext (sLit "Module") <+> quotes (ppr mod)
+                                <+> ptext (sLit "is deprecated:"), 
+          nest 4 (ppr txt) ]
 
 implicitPreludeWarn :: SDoc
 implicitPreludeWarn

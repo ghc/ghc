@@ -35,7 +35,7 @@ import HsImpExp
 import HsLit
 import HsPat
 import HsTypes
-import BasicTypes	( Fixity, DeprecTxt )
+import BasicTypes	( Fixity, WarningTxt )
 import HsUtils
 import HsDoc
 
@@ -61,7 +61,7 @@ data HsModule name
 				-- info to TyDecls/etc; so this list is
 				-- often empty, downstream.
 	[LHsDecl name]		-- Type, class, value, and interface signature decls
-	(Maybe DeprecTxt)	-- reason/explanation for deprecation of this module
+	(Maybe WarningTxt)	-- reason/explanation for warning/deprecation of this module
 	(HaddockModInfo name)   -- Haddock module info
 	(Maybe (HsDoc name))    -- Haddock module description
 

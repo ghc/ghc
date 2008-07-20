@@ -219,7 +219,7 @@ data TcGblEnv
 		-- Nothing <=> Don't retain renamed decls
 
 	tcg_binds     :: LHsBinds Id,	    -- Value bindings in this module
-	tcg_deprecs   :: Deprecations,	    -- ...Deprecations 
+	tcg_warns     :: Warnings,	    -- ...Warnings and deprecations
 	tcg_insts     :: [Instance],	    -- ...Instances
 	tcg_fam_insts :: [FamInst],	    -- ...Family instances
 	tcg_rules     :: [LRuleDecl Id],    -- ...Rules

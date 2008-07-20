@@ -27,7 +27,7 @@ module HsDecls (
 	ConDecl(..), ResType(..), ConDeclField(..), LConDecl,	
 	HsConDeclDetails, hsConDeclArgTys,
 	DocDecl(..), LDocDecl, docDeclDoc,
-	DeprecDecl(..),  LDeprecDecl,
+	WarnDecl(..),  LWarnDecl,
 	HsGroup(..),  emptyRdrGroup, emptyRnGroup, appendGroups,
 	tcdName, tyClDeclNames, tyClDeclTyVars,
 	isClassDecl, isSynDecl, isDataDecl, isTypeDecl, isFamilyDecl,
@@ -79,7 +79,7 @@ data HsDecl id
   | SigD	(Sig id)
   | DefD	(DefaultDecl id)
   | ForD        (ForeignDecl id)
-  | DeprecD	(DeprecDecl id)
+  | WarningD	(WarnDecl id)
   | RuleD	(RuleDecl id)
   | SpliceD	(SpliceDecl id)
   | DocD	(DocDecl id)
@@ -113,7 +113,7 @@ data HsGroup id
 
 	hs_defds  :: [LDefaultDecl id],
 	hs_fords  :: [LForeignDecl id],
-	hs_depds  :: [LDeprecDecl id],
+	hs_warnds :: [LWarnDecl id],
 	hs_ruleds :: [LRuleDecl id],
 
 	hs_docs   :: [LDocDecl id]
@@ -125,7 +125,7 @@ emptyRnGroup  = emptyGroup { hs_valds = emptyValBindsOut }
 
 emptyGroup = HsGroup { hs_tyclds = [], hs_instds = [], hs_derivds = [],
 		       hs_fixds = [], hs_defds = [], hs_fords = [], 
-		       hs_depds = [], hs_ruleds = [],
+		       hs_warnds = [], hs_ruleds = [],
 		       hs_valds = error "emptyGroup hs_valds: Can't happen",
                        hs_docs = [] }
 
@@ -139,7 +139,7 @@ appendGroups
 	hs_fixds  = fixds1, 
 	hs_defds  = defds1,
 	hs_fords  = fords1, 
-	hs_depds  = depds1,
+	hs_warnds = warnds1,
 	hs_ruleds = rulds1,
   hs_docs   = docs1 }
     HsGroup { 
@@ -150,7 +150,7 @@ appendGroups
 	hs_fixds  = fixds2, 
 	hs_defds  = defds2,
 	hs_fords  = fords2, 
-	hs_depds  = depds2,
+	hs_warnds = warnds2,
 	hs_ruleds = rulds2,
   hs_docs   = docs2 }
   = 
@@ -162,7 +162,7 @@ appendGroups
 	hs_fixds  = fixds1 ++ fixds2, 
 	hs_defds  = defds1 ++ defds2,
 	hs_fords  = fords1 ++ fords2, 
-	hs_depds  = depds1 ++ depds2,
+	hs_warnds = warnds1 ++ warnds2,
 	hs_ruleds = rulds1 ++ rulds2,
   hs_docs   = docs1  ++ docs2 }
 \end{code}
@@ -177,7 +177,7 @@ instance OutputableBndr name => Outputable (HsDecl name) where
     ppr (ForD fd)               = ppr fd
     ppr (SigD sd)               = ppr sd
     ppr (RuleD rd)              = ppr rd
-    ppr (DeprecD dd)            = ppr dd
+    ppr (WarningD wd)           = ppr wd
     ppr (SpliceD dd)            = ppr dd
     ppr (DocD doc)              = ppr doc
 
@@ -187,7 +187,7 @@ instance OutputableBndr name => Outputable (HsGroup name) where
 		   hs_instds = inst_decls,
                    hs_derivds = deriv_decls,
 		   hs_fixds  = fix_decls,
-		   hs_depds  = deprec_decls,
+		   hs_warnds = deprec_decls,
 		   hs_fords  = foreign_decls,
 		   hs_defds  = default_decls,
 		   hs_ruleds = rule_decls })
@@ -994,11 +994,11 @@ docDeclDoc (DocGroup _ d) = d
 We use exported entities for things to deprecate.
 
 \begin{code}
-type LDeprecDecl name = Located (DeprecDecl name)
+type LWarnDecl name = Located (WarnDecl name)
 
-data DeprecDecl name = Deprecation name DeprecTxt
+data WarnDecl name = Warning name WarningTxt
 
-instance OutputableBndr name => Outputable (DeprecDecl name) where
-    ppr (Deprecation thing txt)
+instance OutputableBndr name => Outputable (WarnDecl name) where
+    ppr (Warning thing txt)
       = hsep [text "{-# DEPRECATED", ppr thing, doubleQuotes (ppr txt), text "#-}"]
 \end{code}

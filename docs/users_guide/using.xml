@@ -841,7 +841,7 @@ ghc -c Foo.hs</screen>
     of warnings which are generally likely to indicate bugs in your
     program.  These are:
     <option>-fwarn-overlapping-patterns</option>,
-    <option>-fwarn-deprecations</option>,
+    <option>-fwarn-warnings-deprecations</option>,
     <option>-fwarn-deprecated-flags</option>,
     <option>-fwarn-duplicate-exports</option>,
     <option>-fwarn-missing-fields</option>,
@@ -919,15 +919,16 @@ ghc -c Foo.hs</screen>
     <variablelist>
 
       <varlistentry>
-	<term><option>-fwarn-deprecations</option>:</term>
+	<term><option>-fwarn-warnings-deprecations</option>:</term>
 	<listitem>
-	  <indexterm><primary><option>-fwarn-deprecations</option></primary>
+	  <indexterm><primary><option>-fwarn-warnings-deprecations</option></primary>
 	  </indexterm>
+	  <indexterm><primary>warnings</primary></indexterm>
 	  <indexterm><primary>deprecations</primary></indexterm>
-	  <para>Causes a warning to be emitted when a deprecated
-	  function or type is used.  Entities can be marked as
-	  deprecated using a pragma, see <xref
-	  linkend="deprecated-pragma"/>.</para>
+	  <para>Causes a warning to be emitted when a
+	  module, function or type with a WARNING or DEPRECATED pragma
+      is used. See <xref linkend="warning-deprecated-pragma"/> for more
+      details on the pragmas.</para>
 
 	  <para>This option is on by default.</para>
 	</listitem>

@@ -168,9 +168,9 @@ tcRnModule hsc_env hsc_src save_rn_syntax
 		-- thing (especially via 'module Foo' export item)
 		-- That is, only uses in the *body* of the module are complained about
 	traceRn (text "rn3") ;
-	failIfErrsM ;	-- finishDeprecations crashes sometimes 
+	failIfErrsM ;	-- finishWarnings crashes sometimes 
 			-- as a result of typechecker repairs (e.g. unboundNames)
-	tcg_env <- finishDeprecations (hsc_dflags hsc_env) mod_deprec tcg_env ;
+	tcg_env <- finishWarnings (hsc_dflags hsc_env) mod_deprec tcg_env ;
 
 		-- Process the export list
         traceRn (text "rn4a: before exports");
@@ -338,7 +338,7 @@ tcRnExtCore hsc_env (HsExtCore this_mod decls src_binds)
 				-- Stubs
 				mg_rdr_env   = emptyGlobalRdrEnv,
 				mg_fix_env   = emptyFixityEnv,
-				mg_deprecs   = NoDeprecs,
+				mg_warns     = NoWarnings,
 				mg_foreign   = NoStubs,
 				mg_hpc_info  = emptyHpcInfo False,
                                 mg_modBreaks = emptyModBreaks,

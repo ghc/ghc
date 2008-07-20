@@ -169,7 +169,7 @@ data DynFlag
    | Opt_WarnUnusedBinds
    | Opt_WarnUnusedImports
    | Opt_WarnUnusedMatches
-   | Opt_WarnDeprecations
+   | Opt_WarnWarningsDeprecations
    | Opt_WarnDeprecatedFlags
    | Opt_WarnDodgyImports
    | Opt_WarnOrphans
@@ -756,7 +756,7 @@ optLevelFlags
 
 standardWarnings :: [DynFlag]
 standardWarnings
-    = [ Opt_WarnDeprecations,
+    = [ Opt_WarnWarningsDeprecations,
         Opt_WarnDeprecatedFlags,
         Opt_WarnOverlappingPatterns,
         Opt_WarnMissingFields,
@@ -1407,7 +1407,7 @@ fFlags = [
   ( "warn-unused-binds",                Opt_WarnUnusedBinds, const Supported ),
   ( "warn-unused-imports",              Opt_WarnUnusedImports, const Supported ),
   ( "warn-unused-matches",              Opt_WarnUnusedMatches, const Supported ),
-  ( "warn-deprecations",                Opt_WarnDeprecations, const Supported ),
+  ( "warn-warnings-deprecations",       Opt_WarnWarningsDeprecations, const Supported ),
   ( "warn-deprecated-flags",            Opt_WarnDeprecatedFlags, const Supported ),
   ( "warn-orphans",                     Opt_WarnOrphans, const Supported ),
   ( "warn-tabs",                        Opt_WarnTabs, const Supported ),

@@ -32,8 +32,8 @@ module HscTypes (
 	icPrintUnqual, mkPrintUnqualified, extendInteractiveContext,
         substInteractiveContext,
 
-	ModIface(..), mkIfaceDepCache, mkIfaceHashCache, mkIfaceFixCache,
-	emptyIfaceDepCache,
+	ModIface(..), mkIfaceWarnCache, mkIfaceHashCache, mkIfaceFixCache,
+	emptyIfaceWarnCache,
 
 	FixityEnv, FixItem(..), lookupFixity, emptyFixityEnv,
 
@@ -52,7 +52,7 @@ module HscTypes (
 	GenAvailInfo(..), AvailInfo, RdrAvailInfo, 
 	IfaceExport,
 
-	Deprecations(..), DeprecTxt, plusDeprecs,
+	Warnings(..), WarningTxt(..), plusWarns,
 
 	PackageInstEnv, PackageRuleBase,
 
@@ -101,7 +101,7 @@ import PrelNames	( gHC_PRIM )
 import Packages hiding ( Version(..) )
 import DynFlags		( DynFlags(..), isOneShot, HscTarget (..) )
 import DriverPhases	( HscSource(..), isHsBoot, hscSourceString, Phase )
-import BasicTypes	( IPName, Fixity, defaultFixity, DeprecTxt )
+import BasicTypes	( IPName, Fixity, defaultFixity, WarningTxt(..) )
 import OptimizationFuel	( OptFuelState )
 import IfaceSyn
 import FiniteMap	( FiniteMap )
@@ -445,8 +445,8 @@ data ModIface
         mi_fixities :: [(OccName,Fixity)],
 		-- NOT STRICT!  we read this field lazily from the interface file
 
-		-- Deprecations
-	mi_deprecs  :: Deprecations,
+		-- Warnings
+	mi_warns  :: Warnings,
 		-- NOT STRICT!  we read this field lazily from the interface file
 
 		-- Type, class and variable declarations
@@ -485,7 +485,7 @@ data ModIface
 		-- Cached environments for easy lookup
 		-- These are computed (lazily) from other fields
 		-- and are not put into the interface file
-	mi_dep_fn  :: Name -> Maybe DeprecTxt,	-- Cached lookup for mi_deprecs
+	mi_warn_fn  :: Name -> Maybe WarningTxt,	-- Cached lookup for mi_warns
 	mi_fix_fn  :: OccName -> Fixity,	-- Cached lookup for mi_fixities
 	mi_hash_fn :: OccName -> Maybe (OccName, Fingerprint),
                         -- Cached lookup for mi_decls
@@ -546,7 +546,7 @@ data ModGuts
         mg_rules     :: ![CoreRule],	 -- Rules from this module
 	mg_binds     :: ![CoreBind],	 -- Bindings for this module
 	mg_foreign   :: !ForeignStubs,
-	mg_deprecs   :: !Deprecations,	 -- Deprecations declared in the module
+	mg_warns     :: !Warnings,	 -- Warnings declared in the module
 	mg_hpc_info  :: !HpcInfo,        -- info about coverage tick boxes
         mg_modBreaks :: !ModBreaks,
         mg_vect_info :: !VectInfo,        -- Pool of vectorised declarations
@@ -656,7 +656,7 @@ emptyModIface mod
 	       mi_exports  = [],
 	       mi_exp_hash = fingerprint0,
 	       mi_fixities = [],
-	       mi_deprecs  = NoDeprecs,
+	       mi_warns    = NoWarnings,
 	       mi_insts     = [],
 	       mi_fam_insts = [],
 	       mi_rules     = [],
@@ -664,7 +664,7 @@ emptyModIface mod
 	       mi_globals   = Nothing,
 	       mi_orphan_hash = fingerprint0,
                mi_vect_info = noIfaceVectInfo,
-	       mi_dep_fn    = emptyIfaceDepCache,
+	       mi_warn_fn    = emptyIfaceWarnCache,
 	       mi_fix_fn    = emptyIfaceFixCache,
 	       mi_hash_fn   = emptyIfaceHashCache,
 	       mi_hpc       = False
@@ -1004,11 +1004,11 @@ These types are defined here because they are mentioned in ModDetails,
 but they are mostly elaborated elsewhere
 
 \begin{code}
------------------- Deprecations -------------------------
-data Deprecations
-  = NoDeprecs
-  | DeprecAll DeprecTxt	        -- Whole module deprecated
-  | DeprecSome [(OccName,DeprecTxt)] -- Some specific things deprecated
+------------------ Warnings -------------------------
+data Warnings
+  = NoWarnings
+  | WarnAll WarningTxt	        -- Whole module deprecated
+  | WarnSome [(OccName,WarningTxt)] -- Some specific things deprecated
      -- Only an OccName is needed because
      --    (1) a deprecation always applies to a binding
      --        defined in the module in which the deprecation appears.
@@ -1031,20 +1031,20 @@ data Deprecations
      --        a Name to its fixity declaration.
   deriving( Eq )
 
-mkIfaceDepCache :: Deprecations -> Name -> Maybe DeprecTxt
-mkIfaceDepCache NoDeprecs     	  = \_ -> Nothing
-mkIfaceDepCache (DeprecAll t) 	  = \_ -> Just t
-mkIfaceDepCache (DeprecSome pairs) = lookupOccEnv (mkOccEnv pairs) . nameOccName
+mkIfaceWarnCache :: Warnings -> Name -> Maybe WarningTxt
+mkIfaceWarnCache NoWarnings  = \_ -> Nothing
+mkIfaceWarnCache (WarnAll t) = \_ -> Just t
+mkIfaceWarnCache (WarnSome pairs) = lookupOccEnv (mkOccEnv pairs) . nameOccName
 
-emptyIfaceDepCache :: Name -> Maybe DeprecTxt
-emptyIfaceDepCache _ = Nothing
+emptyIfaceWarnCache :: Name -> Maybe WarningTxt
+emptyIfaceWarnCache _ = Nothing
 
-plusDeprecs :: Deprecations -> Deprecations -> Deprecations
-plusDeprecs d NoDeprecs = d
-plusDeprecs NoDeprecs d = d
-plusDeprecs _ (DeprecAll t) = DeprecAll t
-plusDeprecs (DeprecAll t) _ = DeprecAll t
-plusDeprecs (DeprecSome v1) (DeprecSome v2) = DeprecSome (v1 ++ v2)
+plusWarns :: Warnings -> Warnings -> Warnings
+plusWarns d NoWarnings = d
+plusWarns NoWarnings d = d
+plusWarns _ (WarnAll t) = WarnAll t
+plusWarns (WarnAll t) _ = WarnAll t
+plusWarns (WarnSome v1) (WarnSome v2) = WarnSome (v1 ++ v2)
 \end{code}
 
 
@@ -1230,7 +1230,7 @@ data ExternalPackageState
 		--	* Fingerprint info
 		--	* Its exports
 		--	* Fixities
-		--	* Deprecations
+		--	* Warnings
 
 	eps_PTE :: !PackageTypeEnv,	   -- Domain = external-package modules
 

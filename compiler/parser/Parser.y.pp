@@ -28,7 +28,7 @@ module Parser ( parseModule, parseStmt, parseIdentifier, parseType,
 
 import HsSyn
 import RdrHsSyn
-import HscTypes		( IsBootInterface, DeprecTxt )
+import HscTypes		( IsBootInterface, WarningTxt(..) )
 import Lexer
 import RdrName
 import TysWiredIn	( unitTyCon, unitDataCon, tupleTyCon, tupleCon, nilDataCon,
@@ -262,6 +262,7 @@ incorrect.
  '{-# SCC'	   { L _ ITscc_prag }
  '{-# GENERATED'   { L _ ITgenerated_prag }
  '{-# DEPRECATED'  { L _ ITdeprecated_prag }
+ '{-# WARNING'  { L _ ITwarning_prag }
  '{-# UNPACK'      { L _ ITunpack_prag }
  '#-}'		   { L _ ITclose_prag }
 
@@ -375,7 +376,7 @@ identifier :: { Located RdrName }
 -- know what they are doing. :-)
 
 module 	:: { Located (HsModule RdrName) }
- 	: maybedocheader 'module' modid maybemoddeprec maybeexports 'where' body
+ 	: maybedocheader 'module' modid maybemodwarning maybeexports 'where' body
 		{% fileSrcSpan >>= \ loc -> case $1 of { (info, doc) ->
 		   return (L loc (HsModule (Just $3) $5 (fst $7) (snd $7) $4
                           info doc) )}}
@@ -392,9 +393,10 @@ maybedocheader :: { (HaddockModInfo RdrName, Maybe (HsDoc RdrName)) }
 missing_module_keyword :: { () }
 	: {- empty -}				{% pushCurrentContext }
 
-maybemoddeprec :: { Maybe DeprecTxt }
-	: '{-# DEPRECATED' STRING '#-}' 	{ Just (getSTRING $2) }
-	|  {- empty -}				{ Nothing }
+maybemodwarning :: { Maybe WarningTxt }
+    : '{-# DEPRECATED' STRING '#-}' { Just (DeprecatedTxt (getSTRING $2)) }
+    | '{-# WARNING' STRING '#-}'    { Just (WarningTxt (getSTRING $2)) }
+    |  {- empty -}                  { Nothing }
 
 body 	:: { ([LImportDecl RdrName], [LHsDecl RdrName]) }
 	:  '{'            top '}'		{ $2 }
@@ -416,7 +418,7 @@ cvtopdecls :: { [LHsDecl RdrName] }
 -- Module declaration & imports only
 
 header 	:: { Located (HsModule RdrName) }
- 	: maybedocheader 'module' modid maybemoddeprec maybeexports 'where' header_body
+ 	: maybedocheader 'module' modid maybemodwarning maybeexports 'where' header_body
 		{% fileSrcSpan >>= \ loc -> case $1 of { (info, doc) ->
 		   return (L loc (HsModule (Just $3) $5 $7 [] $4
                    info doc))}}
@@ -550,7 +552,8 @@ topdecl :: { OrdList (LHsDecl RdrName) }
         | stand_alone_deriving                  { unitOL (LL (DerivD (unLoc $1))) }
 	| 'default' '(' comma_types0 ')'	{ unitOL (LL $ DefD (DefaultDecl $3)) }
 	| 'foreign' fdecl			{ unitOL (LL (unLoc $2)) }
-	| '{-# DEPRECATED' deprecations '#-}'	{ $2 }
+    | '{-# DEPRECATED' deprecations '#-}' { $2 }
+    | '{-# WARNING' warnings '#-}'        { $2 }
 	| '{-# RULES' rules '#-}'		{ $2 }
       	| decl					{ unLoc $1 }
 
@@ -891,7 +894,19 @@ rule_var :: { RuleBndr RdrName }
        	| '(' varid '::' ctype ')'             	{ RuleBndrSig $2 $4 }
 
 -----------------------------------------------------------------------------
--- Deprecations (c.f. rules)
+-- Warnings and deprecations (c.f. rules)
+
+warnings :: { OrdList (LHsDecl RdrName) }
+	: warnings ';' warning		{ $1 `appOL` $3 }
+	| warnings ';' 			{ $1 }
+	| warning				{ $1 }
+	| {- empty -}				{ nilOL }
+
+-- SUP: TEMPORARY HACK, not checking for `module Foo'
+warning :: { OrdList (LHsDecl RdrName) }
+	: namelist STRING
+		{ toOL [ LL $ WarningD (Warning n (WarningTxt (getSTRING $2)))
+		       | n <- unLoc $1 ] }
 
 deprecations :: { OrdList (LHsDecl RdrName) }
 	: deprecations ';' deprecation		{ $1 `appOL` $3 }
@@ -901,8 +916,8 @@ deprecations :: { OrdList (LHsDecl RdrName) }
 
 -- SUP: TEMPORARY HACK, not checking for `module Foo'
 deprecation :: { OrdList (LHsDecl RdrName) }
-	: depreclist STRING
-		{ toOL [ LL $ DeprecD (Deprecation n (getSTRING $2)) 
+	: namelist STRING
+		{ toOL [ LL $ WarningD (Warning n (DeprecatedTxt (getSTRING $2)))
 		       | n <- unLoc $1 ] }
 
 
@@ -1316,7 +1331,7 @@ exp10 :: { LHsExpr RdrName }
 	| fexp					{ $1 }
 
 scc_annot :: { Located FastString }
-	: '_scc_' STRING			{% (addWarning Opt_WarnDeprecations (getLoc $1) (text "_scc_ is deprecated; use an SCC pragma instead")) >>= \_ ->
+	: '_scc_' STRING			{% (addWarning Opt_WarnWarningsDeprecations (getLoc $1) (text "_scc_ is deprecated; use an SCC pragma instead")) >>= \_ ->
                                    ( do scc <- getSCC $2; return $ LL scc ) }
 	| '{-# SCC' STRING '#-}'		{% do scc <- getSCC $2; return $ LL scc }
 
@@ -1648,15 +1663,15 @@ ipvar	:: { Located (IPName RdrName) }
 	: IPDUPVARID		{ L1 (IPName (mkUnqual varName (getIPDUPVARID $1))) }
 
 -----------------------------------------------------------------------------
--- Deprecations
+-- Warnings and deprecations
 
-depreclist :: { Located [RdrName] }
-depreclist : deprec_var			{ L1 [unLoc $1] }
-	   | deprec_var ',' depreclist	{ LL (unLoc $1 : unLoc $3) }
+namelist :: { Located [RdrName] }
+namelist : name_var              { L1 [unLoc $1] }
+         | name_var ',' namelist { LL (unLoc $1 : unLoc $3) }
 
-deprec_var :: { Located RdrName }
-deprec_var : var			{ $1 }
-	   | con			{ $1 }
+name_var :: { Located RdrName }
+name_var : var { $1 }
+         | con { $1 }
 
 -----------------------------------------
 -- Data constructors

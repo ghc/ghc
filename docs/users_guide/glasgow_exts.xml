@@ -6162,20 +6162,27 @@ Assertion failures can be caught, see the documentation for the
 	don't recommend using this approach with GHC.</para>
     </sect2>
 
-    <sect2 id="deprecated-pragma">
-      <title>DEPRECATED pragma</title>
-      <indexterm><primary>DEPRECATED</primary>
-      </indexterm>
+    <sect2 id="warning-deprecated-pragma">
+      <title>WARNING and DEPRECATED pragmas</title>
+      <indexterm><primary>WARNING</primary></indexterm>
+      <indexterm><primary>DEPRECATED</primary></indexterm>
 
-      <para>The DEPRECATED pragma lets you specify that a particular
-      function, class, or type, is deprecated.  There are two
-      forms.
+      <para>The WARNING pragma allows you to attach an arbitrary warning
+      to a particular function, class, or type.
+      A DEPRECATED pragma lets you specify that
+      a particular function, class, or type is deprecated.
+      There are two ways of using these pragmas.
 
       <itemizedlist>
 	<listitem>
-	  <para>You can deprecate an entire module thus:</para>
+	  <para>You can work on an entire module thus:</para>
 <programlisting>
    module Wibble {-# DEPRECATED "Use Wobble instead" #-} where
+     ...
+</programlisting>
+      <para>Or:</para>
+<programlisting>
+   module Wibble {-# WARNING "This is an unstable interface." #-} where
      ...
 </programlisting>
 	  <para>When you compile any module that import
@@ -6184,34 +6191,34 @@ Assertion failures can be caught, see the documentation for the
 	</listitem>
 
 	<listitem>
-	  <para>You can deprecate a function, class, type, or data constructor, with the
-	  following top-level declaration:</para>
+	  <para>You can attach a warning to a function, class, type, or data constructor, with the
+	  following top-level declarations:</para>
 <programlisting>
    {-# DEPRECATED f, C, T "Don't use these" #-}
+   {-# WARNING unsafePerformIO "This is unsafe; I hope you know what you're doing" #-}
 </programlisting>
 	  <para>When you compile any module that imports and uses any
           of the specified entities, GHC will print the specified
           message.</para>
-	  <para> You can only deprecate entities declared at top level in the module
+	  <para> You can only attach to entities declared at top level in the module
 	  being compiled, and you can only use unqualified names in the list of
-	  entities being deprecated.  A capitalised name, such as <literal>T</literal>
+	  entities. A capitalised name, such as <literal>T</literal>
 	  refers to <emphasis>either</emphasis> the type constructor <literal>T</literal>
 	  <emphasis>or</emphasis> the data constructor <literal>T</literal>, or both if
-	  both are in scope.  If both are in scope, there is currently no way to deprecate 
-	  one without the other (c.f. fixities <xref linkend="infix-tycons"/>).</para>
+	  both are in scope.  If both are in scope, there is currently no way to
+      specify one without the other (c.f. fixities
+      <xref linkend="infix-tycons"/>).</para>
 	</listitem>
       </itemizedlist>
-      Any use of the deprecated item, or of anything from a deprecated
-      module, will be flagged with an appropriate message.  However,
-      deprecations are not reported for
-      (a) uses of a deprecated function within its defining module, and
-      (b) uses of a deprecated function in an export list.
+      Warnings and deprecations are not reported for
+      (a) uses within the defining module, and
+      (b) uses in an export list.
       The latter reduces spurious complaints within a library
       in which one module gathers together and re-exports 
       the exports of several others.
       </para>
       <para>You can suppress the warnings with the flag
-      <option>-fno-warn-deprecations</option>.</para>
+      <option>-fno-warn-warnings-deprecations</option>.</para>
     </sect2>
 
     <sect2 id="inline-noinline-pragma">

@@ -34,7 +34,7 @@ import HscTypes      	( GenAvailInfo(..) )
 import RnHsDoc          ( rnHsDoc, rnMbLHsDoc )
 import TcRnMonad
 
-import HscTypes		( Deprecations(..), plusDeprecs )
+import HscTypes		( Warnings(..), plusWarns )
 import Class		( FunDep )
 import Name		( Name, nameOccName )
 import NameSet
@@ -104,7 +104,7 @@ rnSrcDecls shadowP group@(HsGroup {hs_valds  = val_decls,
                                    hs_instds = inst_decls,
                                    hs_derivds = deriv_decls,
                                    hs_fixds  = fix_decls,
-                                   hs_depds  = deprec_decls,
+                                   hs_warnds  = warn_decls,
                                    hs_fords  = foreign_decls,
                                    hs_defds  = default_decls,
                                    hs_ruleds = rule_decls,
@@ -169,7 +169,7 @@ rnSrcDecls shadowP group@(HsGroup {hs_valds  = val_decls,
    -- rename deprec decls;
    -- check for duplicates and ensure that deprecated things are defined locally
    -- at the moment, we don't keep these around past renaming
-   rn_deprecs <- rnSrcDeprecDecls deprec_decls ;
+   rn_warns <- rnSrcWarnDecls warn_decls ;
 
    -- (H) Rename Everything else
 
@@ -187,7 +187,7 @@ rnSrcDecls shadowP group@(HsGroup {hs_valds  = val_decls,
 			     hs_instds = rn_inst_decls,
                              hs_derivds = rn_deriv_decls,
 			     hs_fixds  = rn_fix_decls,
-			     hs_depds  = [], -- deprecs are returned in the tcg_env
+			     hs_warnds = [], -- warns are returned in the tcg_env
 	                                     -- (see below) not in the HsGroup
 			     hs_fords  = rn_foreign_decls,
 			     hs_defds  = rn_default_decls,
@@ -204,7 +204,7 @@ rnSrcDecls shadowP group@(HsGroup {hs_valds  = val_decls,
 
        final_tcg_env = let tcg_env' = (tcg_env `addTcgDUs` src_dus)
                        in -- we return the deprecs in the env, not in the HsGroup above
-                         tcg_env' { tcg_deprecs = tcg_deprecs tcg_env' `plusDeprecs` rn_deprecs };
+                         tcg_env' { tcg_warns = tcg_warns tcg_env' `plusWarns` rn_warns };
        } ;
 
    traceRn (text "finish rnSrc" <+> ppr rn_group) ;
@@ -300,17 +300,17 @@ gather them together.
 
 \begin{code}
 -- checks that the deprecations are defined locally, and that there are no duplicates
-rnSrcDeprecDecls :: [LDeprecDecl RdrName] -> RnM Deprecations
-rnSrcDeprecDecls [] 
-  = returnM NoDeprecs
+rnSrcWarnDecls :: [LWarnDecl RdrName] -> RnM Warnings
+rnSrcWarnDecls [] 
+  = returnM NoWarnings
 
-rnSrcDeprecDecls decls 
+rnSrcWarnDecls decls 
   = do { -- check for duplicates
-       ; mappM_ (\ (lrdr:lrdr':_) -> addLocErr lrdr (dupDeprecDecl lrdr')) deprec_rdr_dups
+       ; mappM_ (\ (lrdr:lrdr':_) -> addLocErr lrdr (dupWarnDecl lrdr')) warn_rdr_dups
        ; mappM (addLocM rn_deprec) decls	`thenM` \ pairs_s ->
-         returnM (DeprecSome ((concat pairs_s))) }
+         returnM (WarnSome ((concat pairs_s))) }
  where
-   rn_deprec (Deprecation rdr_name txt)
+   rn_deprec (Warning rdr_name txt)
        -- ensures that the names are defined locally
      = lookupLocalDataTcNames rdr_name	`thenM` \ names ->
        returnM [(nameOccName name, txt) | name <- names]
@@ -318,13 +318,13 @@ rnSrcDeprecDecls decls
    -- look for duplicates among the OccNames;
    -- we check that the names are defined above
    -- invt: the lists returned by findDupsEq always have at least two elements
-   deprec_rdr_dups = findDupsEq (\ x -> \ y -> rdrNameOcc (unLoc x) == rdrNameOcc (unLoc y))
-                     (map (\ (L loc (Deprecation rdr_name _)) -> L loc rdr_name) decls)
+   warn_rdr_dups = findDupsEq (\ x -> \ y -> rdrNameOcc (unLoc x) == rdrNameOcc (unLoc y))
+                     (map (\ (L loc (Warning rdr_name _)) -> L loc rdr_name) decls)
                
-dupDeprecDecl :: Located RdrName -> RdrName -> SDoc
+dupWarnDecl :: Located RdrName -> RdrName -> SDoc
 -- Located RdrName -> DeprecDecl RdrName -> SDoc
-dupDeprecDecl (L loc _) rdr_name
-  = vcat [ptext (sLit "Multiple deprecation declarations for") <+> quotes (ppr rdr_name),
+dupWarnDecl (L loc _) rdr_name
+  = vcat [ptext (sLit "Multiple warning declarations for") <+> quotes (ppr rdr_name),
           ptext (sLit "also at ") <+> ppr loc]
 
 \end{code}

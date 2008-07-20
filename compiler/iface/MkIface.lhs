@@ -126,11 +126,11 @@ mkIface hsc_env maybe_old_fingerprint mod_details
                       mg_dir_imps  = dir_imp_mods,
 		      mg_rdr_env   = rdr_env,
 		      mg_fix_env   = fix_env,
-		      mg_deprecs   = deprecs,
+		      mg_warns   = warns,
 	              mg_hpc_info  = hpc_info }
         = mkIface_ hsc_env maybe_old_fingerprint
                    this_mod is_boot used_names deps rdr_env 
-                   fix_env deprecs hpc_info dir_imp_mods mod_details
+                   fix_env warns hpc_info dir_imp_mods mod_details
 	
 -- | make an interface from the results of typechecking only.  Useful
 -- for non-optimising compilation, or where we aren't generating any
@@ -147,7 +147,7 @@ mkIfaceTc hsc_env maybe_old_fingerprint mod_details
                       tcg_imports = imports,
                       tcg_rdr_env = rdr_env,
                       tcg_fix_env = fix_env,
-                      tcg_deprecs = deprecs,
+                      tcg_warns = warns,
                       tcg_hpc = other_hpc_info
                     }
   = do
@@ -156,7 +156,7 @@ mkIfaceTc hsc_env maybe_old_fingerprint mod_details
           let hpc_info = emptyHpcInfo other_hpc_info
           mkIface_ hsc_env maybe_old_fingerprint
                    this_mod (isHsBoot hsc_src) used_names deps rdr_env 
-                   fix_env deprecs hpc_info (imp_mods imports) mod_details
+                   fix_env warns hpc_info (imp_mods imports) mod_details
         
 
 mkUsedNames :: TcGblEnv -> IO NameSet
@@ -208,12 +208,12 @@ mkDependencies
 
 mkIface_ :: HscEnv -> Maybe Fingerprint -> Module -> IsBootInterface
          -> NameSet -> Dependencies -> GlobalRdrEnv
-         -> NameEnv FixItem -> Deprecations -> HpcInfo
+         -> NameEnv FixItem -> Warnings -> HpcInfo
          -> ImportedMods
          -> ModDetails
          -> IO (ModIface, Bool)
 mkIface_ hsc_env maybe_old_fingerprint 
-         this_mod is_boot used_names deps rdr_env fix_env src_deprecs hpc_info
+         this_mod is_boot used_names deps rdr_env fix_env src_warns hpc_info
          dir_imp_mods
 	 ModDetails{  md_insts 	   = insts, 
 		      md_fam_insts = fam_insts,
@@ -240,7 +240,7 @@ mkIface_ hsc_env maybe_old_fingerprint
 				-- Sigh: see Note [Root-main Id] in TcRnDriver
 
 		; fixities    = [(occ,fix) | FixItem occ fix <- nameEnvElts fix_env]
-		; deprecs     = src_deprecs
+		; warns     = src_warns
 		; iface_rules = map (coreRuleToIfaceRule this_mod) rules
 		; iface_insts = map instanceToIfaceInst insts
 		; iface_fam_insts = map famInstToIfaceFamInst fam_insts
@@ -262,7 +262,7 @@ mkIface_ hsc_env maybe_old_fingerprint
                         mi_vect_info = iface_vect_info,
 
 			mi_fixities = fixities,
-			mi_deprecs  = deprecs,
+			mi_warns  = warns,
 			mi_globals  = Just rdr_env,
 
 			-- Left out deliberately: filled in by addVersionInfo
@@ -278,7 +278,7 @@ mkIface_ hsc_env maybe_old_fingerprint
 			mi_hpc       = isHpcUsed hpc_info,
 
 			-- And build the cached values
-			mi_dep_fn = mkIfaceDepCache deprecs,
+			mi_warn_fn = mkIfaceWarnCache warns,
 			mi_fix_fn = mkIfaceFixCache fixities }
 		}
 
@@ -522,7 +522,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
                       (map fst sorted_decls,
                        export_hash,
                        orphan_hash,
-                       mi_deprecs iface0)
+                       mi_warns iface0)
 
    -- The interface hash depends on:
    --    - the ABI hash, plus
