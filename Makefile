@@ -148,6 +148,9 @@ stage1 : $(GCC_LIB_DEP) check-all
 stage2 : check-all
 	$(MAKE) -C compiler stage=2 boot
 	$(MAKE) -C compiler stage=2
+ifeq "$(HADDOCK_DOCS)" "YES"
+	$(MAKE) -C compiler stage=2 doc
+endif
 	$(MAKE) -C ghc      stage=2 boot
 	$(MAKE) -C ghc      stage=2
 

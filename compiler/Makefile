@@ -44,6 +44,8 @@ boot:: boot.stage.$(stage)
 
 all:: build.stage.$(stage)
 
+doc:: doc.stage.$(stage)
+
 stage1 ::
 	$(MAKE) stage=1
 
@@ -174,6 +176,9 @@ boot.stage.%: $(PRIMOP_BITS) $(CONFIG_HS) parser/Parser.y
 build.stage.%:
 	$(MAKE) -f Makefile-stage$* stage=$*
 	$(CABAL) register  --distpref dist-stage$* --inplace
+
+doc.stage.%:
+	$(CABAL) haddock --distpref dist-stage$*
 
 # XXX We ought to actually install the (stage 2) library
 install:
