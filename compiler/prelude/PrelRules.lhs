@@ -564,4 +564,4 @@ match_inline (Type _ : e : _)
   = Just (mkApps unf args1)
 
 match_inline _ = Nothing
-\end{code}		
+\end{code}

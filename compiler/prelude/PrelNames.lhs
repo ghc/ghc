@@ -6,33 +6,33 @@
 
 Nota Bene: all Names defined in here should come from the base package
 
-* ModuleNames for prelude modules, 
+ - ModuleNames for prelude modules, 
 	e.g.	pREL_BASE_Name :: ModuleName
 
-* Modules for prelude modules
+ - Modules for prelude modules
 	e.g.	pREL_Base :: Module
 
-* Uniques for Ids, DataCons, TyCons and Classes that the compiler 
-  "knows about" in some way
+ - Uniques for Ids, DataCons, TyCons and Classes that the compiler 
+   "knows about" in some way
 	e.g.	intTyConKey :: Unique
 		minusClassOpKey :: Unique
 
-* Names for Ids, DataCons, TyCons and Classes that the compiler 
-  "knows about" in some way
+ - Names for Ids, DataCons, TyCons and Classes that the compiler 
+   "knows about" in some way
 	e.g.	intTyConName :: Name
 		minusName    :: Name
-  One of these Names contains
+   One of these Names contains
 	(a) the module and occurrence name of the thing
 	(b) its Unique
-  The may way the compiler "knows about" one of these things is
-  where the type checker or desugarer needs to look it up. For
-  example, when desugaring list comprehensions the desugarer
-  needs to conjure up 'foldr'.  It does this by looking up
-  foldrName in the environment.
+   The may way the compiler "knows about" one of these things is
+   where the type checker or desugarer needs to look it up. For
+   example, when desugaring list comprehensions the desugarer
+   needs to conjure up 'foldr'.  It does this by looking up
+   foldrName in the environment.
 
-* RdrNames for Ids, DataCons etc that the compiler may emit into
-  generated code (e.g. for deriving).  It's not necessary to know
-  the uniques for these guys, only their names
+ - RdrNames for Ids, DataCons etc that the compiler may emit into
+   generated code (e.g. for deriving).  It's not necessary to know
+   the uniques for these guys, only their names
 
 
 \begin{code}
