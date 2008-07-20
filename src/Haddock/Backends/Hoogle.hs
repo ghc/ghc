@@ -80,7 +80,7 @@ typeSig name flds = name ++ " :: " ++ concat (intersperse " -> " flds)
 -- How to print each export
 
 ppExport :: ExportItem Name -> [String]
-ppExport (ExportDecl name decl dc _) = doc dc ++ f (unL decl)
+ppExport (ExportDecl decl dc _) = doc dc ++ f (unL decl)
     where
         f (TyClD d@TyData{}) = ppData d
         f (TyClD d@ClassDecl{}) = ppClass d

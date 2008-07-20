@@ -292,6 +292,9 @@ renameDecl d = case d of
   ForD d -> do
     d' <- renameForD d
     return (ForD d')
+  InstD d -> do
+    d' <- renameInstD d
+    return (InstD d')
   _ -> error "renameDecl"
 
 
@@ -318,11 +321,11 @@ renameTyClD d = case d of
     return (TyData x lcontext' lname' ltyvars' typats' k cons' Nothing) 
  
   TySynonym lname ltyvars typats ltype -> do
+    lname'   <- renameL lname
     ltyvars' <- mapM renameLTyVarBndr ltyvars
     ltype'   <- renameLType ltype
     typats'  <- mapM (mapM renameLType) typats
-    -- We skip type patterns here as well.
-    return (TySynonym (keepL lname) ltyvars' typats' ltype')
+    return (TySynonym lname' ltyvars' typats' ltype')
 
   ClassDecl lcontext lname ltyvars lfundeps lsigs _ ats _ -> do
     lcontext' <- renameLContext lcontext
@@ -379,17 +382,23 @@ renameForD (ForeignExport lname ltype x) = do
   return (ForeignExport (keepL lname) ltype' x)
 
 
+renameInstD (InstDecl ltype _ _ lATs) = do
+  ltype <- renameLType ltype
+  lATs' <- mapM renameLTyClD lATs
+  return (InstDecl ltype emptyBag [] lATs') 
+
+
 renameExportItem :: ExportItem Name -> RnM (ExportItem DocName)
 renameExportItem item = case item of 
   ExportModule mod -> return (ExportModule mod)
   ExportGroup lev id doc -> do
     doc' <- renameDoc doc
     return (ExportGroup lev id doc')
-  ExportDecl x decl doc instances -> do
+  ExportDecl decl doc instances -> do
     decl' <- renameLDecl decl
     doc'  <- mapM renameDoc doc
     instances' <- mapM renameInstHead instances
-    return (ExportDecl x decl' doc' instances')
+    return (ExportDecl decl' doc' instances')
   ExportNoDecl x y subs -> do
     y'    <- lookupRn id y
     subs' <- mapM (lookupRn id) subs

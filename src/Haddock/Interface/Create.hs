@@ -20,6 +20,7 @@ import Data.Maybe
 import Data.Char
 import Data.Ord
 import Control.Monad
+import Control.Arrow
 
 import GHC
 import Outputable
@@ -55,16 +56,18 @@ createInterface ghcMod flags modMap = do
       subMap        = mkSubMap group
       decls         = topDecls group
       declMap       = mkDeclMap decls
+      famMap        = Map.empty --mkFamMap decls
       ignoreExps    = Flag_IgnoreAllExports `elem` flags
       exportedNames = ghcExportedNames ghcMod
       origEnv       = Map.fromList [ (nameOccName n, n) | n <- exportedNames ]
+      instances     = ghcInstances ghcMod
 
   visibleNames <- mkVisibleNames mod modMap localNames 
                                  (ghcNamesInScope ghcMod) 
                                  subMap exports opts declMap 
 
-  exportItems <- mkExportItems modMap mod (ghcExportedNames ghcMod)
-                               decls declMap subMap opts exports ignoreExps
+  exportItems <- mkExportItems modMap mod (ghcExportedNames ghcMod)decls declMap
+                               famMap subMap opts exports ignoreExps instances
 
   -- prune the export list to just those declarations that have
   -- documentation, if the 'prune' option is on.
@@ -121,8 +124,15 @@ parseOption other = tell ["Unrecognised option: " ++ other] >> return Nothing
 
 
 --------------------------------------------------------------------------------
--- Extract declarations
+-- Declarations
 --------------------------------------------------------------------------------
+
+type DeclWithDoc = (LHsDecl Name, Maybe (HsDoc Name))
+
+
+-- | A list of type or data instance declarations with an optional family
+-- declaration.
+type Family = (Maybe DeclWithDoc, [DeclWithDoc])
 
 
 -- | Make a map from names to declarations with documentation. The map excludes
@@ -130,18 +140,35 @@ parseOption other = tell ["Unrecognised option: " ++ other] >> return Nothing
 -- documentation declarations.
 -- Subordinate names are mapped to the parent declaration, but with the doc
 -- for the subordinate declaration.
+mkDeclMap :: [DeclWithDoc] -> Map Name DeclWithDoc
 mkDeclMap decls = Map.fromList [ (n, (L loc d, doc)) | (L loc d, doc) <- decls 
                                , (n, doc) <- (declName d, doc) : subordinates d
-                               , notDocOrInstance d ]
+                               , not (isDoc d), not (isInstance d) ]
 
 
-notDocOrInstance (InstD _) = False
-notDocOrInstance (TyClD (d@TyData {}))
-  | Just _ <- tcdTyPats d = False
-notDocOrInstance (TyClD (d@TySynonym {}))
-  | Just _ <- tcdTyPats d = False
-notDocOrInstance (DocD _) = False
-notDocOrInstance _        = True
+-- | Group type family instances together. Include the family declaration
+-- if found.
+{-mkFamMap :: [DeclWithDoc] -> Map Name Family
+mkFamMap decls = 
+  Map.fromList [ (tcdName $ ex $ head $ g, family g) | g <- groups ]
+  where
+    family g = first listToMaybe $ partition (isFamilyDecl . ex) g
+    groups   = groupBy (comparing (tcdName . ex)) $ 
+               filter (isTyClD . unLoc . fst) decls
+    ex ((L _ (TyClD d)), _) = d
+-}
+
+isTyClD (TyClD _) = True
+isTyClD _ = False
+
+
+isDoc (DocD _) = True
+isDoc _ = False
+
+
+isInstance (InstD _) = True
+isInstance (TyClD d) = isFamInstDecl d
+isInstance _ = False
 
 
 subordinates (TyClD d) = classDataSubs d
@@ -184,9 +211,11 @@ declName (SigD sig) = fromJust $ sigNameNoLoc sig
 
 
 -- All the top-level declarations of a module, ordered by source location,
--- with documentation attached if it exists
-topDecls :: HsGroup Name -> [(LHsDecl Name, Maybe (HsDoc Name))] 
-topDecls = collectDocs . sortByLoc . declsFromGroup
+-- with documentation attached if it exists.
+-- TEMP hack to filter out all instances (we don't want them until
+-- rendering is completely implemented).
+topDecls :: HsGroup Name -> [DeclWithDoc] 
+topDecls = filter (\(L _ d, _) -> not (isInstance d)) . collectDocs . sortByLoc . declsFromGroup
 
 
 -- | Pick out the declarations that we want from a group
@@ -195,12 +224,13 @@ declsFromGroup group =
   decls hs_tyclds TyClD group ++
   decls hs_fords  ForD  group ++
   decls hs_docs   DocD  group ++
+  decls hs_instds InstD group ++
   decls (sigs . hs_valds) SigD group
   where
     sigs (ValBindsOut _ x) = x
 
 
--- | Takes a field of declarations from a data structure and creates HsDecls
+-- | Take a field of declarations from a data structure and create HsDecls
 -- using the given constructor
 decls field con struct = [ L loc (con decl) | L loc decl <- field struct ]
 
@@ -208,6 +238,19 @@ decls field con struct = [ L loc (con decl) | L loc decl <- field struct ]
 -- | Sort by source location
 sortByLoc = sortBy (comparing getLoc)
 
+
+--------------------------------------------------------------------------------
+-- Instances
+--------------------------------------------------------------------------------
+
+{-
+matchingInsts :: Name -> [Instances] -> [Instances]
+matchingInsts name instances = filter ((==) name . is_cls) instances
+
+
+instToData :: Instance -> LHsDecl Name
+instToData inst = TyData {
+-}
 
 --------------------------------------------------------------------------------
 -- Collect docs
@@ -219,11 +262,11 @@ sortByLoc = sortBy (comparing getLoc)
 
 
 -- | Collect the docs and attach them to the right declaration
-collectDocs :: [LHsDecl Name] -> [(LHsDecl Name, Maybe (HsDoc Name))]
+collectDocs :: [LHsDecl Name] -> [DeclWithDoc]
 collectDocs decls = collect Nothing DocEmpty decls
 
 
-collect :: Maybe (LHsDecl Name) -> HsDoc Name -> [LHsDecl Name] -> [(LHsDecl Name, Maybe (HsDoc Name))]
+collect :: Maybe (LHsDecl Name) -> HsDoc Name -> [LHsDecl Name] -> [DeclWithDoc]
 collect d doc_so_far [] =
    case d of
         Nothing -> []
@@ -245,8 +288,7 @@ collect d doc_so_far (e:es) =
         | otherwise -> finishedDoc d0 doc_so_far (collect (Just e) DocEmpty es)
 
 
-finishedDoc :: LHsDecl Name -> HsDoc Name -> [(LHsDecl Name, Maybe (HsDoc Name))] -> 
-               [(LHsDecl Name, Maybe (HsDoc Name))]
+finishedDoc :: LHsDecl Name -> HsDoc Name -> [DeclWithDoc] -> [DeclWithDoc]
 finishedDoc d DocEmpty rest = (d, Nothing) : rest
 finishedDoc d doc rest | notDocDecl d = (d, Just doc) : rest
   where
@@ -257,7 +299,7 @@ finishedDoc _ _ rest = rest
 
 sameDecl d1 d2 = getLoc d1 == getLoc d2
 
-       
+
 mkSubMap :: HsGroup Name -> Map Name [Name]
 mkSubMap group = Map.fromList [ (name, subs) | L _ tycld <- hs_tyclds group,
  let name:subs = map unLoc (tyClDeclNames tycld) ]
@@ -270,29 +312,37 @@ mkExportItems
   :: ModuleMap
   -> Module			-- this module
   -> [Name]			-- exported names (orig)
-  -> [(LHsDecl Name, Maybe (HsDoc Name))]
-  -> Map Name (LHsDecl Name, Maybe (HsDoc Name)) -- maps local names to declarations
+  -> [DeclWithDoc]
+  -> Map Name DeclWithDoc -- maps local names to declarations
+  -> Map Name Family
   -> Map Name [Name]	-- sub-map for this module
   -> [DocOption]
   -> Maybe [IE Name]
   -> Bool				-- --ignore-all-exports flag
+  -> [Instance]
   -> ErrMsgM [ExportItem Name]
 
-mkExportItems modMap this_mod exported_names decls declMap sub_map
-              opts maybe_exps ignore_all_exports
+mkExportItems modMap this_mod exported_names decls declMap famMap sub_map
+              opts maybe_exps ignore_all_exports instances
   | isNothing maybe_exps || ignore_all_exports || OptIgnoreExports `elem` opts
     = everything_local_exported
-  | Just specs <- maybe_exps = do 
-      exps <- mapM lookupExport specs
-      return (concat exps)
+  | Just specs <- maybe_exps = liftM concat $ mapM lookupExport specs
   where
+    instances = [ d  | d@(L _ decl, _) <- decls, isInstance decl ]
+
     everything_local_exported =  -- everything exported
       return (fullContentsOfThisModule this_mod decls)
    
     packageId = modulePackageId this_mod
 
-    lookupExport (IEVar x)             = declWith x
-    lookupExport (IEThingAbs t)        = declWith t
+    lookupExport (IEVar x) = declWith x
+    lookupExport (IEThingAbs t) = declWith t
+  --    | Just fam <- Map.lookup t famMap = absFam fam
+  --    | otherwise = declWith t
+ --     where
+   --     absFam (Just (famDecl, doc), instances) = return $ [ ExportDecl famDecl doc [] ] ++ matchingInsts t
+     --   absFam (Nothing, instances) =
+
     lookupExport (IEThingAll t)        = declWith t
     lookupExport (IEThingWith t cs)    = declWith t
     lookupExport (IEModuleContents m)  = fullContentsOf (mkModule packageId m)
@@ -307,7 +357,7 @@ mkExportItems modMap this_mod exported_names decls declMap sub_map
     declWith :: Name -> ErrMsgM [ ExportItem Name ]
     declWith t
 	| Just (decl, maybeDoc) <- findDecl t
-        = return [ ExportDecl t (restrictTo subs (extractDecl t mdl decl)) maybeDoc [] ]
+        = return [ ExportDecl (restrictTo subs (extractDecl t mdl decl)) maybeDoc [] ]
 	| otherwise
 	= return []
 	where 
@@ -340,7 +390,7 @@ fullContentsOfThisModule :: Module -> [(LHsDecl Name, Maybe (HsDoc Name))] -> [E
 fullContentsOfThisModule module_ decls = catMaybes (map mkExportItem decls)
   where
     mkExportItem (L _ (DocD (DocGroup lev doc)), _) = Just $ ExportGroup lev "" doc
-    mkExportItem (decl, doc) = Just $ ExportDecl (declName (unLoc decl)) decl doc []
+    mkExportItem (decl, doc) = Just $ ExportDecl decl doc []
 --    mkExportItem _ = Nothing -- TODO: see if this is really needed
 
 
@@ -407,7 +457,7 @@ extractRecSel nm mdl t tvs (L _ con : rest) =
 -- Pruning
 pruneExportItems :: [ExportItem Name] -> [ExportItem Name]
 pruneExportItems items = filter hasDoc items
-  where hasDoc (ExportDecl _ _ d _) = isJust d
+  where hasDoc (ExportDecl _ d _) = isJust d
 	hasDoc _ = True
 
 

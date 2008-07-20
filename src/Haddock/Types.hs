@@ -37,9 +37,6 @@ data ExportItem name
 
   = ExportDecl {		  		
 	
-      -- | The original name
-      expItemName :: Name, 
-
       -- | A declaration
       expItemDecl :: LHsDecl name, 
 			       

@@ -43,11 +43,12 @@ attachInstances modules filterNames = map attach modules
       where
         newItems = map attachExport (ifaceExportItems mod)
 
-        attachExport (ExportDecl n decl doc _) =
-          ExportDecl n decl doc (case Map.lookup n instMap of
-                                   Nothing -> []
-                                   Just instheads -> instheads)
-        attachExport otherExport = otherExport
+        attachExport (ExportDecl decl@(L _ (TyClD d)) doc _)
+          | isClassDecl d || isDataDecl d || isFamilyDecl d =
+             ExportDecl decl doc (case Map.lookup (tcdName d) instMap of
+                                    Nothing -> []
+                                    Just instheads -> instheads)
+        attachExport export = export
 
 
 --------------------------------------------------------------------------------
