@@ -69,21 +69,23 @@ data BrokenBlock
 -- | How a block could be entered
 -- See Note [An example of CPS conversion]
 data BlockEntryInfo
-  = FunctionEntry		-- ^ Block is the beginning of a function
-      CmmInfo                   -- ^ Function header info
-      CLabel                    -- ^ The function name
-      CmmFormalsWithoutKinds                -- ^ Aguments to function
-		-- Only the formal parameters are live 
+  = FunctionEntry CmmInfo CLabel CmmFormalsWithoutKinds
+      -- ^ Block is the beginning of a function, parameters are:
+      --   1. Function header info
+      --   2. The function name
+      --   3. Aguments to function
+      -- Only the formal parameters are live
 
-  | ContinuationEntry 		-- ^ Return point of a function call
-      CmmFormalsWithoutKinds                -- ^ return values (argument to continuation)
-      C_SRT                     -- ^ SRT for the continuation's info table
-      Bool                      -- ^ True <=> GC block so ignore stack size
-		-- Live variables, other than 
-		-- the return values, are on the stack
+  | ContinuationEntry CmmFormalsWithoutKinds C_SRT Bool
+      -- ^ Return point of a function call, parameters are:
+      --   1. return values (argument to continuation)
+      --   2. SRT for the continuation's info table
+      --   3. True <=> GC block so ignore stack size
+      -- Live variables, other than
+      -- the return values, are on the stack
 
-  | ControlEntry		-- ^ Any other kind of block.
-                                -- Only entered due to control flow.
+  | ControlEntry
+      -- ^ Any other kind of block.  Only entered due to control flow.
 
   -- TODO: Consider adding ProcPointEntry
   -- no return values, but some live might end up as
@@ -122,41 +124,43 @@ f2(x, y) { // ProcPointEntry
 
 -}
 
-data ContFormat = ContFormat
-      CmmFormals            -- ^ return values (argument to continuation)
-      C_SRT                     -- ^ SRT for the continuation's info table
-      Bool                      -- ^ True <=> GC block so ignore stack size
+data ContFormat = ContFormat CmmFormals C_SRT Bool
+      -- ^ Arguments
+      --   1. return values (argument to continuation)
+      --   2. SRT for the continuation's info table
+      --   3. True <=> GC block so ignore stack size
   deriving (Eq)
 
 -- | Final statement in a 'BlokenBlock'.
 -- Constructors and arguments match those in 'Cmm',
 -- but are restricted to branches, returns, jumps, calls and switches
 data FinalStmt
-  = FinalBranch                 -- ^ Same as 'CmmBranch'
-      BlockId                   -- ^ Target must be a ControlEntry
+  = FinalBranch BlockId
+    -- ^ Same as 'CmmBranch'.  Target must be a ControlEntry
 
-  | FinalReturn                 -- ^ Same as 'CmmReturn'
-      CmmActuals                -- ^ Return values
+  | FinalReturn CmmActuals
+    -- ^ Same as 'CmmReturn'. Parameter is the return values.
 
-  | FinalJump                   -- ^ Same as 'CmmJump'
-      CmmExpr                   -- ^ The function to call
-      CmmActuals                -- ^ Arguments of the call
+  | FinalJump CmmExpr CmmActuals
+    -- ^ Same as 'CmmJump'.  Parameters:
+    --   1. The function to call,
+    --   2. Arguments of the call
 
-  | FinalCall                   -- ^ Same as 'CmmCallee'
-                                -- followed by 'CmmGoto'
-      BlockId                   -- ^ Target of the 'CmmGoto'
-                                -- (must be a 'ContinuationEntry')
-      CmmCallTarget             -- ^ The function to call
-      CmmFormals                -- ^ Results from call
-                                -- (redundant with ContinuationEntry)
-      CmmActuals                -- ^ Arguments to call
-      C_SRT                     -- ^ SRT for the continuation's info table
-      CmmReturnInfo             -- ^ Does the function return?
-      Bool                      -- ^ True <=> GC block so ignore stack size
+  | FinalCall BlockId CmmCallTarget CmmFormals CmmActuals
+              C_SRT   CmmReturnInfo Bool
+      -- ^ Same as 'CmmCallee' followed by 'CmmGoto'.  Parameters:
+      --   1. Target of the 'CmmGoto' (must be a 'ContinuationEntry')
+      --   2. The function to call
+      --   3. Results from call (redundant with ContinuationEntry)
+      --   4. Arguments to call
+      --   5. SRT for the continuation's info table
+      --   6. Does the function return?
+      --   7. True <=> GC block so ignore stack size
 
-  | FinalSwitch                 -- ^ Same as a 'CmmSwitch'
-      CmmExpr                   -- ^ Scrutinee (zero based)
-      [Maybe BlockId]           -- ^ Targets
+  | FinalSwitch CmmExpr [Maybe BlockId]
+      -- ^ Same as a 'CmmSwitch'.  Paremeters:
+      --   1. Scrutinee (zero based)
+      --   2. Targets
 
 -----------------------------------------------------------------------------
 -- Operations for broken blocks
@@ -191,7 +195,7 @@ breakProc ::
                                 -- to create names of the new blocks with
     -> CmmInfo                  -- ^ Info table for the procedure
     -> CLabel                   -- ^ Name of the procedure
-    -> CmmFormalsWithoutKinds               -- ^ Parameters of the procedure
+    -> CmmFormalsWithoutKinds   -- ^ Parameters of the procedure
     -> [CmmBasicBlock]          -- ^ Blocks of the procecure
                                 -- (First block is the entry block)
     -> [BrokenBlock]
@@ -375,7 +379,7 @@ adaptBlockToFormat formats unique
       revised_block = BrokenBlock ident entry stmts revised_targets revised_exit
       revised_targets = adaptor_ident : delete next targets
       revised_exit = FinalCall
-                       adaptor_ident -- ^ The only part that changed
+                       adaptor_ident -- The only part that changed
                        target formals actuals srt ret is_gc
 
       adaptor_block = mk_adaptor_block adaptor_ident
