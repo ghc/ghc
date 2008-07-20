@@ -13,6 +13,9 @@ module Haddock.Backends.Hoogle (
 
 
 import Haddock.GHC
+import Haddock.GHC.Utils
+import Haddock.Types
+import Haddock.Utils
 import GHC hiding ((<.>))
 import SrcLoc
 import Outputable
