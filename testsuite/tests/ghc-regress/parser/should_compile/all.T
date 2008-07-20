@@ -75,5 +75,6 @@ test('read060', normal, compile, [''])
 test('read061', normal, compile, [''])
 test('read062', if_compiler_lt('ghc', '6.9', skip), compile, [''])
 test('read063', if_compiler_lt('ghc', '6.9', skip), compile, [''])
+test('read064', normal, compile, [''])
 test('read_1821', normal, compile, [''])
 
