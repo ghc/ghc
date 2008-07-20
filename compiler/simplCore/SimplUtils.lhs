@@ -758,11 +758,11 @@ postInlineUnconditionally env top_lvl bndr occ_info rhs unfolding
 --	in \y. ....case f of {...} ....
 -- Here f is used just once, and duplicating the case work is fine (exprIsCheap).
 -- But
--- * We can't preInlineUnconditionally because that woud invalidate
---   the occ info for b.  
--- * We can't postInlineUnconditionally because the RHS is big, and
---   that risks exponential behaviour
--- * We can't call-site inline, because the rhs is big
+--  - We can't preInlineUnconditionally because that woud invalidate
+--    the occ info for b.
+--  - We can't postInlineUnconditionally because the RHS is big, and
+--    that risks exponential behaviour
+--  - We can't call-site inline, because the rhs is big
 -- Alas!
 
   where

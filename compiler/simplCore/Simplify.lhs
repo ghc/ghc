@@ -255,7 +255,7 @@ simplRecBind env0 top_lvl pairs0
         ; env1 <- go (zapFloats env_with_info) triples
         ; return (env0 `addRecFloats` env1) }
         -- addFloats adds the floats from env1,
-        -- *and* updates env0 with the in-scope set from env1
+        -- _and_ updates env0 with the in-scope set from env1
   where
     add_rules :: SimplEnv -> (InBndr,InExpr) -> (SimplEnv, (InBndr, OutBndr, InExpr))
         -- Add the (substituted) rules to the binder

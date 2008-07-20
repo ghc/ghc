@@ -268,7 +268,7 @@ addNewInScopeIds env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst }) v
 	-- Why delete?  Consider 
 	--	let x = a*b in (x, \x -> x+3)
 	-- We add [x |-> a*b] to the substitution, but we must
-	-- *delete* it from the substitution when going inside
+	-- _delete_ it from the substitution when going inside
 	-- the (\x -> ...)!
 
 modifyInScope :: SimplEnv -> CoreBndr -> CoreBndr -> SimplEnv
