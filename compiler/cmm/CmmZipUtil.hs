@@ -25,7 +25,7 @@ zipPreds g = foldl add emptyBlockEnv (postorder_dfs g)
 
 givesUniquePredecessorTo :: LastNode l => LGraph m l -> BlockId -> Bool
 givesUniquePredecessorTo g = \id -> elemBlockSet id singlePreds
-    -- | accumulates a pair of sets: the set of all blocks containing a single 
+    -- accumulates a pair of sets: the set of all blocks containing a single
     -- predecessor, and the set of all blocks containing at least two predecessors
     where (singlePreds, _) = fold_blocks add (emptyBlockSet, emptyBlockSet) g
           add b (single, multi) = foldl add_pred (single, multi) (succs b)

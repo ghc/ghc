@@ -379,7 +379,7 @@ lastTail :: ZTail m l -> ZLast l
 lastTail (ZLast l) = l
 lastTail (ZTail _ t) = lastTail t
 
-tailOfLast l = ZLast (LastOther l) -- ^ tedious to write in every client
+tailOfLast l = ZLast (LastOther l) -- tedious to write in every client
 
 
 ------------------ simple graph manipulations
@@ -443,9 +443,11 @@ single_exitg (Graph tail blocks) = foldUFM add (exit_count (lastTail tail)) bloc
 -- more mathematically elegant (but results in more complicated code).
 --
 -- Here's an easy way to go wrong!  Consider
+-- @
 --	A -> [B,C]
 --	B -> D
 --	C -> D
+-- @
 -- Then ordinary dfs would give [A,B,D,C] which has a back ref from C to D.
 -- Better to geot [A,B,C,D]
 

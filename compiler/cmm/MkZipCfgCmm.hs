@@ -27,7 +27,8 @@ import Cmm ( GenCmm(..), GenCmmTop(..), CmmStatic, CmmInfo
            )
 import MachOp (MachHint(..), wordRep)
 import ZipCfgCmmRep hiding (CmmGraph, CmmAGraph, CmmBlock, CmmZ, CmmTopZ)
-  -- ^ to make this module more self-contained, these definitions are duplicated below
+  -- to make this module more self-contained, the above definitions are
+  -- duplicated below
 import PprCmm()
 
 import ClosureInfo
@@ -58,7 +59,7 @@ mkUnsafeCall :: CmmCallTarget -> CmmFormals -> CmmActuals -> CmmAGraph
 mkFinalCall  :: CmmExpr -> CCallConv -> CmmActuals -> CmmAGraph
 		 -- Never returns; like exit() or barf()
 
----------- Context manipulation ('return via')
+---------- Context manipulation ("return via")
 mkAddToContext :: CmmExpr -> [CmmExpr] -> CmmAGraph
 
 ---------- Control transfer

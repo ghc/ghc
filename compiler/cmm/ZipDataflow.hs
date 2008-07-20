@@ -232,7 +232,7 @@ data ForwardFixedPoint m l fact a = FFP
 
 type PassName = String
 
--- | zdfSolveFrom is an overloaded name that resolves to a pure
+-- | 'zdfSolveFrom' is an overloaded name that resolves to a pure
 -- analysis with no rewriting.  It has only two instances: forward and
 -- backward.  Since it needs no rewrites, the type parameters of the
 -- class are transfer functions and the fixed point.
@@ -252,17 +252,17 @@ type PassName = String
 -- 
 -- The intent of the rest of the type signature should be obvious.
 -- If not, place a skype call to norman-ramsey or complain bitterly
--- to norman-ramsey@acm.org.
+-- to <norman-ramsey@acm.org>.
 
 class DataflowSolverDirection transfers fixedpt where
   zdfSolveFrom   :: (DebugNodes m l, Outputable a)
-                 => BlockEnv a        -- Initial facts (unbound == bottom)
+                 => BlockEnv a        -- ^ Initial facts (unbound == bottom)
                  -> PassName
-                 -> DataflowLattice a -- Lattice
-                 -> transfers m l a   -- Dataflow transfer functions
-                 -> a                 -- Fact flowing in (at entry or exit)
-                 -> Graph m l         -- Graph to be analyzed
-                 -> FuelMonad (fixedpt m l a ())  -- Answers
+                 -> DataflowLattice a -- ^ Lattice
+                 -> transfers m l a   -- ^ Dataflow transfer functions
+                 -> a                 -- ^ Fact flowing in (at entry or exit)
+                 -> Graph m l         -- ^ Graph to be analyzed
+                 -> FuelMonad (fixedpt m l a ())  -- ^ Answers
 
 -- There are exactly two instances: forward and backward
 instance DataflowSolverDirection ForwardTransfers ForwardFixedPoint
