@@ -363,7 +363,6 @@ data DynFlags = DynFlags {
   opt_m                 :: [String],
   opt_a                 :: [String],
   opt_l                 :: [String],
-  opt_dep               :: [String],
   opt_windres           :: [String],
 
   -- commands for particular phases
@@ -379,6 +378,13 @@ data DynFlags = DynFlags {
   pgm_T                 :: String,
   pgm_sysman            :: String,
   pgm_windres           :: String,
+
+  --  For ghc -M
+  depMakefile           :: FilePath,
+  depIncludePkgDeps     :: Bool,
+  depExcludeMods        :: [ModuleName],
+  depSuffixes           :: [String],
+  depWarnings           :: Bool,
 
   --  Package flags
   extraPkgConfs         :: [FilePath],
@@ -541,7 +547,6 @@ defaultDynFlags =
         opt_a                   = [],
         opt_m                   = [],
         opt_l                   = [],
-        opt_dep                 = [],
         opt_windres             = [],
 
         extraPkgConfs           = [],
@@ -569,6 +574,13 @@ defaultDynFlags =
         pgm_sysman              = panic "defaultDynFlags: No pgm_sysman",
         pgm_windres             = panic "defaultDynFlags: No pgm_windres",
         -- end of initSysTools values
+        -- ghc -M values
+        depMakefile       = "Makefile",
+        depIncludePkgDeps = False,
+        depExcludeMods    = [],
+        depSuffixes       = [],
+        depWarnings       = True,
+        -- end of ghc -M values
         haddockOptions = Nothing,
         flags = [
             Opt_AutoLinkPackages,
@@ -636,7 +648,7 @@ getVerbFlag dflags
 
 setObjectDir, setHiDir, setStubDir, setObjectSuf, setHiSuf, setHcSuf, parseDynLibLoaderMode,
          setPgmP, setPgmL, setPgmF, setPgmc, setPgmm, setPgms, setPgma, setPgml, setPgmdll, setPgmwindres,
-         addOptL, addOptP, addOptF, addOptc, addOptm, addOpta, addOptl, addOptdep, addOptwindres,
+         addOptL, addOptP, addOptF, addOptc, addOptm, addOpta, addOptl, addOptwindres,
          addCmdlineFramework, addHaddockOpts
    :: String -> DynFlags -> DynFlags
 setOutputFile, setOutputHi, setDumpPrefixForce
@@ -687,8 +699,31 @@ addOptc   f d = d{ opt_c   = f : opt_c d}
 addOptm   f d = d{ opt_m   = f : opt_m d}
 addOpta   f d = d{ opt_a   = f : opt_a d}
 addOptl   f d = d{ opt_l   = f : opt_l d}
-addOptdep f d = d{ opt_dep = f : opt_dep d}
 addOptwindres f d = d{ opt_windres = f : opt_windres d}
+
+setDepMakefile :: FilePath -> DynFlags -> DynFlags
+setDepMakefile f d = d { depMakefile = deOptDep f }
+
+setDepIncludePkgDeps :: Bool -> DynFlags -> DynFlags
+setDepIncludePkgDeps b d = d { depIncludePkgDeps = b }
+
+addDepExcludeMod :: String -> DynFlags -> DynFlags
+addDepExcludeMod m d
+    = d { depExcludeMods = mkModuleName (deOptDep m) : depExcludeMods d }
+
+addDepSuffix :: FilePath -> DynFlags -> DynFlags
+addDepSuffix s d = d { depSuffixes = deOptDep s : depSuffixes d }
+
+setDepWarnings :: Bool -> DynFlags -> DynFlags
+setDepWarnings b d = d { depWarnings = b }
+
+-- XXX Legacy code:
+-- We used to use "-optdep-flag -optdeparg", so for legacy applications
+-- we need to strip the "-optdep" off of the arg
+deOptDep :: String -> String
+deOptDep x = case maybePrefixMatch "-optdep" x of
+             Just rest -> rest
+             Nothing -> x
 
 addCmdlineFramework f d = d{ cmdlineFrameworks = f : cmdlineFrameworks d}
 
@@ -1064,12 +1099,22 @@ dynamic_flags = [
   , Flag "optm"           (HasArg (upd . addOptm)) Supported
   , Flag "opta"           (HasArg (upd . addOpta)) Supported
   , Flag "optl"           (HasArg (upd . addOptl)) Supported
-  , Flag "optdep"         (HasArg (upd . addOptdep)) Supported
   , Flag "optwindres"     (HasArg (upd . addOptwindres)) Supported
 
   , Flag "split-objs"
          (NoArg (if can_split then setDynFlag Opt_SplitObjs else return ()))
          Supported
+
+        -------- ghc -M -----------------------------------------------------
+  , Flag "optdep-s"                 (HasArg (upd . addDepSuffix)) Supported
+  , Flag "optdep-f"                 (HasArg (upd . setDepMakefile)) Supported
+  , Flag "optdep-w"                 (NoArg  (upd (setDepWarnings False)))
+         (Deprecated "-optdep-w doesn't do anything")
+  , Flag "optdep--include-prelude"  (NoArg  (upd (setDepIncludePkgDeps True)))
+         (Deprecated "Use -optdep--include-pkg-deps instead")
+  , Flag "optdep--include-pkg-deps" (NoArg  (upd (setDepIncludePkgDeps True))) Supported
+  , Flag "optdep--exclude-module"   (HasArg (upd . addDepExcludeMod)) Supported
+  , Flag "optdep-x"                 (HasArg (upd . addDepExcludeMod)) Supported
 
         -------- Linking ----------------------------------------------------
   , Flag "c"              (NoArg (upd $ \d -> d{ ghcLink=NoLink } ))
@@ -1596,8 +1641,19 @@ glasgowExtsFlags = [
 
 parseDynamicFlags :: DynFlags -> [String] -> IO (DynFlags, [String], [String])
 parseDynamicFlags dflags args = do
+  -- XXX Legacy support code
+  -- We used to accept things like
+  --     optdep-f  -optdepdepend
+  --     optdep-f  -optdep depend
+  --     optdep -f -optdepdepend
+  --     optdep -f -optdep depend
+  -- but the spaces trip up proper argument handling. So get rid of them.
+  let f ("-optdep" : x : xs) = ("-optdep" ++ x) : f xs
+      f (x : xs) = x : f xs
+      f xs = xs
+      args' = f args
   let ((leftover, errs, warns), dflags')
-          = runCmdLine (processArgs dynamic_flags args) dflags
+          = runCmdLine (processArgs dynamic_flags args') dflags
   when (not (null errs)) $ do
     throwDyn (UsageError (unlines errs))
   return (dflags', leftover, warns)

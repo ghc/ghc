@@ -29,12 +29,10 @@ import Outputable
 import Panic
 import SrcLoc
 import Data.List
-import CmdLineParser
 import FastString
 
 import ErrUtils         ( debugTraceMsg, putMsg )
 
-import Data.IORef       ( IORef, readIORef, writeIORef )
 import Control.Exception
 import System.Exit      ( ExitCode(..), exitWith )
 import System.Directory
@@ -59,7 +57,7 @@ doMkDependHS session srcs
                 -- Do the downsweep to find all the modules
         ; targets <- mapM (\s -> GHC.guessTarget s Nothing) srcs
         ; GHC.setTargets session targets
-        ; excl_mods <- readIORef v_Dep_exclude_mods
+        ; let excl_mods = depExcludeMods dflags
         ; r <- GHC.depanal session excl_mods True {- Allow dup roots -}
         ; case r of
             Nothing -> exitWith (ExitFailure 1)
@@ -74,7 +72,7 @@ doMkDependHS session srcs
 
                 -- Prcess them one by one, dumping results into makefile
                 -- and complaining about cycles
-        ; mapM (processDeps session excl_mods (mkd_tmp_hdl files)) sorted
+        ; mapM (processDeps dflags session excl_mods (mkd_tmp_hdl files)) sorted
 
                 -- If -ddump-mod-cycles, show cycles in the module graph
         ; dumpModCycles dflags mod_summaries
@@ -99,17 +97,13 @@ data MkDepFiles
 
 beginMkDependHS :: DynFlags -> IO MkDepFiles
 beginMkDependHS dflags = do
-        -- slurp in the mkdependHS-style options
-  let flags = getOpts dflags opt_dep
-  _ <- processArgs dep_opts flags
-
         -- open a new temp file in which to stuff the dependency info
         -- as we go along.
   tmp_file <- newTempName dflags "dep"
   tmp_hdl <- openFile tmp_file WriteMode
 
         -- open the makefile
-  makefile <- readIORef v_Dep_makefile
+  let makefile = depMakefile dflags
   exists <- doesFileExist makefile
   mb_make_hdl <-
         if not exists
@@ -154,7 +148,8 @@ beginMkDependHS dflags = do
 --
 -----------------------------------------------------------------
 
-processDeps :: Session
+processDeps :: DynFlags
+            -> Session
             -> [ModuleName]
             -> Handle           -- Write dependencies to here
             -> SCC ModSummary
@@ -174,15 +169,15 @@ processDeps :: Session
 --
 -- For {-# SOURCE #-} imports the "hi" will be "hi-boot".
 
-processDeps _ _ _ (CyclicSCC nodes)
+processDeps _ _ _ _ (CyclicSCC nodes)
   =     -- There shouldn't be any cycles; report them
     throwDyn (ProgramError (showSDoc $ GHC.cyclicModuleErr nodes))
 
-processDeps session excl_mods hdl (AcyclicSCC node)
-  = do  { extra_suffixes   <- readIORef v_Dep_suffixes
-        ; hsc_env <- GHC.sessionHscEnv session
-        ; include_pkg_deps <- readIORef v_Dep_include_pkg_deps
-        ; let src_file  = msHsFilePath node
+processDeps dflags session excl_mods hdl (AcyclicSCC node)
+  = do  { hsc_env <- GHC.sessionHscEnv session
+        ; let extra_suffixes = depSuffixes dflags
+              include_pkg_deps = depIncludePkgDeps dflags
+              src_file  = msHsFilePath node
               obj_file  = msObjFilePath node
               obj_files = insertSuffixes obj_file extra_suffixes
 
@@ -384,36 +379,7 @@ pprCycle summaries = pp_group (CyclicSCC summaries)
 --
 -----------------------------------------------------------------
 
-        -- Flags
-GLOBAL_VAR(v_Dep_makefile,              "Makefile", String);
-GLOBAL_VAR(v_Dep_include_pkg_deps,      False, Bool);
-GLOBAL_VAR(v_Dep_exclude_mods,          [], [ModuleName]);
-GLOBAL_VAR(v_Dep_suffixes,              [], [String]);
-GLOBAL_VAR(v_Dep_warnings,              True, Bool);
-
 depStartMarker, depEndMarker :: String
 depStartMarker = "# DO NOT DELETE: Beginning of Haskell dependencies"
 depEndMarker   = "# DO NOT DELETE: End of Haskell dependencies"
-
--- for compatibility with the old mkDependHS, we accept options of the form
--- -optdep-f -optdep.depend, etc.
-dep_opts :: [Flag IO]
-dep_opts =
-   [ Flag "s"                 (SepArg (consIORef v_Dep_suffixes))
-          Supported
-   , Flag "f"                 (SepArg (writeIORef v_Dep_makefile))
-          Supported
-   , Flag "w"                 (NoArg (writeIORef v_Dep_warnings False))
-          Supported
-
-   , Flag "-include-prelude"  (NoArg (writeIORef v_Dep_include_pkg_deps True))
-          (Deprecated "Use --include-pkg-deps instead")
-
-   , Flag "-include-pkg-deps" (NoArg (writeIORef v_Dep_include_pkg_deps True))
-          Supported
-   , Flag "-exclude-module="  (Prefix (consIORef v_Dep_exclude_mods . mkModuleName))
-          Supported
-   , Flag "x"                 (Prefix (consIORef v_Dep_exclude_mods . mkModuleName))
-          Supported
-   ]
 
