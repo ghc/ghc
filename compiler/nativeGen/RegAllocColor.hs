@@ -48,9 +48,9 @@ regAlloc
 	-> UniqFM (UniqSet Reg)		-- ^ the registers we can use for allocation
 	-> UniqSet Int			-- ^ the set of available spill slots.
 	-> [LiveCmmTop]			-- ^ code annotated with liveness information.
-	-> UniqSM 
-		( [NatCmmTop]		-- ^ code with registers allocated.
-		, [RegAllocStats] )	-- ^ stats for each stage of allocation
+	-> UniqSM ( [NatCmmTop], [RegAllocStats] )
+           -- ^ code with registers allocated and stats for each stage of
+           -- allocation
 		
 regAlloc dflags regsFree slotsFree code
  = do

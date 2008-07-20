@@ -83,7 +83,7 @@ pprNatCmmTop (CmmProc info lbl params (ListGraph blocks)) =
        pprLabel (entryLblToInfoLbl lbl)
   ) $$
   vcat (map pprBasicBlock blocks)
-     -- ^ Even the first block gets a label, because with branch-chain
+     -- above: Even the first block gets a label, because with branch-chain
      -- elimination, it might be the target of a goto.
 #if HAVE_SUBSECTIONS_VIA_SYMBOLS
         -- If we are using the .subsections_via_symbols directive
