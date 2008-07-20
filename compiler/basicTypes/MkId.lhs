@@ -1,4 +1,4 @@
-\%
+%
 % (c) The University of Glasgow 2006
 % (c) The AQUA Project, Glasgow University, 1998
 %
@@ -6,17 +6,17 @@
 This module contains definitions for the IdInfo for things that
 have a standard form, namely:
 
-* data constructors
-* record selectors
-* method and superclass selectors
-* primitive operations
+- data constructors
+- record selectors
+- method and superclass selectors
+- primitive operations
 
 \begin{code}
 {-# OPTIONS -fno-warn-missing-signatures #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and fix
 -- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
+--  <http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings>
 -- for details
 
 module MkId (
@@ -544,7 +544,7 @@ mkRecordSelId tycon field_label
     data_tv_set = tyVarsOfType data_ty
     data_tvs    = varSetElems data_tv_set
     
-        -- *Very* tiresomely, the selectors are (unnecessarily!) overloaded over
+        -- _Very_ tiresomely, the selectors are (unnecessarily!) overloaded over
         -- just the dictionaries in the types of the constructors that contain
         -- the relevant field.  [The Report says that pattern matching on a
         -- constructor gives the same constraints as applying it.]  Urgh.  

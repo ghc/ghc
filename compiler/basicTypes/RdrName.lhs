@@ -570,9 +570,9 @@ data ImpItemSpec  -- Describes import info a particular Name
 	is_explicit :: Bool,
 	is_iloc     :: SrcSpan	-- Location of the import item
     }
-	-- The is_explicit field is True iff the thing was named 
-	-- *explicitly* in the import specs rather 
-	-- than being imported as part of a "..." group 
+	-- The is_explicit field is True iff the thing was
+        -- named /explicitly/ in the import specs rather
+	-- than being imported as part of a "..." group
 	-- e.g.		import C( T(..) )
 	-- Here the constructors of T are not named explicitly; 
 	-- only T is named explicitly.

@@ -275,7 +275,7 @@ data DataCon
 	-- Reason: less confusing, and easier to generate IfaceSyn
 
 	dcEqSpec :: [(TyVar,Type)],	-- Equalities derived from the result type, 
-					-- *as written by the programmer*
+					-- /as written by the programmer/
 		-- This field allows us to move conveniently between the two ways
 		-- of representing a GADT constructor's type:
 		--	MkT :: forall a b. (a :=: [b]) => b -> T a
