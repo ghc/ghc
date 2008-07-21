@@ -58,9 +58,9 @@ data RegAllocStats
 	, raGraphColored :: Color.Graph Reg RegClass Reg -- ^ the coalesced and colored graph
 	, raCoalesced	:: UniqFM Reg			-- ^ the regs that were coaleced
 	, raPatched	:: [LiveCmmTop] 		-- ^ code with vregs replaced by hregs
-	, raSpillClean  :: [LiveCmmTop]			-- ^ code with unneeded spill/reloads cleaned out
+	, raSpillClean  :: [LiveCmmTop]			-- ^ code with unneeded spill\/reloads cleaned out
 	, raFinal	:: [NatCmmTop] 			-- ^ final code
-	, raSRMs	:: (Int, Int, Int) }		-- ^ spill/reload/reg-reg moves present in this code
+	, raSRMs	:: (Int, Int, Int) }		-- ^ spill\/reload\/reg-reg moves present in this code
 
 instance Outputable RegAllocStats where
 
@@ -143,7 +143,7 @@ pprStats stats graph
   in	vcat [outSpills, outLife, outConflict, outScatter]
 
 
--- | Dump a table of how many spill loads / stores were inserted for each vreg.
+-- | Dump a table of how many spill loads \/ stores were inserted for each vreg.
 pprStatsSpills
 	:: [RegAllocStats] -> SDoc
 
@@ -151,7 +151,7 @@ pprStatsSpills stats
  = let
 	finals	= [ s	| s@RegAllocStatsColored{} <- stats]
 
-	-- sum up how many stores/loads/reg-reg-moves were left in the code
+	-- sum up how many stores\/loads\/reg-reg-moves were left in the code
 	total	= foldl' addSRM (0, 0, 0)
 		$ map raSRMs finals
 

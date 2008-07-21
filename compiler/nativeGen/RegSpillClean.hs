@@ -1,5 +1,5 @@
 {-# OPTIONS -fno-warn-missing-signatures #-}
--- | Clean out unneeded spill/reload instrs
+-- | Clean out unneeded spill\/reload instrs
 --
 -- * Handling of join points
 --
@@ -20,7 +20,7 @@
 --	What we really care about here is that on the entry to B3, %r1 will always
 --	have the same value that is in SLOT(0) (ie, %r1 is _valid_)
 --
---	This also works if the reloads in B1/B2 were spills instead, because
+--	This also works if the reloads in B1\/B2 were spills instead, because
 --	spilling %r1 to a slot makes that slot have the same value as %r1.
 --
 
@@ -50,7 +50,7 @@ import Data.List        ( find, nub )
 type Slot = Int
 
 
--- | Clean out unneeded spill/reloads from this top level thing.
+-- | Clean out unneeded spill\/reloads from this top level thing.
 cleanSpills :: LiveCmmTop -> LiveCmmTop
 cleanSpills cmm
 	= evalState (cleanSpin 0 cmm) initCleanS
@@ -72,7 +72,7 @@ cleanSpin spinCount code
 
 cleanSpin spinCount code
  = do
- 	-- init count of cleaned spills/reloads
+ 	-- init count of cleaned spills\/reloads
 	modify $ \s -> s
 		{ sCleanedSpillsAcc	= 0
 		, sCleanedReloadsAcc	= 0
@@ -86,7 +86,7 @@ cleanSpin spinCount code
 	--	safe to erase reloads after join points for the next pass.
 	collateJoinPoints
 
-	-- remember how many spills/reloads we cleaned in this pass
+	-- remember how many spills\/reloads we cleaned in this pass
 	spills		<- gets sCleanedSpillsAcc
 	reloads		<- gets sCleanedReloadsAcc
 	modify $ \s -> s
@@ -351,10 +351,10 @@ data CleanS
 	  --	reloaded from on this path.
 	, sReloadedBy		:: UniqFM [BlockId]
 
-	  -- spills/reloads cleaned each pass (latest at front)
+	  -- spills\/reloads cleaned each pass (latest at front)
 	, sCleanedCount		:: [(Int, Int)]
 
-	  -- spills/reloads that have been cleaned in this pass so far.
+	  -- spills\/reloads that have been cleaned in this pass so far.
 	, sCleanedSpillsAcc	:: Int
 	, sCleanedReloadsAcc	:: Int }
 

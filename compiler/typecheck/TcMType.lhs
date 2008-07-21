@@ -811,7 +811,7 @@ Consider this:
 * Now abstract over the 'a', but float out the Num (C d a) constraint
   because it does not 'really' mention a.  (see exactTyVarsOfType)
   The arg to foo becomes
-	/\a -> \t -> t+t
+	\/\a -> \t -> t+t
 
 * So we get a dict binding for Num (C d a), which is zonked to give
 	a = ()
@@ -820,10 +820,10 @@ Consider this:
   quantification, so the floated dict will still have type (C d a).
   Which renders this whole note moot; happily!]
 
-* Then the /\a abstraction has a zonked 'a' in it.
+* Then the \/\a abstraction has a zonked 'a' in it.
 
 All very silly.   I think its harmless to ignore the problem.  We'll end up with
-a /\a in the final result but all the occurrences of a will be zonked to ()
+a \/\a in the final result but all the occurrences of a will be zonked to ()
 
 Note [Zonking to Skolem]
 ~~~~~~~~~~~~~~~~~~~~~~~~

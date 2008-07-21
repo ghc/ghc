@@ -24,10 +24,10 @@ module Dataflow (
 -- that is H*E.  The N term of the complexity is from the initial call
 -- when 'update' will be passed 'Nothing'.
 fixedpoint ::
-    (node -> [node])            -- ^ map from nodes to those who's
+    (node -> [node])            -- map from nodes to those who's
                                 -- value depend on the argument node
     -> (node -> Maybe node -> s -> Maybe s)
-                                -- ^ Given the node which needs to be
+                                -- Given the node which needs to be
                                 -- updated, and which node caused that node
                                 -- to need to be updated, update the state.
                                 --
@@ -37,13 +37,13 @@ fixedpoint ::
                                 -- Must return 'Nothing' if no change,
                                 -- otherwise returrn 'Just' of the new state.
 
-    -> [node]                   -- ^ Nodes that should initially be updated
+    -> [node]                   -- Nodes that should initially be updated
 
-    -> s                        -- ^ Initial state
+    -> s                        -- Initial state
                                 -- (usually a map from node to
                                 -- the value for that node)
 
-    -> s                        -- ^ Final state
+    -> s                        -- Final state
 fixedpoint dependants update nodes state =
     foldr (fixedpoint' Nothing) state nodes where
         -- Use a depth first traversal of nodes based on the update graph.

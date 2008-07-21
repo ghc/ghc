@@ -244,14 +244,14 @@ slurpConflicts live
 					, moves) lis
 
 
--- | For spill/reloads
+-- | For spill\/reloads
 --
 --	SPILL  v1, slot1
 --	...
 --	RELOAD slot1, v2
 --
 --	If we can arrange that v1 and v2 are allocated to the same hreg it's more likely
---	the spill/reload instrs can be cleaned and replaced by a nop reg-reg move.
+--	the spill\/reload instrs can be cleaned and replaced by a nop reg-reg move.
 --
 --
 slurpReloadCoalesce :: LiveCmmTop -> Bag (Reg, Reg)

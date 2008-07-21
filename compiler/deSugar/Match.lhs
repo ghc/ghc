@@ -242,7 +242,7 @@ Make all constructor patterns in column~1 into @ConPats@, notably
 Handle any irrefutable (or ``twiddle'') @LazyPats@.
 \end{itemize}
 \item
-Now {\em unmix} the equations into {\em blocks} [w/ local function
+Now {\em unmix} the equations into {\em blocks} [w\/ local function
 @unmix_eqns@], in which the equations in a block all have variable
 patterns in column~1, or they all have constructor patterns in ...
 (see ``the mixture rule'' in SLPJ).
@@ -268,7 +268,7 @@ Wadler-chapter @match@ (p.~93, last clause), and @match_unmixed_blk@
 corresponds roughly to @matchVarCon@.
 
 \begin{code}
-match :: [Id]		  -- Variables rep'ing the exprs we're matching with
+match :: [Id]		  -- Variables rep\'ing the exprs we\'re matching with
       -> Type             -- Type of the case expression
       -> [EquationInfo]	  -- Info about patterns, etc. (type synonym below)
       -> DsM MatchResult  -- Desugared result!

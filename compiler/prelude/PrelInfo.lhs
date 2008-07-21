@@ -49,7 +49,7 @@ import Array		( Array, array, (!) )
 
 Notes about wired in things
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-* Wired-in things are Ids/TyCons that are completely known to the compiler.
+* Wired-in things are Ids\/TyCons that are completely known to the compiler.
   They are global values in GHC, (e.g.  listTyCon :: TyCon).
 
 * A wired in Name contains the thing itself inside the Name: 

@@ -87,9 +87,9 @@ $tau_iop$ is the tau type for this instance of a class method
 \item
 $alpha$ is the class variable
 \item
-$LIE_cop' = LIE_cop [X gammas_bar / alpha, fresh betas_bar]$
+$LIE_cop' = LIE_cop [X gammas_bar \/ alpha, fresh betas_bar]$
 \item
-$tau_cop' = tau_cop [X gammas_bar / alpha, fresh betas_bar]$
+$tau_cop' = tau_cop [X gammas_bar \/ alpha, fresh betas_bar]$
 \end{enumerate}
 
 ToDo: Update the list above with names actually in the code.
@@ -97,7 +97,7 @@ ToDo: Update the list above with names actually in the code.
 \begin{enumerate}
 \item
 First, make the LIEs for the class and instance contexts, which means
-instantiate $thetaC [X inst_tyvars / alpha ]$, yielding LIElistC' and LIEC',
+instantiate $thetaC [X inst_tyvars \/ alpha ]$, yielding LIElistC' and LIEC',
 and make LIElistI and LIEI.
 \item
 Then process each method in turn.

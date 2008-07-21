@@ -305,7 +305,7 @@ coalesceGraph' aggressive triv graph kkPairsAcc
 	 pairs	-> coalesceGraph' aggressive triv graph' (reverse pairs ++ kkPairsAcc)
 
 
--- | Coalesce this pair of nodes unconditionally / agressively.
+-- | Coalesce this pair of nodes unconditionally \/ agressively.
 --	The resulting node is the one with the least key.
 --
 --	returns: Just 	 the pair of keys if the nodes were coalesced
@@ -443,7 +443,7 @@ freezeNode k
 --	classes.. this is just a heuristic, after all.
 --
 --	IDEA:	freezing a node might free it up for Simplify.. would be good to check for triv
---		right here, and add it to a worklist if known triv/non-move nodes.
+--		right here, and add it to a worklist if known triv\/non-move nodes.
 --
 freezeOneInGraph
 	:: (Uniquable k, Outputable k)

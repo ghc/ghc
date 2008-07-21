@@ -2237,7 +2237,7 @@ listModuleLine modl line = do
 
 -- | list a section of a source file around a particular SrcSpan.
 -- If the highlight flag is True, also highlight the span using
--- start_bold/end_bold.
+-- start_bold\/end_bold.
 listAround :: SrcSpan -> Bool -> IO ()
 listAround span do_highlight = do
       contents <- BS.readFile (unpackFS file)

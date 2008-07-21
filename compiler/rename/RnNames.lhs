@@ -633,7 +633,7 @@ filterAvail keep ie rest =
         let left = filter keep ns in
         if null left then rest else AvailTC tc left : rest
 
--- | Given an import/export spec, construct the appropriate 'GlobalRdrElt's.
+-- | Given an import\/export spec, construct the appropriate 'GlobalRdrElt's.
 gresFromIE :: ImpDeclSpec -> (LIE Name, AvailInfo) -> [GlobalRdrElt]
 gresFromIE decl_spec (L loc ie, avail)
   = gresFromAvail prov_fn avail

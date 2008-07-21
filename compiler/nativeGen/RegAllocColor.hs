@@ -33,7 +33,7 @@ import Data.List
 import Data.Maybe
 import Control.Monad
 
--- | The maximum number of build/spill cycles we'll allow.
+-- | The maximum number of build\/spill cycles we'll allow.
 --	We should only need 3 or 4 cycles tops.
 --	If we run for any longer than this we're probably in an infinite loop,
 --	It's probably better just to bail out and report a bug at this stage.

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
 %
-\section[WwLib]{A library for the ``worker/wrapper'' back-end to the strictness analyser}
+\section[WwLib]{A library for the ``worker\/wrapper'' back-end to the strictness analyser}
 
 \begin{code}
 module WwLib ( mkWwBodies, mkWWstr, mkWorkerArgs ) where
@@ -44,7 +44,7 @@ Here's an example.  The original function is:
 \begin{verbatim}
 g :: forall a . Int -> [a] -> a
 
-g = /\ a -> \ x ys ->
+g = \/\ a -> \ x ys ->
 	case x of
 	  0 -> head ys
 	  _ -> head (tail ys)
@@ -55,7 +55,7 @@ From this, we want to produce:
 -- wrapper (an unfolding)
 g :: forall a . Int -> [a] -> a
 
-g = /\ a -> \ x ys ->
+g = \/\ a -> \ x ys ->
 	case x of
 	  I# x# -> $wg a x# ys
 	    -- call the worker; don't forget the type args!
@@ -63,7 +63,7 @@ g = /\ a -> \ x ys ->
 -- worker
 $wg :: forall a . Int# -> [a] -> a
 
-$wg = /\ a -> \ x# ys ->
+$wg = \/\ a -> \ x# ys ->
 	let
 	    x = I# x#
 	in
@@ -98,7 +98,7 @@ the unusable strictness-info into the interfaces.
 %*									*
 %************************************************************************
 
-@mkWwBodies@ is called when doing the worker/wrapper split inside a module.
+@mkWwBodies@ is called when doing the worker\/wrapper split inside a module.
 
 \begin{code}
 mkWwBodies :: Type				-- Type of original function

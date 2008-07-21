@@ -809,7 +809,7 @@ joinToTargets block_live new_blocks instr (dest:dests) = do
 	       joinToTargets block_live (block : new_blocks) instr' dests
 
 
--- | Construct a graph of register/spill movements.
+-- | Construct a graph of register\/spill movements.
 --
 -- 	We cut some corners by
 -- 	a) not handling cyclic components
