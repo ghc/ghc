@@ -1,3 +1,4 @@
+{-# OPTIONS -cpp #-}
 {-# LANGUAGE CPP, ForeignFunctionInterface #-}
 
 ------------------------------------------------------------------------
@@ -13,27 +14,21 @@
 #include "../../includes/ghcconfig.h"
 #endif
 
-#if __GLASGOW_HASKELL__ >= 504 || __NHC__ >= 114
+import Control.Monad            ( MonadPlus(..), liftM, liftM2, when )
+import Data.Char                ( isAlpha, isAlphaNum, isSpace, isDigit,
+                                  toUpper, intToDigit, ord )
+import Data.List                ( intersperse, isSuffixOf )
+import System.Cmd               ( system, rawSystem )
 import System.Console.GetOpt
-#else
-import GetOpt
-#endif
-
-import System        (getProgName, getArgs, ExitCode(..), exitWith)
-import Directory     (removeFile,doesFileExist)
-import Monad         (MonadPlus(..), liftM, liftM2, when)
-import Char          (isAlpha, isAlphaNum, isSpace, isDigit, toUpper, intToDigit, ord)
-import List          (intersperse, isSuffixOf)
-import IO            (hPutStr, hPutStrLn, stderr, bracket_)
 
 #if defined(mingw32_HOST_OS)
 import Foreign
-#if __GLASGOW_HASKELL__ >= 504 || __NHC__ >= 114
 import Foreign.C.String
-#else
-import CString
 #endif
-#endif
+import System.Directory         ( removeFile, doesFileExist, findExecutable )
+import System.Environment       ( getProgName, getArgs )
+import System.Exit              ( ExitCode(..), exitWith )
+import System.IO                ( hPutStr, hPutStrLn, stderr )
 
 #if __GLASGOW_HASKELL__ >= 604
 import System.Process           ( runProcess, waitForProcess )
@@ -41,28 +36,28 @@ import System.IO                ( openFile, IOMode(..), hClose )
 #define HAVE_runProcess
 #endif
 
-#if defined(__GLASGOW_HASKELL__) && !defined(BUILD_NHC)
-import System.Cmd       ( rawSystem )
-#define HAVE_rawSystem
-#elif __NHC__ >= 117
-import System.Cmd	 	( rawSystem )
-#define HAVE_rawSystem
-#endif
-
-#if !defined(HAVE_runProcess) || !defined(HAVE_rawSystem)
--- we need system
-#if __NHC__ >= 117 || __GLASGOW_HASKELL__ >= 600
-import System.Cmd	 	( system )
-#else
-import System                   ( system )
-#endif
-#endif
-
+import IO                ( bracket_ )
 import Distribution.Text
-import qualified Paths_hsc2hs
 
-version :: String
-version = "hsc2hs version 0.66\n"
+#if ! BUILD_NHC
+import Paths_hsc2hs             ( getDataFileName, version )
+import Data.Version             ( showVersion )
+#else
+import System.Directory         ( getCurrentDirectory )
+getDataFileName s = do here <- getCurrentDirectory
+                       return (here++"/"++s)
+version = "0.67" -- TODO!!!
+showVersion = id
+#endif
+
+#ifdef __GLASGOW_HASKELL__
+default_compiler = "ghc"
+#else
+default_compiler = "gcc"
+#endif
+
+versionString :: String
+versionString = "hsc2hs version " ++ showVersion version ++ "\n"
 
 data Flag
     = Help
@@ -128,27 +123,38 @@ main = do
     args <- getArgs
     let (flags, files, errs) = getOpt Permute options args
 
-	-- If there is no Template flag explicitly specified, try
-	-- to find one by looking near the executable.  This only
-	-- works on Win32 or Hugs (getExecDir). On Unix, there's a wrapper
-	-- script which specifies an explicit template flag.
-    flags_w_tpl0 <- if any template_flag flags then
-			return flags
-		   else
-			do mb_path <- getExecDir "/bin/hsc2hs.exe"
-			   add_opt <-
-			    case mb_path of
-			      Nothing   -> return id
-			      Just path -> do
-                              -- Euch, this is horrible. Unfortunately
-                              -- Paths_hsc2hs isn't too useful for a
-                              -- relocatable binary, though.
-				let templ = path ++ "/hsc2hs-" ++ display Paths_hsc2hs.version ++ "/template-hsc.h"
-				flg <- doesFileExist templ
-				if flg
-				 then return ((Template templ):)
-				 else return id
-		           return (add_opt flags)
+    -- If there is no Template flag explicitly specified, try
+    -- to find one. We first look near the executable.  This only
+    -- works on Win32 or Hugs (getExecDir). If this finds a template
+    -- file then it's certainly the one we want, even if hsc2hs isn't
+    -- installed where we told Cabal it would be installed.
+    --
+    -- Next we try the location we told Cabal about.
+    --
+    -- If neither of the above work, then hopefully we're on Unix and
+    -- there's a wrapper script which specifies an explicit template flag.
+    flags_w_tpl0 <-
+        if any template_flag flags then return flags
+        else do mb_path <- getExecDir "/bin/hsc2hs.exe"
+                mb_templ1 <-
+                   case mb_path of
+                   Nothing   -> return Nothing
+                   Just path -> do
+                   -- Euch, this is horrible. Unfortunately
+                   -- Paths_hsc2hs isn't too useful for a
+                   -- relocatable binary, though.
+                     let templ1 = path ++ "/hsc2hs-" ++ display Paths_hsc2hs.version ++ "/template-hsc.h"
+                     exists1 <- doesFileExist templ1
+                     if exists1
+                        then return (Just templ1)
+                        else return Nothing
+                case mb_templ1 of
+                    Just templ1 -> return (Template templ1 : flags)
+                    Nothing -> do
+                        templ2 <- getDataFileName "template-hsc.h"
+                        exists2 <- doesFileExist templ2
+                        if exists2 then return (Template templ2 : flags)
+                                   else return flags
 
     -- take only the last --template flag on the cmd line
     let
@@ -158,7 +164,7 @@ main = do
     case (files, errs) of
         (_, _)
             | any isHelp    flags_w_tpl -> bye (usageInfo header options)
-            | any isVersion flags_w_tpl -> bye version
+            | any isVersion flags_w_tpl -> bye versionString
             where
             isHelp    Help    = True; isHelp    _ = False
             isVersion Version = True; isVersion _ = False
@@ -556,35 +562,16 @@ output flags name toks = do
             fixChar c | isAlphaNum c = toUpper c
                       | otherwise    = '_'
 
-        -- Try locating GHC..on Win32, look in the vicinity of hsc2hs.
-	-- Returns a native-format path
-        locateGhc def = do
-	    mb <- getExecDir "bin/hsc2hs.exe"
-	    case mb of
-	      Nothing -> return def
-	      Just x  -> do
-	         let ghc_path = dosifyPath (x ++ "bin/ghc.exe")
-	         flg <- doesFileExist ghc_path
-		 if flg
-		  then return ghc_path
-		  else return def
-
-	-- On a Win32 installation we execute the hsc2hs binary directly,
-	-- with no --cc flags, so we'll call locateGhc here, which will
-	-- succeed, via getExecDir.
-	--
-	-- On a Unix installation, we'll run the wrapper script hsc2hs.sh
-	-- (called plain hsc2hs in the installed tree), which will pass
-	-- a suitable C compiler via --cc
-	--
-	-- The in-place installation always uses the wrapper script,
-	-- (called hsc2hs-inplace, generated from hsc2hs.sh)
     compiler <- case [c | Compiler c <- flags] of
-        []  -> locateGhc "ghc"
+        []  -> do
+                  mb_path <- findExecutable default_compiler
+                  case mb_path of
+                      Nothing -> die ("Can't find "++default_compiler++"\n")
+                      Just path -> return path
         cs  -> return (last cs)
 
     linker <- case [l | Linker l <- flags] of
-        []  -> locateGhc compiler
+        []  -> return compiler
         ls  -> return (last ls)
 
     writeFile cProgName $
@@ -644,11 +631,7 @@ rawSystemL :: String -> Bool -> FilePath -> [String] -> IO ()
 rawSystemL action flg prog args = do
   let cmdLine = prog++" "++unwords args
   when flg $ hPutStrLn stderr ("Executing: " ++ cmdLine)
-#ifndef HAVE_rawSystem
-  exitStatus <- system cmdLine
-#else
   exitStatus <- rawSystem prog args
-#endif
   case exitStatus of
     ExitFailure _ -> die $ action ++ " failed\ncommand was: " ++ cmdLine ++ "\n"
     _             -> return ()
@@ -669,12 +652,11 @@ rawSystemWithStdOutL action flg prog args outFile = do
     ExitFailure _ -> die $ action ++ " failed\ncommand was: " ++ cmdLine ++ "\n"
     _             -> return ()
 
-
 -- delay the cleanup of generated files until the end; attempts to
 -- get around intermittent failure to delete files which has
 -- just been exec'ed by a sub-process (Win32 only.)
 finallyRemove :: FilePath -> IO a -> IO a
-finallyRemove fp act = 
+finallyRemove fp act =
   bracket_ (return fp)
            (const $ noisyRemove fp)
            act
@@ -682,6 +664,7 @@ finallyRemove fp act =
   noisyRemove fpath =
     catch (removeFile fpath)
           (\ e -> hPutStrLn stderr ("Failed to remove file " ++ fpath ++ "; error= " ++ show e))
+
 onlyOne :: String -> IO a
 onlyOne what = die ("Only one "++what++" may be specified\n")
 
@@ -905,7 +888,7 @@ dosifyPath :: String -> String
 dosifyPath = subst '/' '\\'
 
 -- (getExecDir cmd) returns the directory in which the current
---	  	    executable, which should be called 'cmd', is running
+--                  executable, which should be called 'cmd', is running
 -- So if the full path is /a/b/c/d/e, and you pass "d/e" as cmd,
 -- you'll get "/a/b/c" back as the result
 getExecDir :: String -> IO (Maybe String)
@@ -929,3 +912,4 @@ foreign import stdcall unsafe "GetModuleFileNameA"
 #else
 getExecPath = return Nothing
 #endif
+
