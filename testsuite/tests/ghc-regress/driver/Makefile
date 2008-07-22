@@ -409,9 +409,9 @@ DEPFILE= depend
 # modify an existing dependency file.
 test200:
 	$(RM) $(DEPFILE)
-	$(TEST_HC) -M -optdep-f -optdep depend D
+	$(TEST_HC) -M -dep-makefile $(DEPFILE) D
 	test -f $(DEPFILE)
-	$(TEST_HC) -M -optdep-f -optdep depend D B.C A
+	$(TEST_HC) -M -dep-makefile $(DEPFILE) D B.C A
 	test -f $(DEPFILE)
-	$(TEST_HC) -M -optdep-f -optdep depend D.hs B/C.hs A.hs
+	$(TEST_HC) -M -dep-makefile $(DEPFILE) D.hs B/C.hs A.hs
 	test -f $(DEPFILE)
