@@ -72,12 +72,10 @@ Library
 
     Include-Dirs: . parser utils
 
-    -- XXX Change these directory names: The stage2 files are what
-    --     we want for all stages >= 1
     if flag(stage1)
         Include-Dirs: stage1
     else
-        Include-Dirs: stage2
+        Include-Dirs: stage2plus
     Install-Includes: HsVersions.h, ghc_boot_platform.h
 
     c-sources:

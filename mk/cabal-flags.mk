@@ -7,6 +7,7 @@ UTILS_ABS     = $(FPTOOLS_TOP_ABS)/utils
 CABAL = $(LIBRARIES_ABS)/cabal-bin $(GHC) $(LIBRARIES_ABS)/bootstrapping.conf
 INSTALL_PACKAGE = \
     $(UTILS_ABS)/installPackage/install-inplace/bin/installPackage
+STAGE3_PACKAGE_CONF = $(FPTOOLS_TOP_ABS)/stage3.package.conf
 
 # We rely on all the CONFIGURE_ARGS being quoted with '...', and there
 # being no 's inside the values.
@@ -81,9 +82,10 @@ USE_STAGE1_CONFIGURE_FLAGS = \
     --with-compiler=$(GHC_STAGE1) \
     $(USE_STAGE_CONFIGURE_FLAGS)
 
-USE_STAGE2_CONFIGURE_FLAGS = \
-    --with-compiler=$(GHC_STAGE2) \
-    $(USE_STAGE_CONFIGURE_FLAGS)
+USE_STAGE2_CONFIGURE_FLAGS =            \
+    --with-compiler=$(GHC_STAGE2)       \
+    $(USE_STAGE_CONFIGURE_FLAGS)        \
+	--package-db $(STAGE3_PACKAGE_CONF)
 
 BUILD_FLAGS = $(addprefix --ghc-option=,$(SRC_HC_OPTS))
 

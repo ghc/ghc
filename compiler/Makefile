@@ -58,12 +58,16 @@ stage3 ::
 clean distclean::
 	-$(CABAL) clean --distpref dist-stage1
 	-$(CABAL) clean --distpref dist-stage2
+	-$(CABAL) clean --distpref dist-stage3
 	$(RM) -f Makefile-stage1
 	$(RM) -f Makefile-stage2
+	$(RM) -f Makefile-stage3
 	$(RM) -f prelude/primops.txt
 	$(RM) -f $(PRIMOP_BITS)
 	$(RM) -f $(CONFIG_HS)
 	$(RM) -f parser/Parser.y
+	$(RM) -rf stage1 stage2plus
+	$(RM) -f $(STAGE3_PACKAGE_CONF)
 
 CONFIGURE_FLAGS_STAGE1 += --flags=stage1
 CONFIGURE_FLAGS_STAGE2 += --flags=-stage1
@@ -165,6 +169,7 @@ CONFIGURE_FLAGS_STAGE2 += $(USE_STAGE1_CONFIGURE_FLAGS)
 CONFIGURE_FLAGS_STAGE3 += $(USE_STAGE2_CONFIGURE_FLAGS)
 
 boot.stage.%: $(PRIMOP_BITS) $(CONFIG_HS) parser/Parser.y
+	test -e $(STAGE3_PACKAGE_CONF) || echo "[]" > $(STAGE3_PACKAGE_CONF)
 	$(CABAL) configure --distpref dist-stage$* \
 	                   $(CONFIGURE_FLAGS_STAGE$*) \
 	                   $(INSTALL_DIRS_CONFIGURE_FLAGS) \
@@ -183,11 +188,6 @@ doc.stage.%:
 # XXX We ought to actually install the (stage 2) library
 install:
 	@:
-
-stage_dirs :
-	$(MKDIRHIER) stage$(stage)
-
-boot :: stage_dirs
 
 # -----------------------------------------------------------------------------
 # Create compiler configuration
@@ -299,7 +299,8 @@ endif
 
 PLATFORM_H = ghc_boot_platform.h
 
-stage1/$(PLATFORM_H) : stage_dirs $(FPTOOLS_TOP)/mk/config.mk
+stage1/$(PLATFORM_H) : $(FPTOOLS_TOP)/mk/config.mk
+	$(MKDIRHIER) stage1
 	@echo "Creating $@..."
 	@$(RM) $@
 	@echo "#ifndef __PLATFORM_H__"  >$@
@@ -345,7 +346,8 @@ endif
 # For stage2 and above, the BUILD platform is the HOST of stage1, and
 # the HOST platform is the TARGET of stage1.  The TARGET remains the same
 # (stage1 is the cross-compiler, not stage2).
-stage2/$(PLATFORM_H) : stage_dirs $(FPTOOLS_TOP)/mk/config.mk
+stage2plus/$(PLATFORM_H) : $(FPTOOLS_TOP)/mk/config.mk
+	$(MKDIRHIER) stage2plus
 	@echo "Creating $@..."
 	@$(RM) $@
 	@echo "#ifndef __PLATFORM_H__"  >$@
@@ -388,7 +390,11 @@ endif
 	@echo "#endif /* __PLATFORM_H__ */"          >> $@
 	@echo "Done."
 
-STAGE_PLATFORM_H = stage$(stage)/$(PLATFORM_H)
+ifeq "$(stage)" "1"
+STAGE_PLATFORM_H = stage1/$(PLATFORM_H)
+else
+STAGE_PLATFORM_H = stage2plus/$(PLATFORM_H)
+endif
 
 boot :: $(STAGE_PLATFORM_H)
 

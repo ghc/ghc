@@ -635,7 +635,7 @@ doDump = mapM_ putStrLn . intersperse "---" . map showInstalledPackageInfo
 findPackages :: PackageDBStack -> PackageArg -> IO [InstalledPackageInfo]
 findPackages db_stack pkgarg
   = case [ p | p <- all_pkgs, pkgarg `matchesPkg` p ] of
-        []  -> die ("cannot find package " ++ pkg_msg pkgarg)
+        []  -> dieWith 2 ("cannot find package " ++ pkg_msg pkgarg)
         ps -> return ps
   where
         all_pkgs = allPackagesInStack db_stack
@@ -1026,11 +1026,14 @@ bye :: String -> IO a
 bye s = putStr s >> exitWith ExitSuccess
 
 die :: String -> IO a
-die s = do
+die = dieWith 1
+
+dieWith :: Int -> String -> IO a
+dieWith ec s = do
   hFlush stdout
   prog <- getProgramName
   hPutStrLn stderr (prog ++ ": " ++ s)
-  exitWith (ExitFailure 1)
+  exitWith (ExitFailure ec)
 
 dieOrForceAll :: Force -> String -> IO ()
 dieOrForceAll ForceAll s = ignoreError s
