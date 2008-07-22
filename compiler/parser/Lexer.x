@@ -258,7 +258,10 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
   "{-#" $whitechar* (CORE|core)		{ token ITcore_prag }
   "{-#" $whitechar* (UNPACK|unpack)	{ token ITunpack_prag }
 
- "{-#"                                 { nested_comment lexToken }
+  -- We ignore all these pragmas, but don't generate a warning for them
+  -- CFILES is a hugs-only thing.
+  "{-#" $whitechar* (OPTIONS_HUGS|options_hugs|OPTIONS_NHC98|options_nhc98|OPTIONS_JHC|options_jhc|CFILES|cfiles)
+                    { nested_comment lexToken }
 
   -- ToDo: should only be valid inside a pragma:
   "#-}" 				{ token ITclose_prag}
@@ -276,12 +279,18 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
 }
 
 <0> {
+  -- In the "0" mode we ignore these pragmas
+  "{-#"  $whitechar* (OPTIONS|options|OPTIONS_GHC|options_ghc|OPTIONS_HADDOCK|options_haddock|LANGUAGE|language|INCLUDE|include)
+                     { nested_comment lexToken }
+}
+
+<0> {
   "-- #" .* ;
 }
 
 <0,option_prags> {
-	-- This is to catch things like {-# OPTIONS OPTIONS_HUGS ... 
-  "{-#" $whitechar* $idchar+		{ nested_comment lexToken }
+  "{-#"  { warnThen Opt_WarnUnrecognisedPragmas (text "Unrecognised pragma")
+                    (nested_comment lexToken) }
 }
 
 -- '0' state: ordinary lexemes
@@ -1377,6 +1386,11 @@ warn :: DynFlag -> SDoc -> Action
 warn option warning srcspan _buf _len = do
     addWarning option srcspan warning
     lexToken
+
+warnThen :: DynFlag -> SDoc -> Action -> Action
+warnThen option warning action srcspan buf len = do
+    addWarning option srcspan warning
+    action srcspan buf len
 
 -- -----------------------------------------------------------------------------
 -- The Parse Monad

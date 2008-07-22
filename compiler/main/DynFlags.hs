@@ -174,6 +174,7 @@ data DynFlag
    | Opt_WarnDodgyImports
    | Opt_WarnOrphans
    | Opt_WarnTabs
+   | Opt_WarnUnrecognisedPragmas
    | Opt_WarnDodgyForeignImports
 
    -- language opts
@@ -793,6 +794,7 @@ standardWarnings :: [DynFlag]
 standardWarnings
     = [ Opt_WarnWarningsDeprecations,
         Opt_WarnDeprecatedFlags,
+        Opt_WarnUnrecognisedPragmas,
         Opt_WarnOverlappingPatterns,
         Opt_WarnMissingFields,
         Opt_WarnMissingMethods,
@@ -828,6 +830,7 @@ minuswRemovesOpts
        Opt_WarnIncompletePatternsRecUpd,
        Opt_WarnSimplePatterns,
        Opt_WarnMonomorphism,
+       Opt_WarnUnrecognisedPragmas,
        Opt_WarnTabs
       ]
 
@@ -1465,6 +1468,7 @@ fFlags = [
   ( "warn-deprecated-flags",            Opt_WarnDeprecatedFlags, const Supported ),
   ( "warn-orphans",                     Opt_WarnOrphans, const Supported ),
   ( "warn-tabs",                        Opt_WarnTabs, const Supported ),
+  ( "warn-unrecognised-pragmas",        Opt_WarnUnrecognisedPragmas, const Supported ),
   ( "print-explicit-foralls",           Opt_PrintExplicitForalls, const Supported ),
   ( "strictness",                       Opt_Strictness, const Supported ),
   ( "static-argument-transformation",   Opt_StaticArgumentTransformation, const Supported ),
