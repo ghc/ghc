@@ -1203,13 +1203,13 @@ getRegister e@(CmmMachOp mop [x, y]) -- dyadic MachOps
     --------------------
     add_code :: MachRep -> CmmExpr -> CmmExpr -> NatM Register
     add_code rep x (CmmLit (CmmInt y _))
-	| not (is64BitInteger y) = add_int rep x y
+	| is32BitInteger y = add_int rep x y
     add_code rep x y = trivialCode rep (ADD rep) (Just (ADD rep)) x y
 
     --------------------
     sub_code :: MachRep -> CmmExpr -> CmmExpr -> NatM Register
     sub_code rep x (CmmLit (CmmInt y _))
-	| not (is64BitInteger (-y)) = add_int rep x (-y)
+	| is32BitInteger (-y) = add_int rep x (-y)
     sub_code rep x y = trivialCode rep (SUB rep) Nothing x y
 
     -- our three-operand add instruction:
@@ -1307,7 +1307,7 @@ getRegister (CmmLit lit)
   where
    isBigLit (CmmInt i I64) = i < 0 || i > 0xffffffff
    isBigLit _ = False
-	-- note1: not the same as is64BitLit, because that checks for
+	-- note1: not the same as (not.is32BitLit), because that checks for
 	-- signed literals that fit in 32 bits, but we want unsigned
 	-- literals here.
 	-- note2: all labels are small, because we're assuming the
@@ -1849,14 +1849,14 @@ getAmode (CmmMachOp (MO_Add I64) [CmmReg (CmmGlobal PicBaseReg),
 -- This is all just ridiculous, since it carefully undoes 
 -- what mangleIndexTree has just done.
 getAmode (CmmMachOp (MO_Sub rep) [x, CmmLit lit@(CmmInt i _)])
-  | not (is64BitLit lit)
+  | is32BitLit lit
   -- ASSERT(rep == I32)???
   = do (x_reg, x_code) <- getSomeReg x
        let off = ImmInt (-(fromInteger i))
        return (Amode (AddrBaseIndex (EABaseReg x_reg) EAIndexNone off) x_code)
   
 getAmode (CmmMachOp (MO_Add rep) [x, CmmLit lit@(CmmInt i _)])
-  | not (is64BitLit lit)
+  | is32BitLit lit
   -- ASSERT(rep == I32)???
   = do (x_reg, x_code) <- getSomeReg x
        let off = ImmInt (fromInteger i)
@@ -1878,13 +1878,13 @@ getAmode (CmmMachOp (MO_Add rep)
                         [CmmMachOp (MO_Shl _) [y, CmmLit (CmmInt shift _)],
                          CmmLit (CmmInt offset _)]])
   | shift == 0 || shift == 1 || shift == 2 || shift == 3
-  && not (is64BitInteger offset)
+  && is32BitInteger offset
   = x86_complex_amode x y shift offset
 
 getAmode (CmmMachOp (MO_Add rep) [x,y])
   = x86_complex_amode x y 0 0
 
-getAmode (CmmLit lit) | not (is64BitLit lit)
+getAmode (CmmLit lit) | is32BitLit lit
   = return (Amode (ImmAddr (litToImm lit) 0) nilOL)
 
 getAmode expr = do
@@ -2019,7 +2019,7 @@ getNonClobberedOperand (CmmLit lit)
     return (OpAddr (ripRel (ImmCLbl lbl)), code)
 #endif
 getNonClobberedOperand (CmmLit lit)
-  | not (is64BitLit lit) && not (isFloatingRep (cmmLitRep lit)) =
+  | is32BitLit lit && not (isFloatingRep (cmmLitRep lit)) =
     return (OpImm (litToImm lit), nilOL)
 getNonClobberedOperand (CmmLoad mem pk) 
   | IF_ARCH_i386(not (isFloatingRep pk) && pk /= I64, True) = do
@@ -2055,7 +2055,7 @@ getOperand (CmmLit lit)
     return (OpAddr (ripRel (ImmCLbl lbl)), code)
 #endif
 getOperand (CmmLit lit)
-  | not (is64BitLit lit) && not (isFloatingRep (cmmLitRep lit)) = do
+  | is32BitLit lit && not (isFloatingRep (cmmLitRep lit)) = do
     return (OpImm (litToImm lit), nilOL)
 getOperand (CmmLoad mem pk)
   | IF_ARCH_i386(not (isFloatingRep pk) && pk /= I64, True) = do
@@ -2067,7 +2067,7 @@ getOperand e = do
 
 isOperand :: CmmExpr -> Bool
 isOperand (CmmLoad _ _) = True
-isOperand (CmmLit lit)  = not (is64BitLit lit)
+isOperand (CmmLit lit)  = is32BitLit lit
 			  || isSuitableFloatingPointLit lit
 isOperand _             = False
 
@@ -2088,15 +2088,15 @@ getRegOrMem e = do
     return (OpReg reg, code)
 
 #if x86_64_TARGET_ARCH
-is64BitLit (CmmInt i I64) = is64BitInteger i
+is32BitLit (CmmInt i I64) = is32BitInteger i
    -- assume that labels are in the range 0-2^31-1: this assumes the
    -- small memory model (see gcc docs, -mcmodel=small).
 #endif
-is64BitLit x = False
+is32BitLit x = False
 #endif
 
-is64BitInteger :: Integer -> Bool
-is64BitInteger i = i64 > 0x7fffffff || i64 < -0x80000000
+is32BitInteger :: Integer -> Bool
+is32BitInteger i = i64 <= 0x7fffffff && i64 >= -0x80000000
   where i64 = fromIntegral i :: Int64
   -- a CmmInt is intended to be truncated to the appropriate 
   -- number of bits, so here we truncate it to Int64.  This is
@@ -2217,7 +2217,7 @@ condFltCode = panic "MachCode.condFltCode: not on Alphas"
 #if i386_TARGET_ARCH || x86_64_TARGET_ARCH
 
 -- memory vs immediate
-condIntCode cond (CmmLoad x pk) (CmmLit lit) | not (is64BitLit lit) = do
+condIntCode cond (CmmLoad x pk) (CmmLit lit) | is32BitLit lit = do
     Amode x_addr x_code <- getAmode x
     let
 	imm  = litToImm lit
@@ -2441,7 +2441,7 @@ assignIntCode pk dst src
 -- address.
 assignMem_IntCode pk addr (CmmMachOp op [CmmLoad addr2 _,
                                                  CmmLit (CmmInt i _)])
-   | addr == addr2, pk /= I64 || not (is64BitInteger i),
+   | addr == addr2, pk /= I64 || is32BitInteger i,
      Just instr <- check op
    = do Amode amode code_addr <- getAmode addr
         let code = code_addr `snocOL`
@@ -2469,7 +2469,7 @@ assignMem_IntCode pk addr src = do
     return code
   where
     get_op_RI :: CmmExpr -> NatM (InstrBlock,Operand)	-- code, operator
-    get_op_RI (CmmLit lit) | not (is64BitLit lit)
+    get_op_RI (CmmLit lit) | is32BitLit lit
       = return (nilOL, OpImm (litToImm lit))
     get_op_RI op
       = do (reg,code) <- getNonClobberedReg op
@@ -4411,7 +4411,7 @@ SDM's version of The Rules:
 -}
 
 trivialCode rep instr (Just revinstr) (CmmLit lit_a) b
-  | not (is64BitLit lit_a) = do
+  | is32BitLit lit_a = do
   b_code <- getAnyReg b
   let
        code dst 
