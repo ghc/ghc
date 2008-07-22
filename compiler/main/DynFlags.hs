@@ -1106,15 +1106,24 @@ dynamic_flags = [
          Supported
 
         -------- ghc -M -----------------------------------------------------
-  , Flag "optdep-s"                 (HasArg (upd . addDepSuffix)) Supported
-  , Flag "optdep-f"                 (HasArg (upd . setDepMakefile)) Supported
+  , Flag "dep-suffix"               (HasArg (upd . addDepSuffix)) Supported
+  , Flag "optdep-s"                 (HasArg (upd . addDepSuffix))
+         (Deprecated "Use -dep-suffix instead")
+  , Flag "dep-makefile"             (HasArg (upd . setDepMakefile)) Supported
+  , Flag "optdep-f"                 (HasArg (upd . setDepMakefile))
+         (Deprecated "Use -dep-makefile instead")
   , Flag "optdep-w"                 (NoArg  (upd (setDepWarnings False)))
          (Deprecated "-optdep-w doesn't do anything")
+  , Flag "include-pkg-deps" (NoArg  (upd (setDepIncludePkgDeps True))) Supported
   , Flag "optdep--include-prelude"  (NoArg  (upd (setDepIncludePkgDeps True)))
-         (Deprecated "Use -optdep--include-pkg-deps instead")
-  , Flag "optdep--include-pkg-deps" (NoArg  (upd (setDepIncludePkgDeps True))) Supported
-  , Flag "optdep--exclude-module"   (HasArg (upd . addDepExcludeMod)) Supported
-  , Flag "optdep-x"                 (HasArg (upd . addDepExcludeMod)) Supported
+         (Deprecated "Use -include-pkg-deps instead")
+  , Flag "optdep--include-pkg-deps" (NoArg  (upd (setDepIncludePkgDeps True)))
+         (Deprecated "Use -include-pkg-deps instead")
+  , Flag "exclude-module"           (HasArg (upd . addDepExcludeMod)) Supported
+  , Flag "optdep--exclude-module"   (HasArg (upd . addDepExcludeMod))
+         (Deprecated "Use -exclude-module instead")
+  , Flag "optdep-x"                 (HasArg (upd . addDepExcludeMod))
+         (Deprecated "Use -exclude-module instead")
 
         -------- Linking ----------------------------------------------------
   , Flag "c"              (NoArg (upd $ \d -> d{ ghcLink=NoLink } ))
