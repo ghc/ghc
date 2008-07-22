@@ -29,8 +29,10 @@ stage3 ::
 clean distclean::
 	-$(CABAL) clean --distpref dist-stage1
 	-$(CABAL) clean --distpref dist-stage2
+	-$(CABAL) clean --distpref dist-stage3
 	$(RM) -rf stage1-inplace
 	$(RM) -rf stage2-inplace
+	$(RM) -rf stage3-inplace
 
 # XXX This should be defined somewhere more central
 INPLACE_DATA_DIR = $(FPTOOLS_TOP_ABS)/inplace-datadir
