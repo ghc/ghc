@@ -65,7 +65,7 @@ endif
 # sort removes duplicates - we don't actually care about the order
 WITH_EITHER = $(sort $(WITH_BOOTSTRAPPING_COMPILER) $(WITH_STAGE1))
 
-clean:: $(foreach P,$(WITH_EITHER),clean.$P)
+clean distclean:: $(foreach P,$(WITH_EITHER),clean.$P)
 
 with-bootstrapping-compiler: \
     $(foreach P,$(WITH_BOOTSTRAPPING_COMPILER),with-bootstrapping-compiler.$P)
