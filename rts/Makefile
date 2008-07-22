@@ -291,7 +291,11 @@ ifneq "$(PapiLibDirs)" ""
 SRC_LD_OPTS += -L$(PapiLibDirs)
 endif
 
-endif # GhcRtsWithPapi==YES
+else # GhcRtsWithPapi==YES
+
+PACKAGE_CPP_OPTS += -DPAPI_LIB_DIR=""
+
+endif
 
 #-----------------------------------------------------------------------------
 # make depend setup
