@@ -80,6 +80,10 @@ mkGhcModule (mod, file, checkedMod) dynflags = GhcModule {
   ghcInstances      = modInfoInstances modInfo
 }
   where
-    HsModule _ _ _ _ _ mbOpts _ _      = unLoc parsed
+#if __GLASGOW_HASKELL__ == 608 && __GHC_PATCHLEVEL__ == 2
+    HsModule _ _ _ _ _ mbOpts _ _ = unLoc parsed
+#else
+    mbOpts = haddockOptions dynflags
+#endif
     (group, _, mbExports, mbDoc, info) = renamed
-    (parsed, renamed, _, modInfo)      = checkedMod
+    (parsed, renamed, _, modInfo) = checkedMod
