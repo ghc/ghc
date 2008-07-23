@@ -15,9 +15,10 @@ FLAGGED_CONFIGURE_ARGS = $(subst $(space)',\
                                  $(space)--configure-option=',\
                                  $(space)$(CONFIGURE_ARGS))
 
-COMMON_CONFIGURE_FLAGS = \
-    --libsubdir='$$pkgid' \
-    --with-ld=$(LD) \
+COMMON_CONFIGURE_FLAGS =          \
+    --libsubdir='$$pkgid'         \
+    --with-gcc=$(WhatGccIsCalled) \
+    --with-ld=$(LD)               \
     $(addprefix --hsc2hs-option=,$(SRC_HSC2HS_OPTS))
 
 ifneq "$(HSCOLOUR)" ""
