@@ -2,7 +2,7 @@
 
 use strict;
 
-my @top_dirs = ("nofib", "testsuite");
+my @top_dirs = ("nofib", "testsuite", "utils/hsc2hs");
 
 # Figure out where to get the other repositories from,
 # based on where this GHC repo came from.
@@ -10,6 +10,7 @@ my $defaultrepo = `cat _darcs/prefs/defaultrepo`;
 chomp $defaultrepo;
 my $defaultrepo_base;
 my $defaultrepo_lib;
+my $hsc2hs_repo_loc;
 
 if ($defaultrepo =~ /^...*:/) {
     # HTTP or SSH
@@ -18,12 +19,14 @@ if ($defaultrepo =~ /^...*:/) {
     $defaultrepo_base = $defaultrepo;
     $defaultrepo_base =~ s#/[^/]+/?$##;
     $defaultrepo_lib = "$defaultrepo_base/packages";
+    $hsc2hs_repo_loc = $defaultrepo_base;
 }
 elsif ($defaultrepo =~ /^(\.\.)?\//) {
     # Local filesystem, either absolute or relative path
     # (assumes a checked-out tree):
     $defaultrepo_base = $defaultrepo;
     $defaultrepo_lib = "$defaultrepo/libraries";
+    $hsc2hs_repo_loc = "$defaultrepo_base/utils";
 }
 else {
     die "Couldn't work out defaultrepo";
@@ -115,6 +118,10 @@ sub darcsget {
 
     darcsgetpackage($nofib,     $r_flags, $defaultrepo_base, "nofib");
     darcsgetpackage($testsuite, $r_flags, $defaultrepo_base, "testsuite");
+
+    chdir "utils";
+    darcsgetpackage(1         , $r_flags, $hsc2hs_repo_loc,  "hsc2hs");
+    chdir "..";
 
     chdir "libraries";
 
