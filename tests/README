@@ -1,12 +1,18 @@
 This is a little output test suit for Haddock. To add a test: 
 
  1 Create a module in the "tests" directory
- 2 Run runtests.hs (giving it the lib dir to GHC).
+ 2 Run runtests.hs
    You should now have output/<modulename>.html but the test will always
    pass since there is no reference output to compare with
  3 To add reference output, do
      runhaskell copy.hs <modulename>
 
-You can also do
+Tips:
+
+You can do
   runhaskell copy.hs
 to copy all output into reference files
+
+You can do
+  runhaskell runtests.hs all
+to continue despite a failing test
