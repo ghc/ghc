@@ -1645,7 +1645,7 @@ scheduleHandleHeapOverflow( Capability *cap, StgTSO *t )
     }
     
     debugTrace(DEBUG_sched,
-	       "--<< thread %ld (%s) stopped: HeapOverflow\n", 
+	       "--<< thread %ld (%s) stopped: HeapOverflow",
 	       (long)t->id, whatNext_strs[t->what_next]);
 
 #if defined(GRAN)

@@ -214,7 +214,7 @@ updateSparkQueue (Capability *cap)
                n, pruned_sparks);
     
     debugTrace(DEBUG_sched,
-               "new spark queue len=%d; (hd=%p; tl=%p)\n",
+               "new spark queue len=%d; (hd=%p; tl=%p)",
                sparkPoolSize(pool), pool->hd, pool->tl);
 }
 
