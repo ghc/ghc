@@ -381,9 +381,6 @@ GarbageCollect ( rtsBool force_major_gc )
   // Update pointers from the Task list
   update_task_list();
 
-  // Update pointers from capabilities (probably just the spark queues)
-  updateCapabilitiesPostGC();
-
   // Now see which stable names are still alive.
   gcStablePtrTable();
 

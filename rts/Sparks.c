@@ -169,7 +169,7 @@ newSpark (StgRegTable *reg, StgClosure *p)
  * -------------------------------------------------------------------------- */
 
 void
-updateSparkQueue (Capability *cap)
+markSparkQueue (evac_fn evac, void *user, Capability *cap)
 { 
     StgClosure *spark, **sparkp, **to_sparkp;
     nat n, pruned_sparks; // stats only
@@ -190,15 +190,16 @@ updateSparkQueue (Capability *cap)
         ASSERT(*sparkp!=NULL);
         ASSERT(LOOKS_LIKE_CLOSURE_PTR(((StgClosure *)*sparkp)));
         // ToDo?: statistics gathering here (also for GUM!)
-        spark = isAlive(*sparkp);
-        if (spark != NULL && closure_SHOULD_SPARK(spark)) {
+        evac(user,sparkp);
+        spark = *sparkp;
+        if (!closure_SHOULD_SPARK(spark)) {
+            pruned_sparks++;
+        } else{
             *to_sparkp++ = spark;
             if (to_sparkp == pool->lim) {
                 to_sparkp = pool->base;
             }
             n++;
-        } else {
-            pruned_sparks++;
         }
         sparkp++;
         if (sparkp == pool->lim) {
@@ -210,7 +211,7 @@ updateSparkQueue (Capability *cap)
     PAR_TICKY_MARK_SPARK_QUEUE_END(n);
 	
     debugTrace(DEBUG_sched, 
-               "updated %d sparks and pruned %d sparks",
+               "marked %d sparks, pruned %d sparks",
                n, pruned_sparks);
     
     debugTrace(DEBUG_sched,
