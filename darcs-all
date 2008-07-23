@@ -19,13 +19,9 @@ if ($defaultrepo =~ /^...*:/) {
     $defaultrepo_base =~ s#/[^/]+/?$##;
     $defaultrepo_lib = "$defaultrepo_base/packages";
 }
-elsif ($defaultrepo =~ /^\//) {
-    # Local filesystem, absolute path (assumes a checked-out tree):
-    $defaultrepo_base = $defaultrepo;
-    $defaultrepo_lib = "$defaultrepo/libraries";
-}
-elsif ($defaultrepo =~ /^..\//) {
-    # Local filesystem, relative path (assumes a checked-out tree):
+elsif ($defaultrepo =~ /^(\.\.)?\//) {
+    # Local filesystem, either absolute or relative path
+    # (assumes a checked-out tree):
     $defaultrepo_base = $defaultrepo;
     $defaultrepo_lib = "$defaultrepo/libraries";
 }
