@@ -349,7 +349,7 @@ pprReg IF_ARCH_i386(s,) IF_ARCH_x86_64(s,) r
     ppr_reg_no :: Int -> Doc
     ppr_reg_no i | i <= 31 = int i	-- GPRs
                  | i <= 63 = int (i-32) -- FPRs
-		 | otherwise = ptext sLit "very naughty powerpc register"
+                 | otherwise = ptext (sLit "very naughty powerpc register")
 #endif
 #endif
 
