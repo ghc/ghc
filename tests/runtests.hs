@@ -20,7 +20,7 @@ haddockEq file1 file2 = (stripLinks file1) == (stripLinks file2)
   where
     stripLinks f = subRegex (mkRegexWithOpts "<A HREF=[^>]*>" False False) f "<A HREF=\"\">"
 
-check modules = do
+check modules strict = do
   forM_ modules $ \mod -> do
     let outfile = "output" </> (dropExtension mod ++ ".html")
     let reffile = "tests" </> dropExtension mod ++ ".html.ref"
@@ -34,7 +34,7 @@ check modules = do
           then do
             putStrLn $ "Output for " ++ mod ++ " has changed! Exiting with diff:"
             system $ "diff " ++ reffile ++ " " ++ outfile
-            exitFailure
+            if strict then exitFailure else return ()
           else do
             putStrLn $ "Pass: " ++ mod
       else do
@@ -43,6 +43,7 @@ check modules = do
 
 test = do
   contents <- getDirectoryContents "tests"
+  args <- getArgs
   let mods = filter ((==) ".hs" . takeExtension) contents
   let outdir = "output"
   let mods' = map ("tests" </>) mods
@@ -51,4 +52,4 @@ test = do
 
 --  code <- system $ printf "haddock -w -o %s -h --optghc=-fglasgow-exts --optghc=-w %s" outdir (unwords mods')
   unless (code == ExitSuccess) $ error "Haddock run failed! Exiting."
-  check mods
+  check mods (if not (null args) && args !! 0 == "all" then False else True)
