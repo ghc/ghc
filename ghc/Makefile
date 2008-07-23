@@ -17,6 +17,11 @@ boot:: boot.stage.$(stage)
 
 all:: build.stage.$(stage)
 
+rebuild ::
+	-$(CABAL) clean --distpref dist-stage$(stage)
+	$(RM) -rf stage$(stage)-inplace
+	$(MAKE) boot all
+
 stage1 ::
 	$(MAKE) stage=1
 
