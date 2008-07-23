@@ -76,9 +76,14 @@ doIt ghc args = do
                  hClose h
                  doIt ghc (ghc_args ++ [filename])
         filename : prog_args -> do
-            let c1 = ":set prog " ++ show filename
+            let xflag = if takeExtension filename == ".lhs"
+                        then []
+                        else ["-x", "hs"]
+                c1 = ":set prog " ++ show filename
                 c2 = ":main " ++ show prog_args
-            res <- rawSystem ghc (["-ignore-dot-ghci"] ++ ghc_args ++
+            res <- rawSystem ghc (["-ignore-dot-ghci"] ++
+                                  xflag ++
+                                  ghc_args ++
                                   [ "-e", c1, "-e", c2, filename])
             exitWith res
 
