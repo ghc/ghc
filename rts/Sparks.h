@@ -46,7 +46,7 @@ INLINE_HEADER nat
 sparkPoolSize (StgSparkPool *pool) 
 {
     if (pool->hd <= pool->tl) {
-	return (pool->hd - pool->tl);
+	return (pool->tl - pool->hd);
     } else {
 	return (pool->lim - pool->hd + pool->tl - pool->base);
     }
