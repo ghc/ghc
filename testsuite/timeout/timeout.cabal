@@ -1,0 +1,24 @@
+Name: timeout
+-- XXX Version number:
+Version: 1
+Copyright: XXX
+License: BSD3
+-- XXX License-File: LICENSE
+Author: XXX
+Maintainer: XXX
+Synopsis: XXX
+Description:
+	XXX
+Category: Development
+build-type: Simple
+cabal-version: >=1.2
+
+Executable timeout
+    Main-Is: timeout.hs
+    Extensions: CPP
+    Build-Depends: base, process
+    if os(windows)
+        Build-Depends: Win32
+    else
+        Build-Depends: unix
+

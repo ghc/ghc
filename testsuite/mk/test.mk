@@ -104,7 +104,7 @@ RUNTEST_OPTS +=  \
 	-e config.wordsize=\"$(WORDSIZE)\" \
 	-e default_testopts.cleanup=\"$(CLEANUP)\" \
 	-e config.timeout="int($(TIMEOUT)) or config.timeout" \
-	-e config.timeout_prog=\"$(TOP)/timeout/timeout\" \
+	-e config.timeout_prog=\"$(TIMEOUT_PROGRAM)\" \
 	-e config.exeext=\"$(exeext)\" \
 	-e config.top=\"$(FPTOOLS_TOP_ABS)/testsuite\" \
 	$(EXTRA_RUNTEST_OPTS)
@@ -130,9 +130,11 @@ WAY =
 
 all :: test
 
-timeout : $(TOP)/timeout/timeout$(exeext)
+TIMEOUT_PROGRAM = $(TOP)/timeout/install-inplace/bin/timeout$(exeext)
 
-$(TOP)/timeout/timeout$(exeext) :
+timeout : $(TIMEOUT_PROGRAM)
+
+$(TIMEOUT_PROGRAM) :
 	@echo "Looks like you don't have timeout, building it first..."
 	cd $(TOP)/timeout && $(MAKE) $(MFLAGS) all
 
