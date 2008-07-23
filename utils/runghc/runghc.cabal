@@ -25,4 +25,5 @@ Executable runghc
                        process    >= 1   && < 1.1
     else
         Build-Depends: base < 3
+    Build-Depends: filepath
 

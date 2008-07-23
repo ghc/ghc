@@ -11,7 +11,7 @@
 -- runghc program, for invoking from a #! line in a script.  For example:
 --
 --   script.lhs:
---      #! /usr/bin/runghc
+--      #!/usr/bin/env /usr/bin/runghc
 --      > main = putStrLn "hello!"
 --
 -- runghc accepts one flag:
@@ -22,15 +22,15 @@
 
 module Main (main) where
 
-import System.Environment
-import System.IO
-import Data.List
-import System.Exit
+import Control.Exception
 import Data.Char
-import System.Directory ( removeFile )
-import Control.Exception  ( bracket )
-import System.Directory ( findExecutable, getTemporaryDirectory )
-import System.Cmd       ( rawSystem )
+import Data.List
+import System.Cmd
+import System.Directory
+import System.Environment
+import System.Exit
+import System.FilePath
+import System.IO
 
 main :: IO ()
 main = do
@@ -38,25 +38,34 @@ main = do
     case getGhcLoc args of
         (Just ghc, args') -> doIt ghc args'
         (Nothing, args') -> do
-            mb_ghc <- findExecutable "ghc"
-            case mb_ghc of
+            mbPath <- getExecPath
+            case mbPath of
                 Nothing  -> dieProg ("cannot find ghc")
-                Just ghc -> doIt ghc args'
+                Just path ->
+                    let ghc = takeDirectory (normalise path) </> "ghc"
+                    in doIt ghc args'
 
 getGhcLoc :: [String] -> (Maybe FilePath, [String])
-getGhcLoc ("-f" : ghc : args) = (Just ghc, args)
-getGhcLoc (('-' : 'f' : ghc) : args) = (Just ghc, args)
--- If you need the first GHC flag to be a -f flag then you can pass --
--- first
-getGhcLoc ("--" : args) = (Nothing, args)
-getGhcLoc args = (Nothing, args)
+getGhcLoc args = case args of
+                 "-f" : ghc : args' -> f ghc args'
+                 ('-' : 'f' : ghc) : args' -> f ghc args'
+                 -- If you need the first GHC flag to be a -f flag then
+                 -- you can pass -- first
+                 "--" : args -> (Nothing, args)
+                 args        -> (Nothing, args)
+    where f ghc args' = -- If there is another -f flag later on then
+                        -- that overrules the one that we've already
+                        -- found
+                        case getGhcLoc args' of
+                        (Nothing, _) -> (Just ghc, args')
+                        success -> success
 
 doIt :: String -> [String] -> IO ()
 doIt ghc args = do
     let (ghc_args, rest) = getGhcArgs args
     case rest of
         [] -> do
-           -- behave like typical perl, python, ruby interpreters:      
+           -- behave like typical perl, python, ruby interpreters:
            -- read from stdin
            tmpdir <- getTemporaryDirectory
            bracket
@@ -98,4 +107,19 @@ dieProg msg = do
 
 -- usage :: String
 -- usage = "syntax: runghc [-f GHC-PATH | --] [GHC-ARGS] [--] FILE ARG..."
+
+getExecPath :: IO (Maybe String)
+#if defined(mingw32_HOST_OS)
+getExecPath =
+     allocaArray len $ \buf -> do
+         ret <- getModuleFileName nullPtr buf len
+         if ret == 0 then return Nothing
+                     else liftM Just $ peekCString buf
+    where len = 2048 -- Plenty, PATH_MAX is 512 under Win32.
+
+foreign import stdcall unsafe "GetModuleFileNameA"
+    getModuleFileName :: Ptr () -> CString -> Int -> IO Int32
+#else
+getExecPath = return Nothing
+#endif
 
