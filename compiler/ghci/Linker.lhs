@@ -1085,7 +1085,7 @@ locateOneObj dirs lib
 	    Nothing	  -> 
                 do { mb_lib_path <- findFile mk_dyn_lib_path dirs
                    ; case mb_lib_path of
-                       Just _  -> return (DLL (lib ++ "-ghc" ++ cProjectVersion))
+                       Just _  -> return (DLL dyn_lib_name)
                        Nothing -> return (DLL lib) }} -- We assume
  | otherwise
     -- When the GHC package was compiled as dynamic library (=__PIC__ set),
@@ -1100,7 +1100,8 @@ locateOneObj dirs lib
                        Nothing       -> return (DLL lib) }}		-- We assume
    where
      mk_obj_path dir = dir </> (lib <.> "o")
-     mk_dyn_lib_path dir = dir </> mkSOName (lib ++ "-ghc" ++ cProjectVersion)
+     dyn_lib_name = lib ++ "-ghc" ++ cProjectVersion
+     mk_dyn_lib_path dir = dir </> mkSOName dyn_lib_name
 
 -- ----------------------------------------------------------------------------
 -- Loading a dyanmic library (dlopen()-ish on Unix, LoadLibrary-ish on Win32)
