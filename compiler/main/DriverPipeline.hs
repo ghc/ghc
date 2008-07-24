@@ -1433,13 +1433,19 @@ linkDynLib dflags o_files dep_packages = do
     let verb = getVerbFlag dflags
     let o_file = outputFile dflags
 
-    pkg_lib_paths <- getPackageLibraryPath dflags dep_packages
+    -- We don't want to link our dynamic libs against the RTS package,
+    -- because the RTS lib comes in several flavours and we want to be
+    -- able to pick the flavour when a binary is linked.
+    pkgs <- getPreloadPackagesAnd dflags dep_packages
+    let pkgs_no_rts = filter ((/= rtsPackageId) . packageConfigId) pkgs
+
+    let pkg_lib_paths = collectLibraryPaths pkgs_no_rts
     let pkg_lib_path_opts = map ("-L"++) pkg_lib_paths
 
     let lib_paths = libraryPaths dflags
     let lib_path_opts = map ("-L"++) lib_paths
 
-    pkg_link_opts <- getPackageLinkOpts dflags dep_packages
+    let pkg_link_opts = collectLinkOpts dflags pkgs_no_rts
 
 	-- probably _stub.o files
     extra_ld_inputs <- readIORef v_Ld_inputs

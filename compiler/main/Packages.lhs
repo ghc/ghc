@@ -26,6 +26,8 @@ module Packages (
 	getPackageFrameworks,
 	getPreloadPackagesAnd,
 
+        collectIncludeDirs, collectLibraryPaths, collectLinkOpts,
+
 	-- * Utils
 	isDllName
     )
@@ -604,21 +606,29 @@ pprPkg p = text (display (package p))
 -- use.
 
 getPackageIncludePath :: DynFlags -> [PackageId] -> IO [String]
-getPackageIncludePath dflags pkgs = do
-  ps <- getPreloadPackagesAnd dflags pkgs
-  return (nub (filter notNull (concatMap includeDirs ps)))
+getPackageIncludePath dflags pkgs =
+  collectIncludeDirs `fmap` getPreloadPackagesAnd dflags pkgs
+
+collectIncludeDirs :: [PackageConfig] -> [FilePath] 
+collectIncludeDirs ps = nub (filter notNull (concatMap includeDirs ps))
 
 getPackageLibraryPath :: DynFlags -> [PackageId] -> IO [String]
-getPackageLibraryPath dflags pkgs = do 
-  ps <- getPreloadPackagesAnd dflags pkgs
-  return (nub (filter notNull (concatMap libraryDirs ps)))
+getPackageLibraryPath dflags pkgs =
+  collectLibraryPaths `fmap` getPreloadPackagesAnd dflags pkgs
+
+collectLibraryPaths :: [PackageConfig] -> [FilePath]
+collectLibraryPaths ps = nub (filter notNull (concatMap libraryDirs ps))
 
 getPackageLinkOpts :: DynFlags -> [PackageId] -> IO [String]
-getPackageLinkOpts dflags pkgs = do
-  ps <- getPreloadPackagesAnd dflags pkgs
-  let tag = buildTag dflags
-      rts_tag = rtsBuildTag dflags
-  let 
+getPackageLinkOpts dflags pkgs = 
+  collectLinkOpts dflags `fmap` getPreloadPackagesAnd dflags pkgs
+
+collectLinkOpts :: DynFlags -> [PackageConfig] -> [String]
+collectLinkOpts dflags ps = concat (map all_opts ps)
+  where
+        tag = buildTag dflags
+        rts_tag = rtsBuildTag dflags
+
 	mkDynName | opt_Static = id
 		  | otherwise = (++ ("-ghc" ++ cProjectVersion))
       	libs p     = map (mkDynName . addSuffix) (hsLibraries p)
@@ -630,8 +640,6 @@ getPackageLinkOpts dflags pkgs = do
 
         expandTag t | null t = ""
 		    | otherwise = '_':t
-
-  return (concat (map all_opts ps))
 
 getPackageExtraCcOpts :: DynFlags -> [PackageId] -> IO [String]
 getPackageExtraCcOpts dflags pkgs = do
