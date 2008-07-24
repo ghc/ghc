@@ -1391,7 +1391,7 @@ ppr_mono_ty ctxt_prec (HsForAllTy exp tvs ctxt ty)
     hsep [ppForAll exp tvs ctxt, ppr_mono_lty pREC_TOP ty]
 
 -- gaw 2004
-ppr_mono_ty ctxt_prec (HsBangTy b ty)     = ppBang b +++ ppLType ty
+ppr_mono_ty ctxt_prec (HsBangTy b ty)     = ppBang b +++ ppLParendType ty
 ppr_mono_ty ctxt_prec (HsTyVar name)      = ppDocName name
 ppr_mono_ty ctxt_prec (HsFunTy ty1 ty2)   = ppr_fun_ty ctxt_prec ty1 ty2
 ppr_mono_ty ctxt_prec (HsTupleTy con tys) = tupleParens con (map ppLType tys)
