@@ -1336,9 +1336,12 @@ ppType t = case t of
   HsSpliceTy _ -> error "ppType"
   HsDocTy t _ -> ppLType t
 -}
+
+
 --------------------------------------------------------------------------------
 -- Rendering of HsType 
 --------------------------------------------------------------------------------
+
 
 pREC_TOP = (0 :: Int)   -- type in ParseIface.y in GHC
 pREC_FUN = (1 :: Int)   -- btype in ParseIface.y in GHC
@@ -1366,16 +1369,12 @@ ppLType       = ppType . unLoc
 ppLParendType = ppParendType . unLoc
 
 
-ppType ty       = ppr_mono_ty pREC_TOP (prepare ty)
+ppType ty       = ppr_mono_ty pREC_TOP ty
 ppParendType ty = ppr_mono_ty pREC_CON ty
 
 
--- Before printing a type
--- (a) Remove outermost HsParTy parens
--- (b) Drop top-level for-all type variables in user style
---     since they are implicit in Haskell
-prepare (HsParTy ty) = prepare (unLoc ty)
-prepare ty           = ty
+-- Drop top-level for-all type variables in user style
+-- since they are implicit in Haskell
 
 ppForAll exp tvs cxt 
   | show_forall = forall_part <+> ppLContext cxt
@@ -1408,14 +1407,15 @@ ppr_mono_ty ctxt_prec (HsAppTy fun_ty arg_ty)
     hsep [ppr_mono_lty pREC_FUN fun_ty, ppr_mono_lty pREC_CON arg_ty]
 
 ppr_mono_ty ctxt_prec (HsOpTy ty1 op ty2)
-  = maybeParen ctxt_prec pREC_OP $
+  = maybeParen ctxt_prec pREC_FUN $
     ppr_mono_lty pREC_OP ty1 <+> ppr_op <+> ppr_mono_lty pREC_OP ty2
   where
     ppr_op = if not (isSymOcc occName) then quote (ppLDocName op) else ppLDocName op
     occName = docNameOcc . unLoc $ op
 
 ppr_mono_ty ctxt_prec (HsParTy ty)
-  = parens (ppr_mono_lty pREC_TOP ty)
+--  = parens (ppr_mono_lty pREC_TOP ty)
+  = ppr_mono_lty ctxt_prec ty
 
 ppr_mono_ty ctxt_prec (HsDocTy ty doc)
   = ppr_mono_lty ctxt_prec ty
