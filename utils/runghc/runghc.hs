@@ -32,6 +32,12 @@ import System.Exit
 import System.FilePath
 import System.IO
 
+#if defined(mingw32_HOST_OS)
+import Control.Monad
+import Foreign
+import Foreign.C.String
+#endif
+
 main :: IO ()
 main = do
     args <- getArgs
