@@ -1418,7 +1418,7 @@ ppr_mono_ty ctxt_prec (HsParTy ty)
   = parens (ppr_mono_lty pREC_TOP ty)
 
 ppr_mono_ty ctxt_prec (HsDocTy ty doc)
-  = ppLType ty
+  = ppr_mono_lty ctxt_prec ty
 
 ppr_fun_ty ctxt_prec ty1 ty2
   = let p1 = ppr_mono_lty pREC_FUN ty1
