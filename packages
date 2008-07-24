@@ -1,0 +1,41 @@
+utils/hsc2hs                            hsc2hs
+utils/cabal-install         ci          cabal-install
+libraries/array                         packages/array
+libraries/base                          packages/base
+libraries/bytestring                    packages/bytestring
+libraries/Cabal                         packages/Cabal
+libraries/containers                    packages/containers
+libraries/directory                     packages/directory
+libraries/editline                      packages/editline
+libraries/filepath                      packages/filepath
+libraries/ghc-prim                      packages/ghc-prim
+libraries/haskell98                     packages/haskell98
+libraries/hpc                           packages/hpc
+libraries/integer-gmp                   packages/integer-gmp
+libraries/old-locale                    packages/old-locale
+libraries/old-time                      packages/old-time
+libraries/packedstring                  packages/packedstring
+libraries/pretty                        packages/pretty
+libraries/process                       packages/process
+libraries/random                        packages/random
+libraries/template-haskell              packages/template-haskell
+libraries/unix                          packages/unix
+libraries/Win32                         packages/Win32
+libraries/HUnit             extralibs   packages/HUnit
+libraries/QuickCheck        extralibs   packages/QuickCheck
+libraries/cgi               extralibs   packages/cgi
+libraries/haskell-src       extralibs   packages/haskell-src
+libraries/html              extralibs   packages/html
+libraries/mtl               extralibs   packages/mtl
+libraries/network           extralibs   packages/network
+libraries/parsec            extralibs   packages/parsec
+libraries/parallel          extralibs   packages/parallel
+libraries/regex-base        extralibs   packages/regex-base
+libraries/regex-compat      extralibs   packages/regex-compat
+libraries/regex-posix       extralibs   packages/regex-posix
+libraries/stm               extralibs   packages/stm
+libraries/time              extralibs   packages/time
+libraries/xhtml             extralibs   packages/xhtml
+testsuite                   testsuite   testsuite
+nofib                       nofib       nofib
+

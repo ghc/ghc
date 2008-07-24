@@ -2,15 +2,12 @@
 
 use strict;
 
-my @top_dirs = ("nofib", "testsuite", "utils/hsc2hs");
-
 # Figure out where to get the other repositories from,
 # based on where this GHC repo came from.
 my $defaultrepo = `cat _darcs/prefs/defaultrepo`;
 chomp $defaultrepo;
 my $defaultrepo_base;
-my $defaultrepo_lib;
-my $hsc2hs_repo_loc;
+my $checked_out_tree;
 
 if ($defaultrepo =~ /^...*:/) {
     # HTTP or SSH
@@ -18,15 +15,13 @@ if ($defaultrepo =~ /^...*:/) {
     # catching Win32 drives ("C:\").
     $defaultrepo_base = $defaultrepo;
     $defaultrepo_base =~ s#/[^/]+/?$##;
-    $defaultrepo_lib = "$defaultrepo_base/packages";
-    $hsc2hs_repo_loc = $defaultrepo_base;
+    $checked_out_tree = 0;
 }
 elsif ($defaultrepo =~ /^(\.\.)?\//) {
     # Local filesystem, either absolute or relative path
     # (assumes a checked-out tree):
     $defaultrepo_base = $defaultrepo;
-    $defaultrepo_lib = "$defaultrepo/libraries";
-    $hsc2hs_repo_loc = "$defaultrepo_base/utils";
+    $checked_out_tree = 1;
 }
 else {
     die "Couldn't work out defaultrepo";
@@ -35,13 +30,7 @@ else {
 my $verbose = 2;
 my $ignore_failure = 0;
 
-# --extra says we grab the extra libs with 'get'.  It has no effect on
-# the other commands.
-my $extra = 0;
-# --nofib/--testsuite tell get to also grab the respective repos.
-# They have no effect on the other commands.
-my $nofib = 0;
-my $testsuite = 0;
+my %tags;
 
 sub message {
     if ($verbose >= 2) {
@@ -63,51 +52,43 @@ sub darcs {
 }
 
 sub darcsall {
-    my @packages;
+    my $localpath;
+    my $path;
+    my $tag;
+
     darcs @_;
-    for my $dir (@top_dirs) {
-        if (-d $dir && -d "$dir/_darcs") {
-            darcs (@_, "--repodir", $dir);
-        }
-        else {
-            message "== $dir not present or not a repository; skipping";
-        }
-    }
-    for my $path (<libraries/*/_darcs>) {
-        chomp $path;
-        if ($path =~ m#/(.*)/#) {
-            my $pkg = $1;
-            darcs (@_, "--repodir", "libraries/$pkg");
-        }
-        else {
-            die "that pattern can't fail!";
-        }
-    }
-    @packages = `cat libraries/boot-packages`;
-    # @packages = `cat libraries/boot-packages libraries/extra-packages`;
-    for my $pkg (@packages) {
-        chomp $pkg;
-        if (! -d "libraries/$pkg") {
-            warning("$pkg doesn't exist, use 'darcs-all get' to get it");
-        }
-    }
-}
 
-sub darcsgetpackage {
-    my ($get_it, $r_flags, $repo_root, $package) = @_;
+    open IN, "< packages" or die "Can't open packages file";
+    while (<IN>) {
+        chomp;
+        if (/^([^ ]+) +(?:([^ ]+) +)?([^ ]+)/) {
+            $localpath = $1;
+            $tag = defined($2) ? $2 : "";
 
-    if ($get_it) {
-        if (-d $package) {
-            warning("$package already present; omitting");
+            if (-d "$localpath/_darcs") {
+                darcs (@_, "--repodir", $localpath);
+            }
+            elsif ($tag eq "") {
+                message "== Required repo $localpath is missing! Skipping";
+            }
+            else {
+                message "== $localpath repo not present; skipping";
+            }
         }
-        else {
-            darcs (@$r_flags, "$repo_root/$package");
+        elsif (! /^$/) {
+            die "Bad line: $_";
         }
     }
+    close IN;
 }
 
 sub darcsget {
     my $r_flags;
+    my $localpath;
+    my $remotepath;
+    my $path;
+    my $tag;
+
     if (! grep /(?:--complete|--partial)/, @_) {
         warning("adding --partial, to override use --complete");
         $r_flags = [@_, "--partial"];
@@ -116,27 +97,35 @@ sub darcsget {
         $r_flags = \@_;
     }
 
-    darcsgetpackage($nofib,     $r_flags, $defaultrepo_base, "nofib");
-    darcsgetpackage($testsuite, $r_flags, $defaultrepo_base, "testsuite");
+    open IN, "< packages" or die "Can't open packages file";
+    while (<IN>) {
+        chomp;
+        if (/^([^ ]+) +(?:([^ ]+) +)?([^ ]+)/) {
+            $localpath = $1;
+            $tag = defined($2) ? $2 : "";
+            $remotepath = $3;
 
-    chdir "utils";
-    darcsgetpackage(1         , $r_flags, $hsc2hs_repo_loc,  "hsc2hs");
-    chdir "..";
+            if ($checked_out_tree) {
+                $path = "$defaultrepo_base/$localpath";
+            }
+            else {
+                $path = "$defaultrepo_base/$remotepath";
+            }
 
-    chdir "libraries";
-
-    my @packages;
-    if ($extra) {
-        @packages = `cat boot-packages extra-packages`;
+            if (($tag eq "") || defined($tags{$tag})) {
+                if (-d $localpath) {
+                    warning("$localpath already present; omitting");
+                }
+                else {
+                    darcs (@$r_flags, $path, $localpath);
+                }
+            }
+        }
+        elsif (! /^$/) {
+            die "Bad line: $_";
+        }
     }
-    else {
-        @packages = `cat boot-packages`;
-    }
-
-    for my $pkg (@packages) {
-        chomp $pkg;
-        darcsgetpackage(1, $r_flags, $defaultrepo_lib, $pkg);
-    }
+    close IN;
 }
 
 sub main {
@@ -154,14 +143,26 @@ sub main {
         elsif ($arg eq "-s") {
             $verbose = 0;
         }
+        # --ci says we grab cabal-install repo, and the libraries it needs
+        # with 'get'.
+        # It has no effect on the other commands.
+        elsif ($arg eq "--ci") {
+            $tags{"ci"} = 1;
+        }
+        # --extra says we grab the extra libs with 'get'.
+        # It has no effect on the other commands.
         elsif ($arg eq "--extra") {
-            $extra = 1;
+            $tags{"extralibs"} = 1;
         }
+        # --nofib tells get to also grab the nofib repo.
+        # It has no effect on the other commands.
         elsif ($arg eq "--nofib") {
-            $nofib = 1;
+            $tags{"nofib"} = 1;
         }
+        # --testsuite tells get to also grab the testsuite repo.
+        # It has no effect on the other commands.
         elsif ($arg eq "--testsuite") {
-            $testsuite = 1;
+            $tags{"testsuite"} = 1;
         }
         else {
             unshift @_, $arg;
