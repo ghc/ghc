@@ -868,9 +868,9 @@ NHC		= @NHC@
 # tree).  We can refer to "this ghc" as $(GHC_INPLACE):
 
 GHC_INPLACE = $(GHC_STAGE1)
-GHC_STAGE1  = $(GHC_COMPILER_DIR_ABS)/stage1-inplace/bin/ghc
-GHC_STAGE2  = $(GHC_COMPILER_DIR_ABS)/stage2-inplace/bin/ghc
-GHC_STAGE3  = $(GHC_COMPILER_DIR_ABS)/stage3-inplace/bin/ghc
+GHC_STAGE1  = $(GHC_COMPILER_DIR_ABS)/stage1-inplace/ghc
+GHC_STAGE2  = $(GHC_COMPILER_DIR_ABS)/stage2-inplace/ghc
+GHC_STAGE3  = $(GHC_COMPILER_DIR_ABS)/stage3-inplace/ghc
 # XXX All those used to have -no-user-package-conf, but then we can't
 # pass them to Cabal
 

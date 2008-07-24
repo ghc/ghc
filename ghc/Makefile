@@ -85,7 +85,7 @@ build.stage.%:
 	$(INSTALL_PACKAGE) install '$(GHC_PKG_PROG)' 'XXX/package.conf' "" \
 	                   $(FPTOOLS_TOP_ABS)/ghc/stage$*-inplace          \
 	                   $(FPTOOLS_TOP_ABS)/ghc/stage$*-inplace          \
-	                   '$$prefix/bin'                                  \
+	                   '$$prefix'                                      \
 	                   '$(INPLACE_DATA_DIR)'                           \
 	                   '$$prefix/libexec'                              \
 	                   '$$prefix/dynlib'                               \
