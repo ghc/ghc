@@ -67,6 +67,10 @@ CONFIGURE_FLAGS_STAGE1 += $(USE_BOOT_CONFIGURE_FLAGS)
 CONFIGURE_FLAGS_STAGE2 += $(USE_STAGE1_CONFIGURE_FLAGS)
 CONFIGURE_FLAGS_STAGE3 += $(USE_STAGE2_CONFIGURE_FLAGS)
 
+# Allow EXTRA_HC_OPTS to be used from the command line to add options 
+# when building (e.g. -v)
+BUILD_FLAGS=$(patsubst %, --ghc-option=%, $(EXTRA_HC_OPTS))
+
 # XXX In stage2+ we should really use the inplace ghc-pkg
 # It works because installPackage doesn't actually use ghc-pkg, as there's
 # no library to register
