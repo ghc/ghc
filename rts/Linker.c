@@ -1019,7 +1019,9 @@ addDLL( char *dll_name )
 
    initLinker();
 
-   hdl= dlopen(dll_name, RTLD_NOW | RTLD_GLOBAL);
+   // omitted: RTLD_NOW
+   // see http://www.haskell.org/pipermail/cvs-ghc/2007-September/038570.html
+   hdl= dlopen(dll_name, RTLD_LAZY | RTLD_GLOBAL);
 
    if (hdl == NULL) {
       /* dlopen failed; return a ptr to the error msg. */
