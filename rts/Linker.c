@@ -3164,7 +3164,7 @@ ocGetNames_ELF ( ObjectCode* oc )
                if (ELF_ST_TYPE(stab[j].st_info) == STT_FUNC)
                    ad = (char *)allocateFunctionDesc((Elf_Addr)ad);
 #endif
-               IF_DEBUG(linker,debugBelch( "addOTabName(GLOB): %10p  %s %s",
+               IF_DEBUG(linker,debugBelch( "addOTabName(GLOB): %10p  %s %s\n",
                                       ad, oc->fileName, nm ));
                isLocal = FALSE;
             }
