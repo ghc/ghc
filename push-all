@@ -2,8 +2,6 @@
 
 use strict;
 
-my @top_dirs = ("nofib", "testsuite");
-
 my $reporoot;
 
 my $verbose = 1;
@@ -11,8 +9,6 @@ my $ignore_failure = 0;
 
 # --checked-out says we are pushing to a checked out tree
 my $checked_out = 0;
-# --boot-only says we only want to push bootlibs, not extralibs
-my $boot_only = 0;
 # --push or --pull or --send?
 my $push_pull_send = "push";
 
@@ -39,29 +35,40 @@ sub darcs_push {
 
 sub pushall {
     my $dir;
+    my $localpath;
+    my $remotepath;
+    my $path;
+    my $tag;
     my $ghcrepo = $checked_out ? $reporoot : "$reporoot/ghc";
     darcs_push ($ghcrepo, @_);
-    for $dir (@top_dirs) {
-        if (-d $dir && -d "$dir/_darcs") {
-            darcs_push ("$reporoot/$dir", @_, "--repodir", $dir);
-        }
-        else {
-            message "== $dir not present or not a repository; skipping";
+
+    open IN, "< packages" or die "Can't open packages file";
+    while (<IN>) {
+        chomp;
+        if (/^([^ ]+) +(?:([^ ]+) +)?([^ ]+)/) {
+            $localpath = $1;
+            $tag = defined($2) ? $2 : "";
+            $remotepath = $3;
+
+            if ($checked_out) {
+                $path = "$reporoot/$localpath";
+            }
+            else {
+                $path = "$reporoot/$remotepath";
+            }
+
+            if (-d "$localpath/_darcs") {
+                darcs_push ($path, @_, "--repodir", $localpath);
+            }
+            elsif ($tag eq "") {
+                message "== Required repo $localpath is missing! Skipping";
+            }
+            else {
+                message "== $localpath repo not present; skipping";
+            }
         }
     }
-    my $library_lists = $boot_only
-                      ? "libraries/boot-packages"
-                      : "libraries/boot-packages libraries/extra-packages";
-    for my $pkg (`cat $library_lists`) {
-        chomp $pkg;
-        $dir = "libraries/$pkg";
-        if (-d "$dir") {
-            darcs_push ("$reporoot/$dir", @_, "--repodir", "$dir");
-        }
-        else {
-            warning("$pkg doesn't exist, use 'darcs-all get' to get it");
-        }
-    }
+    close IN;
 }
 
 sub main {
@@ -82,9 +89,6 @@ sub main {
             }
             elsif ($arg eq "--checked-out") {
                 $checked_out = 1;
-            }
-            elsif ($arg eq "--boot-only") {
-                $boot_only = 1;
             }
             elsif ($arg eq "--push") {
                 $push_pull_send = "push";
