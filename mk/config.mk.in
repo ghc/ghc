@@ -242,6 +242,11 @@ GhcStage3HcOpts=-O2
 GhcProfiled=NO
 GhcDebugged=NO
 
+# Build shared and/or static libs?
+BuildSharedLibs=@BuildSharedLibs@
+# ToDo later:
+# BuildStaticLibs=@BuildStaticLibs@
+
 # Build a compiler that will build *unregisterised* libraries and
 # binaries by default.  Unregisterised code is supposed to compile and
 # run without any support for architecture-specific assembly mangling,
@@ -362,6 +367,10 @@ else
 GhcLibWays=p
 endif
 
+ifeq "$(BuildSharedLibs)" "YES"
+GhcLibWays += dyn
+endif
+
 # In addition, the RTS is built in some further variations.  Ways that
 # make sense here:
 # 
@@ -379,6 +388,10 @@ GhcRTSWays=
 # Usually want the debug version
 ifeq "$(BootingFromHc)" "NO"
 GhcRTSWays += debug 
+endif
+
+ifeq "$(BuildSharedLibs)" "YES"
+GhcRTSWays += debug_dyn thr_dyn thr_debug_dyn
 endif
 
 # Want the threaded versions unless we're unregisterised

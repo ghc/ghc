@@ -33,21 +33,36 @@ PLATFORM := $(shell echo $(HOSTPLATFORM) | sed 's/i[567]86/i486/g')
 LIBFFI_TARBALL := $(firstword $(wildcard libffi*.tar.gz))
 LIBFFI_DIR := $(subst .tar.gz,,$(LIBFFI_TARBALL))
 
-ifeq "$(findstring dyn, $(GhcRTSWays))" "dyn"
-BUILD_SHARED=yes
-else
-BUILD_SHARED=no
-endif
-
-BINDIST_STAMPS = stamp.ffi.static
+BINDIST_STAMPS = stamp.ffi
 INSTALL_HEADERS += ffi.h
-INSTALL_LIBS += libffi.a
+STATIC_LIB = libffi.a
+INSTALL_LIBS += $(STATIC_LIB)
 
-ifeq "$(BUILD_SHARED)" "yes"
-BINDIST_STAMPS += stamp.ffi.shared
-INSTALL_LIBS += libffi.dll.a
-INSTALL_PROGS += libffi-3.dll
+# We have to add the GHC version to the name of our dynamic libs, because
+# they will be residing in the system location along with dynamic libs from
+# other GHC installations.
+ifeq "$(BuildSharedLibs)" "YES"
+ifeq "$(Windows)" "YES"
+DYNAMIC_PROG = libffi.dll.a
+DYNAMIC_LIBS = libffi-3.dll
+RENAME_LIBS  =
+else
+DYNAMIC_PROG =
+DYNAMIC_LIBS = libffi.so libffi.so.5 libffi.so.5.0.5
 endif
+else
+DYNAMIC_PROG =
+DYNAMIC_LIBS =
+endif
+
+ifeq "$(BuildSharedLibs)" "YES"
+EnableShared=yes
+else
+EnableShared=no
+endif
+
+INSTALL_LIBS  += $(DYNAMIC_LIBS)
+INSTALL_PROGS += $(DYNAMIC_PROGS)
 
 install all :: $(INSTALL_HEADERS) $(INSTALL_LIBS) $(INSTALL_PROGS)
 
@@ -56,7 +71,7 @@ install all :: $(INSTALL_HEADERS) $(INSTALL_LIBS) $(INSTALL_PROGS)
 # will use cygwin symbolic linkks which cannot be read by mingw gcc.
 # The same trick is played by the GMP build in ../gmp.
 
-stamp.ffi.static:
+stamp.ffi:
 	$(RM) -rf $(LIBFFI_DIR) build
 	$(TAR) -zxf $(LIBFFI_TARBALL)
 	mv $(LIBFFI_DIR) build
@@ -66,42 +81,22 @@ stamp.ffi.static:
 	    export PATH; \
 	    cd build && \
 	    CC=$(WhatGccIsCalled) $(SHELL) configure \
-	          --enable-shared=no --host=$(PLATFORM) --build=$(PLATFORM)
+		  --enable-static=yes \
+	          --enable-shared=$(EnableShared) \
+		  --host=$(PLATFORM) --build=$(PLATFORM)
 	touch $@
 
-stamp.ffi.shared:
-	$(RM) -rf $(LIBFFI_DIR) build-shared
-	$(TAR) -zxf $(LIBFFI_TARBALL)
-	mv $(LIBFFI_DIR) build-shared
-	chmod +x ln
-	(set -o igncr 2>/dev/null) && set -o igncr; export SHELLOPTS; \
-	    PATH=`pwd`:$$PATH; \
-	    export PATH; \
-	    cd build-shared && \
-	    CC=$(WhatGccIsCalled) $(SHELL) configure \
-	          --enable-shared=yes --disable-static --host=$(PLATFORM) --build=$(PLATFORM)
-	touch $@
-
-ffi.h: stamp.ffi.static
+ffi.h: stamp.ffi
 	$(CP) build/include/ffi.h .
 
-libffi.a: stamp.ffi.static
+$(STATIC_LIB) $(DYNAMIC_LIBS) $(DYNAMIC_PROG) : stamp.ffi
 	$(MAKE) -C build MAKEFLAGS=
-	$(CP) build/.libs/libffi.a .
-	$(RANLIB) libffi.a
-
-libffi-3.dll: stamp.ffi.shared
-	$(MAKE) -C build-shared MAKEFLAGS=
-	$(CP) build-shared/.libs/libffi-3.dll .
-
-libffi.dll.a: libffi-3.dll
-	$(CP) build-shared/.libs/libffi.dll.a .
+	(cd build; ./libtool --mode=install cp libffi.la $(FPTOOLS_TOP_ABS)/libffi)
 
 clean distclean maintainer-clean ::
-	$(RM) -f stamp.ffi.static stamp.ffi.shared ffi.h
-	$(RM) -f libffi.a libffi-3.dll libffi.dll.a
+	$(RM) -f stamp.ffi ffi.h
+	$(RM) -f libffi.a libffi.la $(DYNAMIC_PROG) $(DYNAMIC_LIBS) $(ORIG_DYNAMIC_LIBS)
 	$(RM) -rf build
-	$(RM) -rf build-shared
 
 #-----------------------------------------------------------------------------
 #

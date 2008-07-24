@@ -723,6 +723,35 @@ AC_ARG_WITH(ld,
  [FP_PROG_LD()]
 )
 
+dnl ** Build shared and/or static libs?
+dnl --------------------------------------------------------------
+AC_ARG_ENABLE(shared,
+[AC_HELP_STRING([--enable-shared],
+[Build shared libraries, if available. [default=no]])],
+[ if test x"$enableval" = x"yes"; then
+        BuildSharedLibs=YES
+  else
+        BuildSharedLibs=NO
+  fi
+],
+[BuildSharedLibs=NO]
+)
+AC_SUBST(BuildSharedLibs)
+
+# ToDo later:
+# AC_ARG_ENABLE(static,
+# [AC_HELP_STRING([--enable-static],
+# [Build static libraries. [default=yes]])],
+# [ if test x"$enableval" = x"yes"; then
+#         BuildStaticLibs=YES
+#   else
+#         BuildStaticLibs=NO
+#   fi
+# ],
+# [BuildStaticLibs=YES]
+# )
+# AC_SUBST(BuildStaticLibs)
+
 dnl ** Booting from .hc files?
 dnl --------------------------------------------------------------
 AC_ARG_ENABLE(hc-boot,

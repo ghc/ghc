@@ -61,6 +61,10 @@ ifeq "$(GhcThreaded)" "YES"
 CONFIGURE_FLAGS_STAGE2 += --ghc-option=-threaded
 endif
 
+ifeq "$(BuildSharedLibs)" "YES"
+CONFIGURE_FLAGS_STAGE2 += --ghc-option=-dynamic
+endif
+
 CONFIGURE_FLAGS_STAGE3 = $(CONFIGURE_FLAGS_STAGE2)
 
 CONFIGURE_FLAGS_STAGE1 += $(USE_BOOT_CONFIGURE_FLAGS)

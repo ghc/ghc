@@ -77,12 +77,13 @@ CONFIGURE_FLAGS_STAGE1 += --flags=-ghci
 ifeq "$(GhcWithInterpreter)" "YES"
 CONFIGURE_FLAGS_STAGE2 += --flags=ghci
 
+ifeq "$(BuildSharedLibs)" "YES"
+CONFIGURE_FLAGS_STAGE2 += --enable-shared
 # If we are going to use dynamic libraries instead of .o files for ghci,
 # we will need to always retain CAFs in the compiler.
 # ghci/keepCAFsForGHCi contains a GNU C __attribute__((constructor))
 # function which sets the keepCAFs flag for the RTS before any Haskell
 # code is run.
-ifeq "$(GhcBuildDylibs)" "YES"
 CONFIGURE_FLAGS_STAGE2 += --flags=dynlibs
 else
 CONFIGURE_FLAGS_STAGE2 += --flags=-dynlibs

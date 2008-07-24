@@ -129,7 +129,7 @@ CONFIGURE_OPTS += --enable-library-profiling
 CONFIGURE_STAMP_EXTRAS := $(CONFIGURE_STAMP_EXTRAS)-profiling
 endif
 
-ifneq "$(findstring $(space)dyn$(space), $(space)$(GhcLibWays)$(space))" ""
+ifeq "$(BuildSharedLibs)" "YES"
 CONFIGURE_OPTS += --enable-shared
 CONFIGURE_STAMP_EXTRAS := $(CONFIGURE_STAMP_EXTRAS)-shared
 endif
