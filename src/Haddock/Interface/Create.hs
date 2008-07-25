@@ -55,18 +55,21 @@ createInterface ghcMod flags modMap = do
       localNames    = ghcDefinedNames ghcMod
       subMap        = mkSubMap group
       decls         = topDecls group
-      declMap       = mkDeclMap decls
-      famMap        = Map.empty --mkFamMap decls
+      decls'        = filterOutInstances decls
+      declMap       = mkDeclMap decls'
+      famMap        = Map.empty --mkFamMap decls'
       ignoreExps    = Flag_IgnoreAllExports `elem` flags
       exportedNames = ghcExportedNames ghcMod
       origEnv       = Map.fromList [ (nameOccName n, n) | n <- exportedNames ]
       instances     = ghcInstances ghcMod
 
+  warnAboutFilteredDecls mod decls
+
   visibleNames <- mkVisibleNames mod modMap localNames 
                                  (ghcNamesInScope ghcMod) 
                                  subMap exports opts declMap 
 
-  exportItems <- mkExportItems modMap mod (ghcExportedNames ghcMod)decls declMap
+  exportItems <- mkExportItems modMap mod (ghcExportedNames ghcMod) decls' declMap
                                famMap subMap opts exports ignoreExps instances
 
   -- prune the export list to just those declarations that have
@@ -212,14 +215,15 @@ declName (SigD sig) = fromJust $ sigNameNoLoc sig
 
 -- All the top-level declarations of a module, ordered by source location,
 -- with documentation attached if it exists.
--- TEMP hack to filter out all instances (we don't want them until
--- rendering is completely implemented).
 topDecls :: HsGroup Name -> [DeclWithDoc] 
-topDecls = filter (\(L _ d, _) -> not (isInstance d)) . collectDocs . sortByLoc . declsFromGroup
+topDecls = collectDocs . sortByLoc . declsFromGroup    
+
+
+filterOutInstances = filter (\(L _ d, _) -> not (isInstance d))
 
 
 -- | Pick out the declarations that we want from a group
-declsFromGroup :: HsGroup Name -> [LHsDecl Name] 
+declsFromGroup :: HsGroup Name -> [LHsDecl Name]
 declsFromGroup group = 
   decls hs_tyclds TyClD group ++
   decls hs_fords  ForD  group ++
@@ -237,6 +241,29 @@ decls field con struct = [ L loc (con decl) | L loc decl <- field struct ]
 
 -- | Sort by source location
 sortByLoc = sortBy (comparing getLoc)
+
+
+warnAboutFilteredDecls mod decls = do
+  let modStr = moduleString mod
+  let typeInstances =
+        nub [ tcdName d | (L _ (TyClD d), _) <- decls, isFamInstDecl d ]
+
+  when (not $null typeInstances) $
+    tell $ nub [
+      "Warning: " ++ modStr ++ ": Instances of type and data "
+      ++ "families are not yet supported. Instances of the following families "
+      ++ "will be filtered out:\n  " ++ (concat $ intersperse ", "
+      $ map (occNameString . nameOccName) typeInstances) ]
+
+  let instances = nub [ pretty i | (L _ (InstD (InstDecl i _ _ ats)), _) <- decls
+                                 , not (null ats) ]
+
+  when (not $ null instances) $
+
+    tell $ nub $ [
+      "Warning: " ++ modStr ++ ": Rendering of associated types for instances has "
+      ++ "not yet been implemented. Associated types will not be shown for the "
+      ++ "following instances:\n" ++ (concat $ intersperse ", " instances) ]
 
 
 --------------------------------------------------------------------------------
