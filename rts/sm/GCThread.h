@@ -196,7 +196,9 @@ extern gc_thread **gc_threads;
 
 #define GLOBAL_REG_DECL(type,name,reg) register type name REG(reg);
 
-#if defined(REG_Base)
+#if defined(REG_Base) && !defined(i386_HOST_ARCH)
+// on i386, REG_Base is %ebx which is also used for PIC, so we don't
+// want to steal it
 
 GLOBAL_REG_DECL(gc_thread*, gct, REG_Base)
 #define DECLARE_GCT /* nothing */
