@@ -795,6 +795,20 @@
 	</listitem>
       </varlistentry>
     </variablelist>
+      
+<varlistentry>
+        <term>
+          <indexterm><primary><option>-w</option></primary></indexterm>
+          <option>-w</option>
+        </term>
+        <term>
+          <indexterm><primary><option>--no-warnings</option></primary></indexterm>
+          <option>--no-warnings</option>
+        </term>
+	<listitem>
+	  <para>Turn off all warnings.</para>
+	</listitem>
+      </varlistentry>
 
     <section id="cpp">
       <title>Using literate or pre-processed source</title>
