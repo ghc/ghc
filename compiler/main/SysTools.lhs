@@ -74,24 +74,33 @@ import FastString
 import SrcLoc           ( SrcLoc, mkSrcLoc, noSrcSpan, mkSrcSpan )
 \end{code}
 
+How GHC finds its files
+~~~~~~~~~~~~~~~~~~~~~~~
 
-                The configuration story
-                ~~~~~~~~~~~~~~~~~~~~~~~
+[Note topdir]
 
 GHC needs various support files (library packages, RTS etc), plus
-various auxiliary programs (cp, gcc, etc).  It finds these in one
-of two places:
+various auxiliary programs (cp, gcc, etc).  It starts by finding topdir:
 
-* When running as an *installed program*, GHC finds most of this support
-  stuff in the installed library tree.  The path to this tree is passed
-  to GHC via the -B flag, and given to initSysTools .
+     for "installed" topdir is the root of GHC's support files ($libdir)
+     for "in-place"  topdir is the root of the build tree
 
-* When running *in-place* in a build tree, GHC finds most of this support
-  stuff in the build tree.  The path to the build tree is, again passed
-  to GHC via -B.
+On Unix:
+  - ghc always has a shell wrapper that passes a -B<dir> option
+  - in an installation, <dir> is $libdir
+  - in a build tree, <dir> is $TOP/inplace-datadir
+  - so we detect the build-tree case and add ".." to get us back to $TOP
 
-GHC tells which of the two is the case by seeing whether package.conf
-is in TopDir [installed] or in TopDir/ghc/driver [inplace] (what a hack).
+On Windows:
+  - ghc never has a shell wrapper.
+  - we can find the location of the ghc binary, which is
+        $topdir/bin/ghc.exe                   in an installation, or
+        $topdir/ghc/stage1-inplace/ghc.exe    in a build tree.
+  - we detect which one of these we have, and calculate $topdir.
+
+
+from topdir we can find package.conf, which contains the locations of
+almost everything else, whether we're in a build tree or installed.
 
 
 SysTools.initSysProgs figures out exactly where all the auxiliary programs
@@ -154,9 +163,7 @@ initSysTools :: Maybe String    -- Maybe TopDir path (without the '-B' prefix)
 
 initSysTools mbMinusB dflags0
   = do  { (am_installed, top_dir) <- findTopDir mbMinusB
-                -- top_dir
-                --      for "installed" this is the root of GHC's support files
-                --      for "in-place" it is the root of the build tree
+                -- see [Note topdir]
                 -- NB: top_dir is assumed to be in standard Unix
                 -- format, '/' separated
 
@@ -298,24 +305,6 @@ initSysTools mbMinusB dflags0
 \end{code}
 
 \begin{code}
--- Find TopDir
---      for "installed" this is the root of GHC's support files
---      for "in-place" it is the root of the build tree
---
--- Plan of action:
--- 1. Set proto_top_dir
---      if there is no given TopDir path, get the directory
---      where GHC is running (only on Windows)
---
--- 2. If package.conf exists in proto_top_dir, we are running
---      installed; and TopDir = proto_top_dir
---
--- 3. Otherwise we are running in-place, so
---      proto_top_dir will be /...stuff.../ghc/compiler
---      Set TopDir to /...stuff..., which is the root of the build tree
---
--- This is very gruesome indeed
-
 findTopDir :: Maybe String   -- Maybe TopDir path (without the '-B' prefix).
            -> IO (Bool,      -- True <=> am installed, False <=> in-place
                   String)    -- TopDir (in Unix format '/' separated)
