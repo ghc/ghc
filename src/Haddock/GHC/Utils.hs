@@ -68,8 +68,8 @@ getMainDeclBinder _ = Nothing
 
 
 pretty :: Outputable a => a -> String
-pretty x = show (ppr x defaultUserStyle)
+pretty x = showSDoc (ppr x)
 
 
 trace_ppr :: Outputable a => a -> b -> b
-trace_ppr x y = trace (showSDoc (ppr x)) y
+trace_ppr x y = trace (pretty x) y
