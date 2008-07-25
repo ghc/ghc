@@ -225,6 +225,75 @@ copy(StgClosure **p, const StgInfoTable *info,
     copy_tag(p,info,src,size,stp,0);
 }
 
+/* -----------------------------------------------------------------------------
+   Evacuate a large object
+
+   This just consists of removing the object from the (doubly-linked)
+   step->large_objects list, and linking it on to the (singly-linked)
+   step->new_large_objects list, from where it will be scavenged later.
+
+   Convention: bd->flags has BF_EVACUATED set for a large object
+   that has been evacuated, or unset otherwise.
+   -------------------------------------------------------------------------- */
+
+STATIC_INLINE void
+evacuate_large(StgPtr p)
+{
+  bdescr *bd = Bdescr(p);
+  step *stp, *new_stp;
+  step_workspace *ws;
+    
+  stp = bd->step;
+  ACQUIRE_SPIN_LOCK(&stp->sync_large_objects);
+
+  // object must be at the beginning of the block (or be a ByteArray)
+  ASSERT(get_itbl((StgClosure *)p)->type == ARR_WORDS ||
+	 (((W_)p & BLOCK_MASK) == 0));
+
+  // already evacuated? 
+  if (bd->flags & BF_EVACUATED) { 
+    /* Don't forget to set the gct->failed_to_evac flag if we didn't get
+     * the desired destination (see comments in evacuate()).
+     */
+    if (stp < gct->evac_step) {
+	gct->failed_to_evac = rtsTrue;
+	TICK_GC_FAILED_PROMOTION();
+    }
+    RELEASE_SPIN_LOCK(&stp->sync_large_objects);
+    return;
+  }
+
+  // remove from large_object list 
+  if (bd->u.back) {
+    bd->u.back->link = bd->link;
+  } else { // first object in the list 
+    stp->large_objects = bd->link;
+  }
+  if (bd->link) {
+    bd->link->u.back = bd->u.back;
+  }
+  
+  /* link it on to the evacuated large object list of the destination step
+   */
+  new_stp = stp->to;
+  if (new_stp < gct->evac_step) {
+      if (gct->eager_promotion) {
+	  new_stp = gct->evac_step;
+      } else {
+	  gct->failed_to_evac = rtsTrue;
+      }
+  }
+
+  ws = &gct->steps[new_stp->abs_no];
+  bd->flags |= BF_EVACUATED;
+  bd->step = new_stp;
+  bd->gen_no = new_stp->gen_no;
+  bd->link = ws->todo_large_objects;
+  ws->todo_large_objects = bd;
+
+  RELEASE_SPIN_LOCK(&stp->sync_large_objects);
+}
+
 /* ----------------------------------------------------------------------------
    Evacuate
 
@@ -669,75 +738,6 @@ loop:
   }
 
   barf("evacuate");
-}
-
-/* -----------------------------------------------------------------------------
-   Evacuate a large object
-
-   This just consists of removing the object from the (doubly-linked)
-   step->large_objects list, and linking it on to the (singly-linked)
-   step->new_large_objects list, from where it will be scavenged later.
-
-   Convention: bd->flags has BF_EVACUATED set for a large object
-   that has been evacuated, or unset otherwise.
-   -------------------------------------------------------------------------- */
-
-STATIC_INLINE void
-evacuate_large(StgPtr p)
-{
-  bdescr *bd = Bdescr(p);
-  step *stp, *new_stp;
-  step_workspace *ws;
-    
-  stp = bd->step;
-  ACQUIRE_SPIN_LOCK(&stp->sync_large_objects);
-
-  // object must be at the beginning of the block (or be a ByteArray)
-  ASSERT(get_itbl((StgClosure *)p)->type == ARR_WORDS ||
-	 (((W_)p & BLOCK_MASK) == 0));
-
-  // already evacuated? 
-  if (bd->flags & BF_EVACUATED) { 
-    /* Don't forget to set the gct->failed_to_evac flag if we didn't get
-     * the desired destination (see comments in evacuate()).
-     */
-    if (stp < gct->evac_step) {
-	gct->failed_to_evac = rtsTrue;
-	TICK_GC_FAILED_PROMOTION();
-    }
-    RELEASE_SPIN_LOCK(&stp->sync_large_objects);
-    return;
-  }
-
-  // remove from large_object list 
-  if (bd->u.back) {
-    bd->u.back->link = bd->link;
-  } else { // first object in the list 
-    stp->large_objects = bd->link;
-  }
-  if (bd->link) {
-    bd->link->u.back = bd->u.back;
-  }
-  
-  /* link it on to the evacuated large object list of the destination step
-   */
-  new_stp = stp->to;
-  if (new_stp < gct->evac_step) {
-      if (gct->eager_promotion) {
-	  new_stp = gct->evac_step;
-      } else {
-	  gct->failed_to_evac = rtsTrue;
-      }
-  }
-
-  ws = &gct->steps[new_stp->abs_no];
-  bd->flags |= BF_EVACUATED;
-  bd->step = new_stp;
-  bd->gen_no = new_stp->gen_no;
-  bd->link = ws->todo_large_objects;
-  ws->todo_large_objects = bd;
-
-  RELEASE_SPIN_LOCK(&stp->sync_large_objects);
 }
 
 /* -----------------------------------------------------------------------------
