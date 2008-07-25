@@ -93,8 +93,8 @@
       </listitem>
       <listitem>
 	<para>We might want documentation in multiple formats - online
-	and printed, for example.  Haddock comes with HTML and DocBook
-	backends, and it is structured in such a way that adding new
+	and printed, for example.  Haddock comes with HTML, DocBook
+  and Hoogle backends, and it is structured in such a way that adding new
 	back-ends is straightforward.</para>
       </listitem>
     </itemizedlist>
