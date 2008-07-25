@@ -163,10 +163,7 @@ initSysTools mbMinusB dflags0
         ; let installed, installed_bin :: FilePath -> FilePath
               installed_bin pgm  = top_dir </> pgm
               installed     file = top_dir </> file
-              real_top_dir
-               | isWindowsHost = top_dir </> ".." </> ".."
-               | otherwise     = top_dir </> ".."
-              inplace dir   pgm  = real_top_dir </> dir </> pgm
+              inplace dir   pgm  = top_dir </> dir </> pgm
 
         ; let pkgconfig_path
                 | am_installed = installed "package.conf"
@@ -332,7 +329,9 @@ findTopDir mbMinusB
                       || exists2 -- On Linux, the presence of inplace signals
                                  -- that we are inplace
 
-       ; return (not amInplace, top_dir)
+       ; let real_top = if exists2 then top_dir </> ".." else top_dir
+
+       ; return (not amInplace, real_top)
        }
   where
     -- get_proto returns a Unix-format path (relying on getBaseDir to do so too)
@@ -525,13 +524,7 @@ copyWithHeader dflags purpose maybe_header from to = do
 
 getExtraViaCOpts :: DynFlags -> IO [String]
 getExtraViaCOpts dflags = do
-  (am_installed, top_dir) <- findTopDir (Just (topDir dflags))
-  let top_dir'
-       -- XXX Euch:
-       | isWindowsHost && not am_installed
-          = top_dir </> ".." </> ".." </> "inplace-datadir"
-       | otherwise = top_dir
-  f <- readFile (top_dir' </> "extra-gcc-opts")
+  f <- readFile (topDir dflags </> "extra-gcc-opts")
   return (words f)
 \end{code}
 
@@ -863,9 +856,14 @@ getBaseDir = do let len = (2048::Int) -- plenty, PATH_MAX is 512 under Win32.
     rootDir s = case splitFileName $ normalise s of
                 (d, "ghc.exe") ->
                     case splitFileName $ takeDirectory d of
+                    -- installed ghc.exe is in $topdir/bin/ghc.exe
                     (d', "bin") -> takeDirectory d'
-                    _ -> panic ("Expected \"bin\" in " ++ show s)
-                _ -> panic ("Expected \"ghc.exe\" in " ++ show s)
+                    -- inplace ghc.exe is in $topdir/ghc/stage1-inplace/ghc.exe
+                    (d', x) | "-inplace" `isSuffixOf` x -> 
+                        takeDirectory d' </> ".."
+                    _ -> fail
+                _ -> fail
+        where fail = panic ("can't decompose ghc.exe path: " ++ show s)
 
 foreign import stdcall unsafe "GetModuleFileNameA"
   getModuleFileName :: Ptr () -> CString -> Int -> IO Int32
