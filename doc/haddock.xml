@@ -231,7 +231,7 @@
         </term>
 	<listitem>
 	  <para>Tell GHC that that its lib directory is
-    <replaceable>dir</replaceable>. Needed to do any processing. </para>
+    <replaceable>dir</replaceable>. Can be used to override the default path.</para>
 	</listitem>
       </varlistentry>
 
