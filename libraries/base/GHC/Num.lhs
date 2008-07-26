@@ -282,10 +282,13 @@ instance  Enum Integer  where
  #-}
 
 enumDeltaIntegerFB :: (Integer -> b -> b) -> Integer -> Integer -> b
-enumDeltaIntegerFB c x d = x `c` enumDeltaIntegerFB c (x+d) d
+enumDeltaIntegerFB c x d = x `seq` (x `c` enumDeltaIntegerFB c (x+d) d)
 
 enumDeltaInteger :: Integer -> Integer -> [Integer]
-enumDeltaInteger x d = x : enumDeltaInteger (x+d) d
+enumDeltaInteger x d = x `seq` x : enumDeltaInteger (x+d) d
+   -- strict accumulator, as for Int
+   -- so, head (drop 1000000 [1 .. ] works
+   -- patch by Don Stewart <dons@galois.com>                       
 
 enumDeltaToIntegerFB c n x delta lim
   | delta >= 0 = up_fb c n x delta lim
