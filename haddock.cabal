@@ -17,7 +17,6 @@ category:             Development
 extra-source-files:
   CHANGES
   README
-  TODO
   doc/Makefile
   doc/README
   doc/aclocal.m4
