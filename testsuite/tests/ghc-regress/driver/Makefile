@@ -391,6 +391,19 @@ test080:
 	test -f A.hc
 
 
+# Tests for #2248, -o and .exe
+
+define test081
+$(RM) $(1).hs $(1).hi $(1)$(OBJSUFFIX) $(1).hc $(1)$(exeext)
+echo "module Main where { main = putStrLn \"ok\" }" >$(1).hs
+$(TEST_HC) --make -v0 $(1).hs
+test -f $(1)$(exeext)
+endef
+
+test081.1:
+	$(call test081, Test_0)
+test081.2:
+	$(call test081, Test.0)
 
 # -----------------------------------------------------------------------------
 # --make tests
