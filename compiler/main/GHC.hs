@@ -454,6 +454,8 @@ guessTarget file (Just phase)
 guessTarget file Nothing
    | isHaskellSrcFilename file
    = return (Target (TargetFile file Nothing) Nothing)
+   | looksLikeModuleName file
+   = return (Target (TargetModule (mkModuleName file)) Nothing)
    | otherwise
    = do exists <- doesFileExist hs_file
 	if exists
@@ -463,7 +465,9 @@ guessTarget file Nothing
 	if exists
 	   then return (Target (TargetFile lhs_file Nothing) Nothing)
 	   else do
-	return (Target (TargetModule (mkModuleName file)) Nothing)
+        throwDyn (ProgramError (showSDoc $
+                 text "target" <+> quotes (text file) <+> 
+                 text "is not a module name or a source file"))
      where 
 	 hs_file  = file <.> "hs"
 	 lhs_file = file <.> "lhs"
