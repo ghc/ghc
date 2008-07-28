@@ -1010,17 +1010,7 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
 	    if (stop_at_atomically) {
 		ASSERT(stmGetEnclosingTRec(tso->trec) == NO_TREC);
 		stmCondemnTransaction(cap, tso -> trec);
-#ifdef REG_R1
 		tso->sp = frame;
-#else
-		// R1 is not a register: the return convention for IO in
-		// this case puts the return value on the stack, so we
-		// need to set up the stack to return to the atomically
-		// frame properly...
-		tso->sp = frame - 2;
-		tso->sp[1] = (StgWord) &stg_NO_FINALIZER_closure; // why not?
-		tso->sp[0] = (StgWord) &stg_ut_1_0_unreg_info;
-#endif
 		tso->what_next = ThreadRunGHC;
 		return;
 	    }

@@ -1072,13 +1072,7 @@ threadStatuszh_fast
  * TVar primitives
  * -------------------------------------------------------------------------- */
 
-#ifdef REG_R1
 #define SP_OFF 0
-#define IF_NOT_REG_R1(x) 
-#else
-#define SP_OFF 1
-#define IF_NOT_REG_R1(x) x
-#endif
 
 // Catch retry frame ------------------------------------------------------------
 
@@ -1089,7 +1083,6 @@ INFO_TABLE_RET(stg_catch_retry_frame, CATCH_RETRY_FRAME,
   W_ unused3, "ptr" W_ unused4, "ptr" W_ unused5)
 {
    W_ r, frame, trec, outer;
-   IF_NOT_REG_R1(W_ rval;  rval = Sp(0);  Sp_adj(1); )
 
    frame = Sp;
    trec = StgTSO_trec(CurrentTSO);
@@ -1099,7 +1092,6 @@ INFO_TABLE_RET(stg_catch_retry_frame, CATCH_RETRY_FRAME,
      /* Succeeded (either first branch or second branch) */
      StgTSO_trec(CurrentTSO) = outer;
      Sp = Sp + SIZEOF_StgCatchRetryFrame;
-     IF_NOT_REG_R1(Sp_adj(-1); Sp(0) = rval;)
      jump %ENTRY_CODE(Sp(SP_OFF));
    } else {
      /* Did not commit: re-execute */
@@ -1125,7 +1117,6 @@ INFO_TABLE_RET(stg_atomically_frame, ATOMICALLY_FRAME,
   "ptr" W_ unused3, "ptr" W_ unused4)
 {
   W_ frame, trec, valid, next_invariant, q, outer;
-  IF_NOT_REG_R1(W_ rval;  rval = Sp(0);  Sp_adj(1); )
 
   frame = Sp;
   trec = StgTSO_trec(CurrentTSO);
@@ -1169,7 +1160,6 @@ INFO_TABLE_RET(stg_atomically_frame, ATOMICALLY_FRAME,
       /* Transaction was valid: commit succeeded */
       StgTSO_trec(CurrentTSO) = NO_TREC;
       Sp = Sp + SIZEOF_StgAtomicallyFrame;
-      IF_NOT_REG_R1(Sp_adj(-1); Sp(0) = rval;)
       jump %ENTRY_CODE(Sp(SP_OFF));
     } else {
       /* Transaction was not valid: try again */
@@ -1189,7 +1179,6 @@ INFO_TABLE_RET(stg_atomically_waiting_frame, ATOMICALLY_FRAME,
   "ptr" W_ unused3, "ptr" W_ unused4)
 {
   W_ frame, trec, valid;
-  IF_NOT_REG_R1(W_ rval;  rval = Sp(0);  Sp_adj(1); )
 
   frame = Sp;
 
@@ -1197,9 +1186,6 @@ INFO_TABLE_RET(stg_atomically_waiting_frame, ATOMICALLY_FRAME,
   (valid) = foreign "C" stmReWait(MyCapability() "ptr", CurrentTSO "ptr") [];
   if (valid != 0) {
     /* Previous attempt is still valid: no point trying again yet */
-	  IF_NOT_REG_R1(Sp_adj(-2);
-			Sp(1) = stg_NO_FINALIZER_closure;
-		  	Sp(0) = stg_ut_1_0_unreg_info;)
     jump stg_block_noregs;
   } else {
     /* Previous attempt is no longer valid: try again */
@@ -1213,11 +1199,7 @@ INFO_TABLE_RET(stg_atomically_waiting_frame, ATOMICALLY_FRAME,
 
 // STM catch frame --------------------------------------------------------------
 
-#ifdef REG_R1
 #define SP_OFF 0
-#else
-#define SP_OFF 1
-#endif
 
 /* Catch frames are very similar to update frames, but when entering
  * one we just pop the frame off the stack and perform the correct
@@ -1230,7 +1212,6 @@ INFO_TABLE_RET(stg_catch_stm_frame, CATCH_STM_FRAME,
 #endif
   "ptr" W_ unused3, "ptr" W_ unused4)
    {
-      IF_NOT_REG_R1(W_ rval;  rval = Sp(0);  Sp_adj(1); )
       W_ r, frame, trec, outer;
       frame = Sp;
       trec = StgTSO_trec(CurrentTSO);
@@ -1240,7 +1221,6 @@ INFO_TABLE_RET(stg_catch_stm_frame, CATCH_STM_FRAME,
         /* Commit succeeded */
         StgTSO_trec(CurrentTSO) = outer;
         Sp = Sp + SIZEOF_StgCatchSTMFrame;
-        IF_NOT_REG_R1(Sp_adj(-1); Sp(0) = rval;)
         jump Sp(SP_OFF);
       } else {
         /* Commit failed */
@@ -1412,9 +1392,6 @@ retry_pop_stack:
     StgHeader_info(frame) = stg_atomically_waiting_frame_info;
     Sp = frame;
     // Fix up the stack in the unregisterised case: the return convention is different.
-    IF_NOT_REG_R1(Sp_adj(-2); 
-		  Sp(1) = stg_NO_FINALIZER_closure;
-		  Sp(0) = stg_ut_1_0_unreg_info;)
     R3 = trec; // passing to stmWaitUnblock()
     jump stg_block_stmwait;
   } else {
@@ -1555,16 +1532,9 @@ newMVarzh_fast
 }
 
 
-/* If R1 isn't available, pass it on the stack */
-#ifdef REG_R1
 #define PerformTake(tso, value)				\
     W_[StgTSO_sp(tso) + WDS(1)] = value;		\
     W_[StgTSO_sp(tso) + WDS(0)] = stg_gc_unpt_r1_info;
-#else
-#define PerformTake(tso, value)					\
-    W_[StgTSO_sp(tso) + WDS(1)] = value;			\
-    W_[StgTSO_sp(tso) + WDS(0)] = stg_ut_1_0_unreg_info;
-#endif
 
 #define PerformPut(tso,lval)			\
     StgTSO_sp(tso) = StgTSO_sp(tso) + WDS(3);	\

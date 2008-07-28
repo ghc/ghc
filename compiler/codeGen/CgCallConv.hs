@@ -336,9 +336,22 @@ assignPrimOpCallRegs args
 	-- For primops, *all* arguments must be passed in registers
 
 assignReturnRegs args
- = assign_regs args (mkRegTbl [])
+ -- when we have a single non-void component to return, use the normal
+ -- unpointed return convention.  This make various things simpler: it
+ -- means we can assume a consistent convention for IO, which is useful
+ -- when writing code that relies on knowing the IO return convention in 
+ -- the RTS (primops, especially exception-related primops).
+ -- Also, the bytecode compiler assumes this when compiling
+ -- case expressions and ccalls, so it only needs to know one set of
+ -- return conventions.
+ | [(rep,arg)] <- non_void_args, CmmGlobal r <- dataReturnConvPrim rep
+    = ([(arg, r)], [])
+ | otherwise
+    = assign_regs args (mkRegTbl [])
 	-- For returning unboxed tuples etc, 
 	-- we use all regs
+ where 
+       non_void_args = filter ((/= VoidArg).fst) args
 
 assign_regs :: [(CgRep,a)]     	-- Arg or result values to assign
 	    -> AvailRegs	-- Regs still avail: Vanilla, Float, Double, Longs

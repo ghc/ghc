@@ -1479,9 +1479,7 @@ schedulePostRunThread (StgTSO *t)
             throwToSingleThreaded_(&capabilities[0], t, 
                                    NULL, rtsTrue, NULL);
             
-#ifdef REG_R1
             ASSERT(get_itbl((StgClosure *)t->sp)->type == ATOMICALLY_FRAME);
-#endif
         }
     }
 

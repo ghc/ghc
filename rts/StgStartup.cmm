@@ -147,18 +147,10 @@ stg_threadFinished
 
 INFO_TABLE_RET( stg_forceIO, RET_SMALL)
 
-#ifdef REG_R1
 {
   Sp_adj(1);
   ENTER();
 }
-#else
-{
-  R1 = Sp(0);
-  Sp_adj(2);
-  ENTER();
-}
-#endif
 
 /* -----------------------------------------------------------------------------
     Non-strict IO application.
@@ -171,18 +163,10 @@ INFO_TABLE_RET( stg_forceIO, RET_SMALL)
 
 INFO_TABLE_RET( stg_noforceIO, RET_SMALL )
 
-#ifdef REG_R1
 {
   Sp_adj(1);
   jump %ENTRY_CODE(Sp(0));
 }
-#else
-{
-  R1 = Sp(0);
-  Sp_adj(2);
-  jump %ENTRY_CODE(Sp(0));
-}
-#endif
 
 /* -----------------------------------------------------------------------------
    Special STG entry points for module registration.
