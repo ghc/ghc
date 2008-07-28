@@ -157,10 +157,14 @@ data Exception   = IOException    IOException
                  | ArrayException ArrayException
                  | AsyncException AsyncException
                  | ExitException  ExitCode
+                 deriving Show
 type IOException = IOError
 data ArithException
 data ArrayException
 data AsyncException
+instance Show ArithException
+instance Show ArrayException
+instance Show AsyncException
 
 catch    :: IO a -> (Exception -> IO a) -> IO a
 a `catch` b = a `H'98.catch` (b . IOException)
