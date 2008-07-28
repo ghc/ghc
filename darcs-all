@@ -17,7 +17,7 @@ if ($defaultrepo =~ /^...*:/) {
     $defaultrepo_base =~ s#/[^/]+/?$##;
     $checked_out_tree = 0;
 }
-elsif ($defaultrepo =~ /^(\.\.)?\//) {
+elsif ($defaultrepo =~ /^\/|\.\.\/|.:(\/|\\)/) {
     # Local filesystem, either absolute or relative path
     # (assumes a checked-out tree):
     $defaultrepo_base = $defaultrepo;
