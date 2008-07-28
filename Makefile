@@ -179,13 +179,13 @@ all :: stamp.inplace-gcc-lib
 # tree somewhere, and then have install copy it from there rather than
 # from the filesystem.
 stamp.inplace-gcc-lib:
-	$(RM) -r compiler/gcc-lib
-	mkdir compiler/gcc-lib
-	cp $(LD) compiler/gcc-lib
+	$(RM) -r ghc/gcc-lib
+	mkdir ghc/gcc-lib
+	cp $(LD) ghc/gcc-lib
 	touch $@
 
 clean ::
-	$(RM) -r compiler/gcc-lib
+	$(RM) -r ghc/gcc-lib
 	$(RM) -f inplace-gcc-lib
 endif
 endif
