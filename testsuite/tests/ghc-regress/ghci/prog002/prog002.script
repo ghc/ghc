@@ -8,7 +8,7 @@
 :shell rm -f *.hi *.o *~
 :shell cp A1.hs A.hs
 
-:load D
+:load D.hs
 
 -- compile A & reload
 :shell $HC $HC_OPTS -fforce-recomp -c A.hs
@@ -30,7 +30,7 @@ B.g 42
 B.g 42
 
 -- pick up newly compiled A
-:load D
+:load D.hs
 
 B.g 42
 B.g 42

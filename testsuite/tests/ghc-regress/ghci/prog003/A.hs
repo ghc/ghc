@@ -1,4 +1,4 @@
-module Main(main,a) where
+module A(main,a) where
 
 import B
 import C(c)

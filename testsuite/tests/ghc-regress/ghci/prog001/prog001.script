@@ -8,7 +8,7 @@
 :shell cp D1.hs D.hs
 
 -- load the program (all interpreted)
-:load A
+:load A.hs
 
 -- reloading should do nothing
 :reload
@@ -33,7 +33,7 @@ main
 :shell cp D2.hs D.hs
 :shell $HC $HC_OPTS -fforce-recomp -c D.hs
 :reload
-:load A
+:load A.hs
 
 -- make sure we're picking up the new D, via B
 :module B

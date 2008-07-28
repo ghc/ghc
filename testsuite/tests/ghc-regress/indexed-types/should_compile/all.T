@@ -38,7 +38,7 @@ test('impexp',
 test('ATLoop',
      extra_clean(['ATLoop_help.o','ATLoop_help.hi']),
      multimod_compile,
-     ['ATLoop','-v0'])
+     ['ATLoop.hs','-v0'])
 
 test('Deriving', normal, compile, [''])
 test('DerivingNewType', expect_fail, compile, [''])
