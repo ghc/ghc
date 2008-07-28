@@ -145,19 +145,30 @@ import System.IO.Unsafe (unsafePerformIO)
 import Data.Dynamic
 
 #ifdef __NHC__
-import System.IO.Error (catch, ioError)
+import qualified System.IO.Error as H'98 (catch)
+import System.IO.Error (ioError)
 import IO              (bracket)
 import DIOError         -- defn of IOError type
+import System          (ExitCode())
 
 -- minimum needed for nhc98 to pretend it has Exceptions
-type Exception   = IOError
+data Exception   = IOException    IOException
+                 | ArithException ArithException
+                 | ArrayException ArrayException
+                 | AsyncException AsyncException
+                 | ExitException  ExitCode
 type IOException = IOError
 data ArithException
 data ArrayException
 data AsyncException
 
+catch    :: IO a -> (Exception -> IO a) -> IO a
+a `catch` b = a `H'98.catch` (b . IOException)
+
 throwIO  :: Exception -> IO a
-throwIO   = ioError
+throwIO (IOException e) = ioError e
+throwIO _               = ioError (UserError "Control.Exception.throwIO"
+                                             "unknown exception")
 throw    :: Exception -> a
 throw     = unsafePerformIO . throwIO
 
@@ -165,9 +176,11 @@ evaluate :: a -> IO a
 evaluate x = x `seq` return x
 
 ioErrors        :: Exception -> Maybe IOError
-ioErrors e       = Just e
+ioErrors        (IOException e)     = Just e
+ioErrors        _                   = Nothing
 arithExceptions :: Exception -> Maybe ArithException
-arithExceptions  = const Nothing
+arithExceptions (ArithException e)  = Just e
+arithExceptions _                   = Nothing
 errorCalls      :: Exception -> Maybe String
 errorCalls       = const Nothing
 dynExceptions   :: Exception -> Maybe Dynamic
@@ -177,12 +190,12 @@ assertions       = const Nothing
 asyncExceptions :: Exception -> Maybe AsyncException
 asyncExceptions  = const Nothing
 userErrors      :: Exception -> Maybe String
-userErrors (UserError _ s) = Just s
-userErrors  _              = Nothing
+userErrors (IOException (UserError _ s)) = Just s
+userErrors  _                            = Nothing
 
 assert :: Bool -> a -> a
 assert True  x = x
-assert False _ = throw (UserError "" "Assertion failed")
+assert False _ = throw (IOException (UserError "" "Assertion failed"))
 #endif
 
 #ifndef __GLASGOW_HASKELL__
@@ -343,7 +356,7 @@ tryJust p a = do
 -- 'Typeable' class.
 throwDyn :: Typeable exception => exception -> b
 #ifdef __NHC__
-throwDyn exception = throw (UserError "" "dynamic exception")
+throwDyn exception = throw (IOException (UserError "" "dynamic exception"))
 #else
 throwDyn exception = throw (DynException (toDyn exception))
 #endif
