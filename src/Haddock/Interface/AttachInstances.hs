@@ -125,6 +125,7 @@ toHsInstHead (_, preds, cls, ts) = (map toHsPred preds, className cls, map toHsT
 toHsPred :: PredType -> HsPred Name
 toHsPred (ClassP cls ts) = HsClassP (className cls) (map toLHsType ts)
 toHsPred (IParam n t) = HsIParam n (toLHsType t)
+toHsPred (EqPred t1 t2) = HsEqualP (toLHsType t1) (toLHsType t2)
 
 
 toLHsType = noLoc . toHsType
