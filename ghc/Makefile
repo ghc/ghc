@@ -13,6 +13,9 @@ else
 INSTALL_FLAGS = --enable-shell-wrappers
 endif
 
+# Don't strip the inplace versions, we might need to debug them
+INPLACE_INSTALL_FLAGS += --disable-executable-stripping
+
 boot:: boot.stage.$(stage)
 
 all:: build.stage.$(stage)
@@ -102,6 +105,7 @@ build.stage.%:
 	                   '$$prefix/html'                                 \
 	                   '$$prefix/haddock'                              \
 	                   --distpref dist-stage$*                         \
+	                   $(INPLACE_INSTALL_FLAGS)                        \
 	                   $(INSTALL_FLAGS)
 
 # XXX For now we always install the stage 2 compiler

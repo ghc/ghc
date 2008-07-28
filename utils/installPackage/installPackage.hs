@@ -22,8 +22,8 @@ main
                     idatadir : idocdir : ihtmldir : ihaddockdir :
                     args' ->
                case parseArgs args' of
-                   (verbosity, distPref, enableShellWrappers) ->
-                       doInstall verbosity distPref enableShellWrappers
+                   (verbosity, distPref, enableShellWrappers, strip) ->
+                       doInstall verbosity distPref enableShellWrappers strip
                                  ghcpkg ghcpkgconf destdir topdir
                                  iprefix ibindir ilibdir ilibexecdir
                                  idynlibdir idatadir idocdir ihtmldir
@@ -35,21 +35,23 @@ main
 parseArgs :: [String]
           -> (Verbosity, -- verbosity
               FilePath,  -- dist prefix
-              Bool)      -- enable shell wrappers?
-parseArgs = f normal defaultDistPref False
-    where f v dp esw (('-':'v':val):args)
-              = f (readEOrFail flagToVerbosity val) dp esw args
-          f v _  esw ("--distpref":dp:args) = f v dp esw args
-          f v dp _   ("--enable-shell-wrappers":args) = f v dp True args
-          f v dp esw [] = (v, dp, esw)
-          f _ _  _   args = error ("Bad arguments: " ++ show args)
+              Bool,      -- enable shell wrappers?
+              Bool)      -- strip exe?
+parseArgs = f normal defaultDistPref False True
+    where f v dp esw strip (('-':'v':val):args)
+              = f (readEOrFail flagToVerbosity val) dp esw strip args
+          f v _  esw strip ("--distpref":dp:args) = f v dp esw strip args
+          f v dp _   strip ("--enable-shell-wrappers":args) = f v dp True strip args
+          f v dp esw strip ("--disable-executable-stripping":args) = f v dp esw False args
+          f v dp esw strip [] = (v, dp, esw, strip)
+          f _ _  _   _     args = error ("Bad arguments: " ++ show args)
 
-doInstall :: Verbosity -> FilePath -> Bool
+doInstall :: Verbosity -> FilePath -> Bool -> Bool
           -> FilePath -> FilePath -> FilePath -> FilePath
           -> FilePath -> FilePath -> FilePath -> FilePath -> FilePath
           -> FilePath -> FilePath -> FilePath -> FilePath
           -> IO ()
-doInstall verbosity distPref enableShellWrappers
+doInstall verbosity distPref enableShellWrappers strip
      ghcpkg ghcpkgconf destdir topdir
      iprefix ibindir ilibdir ilibexecdir idynlibdir idatadir
      idocdir ihtmldir ihaddockdir =
@@ -95,7 +97,8 @@ doInstall verbosity distPref enableShellWrappers
                            htmldir      = toPathTemplate' ihtmldir,
                            haddockdir   = toPathTemplate' ihaddockdir
                          }
-              lbi_copy = lbi { installDirTemplates = i_copy }
+              lbi_copy = lbi { installDirTemplates = i_copy,
+                               stripExes = strip }
               -- When we run GHC we give it a $topdir that includes the
               -- $compiler/lib/ part of libsubdir, so we only want the
               -- $pkgid part in the package.conf file. This is a bit of
