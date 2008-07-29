@@ -184,10 +184,10 @@ extern void freeStorage(void);
 
    -------------------------------------------------------------------------- */
 
-extern StgPtr  allocate        ( nat n );
-extern StgPtr  allocateInGen   ( generation *g, nat n );
-extern StgPtr  allocateLocal   ( Capability *cap, nat n );
-extern StgPtr  allocatePinned  ( nat n );
+extern StgPtr  allocate        ( lnat n );
+extern StgPtr  allocateInGen   ( generation *g, lnat n );
+extern StgPtr  allocateLocal   ( Capability *cap, lnat n );
+extern StgPtr  allocatePinned  ( lnat n );
 extern lnat    allocatedBytes  ( void );
 
 extern bdescr * RTS_VAR(small_alloc_list);

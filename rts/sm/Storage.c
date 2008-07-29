@@ -585,7 +585,7 @@ move_TSO (StgTSO *src, StgTSO *dest)
    -------------------------------------------------------------------------- */
 
 StgPtr
-allocateInGen (generation *g, nat n)
+allocateInGen (generation *g, lnat n)
 {
     step *stp;
     bdescr *bd;
@@ -600,7 +600,7 @@ allocateInGen (generation *g, nat n)
 
     if (n >= LARGE_OBJECT_THRESHOLD/sizeof(W_))
     {
-	nat req_blocks =  (lnat)BLOCK_ROUND_UP(n*sizeof(W_)) / BLOCK_SIZE;
+	lnat req_blocks =  (lnat)BLOCK_ROUND_UP(n*sizeof(W_)) / BLOCK_SIZE;
 
         // Attempting to allocate an object larger than maxHeapSize
         // should definitely be disallowed.  (bug #1791)
@@ -642,7 +642,7 @@ allocateInGen (generation *g, nat n)
 }
 
 StgPtr
-allocate (nat n)
+allocate (lnat n)
 {
     return allocateInGen(g0,n);
 }
@@ -703,7 +703,7 @@ splitLargeBlock (bdescr *bd, nat blocks)
    -------------------------------------------------------------------------- */
 
 StgPtr
-allocateLocal (Capability *cap, nat n)
+allocateLocal (Capability *cap, lnat n)
 {
     bdescr *bd;
     StgPtr p;
@@ -780,7 +780,7 @@ allocateLocal (Capability *cap, nat n)
    ------------------------------------------------------------------------- */
 
 StgPtr
-allocatePinned( nat n )
+allocatePinned( lnat n )
 {
     StgPtr p;
     bdescr *bd = pinned_object_block;

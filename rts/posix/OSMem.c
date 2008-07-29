@@ -176,7 +176,7 @@ void *
 osGetMBlocks(nat n)
 {
   caddr_t ret;
-  lnat size = MBLOCK_SIZE * n;
+  lnat size = MBLOCK_SIZE * (lnat)n;
  
   if (next_request == 0) {
       // use gen_map_mblocks the first time.
