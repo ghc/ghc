@@ -67,6 +67,9 @@ sub pushall {
                 message "== $localpath repo not present; skipping";
             }
         }
+        elsif (! /^(#.*)?$/) {
+            die "Bad line: $_";
+        }
     }
     close IN;
 }
