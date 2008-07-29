@@ -39,6 +39,8 @@ TOP=..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/cabal-flags.mk
 
+# Any libraries listed here should also be in ../packages
+
 SUBDIRS  = ghc-prim $(INTEGER_LIBRARY) base array packedstring
 SUBDIRS += containers bytestring old-locale old-time filepath directory
 ifeq "$(GhcLibsWithUnix)" "YES"

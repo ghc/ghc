@@ -75,7 +75,7 @@ sub darcsall {
                 message "== $localpath repo not present; skipping";
             }
         }
-        elsif (! /^$/) {
+        elsif (! /^(#.*)?$/) {
             die "Bad line: $_";
         }
     }

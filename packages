@@ -1,3 +1,6 @@
+# Note that when adding libraries to this file, you also need to add
+# the library to the SUBDIRS variable in libraries/Makefile so that they
+# actually get built
 utils/hsc2hs                            hsc2hs
 libraries/array                         packages/array
 libraries/base                          packages/base
