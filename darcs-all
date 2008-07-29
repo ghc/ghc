@@ -143,6 +143,11 @@ sub main {
         elsif ($arg eq "-s") {
             $verbose = 0;
         }
+        # --dph says we grab the dph libs with 'get'.
+        # It has no effect on the other commands.
+        elsif ($arg eq "--dph") {
+            $tags{"dph"} = 1;
+        }
         # --extra says we grab the extra libs with 'get'.
         # It has no effect on the other commands.
         elsif ($arg eq "--extra") {

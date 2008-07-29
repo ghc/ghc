@@ -35,6 +35,7 @@ libraries/regex-posix       extralibs   packages/regex-posix
 libraries/stm               extralibs   packages/stm
 libraries/time              extralibs   packages/time
 libraries/xhtml             extralibs   packages/xhtml
+libraries/dph               dph         packages/dph
 testsuite                   testsuite   testsuite
 nofib                       nofib       nofib
 
