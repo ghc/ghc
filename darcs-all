@@ -143,12 +143,6 @@ sub main {
         elsif ($arg eq "-s") {
             $verbose = 0;
         }
-        # --ci says we grab cabal-install repo, and the libraries it needs
-        # with 'get'.
-        # It has no effect on the other commands.
-        elsif ($arg eq "--ci") {
-            $tags{"ci"} = 1;
-        }
         # --extra says we grab the extra libs with 'get'.
         # It has no effect on the other commands.
         elsif ($arg eq "--extra") {

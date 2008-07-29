@@ -1,5 +1,4 @@
 utils/hsc2hs                            hsc2hs
-utils/cabal-install         ci          cabal-install
 libraries/array                         packages/array
 libraries/base                          packages/base
 libraries/bytestring                    packages/bytestring
