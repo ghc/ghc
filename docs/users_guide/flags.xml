@@ -2233,6 +2233,12 @@
 	      <entry>-</entry>
 	    </row>
 	    <row>
+	      <entry><option>-dsuppress-uniques</option></entry>
+	      <entry>Suppress the printing of uniques in debug output (easier to use <command>diff</command>.</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
 	      <entry><option>-dppr-noprags</option></entry>
 	      <entry>Don't output pragma info in dumps</entry>
 	      <entry>static</entry>

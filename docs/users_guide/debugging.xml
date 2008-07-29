@@ -423,6 +423,20 @@
 
       <varlistentry>
 	<term>
+          <option>-dsuppress-uniques</option>
+          <indexterm><primary><option>-dsuppress-uniques</option></primary></indexterm>
+        </term>
+	<listitem>
+	  <para>Suppress the printing of uniques in debugging output. This may make 
+	  the printout ambiguous (e.g. unclear where an occurrence of 'x' is bound), but
+	  it makes the output of two compiler runs have many fewer gratuitous differences,
+	    so you can realistically apply <command>diff</command>.  Once <command>diff</command>
+	  has shown you where to look, you can try again without <option>-dsuppress-uniques</option></para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
           <option>-dppr-user-length</option>
           <indexterm><primary><option>-dppr-user-length</option></primary></indexterm>
         </term>
