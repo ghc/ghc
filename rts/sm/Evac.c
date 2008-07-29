@@ -773,14 +773,25 @@ unchain_thunk_selectors(StgSelector *p, StgClosure *val)
         prev = (StgSelector*)((StgClosure *)p)->payload[0];
 
         // Update the THUNK_SELECTOR with an indirection to the
-        // EVACUATED closure now at p.  Why do this rather than
-        // upd_evacuee(q,p)?  Because we have an invariant that an
-        // EVACUATED closure always points to an object in the
-        // same or an older generation (required by the short-cut
-        // test in the EVACUATED case, below).
-        ((StgInd *)p)->indirectee = val;
-        write_barrier();
-        SET_INFO(p, &stg_IND_info);
+        // value.  The value is still in from-space at this stage.
+        //
+        // (old note: Why not do upd_evacuee(q,p)?  Because we have an
+        // invariant that an EVACUATED closure always points to an
+        // object in the same or an older generation (required by
+        // the short-cut test in the EVACUATED case, below).
+        if ((StgClosure *)p == val) {
+            // must be a loop; just leave a BLACKHOLE in place.  This
+            // can happen when we have a chain of selectors that
+            // eventually loops back on itself.  We can't leave an
+            // indirection pointing to itself, and we want the program
+            // to deadlock if it ever enters this closure, so
+            // BLACKHOLE is correct.
+            SET_INFO(p, &stg_BLACKHOLE_info);
+        } else {
+            ((StgInd *)p)->indirectee = val;
+            write_barrier();
+            SET_INFO(p, &stg_IND_info);
+        }
 
         // For the purposes of LDV profiling, we have created an
         // indirection.
@@ -957,12 +968,18 @@ selector_loop:
               prev_thunk_selector = p;
 
               *q = val;
-              if (evac) evacuate(q);
-              val = *q;
+
+              // update the other selectors in the chain *before*
+              // evacuating the value.  This is necessary in the case
+              // where the value turns out to be one of the selectors
+              // in the chain (i.e. we have a loop), and evacuating it
+              // would corrupt the chain.
+              unchain_thunk_selectors(prev_thunk_selector, val);
+
               // evacuate() cannot recurse through
               // eval_thunk_selector(), because we know val is not
               // a THUNK_SELECTOR.
-              unchain_thunk_selectors(prev_thunk_selector, val);
+              if (evac) evacuate(q);
               return;
           }
 
