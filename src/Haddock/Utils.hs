@@ -40,6 +40,7 @@ module Haddock.Utils (
  ) where
 
 import Haddock.Types
+import Haddock.GHC.Utils
 
 import GHC
 import SrcLoc
@@ -89,7 +90,8 @@ restrictTo names (L loc decl) = L loc $ case decl of
       []    -> TyClD (d { tcdND = DataType, tcdCons = [] }) 
       [con] -> TyClD (d { tcdCons = [con] })
   TyClD d | isClassDecl d -> 
-    TyClD (d { tcdSigs = restrictDecls names (tcdSigs d) })
+    TyClD (d { tcdSigs = restrictDecls names (tcdSigs d),
+               tcdATs = restrictATs names (tcdATs d) })
   _ -> decl
    
 restrictCons :: [Name] -> [LConDecl Name] -> [LConDecl Name]
@@ -116,6 +118,11 @@ restrictDecls :: [Name] -> [LSig Name] -> [LSig Name]
 restrictDecls names decls = filter keep decls
   where keep d = fromJust (sigName d) `elem` names
         -- has to have a name, since it's a class method type signature
+
+
+restrictATs :: [Name] -> [LTyClDecl Name] -> [LTyClDecl Name]
+restrictATs names ats = [ at | at <- ats , tcdName (unL at) `elem` names ]
+
 
 -- -----------------------------------------------------------------------------
 -- Filename mangling functions stolen from s main/DriverUtil.lhs.
