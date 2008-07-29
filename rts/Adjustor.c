@@ -716,7 +716,7 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
                 }
                 else
                 {
-                    if((t == 'l' || t == 'L' || t == 'd')
+                    if(t == 'l' || t == 'L' || t == 'd')
                     {
                         if(src_offset % 8)
                             src_offset += 4;
