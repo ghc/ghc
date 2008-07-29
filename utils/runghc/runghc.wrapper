@@ -1,0 +1,2 @@
+
+exec $executablename -f $bindir/ghc ${1+"$@"}
