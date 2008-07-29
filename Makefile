@@ -88,10 +88,10 @@ endif
 # Sanity check that all the boot libraries are in the tree, to catch
 # failure to run darcs-all.
 check-packages :
-	@ds=`cat libraries/boot-packages`;\
+	@ds=`grep "^[^# ][^ ]*  *[^ ][^ ]*$$" packages | sed "s/ .*//"`;\
 	for d in $$ds; do \
-	  if test ! -d libraries/$$d; then \
-	     echo "Looks like you're missing libraries/$$d,"; \
+	  if test ! -d $$d; then \
+	     echo "Looks like you're missing $$d,"; \
 	     echo "maybe you haven't done './darcs-all get'?"; \
 	     exit 1; \
 	  fi \
