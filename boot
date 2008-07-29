@@ -2,9 +2,9 @@
 set -e
 
 # Check that we have all boot packages.
-for dir in `cat libraries/boot-packages`
+for dir in `grep "^[^# ][^ ]*  *[^ ][^ ]*$" packages | sed "s/ .*//"`
 do
-    if test ! -d libraries/$dir
+    if test ! -d $dir
     then
         echo "Looks like you're missing libraries/$dir." >&2
         echo "Maybe you haven't done './darcs-all get'?" >&2
