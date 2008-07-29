@@ -2436,8 +2436,14 @@ The result type of each constructor must begin with the type constructor being d
 but for a GADT the arguments to the type constructor can be arbitrary monotypes.  
 For example, in the <literal>Term</literal> data
 type above, the type of each constructor must end with <literal>Term ty</literal>, but
-the <literal>ty</literal> may not be a type variable (e.g. the <literal>Lit</literal>
+the <literal>ty</literal> need not be a type variable (e.g. the <literal>Lit</literal>
 constructor).
+</para></listitem>
+
+<listitem><para>
+It's is permitted to declare an ordinary algebraic data type using GADT-style syntax.
+What makes a GADT into a GADT is not the syntax, but rather the presence of data constructors
+whose result type is not just <literal>T a b</literal>.
 </para></listitem>
 
 <listitem><para>
@@ -2474,6 +2480,19 @@ their selector functions actually have different types:
   num :: Term Int -> Term Int
   arg :: Term Bool -> Term Int
 </programlisting>
+</para></listitem>
+
+<listitem><para>
+When pattern-matching against data constructors drawn from a GADT, 
+for example in a <literal>case</literal> expression, the following rules apply:
+<itemizedlist>
+<listitem><para>The type of the scrutinee must be rigid.</para></listitem>
+<listitem><para>The type of the result of the <literal>case</literal> expression must be rigid.</para></listitem>
+<listitem><para>The type of any free variable mentioned in any of
+the <literal>case</literal> alternatives must be rigid.</para></listitem>
+</itemizedlist>
+A type is "rigid" if it is completely known to the compiler at its binding site.  The easiest
+way to ensure that a variable a rigid type is to give it a type signature.
 </para></listitem>
 
 </itemizedlist>
