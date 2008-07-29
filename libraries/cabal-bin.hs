@@ -1,6 +1,7 @@
 
 module Main (main) where
 
+import Control.Monad
 import Data.Maybe
 import Distribution.PackageDescription
 import Distribution.PackageDescription.Parse
@@ -45,7 +46,14 @@ doit verbosity ghc packageConf args = do
 
 runSetup :: Verbosity -> FilePath -> FilePath -> [String] -> IO ()
 runSetup verbosity ghc packageConf args = do
-    rawSystemExit verbosity ghc ["-package-conf", packageConf,
-                                 "--make", "Setup", "-o", "Setup"]
+    -- Don't bother building Setup if we are cleaning. If we need to
+    -- build Setup in order to build, and Setup isn't built already,
+    -- then there shouldn't be anything to clean anyway.
+    unless cleaning $
+        rawSystemExit verbosity ghc ["-package-conf", packageConf,
+                                     "--make", "Setup", "-o", "Setup"]
     rawSystemExit verbosity "./Setup" args
+  where cleaning = case args of
+                   "clean" : _ -> True
+                   _ -> False
 
