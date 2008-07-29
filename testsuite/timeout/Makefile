@@ -30,7 +30,7 @@ calibrate.out:
 # interested in
 
 clean distclean:
-	$(CABAL) clean
+	-$(CABAL) clean
 	$(RM) -rf install-inplace
 	$(RM) -f calibrate.out
 
