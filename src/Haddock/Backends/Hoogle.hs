@@ -60,7 +60,6 @@ ppModule iface = "" : doc (ifaceDoc iface) ++
 ---------------------------------------------------------------------
 -- Utility functions
 
-unL (L _ x) = x
 reL = L undefined
 
 

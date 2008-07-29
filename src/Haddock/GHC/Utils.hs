@@ -24,6 +24,10 @@ import Name
 import Packages
 
 
+unL :: Located a -> a
+unL (L _ x) = x
+
+
 moduleString :: Module -> String
 moduleString = moduleNameString . moduleName 
 
