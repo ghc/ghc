@@ -321,7 +321,7 @@ interactiveUI session srcs maybe_exprs = do
 
 #ifdef USE_EDITLINE
         is_tty <- hIsTerminalDevice stdin
-        when is_tty $ do
+        when is_tty $ withReadline $ do
             Readline.initialize
 
             withGhcAppData
@@ -614,9 +614,7 @@ readlineLoop = do
    io yield
    saveSession -- for use by completion
    prompt <- mkPrompt
-   l <- io (readline prompt `finally` setNonBlockingFD 0)
-                -- readline sometimes puts stdin into blocking mode,
-                -- so we need to put it back for the IO library
+   l <- io $ withReadline (readline prompt)
    splatSavedSession
    case l of
         Nothing -> return Nothing
@@ -625,6 +623,20 @@ readlineLoop = do
                    io (addHistory l)
                    str <- io $ consoleInputToUnicode True l
                    return (Just str)
+
+withReadline :: IO a -> IO a
+withReadline = bracket_ stopTimer (do startTimer; setNonBlockingFD 0)
+     -- Two problems are being worked around here:
+     -- 1. readline sometimes puts stdin into blocking mode,
+     --    so we need to put it back for the IO library
+     -- 2. editline doesn't handle some of its system calls returning
+     --    EINTR, so our timer signal confuses it, hence we turn off
+     --    the timer signal when making calls to editline. (#2277)
+     --    If editline is ever fixed, we can remove this.
+
+-- These come from the RTS
+foreign import ccall unsafe startTimer :: IO ()
+foreign import ccall unsafe stopTimer  :: IO ()
 #endif
 
 queryQueue :: GHCi (Maybe String)

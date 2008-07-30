@@ -27,6 +27,7 @@
 #include "Schedule.h"
 #include "Sparks.h"
 #include "RtsTypeable.h"
+#include "Timer.h"
 
 #ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
@@ -703,6 +704,7 @@ typedef struct _RtsSymbolVal {
       SymX(stackOverflow)			\
       SymX(stg_CAF_BLACKHOLE_info)		\
       SymX(awakenBlockedQueue)			\
+      SymX(startTimer)                          \
       SymX(stg_CHARLIKE_closure)		\
       SymX(stg_MVAR_CLEAN_info)			\
       SymX(stg_MVAR_DIRTY_info)			\
