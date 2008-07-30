@@ -465,10 +465,10 @@ getPkgDatabases modify my_flags = do
 
 readParseDatabase :: PackageDBName -> IO (PackageDBName,PackageDB)
 readParseDatabase filename = do
-  str <- readFile filename `Exception.catch` \_ -> return emptyPackageConfig
+  str <- readFile filename `catchIO` \_ -> return emptyPackageConfig
   let packages = map convertPackageInfoIn $ read str
   Exception.evaluate packages
-    `Exception.catch` \e->
+    `catchError` \e->
         die ("error while parsing " ++ filename ++ ": " ++ show e)
   return (filename,packages)
 
@@ -811,20 +811,19 @@ savingOldConfig filename io = Exception.block $ do
               ioError err
           return False
   (do hPutStrLn stdout "done."; io)
-    `Exception.catch` \e -> do
+    `onException` do
       hPutStr stdout ("WARNING: an error was encountered while writing "
                    ++ "the new configuration.\n")
         -- remove any partially complete new version:
-      try (removeFile filename)
+      removeFile filename `catchIO` \_ -> return ()
         -- and attempt to restore the old one, if we had one:
       when restore_on_error $ do
            hPutStr stdout "Attempting to restore the old configuration... "
            do renameFile oldFile filename
               hPutStrLn stdout "done."
-            `catch` \err -> hPutStrLn stdout ("Failed: " ++ show err)
+            `catchIO` \err -> hPutStrLn stdout ("Failed: " ++ show err)
         -- Note the above renameFile sometimes fails on Windows with
         -- "permission denied", I have no idea why --SDM.
-      Exception.throwIO e
 
 -----------------------------------------------------------------------------
 -- Sanity-check a new package config, and automatically build GHCi libs
@@ -1119,3 +1118,31 @@ installSignalHandlers = do
 isInfixOf               :: (Eq a) => [a] -> [a] -> Bool
 isInfixOf needle haystack = any (isPrefixOf needle) (tails haystack)
 #endif
+
+catchIO :: IO a -> (Exception.IOException -> IO a) -> IO a
+#if __GLASGOW_HASKELL__ >= 609
+catchIO = Exception.catch
+#else
+catchIO io handler = io `Exception.catch` handler'
+    where handler' (Exception.IOException ioe) = handler ioe
+          handler' e                           = Exception.throw e
+#endif
+
+catchError :: IO a -> (String -> IO a) -> IO a
+#if __GLASGOW_HASKELL__ >= 609
+catchError io handler = io `Exception.catch` handler'
+    where handler' (Exception.ErrorCall err) = handler err
+#else
+catchError io handler = io `Exception.catch` handler'
+    where handler' (Exception.ErrorCall err) = handler err
+          handler' e                         = Exception.throw e
+#endif
+
+onException :: IO a -> IO () -> IO a
+#if __GLASGOW_HASKELL__ >= 609
+onException = Exception.onException
+#else
+onException io what = io `Exception.catch` \e -> do what
+                                                    Exception.throw e
+#endif
+
