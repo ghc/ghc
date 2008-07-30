@@ -967,14 +967,7 @@ SRC_CC_OPTS += -G0
 endif
 
 SRC_HSC2HS_OPTS += $(addprefix --cflag=,$(filter-out -O,$(SRC_CC_OPTS)))
-
-# Given
-#   foo bar
-# make
-#   :\"-Ifoo\":\"-Ibar\"
-nothing=
-space=$(nothing) $(nothing)
-SRC_HSC2HS_OPTS += $(subst $(space),,$(foreach d,$(GMP_INCLUDE_DIRS),:\"-I$(d)\"))
+SRC_HSC2HS_OPTS += $(foreach d,$(GMP_INCLUDE_DIRS),-I$(d))
 
 #-----------------------------------------------------------------------------
 # GMP Library (version 2.0.x or above)
