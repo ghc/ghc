@@ -904,7 +904,7 @@ Now catch# has type
 (well almost; the compiler doesn't know about the IO newtype so we
 have to work around that in the definition of catchException below).
 
-\begin{code} 
+\begin{code}
 catchException :: Exception e => IO a -> (e -> IO a) -> IO a
 catchException (IO io) handler = IO $ catch# io handler'
     where handler' e = case fromException e of
