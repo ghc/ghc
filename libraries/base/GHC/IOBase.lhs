@@ -44,7 +44,7 @@ module GHC.IOBase(
     stackOverflow, heapOverflow, ioException, 
     IOError, IOException(..), IOErrorType(..), ioError, userError,
     ExitCode(..),
-    throwIO, block, unblock, catchAny, catchException,
+    throwIO, block, unblock, blocked, catchAny, catchException,
     evaluate,
     ErrorCall(..), ArithException(..), AsyncException(..),
     BlockedOnDeadMVar(..), BlockedIndefinitely(..),
@@ -967,6 +967,12 @@ unblock :: IO a -> IO a
 
 block (IO io) = IO $ blockAsyncExceptions# io
 unblock (IO io) = IO $ unblockAsyncExceptions# io
+
+-- | returns True if asynchronous exceptions are blocked in the
+-- current thread.
+blocked :: IO Bool
+blocked = IO $ \s -> case asyncExceptionsBlocked# s of
+                        (# s', i #) -> (# s', i /=# 0# #)
 \end{code}
 
 \begin{code}

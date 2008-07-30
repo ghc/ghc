@@ -127,6 +127,7 @@ module Control.Exception (
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
+import GHC.IOBase
 import {-# SOURCE #-} GHC.Handle
 import GHC.List
 import GHC.Num
