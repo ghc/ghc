@@ -1,4 +1,7 @@
 {-# OPTIONS_GHC -XNoImplicitPrelude #-}
+
+#include "Typeable.h"
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Control.OldException
@@ -714,7 +717,7 @@ data Exception
         -- fields are missing from some of the constructors.  The
         -- 'String' argument gives the location of the
         -- record update in the source program.
-    deriving Typeable
+INSTANCE_TYPEABLE0(Exception,exceptionTc,"Exception")
 
 nonTermination :: SomeException
 nonTermination = toException NonTermination

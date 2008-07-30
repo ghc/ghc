@@ -12,6 +12,8 @@
 --
 -------------------------------------------------------------------------------
 
+#include "Typeable.h"
+
 module System.Timeout ( timeout ) where
 
 #if __NHC__
@@ -26,13 +28,15 @@ import Control.Monad       (Monad(..), guard)
 import Control.Concurrent  (forkIO, threadDelay, myThreadId, killThread)
 import Control.Exception   (Exception, handleJust, throwTo, bracket)
 import Data.Dynamic        (Typeable, fromDynamic)
+import Data.Typeable
 import Data.Unique         (Unique, newUnique)
 
 -- An internal type that is thrown as a dynamic exception to
 -- interrupt the running IO computation when the timeout has
 -- expired.
 
-data Timeout = Timeout Unique deriving (Eq, Typeable)
+data Timeout = Timeout Unique deriving Eq
+INSTANCE_TYPEABLE0(Timeout,timeoutTc,"Timeout")
 
 instance Show Timeout where
     show _ = "<<timeout>>"

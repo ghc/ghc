@@ -1,4 +1,7 @@
 {-# OPTIONS_GHC -XNoImplicitPrelude #-}
+
+#include "Typeable.h"
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Control.Exception
@@ -46,6 +49,7 @@ module Control.Exception (
         RecConError(..),
         RecSelError(..),
         RecUpdError(..),
+        ErrorCall(..),
 
         -- * Throwing exceptions
         throwIO,        -- :: Exception -> IO a
@@ -557,7 +561,7 @@ patError                 s = throw (PatternMatchFail (untangle s "Non-exhaustive
 -----
 
 data PatternMatchFail = PatternMatchFail String
-    deriving Typeable
+INSTANCE_TYPEABLE0(PatternMatchFail,patternMatchFailTc,"PatternMatchFail")
 
 instance Exception PatternMatchFail
 
@@ -567,7 +571,7 @@ instance Show PatternMatchFail where
 -----
 
 data RecSelError = RecSelError String
-    deriving Typeable
+INSTANCE_TYPEABLE0(RecSelError,recSelErrorTc,"RecSelError")
 
 instance Exception RecSelError
 
@@ -577,7 +581,7 @@ instance Show RecSelError where
 -----
 
 data RecConError = RecConError String
-    deriving Typeable
+INSTANCE_TYPEABLE0(RecConError,recConErrorTc,"RecConError")
 
 instance Exception RecConError
 
@@ -587,7 +591,7 @@ instance Show RecConError where
 -----
 
 data RecUpdError = RecUpdError String
-    deriving Typeable
+INSTANCE_TYPEABLE0(RecUpdError,recUpdErrorTc,"RecUpdError")
 
 instance Exception RecUpdError
 
@@ -597,7 +601,7 @@ instance Show RecUpdError where
 -----
 
 data NoMethodError = NoMethodError String
-    deriving Typeable
+INSTANCE_TYPEABLE0(NoMethodError,noMethodErrorTc,"NoMethodError")
 
 instance Exception NoMethodError
 
@@ -607,7 +611,7 @@ instance Show NoMethodError where
 -----
 
 data AssertionFailed = AssertionFailed String
-    deriving Typeable
+INSTANCE_TYPEABLE0(AssertionFailed,assertionFailedTc,"AssertionFailed")
 
 instance Exception AssertionFailed
 
@@ -617,7 +621,7 @@ instance Show AssertionFailed where
 -----
 
 data NonTermination = NonTermination
-    deriving Typeable
+INSTANCE_TYPEABLE0(NonTermination,nonTerminationTc,"NonTermination")
 
 instance Exception NonTermination
 
@@ -631,7 +635,7 @@ nonTermination = toException NonTermination
 -----
 
 data Deadlock = Deadlock
-    deriving Typeable
+INSTANCE_TYPEABLE0(Deadlock,deadlockTc,"Deadlock")
 
 instance Exception Deadlock
 
@@ -641,7 +645,7 @@ instance Show Deadlock where
 -----
 
 data NestedAtomically = NestedAtomically
-    deriving Typeable
+INSTANCE_TYPEABLE0(NestedAtomically,nestedAtomicallyTc,"NestedAtomically")
 
 instance Exception NestedAtomically
 
