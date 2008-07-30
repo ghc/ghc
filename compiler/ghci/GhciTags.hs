@@ -19,7 +19,7 @@ import Name (nameOccName)
 import OccName (pprOccName)
 
 import Data.Maybe
-import Control.Exception
+import Panic
 import Data.List
 import Control.Monad
 import System.IO
@@ -59,7 +59,7 @@ createTagsFile session tagskind tagFile = do
         is_interpreted <- GHC.moduleIsInterpreted session m
         -- should we just skip these?
         when (not is_interpreted) $
-          throwDyn (CmdLineError ("module '" 
+          ghcError (CmdLineError ("module '" 
                                 ++ GHC.moduleNameString (GHC.moduleName m)
                                 ++ "' is not interpreted"))
         mbModInfo <- GHC.getModuleInfo session m
@@ -113,7 +113,7 @@ collateAndWriteTags ETags file tagInfos = do -- etags style, Emacs/XEmacs
   tagGroups <- mapM tagFileGroup groups 
   IO.try (writeFile file $ concat tagGroups)
   where
-    tagFileGroup [] = throwDyn (CmdLineError "empty tag file group??")
+    tagFileGroup [] = ghcError (CmdLineError "empty tag file group??")
     tagFileGroup group@((_,fileName,_,_):_) = do
       file <- readFile fileName -- need to get additional info from sources..
       let byLine (_,_,l1,_) (_,_,l2,_) = l1 <= l2

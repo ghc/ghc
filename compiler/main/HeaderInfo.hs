@@ -40,7 +40,7 @@ import Panic
 import Maybes
 import Bag		( emptyBag, listToBag )
 
-import Control.Exception
+import Exception
 import Control.Monad
 import System.Exit
 import System.IO
@@ -87,7 +87,7 @@ getOptionsFromFile :: DynFlags
                    -> FilePath            -- input file
                    -> IO [Located String] -- options, if any
 getOptionsFromFile dflags filename
-    = Control.Exception.bracket
+    = Exception.bracket
 	      (openBinaryFile filename ReadMode)
               (hClose)
               (\handle ->
@@ -181,7 +181,7 @@ getOptions' dflags buf filename
 
 checkProcessArgsResult :: [String] -> FilePath -> IO ()
 checkProcessArgsResult flags filename
-  = do when (notNull flags) (throwDyn (ProgramError (
+  = do when (notNull flags) (ghcError (ProgramError (
           showSDoc (hang (text filename <> char ':')
                       4 (text "unknown flags in  {-# OPTIONS #-} pragma:" <+>
                           hsep (map text flags)))

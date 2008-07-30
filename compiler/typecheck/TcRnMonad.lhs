@@ -43,7 +43,6 @@ import Util
  
 import System.IO
 import Data.IORef
-import Control.Exception
 import Control.Monad
 \end{code}
 

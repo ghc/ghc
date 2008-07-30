@@ -22,7 +22,6 @@ import Constants
 import Foreign
 import Foreign.C
 import Text.Printf
-import Control.Exception
 
 ----------------------------------------------------------------------------
 
@@ -45,7 +44,7 @@ prepForeignCall cconv arg_types result_type
     let res_ty = primRepToFFIType result_type
     r <- ffi_prep_cif cif abi (fromIntegral n_args) res_ty arg_arr
     if (r /= fFI_OK)
-       then throwDyn (InstallationError 
+       then ghcError (InstallationError 
                         (printf "prepForeignCallFailed: %d" (show r)))
        else return cif
     

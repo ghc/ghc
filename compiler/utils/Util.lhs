@@ -79,8 +79,8 @@ module Util (
 
 import Panic
 
-import Control.Exception ( Exception(..), finally, catchDyn, throw )
-import qualified Control.Exception as Exception
+import Exception ( Exception(..), finally, catchDyn, throw )
+import qualified Exception
 import Data.Dynamic     ( Typeable )
 import Data.IORef       ( IORef, newIORef )
 import System.IO.Unsafe ( unsafePerformIO )

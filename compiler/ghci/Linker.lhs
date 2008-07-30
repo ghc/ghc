@@ -77,7 +77,7 @@ import System.Directory
 
 import Distribution.Package hiding (depends)
 
-import Control.Exception
+import Exception
 import Data.Maybe
 \end{code}
 
@@ -263,7 +263,7 @@ getHValue :: HscEnv -> Name -> IO HValue
 getHValue hsc_env name = do
    when (isExternalName name) $ do
         ok <- linkDependencies hsc_env noSrcSpan [nameModule name]
-        when (failed ok) $ throwDyn (ProgramError "")
+        when (failed ok) $ ghcError (ProgramError "")
    pls <- readIORef v_PersistentLinkerState
    lookupName (closure_env pls) name
         
@@ -413,7 +413,7 @@ reallyInitDynLinker dflags
 	; ok <- resolveObjs
 
 	; if succeeded ok then maybePutStrLn dflags "done"
-	  else throwDyn (InstallationError "linking extra libraries/objects failed")
+	  else ghcError (InstallationError "linking extra libraries/objects failed")
 	}}
 
 classifyLdInput :: FilePath -> IO (Maybe LibrarySpec)
@@ -469,7 +469,7 @@ preloadLib dflags lib_paths framework_paths lib_spec
             if not b then return False
                      else loadObj name >> return True
     
-    give_up = throwDyn $ 
+    give_up = ghcError $ 
 	      CmdLineError "user specified .o/.so/.DLL could not be loaded."
 \end{code}
 
@@ -500,7 +500,7 @@ linkExpr hsc_env span root_ul_bco
 	-- Link the packages and modules required
    ; ok <- linkDependencies hsc_env span needed_mods
    ; if failed ok then
-	throwDyn (ProgramError "")
+	ghcError (ProgramError "")
      else do {
 
 	-- Link the expression itself
@@ -526,7 +526,7 @@ linkExpr hsc_env span root_ul_bco
 	-- by default, so we can safely ignore them here.
  
 dieWith :: SrcSpan -> Message -> IO a
-dieWith span msg = throwDyn (ProgramError (showSDoc (mkLocMessage span msg)))
+dieWith span msg = ghcError (ProgramError (showSDoc (mkLocMessage span msg)))
 
 
 checkNonStdWay :: DynFlags -> SrcSpan -> IO (Maybe String)
@@ -623,7 +623,7 @@ getLinkDeps hsc_env hpt _ maybe_normal_osuf span mods
 
 
     link_boot_mod_error mod = 
-        throwDyn (ProgramError (showSDoc (
+        ghcError (ProgramError (showSDoc (
             text "module" <+> ppr mod <+> 
             text "cannot be linked; it is only available as a boot module")))
 
@@ -999,7 +999,7 @@ linkPackages dflags new_pkgs
 	     ; return (new_pkg : pkgs') }
 
 	| otherwise
-	= throwDyn (CmdLineError ("unknown package: " ++ packageIdString new_pkg))
+	= ghcError (CmdLineError ("unknown package: " ++ packageIdString new_pkg))
 
 
 linkPackage :: DynFlags -> PackageConfig -> IO ()
@@ -1049,13 +1049,13 @@ linkPackage dflags pkg
         maybePutStr dflags "linking ... "
         ok <- resolveObjs
 	if succeeded ok then maybePutStrLn dflags "done."
-	      else throwDyn (InstallationError ("unable to load package `" ++ display (package pkg) ++ "'"))
+	      else ghcError (InstallationError ("unable to load package `" ++ display (package pkg) ++ "'"))
 
 load_dyn :: [FilePath] -> FilePath -> IO ()
 load_dyn dirs dll = do r <- loadDynamic dirs dll
 		       case r of
 			 Nothing  -> return ()
-			 Just err -> throwDyn (CmdLineError ("can't load .so/.DLL for: " 
+			 Just err -> ghcError (CmdLineError ("can't load .so/.DLL for: " 
                                  			      ++ dll ++ " (" ++ err ++ ")" ))
 
 loadFrameworks :: InstalledPackageInfo_ ModuleName -> IO ()
@@ -1069,7 +1069,7 @@ loadFrameworks pkg
     load fw = do  r <- loadFramework fw_dirs fw
 		  case r of
 		    Nothing  -> return ()
-		    Just err -> throwDyn (CmdLineError ("can't load framework: " 
+		    Just err -> ghcError (CmdLineError ("can't load framework: " 
                                			        ++ fw ++ " (" ++ err ++ ")" ))
 
 -- Try to find an object file for a given library in the given paths.
@@ -1131,7 +1131,7 @@ mkSOName root
 -- name. They are searched for in different paths than normal libraries.
 loadFramework :: [FilePath] -> FilePath -> IO (Maybe String)
 loadFramework extraPaths rootname
-   = do { either_dir <- Control.Exception.try getHomeDirectory
+   = do { either_dir <- Exception.try getHomeDirectory
         ; let homeFrameworkPath = case either_dir of
                                   Left _ -> []
                                   Right dir -> [dir ++ "/Library/Frameworks"]

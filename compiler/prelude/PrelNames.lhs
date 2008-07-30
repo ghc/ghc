@@ -237,7 +237,7 @@ gHC_PRIM, gHC_BOOL, gHC_UNIT, gHC_ORDERING, gHC_GENERICS, gHC_BASE, gHC_ENUM,
     gHC_ST, gHC_ARR, gHC_STABLE, gHC_ADDR, gHC_PTR, gHC_ERR, gHC_REAL,
     gHC_FLOAT, gHC_TOP_HANDLER, sYSTEM_IO, dYNAMIC, tYPEABLE, gENERICS,
     dOTNET, rEAD_PREC, lEX, gHC_INT, gHC_WORD, mONAD, mONAD_FIX, aRROW,
-    gHC_DESUGAR, rANDOM, gHC_EXTS :: Module
+    gHC_DESUGAR, rANDOM, gHC_EXTS, cONTROL_EXCEPTION :: Module
 gHC_PRIM	= mkPrimModule (fsLit "GHC.Prim")   -- Primitive types and values
 gHC_UNIT	= mkPrimModule (fsLit "GHC.Unit")
 gHC_BOOL	= mkPrimModule (fsLit "GHC.Bool")
@@ -281,6 +281,7 @@ aRROW		= mkBaseModule (fsLit "Control.Arrow")
 gHC_DESUGAR = mkBaseModule (fsLit "GHC.Desugar")
 rANDOM		= mkBaseModule (fsLit "System.Random")
 gHC_EXTS	= mkBaseModule (fsLit "GHC.Exts")
+cONTROL_EXCEPTION = mkBaseModule (fsLit "Control.Exception")
 
 mAIN, rOOT_MAIN :: Module
 mAIN	        = mkMainModule_ mAIN_NAME

@@ -78,7 +78,7 @@ import Foreign
 import Foreign.C
 import GHC.Exts
 import Data.Array
-import Control.Exception as Exception
+import Exception
 import Control.Concurrent
 import Data.List (sortBy)
 import Data.IORef
@@ -407,7 +407,7 @@ resume (Session ref) step
        resume = ic_resume ic
 
    case resume of
-     [] -> throwDyn (ProgramError "not stopped at a breakpoint")
+     [] -> ghcError (ProgramError "not stopped at a breakpoint")
      (r:rs) -> do
         -- unbind the temporary locals by restoring the TypeEnv from
         -- before the breakpoint, and drop this Resume from the
@@ -458,16 +458,16 @@ moveHist :: (Int -> Int) -> Session -> IO ([Name], Int, SrcSpan)
 moveHist fn (Session ref) = do
   hsc_env <- readIORef ref
   case ic_resume (hsc_IC hsc_env) of
-     [] -> throwDyn (ProgramError "not stopped at a breakpoint")
+     [] -> ghcError (ProgramError "not stopped at a breakpoint")
      (r:rs) -> do
         let ix = resumeHistoryIx r
             history = resumeHistory r
             new_ix = fn ix
         --
         when (new_ix > length history) $
-           throwDyn (ProgramError "no more logged breakpoints")
+           ghcError (ProgramError "no more logged breakpoints")
         when (new_ix < 0) $
-           throwDyn (ProgramError "already at the beginning of the history")
+           ghcError (ProgramError "already at the beginning of the history")
 
         let
           update_ic apStack mb_info = do
@@ -775,12 +775,12 @@ vanillaProv mod_name = Imported [ImpSpec { is_decl = decl, is_item = ImpAll}]
 mkTopLevEnv :: HomePackageTable -> Module -> IO GlobalRdrEnv
 mkTopLevEnv hpt modl
   = case lookupUFM hpt (moduleName modl) of
-      Nothing -> throwDyn (ProgramError ("mkTopLevEnv: not a home module " ++ 
+      Nothing -> ghcError (ProgramError ("mkTopLevEnv: not a home module " ++ 
                                                 showSDoc (ppr modl)))
       Just details ->
 	 case mi_globals (hm_iface details) of
 		Nothing  -> 
-		   throwDyn (ProgramError ("mkTopLevEnv: not interpreted " 
+		   ghcError (ProgramError ("mkTopLevEnv: not interpreted " 
 						++ showSDoc (ppr modl)))
 		Just env -> return env
 

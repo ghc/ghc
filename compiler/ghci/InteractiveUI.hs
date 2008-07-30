@@ -68,7 +68,7 @@ import System.Console.Editline.Readline as Readline
 
 --import SystemExts
 
-import Control.Exception as Exception
+import Exception
 -- import Control.Concurrent
 
 import System.FilePath
@@ -857,7 +857,7 @@ help :: String -> GHCi ()
 help _ = io (putStr helpText)
 
 info :: String -> GHCi ()
-info "" = throwDyn (CmdLineError "syntax: ':i <thing-you-want-info-about>'")
+info "" = ghcError (CmdLineError "syntax: ':i <thing-you-want-info-about>'")
 info s  = do { let names = words s
 	     ; session <- getSession
 	     ; dflags <- getDynFlags
@@ -947,7 +947,7 @@ editFile str =
      st <- getGHCiState
      let cmd = editor st
      when (null cmd) 
-       $ throwDyn (CmdLineError "editor not set, use :set editor")
+       $ ghcError (CmdLineError "editor not set, use :set editor")
      io $ system (cmd ++ ' ':file)
      return ()
 
@@ -979,7 +979,7 @@ chooseEditFile =
          do targets <- io (GHC.getTargets session)
             case msum (map fromTarget targets) of
               Just file -> return file
-              Nothing   -> throwDyn (CmdLineError "No files to edit.")
+              Nothing   -> ghcError (CmdLineError "No files to edit.")
           
   where fromTarget (GHC.Target (GHC.TargetFile f _) _) = Just f
         fromTarget _ = Nothing -- when would we get a module target?
@@ -996,7 +996,7 @@ defineMacro overwrite s = do
                                   unlines defined)
 	else do
   if (not overwrite && macro_name `elem` defined)
-	then throwDyn (CmdLineError 
+	then ghcError (CmdLineError 
 		("macro '" ++ macro_name ++ "' is already defined"))
 	else do
 
@@ -1025,7 +1025,7 @@ undefineMacro str = mapM_ undef (words str)
  where undef macro_name = do
         cmds <- io (readIORef macros_ref)
         if (macro_name `notElem` map cmdName cmds) 
-      	   then throwDyn (CmdLineError 
+      	   then ghcError (CmdLineError 
       		("macro '" ++ macro_name ++ "' is not defined"))
       	   else do
             io (writeIORef macros_ref (filter ((/= macro_name) . cmdName) cmds))
@@ -1239,8 +1239,8 @@ browseCmd bang m =
         case (as,bs) of
           (as@(_:_), _)   -> browseModule bang (last as) True
           ([],  bs@(_:_)) -> browseModule bang (last bs) True
-          ([],  [])  -> throwDyn (CmdLineError ":browse: no current module")
-    _ -> throwDyn (CmdLineError "syntax:  :browse <module>")
+          ([],  [])  -> ghcError (CmdLineError ":browse: no current module")
+    _ -> ghcError (CmdLineError "syntax:  :browse <module>")
 
 -- without bang, show items in context of their parents and omit children
 -- with bang, show class methods and data constructors separately, and
@@ -1264,7 +1264,7 @@ browseModule bang modl exports_only = do
 
   mb_mod_info <- io $ GHC.getModuleInfo s modl
   case mb_mod_info of
-    Nothing -> throwDyn (CmdLineError ("unknown module: " ++
+    Nothing -> ghcError (CmdLineError ("unknown module: " ++
                                 GHC.moduleNameString (GHC.moduleName modl)))
     Just mod_info -> do
         dflags <- getDynFlags
@@ -1336,7 +1336,7 @@ setContext str
        playCtxtCmd True (cmd, as, bs)
        st <- getGHCiState
        setGHCiState st{ remembered_ctx = remembered_ctx st ++ [(cmd,as,bs)] }
-  | otherwise = throwDyn (CmdLineError "syntax:  :module [+/-] [*]M1 ... [*]Mn")
+  | otherwise = ghcError (CmdLineError "syntax:  :module [+/-] [*]M1 ... [*]Mn")
   where
     (cmd, strs, as, bs) =
         case str of 
@@ -1507,7 +1507,7 @@ newDynFlags minus_opts = do
       io $ handleFlagWarnings dflags' warns
 
       if (not (null leftovers))
-		then throwDyn (CmdLineError ("unrecognised flags: " ++ 
+		then ghcError (CmdLineError ("unrecognised flags: " ++ 
 						unwords leftovers))
 		else return ()
 
@@ -1541,7 +1541,7 @@ unsetOptions str
        mapM_ unsetOpt plus_opts
  
        let no_flag ('-':'f':rest) = return ("-fno-" ++ rest)
-           no_flag f = throwDyn (ProgramError ("don't know how to reverse " ++ f))
+           no_flag f = ghcError (ProgramError ("don't know how to reverse " ++ f))
 
        no_flags <- mapM no_flag minus_opts
        newDynFlags no_flags
@@ -1596,7 +1596,7 @@ showCmd str = do
         ["context"]  -> showContext
         ["packages"]  -> showPackages
         ["languages"]  -> showLanguages
-	_ -> throwDyn (CmdLineError ("syntax:  :show [ args | prog | prompt | editor | stop | modules | bindings\n"++
+	_ -> ghcError (CmdLineError ("syntax:  :show [ args | prog | prompt | editor | stop | modules | bindings\n"++
                                      "               | breaks | context | packages | languages ]"))
 
 showModules :: GHCi ()
@@ -1880,7 +1880,7 @@ wantInterpretedModule str = do
    modl <- lookupModule str
    is_interpreted <- io (GHC.moduleIsInterpreted session modl)
    when (not is_interpreted) $
-       throwDyn (CmdLineError ("module '" ++ str ++ "' is not interpreted"))
+       ghcError (CmdLineError ("module '" ++ str ++ "' is not interpreted"))
    return modl
 
 wantNameFromInterpretedModule :: (Name -> SDoc -> GHCi ()) -> String
@@ -2094,7 +2094,7 @@ breakByModuleLine mod line args
    | otherwise = breakSyntax
 
 breakSyntax :: a
-breakSyntax = throwDyn (CmdLineError "Syntax: :break [<mod>] <line> [<column>]")
+breakSyntax = ghcError (CmdLineError "Syntax: :break [<mod>] <line> [<column>]")
 
 findBreakAndSet :: Module -> (TickArray -> Maybe (Int, SrcSpan)) -> GHCi ()
 findBreakAndSet mod lookupTickTree = do 

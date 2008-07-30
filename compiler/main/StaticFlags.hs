@@ -86,7 +86,6 @@ import Util
 import Maybes		( firstJust )
 import Panic
 
-import Control.Exception ( throwDyn )
 import Data.IORef
 import System.IO.Unsafe	( unsafePerformIO )
 import Control.Monad	( when )
@@ -99,10 +98,10 @@ import Data.List
 parseStaticFlags :: [String] -> IO ([String], [String])
 parseStaticFlags args = do
   ready <- readIORef v_opt_C_ready
-  when ready $ throwDyn (ProgramError "Too late for parseStaticFlags: call it before newSession")
+  when ready $ ghcError (ProgramError "Too late for parseStaticFlags: call it before newSession")
 
   (leftover, errs, warns1) <- processArgs static_flags args
-  when (not (null errs)) $ throwDyn (UsageError (unlines errs))
+  when (not (null errs)) $ ghcError (UsageError (unlines errs))
 
     -- deal with the way flags: the way (eg. prof) gives rise to
     -- further flags, some of which might be static.
@@ -463,7 +462,7 @@ decodeSize str
   | c == "K" || c == "k" = truncate (n * 1000)
   | c == "M" || c == "m" = truncate (n * 1000 * 1000)
   | c == "G" || c == "g" = truncate (n * 1000 * 1000 * 1000)
-  | otherwise            = throwDyn (CmdLineError ("can't decode size: " ++ str))
+  | otherwise            = ghcError (CmdLineError ("can't decode size: " ++ str))
   where (m, c) = span pred str
         n      = readRational m
 	pred c = isDigit c || c == '.'
@@ -549,7 +548,7 @@ findBuildTag = do
   let ws = sort (nub way_names)
 
   if not (allowed_combination ws)
-      then throwDyn (CmdLineError $
+      then ghcError (CmdLineError $
       		    "combination not supported: "  ++
       		    foldr1 (\a b -> a ++ '/':b) 
       		    (map (wayName . lkupWay) ws))

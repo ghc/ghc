@@ -20,8 +20,7 @@ import StringBuffer
 import ErrUtils  ( mkLocMessage )
 import SrcLoc
 import Outputable
-import Panic     ( GhcException(..) )
-import Control.Exception ( throwDyn )
+import Panic
 
 }
 
@@ -162,7 +161,7 @@ loadPackageConfig dflags conf_filename = do
    let loc  = mkSrcLoc (mkFastString conf_filename) 1 0
    case unP parse (mkPState buf loc dflags) of
 	PFailed span err -> 
-           throwDyn (InstallationError (showSDoc (mkLocMessage span err)))
+           ghcError (InstallationError (showSDoc (mkLocMessage span err)))
 
 	POk _ pkg_details -> do
 	    return pkg_details

@@ -69,7 +69,7 @@ import DriverPhases     ( Phase(..), phaseInputExt )
 import Config
 import CmdLineParser
 import Constants        ( mAX_CONTEXT_REDUCTION_DEPTH )
-import Panic            ( panic, GhcException(..) )
+import Panic
 import UniqFM           ( UniqFM )
 import Util
 import Maybes           ( orElse )
@@ -78,7 +78,6 @@ import Outputable
 import {-# SOURCE #-} ErrUtils ( Severity(..), Message, mkLocMessage )
 
 import Data.IORef       ( readIORef )
-import Control.Exception ( throwDyn )
 import Control.Monad    ( when )
 
 import Data.Char
@@ -1668,7 +1667,7 @@ parseDynamicFlags dflags args = do
   let ((leftover, errs, warns), dflags')
           = runCmdLine (processArgs dynamic_flags args') dflags
   when (not (null errs)) $ do
-    throwDyn (UsageError (unlines errs))
+    ghcError (UsageError (unlines errs))
   return (dflags', leftover, warns)
 
 type DynP = CmdLineP DynFlags
@@ -1760,7 +1759,7 @@ ignorePackage p =
 setPackageName :: String -> DynFlags -> DynFlags
 setPackageName p
   | Nothing <- unpackPackageId pid
-  = throwDyn (CmdLineError ("cannot parse \'" ++ p ++ "\' as a package identifier"))
+  = ghcError (CmdLineError ("cannot parse \'" ++ p ++ "\' as a package identifier"))
   | otherwise
   = \s -> s{ thisPackage = pid }
   where

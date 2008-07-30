@@ -49,7 +49,6 @@ import Constants
 import Data.List
 import Foreign
 import Foreign.C
-import Control.Exception	( throwDyn )
 
 import GHC.Exts		( Int(..), ByteArray# )
 
@@ -1401,7 +1400,7 @@ idSizeW id = cgRepSizeW (typeCgRep (idType id))
 -- See bug #1257
 unboxedTupleException :: a
 unboxedTupleException 
-   = throwDyn 
+   = ghcError 
         (ProgramError 
            ("Error: bytecode compiler can't handle unboxed tuples.\n"++
             "  Possibly due to foreign import/export decls in source.\n"++

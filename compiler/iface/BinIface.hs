@@ -44,7 +44,6 @@ import Data.List
 import Data.Word
 import Data.Array
 import Data.IORef
-import Control.Exception
 import Control.Monad
 
 data CheckHiWay = CheckHiWay | IgnoreHiWay
@@ -82,7 +81,7 @@ readBinIface_ checkHiWay traceBinIFaceReading hi_path nc = do
       errorOnMismatch what wanted got
             -- This will be caught by readIface which will emit an error
             -- msg containing the iface module name.
-          = when (wanted /= got) $ throwDyn $ ProgramError
+          = when (wanted /= got) $ ghcError $ ProgramError
                         (what ++ " (wanted " ++ show wanted
                               ++ ", got "    ++ show got ++ ")")
   bh <- Binary.readBinMem hi_path

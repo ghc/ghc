@@ -31,7 +31,7 @@ import Outputable
 import SrcLoc
 import PprTyThing
 
-import Control.Exception
+import Exception
 import Control.Monad
 import Data.List
 import Data.Maybe

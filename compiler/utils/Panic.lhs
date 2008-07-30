@@ -35,10 +35,9 @@ import System.Posix.Signals
 import GHC.ConsoleHandler
 #endif
 
-import Control.Exception
+import Exception
 import Control.Concurrent ( MVar, ThreadId, withMVar, newMVar )
 import Data.Dynamic
-import qualified Control.Exception as Exception
 import Debug.Trace	( trace )
 import System.IO.Unsafe	( unsafePerformIO )
 import System.IO.Error	( isUserError )

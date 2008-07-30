@@ -69,7 +69,7 @@ import qualified Language.Haskell.TH as TH
 import qualified Language.Haskell.TH.Syntax as TH
 
 import GHC.Exts		( unsafeCoerce#, Int#, Int(..) )
-import qualified Control.Exception  as Exception( userErrors )
+import qualified Exception ( userErrors )
 \end{code}
 
 Note [Template Haskell levels]

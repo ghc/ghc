@@ -50,7 +50,7 @@ import SrcLoc		( unLoc )
 import SrcLoc		( Located(..) )
 import FastString
 
-import Control.Exception as Exception
+import Exception
 import Data.IORef	( readIORef, writeIORef, IORef )
 import GHC.Exts		( Int(..) )
 import System.Directory
@@ -351,7 +351,7 @@ compileFile :: HscEnv -> Phase -> (FilePath, Maybe Phase) -> IO FilePath
 compileFile hsc_env stop_phase (src, mb_phase) = do
    exists <- doesFileExist src
    when (not exists) $ 
-   	throwDyn (CmdLineError ("does not exist: " ++ src))
+   	ghcError (CmdLineError ("does not exist: " ++ src))
    
    let
         dflags = hsc_dflags hsc_env
@@ -451,7 +451,7 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_phase) mb_basename output maybe_lo
   -- before B in a normal compilation pipeline.
 
   when (not (start_phase `happensBefore` stop_phase)) $
-	throwDyn (UsageError 
+	ghcError (UsageError 
 		    ("cannot compile this file to desired target: "
 		       ++ input_fn))
 
@@ -777,7 +777,7 @@ runPhase (Hsc src_flavour) stop hsc_env basename suff input_fn get_output_fn _ma
                           Nothing       -- No "module i of n" progress info
 
 	case mbResult of
-          Nothing -> throwDyn (PhaseFailed "hsc" (ExitFailure 1))
+          Nothing -> ghcError (PhaseFailed "hsc" (ExitFailure 1))
           Just HscNoRecomp
               -> do SysTools.touch dflags' "Touching object file" o_file
                     -- The .o file must have a later modification date
@@ -818,7 +818,7 @@ runPhase Cmm stop hsc_env basename _ input_fn get_output_fn maybe_loc
 
 	ok <- hscCmmFile hsc_env' input_fn
 
-	when (not ok) $ throwDyn (PhaseFailed "cmm" (ExitFailure 1))
+	when (not ok) $ ghcError (PhaseFailed "cmm" (ExitFailure 1))
 
 	return (next_phase, dflags, maybe_loc, output_fn)
 
@@ -1352,7 +1352,7 @@ linkBinary dflags o_files dep_packages = do
     -- parallel only: move binary to another dir -- HWL
     success <- runPhase_MoveBinary dflags output_fn dep_packages
     if success then return ()
-               else throwDyn (InstallationError ("cannot move binary"))
+               else ghcError (InstallationError ("cannot move binary"))
 
 
 exeFileName :: DynFlags -> FilePath

@@ -33,7 +33,6 @@ import FastString
 
 import ErrUtils         ( debugTraceMsg, putMsg )
 
-import Control.Exception
 import System.Exit      ( ExitCode(..), exitWith )
 import System.Directory
 import System.FilePath
@@ -171,7 +170,7 @@ processDeps :: DynFlags
 
 processDeps _ _ _ _ (CyclicSCC nodes)
   =     -- There shouldn't be any cycles; report them
-    throwDyn (ProgramError (showSDoc $ GHC.cyclicModuleErr nodes))
+    ghcError (ProgramError (showSDoc $ GHC.cyclicModuleErr nodes))
 
 processDeps dflags session excl_mods hdl (AcyclicSCC node)
   = do  { hsc_env <- GHC.sessionHscEnv session

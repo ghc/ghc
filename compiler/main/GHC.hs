@@ -274,7 +274,7 @@ import qualified Data.List as List
 import Control.Monad
 import System.Exit	( exitWith, ExitCode(..) )
 import System.Time	( ClockTime, getClockTime )
-import Control.Exception as Exception hiding (handle)
+import Exception hiding (handle)
 import Data.IORef
 import System.FilePath
 import System.IO
@@ -1554,7 +1554,7 @@ topSortModuleGraph drop_hs_boot_nodes summaries (Just mod)
 	(graph, vertex_fn, key_fn) = graphFromEdges' nodes
 	root 
 	  | Just key <- lookup_key HsSrcFile mod, Just v <- key_fn key = v
-	  | otherwise  = throwDyn (ProgramError "module does not exist")
+	  | otherwise  = ghcError (ProgramError "module does not exist")
 
 moduleGraphNodes :: Bool -> [ModSummary]
   -> ([(ModSummary, Int, [Int])], HscSource -> ModuleName -> Maybe Int)
@@ -2246,11 +2246,11 @@ findModule s mod_name maybe_pkg = withSession s $ \hsc_env ->
 	  res <- findImportedModule hsc_env mod_name maybe_pkg
 	  case res of
 	    Found _ m | modulePackageId m /= this_pkg -> return m
-		      | otherwise -> throwDyn (CmdLineError (showSDoc $
+		      | otherwise -> ghcError (CmdLineError (showSDoc $
 					text "module" <+> quotes (ppr (moduleName m)) <+>
 					text "is not loaded"))
 	    err -> let msg = cannotFindModule dflags mod_name err in
-		   throwDyn (CmdLineError (showSDoc msg))
+		   ghcError (CmdLineError (showSDoc msg))
 
 #ifdef GHCI
 getHistorySpan :: Session -> History -> IO SrcSpan

@@ -61,7 +61,6 @@ import System.FilePath
 import Data.Maybe
 import Control.Monad
 import Data.List
-import Control.Exception        ( throwDyn )
 
 -- ---------------------------------------------------------------------------
 -- The Package state
@@ -687,7 +686,7 @@ closeDeps pkg_map ps = throwErr (closeDepsErr pkg_map ps)
 
 throwErr :: MaybeErr Message a -> IO a
 throwErr m = case m of
-		Failed e    -> throwDyn (CmdLineError (showSDoc e))
+		Failed e    -> ghcError (CmdLineError (showSDoc e))
 		Succeeded r -> return r
 
 closeDepsErr :: PackageConfigMap -> [(PackageId,Maybe PackageId)]
@@ -710,7 +709,7 @@ add_package pkg_db ps (p, mb_parent)
     	   return (p : ps')
 
 missingPackageErr :: String -> IO [PackageConfig]
-missingPackageErr p = throwDyn (CmdLineError (showSDoc (missingPackageMsg p)))
+missingPackageErr p = ghcError (CmdLineError (showSDoc (missingPackageMsg p)))
 
 missingPackageMsg :: String -> SDoc
 missingPackageMsg p = ptext (sLit "unknown package:") <+> text p

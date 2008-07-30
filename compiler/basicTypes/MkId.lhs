@@ -1141,12 +1141,12 @@ realWorldName    = mkWiredInIdName gHC_PRIM (fsLit "realWorld#")    realWorldPri
 lazyIdName       = mkWiredInIdName gHC_BASE (fsLit "lazy")         lazyIdKey           lazyId
 
 errorName                = mkWiredInIdName gHC_ERR (fsLit "error")            errorIdKey eRROR_ID
-recSelErrorName          = mkWiredInIdName gHC_ERR (fsLit "recSelError")     recSelErrorIdKey rEC_SEL_ERROR_ID
-runtimeErrorName         = mkWiredInIdName gHC_ERR (fsLit "runtimeError")    runtimeErrorIdKey rUNTIME_ERROR_ID
-irrefutPatErrorName      = mkWiredInIdName gHC_ERR (fsLit "irrefutPatError") irrefutPatErrorIdKey iRREFUT_PAT_ERROR_ID
-recConErrorName          = mkWiredInIdName gHC_ERR (fsLit "recConError")     recConErrorIdKey rEC_CON_ERROR_ID
-patErrorName             = mkWiredInIdName gHC_ERR (fsLit "patError")         patErrorIdKey pAT_ERROR_ID
-noMethodBindingErrorName = mkWiredInIdName gHC_ERR (fsLit "noMethodBindingError")
+recSelErrorName          = mkWiredInIdName cONTROL_EXCEPTION (fsLit "recSelError")     recSelErrorIdKey rEC_SEL_ERROR_ID
+runtimeErrorName         = mkWiredInIdName cONTROL_EXCEPTION (fsLit "runtimeError")    runtimeErrorIdKey rUNTIME_ERROR_ID
+irrefutPatErrorName      = mkWiredInIdName cONTROL_EXCEPTION (fsLit "irrefutPatError") irrefutPatErrorIdKey iRREFUT_PAT_ERROR_ID
+recConErrorName          = mkWiredInIdName cONTROL_EXCEPTION (fsLit "recConError")     recConErrorIdKey rEC_CON_ERROR_ID
+patErrorName             = mkWiredInIdName cONTROL_EXCEPTION (fsLit "patError")         patErrorIdKey pAT_ERROR_ID
+noMethodBindingErrorName = mkWiredInIdName cONTROL_EXCEPTION (fsLit "noMethodBindingError")
                                            noMethodBindingErrorIdKey nO_METHOD_BINDING_ERROR_ID
 nonExhaustiveGuardsErrorName 
   = mkWiredInIdName gHC_ERR (fsLit "nonExhaustiveGuardsError") 

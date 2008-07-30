@@ -42,7 +42,6 @@ import GHC.Word		( Word(..) )
 import Data.Array.Base
 import GHC.Arr		( STArray(..) )
 
-import Control.Exception ( throwDyn )
 import Control.Monad	( zipWithM )
 import Control.Monad.ST ( stToIO )
 
@@ -245,7 +244,7 @@ lookupIE ie con_nm
 
 linkFail :: String -> String -> IO a
 linkFail who what
-   = throwDyn (ProgramError $
+   = ghcError (ProgramError $
         unlines [ ""
 	        , "During interactive linking, GHCi couldn't find the following symbol:"
 		, ' ' : ' ' : what 

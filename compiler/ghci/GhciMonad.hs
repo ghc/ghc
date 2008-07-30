@@ -28,7 +28,7 @@ import StaticFlags
 
 import Data.Maybe
 import Numeric
-import Control.Exception as Exception
+import Exception
 import Data.Array
 import Data.Char
 import Data.Int         ( Int64 )

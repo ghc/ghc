@@ -44,7 +44,6 @@ import Util
 import Panic
 
 -- Standard Haskell libraries
-import Control.Exception ( throwDyn )
 import System.IO
 import System.Environment
 import System.Exit
@@ -188,7 +187,7 @@ main =
 #ifndef GHCI
 interactiveUI :: a -> b -> c -> IO ()
 interactiveUI _ _ _ = 
-  throwDyn (CmdLineError "not built for interactive use")
+  ghcError (CmdLineError "not built for interactive use")
 #endif
 
 -- -----------------------------------------------------------------------------
@@ -249,24 +248,24 @@ checkOptions cli_mode dflags srcs objs = do
 	-- -prof and --interactive are not a good combination
    when (notNull (filter (not . isRTSWay) (wayNames dflags))
          && isInterpretiveMode cli_mode) $
-      do throwDyn (UsageError 
+      do ghcError (UsageError 
                    "--interactive can't be used with -prof or -unreg.")
 	-- -ohi sanity check
    if (isJust (outputHi dflags) && 
       (isCompManagerMode cli_mode || srcs `lengthExceeds` 1))
-	then throwDyn (UsageError "-ohi can only be used when compiling a single source file")
+	then ghcError (UsageError "-ohi can only be used when compiling a single source file")
 	else do
 
 	-- -o sanity checking
    if (srcs `lengthExceeds` 1 && isJust (outputFile dflags)
 	 && not (isLinkMode cli_mode))
-	then throwDyn (UsageError "can't apply -o to multiple source files")
+	then ghcError (UsageError "can't apply -o to multiple source files")
 	else do
 
 	-- Check that there are some input files
 	-- (except in the interactive case)
    if null srcs && null objs && needsInputsMode cli_mode
-	then throwDyn (UsageError "no input files")
+	then ghcError (UsageError "no input files")
 	else do
 
      -- Verify that output files point somewhere sensible.
@@ -297,7 +296,7 @@ verifyOutputFiles dflags = do
      when (not flg) (nonExistentDir "-ohi" hi)
  where
    nonExistentDir flg dir = 
-     throwDyn (CmdLineError ("error: directory portion of " ++ 
+     ghcError (CmdLineError ("error: directory portion of " ++ 
                              show dir ++ " does not exist (used with " ++ 
 			     show flg ++ " option.)"))
 
@@ -360,7 +359,7 @@ parseModeFlags args = do
   let ((leftover, errs, warns), (mode, _, flags')) =
 	 runCmdLine (processArgs mode_flags args) (StopBefore StopLn, "", []) 
   when (not (null errs)) $ do
-    throwDyn (UsageError (unlines errs))
+    ghcError (UsageError (unlines errs))
   return (mode, flags' ++ leftover, warns)
 
 type ModeM = CmdLineP (CmdLineMode, String, [String])
@@ -427,7 +426,7 @@ updateMode :: (CmdLineMode -> CmdLineMode) -> String -> ModeM ()
 updateMode f flag = do
   (old_mode, old_flag, flags') <- getCmdLineState
   if notNull old_flag && flag /= old_flag
-      then throwDyn (UsageError
+      then ghcError (UsageError
                ("cannot use `" ++ old_flag ++ "' with `" ++ flag ++ "'"))
       else putCmdLineState (f old_mode, flag, flags')
 
@@ -441,7 +440,7 @@ addFlag s = do
 -- Run --make mode
 
 doMake :: Session -> [(String,Maybe Phase)] -> IO ()
-doMake _    []    = throwDyn (UsageError "no input files")
+doMake _    []    = ghcError (UsageError "no input files")
 doMake sess srcs  = do 
     let (hs_srcs, non_hs_srcs) = partition haskellish srcs
 
@@ -560,4 +559,4 @@ countFS entries longest is_z has_z (b:bs) =
 -- Util
 
 unknownFlagsErr :: [String] -> a
-unknownFlagsErr fs = throwDyn (UsageError ("unrecognised flags: " ++ unwords fs))
+unknownFlagsErr fs = ghcError (UsageError ("unrecognised flags: " ++ unwords fs))

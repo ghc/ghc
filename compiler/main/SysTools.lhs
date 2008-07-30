@@ -48,7 +48,7 @@ import Util
 import DynFlags
 import FiniteMap
 
-import Control.Exception
+import Exception
 import Data.IORef
 import Control.Monad
 import System.Exit
@@ -209,7 +209,7 @@ initSysTools mbMinusB dflags0
         -- Check that the package config exists
         ; config_exists <- doesFileExist pkgconfig_path
         ; when (not config_exists) $
-             throwDyn (InstallationError
+             ghcError (InstallationError
                          ("Can't find package.conf as " ++ pkgconfig_path))
 
         -- On Windows, gcc and friends are distributed with GHC,
@@ -330,7 +330,7 @@ findTopDir mbMinusB
                       -> do maybe_exec_dir <- getBaseDir -- Get directory of executable
                             case maybe_exec_dir of       -- (only works on Windows;
                                                          --  returns Nothing on Unix)
-                              Nothing  -> throwDyn (InstallationError "missing -B<dir> option")
+                              Nothing  -> ghcError (InstallationError "missing -B<dir> option")
                               Just dir -> return dir
 \end{code}
 
@@ -677,9 +677,9 @@ runSomethingFiltered dflags filter_fn phase_name pgm args mb_env = do
                  then return (ExitFailure 1, True)
                  else IO.ioError err)
   case (doesn'tExist, exit_code) of
-     (True, _)        -> throwDyn (InstallationError ("could not execute: " ++ pgm))
+     (True, _)        -> ghcError (InstallationError ("could not execute: " ++ pgm))
      (_, ExitSuccess) -> return ()
-     _                -> throwDyn (PhaseFailed phase_name exit_code)
+     _                -> ghcError (PhaseFailed phase_name exit_code)
 
 builderMainLoop :: DynFlags -> (String -> String) -> FilePath
                 -> [String] -> Maybe [(String, String)]
@@ -817,7 +817,7 @@ traceCmd dflags phase_name cmd_line action
   where
     handle_exn _verb exn = do { debugTraceMsg dflags 2 (char '\n')
                               ; debugTraceMsg dflags 2 (ptext (sLit "Failed:") <+> text cmd_line <+> text (show exn))
-                              ; throwDyn (PhaseFailed phase_name (ExitFailure 1)) }
+                              ; ghcError (PhaseFailed phase_name (ExitFailure 1)) }
 \end{code}
 
 %************************************************************************
