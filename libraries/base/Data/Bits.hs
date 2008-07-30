@@ -222,6 +222,10 @@ instance Bits Int where
         i'# = word2Int# (int2Word# i# `and#` int2Word# (wsib -# 1#))
         wsib = WORD_SIZE_IN_BITS#   {- work around preprocessor problem (??) -}
     bitSize  _             = WORD_SIZE_IN_BITS
+
+    {-# INLINE shiftR #-}
+    -- same as the default definition, but we want it inlined (#2376)
+    x `shiftR`  i = x `shift`  (-i)
 #else /* !__GLASGOW_HASKELL__ */
 
 #ifdef __HUGS__
