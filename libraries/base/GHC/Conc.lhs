@@ -440,7 +440,26 @@ thenSTM (STM m) k = STM ( \s ->
 returnSTM :: a -> STM a
 returnSTM x = STM (\s -> (# s, x #))
 
--- | Unsafely performs IO in the STM monad.
+-- | Unsafely performs IO in the STM monad.  Beware: this is a highly
+-- dangerous thing to do.  
+--
+--   * The STM implementation will often run transactions multiple
+--     times, so you need to be prepared for this if your IO has any
+--     side effects.
+--
+--   * The STM implementation will abort transactions that are known to
+--     be invalid and need to be restarted.  This may happen in the middle
+--     of `unsafeIOToSTM`, so make sure you don't acquire any resources
+--     that need releasing (exception handlers are ignored when aborting
+--     the transaction).  That includes doing any IO using Handles, for
+--     example.  Getting this wrong will probably lead to random deadlocks.
+--
+--   * The transaction may have seen an inconsistent view of memory when
+--     the IO runs.  Invariants that you expect to be true throughout
+--     your program may not be true inside a transaction, due to the
+--     way transactions are implemented.  Normally this wouldn't be visible
+--     to the programmer, but using `unsafeIOToSTM` can expose it.
+--
 unsafeIOToSTM :: IO a -> STM a
 unsafeIOToSTM (IO m) = STM m
 
