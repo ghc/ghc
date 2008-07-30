@@ -2092,7 +2092,7 @@ is32BitLit (CmmInt i I64) = is32BitInteger i
    -- assume that labels are in the range 0-2^31-1: this assumes the
    -- small memory model (see gcc docs, -mcmodel=small).
 #endif
-is32BitLit x = False
+is32BitLit x = True
 #endif
 
 is32BitInteger :: Integer -> Bool
