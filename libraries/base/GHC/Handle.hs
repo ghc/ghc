@@ -976,6 +976,9 @@ fdToHandle_stat fd mb_stat is_socket filepath mode binary = do
         -- regular files need to be locked
         RegularFile -> do
 #ifndef mingw32_HOST_OS
+           -- On Windows we use explicit exclusion via sopen() to implement
+           -- this locking (see __hscore_open()); on Unix we have to
+           -- implment it in the RTS.
            r <- lockFile fd dev ino (fromBool write)
            when (r == -1)  $
                 ioException (IOError Nothing ResourceBusy "openFile"
