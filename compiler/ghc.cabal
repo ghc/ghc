@@ -33,6 +33,8 @@ Flag windows
     Description: On a Windows machine
 
 Library
+    Exposed: False
+
     if flag(base3)
         Build-Depends: base       >= 3   && < 4,
                        directory  >= 1   && < 1.1,
