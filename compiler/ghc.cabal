@@ -120,6 +120,7 @@ Library
         BasicTypes
         DataCon
         Demand
+        Exception
         Id
         IdInfo
         Literal
