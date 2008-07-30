@@ -76,6 +76,7 @@ module Control.Exception (
         try,       -- :: IO a -> IO (Either Exception a)
         tryJust,   -- :: (Exception -> Maybe b) -> a    -> IO (Either b a)
         ignoreExceptions,
+        onException,
 
         -- ** The @evaluate@ function
         evaluate,  -- :: a -> IO a
@@ -347,6 +348,10 @@ tryJust p a = do
 
 ignoreExceptions :: IO () -> IO ()
 ignoreExceptions io = io `catchAny` \_ -> return ()
+
+onException :: IO a -> IO () -> IO a
+onException io what = io `catch` \e -> do what
+                                          throw (e :: SomeException)
 
 -----------------------------------------------------------------------------
 -- Some Useful Functions
