@@ -128,9 +128,8 @@ module Control.Exception (
   ) where
 
 #ifdef __GLASGOW_HASKELL__
-import GHC.Base         ( assert )
-import GHC.IOBase
-import GHC.Exception    as ExceptionBase hiding (Exception, catch)
+import GHC.IOBase as ExceptionBase hiding ( catch )
+import GHC.Exception hiding ( Exception )
 import GHC.Conc         ( throwTo, ThreadId )
 import Data.IORef       ( IORef, newIORef, readIORef, writeIORef )
 import Foreign.C.String ( CString, withCString )

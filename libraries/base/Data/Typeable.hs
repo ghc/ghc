@@ -101,8 +101,8 @@ import GHC.IOBase       (IORef,newIORef,unsafePerformIO)
 -- These imports are so we can define Typeable instances
 -- It'd be better to give Typeable instances in the modules themselves
 -- but they all have to be compiled before Typeable
-import GHC.IOBase       ( IO, MVar, Exception, ArithException, IOException, 
-                          ArrayException, AsyncException, Handle )
+import GHC.IOBase       ( IO, MVar, Exception, ArithException, IOException,
+                          ArrayException, AsyncException, Handle, block )
 import GHC.ST           ( ST )
 import GHC.STRef        ( STRef )
 import GHC.Ptr          ( Ptr, FunPtr )
@@ -110,7 +110,6 @@ import GHC.ForeignPtr   ( ForeignPtr )
 import GHC.Stable       ( StablePtr, newStablePtr, freeStablePtr,
                           deRefStablePtr, castStablePtrToPtr,
                           castPtrToStablePtr )
-import GHC.Exception    ( block )
 import GHC.Arr          ( Array, STArray )
 
 #endif

@@ -44,6 +44,8 @@ module GHC.IOBase(
     stackOverflow, heapOverflow, ioException, 
     IOError, IOException(..), IOErrorType(..), ioError, userError,
     ExitCode(..),
+    throwIO, block, unblock, catch, catchAny, catchException,
+    evaluate,
     -- The RTS calls this
     nonTermination,
   ) where
@@ -59,7 +61,8 @@ import GHC.Show
 import GHC.List
 import GHC.Read
 import Foreign.C.Types (CInt)
-import {-# SOURCE #-} GHC.Exception ( SomeException, toException, throwIO )
+import GHC.Exception hiding (Exception)
+import qualified GHC.Exception as Exc
 
 #ifndef __HADDOCK__
 import {-# SOURCE #-} Data.Typeable     ( showsTypeRep )
@@ -717,6 +720,10 @@ data Exception
 nonTermination :: SomeException
 nonTermination = toException NonTermination
 
+-- For now at least, make the monolithic Exception type an instance of
+-- the Exception class
+instance Exc.Exception Exception
+
 -- |The type of arithmetic exceptions
 data ArithException
   = Overflow
@@ -972,3 +979,108 @@ instance Show IOException where
 data IOMode      =  ReadMode | WriteMode | AppendMode | ReadWriteMode
                     deriving (Eq, Ord, Ix, Enum, Read, Show)
 \end{code}
+
+%*********************************************************
+%*                                                      *
+\subsection{Primitive catch and throwIO}
+%*                                                      *
+%*********************************************************
+
+catchException used to handle the passing around of the state to the
+action and the handler.  This turned out to be a bad idea - it meant
+that we had to wrap both arguments in thunks so they could be entered
+as normal (remember IO returns an unboxed pair...).
+
+Now catch# has type
+
+    catch# :: IO a -> (b -> IO a) -> IO a
+
+(well almost; the compiler doesn't know about the IO newtype so we
+have to work around that in the definition of catchException below).
+
+\begin{code} 
+catchException :: Exception e => IO a -> (e -> IO a) -> IO a
+catchException (IO io) handler = IO $ catch# io handler'
+    where handler' e = case fromException e of
+                       Just e' -> unIO (handler e')
+                       Nothing -> raise# e
+
+catchAny :: IO a -> (forall e . Exception e => e -> IO a) -> IO a
+catchAny (IO io) handler = IO $ catch# io handler'
+    where handler' (SomeException e) = unIO (handler e)
+
+-- | A variant of 'throw' that can be used within the 'IO' monad.
+--
+-- Although 'throwIO' has a type that is an instance of the type of 'throw', the
+-- two functions are subtly different:
+--
+-- > throw e   `seq` x  ===> throw e
+-- > throwIO e `seq` x  ===> x
+--
+-- The first example will cause the exception @e@ to be raised,
+-- whereas the second one won\'t.  In fact, 'throwIO' will only cause
+-- an exception to be raised when it is used within the 'IO' monad.
+-- The 'throwIO' variant should be used in preference to 'throw' to
+-- raise an exception within the 'IO' monad because it guarantees
+-- ordering with respect to other 'IO' operations, whereas 'throw'
+-- does not.
+throwIO :: Exception e => e -> IO a
+throwIO e = IO (raiseIO# (toException e))
+\end{code}
+
+
+%*********************************************************
+%*                                                      *
+\subsection{Controlling asynchronous exception delivery}
+%*                                                      *
+%*********************************************************
+
+\begin{code}
+-- | Applying 'block' to a computation will
+-- execute that computation with asynchronous exceptions
+-- /blocked/.  That is, any thread which
+-- attempts to raise an exception in the current thread with 'Control.Exception.throwTo' will be
+-- blocked until asynchronous exceptions are enabled again.  There\'s
+-- no need to worry about re-enabling asynchronous exceptions; that is
+-- done automatically on exiting the scope of
+-- 'block'.
+--
+-- Threads created by 'Control.Concurrent.forkIO' inherit the blocked
+-- state from the parent; that is, to start a thread in blocked mode,
+-- use @block $ forkIO ...@.  This is particularly useful if you need to
+-- establish an exception handler in the forked thread before any
+-- asynchronous exceptions are received.
+block :: IO a -> IO a
+
+-- | To re-enable asynchronous exceptions inside the scope of
+-- 'block', 'unblock' can be
+-- used.  It scopes in exactly the same way, so on exit from
+-- 'unblock' asynchronous exception delivery will
+-- be disabled again.
+unblock :: IO a -> IO a
+
+block (IO io) = IO $ blockAsyncExceptions# io
+unblock (IO io) = IO $ unblockAsyncExceptions# io
+\end{code}
+
+\begin{code}
+-- | Forces its argument to be evaluated when the resultant 'IO' action
+-- is executed.  It can be used to order evaluation with respect to
+-- other 'IO' operations; its semantics are given by
+--
+-- >   evaluate x `seq` y    ==>  y
+-- >   evaluate x `catch` f  ==>  (return $! x) `catch` f
+-- >   evaluate x >>= f      ==>  (return $! x) >>= f
+--
+-- /Note:/ the first equation implies that @(evaluate x)@ is /not/ the
+-- same as @(return $! x)@.  A correct definition is
+--
+-- >   evaluate x = (return $! x) >>= return
+--
+evaluate :: a -> IO a
+evaluate a = IO $ \s -> case a `seq` () of () -> (# s, a #)
+        -- NB. can't write
+        --      a `seq` (# s, a #)
+        -- because we can't have an unboxed tuple as a function argument
+\end{code}
+

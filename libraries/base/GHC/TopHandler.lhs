@@ -33,7 +33,6 @@ import Control.Concurrent.MVar
 import Foreign
 import Foreign.C
 import GHC.IOBase
-import GHC.Exception    ( catchException )
 import GHC.Prim
 import GHC.Conc
 import GHC.Weak

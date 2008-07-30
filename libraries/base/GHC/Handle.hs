@@ -73,7 +73,7 @@ import GHC.Base
 import GHC.Read         ( Read )
 import GHC.List
 import GHC.IOBase
-import GHC.Exception    ( block, catchException, catchAny, throw, throwIO )
+import GHC.Exception    ( throw )
 import GHC.Enum
 import GHC.Num          ( Integer(..), Num(..) )
 import GHC.Show

@@ -121,7 +121,7 @@ import GHC.Base         ( Int(..) )
 import GHC.Read         ( Read )
 import GHC.Enum         ( Enum )
 #endif
-import GHC.Exception    ( catchException, catchAny, throw, block, unblock )
+import GHC.Exception    ( throw )
 import GHC.Pack         ( packCString# )
 import GHC.Ptr          ( Ptr(..), plusPtr, FunPtr(..) )
 import GHC.STRef

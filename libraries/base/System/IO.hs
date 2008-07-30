@@ -171,7 +171,7 @@ import System.Posix.Internals
 #endif
 
 #ifdef __GLASGOW_HASKELL__
-import GHC.Exception    as ExceptionBase hiding (catch)
+import GHC.IOBase       as ExceptionBase
 #endif
 #ifdef __HUGS__
 import Hugs.Exception   as ExceptionBase
