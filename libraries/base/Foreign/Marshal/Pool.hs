@@ -48,7 +48,7 @@ module Foreign.Marshal.Pool (
 import GHC.Base              ( Int, Monad(..), (.), not )
 import GHC.Err               ( undefined )
 import GHC.Exception         ( throw )
-import GHC.IOBase            ( IO, IORef, newIORef, readIORef, writeIORef
+import GHC.IOBase            ( IO, IORef, newIORef, readIORef, writeIORef,
                                block, unblock, catchAny )
 import GHC.List              ( elem, length )
 import GHC.Num               ( Num(..) )

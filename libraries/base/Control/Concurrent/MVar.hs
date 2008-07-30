@@ -46,7 +46,7 @@ import GHC.Conc ( MVar, newEmptyMVar, newMVar, takeMVar, putMVar,
 #endif
 
 import Prelude
-import Control.Exception as Exception
+import Control.Exception
 
 {-|
   This is a combination of 'takeMVar' and 'putMVar'; ie. it takes the value
@@ -85,7 +85,7 @@ withMVar :: MVar a -> (a -> IO b) -> IO b
 withMVar m io =
   block $ do
     a <- takeMVar m
-    b <- Exception.catch (unblock (io a))
+    b <- catchAny (unblock (io a))
             (\e -> do putMVar m a; throw e)
     putMVar m a
     return b
@@ -100,7 +100,7 @@ modifyMVar_ :: MVar a -> (a -> IO a) -> IO ()
 modifyMVar_ m io =
   block $ do
     a  <- takeMVar m
-    a' <- Exception.catch (unblock (io a))
+    a' <- catchAny (unblock (io a))
             (\e -> do putMVar m a; throw e)
     putMVar m a'
 
@@ -113,7 +113,7 @@ modifyMVar :: MVar a -> (a -> IO (a,b)) -> IO b
 modifyMVar m io =
   block $ do
     a      <- takeMVar m
-    (a',b) <- Exception.catch (unblock (io a))
+    (a',b) <- catchAny (unblock (io a))
                 (\e -> do putMVar m a; throw e)
     putMVar m a'
     return b

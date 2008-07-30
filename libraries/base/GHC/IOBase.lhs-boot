@@ -1,9 +1,0 @@
-
-\begin{code}
-{-# OPTIONS_GHC -XNoImplicitPrelude #-}
-
-module GHC.IOBase where
-
-data Exception
-\end{code}
-

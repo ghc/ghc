@@ -95,6 +95,7 @@ import Prelude
 import Control.Exception as Exception
 
 #ifdef __GLASGOW_HASKELL__
+import GHC.Exception
 import GHC.Conc         ( ThreadId(..), myThreadId, killThread, yield,
                           threadDelay, forkIO, childHandler )
 import qualified GHC.Conc
@@ -396,7 +397,7 @@ runInBoundThread action
                             freeStablePtr
                             (\cEntry -> forkOS_entry_reimported cEntry >> readIORef ref)
                 case resultOrException of
-                    Left exception -> Exception.throw exception
+                    Left exception -> Exception.throw (exception :: SomeException)
                     Right result -> return result
     | otherwise = failNonThreaded
 
@@ -420,7 +421,7 @@ runInUnboundThread action = do
             mv <- newEmptyMVar
             forkIO (Exception.try action >>= putMVar mv)
             takeMVar mv >>= \either -> case either of
-                Left exception -> Exception.throw exception
+                Left exception -> Exception.throw (exception :: SomeException)
                 Right result -> return result
         else action
 

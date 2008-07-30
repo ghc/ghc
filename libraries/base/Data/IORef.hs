@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -XNoImplicitPrelude #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.IORef
@@ -27,14 +28,12 @@ module Data.IORef
 #endif
         ) where
 
-import Prelude  -- Explicit dependency helps 'make depend' do the right thing
-
 #ifdef __HUGS__
 import Hugs.IORef
 #endif
 
 #ifdef __GLASGOW_HASKELL__
-import GHC.Base         ( mkWeak#, atomicModifyMutVar# )
+import GHC.Base
 import GHC.STRef
 import GHC.IOBase
 #if !defined(__PARALLEL_HASKELL__)
@@ -61,7 +60,7 @@ mkWeakIORef r@(IORef (STRef r#)) f = IO $ \s ->
 
 -- |Mutate the contents of an 'IORef'
 modifyIORef :: IORef a -> (a -> a) -> IO ()
-modifyIORef ref f = writeIORef ref . f =<< readIORef ref
+modifyIORef ref f = readIORef ref >>= writeIORef ref . f
 
 
 -- |Atomically modifies the contents of an 'IORef'.

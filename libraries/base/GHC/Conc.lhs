@@ -111,7 +111,7 @@ import {-# SOURCE #-} GHC.TopHandler ( reportError, reportStackOverflow )
 import Data.Maybe
 
 import GHC.Base
-import GHC.IOBase
+import GHC.IOBase hiding ( Exception, BlockedOnDeadMVar, BlockedIndefinitely )
 import GHC.Num          ( Num(..) )
 import GHC.Real         ( fromIntegral, div )
 #ifndef mingw32_HOST_OS
@@ -127,6 +127,7 @@ import GHC.Ptr          ( Ptr(..), plusPtr, FunPtr(..) )
 import GHC.STRef
 import GHC.Show         ( Show(..), showString )
 import Data.Typeable
+import Control.OldException hiding (throwTo)
 
 infixr 0 `par`, `pseq`
 \end{code}
@@ -294,6 +295,7 @@ unblock and then re-block exceptions (using 'unblock' and 'block') without recei
 a pending 'throwTo'.  This is arguably undesirable behaviour.
 
  -}
+-- XXX This is duplicated in Control.{Old,}Exception
 throwTo :: ThreadId -> Exception -> IO ()
 throwTo (ThreadId id) ex = IO $ \ s ->
    case (killThread# id ex s) of s1 -> (# s1, () #)

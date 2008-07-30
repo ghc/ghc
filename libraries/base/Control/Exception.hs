@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -XNoImplicitPrelude #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Control.Exception
@@ -28,11 +29,23 @@
 module Control.Exception (
 
         -- * The Exception type
+        SomeException(..),
         Exception(..),          -- instance Eq, Ord, Show, Typeable
         IOException,            -- instance Eq, Ord, Show, Typeable
         ArithException(..),     -- instance Eq, Ord, Show, Typeable
         ArrayException(..),     -- instance Eq, Ord, Show, Typeable
+        AssertionFailed(..),
         AsyncException(..),     -- instance Eq, Ord, Show, Typeable
+        NonTermination(..), nonTermination,
+        BlockedOnDeadMVar(..),
+        BlockedIndefinitely(..),
+        NestedAtomically(..), nestedAtomically,
+        Deadlock(..),
+        NoMethodError(..),
+        PatternMatchFail(..),
+        RecConError(..),
+        RecSelError(..),
+        RecUpdError(..),
 
         -- * Throwing exceptions
         throwIO,        -- :: Exception -> IO a
@@ -50,16 +63,19 @@ module Control.Exception (
 
         -- ** The @catch@ functions
         catch,     -- :: IO a -> (Exception -> IO a) -> IO a
+        catches, Handler(..),
         catchAny,
         catchJust, -- :: (Exception -> Maybe b) -> IO a -> (b -> IO a) -> IO a
 
         -- ** The @handle@ functions
         handle,    -- :: (Exception -> IO a) -> IO a -> IO a
+        handleAny,
         handleJust,-- :: (Exception -> Maybe b) -> (b -> IO a) -> IO a -> IO a
 
         -- ** The @try@ functions
         try,       -- :: IO a -> IO (Either Exception a)
         tryJust,   -- :: (Exception -> Maybe b) -> a    -> IO (Either b a)
+        ignoreExceptions,
 
         -- ** The @evaluate@ function
         evaluate,  -- :: a -> IO a
@@ -67,27 +83,6 @@ module Control.Exception (
         -- ** The @mapException@ function
         mapException,           -- :: (Exception -> Exception) -> a -> a
 
-        -- ** Exception predicates
-        
-        -- $preds
-
-        ioErrors,               -- :: Exception -> Maybe IOError
-        arithExceptions,        -- :: Exception -> Maybe ArithException
-        errorCalls,             -- :: Exception -> Maybe String
-        dynExceptions,          -- :: Exception -> Maybe Dynamic
-        assertions,             -- :: Exception -> Maybe String
-        asyncExceptions,        -- :: Exception -> Maybe AsyncException
-        userErrors,             -- :: Exception -> Maybe String
-
-        -- * Dynamic exceptions
-
-        -- $dynamic
-        throwDyn,       -- :: Typeable ex => ex -> b
-#ifdef __GLASGOW_HASKELL__
-        throwDynTo,     -- :: Typeable ex => ThreadId -> ex -> b
-#endif
-        catchDyn,       -- :: Typeable ex => IO a -> (ex -> IO a) -> IO a
-        
         -- * Asynchronous Exceptions
 
         -- $async
@@ -120,7 +115,10 @@ module Control.Exception (
         bracketOnError,
 
         finally,        -- :: IO a -> IO b -> IO a
-        
+
+        recSelError, recConError, irrefutPatError, runtimeError,
+        nonExhaustiveGuardsError, patError, noMethodBindingError,
+
 #ifdef __GLASGOW_HASKELL__
         setUncaughtExceptionHandler,      -- :: (Exception -> IO ()) -> IO ()
         getUncaughtExceptionHandler       -- :: IO (Exception -> IO ())
@@ -128,22 +126,24 @@ module Control.Exception (
   ) where
 
 #ifdef __GLASGOW_HASKELL__
-import GHC.IOBase as ExceptionBase hiding ( catch )
+import GHC.Base
+import {-# SOURCE #-} GHC.Handle
+import GHC.List
+import GHC.Num
+import GHC.Show
+import GHC.IOBase as ExceptionBase
 import GHC.Exception hiding ( Exception )
-import GHC.Conc         ( throwTo, ThreadId )
-import Data.IORef       ( IORef, newIORef, readIORef, writeIORef )
+import {-# SOURCE #-} GHC.Conc         ( ThreadId(ThreadId) )
 import Foreign.C.String ( CString, withCString )
-import System.IO        ( stdout, hFlush )
 #endif
 
 #ifdef __HUGS__
 import Hugs.Exception   as ExceptionBase
 #endif
 
-import Prelude          hiding ( catch )
-import System.IO.Error  hiding ( catch, try )
-import System.IO.Unsafe (unsafePerformIO)
 import Data.Dynamic
+import Data.Either
+import Data.Maybe
 
 #ifdef __NHC__
 import qualified System.IO.Error as H'98 (catch)
@@ -179,24 +179,6 @@ throw     = unsafePerformIO . throwIO
 
 evaluate :: a -> IO a
 evaluate x = x `seq` return x
-
-ioErrors        :: Exception -> Maybe IOError
-ioErrors        (IOException e)     = Just e
-ioErrors        _                   = Nothing
-arithExceptions :: Exception -> Maybe ArithException
-arithExceptions (ArithException e)  = Just e
-arithExceptions _                   = Nothing
-errorCalls      :: Exception -> Maybe String
-errorCalls       = const Nothing
-dynExceptions   :: Exception -> Maybe Dynamic
-dynExceptions    = const Nothing
-assertions      :: Exception -> Maybe String
-assertions       = const Nothing
-asyncExceptions :: Exception -> Maybe AsyncException
-asyncExceptions  = const Nothing
-userErrors      :: Exception -> Maybe String
-userErrors (IOException (UserError _ s)) = Just s
-userErrors  _                            = Nothing
 
 assert :: Bool -> a -> a
 assert True  x = x
@@ -263,17 +245,27 @@ blocked  = return False
 -- and then using @C.catch@
 --
 #ifndef __NHC__
-catch   :: IO a                 -- ^ The computation to run
-        -> (Exception -> IO a)  -- ^ Handler to invoke if an exception is raised
-        -> IO a                 
-catch =  ExceptionBase.catchException
+catch   :: Exception e
+        => IO a         -- ^ The computation to run
+        -> (e -> IO a)  -- ^ Handler to invoke if an exception is raised
+        -> IO a
+catch = ExceptionBase.catchException
+
+catches :: IO a -> [Handler a] -> IO a
+catches io handlers = io `catch` catchesHandler handlers
+
+catchesHandler :: [Handler a] -> SomeException -> IO a
+catchesHandler handlers e = foldr tryHandler (throw e) handlers
+    where tryHandler (Handler handler) res
+              = case fromException e of
+                Just e' -> handler e'
+                Nothing -> res
+
+data Handler a = forall e . Exception e => Handler (e -> IO a)
 #endif
 -- | The function 'catchJust' is like 'catch', but it takes an extra
 -- argument which is an /exception predicate/, a function which
--- selects which type of exceptions we\'re interested in.  There are
--- some predefined exception predicates for useful subsets of
--- exceptions: 'ioErrors', 'arithExceptions', and so on.  For example,
--- to catch just calls to the 'error' function, we could use
+-- selects which type of exceptions we\'re interested in.
 --
 -- >   result <- catchJust errorCalls thing_to_try handler
 --
@@ -281,7 +273,8 @@ catch =  ExceptionBase.catchException
 -- are re-raised, and may be caught by an enclosing
 -- 'catch' or 'catchJust'.
 catchJust
-        :: (Exception -> Maybe b) -- ^ Predicate to select exceptions
+        :: Exception e
+        => (e -> Maybe b)         -- ^ Predicate to select exceptions
         -> IO a                   -- ^ Computation to run
         -> (b -> IO a)            -- ^ Handler
         -> IO a
@@ -295,12 +288,15 @@ catchJust p a handler = catch a handler'
 --
 -- >   do handle (\e -> exitWith (ExitFailure 1)) $
 -- >      ...
-handle     :: (Exception -> IO a) -> IO a -> IO a
+handle     :: Exception e => (e -> IO a) -> IO a -> IO a
 handle     =  flip catch
+
+handleAny  :: (forall e . Exception e => e -> IO a) -> IO a -> IO a
+handleAny  =  flip catchAny
 
 -- | A version of 'catchJust' with the arguments swapped around (see
 -- 'handle').
-handleJust :: (Exception -> Maybe b) -> (b -> IO a) -> IO a -> IO a
+handleJust :: Exception e => (e -> Maybe b) -> (b -> IO a) -> IO a -> IO a
 handleJust p =  flip (catchJust p)
 
 -----------------------------------------------------------------------------
@@ -311,7 +307,7 @@ handleJust p =  flip (catchJust p)
 
 -- Notice that the usage of 'unsafePerformIO' is safe here.
 
-mapException :: (Exception -> Exception) -> a -> a
+mapException :: Exception e => (e -> e) -> a -> a
 mapException f v = unsafePerformIO (catch (evaluate v)
                                           (\x -> throw (f x)))
 
@@ -333,13 +329,13 @@ mapException f v = unsafePerformIO (catch (evaluate v)
 -- except that it catches only the IO and user families of exceptions
 -- (as required by the Haskell 98 @IO@ module).
 
-try :: IO a -> IO (Either Exception a)
+try :: Exception e => IO a -> IO (Either e a)
 try a = catch (a >>= \ v -> return (Right v)) (\e -> return (Left e))
 
 -- | A variant of 'try' that takes an exception predicate to select
 -- which exceptions are caught (c.f. 'catchJust').  If the exception
 -- does not match the predicate, it is re-thrown.
-tryJust :: (Exception -> Maybe b) -> IO a -> IO (Either b a)
+tryJust :: Exception e => (e -> Maybe b) -> IO a -> IO (Either b a)
 tryJust p a = do
   r <- try a
   case r of
@@ -348,89 +344,9 @@ tryJust p a = do
                         Nothing -> throw e
                         Just b  -> return (Left b)
 
------------------------------------------------------------------------------
--- Dynamic exceptions
+ignoreExceptions :: IO () -> IO ()
+ignoreExceptions io = io `catchAny` \_ -> return ()
 
--- $dynamic
---  #DynamicExceptions# Because the 'Exception' datatype is not extensible, there is an
--- interface for throwing and catching exceptions of type 'Dynamic'
--- (see "Data.Dynamic") which allows exception values of any type in
--- the 'Typeable' class to be thrown and caught.
-
--- | Raise any value as an exception, provided it is in the
--- 'Typeable' class.
-throwDyn :: Typeable exception => exception -> b
-#ifdef __NHC__
-throwDyn exception = throw (IOException (UserError "" "dynamic exception"))
-#else
-throwDyn exception = throw (DynException (toDyn exception))
-#endif
-
-#ifdef __GLASGOW_HASKELL__
--- | A variant of 'throwDyn' that throws the dynamic exception to an
--- arbitrary thread (GHC only: c.f. 'throwTo').
-throwDynTo :: Typeable exception => ThreadId -> exception -> IO ()
-throwDynTo t exception = throwTo t (DynException (toDyn exception))
-#endif /* __GLASGOW_HASKELL__ */
-
--- | Catch dynamic exceptions of the required type.  All other
--- exceptions are re-thrown, including dynamic exceptions of the wrong
--- type.
---
--- When using dynamic exceptions it is advisable to define a new
--- datatype to use for your exception type, to avoid possible clashes
--- with dynamic exceptions used in other libraries.
---
-catchDyn :: Typeable exception => IO a -> (exception -> IO a) -> IO a
-#ifdef __NHC__
-catchDyn m k = m        -- can't catch dyn exceptions in nhc98
-#else
-catchDyn m k = catchException m handle
-  where handle ex = case ex of
-                           (DynException dyn) ->
-                                case fromDynamic dyn of
-                                    Just exception  -> k exception
-                                    Nothing -> throw ex
-                           _ -> throw ex
-#endif
-
------------------------------------------------------------------------------
--- Exception Predicates
-
--- $preds
--- These pre-defined predicates may be used as the first argument to
--- 'catchJust', 'tryJust', or 'handleJust' to select certain common
--- classes of exceptions.
-#ifndef __NHC__
-ioErrors                :: Exception -> Maybe IOError
-arithExceptions         :: Exception -> Maybe ArithException
-errorCalls              :: Exception -> Maybe String
-assertions              :: Exception -> Maybe String
-dynExceptions           :: Exception -> Maybe Dynamic
-asyncExceptions         :: Exception -> Maybe AsyncException
-userErrors              :: Exception -> Maybe String
-
-ioErrors (IOException e) = Just e
-ioErrors _ = Nothing
-
-arithExceptions (ArithException e) = Just e
-arithExceptions _ = Nothing
-
-errorCalls (ErrorCall e) = Just e
-errorCalls _ = Nothing
-
-assertions (AssertionFailed e) = Just e
-assertions _ = Nothing
-
-dynExceptions (DynException e) = Just e
-dynExceptions _ = Nothing
-
-asyncExceptions (AsyncException e) = Just e
-asyncExceptions _ = Nothing
-
-userErrors (IOException e) | isUserError e = Just (ioeGetErrorString e)
-userErrors _ = Nothing
-#endif
 -----------------------------------------------------------------------------
 -- Some Useful Functions
 
@@ -462,7 +378,7 @@ bracket
 bracket before after thing =
   block (do
     a <- before 
-    r <- catch 
+    r <- catchAny
            (unblock (thing a))
            (\e -> do { after a; throw e })
     after a
@@ -479,7 +395,7 @@ finally :: IO a         -- ^ computation to run first
         -> IO a         -- returns the value from the first computation
 a `finally` sequel =
   block (do
-    r <- catch 
+    r <- catchAny
              (unblock a)
              (\e -> do { sequel; throw e })
     sequel
@@ -501,7 +417,7 @@ bracketOnError
 bracketOnError before after thing =
   block (do
     a <- before 
-    catch 
+    catchAny
         (unblock (thing a))
         (\e -> do { after a; throw e })
  )
@@ -592,16 +508,17 @@ assert False _ = throw (AssertionFailed "")
 
 #ifdef __GLASGOW_HASKELL__
 {-# NOINLINE uncaughtExceptionHandler #-}
-uncaughtExceptionHandler :: IORef (Exception -> IO ())
+uncaughtExceptionHandler :: IORef (SomeException -> IO ())
 uncaughtExceptionHandler = unsafePerformIO (newIORef defaultHandler)
    where
-      defaultHandler :: Exception -> IO ()
-      defaultHandler ex = do
+      defaultHandler :: SomeException -> IO ()
+      defaultHandler se@(SomeException ex) = do
          (hFlush stdout) `catchAny` (\ _ -> return ())
-         let msg = case ex of
-               Deadlock    -> "no threads to run:  infinite loop or deadlock?"
-               ErrorCall s -> s
-               other       -> showsPrec 0 other ""
+         let msg = case cast ex of
+               Just Deadlock -> "no threads to run:  infinite loop or deadlock?"
+               _ -> case cast ex of
+                    Just (ErrorCall s) -> s
+                    _                  -> showsPrec 0 se ""
          withCString "%s" $ \cfmt ->
           withCString msg $ \cmsg ->
             errorBelch cfmt cmsg
@@ -611,9 +528,161 @@ uncaughtExceptionHandler = unsafePerformIO (newIORef defaultHandler)
 foreign import ccall unsafe "HsBase.h errorBelch2"
    errorBelch :: CString -> CString -> IO ()
 
-setUncaughtExceptionHandler :: (Exception -> IO ()) -> IO ()
+setUncaughtExceptionHandler :: (SomeException -> IO ()) -> IO ()
 setUncaughtExceptionHandler = writeIORef uncaughtExceptionHandler
 
-getUncaughtExceptionHandler :: IO (Exception -> IO ())
+getUncaughtExceptionHandler :: IO (SomeException -> IO ())
 getUncaughtExceptionHandler = readIORef uncaughtExceptionHandler
 #endif
+
+recSelError, recConError, irrefutPatError, runtimeError,
+             nonExhaustiveGuardsError, patError, noMethodBindingError
+        :: Addr# -> a   -- All take a UTF8-encoded C string
+
+recSelError              s = throw (RecSelError (unpackCStringUtf8# s)) -- No location info unfortunately
+runtimeError             s = error (unpackCStringUtf8# s)               -- No location info unfortunately
+
+nonExhaustiveGuardsError s = throw (PatternMatchFail (untangle s "Non-exhaustive guards in"))
+irrefutPatError          s = throw (PatternMatchFail (untangle s "Irrefutable pattern failed for pattern"))
+recConError              s = throw (RecConError      (untangle s "Missing field in record construction"))
+noMethodBindingError     s = throw (NoMethodError    (untangle s "No instance nor default method for class operation"))
+patError                 s = throw (PatternMatchFail (untangle s "Non-exhaustive patterns in"))
+
+-----
+
+data PatternMatchFail = PatternMatchFail String
+    deriving Typeable
+
+instance Exception PatternMatchFail
+
+instance Show PatternMatchFail where
+    showsPrec _ (PatternMatchFail err) = showString err
+
+-----
+
+data RecSelError = RecSelError String
+    deriving Typeable
+
+instance Exception RecSelError
+
+instance Show RecSelError where
+    showsPrec _ (RecSelError err) = showString err
+
+-----
+
+data RecConError = RecConError String
+    deriving Typeable
+
+instance Exception RecConError
+
+instance Show RecConError where
+    showsPrec _ (RecConError err) = showString err
+
+-----
+
+data RecUpdError = RecUpdError String
+    deriving Typeable
+
+instance Exception RecUpdError
+
+instance Show RecUpdError where
+    showsPrec _ (RecUpdError err) = showString err
+
+-----
+
+data NoMethodError = NoMethodError String
+    deriving Typeable
+
+instance Exception NoMethodError
+
+instance Show NoMethodError where
+    showsPrec _ (NoMethodError err) = showString err
+
+-----
+
+data AssertionFailed = AssertionFailed String
+    deriving Typeable
+
+instance Exception AssertionFailed
+
+instance Show AssertionFailed where
+    showsPrec _ (AssertionFailed err) = showString err
+
+-----
+
+data NonTermination = NonTermination
+    deriving Typeable
+
+instance Exception NonTermination
+
+instance Show NonTermination where
+    showsPrec _ NonTermination = showString "<<loop>>"
+
+-- GHC's RTS calls this
+nonTermination :: SomeException
+nonTermination = toException NonTermination
+
+-----
+
+data Deadlock = Deadlock
+    deriving Typeable
+
+instance Exception Deadlock
+
+instance Show Deadlock where
+    showsPrec _ Deadlock = showString "<<deadlock>>"
+
+-----
+
+data NestedAtomically = NestedAtomically
+    deriving Typeable
+
+instance Exception NestedAtomically
+
+instance Show NestedAtomically where
+    showsPrec _ NestedAtomically = showString "Control.Concurrent.STM.atomically was nested"
+
+-- GHC's RTS calls this
+nestedAtomically :: SomeException
+nestedAtomically = toException NestedAtomically
+
+-----
+
+instance Exception Dynamic
+
+-----
+
+assertError :: Addr# -> Bool -> a -> a
+assertError str pred v
+  | pred      = v
+  | otherwise = throw (AssertionFailed (untangle str "Assertion failed"))
+
+{-
+(untangle coded message) expects "coded" to be of the form
+        "location|details"
+It prints
+        location message details
+-}
+untangle :: Addr# -> String -> String
+untangle coded message
+  =  location
+  ++ ": " 
+  ++ message
+  ++ details
+  ++ "\n"
+  where
+    coded_str = unpackCStringUtf8# coded
+
+    (location, details)
+      = case (span not_bar coded_str) of { (loc, rest) ->
+        case rest of
+          ('|':det) -> (loc, ' ' : det)
+          _         -> (loc, "")
+        }
+    not_bar c = c /= '|'
+
+-- XXX From GHC.Conc
+throwTo :: Exception e => ThreadId -> e -> IO ()
+throwTo (ThreadId id) ex = IO $ \ s ->
+   case (killThread# id (toException ex) s) of s1 -> (# s1, () #)
+

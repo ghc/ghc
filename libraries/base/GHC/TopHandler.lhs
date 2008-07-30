@@ -1,4 +1,5 @@
 \begin{code}
+{-# OPTIONS_GHC -XNoImplicitPrelude #-}
 {-# OPTIONS_HADDOCK hide #-}
 -----------------------------------------------------------------------------
 -- |
@@ -24,21 +25,20 @@ module GHC.TopHandler (
 
 #include "HsBaseConfig.h"
 
-import Prelude
-
-import System.IO
-import Control.Exception
+import Control.OldException as Old
+import Data.Maybe
 import Control.Concurrent.MVar
 
 import Foreign
 import Foreign.C
-import GHC.IOBase
-import GHC.Prim
-import GHC.Conc
+import GHC.Base
+import GHC.Conc hiding (throwTo)
+import GHC.Err
+import GHC.Num
+import GHC.Real
+import {-# SOURCE #-} GHC.Handle
+import GHC.IOBase hiding (Exception)
 import GHC.Weak
-#ifdef mingw32_HOST_OS
-import GHC.ConsoleHandler
-#endif
 
 -- | 'runMainIO' is wrapped around 'Main.main' (or whatever main is
 -- called in the program).  It catches otherwise uncaught exceptions,
@@ -56,7 +56,7 @@ runMainIO main =
       a <- main
       cleanUp
       return a
-    `catchException`
+    `Old.catch`
       topHandler
 
 install_interrupt_handler :: IO () -> IO ()
@@ -107,7 +107,7 @@ mkWeakThreadId t@(ThreadId t#) = IO $ \s ->
 -- program.
 --
 runIO :: IO a -> IO a
-runIO main = catchException main topHandler
+runIO main = Old.catch main topHandler
 
 -- | Like 'runIO', but in the event of an exception that causes an exit,
 -- we don't shut down the system cleanly, we just exit.  This is
@@ -122,7 +122,7 @@ runIO main = catchException main topHandler
 -- safeExit.  There is a race to shut down between the main and child threads.
 --
 runIOFastExit :: IO a -> IO a
-runIOFastExit main = catchException main topHandlerFastExit
+runIOFastExit main = Old.catch main topHandlerFastExit
         -- NB. this is used by the testsuite driver
 
 -- | The same as 'runIO', but for non-IO computations.  Used for
@@ -130,10 +130,10 @@ runIOFastExit main = catchException main topHandlerFastExit
 -- are used to export Haskell functions with non-IO types.
 --
 runNonIO :: a -> IO a
-runNonIO a = catchException (a `seq` return a) topHandler
+runNonIO a = Old.catch (a `seq` return a) topHandler
 
 topHandler :: Exception -> IO a
-topHandler err = catchException (real_handler safeExit err) topHandler
+topHandler err = Old.catch (real_handler safeExit err) topHandler
 
 topHandlerFastExit :: Exception -> IO a
 topHandlerFastExit err = 

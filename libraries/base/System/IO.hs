@@ -161,6 +161,8 @@ module System.IO (
     openBinaryTempFile,
   ) where
 
+import Control.Exception hiding (bracket)
+
 #ifndef __NHC__
 import Data.Bits
 import Data.List

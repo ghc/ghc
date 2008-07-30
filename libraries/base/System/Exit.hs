@@ -61,9 +61,9 @@ import System
 
 #ifndef __NHC__
 exitWith :: ExitCode -> IO a
-exitWith ExitSuccess = throwIO (ExitException ExitSuccess)
+exitWith ExitSuccess = throwIO ExitSuccess
 exitWith code@(ExitFailure n)
-  | n /= 0 = throwIO (ExitException code)
+  | n /= 0 = throwIO code
 #ifdef __GLASGOW_HASKELL__
   | otherwise = ioError (IOError Nothing InvalidArgument "exitWith" "ExitFailure 0" Nothing)
 #endif

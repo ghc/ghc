@@ -101,8 +101,7 @@ import GHC.IOBase       (IORef,newIORef,unsafePerformIO)
 -- These imports are so we can define Typeable instances
 -- It'd be better to give Typeable instances in the modules themselves
 -- but they all have to be compiled before Typeable
-import GHC.IOBase       ( IO, MVar, Exception, ArithException, IOException,
-                          ArrayException, AsyncException, Handle, block )
+import GHC.IOBase       ( IO, MVar, Handle, block )
 import GHC.ST           ( ST )
 import GHC.STRef        ( STRef )
 import GHC.Ptr          ( Ptr, FunPtr )
@@ -495,11 +494,6 @@ INSTANCE_TYPEABLE1(IO,ioTc,"IO")
 #if defined(__GLASGOW_HASKELL__) || defined(__HUGS__)
 -- Types defined in GHC.IOBase
 INSTANCE_TYPEABLE1(MVar,mvarTc,"MVar" )
-INSTANCE_TYPEABLE0(Exception,exceptionTc,"Exception")
-INSTANCE_TYPEABLE0(IOException,ioExceptionTc,"IOException")
-INSTANCE_TYPEABLE0(ArithException,arithExceptionTc,"ArithException")
-INSTANCE_TYPEABLE0(ArrayException,arrayExceptionTc,"ArrayException")
-INSTANCE_TYPEABLE0(AsyncException,asyncExceptionTc,"AsyncException")
 #endif
 
 -- Types defined in GHC.Arr

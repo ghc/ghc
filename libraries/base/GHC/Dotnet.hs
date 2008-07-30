@@ -42,7 +42,7 @@ checkResult fun = IO $ \ st ->
   case fun st of
     (# st1, res, err #)
       | err `eqAddr#` nullAddr# -> (# st1, res #)
-      | otherwise               -> throw (IOException (raiseError err)) st1
+      | otherwise               -> throw (raiseError err) st1
 
 -- ToDo: attach finaliser.
 unmarshalObject :: Addr# -> Object a

@@ -23,20 +23,11 @@
 -- #hide
 module GHC.Err
        (
-         irrefutPatError
-       , noMethodBindingError
-       , nonExhaustiveGuardsError
-       , patError
-       , recSelError
-       , recConError
-       , runtimeError              -- :: Addr#  -> a    -- Addr# points to UTF8 encoded C string
-
-       , absentErr                 -- :: a
+         absentErr                 -- :: a
        , divZeroError              -- :: a
        , overflowError             -- :: a
 
        , error                     -- :: String -> a
-       , assertError               -- :: String -> Bool -> a -> a
 
        , undefined                 -- :: a
        ) where
@@ -84,55 +75,6 @@ absentErr :: a
 absentErr = error "Oops! The program has entered an `absent' argument!\n"
 \end{code}
 
-\begin{code}
-recSelError, recConError, irrefutPatError, runtimeError,
-             nonExhaustiveGuardsError, patError, noMethodBindingError
-        :: Addr# -> a   -- All take a UTF8-encoded C string
-
-recSelError              s = throw (RecSelError (unpackCStringUtf8# s)) -- No location info unfortunately
-runtimeError             s = error (unpackCStringUtf8# s)               -- No location info unfortunately
-
-nonExhaustiveGuardsError s = throw (PatternMatchFail (untangle s "Non-exhaustive guards in"))
-irrefutPatError          s = throw (PatternMatchFail (untangle s "Irrefutable pattern failed for pattern"))
-recConError              s = throw (RecConError      (untangle s "Missing field in record construction"))
-noMethodBindingError     s = throw (NoMethodError    (untangle s "No instance nor default method for class operation"))
-patError                 s = throw (PatternMatchFail (untangle s "Non-exhaustive patterns in"))
-
-assertError :: Addr# -> Bool -> a -> a
-assertError str pred v 
-  | pred      = v
-  | otherwise = throw (AssertionFailed (untangle str "Assertion failed"))
-\end{code}
-
-
-(untangle coded message) expects "coded" to be of the form 
-
-        "location|details"
-
-It prints
-
-        location message details
-
-\begin{code}
-untangle :: Addr# -> String -> String
-untangle coded message
-  =  location
-  ++ ": " 
-  ++ message
-  ++ details
-  ++ "\n"
-  where
-    coded_str = unpackCStringUtf8# coded
-
-    (location, details)
-      = case (span not_bar coded_str) of { (loc, rest) ->
-        case rest of
-          ('|':det) -> (loc, ' ' : det)
-          _         -> (loc, "")
-        }
-    not_bar c = c /= '|'
-\end{code}
-
 Divide by zero and arithmetic overflow.
 We put them here because they are needed relatively early
 in the libraries before the Exception type has been defined yet.
@@ -140,10 +82,10 @@ in the libraries before the Exception type has been defined yet.
 \begin{code}
 {-# NOINLINE divZeroError #-}
 divZeroError :: a
-divZeroError = throw (ArithException DivideByZero)
+divZeroError = throw DivideByZero
 
 {-# NOINLINE overflowError #-}
 overflowError :: a
-overflowError = throw (ArithException Overflow)
+overflowError = throw Overflow
 \end{code}
 

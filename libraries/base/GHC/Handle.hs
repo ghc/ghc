@@ -73,7 +73,7 @@ import GHC.Base
 import GHC.Read         ( Read )
 import GHC.List
 import GHC.IOBase
-import GHC.Exception    ( throw )
+import GHC.Exception
 import GHC.Enum
 import GHC.Num          ( Integer(..), Num(..) )
 import GHC.Show
@@ -145,11 +145,8 @@ withHandle' fun h m act =
    block $ do
    h_ <- takeMVar m
    checkBufferInvariants h_
-   (h',v)  <- catchException (act h_)
-                (\ err -> putMVar m h_ >>
-                          case err of
-                             IOException ex -> ioError (augmentIOError ex fun h)
-                             _ -> throw err)
+   (h',v)  <- (act h_ `catchAny` \err -> putMVar m h_ >> throw err)
+              `catchException` \ex -> ioError (augmentIOError ex fun h)
    checkBufferInvariants h'
    putMVar m h'
    return v
@@ -164,11 +161,8 @@ withHandle_' fun h m act =
    block $ do
    h_ <- takeMVar m
    checkBufferInvariants h_
-   v  <- catchException (act h_)
-                (\ err -> putMVar m h_ >>
-                          case err of
-                             IOException ex -> ioError (augmentIOError ex fun h)
-                             _ -> throw err)
+   v  <- (act h_ `catchAny` \err -> putMVar m h_ >> throw err)
+         `catchException` \ex -> ioError (augmentIOError ex fun h)
    checkBufferInvariants h_
    putMVar m h_
    return v
@@ -183,11 +177,8 @@ withHandle__' fun h m act =
    block $ do
    h_ <- takeMVar m
    checkBufferInvariants h_
-   h'  <- catchException (act h_)
-                (\ err -> putMVar m h_ >>
-                          case err of
-                             IOException ex -> ioError (augmentIOError ex fun h)
-                             _ -> throw err)
+   h'  <- (act h_ `catchAny` \err -> putMVar m h_ >> throw err)
+          `catchException` \ex -> ioError (augmentIOError ex fun h)
    checkBufferInvariants h'
    putMVar m h'
    return ()
@@ -308,9 +299,9 @@ ioe_notSeekable_notBin = ioException
       "seek operations on text-mode handles are not allowed on this platform"
         Nothing)
 
-ioe_finalizedHandle fp = throw (IOException
+ioe_finalizedHandle fp = throw
    (IOError Nothing IllegalOperation ""
-        "handle is finalized" (Just fp)))
+        "handle is finalized" (Just fp))
 
 ioe_bufsiz :: Int -> IO a
 ioe_bufsiz n = ioException
@@ -1137,14 +1128,14 @@ hClose' h m = withHandle' "hClose" h m $ hClose_help
 -- then closed immediately.  We have to be careful with DuplexHandles
 -- though: we have to leave the closing to the finalizer in that case,
 -- because the write side may still be in use.
-hClose_help :: Handle__ -> IO (Handle__, Maybe Exception)
+hClose_help :: Handle__ -> IO (Handle__, Maybe SomeException)
 hClose_help handle_ =
   case haType handle_ of 
       ClosedHandle -> return (handle_,Nothing)
       _ -> do flushWriteBufferOnly handle_ -- interruptible
               hClose_handle_ handle_
 
-hClose_handle_ :: Handle__ -> IO (Handle__, Maybe Exception)
+hClose_handle_ :: Handle__ -> IO (Handle__, Maybe SomeException)
 hClose_handle_ handle_ = do
     let fd = haFD handle_
 

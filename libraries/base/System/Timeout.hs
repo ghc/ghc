@@ -19,11 +19,12 @@ timeout :: Int -> IO a -> IO (Maybe a)
 timeout n f = fmap Just f
 #else
 
-import Prelude             (IO, Ord((<)), Eq((==)), Int, (.), otherwise, fmap)
+import Prelude             (Show(show), IO, Ord((<)), Eq((==)), Int,
+                            (.), otherwise, fmap)
 import Data.Maybe          (Maybe(..))
 import Control.Monad       (Monad(..), guard)
 import Control.Concurrent  (forkIO, threadDelay, myThreadId, killThread)
-import Control.Exception   (handleJust, throwDynTo, dynExceptions, bracket)
+import Control.Exception   (Exception, handleJust, throwTo, bracket)
 import Data.Dynamic        (Typeable, fromDynamic)
 import Data.Unique         (Unique, newUnique)
 
@@ -32,6 +33,11 @@ import Data.Unique         (Unique, newUnique)
 -- expired.
 
 data Timeout = Timeout Unique deriving (Eq, Typeable)
+
+instance Show Timeout where
+    show _ = "<<timeout>>"
+
+instance Exception Timeout
 
 -- |Wrap an 'IO' computation to time out and return @Nothing@ in case no result
 -- is available within @n@ microseconds (@1\/10^6@ seconds). In case a result
@@ -69,9 +75,9 @@ timeout n f
     | otherwise = do
         pid <- myThreadId
         ex  <- fmap Timeout newUnique
-        handleJust (\e -> dynExceptions e >>= fromDynamic >>= guard . (ex ==))
+        handleJust (\e -> if e == ex then Just () else Nothing)
                    (\_ -> return Nothing)
-                   (bracket (forkIO (threadDelay n >> throwDynTo pid ex))
+                   (bracket (forkIO (threadDelay n >> throwTo pid ex))
                             (killThread)
                             (\_ -> fmap Just f))
 #endif

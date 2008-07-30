@@ -90,6 +90,8 @@ module System.IO.Error (
 #endif
   ) where
 
+import {-# SOURCE #-} Prelude (catch)
+
 import Data.Either
 import Data.Maybe
 
