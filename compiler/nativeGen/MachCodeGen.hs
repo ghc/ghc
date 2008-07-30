@@ -2229,7 +2229,7 @@ condIntCode cond (CmmLoad x pk) (CmmLit lit) | is32BitLit lit = do
 -- anything vs zero, using a mask
 -- TODO: Add some sanity checking!!!!
 condIntCode cond (CmmMachOp (MO_And rep) [x,o2]) (CmmLit (CmmInt 0 pk))
-    | (CmmLit (CmmInt mask pk2)) <- o2
+    | (CmmLit lit@(CmmInt mask pk2)) <- o2, is32BitLit lit
     = do
       (x_reg, x_code) <- getSomeReg x
       let
