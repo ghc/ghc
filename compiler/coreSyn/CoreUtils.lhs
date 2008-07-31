@@ -13,35 +13,38 @@ Utility functions on @Core@ syntax
 --     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
 -- for details
 
+-- | Commonly useful utilites for manipulating the Core language
 module CoreUtils (
-	-- Construction
+	-- * Constructing expressions
 	mkInlineMe, mkSCC, mkCoerce, mkCoerceI,
 	bindNonRec, needsCaseBinding,
 	mkIfThenElse, mkAltExpr, mkPiType, mkPiTypes,
 
-	-- Taking expressions apart
+	-- * Taking expressions apart
 	findDefault, findAlt, isDefaultAlt, mergeAlts, trimConArgs,
 
-	-- Properties of expressions
+	-- * Properties of expressions
 	exprType, coreAltType, coreAltsType,
 	exprIsDupable, exprIsTrivial, exprIsCheap, 
 	exprIsHNF,exprOkForSpeculation, exprIsBig, 
 	exprIsConApp_maybe, exprIsBottom,
 	rhsIsStatic,
 
-	-- Arity and eta expansion
+	-- * Arity and eta expansion
 	manifestArity, exprArity, 
 	exprEtaExpandArity, etaExpand, 
 
-	-- Size
+	-- * Expression and bindings size
 	coreBindsSize, exprSize,
 
-	-- Hashing
+	-- * Hashing
 	hashExpr,
 
-	-- Equality
-	cheapEqExpr, tcEqExpr, tcEqExprX, applyTypeToArgs, applyTypeToArg,
+	-- * Equality
+	cheapEqExpr, tcEqExpr, tcEqExprX,
 
+	-- * Manipulating data constructors and types
+	applyTypeToArgs, applyTypeToArg,
         dataConOrigInstPat, dataConRepInstPat, dataConRepFSInstPat
     ) where
 
@@ -93,7 +96,9 @@ import GHC.Exts		-- For `xori`
 
 \begin{code}
 exprType :: CoreExpr -> Type
-
+-- ^ Recover the type of a well-typed Core expression. Fails when
+-- applied to the actual 'CoreSyn.Type' expression as it cannot
+-- really be said to have a type
 exprType (Var var)	     = idType var
 exprType (Lit lit)	     = literalType lit
 exprType (Let _ body)	     = exprType body
@@ -108,38 +113,38 @@ exprType e@(App _ _)
 exprType other = pprTrace "exprType" (pprCoreExpr other) alphaTy
 
 coreAltType :: CoreAlt -> Type
+-- ^ Returns the type of the alternatives right hand side
 coreAltType (_,_,rhs) = exprType rhs
 
 coreAltsType :: [CoreAlt] -> Type
+-- ^ Returns the type of the first alternative, which should be the same as for all alternatives
 coreAltsType (alt:_) = coreAltType alt
 coreAltsType []	     = panic "corAltsType"
 \end{code}
 
-@mkPiType@ makes a (->) type or a forall type, depending on whether
-it is given a type variable or a term variable.  We cleverly use the
-lbvarinfo field to figure out the right annotation for the arrove in
-case of a term variable.
-
 \begin{code}
-mkPiType  :: Var   -> Type -> Type	-- The more polymorphic version
-mkPiTypes :: [Var] -> Type -> Type	--    doesn't work...
-
-mkPiTypes vs ty = foldr mkPiType ty vs
+mkPiType  :: Var   -> Type -> Type
+-- ^ Makes a @(->)@ type or a forall type, depending
+-- on whether it is given a type variable or a term variable.
+mkPiTypes :: [Var] -> Type -> Type
+-- ^ 'mkPiType' for multiple type or value arguments
 
 mkPiType v ty
    | isId v    = mkFunTy (idType v) ty
    | otherwise = mkForAllTy v ty
+
+mkPiTypes vs ty = foldr mkPiType ty vs
 \end{code}
 
 \begin{code}
 applyTypeToArg :: Type -> CoreExpr -> Type
+-- ^ Determines the type resulting from applying an expression to a function with the given type
 applyTypeToArg fun_ty (Type arg_ty) = applyTy fun_ty arg_ty
 applyTypeToArg fun_ty _             = funResultTy fun_ty
 
 applyTypeToArgs :: CoreExpr -> Type -> [CoreExpr] -> Type
--- A more efficient version of applyTypeToArg 
--- when we have several args
--- The first argument is just for debugging
+-- ^ A more efficient version of 'applyTypeToArg' when we have several arguments.
+-- The first argument is just for debugging, and gives some context
 applyTypeToArgs _ op_ty [] = op_ty
 
 applyTypeToArgs e op_ty (Type ty : args)
@@ -156,8 +161,6 @@ applyTypeToArgs e op_ty (_ : args)
 	Just (_, res_ty) -> applyTypeToArgs e res_ty args
 	Nothing -> pprPanic "applyTypeToArgs" (pprCoreExpr e $$ ppr op_ty)
 \end{code}
-
-
 
 %************************************************************************
 %*									*
@@ -198,18 +201,20 @@ its rhs is trivial) and *then* we could get rid of the inline_me.
 But it hardly seems worth it, so I don't bother.
 
 \begin{code}
+-- | Wraps the given expression in an inlining hint unless the expression
+-- is trivial in some sense, so that doing so would usually hurt us
 mkInlineMe :: CoreExpr -> CoreExpr
 mkInlineMe (Var v) = Var v
 mkInlineMe e	   = Note InlineMe e
 \end{code}
 
-
-
 \begin{code}
+-- | Wrap the given expression in the coercion, dropping identity coercions and coalescing nested coercions
 mkCoerceI :: CoercionI -> CoreExpr -> CoreExpr
 mkCoerceI IdCo e = e
 mkCoerceI (ACo co) e = mkCoerce co e
 
+-- | Wrap the given expression in the coercion safely, coalescing nested coercions
 mkCoerce :: Coercion -> CoreExpr -> CoreExpr
 mkCoerce co (Cast expr co2)
   = ASSERT(let { (from_ty, _to_ty) = coercionKind co; 
@@ -227,6 +232,8 @@ mkCoerce co expr
 \end{code}
 
 \begin{code}
+-- | Wraps the given expression in the cost centre unless
+-- in a way that maximises their utility to the user
 mkSCC :: CostCentre -> Expr b -> Expr b
 	-- Note: Nested SCC's *are* preserved for the benefit of
 	--       cost centre stack profiling
@@ -247,20 +254,26 @@ mkSCC cc expr	    	    = Note (SCC cc) expr
 
 \begin{code}
 bindNonRec :: Id -> CoreExpr -> CoreExpr -> CoreExpr
--- (bindNonRec x r b) produces either
---	let x = r in b
--- or
---	case r of x { _DEFAULT_ -> b }
+-- ^ @bindNonRec x r b@ produces either:
 --
--- depending on whether x is unlifted or not
+-- > let x = r in b
+--
+-- or:
+--
+-- > case r of x { _DEFAULT_ -> b }
+--
+-- depending on whether we have to use a @case@ or @let@
+-- binding for the expression (see 'needsCaseBinding').
 -- It's used by the desugarer to avoid building bindings
--- that give Core Lint a heart attack.  Actually the simplifier
--- deals with them perfectly well.
-
+-- that give Core Lint a heart attack, although actually
+-- the simplifier deals with them perfectly well. See
+-- also 'MkCore.mkCoreLet'
 bindNonRec bndr rhs body 
-  | needsCaseBinding (idType bndr) rhs = Case rhs bndr (exprType body) [(DEFAULT,[],body)]
+  | needsCaseBinding (idType bndr) rhs = Case rhs bndr (exprType body) [(DEFAULT, [], body)]
   | otherwise			       = Let (NonRec bndr rhs) body
 
+-- | Tests whether we have to use a @case@ rather than @let@ binding for this expression
+-- as per the invariants of 'CoreExpr': see "CoreSyn#let_app_invariant"
 needsCaseBinding :: Type -> CoreExpr -> Bool
 needsCaseBinding ty rhs = isUnLiftedType ty && not (exprOkForSpeculation rhs)
 	-- Make a case expression instead of a let
@@ -269,9 +282,12 @@ needsCaseBinding ty rhs = isUnLiftedType ty && not (exprOkForSpeculation rhs)
 \end{code}
 
 \begin{code}
-mkAltExpr :: AltCon -> [CoreBndr] -> [Type] -> CoreExpr
-	-- This guy constructs the value that the scrutinee must have
-	-- when you are in one particular branch of a case
+mkAltExpr :: AltCon     -- ^ Case alternative constructor
+          -> [CoreBndr] -- ^ Things bound by the pattern match
+          -> [Type]     -- ^ The type arguments to the case alternative
+          -> CoreExpr
+-- ^ This guy constructs the value that the scrutinee must have
+-- given that you are in one particular branch of a case
 mkAltExpr (DataAlt con) args inst_tys
   = mkConApp con (map Type inst_tys ++ varsToCoreExprs args)
 mkAltExpr (LitAlt lit) [] []
@@ -298,10 +314,13 @@ The default alternative must be first, if it exists at all.
 This makes it easy to find, though it makes matching marginally harder.
 
 \begin{code}
+-- | Extract the default case alternative
 findDefault :: [CoreAlt] -> ([CoreAlt], Maybe CoreExpr)
 findDefault ((DEFAULT,args,rhs) : alts) = ASSERT( null args ) (alts, Just rhs)
 findDefault alts			= 		      (alts, Nothing)
 
+-- | Find the case alternative corresponding to a particular 
+-- constructor: panics if no such constructor exists
 findAlt :: AltCon -> [CoreAlt] -> CoreAlt
 findAlt con alts
   = case alts of
@@ -323,8 +342,8 @@ isDefaultAlt _               = False
 
 ---------------------------------
 mergeAlts :: [CoreAlt] -> [CoreAlt] -> [CoreAlt]
--- Merge preserving order; alternatives in the first arg
--- shadow ones in the second
+-- ^ Merge alternatives preserving order; alternatives in
+-- the first argument shadow ones in the second
 mergeAlts [] as2 = as2
 mergeAlts as1 [] = as1
 mergeAlts (a1:as1) (a2:as2)
@@ -336,9 +355,12 @@ mergeAlts (a1:as1) (a2:as2)
 
 ---------------------------------
 trimConArgs :: AltCon -> [CoreArg] -> [CoreArg]
--- Given 	case (C a b x y) of
---		   C b x y -> ...
--- we want to drop the leading type argument of the scrutinee
+-- ^ Given:
+--
+-- > case (C a b x y) of
+-- >        C b x y -> ...
+--
+-- We want to drop the leading type argument of the scrutinee
 -- leaving the arguments to match agains the pattern
 
 trimConArgs DEFAULT      args = ASSERT( null args ) []
@@ -358,14 +380,11 @@ trimConArgs (DataAlt dc) args = dropList (dataConUnivTyVars dc) args
 		applications.  Note that primop Ids aren't considered
 		trivial unless 
 
-@exprIsBottom@	is true of expressions that are guaranteed to diverge
-
-
 There used to be a gruesome test for (hasNoBinding v) in the
 Var case:
 	exprIsTrivial (Var v) | hasNoBinding v = idArity v == 0
-The idea here is that a constructor worker, like $wJust, is
-really short for (\x -> $wJust x), becuase $wJust has no binding.
+The idea here is that a constructor worker, like \$wJust, is
+really short for (\x -> \$wJust x), becuase \$wJust has no binding.
 So it should be treated like a lambda.  Ditto unsaturated primops.
 But now constructor workers are not "have-no-binding" Ids.  And
 completely un-applied primops and foreign-call Ids are sufficiently
@@ -519,35 +538,39 @@ exprIsCheap other_expr 	-- Applications and variables
   		--	there's no guarantee that (sel d x) will be too.  Hence (n_val_args == 1)
 \end{code}
 
-exprOkForSpeculation returns True of an expression that it is
-
-	* safe to evaluate even if normal order eval might not 
-	  evaluate the expression at all, or
-
-	* safe *not* to evaluate even if normal order would do so
-
-It returns True iff
-
-	the expression guarantees to terminate, 
-	soon, 
-	without raising an exception,
-	without causing a side effect (e.g. writing a mutable variable)
-
-NB: if exprIsHNF e, then exprOkForSpecuation e
-
-E.G.
-	let x = case y# +# 1# of { r# -> I# r# }
-	in E
-==>
-	case y# +# 1# of { r# -> 
-	let x = I# r#
-	in E 
-	}
-
-We can only do this if the (y+1) is ok for speculation: it has no
-side effects, and can't diverge or raise an exception.
-
 \begin{code}
+-- | 'exprOkForSpeculation' returns True of an expression that is:
+--
+--  * Safe to evaluate even if normal order eval might not 
+--    evaluate the expression at all, or
+--
+--  * Safe /not/ to evaluate even if normal order would do so
+--
+-- Precisely, it returns @True@ iff:
+--
+--  * The expression guarantees to terminate, 
+--
+--  * soon, 
+--
+--  * without raising an exception,
+--
+--  * without causing a side effect (e.g. writing a mutable variable)
+--
+-- Note that if @exprIsHNF e@, then @exprOkForSpecuation e@.
+-- As an example of the considerations in this test, consider:
+--
+-- > let x = case y# +# 1# of { r# -> I# r# }
+-- > in E
+--
+-- being translated to:
+--
+-- > case y# +# 1# of { r# -> 
+-- >    let x = I# r#
+-- >    in E 
+-- > }
+-- 
+-- We can only do this if the @y + 1@ is ok for speculation: it has no
+-- side effects, and can't diverge or raise an exception.
 exprOkForSpeculation :: CoreExpr -> Bool
 exprOkForSpeculation (Lit _)     = True
 exprOkForSpeculation (Type _)    = True
@@ -582,9 +605,8 @@ exprOkForSpeculation other_expr
 
     spec_ok _ _ = False
 
+-- | True of dyadic operators that can fail only if the second arg is zero!
 isDivOp :: PrimOp -> Bool
--- True of dyadic operators that can fail 
--- only if the second arg is zero
 -- This function probably belongs in PrimOp, or even in 
 -- an automagically generated file.. but it's such a 
 -- special case I thought I'd leave it here for now.
@@ -599,9 +621,9 @@ isDivOp DoubleDivOp      = True
 isDivOp _                = False
 \end{code}
 
-
 \begin{code}
-exprIsBottom :: CoreExpr -> Bool	-- True => definitely bottom
+-- | True of expressions that are guaranteed to diverge upon execution
+exprIsBottom :: CoreExpr -> Bool
 exprIsBottom e = go 0 e
                where
                 -- n is the number of args
@@ -619,30 +641,36 @@ idAppIsBottom :: Id -> Int -> Bool
 idAppIsBottom id n_val_args = appIsBottom (idNewStrictness id) n_val_args
 \end{code}
 
-@exprIsHNF@ returns true for expressions that are certainly *already* 
-evaluated to *head* normal form.  This is used to decide whether it's ok 
-to change
-
-	case x of _ -> e   ===>   e
-
-and to decide whether it's safe to discard a `seq`
-
-So, it does *not* treat variables as evaluated, unless they say they are.
-
-But it *does* treat partial applications and constructor applications
-as values, even if their arguments are non-trivial, provided the argument
-type is lifted; 
-	e.g.  (:) (f x) (map f xs)	is a value
-	      map (...redex...)		is a value
-Because `seq` on such things completes immediately
-
-For unlifted argument types, we have to be careful:
-		C (f x :: Int#)
-Suppose (f x) diverges; then C (f x) is not a value.  However this can't 
-happen: see CoreSyn Note [CoreSyn let/app invariant].  Args of unboxed
-type must be ok-for-speculation (or trivial).
-
 \begin{code}
+
+-- | This returns true for expressions that are certainly /already/ 
+-- evaluated to /head/ normal form.  This is used to decide whether it's ok 
+-- to change:
+--
+-- > case x of _ -> e
+--
+-- into:
+--
+-- > e
+--
+-- and to decide whether it's safe to discard a 'seq'.
+-- So, it does /not/ treat variables as evaluated, unless they say they are.
+-- However, it /does/ treat partial applications and constructor applications
+-- as values, even if their arguments are non-trivial, provided the argument
+-- type is lifted. For example, both of these are values:
+--
+-- > (:) (f x) (map f xs)
+-- > map (...redex...)
+--
+-- Because 'seq' on such things completes immediately.
+--
+-- For unlifted argument types, we have to be careful:
+--
+-- > C (f x :: Int#)
+--
+-- Suppose @f x@ diverges; then @C (f x)@ is not a value. However this can't 
+-- happen: see "CoreSyn#let_app_invariant". This invariant states that arguments of
+-- unboxed type must be ok-for-speculation (or trivial).
 exprIsHNF :: CoreExpr -> Bool		-- True => Value-lambda, constructor, PAP
 exprIsHNF (Var v) 	-- NB: There are no value args at this point
   =  isDataConWorkId v 	-- Catches nullary constructors, 
@@ -674,10 +702,12 @@ app_is_value (App f a)  as = app_is_value f (a:as)
 app_is_value _          _  = False
 \end{code}
 
+These InstPat functions go here to avoid circularity between DataCon and Id
+
 \begin{code}
 dataConRepInstPat, dataConOrigInstPat :: [Unique] -> DataCon -> [Type] -> ([TyVar], [CoVar], [Id])
 dataConRepFSInstPat :: [FastString] -> [Unique] -> DataCon -> [Type] -> ([TyVar], [CoVar], [Id])
--- These InstPat functions go here to avoid circularity between DataCon and Id
+
 dataConRepInstPat   = dataConInstPat dataConRepArgTys (repeat ((fsLit "ipv")))
 dataConRepFSInstPat = dataConInstPat dataConRepArgTys
 dataConOrigInstPat  = dataConInstPat dc_arg_tys       (repeat ((fsLit "ipv")))
@@ -764,9 +794,9 @@ dataConInstPat arg_fun fss uniqs con inst_tys
     mk_id_var uniq fs ty = mkUserLocal (mkVarOccFS fs) uniq (substTy subst ty) noSrcSpan
     arg_ids = zipWith3 mk_id_var id_uniqs id_fss arg_tys
 
+-- | Returns @Just (dc, [x1..xn])@ if the argument expression is 
+-- a constructor application of the form @dc x1 .. xn@
 exprIsConApp_maybe :: CoreExpr -> Maybe (DataCon, [CoreExpr])
--- Returns (Just (dc, [x1..xn])) if the argument expression is 
--- a constructor application of the form (dc x1 .. xn)
 exprIsConApp_maybe (Cast expr co)
   =     -- Here we do the KPush reduction rule as described in the FC paper
     case exprIsConApp_maybe expr of {
@@ -893,10 +923,10 @@ exprIsConApp_maybe expr = analyse (collectArgs expr)
 %************************************************************************
 
 \begin{code}
+-- ^ The Arity returned is the number of value args the 
+-- expression can be applied to without doing much work
 exprEtaExpandArity :: DynFlags -> CoreExpr -> Arity
-{- The Arity returned is the number of value args the 
-   thing can be applied to without doing much work
-
+{- 
 exprEtaExpandArity is used when eta expanding
 	e  ==>  \xy -> e x y
 
@@ -1098,17 +1128,21 @@ ok_note other    = True
 
 
 \begin{code}
-etaExpand :: Arity	  	-- Result should have this number of value args
-	  -> [Unique]
-	  -> CoreExpr -> Type	-- Expression and its type
+-- | @etaExpand n us e ty@ returns an expression with
+-- the same meaning as @e@, but with arity @n@.
+--
+-- Given:
+--
+-- > e' = etaExpand n us e ty
+--
+-- We should have that:
+--
+-- > ty = exprType e = exprType e'
+etaExpand :: Arity	  	-- ^ Result should have this number of value args
+	  -> [Unique]           -- ^ Uniques to assign to the new binders
+	  -> CoreExpr	        -- ^ Expression to expand
+	  -> Type               -- ^ Type of expression to expand
 	  -> CoreExpr
--- (etaExpand n us e ty) returns an expression with 
--- the same meaning as 'e', but with arity 'n'.  
---
--- Given e' = etaExpand n us e ty
--- We should have
---	ty = exprType e = exprType e'
---
 -- Note that SCCs are not treated specially.  If we have
 --	etaExpand 2 (\x -> scc "foo" e)
 --	= (\xy -> (scc "foo" e) y)
@@ -1257,6 +1291,7 @@ in exprArity.  That is a less local change, so I'm going to leave it for today!
 
 
 \begin{code}
+-- | An approximate, fast, version of 'exprEtaExpandArity'
 exprArity :: CoreExpr -> Arity
 exprArity e = go e
   where
@@ -1289,11 +1324,12 @@ exprArity e = go e
 %*									*
 %************************************************************************
 
-@cheapEqExpr@ is a cheap equality test which bales out fast!
-	True  => definitely equal
-	False => may or may not be equal
-
 \begin{code}
+-- | A cheap equality test which bales out fast!
+--      If it returns @True@ the arguments are definitely equal,
+--      otherwise, they may or may not be equal.
+--
+-- See also 'exprIsBig'
 cheapEqExpr :: Expr b -> Expr b -> Bool
 
 cheapEqExpr (Var v1)   (Var v2)   = v1==v2
@@ -1309,7 +1345,7 @@ cheapEqExpr (Cast e1 t1) (Cast e2 t2)
 cheapEqExpr _ _ = False
 
 exprIsBig :: Expr b -> Bool
--- Returns True of expressions that are too big to be compared by cheapEqExpr
+-- ^ Returns @True@ of expressions that are too big to be compared by 'cheapEqExpr'
 exprIsBig (Lit _)      = False
 exprIsBig (Var _)      = False
 exprIsBig (Type _)     = False
@@ -1321,8 +1357,8 @@ exprIsBig _            = True
 
 \begin{code}
 tcEqExpr :: CoreExpr -> CoreExpr -> Bool
--- Used in rule matching, so does *not* look through 
--- newtypes, predicate types; hence tcEqExpr
+-- ^ A kind of shallow equality used in rule matching, so does 
+-- /not/ look through newtypes or predicate types
 
 tcEqExpr e1 e2 = tcEqExprX rn_env e1 e2
   where
@@ -1378,8 +1414,8 @@ coreBindsSize :: [CoreBind] -> Int
 coreBindsSize bs = foldr ((+) . bindSize) 0 bs
 
 exprSize :: CoreExpr -> Int
-	-- A measure of the size of the expressions
-	-- It also forces the expression pretty drastically as a side effect
+-- ^ A measure of the size of the expressions, strictly greater than 0
+-- It also forces the expression pretty drastically as a side effect
 exprSize (Var v)         = v `seq` 1
 exprSize (Lit lit)       = lit `seq` 1
 exprSize (App f a)       = exprSize f + exprSize a
@@ -1424,16 +1460,16 @@ altSize (c,bs,e) = c `seq` varsSize bs + exprSize e
 
 \begin{code}
 hashExpr :: CoreExpr -> Int
--- Two expressions that hash to the same Int may be equal (but may not be)
--- Two expressions that hash to the different Ints are definitely unequal
+-- ^ Two expressions that hash to the same @Int@ may be equal (but may not be)
+-- Two expressions that hash to the different Ints are definitely unequal.
+--
+-- The emphasis is on a crude, fast hash, rather than on high precision.
 -- 
--- But "unequal" here means "not identical"; two alpha-equivalent 
--- expressions may hash to the different Ints
+-- But unequal here means \"not identical\"; two alpha-equivalent 
+-- expressions may hash to the different Ints.
 --
--- The emphasis is on a crude, fast hash, rather than on high precision
---
--- We must be careful that \x.x and \y.y map to the same hash code,
--- (at least if we want the above invariant to be true)
+-- We must be careful that @\\x.x@ and @\\y.y@ map to the same hash code,
+-- (at least if we want the above invariant to be true).
 
 hashExpr e = fromIntegral (hash_expr (1,emptyVarEnv) e .&. 0x7fffffff)
              -- UniqFM doesn't like negative Ints
@@ -1492,14 +1528,13 @@ arguments, come from another DLL (because we can't refer to static
 labels in other DLLs).
 
 If this happens we simply make the RHS into an updatable thunk, 
-and 'exectute' it rather than allocating it statically.
+and 'execute' it rather than allocating it statically.
 
 \begin{code}
+-- | This function is called only on *top-level* right-hand sides.
+-- Returns @True@ if the RHS can be allocated statically in the output,
+-- with no thunks involved at all.
 rhsIsStatic :: PackageId -> CoreExpr -> Bool
--- This function is called only on *top-level* right-hand sides
--- Returns True if the RHS can be allocated statically, with
--- no thunks involved at all.
---
 -- It's called (i) in TidyPgm.hasCafRefs to decide if the rhs is, or
 -- refers to, CAFs; (ii) in CoreToStg to decide whether to put an
 -- update flag on it and (iii) in DsExpr to decide how to expand
