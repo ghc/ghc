@@ -405,7 +405,7 @@ splitp_blocks p blocks = lift $ foldUFM scan (Nothing, emptyBlockEnv) blocks
           lift (Nothing, _) = Nothing
           lift (Just b, bs) = Just (b, bs)
 
--- | 'insertBlock' should not be used to *replace* an existing block
+-- | 'insertBlock' should not be used to /replace/ an existing block
 -- but only to insert a new one
 insertBlock :: Block m l -> BlockEnv (Block m l) -> BlockEnv (Block m l)
 insertBlock b bs =
