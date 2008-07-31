@@ -25,7 +25,7 @@ module GHC.TopHandler (
 
 #include "HsBaseConfig.h"
 
-import Control.OldException as Old
+import Control.Exception
 import Data.Maybe
 import Control.Concurrent.MVar
 
@@ -37,8 +37,9 @@ import GHC.Err
 import GHC.Num
 import GHC.Real
 import {-# SOURCE #-} GHC.Handle
-import GHC.IOBase hiding (Exception)
+import GHC.IOBase
 import GHC.Weak
+import Data.Typeable
 
 -- | 'runMainIO' is wrapped around 'Main.main' (or whatever main is
 -- called in the program).  It catches otherwise uncaught exceptions,
@@ -52,11 +53,11 @@ runMainIO main =
            m <- deRefWeak weak_tid 
            case m of
                Nothing  -> return ()
-               Just tid -> throwTo tid (AsyncException UserInterrupt)
+               Just tid -> throwTo tid (toException UserInterrupt)
       a <- main
       cleanUp
       return a
-    `Old.catch`
+    `catch`
       topHandler
 
 install_interrupt_handler :: IO () -> IO ()
@@ -107,7 +108,7 @@ mkWeakThreadId t@(ThreadId t#) = IO $ \s ->
 -- program.
 --
 runIO :: IO a -> IO a
-runIO main = Old.catch main topHandler
+runIO main = catch main topHandler
 
 -- | Like 'runIO', but in the event of an exception that causes an exit,
 -- we don't shut down the system cleanly, we just exit.  This is
@@ -122,7 +123,7 @@ runIO main = Old.catch main topHandler
 -- safeExit.  There is a race to shut down between the main and child threads.
 --
 runIOFastExit :: IO a -> IO a
-runIOFastExit main = Old.catch main topHandlerFastExit
+runIOFastExit main = catch main topHandlerFastExit
         -- NB. this is used by the testsuite driver
 
 -- | The same as 'runIO', but for non-IO computations.  Used for
@@ -130,12 +131,12 @@ runIOFastExit main = Old.catch main topHandlerFastExit
 -- are used to export Haskell functions with non-IO types.
 --
 runNonIO :: a -> IO a
-runNonIO a = Old.catch (a `seq` return a) topHandler
+runNonIO a = catch (a `seq` return a) topHandler
 
-topHandler :: Exception -> IO a
-topHandler err = Old.catch (real_handler safeExit err) topHandler
+topHandler :: SomeException -> IO a
+topHandler err = catch (real_handler safeExit err) topHandler
 
-topHandlerFastExit :: Exception -> IO a
+topHandlerFastExit :: SomeException -> IO a
 topHandlerFastExit err = 
   catchException (real_handler fastExit err) topHandlerFastExit
 
@@ -143,29 +144,29 @@ topHandlerFastExit err =
 -- (e.g. evaluating the string passed to 'error' might generate
 --  another error, etc.)
 --
-real_handler :: (Int -> IO a) -> Exception -> IO a
-real_handler exit exn =
+real_handler :: (Int -> IO a) -> SomeException -> IO a
+real_handler exit se@(SomeException exn) =
   cleanUp >>
-  case exn of
-        AsyncException StackOverflow -> do
+  case cast exn of
+      Just StackOverflow -> do
            reportStackOverflow
            exit 2
 
-        AsyncException UserInterrupt  -> exitInterrupted
+      Just UserInterrupt  -> exitInterrupted
 
-        -- only the main thread gets ExitException exceptions
-        ExitException ExitSuccess     -> exit 0
-        ExitException (ExitFailure n) -> exit n
+      _ -> case cast exn of
+           -- only the main thread gets ExitException exceptions
+           Just ExitSuccess     -> exit 0
+           Just (ExitFailure n) -> exit n
 
-        other -> do
-           reportError other
-           exit 1
+           _ -> do reportError se
+                   exit 1
            
 
 reportStackOverflow :: IO a
 reportStackOverflow = do callStackOverflowHook; return undefined
 
-reportError :: Exception -> IO a
+reportError :: SomeException -> IO a
 reportError ex = do
    handler <- getUncaughtExceptionHandler
    handler ex

@@ -111,7 +111,7 @@ import {-# SOURCE #-} GHC.TopHandler ( reportError, reportStackOverflow )
 import Data.Maybe
 
 import GHC.Base
-import GHC.IOBase hiding ( Exception, BlockedOnDeadMVar, BlockedIndefinitely )
+import GHC.IOBase
 import GHC.Num          ( Num(..) )
 import GHC.Real         ( fromIntegral, div )
 #ifndef mingw32_HOST_OS
@@ -121,13 +121,12 @@ import GHC.Base         ( Int(..) )
 import GHC.Read         ( Read )
 import GHC.Enum         ( Enum )
 #endif
-import GHC.Exception    ( throw )
+import GHC.Exception    ( SomeException(..), throw )
 import GHC.Pack         ( packCString# )
 import GHC.Ptr          ( Ptr(..), plusPtr, FunPtr(..) )
 import GHC.STRef
 import GHC.Show         ( Show(..), showString )
 import Data.Typeable
-import Control.OldException hiding (throwTo)
 
 infixr 0 `par`, `pseq`
 \end{code}
@@ -237,20 +236,22 @@ numCapabilities = unsafePerformIO $  do
 
 foreign import ccall "&n_capabilities" n_capabilities :: Ptr CInt
 
-childHandler :: Exception -> IO ()
+childHandler :: SomeException -> IO ()
 childHandler err = catchException (real_handler err) childHandler
 
-real_handler :: Exception -> IO ()
-real_handler ex =
-  case ex of
-        -- ignore thread GC and killThread exceptions:
-        BlockedOnDeadMVar            -> return ()
-        BlockedIndefinitely          -> return ()
-        AsyncException ThreadKilled  -> return ()
-
-        -- report all others:
-        AsyncException StackOverflow -> reportStackOverflow
-        other       -> reportError other
+real_handler :: SomeException -> IO ()
+real_handler se@(SomeException ex) =
+  -- ignore thread GC and killThread exceptions:
+  case cast ex of
+  Just BlockedOnDeadMVar                -> return ()
+  _ -> case cast ex of
+       Just BlockedIndefinitely         -> return ()
+       _ -> case cast ex of
+            Just ThreadKilled           -> return ()
+            _ -> case cast ex of
+                 -- report all others:
+                 Just StackOverflow     -> reportStackOverflow
+                 _                      -> reportError se
 
 {- | 'killThread' terminates the given thread (GHC only).
 Any work already done by the thread isn\'t
@@ -263,7 +264,7 @@ terms of 'throwTo':
 
 -}
 killThread :: ThreadId -> IO ()
-killThread tid = throwTo tid (AsyncException ThreadKilled)
+killThread tid = throwTo tid (toException ThreadKilled)
 
 {- | 'throwTo' raises an arbitrary exception in the target thread (GHC only).
 
@@ -296,7 +297,7 @@ a pending 'throwTo'.  This is arguably undesirable behaviour.
 
  -}
 -- XXX This is duplicated in Control.{Old,}Exception
-throwTo :: ThreadId -> Exception -> IO ()
+throwTo :: ThreadId -> SomeException -> IO ()
 throwTo (ThreadId id) ex = IO $ \ s ->
    case (killThread# id ex s) of s1 -> (# s1, () #)
 
@@ -495,7 +496,7 @@ orElse :: STM a -> STM a -> STM a
 orElse (STM m) e = STM $ \s -> catchRetry# m (unSTM e) s
 
 -- |Exception handling within STM actions.
-catchSTM :: STM a -> (Exception -> STM a) -> STM a
+catchSTM :: STM a -> (SomeException -> STM a) -> STM a
 catchSTM (STM m) k = STM $ \s -> catchSTM# m (\ex -> unSTM (k ex)) s
 
 -- | Low-level primitive on which always and alwaysSucceeds are built.

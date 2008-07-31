@@ -3,8 +3,8 @@
 module GHC.TopHandler ( reportError, reportStackOverflow ) where
 
 import GHC.IOBase (IO)
-import Control.OldException (Exception)
+import Control.Exception (SomeException)
 
-reportError :: Exception -> IO a
+reportError :: SomeException -> IO a
 reportStackOverflow :: IO a
 \end{code}
