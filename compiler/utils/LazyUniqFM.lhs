@@ -13,8 +13,10 @@ Basically, the things need to be in class @Uniquable@, and we use the
 \begin{code}
 {-# OPTIONS -Wall -fno-warn-name-shadowing -Werror #-}
 module LazyUniqFM (
+	-- * Lazy unique-keyed mappings
 	UniqFM,   	-- abstract type
 
+	-- ** Manipulating those mappings
 	emptyUFM,
 	unitUFM,
 	unitDirectlyUFM,
@@ -177,6 +179,7 @@ ufmToList	:: UniqFM elt -> [(Unique, elt)]
 \begin{code}
 data Lazy a = Lazy { fromLazy :: a }
 
+-- | @UniqFM a@ is a mapping from Unique to @a@ where the element @a@ is evaluated lazily.
 newtype UniqFM ele = MkUniqFM (S.UniqFM (Lazy ele))
 
 instance Outputable a => Outputable (UniqFM a) where
