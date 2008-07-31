@@ -15,14 +15,17 @@ Basically, the things need to be in class @Uniquable@, and we use the
 \begin{code}
 {-# OPTIONS -Wall -fno-warn-name-shadowing #-}
 module UniqFM (
+	-- * Unique-keyed mappings
 	UniqFM(..),   	-- abstract type
 			-- (de-abstracted for MachRegs.trivColorable optimisation BL 2007/09)
 
+        -- ** Manipulating those mappings
 	emptyUFM,
 	unitUFM,
 	unitDirectlyUFM,
 	listToUFM,
 	listToUFM_Directly,
+	listToUFM_C,
 	addToUFM,addToUFM_C,addToUFM_Acc,
 	addListToUFM,addListToUFM_C,
 	addToUFM_Directly,
@@ -74,6 +77,9 @@ unitDirectlyUFM -- got the Unique already
 listToUFM	:: Uniquable key => [(key,elt)] -> UniqFM elt
 listToUFM_Directly
 		:: [(Unique, elt)] -> UniqFM elt
+listToUFM_C     :: Uniquable key => (elt -> elt -> elt) 
+                           -> [(key, elt)] 
+                           -> UniqFM elt
 
 addToUFM	:: Uniquable key => UniqFM elt -> key -> elt  -> UniqFM elt
 addListToUFM	:: Uniquable key => UniqFM elt -> [(key,elt)] -> UniqFM elt
@@ -196,11 +202,11 @@ This code is explained in the paper:
 %*									*
 %************************************************************************
 
-@UniqFM a@ is a mapping from Unique to a.
-
 First, the DataType itself; which is either a Node, a Leaf, or an Empty.
 
 \begin{code}
+-- | @UniqFM a@ is a mapping from Unique to @a@. DO NOT use these constructors
+-- directly unless you live in this module!
 data UniqFM ele
   = EmptyUFM
   | LeafUFM !FastInt ele
@@ -243,6 +249,9 @@ listToUFM key_elt_pairs
 
 listToUFM_Directly uniq_elt_pairs
   = addListToUFM_directly_C use_snd EmptyUFM uniq_elt_pairs
+
+listToUFM_C combiner key_elt_pairs
+  = addListToUFM_C combiner EmptyUFM key_elt_pairs
 \end{code}
 
 Now ways of adding things to UniqFMs.
