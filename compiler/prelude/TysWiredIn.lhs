@@ -3,49 +3,54 @@
 %
 \section[TysWiredIn]{Wired-in knowledge about {\em non-primitive} types}
 
-This module is about types that can be defined in Haskell, but which
-must be wired into the compiler nonetheless.
-
 This module tracks the ``state interface'' document, ``GHC prelude:
 types and operations.''
 
 \begin{code}
+-- | This module is about types that can be defined in Haskell, but which
+-- must be wired into the compiler nonetheless.
 module TysWiredIn (
+        -- * All wired in things
 	wiredInTyCons, 
 
+        -- * Bool
 	boolTy,	boolTyCon, boolTyCon_RDR, boolTyConName,
 	trueDataCon,  trueDataConId,  true_RDR,
 	falseDataCon, falseDataConId, false_RDR,
 
+        -- * Char
 	charTyCon, charDataCon, charTyCon_RDR,
 	charTy, stringTy, charTyConName,
 
-	
+	-- * Double
 	doubleTyCon, doubleDataCon, doubleTy, doubleTyConName, 
 	
+	-- * Float
 	floatTyCon, floatDataCon, floatTy, floatTyConName,
 
+        -- * Int
 	intTyCon, intDataCon, intTyCon_RDR, intDataCon_RDR, intTyConName,
 	intTy,
 
+        -- * Word
 	wordTyCon, wordDataCon, wordTyConName, wordTy,
 
+        -- * List
 	listTyCon, nilDataCon, consDataCon,
 	listTyCon_RDR, consDataCon_RDR, listTyConName,
 	mkListTy,
 
-	-- tuples
+	-- * Tuples
 	mkTupleTy,
 	tupleTyCon, tupleCon, 
 	unitTyCon, unitDataCon, unitDataConId, pairTyCon, 
 	unboxedSingletonTyCon, unboxedSingletonDataCon,
 	unboxedPairTyCon, unboxedPairDataCon,
-       
-        boxedTupleArr, unboxedTupleArr,
 
+        -- * Unit
 	unitTy,
 
-        -- parallel arrays
+        -- * Parallel arrays
 	mkPArrTy,
 	parrTyCon, parrFakeCon, isPArrTyCon, isPArrFakeCon,
 	parrTyCon_RDR, parrTyConName
@@ -63,8 +68,8 @@ import Module		( Module )
 import RdrName
 import Name		( Name, BuiltInSyntax(..), nameUnique, nameOccName, 
 			  nameModule, mkWiredInName )
-import OccName		( mkOccNameFS, tcName, dataName, mkTupleOcc,
-			  mkDataConWorkerOcc )
+import OccName		( mkTcOccFS, mkDataOccFS, mkTupleOcc, mkDataConWorkerOcc,
+			  tcName, dataName )
 import DataCon		( DataCon, mkDataCon, dataConWorkId, dataConSourceArity )
 import Var
 import TyCon		( TyCon, AlgTyConRhs(DataTyCon), tyConDataCons,
@@ -136,13 +141,13 @@ wiredInTyCons = [ unitTyCon	-- Not treated like other tuples, because
 \begin{code}
 mkWiredInTyConName :: BuiltInSyntax -> Module -> FastString -> Unique -> TyCon -> Name
 mkWiredInTyConName built_in modu fs unique tycon
-  = mkWiredInName modu (mkOccNameFS tcName fs) unique
+  = mkWiredInName modu (mkTcOccFS fs) unique
 		  (ATyCon tycon)	-- Relevant TyCon
 		  built_in
 
 mkWiredInDataConName :: BuiltInSyntax -> Module -> FastString -> Unique -> DataCon -> Name
 mkWiredInDataConName built_in modu fs unique datacon
-  = mkWiredInName modu (mkOccNameFS dataName fs) unique
+  = mkWiredInName modu (mkDataOccFS fs) unique
 		  (ADataCon datacon)	-- Relevant DataCon
 		  built_in
 
@@ -474,6 +479,7 @@ listTyCon = pcRecDataTyCon listTyConName alpha_tyvar [nilDataCon, consDataCon]
 
 nilDataCon :: DataCon
 nilDataCon  = pcDataCon nilDataConName alpha_tyvar [] listTyCon
+
 consDataCon :: DataCon
 consDataCon = pcDataConWithFixity True {- Declared infix -}
 	       consDataConName
@@ -546,19 +552,17 @@ unitTy = mkTupleTy Boxed 0 []
 Special syntax for parallel arrays needs some wired in definitions.
 
 \begin{code}
--- construct a type representing the application of the parallel array
--- constructor 
---
+-- | Construct a type representing the application of the parallel array constructor 
 mkPArrTy    :: Type -> Type
 mkPArrTy ty  = mkTyConApp parrTyCon [ty]
 
--- represents the type constructor of parallel arrays
+-- | Represents the type constructor of parallel arrays
 --
---  * this must match the definition in `PrelPArr'
+--  * This must match the definition in @PrelPArr@
 --
 -- NB: Although the constructor is given here, it will not be accessible in
 --     user code as it is not in the environment of any compiled module except
---     `PrelPArr'.
+--     @PrelPArr@.
 --
 parrTyCon :: TyCon
 parrTyCon  = pcNonRecDataTyCon parrTyConName alpha_tyvar [parrDataCon]
@@ -573,14 +577,13 @@ parrDataCon  = pcDataCon
 		    alpha_ty] 
 		 parrTyCon
 
--- check whether a type constructor is the constructor for parallel arrays
---
+-- | Check whether a type constructor is the constructor for parallel arrays
 isPArrTyCon    :: TyCon -> Bool
 isPArrTyCon tc  = tyConName tc == parrTyConName
 
--- fake array constructors
+-- | Fake array constructors
 --
---  * these constructors are never really used to represent array values;
+-- * These constructors are never really used to represent array values;
 --   however, they are very convenient during desugaring (and, in particular,
 --   in the pattern matching compiler) to treat array pattern just like
 --   yet another constructor pattern
@@ -604,12 +607,11 @@ mkPArrFakeCon arity  = data_con
 	tyvar     = head alphaTyVars
 	tyvarTys  = replicate arity $ mkTyVarTy tyvar
         nameStr   = mkFastString ("MkPArr" ++ show arity)
-	name      = mkWiredInName gHC_PARR (mkOccNameFS dataName nameStr) unique
+	name      = mkWiredInName gHC_PARR (mkDataOccFS nameStr) unique
 				  (ADataCon data_con) UserSyntax
 	unique      = mkPArrDataConUnique arity
 
--- checks whether a data constructor is a fake constructor for parallel arrays
---
+-- | Checks whether a data constructor is a fake constructor for parallel arrays
 isPArrFakeCon      :: DataCon -> Bool
 isPArrFakeCon dcon  = dcon == parrFakeCon (dataConSourceArity dcon)
 \end{code}
