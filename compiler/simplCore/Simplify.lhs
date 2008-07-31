@@ -13,7 +13,6 @@ import SimplMonad
 import Type hiding      ( substTy, extendTvSubst )
 import SimplEnv
 import SimplUtils
-import Literal		( mkStringLit )
 import MkId		( rUNTIME_ERROR_ID )
 import Id
 import Var
@@ -1263,7 +1262,7 @@ rebuildCase env scrut case_bndr alts cont
 		-- inaccessible.  So we simply put an error case here instead.
 	    pprTrace "mkCase: null alts" (ppr case_bndr <+> ppr scrut) $
 	    let res_ty' = contResultType env' (substTy env' (coreAltsType alts)) dup_cont
-		lit = Lit (mkStringLit "Impossible alternative")
+		lit = mkStringLit "Impossible alternative"
 	    in return (env', mkApps (Var rUNTIME_ERROR_ID) [Type res_ty', lit])
 
 	  else do
