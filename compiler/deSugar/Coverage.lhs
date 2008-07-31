@@ -635,7 +635,7 @@ getFileName = fileName `liftM` getEnv
 sameFileName :: SrcSpan -> TM a -> TM a -> TM a
 sameFileName pos out_of_scope in_scope = do
   file_name <- getFileName
-  case optSrcSpanFileName pos of 
+  case srcSpanFileName_maybe pos of 
     Just file_name2 
       | file_name == file_name2 -> in_scope
     _ -> out_of_scope
