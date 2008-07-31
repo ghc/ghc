@@ -7,7 +7,7 @@ module Dataflow (
 -----------------------------------------------------------------------------
 -- | Solve the fixed-point of a dataflow problem.
 --
--- Complexity: O(N+H*E) calls to 'update' where
+-- Complexity: O(N+H*E) calls to the update function where:
 --   N = number of nodes,
 --   E = number of edges,
 --   H = maximum height of the lattice for any particular node.
