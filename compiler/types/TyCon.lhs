@@ -61,7 +61,7 @@ module TyCon(
 	synTyConDefn, synTyConRhs, synTyConType, synTyConResKind,
 	tyConExtName,		-- External name for foreign types
 
-        maybeTyConSingleCon,
+        tyConSingleDataCon_maybe,
 
 	-- Generics
         tyConHasGenerics
@@ -932,14 +932,14 @@ synTyConResKind tycon  = pprPanic "synTyConResKind" (ppr tycon)
 \end{code}
 
 \begin{code}
-maybeTyConSingleCon :: TyCon -> Maybe DataCon
-maybeTyConSingleCon (AlgTyCon {algTcRhs = DataTyCon {data_cons = [c] }}) = Just c
-maybeTyConSingleCon (AlgTyCon {algTcRhs = NewTyCon { data_con = c }})    = Just c
-maybeTyConSingleCon (AlgTyCon {})	         = Nothing
-maybeTyConSingleCon (TupleTyCon {dataCon = con}) = Just con
-maybeTyConSingleCon (PrimTyCon {})               = Nothing
-maybeTyConSingleCon (FunTyCon {})                = Nothing  -- case at funty
-maybeTyConSingleCon tc = pprPanic "maybeTyConSingleCon: unexpected tycon " $ ppr tc
+tyConSingleDataCon_maybe :: TyCon -> Maybe DataCon
+tyConSingleDataCon_maybe (AlgTyCon {algTcRhs = DataTyCon {data_cons = [c] }}) = Just c
+tyConSingleDataCon_maybe (AlgTyCon {algTcRhs = NewTyCon { data_con = c }})    = Just c
+tyConSingleDataCon_maybe (AlgTyCon {})	         = Nothing
+tyConSingleDataCon_maybe (TupleTyCon {dataCon = con}) = Just con
+tyConSingleDataCon_maybe (PrimTyCon {})               = Nothing
+tyConSingleDataCon_maybe (FunTyCon {})                = Nothing  -- case at funty
+tyConSingleDataCon_maybe tc = pprPanic "tyConSingleDataCon_maybe: unexpected tycon " $ ppr tc
 \end{code}
 
 \begin{code}

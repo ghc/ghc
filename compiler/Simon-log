@@ -710,7 +710,7 @@ To-do
 * Bogus report of overlapped pattern for
 	f (R {field = [c]}) = 1
   	f (R {})	      = 2
-  This shows up for TyCon.maybeTyConSingleCon
+  This shows up for TyCon.tyConSingleDataCon_maybe
 
 *  > module Main( main ) where
 

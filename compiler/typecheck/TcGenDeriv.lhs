@@ -156,7 +156,7 @@ gen_Eq_binds loc tycon
     no_nullary_cons = null nullary_cons
 
     rest | no_nullary_cons
-	 = case maybeTyConSingleCon tycon of
+	 = case tyConSingleDataCon_maybe tycon of
 	    	  Just _ -> []
 	    	  Nothing -> -- if cons don't match, then False
 	    	     [([nlWildPat, nlWildPat], false_Expr)]
@@ -680,7 +680,7 @@ gen_Ix_binds loc tycon
       = listToBag [single_con_range, single_con_index, single_con_inRange]
 
     data_con
-      =	case maybeTyConSingleCon tycon of -- just checking...
+      =	case tyConSingleDataCon_maybe tycon of -- just checking...
 	  Nothing -> panic "get_Ix_binds"
 	  Just dc | any isUnLiftedType (dataConOrigArgTys dc)
 		  -> pprPanic "Can't derive Ix for a single-constructor type with primitive argument types:" (ppr tycon)

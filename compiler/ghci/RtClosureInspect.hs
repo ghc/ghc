@@ -386,7 +386,7 @@ ppr_termM1 NewtypeWrap{} = panic "ppr_termM1 - NewtypeWrap"
 pprNewtypeWrap y p NewtypeWrap{ty=ty, wrapped_term=t} 
   | Just (tc,_) <- splitNewTyConApp_maybe ty
   , ASSERT(isNewTyCon tc) True
-  , Just new_dc <- maybeTyConSingleCon tc = do 
+  , Just new_dc <- tyConSingleDataCon_maybe tc = do 
          real_term <- y max_prec t
          return$ cparen (p >= app_prec) (ppr new_dc <+> real_term)
 pprNewtypeWrap _ _ _ = panic "pprNewtypeWrap"
@@ -682,7 +682,7 @@ cvObtainTerm hsc_env bound force mb_ty hval = runTR hsc_env $ do
    | Just (tc, args) <- splitNewTyConApp_maybe ty
    , isNewTyCon tc
    , wrapped_type    <- newTyConInstRhs tc args
-   , Just dc         <- maybeTyConSingleCon tc
+   , Just dc         <- tyConSingleDataCon_maybe tc
    , t'              <- expandNewtypes t{ ty = wrapped_type
                                         , subTerms = map expandNewtypes tt }
    = NewtypeWrap ty (Right dc) t'
