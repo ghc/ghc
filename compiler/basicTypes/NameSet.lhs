@@ -5,19 +5,26 @@
 
 \begin{code}
 module NameSet (
-	-- Sets of Names
+	-- * Names set type
 	NameSet,
+	
+	-- ** Manipulating these sets
 	emptyNameSet, unitNameSet, mkNameSet, unionNameSets, unionManyNameSets,
 	minusNameSet, elemNameSet, nameSetToList, addOneToNameSet, addListToNameSet, 
 	delFromNameSet, delListFromNameSet, isEmptyNameSet, foldNameSet, filterNameSet,
 	intersectsNameSet, intersectNameSet,
 	
-	-- Free variables
-	FreeVars, isEmptyFVs, emptyFVs, plusFVs, plusFV, 
+	-- * Free variables
+	FreeVars,
+	
+	-- ** Manipulating sets of free variables
+	isEmptyFVs, emptyFVs, plusFVs, plusFV, 
 	mkFVs, addOneFV, unitFV, delFV, delFVs,
 
-	-- Defs and uses
+	-- * Defs and uses
 	Defs, Uses, DefUse, DefUses,
+	
+	-- ** Manipulating defs and uses
 	emptyDUs, usesOnly, mkDUs, plusDU, 
 	findUses, duDefs, duUses, allUses
     ) where
@@ -36,6 +43,7 @@ import UniqSet
 
 \begin{code}
 type NameSet = UniqSet Name
+
 emptyNameSet	   :: NameSet
 unitNameSet	   :: Name -> NameSet
 addListToNameSet   :: NameSet -> [Name] -> NameSet
@@ -52,8 +60,9 @@ delListFromNameSet :: NameSet -> [Name] -> NameSet
 foldNameSet	   :: (Name -> b -> b) -> b -> NameSet -> b
 filterNameSet	   :: (Name -> Bool) -> NameSet -> NameSet
 intersectNameSet   :: NameSet -> NameSet -> NameSet
-intersectsNameSet  :: NameSet -> NameSet -> Bool 	-- True if non-empty intersection
-	-- (s1 `intersectsNameSet` s2) doesn't compute s2 if s1 is empty
+intersectsNameSet  :: NameSet -> NameSet -> Bool
+-- ^ True if there is a non-empty intersection.
+-- @s1 `intersectsNameSet` s2@ doesn't compute @s2@ if @s1@ is empty
 
 isEmptyNameSet    = isEmptyUniqSet
 emptyNameSet	  = emptyUniqSet
@@ -117,21 +126,23 @@ delFVs ns s = delListFromNameSet s ns
 %************************************************************************
 
 \begin{code}
+-- | A set of names that are defined somewhere
 type Defs = NameSet
+
+-- | A set of names that are used somewhere
 type Uses = NameSet
 
-type DefUses = [DefUse]
-	-- In dependency order: earlier Defs scope over later Uses
-
+-- | @(Just ds, us) =>@ The use of any member of the @ds@
+--                      implies that all the @us@ are used too.
+--                      Also, @us@ may mention @ds@.
+--
+-- @Nothing =>@ Nothing is defined in this group, but
+-- 	        nevertheless all the uses are essential.
+--	        Used for instance declarations, for example
 type DefUse  = (Maybe Defs, Uses)
-	-- For items (Just ds, us), the use of any member 
-	-- of the ds implies that all the us are used too
-	--
-	-- Also, us may mention ds
-	--
-	-- Nothing => Nothing defined in this group, but
-	-- 	      nevertheless all the uses are essential.
-	--	      Used for instance declarations, for example
+
+-- | A number of 'DefUse's in dependency order: earlier 'Defs' scope over later 'Uses'
+type DefUses = [DefUse]
 
 emptyDUs :: DefUses
 emptyDUs = []
@@ -152,15 +163,14 @@ duDefs dus = foldr get emptyNameSet dus
     get (Just d1, _u1) d2 = d1 `unionNameSets` d2
 
 duUses :: DefUses -> Uses
--- Just like allUses, but defs are not eliminated
+-- ^ Just like 'allUses', but 'Defs' are not eliminated from the 'Uses' returned
 duUses dus = foldr get emptyNameSet dus
   where
     get (_d1, u1) u2 = u1 `unionNameSets` u2
 
 allUses :: DefUses -> Uses
--- Collect all uses, regardless of
--- whether the group is itself used,
--- but remove defs on the way
+-- ^ Collect all 'Uses', regardless of whether the group is itself used,
+-- but remove 'Defs' on the way
 allUses dus
   = foldr get emptyNameSet dus
   where
@@ -169,11 +179,9 @@ allUses dus
 				     `minusNameSet` defs
 
 findUses :: DefUses -> Uses -> Uses
--- Given some DefUses and some Uses, 
--- find all the uses, transitively. 
--- The result is a superset of the input uses;
--- and includes things defined in the input DefUses
--- (but only if they are used)
+-- ^ Given some 'DefUses' and some 'Uses', find all the uses, transitively.
+-- The result is a superset of the input 'Uses'; and includes things defined 
+-- in the input 'DefUses' (but only if they are used)
 findUses dus uses 
   = foldr get uses dus
   where
