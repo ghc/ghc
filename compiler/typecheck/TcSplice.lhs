@@ -73,6 +73,8 @@ import qualified Language.Haskell.TH.Syntax as TH
 import GHC.Exts		( unsafeCoerce#, Int#, Int(..) )
 #if __GLASGOW_HASKELL__ < 609
 import qualified Exception ( userErrors )
+#else
+import System.IO.Error
 #endif
 \end{code}
 
@@ -603,9 +605,15 @@ runMeta convert expr
 		     -> failM	-- Error already in Tc monad
 		     | otherwise -> failWithTc (mk_msg "run" exn)	-- Exception
 #else
-	    Left (SomeException exn) -> do
+	    Left (SomeException exn) ->
                     case cast exn of
-                        Just (ErrorCall "IOEnv failure") ->
+                    Just (ErrorCall "IOEnv failure") ->
+                        failM -- Error already in Tc monad
+                    _ ->
+                        case cast exn of
+                        Just ioe
+                         | isUserError ioe &&
+                           (ioeGetErrorString ioe == "IOEnv failure") ->
                             failM -- Error already in Tc monad
                         _ -> failWithTc (mk_msg "run" exn)	-- Exception
 #endif
