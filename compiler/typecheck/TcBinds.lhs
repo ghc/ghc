@@ -217,7 +217,7 @@ tc_group poly_rec top_lvl sig_fn prag_fn (Recursive, binds) thing_inside
         -- group at once; an earlier one may use a later one!
     do  { traceTc (text "tc_group rec" <+> pprLHsBinds binds)
         ; (binds1,thing) <- bindLocalInsts top_lvl $
-                            go (stronglyConnComp (mkEdges sig_fn binds))
+                            go (stronglyConnCompFromEdgedVertices (mkEdges sig_fn binds))
         ; return ([(Recursive, unionManyBags binds1)], thing) }
                 -- Rec them all together
   where
