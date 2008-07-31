@@ -11,15 +11,26 @@
 --     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
 -- for details
 
+-- | Functions for collecting together and applying rewrite rules to a module.
+-- The 'CoreRule' datatype itself is declared elsewhere.
 module Rules (
-	RuleBase, emptyRuleBase, mkRuleBase, extendRuleBaseList, 
-	unionRuleBase, pprRuleBase, ruleCheckProgram,
-
-	mkSpecInfo, extendSpecInfo, addSpecInfo,
-	rulesOfBinds, addIdSpecialisations, 
+	-- * RuleBase
+	RuleBase, 
 	
-	matchN,
+	-- ** Constructing 
+	emptyRuleBase, mkRuleBase, extendRuleBaseList, 
+	unionRuleBase, pprRuleBase, 
+	
+	-- ** Checking rule applications
+	ruleCheckProgram,
 
+        -- ** Manipulating 'SpecInfo' rules
+	mkSpecInfo, extendSpecInfo, addSpecInfo,
+	addIdSpecialisations, 
+	
+	-- * Misc. CoreRule helpers
+        rulesOfBinds,
+        
         lookupRule, mkLocalRule, roughTopNames
     ) where
 
@@ -92,7 +103,8 @@ where pi' :: Lift Int# is the specialised version of pi.
 \begin{code}
 mkLocalRule :: RuleName -> Activation 
 	    -> Name -> [CoreBndr] -> [CoreExpr] -> CoreExpr -> CoreRule
--- Used to make CoreRule for an Id defined in this module
+-- ^ Used to make 'CoreRule' for an 'Id' defined in the module being 
+-- compiled. See also 'CoreSyn.CoreRule'
 mkLocalRule name act fn bndrs args rhs
   = Rule { ru_name = name, ru_fn = fn, ru_act = act,
 	   ru_bndrs = bndrs, ru_args = args,
@@ -101,14 +113,19 @@ mkLocalRule name act fn bndrs args rhs
 
 --------------
 roughTopNames :: [CoreExpr] -> [Maybe Name]
+-- ^ Find the \"top\" free names of several expressions. 
+-- Such names are either:
+--
+-- 1. The function finally being applied to in an application chain
+--    (if that name is a GlobalId: see "Var#globalvslocal"), or
+--
+-- 2. The 'TyCon' if the expression is a 'Type'
+--
+-- This is used for the fast-match-check for rules; 
+--	if the top names don't match, the rest can't
 roughTopNames args = map roughTopName args
 
 roughTopName :: CoreExpr -> Maybe Name
--- Find the "top" free name of an expression
--- a) the function in an App chain (if a GlobalId)
--- b) the TyCon in a type
--- This is used for the fast-match-check for rules; 
---	if the top names don't match, the rest can't
 roughTopName (Type ty) = case tcSplitTyConApp_maybe ty of
 			  Just (tc,_) -> Just (getName tc)
 			  Nothing     -> Nothing
@@ -118,17 +135,17 @@ roughTopName (Var f) | isGlobalId f = Just (idName f)
 roughTopName other = Nothing
 
 ruleCantMatch :: [Maybe Name] -> [Maybe Name] -> Bool
--- (ruleCantMatch tpl actual) returns True only if 'actual'
--- definitely can't match 'tpl' by instantiating 'tpl'.  
+-- ^ @ruleCantMatch tpl actual@ returns True only if @actual@
+-- definitely can't match @tpl@ by instantiating @tpl@.  
 -- It's only a one-way match; unlike instance matching we 
--- don't consider unification
+-- don't consider unification.
 -- 
 -- Notice that [_$_]
---	ruleCantMatch [Nothing] [Just n2] = False
+--	@ruleCantMatch [Nothing] [Just n2] = False@
 --      Reason: a template variable can be instantiated by a constant
 -- Also:
---	ruleCantMatch [Just n1] [Nothing] = False
---      Reason: a local variable 'v' in the actuals might [_$_]
+--	@ruleCantMatch [Just n1] [Nothing] = False@
+--      Reason: a local variable @v@ in the actuals might [_$_]
 
 ruleCantMatch (Just n1 : ts) (Just n2 : as) = n1 /= n2 || ruleCantMatch ts as
 ruleCantMatch (t       : ts) (a       : as) = ruleCantMatch ts as
@@ -143,6 +160,8 @@ ruleCantMatch ts	     as		    = False
 %************************************************************************
 
 \begin{code}
+-- | Make a 'SpecInfo' containing a number of 'CoreRule's, suitable
+-- for putting into an 'IdInfo'
 mkSpecInfo :: [CoreRule] -> SpecInfo
 mkSpecInfo rules = SpecInfo rules (rulesFreeVars rules)
 
@@ -159,6 +178,7 @@ addIdSpecialisations id rules
   = setIdSpecialisation id $
     extendSpecInfo (idSpecialisation id) rules
 
+-- | Gather all the rules for locally bound identifiers from the supplied bindings
 rulesOfBinds :: [CoreBind] -> [CoreRule]
 rulesOfBinds binds = concatMap (concatMap idCoreRules . bindersOf) binds
 \end{code}
@@ -171,8 +191,8 @@ rulesOfBinds binds = concatMap (concatMap idCoreRules . bindersOf) binds
 %************************************************************************
 
 \begin{code}
+-- | Gathers a collection of 'CoreRule's. Maps (the name of) an 'Id' to its rules
 type RuleBase = NameEnv [CoreRule]
-	-- Maps (the name of) an Id to its rules
 	-- The rules are are unordered; 
 	-- we sort out any overlaps on lookup
 
@@ -221,9 +241,16 @@ in the Simplifier works better as it is.  Reason: the 'args' passed
 to lookupRule are the result of a lazy substitution
 
 \begin{code}
-lookupRule :: (Activation -> Bool) -> InScopeSet
-	   -> RuleBase	-- Imported rules
-	   -> Id -> [CoreExpr] -> Maybe (CoreRule, CoreExpr)
+-- | The main rule matching function. Attempts to apply all the active
+-- rules in a given 'RuleBase' to this instance of an application
+-- in a given context, returning the rule applied and the resulting
+-- expression if successful.
+lookupRule :: (Activation -> Bool)  -- ^ Activation test
+           -> InScopeSet                -- ^ Variables that are in scope at this point
+	   -> RuleBase	                -- ^ Imported rules
+	   -> Id                        -- ^ Function 'Id' to lookup a rule by
+	   -> [CoreExpr]                -- ^ Arguments to function
+	   -> Maybe (CoreRule, CoreExpr)
 -- See Note [Extra argsin rule matching]
 lookupRule is_active in_scope rule_base fn args
   = matchRules is_active in_scope fn args (getRules rule_base fn)
@@ -347,12 +374,15 @@ matchRule is_active in_scope args rough_args
 \end{code}
 
 \begin{code}
-matchN	:: InScopeSet
-	-> [Var]		-- Template tyvars
-	-> [CoreExpr]		-- Template
-	-> [CoreExpr]		-- Target; can have more elts than template
-	-> Maybe ([CoreBind],	-- Bindings to wrap around the entire result
-		  [CoreExpr]) 	-- What is substituted for each template var
+-- For a given match template and context, find bindings to wrap around 
+-- the entire result and what should be substituted for each template variable.
+-- Fail if there are two few actual arguments from the target to match the template
+matchN	:: InScopeSet           -- ^ In-scope variables
+	-> [Var]		-- ^ Match template type variables
+	-> [CoreExpr]		-- ^ Match template
+	-> [CoreExpr]		-- ^ Target; can have more elements than the template
+	-> Maybe ([CoreBind],
+		  [CoreExpr])
 
 matchN in_scope tmpl_vars tmpl_es target_es
   = do	{ (tv_subst, id_subst, binds)
@@ -731,19 +761,19 @@ SpecConstr sees this fragment:
 	  Data.Maybe.Nothing -> lvl_smf;
 	  Data.Maybe.Just n_acT [Just S(L)] ->
 	    case n_acT of wild1_ams [Just A] { GHC.Base.I# y_amr [Just L] ->
-	    $wfoo_smW (GHC.Prim.-# ds_Xmb y_amr) wild_Xf
+	    \$wfoo_smW (GHC.Prim.-# ds_Xmb y_amr) wild_Xf
 	    }};
 
 and correctly generates the rule
 
 	RULES: "SC:$wfoo1" [0] __forall {y_amr [Just L] :: GHC.Prim.Int#
 					  sc_snn :: GHC.Prim.Int#}
-	  $wfoo_smW sc_snn (Data.Maybe.Just @ GHC.Base.Int (GHC.Base.I# y_amr))
-	  = $s$wfoo_sno y_amr sc_snn ;]
+	  \$wfoo_smW sc_snn (Data.Maybe.Just @ GHC.Base.Int (GHC.Base.I# y_amr))
+	  = \$s\$wfoo_sno y_amr sc_snn ;]
 
 BUT we must ensure that this rule matches in the original function!
-Note that the call to $wfoo is
-	    $wfoo_smW (GHC.Prim.-# ds_Xmb y_amr) wild_Xf
+Note that the call to \$wfoo is
+	    \$wfoo_smW (GHC.Prim.-# ds_Xmb y_amr) wild_Xf
 
 During matching we expand wild_Xf to (Just n_acT).  But then we must also
 expand n_acT to (I# y_amr).  And we can only do that if we look up n_acT
@@ -768,9 +798,13 @@ We want to know what sites have rules that could have fired but didn't.
 This pass runs over the tree (without changing it) and reports such.
 
 \begin{code}
-ruleCheckProgram :: CompilerPhase -> String -> RuleBase -> [CoreBind] -> SDoc
--- Report partial matches for rules beginning 
--- with the specified string
+-- | Report partial matches for rules beginning with the specified
+-- string for the purposes of error reporting
+ruleCheckProgram :: CompilerPhase               -- ^ Phase to check in
+                 -> String                      -- ^ Rule pattern
+                 -> RuleBase                    -- ^ Database of rules
+                 -> [CoreBind]                  -- ^ Bindings to check in
+                 -> SDoc                        -- ^ Resulting check message
 ruleCheckProgram phase rule_pat rule_base binds 
   | isEmptyBag results
   = text "Rule check results: no rule application sites"
