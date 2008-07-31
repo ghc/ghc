@@ -30,6 +30,7 @@ import Type
 import CoreSyn
 import CoreFVs
 import CoreUtils
+import MkCore
 
 import Name
 import Var
