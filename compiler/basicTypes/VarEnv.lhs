@@ -5,7 +5,10 @@
 
 \begin{code}
 module VarEnv (
+        -- * Var, Id and TyVar environments (maps)
 	VarEnv, IdEnv, TyVarEnv,
+	
+	-- ** Manipulating these environments
 	emptyVarEnv, unitVarEnv, mkVarEnv,
 	elemVarEnv, varEnvElts, varEnvKeys,
 	extendVarEnv, extendVarEnv_C, extendVarEnvList,
@@ -18,19 +21,26 @@ module VarEnv (
 	elemVarEnvByKey, lookupVarEnv_Directly,
 	filterVarEnv_Directly,
 
-	-- InScopeSet
-	InScopeSet, emptyInScopeSet, mkInScopeSet, delInScopeSet,
+	-- * The InScopeSet type
+	InScopeSet, 
+	
+	-- ** Operations on InScopeSets
+	emptyInScopeSet, mkInScopeSet, delInScopeSet,
 	extendInScopeSet, extendInScopeSetList, extendInScopeSetSet, 
 	modifyInScopeSet,
 	getInScopeVars, lookupInScope, elemInScopeSet, uniqAway, 
 
-	-- RnEnv2 and its operations
-	RnEnv2, mkRnEnv2, rnBndr2, rnBndrs2, rnOccL, rnOccR, inRnEnvL, inRnEnvR,
-		rnBndrL, rnBndrR, nukeRnEnvL, nukeRnEnvR, extendRnInScopeList,
-		rnInScope, rnInScopeSet, lookupRnInScope,
+	-- * The RnEnv2 type
+	RnEnv2, 
+	
+	-- ** Operations on RnEnv2s
+	mkRnEnv2, rnBndr2, rnBndrs2, rnOccL, rnOccR, inRnEnvL, inRnEnvR,
+	rnBndrL, rnBndrR, nukeRnEnvL, nukeRnEnvR, extendRnInScopeList,
+	rnInScope, rnInScopeSet, lookupRnInScope,
 
-	-- TidyEnvs
-	TidyEnv, emptyTidyEnv
+	-- * TidyEnv and its operation
+	TidyEnv, 
+	emptyTidyEnv
     ) where
 
 import OccName
@@ -54,6 +64,7 @@ import FastString
 %************************************************************************
 
 \begin{code}
+-- | A set of variables that are in scope at some point
 data InScopeSet = InScope (VarEnv Var) FastInt
 	-- The Int# is a kind of hash-value used by uniqAway
 	-- For example, it might be the size of the set
@@ -83,9 +94,11 @@ extendInScopeSetSet :: InScopeSet -> VarEnv Var -> InScopeSet
 extendInScopeSetSet (InScope in_scope n) vs
    = InScope (in_scope `plusVarEnv` vs) (n +# iUnbox (sizeUFM vs))
 
+-- | Replace the first 'Var' with the second in the set of in-scope variables
 modifyInScopeSet :: InScopeSet -> Var -> Var -> InScopeSet
 -- Exploit the fact that the in-scope "set" is really a map
 -- 	Make old_v map to new_v
+-- QUESTION: shouldn't we add a mapping from new_v to new_v as it is presumably now in scope? - MB 08
 modifyInScopeSet (InScope in_scope n) old_v new_v = InScope (extendVarEnv in_scope old_v new_v) (n +# _ILIT(1))
 
 delInScopeSet :: InScopeSet -> Var -> InScopeSet
@@ -94,10 +107,15 @@ delInScopeSet (InScope in_scope n) v = InScope (in_scope `delVarEnv` v) n
 elemInScopeSet :: Var -> InScopeSet -> Bool
 elemInScopeSet v (InScope in_scope _) = v `elemVarEnv` in_scope
 
+-- | If the given variable was even added to the 'InScopeSet', or if it was the \"from\" argument
+-- of any 'modifyInScopeSet' operation, returns that variable with all appropriate modifications
+-- applied to it. Otherwise, return @Nothing@
 lookupInScope :: InScopeSet -> Var -> Maybe Var
 -- It's important to look for a fixed point
 -- When we see (case x of y { I# v -> ... })
--- we add  [x -> y] to the in-scope set (Simplify.simplCaseBinder).
+-- we add  [x -> y] to the in-scope set (Simplify.simplCaseBinder and
+-- modifyInScopeSet).
+--
 -- When we lookup up an occurrence of x, we map to y, but then
 -- we want to look up y in case it has acquired more evaluation information by now.
 lookupInScope (InScope in_scope _) v 
@@ -110,11 +128,12 @@ lookupInScope (InScope in_scope _) v
 \end{code}
 
 \begin{code}
+-- | @uniqAway in_scope v@ finds a unique that is not used in the
+-- in-scope set, and gives that to v. 
 uniqAway :: InScopeSet -> Var -> Var
--- (uniqAway in_scope v) finds a unique that is not used in the
--- in-scope set, and gives that to v.  It starts with v's current unique, of course,
--- in the hope that it won't have to change it, and thereafter uses a combination
--- of that and the hash-code found in the in-scope set
+-- It starts with v's current unique, of course, in the hope that it won't
+-- have to change, and thereafter uses a combination of that and the hash-code
+-- found in the in-scope set
 uniqAway in_scope var
   | var `elemInScopeSet` in_scope = uniqAway' in_scope var	-- Make a new one
   | otherwise 			  = var				-- Nothing to do
@@ -137,35 +156,40 @@ uniqAway' (InScope set n) var
 	    uniq = deriveUnique orig_unique (iBox (n *# k))
 \end{code}
 
-
 %************************************************************************
 %*									*
 		Dual renaming
 %*									*
 %************************************************************************
 
-When we are comparing (or matching) types or terms, we are faced with 
-"going under" corresponding binders.  E.g. when comparing
-	\x. e1	~   \y. e2
-
-Basically we want to rename [x->y] or [y->x], but there are lots of 
-things we must be careful of.  In particular, x might be free in e2, or
-y in e1.  So the idea is that we come up with a fresh binder that is free
-in neither, and rename x and y respectively.  That means we must maintain
-	a) a renaming for the left-hand expression
-	b) a renaming for the right-hand expressions
-	c) an in-scope set
-
-Furthermore, when matching, we want to be able to have an 'occurs check',
-to prevent
-	\x. f   ~   \y. y
-matching with f->y.  So for each expression we want to know that set of
-locally-bound variables. That is precisely the domain of the mappings (a)
-and (b), but we must ensure that we always extend the mappings as we go in.
-
-
 \begin{code}
-data RnEnv2 
+-- | When we are comparing (or matching) types or terms, we are faced with 
+-- \"going under\" corresponding binders.  E.g. when comparing:
+--
+-- > \x. e1	~   \y. e2
+--
+-- Basically we want to rename [@x@ -> @y@] or [@y@ -> @x@], but there are lots of 
+-- things we must be careful of.  In particular, @x@ might be free in @e2@, or
+-- y in @e1@.  So the idea is that we come up with a fresh binder that is free
+-- in neither, and rename @x@ and @y@ respectively.  That means we must maintain:
+--
+-- 1. A renaming for the left-hand expression
+--
+-- 2. A renaming for the right-hand expressions
+--
+-- 3. An in-scope set
+-- 
+-- Furthermore, when matching, we want to be able to have an 'occurs check',
+-- to prevent:
+--
+-- > \x. f   ~   \y. y
+--
+-- matching with [@f@ -> @y@].  So for each expression we want to know that set of
+-- locally-bound variables. That is precisely the domain of the mappings 1.
+-- and 2., but we must ensure that we always extend the mappings as we go in.
+--
+-- All of this information is bundled up in the 'RnEnv2'
+data RnEnv2
   = RV2 { envL 	   :: VarEnv Var	-- Renaming for Left term
 	, envR 	   :: VarEnv Var	-- Renaming for Right term
 	, in_scope :: InScopeSet }	-- In scope in left or right terms
@@ -191,14 +215,14 @@ rnInScopeSet :: RnEnv2 -> InScopeSet
 rnInScopeSet = in_scope
 
 rnBndrs2 :: RnEnv2 -> [Var] -> [Var] -> RnEnv2
--- Arg lists must be of equal length
+-- ^ Applies 'rnBndr2' to several variables: the two variable lists must be of equal length
 rnBndrs2 env bsL bsR = foldl2 rnBndr2 env bsL bsR 
 
 rnBndr2 :: RnEnv2 -> Var -> Var -> RnEnv2
--- (rnBndr2 env bL bR) go under a binder bL in the Left term 1, 
--- 		       and binder bR in the Right term
--- It finds a new binder, new_b,
--- and returns an environment mapping bL->new_b and bR->new_b resp.
+-- ^ @rnBndr2 env bL bR@ goes under a binder @bL@ in the Left term,
+-- 		         and binder @bR@ in the Right term.
+-- It finds a new binder, @new_b@,
+-- and returns an environment mapping @bL -> new_b@ and @bR -> new_b@
 rnBndr2 (RV2 { envL = envL, envR = envR, in_scope = in_scope }) bL bR
   = RV2 { envL 	   = extendVarEnv envL bL new_b	  -- See Note
 	, envR 	   = extendVarEnv envR bR new_b	  -- [Rebinding]
@@ -217,10 +241,9 @@ rnBndr2 (RV2 { envL = envL, envR = envR, in_scope = in_scope }) bL bR
 	--   Inside \x  \y	{ [x->y], [y->y],       {y} }
 	-- 	 \x  \z	  	{ [x->x], [y->y, z->x], {y,x} }
 
-rnBndrL, rnBndrR :: RnEnv2 -> Var -> (RnEnv2, Var)
--- Used when there's a binder on one side or the other only
--- Useful when eta-expanding
--- 
+rnBndrL :: RnEnv2 -> Var -> (RnEnv2, Var)
+-- ^ Similar to 'rnBndr2' but used when there's a binder on the left
+-- side only. Useful when eta-expanding
 rnBndrL (RV2 { envL = envL, envR = envR, in_scope = in_scope }) bL
   = (RV2 { envL     = extendVarEnv envL bL new_b
 	 , envR     = extendVarEnv envR new_b new_b 	-- Note [rnBndrLR]
@@ -228,6 +251,9 @@ rnBndrL (RV2 { envL = envL, envR = envR, in_scope = in_scope }) bL
   where
     new_b = uniqAway in_scope bL
 
+rnBndrR :: RnEnv2 -> Var -> (RnEnv2, Var)
+-- ^ Similar to 'rnBndr2' but used when there's a binder on the right
+-- side only. Useful when eta-expanding
 rnBndrR (RV2 { envL = envL, envR = envR, in_scope = in_scope }) bR
   = (RV2 { envL     = extendVarEnv envL new_b new_b	-- Note [rnBndrLR]
 	 , envR     = extendVarEnv envR bR new_b
@@ -249,12 +275,12 @@ rnBndrR (RV2 { envL = envL, envR = envR, in_scope = in_scope }) bR
 -- succeeding with [x -> v y], which is bogus of course 
 
 rnOccL, rnOccR :: RnEnv2 -> Var -> Var
--- Look up the renaming of an occurrence in the left or right term
+-- ^ Look up the renaming of an occurrence in the left or right term
 rnOccL (RV2 { envL = env }) v = lookupVarEnv env v `orElse` v
 rnOccR (RV2 { envR = env }) v = lookupVarEnv env v `orElse` v
 
 inRnEnvL, inRnEnvR :: RnEnv2 -> Var -> Bool
--- Tells whether a variable is locally bound
+-- ^ Tells whether a variable is locally bound
 inRnEnvL (RV2 { envL = env }) v = v `elemVarEnv` env
 inRnEnvR (RV2 { envR = env }) v = v `elemVarEnv` env
 
@@ -262,6 +288,7 @@ lookupRnInScope :: RnEnv2 -> Var -> Var
 lookupRnInScope env v = lookupInScope (in_scope env) v `orElse` v
 
 nukeRnEnvL, nukeRnEnvR :: RnEnv2 -> RnEnv2
+-- ^ Wipe the left or right side renaming
 nukeRnEnvL env = env { envL = emptyVarEnv }
 nukeRnEnvR env = env { envR = emptyVarEnv }
 \end{code}
@@ -273,10 +300,9 @@ nukeRnEnvR env = env { envR = emptyVarEnv }
 %*									*
 %************************************************************************
 
-When tidying up print names, we keep a mapping of in-scope occ-names
-(the TidyOccEnv) and a Var-to-Var of the current renamings.
-
 \begin{code}
+-- | When tidying up print names, we keep a mapping of in-scope occ-names
+-- (the 'TidyOccEnv') and a Var-to-Var of the current renamings
 type TidyEnv = (TidyOccEnv, VarEnv Var)
 
 emptyTidyEnv :: TidyEnv
