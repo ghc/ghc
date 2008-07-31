@@ -11,7 +11,7 @@ import ZipCfg
 import Maybes
 import UniqSet
 
--- | Compute the predecessors of each *reachable* block
+-- | Compute the predecessors of each /reachable/ block
 zipPreds :: LastNode l => LGraph m l -> BlockEnv BlockSet
 zipPreds g = foldl add emptyBlockEnv (postorder_dfs g)
     where add env block@(Block id _) =
