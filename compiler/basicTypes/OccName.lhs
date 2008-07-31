@@ -4,28 +4,49 @@
 %
 
 \begin{code}
+-- |
+-- #name_types#
+-- GHC uses several kinds of name internally:
+--
+-- * 'OccName.OccName' represents names as strings with just a little more information:
+--   the "namespace" that the name came from, e.g. the namespace of value, type constructors or
+--   data constructors
+--
+-- * 'RdrName.RdrName': see "RdrName#name_types"
+--
+-- * 'Name.Name': see "Name#name_types"
+--
+-- * 'Id.Id': see "Id#name_types"
+--
+-- * 'Var.Var': see "Var#name_types"
 module OccName (
-        mk_deriv,
-	-- * The NameSpace type; abstact
-	NameSpace, tcName, clsName, tcClsName, dataName, varName, 
+	-- * The 'NameSpace' type
+	NameSpace, -- Abstract
+	
+	-- ** Construction
+	-- $real_vs_source_data_constructors
+	tcName, clsName, tcClsName, dataName, varName, 
 	tvName, srcDataName,
 
-	-- ** Printing
+	-- ** Pretty Printing
 	pprNameSpace, pprNonVarNameSpace, pprNameSpaceBrief,
 
-	-- * The OccName type
+	-- * The 'OccName' type
 	OccName, 	-- Abstract, instance of Outputable
 	pprOccName, 
 
 	-- ** Construction	
 	mkOccName, mkOccNameFS, 
 	mkVarOcc, mkVarOccFS,
-	mkTyVarOcc,
+	mkDataOcc, mkDataOccFS,
+	mkTyVarOcc, mkTyVarOccFS,
+	mkTcOcc, mkTcOccFS,
+	mkClsOcc, mkClsOccFS,
 	mkDFunOcc,
 	mkTupleOcc, 
 	setOccNameSpace,
 
-	-- ** Derived OccNames
+	-- ** Derived 'OccName's
         isDerivedOccName,
 	mkDataConWrapperOcc, mkWorkerOcc, mkDefaultMethodOcc,
 	mkDerivedTyConOcc, mkNewTyCoOcc, 
@@ -44,26 +65,28 @@ module OccName (
 	occNameFS, occNameString, occNameSpace, 
 
 	isVarOcc, isTvOcc, isTcOcc, isDataOcc, isDataSymOcc, isSymOcc, isValOcc,
-	parenSymOcc, reportIfUnused, isTcClsName, isVarName,
+	parenSymOcc, reportIfUnused, 
+	
+	isTcClsNameSpace, isTvNameSpace, isDataConNameSpace, isVarNameSpace, isValNameSpace,
 
 	isTupleOcc_maybe,
 
-	-- The OccEnv type
+	-- * The 'OccEnv' type
 	OccEnv, emptyOccEnv, unitOccEnv, extendOccEnv, mapOccEnv,
 	lookupOccEnv, mkOccEnv, mkOccEnv_C, extendOccEnvList, elemOccEnv,
 	occEnvElts, foldOccEnv, plusOccEnv, plusOccEnv_C, extendOccEnv_C,
         filterOccEnv, delListFromOccEnv, delFromOccEnv,
 
-	-- The OccSet type
+	-- * The 'OccSet' type
 	OccSet, emptyOccSet, unitOccSet, mkOccSet, extendOccSet, 
 	extendOccSetList,
 	unionOccSets, unionManyOccSets, minusOccSet, elemOccSet, occSetElts, 
 	foldOccSet, isEmptyOccSet, intersectOccSet, intersectsOccSet,
                   
-	-- Tidying up
+	-- * Tidying up
 	TidyOccEnv, emptyTidyOccEnv, tidyOccName, initTidyOccEnv,
 
-	-- The basic form of names
+	-- * Lexical characteristics of Haskell names
 	isLexCon, isLexVar, isLexId, isLexSym,
 	isLexConId, isLexConSym, isLexVarId, isLexVarSym,
 	startsVarSym, startsVarId, startsConSym, startsConId
@@ -82,7 +105,9 @@ import Binary
 
 import GHC.Exts
 import Data.Char
+\end{code}
 
+\begin{code}
 -- Unicode TODO: put isSymbol in libcompat
 #if !defined(__GLASGOW_HASKELL__) || __GLASGOW_HASKELL__ > 604
 #else
@@ -109,19 +134,21 @@ data NameSpace = VarName	-- Variables, including "real" data constructors
 
 -- Note [Data Constructors]  
 -- see also: Note [Data Constructor Naming] in DataCon.lhs
--- 
---	"Source" data constructors are the data constructors mentioned
---	in Haskell source code
 --
---	"Real" data constructors are the data constructors of the
---	representation type, which may not be the same as the source
---	type
-
--- Example:
---	data T = T !(Int,Int)
+-- $real_vs_source_data_constructors
+-- There are two forms of data constructor:
 --
--- The source datacon has type (Int,Int) -> T
--- The real   datacon has type Int -> Int -> T
+--	[Source data constructors] The data constructors mentioned in Haskell source code
+--
+--	[Real data constructors] The data constructors of the representation type, which may not be the same as the source type
+--
+-- For example:
+--
+-- > data T = T !(Int, Int)
+--
+-- The source datacon has type @(Int, Int) -> T@
+-- The real   datacon has type @Int -> Int -> T@
+--
 -- GHC chooses a representation based on the strictness etc.
 
 tcName, clsName, tcClsName :: NameSpace
@@ -141,14 +168,27 @@ srcDataName = DataName	-- Haskell-source data constructors should be
 tvName      = TvName
 varName     = VarName
 
-isTcClsName :: NameSpace -> Bool
-isTcClsName TcClsName = True
-isTcClsName _	      = False
+isDataConNameSpace :: NameSpace -> Bool
+isDataConNameSpace DataName = True
+isDataConNameSpace _        = False
 
-isVarName :: NameSpace -> Bool	-- Variables or type variables, but not constructors
-isVarName TvName  = True
-isVarName VarName = True
-isVarName _       = False
+isTcClsNameSpace :: NameSpace -> Bool
+isTcClsNameSpace TcClsName = True
+isTcClsNameSpace _         = False
+
+isTvNameSpace :: NameSpace -> Bool
+isTvNameSpace TvName = True
+isTvNameSpace _      = False
+
+isVarNameSpace :: NameSpace -> Bool	-- Variables or type variables, but not constructors
+isVarNameSpace TvName  = True
+isVarNameSpace VarName = True
+isVarNameSpace _       = False
+
+isValNameSpace :: NameSpace -> Bool
+isValNameSpace DataName = True
+isValNameSpace VarName  = True
+isValNameSpace _        = False
 
 pprNameSpace :: NameSpace -> SDoc
 pprNameSpace DataName  = ptext (sLit "data constructor")
@@ -233,8 +273,29 @@ mkVarOcc s = mkOccName varName s
 mkVarOccFS :: FastString -> OccName
 mkVarOccFS fs = mkOccNameFS varName fs
 
-mkTyVarOcc :: FastString -> OccName
-mkTyVarOcc fs = mkOccNameFS tvName fs
+mkDataOcc :: String -> OccName
+mkDataOcc = mkOccName dataName
+
+mkDataOccFS :: FastString -> OccName
+mkDataOccFS = mkOccNameFS dataName
+
+mkTyVarOcc :: String -> OccName
+mkTyVarOcc = mkOccName tvName
+
+mkTyVarOccFS :: FastString -> OccName
+mkTyVarOccFS fs = mkOccNameFS tvName fs
+
+mkTcOcc :: String -> OccName
+mkTcOcc = mkOccName tcName
+
+mkTcOccFS :: FastString -> OccName
+mkTcOccFS = mkOccNameFS tcName
+
+mkClsOcc :: String -> OccName
+mkClsOcc = mkOccName clsName
+
+mkClsOccFS :: FastString -> OccName
+mkClsOccFS = mkOccNameFS clsName
 \end{code}
 
 
@@ -351,7 +412,7 @@ occNameString (OccName _ s) = unpackFS s
 setOccNameSpace :: NameSpace -> OccName -> OccName
 setOccNameSpace sp (OccName _ occ) = OccName sp occ
 
-isVarOcc, isTvOcc, isDataSymOcc, isSymOcc, isTcOcc, isValOcc, isDataOcc :: OccName -> Bool
+isVarOcc, isTvOcc, isTcOcc, isDataOcc :: OccName -> Bool
 
 isVarOcc (OccName VarName _) = True
 isVarOcc _                   = False
@@ -362,17 +423,12 @@ isTvOcc _                  = False
 isTcOcc (OccName TcClsName _) = True
 isTcOcc _                     = False
 
+-- | /Value/ 'OccNames's are those that are either in 
+-- the variable or data constructor namespaces
+isValOcc :: OccName -> Bool
 isValOcc (OccName VarName  _) = True
 isValOcc (OccName DataName _) = True
 isValOcc _                    = False
-
--- Data constructor operator (starts with ':', or '[]')
--- Pretty inefficient!
-isDataSymOcc (OccName DataName s) = isLexConSym s
-isDataSymOcc (OccName VarName s)  
-  | isLexConSym s = pprPanic "isDataSymOcc: check me" (ppr s)
-		-- Jan06: I don't think this should happen
-isDataSymOcc _                    = False
 
 isDataOcc (OccName DataName _) = True
 isDataOcc (OccName VarName s)  
@@ -380,15 +436,27 @@ isDataOcc (OccName VarName s)
 		-- Jan06: I don't think this should happen
 isDataOcc _                    = False
 
--- Any operator (data constructor or variable)
+-- | Test if the 'OccName' is a data constructor that starts with
+-- a symbol (e.g. @:@, or @[]@)
+isDataSymOcc :: OccName -> Bool
+isDataSymOcc (OccName DataName s) = isLexConSym s
+isDataSymOcc (OccName VarName s)  
+  | isLexConSym s = pprPanic "isDataSymOcc: check me" (ppr s)
+		-- Jan06: I don't think this should happen
+isDataSymOcc _                    = False
 -- Pretty inefficient!
+
+-- | Test if the 'OccName' is that for any operator (whether 
+-- it is a data constructor or variable or whatever)
+isSymOcc :: OccName -> Bool
 isSymOcc (OccName DataName s)  = isLexConSym s
 isSymOcc (OccName TcClsName s) = isLexConSym s
 isSymOcc (OccName VarName s)   = isLexSym s
 isSymOcc (OccName TvName s)    = isLexSym s
+-- Pretty inefficient!
 
 parenSymOcc :: OccName -> SDoc -> SDoc
--- Wrap parens around an operator
+-- ^ Wrap parens around an operator
 parenSymOcc occ doc | isSymOcc occ = parens doc
 		    | otherwise    = doc
 \end{code}
@@ -396,8 +464,9 @@ parenSymOcc occ doc | isSymOcc occ = parens doc
 
 \begin{code}
 reportIfUnused :: OccName -> Bool
-  -- Haskell 98 encourages compilers to suppress warnings about
-  -- unused names in a pattern if they start with "_".
+-- ^ Haskell 98 encourages compilers to suppress warnings about
+-- unused names in a pattern if they start with @_@: this implements
+-- that test
 reportIfUnused occ = case occNameString occ of
 			('_' : _) -> False
 			_other    -> True
@@ -415,14 +484,14 @@ Here's our convention for splitting up the interface file name space:
 	d...		dictionary identifiers
 			(local variables, so no name-clash worries)
 
-	$f...		dict-fun identifiers (from inst decls)
-	$dm...		default methods
-	$p...		superclass selectors
-	$w...		workers
+	\$f...		dict-fun identifiers (from inst decls)
+	\$dm...		default methods
+	\$p...		superclass selectors
+	\$w...		workers
 	:T...		compiler-generated tycons for dictionaries
 	:D...		...ditto data cons
         :Co...          ...ditto coercions
-	$sf..		specialised version of f
+	\$sf..		specialised version of f
 
 	in encoded form these appear as Zdfxxx etc
 
@@ -512,38 +581,37 @@ mkDataConWorkerOcc datacon_occ = setOccNameSpace varName datacon_occ
 \end{code}
 
 \begin{code}
-mkSuperDictSelOcc :: Int 	-- Index of superclass, eg 3
-		  -> OccName 	-- Class, eg "Ord"
-		  -> OccName	-- eg "$p3Ord"
+mkSuperDictSelOcc :: Int 	-- ^ Index of superclass, e.g. 3
+		  -> OccName 	-- ^ Class, e.g. @Ord@
+		  -> OccName	-- ^ Derived 'Occname', e.g. @$p3Ord@
 mkSuperDictSelOcc index cls_occ
   = mk_deriv varName "$p" (show index ++ occNameString cls_occ)
 
-mkLocalOcc :: Unique 		-- Unique
-	   -> OccName		-- Local name (e.g. "sat")
-	   -> OccName		-- Nice unique version ("$L23sat")
+mkLocalOcc :: Unique 		-- ^ Unique to combine with the 'OccName'
+	   -> OccName		-- ^ Local name, e.g. @sat@
+	   -> OccName		-- ^ Nice unique version, e.g. @$L23sat@
 mkLocalOcc uniq occ
    = mk_deriv varName ("$L" ++ show uniq) (occNameString occ)
 	-- The Unique might print with characters 
 	-- that need encoding (e.g. 'z'!)
 \end{code}
 
-Derive a name for the representation type constructor of a data/newtype
-instance.
-
 \begin{code}
-mkInstTyTcOcc :: Int			-- Index
-	      -> OccName		-- Family name (e.g. "Map")
-	      -> OccName		-- Nice unique version (":R23Map")
+-- | Derive a name for the representation type constructor of a @data@/@newtype@
+-- instance.
+mkInstTyTcOcc :: Int			-- ^ DFun Index
+	      -> OccName		-- ^ Family name, e.g. @Map@
+	      -> OccName		-- ^ Nice unique version, e.g. @:R23Map@
 mkInstTyTcOcc index occ
    = mk_deriv tcName (":R" ++ show index) (occNameString occ)
 \end{code}
 
 \begin{code}
-mkDFunOcc :: String		-- Typically the class and type glommed together e.g. "OrdMaybe"
+mkDFunOcc :: String		-- ^ Typically the class and type glommed together e.g. @OrdMaybe@.
 				-- Only used in debug mode, for extra clarity
-	  -> Bool		-- True <=> hs-boot instance dfun
-	  -> Int		-- Unique index
-	  -> OccName		-- "$f3OrdMaybe"
+	  -> Bool		-- ^ Is this a hs-boot instance DFun?
+	  -> Int		-- ^ Unique index
+	  -> OccName		-- ^ E.g. @$f3OrdMaybe@
 
 -- In hs-boot files we make dict funs like $fx7ClsTy, which get bound to the real
 -- thing when we compile the mother module. Reason: we don't know exactly
