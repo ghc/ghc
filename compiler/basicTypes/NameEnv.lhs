@@ -6,7 +6,11 @@
 
 \begin{code}
 module NameEnv (
-	NameEnv, mkNameEnv,
+	-- * Var, Id and TyVar environments (maps) 
+	NameEnv, 
+	
+	-- ** Manipulating these environments
+	mkNameEnv,
 	emptyNameEnv, unitNameEnv, nameEnvElts, nameEnvUniqueElts,
 	extendNameEnv_C, extendNameEnv_Acc, extendNameEnv,
         extendNameEnvList, extendNameEnvList_C,
