@@ -213,6 +213,9 @@ data Module = Module {
   }
   deriving (Eq, Ord)
 
+instance Uniquable Module where
+  getUnique (Module p n) = getUnique (packageIdFS p `appendFS` moduleNameFS n)
+
 instance Outputable Module where
   ppr = pprModule
 
