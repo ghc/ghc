@@ -25,6 +25,7 @@ import DataCon
 import TcType
 import Type
 import CoreSyn
+import MkCore
 import DsMonad
 import DsUtils
 import Util	( takeList )
@@ -124,7 +125,7 @@ matchOneCon vars ty (eqn1 : eqns)	-- All eqns for a single constructor
 	= do { prs <- dsLHsBinds bind
 	     ; return (wrapBinds (tvs `zip` tvs1) 
 		       . wrapBinds (ds  `zip` dicts1)
-		       . mkDsLet (Rec prs),
+		       . mkCoreLet (Rec prs),
 		       eqn { eqn_pats = conArgPats con1 arg_tys args ++ pats }) }
 
 conArgPats :: DataCon 
