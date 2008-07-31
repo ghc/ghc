@@ -82,7 +82,7 @@ class DataflowAnalysis m where
   markFactsUnchanged :: m f ()   -- ^ Useful for starting a new iteration
   factsStatus :: m f ChangeFlag
   subAnalysis :: m f a -> m f a  -- ^ Do a new analysis and then throw away
-                                 -- *all* the related state.
+                                 -- /all/ the related state.
 
   getFact :: BlockId -> m f f
   setFact :: Outputable f => BlockId -> f -> m f ()
