@@ -34,7 +34,7 @@ module MkId (
         -- And some particular Ids; see below for why they are wired in
         wiredInIds, ghcPrimIds,
         unsafeCoerceId, realWorldPrimId, voidArgId, nullAddrId, seqId,
-        lazyId, lazyIdUnfolding, lazyIdKey, 
+        lazyId, lazyIdUnfolding, lazyIdKey,
 
         mkRuntimeErrorApp,
         rEC_CON_ERROR_ID, iRREFUT_PAT_ERROR_ID, rUNTIME_ERROR_ID,
@@ -90,6 +90,7 @@ import Module
 %************************************************************************
 
 \begin{code}
+wiredInIds :: [Id]
 wiredInIds
   = [   -- These error-y things are wired in because we don't yet have
         -- a way to express in an interface file that the result type variable
@@ -117,6 +118,7 @@ wiredInIds
     ] ++ ghcPrimIds
 
 -- These Ids are exported from GHC.Prim
+ghcPrimIds :: [Id]
 ghcPrimIds
   = [   -- These can't be defined in Haskell, but they have
         -- perfectly reasonable unfoldings in Core
@@ -957,7 +959,7 @@ unwrapFamInstScrut tycon args scrut
 
 %************************************************************************
 %*                                                                      *
-\subsection{Primitive operations
+\subsection{Primitive operations}
 %*                                                                      *
 %************************************************************************
 
@@ -1275,7 +1277,7 @@ mkRuntimeErrorApp
 mkRuntimeErrorApp err_id res_ty err_msg 
   = mkApps (Var err_id) [Type res_ty, err_string]
   where
-    err_string = Lit (mkStringLit err_msg)
+    err_string = Lit (mkMachString err_msg)
 
 rEC_SEL_ERROR_ID                = mkRuntimeErrorId recSelErrorName
 rUNTIME_ERROR_ID                = mkRuntimeErrorId runtimeErrorName
