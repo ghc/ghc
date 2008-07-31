@@ -3,17 +3,17 @@
 --
 -- Dynamic flags
 --
--- Most flags are dynamic flags, which means they can change from
--- compilation to compilation using OPTIONS_GHC pragmas, and in a
--- multi-session GHC each session can be using different dynamic
--- flags.  Dynamic flags can also be set at the prompt in GHCi.
 --
 -- (c) The University of Glasgow 2005
 --
 -----------------------------------------------------------------------------
 
+-- | Most flags are dynamic flags, which means they can change from
+-- compilation to compilation using @OPTIONS_GHC@ pragmas, and in a
+-- multi-session GHC each session can be using different dynamic
+-- flags.  Dynamic flags can also be set at the prompt in GHCi.
 module DynFlags (
-        -- Dynamic flags
+        -- * Dynamic flags and associated configuration types
         DynFlag(..),
         DynFlags(..),
         HscTarget(..), isObjectTarget, defaultObjectTarget,
@@ -25,40 +25,50 @@ module DynFlags (
         fFlags, xFlags,
         DPHBackend(..),
 
-        -- Configuration of the core-to-core and stg-to-stg phases
-        CoreToDo(..),
-        StgToDo(..),
-        SimplifierSwitch(..),
-        SimplifierMode(..), FloatOutSwitches(..),
-        getCoreToDo, getStgToDo,
-
-        -- Manipulating DynFlags
+        -- ** Manipulating DynFlags
         defaultDynFlags,                -- DynFlags
         initDynFlags,                   -- DynFlags -> IO DynFlags
 
         dopt,                           -- DynFlag -> DynFlags -> Bool
         dopt_set, dopt_unset,           -- DynFlags -> DynFlag -> DynFlags
-        getOpts,                        -- (DynFlags -> [a]) -> IO [a]
+        getOpts,                        -- DynFlags -> (DynFlags -> [a]) -> [a]
         getVerbFlag,
+        getMainFun,
         updOptLevel,
         setTmpDir,
         setPackageName,
 
-        -- parsing DynFlags
+        -- ** Parsing DynFlags
         parseDynamicFlags,
         allFlags,
 
-        -- misc stuff
+        supportedLanguages, languageOptions,
+
+        -- ** DynFlag C compiler options
         machdepCCOpts, picCCOpts,
-    supportedLanguages, languageOptions,
-    compilerInfo,
+
+        -- * Configuration of the core-to-core passes
+        CoreToDo(..),
+        SimplifierMode(..),
+        SimplifierSwitch(..),
+        FloatOutSwitches(..),
+        getCoreToDo,
+
+        -- * Configuration of the stg-to-stg passes
+        StgToDo(..),
+        getStgToDo,
+
+        -- * Compiler configuration suitable for display to the user
+        compilerInfo
   ) where
 
 #include "HsVersions.h"
 
 import Module
 import PackageConfig
-import PrelNames        ( mAIN )
+import PrelNames        ( mAIN, main_RDR_Unqual )
+import RdrName          ( RdrName, mkRdrUnqual )
+import OccName          ( mkVarOccFS )
 #ifdef i386_TARGET_ARCH
 import StaticFlags      ( opt_Static )
 #endif
@@ -74,6 +84,7 @@ import UniqFM           ( UniqFM )
 import Util
 import Maybes           ( orElse )
 import SrcLoc           ( SrcSpan )
+import FastString
 import Outputable
 import {-# SOURCE #-} ErrUtils ( Severity(..), Message, mkLocMessage )
 
@@ -87,6 +98,7 @@ import System.IO        ( stderr, hPutChar )
 -- -----------------------------------------------------------------------------
 -- DynFlags
 
+-- | Enumerates the simple on-or-off dynamic flags
 data DynFlag
 
    -- debugging flags
@@ -289,40 +301,42 @@ data DynFlag
 
    deriving (Eq, Show)
 
+-- | Contains not only a collection of 'DynFlag's but also a plethora of
+-- information relating to the compilation of a single file or GHC session
 data DynFlags = DynFlags {
   ghcMode               :: GhcMode,
   ghcLink               :: GhcLink,
   coreToDo              :: Maybe [CoreToDo], -- reserved for -Ofile
   stgToDo               :: Maybe [StgToDo],  -- similarly
   hscTarget             :: HscTarget,
-  hscOutName            :: String,      -- name of the output file
-  extCoreName           :: String,      -- name of the .core output file
-  verbosity             :: Int,         -- verbosity level
-  optLevel              :: Int,         -- optimisation level
-  simplPhases           :: Int,         -- number of simplifier phases
-  maxSimplIterations    :: Int,         -- max simplifier iterations
+  hscOutName            :: String,      -- ^ Name of the output file
+  extCoreName           :: String,      -- ^ Name of the .core output file
+  verbosity             :: Int,         -- ^ Verbosity level: see "DynFlags#verbosity_levels"
+  optLevel              :: Int,         -- ^ Optimisation level
+  simplPhases           :: Int,         -- ^ Number of simplifier phases
+  maxSimplIterations    :: Int,         -- ^ Max simplifier iterations
   shouldDumpSimplPhase  :: SimplifierMode -> Bool,
   ruleCheck             :: Maybe String,
 
-  specConstrThreshold   :: Maybe Int,   -- Threshold for SpecConstr
-  specConstrCount       :: Maybe Int,   -- Max number of specialisations for any one function
-  liberateCaseThreshold :: Maybe Int,   -- Threshold for LiberateCase
+  specConstrThreshold   :: Maybe Int,   -- ^ Threshold for SpecConstr
+  specConstrCount       :: Maybe Int,   -- ^ Max number of specialisations for any one function
+  liberateCaseThreshold :: Maybe Int,   -- ^ Threshold for LiberateCase
 
   stolen_x86_regs       :: Int,
-  cmdlineHcIncludes     :: [String],    -- -#includes
+  cmdlineHcIncludes     :: [String],    -- ^ @\-\#includes@
   importPaths           :: [FilePath],
   mainModIs             :: Module,
   mainFunIs             :: Maybe String,
-  ctxtStkDepth          :: Int,         -- Typechecker context stack depth
+  ctxtStkDepth          :: Int,         -- ^ Typechecker context stack depth
 
   dphBackend            :: DPHBackend,
 
   thisPackage           :: PackageId,
 
   -- ways
-  wayNames              :: [WayName],   -- way flags from the cmd line
-  buildTag              :: String,      -- the global "way" (eg. "p" for prof)
-  rtsBuildTag           :: String,      -- the RTS "way"
+  wayNames              :: [WayName],   -- ^ Way flags from the command line
+  buildTag              :: String,      -- ^ The global \"way\" (e.g. \"p\" for prof)
+  rtsBuildTag           :: String,      -- ^ The RTS \"way\"
 
   -- paths etc.
   objectDir             :: Maybe String,
@@ -337,12 +351,12 @@ data DynFlags = DynFlags {
   outputHi              :: Maybe String,
   dynLibLoader          :: DynLibLoader,
 
-  -- | This is set by DriverPipeline.runPipeline based on where
+  -- | This is set by 'DriverPipeline.runPipeline' based on where
   --    its output is going.
   dumpPrefix            :: Maybe FilePath,
 
-  -- | Override the dumpPrefix set by runPipeline.
-  --    Set by -ddump-file-prefix
+  -- | Override the 'dumpPrefix' set by 'DriverPipeline.runPipeline'.
+  --    Set by @-ddump-file-prefix@
   dumpPrefixForce       :: Maybe FilePath,
 
   includePaths          :: [String],
@@ -354,7 +368,7 @@ data DynFlags = DynFlags {
   ghcUsagePath          :: FilePath,    -- Filled in by SysTools
   ghciUsagePath         :: FilePath,    -- ditto
 
-  hpcDir                :: String,      -- ^ path to store the .mix files
+  hpcDir                :: String,      -- ^ Path to store the .mix files
 
   -- options for particular phases
   opt_L                 :: [String],
@@ -391,11 +405,11 @@ data DynFlags = DynFlags {
   extraPkgConfs         :: [FilePath],
   topDir                :: FilePath,    -- filled in by SysTools
   systemPackageConfig   :: FilePath,    -- ditto
-        -- The -package-conf flags given on the command line, in the order
+        -- ^ The @-package-conf@ flags given on the command line, in the order
         -- they appeared.
 
   packageFlags          :: [PackageFlag],
-        -- The -package and -hide-package flags from the command-line
+        -- ^ The @-package@ and @-hide-package@ flags from the command-line
 
   -- Package state
   -- NB. do not modify this field, it is calculated by
@@ -406,7 +420,7 @@ data DynFlags = DynFlags {
   -- hsc dynamic flags
   flags                 :: [DynFlag],
 
-  -- message output
+  -- | Message output action: use "ErrUtils" instead of this if you can
   log_action            :: Severity -> SrcSpan -> PprStyle -> Message -> IO (),
 
   haddockOptions :: Maybe String
@@ -420,7 +434,7 @@ data HscTarget
   | HscNothing
   deriving (Eq, Show)
 
--- | will this target result in an object file on the disk?
+-- | Will this target result in an object file on the disk?
 isObjectTarget :: HscTarget -> Bool
 isObjectTarget HscC     = True
 isObjectTarget HscAsm   = True
@@ -433,21 +447,21 @@ isObjectTarget _        = False
 -- imported modules, but in multi-module mode we look for source files
 -- in order to check whether they need to be recompiled.
 data GhcMode
-  = CompManager         -- ^ --make, GHCi, etc.
-  | OneShot             -- ^ ghc -c Foo.hs
-  | MkDepend            -- ^ ghc -M, see Finder for why we need this
+  = CompManager         -- ^ @\-\-make@, GHCi, etc.
+  | OneShot             -- ^ @ghc -c Foo.hs@
+  | MkDepend            -- ^ @ghc -M@, see "Finder" for why we need this
   deriving Eq
 
 isOneShot :: GhcMode -> Bool
 isOneShot OneShot = True
 isOneShot _other  = False
 
--- | What kind of linking to do.
-data GhcLink    -- What to do in the link step, if there is one
-  = NoLink              -- Don't link at all
-  | LinkBinary          -- Link object code into a binary
-  | LinkInMemory        -- Use the in-memory dynamic linker
-  | LinkDynLib          -- Link objects into a dynamic lib (DLL on Windows, DSO on ELF platforms)
+-- | What to do in the link step, if there is one.
+data GhcLink
+  = NoLink              -- ^ Don't link at all
+  | LinkBinary          -- ^ Link object code into a binary
+  | LinkInMemory        -- ^ Use the in-memory dynamic linker
+  | LinkDynLib          -- ^ Link objects into a dynamic lib (DLL on Windows, DSO on ELF platforms)
   deriving (Eq, Show)
 
 isNoLink :: GhcLink -> Bool
@@ -463,7 +477,7 @@ data PackageFlag
 defaultHscTarget :: HscTarget
 defaultHscTarget = defaultObjectTarget
 
--- | the 'HscTarget' value corresponding to the default way to create
+-- | The 'HscTarget' value corresponding to the default way to create
 -- object files on the current platform.
 defaultObjectTarget :: HscTarget
 defaultObjectTarget
@@ -476,6 +490,7 @@ data DynLibLoader
   | SystemDependent
   deriving Eq
 
+-- | Used by 'GHC.newSession' to partially initialize a new 'DynFlags' value
 initDynFlags :: DynFlags -> IO DynFlags
 initDynFlags dflags = do
  -- someday these will be dynamic flags
@@ -488,6 +503,8 @@ initDynFlags dflags = do
         rtsBuildTag     = rts_build_tag
         }
 
+-- | The normal 'DynFlags'. Note that they is not suitable for use in this form
+-- and must be fully initialized by 'GHC.newSession' first.
 defaultDynFlags :: DynFlags
 defaultDynFlags =
      DynFlags {
@@ -619,6 +636,7 @@ defaultDynFlags =
       }
 
 {-
+    #verbosity_levels#
     Verbosity levels:
 
     0   |   print errors & warnings only
@@ -629,19 +647,27 @@ defaultDynFlags =
     5   |   "ghc -v -ddump-all"
 -}
 
+-- | Test whether a 'DynFlag' is set
 dopt :: DynFlag -> DynFlags -> Bool
 dopt f dflags  = f `elem` (flags dflags)
 
+-- | Set a 'DynFlag'
 dopt_set :: DynFlags -> DynFlag -> DynFlags
 dopt_set dfs f = dfs{ flags = f : flags dfs }
 
+-- | Unset a 'DynFlag'
 dopt_unset :: DynFlags -> DynFlag -> DynFlags
 dopt_unset dfs f = dfs{ flags = filter (/= f) (flags dfs) }
 
-getOpts :: DynFlags -> (DynFlags -> [a]) -> [a]
+-- | Retrieve the options corresponding to a particular @opt_*@ field in the correct order
+getOpts :: DynFlags             -- ^ 'DynFlags' to retrieve the options from
+        -> (DynFlags -> [a])    -- ^ Relevant record accessor: one of the @opt_*@ accessors
+        -> [a]                  -- ^ Correctly ordered extracted options
 getOpts dflags opts = reverse (opts dflags)
         -- We add to the options from the front, so we need to reverse the list
 
+-- | Gets the verbosity flag for the current verbosity level. This is fed to
+-- other tools, so GHC-specific verbosity flags like @-ddump-most@ are not included
 getVerbFlag :: DynFlags -> String
 getVerbFlag dflags
   | verbosity dflags >= 3  = "-v"
@@ -733,13 +759,12 @@ addHaddockOpts f d = d{ haddockOptions = Just f}
 -- -----------------------------------------------------------------------------
 -- Command-line options
 
--- When invoking external tools as part of the compilation pipeline, we
+-- | When invoking external tools as part of the compilation pipeline, we
 -- pass these a sequence of options on the command-line. Rather than
 -- just using a list of Strings, we use a type that allows us to distinguish
--- between filepaths and 'other stuff'. [The reason being, of course, that
+-- between filepaths and 'other stuff'. The reason for this is that
 -- this type gives us a handle on transforming filenames, and filenames only,
--- to whatever format they're expected to be on a particular platform.]
-
+-- to whatever format they're expected to be on a particular platform.
 data Option
  = FileOption -- an entry that _contains_ filename(s) / filepaths.
               String  -- a non-filepath prefix that shouldn't be
@@ -751,7 +776,7 @@ data Option
 -- Setting the optimisation level
 
 updOptLevel :: Int -> DynFlags -> DynFlags
--- Set dynflags appropriate to the optimisation level
+-- ^ Sets the 'DynFlags' to be appropriate to the optimisation level
 updOptLevel n dfs
   = dfs2{ optLevel = final_n }
   where
@@ -1429,8 +1454,8 @@ dynamic_flags = [
  ++ map (mkFlag True  "X"    setDynFlag  ) xFlags
  ++ map (mkFlag False "XNo"  unSetDynFlag) xFlags
 
-mkFlag :: Bool -- True => turn it on, False => turn it off
-       -> String
+mkFlag :: Bool                  -- ^ True <=> it should be turned on
+       -> String                -- ^ The flag prefix
        -> (DynFlag -> DynP ())
        -> (String, DynFlag, Bool -> Deprecated)
        -> Flag DynP
@@ -1442,8 +1467,7 @@ deprecatedForLanguage lang turnOn =
     Deprecated ("Use the " ++ prefix ++ lang ++ " language instead")
     where prefix = if turnOn then "" else "No"
 
--- these -f<blah> flags can all be reversed with -fno-<blah>
-
+-- | These @-f\<blah\>@ flags can all be reversed with @-fno-\<blah\>@
 fFlags :: [(String, DynFlag, Bool -> Deprecated)]
 fFlags = [
   ( "warn-dodgy-foreign-imports",       Opt_WarnDodgyForeignImports, const Supported ),
@@ -1544,7 +1568,7 @@ supportedLanguages = [ name | (name, _, _) <- xFlags ]
 languageOptions :: [DynFlag]
 languageOptions = [ dynFlag | (_, dynFlag, _) <- xFlags ]
 
--- These -X<blah> flags can all be reversed with -XNo<blah>
+-- | These -X<blah> flags can all be reversed with -XNo<blah>
 xFlags :: [(String, DynFlag, Bool -> Deprecated)]
 xFlags = [
   ( "CPP",                              Opt_Cpp, const Supported ),
@@ -1834,6 +1858,13 @@ setMainIs arg
   = upd $ \d -> d{ mainFunIs = Just arg }
   where
     (main_mod, main_fn) = splitLongestPrefix arg (== '.')
+
+-- | Get the unqualified name of the function to use as the \"main\" for the main module.
+-- Either returns the default name or the one configured on the command line with -main-is
+getMainFun :: DynFlags -> RdrName
+getMainFun dflags = case (mainFunIs dflags) of
+    Just fn -> mkRdrUnqual (mkVarOccFS (mkFastString fn))
+    Nothing -> main_RDR_Unqual
 
 -----------------------------------------------------------------------------
 -- Paths & Libraries
