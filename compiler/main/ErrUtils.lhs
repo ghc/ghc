@@ -11,7 +11,7 @@ module ErrUtils (
 	ErrMsg, WarnMsg, throwErrMsg, handleErrMsg,
 	errMsgSpans, errMsgContext, errMsgShortDoc, errMsgExtraInfo,
 	Messages, errorsFound, emptyMessages,
-	mkErrMsg, mkWarnMsg, mkPlainErrMsg, mkLongErrMsg,
+	mkErrMsg, mkPlainErrMsg, mkLongErrMsg, mkWarnMsg, mkPlainWarnMsg,
 	printErrorsAndWarnings, printBagOfErrors, printBagOfWarnings,
     handleFlagWarnings,
 
@@ -131,6 +131,10 @@ mkLongErrMsg locn print_unqual msg extra
 
 mkWarnMsg :: SrcSpan -> PrintUnqualified -> Message -> WarnMsg
 mkWarnMsg = mkErrMsg
+
+-- Variant that doesn't care about qualified/unqualified names
+mkPlainWarnMsg :: SrcSpan -> Message -> ErrMsg
+mkPlainWarnMsg locn msg = mkWarnMsg locn alwaysQualify msg
 
 type Messages = (Bag WarnMsg, Bag ErrMsg)
 
