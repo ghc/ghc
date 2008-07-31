@@ -400,7 +400,7 @@ externalVar mod fs
 
 externalTyCon :: Module -> FastString -> DsM TyCon
 externalTyCon mod fs
-  = dsLookupTyCon =<< lookupOrig mod (mkOccNameFS tcName fs)
+  = dsLookupTyCon =<< lookupOrig mod (mkTcOccFS fs)
 
 externalType :: Module -> FastString -> DsM Type
 externalType mod fs
@@ -426,7 +426,7 @@ primPArray tycon (Builtins { dphModules = mods })
   | Just suffix <- lookupNameEnv prim_ty_cons (tyConName tycon)
   = liftM Just
   $ dsLookupTyCon =<< lookupOrig (dph_Unboxed mods)
-                                 (mkOccName tcName $ "PArray" ++ suffix)
+                                 (mkTcOcc $ "PArray" ++ suffix)
 
   | otherwise = return Nothing
 
