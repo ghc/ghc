@@ -502,7 +502,7 @@ regLiveness (CmmProc info lbl params (ListGraph blocks@(first : _)))
 
 
 sccBlocks :: [NatBasicBlock] -> [SCC NatBasicBlock]
-sccBlocks blocks = stronglyConnComp graph
+sccBlocks blocks = stronglyConnCompFromEdgedVertices graph
   where
 	getOutEdges :: [Instr] -> [BlockId]
 	getOutEdges instrs = foldl' (\a x -> jumpDests x a) [] instrs
