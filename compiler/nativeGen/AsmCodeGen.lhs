@@ -456,7 +456,7 @@ sequenceBlocks (entry:blocks) =
   -- the first block is the entry point ==> it must remain at the start.
 
 sccBlocks :: [NatBasicBlock] -> [SCC (NatBasicBlock,Unique,[Unique])]
-sccBlocks blocks = stronglyConnCompR (map mkNode blocks)
+sccBlocks blocks = stronglyConnCompFromEdgedVerticesR (map mkNode blocks)
 
 getOutEdges :: [Instr] -> [Unique]
 getOutEdges instrs = case jumpDests (last instrs) [] of
