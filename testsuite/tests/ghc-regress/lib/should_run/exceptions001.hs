@@ -1,7 +1,7 @@
 module Main where
 
 import Prelude hiding (catch)
-import Control.Exception 
+import Control.OldException 
 
 main = do
   ioTest

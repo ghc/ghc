@@ -1,11 +1,11 @@
 module Main where
 	{
-	import qualified Control.Exception;
+	import qualified Control.OldException as Exception;
 	import Data.IORef;
 	import Prelude;
 
 	safeCatch :: IO () -> IO ();
-	safeCatch f = Control.Exception.catch f (\_ -> return ());
+	safeCatch f = Exception.catch f (\_ -> return ());
 
 	type Thrower = IO Bool;
 
@@ -64,20 +64,20 @@ module Main where
 	errorThrower = MkNamed "error" (error "some error");
 
 	throwThrower :: Named Thrower;
-	throwThrower = MkNamed "Control.Exception.throw"
-	 (Control.Exception.throw (Control.Exception.ErrorCall "throw error"));
+	throwThrower = MkNamed "Exception.throw"
+	 (Exception.throw (Exception.ErrorCall "throw error"));
 
 	ioErrorErrorCallThrower :: Named Thrower;
 	ioErrorErrorCallThrower = MkNamed "ioError ErrorCall"
-	 (Control.Exception.throwIO (Control.Exception.ErrorCall "throw error"));
+	 (Exception.throwIO (Exception.ErrorCall "throw error"));
 
 	ioErrorIOExceptionThrower :: Named Thrower;
 	ioErrorIOExceptionThrower = MkNamed "ioError IOException"
-	 (Control.Exception.throwIO (Control.Exception.IOException undefined));
+	 (Exception.throwIO (Exception.IOException undefined));
 
 	returnThrowThrower :: Named Thrower;
-	returnThrowThrower = MkNamed "return Control.Exception.throw"
-	 (return (Control.Exception.throw (Control.Exception.ErrorCall "throw error")));
+	returnThrowThrower = MkNamed "return Exception.throw"
+	 (return (Exception.throw (Exception.ErrorCall "throw error")));
 
 
 	-- catchers
@@ -90,12 +90,12 @@ module Main where
 	 (\f cc -> Prelude.catch (f >> (return ())) (const cc));
 
 	ceCatchCatcher :: Named Catcher;
-	ceCatchCatcher = MkNamed "Control.Exception.catch"
-	 (\f cc -> Control.Exception.catch (f >> (return ())) (const cc));
+	ceCatchCatcher = MkNamed "Exception.catch"
+	 (\f cc -> Exception.catch (f >> (return ())) (const cc));
 
 	finallyCatcher :: Named Catcher;
-	finallyCatcher = MkNamed "Control.Exception.finally"
-	 (\f cc -> Control.Exception.finally (f >> (return ())) cc);
+	finallyCatcher = MkNamed "Exception.finally"
+	 (\f cc -> Exception.finally (f >> (return ())) cc);
 
 	main = checkNamedCatches
 		[bindCatcher,preludeCatchCatcher,ceCatchCatcher,finallyCatcher]
