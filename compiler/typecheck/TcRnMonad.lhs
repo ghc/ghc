@@ -40,7 +40,8 @@ import StaticFlags
 import FastString
 import Panic
 import Util
- 
+import Exception
+
 import System.IO
 import Data.IORef
 import Control.Monad
@@ -536,7 +537,11 @@ discardWarnings thing_inside
 
 
 \begin{code}
+#if __GLASGOW_HASKELL__ < 609
 try_m :: TcRn r -> TcRn (Either Exception r)
+#else
+try_m :: TcRn r -> TcRn (Either ErrorCall r)
+#endif
 -- Does try_m, with a debug-trace on failure
 try_m thing 
   = do { mb_r <- tryM thing ;

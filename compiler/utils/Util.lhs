@@ -65,8 +65,6 @@ module Util (
         doesDirNameExist,
         modificationTimeIfExists,
 
-        later, handleDyn, handle,
-
         -- Filename utils
         Suffix,
         splitLongestPrefix,
@@ -79,9 +77,6 @@ module Util (
 
 import Panic
 
-import Exception ( Exception(..), finally, catchDyn, throw )
-import qualified Exception
-import Data.Dynamic     ( Typeable )
 import Data.IORef       ( IORef, newIORef )
 import System.IO.Unsafe ( unsafePerformIO )
 import Data.IORef       ( readIORef, writeIORef )
@@ -822,20 +817,6 @@ doesDirNameExist :: FilePath -> IO Bool
 doesDirNameExist fpath = case takeDirectory fpath of
                          "" -> return True -- XXX Hack
                          _  -> doesDirectoryExist (takeDirectory fpath)
-
--- -----------------------------------------------------------------------------
--- Exception utils
-
-later :: IO b -> IO a -> IO a
-later = flip finally
-
-handleDyn :: Typeable ex => (ex -> IO a) -> IO a -> IO a
-handleDyn = flip catchDyn
-
-handle :: (Exception -> IO a) -> IO a -> IO a
-handle h f = f `Exception.catch` \e -> case e of
-    ExitException _ -> throw e
-    _               -> h e
 
 -- --------------------------------------------------------------
 -- check existence & modification time at the same time

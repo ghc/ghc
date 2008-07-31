@@ -90,13 +90,13 @@ import Foreign.StablePtr
 data RunResult
   = RunOk [Name] 		-- ^ names bound by this evaluation
   | RunFailed	 		-- ^ statement failed compilation
-  | RunException Exception	-- ^ statement raised an exception
+  | RunException SomeException	-- ^ statement raised an exception
   | RunBreak ThreadId [Name] (Maybe BreakInfo)
 
 data Status
    = Break Bool HValue BreakInfo ThreadId
           -- ^ the computation hit a breakpoint (Bool <=> was an exception)
-   | Complete (Either Exception [HValue])
+   | Complete (Either SomeException [HValue])
           -- ^ the computation completed with either an exception or a value
 
 data Resume
@@ -338,6 +338,7 @@ sandboxIO dflags statusMVar thing =
 -- not "Interrupted", we unset the exception flag before throwing.
 --
 rethrow :: DynFlags -> IO a -> IO a
+#if __GLASGOW_HASKELL__ < 609
 rethrow dflags io = Exception.catch io $ \e -> do -- NB. not catchDyn
                 case e of
                    -- If -fbreak-on-error, we break unconditionally,
@@ -355,7 +356,22 @@ rethrow dflags io = Exception.catch io $ \e -> do -- NB. not catchDyn
                    _    -> poke exceptionFlag 0
 
                 Exception.throwIO e
+#else
+rethrow dflags io = Exception.catch io $ \se@(SomeException e) -> do
+                   -- If -fbreak-on-error, we break unconditionally,
+                   --  but with care of not breaking twice 
+                if dopt Opt_BreakOnError dflags &&
+                   not (dopt Opt_BreakOnException dflags)
+                    then poke exceptionFlag 1
+                    else case cast e of
+                         -- If it is an "Interrupted" exception, we allow
+                         --  a possible break by way of -fbreak-on-exception
+                         Just Interrupted -> return ()
+                         -- In any other case, we don't want to break
+                         _ -> poke exceptionFlag 0
 
+                Exception.throwIO se
+#endif
 
 withInterruptsSentTo :: ThreadId -> IO r -> IO r
 withInterruptsSentTo thread get_result = do

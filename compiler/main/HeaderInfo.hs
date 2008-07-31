@@ -70,7 +70,7 @@ getImports dflags buf filename source_filename = do
 	      return (source_imps, ordinary_imps, mod)
   
 parseError :: SrcSpan -> Message -> a
-parseError span err = throwDyn $ mkPlainErrMsg span err
+parseError span err = throwErrMsg $ mkPlainErrMsg span err
 
 isSourceIdecl :: ImportDecl name -> Bool
 isSourceIdecl (ImportDecl _ s _ _ _) = s

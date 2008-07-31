@@ -468,7 +468,7 @@ runGHCi paths maybe_exprs = do
 interactiveLoop :: Bool -> Bool -> GHCi ()
 interactiveLoop is_tty show_prompt =
   -- Ignore ^C exceptions caught here
-  ghciHandleDyn (\e -> case e of 
+  ghciHandleGhcException (\e -> case e of 
 			Interrupted -> do
 #if defined(mingw32_HOST_OS)
 				io (putStrLn "")
@@ -504,7 +504,7 @@ checkPerms _ =
   return True
 #else
 checkPerms name =
-  Util.handle (\_ -> return False) $ do
+  handleIO (\_ -> return False) $ do
      st <- getFileStatus name
      me <- getRealUserID
      if fileOwner st /= me then do
@@ -650,7 +650,7 @@ queryQueue = do
 runCommands :: GHCi (Maybe String) -> GHCi ()
 runCommands = runCommands' handler
 
-runCommands' :: (Exception -> GHCi Bool) -- Exception handler
+runCommands' :: (SomeException -> GHCi Bool) -- Exception handler
              -> GHCi (Maybe String) -> GHCi ()
 runCommands' eh getCmd = do
   mb_cmd <- noSpace queryQueue
@@ -1822,14 +1822,15 @@ completeHomeModuleOrFile=completeNone
 -- raising another exception.  We therefore don't put the recursive
 -- handler arond the flushing operation, so if stderr is closed
 -- GHCi will just die gracefully rather than going into an infinite loop.
-handler :: Exception -> GHCi Bool
+handler :: SomeException -> GHCi Bool
 
 handler exception = do
   flushInterpBuffers
   io installSignalHandlers
   ghciHandle handler (showException exception >> return False)
 
-showException :: Exception -> GHCi ()
+showException :: SomeException -> GHCi ()
+#if __GLASGOW_HASKELL__ < 609
 showException (DynException dyn) =
   case fromDynamic dyn of
     Nothing               -> io (putStrLn ("*** Exception: (unknown)"))
@@ -1840,6 +1841,17 @@ showException (DynException dyn) =
 
 showException other_exception
   = io (putStrLn ("*** Exception: " ++ show other_exception))
+#else
+showException (SomeException e) =
+  io $ case cast e of
+       Just Interrupted         -> putStrLn "Interrupted."
+       -- omit the location for CmdLineError:
+       Just (CmdLineError s)    -> putStrLn s
+       -- ditto:
+       Just ph@(PhaseFailed {}) -> putStrLn (showGhcException ph "")
+       Just other_ghc_ex        -> print other_ghc_ex
+       Nothing                  -> putStrLn ("*** Exception: " ++ show e)
+#endif
 
 -----------------------------------------------------------------------------
 -- recursive exception handlers
@@ -1848,7 +1860,7 @@ showException other_exception
 -- in an exception loop (eg. let a = error a in a) the ^C exception
 -- may never be delivered.  Thanks to Marcin for pointing out the bug.
 
-ghciHandle :: (Exception -> GHCi a) -> GHCi a -> GHCi a
+ghciHandle :: (SomeException -> GHCi a) -> GHCi a -> GHCi a
 ghciHandle h (GHCi m) = GHCi $ \s -> 
    Exception.catch (m s) 
 	(\e -> unGHCi (ghciUnblock (h e)) s)
@@ -1856,7 +1868,7 @@ ghciHandle h (GHCi m) = GHCi $ \s ->
 ghciUnblock :: GHCi a -> GHCi a
 ghciUnblock (GHCi a) = GHCi $ \s -> Exception.unblock (a s)
 
-ghciTry :: GHCi a -> GHCi (Either Exception a)
+ghciTry :: GHCi a -> GHCi (Either SomeException a)
 ghciTry (GHCi m) = GHCi $ \s -> Exception.try (m s) 
 
 -- ----------------------------------------------------------------------------
@@ -2174,7 +2186,7 @@ findBreakByCoord mb_file (line, col) arr
 do_bold :: Bool
 do_bold = (`isPrefixOf` unsafePerformIO mTerm) `any` ["xterm", "linux"]
     where mTerm = System.Environment.getEnv "TERM"
-                  `Exception.catch` \_ -> return "TERM not set"
+                  `catchIO` \_ -> return "TERM not set"
 
 start_bold :: String
 start_bold = "\ESC[1m"

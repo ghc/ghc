@@ -1131,7 +1131,7 @@ mkSOName root
 -- name. They are searched for in different paths than normal libraries.
 loadFramework :: [FilePath] -> FilePath -> IO (Maybe String)
 loadFramework extraPaths rootname
-   = do { either_dir <- Exception.try getHomeDirectory
+   = do { either_dir <- tryIO getHomeDirectory
         ; let homeFrameworkPath = case either_dir of
                                   Left _ -> []
                                   Right dir -> [dir ++ "/Library/Frameworks"]

@@ -63,13 +63,17 @@ import Maybe
 import BasicTypes
 import Panic
 import FastString
+import Data.Typeable (cast)
+import Exception
 
 import qualified Language.Haskell.TH as TH
 -- THSyntax gives access to internal functions and data types
 import qualified Language.Haskell.TH.Syntax as TH
 
 import GHC.Exts		( unsafeCoerce#, Int#, Int(..) )
+#if __GLASGOW_HASKELL__ < 609
 import qualified Exception ( userErrors )
+#endif
 \end{code}
 
 Note [Template Haskell levels]
@@ -593,10 +597,18 @@ runMeta convert expr
 
 	; case either_tval of
 	    Right v -> return v
+#if __GLASGOW_HASKELL__ < 609
 	    Left exn | Just s <- Exception.userErrors exn
 		     , s == "IOEnv failure" 
 		     -> failM	-- Error already in Tc monad
 		     | otherwise -> failWithTc (mk_msg "run" exn)	-- Exception
+#else
+	    Left (SomeException exn) -> do
+                    case cast exn of
+                        Just (ErrorCall "IOEnv failure") ->
+                            failM -- Error already in Tc monad
+                        _ -> failWithTc (mk_msg "run" exn)	-- Exception
+#endif
         }}}
   where
     mk_msg s exn = vcat [text "Exception when trying to" <+> text s <+> text "compile-time code:",

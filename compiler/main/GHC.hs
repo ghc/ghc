@@ -274,11 +274,14 @@ import qualified Data.List as List
 import Control.Monad
 import System.Exit	( exitWith, ExitCode(..) )
 import System.Time	( ClockTime, getClockTime )
-import Exception hiding (handle)
+import Exception
 import Data.IORef
 import System.FilePath
 import System.IO
 import System.IO.Error	( try, isDoesNotExistError )
+#if __GLASGOW_HASKELL__ >= 609
+import Data.Typeable (cast)
+#endif
 import Prelude hiding (init)
 
 
@@ -290,33 +293,55 @@ import Prelude hiding (init)
 -- the top level of your program.  The default handlers output the error
 -- message(s) to stderr and exit cleanly.
 defaultErrorHandler :: DynFlags -> IO a -> IO a
-defaultErrorHandler dflags inner = 
+defaultErrorHandler dflags inner =
   -- top-level exception handler: any unrecognised exception is a compiler bug.
+#if __GLASGOW_HASKELL__ < 609
   handle (\exception -> do
-  	   hFlush stdout
-	   case exception of
-		-- an IO exception probably isn't our fault, so don't panic
-		IOException _ ->
-		  fatalErrorMsg dflags (text (show exception))
-		AsyncException StackOverflow ->
-		  fatalErrorMsg dflags (text "stack overflow: use +RTS -K<size> to increase it")
-		_other ->
-		  fatalErrorMsg dflags (text (show (Panic (show exception))))
-	   exitWith (ExitFailure 1)
+           hFlush stdout
+           case exception of
+                -- an IO exception probably isn't our fault, so don't panic
+                IOException _ ->
+                  fatalErrorMsg dflags (text (show exception))
+                AsyncException StackOverflow ->
+                  fatalErrorMsg dflags (text "stack overflow: use +RTS -K<size> to increase it")
+                ExitException _ -> throw exception
+                _ ->
+                  fatalErrorMsg dflags (text (show (Panic (show exception))))
+           exitWith (ExitFailure 1)
          ) $
+#else
+  handle (\(SomeException exception) -> do
+           hFlush stdout
+           case cast exception of
+                -- an IO exception probably isn't our fault, so don't panic
+                Just (ioe :: IOException) ->
+                  fatalErrorMsg dflags (text (show ioe))
+                _ -> case cast exception of
+                     Just StackOverflow ->
+                         fatalErrorMsg dflags (text "stack overflow: use +RTS -K<size> to increase it")
+                     _ -> case cast exception of
+                          Just (ex :: ExitCode) -> throw ex
+                          _ ->
+                              fatalErrorMsg dflags
+                                  (text (show (Panic (show exception))))
+           exitWith (ExitFailure 1)
+         ) $
+#endif
 
   -- program errors: messages with locations attached.  Sometimes it is
   -- convenient to just throw these as exceptions.
-  handleDyn (\dyn -> do printBagOfErrors dflags (unitBag dyn)
-			exitWith (ExitFailure 1)) $
+  handleErrMsg
+            (\em -> do printBagOfErrors dflags (unitBag em)
+                       exitWith (ExitFailure 1)) $
 
   -- error messages propagated as exceptions
-  handleDyn (\dyn -> do
+  handleGhcException
+            (\ge -> do
   		hFlush stdout
-  		case dyn of
+  		case ge of
 		     PhaseFailed _ code -> exitWith code
 		     Interrupted -> exitWith (ExitFailure 1)
-		     _ -> do fatalErrorMsg dflags (text (show (dyn :: GhcException)))
+		     _ -> do fatalErrorMsg dflags (text (show ge))
 			     exitWith (ExitFailure 1)
 	    ) $
   inner
@@ -328,13 +353,13 @@ defaultErrorHandler dflags inner =
 defaultCleanupHandler :: DynFlags -> IO a -> IO a
 defaultCleanupHandler dflags inner = 
     -- make sure we clean up after ourselves
-    later (do cleanTempFiles dflags
+    inner `onException`
+          (do cleanTempFiles dflags
               cleanTempDirs dflags
           )
           -- exceptions will be blocked while we clean the temporary files,
           -- so there shouldn't be any difficulty if we receive further
           -- signals.
-    inner
 
 
 -- | Starts a new session.  A session consists of a set of loaded
@@ -465,7 +490,8 @@ guessTarget file Nothing
 	if exists
 	   then return (Target (TargetFile lhs_file Nothing) Nothing)
 	   else do
-        throwDyn (ProgramError (showSDoc $
+        throwGhcException
+                 (ProgramError (showSDoc $
                  text "target" <+> quotes (text file) <+> 
                  text "is not a module name or a source file"))
      where 
@@ -1661,7 +1687,8 @@ downsweep :: HscEnv
 		-- in which case there can be repeats
 downsweep hsc_env old_summaries excl_mods allow_dup_roots
    = -- catch error messages and return them
-     handleDyn (\err_msg -> printBagOfErrors (hsc_dflags hsc_env) (unitBag err_msg) >> return Nothing) $ do
+     handleErrMsg
+               (\err_msg -> printBagOfErrors (hsc_dflags hsc_env) (unitBag err_msg) >> return Nothing) $ do
        rootSummaries <- mapM getRootSummary roots
        let root_map = mkRootMap rootSummaries
        checkDuplicates root_map
@@ -1678,7 +1705,7 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
 	   = do exists <- doesFileExist file
 		if exists 
 		    then summariseFile hsc_env old_summaries file mb_phase maybe_buf
-		    else throwDyn $ mkPlainErrMsg noSrcSpan $
+		    else throwErrMsg $ mkPlainErrMsg noSrcSpan $
 			   text "can't find file:" <+> text file
 	getRootSummary (Target (TargetModule modl) maybe_buf)
  	   = do maybe_summary <- summariseModule hsc_env old_summary_map False 
@@ -1928,7 +1955,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod) maybe_buf exc
         (srcimps, the_imps, L mod_loc mod_name) <- getImports dflags' buf hspp_fn src_fn
 
 	when (mod_name /= wanted_mod) $
-		throwDyn $ mkPlainErrMsg mod_loc $ 
+		throwErrMsg $ mkPlainErrMsg mod_loc $ 
 			      text "File name does not match module name:" 
 			      $$ text "Saw:" <+> quotes (ppr mod_name)
                               $$ text "Expected:" <+> quotes (ppr wanted_mod)
@@ -1995,21 +2022,21 @@ preprocessFile hsc_env src_fn mb_phase (Just (buf, _time))
 noModError :: DynFlags -> SrcSpan -> ModuleName -> FindResult -> IO ab
 -- ToDo: we don't have a proper line number for this error
 noModError dflags loc wanted_mod err
-  = throwDyn $ mkPlainErrMsg loc $ cannotFindModule dflags wanted_mod err
+  = throwErrMsg $ mkPlainErrMsg loc $ cannotFindModule dflags wanted_mod err
 				
 noHsFileErr :: SrcSpan -> String -> a
 noHsFileErr loc path
-  = throwDyn $ mkPlainErrMsg loc $ text "Can't find" <+> text path
+  = throwErrMsg $ mkPlainErrMsg loc $ text "Can't find" <+> text path
  
 packageModErr :: ModuleName -> a
 packageModErr mod
-  = throwDyn $ mkPlainErrMsg noSrcSpan $
+  = throwErrMsg $ mkPlainErrMsg noSrcSpan $
 	text "module" <+> quotes (ppr mod) <+> text "is a package module"
 
 multiRootsErr :: [ModSummary] -> IO ()
 multiRootsErr [] = panic "multiRootsErr"
 multiRootsErr summs@(summ1:_)
-  = throwDyn $ mkPlainErrMsg noSrcSpan $
+  = throwErrMsg $ mkPlainErrMsg noSrcSpan $
 	text "module" <+> quotes (ppr mod) <+> 
 	text "is defined in multiple files:" <+>
 	sep (map text files)

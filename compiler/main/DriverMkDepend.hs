@@ -31,6 +31,7 @@ import SrcLoc
 import Data.List
 import FastString
 
+import Exception
 import ErrUtils         ( debugTraceMsg, putMsg )
 
 import System.Exit      ( ExitCode(..), exitWith )
@@ -126,9 +127,9 @@ beginMkDependHS dflags = do
                         then return ()
                         else chuck
 
-           catchJust ioErrors slurp
+           catchIO slurp
                 (\e -> if isEOFError e then return () else ioError e)
-           catchJust ioErrors chuck
+           catchIO chuck
                 (\e -> if isEOFError e then return () else ioError e)
 
            return (Just makefile_hdl)
@@ -295,7 +296,7 @@ endMkDependHS dflags
                 hPutStrLn tmp_hdl l
                 slurp
 
-        catchJust ioErrors slurp
+        catchIO slurp
                 (\e -> if isEOFError e then return () else ioError e)
 
         hClose hdl

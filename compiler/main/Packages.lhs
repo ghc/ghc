@@ -55,6 +55,7 @@ import Distribution.Text
 import Distribution.Version
 import FastString
 import ErrUtils         ( debugTraceMsg, putMsg, Message )
+import Exception
 
 import System.Directory
 import System.FilePath
@@ -172,7 +173,7 @@ initPackages dflags = do
 
 readPackageConfigs :: DynFlags -> IO PackageConfigMap
 readPackageConfigs dflags = do
-   e_pkg_path <- try (getEnv "GHC_PACKAGE_PATH")
+   e_pkg_path <- tryIO (getEnv "GHC_PACKAGE_PATH")
    system_pkgconfs <- getSystemPackageConfigs dflags
 
    let pkgconfs = case e_pkg_path of
@@ -215,7 +216,7 @@ getSystemPackageConfigs dflags = do
 	-- unless the -no-user-package-conf flag was given.
 	-- We only do this when getAppUserDataDirectory is available 
 	-- (GHC >= 6.3).
-   user_pkgconf <- handle (\_ -> return []) $ do
+   user_pkgconf <- do
       appdir <- getAppUserDataDirectory "ghc"
       let 
      	 pkgconf = appdir
@@ -225,6 +226,7 @@ getSystemPackageConfigs dflags = do
       if (flg && dopt Opt_ReadUserPackageConf dflags)
 	then return [pkgconf]
 	else return []
+    `catchIO` (\_ -> return [])
 
    return (user_pkgconf ++ system_pkgconfs ++ [system_pkgconf])
 

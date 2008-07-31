@@ -23,7 +23,8 @@ module IOEnv (
         IORef, newMutVar, readMutVar, writeMutVar, updMutVar
   ) where
 
-import Panic            ( try, tryUser, tryMost, Exception(..) )
+import Exception
+import Panic
 
 import Data.IORef       ( IORef, newIORef, readIORef, writeIORef, modifyIORef )
 import System.IO.Unsafe ( unsafeInterleaveIO )
@@ -94,7 +95,11 @@ fixM f = IOEnv (\ env -> fixIO (\ r -> unIOEnv (f r) env))
 
 
 ---------------------------
+#if __GLASGOW_HASKELL__ < 609
 tryM :: IOEnv env r -> IOEnv env (Either Exception r)
+#else
+tryM :: IOEnv env r -> IOEnv env (Either ErrorCall r)
+#endif
 -- Reflect UserError exceptions (only) into IOEnv monad
 -- Other exceptions are not caught; they are simply propagated as exns
 --
@@ -104,13 +109,14 @@ tryM :: IOEnv env r -> IOEnv env (Either Exception r)
 -- begin compiled!
 tryM (IOEnv thing) = IOEnv (\ env -> tryUser (thing env))
 
-tryAllM :: IOEnv env r -> IOEnv env (Either Exception r)
+-- XXX We shouldn't be catching everything, e.g. timeouts
+tryAllM :: IOEnv env r -> IOEnv env (Either SomeException r)
 -- Catch *all* exceptions
 -- This is used when running a Template-Haskell splice, when
 -- even a pattern-match failure is a programmer error
 tryAllM (IOEnv thing) = IOEnv (\ env -> try (thing env))
 
-tryMostM :: IOEnv env r -> IOEnv env (Either Exception r)
+tryMostM :: IOEnv env r -> IOEnv env (Either SomeException r)
 tryMostM (IOEnv thing) = IOEnv (\ env -> tryMost (thing env))
 
 ---------------------------

@@ -8,7 +8,7 @@ module ErrUtils (
 	Message, mkLocMessage, printError,
 	Severity(..),
 
-	ErrMsg, WarnMsg,
+	ErrMsg, WarnMsg, throwErrMsg, handleErrMsg,
 	errMsgSpans, errMsgContext, errMsgShortDoc, errMsgExtraInfo,
 	Messages, errorsFound, emptyMessages,
 	mkErrMsg, mkWarnMsg, mkPlainErrMsg, mkLongErrMsg,
@@ -44,6 +44,7 @@ import System.Exit	( ExitCode(..), exitWith )
 import Data.Dynamic
 import Data.List
 import System.IO
+import Exception
 
 -- -----------------------------------------------------------------------------
 -- Basic error messages: just render a message with a source location.
@@ -80,6 +81,27 @@ data ErrMsg = ErrMsg {
 	-- The SrcSpan is used for sorting errors into line-number order
 	-- NB  Pretty.Doc not SDoc: we deal with the printing style (in ptic 
 	-- whether to qualify an External Name) at the error occurrence
+
+#if __GLASGOW_HASKELL__ >= 609
+instance Exception ErrMsg
+#endif
+
+instance Show ErrMsg where
+    show em = showSDoc (errMsgShortDoc em)
+
+throwErrMsg :: ErrMsg -> a
+#if __GLASGOW_HASKELL__ < 609
+throwErrMsg = throwDyn
+#else
+throwErrMsg = throw
+#endif
+
+handleErrMsg :: (ErrMsg -> IO a) -> IO a -> IO a
+#if __GLASGOW_HASKELL__ < 609
+handleErrMsg = flip catchDyn
+#else
+handleErrMsg = handle
+#endif
 
 -- So we can throw these things as exceptions
 errMsgTc :: TyCon

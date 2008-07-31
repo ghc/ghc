@@ -1120,7 +1120,7 @@ runPhase_MoveBinary dflags input_fn dep_packages
            pvm_executable_base = "=" ++ input_fn
            pvm_executable = pvm_root ++ "/bin/" ++ pvm_arch ++ "/" ++ pvm_executable_base
         -- nuke old binary; maybe use configur'ed names for cp and rm?
-        Panic.try (removeFile pvm_executable)
+        tryIO (removeFile pvm_executable)
         -- move the newly created binary into PVM land
         copy dflags "copying PVM executable" input_fn pvm_executable
         -- generate a wrapper script for running a parallel prg under PVM

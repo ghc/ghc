@@ -28,13 +28,11 @@ import StaticFlags
 
 import Data.Maybe
 import Numeric
-import Exception
 import Data.Array
 import Data.Char
 import Data.Int         ( Int64 )
 import Data.IORef
 import Data.List
-import Data.Typeable
 import System.CPUTime
 import System.Directory
 import System.Environment
@@ -140,9 +138,9 @@ instance Monad GHCi where
 instance Functor GHCi where
     fmap f m = m >>= return . f
 
-ghciHandleDyn :: Typeable t => (t -> GHCi a) -> GHCi a -> GHCi a
-ghciHandleDyn h (GHCi m) = GHCi $ \s -> 
-   Exception.catchDyn (m s) (\e -> unGHCi (h e) s)
+ghciHandleGhcException :: (GhcException -> GHCi a) -> GHCi a -> GHCi a
+ghciHandleGhcException h (GHCi m) = GHCi $ \s -> 
+   handleGhcException (\e -> unGHCi (h e) s) (m s)
 
 getGHCiState :: GHCi GHCiState
 getGHCiState   = GHCi $ \r -> readIORef r
