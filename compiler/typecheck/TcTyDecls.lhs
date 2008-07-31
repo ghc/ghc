@@ -102,7 +102,7 @@ synTyConsOfType ty
 \begin{code}
 calcSynCycles :: [LTyClDecl Name] -> [SCC (LTyClDecl Name)]
 calcSynCycles decls
-  = stronglyConnComp syn_edges
+  = stronglyConnCompFromEdgedVertices syn_edges
   where
     syn_edges = [ (ldecl, unLoc (tcdLName decl),
                           mk_syn_edges (tcdSynRhs decl))
@@ -114,7 +114,7 @@ calcSynCycles decls
 
 calcClassCycles :: [LTyClDecl Name] -> [[LTyClDecl Name]]
 calcClassCycles decls
-  = [decls | CyclicSCC decls <- stronglyConnComp cls_edges]
+  = [decls | CyclicSCC decls <- stronglyConnCompFromEdgedVertices cls_edges]
   where
     cls_edges = [ (ldecl, unLoc (tcdLName decl),
                           mk_cls_edges (unLoc (tcdCtxt decl)))
@@ -287,7 +287,7 @@ findLoopBreakers deps
   = go [(tc,tc,ds) | (tc,ds) <- deps]
   where
     go edges = [ name
-               | CyclicSCC ((tc,_,_) : edges') <- stronglyConnCompR edges,
+               | CyclicSCC ((tc,_,_) : edges') <- stronglyConnCompFromEdgedVerticesR edges,
                  name <- tyConName tc : go edges']
 \end{code}
 
