@@ -26,6 +26,7 @@ import DsUtils
 
 import HsSyn		-- lots of things
 import CoreSyn		-- lots of things
+import MkCore
 import CoreUtils
 import CoreFVs
 
