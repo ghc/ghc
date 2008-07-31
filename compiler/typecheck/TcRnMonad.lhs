@@ -324,6 +324,10 @@ newSysLocalIds :: FastString -> [TcType] -> TcRnIf gbl lcl [TcId]
 newSysLocalIds fs tys
   = do	{ us <- newUniqueSupply
 	; return (zipWith (mkSysLocal fs) (uniqsFromSupply us) tys) }
+
+instance MonadUnique (IOEnv (Env gbl lcl)) where
+        getUniqueM = newUnique
+        getUniqueSupplyM = newUniqueSupply
 \end{code}
 
 
