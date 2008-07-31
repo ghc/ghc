@@ -184,7 +184,11 @@ newIPName occ_name_ip = do
 	key = occ_name_ip	-- Ensures that ?x and %x get distinct Names
 \end{code}
 
-	Local helper functions (not exported)
+%************************************************************************
+%*									*
+		Name cache access
+%*									*
+%************************************************************************
 
 \begin{code}
 lookupOrigNameCache :: OrigNameCache -> Module -> OccName -> Maybe Name
