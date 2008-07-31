@@ -439,7 +439,7 @@ get_Regtable_addr_from_offset rep offset =
 #endif
 
 
--- | Returns 'True' if this global register is stored in a caller-saves
+-- | Returns @True@ if this global register is stored in a caller-saves
 -- machine register.
 
 callerSaves :: GlobalReg -> Bool
@@ -904,7 +904,7 @@ doSimultaneously1 vertices
 	edges_from stmt1 = [ key2 | (key2, stmt2) <- vertices, 
 				    stmt1 `mustFollow` stmt2
 			   ]
-	components = stronglyConnComp edges
+	components = stronglyConnCompFromEdgedVertices edges
 
 	-- do_components deal with one strongly-connected component
 	-- Not cyclic, or singleton?  Just do it
