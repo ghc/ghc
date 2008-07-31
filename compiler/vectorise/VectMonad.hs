@@ -36,7 +36,7 @@ module VectMonad (
 
 import VectBuiltIn
 
-import HscTypes
+import HscTypes hiding  ( MonadThings(..) )
 import Module           ( PackageId )
 import CoreSyn
 import TyCon
