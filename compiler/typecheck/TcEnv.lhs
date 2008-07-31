@@ -42,7 +42,8 @@ module TcEnv(
 	topIdLvl, thTopLevelId,
 
 	-- New Ids
-	newLocalName, newDFunName, newFamInstTyConName,
+	newLocalName, newDFunName, newFamInstTyConName, 
+	mkStableIdFromString, mkStableIdFromName
   ) where
 
 #include "HsVersions.h"
@@ -55,6 +56,7 @@ import TcMType
 import TcType
 -- import TcSuspension
 import qualified Type
+import Id
 import Var
 import VarSet
 import VarEnv
@@ -73,6 +75,7 @@ import HscTypes
 import SrcLoc
 import Outputable
 import Maybes
+import Unique
 import FastString
 \end{code}
 
@@ -106,9 +109,9 @@ tcLookupGlobal name
 		Nothing	   -> do 
 	 
 		-- Try global envt
-	{ (eps,hpt) <- getEpsAndHpt
-	; dflags <- getDOpts
-	; case lookupType dflags hpt (eps_PTE eps) name of  {
+	{ hsc_env <- getTopEnv
+        ; mb_thing <- liftIO (lookupTypeHscEnv hsc_env name)
+	; case mb_thing of  {
 	    Just thing -> return thing ;
 	    Nothing    -> do
 
@@ -673,6 +676,27 @@ newFamInstTyConName tc_name loc
 	; newGlobalBinder mod (mkInstTyTcOcc index occ) loc }
 \end{code}
 
+Stable names used for foreign exports and annotations.
+For stable names, the name must be unique (see #1533).  If the
+same thing has several stable Ids based on it, the
+top-level bindings generated must not have the same name.
+Hence we create an External name (doesn't change), and we
+append a Unique to the string right here.
+
+\begin{code}
+mkStableIdFromString :: String -> Type -> SrcSpan -> (OccName -> OccName) -> TcM TcId
+mkStableIdFromString str sig_ty loc occ_wrapper = do
+    uniq <- newUnique
+    mod <- getModule
+    let uniq_str = showSDoc (pprUnique uniq) :: String
+        occ = mkVarOcc (str ++ '_' : uniq_str) :: OccName
+        gnm = mkExternalName uniq mod (occ_wrapper occ) loc :: Name
+	id  = mkExportedLocalId gnm sig_ty :: Id
+    return id
+
+mkStableIdFromName :: Name -> Type -> SrcSpan -> (OccName -> OccName) -> TcM TcId
+mkStableIdFromName nm = mkStableIdFromString (getOccString nm)
+\end{code}
 
 %************************************************************************
 %*									*
