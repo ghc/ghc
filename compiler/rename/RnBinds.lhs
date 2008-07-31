@@ -37,7 +37,7 @@ import RdrName		( RdrName, rdrNameOcc )
 import SrcLoc
 import ListSetOps	( findDupsEq )
 import BasicTypes	( RecFlag(..) )
-import Digraph		( SCC(..), stronglyConnComp )
+import Digraph		( SCC(..), stronglyConnCompFromEdgedVertices )
 import Bag
 import Outputable
 import FastString
@@ -538,7 +538,7 @@ depAnalBinds :: Bag (LHsBind Name, [Name], Uses)
 depAnalBinds binds_w_dus
   = (map get_binds sccs, map get_du sccs)
   where
-    sccs = stronglyConnComp edges
+    sccs = stronglyConnCompFromEdgedVertices edges
 
     keyd_nodes = bagToList binds_w_dus `zip` [0::Int ..]
 
@@ -705,7 +705,7 @@ renameSigs mb_names ok_sig sigs
 renameSig :: Maybe NameSet -> Sig RdrName -> RnM (Sig Name)
 -- FixitySig is renamed elsewhere.
 renameSig mb_names sig@(TypeSig v ty)
-  = do	{ new_v <- lookupSigOccRn mb_names sig v
+  = do	{ new_v <- lookupSigLocOccRn mb_names sig v
 	; new_ty <- rnHsSigType (quotes (ppr v)) ty
 	; return (TypeSig new_v new_ty) }
 
@@ -714,16 +714,16 @@ renameSig _ (SpecInstSig ty)
 	; return (SpecInstSig new_ty) }
 
 renameSig mb_names sig@(SpecSig v ty inl)
-  = do	{ new_v <- lookupSigOccRn mb_names sig v
+  = do	{ new_v <- lookupSigLocOccRn mb_names sig v
 	; new_ty <- rnHsSigType (quotes (ppr v)) ty
 	; return (SpecSig new_v new_ty inl) }
 
 renameSig mb_names sig@(InlineSig v s)
-  = do	{ new_v <- lookupSigOccRn mb_names sig v
+  = do	{ new_v <- lookupSigLocOccRn mb_names sig v
 	; return (InlineSig new_v s) }
 
 renameSig mb_names sig@(FixSig (FixitySig v f))
-  = do	{ new_v <- lookupSigOccRn mb_names sig v
+  = do	{ new_v <- lookupSigLocOccRn mb_names sig v
 	; return (FixSig (FixitySig new_v f)) }
 
 -- lookupSigOccRn is used for type signatures and pragmas
@@ -745,13 +745,16 @@ renameSig mb_names sig@(FixSig (FixitySig v f))
 -- return the imported 'f', so that later on the reanamer will
 -- correctly report "misplaced type sig".
 
-lookupSigOccRn :: Maybe NameSet -> Sig RdrName -> Located RdrName -> RnM (Located Name)
-lookupSigOccRn mb_names sig (L loc v)
+lookupSigLocOccRn :: Maybe NameSet -> Sig RdrName -> Located RdrName -> RnM (Located Name)
+lookupSigLocOccRn mb_names sig = wrapLocM (lookupSigOccRn mb_names sig)
+
+lookupSigOccRn :: Maybe NameSet -> Sig RdrName -> RdrName -> RnM Name
+lookupSigOccRn mb_names sig v
   = do 	{ mb_n <- lookupBndrRn_maybe v
 	; case mb_n of {
 	    Just n  -> case mb_names of {
-			Nothing 		     -> return (L loc n) ;
-			Just ns | n `elemNameSet` ns -> return (L loc n) 
+			Nothing 		     -> return n ;
+			Just ns | n `elemNameSet` ns -> return n 
 				| otherwise -> bale_out_with local_msg } ;
 		          
 	    Nothing -> do
@@ -766,7 +769,7 @@ lookupSigOccRn mb_names sig (L loc v)
 				<+> ptext (sLit "for") <+> quotes (ppr v)
 			   , nest 2 $ ptext (sLit "lacks an accompanying binding")]
 		       $$ nest 2 msg)
-	     ; return (L loc (mkUnboundName v)) }
+	     ; return (mkUnboundName v) }
 
     local_msg = parens $ ptext (sLit "The")  <+> hsSigDoc sig <+> ptext (sLit "must be given where")
 			 <+> quotes (ppr v) <+> ptext (sLit "is declared")
