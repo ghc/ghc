@@ -21,7 +21,7 @@ module VectUtils (
 import VectCore
 import VectMonad
 
-import DsUtils
+import MkCore
 import CoreSyn
 import CoreUtils
 import Coercion
