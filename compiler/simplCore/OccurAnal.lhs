@@ -28,7 +28,7 @@ import VarSet
 import VarEnv
 
 import Maybes           ( orElse )
-import Digraph          ( stronglyConnCompR, SCC(..) )
+import Digraph          ( SCC(..), stronglyConnCompFromEdgedVerticesR )
 import PrelNames        ( buildIdKey, foldrIdKey, runSTRepIdKey, augmentIdKey )
 import Unique           ( Unique )
 import UniqFM           ( keysUFM, intersectUFM_C, foldUFM_Directly )
@@ -290,7 +290,7 @@ occAnalBind env (Rec pairs) body_usage
     bndr_set = mkVarSet (map fst pairs)
 
     sccs :: [SCC (Node Details)]
-    sccs = {-# SCC "occAnalBind.scc" #-} stronglyConnCompR rec_edges
+    sccs = {-# SCC "occAnalBind.scc" #-} stronglyConnCompFromEdgedVerticesR rec_edges
 
     rec_edges :: [Node Details]
     rec_edges = {-# SCC "occAnalBind.assoc" #-}  map make_node pairs
@@ -365,7 +365,7 @@ occAnalRec (CyclicSCC nodes) (body_usage, binds)
 	----------------------------
 	-- Now reconstruct the cycle
     pairs | no_rules  = reOrderCycle tagged_nodes
- 	  | otherwise = concatMap reOrderRec (stronglyConnCompR loop_breaker_edges)
+ 	  | otherwise = concatMap reOrderRec (stronglyConnCompFromEdgedVerticesR loop_breaker_edges)
 
 	-- See Note [Choosing loop breakers] for looop_breaker_edges
     loop_breaker_edges = map mk_node tagged_nodes
@@ -474,7 +474,7 @@ reOrderCycle [bind]     -- Common case of simple self-recursion
 reOrderCycle (bind : binds)
   =     -- Choose a loop breaker, mark it no-inline,
         -- do SCC analysis on the rest, and recursively sort them out
-    concatMap reOrderRec (stronglyConnCompR unchosen) ++
+    concatMap reOrderRec (stronglyConnCompFromEdgedVerticesR unchosen) ++
     [(makeLoopBreaker False bndr, rhs)]
 
   where
