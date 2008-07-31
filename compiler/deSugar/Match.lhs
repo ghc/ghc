@@ -26,6 +26,7 @@ import Check
 import CoreSyn
 import Literal
 import CoreUtils
+import MkCore
 import DsMonad
 import DsBinds
 import DsGRHSs
@@ -462,7 +463,7 @@ tidy1 v (VarPat var)
 
 tidy1 v (VarPatOut var binds)
   = do	{ prs <- dsLHsBinds binds
-	; return (wrapBind var v . mkDsLet (Rec prs),
+	; return (wrapBind var v . mkCoreLet (Rec prs),
 		  WildPat (idType var)) }
 
 	-- case v of { x@p -> mr[] }
@@ -485,7 +486,7 @@ tidy1 v (AsPat (L _ var) pat)
 tidy1 v (LazyPat pat)
   = do	{ sel_prs <- mkSelectorBinds pat (Var v)
 	; let sel_binds =  [NonRec b rhs | (b,rhs) <- sel_prs]
-	; return (mkDsLets sel_binds, WildPat (idType v)) }
+	; return (mkCoreLets sel_binds, WildPat (idType v)) }
 
 tidy1 _ (ListPat pats ty)
   = return (idDsWrapper, unLoc list_ConPat)
