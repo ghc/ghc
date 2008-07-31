@@ -372,17 +372,20 @@ the base of the module hierarchy.  So it seemed simpler to put the
 defn of OccInfo here, safely at the bottom
 
 \begin{code}
+-- | Identifier occurrence information
 data OccInfo 
-  = NoOccInfo		-- Many occurrences, or unknown
+  = NoOccInfo		-- ^ There are many occurrences, or unknown occurences
 
-  | IAmDead		-- Marks unused variables.  Sometimes useful for
+  | IAmDead		-- ^ Marks unused variables.  Sometimes useful for
 			-- lambda and case-bound variables.
 
-  | OneOcc		-- Occurs exactly once, not inside a rule
+  | OneOcc
 	!InsideLam
  	!OneBranch
-	!InterestingCxt
+	!InterestingCxt -- ^ Occurs exactly once, not inside a rule
 
+  -- | This identifier breaks a loop of mutually recursive functions. The field
+  -- marks whether it is only a loop breaker due to a reference in a rule
   | IAmALoopBreaker	-- Note [LoopBreaker OccInfo]
 	!RulesOnly	-- True <=> This is a weak or rules-only loop breaker
 			--  	    See OccurAnal Note [Weak loop breakers]
