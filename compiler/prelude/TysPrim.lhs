@@ -48,7 +48,7 @@ module TysPrim(
 
 import Var		( TyVar, mkTyVar )
 import Name		( Name, BuiltInSyntax(..), mkInternalName, mkWiredInName )
-import OccName		( mkOccNameFS, tcName, mkTyVarOcc )
+import OccName		( mkTyVarOccFS, mkTcOccFS )
 import TyCon		( TyCon, mkPrimTyCon, mkLiftedPrimTyCon,
 			  PrimRep(..) )
 import Type
@@ -100,7 +100,7 @@ primTyCons
 
 mkPrimTc :: FastString -> Unique -> TyCon -> Name
 mkPrimTc fs unique tycon
-  = mkWiredInName gHC_PRIM (mkOccNameFS tcName fs) 
+  = mkWiredInName gHC_PRIM (mkTcOccFS fs) 
 		  unique
 		  (ATyCon tycon)	-- Relevant TyCon
 		  UserSyntax		-- None are built-in syntax
@@ -146,7 +146,7 @@ alphaTyVars is a list of type variables for use in templates:
 \begin{code}
 tyVarList :: Kind -> [TyVar]
 tyVarList kind = [ mkTyVar (mkInternalName (mkAlphaTyVarUnique u) 
-				(mkTyVarOcc (mkFastString name))
+				(mkTyVarOccFS (mkFastString name))
 			 	noSrcSpan) kind
 	         | u <- [2..],
 		   let name | c <= 'z'  = [c]
