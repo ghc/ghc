@@ -33,7 +33,7 @@ import Unique
 import UniqFM
 import UniqSet
 import Util
-import Digraph           ( SCC(..), stronglyConnComp )
+import Digraph           ( SCC(..), stronglyConnCompFromEdgedVertices )
 
 import Outputable
 import FastString
@@ -979,7 +979,7 @@ classifyTyCons = classify [] []
 -- | Compute mutually recursive groups of tycons in topological order
 --
 tyConGroups :: [TyCon] -> [TyConGroup]
-tyConGroups tcs = map mk_grp (stronglyConnComp edges)
+tyConGroups tcs = map mk_grp (stronglyConnCompFromEdgedVertices edges)
   where
     edges = [((tc, ds), tc, uniqSetToList ds) | tc <- tcs
                                 , let ds = tyConsOfTyCon tc]
