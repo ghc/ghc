@@ -1,9 +1,8 @@
- %
+%
 % (c) The University of Glasgow, 2006
 %
-% Package manipulation
-%
 \begin{code}
+-- | Package manipulation
 module Packages (
 	module PackageConfig,
 
@@ -66,33 +65,33 @@ import Data.List
 -- ---------------------------------------------------------------------------
 -- The Package state
 
--- Package state is all stored in DynFlags, including the details of
+-- | Package state is all stored in 'DynFlag's, including the details of
 -- all packages, which packages are exposed, and which modules they
 -- provide.
-
--- The package state is computed by initPackages, and kept in DynFlags.
 --
---   * -package <pkg> causes <pkg> to become exposed, and all other packages 
+-- The package state is computed by 'initPackages', and kept in DynFlags.
+--
+--   * @-package <pkg>@ causes @<pkg>@ to become exposed, and all other packages 
 --	with the same name to become hidden.
 -- 
---   * -hide-package <pkg> causes <pkg> to become hidden.
+--   * @-hide-package <pkg>@ causes @<pkg>@ to become hidden.
 -- 
---   * Let exposedPackages be the set of packages thus exposed.  
---     Let depExposedPackages be the transitive closure from exposedPackages of
+--   * Let @exposedPackages@ be the set of packages thus exposed.  
+--     Let @depExposedPackages@ be the transitive closure from @exposedPackages@ of
 --     their dependencies.
 --
 --   * When searching for a module from an preload import declaration,
---     only the exposed modules in exposedPackages are valid.
+--     only the exposed modules in @exposedPackages@ are valid.
 --
 --   * When searching for a module from an implicit import, all modules
---     from depExposedPackages are valid.
+--     from @depExposedPackages@ are valid.
 --
---   * When linking in a comp manager mode, we link in packages the
+--   * When linking in a compilation manager mode, we link in packages the
 --     program depends on (the compiler knows this list by the
 --     time it gets to the link step).  Also, we link in all packages
---     which were mentioned with preload -package flags on the command-line,
---     or are a transitive dependency of same, or are "base"/"rts".
---     The reason for (b) is that we might need packages which don't
+--     which were mentioned with preload @-package@ flags on the command-line,
+--     or are a transitive dependency of same, or are \"base\"/\"rts\".
+--     The reason for this is that we might need packages which don't
 --     contain any Haskell modules, and therefore won't be discovered
 --     by the normal mechanism of dependency tracking.
 
@@ -122,12 +121,13 @@ data PackageState = PackageState {
 	-- exposed is True if the package exposes that module.
   }
 
--- A PackageConfigMap maps a PackageId to a PackageConfig
+-- | A PackageConfigMap maps a 'PackageId' to a 'PackageConfig'
 type PackageConfigMap = UniqFM PackageConfig
 
 emptyPackageConfigMap :: PackageConfigMap
 emptyPackageConfigMap = emptyUFM
 
+-- | Find the package we know about with the given id (e.g. \"foo-1.0\"), if any
 lookupPackage :: PackageConfigMap -> PackageId -> Maybe PackageConfig
 lookupPackage = lookupUFM
 
@@ -137,6 +137,8 @@ extendPackageConfigMap pkg_map new_pkgs
   = foldl add pkg_map new_pkgs
   where add pkg_map p = addToUFM pkg_map (packageConfigId p) p
 
+-- | Looks up the package with the given id in the package state, panicing if it is
+-- not found
 getPackageDetails :: PackageState -> PackageId -> PackageConfig
 getPackageDetails ps pid = expectJust "getPackageDetails" (lookupPackage (pkgIdMap ps) pid)
 
@@ -150,11 +152,11 @@ getPackageDetails ps pid = expectJust "getPackageDetails" (lookupPackage (pkgIdM
 --
 -- Returns a list of packages to link in if we're doing dynamic linking.
 -- This list contains the packages that the user explicitly mentioned with
--- -package flags.
+-- @-package@ flags.
 --
 -- 'initPackages' can be called again subsequently after updating the
 -- 'packageFlags' field of the 'DynFlags', and it will update the
--- 'packageState' in 'DynFlags' and return a list of packages to
+-- 'pkgState' in 'DynFlags' and return a list of packages to
 -- link in.
 initPackages :: DynFlags -> IO (DynFlags, [PackageId])
 initPackages dflags = do 
@@ -314,15 +316,16 @@ applyPackageFlag pkgs flag =
 matchingPackages :: String -> [PackageConfig]
          -> Maybe ([PackageConfig], [PackageConfig])
 matchingPackages str pkgs
-  = case partition (matches str) pkgs of
+  = case partition (packageMatches str) pkgs of
 	([],_)    -> Nothing
 	(ps,rest) -> Just (sortByVersion ps, rest)
-  where
-        -- A package named on the command line can either include the
-	-- version, or just the name if it is unambiguous.
-	matches str p
-		=  str == display (package p)
-		|| str == display (pkgName (package p))
+
+-- A package named on the command line can either include the
+-- version, or just the name if it is unambiguous.
+packageMatches :: String -> PackageConfig -> Bool
+packageMatches str p
+	=  str == display (package p)
+	|| str == display (pkgName (package p))
 
 pickPackages :: [PackageConfig] -> [String] -> [PackageConfig]
 pickPackages pkgs strs = 
@@ -606,6 +609,7 @@ pprPkg p = text (display (package p))
 -- of preload (command-line) packages to determine which packages to
 -- use.
 
+-- | Find all the include directories in these and the preload packages
 getPackageIncludePath :: DynFlags -> [PackageId] -> IO [String]
 getPackageIncludePath dflags pkgs =
   collectIncludeDirs `fmap` getPreloadPackagesAnd dflags pkgs
@@ -613,6 +617,7 @@ getPackageIncludePath dflags pkgs =
 collectIncludeDirs :: [PackageConfig] -> [FilePath] 
 collectIncludeDirs ps = nub (filter notNull (concatMap includeDirs ps))
 
+-- | Find all the library paths in these and the preload packages
 getPackageLibraryPath :: DynFlags -> [PackageId] -> IO [String]
 getPackageLibraryPath dflags pkgs =
   collectLibraryPaths `fmap` getPreloadPackagesAnd dflags pkgs
@@ -620,6 +625,7 @@ getPackageLibraryPath dflags pkgs =
 collectLibraryPaths :: [PackageConfig] -> [FilePath]
 collectLibraryPaths ps = nub (filter notNull (concatMap libraryDirs ps))
 
+-- | Find all the link options in these and the preload packages
 getPackageLinkOpts :: DynFlags -> [PackageId] -> IO [String]
 getPackageLinkOpts dflags pkgs = 
   collectLinkOpts dflags `fmap` getPreloadPackagesAnd dflags pkgs
@@ -642,16 +648,19 @@ collectLinkOpts dflags ps = concat (map all_opts ps)
         expandTag t | null t = ""
 		    | otherwise = '_':t
 
+-- | Find all the C-compiler options in these and the preload packages
 getPackageExtraCcOpts :: DynFlags -> [PackageId] -> IO [String]
 getPackageExtraCcOpts dflags pkgs = do
   ps <- getPreloadPackagesAnd dflags pkgs
   return (concatMap ccOptions ps)
 
+-- | Find all the package framework paths in these and the preload packages
 getPackageFrameworkPath  :: DynFlags -> [PackageId] -> IO [String]
 getPackageFrameworkPath dflags pkgs = do
   ps <- getPreloadPackagesAnd dflags pkgs
   return (nub (filter notNull (concatMap frameworkDirs ps)))
 
+-- | Find all the package frameworks in these and the preload packages
 getPackageFrameworks  :: DynFlags -> [PackageId] -> IO [String]
 getPackageFrameworks dflags pkgs = do
   ps <- getPreloadPackagesAnd dflags pkgs
@@ -660,15 +669,17 @@ getPackageFrameworks dflags pkgs = do
 -- -----------------------------------------------------------------------------
 -- Package Utils
 
--- | Takes a Module, and if the module is in a package returns 
--- @(pkgconf,exposed)@ where pkgconf is the PackageConfig for that package,
--- and exposed is True if the package exposes the module.
+-- | Takes a 'Module', and if the module is in a package returns 
+-- @(pkgconf, exposed)@ where pkgconf is the PackageConfig for that package,
+-- and exposed is @True@ if the package exposes the module.
 lookupModuleInAllPackages :: DynFlags -> ModuleName -> [(PackageConfig,Bool)]
 lookupModuleInAllPackages dflags m =
   case lookupUFM (moduleToPkgConfAll (pkgState dflags)) m of
 	Nothing -> []
 	Just ps -> ps
 
+-- | Find all the 'PackageConfig' in both the preload packages from 'DynFlags' and corresponding to the list of
+-- 'PackageConfig's
 getPreloadPackagesAnd :: DynFlags -> [PackageId] -> IO [PackageConfig]
 getPreloadPackagesAnd dflags pkgids =
   let 
@@ -723,6 +734,7 @@ missingDependencyMsg (Just parent)
 
 -- -----------------------------------------------------------------------------
 
+-- | Will the 'Name' come from a dynamically linked library?
 isDllName :: PackageId -> Name -> Bool
 isDllName this_pkg name
   | opt_Static = False
@@ -732,8 +744,8 @@ isDllName this_pkg name
 -- -----------------------------------------------------------------------------
 -- Displaying packages
 
+-- | Show package info on console, if verbosity is >= 3
 dumpPackages :: DynFlags -> IO ()
--- Show package info on console, if verbosity is >= 3
 dumpPackages dflags
   = do  let pkg_map = pkgIdMap (pkgState dflags)
 	putMsg dflags $
