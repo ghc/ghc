@@ -63,7 +63,7 @@ import Class            ( FunDep )
 import TypeRep          ( Kind )
 import RdrName		( RdrName, isRdrTyVar, isRdrTc, mkUnqual, rdrNameOcc, 
 			  isRdrDataCon, isUnqual, getRdrName, isQual,
-			  setRdrNameSpace )
+			  setRdrNameSpace, showRdrName )
 import BasicTypes	( maxPrecedence, Activation, InlineSpec(..), alwaysInlineSpec, neverInlineSpec )
 import Lexer		( P, failSpanMsgP, extension, standaloneDerivingEnabled, bangPatEnabled )
 import TysWiredIn	( unitTyCon ) 
@@ -1070,9 +1070,6 @@ mkExtName rdrNm = mkFastString (occNameString (rdrNameOcc rdrNm))
 -- Misc utils
 
 \begin{code}
-showRdrName :: RdrName -> String
-showRdrName r = showSDoc (ppr r)
-
 parseError :: SrcSpan -> String -> P a
 parseError span s = parseErrorSDoc span (text s)
 
