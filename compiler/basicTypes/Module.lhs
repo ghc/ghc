@@ -30,6 +30,7 @@ module Module
 	stablePackageIdCmp,
 
 	-- * Wired-in PackageIds
+	-- $wired_in_packages
 	primPackageId,
 	integerPackageId,
 	basePackageId,
@@ -64,9 +65,9 @@ module Module
 	-- * ModuleName mappings
 	ModuleNameEnv,
 
-	-- * Sets of modules
-	ModuleSet, emptyModuleSet, mkModuleSet, moduleSetElts, extendModuleSet,
-	elemModuleSet
+	-- * Sets of Modules
+	ModuleSet, 
+	emptyModuleSet, mkModuleSet, moduleSetElts, extendModuleSet, elemModuleSet
     ) where
 
 import Outputable
@@ -88,6 +89,8 @@ import System.FilePath
 %************************************************************************
 
 \begin{code}
+-- | Where a module lives on the file system: the actual locations
+-- of the .hs, .hi and .o files, if we have them
 data ModLocation
    = ModLocation {
         ml_hs_file   :: Maybe FilePath,
@@ -120,15 +123,17 @@ where the object file will reside if/when it is created.
 
 \begin{code}
 addBootSuffix :: FilePath -> FilePath
--- Add the "-boot" suffix to .hs, .hi and .o files
+-- ^ Add the @-boot@ suffix to .hs, .hi and .o files
 addBootSuffix path = path ++ "-boot"
 
 addBootSuffix_maybe :: Bool -> FilePath -> FilePath
+-- ^ Add the @-boot@ suffix if the @Bool@ argument is @True@
 addBootSuffix_maybe is_boot path
  | is_boot   = addBootSuffix path
  | otherwise = path
 
 addBootSuffixLocn :: ModLocation -> ModLocation
+-- ^ Add the @-boot@ suffix to all file paths associated with the module
 addBootSuffixLocn locn
   = locn { ml_hs_file  = fmap addBootSuffix (ml_hs_file locn)
 	 , ml_hi_file  = addBootSuffix (ml_hi_file locn)
@@ -143,7 +148,7 @@ addBootSuffixLocn locn
 %************************************************************************
 
 \begin{code}
--- | A ModuleName is a simple string, eg. @Data.List@.
+-- | A ModuleName is essentially a simple string, e.g. @Data.List@.
 newtype ModuleName = ModuleName FastString
 
 instance Uniquable ModuleName where
@@ -166,7 +171,7 @@ instance Binary ModuleName where
   get bh = do fs <- get bh; return (ModuleName fs)
 
 stableModuleNameCmp :: ModuleName -> ModuleName -> Ordering
--- Compare lexically, not by unique
+-- ^ Compares module names lexically, rather than by their 'Unique's
 stableModuleNameCmp n1 n2 = moduleNameFS n1 `compare` moduleNameFS n2
 
 pprModuleName :: ModuleName -> SDoc
@@ -188,7 +193,7 @@ mkModuleName s = ModuleName (mkFastString s)
 mkModuleNameFS :: FastString -> ModuleName
 mkModuleNameFS s = ModuleName s
 
--- Returns the string version of the module name, with dots replaced by slashes
+-- | Returns the string version of the module name, with dots replaced by slashes
 moduleNameSlashes :: ModuleName -> String
 moduleNameSlashes = dots_to_slashes . moduleNameString
   where dots_to_slashes = map (\c -> if c == '.' then pathSeparator else c)
@@ -215,8 +220,8 @@ instance Binary Module where
   put_ bh (Module p n) = put_ bh p >> put_ bh n
   get bh = do p <- get bh; n <- get bh; return (Module p n)
 
--- This gives a stable ordering, as opposed to the Ord instance which
--- gives an ordering based on the Uniques of the components, which may
+-- | This gives a stable ordering, as opposed to the Ord instance which
+-- gives an ordering based on the 'Unique's of the components, which may
 -- not be stable from run to run of the compiler.
 stableModuleCmp :: Module -> Module -> Ordering
 stableModuleCmp (Module p1 n1) (Module p2 n2) 
@@ -250,7 +255,8 @@ pprPackagePrefix p mod = getPprStyle doc
 %************************************************************************
 
 \begin{code}
-newtype PackageId = PId FastString deriving( Eq )  -- includes the version
+-- | Essentially just a string identifying a package, including the version: e.g. parsec-1.0
+newtype PackageId = PId FastString deriving( Eq )
     -- here to avoid module loops with PackageConfig
 
 instance Uniquable PackageId where
@@ -262,6 +268,7 @@ instance Ord PackageId where
   nm1 `compare` nm2 = getUnique nm1 `compare` getUnique nm2
 
 stablePackageIdCmp :: PackageId -> PackageId -> Ordering
+-- ^ Compares package ids lexically, rather than by their 'Unique's
 stablePackageIdCmp p1 p2 = packageIdFS p1 `compare` packageIdFS p2
 
 instance Outputable PackageId where
@@ -285,9 +292,8 @@ packageIdString = unpackFS . packageIdFS
 
 
 -- -----------------------------------------------------------------------------
--- Package Ids that are wired in
-
--- Certain packages are "known" to the compiler, in that we know about certain
+-- $wired_in_packages
+-- Certain packages are known to the compiler, in that we know about certain
 -- entities that reside in these packages, and the compiler needs to 
 -- declare static Modules and Names that refer to these packages.  Hence
 -- the wired-in packages can't include version numbers, since we don't want
@@ -297,12 +303,14 @@ packageIdString = unpackFS . packageIdFS
 -- normal in the packages database, and you can still have multiple
 -- versions of them installed.  However, for each invocation of GHC,
 -- only a single instance of each wired-in package will be recognised
--- (the desired one is selected via -package/-hide-package), and GHC
--- will use the unversioned PackageId below when referring to it,
+-- (the desired one is selected via @-package@/@-hide-package@), and GHC
+-- will use the unversioned 'PackageId' below when referring to it,
 -- including in .hi files and object file symbols.  Unselected
 -- versions of wired-in packages will be ignored, as will any other
 -- package that depends directly or indirectly on it (much as if you
--- had used -ignore-package).
+-- had used @-ignore-package@).
+
+-- Make sure you change 'Packages.findWiredInPackages' if you add an entry here
 
 integerPackageId, primPackageId,
   basePackageId, rtsPackageId, haskell98PackageId,
@@ -318,9 +326,9 @@ ndpPackageId       = fsToPackageId (fsLit "ndp")
 dphSeqPackageId    = fsToPackageId (fsLit "dph-seq")
 dphParPackageId    = fsToPackageId (fsLit "dph-par")
 
--- This is the package Id for the program.  It is the default package
--- Id if you don't specify a package name.  We don't add this prefix
--- to symbol name, since there can be only one main package per program.
+-- | This is the package Id for the current program.  It is the default
+-- package Id if you don't specify a package name.  We don't add this prefix
+-- to symbol names, since there can be only one main package per program.
 mainPackageId	   = fsToPackageId (fsLit "main")
 \end{code}
 
@@ -331,6 +339,7 @@ mainPackageId	   = fsToPackageId (fsLit "main")
 %************************************************************************
 
 \begin{code}
+-- | A map keyed off of 'Module's
 type ModuleEnv elt = FiniteMap Module elt
 
 emptyModuleEnv       :: ModuleEnv a
@@ -379,7 +388,9 @@ foldModuleEnv f     = foldFM (\_ v -> f v)
 \end{code}
 
 \begin{code}
+-- | A set of 'Module's
 type ModuleSet = FiniteMap Module ()
+
 mkModuleSet	:: [Module] -> ModuleSet
 extendModuleSet :: ModuleSet -> Module -> ModuleSet
 emptyModuleSet  :: ModuleSet
@@ -397,5 +408,6 @@ A ModuleName has a Unique, so we can build mappings of these using
 UniqFM.
 
 \begin{code}
+-- | A map keyed off of 'ModuleName's (actually, their 'Unique's)
 type ModuleNameEnv elt = UniqFM elt
 \end{code}
