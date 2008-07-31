@@ -3,39 +3,69 @@
 %
 
 \begin{code}
+-- | This module contains types that relate to the positions of things
+-- in source files, and allow tagging of those things with locations
 module SrcLoc (
+	-- * SrcLoc
 	SrcLoc,			-- Abstract
 
-	mkSrcLoc, isGoodSrcLoc,	mkGeneralSrcLoc,
-	noSrcLoc, 		-- "I'm sorry, I haven't a clue"
-	advanceSrcLoc,
+        -- ** Constructing SrcLoc
+	mkSrcLoc, mkGeneralSrcLoc,
 
+	noSrcLoc, 		-- "I'm sorry, I haven't a clue"
 	generatedSrcLoc,	-- Code generated within the compiler
 	interactiveSrcLoc,	-- Code from an interactive session
 
+        advanceSrcLoc,
+
+	-- ** Unsafely deconstructing SrcLoc
+	-- These are dubious exports, because they crash on some inputs
 	srcLocFile,		-- return the file name part
 	srcLocLine,		-- return the line part
 	srcLocCol,		-- return the column part
+	
+	-- ** Misc. operations on SrcLoc
 	pprDefnLoc,
+	
+        -- ** Predicates on SrcLoc
+        isGoodSrcLoc,
 
+        -- * SrcSpan
 	SrcSpan,		-- Abstract
+
+        -- ** Constructing SrcSpan
+	mkGeneralSrcSpan, mkSrcSpan, 
 	noSrcSpan, 
 	wiredInSrcSpan,		-- Something wired into the compiler
-	mkGeneralSrcSpan, 
-	isGoodSrcSpan, isOneLineSpan,
-	mkSrcSpan, srcLocSpan,
+	srcLocSpan,
 	combineSrcSpans,
+	
+	-- ** Deconstructing SrcSpan
 	srcSpanStart, srcSpanEnd,
-	optSrcSpanFileName,
+	srcSpanFileName_maybe,
 
-	-- These are dubious exports, because they crash on some inputs,
-	-- used only in Lexer.x where we are sure what the Span looks like
+	-- ** Unsafely deconstructing SrcSpan
+	-- These are dubious exports, because they crash on some inputs
 	srcSpanFile, 
         srcSpanStartLine, srcSpanEndLine, 
         srcSpanStartCol, srcSpanEndCol,
 
-	Located(..), getLoc, unLoc, noLoc, eqLocated, cmpLocated, combineLocs, addCLoc,
-        leftmost_smallest, leftmost_largest, rightmost, spans, isSubspanOf
+        -- ** Predicates on SrcSpan
+        isGoodSrcSpan, isOneLineSpan,
+
+        -- * Located
+	Located(..), 
+	
+	-- ** Constructing Located
+	noLoc,
+	
+	-- ** Deconstructing Located
+	getLoc, unLoc, 
+	
+	-- ** Combining and comparing Located values
+	eqLocated, cmpLocated, combineLocs, addCLoc,
+        leftmost_smallest, leftmost_largest, rightmost, 
+        spans, isSubspanOf
     ) where
 
 import Util
@@ -53,6 +83,7 @@ import System.FilePath
 We keep information about the {\em definition} point for each entity;
 this is the obvious stuff:
 \begin{code}
+-- | Represents a single point within a file
 data SrcLoc
   = SrcLoc	FastString	-- A precise location (file name)
 		{-# UNPACK #-} !Int		-- line number, begins at 1
@@ -65,39 +96,46 @@ data SrcLoc
 
 %************************************************************************
 %*									*
-\subsection[SrcLoc-access-fns]{Access functions for names}
+\subsection[SrcLoc-access-fns]{Access functions}
 %*									*
 %************************************************************************
 
-Things to make 'em:
 \begin{code}
 mkSrcLoc :: FastString -> Int -> Int -> SrcLoc
 mkSrcLoc x line col = SrcLoc x line col
 
+-- | Built-in "bad" 'SrcLoc' values for particular locations
 noSrcLoc, generatedSrcLoc, interactiveSrcLoc :: SrcLoc
 noSrcLoc	  = UnhelpfulLoc (fsLit "<no location info>")
 generatedSrcLoc   = UnhelpfulLoc (fsLit "<compiler-generated code>")
 interactiveSrcLoc = UnhelpfulLoc (fsLit "<interactive session>")
 
+-- | Creates a "bad" 'SrcLoc' that has no detailed information about its location
 mkGeneralSrcLoc :: FastString -> SrcLoc
 mkGeneralSrcLoc = UnhelpfulLoc 
 
+-- | "Good" 'SrcLoc's have precise information about their location
 isGoodSrcLoc :: SrcLoc -> Bool
 isGoodSrcLoc (SrcLoc _ _ _) = True
 isGoodSrcLoc _other         = False
 
+-- | Gives the filename of the 'SrcLoc' if it is available, otherwise returns a dummy value
 srcLocFile :: SrcLoc -> FastString
 srcLocFile (SrcLoc fname _ _) = fname
 srcLocFile _other	      = (fsLit "<unknown file")
 
+-- | Raises an error when used on a "bad" 'SrcLoc'
 srcLocLine :: SrcLoc -> Int
 srcLocLine (SrcLoc _ l _) = l
 srcLocLine _other	  = panic "srcLocLine: unknown line"
 
+-- | Raises an error when used on a "bad" 'SrcLoc'
 srcLocCol :: SrcLoc -> Int
 srcLocCol (SrcLoc _ _ c) = c
 srcLocCol _other         = panic "srcLocCol: unknown col"
 
+-- | Move the 'SrcLoc' down by one line if the character is a newline
+-- and across by one character in any other case
 advanceSrcLoc :: SrcLoc -> Char -> SrcLoc
 advanceSrcLoc (SrcLoc f l _) '\n' = SrcLoc f  (l + 1) 0
 advanceSrcLoc (SrcLoc f l c) _    = SrcLoc f  l (c + 1)
@@ -159,7 +197,7 @@ by a pair of (line,column) coordinates, but in fact we optimise
 slightly by using more compact representations for single-line and
 zero-length spans, both of which are quite common.
 
-The end position is defined to be the column *after* the end of the
+The end position is defined to be the column /after/ the end of the
 span.  That is, a span of (1,1)-(1,2) is one character long, and a
 span of (1,1)-(1,1) is zero characters long.
 -}
@@ -195,46 +233,96 @@ data SrcSpan
   deriving Eq
 #endif
 
--- We want to order SrcSpans first by the start point, then by the end point.
-instance Ord SrcSpan where
-  a `compare` b = 
-     (srcSpanStart a `compare` srcSpanStart b) `thenCmp` 
-     (srcSpanEnd   a `compare` srcSpanEnd   b)
-
+-- | Built-in "bad" 'SrcSpan's for common sources of location uncertainty
 noSrcSpan, wiredInSrcSpan :: SrcSpan
 noSrcSpan      = UnhelpfulSpan (fsLit "<no location info>")
 wiredInSrcSpan = UnhelpfulSpan (fsLit "<wired into compiler>")
 
+-- | Create a "bad" 'SrcSpan' that has not location information
 mkGeneralSrcSpan :: FastString -> SrcSpan
 mkGeneralSrcSpan = UnhelpfulSpan
 
+-- | Create a 'SrcSpan' corresponding to a single point
+srcLocSpan :: SrcLoc -> SrcSpan
+srcLocSpan (UnhelpfulLoc str) = UnhelpfulSpan str
+srcLocSpan (SrcLoc file line col) = SrcSpanPoint file line col
+
+-- | Create a 'SrcSpan' between two points in a file
+mkSrcSpan :: SrcLoc -> SrcLoc -> SrcSpan
+mkSrcSpan (UnhelpfulLoc str) _ = UnhelpfulSpan str
+mkSrcSpan _ (UnhelpfulLoc str) = UnhelpfulSpan str
+mkSrcSpan loc1 loc2
+  | line1 == line2 = if col1 == col2
+			then SrcSpanPoint file line1 col1
+			else SrcSpanOneLine file line1 col1 col2
+  | otherwise      = SrcSpanMultiLine file line1 col1 line2 col2
+  where
+	line1 = srcLocLine loc1
+	line2 = srcLocLine loc2
+	col1 = srcLocCol loc1
+	col2 = srcLocCol loc2
+	file = srcLocFile loc1
+
+-- | Combines two 'SrcSpan' into one that spans at least all the characters
+-- within both spans. Assumes the "file" part is the same in both inputs
+combineSrcSpans	:: SrcSpan -> SrcSpan -> SrcSpan
+combineSrcSpans	(UnhelpfulSpan _) r = r -- this seems more useful
+combineSrcSpans	l (UnhelpfulSpan _) = l
+combineSrcSpans	start end 
+ = case line1 `compare` line2 of
+     EQ -> case col1 `compare` col2 of
+		EQ -> SrcSpanPoint file line1 col1
+		LT -> SrcSpanOneLine file line1 col1 col2
+		GT -> SrcSpanOneLine file line1 col2 col1
+     LT -> SrcSpanMultiLine file line1 col1 line2 col2
+     GT -> SrcSpanMultiLine file line2 col2 line1 col1
+  where
+	line1 = srcSpanStartLine start
+	col1  = srcSpanStartCol start
+	line2 = srcSpanEndLine end
+	col2  = srcSpanEndCol end
+	file  = srcSpanFile start
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[SrcSpan-predicates]{Predicates}
+%*									*
+%************************************************************************
+
+\begin{code}
+-- | Test if a 'SrcSpan' is "good", i.e. has precise location information
 isGoodSrcSpan :: SrcSpan -> Bool
 isGoodSrcSpan SrcSpanOneLine{} = True
 isGoodSrcSpan SrcSpanMultiLine{} = True
 isGoodSrcSpan SrcSpanPoint{} = True
 isGoodSrcSpan _ = False
 
-optSrcSpanFileName :: SrcSpan -> Maybe FastString
-optSrcSpanFileName (SrcSpanOneLine { srcSpanFile = nm })   = Just nm
-optSrcSpanFileName (SrcSpanMultiLine { srcSpanFile = nm }) = Just nm
-optSrcSpanFileName (SrcSpanPoint { srcSpanFile = nm})      = Just nm
-optSrcSpanFileName _                                       = Nothing
-
 isOneLineSpan :: SrcSpan -> Bool
--- True if the span is known to straddle more than one line
--- By default, it returns False
+-- ^ True if the span is known to straddle more than one line.
+-- For "bad" 'SrcSpan', it returns False
 isOneLineSpan s
   | isGoodSrcSpan s = srcSpanStartLine s == srcSpanEndLine s
   | otherwise	    = False		
 
---------------------------------------------------------
--- Don't export these four;
--- they panic on Unhelpful.
--- They are for internal use only
--- Urk!  Some are needed for Lexer.x; see comment in export list
+\end{code}
 
-srcSpanStartLine, srcSpanEndLine, srcSpanStartCol, srcSpanEndCol
-  :: SrcSpan -> Int
+%************************************************************************
+%*									*
+\subsection[SrcSpan-unsafe-access-fns]{Unsafe access functions}
+%*									*
+%************************************************************************
+
+\begin{code}
+
+-- | Raises an error when used on a "bad" 'SrcSpan'
+srcSpanStartLine :: SrcSpan -> Int
+-- | Raises an error when used on a "bad" 'SrcSpan'
+srcSpanEndLine :: SrcSpan -> Int
+-- | Raises an error when used on a "bad" 'SrcSpan'
+srcSpanStartCol :: SrcSpan -> Int
+-- | Raises an error when used on a "bad" 'SrcSpan'
+srcSpanEndCol :: SrcSpan -> Int
 
 srcSpanStartLine SrcSpanOneLine{ srcSpanLine=l } = l
 srcSpanStartLine SrcSpanMultiLine{ srcSpanSLine=l } = l
@@ -255,9 +343,21 @@ srcSpanEndCol SrcSpanOneLine{ srcSpanECol=c } = c
 srcSpanEndCol SrcSpanMultiLine{ srcSpanECol=c } = c
 srcSpanEndCol SrcSpanPoint{ srcSpanCol=c } = c
 srcSpanEndCol _ = panic "SrcLoc.srcSpanEndCol"
---------------------------------------------------------
 
-srcSpanStart, srcSpanEnd :: SrcSpan -> SrcLoc
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[SrcSpan-access-fns]{Access functions}
+%*									*
+%************************************************************************
+
+\begin{code}
+
+-- | Returns the location at the start of the 'SrcSpan' or a "bad" 'SrcSpan' if that is unavailable
+srcSpanStart :: SrcSpan -> SrcLoc
+-- | Returns the location at the end of the 'SrcSpan' or a "bad" 'SrcSpan' if that is unavailable
+srcSpanEnd :: SrcSpan -> SrcLoc
 
 srcSpanStart (UnhelpfulSpan str) = UnhelpfulLoc str
 srcSpanStart s = mkSrcLoc (srcSpanFile s) 
@@ -270,49 +370,29 @@ srcSpanEnd s =
 	   (srcSpanEndLine s)
  	   (srcSpanEndCol s)
 
-srcLocSpan :: SrcLoc -> SrcSpan
-srcLocSpan (UnhelpfulLoc str) = UnhelpfulSpan str
-srcLocSpan (SrcLoc file line col) = SrcSpanPoint file line col
+-- | Obtains the filename for a 'SrcSpan' if it is "good"
+srcSpanFileName_maybe :: SrcSpan -> Maybe FastString
+srcSpanFileName_maybe (SrcSpanOneLine { srcSpanFile = nm })   = Just nm
+srcSpanFileName_maybe (SrcSpanMultiLine { srcSpanFile = nm }) = Just nm
+srcSpanFileName_maybe (SrcSpanPoint { srcSpanFile = nm})      = Just nm
+srcSpanFileName_maybe _                                       = Nothing
 
-mkSrcSpan :: SrcLoc -> SrcLoc -> SrcSpan
-mkSrcSpan (UnhelpfulLoc str) _ = UnhelpfulSpan str
-mkSrcSpan _ (UnhelpfulLoc str) = UnhelpfulSpan str
-mkSrcSpan loc1 loc2
-  | line1 == line2 = if col1 == col2
-			then SrcSpanPoint file line1 col1
-			else SrcSpanOneLine file line1 col1 col2
-  | otherwise      = SrcSpanMultiLine file line1 col1 line2 col2
-  where
-	line1 = srcLocLine loc1
-	line2 = srcLocLine loc2
-	col1 = srcLocCol loc1
-	col2 = srcLocCol loc2
-	file = srcLocFile loc1
+\end{code}
 
-combineSrcSpans	:: SrcSpan -> SrcSpan -> SrcSpan
--- Assumes the 'file' part is the same in both
-combineSrcSpans	(UnhelpfulSpan _) r = r -- this seems more useful
-combineSrcSpans	l (UnhelpfulSpan _) = l
-combineSrcSpans	start end 
- = case line1 `compare` line2 of
-     EQ -> case col1 `compare` col2 of
-		EQ -> SrcSpanPoint file line1 col1
-		LT -> SrcSpanOneLine file line1 col1 col2
-		GT -> SrcSpanOneLine file line1 col2 col1
-     LT -> SrcSpanMultiLine file line1 col1 line2 col2
-     GT -> SrcSpanMultiLine file line2 col2 line1 col1
-  where
-	line1 = srcSpanStartLine start
-	col1  = srcSpanStartCol start
-	line2 = srcSpanEndLine end
-	col2  = srcSpanEndCol end
-	file  = srcSpanFile start
+%************************************************************************
+%*									*
+\subsection[SrcSpan-instances]{Instances}
+%*									*
+%************************************************************************
 
-pprDefnLoc :: SrcSpan -> SDoc
--- "defined at ..."
-pprDefnLoc loc
-  | isGoodSrcSpan loc = ptext (sLit "Defined at") <+> ppr loc
-  | otherwise	      = ppr loc
+\begin{code}
+
+-- We want to order SrcSpans first by the start point, then by the end point.
+instance Ord SrcSpan where
+  a `compare` b = 
+     (srcSpanStart a `compare` srcSpanStart b) `thenCmp` 
+     (srcSpanEnd   a `compare` srcSpanEnd   b)
+
 
 instance Outputable SrcSpan where
     ppr span
@@ -322,7 +402,6 @@ instance Outputable SrcSpan where
         else
            hcat [text "{-# LINE ", int (srcSpanStartLine span), space,
                  char '\"', pprFastFilePath $ srcSpanFile span, text " #-}"]
-
 
 pprUserSpan :: SrcSpan -> SDoc
 pprUserSpan (SrcSpanOneLine src_path line start_col end_col)
@@ -351,6 +430,12 @@ pprUserSpan (SrcSpanPoint src_path line col)
 	 ]
 
 pprUserSpan (UnhelpfulSpan s)  = ftext s
+
+pprDefnLoc :: SrcSpan -> SDoc
+-- ^ Pretty prints information about the 'SrcSpan' in the style "defined at ..."
+pprDefnLoc loc
+  | isGoodSrcSpan loc = ptext (sLit "Defined at") <+> ppr loc
+  | otherwise	      = ppr loc
 \end{code}
 
 %************************************************************************
@@ -375,14 +460,19 @@ noLoc e = L noSrcSpan e
 combineLocs :: Located a -> Located b -> SrcSpan
 combineLocs a b = combineSrcSpans (getLoc a) (getLoc b)
 
+-- | Combine locations from two 'Located' things and add them to a third thing
 addCLoc :: Located a -> Located b -> c -> Located c
 addCLoc a b c = L (combineSrcSpans (getLoc a) (getLoc b)) c
 
 -- not clear whether to add a general Eq instance, but this is useful sometimes:
+
+-- | Tests whether the two located things are equal
 eqLocated :: Eq a => Located a -> Located a -> Bool
 eqLocated a b = unLoc a == unLoc b
 
--- not clear whether to add a general Eq instance, but this is useful sometimes:
+-- not clear whether to add a general Ord instance, but this is useful sometimes:
+
+-- | Tests the ordering of the two located things
 cmpLocated :: Ord a => Located a -> Located a -> Ordering
 cmpLocated a b = unLoc a `compare` unLoc b
 
@@ -394,14 +484,14 @@ instance Outputable e => Outputable (Located e) where
 	-- do we want to dump the span in debugSty mode?    
 \end{code}
 
-
 %************************************************************************
 %*									*
-\subsection{Manipulating SrcSpans}
+\subsection{Ordering SrcSpans for InteractiveUI}
 %*									*
 %************************************************************************
 
 \begin{code}
+-- | Alternative strategies for ordering 'SrcSpan's
 leftmost_smallest, leftmost_largest, rightmost :: SrcSpan -> SrcSpan -> Ordering
 rightmost            = flip compare
 leftmost_smallest    = compare 
@@ -410,13 +500,17 @@ leftmost_largest a b = (srcSpanStart a `compare` srcSpanStart b)
                        (srcSpanEnd b `compare` srcSpanEnd a)
 
 
-spans :: SrcSpan -> (Int,Int) -> Bool
+-- | Determines whether a span encloses a given line and column index
+spans :: SrcSpan -> (Int, Int) -> Bool
 spans span (l,c) = srcSpanStart span <= loc && loc <= srcSpanEnd span
    where loc = mkSrcLoc (srcSpanFile span) l c
 
-isSubspanOf :: SrcSpan -> SrcSpan -> Bool
+-- | Determines whether a span is enclosed by another one
+isSubspanOf :: SrcSpan -- ^ The span that may be enclosed by the other
+            -> SrcSpan -- ^ The span it may be enclosed by
+            -> Bool
 isSubspanOf src parent 
-    | optSrcSpanFileName parent /= optSrcSpanFileName src = False
+    | srcSpanFileName_maybe parent /= srcSpanFileName_maybe src = False
     | otherwise = srcSpanStart parent <= srcSpanStart src &&
                   srcSpanEnd parent   >= srcSpanEnd src
 
