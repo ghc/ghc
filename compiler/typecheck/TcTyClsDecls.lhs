@@ -31,6 +31,7 @@ import Generics
 import Class
 import TyCon
 import DataCon
+import Id
 import Var
 import VarSet
 import Name

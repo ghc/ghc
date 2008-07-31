@@ -90,7 +90,7 @@ import Rules		( RuleBase )
 import CoreSyn		( CoreBind )
 import VarEnv
 import VarSet
-import Var       hiding ( setIdType )
+import Var
 import Id
 import Type		
 

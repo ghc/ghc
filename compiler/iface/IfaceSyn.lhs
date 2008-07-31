@@ -24,7 +24,6 @@ module IfaceSyn (
 
 #include "HsVersions.h"
 
-import CoreSyn
 import IfaceType
 
 import NewDemand

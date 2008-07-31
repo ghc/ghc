@@ -30,6 +30,8 @@ module BasicTypes(
 
 	RecFlag(..), isRec, isNonRec, boolToRecFlag,
 
+	RuleName,
+
 	TopLevelFlag(..), isTopLevel, isNotTopLevel,
 
 	OverlapFlag(..), 
@@ -129,6 +131,15 @@ instance Outputable name => Outputable (IPName name) where
     ppr (IPName n) = char '?' <> ppr n -- Ordinary implicit parameters
 \end{code}
 
+%************************************************************************
+%*									*
+		Rules
+%*									*
+%************************************************************************
+
+\begin{code}
+type RuleName = FastString
+\end{code}
 
 %************************************************************************
 %*									*

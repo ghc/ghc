@@ -31,6 +31,7 @@ import TypeRep
 import DataCon
 import Class
 import Var
+import Id
 import MkId
 import Name
 import NameSet

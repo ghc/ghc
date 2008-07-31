@@ -53,7 +53,7 @@ essential to make this work well!
 module SAT ( doStaticArgs ) where
 
 import DynFlags
-import Var hiding (mkLocalId)
+import Var
 import CoreSyn
 import CoreLint
 import CoreUtils

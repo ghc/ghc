@@ -6,25 +6,25 @@
 
 \begin{code}
 module Id (
+        -- * The main types
 	Id, DictId,
 
-	-- Simple construction
-	mkGlobalId, mkLocalId, mkLocalIdWithInfo, 
-	mkSysLocal, mkUserLocal, mkVanillaGlobal,
-	mkTemplateLocals, mkTemplateLocalsNum, mkWildId, mkTemplateLocal,
-	mkWorkerId, mkExportedLocalId,
+	-- ** Simple construction
+	mkGlobalId, mkVanillaGlobal, mkVanillaGlobalWithInfo,
+	mkLocalId, mkLocalIdWithInfo,
+	mkSysLocal, mkSysLocalM, mkUserLocal, mkUserLocalM,
 
-	-- Taking an Id apart
+	-- ** Taking an Id apart
 	idName, idType, idUnique, idInfo,
 	isId, globalIdDetails, idPrimRep,
 	recordSelectorFieldLabel,
 
-	-- Modifying an Id
+	-- ** Modifying an Id
 	setIdName, setIdUnique, Id.setIdType, setIdExported, setIdNotExported, 
-	setIdInfo, lazySetIdInfo, modifyIdInfo, maybeModifyIdInfo,
+	globaliseId, setIdInfo, lazySetIdInfo, modifyIdInfo, maybeModifyIdInfo,
 	zapLamIdInfo, zapDemandIdInfo, zapFragileIdInfo, transferPolyIdInfo,
 
-	-- Predicates
+	-- ** Predicates on Ids
 	isImplicitId, isDeadBinder, isDictId, isStrictId,
 	isExportedId, isLocalId, isGlobalId,
 	isRecordSelector, isNaughtyRecordSelector,
@@ -36,15 +36,15 @@ module Id (
         isTickBoxOp, isTickBoxOp_maybe,
 	hasNoBinding, 
 
-	-- Inline pragma stuff
+	-- ** Inline pragma stuff
 	idInlinePragma, setInlinePragma, modifyInlinePragma, 
 
 
-	-- One shot lambda stuff
+	-- ** One shot lambda stuff
 	isOneShotBndr, isOneShotLambda, isStateHackType,
 	setOneShotLambda, clearOneShotLambda,
 
-	-- IdInfo stuff
+	-- ** IdInfo stuff
 	setIdUnfolding,
 	setIdArity,
 	setIdNewDemandInfo, 
@@ -54,6 +54,7 @@ module Id (
 	setIdCafInfo,
 	setIdOccInfo,
 
+	-- ** Id demand information
 #ifdef OLD_STRICTNESS
 	idDemandInfo, 
 	idStrictness, 
@@ -81,15 +82,16 @@ module Id (
 
 #include "HsVersions.h"
 
-import CoreSyn
+import {-# SOURCE #-} CoreSyn ( CoreRule, Unfolding )
+
+import IdInfo
 import BasicTypes
 import qualified Var
-import Var hiding (mkLocalId, mkGlobalId, mkExportedLocalId)
+import Var
 import TyCon
 import Type
 import TcType
-import TysPrim
-import IdInfo 
+import TysPrim 
 #ifdef OLD_STRICTNESS
 import qualified Demand
 #endif
@@ -105,6 +107,7 @@ import Maybes
 import SrcLoc
 import Outputable
 import Unique
+import UniqSupply
 import FastString
 import StaticFlags
 
@@ -123,8 +126,58 @@ infixl 	1 `setIdUnfolding`,
 	  ,`setIdDemandInfo`
 #endif
 \end{code}
+%************************************************************************
+%*									*
+\subsection{Basic Id manipulation}
+%*									*
+%************************************************************************
 
+\begin{code}
+idName   :: Id -> Name
+idName    = Var.varName
 
+idUnique :: Id -> Unique
+idUnique  = varUnique
+
+idType   :: Id -> Kind
+idType    = varType
+
+setIdUnique :: Id -> Unique -> Id
+setIdUnique = setVarUnique
+
+setIdName :: Id -> Name -> Id
+setIdName = setVarName
+
+setIdType :: Id -> Type -> Id
+setIdType id ty = seqType ty `seq` Var.setVarType id ty
+
+setIdExported :: Id -> Id
+setIdExported = setIdVarExported
+
+setIdNotExported :: Id -> Id
+setIdNotExported = setIdVarNotExported
+
+globaliseId :: GlobalIdDetails -> Id -> Id
+globaliseId = globaliseIdVar
+
+idInfo :: Id -> IdInfo
+idInfo = varIdInfo
+
+lazySetIdInfo :: Id -> IdInfo -> Id
+lazySetIdInfo = lazySetVarIdInfo
+
+setIdInfo :: Id -> IdInfo -> Id
+setIdInfo id info = seqIdInfo info `seq` (lazySetIdInfo id info)
+        -- Try to avoid spack leaks by seq'ing
+
+modifyIdInfo :: (IdInfo -> IdInfo) -> Id -> Id
+modifyIdInfo fn id = setIdInfo id (fn (idInfo id))
+
+-- maybeModifyIdInfo tries to avoid unnecesary thrashing
+maybeModifyIdInfo :: Maybe IdInfo -> Id -> Id
+maybeModifyIdInfo (Just new_info) id = lazySetIdInfo id new_info
+maybeModifyIdInfo Nothing	  id = id
+\end{code}
 
 %************************************************************************
 %*									*
@@ -147,33 +200,44 @@ substitution (which changes the free type variables) is more common.
 Anyway, we removed it in March 2008.
 
 \begin{code}
-mkLocalIdWithInfo :: Name -> Type -> IdInfo -> Id
-mkLocalIdWithInfo name ty info = Var.mkLocalId name ty info
-	-- Note [Free type variables]
-
-mkExportedLocalId :: Name -> Type -> Id
-mkExportedLocalId name ty = Var.mkExportedLocalId name ty vanillaIdInfo
-	-- Note [Free type variables]
-
+-- | Create a global Id. Global identifiers are those that are imported or are data constructors/destructors.
 mkGlobalId :: GlobalIdDetails -> Name -> Type -> IdInfo -> Id
-mkGlobalId details name ty info = Var.mkGlobalId details name ty info
-\end{code}
+mkGlobalId = mkGlobalIdVar
 
-\begin{code}
+mkVanillaGlobal :: Name -> Type -> Id
+mkVanillaGlobal name ty = mkVanillaGlobalWithInfo name ty vanillaIdInfo
+
+mkVanillaGlobalWithInfo :: Name -> Type -> IdInfo -> Id
+mkVanillaGlobalWithInfo = mkGlobalId VanillaGlobal
+
+
+-- | Create a local Id. Local identifiers are those bound at the top level of the current module or in an expression.
 mkLocalId :: Name -> Type -> Id
 mkLocalId name ty = mkLocalIdWithInfo name ty vanillaIdInfo
 
--- SysLocal: for an Id being created by the compiler out of thin air...
+mkLocalIdWithInfo :: Name -> Type -> IdInfo -> Id
+mkLocalIdWithInfo = mkLocalIdVar
+
+-- | Create a local Id that is marked as exported. This prevents things attached to it from being removed as dead code.
+mkExportedLocalId :: Name -> Type -> Id
+mkExportedLocalId name ty = mkExportedLocalIdVar name ty vanillaIdInfo
+	-- Note [Free type variables]
+
+
+-- | Create a system local Id. These are local Ids that are created by the compiler out of thin air
 mkSysLocal :: FastString -> Unique -> Type -> Id
 mkSysLocal fs uniq ty = mkLocalId (mkSystemVarName uniq fs) ty
 
+mkSysLocalM :: MonadUnique m => FastString -> Type -> m Id
+mkSysLocalM fs ty = getUniqueM >>= (\uniq -> return (mkSysLocal fs uniq ty))
 
--- UserLocal: an Id with a name the user might recognize...
+
+-- | Create a user local Id. These are local Id with a name and location that the user might recognize
 mkUserLocal :: OccName -> Unique -> Type -> SrcSpan -> Id
-mkVanillaGlobal :: Name -> Type -> IdInfo -> Id
+mkUserLocal occ uniq ty loc = mkLocalId (mkInternalName uniq occ loc) ty
 
-mkUserLocal occ uniq ty loc = mkLocalId (mkInternalName    uniq occ loc) ty
-mkVanillaGlobal 	    = mkGlobalId VanillaGlobal
+mkUserLocalM :: MonadUnique m => OccName -> Type -> SrcSpan -> m Id
+mkUserLocalM occ ty loc = getUniqueM >>= (\uniq -> return (mkUserLocal occ uniq ty loc))
 \end{code}
 
 Make some local @Ids@ for a template @CoreExpr@.  These have bogus
@@ -181,27 +245,29 @@ Make some local @Ids@ for a template @CoreExpr@.  These have bogus
 instantiated before use.
  
 \begin{code}
--- "Wild Id" typically used when you need a binder that you don't expect to use
+-- | Make a "wild Id". This is typically used when you need a binder that you don't expect to use
 mkWildId :: Type -> Id
 mkWildId ty = mkSysLocal (fsLit "wild") (mkBuiltinUnique 1) ty
 
 mkWorkerId :: Unique -> Id -> Type -> Id
--- A worker gets a local name.  CoreTidy will externalise it if necessary.
+-- | Workers get local names. CoreTidy will externalise these if necessary
 mkWorkerId uniq unwrkr ty
   = mkLocalId wkr_name ty
   where
     wkr_name = mkInternalName uniq (mkWorkerOcc (getOccName unwrkr)) (getSrcSpan unwrkr)
 
--- "Template locals" typically used in unfoldings
-mkTemplateLocals :: [Type] -> [Id]
-mkTemplateLocals tys = zipWith mkTemplateLocal [1..] tys
+-- | Create a "template local": a family of system local Ids in bijection with Ints, typically used in unfoldings
+mkTemplateLocal :: Int -> Type -> Id
+mkTemplateLocal i ty = mkSysLocal (fsLit "tpl") (mkBuiltinUnique i) ty
 
+-- | Create a template local for a series of types
+mkTemplateLocals :: [Type] -> [Id]
+mkTemplateLocals = mkTemplateLocalsNum 1
+
+-- | Create a template local for a series of type, but start from a specified template local
 mkTemplateLocalsNum :: Int -> [Type] -> [Id]
 -- The Int gives the starting point for unique allocation
 mkTemplateLocalsNum n tys = zipWith mkTemplateLocal [n..] tys
-
-mkTemplateLocal :: Int -> Type -> Id
-mkTemplateLocal i ty = mkSysLocal (fsLit "tpl") (mkBuiltinUnique i) ty
 \end{code}
 
 
@@ -212,12 +278,23 @@ mkTemplateLocal i ty = mkSysLocal (fsLit "tpl") (mkBuiltinUnique i) ty
 %************************************************************************
 
 \begin{code}
-setIdType :: Id -> Type -> Id
-	-- Add free tyvar info to the type
-setIdType id ty = seqType ty `seq` Var.setIdType id ty
-
 idPrimRep :: Id -> PrimRep
 idPrimRep id = typePrimRep (idType id)
+
+globalIdDetails :: Id -> GlobalIdDetails
+globalIdDetails = globalIdVarDetails
+
+isId :: Id -> Bool
+isId = isIdVar
+
+isLocalId :: Id -> Bool
+isLocalId = isLocalIdVar
+
+isGlobalId :: Id -> Bool
+isGlobalId = isGlobalIdVar
+
+isExportedId :: Var -> Bool
+isExportedId = isExportedIdVar
 \end{code}
 
 
@@ -234,17 +311,16 @@ recordSelectorFieldLabel id
         RecordSelId { sel_tycon = tycon, sel_label = lbl } -> (tycon,lbl)
         _ -> panic "recordSelectorFieldLabel"
 
-isRecordSelector        :: Var -> Bool
-isNaughtyRecordSelector :: Var -> Bool
-isPrimOpId              :: Var -> Bool
-isFCallId               :: Var -> Bool
-isDataConWorkId         :: Var -> Bool
-hasNoBinding            :: Var -> Bool
+isRecordSelector        :: Id -> Bool
+isNaughtyRecordSelector :: Id -> Bool
+isPrimOpId              :: Id -> Bool
+isFCallId               :: Id -> Bool
+isDataConWorkId         :: Id -> Bool
 
-isClassOpId_maybe       :: Var -> Maybe Class
-isPrimOpId_maybe        :: Var -> Maybe PrimOp
-isFCallId_maybe         :: Var -> Maybe ForeignCall
-isDataConWorkId_maybe   :: Var -> Maybe DataCon
+isClassOpId_maybe       :: Id -> Maybe Class
+isPrimOpId_maybe        :: Id -> Maybe PrimOp
+isFCallId_maybe         :: Id -> Maybe ForeignCall
+isDataConWorkId_maybe   :: Id -> Maybe DataCon
 
 isRecordSelector id = case globalIdDetails id of
                         RecordSelId {}  -> True
@@ -289,20 +365,20 @@ isDataConId_maybe id = case globalIdDetails id of
                          _                 -> Nothing
 
 idDataCon :: Id -> DataCon
--- Get from either the worker or the wrapper to the DataCon
--- Currently used only in the desugarer
---	 INVARIANT: idDataCon (dataConWrapId d) = d
+-- ^ Get from either the worker or the wrapper to the DataCon.
+-- Currently used only in the desugarer.
+--
+--	 INVARIANT: @idDataCon (dataConWrapId d) = d@
+--
 -- (Remember, dataConWrapId can return either the wrapper or the worker.)
-idDataCon id = case globalIdDetails id of
-                  DataConWorkId con -> con
-                  DataConWrapId con -> con
-                  _                 -> pprPanic "idDataCon" (ppr id)
+idDataCon id = isDataConId_maybe id `orElse` pprPanic "idDataCon" (ppr id
 
 
 isDictId :: Id -> Bool
 isDictId id = isDictTy (idType id)
 
--- hasNoBinding returns True of an Id which may not have a
+hasNoBinding :: Id -> Bool
+-- ^ Returns True of an Id which may not have a
 -- binding, even though it is defined in this module.  
 -- Data constructor workers used to be things of this kind, but
 -- they aren't any more.  Instead, we inject a binding for 
@@ -315,9 +391,9 @@ hasNoBinding id = case globalIdDetails id of
 			_                -> False
 
 isImplicitId :: Id -> Bool
-	-- isImplicitId tells whether an Id's info is implied by other
-	-- declarations, so we don't need to put its signature in an interface
-	-- file, even if it's mentioned in some other interface unfolding.
+-- ^ isImplicitId tells whether an Id's info is implied by other
+-- declarations, so we don't need to put its signature in an interface
+-- file, even if it's mentioned in some other interface unfolding.
 isImplicitId id
   = case globalIdDetails id of
 	RecordSelId {}  -> True
@@ -396,7 +472,7 @@ setIdStrictness :: Id -> StrictnessInfo -> Id
 setIdStrictness id strict_info = modifyIdInfo (`setStrictnessInfo` strict_info) id
 #endif
 
--- isBottomingId returns true if an application to n args would diverge
+-- | Returns true if an application to n args would diverge
 isBottomingId :: Id -> Bool
 isBottomingId id = isBottomingSig (idNewStrictness id)
 
@@ -411,15 +487,13 @@ setIdNewStrictness id sig = modifyIdInfo (`setNewStrictnessInfo` Just sig) id
 
 zapIdNewStrictness :: Id -> Id
 zapIdNewStrictness id = modifyIdInfo (`setNewStrictnessInfo` Nothing) id
-\end{code}
 
-This predicate says whether the id has a strict demand placed on it or
-has a type such that it can always be evaluated strictly (e.g., an
-unlifted type, but see the comment for isStrictType).  We need to
-check separately whether <id> has a so-called "strict type" because if
-the demand for <id> hasn't been computed yet but <id> has a strict
-type, we still want (isStrictId <id>) to be True.
-\begin{code}
+-- | This predicate says whether the id has a strict demand placed on it or
+-- has a type such that it can always be evaluated strictly (e.g., an
+-- unlifted type, but see the comment for 'isStrictType').  We need to
+-- check separately whether <id> has a so-called "strict type" because if
+-- the demand for <id> hasn't been computed yet but <id> has a strict
+-- type, we still want @isStrictId <id>@ to be True.
 isStrictId :: Id -> Bool
 isStrictId id
   = ASSERT2( isId id, text "isStrictId: not an id: " <+> ppr id )

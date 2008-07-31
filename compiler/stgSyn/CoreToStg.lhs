@@ -18,7 +18,7 @@ import StgSyn
 import Type
 import TyCon
 import Id
-import Var		( Var, globalIdDetails, idType )
+import Var		( Var )
 import IdInfo
 import DataCon
 import CostCentre	( noCCS )

@@ -42,13 +42,14 @@ module CoreSyn (
 	-- Core rules
 	CoreRule(..),	-- CoreSubst, CoreTidy, CoreFVs, PprCore only
 	RuleName, seqRules, ruleArity,
-	isBuiltinRule, ruleName, isLocalRule, ruleIdName
+	isBuiltinRule, ruleName, isLocalRule, ruleIdName, setRuleIdName
     ) where
 
 #include "HsVersions.h"
 
 import CostCentre
 import Var
+import Id
 import Type
 import Coercion
 import Name
@@ -205,8 +206,6 @@ A Rule is
 	   as the rule itself
 
 \begin{code}
-type RuleName = FastString
-
 data CoreRule
   = Rule { 
 	ru_name :: RuleName,
@@ -262,6 +261,9 @@ ruleIdName = ru_fn
 
 isLocalRule :: CoreRule -> Bool
 isLocalRule = ru_local
+
+setRuleIdName :: Name -> CoreRule -> CoreRule
+setRuleIdName nm ru = ru { ru_fn = nm }
 \end{code}
 
 

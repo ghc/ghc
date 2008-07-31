@@ -33,6 +33,7 @@ import CoreUtils
 
 import Name
 import Var
+import Id
 import PrelInfo
 import DataCon
 import TysWiredIn

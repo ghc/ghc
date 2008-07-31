@@ -51,7 +51,7 @@ import VarSet
 import VarEnv		( emptyTidyEnv )
 #endif
 
-import Var		( Id )
+import Id		( Id )
 import Module		( emptyModuleEnv, ModLocation(..), Module )
 import RdrName
 import HsSyn

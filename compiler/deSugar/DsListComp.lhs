@@ -28,7 +28,7 @@ import DsUtils
 
 import DynFlags
 import CoreUtils
-import Var
+import Id
 import Type
 import TysWiredIn
 import Match

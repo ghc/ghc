@@ -36,6 +36,7 @@ import CmmUtils
 import CLabel
 import ClosureInfo
 import CostCentre
+import Id
 import Var
 import SMRep
 import BasicTypes

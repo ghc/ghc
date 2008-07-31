@@ -20,7 +20,7 @@ import CoreLint
 import CoreUtils
 import VarEnv
 import VarSet
-import Var hiding( mkGlobalId )
+import Var
 import Id
 import IdInfo
 import InstEnv
@@ -176,7 +176,7 @@ tidyExternalId :: Id -> Id
 -- (NB: vanillaIdInfo makes a conservative assumption about Caf-hood.)
 tidyExternalId id 
   = ASSERT2( isLocalId id && isExternalName (idName id), ppr id )
-    mkVanillaGlobal (idName id) (tidyTopType (idType id)) vanillaIdInfo
+    mkVanillaGlobal (idName id) (tidyTopType (idType id))
 \end{code}
 
 

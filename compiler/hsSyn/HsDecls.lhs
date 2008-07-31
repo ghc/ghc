@@ -46,7 +46,6 @@ import HsPat
 import HsTypes
 import HsDoc
 import NameSet
-import CoreSyn
 import {- Kind parts of -} Type
 import BasicTypes
 import ForeignCall

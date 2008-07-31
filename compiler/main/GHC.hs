@@ -223,7 +223,7 @@ import HsSyn hiding ((<.>))
 import Type             hiding (typeKind)
 import TcType           hiding (typeKind)
 import Id
-import Var              hiding (setIdType)
+import Var
 import TysPrim		( alphaTyVars )
 import TyCon
 import Class

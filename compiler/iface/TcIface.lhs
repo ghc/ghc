@@ -354,7 +354,7 @@ tcIfaceDecl ignore_prags (IfaceId {ifName = occ_name, ifType = iface_type, ifIdI
   = do	{ name <- lookupIfaceTop occ_name
 	; ty <- tcIfaceType iface_type
 	; info <- tcIdInfo ignore_prags name ty info
-	; return (AnId (mkVanillaGlobal name ty info)) }
+	; return (AnId (mkVanillaGlobalWithInfo name ty info)) }
 
 tcIfaceDecl _
 	    (IfaceData {ifName = occ_name, 

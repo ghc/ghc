@@ -5,33 +5,72 @@
 \section{@Vars@: Variables}
 
 \begin{code}
+-- |
+-- #name_types#
+-- GHC uses several kinds of name internally:
+--
+-- * 'OccName.OccName': see "OccName#name_types"
+--
+-- * 'RdrName.RdrName': see "RdrName#name_types"
+--
+-- * 'Name.Name': see "Name#name_types"
+--
+-- * 'Id.Id': see "Id#name_types"
+--
+-- * 'Var.Var' is a synonym for the 'Id.Id' type but it may additionally potentially contain type variables, 
+--   which have a 'TypeRep.Kind' rather than a 'TypeRep.Type' and only contain some extra details during typechecking.
+--   These 'Var.Var' names may either be global or local, see "Var#globalvslocal"
+--
+-- #globalvslocal#
+-- Global 'Id's and 'Var's are those that are imported or correspond to a data constructor, primitive operation, or record selectors.
+-- Local 'Id's and 'Var's are those bound within an expression (e.g. by a lambda) or at the top level of the module being compiled.
 module Var (
-	Var, 
-	varName, varUnique, varType,
-	setVarName, setVarUnique, 
+        -- * The main data type
+	Var,
 
-	-- TyVars
-	TyVar, mkTyVar, mkTcTyVar, mkWildCoVar,
-	tyVarName, tyVarKind,
+	-- ** Constructing 'Var's
+	mkLocalIdVar, mkExportedLocalIdVar, mkGlobalIdVar, 
+
+	-- ** Taking 'Var's apart
+	varName, varUnique, varType, varIdInfo, globalIdVarDetails,
+
+	-- ** Modifying 'Var's
+	setVarName, setVarUnique, setVarType,
+	setIdVarExported, setIdVarNotExported, 
+	globaliseIdVar, lazySetVarIdInfo,
+
+        -- ** Predicates
+        isCoVar, isIdVar, isTyVar, isTcTyVar,
+        isLocalVar, isLocalIdVar,
+	isGlobalIdVar, isExportedIdVar,
+	mustHaveLocalBinding,
+
+	-- * Type variable data type
+	TyVar,
+
+	-- ** Constructing 'TyVar's
+	mkTyVar, mkTcTyVar, mkWildCoVar,
+
+	-- ** Taking 'TyVar's apart
+	tyVarName, tyVarKind, tcTyVarDetails,
+
+	-- ** Modifying 'TyVar's
 	setTyVarName, setTyVarUnique, setTyVarKind,
-	tcTyVarDetails,
 
-        -- CoVars
-        CoVar, coVarName, setCoVarUnique, setCoVarName, mkCoVar, isCoVar,
+        -- * Coercion variable data type
+        CoVar,
 
-	-- Ids
-	Id, DictId,
-	idName, idType, idUnique, idInfo, modifyIdInfo, maybeModifyIdInfo,
-	setIdName, setIdUnique, setIdType, setIdInfo, lazySetIdInfo, 
-	setIdExported, setIdNotExported,
+        -- ** Constructing 'CoVar's
+        mkCoVar,
 
-	globalIdDetails, globaliseId, 
+        -- ** Taking 'CoVar's apart
+        coVarName,
 
-	mkLocalId, mkExportedLocalId, mkGlobalId, 
+        -- ** Modifying 'CoVar's
+        setCoVarUnique, setCoVarName,
 
-	isTyVar, isTcTyVar, isId, isLocalVar, isLocalId,
-	isGlobalId, isExportedId, 
-	mustHaveLocalBinding
+	-- * 'Var' type synonyms
+	Id, DictId
     ) where
 
 #include "HsVersions.h"
@@ -39,14 +78,14 @@ module Var (
 import {-# SOURCE #-}	TypeRep( Type, Kind )
 import {-# SOURCE #-}	TcType( TcTyVarDetails, pprTcTyVarDetails )
 import {-# SOURCE #-}	IdInfo( GlobalIdDetails, notGlobalId, 
-                                IdInfo, seqIdInfo )
+                                IdInfo )
 import {-# SOURCE #-}	TypeRep( isCoercionKind )
 
 import Name hiding (varName)
 import Unique
 import FastTypes
 import FastString
-import Outputable       
+import Outputable
 \end{code}
 
 
@@ -63,13 +102,15 @@ strictness).  The essential info about different kinds of @Vars@ is
 in its @VarDetails@.
 
 \begin{code}
+-- | Essentially a typed 'Name', that may also contain some additional information
+-- about the 'Var' and it's use sites.
 data Var
   = TyVar {
 	varName    :: !Name,
 	realUnique :: FastInt,		-- Key for fast comparison
 					-- Identical to the Unique in the name,
 					-- cached here for speed
-	varType       :: Kind,
+	varType       :: Kind,          -- ^ The type or kind of the 'Var' in question
         isCoercionVar :: Bool
  }
 
@@ -98,10 +139,8 @@ data Var
 	lclDetails :: LocalIdDetails }
 
 data LocalIdDetails 
-  = NotExported	-- Not exported
-  | Exported	-- Exported
-  -- Exported Ids are kept alive; 
-  -- NotExported things may be discarded as dead code.
+  = NotExported	-- ^ Not exported: may be discarded as dead code.
+  | Exported	-- ^ Exported: kept alive
 \end{code}
 
 Note [GlobalId/LocalId]
@@ -120,7 +159,6 @@ A LocalId is
   * always treated as a candidate by the free-variable finder
 
 After CoreTidy, top-level LocalIds are turned into GlobalIds
- 
 
 \begin{code}
 instance Outputable Var where
@@ -166,6 +204,36 @@ setVarName :: Var -> Name -> Var
 setVarName var new_name
   = var { realUnique = getKeyFastInt (getUnique new_name), 
    	  varName = new_name }
+
+setVarType :: Id -> Type -> Id
+setVarType id ty = id { varType = ty }
+
+setIdVarExported :: Var -> Var
+-- ^ Exports the given local 'Id'. Can also be called on global 'Id's, such as data constructors
+-- and class operations, which are born as global 'Id's and automatically exported
+setIdVarExported id@(LocalId {}) = id { lclDetails = Exported }
+setIdVarExported other_id	      = ASSERT( isIdVar other_id ) other_id
+
+setIdVarNotExported :: Id -> Id
+-- ^ We can only do this to LocalIds
+setIdVarNotExported id = ASSERT( isLocalIdVar id ) id { lclDetails = NotExported }
+
+globaliseIdVar :: GlobalIdDetails -> Var -> Var
+-- ^ If it's a local, make it global
+globaliseIdVar details id = GlobalId { varName    = varName id,
+				    realUnique = realUnique id,
+			   	    varType    = varType id,
+				    idInfo_    = varIdInfo id,
+				    gblDetails = details }
+
+-- | Extract 'Id' information from the 'Var' if it represents a global or local 'Id', otherwise panic
+varIdInfo :: Var -> IdInfo
+varIdInfo (GlobalId {idInfo_ = info}) = info
+varIdInfo (LocalId  {idInfo_ = info}) = info
+varIdInfo other_var		   = pprPanic "idInfo" (ppr other_var)
+
+lazySetVarIdInfo :: Var -> IdInfo -> Var
+lazySetVarIdInfo id info = id { idInfo_ = info }
 \end{code}
 
 
@@ -221,8 +289,9 @@ mkTcTyVar name kind details
 %************************************************************************
 
 \begin{code}
-type CoVar = Var	-- A coercion variable is simply a type 
-			-- variable of kind (ty1 :=: ty2)
+type CoVar = Var	-- ^ A coercion variable is simply a type 
+			-- variable of kind @ty1 :=: ty2@. Hence its
+			-- 'varType' is always @PredTy (EqPred t1 t2)@
 
 coVarName :: CoVar -> Name
 coVarName = varName
@@ -237,14 +306,12 @@ mkCoVar :: Name -> Kind -> CoVar
 mkCoVar name kind = ASSERT( isCoercionKind kind )
 		    TyVar { varName    	  = name
 			  , realUnique 	  = getKeyFastInt (nameUnique name)
-			  , varType    	  = kind	
-				-- varType is always PredTy (EqPred t1 t2)
+			  , varType    	  = kind
                           , isCoercionVar = True
 			}
 
 mkWildCoVar :: Kind -> TyVar
--- A type variable that is never referred to,
--- so its unique doesn't matter
+-- ^ Create a type variable that is never referred to, so its unique doesn't matter
 mkWildCoVar kind 
   = ASSERT( isCoercionKind kind )
     TyVar { varName = mkSysTvName wild_uniq (fsLit "co_wild"),
@@ -253,164 +320,112 @@ mkWildCoVar kind
             isCoercionVar = True }
   where
     wild_uniq = mkBuiltinUnique 1
+
 \end{code}
 
 %************************************************************************
 %*									*
-\subsection{Id Construction}
+\subsection{Ids}
 %*									*
 %************************************************************************
 
-Most Id-related functions are in Id.lhs and MkId.lhs
-
 \begin{code}
-type Id     = Var
-type DictId = Id
-\end{code}
 
-\begin{code}
-idName   :: Id -> Name
-idUnique :: Id -> Unique
-idType   :: Id -> Kind
+-- These synonyms are here and not in Id because otherwise we need a very
+-- large number of SOURCE imports of Id.hs :-(
+type Id = Var
+type DictId = Var
 
-idName    = varName
-idUnique  = varUnique
-idType    = varType
-
-setIdUnique :: Id -> Unique -> Id
-setIdUnique = setVarUnique
-
-setIdName :: Id -> Name -> Id
-setIdName = setVarName
-
-setIdType :: Id -> Type -> Id
-setIdType id ty = id {varType = ty}
-
-setIdExported :: Id -> Id
--- Can be called on GlobalIds, such as data cons and class ops,
--- which are "born" as GlobalIds and automatically exported
-setIdExported id@(LocalId {}) = id { lclDetails = Exported }
-setIdExported other_id	      = ASSERT( isId other_id ) other_id
-
-setIdNotExported :: Id -> Id
--- We can only do this to LocalIds
-setIdNotExported id = ASSERT( isLocalId id ) id { lclDetails = NotExported }
-
-globaliseId :: GlobalIdDetails -> Id -> Id
--- If it's a local, make it global
-globaliseId details id = GlobalId { varName    = varName id,
-				    realUnique = realUnique id,
-			   	    varType    = varType id,
-				    idInfo_    = idInfo id,
-				    gblDetails = details }
-
-idInfo :: Id -> IdInfo
-idInfo (GlobalId {idInfo_ = info}) = info
-idInfo (LocalId  {idInfo_ = info}) = info
-idInfo other_var		   = pprPanic "idInfo" (ppr other_var)
-
-lazySetIdInfo :: Id -> IdInfo -> Id
-lazySetIdInfo id info = id {idInfo_ = info}
-
-setIdInfo :: Id -> IdInfo -> Id
-setIdInfo id info = seqIdInfo info `seq` id {idInfo_ = info}
-	-- Try to avoid spack leaks by seq'ing
-
-modifyIdInfo :: (IdInfo -> IdInfo) -> Id -> Id
-modifyIdInfo fn id
-  = seqIdInfo new_info `seq` id {idInfo_ = new_info}
-  where
-    new_info = fn (idInfo id)
-
--- maybeModifyIdInfo tries to avoid unnecesary thrashing
-maybeModifyIdInfo :: Maybe IdInfo -> Id -> Id
-maybeModifyIdInfo (Just new_info) id = id {idInfo_ = new_info}
-maybeModifyIdInfo Nothing	  id = id
 \end{code}
 
 %************************************************************************
 %*									*
-\subsection{Predicates over variables
+\subsection{Predicates over variables}
 %*									*
 %************************************************************************
 
 \begin{code}
-mkGlobalId :: GlobalIdDetails -> Name -> Type -> IdInfo -> Id
-mkGlobalId details name ty info 
+-- | For an explanation of global vs. local 'Var's, see "Var#globalvslocal"
+mkGlobalIdVar :: GlobalIdDetails -> Name -> Type -> IdInfo -> Var
+mkGlobalIdVar details name ty info 
   = GlobalId {	varName    = name, 
 		realUnique = getKeyFastInt (nameUnique name), 	-- Cache the unique
 		varType     = ty,	
 		gblDetails = details,
 		idInfo_    = info }
 
-mk_local_id :: Name -> Type -> LocalIdDetails -> IdInfo -> Id
-mk_local_id name ty details info
+mkLocalIdVar' :: Name -> Type -> LocalIdDetails -> IdInfo -> Var
+mkLocalIdVar' name ty details info
   = LocalId {	varName    = name, 
 		realUnique = getKeyFastInt (nameUnique name), 	-- Cache the unique
 		varType     = ty,	
 		lclDetails = details,
 		idInfo_    = info }
 
-mkLocalId :: Name -> Type -> IdInfo -> Id
-mkLocalId name ty info = mk_local_id name ty NotExported info
+-- | For an explanation of global vs. local 'Var's, see "Var#globalvslocal"
+mkLocalIdVar :: Name -> Type -> IdInfo -> Var
+mkLocalIdVar name ty info = mkLocalIdVar' name ty NotExported info
 
-mkExportedLocalId :: Name -> Type -> IdInfo -> Id
-mkExportedLocalId name ty info = mk_local_id name ty Exported info
+-- | Exported 'Var's will not be removed as dead code
+mkExportedLocalIdVar :: Name -> Type -> IdInfo -> Var
+mkExportedLocalIdVar name ty info = mkLocalIdVar' name ty Exported info
 \end{code}
 
 \begin{code}
-isTyVar, isTcTyVar	    :: Var -> Bool
-isId, isLocalVar, isLocalId :: Var -> Bool
-isGlobalId, isExportedId    :: Var -> Bool
-mustHaveLocalBinding	    :: Var -> Bool
-isCoVar                     :: Var -> Bool
-
+isTyVar :: Var -> Bool
 isTyVar (TyVar {})   = True
 isTyVar (TcTyVar {}) = True
 isTyVar _            = False
 
+isTcTyVar :: Var -> Bool
 isTcTyVar (TcTyVar {}) = True
 isTcTyVar _            = False
 
-isId (LocalId {})  = True
-isId (GlobalId {}) = True
-isId _             = False
+isIdVar :: Var -> Bool
+isIdVar (LocalId {})  = True
+isIdVar (GlobalId {}) = True
+isIdVar _             = False
 
-isLocalId (LocalId {}) = True
-isLocalId _            = False
+isLocalIdVar :: Var -> Bool
+isLocalIdVar (LocalId {}) = True
+isLocalIdVar _            = False
 
+isCoVar :: Var -> Bool
 isCoVar (v@(TyVar {})) = isCoercionVar v
 isCoVar _              = False
 
--- isLocalVar returns True for type variables as well as local Ids
+-- | 'isLocalVar' returns @True@ for type variables as well as local 'Id's
 -- These are the variables that we need to pay attention to when finding free
 -- variables, or doing dependency analysis.
+isLocalVar :: Var -> Bool
 isLocalVar (GlobalId {}) = False 
 isLocalVar _             = True
 
--- mustHaveLocalBinding returns True of Ids and TyVars
+-- | 'mustHaveLocalBinding' returns @True@ of 'Id's and 'TyVar's
 -- that must have a binding in this module.  The converse
--- is not quite right: there are some GlobalIds that must have
+-- is not quite right: there are some global 'Id's that must have
 -- bindings, such as record selectors.  But that doesn't matter,
 -- because it's only used for assertions
+mustHaveLocalBinding	    :: Var -> Bool
 mustHaveLocalBinding var = isLocalVar var
 
-isGlobalId (GlobalId {}) = True
-isGlobalId _             = False
+isGlobalIdVar :: Var -> Bool
+isGlobalIdVar (GlobalId {}) = True
+isGlobalIdVar _             = False
 
--- isExportedId means "don't throw this away"
-isExportedId (GlobalId {}) = True
-isExportedId (LocalId {lclDetails = details}) 
+-- | 'isExportedIdVar' means \"don't throw this away\"
+isExportedIdVar :: Var -> Bool
+isExportedIdVar (GlobalId {}) = True
+isExportedIdVar (LocalId {lclDetails = details}) 
   = case details of
 	Exported   -> True
 	_          -> False
-isExportedId _ = False
+isExportedIdVar _ = False
 \end{code}
 
 \begin{code}
-globalIdDetails :: Var -> GlobalIdDetails
--- Works OK on local Ids too, returning notGlobalId
-globalIdDetails (GlobalId {gblDetails = details}) = details
-globalIdDetails _                                 = notGlobalId
+globalIdVarDetails :: Var -> GlobalIdDetails
+-- ^ Find the global 'Id' information if the 'Var' is a global 'Id', otherwise returns 'notGlobalId'
+globalIdVarDetails (GlobalId {gblDetails = details}) = details
+globalIdVarDetails _                                 = notGlobalId
 \end{code}
-

@@ -1314,7 +1314,7 @@ errorTy  = mkSigmaTy [openAlphaTyVar] [] (mkFunTys [mkListTy charTy] openAlphaTy
 \begin{code}
 pcMiscPrelId :: Name -> Type -> IdInfo -> Id
 pcMiscPrelId name ty info
-  = mkVanillaGlobal name ty info
+  = mkVanillaGlobalWithInfo name ty info
     -- We lie and say the thing is imported; otherwise, we get into
     -- a mess with dependency analysis; e.g., core2stg may heave in
     -- random calls to GHCbase.unpackPS__.  If GHCbase is the module

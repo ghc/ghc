@@ -114,7 +114,7 @@ make_tbind :: TyVar -> C.Tbind
 make_tbind tv = (make_var_id (tyVarName tv), make_kind (tyVarKind tv))
     
 make_vbind :: Var -> C.Vbind
-make_vbind v = (make_var_id  (Var.varName v), make_ty (idType v))
+make_vbind v = (make_var_id  (Var.varName v), make_ty (varType v))
 
 make_vdef :: Bool -> CoreBind -> CoreM C.Vdefg
 make_vdef topLevel b = 
@@ -128,7 +128,7 @@ make_vdef topLevel b =
           let local = not topLevel || localN
           rhs <- make_exp e
           -- use local flag to determine where to add the module name
-          return (local, make_qid local True vName, make_ty (idType v),rhs)
+          return (local, make_qid local True vName, make_ty (varType v),rhs)
   	where vName = Var.varName v
 
 make_exp :: CoreExpr -> CoreM C.Exp
@@ -136,11 +136,11 @@ make_exp (Var v) = do
   let vName = Var.varName v
   isLocal <- isALocal vName
   return $
-     case globalIdDetails v of
+     case globalIdVarDetails v of
        FCallId (CCall (CCallSpec (StaticTarget nm) callconv _)) 
-           -> C.External (unpackFS nm) (showSDoc (ppr callconv)) (make_ty (idType v))
+           -> C.External (unpackFS nm) (showSDoc (ppr callconv)) (make_ty (varType v))
        FCallId (CCall (CCallSpec DynamicTarget     callconv _)) 
-           -> C.DynExternal            (showSDoc (ppr callconv)) (make_ty (idType v))
+           -> C.DynExternal            (showSDoc (ppr callconv)) (make_ty (varType v))
        FCallId _ 
            -> pprPanic "MkExternalCore died: can't handle non-{static,dynamic}-C foreign call"
                     (ppr v)

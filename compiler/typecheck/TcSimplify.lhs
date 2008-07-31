@@ -36,6 +36,7 @@ import TcIface
 import TcTyFuns
 import DsUtils	-- Big-tuple functions
 import Var
+import Id
 import Name
 import NameSet
 import Class

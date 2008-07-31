@@ -16,7 +16,7 @@ import SrcLoc
 import ErrUtils
 import Name
 import Bag
-import Var
+import Id
 import VarSet
 import Data.List
 import FastString

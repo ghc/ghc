@@ -147,7 +147,6 @@ import TyCon
 
 -- others:
 import DynFlags
-import CoreSyn
 import Name
 import NameSet
 import VarEnv

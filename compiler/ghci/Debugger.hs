@@ -17,7 +17,7 @@ import RtClosureInspect
 
 import HscTypes
 import IdInfo
---import Id
+import Id
 import Name
 import Var hiding ( varName )
 import VarSet

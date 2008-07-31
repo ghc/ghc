@@ -21,7 +21,7 @@ import CoreSyn
 import CoreUtils	( exprIsHNF, exprIsDupable )
 import CoreLint		( showPass, endPass )
 import CoreFVs		( CoreExprWithFVs, freeVars, freeVarsOf, idRuleVars )
-import Id		( isOneShotBndr )
+import Id		( isOneShotBndr, idType )
 import Var
 import Type		( isUnLiftedType )
 import VarSet

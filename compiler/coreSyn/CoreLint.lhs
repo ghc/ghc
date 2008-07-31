@@ -566,7 +566,7 @@ lintAndScopeIds ids linterF
 lintAndScopeId :: Var -> (Var -> LintM a) -> LintM a
 lintAndScopeId id linterF 
   = do { ty <- lintTy (idType id)
-       ; let id' = Var.setIdType id ty
+       ; let id' = setIdType id ty
        ; addInScopeVars [id'] $ (linterF id')
        }
 

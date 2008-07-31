@@ -77,7 +77,6 @@ module IdInfo (
         TickBoxOp(..), TickBoxId,
     ) where
 
-import CoreSyn
 import Class
 import PrimOp
 import Name
@@ -503,9 +502,7 @@ specInfoRules (SpecInfo rules _) = rules
 
 setSpecInfoHead :: Name -> SpecInfo -> SpecInfo
 setSpecInfoHead fn (SpecInfo rules fvs)
-  = SpecInfo (map set_head rules) fvs
-  where
-    set_head rule = rule { ru_fn = fn }
+  = SpecInfo (map (setRuleIdName fn) rules) fvs
 
 seqSpecInfo :: SpecInfo -> ()
 seqSpecInfo (SpecInfo rules fvs) = seqRules rules `seq` seqVarSet fvs
@@ -747,7 +744,7 @@ zapFragileInfo :: IdInfo -> Maybe IdInfo
 zapFragileInfo info 
   = Just (info `setSpecInfo` emptySpecInfo
 	       `setWorkerInfo` NoWorker
-               `setUnfoldingInfo` NoUnfolding
+               `setUnfoldingInfo` noUnfolding
 	       `setOccInfo` if isFragileOcc occ then NoOccInfo else occ)
   where
     occ = occInfo info

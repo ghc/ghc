@@ -48,8 +48,7 @@ module StgSyn (
 
 import CostCentre	( CostCentreStack, CostCentre )
 import VarSet		( IdSet, isEmptyVarSet )
-import Var		( isId )
-import Id		( Id, idName, idType, idCafInfo )
+import Id		( Id, idName, idType, idCafInfo, isId )
 import IdInfo		( mayHaveCafRefs )
 import Packages		( isDllName )
 import Literal		( Literal, literalType )

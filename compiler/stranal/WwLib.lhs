@@ -23,7 +23,7 @@ import TysWiredIn	( tupleCon )
 import Type
 import Coercion         ( mkSymCoercion, splitNewTypeRepCo_maybe )
 import BasicTypes	( Boxity(..) )
-import Var              ( Var, isId )
+import Var              ( Var, isIdVar )
 import UniqSupply
 import Unique
 import Util		( zipWithEqual, notNull )
@@ -127,12 +127,12 @@ mkWwBodies fun_ty demands res_info one_shots = do
         -- Don't do CPR if the worker doesn't have any value arguments
         -- Then the worker is just a constant, so we don't want to unbox it.
     (wrap_fn_cpr, work_fn_cpr,  _cpr_res_ty)
-       <- if any isId work_args then
+       <- if any isIdVar work_args then
              mkWWcpr res_ty res_info
           else
              return (id, id, res_ty)
 
-    return ([idNewDemandInfo v | v <- work_call_args, isId v],
+    return ([idNewDemandInfo v | v <- work_call_args, isIdVar v],
               Note InlineMe . wrap_fn_args . wrap_fn_cpr . wrap_fn_str . applyToVars work_call_args . Var,
               mkLams work_lam_args. work_fn_str . work_fn_cpr . work_fn_args)
         -- We use an INLINE unconditionally, even if the wrapper turns out to be
@@ -170,7 +170,7 @@ mkWorkerArgs :: [Var]
 	     -> ([Var],	-- Lambda bound args
 		 [Var])	-- Args at call site
 mkWorkerArgs args res_ty
-    | any isId args || not (isUnLiftedType res_ty)
+    | any isIdVar args || not (isUnLiftedType res_ty)
     = (args, args)
     | otherwise	
     = (args ++ [voidArgId], args ++ [realWorldPrimId])

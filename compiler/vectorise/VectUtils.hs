@@ -420,7 +420,7 @@ buildEnv vvs
                 return (vbody', lbody'))
   where
     (vs,ls) = unzip vvs
-    tys     = map idType vs
+    tys     = map varType vs
 
 mkVectEnv :: [Type] -> [Var] -> (Type, CoreExpr, CoreExpr -> CoreExpr -> CoreExpr)
 mkVectEnv []   []  = (unitTy, Var unitDataConId, \_ body -> body)

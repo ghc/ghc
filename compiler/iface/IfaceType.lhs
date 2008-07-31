@@ -25,6 +25,7 @@ module IfaceType (
 
 import TypeRep
 import TyCon
+import Id
 import Var
 import TysWiredIn
 import Name

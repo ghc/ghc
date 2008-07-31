@@ -31,8 +31,7 @@ import Coercion
 import VarEnv
 import TysPrim
 import Id
-import IdInfo
-import Var hiding (mkLocalId)
+import Var
 import Name
 import NameSet
 import NameEnv
@@ -103,7 +102,7 @@ tcHsBootSigs (ValBindsOut binds sigs)
   where
     tc_boot_sig (TypeSig (L _ name) ty)
       = do { sigma_ty <- tcHsSigType (FunSigCtxt name) ty
-           ; return (mkVanillaGlobal name sigma_ty vanillaIdInfo) }
+           ; return (mkVanillaGlobal name sigma_ty) }
         -- Notice that we make GlobalIds, not LocalIds
     tc_boot_sig s = pprPanic "tcHsBootSigs/tc_boot_sig" (ppr s)
 tcHsBootSigs groups = pprPanic "tcHsBootSigs" (ppr groups)
