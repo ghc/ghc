@@ -22,6 +22,7 @@ import {-# SOURCE #-} DsExpr ( dsLExpr, dsLocalBinds )
 import HsSyn
 import TcHsSyn
 import CoreSyn
+import MkCore
 
 import DsMonad		-- the monadery used in the desugarer
 import DsUtils
@@ -585,7 +586,7 @@ dePArrComp (LetStmt ds : qs) body pa cea = do
     v <- newSysLocalDs ty'cea
     clet <- dsLocalBinds ds (mkCoreTup (map Var xs))
     let'v <- newSysLocalDs (exprType clet)
-    let projBody = mkDsLet (NonRec let'v clet) $ 
+    let projBody = mkCoreLet (NonRec let'v clet) $ 
                    mkCoreTup [Var v, Var let'v]
         errTy    = exprType projBody
         errMsg   = "DsListComp.dePArrComp: internal error!"
