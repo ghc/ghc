@@ -4,34 +4,53 @@
 %
 
 \begin{code}
+
+-- |
+-- #name_types#
+-- GHC uses several kinds of name internally:
+--
+-- * 'OccName.OccName': see "OccName#name_types"
+--
+-- * 'RdrName.RdrName' is the type of names that come directly from the parser. They
+--   have not yet had their scoping and binding resolved by the renamer and can be
+--   thought of to a first approximation as an 'OccName.OccName' with an optional module
+--   qualifier
+--
+-- * 'Name.Name': see "Name#name_types"
+--
+-- * 'Id.Id': see "Id#name_types"
+--
+-- * 'Var.Var': see "Var#name_types"
 module RdrName (
+        -- * The main type
 	RdrName(..),	-- Constructors exported only to BinIface
 
-	-- Construction
+	-- ** Construction
 	mkRdrUnqual, mkRdrQual, 
 	mkUnqual, mkVarUnqual, mkQual, mkOrig,
 	nameRdrName, getRdrName, 
 	mkDerivedRdrName, 
 
-	-- Destruction
-	rdrNameOcc, setRdrNameSpace,
+	-- ** Destruction
+	rdrNameOcc, rdrNameSpace, setRdrNameSpace,
 	isRdrDataCon, isRdrTyVar, isRdrTc, isQual, isQual_maybe, isUnqual, 
 	isOrig, isOrig_maybe, isExact, isExact_maybe, isSrcRdrName,
 
-	-- Printing;	instance Outputable RdrName
+	-- ** Printing
+	showRdrName,
 
-	-- LocalRdrEnv
+	-- * Local mapping of 'RdrName' to 'Name.Name'
 	LocalRdrEnv, emptyLocalRdrEnv, extendLocalRdrEnv,
 	lookupLocalRdrEnv, lookupLocalRdrOcc, elemLocalRdrEnv,
 
-	-- GlobalRdrEnv
+	-- * Global mapping of 'RdrName' to 'GlobalRdrElt's
 	GlobalRdrEnv, emptyGlobalRdrEnv, mkGlobalRdrEnv, plusGlobalRdrEnv, 
 	lookupGlobalRdrEnv, extendGlobalRdrEnv,
 	pprGlobalRdrEnv, globalRdrEnvElts,
 	lookupGRE_RdrName, lookupGRE_Name, getGRE_NameQualifier_maybes,
         hideSomeUnquals, findLocalDupsRdrEnv,
 
-	-- GlobalRdrElt, Provenance, ImportSpec
+	-- ** Global 'RdrName' mapping elements: 'GlobalRdrElt', 'Provenance', 'ImportSpec'
 	GlobalRdrElt(..), isLocalGRE, unQualOK, qualSpecOK, unQualSpecOK,
 	Provenance(..), pprNameProvenance,
 	Parent(..), 
@@ -57,27 +76,37 @@ import Util
 %************************************************************************
 
 \begin{code}
-data RdrName 
+-- | Do not use the data constructors of RdrName directly: prefer the family
+-- of functions that creates them, such as 'mkRdrUnqual'
+data RdrName
   = Unqual OccName
-	-- Used for ordinary, unqualified occurrences 
+	-- ^ Used for ordinary, unqualified occurrences, e.g. @x@, @y@ or @Foo@.
+	-- Create such a 'RdrName' with 'mkRdrUnqual'
 
   | Qual ModuleName OccName
-	-- A qualified name written by the user in 
-	--  *source* code.  The module isn't necessarily 
+	-- ^ A qualified name written by the user in 
+	-- /source/ code.  The module isn't necessarily 
 	-- the module where the thing is defined; 
-	-- just the one from which it is imported
+	-- just the one from which it is imported.
+	-- Examples are @Bar.x@, @Bar.y@ or @Bar.Foo@.
+	-- Create such a 'RdrName' with 'mkRdrQual'
 
   | Orig Module OccName
-	-- An original name; the module is the *defining* module.
+	-- ^ An original name; the module is the /defining/ module.
 	-- This is used when GHC generates code that will be fed
 	-- into the renamer (e.g. from deriving clauses), but where
-	-- we want to say "Use Prelude.map dammit".  
+	-- we want to say \"Use Prelude.map dammit\". One of these
+	-- can be created with 'mkOrig'
  
   | Exact Name
-	-- We know exactly the Name. This is used 
-	--  (a) when the parser parses built-in syntax like "[]" 
-	--	and "(,)", but wants a RdrName from it
-	--  (b) by Template Haskell, when TH has generated a unique name
+	-- ^ We know exactly the 'Name'. This is used:
+	--
+	--  (1) When the parser parses built-in syntax like @[]@
+	--	and @(,)@, but wants a 'RdrName' from it
+	--
+	--  (2) By Template Haskell, when TH has generated a unique name
+	--
+	-- Such a 'RdrName' can be created by using 'getRdrName' on a 'Name'
 \end{code}
 
 
@@ -94,15 +123,23 @@ rdrNameOcc (Unqual occ) = occ
 rdrNameOcc (Orig _ occ) = occ
 rdrNameOcc (Exact name) = nameOccName name
 
+rdrNameSpace :: RdrName -> NameSpace
+rdrNameSpace = occNameSpace . rdrNameOcc
+
 setRdrNameSpace :: RdrName -> NameSpace -> RdrName
--- This rather gruesome function is used mainly by the parser
--- When parsing		data T a = T | T1 Int
--- we parse the data constructors as *types* because of parser ambiguities,
--- so then we need to change the *type constr* to a *data constr*
+-- ^ This rather gruesome function is used mainly by the parser.
+-- When parsing:
 --
--- The original-name case *can* occur when parsing
--- 		data [] a = [] | a : [a]
--- For the orig-name case we return an unqualified name.
+-- > data T a = T | T1 Int
+--
+-- we parse the data constructors as /types/ because of parser ambiguities,
+-- so then we need to change the /type constr/ to a /data constr/
+--
+-- The exact-name case /can/ occur when parsing:
+--
+-- > data [] a = [] | a : [a]
+--
+-- For the exact-name case we return an original name.
 setRdrNameSpace (Unqual occ) ns = Unqual (setOccNameSpace ns occ)
 setRdrNameSpace (Qual m occ) ns = Qual m (setOccNameSpace ns occ)
 setRdrNameSpace (Orig m occ) ns = Orig m (setOccNameSpace ns occ)
@@ -122,7 +159,9 @@ mkOrig :: Module -> OccName -> RdrName
 mkOrig mod occ = Orig mod occ
 
 ---------------
-mkDerivedRdrName :: Name -> (OccName -> OccName) -> (RdrName)
+-- | Produce an original 'RdrName' whose module that of a parent 'Name' but its 'OccName'
+-- is derived from that of it's parent using the supplied function
+mkDerivedRdrName :: Name -> (OccName -> OccName) -> RdrName
 mkDerivedRdrName parent mk_occ
   = mkOrig (nameModule parent) (mk_occ (nameOccName parent))
 
@@ -135,6 +174,8 @@ mkUnqual sp n = Unqual (mkOccNameFS sp n)
 mkVarUnqual :: FastString -> RdrName
 mkVarUnqual n = Unqual (mkVarOccFS n)
 
+-- | Make a qualified 'RdrName' in the given namespace and where the 'ModuleName' and
+-- the 'OccName' are taken from the first and second elements of the tuple respectively
 mkQual :: NameSpace -> (FastString, FastString) -> RdrName
 mkQual sp (m, n) = Qual (mkModuleNameFS m) (mkOccNameFS sp n)
 
@@ -215,6 +256,9 @@ instance OutputableBndr RdrName where
 	| isTvOcc (rdrNameOcc n) = char '@' <+> ppr n
 	| otherwise		 = ppr n
 
+showRdrName :: RdrName -> String
+showRdrName r = showSDoc (ppr r)
+
 instance Eq RdrName where
     (Exact n1) 	  == (Exact n2)    = n1==n2
 	-- Convert exact to orig
@@ -256,18 +300,15 @@ instance Ord RdrName where
     compare (Orig _ _)   _	      = GT
 \end{code}
 
-
-
 %************************************************************************
 %*									*
 			LocalRdrEnv
 %*									*
 %************************************************************************
 
-A LocalRdrEnv is used for local bindings (let, where, lambda, case)
-It is keyed by OccName, because we never use it for qualified names.
-
 \begin{code}
+-- | This environment is used to store local bindings (@let@, @where@, lambda, @case@).
+-- It is keyed by OccName, because we never use it for qualified names
 type LocalRdrEnv = OccEnv Name
 
 emptyLocalRdrEnv :: LocalRdrEnv
@@ -291,7 +332,6 @@ elemLocalRdrEnv rdr_name env
   | otherwise	      = False
 \end{code}
 
-
 %************************************************************************
 %*									*
 			GlobalRdrEnv
@@ -300,22 +340,23 @@ elemLocalRdrEnv rdr_name env
 
 \begin{code}
 type GlobalRdrEnv = OccEnv [GlobalRdrElt]
-	-- Keyed by OccName; when looking up a qualified name
-	-- we look up the OccName part, and then check the Provenance
-	-- to see if the appropriate qualification is valid.  This
-	-- saves routinely doubling the size of the env by adding both
-	-- qualified and unqualified names to the domain.
-	--
-	-- The list in the range is reqd because there may be name clashes
-	-- These only get reported on lookup, not on construction
+-- ^ Keyed by 'OccName'; when looking up a qualified name
+-- we look up the 'OccName' part, and then check the 'Provenance'
+-- to see if the appropriate qualification is valid.  This
+-- saves routinely doubling the size of the env by adding both
+-- qualified and unqualified names to the domain.
+--
+-- The list in the codomain is required because there may be name clashes
+-- These only get reported on lookup, not on construction
+--
+-- INVARIANT: All the members of the list have distinct 
+--	      'gre_name' fields; that is, no duplicate Names
 
-	-- INVARIANT: All the members of the list have distinct 
-	--	      gre_name fields; that is, no duplicate Names
-
+-- | An element of the 'GlobalRdrEnv'
 data GlobalRdrElt 
   = GRE { gre_name :: Name,
 	  gre_par  :: Parent,
-	  gre_prov :: Provenance	-- Why it's in scope
+	  gre_prov :: Provenance	-- ^ Why it's in scope
     }
 
 data Parent = NoParent | ParentIs Name
@@ -392,20 +433,24 @@ getGRE_NameQualifier_maybes env
         qualifier_maybe (Imported iss) = Just $ map (is_as . is_decl) iss 
 
 pickGREs :: RdrName -> [GlobalRdrElt] -> [GlobalRdrElt]
--- Take a list of GREs which have the right OccName
+-- ^ Take a list of GREs which have the right OccName
 -- Pick those GREs that are suitable for this RdrName
 -- And for those, keep only only the Provenances that are suitable
 -- 
--- Consider
+-- Consider:
+--
+-- @
 --	 module A ( f ) where
 --	 import qualified Foo( f )
 --	 import Baz( f )
 --	 f = undefined
--- Let's suppose that Foo.f and Baz.f are the same entity really.
--- The export of f is ambiguous because it's in scope from the local def
--- and the import.  The lookup of (Unqual f) should return a GRE for
--- the locally-defined f, and a GRE for the imported f, with a *single* 
--- provenance, namely the one for Baz(f).
+-- @
+--
+-- Let's suppose that @Foo.f@ and @Baz.f@ are the same entity really.
+-- The export of @f@ is ambiguous because it's in scope from the local def
+-- and the import.  The lookup of @Unqual f@ should return a GRE for
+-- the locally-defined @f@, and a GRE for the imported @f@, with a /single/ 
+-- provenance, namely the one for @Baz(f)@.
 pickGREs rdr_name gres
   = mapCatMaybes pick gres
   where
@@ -440,17 +485,9 @@ isLocalGRE (GRE {gre_prov = LocalDef}) = True
 isLocalGRE _                           = False
 
 unQualOK :: GlobalRdrElt -> Bool
--- An unqualifed version of this thing is in scope
+-- ^ Test if an unqualifed version of this thing would be in scope
 unQualOK (GRE {gre_prov = LocalDef})    = True
 unQualOK (GRE {gre_prov = Imported is}) = any unQualSpecOK is
-
-unQualSpecOK :: ImportSpec -> Bool
--- In scope unqualified
-unQualSpecOK is = not (is_qual (is_decl is))
-
-qualSpecOK :: ModuleName -> ImportSpec -> Bool
--- In scope qualified with M
-qualSpecOK mod is = mod == is_as (is_decl is)
 
 plusGlobalRdrEnv :: GlobalRdrEnv -> GlobalRdrEnv -> GlobalRdrEnv
 plusGlobalRdrEnv env1 env2 = plusOccEnv_C (foldr insertGRE) env1 env2
@@ -464,7 +501,7 @@ mkGlobalRdrEnv gres
 				 [gre]
 
 findLocalDupsRdrEnv :: GlobalRdrEnv -> [OccName] -> (GlobalRdrEnv, [[Name]])
--- For each OccName, see if there are multiple LocalDef definitions
+-- ^ For each 'OccName', see if there are multiple local definitions
 -- for it.  If so, remove all but one (to suppress subsequent error messages)
 -- and return a list of the duplicate bindings
 findLocalDupsRdrEnv rdr_env occs 
@@ -500,12 +537,15 @@ plusGRE g1 g2
 	  gre_par  = gre_par  g1 `plusParent` gre_par  g2 }
 
 hideSomeUnquals :: GlobalRdrEnv -> [OccName] -> GlobalRdrEnv
--- Hide any unqualified bindings for the specified OccNames
+-- ^ Hide any unqualified bindings for the specified OccNames
 -- This is used in TH, when renaming a declaration bracket
---	[d| foo = ... |]
--- We want unqualified 'foo' in "..." to mean this foo, not
--- the one from the enclosing module.  But the *qualified* name
--- from the enclosing moudule must certainly still be avaialable
+--
+-- > [d| foo = ... |]
+--
+-- We want unqualified @foo@ in "..." to mean this @foo@, not
+-- the one from the enclosing module.  But the /qualified/ name
+-- from the enclosing module must certainly still be available
+
 -- 	Seems like 5 times as much work as it deserves!
 hideSomeUnquals rdr_env occs
   = foldr hide rdr_env occs
@@ -529,53 +569,66 @@ hideSomeUnquals rdr_env occs
   	= spec { is_decl = decl_spec { is_qual = True } }
 \end{code}
 
-
 %************************************************************************
 %*									*
 			Provenance
 %*									*
 %************************************************************************
 
-The "provenance" of something says how it came to be in scope.
-It's quite elaborate so that we can give accurate unused-name warnings.
-
 \begin{code}
+-- | The 'Provenance' of something says how it came to be in scope.
+-- It's quite elaborate so that we can give accurate unused-name warnings.
 data Provenance
-  = LocalDef		-- Defined locally
-  | Imported 		-- Imported
-	[ImportSpec]	-- INVARIANT: non-empty
+  = LocalDef		-- ^ The thing was defined locally
+  | Imported 		
+	[ImportSpec]	-- ^ The thing was imported.
+	                -- 
+	                -- INVARIANT: the list of 'ImportSpec' is non-empty
 
 data ImportSpec = ImpSpec { is_decl :: ImpDeclSpec,
 			    is_item ::  ImpItemSpec }
 		deriving( Eq, Ord )
 
-data ImpDeclSpec	-- Describes a particular import declaration
-			-- Shared among all the Provenaces for that decl
+-- | Describes a particular import declaration and is
+-- shared among all the 'Provenance's for that decl
+data ImpDeclSpec
   = ImpDeclSpec {
-	is_mod      :: ModuleName, -- 'import Muggle'
-				-- Note the Muggle may well not be 
-				-- the defining module for this thing!
-                                -- TODO: either should be Module, or there
-                                -- should be a Maybe PackageId here too.
-	is_as       :: ModuleName, -- 'as M' (or 'Muggle' if there is no 'as' clause)
-	is_qual     :: Bool,	-- True <=> qualified (only)
-	is_dloc     :: SrcSpan	-- Location of import declaration
+	is_mod      :: ModuleName, -- ^ Module imported, e.g. @import Muggle@
+				   -- Note the @Muggle@ may well not be 
+				   -- the defining module for this thing!
+
+                                   -- TODO: either should be Module, or there
+                                   -- should be a Maybe PackageId here too.
+	is_as       :: ModuleName, -- ^ Import alias, e.g. from @as M@ (or @Muggle@ if there is no @as@ clause)
+	is_qual     :: Bool,	   -- ^ Was this import qualified?
+	is_dloc     :: SrcSpan	   -- ^ The location of the import declaration
     }
 
-data ImpItemSpec  -- Describes import info a particular Name
-  = ImpAll		-- The import had no import list, 
-			-- or  had a hiding list
+-- | Describes import info a particular Name
+data ImpItemSpec
+  = ImpAll		-- ^ The import had no import list, 
+			-- or had a hiding list
 
-  | ImpSome {		-- The import had an import list
+  | ImpSome {
 	is_explicit :: Bool,
 	is_iloc     :: SrcSpan	-- Location of the import item
-    }
-	-- The is_explicit field is True iff the thing was
-        -- named /explicitly/ in the import specs rather
-	-- than being imported as part of a "..." group
-	-- e.g.		import C( T(..) )
-	-- Here the constructors of T are not named explicitly; 
-	-- only T is named explicitly.
+    }   -- ^ The import had an import list.
+	-- The 'is_explicit' field is @True@ iff the thing was named 
+	-- /explicitly/ in the import specs rather
+	-- than being imported as part of a "..." group. Consider:
+	--
+	-- > import C( T(..) )
+	--
+	-- Here the constructors of @T@ are not named explicitly; 
+	-- only @T@ is named explicitly.
+
+unQualSpecOK :: ImportSpec -> Bool
+-- ^ Is in scope unqualified?
+unQualSpecOK is = not (is_qual (is_decl is))
+
+qualSpecOK :: ModuleName -> ImportSpec -> Bool
+-- ^ Is in scope qualified with the given module?
+qualSpecOK mod is = mod == is_as (is_decl is)
 
 importSpecLoc :: ImportSpec -> SrcSpan
 importSpecLoc (ImpSpec decl ImpAll) = is_dloc decl
@@ -629,7 +682,7 @@ plusProv _               LocalDef        = LocalDef
 plusProv (Imported is1)  (Imported is2)  = Imported (is1++is2)
 
 pprNameProvenance :: GlobalRdrElt -> SDoc
--- Print out the place where the name was imported
+-- ^ Print out the place where the name was imported
 pprNameProvenance (GRE {gre_name = name, gre_prov = LocalDef})
   = ptext (sLit "defined at") <+> ppr (nameSrcLoc name)
 pprNameProvenance (GRE {gre_name = name, gre_prov = Imported whys})
