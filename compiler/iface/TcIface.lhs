@@ -68,7 +68,7 @@ This module takes
 An IfaceDecl is populated with RdrNames, and these are not renamed to
 Names before typechecking, because there should be no scope errors etc.
 
-	-- For (b) consider: f = $(...h....)
+	-- For (b) consider: f = \$(...h....)
 	-- where h is imported, and calls f via an hi-boot file.  
 	-- This is bad!  But it is not seen as a staging error, because h
 	-- is indeed imported.  We don't want the type-checker to black-hole 
@@ -880,6 +880,7 @@ tcIdInfo ignore_prags name ty info
     -- we start; default assumption is that it has CAFs
     init_info = vanillaIdInfo
 
+    tcPrag :: IdInfo -> IfaceInfoItem -> IfL IdInfo
     tcPrag info HsNoCafRefs         = return (info `setCafInfo`   NoCafRefs)
     tcPrag info (HsArity arity)     = return (info `setArityInfo` arity)
     tcPrag info (HsStrictness str)  = return (info `setAllStrictnessInfo` Just str)
@@ -985,9 +986,9 @@ tcIfaceGlobal name
 
 	  ; _ -> do
 
-	{ (eps,hpt) <- getEpsAndHpt
- 	; dflags <- getDOpts
-	; case lookupType dflags hpt (eps_PTE eps) name of {
+	{ hsc_env <- getTopEnv
+        ; mb_thing <- liftIO (lookupTypeHscEnv hsc_env name)
+	; case mb_thing of {
 	    Just thing -> return thing ;
 	    Nothing    -> do
 
@@ -1125,13 +1126,13 @@ newExtCoreBndr (IfLetBndr var ty _)    -- Ignoring IdInfo for now
 -----------------------
 bindIfaceTyVar :: IfaceTvBndr -> (TyVar -> IfL a) -> IfL a
 bindIfaceTyVar (occ,kind) thing_inside
-  = do	{ name <- newIfaceName (mkTyVarOcc occ)
+  = do	{ name <- newIfaceName (mkTyVarOccFS occ)
    	; tyvar <- mk_iface_tyvar name kind
 	; extendIfaceTyVarEnv [tyvar] (thing_inside tyvar) }
 
 bindIfaceTyVars :: [IfaceTvBndr] -> ([TyVar] -> IfL a) -> IfL a
 bindIfaceTyVars bndrs thing_inside
-  = do	{ names <- newIfaceNames (map mkTyVarOcc occs)
+  = do	{ names <- newIfaceNames (map mkTyVarOccFS occs)
   	; tyvars <- zipWithM mk_iface_tyvar names kinds
 	; extendIfaceTyVarEnv tyvars (thing_inside tyvars) }
   where
