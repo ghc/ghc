@@ -5,6 +5,9 @@
 \section[TypeRep]{Type - friends' interface}
 
 \begin{code}
+-- We expose the relevant stuff from this module via the Type module
+{-# OPTIONS_HADDOCK hide #-}
+
 module TypeRep (
 	TyThing(..), 
 	Type(..),
@@ -61,56 +64,6 @@ import Outputable
 import FastString
 \end{code}
 
-%************************************************************************
-%*									*
-\subsection{Type Classifications}
-%*									*
-%************************************************************************
-
-A type is
-
-	*unboxed*	iff its representation is other than a pointer
-			Unboxed types are also unlifted.
-
-	*lifted*	A type is lifted iff it has bottom as an element.
-			Closures always have lifted types:  i.e. any
-			let-bound identifier in Core must have a lifted
-			type.  Operationally, a lifted object is one that
-			can be entered.
-
-			Only lifted types may be unified with a type variable.
-
-	*algebraic*	A type with one or more constructors, whether declared
-			with "data" or "newtype".   
-			An algebraic type is one that can be deconstructed
-			with a case expression.  
-			*NOT* the same as lifted types,  because we also 
-			include unboxed tuples in this classification.
-
-	*data*		A type declared with "data".  Also boxed tuples.
-
-	*primitive*	iff it is a built-in type that can't be expressed
-			in Haskell.
-
-Currently, all primitive types are unlifted, but that's not necessarily
-the case.  (E.g. Int could be primitive.)
-
-Some primitive types are unboxed, such as Int#, whereas some are boxed
-but unlifted (such as ByteArray#).  The only primitive types that we
-classify as algebraic are the unboxed tuples.
-
-examples of type classifications:
-
-Type		primitive	boxed		lifted		algebraic    
------------------------------------------------------------------------------
-Int#,		Yes		No		No		No
-ByteArray#	Yes		Yes		No		No
-(# a, b #)	Yes		No		No		Yes
-(  a, b  )	No		Yes		Yes		Yes
-[a]		No		Yes		Yes		Yes
-
-
-
 	----------------------
 	A note about newtypes
 	----------------------
@@ -162,73 +115,90 @@ to cut all loops.  The other members of the loop may be marked 'non-recursive'.
 
 
 \begin{code}
+-- | The key representation of types within the compiler
 data Type
-  = TyVarTy TyVar	
+  = TyVarTy TyVar	-- ^ Vanilla type variable
 
   | AppTy
-	Type		-- Function is *not* a TyConApp
-	Type		-- It must be another AppTy, or TyVarTy
-
-  | TyConApp		-- Application of a TyCon, including newtypes *and* synonyms
-	TyCon		--  *Invariant* saturated appliations of FunTyCon and
-			-- 	synonyms have their own constructors, below.
-			-- However, *unsaturated* FunTyCons do appear as TyConApps.  
-			-- 
-	[Type]		-- Might not be saturated.
-			-- Even type synonyms are not necessarily saturated;
-			-- for example unsaturated type synonyms can appear as the 
-			-- RHS of a type synonym.
-
-  | FunTy		-- Special case of TyConApp: TyConApp FunTyCon [t1,t2]
 	Type
-	Type
+	Type		-- ^ Type application to something other than a 'TyCon'. Parameters:
+	                --
+	                --  1) Function: must /not/ be a 'TyConApp', must be another 'AppTy', or 'TyVarTy'
+	                --
+	                --  2) Argument type
 
-  | ForAllTy		-- A polymorphic type
+  | TyConApp
+	TyCon
+	[Type]		-- ^ Application of a 'TyCon', including newtypes /and/ synonyms.
+	                -- Invariant: saturated appliations of 'FunTyCon' must
+	                -- use 'FunTy' and saturated synonyms must use their own
+	                -- constructors. However, /unsaturated/ 'FunTyCon's do appear as 'TyConApp's.
+	                -- Parameters:
+	                --
+	                -- 1) Type constructor being applied to.
+	                --
+	                -- 2) Type arguments. Might not have enough type arguments here to saturate the constructor.
+	                -- Even type synonyms are not necessarily saturated; for example unsaturated type synonyms
+	                -- can appear as the right hand side of a type synonym.
+
+  | FunTy
+	Type
+	Type		-- ^ Special case of 'TyConApp': @TyConApp FunTyCon [t1, t2]@
+
+  | ForAllTy
 	TyVar
-	Type	
+	Type	        -- ^ A polymorphic type
 
-  | PredTy		-- The type of evidence for a type predictate
-	PredType	-- See Note [PredTy], and Note [Equality predicates]
-	-- NB: A PredTy (EqPred _ _) can appear only as the kind
-	--     of a coercion variable; never as the argument or result
-	--     of a FunTy (unlike ClassP, IParam)
+  | PredTy
+	PredType	-- ^ The type of evidence for a type predictate.
+                        -- Note that a @PredTy (EqPred _ _)@ can appear only as the kind
+	                -- of a coercion variable; never as the argument or result
+	                -- of a 'FunTy' (unlike the 'PredType' constructors 'ClassP' or 'IParam')
+	                
+	                -- See Note [PredTy], and Note [Equality predicates]
 
-type Kind = Type 	-- Invariant: a kind is always
-			--	FunTy k1 k2
-			-- or	TyConApp PrimTyCon [...]
-			-- or	TyVar kv (during inference only)
-			-- or   ForAll ... (for top-level coercions)
+-- | The key type representing kinds in the compiler.
+-- Invariant: a kind is always in one of these forms:
+--
+-- > FunTy k1 k2
+-- > TyConApp PrimTyCon [...]
+-- > TyVar kv   -- (during inference only)
+-- > ForAll ... -- (for top-level coercions)
+type Kind = Type
 
-type SuperKind = Type   -- Invariant: a super kind is always 
-                        --   TyConApp SuperKindTyCon ...
+-- | "Super kinds", used to help encode 'Kind's as types.
+-- Invariant: a super kind is always of this form:
+--
+-- > TyConApp SuperKindTyCon ...
+type SuperKind = Type
 \end{code}
 
 -------------------------------------
  		Note [PredTy]
 
-A type of the form
-	PredTy p
-represents a value whose type is the Haskell predicate p, 
-where a predicate is what occurs before the '=>' in a Haskell type.
-It can be expanded into its representation, but: 
-
-	* The type checker must treat it as opaque
-	* The rest of the compiler treats it as transparent
-
-Consider these examples:
-	f :: (Eq a) => a -> Int
-	g :: (?x :: Int -> Int) => a -> Int
-	h :: (r\l) => {r} => {l::Int | r}
-
-Here the "Eq a" and "?x :: Int -> Int" and "r\l" are all called *predicates*
-Predicates are represented inside GHC by PredType:
-
 \begin{code}
+-- | A type of the form @PredTy p@ represents a value whose type is
+-- the Haskell predicate @p@, where a predicate is what occurs before 
+-- the @=>@ in a Haskell type.
+-- It can be expanded into its representation, but: 
+--
+-- * The type checker must treat it as opaque
+--
+-- * The rest of the compiler treats it as transparent
+--
+-- Consider these examples:
+--
+-- > f :: (Eq a) => a -> Int
+-- > g :: (?x :: Int -> Int) => a -> Int
+-- > h :: (r\l) => {r} => {l::Int | r}
+--
+-- Here the @Eq a@ and @?x :: Int -> Int@ and @r\l@ are all called \"predicates\"
 data PredType 
-  = ClassP Class [Type]		-- Class predicate
-  | IParam (IPName Name) Type	-- Implicit parameter
-  | EqPred Type Type		-- Equality predicate (ty1 ~ ty2)
+  = ClassP Class [Type]		-- ^ Class predicate e.g. @Eq a@
+  | IParam (IPName Name) Type	-- ^ Implicit parameter e.g. @?x :: Int@
+  | EqPred Type Type		-- ^ Equality predicate e.g @ty1 ~ ty2@
 
+-- | A collection of 'PredType's
 type ThetaType = [PredType]
 \end{code}
 
@@ -274,6 +244,7 @@ this module seems the right place for TyThing, because it's needed for
 funTyCon and all the types in TysPrim.
 
 \begin{code}
+-- | A typecheckable-thing, essentially anything that has a name
 data TyThing = AnId     Id
 	     | ADataCon DataCon
 	     | ATyCon   TyCon
@@ -311,6 +282,7 @@ We define a few wired-in type constructors here to avoid module knots
 --------------------------
 -- First the TyCons...
 
+-- | See "Type#kind_subtyping" for details of the distinction between the 'Kind' 'TyCon's
 funTyCon, tySuperKindTyCon, coSuperKindTyCon, liftedTypeKindTyCon,
       openTypeKindTyCon, unliftedTypeKindTyCon,
       ubxTupleKindTyCon, argTypeKindTyCon
@@ -355,7 +327,7 @@ argTypeKindTyConName      = mkPrimTyConName (fsLit "??") argTypeKindTyConKey arg
 funTyConName              = mkPrimTyConName (fsLit "(->)") funTyConKey funTyCon
 
 mkPrimTyConName :: FastString -> Unique -> TyCon -> Name
-mkPrimTyConName occ key tycon = mkWiredInName gHC_PRIM (mkOccNameFS tcName occ) 
+mkPrimTyConName occ key tycon = mkWiredInName gHC_PRIM (mkTcOccFS occ) 
 					      key 
 					      (ATyCon tycon)
 					      BuiltInSyntax
@@ -368,6 +340,7 @@ mkPrimTyConName occ key tycon = mkWiredInName gHC_PRIM (mkOccNameFS tcName occ)
 kindTyConType :: TyCon -> Type
 kindTyConType kind = TyConApp kind []
 
+-- | See "Type#kind_subtyping" for details of the distinction between these 'Kind's
 liftedTypeKind, unliftedTypeKind, openTypeKind, argTypeKind, ubxTupleKind :: Kind
 
 liftedTypeKind   = kindTyConType liftedTypeKindTyCon
@@ -376,9 +349,11 @@ openTypeKind     = kindTyConType openTypeKindTyCon
 argTypeKind      = kindTyConType argTypeKindTyCon
 ubxTupleKind	 = kindTyConType ubxTupleKindTyCon
 
+-- | Given two kinds @k1@ and @k2@, creates the 'Kind' @k1 -> k2@
 mkArrowKind :: Kind -> Kind -> Kind
 mkArrowKind k1 k2 = FunTy k1 k2
 
+-- | Iterated application of 'mkArrowKind'
 mkArrowKinds :: [Kind] -> Kind -> Kind
 mkArrowKinds arg_kinds result_kind = foldr mkArrowKind result_kind arg_kinds
 
