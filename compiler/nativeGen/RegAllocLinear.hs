@@ -797,7 +797,7 @@ joinToTargets block_live new_blocks instr (dest:dests) = do
 	       delta <- getDeltaR
 	       
                let graph = makeRegMovementGraph adjusted_assig dest_assig
-	       let sccs  = stronglyConnCompR graph
+	       let sccs  = stronglyConnCompFromEdgedVerticesR graph
 	       fixUpInstrs <- mapM (handleComponent delta instr) sccs
 
 	       block_id <- getUniqueR
@@ -901,7 +901,7 @@ handleComponent delta instr (CyclicSCC ((vreg, (InReg sreg),dsts):rest))
  = do
 	spill_id <- getUniqueR
 	(_, slot) 		<- spillR (RealReg sreg) spill_id
-	remainingFixUps 	<- mapM (handleComponent delta instr) (stronglyConnCompR rest)
+	remainingFixUps 	<- mapM (handleComponent delta instr) (stronglyConnCompFromEdgedVerticesR rest)
 	restoreAndFixInstr 	<- getRestoreMoves dsts slot
 	return ([instr] ++ concat remainingFixUps ++ restoreAndFixInstr)
 
