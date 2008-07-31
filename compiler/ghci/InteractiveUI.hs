@@ -1951,7 +1951,7 @@ stepModuleCmd  [] = do
     Nothing  -> stepCmd []
     Just _ -> do
        Just span <- getCurrentBreakSpan
-       let f some_span = optSrcSpanFileName span == optSrcSpanFileName some_span
+       let f some_span = srcSpanFileName_maybe span == srcSpanFileName_maybe some_span
        doContinue f GHC.SingleStep
 
 stepModuleCmd expression = stepCmd expression
