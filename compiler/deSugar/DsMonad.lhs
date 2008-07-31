@@ -12,7 +12,7 @@ module DsMonad (
 	foldlM, foldrM, ifOptM,
 	Applicative(..),(<$>),
 
-	newTyVarsDs, newLocalName,
+	newLocalName,
 	duplicateLocalDs, newSysLocalDs, newSysLocalsDs, newUniqueId,
 	newFailLocalDs,
 	getSrcSpanDs, putSrcSpanDs,
@@ -206,7 +206,6 @@ mkDsEnvs dflags mod rdr_env type_env msg_var
 			            ds_loc = noSrcSpan }
 
        return (gbl_env, lcl_env)
-
 \end{code}
 
 %************************************************************************
@@ -223,9 +222,7 @@ it easier to read debugging output.
 \begin{code}
 -- Make a new Id with the same print name, but different type, and new unique
 newUniqueId :: Name -> Type -> DsM Id
-newUniqueId id ty = do
-    uniq <- newUnique
-    return (mkSysLocal (occNameFS (nameOccName id)) uniq ty)
+newUniqueId id = mkSysLocalM (occNameFS (nameOccName id))
 
 duplicateLocalDs :: Id -> DsM Id
 duplicateLocalDs old_local = do
@@ -233,24 +230,11 @@ duplicateLocalDs old_local = do
     return (setIdUnique old_local uniq)
 
 newSysLocalDs, newFailLocalDs :: Type -> DsM Id
-newSysLocalDs ty = do
-    uniq <- newUnique
-    return (mkSysLocal (fsLit "ds") uniq ty)
+newSysLocalDs = mkSysLocalM (fsLit "ds")
+newFailLocalDs = mkSysLocalM (fsLit "fail")
 
 newSysLocalsDs :: [Type] -> DsM [Id]
 newSysLocalsDs tys = mapM newSysLocalDs tys
-
-newFailLocalDs ty = do
-    uniq <- newUnique
-    return (mkSysLocal (fsLit "fail") uniq ty)
-	-- The UserLocal bit just helps make the code a little clearer
-\end{code}
-
-\begin{code}
-newTyVarsDs :: [TyVar] -> DsM [TyVar]
-newTyVarsDs tyvar_tmpls = do
-    uniqs <- newUniqueSupply
-    return (zipWith setTyVarUnique tyvar_tmpls (uniqsFromSupply uniqs))
 \end{code}
 
 We can also reach out and either set/grab location information from
@@ -281,7 +265,6 @@ warnDs warn = do { env <- getGblEnv
 		 ; let msg = mkWarnMsg loc (ds_unqual env) 
 				      (ptext (sLit "Warning:") <+> warn)
 		 ; updMutVar (ds_msgs env) (\ (w,e) -> (w `snocBag` msg, e)) }
-	    where
 
 failWithDs :: SDoc -> DsM a
 failWithDs err 
@@ -290,10 +273,12 @@ failWithDs err
 	; let msg = mkErrMsg loc (ds_unqual env) err
 	; updMutVar (ds_msgs env) (\ (w,e) -> (w, e `snocBag` msg))
 	; failM }
-	where
 \end{code}
 
 \begin{code}
+instance MonadThings (IOEnv (Env DsGblEnv DsLclEnv)) where
+    lookupThing = dsLookupGlobal
+
 dsLookupGlobal :: Name -> DsM TyThing
 -- Very like TcEnv.tcLookupGlobal
 dsLookupGlobal name 
