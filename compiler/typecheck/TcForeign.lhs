@@ -25,6 +25,7 @@ import HsSyn
 import TcRnMonad
 import TcHsType
 import TcExpr
+import TcEnv
 
 import ForeignCall
 import ErrUtils
@@ -41,7 +42,6 @@ import DynFlags
 import Outputable
 import SrcLoc
 import Bag
-import Unique
 import FastString
 \end{code}
 
@@ -229,24 +229,12 @@ tcFExport fo@(ForeignExport (L loc nm) hs_ty spec) =
 	  -- to create a local binding which will call the exported function
 	  -- at a particular type (and, maybe, overloading).
 
-   uniq <- newUnique
-   mod <- getModule
-   let
-          -- We need to give a name to the new top-level binding that
-          -- is *stable* (i.e. the compiler won't change it later),
-          -- because this name will be referred to by the C code stub.
-          -- Furthermore, the name must be unique (see #1533).  If the
-          -- same function is foreign-exported multiple times, the
-          -- top-level bindings generated must not have the same name.
-          -- Hence we create an External name (doesn't change), and we
-          -- append a Unique to the string right here.
-        uniq_str = showSDoc (pprUnique uniq)
-        occ = mkVarOcc (occNameString (getOccName nm) ++ '_' : uniq_str)
-        gnm  = mkExternalName uniq mod (mkForeignExportOcc occ) loc
-	id   = mkExportedLocalId gnm sig_ty
-	bind = L loc (VarBind id rhs)
 
-   return (bind, ForeignExport (L loc id) undefined spec)
+   -- We need to give a name to the new top-level binding that
+   -- is *stable* (i.e. the compiler won't change it later),
+   -- because this name will be referred to by the C code stub.
+   id  <- mkStableIdFromName nm sig_ty loc mkForeignExportOcc
+   return (L loc (VarBind id rhs), ForeignExport (L loc id) undefined spec)
 tcFExport d = pprPanic "tcFExport" (ppr d)
 \end{code}
 
