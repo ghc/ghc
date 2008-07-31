@@ -132,6 +132,8 @@
 (^|/)BitKeeper($|/)
 (^|/)ChangeSet($|/)
 (^|/)\.svn($|/)
+(^|/)\.git($|/)
+\.git-ignore$
 \.py[co]$
 \#
 \.cvsignore$
