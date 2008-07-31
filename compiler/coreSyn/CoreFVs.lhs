@@ -12,18 +12,24 @@ Taken quite directly from the Peyton Jones/Lester paper.
 --     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
 -- for details
 
+-- | A module concerned with finding the free variables of an expression.
 module CoreFVs (
+        -- * Free variables of expressions and binding groups
 	exprFreeVars,	-- CoreExpr   -> VarSet	-- Find all locally-defined free Ids or tyvars
 	exprsFreeVars,	-- [CoreExpr] -> VarSet
 	bindFreeVars, 	-- CoreBind   -> VarSet
 
+        -- * Selective free variables of expressions
+        InterestingVarFun,
 	exprSomeFreeVars, exprsSomeFreeVars,
 	exprFreeNames, exprsFreeNames,
 
+        -- * Free variables of Rules, Vars and Ids
 	idRuleVars, idFreeVars, varTypeTyVars, 
 	ruleRhsFreeVars, rulesFreeVars,
 	ruleLhsFreeNames, ruleLhsFreeIds, 
 
+        -- * Core syntax tree annotation with free variables
 	CoreExprWithFVs,	-- = AnnExpr Id VarSet
 	CoreBindWithFVs,	-- = AnnBind Id VarSet
 	freeVars,		-- CoreExpr -> CoreExprWithFVs
@@ -61,29 +67,35 @@ So far as type variables are concerned, it only finds tyvars that are
 but not those that are free in the type of variable occurrence.
 
 \begin{code}
-exprFreeVars :: CoreExpr -> VarSet	-- Find all locally-defined free Ids or tyvars
+-- | Find all locally-defined free Ids or type variables in an expression
+exprFreeVars :: CoreExpr -> VarSet
 exprFreeVars = exprSomeFreeVars isLocalVar
 
+-- | Find all locally-defined free Ids or type variables in several expressions
 exprsFreeVars :: [CoreExpr] -> VarSet
 exprsFreeVars = foldr (unionVarSet . exprFreeVars) emptyVarSet
 
+-- | Find all locally defined free Ids in a binding group
 bindFreeVars :: CoreBind -> VarSet
 bindFreeVars (NonRec _ r) = exprFreeVars r
 bindFreeVars (Rec prs)    = addBndrs (map fst prs) 
 				     (foldr (union . rhs_fvs) noVars prs)
 				     isLocalVar emptyVarSet
 
-exprSomeFreeVars :: InterestingVarFun 	-- Says which Vars are interesting
+-- | Finds free variables in an expression selected by a predicate
+exprSomeFreeVars :: InterestingVarFun 	-- ^ Says which 'Var's are interesting
 		 -> CoreExpr
 		 -> VarSet
 exprSomeFreeVars fv_cand e = expr_fvs e fv_cand emptyVarSet
 
-exprsSomeFreeVars :: InterestingVarFun 	-- Says which Vars are interesting
+-- | Finds free variables in several expressions selected by a predicate
+exprsSomeFreeVars :: InterestingVarFun 	-- Says which 'Var's are interesting
 		  -> [CoreExpr]
 		  -> VarSet
 exprsSomeFreeVars fv_cand = foldr (unionVarSet . exprSomeFreeVars fv_cand) emptyVarSet
 
-type InterestingVarFun = Var -> Bool	-- True <=> interesting
+-- | Predicate on possible free variables: returns @True@ iff the variable is interesting
+type InterestingVarFun = Var -> Bool
 \end{code}
 
 
@@ -197,26 +209,26 @@ exprs_fvs exprs = foldr (union . expr_fvs) noVars exprs
 %*									*
 %************************************************************************
 
-exprFreeNames finds the free *external* *names* of an expression, notably
-including the names of type constructors (which of course do not show
-up in exprFreeVars).  Similarly ruleLhsFreeNames.  The latter is used
-when deciding whether a rule is an orphan.  In particular, suppose that
-T is defined in this module; we want to avoid declaring that a rule like
-	fromIntegral T = fromIntegral_T
-is an orphan.  Of course it isn't, an declaring it an orphan would
-make the whole module an orphan module, which is bad.
-
-There's no need to delete local binders, because they will all
-be *internal* names.
-
 \begin{code}
+-- | Similar to 'exprFreeNames'. However, this is used when deciding whether 
+-- a rule is an orphan.  In particular, suppose that T is defined in this 
+-- module; we want to avoid declaring that a rule like:
+-- 
+-- > fromIntegral T = fromIntegral_T
+--
+-- is an orphan. Of course it isn't, and declaring it an orphan would
+-- make the whole module an orphan module, which is bad.
 ruleLhsFreeNames :: CoreRule -> NameSet
 ruleLhsFreeNames (BuiltinRule { ru_fn = fn }) = unitNameSet fn
 ruleLhsFreeNames (Rule { ru_fn = fn, ru_args = tpl_args })
   = addOneToNameSet (exprsFreeNames tpl_args) fn
 
+-- | Finds the free /external/ names of an expression, notably
+-- including the names of type constructors (which of course do not show
+-- up in 'exprFreeVars').
 exprFreeNames :: CoreExpr -> NameSet
--- Find the free *external* names of an expression
+-- There's no need to delete local binders, because they will all
+-- be /internal/ names.
 exprFreeNames e
   = go e
   where
@@ -237,6 +249,7 @@ exprFreeNames e
 
     go_alt (_,_,r) = go r
 
+-- | Finds the free /external/ names of several expressions: see 'exprFreeNames' for details
 exprsFreeNames :: [CoreExpr] -> NameSet
 exprsFreeNames es = foldr (unionNameSets . exprFreeNames) emptyNameSet es
 \end{code}
@@ -247,8 +260,8 @@ exprsFreeNames es = foldr (unionNameSets . exprFreeNames) emptyNameSet es
 %*									*
 %************************************************************************
 
-
 \begin{code}
+-- | Those variables free in the right hand side of a rule
 ruleRhsFreeVars :: CoreRule -> VarSet
 ruleRhsFreeVars (BuiltinRule {}) = noFVs
 ruleRhsFreeVars (Rule { ru_fn = fn, ru_bndrs = bndrs, ru_rhs = rhs })
@@ -256,17 +269,19 @@ ruleRhsFreeVars (Rule { ru_fn = fn, ru_bndrs = bndrs, ru_rhs = rhs })
   where
     fvs = addBndrs bndrs (expr_fvs rhs) isLocalVar emptyVarSet
 
-ruleFreeVars :: CoreRule -> VarSet	-- All free variables, both left and right
+-- | Those variables free in the both the left right hand sides of a rule
+ruleFreeVars :: CoreRule -> VarSet
 ruleFreeVars (Rule { ru_fn = fn, ru_bndrs = bndrs, ru_rhs = rhs, ru_args = args })
   = delFromUFM fvs fn	-- Note [Rule free var hack]
   where
     fvs = addBndrs bndrs (exprs_fvs (rhs:args)) isLocalVar emptyVarSet
 
+-- | Those variables free in the right hand side of several rules
 rulesFreeVars :: [CoreRule] -> VarSet
 rulesFreeVars rules = foldr (unionVarSet . ruleFreeVars) emptyVarSet rules
 
 ruleLhsFreeIds :: CoreRule -> VarSet
--- This finds all locally-defined free Ids on the LHS of the rule
+-- ^ This finds all locally-defined free Ids on the left hand side of a rule
 ruleLhsFreeIds (BuiltinRule {}) = noFVs
 ruleLhsFreeIds (Rule { ru_bndrs = bndrs, ru_args = args })
   = addBndrs bndrs (exprs_fvs args) isLocalId emptyVarSet
@@ -291,12 +306,15 @@ The free variable pass annotates every node in the expression with its
 NON-GLOBAL free variables and type variables.
 
 \begin{code}
+-- | Every node in a binding group annotated with its 
+-- (non-global) free variables, both Ids and TyVars
 type CoreBindWithFVs = AnnBind Id VarSet
+-- | Every node in an expression annotated with its 
+-- (non-global) free variables, both Ids and TyVars
 type CoreExprWithFVs = AnnExpr Id VarSet
-	-- Every node annotated with its free variables,
-	-- both Ids and TyVars
 
 freeVarsOf :: CoreExprWithFVs -> IdSet
+-- ^ Inverse function to 'freeVars'
 freeVarsOf (free_vars, _) = free_vars
 
 noFVs :: VarSet
@@ -368,7 +386,7 @@ idRuleVars id = ASSERT( isId id) specInfoFreeVars (idSpecialisation id)
 
 \begin{code}
 freeVars :: CoreExpr -> CoreExprWithFVs
-
+-- ^ Annotate a 'CoreExpr' with its (non-global) free type and value variables at every tree node
 freeVars (Var v)
   = (fvs, AnnVar v)
   where
