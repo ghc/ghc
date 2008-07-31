@@ -2,7 +2,7 @@
 rnfail023.hs:7:0:
     The type signature for `f' lacks an accompanying binding
 
-rnfail023.hs:8:0:
+rnfail023.hs:8:11:
     The INLINE pragma for `f' lacks an accompanying binding
 
 rnfail023.hs:14:6:
