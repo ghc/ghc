@@ -61,7 +61,7 @@ import InstEnv
 import FunDeps
 import TcMType
 import TcType
-import DsUtils
+import MkCore
 import Type
 import TypeRep
 import Class
@@ -385,7 +385,7 @@ mkPredName uniq loc pred_ty
 		-- we use the outermost tycon of the lhs, if there is one, to
 		-- improve readability of Core code
 	        baseOcc = case splitTyConApp_maybe ty of
-			    Nothing      -> mkOccName tcName "$"
+			    Nothing      -> mkTcOcc "$"
                             Just (tc, _) -> getOccName tc
 \end{code}
 
