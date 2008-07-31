@@ -907,11 +907,7 @@ check_main dflags tcg_env
   where
     mod 	 = tcg_mod tcg_env
     main_mod     = mainModIs dflags
-    main_is_flag = mainFunIs dflags
-
-    main_fn  = case main_is_flag of
-		  Just fn -> mkRdrUnqual (mkVarOccFS (mkFastString fn))
-		  Nothing -> main_RDR_Unqual
+    main_fn      = getMainFun dflags
 
     complain_no_main | ghcLink dflags == LinkInMemory = return ()
 		     | otherwise = failWithTc noMainMsg
@@ -922,8 +918,9 @@ check_main dflags tcg_env
     mainCtxt  = ptext (sLit "When checking the type of the") <+> pp_main_fn
     noMainMsg = ptext (sLit "The") <+> pp_main_fn
 		<+> ptext (sLit "is not defined in module") <+> quotes (ppr main_mod)
-    pp_main_fn | isJust main_is_flag = ptext (sLit "main function") <+> quotes (ppr main_fn)
-	       | otherwise 	     = ptext (sLit "function") <+> quotes (ppr main_fn)
+    pp_main_fn | main_fn == main_RDR_Unqual = ptext (sLit "function") <+> quotes (ppr main_fn)
+	       | otherwise                  = ptext (sLit "main function") <+> quotes (ppr main_fn)
+	       
 \end{code}
 
 Note [Root-main Id]
