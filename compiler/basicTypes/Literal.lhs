@@ -13,18 +13,28 @@
 -- for details
 
 module Literal
-	( Literal(..)		-- Exported to ParseIface
+	( 
+	-- * Main data type
+	  Literal(..)		-- Exported to ParseIface
+	
+	-- ** Creating Literals
 	, mkMachInt, mkMachWord
-	, mkMachInt64, mkMachWord64, mkStringLit
+	, mkMachInt64, mkMachWord64
+	, mkMachFloat, mkMachDouble
+	, mkMachChar, mkMachString
+	
+	-- ** Operations on Literals
 	, litSize
-	, litIsDupable, litIsTrivial
 	, literalType
 	, hashLiteral
 
+        -- ** Predicates on Literals and their contents
+	, litIsDupable, litIsTrivial
 	, inIntRange, inWordRange, tARGET_MAX_INT, inCharRange
 	, isZeroLit
 	, litFitsInChar
 
+        -- ** Coercions
 	, word2IntLit, int2WordLit
 	, narrow8IntLit, narrow16IntLit, narrow32IntLit
 	, narrow8WordLit, narrow16WordLit, narrow32WordLit
@@ -72,7 +82,6 @@ tARGET_MAX_WORD = (tARGET_MAX_INT * 2) + 1
 tARGET_MAX_CHAR :: Int
 tARGET_MAX_CHAR = 0x10ffff
 \end{code}
- 
 
 %************************************************************************
 %*									*
@@ -80,50 +89,46 @@ tARGET_MAX_CHAR = 0x10ffff
 %*									*
 %************************************************************************
 
-So-called @Literals@ are {\em either}:
-\begin{itemize}
-\item
-An unboxed (``machine'') literal (type: @IntPrim@, @FloatPrim@, etc.),
-which is presumed to be surrounded by appropriate constructors
-(@mKINT@, etc.), so that the overall thing makes sense.
-\item
-An Integer, Rational, or String literal whose representation we are
-{\em uncommitted} about; i.e., the surrounding with constructors,
-function applications, etc., etc., has not yet been done.
-\end{itemize}
-
 \begin{code}
+-- | So-called 'Literal's are one of:
+--
+-- * An unboxed (/machine/) literal ('MachInt', 'MachFloat', etc.),
+--   which is presumed to be surrounded by appropriate constructors
+--   (@Int#@, etc.), so that the overall thing makes sense.
+--
+-- * The literal derived from the label mentioned in a \"foreign label\" 
+--   declaration ('MachLabel')
 data Literal
   =	------------------
 	-- First the primitive guys
-    MachChar	Char             -- Char#        At least 31 bits
+    MachChar	Char            -- ^ @Char#@ - at least 31 bits. Create with 'mkMachChar'
 
-  | MachStr	FastString	-- A string-literal: stored and emitted
+  | MachStr	FastString	-- ^ A string-literal: stored and emitted
 				-- UTF-8 encoded, we'll arrange to decode it
-				-- at runtime.  Also emitted with a '\0'
-				-- terminator.
+				-- at runtime.  Also emitted with a @'\0'@
+				-- terminator. Create with 'mkMachString'
 
-  | MachNullAddr                -- the NULL pointer, the only pointer value
-                                -- that can be represented as a Literal.
+  | MachNullAddr                -- ^ The @NULL@ pointer, the only pointer value
+                                -- that can be represented as a Literal. Create 
+                                -- with 'nullAddrLit'
 
-  | MachInt	Integer		-- Int#		At least WORD_SIZE_IN_BITS bits
-  | MachInt64	Integer		-- Int64#	At least 64 bits
-  | MachWord	Integer		-- Word#	At least WORD_SIZE_IN_BITS bits
-  | MachWord64	Integer		-- Word64#	At least 64 bits
+  | MachInt	Integer		-- ^ @Int#@ - at least @WORD_SIZE_IN_BITS@ bits. Create with 'mkMachInt'
+  | MachInt64	Integer		-- ^ @Int64#@ - at least 64 bits. Create with 'mkMachInt64'
+  | MachWord	Integer		-- ^ @Word#@ - at least @WORD_SIZE_IN_BITS@ bits. Create with 'mkMachWord'
+  | MachWord64	Integer		-- ^ @Word64#@ - at least 64 bits. Create with 'mkMachWord64'
 
-  | MachFloat	Rational
-  | MachDouble	Rational
+  | MachFloat	Rational        -- ^ @Float#@. Create with 'mkMachFloat'
+  | MachDouble	Rational        -- ^ @Double#@. Create with 'mkMachDouble'
 
-        -- MachLabel is used (only) for the literal derived from a 
-	-- "foreign label" declaration.
-	-- string argument is the name of a symbol.  This literal
-	-- refers to the *address* of the label.
-  | MachLabel   FastString		-- always an Addr#
-  		(Maybe Int)             -- the size (in bytes) of the arguments
-					-- the label expects. Only applicable with
-					-- 'stdcall' labels.
-					-- Just x => "@<x>" will be appended to label
-					--           name when emitting asm.
+  | MachLabel   FastString
+  		(Maybe Int)     -- ^ A label literal. Parameters:
+  		                --
+  		                -- 1) The name of the symbol mentioned in the declaration
+  		                --
+  		                -- 2) The size (in bytes) of the arguments
+				--    the label expects. Only applicable with
+				--    @stdcall@ labels. @Just x@ => @\<x\>@ will
+				--    be appended to label name when emitting assembly.
 \end{code}
 
 Binary instance
@@ -198,21 +203,44 @@ instance Ord Literal where
 	Construction
 	~~~~~~~~~~~~
 \begin{code}
-mkMachInt, mkMachWord, mkMachInt64, mkMachWord64 :: Integer -> Literal
-
+-- | Creates a 'Literal' of type @Int#@
+mkMachInt :: Integer -> Literal
 mkMachInt  x   = -- ASSERT2( inIntRange x,  integer x ) 
 	 	 -- Not true: you can write out of range Int# literals
 		 -- For example, one can write (intToWord# 0xffff0000) to
 		 -- get a particular Word bit-pattern, and there's no other
 		 -- convenient way to write such literals, which is why we allow it.
 		 MachInt x
+
+-- | Creates a 'Literal' of type @Word#@
+mkMachWord :: Integer -> Literal
 mkMachWord x   = -- ASSERT2( inWordRange x, integer x ) 
 		 MachWord x
+
+-- | Creates a 'Literal' of type @Int64#@
+mkMachInt64 :: Integer -> Literal
 mkMachInt64  x = MachInt64 x
+
+-- | Creates a 'Literal' of type @Word64#@
+mkMachWord64 :: Integer -> Literal
 mkMachWord64 x = MachWord64 x
 
-mkStringLit :: String -> Literal
-mkStringLit s = MachStr (mkFastString s) -- stored UTF-8 encoded
+-- | Creates a 'Literal' of type @Float#@
+mkMachFloat :: Rational -> Literal
+mkMachFloat = MachFloat
+
+-- | Creates a 'Literal' of type @Double#@
+mkMachDouble :: Rational -> Literal
+mkMachDouble = MachDouble
+
+-- | Creates a 'Literal' of type @Char#@
+mkMachChar :: Char -> Literal
+mkMachChar = MachChar
+
+-- | Creates a 'Literal' of type @Addr#@, which is appropriate for passing to
+-- e.g. some of the \"error\" functions in GHC.Err such as @GHC.Err.runtimeError@
+mkMachString :: String -> Literal
+mkMachString s = MachStr (mkFastString s) -- stored UTF-8 encoded
 
 inIntRange, inWordRange :: Integer -> Bool
 inIntRange  x = x >= tARGET_MIN_INT && x <= tARGET_MAX_INT
@@ -221,6 +249,7 @@ inWordRange x = x >= 0		    && x <= tARGET_MAX_WORD
 inCharRange :: Char -> Bool
 inCharRange c =  c >= '\0' && c <= chr tARGET_MAX_CHAR
 
+-- | Tests whether the literal represents a zero of whatever type it is
 isZeroLit :: Literal -> Bool
 isZeroLit (MachInt    0) = True
 isZeroLit (MachInt64  0) = True
@@ -276,17 +305,17 @@ nullAddrLit = MachNullAddr
 	Predicates
 	~~~~~~~~~~
 \begin{code}
-litIsTrivial :: Literal -> Bool
--- True if there is absolutely no penalty to duplicating the literal
---	c.f. CoreUtils.exprIsTrivial
+-- | True if there is absolutely no penalty to duplicating the literal.
 -- False principally of strings
+litIsTrivial :: Literal -> Bool
+--	c.f. CoreUtils.exprIsTrivial
 litIsTrivial (MachStr _) = False
 litIsTrivial _           = True
 
+-- | True if code space does not go bad if we duplicate this literal
+-- Currently we treat it just like 'litIsTrivial'
 litIsDupable :: Literal -> Bool
--- True if code space does not go bad if we duplicate this literal
 --	c.f. CoreUtils.exprIsDupable
--- Currently we treat it just like litIsTrivial
 litIsDupable (MachStr _) = False
 litIsDupable _           = True
 
@@ -296,12 +325,11 @@ litFitsInChar (MachInt i)
                         && fromInteger i >= ord maxBound 
 litFitsInChar _         = False
 
+-- | Finds a nominal size of a string literal. Every literal has size at least 1
 litSize :: Literal -> Int
 -- Used by CoreUnfold.sizeExpr
 litSize (MachStr str) = 1 + ((lengthFS str + 3) `div` 4)
-	-- Every literal has size at least 1, otherwise
-	-- 	f "x" 
-	-- might be too small
+	-- If size could be 0 then @f "x"@ might be too small
 	-- [Sept03: make literal strings a bit bigger to avoid fruitless 
 	--  duplication of little strings]
 litSize _other	      = 1
@@ -310,6 +338,7 @@ litSize _other	      = 1
 	Types
 	~~~~~
 \begin{code}
+-- | Find the Haskell 'Type' the literal occupies
 literalType :: Literal -> Type
 literalType MachNullAddr    = addrPrimTy
 literalType (MachChar _)    = charPrimTy
@@ -376,7 +405,7 @@ pprLit (MachLabel l mb) = ptext (sLit "__label") <+>
 			       Just x  -> doubleQuotes (text (unpackFS l ++ '@':show x))
 
 pprIntVal :: Integer -> SDoc
--- Print negative integers with parens to be sure it's unambiguous
+-- ^ Print negative integers with parens to be sure it's unambiguous
 pprIntVal i | i < 0     = parens (integer i)
 	    | otherwise = integer i
 \end{code}
