@@ -445,7 +445,7 @@ cPprTermBase y =
 
            isTupleTy ty    = fromMaybe False $ do 
              (tc,_) <- splitTyConApp_maybe ty 
-             return (tc `elem` (fst.unzip.elems) boxedTupleArr)
+             return (isBoxedTupleTyCon tc)
 
            isTyCon a_tc ty = fromMaybe False $ do 
              (tc,_) <- splitTyConApp_maybe ty
