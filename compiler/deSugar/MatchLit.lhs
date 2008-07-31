@@ -22,6 +22,7 @@ import HsSyn
 
 import Id
 import CoreSyn
+import MkCore
 import TyCon
 import DataCon
 import TcHsSyn	( shortCutLit )
@@ -61,17 +62,17 @@ See also below where we look for @DictApps@ for \tr{plusInt}, etc.
 
 \begin{code}
 dsLit :: HsLit -> DsM CoreExpr
-dsLit (HsStringPrim s) = return (mkLit (MachStr s))
-dsLit (HsCharPrim   c) = return (mkLit (MachChar c))
-dsLit (HsIntPrim    i) = return (mkLit (MachInt i))
-dsLit (HsWordPrim   w) = return (mkLit (MachWord w))
-dsLit (HsFloatPrim  f) = return (mkLit (MachFloat f))
-dsLit (HsDoublePrim d) = return (mkLit (MachDouble d))
+dsLit (HsStringPrim s) = return (Lit (MachStr s))
+dsLit (HsCharPrim   c) = return (Lit (MachChar c))
+dsLit (HsIntPrim    i) = return (Lit (MachInt i))
+dsLit (HsWordPrim   w) = return (Lit (MachWord w))
+dsLit (HsFloatPrim  f) = return (Lit (MachFloat f))
+dsLit (HsDoublePrim d) = return (Lit (MachDouble d))
 
 dsLit (HsChar c)       = return (mkCharExpr c)
 dsLit (HsString str)   = mkStringExprFS str
 dsLit (HsInteger i _)  = mkIntegerExpr i
-dsLit (HsInt i)	       = return (mkIntExpr i)
+dsLit (HsInt i)	       = return (mkIntExpr (fromIntegral i))
 
 dsLit (HsRat r ty) = do
    num   <- mkIntegerExpr (numerator r)
