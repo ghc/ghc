@@ -5,7 +5,10 @@
 
 \begin{code}
 module VarSet (
+        -- * Var, Id and TyVar set types
 	VarSet, IdSet, TyVarSet,
+	
+	-- ** Manipulating these sets
 	emptyVarSet, unitVarSet, mkVarSet,
 	extendVarSet, extendVarSetList, extendVarSet_C,
 	elemVarSet, varSetElems, subVarSet,
