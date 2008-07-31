@@ -10,8 +10,10 @@ Basically, the things need to be in class @Uniquable@.
 
 \begin{code}
 module UniqSet (
+        -- * Unique set type
         UniqSet,    -- abstract type: NOT
 
+        -- ** Manipulating these sets
         mkUniqSet, uniqSetToList, emptyUniqSet, unitUniqSet,
         addOneToUniqSet, addListToUniqSet, addOneToUniqSet_C,
         delOneFromUniqSet, delListFromUniqSet, delOneFromUniqSet_Directly,
@@ -118,8 +120,8 @@ hashUniqSet (MkUniqSet set) = hashUFM set
 isEmptyUniqSet :: UniqSet a -> Bool
 isEmptyUniqSet (MkUniqSet set) = isNullUFM set {-SLOW: sizeUFM set == 0-}
 
+-- | Invariant: the mapping function doesn't change the unique
 mapUniqSet :: (a -> a) -> UniqSet a -> UniqSet a
-  -- VERY IMPORTANT: *assumes* that the function doesn't change the unique
 mapUniqSet f (MkUniqSet set) = MkUniqSet (mapUFM f set)
 \end{code}
 
