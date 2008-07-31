@@ -19,8 +19,10 @@ near the end.
 
 \begin{code}
 module FiniteMap (
+        -- * Mappings keyed from arbitrary types
         FiniteMap, -- abstract type
 
+        -- ** Manipulating those mappings
         emptyFM, unitFM, listToFM,
 
         addToFM,
@@ -84,51 +86,55 @@ import Data.List
 -- BUILDING
 emptyFM     :: FiniteMap key elt
 unitFM      :: key -> elt -> FiniteMap key elt
--- In the case of duplicates, the last is taken:
+-- | In the case of duplicates keys, the last item is taken
 listToFM    :: (Ord key OUTPUTABLE_key) => [(key,elt)] -> FiniteMap key elt
--- In the case of duplicates, who knows which is taken:
+-- | In the case of duplicate keys, who knows which item is taken
 bagToFM     :: (Ord key OUTPUTABLE_key) => Bag (key,elt) -> FiniteMap key elt
 
 -- ADDING AND DELETING
--- Throws away any previous binding
--- In the list case, the items are added starting with the
--- first one in the list
+
+-- | Throws away any previous binding
 addToFM     :: (Ord key OUTPUTABLE_key)
             => FiniteMap key elt -> key -> elt -> FiniteMap key elt
+-- | Throws away any previous binding, items are added left-to-right
 addListToFM :: (Ord key OUTPUTABLE_key)
             => FiniteMap key elt -> [(key,elt)] -> FiniteMap key elt
 
--- Combines with previous binding
--- The combining fn goes (old -> new -> new)
+-- | Combines added item with previous item, if any
 addToFM_C       :: (Ord key OUTPUTABLE_key) => (elt -> elt -> elt)
                            -> FiniteMap key elt -> key -> elt
                            -> FiniteMap key elt
+-- | Combines added item with previous item, if any, items are added left-to-right
 addListToFM_C   :: (Ord key OUTPUTABLE_key) => (elt -> elt -> elt)
                            -> FiniteMap key elt -> [(key,elt)]
                            -> FiniteMap key elt
 
--- Deletion doesn't complain if you try to delete something which isn't there
+-- | Deletion doesn't complain if you try to delete something which isn't there
 delFromFM       :: (Ord key OUTPUTABLE_key)
                 => FiniteMap key elt -> key   -> FiniteMap key elt
+-- | Deletion doesn't complain if you try to delete something which isn't there
 delListFromFM   :: (Ord key OUTPUTABLE_key)
                 => FiniteMap key elt -> [key] -> FiniteMap key elt
 
 -- COMBINING
--- Bindings in right argument shadow those in the left
+
+-- | Bindings in right argument shadow those in the left
 plusFM          :: (Ord key OUTPUTABLE_key)
                 => FiniteMap key elt -> FiniteMap key elt -> FiniteMap key elt
 
--- Combines bindings for the same thing with the given function
+-- | Combines bindings for the same thing with the given function, 
+-- bindings in right argument shadow those in the left
 plusFM_C        :: (Ord key OUTPUTABLE_key)
                 => (elt -> elt -> elt)
                 -> FiniteMap key elt -> FiniteMap key elt -> FiniteMap key elt
 
--- (minusFM a1 a2) deletes from a1 any bindings which are bound in a2
+-- | Deletes from the left argument any bindings in the right argument
 minusFM         :: (Ord key OUTPUTABLE_key)
                 => FiniteMap key elt -> FiniteMap key elt -> FiniteMap key elt
 
 intersectFM     :: (Ord key OUTPUTABLE_key)
                 => FiniteMap key elt -> FiniteMap key elt -> FiniteMap key elt
+-- | Combines bindings for the same thing in the two maps with the given function
 intersectFM_C   :: (Ord key OUTPUTABLE_key)
                 => (elt1 -> elt2 -> elt3)
                 -> FiniteMap key elt1 -> FiniteMap key elt2
@@ -150,8 +156,7 @@ elemFM                  :: (Ord key OUTPUTABLE_key)
                         => key -> FiniteMap key elt -> Bool
 lookupFM                :: (Ord key OUTPUTABLE_key)
                         => FiniteMap key elt -> key -> Maybe elt
--- lookupWithDefaultFM supplies a "default" elt
--- to return for an unmapped key
+-- | Supplies a "default" element in return for an unmapped key
 lookupWithDefaultFM     :: (Ord key OUTPUTABLE_key)
                         => FiniteMap key elt -> elt -> key -> elt
 
@@ -182,6 +187,7 @@ factor of at most \tr{sIZE_RATIO}
 \end{enumerate}
 
 \begin{code}
+-- | A finite mapping from (orderable) key types to elements
 data FiniteMap key elt
   = EmptyFM
   | Branch key elt        -- Key and elt stored here
