@@ -17,7 +17,11 @@ Haskell).
 
 \begin{code}
 module Unique (
-	Unique, Uniquable(..), hasKey,
+        -- * Main data types
+	Unique, Uniquable(..), 
+	
+	-- ** Constructors, desctructors and operations on 'Unique's
+	hasKey,
 
 	pprUnique, 
 
@@ -31,6 +35,8 @@ module Unique (
 	initTyVarUnique,
 
 	isTupleKey, 
+
+        -- ** Making built-in uniques
 
 	-- now all the built-in Uniques (and functions to make them)
 	-- [the Oh-So-Wonderful Haskell module system wins again...]
@@ -77,6 +83,10 @@ Fast comparison is everything on @Uniques@:
 
 \begin{code}
 --why not newtype Int?
+
+-- | The type of unique identifiers that are used in many places in GHC
+-- for fast ordering and equality tests. You should generate these with
+-- the functions from the 'UniqSupply' module
 data Unique = MkUnique FastInt
 \end{code}
 
@@ -147,6 +157,7 @@ unpkUnique (MkUnique u)
 %************************************************************************
 
 \begin{code}
+-- | Class of things that we can obtain a 'Unique' from
 class Uniquable a where
     getUnique :: a -> Unique
 
@@ -277,6 +288,8 @@ Allocation of unique supply characters:
 	X:   uniques derived by deriveUnique
 	_:   unifiable tyvars   (above)
 	0-9: prelude things below
+	     (no numbers left any more..)
+	::   (prelude) parallel array data constructors
 
 	other a-z: lower case chars for unique supplies.  Used so far:
 
@@ -325,8 +338,8 @@ mkTupleDataConUnique Unboxed a	= mkUnique '8' (2*a)
 isTupleKey u = case unpkUnique u of
 		(tag,_) -> tag == '4' || tag == '5' || tag == '7' || tag == '8'
 
-mkPrimOpIdUnique op		= mkUnique '9' op
-mkPreludeMiscIdUnique i		= mkUnique '0' i
+mkPrimOpIdUnique op         = mkUnique '9' op
+mkPreludeMiscIdUnique  i    = mkUnique '0' i
 
 -- No numbers left anymore, so I pick something different for the character
 -- tag 
