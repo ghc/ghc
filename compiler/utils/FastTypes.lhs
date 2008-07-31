@@ -10,8 +10,15 @@
 --it's only used in an appropriate pattern of efficiency.
 --(it also makes `let`s and `case`s stricter...)
 
+-- | Fast integers, characters and pointer types for use in many parts of GHC
 module FastTypes (
-    FastInt, _ILIT, iBox, iUnbox,
+    -- * FastInt
+    FastInt,
+    
+    -- ** Getting in and out of FastInt
+    _ILIT, iBox, iUnbox,
+    
+    -- ** Arithmetic on FastInt
     (+#), (-#), (*#), quotFastInt, negateFastInt,
     --quotRemFastInt is difficult because unboxed values can't
     --be tupled, but unboxed tuples aren't portable.  Just use
@@ -32,11 +39,25 @@ module FastTypes (
     bitAndFastInt, bitOrFastInt,
     --add more operations to this file as you need them
 
+    -- * FastChar
+    FastChar,
+
+    -- ** Getting in and out of FastChar
+    _CLIT, cBox, cUnbox,
+
+    -- ** Operations on FastChar
+    fastOrd, fastChr, eqFastChar,
     --note, fastChr is "unsafe"Chr: it doesn't check for
     --character values above the range of Unicode
-    FastChar, _CLIT, cBox, cUnbox, fastOrd, fastChr, eqFastChar,
 
-    FastPtr, pBox, pUnbox, castFastPtr
+    -- * FastPtr
+    FastPtr, 
+    
+    -- ** Getting in and out of FastPtr
+    pBox, pUnbox,
+    
+    -- ** Casting FastPtrs
+    castFastPtr
   ) where
 
 #include "HsVersions.h"
