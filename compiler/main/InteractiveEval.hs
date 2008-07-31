@@ -528,7 +528,7 @@ bindLocalsAtBreakpoint hsc_env apStack Nothing = do
    let exn_fs    = fsLit "_exception"
        exn_name  = mkInternalName (getUnique exn_fs) (mkVarOccFS exn_fs) span
        e_fs      = fsLit "e"
-       e_name    = mkInternalName (getUnique e_fs) (mkTyVarOcc e_fs) span
+       e_name    = mkInternalName (getUnique e_fs) (mkTyVarOccFS e_fs) span
        e_tyvar   = mkTcTyVar e_name liftedTypeKind (SkolemTv RuntimeUnkSkol)
        exn_id    = Id.mkGlobalId VanillaGlobal exn_name (mkTyVarTy e_tyvar)
                                 vanillaIdInfo
@@ -807,7 +807,7 @@ getContext :: Session -> IO ([Module],[Module])
 getContext s = withSession s (\HscEnv{ hsc_IC=ic } ->
 				return (ic_toplev_scope ic, ic_exports ic))
 
--- | Returns 'True' if the specified module is interpreted, and hence has
+-- | Returns @True@ if the specified module is interpreted, and hence has
 -- its full top-level scope available.
 moduleIsInterpreted :: Session -> Module -> IO Bool
 moduleIsInterpreted s modl = withSession s $ \h ->
