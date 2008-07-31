@@ -145,7 +145,7 @@ dsCImport id (CLabel cid) cconv _ = do
    (resTy, foRhs) <- resultWrapper ty
    ASSERT(fromJust resTy `coreEqType` addrPrimTy)    -- typechecker ensures this
     let
-        rhs = foRhs (mkLit (MachLabel cid stdcall_info))
+        rhs = foRhs (Lit (MachLabel cid stdcall_info))
         stdcall_info = fun_type_arg_stdcall_info cconv ty
     in
     return ([(id, rhs)], empty, empty)
@@ -250,7 +250,7 @@ The function that does most of the work for `@foreign export@' declarations.
 For each `@foreign export foo@' in a module M we generate:
 \begin{itemize}
 \item a C function `@foo@', which calls
-\item a Haskell stub `@M.$ffoo@', which calls
+\item a Haskell stub `@M.\$ffoo@', which calls
 \end{itemize}
 the user-written Haskell function `@M.foo@'.
 
@@ -356,8 +356,8 @@ dsFExportDynamic id cconv = do
          -}
         adj_args      = [ mkIntLitInt (ccallConvToInt cconv)
                         , Var stbl_value
-                        , mkLit (MachLabel fe_nm mb_sz_args)
-                        , mkLit (mkStringLit typestring)
+                        , Lit (MachLabel fe_nm mb_sz_args)
+                        , Lit (mkMachString typestring)
                         ]
           -- name of external entry point providing these services.
           -- (probably in the RTS.) 
