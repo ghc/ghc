@@ -4,24 +4,25 @@
 
 \begin{code}
 module Digraph(
+        Graph, graphFromVerticesAndAdjacency, graphFromEdgedVertices,
 
-        -- At present the only one with a "nice" external interface
-        stronglyConnComp, stronglyConnCompR, SCC(..), flattenSCC, flattenSCCs,
+        SCC(..), flattenSCC, flattenSCCs,
+        stronglyConnCompG, topologicalSortG, 
+        verticesG, edgesG, hasVertexG,
+        reachableG, transposeG,
+        outdegreeG, indegreeG,
+        vertexGroupsG, emptyG,
+        componentsG,
 
-        Graph, Vertex,
-        graphFromEdges, graphFromEdges',
-        buildG, transposeG, reverseE, outdegree, indegree,
+        -- For backwards compatability with the simpler version of Digraph
+        stronglyConnCompFromEdgedVertices, stronglyConnCompFromEdgedVerticesR,
 
-        Tree(..), Forest,
-        showTree, showForest,
-
-        dfs, dff,
-        topSort,
-        components,
-        scc,
+        -- No friendly interface yet, not used but exported to avoid warnings
+        tabulate, preArr,
+        components, undirected,
         back, cross, forward,
-        reachable, path,
-        bcc
+        path,
+        bcc, do_label, bicomps, collect
     ) where
 
 #include "HsVersions.h"
@@ -29,7 +30,7 @@ module Digraph(
 ------------------------------------------------------------------------------
 -- A version of the graph algorithms described in:
 --
--- ``Lazy Depth-First Search and Linear Graph Algorithms in Haskell''
+-- ``Lazy Depth-First Search and Linear IntGraph Algorithms in Haskell''
 --   by David King and John Launchbury
 --
 -- Also included is some additional code for printing tree structures ...
@@ -38,14 +39,16 @@ module Digraph(
 
 import Util        ( sortLe )
 import Outputable
+import Maybes      ( expectJust )
 
 -- Extensions
+import Control.Monad    ( filterM, liftM, liftM2 )
 import Control.Monad.ST
 
 -- std interfaces
 import Data.Maybe
 import Data.Array
-import Data.List
+import Data.List   ( (\\) )
 
 #if !defined(__GLASGOW_HASKELL__) || __GLASGOW_HASKELL__ > 604
 import Data.Array.ST
@@ -54,16 +57,106 @@ import Data.Array.ST  hiding ( indices, bounds )
 #endif
 \end{code}
 
+%************************************************************************
+%*                                                                      *
+%*      Graphs and Graph Construction
+%*                                                                      *
+%************************************************************************
+
+Note [Nodes, keys, vertices]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * A 'node' is a big blob of client-stuff
+
+ * Each 'node' has a unique (client) 'key', but the latter 
+	is in Ord and has fast comparison
+
+ * Digraph then maps each 'key' to a Vertex (Int) which is
+  	arranged densely in 0.n
+
+\begin{code}
+data Graph node = Graph { 
+    gr_int_graph :: IntGraph,
+    gr_vertex_to_node :: Vertex -> node,
+    gr_node_to_vertex :: node -> Maybe Vertex
+  }
+
+data Edge node = Edge node node
+
+emptyGraph :: Graph a
+emptyGraph = Graph (array (1, 0) []) (error "emptyGraph") (const Nothing)
+
+graphFromVerticesAndAdjacency
+        :: Ord key
+        => [(node, key)]
+        -> [(key, key)]  -- First component is source vertex key, 
+                         -- second is target vertex key (thing depended on)
+                         -- Unlike the other interface I insist they correspond to
+                         -- actual vertices because the alternative hides bugs. I can't
+                         -- do the same thing for the other one for backcompat reasons.
+        -> Graph (node, key)
+graphFromVerticesAndAdjacency []       _     = emptyGraph
+graphFromVerticesAndAdjacency vertices edges = Graph graph vertex_node (key_vertex . key_extractor)
+  where key_extractor = snd
+        (bounds, vertex_node, key_vertex, _) = reduceNodesIntoVertices vertices key_extractor
+        key_vertex_pair (a, b) = (expectJust "graphFromVerticesAndAdjacency" $ key_vertex a, 
+                                  expectJust "graphFromVerticesAndAdjacency" $ key_vertex b)
+        reduced_edges = map key_vertex_pair edges
+        graph = buildG bounds reduced_edges
+
+graphFromEdgedVertices
+        :: Ord key
+        => [(node, key, [key])]         -- The graph; its ok for the
+                                        -- out-list to contain keys which arent
+                                        -- a vertex key, they are ignored
+        -> Graph (node, key, [key])
+graphFromEdgedVertices []             = emptyGraph
+graphFromEdgedVertices edged_vertices = Graph graph vertex_fn (key_vertex . key_extractor)
+  where key_extractor (_, k, _) = k
+        (bounds, vertex_fn, key_vertex, numbered_nodes) = reduceNodesIntoVertices edged_vertices key_extractor
+        graph = array bounds [(v, mapMaybe key_vertex ks) | (v, (_, _, ks)) <- numbered_nodes]
+
+reduceNodesIntoVertices 
+        :: Ord key 
+        => [node] 
+        -> (node -> key) 
+        -> (Bounds, Vertex -> node, key -> Maybe Vertex, [(Int, node)])
+reduceNodesIntoVertices nodes key_extractor = (bounds, (!) vertex_map, key_vertex, numbered_nodes)
+  where
+    max_v           = length nodes - 1
+    bounds          = (0, max_v) :: (Vertex, Vertex)
+
+    sorted_nodes    = let n1 `le` n2 = (key_extractor n1 `compare` key_extractor n2) /= GT
+                      in sortLe le nodes
+    numbered_nodes  = zipWith (,) [0..] sorted_nodes
+
+    key_map         = array bounds [(i, key_extractor node) | (i, node) <- numbered_nodes]
+    vertex_map      = array bounds numbered_nodes
+
+    --key_vertex :: key -> Maybe Vertex
+    -- returns Nothing for non-interesting vertices
+    key_vertex k = find 0 max_v
+      where
+        find a b | a > b = Nothing
+                 | otherwise = let mid = (a + b) `div` 2
+                               in case compare k (key_map ! mid) of
+                                    LT -> find a (mid - 1)
+                                    EQ -> Just mid
+                                    GT -> find (mid + 1) b
+\end{code}
 
 %************************************************************************
 %*                                                                      *
-%*      External interface
+%*      SCC
 %*                                                                      *
 %************************************************************************
 
 \begin{code}
 data SCC vertex = AcyclicSCC vertex
                 | CyclicSCC  [vertex]
+
+instance Functor SCC where
+    fmap f (AcyclicSCC v) = AcyclicSCC (f v)
+    fmap f (CyclicSCC vs) = CyclicSCC (fmap f vs)
 
 flattenSCCs :: [SCC a] -> [a]
 flattenSCCs = concatMap flattenSCC
@@ -77,139 +170,158 @@ instance Outputable a => Outputable (SCC a) where
    ppr (CyclicSCC vs) = text "REC" $$ (nest 3 (vcat (map ppr vs)))
 \end{code}
 
-Note [Nodes, keys, vertices]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
- * A 'node' is a big blob of client-stuff
+%************************************************************************
+%*                                                                      *
+%*      Strongly Connected Component wrappers for Graph
+%*                                                                      *
+%************************************************************************
 
- * Each 'node' has a unique (client) 'key', but the latter 
-	is in Ord and has fast comparison
-
- * Digraph then maps each 'key' to a Vertex (Int) which is
-  	arranged densely in 0.n
+Note: the components are returned topologically sorted: later components
+depend on earlier ones, but not vice versa i.e. later components only have 
+edges going from them to earlier ones.
 
 \begin{code}
-stronglyConnComp
-        :: Ord key
-        => [(node, key, [key])]         -- The graph; its ok for the
-                                        -- out-list to contain keys which arent
-                                        -- a vertex key, they are ignored
-        -> [SCC node]   -- Returned in topologically sorted order
-                        -- Later components depend on earlier ones, but not vice versa
-
-stronglyConnComp edges
-  = map get_node (stronglyConnCompR edges)
+stronglyConnCompG :: Graph node -> [SCC node]
+stronglyConnCompG (Graph { gr_int_graph = graph, gr_vertex_to_node = vertex_fn }) = map decode forest
   where
-    get_node (AcyclicSCC (n, _, _)) = AcyclicSCC n
-    get_node (CyclicSCC triples)     = CyclicSCC [n | (n,_,_) <- triples]
-
--- The "R" interface is used when you expect to apply SCC to
--- the (some of) the result of SCC, so you dont want to lose the dependency info
-stronglyConnCompR
-        :: Ord key
-        => [(node, key, [key])]         -- The graph; its ok for the
-                                        -- out-list to contain keys which arent
-                                        -- a vertex key, they are ignored
-        -> [SCC (node, key, [key])]     -- Topologically sorted
-
-stronglyConnCompR [] = []  -- added to avoid creating empty array in graphFromEdges -- SOF
-stronglyConnCompR edges
-  = map decode forest
-  where
-    (graph, vertex_fn) = {-# SCC "graphFromEdges" #-} graphFromEdges edges
     forest             = {-# SCC "Digraph.scc" #-} scc graph
     decode (Node v []) | mentions_itself v = CyclicSCC [vertex_fn v]
                        | otherwise         = AcyclicSCC (vertex_fn v)
     decode other = CyclicSCC (dec other [])
-                 where
-                   dec (Node v ts) vs = vertex_fn v : foldr dec vs ts
+      where dec (Node v ts) vs = vertex_fn v : foldr dec vs ts
     mentions_itself v = v `elem` (graph ! v)
+
+
+-- The following two versions are provided for backwards compatability:
+stronglyConnCompFromEdgedVertices
+        :: Ord key
+        => [(node, key, [key])]
+        -> [SCC node]
+stronglyConnCompFromEdgedVertices = map (fmap get_node) . stronglyConnCompFromEdgedVerticesR
+  where get_node (n, _, _) = n
+
+-- The "R" interface is used when you expect to apply SCC to
+-- the (some of) the result of SCC, so you dont want to lose the dependency info
+stronglyConnCompFromEdgedVerticesR
+        :: Ord key
+        => [(node, key, [key])]
+        -> [SCC (node, key, [key])]
+stronglyConnCompFromEdgedVerticesR = stronglyConnCompG . graphFromEdgedVertices
 \end{code}
 
 %************************************************************************
 %*                                                                      *
-%*      Graphs
+%*      Misc wrappers for Graph
 %*                                                                      *
 %************************************************************************
 
+\begin{code}
+topologicalSortG :: Graph node -> [node]
+topologicalSortG graph = map (gr_vertex_to_node graph) result
+  where result = {-# SCC "Digraph.topSort" #-} topSort (gr_int_graph graph)
+
+reachableG :: Graph node -> node -> [node]
+reachableG graph from = map (gr_vertex_to_node graph) result
+  where from_vertex = expectJust "reachableG" (gr_node_to_vertex graph from)
+        result = {-# SCC "Digraph.reachable" #-} reachable (gr_int_graph graph) from_vertex
+
+hasVertexG :: Graph node -> node -> Bool
+hasVertexG graph node = isJust $ gr_node_to_vertex graph node
+
+verticesG :: Graph node -> [node]
+verticesG graph = map (gr_vertex_to_node graph) $ vertices (gr_int_graph graph)
+
+edgesG :: Graph node -> [Edge node]
+edgesG graph = map (\(v1, v2) -> Edge (v2n v1) (v2n v2)) $ edges (gr_int_graph graph)
+  where v2n = gr_vertex_to_node graph
+
+transposeG :: Graph node -> Graph node
+transposeG graph = Graph (transpose (gr_int_graph graph)) (gr_vertex_to_node graph) (gr_node_to_vertex graph)
+
+outdegreeG :: Graph node -> node -> Maybe Int
+outdegreeG = degreeG outdegree
+
+indegreeG :: Graph node -> node -> Maybe Int
+indegreeG = degreeG indegree
+
+degreeG :: (IntGraph -> Table Int) -> Graph node -> node -> Maybe Int
+degreeG degree graph node = let table = degree (gr_int_graph graph)
+                            in fmap ((!) table) $ gr_node_to_vertex graph node
+
+vertexGroupsG :: Graph node -> [[node]]
+vertexGroupsG graph = map (map (gr_vertex_to_node graph)) result
+  where result = vertexGroups (gr_int_graph graph)
+
+emptyG :: Graph node -> Bool
+emptyG g = graphEmpty (gr_int_graph g)
+
+componentsG :: Graph node -> [[node]]
+componentsG graph = map (map (gr_vertex_to_node graph) . flattenTree) $ components (gr_int_graph graph)
+\end{code}
+
+%************************************************************************
+%*                                                                      *
+%*      Showing Graphs
+%*                                                                      *
+%************************************************************************
+
+\begin{code}
+
+instance Outputable node => Outputable (Graph node) where
+    ppr graph = vcat [
+                  hang (text "Vertices:") 2 (vcat (map ppr $ verticesG graph)),
+                  hang (text "Edges:") 2 (vcat (map ppr $ edgesG graph))
+                ]
+
+instance Outputable node => Outputable (Edge node) where
+    ppr (Edge from to) = ppr from <+> text "->" <+> ppr to
+
+\end{code}
+
+%************************************************************************
+%*                                                                      *
+%*      IntGraphs
+%*                                                                      *
+%************************************************************************
 
 \begin{code}
 type Vertex  = Int
 type Table a = Array Vertex a
-type Graph   = Table [Vertex]
+type IntGraph   = Table [Vertex]
 type Bounds  = (Vertex, Vertex)
-type Edge    = (Vertex, Vertex)
+type IntEdge    = (Vertex, Vertex)
 \end{code}
 
 \begin{code}
-vertices :: Graph -> [Vertex]
+vertices :: IntGraph -> [Vertex]
 vertices  = indices
 
-edges    :: Graph -> [Edge]
+edges    :: IntGraph -> [IntEdge]
 edges g   = [ (v, w) | v <- vertices g, w <- g!v ]
 
 mapT    :: (Vertex -> a -> b) -> Table a -> Table b
 mapT f t = array (bounds t) [ (v, f v (t ! v)) | v <- indices t ]
 
-buildG :: Bounds -> [Edge] -> Graph
+buildG :: Bounds -> [IntEdge] -> IntGraph
 buildG bounds edges = accumArray (flip (:)) [] bounds edges
 
-transposeG  :: Graph -> Graph
-transposeG g = buildG (bounds g) (reverseE g)
+transpose  :: IntGraph -> IntGraph
+transpose g = buildG (bounds g) (reverseE g)
 
-reverseE    :: Graph -> [Edge]
+reverseE    :: IntGraph -> [IntEdge]
 reverseE g   = [ (w, v) | (v, w) <- edges g ]
 
-outdegree :: Graph -> Table Int
+outdegree :: IntGraph -> Table Int
 outdegree  = mapT numEdges
              where numEdges _ ws = length ws
 
-indegree :: Graph -> Table Int
-indegree  = outdegree . transposeG
-\end{code}
+indegree :: IntGraph -> Table Int
+indegree  = outdegree . transpose
 
+graphEmpty :: IntGraph -> Bool
+graphEmpty g = lo > hi
+  where (lo, hi) = bounds g
 
-\begin{code}
-graphFromEdges
-        :: Ord key
-        => [(node, key, [key])]
-        -> (Graph, Vertex -> (node, key, [key]))
-graphFromEdges edges =
-  case graphFromEdges' edges of (graph, vertex_fn, _) -> (graph, vertex_fn)
-
-graphFromEdges'
-        :: Ord key
-        => [(node, key, [key])]
-        -> (Graph, Vertex -> (node, key, [key]), key -> Maybe Vertex)
-graphFromEdges' edges
-  = (graph, \v -> vertex_map ! v, key_vertex)
-  where
-    max_v           = length edges - 1
-    bounds          = (0,max_v) :: (Vertex, Vertex)
-    sorted_edges    = let
-                         (_,k1,_) `le` (_,k2,_) = (k1 `compare` k2) /= GT
-                      in
-                        sortLe le edges
-    edges1          = zipWith (,) [0..] sorted_edges
-
-    graph           = array bounds [ (v, mapMaybe key_vertex ks)
-                               | (v, (_,    _, ks)) <- edges1]
-    key_map         = array bounds [ (v, k)
-                               | (v, (_,    k, _ )) <- edges1]
-    vertex_map      = array bounds edges1
-
-
-    -- key_vertex :: key -> Maybe Vertex
-    --  returns Nothing for non-interesting vertices
-    key_vertex k   = find 0 max_v
-                   where
-                     find a b | a > b
-                              = Nothing
-                     find a b = case compare k (key_map ! mid) of
-                                   LT -> find a (mid-1)
-                                   EQ -> Just mid
-                                   GT -> find (mid+1) b
-                              where
-                                mid = (a + b) `div` 2
 \end{code}
 
 %************************************************************************
@@ -224,6 +336,9 @@ type Forest a = [Tree a]
 
 mapTree              :: (a -> b) -> (Tree a -> Tree b)
 mapTree f (Node x ts) = Node (f x) (map (mapTree f) ts)
+
+flattenTree :: Tree a -> [a]
+flattenTree (Node x ts) = x : concatMap flattenTree ts
 \end{code}
 
 \begin{code}
@@ -232,6 +347,9 @@ instance Show a => Show (Tree a) where
 
 showTree :: Show a => Tree a -> String
 showTree  = drawTree . mapTree show
+
+instance Show a => Show (Forest a) where
+  showsPrec _ f s = showForest f ++ s
 
 showForest :: Show a => Forest a -> String
 showForest  = unlines . map showTree
@@ -279,13 +397,13 @@ include m v   = writeArray m v True
 \end{code}
 
 \begin{code}
-dff          :: Graph -> Forest Vertex
+dff          :: IntGraph -> Forest Vertex
 dff g         = dfs g (vertices g)
 
-dfs          :: Graph -> [Vertex] -> Forest Vertex
+dfs          :: IntGraph -> [Vertex] -> Forest Vertex
 dfs g vs      = prune (bounds g) (map (generate g) vs)
 
-generate     :: Graph -> Vertex -> Tree Vertex
+generate     :: IntGraph -> Vertex -> Tree Vertex
 generate g v  = Node v (map (generate g) (g!v))
 
 prune        :: Bounds -> Forest Vertex -> Forest Vertex
@@ -324,12 +442,11 @@ preorderF           :: Forest a -> [a]
 preorderF ts         = concat (map preorder ts)
 
 tabulate        :: Bounds -> [Vertex] -> Table Int
-tabulate bnds vs = array bnds (zipWith (,) vs [1..])
+tabulate bnds vs = array bnds (zip vs [1..])
 
 preArr          :: Bounds -> Forest Vertex -> Table Int
 preArr bnds      = tabulate bnds . preorderF
 \end{code}
-
 
 ------------------------------------------------------------
 -- Algorithm 2: topological sorting
@@ -342,88 +459,85 @@ postorder (Node a ts) = postorderF ts . (a :)
 postorderF   :: Forest a -> [a] -> [a]
 postorderF ts = foldr (.) id $ map postorder ts
 
-postOrd :: Graph -> [Vertex]
+postOrd :: IntGraph -> [Vertex]
 postOrd g = postorderF (dff g) []
 
-topSort :: Graph -> [Vertex]
+topSort :: IntGraph -> [Vertex]
 topSort = reverse . postOrd
 \end{code}
-
 
 ------------------------------------------------------------
 -- Algorithm 3: connected components
 ------------------------------------------------------------
 
 \begin{code}
-components   :: Graph -> Forest Vertex
+components   :: IntGraph -> Forest Vertex
 components    = dff . undirected
 
-undirected   :: Graph -> Graph
+undirected   :: IntGraph -> IntGraph
 undirected g  = buildG (bounds g) (edges g ++ reverseE g)
 \end{code}
 
-
+------------------------------------------------------------
 -- Algorithm 4: strongly connected components
+------------------------------------------------------------
 
 \begin{code}
-scc  :: Graph -> Forest Vertex
-scc g = dfs g (reverse (postOrd (transposeG g)))
+scc  :: IntGraph -> Forest Vertex
+scc g = dfs g (reverse (postOrd (transpose g)))
 \end{code}
-
 
 ------------------------------------------------------------
 -- Algorithm 5: Classifying edges
 ------------------------------------------------------------
 
 \begin{code}
-back              :: Graph -> Table Int -> Graph
+back              :: IntGraph -> Table Int -> IntGraph
 back g post        = mapT select g
  where select v ws = [ w | w <- ws, post!v < post!w ]
 
-cross             :: Graph -> Table Int -> Table Int -> Graph
+cross             :: IntGraph -> Table Int -> Table Int -> IntGraph
 cross g pre post   = mapT select g
  where select v ws = [ w | w <- ws, post!v > post!w, pre!v > pre!w ]
 
-forward           :: Graph -> Graph -> Table Int -> Graph
+forward           :: IntGraph -> IntGraph -> Table Int -> IntGraph
 forward g tree pre = mapT select g
  where select v ws = [ w | w <- ws, pre!v < pre!w ] \\ tree!v
 \end{code}
-
 
 ------------------------------------------------------------
 -- Algorithm 6: Finding reachable vertices
 ------------------------------------------------------------
 
 \begin{code}
-reachable    :: Graph -> Vertex -> [Vertex]
+reachable    :: IntGraph -> Vertex -> [Vertex]
 reachable g v = preorderF (dfs g [v])
 
-path         :: Graph -> Vertex -> Vertex -> Bool
+path         :: IntGraph -> Vertex -> Vertex -> Bool
 path g v w    = w `elem` (reachable g v)
 \end{code}
-
 
 ------------------------------------------------------------
 -- Algorithm 7: Biconnected components
 ------------------------------------------------------------
 
 \begin{code}
-bcc :: Graph -> Forest [Vertex]
+bcc :: IntGraph -> Forest [Vertex]
 bcc g = (concat . map bicomps . map (do_label g dnum)) forest
  where forest = dff g
        dnum   = preArr (bounds g) forest
 
-do_label :: Graph -> Table Int -> Tree Vertex -> Tree (Vertex,Int,Int)
+do_label :: IntGraph -> Table Int -> Tree Vertex -> Tree (Vertex,Int,Int)
 do_label g dnum (Node v ts) = Node (v,dnum!v,lv) us
  where us = map (do_label g dnum) ts
        lv = minimum ([dnum!v] ++ [dnum!w | w <- g!v]
                      ++ [lu | Node (_,_,lu) _ <- us])
 
-bicomps :: Tree (Vertex,Int,Int) -> Forest [Vertex]
+bicomps :: Tree (Vertex, Int, Int) -> Forest [Vertex]
 bicomps (Node (v,_,_) ts)
       = [ Node (v:vs) us | (_,Node vs us) <- map collect ts]
 
-collect :: Tree (Vertex,Int,Int) -> (Int, Tree [Vertex])
+collect :: Tree (Vertex, Int, Int) -> (Int, Tree [Vertex])
 collect (Node (v,dv,lv) ts) = (lv, Node (v:vs) cs)
  where collected = map collect ts
        vs = concat [ ws | (lw, Node ws _)  <- collected, lw<dv]
@@ -431,3 +545,51 @@ collect (Node (v,dv,lv) ts) = (lv, Node (v:vs) cs)
                         | (lw, Node ws us) <- collected ]
 \end{code}
 
+------------------------------------------------------------
+-- Algorithm 8: Total ordering on groups of vertices
+------------------------------------------------------------
+
+The plan here is to extract a list of groups of elements of the graph
+such that each group has no dependence except on nodes in previous
+groups (i.e. in particular they may not depend on nodes in their own
+group) and is maximal such group.
+
+Clearly we cannot provide a solution for cyclic graphs.
+
+We proceed by iteratively removing elements with no outgoing edges
+and their associated edges from the graph.
+
+This probably isn't very efficient and certainly isn't very clever.
+
+\begin{code}
+
+vertexGroups :: IntGraph -> [[Vertex]]
+vertexGroups g = runST (mkEmpty (bounds g) >>= \provided -> vertexGroupsS provided g next_vertices)
+  where next_vertices = noOutEdges g
+
+noOutEdges :: IntGraph -> [Vertex]
+noOutEdges g = [ v | v <- vertices g, null (g!v)]
+
+vertexGroupsS :: Set s -> IntGraph -> [Vertex] -> ST s [[Vertex]]
+vertexGroupsS provided g to_provide
+  = if null to_provide 
+    then do { 
+          all_provided <- allM (provided `contains`) (vertices g)
+        ; if all_provided
+          then return []
+          else error "vertexGroup: cyclic graph" 
+        }
+    else do { 
+          mapM_ (include provided) to_provide
+        ; to_provide' <- filterM (vertexReady provided g) (vertices g)
+        ; rest <- vertexGroupsS provided g to_provide'
+        ; return $ to_provide : rest 
+        }
+
+vertexReady :: Set s -> IntGraph -> Vertex -> ST s Bool
+vertexReady provided g v = liftM2 (&&) (liftM not $ provided `contains` v) (allM (provided `contains`) (g!v))
+
+allM :: Monad m => (a -> m Bool) -> [a] -> m Bool
+allM _ []     = return True
+allM f (b:bs) = (f b) >>= (\bv -> if bv then allM f bs else return False)
+\end{code}
