@@ -480,10 +480,10 @@ cLongRep = I64
 -- isCommutableMachOp
 
 {- |
-Returns 'True' if the MachOp has commutable arguments.  This is used
+Returns @True@ if the MachOp has commutable arguments.  This is used
 in the platform-independent Cmm optimisations.
 
-If in doubt, return 'False'.  This generates worse code on the
+If in doubt, return @False@.  This generates worse code on the
 native routes, but is otherwise harmless.
 -}
 isCommutableMachOp :: MachOp -> Bool
@@ -504,10 +504,10 @@ isCommutableMachOp mop =
 -- isAssociativeMachOp
 
 {- |
-Returns 'True' if the MachOp is associative (i.e. @(x+y)+z == x+(y+z)@)
+Returns @True@ if the MachOp is associative (i.e. @(x+y)+z == x+(y+z)@)
 This is used in the platform-independent Cmm optimisations.
 
-If in doubt, return 'False'.  This generates worse code on the
+If in doubt, return @False@.  This generates worse code on the
 native routes, but is otherwise harmless.
 -}
 isAssociativeMachOp :: MachOp -> Bool
@@ -524,7 +524,7 @@ isAssociativeMachOp mop =
 -- isComparisonMachOp
 
 {- | 
-Returns 'True' if the MachOp is a comparison.
+Returns @True@ if the MachOp is a comparison.
 
 If in doubt, return False.  This generates worse code on the
 native routes, but is otherwise harmless.
