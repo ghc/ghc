@@ -207,6 +207,7 @@ Library
         CoreUnfold
         CoreUtils
         ExternalCore
+        MkCore
         MkExternalCore
         PprCore
         PprExternalCore
