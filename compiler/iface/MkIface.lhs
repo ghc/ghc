@@ -426,7 +426,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
                   where n = ifName d
 
         -- strongly-connected groups of declarations, in dependency order
-       groups = stronglyConnComp edges
+       groups = stronglyConnCompFromEdgedVertices edges
 
        global_hash_fn = mkHashFun hsc_env eps
 
