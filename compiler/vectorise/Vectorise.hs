@@ -8,7 +8,7 @@ import VectType
 import VectCore
 
 import DynFlags
-import HscTypes
+import HscTypes hiding      ( MonadThings(..) )
 
 import Module               ( dphSeqPackageId, dphParPackageId )
 import CoreLint             ( showPass, endPass )
