@@ -9,73 +9,87 @@ Haskell. [WDP 94/11])
 
 \begin{code}
 module IdInfo (
+        -- * The GlobalIdDetails type
 	GlobalIdDetails(..), notGlobalId, 	-- Not abstract
 
+        -- * The IdInfo type
 	IdInfo,		-- Abstract
 	vanillaIdInfo, noCafIdInfo,
 	seqIdInfo, megaSeqIdInfo,
 
-	-- Zapping
+	-- ** Zapping various forms of Info
 	zapLamInfo, zapDemandInfo, zapFragileInfo,
 
-	-- Arity
+	-- ** The ArityInfo type
 	ArityInfo,
 	unknownArity, 
 	arityInfo, setArityInfo, ppArityInfo, 
 
-	-- New demand and strictness info
+	-- ** Demand and strictness Info
  	newStrictnessInfo, setNewStrictnessInfo, 
   	newDemandInfo, setNewDemandInfo, pprNewStrictness,
 	setAllStrictnessInfo,
 
 #ifdef OLD_STRICTNESS
-	-- Strictness; imported from Demand
+	-- ** Old strictness Info
 	StrictnessInfo(..),
 	mkStrictnessInfo, noStrictnessInfo,
-	ppStrictnessInfo,isBottomingStrictness, 
-#endif
-
-        -- Worker
-        WorkerInfo(..), workerExists, wrapperArity, workerId,
-        workerInfo, setWorkerInfo, ppWorkerInfo,
-
-	-- Unfolding
-	unfoldingInfo, setUnfoldingInfo, setUnfoldingInfoLazily,
-
-#ifdef OLD_STRICTNESS
-	-- Old DemandInfo and StrictnessInfo
-	demandInfo, setDemandInfo, 
+	ppStrictnessInfo, isBottomingStrictness, 
 	strictnessInfo, setStrictnessInfo,
-        cprInfoFromNewStrictness,
-	oldStrictnessFromNew, newStrictnessFromOld,
+	
+        oldStrictnessFromNew, newStrictnessFromOld,
+
+	-- ** Old demand Info
+	demandInfo, setDemandInfo, 
 	oldDemand, newDemand,
 
-        -- Constructed Product Result Info
-        CprInfo(..), cprInfo, setCprInfo, ppCprInfo, noCprInfo,
+        -- ** Old Constructed Product Result Info
+        CprInfo(..), 
+        cprInfo, setCprInfo, ppCprInfo, noCprInfo,
+        cprInfoFromNewStrictness,
 #endif
 
-	-- Inline prags
-	InlinePragInfo, 
-	inlinePragInfo, setInlinePragInfo, 
+        -- ** The WorkerInfo type
+        WorkerInfo(..),
+        workerExists, wrapperArity, workerId,
+        workerInfo, setWorkerInfo, ppWorkerInfo,
 
-	-- Occurrence info
-	OccInfo(..), isFragileOcc, isDeadOcc, isLoopBreaker,
-	InsideLam, OneBranch, insideLam, notInsideLam, oneBranch, notOneBranch,
-	occInfo, setOccInfo, 
+	-- ** Unfolding Info
+	unfoldingInfo, setUnfoldingInfo, setUnfoldingInfoLazily,
 
-	-- Specialisation
-	SpecInfo(..), specInfo, setSpecInfo, isEmptySpecInfo, 
-	specInfoFreeVars, specInfoRules, seqSpecInfo, setSpecInfoHead,
+	-- ** The InlinePragInfo type
+	InlinePragInfo,
+	inlinePragInfo, setInlinePragInfo,
 
-	-- CAF info
-	CafInfo(..), cafInfo, ppCafInfo, setCafInfo, mayHaveCafRefs,
+	-- ** The OccInfo type
+	OccInfo(..),
+	isFragileOcc, isDeadOcc, isLoopBreaker,
+	occInfo, setOccInfo,
 
-        -- Lambda-bound variable info
-        LBVarInfo(..), lbvarInfo, setLBVarInfo, noLBVarInfo, hasNoLBVarInfo,
+	InsideLam, OneBranch,
+	insideLam, notInsideLam, oneBranch, notOneBranch,
+	
+	-- ** The SpecInfo type
+	SpecInfo(..),
+	isEmptySpecInfo, specInfoFreeVars,
+	specInfoRules, seqSpecInfo, setSpecInfoHead,
+        specInfo, setSpecInfo,
 
-        -- Tick-box info
+	-- ** The CAFInfo type
+	CafInfo(..),
+	ppCafInfo, mayHaveCafRefs,
+	cafInfo, setCafInfo,
+
+        -- ** The LBVarInfo type
+        LBVarInfo(..),
+        noLBVarInfo, hasNoLBVarInfo,
+        lbvarInfo, setLBVarInfo,
+
+        -- ** Tick-box Info
         TickBoxOp(..), TickBoxId,
     ) where
+
+import {-# SOURCE #-} CoreSyn ( CoreRule, setRuleIdName, seqRules, Unfolding, noUnfolding )
 
 import Class
 import PrimOp
@@ -128,7 +142,7 @@ infixl 	1 `setSpecInfo`,
 To be removed later
 
 \begin{code}
--- Set old and new strictness info
+-- | Set old and new strictness information together
 setAllStrictnessInfo :: IdInfo -> Maybe StrictSig -> IdInfo
 setAllStrictnessInfo info Nothing
   = info { newStrictnessInfo = Nothing
@@ -229,33 +243,41 @@ an IdInfo.hi-boot, but no Id.hi-boot, and GlobalIdDetails is imported
 (recursively) by Var.lhs.
 
 \begin{code}
+-- | Information pertaining to global 'Id's. See "Var#globalvslocal" for the distinction 
+-- between global and local in this context
 data GlobalIdDetails
-  = VanillaGlobal		-- Imported from elsewhere, a default method Id.
+  = VanillaGlobal		-- ^ The 'Id' is imported from elsewhere or is a default method 'Id'
 
-  | RecordSelId                 -- The Id for a record selector
-    { sel_tycon   :: TyCon	-- For a data type family, this is the *instance* TyCon
-				--	not the family TyCon
+  -- | The 'Id' for a record selector
+  | RecordSelId                 
+    { sel_tycon   :: TyCon	-- ^ For a data type family, this is the /instance/ 'TyCon'
+				--   not the family 'TyCon'
     , sel_label   :: FieldLabel
-    , sel_naughty :: Bool       -- True <=> naughty
-    }				-- See Note [Naughty record selectors]
+    , sel_naughty :: Bool       -- True <=> a "naughty" selector which can't actually exist, for example @x@ in:
+                                -- 
+                                -- > data T = forall a. MkT { x :: a }
+    }				
+				-- See Note [Naughty record selectors]
 				-- with MkId.mkRecordSelectorId
 
-  | DataConWorkId DataCon	-- The Id for a data constructor *worker*
-  | DataConWrapId DataCon	-- The Id for a data constructor *wrapper*
+  | DataConWorkId DataCon	-- ^ The 'Id' is for a data constructor /worker/
+  | DataConWrapId DataCon	-- ^ The 'Id' is for a data constructor /wrapper/
+				
 				-- [the only reasons we need to know is so that
 				--  a) to support isImplicitId
 				--  b) when desugaring a RecordCon we can get 
 				--     from the Id back to the data con]
 
-  | ClassOpId Class		-- An operation of a class
+  | ClassOpId Class		-- ^ The 'Id' is an operation of a class
 
-  | PrimOpId PrimOp		-- The Id for a primitive operator
-  | FCallId ForeignCall		-- The Id for a foreign call
+  | PrimOpId PrimOp		-- ^ The 'Id' is for a primitive operator
+  | FCallId ForeignCall		-- ^ The 'Id' is for a foreign call
 
-  | TickBoxOpId TickBoxOp	-- The Id for a tick box (both traditional and binary)
+  | TickBoxOpId TickBoxOp	-- ^ The 'Id' is for a HPC tick box (both traditional and binary)
 
-  | NotGlobalId			-- Used as a convenient extra return value from globalIdDetails
-    
+  | NotGlobalId			-- ^ Used as a convenient extra return value from 'globalIdDetails'
+
+-- | An entirely unhelpful 'GlobalIdDetails'
 notGlobalId :: GlobalIdDetails
 notGlobalId = NotGlobalId
 
@@ -278,56 +300,58 @@ instance Outputable GlobalIdDetails where
 %*									*
 %************************************************************************
 
-An @IdInfo@ gives {\em optional} information about an @Id@.  If
-present it never lies, but it may not be present, in which case there
-is always a conservative assumption which can be made.
-
-Two @Id@s may have different info even though they have the same
-@Unique@ (and are hence the same @Id@); for example, one might lack
-the properties attached to the other.
-
-The @IdInfo@ gives information about the value, or definition, of the
-@Id@.  It does {\em not} contain information about the @Id@'s usage
-(except for @DemandInfo@? ToDo). (@lbvarInfo@ is also a marginal
-case.  KSW 1999-04).
-
 \begin{code}
+-- | An 'IdInfo' gives /optional/ information about an 'Id'.  If
+-- present it never lies, but it may not be present, in which case there
+-- is always a conservative assumption which can be made.
+-- 
+-- Two 'Id's may have different info even though they have the same
+-- 'Unique' (and are hence the same 'Id'); for example, one might lack
+-- the properties attached to the other.
+-- 
+-- The 'IdInfo' gives information about the value, or definition, of the
+-- 'Id'.  It does not contain information about the 'Id''s usage,
+-- except for 'demandInfo' and 'lbvarInfo'.
 data IdInfo
   = IdInfo {
-	arityInfo 	:: !ArityInfo,		-- Its arity
-	specInfo 	:: SpecInfo,		-- Specialisations of this function which exist
+	arityInfo 	:: !ArityInfo,		-- ^ 'Id' arity
+	specInfo 	:: SpecInfo,		-- ^ Specialisations of the 'Id's function which exist
 #ifdef OLD_STRICTNESS
-	cprInfo 	:: CprInfo,             -- Function always constructs a product result
-	demandInfo 	:: Demand.Demand,	-- Whether or not it is definitely demanded
-	strictnessInfo	:: StrictnessInfo,	-- Strictness properties
+	cprInfo 	:: CprInfo,             -- ^ If the 'Id's function always constructs a product result
+	demandInfo 	:: Demand.Demand,	-- ^ Whether or not the 'Id' is definitely demanded
+	strictnessInfo	:: StrictnessInfo,	-- ^ 'Id' strictness properties
 #endif
-        workerInfo      :: WorkerInfo,          -- Pointer to Worker Function
+        workerInfo      :: WorkerInfo,          -- ^ Pointer to worker function.
 						-- Within one module this is irrelevant; the 
-						-- inlining of a worker is handled via the Unfolding
-						-- WorkerInfo is used *only* to indicate the form of
+						-- inlining of a worker is handled via the 'Unfolding'.
+						-- However, when the module is imported by others, the
+						-- 'WorkerInfo' is used /only/ to indicate the form of
 						-- the RHS, so that interface files don't actually 
 						-- need to contain the RHS; it can be derived from
 						-- the strictness info
 
-	unfoldingInfo	:: Unfolding,		-- Its unfolding
-	cafInfo		:: CafInfo,		-- CAF info
-        lbvarInfo	:: LBVarInfo,		-- Info about a lambda-bound variable
-	inlinePragInfo	:: InlinePragInfo,	-- Inline pragma
-	occInfo		:: OccInfo,		-- How it occurs
+	unfoldingInfo	:: Unfolding,		-- ^ The 'Id's unfolding
+	cafInfo		:: CafInfo,		-- ^ 'Id' CAF info
+        lbvarInfo	:: LBVarInfo,		-- ^ Info about a lambda-bound variable, if the 'Id' is one
+	inlinePragInfo	:: InlinePragInfo,	-- ^ Any inline pragma atached to the 'Id'
+	occInfo		:: OccInfo,		-- ^ How the 'Id' occurs in the program
 
-	newStrictnessInfo :: Maybe StrictSig,	-- Reason for Maybe: the DmdAnal phase needs to
-						-- know whether whether this is the first visit,
-						-- so it can assign botSig.  Other customers want
-						-- topSig.  So Nothing is good.
+	newStrictnessInfo :: Maybe StrictSig,	-- ^ Id strictness information. Reason for Maybe: 
+	                                        -- the DmdAnal phase needs to know whether
+						-- this is the first visit, so it can assign botSig.
+						-- Other customers want topSig.  So @Nothing@ is good.
 
-	newDemandInfo	  :: Maybe Demand	-- Similarly we want to know if there's no
-						-- known demand yet, for when we are looking for
-						-- CPR info
+	newDemandInfo	  :: Maybe Demand	-- ^ Id demand information. Similarly we want to know 
+	                                        -- if there's no known demand yet, for when we are looking
+						-- for CPR info
     }
 
+-- | Just evaluate the 'IdInfo' to WHNF
 seqIdInfo :: IdInfo -> ()
 seqIdInfo (IdInfo {}) = ()
 
+-- | Evaluate all the fields of the 'IdInfo' that are generally demanded by the
+-- compiler
 megaSeqIdInfo :: IdInfo -> ()
 megaSeqIdInfo info
   = seqSpecInfo (specInfo info)			`seq`
@@ -399,6 +423,7 @@ setNewStrictnessInfo info dd = dd `seq` info { newStrictnessInfo = dd }
 
 
 \begin{code}
+-- | Basic 'IdInfo' that carries no useful information whatsoever
 vanillaIdInfo :: IdInfo
 vanillaIdInfo 
   = IdInfo {
@@ -419,6 +444,7 @@ vanillaIdInfo
 	    newStrictnessInfo   = Nothing
 	   }
 
+-- | More informative 'IdInfo' we can use when we know the 'Id' has no CAF references
 noCafIdInfo :: IdInfo
 noCafIdInfo  = vanillaIdInfo `setCafInfo`    NoCafRefs
 	-- Used for built-in type Ids in MkId.
@@ -436,15 +462,17 @@ of their arities; so it should not be asking...	 (but other things
 besides the code-generator need arity info!)
 
 \begin{code}
+-- | An 'ArityInfo' of @n@ tells us that partial application of this 
+-- 'Id' to up to @n-1@ value arguments does essentially no work.
+--
+-- That is not necessarily the same as saying that it has @n@ leading 
+-- lambdas, because coerces may get in the way.
+--
+-- The arity might increase later in the compilation process, if
+-- an extra lambda floats up to the binding site.
 type ArityInfo = Arity
-  	-- A partial application of this Id to up to n-1 value arguments
-	-- does essentially no work.  That is not necessarily the
-	-- same as saying that it has n leading lambdas, because coerces
-	-- may get in the way.
 
-	-- The arity might increase later in the compilation process, if
-	-- an extra lambda floats up to the binding site.
-
+-- | It is always safe to assume that an 'Id' has an arity of 0
 unknownArity :: Arity
 unknownArity = 0 :: Arity
 
@@ -460,16 +488,16 @@ ppArityInfo n = hsep [ptext (sLit "Arity"), int n]
 %************************************************************************
 
 \begin{code}
+-- | Tells when the inlining is active.
+-- When it is active the thing may be inlined, depending on how
+-- big it is.
+--
+-- If there was an @INLINE@ pragma, then as a separate matter, the
+-- RHS will have been made to look small with a Core inline 'Note'
+--
+-- The default 'InlinePragInfo' is 'AlwaysActive', so the info serves
+-- entirely as a way to inhibit inlining until we want it
 type InlinePragInfo = Activation
-	-- Tells when the inlining is active
-	-- When it is active the thing may be inlined, depending on how
-	-- big it is.
-	--
-	-- If there was an INLINE pragma, then as a separate matter, the
-	-- RHS will have been made to look small with a CoreSyn Inline Note
-
-	-- The default InlinePragInfo is AlwaysActive, so the info serves
-	-- entirely as a way to inhibit inlining until we want it
 \end{code}
 
 
@@ -480,6 +508,8 @@ type InlinePragInfo = Activation
 %************************************************************************
 
 \begin{code}
+-- | Records the specializations of this 'Id' that we know about
+-- in the form of rewrite 'CoreRule's that target them
 data SpecInfo 
   = SpecInfo 
 	[CoreRule] 
@@ -488,18 +518,22 @@ data SpecInfo
 			-- ru_fn though.
 			-- Note [Rule dependency info] in OccurAnal
 
+-- | Assume that no specilizations exist: always safe
 emptySpecInfo :: SpecInfo
 emptySpecInfo = SpecInfo [] emptyVarSet
 
 isEmptySpecInfo :: SpecInfo -> Bool
 isEmptySpecInfo (SpecInfo rs _) = null rs
 
+-- | Retrieve the locally-defined free variables of both the left and
+-- right hand sides of the specialization rules
 specInfoFreeVars :: SpecInfo -> VarSet
 specInfoFreeVars (SpecInfo _ fvs) = fvs
 
 specInfoRules :: SpecInfo -> [CoreRule]
 specInfoRules (SpecInfo rules _) = rules
 
+-- | Change the name of the function the rule is keyed on on all of the 'CoreRule's
 setSpecInfoHead :: Name -> SpecInfo -> SpecInfo
 setSpecInfoHead fn (SpecInfo rules fvs)
   = SpecInfo (map (setRuleIdName fn) rules) fvs
@@ -508,17 +542,11 @@ seqSpecInfo :: SpecInfo -> ()
 seqSpecInfo (SpecInfo rules fvs) = seqRules rules `seq` seqVarSet fvs
 \end{code}
 
-
-
 %************************************************************************
 %*									*
 \subsection[worker-IdInfo]{Worker info about an @Id@}
 %*									*
 %************************************************************************
-
-If this Id has a worker then we store a reference to it. Worker
-functions are generated by the worker/wrapper pass.  This uses
-information from strictness analysis.
 
 There might not be a worker, even for a strict function, because:
 (a) the function might be small enough to inline, so no need 
@@ -544,10 +572,12 @@ this to".
 
 \begin{code}
 
-data WorkerInfo = NoWorker
-		| HasWorker Id Arity
-	-- The Arity is the arity of the *wrapper* at the moment of the
-	-- w/w split.  See notes above.
+-- | If this Id has a worker then we store a reference to it. Worker
+-- functions are generated by the worker/wrapper pass, using information
+-- information from strictness analysis.
+data WorkerInfo = NoWorker              -- ^ No known worker function
+		| HasWorker Id Arity    -- ^ The 'Arity' is the arity of the /wrapper/ at the moment of the
+	                                -- worker/wrapper split, which may be different from the current 'Id' 'Aritiy'
 
 seqWorker :: WorkerInfo -> ()
 seqWorker (HasWorker id a) = id `seq` a `seq` ()
@@ -561,10 +591,12 @@ workerExists :: WorkerInfo -> Bool
 workerExists NoWorker        = False
 workerExists (HasWorker _ _) = True
 
+-- | The 'Id' of the worker function if it exists, or a panic otherwise
 workerId :: WorkerInfo -> Id
 workerId (HasWorker id _) = id
 workerId NoWorker = panic "workerId: NoWorker"
 
+-- | The 'Arity' of the worker function at the time of the split if it exists, or a panic otherwise
 wrapperArity :: WorkerInfo -> Arity
 wrapperArity (HasWorker _ a) = a
 wrapperArity NoWorker = panic "wrapperArity: NoWorker"
@@ -580,17 +612,21 @@ wrapperArity NoWorker = panic "wrapperArity: NoWorker"
 \begin{code}
 -- CafInfo is used to build Static Reference Tables (see simplStg/SRT.lhs).
 
+-- | Records whether an 'Id' makes Constant Applicative Form references
 data CafInfo 
-	= MayHaveCafRefs		-- either:
-					-- (1) A function or static constructor
-					--     that refers to one or more CAFs,
-					-- (2) A real live CAF
+	= MayHaveCafRefs		-- ^ Indicates that the 'Id' is for either:
+					--
+					-- 1. A function or static constructor
+					--    that refers to one or more CAFs, or
+					--
+					-- 2. A real live CAF
 
-	| NoCafRefs			-- A function or static constructor
+	| NoCafRefs			-- ^ A function or static constructor
 				        -- that refers to no CAFs.
 
+-- | Assumes that the 'Id' has CAF references: definitely safe
 vanillaCafInfo :: CafInfo
-vanillaCafInfo = MayHaveCafRefs		-- Definitely safe
+vanillaCafInfo = MayHaveCafRefs
 
 mayHaveCafRefs :: CafInfo -> Bool
 mayHaveCafRefs  MayHaveCafRefs = True
@@ -610,29 +646,26 @@ ppCafInfo MayHaveCafRefs = empty
 %*									*
 %************************************************************************
 
-If the @Id@ is a function then it may have CPR info. A CPR analysis
-phase detects whether:
-
-\begin{enumerate}
-\item
-The function's return value has a product type, i.e. an algebraic  type 
-with a single constructor. Examples of such types are tuples and boxed
-primitive values.
-\item
-The function always 'constructs' the value that it is returning.  It
-must do this on every path through,  and it's OK if it calls another
-function which constructs the result.
-\end{enumerate}
-
-If this is the case then we store a template which tells us the
-function has the CPR property and which components of the result are
-also CPRs.   
-
 \begin{code}
 #ifdef OLD_STRICTNESS
+-- | If the @Id@ is a function then it may have Constructed Product Result 
+-- (CPR) info. A CPR analysis phase detects whether:
+-- 
+-- 1. The function's return value has a product type, i.e. an algebraic  type 
+-- with a single constructor. Examples of such types are tuples and boxed
+-- primitive values.
+--
+-- 2. The function always 'constructs' the value that it is returning.  It
+-- must do this on every path through,  and it's OK if it calls another
+-- function which constructs the result.
+-- 
+-- If this is the case then we store a template which tells us the
+-- function has the CPR property and which components of the result are
+-- also CPRs.
 data CprInfo
-  = NoCPRInfo
-  | ReturnsCPR	-- Yes, this function returns a constructed product
+  = NoCPRInfo   -- ^ No, this function does not return a constructed product
+  | ReturnsCPR	-- ^ Yes, this function returns a constructed product
+		
 		-- Implicitly, this means "after the function has been applied
 		-- to all its arguments", so the worker/wrapper builder in 
 		-- WwLib.mkWWcpr checks that that it is indeed saturated before
@@ -641,11 +674,13 @@ data CprInfo
 	-- We used to keep nested info about sub-components, but
 	-- we never used it so I threw it away
 
+-- | It's always safe to assume that an 'Id' does not have the CPR property
+noCprInfo :: CprInt
+noCprInfo = NoCPRInfo
+
 seqCpr :: CprInfo -> ()
 seqCpr ReturnsCPR = ()
 seqCpr NoCPRInfo  = ()
-
-noCprInfo       = NoCPRInfo
 
 ppCprInfo NoCPRInfo  = empty
 ppCprInfo ReturnsCPR = ptext (sLit "__M")
@@ -658,36 +693,33 @@ instance Show CprInfo where
 #endif
 \end{code}
 
-
 %************************************************************************
 %*									*
 \subsection[lbvar-IdInfo]{Lambda-bound var info about an @Id@}
 %*									*
 %************************************************************************
 
-If the @Id@ is a lambda-bound variable then it may have lambda-bound
-var info.  Sometimes we know whether the lambda binding this var is a
-``one-shot'' lambda; that is, whether it is applied at most once.
-
-This information may be useful in optimisation, as computations may
-safely be floated inside such a lambda without risk of duplicating
-work.
-
 \begin{code}
-data LBVarInfo = NoLBVarInfo 
-	       | IsOneShotLambda	-- The lambda is applied at most once).
+-- | If the 'Id' is a lambda-bound variable then it may have lambda-bound
+-- variable info. Sometimes we know whether the lambda binding this variable
+-- is a \"one-shot\" lambda; that is, whether it is applied at most once.
+--
+-- This information may be useful in optimisation, as computations may
+-- safely be floated inside such a lambda without risk of duplicating
+-- work.
+data LBVarInfo = NoLBVarInfo            -- ^ No information
+	       | IsOneShotLambda	-- ^ The lambda is applied at most once).
 
-seqLBVar :: LBVarInfo -> ()
-seqLBVar l = l `seq` ()
-\end{code}
+-- | It is always safe to assume that an 'Id' has no lambda-bound variable information
+noLBVarInfo :: LBVarInfo
+noLBVarInfo = NoLBVarInfo
 
-\begin{code}
 hasNoLBVarInfo :: LBVarInfo -> Bool
 hasNoLBVarInfo NoLBVarInfo     = True
 hasNoLBVarInfo IsOneShotLambda = False
 
-noLBVarInfo :: LBVarInfo
-noLBVarInfo = NoLBVarInfo
+seqLBVar :: LBVarInfo -> ()
+seqLBVar l = l `seq` ()
 
 pprLBVarInfo :: LBVarInfo -> SDoc
 pprLBVarInfo NoLBVarInfo     = empty
@@ -707,10 +739,12 @@ instance Show LBVarInfo where
 %*									*
 %************************************************************************
 
-@zapLamInfo@ is used for lambda binders that turn out to to be
-part of an unsaturated lambda
-
 \begin{code}
+-- | This is used to remove information on lambda binders that we have
+-- setup as part of a lambda group, assuming they will be applied all at once,
+-- but turn out to be part of an unsaturated lambda as in e.g:
+--
+-- > (\x1. \x2. e) arg1
 zapLamInfo :: IdInfo -> Maybe IdInfo
 zapLamInfo info@(IdInfo {occInfo = occ, newDemandInfo = demand})
   | is_safe_occ occ && is_safe_dmd demand
@@ -732,6 +766,7 @@ zapLamInfo info@(IdInfo {occInfo = occ, newDemandInfo = demand})
 \end{code}
 
 \begin{code}
+-- | Remove demand info on the 'IdInfo' if it is present, otherwise return @Nothing@
 zapDemandInfo :: IdInfo -> Maybe IdInfo
 zapDemandInfo info@(IdInfo {newDemandInfo = dmd})
   | isJust dmd = Just (info {newDemandInfo = Nothing})
@@ -740,7 +775,7 @@ zapDemandInfo info@(IdInfo {newDemandInfo = dmd})
 
 \begin{code}
 zapFragileInfo :: IdInfo -> Maybe IdInfo
--- Zap info that depends on free variables
+-- ^ Zap info that depends on free variables
 zapFragileInfo info 
   = Just (info `setSpecInfo` emptySpecInfo
 	       `setWorkerInfo` NoWorker
@@ -759,9 +794,9 @@ zapFragileInfo info
 \begin{code}
 type TickBoxId = Int
 
+-- | Tick box for Hpc-style coverage
 data TickBoxOp 
    = TickBox Module {-# UNPACK #-} !TickBoxId
-          -- ^Tick box for Hpc-style coverage
 
 instance Outputable TickBoxOp where
     ppr (TickBox mod n)         = ptext (sLit "tick") <+> ppr (mod,n)
