@@ -591,8 +591,8 @@ cvtName ctxt_ns (TH.Name occ flavour)
 okOcc :: OccName.NameSpace -> String -> Bool
 okOcc _  []      = False
 okOcc ns str@(c:_) 
-  | OccName.isVarName ns = startsVarId c || startsVarSym c
-  | otherwise 	 	 = startsConId c || startsConSym c || str == "[]"
+  | OccName.isVarNameSpace ns = startsVarId c || startsVarSym c
+  | otherwise 	 	      = startsConId c || startsConSym c || str == "[]"
 
 badOcc :: OccName.NameSpace -> String -> SDoc
 badOcc ctxt_ns occ 
@@ -634,8 +634,8 @@ isBuiltInOcc ctxt_ns occ
     go_tuple _ _            = Nothing
 
     tup_name n 
-	| OccName.isTcClsName ctxt_ns = Name.getName (tupleTyCon Boxed n)
-	| otherwise 		      = Name.getName (tupleCon Boxed n)
+	| OccName.isTcClsNameSpace ctxt_ns = Name.getName (tupleTyCon Boxed n)
+	| otherwise 		           = Name.getName (tupleCon Boxed n)
 
 mk_uniq_occ :: OccName.NameSpace -> String -> Int# -> OccName.OccName
 mk_uniq_occ ns occ uniq 
