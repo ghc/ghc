@@ -162,7 +162,7 @@ module Pretty (
 
         empty, isEmpty, nest,
 
-        text, char, ftext, ptext,
+        char, text, ftext, ptext,
         int, integer, float, double, rational,
         parens, brackets, braces, quotes, doubleQuotes,
         semi, comma, colon, space, equals,
@@ -531,7 +531,6 @@ union_ p q = Union (LOCAL_ASSERT( _ok p ) p) (LOCAL_ASSERT( _ok q ) q)
              _ok _                  = False
 \end{code}
 
-
 Notice the difference between
         * NoDoc (no documents)
         * Empty (one empty document; no height and no width)
@@ -557,7 +556,7 @@ text  s = case iUnbox (length   s) of {sl -> textBeside_ (Str s)  sl Empty}
 ftext :: FastString -> Doc
 ftext s = case iUnbox (lengthFS s) of {sl -> textBeside_ (PStr s) sl Empty}
 ptext :: LitString -> Doc
-ptext s_= case iUnbox (strLength s) of {sl -> textBeside_ (LStr s sl) sl Empty}
+ptext s_= case iUnbox (lengthLS s) of {sl -> textBeside_ (LStr s sl) sl Empty}
   where s = {-castPtr-} s_
 
 #if defined(__GLASGOW_HASKELL__)
