@@ -352,7 +352,7 @@ eqTc (IfaceTc name) tycon = name == tyConName tycon
 -- are very limited (see the productions for 'ty', so the translation
 -- isn't hard
 toHsType :: IfaceType -> LHsType RdrName
-toHsType (IfaceTyVar v)        		 = noLoc $ HsTyVar (mkRdrUnqual (mkTyVarOcc v))
+toHsType (IfaceTyVar v)        		 = noLoc $ HsTyVar (mkRdrUnqual (mkTyVarOccFS v))
 toHsType (IfaceAppTy t1 t2)    		 = noLoc $ HsAppTy (toHsType t1) (toHsType t2)
 toHsType (IfaceFunTy t1 t2)    		 = noLoc $ HsFunTy (toHsType t1) (toHsType t2)
 toHsType (IfaceTyConApp (IfaceTc tc) ts) = foldl mkHsAppTy (noLoc $ HsTyVar (ifaceExtRdrName tc)) (map toHsType ts) 
@@ -384,7 +384,7 @@ ifaceArrow ifT1 ifT2 = IfaceFunTy ifT1 ifT2
 ifaceEq ifT1 ifT2 = IfacePredTy (IfaceEqPred ifT1 ifT2)
 
 toHsTvBndr :: IfaceTvBndr -> LHsTyVarBndr RdrName
-toHsTvBndr (tv,k) = noLoc $ KindedTyVar (mkRdrUnqual (mkTyVarOcc tv)) (toKind k)
+toHsTvBndr (tv,k) = noLoc $ KindedTyVar (mkRdrUnqual (mkTyVarOccFS tv)) (toKind k)
 
 ifaceExtRdrName :: Name -> RdrName
 ifaceExtRdrName name = mkOrig (nameModule name) (nameOccName name)
