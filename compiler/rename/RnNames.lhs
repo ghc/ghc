@@ -372,13 +372,16 @@ get_local_binders gbl_env (HsGroup {hs_valds  = ValBindsIn _ val_sigs,
     mod        = tcg_mod gbl_env
     is_hs_boot = isHsBoot (tcg_src gbl_env) ;
 
+    for_hs_bndrs :: [Located RdrName]
     for_hs_bndrs = [nm | L _ (ForeignImport nm _ _) <- foreign_decls]
 
     -- In a hs-boot file, the value binders come from the
     --  *signatures*, and there should be no foreign binders 
+    val_bndrs :: [Located RdrName]
     val_bndrs | is_hs_boot = [nm | L _ (TypeSig nm _) <- val_sigs]
               | otherwise  = for_hs_bndrs
 
+    new_simple :: Located RdrName -> RnM (GenAvailInfo Name)
     new_simple rdr_name = do
         nm <- newTopSrcBinder mod rdr_name
         return (Avail nm)
