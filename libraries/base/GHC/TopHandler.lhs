@@ -32,7 +32,6 @@ import Foreign
 import Foreign.C
 import GHC.Base
 import GHC.Conc hiding (throwTo)
-import GHC.Err
 import GHC.Num
 import GHC.Real
 import GHC.Handle
