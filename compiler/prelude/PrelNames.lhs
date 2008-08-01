@@ -670,7 +670,7 @@ dataClassName = clsQual gENERICS (fsLit "Data") dataClassKey
 
 -- Error module
 assertErrorName    :: Name
-assertErrorName	  = varQual gHC_ERR (fsLit "assertError") assertErrorIdKey
+assertErrorName	  = varQual cONTROL_EXCEPTION (fsLit "assertError") assertErrorIdKey
 
 -- Enum module (Enum, Bounded)
 enumClassName, enumFromName, enumFromToName, enumFromThenName,
