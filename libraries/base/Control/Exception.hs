@@ -130,12 +130,10 @@ module Control.Exception (
 import GHC.Base
 import GHC.IOBase
 import GHC.List
-import GHC.Num
 import GHC.Show
 import GHC.IOBase as ExceptionBase
 import GHC.Exception hiding ( Exception )
 import GHC.Conc         ( ThreadId(ThreadId) )
-import Foreign.C.String ( CString, withCString )
 #endif
 
 #ifdef __HUGS__
