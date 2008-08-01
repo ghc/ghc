@@ -35,7 +35,7 @@ import GHC.Conc hiding (throwTo)
 import GHC.Err
 import GHC.Num
 import GHC.Real
-import {-# SOURCE #-} GHC.Handle
+import GHC.Handle
 import GHC.IOBase
 import GHC.Weak
 import Data.Typeable

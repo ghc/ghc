@@ -139,10 +139,11 @@ import GHC.IOBase (block, unblock, evaluate, catchException, throwIO)
 import qualified GHC.IOBase as ExceptionBase
 import qualified GHC.IOBase as New
 import GHC.Exception hiding ( Exception )
-import {-# SOURCE #-} GHC.Conc
+import GHC.Conc hiding (setUncaughtExceptionHandler,
+                        getUncaughtExceptionHandler)
 import Data.IORef       ( IORef, newIORef, readIORef, writeIORef )
 import Foreign.C.String ( CString, withCString )
-import {-# SOURCE #-} GHC.Handle       ( stdout, hFlush )
+import GHC.Handle       ( stdout, hFlush )
 #endif
 
 #ifdef __HUGS__
