@@ -147,7 +147,7 @@ subdirs:
 
 HERE_ABS=$(FPTOOLS_TOP_ABS)/libraries
 
-IFBUILDABLE=ifBuildable/ifBuildable $(HERE_ABS)/boot-packages
+IFBUILDABLE=ifBuildable/ifBuildable $(FPTOOLS_TOP_ABS)/packages
 
 CABAL_GHC_FLAGS = -Wall
 ifeq "$(ghc_ge_605)" "NO"
