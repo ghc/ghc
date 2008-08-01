@@ -123,6 +123,7 @@ module Control.Exception (
 
         recSelError, recConError, irrefutPatError, runtimeError,
         nonExhaustiveGuardsError, patError, noMethodBindingError,
+        assertError,
 
 #ifdef __GLASGOW_HASKELL__
         setUncaughtExceptionHandler,      -- :: (Exception -> IO ()) -> IO ()
