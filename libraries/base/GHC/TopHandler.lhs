@@ -27,7 +27,6 @@ module GHC.TopHandler (
 
 import Control.Exception
 import Data.Maybe
-import Control.Concurrent.MVar
 
 import Foreign
 import Foreign.C
@@ -77,12 +76,19 @@ install_interrupt_handler handler = do
 -- isn't available here.
 install_interrupt_handler handler = do
    let sig = CONST_SIGINT :: CInt
-   withMVar signalHandlerLock $ \_ ->
+   withSignalHandlerLock $
      alloca $ \p_sp -> do
        sptr <- newStablePtr handler
        poke p_sp sptr
        stg_sig_install sig STG_SIG_RST p_sp nullPtr
        return ()
+
+withSignalHandlerLock :: IO () -> IO ()
+withSignalHandlerLock io
+ = block $ do
+       takeMVar signalHandlerLock
+       catchAny (unblock io) (\e -> do putMVar signalHandlerLock (); throw e)
+       putMVar signalHandlerLock ()
 
 foreign import ccall unsafe
   stg_sig_install
