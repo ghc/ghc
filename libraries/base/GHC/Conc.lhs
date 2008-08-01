@@ -95,6 +95,7 @@ module GHC.Conc
         , win32ConsoleHandler
         , toWin32ConsoleEvent
 #endif
+        , reportError, reportStackOverflow
         ) where
 
 import System.Posix.Types
@@ -103,10 +104,6 @@ import System.Posix.Internals
 #endif
 import Foreign
 import Foreign.C
-
-#ifndef __HADDOCK__
-import {-# SOURCE #-} GHC.TopHandler ( reportError, reportStackOverflow )
-#endif
 
 import Data.Maybe
 
@@ -127,6 +124,8 @@ import GHC.Ptr          ( Ptr(..), plusPtr, FunPtr(..) )
 import GHC.STRef
 import GHC.Show         ( Show(..), showString )
 import Data.Typeable
+import GHC.Err
+import Control.Exception hiding (throwTo)
 
 infixr 0 `par`, `pseq`
 \end{code}
@@ -1252,4 +1251,17 @@ foreign import ccall unsafe "sizeof_fd_set"
 
 #endif
 
+reportStackOverflow :: IO a
+reportStackOverflow = do callStackOverflowHook; return undefined
+
+reportError :: SomeException -> IO a
+reportError ex = do
+   handler <- getUncaughtExceptionHandler
+   handler ex
+   return undefined
+
+-- SUP: Are the hooks allowed to re-enter Haskell land?  If so, remove
+-- the unsafe below.
+foreign import ccall unsafe "stackOverflow"
+        callStackOverflowHook :: IO ()
 \end{code}

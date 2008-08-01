@@ -169,20 +169,6 @@ real_handler exit se@(SomeException exn) =
                    exit 1
            
 
-reportStackOverflow :: IO a
-reportStackOverflow = do callStackOverflowHook; return undefined
-
-reportError :: SomeException -> IO a
-reportError ex = do
-   handler <- getUncaughtExceptionHandler
-   handler ex
-   return undefined
-
--- SUP: Are the hooks allowed to re-enter Haskell land?  If so, remove
--- the unsafe below.
-foreign import ccall unsafe "stackOverflow"
-        callStackOverflowHook :: IO ()
-
 -- try to flush stdout/stderr, but don't worry if we fail
 -- (these handles might have errors, and we don't want to go into
 -- an infinite loop).
