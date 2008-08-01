@@ -46,7 +46,7 @@ module GHC.IOBase(
     ExitCode(..),
     throwIO, block, unblock, blocked, catchAny, catchException,
     evaluate,
-    ErrorCall(..), ArithException(..), AsyncException(..),
+    ErrorCall(..),
     BlockedOnDeadMVar(..), BlockedIndefinitely(..), Deadlock(..)
   ) where
 
