@@ -47,7 +47,7 @@ module GHC.IOBase(
     throwIO, block, unblock, blocked, catchAny, catchException,
     evaluate,
     ErrorCall(..), ArithException(..), AsyncException(..),
-    BlockedOnDeadMVar(..), BlockedIndefinitely(..),
+    BlockedOnDeadMVar(..), BlockedIndefinitely(..), Deadlock(..)
   ) where
 
 import GHC.ST
@@ -657,6 +657,16 @@ instance Exception BlockedIndefinitely
 
 instance Show BlockedIndefinitely where
     showsPrec _ BlockedIndefinitely = showString "thread blocked indefinitely"
+
+-----
+
+data Deadlock = Deadlock
+    deriving Typeable
+
+instance Exception Deadlock
+
+instance Show Deadlock where
+    showsPrec _ Deadlock = showString "<<deadlock>>"
 
 -----
 

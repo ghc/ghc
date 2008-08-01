@@ -95,6 +95,9 @@ module GHC.Conc
         , win32ConsoleHandler
         , toWin32ConsoleEvent
 #endif
+        , setUncaughtExceptionHandler      -- :: (Exception -> IO ()) -> IO ()
+        , getUncaughtExceptionHandler      -- :: IO (Exception -> IO ())
+
         , reportError, reportStackOverflow
         ) where
 
@@ -108,6 +111,7 @@ import Foreign.C
 import Data.Maybe
 
 import GHC.Base
+import {-# SOURCE #-} GHC.Handle
 import GHC.IOBase
 import GHC.Num          ( Num(..) )
 import GHC.Real         ( fromIntegral, div )
@@ -125,7 +129,6 @@ import GHC.STRef
 import GHC.Show         ( Show(..), showString )
 import Data.Typeable
 import GHC.Err
-import Control.Exception hiding (throwTo)
 
 infixr 0 `par`, `pseq`
 \end{code}
@@ -1264,4 +1267,31 @@ reportError ex = do
 -- the unsafe below.
 foreign import ccall unsafe "stackOverflow"
         callStackOverflowHook :: IO ()
+
+{-# NOINLINE uncaughtExceptionHandler #-}
+uncaughtExceptionHandler :: IORef (SomeException -> IO ())
+uncaughtExceptionHandler = unsafePerformIO (newIORef defaultHandler)
+   where
+      defaultHandler :: SomeException -> IO ()
+      defaultHandler se@(SomeException ex) = do
+         (hFlush stdout) `catchAny` (\ _ -> return ())
+         let msg = case cast ex of
+               Just Deadlock -> "no threads to run:  infinite loop or deadlock?"
+               _ -> case cast ex of
+                    Just (ErrorCall s) -> s
+                    _                  -> showsPrec 0 se ""
+         withCString "%s" $ \cfmt ->
+          withCString msg $ \cmsg ->
+            errorBelch cfmt cmsg
+
+-- don't use errorBelch() directly, because we cannot call varargs functions
+-- using the FFI.
+foreign import ccall unsafe "HsBase.h errorBelch2"
+   errorBelch :: CString -> CString -> IO ()
+
+setUncaughtExceptionHandler :: (SomeException -> IO ()) -> IO ()
+setUncaughtExceptionHandler = writeIORef uncaughtExceptionHandler
+
+getUncaughtExceptionHandler :: IO (SomeException -> IO ())
+getUncaughtExceptionHandler = readIORef uncaughtExceptionHandler
 \end{code}

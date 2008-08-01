@@ -124,23 +124,17 @@ module Control.Exception (
         recSelError, recConError, irrefutPatError, runtimeError,
         nonExhaustiveGuardsError, patError, noMethodBindingError,
         assertError,
-
-#ifdef __GLASGOW_HASKELL__
-        setUncaughtExceptionHandler,      -- :: (Exception -> IO ()) -> IO ()
-        getUncaughtExceptionHandler       -- :: IO (Exception -> IO ())
-#endif
   ) where
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
 import GHC.IOBase
-import {-# SOURCE #-} GHC.Handle
 import GHC.List
 import GHC.Num
 import GHC.Show
 import GHC.IOBase as ExceptionBase
 import GHC.Exception hiding ( Exception )
-import {-# SOURCE #-} GHC.Conc         ( ThreadId(ThreadId) )
+import GHC.Conc         ( ThreadId(ThreadId) )
 import Foreign.C.String ( CString, withCString )
 #endif
 
@@ -516,36 +510,6 @@ assert True x = x
 assert False _ = throw (AssertionFailed "")
 #endif
 
-
-#ifdef __GLASGOW_HASKELL__
-{-# NOINLINE uncaughtExceptionHandler #-}
-uncaughtExceptionHandler :: IORef (SomeException -> IO ())
-uncaughtExceptionHandler = unsafePerformIO (newIORef defaultHandler)
-   where
-      defaultHandler :: SomeException -> IO ()
-      defaultHandler se@(SomeException ex) = do
-         (hFlush stdout) `catchAny` (\ _ -> return ())
-         let msg = case cast ex of
-               Just Deadlock -> "no threads to run:  infinite loop or deadlock?"
-               _ -> case cast ex of
-                    Just (ErrorCall s) -> s
-                    _                  -> showsPrec 0 se ""
-         withCString "%s" $ \cfmt ->
-          withCString msg $ \cmsg ->
-            errorBelch cfmt cmsg
-
--- don't use errorBelch() directly, because we cannot call varargs functions
--- using the FFI.
-foreign import ccall unsafe "HsBase.h errorBelch2"
-   errorBelch :: CString -> CString -> IO ()
-
-setUncaughtExceptionHandler :: (SomeException -> IO ()) -> IO ()
-setUncaughtExceptionHandler = writeIORef uncaughtExceptionHandler
-
-getUncaughtExceptionHandler :: IO (SomeException -> IO ())
-getUncaughtExceptionHandler = readIORef uncaughtExceptionHandler
-#endif
-
 recSelError, recConError, irrefutPatError, runtimeError,
              nonExhaustiveGuardsError, patError, noMethodBindingError
         :: Addr# -> a   -- All take a UTF8-encoded C string
@@ -632,16 +596,6 @@ instance Show NonTermination where
 -- GHC's RTS calls this
 nonTermination :: SomeException
 nonTermination = toException NonTermination
-
------
-
-data Deadlock = Deadlock
-INSTANCE_TYPEABLE0(Deadlock,deadlockTc,"Deadlock")
-
-instance Exception Deadlock
-
-instance Show Deadlock where
-    showsPrec _ Deadlock = showString "<<deadlock>>"
 
 -----
 
