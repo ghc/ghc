@@ -114,9 +114,10 @@ import GHC.Base
 import {-# SOURCE #-} GHC.Handle
 import GHC.IOBase
 import GHC.Num          ( Num(..) )
-import GHC.Real         ( fromIntegral, div )
-#ifndef mingw32_HOST_OS
-import GHC.Base         ( Int(..) )
+import GHC.Real         ( fromIntegral )
+#ifdef mingw32_HOST_OS
+import GHC.Real         ( div )
+import GHC.Ptr          ( plusPtr, FunPtr(..) )
 #endif
 #ifdef mingw32_HOST_OS
 import GHC.Read         ( Read )
@@ -124,7 +125,7 @@ import GHC.Enum         ( Enum )
 #endif
 import GHC.Exception    ( SomeException(..), throw )
 import GHC.Pack         ( packCString# )
-import GHC.Ptr          ( Ptr(..), plusPtr, FunPtr(..) )
+import GHC.Ptr          ( Ptr(..) )
 import GHC.STRef
 import GHC.Show         ( Show(..), showString )
 import Data.Typeable

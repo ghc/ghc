@@ -22,15 +22,11 @@ module GHC.Dotnet
         , checkResult
         ) where
 
-import GHC.Prim
 import GHC.Base
 import GHC.Exception
-import GHC.IO
 import GHC.IOBase
 import GHC.Ptr
-import Foreign.Marshal.Array
 import Foreign.Marshal.Alloc
-import Foreign.Storable
 import Foreign.C.String
 
 data Object a

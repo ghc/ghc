@@ -64,8 +64,8 @@ import Foreign.C.Types (CInt)
 import GHC.Exception
 
 #ifndef __HADDOCK__
-import {-# SOURCE #-} Data.Typeable     ( Typeable, showsTypeRep )
-import {-# SOURCE #-} Data.Dynamic      ( Dynamic, dynTypeRep )
+import {-# SOURCE #-} Data.Typeable     ( Typeable )
+import {-# SOURCE #-} Data.Dynamic      ( Dynamic )
 #endif
 
 -- ---------------------------------------------------------------------------

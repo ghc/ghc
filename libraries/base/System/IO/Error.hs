@@ -98,7 +98,6 @@ import Data.Maybe
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
 import GHC.IOBase
-import GHC.Exception
 import Text.Show
 #endif
 

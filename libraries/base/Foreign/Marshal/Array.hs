@@ -62,7 +62,6 @@ module Foreign.Marshal.Array (
   advancePtr,     -- :: Storable a => Ptr a -> Int -> Ptr a
 ) where
 
-import Control.Monad
 import Foreign.Ptr      (Ptr, plusPtr)
 import Foreign.Storable (Storable(sizeOf,peekElemOff,pokeElemOff))
 import Foreign.Marshal.Alloc (mallocBytes, allocaBytes, reallocBytes)

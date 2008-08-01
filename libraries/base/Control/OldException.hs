@@ -138,7 +138,6 @@ import GHC.IOBase ( IO )
 import GHC.IOBase (block, unblock, evaluate, catchException, throwIO)
 import qualified GHC.IOBase as ExceptionBase
 import qualified GHC.IOBase as New
-import GHC.Exception hiding ( Exception )
 import GHC.Conc hiding (setUncaughtExceptionHandler,
                         getUncaughtExceptionHandler)
 import Data.IORef       ( IORef, newIORef, readIORef, writeIORef )
@@ -151,6 +150,7 @@ import Hugs.Exception   as ExceptionBase
 #endif
 
 import qualified Control.Exception as New
+import           Control.Exception ( throw, SomeException )
 import System.IO.Error  hiding ( catch, try )
 import System.IO.Unsafe (unsafePerformIO)
 import Data.Dynamic
@@ -721,7 +721,7 @@ data Exception
 INSTANCE_TYPEABLE0(Exception,exceptionTc,"Exception")
 
 nonTermination :: SomeException
-nonTermination = toException NonTermination
+nonTermination = New.toException NonTermination
 
 -- For now at least, make the monolithic Exception type an instance of
 -- the Exception class

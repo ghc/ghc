@@ -146,21 +146,16 @@ module Prelude (
 #ifndef __HUGS__
 import Control.Monad
 import System.IO
-import Text.Read
-import Text.Show
 import Data.List
 import Data.Either
 import Data.Maybe
-import Data.Bool
 import Data.Tuple
-import Data.Eq
-import Data.Ord
 #endif
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
 import GHC.IOBase
-import GHC.Exception
+import GHC.Exception ( throw )
 import GHC.Read
 import GHC.Enum
 import GHC.Num
@@ -170,7 +165,7 @@ import GHC.Show
 import GHC.Err   ( error, undefined )
 #endif
 
-import qualified Control.OldException as Old
+import qualified Control.OldException as Old hiding ( throw )
 
 #ifdef __HUGS__
 import Hugs.Prelude

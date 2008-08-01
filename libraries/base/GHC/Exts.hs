@@ -51,7 +51,6 @@ import GHC.Prim
 import GHC.Base
 import GHC.Word
 import GHC.Int
-import GHC.Num
 import GHC.Float
 import GHC.Ptr
 import Data.String

@@ -21,7 +21,7 @@ module Data.Either (
    partitionEithers, -- :: [Either a b] -> ([a],[b])
  ) where
 
-import Data.Tuple
+import Data.Tuple ()
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base

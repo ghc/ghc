@@ -35,7 +35,7 @@ module GHC.Err
 #ifndef __HADDOCK__
 import GHC.Base
 import GHC.IOBase
-import GHC.List     ( span )
+import GHC.List ()
 import GHC.Exception
 #endif
 \end{code}

@@ -58,7 +58,6 @@ module GHC.Handle (
  ) where
 
 import Control.Monad
-import Data.Bits
 import Data.Maybe
 import Foreign
 import Foreign.C
@@ -77,7 +76,6 @@ import GHC.Exception
 import GHC.Enum
 import GHC.Num          ( Integer(..), Num(..) )
 import GHC.Show
-import GHC.Real         ( toInteger )
 #if defined(DEBUG_DUMP)
 import GHC.Pack
 #endif

@@ -101,20 +101,6 @@ module Foreign.C.Error (
 #include "HsBaseConfig.h"
 #endif
 
--- system dependent imports
--- ------------------------
-
--- GHC allows us to get at the guts inside IO errors/exceptions
---
-#if __GLASGOW_HASKELL__
-import GHC.IOBase (IOException(..), IOErrorType(..))
-#endif /* __GLASGOW_HASKELL__ */
-
-
--- regular imports
--- ---------------
-
-import Foreign.Storable
 import Foreign.Ptr
 import Foreign.C.Types
 import Foreign.C.String
