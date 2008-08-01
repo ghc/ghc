@@ -1,9 +1,0 @@
-\begin{code}
-{-# OPTIONS_GHC -XNoImplicitPrelude #-}
-
-module GHC.Conc where
-
-import GHC.Prim
-
-data ThreadId = ThreadId ThreadId#
-\end{code}
