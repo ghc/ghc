@@ -68,18 +68,15 @@ module Control.Exception (
         -- ** The @catch@ functions
         catch,     -- :: IO a -> (Exception -> IO a) -> IO a
         catches, Handler(..),
-        catchAny,
         catchJust, -- :: (Exception -> Maybe b) -> IO a -> (b -> IO a) -> IO a
 
         -- ** The @handle@ functions
         handle,    -- :: (Exception -> IO a) -> IO a -> IO a
-        handleAny,
         handleJust,-- :: (Exception -> Maybe b) -> (b -> IO a) -> IO a -> IO a
 
         -- ** The @try@ functions
         try,       -- :: IO a -> IO (Either Exception a)
         tryJust,   -- :: (Exception -> Maybe b) -> a    -> IO (Either b a)
-        ignoreExceptions,
         onException,
 
         -- ** The @evaluate@ function
@@ -290,9 +287,6 @@ catchJust p a handler = catch a handler'
 handle     :: Exception e => (e -> IO a) -> IO a -> IO a
 handle     =  flip catch
 
-handleAny  :: (forall e . Exception e => e -> IO a) -> IO a -> IO a
-handleAny  =  flip catchAny
-
 -- | A version of 'catchJust' with the arguments swapped around (see
 -- 'handle').
 handleJust :: Exception e => (e -> Maybe b) -> (b -> IO a) -> IO a -> IO a
@@ -343,9 +337,6 @@ tryJust p a = do
                         Nothing -> throw e
                         Just b  -> return (Left b)
 
-ignoreExceptions :: IO () -> IO ()
-ignoreExceptions io = io `catchAny` \_ -> return ()
-
 onException :: IO a -> IO () -> IO a
 onException io what = io `catch` \e -> do what
                                           throw (e :: SomeException)
@@ -381,9 +372,7 @@ bracket
 bracket before after thing =
   block (do
     a <- before 
-    r <- catchAny
-           (unblock (thing a))
-           (\e -> do { after a; throw e })
+    r <- unblock (thing a) `onException` after a
     after a
     return r
  )
@@ -398,9 +387,7 @@ finally :: IO a         -- ^ computation to run first
         -> IO a         -- returns the value from the first computation
 a `finally` sequel =
   block (do
-    r <- catchAny
-             (unblock a)
-             (\e -> do { sequel; throw e })
+    r <- unblock a `onException` sequel
     sequel
     return r
   )
@@ -420,9 +407,7 @@ bracketOnError
 bracketOnError before after thing =
   block (do
     a <- before 
-    catchAny
-        (unblock (thing a))
-        (\e -> do { after a; throw e })
+    unblock (thing a) `onException` after a
  )
 
 -- -----------------------------------------------------------------------------
