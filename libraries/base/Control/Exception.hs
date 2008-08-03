@@ -337,7 +337,7 @@ tryJust p a = do
                         Nothing -> throw e
                         Just b  -> return (Left b)
 
-onException :: IO a -> IO () -> IO a
+onException :: IO a -> IO b -> IO a
 onException io what = io `catch` \e -> do what
                                           throw (e :: SomeException)
 
