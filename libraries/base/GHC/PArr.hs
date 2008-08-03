@@ -149,7 +149,7 @@ module GHC.PArr (
 import Prelude
 
 import GHC.ST   ( ST(..), runST )
-import GHC.Exts ( Int#, Array#, Int(I#), MutableArray#, newArray#,
+import GHC.Base ( Int#, Array#, Int(I#), MutableArray#, newArray#,
                   unsafeFreezeArray#, indexArray#, writeArray#, (<#), (>=#) )
 
 infixl 9  !:
