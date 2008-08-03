@@ -46,7 +46,7 @@ module GHC.IOBase(
     ExitCode(..),
     throwIO, block, unblock, blocked, catchAny, catchException,
     evaluate,
-    ErrorCall(..),
+    ErrorCall(..), AssertionFailed(..), assertError, untangle,
     BlockedOnDeadMVar(..), BlockedIndefinitely(..), Deadlock(..)
   ) where
 
@@ -670,6 +670,16 @@ instance Show Deadlock where
 
 -----
 
+data AssertionFailed = AssertionFailed String
+    deriving Typeable
+
+instance Exception AssertionFailed
+
+instance Show AssertionFailed where
+    showsPrec _ (AssertionFailed err) = showString err
+
+-----
+
 -- |The type of arithmetic exceptions
 data ArithException
   = Overflow
@@ -1004,5 +1014,36 @@ evaluate a = IO $ \s -> case a `seq` () of () -> (# s, a #)
         -- NB. can't write
         --      a `seq` (# s, a #)
         -- because we can't have an unboxed tuple as a function argument
+\end{code}
+
+\begin{code}
+assertError :: Addr# -> Bool -> a -> a
+assertError str pred v
+  | pred      = v
+  | otherwise = throw (AssertionFailed (untangle str "Assertion failed"))
+
+{-
+(untangle coded message) expects "coded" to be of the form
+        "location|details"
+It prints
+        location message details
+-}
+untangle :: Addr# -> String -> String
+untangle coded message
+  =  location
+  ++ ": "
+  ++ message
+  ++ details
+  ++ "\n"
+  where
+    coded_str = unpackCStringUtf8# coded
+
+    (location, details)
+      = case (span not_bar coded_str) of { (loc, rest) ->
+        case rest of
+          ('|':det) -> (loc, ' ' : det)
+          _         -> (loc, "")
+        }
+    not_bar c = c /= '|'
 \end{code}
 

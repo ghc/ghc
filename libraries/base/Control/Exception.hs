@@ -558,16 +558,6 @@ instance Show NoMethodError where
 
 -----
 
-data AssertionFailed = AssertionFailed String
-INSTANCE_TYPEABLE0(AssertionFailed,assertionFailedTc,"AssertionFailed")
-
-instance Exception AssertionFailed
-
-instance Show AssertionFailed where
-    showsPrec _ (AssertionFailed err) = showString err
-
------
-
 data NonTermination = NonTermination
 INSTANCE_TYPEABLE0(NonTermination,nonTerminationTc,"NonTermination")
 
@@ -599,35 +589,6 @@ nestedAtomically = toException NestedAtomically
 instance Exception Dynamic
 
 -----
-
-assertError :: Addr# -> Bool -> a -> a
-assertError str pred v
-  | pred      = v
-  | otherwise = throw (AssertionFailed (untangle str "Assertion failed"))
-
-{-
-(untangle coded message) expects "coded" to be of the form
-        "location|details"
-It prints
-        location message details
--}
-untangle :: Addr# -> String -> String
-untangle coded message
-  =  location
-  ++ ": " 
-  ++ message
-  ++ details
-  ++ "\n"
-  where
-    coded_str = unpackCStringUtf8# coded
-
-    (location, details)
-      = case (span not_bar coded_str) of { (loc, rest) ->
-        case rest of
-          ('|':det) -> (loc, ' ' : det)
-          _         -> (loc, "")
-        }
-    not_bar c = c /= '|'
 
 -- XXX From GHC.Conc
 throwTo :: Exception e => ThreadId -> e -> IO ()
