@@ -1,6 +1,23 @@
-Changes in version 2.2.0:
+Changes in version 2.2.1:
 
-  * It is not longer required to specify the path to GHC's lib dir
+  * Support for GHC 6.8.3
+
+  * The Hoogle backend is back, thanks to Neil Mitchell. The plan is to be
+    compatible with the upcoming Hoogle 4 pre-release
+
+  * Show associated types in the documentation for class declarations
+
+  * Show type family declarations
+
+  * Show type equality predicates
+
+  * Major bug fixes (#1 and #44)
+
+  * It is no longer required to specify the path to GHC's lib dir
+
+  * Remove unnecessary parenthesis in type signatures
+
+-----------------------------------------------------------------------------
 
 Changes in version 2.1.0:
 
