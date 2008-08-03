@@ -269,6 +269,8 @@ filterDecls decls = filter (isHandled . unL . fst) decls
     isHandled (TyClD {}) = True
     isHandled (InstD {}) = True
     isHandled (SigD d) = isVanillaLSig (reL d)
+    -- we keep doc declarations to be able to get at named docs
+    isHandled (DocD _) = True
     isHandled _ = False
 
 
