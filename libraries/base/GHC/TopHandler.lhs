@@ -38,6 +38,9 @@ import GHC.Handle
 import GHC.IOBase
 import GHC.Weak
 import Data.Typeable
+#if defined(mingw32_HOST_OS)
+import GHC.ConsoleHandler
+#endif
 
 -- | 'runMainIO' is wrapped around 'Main.main' (or whatever main is
 -- called in the program).  It catches otherwise uncaught exceptions,

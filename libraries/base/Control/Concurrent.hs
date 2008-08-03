@@ -470,7 +470,7 @@ withThread io = do
   x <- takeMVar m
   case x of
     Right a -> return a
-    Left e  -> throwIO e
+    Left e  -> throwIO (e :: IOException)
 
 waitFd :: Fd -> CInt -> IO ()
 waitFd fd write = do
