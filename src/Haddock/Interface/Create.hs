@@ -408,8 +408,11 @@ mkExportItems modMap this_mod exported_names decls declMap famMap sub_map
 
     declWith :: Name -> ErrMsgM [ ExportItem Name ]
     declWith t
-      | Just (decl, maybeDoc) <- findDecl t
-        = return [ ExportDecl (restrictTo subs (extractDecl t mdl decl)) maybeDoc [] ]
+      -- temp hack: we filter out separately declared ATs, since we haven't decided how
+      -- to handle them yet. We should really give an warning message also, and filter the
+      -- name out in mkVisibleNames...
+      | Just (decl, maybeDoc) <- findDecl t, t `notElem` declATs (unL decl) =
+          return [ ExportDecl (restrictTo subs (extractDecl t mdl decl)) maybeDoc [] ]
       | otherwise = return []
      where 
        mdl = nameModule t

@@ -92,6 +92,10 @@ isInstD (TyClD d) = isFamInstDecl d
 isInstD _ = False
 
 
+declATs (TyClD d) | isClassDecl d = map (tcdName . unL) $ tcdATs d
+declATs _ = []
+
+
 pretty :: Outputable a => a -> String
 pretty x = showSDoc (ppr x)
 
