@@ -421,18 +421,18 @@ mkExportItems modMap this_mod exported_names decls declMap famMap sub_map
       case r of
         Nothing -> return []
         Just found -> return [ ExportDoc found ]
- 
+
     declWith :: Name -> ErrMsgM [ ExportItem Name ]
     declWith t
-	| Just (decl, maybeDoc) <- findDecl t
+      | Just (decl, maybeDoc) <- findDecl t
         = return [ ExportDecl (restrictTo subs (extractDecl t mdl decl)) maybeDoc [] ]
-	| otherwise
-	= return []
-	where 
-              mdl = nameModule t
-	      subs = filter (`elem` exported_names) all_subs
-              all_subs | mdl == this_mod = Map.findWithDefault [] t sub_map
-		       | otherwise       = allSubsOfName modMap t
+      | otherwise = return []
+     where 
+       mdl = nameModule t
+       subs = filter (`elem` exported_names) all_subs
+       all_subs
+         | mdl == this_mod = Map.findWithDefault [] t sub_map
+         | otherwise       = allSubsOfName modMap t
 
     fullContentsOf m  
 	| m == this_mod = return (fullContentsOfThisModule this_mod decls)
