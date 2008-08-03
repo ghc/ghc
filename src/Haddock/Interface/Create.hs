@@ -191,12 +191,9 @@ classDataSubs decl
     fields       = concat [ fields | RecCon fields <- map con_details cons]
 
 
--- All the sub declarations of a class (except default methods), ordered by
+-- All the sub declarations of a class (that we handle), ordered by
 -- source location, with documentation attached if it exists. 
-classDecls = filter notDef . collectDocs . sortByLoc . declsFromClass
-  where
-    notDef (L _ (ValD _), _) = False
-    notDef _                 = True  
+classDecls = filterDecls . collectDocs . sortByLoc . declsFromClass
 
 
 declsFromClass class_ = docs ++ defs ++ sigs ++ ats
@@ -236,15 +233,6 @@ declsFromGroup group =
     sigs (ValBindsOut _ x) = x
 
 
--- | Filter out declarations that we don't handle in Haddock
-filterDecls :: [DeclWithDoc] -> [DeclWithDoc]
-filterDecls decls = filter (isHandled . unL . fst) decls
-  where
-    -- TODO: filter out exactly everything we don't handle   
-    isHandled (ForD (ForeignExport {})) = False
-    isHandled _ = True 
-
-
 -- | Take a field of declarations from a data structure and create HsDecls
 -- using the given constructor
 decls field con struct = [ L loc (con decl) | L loc decl <- field struct ]
@@ -275,6 +263,29 @@ warnAboutFilteredDecls mod decls = do
       "Warning: " ++ modStr ++ ": Rendering of associated types for instances has "
       ++ "not yet been implemented. Associated types will not be shown for the "
       ++ "following instances:\n" ++ (concat $ intersperse ", " instances) ]
+
+
+--------------------------------------------------------------------------------
+-- Filtering of declarations
+--
+-- We filter out declarations that we don't intend to handle later.
+--------------------------------------------------------------------------------
+
+
+-- | Filter out declarations that we don't handle in Haddock
+filterDecls :: [DeclWithDoc] -> [DeclWithDoc]
+filterDecls decls = filter (isHandled . unL . fst) decls
+  where
+    -- TODO: filter out exactly everything we don't handle   
+    isHandled (ForD (ForeignExport {})) = False
+    isHandled (SigD d) = isHandledSig d
+    isHandled (ValD d) = False
+    isHandled _ = True 
+
+
+-- | Is the 'Sig' handled by Haddock?
+isHandledSig (TypeSig {}) = True
+isHandledSig _ = False
 
 
 --------------------------------------------------------------------------------
