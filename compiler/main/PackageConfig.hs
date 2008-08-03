@@ -50,7 +50,7 @@ defaultPackageConfig = emptyInstalledPackageInfo
 -- package sub-system.
 --
 -- This means that in theory you could have multiple base packages installed
--- (for example), and switch between them using @-package@/@-hide-package@.
+-- (for example), and switch between them using @-package@\/@-hide-package@.
 --
 -- A 'PackageId' is a string of the form @<pkg>-<version>@.
 

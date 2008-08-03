@@ -303,7 +303,7 @@ packageIdString = unpackFS . packageIdFS
 -- normal in the packages database, and you can still have multiple
 -- versions of them installed.  However, for each invocation of GHC,
 -- only a single instance of each wired-in package will be recognised
--- (the desired one is selected via @-package@/@-hide-package@), and GHC
+-- (the desired one is selected via @-package@\/@-hide-package@), and GHC
 -- will use the unversioned 'PackageId' below when referring to it,
 -- including in .hi files and object file symbols.  Unselected
 -- versions of wired-in packages will be ignored, as will any other
