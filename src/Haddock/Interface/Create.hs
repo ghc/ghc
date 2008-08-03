@@ -278,14 +278,9 @@ filterDecls decls = filter (isHandled . unL . fst) decls
   where
     -- TODO: filter out exactly everything we don't handle   
     isHandled (ForD (ForeignExport {})) = False
-    isHandled (SigD d) = isHandledSig d
+    isHandled (SigD d) = isVanillaLSig (reL d)
     isHandled (ValD d) = False
     isHandled _ = True 
-
-
--- | Is the 'Sig' handled by Haddock?
-isHandledSig (TypeSig {}) = True
-isHandledSig _ = False
 
 
 --------------------------------------------------------------------------------
