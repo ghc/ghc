@@ -184,7 +184,10 @@ classDataSubs decl
   | isDataDecl  decl = recordFields
   | otherwise        = []
   where
-    classMeths   = [ (declName d, doc) | (L _ d, doc) <- classDecls decl ]
+    -- for now, we don't include AT names in the map, since we can't yet
+    -- handle separately exported ATs. (We should warn about this, really).
+    classMeths   = [ (declName d, doc) | (L _ d, doc) <- classDecls decl
+                                       , not (isTyClD d) ]
     recordFields = [ (unLoc lname, fmap unLoc doc) |
                      ConDeclField lname _ doc <- fields ]
     cons         = [ con | L _ con <- tcdCons decl ]
@@ -349,6 +352,14 @@ mkSubMap group = Map.fromList [ (name, subs) | L _ tycld <- hs_tyclds group,
  let name:subs = map unLoc (tyClDeclNames tycld) ]
 
 
+{-
+attachATs :: [IE Name] -> ([IE Name], [Name])
+attachATs exports = 
+  where
+    ats =   <- export ]
+-}
+
+
 -- | Build the list of items that will become the documentation, from the
 -- export list.  At this point, the list of ExportItems is in terms of
 -- original names.
@@ -450,6 +461,7 @@ extractDecl name mdl decl
       TyClD d | isClassDecl d -> 
         let matches = [ sig | sig <- tcdSigs d, sigName sig == Just name,
                         isVanillaLSig sig ] -- TODO: document fixity
+--        let assocMathes = [ tyDecl | at <- tcdATs d,  ] 
         in case matches of 
           [s0] -> let (n, tyvar_names) = name_and_tyvars d
                       L pos sig = extractClassDecl n mdl tyvar_names s0
