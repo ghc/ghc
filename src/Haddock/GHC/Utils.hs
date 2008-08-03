@@ -28,6 +28,10 @@ unL :: Located a -> a
 unL (L _ x) = x
 
 
+reL :: a -> Located a
+reL = L undefined
+
+
 moduleString :: Module -> String
 moduleString = moduleNameString . moduleName 
 

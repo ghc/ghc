@@ -60,8 +60,6 @@ ppModule iface = "" : doc (ifaceDoc iface) ++
 ---------------------------------------------------------------------
 -- Utility functions
 
-reL = L undefined
-
 
 dropComment (' ':'-':'-':' ':_) = []
 dropComment (x:xs) = x : dropComment xs
