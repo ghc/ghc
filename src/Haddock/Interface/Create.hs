@@ -146,7 +146,7 @@ type Family = (Maybe DeclWithDoc, [DeclWithDoc])
 mkDeclMap :: [DeclWithDoc] -> Map Name DeclWithDoc
 mkDeclMap decls = Map.fromList [ (n, (L loc d, doc)) | (L loc d, doc) <- decls 
                                , (n, doc) <- (declName d, doc) : subordinates d
-                               , not (isDoc d), not (isInstance d) ]
+                               , not (isDocD d), not (isInstD d) ]
 
 
 -- | Group type family instances together. Include the family declaration
@@ -161,21 +161,6 @@ mkFamMap decls =
     ex ((L _ (TyClD d)), _) = d
 -}
 
-isTyClD (TyClD _) = True
-isTyClD _ = False
-
-
-isClassD (TyClD d) = isClassDecl d
-isClassD _ = False
-
-
-isDoc (DocD _) = True
-isDoc _ = False
-
-
-isInstance (InstD _) = True
-isInstance (TyClD d) = isFamInstDecl d
-isInstance _ = False
 
 
 subordinates (TyClD d) = classDataSubs d
@@ -188,10 +173,7 @@ classDataSubs decl
   | isDataDecl  decl = recordFields
   | otherwise        = []
   where
-    -- for now, we don't include AT names in the map, since we can't yet
-    -- handle separately exported ATs. (We should warn about this, really).
-    classMeths   = [ (declName d, doc) | (L _ d, doc) <- classDecls decl
-                                       , not (isTyClD d) ]
+    classMeths   = [ (declName d, doc) | (L _ d, doc) <- classDecls decl ]
     recordFields = [ (unLoc lname, fmap unLoc doc) |
                      ConDeclField lname _ doc <- fields ]
     cons         = [ con | L _ con <- tcdCons decl ]
@@ -223,7 +205,7 @@ topDecls :: HsGroup Name -> [DeclWithDoc]
 topDecls = filterClasses . filterDecls . collectDocs . sortByLoc . declsFromGroup
 
 
-filterOutInstances = filter (\(L _ d, _) -> not (isInstance d))
+filterOutInstances = filter (\(L _ d, _) -> not (isInstD d))
 
 
 -- | Take all declarations in an 'HsGroup' and convert them into a list of
@@ -396,7 +378,7 @@ mkExportItems modMap this_mod exported_names decls declMap famMap sub_map
     = everything_local_exported
   | Just specs <- maybe_exps = liftM concat $ mapM lookupExport specs
   where
-    instances = [ d  | d@(L _ decl, _) <- decls, isInstance decl ]
+    instances = [ d  | d@(L _ decl, _) <- decls, isInstD decl ]
 
     everything_local_exported =  -- everything exported
       return (fullContentsOfThisModule this_mod decls)

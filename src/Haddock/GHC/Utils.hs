@@ -75,6 +75,23 @@ getMainDeclBinder (ForD (ForeignExport _ _ _)) = Nothing
 getMainDeclBinder _ = Nothing
 
 
+isTyClD (TyClD _) = True
+isTyClD _ = False
+
+
+isClassD (TyClD d) = isClassDecl d
+isClassD _ = False
+
+
+isDocD (DocD _) = True
+isDocD _ = False
+
+
+isInstD (InstD _) = True
+isInstD (TyClD d) = isFamInstDecl d
+isInstD _ = False
+
+
 pretty :: Outputable a => a -> String
 pretty x = showSDoc (ppr x)
 
