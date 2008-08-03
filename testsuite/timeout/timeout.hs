@@ -1,9 +1,10 @@
 {-# OPTIONS -cpp #-}
 
+import Prelude hiding (catch)
+
 import Control.Concurrent (forkIO, threadDelay)
 import Control.Concurrent.MVar (putMVar, takeMVar, newEmptyMVar)
-import Control.Exception (ignoreExceptions, catchAny, throw, catch)
-import Control.OldException (Exception(ExitException), catch)
+import Control.Exception (throw, catch, try, IOException)
 import Data.Maybe (isNothing)
 import System.Cmd (system)
 import System.Environment (getArgs)
@@ -46,22 +47,29 @@ run secs cmd = do
         forkIO (do threadDelay (secs * 1000000)
                    putMVar m Nothing
                )
-        forkIO (ignoreExceptions (do
-                           pid <- systemSession cmd
-                           ph <- mkProcessHandle pid
-                           putMVar mp (pid,ph)
+        forkIO (do ei <- try $ do pid <- systemSession cmd
+                                  ph <- mkProcessHandle pid
+                                  return (pid, ph)
+                   putMVar mp ei
+                   case ei of
+                       Left _ -> return ()
+                       Right (_, ph) -> do
                            r <- waitForProcess ph
-                           putMVar m (Just r)))
-
-        (pid,ph) <- takeMVar mp
-        r <- takeMVar m
-        case r of
-          Nothing -> do
-                hPutStrLn stderr timeoutMsg
-                killProcess pid ph
-                exitWith (ExitFailure 99)
-          Just r -> do
-                exitWith r
+                           putMVar m (Just r))
+        ei_pid_ph <- takeMVar mp
+        case ei_pid_ph of
+            Left e -> do hPutStrLn stderr
+                                   ("Timeout:\n" ++ show (e :: IOException))
+                         exitWith (ExitFailure 98)
+            Right (pid,ph) -> do
+                r <- takeMVar m
+                case r of
+                  Nothing -> do
+                        hPutStrLn stderr timeoutMsg
+                        killProcess pid ph
+                        exitWith (ExitFailure 99)
+                  Just r -> do
+                        exitWith r
 
 systemSession cmd =
  forkProcess $ do
@@ -74,7 +82,7 @@ systemSession cmd =
    -- more threads.
 
 killProcess pid ph = do
-  ignoreExceptions (signalProcessGroup sigTERM pid)
+  ignoreIOExceptions (signalProcessGroup sigTERM pid)
   checkReallyDead 10
   where
     checkReallyDead 0 = hPutStrLn stderr "checkReallyDead: Giving up"
@@ -82,8 +90,11 @@ killProcess pid ph = do
       do threadDelay (3*100000) -- 3/10 sec
          m <- getProcessExitCode ph
          when (isNothing m) $ do
-             ignoreExceptions (signalProcessGroup sigKILL pid)
+             ignoreIOExceptions (signalProcessGroup sigKILL pid)
              checkReallyDead n
+
+ignoreIOExceptions :: IO () -> IO ()
+ignoreIOExceptions io = io `catch` ((\_ -> return ()) :: IOException -> IO ())
 
 #else
 run secs cmd =
