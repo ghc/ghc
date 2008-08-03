@@ -213,17 +213,19 @@ declName (ForD (ForeignImport n _ _)) = unLoc n
 declName (SigD sig) = fromJust $ sigNameNoLoc sig
 
 
--- All the top-level declarations of a module, ordered by source location,
--- with documentation attached if it exists.
+-- | The top-level declarations of a module that we care about, 
+-- ordered by source location, with documentation attached if it exists.
 topDecls :: HsGroup Name -> [DeclWithDoc] 
-topDecls = collectDocs . sortByLoc . declsFromGroup    
+topDecls = filterDecls . collectDocs . sortByLoc . declsFromGroup    
 
 
 filterOutInstances = filter (\(L _ d, _) -> not (isInstance d))
 
 
--- | Pick out the declarations that we want from a group
+-- | Take all declarations in an 'HsGroup' and convert them into a list of
+-- 'LHsDecl's
 declsFromGroup :: HsGroup Name -> [LHsDecl Name]
+-- TODO: actually take all declarations
 declsFromGroup group = 
   decls hs_tyclds TyClD group ++
   decls hs_fords  ForD  group ++
@@ -232,6 +234,15 @@ declsFromGroup group =
   decls (sigs . hs_valds) SigD group
   where
     sigs (ValBindsOut _ x) = x
+
+
+-- | Filter out declarations that we don't handle in Haddock
+filterDecls :: [DeclWithDoc] -> [DeclWithDoc]
+filterDecls decls = filter (isHandled . unL . fst) decls
+  where
+    -- TODO: filter out exactly everything we don't handle   
+    isHandled (ForD (ForeignExport {})) = False
+    isHandled _ = True 
 
 
 -- | Take a field of declarations from a data structure and create HsDecls
