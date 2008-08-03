@@ -130,7 +130,7 @@ import GHC.List
 import GHC.Show
 import GHC.IOBase as ExceptionBase
 import GHC.Exception hiding ( Exception )
-import GHC.Conc         ( ThreadId(ThreadId) )
+import GHC.Conc
 #endif
 
 #ifdef __HUGS__
@@ -587,11 +587,4 @@ nestedAtomically = toException NestedAtomically
 -----
 
 instance Exception Dynamic
-
------
-
--- XXX From GHC.Conc
-throwTo :: Exception e => ThreadId -> e -> IO ()
-throwTo (ThreadId id) ex = IO $ \ s ->
-   case (killThread# id (toException ex) s) of s1 -> (# s1, () #)
 

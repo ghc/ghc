@@ -263,11 +263,11 @@ The memory used by the thread will be garbage collected if it isn\'t
 referenced from anywhere.  The 'killThread' function is defined in
 terms of 'throwTo':
 
-> killThread tid = throwTo tid (AsyncException ThreadKilled)
+> killThread tid = throwTo tid ThreadKilled
 
 -}
 killThread :: ThreadId -> IO ()
-killThread tid = throwTo tid (toException ThreadKilled)
+killThread tid = throwTo tid ThreadKilled
 
 {- | 'throwTo' raises an arbitrary exception in the target thread (GHC only).
 
@@ -299,10 +299,9 @@ unblock and then re-block exceptions (using 'unblock' and 'block') without recei
 a pending 'throwTo'.  This is arguably undesirable behaviour.
 
  -}
--- XXX This is duplicated in Control.{Old,}Exception
-throwTo :: ThreadId -> SomeException -> IO ()
+throwTo :: Exception e => ThreadId -> e -> IO ()
 throwTo (ThreadId id) ex = IO $ \ s ->
-   case (killThread# id ex s) of s1 -> (# s1, () #)
+   case (killThread# id (toException ex) s) of s1 -> (# s1, () #)
 
 -- | Returns the 'ThreadId' of the calling thread (GHC only).
 myThreadId :: IO ThreadId
