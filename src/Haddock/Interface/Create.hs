@@ -165,6 +165,10 @@ isTyClD (TyClD _) = True
 isTyClD _ = False
 
 
+isClassD (TyClD d) = isClassDecl d
+isClassD _ = False
+
+
 isDoc (DocD _) = True
 isDoc _ = False
 
@@ -216,7 +220,7 @@ declName (SigD sig) = fromJust $ sigNameNoLoc sig
 -- | The top-level declarations of a module that we care about, 
 -- ordered by source location, with documentation attached if it exists.
 topDecls :: HsGroup Name -> [DeclWithDoc] 
-topDecls = filterDecls . collectDocs . sortByLoc . declsFromGroup    
+topDecls = filterClasses . filterDecls . collectDocs . sortByLoc . declsFromGroup
 
 
 filterOutInstances = filter (\(L _ d, _) -> not (isInstance d))
@@ -279,11 +283,20 @@ warnAboutFilteredDecls mod decls = do
 filterDecls :: [DeclWithDoc] -> [DeclWithDoc]
 filterDecls decls = filter (isHandled . unL . fst) decls
   where
-    -- TODO: filter out exactly everything we don't handle   
-    isHandled (ForD (ForeignExport {})) = False
+    isHandled (ForD (ForeignImport {})) = True
+    isHandled (TyClD {}) = True
+    isHandled (InstD {}) = True
     isHandled (SigD d) = isVanillaLSig (reL d)
-    isHandled (ValD d) = False
-    isHandled _ = True 
+    isHandled _ = False
+
+
+-- | Go through all class declarations and filter their sub-declarations
+filterClasses :: [DeclWithDoc] -> [DeclWithDoc]
+filterClasses decls = [ if isClassD d then (L loc (filterClass d), doc) else x 
+                      | x@(L loc d, doc) <- decls ]
+  where
+    filterClass (TyClD c) =
+      TyClD $ c { tcdSigs = filter isVanillaLSig $ tcdSigs c }  
 
 
 --------------------------------------------------------------------------------
