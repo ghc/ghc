@@ -38,7 +38,6 @@ module GHC.List (
 
  ) where
 
-import Data.Tuple()     -- Instances
 import Data.Maybe
 import GHC.Base
 
