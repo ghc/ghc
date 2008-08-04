@@ -273,6 +273,9 @@ test('faxen', normal, compile, [''])
 test('T1495', normal, compile, [''])
 test('T2045', normal, compile, [''])   # Needs -fhpc
 test('T2478', normal, compile, ['']) 
+test('T2433', extra_clean(['T2433_Help.hi', 'T2433_Help.o']), 
+     multimod_compile, ['T2433', '-v0'])
+     
 
 # Omitting temporarily
 test('syn-perf', normal, compile, ['-fcontext-stack=30'])
