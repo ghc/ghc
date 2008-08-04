@@ -127,7 +127,6 @@ module Control.Exception (
 #ifdef __GLASGOW_HASKELL__
         recSelError, recConError, irrefutPatError, runtimeError,
         nonExhaustiveGuardsError, patError, noMethodBindingError,
-        assertError,
 #endif
   ) where
 
