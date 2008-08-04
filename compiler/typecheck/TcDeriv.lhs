@@ -467,13 +467,17 @@ mkEqnHelp orig tvs cls cls_tys tc_app mtheta
 	          -- we want to check the instance tycon, not the family tycon
 
 	-- For standalone deriving (mtheta /= Nothing), 
-	-- check that all the data constructors are in scope
+	-- check that all the data constructors are in scope.
+	-- No need for this when deriving Typeable, becuase we don't need
+	-- the constructors for that.
 	-- By this time we know that the thing is algebraic
 	--	because we've called checkInstHead in derivingStandalone
 	; rdr_env <- getGlobalRdrEnv
 	; let hidden_data_cons = isAbstractTyCon rep_tc || any not_in_scope (tyConDataCons rep_tc)
 	      not_in_scope dc  = null (lookupGRE_Name rdr_env (dataConName dc))
-	; checkTc (isNothing mtheta || not hidden_data_cons) 
+	; checkTc (isNothing mtheta || 
+	  	   not hidden_data_cons ||
+		   className cls `elem` typeableClassNames) 
 		  (derivingHiddenErr tycon)
 
 	; mayDeriveDataTypeable <- doptM Opt_DeriveDataTypeable
