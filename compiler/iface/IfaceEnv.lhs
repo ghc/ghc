@@ -193,7 +193,8 @@ newIPName occ_name_ip = do
 \begin{code}
 lookupOrigNameCache :: OrigNameCache -> Module -> OccName -> Maybe Name
 lookupOrigNameCache _ mod occ
-  | mod == dATA_TUP || mod == gHC_PRIM,		-- Boxed tuples from one, 
+  -- XXX Why is gHC_UNIT not mentioned here?
+  | mod == gHC_TUPLE || mod == gHC_PRIM,		-- Boxed tuples from one, 
     Just tup_info <- isTupleOcc_maybe occ	-- unboxed from the other
   = 	-- Special case for tuples; there are too many
 	-- of them to pre-populate the original-name cache

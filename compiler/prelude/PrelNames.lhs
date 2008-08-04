@@ -233,7 +233,7 @@ pRELUDE		= mkBaseModule_ pRELUDE_NAME
 
 gHC_PRIM, gHC_BOOL, gHC_UNIT, gHC_ORDERING, gHC_GENERICS, gHC_BASE, gHC_ENUM,
     gHC_SHOW, gHC_READ, gHC_NUM, gHC_INTEGER, gHC_LIST, gHC_PARR,
-    dATA_TUP, dATA_EITHER, dATA_STRING, gHC_PACK, gHC_CONC, gHC_IO_BASE,
+    gHC_TUPLE, dATA_TUPLE, dATA_EITHER, dATA_STRING, gHC_PACK, gHC_CONC, gHC_IO_BASE,
     gHC_ST, gHC_ARR, gHC_STABLE, gHC_ADDR, gHC_PTR, gHC_ERR, gHC_REAL,
     gHC_FLOAT, gHC_TOP_HANDLER, sYSTEM_IO, dYNAMIC, tYPEABLE, gENERICS,
     dOTNET, rEAD_PREC, lEX, gHC_INT, gHC_WORD, mONAD, mONAD_FIX, aRROW,
@@ -251,7 +251,8 @@ gHC_NUM		= mkBaseModule (fsLit "GHC.Num")
 gHC_INTEGER	= mkIntegerModule (fsLit "GHC.Integer")
 gHC_LIST	= mkBaseModule (fsLit "GHC.List")
 gHC_PARR	= mkBaseModule (fsLit "GHC.PArr")
-dATA_TUP	= mkBaseModule (fsLit "Data.Tuple")
+gHC_TUPLE	= mkPrimModule (fsLit "GHC.Tuple")
+dATA_TUPLE	= mkBaseModule (fsLit "Data.Tuple")
 dATA_EITHER	= mkBaseModule (fsLit "Data.Either")
 dATA_STRING	= mkBaseModule (fsLit "Data.String")
 gHC_PACK	= mkBaseModule (fsLit "GHC.Pack")
@@ -327,7 +328,7 @@ mkMainModule_ m = mkModule mainPackageId m
 \begin{code}
 mkTupleModule :: Boxity -> Arity -> Module
 mkTupleModule Boxed   0 = gHC_UNIT
-mkTupleModule Boxed   _ = dATA_TUP
+mkTupleModule Boxed   _ = gHC_TUPLE
 mkTupleModule Unboxed _ = gHC_PRIM
 \end{code}
 
@@ -609,8 +610,8 @@ breakpointAutoJumpName
 
 -- PrelTup
 fstName, sndName :: Name
-fstName		  = varQual dATA_TUP (fsLit "fst") fstIdKey
-sndName		  = varQual dATA_TUP (fsLit "snd") sndIdKey
+fstName		  = varQual dATA_TUPLE (fsLit "fst") fstIdKey
+sndName		  = varQual dATA_TUPLE (fsLit "snd") sndIdKey
 
 -- Module PrelNum
 numClassName, fromIntegerName, minusName, negateName, plusIntegerName,
