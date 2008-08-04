@@ -29,9 +29,6 @@ Flag ghci
 Flag stage1
     Description: Is this stage 1?
 
-Flag windows
-    Description: On a Windows machine
-
 Library
     Exposed: False
 
@@ -47,7 +44,7 @@ Library
         Build-Depends: base < 3
     Build-Depends: filepath >= 1 && < 1.2
     Build-Depends: haskell98, Cabal, hpc
-    if flag(windows)
+    if os(windows)
         Build-Depends: Win32
     else
         Build-Depends: unix
