@@ -106,6 +106,7 @@ import Hugs.Prelude(Handle, IOException(..), IOErrorType(..))
 #endif
 
 #ifdef __NHC__
+import Prelude
 import IO
   ( IOError ()
   , try
