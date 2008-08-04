@@ -42,7 +42,9 @@ module Outputable (
 	pprCode, mkCodeStyle,
 	showSDoc, showSDocForUser, showSDocDebug, showSDocDump,
 	showSDocUnqual, showsPrecSDoc,
-	pprHsChar, pprHsString,
+
+	pprInfixVar, pprPrefixVar,
+	pprHsChar, pprHsString, pprHsInfix, pprHsVar,
 
 	-- error handling
 	pprPanic, assertPprPanic, pprPanicFastInt, pprPgmError, 
@@ -54,10 +56,11 @@ import {-# SOURCE #-} 	Module( Module, ModuleName, moduleName )
 import {-# SOURCE #-} 	OccName( OccName )
 
 import StaticFlags
-import FastString
+import FastString 
 import FastTypes
 import qualified Pretty
 import Pretty		( Doc, Mode(..) )
+import Char		( isAlpha )
 import Panic
 
 import Data.Word	( Word32 )
@@ -311,7 +314,7 @@ showSDocForUser :: PrintUnqualified -> SDoc -> String
 showSDocForUser unqual doc = show (doc (mkUserStyle unqual AllTheWay))
 
 showSDocUnqual :: SDoc -> String
--- Only used in the gruesome HsExpr.isOperator
+-- Only used in the gruesome isOperator
 showSDocUnqual d = show (d (mkUserStyle neverQualify AllTheWay))
 
 showsPrecSDoc :: Int -> SDoc -> ShowS
@@ -522,15 +525,48 @@ class Outputable a => OutputableBndr a where
 %************************************************************************
 
 \begin{code}
--- We have 31-bit Chars and will simply use Show instances
--- of Char and String.
-
+-- We have 31-bit Chars and will simply use Show instances of Char and String.
 pprHsChar :: Char -> SDoc
 pprHsChar c | c > '\x10ffff' = char '\\' <> text (show (fromIntegral (ord c) :: Word32))
             | otherwise      = text (show c)
 
 pprHsString :: FastString -> SDoc
 pprHsString fs = text (show (unpackFS fs))
+
+---------------------
+-- Put a name in parens if it's an operator
+pprPrefixVar :: Bool -> SDoc -> SDoc
+pprPrefixVar is_operator pp_v
+  | is_operator = parens pp_v
+  | otherwise	= pp_v
+
+-- Put a name in backquotes if it's not an operator
+pprInfixVar :: Bool -> SDoc -> SDoc
+pprInfixVar is_operator pp_v 
+  | is_operator = pp_v
+  | otherwise   = char '`' <> pp_v <> char '`'
+
+---------------------
+-- pprHsVar and pprHsInfix use the gruesome isOperator, which
+-- in turn uses (showSDoc (ppr v)), rather than isSymOcc (getOccName v).
+-- Reason: it means that pprHsVar doesn't need a NamedThing context,
+--         which none of the HsSyn printing functions do
+pprHsVar, pprHsInfix :: Outputable name => name -> SDoc
+pprHsVar   v = pprPrefixVar (isOperator pp_v) pp_v  
+	     where pp_v = ppr v
+pprHsInfix v = pprInfixVar  (isOperator pp_v) pp_v
+	     where pp_v = ppr v
+
+isOperator :: SDoc -> Bool
+isOperator ppr_v 
+  = case showSDocUnqual ppr_v of
+        ('(':_)   -> False              -- (), (,) etc
+        ('[':_)   -> False              -- []
+        ('$':c:_) -> not (isAlpha c)    -- Don't treat $d as an operator
+        (':':c:_) -> not (isAlpha c)    -- Don't treat :T as an operator
+        ('_':_)   -> False              -- Not an operator
+        (c:_)     -> not (isAlpha c)    -- Starts with non-alpha
+        _         -> False
 \end{code}
 
 

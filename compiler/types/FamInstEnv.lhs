@@ -94,7 +94,7 @@ pprFamInstHdr :: FamInst -> SDoc
 pprFamInstHdr (FamInst {fi_fam = fam, fi_tys = tys, fi_tycon = tycon})
   = pprTyConSort <+> pprHead
   where
-    pprHead = pprTypeApp fam (ppr fam) tys
+    pprHead = pprTypeApp fam tys
     pprTyConSort | isDataTyCon tycon = ptext (sLit "data instance")
 		 | isNewTyCon  tycon = ptext (sLit "newtype instance")
 		 | isSynTyCon  tycon = ptext (sLit "type instance")

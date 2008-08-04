@@ -537,7 +537,7 @@ tcLookupFamInstExact tycon tys
 famInstNotFound :: TyCon -> [Type] -> TcM a
 famInstNotFound tycon tys 
   = failWithTc (ptext (sLit "No family instance for")
-			<+> quotes (pprTypeApp tycon (ppr tycon) tys))
+			<+> quotes (pprTypeApp tycon tys))
 \end{code}
 
 

@@ -43,7 +43,6 @@ import {-# SOURCE #-}	HsExpr( HsExpr, pprExpr )
 
 import HsBinds
 import HsPat
-import HsImpExp
 import HsTypes
 import HsDoc
 import NameSet
@@ -712,7 +711,7 @@ pprConDecl :: OutputableBndr name => ConDecl name -> SDoc
 pprConDecl (ConDecl con expl tvs cxt details ResTyH98 doc)
   = sep [ppr_mbDoc doc, pprHsForAll expl tvs cxt, ppr_details con details]
   where
-    ppr_details con (InfixCon t1 t2) = hsep [ppr t1, pprHsVar con, ppr t2]
+    ppr_details con (InfixCon t1 t2) = hsep [ppr t1, pprHsInfix con, ppr t2]
     ppr_details con (PrefixCon tys)  = hsep (pprHsVar con : map ppr tys)
     ppr_details con (RecCon fields)  = ppr con <+> ppr_fields fields
 

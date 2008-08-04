@@ -21,7 +21,6 @@ import HsDoc		( HsDoc )
 import Outputable
 import FastString
 import SrcLoc		( Located(..) )
-import Char		( isAlpha )
 \end{code}
 
 %************************************************************************
@@ -120,25 +119,4 @@ instance (Outputable name) => Outputable (IE name) where
     ppr (IEDocNamed string)     = text ("<IEDocNamed: " ++ string ++ ">")
 \end{code}
 
-\begin{code}
-pprHsVar :: Outputable name => name -> SDoc
-pprHsVar v | isOperator ppr_v = parens ppr_v
-	   | otherwise	      = ppr_v
-	   where
-	     ppr_v = ppr v
-
-isOperator :: SDoc -> Bool
-isOperator ppr_v 
-  = case showSDocUnqual ppr_v of
-        ('(':_)   -> False              -- (), (,) etc
-        ('[':_)   -> False              -- []
-        ('$':c:_) -> not (isAlpha c)    -- Don't treat $d as an operator
-        (':':c:_) -> not (isAlpha c)    -- Don't treat :T as an operator
-        ('_':_)   -> False              -- Not an operator
-        (c:_)     -> not (isAlpha c)    -- Starts with non-alpha
-        _         -> False
-    -- We use (showSDoc (ppr v)), rather than isSymOcc (getOccName v) simply so
-    -- that we don't need NamedThing in the context of all these functions.
-    -- Gruesome, but simple.
-\end{code}
 

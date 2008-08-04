@@ -32,7 +32,8 @@ module Name (
 	
 	-- Class NamedThing and overloaded friends
 	NamedThing(..),
-	getSrcLoc, getSrcSpan, getOccString
+	getSrcLoc, getSrcSpan, getOccString,
+ 	pprInfixName, pprPrefixName
     ) where
 
 import {-# SOURCE #-} TypeRep( TyThing )
@@ -422,5 +423,11 @@ getOccString	    :: NamedThing a => a -> String
 getSrcLoc	    = nameSrcLoc	   . getName
 getSrcSpan	    = nameSrcSpan	   . getName
 getOccString 	    = occNameString	   . getOccName
+
+pprInfixName, pprPrefixName :: (Outputable a, NamedThing a) => a -> SDoc
+-- See Outputable.pprPrefixVar, pprInfixVar; 
+-- add parens or back-quotes as appropriate
+pprInfixName  n = pprInfixVar  (isSymOcc (getOccName n)) (ppr n)
+pprPrefixName n = pprPrefixVar (isSymOcc (getOccName n)) (ppr n)
 \end{code}
 

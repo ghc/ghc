@@ -448,11 +448,10 @@ pprType, pprParendType :: Type -> SDoc
 pprType       ty = ppr_type TopPrec   ty
 pprParendType ty = ppr_type TyConPrec ty
 
-pprTypeApp :: NamedThing a => a -> SDoc -> [Type] -> SDoc
--- The first arg is the tycon; it's used to arrange printing infix 
--- if it looks like an operator
--- Second arg is the pretty-printed tycon
-pprTypeApp tc pp_tc tys = ppr_type_app TopPrec (getName tc) pp_tc tys
+pprTypeApp :: NamedThing a => a -> [Type] -> SDoc
+-- The first arg is the tycon, or sometimes class
+-- Print infix if the tycon/class looks like an operator
+pprTypeApp tc tys = ppr_type_app TopPrec (getName tc) tys
 
 ------------------
 pprPred :: PredType -> SDoc
@@ -460,7 +459,7 @@ pprPred (ClassP cls tys) = pprClassPred cls tys
 pprPred (IParam ip ty)   = ppr ip <> dcolon <> pprType ty
 pprPred (EqPred ty1 ty2) = sep [ppr ty1, nest 2 (ptext (sLit "~")), ppr ty2]
 pprClassPred :: Class -> [Type] -> SDoc
-pprClassPred clas tys = ppr_type_app TopPrec (getName clas) (ppr clas) tys
+pprClassPred clas tys = ppr_type_app TopPrec (getName clas) tys
 
 pprTheta :: ThetaType -> SDoc
 pprTheta theta = parens (sep (punctuate comma (map pprPred theta)))
@@ -543,26 +542,23 @@ ppr_tc_app p tc tys
   | isTupleTyCon tc && tyConArity tc == length tys
   = tupleParens (tupleTyConBoxity tc) (sep (punctuate comma (map pprType tys)))
   | otherwise
-  = ppr_type_app p (getName tc) (ppr_naked_tc tc) tys
+  = ppr_type_app p (getName tc) tys
 
-ppr_type_app :: Prec -> Name -> SDoc -> [Type] -> SDoc
-ppr_type_app p tc pp_tc tys
+ppr_type_app :: Prec -> Name -> [Type] -> SDoc
+-- Used for classes as well as types; that's why it's separate from ppr_tc_app
+ppr_type_app p tc tys
   | is_sym_occ		-- Print infix if possible
   , [ty1,ty2] <- tys	-- We know nothing of precedence though
   = maybeParen p FunPrec (sep [ppr_type FunPrec ty1, 
-			       pp_tc <+> ppr_type FunPrec ty2])
+			       pprInfixVar True (ppr tc) <+> ppr_type FunPrec ty2])
   | otherwise
-  = maybeParen p TyConPrec (hang paren_tc 2 (sep (map pprParendType tys)))
+  = maybeParen p TyConPrec (hang (pprPrefixVar is_sym_occ (ppr tc))
+    	       	 	       2 (sep (map pprParendType tys)))
   where
     is_sym_occ = isSymOcc (getOccName tc)
-    paren_tc | is_sym_occ = parens pp_tc
-	     | otherwise  = pp_tc
 
-ppr_tc :: TyCon -> SDoc
-ppr_tc tc = parenSymOcc (getOccName tc) (ppr_naked_tc tc)
-
-ppr_naked_tc :: TyCon -> SDoc	-- No brackets for SymOcc
-ppr_naked_tc tc 
+ppr_tc :: TyCon -> SDoc	-- No brackets for SymOcc
+ppr_tc tc 
   = pp_nt_debug <> ppr tc
   where
    pp_nt_debug | isNewTyCon tc = ifPprDebug (if isRecursiveTyCon tc 

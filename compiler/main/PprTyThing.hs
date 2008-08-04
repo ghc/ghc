@@ -76,7 +76,7 @@ pprTyThingHdr pefas (AClass cls)       = pprClassHdr   pefas cls
 pprTyConHdr :: PrintExplicitForalls -> TyCon -> SDoc
 pprTyConHdr _ tyCon
   | Just (_fam_tc, tys) <- tyConFamInst_maybe tyCon
-  = ptext keyword <+> ptext (sLit "instance") <+> pprTypeApp tyCon (ppr_bndr tyCon) tys
+  = ptext keyword <+> ptext (sLit "instance") <+> pprTypeApp tyCon tys
   | otherwise
   = ptext keyword <+> opt_family <+> opt_stupid <+> ppr_bndr tyCon <+> hsep (map ppr vars)
   where
@@ -212,7 +212,7 @@ pprDataConDecl _ gadt_style show_label dataCon
 
     ppr_fields [ty1, ty2]
 	| GHC.dataConIsInfix dataCon && null labels
-	= sep [pprParendBangTy ty1, ppr dataCon, pprParendBangTy ty2]
+	= sep [pprParendBangTy ty1, pprInfixName dataCon, pprParendBangTy ty2]
     ppr_fields fields
 	| null labels
 	= ppr_bndr dataCon <+> sep (map pprParendBangTy fields)

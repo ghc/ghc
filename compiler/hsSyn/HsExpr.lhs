@@ -15,7 +15,6 @@ import HsDecls
 import HsPat
 import HsLit
 import HsTypes
-import HsImpExp
 import HsBinds
 
 -- others:
@@ -346,7 +345,7 @@ ppr_expr (OpApp e1 op _ e2)
       = hang (ppr op) 2 (sep [pp_e1, pp_e2])
 
     pp_infixly v
-      = sep [nest 2 pp_e1, pprInfix v, nest 2 pp_e2]
+      = sep [nest 2 pp_e1, pprHsInfix v, nest 2 pp_e2]
 
 ppr_expr (NegApp e _) = char '-' <+> pprDebugParendExpr e
 
@@ -359,7 +358,7 @@ ppr_expr (SectionL expr op)
 
     pp_prefixly = hang (hsep [text " \\ x_ ->", ppr op])
                        4 (hsep [pp_expr, ptext (sLit "x_ )")])
-    pp_infixly v = (sep [pp_expr, pprInfix v])
+    pp_infixly v = (sep [pp_expr, pprHsInfix v])
 
 ppr_expr (SectionR op expr)
   = case unLoc op of
@@ -371,7 +370,7 @@ ppr_expr (SectionR op expr)
     pp_prefixly = hang (hsep [text "( \\ x_ ->", ppr op, ptext (sLit "x_")])
                        4 ((<>) pp_expr rparen)
     pp_infixly v
-      = (sep [pprInfix v, pp_expr])
+      = (sep [pprHsInfix v, pp_expr])
 
 --avoid using PatternSignatures for stage1 code portability
 ppr_expr exprType@(HsLam matches)
@@ -477,7 +476,7 @@ ppr_expr (HsArrApp arrow arg _ HsHigherOrderApp False)
   = hsep [ppr_lexpr arg, ptext (sLit ">>-"), ppr_lexpr arrow]
 
 ppr_expr (HsArrForm (L _ (HsVar v)) (Just _) [arg1, arg2])
-  = sep [pprCmdArg (unLoc arg1), hsep [pprInfix v, pprCmdArg (unLoc arg2)]]
+  = sep [pprCmdArg (unLoc arg1), hsep [pprHsInfix v, pprCmdArg (unLoc arg2)]]
 ppr_expr (HsArrForm op _ args)
   = hang (ptext (sLit "(|") <> ppr_lexpr op)
          4 (sep (map (pprCmdArg.unLoc) args) <> ptext (sLit "|)"))
@@ -490,12 +489,6 @@ pprCmdArg (HsCmdTop cmd _ _ _)
 
 instance OutputableBndr id => Outputable (HsCmdTop id) where
     ppr = pprCmdArg
-
--- Put a var in backquotes if it's not an operator already
-pprInfix :: Outputable name => name -> SDoc
-pprInfix v | isOperator ppr_v = ppr_v
-           | otherwise        = char '`' <> ppr_v <> char '`'
-    where ppr_v = ppr v
 
 -- add parallel array brackets around a document
 --
