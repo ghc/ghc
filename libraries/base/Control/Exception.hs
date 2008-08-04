@@ -39,10 +39,14 @@ module Control.Exception (
         ArrayException(..),     -- instance Eq, Ord, Show, Typeable
         AssertionFailed(..),
         AsyncException(..),     -- instance Eq, Ord, Show, Typeable
+
+#ifdef __GLASGOW_HASKELL__
         NonTermination(..), nonTermination,
+        NestedAtomically(..), nestedAtomically,
+#endif
+
         BlockedOnDeadMVar(..),
         BlockedIndefinitely(..),
-        NestedAtomically(..), nestedAtomically,
         Deadlock(..),
         NoMethodError(..),
         PatternMatchFail(..),
@@ -67,8 +71,10 @@ module Control.Exception (
 
         -- ** The @catch@ functions
         catch,     -- :: IO a -> (Exception -> IO a) -> IO a
+#ifdef __GLASGOW_HASKELL__
         catches, Handler(..),
         catchJust, -- :: (Exception -> Maybe b) -> IO a -> (b -> IO a) -> IO a
+#endif
 
         -- ** The @handle@ functions
         handle,    -- :: (Exception -> IO a) -> IO a -> IO a
@@ -118,9 +124,11 @@ module Control.Exception (
 
         finally,        -- :: IO a -> IO b -> IO a
 
+#ifdef __GLASGOW_HASKELL__
         recSelError, recConError, irrefutPatError, runtimeError,
         nonExhaustiveGuardsError, patError, noMethodBindingError,
         assertError,
+#endif
   ) where
 
 #ifdef __GLASGOW_HASKELL__
@@ -147,30 +155,75 @@ import System.IO.Error (ioError)
 import IO              (bracket)
 import DIOError         -- defn of IOError type
 import System          (ExitCode())
+import System.IO.Unsafe (unsafePerformIO)
+import Unsafe.Coerce    (unsafeCoerce)
 
 -- minimum needed for nhc98 to pretend it has Exceptions
+
+{-
 data Exception   = IOException    IOException
                  | ArithException ArithException
                  | ArrayException ArrayException
                  | AsyncException AsyncException
                  | ExitException  ExitCode
                  deriving Show
+-}
+class ({-Typeable e,-} Show e) => Exception e where
+    toException   :: e -> SomeException
+    fromException :: SomeException -> Maybe e
+
+data SomeException = forall e . Exception e => SomeException e
+
+INSTANCE_TYPEABLE0(SomeException,someExceptionTc,"SomeException")
+
+instance Show SomeException where
+    showsPrec p (SomeException e) = showsPrec p e
+instance Exception SomeException where
+    toException se = se
+    fromException = Just
+
 type IOException = IOError
+instance Exception IOError where
+    toException                     = SomeException
+    fromException (SomeException e) = Just (unsafeCoerce e)
+
 data ArithException
 data ArrayException
 data AsyncException
+data AssertionFailed
+data PatternMatchFail
+data NoMethodError
+data Deadlock
+data BlockedOnDeadMVar
+data BlockedIndefinitely
+data ErrorCall
+data RecConError
+data RecSelError
+data RecUpdError
 instance Show ArithException
 instance Show ArrayException
 instance Show AsyncException
+instance Show AssertionFailed
+instance Show PatternMatchFail
+instance Show NoMethodError
+instance Show Deadlock
+instance Show BlockedOnDeadMVar
+instance Show BlockedIndefinitely
+instance Show ErrorCall
+instance Show RecConError
+instance Show RecSelError
+instance Show RecUpdError
 
-catch    :: IO a -> (Exception -> IO a) -> IO a
-a `catch` b = a `H'98.catch` (b . IOException)
+catch   :: Exception e
+        => IO a         -- ^ The computation to run
+        -> (e -> IO a)  -- ^ Handler to invoke if an exception is raised
+        -> IO a
+catch io h = H'98.catch  io  (h . fromJust . fromException . toException)
 
-throwIO  :: Exception -> IO a
-throwIO (IOException e) = ioError e
-throwIO _               = ioError (UserError "Control.Exception.throwIO"
-                                             "unknown exception")
-throw    :: Exception -> a
+throwIO  :: Exception e => e -> IO a
+throwIO   = ioError . fromJust . fromException . toException
+
+throw    :: Exception e => e -> a
 throw     = unsafePerformIO . throwIO
 
 evaluate :: a -> IO a
@@ -178,7 +231,8 @@ evaluate x = x `seq` return x
 
 assert :: Bool -> a -> a
 assert True  x = x
-assert False _ = throw (IOException (UserError "" "Assertion failed"))
+assert False _ = throw (toException (UserError "" "Assertion failed"))
+
 #endif
 
 #ifndef __GLASGOW_HASKELL__
@@ -246,6 +300,7 @@ catch   :: Exception e
         -> (e -> IO a)  -- ^ Handler to invoke if an exception is raised
         -> IO a
 catch = ExceptionBase.catchException
+#endif
 
 catches :: IO a -> [Handler a] -> IO a
 catches io handlers = io `catch` catchesHandler handlers
@@ -258,7 +313,6 @@ catchesHandler handlers e = foldr tryHandler (throw e) handlers
                 Nothing -> res
 
 data Handler a = forall e . Exception e => Handler (e -> IO a)
-#endif
 -- | The function 'catchJust' is like 'catch', but it takes an extra
 -- argument which is an /exception predicate/, a function which
 -- selects which type of exceptions we\'re interested in.
@@ -408,7 +462,7 @@ bracketOnError before after thing =
   block (do
     a <- before 
     unblock (thing a) `onException` after a
- )
+  )
 
 -- -----------------------------------------------------------------------------
 -- Asynchronous exceptions
@@ -493,6 +547,7 @@ assert True x = x
 assert False _ = throw (AssertionFailed "")
 #endif
 
+#ifndef __NHC__
 recSelError, recConError, irrefutPatError, runtimeError,
              nonExhaustiveGuardsError, patError, noMethodBindingError
         :: Addr# -> a   -- All take a UTF8-encoded C string
@@ -587,4 +642,6 @@ nestedAtomically = toException NestedAtomically
 -----
 
 instance Exception Dynamic
+
+#endif
 
