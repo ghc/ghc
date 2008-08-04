@@ -118,6 +118,7 @@ import System.IO.Unsafe         ( unsafePerformIO )
 import System.IO                ( Handle )
 import System.IO.Error          ( IOError, ioError )
 import System.IO.Unsafe         ( unsafePerformIO )
+import Foreign.Storable         ( Storable(poke,peek) )
 #endif
 
 #ifdef __HUGS__
