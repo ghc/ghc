@@ -2534,13 +2534,9 @@ ocResolve_PEi386 ( ObjectCode* oc )
                    + sym->Value);
          } else {
             copyName ( sym->Name, strtab, symbol, 1000-1 );
-            S = (UInt32) lookupLocalSymbol( oc, symbol );
-            if ((void*)S != NULL) goto foundit;
             S = (UInt32) lookupSymbol( symbol );
             if ((void*)S != NULL) goto foundit;
             zapTrailingAtSign ( symbol );
-            S = (UInt32) lookupLocalSymbol( oc, symbol );
-            if ((void*)S != NULL) goto foundit;
             S = (UInt32) lookupSymbol( symbol );
             if ((void*)S != NULL) goto foundit;
 	    /* Newline first because the interactive linker has printed "linking..." */
