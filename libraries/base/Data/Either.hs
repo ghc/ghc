@@ -25,6 +25,7 @@ import Data.Tuple ()
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
+import GHC.Show
 
 {-
 -- just for testing
@@ -41,7 +42,7 @@ either correct or an error; by convention, the 'Left' constructor is
 used to hold an error value and the 'Right' constructor is used to
 hold a correct value (mnemonic: \"right\" also means \"correct\").
 -}
-data  Either a b  =  Left a | Right b   deriving (Eq, Ord )
+data  Either a b  =  Left a | Right b   deriving (Eq, Ord, Show)
 
 -- | Case analysis for the 'Either' type.
 -- If the value is @'Left' a@, apply the first function to @a@;

@@ -35,7 +35,6 @@ module GHC.Show
 
 import GHC.Base
 import Data.Maybe
-import Data.Either
 import GHC.List ( (!!), foldr1
 #ifdef USE_REPORT_PRELUDE
                 , concatMap
@@ -203,14 +202,6 @@ instance Show a => Show (Maybe a) where
                           = (showParen (p > appPrec) $ 
                              showString "Just " . 
                              showsPrec appPrec1 x) s
-
-instance (Show a, Show b) => Show (Either a b) where
-    showsPrec p e s =
-       (showParen (p > appPrec) $
-        case e of
-         Left  a -> showString "Left "  . showsPrec appPrec1 a
-         Right b -> showString "Right " . showsPrec appPrec1 b)
-       s
 \end{code}
 
 
