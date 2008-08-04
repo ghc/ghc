@@ -1178,23 +1178,6 @@ lookupSymbol( char *lbl )
     }
 }
 
-static
-__attribute((unused))
-void *
-lookupLocalSymbol( ObjectCode* oc, char *lbl )
-{
-    void *val;
-    initLinker() ;
-    val = lookupStrHashTable(oc->lochash, lbl);
-
-    if (val == NULL) {
-        return NULL;
-    } else {
-	return val;
-    }
-}
-
-
 /* -----------------------------------------------------------------------------
  * Debugging aid: look in GHCi's object symbol tables for symbols
  * within DELTA bytes of the specified address, and show their names.
@@ -1216,11 +1199,7 @@ void ghci_enquire ( char* addr )
       for (i = 0; i < oc->n_symbols; i++) {
          sym = oc->symbols[i];
          if (sym == NULL) continue;
-         // debugBelch("enquire %p %p\n", sym, oc->lochash);
          a = NULL;
-         if (oc->lochash != NULL) {
-            a = lookupStrHashTable(oc->lochash, sym);
-	 }
          if (a == NULL) {
             a = lookupStrHashTable(symhash, sym);
 	 }
@@ -1305,7 +1284,6 @@ loadObj( char *path )
    oc->fileSize          = st.st_size;
    oc->symbols           = NULL;
    oc->sections          = NULL;
-   oc->lochash           = allocStrHashTable();
    oc->proddables        = NULL;
 
    /* chain it onto the list of objects */
@@ -1514,9 +1492,6 @@ unloadObj( char *path )
 	    stgFree(oc->fileName);
 	    stgFree(oc->symbols);
 	    stgFree(oc->sections);
-	    /* The local hash table should have been freed at the end
-               of the ocResolve_ call on it. */
-            ASSERT(oc->lochash == NULL);
 	    stgFree(oc);
 	    return 1;
 	}
@@ -3626,10 +3601,6 @@ ocResolve_ELF ( ObjectCode* oc )
       }
    }
 
-   /* Free the local symbol table; we won't need it again. */
-   freeHashTable(oc->lochash, NULL);
-   oc->lochash = NULL;
-
 #if defined(powerpc_HOST_ARCH)
    ocFlushInstructionCache( oc );
 #endif
@@ -3908,8 +3879,6 @@ static int resolveImports(
 	if((symbol->n_type & N_TYPE) == N_UNDF
 	    && (symbol->n_type & N_EXT) && (symbol->n_value != 0))
 	    addr = (void*) (symbol->n_value);
-	else if((addr = lookupLocalSymbol(oc,nm)) != NULL)
-	    ;
 	else
 	    addr = lookupSymbol(nm);
 	if(!addr)
@@ -4555,10 +4524,6 @@ static int ocResolve_MachO(ObjectCode* oc)
 	if(!relocateSection(oc,image,symLC,nlist,segLC->nsects,sections,&sections[i]))
 	    return 0;
     }
-
-    /* Free the local symbol table; we won't need it again. */
-    freeHashTable(oc->lochash, NULL);
-    oc->lochash = NULL;
 
 #if defined (powerpc_HOST_ARCH)
     ocFlushInstructionCache( oc );
