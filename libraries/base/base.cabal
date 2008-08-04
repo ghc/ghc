@@ -32,7 +32,6 @@ Library {
             GHC.Conc,
             GHC.ConsoleHandler,
             GHC.Desugar,
-            GHC.Dotnet,
             GHC.Enum,
             GHC.Environment,
             GHC.Err,
