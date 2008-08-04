@@ -85,6 +85,9 @@ typedef struct _ObjectCode {
        list. */
     Section* sections;
 
+    /* A private hash table for local symbols. */
+    HashTable* lochash;
+    
     /* Allow a chain of these things */
     struct _ObjectCode * next;
 
