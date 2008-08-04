@@ -87,6 +87,7 @@ instance Ord () where
     min () () = ()
     compare () () = EQ
 
+#ifndef __HADDOCK__
 deriving instance (Eq  a, Eq  b) => Eq  (a, b)
 deriving instance (Ord a, Ord b) => Ord (a, b)
 deriving instance (Eq  a, Eq  b, Eq  c) => Eq  (a, b, c)
@@ -151,6 +152,7 @@ deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g,
 deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g,
                    Ord h, Ord i, Ord j, Ord k, Ord l, Ord m, Ord n, Ord o)
                => Ord (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o)
+#endif  /* !__HADDOCK__ */
 #endif  /* __GLASGOW_HASKELL__ */
 
 -- ---------------------------------------------------------------------------
