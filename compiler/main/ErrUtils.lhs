@@ -139,7 +139,7 @@ emptyMessages = (emptyBag, emptyBag)
 
 errorsFound :: DynFlags -> Messages -> Bool
 -- The dyn-flags are used to see if the user has specified
--- -Werorr, which says that warnings should be fatal
+-- -Werror, which says that warnings should be fatal
 errorsFound dflags (warns, errs) 
   | dopt Opt_WarnIsError dflags = not (isEmptyBag errs) || not (isEmptyBag warns)
   | otherwise  		        = not (isEmptyBag errs)

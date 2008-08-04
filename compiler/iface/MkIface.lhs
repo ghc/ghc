@@ -92,12 +92,14 @@ import Maybes
 import ListSetOps
 import Binary
 import Fingerprint
+import Bag
 import Panic
 
 import Control.Monad
 import Data.List
 import Data.IORef
 import System.FilePath
+import System.Exit	( exitWith, ExitCode(..) )
 \end{code}
 
 
@@ -282,17 +284,32 @@ mkIface_ hsc_env maybe_old_fingerprint
 			mi_fix_fn = mkIfaceFixCache fixities }
 		}
 
-        ; (new_iface, no_change_at_all, pp_orphs) 
+        ; (new_iface, no_change_at_all) 
 	        <- {-# SCC "versioninfo" #-}
 			 addFingerprints hsc_env maybe_old_fingerprint
                                          intermediate_iface decls
 
-		-- Debug printing
-	; when (isJust pp_orphs && dopt Opt_WarnOrphans dflags) 
-	       (printDump (expectJust "mkIface" pp_orphs))
+		-- Warn about orphans
+	; let orph_warnings   --- Laziness means no work done unless -fwarn-orphans
+	        | dopt Opt_WarnOrphans dflags = rule_warns `unionBags` inst_warns
+	        | otherwise 	       	      = emptyBag
+	      errs_and_warns = (orph_warnings, emptyBag)
+	      unqual = mkPrintUnqualified dflags rdr_env
+	      inst_warns = listToBag [ instOrphWarn unqual d 
+	      		   	     | (d,i) <- insts `zip` iface_insts
+	      		   	     , isNothing (ifInstOrph i) ]
+	      rule_warns = listToBag [ ruleOrphWarn unqual this_mod r 
+	      		    	     | r <- iface_rules
+	      		   	     , isNothing (ifRuleOrph r) ]
+
+	; when (not (isEmptyBag orph_warnings))
+	       (do { printErrorsAndWarnings dflags errs_and_warns
+	       	   ; when (errorsFound dflags errs_and_warns) 
+		          (exitWith (ExitFailure 1)) })
 
 -- XXX	; when (dopt Opt_D_dump_hi_diffs dflags) (printDump pp_diffs)
-
+   
+	   	-- Debug printing
 	; dumpIfSet_dyn dflags Opt_D_dump_hi "FINAL INTERFACE" 
 			(pprModIface new_iface)
 
@@ -373,9 +390,8 @@ addFingerprints
         -> ModIface	     -- The new interface (lacking decls)
         -> [IfaceDecl]       -- The new decls
         -> IO (ModIface,     -- Updated interface
-               Bool,	     -- True <=> no changes at all; 
+               Bool)	     -- True <=> no changes at all; 
                              -- no need to write Iface
-               Maybe SDoc)   -- Warnings about orphans
 
 addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
  = do
@@ -548,7 +564,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
                 mi_decls       = sorted_decls,
                 mi_hash_fn     = lookupOccEnv local_env }
    --
-   return (final_iface, no_change_at_all, pp_orphs)
+   return (final_iface, no_change_at_all)
 
   where
     this_mod = mi_module iface0
@@ -560,7 +576,6 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
         -- non-orphans?
     fam_insts = mi_fam_insts iface0
     fix_fn = mi_fix_fn iface0
-    pp_orphs = pprOrphans orph_insts orph_rules
 
 
 getOrphanHashes :: HscEnv -> [Module] -> IO [Fingerprint]
@@ -720,18 +735,19 @@ oldMD5 dflags bh = do
         return $! readHexFingerprint hash_str
 -}
 
-pprOrphans :: [IfaceInst] -> [IfaceRule] -> Maybe SDoc
-pprOrphans insts rules
-  | null insts && null rules = Nothing
-  | otherwise
-  = Just $ vcat [
-	if null insts then empty else
-	     hang (ptext (sLit "Warning: orphan instances:"))
-		2 (vcat (map ppr insts)),
-	if null rules then empty else
-	     hang (ptext (sLit "Warning: orphan rules:"))
-		2 (vcat (map ppr rules))
-    ]
+instOrphWarn :: PrintUnqualified -> Instance -> WarnMsg
+instOrphWarn unqual inst
+  = mkWarnMsg (getSrcSpan inst) unqual $
+    hang (ptext (sLit "Warning: orphan instance:")) 2 (pprInstanceHdr inst)
+
+ruleOrphWarn :: PrintUnqualified -> Module -> IfaceRule -> WarnMsg
+ruleOrphWarn unqual mod rule
+  = mkWarnMsg silly_loc unqual $
+    ptext (sLit "Orphan rule:") <+> ppr rule
+  where
+    silly_loc = srcLocSpan (mkSrcLoc (moduleNameFS (moduleName mod)) 1 0)
+    -- We don't have a decent SrcSpan for a Rule, not even the CoreRule
+    -- Could readily be fixed by adding a SrcSpan to CoreRule, if we wanted to
 
 ----------------------
 -- mkOrphMap partitions instance decls or rules into
