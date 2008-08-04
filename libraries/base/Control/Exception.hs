@@ -358,7 +358,7 @@ handleJust p =  flip (catchJust p)
 
 -- Notice that the usage of 'unsafePerformIO' is safe here.
 
-mapException :: Exception e => (e -> e) -> a -> a
+mapException :: (Exception e1, Exception e2) => (e1 -> e2) -> a -> a
 mapException f v = unsafePerformIO (catch (evaluate v)
                                           (\x -> throw (f x)))
 
