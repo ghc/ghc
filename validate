@@ -45,29 +45,29 @@ do
     shift
 done
 
-if [ $testsuite_only -eq 0 ]; then
-
-if [ $no_clean -eq 0 ] && [ -f mk/config.mk ]; then
-    make distclean
-fi
-
-case $OSTYPE in
-    cygwin|msys) config_args=--build=i386-unknown-mingw32
-        if [ -f c:/mingw/bin/gcc.exe ]
-        then
-            config_args="$config_args --with-gcc=c:/mingw/bin/gcc"
-        fi
-        ;;
-esac
-
 if [ "$CPUS" = "" ]; then
     threads=2
 else
     threads=`expr $CPUS + 1`
 fi
 
-sh boot
-./configure "--prefix=`pwd`/inst" $config_args
+if [ $testsuite_only -eq 0 ]; then
+
+if [ $no_clean -eq 0 ] && [ -f mk/config.mk ]; then
+    make distclean
+
+    case $OSTYPE in
+        cygwin|msys) config_args=--build=i386-unknown-mingw32
+            if [ -f c:/mingw/bin/gcc.exe ]
+            then
+                config_args="$config_args --with-gcc=c:/mingw/bin/gcc"
+            fi
+            ;;
+    esac
+
+    sh boot
+    ./configure "--prefix=`pwd`/inst" $config_args
+fi
 
 thisdir=`utils/pwd/pwd forwardslash`
 
