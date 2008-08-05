@@ -65,7 +65,6 @@ import GHC.Exception
 
 #ifndef __HADDOCK__
 import {-# SOURCE #-} Data.Typeable     ( Typeable )
-import {-# SOURCE #-} Data.Dynamic      ( Dynamic )
 #endif
 
 -- ---------------------------------------------------------------------------
@@ -814,13 +813,9 @@ data IOErrorType
   | TimeExpired
   | ResourceVanished
   | Interrupted
-  | DynIOError Dynamic -- cheap&cheerful extensible IO error type.
 
 instance Eq IOErrorType where
-   x == y = 
-     case x of
-       DynIOError{} -> False -- from a strictness POV, compatible with a derived Eq inst?
-       _ -> getTag x ==# getTag y
+   x == y = getTag x ==# getTag y
  
 instance Show IOErrorType where
   showsPrec _ e =
@@ -845,7 +840,6 @@ instance Show IOErrorType where
       TimeExpired       -> "timeout"
       UnsatisfiedConstraints -> "unsatisified constraints" -- ultra-precise!
       UnsupportedOperation -> "unsupported operation"
-      DynIOError{}      -> "unknown IO error"
 
 -- | Construct an 'IOError' value with a string describing the error.
 -- The 'fail' method of the 'IO' instance of the 'Monad' class raises a
