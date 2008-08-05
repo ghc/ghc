@@ -62,3 +62,33 @@ throw :: Exception e => e -> a
 throw e = raise# (toException e)
 \end{code}
 
+\begin{code}
+data ErrorCall = ErrorCall String
+    deriving Typeable
+
+instance Exception ErrorCall
+
+instance Show ErrorCall where
+    showsPrec _ (ErrorCall err) = showString err
+
+-----
+
+-- |The type of arithmetic exceptions
+data ArithException
+  = Overflow
+  | Underflow
+  | LossOfPrecision
+  | DivideByZero
+  | Denormal
+  deriving (Eq, Ord, Typeable)
+
+instance Exception ArithException
+
+instance Show ArithException where
+  showsPrec _ Overflow        = showString "arithmetic overflow"
+  showsPrec _ Underflow       = showString "arithmetic underflow"
+  showsPrec _ LossOfPrecision = showString "loss of precision"
+  showsPrec _ DivideByZero    = showString "divide by zero"
+  showsPrec _ Denormal        = showString "denormal"
+
+\end{code}

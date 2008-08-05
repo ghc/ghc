@@ -34,7 +34,6 @@ module GHC.Err
 
 #ifndef __HADDOCK__
 import GHC.Types
-import GHC.IOBase
 import GHC.Exception
 #endif
 \end{code}

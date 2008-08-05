@@ -634,16 +634,6 @@ showHandle file = showString "{handle: " . showString file . showString "}"
 -- ------------------------------------------------------------------------
 -- Exception datatypes and operations
 
-data ErrorCall = ErrorCall String
-    deriving Typeable
-
-instance Exception ErrorCall
-
-instance Show ErrorCall where
-    showsPrec _ (ErrorCall err) = showString err
-
------
-
 data BlockedOnDeadMVar = BlockedOnDeadMVar
     deriving Typeable
 
@@ -683,17 +673,6 @@ instance Show AssertionFailed where
     showsPrec _ (AssertionFailed err) = showString err
 
 -----
-
--- |The type of arithmetic exceptions
-data ArithException
-  = Overflow
-  | Underflow
-  | LossOfPrecision
-  | DivideByZero
-  | Denormal
-  deriving (Eq, Ord, Typeable)
-
-instance Exception ArithException
 
 -- |Asynchronous exceptions
 data AsyncException
@@ -739,13 +718,6 @@ instance Exception ArrayException
 stackOverflow, heapOverflow :: SomeException -- for the RTS
 stackOverflow = toException StackOverflow
 heapOverflow  = toException HeapOverflow
-
-instance Show ArithException where
-  showsPrec _ Overflow        = showString "arithmetic overflow"
-  showsPrec _ Underflow       = showString "arithmetic underflow"
-  showsPrec _ LossOfPrecision = showString "loss of precision"
-  showsPrec _ DivideByZero    = showString "divide by zero"
-  showsPrec _ Denormal        = showString "denormal"
 
 instance Show AsyncException where
   showsPrec _ StackOverflow   = showString "stack overflow"
