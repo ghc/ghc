@@ -64,7 +64,7 @@ executable haddock
     base,
     haskell98,
     ghc == 6.8.2 || == 6.8.3,
-    ghc-paths <= 0.1.0.2,
+    ghc-paths,
     filepath,
     directory,
     pretty,
