@@ -351,6 +351,7 @@ showLitChar c              s =  showString ('\\' : asciiTab!!ord c) s
         -- I've done manual eta-expansion here, becuase otherwise it's
         -- impossible to stop (asciiTab!!ord) getting floated out as an MFE
 
+isDec :: Char -> Bool
 isDec c = c >= '0' && c <= '9'
 
 protectEsc :: (Char -> Bool) -> ShowS -> ShowS
@@ -380,6 +381,7 @@ intToDigit (I# i)
     | i >=# 10# && i <=# 15# =  unsafeChr (ord 'a' `minusInt` ten `plusInt` I# i)
     | otherwise           =  error ("Char.intToDigit: not a digit " ++ show (I# i))
 
+ten :: Int
 ten = I# 10#
 
 showSignedInt :: Int -> Int -> ShowS
@@ -399,8 +401,8 @@ itos n# cs
     | otherwise = itos' n# cs
     where
     itos' :: Int# -> String -> String
-    itos' n# cs
-        | n# <# 10#  = C# (chr# (ord# '0'# +# n#)) : cs
-        | otherwise = case chr# (ord# '0'# +# (n# `remInt#` 10#)) of { c# ->
-                      itos' (n# `quotInt#` 10#) (C# c# : cs) }
+    itos' x# cs'
+        | x# <# 10#  = C# (chr# (ord# '0'# +# x#)) : cs'
+        | otherwise = case chr# (ord# '0'# +# (x# `remInt#` 10#)) of { c# ->
+                      itos' (x# `quotInt#` 10#) (C# c# : cs') }
 \end{code}

@@ -156,9 +156,9 @@ instance Show Integer where
 
 -- Divide an conquer implementation of string conversion
 integerToString :: Integer -> String -> String
-integerToString n cs
-    | n < 0     = '-' : integerToString' (-n) cs
-    | otherwise = integerToString' n cs
+integerToString n0 cs0
+    | n0 < 0    = '-' : integerToString' (- n0) cs0
+    | otherwise = integerToString' n0 cs0
     where
     integerToString' :: Integer -> String -> String
     integerToString' n cs
@@ -181,9 +181,10 @@ integerToString n cs
         (# q, r #) ->
             if q > 0 then fromInteger q : fromInteger r : jsplitb p ns
                      else fromInteger r : jsplitb p ns
+    jsplith _ [] = error "jsplith: []"
 
     jsplitb :: Integer -> [Integer] -> [Integer]
-    jsplitb p []     = []
+    jsplitb _ []     = []
     jsplitb p (n:ns) = case n `quotRemInteger` p of
                        (# q, r #) ->
                            q : r : jsplitb p ns
@@ -199,6 +200,7 @@ integerToString n cs
                 r = fromInteger r'
             in if q > 0 then jhead q $ jblock r $ jprintb ns cs
                         else jhead r $ jprintb ns cs
+    jprinth [] _ = error "jprinth []"
 
     jprintb :: [Integer] -> String -> String
     jprintb []     cs = cs
@@ -290,31 +292,37 @@ enumDeltaInteger x d = x `seq` (x : enumDeltaInteger (x+d) d)
 --     head (drop 1000000 [1 .. ]
 -- works
 
+enumDeltaToIntegerFB :: (Integer -> a -> a) -> a
+                     -> Integer -> Integer -> Integer -> a
 enumDeltaToIntegerFB c n x delta lim
   | delta >= 0 = up_fb c n x delta lim
   | otherwise  = dn_fb c n x delta lim
 
+enumDeltaToInteger :: Integer -> Integer -> Integer -> [Integer]
 enumDeltaToInteger x delta lim
   | delta >= 0 = up_list x delta lim
   | otherwise  = dn_list x delta lim
 
-up_fb c n x delta lim = go (x::Integer)
+up_fb :: (Integer -> a -> a) -> a -> Integer -> Integer -> Integer -> a
+up_fb c n x0 delta lim = go (x0 :: Integer)
                       where
                         go x | x > lim   = n
                              | otherwise = x `c` go (x+delta)
-dn_fb c n x delta lim = go (x::Integer)
+dn_fb :: (Integer -> a -> a) -> a -> Integer -> Integer -> Integer -> a
+dn_fb c n x0 delta lim = go (x0 :: Integer)
                       where
                         go x | x < lim   = n
                              | otherwise = x `c` go (x+delta)
 
-up_list x delta lim = go (x::Integer)
+up_list :: Integer -> Integer -> Integer -> [Integer]
+up_list x0 delta lim = go (x0 :: Integer)
                     where
                         go x | x > lim   = []
                              | otherwise = x : go (x+delta)
-dn_list x delta lim = go (x::Integer)
+dn_list :: Integer -> Integer -> Integer -> [Integer]
+dn_list x0 delta lim = go (x0 :: Integer)
                     where
                         go x | x < lim   = []
                              | otherwise = x : go (x+delta)
-
 \end{code}
 

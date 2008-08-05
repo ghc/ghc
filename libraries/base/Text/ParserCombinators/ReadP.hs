@@ -114,7 +114,7 @@ instance Monad P where
 
   (Get f)      >>= k = Get (\c -> f c >>= k)
   (Look f)     >>= k = Look (\s -> f s >>= k)
-  Fail         >>= k = Fail
+  Fail         >>= _ = Fail
   (Result x p) >>= k = k x `mplus` (p >>= k)
   (Final r)    >>= k = final [ys' | (x,s) <- r, ys' <- run (k x) s]
 
@@ -218,9 +218,9 @@ R f1 +++ R f2 = R (\k -> f1 k `mplus` f2 k)
 --   locally produces any result at all, then right parser is
 --   not used.
 #ifdef __GLASGOW_HASKELL__
-R f <++ q =
+R f0 <++ q =
   do s <- look
-     probe (f return) s 0#
+     probe (f0 return) s 0#
  where
   probe (Get f)        (c:s) n = probe (f c) s (n+#1#)
   probe (Look f)       s     n = probe (f s) s n
@@ -258,10 +258,10 @@ gather (R m) =
   R (\k -> gath id (m (\a -> return (\s -> k (s,a)))))  
  where
   gath l (Get f)      = Get (\c -> gath (l.(c:)) (f c))
-  gath l Fail         = Fail
+  gath _ Fail         = Fail
   gath l (Look f)     = Look (\s -> gath l (f s))
   gath l (Result k p) = k (l []) `mplus` gath l p
-  gath l (Final r)    = error "do not use readS_to_P in gather!"
+  gath _ (Final _)    = error "do not use readS_to_P in gather!"
 
 -- ---------------------------------------------------------------------------
 -- Derived operations

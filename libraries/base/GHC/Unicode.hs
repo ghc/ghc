@@ -148,9 +148,6 @@ toLower c = chr (fromIntegral (towlower (fromIntegral (ord c))))
 toUpper c = chr (fromIntegral (towupper (fromIntegral (ord c))))
 toTitle c = chr (fromIntegral (towtitle (fromIntegral (ord c))))
 
-foreign import ccall unsafe "u_iswdigit"
-  iswdigit :: CInt -> CInt
-
 foreign import ccall unsafe "u_iswalpha"
   iswalpha :: CInt -> CInt
 

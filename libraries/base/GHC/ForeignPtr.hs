@@ -138,9 +138,9 @@ mallocForeignPtr = doMalloc undefined
         doMalloc a = do
           r <- newIORef []
           IO $ \s ->
-            case newPinnedByteArray# size s of { (# s, mbarr# #) ->
-             (# s, ForeignPtr (byteArrayContents# (unsafeCoerce# mbarr#))
-                              (MallocPtr mbarr# r) #)
+            case newPinnedByteArray# size s of { (# s', mbarr# #) ->
+             (# s', ForeignPtr (byteArrayContents# (unsafeCoerce# mbarr#))
+                               (MallocPtr mbarr# r) #)
             }
             where (I# size) = sizeOf a
 
@@ -150,9 +150,9 @@ mallocForeignPtrBytes :: Int -> IO (ForeignPtr a)
 mallocForeignPtrBytes (I# size) = do 
   r <- newIORef []
   IO $ \s ->
-     case newPinnedByteArray# size s      of { (# s, mbarr# #) ->
-       (# s, ForeignPtr (byteArrayContents# (unsafeCoerce# mbarr#))
-                        (MallocPtr mbarr# r) #)
+     case newPinnedByteArray# size s      of { (# s', mbarr# #) ->
+       (# s', ForeignPtr (byteArrayContents# (unsafeCoerce# mbarr#))
+                         (MallocPtr mbarr# r) #)
      }
 
 -- | Allocate some memory and return a 'ForeignPtr' to it.  The memory
@@ -172,9 +172,9 @@ mallocPlainForeignPtr :: Storable a => IO (ForeignPtr a)
 mallocPlainForeignPtr = doMalloc undefined
   where doMalloc :: Storable b => b -> IO (ForeignPtr b)
         doMalloc a = IO $ \s ->
-            case newPinnedByteArray# size s of { (# s, mbarr# #) ->
-             (# s, ForeignPtr (byteArrayContents# (unsafeCoerce# mbarr#))
-                              (PlainPtr mbarr#) #)
+            case newPinnedByteArray# size s of { (# s', mbarr# #) ->
+             (# s', ForeignPtr (byteArrayContents# (unsafeCoerce# mbarr#))
+                               (PlainPtr mbarr#) #)
             }
             where (I# size) = sizeOf a
 
@@ -184,9 +184,9 @@ mallocPlainForeignPtr = doMalloc undefined
 -- exception to be thrown.
 mallocPlainForeignPtrBytes :: Int -> IO (ForeignPtr a)
 mallocPlainForeignPtrBytes (I# size) = IO $ \s ->
-    case newPinnedByteArray# size s      of { (# s, mbarr# #) ->
-       (# s, ForeignPtr (byteArrayContents# (unsafeCoerce# mbarr#))
-                        (PlainPtr mbarr#) #)
+    case newPinnedByteArray# size s      of { (# s', mbarr# #) ->
+       (# s', ForeignPtr (byteArrayContents# (unsafeCoerce# mbarr#))
+                         (PlainPtr mbarr#) #)
      }
 
 addForeignPtrFinalizer :: FinalizerPtr a -> ForeignPtr a -> IO ()
@@ -212,16 +212,17 @@ addForeignPtrConcFinalizer :: ForeignPtr a -> IO () -> IO ()
 -- are finalized objects, so a finalizer should not refer to a 'Handle'
 -- (including @stdout@, @stdin@ or @stderr@).
 --
-addForeignPtrConcFinalizer (ForeignPtr a c) finalizer = 
+addForeignPtrConcFinalizer (ForeignPtr _ c) finalizer = 
   addForeignPtrConcFinalizer_ c finalizer
 
-addForeignPtrConcFinalizer_ f@(PlainForeignPtr r) finalizer = do
+addForeignPtrConcFinalizer_ :: ForeignPtrContents -> IO () -> IO ()
+addForeignPtrConcFinalizer_ (PlainForeignPtr r) finalizer = do
   fs <- readIORef r
   writeIORef r (finalizer : fs)
   if (null fs)
      then IO $ \s ->
               case r of { IORef (STRef r#) ->
-              case mkWeak# r# () (foreignPtrFinalizer r) s of {  (# s1, w #) ->
+              case mkWeak# r# () (foreignPtrFinalizer r) s of {  (# s1, _ #) ->
               (# s1, () #) }}
      else return ()
 addForeignPtrConcFinalizer_ f@(MallocPtr fo r) finalizer = do 
@@ -230,7 +231,7 @@ addForeignPtrConcFinalizer_ f@(MallocPtr fo r) finalizer = do
   if (null fs)
      then  IO $ \s -> 
                case mkWeak# fo () (do foreignPtrFinalizer r; touch f) s of
-                  (# s1, w #) -> (# s1, () #)
+                  (# s1, _ #) -> (# s1, () #)
      else return ()
 
 addForeignPtrConcFinalizer_ _ _ =
@@ -274,9 +275,10 @@ touchForeignPtr :: ForeignPtr a -> IO ()
 -- result in artificial deadlock.  Another alternative is to use
 -- explicit reference counting.
 --
-touchForeignPtr (ForeignPtr fo r) = touch r
+touchForeignPtr (ForeignPtr _ r) = touch r
 
-touch r = IO $ \s -> case touch# r s of s -> (# s, () #)
+touch :: ForeignPtrContents -> IO ()
+touch r = IO $ \s -> case touch# r s of s' -> (# s', () #)
 
 unsafeForeignPtrToPtr :: ForeignPtr a -> Ptr a
 -- ^This function extracts the pointer component of a foreign
@@ -293,7 +295,7 @@ unsafeForeignPtrToPtr :: ForeignPtr a -> Ptr a
 -- than combinations of 'unsafeForeignPtrToPtr' and
 -- 'touchForeignPtr'.  However, the later routines
 -- are occasionally preferred in tool generated marshalling code.
-unsafeForeignPtrToPtr (ForeignPtr fo r) = Ptr fo
+unsafeForeignPtrToPtr (ForeignPtr fo _) = Ptr fo
 
 castForeignPtr :: ForeignPtr a -> ForeignPtr b
 -- ^This function casts a 'ForeignPtr'
@@ -312,4 +314,6 @@ finalizeForeignPtr (ForeignPtr _ foreignPtr) = do
                 refFinalizers = case foreignPtr of
                         (PlainForeignPtr ref) -> ref
                         (MallocPtr     _ ref) -> ref
+                        PlainPtr _            ->
+                            error "finalizeForeignPtr PlainPtr"
 

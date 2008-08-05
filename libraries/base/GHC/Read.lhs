@@ -473,9 +473,9 @@ instance Read a => Read [a] where
 instance  (Ix a, Read a, Read b) => Read (Array a b)  where
     readPrec = parens $ prec appPrec $
                do L.Ident "array" <- lexP
-                  bounds <- step readPrec
+                  theBounds <- step readPrec
                   vals   <- step readPrec
-                  return (array bounds vals)
+                  return (array theBounds vals)
 
     readListPrec = readListPrecDefault
     readList     = readListDefault

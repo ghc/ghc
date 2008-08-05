@@ -140,7 +140,7 @@ bindIO (IO m) k = IO ( \ s ->
 thenIO :: IO a -> IO b -> IO b
 thenIO (IO m) k = IO ( \ s ->
   case m s of 
-    (# new_s, a #) -> unIO k new_s
+    (# new_s, _ #) -> unIO k new_s
   )
 
 returnIO :: a -> IO a
@@ -471,15 +471,18 @@ data HandleType
  | AppendHandle
  | ReadWriteHandle
 
+isReadableHandleType :: HandleType -> Bool
 isReadableHandleType ReadHandle         = True
 isReadableHandleType ReadWriteHandle    = True
 isReadableHandleType _                  = False
 
+isWritableHandleType :: HandleType -> Bool
 isWritableHandleType AppendHandle    = True
 isWritableHandleType WriteHandle     = True
 isWritableHandleType ReadWriteHandle = True
 isWritableHandleType _               = False
 
+isReadWriteHandleType :: HandleType -> Bool
 isReadWriteHandleType ReadWriteHandle{} = True
 isReadWriteHandleType _                 = False
 
@@ -583,7 +586,7 @@ instance Eq (IOArray i e) where
 -- |Build a new 'IOArray'
 newIOArray :: Ix i => (i,i) -> e -> IO (IOArray i e)
 {-# INLINE newIOArray #-}
-newIOArray lu init  = stToIO $ do {marr <- newSTArray lu init; return (IOArray marr)}
+newIOArray lu initial  = stToIO $ do {marr <- newSTArray lu initial; return (IOArray marr)}
 
 -- | Read a value from an 'IOArray'
 unsafeReadIOArray  :: Ix i => IOArray i e -> Int -> IO e
@@ -612,7 +615,7 @@ writeIOArray (IOArray marr) i e = stToIO (writeSTArray marr i e)
 -- than the derived one.
 
 instance Show HandleType where
-  showsPrec p t =
+  showsPrec _ t =
     case t of
       ClosedHandle      -> showString "closed"
       SemiClosedHandle  -> showString "semi-closed"
@@ -622,9 +625,10 @@ instance Show HandleType where
       ReadWriteHandle   -> showString "read-writable"
 
 instance Show Handle where 
-  showsPrec p (FileHandle   file _)   = showHandle file
-  showsPrec p (DuplexHandle file _ _) = showHandle file
+  showsPrec _ (FileHandle   file _)   = showHandle file
+  showsPrec _ (DuplexHandle file _ _) = showHandle file
 
+showHandle :: FilePath -> String -> String
 showHandle file = showString "{handle: " . showString file . showString "}"
 
 -- ------------------------------------------------------------------------
@@ -1019,8 +1023,8 @@ evaluate a = IO $ \s -> case a `seq` () of () -> (# s, a #)
 
 \begin{code}
 assertError :: Addr# -> Bool -> a -> a
-assertError str pred v
-  | pred      = v
+assertError str predicate v
+  | predicate = v
   | otherwise = throw (AssertionFailed (untangle str "Assertion failed"))
 
 {-

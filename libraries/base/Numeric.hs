@@ -111,7 +111,7 @@ readFloatP =
      case tok of
        L.Rat y  -> return (fromRational y)
        L.Int i  -> return (fromInteger i)
-       other    -> pfail
+       _        -> pfail
 
 -- It's turgid to have readSigned work using list comprehensions,
 -- but it's specified as a ReadS to ReadS transformer
@@ -135,9 +135,9 @@ readSigned readPos = readParen False read'
 
 -- | Show /non-negative/ 'Integral' numbers in base 10.
 showInt :: Integral a => a -> ShowS
-showInt n cs
-    | n < 0     = error "Numeric.showInt: can't show negative numbers"
-    | otherwise = go n cs
+showInt n0 cs0
+    | n0 < 0    = error "Numeric.showInt: can't show negative numbers"
+    | otherwise = go n0 cs0
     where
     go n cs
         | n < 10    = case unsafeChr (ord '0' + fromIntegral n) of
@@ -197,10 +197,10 @@ showGFloat d x =  showString (formatRealFloat FFGeneric d x)
 -- | Shows a /non-negative/ 'Integral' number using the base specified by the
 -- first argument, and the character representation specified by the second.
 showIntAtBase :: Integral a => a -> (Int -> Char) -> a -> ShowS
-showIntAtBase base toChr n r
+showIntAtBase base toChr n0 r0
   | base <= 1 = error ("Numeric.showIntAtBase: applied to unsupported base " ++ show base)
-  | n <  0    = error ("Numeric.showIntAtBase: applied to negative number " ++ show n)
-  | otherwise = showIt (quotRem n base) r
+  | n0 <  0   = error ("Numeric.showIntAtBase: applied to negative number " ++ show n0)
+  | otherwise = showIt (quotRem n0 base) r0
    where
     showIt (n,d) r = seq c $ -- stricter than necessary
       case n of

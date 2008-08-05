@@ -188,6 +188,7 @@ class  (Real a, Fractional a) => RealFrac a  where
                                 -1 -> n
                                 0  -> if even n then n else m
                                 1  -> m
+                                _  -> error "round default defn: Bad value"
     
     ceiling x           =  if r > 0 then n + 1 else n
                            where (n,r) = properFraction x
@@ -210,11 +211,12 @@ numericEnumFromTo       :: (Ord a, Fractional a) => a -> a -> [a]
 numericEnumFromTo n m   = takeWhile (<= m + 1/2) (numericEnumFrom n)
 
 numericEnumFromThenTo   :: (Ord a, Fractional a) => a -> a -> a -> [a]
-numericEnumFromThenTo e1 e2 e3 = takeWhile pred (numericEnumFromThen e1 e2)
+numericEnumFromThenTo e1 e2 e3
+    = takeWhile predicate (numericEnumFromThen e1 e2)
                                 where
                                  mid = (e2 - e1) / 2
-                                 pred | e2 >= e1  = (<= e3 + mid)
-                                      | otherwise = (>= e3 + mid)
+                                 predicate | e2 >= e1  = (<= e3 + mid)
+                                           | otherwise = (>= e3 + mid)
 \end{code}
 
 
@@ -276,17 +278,17 @@ instance  Real Integer  where
 instance  Integral Integer where
     toInteger n      = n
 
-    a `quot` 0 = divZeroError
+    _ `quot` 0 = divZeroError
     n `quot` d = n `quotInteger` d
 
-    a `rem` 0 = divZeroError
+    _ `rem` 0 = divZeroError
     n `rem`  d = n `remInteger`  d
 
-    a `divMod` 0 = divZeroError
+    _ `divMod` 0 = divZeroError
     a `divMod` b = case a `divModInteger` b of
                    (# x, y #) -> (x, y)
 
-    a `quotRem` 0 = divZeroError
+    _ `quotRem` 0 = divZeroError
     a `quotRem` b = case a `quotRemInteger` b of
                     (# q, r #) -> (q, r)
 

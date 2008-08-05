@@ -350,23 +350,27 @@ instance  Enum Char  where
 -- We can do better than for Ints because we don't
 -- have hassles about arithmetic overflow at maxBound
 {-# INLINE [0] eftCharFB #-}
-eftCharFB c n x y = go x
+eftCharFB :: (Char -> a -> a) -> a -> Int# -> Int# -> a
+eftCharFB c n x0 y = go x0
                  where
                     go x | x ># y    = n
                          | otherwise = C# (chr# x) `c` go (x +# 1#)
 
-eftChar x y | x ># y    = [] 
-                | otherwise = C# (chr# x) : eftChar (x +# 1#) y
+eftChar :: Int# -> Int# -> String
+eftChar x y | x ># y    = []
+            | otherwise = C# (chr# x) : eftChar (x +# 1#) y
 
 
 -- For enumFromThenTo we give up on inlining
 {-# NOINLINE [0] efdCharFB #-}
+efdCharFB :: (Char -> a -> a) -> a -> Int# -> Int# -> a
 efdCharFB c n x1 x2
   | delta >=# 0# = go_up_char_fb c n x1 delta 0x10FFFF#
   | otherwise    = go_dn_char_fb c n x1 delta 0#
   where
     delta = x2 -# x1
 
+efdChar :: Int# -> Int# -> String
 efdChar x1 x2
   | delta >=# 0# = go_up_char_list x1 delta 0x10FFFF#
   | otherwise    = go_dn_char_list x1 delta 0#
@@ -374,38 +378,44 @@ efdChar x1 x2
     delta = x2 -# x1
 
 {-# NOINLINE [0] efdtCharFB #-}
+efdtCharFB :: (Char -> a -> a) -> a -> Int# -> Int# -> Int# -> a
 efdtCharFB c n x1 x2 lim
   | delta >=# 0# = go_up_char_fb c n x1 delta lim
   | otherwise    = go_dn_char_fb c n x1 delta lim
   where
     delta = x2 -# x1
 
+efdtChar :: Int# -> Int# -> Int# -> String
 efdtChar x1 x2 lim
   | delta >=# 0# = go_up_char_list x1 delta lim
   | otherwise    = go_dn_char_list x1 delta lim
   where
     delta = x2 -# x1
 
-go_up_char_fb c n x delta lim
-  = go_up x
+go_up_char_fb :: (Char -> a -> a) -> a -> Int# -> Int# -> Int# -> a
+go_up_char_fb c n x0 delta lim
+  = go_up x0
   where
     go_up x | x ># lim  = n
             | otherwise = C# (chr# x) `c` go_up (x +# delta)
 
-go_dn_char_fb c n x delta lim
-  = go_dn x
+go_dn_char_fb :: (Char -> a -> a) -> a -> Int# -> Int# -> Int# -> a
+go_dn_char_fb c n x0 delta lim
+  = go_dn x0
   where
     go_dn x | x <# lim  = n
             | otherwise = C# (chr# x) `c` go_dn (x +# delta)
 
-go_up_char_list x delta lim
-  = go_up x
+go_up_char_list :: Int# -> Int# -> Int# -> String
+go_up_char_list x0 delta lim
+  = go_up x0
   where
     go_up x | x ># lim  = []
             | otherwise = C# (chr# x) : go_up (x +# delta)
 
-go_dn_char_list x delta lim
-  = go_dn x
+go_dn_char_list :: Int# -> Int# -> Int# -> String
+go_dn_char_list x0 delta lim
+  = go_dn x0
   where
     go_dn x | x <# lim  = []
             | otherwise = C# (chr# x) : go_dn (x +# delta)
@@ -468,15 +478,15 @@ instance  Enum Int  where
 
 eftInt :: Int# -> Int# -> [Int]
 -- [x1..x2]
-eftInt x y | x ># y    = []
-           | otherwise = go x
+eftInt x0 y | x0 ># y    = []
+            | otherwise = go x0
                where
                  go x = I# x : if x ==# y then [] else go (x +# 1#)
 
 {-# INLINE [0] eftIntFB #-}
 eftIntFB :: (Int -> r -> r) -> r -> Int# -> Int# -> r
-eftIntFB c n x y | x ># y    = n        
-                 | otherwise = go x
+eftIntFB c n x0 y | x0 ># y    = n        
+                  | otherwise = go x0
                  where
                    go x = I# x `c` if x ==# y then n else go (x +# 1#)
                         -- Watch out for y=maxBound; hence ==, not >

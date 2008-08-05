@@ -68,7 +68,7 @@ import GHC.Base
 -- ---------------------------------------------------------------------------
 -- The readPrec type
 
-newtype ReadPrec a = P { unP :: Prec -> ReadP a }
+newtype ReadPrec a = P (Prec -> ReadP a)
 
 -- Functor, Monad, MonadPlus
 
@@ -104,7 +104,7 @@ step (P f) = P (\n -> f (n+1))
 
 reset :: ReadPrec a -> ReadPrec a
 -- ^ Resets the precedence context to zero.
-reset (P f) = P (\n -> f minPrec)
+reset (P f) = P (\_ -> f minPrec)
 
 prec :: Prec -> ReadPrec a -> ReadPrec a
 -- ^ @(prec n p)@ checks whether the precedence context is 

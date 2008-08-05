@@ -162,10 +162,10 @@ lexChar = do { (c,_) <- lexCharE; return c }
 
 lexCharE :: ReadP (Char, Bool)  -- "escaped or not"?
 lexCharE =
-  do c <- get
-     if c == '\\'
-       then do c <- lexEsc; return (c, True)
-       else do return (c, False)
+  do c1 <- get
+     if c1 == '\\'
+       then do c2 <- lexEsc; return (c2, True)
+       else do return (c1, False)
  where 
   lexEsc =
     lexEscChar
@@ -360,8 +360,8 @@ lexFrac :: ReadP (Maybe Digits)
 -- Read the fractional part; fail if it doesn't
 -- start ".d" where d is a digit
 lexFrac = do char '.'
-             frac <- lexDigits 10
-             return (Just frac)
+             fraction <- lexDigits 10
+             return (Just fraction)
 
 lexExp :: ReadP (Maybe Integer)
 lexExp = do char 'e' +++ char 'E'
@@ -393,13 +393,13 @@ lexInteger base =
 
 val :: Num a => a -> a -> Digits -> a
 -- val base y [d1,..,dn] = y ++ [d1,..,dn], as it were
-val base y []     = y
+val _    y []     = y
 val base y (x:xs) = y' `seq` val base y' xs
  where
   y' = y * base + fromIntegral x
 
 frac :: Integral a => a -> a -> a -> Digits -> Ratio a
-frac base a b []     = a % b
+frac _    a b []     = a % b
 frac base a b (x:xs) = a' `seq` b' `seq` frac base a' b' xs
  where
   a' = a * base + fromIntegral x
@@ -418,6 +418,9 @@ valDig 16 c
   | 'A' <= c && c <= 'F' = Just (ord c - ord 'A' + 10)
   | otherwise            = Nothing
 
+valDig _ _ = error "valDig: Bad base"
+
+valDecDig :: Char -> Maybe Int
 valDecDig c
   | '0' <= c && c <= '9' = Just (ord c - ord '0')
   | otherwise            = Nothing

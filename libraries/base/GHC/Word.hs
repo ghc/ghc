@@ -115,22 +115,22 @@ instance Enum Word where
     enumFromThenTo      = integralEnumFromThenTo
 
 instance Integral Word where
-    quot    x@(W# x#) y@(W# y#)
+    quot    (W# x#) y@(W# y#)
         | y /= 0                = W# (x# `quotWord#` y#)
         | otherwise             = divZeroError
-    rem     x@(W# x#) y@(W# y#)
+    rem     (W# x#) y@(W# y#)
         | y /= 0                = W# (x# `remWord#` y#)
         | otherwise             = divZeroError
-    div     x@(W# x#) y@(W# y#)
+    div     (W# x#) y@(W# y#)
         | y /= 0                = W# (x# `quotWord#` y#)
         | otherwise             = divZeroError
-    mod     x@(W# x#) y@(W# y#)
+    mod     (W# x#) y@(W# y#)
         | y /= 0                = W# (x# `remWord#` y#)
         | otherwise             = divZeroError
-    quotRem x@(W# x#) y@(W# y#)
+    quotRem (W# x#) y@(W# y#)
         | y /= 0                = (W# (x# `quotWord#` y#), W# (x# `remWord#` y#))
         | otherwise             = divZeroError
-    divMod  x@(W# x#) y@(W# y#)
+    divMod  (W# x#) y@(W# y#)
         | y /= 0                = (W# (x# `quotWord#` y#), W# (x# `remWord#` y#))
         | otherwise             = divZeroError
     toInteger (W# x#)
@@ -153,9 +153,9 @@ instance Bounded Word where
 #endif
 
 instance Ix Word where
-    range (m,n)              = [m..n]
-    unsafeIndex b@(m,_) i    = fromIntegral (i - m)
-    inRange (m,n) i          = m <= i && i <= n
+    range (m,n)         = [m..n]
+    unsafeIndex (m,_) i = fromIntegral (i - m)
+    inRange (m,n) i     = m <= i && i <= n
 
 instance Read Word where
     readsPrec p s = [(fromInteger x, r) | (x, r) <- readsPrec p s]
@@ -231,22 +231,22 @@ instance Enum Word8 where
     enumFromThen        = boundedEnumFromThen
 
 instance Integral Word8 where
-    quot    x@(W8# x#) y@(W8# y#)
+    quot    (W8# x#) y@(W8# y#)
         | y /= 0                  = W8# (x# `quotWord#` y#)
         | otherwise               = divZeroError
-    rem     x@(W8# x#) y@(W8# y#)
+    rem     (W8# x#) y@(W8# y#)
         | y /= 0                  = W8# (x# `remWord#` y#)
         | otherwise               = divZeroError
-    div     x@(W8# x#) y@(W8# y#)
+    div     (W8# x#) y@(W8# y#)
         | y /= 0                  = W8# (x# `quotWord#` y#)
         | otherwise               = divZeroError
-    mod     x@(W8# x#) y@(W8# y#)
+    mod     (W8# x#) y@(W8# y#)
         | y /= 0                  = W8# (x# `remWord#` y#)
         | otherwise               = divZeroError
-    quotRem x@(W8# x#) y@(W8# y#)
+    quotRem (W8# x#) y@(W8# y#)
         | y /= 0                  = (W8# (x# `quotWord#` y#), W8# (x# `remWord#` y#))
         | otherwise               = divZeroError
-    divMod  x@(W8# x#) y@(W8# y#)
+    divMod  (W8# x#) y@(W8# y#)
         | y /= 0                  = (W8# (x# `quotWord#` y#), W8# (x# `remWord#` y#))
         | otherwise               = divZeroError
     toInteger (W8# x#)            = smallInteger (word2Int# x#)
@@ -256,9 +256,9 @@ instance Bounded Word8 where
     maxBound = 0xFF
 
 instance Ix Word8 where
-    range (m,n)              = [m..n]
-    unsafeIndex b@(m,_) i    = fromIntegral (i - m)
-    inRange (m,n) i          = m <= i && i <= n
+    range (m,n)         = [m..n]
+    unsafeIndex (m,_) i = fromIntegral (i - m)
+    inRange (m,n) i     = m <= i && i <= n
 
 instance Read Word8 where
     readsPrec p s = [(fromIntegral (x::Int), r) | (x, r) <- readsPrec p s]
@@ -335,22 +335,22 @@ instance Enum Word16 where
     enumFromThen        = boundedEnumFromThen
 
 instance Integral Word16 where
-    quot    x@(W16# x#) y@(W16# y#)
+    quot    (W16# x#) y@(W16# y#)
         | y /= 0                    = W16# (x# `quotWord#` y#)
         | otherwise                 = divZeroError
-    rem     x@(W16# x#) y@(W16# y#)
+    rem     (W16# x#) y@(W16# y#)
         | y /= 0                    = W16# (x# `remWord#` y#)
         | otherwise                 = divZeroError
-    div     x@(W16# x#) y@(W16# y#)
+    div     (W16# x#) y@(W16# y#)
         | y /= 0                    = W16# (x# `quotWord#` y#)
         | otherwise                 = divZeroError
-    mod     x@(W16# x#) y@(W16# y#)
+    mod     (W16# x#) y@(W16# y#)
         | y /= 0                    = W16# (x# `remWord#` y#)
         | otherwise                 = divZeroError
-    quotRem x@(W16# x#) y@(W16# y#)
+    quotRem (W16# x#) y@(W16# y#)
         | y /= 0                    = (W16# (x# `quotWord#` y#), W16# (x# `remWord#` y#))
         | otherwise                 = divZeroError
-    divMod  x@(W16# x#) y@(W16# y#)
+    divMod  (W16# x#) y@(W16# y#)
         | y /= 0                    = (W16# (x# `quotWord#` y#), W16# (x# `remWord#` y#))
         | otherwise                 = divZeroError
     toInteger (W16# x#)             = smallInteger (word2Int# x#)
@@ -360,9 +360,9 @@ instance Bounded Word16 where
     maxBound = 0xFFFF
 
 instance Ix Word16 where
-    range (m,n)              = [m..n]
-    unsafeIndex b@(m,_) i    = fromIntegral (i - m)
-    inRange (m,n) i          = m <= i && i <= n
+    range (m,n)         = [m..n]
+    unsafeIndex (m,_) i = fromIntegral (i - m)
+    inRange (m,n) i     = m <= i && i <= n
 
 instance Read Word16 where
     readsPrec p s = [(fromIntegral (x::Int), r) | (x, r) <- readsPrec p s]
@@ -552,22 +552,22 @@ instance Enum Word32 where
 #endif
 
 instance Integral Word32 where
-    quot    x@(W32# x#) y@(W32# y#)
+    quot    (W32# x#) y@(W32# y#)
         | y /= 0                    = W32# (x# `quotWord#` y#)
         | otherwise                 = divZeroError
-    rem     x@(W32# x#) y@(W32# y#)
+    rem     (W32# x#) y@(W32# y#)
         | y /= 0                    = W32# (x# `remWord#` y#)
         | otherwise                 = divZeroError
-    div     x@(W32# x#) y@(W32# y#)
+    div     (W32# x#) y@(W32# y#)
         | y /= 0                    = W32# (x# `quotWord#` y#)
         | otherwise                 = divZeroError
-    mod     x@(W32# x#) y@(W32# y#)
+    mod     (W32# x#) y@(W32# y#)
         | y /= 0                    = W32# (x# `remWord#` y#)
         | otherwise                 = divZeroError
-    quotRem x@(W32# x#) y@(W32# y#)
+    quotRem (W32# x#) y@(W32# y#)
         | y /= 0                    = (W32# (x# `quotWord#` y#), W32# (x# `remWord#` y#))
         | otherwise                 = divZeroError
-    divMod  x@(W32# x#) y@(W32# y#)
+    divMod  (W32# x#) y@(W32# y#)
         | y /= 0                    = (W32# (x# `quotWord#` y#), W32# (x# `remWord#` y#))
         | otherwise                 = divZeroError
     toInteger (W32# x#)
@@ -630,9 +630,9 @@ instance Bounded Word32 where
     maxBound = 0xFFFFFFFF
 
 instance Ix Word32 where
-    range (m,n)              = [m..n]
-    unsafeIndex b@(m,_) i    = fromIntegral (i - m)
-    inRange (m,n) i          = m <= i && i <= n
+    range (m,n)         = [m..n]
+    unsafeIndex (m,_) i = fromIntegral (i - m)
+    inRange (m,n) i     = m <= i && i <= n
 
 instance Read Word32 where  
 #if WORD_SIZE_IN_BITS < 33
@@ -793,22 +793,22 @@ instance Enum Word64 where
     enumFromThenTo      = integralEnumFromThenTo
 
 instance Integral Word64 where
-    quot    x@(W64# x#) y@(W64# y#)
+    quot    (W64# x#) y@(W64# y#)
         | y /= 0                    = W64# (x# `quotWord#` y#)
         | otherwise                 = divZeroError
-    rem     x@(W64# x#) y@(W64# y#)
+    rem     (W64# x#) y@(W64# y#)
         | y /= 0                    = W64# (x# `remWord#` y#)
         | otherwise                 = divZeroError
-    div     x@(W64# x#) y@(W64# y#)
+    div     (W64# x#) y@(W64# y#)
         | y /= 0                    = W64# (x# `quotWord#` y#)
         | otherwise                 = divZeroError
-    mod     x@(W64# x#) y@(W64# y#)
+    mod     (W64# x#) y@(W64# y#)
         | y /= 0                    = W64# (x# `remWord#` y#)
         | otherwise                 = divZeroError
-    quotRem x@(W64# x#) y@(W64# y#)
+    quotRem (W64# x#) y@(W64# y#)
         | y /= 0                    = (W64# (x# `quotWord#` y#), W64# (x# `remWord#` y#))
         | otherwise                 = divZeroError
-    divMod  x@(W64# x#) y@(W64# y#)
+    divMod  (W64# x#) y@(W64# y#)
         | y /= 0                    = (W64# (x# `quotWord#` y#), W64# (x# `remWord#` y#))
         | otherwise                 = divZeroError
     toInteger (W64# x#)
@@ -845,7 +845,10 @@ instance Bits Word64 where
 "fromIntegral/Word64->a" fromIntegral = \(W64# x#) -> fromIntegral (W# x#)
   #-}
 
+uncheckedShiftL64# :: Word# -> Int# -> Word#
 uncheckedShiftL64#  = uncheckedShiftL#
+
+uncheckedShiftRL64# :: Word# -> Int# -> Word#
 uncheckedShiftRL64# = uncheckedShiftRL#
 
 #endif
@@ -861,9 +864,9 @@ instance Bounded Word64 where
     maxBound = 0xFFFFFFFFFFFFFFFF
 
 instance Ix Word64 where
-    range (m,n)              = [m..n]
-    unsafeIndex b@(m,_) i    = fromIntegral (i - m)
-    inRange (m,n) i          = m <= i && i <= n
+    range (m,n)         = [m..n]
+    unsafeIndex (m,_) i = fromIntegral (i - m)
+    inRange (m,n) i     = m <= i && i <= n
 
 instance Read Word64 where
     readsPrec p s = [(fromInteger x, r) | (x, r) <- readsPrec p s]

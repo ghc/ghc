@@ -517,25 +517,25 @@ tup4Tc :: TyCon
 tup4Tc = mkTyCon "(,,,)"
 
 instance Typeable4 (,,,) where
-  typeOf4 tu = mkTyConApp tup4Tc []
+  typeOf4 _ = mkTyConApp tup4Tc []
 
 tup5Tc :: TyCon
 tup5Tc = mkTyCon "(,,,,)"
 
 instance Typeable5 (,,,,) where
-  typeOf5 tu = mkTyConApp tup5Tc []
+  typeOf5 _ = mkTyConApp tup5Tc []
 
 tup6Tc :: TyCon
 tup6Tc = mkTyCon "(,,,,,)"
 
 instance Typeable6 (,,,,,) where
-  typeOf6 tu = mkTyConApp tup6Tc []
+  typeOf6 _ = mkTyConApp tup6Tc []
 
 tup7Tc :: TyCon
 tup7Tc = mkTyCon "(,,,,,,)"
 
 instance Typeable7 (,,,,,,) where
-  typeOf7 tu = mkTyConApp tup7Tc []
+  typeOf7 _ = mkTyConApp tup7Tc []
 #endif /* __NHC__ */
 
 INSTANCE_TYPEABLE1(Ptr,ptrTc,"Ptr")
@@ -629,7 +629,7 @@ cache = unsafePerformIO $ do
 
 newKey :: IORef Key -> IO Key
 #ifdef __GLASGOW_HASKELL__
-newKey kloc = do i <- genSym; return (Key i)
+newKey _ = do i <- genSym; return (Key i)
 #else
 newKey kloc = do { k@(Key i) <- readIORef kloc ;
                    writeIORef kloc (Key (i+1)) ;

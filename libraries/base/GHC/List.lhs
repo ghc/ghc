@@ -57,6 +57,7 @@ head                    :: [a] -> a
 head (x:_)              =  x
 head []                 =  badHead
 
+badHead :: a
 badHead = errorEmptyList "head"
 
 -- This rule is useful in cases like 
@@ -129,6 +130,7 @@ filter pred (x:xs)
   | otherwise      = filter pred xs
 
 {-# NOINLINE [0] filterFB #-}
+filterFB :: (a -> b -> b) -> (a -> Bool) -> a -> b -> b
 filterFB c p x r | p x       = x `c` r
                  | otherwise = r
 
@@ -161,7 +163,7 @@ filterFB c p x r | p x       = x `c` r
 -- and hence the classic space leak on foldl (+) 0 xs
 
 foldl        :: (a -> b -> a) -> a -> [b] -> a
-foldl f z xs = lgo z xs
+foldl f z0 xs0 = lgo z0 xs0
              where
                 lgo z []     =  z
                 lgo z (x:xs) = lgo (f z x) xs
@@ -212,8 +214,8 @@ scanr f q0 (x:xs)       =  f x q : qs
 -- | 'scanr1' is a variant of 'scanr' that has no starting value argument.
 
 scanr1                  :: (a -> a -> a) -> [a] -> [a]
-scanr1 f []             =  []
-scanr1 f [x]            =  [x]
+scanr1 _ []             =  []
+scanr1 _ [x]            =  [x]
 scanr1 f (x:xs)         =  f x q : qs
                            where qs@(q:_) = scanr1 f xs 
 
@@ -225,6 +227,7 @@ scanr1 f (x:xs)         =  f x q : qs
 iterate :: (a -> a) -> a -> [a]
 iterate f x =  x : iterate f (f x)
 
+iterateFB :: (a -> b -> b) -> (a -> a) -> a -> b
 iterateFB c f x = x `c` iterateFB c f (f x)
 
 
@@ -241,6 +244,7 @@ repeat :: a -> [a]
 repeat x = xs where xs = x : xs
 
 {-# INLINE [0] repeatFB #-}     -- ditto
+repeatFB :: (a -> b -> b) -> a -> b
 repeatFB c x = xs where xs = x `c` xs
 
 
@@ -577,8 +581,8 @@ xs     !! n | n < 0 =  error "Prelude.!!: negative index"
 -- The semantics is not quite the same for error conditions
 -- in the more efficient version.
 --
-xs !! (I# n) | n <# 0#   =  error "Prelude.(!!): negative index\n"
-             | otherwise =  sub xs n
+xs !! (I# n0) | n0 <# 0#   =  error "Prelude.(!!): negative index\n"
+               | otherwise =  sub xs n0
                          where
                             sub :: [a] -> Int# -> a
                             sub []     _ = error "Prelude.(!!): index too large\n"
@@ -596,13 +600,16 @@ xs !! (I# n) | n <# 0#   =  error "Prelude.(!!): negative index\n"
 %*********************************************************
 
 \begin{code}
+foldr2 :: (a -> b -> c -> c) -> c -> [a] -> [b] -> c
 foldr2 _k z []    _ys    = z
 foldr2 _k z _xs   []     = z
 foldr2 k z (x:xs) (y:ys) = k x y (foldr2 k z xs ys)
 
+foldr2_left :: (a -> b -> c -> d) -> d -> a -> ([b] -> c) -> [b] -> d
 foldr2_left _k  z _x _r []     = z
 foldr2_left  k _z  x  r (y:ys) = k x y (r ys)
 
+foldr2_right :: (a -> b -> c -> d) -> d -> b -> ([a] -> c) -> [a] -> d
 foldr2_right _k z  _y _r []     = z
 foldr2_right  k _z  y  r (x:xs) = k x y (r xs)
 
@@ -639,6 +646,7 @@ zip (a:as) (b:bs) = (a,b) : zip as bs
 zip _      _      = []
 
 {-# INLINE [0] zipFB #-}
+zipFB :: ((a, b) -> c -> d) -> a -> b -> c -> d
 zipFB c x y r = (x,y) `c` r
 
 {-# RULES
@@ -673,6 +681,7 @@ zipWith f (a:as) (b:bs) = f a b : zipWith f as bs
 zipWith _ _      _      = []
 
 {-# INLINE [0] zipWithFB #-}
+zipWithFB :: (a -> b -> c) -> (d -> e -> a) -> d -> e -> b -> c
 zipWithFB c f x y r = (x `f` y) `c` r
 
 {-# RULES

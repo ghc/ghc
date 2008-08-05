@@ -520,6 +520,7 @@ formatRealFloat fmt decs x
           "0"     -> "0.0e0"
           [d]     -> d : ".0e" ++ show_e'
           (d:ds') -> d : '.' : ds' ++ "e" ++ show_e'
+          []      -> error "formatRealFloat/doFmt/FFExponent: []"
        Just dec ->
         let dec' = max dec 1 in
         case is of
@@ -565,6 +566,7 @@ roundTo base d is =
   case f d is of
     x@(0,_) -> x
     (1,xs)  -> (1, 1:xs)
+    _       -> error "roundTo: bad Value"
  where
   b2 = base `div` 2
 
@@ -732,13 +734,13 @@ Now, here's Lennart's code (which works)
 fromRat :: (RealFloat a) => Rational -> a
 
 -- Deal with special cases first, delegating the real work to fromRat'
-fromRat (n :% 0) | n > 0  =  1/0        -- +Infinity
-                 | n == 0 =  0/0        -- NaN
-                 | n < 0  = -1/0        -- -Infinity
+fromRat (n :% 0) | n > 0     =  1/0        -- +Infinity
+                 | n < 0     = -1/0        -- -Infinity
+                 | otherwise =  0/0        -- NaN
 
-fromRat (n :% d) | n > 0  = fromRat' (n :% d)
-                 | n == 0 = encodeFloat 0 0             -- Zero
-                 | n < 0  = - fromRat' ((-n) :% d)
+fromRat (n :% d) | n > 0     = fromRat' (n :% d)
+                 | n < 0     = - fromRat' ((-n) :% d)
+                 | otherwise = encodeFloat 0 0             -- Zero
 
 -- Conversion process:
 -- Scale the rational number by the RealFloat base until

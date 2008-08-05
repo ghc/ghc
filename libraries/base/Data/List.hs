@@ -434,7 +434,7 @@ intercalate xs xss = concat (intersperse xs xss)
 transpose               :: [[a]] -> [[a]]
 transpose []             = []
 transpose ([]   : xss)   = transpose xss
-transpose ((x:xs) : xss) = (x : [h | (h:t) <- xss]) : transpose (xs : [ t | (h:t) <- xss])
+transpose ((x:xs) : xss) = (x : [h | (h:_) <- xss]) : transpose (xs : [ t | (_:t) <- xss])
 
 
 -- | The 'partition' function takes a predicate a list and returns
@@ -447,6 +447,7 @@ partition               :: (a -> Bool) -> [a] -> ([a],[a])
 {-# INLINE partition #-}
 partition p xs = foldr (select p) ([],[]) xs
 
+select :: (a -> Bool) -> a -> ([a], [a]) -> ([a], [a])
 select p x ~(ts,fs) | p x       = (x:ts,fs)
                     | otherwise = (ts, x:fs)
 
@@ -543,22 +544,22 @@ strictMinimum xs        =  foldl1' min xs
 -- The list must be finite and non-empty.
 maximumBy               :: (a -> a -> Ordering) -> [a] -> a
 maximumBy _ []          =  error "List.maximumBy: empty list"
-maximumBy cmp xs        =  foldl1 max xs
+maximumBy cmp xs        =  foldl1 maxBy xs
                         where
-                           max x y = case cmp x y of
-                                        GT -> x
-                                        _  -> y
+                           maxBy x y = case cmp x y of
+                                       GT -> x
+                                       _  -> y
 
 -- | The 'minimumBy' function takes a comparison function and a list
 -- and returns the least element of the list by the comparison function.
 -- The list must be finite and non-empty.
 minimumBy               :: (a -> a -> Ordering) -> [a] -> a
 minimumBy _ []          =  error "List.minimumBy: empty list"
-minimumBy cmp xs        =  foldl1 min xs
+minimumBy cmp xs        =  foldl1 minBy xs
                         where
-                           min x y = case cmp x y of
-                                        GT -> y
-                                        _  -> x
+                           minBy x y = case cmp x y of
+                                       GT -> y
+                                       _  -> x
 
 -- | The 'genericLength' function is an overloaded version of 'length'.  In
 -- particular, instead of returning an 'Int', it returns any type which is
@@ -754,12 +755,12 @@ nonEmptySubsequences (x:xs)  =  [x] : foldr f [] (nonEmptySubsequences xs)
 --
 -- > permutations "abc" == ["abc","bac","cba","bca","cab","acb"]
 permutations            :: [a] -> [[a]]
-permutations xs         =  xs : perms xs []
+permutations xs0        =  xs0 : perms xs0 []
   where
-    perms []     is = []
+    perms []     _  = []
     perms (t:ts) is = foldr interleave (perms ts (t:is)) (permutations is)
       where interleave    xs     r = let (_,zs) = interleave' id xs r in zs
-            interleave' f []     r = (ts, r)
+            interleave' _ []     r = (ts, r)
             interleave' f (y:ys) r = let (us,zs) = interleave' (f . (y:)) ys r
                                      in  (y:us, f (t:y:us) : zs)
 
@@ -830,18 +831,18 @@ mergesort :: (a -> a -> Ordering) -> [a] -> [a]
 mergesort cmp = mergesort' cmp . map wrap
 
 mergesort' :: (a -> a -> Ordering) -> [[a]] -> [a]
-mergesort' cmp [] = []
-mergesort' cmp [xs] = xs
+mergesort' _   [] = []
+mergesort' _   [xs] = xs
 mergesort' cmp xss = mergesort' cmp (merge_pairs cmp xss)
 
 merge_pairs :: (a -> a -> Ordering) -> [[a]] -> [[a]]
-merge_pairs cmp [] = []
-merge_pairs cmp [xs] = [xs]
+merge_pairs _   [] = []
+merge_pairs _   [xs] = [xs]
 merge_pairs cmp (xs:ys:xss) = merge cmp xs ys : merge_pairs cmp xss
 
 merge :: (a -> a -> Ordering) -> [a] -> [a] -> [a]
-merge cmp [] ys = ys
-merge cmp xs [] = xs
+merge _   [] ys = ys
+merge _   xs [] = xs
 merge cmp (x:xs) (y:ys)
  = case x `cmp` y of
         GT -> y : merge cmp (x:xs)   ys
@@ -921,7 +922,7 @@ unfoldr f b  =
 -- | A strict version of 'foldl'.
 foldl'           :: (a -> b -> a) -> a -> [b] -> a
 #ifdef __GLASGOW_HASKELL__
-foldl' f z xs = lgo z xs
+foldl' f z0 xs0 = lgo z0 xs0
     where lgo z []     = z
           lgo z (x:xs) = let z' = f z x in z' `seq` lgo z' xs
 #else

@@ -463,7 +463,7 @@ indices (Array l u _ _) = range (l,u)
 -- | The list of elements of an array in index order.
 {-# INLINE elems #-}
 elems :: Ix i => Array i e -> [e]
-elems arr@(Array l u n _) =
+elems arr@(Array _ _ n _) =
     [unsafeAt arr i | i <- [0 .. n - 1]]
 
 -- | The list of associations of an array in index order.
@@ -493,19 +493,19 @@ accumArray :: Ix i
         -> (i,i)                -- ^ bounds of the array
         -> [(i, a)]             -- ^ association list
         -> Array i e
-accumArray f init (l,u) ies =
+accumArray f initial (l,u) ies =
     let n = safeRangeSize (l,u)
-    in unsafeAccumArray' f init (l,u) n
+    in unsafeAccumArray' f initial (l,u) n
                          [(safeIndex (l,u) n i, e) | (i, e) <- ies]
 
 {-# INLINE unsafeAccumArray #-}
 unsafeAccumArray :: Ix i => (e -> a -> e) -> e -> (i,i) -> [(Int, a)] -> Array i e
-unsafeAccumArray f init b ies = unsafeAccumArray' f init b (rangeSize b) ies
+unsafeAccumArray f initial b ies = unsafeAccumArray' f initial b (rangeSize b) ies
 
 {-# INLINE unsafeAccumArray' #-}
 unsafeAccumArray' :: Ix i => (e -> a -> e) -> e -> (i,i) -> Int -> [(Int, a)] -> Array i e
-unsafeAccumArray' f init (l,u) n@(I# n#) ies = runST (ST $ \s1# ->
-    case newArray# n# init s1#          of { (# s2#, marr# #) ->
+unsafeAccumArray' f initial (l,u) n@(I# n#) ies = runST (ST $ \s1# ->
+    case newArray# n# initial s1#          of { (# s2#, marr# #) ->
     foldr (adjust f marr#) (done l u n marr#) ies s2# })
 
 {-# INLINE adjust #-}
@@ -651,9 +651,9 @@ might be different, though.
 \begin{code}
 {-# INLINE newSTArray #-}
 newSTArray :: Ix i => (i,i) -> e -> ST s (STArray s i e)
-newSTArray (l,u) init = ST $ \s1# ->
+newSTArray (l,u) initial = ST $ \s1# ->
     case safeRangeSize (l,u)            of { n@(I# n#) ->
-    case newArray# n# init s1#          of { (# s2#, marr# #) ->
+    case newArray# n# initial s1#       of { (# s2#, marr# #) ->
     (# s2#, STArray l u n marr# #) }}
 
 {-# INLINE boundsSTArray #-}

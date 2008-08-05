@@ -95,9 +95,9 @@ class Num a => Bits a where
         question. -}
     shift             :: a -> Int -> a
 
-    x `shift`   i | i<0  = x `shiftR` (-i)
-                  | i==0 = x
-                  | i>0  = x `shiftL` i
+    x `shift`   i | i<0       = x `shiftR` (-i)
+                  | i>0       = x `shiftL` i
+                  | otherwise = x
 
     {-| @'rotate' x i@ rotates @x@ left by @i@ bits if @i@ is positive,
         or right by @-i@ bits otherwise.
@@ -109,9 +109,9 @@ class Num a => Bits a where
         question. -}
     rotate            :: a -> Int -> a
 
-    x `rotate`  i | i<0  = x `rotateR` (-i)
-                  | i==0 = x
-                  | i>0  = x `rotateL` i
+    x `rotate`  i | i<0       = x `rotateR` (-i)
+                  | i>0       = x `rotateL` i
+                  | otherwise = x
 
     {-
     -- Rotation can be implemented in terms of two shifts, but care is

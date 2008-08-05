@@ -117,9 +117,9 @@ instance Bounded Int8 where
     maxBound =  0x7F
 
 instance Ix Int8 where
-    range (m,n)              = [m..n]
-    unsafeIndex b@(m,_) i    = fromIntegral i - fromIntegral m
-    inRange (m,n) i          = m <= i && i <= n
+    range (m,n)         = [m..n]
+    unsafeIndex (m,_) i = fromIntegral i - fromIntegral m
+    inRange (m,n) i     = m <= i && i <= n
 
 instance Read Int8 where
     readsPrec p s = [(fromIntegral (x::Int), r) | (x, r) <- readsPrec p s]
@@ -233,9 +233,9 @@ instance Bounded Int16 where
     maxBound =  0x7FFF
 
 instance Ix Int16 where
-    range (m,n)              = [m..n]
-    unsafeIndex b@(m,_) i    = fromIntegral i - fromIntegral m
-    inRange (m,n) i          = m <= i && i <= n
+    range (m,n)         = [m..n]
+    unsafeIndex (m,_) i = fromIntegral i - fromIntegral m
+    inRange (m,n) i     = m <= i && i <= n
 
 instance Read Int16 where
     readsPrec p s = [(fromIntegral (x::Int), r) | (x, r) <- readsPrec p s]
@@ -535,9 +535,9 @@ instance Bounded Int32 where
     maxBound =  0x7FFFFFFF
 
 instance Ix Int32 where
-    range (m,n)              = [m..n]
-    unsafeIndex b@(m,_) i    = fromIntegral i - fromIntegral m
-    inRange (m,n) i          = m <= i && i <= n
+    range (m,n)         = [m..n]
+    unsafeIndex (m,_) i = fromIntegral i - fromIntegral m
+    inRange (m,n) i     = m <= i && i <= n
 
 ------------------------------------------------------------------------
 -- type Int64
@@ -787,7 +787,10 @@ instance Bits Int64 where
 "fromIntegral/Int64->a" fromIntegral = \(I64# x#) -> fromIntegral (I# x#)
   #-}
 
+uncheckedIShiftL64# :: Int# -> Int# -> Int#
 uncheckedIShiftL64#  = uncheckedIShiftL#
+
+uncheckedIShiftRA64# :: Int# -> Int# -> Int#
 uncheckedIShiftRA64# = uncheckedIShiftRA#
 #endif
 
@@ -799,6 +802,6 @@ instance Bounded Int64 where
     maxBound =  0x7FFFFFFFFFFFFFFF
 
 instance Ix Int64 where
-    range (m,n)              = [m..n]
-    unsafeIndex b@(m,_) i    = fromIntegral i - fromIntegral m
-    inRange (m,n) i          = m <= i && i <= n
+    range (m,n)         = [m..n]
+    unsafeIndex (m,_) i = fromIntegral i - fromIntegral m
+    inRange (m,n) i     = m <= i && i <= n
