@@ -25,7 +25,6 @@ libraries/unix                          packages/unix
 libraries/Win32                         packages/Win32
 libraries/HUnit             extralibs   packages/HUnit
 libraries/QuickCheck        extralibs   packages/QuickCheck
-libraries/cgi               extralibs   packages/cgi
 libraries/haskell-src       extralibs   packages/haskell-src
 libraries/html              extralibs   packages/html
 libraries/mtl               extralibs   packages/mtl
