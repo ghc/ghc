@@ -158,9 +158,9 @@ falseDataConName  = mkWiredInDataConName UserSyntax gHC_BOOL (fsLit "False") fal
 trueDataConName	  = mkWiredInDataConName UserSyntax gHC_BOOL (fsLit "True")  trueDataConKey  trueDataCon 
 
 listTyConName, nilDataConName, consDataConName :: Name
-listTyConName	  = mkWiredInTyConName   BuiltInSyntax gHC_BASE (fsLit "[]") listTyConKey listTyCon
-nilDataConName 	  = mkWiredInDataConName BuiltInSyntax gHC_BASE (fsLit "[]") nilDataConKey nilDataCon 
-consDataConName	  = mkWiredInDataConName BuiltInSyntax gHC_BASE (fsLit ":") consDataConKey consDataCon
+listTyConName	  = mkWiredInTyConName   BuiltInSyntax gHC_TYPES (fsLit "[]") listTyConKey listTyCon
+nilDataConName 	  = mkWiredInDataConName BuiltInSyntax gHC_TYPES (fsLit "[]") nilDataConKey nilDataCon 
+consDataConName	  = mkWiredInDataConName BuiltInSyntax gHC_TYPES (fsLit ":") consDataConKey consDataCon
 
 floatTyConName, floatDataConName, doubleTyConName, doubleDataConName :: Name
 floatTyConName	   = mkWiredInTyConName   UserSyntax gHC_FLOAT (fsLit "Float") floatTyConKey floatTyCon
