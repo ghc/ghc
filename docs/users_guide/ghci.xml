@@ -650,13 +650,14 @@ Prelude IO>
             loaded</literal>&rdquo;.</para>
       </sect3>
 
-      <sect3>
+      <sect3 id="ghci-import-qualified">
 	<title>Qualified names</title>
 
 	<para>To make life slightly easier, the GHCi prompt also
         behaves as if there is an implicit <literal>import
         qualified</literal> declaration for every module in every
-        package, and every module currently loaded into GHCi.</para>
+        package, and every module currently loaded into GHCi.  This
+          behaviour can be disabled with the flag <option>-fno-implicit-import-qualified</option><indexterm><primary><option>-fno-implicit-import-qualified</option></primary></indexterm>.</para>
       </sect3>
 
       <sect3>

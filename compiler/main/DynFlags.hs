@@ -278,6 +278,7 @@ data DynFlag
    | Opt_RunCPSZ
    | Opt_ConvertToZipCfgAndBack
    | Opt_AutoLinkPackages
+   | Opt_ImplicitImportQualified
 
    -- keeping stuff
    | Opt_KeepHiDiffs
@@ -1532,7 +1533,8 @@ fFlags = [
   ( "allow-incoherent-instances",       Opt_IncoherentInstances,
     deprecatedForLanguage "IncoherentInstances" ),
   ( "gen-manifest",                     Opt_GenManifest, const Supported ),
-  ( "embed-manifest",                   Opt_EmbedManifest, const Supported )
+  ( "embed-manifest",                   Opt_EmbedManifest, const Supported ),
+  ( "implicit-import-qualified",        Opt_ImplicitImportQualified, const Supported )
   ]
 
 supportedLanguages :: [String]

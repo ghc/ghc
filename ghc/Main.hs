@@ -125,9 +125,16 @@ main =
 				 	 _other   -> 1
 			}
 
+      -- turn on -fimplicit-import-qualified for GHCi now, so that it
+      -- can be overriden from the command-line
+      dflags1a | DoInteractive <- cli_mode = imp_qual_enabled
+               | DoEval _      <- cli_mode = imp_qual_enabled
+               | otherwise                 = dflags1
+        where imp_qual_enabled = dflags1 `dopt_set` Opt_ImplicitImportQualified
+
 	-- The rest of the arguments are "dynamic"
 	-- Leftover ones are presumably files
-  (dflags2, fileish_args, dynamicFlagWarnings) <- GHC.parseDynamicFlags dflags1 argv3
+  (dflags2, fileish_args, dynamicFlagWarnings) <- GHC.parseDynamicFlags dflags1a argv3
 
   let flagWarnings = staticFlagWarnings
                   ++ modeFlagWarnings

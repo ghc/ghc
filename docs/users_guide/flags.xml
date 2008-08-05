@@ -522,6 +522,13 @@
 	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
+	    <row>
+	      <entry><option>-fno-implicit-import-qualified</option></entry>
+	      <entry><link linkend="ghci-import-qualified">Turn off
+	      implicit qualified import of everything in GHCi</link></entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
 
 	  </tbody>
 	</tgroup>

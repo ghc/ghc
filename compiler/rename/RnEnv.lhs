@@ -359,23 +359,27 @@ lookupGlobalOccRn rdr_name
   = lookupImportedName rdr_name	
 
   | otherwise
-  =	-- First look up the name in the normal environment.
-   lookupGreRn_maybe rdr_name		`thenM` \ mb_gre ->
+  = do
+  	-- First look up the name in the normal environment.
+   mb_gre <- lookupGreRn_maybe rdr_name
    case mb_gre of {
 	Just gre -> returnM (gre_name gre) ;
-	Nothing   -> 
+	Nothing   -> do
 
 	-- We allow qualified names on the command line to refer to 
 	--  *any* name exported by any module in scope, just as if 
 	-- there was an "import qualified M" declaration for every 
 	-- module.
-   getModule 		`thenM` \ mod ->
-   if isQual rdr_name && mod == iNTERACTIVE then	
-					-- This test is not expensive,
-	lookupQualifiedName rdr_name	-- and only happens for failed lookups
-   else	do
+   allow_qual <- doptM Opt_ImplicitImportQualified
+   mod <- getModule
+               -- This test is not expensive,
+               -- and only happens for failed lookups
+   if isQual rdr_name && allow_qual && mod == iNTERACTIVE
+      then lookupQualifiedName rdr_name
+      else do 
         traceRn $ text "lookupGlobalOccRn"
-	unboundName rdr_name }
+        unboundName rdr_name
+  }
 
 lookupImportedName :: RdrName -> TcRnIf m n Name
 -- Lookup the occurrence of an imported name
