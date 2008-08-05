@@ -518,10 +518,11 @@ tupleTypeName n = mk_tup_name (n-1) TcClsName
 
 mk_tup_name :: Int -> NameSpace -> Name
 mk_tup_name n_commas space
-  = Name occ (NameG space (mkPkgName "base") tup_mod)
+  = Name occ (NameG space (mkPkgName "ghc-prim") tup_mod)
   where
     occ = mkOccName ('(' : replicate n_commas ',' ++ ")")
-    tup_mod = mkModName "Data.Tuple"
+    -- XXX Should it be GHC.Unit for 0 commas?
+    tup_mod = mkModName "GHC.Tuple"
 
 
 
