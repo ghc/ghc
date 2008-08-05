@@ -269,7 +269,9 @@ tcDeriving tycl_decls inst_decls deriv_decls
   = recoverM (return ([], emptyValBindsOut)) $
     do	{   	-- Fish the "deriving"-related information out of the TcEnv
 		-- And make the necessary "equations".
-	; early_specs <- makeDerivSpecs tycl_decls inst_decls deriv_decls
+	  is_boot <- tcIsHsBoot
+	; traceTc (text "tcDeriving" <+> ppr is_boot)
+	; early_specs <- makeDerivSpecs is_boot tycl_decls inst_decls deriv_decls
 
 	; overlap_flag <- getOverlapFlag
 	; let (infer_specs, given_specs) = splitEithers early_specs
@@ -280,7 +282,6 @@ tcDeriving tycl_decls inst_decls deriv_decls
 
 	; insts2 <- mapM (genInst overlap_flag) final_specs
 
-	; is_boot <- tcIsHsBoot
 		 -- Generate the generic to/from functions from each type declaration
 	; gen_binds <- mkGenericBinds is_boot
 	; (inst_info, rn_binds) <- renameDeriv is_boot gen_binds (insts1 ++ insts2)
@@ -387,23 +388,37 @@ or} has just one data constructor (e.g., tuples).
 all those.
 
 \begin{code}
-makeDerivSpecs :: [LTyClDecl Name] 
+makeDerivSpecs :: Bool 
+	       -> [LTyClDecl Name] 
                -> [LInstDecl Name]
 	       -> [LDerivDecl Name] 
 	       -> TcM [EarlyDerivSpec]
 
-makeDerivSpecs tycl_decls inst_decls deriv_decls
-  = do	{ eqns1 <- mapAndRecoverM deriveTyData $
-                     extractTyDataPreds tycl_decls ++
-		     [ pd                        -- traverse assoc data families
-                     | L _ (InstDecl _ _ _ ats) <- inst_decls
-		     , pd <- extractTyDataPreds ats ]
+makeDerivSpecs is_boot tycl_decls inst_decls deriv_decls
+  | is_boot 	-- No 'deriving' at all in hs-boot files
+  = do	{ mapM_ add_deriv_err deriv_locs 
+	; return [] }
+  | otherwise
+  = do	{ eqns1 <- mapAndRecoverM deriveTyData all_tydata
 	; eqns2 <- mapAndRecoverM deriveStandalone deriv_decls
 	; return (catMaybes (eqns1 ++ eqns2)) }
   where
-    extractTyDataPreds decls = 		   
-      [(p, d) | d@(L _ (TyData {tcdDerivs = Just preds})) <- decls, p <- preds]
+    extractTyDataPreds decls
+      = [(p, d) | d@(L _ (TyData {tcdDerivs = Just preds})) <- decls, p <- preds]
 
+    all_tydata :: [(LHsType Name, LTyClDecl Name)]
+	-- Derived predicate paired with its data type declaration
+    all_tydata = extractTyDataPreds tycl_decls ++
+		 [ pd                -- Traverse assoc data families
+                 | L _ (InstDecl _ _ _ ats) <- inst_decls
+		 , pd <- extractTyDataPreds ats ]
+
+    deriv_locs = map (getLoc . snd) all_tydata
+		 ++ map getLoc deriv_decls
+
+    add_deriv_err loc = setSrcSpan loc $
+			addErr (hang (ptext (sLit "Deriving not permitted in hs-boot file"))
+				   2 (ptext (sLit "Use an instance declaration instead")))
 
 ------------------------------------------------------------------
 deriveStandalone :: LDerivDecl Name -> TcM (Maybe EarlyDerivSpec)
