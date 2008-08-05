@@ -18,6 +18,7 @@ Library {
         GHC.IntWord32
         GHC.IntWord64
         GHC.Tuple
+        GHC.Types
         GHC.Unit
     c-sources:
         cbits/longlong.c
