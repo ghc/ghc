@@ -747,6 +747,7 @@ instance Show AsyncException where
   showsPrec _ StackOverflow   = showString "stack overflow"
   showsPrec _ HeapOverflow    = showString "heap overflow"
   showsPrec _ ThreadKilled    = showString "thread killed"
+  showsPrec _ UserInterrupt   = showString "user interrupt"
 
 instance Show ArrayException where
   showsPrec _ (IndexOutOfBounds s)
