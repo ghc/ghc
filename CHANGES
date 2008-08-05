@@ -1,3 +1,7 @@
+Changed in version 2.2.2:
+
+  * Relax version dependency on ghc-paths
+
 Changes in version 2.2.1:
 
   * Support for GHC 6.8.3
