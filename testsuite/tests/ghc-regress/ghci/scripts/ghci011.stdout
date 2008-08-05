@@ -12,7 +12,7 @@ instance Eq () -- Defined in Data.Tuple
 instance Ord () -- Defined in Data.Tuple
 instance Read () -- Defined in GHC.Read
 instance Show () -- Defined in GHC.Show
-data (,) a b = (,) a b 	-- Defined in Data.Tuple
+data (,) a b = (,) a b 	-- Defined in GHC.Tuple
 instance (Bounded a, Bounded b) => Bounded (a, b)
   -- Defined in GHC.Enum
 instance (Eq a, Eq b) => Eq (a, b) -- Defined in Data.Tuple
