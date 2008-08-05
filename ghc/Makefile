@@ -82,6 +82,12 @@ BUILD_FLAGS=$(patsubst %, --ghc-option=%, $(EXTRA_HC_OPTS))
 # It works because installPackage doesn't actually use ghc-pkg, as there's
 # no library to register
 
+ifeq "$(stage)" "1"
+# GHC 6.9+ can handle cross-package recompilation checking, but
+# we don't rely on the bootstrapping compiler being able to do this.
+TOUCH_MAIN = $(RM) dist-stage1/build/ghc/ghc-tmp/Main.o
+endif
+
 boot.stage.%:
 	$(CABAL) configure --distpref dist-stage$*         \
 	                   $(INSTALL_DIRS_CONFIGURE_FLAGS) \
@@ -92,6 +98,7 @@ boot.stage.%:
 	                   --datasubdir=.
 
 build.stage.%:
+	$(TOUCH_MAIN)
 	$(CABAL) build     --distpref dist-stage$* $(BUILD_FLAGS)
 	$(INSTALL_PACKAGE) install '$(GHC_PKG_PROG)' 'XXX/package.conf' "" \
 	                   $(FPTOOLS_TOP_ABS)/ghc/stage$*-inplace          \
