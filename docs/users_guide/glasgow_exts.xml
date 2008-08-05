@@ -1568,6 +1568,29 @@ necessary to enable them.
 </para>
 </sect2>
 
+<sect2 id="package-imports">
+  <title>Package-qualified imports</title>
+
+  <para>With the <option>-XPackageImports</option> flag, GHC allows
+  import declarations to be qualified by the package name that the
+    module is intended to be imported from.  For example:</para>
+
+<programlisting>
+import "network" Network.Socket
+</programlisting>
+  
+  <para>would import the module <literal>Network.Socket</literal> from
+    the package <literal>network</literal> (any version).  This may
+    be used to disambiguate an import when the same module is
+    available from multiple packages, or is present in both the
+    current package being built and an external package.</para>
+
+  <para>Note: you probably don't need to use this feature, it was
+    added mainly so that we can build backwards-compatible versions of
+    packages when APIs change.  It can lead to fragile dependencies in
+    the common case: modules occasionally move from one package to
+    another, rendering any package-qualified imports broken.</para>
+</sect2>
 </sect1>
 
 

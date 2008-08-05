@@ -63,7 +63,7 @@ rnImports imports
          implicit_prelude <- doptM Opt_ImplicitPrelude
          let prel_imports	= mkPrelImports this_mod implicit_prelude imports
              (source, ordinary) = partition is_source_import imports
-             is_source_import (L _ (ImportDecl _ is_boot _ _ _)) = is_boot
+             is_source_import (L _ (ImportDecl _ _ is_boot _ _ _)) = is_boot
 
          ifOptM Opt_WarnImplicitPrelude (
             when (notNull prel_imports) $ addWarn (implicitPreludeWarn)
@@ -99,13 +99,14 @@ mkPrelImports this_mod implicit_prelude import_decls
   | otherwise = [preludeImportDecl]
   where
       explicit_prelude_import
-       = notNull [ () | L _ (ImportDecl mod _ _ _ _) <- import_decls, 
+       = notNull [ () | L _ (ImportDecl mod Nothing _ _ _ _) <- import_decls, 
 	           unLoc mod == pRELUDE_NAME ]
 
       preludeImportDecl :: LImportDecl RdrName
       preludeImportDecl
         = L loc $
 	  ImportDecl (L loc pRELUDE_NAME)
+               Nothing {- no specific package -}
 	       False {- Not a boot interface -}
 	       False	{- Not qualified -}
 	       Nothing	{- No "as" -}
@@ -118,10 +119,14 @@ rnImportDecl  :: Module
 	      -> LImportDecl RdrName
 	      -> RnM (LImportDecl Name, GlobalRdrEnv, ImportAvails,AnyHpcUsage)
 
-rnImportDecl this_mod (L loc (ImportDecl loc_imp_mod_name want_boot
+rnImportDecl this_mod (L loc (ImportDecl loc_imp_mod_name mb_pkg want_boot
                                          qual_only as_mod imp_details))
   = 
     setSrcSpan loc $ do
+
+    when (isJust mb_pkg) $ do
+        pkg_imports <- doptM Opt_PackageImports
+        when (not pkg_imports) $ addErr packageImportErr
 
 	-- If there's an error in loadInterface, (e.g. interface
 	-- file not found) we get lots of spurious errors from 'filterImports'
@@ -129,7 +134,7 @@ rnImportDecl this_mod (L loc (ImportDecl loc_imp_mod_name want_boot
 	imp_mod_name = unLoc loc_imp_mod_name
 	doc = ppr imp_mod_name <+> ptext (sLit "is directly imported")
 
-    iface <- loadSrcInterface doc imp_mod_name want_boot
+    iface <- loadSrcInterface doc imp_mod_name want_boot mb_pkg
 
 	-- Compiler sanity check: if the import didn't say
 	-- {-# SOURCE #-} we should not get a hi-boot file
@@ -239,7 +244,7 @@ rnImportDecl this_mod (L loc (ImportDecl loc_imp_mod_name want_boot
 	  _    	      -> return ()
      )
 
-    let new_imp_decl = L loc (ImportDecl loc_imp_mod_name want_boot
+    let new_imp_decl = L loc (ImportDecl loc_imp_mod_name mb_pkg want_boot
                                          qual_only as_mod new_imp_details)
 
     return (new_imp_decl, gbl_env, imports, mi_hpc iface)
@@ -1443,4 +1448,8 @@ moduleWarn mod (DeprecatedTxt txt)
 implicitPreludeWarn :: SDoc
 implicitPreludeWarn
   = ptext (sLit "Module `Prelude' implicitly imported")
+
+packageImportErr :: SDoc
+packageImportErr
+  = ptext (sLit "Package-qualified imports are not enabled; use -XPackageImports")
 \end{code}

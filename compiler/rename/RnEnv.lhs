@@ -470,7 +470,7 @@ lookupQualifiedName rdr_name
   | Just (mod,occ) <- isQual_maybe rdr_name
    -- Note: we want to behave as we would for a source file import here,
    -- and respect hiddenness of modules/packages, hence loadSrcInterface.
-   = loadSrcInterface doc mod False	`thenM` \ iface ->
+   = loadSrcInterface doc mod False Nothing	`thenM` \ iface ->
 
    case  [ (mod,occ) | 
 	   (mod,avails) <- mi_exports iface,

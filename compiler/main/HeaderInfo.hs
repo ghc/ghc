@@ -61,8 +61,9 @@ getImports dflags buf filename source_filename = do
 	      let
                 main_loc = mkSrcLoc (mkFastString source_filename) 1 0
 		mod = mb_mod `orElse` L (srcLocSpan main_loc) mAIN_NAME
-	        (src_idecls, ord_idecls) = partition isSourceIdecl (map unLoc imps)
-		source_imps   = map getImpMod src_idecls	
+                imps' = filter isHomeImp (map unLoc imps)
+	        (src_idecls, ord_idecls) = partition isSourceIdecl imps'
+		source_imps   = map getImpMod src_idecls
 		ordinary_imps = filter ((/= moduleName gHC_PRIM) . unLoc) 
 					(map getImpMod ord_idecls)
 		     -- GHC.Prim doesn't exist physically, so don't go looking for it.
@@ -72,11 +73,16 @@ getImports dflags buf filename source_filename = do
 parseError :: SrcSpan -> Message -> a
 parseError span err = throwErrMsg $ mkPlainErrMsg span err
 
+-- we aren't interested in package imports here, filter them out
+isHomeImp :: ImportDecl name -> Bool
+isHomeImp (ImportDecl _ (Just p) _ _ _ _) = p == fsLit "this"
+isHomeImp (ImportDecl _ Nothing  _ _ _ _) = True
+
 isSourceIdecl :: ImportDecl name -> Bool
-isSourceIdecl (ImportDecl _ s _ _ _) = s
+isSourceIdecl (ImportDecl _ _ s _ _ _) = s
 
 getImpMod :: ImportDecl name -> Located ModuleName
-getImpMod (ImportDecl located_mod _ _ _ _) = located_mod
+getImpMod (ImportDecl located_mod _ _ _ _ _) = located_mod
 
 --------------------------------------------------------------
 -- Get options

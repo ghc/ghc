@@ -959,6 +959,12 @@
 	      <entry>dynamic</entry>
 	      <entry><option>-XNoFunctionalDependencies</option></entry>
 	    </row>
+	    <row>
+	      <entry><option>-XPackageImports</option></entry>
+	      <entry>Enable <link linkend="package-imports">package-qualified imports</link>.</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-XNoPackageImports</option></entry>
+	    </row>
 	  </tbody>
 	</tgroup>
       </informaltable>

@@ -241,6 +241,7 @@ data DynFlag
    | Opt_RankNTypes
    | Opt_ImpredicativeTypes
    | Opt_TypeOperators
+   | Opt_PackageImports
 
    | Opt_PrintExplicitForalls
 
@@ -1628,7 +1629,8 @@ xFlags = [
   ( "GeneralizedNewtypeDeriving",       Opt_GeneralizedNewtypeDeriving, const Supported ),
   ( "OverlappingInstances",             Opt_OverlappingInstances, const Supported ),
   ( "UndecidableInstances",             Opt_UndecidableInstances, const Supported ),
-  ( "IncoherentInstances",              Opt_IncoherentInstances, const Supported )
+  ( "IncoherentInstances",              Opt_IncoherentInstances, const Supported ),
+  ( "PackageImports",                   Opt_PackageImports, const Supported )
   ]
 
 impliedFlags :: [(DynFlag, [DynFlag])]

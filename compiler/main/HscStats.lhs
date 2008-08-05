@@ -119,7 +119,7 @@ ppSourceStats short (L _ (HsModule _ exports imports ldecls _ _ _))
     sig_info (InlineSig _ _)    = (0,0,0,1)
     sig_info _                  = (0,0,0,0)
 
-    import_info (L _ (ImportDecl _ _ qual as spec))
+    import_info (L _ (ImportDecl _ _ _ qual as spec))
 	= add6 (1, qual_info qual, as_info as, 0,0,0) (spec_info spec)
     qual_info False  = 0
     qual_info True   = 1

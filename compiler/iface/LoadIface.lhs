@@ -70,15 +70,20 @@ import Data.Maybe
 \begin{code}
 -- | Load the interface corresponding to an @import@ directive in 
 -- source code.  On a failure, fail in the monad with an error message.
-loadSrcInterface :: SDoc -> ModuleName -> IsBootInterface -> RnM ModIface
-loadSrcInterface doc mod want_boot  = do 	
+loadSrcInterface :: SDoc
+                 -> ModuleName
+                 -> IsBootInterface     -- {-# SOURCE #-} ?
+                 -> Maybe FastString    -- "package", if any
+                 -> RnM ModIface
+
+loadSrcInterface doc mod want_boot maybe_pkg  = do
   -- We must first find which Module this import refers to.  This involves
   -- calling the Finder, which as a side effect will search the filesystem
   -- and create a ModLocation.  If successful, loadIface will read the
   -- interface; it will call the Finder again, but the ModLocation will be
   -- cached from the first search.
   hsc_env <- getTopEnv
-  res <- liftIO $ findImportedModule hsc_env mod Nothing
+  res <- liftIO $ findImportedModule hsc_env mod maybe_pkg
   case res of
     Found _ mod -> do
       mb_iface <- initIfaceTcRn $ loadInterface doc mod (ImportByUser want_boot)

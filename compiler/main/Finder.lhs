@@ -37,6 +37,7 @@ import FiniteMap
 import LazyUniqFM
 import Maybes		( expectJust )
 
+import Distribution.Package
 import Data.IORef	( IORef, writeIORef, readIORef, modifyIORef )
 import Data.List
 import System.Directory
@@ -113,27 +114,20 @@ lookupModLocationCache ref key = do
 -- packages to find the module, if a package is specified then only
 -- that package is searched for the module.
 
-findImportedModule :: HscEnv -> ModuleName -> Maybe PackageId -> IO FindResult
-findImportedModule hsc_env mod_name mb_pkgid =
-  case mb_pkgid of
-	Nothing		    	   -> unqual_import
-	Just pkg | pkg == this_pkg -> home_import
-	         | otherwise	   -> pkg_import pkg
+findImportedModule :: HscEnv -> ModuleName -> Maybe FastString -> IO FindResult
+findImportedModule hsc_env mod_name mb_pkg =
+  case mb_pkg of
+	Nothing                        -> unqual_import
+	Just pkg | pkg == fsLit "this" -> home_import -- "this" is special
+	         | otherwise           -> pkg_import
   where
-    dflags = hsc_dflags hsc_env
-    this_pkg = thisPackage dflags
+    home_import   = findHomeModule hsc_env mod_name
 
-    home_import     = findHomeModule hsc_env mod_name
+    pkg_import    = findExposedPackageModule hsc_env mod_name mb_pkg
 
-    pkg_import pkg  = findPackageModule hsc_env (mkModule pkg mod_name)
-			-- ToDo: this isn't quite right, the module we want
-			-- might actually be in another package, but re-exposed
-			-- ToDo: should return NotFoundInPackage if
-			-- the module isn't exposed by the package.
-
-    unqual_import   = home_import 
+    unqual_import = home_import 
 			`orIfNotFound`
-		      findExposedPackageModule hsc_env mod_name
+		      findExposedPackageModule hsc_env mod_name Nothing
 
 -- | Locate a specific 'Module'.  The purpose of this function is to
 -- create a 'ModLocation' for a given 'Module', that is to find out
@@ -176,8 +170,9 @@ homeSearchCache hsc_env mod_name do_this = do
 	   _other        -> return ()
 	return result
 
-findExposedPackageModule :: HscEnv -> ModuleName -> IO FindResult
-findExposedPackageModule hsc_env mod_name
+findExposedPackageModule :: HscEnv -> ModuleName -> Maybe FastString
+                         -> IO FindResult
+findExposedPackageModule hsc_env mod_name mb_pkg
         -- not found in any package:
   | null found = return (NotFound [] Nothing)
         -- found in just one exposed package:
@@ -195,8 +190,18 @@ findExposedPackageModule hsc_env mod_name
   where
 	dflags = hsc_dflags hsc_env
         found = lookupModuleInAllPackages dflags mod_name
-        found_exposed = filter is_exposed found
+
+        found_exposed = [ (pkg_conf,exposed_mod) 
+                        | x@(pkg_conf,exposed_mod) <- found,
+                          is_exposed x,
+                          pkg_conf `matches` mb_pkg ]
+
         is_exposed (pkg_conf,exposed_mod) = exposed pkg_conf && exposed_mod
+
+        _pkg_conf `matches` Nothing  = True
+        pkg_conf  `matches` Just pkg =
+           case packageName pkg_conf of 
+              PackageName n -> pkg == mkFastString n
 
 
 modLocationCache :: HscEnv -> Module -> IO FindResult -> IO FindResult

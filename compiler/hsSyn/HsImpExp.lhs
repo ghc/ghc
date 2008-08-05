@@ -35,6 +35,7 @@ type LImportDecl name = Located (ImportDecl name)
 
 data ImportDecl name
   = ImportDecl	  (Located ModuleName)		-- module name
+                  (Maybe FastString)            -- package qualifier
 		  Bool				-- True <=> {-# SOURCE #-} import
 		  Bool				-- True => qualified
 		  (Maybe ModuleName)		-- as Module
@@ -43,11 +44,14 @@ data ImportDecl name
 
 \begin{code}
 instance (Outputable name) => Outputable (ImportDecl name) where
-    ppr (ImportDecl mod from qual as spec)
+    ppr (ImportDecl mod pkg from qual as spec)
       = hang (hsep [ptext (sLit "import"), ppr_imp from, 
-                    pp_qual qual, ppr mod, pp_as as])
+                    pp_qual qual, pp_pkg pkg, ppr mod, pp_as as])
 	     4 (pp_spec spec)
       where
+        pp_pkg Nothing  = empty
+        pp_pkg (Just p) = doubleQuotes (ftext p)
+
 	pp_qual False   = empty
 	pp_qual True	= ptext (sLit "qualified")
 
@@ -64,7 +68,7 @@ instance (Outputable name) => Outputable (ImportDecl name) where
 			= ptext (sLit "hiding") <+> parens (interpp'SP spec)
 
 ideclName :: ImportDecl name -> Located ModuleName
-ideclName (ImportDecl mod_nm _ _ _ _) = mod_nm
+ideclName (ImportDecl mod_nm _ _ _ _ _) = mod_nm
 \end{code}
 
 %************************************************************************

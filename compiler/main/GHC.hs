@@ -2263,7 +2263,7 @@ getTokenStream :: Session -> Module -> IO [Located Token]
 -- | Takes a 'ModuleName' and possibly a 'PackageId', and consults the
 -- filesystem and package database to find the corresponding 'Module', 
 -- using the algorithm that is used for an @import@ declaration.
-findModule :: Session -> ModuleName -> Maybe PackageId -> IO Module
+findModule :: Session -> ModuleName -> Maybe FastString -> IO Module
 findModule s mod_name maybe_pkg = withSession s $ \hsc_env ->
   let
         dflags = hsc_dflags hsc_env

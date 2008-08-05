@@ -413,11 +413,9 @@ findWiredInPackages dflags pkgs preload this_package = do
 			   -> IO (Maybe (PackageIdentifier, PackageId))
 	findWiredInPackage pkgs wired_pkg =
            let all_ps = [ p | p <- pkgs, p `matches` wired_pkg ] in
-	   case filter exposed all_ps of
-		[] -> case all_ps of
-                        []   -> notfound
-                        many -> pick (head (sortByVersion many))
-		many  -> pick (head (sortByVersion many))
+	   case all_ps of
+		[]   -> notfound
+		many -> pick (head (sortByVersion many))
           where
                 suffixes = snd wired_pkg
                 notfound = do
@@ -444,9 +442,18 @@ findWiredInPackages dflags pkgs preload this_package = do
   let 
         wired_in_ids = catMaybes mb_wired_in_ids
 
-	deleteOtherWiredInPackages pkgs = filterOut bad pkgs
-	  where bad p = any (p `matches`) wired_in_pkgids
-                     && package p `notElem` map fst wired_in_ids
+        -- this is old: we used to assume that if there were
+        -- multiple versions of wired-in packages installed that
+        -- they were mutually exclusive.  Now we're assuming that
+        -- you have one "main" version of each wired-in package
+        -- (the latest version), and the others are backward-compat
+        -- wrappers that depend on this one.  e.g. base-4.0 is the
+        -- latest, base-3.0 is a compat wrapper depending on base-4.0.
+        {-
+ 	deleteOtherWiredInPackages pkgs = filterOut bad pkgs
+ 	  where bad p = any (p `matches`) wired_in_pkgids
+                      && package p `notElem` map fst wired_in_ids
+        -}
 
 	updateWiredInDependencies pkgs = map upd_pkg pkgs
 	  where upd_pkg p = p{ package = upd_pid (package p),
@@ -457,9 +464,9 @@ findWiredInPackages dflags pkgs preload this_package = do
 				((x, y):_) -> x{ pkgName = PackageName (packageIdString y),
                                                  pkgVersion = Version [] [] }
 
-        pkgs1 = deleteOtherWiredInPackages pkgs
+        -- pkgs1 = deleteOtherWiredInPackages pkgs
 
-        pkgs2 = updateWiredInDependencies pkgs1
+        pkgs2 = updateWiredInDependencies pkgs
 
         preload1 = map upd_pid preload
 
