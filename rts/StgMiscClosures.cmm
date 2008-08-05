@@ -13,7 +13,7 @@
 #include "Cmm.h"
 
 import pthread_mutex_lock;
-import base_GHCziBase_Czh_static_info;
+import ghczmprim_GHCziTypes_Czh_static_info;
 import base_GHCziBase_Izh_static_info;
 import EnterCriticalSection;
 import LeaveCriticalSection;
@@ -595,10 +595,10 @@ CLOSURE(stg_dummy_ret_closure,stg_dummy_ret);
  *
  */
 #warning Is this correct? _imp is a pointer!
-#define Char_hash_static_info _imp__base_GHCziBase_Czh_static_info
+#define Char_hash_static_info _imp__ghczmprim_GHCziTypes_Czh_static_info
 #define Int_hash_static_info _imp__base_GHCziBase_Izh_static_info
 #else
-#define Char_hash_static_info base_GHCziBase_Czh_static_info
+#define Char_hash_static_info ghczmprim_GHCziTypes_Czh_static_info
 #define Int_hash_static_info base_GHCziBase_Izh_static_info
 #endif
 
