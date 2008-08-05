@@ -33,7 +33,7 @@ module GHC.Err
        ) where
 
 #ifndef __HADDOCK__
-import GHC.Base
+import GHC.Types
 import GHC.IOBase
 import GHC.Exception
 #endif
@@ -47,7 +47,7 @@ import GHC.Exception
 
 \begin{code}
 -- | 'error' stops execution and displays an error message.
-error :: String -> a
+error :: [Char] -> a
 error s = throw (ErrorCall s)
 
 -- | A special case of 'error'.

@@ -87,11 +87,13 @@ module GHC.Base
         module GHC.Bool,
         module GHC.Generics,
         module GHC.Ordering,
+        module GHC.Types,
         module GHC.Prim,        -- Re-export GHC.Prim and GHC.Err, to avoid lots
         module GHC.Err          -- of people having to import it explicitly
   ) 
         where
 
+import GHC.Types
 import GHC.Bool
 import GHC.Generics
 import GHC.Ordering
@@ -573,7 +575,6 @@ To convert a 'Char' to or from the corresponding 'Int' value defined
 by Unicode, use 'Prelude.toEnum' and 'Prelude.fromEnum' from the
 'Prelude.Enum' class respectively (or equivalently 'ord' and 'chr').
 -}
-data Char = C# Char#
 
 -- We don't use deriving for Eq and Ord, because for Ord the derived
 -- instance defines only compare, which takes two primops.  Then
