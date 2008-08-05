@@ -187,6 +187,10 @@ instance Exception IOError where
     toException                     = SomeException
     fromException (SomeException e) = Just (unsafeCoerce e)
 
+instance Exception ExitCode where
+    toException                     = SomeException
+    fromException (SomeException e) = Just (unsafeCoerce e)
+
 data ArithException
 data ArrayException
 data AsyncException
