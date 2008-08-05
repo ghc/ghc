@@ -79,6 +79,7 @@ other dynamic, non-language, flag settings:
   -fno-regs-iterative
   -fgen-manifest
   -fembed-manifest
+  -fimplicit-import-qualified
 active language flags:
   -XImplicitPrelude
   -XMonomorphismRestriction
@@ -190,6 +191,7 @@ other dynamic, non-language, flag settings:
   -fno-regs-iterative
   -fgen-manifest
   -fembed-manifest
+  -fimplicit-import-qualified
 active language flags:
   -XImplicitPrelude
   -XMonomorphismRestriction
