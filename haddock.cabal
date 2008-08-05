@@ -63,7 +63,7 @@ executable haddock
   build-depends:
     base,
     haskell98,
-    ghc == 6.8.2 || == 6.8.3,
+    ghc >= 6.8.2,
     ghc-paths,
     filepath,
     directory,
