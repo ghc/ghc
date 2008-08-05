@@ -99,7 +99,7 @@ import GHC.Prim
 import {-# SOURCE #-} GHC.Err
 
 infixr 9  .
-infixr 5  ++, :
+infixr 5  ++
 infix  4  ==, /=, <, <=, >=, >
 infixr 3  &&
 infixr 2  ||
@@ -274,9 +274,8 @@ class  Monad m  where
 %*********************************************************
 
 \begin{code}
-data [] a = [] | a : [a]  -- do explicitly: deriving (Eq, Ord)
-                          -- to avoid weird names like con2tag_[]#
-
+-- do explicitly: deriving (Eq, Ord)
+-- to avoid weird names like con2tag_[]#
 
 instance (Eq a) => Eq [a] where
     {-# SPECIALISE instance Eq [Char] #-}
