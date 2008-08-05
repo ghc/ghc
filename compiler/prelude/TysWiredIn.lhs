@@ -147,8 +147,8 @@ mkWiredInDataConName built_in modu fs unique datacon
 		  built_in
 
 charTyConName, charDataConName, intTyConName, intDataConName :: Name
-charTyConName	  = mkWiredInTyConName   UserSyntax gHC_BASE (fsLit "Char") charTyConKey charTyCon
-charDataConName   = mkWiredInDataConName UserSyntax gHC_BASE (fsLit "C#") charDataConKey charDataCon
+charTyConName	  = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Char") charTyConKey charTyCon
+charDataConName   = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "C#") charDataConKey charDataCon
 intTyConName	  = mkWiredInTyConName   UserSyntax gHC_BASE (fsLit "Int") intTyConKey   intTyCon
 intDataConName	  = mkWiredInDataConName UserSyntax gHC_BASE (fsLit "I#") intDataConKey  intDataCon
 
