@@ -1198,7 +1198,10 @@ reportUnusedNames export_decls gbl_env
                       (_, no_imp, loc) <- xs,
 		       let mod_name = moduleName mod,
     		       not (mod_name `elemFM` minimal_imports1),
-    		       mod /= pRELUDE,
+    		       moduleName mod /= pRELUDE_NAME,
+                             -- XXX not really correct, but we don't want
+                             -- to generate warnings when compiling against
+                             -- a compat version of base.
 		       not no_imp]
 	-- The not no_imp part is not to complain about
 	-- import M (), which is an idiom for importing
