@@ -22,12 +22,6 @@ module GHC.Read
   -- ReadS type
   , ReadS      -- :: *; = String -> [(a,String)]
 
-  -- utility functions
-  , reads      -- :: Read a => ReadS a
-  , readp      -- :: Read a => ReadP a
-  , readEither -- :: Read a => String -> Either String a
-  , read       -- :: Read a => String -> a
-
   -- H98 compatibility
   , lex         -- :: ReadS String
   , lexLitChar  -- :: ReadS String
@@ -44,6 +38,9 @@ module GHC.Read
 
   -- Temporary
   , readParen
+
+  -- XXX Can this be removed?
+  , readp
   )
  where
 
@@ -64,7 +61,6 @@ import qualified Text.Read.Lex as L
 import Text.ParserCombinators.ReadPrec
 
 import Data.Maybe
-import Data.Either
 
 #ifndef __HADDOCK__
 import {-# SOURCE #-} GHC.Unicode       ( isDigit )
@@ -223,33 +219,6 @@ readListPrecDefault :: Read a => ReadPrec [a]
 -- ^ A possible replacement definition for the 'readListPrec' method,
 --   defined using 'readPrec' (GHC only).
 readListPrecDefault = list readPrec
-
-------------------------------------------------------------------------
--- utility functions
-
--- | equivalent to 'readsPrec' with a precedence of 0.
-reads :: Read a => ReadS a
-reads = readsPrec minPrec
-
-readp :: Read a => ReadP a
-readp = readPrec_to_P readPrec minPrec
-
-readEither :: Read a => String -> Either String a
-readEither s =
-  case [ x | (x,"") <- readPrec_to_S read' minPrec s ] of
-    [x] -> Right x
-    []  -> Left "Prelude.read: no parse"
-    _   -> Left "Prelude.read: ambiguous parse"
- where
-  read' =
-    do x <- readPrec
-       lift P.skipSpaces
-       return x
-
--- | The 'read' function reads input from a string, which must be
--- completely consumed by the input process.
-read :: Read a => String -> a
-read s = either error id (readEither s)
 
 ------------------------------------------------------------------------
 -- H98 compatibility
@@ -443,23 +412,6 @@ instance Read a => Read (Maybe a) where
         do L.Ident "Just" <- lexP
            x              <- step readPrec
            return (Just x))
-    )
-
-  readListPrec = readListPrecDefault
-  readList     = readListDefault
-
-instance (Read a, Read b) => Read (Either a b) where
-  readPrec =
-    parens
-    ( prec appPrec
-      ( do L.Ident "Left" <- lexP
-           x            <- step readPrec
-           return (Left x)
-       +++
-        do L.Ident "Right" <- lexP
-           y             <- step readPrec
-           return (Right y)
-      )
     )
 
   readListPrec = readListPrecDefault
@@ -714,3 +666,11 @@ instance (Read a, Read b, Read c, Read d, Read e, Read f, Read g, Read h,
   readListPrec = readListPrecDefault
   readList     = readListDefault
 \end{code}
+
+\begin{code}
+-- XXX Can this be removed?
+
+readp :: Read a => ReadP a
+readp = readPrec_to_P readPrec minPrec
+\end{code}
+

@@ -45,7 +45,10 @@ module Text.Read (
  ) where
 
 #ifdef __GLASGOW_HASKELL__
+import GHC.Base
 import GHC.Read
+import Data.Either
+import Text.ParserCombinators.ReadP as P
 #endif
 #if defined(__GLASGOW_HASKELL__) || defined(__HUGS__)
 import Text.ParserCombinators.ReadPrec
@@ -68,3 +71,30 @@ parens p = optional
     L.Punc ")" <- lexP
     return x
 #endif
+
+#ifdef __GLASGOW_HASKELL__
+------------------------------------------------------------------------
+-- utility functions
+
+-- | equivalent to 'readsPrec' with a precedence of 0.
+reads :: Read a => ReadS a
+reads = readsPrec minPrec
+
+readEither :: Read a => String -> Either String a
+readEither s =
+  case [ x | (x,"") <- readPrec_to_S read' minPrec s ] of
+    [x] -> Right x
+    []  -> Left "Prelude.read: no parse"
+    _   -> Left "Prelude.read: ambiguous parse"
+ where
+  read' =
+    do x <- readPrec
+       lift P.skipSpaces
+       return x
+
+-- | The 'read' function reads input from a string, which must be
+-- completely consumed by the input process.
+read :: Read a => String -> a
+read s = either error id (readEither s)
+#endif
+

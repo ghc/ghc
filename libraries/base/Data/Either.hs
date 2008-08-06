@@ -21,9 +21,13 @@ module Data.Either (
    partitionEithers, -- :: [Either a b] -> ([a],[b])
  ) where
 
+#include "Typeable.h"
+
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
 import GHC.Show
+import GHC.Read
+import Data.Typeable
 
 {-
 -- just for testing
@@ -40,7 +44,7 @@ either correct or an error; by convention, the 'Left' constructor is
 used to hold an error value and the 'Right' constructor is used to
 hold a correct value (mnemonic: \"right\" also means \"correct\").
 -}
-data  Either a b  =  Left a | Right b   deriving (Eq, Ord, Show)
+data  Either a b  =  Left a | Right b   deriving (Eq, Ord, Read, Show)
 
 -- | Case analysis for the 'Either' type.
 -- If the value is @'Left' a@, apply the first function to @a@;
@@ -49,6 +53,8 @@ either                  :: (a -> c) -> (b -> c) -> Either a b -> c
 either f _ (Left x)     =  f x
 either _ g (Right y)    =  g y
 #endif  /* __GLASGOW_HASKELL__ */
+
+INSTANCE_TYPEABLE2(Either,eitherTc,"Either")
 
 -- | Extracts from a list of 'Either' all the 'Left' elements
 -- All the 'Left' elements are extracted in order.

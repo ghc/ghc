@@ -83,7 +83,6 @@ module Data.Typeable
 
 import qualified Data.HashTable as HT
 import Data.Maybe
-import Data.Either
 import Data.Int
 import Data.Word
 import Data.List( foldl, intersperse )
@@ -487,7 +486,6 @@ INSTANCE_TYPEABLE0((),unitTc,"()")
 INSTANCE_TYPEABLE1([],listTc,"[]")
 INSTANCE_TYPEABLE1(Maybe,maybeTc,"Maybe")
 INSTANCE_TYPEABLE1(Ratio,ratioTc,"Ratio")
-INSTANCE_TYPEABLE2(Either,eitherTc,"Either")
 INSTANCE_TYPEABLE2((->),funTc,"->")
 INSTANCE_TYPEABLE1(IO,ioTc,"IO")
 
