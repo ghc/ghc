@@ -90,10 +90,11 @@ import Unsafe.Coerce
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
-import GHC.Show
-import GHC.Err
-import GHC.Num
-import GHC.Float
+import GHC.Show         (Show(..), ShowS,
+                         shows, showString, showChar, showParen)
+import GHC.Err          (undefined)
+import GHC.Num          (Integer, fromInteger, (+))
+import GHC.Float        (Float, Double)
 import GHC.Real         ( rem, Ratio )
 import GHC.IOBase       (IORef,newIORef,unsafePerformIO)
 
