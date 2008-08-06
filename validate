@@ -53,8 +53,10 @@ fi
 
 if [ $testsuite_only -eq 0 ]; then
 
-if [ $no_clean -eq 0 ] && [ -f mk/config.mk ]; then
-    make distclean
+if [ $no_clean -eq 0 ]; then
+    if [ -f mk/config.mk ]; then
+        make distclean
+    fi
 
     case $OSTYPE in
         cygwin|msys) config_args=--build=i386-unknown-mingw32
