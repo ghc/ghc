@@ -231,7 +231,7 @@ genericTyConNames = [crossTyConName, plusTyConName, genUnitTyConName]
 pRELUDE :: Module
 pRELUDE		= mkBaseModule_ pRELUDE_NAME
 
-gHC_PRIM, gHC_TYPES, gHC_BOOL, gHC_UNIT, gHC_ORDERING, gHC_GENERICS, gHC_BASE, gHC_ENUM,
+gHC_PRIM, gHC_TYPES, gHC_BOOL, gHC_UNIT, gHC_ORDERING, gHC_GENERICS, gHC_CLASSES, gHC_BASE, gHC_ENUM,
     gHC_SHOW, gHC_READ, gHC_NUM, gHC_INTEGER, gHC_LIST, gHC_PARR,
     gHC_TUPLE, dATA_TUPLE, dATA_EITHER, dATA_STRING, gHC_PACK, gHC_CONC, gHC_IO_BASE,
     gHC_ST, gHC_ARR, gHC_STABLE, gHC_ADDR, gHC_PTR, gHC_ERR, gHC_REAL,
@@ -244,6 +244,7 @@ gHC_UNIT	= mkPrimModule (fsLit "GHC.Unit")
 gHC_BOOL	= mkPrimModule (fsLit "GHC.Bool")
 gHC_ORDERING	= mkPrimModule (fsLit "GHC.Ordering")
 gHC_GENERICS	= mkPrimModule (fsLit "GHC.Generics")
+gHC_CLASSES	= mkBaseModule (fsLit "GHC.Classes")
 gHC_BASE	= mkBaseModule (fsLit "GHC.Base")
 gHC_ENUM	= mkBaseModule (fsLit "GHC.Enum")
 gHC_SHOW	= mkBaseModule (fsLit "GHC.Show")
@@ -354,11 +355,11 @@ eq_RDR, ge_RDR, ne_RDR, le_RDR, lt_RDR, gt_RDR, compare_RDR,
     ltTag_RDR, eqTag_RDR, gtTag_RDR :: RdrName
 eq_RDR 			= nameRdrName eqName
 ge_RDR 			= nameRdrName geName
-ne_RDR 			= varQual_RDR  gHC_BASE (fsLit "/=")
-le_RDR 			= varQual_RDR  gHC_BASE (fsLit "<=") 
-lt_RDR 			= varQual_RDR  gHC_BASE (fsLit "<") 
-gt_RDR 			= varQual_RDR  gHC_BASE (fsLit ">")  
-compare_RDR		= varQual_RDR  gHC_BASE (fsLit "compare") 
+ne_RDR 			= varQual_RDR  gHC_CLASSES (fsLit "/=")
+le_RDR 			= varQual_RDR  gHC_CLASSES (fsLit "<=") 
+lt_RDR 			= varQual_RDR  gHC_CLASSES (fsLit "<") 
+gt_RDR 			= varQual_RDR  gHC_CLASSES (fsLit ">")  
+compare_RDR		= varQual_RDR  gHC_CLASSES (fsLit "compare") 
 ltTag_RDR		= dataQual_RDR gHC_ORDERING (fsLit "LT") 
 eqTag_RDR		= dataQual_RDR gHC_ORDERING (fsLit "EQ")
 gtTag_RDR		= dataQual_RDR gHC_ORDERING (fsLit "GT")
@@ -438,7 +439,7 @@ compose_RDR		= varQual_RDR gHC_BASE (fsLit ".")
 not_RDR, getTag_RDR, succ_RDR, pred_RDR, minBound_RDR, maxBound_RDR,
     range_RDR, inRange_RDR, index_RDR,
     unsafeIndex_RDR, unsafeRangeSize_RDR :: RdrName
-not_RDR 		= varQual_RDR gHC_BASE (fsLit "not")
+not_RDR 		= varQual_RDR gHC_CLASSES (fsLit "not")
 getTag_RDR	 	= varQual_RDR gHC_BASE (fsLit "getTag")
 succ_RDR 		= varQual_RDR gHC_ENUM (fsLit "succ")
 pred_RDR                = varQual_RDR gHC_ENUM (fsLit "pred")
@@ -552,10 +553,10 @@ inlineIdName	 	= varQual gHC_BASE (fsLit "inline") inlineIdKey
 
 -- Base classes (Eq, Ord, Functor)
 eqClassName, eqName, ordClassName, geName, functorClassName :: Name
-eqClassName	  = clsQual  gHC_BASE (fsLit "Eq")      eqClassKey
-eqName		  = methName gHC_BASE (fsLit "==")      eqClassOpKey
-ordClassName	  = clsQual  gHC_BASE (fsLit "Ord")     ordClassKey
-geName		  = methName gHC_BASE (fsLit ">=")      geClassOpKey
+eqClassName	  = clsQual  gHC_CLASSES (fsLit "Eq")      eqClassKey
+eqName		  = methName gHC_CLASSES (fsLit "==")      eqClassOpKey
+ordClassName	  = clsQual  gHC_CLASSES (fsLit "Ord")     ordClassKey
+geName		  = methName gHC_CLASSES (fsLit ">=")      geClassOpKey
 functorClassName  = clsQual  gHC_BASE (fsLit "Functor") functorClassKey
 
 -- Class Monad
@@ -582,8 +583,8 @@ buildName	  = varQual gHC_BASE (fsLit "build")      buildIdKey
 augmentName	  = varQual gHC_BASE (fsLit "augment")    augmentIdKey
 mapName       = varQual gHC_BASE (fsLit "map")        mapIdKey
 appendName	  = varQual gHC_BASE (fsLit "++")         appendIdKey
-andName		  = varQual gHC_BASE (fsLit "&&")	 andIdKey
-orName		  = varQual gHC_BASE (fsLit "||")	 orIdKey
+andName		  = varQual gHC_CLASSES (fsLit "&&")	 andIdKey
+orName		  = varQual gHC_CLASSES (fsLit "||")	 orIdKey
 assertName        = varQual gHC_BASE (fsLit "assert")     assertIdKey
 breakpointName    = varQual gHC_BASE (fsLit "breakpoint") breakpointIdKey
 breakpointCondName= varQual gHC_BASE (fsLit "breakpointCond") breakpointCondIdKey
