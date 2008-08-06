@@ -104,7 +104,6 @@ import GHC.IOBase       ( IO, MVar, Handle, block )
 import GHC.ST           ( ST )
 import GHC.STRef        ( STRef )
 import GHC.Ptr          ( Ptr, FunPtr )
-import GHC.ForeignPtr   ( ForeignPtr )
 import GHC.Stable       ( StablePtr, newStablePtr, freeStablePtr,
                           deRefStablePtr, castStablePtrToPtr,
                           castPtrToStablePtr )
@@ -538,7 +537,6 @@ instance Typeable7 (,,,,,,) where
 
 INSTANCE_TYPEABLE1(Ptr,ptrTc,"Ptr")
 INSTANCE_TYPEABLE1(FunPtr,funPtrTc,"FunPtr")
-INSTANCE_TYPEABLE1(ForeignPtr,foreignPtrTc,"ForeignPtr")
 INSTANCE_TYPEABLE1(StablePtr,stablePtrTc,"StablePtr")
 INSTANCE_TYPEABLE1(IORef,iORefTc,"IORef")
 
