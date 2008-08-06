@@ -633,11 +633,6 @@ eqString _        _        = False
 %*********************************************************
 
 \begin{code}
-data Int = I# Int#
--- ^A fixed-precision integer type with at least the range @[-2^29 .. 2^29-1]@.
--- The exact range for a given implementation can be determined by using
--- 'Prelude.minBound' and 'Prelude.maxBound' from the 'Prelude.Bounded' class.
-
 zeroInt, oneInt, twoInt, maxInt, minInt :: Int
 zeroInt = I# 0#
 oneInt  = I# 1#

@@ -18,7 +18,8 @@
 #include "ieee-flpt.h"
 
 -- #hide
-module GHC.Float( module GHC.Float, Float#, Double# )  where
+module GHC.Float( module GHC.Float, Float(..), Double(..), Float#, Double# )
+    where
 
 import Data.Maybe
 
@@ -136,25 +137,6 @@ class  (RealFrac a, Floating a) => RealFloat a  where
                           =  pi    -- must be after the previous test on zero y
       | x==0 && y==0      =  y     -- must be after the other double zero tests
       | otherwise         =  x + y -- x or y is a NaN, return a NaN (via +)
-\end{code}
-
-
-%*********************************************************
-%*                                                      *
-\subsection{Type @Integer@, @Float@, @Double@}
-%*                                                      *
-%*********************************************************
-
-\begin{code}
--- | Single-precision floating point numbers.
--- It is desirable that this type be at least equal in range and precision
--- to the IEEE single-precision type.
-data Float      = F# Float#
-
--- | Double-precision floating point numbers.
--- It is desirable that this type be at least equal in range and precision
--- to the IEEE double-precision type.
-data Double     = D# Double#
 \end{code}
 
 
