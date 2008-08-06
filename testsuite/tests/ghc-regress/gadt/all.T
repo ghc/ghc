@@ -51,6 +51,9 @@ test('arrow', if_compiler_lt('ghc', '6.9', skip), compile, [''])
 test('tdpe', normal, compile, [''])
 test('Nilsson', skip_if_fast, compile, [''])
 
+# 'records' is done twice, so that even in fast mode we check it works
+# The second way tests that running it works too
+test('records', normal, compile, [''])
 test('records', skip_if_fast, compile_and_run, [''])
 test('ubx-records', skip_if_fast, compile_and_run, [''])
 test('records-fail1', normal, compile_fail, [''])
