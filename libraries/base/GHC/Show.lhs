@@ -35,11 +35,7 @@ module GHC.Show
 
 import GHC.Base
 import Data.Maybe
-import GHC.List ( (!!), foldr1
-#ifdef USE_REPORT_PRELUDE
-                , concatMap
-#endif
-                )
+import GHC.List ((!!), foldr1)
 \end{code}
 
 
