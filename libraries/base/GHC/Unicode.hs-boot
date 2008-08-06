@@ -1,7 +1,9 @@
 {-# OPTIONS_GHC -XNoImplicitPrelude #-}
 
 module GHC.Unicode where
-import GHC.Base( Char, Bool )
+
+import GHC.Bool
+import GHC.Types
 
 isAscii         :: Char -> Bool
 isLatin1        :: Char -> Bool
