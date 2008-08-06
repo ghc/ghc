@@ -6,4 +6,4 @@ TH_exn1.hs:1:0:
       Code: let
 	      return = return
 	      $dMonad = Language.Haskell.TH.Syntax.$f22
-	    in case reverse "no" of [] -> return (GHC.Base.[])
+	    in case reverse "no" of [] -> return (GHC.Types.[])

@@ -1,4 +1,4 @@
-data [] a = [] | a : [a] 	-- Defined in GHC.Base
+data [] a = [] | a : [a] 	-- Defined in GHC.Types
 instance (Eq a) => Eq [a] -- Defined in GHC.Base
 instance Monad [] -- Defined in GHC.Base
 instance Functor [] -- Defined in GHC.Base

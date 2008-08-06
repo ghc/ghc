@@ -14,7 +14,7 @@ TH_reifyDecl1.hs:33:9:
                             | (TH_reifyDecl1.Tree a_0) TH_reifyDecl1.:+: (TH_reifyDecl1.Tree a_0)
 
 TH_reifyDecl1.hs:33:9:
-    type TH_reifyDecl1.IntList = GHC.Base.[] GHC.Base.Int
+    type TH_reifyDecl1.IntList = GHC.Types.[] GHC.Base.Int
 
 TH_reifyDecl1.hs:33:9:
     newtype TH_reifyDecl1.Length = TH_reifyDecl1.Length GHC.Base.Int
