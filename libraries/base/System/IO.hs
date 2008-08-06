@@ -186,7 +186,7 @@ import GHC.Handle       -- all the stuff exported by IO for the GHC version
 import GHC.IO
 import GHC.Exception
 import GHC.Num
-import GHC.Read
+import Text.Read
 import GHC.Show
 #endif
 

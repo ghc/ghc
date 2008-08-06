@@ -156,7 +156,7 @@ import Data.Tuple
 import GHC.Base
 import GHC.IOBase
 import GHC.Exception ( throw )
-import GHC.Read
+import Text.Read
 import GHC.Enum
 import GHC.Num
 import GHC.Real
