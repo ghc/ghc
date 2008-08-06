@@ -28,7 +28,7 @@
 module Unsafe.Coerce (unsafeCoerce) where
 
 #if defined(__GLASGOW_HASKELL__)
-import GHC.Base (unsafeCoerce#)
+import GHC.Prim (unsafeCoerce#)
 unsafeCoerce :: a -> b
 unsafeCoerce = unsafeCoerce#
 #endif
