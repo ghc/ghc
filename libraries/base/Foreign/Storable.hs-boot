@@ -3,7 +3,7 @@
 
 module Foreign.Storable where
 
-import GHC.Float
+import GHC.Base
 import GHC.Int
 import GHC.Word
 

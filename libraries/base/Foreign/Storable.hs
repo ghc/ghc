@@ -46,7 +46,6 @@ import GHC.Num
 import GHC.Int
 import GHC.Word
 import GHC.Ptr
-import GHC.Float
 import GHC.Err
 import GHC.IOBase
 import GHC.Base
