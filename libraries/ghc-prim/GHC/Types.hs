@@ -4,6 +4,8 @@
 module GHC.Types where
 
 import GHC.Prim
+-- We need Inl etc behind the scenes for the type definitions
+import GHC.Generics ()
 
 infixr 5 :
 
