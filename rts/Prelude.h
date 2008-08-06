@@ -45,9 +45,9 @@ PRELUDE_CLOSURE(base_ControlziException_nestedAtomically_closure);
 PRELUDE_CLOSURE(base_GHCziConc_ensureIOManagerIsRunning_closure);
 
 PRELUDE_INFO(ghczmprim_GHCziTypes_Czh_static_info);
-PRELUDE_INFO(base_GHCziBase_Izh_static_info);
-PRELUDE_INFO(base_GHCziFloat_Fzh_static_info);
-PRELUDE_INFO(base_GHCziFloat_Dzh_static_info);
+PRELUDE_INFO(ghczmprim_GHCziTypes_Izh_static_info);
+PRELUDE_INFO(ghczmprim_GHCziTypes_Fzh_static_info);
+PRELUDE_INFO(ghczmprim_GHCziTypes_Dzh_static_info);
 PRELUDE_INFO(base_Addr_Azh_static_info);
 PRELUDE_INFO(base_GHCziPtr_Ptr_static_info);
 PRELUDE_INFO(base_GHCziPtr_FunPtr_static_info);
@@ -61,9 +61,9 @@ PRELUDE_INFO(base_GHCziWord_W16zh_static_info);
 PRELUDE_INFO(base_GHCziWord_W32zh_static_info);
 PRELUDE_INFO(base_GHCziWord_W64zh_static_info);
 PRELUDE_INFO(ghczmprim_GHCziTypes_Czh_con_info);
-PRELUDE_INFO(base_GHCziBase_Izh_con_info);
-PRELUDE_INFO(base_GHCziFloat_Fzh_con_info);
-PRELUDE_INFO(base_GHCziFloat_Dzh_con_info);
+PRELUDE_INFO(ghczmprim_GHCziTypes_Izh_con_info);
+PRELUDE_INFO(ghczmprim_GHCziTypes_Fzh_con_info);
+PRELUDE_INFO(ghczmprim_GHCziTypes_Dzh_con_info);
 PRELUDE_INFO(base_GHCziPtr_Ptr_con_info);
 PRELUDE_INFO(base_GHCziPtr_FunPtr_con_info);
 PRELUDE_INFO(base_Addr_Azh_con_info);
@@ -93,10 +93,10 @@ PRELUDE_INFO(base_GHCziStable_StablePtr_con_info);
 #define NestedAtomically_closure  DLL_IMPORT_DATA_REF(base_ControlziException_nestedAtomically_closure)
 
 #define Czh_static_info           DLL_IMPORT_DATA_REF(ghczmprim_GHCziTypes_Czh_static_info)
-#define Fzh_static_info           DLL_IMPORT_DATA_REF(base_GHCziFloat_Fzh_static_info)
-#define Dzh_static_info           DLL_IMPORT_DATA_REF(base_GHCziFloat_Dzh_static_info)
+#define Fzh_static_info           DLL_IMPORT_DATA_REF(ghczmprim_GHCziTypes_Fzh_static_info)
+#define Dzh_static_info           DLL_IMPORT_DATA_REF(ghczmprim_GHCziTypes_Dzh_static_info)
 #define Azh_static_info           DLL_IMPORT_DATA_REF(base_Addr_Azh_static_info)
-#define Izh_static_info           DLL_IMPORT_DATA_REF(base_GHCziBase_Izh_static_info)
+#define Izh_static_info           DLL_IMPORT_DATA_REF(ghczmprim_GHCziTypes_Izh_static_info)
 #define I8zh_static_info          DLL_IMPORT_DATA_REF(base_GHCziInt_I8zh_static_info)
 #define I16zh_static_info         DLL_IMPORT_DATA_REF(base_GHCziInt_I16zh_static_info)
 #define I32zh_static_info         DLL_IMPORT_DATA_REF(base_GHCziInt_I32zh_static_info)
@@ -109,9 +109,9 @@ PRELUDE_INFO(base_GHCziStable_StablePtr_con_info);
 #define Ptr_static_info           DLL_IMPORT_DATA_REF(base_GHCziPtr_Ptr_static_info)
 #define FunPtr_static_info        DLL_IMPORT_DATA_REF(base_GHCziPtr_FunPtr_static_info)
 #define Czh_con_info              DLL_IMPORT_DATA_REF(ghczmprim_GHCziTypes_Czh_con_info)
-#define Izh_con_info              DLL_IMPORT_DATA_REF(base_GHCziBase_Izh_con_info)
-#define Fzh_con_info              DLL_IMPORT_DATA_REF(base_GHCziFloat_Fzh_con_info)
-#define Dzh_con_info              DLL_IMPORT_DATA_REF(base_GHCziFloat_Dzh_con_info)
+#define Izh_con_info              DLL_IMPORT_DATA_REF(ghczmprim_GHCziTypes_Izh_con_info)
+#define Fzh_con_info              DLL_IMPORT_DATA_REF(ghczmprim_GHCziTypes_Fzh_con_info)
+#define Dzh_con_info              DLL_IMPORT_DATA_REF(ghczmprim_GHCziTypes_Dzh_con_info)
 #define Azh_con_info              DLL_IMPORT_DATA_REF(base_Addr_Azh_con_info)
 #define Wzh_con_info              DLL_IMPORT_DATA_REF(base_GHCziWord_Wzh_con_info)
 #define W8zh_con_info             DLL_IMPORT_DATA_REF(base_GHCziWord_W8zh_con_info)
