@@ -29,9 +29,9 @@ module GHC.Unicode (
   ) where
 
 import GHC.Base
-import GHC.Real  (fromIntegral)
-import GHC.Int
-import GHC.Num   (fromInteger)
+import GHC.Real        (fromIntegral)
+import Foreign.C.Types (CInt)
+import GHC.Num         (fromInteger)
 
 #include "HsBaseConfig.h"
 
@@ -133,8 +133,6 @@ toTitle                 :: Char -> Char
 #if 1
 
 -- Regardless of the O/S and Library, use the functions contained in WCsubst.c
-
-type CInt = HTYPE_INT
 
 isAlpha    c = iswalpha (fromIntegral (ord c)) /= 0
 isAlphaNum c = iswalnum (fromIntegral (ord c)) /= 0
