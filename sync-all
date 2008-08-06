@@ -1,0 +1,266 @@
+#!/usr/bin/perl -w
+
+use strict;
+use Cwd;
+
+# Figure out where to get the other repositories from,
+# based on where this GHC repo came from.
+my $branch = `git branch | grep "\* " | sed "s/^\* //"`; chomp $branch;
+my $remote = `git config branch.$branch.remote`;         chomp $remote;
+my $defaultrepo = `git config remote.$remote.url`;       chomp $defaultrepo;
+
+my $defaultrepo_base;
+my $checked_out_tree;
+
+if ($defaultrepo =~ /^...*:/) {
+    # HTTP or SSH
+    # Above regex says "at least two chars before the :", to avoid
+    # catching Win32 drives ("C:\").
+    $defaultrepo_base = $defaultrepo;
+    $defaultrepo_base =~ s#/[^/]+/?$##;
+    $checked_out_tree = 0;
+}
+elsif ($defaultrepo =~ /^\/|\.\.\/|.:(\/|\\)/) {
+    # Local filesystem, either absolute or relative path
+    # (assumes a checked-out tree):
+    $defaultrepo_base = $defaultrepo;
+    $checked_out_tree = 1;
+}
+else {
+    die "Couldn't work out defaultrepo";
+}
+
+my $verbose = 2;
+my $get_mode;
+
+# Flags specific to a particular command
+my $ignore_failure = 0;
+my $local_repo_unnecessary = 0;
+
+# Always define the empty tag so that we fetch the /required/ packages
+my %tags;
+$tags{""} = 1;
+
+sub message {
+    if ($verbose >= 2) {
+        print "@_\n";
+    }
+}
+
+sub warning {
+    if ($verbose >= 1) {
+        print "warning: @_\n";
+    }
+}
+
+sub scm {
+    my $scm = shift;
+    
+    message "== running $scm @_";
+    system ($scm, @_) == 0
+        or $ignore_failure
+        or die "$scm failed: $?";
+}
+
+sub repoexists {
+    my ($scm, $localpath) = @_;
+    
+    if ($scm eq "darcs") {
+        -d "$localpath/_darcs";
+    }
+    else {
+        -d "$localpath/.git";
+    }
+}
+
+sub scmall {
+    my $command = shift;
+    
+    my $localpath;
+    my $tag;
+    my $remotepath;
+    my $scm;
+
+    my $path;
+    my $wd_before = getcwd;
+
+    my @scm_args;
+
+    open IN, "< packages" or die "Can't open packages file";
+    while (<IN>) {
+        chomp;
+        if (/^([^# ]+) +(?:([^ ]+) +)?([^ ]+) +([^ ]+)$/) {
+            $localpath = $1;
+            $tag = defined($2) ? $2 : "";
+            $remotepath = $3;
+            $scm = $4;
+
+            # Check the SCM is OK as early as possible
+            die "Unknown SCM: $scm" if (($scm ne "darcs") and ($scm ne "git"));
+
+            # Work out the path for this package in the repo we pulled from
+            if ($checked_out_tree) {
+                $path = "$defaultrepo_base/$localpath";
+            }
+            else {
+                $path = "$defaultrepo_base/$remotepath";
+            }
+            
+            # Work out the arguments we should give to the SCM
+            if ($command =~ /^(?:w|wh|wha|what|whats|whatsn|whatsne|whatsnew)$/) {
+                @scm_args = (($scm eq "darcs" and "whatsnew")
+                          or ($scm eq "git" and "status"));
+                
+                # Hack around 'darcs whatsnew' failing if there are no changes
+                $ignore_failure = 1;
+            }
+            elsif ($command =~ /^(?:pus|push)$/) {
+                @scm_args = "push";
+            }
+            elsif ($command =~ /^(?:pul|pull)$/) {
+                @scm_args = "pull";
+                # Q: should we append the -a argument for darcs repos?
+            }
+            elsif ($command =~ /^(?:g|ge|get)$/) {
+                # Skip any repositories we have not included the tag for
+                if (not defined($tags{$tag})) {
+                    next;
+                }
+                
+                if (-d $localpath) {
+                    warning("$localpath already present; omitting") if $localpath ne ".";
+                    next;
+                }
+                
+                # The first time round the loop, default the get-mode
+                if (not defined($get_mode)) {
+                    warning("adding --partial, to override use --complete");
+                    $get_mode = "--partial";
+                }
+                
+                # The only command that doesn't need a repo
+                $local_repo_unnecessary = 1;
+                
+                if ($scm eq "darcs") {
+                    # Note: we can only use the get-mode with darcs for now
+                    @scm_args = ("get", $get_mode, $path, $localpath);
+                }
+                else {
+                    @scm_args = ("clone", $path, $localpath);
+                }
+            }
+            elsif ($command =~ /^(?:s|se|sen|send)$/) {
+                @scm_args = (($scm eq "darcs" and "send")
+                          or ($scm eq "git" and "send-email"));
+            }
+            else {
+                die "Unknown command: $command";
+            }
+            
+            # Actually execute the command
+            chdir $wd_before or die "Could not change to $wd_before";
+            if (repoexists ($scm, $localpath)) {
+                chdir $localpath or die "Could not change to $localpath";
+                scm ($scm, @scm_args, @_);
+            }
+            elsif ($local_repo_unnecessary) {
+                # Don't bother to change directory in this case
+                scm ($scm, @scm_args, @_);
+            }
+            elsif ($tag eq "") {
+                message "== Required repo $localpath is missing! Skipping";
+            }
+            else {
+                message "== $localpath repo not present; skipping";
+            }
+        }
+        elsif (! /^(#.*)?$/) {
+            die "Bad line: $_";
+        }
+    }
+    close IN;
+}
+
+sub main {
+    if (! -d ".git" || ! -d "compiler") {
+        die "error: sync-all must be run from the top level of the ghc tree."
+    }
+
+    while ($#_ ne -1) {
+        my $arg = shift;
+        # We handle -q here as well as lower down as we need to skip over it
+        # if it comes before the source-control command
+        if ($arg eq "-q") {
+            $verbose = 1;
+        }
+        elsif ($arg eq "-s") {
+            $verbose = 0;
+        }
+        elsif ($arg eq "--ignore-failure") {
+            $ignore_failure = 1;
+        }
+        # --<tag> says we grab the libs tagged 'tag' with
+        # 'get'. It has no effect on the other commands.
+        elsif ($arg =~ m/^--/) {
+            $arg =~ s/^--//;
+            $tags{$arg} = 1;
+        }
+        elsif ($arg eq "--complete" || $arg eq "--partial") {
+            $get_mode = $arg;
+        }
+        else {
+            unshift @_, $arg;
+            if (grep /^-q$/, @_) {
+                $verbose = 1;
+            }
+            last;
+        }
+    }
+
+    if ($#_ eq -1) {
+        # Get the built in help
+        my $help = <<END;
+What do you want to do?
+Supported commands:
+
+ * whatsnew
+ * push
+ * pull
+ * get, with options:
+  * --<package-tag>
+  * --complete
+  * --partial
+ * send
+
+Available package-tags are:
+END
+
+        # Collect all the tags in the packages file
+        my %available_tags;
+        open IN, "< packages" or die "Can't open packages file";
+        while (<IN>) {
+            chomp;
+            if (/^([^# ]+) +(?:([^ ]+) +)?([^ ]+) +([^ ]+)/) {
+                if (defined($2)) {
+                    $available_tags{$2} = 1;
+                }
+            }
+            elsif (! /^(#.*)?$/) {
+                die "Bad line: $_";
+            }
+        }
+        close IN;
+        
+        # Show those tags and the help text
+        my @available_tags = keys %available_tags;
+        print "$help@available_tags";
+        exit 1;
+    }
+    else {
+        # Give the command and rest of the arguments to the main loop
+        scmall @_;
+    }
+}
+
+main(@ARGV);
+

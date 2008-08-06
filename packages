@@ -1,43 +1,44 @@
 # Note that when adding libraries to this file, you also need to add
 # the library to the SUBDIRS variable in libraries/Makefile so that they
 # actually get built
-utils/hsc2hs                            hsc2hs
-libraries/array                         packages/array
-libraries/base                          packages/base
-libraries/bytestring                    packages/bytestring
-libraries/Cabal                         packages/Cabal
-libraries/containers                    packages/containers
-libraries/directory                     packages/directory
-libraries/editline                      packages/editline
-libraries/filepath                      packages/filepath
-libraries/ghc-prim                      packages/ghc-prim
-libraries/haskell98                     packages/haskell98
-libraries/hpc                           packages/hpc
-libraries/integer-gmp                   packages/integer-gmp
-libraries/old-locale                    packages/old-locale
-libraries/old-time                      packages/old-time
-libraries/packedstring                  packages/packedstring
-libraries/pretty                        packages/pretty
-libraries/process                       packages/process
-libraries/random                        packages/random
-libraries/template-haskell              packages/template-haskell
-libraries/unix                          packages/unix
-libraries/Win32                         packages/Win32
-libraries/HUnit             extralibs   packages/HUnit
-libraries/QuickCheck        extralibs   packages/QuickCheck
-libraries/haskell-src       extralibs   packages/haskell-src
-libraries/html              extralibs   packages/html
-libraries/mtl               extralibs   packages/mtl
-libraries/network           extralibs   packages/network
-libraries/parsec            extralibs   packages/parsec
-libraries/parallel          extralibs   packages/parallel
-libraries/regex-base        extralibs   packages/regex-base
-libraries/regex-compat      extralibs   packages/regex-compat
-libraries/regex-posix       extralibs   packages/regex-posix
-libraries/stm               extralibs   packages/stm
-libraries/time              extralibs   packages/time
-libraries/xhtml             extralibs   packages/xhtml
-libraries/dph               dph         packages/dph
-testsuite                   testsuite   testsuite
-nofib                       nofib       nofib
+.                                       ghc                             git
+utils/hsc2hs                            hsc2hs                          darcs
+libraries/array                         packages/array                  darcs
+libraries/base                          packages/base                   darcs
+libraries/bytestring                    packages/bytestring             darcs
+libraries/Cabal                         packages/Cabal                  darcs
+libraries/containers                    packages/containers             darcs
+libraries/directory                     packages/directory              darcs
+libraries/editline                      packages/editline               darcs
+libraries/filepath                      packages/filepath               darcs
+libraries/ghc-prim                      packages/ghc-prim               darcs
+libraries/haskell98                     packages/haskell98              darcs
+libraries/hpc                           packages/hpc                    darcs
+libraries/integer-gmp                   packages/integer-gmp            darcs
+libraries/old-locale                    packages/old-locale             darcs
+libraries/old-time                      packages/old-time               darcs
+libraries/packedstring                  packages/packedstring           darcs
+libraries/pretty                        packages/pretty                 darcs
+libraries/process                       packages/process                darcs
+libraries/random                        packages/random                 darcs
+libraries/template-haskell              packages/template-haskell       darcs
+libraries/unix                          packages/unix                   darcs
+libraries/Win32                         packages/Win32                  darcs
+libraries/HUnit             extralibs   packages/HUnit                  darcs
+libraries/QuickCheck        extralibs   packages/QuickCheck             darcs
+libraries/haskell-src       extralibs   packages/haskell-src            darcs
+libraries/html              extralibs   packages/html                   darcs
+libraries/mtl               extralibs   packages/mtl                    darcs
+libraries/network           extralibs   packages/network                darcs
+libraries/parsec            extralibs   packages/parsec                 darcs
+libraries/parallel          extralibs   packages/parallel               darcs
+libraries/regex-base        extralibs   packages/regex-base             darcs
+libraries/regex-compat      extralibs   packages/regex-compat           darcs
+libraries/regex-posix       extralibs   packages/regex-posix            darcs
+libraries/stm               extralibs   packages/stm                    darcs
+libraries/time              extralibs   packages/time                   darcs
+libraries/xhtml             extralibs   packages/xhtml                  darcs
+libraries/dph               dph         packages/dph                    darcs
+testsuite                   testsuite   testsuite                       darcs
+nofib                       nofib       nofib                           darcs
 

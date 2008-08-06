@@ -56,12 +56,10 @@ sub darcsall {
     my $path;
     my $tag;
 
-    darcs @_;
-
     open IN, "< packages" or die "Can't open packages file";
     while (<IN>) {
         chomp;
-        if (/^([^ ]+) +(?:([^ ]+) +)?([^ ]+)/) {
+        if (/^([^# ]+) +(?:([^ ]+) +)?([^ ]+) +([^ ]+)$/) {
             $localpath = $1;
             $tag = defined($2) ? $2 : "";
 

@@ -988,7 +988,17 @@ if test "$RELEASE" = "NO"; then
     if test -f VERSION_DATE; then
         PACKAGE_VERSION=${PACKAGE_VERSION}.`cat VERSION_DATE`
         AC_MSG_RESULT(given $PACKAGE_VERSION)
+    elif test -d .git; then
+        changequote(, )dnl
+        ver_date=`git log -n 1 --date=short --pretty=format:%ci | sed "s/^.*\([0-9][0-9][0-9][0-9]\)-\([0-9][0-9]\)-\([0-9][0-9]\).*$/\1\2\3/"`
+        if echo $ver_date | grep '^[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]$' 2>&1 >/dev/null; then true; else
+        changequote([, ])dnl
+                AC_MSG_ERROR([failed to detect version date: check that git is in your path])
+        fi
+        PACKAGE_VERSION=${PACKAGE_VERSION}.$ver_date
+        AC_MSG_RESULT(inferred $PACKAGE_VERSION)
     elif test -d _darcs; then
+        # TODO: Remove this branch after conversion to Git
         changequote(, )dnl
         ver_date=`darcs changes --quiet --no-summary --xml | head -500 | grep 'date=' | sed "s/^.*date='\([0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]\).*$/\1/g" | sort -n | tail -1`
         if echo $ver_date | grep '^[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]$' 2>&1 >/dev/null; then true; else
@@ -1001,7 +1011,7 @@ if test "$RELEASE" = "NO"; then
         PACKAGE_VERSION=`cat VERSION`
         AC_MSG_RESULT(given $PACKAGE_VERSION)
     else
-        AC_MSG_WARN([cannot determine snapshot version: no _darcs directory and no VERSION file])
+        AC_MSG_WARN([cannot determine snapshot version: no .git or _darcs directory and no VERSION file])
     fi
 fi
 
