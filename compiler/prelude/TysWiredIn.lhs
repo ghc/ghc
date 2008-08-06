@@ -149,8 +149,8 @@ mkWiredInDataConName built_in modu fs unique datacon
 charTyConName, charDataConName, intTyConName, intDataConName :: Name
 charTyConName	  = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Char") charTyConKey charTyCon
 charDataConName   = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "C#") charDataConKey charDataCon
-intTyConName	  = mkWiredInTyConName   UserSyntax gHC_BASE (fsLit "Int") intTyConKey   intTyCon
-intDataConName	  = mkWiredInDataConName UserSyntax gHC_BASE (fsLit "I#") intDataConKey  intDataCon
+intTyConName	  = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Int") intTyConKey   intTyCon
+intDataConName	  = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "I#") intDataConKey  intDataCon
 
 boolTyConName, falseDataConName, trueDataConName :: Name
 boolTyConName	  = mkWiredInTyConName   UserSyntax gHC_BOOL (fsLit "Bool") boolTyConKey boolTyCon
@@ -163,10 +163,10 @@ nilDataConName 	  = mkWiredInDataConName BuiltInSyntax gHC_TYPES (fsLit "[]") ni
 consDataConName	  = mkWiredInDataConName BuiltInSyntax gHC_TYPES (fsLit ":") consDataConKey consDataCon
 
 floatTyConName, floatDataConName, doubleTyConName, doubleDataConName :: Name
-floatTyConName	   = mkWiredInTyConName   UserSyntax gHC_FLOAT (fsLit "Float") floatTyConKey floatTyCon
-floatDataConName   = mkWiredInDataConName UserSyntax gHC_FLOAT (fsLit "F#") floatDataConKey floatDataCon
-doubleTyConName    = mkWiredInTyConName   UserSyntax gHC_FLOAT (fsLit "Double") doubleTyConKey doubleTyCon
-doubleDataConName  = mkWiredInDataConName UserSyntax gHC_FLOAT (fsLit "D#") doubleDataConKey doubleDataCon
+floatTyConName	   = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Float") floatTyConKey floatTyCon
+floatDataConName   = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "F#") floatDataConKey floatDataCon
+doubleTyConName    = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Double") doubleTyConKey doubleTyCon
+doubleDataConName  = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "D#") doubleDataConKey doubleDataCon
 
 parrTyConName, parrDataConName :: Name
 parrTyConName	  = mkWiredInTyConName   BuiltInSyntax gHC_PARR (fsLit "[::]") parrTyConKey parrTyCon 
