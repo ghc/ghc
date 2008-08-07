@@ -2,20 +2,25 @@
 % (c) The University of Glasgow 2006
 % (c) The University of Glasgow 1992-2002
 %
-\section[Util]{Highly random utility functions}
 
 \begin{code}
+-- | Highly random utility functions
 module Util (
+        -- * Flags dependent on the compiler build
         ghciSupported, debugIsOn, ghciTablesNextToCode, picIsOn,
         isWindowsHost, isWindowsTarget, isDarwinTarget,
 
-        -- general list processing
+        -- * General list processing
         zipEqual, zipWithEqual, zipWith3Equal, zipWith4Equal,
         zipLazy, stretchZipWith,
+        
+        unzipWith,
+        
         mapFst, mapSnd,
         mapAndUnzip, mapAndUnzip3,
         nOfThem, filterOut, partitionWith, splitEithers,
-        foldl1',
+        
+        foldl1', foldl2, count, all2,
 
         lengthExceeds, lengthIs, lengthAtLeast,
         listLengthCmp, atLength, equalLength, compareLength,
@@ -25,47 +30,43 @@ module Util (
 
         isIn, isn'tIn,
 
-        -- for-loop
-        nTimes,
-
-        -- sorting
-        sortLe, sortWith, on,
-
-        -- transitive closures
-        transitiveClosure,
-
-        -- accumulating
-        foldl2, count, all2,
-
+        -- * List operations controlled by another list
         takeList, dropList, splitAtList, split,
 
-        -- comparisons
+        -- * For loop
+        nTimes,
+
+        -- * Sorting
+        sortLe, sortWith, on,
+
+        -- * Comparisons
         isEqual, eqListBy,
         thenCmp, cmpList, maybePrefixMatch,
         removeSpaces,
 
-        -- strictness
+        -- * Transitive closures
+        transitiveClosure,
+
+        -- * Strictness
         seqList,
 
-        -- pairs
-        unzipWith,
-
-        global, consIORef,
-
-        -- module names
+        -- * Module names
         looksLikeModuleName,
 
+        -- * Argument processing
         getCmd, toCmdArgs, toArgs,
 
-        -- Floating point stuff
+        -- * Floating point
         readRational,
 
-        -- IO-ish utilities
+        -- * IO-ish utilities
         createDirectoryHierarchy,
         doesDirNameExist,
         modificationTimeIfExists,
 
-        -- Filename utils
+        global, consIORef,
+
+        -- * Filenames and paths
         Suffix,
         splitLongestPrefix,
         escapeSpaces,
@@ -164,7 +165,7 @@ isDarwinTarget = False
 %************************************************************************
 
 \begin{code}
--- Compose a function with itself n times.  (nth rather than twice)
+-- | Compose a function with itself n times.  (nth rather than twice)
 nTimes :: Int -> (a -> a) -> (a -> a)
 nTimes 0 _ = id
 nTimes 1 f = f
@@ -179,12 +180,13 @@ nTimes n f = f . nTimes (n-1) f
 
 \begin{code}
 filterOut :: (a->Bool) -> [a] -> [a]
--- Like filter, only reverses the sense of the test
+-- ^ Like filter, only it reverses the sense of the test
 filterOut _ [] = []
 filterOut p (x:xs) | p x       = filterOut p xs
                    | otherwise = x : filterOut p xs
 
 partitionWith :: (a -> Either b c) -> [a] -> ([b], [c])
+-- ^ Uses a function to determine which of two output lists an input element should join
 partitionWith _ [] = ([],[])
 partitionWith f (x:xs) = case f x of
                          Left  b -> (b:bs, cs)
@@ -192,6 +194,7 @@ partitionWith f (x:xs) = case f x of
     where (bs,cs) = partitionWith f xs
 
 splitEithers :: [Either a b] -> ([a], [b])
+-- ^ Teases a list of 'Either's apart into two lists
 splitEithers [] = ([],[])
 splitEithers (e : es) = case e of
                         Left x -> (x:xs, ys)
@@ -236,8 +239,7 @@ zipWith4Equal msg _ _  _  _  _  =  panic ("zipWith4Equal: unequal lists:"++msg)
 \end{code}
 
 \begin{code}
--- zipLazy is lazy in the second list (observe the ~)
-
+-- | 'zipLazy' is a kind of 'zip' that is lazy in the second list (observe the ~)
 zipLazy :: [a] -> [b] -> [(a,b)]
 zipLazy []     _       = []
 -- We want to write this, but with GHC 6.4 we get a warning, so it
@@ -251,8 +253,8 @@ zipLazy (x:xs) zs = let y : ys = zs
 
 \begin{code}
 stretchZipWith :: (a -> Bool) -> b -> (a->b->c) -> [a] -> [b] -> [c]
--- (stretchZipWith p z f xs ys) stretches ys by inserting z in
--- the places where p returns *True*
+-- ^ @stretchZipWith p z f xs ys@ stretches @ys@ by inserting @z@ in
+-- the places where @p@ returns @True@
 
 stretchZipWith _ _ _ []     _ = []
 stretchZipWith p z f (x:xs) ys
@@ -293,14 +295,14 @@ mapAndUnzip3 f (x:xs)
 nOfThem :: Int -> a -> [a]
 nOfThem n thing = replicate n thing
 
--- 'atLength atLen atEnd ls n' unravels list 'ls' to position 'n';
--- specification:
+-- | @atLength atLen atEnd ls n@ unravels list @ls@ to position @n@. Precisely:
 --
+-- @
 --  atLength atLenPred atEndPred ls n
 --   | n < 0         = atLenPred n
 --   | length ls < n = atEndPred (n - length ls)
 --   | otherwise     = atLenPred (drop n ls)
---
+-- @
 atLength :: ([a] -> b)
          -> (Int -> b)
          -> [a]
@@ -314,9 +316,10 @@ atLength atLenPred atEndPred ls n
     go 0 ls = atLenPred ls
     go n (_:xs) = go (n-1) xs
 
--- special cases.
+-- Some special cases of atLength:
+
 lengthExceeds :: [a] -> Int -> Bool
--- (lengthExceeds xs n) = (length xs > n)
+-- ^ > (lengthExceeds xs n) = (length xs > n)
 lengthExceeds = atLength notNull (const False)
 
 lengthAtLeast :: [a] -> Int -> Bool
