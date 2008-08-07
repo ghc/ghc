@@ -48,12 +48,12 @@ Nothing :: Maybe a
 (+) :: (GHC.Num.Num a) => a -> a -> a
 (=<<) :: (Monad m) => (a -> m b) -> m a -> m b
 class Eq a where
-  (GHC.Base.==) :: a -> a -> GHC.Bool.Bool
-  (GHC.Base./=) :: a -> a -> GHC.Bool.Bool
+  (GHC.Classes.==) :: a -> a -> GHC.Bool.Bool
+  (GHC.Classes./=) :: a -> a -> GHC.Bool.Bool
 -- imported via Prelude, T
-Prelude.length :: [a] -> GHC.Base.Int
+Prelude.length :: [a] -> GHC.Types.Int
 -- imported via T
-T.length :: Data.ByteString.Internal.ByteString -> GHC.Base.Int
+T.length :: Data.ByteString.Internal.ByteString -> GHC.Types.Int
 :browse! T
 -- defined locally
 T.length :: GHC.Integer.Integer

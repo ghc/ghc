@@ -1,5 +1,5 @@
 
-TH_reifyMkName.hs:9:2: TyConI (TySynD Foo.C [] (ConT GHC.Base.Int))
+TH_reifyMkName.hs:9:2: TyConI (TySynD Foo.C [] (ConT GHC.Types.Int))
 Loading package ghc-prim ... linking ... done.
 Loading package integer ... linking ... done.
 Loading package base ... linking ... done.

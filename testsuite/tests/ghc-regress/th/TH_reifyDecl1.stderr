@@ -14,15 +14,15 @@ TH_reifyDecl1.hs:33:9:
                             | (TH_reifyDecl1.Tree a_0) TH_reifyDecl1.:+: (TH_reifyDecl1.Tree a_0)
 
 TH_reifyDecl1.hs:33:9:
-    type TH_reifyDecl1.IntList = GHC.Types.[] GHC.Base.Int
+    type TH_reifyDecl1.IntList = GHC.Types.[] GHC.Types.Int
 
 TH_reifyDecl1.hs:33:9:
-    newtype TH_reifyDecl1.Length = TH_reifyDecl1.Length GHC.Base.Int
+    newtype TH_reifyDecl1.Length = TH_reifyDecl1.Length GHC.Types.Int
 
 TH_reifyDecl1.hs:33:9:
     Constructor from TH_reifyDecl1.Tree: TH_reifyDecl1.Leaf :: forall a_0 . TH_reifyDecl1.Tree a_0
 
 TH_reifyDecl1.hs:33:9:
     Class op from TH_reifyDecl1.C: TH_reifyDecl1.m :: forall a_0 . TH_reifyDecl1.C a_0 => a_0 ->
-                                                                                      GHC.Base.Int
+                                                                                      GHC.Types.Int
                                infixl 3 TH_reifyDecl1.m
