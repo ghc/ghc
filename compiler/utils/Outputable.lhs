@@ -3,13 +3,46 @@
 % (c) The GRASP Project, Glasgow University, 1992-1998
 %
 
-Outputable: defines classes for pretty-printing and forcing, both
-forms of ``output.''
-
 \begin{code}
+-- | This module defines classes and functions for pretty-printing. It also
+-- exports a number of helpful debugging and other utilities such as 'trace' and 'panic'.
+--
+-- The interface to this module is very similar to the standard Hughes-PJ pretty printing
+-- module, except that it exports a number of additional functions that are rarely used,
+-- and works over the 'SDoc' type.
 module Outputable (
-	Outputable(..), OutputableBndr(..),	-- Class
+	-- * Type classes
+	Outputable(..), OutputableBndr(..),
 
+        -- * Pretty printing combinators
+	SDoc,
+	docToSDoc,
+	interppSP, interpp'SP, pprQuotedList, pprWithCommas,
+	empty, nest,
+	char,
+	text, ftext, ptext,
+	int, integer, float, double, rational,
+	parens, cparen, brackets, braces, quotes, doubleQuotes, angleBrackets,
+	semi, comma, colon, dcolon, space, equals, dot, arrow,
+	lparen, rparen, lbrack, rbrack, lbrace, rbrace, underscore,
+	(<>), (<+>), hcat, hsep, 
+	($$), ($+$), vcat,
+	sep, cat, 
+	fsep, fcat, 
+	hang, punctuate,
+	speakNth, speakNTimes, speakN, speakNOf, plural,
+
+        -- * Converting 'SDoc' into strings and outputing it
+	printSDoc, printErrs, hPrintDump, printDump,
+	printForC, printForAsm, printForUser, printForUserPartWay,
+	pprCode, mkCodeStyle,
+	showSDoc, showSDocForUser, showSDocDebug, showSDocDump,
+	showSDocUnqual, showsPrecSDoc,
+
+	pprInfixVar, pprPrefixVar,
+	pprHsChar, pprHsString, pprHsInfix, pprHsVar,
+
+        -- * Controlling the style in which output is printed
 	BindingSite(..),
 
 	PprStyle, CodeStyle(..), PrintUnqualified, alwaysQualify, neverQualify,
@@ -21,32 +54,7 @@ module Outputable (
 	mkErrStyle, defaultErrStyle, defaultDumpStyle, defaultUserStyle,
         mkUserStyle,
 
-	SDoc, 		-- Abstract
-	docToSDoc,
-	interppSP, interpp'SP, pprQuotedList, pprWithCommas,
-	empty, nest,
-	text, char, ftext, ptext,
-	int, integer, float, double, rational,
-	parens, cparen, brackets, braces, quotes, doubleQuotes, angleBrackets,
-	semi, comma, colon, dcolon, space, equals, dot, arrow,
-	lparen, rparen, lbrack, rbrack, lbrace, rbrace, underscore,
-	(<>), (<+>), hcat, hsep, 
-	($$), ($+$), vcat, 
-	sep, cat, 
-	fsep, fcat, 
-	hang, punctuate,
-	speakNth, speakNTimes, speakN, speakNOf, plural,
-
-	printSDoc, printErrs, hPrintDump, printDump,
-	printForC, printForAsm, printForUser, printForUserPartWay,
-	pprCode, mkCodeStyle,
-	showSDoc, showSDocForUser, showSDocDebug, showSDocDump,
-	showSDocUnqual, showsPrecSDoc,
-
-	pprInfixVar, pprPrefixVar,
-	pprHsChar, pprHsString, pprHsInfix, pprHsVar,
-
-	-- error handling
+	-- * Error handling and debugging utilities
 	pprPanic, assertPprPanic, pprPanicFastInt, pprPgmError, 
 	pprTrace, warnPprTrace,
 	trace, pgmError, panic, panicFastInt, assertPanic
@@ -332,8 +340,8 @@ docToSDoc :: Doc -> SDoc
 docToSDoc d = \_ -> d
 
 empty    :: SDoc
-text     :: String     -> SDoc
 char     :: Char       -> SDoc
+text     :: String     -> SDoc
 ftext    :: FastString -> SDoc
 ptext    :: LitString  -> SDoc
 int      :: Int        -> SDoc
@@ -343,8 +351,8 @@ double   :: Double     -> SDoc
 rational :: Rational   -> SDoc
 
 empty _sty      = Pretty.empty
-text s _sty     = Pretty.text s
 char c _sty     = Pretty.char c
+text s _sty     = Pretty.text s
 ftext s _sty    = Pretty.ftext s
 ptext s _sty    = Pretty.ptext s
 int n _sty      = Pretty.int n
@@ -394,7 +402,16 @@ lbrace _sty = Pretty.lbrace
 rbrace _sty = Pretty.rbrace
 
 nest :: Int -> SDoc -> SDoc
-(<>), (<+>), ($$), ($+$) :: SDoc -> SDoc -> SDoc
+-- ^ Indent 'SDoc' some specified amount
+(<>) :: SDoc -> SDoc -> SDoc
+-- ^ Join two 'SDoc' together horizontally without a gap
+(<+>) :: SDoc -> SDoc -> SDoc
+-- ^ Join two 'SDoc' together horizontally with a gap between them
+($$) :: SDoc -> SDoc -> SDoc
+-- ^ Join two 'SDoc' together vertically; if there is 
+-- no vertical overlap it "dovetails" the two onto one line
+($+$) :: SDoc -> SDoc -> SDoc
+-- ^ Join two 'SDoc' together vertically
 
 nest n d sty    = Pretty.nest n (d sty)
 (<>) d1 d2 sty  = (Pretty.<>)  (d1 sty) (d2 sty)
@@ -402,7 +419,21 @@ nest n d sty    = Pretty.nest n (d sty)
 ($$) d1 d2 sty  = (Pretty.$$)  (d1 sty) (d2 sty)
 ($+$) d1 d2 sty = (Pretty.$+$) (d1 sty) (d2 sty)
 
-hcat, hsep, vcat, sep, cat, fsep, fcat :: [SDoc] -> SDoc
+hcat :: [SDoc] -> SDoc
+-- ^ Concatenate 'SDoc' horizontally
+hsep :: [SDoc] -> SDoc
+-- ^ Concatenate 'SDoc' horizontally with a space between each one
+vcat :: [SDoc] -> SDoc
+-- ^ Concatenate 'SDoc' vertically with dovetailing
+sep :: [SDoc] -> SDoc
+-- ^ Separate: is either like 'hsep' or like 'vcat', depending on what fits
+cat :: [SDoc] -> SDoc
+-- ^ Catenate: is either like 'hcat' or like 'vcat', depending on what fits
+fsep :: [SDoc] -> SDoc
+-- ^ A paragraph-fill combinator. It's much like sep, only it
+-- keeps fitting things on one line until it can't fit any more.
+fcat :: [SDoc] -> SDoc
+-- ^ This behaves like 'fsep', but it uses '<>' for horizontal conposition rather than '<+>'
 
 
 hcat ds sty = Pretty.hcat [d sty | d <- ds]
@@ -413,11 +444,15 @@ cat ds sty  = Pretty.cat  [d sty | d <- ds]
 fsep ds sty = Pretty.fsep [d sty | d <- ds]
 fcat ds sty = Pretty.fcat [d sty | d <- ds]
 
-hang :: SDoc -> Int -> SDoc -> SDoc
-
+hang :: SDoc  -- ^ The header
+      -> Int  -- ^ Amount to indent the hung body
+      -> SDoc -- ^ The hung body, indented and placed below the header
+      -> SDoc
 hang d1 n d2 sty   = Pretty.hang (d1 sty) n (d2 sty)
 
-punctuate :: SDoc -> [SDoc] -> [SDoc]
+punctuate :: SDoc   -- ^ The punctuation
+          -> [SDoc] -- ^ The list that will have punctuation added between every adjacent pair of elements
+          -> [SDoc] -- ^ Punctuated list
 punctuate _ []     = []
 punctuate p (d:ds) = go d ds
 		   where
@@ -433,6 +468,7 @@ punctuate p (d:ds) = go d ds
 %************************************************************************
 
 \begin{code}
+-- | Class designating that some type has an 'SDoc' representation
 class Outputable a where
 	ppr :: a -> SDoc
 \end{code}
@@ -494,29 +530,24 @@ instance Outputable FastString where
 				-- no double quotes or anything
 \end{code}
 
-
 %************************************************************************
 %*									*
 \subsection{The @OutputableBndr@ class}
 %*									*
 %************************************************************************
 
-When we print a binder, we often want to print its type too.
-The @OutputableBndr@ class encapsulates this idea.
-
-@BindingSite@ is used to tell the thing that prints binder what
-language construct is binding the identifier.  This can be used
-to decide how much info to print.
-
 \begin{code}
+-- | 'BindingSite' is used to tell the thing that prints binder what
+-- language construct is binding the identifier.  This can be used
+-- to decide how much info to print.
 data BindingSite = LambdaBind | CaseBind | LetBind
 
+-- | When we print a binder, we often want to print its type too.
+-- The @OutputableBndr@ class encapsulates this idea.
 class Outputable a => OutputableBndr a where
    pprBndr :: BindingSite -> a -> SDoc
    pprBndr _b x = ppr x
 \end{code}
-
-
 
 %************************************************************************
 %*									*
@@ -526,10 +557,13 @@ class Outputable a => OutputableBndr a where
 
 \begin{code}
 -- We have 31-bit Chars and will simply use Show instances of Char and String.
+
+-- | Special combinator for showing character literals.
 pprHsChar :: Char -> SDoc
 pprHsChar c | c > '\x10ffff' = char '\\' <> text (show (fromIntegral (ord c) :: Word32))
             | otherwise      = text (show c)
 
+-- | Special combinator for showing string literals.
 pprHsString :: FastString -> SDoc
 pprHsString fs = text (show (unpackFS fs))
 
@@ -569,7 +603,6 @@ isOperator ppr_v
         _         -> False
 \end{code}
 
-
 %************************************************************************
 %*									*
 \subsection{Other helper functions}
@@ -577,17 +610,24 @@ isOperator ppr_v
 %************************************************************************
 
 \begin{code}
-pprWithCommas :: (a -> SDoc) -> [a] -> SDoc
+pprWithCommas :: (a -> SDoc) -- ^ The pretty printing function to use
+              -> [a]         -- ^ The things to be pretty printed
+              -> SDoc        -- ^ 'SDoc' where the things have been pretty printed,
+                             -- comma-separated and finally packed into a paragraph.
 pprWithCommas pp xs = fsep (punctuate comma (map pp xs))
 
+-- | Returns the seperated concatenation of the pretty printed things.
 interppSP  :: Outputable a => [a] -> SDoc
 interppSP  xs = sep (map ppr xs)
 
+-- | Returns the comma-seperated concatenation of the pretty printed things.
 interpp'SP :: Outputable a => [a] -> SDoc
 interpp'SP xs = sep (punctuate comma (map ppr xs))
 
+-- | Returns the comma-seperated concatenation of the quoted pretty printed things.
+--
+-- > [x,y,z]  ==>  `x', `y', `z'
 pprQuotedList :: Outputable a => [a] -> SDoc
--- [x,y,z]  ==>  `x', `y', `z'
 pprQuotedList xs = hsep (punctuate comma (map (quotes . ppr) xs))
 \end{code}
 
@@ -598,10 +638,12 @@ pprQuotedList xs = hsep (punctuate comma (map (quotes . ppr) xs))
 %*									*
 %************************************************************************
 
-@speakNth@ converts an integer to a verbal index; eg 1 maps to
-``first'' etc.
-
 \begin{code}
+-- | Converts an integer to a verbal index:
+--
+-- > speakNth 1 = text "first"
+-- > speakNth 5 = text "fifth"
+-- > speakNth 21 = text "21st"
 speakNth :: Int -> SDoc
 speakNth 1 = ptext (sLit "first")
 speakNth 2 = ptext (sLit "second")
@@ -619,6 +661,11 @@ speakNth n = hcat [ int n, text suffix ]
 
     last_dig = n `rem` 10
 
+-- | Converts an integer to a verbal multiplicity:
+-- 
+-- > speakN 0 = text "none"
+-- > speakN 5 = text "five"
+-- > speakN 10 = text "10"
 speakN :: Int -> SDoc
 speakN 0 = ptext (sLit "none")	-- E.g.  "he has none"
 speakN 1 = ptext (sLit "one")	-- E.g.  "he has one"
@@ -629,16 +676,32 @@ speakN 5 = ptext (sLit "five")
 speakN 6 = ptext (sLit "six")
 speakN n = int n
 
+-- | Converts an integer and object description to a statement about the
+-- multiplicity of those objects:
+--
+-- > speakNOf 0 (text "melon") = text "no melons"
+-- > speakNOf 1 (text "melon") = text "one melon"
+-- > speakNOf 3 (text "melon") = text "three melons"
 speakNOf :: Int -> SDoc -> SDoc
-speakNOf 0 d = ptext (sLit "no") <+> d <> char 's'	-- E.g. "no arguments"
+speakNOf 0 d = ptext (sLit "no") <+> d <> char 's'
 speakNOf 1 d = ptext (sLit "one") <+> d			-- E.g. "one argument"
 speakNOf n d = speakN n <+> d <> char 's'		-- E.g. "three arguments"
 
+-- | Converts a strictly positive integer into a number of times:
+--
+-- > speakNTimes 1 = text "once"
+-- > speakNTimes 2 = text "twice"
+-- > speakNTimes 4 = text "4 times"
 speakNTimes :: Int {- >=1 -} -> SDoc
 speakNTimes t | t == 1 	   = ptext (sLit "once")
               | t == 2 	   = ptext (sLit "twice")
               | otherwise  = speakN t <+> ptext (sLit "times")
 
+-- | Determines the pluralisation suffix appropriate for the length of a list:
+--
+-- > plural [] = char 's'
+-- > plural ["Hello"] = empty
+-- > plural ["Hello", "World"] = char 's'
 plural :: [a] -> SDoc
 plural [_] = empty  -- a bit frightening, but there you are
 plural _   = char 's'
@@ -652,17 +715,23 @@ plural _   = char 's'
 %************************************************************************
 
 \begin{code}
-pprPanic, pprPgmError :: String -> SDoc -> a
+pprPanic :: String -> SDoc -> a
+-- ^ Throw an exception saying "bug in GHC"
+pprPgmError :: String -> SDoc -> a
+-- ^ Throw an exception saying "bug in pgm being compiled" (used for unusual program errors)
 pprTrace :: String -> SDoc -> a -> a
-pprPanic    = pprAndThen panic		-- Throw an exn saying "bug in GHC"
+-- ^ If debug output is on, show some 'SDoc' on the screen
 
-pprPgmError = pprAndThen pgmError	-- Throw an exn saying "bug in pgm being compiled"
-					--	(used for unusual pgm errors)
+pprPanic    = pprAndThen panic
+
+pprPgmError = pprAndThen pgmError
+
 pprTrace str doc x
    | opt_NoDebugOutput = x
    | otherwise         = pprAndThen trace str doc x
 
 pprPanicFastInt :: String -> SDoc -> FastInt
+-- ^ Specialization of pprPanic that can be safely used with 'FastInt'
 pprPanicFastInt heading pretty_msg = panicFastInt (show (doc PprDebug))
 			     where
 			       doc = text heading <+> pretty_msg
@@ -673,6 +742,8 @@ pprAndThen cont heading pretty_msg = cont (show (doc PprDebug))
      doc = sep [text heading, nest 4 pretty_msg]
 
 assertPprPanic :: String -> Int -> SDoc -> a
+-- ^ Panic with an assertation failure, recording the given file and line number.
+-- Should typically be accessed with the ASSERT family of macros
 assertPprPanic file line msg
   = panic (show (doc PprDebug))
   where
@@ -682,6 +753,8 @@ assertPprPanic file line msg
 		    msg]
 
 warnPprTrace :: Bool -> String -> Int -> SDoc -> a -> a
+-- ^ Just warn about an assertion failure, recording the given file and line number.
+-- Should typically be accessed with the WARN macros
 warnPprTrace _     _file _line _msg x | opt_NoDebugOutput = x
 warnPprTrace False _file _line _msg x = x
 warnPprTrace True   file  line  msg x
