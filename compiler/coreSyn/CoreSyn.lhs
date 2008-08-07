@@ -199,7 +199,6 @@ data Expr b
 					--
 					-- @
                                         --      data Foo = Red | Green | Blue
-                                        --
                                         -- ... case x of 
                                         --      Red   -> True
                                         --      other -> f (case x of 
@@ -738,7 +737,7 @@ rhssOfAlts :: [Alt b] -> [Expr b]
 rhssOfAlts alts = [e | (_,_,e) <- alts]
 
 -- | Collapse all the bindings in the supplied groups into a single
--- list of lhs/rhs pairs suitable for binding in a 'Rec' binding group
+-- list of lhs\/rhs pairs suitable for binding in a 'Rec' binding group
 flattenBinds :: [Bind b] -> [(b, Expr b)]
 flattenBinds (NonRec b r : binds) = (b,r) : flattenBinds binds
 flattenBinds (Rec prs1   : binds) = prs1 ++ flattenBinds binds

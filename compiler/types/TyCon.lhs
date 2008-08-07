@@ -158,7 +158,7 @@ data TyCon
 
 	algTcRec :: RecFlag,		-- ^ Tells us whether the data type is part of a mutually-recursive group or not
 
-	hasGenerics :: Bool,		-- ^ Whether generic (in the -XGenerics sense) to/from functions are
+	hasGenerics :: Bool,		-- ^ Whether generic (in the -XGenerics sense) to\/from functions are
 	                                -- available in the exports of the data type's source module.
 
 	algTcParent :: TyConParent	-- ^ Gives the class or family declaration 'TyCon' for derived 'TyCon's
@@ -976,7 +976,7 @@ expand tvs rhs tys
 \end{code}
 
 \begin{code}
--- | Does this 'TyCon' have any generic to/from functions available? See also 'hasGenerics'
+-- | Does this 'TyCon' have any generic to\/from functions available? See also 'hasGenerics'
 tyConHasGenerics :: TyCon -> Bool
 tyConHasGenerics (AlgTyCon {hasGenerics = hg})   = hg
 tyConHasGenerics (TupleTyCon {hasGenerics = hg}) = hg

@@ -1625,7 +1625,7 @@ Kinds
 --            ??   (\#)
 --           \/  &#92;
 --          \*    \#
---
+-- .
 -- Where:        \*    [LiftedTypeKind]   means boxed type
 --              \#    [UnliftedTypeKind] means unboxed type
 --              (\#)  [UbxTupleKind]     means unboxed tuple

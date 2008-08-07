@@ -597,8 +597,8 @@ mkLocalOcc uniq occ
 \end{code}
 
 \begin{code}
--- | Derive a name for the representation type constructor of a @data@/@newtype@
--- instance.
+-- | Derive a name for the representation type constructor of a
+-- @data@\/@newtype@ instance.
 mkInstTyTcOcc :: Int			-- ^ DFun Index
 	      -> OccName		-- ^ Family name, e.g. @Map@
 	      -> OccName		-- ^ Nice unique version, e.g. @:R23Map@

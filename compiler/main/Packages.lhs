@@ -90,7 +90,7 @@ import Data.List
 --     program depends on (the compiler knows this list by the
 --     time it gets to the link step).  Also, we link in all packages
 --     which were mentioned with preload @-package@ flags on the command-line,
---     or are a transitive dependency of same, or are \"base\"/\"rts\".
+--     or are a transitive dependency of same, or are \"base\"\/\"rts\".
 --     The reason for this is that we might need packages which don't
 --     contain any Haskell modules, and therefore won't be discovered
 --     by the normal mechanism of dependency tracking.

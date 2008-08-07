@@ -1195,7 +1195,7 @@ data GenAvailInfo name	= Avail name	 -- ^ An ordinary identifier in scope
 				         --  2) The available pieces of type or class.
 					 --     NB: If the type or class is itself
 					 --     to be in scope, it must be in this list.
-					 --     Thus, typically: @AvailTC Eq [Eq, ==, /=]@
+					 --     Thus, typically: @AvailTC Eq [Eq, ==, \/=]@
 			deriving( Eq )
 			-- Equality used when deciding if the interface has changed
 
