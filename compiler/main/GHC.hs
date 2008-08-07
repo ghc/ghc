@@ -1531,21 +1531,15 @@ typecheckLoop hsc_env mods = do
 
 reachableBackwards :: ModuleName -> [ModSummary] -> [ModSummary]
 reachableBackwards mod summaries
-  = [ ms | (ms,_,_) <- map vertex_fn nodes_we_want ]
-  where          
-        -- all the nodes reachable by traversing the edges backwards
-        -- from the root node:
-        nodes_we_want = reachable (transposeG graph) root
-
-        -- the rest just sets up the graph:
-	(nodes, lookup_key) = moduleGraphNodes False summaries
-	(graph, vertex_fn, key_fn) = graphFromEdges' nodes
-	root 
-	  | Just key <- lookup_key HsBootFile mod, Just v <- key_fn key = v
-	  | otherwise = panic "reachableBackwards"
+  = [ ms | (ms,_,_) <- reachableG (transposeG graph) root ]
+  where -- the rest just sets up the graph:
+        (graph, lookup_node) = moduleGraphNodes False summaries
+        root  = expectJust "reachableBackwards" (lookup_node HsBootFile mod)
 
 -- ---------------------------------------------------------------------------
 -- Topological sort of the module graph
+
+type SummaryNode = (ModSummary, Int, [Int])
 
 topSortModuleGraph
 	  :: Bool 		-- Drop hi-boot nodes? (see below)
@@ -1567,66 +1561,75 @@ topSortModuleGraph
 --		the a source-import of Foo is an import of Foo
 --		The resulting graph has no hi-boot nodes, but can by cyclic
 
-topSortModuleGraph drop_hs_boot_nodes summaries Nothing
-  = stronglyConnComp (fst (moduleGraphNodes drop_hs_boot_nodes summaries))
-topSortModuleGraph drop_hs_boot_nodes summaries (Just mod)
-  = stronglyConnComp (map vertex_fn (reachable graph root))
-  where 
-	-- restrict the graph to just those modules reachable from
-	-- the specified module.  We do this by building a graph with
-	-- the full set of nodes, and determining the reachable set from
-	-- the specified node.
-	(nodes, lookup_key) = moduleGraphNodes drop_hs_boot_nodes summaries
-	(graph, vertex_fn, key_fn) = graphFromEdges' nodes
-	root 
-	  | Just key <- lookup_key HsSrcFile mod, Just v <- key_fn key = v
-	  | otherwise  = ghcError (ProgramError "module does not exist")
+topSortModuleGraph drop_hs_boot_nodes summaries mb_root_mod
+  = map (fmap summaryNodeSummary) $ stronglyConnCompG initial_graph
+  where
+    (graph, lookup_node) = moduleGraphNodes drop_hs_boot_nodes summaries
+    
+    initial_graph = case mb_root_mod of
+        Nothing -> graph
+        Just root_mod ->
+            -- restrict the graph to just those modules reachable from
+            -- the specified module.  We do this by building a graph with
+            -- the full set of nodes, and determining the reachable set from
+            -- the specified node.
+            let root | Just node <- lookup_node HsSrcFile root_mod, graph `hasVertexG` node = node
+                     | otherwise = ghcError (ProgramError "module does not exist")
+            in graphFromEdgedVertices (seq root (reachableG graph root))
+
+summaryNodeKey :: SummaryNode -> Int
+summaryNodeKey (_, k, _) = k
+
+summaryNodeSummary :: SummaryNode -> ModSummary
+summaryNodeSummary (s, _, _) = s
 
 moduleGraphNodes :: Bool -> [ModSummary]
-  -> ([(ModSummary, Int, [Int])], HscSource -> ModuleName -> Maybe Int)
-moduleGraphNodes drop_hs_boot_nodes summaries = (nodes, lookup_key)
-   where
-	-- Drop hs-boot nodes by using HsSrcFile as the key
-	hs_boot_key | drop_hs_boot_nodes = HsSrcFile
-		    | otherwise		 = HsBootFile	
+  -> (Graph SummaryNode, HscSource -> ModuleName -> Maybe SummaryNode)
+moduleGraphNodes drop_hs_boot_nodes summaries = (graphFromEdgedVertices nodes, lookup_node)
+  where
+    numbered_summaries = zip summaries [1..]
 
-	-- We use integers as the keys for the SCC algorithm
-	nodes :: [(ModSummary, Int, [Int])]	
-	nodes = [(s, expectJust "topSort" $ 
-			lookup_key (ms_hsc_src s) (ms_mod_name s),
-		     out_edge_keys hs_boot_key (map unLoc (ms_srcimps s)) ++
-		     out_edge_keys HsSrcFile   (map unLoc (ms_imps s)) ++
-		     (-- see [boot-edges] below
-		      if drop_hs_boot_nodes || ms_hsc_src s == HsBootFile 
-			then [] 
-			else case lookup_key HsBootFile (ms_mod_name s) of
-				Nothing -> []
-				Just k  -> [k])
-		 )
-		| s <- summaries
-		, not (isBootSummary s && drop_hs_boot_nodes) ]
-		-- Drop the hi-boot ones if told to do so
+    lookup_node :: HscSource -> ModuleName -> Maybe SummaryNode
+    lookup_node hs_src mod = lookupFM node_map (mod, hs_src)
 
-	-- [boot-edges] if this is a .hs and there is an equivalent
-	-- .hs-boot, add a link from the former to the latter.  This
-	-- has the effect of detecting bogus cases where the .hs-boot
-	-- depends on the .hs, by introducing a cycle.  Additionally,
-	-- it ensures that we will always process the .hs-boot before
-	-- the .hs, and so the HomePackageTable will always have the
-	-- most up to date information.
+    lookup_key :: HscSource -> ModuleName -> Maybe Int
+    lookup_key hs_src mod = fmap summaryNodeKey (lookup_node hs_src mod)
 
-	key_map :: NodeMap Int
-	key_map = listToFM ([(moduleName (ms_mod s), ms_hsc_src s)
-			    | s <- summaries]
-			   `zip` [1..])
+    node_map :: NodeMap SummaryNode
+    node_map = listToFM [ ((moduleName (ms_mod s), ms_hsc_src s), node)
+                        | node@(s, _, _) <- nodes ]
 
-	lookup_key :: HscSource -> ModuleName -> Maybe Int
-	lookup_key hs_src mod = lookupFM key_map (mod, hs_src)
+    -- We use integers as the keys for the SCC algorithm
+    nodes :: [SummaryNode]
+    nodes = [ (s, key, out_keys)
+            | (s, key) <- numbered_summaries
+             -- Drop the hi-boot ones if told to do so
+            , not (isBootSummary s && drop_hs_boot_nodes)
+            , let out_keys = out_edge_keys hs_boot_key (map unLoc (ms_srcimps s)) ++
+                             out_edge_keys HsSrcFile   (map unLoc (ms_imps s)) ++
+                             (-- see [boot-edges] below
+                              if drop_hs_boot_nodes || ms_hsc_src s == HsBootFile 
+                              then [] 
+                              else case lookup_key HsBootFile (ms_mod_name s) of
+                                    Nothing -> []
+                                    Just k  -> [k]) ]
 
-	out_edge_keys :: HscSource -> [ModuleName] -> [Int]
-        out_edge_keys hi_boot ms = mapCatMaybes (lookup_key hi_boot) ms
-		-- If we want keep_hi_boot_nodes, then we do lookup_key with
-		-- the IsBootInterface parameter True; else False
+    -- [boot-edges] if this is a .hs and there is an equivalent
+    -- .hs-boot, add a link from the former to the latter.  This
+    -- has the effect of detecting bogus cases where the .hs-boot
+    -- depends on the .hs, by introducing a cycle.  Additionally,
+    -- it ensures that we will always process the .hs-boot before
+    -- the .hs, and so the HomePackageTable will always have the
+    -- most up to date information.
+
+    -- Drop hs-boot nodes by using HsSrcFile as the key
+    hs_boot_key | drop_hs_boot_nodes = HsSrcFile
+                | otherwise          = HsBootFile
+
+    out_edge_keys :: HscSource -> [ModuleName] -> [Int]
+    out_edge_keys hi_boot ms = mapCatMaybes (lookup_key hi_boot) ms
+        -- If we want keep_hi_boot_nodes, then we do lookup_key with
+        -- the IsBootInterface parameter True; else False
 
 
 type NodeKey   = (ModuleName, HscSource)  -- The nodes of the graph are 
@@ -2212,7 +2215,7 @@ isDictonaryId id
 -- 'setContext'.
 lookupGlobalName :: Session -> Name -> IO (Maybe TyThing)
 lookupGlobalName s name = withSession s $ \hsc_env -> do
-   eps <- readIORef (hsc_EPS hsc_env)
+   eps <- hscEPS hsc_env
    return $! lookupType (hsc_dflags hsc_env) 
 			(hsc_HPT hsc_env) (eps_PTE eps) name
 
