@@ -5,19 +5,45 @@
 \section[Name]{@Name@: to transmit name info from renamer to typechecker}
 
 \begin{code}
-module Name (
-	-- Re-export the OccName stuff
-	module OccName,
+-- |
+-- #name_types#
+-- GHC uses several kinds of name internally:
+--
+-- * 'OccName.OccName': see "OccName#name_types"
+--
+-- * 'RdrName.RdrName': see "RdrName#name_types"
+--
+-- *  'Name.Name' is the type of names that have had their scoping and binding resolved. They
+--   have an 'OccName.OccName' but also a 'Unique.Unique' that disambiguates Names that have
+--   the same 'OccName.OccName' and indeed is used for all 'Name.Name' comparison. Names
+--   also contain information about where they originated from, see "Name#name_sorts"
+--
+-- * 'Id.Id': see "Id#name_types"
+--
+-- * 'Var.Var': see "Var#name_types"
+--
+-- #name_sorts#
+-- Names are one of:
+--
+--  * External, if they name things declared in other modules. Some external
+--    Names are wired in, i.e. they name primitives defined in the compiler itself
+--
+--  * Internal, if they name things in the module being compiled. Some internal
+--    Names are system names, if they are names manufactured by the compiler
 
-	-- The Name type
+module Name (
+	-- * The main types
 	Name,					-- Abstract
-	BuiltInSyntax(..), 
+	BuiltInSyntax(..),
+
+	-- ** Creating 'Name's
 	mkInternalName, mkSystemName,
 	mkSystemVarName, mkSysTvName, 
 	mkFCallName, mkIPName,
         mkTickBoxOpName,
 	mkExternalName, mkWiredInName,
 
+	-- ** Manipulating and deconstructing 'Name's
 	nameUnique, setNameUnique,
 	nameOccName, nameModule, nameModule_maybe,
 	tidyNameOcc, 
@@ -25,15 +51,22 @@ module Name (
 
 	nameSrcLoc, nameSrcSpan, pprNameLoc,
 
+	-- ** Predicates on 'Name's
 	isSystemName, isInternalName, isExternalName,
-	isTyVarName, isTyConName, isWiredInName, isBuiltInSyntax,
+	isTyVarName, isTyConName, isDataConName, 
+	isValName, isVarName,
+	isWiredInName, isBuiltInSyntax,
 	wiredInNameTyThing_maybe, 
 	nameIsLocalOrFrom,
-	
-	-- Class NamedThing and overloaded friends
+
+	-- * Class 'NamedThing' and overloaded friends
 	NamedThing(..),
 	getSrcLoc, getSrcSpan, getOccString,
- 	pprInfixName, pprPrefixName
+
+ 	pprInfixName, pprPrefixName,
+
+	-- Re-export the OccName stuff
+	module OccName
     ) where
 
 import {-# SOURCE #-} TypeRep( TyThing )
@@ -58,6 +91,8 @@ import Data.Array
 %************************************************************************
  
 \begin{code}
+-- | A unique, unambigious name for something, containing information about where
+-- that thing originated.
 data Name = Name {
 		n_sort :: NameSort,	-- What sort of name it is
 		n_occ  :: !OccName,	-- Its occurrence name
@@ -82,10 +117,10 @@ data NameSort
   | System		-- A system-defined Id or TyVar.  Typically the
 			-- OccName is very uninformative (like 's')
 
-data BuiltInSyntax = BuiltInSyntax | UserSyntax
--- BuiltInSyntax is for things like (:), [], tuples etc, 
--- which have special syntactic forms.  They aren't "in scope"
+-- | BuiltInSyntax is for things like @(:)@, @[]@ and tuples, 
+-- which have special syntactic forms.  They aren't in scope
 -- as such.
+data BuiltInSyntax = BuiltInSyntax | UserSyntax
 \end{code}
 
 Notes about the NameSorts:
@@ -132,6 +167,12 @@ nameSrcLoc  name = srcSpanStart (n_loc name)
 nameSrcSpan name = n_loc  name
 \end{code}
 
+%************************************************************************
+%*									*
+\subsection{Predicates on names}
+%*									*
+%************************************************************************
+
 \begin{code}
 nameIsLocalOrFrom :: Module -> Name -> Bool
 isInternalName	  :: Name -> Bool
@@ -172,6 +213,15 @@ isTyVarName name = isTvOcc (nameOccName name)
 isTyConName :: Name -> Bool
 isTyConName name = isTcOcc (nameOccName name)
 
+isDataConName :: Name -> Bool
+isDataConName name = isDataOcc (nameOccName name)
+
+isValName :: Name -> Bool
+isValName name = isValOcc (nameOccName name)
+
+isVarName :: Name -> Bool
+isVarName = isVarOcc . nameOccName
+
 isSystemName (Name {n_sort = System}) = True
 isSystemName _                        = False
 \end{code}
@@ -184,6 +234,8 @@ isSystemName _                        = False
 %************************************************************************
 
 \begin{code}
+-- | Create a name which is (for now at least) local to the current module and hence
+-- does not need a 'Module' to disambiguate it from other 'Name's
 mkInternalName :: Unique -> OccName -> SrcSpan -> Name
 mkInternalName uniq occ loc = Name { n_uniq = getKeyFastInt uniq, n_sort = Internal, n_occ = occ, n_loc = loc }
 	-- NB: You might worry that after lots of huffing and
@@ -195,18 +247,20 @@ mkInternalName uniq occ loc = Name { n_uniq = getKeyFastInt uniq, n_sort = Inter
 	--	* for interface files we tidyCore first, which puts the uniques
 	--	  into the print name (see setNameVisibility below)
 
+-- | Create a name which definitely originates in the given module
 mkExternalName :: Unique -> Module -> OccName -> SrcSpan -> Name
 mkExternalName uniq mod occ loc 
   = Name { n_uniq = getKeyFastInt uniq, n_sort = External mod,
            n_occ = occ, n_loc = loc }
 
-mkWiredInName :: Module -> OccName -> Unique -> TyThing -> BuiltInSyntax
-        -> Name
+-- | Create a name which is actually defined by the compiler itself
+mkWiredInName :: Module -> OccName -> Unique -> TyThing -> BuiltInSyntax -> Name
 mkWiredInName mod occ uniq thing built_in
   = Name { n_uniq = getKeyFastInt uniq,
 	   n_sort = WiredIn mod thing built_in,
 	   n_occ = occ, n_loc = wiredInSrcSpan }
 
+-- | Create a name brought into being by the compiler
 mkSystemName :: Unique -> OccName -> Name
 mkSystemName uniq occ = Name { n_uniq = getKeyFastInt uniq, n_sort = System, 
 			       n_occ = occ, n_loc = noSrcSpan }
@@ -217,16 +271,19 @@ mkSystemVarName uniq fs = mkSystemName uniq (mkVarOccFS fs)
 mkSysTvName :: Unique -> FastString -> Name
 mkSysTvName uniq fs = mkSystemName uniq (mkOccNameFS tvName fs) 
 
+-- | Make a name for a foreign call
 mkFCallName :: Unique -> String -> Name
 	-- The encoded string completely describes the ccall
 mkFCallName uniq str =  Name { n_uniq = getKeyFastInt uniq, n_sort = Internal, 
 			       n_occ = mkVarOcc str, n_loc = noSrcSpan }
+
 
 mkTickBoxOpName :: Unique -> String -> Name
 mkTickBoxOpName uniq str 
    = Name { n_uniq = getKeyFastInt uniq, n_sort = Internal, 
 	    n_occ = mkVarOcc str, n_loc = noSrcSpan }
 
+-- | Make the name of an implicit parameter
 mkIPName :: Unique -> OccName -> Name
 mkIPName uniq occ
   = Name { n_uniq = getKeyFastInt uniq,
@@ -249,14 +306,14 @@ tidyNameOcc :: Name -> OccName -> Name
 tidyNameOcc name@(Name { n_sort = System }) occ = name { n_occ = occ, n_sort = Internal}
 tidyNameOcc name 			    occ = name { n_occ = occ }
 
+-- | Make the 'Name' into an internal name, regardless of what it was to begin with
 localiseName :: Name -> Name
 localiseName n = n { n_sort = Internal }
 \end{code}
 
-
 %************************************************************************
 %*									*
-\subsection{Predicates and selectors}
+\subsection{Hashing and comparison}
 %*									*
 %************************************************************************
 
@@ -266,19 +323,16 @@ hashName name = getKey (nameUnique name) + 1
 	-- The +1 avoids keys with lots of zeros in the ls bits, which 
 	-- interacts badly with the cheap and cheerful multiplication in
 	-- hashExpr
-\end{code}
 
+cmpName :: Name -> Name -> Ordering
+cmpName n1 n2 = iBox (n_uniq n1) `compare` iBox (n_uniq n2)
+\end{code}
 
 %************************************************************************
 %*									*
 \subsection[Name-instances]{Instance declarations}
 %*									*
 %************************************************************************
-
-\begin{code}
-cmpName :: Name -> Name -> Ordering
-cmpName n1 n2 = iBox (n_uniq n1) `compare` iBox (n_uniq n2)
-\end{code}
 
 \begin{code}
 instance Eq Name where
@@ -408,6 +462,7 @@ pprNameLoc name
 %************************************************************************
 
 \begin{code}
+-- | A class allowing convenient access to the 'Name' of various datatypes
 class NamedThing a where
     getOccName :: a -> OccName
     getName    :: a -> Name
