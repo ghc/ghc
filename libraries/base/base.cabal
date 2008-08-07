@@ -29,6 +29,7 @@ Library {
             Foreign.Concurrent,
             GHC.Arr,
             GHC.Base,
+            GHC.Classes,
             GHC.Conc,
             GHC.ConsoleHandler,
             GHC.Desugar,

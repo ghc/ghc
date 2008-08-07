@@ -40,7 +40,9 @@ module Data.Tuple
     where
 
 #ifdef __GLASGOW_HASKELL__
-import GHC.Base
+import GHC.Bool
+import GHC.Classes
+import GHC.Ordering
 -- XXX The standalone deriving clauses fail with
 --     The data constructors of `(,)' are not all in scope
 --       so you cannot derive an instance for it

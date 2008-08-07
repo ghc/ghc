@@ -85,6 +85,7 @@ module GHC.Base
         (
         module GHC.Base,
         module GHC.Bool,
+        module GHC.Classes,
         module GHC.Generics,
         module GHC.Ordering,
         module GHC.Types,
@@ -95,6 +96,7 @@ module GHC.Base
 
 import GHC.Types
 import GHC.Bool
+import GHC.Classes
 import GHC.Generics
 import GHC.Ordering
 import GHC.Prim
@@ -102,9 +104,6 @@ import {-# SOURCE #-} GHC.Err
 
 infixr 9  .
 infixr 5  ++
-infix  4  ==, /=, <, <=, >=, >
-infixr 3  &&
-infixr 2  ||
 infixl 1  >>, >>=
 infixr 0  $
 
@@ -147,61 +146,6 @@ unpackCStringUtf8# a = error "urk"
 -}
 \end{code}
 
-
-%*********************************************************
-%*                                                      *
-\subsection{Standard classes @Eq@, @Ord@}
-%*                                                      *
-%*********************************************************
-
-\begin{code}
-
--- | The 'Eq' class defines equality ('==') and inequality ('/=').
--- All the basic datatypes exported by the "Prelude" are instances of 'Eq',
--- and 'Eq' may be derived for any datatype whose constituents are also
--- instances of 'Eq'.
---
--- Minimal complete definition: either '==' or '/='.
---
-class  Eq a  where
-    (==), (/=)           :: a -> a -> Bool
-
-    x /= y               = not (x == y)
-    x == y               = not (x /= y)
-
--- | The 'Ord' class is used for totally ordered datatypes.
---
--- Instances of 'Ord' can be derived for any user-defined
--- datatype whose constituent types are in 'Ord'.  The declared order
--- of the constructors in the data declaration determines the ordering
--- in derived 'Ord' instances.  The 'Ordering' datatype allows a single
--- comparison to determine the precise ordering of two objects.
---
--- Minimal complete definition: either 'compare' or '<='.
--- Using 'compare' can be more efficient for complex types.
---
-class  (Eq a) => Ord a  where
-    compare              :: a -> a -> Ordering
-    (<), (<=), (>), (>=) :: a -> a -> Bool
-    max, min             :: a -> a -> a
-
-    compare x y
-        | x == y    = EQ
-        | x <= y    = LT        -- NB: must be '<=' not '<' to validate the
-                                -- above claim about the minimal things that
-                                -- can be defined for an instance of Ord
-        | otherwise = GT
-
-    x <  y = case compare x y of { LT -> True;  _other -> False }
-    x <= y = case compare x y of { GT -> False; _other -> True }
-    x >  y = case compare x y of { GT -> True;  _other -> False }
-    x >= y = case compare x y of { LT -> False; _other -> True }
-
-        -- These two default methods use '<=' rather than 'compare'
-        -- because the latter is often more expensive
-    max x y = if x <= y then y else x
-    min x y = if x <= y then x else y
-\end{code}
 
 %*********************************************************
 %*                                                      *
@@ -494,23 +438,6 @@ instance Ord Bool where
     compare _     _     = EQ
 
 -- Read is in GHC.Read, Show in GHC.Show
-
--- Boolean functions
-
--- | Boolean \"and\"
-(&&)                    :: Bool -> Bool -> Bool
-True  && x              =  x
-False && _              =  False
-
--- | Boolean \"or\"
-(||)                    :: Bool -> Bool -> Bool
-True  || _              =  True
-False || x              =  x
-
--- | Boolean \"not\"
-not                     :: Bool -> Bool
-not True                =  False
-not False               =  True
 
 -- |'otherwise' is defined as the value 'True'.  It helps to make
 -- guards more readable.  eg.
