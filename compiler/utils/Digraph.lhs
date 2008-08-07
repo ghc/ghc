@@ -40,6 +40,7 @@ module Digraph(
 import Util        ( sortLe )
 import Outputable
 import Maybes      ( expectJust )
+import MonadUtils  ( allM )
 
 -- Extensions
 import Control.Monad    ( filterM, liftM, liftM2 )
@@ -588,8 +589,4 @@ vertexGroupsS provided g to_provide
 
 vertexReady :: Set s -> IntGraph -> Vertex -> ST s Bool
 vertexReady provided g v = liftM2 (&&) (liftM not $ provided `contains` v) (allM (provided `contains`) (g!v))
-
-allM :: Monad m => (a -> m Bool) -> [a] -> m Bool
-allM _ []     = return True
-allM f (b:bs) = (f b) >>= (\bv -> if bv then allM f bs else return False)
 \end{code}

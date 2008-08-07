@@ -13,7 +13,7 @@ module MonadUtils
         , mapAccumLM
         , mapSndM
         , concatMapM
-        , anyM
+        , anyM, allM
         , foldlM, foldrM
         ) where
 
@@ -116,12 +116,17 @@ mapSndM f ((a,b):xs) = do { c <- f b; rs <- mapSndM f xs; return ((a,c):rs) }
 concatMapM :: Monad m => (a -> m [b]) -> [a] -> m [b]
 concatMapM f xs = liftM concat (mapM f xs)
 
--- | Monadic version of 'any', aborts the computation at the first False value
+-- | Monadic version of 'any', aborts the computation at the first @True@ value
 anyM :: Monad m => (a -> m Bool) -> [a] -> m Bool
 anyM _ []     = return False
 anyM f (x:xs) = do b <- f x
                    if b then return True 
                         else anyM f xs
+
+-- | Monad version of 'all', aborts the computation at the first @False@ value
+allM :: Monad m => (a -> m Bool) -> [a] -> m Bool
+allM _ []     = return True
+allM f (b:bs) = (f b) >>= (\bv -> if bv then allM f bs else return False)
 
 -- | Monadic version of foldl
 foldlM :: (Monad m) => (a -> b -> m a) -> a -> [b] -> m a
