@@ -311,7 +311,7 @@ splitFun fn_id fn_info wrap_dmds res_info inline_prag rhs
 -- Otherwise we spuriously float stuff out of case-expression join points,
 -- which is very annoying.
 get_one_shots (Lam b e)
-  | isId b    = isOneShotLambda b : get_one_shots e
+  | isIdVar b = isOneShotLambda b : get_one_shots e
   | otherwise = get_one_shots e
 get_one_shots (Note _ e) = get_one_shots e
 get_one_shots other	 = noOneShotInfo

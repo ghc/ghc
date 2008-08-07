@@ -89,7 +89,7 @@ module IdInfo (
         TickBoxOp(..), TickBoxId,
     ) where
 
-import {-# SOURCE #-} CoreSyn ( CoreRule, setRuleIdName, seqRules, Unfolding, noUnfolding )
+import CoreSyn ( CoreRule, setRuleIdName, seqRules, Unfolding, noUnfolding )
 
 import Class
 import PrimOp

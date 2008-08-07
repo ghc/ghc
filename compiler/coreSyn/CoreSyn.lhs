@@ -25,7 +25,7 @@ module CoreSyn (
 	mkConApp, mkTyBind,
 	varToCoreExpr, varsToCoreExprs,
 
-        isTyVar, isId, cmpAltCon, cmpAlt, ltAlt,
+        isTyVar, isIdVar, cmpAltCon, cmpAlt, ltAlt,
 	
 	-- ** Simple 'Expr' access functions and predicates
 	bindersOf, bindersOfBinds, rhssOfBind, rhssOfAlts, 
@@ -68,7 +68,6 @@ module CoreSyn (
 
 import CostCentre
 import Var
-import Id
 import Type
 import Coercion
 import Name
@@ -705,7 +704,7 @@ mkTyBind tv ty      = NonRec tv (Type ty)
 
 -- | Convert a binder into either a 'Var' or 'Type' 'Expr' appropriately
 varToCoreExpr :: CoreBndr -> Expr b
-varToCoreExpr v | isId v    = Var v
+varToCoreExpr v | isIdVar v = Var v
                 | otherwise = Type (mkTyVarTy v)
 
 varsToCoreExprs :: [CoreBndr] -> [Expr b]
@@ -778,8 +777,8 @@ collectTyBinders expr
 collectValBinders expr
   = go [] expr
   where
-    go ids (Lam b e) | isId b = go (b:ids) e
-    go ids body		      = (reverse ids, body)
+    go ids (Lam b e) | isIdVar b = go (b:ids) e
+    go ids body		         = (reverse ids, body)
 \end{code}
 
 \begin{code}
@@ -817,7 +816,7 @@ at runtime.  Similarly isRuntimeArg.
 \begin{code}
 -- | Will this variable exist at runtime?
 isRuntimeVar :: Var -> Bool
-isRuntimeVar = isId 
+isRuntimeVar = isIdVar 
 
 -- | Will this argument expression exist at runtime?
 isRuntimeArg :: CoreExpr -> Bool
@@ -835,7 +834,7 @@ isTypeArg _        = False
 
 -- | The number of binders that bind values rather than types
 valBndrCount :: [CoreBndr] -> Int
-valBndrCount = count isId
+valBndrCount = count isIdVar
 
 -- | The number of argument expressions that are values rather than types at their top level
 valArgCount :: [Arg b] -> Int

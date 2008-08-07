@@ -97,7 +97,7 @@ module Id (
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} CoreSyn ( CoreRule, Unfolding )
+import CoreSyn ( CoreRule, Unfolding )
 
 import IdInfo
 import BasicTypes
