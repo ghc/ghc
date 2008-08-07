@@ -98,7 +98,7 @@ sub darcsget {
     open IN, "< packages" or die "Can't open packages file";
     while (<IN>) {
         chomp;
-        if (/^([^ ]+) +(?:([^ ]+) +)?([^ ]+)/) {
+        if (/^([^ ]+) +(?:([^ ]+) +)?([^ ]+) +([^ ]+)$/) {
             $localpath = $1;
             $tag = defined($2) ? $2 : "";
             $remotepath = $3;
@@ -119,7 +119,7 @@ sub darcsget {
                 }
             }
         }
-        elsif (! /^$/) {
+        elsif (! /^(#.*)?$/) {
             die "Bad line: $_";
         }
     }
