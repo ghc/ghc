@@ -72,7 +72,7 @@ dsLit (HsDoublePrim d) = return (Lit (MachDouble d))
 dsLit (HsChar c)       = return (mkCharExpr c)
 dsLit (HsString str)   = mkStringExprFS str
 dsLit (HsInteger i _)  = mkIntegerExpr i
-dsLit (HsInt i)	       = return (mkIntExpr (fromIntegral i))
+dsLit (HsInt i)	       = return (mkIntExpr i)
 
 dsLit (HsRat r ty) = do
    num   <- mkIntegerExpr (numerator r)

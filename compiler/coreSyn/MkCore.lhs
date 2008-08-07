@@ -7,8 +7,9 @@ module MkCore (
         mkCoreLams,
         
         -- * Constructing boxed literals
-        mkWordExpr,
-        mkIntExpr, mkIntegerExpr,
+        mkWordExpr, mkWordExprWord,
+        mkIntExpr, mkIntExprInt,
+        mkIntegerExpr,
         mkFloatExpr, mkDoubleExpr,
         mkCharExpr, mkStringExpr, mkStringExprFS,
         
@@ -216,12 +217,20 @@ mkCoreLams = mkLams
 
 \begin{code}
 -- | Create a 'CoreExpr' which will evaluate to the given @Int@
-mkIntExpr      :: Int        -> CoreExpr            -- Result = I# i :: Int
-mkIntExpr  i = mkConApp intDataCon  [mkIntLitInt i]
+mkIntExpr      :: Integer    -> CoreExpr            -- Result = I# i :: Int
+mkIntExpr  i = mkConApp intDataCon  [mkIntLit i]
+
+-- | Create a 'CoreExpr' which will evaluate to the given @Int@
+mkIntExprInt   :: Int        -> CoreExpr            -- Result = I# i :: Int
+mkIntExprInt  i = mkConApp intDataCon  [mkIntLitInt i]
+
+-- | Create a 'CoreExpr' which will evaluate to the a @Word@ with the given value
+mkWordExpr     :: Integer    -> CoreExpr
+mkWordExpr w = mkConApp wordDataCon [mkWordLit w]
 
 -- | Create a 'CoreExpr' which will evaluate to the given @Word@
-mkWordExpr     :: Word       -> CoreExpr
-mkWordExpr w = mkConApp wordDataCon [mkWordLitWord w]
+mkWordExprWord :: Word       -> CoreExpr
+mkWordExprWord w = mkConApp wordDataCon [mkWordLitWord w]
 
 -- | Create a 'CoreExpr' which will evaluate to the given @Integer@
 mkIntegerExpr  :: MonadThings m => Integer    -> m CoreExpr  -- Result :: Integer

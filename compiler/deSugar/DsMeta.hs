@@ -1250,7 +1250,7 @@ repNamedTyCon (MkC s) = rep2 conTName [s]
 
 repTupleTyCon :: Int -> DsM (Core TH.TypeQ)
 -- Note: not Core Int; it's easier to be direct here
-repTupleTyCon i = rep2 tupleTName [mkIntExpr (fromIntegral i)]
+repTupleTyCon i = rep2 tupleTName [mkIntExprInt i]
 
 repArrowTyCon :: DsM (Core TH.TypeQ)
 repArrowTyCon = rep2 arrowTName []
@@ -1345,7 +1345,7 @@ coreStringLit :: String -> DsM (Core String)
 coreStringLit s = do { z <- mkStringExpr s; return(MkC z) }
 
 coreIntLit :: Int -> DsM (Core Int)
-coreIntLit i = return (MkC (mkIntExpr (fromIntegral i)))
+coreIntLit i = return (MkC (mkIntExprInt i))
 
 coreVar :: Id -> Core TH.Name	-- The Id has type Name
 coreVar id = MkC (Var id)
