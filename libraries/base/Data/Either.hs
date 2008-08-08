@@ -27,8 +27,11 @@ module Data.Either (
 import GHC.Base
 import GHC.Show
 import GHC.Read
+#endif
+
 import Data.Typeable
 
+#ifdef __GLASGOW_HASKELL__
 {-
 -- just for testing
 import Test.QuickCheck
