@@ -68,14 +68,15 @@ SUBDIRS += $(wildcard time)
 SUBDIRS += $(wildcard stm)
 SUBDIRS += $(wildcard xhtml)
 SUBDIRS += $(wildcard parallel)
-SUBDIRS_BUILD += $(wildcard dph/dph-base)
-SUBDIRS_BUILD += $(wildcard dph/dph-prim-interface)
-SUBDIRS_BUILD += $(wildcard dph/dph-prim-seq)
-SUBDIRS_BUILD += $(wildcard dph/dph-prim-par)
-SUBDIRS_BUILD += $(wildcard dph/dph)
+ifneq "$(wildcard dph)" ""
+SUBDIRS += dph/dph-base
+SUBDIRS += dph/dph-prim-interface
+SUBDIRS += dph/dph-prim-seq
+SUBDIRS += dph/dph-prim-par
+SUBDIRS += dph/dph_seq
+SUBDIRS += dph/dph_par
 endif
-
-SUBDIRS += $(SUBDIRS_BUILD)
+endif
 
 # -----------------------------------------------------------------------------
 
@@ -230,6 +231,17 @@ ALL_CONFIGURE_FLAGS = \
 	                              --use-index=../doc-index.html" \
 	           $(CONFIGURE_OPTS)
 
+stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).dph/dph_par: \
+    create_dph_par
+
+stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).dph/dph_seq: \
+    create_dph_seq
+
+.PHONY: dph_create_par create_dph_seq
+
+create_dph_par create_dph_seq: create_%:
+	$(MAKE) -C dph $*
+
 $(foreach SUBDIR,$(SUBDIRS), \
 		  stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).$(SUBDIR)): \
 stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).%: cabal-bin \
@@ -248,9 +260,7 @@ stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).%: cabal-bin \
 # needs to be done.  However, we're careful not to overwrite GNUmakefile
 # if it hasn't changed, so that dependency-generation isn't forced
 # every time.
-# Packages in $(SUBDIRS_BUILD) need to use the build.* rules instead of
-# make.*, so filter them out and use an alternate rule below instead.
-$(foreach SUBDIR,$(filter-out $(SUBDIRS_BUILD),$(SUBDIRS)),make.library.$(SUBDIR)):\
+$(foreach SUBDIR,$(SUBDIRS),make.library.$(SUBDIR)):\
 make.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
                 cabal-bin ifBuildable/ifBuildable bootstrapping.conf
 	if $(IFBUILDABLE) $*; then \
@@ -264,10 +274,6 @@ make.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
 	fi
 
 MAKEFILE_LOCAL = $(FPTOOLS_TOP_ABS)/libraries/Makefile.local
-
-# Alternate rule, as described above
-$(foreach SUBDIR,$(SUBDIRS_BUILD),make.library.$(SUBDIR)):\
-make.library.%: build.library.%
 
 # Build the library using 'setup build' (not the default)
 $(foreach SUBDIR,$(SUBDIRS),build.library.$(SUBDIR)):\
@@ -301,7 +307,10 @@ doc.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
 ifneq "$(HSCOLOUR)" ""
 # We use */src rather than $*/src due to the $(INTEGER_LIBRARY)/integer
 # mismatch
-	if $(IFBUILDABLE) $*; then cp hscolour.css $*/dist/doc/html/*/src/; fi
+# XXX We also need to check that the directory exists, as e.g. dph disables
+# haddock, so the directory doesn't get made. We should remove this once
+# we can always haddock everything.
+	if $(IFBUILDABLE) $* && [ -d $*/dist/doc/html/*/src/ ]; then cp hscolour.css $*/dist/doc/html/*/src/; fi
 endif
 
 .PHONY: distclean clean clean.library.%
@@ -319,6 +328,10 @@ clean: $(foreach SUBDIR,$(SUBDIRS),clean.library.$(SUBDIR))
 	$(RM) -rf ifBuildable
 	$(RM) -f libraries.txt index.html doc-index.html doc-index*.html
 	$(RM) -f haddock* *.gif
+	$(RM) -rf stamp/*
+ifneq "$(wildcard dph)" ""
+	$(MAKE) -C dph clean
+endif
 
 distclean:
 	$(RM) $(foreach lib, $(SUBDIRS), $(lib)/.depend $(lib)/.depend.bak)
