@@ -1191,10 +1191,10 @@ filterCalls :: VarSet -> CallDetails -> CallDetails
 -- Remove any calls that mention the variables
 filterCalls bs calls
   = mapFM (\_ cs -> filter_calls cs) $
-    filterFM (\k _ -> k `elemVarSet` bs) calls
+    filterFM (\k _ -> not (k `elemVarSet` bs)) calls
   where
     filter_calls :: CallInfo -> CallInfo
-    filter_calls = filterFM (\_ (_, fvs) -> fvs `intersectsVarSet` bs)
+    filter_calls = filterFM (\_ (_, fvs) -> not (fvs `intersectsVarSet` bs))
 \end{code}
 
 
