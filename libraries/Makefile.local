@@ -5,7 +5,7 @@
 # Careful here: including boilerplate.mk breaks things, because paths.mk and
 # opts.mk overrides some of the variable settings in the Cabal Makefile, so
 # we just include config.mk and custom-settings.mk.
-TOP=../..
+include ../defineTOP.mk
 SAVE_GHC := $(GHC)
 SAVE_AR  := $(AR)
 SAVE_LD  := $(LD)
