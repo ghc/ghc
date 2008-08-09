@@ -18,13 +18,16 @@ import Language.Core.Prims
 import Language.Core.Core
 import Language.Core.Env
 import Language.Core.Check
+import Language.Core.Environments
+import Language.Core.Encoding
 
 prepModule :: Menv -> Module -> Module
 prepModule globalEnv (Module mn tdefs vdefgs) = 
     Module mn tdefs vdefgs' 
   where
 
-    (_,vdefgs') = foldl prepTopVdefg (eempty,[]) vdefgs
+    (tcenv, cenv) = mkTypeEnvsNoChecking tdefs
+    (_,vdefgs') = foldl' prepTopVdefg (eempty,[]) vdefgs
 
     prepTopVdefg (venv,vdefgs) vdefg = (venv',vdefgs ++ [vdefg'])
        where (venv',vdefg') = prepVdefg (venv,eempty) vdefg
@@ -35,7 +38,7 @@ prepModule globalEnv (Module mn tdefs vdefgs) =
      	(venv, Nonrec(Vdef(qx,t,prepExp env e)))
     prepVdefg (venv,tvenv) (Rec vdefs) = 
 	(venv',Rec [ Vdef(qx,t,prepExp (venv',tvenv) e) | Vdef(qx,t,e) <- vdefs])
-	where venv' = foldl eextend venv [(x,t) | Vdef((Nothing,x),t,_) <- vdefs]
+	where venv' = foldl' eextend venv [(x,t) | Vdef((Nothing,x),t,_) <- vdefs]
 
     prepExp _ (Var qv) = Var qv
     prepExp _ (Dcon qdc) = Dcon qdc
@@ -51,7 +54,7 @@ prepModule globalEnv (Module mn tdefs vdefgs) =
             -- We need to know the type of the let body in order to construct
             -- a case expression. 
                                 -- need to extend the env with the let-bound var too!
-            let eTy = typeOfExp (eextend venv (x, t), tvenv) e in
+            let eTy = typeOfExp (eextend venv (x, t)) tvenv e in
                Case (prepExp env b) (x,t) 
                   eTy
                   [Adefault (prepExp (eextend venv (x,t),tvenv) e)] 
@@ -62,7 +65,7 @@ prepModule globalEnv (Module mn tdefs vdefgs) =
     prepExp env (Note s e) = Note s (prepExp env e)
     prepExp _ (External s t) = External s t
 
-    prepAlt (venv,tvenv) (Acon qdc tbs vbs e) = Acon qdc tbs vbs (prepExp (foldl eextend venv vbs,foldl eextend tvenv tbs) e)
+    prepAlt (venv,tvenv) (Acon qdc tbs vbs e) = Acon qdc tbs vbs (prepExp (foldl' eextend venv vbs,foldl' eextend tvenv tbs) e)
     prepAlt env (Alit l e) = Alit l (prepExp env e)
     prepAlt env (Adefault e) = Adefault (prepExp env e)
 
@@ -93,12 +96,12 @@ prepModule globalEnv (Module mn tdefs vdefgs) =
     etaExpand :: [Kind] -> [Ty] -> Exp -> Exp
     etaExpand ks ts e = 
          -- what a pain
-         let tyArgs = [("$t_"++(show i),k) | (i, k) <- zip [(1::Integer)..] ks]   
-             termArgs = [ ('$':(show i),t) | (i,t) <- zip [(1::Integer)..] ts] in
+         let tyArgs = [(zEncodeString $ "$t_"++(show i),k) | (i, k) <- zip [(1::Integer)..] ks]   
+             termArgs = [ (zEncodeString $ '$':(show i),t) | (i,t) <- zip [(1::Integer)..] ts] in
           foldr (\ (t1,k1) e -> Lam (Tb (t1,k1)) e)
 	   (foldr (\ (v,t) e -> Lam (Vb (v,t)) e)
-              (foldl (\ e (v,_) -> App e (Var (unqual v)))
-                 (foldl (\ e (tv,_) -> Appt e (Tvar tv))
+              (foldl' (\ e (v,_) -> App e (Var (unqual v)))
+                 (foldl' (\ e (tv,_) -> Appt e (Tvar tv))
                    e tyArgs)
               termArgs) termArgs)
            tyArgs
@@ -106,9 +109,9 @@ prepModule globalEnv (Module mn tdefs vdefgs) =
     rewindApp _ e [] = e
     rewindApp env@(venv,tvenv) e1 (Left e2:as) | kindOfTy tvenv t `eqKind` Kunlifted && suspends e2 =
        -- This is the other place where we call the typechecker.
-        Case newScrut (v,t) (typeOfExp env' rhs) [Adefault rhs]
+        Case newScrut (v,t) (typeOfExp venv' tvenv rhs) [Adefault rhs]
         where newScrut = prepExp env e2
-              rhs = (rewindApp env' (App e1 (Var (unqual v))) as)
+              rhs = (rewindApp (venv', tvenv) (App e1 (Var (unqual v))) as)
                  -- note:
                  -- e1 gets moved inside rhs. so if we pick a case
                  -- var name (outside e1) equal to a name bound *inside*
@@ -117,18 +120,18 @@ prepModule globalEnv (Module mn tdefs vdefgs) =
                  -- So, we pass the bound vars of e1 to freshVar along with
                  -- the domain of the current env.
               v = freshVar (edomain venv `union` (boundVars e1))
-              t = typeOfExp env e2
-              env' = (eextend venv (v,t),tvenv)
+              t = typeOfExp venv tvenv e2
+              venv' = eextend venv (v,t)
     rewindApp env e1 (Left e2:as) = rewindApp env (App e1 (prepExp env e2)) as
     rewindApp env e (Right t:as) = rewindApp env (Appt e t) as
 
     freshVar vs = maximum ("":vs) ++ "x" -- one simple way!
-
-    typeOfExp :: (Venv, Tvenv) -> Exp -> Ty
-    typeOfExp = uncurry (checkExpr mn globalEnv tdefs)
+    
+    typeOfExp :: Venv -> Tvenv -> Exp -> Ty
+    typeOfExp = checkExpr mn globalEnv tcenv cenv
 
     kindOfTy :: Tvenv -> Ty -> Kind
-    kindOfTy tvenv = checkType mn globalEnv tdefs tvenv
+    kindOfTy tvenv = checkType mn globalEnv tcenv tvenv
 
     {- Return false for those expressions for which Interp.suspendExp builds a thunk. -}
     suspends (Var _) = False

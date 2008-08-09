@@ -4,12 +4,14 @@ module Language.Core.Check(
   checkExpr, checkType, 
   primCoercionError, 
   Menv, Venv, Tvenv, Envs(..),
-  CheckRes(..), splitTy, substl) where
+  CheckRes(..), splitTy, substl,
+  mkTypeEnvsNoChecking) where
 
 import Language.Core.Core
 import Language.Core.Printer()
 import Language.Core.PrimEnv
 import Language.Core.Env
+import Language.Core.Environments
 
 import Control.Monad.Reader
 import Data.List
@@ -40,19 +42,6 @@ require :: Bool -> String -> CheckResult ()
 require False s = fail s
 require True  _ = return ()
 
-{- Environments. -}
-type Tvenv = Env Tvar Kind                    -- type variables  (local only)
-type Tcenv = Env Tcon KindOrCoercion          -- type constructors
-type Cenv = Env Dcon Ty 		      -- data constructors
-type Venv = Env Var Ty 			      -- values
-type Menv = Env AnMname Envs		      -- modules
-data Envs = Envs {tcenv_::Tcenv,cenv_::Cenv,venv_::Venv} -- all the exportable envs
-  deriving Show
-
-{- Extend an environment, checking for illegal shadowing of identifiers (for term
-   variables -- shadowing type variables is allowed.) -}
-data EnvType = Tv | NotTv
-  deriving Eq
 
 extendM :: (Ord a, Show a) => EnvType -> Env a b -> (a,b) -> CheckResult (Env a b)
 extendM envType env (k,d) = 
@@ -71,7 +60,7 @@ lookupM :: (Ord a, Show a) => Env a b -> a -> CheckResult b
 lookupM env k =   
    case elookup env k of
      Just v -> return v
-     Nothing -> fail ("undefined identifier: " ++ show k)
+     Nothing -> fail ("undefined identifier: " ++ show k ++ " e = " ++ show (edomain env))
             
 {- Main entry point. -}
 checkModule :: Menv -> Module -> CheckRes Menv
@@ -258,26 +247,25 @@ vdefIsMainWrapper :: AnMname -> Mname -> Bool
 vdefIsMainWrapper enclosing defining = 
    enclosing == mainMname && defining == wrapperMainAnMname
 
-checkExpr :: AnMname -> Menv -> [Tdef] -> Venv -> Tvenv 
+checkExpr :: AnMname -> Menv -> Tcenv -> Cenv -> Venv -> Tvenv 
                -> Exp -> Ty
-checkExpr mn menv tdefs venv tvenv e = case runReaderT (do
-  (tcenv, cenv) <- mkTypeEnvs tdefs
+checkExpr mn menv _tcenv _cenv venv tvenv e = case runReaderT (do
+  --(tcenv, cenv) <- mkTypeEnvs tdefs
   -- Since the preprocessor calls checkExpr after code has been
   -- typechecked, we expect to find the external env in the Menv.
   case (elookup menv mn) of
      Just thisEnv ->
-       checkExp (tcenv, tvenv, cenv, (venv_ thisEnv), venv) e
+       checkExp ({-tcenv-}tcenv_ thisEnv, tvenv, {-cenv-}cenv_ thisEnv, (venv_ thisEnv), venv) e
      Nothing -> reportError e ("checkExpr: Environment for " ++ 
                   show mn ++ " not found")) (mn,menv) of
          OkC t -> t
          FailC s -> reportError e s
 
-checkType :: AnMname -> Menv -> [Tdef] -> Tvenv -> Ty -> Kind
-checkType mn menv tdefs tvenv t = case runReaderT (do
-  (tcenv, _) <- mkTypeEnvs tdefs
-  checkTy (tcenv, tvenv) t) (mn, menv) of
+checkType :: AnMname -> Menv -> Tcenv -> Tvenv -> Ty -> Kind
+checkType mn menv _tcenv tvenv t = 
+ case runReaderT (checkTy (tcenv_ (fromMaybe (error "checkType") (elookup menv mn)), tvenv) t) (mn, menv) of
       OkC k -> k
-      FailC s -> reportError tvenv s
+      FailC s -> reportError tvenv (s ++ "\n " ++ show menv ++ "\n mname =" ++ show mn)
 
 checkExp :: (Tcenv,Tvenv,Cenv,Venv,Venv) -> Exp -> CheckResult Ty
 checkExp (tcenv,tvenv,cenv,e_venv,l_venv) = ch

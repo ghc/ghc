@@ -44,7 +44,7 @@ build_primitive_sources f pd lbi uhs x
           primEnvExists <- doesFileExist primhs
           genprimopcodeExists <- doesFileExist genprimopcode
           primopsExists <- doesFileExist primops
-          unless (primEnvExists && !genprimopcodeExists && !primopsExists) do
+          unless (primEnvExists && not genprimopcodeExists && not primopsExists) $ do
              maybeExit $ system (genprimopcode ++ " --make-ext-core-source < "
                            ++ primops ++ " > " ++ primhs_tmp)
              maybeUpdateFile primhs_tmp primhs
