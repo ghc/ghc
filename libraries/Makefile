@@ -163,7 +163,7 @@ BOOTSTRAPPING_FLAGS = $(CABAL_GHC_FLAGS) -DCABAL_VERSION=$(CABAL_VERSION) -odir 
 boot: ifBuildable/ifBuildable cabal-bin bootstrapping.conf
 
 cabal-bin: cabal-bin.hs
-	mkdir $(HERE_ABS)/bootstrapping
+	mkdir bootstrapping
 	$(GHC) $(BOOTSTRAPPING_FLAGS) --make cabal-bin -o cabal-bin
 
 bootstrapping.conf: cabal-bin
