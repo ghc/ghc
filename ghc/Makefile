@@ -34,13 +34,15 @@ stage2 ::
 stage3 ::
 	$(MAKE) stage=3
 
-clean distclean::
-	-$(CABAL) clean --distpref dist-stage1
-	-$(CABAL) clean --distpref dist-stage2
-	-$(CABAL) clean --distpref dist-stage3
-	$(RM) -rf stage1-inplace
-	$(RM) -rf stage2-inplace
-	$(RM) -rf stage3-inplace
+ifeq "$(CLEAN_ALL_STAGES)" "YES"
+clean distclean:: clean.stage.1 clean.stage.2 clean.stage.3
+else
+clean distclean:: clean.stage.$(stage)
+endif
+
+clean.stage.%:
+	-$(CABAL) clean --distpref dist-stage$*
+	$(RM) -rf stage$*-inplace
 
 # XXX This should be defined somewhere more central
 INPLACE_DATA_DIR = $(FPTOOLS_TOP_ABS)/inplace-datadir
