@@ -19,12 +19,12 @@ boot all ::
 	test -e $(INPLACE_PKG_CONF) || echo "[]" > $(INPLACE_PKG_CONF)
 	touch $(INPLACE_FILE)
 
-INSTALL_DATAS += package.conf ghc-usage.txt ghci-usage.txt
+INSTALL_DATAS += ghc-usage.txt ghci-usage.txt
 
 # Since cleaning effectively uninstalls all the packages, we must 
 # remove the stamp files that the build system uses to avoid unnecessarily
-# re-installing packages.
-CLEAN_FILES += package.conf* stamp-pkg-conf*
+# re-installing the RTS
+CLEAN_FILES += stamp-pkg-conf-rts
 
 binary-dist:
 	for FILE in Makefile $(INSTALL_DATAS); do echo $(WHERE_AM_I)/$$FILE >> $(BIN_DIST_LIST); done

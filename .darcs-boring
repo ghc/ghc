@@ -227,7 +227,6 @@ package.conf.installed$
 ^driver/package.conf.inplace.old$
 ^driver/split/ghc-split$
 ^driver/split/ghc-split.prl$
-^driver/stamp-pkg-conf-ghc$
 ^driver/stamp-pkg-conf-rts$
 ^includes/DerivedConstants.h$
 ^includes/GHCConstants.h$
