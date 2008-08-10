@@ -76,7 +76,7 @@ $(ALL_TARGET) docs runtests $(BOOT_TARGET) TAGS clean distclean mostlyclean main
 	  echo "== $(MAKE) $@ $(MFLAGS);"; \
 	  echo " in $(shell pwd)/$$i"; \
 	  echo "------------------------------------------------------------------------"; \
-	  $(MAKE) --no-print-directory -C $$i $(MFLAGS) $@; \
+	  $(MAKE) --no-print-directory -C $$i $(MFLAGS) $@ CLEAN_ALL_STAGES=YES; \
 	  if [ $$? -eq 0 -o $$x_on_err -eq 0 ]; \
 	      then echo "Finished making $@ in $$i": $$?; \
 	      else echo "Failed making $@ in $$i": $$?; exit 1; \

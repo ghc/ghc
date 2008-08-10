@@ -56,18 +56,22 @@ stage3 ::
 	$(MAKE) stage=3
 
 clean distclean::
-	-$(CABAL) clean --distpref dist-stage1
-	-$(CABAL) clean --distpref dist-stage2
-	-$(CABAL) clean --distpref dist-stage3
-	$(RM) -f Makefile-stage1
-	$(RM) -f Makefile-stage2
-	$(RM) -f Makefile-stage3
 	$(RM) -f prelude/primops.txt
 	$(RM) -f $(PRIMOP_BITS)
 	$(RM) -f $(CONFIG_HS)
 	$(RM) -f parser/Parser.y
 	$(RM) -rf stage1 stage2plus
 	$(RM) -f $(STAGE3_PACKAGE_CONF)
+
+ifeq "$(CLEAN_ALL_STAGES)" "YES"
+clean distclean:: clean.stage.1 clean.stage.2 clean.stage.3
+else
+clean distclean:: clean.stage.$(stage)
+endif
+
+clean.stage.%:
+	-$(CABAL) clean --distpref dist-stage$*
+	$(RM) -f Makefile-stage$*
 
 CONFIGURE_FLAGS_STAGE1 += --flags=stage1
 CONFIGURE_FLAGS_STAGE2 += --flags=-stage1
