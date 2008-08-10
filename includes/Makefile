@@ -177,10 +177,8 @@ endif
 #
 INSTALL_HEADERS += $(H_FILES) $(H_CONFIG) $(H_PLATFORM)
 
-binary-dist:
-	$(INSTALL_DIR)                     $(BIN_DIST_DIR)/includes
-	$(INSTALL_DATA) Makefile           $(BIN_DIST_DIR)/includes/
-	$(INSTALL_DATA) $(INSTALL_HEADERS) $(BIN_DIST_DIR)/includes/
+BINDIST_EXTRAS += $(INSTALL_HEADERS)
+include $(TOP)/mk/bindist.mk
 
 #
 # `make clean' settings:

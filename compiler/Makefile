@@ -435,10 +435,14 @@ primop-primop-info.hs-incl: prelude/primops.txt
 primop-usage.hs-incl: prelude/primops.txt
 	$(GENPRIMOP) --usage              < $< > $@
 
-# XXX:
 #-----------------------------------------------------------------------------
 # binary-dist
 #
+
+# XXX This is just broken, currently
+binary-dist:
+	@:
+
 #binary-dist:
 #	$(INSTALL_DIR)                         $(BIN_DIST_DIR)/compiler
 #	$(INSTALL_DIR)                         $(BIN_DIST_DIR)/compiler/stage$(stage)

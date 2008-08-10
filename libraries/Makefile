@@ -371,33 +371,20 @@ install.library.%: ifBuildable/ifBuildable
 
 BIN_DIST_LIBDIR=$(BIN_DIST_DIR)/libraries
 
-binary-dist: $(foreach SUBDIR,$(SUBDIRS),binary-dist.library.$(SUBDIR))
-	mkdir                               $(BIN_DIST_LIBDIR)/ifBuildable
-	cp 	  ifBuildable/ifBuildable       $(BIN_DIST_LIBDIR)/ifBuildable
-	cp    Makefile                      $(BIN_DIST_LIBDIR)
+BINDIST_EXTRAS += ifBuildable/ifBuildable
 ifeq "$(HADDOCK_DOCS)" "YES"
-	cp    gen_contents_index            $(BIN_DIST_LIBDIR)
-	cp    index.html                    $(BIN_DIST_LIBDIR)
-	cp    doc-index*.html               $(BIN_DIST_LIBDIR)
+BINDIST_EXTRAS += gen_contents_index
+BINDIST_EXTRAS += index.html
+BINDIST_EXTRAS += doc-index*.html
 endif
-	cp -pR stamp                         $(BIN_DIST_LIBDIR)
+binary-dist: $(foreach SUBDIR,$(SUBDIRS),binary-dist.library.$(SUBDIR))
+# This is a bit of a hack, but it works...
+	echo $(WHERE_AM_I)/Makefile >> $(BIN_DIST_LIST)
 
 $(foreach SUBDIR,$(SUBDIRS),binary-dist.library.$(SUBDIR)): \
 binary-dist.library.%:
 	if $(IFBUILDABLE) $*; then \
-	  $(MKDIRHIER) $(BIN_DIST_LIBDIR)/$*; \
-	  cd $* && \
-	  cp    $*.cabal      $(BIN_DIST_LIBDIR)/$* && \
-	  cp    LICENSE       $(BIN_DIST_LIBDIR)/$* && \
-	  cp -R dist          $(BIN_DIST_LIBDIR)/$* && \
-	  $(FIND) . -name "*.buildinfo" -exec cp {} $(BIN_DIST_LIBDIR)/$* \; && \
-	  $(FIND) . -name unbuildable -exec cp {} $(BIN_DIST_LIBDIR)/$* \; && \
-	  (cp -RL include      $(BIN_DIST_LIBDIR)/$* || true) && \
-	  $(FIND) $(BIN_DIST_LIBDIR)/$*/dist \
-	     \( -name "*_split" -o -name "autogen" \) | xargs rm -rf && \
-	  $(FIND) $(BIN_DIST_LIBDIR)/$*/dist \
-	     \( \( -name "*.o" -o -name "*.p_o" \) -a ! -name "HS*" \) \
-	     -exec rm {} \; ; \
+	  $(MAKE) -C $* -f Makefile.local binary-dist BINDIST_EXTRAS="$*.cabal LICENSE $*.buildinfo unbuildable" WHERE_AM_I=$(WHERE_AM_I)/$*; \
 	fi
 
 # Ignore some doc targets that we don't support

@@ -1,5 +1,6 @@
 
 include $(TOP)/mk/cabal-flags.mk
+include $(TOP)/mk/bindist.mk
 
 # XXX We would like to turn this on, but Cabal generates paths files
 #     that are not -Wall clean!
@@ -59,6 +60,4 @@ distclean:
 ifneq "$(EXTRA_CLEAN)" ""
 	$(RM) -f $(EXTRA_CLEAN)
 endif
-
-# XXX fix binary-dist
 

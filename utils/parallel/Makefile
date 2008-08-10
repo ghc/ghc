@@ -48,12 +48,8 @@ $(BASH_INSTALLERS): install.bash.%:
 	cat $*.bash      >> $(bindir)/$*
 	$(EXECUTABLE_FILE)  $(bindir)/$*
 
-binary-dist:
-	$(INSTALL_DIR)                                   $(BIN_DIST_DIR)/utils/parallel
-	$(INSTALL_DATA) Makefile                         $(BIN_DIST_DIR)/utils/parallel/
-ifeq "$(INSTALL_PARALLEL_SCRIPTS)" "YES"
-	$(INSTALL_DATA) $(addsuffix .pl,$(PERL_PROGS))   $(BIN_DIST_DIR)/utils/parallel/
-	$(INSTALL_DATA) $(addsuffix .bash,$(BASH_PROGS)) $(BIN_DIST_DIR)/utils/parallel/
-endif
+BINDIST_EXTRAS += $(addsuffix .pl,$(PERL_PROGS))
+BINDIST_EXTRAS += $(addsuffix .bash,$(BASH_PROGS))
+include $(TOP)/mk/bindist.mk
 
 include $(TOP)/mk/target.mk

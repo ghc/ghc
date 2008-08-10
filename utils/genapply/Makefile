@@ -27,4 +27,7 @@ GenApply.o : $(GHC_INCLUDE_DIR)/ghcconfig.h
 GenApply.o : $(GHC_INCLUDE_DIR)/MachRegs.h
 GenApply.o : $(GHC_INCLUDE_DIR)/Constants.h
 
+binary-dist:
+	@:
+
 include $(TOP)/mk/target.mk

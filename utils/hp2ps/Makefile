@@ -14,9 +14,7 @@ LIBS	     = $(LIBM)
 
 CLEAN_FILES += $(C_OBJS) $(C_PROG)
 
-binary-dist:
-	$(INSTALL_DIR)               $(BIN_DIST_DIR)/utils/hp2ps
-	$(INSTALL_DATA)    Makefile  $(BIN_DIST_DIR)/utils/hp2ps/
-	$(INSTALL_PROGRAM) $(C_PROG) $(BIN_DIST_DIR)/utils/hp2ps/
+BINDIST_EXTRAS += $(C_PROG)
+include $(TOP)/mk/bindist.mk
 
 include $(TOP)/mk/target.mk

@@ -11,9 +11,7 @@ all::
 	cat $(PROG).sh                                 >> $(PROG)
 	$(EXECUTABLE_FILE) $(PROG)
 
-binary-dist:
-	$(INSTALL_DIR)             $(BIN_DIST_DIR)/utils/mkdirhier
-	$(INSTALL_DATA)   Makefile $(BIN_DIST_DIR)/utils/mkdirhier/
-	$(INSTALL_SCRIPT) $(PROG)  $(BIN_DIST_DIR)/utils/mkdirhier/
+BINDIST_EXTRAS += $(PROG)
+include $(TOP)/mk/bindist.mk
 
 include $(TOP)/mk/target.mk

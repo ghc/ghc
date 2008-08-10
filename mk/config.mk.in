@@ -535,10 +535,15 @@ endif
 # On Windows this is a c:/foo/bar style path.
 FPTOOLS_TOP_ABS		= @hardtop@
 
-BIN_DIST_NAME=ghc-$(ProjectVersion)
 BIN_DIST_TOPDIR_ABS=$(FPTOOLS_TOP_ABS)
 BIN_DIST_DIR=$(BIN_DIST_TOPDIR_ABS)/$(BIN_DIST_NAME)
-BIN_DIST_TARBALL=$(FPTOOLS_TOP_ABS)/$(BIN_DIST_NAME)-$(TARGETPLATFORM).tar.bz2
+
+BIN_DIST_NAME=ghc-$(ProjectVersion)
+BIN_DIST_TAR=$(FPTOOLS_TOP_ABS)/$(BIN_DIST_NAME)-$(TARGETPLATFORM).tar
+BIN_DIST_TAR_BZ2=$(BIN_DIST_TAR).bz2
+BIN_DIST_PREP_DIR=$(FPTOOLS_TOP_ABS)/bindist-prep
+BIN_DIST_PREP=$(BIN_DIST_PREP_DIR)/$(BIN_DIST_NAME)
+BIN_DIST_LIST=$(FPTOOLS_TOP_ABS)/bindist-list
 
 # Definition of installation directories, we don't use half of these, but since
 # the configure script has them on offer while passing through, we might as well

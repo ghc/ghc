@@ -114,21 +114,9 @@ endif
 
 include $(TOP)/mk/target.mk
 
-binary-dist:
-	$(INSTALL_DIR)                         $(BIN_DIST_DIR)/gmp
-	$(INSTALL_DATA)    Makefile            $(BIN_DIST_DIR)/gmp/
-ifneq "$(HaveLibGmp)" "YES"
- ifneq "$(HaveFrameworkGMP)" "YES"
-	$(INSTALL_DATA)    $(BINDIST_STAMPS)   $(BIN_DIST_DIR)/gmp/
-  ifneq "$(INSTALL_PROGS)" ""
-	$(INSTALL_DATA)    $(INSTALL_PROGS)    $(BIN_DIST_DIR)/gmp/
-  endif
-  ifneq "$(INSTALL_LIBS)" ""
-	$(INSTALL_DATA)    $(INSTALL_LIBS)     $(BIN_DIST_DIR)/gmp/
-  endif
-  ifneq "$(INSTALL_HEADERS)" ""
-	$(INSTALL_HEADER)  $(INSTALL_HEADERS)  $(BIN_DIST_DIR)/gmp/
-  endif
- endif
-endif
+BINDIST_EXTRAS += $(BINDIST_STAMPS)
+BINDIST_EXTRAS += $(INSTALL_PROGS)
+BINDIST_EXTRAS += $(INSTALL_LIBS)
+BINDIST_EXTRAS += $(INSTALL_HEADERS)
+include $(TOP)/mk/bindist.mk
 

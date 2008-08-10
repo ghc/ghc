@@ -28,6 +28,9 @@ distclean: clean
 
 maintainer-clean: distclean
 
+binary-dist:
+	@:
+
 # dummy targets
 all:
 boot:

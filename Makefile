@@ -307,90 +307,99 @@ binary-dist::
 
 else
 
-BinDistDirs = includes compiler docs rts
+.PHONY: binary-dist
 
-BIN_DIST_TOP= distrib/Makefile \
-              distrib/configure-bin.ac \
-              distrib/INSTALL \
-              distrib/README \
-              ANNOUNCE \
-              LICENSE \
-              install-sh \
-              extra-gcc-opts.in \
-              config.guess \
-              config.sub   \
-              aclocal.m4
+BIN_DIST_VARFILE=$(BIN_DIST_PREP)/Makefile-vars.in
 
+WHERE_AM_I = $(BIN_DIST_NAME)
+
+binary-dist::
+# For the most part we will be putting filenames in $(BIN_DIST_LIST),
+# and telling tar to tar all of those files up. So to start with we
+# remove $(BIN_DIST_LIST) so that we can start with an empty slate
+	$(RM) -f $(BIN_DIST_LIST)
+# Now we add a few files from mk/ to $(BIN_DIST_LIST)
+	echo $(WHERE_AM_I)/mk/package.mk     >> $(BIN_DIST_LIST)
+	echo $(WHERE_AM_I)/mk/install.mk     >> $(BIN_DIST_LIST)
+	echo $(WHERE_AM_I)/mk/recurse.mk     >> $(BIN_DIST_LIST)
+	echo $(WHERE_AM_I)/mk/cabal.mk       >> $(BIN_DIST_LIST)
+	echo $(WHERE_AM_I)/mk/cabal-flags.mk >> $(BIN_DIST_LIST)
+	echo $(WHERE_AM_I)/mk/fptools.css    >> $(BIN_DIST_LIST)
+	echo $(WHERE_AM_I)/ANNOUNCE          >> $(BIN_DIST_LIST)
+	echo $(WHERE_AM_I)/LICENSE           >> $(BIN_DIST_LIST)
+	echo $(WHERE_AM_I)/install-sh        >> $(BIN_DIST_LIST)
+	echo $(WHERE_AM_I)/extra-gcc-opts.in >> $(BIN_DIST_LIST)
+	echo $(WHERE_AM_I)/config.guess      >> $(BIN_DIST_LIST)
+	echo $(WHERE_AM_I)/config.sub        >> $(BIN_DIST_LIST)
+# Now we recurse into various subdirectories and tell them to add and
+# files that they want into $(BIN_DIST_LIST)
+# XXX Ug, this duplication of "-C foo WHERE_AM_I=.../foo" isn't nice.
+	$(MAKE) -C gmp                 binary-dist WHERE_AM_I=$(WHERE_AM_I)/gmp
+	$(MAKE) -C includes            binary-dist WHERE_AM_I=$(WHERE_AM_I)/includes
+	$(MAKE) -C compiler            binary-dist WHERE_AM_I=$(WHERE_AM_I)/compiler $(INSTALL_STAGE)
+	$(MAKE) -C rts                 binary-dist WHERE_AM_I=$(WHERE_AM_I)/rts
+	$(MAKE) -C driver              binary-dist WHERE_AM_I=$(WHERE_AM_I)/driver
+	$(MAKE) -C utils               binary-dist WHERE_AM_I=$(WHERE_AM_I)/utils
+	$(MAKE) -C docs                binary-dist WHERE_AM_I=$(WHERE_AM_I)/docs
+	$(MAKE) -C libraries           binary-dist WHERE_AM_I=$(WHERE_AM_I)/libraries
+	$(MAKE) -C libraries/Cabal/doc binary-dist WHERE_AM_I=$(WHERE_AM_I)/libraries/Cabal/doc
+# Now thinks get messier. Some files we need to move around, rename or
+# generate. We do this under $(BIN_DIST_PREP).
+	$(RM) -rf    $(BIN_DIST_PREP_DIR)
+	$(MKDIRHIER) $(BIN_DIST_PREP)/utils/pwd
+	cp utils/pwd/dist-install/build/pwd/pwd $(BIN_DIST_PREP)/utils/pwd
+	$(MKDIRHIER) $(BIN_DIST_PREP)/mk
+	echo 'include $$(TOP)/Makefile-vars' >  $(BIN_DIST_PREP)/mk/boilerplate.mk
+	echo 'include $$(TOP)/mk/package.mk' >  $(BIN_DIST_PREP)/mk/target.mk
+	echo 'include $$(TOP)/mk/install.mk' >> $(BIN_DIST_PREP)/mk/target.mk
+	echo 'include $$(TOP)/mk/recurse.mk' >> $(BIN_DIST_PREP)/mk/target.mk
+	touch                                   $(BIN_DIST_PREP)/mk/bindist.mk
 ifeq "$(darwin_TARGET_OS)" "1"
-BIN_DIST_TOP+=mk/fix_install_names.sh
+	cp mk/fix_install_names.sh $(BIN_DIST_PREP)/mk
 endif
 
-.PHONY: binary-dist-pre% binary-dist
+	cp distrib/Makefile         $(BIN_DIST_PREP)
+	cp distrib/INSTALL          $(BIN_DIST_PREP)
+	cp distrib/README           $(BIN_DIST_PREP)
+	cp distrib/configure-bin.ac $(BIN_DIST_PREP)/configure.ac
+# We can't just list aclocal.m4 in $(BIN_DIST_LIST), as it needs to be
+# next to configure.ac when we run autoreconf
+	cp aclocal.m4               $(BIN_DIST_PREP)
+	cd $(BIN_DIST_PREP) && autoreconf
 
-binary-dist:: binary-dist-pre
+	echo "package = ghc"                              >> $(BIN_DIST_VARFILE)
+	echo "version = $(ProjectVersion)"                >> $(BIN_DIST_VARFILE)
+	echo "ProjectVersion = $(ProjectVersion)"         >> $(BIN_DIST_VARFILE)
+	echo "HaveLibGmp = $(HaveLibGmp)"                 >> $(BIN_DIST_VARFILE)
+	echo "GhcLibsWithUnix = $(GhcLibsWithUnix)"       >> $(BIN_DIST_VARFILE)
+	echo "GhcWithInterpreter = $(GhcWithInterpreter)" >> $(BIN_DIST_VARFILE)
+	echo "GhcHasEditline = $(GhcHasEditline)"         >> $(BIN_DIST_VARFILE)
+	echo "BootingFromHc = $(BootingFromHc)"           >> $(BIN_DIST_VARFILE)
+	echo "XMLDocWays = $(XMLDocWays)"                 >> $(BIN_DIST_VARFILE)
+# We won't actually use xsltproc, but we need to know if it's "" or not
+	echo "XSLTPROC = $(XSLTPROC)"                     >> $(BIN_DIST_VARFILE)
+	echo "TARGETPLATFORM = $(TARGETPLATFORM)"         >> $(BIN_DIST_VARFILE)
+	echo "HADDOCK_DOCS = $(HADDOCK_DOCS)"             >> $(BIN_DIST_VARFILE)
+	cat distrib/Makefile-bin-vars.in                  >> $(BIN_DIST_VARFILE)
 
-binary-dist-pre::
-	$(MKDIRHIER) $(BIN_DIST_DIR)/mk
-	echo 'include $$(TOP)/Makefile-vars' >  $(BIN_DIST_DIR)/mk/boilerplate.mk
-	echo 'include $$(TOP)/mk/package.mk' >  $(BIN_DIST_DIR)/mk/target.mk
-	echo 'include $$(TOP)/mk/install.mk' >> $(BIN_DIST_DIR)/mk/target.mk
-	echo 'include $$(TOP)/mk/recurse.mk' >> $(BIN_DIST_DIR)/mk/target.mk
-	cp mk/package.mk $(BIN_DIST_DIR)/mk/
-	cp mk/install.mk $(BIN_DIST_DIR)/mk/
-	cp mk/recurse.mk $(BIN_DIST_DIR)/mk/
-	cp mk/fptools.css $(BIN_DIST_DIR)/mk/
-	$(MKDIRHIER) $(BIN_DIST_DIR)/lib/$(TARGETPLATFORM)
-	$(MKDIRHIER) $(BIN_DIST_DIR)/share
+# With that done, we can now build the actual tarball
 
-binary-dist::
-	$(MAKE) -C gmp       binary-dist DOING_BIN_DIST=YES
-	$(MAKE) -C includes  binary-dist DOING_BIN_DIST=YES
-	$(MAKE) -C compiler  binary-dist DOING_BIN_DIST=YES $(INSTALL_STAGE)
-	$(MAKE) -C rts       binary-dist DOING_BIN_DIST=YES
-	$(MAKE) -C driver    binary-dist DOING_BIN_DIST=YES
-	$(MAKE) -C utils     binary-dist DOING_BIN_DIST=YES
-	$(MAKE) -C docs      binary-dist DOING_BIN_DIST=YES
-	$(MAKE) -C libraries binary-dist DOING_BIN_DIST=YES
-	$(MAKE) -C libraries/Cabal/doc binary-dist DOING_BIN_DIST=YES
-
-VARFILE=$(BIN_DIST_DIR)/Makefile-vars.in
-
-binary-dist::
-	@for i in $(BIN_DIST_TOP); do \
-	  if test -f "$$i"; then \
-	     echo cp $$i $(BIN_DIST_DIR); \
-	     cp $$i $(BIN_DIST_DIR); \
-	  fi; \
-	done;
-	@echo "Configuring the Makefile for this project..."
-	echo                                                         >  $(VARFILE)
-	echo "package = ghc"                                         >> $(VARFILE)
-	echo "version = $(ProjectVersion)"                           >> $(VARFILE)
-	echo "ProjectVersion = $(ProjectVersion)"                    >> $(VARFILE)
-	echo "HaveLibGmp = $(HaveLibGmp)"                            >> $(VARFILE)
-	echo "GhcLibsWithUnix = $(GhcLibsWithUnix)"                  >> $(VARFILE)
-	echo "GhcWithInterpreter = $(GhcWithInterpreter)"            >> $(VARFILE)
-	echo "GhcHasEditline = $(GhcHasEditline)"                    >> $(VARFILE)
-	echo "BootingFromHc = $(BootingFromHc)"                      >> $(VARFILE)
-	echo "XMLDocWays = $(XMLDocWays)"                            >> $(VARFILE)
-	# We won't actually use xsltproc, but we need to know if it's "" or not
-	echo "XSLTPROC = $(XSLTPROC)"                                >> $(VARFILE)
-	echo "TARGETPLATFORM = $(TARGETPLATFORM)"                    >> $(VARFILE)
-	echo "HADDOCK_DOCS = $(HADDOCK_DOCS)"                        >> $(VARFILE)
-
-	cat distrib/Makefile-bin-vars.in                             >> $(VARFILE)
-	@echo "Generating a shippable configure script.."
-	$(MV) $(BIN_DIST_DIR)/configure-bin.ac $(BIN_DIST_DIR)/configure.ac
-	( cd $(BIN_DIST_DIR); autoreconf )
+	$(RM) -f $(BIN_DIST_NAME)
+	ln -s . $(BIN_DIST_NAME)
+	tar cf $(BIN_DIST_TAR) -T $(BIN_DIST_LIST)
+	cd $(BIN_DIST_PREP_DIR) && tar rf $(BIN_DIST_TAR) $(BIN_DIST_NAME)
+	bzip2 < $(BIN_DIST_TAR) > $(BIN_DIST_TAR_BZ2)
+	tar tf $(BIN_DIST_TAR) | sort > bin-manifest-$(ProjectVersion)
 endif
 
-# Tar up the distribution and build a manifest
-binary-dist :: tar-binary-dist
-
-.PHONY: tar-binary-dist
-tar-binary-dist:
-	( cd $(BIN_DIST_TOPDIR_ABS); tar cf - $(BIN_DIST_NAME) | bzip2 >$(BIN_DIST_TARBALL) )
-	( cd $(BIN_DIST_TOPDIR_ABS); bunzip2 -c $(BIN_DIST_TARBALL) | tar tf - | sed "s/^ghc-$(ProjectVersion)/fptools/" | sort >$(FPTOOLS_TOP_ABS)/bin-manifest-$(ProjectVersion) )
+# XXX Presumably we still need to do this for Windows?
+## Tar up the distribution and build a manifest
+#binary-dist :: tar-binary-dist
+#
+#.PHONY: tar-binary-dist
+#tar-binary-dist:
+#	( cd $(BIN_DIST_TOPDIR_ABS); tar cf - $(BIN_DIST_NAME) | bzip2 >$(BIN_DIST_TARBALL) )
+#	( cd $(BIN_DIST_TOPDIR_ABS); bunzip2 -c $(BIN_DIST_TARBALL) | tar tf - | sed "s/^ghc-$(ProjectVersion)/fptools/" | sort >$(FPTOOLS_TOP_ABS)/bin-manifest-$(ProjectVersion) )
 
 PUBLISH_FILES = $(BIN_DIST_TARBALL)
 

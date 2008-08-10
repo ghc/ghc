@@ -33,3 +33,6 @@ endif
 # Now add flags from the GHC build system to the Cabal build:
 GHC_OPTS    += $(SRC_HC_OPTS)
 GHC_OPTS    += $(GhcLibHcOpts)
+
+include $(TOP)/mk/bindist.mk
+

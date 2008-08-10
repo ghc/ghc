@@ -20,9 +20,7 @@ ifeq "$(BootingFromHc)" "YES"
 boot :: all
 endif
 
-binary-dist:
-	$(INSTALL_DIR)             $(BIN_DIST_DIR)/driver/mangler
-	$(INSTALL_DATA)   Makefile $(BIN_DIST_DIR)/driver/mangler/
-	$(INSTALL_SCRIPT) $(PROG)  $(BIN_DIST_DIR)/driver/mangler/
+BINDIST_EXTRAS += $(PROG)
+include $(TOP)/mk/bindist.mk
 
 include $(TOP)/mk/target.mk

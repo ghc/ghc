@@ -42,11 +42,6 @@ endif
 #  unlikely to want it desperately.  It is easy to build once you have
 #  a Haskell compiler and if you want it.
 
-binary-dist:
-	$(INSTALL_DIR)           $(BIN_DIST_DIR)/utils
-	$(INSTALL_DATA) Makefile $(BIN_DIST_DIR)/utils/
-	set -e; for d in $(SUBDIRS); do $(MAKE) -C $$d binary-dist; done
-
 include $(TOP)/mk/target.mk
 
 # genprimopcode is needed to boot in ghc/compiler...
@@ -57,13 +52,17 @@ endif
 
 WITH_BOOTSTRAPPING_COMPILER = installPackage ghc-pkg hsc2hs hpc
 
-WITH_STAGE1 = installPackage ghc-pkg hasktags runghc hpc
+WITH_STAGE1 = installPackage ghc-pkg hasktags runghc hpc pwd
 ifneq "$(NO_INSTALL_HSC2HS)" "YES"
 WITH_STAGE1 += hsc2hs
 endif
 
 # sort removes duplicates - we don't actually care about the order
 WITH_EITHER = $(sort $(WITH_BOOTSTRAPPING_COMPILER) $(WITH_STAGE1))
+
+binary-dist: $(foreach P,$(WITH_STAGE1),binary-dist.$P)
+	echo $(WHERE_AM_I)/Makefile >> $(BIN_DIST_LIST)
+	set -e; for d in $(SUBDIRS); do $(MAKE) -C $$d binary-dist WHERE_AM_I=$(WHERE_AM_I)/$$d; done
 
 clean distclean:: $(foreach P,$(WITH_EITHER),clean.$P)
 
@@ -89,4 +88,8 @@ with-stage-1.%:
 $(foreach P,$(WITH_STAGE1),install.$P): \
 install.%:
 	$(MAKE) -C $* install
+
+$(foreach P,$(WITH_STAGE1),binary-dist.$P): \
+binary-dist.%:
+	$(MAKE) -C $* binary-dist WHERE_AM_I=$(WHERE_AM_I)/$*
 

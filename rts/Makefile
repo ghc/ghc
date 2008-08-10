@@ -468,13 +468,8 @@ endif
 #
 # binary-dist
 
-binary-dist:
-	$(INSTALL_DIR)                         $(BIN_DIST_DIR)/rts
-	$(INSTALL_DATA)    Makefile            $(BIN_DIST_DIR)/rts/
-	$(INSTALL_DATA)    package.conf.in     $(BIN_DIST_DIR)/rts/
-ifneq "$(INSTALL_LIBS)" ""
-	$(INSTALL_DATA)    $(INSTALL_LIBS)     $(BIN_DIST_DIR)/rts/
-endif
-ifneq "$(INSTALL_LIBEXECS)" ""
-	$(INSTALL_PROGRAM) $(INSTALL_LIBEXECS) $(BIN_DIST_DIR)/rts/
-endif
+BINDIST_EXTRAS += package.conf.in
+BINDIST_EXTRAS += $(INSTALL_LIBS)
+BINDIST_EXTRAS += $(INSTALL_LIBEXECS)
+include $(TOP)/mk/bindist.mk
+

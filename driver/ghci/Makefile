@@ -53,8 +53,6 @@ ghci.res : ghci.rc ghci.ico
 	windres --preprocessor="$(CPP) -xc -DRC_INVOKED" -o ghci.res -i ghci.rc -O coff
 endif
 
-binary-dist:
-	$(INSTALL_DIR)           $(BIN_DIST_DIR)/driver/ghci
-	$(INSTALL_DATA) Makefile $(BIN_DIST_DIR)/driver/ghci/
+include $(TOP)/mk/bindist.mk
 
 include $(TOP)/mk/target.mk

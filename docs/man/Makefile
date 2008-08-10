@@ -45,11 +45,7 @@ install-docs:: $(MAN_PAGE).$(MAN_SECTION)
 
 endif
 
-binary-dist:: $(MAN_PAGE).$(MAN_SECTION)
-	$(MKDIRHIER) $(BIN_DIST_DIR)/docs/man
-	cp Makefile                   $(BIN_DIST_DIR)/docs/man/
-ifneq "$(strip $(XSLTPROC))" ""
-	cp $(MAN_PAGE).$(MAN_SECTION) $(BIN_DIST_DIR)/docs/man/
-endif
+BINDIST_EXTRAS += $(MAN_PAGE).$(MAN_SECTION)
+include $(TOP)/mk/bindist.mk
 
 include $(TOP)/mk/target.mk

@@ -23,8 +23,6 @@ endif
 
 # -----------------------------------------------------------------------------
 
-binary-dist:
-	$(INSTALL_DIR)           $(BIN_DIST_DIR)/driver/ghc
-	$(INSTALL_DATA) Makefile $(BIN_DIST_DIR)/driver/ghc/
+include $(TOP)/mk/bindist.mk
 
 include $(TOP)/mk/target.mk

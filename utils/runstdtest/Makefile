@@ -12,4 +12,7 @@ all::
 	cat $(PROG).prl                                >> $(PROG)
 	$(EXECUTABLE_FILE) $(PROG)
 
+binary-dist:
+	@:
+
 include $(TOP)/mk/target.mk

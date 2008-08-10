@@ -28,9 +28,7 @@ INSTALL_DATAS += package.conf ghc-usage.txt ghci-usage.txt
 CLEAN_FILES += package.conf* stamp-pkg-conf*
 
 binary-dist:
-	$(INSTALL_DIR)                   $(BIN_DIST_DIR)/driver
-	$(INSTALL_DATA) Makefile         $(BIN_DIST_DIR)/driver
-	$(INSTALL_DATA) $(INSTALL_DATAS) $(BIN_DIST_DIR)/driver
-	set -e; for d in $(SUBDIRS); do $(MAKE) -C $$d binary-dist; done
+	for FILE in Makefile $(INSTALL_DATAS); do echo $(WHERE_AM_I)/$$FILE >> $(BIN_DIST_LIST); done
+	set -e; for d in $(SUBDIRS); do $(MAKE) -C $$d binary-dist WHERE_AM_I=$(WHERE_AM_I)/$$d; done
 
 include $(TOP)/mk/target.mk

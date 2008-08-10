@@ -6,21 +6,20 @@ ifneq "$(DOING_BIN_DIST)" "YES"
 SUBDIRS += ext-core storage-mgt
 endif
 
-PAGES = index.html
+PAGE = index.html
 
-install-docs :: $(PAGES)
-	$(INSTALL_DIR) 							 $(DESTDIR)$(htmldir)
-	$(INSTALL_DATA) $(INSTALL_OPTS) $(PAGES) $(DESTDIR)$(htmldir)
+install-docs :: $(PAGE)
+	$(INSTALL_DIR)                          $(DESTDIR)$(htmldir)
+	$(INSTALL_DATA) $(INSTALL_OPTS) $(PAGE) $(DESTDIR)$(htmldir)
 
 .PHONY: binary-dist binary-dist.doc.%
 
 binary-dist: $(foreach SUBDIR,$(SUBDIRS),binary-dist.doc.$(SUBDIR))
-	$(MKDIRHIER) $(BIN_DIST_DIR)/docs
-	cp Makefile $(BIN_DIST_DIR)/docs/
-	cp $(PAGES) $(BIN_DIST_DIR)/docs/
+	echo $(WHERE_AM_I)/Makefile >> $(BIN_DIST_LIST)
+	echo $(WHERE_AM_I)/$(PAGE)  >> $(BIN_DIST_LIST)
 
 $(foreach SUBDIR,$(SUBDIRS),binary-dist.doc.$(SUBDIR)): \
 binary-dist.doc.%:
-	$(MAKE) -C $* binary-dist
+	$(MAKE) -C $* binary-dist WHERE_AM_I=$(WHERE_AM_I)/$*
 
 include $(TOP)/mk/target.mk
