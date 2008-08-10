@@ -610,6 +610,9 @@ extraclean::
 	$(RM) -rf autom4te.cache
 
 clean distclean ::
+	$(RM) -rf inplace-datadir
+
+clean distclean ::
 	$(MAKE) -C bindisttest $@
 	if test -d testsuite; then $(MAKE) -C testsuite $@; fi
 
