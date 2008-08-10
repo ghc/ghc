@@ -1,0 +1,24 @@
+Name: pwd
+Version: 0.1
+Copyright: XXX
+License: BSD
+-- XXX License-File: LICENSE
+-- XXX Author:
+-- XXX Maintainer:
+Synopsis: XXX
+Description:
+	XXX
+build-type: Simple
+cabal-version: >=1.2
+
+Flag base3
+  Description: Choose the new smaller, split-up base package.
+
+Executable pwd
+    Main-Is: pwd.hs
+    if flag(base3)
+        Build-Depends: base       >= 3   && < 4,
+                       directory  >= 1   && < 1.1
+    else
+        Build-Depends: base < 3
+
