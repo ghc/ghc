@@ -1,3 +1,5 @@
+TOP = ../..
+
 #	General makefile for Latex stuff
 
 LATEX=latex \\nonstopmode \\input
@@ -28,8 +30,7 @@ distclean: clean
 
 maintainer-clean: distclean
 
-binary-dist:
-	@:
+include $(TOP)/mk/bindist.mk
 
 # dummy targets
 all:

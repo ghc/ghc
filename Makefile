@@ -337,6 +337,7 @@ binary-dist::
 	$(MAKE) -C gmp                 binary-dist WHERE_AM_I=$(WHERE_AM_I)/gmp
 	$(MAKE) -C includes            binary-dist WHERE_AM_I=$(WHERE_AM_I)/includes
 	$(MAKE) -C compiler            binary-dist WHERE_AM_I=$(WHERE_AM_I)/compiler $(INSTALL_STAGE)
+	$(MAKE) -C ghc                 binary-dist WHERE_AM_I=$(WHERE_AM_I)/ghc      $(INSTALL_STAGE)
 	$(MAKE) -C rts                 binary-dist WHERE_AM_I=$(WHERE_AM_I)/rts
 	$(MAKE) -C driver              binary-dist WHERE_AM_I=$(WHERE_AM_I)/driver
 	$(MAKE) -C utils               binary-dist WHERE_AM_I=$(WHERE_AM_I)/utils
@@ -346,8 +347,6 @@ binary-dist::
 # Now thinks get messier. Some files we need to move around, rename or
 # generate. We do this under $(BIN_DIST_PREP).
 	$(RM) -rf    $(BIN_DIST_PREP_DIR)
-	$(MKDIRHIER) $(BIN_DIST_PREP)/utils/pwd
-	cp utils/pwd/dist-install/build/pwd/pwd $(BIN_DIST_PREP)/utils/pwd
 	$(MKDIRHIER) $(BIN_DIST_PREP)/mk
 	echo 'include $$(TOP)/Makefile-vars' >  $(BIN_DIST_PREP)/mk/boilerplate.mk
 	echo 'include $$(TOP)/mk/package.mk' >  $(BIN_DIST_PREP)/mk/target.mk
@@ -366,6 +365,15 @@ endif
 # next to configure.ac when we run autoreconf
 	cp aclocal.m4               $(BIN_DIST_PREP)
 	cd $(BIN_DIST_PREP) && autoreconf
+# We need to copy the pwd program that was built with stage1 to where
+# the build system expects to find it, i.e. the location the pwd built
+# with the bootstrapping compiler normally occupies
+	$(MKDIRHIER) $(BIN_DIST_PREP)/utils/pwd
+	cp utils/pwd/dist-install/build/pwd/pwd $(BIN_DIST_PREP)/utils/pwd
+# And likewise the installPackage program
+	$(MKDIRHIER) $(BIN_DIST_PREP)/utils/installPackage/install-inplace/bin
+	cp utils/installPackage/dist-install/build/installPackage/installPackage \
+	   $(BIN_DIST_PREP)/utils/installPackage/install-inplace/bin
 
 	echo "package = ghc"                              >> $(BIN_DIST_VARFILE)
 	echo "version = $(ProjectVersion)"                >> $(BIN_DIST_VARFILE)
@@ -380,6 +388,7 @@ endif
 	echo "XSLTPROC = $(XSLTPROC)"                     >> $(BIN_DIST_VARFILE)
 	echo "TARGETPLATFORM = $(TARGETPLATFORM)"         >> $(BIN_DIST_VARFILE)
 	echo "HADDOCK_DOCS = $(HADDOCK_DOCS)"             >> $(BIN_DIST_VARFILE)
+	echo "INTEGER_LIBRARY = $(INTEGER_LIBRARY)"       >> $(BIN_DIST_VARFILE)
 	cat distrib/Makefile-bin-vars.in                  >> $(BIN_DIST_VARFILE)
 
 # With that done, we can now build the actual tarball

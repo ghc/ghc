@@ -439,25 +439,6 @@ primop-usage.hs-incl: prelude/primops.txt
 # binary-dist
 #
 
-# XXX This is just broken, currently
-binary-dist:
-	@:
-
-#binary-dist:
-#	$(INSTALL_DIR)                         $(BIN_DIST_DIR)/compiler
-#	$(INSTALL_DIR)                         $(BIN_DIST_DIR)/compiler/stage$(stage)
-#	echo "stage=$(stage)"                > $(BIN_DIST_DIR)/compiler/Makefile
-#	cat Makefile                        >> $(BIN_DIST_DIR)/compiler/Makefile
-#	$(INSTALL_DATA)    package.conf.in     $(BIN_DIST_DIR)/compiler/
-#	set -e; for d in stage$(stage)/*/; do $(INSTALL_DIR) $(BIN_DIST_DIR)/compiler/$$d; done
-#	set -e; for f in $(HS_IFACES); do $(INSTALL_DATA) $$f $(BIN_DIST_DIR)/compiler/$$f; done
-#ifneq "$(INSTALL_LIBS)" ""
-#	set -e; for f in $(INSTALL_LIBS); do $(INSTALL_DATA) $$f $(BIN_DIST_DIR)/compiler/$$f; done
-#endif
-#ifneq "$(INSTALL_PROGS)" ""
-#	set -e; for f in $(INSTALL_PROGS); do $(INSTALL_PROGRAM) $$f $(BIN_DIST_DIR)/compiler/$$f; done
-#endif
-#ifneq "$(INSTALL_LIBEXECS)" ""
-#	set -e; for f in $(INSTALL_LIBEXECS); do $(INSTALL_PROGRAM) $$f $(BIN_DIST_DIR)/compiler/$$f; done
-#endif
+include $(TOP)/mk/bindist.mk
+LIB_DIST_DIR = dist-stage$(stage)
 

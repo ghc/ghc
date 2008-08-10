@@ -7,7 +7,7 @@
 TOP=..
 include $(TOP)/mk/boilerplate.mk
 
-SUBDIRS = mangler split ghc ghci
+SUBDIRS = mangler split ghci
 
 INPLACE_DATA_DIR = $(FPTOOLS_TOP_ABS)/inplace-datadir
 INPLACE_PKG_CONF = $(INPLACE_DATA_DIR)/package.conf

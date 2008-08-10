@@ -119,6 +119,8 @@ ihtmldir            = $(htmldir)/libraries/$$pkg
 html_installed_root = $(htmldir)/libraries
 endif
 
+IFBUILDABLE=ifBuildable/ifBuildable $(FPTOOLS_TOP_ABS)/packages
+
 ifneq "$(DOING_BIN_DIST)" "YES"
 
 CONFIGURE_OPTS =
@@ -145,8 +147,6 @@ subdirs:
 	@echo $(SUBDIRS)
 
 HERE_ABS=$(FPTOOLS_TOP_ABS)/libraries
-
-IFBUILDABLE=ifBuildable/ifBuildable $(FPTOOLS_TOP_ABS)/packages
 
 CABAL_GHC_FLAGS = -Wall
 ifeq "$(ghc_ge_605)" "NO"
@@ -364,7 +364,7 @@ $(foreach SUBDIR,$(SUBDIRS),install.library.$(SUBDIR)): \
 install.library.%: ifBuildable/ifBuildable
 	if $(IFBUILDABLE) $*; then \
 	  cd $* && \
-	  $(INSTALL_PACKAGE) install '$(GHC_PKG_PROG)' '$(DESTDIR)$(libdir)/package.conf' '$(DESTDIR)' '$(prefix)' '$(iprefix)' '$(ibindir)' '$(ilibdir)' '$(ilibexecdir)' '$(idynlibdir)' '$(idatadir)' '$(idocdir)' '$(ihtmldir)' '$(ihaddockdir)' ; \
+	  $(INSTALL_PACKAGE) install '$(DESTDIR)$(bindir)/ghc-pkg' '$(DESTDIR)$(datadir)/package.conf' '$(DESTDIR)' '$(prefix)' '$(iprefix)' '$(ibindir)' '$(ilibdir)' '$(ilibexecdir)' '$(idynlibdir)' '$(idatadir)' '$(idocdir)' '$(ihtmldir)' '$(ihaddockdir)' ; \
 	fi
 
 .PHONY: binary-dist binary-dist.library.%
@@ -372,14 +372,16 @@ install.library.%: ifBuildable/ifBuildable
 BIN_DIST_LIBDIR=$(BIN_DIST_DIR)/libraries
 
 BINDIST_EXTRAS += ifBuildable/ifBuildable
-ifeq "$(HADDOCK_DOCS)" "YES"
-BINDIST_EXTRAS += gen_contents_index
-BINDIST_EXTRAS += index.html
-BINDIST_EXTRAS += doc-index*.html
-endif
 binary-dist: $(foreach SUBDIR,$(SUBDIRS),binary-dist.library.$(SUBDIR))
-# This is a bit of a hack, but it works...
 	echo $(WHERE_AM_I)/Makefile >> $(BIN_DIST_LIST)
+# XXX This needs to be changed: This ifBuildable is built with the
+# bootstrapping compiler, so isn't OS X friendly. It should be made into
+# a Cabal package if we keep it. However, once we drop extralibs we can
+# probably remove it anyway.
+	echo $(WHERE_AM_I)/ifBuildable/ifBuildable >> $(BIN_DIST_LIST)
+ifeq "$(HADDOCK_DOCS)" "YES"
+	for FILE in gen_contents_index index.html doc-index*.html; do echo $(WHERE_AM_I)/$$FILE >> $(BIN_DIST_LIST); done
+endif
 
 $(foreach SUBDIR,$(SUBDIRS),binary-dist.library.$(SUBDIR)): \
 binary-dist.library.%:

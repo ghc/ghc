@@ -119,16 +119,11 @@ build.stage.%:
 install:
 	$(INSTALL_PACKAGE) install UNUSED UNUSED '$(DESTDIR)' '$(prefix)' \
 	                   '$(prefix)' '$(bindir)' '$(libdir)'            \
-                       '$(libexecdir)' '$(dynlibdir)' '$(libdir)'     \
+                       '$(libexecdir)' '$(dynlibdir)' '$(datadir)'    \
                        '$(docdir)' '$(htmldir)' '$(haddockdir)'       \
 	                   --distpref dist-stage2                         \
 	                   $(INSTALL_FLAGS)
 
-# XXX fix:
-#binary-dist:
-#	$(INSTALL_DIR)                      $(BIN_DIST_DIR)/utils/hsc2hs
-#	$(INSTALL_DATA)    Makefile         $(BIN_DIST_DIR)/utils/hsc2hs/
-#	$(INSTALL_DATA)    hsc2hs.sh        $(BIN_DIST_DIR)/utils/hsc2hs/
-#	$(INSTALL_DATA)    $(INSTALL_DATAS) $(BIN_DIST_DIR)/utils/hsc2hs/
-#	$(INSTALL_PROGRAM) $(HS_PROG)       $(BIN_DIST_DIR)/utils/hsc2hs/
+include $(TOP)/mk/bindist.mk
+EXE_DIST_DIR = dist-stage$(stage)
 

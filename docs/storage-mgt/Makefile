@@ -1,3 +1,5 @@
+TOP = ../..
+
 #	General makefile for Latex stuff
 
 dvi: sm.dvi rp.dvi ldv.dvi
@@ -25,8 +27,7 @@ distclean: clean
 
 maintainer-clean: distclean
 
-binary-dist:
-	@:
+include $(TOP)/mk/bindist.mk
 
 # dummy targets
 all:
