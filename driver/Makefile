@@ -17,7 +17,6 @@ INPLACE_FILE     = $(INPLACE_DATA_DIR)/inplace
 boot all ::
 	$(MKDIRHIER) $(INPLACE_DATA_DIR)
 	test -e $(INPLACE_PKG_CONF) || echo "[]" > $(INPLACE_PKG_CONF)
-	echo "[]" > package.conf
 	touch $(INPLACE_FILE)
 
 INSTALL_DATAS += package.conf ghc-usage.txt ghci-usage.txt
