@@ -284,7 +284,8 @@ prepareRules :: HscEnv
 					-- 	(b) Rules are now just orphan rules
 
 prepareRules hsc_env@(HscEnv { hsc_dflags = dflags, hsc_HPT = hpt })
-	     guts@(ModGuts { mg_binds = binds, mg_deps = deps, mg_rules = local_rules })
+	     guts@(ModGuts { mg_binds = binds, mg_deps = deps 
+	     		   , mg_rules = local_rules, mg_rdr_env = rdr_env })
 	     us 
   = do	{ let 	-- Simplify the local rules; boringly, we need to make an in-scope set
 		-- from the local binders, to avoid warnings from Simplify.simplVar
@@ -317,7 +318,8 @@ prepareRules hsc_env@(HscEnv { hsc_dflags = dflags, hsc_HPT = hpt })
 	      imp_rule_base = extendRuleBaseList hpt_rule_base rules_for_imps
 
 	; dumpIfSet_dyn dflags Opt_D_dump_rules "Transformation rules"
-		(vcat [text "Local rules", pprRules better_rules,
+		(withPprStyle (mkUserStyle (mkPrintUnqualified dflags rdr_env) AllTheWay) $
+		 vcat [text "Local rules", pprRules better_rules,
 		       text "",
 		       text "Imported rules", pprRuleBase imp_rule_base])
 

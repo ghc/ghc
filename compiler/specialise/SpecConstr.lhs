@@ -463,7 +463,8 @@ specConstrProgram dflags us binds
 	endPass dflags "SpecConstr" Opt_D_dump_spec binds'
 
 	dumpIfSet_dyn dflags Opt_D_dump_rules "Top-level specialisations"
-		  (pprRules (tidyRules emptyTidyEnv (rulesOfBinds binds')))
+		  (withPprStyle defaultUserStyle $
+		   pprRules (tidyRules emptyTidyEnv (rulesOfBinds binds')))
 
 	return binds'
   where
