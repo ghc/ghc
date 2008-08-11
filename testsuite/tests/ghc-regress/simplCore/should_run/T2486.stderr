@@ -1,0 +1,31 @@
+
+==================== Transformation rules ====================
+Local rules
+
+Imported rules
+
+
+
+==================== Top-level specialisations ====================
+"SPEC Main.fib" ALWAYS
+    forall {$dNum_sRV :: GHC.Num.Num GHC.Types.Double
+            $dOrd_sRX :: GHC.Classes.Ord GHC.Types.Double}
+      Main.fib @ GHC.Types.Double $dNum_sRV $dOrd_sRX
+      = $sfib_sSv
+"SPEC Main.fib" ALWAYS
+    forall {$dNum_sSd :: GHC.Num.Num GHC.Types.Int
+            $dOrd_sSf :: GHC.Classes.Ord GHC.Types.Int}
+      Main.fib @ GHC.Types.Int $dNum_sSd $dOrd_sSf
+      = $sfib_sSu
+"SPEC Main.tak" ALWAYS
+    forall {$dNum_sRh :: GHC.Num.Num GHC.Types.Double
+            $dOrd_sRj :: GHC.Classes.Ord GHC.Types.Double}
+      Main.tak @ GHC.Types.Double $dNum_sRh $dOrd_sRj
+      = $stak_sRF
+"SPEC Main.tak" ALWAYS
+    forall {$dNum_sRt :: GHC.Num.Num GHC.Types.Int
+            $dOrd_sRv :: GHC.Classes.Ord GHC.Types.Int}
+      Main.tak @ GHC.Types.Int $dNum_sRt $dOrd_sRv
+      = $stak_sRE
+
+

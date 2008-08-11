@@ -21,3 +21,8 @@ test('simplrun009', normal, compile_and_run, [''])
 test('simplrun010', composes([extra_run_opts('24 16 8'),
                               exit_code(1)])
                   , compile_and_run, [''])
+
+# Really we'd like to run T2486 too, to check that its
+# runtime has not gone up, but here I just compile it so that
+# the output of -ddump-rules can be compared
+test('T2486', normal, compile, [''])
