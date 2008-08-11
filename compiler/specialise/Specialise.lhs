@@ -1164,11 +1164,15 @@ dumpUDs :: [CoreBndr]
 dumpUDs bndrs (MkUD { dict_binds = orig_dbs
 		    , calls = orig_calls
 		    , ud_fvs = fvs}) body
-  = (MkUD { dict_binds = free_dbs
-	  , calls      = free_calls 
-	  , ud_fvs     = fvs `minusVarSet` bndr_set},  -- This may delete fewer variables 
-     foldrBag add_let body dump_dbs)		       -- than in priciple possible
+  = (new_uds, foldrBag add_let body dump_dbs)		
+		-- This may delete fewer variables 
+		-- than in priciple possible
   where
+    new_uds = 
+     MkUD { dict_binds = free_dbs
+	  , calls      = free_calls 
+	  , ud_fvs     = fvs `minusVarSet` bndr_set}
+
     bndr_set = mkVarSet bndrs
     add_let (bind,_) body = Let bind body
 
