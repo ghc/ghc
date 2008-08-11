@@ -730,7 +730,8 @@ than with the Avails handling stuff in TcSimplify
 
 \begin{code}
 instance Ord Inst where
-  compare = cmpInst
+   compare = cmpInst
+	-- Used *only* for AvailEnv in TcSimplify
 
 instance Eq Inst where
   (==) i1 i2 = case i1 `cmpInst` i2 of
@@ -761,11 +762,12 @@ cmpInst i1@(ImplicInst {}) i2@(ImplicInst {}) = tci_name i1 `compare` tci_name i
 cmpInst (ImplicInst {})    _                  = LT
 
 	-- same for Equality constraints
-cmpInst (EqInst {})    (Dict {})	      = GT
-cmpInst (EqInst {})    (Method {})	      = GT
-cmpInst (EqInst {})    (LitInst {})	      = GT
-cmpInst (EqInst {})    (ImplicInst {})	      = GT
-cmpInst i1@(EqInst {}) i2@(EqInst {})         = tci_name i1 `compare` tci_name i2
+cmpInst (EqInst {})    (Dict {})       = GT
+cmpInst (EqInst {})    (Method {})     = GT
+cmpInst (EqInst {})    (LitInst {})    = GT
+cmpInst (EqInst {})    (ImplicInst {}) = GT
+cmpInst i1@(EqInst {}) i2@(EqInst {})  = (tci_left  i1 `tcCmpType` tci_left  i2) `thenCmp`
+                                         (tci_right i1 `tcCmpType` tci_right i2)
 \end{code}
 
 
