@@ -15,7 +15,14 @@ module Haddock.Exception (
 
 
 import Data.Typeable
+
+
+-- TODO: change this to test for base version instead
+#if __GLASGOW_HASKELL__ >= 609 
+import Control.OldException
+#else
 import Control.Exception
+#endif
 
 
 data HaddockException = HaddockException String deriving Typeable
