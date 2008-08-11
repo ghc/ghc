@@ -220,6 +220,15 @@
     <para>The modules should <emphasis>not</emphasis> be mutually
     recursive, as Haddock don't like swimming in circles.</para>
 
+    <para>You must also specify an option for the output format.
+    Currently only the <option>-h</option> for HTML is
+    functional.</para>
+
+    <para>The packaging
+    tool <ulink url="http://www.haskell.org/ghc/docs/latest/html/Cabal/index.html">Cabal</ulink>
+    has Haddock support, and is often used instead of invoking Haddock
+    directly.</para>
+
     <para>The following options are available:</para>
 
     <variablelist>
