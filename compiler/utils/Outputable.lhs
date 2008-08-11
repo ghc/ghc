@@ -52,7 +52,7 @@ module Outputable (
 	codeStyle, userStyle, debugStyle, dumpStyle, asmStyle,
 	ifPprDebug, qualName, qualModule,
 	mkErrStyle, defaultErrStyle, defaultDumpStyle, defaultUserStyle,
-        mkUserStyle,
+        mkUserStyle, Depth(..),
 
 	-- * Error handling and debugging utilities
 	pprPanic, assertPprPanic, pprPanicFastInt, pprPgmError, 
@@ -154,9 +154,7 @@ alwaysQualifyModules _ = True
 neverQualifyModules :: QueryQualifyModule
 neverQualifyModules _ = False
 
-type QueryQualifies = (QueryQualifyName, QueryQualifyModule)
-
-alwaysQualify, neverQualify :: QueryQualifies
+alwaysQualify, neverQualify :: PrintUnqualified
 alwaysQualify = (alwaysQualifyNames, alwaysQualifyModules)
 neverQualify  = (neverQualifyNames,  neverQualifyModules)
 
@@ -179,7 +177,7 @@ defaultErrStyle
   | opt_PprStyle_Debug   = mkUserStyle alwaysQualify AllTheWay
   | otherwise            = mkUserStyle alwaysQualify (PartWay opt_PprUserLength)
 
-mkUserStyle :: QueryQualifies -> Depth -> PprStyle
+mkUserStyle :: PrintUnqualified -> Depth -> PprStyle
 mkUserStyle unqual depth
    | opt_PprStyle_Debug = PprDebug
    | otherwise          = PprUser unqual depth
