@@ -102,17 +102,20 @@ rnLExpr = wrapLocFstM rnExpr
 
 rnExpr :: HsExpr RdrName -> RnM (HsExpr Name, FreeVars)
 
+finishHsVar :: Name -> RnM (HsExpr Name, FreeVars)
+-- Separated from rnExpr because it's also used
+-- when renaming infix expressions
+-- See Note [Adding the implicit parameter to 'assert']
+finishHsVar name 
+ = do { ignore_asserts <- doptM Opt_IgnoreAsserts
+      ; if ignore_asserts || not (name `hasKey` assertIdKey)
+	then return (HsVar name, unitFV name)
+	else do { e <- mkAssertErrorExpr
+		; return (e, unitFV name) } }
+
 rnExpr (HsVar v)
-  = do name           <- lookupOccRn v
-       ignore_asserts <- doptM Opt_IgnoreAsserts
-       finish_var ignore_asserts name
-  where
-    finish_var ignore_asserts name
-	| ignore_asserts || not (name `hasKey` assertIdKey)
-	= return (HsVar name, unitFV name)
-  	| otherwise
-	= do { (e, fvs) <- mkAssertErrorExpr
-             ; return (e, fvs `addOneFV` name) }
+  = do name <- lookupOccRn v
+       finishHsVar name
 
 rnExpr (HsIPVar v)
   = newIPNameRn v		`thenM` \ name ->
@@ -141,21 +144,21 @@ rnExpr (HsApp fun arg)
     rnLExpr arg		`thenM` \ (arg',fvArg) ->
     returnM (HsApp fun' arg', fvFun `plusFV` fvArg)
 
-rnExpr (OpApp e1 op _ e2) 
-  = rnLExpr e1				`thenM` \ (e1', fv_e1) ->
-    rnLExpr e2				`thenM` \ (e2', fv_e2) ->
-    rnLExpr op				`thenM` \ (op'@(L _ (HsVar op_name)), fv_op) ->
-
+rnExpr (OpApp e1 (L op_loc (HsVar op_rdr)) _ e2) 
+  = do	{ (e1', fv_e1) <- rnLExpr e1
+	; (e2', fv_e2) <- rnLExpr e2
+	; op_name <- setSrcSpan op_loc (lookupOccRn op_rdr)
+  	; (op', fv_op) <- finishHsVar op_name
+		-- NB: op' is usually just a variable, but might be
+		--     an applicatoin (assert "Foo.hs:47")
 	-- Deal with fixity
 	-- When renaming code synthesised from "deriving" declarations
 	-- we used to avoid fixity stuff, but we can't easily tell any
 	-- more, so I've removed the test.  Adding HsPars in TcGenDeriv
 	-- should prevent bad things happening.
-    lookupFixityRn op_name		`thenM` \ fixity ->
-    mkOpAppRn e1' op' fixity e2'	`thenM` \ final_e -> 
-
-    returnM (final_e,
-	      fv_e1 `plusFV` fv_op `plusFV` fv_e2)
+	; fixity <- lookupFixityRn op_name
+	; final_e <- mkOpAppRn e1' (L op_loc op') fixity e2'
+	; return (final_e, fv_e1 `plusFV` fv_op `plusFV` fv_e2) }
 
 rnExpr (NegApp e _)
   = rnLExpr e			`thenM` \ (e', fv_e) ->
@@ -1131,16 +1134,23 @@ segsToStmts ((defs, uses, fwds, ss) : segs) fvs_later
 srcSpanPrimLit :: SrcSpan -> HsExpr Name
 srcSpanPrimLit span = HsLit (HsStringPrim (mkFastString (showSDoc (ppr span))))
 
-mkAssertErrorExpr :: RnM (HsExpr Name, FreeVars)
+mkAssertErrorExpr :: RnM (HsExpr Name)
 -- Return an expression for (assertError "Foo.hs:27")
 mkAssertErrorExpr
   = getSrcSpanM    			`thenM` \ sloc ->
-    let
-	expr = HsApp (L sloc (HsVar assertErrorName)) 
-		     (L sloc (srcSpanPrimLit sloc))
-    in
-    returnM (expr, emptyFVs)
+    return (HsApp (L sloc (HsVar assertErrorName)) 
+		  (L sloc (srcSpanPrimLit sloc)))
 \end{code}
+
+Note [Adding the implicit parameter to 'assert']
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The renamer transforms (assert e1 e2) to (assert "Foo.hs:27" e1 e2).
+By doing this in the renamer we allow the typechecker to just see the
+expanded application and do the right thing. But it's not really 
+the Right Thing because there's no way to "undo" if you want to see
+the original source code.  We'll have fix this in due course, when
+we care more about being able to reconstruct the exact original 
+program.
 
 %************************************************************************
 %*									*
