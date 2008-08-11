@@ -58,7 +58,6 @@ import Util
 import SrcLoc
 import DynFlags
 import FastString
-
 import Control.Monad
 import Data.List
 \end{code}
@@ -1485,27 +1484,55 @@ Instead we want to quantify over the dictionaries separately.
 
 In short, tcSimplifyRuleLhs must *only* squash LitInst and MethInts, leaving
 all dicts unchanged, with absolutely no sharing.  It's simpler to do this
-from scratch, rather than further parameterise simpleReduceLoop etc
+from scratch, rather than further parameterise simpleReduceLoop etc.
+Simpler, maybe, but alas not simple (see Trac #2494)
+
+* Type errors may give rise to an (unsatisfiable) equality constraint
+
+* Applications of a higher-rank function on the LHS may give
+  rise to an implication constraint, esp if there are unsatisfiable
+  equality constraints inside.
 
 \begin{code}
 tcSimplifyRuleLhs :: [Inst] -> TcM ([Inst], TcDictBinds)
 tcSimplifyRuleLhs wanteds
-  = go [] emptyBag wanteds
+  = do	{ wanteds' <- zonkInsts wanteds
+	; (irreds, binds) <- go [] emptyBag wanteds'
+	; let (dicts, bad_irreds) = partition isDict irreds
+	; traceTc (text "tcSimplifyrulelhs" <+> pprInsts bad_irreds)
+	; addNoInstanceErrs (nub bad_irreds)
+		-- The nub removes duplicates, which has
+		-- not happened otherwise (see notes above)
+	; return (dicts, binds) }
   where
-    go dicts binds []
-	= return (dicts, binds)
-    go dicts binds (w:ws)
+    go :: [Inst] -> TcDictBinds -> [Inst] -> TcM ([Inst], TcDictBinds)
+    go irreds binds []
+	= return (irreds, binds)
+    go irreds binds (w:ws)
 	| isDict w
-	= go (w:dicts) binds ws
+	= go (w:irreds) binds ws
+	| isImplicInst w	-- Have a go at reducing the implication
+	= do { (binds1, irreds1) <- reduceImplication red_env w
+	     ; let (bad_irreds, ok_irreds) = partition isImplicInst irreds1
+	     ; go (bad_irreds ++ irreds) 
+		  (binds `unionBags` binds1) 
+		  (ok_irreds ++ ws)}
 	| otherwise
 	= do { w' <- zonkInst w  -- So that (3::Int) does not generate a call
 				 -- to fromInteger; this looks fragile to me
 	     ; lookup_result <- lookupSimpleInst w'
 	     ; case lookup_result of
-		 GenInst ws' rhs -> 
-                   go dicts (addInstToDictBind binds w rhs) (ws' ++ ws)
-		 NoInstance	 -> pprPanic "tcSimplifyRuleLhs" (ppr w)
+		 NoInstance      -> go (w:irreds) binds ws
+		 GenInst ws' rhs -> go irreds binds' (ws' ++ ws)
+			where
+			  binds' = addInstToDictBind binds w rhs
 	  }
+
+	-- Sigh: we need to reduce inside implications
+    red_env = mkRedEnv doc try_me []
+    doc = ptext (sLit "Implication constraint in RULE lhs")
+    try_me inst | isMethodOrLit inst = ReduceMe AddSCs
+		| otherwise	     = Stop	-- Be gentle
 \end{code}
 
 tcSimplifyBracket is used when simplifying the constraints arising from
