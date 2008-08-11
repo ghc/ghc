@@ -20,7 +20,7 @@ Executable ghc-pkg
     Main-Is: Main.hs
     Extensions: CPP, ForeignFunctionInterface
     if flag(base3)
-        Build-Depends: base       >= 3   && < 4,
+        Build-Depends: base       >= 3   && < 5,
                        directory  >= 1   && < 1.1,
                        process    >= 1   && < 1.1,
                        pretty     >= 1   && < 1.1

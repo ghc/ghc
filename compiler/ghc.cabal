@@ -33,7 +33,7 @@ Library
     Exposed: False
 
     if flag(base3)
-        Build-Depends: base       >= 3   && < 4,
+        Build-Depends: base       >= 3   && < 5,
                        directory  >= 1   && < 1.1,
                        process    >= 1   && < 1.1,
                        bytestring >= 0.9 && < 0.10,

@@ -41,7 +41,7 @@ include $(TOP)/mk/cabal-flags.mk
 
 # Any libraries listed here should also be in ../packages
 
-SUBDIRS  = ghc-prim $(INTEGER_LIBRARY) base array packedstring
+SUBDIRS  = ghc-prim $(INTEGER_LIBRARY) base base3-compat array packedstring
 SUBDIRS += containers bytestring old-locale old-time filepath directory
 ifeq "$(GhcLibsWithUnix)" "YES"
 SUBDIRS += unix
@@ -289,7 +289,10 @@ build.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
 
 html: doc
 
-doc: $(foreach SUBDIR,$(SUBDIRS),doc.library.$(SUBDIR))
+# No docs for compat libraries for now.
+DOC_SUBDIRS = $(filter-out %-compat, $(SUBDIRS))
+
+doc: $(foreach SUBDIR,$(DOC_SUBDIRS),doc.library.$(SUBDIR))
 	sh gen_contents_index --inplace
 
 # Making hyperlinked source only works if we have hscolour
@@ -297,7 +300,7 @@ ifneq "$(HSCOLOUR)" ""
 CABAL_HADDOCK_FLAGS=--hyperlink-source
 endif
 
-$(foreach SUBDIR,$(SUBDIRS),doc.library.$(SUBDIR)):\
+$(foreach SUBDIR,$(DOC_SUBDIRS),doc.library.$(SUBDIR)):\
 doc.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
                cabal-bin ifBuildable/ifBuildable bootstrapping.conf
 	if $(IFBUILDABLE) $*; then \

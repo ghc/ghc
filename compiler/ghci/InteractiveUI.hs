@@ -337,8 +337,7 @@ interactiveUI session srcs maybe_exprs = do
 #endif
 
    -- initial context is just the Prelude
-   prel_mod <- GHC.findModule session (GHC.mkModuleName "Prelude") 
-                                      (Just basePackageId)
+   prel_mod <- GHC.findModule session (GHC.mkModuleName "Prelude") Nothing
    GHC.setContext session [] [prel_mod]
 
    default_editor <- findEditor

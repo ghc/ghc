@@ -5,6 +5,7 @@
 utils/hsc2hs                            hsc2hs                          darcs
 libraries/array                         packages/array                  darcs
 libraries/base                          packages/base                   darcs
+libraries/base3-compat                  packages/base3-compat           darcs
 libraries/bytestring                    packages/bytestring             darcs
 libraries/Cabal                         packages/Cabal                  darcs
 libraries/containers                    packages/containers             darcs
@@ -41,4 +42,3 @@ libraries/xhtml             extralibs   packages/xhtml                  darcs
 libraries/dph               dph         packages/dph                    darcs
 testsuite                   testsuite   testsuite                       darcs
 nofib                       nofib       nofib                           darcs
-
