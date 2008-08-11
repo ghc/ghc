@@ -1147,7 +1147,7 @@ error = rtsTrue;
 		if (rts_argv[arg][2] != '\0') {
 		    RtsFlags.ParFlags.gcThreads
 		      = strtol(rts_argv[arg]+2, (char **) NULL, 10);
-		    if (RtsFlags.ParFlags.nNodes <= 0) {
+		    if (RtsFlags.ParFlags.gcThreads <= 0) {
 		      errorBelch("bad value for -g");
 		      error = rtsTrue;
 		    }
