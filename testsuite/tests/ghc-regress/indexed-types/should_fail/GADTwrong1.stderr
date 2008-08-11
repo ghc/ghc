@@ -7,4 +7,4 @@ GADTwrong1.hs:12:18:
            the constructor `T' at GADTwrong1.hs:12:11
     In the expression: y
     In a case alternative: T y -> y
-    In the expression: case T x :: T (Const b) of T y -> y
+    In the expression: case T x :: T (Const b) of { T y -> y }

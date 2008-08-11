@@ -4,6 +4,6 @@ gadt-escape1.hs:16:52:
       Solution: add a type signature
     In a case alternative: Hidden (ExpInt _) a -> a
     In the expression:
-        case (hval :: Hidden) of Hidden (ExpInt _) a -> a
+        case (hval :: Hidden) of { Hidden (ExpInt _) a -> a }
     In the definition of `weird1':
-        weird1 = case (hval :: Hidden) of Hidden (ExpInt _) a -> a
+        weird1 = case (hval :: Hidden) of { Hidden (ExpInt _) a -> a }

@@ -6,6 +6,6 @@ tcfail201.hs:17:5:
     In the pattern: DocEmpty
     In a case alternative: DocEmpty -> z DocEmpty
     In the expression:
-        case hsDoc of
+        case hsDoc of {
           DocEmpty -> z DocEmpty
-          (DocParagraph hsDoc) -> z DocParagraph `k` hsDoc
+          (DocParagraph hsDoc) -> z DocParagraph `k` hsDoc }
