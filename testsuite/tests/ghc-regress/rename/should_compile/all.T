@@ -112,6 +112,7 @@ test('T1972', if_compiler_lt('ghc', '6.9', expect_fail), compile, [''])
 test('T2205', normal, compile, [''])
 
 test('2334', normal, compile, [''])
+test('T2506', normal, compile, [''])
 
 test('timing001', normal, compile, [''])
 test('timing002', normal, compile, [''])
