@@ -500,17 +500,18 @@ rnSrcDerivDecl (DerivDecl ty)
 rnHsRuleDecl :: RuleDecl RdrName -> RnM (RuleDecl Name, FreeVars)
 rnHsRuleDecl (HsRule rule_name act vars lhs _fv_lhs rhs _fv_rhs)
   = bindPatSigTyVarsFV (collectRuleBndrSigTys vars)	$
-
     bindLocatedLocalsFV doc (map get_var vars)		$ \ ids ->
-    mapFvRn rn_var (vars `zip` ids)		`thenM` \ (vars', fv_vars) ->
+    do	{ (vars', fv_vars) <- mapFvRn rn_var (vars `zip` ids)
+		-- NB: The binders in a rule are always Ids
+		--     We don't (yet) support type variables
 
-    rnLExpr lhs					`thenM` \ (lhs', fv_lhs') ->
-    rnLExpr rhs					`thenM` \ (rhs', fv_rhs') ->
+	; (lhs', fv_lhs') <- rnLExpr lhs
+	; (rhs', fv_rhs') <- rnLExpr rhs
 
-    checkValidRule rule_name ids lhs' fv_lhs'	`thenM_`
+	; checkValidRule rule_name ids lhs' fv_lhs'
 
-    returnM (HsRule rule_name act vars' lhs' fv_lhs' rhs' fv_rhs',
-	     fv_vars `plusFV` fv_lhs' `plusFV` fv_rhs')
+	; return (HsRule rule_name act vars' lhs' fv_lhs' rhs' fv_rhs',
+		  fv_vars `plusFV` fv_lhs' `plusFV` fv_rhs') }
   where
     doc = text "In the transformation rule" <+> ftext rule_name
   
