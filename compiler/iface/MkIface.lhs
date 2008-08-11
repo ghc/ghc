@@ -1290,8 +1290,8 @@ tyThingToIfaceDecl (ATyCon tycon)
   | isSynTyCon tycon
   = IfaceSyn {	ifName    = getOccName tycon,
 		ifTyVars  = toIfaceTvBndrs tyvars,
-		ifOpenSyn = syn_isOpen,
-		ifSynRhs  = toIfaceType syn_tyki,
+		ifSynRhs  = syn_rhs,
+	  	ifSynKind = syn_ki,
                 ifFamInst = famInstToIface (tyConFamInst_maybe tycon)
              }
 
@@ -1312,9 +1312,10 @@ tyThingToIfaceDecl (ATyCon tycon)
   | otherwise = pprPanic "toIfaceDecl" (ppr tycon)
   where
     tyvars = tyConTyVars tycon
-    (syn_isOpen, syn_tyki) = case synTyConRhs tycon of
-			       OpenSynTyCon ki _ -> (True , ki)
-			       SynonymTyCon ty   -> (False, ty)
+    (syn_rhs, syn_ki) 
+       = case synTyConRhs tycon of
+	    OpenSynTyCon ki _ -> (Nothing,               toIfaceType ki)
+	    SynonymTyCon ty   -> (Just (toIfaceType ty), toIfaceType (typeKind ty))
 
     ifaceConDecls (NewTyCon { data_con = con })     = 
       IfNewTyCon  (ifaceConDecl con)

@@ -293,7 +293,7 @@ tcFamInstDecl1 (decl@TySynonym {tcdLName = L loc tc_name})
          -- (4) construct representation tycon
        ; rep_tc_name <- newFamInstTyConName tc_name loc
        ; buildSynTyCon rep_tc_name t_tvs (SynonymTyCon t_rhs) 
-                       (Just (family, t_typats))
+                       (typeKind t_rhs) (Just (family, t_typats))
        }}
 
   -- "newtype instance" and "data instance"
@@ -659,7 +659,8 @@ tcSynDecl
   = tcTyVarBndrs tvs		$ \ tvs' -> do 
     { traceTc (text "tcd1" <+> ppr tc_name) 
     ; rhs_ty' <- tcHsKindedType rhs_ty
-    ; tycon <- buildSynTyCon tc_name tvs' (SynonymTyCon rhs_ty') Nothing
+    ; tycon <- buildSynTyCon tc_name tvs' (SynonymTyCon rhs_ty') 
+      	       		     (typeKind rhs_ty') Nothing
     ; return (ATyCon tycon) 
     }
 tcSynDecl d = pprPanic "tcSynDecl" (ppr d)
@@ -685,7 +686,7 @@ tcTyClDecl1 _calc_isrec
 	-- Check that we don't use families without -XTypeFamilies
   ; checkTc idx_tys $ badFamInstDecl tc_name
 
-  ; tycon <- buildSynTyCon tc_name tvs' (OpenSynTyCon kind Nothing) Nothing
+  ; tycon <- buildSynTyCon tc_name tvs' (OpenSynTyCon kind Nothing) kind Nothing
   ; return [ATyCon tycon]
   }
 

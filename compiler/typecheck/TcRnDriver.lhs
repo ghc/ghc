@@ -181,10 +181,11 @@ tcRnModule hsc_env hsc_src save_rn_syntax
 	-- Must be done after processing the exports
  	tcg_env <- checkHiBootIface tcg_env boot_iface ;
 
-	-- Make the new type env available to stuff slurped from interface files
-	-- Must do this after checkHiBootIface, because the latter might add new
-	-- bindings for boot_dfuns, which may be mentioned in imported unfoldings
-	writeMutVar (tcg_type_env_var tcg_env) (tcg_type_env tcg_env) ;
+	-- The new type env is already available to stuff slurped from 
+	-- interface files, via TcEnv.updateGlobalTypeEnv
+	-- It's important that this includes the stuff in checkHiBootIface, 
+	-- because the latter might add new bindings for boot_dfuns, 
+	-- which may be mentioned in imported unfoldings
 
 		-- Rename the Haddock documentation 
 	tcg_env <- rnHaddock module_info maybe_doc tcg_env ;
@@ -400,13 +401,13 @@ tcRnSrcDecls boot_iface decls
 
 	(bind_ids, binds', fords', rules') <- zonkTopDecls all_binds rules fords ;
 
+	
 	let { final_type_env = extendTypeEnvWithIds type_env bind_ids
-	    ; tcg_env' = tcg_env { tcg_type_env = final_type_env,
-			 	   tcg_binds = binds',
+	    ; tcg_env' = tcg_env { tcg_binds = binds',
 				   tcg_rules = rules', 
 				   tcg_fords = fords' } } ;
 
-	return (tcg_env' { tcg_binds = tcg_binds tcg_env' }) 
+        setGlobalTypeEnv tcg_env' final_type_env				   
    }
 
 tc_rn_src_decls :: ModDetails -> [LHsDecl RdrName] -> TcM (TcGblEnv, TcLclEnv)
@@ -501,7 +502,7 @@ tcRnHsBootDecls decls
 	      ; type_env1 = extendTypeEnvWithIds type_env0 val_ids
 	      ; type_env2 = extendTypeEnvWithIds type_env1 dfun_ids 
 	      ; dfun_ids = map iDFunId inst_infos }
-	; return (gbl_env { tcg_type_env = type_env2 }) 
+	; setGlobalTypeEnv gbl_env type_env2  
    }}}}
 
 spliceInHsBootErr (SpliceDecl (L loc _), _)
@@ -537,15 +538,6 @@ checkHiBootIface
 		-- Check the exports of the boot module, one by one
 	; mapM_ check_export boot_exports
 
-		-- Check instance declarations
-	; mb_dfun_prs <- mapM check_inst boot_insts
-	; let tcg_env' = tcg_env { tcg_binds    = binds `unionBags` dfun_binds,
-				   tcg_type_env = extendTypeEnvWithIds local_type_env boot_dfuns }
-	      dfun_prs   = catMaybes mb_dfun_prs
-	      boot_dfuns = map fst dfun_prs
-	      dfun_binds = listToBag [ noLoc $ VarBind boot_dfun (nlHsVar dfun)
-				     | (boot_dfun, dfun) <- dfun_prs ]
-
 		-- Check for no family instances
 	; unless (null boot_fam_insts) $
 	    panic ("TcRnDriver.checkHiBootIface: Cannot handle family " ++
@@ -554,8 +546,17 @@ checkHiBootIface
             --	      be the equivalent to the dfun bindings returned for class
             --	      instances?  We can't easily equate tycons...
 
+		-- Check instance declarations
+	; mb_dfun_prs <- mapM check_inst boot_insts
+	; let tcg_env' = tcg_env { tcg_binds = binds `unionBags` dfun_binds }
+	      final_type_env = extendTypeEnvWithIds local_type_env boot_dfuns
+	      dfun_prs   = catMaybes mb_dfun_prs
+	      boot_dfuns = map fst dfun_prs
+	      dfun_binds = listToBag [ noLoc $ VarBind boot_dfun (nlHsVar dfun)
+				     | (boot_dfun, dfun) <- dfun_prs ]
+
         ; failIfErrsM
-	; return tcg_env' }
+	; setGlobalTypeEnv tcg_env' final_type_env }
   where
     check_export boot_avail	-- boot_avail is exported by the boot iface
       | name `elem` dfun_names = return ()	
@@ -779,10 +780,6 @@ tcTopSrcDecls boot_details
 	tcg_env <- tcTyAndClassDecls boot_details tycl_decls ;
 		-- If there are any errors, tcTyAndClassDecls fails here
 	
-	-- Make these type and class decls available to stuff slurped from interface files
-	writeMutVar (tcg_type_env_var tcg_env) (tcg_type_env tcg_env) ;
-
-
 	setGblEnv tcg_env	$ do {
 		-- Source-language instances, including derivings,
 		-- and import the supporting declarations

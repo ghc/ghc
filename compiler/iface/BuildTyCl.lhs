@@ -39,22 +39,23 @@ import Data.List
 ------------------------------------------------------
 buildSynTyCon :: Name -> [TyVar] 
               -> SynTyConRhs 
+	      -> Kind			-- Kind of the RHS
 	      -> Maybe (TyCon, [Type])  -- family instance if applicable
               -> TcRnIf m n TyCon
 
-buildSynTyCon tc_name tvs rhs@(OpenSynTyCon rhs_ki _) _
+buildSynTyCon tc_name tvs rhs@(OpenSynTyCon {}) rhs_kind _
   = let
-      kind = mkArrowKinds (map tyVarKind tvs) rhs_ki
+      kind = mkArrowKinds (map tyVarKind tvs) rhs_kind
     in
     return $ mkSynTyCon tc_name kind tvs rhs NoParentTyCon
     
-buildSynTyCon tc_name tvs rhs@(SynonymTyCon rhs_ty) mb_family
+buildSynTyCon tc_name tvs rhs@(SynonymTyCon {}) rhs_kind mb_family
   = do { -- We need to tie a knot as the coercion of a data instance depends
 	 -- on the instance representation tycon and vice versa.
        ; tycon <- fixM (\ tycon_rec -> do 
 	 { parent <- mkParentInfo mb_family tc_name tvs tycon_rec
 	 ; let { tycon   = mkSynTyCon tc_name kind tvs rhs parent
-	       ; kind    = mkArrowKinds (map tyVarKind tvs) (typeKind rhs_ty)
+	       ; kind    = mkArrowKinds (map tyVarKind tvs) rhs_kind
 	       }
          ; return tycon
          })

@@ -227,6 +227,7 @@ buildPReprTyCon orig_tc vect_tc
       liftDs $ buildSynTyCon name
                              tyvars
                              (SynonymTyCon rhs_ty)
+			     (typeKind rhs_ty)
                              (Just $ mk_fam_inst prepr_tc vect_tc)
   where
     tyvars = tyConTyVars vect_tc

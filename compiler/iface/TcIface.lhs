@@ -356,14 +356,13 @@ tcIfaceDecl ignore_prags (IfaceId {ifName = occ_name, ifType = iface_type, ifIdI
 	; info <- tcIdInfo ignore_prags name ty info
 	; return (AnId (mkVanillaGlobalWithInfo name ty info)) }
 
-tcIfaceDecl _
-	    (IfaceData {ifName = occ_name, 
-			ifTyVars = tv_bndrs, 
-			ifCtxt = ctxt, ifGadtSyntax = gadt_syn,
-			ifCons = rdr_cons, 
-			ifRec = is_rec, 
-			ifGeneric = want_generic,
-			ifFamInst = mb_family })
+tcIfaceDecl _ (IfaceData {ifName = occ_name, 
+			  ifTyVars = tv_bndrs, 
+			  ifCtxt = ctxt, ifGadtSyntax = gadt_syn,
+			  ifCons = rdr_cons, 
+			  ifRec = is_rec, 
+			  ifGeneric = want_generic,
+			  ifFamInst = mb_family })
   = do	{ tc_name <- lookupIfaceTop occ_name
 	; bindIfaceTyVars tv_bndrs $ \ tyvars -> do
 
@@ -385,25 +384,30 @@ tcIfaceDecl _
 	; return (ATyCon tycon)
     }}
 
-tcIfaceDecl _
-	    (IfaceSyn {ifName = occ_name, ifTyVars = tv_bndrs, 
-		       ifOpenSyn = isOpen, ifSynRhs = rdr_rhs_ty,
-		       ifFamInst = mb_family})
+tcIfaceDecl _ (IfaceSyn {ifName = occ_name, ifTyVars = tv_bndrs, 
+		         ifSynRhs = mb_rhs_ty,
+		         ifSynKind = kind, ifFamInst = mb_family})
    = bindIfaceTyVars tv_bndrs $ \ tyvars -> do
      { tc_name <- lookupIfaceTop occ_name
-     ; rhs_tyki <- tcIfaceType rdr_rhs_ty
-     ; let rhs = if isOpen then OpenSynTyCon rhs_tyki Nothing
-			   else SynonymTyCon rhs_tyki
-     ; famInst <- case mb_family of
-		    Nothing         -> return Nothing
-		    Just (fam, tys) -> 
-		      do { famTyCon <- tcIfaceTyCon fam
-		         ; insttys <- mapM tcIfaceType tys
-		         ; return $ Just (famTyCon, insttys)
-		         }
-     ; tycon <- buildSynTyCon tc_name tyvars rhs famInst
+     ; rhs_kind <- tcIfaceType kind	-- Note [Synonym kind loop]
+     ; ~(rhs, fam) <- forkM (mk_doc tc_name) $ 
+       	      	      do { rhs <- tc_syn_rhs rhs_kind mb_rhs_ty
+			 ; fam <- tc_syn_fam mb_family
+			 ; return (rhs, fam) }
+     ; tycon <- buildSynTyCon tc_name tyvars rhs rhs_kind fam
      ; return $ ATyCon tycon
      }
+   where
+     mk_doc n = ptext (sLit "Type syonym") <+> ppr n
+     tc_syn_rhs kind Nothing   = return (OpenSynTyCon kind Nothing)
+     tc_syn_rhs _    (Just ty) = do { rhs_ty <- tcIfaceType ty
+		   		    ; return (SynonymTyCon rhs_ty) }
+     tc_syn_fam Nothing 
+       = return Nothing
+     tc_syn_fam (Just (fam, tys)) 
+       = do { famTyCon <- tcIfaceTyCon fam
+      	    ; insttys <- mapM tcIfaceType tys
+       	    ; return $ Just (famTyCon, insttys) }
 
 tcIfaceDecl ignore_prags
 	    (IfaceClass {ifCtxt = rdr_ctxt, ifName = occ_name, 
@@ -505,6 +509,23 @@ tcIfaceEqSpec spec
                               ; return (tv,ty) }
 \end{code}
 
+Note [Synonym kind loop]
+~~~~~~~~~~~~~~~~~~~~~~~~
+Notice that we eagerly grab the *kind* from the interface file, but
+build a forkM thunk for the *rhs* (and family stuff).  To see why, 
+consider this (Trac #2412)
+
+M.hs:       module M where { import X; data T = MkT S }
+X.hs:       module X where { import {-# SOURCE #-} M; type S = T }
+M.hs-boot:  module M where { data T }
+
+When kind-checking M.hs we need S's kind.  But we do not want to
+find S's kind from (typeKind S-rhs), because we don't want to look at
+S-rhs yet!  Since S is imported from X.hi, S gets just one chance to
+be defined, and we must not do that until we've finished with M.T.
+
+Solution: record S's kind in the interface file; now we can safely
+look at it.
 
 %************************************************************************
 %*									*

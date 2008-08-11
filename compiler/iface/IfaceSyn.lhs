@@ -81,11 +81,10 @@ data IfaceDecl
 
   | IfaceSyn  {	ifName    :: OccName,		-- Type constructor
 		ifTyVars  :: [IfaceTvBndr],	-- Type variables
-		ifOpenSyn :: Bool,		-- Is an open family?
-		ifSynRhs  :: IfaceType,		-- Type for an ordinary
-						-- synonym and kind for an
-						-- open family
-                ifFamInst    :: Maybe (IfaceTyCon, [IfaceType])
+		ifSynKind :: IfaceKind,		-- Kind of the *rhs* (not of the tycon)
+		ifSynRhs  :: Maybe IfaceType,	-- Just rhs for an ordinary synonyn
+						-- Nothing for an open family
+                ifFamInst :: Maybe (IfaceTyCon, [IfaceType])
                                                 -- Just <=> instance of family
                                                 -- Invariant: ifOpenSyn == False
                                                 --   for family instances
@@ -426,15 +425,15 @@ pprIfaceDecl (IfaceForeign {ifName = tycon})
   = hsep [ptext (sLit "foreign import type dotnet"), ppr tycon]
 
 pprIfaceDecl (IfaceSyn {ifName = tycon, ifTyVars = tyvars, 
-		        ifOpenSyn = False, ifSynRhs = mono_ty, 
+		        ifSynRhs = Just mono_ty, 
                         ifFamInst = mbFamInst})
   = hang (ptext (sLit "type") <+> pprIfaceDeclHead [] tycon tyvars)
        4 (vcat [equals <+> ppr mono_ty, pprFamily mbFamInst])
 
 pprIfaceDecl (IfaceSyn {ifName = tycon, ifTyVars = tyvars, 
-		        ifOpenSyn = True, ifSynRhs = mono_ty})
+		        ifSynRhs = Nothing, ifSynKind = kind })
   = hang (ptext (sLit "type family") <+> pprIfaceDeclHead [] tycon tyvars)
-       4 (dcolon <+> ppr mono_ty)
+       4 (dcolon <+> ppr kind)
 
 pprIfaceDecl (IfaceData {ifName = tycon, ifGeneric = gen, ifCtxt = context,
 			 ifTyVars = tyvars, ifCons = condecls, 
@@ -668,7 +667,7 @@ freeNamesIfDecl d@IfaceData{} =
   freeNamesIfConDecls (ifCons d)
 freeNamesIfDecl d@IfaceSyn{} =
   freeNamesIfTvBndrs (ifTyVars d) &&&
-  freeNamesIfType    (ifSynRhs d) &&&
+  freeNamesIfSynRhs (ifSynRhs d) &&&
   freeNamesIfTcFam (ifFamInst d)
 freeNamesIfDecl d@IfaceClass{} =
   freeNamesIfTvBndrs (ifTyVars d) &&&
@@ -677,6 +676,10 @@ freeNamesIfDecl d@IfaceClass{} =
   fnList freeNamesIfClsSig (ifSigs d)
 
 -- All other changes are handled via the version info on the tycon
+freeNamesIfSynRhs :: Maybe IfaceType -> NameSet
+freeNamesIfSynRhs (Just ty) = freeNamesIfType ty
+freeNamesIfSynRhs Nothing   = emptyNameSet
+
 freeNamesIfTcFam :: Maybe (IfaceTyCon, [IfaceType]) -> NameSet
 freeNamesIfTcFam (Just (tc,tys)) = 
   freeNamesIfTc tc &&& fnList freeNamesIfType tys

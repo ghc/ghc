@@ -12,7 +12,7 @@ module TcEnv(
 	InstBindings(..),
 
 	-- Global environment
-	tcExtendGlobalEnv, 
+	tcExtendGlobalEnv, setGlobalTypeEnv,
 	tcExtendGlobalValEnv,
 	tcLookupLocatedGlobal,	tcLookupGlobal, 
 	tcLookupField, tcLookupTyCon, tcLookupClass, tcLookupDataCon,
@@ -215,28 +215,37 @@ tcLookupFamInst tycon tys
 
 
 \begin{code}
+setGlobalTypeEnv :: TcGblEnv -> TypeEnv -> TcM TcGblEnv
+-- Use this to update the global type env 
+-- It updates both  * the normal tcg_type_env field
+-- 	   	    * the tcg_type_env_var field seen by interface files
+setGlobalTypeEnv tcg_env new_type_env
+  = do  {     -- Sync the type-envt variable seen by interface files
+    	   writeMutVar (tcg_type_env_var tcg_env) new_type_env
+	 ; return (tcg_env { tcg_type_env = new_type_env }) }
+
 tcExtendGlobalEnv :: [TyThing] -> TcM r -> TcM r
   -- Given a mixture of Ids, TyCons, Classes, all from the
   -- module being compiled, extend the global environment
 tcExtendGlobalEnv things thing_inside
-   = do	{ env <- getGblEnv
-	; let ge'  = extendTypeEnvList (tcg_type_env env) things
-	; setGblEnv (env {tcg_type_env = ge'}) thing_inside }
+   = do	{ tcg_env <- getGblEnv
+	; let ge'  = extendTypeEnvList (tcg_type_env tcg_env) things
+	; tcg_env' <- setGlobalTypeEnv tcg_env ge'
+	; setGblEnv tcg_env' thing_inside }
 
 tcExtendGlobalValEnv :: [Id] -> TcM a -> TcM a
   -- Same deal as tcExtendGlobalEnv, but for Ids
 tcExtendGlobalValEnv ids thing_inside 
   = tcExtendGlobalEnv [AnId id | id <- ids] thing_inside
-\end{code}
 
-\begin{code}
 tcExtendRecEnv :: [(Name,TyThing)] -> TcM r -> TcM r
 -- Extend the global environments for the type/class knot tying game
+-- Just like tcExtendGlobalEnv, except the argument is a list of pairs
 tcExtendRecEnv gbl_stuff thing_inside
- = updGblEnv upd thing_inside
- where
-   upd env = env { tcg_type_env = extend (tcg_type_env env) }
-   extend env = extendNameEnvList env gbl_stuff
+ = do  { tcg_env <- getGblEnv
+       ; let ge' = extendNameEnvList (tcg_type_env tcg_env) gbl_stuff 
+       ; tcg_env' <- setGlobalTypeEnv tcg_env ge'
+       ; setGblEnv tcg_env' thing_inside }
 \end{code}
 
 
