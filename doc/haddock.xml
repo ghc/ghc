@@ -221,7 +221,8 @@
     recursive, as Haddock don't like swimming in circles.</para>
 
     <para>You must also specify an option for the output format.
-    Currently only the <option>-h</option> for HTML is
+    Currently only the <option>-h</option> option for HTML and the
+    <option>--hoogle</option> option for outputting Hoogle data are
     functional.</para>
 
     <para>The packaging
