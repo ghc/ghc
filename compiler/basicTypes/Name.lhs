@@ -77,6 +77,7 @@ import SrcLoc
 import Unique
 import Maybes
 import Binary
+import StaticFlags
 import FastTypes
 import FastString
 import Outputable
@@ -418,7 +419,7 @@ pprInternal sty uniq occ
   | codeStyle sty  = pprUnique uniq
   | debugStyle sty = ppr_occ_name occ <> braces (hsep [pprNameSpaceBrief (occNameSpace occ), 
 				 		       pprUnique uniq])
-  | dumpStyle sty  = ppr_occ_name occ <> char '_' <> pprUnique uniq
+  | dumpStyle sty  = ppr_occ_name occ <> ppr_underscore_unique uniq
 			-- For debug dumps, we're not necessarily dumping
 			-- tidied code, so we need to print the uniques.
   | otherwise      = ppr_occ_name occ	-- User style
@@ -427,12 +428,19 @@ pprInternal sty uniq occ
 pprSystem :: PprStyle -> Unique -> OccName -> SDoc
 pprSystem sty uniq occ
   | codeStyle sty  = pprUnique uniq
-  | debugStyle sty = ppr_occ_name occ <> char '_' <> pprUnique uniq
+  | debugStyle sty = ppr_occ_name occ <> ppr_underscore_unique uniq
 		     <> braces (pprNameSpaceBrief (occNameSpace occ))
-  | otherwise	   = ppr_occ_name occ <> char '_' <> pprUnique uniq
+  | otherwise	   = ppr_occ_name occ <> ppr_underscore_unique uniq
 				-- If the tidy phase hasn't run, the OccName
 				-- is unlikely to be informative (like 's'),
 				-- so print the unique
+
+ppr_underscore_unique :: Unique -> SDoc
+-- Print an underscore separating the name from its unique
+-- But suppress it if we aren't printing the uniques anyway
+ppr_underscore_unique uniq
+  | opt_SuppressUniques = empty
+  | otherwise		= char '_' <> pprUnique uniq
 
 ppr_occ_name :: OccName -> SDoc
 ppr_occ_name occ = ftext (occNameFS occ)
