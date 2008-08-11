@@ -212,7 +212,7 @@ We do sometimes make strings with @Uniques@ in them:
 \begin{code}
 pprUnique :: Unique -> SDoc
 pprUnique uniq
-  | debugIsOn && opt_SuppressUniques
+  | debugIsOn || opt_SuppressUniques
   = empty	-- Used exclusively to suppress uniques so you 
   | otherwise	-- can compare output easily
   = case unpkUnique uniq of
