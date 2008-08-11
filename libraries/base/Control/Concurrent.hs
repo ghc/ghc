@@ -427,6 +427,7 @@ runInUnboundThread action = do
 
 #endif /* __GLASGOW_HASKELL__ */
 
+#ifdef __GLASGOW_HASKELL__
 -- ---------------------------------------------------------------------------
 -- threadWaitRead/threadWaitWrite
 
@@ -618,3 +619,4 @@ foreign import ccall safe "fdReady"
       lock is woken up, but haven't found it to be useful for anything
       other than this example :-)
 -}
+#endif /* __GLASGOW_HASKELL__ */
