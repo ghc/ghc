@@ -378,8 +378,8 @@ ppr_expr exprType@(HsLam matches)
  where idType :: HsExpr id -> HsMatchContext id; idType = undefined
 
 ppr_expr exprType@(HsCase expr matches)
-  = sep [ sep [ptext (sLit "case"), nest 4 (ppr expr), ptext (sLit "of")],
-          nest 2 (pprMatches (CaseAlt `asTypeOf` idType exprType) matches) ]
+  = sep [ sep [ptext (sLit "case"), nest 4 (ppr expr), ptext (sLit "of {")],
+          nest 2 (pprMatches (CaseAlt `asTypeOf` idType exprType) matches <+> char '}') ]
  where idType :: HsExpr id -> HsMatchContext id; idType = undefined
 
 ppr_expr (HsIf e1 e2 e3)
@@ -663,9 +663,12 @@ data Match id
                                 -- Nothing after typechecking
         (GRHSs id)
 
+isEmptyMatchGroup :: MatchGroup id -> Bool
+isEmptyMatchGroup (MatchGroup ms _) = null ms
+
 matchGroupArity :: MatchGroup id -> Arity
 matchGroupArity (MatchGroup [] _)
-  = panic "matchGroupArity"     -- MatchGroup is never empty
+  = panic "matchGroupArity"     -- Precondition: MatchGroup is non-empty
 matchGroupArity (MatchGroup (match:matches) _)
   = ASSERT( all ((== n_pats) . length . hsLMatchPats) matches )
     -- Assertion just checks that all the matches have the same number of pats

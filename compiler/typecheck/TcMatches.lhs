@@ -36,6 +36,8 @@ import SrcLoc
 import FastString
 
 import Control.Monad
+
+#include "HsVersions.h"
 \end{code}
 
 %************************************************************************
@@ -92,6 +94,13 @@ tcMatchesCase :: TcMatchCtxt		-- Case context
 	      -> TcM (MatchGroup TcId)	-- Translated alternatives
 
 tcMatchesCase ctxt scrut_ty matches res_ty
+  | isEmptyMatchGroup matches
+  =	  -- Allow empty case expressions
+    do {  -- Make sure we follow the invariant that res_ty is filled in
+          res_ty' <- refineBoxToTau res_ty
+       ;  return (MatchGroup [] (mkFunTys [scrut_ty] res_ty')) }
+
+  | otherwise
   = tcMatches ctxt [scrut_ty] res_ty matches
 
 tcMatchLambda :: MatchGroup Name -> BoxyRhoType -> TcM (HsWrapper, MatchGroup TcId)
@@ -141,7 +150,8 @@ data TcMatchCtxt 	-- c.f. TcStmtCtxt, also in this module
 		 -> TcM (LHsExpr TcId) }	
 
 tcMatches ctxt pat_tys rhs_ty (MatchGroup matches _)
-  = do	{ matches' <- mapM (tcMatch ctxt pat_tys rhs_ty) matches
+  = ASSERT( not (null matches) )	-- Ensure that rhs_ty is filled in
+    do	{ matches' <- mapM (tcMatch ctxt pat_tys rhs_ty) matches
 	; return (MatchGroup matches' (mkFunTys pat_tys rhs_ty)) }
 
 -------------

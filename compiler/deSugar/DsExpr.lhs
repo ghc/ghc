@@ -266,10 +266,15 @@ dsExpr (HsSCC cc expr) = do
 dsExpr (HsCoreAnn fs expr)
   = Note (CoreNote $ unpackFS fs) <$> dsLExpr expr
 
-dsExpr (HsCase discrim matches) = do
-    core_discrim <- dsLExpr discrim
-    ([discrim_var], matching_code) <- matchWrapper CaseAlt matches
-    return (scrungleMatch discrim_var core_discrim matching_code)
+dsExpr (HsCase discrim matches@(MatchGroup _ rhs_ty)) 
+  | isEmptyMatchGroup matches	-- A Core 'case' is always non-empty
+  = 		      		-- So desugar empty HsCase to error call
+    mkErrorAppDs pAT_ERROR_ID (funResultTy rhs_ty) "case"
+
+  | otherwise
+  = do { core_discrim <- dsLExpr discrim
+       ; ([discrim_var], matching_code) <- matchWrapper CaseAlt matches
+       ; return (scrungleMatch discrim_var core_discrim matching_code) }
 
 -- Pepe: The binds are in scope in the body but NOT in the binding group
 --       This is to avoid silliness in breakpoints

@@ -787,9 +787,9 @@ lookupSigOccRn mb_names sig v
 
 \begin{code}
 rnMatchGroup :: HsMatchContext Name -> MatchGroup RdrName -> RnM (MatchGroup Name, FreeVars)
-rnMatchGroup ctxt (MatchGroup ms _) = do
-    (new_ms, ms_fvs) <- mapFvRn (rnMatch ctxt) ms
-    return (MatchGroup new_ms placeHolderType, ms_fvs)
+rnMatchGroup ctxt (MatchGroup ms _) 
+  = do { (new_ms, ms_fvs) <- mapFvRn (rnMatch ctxt) ms
+       ; return (MatchGroup new_ms placeHolderType, ms_fvs) }
 
 rnMatch :: HsMatchContext Name -> LMatch RdrName -> RnM (LMatch Name, FreeVars)
 rnMatch ctxt  = wrapLocFstM (rnMatch' ctxt)
