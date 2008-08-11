@@ -161,7 +161,7 @@ module System.IO (
     openBinaryTempFile,
   ) where
 
-import Control.Exception hiding (bracket)
+import Control.Exception
 
 #ifndef __NHC__
 import Data.Bits
@@ -170,13 +170,6 @@ import Data.Maybe
 import Foreign.C.Error
 import Foreign.C.String
 import System.Posix.Internals
-#endif
-
-#ifdef __GLASGOW_HASKELL__
-import GHC.IOBase       as ExceptionBase
-#endif
-#ifdef __HUGS__
-import Hugs.Exception   as ExceptionBase
 #endif
 
 #ifdef __GLASGOW_HASKELL__
@@ -194,8 +187,6 @@ import GHC.Show
 import Hugs.IO
 import Hugs.IOExts
 import Hugs.IORef
-import Hugs.Prelude     ( throw, Exception(NonTermination) )
-import Control.Exception ( bracket )
 import System.IO.Unsafe ( unsafeInterleaveIO )
 #endif
 
@@ -491,8 +482,7 @@ openTempFile' loc tmp_dir template binary = do
          -- XXX We want to tell fdToHandle what the filepath is,
          -- as any exceptions etc will only be able to report the
          -- fd currently
-         h <- fdToHandle fd
-                `ExceptionBase.catchAny` \e -> do c_close fd; throw e
+         h <- fdToHandle fd `onException` c_close fd
          return (filepath, h)
 #endif
       where
@@ -550,24 +540,3 @@ foreign import ccall "getpid" c_getpid :: IO Int
 -- It follows that an attempt to write to a file (using 'writeFile', for
 -- example) that was earlier opened by 'readFile' will usually result in
 -- failure with 'System.IO.Error.isAlreadyInUseError'.
-
--- -----------------------------------------------------------------------------
--- Utils
-
-#ifdef __GLASGOW_HASKELL__
--- Copied here to avoid recursive dependency with Control.Exception
-bracket
-        :: IO a         -- ^ computation to run first (\"acquire resource\")
-        -> (a -> IO b)  -- ^ computation to run last (\"release resource\")
-        -> (a -> IO c)  -- ^ computation to run in-between
-        -> IO c         -- returns the value from the in-between computation
-bracket before after thing =
-  block (do
-    a <- before
-    r <- catchAny
-           (unblock (thing a))
-           (\e -> do { after a; throw e })
-    after a
-    return r
- )
-#endif
