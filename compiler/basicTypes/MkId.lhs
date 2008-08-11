@@ -462,16 +462,28 @@ For GADTs, we require that all constructors with a common field 'f' have the sam
 result type (modulo alpha conversion).  [Checked in TcTyClsDecls.checkValidTyCon]
 E.g. 
         data T where
-          T1 { f :: a } :: T [a]
-          T2 { f :: a, y :: b  } :: T [a]
-and now the selector takes that type as its argument:
-        f :: forall a. T [a] -> a
-        f t = case t of
-                T1 { f = v } -> v
-                T2 { f = v } -> v
+          T1 { f :: Maybe a } :: T [a]
+          T2 { f :: Maybe a, y :: b  } :: T [a]
+
+and now the selector takes that result type as its argument:
+   f :: forall a. T [a] -> Maybe a
+
+Details: the "real" types of T1,T2 are:
+   T1 :: forall r a.   (r~[a]) => a -> T r
+   T2 :: forall r a b. (r~[a]) => a -> b -> T r
+
+So the selector loooks like this:
+   f :: forall a. T [a] -> Maybe a
+   f (a:*) (t:T [a])
+     = case t of
+	 T1 c   (g:[a]~[c]) (v:Maybe c)       -> v `cast` Maybe (right (sym g))
+         T2 c d (g:[a]~[c]) (v:Maybe c) (w:d) -> v `cast` Maybe (right (sym g))
+
 Note the forall'd tyvars of the selector are just the free tyvars
 of the result type; there may be other tyvars in the constructor's
 type (e.g. 'b' in T2).
+
+Note the need for casts in the result!
 
 Note [Selector running example]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -641,9 +653,7 @@ mkRecordSelId tycon field_label
         --      foo = /\a. \t:T. case t of { MkT f -> f a }
 
     mk_alt data_con
-      =   ASSERT2( data_ty `tcEqType` field_ty, 
-                   ppr data_con $$ ppr data_ty $$ ppr field_ty )
-          mkReboxingAlt rebox_uniqs data_con (ex_tvs ++ co_tvs ++ arg_vs) rhs
+      = mkReboxingAlt rebox_uniqs data_con (ex_tvs ++ co_tvs ++ arg_vs) rhs
       where
            -- get pattern binders with types appropriately instantiated
         arg_uniqs = map mkBuiltinUnique [arg_base..]
@@ -654,20 +664,21 @@ mkRecordSelId tycon field_label
         rebox_uniqs = map mkBuiltinUnique [rebox_base..]
 
         -- data T :: *->* where T1 { fld :: Maybe b } -> T [b]
-        --      Hence T1 :: forall a b. (a=[b]) => b -> T a
+        --      Hence T1 :: forall a b. (a~[b]) => b -> T a
         -- fld :: forall b. T [b] -> Maybe b
         -- fld = /\b.\(t:T[b]). case t of 
         --              T1 b' (c : [b]=[b']) (x:Maybe b') 
         --                      -> x `cast` Maybe (sym (right c))
 
-                -- Generate the refinement for b'=b, 
-                -- and apply to (Maybe b'), to get (Maybe b)
-        reft           = matchRefine co_tvs
-        the_arg_id_ty  = idType the_arg_id
-        (rhs, data_ty) = 
-          case refineType reft the_arg_id_ty of
-            Just (co, data_ty) -> (Cast (Var the_arg_id) co, data_ty)
-            Nothing            -> (Var the_arg_id, the_arg_id_ty)
+                -- Generate the cast for the result
+		-- See Note [GADT record selectors] for why a cast is needed
+	in_scope_tvs = ex_tvs ++ co_tvs ++ data_tvs
+        reft         = matchRefine in_scope_tvs (map (mkSymCoercion . mkTyVarTy) co_tvs)
+        rhs = case refineType reft (idType the_arg_id) of
+                Nothing            -> Var the_arg_id
+                Just (co, data_ty) -> ASSERT2( data_ty `tcEqType` field_ty, 
+	    	                        ppr data_con $$ ppr data_ty $$ ppr field_ty )
+          	       		      Cast (Var the_arg_id) co
 
         field_vs    = filter (not . isPredTy . idType) arg_vs 
         the_arg_id  = assoc "mkRecordSelId:mk_alt" 

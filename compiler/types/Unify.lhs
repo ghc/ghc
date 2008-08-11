@@ -442,7 +442,7 @@ refineResType reft ty
 %************************************************************************
 
 \begin{code}
-matchRefine :: [CoVar] -> Refinement
+matchRefine :: [TyVar] -> [Coercion] -> Refinement
 \end{code}
 
 Given a list of coercions, where for each coercion c::(ty1~ty2), the type ty2
@@ -462,19 +462,16 @@ Precondition: The rhs types must indeed be a specialisation of the lhs types;
 NB: matchRefine does *not* expand the type synonyms.
 
 \begin{code}
-matchRefine co_vars 
-  = Reft in_scope (foldr plusVarEnv emptyVarEnv (map refineOne co_vars))
+matchRefine in_scope_tvs cos 
+  = Reft in_scope (foldr plusVarEnv emptyVarEnv (map refineOne cos))
   where
-    in_scope = foldr extend emptyInScopeSet co_vars
+    in_scope = mkInScopeSet (mkVarSet in_scope_tvs)
+	-- NB: in_scope_tvs include both coercion variables
+	--     *and* the tyvars in their kinds
 
-	-- For each co_var, add it *and* the tyvars it mentions, to in_scope
-    extend co_var in_scope
-      = extendInScopeSetSet in_scope $
-	  extendVarSet (tyVarsOfType (tyVarKind co_var)) co_var
-
-    refineOne co_var = refine (TyVarTy co_var) ty1 ty2
+    refineOne co = refine co ty1 ty2
       where
-        (ty1, ty2) = splitCoercionKind (tyVarKind co_var)
+        (ty1, ty2) = coercionKind co
 
     refine co (TyVarTy tv) ty                     = unitVarEnv tv (co, ty)
     refine co (TyConApp _ tys) (TyConApp _ tys')  = refineArgs co tys tys'
