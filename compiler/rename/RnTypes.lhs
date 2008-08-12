@@ -170,9 +170,8 @@ rnHsType doc (HsPredTy pred) = do
     pred' <- rnPred doc pred
     return (HsPredTy pred')
 
-rnHsType _ (HsSpliceTy _) = do
-    addErr (ptext (sLit "Type splices are not yet implemented"))
-    failM
+rnHsType _ (HsSpliceTy _) =
+    failWith (ptext (sLit "Type splices are not yet implemented"))
 
 rnHsType doc (HsDocTy ty haddock_doc) = do
     ty' <- rnLHsType doc ty

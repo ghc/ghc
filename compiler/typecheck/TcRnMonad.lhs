@@ -464,8 +464,11 @@ getErrsVar = do { env <- getLclEnv; return (tcl_errs env) }
 setErrsVar :: TcRef Messages -> TcRn a -> TcRn a
 setErrsVar v = updLclEnv (\ env -> env { tcl_errs =  v })
 
-addErr :: Message -> TcRn ()
+addErr :: Message -> TcRn ()	-- Ignores the context stack
 addErr msg = do { loc <- getSrcSpanM ; addErrAt loc msg }
+
+failWith :: Message -> TcRn a
+failWith msg = addErr msg >> failM
 
 addLocErr :: Located e -> (e -> Message) -> TcRn ()
 addLocErr (L loc e) fn = addErrAt loc (fn e)

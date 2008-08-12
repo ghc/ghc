@@ -564,9 +564,7 @@ rnBracket (VarBr n) = do { name <- lookupOccRn n
 rnBracket (ExpBr e) = do { (e', fvs) <- rnLExpr e
 			 ; return (ExpBr e', fvs) }
 
-rnBracket (PatBr _) = do { addErr (ptext (sLit "Tempate Haskell pattern brackets are not supported yet"));
-                           failM }
-
+rnBracket (PatBr _) = failWith (ptext (sLit "Tempate Haskell pattern brackets are not supported yet"))
 rnBracket (TypBr t) = do { (t', fvs) <- rnHsTypeFVs doc t
 			 ; return (TypBr t', fvs) }
 		    where
@@ -930,8 +928,7 @@ rn_rec_stmt_lhs fix_env (L loc (BindStmt pat expr a b))
                fv_pat)]
 
 rn_rec_stmt_lhs _ (L _ (LetStmt binds@(HsIPBinds _)))
-  = do	{ addErr (badIpBinds (ptext (sLit "an mdo expression")) binds)
-	; failM }
+  = failWith (badIpBinds (ptext (sLit "an mdo expression")) binds)
 
 rn_rec_stmt_lhs fix_env (L loc (LetStmt (HsValBinds binds))) 
     = do binds' <- rnValBindsLHS fix_env binds
@@ -993,8 +990,7 @@ rn_rec_stmt _ (L loc (BindStmt pat' expr _ _)) fv_pat
 	      L loc (BindStmt pat' expr' bind_op fail_op))]
 
 rn_rec_stmt _ (L _ (LetStmt binds@(HsIPBinds _))) _
-  = do	{ addErr (badIpBinds (ptext (sLit "an mdo expression")) binds)
-	; failM }
+  = failWith (badIpBinds (ptext (sLit "an mdo expression")) binds)
 
 rn_rec_stmt all_bndrs (L loc (LetStmt (HsValBinds binds'))) _ = do 
   (binds', du_binds) <- 
