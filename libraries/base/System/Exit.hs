@@ -28,8 +28,8 @@ import GHC.IOBase
 #endif
 
 #ifdef __HUGS__
-import Hugs.Prelude
-import Hugs.Exception
+import Hugs.Prelude (ExitCode(..))
+import Control.Exception.Base
 #endif
 
 #ifdef __NHC__
