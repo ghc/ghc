@@ -12,21 +12,19 @@
 --
 -------------------------------------------------------------------------------
 
+#ifdef __GLASGOW_HASKELL__
 #include "Typeable.h"
+#endif
 
 module System.Timeout ( timeout ) where
 
-#if __NHC__
-timeout :: Int -> IO a -> IO (Maybe a)
-timeout n f = fmap Just f
-#else
-
+#ifdef __GLASGOW_HASKELL__
 import Prelude             (Show(show), IO, Ord((<)), Eq((==)), Int,
                             (.), otherwise, fmap)
 import Data.Maybe          (Maybe(..))
 import Control.Monad       (Monad(..), guard)
 import Control.Concurrent  (forkIO, threadDelay, myThreadId, killThread)
-import Control.Exception.Base (Exception, handleJust, throwTo, bracket)
+import Control.Exception   (Exception, handleJust, throwTo, bracket)
 import Data.Dynamic        (Typeable, fromDynamic)
 import Data.Typeable
 import Data.Unique         (Unique, newUnique)
@@ -42,6 +40,7 @@ instance Show Timeout where
     show _ = "<<timeout>>"
 
 instance Exception Timeout
+#endif /* !__GLASGOW_HASKELL__ */
 
 -- |Wrap an 'IO' computation to time out and return @Nothing@ in case no result
 -- is available within @n@ microseconds (@1\/10^6@ seconds). In case a result
@@ -73,6 +72,7 @@ instance Exception Timeout
 -- I\/O or file I\/O using this combinator.
 
 timeout :: Int -> IO a -> IO (Maybe a)
+#ifdef __GLASGOW_HASKELL__
 timeout n f
     | n <  0    = fmap Just f
     | n == 0    = return Nothing
@@ -84,4 +84,6 @@ timeout n f
                    (bracket (forkIO (threadDelay n >> throwTo pid ex))
                             (killThread)
                             (\_ -> fmap Just f))
-#endif
+#else
+timeout n f = fmap Just f
+#endif /* !__GLASGOW_HASKELL__ */
