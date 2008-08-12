@@ -50,15 +50,8 @@ ppHoogle package version ifaces odir = do
 ppModule :: Interface -> [String]
 ppModule iface = "" : doc (ifaceDoc iface) ++
                  ["module " ++ moduleString (ifaceMod iface)] ++
-                 concatMap ppExport exported ++
+                 concatMap ppExport (ifaceExportItems iface) ++
                  concatMap ppInstance (ifaceInstances iface)
-    where
-        locals = Set.fromList $ ifaceLocals iface
-        exported = [i | i@(ExportDecl{expItemDecl=decl}) <- ifaceExportItems iface
-                      , isLocal (unLoc decl)]
-        isLocal decl
-          | Just name <- getMainDeclBinder decl = name `Set.member` locals
-          | otherwise = False
 
 
 ---------------------------------------------------------------------
