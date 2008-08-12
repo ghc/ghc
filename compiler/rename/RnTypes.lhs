@@ -490,7 +490,7 @@ checkSectionPrec direction section op arg
 	  checkErr (op_prec < arg_prec
 		     || op_prec == arg_prec && direction == assoc)
 		  (sectionPrecErr (ppr_op op_name, op_fix) 	
-		  (pp_arg_op, arg_fix) section)
+				  (pp_arg_op, arg_fix) section)
 \end{code}
 
 Precedence-related error messages
