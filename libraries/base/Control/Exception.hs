@@ -133,6 +133,8 @@ import Control.Exception.Base
 import GHC.Base
 import GHC.IOBase
 import Data.Maybe
+#else
+import Prelude hiding (catch)
 #endif
 
 #if __GLASGOW_HASKELL__ || __HUGS__
