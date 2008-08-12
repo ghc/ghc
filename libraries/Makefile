@@ -73,8 +73,8 @@ SUBDIRS += dph/dph-base
 SUBDIRS += dph/dph-prim-interface
 SUBDIRS += dph/dph-prim-seq
 SUBDIRS += dph/dph-prim-par
-SUBDIRS += dph/dph_seq
-SUBDIRS += dph/dph_par
+SUBDIRS += dph/dph-seq
+SUBDIRS += dph/dph-par
 endif
 endif
 
@@ -231,15 +231,15 @@ ALL_CONFIGURE_FLAGS = \
 	                              --use-index=../doc-index.html" \
 	           $(CONFIGURE_OPTS)
 
-stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).dph/dph_par: \
-    create_dph_par
+stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).dph/dph-par: \
+    create_dph-par
 
-stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).dph/dph_seq: \
-    create_dph_seq
+stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).dph/dph-seq: \
+    create_dph-seq
 
-.PHONY: dph_create_par create_dph_seq
+.PHONY: dph-create_par create_dph-seq
 
-create_dph_par create_dph_seq: create_%:
+create_dph-par create_dph-seq: create_%:
 	$(MAKE) -C dph $*
 
 $(foreach SUBDIR,$(SUBDIRS), \
