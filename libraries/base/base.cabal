@@ -154,6 +154,8 @@ Library {
         Text.Show,
         Text.Show.Functions
         Unsafe.Coerce
+    other-modules:
+        Control.Exception.Base
     c-sources:
         cbits/PrelIOUtils.c
         cbits/WCsubst.c

@@ -135,7 +135,7 @@ import GHC.Base
 import GHC.Num
 import GHC.Show
 import GHC.IOBase ( IO )
-import GHC.IOBase (block, unblock, evaluate, catchException, throwIO)
+import GHC.IOBase (catchException)
 import qualified GHC.IOBase as ExceptionBase
 import qualified GHC.IOBase as New
 import GHC.Conc hiding (setUncaughtExceptionHandler,
@@ -146,11 +146,12 @@ import GHC.Handle       ( stdout, hFlush )
 #endif
 
 #ifdef __HUGS__
-import Hugs.Exception   as ExceptionBase
+import Prelude          hiding (catch)
+import Hugs.Prelude     as New (ExitCode(..))
 #endif
 
 import qualified Control.Exception as New
-import           Control.Exception ( throw, SomeException )
+import           Control.Exception ( throw, SomeException, block, unblock, evaluate, throwIO )
 import System.IO.Error  hiding ( catch, try )
 import System.IO.Unsafe (unsafePerformIO)
 import Data.Dynamic
@@ -725,7 +726,7 @@ nonTermination = New.toException NonTermination
 
 -- For now at least, make the monolithic Exception type an instance of
 -- the Exception class
-instance ExceptionBase.Exception Exception
+instance New.Exception Exception
 
 instance Show Exception where
   showsPrec _ (IOException err)          = shows err

@@ -161,7 +161,7 @@ module System.IO (
     openBinaryTempFile,
   ) where
 
-import Control.Exception
+import Control.Exception.Base
 
 #ifndef __NHC__
 import Data.Bits

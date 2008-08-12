@@ -50,7 +50,7 @@ import GHC.Num
 import NHC.FFI                  ( FinalizerPtr, CInt(..) )
 import IO                       ( bracket )
 #else
-import Control.Exception        ( bracket )
+import Control.Exception.Base   ( bracket )
 #endif
 
 #ifdef __HUGS__

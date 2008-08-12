@@ -90,23 +90,24 @@ module System.IO.Error (
 #endif
   ) where
 
-import {-# SOURCE #-} Prelude (catch)
-
+#ifndef __HUGS__
 import Data.Either
+#endif
 import Data.Maybe
 
 #ifdef __GLASGOW_HASKELL__
+import {-# SOURCE #-} Prelude (catch)
+
 import GHC.Base
 import GHC.IOBase
 import Text.Show
 #endif
 
 #ifdef __HUGS__
-import Hugs.Prelude(Handle, IOException(..), IOErrorType(..))
+import Hugs.Prelude(Handle, IOException(..), IOErrorType(..), IO)
 #endif
 
 #ifdef __NHC__
-import Prelude
 import IO
   ( IOError ()
   , try

@@ -26,7 +26,7 @@ import Prelude             (Show(show), IO, Ord((<)), Eq((==)), Int,
 import Data.Maybe          (Maybe(..))
 import Control.Monad       (Monad(..), guard)
 import Control.Concurrent  (forkIO, threadDelay, myThreadId, killThread)
-import Control.Exception   (Exception, handleJust, throwTo, bracket)
+import Control.Exception.Base (Exception, handleJust, throwTo, bracket)
 import Data.Dynamic        (Typeable, fromDynamic)
 import Data.Typeable
 import Data.Unique         (Unique, newUnique)

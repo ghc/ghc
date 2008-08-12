@@ -32,7 +32,7 @@ import Prelude
 import Data.List
 import Foreign
 import Foreign.C
-import Control.Exception        ( bracket )
+import Control.Exception.Base   ( bracket )
 import Control.Monad
 import GHC.IOBase
 #endif
