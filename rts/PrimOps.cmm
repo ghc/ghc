@@ -49,7 +49,7 @@ import __gmpz_com;
 import pthread_mutex_lock;
 import pthread_mutex_unlock;
 #endif
-import base_ControlziException_nestedAtomically_closure;
+import base_ControlziExceptionziBase_nestedAtomically_closure;
 import EnterCriticalSection;
 import LeaveCriticalSection;
 
@@ -1251,7 +1251,7 @@ atomicallyzh_fast
 
   /* Nested transactions are not allowed; raise an exception */
   if (old_trec != NO_TREC) {
-     R1 = base_ControlziException_nestedAtomically_closure;
+     R1 = base_ControlziExceptionziBase_nestedAtomically_closure;
      jump raisezh_fast;
   }
 
