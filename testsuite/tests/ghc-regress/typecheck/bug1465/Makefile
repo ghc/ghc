@@ -24,7 +24,7 @@ prep:
 	for i in v1 v2; do \
 	   (cd $$i && \
 		$(TEST_HC) --make -o setup Setup.hs && \
-		./setup configure -v0 --with-compiler=$(TEST_HC) --with-hc-pkg=../$(GHC_PKG_INPLACE) && \
+		./setup configure -v0 --with-compiler=$(TEST_HC) --with-hc-pkg=$(GHC_PKG_INPLACE) && \
 		./setup build && \
 		./setup register --inplace ); done
 
