@@ -8,24 +8,24 @@ Imported rules
 
 ==================== Top-level specialisations ====================
 "SPEC Main.fib" ALWAYS
-    forall {$dNum_sRV :: GHC.Num.Num GHC.Types.Double
-            $dOrd_sRW :: GHC.Classes.Ord GHC.Types.Double}
-      Main.fib @ GHC.Types.Double $dNum_sRV $dOrd_sRW
-      = $sfib_sSu
+    forall {$dNum :: GHC.Num.Num GHC.Types.Double
+            $dOrd :: GHC.Classes.Ord GHC.Types.Double}
+      Main.fib @ GHC.Types.Double $dNum $dOrd
+      = $sfib
 "SPEC Main.fib" ALWAYS
-    forall {$dNum_sSd :: GHC.Num.Num GHC.Types.Int
-            $dOrd_sSe :: GHC.Classes.Ord GHC.Types.Int}
-      Main.fib @ GHC.Types.Int $dNum_sSd $dOrd_sSe
-      = $sfib_sSv
+    forall {$dNum :: GHC.Num.Num GHC.Types.Int
+            $dOrd :: GHC.Classes.Ord GHC.Types.Int}
+      Main.fib @ GHC.Types.Int $dNum $dOrd
+      = $sfib
 "SPEC Main.tak" ALWAYS
-    forall {$dNum_sRh :: GHC.Num.Num GHC.Types.Double
-            $dOrd_sRi :: GHC.Classes.Ord GHC.Types.Double}
-      Main.tak @ GHC.Types.Double $dNum_sRh $dOrd_sRi
-      = $stak_sRE
+    forall {$dNum :: GHC.Num.Num GHC.Types.Double
+            $dOrd :: GHC.Classes.Ord GHC.Types.Double}
+      Main.tak @ GHC.Types.Double $dNum $dOrd
+      = $stak
 "SPEC Main.tak" ALWAYS
-    forall {$dNum_sRt :: GHC.Num.Num GHC.Types.Int
-            $dOrd_sRu :: GHC.Classes.Ord GHC.Types.Int}
-      Main.tak @ GHC.Types.Int $dNum_sRt $dOrd_sRu
-      = $stak_sRF
+    forall {$dNum :: GHC.Num.Num GHC.Types.Int
+            $dOrd :: GHC.Classes.Ord GHC.Types.Int}
+      Main.tak @ GHC.Types.Int $dNum $dOrd
+      = $stak
 
 

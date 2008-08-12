@@ -69,4 +69,5 @@ test('rnfail055',
 
 test('rn_dup', normal, compile_fail, [''])
 test('T2310', if_compiler_lt('ghc', '6.9', expect_fail), compile_fail, [''])
+test('T2490', normal, compile_fail, [''])
 

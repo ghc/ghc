@@ -1,5 +1,5 @@
 
-rnfail019.hs:5:9:
+rnfail019.hs:5:8:
     The operator `:' [infixr 5] of a section
-	must have lower precedence than the operand `(:)' [infixr 5]
-	in the section: `x : y :'
+        must have lower precedence than the operand `(:)' [infixr 5]
+        in the section: `x : y :'
