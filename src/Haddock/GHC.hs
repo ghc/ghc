@@ -31,7 +31,8 @@ import StaticFlags
 -- compilation and linking.  
 startGhc :: String -> [String] -> IO (Session, DynFlags)
 startGhc libDir flags = do
-  restFlags <- parseStaticFlags flags
+  -- TODO: handle warnings?
+  (restFlags, _) <- parseStaticFlags flags
   session   <- newSession (Just libDir)
   dynflags  <- getSessionDynFlags session
   let dynflags' = dopt_set dynflags Opt_Haddock
@@ -91,7 +92,12 @@ loadPackages session pkgStrs = do
 
 -- | Try to parse dynamic GHC flags
 parseGhcFlags dynflags flags origFlags = do
+  -- TODO: handle warnings?
+#if __GLASGOW_HASKELL__ >= 609
+  (dynflags', rest, _) <- parseDynamicFlags dynflags flags
+#else
   (dynflags', rest) <- parseDynamicFlags dynflags flags
+#endif
   if not (null rest)
     then throwE ("Couldn't parse GHC options: " ++ (unwords origFlags))
     else return dynflags'
