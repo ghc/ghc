@@ -1492,6 +1492,7 @@ fFlags = [
   ( "warn-unused-imports",              Opt_WarnUnusedImports, const Supported ),
   ( "warn-unused-matches",              Opt_WarnUnusedMatches, const Supported ),
   ( "warn-warnings-deprecations",       Opt_WarnWarningsDeprecations, const Supported ),
+  ( "warn-deprecations",                Opt_WarnWarningsDeprecations, const Supported ),
   ( "warn-deprecated-flags",            Opt_WarnDeprecatedFlags, const Supported ),
   ( "warn-orphans",                     Opt_WarnOrphans, const Supported ),
   ( "warn-tabs",                        Opt_WarnTabs, const Supported ),
