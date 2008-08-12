@@ -52,12 +52,15 @@ install:
 	                   --distpref dist-install                        \
 	                   $(INSTALL_FLAGS)
 
-clean: distclean
-
-distclean:
+clean:
 	-$(CABAL) clean --distpref dist-inplace
 	-$(CABAL) clean --distpref dist-install
 ifneq "$(EXTRA_CLEAN)" ""
 	$(RM) -f $(EXTRA_CLEAN)
+endif
+
+distclean: clean
+ifneq "$(EXTRA_DISTCLEAN)" ""
+	$(RM) -f $(EXTRA_DISTCLEAN)
 endif
 
