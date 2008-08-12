@@ -113,9 +113,7 @@ import GHC.Arr          ( Array, STArray )
 
 #ifdef __HUGS__
 import Hugs.Prelude     ( Key(..), TypeRep(..), TyCon(..), Ratio,
-                          Exception, ArithException, IOException,
-                          ArrayException, AsyncException, Handle,
-                          Ptr, FunPtr, ForeignPtr, StablePtr )
+                          Handle, Ptr, FunPtr, ForeignPtr, StablePtr )
 import Hugs.IORef       ( IORef, newIORef, readIORef, writeIORef )
 import Hugs.IOExts      ( unsafePerformIO )
         -- For the Typeable instance
