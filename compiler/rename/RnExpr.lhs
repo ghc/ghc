@@ -166,10 +166,7 @@ rnExpr (NegApp e _)
     mkNegAppRn e' neg_name	`thenM` \ final_e ->
     returnM (final_e, fv_e `plusFV` fv_neg)
 
-rnExpr (HsPar e)
-  = rnLExpr e 		`thenM` \ (e', fvs_e) ->
-    returnM (HsPar e', fvs_e)
-
+------------------------------------------
 -- Template Haskell extensions
 -- Don't ifdef-GHCI them because we want to fail gracefully
 -- (not with an rnExpr crash) in a stage-1 compiler.
@@ -192,18 +189,27 @@ rnExpr (HsQuasiQuoteE qq)
     returnM (expr'', fvs_qq `plusFV` fvs_expr)
 #endif 	/* GHCI */
 
-rnExpr section@(SectionL expr op)
-  = rnLExpr expr	 	`thenM` \ (expr', fvs_expr) ->
-    rnLExpr op	 		`thenM` \ (op', fvs_op) ->
-    checkSectionPrec InfixL section op' expr' `thenM_`
-    returnM (SectionL expr' op', fvs_op `plusFV` fvs_expr)
+---------------------------------------------
+--	Sections
+-- See Note [Parsing sections] in Parser.y.pp
+rnExpr (HsPar (L loc (section@(SectionL {}))))
+  = do	{ (section', fvs) <- rnSection section
+	; return (HsPar (L loc section'), fvs) }
 
-rnExpr section@(SectionR op expr)
-  = rnLExpr op	 				`thenM` \ (op',   fvs_op) ->
-    rnLExpr expr	 				`thenM` \ (expr', fvs_expr) ->
-    checkSectionPrec InfixR section op' expr'	`thenM_`
-    returnM (SectionR op' expr', fvs_op `plusFV` fvs_expr)
+rnExpr (HsPar (L loc (section@(SectionR {}))))
+  = do	{ (section', fvs) <- rnSection section
+	; return (HsPar (L loc section'), fvs) }
 
+rnExpr (HsPar e)
+  = do	{ (e', fvs_e) <- rnLExpr e
+	; return (HsPar e', fvs_e) }
+
+rnExpr expr@(SectionL {})
+  = do	{ addErr (sectionErr expr); rnSection expr }
+rnExpr expr@(SectionR {})
+  = do	{ addErr (sectionErr expr); rnSection expr }
+
+---------------------------------------------
 rnExpr (HsCoreAnn ann expr)
   = rnLExpr expr `thenM` \ (expr', fvs_expr) ->
     returnM (HsCoreAnn ann expr', fvs_expr)
@@ -344,8 +350,24 @@ rnExpr (HsArrForm op fixity cmds)
 
 rnExpr other = pprPanic "rnExpr: unexpected expression" (ppr other)
 	-- HsWrap
-\end{code}
 
+----------------------
+-- See Note [Parsing sections] in Parser.y.pp
+rnSection :: HsExpr RdrName -> RnM (HsExpr Name, FreeVars)
+rnSection section@(SectionR op expr)
+  = do	{ (op', fvs_op)     <- rnLExpr op
+	; (expr', fvs_expr) <- rnLExpr expr
+	; checkSectionPrec InfixR section op' expr'
+	; return (SectionR op' expr', fvs_op `plusFV` fvs_expr) }
+
+rnSection section@(SectionL expr op)
+  = do	{ (expr', fvs_expr) <- rnLExpr expr
+	; (op', fvs_op)     <- rnLExpr op
+	; checkSectionPrec InfixL section op' expr'
+	; return (SectionL expr' op', fvs_op `plusFV` fvs_expr) }
+
+rnSection other = pprPanic "rnSection" (ppr other)
+\end{code}
 
 %************************************************************************
 %*									*
@@ -1198,6 +1220,11 @@ checkTransformStmt ctxt = addErr msg
     msg = ptext (sLit "Illegal transform or grouping in") <+> pprStmtContext ctxt
     
 ---------
+sectionErr :: HsExpr RdrName -> SDoc
+sectionErr expr
+  = hang (ptext (sLit "A section must be enclosed in parentheses"))
+       2 (ptext (sLit "thus:") <+> (parens (ppr expr)))
+
 patSynErr :: HsExpr RdrName -> RnM (HsExpr Name, FreeVars)
 patSynErr e = do { addErr (sep [ptext (sLit "Pattern syntax in expression context:"),
 			 	nest 4 (ppr e)])

@@ -1429,16 +1429,27 @@ cvtopdecls0 :: { [LHsDecl RdrName] }
 	: {- empty -}		{ [] }
 	| cvtopdecls		{ $1 }
 
--- tuple expressions: things that can appear unparenthesized as long as they're
+-- "texp" is short for tuple expressions: 
+-- things that can appear unparenthesized as long as they're
 -- inside parens or delimitted by commas
 texp :: { LHsExpr RdrName }
 	: exp				{ $1 }
-	-- Technically, this should only be used for bang patterns,
-       -- but we can be a little more liberal here and avoid parens
-       -- inside tuples
-       | infixexp qop 	{ LL $ SectionL $1 $2 }
+
+	-- Note [Parsing sections]
+	-- ~~~~~~~~~~~~~~~~~~~~~~~
+	-- We include left and right sections here, which isn't
+	-- technically right according to Haskell 98.  For example
+	--	(3 +, True) isn't legal
+	-- However, we want to parse bang patterns like
+	--	(!x, !y)
+	-- and it's convenient to do so here as a section
+        -- Then when converting expr to pattern we unravel it again
+	-- Meanwhile, the renamer checks that real sections appear
+	-- inside parens.
+        | infixexp qop 	{ LL $ SectionL $1 $2 }
 	| qopm infixexp       { LL $ SectionR $1 $2 }
-       -- view patterns get parenthesized above
+
+       -- View patterns get parenthesized above
 	| exp '->' exp   { LL $ EViewPat $1 $3 }
 
 texps :: { [LHsExpr RdrName] }
