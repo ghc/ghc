@@ -48,8 +48,24 @@ data InterfaceFile = InterfaceFile {
 binaryInterfaceMagic :: Word32
 binaryInterfaceMagic = 0xD0Cface
 
+
+-- Since datatypes in GHC might change between patchlevel versions,
+-- and because we store GHC datatypes in our interface files,
+-- we need to make sure we version our interface files accordingly.
+--
+-- Instead of adding one, we add three to all version numbers
+-- when one of our own (stored) datatypes is changed. 
 binaryInterfaceVersion :: Word16
-binaryInterfaceVersion = 1
+#if __GLASGOW_HASKELL__ == 608 && __GHC_PATCHLEVEL__ == 2
+binaryInterfaceVersion = 2
+#endif
+#if __GLASGOW_HASKELL__ == 608 && __GHC_PATCHLEVEL__ == 3
+binaryInterfaceVersion = 3
+#endif
+#if __GLASGOW_HASKELL__ >= 609
+binaryInterfaceVersion = 4
+#endif
+
 
 initBinMemSize :: Int
 initBinMemSize = 1024*1024
