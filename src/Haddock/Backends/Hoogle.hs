@@ -88,6 +88,7 @@ ppExport (ExportDecl decl dc _) = doc dc ++ f (unL decl)
     where
         f (TyClD d@TyData{}) = ppData d
         f (TyClD d@ClassDecl{}) = ppClass d
+        f (TyClD d@TySynonym{}) = ppSynonym d
         f (ForD (ForeignImport name typ _)) = ppSig $ TypeSig name typ
         f (ForD (ForeignExport name typ _)) = ppSig $ TypeSig name typ
         f (SigD sig) = ppSig sig
@@ -98,6 +99,10 @@ ppExport _ = []
 ppSig :: Sig Name -> [String]
 ppSig (TypeSig name sig) = [operator (out name) ++ " :: " ++ out sig]
 ppSig _ = []
+
+
+ppSynonym :: TyClDecl Name -> [String]
+ppSynonym x = [out x]
 
 
 -- note: does not yet output documentation for class methods
