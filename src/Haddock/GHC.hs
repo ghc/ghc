@@ -7,7 +7,6 @@
 
 module Haddock.GHC (
   startGhc,
-  loadPackages,
   module Haddock.GHC.Typecheck,
   module Haddock.GHC.Utils
 ) where
@@ -51,6 +50,8 @@ startGhc libDir flags = do
 -- list of packages. The matching packages might be newer versions of the 
 -- supplied ones. For each matching package, return its InstalledPackageInfo. 
 
+-- Commented out, since it is unused and doesn't build with GHC >= 6.9
+{-
 loadPackages :: Session -> [String] -> IO [InstalledPackageInfo]
 
 -- It would be better to try to get the "in scope" packages from GHC instead.
@@ -86,7 +87,7 @@ loadPackages session pkgStrs = do
   where
     handleParse (Just pkg) = return (pkgName pkg)
     handleParse Nothing = throwE "Could not parse package identifier"
-
+-}
 
 -- | Try to parse dynamic GHC flags
 parseGhcFlags dynflags flags origFlags = do
