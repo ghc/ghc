@@ -16,7 +16,11 @@ import Haddock.GHC
 import Haddock.GHC.Utils
 import Haddock.Types
 import Haddock.Utils
+#if __GLASGOW_HASKELL__ >= 609
+import GHC
+#else
 import GHC hiding ((<.>))
+#endif
 import SrcLoc
 import Outputable
 
