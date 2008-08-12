@@ -78,6 +78,7 @@ collectInstances modules filterNames
                     Just tycon <- nub (is_tcs inst) ]    
 
 
+-- TODO: should we support PredTy here?
 instHead :: ([TyVar], [PredType], Class, [Type]) -> ([Int], Name, [SimpleType])
 instHead (_, _, cls, args)
   = (map argCount args, className cls, map simplify args)
@@ -86,7 +87,6 @@ instHead (_, _, cls, args)
     argCount (TyConApp _ ts) = length ts
     argCount (FunTy _ _ ) = 2
     argCount (ForAllTy _ t) = argCount t
-    argCount (NoteTy _ t) = argCount t
     argCount _ = 0
 
     simplify (ForAllTy _ t) = simplify t
@@ -96,7 +96,6 @@ instHead (_, _, cls, args)
       where (SimpleType s args) = simplify t1
     simplify (TyVarTy v) = SimpleType (tyVarName v) []
     simplify (TyConApp tc ts) = SimpleType (tyConName tc) (map simplify ts)
-    simplify (NoteTy _ t) = simplify t
     simplify _ = error "simplify"
 
 
@@ -145,7 +144,6 @@ toHsType t = case t of
   FunTy a b -> HsFunTy (toLHsType a) (toLHsType b)
   ForAllTy v t -> cvForAll [v] t 
   PredTy p -> HsPredTy (toHsPred p) 
-  NoteTy _ t -> toHsType t
   where
     tycon tc = HsTyVar (tyConName tc)
     app tc ts = foldl (\a b -> HsAppTy (noLoc a) (noLoc b)) tc (map toHsType ts)
