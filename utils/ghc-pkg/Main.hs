@@ -44,7 +44,7 @@ import System.Environment ( getArgs, getProgName, getEnv )
 import System.IO
 import System.IO.Error (try)
 import Data.List ( isPrefixOf, isSuffixOf, intersperse, sortBy, nub,
-                   unfoldr, break )
+                   unfoldr, break, partition )
 #if __GLASGOW_HASKELL__ > 604
 import Data.List ( isInfixOf )
 #else
@@ -276,13 +276,13 @@ runit cli nonopts = do
         registerPackage filename cli auto_ghci_libs True force
     ["unregister", pkgid_str] -> do
         pkgid <- readGlobPkgId pkgid_str
-        unregisterPackage pkgid cli
+        unregisterPackage pkgid cli force
     ["expose", pkgid_str] -> do
         pkgid <- readGlobPkgId pkgid_str
-        exposePackage pkgid cli
+        exposePackage pkgid cli force
     ["hide",   pkgid_str] -> do
         pkgid <- readGlobPkgId pkgid_str
-        hidePackage pkgid cli
+        hidePackage pkgid cli force
     ["list"] -> do
         listPackages cli Nothing Nothing
     ["list", pkgid_str] ->
@@ -508,8 +508,7 @@ registerPackage input my_flags auto_ghci_libs update force = do
   validatePackageConfig pkg db_stack auto_ghci_libs update force
   let new_details = filter not_this (snd db_to_operate_on) ++ [pkg]
       not_this p = package p /= package pkg
-  savingOldConfig db_filename $
-    writeNewConfig db_filename new_details
+  writeNewConfig db_filename new_details
 
 parsePackageInfo
         :: String
@@ -524,31 +523,41 @@ parsePackageInfo str =
 -- -----------------------------------------------------------------------------
 -- Exposing, Hiding, Unregistering are all similar
 
-exposePackage :: PackageIdentifier ->  [Flag] -> IO ()
+exposePackage :: PackageIdentifier ->  [Flag] -> Force -> IO ()
 exposePackage = modifyPackage (\p -> [p{exposed=True}])
 
-hidePackage :: PackageIdentifier ->  [Flag] -> IO ()
+hidePackage :: PackageIdentifier ->  [Flag] -> Force -> IO ()
 hidePackage = modifyPackage (\p -> [p{exposed=False}])
 
-unregisterPackage :: PackageIdentifier ->  [Flag] -> IO ()
+unregisterPackage :: PackageIdentifier ->  [Flag] -> Force -> IO ()
 unregisterPackage = modifyPackage (\_ -> [])
 
 modifyPackage
   :: (InstalledPackageInfo -> [InstalledPackageInfo])
   -> PackageIdentifier
   -> [Flag]
+  -> Force
   -> IO ()
-modifyPackage fn pkgid my_flags  = do
+modifyPackage fn pkgid my_flags force = do
   db_stack <- getPkgDatabases True{-modify-} my_flags
-  let ((db_name, pkgs) : _) = db_stack
+  let old_broken = brokenPackages (allPackagesInStack db_stack)
+  let ((db_name, pkgs) : rest_of_stack) = db_stack
   ps <- findPackages [(db_name,pkgs)] (Id pkgid)
   let pids = map package ps
   let new_config = concat (map modify pkgs)
       modify pkg
           | package pkg `elem` pids = fn pkg
           | otherwise               = [pkg]
-  savingOldConfig db_name $
-      writeNewConfig db_name new_config
+  let new_stack = (db_name,new_config) : rest_of_stack
+      new_broken = map package (brokenPackages (allPackagesInStack new_stack))
+      newly_broken = filter (`notElem` map package old_broken) new_broken
+
+  when (not (null newly_broken)) $
+      dieOrForceAll force ("unregistering " ++ display pkgid ++
+           " would break the following packages: "
+              ++ unwords (map display newly_broken))
+
+  writeNewConfig db_name new_config
 
 -- -----------------------------------------------------------------------------
 -- Listing packages
@@ -578,7 +587,7 @@ listPackages my_flags mPackageName mModuleName = do
 
       match `exposedInPkg` pkg = any match (map display $ exposedModules pkg)
 
-      pkg_map = map (\p -> (package p, p)) $ allPackagesInStack db_stack
+      pkg_map = allPackagesInStack db_stack
       show_func = if simple_output then show_simple else mapM_ (show_normal pkg_map)
 
   show_func (reverse db_stack_sorted)
@@ -588,8 +597,9 @@ listPackages my_flags mPackageName mModuleName = do
                 text db_name <> colon $$ nest 4 packages
                 )
            where packages = fsep (punctuate comma (map pp_pkg pkg_confs))
+                 broken = map package (brokenPackages pkg_map)
                  pp_pkg p
-                   | isBrokenPackage p pkg_map = braces doc
+                   | package p `elem` broken = braces doc
                    | exposed p = doc
                    | otherwise = parens doc
                    where doc = text (display (package p))
@@ -728,13 +738,12 @@ checkConsistency my_flags = do
   db_stack <- getPkgDatabases True my_flags
          -- check behaves like modify for the purposes of deciding which
          -- databases to use, because ordering is important.
-  let pkgs = map (\p -> (package p, p)) $ allPackagesInStack db_stack
-      broken_pkgs = do
-        (pid, p) <- pkgs
-        let broken_deps = missingPackageDeps p pkgs
-        guard (not . null $ broken_deps)
-        return (pid, broken_deps)
-  mapM_ (putStrLn . render . show_func) broken_pkgs
+  let pkgs = allPackagesInStack db_stack
+      broken_pkgs = brokenPackages pkgs
+      broken_ids = map package broken_pkgs
+      broken_why = [ (package p, filter (`elem` broken_ids) (depends p))
+                   | p <- broken_pkgs ]
+  mapM_ (putStrLn . render . show_func) broken_why
   where
   show_func | FlagSimpleOutput `elem` my_flags = show_simple
             | otherwise = show_normal
@@ -745,20 +754,22 @@ checkConsistency my_flags = do
     text "package" <+> text (display pid) <+> text "has missing dependencies:"
       $$ nest 4 (fsep (punctuate comma (map (text . display) deps)))
 
-missingPackageDeps :: InstalledPackageInfo
-                   -> [(PackageIdentifier, InstalledPackageInfo)]
-                   -> [PackageIdentifier]
-missingPackageDeps pkg pkg_map =
-  [ d | d <- depends pkg, isNothing (lookup d pkg_map)] ++
-  [ d | d <- depends pkg, Just p <- return (lookup d pkg_map), 
-                          isBrokenPackage p pkg_map]
 
-isBrokenPackage :: InstalledPackageInfo -> [(PackageIdentifier, InstalledPackageInfo)] -> Bool
-isBrokenPackage pkg pkg_map
-   = not . null $ missingPackageDeps pkg (filter notme pkg_map)
-   where notme (p, _ipi) = package pkg /= p
-        -- remove p from the database when we invoke missingPackageDeps,
-        -- because we want mutually recursive groups of package to show up
+brokenPackages :: [InstalledPackageInfo] -> [InstalledPackageInfo]
+brokenPackages pkgs = go [] pkgs
+ where
+   go avail not_avail =
+     case partition (depsAvailable avail) not_avail of
+        ([],        not_avail) -> not_avail
+        (new_avail, not_avail) -> go (new_avail ++ avail) not_avail
+
+   depsAvailable :: [InstalledPackageInfo] -> InstalledPackageInfo
+                 -> Bool
+   depsAvailable pkgs_ok pkg = null dangling
+        where dangling = filter (`notElem` pids) (depends pkg)
+              pids = map package pkgs_ok
+
+        -- we want mutually recursive groups of package to show up
         -- as broken. (#1750)
 
 -- -----------------------------------------------------------------------------
