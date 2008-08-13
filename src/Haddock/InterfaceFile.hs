@@ -37,6 +37,8 @@ import HscTypes
 import FastMutInt
 import InstEnv
 import HsDoc
+import FastString
+import Unique
 
 
 data InterfaceFile = InterfaceFile {
@@ -86,7 +88,23 @@ writeInterfaceFile filename iface = do
   put_ bh symtab_p_p
 
   -- Make some intial state
+#if __GLASGOW_HASKELL__ >= 609
+  symtab_next <- newFastMutInt
+  writeFastMutInt symtab_next 0
+  symtab_map <- newIORef emptyUFM
+  let bin_symtab = BinSymbolTable {
+                      bin_symtab_next = symtab_next,
+                      bin_symtab_map  = symtab_map }
+  dict_next_ref <- newFastMutInt
+  writeFastMutInt dict_next_ref 0
+  dict_map_ref <- newIORef emptyUFM
+  let bin_dict = BinDictionary {
+                      bin_dict_next = dict_next_ref,
+                      bin_dict_map  = dict_map_ref }
+  ud <- newWriteState (putName bin_symtab) (putFastString bin_dict)
+#else
   ud <- newWriteState
+#endif
 
   -- put the main thing
   bh <- return $ setUserData bh ud
@@ -98,8 +116,13 @@ writeInterfaceFile filename iface = do
   seekBin bh symtab_p		
 
   -- write the symbol table itself
+#if __GLASGOW_HASKELL__ >= 609
+  symtab_next <- readFastMutInt symtab_next
+  symtab_map  <- readIORef symtab_map
+#else
   symtab_next <- readFastMutInt (ud_symtab_next ud)
   symtab_map  <- readIORef (ud_symtab_map ud)
+#endif
   putSymbolTable bh symtab_next symtab_map
 
   -- write the dictionary pointer at the fornt of the file
@@ -108,13 +131,19 @@ writeInterfaceFile filename iface = do
   seekBin bh dict_p
 
   -- write the dictionary itself
+#if __GLASGOW_HASKELL__ >= 609
+  dict_next <- readFastMutInt dict_next_ref
+  dict_map  <- readIORef dict_map_ref
+#else
   dict_next <- readFastMutInt (ud_dict_next ud)
   dict_map  <- readIORef (ud_dict_map ud)
+#endif
   putDictionary bh dict_next dict_map
 
-	-- snd send the result to the file
+  -- and send the result to the file
   writeBinMem bh filename
   return ()
+
 
 -- | Read a Haddock (@.haddock@) interface file. Return either an 
 -- 'InterfaceFile' or an error message. If given a GHC 'Session', the function
@@ -180,6 +209,54 @@ readInterfaceFile mbSession filename = do
 -------------------------------------------------------------------------------
 -- Symbol table
 -------------------------------------------------------------------------------
+
+
+#if __GLASGOW_HASKELL__ >= 609
+putName :: BinSymbolTable -> BinHandle -> Name -> IO ()
+putName BinSymbolTable{
+            bin_symtab_map = symtab_map_ref,
+            bin_symtab_next = symtab_next }    bh name
+  = do
+    symtab_map <- readIORef symtab_map_ref
+    case lookupUFM symtab_map name of
+      Just (off,_) -> put_ bh off
+      Nothing -> do
+         off <- readFastMutInt symtab_next
+         writeFastMutInt symtab_next (off+1)
+         writeIORef symtab_map_ref
+             $! addToUFM symtab_map name (off,name)
+         put_ bh off
+
+
+data BinSymbolTable = BinSymbolTable {
+        bin_symtab_next :: !FastMutInt, -- The next index to use
+        bin_symtab_map  :: !(IORef (UniqFM (Int,Name)))
+                                -- indexed by Name
+  }
+
+
+putFastString :: BinDictionary -> BinHandle -> FastString -> IO ()
+putFastString BinDictionary { bin_dict_next = j_r,
+                              bin_dict_map  = out_r}  bh f
+  = do
+    out <- readIORef out_r
+    let uniq = getUnique f
+    case lookupUFM out uniq of
+        Just (j, _)  -> put_ bh j
+        Nothing -> do
+           j <- readFastMutInt j_r
+           put_ bh j
+           writeFastMutInt j_r (j + 1)
+           writeIORef out_r $! addToUFM out uniq (j, f)
+
+
+data BinDictionary = BinDictionary {
+        bin_dict_next :: !FastMutInt, -- The next index to use
+        bin_dict_map  :: !(IORef (UniqFM (Int,FastString)))
+                                -- indexed by FastString
+  }
+#endif
+
 
 putSymbolTable :: BinHandle -> Int -> UniqFM (Int,Name) -> IO ()
 putSymbolTable bh next_off symtab = do
