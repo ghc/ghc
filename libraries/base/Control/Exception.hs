@@ -35,12 +35,12 @@ module Control.Exception (
 #else
         SomeException(..),
 #endif
-        Exception(..),          -- instance Eq, Ord, Show, Typeable
-        IOException,            -- instance Eq, Ord, Show, Typeable
-        ArithException(..),     -- instance Eq, Ord, Show, Typeable
-        ArrayException(..),     -- instance Eq, Ord, Show, Typeable
+        Exception(..),          -- class
+        IOException,            -- instance Eq, Ord, Show, Typeable, Exception
+        ArithException(..),     -- instance Eq, Ord, Show, Typeable, Exception
+        ArrayException(..),     -- instance Eq, Ord, Show, Typeable, Exception
         AssertionFailed(..),
-        AsyncException(..),     -- instance Eq, Ord, Show, Typeable
+        AsyncException(..),     -- instance Eq, Ord, Show, Typeable, Exception
 
 #if __GLASGOW_HASKELL__ || __HUGS__
         NonTermination(..),
@@ -76,9 +76,7 @@ module Control.Exception (
 
         -- ** The @catch@ functions
         catch,     -- :: IO a -> (Exception -> IO a) -> IO a
-#if __GLASGOW_HASKELL__ || __HUGS__
         catches, Handler(..),
-#endif
         catchJust, -- :: (Exception -> Maybe b) -> IO a -> (b -> IO a) -> IO a
 
         -- ** The @handle@ functions
@@ -144,7 +142,6 @@ import Prelude hiding (catch)
 import System (ExitCode())
 #endif
 
-#if __GLASGOW_HASKELL__ || __HUGS__
 data Handler a = forall e . Exception e => Handler (e -> IO a)
 
 catches :: IO a -> [Handler a] -> IO a
@@ -156,7 +153,6 @@ catchesHandler handlers e = foldr tryHandler (throw e) handlers
               = case fromException e of
                 Just e' -> handler e'
                 Nothing -> res
-#endif
 
 -- -----------------------------------------------------------------------------
 -- Asynchronous exceptions
