@@ -804,45 +804,15 @@ writeNewConfig :: FilePath -> [InstalledPackageInfo] -> IO ()
 writeNewConfig filename packages = do
   hPutStr stdout "Writing new package config file... "
   createDirectoryIfMissing True $ takeDirectory filename
-  h <- openFile filename WriteMode `catch` \e ->
-      if isPermissionError e
-      then die (filename ++ ": you don't have permission to modify this file")
-      else ioError e
   let shown = concat $ intersperse ",\n "
                      $ map (show . convertPackageInfoOut) packages
       fileContents = "[" ++ shown ++ "\n]"
-  hPutStrLn h fileContents
-  hClose h
+  writeFileAtomic filename fileContents
+    `catch` \e ->
+      if isPermissionError e
+      then die (filename ++ ": you don't have permission to modify this file")
+      else ioError e
   hPutStrLn stdout "done."
-
-savingOldConfig :: FilePath -> IO () -> IO ()
-savingOldConfig filename io = Exception.block $ do
-  hPutStr stdout "Saving old package config file... "
-    -- mv rather than cp because we've already done an hGetContents
-    -- on this file so we won't be able to open it for writing
-    -- unless we move the old one out of the way...
-  let oldFile = filename ++ ".old"
-  restore_on_error <- catch (renameFile filename oldFile >> return True) $
-      \err -> do
-          unless (isDoesNotExistError err) $ do
-              hPutStrLn stderr (unwords ["Unable to rename", show filename,
-                                         "to", show oldFile])
-              ioError err
-          return False
-  (do hPutStrLn stdout "done."; io)
-    `onException` do
-      hPutStr stdout ("WARNING: an error was encountered while writing "
-                   ++ "the new configuration.\n")
-        -- remove any partially complete new version:
-      removeFile filename `catchIO` \_ -> return ()
-        -- and attempt to restore the old one, if we had one:
-      when restore_on_error $ do
-           hPutStr stdout "Attempting to restore the old configuration... "
-           do renameFile oldFile filename
-              hPutStrLn stdout "done."
-            `catchIO` \err -> hPutStrLn stdout ("Failed: " ++ show err)
-        -- Note the above renameFile sometimes fails on Windows with
-        -- "permission denied", I have no idea why --SDM.
 
 -----------------------------------------------------------------------------
 -- Sanity-check a new package config, and automatically build GHCi libs
@@ -1147,6 +1117,13 @@ catchIO io handler = io `Exception.catch` handler'
           handler' e                           = Exception.throw e
 #endif
 
+throwIOIO :: Exception.IOException -> IO a
+#if __GLASGOW_HASKELL__ >= 609
+throwIOIO = Exception.throwIO
+#else
+throwIOIO ioe = Exception.throwIO (Exception.IOException ioe)
+#endif
+
 catchError :: IO a -> (String -> IO a) -> IO a
 #if __GLASGOW_HASKELL__ >= 609
 catchError io handler = io `Exception.catch` handler'
@@ -1165,3 +1142,35 @@ onException io what = io `Exception.catch` \e -> do what
                                                     Exception.throw e
 #endif
 
+
+-- copied from Cabal's Distribution.Simple.Utils, except that we want
+-- to use text files here, rather than binary files.
+writeFileAtomic :: FilePath -> String -> IO ()
+writeFileAtomic targetFile content = do
+  (tmpFile, tmpHandle) <- openTempFile targetDir template
+  do  hPutStr tmpHandle content
+      hClose tmpHandle
+#if mingw32_HOST_OS || mingw32_TARGET_OS
+      renameFile tmpFile targetFile
+        -- If the targetFile exists then renameFile will fail
+        `catchIO` \err -> do
+          exists <- doesFileExist targetFile
+          if exists
+            then do removeFile targetFile
+                    -- Big fat hairy race condition
+                    renameFile tmpFile targetFile
+                    -- If the removeFile succeeds and the renameFile fails
+                    -- then we've lost the atomic property.
+            else throwIOIO err
+#else
+      renameFile tmpFile targetFile
+#endif
+   `onException` do hClose tmpHandle
+                    removeFile tmpFile
+  where
+    template = targetName <.> "tmp"
+    targetDir | null targetDir_ = "."
+              | otherwise       = targetDir_
+    --TODO: remove this when takeDirectory/splitFileName is fixed
+    --      to always return a valid dir
+    (targetDir_,targetName) = splitFileName targetFile
