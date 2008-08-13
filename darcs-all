@@ -114,7 +114,12 @@ sub darcsget {
                 $path = "$defaultrepo_base/$localpath";
             }
             else {
-                $path = "$defaultrepo_base/$remotepath";
+                if ($remotepath =~ /^http:/) {
+                    $path = $remotepath;
+                }
+                else {
+                    $path = "$defaultrepo_base/$remotepath";
+                }
             }
 
             if (($tag eq "") || defined($tags{$tag})) {
