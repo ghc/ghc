@@ -1464,9 +1464,11 @@ mkFlag turnOn flagPrefix f (name, dynflag, deprecated)
     = Flag (flagPrefix ++ name) (NoArg (f dynflag)) (deprecated turnOn)
 
 deprecatedForLanguage :: String -> Bool -> Deprecated
-deprecatedForLanguage lang turnOn =
-    Deprecated ("Use the " ++ prefix ++ lang ++ " language instead")
-    where prefix = if turnOn then "" else "No"
+deprecatedForLanguage lang turn_on
+    = Deprecated ("use -X"  ++ flag ++ " or pragma {-# LANGUAGE " ++ flag ++ "#-} instead")
+    where 
+      flag | turn_on    = lang
+           | otherwise = "No"++lang
 
 -- | These @-f\<blah\>@ flags can all be reversed with @-fno-\<blah\>@
 fFlags :: [(String, DynFlag, Bool -> Deprecated)]
