@@ -258,7 +258,7 @@ render flags interfaces installedIfaces = do
     copyHtmlBits odir libdir css_file
 
   when (Flag_Hoogle `elem` flags) $ do
-    ppHoogle pkgName pkgVer visibleIfaces odir
+    ppHoogle pkgName pkgVer title prologue visibleIfaces odir
 
 -------------------------------------------------------------------------------
 -- Reading and dumping interface files
