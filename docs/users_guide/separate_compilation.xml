@@ -1169,7 +1169,8 @@ just in case they contain an instance declaration that matters to M.  This would
 be a disaster in practice, so GHC tries to be clever. </para>
 
 <para>In particular, if an instance declaration is in the same module as the definition
-of any type or class mentioned in the head of the instance declaration, then
+of any type or class mentioned in the <emphasis>head</emphasis> of the instance declaration 
+(the part after the &ldquo;<literal>=&gt;</literal>&rdquo;; see <xref linkend="instance-rules"/>), then
 GHC has to visit that interface file anyway.  Example:</para>
 <programlisting>
   module A where
@@ -1208,7 +1209,7 @@ functional dependency:
     class E x y | y -> x where ...
 </programlisting>
 Then in some importing module M, the constraint <literal>(E a Int)</literal> should be "improved" by setting
-<literal>a = Int</literal>, <emphasis>even though there is no explicit mention
+<literal>a = T</literal>, <emphasis>even though there is no explicit mention
 of <literal>T</literal> in M</emphasis>.</para>
 
 These considerations lead to the following definition of an orphan module:
@@ -1232,7 +1233,7 @@ These considerations lead to the following definition of an orphan module:
 	</para></listitem>
   </itemizedlist>
   </para>
-  <para> Only the instance head  (the part after the &ldquo;<literal>=&gt;</literal>&rdquo;)
+  <para> Only the instance head 
   counts.  In the example above, it is not good enough for C's declaration
   to be in module A; it must be the declaration of D or T.</para>
   </listitem>
