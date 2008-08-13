@@ -398,18 +398,24 @@ getPkgDatabases modify my_flags = do
       else return []
 
   -- get the location of the user package database, and create it if necessary
-  appdir <- getAppUserDataDirectory "ghc"
+  -- getAppUserDataDirectory can fail (e.g. if $HOME isn't set)
+  appdir <- try $ getAppUserDataDirectory "ghc"
 
-  let
-        subdir = targetARCH ++ '-':targetOS ++ '-':Version.version
-        archdir   = appdir </> subdir
-        user_conf = archdir </> "package.conf"
-  user_exists <- doesFileExist user_conf
+  mb_user_conf <-
+     case appdir of
+       Right dir -> do
+               let subdir = targetARCH ++ '-':targetOS ++ '-':Version.version
+                   user_conf = dir </> subdir </> "package.conf"
+               user_exists <- doesFileExist user_conf
+               return (Just (user_conf,user_exists))
+       Left ex ->
+               return Nothing
 
   -- If the user database doesn't exist, and this command isn't a
   -- "modify" command, then we won't attempt to create or use it.
   let sys_databases
-        | modify || user_exists = user_conf : global_confs ++ [global_conf]
+        | Just (user_conf,user_exists) <- mb_user_conf,
+          modify || user_exists = user_conf : global_confs ++ [global_conf]
         | otherwise             = global_confs ++ [global_conf]
 
   e_pkg_path <- try (System.Environment.getEnv "GHC_PACKAGE_PATH")
@@ -426,7 +432,9 @@ getPkgDatabases modify my_flags = do
       virt_global_conf = last env_stack
 
   let db_flags = [ f | Just f <- map is_db_flag my_flags ]
-         where is_db_flag FlagUser       = Just user_conf
+         where is_db_flag FlagUser
+                      | Just (user_conf,user_exists) <- mb_user_conf 
+                      = Just user_conf
                is_db_flag FlagGlobal     = Just virt_global_conf
                is_db_flag (FlagConfig f) = Just f
                is_db_flag _              = Nothing
