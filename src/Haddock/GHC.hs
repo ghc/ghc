@@ -32,7 +32,11 @@ import StaticFlags
 startGhc :: String -> [String] -> IO (Session, DynFlags)
 startGhc libDir flags = do
   -- TODO: handle warnings?
+#if __GLASGOW_HASKELL__ >= 609 
   (restFlags, _) <- parseStaticFlags flags
+#else
+  restFlags <- parseStaticFlags flags
+#endif
   session   <- newSession (Just libDir)
   dynflags  <- getSessionDynFlags session
   let dynflags' = dopt_set dynflags Opt_Haddock
