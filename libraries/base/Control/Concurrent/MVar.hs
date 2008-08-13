@@ -46,7 +46,7 @@ import GHC.Conc ( MVar, newEmptyMVar, newMVar, takeMVar, putMVar,
 #endif
 
 import Prelude
-import Control.Exception
+import Control.Exception.Base
 
 {-|
   This is a combination of 'takeMVar' and 'putMVar'; ie. it takes the value

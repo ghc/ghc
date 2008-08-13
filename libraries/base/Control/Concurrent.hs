@@ -92,7 +92,7 @@ module Control.Concurrent (
 
 import Prelude
 
-import Control.Exception as Exception
+import Control.Exception.Base as Exception
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Exception
