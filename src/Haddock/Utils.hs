@@ -48,7 +48,7 @@ import Name
 import OccName
 import Binary
 import Module
-import PackageConfig ( stringToPackageId )
+import PackageConfig
 
 import Control.Monad ( liftM, MonadPlus(..) )
 import Data.Char ( isAlpha, isSpace, toUpper, ord, chr )

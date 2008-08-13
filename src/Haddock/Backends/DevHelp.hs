@@ -10,9 +10,11 @@ import Haddock.ModuleTree
 import Haddock.Types
 import Haddock.Utils
 
-import Module        ( moduleName, moduleNameString, Module, mkModule, mkModuleName )
-import PackageConfig ( stringToPackageId )
+import Module
 import Name          ( Name, nameModule, getOccString, nameOccName )
+#if __GLASGOW_HASKELL__ < 609
+import PackageConfig (stringToPackageId)
+#endif
 
 import Data.Maybe    ( fromMaybe )
 import qualified Data.Map as Map

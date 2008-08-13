@@ -39,7 +39,7 @@ import qualified Data.Map as Map hiding ( Map )
 import GHC hiding ( NoLink )
 import Name
 import Module
-import PackageConfig         ( stringToPackageId )
+import PackageConfig
 import RdrName hiding ( Qual )
 import SrcLoc   
 import FastString            ( unpackFS )
