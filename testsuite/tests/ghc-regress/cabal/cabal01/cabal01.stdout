@@ -2,7 +2,6 @@ install1:
 bin
 lib
 Reading package info from "dist/installed-pkg-config" ... done.
-Saving old package config file... done.
 Writing new package config file... done.
 install2:
 bin
@@ -12,5 +11,4 @@ build
 installed-pkg-config
 setup-config
 test-1.0.tar.gz
-Saving old package config file... done.
 Writing new package config file... done.

@@ -10,13 +10,13 @@ ghcpkg01 :
 	@rm -f $(PKGCONF01)
 	echo "[]" >$(PKGCONF01)
 	$(LOCAL_GHC_PKG01) list
-	$(LOCAL_GHC_PKG01) register --force test.pkg
+	$(LOCAL_GHC_PKG01) register --force test.pkg 2>/dev/null
 	$(LOCAL_GHC_PKG01) describe testpkg
 	$(LOCAL_GHC_PKG01) describe testpkg-1.2.3.4
 	$(LOCAL_GHC_PKG01) field testpkg-1.2.3.4 import-dirs
 
 	@: # test2.pkg is a later version of testpkg-1.2.3.4
-	$(LOCAL_GHC_PKG01) register --force test2.pkg
+	$(LOCAL_GHC_PKG01) register --force test2.pkg 2>/dev/null
 	$(LOCAL_GHC_PKG01) list
 	$(LOCAL_GHC_PKG01) describe testpkg-2.0
 	$(LOCAL_GHC_PKG01) describe testpkg-*
@@ -97,9 +97,8 @@ COPY_PACKAGE_CONF = package.conf.copy
 GHC_PKG_COPY = $(GHC_PKG_INPLACE) --global-conf=$(COPY_PACKAGE_CONF)
 
 ghcpkg02:
-	cp $(GHC_DRIVER_DIR)/package.conf.inplace $(COPY_PACKAGE_CONF)
+	cp $(INPLACE_DATA_DIR)/package.conf $(COPY_PACKAGE_CONF)
 	for i in `$(GHC_PKG_COPY) list --global --simple-output`; do \
 		echo Updating $$i; \
 		$(GHC_PKG_COPY) describe --global $$i | $(GHC_PKG_COPY) update --global --force -; \
 	done
-
