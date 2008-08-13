@@ -158,12 +158,18 @@ ppCtor dat con = ldoc (con_doc con) ++ f (con_details con)
 ---------------------------------------------------------------------
 -- DOCUMENTATION
 
-ldoc :: Maybe (LHsDoc Name) -> [String]
+ldoc :: Outputable o => Maybe (LHsDoc o) -> [String]
 ldoc = doc . liftM unL
 
-doc :: Maybe (HsDoc Name) -> [String]
-doc Nothing = []
-doc (Just d) = "" : zipWith (++) ("-- | " : repeat "--   ") (showTags $ markup markupTag d)
+doc :: Outputable o => Maybe (HsDoc o) -> [String]
+doc = docWith ""
+
+
+docWith :: Outputable o => String -> Maybe (HsDoc o) -> [String]
+docWith [] Nothing = []
+docWith header d = ("":) $ zipWith (++) ("-- | " : repeat "--   ") $
+    [header | header /= ""] ++ ["" | header /= "" && isJust d] ++
+    maybe [] (showTags . markup markupTag) d
 
 
 data Tag = TagL Char [Tags] | TagP Tags | TagPre Tags | TagInline String Tags | Str String
@@ -181,7 +187,7 @@ str a = [Str a]
 -- or inlne for others (a,i,tt)
 -- entities (&,>,<) should always be appropriately escaped
 
-markupTag :: DocMarkup Name [Tag]
+markupTag :: Outputable o => DocMarkup o [Tag]
 markupTag = Markup {
   markupParagraph     = box TagP,
   markupEmpty         = str "",
