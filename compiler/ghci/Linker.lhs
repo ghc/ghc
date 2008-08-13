@@ -75,7 +75,7 @@ import System.FilePath
 import System.IO
 import System.Directory
 
-import Distribution.Package hiding (depends)
+import Distribution.Package hiding (depends, PackageId)
 
 import Exception
 import Data.Maybe

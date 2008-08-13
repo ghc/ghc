@@ -49,7 +49,7 @@ import Outputable
 
 import System.Environment ( getEnv )
 import Distribution.InstalledPackageInfo hiding (depends)
-import Distribution.Package hiding (depends)
+import Distribution.Package hiding (depends, PackageId)
 import Distribution.Text
 import Distribution.Version
 import FastString

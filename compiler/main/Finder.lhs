@@ -37,7 +37,7 @@ import FiniteMap
 import LazyUniqFM
 import Maybes		( expectJust )
 
-import Distribution.Package
+import Distribution.Package hiding (PackageId)
 import Data.IORef	( IORef, writeIORef, readIORef, modifyIORef )
 import Data.List
 import System.Directory

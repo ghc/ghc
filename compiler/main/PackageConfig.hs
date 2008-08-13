@@ -25,7 +25,7 @@ import Data.Maybe
 import Module
 import Distribution.InstalledPackageInfo
 import Distribution.ModuleName
-import Distribution.Package
+import Distribution.Package hiding (PackageId)
 import Distribution.Text
 import Distribution.Version
 import Distribution.Compat.ReadP
