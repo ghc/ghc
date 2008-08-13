@@ -46,6 +46,9 @@ module Control.Exception (
         NonTermination(..),
         NestedAtomically(..),
 #endif
+#ifdef __NHC__
+        System.ExitCode(),	-- instance Exception
+#endif
 
         BlockedOnDeadMVar(..),
         BlockedIndefinitely(..),
@@ -135,6 +138,10 @@ import GHC.IOBase
 import Data.Maybe
 #else
 import Prelude hiding (catch)
+#endif
+
+#ifdef __NHC__
+import System (ExitCode())
 #endif
 
 #if __GLASGOW_HASKELL__ || __HUGS__
