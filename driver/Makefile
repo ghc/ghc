@@ -9,7 +9,6 @@ include $(TOP)/mk/boilerplate.mk
 
 SUBDIRS = mangler split ghci
 
-INPLACE_DATA_DIR = $(FPTOOLS_TOP_ABS)/inplace-datadir
 INPLACE_PKG_CONF = $(INPLACE_DATA_DIR)/package.conf
 # Used to signal that we are inplace, as opposed to installed:
 INPLACE_FILE     = $(INPLACE_DATA_DIR)/inplace

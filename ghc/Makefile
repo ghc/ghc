@@ -44,9 +44,6 @@ clean.stage.%:
 	-$(CABAL) clean --distpref dist-stage$*
 	$(RM) -rf stage$*-inplace
 
-# XXX This should be defined somewhere more central
-INPLACE_DATA_DIR = $(FPTOOLS_TOP_ABS)/inplace-datadir
-
 CONFIGURE_FLAGS_STAGE1 += --flags=-ghci
 
 ifeq "$(GhcWithInterpreter)" "YES"
