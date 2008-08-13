@@ -135,7 +135,6 @@ import GHC.Base
 import GHC.Num
 import GHC.Show
 import GHC.IOBase ( IO )
-import GHC.IOBase (catchException)
 import qualified GHC.IOBase as ExceptionBase
 import qualified GHC.IOBase as New
 import GHC.Conc hiding (setUncaughtExceptionHandler,
@@ -398,7 +397,7 @@ catchDyn :: Typeable exception => IO a -> (exception -> IO a) -> IO a
 #ifdef __NHC__
 catchDyn m k = m        -- can't catch dyn exceptions in nhc98
 #else
-catchDyn m k = catchException m handle
+catchDyn m k = New.catch m handle
   where handle ex = case ex of
                            (DynException dyn) ->
                                 case fromDynamic dyn of
