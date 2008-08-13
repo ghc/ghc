@@ -23,8 +23,12 @@ import Haddock.Utils
 import Paths_haddock
 
 import Control.Monad
+#if __GLASGOW_HASKELL__ >= 609
+import Control.OldException
+import qualified Control.Exception as NewException
+#else
 import Control.Exception
-import Control.Exception
+#endif
 import Data.Dynamic
 import Data.Maybe
 import Data.IORef
@@ -37,8 +41,13 @@ import GHC
 import GHC.Paths
 import DynFlags
 import Bag
-import Util (handleDyn)
 import ErrUtils
+#if __GLASGOW_HASKELL__ >= 609
+import Panic (handleGhcException)
+import Util
+#else
+import Util hiding (handle)
+#endif
 
 
 --------------------------------------------------------------------------------
@@ -65,28 +74,41 @@ handleNormalExceptions inner =
 
 
 handleHaddockExceptions inner = 
-  handleDyn (\(e::HaddockException) -> do
-    putStrLn $ "haddock: " ++ (show e)
-    exitFailure
-  ) inner
+#if __GLASGOW_HASKELL__ >= 609
+  NewException.catches inner [NewException.Handler handler]
+#else
+  handleDyn handler inner
+#endif
+  where
+    handler (e::HaddockException) = do
+      putStrLn $ "haddock: " ++ (show e)
+      exitFailure
 
 
 handleGhcExceptions inner = 
   -- compilation errors: messages with locations attached
-  handleDyn (\dyn -> do
+#if __GLASGOW_HASKELL__ >= 609
+  handleErrMsg (\e -> do
+#else
+ handleDyn (\e -> do
+#endif
     putStrLn "haddock: Compilation error(s):"
-    printBagOfErrors defaultDynFlags (unitBag dyn)
+    printBagOfErrors defaultDynFlags (unitBag e)
     exitFailure
   ) $
 
   -- error messages propagated as exceptions
-  handleDyn (\dyn -> do
+#if __GLASGOW_HASKELL__ >= 609
+  handleGhcException (\e -> do
+#else
+  handleDyn (\e -> do
+#endif
     hFlush stdout
-    case dyn of
+    case e of
       PhaseFailed _ code -> exitWith code
       Interrupted -> exitFailure
       _ -> do 
-        print (dyn :: GhcException)
+        print (e :: GhcException)
         exitFailure
   ) inner
 
