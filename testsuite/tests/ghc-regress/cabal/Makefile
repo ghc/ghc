@@ -32,6 +32,10 @@ ghcpkg01 :
 
 	@: # test3.pkg  depends on testpkg-2.0
 	$(LOCAL_GHC_PKG01) register test3.pkg
+
+	@: # unregistering testpkg-2.0 should fail now, testpkg-3.0 depends on it
+	if $(LOCAL_GHC_PKG01) unregister testpkg-2.0; then false; else true; fi
+
 	$(LOCAL_GHC_PKG01) unregister testpkg-3.0
 
 	$(LOCAL_GHC_PKG01) unregister testpkg-2.0
