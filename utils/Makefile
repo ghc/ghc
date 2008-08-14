@@ -52,7 +52,7 @@ endif
 
 WITH_BOOTSTRAPPING_COMPILER = installPackage ghc-pkg hsc2hs hpc
 
-WITH_STAGE1 = installPackage ghc-pkg hasktags runghc hpc pwd
+WITH_STAGE1 = installPackage ghc-pkg hasktags runghc hpc pwd haddock
 ifneq "$(NO_INSTALL_HSC2HS)" "YES"
 WITH_STAGE1 += hsc2hs
 endif
