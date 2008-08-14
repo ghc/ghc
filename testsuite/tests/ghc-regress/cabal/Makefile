@@ -77,6 +77,26 @@ ghcpkg04 :
 	@: # testpkg-1.2.3.4 and newtestpkg-2.0 are both exposed now
 	$(TEST_HC) -package-conf $(PKGCONF04) -c ghcpkg04.hs || true
 
+# Test stacking of package.confs (also #2441)
+PKGCONF05a=local05a.package.conf
+PKGCONF05b=local05b.package.conf
+LOCAL_GHC_PKG05a = $(GHC_PKG_INPLACE) -f $(PKGCONF05a)
+LOCAL_GHC_PKG05b = $(GHC_PKG_INPLACE) -f $(PKGCONF05a) -f $(PKGCONF05b)
+
+ghcpkg05 :
+	rm -f $(PKGCONF05a) $(PKGCONF05b)
+	echo "[]" >$(PKGCONF05a)
+	echo "[]" >$(PKGCONF05b)
+	$(LOCAL_GHC_PKG05a) register --force test2.pkg >/dev/null 2>&1 
+	$(LOCAL_GHC_PKG05b) register --force test3.pkg >/dev/null 2>&1 
+	$(LOCAL_GHC_PKG05b) check
+	$(LOCAL_GHC_PKG05b) list
+	$(LOCAL_GHC_PKG05b) expose testpkg-2.0
+	$(LOCAL_GHC_PKG05b) hide   testpkg-2.0
+	if $(LOCAL_GHC_PKG05b) unregister testpkg-2.0; then false; else true; fi
+	$(LOCAL_GHC_PKG05b) unregister testpkg-3.0
+	$(LOCAL_GHC_PKG05b) unregister testpkg-2.0
+
 PKGCONF1750=local1750.package.conf
 LOCAL_GHC_PKG1750 = $(GHC_PKG_INPLACE) -f $(PKGCONF1750)
 
