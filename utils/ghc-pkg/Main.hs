@@ -359,14 +359,15 @@ globVersion = Version{ versionBranch=[], versionTags=["*"] }
 type PackageDBName  = FilePath
 type PackageDB      = [InstalledPackageInfo]
 
-type PackageDBStack = [(PackageDBName,PackageDB)]
+type NamedPackageDB = (PackageDBName, PackageDB)
+type PackageDBStack = [NamedPackageDB]
         -- A stack of package databases.  Convention: head is the topmost
         -- in the stack.  Earlier entries override later one.
 
 allPackagesInStack :: PackageDBStack -> [InstalledPackageInfo]
 allPackagesInStack = concatMap snd
 
-getPkgDatabases :: Bool -> [Flag] -> IO PackageDBStack
+getPkgDatabases :: Bool -> [Flag] -> IO (PackageDBStack, Maybe PackageDBName)
 getPkgDatabases modify my_flags = do
   -- first we determine the location of the global package config.  On Windows,
   -- this is found relative to the ghc-pkg.exe binary, whereas on Unix the
@@ -445,14 +446,14 @@ getPkgDatabases modify my_flags = do
                is_db_flag (FlagConfig f) = Just f
                is_db_flag _              = Nothing
 
-  final_stack <-
+  (final_stack, to_modify) <-
      if not modify
         then    -- For a "read" command, we use all the databases
                 -- specified on the command line.  If there are no
                 -- command-line flags specifying databases, the default
                 -- is to use all the ones we know about.
-             if null db_flags then return env_stack 
-                              else return (reverse (nub db_flags))
+             if null db_flags then return (env_stack, Nothing)
+                              else return (reverse (nub db_flags), Nothing)
         else let
                 -- For a "modify" command, treat all the databases as
                 -- a stack, where we are modifying the top one, but it
@@ -466,16 +467,16 @@ getPkgDatabases modify my_flags = do
                                 [ f | FlagConfig f <- reverse my_flags ]
                                 ++ env_stack
 
-                modifying f
-                  | f `elem` flag_stack = return (dropWhile (/= f) flag_stack)
-                  | otherwise           = die ("requesting modification of database:\n\t" ++ f ++ "\n\twhich is not in the database stack.")
+                -- the database we actually modify is the one mentioned
+                -- rightmost on the command-line.
+                to_modify = if null db_flags 
+                                then Just virt_global_conf
+                                else Just (last db_flags)
              in
-                if null db_flags 
-                   then modifying virt_global_conf
-                   else modifying (head db_flags)
+                return (flag_stack, to_modify)
 
   db_stack <- mapM readParseDatabase final_stack
-  return db_stack
+  return (db_stack, to_modify)
 
 readParseDatabase :: PackageDBName -> IO (PackageDBName,PackageDB)
 readParseDatabase filename = do
@@ -499,12 +500,11 @@ registerPackage :: FilePath
                 -> Force
                 -> IO ()
 registerPackage input my_flags auto_ghci_libs update force = do
-  db_stack <- getPkgDatabases True my_flags
+  (db_stack, Just to_modify) <- getPkgDatabases True my_flags
   let
-        db_to_operate_on = my_head "db" db_stack
-        db_filename      = fst db_to_operate_on
+        db_to_operate_on = my_head "register" $
+                           filter ((== to_modify).fst) db_stack
   --
-
   s <-
     case input of
       "-" -> do
@@ -519,10 +519,13 @@ registerPackage input my_flags auto_ghci_libs update force = do
   pkg <- parsePackageInfo expanded
   putStrLn "done."
 
-  validatePackageConfig pkg db_stack auto_ghci_libs update force
+  let truncated_stack = dropWhile ((/= to_modify).fst) db_stack
+  -- truncate the stack for validation, because we don't allow
+  -- packages lower in the stack to refer to those higher up.
+  validatePackageConfig pkg truncated_stack auto_ghci_libs update force
   let new_details = filter not_this (snd db_to_operate_on) ++ [pkg]
       not_this p = package p /= package pkg
-  writeNewConfig db_filename new_details
+  writeNewConfig to_modify new_details
 
 parsePackageInfo
         :: String
@@ -553,19 +556,24 @@ modifyPackage
   -> Force
   -> IO ()
 modifyPackage fn pkgid my_flags force = do
-  db_stack <- getPkgDatabases True{-modify-} my_flags
-  let old_broken = brokenPackages (allPackagesInStack db_stack)
-  let ((db_name, pkgs) : rest_of_stack) = db_stack
-  ps <- findPackages [(db_name,pkgs)] (Id pkgid)
-  let pids = map package ps
-  let new_config = concat (map modify pkgs)
+  (db_stack, Just to_modify) <- getPkgDatabases True{-modify-} my_flags
+  ((db_name, pkgs), ps) <- fmap head $ findPackagesByDB db_stack (Id pkgid)
+--  let ((db_name, pkgs) : rest_of_stack) = db_stack
+--  ps <- findPackages [(db_name,pkgs)] (Id pkgid)
+  let 
+      pids = map package ps
       modify pkg
           | package pkg `elem` pids = fn pkg
           | otherwise               = [pkg]
-  let new_stack = (db_name,new_config) : rest_of_stack
+      new_config = concat (map modify pkgs)
+
+  let
+      old_broken = brokenPackages (allPackagesInStack db_stack)
+      rest_of_stack = [ (nm,pkgs) | (nm,pkgs) <- db_stack, nm /= db_name ]
+      new_stack = (db_name,new_config) : rest_of_stack
       new_broken = map package (brokenPackages (allPackagesInStack new_stack))
       newly_broken = filter (`notElem` map package old_broken) new_broken
-
+  --
   when (not (null newly_broken)) $
       dieOrForceAll force ("unregistering " ++ display pkgid ++
            " would break the following packages: "
@@ -579,7 +587,7 @@ modifyPackage fn pkgid my_flags force = do
 listPackages ::  [Flag] -> Maybe PackageArg -> Maybe (String->Bool) -> IO ()
 listPackages my_flags mPackageName mModuleName = do
   let simple_output = FlagSimpleOutput `elem` my_flags
-  db_stack <- getPkgDatabases False my_flags
+  (db_stack, _) <- getPkgDatabases False my_flags
   let db_stack_filtered -- if a package is given, filter out all other packages
         | Just this <- mPackageName =
             map (\(conf,pkgs) -> (conf, filter (this `matchesPkg`) pkgs))
@@ -631,7 +639,7 @@ listPackages my_flags mPackageName mModuleName = do
 
 latestPackage ::  [Flag] -> PackageIdentifier -> IO ()
 latestPackage my_flags pkgid = do
-  db_stack <- getPkgDatabases False my_flags
+  (db_stack, _) <- getPkgDatabases False my_flags
   ps <- findPackages db_stack (Id pkgid)
   show_pkg (sortBy compPkgIdVer (map package ps))
   where
@@ -643,13 +651,13 @@ latestPackage my_flags pkgid = do
 
 describePackage :: [Flag] -> PackageArg -> IO ()
 describePackage my_flags pkgarg = do
-  db_stack <- getPkgDatabases False my_flags
+  (db_stack, _) <- getPkgDatabases False my_flags
   ps <- findPackages db_stack pkgarg
   doDump ps
 
 dumpPackages :: [Flag] -> IO ()
 dumpPackages my_flags = do
-  db_stack <- getPkgDatabases False my_flags
+  (db_stack, _) <- getPkgDatabases False my_flags
   doDump (allPackagesInStack db_stack)
 
 doDump :: [InstalledPackageInfo] -> IO ()
@@ -658,13 +666,20 @@ doDump = mapM_ putStrLn . intersperse "---" . map showInstalledPackageInfo
 -- PackageId is can have globVersion for the version
 findPackages :: PackageDBStack -> PackageArg -> IO [InstalledPackageInfo]
 findPackages db_stack pkgarg
-  = case [ p | p <- all_pkgs, pkgarg `matchesPkg` p ] of
-        []  -> dieWith 2 ("cannot find package " ++ pkg_msg pkgarg)
+  = fmap (concatMap snd) $ findPackagesByDB db_stack pkgarg
+
+findPackagesByDB :: PackageDBStack -> PackageArg
+                 -> IO [(NamedPackageDB, [InstalledPackageInfo])]
+findPackagesByDB db_stack pkgarg
+  = case [ (db, matched)
+         | db@(db_name,pkgs) <- db_stack,
+           let matched = filter (pkgarg `matchesPkg`) pkgs,
+           not (null matched) ] of
+        [] -> die ("cannot find package " ++ pkg_msg pkgarg)
         ps -> return ps
   where
-        all_pkgs = allPackagesInStack db_stack
         pkg_msg (Id pkgid)           = display pkgid
-        pkg_msg (Substring pkgpat _) = "matching "++pkgpat
+        pkg_msg (Substring pkgpat _) = "matching " ++ pkgpat
 
 matches :: PackageIdentifier -> PackageIdentifier -> Bool
 pid `matches` pid'
@@ -683,7 +698,7 @@ compPkgIdVer p1 p2 = pkgVersion p1 `compare` pkgVersion p2
 
 describeField :: [Flag] -> PackageArg -> [String] -> IO ()
 describeField my_flags pkgarg fields = do
-  db_stack <- getPkgDatabases False my_flags
+  (db_stack, _) <- getPkgDatabases False my_flags
   fns <- toFields fields
   ps <- findPackages db_stack pkgarg
   let top_dir = takeDirectory (fst (last db_stack))
@@ -749,7 +764,7 @@ strList = show
 
 checkConsistency :: [Flag] -> IO ()
 checkConsistency my_flags = do
-  db_stack <- getPkgDatabases True my_flags
+  (db_stack, _) <- getPkgDatabases True my_flags
          -- check behaves like modify for the purposes of deciding which
          -- databases to use, because ordering is important.
   let pkgs = allPackagesInStack db_stack
