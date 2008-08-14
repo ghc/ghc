@@ -286,3 +286,11 @@ test('syn-perf2', normal, compile, [''])
 test('LoopOfTheDay1', normal, compile, [''])
 test('LoopOfTheDay2', normal, compile, [''])
 test('LoopOfTheDay3', normal, compile, [''])
+
+test('T2412',
+     extra_clean(['T2412.hi-boot', 'T2412.o-boot',
+                  'T2412A.hi', 'T2412A.o',
+                  'T2412.hi', 'T2412.o']),
+     run_command,
+     ['$MAKE --no-print-directory -s T2412'])
+
