@@ -9,10 +9,10 @@
 
 void errorBelch2(const char*s, char *t)
 {
-    return errorBelch(s,t);
+    errorBelch(s,t);
 }
 
 void debugBelch2(const char*s, char *t)
 {
-    return debugBelch(s,t);
+    debugBelch(s,t);
 }
