@@ -102,6 +102,7 @@ data Flag
   | FlagSimpleOutput
   | FlagNamesOnly
   | FlagIgnoreCase
+  | FlagNoUserDb
   deriving Eq
 
 flags :: [OptDescr Flag]
@@ -114,6 +115,8 @@ flags = [
         "use the specified package config file",
   Option [] ["global-conf"] (ReqArg FlagGlobalConfig "FILE")
         "location of the global package config",
+  Option [] ["no-user-package-conf"] (NoArg FlagNoUserDb)
+        "never read the user package database",
   Option [] ["force"] (NoArg FlagForce)
          "ignore missing dependencies, directories, and libraries",
   Option [] ["force-files"] (NoArg FlagForceFiles)
@@ -397,11 +400,14 @@ getPkgDatabases modify my_flags = do
                      , isSuffixOf ".conf" file]
       else return []
 
+  let no_user_db = FlagNoUserDb `elem` my_flags
+
   -- get the location of the user package database, and create it if necessary
   -- getAppUserDataDirectory can fail (e.g. if $HOME isn't set)
   appdir <- try $ getAppUserDataDirectory "ghc"
 
   mb_user_conf <-
+     if no_user_db then return Nothing else
      case appdir of
        Right dir -> do
                let subdir = targetARCH ++ '-':targetOS ++ '-':Version.version
