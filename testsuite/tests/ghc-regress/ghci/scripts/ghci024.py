@@ -159,6 +159,7 @@ other dynamic, non-language, flag settings:
   -fno-warn-unused-imports
   -fno-warn-unused-matches
   -fwarn-warnings-deprecations
+  -fwarn-deprecations
   -fwarn-deprecated-flags
   -fno-warn-orphans
   -fno-warn-tabs
