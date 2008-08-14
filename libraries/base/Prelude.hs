@@ -165,7 +165,9 @@ import GHC.Show
 import GHC.Err   ( error, undefined )
 #endif
 
-import qualified Control.OldException as Old hiding ( throw )
+#ifndef __HUGS__
+import qualified Control.Exception.Base as New (catch)
+#endif
 
 #ifdef __HUGS__
 import Hugs.Prelude
@@ -190,6 +192,7 @@ seq :: a -> b -> b
 seq _ y = y
 #endif
 
+#ifndef __HUGS__
 -- | The 'catch' function establishes a handler that receives any 'IOError'
 -- raised in the action protected by 'catch'.  An 'IOError' is caught by
 -- the most recent handler established by 'catch'.  These handlers are
@@ -209,7 +212,5 @@ seq _ y = y
 -- Non-I\/O exceptions are not caught by this variant; to catch all
 -- exceptions, use 'Control.Exception.catch' from "Control.Exception".
 catch :: IO a -> (IOError -> IO a) -> IO a
-catch io handler = io `Old.catch` handler'
-    where handler' (Old.IOException ioe) = handler ioe
-          handler' e                     = throw e
-
+catch = New.catch
+#endif /* !__HUGS__ */
