@@ -232,14 +232,12 @@ ALL_CONFIGURE_FLAGS = \
 	           $(CONFIGURE_OPTS)
 
 stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).dph/dph-par: \
-    create_dph-par
+    dph/dph-par
 
 stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).dph/dph-seq: \
-    create_dph-seq
+    dph/dph-seq
 
-.PHONY: dph-create_par create_dph-seq
-
-create_dph-par create_dph-seq: create_%:
+dph/%:
 	$(MAKE) -C dph $*
 
 $(foreach SUBDIR,$(SUBDIRS), \
