@@ -150,7 +150,7 @@ import Hugs.Prelude     as New (ExitCode(..))
 #endif
 
 import qualified Control.Exception as New
-import           Control.Exception ( throw, SomeException, block, unblock, evaluate, throwIO )
+import           Control.Exception ( throw, SomeException(..), block, unblock, evaluate, throwIO )
 import System.IO.Error  hiding ( catch, try )
 import System.IO.Unsafe (unsafePerformIO)
 import Data.Dynamic
@@ -255,30 +255,9 @@ assert False _ = throw (UserError "" "Assertion failed")
 catch   :: IO a                 -- ^ The computation to run
         -> (Exception -> IO a)  -- ^ Handler to invoke if an exception is raised
         -> IO a
-catch io handler =
-    -- We need to catch all the sorts of exceptions that used to be
-    -- bundled up into the Exception type, and rebundle them for the
-    -- legacy handler we've been given.
-    io `New.catches`
-        [New.Handler (\e -> handler e),
-         New.Handler (\exc -> handler (ArithException exc)),
-         New.Handler (\exc -> handler (ArrayException exc)),
-         New.Handler (\(New.AssertionFailed err) -> handler (AssertionFailed err)),
-         New.Handler (\exc -> handler (AsyncException exc)),
-         New.Handler (\New.BlockedOnDeadMVar -> handler BlockedOnDeadMVar),
-         New.Handler (\New.BlockedIndefinitely -> handler BlockedIndefinitely),
-         New.Handler (\New.NestedAtomically -> handler NestedAtomically),
-         New.Handler (\New.Deadlock -> handler Deadlock),
-         New.Handler (\exc -> handler (DynException exc)),
-         New.Handler (\(New.ErrorCall err) -> handler (ErrorCall err)),
-         New.Handler (\exc -> handler (ExitException exc)),
-         New.Handler (\exc -> handler (IOException exc)),
-         New.Handler (\(New.NoMethodError err) -> handler (NoMethodError err)),
-         New.Handler (\New.NonTermination -> handler NonTermination),
-         New.Handler (\(New.PatternMatchFail err) -> handler (PatternMatchFail err)),
-         New.Handler (\(New.RecConError err) -> handler (RecConError err)),
-         New.Handler (\(New.RecSelError err) -> handler (RecSelError err)),
-         New.Handler (\(New.RecUpdError err) -> handler (RecUpdError err))]
+-- note: bundling the exceptions is done in the ExceptionBase.Exception
+-- instance of Exception; see below.
+catch = New.catch
 
 -- | The function 'catchJust' is like 'catch', but it takes an extra
 -- argument which is an /exception predicate/, a function which
@@ -723,9 +702,57 @@ INSTANCE_TYPEABLE0(Exception,exceptionTc,"Exception")
 nonTermination :: SomeException
 nonTermination = New.toException NonTermination
 
--- For now at least, make the monolithic Exception type an instance of
--- the Exception class
-instance New.Exception Exception
+-- helper type for simplifying the type casting logic below
+data Caster = forall e . ExceptionBase.Exception e => Caster (e -> Exception)
+
+instance New.Exception Exception where
+  -- We need to collect all the sorts of exceptions that used to be
+  -- bundled up into the Exception type, and rebundle them for
+  -- legacy handlers.
+  fromException (SomeException exc) = foldr tryCast Nothing casters where
+    tryCast (Caster f) e = case cast exc of
+      Just exc -> Just (f exc)
+      _        -> e
+    casters =
+      [Caster (\e -> e),
+       Caster (\exc -> ArithException exc),
+       Caster (\exc -> ArrayException exc),
+       Caster (\(New.AssertionFailed err) -> AssertionFailed err),
+       Caster (\exc -> AsyncException exc),
+       Caster (\New.BlockedOnDeadMVar -> BlockedOnDeadMVar),
+       Caster (\New.BlockedIndefinitely -> BlockedIndefinitely),
+       Caster (\New.NestedAtomically -> NestedAtomically),
+       Caster (\New.Deadlock -> Deadlock),
+       Caster (\exc -> DynException exc),
+       Caster (\(New.ErrorCall err) -> ErrorCall err),
+       Caster (\exc -> ExitException exc),
+       Caster (\exc -> IOException exc),
+       Caster (\(New.NoMethodError err) -> NoMethodError err),
+       Caster (\New.NonTermination -> NonTermination),
+       Caster (\(New.PatternMatchFail err) -> PatternMatchFail err),
+       Caster (\(New.RecConError err) -> RecConError err),
+       Caster (\(New.RecSelError err) -> RecSelError err),
+       Caster (\(New.RecUpdError err) -> RecUpdError err)]
+
+  -- Unbundle exceptions.
+  toException (ArithException exc)   = SomeException exc
+  toException (ArrayException exc)   = SomeException exc
+  toException (AssertionFailed err)  = SomeException (New.AssertionFailed err)
+  toException (AsyncException exc)   = SomeException exc
+  toException BlockedOnDeadMVar      = SomeException New.BlockedOnDeadMVar
+  toException BlockedIndefinitely    = SomeException New.BlockedIndefinitely
+  toException NestedAtomically       = SomeException New.NestedAtomically
+  toException Deadlock               = SomeException New.Deadlock
+  toException (DynException exc)     = SomeException exc
+  toException (ErrorCall err)        = SomeException (New.ErrorCall err)
+  toException (ExitException exc)    = SomeException exc
+  toException (IOException exc)      = SomeException exc
+  toException (NoMethodError err)    = SomeException (New.NoMethodError err)
+  toException NonTermination         = SomeException NonTermination
+  toException (PatternMatchFail err) = SomeException (New.PatternMatchFail err)
+  toException (RecConError err)      = SomeException (New.RecConError err)
+  toException (RecSelError err)      = SomeException (New.RecSelError err)
+  toException (RecUpdError err)      = SomeException (New.RecUpdError err)
 
 instance Show Exception where
   showsPrec _ (IOException err)          = shows err
