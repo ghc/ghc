@@ -31,6 +31,8 @@ module Data.Traversable (
         Traversable(..),
         for,
         forM,
+        mapAccumL,
+        mapAccumR,
         fmapDefault,
         foldMapDefault,
         ) where
@@ -113,6 +115,48 @@ for = flip traverse
 forM :: (Traversable t, Monad m) => t a -> (a -> m b) -> m (t b)
 {-# INLINE forM #-}
 forM = flip mapM
+
+-- left-to-right state transformer
+newtype StateL s a = StateL { runStateL :: s -> (s, a) }
+
+instance Functor (StateL s) where
+        fmap f (StateL k) = StateL $ \ s ->
+                let (s', v) = k s in (s', f v)
+
+instance Applicative (StateL s) where
+        pure x = StateL (\ s -> (s, x))
+        StateL kf <*> StateL kv = StateL $ \ s ->
+                let (s', f) = kf s
+                    (s'', v) = kv s'
+                in (s'', f v)
+
+-- |The 'mapAccumL' function behaves like a combination of 'fmap'
+-- and 'foldl'; it applies a function to each element of a structure,
+-- passing an accumulating parameter from left to right, and returning
+-- a final value of this accumulator together with the new structure.
+mapAccumL :: Traversable t => (a -> b -> (a, c)) -> a -> t b -> (a, t c)
+mapAccumL f s t = runStateL (traverse (StateL . flip f) t) s
+
+-- right-to-left state transformer
+newtype StateR s a = StateR { runStateR :: s -> (s, a) }
+
+instance Functor (StateR s) where
+        fmap f (StateR k) = StateR $ \ s ->
+                let (s', v) = k s in (s', f v)
+
+instance Applicative (StateR s) where
+        pure x = StateR (\ s -> (s, x))
+        StateR kf <*> StateR kv = StateR $ \ s ->
+                let (s', v) = kv s
+                    (s'', f) = kf s'
+                in (s'', f v)
+
+-- |The 'mapAccumR' function behaves like a combination of 'fmap'
+-- and 'foldr'; it applies a function to each element of a structure,
+-- passing an accumulating parameter from right to left, and returning
+-- a final value of this accumulator together with the new structure.
+mapAccumR :: Traversable t => (a -> b -> (a, c)) -> a -> t b -> (a, t c)
+mapAccumR f s t = runStateR (traverse (StateR . flip f) t) s
 
 -- | This function may be used as a value for `fmap` in a `Functor` instance.
 fmapDefault :: Traversable t => (a -> b) -> t a -> t b
