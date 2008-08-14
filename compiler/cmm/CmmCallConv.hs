@@ -9,29 +9,31 @@ module CmmCallConv (
   ParamLocation(..),
   ArgumentFormat,
   assignArguments,
+  assignArgumentsPos,
   argumentsSize,
 ) where
 
 #include "HsVersions.h"
 
 import Cmm
-import MachOp
 import SMRep
 
 import Constants
 import StaticFlags (opt_Unregisterised)
+import Outputable
 import Panic
 
 -- Calculate the 'GlobalReg' or stack locations for function call
 -- parameters as used by the Cmm calling convention.
 
-data ParamLocation
+data ParamLocation a
   = RegisterParam GlobalReg
-  | StackParam WordOff
+  | StackParam a
 
-type ArgumentFormat a = [(a, ParamLocation)]
+type ArgumentFormat a b = [(a, ParamLocation b)]
 
-assignArguments :: (a -> MachRep) -> [a] -> ArgumentFormat a
+-- Stack parameters are returned as word offsets.
+assignArguments :: (a -> CmmType) -> [a] -> ArgumentFormat a WordOff
 assignArguments f reps = assignments
     where
       (sizes, assignments) = unzip $ assignArguments' reps (negate (sum sizes)) availRegs
@@ -40,20 +42,38 @@ assignArguments f reps = assignments
           (size,(r,assignment)):assignArguments' rs new_offset remaining
           where 
             (assignment, new_offset, size, remaining) =
-                assign_reg (f r) offset availRegs
+                assign_reg False assign_slot_up (f r) offset availRegs
 
-argumentsSize :: (a -> MachRep) -> [a] -> WordOff
+-- | JD: For the new stack story, I want arguments passed on the stack to manifest as
+-- positive offsets in a CallArea, not negative offsets from the stack pointer.
+-- Also, I want byte offsets, not word offsets.
+-- The first argument tells us whether we are assigning positions for call arguments
+-- or return results. The distinction matters because we reserve different
+-- global registers in each case.
+assignArgumentsPos :: Bool -> (a -> CmmType) -> [a] -> ArgumentFormat a ByteOff
+assignArgumentsPos isCall arg_ty reps = map cvt assignments
+    where
+      (sizes, assignments) = unzip $ assignArguments' reps 0 availRegs
+      assignArguments' [] _ _ = []
+      assignArguments' (r:rs) offset avails =
+          (size,(r,assignment)):assignArguments' rs new_offset remaining
+          where 
+            (assignment, new_offset, size, remaining) =
+                assign_reg isCall assign_slot_down (arg_ty r) offset avails
+      cvt (l, RegisterParam r) = (l, RegisterParam r)
+      cvt (l, StackParam off)  = (l, StackParam $ off * wORD_SIZE)
+
+argumentsSize :: (a -> CmmType) -> [a] -> WordOff
 argumentsSize f reps = maximum (0 : map arg_top args)
     where
       args = assignArguments f reps
-
       arg_top (a, StackParam offset) = -offset
       arg_top (_, RegisterParam _) = 0
 
 -----------------------------------------------------------------------------
 -- Local information about the registers available
 
-type AvailRegs = ( [GlobalReg]   -- available vanilla regs.
+type AvailRegs = ( [VGcPtr -> GlobalReg]   -- available vanilla regs.
 		 , [GlobalReg]   -- floats
 		 , [GlobalReg]   -- doubles
 		 , [GlobalReg]   -- longs (int64 and word64)
@@ -81,20 +101,49 @@ availRegs = (regList VanillaReg useVanillaRegs,
     where
       regList f max = map f [1 .. max]
 
+-- Round the size of a local register up to the nearest word.
 slot_size :: LocalReg -> Int
-slot_size reg =
-    ((machRepByteWidth (localRegRep reg) - 1) `div` wORD_SIZE) + 1
+slot_size reg = slot_size' (typeWidth (localRegType reg))
 
-slot_size' :: MachRep -> Int
-slot_size' reg = ((machRepByteWidth reg - 1) `div` wORD_SIZE) + 1
+slot_size' :: Width -> Int
+slot_size' reg = ((widthInBytes reg - 1) `div` wORD_SIZE) + 1
 
-assign_reg :: MachRep -> WordOff -> AvailRegs -> (ParamLocation, WordOff, WordOff, AvailRegs)
-assign_reg I8  off (v:vs, fs, ds, ls) = (RegisterParam $ v, off, 0, (vs, fs, ds, ls))
-assign_reg I16 off (v:vs, fs, ds, ls) = (RegisterParam $ v, off, 0, (vs, fs, ds, ls))
-assign_reg I32 off (v:vs, fs, ds, ls) = (RegisterParam $ v, off, 0, (vs, fs, ds, ls))
-assign_reg I64 off (vs, fs, ds, l:ls) = (RegisterParam $ l, off, 0, (vs, fs, ds, ls))
-assign_reg I128 off _                 = panic "I128 is not a supported register type"
-assign_reg F32 off (vs, f:fs, ds, ls) = (RegisterParam $ f, off, 0, (vs, fs, ds, ls))
-assign_reg F64 off (vs, fs, d:ds, ls) = (RegisterParam $ d, off, 0, (vs, fs, ds, ls))
-assign_reg F80 off _                  = panic "F80 is not a supported register type"
-assign_reg reg off _                  = (StackParam $ off, off + size, size, ([], [], [], [])) where size = slot_size' reg
+type Assignment = (ParamLocation WordOff, WordOff, WordOff, AvailRegs)
+type SlotAssigner = Width -> Int -> AvailRegs -> Assignment
+
+assign_reg :: Bool -> SlotAssigner -> CmmType -> WordOff -> AvailRegs -> Assignment
+assign_reg isCall slot ty off avails
+  | isFloatType ty = assign_float_reg        slot width off avails
+  | otherwise      = assign_bits_reg  isCall slot width off gcp avails
+  where
+    width = typeWidth ty
+    gcp | isGcPtrType ty = VGcPtr
+	| otherwise  	 = VNonGcPtr
+
+-- Assigning a slot on a stack that grows up:
+-- JD: I don't know why this convention stops using all the registers
+--     after running out of one class of registers.
+assign_slot_up :: SlotAssigner
+assign_slot_up width off regs =
+  (StackParam $ off, off + size, size, ([], [], [], [])) where size = slot_size' width
+
+-- Assigning a slot on a stack that grows down:
+assign_slot_down :: SlotAssigner
+assign_slot_down width off regs =
+  (StackParam $ off + size, off + size, size, ([], [], [], []))
+  where size = slot_size' width
+
+-- On calls, `node` is used to hold the closure that is entered, so we can't
+-- pass arguments in that register.
+assign_bits_reg _ _ W128 _ _ _ = panic "I128 is not a supported register type"
+assign_bits_reg isCall assign_slot w off gcp regs@(v:vs, fs, ds, ls) =
+  if isCall && v gcp == node then
+    assign_bits_reg isCall assign_slot w off gcp (vs, fs, ds, ls)
+  else if widthInBits w <= widthInBits wordWidth then
+    (RegisterParam (v gcp), off, 0, (vs, fs, ds, ls))
+  else assign_slot w off regs
+
+assign_float_reg _ W32 off (vs, f:fs, ds, ls) = (RegisterParam $ f, off, 0, (vs, fs, ds, ls))
+assign_float_reg _ W64 off (vs, fs, d:ds, ls) = (RegisterParam $ d, off, 0, (vs, fs, ds, ls))
+assign_float_reg _ W80 off _                  = panic "F80 is not a supported register type"
+assign_float_reg assign_slot width off r = assign_slot width off r

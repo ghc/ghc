@@ -1,11 +1,9 @@
 
 module CmmSpillReload
-  ( ExtendWithSpills(..)
-  , DualLive(..)
+  ( DualLive(..)
   , dualLiveLattice, dualLiveTransfers, dualLiveness
   --, insertSpillsAndReloads  --- XXX todo check live-in at entry against formals
   , dualLivenessWithInsertion
-  , elimSpillAndReload
 
   , availRegsLattice
   , cmmAvailableReloads
@@ -41,16 +39,9 @@ import Prelude hiding (zip)
 -- establish the invariant that at a call (or at any proc point with
 -- an established protocol) all live variables not expected in
 -- registers are sitting on the stack.  We use a backward analysis to
--- insert spills and reloads.  It should some day be followed by a
+-- insert spills and reloads.  It should be followed by a
 -- forward transformation to sink reloads as deeply as possible, so as
 -- to reduce register pressure.
-
-data ExtendWithSpills m
-    = NotSpillOrReload m
-    | Spill  RegSet
-    | Reload RegSet
-
-type M = ExtendWithSpills Middle
 
 -- A variable can be expected to be live in a register, live on the
 -- stack, or both.  This analysis ensures that spills and reloads are
@@ -70,8 +61,8 @@ dualUnionList ls = DualLive ss rs
     where ss = unionManyUniqSets $ map on_stack ls
           rs = unionManyUniqSets $ map in_regs  ls
 
-_changeStack, changeRegs :: (RegSet -> RegSet) -> DualLive -> DualLive
-_changeStack f live = live { on_stack = f (on_stack live) }
+changeStack, changeRegs :: (RegSet -> RegSet) -> DualLive -> DualLive
+changeStack f live = live { on_stack = f (on_stack live) }
 changeRegs   f live = live { in_regs  = f (in_regs  live) }
 
 
@@ -85,24 +76,23 @@ dualLiveLattice =
                            return $ DualLive stack regs
           add1 = fact_add_to liveLattice
 
-type LiveReloadFix a = FuelMonad (BackwardFixedPoint M Last DualLive a)
+type LiveReloadFix a = FuelMonad (BackwardFixedPoint Middle Last DualLive a)
 
-dualLivenessWithInsertion :: BlockSet -> (Graph M Last) -> FuelMonad (Graph M Last)
+dualLivenessWithInsertion :: BlockSet -> (LGraph Middle Last) -> FuelMonad (LGraph Middle Last)
 dualLivenessWithInsertion procPoints g =
-  liftM zdfFpContents $ (res :: LiveReloadFix (Graph M Last))
-    where res = zdfRewriteFrom RewriteDeep emptyBlockEnv "dual liveness with insertion"
-                               dualLiveLattice (dualLiveTransfers procPoints)
-                               (insertSpillAndReloadRewrites procPoints) empty g
+  liftM zdfFpContents $ (res :: LiveReloadFix (LGraph Middle Last))
+    where res = zdfBRewriteFromL RewriteDeep emptyBlockEnv "dual liveness with insertion"
+                                 dualLiveLattice (dualLiveTransfers procPoints)
+                                 (insertSpillAndReloadRewrites procPoints) empty g
           empty = fact_bot dualLiveLattice
--- = a_ft_b_unlimited dualLiveness insertSpillsAndReloads
 
-dualLiveness :: BlockSet -> Graph M Last -> FuelMonad (BlockEnv DualLive)
+dualLiveness :: BlockSet -> LGraph Middle Last -> FuelMonad (BlockEnv DualLive)
 dualLiveness procPoints g = liftM zdfFpFacts $ (res :: LiveReloadFix ())
-    where res = zdfSolveFrom emptyBlockEnv "dual liveness" dualLiveLattice
-                             (dualLiveTransfers procPoints) empty g
+    where res = zdfSolveFromL emptyBlockEnv "dual liveness" dualLiveLattice
+                              (dualLiveTransfers procPoints) empty g
           empty = fact_bot dualLiveLattice
 
-dualLiveTransfers :: BlockSet -> BackwardTransfers M Last DualLive
+dualLiveTransfers :: BlockSet -> BackwardTransfers Middle Last DualLive
 dualLiveTransfers procPoints = BackwardTransfers first middle last
     where last   = lastDualLiveness
           middle = middleDualLiveness
@@ -112,29 +102,25 @@ dualLiveTransfers procPoints = BackwardTransfers first middle last
                        , in_regs  = emptyRegSet }
             else live
   
-
-middleDualLiveness :: DualLive -> M -> DualLive
-middleDualLiveness live (Spill regs) = live'
-    -- live-in on-stack requirements are satisfied;
-    -- live-out in-regs obligations are created
-    where live' = DualLive { on_stack = on_stack live `minusRegSet` regs
-                           , in_regs  = in_regs  live `plusRegSet`  regs }
-
-middleDualLiveness live (Reload regs) = live'
-    -- live-in in-regs requirements are satisfied;
-    -- live-out on-stack obligations are created
-    where live' = DualLive { on_stack = on_stack live `plusRegSet`  regs
-                           , in_regs  = in_regs  live `minusRegSet` regs }
-
-middleDualLiveness live (NotSpillOrReload m) = changeRegs (middleLiveness m) live
+middleDualLiveness :: DualLive -> Middle -> DualLive
+middleDualLiveness live m =
+  changeStack updSlots $ changeRegs (middleLiveness m) live
+    where updSlots live = foldSlotsUsed reload (foldSlotsDefd spill live m) m
+          spill  live s@(RegSlot r, _, _) = check s $ deleteFromRegSet live r
+          spill  live _ = live
+          reload live s@(RegSlot r, _, _) = check s $ extendRegSet live r
+          reload live _ = live
+          check (RegSlot (LocalReg _ ty), o, w) x
+             | o == w && w == widthInBytes (typeWidth ty) = x
+          check _ _ = panic "middleDualLiveness unsupported: slices"
 
 lastDualLiveness :: (BlockId -> DualLive) -> Last -> DualLive
 lastDualLiveness env l = last l
-  where last (LastReturn)            = empty
-        last (LastJump e)            = changeRegs (gen e) empty
-        last (LastBranch id)         = env id
-        last (LastCall tgt Nothing)  = changeRegs (gen tgt) empty
-        last (LastCall tgt (Just k)) = 
+  where last (LastReturn _)            = empty
+        last (LastJump e _)            = changeRegs (gen e) empty
+        last (LastBranch id)           = env id
+        last (LastCall tgt Nothing _)  = changeRegs (gen tgt) empty
+        last (LastCall tgt (Just k) _) = 
             -- nothing can be live in registers at this point
             let live = env k in
             if  isEmptyUniqSet (in_regs live) then
@@ -142,77 +128,52 @@ lastDualLiveness env l = last l
             else
                 pprTrace "Offending party:" (ppr k <+> ppr live) $
                 panic "live values in registers at call continuation"
-        last (LastCondBranch e t f) = changeRegs (gen e) $ dualUnion (env t) (env f)
-        last (LastSwitch e tbl)     = changeRegs (gen e) $ dualUnionList $
+        last (LastCondBranch e t f)   = changeRegs (gen e) $ dualUnion (env t) (env f)
+        last (LastSwitch e tbl)       = changeRegs (gen e) $ dualUnionList $
                                                              map env (catMaybes tbl)
         empty = fact_bot dualLiveLattice
                       
-gen, kill :: UserOfLocalRegs a => a -> RegSet -> RegSet
-gen  a live = foldRegsUsed extendRegSet      live a
-kill a live = foldRegsUsed delOneFromUniqSet live a
+gen :: UserOfLocalRegs a => a -> RegSet -> RegSet
+gen a live = foldRegsUsed extendRegSet      live a
 
-insertSpillAndReloadRewrites :: BlockSet -> BackwardRewrites M Last DualLive
+insertSpillAndReloadRewrites :: BlockSet -> BackwardRewrites Middle Last DualLive
 insertSpillAndReloadRewrites procPoints = BackwardRewrites first middle last exit
     where middle = middleInsertSpillsAndReloads
           last   = \_ _ -> Nothing
           exit = Nothing
           first live id =
             if elemBlockSet id procPoints && not (isEmptyUniqSet reloads) then
-              Just $ mkMiddles $ [Reload reloads]
+              Just $ mkMiddles $ map reload $ uniqSetToList reloads
             else Nothing
-              where reloads = in_regs live
+            where reloads = in_regs live
 
 
-middleInsertSpillsAndReloads :: DualLive -> M -> Maybe (AGraph M Last)
-middleInsertSpillsAndReloads _ (Spill _)  = Nothing
-middleInsertSpillsAndReloads _ (Reload _) = Nothing
-middleInsertSpillsAndReloads live m@(NotSpillOrReload nsr) = middle nsr
-  where middle (MidAssign (CmmLocal reg) _) = 
+middleInsertSpillsAndReloads :: DualLive -> Middle -> Maybe (AGraph Middle Last)
+middleInsertSpillsAndReloads live m = middle m
+  where middle (MidAssign (CmmLocal reg) (CmmLoad (CmmStackSlot (RegSlot reg') _) _))
+          | reg == reg' = Nothing
+        middle (MidAssign (CmmLocal reg) _) = 
             if reg `elemRegSet` on_stack live then -- must spill
-                my_trace "Spilling" (f4sep [text "spill" <+> ppr reg,
-                                            text "after", ppr m]) $
-                Just $ mkMiddles [m, Spill $ mkRegSet [reg]]
-            else
-                Nothing
-        middle (CopyIn _ formals _) = 
-            -- only 'formals' can be in regs at this point
-            let regs' = kill formals (in_regs live) -- live in regs; must reload
-                is_stack_var r = elemRegSet r (on_stack live)
-                needs_spilling = filterRegsUsed is_stack_var formals
-                   -- a formal that is expected on the stack; must spill
-            in  if isEmptyUniqSet regs' && isEmptyUniqSet needs_spilling then
-                    Nothing
-                else
-                    let code  = if isEmptyUniqSet regs' then []
-                                else Reload regs' : []
-                        code' = if isEmptyUniqSet needs_spilling then code
-                                else Spill needs_spilling : code
-                    in
-                    my_trace "At CopyIn" (f4sep [text "Triggered by ", ppr live,
-                                                 ppr (Reload regs' :: M),
-                                                 ppr (Spill needs_spilling :: M),
-                                                 text "after", ppr m]) $
-                    Just $ mkMiddles (m : code')
+                 my_trace "Spilling" (f4sep [text "spill" <+> ppr reg,
+                                             text "after", ppr m]) $
+                 Just $ mkMiddles $ [m, spill reg]
+            else Nothing
         middle _ = Nothing
                       
--- | For conversion back to vanilla C--
+-- Generating spill and reload code
+regSlot :: LocalReg -> CmmExpr
+regSlot r = CmmStackSlot (RegSlot r) (widthInBytes $ typeWidth $ localRegType r)
 
-elimSpillAndReload :: StackSlotMap -> LGraph M l -> (StackSlotMap, LGraph Middle l)
-elimSpillAndReload slots g = toGraph $ fold_blocks block ((slots, [])) g
-  where toGraph (slots, l) = (slots, of_block_list (lg_entry g) l)
-        block (Block id t) (slots, blocks) =
-          lift (\ t' -> Block id t' : blocks) $ tail t slots
-        tail (ZLast l)   slots = (slots, ZLast l)
-        tail (ZTail m t) slots = middle m $ tail t slots
-        middle (NotSpillOrReload m) (slots, t) = (slots, ZTail m t)
-        middle (Spill  regs)        z          = foldUniqSet spill  z regs
-        middle (Reload regs)        z          = foldUniqSet reload z regs
-        move f r (slots, t) =
-          lift (\ slot -> ZTail (f slot (CmmLocal r)) t) $ getSlot slots r
-        spill  = move (\ slot reg -> MidStore  slot (CmmReg reg))
-        reload = move (\ slot reg -> MidAssign reg slot)
-        lift f (slots, x) = (slots, f x)
+spill, reload :: LocalReg -> Middle
+spill  r = MidStore  (regSlot r) (CmmReg $ CmmLocal r)
+reload r = MidAssign (CmmLocal r) (CmmLoad (regSlot r) $ localRegType r)
 
+spillHead  :: ZHead Middle -> RegSet            -> ZHead Middle
+reloadTail :: RegSet       -> ZTail Middle Last -> ZTail Middle Last
+spillHead h regset = foldl spl h $ uniqSetToList regset
+  where spl h r = ZHead h $ spill r
+reloadTail regset t = foldl rel t $ uniqSetToList regset
+  where rel t r = ZTail (reload r) t
 
 ----------------------------------------------------------------
 --- sinking reloads
@@ -249,9 +210,9 @@ smallerAvail (UniverseMinus _) (AvailRegs     _)  = False
 smallerAvail (AvailRegs     s) (AvailRegs    s')  = sizeUniqSet s < sizeUniqSet s'
 smallerAvail (UniverseMinus s) (UniverseMinus s') = sizeUniqSet s > sizeUniqSet s'
 
-extendAvail :: AvailRegs -> LocalReg -> AvailRegs
-extendAvail (UniverseMinus s) r = UniverseMinus (deleteFromRegSet s r)
-extendAvail (AvailRegs     s) r = AvailRegs (extendRegSet s r)
+--extendAvail :: AvailRegs -> LocalReg -> AvailRegs
+--extendAvail (UniverseMinus s) r = UniverseMinus (deleteFromRegSet s r)
+--extendAvail (AvailRegs     s) r = AvailRegs (extendRegSet s r)
 
 deleteFromAvail :: AvailRegs -> LocalReg -> AvailRegs
 deleteFromAvail (UniverseMinus s) r = UniverseMinus (extendRegSet s r)
@@ -262,15 +223,15 @@ elemAvail (UniverseMinus s) r = not $ elemRegSet r s
 elemAvail (AvailRegs     s) r = elemRegSet r s
 
 type CmmAvail = BlockEnv AvailRegs
-type AvailFix = FuelMonad (ForwardFixedPoint M Last AvailRegs ())
+type AvailFix = FuelMonad (ForwardFixedPoint Middle Last AvailRegs ())
 
-cmmAvailableReloads :: Graph M Last -> FuelMonad CmmAvail
+cmmAvailableReloads :: LGraph Middle Last -> FuelMonad CmmAvail
 cmmAvailableReloads g = liftM zdfFpFacts $ (res :: AvailFix)
-    where res = zdfSolveFrom emptyBlockEnv "available reloads" availRegsLattice
-                             avail_reloads_transfer empty g
+    where res = zdfSolveFromL emptyBlockEnv "available reloads" availRegsLattice
+                              avail_reloads_transfer empty g
           empty = (fact_bot availRegsLattice)
 
-avail_reloads_transfer :: ForwardTransfers M Last AvailRegs
+avail_reloads_transfer :: ForwardTransfers Middle Last AvailRegs
 avail_reloads_transfer = ForwardTransfers first middle last id
   where first avail _ = avail
         middle        = flip middleAvail
@@ -278,36 +239,33 @@ avail_reloads_transfer = ForwardTransfers first middle last id
 
 -- | The transfer equations use the traditional 'gen' and 'kill'
 -- notations, which should be familiar from the dragon book.
-agen, akill :: UserOfLocalRegs a => a -> AvailRegs -> AvailRegs
-agen  a live = foldRegsUsed extendAvail     live a
+--agen, 
+akill :: UserOfLocalRegs a => a -> AvailRegs -> AvailRegs
+--agen  a live = foldRegsUsed extendAvail     live a
 akill a live = foldRegsUsed deleteFromAvail live a
 
 -- Note: you can't sink the reload past a use.
-middleAvail :: M -> AvailRegs -> AvailRegs
-middleAvail (Spill _) = id
-middleAvail (Reload regs) = agen regs
-middleAvail (NotSpillOrReload m) = middle m
+middleAvail :: Middle -> AvailRegs -> AvailRegs
+middleAvail m = middle m
   where middle m live = middle' m $ foldRegsUsed deleteFromAvail live m
         middle' (MidComment {})                 = id
         middle' (MidAssign lhs _expr)           = akill lhs
         middle' (MidStore {})                   = id
         middle' (MidUnsafeCall _tgt ress _args) = akill ress
         middle' (MidAddToContext {})            = id
-        middle' (CopyIn _ formals _)            = akill formals
-        middle' (CopyOut {})                    = id
 
 lastAvail :: AvailRegs -> Last -> LastOutFacts AvailRegs
-lastAvail _ (LastCall _ (Just k)) = LastOutFacts [(k, AvailRegs emptyRegSet)]
+lastAvail _ (LastCall _ (Just k) _) = LastOutFacts [(k, AvailRegs emptyRegSet)]
 lastAvail avail l = LastOutFacts $ map (\id -> (id, avail)) $ succs l
 
-insertLateReloads :: Graph M Last -> FuelMonad (Graph M Last)
+insertLateReloads :: LGraph Middle Last -> FuelMonad (LGraph Middle Last)
 insertLateReloads g =
   do env <- cmmAvailableReloads g
-     g   <- lGraphOfGraph g
-     liftM graphOfLGraph $ mapM_blocks (insertM env) g
+     mapM_blocks (insertM env) g
     where insertM env b = fuelConsumingPass "late reloads" (insert b)
             where avail id = lookupBlockEnv env id `orElse` AvailRegs emptyRegSet
-                  insert (Block id tail) fuel = propagate (ZFirst id) (avail id) tail fuel
+                  insert (Block id off tail) fuel =
+                    propagate (ZFirst id off) (avail id) tail fuel
                   propagate h avail (ZTail m t) fuel =
                       let (h', fuel') = maybe_add_reload h avail m fuel in
                       propagate (ZHead h' m) (middleAvail m avail) t fuel'
@@ -318,31 +276,31 @@ insertLateReloads g =
                       let used = filterRegsUsed (elemAvail avail) node
                       in  if not (canRewriteWithFuel fuel) || isEmptyUniqSet used
                           then (h,fuel)
-                          else (ZHead h (Reload used), oneLessFuel fuel)
+                          else (spillHead h used, oneLessFuel fuel)
 
-type LateReloadFix = FuelMonad (ForwardFixedPoint M Last AvailRegs (Graph M Last))
+type LateReloadFix = FuelMonad (ForwardFixedPoint Middle Last AvailRegs (LGraph Middle Last))
 
-insertLateReloads' :: (Graph M Last) -> FuelMonad (Graph M Last)
+insertLateReloads' :: (LGraph Middle Last) -> FuelMonad (LGraph Middle Last)
 insertLateReloads' g = liftM zdfFpContents $ (res :: LateReloadFix)
-    where res = zdfRewriteFrom RewriteShallow emptyBlockEnv "insert late reloads"
-                               availRegsLattice avail_reloads_transfer rewrites bot g
+    where res = zdfFRewriteFromL RewriteShallow emptyBlockEnv "insert late reloads"
+                                 availRegsLattice avail_reloads_transfer rewrites bot g
           bot = fact_bot availRegsLattice
           rewrites = ForwardRewrites first middle last exit
           first _ _ = Nothing
-          middle :: AvailRegs -> M -> Maybe (AGraph M Last)
-          last   :: AvailRegs -> Last -> Maybe (AGraph M Last)
+          middle :: AvailRegs -> Middle -> Maybe (AGraph Middle Last)
+          last   :: AvailRegs -> Last -> Maybe (AGraph Middle Last)
           middle avail m = maybe_reload_before avail m (ZTail m (ZLast LastExit))
           last avail l   = maybe_reload_before avail l (ZLast (LastOther l))
           exit _ = Nothing
           maybe_reload_before avail node tail =
               let used = filterRegsUsed (elemAvail avail) node
               in  if isEmptyUniqSet used then Nothing
-                  else Just $ mkZTail $ ZTail (Reload used) tail
+                  else Just $ mkZTail $ reloadTail used tail
           
-removeDeadAssignmentsAndReloads :: BlockSet -> (Graph M Last) -> FuelMonad (Graph M Last)
+removeDeadAssignmentsAndReloads :: BlockSet -> (LGraph Middle Last) -> FuelMonad (LGraph Middle Last)
 removeDeadAssignmentsAndReloads procPoints g =
-   liftM zdfFpContents $ (res :: LiveReloadFix (Graph M Last))
-     where res = zdfRewriteFrom RewriteDeep emptyBlockEnv "dead-assignment & -reload elim"
+   liftM zdfFpContents $ (res :: LiveReloadFix (LGraph Middle Last))
+     where res = zdfBRewriteFromL RewriteDeep emptyBlockEnv "dead-assignment & -reload elim"
                    dualLiveLattice (dualLiveTransfers procPoints)
                    rewrites (fact_bot dualLiveLattice) g
            rewrites = BackwardRewrites first middle last exit
@@ -351,16 +309,8 @@ removeDeadAssignmentsAndReloads procPoints g =
            middle = middleRemoveDeads
            first _ _ = Nothing
 
-middleRemoveDeads :: DualLive -> M -> Maybe (AGraph M Last)
-middleRemoveDeads _ (Spill _)  = Nothing
-middleRemoveDeads live (Reload s) =
-    if sizeUniqSet worth_reloading < sizeUniqSet s then
-        Just $ if isEmptyUniqSet worth_reloading then emptyAGraph
-               else mkMiddles [Reload worth_reloading]
-    else
-        Nothing
-  where worth_reloading = intersectUniqSets s (in_regs live)
-middleRemoveDeads live (NotSpillOrReload m) = middle m 
+middleRemoveDeads :: DualLive -> Middle -> Maybe (AGraph Middle Last)
+middleRemoveDeads live m = middle m 
   where middle (MidAssign (CmmLocal reg') _)
                | not (reg' `elemRegSet` in_regs live) = Just emptyAGraph
         middle _ = Nothing
@@ -368,23 +318,8 @@ middleRemoveDeads live (NotSpillOrReload m) = middle m
 
 
 ---------------------
--- register usage
-
-instance UserOfLocalRegs m => UserOfLocalRegs (ExtendWithSpills m) where
-    foldRegsUsed  f z (Spill  regs) = foldRegsUsed f z regs
-    foldRegsUsed _f z (Reload _)    = z
-    foldRegsUsed  f z (NotSpillOrReload m) = foldRegsUsed f z m
-
----------------------
 -- prettyprinting
 
-instance Outputable m => Outputable (ExtendWithSpills m) where
-    ppr (Spill  regs) = ppr_regs "Spill"  regs
-    ppr (Reload regs) = ppr_regs "Reload" regs
-    ppr (NotSpillOrReload m) = ppr m
-
-instance Outputable m => DebugNodes (ExtendWithSpills m) Last
-                               
 ppr_regs :: String -> RegSet -> SDoc
 ppr_regs s regs = text s <+> commafy (map ppr $ uniqSetToList regs)
   where commafy xs = hsep $ punctuate comma xs

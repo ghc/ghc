@@ -623,6 +623,7 @@ data CafInfo
 
 	| NoCafRefs			-- ^ A function or static constructor
 				        -- that refers to no CAFs.
+        deriving (Eq, Ord)
 
 -- | Assumes that the 'Id' has CAF references: definitely safe
 vanillaCafInfo :: CafInfo

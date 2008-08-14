@@ -17,7 +17,6 @@ import BlockId
 import Cmm
 import CLabel
 import CmmBrokenBlock -- Data types only
-import MachOp
 import CmmUtils
 import CmmCallConv
 
@@ -57,7 +56,7 @@ data Continuation info =
      info              -- Left <=> Continuation created by the CPS
                        -- Right <=> Function or Proc point
      CLabel            -- Used to generate both info & entry labels
-     CmmFormalsWithoutKinds        -- Argument locals live on entry (C-- procedure params)
+     CmmFormals        -- Argument locals live on entry (C-- procedure params)
      Bool              -- True <=> GC block so ignore stack size
      [BrokenBlock]     -- Code, may be empty.  The first block is
                        -- the entry point.  The order is otherwise initially 
@@ -70,7 +69,7 @@ data Continuation info =
 
 data ContinuationFormat
     = ContinuationFormat {
-        continuation_formals :: CmmFormalsWithoutKinds,
+        continuation_formals :: CmmFormals,
         continuation_label :: Maybe CLabel,	-- The label occupying the top slot
         continuation_frame_size :: WordOff,	-- Total frame size in words (not including arguments)
         continuation_stack :: [Maybe LocalReg]	-- local reg offsets from stack top
@@ -95,7 +94,7 @@ continuationToProc (max_stack, update_frame_size, formats) stack_use uniques
       curr_format = maybe unknown_block id $ lookup label formats
       unknown_block = panic "unknown BlockId in continuationToProc"
       curr_stack = continuation_frame_size curr_format
-      arg_stack = argumentsSize localRegRep formals
+      arg_stack = argumentsSize localRegType formals
 
       param_stmts :: [CmmStmt]
       param_stmts = function_entry curr_format
@@ -145,8 +144,8 @@ continuationToProc (max_stack, update_frame_size, formats) stack_use uniques
                      [BasicBlock new_next $
                       pack_continuation curr_format cont_format ++
                       tail_call (curr_stack - cont_stack)
-                              (CmmLit $ CmmLabel $ toCLabel next)
-                              arguments])
+                                (CmmLit $ CmmLabel $ toCLabel next)
+                                arguments])
 
                 -- branches to blocks in the current function don't have to jump
                 | otherwise
@@ -194,7 +193,7 @@ continuationToProc (max_stack, update_frame_size, formats) stack_use uniques
                         -- A return is a tail call to the stack top
                         FinalReturn arguments ->
                             tail_call curr_stack
-                                (entryCode (CmmLoad (CmmReg spReg) wordRep))
+                                (entryCode (CmmLoad (CmmReg spReg) bWord))
                                 arguments
 
                         -- A tail call
@@ -228,22 +227,22 @@ continuationToProc (max_stack, update_frame_size, formats) stack_use uniques
                                 foreignCall call_uniques (CmmPrim target)
                                             results arguments
 
-formal_to_actual reg = CmmKinded (CmmReg (CmmLocal reg)) NoHint
+formal_to_actual reg = CmmHinted (CmmReg (CmmLocal reg)) NoHint
 
-foreignCall :: [Unique] -> CmmCallTarget -> CmmFormals -> CmmActuals -> [CmmStmt]
+foreignCall :: [Unique] -> CmmCallTarget -> HintedCmmFormals -> HintedCmmActuals -> [CmmStmt]
 foreignCall uniques call results arguments =
     arg_stmts ++
     saveThreadState ++
     caller_save ++
     [CmmCall (CmmCallee suspendThread CCallConv)
-		 [ CmmKinded id PtrHint ]
-		 [ CmmKinded (CmmReg (CmmGlobal BaseReg)) PtrHint ]
+		 [ CmmHinted id AddrHint ]
+		 [ CmmHinted (CmmReg (CmmGlobal BaseReg)) AddrHint ]
 		 CmmUnsafe
                  CmmMayReturn,
      CmmCall call results new_args CmmUnsafe CmmMayReturn,
      CmmCall (CmmCallee resumeThread CCallConv)
-                 [ CmmKinded new_base PtrHint ]
-		 [ CmmKinded (CmmReg (CmmLocal id)) PtrHint ]
+                 [ CmmHinted new_base AddrHint ]
+		 [ CmmHinted (CmmReg (CmmLocal id)) AddrHint ]
 		 CmmUnsafe
                  CmmMayReturn,
      -- Assign the result to BaseReg: we
@@ -251,14 +250,14 @@ foreignCall uniques call results arguments =
      CmmAssign (CmmGlobal BaseReg) (CmmReg (CmmLocal new_base))] ++
     caller_load ++
     loadThreadState tso_unique ++
-    [CmmJump (CmmReg spReg) (map (formal_to_actual . kindlessCmm) results)]
+    [CmmJump (CmmReg spReg) (map (formal_to_actual . hintlessCmm) results)]
     where
       (_, arg_stmts, new_args) =
           loadArgsIntoTemps argument_uniques arguments
       (caller_save, caller_load) =
           callerSaveVolatileRegs (Just [{-only system regs-}])
-      new_base = LocalReg base_unique (cmmRegRep (CmmGlobal BaseReg)) GCKindNonPtr
-      id = LocalReg id_unique wordRep GCKindNonPtr
+      new_base = LocalReg base_unique (cmmRegType (CmmGlobal BaseReg))
+      id = LocalReg id_unique bWord
       tso_unique : base_unique : id_unique : argument_uniques = uniques
 
 -- -----------------------------------------------------------------------------
@@ -288,7 +287,7 @@ loadThreadState tso_unique =
   	CmmAssign (CmmLocal tso) stgCurrentTSO,
 	-- Sp = tso->sp;
 	CmmAssign sp (CmmLoad (cmmOffset (CmmReg (CmmLocal tso)) tso_SP)
-	                      wordRep),
+	                      bWord),
 	-- SpLim = tso->stack + RESERVED_STACK_WORDS;
 	CmmAssign spLim (cmmOffsetW (cmmOffset (CmmReg (CmmLocal tso)) tso_STACK)
 			            rESERVED_STACK_WORDS)
@@ -297,24 +296,24 @@ loadThreadState tso_unique =
   -- and load the current cost centre stack from the TSO when profiling:
   if opt_SccProfilingOn 
   then [CmmStore curCCSAddr 
-	(CmmLoad (cmmOffset (CmmReg (CmmLocal tso)) tso_CCCS) wordRep)]
+	(CmmLoad (cmmOffset (CmmReg (CmmLocal tso)) tso_CCCS) bWord)]
   else []
-  where tso = LocalReg tso_unique wordRep GCKindNonPtr -- TODO FIXME NOW
+  where tso = LocalReg tso_unique bWord -- TODO FIXME NOW
 
 
 openNursery = [
         -- Hp = CurrentNursery->free - 1;
-	CmmAssign hp (cmmOffsetW (CmmLoad nursery_bdescr_free wordRep) (-1)),
+	CmmAssign hp (cmmOffsetW (CmmLoad nursery_bdescr_free bWord) (-1)),
 
         -- HpLim = CurrentNursery->start + 
 	--		CurrentNursery->blocks*BLOCK_SIZE_W - 1;
 	CmmAssign hpLim
 	    (cmmOffsetExpr
-		(CmmLoad nursery_bdescr_start wordRep)
+		(CmmLoad nursery_bdescr_start bWord)
 		(cmmOffset
 		  (CmmMachOp mo_wordMul [
-		    CmmMachOp (MO_S_Conv I32 wordRep)
-		      [CmmLoad nursery_bdescr_blocks I32],
+		    CmmMachOp (MO_SS_Conv W32 wordWidth)
+		      [CmmLoad nursery_bdescr_blocks b32],
 		    CmmLit (mkIntCLit bLOCK_SIZE)
 		   ])
 		  (-1)
@@ -358,17 +357,17 @@ currentNursery 	  = CmmGlobal CurrentNursery
 -- for packing/unpacking continuations
 -- and entering/exiting functions
 
-tail_call :: WordOff -> CmmExpr -> CmmActuals -> [CmmStmt]
+tail_call :: WordOff -> CmmExpr -> HintedCmmActuals -> [CmmStmt]
 tail_call spRel target arguments
   = store_arguments ++ adjust_sp_reg spRel ++ jump where
     store_arguments =
         [stack_put spRel expr offset
-         | ((CmmKinded expr _), StackParam offset) <- argument_formats] ++
+         | ((CmmHinted expr _), StackParam offset) <- argument_formats] ++
         [global_put expr global
-         | ((CmmKinded expr _), RegisterParam global) <- argument_formats]
+         | ((CmmHinted expr _), RegisterParam global) <- argument_formats]
     jump = [CmmJump target arguments]
 
-    argument_formats = assignArguments (cmmExprRep . kindlessCmm) arguments
+    argument_formats = assignArguments (cmmExprType . hintlessCmm) arguments
 
 adjust_sp_reg spRel =
     if spRel == 0
@@ -386,8 +385,8 @@ gc_stack_check gc_block max_frame_size
   = check_stack_limit where
     check_stack_limit = [
      CmmCondBranch
-     (CmmMachOp (MO_U_Lt $ cmmRegRep spReg)
-                    [CmmRegOff spReg (-max_frame_size*wORD_SIZE),
+     (CmmMachOp (MO_U_Lt (typeWidth (cmmRegType spReg)))
+                [CmmRegOff spReg (-max_frame_size*wORD_SIZE),
                      CmmReg spLimReg])
      gc_block]
 
@@ -437,7 +436,7 @@ pack_frame curr_frame_size next_frame_size next_frame_header frame_args =
     mkOffsets size (Nothing:exprs) = mkOffsets (size+1) exprs
     mkOffsets size (Just expr:exprs) = (expr, size):mkOffsets (size + width) exprs
         where
-          width = machRepByteWidth (cmmExprRep expr) `quot` wORD_SIZE
+          width = (widthInBytes $ typeWidth $ cmmExprType expr) `quot` wORD_SIZE
           -- TODO: it would be better if we had a machRepWordWidth
 
     spRel = curr_frame_size - next_frame_size
@@ -461,7 +460,7 @@ function_entry (ContinuationFormat formals _ _ live_regs)
         [global_get reg global
          | (reg, RegisterParam global) <- argument_formats]
 
-    argument_formats = assignArguments (localRegRep) formals
+    argument_formats = assignArguments (localRegType) formals
 
     -- TODO: eliminate copy/paste with pack_continuation
     curr_offsets = mkOffsets label_size live_regs
@@ -472,7 +471,7 @@ function_entry (ContinuationFormat formals _ _ live_regs)
     mkOffsets size (Nothing:regs) = mkOffsets (size+1) regs
     mkOffsets size (Just reg:regs) = (reg, size):mkOffsets (size + width) regs
         where
-          width = machRepByteWidth (localRegRep reg) `quot` wORD_SIZE
+          width = (widthInBytes $ typeWidth $ localRegType reg) `quot` wORD_SIZE
           -- TODO: it would be better if we had a machRepWordWidth
 
 -----------------------------------------------------------------------------
@@ -499,7 +498,7 @@ stack_get :: WordOff
 stack_get spRel reg offset =
     CmmAssign (CmmLocal reg)
               (CmmLoad (CmmRegOff spReg (wORD_SIZE*(spRel + offset)))
-                       (localRegRep reg))
+                       (localRegType reg))
 global_put :: CmmExpr -> GlobalReg -> CmmStmt
 global_put expr global = CmmAssign (CmmGlobal global) expr
 global_get :: LocalReg -> GlobalReg -> CmmStmt

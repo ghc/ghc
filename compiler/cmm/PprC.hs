@@ -37,7 +37,6 @@ import BlockId
 import Cmm
 import PprCmm	()	-- Instances only
 import CLabel
-import MachOp
 import ForeignCall
 import ClosureInfo
 
@@ -191,18 +190,15 @@ pprStmt stmt = case stmt of
     CmmAssign dest src -> pprAssign dest src
 
     CmmStore  dest src
-	| rep == I64 && wordRep /= I64
-	-> ptext (sLit "ASSIGN_Word64") <> 
-		parens (mkP_ <> pprExpr1 dest <> comma <> pprExpr src) <> semi
-
-	| rep == F64 && wordRep /= I64
-	-> ptext (sLit "ASSIGN_DBL") <> 
-		parens (mkP_ <> pprExpr1 dest <> comma <> pprExpr src) <> semi
+ 	| typeWidth rep == W64 && wordWidth /= W64
+ 	-> (if isFloatType rep then ptext (sLit "ASSIGN_DBL")
+ 			       else ptext (sLit ("ASSIGN_Word64"))) <> 
+ 	   parens (mkP_ <> pprExpr1 dest <> comma <> pprExpr src) <> semi
 
  	| otherwise
 	-> hsep [ pprExpr (CmmLoad dest rep), equals, pprExpr src <> semi ]
 	where
-	  rep = cmmExprRep src
+	  rep = cmmExprType src
 
     CmmCall (CmmCallee fn cconv) results args safety ret ->
         maybe_proto $$
@@ -254,16 +250,16 @@ pprStmt stmt = case stmt of
     CmmJump lbl _params      -> mkJMP_(pprExpr lbl) <> semi
     CmmSwitch arg ids        -> pprSwitch arg ids
 
-pprCFunType :: SDoc -> CCallConv -> CmmFormals -> CmmActuals -> SDoc
+pprCFunType :: SDoc -> CCallConv -> HintedCmmFormals -> HintedCmmActuals -> SDoc
 pprCFunType ppr_fn cconv ress args
   = res_type ress <+>
     parens (text (ccallConvAttribute cconv) <>  ppr_fn) <>
     parens (commafy (map arg_type args))
   where
 	res_type [] = ptext (sLit "void")
-	res_type [CmmKinded one hint] = machRepHintCType (localRegRep one) hint
+	res_type [CmmHinted one hint] = machRepHintCType (localRegType one) hint
 
-	arg_type (CmmKinded expr hint) = machRepHintCType (cmmExprRep expr) hint
+	arg_type (CmmHinted expr hint) = machRepHintCType (cmmExprType expr) hint
 
 -- ---------------------------------------------------------------------
 -- unconditional branches
@@ -304,11 +300,11 @@ pprSwitch e maybe_ids
     caseify (ix:ixs, ident) = vcat (map do_fallthrough ixs) $$ final_branch ix
 	where 
 	do_fallthrough ix =
-                 hsep [ ptext (sLit "case") , pprHexVal ix wordRep <> colon ,
+                 hsep [ ptext (sLit "case") , pprHexVal ix wordWidth <> colon ,
                         ptext (sLit "/* fall through */") ]
 
 	final_branch ix = 
-	        hsep [ ptext (sLit "case") , pprHexVal ix wordRep <> colon ,
+	        hsep [ ptext (sLit "case") , pprHexVal ix wordWidth <> colon ,
                        ptext (sLit "goto") , (pprBlockId ident) <> semi ]
 
 -- ---------------------------------------------------------------------
@@ -321,7 +317,7 @@ pprSwitch e maybe_ids
 --
 -- has a type in C which is also given by
 --
---	machRepCType (cmmExprRep e)
+--	machRepCType (cmmExprType e)
 --
 -- (similar invariants apply to the rest of the pretty printer).
 
@@ -329,30 +325,8 @@ pprExpr :: CmmExpr -> SDoc
 pprExpr e = case e of
     CmmLit lit -> pprLit lit
 
-    CmmLoad e I64 | wordRep /= I64
-	-> ptext (sLit "PK_Word64") <> parens (mkP_ <> pprExpr1 e)
 
-    CmmLoad e F64 | wordRep /= I64
-	-> ptext (sLit "PK_DBL") <> parens (mkP_ <> pprExpr1 e)
-
-    CmmLoad (CmmReg r) rep 
-	| isPtrReg r && rep == wordRep
-	-> char '*' <> pprAsPtrReg r
-
-    CmmLoad (CmmRegOff r 0) rep 
-	| isPtrReg r && rep == wordRep
-	-> char '*' <> pprAsPtrReg r
-
-    CmmLoad (CmmRegOff r off) rep
-	| isPtrReg r && rep == wordRep && (off `rem` wORD_SIZE == 0)
-	-- ToDo: check that the offset is a word multiple?
-        --       (For tagging to work, I had to avoid unaligned loads. --ARY)
-	-> pprAsPtrReg r <> brackets (ppr (off `shiftR` wordShift))
-
-    CmmLoad expr rep ->
-	-- the general case:
-	cLoad expr rep
-
+    CmmLoad e ty -> pprLoad e ty
     CmmReg reg      -> pprCastReg reg
     CmmRegOff reg 0 -> pprCastReg reg
 
@@ -363,6 +337,32 @@ pprExpr e = case e of
 	pprRegOff op i' = pprCastReg reg <> op <> int i'
 
     CmmMachOp mop args -> pprMachOpApp mop args
+
+
+pprLoad :: CmmExpr -> CmmType -> SDoc
+pprLoad e ty
+  | width == W64, wordWidth /= W64
+  = (if isFloatType ty then ptext (sLit "PK_DBL")
+	    	       else ptext (sLit "PK_Word64"))
+    <> parens (mkP_ <> pprExpr1 e)
+
+  | otherwise 
+  = case e of
+	CmmReg r | isPtrReg r && width == wordWidth && not (isFloatType ty)
+		 -> char '*' <> pprAsPtrReg r
+
+	CmmRegOff r 0 | isPtrReg r && width == wordWidth && not (isFloatType ty)
+		      -> char '*' <> pprAsPtrReg r
+
+	CmmRegOff r off | isPtrReg r && width == wordWidth
+			, off `rem` wORD_SIZE == 0 && not (isFloatType ty)
+	-- ToDo: check that the offset is a word multiple?
+        --       (For tagging to work, I had to avoid unaligned loads. --ARY)
+			-> pprAsPtrReg r <> brackets (ppr (off `shiftR` wordShift))
+
+	_other -> cLoad e ty
+  where
+    width = typeWidth ty
 
 pprExpr1 :: CmmExpr -> SDoc
 pprExpr1 (CmmLit lit) 	  = pprLit1 lit
@@ -406,8 +406,15 @@ pprMachOpApp' mop args
     _     -> panic "PprC.pprMachOp : machop with wrong number of args"
 
   where
-    pprArg e | signedOp mop = cCast (machRepSignedCType (cmmExprRep e)) e
+	-- Cast needed for signed integer ops
+    pprArg e | signedOp    mop = cCast (machRep_S_CType (typeWidth (cmmExprType e))) e
+             | needsFCasts mop = cCast (machRep_F_CType (typeWidth (cmmExprType e))) e
  	     | otherwise    = pprExpr1 e
+    needsFCasts (MO_F_Eq _)   = False
+    needsFCasts (MO_F_Ne _)   = False
+    needsFCasts (MO_F_Neg _)  = True
+    needsFCasts (MO_F_Quot _) = True
+    needsFCasts mop  = floatComparison mop
 
 -- --------------------------------------------------------------------------
 -- Literals
@@ -416,7 +423,7 @@ pprLit :: CmmLit -> SDoc
 pprLit lit = case lit of
     CmmInt i rep      -> pprHexVal i rep
 
-    CmmFloat f rep     -> parens (machRepCType rep) <> str
+    CmmFloat f w       -> parens (machRep_F_CType w) <> str
         where d = fromRational f :: Double
               str | isInfinite d && d < 0 = ptext (sLit "-INFINITY")
                   | isInfinite d          = ptext (sLit "INFINITY")
@@ -449,29 +456,29 @@ pprLit1 other = pprLit other
 
 pprStatics :: [CmmStatic] -> [SDoc]
 pprStatics [] = []
-pprStatics (CmmStaticLit (CmmFloat f F32) : rest) 
+pprStatics (CmmStaticLit (CmmFloat f W32) : rest) 
   -- floats are padded to a word, see #1852
-  | wORD_SIZE == 8, CmmStaticLit (CmmInt 0 I32) : rest' <- rest
+  | wORD_SIZE == 8, CmmStaticLit (CmmInt 0 W32) : rest' <- rest
   = pprLit1 (floatToWord f) : pprStatics rest'
   | wORD_SIZE == 4
   = pprLit1 (floatToWord f) : pprStatics rest
   | otherwise
-  = pprPanic "pprStatics: float" (vcat (map (\(CmmStaticLit l) -> ppr (cmmLitRep l)) rest))
-pprStatics (CmmStaticLit (CmmFloat f F64) : rest)
+  = pprPanic "pprStatics: float" (vcat (map (\(CmmStaticLit l) -> ppr (cmmLitType l)) rest))
+pprStatics (CmmStaticLit (CmmFloat f W64) : rest)
   = map pprLit1 (doubleToWords f) ++ pprStatics rest
-pprStatics (CmmStaticLit (CmmInt i I64) : rest)
-  | machRepByteWidth I32 == wORD_SIZE
+pprStatics (CmmStaticLit (CmmInt i W64) : rest)
+  | wordWidth == W32
 #ifdef WORDS_BIGENDIAN
-  = pprStatics (CmmStaticLit (CmmInt q I32) : 
-		CmmStaticLit (CmmInt r I32) : rest)
+  = pprStatics (CmmStaticLit (CmmInt q W32) : 
+		CmmStaticLit (CmmInt r W32) : rest)
 #else
-  = pprStatics (CmmStaticLit (CmmInt r I32) : 
-		CmmStaticLit (CmmInt q I32) : rest)
+  = pprStatics (CmmStaticLit (CmmInt r W32) : 
+		CmmStaticLit (CmmInt q W32) : rest)
 #endif
   where r = i .&. 0xffffffff
 	q = i `shiftR` 32
-pprStatics (CmmStaticLit (CmmInt i rep) : rest)
-  | machRepByteWidth rep /= wORD_SIZE
+pprStatics (CmmStaticLit (CmmInt i w) : rest)
+  | w /= wordWidth
   = panic "pprStatics: cannot emit a non-word-sized static literal"
 pprStatics (CmmStaticLit lit : rest)
   = pprLit1 lit : pprStatics rest
@@ -518,17 +525,32 @@ pprMachOp_for_C mop = case mop of
         MO_U_Quot       _ -> char '/'
         MO_U_Rem        _ -> char '%'
 
-        -- Signed comparisons (floating-point comparisons also use these)
-        -- & Unsigned comparisons
+        -- & Floating-point operations
+        MO_F_Add        _ -> char '+'
+        MO_F_Sub        _ -> char '-'
+        MO_F_Neg        _ -> char '-'
+        MO_F_Mul        _ -> char '*'
+        MO_F_Quot       _ -> char '/'
+
+        -- Signed comparisons
         MO_S_Ge         _ -> ptext (sLit ">=")
         MO_S_Le         _ -> ptext (sLit "<=")
         MO_S_Gt         _ -> char '>'
         MO_S_Lt         _ -> char '<'
 
+        -- & Unsigned comparisons
         MO_U_Ge         _ -> ptext (sLit ">=")
         MO_U_Le         _ -> ptext (sLit "<=")
         MO_U_Gt         _ -> char '>'
         MO_U_Lt         _ -> char '<'
+
+        -- & Floating-point comparisons
+        MO_F_Eq         _ -> ptext (sLit "==")
+        MO_F_Ne         _ -> ptext (sLit "!=")
+        MO_F_Ge         _ -> ptext (sLit ">=")
+        MO_F_Le         _ -> ptext (sLit "<=")
+        MO_F_Gt         _ -> char '>'
+        MO_F_Lt         _ -> char '<'
 
         -- Bitwise operations.  Not all of these may be supported at all
         -- sizes, and only integral MachReps are valid.
@@ -540,29 +562,31 @@ pprMachOp_for_C mop = case mop of
         MO_U_Shr        _ -> ptext (sLit ">>") -- unsigned shift right
         MO_S_Shr        _ -> ptext (sLit ">>") -- signed shift right
 
--- Conversions.  Some of these will be NOPs.
+-- Conversions.  Some of these will be NOPs, but never those that convert
+-- between ints and floats.
 -- Floating-point conversions use the signed variant.
 -- We won't know to generate (void*) casts here, but maybe from
 -- context elsewhere
 
 -- noop casts
-        MO_U_Conv I8 I8     -> empty
-        MO_U_Conv I16 I16   -> empty
-        MO_U_Conv I32 I32   -> empty
-        MO_U_Conv I64 I64   -> empty
-        MO_U_Conv I128 I128 -> empty
-        MO_S_Conv I8 I8     -> empty
-        MO_S_Conv I16 I16   -> empty
-        MO_S_Conv I32 I32   -> empty
-        MO_S_Conv I64 I64   -> empty
-        MO_S_Conv I128 I128 -> empty
+        MO_UU_Conv from to | from == to -> empty
+	MO_UU_Conv _from to  -> parens (machRep_U_CType to)
 
-	MO_U_Conv _from to  -> parens (machRepCType to)
-	MO_S_Conv _from to  -> parens (machRepSignedCType to)
+        MO_SS_Conv from to | from == to -> empty
+	MO_SS_Conv _from to  -> parens (machRep_S_CType to)
 
-        _ -> panic "PprC.pprMachOp_for_C: unknown machop"
+        -- TEMPORARY: the old code didn't check this case, so let's leave it out
+        -- to facilitate comparisons against the old output code.
+        --MO_FF_Conv from to | from == to -> empty
+	MO_FF_Conv _from to  -> parens (machRep_F_CType to)
 
-signedOp :: MachOp -> Bool
+	MO_SF_Conv _from to  -> parens (machRep_F_CType to)
+	MO_FS_Conv _from to  -> parens (machRep_S_CType to)
+
+        _ -> pprTrace "offending mop" (ptext $ sLit $ show mop) $
+             panic "PprC.pprMachOp_for_C: unknown machop"
+
+signedOp :: MachOp -> Bool	-- Argument type(s) are signed ints
 signedOp (MO_S_Quot _)	 = True
 signedOp (MO_S_Rem  _)	 = True
 signedOp (MO_S_Neg  _)	 = True
@@ -571,8 +595,18 @@ signedOp (MO_S_Le   _)	 = True
 signedOp (MO_S_Gt   _)	 = True
 signedOp (MO_S_Lt   _)	 = True
 signedOp (MO_S_Shr  _)	 = True
-signedOp (MO_S_Conv _ _) = True
+signedOp (MO_SS_Conv _ _) = True
+signedOp (MO_SF_Conv _ _) = True
 signedOp _ = False
+
+floatComparison :: MachOp -> Bool  -- comparison between float args
+floatComparison (MO_F_Eq   _)	 = True
+floatComparison (MO_F_Ne   _)	 = True
+floatComparison (MO_F_Ge   _)	 = True
+floatComparison (MO_F_Le   _)	 = True
+floatComparison (MO_F_Gt   _)	 = True
+floatComparison (MO_F_Lt   _)	 = True
+floatComparison _ = False
 
 -- ---------------------------------------------------------------------
 -- tend to be implemented by foreign calls
@@ -692,9 +726,13 @@ isFixedPtrReg (CmmLocal _) = False
 isFixedPtrReg (CmmGlobal r) = isFixedPtrGlobalReg r
 
 -- True if (pprAsPtrReg reg) will give an expression with type StgPtr
+-- JD: THIS IS HORRIBLE AND SHOULD BE RENAMED, AT THE VERY LEAST.
+-- THE GARBAGE WITH THE VNonGcPtr HELPS MATCH THE OLD CODE GENERATOR'S OUTPUT;
+-- I'M NOT SURE IF IT SHOULD REALLY STAY THAT WAY.
 isPtrReg :: CmmReg -> Bool
 isPtrReg (CmmLocal _) 		    = False
-isPtrReg (CmmGlobal (VanillaReg n)) = True -- if we print via pprAsPtrReg
+isPtrReg (CmmGlobal (VanillaReg n VGcPtr)) = True -- if we print via pprAsPtrReg
+isPtrReg (CmmGlobal (VanillaReg n VNonGcPtr)) = False --if we print via pprAsPtrReg
 isPtrReg (CmmGlobal reg)	    = isFixedPtrGlobalReg reg
 
 -- True if this global reg has type StgPtr
@@ -706,7 +744,7 @@ isFixedPtrGlobalReg SpLim	= True
 isFixedPtrGlobalReg _ 		= False
 
 -- True if in C this register doesn't have the type given by 
--- (machRepCType (cmmRegRep reg)), so it has to be cast.
+-- (machRepCType (cmmRegType reg)), so it has to be cast.
 isStrangeTypeReg :: CmmReg -> Bool
 isStrangeTypeReg (CmmLocal _) 	= False
 isStrangeTypeReg (CmmGlobal g) 	= isStrangeTypeGlobal g
@@ -731,12 +769,16 @@ pprReg r = case r of
         CmmGlobal global -> pprGlobalReg global
 		
 pprAsPtrReg :: CmmReg -> SDoc
-pprAsPtrReg (CmmGlobal (VanillaReg n)) = char 'R' <> int n <> ptext (sLit ".p")
+pprAsPtrReg (CmmGlobal (VanillaReg n gcp)) 
+  = WARN( gcp /= VGcPtr, ppr n ) char 'R' <> int n <> ptext (sLit ".p")
 pprAsPtrReg other_reg = pprReg other_reg
 
 pprGlobalReg :: GlobalReg -> SDoc
 pprGlobalReg gr = case gr of
-    VanillaReg n   -> char 'R' <> int n  <> ptext (sLit ".w")
+    VanillaReg n _ -> char 'R' <> int n  <> ptext (sLit ".w")
+	-- pprGlobalReg prints a VanillaReg as a .w regardless
+	-- Example:	R1.w = R1.w & (-0x8UL);
+	--		JMP_(*R1.p);
     FloatReg   n   -> char 'F' <> int n
     DoubleReg  n   -> char 'D' <> int n
     LongReg    n   -> char 'L' <> int n
@@ -753,12 +795,12 @@ pprGlobalReg gr = case gr of
     GCFun          -> ptext (sLit "stg_gc_fun")
 
 pprLocalReg :: LocalReg -> SDoc
-pprLocalReg (LocalReg uniq _ _) = char '_' <> ppr uniq
+pprLocalReg (LocalReg uniq _) = char '_' <> ppr uniq
 
 -- -----------------------------------------------------------------------------
 -- Foreign Calls
 
-pprCall :: SDoc -> CCallConv -> CmmFormals -> CmmActuals -> CmmSafety
+pprCall :: SDoc -> CCallConv -> HintedCmmFormals -> HintedCmmActuals -> CmmSafety
 	-> SDoc
 
 pprCall ppr_fn cconv results args _
@@ -781,26 +823,27 @@ pprCall ppr_fn cconv results args _
     ppr_assign results (ppr_fn <> parens (commafy (map pprArg args))) <> semi
   where 
      ppr_assign []           rhs = rhs
-     ppr_assign [CmmKinded one hint] rhs
+     ppr_assign [CmmHinted one hint] rhs
 	 = pprLocalReg one <> ptext (sLit " = ")
-		 <> pprUnHint hint (localRegRep one) <> rhs
+		 <> pprUnHint hint (localRegType one) <> rhs
      ppr_assign _other _rhs = panic "pprCall: multiple results"
 
-     pprArg (CmmKinded expr hint)
-         | hint `elem` [PtrHint,SignedHint]
-         = cCast (machRepHintCType (cmmExprRep expr) hint) expr
+     pprArg (CmmHinted expr AddrHint)
+   	= cCast (ptext (sLit "void *")) expr
 	-- see comment by machRepHintCType below
-     pprArg (CmmKinded expr _other)
-         = pprExpr expr
+     pprArg (CmmHinted expr SignedHint)
+	= cCast (machRep_S_CType $ typeWidth $ cmmExprType expr) expr
+     pprArg (CmmHinted expr _other)
+	= pprExpr expr
 
-     pprUnHint PtrHint    rep = parens (machRepCType rep)
+     pprUnHint AddrHint   rep = parens (machRepCType rep)
      pprUnHint SignedHint rep = parens (machRepCType rep)
      pprUnHint _          _   = empty
 
 pprGlobalRegName :: GlobalReg -> SDoc
 pprGlobalRegName gr = case gr of
-    VanillaReg n   -> char 'R' <> int n  -- without the .w suffix
-    _              -> pprGlobalReg gr
+    VanillaReg n _  -> char 'R' <> int n  -- without the .w suffix
+    _               -> pprGlobalReg gr
 
 -- Currently we only have these two calling conventions, but this might
 -- change in the future...
@@ -823,7 +866,7 @@ pprDataExterns statics
   where (_, lbls) = runTE (mapM_ te_Static statics)
 
 pprTempDecl :: LocalReg -> SDoc
-pprTempDecl l@(LocalReg _ rep _)
+pprTempDecl l@(LocalReg _ rep)
   = hcat [ machRepCType rep, space, pprLocalReg l, semi ]
 
 pprExternDecl :: Bool -> CLabel -> SDoc
@@ -832,11 +875,11 @@ pprExternDecl in_srt lbl
   | not (needsCDecl lbl) = empty
   | Just sz <- foreignLabelStdcallInfo lbl = stdcall_decl sz
   | otherwise =
-	hcat [ visibility, label_type (labelType lbl), 
+	hcat [ visibility, label_type lbl,
 	       lparen, pprCLabel lbl, text ");" ]
  where
-  label_type CodeLabel = ptext (sLit "F_")
-  label_type DataLabel = ptext (sLit "I_")
+  label_type lbl | isCFunctionLabel lbl = ptext (sLit "F_")
+		 | otherwise		= ptext (sLit "I_")
 
   visibility
      | externallyVisibleCLabel lbl = char 'E'
@@ -847,7 +890,7 @@ pprExternDecl in_srt lbl
   -- add the @n suffix to the label (#2276)
   stdcall_decl sz =
         ptext (sLit "extern __attribute__((stdcall)) void ") <> pprCLabel lbl
-        <> parens (commafy (replicate (sz `quot` wORD_SIZE) (machRepCType wordRep)))
+        <> parens (commafy (replicate (sz `quot` wORD_SIZE) (machRep_U_CType wordWidth)))
         <> semi
 
 type TEState = (UniqSet LocalReg, FiniteMap CLabel ())
@@ -882,8 +925,8 @@ te_Lit _ = return ()
 te_Stmt :: CmmStmt -> TE ()
 te_Stmt (CmmAssign r e)		= te_Reg r >> te_Expr e
 te_Stmt (CmmStore l r)		= te_Expr l >> te_Expr r
-te_Stmt (CmmCall _ rs es _ _)	= mapM_ (te_temp.kindlessCmm) rs >>
-				  mapM_ (te_Expr.kindlessCmm) es
+te_Stmt (CmmCall _ rs es _ _)	= mapM_ (te_temp.hintlessCmm) rs >>
+				  mapM_ (te_Expr.hintlessCmm) es
 te_Stmt (CmmCondBranch e _)	= te_Expr e
 te_Stmt (CmmSwitch e _)		= te_Expr e
 te_Stmt (CmmJump e _)		= te_Expr e
@@ -907,7 +950,7 @@ te_Reg _            = return ()
 cCast :: SDoc -> CmmExpr -> SDoc
 cCast ty expr = parens ty <> pprExpr1 expr
 
-cLoad :: CmmExpr -> MachRep -> SDoc
+cLoad :: CmmExpr -> CmmType -> SDoc
 #ifdef BEWARE_LOAD_STORE_ALIGNMENT
 cLoad expr rep =
     let decl = machRepCType rep <+> ptext (sLit "x") <> semi
@@ -919,41 +962,50 @@ cLoad expr rep =
 cLoad expr rep = char '*' <> parens (cCast (machRepPtrCType rep) expr)
 #endif
 
+isCmmWordType :: CmmType -> Bool
+-- True of GcPtrReg/NonGcReg of native word size
+isCmmWordType ty = not (isFloatType ty) 
+		   && typeWidth ty == wordWidth
+
 -- This is for finding the types of foreign call arguments.  For a pointer
 -- argument, we always cast the argument to (void *), to avoid warnings from
 -- the C compiler.
-machRepHintCType :: MachRep -> MachHint -> SDoc
-machRepHintCType rep PtrHint    = ptext (sLit "void *")
-machRepHintCType rep SignedHint = machRepSignedCType rep
+machRepHintCType :: CmmType -> ForeignHint -> SDoc
+machRepHintCType rep AddrHint    = ptext (sLit "void *")
+machRepHintCType rep SignedHint = machRep_S_CType (typeWidth rep)
 machRepHintCType rep _other     = machRepCType rep
 
-machRepPtrCType :: MachRep -> SDoc
-machRepPtrCType r | r == wordRep = ptext (sLit "P_")
-	          | otherwise    = machRepCType r <> char '*'
+machRepPtrCType :: CmmType -> SDoc
+machRepPtrCType r | isCmmWordType r = ptext (sLit "P_")
+	          | otherwise       = machRepCType r <> char '*'
 
-machRepCType :: MachRep -> SDoc
-machRepCType r | r == wordRep = ptext (sLit "W_")
-	       | otherwise    = sized_type
-  where sized_type = case r of
-			I8	-> ptext (sLit "StgWord8")
-			I16	-> ptext (sLit "StgWord16")
-			I32	-> ptext (sLit "StgWord32")
-			I64	-> ptext (sLit "StgWord64")
-			F32	-> ptext (sLit "StgFloat") -- ToDo: correct?
-			F64	-> ptext (sLit "StgDouble")
-			_  -> panic "machRepCType"
+machRepCType :: CmmType -> SDoc
+machRepCType ty | isFloatType ty = machRep_F_CType w
+		| otherwise	 = machRep_U_CType w
+		where
+		  w = typeWidth ty
 
-machRepSignedCType :: MachRep -> SDoc
-machRepSignedCType r | r == wordRep = ptext (sLit "I_")
-                     | otherwise    = sized_type
-  where sized_type = case r of
-			I8	-> ptext (sLit "StgInt8")
-			I16	-> ptext (sLit "StgInt16")
-			I32	-> ptext (sLit "StgInt32")
-			I64	-> ptext (sLit "StgInt64")
-			F32	-> ptext (sLit "StgFloat") -- ToDo: correct?
-			F64	-> ptext (sLit "StgDouble")
-			_ -> panic "machRepCType"
+machRep_F_CType :: Width -> SDoc
+machRep_F_CType W32 = ptext (sLit "StgFloat") -- ToDo: correct?
+machRep_F_CType W64 = ptext (sLit "StgDouble")
+machRep_F_CType _   = panic "machRep_F_CType"
+
+machRep_U_CType :: Width -> SDoc
+machRep_U_CType w | w == wordWidth = ptext (sLit "W_")
+machRep_U_CType W8  = ptext (sLit "StgWord8")
+machRep_U_CType W16 = ptext (sLit "StgWord16")
+machRep_U_CType W32 = ptext (sLit "StgWord32")
+machRep_U_CType W64 = ptext (sLit "StgWord64")
+machRep_U_CType _   = panic "machRep_U_CType"
+
+machRep_S_CType :: Width -> SDoc
+machRep_S_CType w | w == wordWidth = ptext (sLit "I_")
+machRep_S_CType W8  = ptext (sLit "StgInt8")
+machRep_S_CType W16 = ptext (sLit "StgInt16")
+machRep_S_CType W32 = ptext (sLit "StgInt32")
+machRep_S_CType W64 = ptext (sLit "StgInt64")
+machRep_S_CType _   = panic "machRep_S_CType"
+  
 
 -- ---------------------------------------------------------------------
 -- print strings as valid C strings
@@ -982,8 +1034,8 @@ charToC w =
 -- can safely initialise to static locations.
 
 big_doubles 
-  | machRepByteWidth F64 == 2 * wORD_SIZE  = True
-  | machRepByteWidth F64 == wORD_SIZE      = False
+  | widthInBytes W64 == 2 * wORD_SIZE  = True
+  | widthInBytes W64 == wORD_SIZE      = False
   | otherwise = panic "big_doubles"
 
 castFloatToIntArray :: STUArray s Int Float -> ST s (STUArray s Int Int)
@@ -1000,7 +1052,7 @@ floatToWord r
 	writeArray arr 0 (fromRational r)
 	arr' <- castFloatToIntArray arr
 	i <- readArray arr' 0
-	return (CmmInt (toInteger i) wordRep)
+	return (CmmInt (toInteger i) wordWidth)
     )
 
 doubleToWords :: Rational -> [CmmLit]
@@ -1012,8 +1064,8 @@ doubleToWords r
 	arr' <- castDoubleToIntArray arr
 	i1 <- readArray arr' 0
 	i2 <- readArray arr' 1
-	return [ CmmInt (toInteger i1) wordRep
-	       , CmmInt (toInteger i2) wordRep
+	return [ CmmInt (toInteger i1) wordWidth
+	       , CmmInt (toInteger i2) wordWidth
 	       ]
     )
   | otherwise				-- doubles are 1 word
@@ -1022,20 +1074,20 @@ doubleToWords r
 	writeArray arr 0 (fromRational r)
 	arr' <- castDoubleToIntArray arr
 	i <- readArray arr' 0
-	return [ CmmInt (toInteger i) wordRep ]
+	return [ CmmInt (toInteger i) wordWidth ]
     )
 
 -- ---------------------------------------------------------------------------
 -- Utils
 
 wordShift :: Int
-wordShift = machRepLogWidth wordRep
+wordShift = widthInLog wordWidth
 
 commafy :: [SDoc] -> SDoc
 commafy xs = hsep $ punctuate comma xs
 
 -- Print in C hex format: 0x13fa
-pprHexVal :: Integer -> MachRep -> SDoc
+pprHexVal :: Integer -> Width -> SDoc
 pprHexVal 0 _ = ptext (sLit "0x0")
 pprHexVal w rep
   | w < 0     = parens (char '-' <> ptext (sLit "0x") <> go (-w) <> repsuffix rep)
@@ -1048,9 +1100,9 @@ pprHexVal w rep
 	-- warnings about integer overflow from gcc.
 
 	-- on 32-bit platforms, add "ULL" to 64-bit literals
-      repsuffix I64 | wORD_SIZE == 4 = ptext (sLit "ULL")
+      repsuffix W64 | wORD_SIZE == 4 = ptext (sLit "ULL")
       	-- on 64-bit platforms with 32-bit int, add "L" to 64-bit literals
-      repsuffix I64 | cINT_SIZE == 4 = ptext (sLit "UL")
+      repsuffix W64 | cINT_SIZE == 4 = ptext (sLit "UL")
       repsuffix _ = char 'U'
       
       go 0 = empty

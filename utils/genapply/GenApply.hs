@@ -426,12 +426,12 @@ formalParam V _ = empty
 formalParam arg n =
     formalParamType arg <> space <>
     text "arg" <> int n <> text ", "
-formalParamType arg | isPtr arg = text "\"ptr\"" <> space <> argRep arg
-                    | otherwise = argRep arg
+formalParamType arg = argRep arg
 
 argRep F = text "F_"
 argRep D = text "D_"
 argRep L = text "L_"
+argRep P = text "gcptr"
 argRep _ = text "W_"
 
 genApply regstatus args =

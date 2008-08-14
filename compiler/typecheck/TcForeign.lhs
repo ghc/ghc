@@ -33,7 +33,6 @@ import Id
 #if alpha_TARGET_ARCH
 import Type
 import SMRep
-import MachOp
 #endif
 import Name
 import OccName
@@ -189,7 +188,7 @@ checkFEDArgs :: [Type] -> TcM ()
 checkFEDArgs arg_tys
   = check (integral_args <= 32) err
   where
-    integral_args = sum [ (machRepByteWidth . argMachRep . primRepToCgRep) prim_rep
+    integral_args = sum [ (widthInBytes . argMachRep . primRepToCgRep) prim_rep
 			| prim_rep <- map typePrimRep arg_tys,
 			  primRepHint prim_rep /= FloatHint ]
     err = ptext (sLit "On Alpha, I can only handle 32 bytes of non-floating-point arguments to foreign export dynamic")

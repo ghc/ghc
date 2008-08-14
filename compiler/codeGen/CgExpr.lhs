@@ -37,7 +37,7 @@ import CgHpc
 import CgUtils
 import ClosureInfo
 import Cmm
-import MachOp
+import CmmUtils
 import VarSet
 import Literal
 import PrimOp
@@ -48,6 +48,7 @@ import Maybes
 import ListSetOps
 import BasicTypes
 import Util
+import FastString
 import Outputable
 \end{code}
 
@@ -128,18 +129,15 @@ cgExpr (StgOpApp (StgFCallOp fcall _) stg_args res_ty) = do
 		    | (stg_arg, (rep,expr)) <- stg_args `zip` reps_n_amodes, 
 		      nonVoidArg rep]
 
-    arg_tmps <- sequence [
-                 if isFollowableArg (typeCgRep (stgArgType stg_arg))
-                 then assignPtrTemp arg
-                 else assignNonPtrTemp arg
-                     | (arg, stg_arg) <- arg_exprs]
-    let	arg_hints = zipWith CmmKinded arg_tmps (map (typeHint.stgArgType) stg_args)
+    arg_tmps <- sequence [ assignTemp arg
+                         | (arg, stg_arg) <- arg_exprs]
+    let	arg_hints = zipWith CmmHinted arg_tmps (map (typeForeignHint.stgArgType) stg_args)
     {-
 	Now, allocate some result regs.
     -}
     (res_reps,res_regs,res_hints)  <- newUnboxedTupleRegs res_ty
     ccallReturnUnboxedTuple (zip res_reps (map (CmmReg . CmmLocal) res_regs)) $
-	emitForeignCall (zipWith CmmKinded res_regs res_hints) fcall 
+	emitForeignCall (zipWith CmmHinted res_regs res_hints) fcall 
 	   arg_hints emptyVarSet{-no live vars-}
       
 -- tagToEnum# is special: we need to pull the constructor out of the table,
@@ -148,10 +146,7 @@ cgExpr (StgOpApp (StgFCallOp fcall _) stg_args res_ty) = do
 cgExpr (StgOpApp (StgPrimOp TagToEnumOp) [arg] res_ty) 
   = ASSERT(isEnumerationTyCon tycon)
     do	{ (rep,amode) <- getArgAmode arg
-	; amode' <- if isFollowableArg rep
-                    then assignPtrTemp amode
-	            else assignNonPtrTemp amode
-					-- We're going to use it twice,
+	; amode' <- assignTemp amode	-- We're going to use it twice,
 					-- so save in a temp if non-trivial
 	; stmtC (CmmAssign nodeReg (tagToClosure tycon amode'))
 	; performReturn emitReturnInstr }
@@ -173,9 +168,7 @@ cgExpr x@(StgOpApp op@(StgPrimOp primop) args res_ty)
 	     performReturn emitReturnInstr
 
   | ReturnsPrim rep <- result_info
-	= do res <- if isFollowableArg (typeCgRep res_ty)
-                        then newPtrTemp (argMachRep (typeCgRep res_ty))
-                        else newNonPtrTemp (argMachRep (typeCgRep res_ty))
+	= do res <- newTemp (typeCmmType res_ty)
              cgPrimOp [res] primop args emptyVarSet
 	     performPrimReturn (primRepToCgRep rep) (CmmReg (CmmLocal res))
 
@@ -186,9 +179,7 @@ cgExpr x@(StgOpApp op@(StgPrimOp primop) args res_ty)
 
   | ReturnsAlg tycon <- result_info, isEnumerationTyCon tycon
 	-- c.f. cgExpr (...TagToEnumOp...)
-	= do tag_reg <- if isFollowableArg (typeCgRep res_ty)
-                        then newPtrTemp wordRep
-                        else newNonPtrTemp wordRep
+	= do tag_reg <- newTemp bWord	-- The tag is a word
 	     cgPrimOp [tag_reg] primop args emptyVarSet
 	     stmtC (CmmAssign nodeReg
                     (tagToClosure tycon
@@ -455,16 +446,14 @@ cgLetNoEscapeRhs full_live_in_rhss rhs_eob_info maybe_cc_slot rec binder
 Little helper for primitives that return unboxed tuples.
 
 \begin{code}
-newUnboxedTupleRegs :: Type -> FCode ([CgRep], [LocalReg], [MachHint])
+newUnboxedTupleRegs :: Type -> FCode ([CgRep], [LocalReg], [ForeignHint])
 newUnboxedTupleRegs res_ty =
    let
 	ty_args = tyConAppArgs (repType res_ty)
-	(reps,hints) = unzip [ (rep, typeHint ty) | ty <- ty_args,
+	(reps,hints) = unzip [ (rep, typeForeignHint ty) | ty <- ty_args,
 					   	    let rep = typeCgRep ty,
 					 	    nonVoidArg rep ]
-	make_new_temp rep = if isFollowableArg rep
-                            then newPtrTemp (argMachRep rep)
-                            else newNonPtrTemp (argMachRep rep)
+	make_new_temp rep = newTemp (argMachRep rep)
    in do
    regs <- mapM make_new_temp reps
    return (reps,regs,hints)

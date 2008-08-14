@@ -5,7 +5,6 @@ where
 
 
 import BlockId
-import Cmm hiding (blockId)
 import CmmExpr
 import Prelude hiding (iterate, zip, unzip)
 import ZipCfg
@@ -70,7 +69,7 @@ upd_graph g subst = map_nodes id middle last g
   where middle m = m
         last (LastBranch bid)       = LastBranch $ sub bid
         last (LastCondBranch p t f) = cond p (sub t) (sub f)
-        last (LastCall t bid)       = LastCall   t $ liftM sub bid
+        last (LastCall t bid s)     = LastCall   t (liftM sub bid) s
         last (LastSwitch e bs)      = LastSwitch e $ map (liftM sub) bs
         last l = l
         cond p t f = if t == f then LastBranch t else LastCondBranch p t f
@@ -80,17 +79,15 @@ upd_graph g subst = map_nodes id middle last g
 -- The hashing is a bit arbitrary (the numbers are completely arbitrary),
 -- but it should be fast and good enough.
 hash_block :: CmmBlock -> Int
-hash_block (Block _ t) = hash_tail t 0
+hash_block (Block _ _ t) = hash_tail t 0
   where hash_mid   (MidComment (FastString u _ _ _ _)) = u
         hash_mid   (MidAssign r e) = hash_reg r + hash_e e
         hash_mid   (MidStore e e') = hash_e e + hash_e e'
-        hash_mid   (MidUnsafeCall t _ as) = hash_tgt t + hash_as as
+        hash_mid   (MidUnsafeCall t _ as) = hash_tgt t + hash_lst hash_e as
         hash_mid   (MidAddToContext e es) = hash_e e + hash_lst hash_e es
-        hash_mid   (CopyIn _ fs _) = hash_fs fs
-        hash_mid   (CopyOut _ as) = hash_as as
         hash_reg   (CmmLocal l) = hash_local l
         hash_reg   (CmmGlobal _)    = 19
-        hash_local (LocalReg _ _ _) = 117
+        hash_local (LocalReg _ _) = 117
         hash_e (CmmLit l) = hash_lit l
         hash_e (CmmLoad e _) = 67 + hash_e e
         hash_e (CmmReg r) = hash_reg r
@@ -102,17 +99,14 @@ hash_block (Block _ t) = hash_tail t 0
         hash_lit (CmmLabel _) = 119 -- ugh
         hash_lit (CmmLabelOff _ i) = 199 + i
         hash_lit (CmmLabelDiffOff _ _ i) = 299 + i
-        hash_tgt (CmmCallee e _) = hash_e e
-        hash_tgt (CmmPrim _) = 31 -- lots of these
-        hash_as = hash_lst $ hash_kinded hash_e
-        hash_fs = hash_lst $ hash_kinded hash_local
-        hash_kinded f (CmmKinded x _) = f x
-        hash_lst f = foldl (\z x -> f x + z) 0
+        hash_tgt (ForeignTarget e _) = hash_e e
+        hash_tgt (PrimTarget _) = 31 -- lots of these
+        hash_lst f = foldl (\z x -> f x + z) (0::Int)
         hash_last (LastBranch _) = 23 -- would be great to hash these properly
         hash_last (LastCondBranch p _ _) = hash_e p 
-        hash_last LastReturn = 17 -- better ideas?
-        hash_last (LastJump e) = hash_e e
-        hash_last (LastCall e _) = hash_e e
+        hash_last (LastReturn _) = 17 -- better ideas?
+        hash_last (LastJump e _) = hash_e e
+        hash_last (LastCall e _ _) = hash_e e
         hash_last (LastSwitch e _) = hash_e e
         hash_tail (ZLast LastExit) v = 29 + v * 2
         hash_tail (ZLast (LastOther l)) v = hash_last l + (v * 2)
@@ -130,7 +124,8 @@ lookupBid subst bid = case lookupFM subst bid of
 
 -- Equality on the body of a block, modulo a function mapping block IDs to block IDs.
 eqBlockBodyWith :: (BlockId -> BlockId -> Bool) -> CmmBlock -> CmmBlock -> Bool
-eqBlockBodyWith eqBid (Block _ t) (Block _ t') = eqTailWith eqBid t t'
+eqBlockBodyWith eqBid (Block _ Nothing t) (Block _ Nothing t') = eqTailWith eqBid t t'
+eqBlockBodyWith _ _ _ = False
 
 type CmmTail = ZTail Middle Last
 eqTailWith :: (BlockId -> BlockId -> Bool) -> CmmTail -> CmmTail -> Bool
@@ -143,10 +138,11 @@ eqLastWith :: (BlockId -> BlockId -> Bool) -> Last -> Last -> Bool
 eqLastWith eqBid (LastBranch bid) (LastBranch bid') = eqBid bid bid'
 eqLastWith eqBid c@(LastCondBranch _ _ _) c'@(LastCondBranch _ _ _) =
   eqBid (cml_true c) (cml_true c')  && eqBid (cml_false c) (cml_false c') 
-eqLastWith _ LastReturn LastReturn = True
-eqLastWith _ (LastJump e) (LastJump e') = e == e'
-eqLastWith eqBid c@(LastCall _ _) c'@(LastCall _ _) =
-  cml_target c == cml_target c' && eqMaybeWith eqBid (cml_cont c) (cml_cont c')
+eqLastWith _ (LastReturn s) (LastReturn s') = s == s'
+eqLastWith _ (LastJump e s) (LastJump e' s') = e == e' && s == s'
+eqLastWith eqBid c@(LastCall _ _ s) c'@(LastCall _ _ s') =
+  cml_target c == cml_target c' && eqMaybeWith eqBid (cml_cont c) (cml_cont c') &&
+  s == s'
 eqLastWith eqBid (LastSwitch e bs) (LastSwitch e' bs') =
   e == e' && eqLstWith (eqMaybeWith eqBid) bs bs'
 eqLastWith _ _ _ = False

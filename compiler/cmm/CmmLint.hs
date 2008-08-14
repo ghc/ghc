@@ -19,7 +19,6 @@ module CmmLint (
 import BlockId
 import Cmm
 import CLabel
-import MachOp
 import Maybe
 import Outputable
 import PprCmm
@@ -32,17 +31,22 @@ import Control.Monad
 -- -----------------------------------------------------------------------------
 -- Exported entry points:
 
-cmmLint :: GenCmm d h (ListGraph CmmStmt) -> Maybe SDoc
-cmmLint (Cmm tops) = runCmmLint $ mapM_ lintCmmTop tops
+cmmLint :: (Outputable d, Outputable h)
+	=> GenCmm d h (ListGraph CmmStmt) -> Maybe SDoc
+cmmLint (Cmm tops) = runCmmLint (mapM_ lintCmmTop) tops
 
-cmmLintTop :: GenCmmTop d h (ListGraph CmmStmt) -> Maybe SDoc
-cmmLintTop top = runCmmLint $ lintCmmTop top
+cmmLintTop :: (Outputable d, Outputable h)
+	   => GenCmmTop d h (ListGraph CmmStmt) -> Maybe SDoc
+cmmLintTop top = runCmmLint lintCmmTop top
 
-runCmmLint :: CmmLint a -> Maybe SDoc
-runCmmLint l = 
-   case unCL l of
-	Left err -> Just (ptext (sLit "Cmm lint error:") $$ nest 2 err)
-	Right _  -> Nothing
+runCmmLint :: Outputable a => (a -> CmmLint b) -> a -> Maybe SDoc
+runCmmLint l p = 
+   case unCL (l p) of
+	Left err -> Just (vcat [ptext $ sLit ("Cmm lint error:"),
+				nest 2 err,
+				ptext $ sLit ("Program was:"),
+				nest 2 (ppr p)])
+  	Right _  -> Nothing
 
 lintCmmTop :: (GenCmmTop h i (ListGraph CmmStmt)) -> CmmLint ()
 lintCmmTop (CmmProc _ lbl _ (ListGraph blocks))
@@ -64,40 +68,33 @@ lintCmmBlock labels (BasicBlock id stmts)
 -- Checks whether a CmmExpr is "type-correct", and check for obvious-looking
 -- byte/word mismatches.
 
-lintCmmExpr :: CmmExpr -> CmmLint MachRep
+lintCmmExpr :: CmmExpr -> CmmLint CmmType
 lintCmmExpr (CmmLoad expr rep) = do
   lintCmmExpr expr
-  when (machRepByteWidth rep >= wORD_SIZE) $
+  when (widthInBytes (typeWidth rep) >= wORD_SIZE) $
      cmmCheckWordAddress expr
   return rep
 lintCmmExpr expr@(CmmMachOp op args) = do
-  mapM_ lintCmmExpr args
-  if map cmmExprRep args == machOpArgReps op
-  	then cmmCheckMachOp op args
-	else cmmLintMachOpErr expr (map cmmExprRep args) (machOpArgReps op)
+  tys <- mapM lintCmmExpr args
+  if map (typeWidth . cmmExprType) args == machOpArgReps op
+  	then cmmCheckMachOp op args tys
+	else cmmLintMachOpErr expr (map cmmExprType args) (machOpArgReps op)
 lintCmmExpr (CmmRegOff reg offset)
-  = lintCmmExpr (CmmMachOp (MO_Add rep) 
+  = lintCmmExpr (CmmMachOp (MO_Add rep)
 		[CmmReg reg, CmmLit (CmmInt (fromIntegral offset) rep)])
-  where rep = cmmRegRep reg
-lintCmmExpr lit@(CmmLit (CmmInt _ rep))
-  | isFloatingRep rep
-  = cmmLintErr (text "integer literal with floating MachRep: " <> ppr lit)
+  where rep = typeWidth (cmmRegType reg)
 lintCmmExpr expr = 
-  return (cmmExprRep expr)
+  return (cmmExprType expr)
 
 -- Check for some common byte/word mismatches (eg. Sp + 1)
-cmmCheckMachOp   :: MachOp -> [CmmExpr] -> CmmLint MachRep
-cmmCheckMachOp  op args@[CmmReg reg, CmmLit (CmmInt i _)]
+cmmCheckMachOp   :: MachOp -> [CmmExpr] -> [CmmType] -> CmmLint CmmType
+cmmCheckMachOp  op args@[CmmReg reg, CmmLit (CmmInt i _)] _
   | isWordOffsetReg reg && isOffsetOp op && i `rem` fromIntegral wORD_SIZE /= 0
   = cmmLintDubiousWordOffset (CmmMachOp op args)
-cmmCheckMachOp op [lit@(CmmLit (CmmInt { })), reg@(CmmReg _)]
-  = cmmCheckMachOp op [reg, lit]
-cmmCheckMachOp op@(MO_U_Conv from to) args
-  | isFloatingRep from || isFloatingRep to
-  = cmmLintErr (text "unsigned conversion from/to floating rep: " 
-		<> ppr (CmmMachOp op args))
-cmmCheckMachOp op _args
-  = return (resultRepOfMachOp op)
+cmmCheckMachOp op [lit@(CmmLit (CmmInt { })), reg@(CmmReg _)] tys
+  = cmmCheckMachOp op [reg, lit] tys
+cmmCheckMachOp op _ tys
+  = return (machOpResultType op tys)
 
 isWordOffsetReg  :: CmmReg -> Bool
 isWordOffsetReg (CmmGlobal Sp) = True
@@ -134,24 +131,26 @@ lintCmmStmt labels = lint
           lint (CmmComment {}) = return ()
           lint stmt@(CmmAssign reg expr) = do
             erep <- lintCmmExpr expr
-            if (erep == cmmRegRep reg)
+	    let reg_ty = cmmRegType reg
+            if (erep `cmmEqType_ignoring_ptrhood` reg_ty)
                 then return ()
-                else cmmLintAssignErr stmt
+                else cmmLintAssignErr stmt erep reg_ty
           lint (CmmStore l r) = do
             lintCmmExpr l
             lintCmmExpr r
             return ()
           lint (CmmCall target _res args _ _) =
-              lintTarget target >> mapM_ (lintCmmExpr . kindlessCmm) args
+              lintTarget target >> mapM_ (lintCmmExpr . hintlessCmm) args
           lint (CmmCondBranch e id) = checkTarget id >> lintCmmExpr e >> checkCond e
           lint (CmmSwitch e branches) = do
             mapM_ checkTarget $ catMaybes branches
             erep <- lintCmmExpr e
-            if (erep == wordRep)
+            if (erep `cmmEqType_ignoring_ptrhood` bWord)
               then return ()
-              else cmmLintErr (text "switch scrutinee is not a word: " <> ppr e)
-          lint (CmmJump e args) = lintCmmExpr e >> mapM_ (lintCmmExpr . kindlessCmm) args
-          lint (CmmReturn ress) = mapM_ (lintCmmExpr . kindlessCmm) ress
+              else cmmLintErr (text "switch scrutinee is not a word: " <> ppr e <>
+                               text " :: " <> ppr erep)
+          lint (CmmJump e args) = lintCmmExpr e >> mapM_ (lintCmmExpr . hintlessCmm) args
+          lint (CmmReturn ress) = mapM_ (lintCmmExpr . hintlessCmm) ress
           lint (CmmBranch id)    = checkTarget id
           checkTarget id = if elemBlockSet id labels then return ()
                            else cmmLintErr (text "Branch to nonexistent id" <+> ppr id)
@@ -188,16 +187,21 @@ addLintInfo info thing = CmmLint $
 	Left err -> Left (hang info 2 err)
 	Right a  -> Right a
 
-cmmLintMachOpErr :: CmmExpr -> [MachRep] -> [MachRep] -> CmmLint a
+cmmLintMachOpErr :: CmmExpr -> [CmmType] -> [Width] -> CmmLint a
 cmmLintMachOpErr expr argsRep opExpectsRep
      = cmmLintErr (text "in MachOp application: " $$ 
 					nest 2 (pprExpr expr) $$
 				        (text "op is expecting: " <+> ppr opExpectsRep) $$
 					(text "arguments provide: " <+> ppr argsRep))
 
-cmmLintAssignErr :: CmmStmt -> CmmLint a
-cmmLintAssignErr stmt = cmmLintErr (text "in assignment: " $$ 
-					nest 2 (pprStmt stmt))
+cmmLintAssignErr :: CmmStmt -> CmmType -> CmmType -> CmmLint a
+cmmLintAssignErr stmt e_ty r_ty
+  = cmmLintErr (text "in assignment: " $$ 
+		nest 2 (vcat [pprStmt stmt, 
+			      text "Reg ty:" <+> ppr r_ty,
+			      text "Rhs ty:" <+> ppr e_ty]))
+			 
+					
 
 cmmLintDubiousWordOffset :: CmmExpr -> CmmLint a
 cmmLintDubiousWordOffset expr

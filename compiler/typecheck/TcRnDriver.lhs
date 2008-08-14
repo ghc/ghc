@@ -320,7 +320,8 @@ tcRnExtCore hsc_env (HsExtCore this_mod decls src_binds)
 	my_exports = map (Avail . idName) bndrs ;
 		-- ToDo: export the data types also?
 
-	final_type_env = extendTypeEnvWithIds (tcg_type_env tcg_env) bndrs ;
+	final_type_env = 
+             extendTypeEnvWithIds (tcg_type_env tcg_env) bndrs ;
 
 	mod_guts = ModGuts {	mg_module    = this_mod,
 				mg_boot	     = False,

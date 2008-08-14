@@ -47,6 +47,7 @@ import Constants
 import TyCon
 import DataCon
 import Id
+import IdInfo
 import Type
 import PrelInfo
 import Outputable
@@ -82,7 +83,7 @@ cgTopRhsCon id con args
 	; let
 	    name          = idName id
 	    lf_info	  = mkConLFInfo con
-    	    closure_label = mkClosureLabel name
+    	    closure_label = mkClosureLabel name $ idCafInfo id
 	    caffy         = any stgArgHasCafRefs args
 	    (closure_info, amodes_w_offsets) = layOutStaticConstr con amodes
 	    closure_rep = mkStaticClosureFields
@@ -142,7 +143,8 @@ at all.
 \begin{code}
 buildDynCon binder cc con []
   = returnFC (taggedStableIdInfo binder
-			   (mkLblExpr (mkClosureLabel (dataConName con)))
+			   (mkLblExpr (mkClosureLabel (dataConName con)
+                                      (idCafInfo binder)))
     			   (mkConLFInfo con)
                            con)
 \end{code}
@@ -174,7 +176,7 @@ buildDynCon binder cc con [arg_amode]
   , (_, CmmLit (CmmInt val _)) <- arg_amode
   , let val_int = (fromIntegral val) :: Int
   , val_int <= mAX_INTLIKE && val_int >= mIN_INTLIKE
-  = do 	{ let intlike_lbl   = mkRtsDataLabel (sLit "stg_INTLIKE_closure")
+  = do 	{ let intlike_lbl   = mkRtsGcPtrLabel (sLit "stg_INTLIKE_closure")
 	      offsetW = (val_int - mIN_INTLIKE) * (fixedHdrSize + 1)
 		-- INTLIKE closures consist of a header and one word payload
 	      intlike_amode = CmmLit (cmmLabelOffW intlike_lbl offsetW)
@@ -185,7 +187,7 @@ buildDynCon binder cc con [arg_amode]
   , (_, CmmLit (CmmInt val _)) <- arg_amode
   , let val_int = (fromIntegral val) :: Int
   , val_int <= mAX_CHARLIKE && val_int >= mIN_CHARLIKE
-  = do 	{ let charlike_lbl   = mkRtsDataLabel (sLit "stg_CHARLIKE_closure")
+  = do 	{ let charlike_lbl   = mkRtsGcPtrLabel (sLit "stg_CHARLIKE_closure")
 	      offsetW = (val_int - mIN_CHARLIKE) * (fixedHdrSize + 1)
 		-- CHARLIKE closures consist of a header and one word payload
 	      charlike_amode = CmmLit (cmmLabelOffW charlike_lbl offsetW)
@@ -401,9 +403,8 @@ cgTyCon tycon
             -- code appears to put it before --- NR 16 Aug 2007
 	; extra <- 
 	   if isEnumerationTyCon tycon then do
-	        tbl <- getCmm (emitRODataLits (mkLocalClosureTableLabel 
-						(tyConName tycon))
-			   [ CmmLabelOff (mkLocalClosureLabel (dataConName con)) (tagForCon con)
+	        tbl <- getCmm (emitRODataLits "cgTyCon" (mkLocalClosureTableLabel (tyConName tycon) NoCafRefs)
+			   [ CmmLabelOff (mkLocalClosureLabel (dataConName con) NoCafRefs) (tagForCon con)
     			   | con <- tyConDataCons tycon])
 		return [tbl]
 	   else

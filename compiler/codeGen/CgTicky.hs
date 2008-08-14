@@ -52,12 +52,12 @@ import CgMonad
 import SMRep
 
 import Cmm
-import MachOp
 import CmmUtils
 import CLabel
 
 import Name
 import Id
+import IdInfo
 import StaticFlags
 import BasicTypes
 import FastString
@@ -106,7 +106,7 @@ emitTickyCounter cl_info args on_stk
 	    ] }
   where
     name = closureName cl_info
-    ticky_ctr_label = mkRednCountsLabel name
+    ticky_ctr_label = mkRednCountsLabel name NoCafRefs
     arg_descr = map (showTypeCategory . idType) args
     fun_descr mod_name = ppr_for_ticky_name mod_name name
 
@@ -172,13 +172,13 @@ registerTickyCtr ctr_lbl
   = emitIf test (stmtsC register_stmts)
   where
     -- krc: code generator doesn't handle Not, so we test for Eq 0 instead
-    test = CmmMachOp (MO_Eq wordRep)
+    test = CmmMachOp (MO_Eq wordWidth)
               [CmmLoad (CmmLit (cmmLabelOffB ctr_lbl 
-				oFFSET_StgEntCounter_registeredp)) wordRep,
+				oFFSET_StgEntCounter_registeredp)) bWord,
                CmmLit (mkIntCLit 0)]
     register_stmts
       =	[ CmmStore (CmmLit (cmmLabelOffB ctr_lbl oFFSET_StgEntCounter_link))
-		   (CmmLoad ticky_entry_ctrs wordRep)
+		   (CmmLoad ticky_entry_ctrs bWord)
 	, CmmStore ticky_entry_ctrs (mkLblExpr ctr_lbl)
 	, CmmStore (CmmLit (cmmLabelOffB ctr_lbl 
 				oFFSET_StgEntCounter_registeredp))
@@ -288,13 +288,13 @@ tickyAllocHeap hp
 	  if hp == 0 then [] 	-- Inside the stmtC to avoid control
 	  else [		-- dependency on the argument
 		-- Bump the allcoation count in the StgEntCounter
-	    addToMem REP_StgEntCounter_allocs 
+	    addToMem (typeWidth REP_StgEntCounter_allocs)
 			(CmmLit (cmmLabelOffB ticky_ctr 
 				oFFSET_StgEntCounter_allocs)) hp,
 		-- Bump ALLOC_HEAP_ctr
-	    addToMemLbl cLongRep (mkRtsDataLabel (sLit "ALLOC_HEAP_ctr")) 1,
-		-- Bump ALLOC_HEAP_tot
-	    addToMemLbl cLongRep (mkRtsDataLabel (sLit "ALLOC_HEAP_tot")) hp] }
+	    addToMemLbl cLongWidth (mkRtsDataLabel $ sLit "ALLOC_HEAP_ctr") 1,
+  		-- Bump ALLOC_HEAP_tot
+	    addToMemLbl cLongWidth (mkRtsDataLabel $ sLit "ALLOC_HEAP_tot") hp] }
 
 -- -----------------------------------------------------------------------------
 -- Ticky utils
@@ -304,7 +304,7 @@ ifTicky code
   | opt_DoTickyProfiling = code
   | otherwise		 = nopC
 
-addToMemLbl :: MachRep -> CLabel -> Int -> CmmStmt
+addToMemLbl :: Width -> CLabel -> Int -> CmmStmt
 addToMemLbl rep lbl n = addToMem rep (CmmLit (CmmLabel lbl)) n
 
 -- All the ticky-ticky counters are declared "unsigned long" in C
@@ -313,27 +313,28 @@ bumpTickyCounter lbl = bumpTickyCounter' (cmmLabelOffB (mkRtsDataLabel lbl) 0)
 
 bumpTickyCounter' :: CmmLit -> Code
 -- krc: note that we're incrementing the _entry_count_ field of the ticky counter
-bumpTickyCounter' lhs = stmtC (addToMem cLongRep (CmmLit lhs) 1)
-
-addToMemLong = addToMem cLongRep
+bumpTickyCounter' lhs = stmtC (addToMemLong (CmmLit lhs) 1)
 
 bumpHistogram :: LitString -> Int -> Code
 bumpHistogram lbl n 
---  = bumpHistogramE lbl (CmmLit (CmmInt (fromIntegral n) cLongRep))
+--  = bumpHistogramE lbl (CmmLit (CmmInt (fromIntegral n) cLong))
     = return ()	   -- TEMP SPJ Apr 07
 
 bumpHistogramE :: LitString -> CmmExpr -> Code
 bumpHistogramE lbl n 
-  = do  t <- newNonPtrTemp cLongRep
+  = do  t <- newTemp cLong
 	stmtC (CmmAssign (CmmLocal t) n)
-	emitIf (CmmMachOp (MO_U_Le cLongRep) [CmmReg (CmmLocal t), eight]) $
+	emitIf (CmmMachOp (MO_U_Le cLongWidth) [CmmReg (CmmLocal t), eight]) $
 		stmtC (CmmAssign (CmmLocal t) eight)
-	stmtC (addToMemLong (cmmIndexExpr cLongRep 
+	stmtC (addToMemLong (cmmIndexExpr cLongWidth
 				(CmmLit (CmmLabel (mkRtsDataLabel lbl)))
 				(CmmReg (CmmLocal t)))
 			    1)
   where 
-   eight = CmmLit (CmmInt 8 cLongRep)
+   eight = CmmLit (CmmInt 8 cLongWidth)
+
+------------------------------------------------------------------
+addToMemLong = addToMem cLongWidth
 
 ------------------------------------------------------------------
 -- Showing the "type category" for ticky-ticky profiling

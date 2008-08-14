@@ -38,7 +38,6 @@ import CLabel
 import Cmm
 import CmmUtils
 import PprCmm
-import MachOp
 
 import StgSyn
 import PrelNames
@@ -51,6 +50,7 @@ import CostCentre
 import Id
 import Name
 import OccName
+import Outputable
 import TyCon
 import Module
 import ErrUtils
@@ -198,7 +198,7 @@ mkModuleInit way cost_centre_info this_mod main_mod imported_mods hpc_info
 
     jump_to_init = stmtC (CmmJump (mkLblExpr real_init_lbl) [])
 
-    mod_reg_val = CmmLoad (mkLblExpr moduleRegdLabel) wordRep
+    mod_reg_val = CmmLoad (mkLblExpr moduleRegdLabel) bWord
 
     -- Main refers to GHC.TopHandler.runIO, so make sure we call the
     -- init function for GHC.TopHandler.
@@ -224,7 +224,7 @@ mkModuleInit way cost_centre_info this_mod main_mod imported_mods hpc_info
                     -- The return-code pops the work stack by 
                     -- incrementing Sp, and then jumpd to the popped item
     ret_code = stmtsC [ CmmAssign spReg (cmmRegOffW spReg 1)
-                      , CmmJump (CmmLoad (cmmRegOffW spReg (-1)) wordRep) [] ]
+                      , CmmJump (CmmLoad (cmmRegOffW spReg (-1)) bWord) [] ]
 
 
     rec_descent_init = if opt_SccProfilingOn || isHpcUsed hpc_info
@@ -303,8 +303,8 @@ mkSRT these (id,[])  = nopC
 mkSRT these (id,ids)
   = do	{ ids <- mapFCs remap ids
 	; id  <- remap id
-	; emitRODataLits (mkSRTLabel (idName id)) 
-		       (map (CmmLabel . mkClosureLabel . idName) ids)
+	; emitRODataLits "CodeGen.mkSRT" (mkSRTLabel (idName id) (idCafInfo id)) 
+	       (map (\id -> CmmLabel $ mkClosureLabel (idName id) (idCafInfo id)) ids)
 	}
   where
 	-- Sigh, better map all the ids against the environment in 
@@ -326,7 +326,7 @@ cgTopRhs bndr (StgRhsCon cc con args)
 
 cgTopRhs bndr (StgRhsClosure cc bi fvs upd_flag srt args body)
   = ASSERT(null fvs)    -- There should be no free variables
-    setSRTLabel (mkSRTLabel (idName bndr)) $
+    setSRTLabel (mkSRTLabel (idName bndr) (idCafInfo bndr)) $
     setSRT srt $
     forkStatics (cgTopRhsClosure bndr cc bi upd_flag args body)
 \end{code}

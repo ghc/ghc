@@ -15,7 +15,7 @@ module CmmBrokenBlock (
   adaptBlockToFormat,
   selectContinuations,
   ContFormat,
-  makeContinuationEntries,
+  makeContinuationEntries
   ) where
 
 #include "HsVersions.h"
@@ -24,7 +24,6 @@ import BlockId
 import Cmm
 import CmmUtils
 import CLabel
-import MachOp (MachHint(..))
 
 import CgUtils (callerSaveVolatileRegs)
 import ClosureInfo
@@ -69,14 +68,14 @@ data BrokenBlock
 -- | How a block could be entered
 -- See Note [An example of CPS conversion]
 data BlockEntryInfo
-  = FunctionEntry CmmInfo CLabel CmmFormalsWithoutKinds
+  = FunctionEntry CmmInfo CLabel CmmFormals
       -- ^ Block is the beginning of a function, parameters are:
       --   1. Function header info
       --   2. The function name
       --   3. Aguments to function
       -- Only the formal parameters are live
 
-  | ContinuationEntry CmmFormalsWithoutKinds C_SRT Bool
+  | ContinuationEntry CmmFormals C_SRT Bool
       -- ^ Return point of a function call, parameters are:
       --   1. return values (argument to continuation)
       --   2. SRT for the continuation's info table
@@ -124,7 +123,7 @@ f2(x, y) { // ProcPointEntry
 
 -}
 
-data ContFormat = ContFormat CmmFormals C_SRT Bool
+data ContFormat = ContFormat HintedCmmFormals C_SRT Bool
       -- ^ Arguments
       --   1. return values (argument to continuation)
       --   2. SRT for the continuation's info table
@@ -138,15 +137,15 @@ data FinalStmt
   = FinalBranch BlockId
     -- ^ Same as 'CmmBranch'.  Target must be a ControlEntry
 
-  | FinalReturn CmmActuals
+  | FinalReturn HintedCmmActuals
     -- ^ Same as 'CmmReturn'. Parameter is the return values.
 
-  | FinalJump CmmExpr CmmActuals
+  | FinalJump CmmExpr HintedCmmActuals
     -- ^ Same as 'CmmJump'.  Parameters:
     --   1. The function to call,
     --   2. Arguments of the call
 
-  | FinalCall BlockId CmmCallTarget CmmFormals CmmActuals
+  | FinalCall BlockId CmmCallTarget HintedCmmFormals HintedCmmActuals
               C_SRT   CmmReturnInfo Bool
       -- ^ Same as 'CmmCallee' followed by 'CmmGoto'.  Parameters:
       --   1. Target of the 'CmmGoto' (must be a 'ContinuationEntry')
@@ -195,7 +194,7 @@ breakProc ::
                                 -- to create names of the new blocks with
     -> CmmInfo                  -- ^ Info table for the procedure
     -> CLabel                   -- ^ Name of the procedure
-    -> CmmFormalsWithoutKinds   -- ^ Parameters of the procedure
+    -> CmmFormals               -- ^ Parameters of the procedure
     -> [CmmBasicBlock]          -- ^ Blocks of the procecure
                                 -- (First block is the entry block)
     -> [BrokenBlock]
@@ -353,7 +352,7 @@ makeContinuationEntries formats
     case lookup ident formats of
       Nothing -> block
       Just (ContFormat formals srt is_gc) ->
-          BrokenBlock ident (ContinuationEntry (map kindlessCmm formals) srt is_gc)
+          BrokenBlock ident (ContinuationEntry (map hintlessCmm formals) srt is_gc)
                       stmts targets exit
 
 adaptBlockToFormat :: [(BlockId, ContFormat)]
@@ -383,20 +382,19 @@ adaptBlockToFormat formats unique
                        target formals actuals srt ret is_gc
 
       adaptor_block = mk_adaptor_block adaptor_ident
-                  (ContinuationEntry (map kindlessCmm formals) srt is_gc)
-                  next format_formals
+                  (ContinuationEntry (map hintlessCmm formals) srt is_gc) next
       adaptor_ident = BlockId unique
 
-      mk_adaptor_block :: BlockId -> BlockEntryInfo -> BlockId -> CmmFormals -> BrokenBlock
-      mk_adaptor_block ident entry next formals =
+      mk_adaptor_block :: BlockId -> BlockEntryInfo -> BlockId -> BrokenBlock
+      mk_adaptor_block ident entry next =
           BrokenBlock ident entry [] [next] exit
               where
                 exit = FinalJump
                          (CmmLit (CmmLabel (mkReturnPtLabel (getUnique next))))
                          (map formal_to_actual format_formals)
 
-                formal_to_actual (CmmKinded reg hint)
-                     = (CmmKinded (CmmReg (CmmLocal reg)) hint)
+                formal_to_actual (CmmHinted reg hint)
+                     = (CmmHinted (CmmReg (CmmLocal reg)) hint)
                 -- TODO: Check if NoHint is right.  We're
                 -- jumping to a C-- function not a foreign one
                 -- so it might always be right.

@@ -57,10 +57,19 @@
 
 #if defined(GEN_HASKELL)
 #define field_type_(str, s_type, field) /* nothing */
+#define field_type_gcptr_(str, s_type, field) /* nothing */
 #else
+/* Defining REP_x to be b32 etc
+   These are both the C-- types used in a load
+      e.g.  b32[addr]
+   and the names of the CmmTypes in the compiler
+      b32 :: CmmType
+*/
 #define field_type_(str, s_type, field) \
-    printf("#define REP_" str " I"); \
+    printf("#define REP_" str " b"); \
     printf("%d\n", sizeof (__typeof__(((((s_type*)0)->field)))) * 8);
+#define field_type_gcptr_(str, s_type, field) \
+    printf("#define REP_" str " gcptr\n");
 #endif
 
 #define field_type(s_type, field) \
@@ -136,16 +145,22 @@
     closure_payload_macro(str(s_type,field));
 
 /* Byte offset and MachRep for a closure field, minus the header */
-#define closure_field(s_type, field) \
-    closure_field_offset(s_type,field) \
-    field_type(s_type, field); \
-    closure_field_macro(str(s_type,field))
-
-/* Byte offset and MachRep for a closure field, minus the header */
 #define closure_field_(str, s_type, field) \
     closure_field_offset_(str,s_type,field) \
     field_type_(str, s_type, field); \
     closure_field_macro(str)
+
+#define closure_field(s_type, field) \
+    closure_field_(str(s_type,field),s_type,field)
+
+/* Byte offset and MachRep for a closure field, minus the header */
+#define closure_field_gcptr_(str, s_type, field) \
+    closure_field_offset_(str,s_type,field) \
+    field_type_gcptr_(str, s_type, field); \
+    closure_field_macro(str)
+
+#define closure_field_gcptr(s_type, field) \
+    closure_field_gcptr_(str(s_type,field),s_type,field)
 
 /* Byte offset for a TSO field, minus the header and variable prof bit. */
 #define tso_payload_offset(s_type, field) \
@@ -310,23 +325,23 @@ main(int argc, char *argv[])
 
     closure_size(StgPAP);
     closure_field(StgPAP, n_args);
-    closure_field(StgPAP, fun);
+    closure_field_gcptr(StgPAP, fun);
     closure_field(StgPAP, arity);
     closure_payload(StgPAP, payload);
 
     thunk_size(StgAP);
     closure_field(StgAP, n_args);
-    closure_field(StgAP, fun);
+    closure_field_gcptr(StgAP, fun);
     closure_payload(StgAP, payload);
 
     thunk_size(StgAP_STACK);
     closure_field(StgAP_STACK, size);
-    closure_field(StgAP_STACK, fun);
+    closure_field_gcptr(StgAP_STACK, fun);
     closure_payload(StgAP_STACK, payload);
 
     thunk_size(StgSelector);
 
-    closure_field(StgInd, indirectee);
+    closure_field_gcptr(StgInd, indirectee);
 
     closure_size(StgMutVar);
     closure_field(StgMutVar, var);

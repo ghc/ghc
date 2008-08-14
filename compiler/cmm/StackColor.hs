@@ -8,7 +8,6 @@ import CmmExpr
 import CmmSpillReload
 import DFMonad
 import qualified GraphOps
-import MachOp
 import ZipCfg
 import ZipCfgCmmRep
 import ZipDataflow
@@ -18,8 +17,6 @@ import Panic
 import UniqSet
 
 import Data.List
-
-type M = ExtendWithSpills Middle
 
 fold_edge_facts_b ::
   LastNode l => (DualLive -> a -> a) -> BackwardTransfers m l DualLive -> LGraph m l
@@ -32,12 +29,12 @@ fold_edge_facts_b f comp graph env z =
           last_in _ LastExit = fact_bot dualLiveLattice
           last_in env (LastOther l) = bt_last_in comp env l
       in head_fold h (last_in env l) z
-    head_fold (ZHead h m) out z = head_fold h (bt_middle_in comp out m) (f out z)
-    head_fold (ZFirst id) out z = f (bt_first_in comp out id) (f out z)
+    head_fold (ZHead h m)   out z = head_fold h (bt_middle_in comp out m) (f out z)
+    head_fold (ZFirst id _) out z = f (bt_first_in comp out id) (f out z)
 
-foldConflicts :: (RegSet -> a -> a) -> a -> LGraph M Last -> FuelMonad a
+foldConflicts :: (RegSet -> a -> a) -> a -> LGraph Middle Last -> FuelMonad a
 foldConflicts f z g =
-  do env <- dualLiveness emptyBlockSet $ graphOfLGraph g
+  do env <- dualLiveness emptyBlockSet g
      let lookup id = lookupBlockEnv env id `orElse` fact_bot dualLiveLattice
          f' dual z = f (on_stack dual) z
      return $ fold_edge_facts_b f' (dualLiveTransfers emptyBlockSet) g lookup z
@@ -50,7 +47,7 @@ foldConflicts f z g =
 type IGraph = Color.Graph LocalReg SlotClass StackPlacement
 type ClassCount = [(SlotClass, Int)]
 
-buildIGraphAndCounts :: LGraph M Last -> FuelMonad (IGraph, ClassCount)
+buildIGraphAndCounts :: LGraph Middle Last -> FuelMonad (IGraph, ClassCount)
 buildIGraphAndCounts g = igraph_and_counts
     where igraph_and_counts = foldConflicts add (Color.initGraph, zero) g
           zero = map (\c -> (c, 0)) allSlotClasses
@@ -73,16 +70,14 @@ graphAddConflictSet :: RegSet -> IGraph -> IGraph
 graphAddConflictSet set graph = GraphOps.addConflicts set slotClass graph
 
 slotClass :: LocalReg -> SlotClass
-slotClass (LocalReg _ machRep _) = 
-    case machRep of -- the horror, the horror
-      I8   -> SlotClass32
-      I16  -> SlotClass32
-      I32  -> SlotClass32
-      I64  -> SlotClass64
-      I128 -> SlotClass128
-      F32  -> SlotClass32
-      F64  -> SlotClass64
-      F80  -> SlotClass64
+slotClass (LocalReg _ ty) = 
+    case typeWidth ty of -- the horror, the horror
+      W8   -> SlotClass32
+      W16  -> SlotClass32
+      W32  -> SlotClass32
+      W64  -> SlotClass64
+      W128 -> SlotClass128
+      W80  -> SlotClass64
 
 {-
 colorMe :: (IGraph, ClassCount) -> (IGraph, UniqSet LocalReg)

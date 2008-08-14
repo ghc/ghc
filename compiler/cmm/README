@@ -45,7 +45,6 @@ Sketch of the new arrivals:
   DFMonad        Support for dataflow analysis and dataflow-based
                  transformation.   This module needs work.  Includes 
                    DataflowLattice - for tracking dataflow facts (good)
-                   DFA - monad for iterative dataflow analysis (OK)
                    DFM - monad for iterative dataflow analysis and rewriting (OK)
                    DFTx - monad to track Whalley/Davidson transactions (ugly)
                    type class DataflowAnalysis - operations common to DFA, DFM
@@ -88,8 +87,6 @@ Sketch of the new arrivals:
   CmmCPSZ        The CPS transformation so far.
 
   CmmContFlowOpt Branch-chain elimination and elimination of unreachable code.
-
-  CmmCvt         Conversion to and from the new format.
 
   CmmOpt         Changed optimization to use 'foldRegsUsed'; eliminated
                  significant duplication of code.

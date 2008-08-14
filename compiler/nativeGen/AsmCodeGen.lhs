@@ -36,7 +36,6 @@ import qualified GraphColor	as Color
 import Cmm
 import CmmOpt		( cmmMiniInline, cmmMachOpFold )
 import PprCmm
-import MachOp
 import CLabel
 import State
 
@@ -716,9 +715,9 @@ cmmStmtConFold stmt
 			        e' <- cmmExprConFold CallReference e
 			        return $ CmmCallee e' conv
 			      other -> return other
-                 args' <- mapM (\(CmmKinded arg hint) -> do
+                 args' <- mapM (\(CmmHinted arg hint) -> do
                                   arg' <- cmmExprConFold DataReference arg
-                                  return (CmmKinded arg' hint)) args
+                                  return (CmmHinted arg' hint)) args
 	         return $ CmmCall target' regs args' srt returns
 
         CmmCondBranch test dest
@@ -759,9 +758,9 @@ cmmExprConFold referenceKind expr
            -> do
 		 dflags <- getDynFlagsCmmOpt
 		 dynRef <- cmmMakeDynamicReference dflags addImportCmmOpt referenceKind lbl
-                 return $ cmmMachOpFold (MO_Add wordRep) [
+                 return $ cmmMachOpFold (MO_Add wordWidth) [
                      dynRef,
-                     (CmmLit $ CmmInt (fromIntegral off) wordRep)
+                     (CmmLit $ CmmInt (fromIntegral off) wordWidth)
                    ]
 
 #if powerpc_TARGET_ARCH
@@ -795,7 +794,7 @@ cmmExprConFold referenceKind expr
                     -> case mid of 
                           BaseReg -> cmmExprConFold DataReference baseRegAddr
                           other   -> cmmExprConFold DataReference
-                                        (CmmLoad baseRegAddr (globalRegRep mid))
+                                        (CmmLoad baseRegAddr (globalRegType mid))
 	   -- eliminate zero offsets
 	CmmRegOff reg 0
 	   -> cmmExprConFold referenceKind (CmmReg reg)
@@ -807,10 +806,10 @@ cmmExprConFold referenceKind expr
            -> case get_GlobalReg_reg_or_addr mid of
                 Left  realreg -> return expr
                 Right baseRegAddr
-                   -> cmmExprConFold DataReference (CmmMachOp (MO_Add wordRep) [
+                   -> cmmExprConFold DataReference (CmmMachOp (MO_Add wordWidth) [
                                         CmmReg (CmmGlobal mid),
                                         CmmLit (CmmInt (fromIntegral offset)
-                                                       wordRep)])
+                                                       wordWidth)])
         other
            -> return other
 

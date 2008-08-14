@@ -286,7 +286,7 @@ getCgIdInfo id
 	    name = idName id
 	in
 	if isExternalName name then do
-	    let ext_lbl = CmmLit (CmmLabel (mkClosureLabel name))
+	    let ext_lbl = CmmLit (CmmLabel (mkClosureLabel name $ idCafInfo id))
 	    return (stableIdInfo id ext_lbl (mkLFImported id))
 	else
 	if isVoidArg (idCgRep id) then
@@ -447,10 +447,7 @@ bindNewToTemp id
 	return temp_reg
   where
     uniq     = getUnique id
-    temp_reg = LocalReg uniq (argMachRep (idCgRep id)) kind
-    kind     = if isFollowableArg (idCgRep id)
-               then GCKindPtr
-               else GCKindNonPtr
+    temp_reg = LocalReg uniq (argMachRep (idCgRep id))
     lf_info  = mkLFArgument id	-- Always used of things we
 				-- know nothing about
 

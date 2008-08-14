@@ -18,8 +18,6 @@ import DsMonad
 
 import HsSyn
 import DataCon
-import MachOp
-import SMRep
 import CoreUtils
 import Id
 import Literal
@@ -31,6 +29,8 @@ import Coercion
 import TcType
 import Var
 
+import CmmExpr
+import CmmUtils
 import HscTypes
 import ForeignCall
 import TysWiredIn
@@ -165,8 +165,7 @@ fun_type_arg_stdcall_info StdCallConv ty
   = let
        (_tvs,sans_foralls)        = tcSplitForAllTys arg_ty
        (fe_arg_tys, _orig_res_ty) = tcSplitFunTys sans_foralls
-    in 
-        Just $ sum (map (machRepByteWidth . typeMachRep . getPrimTyOf) fe_arg_tys)
+    in Just $ sum (map (widthInBytes . typeWidth . typeCmmType . getPrimTyOf) fe_arg_tys)
 fun_type_arg_stdcall_info _other_conv _
   = Nothing
 \end{code}
@@ -425,19 +424,26 @@ mkFExportCBits :: FastString
 		  )
 mkFExportCBits c_nm maybe_target arg_htys res_hty is_IO_res_ty cc 
  = (header_bits, c_bits, type_string,
-    sum [ machRepByteWidth rep | (_,_,_,rep) <- aug_arg_info] -- all the args
+    sum [ widthInBytes (typeWidth rep) | (_,_,_,rep) <- aug_arg_info] -- all the args
+	 -- NB. the calculation here isn't strictly speaking correct.
+	 -- We have a primitive Haskell type (eg. Int#, Double#), and
+	 -- we want to know the size, when passed on the C stack, of
+	 -- the associated C type (eg. HsInt, HsDouble).  We don't have
+	 -- this information to hand, but we know what GHC's conventions
+	 -- are for passing around the primitive Haskell types, so we
+	 -- use that instead.  I hope the two coincide --SDM
     )
  where
   -- list the arguments to the C function
   arg_info :: [(SDoc, 		-- arg name
 		SDoc,		-- C type
 	        Type,		-- Haskell type
-		MachRep)]	-- the MachRep
+		CmmType)]	-- the CmmType
   arg_info  = [ let stg_type = showStgType ty in
                 (arg_cname n stg_type,
                  stg_type,
                  ty, 
-		 typeMachRep (getPrimTyOf ty))
+		 typeCmmType (getPrimTyOf ty))
 	      | (ty,n) <- zip arg_htys [1::Int ..] ]
 
   arg_cname n stg_ty
@@ -464,7 +470,7 @@ mkFExportCBits c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
 
   stable_ptr_arg = 
 	(text "the_stableptr", text "StgStablePtr", undefined,
-	 typeMachRep (mkStablePtrPrimTy alphaTy))
+	 typeCmmType (mkStablePtrPrimTy alphaTy))
 
   -- stuff to do with the return type of the C function
   res_hty_is_unit = res_hty `coreEqType` unitTy	-- Look through any newtypes
@@ -582,16 +588,6 @@ foreignExportInitialiser hs_fn =
     ]
 
 
--- NB. the calculation here isn't strictly speaking correct.
--- We have a primitive Haskell type (eg. Int#, Double#), and
--- we want to know the size, when passed on the C stack, of
--- the associated C type (eg. HsInt, HsDouble).  We don't have
--- this information to hand, but we know what GHC's conventions
--- are for passing around the primitive Haskell types, so we
--- use that instead.  I hope the two coincide --SDM
-typeMachRep :: Type -> MachRep
-typeMachRep ty = argMachRep (typeCgRep ty)
-
 mkHObj :: Type -> SDoc
 mkHObj t = text "rts_mk" <> text (showFFIType t)
 
@@ -608,8 +604,8 @@ showFFIType t = getOccString (getName tc)
 	    Just (tc,_) -> tc
 	    Nothing	-> pprPanic "showFFIType" (ppr t)
 
-insertRetAddr :: CCallConv -> [(SDoc, SDoc, Type, MachRep)]
-                           -> [(SDoc, SDoc, Type, MachRep)]
+insertRetAddr :: CCallConv -> [(SDoc, SDoc, Type, CmmType)]
+                           -> [(SDoc, SDoc, Type, CmmType)]
 #if !defined(x86_64_TARGET_ARCH)
 insertRetAddr CCallConv args = ret_addr_arg : args
 insertRetAddr _ args = args
@@ -619,19 +615,19 @@ insertRetAddr _ args = args
 -- need to flush a register argument to the stack (See rts/Adjustor.c for
 -- details).
 insertRetAddr CCallConv args = go 0 args
-  where  go :: Int -> [(SDoc, SDoc, Type, MachRep)]
-                   -> [(SDoc, SDoc, Type, MachRep)]
+  where  go :: Int -> [(SDoc, SDoc, Type, CmmType)]
+                   -> [(SDoc, SDoc, Type, CmmType)]
          go 6 args = ret_addr_arg : args
 	 go n (arg@(_,_,_,rep):args)
-	  | I64 <- rep = arg : go (n+1) args
+	  | cmmEqType_ignoring_ptrhood rep b64 = arg : go (n+1) args
 	  | otherwise  = arg : go n     args
 	 go _ [] = []
 insertRetAddr _ args = args
 #endif
 
-ret_addr_arg :: (SDoc, SDoc, Type, MachRep)
+ret_addr_arg :: (SDoc, SDoc, Type, CmmType)
 ret_addr_arg = (text "original_return_addr", text "void*", undefined, 
-		typeMachRep addrPrimTy)
+		typeCmmType addrPrimTy)
 
 -- This function returns the primitive type associated with the boxed
 -- type argument to a foreign export (eg. Int ==> Int#).

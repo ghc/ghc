@@ -34,7 +34,6 @@ import TysPrim
 import CLabel
 import Cmm
 import CmmUtils
-import MachOp
 import SMRep
 import ForeignCall
 import ClosureInfo
@@ -49,7 +48,7 @@ import Control.Monad
 -- Code generation for Foreign Calls
 
 cgForeignCall
-	:: CmmFormals	-- where to put the results
+	:: HintedCmmFormals	-- where to put the results
 	-> ForeignCall		-- the op
 	-> [StgArg]		-- arguments
 	-> StgLiveVars	-- live vars, in case we need to save them
@@ -63,16 +62,16 @@ cgForeignCall results fcall stg_args live
 	  	    | (stg_arg, (rep,expr)) <- stg_args `zip` reps_n_amodes, 
 	               nonVoidArg rep]
 
-	arg_hints = zipWith CmmKinded
-                      arg_exprs (map (typeHint.stgArgType) stg_args)
+	arg_hints = zipWith CmmHinted
+                      arg_exprs (map (typeForeignHint.stgArgType) stg_args)
   -- in
   emitForeignCall results fcall arg_hints live
 
 
 emitForeignCall
-	:: CmmFormals	-- where to put the results
+	:: HintedCmmFormals	-- where to put the results
 	-> ForeignCall		-- the op
-	-> [CmmKinded CmmExpr] -- arguments
+	-> [CmmHinted CmmExpr] -- arguments
 	-> StgLiveVars	-- live vars, in case we need to save them
 	-> Code
 
@@ -86,18 +85,18 @@ emitForeignCall results (CCall (CCallSpec target cconv safety)) args live
 	= case target of
 	   StaticTarget lbl -> (args, CmmLit (CmmLabel 
 					(mkForeignLabel lbl call_size False)))
-	   DynamicTarget    ->  case args of (CmmKinded fn _):rest -> (rest, fn)
+	   DynamicTarget    ->  case args of (CmmHinted fn _):rest -> (rest, fn)
 
 	-- in the stdcall calling convention, the symbol needs @size appended
 	-- to it, where size is the total number of bytes of arguments.  We
 	-- attach this info to the CLabel here, and the CLabel pretty printer
 	-- will generate the suffix when the label is printed.
       call_size
-	| StdCallConv <- cconv = Just (sum (map (arg_size.cmmExprRep.kindlessCmm) args))
+	| StdCallConv <- cconv = Just (sum (map (arg_size.cmmExprType.hintlessCmm) args))
 	| otherwise            = Nothing
 
 	-- ToDo: this might not be correct for 64-bit API
-      arg_size rep = max (machRepByteWidth rep) wORD_SIZE
+      arg_size rep = max (widthInBytes (typeWidth rep)) wORD_SIZE
 
 emitForeignCall _ (DNCall _) _ _
   = panic "emitForeignCall: DNCall"
@@ -106,9 +105,9 @@ emitForeignCall _ (DNCall _) _ _
 -- alternative entry point, used by CmmParse
 emitForeignCall'
 	:: Safety
-	-> CmmFormals	-- where to put the results
+	-> HintedCmmFormals	-- where to put the results
 	-> CmmCallTarget	-- the op
-	-> [CmmKinded CmmExpr] -- arguments
+	-> [CmmHinted CmmExpr] -- arguments
 	-> Maybe [GlobalReg]	-- live vars, in case we need to save them
         -> C_SRT                -- the SRT of the calls continuation
         -> CmmReturnInfo
@@ -124,8 +123,8 @@ emitForeignCall' safety results target args vols srt ret
   | otherwise = do
     -- Both 'id' and 'new_base' are GCKindNonPtr because they're
     -- RTS only objects and are not subject to garbage collection
-    id <- newNonPtrTemp wordRep
-    new_base <- newNonPtrTemp (cmmRegRep (CmmGlobal BaseReg))
+    id <- newTemp bWord
+    new_base <- newTemp (cmmRegType (CmmGlobal BaseReg))
     temp_args <- load_args_into_temps args
     temp_target <- load_target_into_temp target
     let (caller_save, caller_load) = callerSaveVolatileRegs vols
@@ -134,16 +133,16 @@ emitForeignCall' safety results target args vols srt ret
     -- The CmmUnsafe arguments are only correct because this part
     -- of the code hasn't been moved into the CPS pass yet.
     -- Once that happens, this function will just emit a (CmmSafe srt) call,
-    -- and the CPS will will be the one to convert that
+    -- and the CPS will be the one to convert that
     -- to this sequence of three CmmUnsafe calls.
     stmtC (CmmCall (CmmCallee suspendThread CCallConv) 
-			[ CmmKinded id PtrHint ]
-			[ CmmKinded (CmmReg (CmmGlobal BaseReg)) PtrHint ] 
+			[ CmmHinted id AddrHint ]
+			[ CmmHinted (CmmReg (CmmGlobal BaseReg)) AddrHint ] 
 			CmmUnsafe ret)
     stmtC (CmmCall temp_target results temp_args CmmUnsafe ret)
     stmtC (CmmCall (CmmCallee resumeThread CCallConv) 
-			[ CmmKinded new_base PtrHint ]
-			[ CmmKinded (CmmReg (CmmLocal id)) PtrHint ]
+			[ CmmHinted new_base AddrHint ]
+			[ CmmHinted (CmmReg (CmmLocal id)) AddrHint ]
 			CmmUnsafe ret)
     -- Assign the result to BaseReg: we
     -- might now have a different Capability!
@@ -163,9 +162,9 @@ resumeThread  = CmmLit (CmmLabel (mkRtsCodeLabel (sLit "resumeThread")))
 -- This is a HACK; really it should be done in the back end, but
 -- it's easier to generate the temporaries here.
 load_args_into_temps = mapM arg_assign_temp
-  where arg_assign_temp (CmmKinded e hint) = do
+  where arg_assign_temp (CmmHinted e hint) = do
 	   tmp <- maybe_assign_temp e
-	   return (CmmKinded tmp hint)
+	   return (CmmHinted tmp hint)
 	
 load_target_into_temp (CmmCallee expr conv) = do 
   tmp <- maybe_assign_temp expr
@@ -179,7 +178,7 @@ maybe_assign_temp e
 	-- don't use assignTemp, it uses its own notion of "trivial"
 	-- expressions, which are wrong here.
         -- this is a NonPtr because it only duplicates an existing
-	reg <- newNonPtrTemp (cmmExprRep e) --TODO FIXME NOW
+	reg <- newTemp (cmmExprType e) --TODO FIXME NOW
 	stmtC (CmmAssign (CmmLocal reg) e)
 	return (CmmReg (CmmLocal reg))
 
@@ -201,13 +200,13 @@ emitSaveThreadState = do
 emitCloseNursery = stmtC $ CmmStore nursery_bdescr_free (cmmOffsetW stgHp 1)
 
 emitLoadThreadState = do
-  tso <- newNonPtrTemp wordRep -- TODO FIXME NOW
+  tso <- newTemp bWord -- TODO FIXME NOW
   stmtsC [
 	-- tso = CurrentTSO;
   	CmmAssign (CmmLocal tso) stgCurrentTSO,
 	-- Sp = tso->sp;
 	CmmAssign sp (CmmLoad (cmmOffset (CmmReg (CmmLocal tso)) tso_SP)
-	                      wordRep),
+	                      bWord),
 	-- SpLim = tso->stack + RESERVED_STACK_WORDS;
 	CmmAssign spLim (cmmOffsetW (cmmOffset (CmmReg (CmmLocal tso)) tso_STACK)
 			            rESERVED_STACK_WORDS)
@@ -216,21 +215,21 @@ emitLoadThreadState = do
   -- and load the current cost centre stack from the TSO when profiling:
   when opt_SccProfilingOn $
 	stmtC (CmmStore curCCSAddr 
-		(CmmLoad (cmmOffset (CmmReg (CmmLocal tso)) tso_CCCS) wordRep))
+		(CmmLoad (cmmOffset (CmmReg (CmmLocal tso)) tso_CCCS) bWord))
 
 emitOpenNursery = stmtsC [
         -- Hp = CurrentNursery->free - 1;
-	CmmAssign hp (cmmOffsetW (CmmLoad nursery_bdescr_free wordRep) (-1)),
+	CmmAssign hp (cmmOffsetW (CmmLoad nursery_bdescr_free gcWord) (-1)),
 
         -- HpLim = CurrentNursery->start + 
 	--		CurrentNursery->blocks*BLOCK_SIZE_W - 1;
 	CmmAssign hpLim
 	    (cmmOffsetExpr
-		(CmmLoad nursery_bdescr_start wordRep)
+		(CmmLoad nursery_bdescr_start bWord)
 		(cmmOffset
 		  (CmmMachOp mo_wordMul [
-		    CmmMachOp (MO_S_Conv I32 wordRep)
-		      [CmmLoad nursery_bdescr_blocks I32],
+		    CmmMachOp (MO_SS_Conv W32 wordWidth)
+		      [CmmLoad nursery_bdescr_blocks b32],
 		    CmmLit (mkIntCLit bLOCK_SIZE)
 		   ])
 		  (-1)

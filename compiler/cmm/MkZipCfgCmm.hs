@@ -13,7 +13,8 @@ module MkZipCfgCmm
   , (<*>), catAGraphs, mkLabel, mkBranch
   , emptyAGraph, withFreshLabel, withUnique, outOfLine
   , lgraphOfAGraph, graphOfAGraph, labelAGraph
-  , CmmZ, CmmTopZ, CmmGraph, CmmBlock, CmmAGraph, Middle, Last, Convention(..)
+  , CmmZ, CmmTopZ, CmmGraph, CmmBlock, CmmAGraph
+  , Middle, Last, Convention(..), ForeignConvention(..), MidCallTarget(..), Transfer(..)
   )
 where
 
@@ -22,10 +23,9 @@ where
 import BlockId
 import CmmExpr
 import Cmm ( GenCmm(..), GenCmmTop(..), CmmStatic, CmmInfo
-           , CmmCallTarget(..), CmmActuals, CmmFormals, CmmFormalsWithoutKinds
-           , CmmKinded (..)
+           , CmmActuals, CmmFormals
            )
-import MachOp (MachHint(..), wordRep)
+import CmmCallConv (assignArgumentsPos, ParamLocation(..))
 import ZipCfgCmmRep hiding (CmmGraph, CmmAGraph, CmmBlock, CmmZ, CmmTopZ)
   -- to make this module more self-contained, the above definitions are
   -- duplicated below
@@ -34,14 +34,17 @@ import PprCmm()
 import ClosureInfo
 import FastString
 import ForeignCall
-import ZipCfg 
 import MkZipCfg
+import Panic 
+import ZipCfg 
 
 type CmmGraph  = LGraph Middle Last
 type CmmAGraph = AGraph Middle Last
 type CmmBlock  = Block  Middle Last
 type CmmZ      = GenCmm    CmmStatic CmmInfo CmmGraph
 type CmmTopZ   = GenCmmTop CmmStatic CmmInfo CmmGraph
+
+data Transfer = Call | Jump | Ret deriving Eq
 
 ---------- No-ops
 mkNop        :: CmmAGraph
@@ -55,7 +58,7 @@ mkStore      :: CmmExpr -> CmmExpr -> CmmAGraph
 mkCall       :: CmmExpr -> CCallConv -> CmmFormals -> CmmActuals -> C_SRT -> CmmAGraph
 mkCmmCall    :: CmmExpr -> CmmFormals -> CmmActuals -> C_SRT -> CmmAGraph
 			-- Native C-- calling convention
-mkUnsafeCall :: CmmCallTarget -> CmmFormals -> CmmActuals -> CmmAGraph
+mkUnsafeCall :: MidCallTarget -> CmmFormals -> CmmActuals -> CmmAGraph
 mkFinalCall  :: CmmExpr -> CCallConv -> CmmActuals -> CmmAGraph
 		 -- Never returns; like exit() or barf()
 
@@ -63,10 +66,10 @@ mkFinalCall  :: CmmExpr -> CCallConv -> CmmActuals -> CmmAGraph
 mkAddToContext :: CmmExpr -> [CmmExpr] -> CmmAGraph
 
 ---------- Control transfer
-mkJump       	:: Area    -> CmmExpr -> CmmActuals -> CmmAGraph
-mkCbranch    	:: CmmExpr -> BlockId -> BlockId    -> CmmAGraph
-mkSwitch     	:: CmmExpr -> [Maybe BlockId]       -> CmmAGraph
-mkReturn     	:: Area    -> CmmActuals            -> CmmAGraph
+mkJump       	:: CmmExpr -> CmmActuals -> CmmAGraph
+mkCbranch    	:: CmmExpr -> BlockId -> BlockId          -> CmmAGraph
+mkSwitch     	:: CmmExpr -> [Maybe BlockId]             -> CmmAGraph
+mkReturn     	:: CmmActuals -> CmmAGraph
 
 mkCmmIfThenElse :: CmmExpr -> CmmAGraph -> CmmAGraph -> CmmAGraph
 mkCmmIfThen     :: CmmExpr -> CmmAGraph -> CmmAGraph
@@ -74,7 +77,7 @@ mkCmmWhileDo    :: CmmExpr -> CmmAGraph -> CmmAGraph
 
 -- Not to be forgotten, but exported by MkZipCfg:
 -- mkBranch   	  :: BlockId -> CmmAGraph
--- mkLabel    	  :: BlockId -> CmmAGraph
+-- mkLabel    	  :: BlockId -> Maybe Int -> CmmAGraph
 -- outOfLine  	  :: CmmAGraph -> CmmAGraph
 -- withUnique 	  :: (Unique -> CmmAGraph) -> CmmAGraph
 -- withFreshLabel :: String -> (BlockId -> CmmAGraph) -> CmmAGraph
@@ -88,8 +91,8 @@ mkCmmIfThen e tbranch
   = withFreshLabel "end of if"     $ \endif ->
     withFreshLabel "start of then" $ \tid ->
     mkCbranch e tid endif <*>
-    mkLabel tid <*> tbranch <*> mkBranch endif <*>
-    mkLabel endif
+    mkLabel tid Nothing <*> tbranch <*> mkBranch endif <*>
+    mkLabel endif Nothing
 
 
 
@@ -100,65 +103,89 @@ mkComment fs              = mkMiddle $ MidComment fs
 mkAssign l r              = mkMiddle $ MidAssign l r
 mkStore  l r              = mkMiddle $ MidStore  l r
 
-mkCbranch pred ifso ifnot = mkLast   $ LastCondBranch pred ifso ifnot
+
+-- Why are we inserting extra blocks that simply branch to the successors?
+-- Because in addition to the branch instruction, @mkBranch@ will insert
+-- a necessary adjustment to the stack pointer.
+mkCbranch pred ifso ifnot = mkLast (LastCondBranch pred ifso ifnot)
 mkSwitch e tbl            = mkLast   $ LastSwitch e tbl
 
 mkUnsafeCall tgt results actuals = mkMiddle $ MidUnsafeCall tgt results actuals
 mkAddToContext ra actuals        = mkMiddle $ MidAddToContext ra actuals
 
 cmmResConv :: Convention
-cmmResConv = ConventionStandard CmmCallConv Results
+cmmResConv = Native
 
-copyIn :: Convention -> Area -> CmmFormals -> [Middle]
-copyIn _ area formals = reverse $ snd $ foldl ci (1, []) formals
-  where ci (n, ms) v = (n+1, MidAssign (CmmLocal $ kindlessCmm v)
-                                       (CmmLoad (CmmStackSlot area n) wordRep) : ms)
+-- Return the number of bytes used for copying arguments, as well as the
+-- instructions to copy the arguments.
+copyIn :: Convention -> Bool -> Area -> CmmFormals -> (Int, [Middle])
+copyIn _ isCall area formals =
+  foldr ci (init_offset, []) $ assignArgumentsPos isCall localRegType formals
+  where ci (reg, RegisterParam r) (n, ms) =
+          (n, MidAssign (CmmLocal reg) (CmmReg $ CmmGlobal r) : ms)
+        ci (reg, StackParam off) (n, ms) =
+          let ty = localRegType reg
+              off' = off + init_offset
+          in (max n off',
+              MidAssign (CmmLocal reg) (CmmLoad (CmmStackSlot area off') ty) : ms)
+        init_offset = widthInBytes wordWidth
 
-copyOut :: Convention -> Area -> CmmActuals -> [Middle]
-copyOut conv area actuals = moveSP conv $ snd $ foldl co (1, []) actuals
-  where moveSP (ConventionStandard _ Arguments) args =
-           MidAssign spReg (outgoingSlot area) : reverse args
-        moveSP _ args = reverse $ MidAssign spReg (outgoingSlot area) : args
-        co (n, ms) v = (n+1, MidStore (CmmStackSlot area n) (kindlessCmm v) : ms)
-mkEntry :: Area -> Convention -> CmmFormalsWithoutKinds -> [Middle]
-mkEntry area conv formals = copyIn conv area fs
-  where fs = map (\f -> CmmKinded f NoHint) formals
+-- The argument layout function ignores the pointer to the info table, so we slot that
+-- in here. When copying-out to a young area, we set the info table for return
+-- and adjust the offsets of the other parameters.
+-- If this is a call instruction, we adjust the offsets of the other parameters.
+copyOut :: Convention -> Transfer -> Area -> CmmActuals -> (Int, [Middle])
+copyOut _ transfer area@(CallArea a) actuals =
+  foldr co (init_offset, []) args'
+  where args = assignArgumentsPos skip_node cmmExprType actuals
+        skip_node = transfer /= Ret
+        (setRA, init_offset) =
+          case a of Young id -> -- set RA if making a call
+                      if transfer == Call then
+                        ([(CmmLit (CmmLabel (infoTblLbl id)),
+                           StackParam init_offset)], ra_width)
+                      else ([], 0)
+                    Old -> ([], ra_width)
+        ra_width = widthInBytes wordWidth
+        args' = foldl adjust setRA args
+          where adjust rst (v, StackParam off) = (v, StackParam (off + init_offset)) : rst
+                adjust rst x@(_, RegisterParam _) = x : rst
+        co (v, RegisterParam r) (n, ms) = (n, MidAssign (CmmGlobal r) v : ms)
+        co (v, StackParam off)  (n, ms) =
+          (max n off, MidStore (CmmStackSlot area off) v : ms)
+copyOut _ _ (RegSlot _) _ = panic "cannot copy arguments into a register slot"
+
+mkEntry :: BlockId -> Convention -> CmmFormals -> (Int, CmmAGraph)
+mkEntry _ conv formals =
+  let (off, copies) = copyIn conv False (CallArea Old) formals in
+  (off, mkMiddles copies)
 
 -- I'm not sure how to get the calling conventions right yet,
 -- and I suspect this should not be resolved until sometime after
 -- Simon's patch is applied.
 -- For now, I apply a bogus calling convention: all arguments go on the
 -- stack, using the same amount of stack space.
-lastWithArgs' :: BlockId -> Area -> Convention -> CmmActuals -> Maybe CmmFormals ->
-                 (BlockId -> Last) -> CmmAGraph
-lastWithArgs' k area conv actuals formals toLast =
-  (mkMiddles $ copyOut conv area actuals) <*>
-  -- adjust the sp
-  mkLast (toLast k) <*>
-  case formals of
-    Just formals -> mkLabel k <*> (mkMiddles $ copyIn conv area formals)
-    Nothing      -> emptyAGraph
-lastWithArgs :: Convention -> CmmActuals -> Maybe CmmFormals -> (BlockId -> Last) -> CmmAGraph
-lastWithArgs c a f l =
-  withFreshLabel "call successor" $ \k -> lastWithArgs' k (mkCallArea k a f) c a f l
 
-always :: a -> b -> a
-always x _ = x
+lastWithArgs :: Transfer -> Area -> Convention -> CmmActuals -> (Int -> Last) -> CmmAGraph
+lastWithArgs transfer area conv actuals last =
+  let (outArgs, copies) = copyOut conv transfer area actuals in
+  mkMiddles copies <*> mkLast (last outArgs)
 
 -- The area created for the jump and return arguments is the same area as the
 -- procedure entry.
-mkJump   area e actuals =
-  lastWithArgs' (areaId area) area cmmResConv actuals Nothing $ always $ LastJump e
-mkReturn area   actuals =
-  lastWithArgs' (areaId area) area cmmResConv actuals Nothing $ always LastReturn
+mkJump e actuals = lastWithArgs Jump (CallArea Old) cmmResConv actuals $ LastJump e
+mkReturn actuals = lastWithArgs Ret  (CallArea Old) cmmResConv actuals $ LastJump e
+  where e = CmmStackSlot (CallArea Old) (widthInBytes wordWidth)
 
-mkFinalCall f conv actuals =
-  lastWithArgs (ConventionStandard conv Arguments) actuals Nothing
-      $ always $ LastCall f Nothing --mkFinalCall  f conv actuals =
+mkFinalCall f _ actuals =
+  lastWithArgs Call (CallArea Old) Native actuals $ LastCall f Nothing
 
 mkCmmCall f results actuals srt = mkCall f CmmCallConv results actuals srt
 
 -- I'm dropping the SRT, but that should be okay: we plan to reconstruct it later.
-mkCall f conv results actuals _ =
-  lastWithArgs (ConventionStandard conv Arguments) actuals (Just results)
-        $ \k -> LastCall f (Just k)
+mkCall f _ results actuals _ =
+  withFreshLabel "call successor" $ \k ->
+  let area = CallArea $ Young k
+      (off, copyin) = copyIn Native False area results
+      copyout = lastWithArgs Call area Native actuals $ LastCall f (Just k)
+  in copyout <*> mkLabel k (Just off) <*> (mkMiddles copyin)

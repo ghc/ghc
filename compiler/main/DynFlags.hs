@@ -291,10 +291,14 @@ data DynFlag
    | Opt_PrintBindContents
    | Opt_GenManifest
    | Opt_EmbedManifest
+
+	-- temporary flags
+   | Opt_RunCPS
    | Opt_RunCPSZ
    | Opt_ConvertToZipCfgAndBack
    | Opt_AutoLinkPackages
    | Opt_ImplicitImportQualified
+   | Opt_TryNewCodeGen
 
    -- keeping stuff
    | Opt_KeepHiDiffs
@@ -1599,7 +1603,9 @@ fFlags = [
   ( "break-on-error",                   Opt_BreakOnError, const Supported ),
   ( "print-evld-with-show",             Opt_PrintEvldWithShow, const Supported ),
   ( "print-bind-contents",              Opt_PrintBindContents, const Supported ),
-  ( "run-cps",                          Opt_RunCPSZ, const Supported ),
+  ( "run-cps",                          Opt_RunCPS, const Supported ),
+  ( "run-cpsz",                         Opt_RunCPSZ, const Supported ),
+  ( "new-codegen",                      Opt_TryNewCodeGen, const Supported ),
   ( "convert-to-zipper-and-back",       Opt_ConvertToZipCfgAndBack, const Supported ),
   ( "vectorise",                        Opt_Vectorise, const Supported ),
   ( "regs-graph",                       Opt_RegsGraph, const Supported ),

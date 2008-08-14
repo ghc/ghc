@@ -274,7 +274,6 @@ to reflect the frame pushed.
 
 \begin{code}
 pushUpdateFrame :: CmmExpr -> Code -> Code
-
 pushUpdateFrame updatee code
   = do	{
       when debugIsOn $ do

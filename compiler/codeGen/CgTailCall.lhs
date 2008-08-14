@@ -41,6 +41,7 @@ import Type
 import Id
 import StgSyn
 import PrimOp
+import FastString
 import Outputable
 
 import Control.Monad
@@ -116,7 +117,7 @@ performTailCall fun_info arg_amodes pending_assts
 	; EndOfBlockInfo sp _ <- getEndOfBlockInfo
 	; this_pkg <- getThisPackage
 
-	; case (getCallMethod fun_name lf_info (length arg_amodes)) of
+	; case (getCallMethod fun_name fun_has_cafs lf_info (length arg_amodes)) of
 
 	    -- Node must always point to things we enter
 	    EnterIt -> do
@@ -183,8 +184,10 @@ performTailCall fun_info arg_amodes pending_assts
 	        }
 	}
   where
-    fun_name  = idName (cgIdInfoId fun_info)
+    fun_id    = cgIdInfoId fun_info
+    fun_name  = idName fun_id
     lf_info   = cgIdInfoLF fun_info
+    fun_has_cafs = idCafInfo fun_id
     untag_node = CmmAssign nodeReg (cmmUntag (CmmReg nodeReg))
     -- Test if closure is a constructor
     maybeSwitchOnCons enterClosure eob

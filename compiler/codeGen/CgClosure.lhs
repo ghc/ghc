@@ -38,7 +38,6 @@ import CgCallConv
 import CgUtils
 import ClosureInfo
 import SMRep
-import MachOp
 import Cmm
 import CmmUtils
 import CLabel
@@ -85,7 +84,7 @@ cgTopRhsClosure id ccs binder_info upd_flag args body = do
   ; mod_name <- getModuleName
   ; let descr         = closureDescription mod_name name
 	closure_info  = mkClosureInfo True id lf_info 0 0 srt_info descr
-	closure_label = mkLocalClosureLabel name
+	closure_label = mkLocalClosureLabel name $ idCafInfo id
     	cg_id_info    = stableIdInfo id (mkLblExpr closure_label) lf_info
 	closure_rep   = mkStaticClosureFields closure_info ccs True []
 
@@ -259,6 +258,7 @@ closureCodeBody binder_info cl_info cc [{- No args i.e. thunk -}] body = do
 		-- in update frame CAF/DICT functions will be
 		-- subsumed by this enclosing cc
 	    { enterCostCentre cl_info cc body
+            ; stmtsC [CmmComment $ mkFastString $ showSDoc $ ppr body]
 	    ; cgExpr body }
 	}
     
@@ -282,7 +282,7 @@ closureCodeBody binder_info cl_info cc args body
 	(sp_top, stk_args)     = mkVirtStkOffsets vSp other_args
 
 	-- Allocate the global ticky counter
-  ; let ticky_ctr_lbl = mkRednCountsLabel (closureName cl_info)
+  ; let ticky_ctr_lbl = mkRednCountsLabel (closureName cl_info) (clHasCafRefs cl_info)
   ; emitTickyCounter cl_info args sp_top
 
    	-- ...and establish the ticky-counter 
@@ -355,7 +355,8 @@ mkSlowEntryCode cl_info reg_args
   | otherwise = return noStmts
   where
      name = closureName cl_info
-     slow_lbl = mkSlowEntryLabel name
+     has_caf_refs = clHasCafRefs cl_info
+     slow_lbl = mkSlowEntryLabel name has_caf_refs
 
      load_stmts = mkStmts load_assts `plusStmts` mkStmts [stk_adj_pop, jump_to_entry]
      save_stmts = oneStmt stk_adj_push `plusStmts`  mkStmts save_assts
@@ -372,13 +373,13 @@ mkSlowEntryCode cl_info reg_args
 						   (argMachRep rep))
 
      save_assts = zipWithEqual "mk_save" mk_save reps_w_regs stk_offsets
-     mk_save (rep,reg) offset = ASSERT( argMachRep rep == globalRegRep reg )
+     mk_save (rep,reg) offset = ASSERT( argMachRep rep `cmmEqType` globalRegType reg )
 				CmmStore (cmmRegOffW spReg offset) 
 					 (CmmReg (CmmGlobal reg))
 
      stk_adj_pop   = CmmAssign spReg (cmmRegOffW spReg final_stk_offset)
      stk_adj_push  = CmmAssign spReg (cmmRegOffW spReg (- final_stk_offset))
-     jump_to_entry = CmmJump (mkLblExpr (enterLocalIdLabel name)) []
+     jump_to_entry = CmmJump (mkLblExpr (enterLocalIdLabel name has_caf_refs)) []
 \end{code}
 
 
@@ -565,7 +566,7 @@ link_caf cl_info is_upd = do
 	-- so that the garbage collector can find them
 	-- This must be done *before* the info table pointer is overwritten, 
 	-- because the old info table ptr is needed for reversion
-  ; emitRtsCallWithVols (sLit "newCAF") [CmmKinded (CmmReg nodeReg) PtrHint] [node] False
+  ; emitRtsCallWithVols (sLit "newCAF") [CmmHinted (CmmReg nodeReg) AddrHint] [node] False
 	-- node is live, so save it.
 
 	-- Overwrite the closure with a (static) indirection 

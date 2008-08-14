@@ -24,7 +24,7 @@ exit    :: LGraph m l -> FGraph m l         -- focus on edge into default exit n
                                             -- (fails if there isn't one)
 focusp  :: (Block m l -> Bool) -> LGraph m l -> Maybe (FGraph m l)
                                       -- focus on start of block satisfying predicate
-unfocus :: FGraph m l -> LGraph m l            -- lose focus 
+-- unfocus :: FGraph m l -> LGraph m l            -- lose focus 
 
 -- | We can insert a single-entry, single-exit subgraph at
 -- the current focus.
@@ -37,16 +37,16 @@ splice_focus_exit  :: FGraph m l -> LGraph m l -> FGraph m l
 
 _unused :: ()
 _unused = all `seq` ()
-    where all = ( exit, focusp, unfocus {- , splice_focus_entry, splice_focus_exit -}
+    where all = ( exit, focusp --, unfocus {- , splice_focus_entry, splice_focus_exit -}
                 , foldM_fwd_block (\_ a -> Just a)
                 )
 
-unfocus (FGraph e bz bs) = LGraph e (insertBlock (zip bz) bs)
+--unfocus (FGraph e bz bs) = LGraph e (insertBlock (zip bz) bs)
 
-focusp p (LGraph entry blocks) =
+focusp p (LGraph entry _ blocks) =
     fmap (\(b, bs) -> FGraph entry (unzip b) bs) (splitp_blocks p blocks)
 
-exit g@(LGraph eid _) = FGraph eid (ZBlock h (ZLast l)) others
+exit g@(LGraph eid _ _) = FGraph eid (ZBlock h (ZLast l)) others
     where FGraph _ b others = focusp is_exit g `orElse` panic "no exit in flow graph"
           (h, l) = goto_end b
 
@@ -65,7 +65,7 @@ splice_focus_exit (FGraph eid (ZBlock head tail) blocks) g =
 foldM_fwd_block ::
   Monad m => (BlockId -> a -> m a) -> (mid -> a -> m a) -> (ZLast l -> a -> m a) ->
              Block mid l -> a -> m a
-foldM_fwd_block first middle last (Block id t) z = do { z <- first id z; tail t z }
+foldM_fwd_block first middle last (Block id _ t) z = do { z <- first id z; tail t z }
     where tail (ZTail m t) z = do { z <- middle m z; tail t z }
           tail (ZLast l)   z = last l z
 

@@ -74,6 +74,7 @@ import BlockId
 import Cmm
 import CmmUtils
 import CLabel
+import PprCmm
 import StgSyn (SRT)
 import SMRep
 import Module
@@ -746,7 +747,7 @@ emitData sect lits
   where
     data_block = CmmData sect lits
 
-emitProc :: CmmInfo -> CLabel -> CmmFormalsWithoutKinds -> [CmmBasicBlock] -> Code
+emitProc :: CmmInfo -> CLabel -> CmmFormals -> [CmmBasicBlock] -> Code
 emitProc info lbl args blocks
   = do  { let proc_block = CmmProc info lbl args (ListGraph blocks)
 	; state <- getState
@@ -767,7 +768,8 @@ getCmm code
   = do	{ state1 <- getState
 	; ((), state2) <- withState code (state1 { cgs_tops  = nilOL })
 	; setState $ state2 { cgs_tops = cgs_tops state1 } 
-	; return (Cmm (fromOL (cgs_tops state2))) }
+	; return (Cmm (fromOL (cgs_tops state2))) 
+        }
 
 -- ----------------------------------------------------------------------------
 -- CgStmts

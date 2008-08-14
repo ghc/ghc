@@ -88,6 +88,7 @@
 #define I16 bits16
 #define I32 bits32
 #define I64 bits64
+#define P_  gcptr
 
 #if SIZEOF_VOID_P == 4
 #define W_ bits32
@@ -254,10 +255,10 @@
 #define ENTER()						\
  again:							\
   W_ info;						\
-  if (GETTAG(R1) != 0) {                                \
+  if (GETTAG(P1) != 0) {                                \
       jump %ENTRY_CODE(Sp(0));				\
   }                                                     \
-  info = %INFO_PTR(R1);					\
+  info = %INFO_PTR(P1);					\
   switch [INVALID_OBJECT .. N_CLOSURE_TYPES]		\
          (TO_W_( %INFO_TYPE(%STD_INFO(info)) )) {	\
   case							\
@@ -267,7 +268,7 @@
     IND_OLDGEN_PERM,					\
     IND_STATIC:						\
    {							\
-      R1 = StgInd_indirectee(R1);			\
+      P1 = StgInd_indirectee(P1);			\
       goto again;					\
    }							\
   case							\
@@ -562,7 +563,7 @@
   bdescr_free(__bd) = free + WDS(1);
 
 #define recordMutable(p, regs)                                  \
-      W_ __p;                                                   \
+      P_ __p;                                                   \
       W_ __bd;                                                  \
       W_ __gen;                                                 \
       __p = p;                                                  \

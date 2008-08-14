@@ -16,7 +16,6 @@ import Cmm
 import CmmUtils
 
 import CLabel
-import MachOp
 
 import Bitmap
 import ClosureInfo
@@ -26,6 +25,7 @@ import CgUtils
 import SMRep
 
 import Constants
+import Outputable
 import StaticFlags
 import Unique
 import UniqSupply
@@ -83,14 +83,15 @@ mkInfoTable uniq (CmmProc (CmmInfo _ _ info) entry_label arguments blocks) =
 
       CmmInfoTable (ProfilingInfo ty_prof cl_prof) type_tag type_info ->
           let info_label = entryLblToInfoLbl entry_label
-              ty_prof' = makeRelativeRefTo info_label ty_prof
-              cl_prof' = makeRelativeRefTo info_label cl_prof
+              ty_prof'   = makeRelativeRefTo info_label ty_prof
+              cl_prof'   = makeRelativeRefTo info_label cl_prof
           in case type_info of
           -- A function entry point.
-          FunInfo (ptrs, nptrs) srt fun_type fun_arity pap_bitmap slow_entry ->
+          FunInfo (ptrs, nptrs) srt fun_arity pap_bitmap slow_entry ->
               mkInfoTableAndCode info_label std_info fun_extra_bits entry_label
                                  arguments blocks
             where
+              fun_type = argDescrType pap_bitmap
               fun_extra_bits =
                  [packHalfWordsCLit fun_type fun_arity] ++
                  case pap_bitmap of
@@ -112,7 +113,6 @@ mkInfoTable uniq (CmmProc (CmmInfo _ _ info) entry_label arguments blocks) =
                 std_info = mkStdInfoTable ty_prof' cl_prof' type_tag con_tag layout
                 con_name = makeRelativeRefTo info_label descr
                 layout = packHalfWordsCLit ptrs nptrs
-
           -- A thunk.
           ThunkInfo (ptrs, nptrs) srt ->
               mkInfoTableAndCode info_label std_info srt_label entry_label
@@ -150,7 +150,7 @@ mkInfoTableAndCode :: CLabel
                    -> [CmmLit]
                    -> [CmmLit]
                    -> CLabel
-                   -> CmmFormalsWithoutKinds
+                   -> CmmFormals
                    -> ListGraph CmmStmt
                    -> [RawCmmTop]
 mkInfoTableAndCode info_lbl std_info extra_bits entry_lbl args blocks
@@ -210,22 +210,19 @@ mkLiveness uniq live =
     -- does not fit in one word
     then (CmmLabel big_liveness, [data_lits], rET_BIG)
     -- fits in one word
-    else (mkWordCLit small_liveness, [], rET_SMALL)
+    else (mkWordCLit  small_liveness, [], rET_SMALL)
   where
     mkBits [] = []
     mkBits (reg:regs) = take sizeW bits ++ mkBits regs where
         sizeW = case reg of
                   Nothing -> 1
-                  Just r -> (machRepByteWidth (localRegRep r) + wORD_SIZE - 1)
+                  Just r -> (widthInBytes (typeWidth (localRegType r)) + wORD_SIZE - 1)
                             `quot` wORD_SIZE
                             -- number of words, rounded up
         bits = repeat $ is_non_ptr reg -- True <=> Non Ptr
 
-    is_non_ptr Nothing = True
-    is_non_ptr (Just reg) =
-        case localRegGCFollow reg of
-          GCKindNonPtr -> True
-          GCKindPtr -> False
+    is_non_ptr Nothing    = True
+    is_non_ptr (Just reg) = not $ isGcPtrType (localRegType reg)
 
     bits :: [Bool]
     bits = mkBits live

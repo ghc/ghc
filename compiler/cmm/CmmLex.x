@@ -95,7 +95,8 @@ $white_no_nl+		;
   "&&"			{ kw CmmT_BoolAnd }
   "||"			{ kw CmmT_BoolOr }
   
-  R@decimal		{ global_regN VanillaReg }
+  P@decimal		{ global_regN (\n -> VanillaReg n VGcPtr) }
+  R@decimal		{ global_regN (\n -> VanillaReg n VNonGcPtr) }
   F@decimal		{ global_regN FloatReg }
   D@decimal		{ global_regN DoubleReg }
   L@decimal		{ global_regN LongReg }
@@ -159,6 +160,7 @@ data CmmToken
   | CmmT_bits64
   | CmmT_float32
   | CmmT_float64
+  | CmmT_gcptr
   | CmmT_GlobalReg GlobalReg
   | CmmT_Name	   FastString
   | CmmT_String	   String
@@ -236,7 +238,15 @@ reservedWordsFM = listToUFM $
 	( "bits32",		CmmT_bits32 ),
 	( "bits64",		CmmT_bits64 ),
 	( "float32",		CmmT_float32 ),
-	( "float64",		CmmT_float64 )
+	( "float64",		CmmT_float64 ),
+-- New forms
+	( "b8",			CmmT_bits8 ),
+	( "b16",		CmmT_bits16 ),
+	( "b32",		CmmT_bits32 ),
+	( "b64",		CmmT_bits64 ),
+	( "f32",		CmmT_float32 ),
+	( "f64",		CmmT_float64 ),
+	( "gcptr",		CmmT_gcptr )
 	]
 
 tok_decimal span buf len 

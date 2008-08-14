@@ -18,7 +18,6 @@ module CgHpc (cgTickBox, initHpc, hpcTable) where
 import Cmm
 import CLabel
 import Module
-import MachOp
 import CmmUtils
 import CgUtils
 import CgMonad
@@ -35,14 +34,14 @@ import Data.Word
 
 cgTickBox :: Module -> Int -> Code
 cgTickBox mod n = do
-       let tick_box = (cmmIndex I64
+       let tick_box = (cmmIndex W64
                        (CmmLit $ CmmLabel $ mkHpcTicksLabel $ mod)
                        (fromIntegral n)
                       )
        stmtsC [ CmmStore tick_box
-                         (CmmMachOp (MO_Add I64)
-                                               [ CmmLoad tick_box I64
-                                               , CmmLit (CmmInt 1 I64)
+                         (CmmMachOp (MO_Add W64)
+                                               [ CmmLoad tick_box b64
+                                               , CmmLit (CmmInt 1 W64)
                                                ])
               ] 
 
@@ -56,7 +55,7 @@ hpcTable this_mod (HpcInfo hpc_tickCount _) = do
                                         ]
                         emitData Data $ [ CmmDataLabel (mkHpcTicksLabel this_mod)
                                         ] ++
-                                        [ CmmStaticLit (CmmInt 0 I64)
+                                        [ CmmStaticLit (CmmInt 0 W64)
                                         | _ <- take hpc_tickCount [0::Int ..]
                                         ]
   where
@@ -70,24 +69,24 @@ hpcTable this_mod (NoHpcInfo {}) = error "TODO: impossible"
 
 initHpc :: Module -> HpcInfo -> Code
 initHpc this_mod (HpcInfo tickCount hashNo)
-  = do { id <- newNonPtrTemp wordRep -- TODO FIXME NOW
+  = do { id <- newTemp bWord
        ; emitForeignCall'
                PlayRisky
-               [CmmKinded id NoHint]
+               [CmmHinted id NoHint]
                (CmmCallee
                  (CmmLit $ CmmLabel $ mkForeignLabel mod_alloc Nothing False)
                   CCallConv
                )
-               [ CmmKinded (mkLblExpr mkHpcModuleNameLabel) PtrHint
-               , CmmKinded (word32 tickCount) NoHint
-               , CmmKinded (word32 hashNo)    NoHint
-               , CmmKinded (CmmLit $ CmmLabel $ mkHpcTicksLabel $ this_mod) PtrHint
+               [ CmmHinted (mkLblExpr mkHpcModuleNameLabel) AddrHint
+               , CmmHinted (word32 tickCount) NoHint
+               , CmmHinted (word32 hashNo)    NoHint
+               , CmmHinted (CmmLit $ CmmLabel $ mkHpcTicksLabel $ this_mod) AddrHint
                ]
                (Just [])
                NoC_SRT -- No SRT b/c we PlayRisky
                CmmMayReturn
        }
   where
-       word32 i = CmmLit (CmmInt (fromIntegral (fromIntegral i :: Word32)) I32)
+       word32 i = CmmLit (CmmInt (fromIntegral (fromIntegral i :: Word32)) W32)
        mod_alloc = mkFastString "hs_hpc_module"
 

@@ -1,6 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module MkZipCfg
     ( AGraph, (<*>), catAGraphs
+    , freshBlockId
     , emptyAGraph, withFreshLabel, withUnique
     , mkMiddle, mkMiddles, mkLast, mkZTail, mkBranch, mkLabel, mkIfThenElse, mkWhileDo
     , outOfLine
@@ -166,7 +167,7 @@ catAGraphs :: [AGraph m l] -> AGraph m l
 
 emptyAGraph :: AGraph m l
 mkLabel     :: (LastNode l) =>
-               BlockId -> AGraph m l              -- graph contains the label
+               BlockId -> Maybe Int -> AGraph m l -- graph contains the label
 mkMiddle    :: m -> AGraph m l   -- graph contains the node
 mkLast      :: (Outputable m, Outputable l, LastNode l) =>
                l       -> AGraph m l              -- graph contains the node
@@ -230,9 +231,9 @@ mkWhileDo    :: (Outputable m, Outputable l, LastNode l)
 -- because it may require the allocation of fresh, unique labels.
 
 graphOfAGraph  :: AGraph m l -> UniqSM (Graph  m l)
-lgraphOfAGraph :: AGraph m l -> UniqSM (LGraph m l)
+lgraphOfAGraph :: Int -> AGraph m l -> UniqSM (LGraph m l)
   -- ^ allocate a fresh label for the entry point
-labelAGraph    :: BlockId -> AGraph m l -> UniqSM (LGraph m l)
+labelAGraph    :: BlockId -> Int -> AGraph m l -> UniqSM (LGraph m l)
   -- ^ use the given BlockId as the label of the entry point
 
 
@@ -261,20 +262,20 @@ emptyAGraph = AGraph return
 graphOfAGraph (AGraph f) = f emptyGraph
 emptyGraph = Graph (ZLast LastExit) emptyBlockEnv
 
-labelAGraph id g =
+labelAGraph id args g =
     do Graph tail blocks <- graphOfAGraph g
-       return $ LGraph id $ insertBlock (Block id tail) blocks
+       return $ LGraph id args $ insertBlock (Block id Nothing tail) blocks
 
-lgraphOfAGraph g = do id <- freshBlockId "graph entry"
-                      labelAGraph id g
+lgraphOfAGraph args g = do id <- freshBlockId "graph entry"
+                           labelAGraph id args g
 
 -------------------------------------
 -- constructors
 
-mkLabel id = AGraph f
+mkLabel id args = AGraph f
     where f (Graph tail blocks) =
             return $ Graph (ZLast (mkBranchNode id))
-                           (insertBlock (Block id tail) blocks)
+                           (insertBlock (Block id args tail) blocks)
 
 mkBranch target = mkLast $ mkBranchNode target
 
@@ -314,24 +315,21 @@ outOfLine (AGraph f) = AGraph f'
                note_this_code_becomes_unreachable emptyEntrance
                return $ Graph tail' (blocks `plusUFM` blocks')
                                                        
-
 mkIfThenElse cbranch tbranch fbranch = 
     withFreshLabel "end of if"     $ \endif ->
     withFreshLabel "start of then" $ \tid ->
     withFreshLabel "start of else" $ \fid ->
         cbranch tid fid <*>
-        mkLabel tid <*> tbranch <*> mkBranch endif <*>
-        mkLabel fid <*> fbranch <*> mkLabel endif
-
+        mkLabel tid Nothing <*> tbranch <*> mkBranch endif <*>
+        mkLabel fid Nothing <*> fbranch <*> mkLabel endif Nothing
 
 mkWhileDo cbranch body = 
   withFreshLabel "loop test" $ \test ->
   withFreshLabel "loop head" $ \head ->
   withFreshLabel "end while" $ \endwhile ->
      -- Forrest Baskett's while-loop layout
-     mkBranch test <*> mkLabel head <*> body <*> mkLabel test
-                   <*> cbranch head endwhile <*> mkLabel endwhile
-
+     mkBranch test <*> mkLabel head Nothing <*> body <*> mkLabel test Nothing
+                   <*> cbranch head endwhile <*> mkLabel endwhile Nothing
 
 -- | Bleat if the insertion of a last node will create unreachable code
 note_this_code_becomes_unreachable ::
@@ -360,6 +358,6 @@ Emitting a Branch at this point is fine:
 -- thrown away at this spot---there's no reason a BlockId couldn't one day carry
 -- a string.  
 
-freshBlockId :: String -> UniqSM BlockId
-freshBlockId _ = do { u <- getUniqueM; return $ BlockId u }
+freshBlockId :: MonadUnique m => String -> m BlockId
+freshBlockId _s = getUniqueM >>= return . BlockId
 

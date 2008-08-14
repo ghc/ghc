@@ -24,6 +24,10 @@
 
 module MachRegs (
 
+	-- * Sizes
+	Size(..), intSize, floatSize, isFloatSize, 
+		  wordSize, cmmTypeSize, sizeToWidth,
+
 	-- * Immediate values
 	Imm(..), strImmLit, litToImm,
 
@@ -93,9 +97,7 @@ module MachRegs (
 #include "../includes/MachRegs.h"
 
 import Cmm
-import MachOp		( MachRep(..) )
 import CgUtils          ( get_GlobalReg_addr )
-
 import CLabel           ( CLabel, mkMainCapabilityLabel )
 import Pretty
 import Outputable	( Outputable(..), pprPanic, panic )
@@ -110,6 +112,95 @@ import UniqFM
 #if powerpc_TARGET_ARCH
 import Data.Word	( Word8, Word16, Word32 )
 import Data.Int 	( Int8, Int16, Int32 )
+#endif
+
+-- -----------------------------------------------------------------------------
+-- Sizes on this architecture
+-- 
+-- A Size is usually a combination of width and class
+
+-- It looks very like the old MachRep, but it's now of purely local
+-- significance, here in the native code generator.  You can change it
+-- without global consequences.
+--
+-- A major use is as an opcode qualifier; thus the opcode 
+--	mov.l a b
+-- might be encoded 
+-- 	MOV II32 a b
+-- where the Size field encodes the ".l" part.
+
+-- ToDo: it's not clear to me that we need separate signed-vs-unsigned sizes
+-- here.  I've removed them from the x86 version, we'll see what happens --SDM
+
+-- ToDo: quite a few occurrences of Size could usefully be replaced by Width
+
+#if powerpc_TARGET_ARCH || i386_TARGET_ARCH || x86_64_TARGET_ARCH
+data Size	-- For these three, the "size" also gives the int/float
+		-- distinction, because the instructions for int/float
+		-- differ only in their suffices
+  = II8 | II16 | II32 | II64 | FF32 | FF64 | FF80
+  deriving Eq
+
+intSize, floatSize :: Width -> Size
+intSize W8 = II8
+intSize W16 = II16
+intSize W32 = II32
+intSize W64 = II64
+intSize other = pprPanic "MachInstrs.intSize" (ppr other)
+
+floatSize W32 = FF32
+floatSize W64 = FF64
+floatSize other = pprPanic "MachInstrs.intSize" (ppr other)
+
+wordSize :: Size
+wordSize = intSize wordWidth
+
+sizeToWidth :: Size -> Width
+sizeToWidth II8  = W8
+sizeToWidth II16 = W16
+sizeToWidth II32 = W32
+sizeToWidth II64 = W64
+sizeToWidth FF32 = W32
+sizeToWidth FF64 = W64
+sizeToWidth _ = panic "MachInstrs.sizeToWidth"
+
+cmmTypeSize :: CmmType -> Size
+cmmTypeSize ty | isFloatType ty = floatSize (typeWidth ty)
+	       | otherwise	= intSize (typeWidth ty)
+
+isFloatSize :: Size -> Bool
+isFloatSize FF32 = True
+isFloatSize FF64 = True
+isFloatSize FF80 = True
+isFloatSize other = False
+#endif
+
+#if alpha_TARGET_ARCH
+data Size
+    = B	    -- byte
+    | Bu
+--  | W	    -- word (2 bytes): UNUSED
+--  | Wu    -- : UNUSED
+    | L	    -- longword (4 bytes)
+    | Q	    -- quadword (8 bytes)
+--  | FF    -- VAX F-style floating pt: UNUSED
+--  | GF    -- VAX G-style floating pt: UNUSED
+--  | DF    -- VAX D-style floating pt: UNUSED
+--  | SF    -- IEEE single-precision floating pt: UNUSED
+    | TF    -- IEEE double-precision floating pt
+  deriving Eq
+#endif
+
+#if sparc_TARGET_ARCH /* || powerpc_TARGET_ARCH */
+data Size
+    = B     -- byte (signed)
+    | Bu    -- byte (unsigned)
+    | H     -- halfword (signed, 2 bytes)
+    | Hu    -- halfword (unsigned, 2 bytes)
+    | W	    -- word (4 bytes)
+    | F	    -- IEEE single-precision floating pt
+    | DF    -- IEEE single-precision floating pt
+  deriving Eq
 #endif
 
 -- -----------------------------------------------------------------------------
@@ -138,8 +229,8 @@ strImmLit s = ImmLit (text s)
 
 litToImm :: CmmLit -> Imm
 litToImm (CmmInt i _)        = ImmInteger i
-litToImm (CmmFloat f F32)    = ImmFloat f
-litToImm (CmmFloat f F64)    = ImmDouble f
+litToImm (CmmFloat f W32)    = ImmFloat f
+litToImm (CmmFloat f W64)    = ImmDouble f
 litToImm (CmmLabel l)        = ImmCLbl l
 litToImm (CmmLabelOff l off) = ImmIndex l off
 litToImm (CmmLabelDiffOff l1 l2 off)
@@ -265,23 +356,22 @@ largeOffsetError i
 fits16Bits :: Integral a => a -> Bool
 fits16Bits x = x >= -32768 && x < 32768
 
-makeImmediate :: Integral a => MachRep -> Bool -> a -> Maybe Imm
-
+makeImmediate :: Integral a => Width -> Bool -> a -> Maybe Imm
 makeImmediate rep signed x = fmap ImmInt (toI16 rep signed)
     where
-        narrow I32 False = fromIntegral (fromIntegral x :: Word32)
-        narrow I16 False = fromIntegral (fromIntegral x :: Word16)
-        narrow I8  False = fromIntegral (fromIntegral x :: Word8)
-        narrow I32 True  = fromIntegral (fromIntegral x :: Int32)
-        narrow I16 True  = fromIntegral (fromIntegral x :: Int16)
-        narrow I8  True  = fromIntegral (fromIntegral x :: Int8)
+        narrow W32 False = fromIntegral (fromIntegral x :: Word32)
+        narrow W16 False = fromIntegral (fromIntegral x :: Word16)
+        narrow W8  False = fromIntegral (fromIntegral x :: Word8)
+        narrow W32 True  = fromIntegral (fromIntegral x :: Int32)
+        narrow W16 True  = fromIntegral (fromIntegral x :: Int16)
+        narrow W8  True  = fromIntegral (fromIntegral x :: Int8)
         
         narrowed = narrow rep signed
         
-        toI16 I32 True
+        toI16 W32 True
             | narrowed >= -32768 && narrowed < 32768 = Just narrowed
             | otherwise = Nothing
-        toI16 I32 False
+        toI16 W32 False
             | narrowed >= 0 && narrowed < 65536 = Just narrowed
             | otherwise = Nothing
         toI16 _ _  = Just narrowed
@@ -392,16 +482,18 @@ instance Uniquable Reg where
 unRealReg (RealReg i) = i
 unRealReg vreg        = pprPanic "unRealReg on VirtualReg" (ppr vreg)
 
-mkVReg :: Unique -> MachRep -> Reg
-mkVReg u rep
-   = case rep of
+mkVReg :: Unique -> Size -> Reg
+mkVReg u size
+   | not (isFloatSize size) = VirtualRegI u
+   | otherwise
+   = case size of
 #if sparc_TARGET_ARCH
-        F32   -> VirtualRegF u
+        FF32    -> VirtualRegF u
 #else
-        F32   -> VirtualRegD u
+        FF32    -> VirtualRegD u
 #endif
-        F64   -> VirtualRegD u
-        other -> VirtualRegI u
+        FF64    -> VirtualRegD u
+	_other -> panic "mkVReg"
 
 isVirtualReg :: Reg -> Bool
 isVirtualReg (RealReg _)      = False
@@ -1358,34 +1450,34 @@ globalRegMaybe :: GlobalReg -> Maybe Reg
 globalRegMaybe BaseReg			= Just (RealReg REG_Base)
 #endif
 #ifdef REG_R1
-globalRegMaybe (VanillaReg 1) 		= Just (RealReg REG_R1)
+globalRegMaybe (VanillaReg 1 _)		= Just (RealReg REG_R1)
 #endif 
 #ifdef REG_R2 
-globalRegMaybe (VanillaReg 2) 		= Just (RealReg REG_R2)
+globalRegMaybe (VanillaReg 2 _)		= Just (RealReg REG_R2)
 #endif 
 #ifdef REG_R3 
-globalRegMaybe (VanillaReg 3) 		= Just (RealReg REG_R3)
+globalRegMaybe (VanillaReg 3 _) 	= Just (RealReg REG_R3)
 #endif 
 #ifdef REG_R4 
-globalRegMaybe (VanillaReg 4) 		= Just (RealReg REG_R4)
+globalRegMaybe (VanillaReg 4 _)		= Just (RealReg REG_R4)
 #endif 
 #ifdef REG_R5 
-globalRegMaybe (VanillaReg 5) 		= Just (RealReg REG_R5)
+globalRegMaybe (VanillaReg 5 _)		= Just (RealReg REG_R5)
 #endif 
 #ifdef REG_R6 
-globalRegMaybe (VanillaReg 6) 		= Just (RealReg REG_R6)
+globalRegMaybe (VanillaReg 6 _)		= Just (RealReg REG_R6)
 #endif 
 #ifdef REG_R7 
-globalRegMaybe (VanillaReg 7) 		= Just (RealReg REG_R7)
+globalRegMaybe (VanillaReg 7 _)		= Just (RealReg REG_R7)
 #endif 
 #ifdef REG_R8 
-globalRegMaybe (VanillaReg 8) 		= Just (RealReg REG_R8)
+globalRegMaybe (VanillaReg 8 _)		= Just (RealReg REG_R8)
 #endif
 #ifdef REG_R9 
-globalRegMaybe (VanillaReg 9) 		= Just (RealReg REG_R9)
+globalRegMaybe (VanillaReg 9 _)		= Just (RealReg REG_R9)
 #endif
 #ifdef REG_R10 
-globalRegMaybe (VanillaReg 10)		= Just (RealReg REG_R10)
+globalRegMaybe (VanillaReg 10 _)	= Just (RealReg REG_R10)
 #endif
 #ifdef REG_F1
 globalRegMaybe (FloatReg 1)		= Just (RealReg REG_F1)

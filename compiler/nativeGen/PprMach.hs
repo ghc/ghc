@@ -28,7 +28,6 @@ module PprMach (
 
 import BlockId
 import Cmm
-import MachOp		( MachRep(..), wordRep, isFloatingRep )
 import MachRegs		-- may differ per-platform
 import MachInstrs
 
@@ -113,9 +112,9 @@ pprBasicBlock (BasicBlock (BlockId id) instrs) =
 -- on which bit of it we care about.  Yurgh.
 
 pprUserReg :: Reg -> Doc
-pprUserReg = pprReg IF_ARCH_i386(I32,) IF_ARCH_x86_64(I64,)
+pprUserReg = pprReg IF_ARCH_i386(II32,) IF_ARCH_x86_64(II64,)
 
-pprReg :: IF_ARCH_i386(MachRep ->,) IF_ARCH_x86_64(MachRep ->,) Reg -> Doc
+pprReg :: IF_ARCH_i386(Size ->,) IF_ARCH_x86_64(Size ->,) Reg -> Doc
 
 pprReg IF_ARCH_i386(s,) IF_ARCH_x86_64(s,) r
   = case r of
@@ -165,9 +164,9 @@ pprReg IF_ARCH_i386(s,) IF_ARCH_x86_64(s,) r
       })
 #endif
 #if i386_TARGET_ARCH
-    ppr_reg_no :: MachRep -> Int -> Doc
-    ppr_reg_no I8   = ppr_reg_byte
-    ppr_reg_no I16  = ppr_reg_word
+    ppr_reg_no :: Size -> Int -> Doc
+    ppr_reg_no II8   = ppr_reg_byte
+    ppr_reg_no II16  = ppr_reg_word
     ppr_reg_no _    = ppr_reg_long
 
     ppr_reg_byte i = ptext
@@ -200,10 +199,10 @@ pprReg IF_ARCH_i386(s,) IF_ARCH_x86_64(s,) r
 #endif
 
 #if x86_64_TARGET_ARCH
-    ppr_reg_no :: MachRep -> Int -> Doc
-    ppr_reg_no I8   = ppr_reg_byte
-    ppr_reg_no I16  = ppr_reg_word
-    ppr_reg_no I32  = ppr_reg_long
+    ppr_reg_no :: Size -> Int -> Doc
+    ppr_reg_no II8   = ppr_reg_byte
+    ppr_reg_no II16  = ppr_reg_word
+    ppr_reg_no II32  = ppr_reg_long
     ppr_reg_no _    = ppr_reg_quad
 
     ppr_reg_byte i = ptext
@@ -358,7 +357,7 @@ pprReg IF_ARCH_i386(s,) IF_ARCH_x86_64(s,) r
 -- pprSize: print a 'Size'
 
 #if powerpc_TARGET_ARCH || i386_TARGET_ARCH || x86_64_TARGET_ARCH || sparc_TARGET_ARCH
-pprSize :: MachRep -> Doc
+pprSize :: Size -> Doc
 #else
 pprSize :: Size -> Doc
 #endif
@@ -378,41 +377,41 @@ pprSize x = ptext (case x of
 	 TF -> sLit "t"
 #endif
 #if i386_TARGET_ARCH || x86_64_TARGET_ARCH
-	I8   -> sLit "b"
-	I16  -> sLit "w"
-	I32  -> sLit "l"
-	I64  -> sLit "q"
+	II8   -> sLit "b"
+	II16  -> sLit "w"
+	II32  -> sLit "l"
+	II64  -> sLit "q"
 #endif
 #if i386_TARGET_ARCH
-	F32  -> sLit "s"
-	F64  -> sLit "l"
-	F80  -> sLit "t"
+	FF32  -> sLit "s"
+	FF64  -> sLit "l"
+	FF80  -> sLit "t"
 #endif
 #if x86_64_TARGET_ARCH
-	F32  -> sLit "ss"	-- "scalar single-precision float" (SSE2)
-	F64  -> sLit "sd"	-- "scalar double-precision float" (SSE2)
+	FF32  -> sLit "ss"	-- "scalar single-precision float" (SSE2)
+	FF64  -> sLit "sd"	-- "scalar double-precision float" (SSE2)
 #endif
 #if sparc_TARGET_ARCH
-	I8   -> sLit "sb"
-        I16   -> sLit "sh"
-	I32   -> sLit ""
-	F32   -> sLit ""
-	F64  -> sLit "d"
+	II8   -> sLit "sb"
+        II16  -> sLit "sh"
+	II32  -> sLit ""
+	FF32  -> sLit ""
+	FF64  -> sLit "d"
     )
-pprStSize :: MachRep -> Doc
+pprStSize :: Size -> Doc
 pprStSize x = ptext (case x of
-	I8   -> sLit "b"
-	I16  -> sLit "h"
-	I32  -> sLit ""
-	F32  -> sLit ""
-	F64  -> sLit "d"
+	II8   -> sLit "b"
+	II16  -> sLit "h"
+	II32  -> sLit ""
+	FF32  -> sLit ""
+	FF64  -> sLit "d"
 #endif
 #if powerpc_TARGET_ARCH
-	I8   -> sLit "b"
-        I16  -> sLit "h"
-	I32  -> sLit "w"
-	F32  -> sLit "fs"
-	F64  -> sLit "fd"
+	II8   -> sLit "b"
+        II16  -> sLit "h"
+	II32  -> sLit "w"
+	FF32  -> sLit "fs"
+	FF64  -> sLit "fd"
 #endif
     )
 
@@ -558,7 +557,7 @@ pprAddr (AddrBaseIndex base index displacement)
   = let
 	pp_disp  = ppr_disp displacement
 	pp_off p = pp_disp <> char '(' <> p <> char ')'
-	pp_reg r = pprReg wordRep r
+	pp_reg r = pprReg wordSize r
     in
     case (base,index) of
       (EABaseNone,  EAIndexNone) -> pp_disp
@@ -735,30 +734,30 @@ pprAlign bytes =
 
 pprDataItem :: CmmLit -> Doc
 pprDataItem lit
-  = vcat (ppr_item (cmmLitRep lit) lit)
+  = vcat (ppr_item (cmmTypeSize $ cmmLitType lit) lit)
     where
 	imm = litToImm lit
 
 	-- These seem to be common:
-	ppr_item I8   x = [ptext (sLit "\t.byte\t") <> pprImm imm]
-	ppr_item I32  x = [ptext (sLit "\t.long\t") <> pprImm imm]
-	ppr_item F32  (CmmFloat r _)
+	ppr_item II8   x = [ptext (sLit "\t.byte\t") <> pprImm imm]
+	ppr_item II32  x = [ptext (sLit "\t.long\t") <> pprImm imm]
+	ppr_item FF32  (CmmFloat r _)
            = let bs = floatToBytes (fromRational r)
              in  map (\b -> ptext (sLit "\t.byte\t") <> pprImm (ImmInt b)) bs
-    	ppr_item F64 (CmmFloat r _)
+    	ppr_item FF64 (CmmFloat r _)
            = let bs = doubleToBytes (fromRational r)
              in  map (\b -> ptext (sLit "\t.byte\t") <> pprImm (ImmInt b)) bs
 
 #if sparc_TARGET_ARCH
         -- copy n paste of x86 version
-	ppr_item I16  x = [ptext (sLit "\t.short\t") <> pprImm imm]
-	ppr_item I64  x = [ptext (sLit "\t.quad\t") <> pprImm imm]
+	ppr_item II16  x = [ptext (sLit "\t.short\t") <> pprImm imm]
+	ppr_item II64  x = [ptext (sLit "\t.quad\t") <> pprImm imm]
 #endif
 #if i386_TARGET_ARCH || x86_64_TARGET_ARCH
-	ppr_item I16  x = [ptext (sLit "\t.word\t") <> pprImm imm]
+	ppr_item II16  x = [ptext (sLit "\t.word\t") <> pprImm imm]
 #endif
 #if i386_TARGET_ARCH && darwin_TARGET_OS
-        ppr_item I64 (CmmInt x _)  =
+        ppr_item II64 (CmmInt x _)  =
                 [ptext (sLit "\t.long\t")
                     <> int (fromIntegral (fromIntegral x :: Word32)),
                  ptext (sLit "\t.long\t")
@@ -766,7 +765,7 @@ pprDataItem lit
                         (fromIntegral (x `shiftR` 32) :: Word32))]
 #endif
 #if i386_TARGET_ARCH || (darwin_TARGET_OS && x86_64_TARGET_ARCH)
-	ppr_item I64  x = [ptext (sLit "\t.quad\t") <> pprImm imm]
+	ppr_item II64  x = [ptext (sLit "\t.quad\t") <> pprImm imm]
 #endif
 #if x86_64_TARGET_ARCH && !darwin_TARGET_OS
 	-- x86_64: binutils can't handle the R_X86_64_PC64 relocation
@@ -777,7 +776,7 @@ pprDataItem lit
         --
         -- See Note [x86-64-relative] in includes/InfoTables.h
 	-- 
-	ppr_item I64  x 
+	ppr_item II64  x 
 	   | isRelativeReloc x =
 		[ptext (sLit "\t.long\t") <> pprImm imm,
 		 ptext (sLit "\t.long\t0")]
@@ -788,8 +787,8 @@ pprDataItem lit
 		isRelativeReloc _ = False
 #endif
 #if powerpc_TARGET_ARCH
-	ppr_item I16 x = [ptext (sLit "\t.short\t") <> pprImm imm]
-        ppr_item I64 (CmmInt x _)  =
+	ppr_item II16 x = [ptext (sLit "\t.short\t") <> pprImm imm]
+        ppr_item II64 (CmmInt x _)  =
                 [ptext (sLit "\t.long\t")
                     <> int (fromIntegral 
                         (fromIntegral (x `shiftR` 32) :: Word32)),
@@ -1249,18 +1248,18 @@ pprInstr (RELOAD slot reg)
 pprInstr (MOV size src dst)
   = pprSizeOpOp (sLit "mov") size src dst
 
-pprInstr (MOVZxL I32 src dst) = pprSizeOpOp (sLit "mov") I32 src dst
+pprInstr (MOVZxL II32 src dst) = pprSizeOpOp (sLit "mov") II32 src dst
 	-- 32-to-64 bit zero extension on x86_64 is accomplished by a simple
 	-- movl.  But we represent it as a MOVZxL instruction, because
 	-- the reg alloc would tend to throw away a plain reg-to-reg
 	-- move, and we still want it to do that.
 
-pprInstr (MOVZxL sizes src dst) = pprSizeOpOpCoerce (sLit "movz") sizes I32 src dst
+pprInstr (MOVZxL sizes src dst) = pprSizeOpOpCoerce (sLit "movz") sizes II32 src dst
 	-- zero-extension only needs to extend to 32 bits: on x86_64, 
 	-- the remaining zero-extension to 64 bits is automatic, and the 32-bit
 	-- instruction is shorter.
 
-pprInstr (MOVSxL sizes src dst) = pprSizeOpOpCoerce (sLit "movs") sizes wordRep src dst
+pprInstr (MOVSxL sizes src dst) = pprSizeOpOpCoerce (sLit "movs") sizes wordSize src dst
 
 -- here we do some patching, since the physical registers are only set late
 -- in the code generation.
@@ -1296,8 +1295,8 @@ pprInstr (IMUL size op1 op2) = pprSizeOpOp (sLit "imul") size op1 op2
 pprInstr (AND size src dst) = pprSizeOpOp (sLit "and") size src dst
 pprInstr (OR  size src dst) = pprSizeOpOp (sLit "or")  size src dst
 
-pprInstr (XOR F32 src dst)  = pprOpOp (sLit "xorps") F32 src dst
-pprInstr (XOR F64 src dst)  = pprOpOp (sLit "xorpd") F64 src dst
+pprInstr (XOR FF32 src dst) = pprOpOp (sLit "xorps") FF32 src dst
+pprInstr (XOR FF64 src dst) = pprOpOp (sLit "xorpd") FF64 src dst
 pprInstr (XOR size src dst) = pprSizeOpOp (sLit "xor")  size src dst
 
 pprInstr (NOT size op) = pprSizeOp (sLit "not") size op
@@ -1310,8 +1309,14 @@ pprInstr (SHR size src dst) = pprShift (sLit "shr") size src dst
 pprInstr (BT  size imm src) = pprSizeImmOp (sLit "bt") size imm src
 
 pprInstr (CMP size src dst) 
-  | isFloatingRep size =  pprSizeOpOp (sLit "ucomi")  size src dst -- SSE2
-  | otherwise          =  pprSizeOpOp (sLit "cmp")  size src dst
+  | is_float size =  pprSizeOpOp (sLit "ucomi") size src dst -- SSE2
+  | otherwise     =  pprSizeOpOp (sLit "cmp")   size src dst
+  where
+	-- This predicate is needed here and nowhere else
+    is_float FF32 = True	
+    is_float FF64 = True
+    is_float FF80 = True
+    is_float other = False
 
 pprInstr (TEST size src dst) = pprSizeOpOp (sLit "test")  size src dst
 pprInstr (PUSH size op) = pprSizeOp (sLit "push") size op
@@ -1322,10 +1327,10 @@ pprInstr (POP size op) = pprSizeOp (sLit "pop") size op
 -- pprInstr POPA = ptext (sLit "\tpopal")
 
 pprInstr NOP = ptext (sLit "\tnop")
-pprInstr (CLTD I32) = ptext (sLit "\tcltd")
-pprInstr (CLTD I64) = ptext (sLit "\tcqto")
+pprInstr (CLTD II32) = ptext (sLit "\tcltd")
+pprInstr (CLTD II64) = ptext (sLit "\tcqto")
 
-pprInstr (SETCC cond op) = pprCondInstr (sLit "set") cond (pprOperand I8 op)
+pprInstr (SETCC cond op) = pprCondInstr (sLit "set") cond (pprOperand II8 op)
 
 pprInstr (JXX cond (BlockId id)) 
   = pprCondInstr (sLit "j") cond (pprCLabel_asm lab)
@@ -1334,10 +1339,10 @@ pprInstr (JXX cond (BlockId id))
 pprInstr (JXX_GBL cond imm) = pprCondInstr (sLit "j") cond (pprImm imm)
 
 pprInstr (JMP (OpImm imm)) = (<>) (ptext (sLit "\tjmp ")) (pprImm imm)
-pprInstr (JMP op)          = (<>) (ptext (sLit "\tjmp *")) (pprOperand wordRep op)
+pprInstr (JMP op)          = (<>) (ptext (sLit "\tjmp *")) (pprOperand wordSize op)
 pprInstr (JMP_TBL op ids)  = pprInstr (JMP op)
 pprInstr (CALL (Left imm) _)    = (<>) (ptext (sLit "\tcall ")) (pprImm imm)
-pprInstr (CALL (Right reg) _)   = (<>) (ptext (sLit "\tcall *")) (pprReg wordRep reg)
+pprInstr (CALL (Right reg) _)   = (<>) (ptext (sLit "\tcall *")) (pprReg wordSize reg)
 
 pprInstr (IDIV sz op)	= pprSizeOp (sLit "idiv") sz op
 pprInstr (DIV sz op)    = pprSizeOp (sLit "div")  sz op
@@ -1359,9 +1364,9 @@ pprInstr (CVTSI2SD from to)   = pprOpReg  (sLit "cvtsi2sdq") from to
     -- FETCHGOT for PIC on ELF platforms
 pprInstr (FETCHGOT reg)
    = vcat [ ptext (sLit "\tcall 1f"),
-            hcat [ ptext (sLit "1:\tpopl\t"), pprReg I32 reg ],
+            hcat [ ptext (sLit "1:\tpopl\t"), pprReg II32 reg ],
             hcat [ ptext (sLit "\taddl\t$_GLOBAL_OFFSET_TABLE_+(.-1b), "),
-                   pprReg I32 reg ]
+                   pprReg II32 reg ]
           ]
 
     -- FETCHPC for PIC on Darwin/x86
@@ -1370,7 +1375,7 @@ pprInstr (FETCHGOT reg)
     --  and it's a good thing to use the same name on both platforms)
 pprInstr (FETCHPC reg)
    = vcat [ ptext (sLit "\tcall 1f"),
-            hcat [ ptext (sLit "1:\tpopl\t"), pprReg I32 reg ]
+            hcat [ ptext (sLit "1:\tpopl\t"), pprReg II32 reg ]
           ]
 
 
@@ -1419,12 +1424,12 @@ pprInstr g@(GDTOI src dst)
          hcat [gtab, text "addl $8, %esp"]
      ])
    where
-     reg = pprReg I32 dst
+     reg = pprReg II32 dst
 
 pprInstr g@(GITOF src dst) 
    = pprInstr (GITOD src dst)
 pprInstr g@(GITOD src dst) 
-   = pprG g (hcat [gtab, text "pushl ", pprReg I32 src, 
+   = pprG g (hcat [gtab, text "pushl ", pprReg II32 src, 
                    text " ; ffree %st(7); fildl (%esp) ; ",
                    gpop dst 1, text " ; addl $4,%esp"])
 
@@ -1581,7 +1586,7 @@ pprInstr GFREE
             ptext (sLit "\tffree %st(4) ;ffree %st(5) ;ffree %st(6) ;ffree %st(7)") 
           ]
 
-pprTrigOp :: String -> Bool -> CLabel -> CLabel -> Reg -> Reg -> MachRep -> Doc
+pprTrigOp :: String -> Bool -> CLabel -> CLabel -> Reg -> Reg -> Size -> Doc
 pprTrigOp op -- fsin, fcos or fptan
           isTan -- we need a couple of extra steps if we're doing tan
           l1 l2 -- internal labels for us to use
@@ -1626,8 +1631,8 @@ pprTrigOp op -- fsin, fcos or fptan
 --------------------------
 
 -- coerce %st(0) to the specified size
-gcoerceto F64 = empty
-gcoerceto F32 = empty --text "subl $4,%esp ; fstps (%esp) ; flds (%esp) ; addl $4,%esp ; "
+gcoerceto FF64 = empty
+gcoerceto FF32 = empty --text "subl $4,%esp ; fstps (%esp) ; flds (%esp) ; addl $4,%esp ; "
 
 gpush reg offset
    = hcat [text "ffree %st(7) ; fld ", greg reg offset]
@@ -1647,20 +1652,20 @@ pprG :: Instr -> Doc -> Doc
 pprG fake actual
    = (char '#' <> pprGInstr fake) $$ actual
 
-pprGInstr (GMOV src dst)   = pprSizeRegReg (sLit "gmov") F64 src dst
+pprGInstr (GMOV src dst)   = pprSizeRegReg (sLit "gmov") FF64 src dst
 pprGInstr (GLD sz src dst) = pprSizeAddrReg (sLit "gld") sz src dst
 pprGInstr (GST sz src dst) = pprSizeRegAddr (sLit "gst") sz src dst
 
-pprGInstr (GLDZ dst) = pprSizeReg (sLit "gldz") F64 dst
-pprGInstr (GLD1 dst) = pprSizeReg (sLit "gld1") F64 dst
+pprGInstr (GLDZ dst) = pprSizeReg (sLit "gldz") FF64 dst
+pprGInstr (GLD1 dst) = pprSizeReg (sLit "gld1") FF64 dst
 
-pprGInstr (GFTOI src dst) = pprSizeSizeRegReg (sLit "gftoi") F32 I32  src dst
-pprGInstr (GDTOI src dst) = pprSizeSizeRegReg (sLit "gdtoi") F64 I32 src dst
+pprGInstr (GFTOI src dst) = pprSizeSizeRegReg (sLit "gftoi") FF32 II32  src dst
+pprGInstr (GDTOI src dst) = pprSizeSizeRegReg (sLit "gdtoi") FF64 II32 src dst
 
-pprGInstr (GITOF src dst) = pprSizeSizeRegReg (sLit "gitof") I32 F32  src dst
-pprGInstr (GITOD src dst) = pprSizeSizeRegReg (sLit "gitod") I32 F64 src dst
+pprGInstr (GITOF src dst) = pprSizeSizeRegReg (sLit "gitof") II32 FF32  src dst
+pprGInstr (GITOD src dst) = pprSizeSizeRegReg (sLit "gitod") II32 FF64 src dst
 
-pprGInstr (GCMP co src dst) = pprCondRegReg (sLit "gcmp_") F64 co src dst
+pprGInstr (GCMP co src dst) = pprCondRegReg (sLit "gcmp_") FF64 co src dst
 pprGInstr (GABS sz src dst) = pprSizeRegReg (sLit "gabs") sz src dst
 pprGInstr (GNEG sz src dst) = pprSizeRegReg (sLit "gneg") sz src dst
 pprGInstr (GSQRT sz src dst) = pprSizeRegReg (sLit "gsqrt") sz src dst
@@ -1682,7 +1687,7 @@ pprDollImm :: Imm -> Doc
 
 pprDollImm i =  ptext (sLit "$") <> pprImm i
 
-pprOperand :: MachRep -> Operand -> Doc
+pprOperand :: Size -> Operand -> Doc
 pprOperand s (OpReg r)   = pprReg s r
 pprOperand s (OpImm i)   = pprDollImm i
 pprOperand s (OpAddr ea) = pprAddr ea
@@ -1691,11 +1696,11 @@ pprMnemonic_  :: LitString -> Doc
 pprMnemonic_ name = 
    char '\t' <> ptext name <> space
 
-pprMnemonic  :: LitString -> MachRep -> Doc
+pprMnemonic  :: LitString -> Size -> Doc
 pprMnemonic name size = 
    char '\t' <> ptext name <> pprSize size <> space
 
-pprSizeImmOp :: LitString -> MachRep -> Imm -> Operand -> Doc
+pprSizeImmOp :: LitString -> Size -> Imm -> Operand -> Doc
 pprSizeImmOp name size imm op1
   = hcat [
 	pprMnemonic name size,
@@ -1705,14 +1710,14 @@ pprSizeImmOp name size imm op1
 	pprOperand size op1
     ]
 	
-pprSizeOp :: LitString -> MachRep -> Operand -> Doc
+pprSizeOp :: LitString -> Size -> Operand -> Doc
 pprSizeOp name size op1
   = hcat [
 	pprMnemonic name size,
 	pprOperand size op1
     ]
 
-pprSizeOpOp :: LitString -> MachRep -> Operand -> Operand -> Doc
+pprSizeOpOp :: LitString -> Size -> Operand -> Operand -> Doc
 pprSizeOpOp name size op1 op2
   = hcat [
 	pprMnemonic name size,
@@ -1721,7 +1726,7 @@ pprSizeOpOp name size op1 op2
 	pprOperand size op2
     ]
 
-pprOpOp :: LitString -> MachRep -> Operand -> Operand -> Doc
+pprOpOp :: LitString -> Size -> Operand -> Operand -> Doc
 pprOpOp name size op1 op2
   = hcat [
 	pprMnemonic_ name,
@@ -1730,14 +1735,14 @@ pprOpOp name size op1 op2
 	pprOperand size op2
     ]
 
-pprSizeReg :: LitString -> MachRep -> Reg -> Doc
+pprSizeReg :: LitString -> Size -> Reg -> Doc
 pprSizeReg name size reg1
   = hcat [
 	pprMnemonic name size,
 	pprReg size reg1
     ]
 
-pprSizeRegReg :: LitString -> MachRep -> Reg -> Reg -> Doc
+pprSizeRegReg :: LitString -> Size -> Reg -> Reg -> Doc
 pprSizeRegReg name size reg1 reg2
   = hcat [
 	pprMnemonic name size,
@@ -1750,21 +1755,21 @@ pprRegReg :: LitString -> Reg -> Reg -> Doc
 pprRegReg name reg1 reg2
   = hcat [
 	pprMnemonic_ name,
-	pprReg wordRep reg1,
+	pprReg wordSize reg1,
         comma,
-        pprReg wordRep reg2
+        pprReg wordSize reg2
     ]
 
 pprOpReg :: LitString -> Operand -> Reg -> Doc
 pprOpReg name op1 reg2
   = hcat [
 	pprMnemonic_ name,
-	pprOperand wordRep op1,
+	pprOperand wordSize op1,
         comma,
-        pprReg wordRep reg2
+        pprReg wordSize reg2
     ]
 
-pprCondRegReg :: LitString -> MachRep -> Cond -> Reg -> Reg -> Doc
+pprCondRegReg :: LitString -> Size -> Cond -> Reg -> Reg -> Doc
 pprCondRegReg name size cond reg1 reg2
   = hcat [
     	char '\t',
@@ -1776,7 +1781,7 @@ pprCondRegReg name size cond reg1 reg2
         pprReg size reg2
     ]
 
-pprSizeSizeRegReg :: LitString -> MachRep -> MachRep -> Reg -> Reg -> Doc
+pprSizeSizeRegReg :: LitString -> Size -> Size -> Reg -> Reg -> Doc
 pprSizeSizeRegReg name size1 size2 reg1 reg2
   = hcat [
     	char '\t',
@@ -1790,7 +1795,7 @@ pprSizeSizeRegReg name size1 size2 reg1 reg2
         pprReg size2 reg2
     ]
 
-pprSizeRegRegReg :: LitString -> MachRep -> Reg -> Reg -> Reg -> Doc
+pprSizeRegRegReg :: LitString -> Size -> Reg -> Reg -> Reg -> Doc
 pprSizeRegRegReg name size reg1 reg2 reg3
   = hcat [
 	pprMnemonic name size,
@@ -1801,7 +1806,7 @@ pprSizeRegRegReg name size reg1 reg2 reg3
         pprReg size reg3
     ]
 
-pprSizeAddrReg :: LitString -> MachRep -> AddrMode -> Reg -> Doc
+pprSizeAddrReg :: LitString -> Size -> AddrMode -> Reg -> Doc
 pprSizeAddrReg name size op dst
   = hcat [
 	pprMnemonic name size,
@@ -1810,7 +1815,7 @@ pprSizeAddrReg name size op dst
 	pprReg size dst
     ]
 
-pprSizeRegAddr :: LitString -> MachRep -> Reg -> AddrMode -> Doc
+pprSizeRegAddr :: LitString -> Size -> Reg -> AddrMode -> Doc
 pprSizeRegAddr name size src op
   = hcat [
 	pprMnemonic name size,
@@ -1819,16 +1824,16 @@ pprSizeRegAddr name size src op
 	pprAddr op
     ]
 
-pprShift :: LitString -> MachRep -> Operand -> Operand -> Doc
+pprShift :: LitString -> Size -> Operand -> Operand -> Doc
 pprShift name size src dest
   = hcat [
 	pprMnemonic name size,
-	pprOperand I8 src,  -- src is 8-bit sized
+	pprOperand II8 src,  -- src is 8-bit sized
 	comma,
 	pprOperand size dest
     ]
 
-pprSizeOpOpCoerce :: LitString -> MachRep -> MachRep -> Operand -> Operand -> Doc
+pprSizeOpOpCoerce :: LitString -> Size -> Size -> Operand -> Operand -> Doc
 pprSizeOpOpCoerce name size1 size2 op1 op2
   = hcat [ char '\t', ptext name, pprSize size1, pprSize size2, space,
 	pprOperand size1 op1,
@@ -1875,7 +1880,7 @@ pprInstr (RELOAD slot reg)
 --    ld  [g1+4],%f(n+1)
 --    sub g1,g2,g1           -- to restore g1
 
-pprInstr (LD F64 (AddrRegReg g1 g2) reg)
+pprInstr (LD FF64 (AddrRegReg g1 g2) reg)
   = vcat [
        hcat [ptext (sLit "\tadd\t"), pprReg g1,comma,pprReg g2,comma,pprReg g1],
        hcat [pp_ld_lbracket, pprReg g1, pp_rbracket_comma, pprReg reg],
@@ -1886,7 +1891,7 @@ pprInstr (LD F64 (AddrRegReg g1 g2) reg)
 -- Translate to
 --    ld  [addr],%fn
 --    ld  [addr+4],%f(n+1)
-pprInstr (LD F64 addr reg) | isJust off_addr
+pprInstr (LD FF64 addr reg) | isJust off_addr
   = vcat [
        hcat [pp_ld_lbracket, pprAddr addr, pp_rbracket_comma, pprReg reg],
        hcat [pp_ld_lbracket, pprAddr addr2, pp_rbracket_comma,pprReg (fPair reg)]
@@ -1914,7 +1919,7 @@ pprInstr (LD size addr reg)
 --    st  %fn,[g1]
 --    st  %f(n+1),[g1+4]
 --    sub g1,g2,g1           -- to restore g1
-pprInstr (ST F64 reg (AddrRegReg g1 g2))
+pprInstr (ST FF64 reg (AddrRegReg g1 g2))
  = vcat [
        hcat [ptext (sLit "\tadd\t"), pprReg g1,comma,pprReg g2,comma,pprReg g1],
        hcat [ptext (sLit "\tst\t"), pprReg reg, pp_comma_lbracket, 
@@ -1927,7 +1932,7 @@ pprInstr (ST F64 reg (AddrRegReg g1 g2))
 -- Translate to
 --    st  %fn,[addr]
 --    st  %f(n+1),[addr+4]
-pprInstr (ST F64 reg addr) | isJust off_addr 
+pprInstr (ST FF64 reg addr) | isJust off_addr 
  = vcat [
       hcat [ptext (sLit "\tst\t"), pprReg reg, pp_comma_lbracket, 
             pprAddr addr, rbrack],
@@ -2002,12 +2007,12 @@ pprInstr (SETHI imm reg)
 
 pprInstr NOP = ptext (sLit "\tnop")
 
-pprInstr (FABS F32 reg1 reg2) = pprSizeRegReg (sLit "fabs") F32 reg1 reg2
-pprInstr (FABS F64 reg1 reg2)
-  = (<>) (pprSizeRegReg (sLit "fabs") F32 reg1 reg2)
+pprInstr (FABS FF32 reg1 reg2) = pprSizeRegReg (sLit "fabs") FF32 reg1 reg2
+pprInstr (FABS FF64 reg1 reg2)
+  = (<>) (pprSizeRegReg (sLit "fabs") FF32 reg1 reg2)
     (if (reg1 == reg2) then empty
      else (<>) (char '\n')
-    	  (pprSizeRegReg (sLit "fmov") F32 (fPair reg1) (fPair reg2)))
+    	  (pprSizeRegReg (sLit "fmov") FF32 (fPair reg1) (fPair reg2)))
 
 pprInstr (FADD size reg1 reg2 reg3)
   = pprSizeRegRegReg (sLit "fadd") size reg1 reg2 reg3
@@ -2016,22 +2021,22 @@ pprInstr (FCMP e size reg1 reg2)
 pprInstr (FDIV size reg1 reg2 reg3)
   = pprSizeRegRegReg (sLit "fdiv") size reg1 reg2 reg3
 
-pprInstr (FMOV F32 reg1 reg2) = pprSizeRegReg (sLit "fmov") F32 reg1 reg2
-pprInstr (FMOV F64 reg1 reg2)
-  = (<>) (pprSizeRegReg (sLit "fmov") F32 reg1 reg2)
+pprInstr (FMOV FF32 reg1 reg2) = pprSizeRegReg (sLit "fmov") FF32 reg1 reg2
+pprInstr (FMOV FF64 reg1 reg2)
+  = (<>) (pprSizeRegReg (sLit "fmov") FF32 reg1 reg2)
     (if (reg1 == reg2) then empty
      else (<>) (char '\n')
-    	  (pprSizeRegReg (sLit "fmov") F32 (fPair reg1) (fPair reg2)))
+    	  (pprSizeRegReg (sLit "fmov") FF32 (fPair reg1) (fPair reg2)))
 
 pprInstr (FMUL size reg1 reg2 reg3)
   = pprSizeRegRegReg (sLit "fmul") size reg1 reg2 reg3
 
-pprInstr (FNEG F32 reg1 reg2) = pprSizeRegReg (sLit "fneg") F32 reg1 reg2
-pprInstr (FNEG F64 reg1 reg2)
-  = (<>) (pprSizeRegReg (sLit "fneg") F32 reg1 reg2)
+pprInstr (FNEG FF32 reg1 reg2) = pprSizeRegReg (sLit "fneg") FF32 reg1 reg2
+pprInstr (FNEG FF64 reg1 reg2)
+  = (<>) (pprSizeRegReg (sLit "fneg") FF32 reg1 reg2)
     (if (reg1 == reg2) then empty
      else (<>) (char '\n')
-    	  (pprSizeRegReg (sLit "fmov") F32 (fPair reg1) (fPair reg2)))
+    	  (pprSizeRegReg (sLit "fmov") FF32 (fPair reg1) (fPair reg2)))
 
 pprInstr (FSQRT size reg1 reg2)     = pprSizeRegReg (sLit "fsqrt") size reg1 reg2
 pprInstr (FSUB size reg1 reg2 reg3) = pprSizeRegRegReg (sLit "fsub") size reg1 reg2 reg3
@@ -2040,14 +2045,14 @@ pprInstr (FxTOy size1 size2 reg1 reg2)
     	ptext (sLit "\tf"),
 	ptext
     	(case size1 of
-    	    I32  -> sLit "ito"
-    	    F32  -> sLit "sto"
-    	    F64  -> sLit "dto"),
+    	    II32  -> sLit "ito"
+    	    FF32  -> sLit "sto"
+    	    FF64  -> sLit "dto"),
 	ptext
     	(case size2 of
-    	    I32  -> sLit "i\t"
-    	    F32  -> sLit "s\t"
-    	    F64  -> sLit "d\t"),
+    	    II32  -> sLit "i\t"
+    	    FF32  -> sLit "s\t"
+    	    FF64  -> sLit "d\t"),
 	pprReg reg1, comma, pprReg reg2
     ]
 
@@ -2079,27 +2084,27 @@ pprRI :: RI -> Doc
 pprRI (RIReg r) = pprReg r
 pprRI (RIImm r) = pprImm r
 
-pprSizeRegReg :: LitString -> MachRep -> Reg -> Reg -> Doc
+pprSizeRegReg :: LitString -> Size -> Reg -> Reg -> Doc
 pprSizeRegReg name size reg1 reg2
   = hcat [
     	char '\t',
 	ptext name,
     	(case size of
-    	    F32  -> ptext (sLit "s\t")
-    	    F64 -> ptext (sLit "d\t")),
+    	    FF32 -> ptext (sLit "s\t")
+    	    FF64 -> ptext (sLit "d\t")),
 	pprReg reg1,
 	comma,
 	pprReg reg2
     ]
 
-pprSizeRegRegReg :: LitString -> MachRep -> Reg -> Reg -> Reg -> Doc
+pprSizeRegRegReg :: LitString -> Size -> Reg -> Reg -> Reg -> Doc
 pprSizeRegRegReg name size reg1 reg2 reg3
   = hcat [
     	char '\t',
 	ptext name,
     	(case size of
-    	    F32  -> ptext (sLit "s\t")
-    	    F64  -> ptext (sLit "d\t")),
+    	    FF32  -> ptext (sLit "s\t")
+    	    FF64  -> ptext (sLit "d\t")),
 	pprReg reg1,
 	comma,
 	pprReg reg2,
@@ -2164,11 +2169,11 @@ pprInstr (LD sz reg addr) = hcat [
 	char '\t',
 	ptext (sLit "l"),
 	ptext (case sz of
-	    I8  -> sLit "bz"
-	    I16 -> sLit "hz"
-	    I32 -> sLit "wz"
-	    F32 -> sLit "fs"
-	    F64 -> sLit "fd"),
+	    II8  -> sLit "bz"
+	    II16 -> sLit "hz"
+	    II32 -> sLit "wz"
+	    FF32 -> sLit "fs"
+	    FF64 -> sLit "fd"),
         case addr of AddrRegImm _ _ -> empty
                      AddrRegReg _ _ -> char 'x',
 	char '\t',
@@ -2180,11 +2185,11 @@ pprInstr (LA sz reg addr) = hcat [
 	char '\t',
 	ptext (sLit "l"),
 	ptext (case sz of
-	    I8  -> sLit "ba"
-	    I16 -> sLit "ha"
-	    I32 -> sLit "wa"
-	    F32 -> sLit "fs"
-	    F64 -> sLit "fd"),
+	    II8  -> sLit "ba"
+	    II16 -> sLit "ha"
+	    II32 -> sLit "wa"
+	    FF32 -> sLit "fs"
+	    FF64 -> sLit "fd"),
         case addr of AddrRegImm _ _ -> empty
                      AddrRegReg _ _ -> char 'x',
 	char '\t',
@@ -2499,8 +2504,8 @@ pprRI :: RI -> Doc
 pprRI (RIReg r) = pprReg r
 pprRI (RIImm r) = pprImm r
 
-pprFSize F64 = empty
-pprFSize F32 = char 's'
+pprFSize FF64 = empty
+pprFSize FF32 = char 's'
 
     -- limit immediate argument for shift instruction to range 0..32
     -- (yes, the maximum is really 32, not 31)

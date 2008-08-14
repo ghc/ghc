@@ -36,7 +36,6 @@ import ClosureInfo
 import SMRep
 import CmmUtils
 import Cmm
-import MachOp
 
 import StgSyn
 import StaticFlags
@@ -164,8 +163,8 @@ cgCase (StgOpApp op@(StgFCallOp fcall _) args _)
     do	--  *must* be an unboxed tuple alt.
 	-- exactly like the cgInlinePrimOp case for unboxed tuple alts..
 	{ res_tmps <- mapFCs bindNewToTemp non_void_res_ids
-	; let res_hints = map (typeHint.idType) non_void_res_ids
-	; cgForeignCall (zipWith CmmKinded res_tmps res_hints) fcall args live_in_alts
+	; let res_hints = map (typeForeignHint.idType) non_void_res_ids
+	; cgForeignCall (zipWith CmmHinted res_tmps res_hints) fcall args live_in_alts
 	; cgExpr rhs }
   where
    (_, res_ids, _, rhs) = head alts
@@ -340,7 +339,7 @@ cgInlinePrimOp primop args bndr (AlgAlt tycon) live_in_alts alts
          (_,e) <- getArgAmode arg
 	 return e
     do_enum_primop primop
-      = do tmp <- newNonPtrTemp wordRep
+      = do tmp <- newTemp bWord
 	   cgPrimOp [tmp] primop args live_in_alts
     	   returnFC (CmmReg (CmmLocal tmp))
 
@@ -612,6 +611,6 @@ restoreCurrentCostCentre Nothing     _freeit = nopC
 restoreCurrentCostCentre (Just slot) freeit
  = do 	{ sp_rel <- getSpRelOffset slot
 	; whenC freeit (freeStackSlots [slot])
-	; stmtC (CmmStore curCCSAddr (CmmLoad sp_rel wordRep)) }
+	; stmtC (CmmStore curCCSAddr (CmmLoad sp_rel bWord)) }
 \end{code}
 

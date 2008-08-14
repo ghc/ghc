@@ -114,7 +114,7 @@ import LeaveCriticalSection;
    There are canned sequences for 'n' pointer values in registers.
    -------------------------------------------------------------------------- */
 
-INFO_TABLE_RET( stg_enter, RET_SMALL, "ptr" W_ unused)
+INFO_TABLE_RET( stg_enter, RET_SMALL, P_ unused)
 {
     R1 = Sp(1);
     Sp_adj(2);
@@ -444,7 +444,7 @@ INFO_TABLE_RET( stg_gc_void, RET_SMALL)
 
 /*-- R1 is boxed/unpointed -------------------------------------------------- */
 
-INFO_TABLE_RET( stg_gc_unpt_r1, RET_SMALL, "ptr" W_ unused)
+INFO_TABLE_RET( stg_gc_unpt_r1, RET_SMALL, P_ unused)
 {
     R1 = Sp(1);
     Sp_adj(2);
@@ -531,7 +531,7 @@ stg_gc_l1
 
 /*-- Unboxed tuple return, one pointer (unregisterised build only) ---------- */
 
-INFO_TABLE_RET( stg_ut_1_0_unreg, RET_SMALL, "ptr" W_ unused )
+INFO_TABLE_RET( stg_ut_1_0_unreg, RET_SMALL, P_ unused )
 {
     Sp_adj(1);
     // one ptr is on the stack (Sp(0))
@@ -816,7 +816,7 @@ stg_block_1
  * 
  * -------------------------------------------------------------------------- */
 
-INFO_TABLE_RET( stg_block_takemvar, RET_SMALL, "ptr" W_ unused )
+INFO_TABLE_RET( stg_block_takemvar, RET_SMALL, P_ unused )
 {
     R1 = Sp(1);
     Sp_adj(2);
@@ -843,7 +843,7 @@ stg_block_takemvar
     BLOCK_BUT_FIRST(stg_block_takemvar_finally);
 }
 
-INFO_TABLE_RET( stg_block_putmvar, RET_SMALL, "ptr" W_ unused1, "ptr" W_ unused2 )
+INFO_TABLE_RET( stg_block_putmvar, RET_SMALL, P_ unused1, P_ unused2 )
 {
     R2 = Sp(2);
     R1 = Sp(1);
@@ -892,7 +892,7 @@ stg_block_blackhole
     BLOCK_BUT_FIRST(stg_block_blackhole_finally);
 }
 
-INFO_TABLE_RET( stg_block_throwto, RET_SMALL, "ptr" W_ unused, "ptr" W_ unused )
+INFO_TABLE_RET( stg_block_throwto, RET_SMALL, P_ unused, P_ unused )
 {
     R2 = Sp(2);
     R1 = Sp(1);

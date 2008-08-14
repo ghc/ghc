@@ -1084,7 +1084,7 @@ INFO_TABLE_RET(stg_catch_retry_frame, CATCH_RETRY_FRAME,
 #if defined(PROFILING)
   W_ unused1, W_ unused2,
 #endif
-  W_ unused3, "ptr" W_ unused4, "ptr" W_ unused5)
+  W_ unused3, P_ unused4, P_ unused5)
 {
    W_ r, frame, trec, outer;
 
@@ -1118,7 +1118,7 @@ INFO_TABLE_RET(stg_atomically_frame, ATOMICALLY_FRAME,
 #if defined(PROFILING)
   W_ unused1, W_ unused2,
 #endif
-  "ptr" W_ unused3, "ptr" W_ unused4)
+  P_ unused3, P_ unused4)
 {
   W_ frame, trec, valid, next_invariant, q, outer;
 
@@ -1180,7 +1180,7 @@ INFO_TABLE_RET(stg_atomically_waiting_frame, ATOMICALLY_FRAME,
 #if defined(PROFILING)
   W_ unused1, W_ unused2,
 #endif
-  "ptr" W_ unused3, "ptr" W_ unused4)
+  P_ unused3, P_ unused4)
 {
   W_ frame, trec, valid;
 
@@ -1214,7 +1214,7 @@ INFO_TABLE_RET(stg_catch_stm_frame, CATCH_STM_FRAME,
 #if defined(PROFILING)
   W_ unused1, W_ unused2,
 #endif
-  "ptr" W_ unused3, "ptr" W_ unused4)
+  P_ unused3, P_ unused4)
    {
       W_ r, frame, trec, outer;
       frame = Sp;

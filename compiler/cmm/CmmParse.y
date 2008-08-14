@@ -36,7 +36,6 @@ import PprCmm
 import CmmUtils
 import CmmLex
 import CLabel
-import MachOp
 import SMRep
 import Lexer
 
@@ -127,6 +126,7 @@ import System.Exit
 	'bits64'	{ L _ (CmmT_bits64) }
 	'float32'	{ L _ (CmmT_float32) }
 	'float64'	{ L _ (CmmT_float64) }
+	'gcptr'	        { L _ (CmmT_gcptr) }
 
 	GLOBALREG	{ L _ (CmmT_GlobalReg   $$) }
   	NAME		{ L _ (CmmT_Name	$$) }
@@ -191,12 +191,12 @@ static 	:: { ExtFCode [CmmStatic] }
 	| type expr ';'	{ do e <- $2;
 			     return [CmmStaticLit (getLit e)] }
 	| type ';'			{ return [CmmUninitialised
-							(machRepByteWidth $1)] }
+							(widthInBytes (typeWidth $1))] }
         | 'bits8' '[' ']' STRING ';'	{ return [mkString $4] }
         | 'bits8' '[' INT ']' ';'	{ return [CmmUninitialised 
 							(fromIntegral $3)] }
         | typenot8 '[' INT ']' ';'	{ return [CmmUninitialised 
-						(machRepByteWidth $1 * 
+						(widthInBytes (typeWidth $1) * 
 							fromIntegral $3)] }
 	| 'align' INT ';'		{ return [CmmAlign (fromIntegral $2)] }
 	| 'CLOSURE' '(' NAME lits ')'
@@ -214,7 +214,7 @@ lits	:: { [ExtFCode CmmExpr] }
 
 cmmproc :: { ExtCode }
 -- TODO: add real SRT/info tables to parsed Cmm
-	: info maybe_formals_without_kinds maybe_gc_block maybe_frame '{' body '}'
+	: info maybe_formals_without_hints maybe_gc_block maybe_frame '{' body '}'
 		{ do ((entry_ret_label, info, live, formals, gc_block, frame), stmts) <-
 		       getCgStmtsEC' $ loopDecls $ do {
 		         (entry_ret_label, info, live) <- $1;
@@ -226,12 +226,12 @@ cmmproc :: { ExtCode }
 		     blks <- code (cgStmtsToBlocks stmts)
 		     code (emitInfoTableAndCode entry_ret_label (CmmInfo gc_block frame info) formals blks) }
 
-	| info maybe_formals_without_kinds ';'
+	| info maybe_formals_without_hints ';'
 		{ do (entry_ret_label, info, live) <- $1;
 		     formals <- sequence $2;
 		     code (emitInfoTableAndCode entry_ret_label (CmmInfo Nothing Nothing info) formals []) }
 
-	| NAME maybe_formals_without_kinds maybe_gc_block maybe_frame '{' body '}'
+	| NAME maybe_formals_without_hints maybe_gc_block maybe_frame '{' body '}'
 		{ do ((formals, gc_block, frame), stmts) <-
 			getCgStmtsEC' $ loopDecls $ do {
 		          formals <- sequence $2;
@@ -256,8 +256,9 @@ info	:: { ExtFCode (CLabel, CmmInfoTable, [Maybe LocalReg]) }
 		{ do prof <- profilingInfo $11 $13
 		     return (mkRtsEntryLabelFS $3,
 			CmmInfoTable prof (fromIntegral $9)
-				     (FunInfo (fromIntegral $5, fromIntegral $7) NoC_SRT (fromIntegral $15) 0
-				      (ArgSpec 0)
+				     (FunInfo (fromIntegral $5, fromIntegral $7) NoC_SRT
+				      0  -- Arity zero
+				      (ArgSpec (fromIntegral $15))
 				      zeroCLit),
 			[]) }
 		-- we leave most of the fields zero here.  This is only used
@@ -269,8 +270,8 @@ info	:: { ExtFCode (CLabel, CmmInfoTable, [Maybe LocalReg]) }
 		{ do prof <- profilingInfo $11 $13
 		     return (mkRtsEntryLabelFS $3,
 			CmmInfoTable prof (fromIntegral $9)
-				     (FunInfo (fromIntegral $5, fromIntegral $7) NoC_SRT (fromIntegral $15) (fromIntegral $17)
-				      (ArgSpec 0)
+				     (FunInfo (fromIntegral $5, fromIntegral $7) NoC_SRT (fromIntegral $17)
+				      (ArgSpec (fromIntegral $15))
 				      zeroCLit),
 			[]) }
 		-- we leave most of the fields zero here.  This is only used
@@ -303,7 +304,7 @@ info	:: { ExtFCode (CLabel, CmmInfoTable, [Maybe LocalReg]) }
 				     (ContInfo [] NoC_SRT),
 			[]) }
 
-	| 'INFO_TABLE_RET' '(' NAME ',' INT ',' formals_without_kinds0 ')'
+	| 'INFO_TABLE_RET' '(' NAME ',' INT ',' formals_without_hints0 ')'
 		-- closure type, live regs
 		{ do live <- sequence (map (liftM Just) $7)
 		     return (mkRtsRetLabelFS $3,
@@ -317,10 +318,7 @@ body	:: { ExtCode }
 	| stmt body			{ do $1; $2 }
 
 decl	:: { ExtCode }
-	: type names ';'		{ mapM_ (newLocal defaultKind $1) $2 }
-	| STRING type names ';'		{% do k <- parseGCKind $1;
-					      return $ mapM_ (newLocal k $2) $3 }
-
+	: type names ';'		{ mapM_ (newLocal $1) $2 }
 	| 'import' names ';'		{ mapM_ newImport $2 }
 	| 'export' names ';'		{ return () }  -- ignore exports
 
@@ -345,9 +343,9 @@ stmt	:: { ExtCode }
 	-- we tweak the syntax to avoid the conflict.  The later
 	-- option is taken here because the other way would require
 	-- multiple levels of expanding and get unwieldy.
-	| maybe_results 'foreign' STRING expr '(' cmm_kind_exprs0 ')' safety vols opt_never_returns ';'
+	| maybe_results 'foreign' STRING expr '(' cmm_hint_exprs0 ')' safety vols opt_never_returns ';'
 		{% foreignCall $3 $1 $4 $6 $9 $8 $10 }
-	| maybe_results 'prim' '%' NAME '(' cmm_kind_exprs0 ')' safety vols ';'
+	| maybe_results 'prim' '%' NAME '(' cmm_hint_exprs0 ')' safety vols ';'
 		{% primCall $1 $4 $6 $9 $8 }
 	-- stmt-level macros, stealing syntax from ordinary C-- function calls.
 	-- Perhaps we ought to use the %%-form?
@@ -446,8 +444,8 @@ expr	:: { ExtFCode CmmExpr }
 	| expr0				{ $1 }
 
 expr0	:: { ExtFCode CmmExpr }
-	: INT   maybe_ty	 { return (CmmLit (CmmInt $1 $2)) }
-	| FLOAT maybe_ty	 { return (CmmLit (CmmFloat $1 $2)) }
+	: INT   maybe_ty	 { return (CmmLit (CmmInt $1 (typeWidth $2))) }
+	| FLOAT maybe_ty	 { return (CmmLit (CmmFloat $1 (typeWidth $2))) }
 	| STRING		 { do s <- code (mkStringCLit $1); 
 				      return (CmmLit s) }
 	| reg			 { $1 }
@@ -457,27 +455,27 @@ expr0	:: { ExtFCode CmmExpr }
 
 
 -- leaving out the type of a literal gives you the native word size in C--
-maybe_ty :: { MachRep }
-	: {- empty -}			{ wordRep }
+maybe_ty :: { CmmType }
+	: {- empty -}			{ bWord }
 	| '::' type			{ $2 }
 
-maybe_actuals :: { [ExtFCode CmmActual] }
+maybe_actuals :: { [ExtFCode HintedCmmActual] }
 	: {- empty -}		{ [] }
-	| '(' cmm_kind_exprs0 ')'	{ $2 }
+	| '(' cmm_hint_exprs0 ')'	{ $2 }
 
-cmm_kind_exprs0 :: { [ExtFCode CmmActual] }
+cmm_hint_exprs0 :: { [ExtFCode HintedCmmActual] }
 	: {- empty -}			{ [] }
-	| cmm_kind_exprs			{ $1 }
+	| cmm_hint_exprs			{ $1 }
 
-cmm_kind_exprs :: { [ExtFCode CmmActual] }
-	: cmm_kind_expr			{ [$1] }
-	| cmm_kind_expr ',' cmm_kind_exprs	{ $1 : $3 }
+cmm_hint_exprs :: { [ExtFCode HintedCmmActual] }
+	: cmm_hint_expr			{ [$1] }
+	| cmm_hint_expr ',' cmm_hint_exprs	{ $1 : $3 }
 
-cmm_kind_expr :: { ExtFCode CmmActual }
-	: expr				{ do e <- $1; return (CmmKinded e (inferCmmKind e)) }
-	| expr STRING			{% do h <- parseCmmKind $2;
+cmm_hint_expr :: { ExtFCode HintedCmmActual }
+	: expr				{ do e <- $1; return (CmmHinted e (inferCmmHint e)) }
+	| expr STRING			{% do h <- parseCmmHint $2;
 					      return $ do
-						e <- $1; return (CmmKinded e h) }
+						e <- $1; return (CmmHinted e h) }
 
 exprs0  :: { [ExtFCode CmmExpr] }
 	: {- empty -}			{ [] }
@@ -491,20 +489,20 @@ reg	:: { ExtFCode CmmExpr }
 	: NAME			{ lookupName $1 }
 	| GLOBALREG		{ return (CmmReg (CmmGlobal $1)) }
 
-maybe_results :: { [ExtFCode CmmFormal] }
+maybe_results :: { [ExtFCode HintedCmmFormal] }
 	: {- empty -}		{ [] }
 	| '(' cmm_formals ')' '='	{ $2 }
 
-cmm_formals :: { [ExtFCode CmmFormal] }
+cmm_formals :: { [ExtFCode HintedCmmFormal] }
 	: cmm_formal			{ [$1] }
 	| cmm_formal ','			{ [$1] }
 	| cmm_formal ',' cmm_formals	{ $1 : $3 }
 
-cmm_formal :: { ExtFCode CmmFormal }
-	: local_lreg			{ do e <- $1; return (CmmKinded e (inferCmmKind (CmmReg (CmmLocal e)))) }
-	| STRING local_lreg		{% do h <- parseCmmKind $1;
+cmm_formal :: { ExtFCode HintedCmmFormal }
+	: local_lreg			{ do e <- $1; return (CmmHinted e (inferCmmHint (CmmReg (CmmLocal e)))) }
+	| STRING local_lreg		{% do h <- parseCmmHint $1;
 					      return $ do
-						e <- $2; return (CmmKinded e h) }
+						e <- $2; return (CmmHinted e h) }
 
 local_lreg :: { ExtFCode LocalReg }
 	: NAME			{ do e <- lookupName $1;
@@ -521,23 +519,21 @@ lreg	:: { ExtFCode CmmReg }
 					other -> pprPanic "CmmParse:" (ftext $1 <> text " not a register") }
 	| GLOBALREG		{ return (CmmGlobal $1) }
 
-maybe_formals_without_kinds :: { [ExtFCode LocalReg] }
+maybe_formals_without_hints :: { [ExtFCode LocalReg] }
 	: {- empty -}		{ [] }
-	| '(' formals_without_kinds0 ')'	{ $2 }
+	| '(' formals_without_hints0 ')'	{ $2 }
 
-formals_without_kinds0 :: { [ExtFCode LocalReg] }
+formals_without_hints0 :: { [ExtFCode LocalReg] }
 	: {- empty -}		{ [] }
-	| formals_without_kinds		{ $1 }
+	| formals_without_hints		{ $1 }
 
-formals_without_kinds :: { [ExtFCode LocalReg] }
-	: formal_without_kind ','		{ [$1] }
-	| formal_without_kind		{ [$1] }
-	| formal_without_kind ',' formals_without_kinds	{ $1 : $3 }
+formals_without_hints :: { [ExtFCode LocalReg] }
+	: formal_without_hint ','		{ [$1] }
+	| formal_without_hint		{ [$1] }
+	| formal_without_hint ',' formals_without_hints	{ $1 : $3 }
 
-formal_without_kind :: { ExtFCode LocalReg }
-	: type NAME		{ newLocal defaultKind $1 $2 }
-	| STRING type NAME	{% do k <- parseGCKind $1;
-				     return $ newLocal k $2 $3 }
+formal_without_hint :: { ExtFCode LocalReg }
+	: type NAME		{ newLocal $1 $2 }
 
 maybe_frame :: { ExtFCode (Maybe UpdateFrame) }
 	: {- empty -}			{ return Nothing }
@@ -550,16 +546,17 @@ maybe_gc_block :: { ExtFCode (Maybe BlockId) }
 	| 'goto' NAME
 		{ do l <- lookupLabel $2; return (Just l) }
 
-type	:: { MachRep }
-	: 'bits8'		{ I8 }
+type	:: { CmmType }
+	: 'bits8'		{ b8 }
 	| typenot8		{ $1 }
 
-typenot8 :: { MachRep }
-	: 'bits16'		{ I16 }
-	| 'bits32'		{ I32 }
-	| 'bits64'		{ I64 }
-	| 'float32'		{ F32 }
-	| 'float64'		{ F64 }
+typenot8 :: { CmmType }
+	: 'bits16'		{ b16 }
+	| 'bits32'		{ b32 }
+	| 'bits64'		{ b64 }
+	| 'float32'		{ f32 }
+	| 'float64'		{ f64 }
+	| 'gcptr'		{ gcWord }
 {
 section :: String -> Section
 section "text"	 = Text
@@ -576,17 +573,17 @@ mkString s = CmmString (map (fromIntegral.ord) s)
 -- argument.  We assume that this is correct: for MachOps that don't have
 -- symmetrical args (e.g. shift ops), the first arg determines the type of
 -- the op.
-mkMachOp :: (MachRep -> MachOp) -> [ExtFCode CmmExpr] -> ExtFCode CmmExpr
+mkMachOp :: (Width -> MachOp) -> [ExtFCode CmmExpr] -> ExtFCode CmmExpr
 mkMachOp fn args = do
   arg_exprs <- sequence args
-  return (CmmMachOp (fn (cmmExprRep (head arg_exprs))) arg_exprs)
+  return (CmmMachOp (fn (typeWidth (cmmExprType (head arg_exprs)))) arg_exprs)
 
 getLit :: CmmExpr -> CmmLit
 getLit (CmmLit l) = l
 getLit (CmmMachOp (MO_S_Neg _) [CmmLit (CmmInt i r)])  = CmmInt (negate i) r
 getLit _ = panic "invalid literal" -- TODO messy failure
 
-nameToMachOp :: FastString -> P (MachRep -> MachOp)
+nameToMachOp :: FastString -> P (Width -> MachOp)
 nameToMachOp name = 
   case lookupUFM machOps name of
 	Nothing -> fail ("unknown primitive " ++ unpackFS name)
@@ -656,24 +653,27 @@ machOps = listToUFM $
 	( "shrl",	MO_U_Shr ),
 	( "shra",	MO_S_Shr ),
 
-	( "lobits8",  flip MO_U_Conv I8  ),
-	( "lobits16", flip MO_U_Conv I16 ),
-	( "lobits32", flip MO_U_Conv I32 ),
-	( "lobits64", flip MO_U_Conv I64 ),
-	( "sx16",     flip MO_S_Conv I16 ),
-	( "sx32",     flip MO_S_Conv I32 ),
-	( "sx64",     flip MO_S_Conv I64 ),
-	( "zx16",     flip MO_U_Conv I16 ),
-	( "zx32",     flip MO_U_Conv I32 ),
-	( "zx64",     flip MO_U_Conv I64 ),
-	( "f2f32",    flip MO_S_Conv F32 ),  -- TODO; rounding mode
-	( "f2f64",    flip MO_S_Conv F64 ),  -- TODO; rounding mode
-	( "f2i8",     flip MO_S_Conv I8 ),
-	( "f2i16",    flip MO_S_Conv I16 ),
-	( "f2i32",    flip MO_S_Conv I32 ),
-	( "f2i64",    flip MO_S_Conv I64 ),
-	( "i2f32",    flip MO_S_Conv F32 ),
-	( "i2f64",    flip MO_S_Conv F64 )
+	( "lobits8",  flip MO_UU_Conv W8  ),
+	( "lobits16", flip MO_UU_Conv W16 ),
+	( "lobits32", flip MO_UU_Conv W32 ),
+	( "lobits64", flip MO_UU_Conv W64 ),
+
+	( "zx16",     flip MO_UU_Conv W16 ),
+	( "zx32",     flip MO_UU_Conv W32 ),
+	( "zx64",     flip MO_UU_Conv W64 ),
+
+	( "sx16",     flip MO_SS_Conv W16 ),
+	( "sx32",     flip MO_SS_Conv W32 ),
+	( "sx64",     flip MO_SS_Conv W64 ),
+
+	( "f2f32",    flip MO_FF_Conv W32 ),  -- TODO; rounding mode
+	( "f2f64",    flip MO_FF_Conv W64 ),  -- TODO; rounding mode
+	( "f2i8",     flip MO_FS_Conv W8 ),
+	( "f2i16",    flip MO_FS_Conv W16 ),
+	( "f2i32",    flip MO_FS_Conv W32 ),
+	( "f2i64",    flip MO_FS_Conv W64 ),
+	( "i2f32",    flip MO_SF_Conv W32 ),
+	( "i2f64",    flip MO_SF_Conv W64 )
 	]
 
 callishMachOps = listToUFM $
@@ -687,32 +687,25 @@ parseSafety "safe"   = return (CmmSafe NoC_SRT)
 parseSafety "unsafe" = return CmmUnsafe
 parseSafety str      = fail ("unrecognised safety: " ++ str)
 
-parseCmmKind :: String -> P CmmKind
-parseCmmKind "ptr"    = return PtrHint
-parseCmmKind "signed" = return SignedHint
-parseCmmKind "float"  = return FloatHint
-parseCmmKind str      = fail ("unrecognised hint: " ++ str)
-
-parseGCKind :: String -> P GCKind
-parseGCKind "ptr"    = return GCKindPtr
-parseGCKind str      = fail ("unrecognized kin: " ++ str)
-
-defaultKind :: GCKind
-defaultKind = GCKindNonPtr
+parseCmmHint :: String -> P ForeignHint
+parseCmmHint "ptr"    = return AddrHint
+parseCmmHint "signed" = return SignedHint
+parseCmmHint str      = fail ("unrecognised hint: " ++ str)
 
 -- labels are always pointers, so we might as well infer the hint
-inferCmmKind :: CmmExpr -> CmmKind
-inferCmmKind (CmmLit (CmmLabel _)) = PtrHint
-inferCmmKind (CmmReg (CmmGlobal g)) | isPtrGlobalReg g = PtrHint
-inferCmmKind _ = NoHint
+inferCmmHint :: CmmExpr -> ForeignHint
+inferCmmHint (CmmLit (CmmLabel _)) = AddrHint
+inferCmmHint (CmmReg (CmmGlobal g)) | isPtrGlobalReg g = AddrHint
+inferCmmHint _ = NoHint
 
-isPtrGlobalReg Sp		= True
-isPtrGlobalReg SpLim		= True
-isPtrGlobalReg Hp		= True
-isPtrGlobalReg HpLim		= True
-isPtrGlobalReg CurrentTSO	= True
-isPtrGlobalReg CurrentNursery	= True
-isPtrGlobalReg _		= False
+isPtrGlobalReg Sp		     = True
+isPtrGlobalReg SpLim		     = True
+isPtrGlobalReg Hp		     = True
+isPtrGlobalReg HpLim		     = True
+isPtrGlobalReg CurrentTSO	     = True
+isPtrGlobalReg CurrentNursery	     = True
+isPtrGlobalReg (VanillaReg _ VGcPtr) = True
+isPtrGlobalReg _		     = False
 
 happyError :: P a
 happyError = srcParseFail
@@ -819,10 +812,10 @@ addVarDecl var expr = EC $ \e s -> return ((var, Var expr):s, ())
 addLabel :: FastString -> BlockId -> ExtCode
 addLabel name block_id = EC $ \e s -> return ((name, Label block_id):s, ())
 
-newLocal :: GCKind -> MachRep -> FastString -> ExtFCode LocalReg
-newLocal kind ty name = do
+newLocal :: CmmType -> FastString -> ExtFCode LocalReg
+newLocal ty name = do
    u <- code newUnique
-   let reg = LocalReg u ty kind
+   let reg = LocalReg u ty
    addVarDecl name (CmmReg (CmmLocal reg))
    return reg
 
@@ -895,9 +888,9 @@ staticClosure cl_label info payload
 
 foreignCall
 	:: String
-	-> [ExtFCode CmmFormal]
+	-> [ExtFCode HintedCmmFormal]
 	-> ExtFCode CmmExpr
-	-> [ExtFCode CmmActual]
+	-> [ExtFCode HintedCmmActual]
 	-> Maybe [GlobalReg]
         -> CmmSafety
         -> CmmReturnInfo
@@ -927,22 +920,22 @@ foreignCall conv_string results_code expr_code args_code vols safety ret
                    (CmmCallee expr' convention) args vols NoC_SRT ret) where
 	        unused = panic "not used by emitForeignCall'"
 
-adjCallTarget :: CCallConv -> CmmExpr -> [CmmKinded CmmExpr] -> CmmExpr
+adjCallTarget :: CCallConv -> CmmExpr -> [CmmHinted CmmExpr] -> CmmExpr
 #ifdef mingw32_TARGET_OS
 -- On Windows, we have to add the '@N' suffix to the label when making
 -- a call with the stdcall calling convention.
 adjCallTarget StdCallConv (CmmLit (CmmLabel lbl)) args
   = CmmLit (CmmLabel (addLabelSize lbl (sum (map size args))))
-  where size (CmmKinded e _) = max wORD_SIZE (machRepByteWidth (cmmExprRep e))
+  where size (CmmHinted e _) = max wORD_SIZE (widthInBytes (typeWidth (cmmExprType e)))
                  -- c.f. CgForeignCall.emitForeignCall
 #endif
 adjCallTarget _ expr _
   = expr
 
 primCall
-	:: [ExtFCode CmmFormal]
+	:: [ExtFCode HintedCmmFormal]
 	-> FastString
-	-> [ExtFCode CmmActual]
+	-> [ExtFCode HintedCmmActual]
 	-> Maybe [GlobalReg]
         -> CmmSafety
         -> P ExtCode
@@ -961,7 +954,7 @@ primCall results_code name args_code vols safety
 		      (CmmPrim p) args vols NoC_SRT CmmMayReturn) where
 		    unused = panic "not used by emitForeignCall'"
 
-doStore :: MachRep -> ExtFCode CmmExpr  -> ExtFCode CmmExpr -> ExtCode
+doStore :: CmmType -> ExtFCode CmmExpr  -> ExtFCode CmmExpr -> ExtCode
 doStore rep addr_code val_code
   = do addr <- addr_code
        val <- val_code
@@ -970,9 +963,11 @@ doStore rep addr_code val_code
 	-- mismatch to be flagged by cmm-lint.  If we don't do this, then
 	-- the store will happen at the wrong type, and the error will not
 	-- be noticed.
+       let val_width = typeWidth (cmmExprType val)
+           rep_width = typeWidth rep
        let coerce_val 
-		| cmmExprRep val /= rep = CmmMachOp (MO_U_Conv rep rep) [val]
-		| otherwise             = val
+		| val_width /= rep_width = CmmMachOp (MO_UU_Conv val_width rep_width) [val]
+		| otherwise              = val
        stmtEC (CmmStore addr coerce_val)
 
 -- Return an unboxed tuple.
@@ -982,7 +977,7 @@ emitRetUT args = do
   (sp, stmts) <- pushUnboxedTuple 0 args
   emitStmts stmts
   when (sp /= 0) $ stmtC (CmmAssign spReg (cmmRegOffW spReg (-sp)))
-  stmtC (CmmJump (entryCode (CmmLoad (cmmRegOffW spReg sp) wordRep)) [])
+  stmtC (CmmJump (entryCode (CmmLoad (cmmRegOffW spReg sp) bWord)) [])
   -- TODO (when using CPS): emitStmt (CmmReturn (map snd args))
 
 -- -----------------------------------------------------------------------------
@@ -1088,9 +1083,9 @@ doSwitch mb_range scrut arms deflt
 initEnv :: Env
 initEnv = listToUFM [
   ( fsLit "SIZEOF_StgHeader", 
-    Var (CmmLit (CmmInt (fromIntegral (fixedHdrSize * wORD_SIZE)) wordRep) )),
+    Var (CmmLit (CmmInt (fromIntegral (fixedHdrSize * wORD_SIZE)) wordWidth) )),
   ( fsLit "SIZEOF_StgInfoTable",
-    Var (CmmLit (CmmInt (fromIntegral stdInfoTableSizeB) wordRep) ))
+    Var (CmmLit (CmmInt (fromIntegral stdInfoTableSizeB) wordWidth) ))
   ]
 
 parseCmmFile :: DynFlags -> FilePath -> IO (Messages, Maybe Cmm)

@@ -188,7 +188,6 @@ Library
         CmmZipUtil
         DFMonad
         Dataflow
-        MachOp
         MkZipCfg
         MkZipCfgCmm
         OptimizationFuel
@@ -221,6 +220,22 @@ Library
         CgTailCall
         CgTicky
         CgUtils
+        StgCmm
+        StgCmmBind
+        StgCmmClosure
+        StgCmmCon
+        StgCmmEnv
+        StgCmmExpr
+        StgCmmForeign
+        StgCmmGran
+        StgCmmHeap
+        StgCmmHpc
+        StgCmmLayout
+        StgCmmMonad
+        StgCmmPrim
+        StgCmmProf
+        StgCmmTicky
+        StgCmmUtils
         ClosureInfo
         CodeGen
         SMRep

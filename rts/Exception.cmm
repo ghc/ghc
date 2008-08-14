@@ -253,7 +253,7 @@ INFO_TABLE_RET(stg_catch_frame, CATCH_FRAME,
 #if defined(PROFILING)
   W_ unused1, W_ unused2,
 #endif
-  W_ unused3, "ptr" W_ unused4)
+  W_ unused3, P_ unused4)
    {
       Sp = Sp + SIZEOF_StgCatchFrame;
       jump %ENTRY_CODE(Sp(SP_OFF));
@@ -315,7 +315,7 @@ section "data" {
   no_break_on_exception: W_[1];
 }
 
-INFO_TABLE_RET(stg_raise_ret, RET_SMALL, "ptr" W_ arg1)
+INFO_TABLE_RET(stg_raise_ret, RET_SMALL, P_ arg1)
 {
   R1 = Sp(1);
   Sp = Sp + WDS(2);

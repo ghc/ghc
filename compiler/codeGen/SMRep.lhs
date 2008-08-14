@@ -24,14 +24,15 @@ module SMRep (
 
 	-- Argument/return representations
 	CgRep(..), nonVoidArg,
-	argMachRep, primRepToCgRep, primRepHint,
+	argMachRep, primRepToCgRep, 
+-- Temp primRepHint, typeHint,
 	isFollowableArg, isVoidArg, 
 	isFloatingArg, is64BitArg,
 	separateByPtrFollowness,
 	cgRepSizeW, cgRepSizeB,
 	retAddrSizeW,
 
-	typeCgRep, idCgRep, tyConCgRep, typeHint,
+	typeCgRep, idCgRep, tyConCgRep, 
 
 	-- Closure repesentation
 	SMRep(..), ClosureType(..),
@@ -45,10 +46,10 @@ module SMRep (
 
 #include "../includes/MachDeps.h"
 
+import CmmExpr	-- CmmType and friends
 import Id
 import Type
 import TyCon
-import MachOp
 import StaticFlags
 import Constants
 import Outputable
@@ -136,12 +137,12 @@ instance Outputable CgRep where
     ppr FloatArg  = ptext (sLit "F_")
     ppr DoubleArg = ptext (sLit "D_")
 
-argMachRep :: CgRep -> MachRep
-argMachRep PtrArg    = wordRep
-argMachRep NonPtrArg = wordRep
-argMachRep LongArg   = I64
-argMachRep FloatArg  = F32
-argMachRep DoubleArg = F64
+argMachRep :: CgRep -> CmmType
+argMachRep PtrArg    = gcWord
+argMachRep NonPtrArg = bWord
+argMachRep LongArg   = b64
+argMachRep FloatArg  = f32
+argMachRep DoubleArg = f64
 argMachRep VoidArg   = panic "argMachRep:VoidRep"
 
 primRepToCgRep :: PrimRep -> CgRep
@@ -155,17 +156,6 @@ primRepToCgRep AddrRep    = NonPtrArg
 primRepToCgRep FloatRep   = FloatArg
 primRepToCgRep DoubleRep  = DoubleArg
 
-primRepHint :: PrimRep -> MachHint
-primRepHint VoidRep	= panic "primRepHint:VoidRep"
-primRepHint PtrRep	= PtrHint
-primRepHint IntRep	= SignedHint
-primRepHint WordRep	= NoHint
-primRepHint Int64Rep	= SignedHint
-primRepHint Word64Rep	= NoHint
-primRepHint AddrRep     = PtrHint -- NB! PtrHint, but NonPtrArg
-primRepHint FloatRep	= FloatHint
-primRepHint DoubleRep	= FloatHint
-
 idCgRep :: Id -> CgRep
 idCgRep x = typeCgRep . idType $ x
 
@@ -174,9 +164,6 @@ tyConCgRep = primRepToCgRep . tyConPrimRep
 
 typeCgRep :: Type -> CgRep
 typeCgRep = primRepToCgRep . typePrimRep 
-
-typeHint :: Type -> MachHint
-typeHint = primRepHint . typePrimRep
 \end{code}
 
 Whether or not the thing is a pointer that the garbage-collector

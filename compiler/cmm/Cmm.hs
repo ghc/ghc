@@ -7,21 +7,21 @@
 -----------------------------------------------------------------------------
 
 module Cmm ( 
-	GenCmm(..), Cmm, RawCmm,
-	GenCmmTop(..), CmmTop, RawCmmTop,
-	ListGraph(..),
+        GenCmm(..), Cmm, RawCmm,
+        GenCmmTop(..), CmmTop, RawCmmTop,
+        ListGraph(..),
         cmmMapGraph, cmmTopMapGraph,
         cmmMapGraphM, cmmTopMapGraphM,
-	CmmInfo(..), UpdateFrame(..),
+        CmmInfo(..), UpdateFrame(..),
         CmmInfoTable(..), ClosureTypeInfo(..), ProfilingInfo(..), ClosureTypeTag,
         GenBasicBlock(..), CmmBasicBlock, blockId, blockStmts, mapBlockStmts,
         CmmReturnInfo(..),
-	CmmStmt(..), CmmActual, CmmActuals, CmmFormal, CmmFormals, CmmKind,
-        CmmFormalsWithoutKinds, CmmFormalWithoutKind,
-        CmmKinded(..),
+        CmmStmt(..), CmmActual, CmmActuals, CmmFormal, CmmFormals, 
+        HintedCmmFormal, HintedCmmFormals, HintedCmmActual, HintedCmmActuals,
         CmmSafety(..),
-	CmmCallTarget(..),
-	CmmStatic(..), Section(..),
+        CmmCallTarget(..), CallishMachOp(..), pprCallishMachOp,
+        ForeignHint(..), CmmHinted(..),
+        CmmStatic(..), Section(..),
         module CmmExpr,
   ) where
 
@@ -29,10 +29,10 @@ module Cmm (
 
 import BlockId
 import CmmExpr
-import MachOp
 import CLabel
 import ForeignCall
 import SMRep
+
 import ClosureInfo
 import Outputable
 import FastString
@@ -46,7 +46,7 @@ import Data.Word
 -- with assembly-language labels.
 
 -----------------------------------------------------------------------------
---		Cmm, CmmTop, CmmBasicBlock
+--  Cmm, CmmTop, CmmBasicBlock
 -----------------------------------------------------------------------------
 
 -- A file is a list of top-level chunks.  These may be arbitrarily
@@ -59,7 +59,7 @@ import Data.Word
 --
 -- We expect there to be two main instances of this type:
 --   (a) C--, i.e. populated with various C-- constructs
---		(Cmm and RawCmm below)
+--       (Cmm and RawCmm below)
 --   (b) Native code, populated with data/instructions
 --
 -- A second family of instances based on ZipCfg is work in progress.
@@ -72,7 +72,7 @@ data GenCmmTop d h g
   = CmmProc	-- A procedure
      h	               -- Extra header such as the info table
      CLabel            -- Used to generate both info & entry labels
-     CmmFormalsWithoutKinds -- Argument locals live on entry (C-- procedure params)
+     CmmFormals		     -- Argument locals live on entry (C-- procedure params)
                        -- XXX Odd that there are no kinds, but there you are ---NR
      g                 -- Control-flow graph for the procedure's code
 
@@ -164,11 +164,11 @@ data CmmInfoTable
 
 data ClosureTypeInfo
   = ConstrInfo ClosureLayout ConstrTag ConstrDescription
-  | FunInfo ClosureLayout C_SRT FunType FunArity ArgDescr SlowEntry
-  | ThunkInfo ClosureLayout C_SRT
+  | FunInfo    ClosureLayout C_SRT FunArity ArgDescr SlowEntry
+  | ThunkInfo  ClosureLayout C_SRT
   | ThunkSelectorInfo SelectorOffset C_SRT
   | ContInfo
-      [Maybe LocalReg]  -- Forced stack parameters
+      [Maybe LocalReg]  -- stack layout
       C_SRT
 
 data CmmReturnInfo = CmmMayReturn
@@ -180,7 +180,6 @@ type ClosureTypeTag = StgHalfWord
 type ClosureLayout = (StgHalfWord, StgHalfWord) -- ptrs, nptrs
 type ConstrTag = StgHalfWord
 type ConstrDescription = CmmLit
-type FunType = StgHalfWord
 type FunArity = StgHalfWord
 type SlowEntry = CmmLit
   -- We would like this to be a CLabel but
@@ -201,19 +200,19 @@ data UpdateFrame =
 -- control to a new function.
 -----------------------------------------------------------------------------
 
-data CmmStmt
+data CmmStmt	-- Old-style
   = CmmNop
   | CmmComment FastString
 
   | CmmAssign CmmReg CmmExpr	 -- Assign to register
 
   | CmmStore CmmExpr CmmExpr     -- Assign to memory location.  Size is
-                                 -- given by cmmExprRep of the rhs.
+                                 -- given by cmmExprType of the rhs.
 
   | CmmCall	 		 -- A call (forign, native or primitive), with 
      CmmCallTarget
-     CmmFormals		 -- zero or more results
-     CmmActuals			 -- zero or more arguments
+     HintedCmmFormals		 -- zero or more results
+     HintedCmmActuals		 -- zero or more arguments
      CmmSafety			 -- whether to build a continuation
      CmmReturnInfo
 
@@ -228,27 +227,27 @@ data CmmStmt
 	-- Undefined outside range, and when there's a Nothing
 
   | CmmJump CmmExpr      -- Jump to another C-- function,
-      CmmActuals         -- with these parameters.
+      HintedCmmActuals         -- with these parameters.  (parameters never used)
 
   | CmmReturn            -- Return from a native C-- function,
-      CmmActuals         -- with these return values.
+      HintedCmmActuals         -- with these return values. (parameters never used)
 
-type CmmKind   = MachHint
-data CmmKinded a = CmmKinded { kindlessCmm :: a, cmmKind :: CmmKind }
-                         deriving (Eq)
-type CmmActual = CmmKinded CmmExpr
-type CmmFormal = CmmKinded LocalReg
+type CmmActual = CmmExpr
+type CmmFormal = LocalReg
 type CmmActuals = [CmmActual]
 type CmmFormals = [CmmFormal]
-type CmmFormalWithoutKind   = LocalReg
-type CmmFormalsWithoutKinds = [CmmFormalWithoutKind]
+
+data CmmHinted a = CmmHinted { hintlessCmm :: a, cmmHint :: ForeignHint }
+	   	 deriving( Eq )
+
+type HintedCmmActuals = [HintedCmmActual]
+type HintedCmmFormals = [HintedCmmFormal]
+type HintedCmmFormal  = CmmHinted CmmFormal
+type HintedCmmActual  = CmmHinted CmmActual
 
 data CmmSafety      = CmmUnsafe | CmmSafe C_SRT
 
 -- | enable us to fold used registers over 'CmmActuals' and 'CmmFormals'
-instance UserOfLocalRegs a => UserOfLocalRegs (CmmKinded a) where
-  foldRegsUsed f set (CmmKinded a _) = foldRegsUsed f set a
-
 instance UserOfLocalRegs CmmStmt where
   foldRegsUsed f set s = stmt s set
     where stmt (CmmNop)                  = id
@@ -267,13 +266,18 @@ instance UserOfLocalRegs CmmCallTarget where
     foldRegsUsed f set (CmmCallee e _) = foldRegsUsed f set e
     foldRegsUsed _ set (CmmPrim {})    = set
 
-instance DefinerOfLocalRegs a => DefinerOfLocalRegs (CmmKinded a) where
-  foldRegsDefd f z (CmmKinded x _) = foldRegsDefd f z x
+instance UserOfSlots CmmCallTarget where
+    foldSlotsUsed f set (CmmCallee e _) = foldSlotsUsed f set e
+    foldSlotsUsed _ set (CmmPrim {})    = set
 
---just look like a tuple, since it was a tuple before
--- ... is that a good idea? --Isaac Dupree
-instance (Outputable a) => Outputable (CmmKinded a) where
-  ppr (CmmKinded a k) = ppr (a, k)
+instance UserOfLocalRegs a => UserOfLocalRegs (CmmHinted a) where
+  foldRegsUsed f set a = foldRegsUsed f set (hintlessCmm a)
+
+instance UserOfSlots a => UserOfSlots (CmmHinted a) where
+  foldSlotsUsed f set a = foldSlotsUsed f set (hintlessCmm a)
+
+instance DefinerOfLocalRegs a => DefinerOfLocalRegs (CmmHinted a) where
+  foldRegsDefd f set a = foldRegsDefd f set (hintlessCmm a)
 
 {-
 Discussion
@@ -332,6 +336,51 @@ data CmmCallTarget
 				-- code by the backend.
   deriving Eq
 
+
+data ForeignHint
+  = NoHint | AddrHint | SignedHint
+  deriving( Eq )
+	-- Used to give extra per-argument or per-result
+	-- information needed by foreign calling conventions
+
+
+-- CallishMachOps tend to be implemented by foreign calls in some backends,
+-- so we separate them out.  In Cmm, these can only occur in a
+-- statement position, in contrast to an ordinary MachOp which can occur
+-- anywhere in an expression.
+data CallishMachOp
+  = MO_F64_Pwr
+  | MO_F64_Sin
+  | MO_F64_Cos
+  | MO_F64_Tan
+  | MO_F64_Sinh
+  | MO_F64_Cosh
+  | MO_F64_Tanh
+  | MO_F64_Asin
+  | MO_F64_Acos
+  | MO_F64_Atan
+  | MO_F64_Log
+  | MO_F64_Exp
+  | MO_F64_Sqrt
+  | MO_F32_Pwr
+  | MO_F32_Sin
+  | MO_F32_Cos
+  | MO_F32_Tan
+  | MO_F32_Sinh
+  | MO_F32_Cosh
+  | MO_F32_Tanh
+  | MO_F32_Asin
+  | MO_F32_Acos
+  | MO_F32_Atan
+  | MO_F32_Log
+  | MO_F32_Exp
+  | MO_F32_Sqrt
+  | MO_WriteBarrier
+  deriving (Eq, Show)
+
+pprCallishMachOp :: CallishMachOp -> SDoc
+pprCallishMachOp mo = text (show mo)
+  
 -----------------------------------------------------------------------------
 --		Static Data
 -----------------------------------------------------------------------------

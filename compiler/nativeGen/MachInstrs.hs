@@ -25,9 +25,6 @@ module MachInstrs (
 #if powerpc_TARGET_ARCH
         condNegate,
 #endif
-#if !powerpc_TARGET_ARCH && !i386_TARGET_ARCH && !x86_64_TARGET_ARCH
-	Size(..), machRepSize,
-#endif
 	RI(..),
 
 #if i386_TARGET_ARCH || x86_64_TARGET_ARCH
@@ -46,7 +43,6 @@ module MachInstrs (
 import BlockId
 import MachRegs
 import Cmm
-import MachOp		( MachRep(..) )
 import CLabel           ( CLabel, pprCLabel )
 import Panic		( panic )
 import Outputable
@@ -162,48 +158,6 @@ condNegate LEU     = GU
 condNegate LTT     = GE
 condNegate LU      = GEU
 condNegate NE      = EQQ
-#endif
-
--- -----------------------------------------------------------------------------
--- Sizes on this architecture
-
--- ToDo: it's not clear to me that we need separate signed-vs-unsigned sizes
--- here.  I've removed them from the x86 version, we'll see what happens --SDM
-
-#if !powerpc_TARGET_ARCH && !i386_TARGET_ARCH && !x86_64_TARGET_ARCH
-data Size
-#if alpha_TARGET_ARCH
-    = B	    -- byte
-    | Bu
---  | W	    -- word (2 bytes): UNUSED
---  | Wu    -- : UNUSED
-    | L	    -- longword (4 bytes)
-    | Q	    -- quadword (8 bytes)
---  | FF    -- VAX F-style floating pt: UNUSED
---  | GF    -- VAX G-style floating pt: UNUSED
---  | DF    -- VAX D-style floating pt: UNUSED
---  | SF    -- IEEE single-precision floating pt: UNUSED
-    | TF    -- IEEE double-precision floating pt
-#endif
-#if sparc_TARGET_ARCH || powerpc_TARGET_ARCH
-    = B     -- byte (signed)
-    | Bu    -- byte (unsigned)
-    | H     -- halfword (signed, 2 bytes)
-    | Hu    -- halfword (unsigned, 2 bytes)
-    | W	    -- word (4 bytes)
-    | F	    -- IEEE single-precision floating pt
-    | DF    -- IEEE single-precision floating pt
-#endif
-  deriving Eq
-
-machRepSize :: MachRep -> Size
-machRepSize I8    = IF_ARCH_alpha(Bu, IF_ARCH_sparc(Bu, ))
-machRepSize I16   = IF_ARCH_alpha(err,IF_ARCH_sparc(Hu, ))
-machRepSize I32   = IF_ARCH_alpha(L,  IF_ARCH_sparc(W,  ))
-machRepSize I64	  = panic "machRepSize: I64"
-machRepSize I128  = panic "machRepSize: I128"
-machRepSize F32   = IF_ARCH_alpha(TF, IF_ARCH_sparc(F, ))
-machRepSize F64   = IF_ARCH_alpha(TF, IF_ARCH_sparc(DF,))
 #endif
 
 -- -----------------------------------------------------------------------------
@@ -412,41 +366,41 @@ bit or 64 bit precision.
 -- data Instr continues...
 
 -- Moves.
-	| MOV	      MachRep Operand Operand
-	| MOVZxL      MachRep Operand Operand -- size is the size of operand 1
-	| MOVSxL      MachRep Operand Operand -- size is the size of operand 1
+	| MOV	      Size Operand Operand
+	| MOVZxL      Size Operand Operand -- size is the size of operand 1
+	| MOVSxL      Size Operand Operand -- size is the size of operand 1
 	-- x86_64 note: plain mov into a 32-bit register always zero-extends
 	-- into the 64-bit reg, in contrast to the 8 and 16-bit movs which
 	-- don't affect the high bits of the register.
 
 -- Load effective address (also a very useful three-operand add instruction :-)
-	| LEA         MachRep Operand Operand
+	| LEA         Size Operand Operand
 
 -- Int Arithmetic.
-	| ADD	      MachRep Operand Operand
-	| ADC	      MachRep Operand Operand
-	| SUB	      MachRep Operand Operand
+	| ADD	      Size Operand Operand
+	| ADC	      Size Operand Operand
+	| SUB	      Size Operand Operand
 
-	| MUL	      MachRep Operand Operand
-	| IMUL	      MachRep Operand Operand	-- signed int mul
-        | IMUL2       MachRep Operand -- %edx:%eax = operand * %eax
+	| MUL	      Size Operand Operand
+	| IMUL	      Size Operand Operand	-- signed int mul
+        | IMUL2       Size Operand -- %edx:%eax = operand * %eax
 
-	| DIV	      MachRep Operand	-- eax := eax:edx/op, edx := eax:edx%op
-	| IDIV	      MachRep Operand	-- ditto, but signed
+	| DIV	      Size Operand	-- eax := eax:edx/op, edx := eax:edx%op
+	| IDIV	      Size Operand	-- ditto, but signed
 
 -- Simple bit-twiddling.
-	| AND	      MachRep Operand Operand
-	| OR	      MachRep Operand Operand
-	| XOR	      MachRep Operand Operand
-	| NOT	      MachRep Operand
-	| NEGI	      MachRep Operand -- NEG instruction (name clash with Cond)
+	| AND	      Size Operand Operand
+	| OR	      Size Operand Operand
+	| XOR	      Size Operand Operand
+	| NOT	      Size Operand
+	| NEGI	      Size Operand -- NEG instruction (name clash with Cond)
 
 -- Shifts (amount may be immediate or %cl only)
-	| SHL	      MachRep Operand{-amount-} Operand
-	| SAR	      MachRep Operand{-amount-} Operand
-	| SHR	      MachRep Operand{-amount-} Operand
+	| SHL	      Size Operand{-amount-} Operand
+	| SAR	      Size Operand{-amount-} Operand
+	| SHR	      Size Operand{-amount-} Operand
 
-        | BT          MachRep Imm Operand
+        | BT          Size Imm Operand
 	| NOP
 
 #if i386_TARGET_ARCH
@@ -458,8 +412,8 @@ bit or 64 bit precision.
         -- and furthermore are constrained to be fp regs only.
         -- IMPORTANT: keep is_G_insn up to date with any changes here
     	| GMOV	      Reg Reg -- src(fpreg), dst(fpreg)
-        | GLD         MachRep AddrMode Reg -- src, dst(fpreg)
-        | GST         MachRep Reg AddrMode -- src(fpreg), dst
+        | GLD         Size AddrMode Reg -- src, dst(fpreg)
+        | GST         Size Reg AddrMode -- src(fpreg), dst
 		      
         | GLDZ        Reg -- dst(fpreg)
         | GLD1        Reg -- dst(fpreg)
@@ -470,10 +424,10 @@ bit or 64 bit precision.
         | GITOF       Reg Reg -- src(intreg), dst(fpreg)
         | GITOD       Reg Reg -- src(intreg), dst(fpreg)
 	
-	| GADD	      MachRep Reg Reg Reg -- src1, src2, dst
-	| GDIV	      MachRep Reg Reg Reg -- src1, src2, dst
-	| GSUB	      MachRep Reg Reg Reg -- src1, src2, dst
-	| GMUL	      MachRep Reg Reg Reg -- src1, src2, dst
+	| GADD	      Size Reg Reg Reg -- src1, src2, dst
+	| GDIV	      Size Reg Reg Reg -- src1, src2, dst
+	| GSUB	      Size Reg Reg Reg -- src1, src2, dst
+	| GMUL	      Size Reg Reg Reg -- src1, src2, dst
 	
 		-- FP compare.  Cond must be `elem` [EQQ, NE, LE, LTT, GE, GTT]
 		-- Compare src1 with src2; set the Zero flag iff the numbers are
@@ -481,12 +435,12 @@ bit or 64 bit precision.
 		-- test the %eflags zero flag regardless of the supplied Cond.
     	| GCMP	      Cond Reg Reg -- src1, src2
 	
-     	| GABS	      MachRep Reg Reg -- src, dst
-    	| GNEG	      MachRep Reg Reg -- src, dst
-    	| GSQRT	      MachRep Reg Reg -- src, dst
-    	| GSIN	      MachRep CLabel CLabel Reg Reg -- src, dst
-    	| GCOS	      MachRep CLabel CLabel Reg Reg -- src, dst
-    	| GTAN	      MachRep CLabel CLabel Reg Reg -- src, dst
+     	| GABS	      Size Reg Reg -- src, dst
+    	| GNEG	      Size Reg Reg -- src, dst
+    	| GSQRT	      Size Reg Reg -- src, dst
+    	| GSIN	      Size CLabel CLabel Reg Reg -- src, dst
+    	| GCOS	      Size CLabel CLabel Reg Reg -- src, dst
+    	| GTAN	      Size CLabel CLabel Reg Reg -- src, dst
 	
         | GFREE         -- do ffree on all x86 regs; an ugly hack
 #endif
@@ -508,22 +462,22 @@ bit or 64 bit precision.
 	-- are  Operand Reg.
 
  	-- SSE2 floating-point division:
-	| FDIV		MachRep Operand Operand   -- divisor, dividend(dst)
+	| FDIV		Size Operand Operand   -- divisor, dividend(dst)
 
 	-- use CMP for comparisons.  ucomiss and ucomisd instructions
 	-- compare single/double prec floating point respectively.
 
-	| SQRT		MachRep Operand Reg	-- src, dst
+	| SQRT		Size Operand Reg	-- src, dst
 #endif
 
 -- Comparison
-	| TEST          MachRep Operand Operand
-	| CMP           MachRep Operand Operand
+	| TEST          Size Operand Operand
+	| CMP           Size Operand Operand
 	| SETCC         Cond Operand
 
 -- Stack Operations.
-	| PUSH          MachRep Operand
-	| POP           MachRep Operand
+	| PUSH          Size Operand
+	| POP           Size Operand
 	-- both unused (SDM):
 	--  | PUSHA
 	--  | POPA
@@ -536,7 +490,7 @@ bit or 64 bit precision.
 	| CALL	      (Either Imm Reg) [Reg]
 
 -- Other things.
-	| CLTD MachRep	 -- sign extend %eax into %edx:%eax
+	| CLTD Size	 -- sign extend %eax into %edx:%eax
 
 	| FETCHGOT    Reg  -- pseudo-insn for ELF position-independent code
                            -- pretty-prints as
@@ -598,8 +552,8 @@ is_G_instr instr
 -- data Instr continues...
 
 -- Loads and stores.
-	      | LD	      MachRep AddrMode Reg -- size, src, dst
-	      | ST	      MachRep Reg AddrMode -- size, src, dst
+	      | LD	      Size AddrMode Reg -- size, src, dst
+	      | ST	      Size Reg AddrMode -- size, src, dst
 
 -- Int Arithmetic.
 	      | ADD	      Bool Bool Reg RI Reg -- x?, cc?, src1, src2, dst
@@ -625,16 +579,16 @@ is_G_instr instr
 
 -- Note that we cheat by treating F{ABS,MOV,NEG} of doubles as single
 -- instructions right up until we spit them out.
-    	      | FABS	      MachRep Reg Reg	   -- src dst
-	      | FADD	      MachRep Reg Reg Reg  -- src1, src2, dst
-    	      | FCMP	      Bool MachRep Reg Reg -- exception?, src1, src2, dst
-	      | FDIV	      MachRep Reg Reg Reg -- src1, src2, dst
-    	      | FMOV	      MachRep Reg Reg     -- src, dst
-	      | FMUL	      MachRep Reg Reg Reg -- src1, src2, dst
-    	      | FNEG	      MachRep Reg Reg     -- src, dst
-    	      | FSQRT	      MachRep Reg Reg     -- src, dst
-	      | FSUB	      MachRep Reg Reg Reg -- src1, src2, dst
-    	      | FxTOy	      MachRep MachRep Reg Reg -- src, dst
+    	      | FABS	      Size Reg Reg	   -- src dst
+	      | FADD	      Size Reg Reg Reg  -- src1, src2, dst
+    	      | FCMP	      Bool Size Reg Reg -- exception?, src1, src2, dst
+	      | FDIV	      Size Reg Reg Reg -- src1, src2, dst
+    	      | FMOV	      Size Reg Reg     -- src, dst
+	      | FMUL	      Size Reg Reg Reg -- src1, src2, dst
+    	      | FNEG	      Size Reg Reg     -- src, dst
+    	      | FSQRT	      Size Reg Reg     -- src, dst
+	      | FSUB	      Size Reg Reg Reg -- src1, src2, dst
+    	      | FxTOy	      Size Size Reg Reg -- src, dst
 
 -- Jumping around.
 	      | BI	      Cond Bool Imm -- cond, annul?, target
@@ -676,16 +630,16 @@ fPair other = pprPanic "fPair(sparc NCG)" (ppr other)
 -- data Instr continues...
 
 -- Loads and stores.
-	      | LD	MachRep Reg AddrMode -- Load size, dst, src
-	      | LA      MachRep Reg AddrMode -- Load arithmetic size, dst, src
-	      | ST	MachRep Reg AddrMode -- Store size, src, dst 
-	      | STU	MachRep Reg AddrMode -- Store with Update size, src, dst 
+	      | LD	Size Reg AddrMode -- Load size, dst, src
+	      | LA      Size Reg AddrMode -- Load arithmetic size, dst, src
+	      | ST	Size Reg AddrMode -- Store size, src, dst 
+	      | STU	Size Reg AddrMode -- Store with Update size, src, dst 
 	      | LIS	Reg Imm -- Load Immediate Shifted dst, src
 	      | LI	Reg Imm -- Load Immediate dst, src
 	      | MR	Reg Reg -- Move Register dst, src -- also for fmr
 	      
-	      | CMP     MachRep Reg RI --- size, src1, src2
-	      | CMPL    MachRep Reg RI --- size, src1, src2
+	      | CMP     Size Reg RI --- size, src1, src2
+	      | CMPL    Size Reg RI --- size, src1, src2
 	      
 	      | BCC     Cond BlockId
 	      | BCCFAR  Cond BlockId
@@ -717,7 +671,7 @@ fPair other = pprPanic "fPair(sparc NCG)" (ppr other)
 	      | XOR	Reg Reg RI -- dst, src1, src2
 	      | XORIS	Reg Reg Imm -- XOR Immediate Shifted dst, src1, src2
 	      
-              | EXTS    MachRep Reg Reg
+              | EXTS    Size Reg Reg
 		  
 	      | NEG	Reg Reg
 	      | NOT	Reg Reg
@@ -729,10 +683,10 @@ fPair other = pprPanic "fPair(sparc NCG)" (ppr other)
         	        -- Rotate Left Word Immediate then AND with Mask
 	      | RLWINM  Reg Reg Int Int Int
 	      
-	      | FADD	MachRep Reg Reg Reg
-	      | FSUB	MachRep Reg Reg Reg
-	      | FMUL	MachRep Reg Reg Reg
-	      | FDIV	MachRep Reg Reg Reg
+	      | FADD	Size Reg Reg Reg
+	      | FSUB	Size Reg Reg Reg
+	      | FMUL	Size Reg Reg Reg
+	      | FDIV	Size Reg Reg Reg
 	      | FNEG	Reg Reg	 -- negate is the same for single and double prec.
 	      
 	      | FCMP	Reg Reg

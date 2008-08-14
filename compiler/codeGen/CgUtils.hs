@@ -20,8 +20,7 @@ module CgUtils (
         emitRODataLits, mkRODataLits,
         emitIf, emitIfThenElse,
 	emitRtsCall, emitRtsCallWithVols, emitRtsCallWithResult,
-	assignNonPtrTemp, newNonPtrTemp,
-	assignPtrTemp, newPtrTemp,
+	assignTemp, newTemp,
 	emitSimultaneously,
 	emitSwitch, emitLitSwitch,
 	tagToClosure,
@@ -47,7 +46,7 @@ module CgUtils (
 	packHalfWordsCLit,
 	blankWord,
 
-	getSRTInfo
+	getSRTInfo, clHasCafRefs
   ) where
 
 #include "HsVersions.h"
@@ -58,13 +57,13 @@ import CgMonad
 import TyCon
 import DataCon
 import Id
+import IdInfo
 import Constants
 import SMRep
 import PprCmm		( {- instances -} )
 import Cmm
 import CLabel
 import CmmUtils
-import MachOp
 import ForeignCall
 import ClosureInfo
 import StgSyn (SRT(..))
@@ -103,24 +102,24 @@ cgLit (MachStr s) = mkByteStringCLit (bytesFS s)
 cgLit other_lit   = return (mkSimpleLit other_lit)
 
 mkSimpleLit :: Literal -> CmmLit
-mkSimpleLit (MachChar	c)    = CmmInt (fromIntegral (ord c)) wordRep
+mkSimpleLit (MachChar	c)    = CmmInt (fromIntegral (ord c)) wordWidth
 mkSimpleLit MachNullAddr      = zeroCLit
-mkSimpleLit (MachInt i)       = CmmInt i wordRep
-mkSimpleLit (MachInt64 i)     = CmmInt i I64
-mkSimpleLit (MachWord i)      = CmmInt i wordRep
-mkSimpleLit (MachWord64 i)    = CmmInt i I64
-mkSimpleLit (MachFloat r)     = CmmFloat r F32
-mkSimpleLit (MachDouble r)    = CmmFloat r F64
+mkSimpleLit (MachInt i)       = CmmInt i wordWidth
+mkSimpleLit (MachInt64 i)     = CmmInt i W64
+mkSimpleLit (MachWord i)      = CmmInt i wordWidth
+mkSimpleLit (MachWord64 i)    = CmmInt i W64
+mkSimpleLit (MachFloat r)     = CmmFloat r W32
+mkSimpleLit (MachDouble r)    = CmmFloat r W64
 mkSimpleLit (MachLabel fs ms) = CmmLabel (mkForeignLabel fs ms is_dyn)
 			      where
 				is_dyn = False	-- ToDo: fix me
 	
 mkLtOp :: Literal -> MachOp
 -- On signed literals we must do a signed comparison
-mkLtOp (MachInt _)    = MO_S_Lt wordRep
-mkLtOp (MachFloat _)  = MO_S_Lt F32
-mkLtOp (MachDouble _) = MO_S_Lt F64
-mkLtOp lit	      = MO_U_Lt (cmmLitRep (mkSimpleLit lit))
+mkLtOp (MachInt _)    = MO_S_Lt wordWidth
+mkLtOp (MachFloat _)  = MO_F_Lt W32
+mkLtOp (MachDouble _) = MO_F_Lt W64
+mkLtOp lit	      = MO_U_Lt (typeWidth (cmmLitType (mkSimpleLit lit)))
 
 
 ---------------------------------------------------
@@ -151,7 +150,7 @@ cmmOffsetLitB = cmmOffsetLit
 cmmOffsetExprW :: CmmExpr -> CmmExpr -> CmmExpr
 -- The second arg is a *word* offset; need to change it to bytes
 cmmOffsetExprW e (CmmLit (CmmInt n _)) = cmmOffsetW e (fromInteger n)
-cmmOffsetExprW e wd_off = cmmIndexExpr wordRep e wd_off
+cmmOffsetExprW e wd_off = cmmIndexExpr wordWidth e wd_off
 
 cmmOffsetW :: CmmExpr -> WordOff -> CmmExpr
 cmmOffsetW e n = cmmOffsetB e (wORD_SIZE * n)
@@ -165,9 +164,8 @@ cmmOffsetLitW lit wd_off = cmmOffsetLitB lit (wORD_SIZE * wd_off)
 cmmLabelOffW :: CLabel -> WordOff -> CmmLit
 cmmLabelOffW lbl wd_off = cmmLabelOffB lbl (wORD_SIZE * wd_off)
 
-cmmLoadIndexW :: CmmExpr -> Int -> CmmExpr
-cmmLoadIndexW base off
-  = CmmLoad (cmmOffsetW base off) wordRep
+cmmLoadIndexW :: CmmExpr -> Int -> CmmType -> CmmExpr
+cmmLoadIndexW base off ty = CmmLoad (cmmOffsetW base off) ty
 
 -----------------------
 cmmNeWord, cmmEqWord, cmmOrWord, cmmAndWord :: CmmExpr -> CmmExpr -> CmmExpr
@@ -184,7 +182,7 @@ cmmSubWord e1 e2 = CmmMachOp mo_wordSub [e1, e2]
 
 cmmNegate :: CmmExpr -> CmmExpr
 cmmNegate (CmmLit (CmmInt n rep)) = CmmLit (CmmInt (-n) rep)
-cmmNegate e			  = CmmMachOp (MO_S_Neg (cmmExprRep e)) [e]
+cmmNegate e			  = CmmMachOp (MO_S_Neg (cmmExprWidth e)) [e]
 
 blankWord :: CmmStatic
 blankWord = CmmUninitialised wORD_SIZE
@@ -244,7 +242,7 @@ dataConTagZ con = dataConTag con - fIRST_TAG
 --	Making literals
 
 mkWordCLit :: StgWord -> CmmLit
-mkWordCLit wd = CmmInt (fromIntegral wd) wordRep
+mkWordCLit wd = CmmInt (fromIntegral wd) wordWidth
 
 packHalfWordsCLit :: (Integral a, Integral b) => a -> b -> CmmLit
 -- Make a single word literal in which the lower_half_word is
@@ -267,18 +265,18 @@ packHalfWordsCLit lower_half_word upper_half_word
 --
 --------------------------------------------------------------------------
 
-addToMem :: MachRep 	-- rep of the counter
+addToMem :: Width 	-- rep of the counter
 	 -> CmmExpr	-- Address
 	 -> Int		-- What to add (a word)
 	 -> CmmStmt
-addToMem rep ptr n = addToMemE rep ptr (CmmLit (CmmInt (toInteger n) rep))
+addToMem width ptr n = addToMemE width ptr (CmmLit (CmmInt (toInteger n) width))
 
-addToMemE :: MachRep 	-- rep of the counter
+addToMemE :: Width 	-- rep of the counter
 	  -> CmmExpr	-- Address
 	  -> CmmExpr	-- What to add (a word-typed expression)
 	  -> CmmStmt
-addToMemE rep ptr n
-  = CmmStore ptr (CmmMachOp (MO_Add rep) [CmmLoad ptr rep, n])
+addToMemE width ptr n
+  = CmmStore ptr (CmmMachOp (MO_Add width) [CmmLoad ptr (cmmBits width), n])
 
 -------------------------------------------------------------------------
 --
@@ -289,9 +287,9 @@ addToMemE rep ptr n
 
 tagToClosure :: TyCon -> CmmExpr -> CmmExpr
 tagToClosure tycon tag
-  = CmmLoad (cmmOffsetExprW closure_tbl tag) wordRep
+  = CmmLoad (cmmOffsetExprW closure_tbl tag) gcWord
   where closure_tbl = CmmLit (CmmLabel lbl)
-	lbl = mkClosureTableLabel (tyConName tycon)
+	lbl = mkClosureTableLabel (tyConName tycon) NoCafRefs
 
 -------------------------------------------------------------------------
 --
@@ -334,24 +332,24 @@ emitIfThenElse cond then_part else_part
        ; labelC join_id
        }
 
-emitRtsCall :: LitString -> [CmmKinded CmmExpr] -> Bool -> Code
+emitRtsCall :: LitString -> [CmmHinted CmmExpr] -> Bool -> Code
 emitRtsCall fun args safe = emitRtsCall' [] fun args Nothing safe
    -- The 'Nothing' says "save all global registers"
 
-emitRtsCallWithVols :: LitString -> [CmmKinded CmmExpr] -> [GlobalReg] -> Bool -> Code
+emitRtsCallWithVols :: LitString -> [CmmHinted CmmExpr] -> [GlobalReg] -> Bool -> Code
 emitRtsCallWithVols fun args vols safe
    = emitRtsCall' [] fun args (Just vols) safe
 
-emitRtsCallWithResult :: LocalReg -> MachHint -> LitString
-	-> [CmmKinded CmmExpr] -> Bool -> Code
+emitRtsCallWithResult :: LocalReg -> ForeignHint -> LitString
+	-> [CmmHinted CmmExpr] -> Bool -> Code
 emitRtsCallWithResult res hint fun args safe
-   = emitRtsCall' [CmmKinded res hint] fun args Nothing safe
+   = emitRtsCall' [CmmHinted res hint] fun args Nothing safe
 
 -- Make a call to an RTS C procedure
 emitRtsCall'
-   :: CmmFormals
+   :: [CmmHinted LocalReg]
    -> LitString
-   -> [CmmKinded CmmExpr]
+   -> [CmmHinted CmmExpr]
    -> Maybe [GlobalReg]
    -> Bool -- True <=> CmmSafe call
    -> Code
@@ -393,7 +391,8 @@ callerSaveVolatileRegs vols = (caller_save, caller_load)
 
     vol_list = case vols of Nothing -> all_of_em; Just regs -> regs
 
-    all_of_em = [ VanillaReg n | n <- [0..mAX_Vanilla_REG] ]
+    all_of_em = [ VanillaReg n VNonGcPtr | n <- [0..mAX_Vanilla_REG] ]
+			-- The VNonGcPtr is a lie, but I don't think it matters
 	     ++ [ FloatReg   n | n <- [0..mAX_Float_REG] ]
 	     ++ [ DoubleReg  n | n <- [0..mAX_Double_REG] ]
 	     ++ [ LongReg    n | n <- [0..mAX_Long_REG] ]
@@ -407,7 +406,7 @@ callerSaveVolatileRegs vols = (caller_save, caller_load)
     callerRestoreGlobalReg reg next
 	| callerSaves reg = 
 		CmmAssign (CmmGlobal reg)
-			  (CmmLoad (get_GlobalReg_addr reg) (globalRegRep reg))
+			  (CmmLoad (get_GlobalReg_addr reg) (globalRegType reg))
 			: next
 	| otherwise = next
 
@@ -423,14 +422,14 @@ callerSaveVolatileRegs vols = (caller_save, caller_load)
 get_GlobalReg_addr              :: GlobalReg -> CmmExpr
 get_GlobalReg_addr BaseReg = regTableOffset 0
 get_GlobalReg_addr mid     = get_Regtable_addr_from_offset 
-				(globalRegRep mid) (baseRegOffset mid)
+				(globalRegType mid) (baseRegOffset mid)
 
 -- Calculate a literal representing an offset into the register table.
 -- Used when we don't have an actual BaseReg to offset from.
 regTableOffset n = 
   CmmLit (CmmLabelOff mkMainCapabilityLabel (oFFSET_Capability_r + n))
 
-get_Regtable_addr_from_offset   :: MachRep -> Int -> CmmExpr
+get_Regtable_addr_from_offset   :: CmmType -> Int -> CmmExpr
 get_Regtable_addr_from_offset rep offset =
 #ifdef REG_Base
   CmmRegOff (CmmGlobal BaseReg) offset
@@ -448,28 +447,28 @@ callerSaves :: GlobalReg -> Bool
 callerSaves BaseReg		= True
 #endif
 #ifdef CALLER_SAVES_R1
-callerSaves (VanillaReg 1)	= True
+callerSaves (VanillaReg 1 _)	= True
 #endif
 #ifdef CALLER_SAVES_R2
-callerSaves (VanillaReg 2)	= True
+callerSaves (VanillaReg 2 _)	= True
 #endif
 #ifdef CALLER_SAVES_R3
-callerSaves (VanillaReg 3)	= True
+callerSaves (VanillaReg 3 _)	= True
 #endif
 #ifdef CALLER_SAVES_R4
-callerSaves (VanillaReg 4)	= True
+callerSaves (VanillaReg 4 _)	= True
 #endif
 #ifdef CALLER_SAVES_R5
-callerSaves (VanillaReg 5)	= True
+callerSaves (VanillaReg 5 _)	= True
 #endif
 #ifdef CALLER_SAVES_R6
-callerSaves (VanillaReg 6)	= True
+callerSaves (VanillaReg 6 _)	= True
 #endif
 #ifdef CALLER_SAVES_R7
-callerSaves (VanillaReg 7)	= True
+callerSaves (VanillaReg 7 _)	= True
 #endif
 #ifdef CALLER_SAVES_R8
-callerSaves (VanillaReg 8)	= True
+callerSaves (VanillaReg 8 _)	= True
 #endif
 #ifdef CALLER_SAVES_F1
 callerSaves (FloatReg 1)	= True
@@ -518,16 +517,16 @@ callerSaves _			= False
 
 baseRegOffset :: GlobalReg -> Int
 
-baseRegOffset (VanillaReg 1)      = oFFSET_StgRegTable_rR1
-baseRegOffset (VanillaReg 2)      = oFFSET_StgRegTable_rR2
-baseRegOffset (VanillaReg 3)      = oFFSET_StgRegTable_rR3
-baseRegOffset (VanillaReg 4)      = oFFSET_StgRegTable_rR4
-baseRegOffset (VanillaReg 5)      = oFFSET_StgRegTable_rR5
-baseRegOffset (VanillaReg 6)      = oFFSET_StgRegTable_rR6
-baseRegOffset (VanillaReg 7)      = oFFSET_StgRegTable_rR7
-baseRegOffset (VanillaReg 8)      = oFFSET_StgRegTable_rR8
-baseRegOffset (VanillaReg 9)      = oFFSET_StgRegTable_rR9
-baseRegOffset (VanillaReg 10)     = oFFSET_StgRegTable_rR10
+baseRegOffset (VanillaReg 1 _)    = oFFSET_StgRegTable_rR1
+baseRegOffset (VanillaReg 2 _)    = oFFSET_StgRegTable_rR2
+baseRegOffset (VanillaReg 3 _)    = oFFSET_StgRegTable_rR3
+baseRegOffset (VanillaReg 4 _)    = oFFSET_StgRegTable_rR4
+baseRegOffset (VanillaReg 5 _)    = oFFSET_StgRegTable_rR5
+baseRegOffset (VanillaReg 6 _)    = oFFSET_StgRegTable_rR6
+baseRegOffset (VanillaReg 7 _)    = oFFSET_StgRegTable_rR7
+baseRegOffset (VanillaReg 8 _)    = oFFSET_StgRegTable_rR8
+baseRegOffset (VanillaReg 9 _)    = oFFSET_StgRegTable_rR9
+baseRegOffset (VanillaReg 10 _)   = oFFSET_StgRegTable_rR10
 baseRegOffset (FloatReg  1)       = oFFSET_StgRegTable_rF1
 baseRegOffset (FloatReg  2)       = oFFSET_StgRegTable_rF2
 baseRegOffset (FloatReg  3)       = oFFSET_StgRegTable_rF3
@@ -565,15 +564,15 @@ mkDataLits :: CLabel -> [CmmLit] -> GenCmmTop CmmStatic info graph
 mkDataLits lbl lits
   = CmmData Data (CmmDataLabel lbl : map CmmStaticLit lits)
 
-emitRODataLits :: CLabel -> [CmmLit] -> Code
+emitRODataLits :: String -> CLabel -> [CmmLit] -> Code
 -- Emit a read-only data block
-emitRODataLits lbl lits
+emitRODataLits caller lbl lits
   = emitData section (CmmDataLabel lbl : map CmmStaticLit lits)
-  where section | any needsRelocation lits = RelocatableReadOnlyData
-                | otherwise                = ReadOnlyData
-        needsRelocation (CmmLabel _)      = True
-        needsRelocation (CmmLabelOff _ _) = True
-        needsRelocation _                 = False
+    where section | any needsRelocation lits = RelocatableReadOnlyData
+                  | otherwise                = ReadOnlyData
+          needsRelocation (CmmLabel _)      = True
+          needsRelocation (CmmLabelOff _ _) = True
+          needsRelocation _                 = False
 
 mkRODataLits :: CLabel -> [CmmLit] -> GenCmmTop CmmStatic info graph
 mkRODataLits lbl lits
@@ -602,30 +601,17 @@ mkByteStringCLit bytes
 --
 -------------------------------------------------------------------------
 
-assignNonPtrTemp :: CmmExpr -> FCode CmmExpr
+assignTemp :: CmmExpr -> FCode CmmExpr
 -- For a non-trivial expression, e, create a local
 -- variable and assign the expression to it
-assignNonPtrTemp e 
+assignTemp e 
   | isTrivialCmmExpr e = return e
-  | otherwise 	       = do { reg <- newNonPtrTemp (cmmExprRep e) 
+  | otherwise 	       = do { reg <- newTemp (cmmExprType e) 
 			    ; stmtC (CmmAssign (CmmLocal reg) e)
 			    ; return (CmmReg (CmmLocal reg)) }
 
-assignPtrTemp :: CmmExpr -> FCode CmmExpr
--- For a non-trivial expression, e, create a local
--- variable and assign the expression to it
-assignPtrTemp e 
-  | isTrivialCmmExpr e = return e
-  | otherwise 	       = do { reg <- newPtrTemp (cmmExprRep e) 
-			    ; stmtC (CmmAssign (CmmLocal reg) e)
-			    ; return (CmmReg (CmmLocal reg)) }
-
-newNonPtrTemp :: MachRep -> FCode LocalReg
-newNonPtrTemp rep = do { uniq <- newUnique; return (LocalReg uniq rep GCKindNonPtr) }
-
-newPtrTemp :: MachRep -> FCode LocalReg
-newPtrTemp rep = do { uniq <- newUnique; return (LocalReg uniq rep GCKindPtr) }
-
+newTemp :: CmmType -> FCode LocalReg
+newTemp rep = do { uniq <- newUnique; return (LocalReg uniq rep) }
 
 -------------------------------------------------------------------------
 --
@@ -727,7 +713,7 @@ mk_switch tag_expr branches mb_deflt lo_tag hi_tag via_C
 
   -- if we can knock off a bunch of default cases with one if, then do so
   | Just deflt <- mb_deflt, (lowest_branch - lo_tag) >= n_branches
-  = do { (assign_tag, tag_expr') <- assignNonPtrTemp' tag_expr
+  = do { (assign_tag, tag_expr') <- assignTemp' tag_expr
        ; let cond = cmmULtWord tag_expr' (CmmLit (mkIntCLit lowest_branch))
 	     branch = CmmCondBranch cond deflt
        ; stmts <- mk_switch tag_expr' branches mb_deflt 
@@ -736,7 +722,7 @@ mk_switch tag_expr branches mb_deflt lo_tag hi_tag via_C
        }
 
   | Just deflt <- mb_deflt, (hi_tag - highest_branch) >= n_branches
-  = do { (assign_tag, tag_expr') <- assignNonPtrTemp' tag_expr
+  = do { (assign_tag, tag_expr') <- assignTemp' tag_expr
        ; let cond = cmmUGtWord tag_expr' (CmmLit (mkIntCLit highest_branch))
 	     branch = CmmCondBranch cond deflt
        ; stmts <- mk_switch tag_expr' branches mb_deflt 
@@ -745,7 +731,7 @@ mk_switch tag_expr branches mb_deflt lo_tag hi_tag via_C
        }
 
   | otherwise	-- Use an if-tree
-  = do	{ (assign_tag, tag_expr') <- assignNonPtrTemp' tag_expr
+  = do	{ (assign_tag, tag_expr') <- assignTemp' tag_expr
 		-- To avoid duplication
 	; lo_stmts <- mk_switch tag_expr' lo_branches mb_deflt 
 				lo_tag (mid_tag-1) via_C
@@ -810,9 +796,9 @@ mk_switch tag_expr branches mb_deflt lo_tag hi_tag via_C
     is_lo (t,_) = t < mid_tag
 
 
-assignNonPtrTemp' e
+assignTemp' e
   | isTrivialCmmExpr e = return (CmmNop, e)
-  | otherwise          = do { reg <- newNonPtrTemp (cmmExprRep e)
+  | otherwise          = do { reg <- newTemp (cmmExprType e)
                             ; return (CmmAssign (CmmLocal reg) e, CmmReg (CmmLocal reg)) }
 
 emitLitSwitch :: CmmExpr			-- Tag to switch on
@@ -828,7 +814,7 @@ emitLitSwitch :: CmmExpr			-- Tag to switch on
 emitLitSwitch scrut [] deflt 
   = emitCgStmts deflt
 emitLitSwitch scrut branches deflt_blk
-  = do	{ scrut' <- assignNonPtrTemp scrut
+  = do	{ scrut' <- assignTemp scrut
 	; deflt_blk_id <- forkCgStmts deflt_blk
 	; blk <- mk_lit_switch scrut' deflt_blk_id (sortLe le branches)
 	; emitCgStmts blk }
@@ -842,8 +828,9 @@ mk_lit_switch scrut deflt_blk_id [(lit,blk)]
   = return (consCgStmt if_stmt blk)
   where
     cmm_lit = mkSimpleLit lit
-    rep     = cmmLitRep cmm_lit
-    cond    = CmmMachOp (MO_Ne rep) [scrut, CmmLit cmm_lit]
+    rep     = cmmLitType cmm_lit
+    ne      = if isFloatType rep then MO_F_Ne else MO_Ne
+    cond    = CmmMachOp (ne (typeWidth rep)) [scrut, CmmLit cmm_lit]
     if_stmt = CmmCondBranch cond deflt_blk_id
 
 mk_lit_switch scrut deflt_blk_id branches
@@ -920,11 +907,11 @@ doSimultaneously1 vertices
 		; stmtC from_temp }
 
 	go_via_temp (CmmAssign dest src)
-	  = do	{ tmp <- newNonPtrTemp (cmmRegRep dest) -- TODO FIXME NOW if the pair of assignments move across a call this will be wrong
+	  = do	{ tmp <- newTemp (cmmRegType dest) -- TODO FIXME NOW if the pair of assignments move across a call this will be wrong
 		; stmtC (CmmAssign (CmmLocal tmp) src)
 		; return (CmmAssign dest (CmmReg (CmmLocal tmp))) }
 	go_via_temp (CmmStore dest src)
-	  = do	{ tmp <- newNonPtrTemp (cmmExprRep src) -- TODO FIXME NOW if the pair of assignemnts move across a call this will be wrong
+	  = do	{ tmp <- newTemp (cmmExprType src) -- TODO FIXME NOW if the pair of assignemnts move across a call this will be wrong
 		; stmtC (CmmAssign (CmmLocal tmp) src)
 		; return (CmmStore dest (CmmReg (CmmLocal tmp))) }
     in
@@ -932,7 +919,7 @@ doSimultaneously1 vertices
 
 mustFollow :: CmmStmt -> CmmStmt -> Bool
 CmmAssign reg _  `mustFollow` stmt = anySrc (reg `regUsedIn`) stmt
-CmmStore loc e   `mustFollow` stmt = anySrc (locUsedIn loc (cmmExprRep e)) stmt
+CmmStore loc e   `mustFollow` stmt = anySrc (locUsedIn loc (cmmExprType e)) stmt
 CmmNop           `mustFollow` stmt = False
 CmmComment _     `mustFollow` stmt = False
 
@@ -952,7 +939,7 @@ reg `regUsedIn` CmmReg reg' 	 = reg == reg'
 reg `regUsedIn` CmmRegOff reg' _ = reg == reg'
 reg `regUsedIn` CmmMachOp _ es   = any (reg `regUsedIn`) es
 
-locUsedIn :: CmmExpr -> MachRep -> CmmExpr -> Bool
+locUsedIn :: CmmExpr -> CmmType -> CmmExpr -> Bool
 -- (locUsedIn a r e) checks whether writing to r[a] could affect the value of
 -- 'e'.  Returns True if it's not sure.
 locUsedIn loc rep (CmmLit _) 	     = False
@@ -961,7 +948,7 @@ locUsedIn loc rep (CmmReg reg')      = False
 locUsedIn loc rep (CmmRegOff reg' _) = False
 locUsedIn loc rep (CmmMachOp _ es)   = any (locUsedIn loc rep) es
 
-possiblySameLoc :: CmmExpr -> MachRep -> CmmExpr -> MachRep -> Bool
+possiblySameLoc :: CmmExpr -> CmmType -> CmmExpr -> CmmType -> Bool
 -- Assumes that distinct registers (eg Hp, Sp) do not 
 -- point to the same location, nor any offset thereof.
 possiblySameLoc (CmmReg r1)       rep1 (CmmReg r2)      rep2  = r1==r2
@@ -970,8 +957,8 @@ possiblySameLoc (CmmRegOff r1 0)  rep1 (CmmReg r2)      rep2  = r1==r2
 possiblySameLoc (CmmRegOff r1 start1) rep1 (CmmRegOff r2 start2) rep2 
   = r1==r2 && end1 > start2 && end2 > start1
   where
-    end1 = start1 + machRepByteWidth rep1
-    end2 = start2 + machRepByteWidth rep2
+    end1 = start1 + widthInBytes (typeWidth rep1)
+    end2 = start2 + widthInBytes (typeWidth rep2)
 
 possiblySameLoc l1 rep1 (CmmLit _) rep2 = False
 possiblySameLoc l1 rep1 l2	   rep2 = True	-- Conservative
@@ -999,7 +986,7 @@ getSRTInfo = do
       | len > hALF_WORD_SIZE_IN_BITS || bmp == [fromIntegral srt_escape]
       -> do id <- newUnique
             let srt_desc_lbl = mkLargeSRTLabel id
-	    emitRODataLits srt_desc_lbl
+	    emitRODataLits "getSRTInfo" srt_desc_lbl
              ( cmmLabelOffW srt_lbl off
 	       : mkWordCLit (fromIntegral len)
 	       : map mkWordCLit bmp)
@@ -1011,3 +998,9 @@ getSRTInfo = do
 		-- The fromIntegral converts to StgHalfWord
 
 srt_escape = (-1) :: StgHalfWord
+
+clHasCafRefs :: ClosureInfo -> CafInfo
+clHasCafRefs (ClosureInfo {closureSRT = srt}) = 
+  case srt of NoC_SRT -> NoCafRefs
+              _       -> MayHaveCafRefs
+clHasCafRefs (ConInfo {}) = NoCafRefs

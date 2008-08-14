@@ -7,7 +7,6 @@ module DFMonad
 
     , DFM, runDFM, liftToDFM
     , markGraphRewritten, graphWasRewritten
-    , freshBlockId
     , module OptimizationFuel
     )
 where
@@ -194,9 +193,6 @@ graphWasRewritten :: DFM f ChangeFlag
 graphWasRewritten = DFM' f
     where f _ s = return (df_rewritten s, s)
                     
-freshBlockId :: String -> DFM f BlockId
-freshBlockId _s = getUniqueM >>= return . BlockId
-
 instance Monad m => Monad (DFM' m f) where
   DFM' f >>= k = DFM' (\l s -> do (a, s') <- f l s
                                   let DFM' f' = k a in f' l s')

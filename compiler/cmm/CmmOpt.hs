@@ -25,7 +25,6 @@ import Cmm
 import CmmExpr
 import CmmUtils
 import CLabel
-import MachOp
 import StaticFlags
 
 import UniqFM
@@ -100,7 +99,7 @@ cmmMiniInline blocks = map do_inline blocks
 
 cmmMiniInlineStmts :: UniqFM Int -> [CmmStmt] -> [CmmStmt]
 cmmMiniInlineStmts uses [] = []
-cmmMiniInlineStmts uses (stmt@(CmmAssign (CmmLocal (LocalReg u _ _)) expr) : stmts)
+cmmMiniInlineStmts uses (stmt@(CmmAssign (CmmLocal (LocalReg u _)) expr) : stmts)
         -- not used at all: just discard this assignment
   | Nothing <- lookupUFM uses u
   = cmmMiniInlineStmts uses stmts
@@ -121,7 +120,7 @@ cmmMiniInlineStmts uses (stmt:stmts)
 -- Try to inline a temporary assignment.  We can skip over assignments to
 -- other tempoararies, because we know that expressions aren't side-effecting
 -- and temporaries are single-assignment.
-lookForInline u expr (stmt@(CmmAssign (CmmLocal (LocalReg u' _ _)) rhs) : rest)
+lookForInline u expr (stmt@(CmmAssign (CmmLocal (LocalReg u' _)) rhs) : rest)
   | u /= u' 
   = case lookupUFM (countUses rhs) u of
 	Just 1 -> Just (inlineStmt u expr stmt : rest)
@@ -155,19 +154,21 @@ inlineStmt u a (CmmCall target regs es srt ret)
    = CmmCall (infn target) regs es' srt ret
    where infn (CmmCallee fn cconv) = CmmCallee fn cconv
 	 infn (CmmPrim p) = CmmPrim p
-	 es' = [ (CmmKinded (inlineExpr u a e) hint) | (CmmKinded e hint) <- es ]
+	 es' = [ (CmmHinted (inlineExpr u a e) hint) | (CmmHinted e hint) <- es ]
 inlineStmt u a (CmmCondBranch e d) = CmmCondBranch (inlineExpr u a e) d
 inlineStmt u a (CmmSwitch e d) = CmmSwitch (inlineExpr u a e) d
 inlineStmt u a (CmmJump e d) = CmmJump (inlineExpr u a e) d
 inlineStmt u a other_stmt = other_stmt
 
 inlineExpr :: Unique -> CmmExpr -> CmmExpr -> CmmExpr
-inlineExpr u a e@(CmmReg (CmmLocal (LocalReg u' _ _)))
+inlineExpr u a e@(CmmReg (CmmLocal (LocalReg u' _)))
   | u == u' = a
   | otherwise = e
-inlineExpr u a e@(CmmRegOff (CmmLocal (LocalReg u' rep _)) off)
-  | u == u' = CmmMachOp (MO_Add rep) [a, CmmLit (CmmInt (fromIntegral off) rep)]
+inlineExpr u a e@(CmmRegOff (CmmLocal (LocalReg u' rep)) off)
+  | u == u' = CmmMachOp (MO_Add width) [a, CmmLit (CmmInt (fromIntegral off) width)]
   | otherwise = e
+  where
+    width = typeWidth rep
 inlineExpr u a (CmmLoad e rep) = CmmLoad (inlineExpr u a e) rep
 inlineExpr u a (CmmMachOp op es) = CmmMachOp op (map (inlineExpr u a) es)
 inlineExpr u a other_expr = other_expr
@@ -192,17 +193,16 @@ cmmMachOpFold op arg@[CmmLit (CmmInt x rep)]
 	-- "from" type, in order to truncate to the correct size.
 	-- The final narrow/widen to the destination type
 	-- is implicit in the CmmLit.
-      MO_S_Conv from to
-	   | isFloatingRep to -> CmmLit (CmmFloat (fromInteger x) to)
-	   | otherwise        -> CmmLit (CmmInt (narrowS from x) to)
-      MO_U_Conv from to -> CmmLit (CmmInt (narrowU from x) to)
+      MO_SF_Conv from to -> CmmLit (CmmFloat (fromInteger x) to)
+      MO_SS_Conv from to -> CmmLit (CmmInt (narrowS from x) to)
+      MO_UU_Conv from to -> CmmLit (CmmInt (narrowU from x) to)
 
       _ -> panic "cmmMachOpFold: unknown unary op"
 
 
 -- Eliminate conversion NOPs
-cmmMachOpFold (MO_S_Conv rep1 rep2) [x] | rep1 == rep2 = x
-cmmMachOpFold (MO_U_Conv rep1 rep2) [x] | rep1 == rep2 = x
+cmmMachOpFold (MO_SS_Conv rep1 rep2) [x] | rep1 == rep2 = x
+cmmMachOpFold (MO_UU_Conv rep1 rep2) [x] | rep1 == rep2 = x
 
 -- Eliminate nested conversions where possible
 cmmMachOpFold conv_outer args@[CmmMachOp conv_inner [x]]
@@ -221,20 +221,18 @@ cmmMachOpFold conv_outer args@[CmmMachOp conv_inner [x]]
 	    cmmMachOpFold (intconv signed1 rep1 rep3) [x]
 	-- Nested narrowings: collapse
 	| rep1 > rep2 && rep2 > rep3 ->
-	    cmmMachOpFold (MO_U_Conv rep1 rep3) [x]
+	    cmmMachOpFold (MO_UU_Conv rep1 rep3) [x]
 	| otherwise ->
 	    CmmMachOp conv_outer args
   where
-	isIntConversion (MO_U_Conv rep1 rep2) 
-	  | not (isFloatingRep rep1) && not (isFloatingRep rep2) 
+	isIntConversion (MO_UU_Conv rep1 rep2) 
 	  = Just (rep1,rep2,False)
-	isIntConversion (MO_S_Conv rep1 rep2)
-	  | not (isFloatingRep rep1) && not (isFloatingRep rep2) 
+	isIntConversion (MO_SS_Conv rep1 rep2)
 	  = Just (rep1,rep2,True)
 	isIntConversion _ = Nothing
 
-	intconv True  = MO_S_Conv
-	intconv False = MO_U_Conv
+	intconv True  = MO_SS_Conv
+	intconv False = MO_UU_Conv
 
 -- ToDo: a narrow of a load can be collapsed into a narrow load, right?
 -- but what if the architecture only supports word-sized loads, should
@@ -244,18 +242,18 @@ cmmMachOpFold mop args@[CmmLit (CmmInt x xrep), CmmLit (CmmInt y _)]
   = case mop of
 	-- for comparisons: don't forget to narrow the arguments before
 	-- comparing, since they might be out of range.
-    	MO_Eq r   -> CmmLit (CmmInt (if x_u == y_u then 1 else 0) wordRep)
-    	MO_Ne r   -> CmmLit (CmmInt (if x_u /= y_u then 1 else 0) wordRep)
+    	MO_Eq r   -> CmmLit (CmmInt (if x_u == y_u then 1 else 0) wordWidth)
+    	MO_Ne r   -> CmmLit (CmmInt (if x_u /= y_u then 1 else 0) wordWidth)
 
-    	MO_U_Gt r -> CmmLit (CmmInt (if x_u >  y_u then 1 else 0) wordRep)
-    	MO_U_Ge r -> CmmLit (CmmInt (if x_u >= y_u then 1 else 0) wordRep)
-    	MO_U_Lt r -> CmmLit (CmmInt (if x_u <  y_u then 1 else 0) wordRep)
-    	MO_U_Le r -> CmmLit (CmmInt (if x_u <= y_u then 1 else 0) wordRep)
+    	MO_U_Gt r -> CmmLit (CmmInt (if x_u >  y_u then 1 else 0) wordWidth)
+    	MO_U_Ge r -> CmmLit (CmmInt (if x_u >= y_u then 1 else 0) wordWidth)
+    	MO_U_Lt r -> CmmLit (CmmInt (if x_u <  y_u then 1 else 0) wordWidth)
+    	MO_U_Le r -> CmmLit (CmmInt (if x_u <= y_u then 1 else 0) wordWidth)
 
-    	MO_S_Gt r -> CmmLit (CmmInt (if x_s >  y_s then 1 else 0) wordRep) 
-    	MO_S_Ge r -> CmmLit (CmmInt (if x_s >= y_s then 1 else 0) wordRep)
-    	MO_S_Lt r -> CmmLit (CmmInt (if x_s <  y_s then 1 else 0) wordRep)
-    	MO_S_Le r -> CmmLit (CmmInt (if x_s <= y_s then 1 else 0) wordRep)
+    	MO_S_Gt r -> CmmLit (CmmInt (if x_s >  y_s then 1 else 0) wordWidth) 
+    	MO_S_Ge r -> CmmLit (CmmInt (if x_s >= y_s then 1 else 0) wordWidth)
+    	MO_S_Lt r -> CmmLit (CmmInt (if x_s <  y_s then 1 else 0) wordWidth)
+    	MO_S_Le r -> CmmLit (CmmInt (if x_s <= y_s then 1 else 0) wordWidth)
 
     	MO_Add r -> CmmLit (CmmInt (x + y) r)
     	MO_Sub r -> CmmLit (CmmInt (x - y) r)
@@ -350,12 +348,13 @@ cmmMachOpFold cmp [CmmMachOp conv [x], CmmLit (CmmInt i _)]
         -- then we can do the comparison at the smaller size
   = cmmMachOpFold narrow_cmp [x, CmmLit (CmmInt i rep)]
  where
-    maybe_conversion (MO_U_Conv from to)
+    maybe_conversion (MO_UU_Conv from to)
         | to > from
         = Just (from, False, narrowU)
-    maybe_conversion (MO_S_Conv from to)
-        | to > from, not (isFloatingRep from)
+    maybe_conversion (MO_SS_Conv from to)
+        | to > from
         = Just (from, True, narrowS)
+
         -- don't attempt to apply this optimisation when the source
         -- is a float; see #1916
     maybe_conversion _ = Nothing
@@ -397,10 +396,10 @@ cmmMachOpFold mop args@[x, y@(CmmLit (CmmInt 0 _))]
 	MO_Eq    r | Just x' <- maybeInvertCmmExpr x -> x'
 	MO_U_Gt  r | isComparisonExpr x -> x
 	MO_S_Gt  r | isComparisonExpr x -> x
-	MO_U_Lt  r | isComparisonExpr x -> CmmLit (CmmInt 0 wordRep)
-	MO_S_Lt  r | isComparisonExpr x -> CmmLit (CmmInt 0 wordRep)
-	MO_U_Ge  r | isComparisonExpr x -> CmmLit (CmmInt 1 wordRep)
-	MO_S_Ge  r | isComparisonExpr x -> CmmLit (CmmInt 1 wordRep)
+	MO_U_Lt  r | isComparisonExpr x -> CmmLit (CmmInt 0 wordWidth)
+	MO_S_Lt  r | isComparisonExpr x -> CmmLit (CmmInt 0 wordWidth)
+	MO_U_Ge  r | isComparisonExpr x -> CmmLit (CmmInt 1 wordWidth)
+	MO_S_Ge  r | isComparisonExpr x -> CmmLit (CmmInt 1 wordWidth)
 	MO_U_Le  r | Just x' <- maybeInvertCmmExpr x -> x'
 	MO_S_Le  r | Just x' <- maybeInvertCmmExpr x -> x'
     	other    -> CmmMachOp mop args
@@ -416,10 +415,10 @@ cmmMachOpFold mop args@[x, y@(CmmLit (CmmInt 1 rep))]
 	MO_Eq    r | isComparisonExpr x -> x
 	MO_U_Lt  r | Just x' <- maybeInvertCmmExpr x -> x'
 	MO_S_Lt  r | Just x' <- maybeInvertCmmExpr x -> x'
-	MO_U_Gt  r | isComparisonExpr x -> CmmLit (CmmInt 0 wordRep)
-	MO_S_Gt  r | isComparisonExpr x -> CmmLit (CmmInt 0 wordRep)
-	MO_U_Le  r | isComparisonExpr x -> CmmLit (CmmInt 1 wordRep)
-	MO_S_Le  r | isComparisonExpr x -> CmmLit (CmmInt 1 wordRep)
+	MO_U_Gt  r | isComparisonExpr x -> CmmLit (CmmInt 0 wordWidth)
+	MO_S_Gt  r | isComparisonExpr x -> CmmLit (CmmInt 0 wordWidth)
+	MO_U_Le  r | isComparisonExpr x -> CmmLit (CmmInt 1 wordWidth)
+	MO_S_Le  r | isComparisonExpr x -> CmmLit (CmmInt 1 wordWidth)
 	MO_U_Ge  r | isComparisonExpr x -> x
 	MO_S_Ge  r | isComparisonExpr x -> x
     	other       -> CmmMachOp mop args
@@ -451,7 +450,7 @@ cmmMachOpFold mop args@[x, y@(CmmLit (CmmInt n _))]
 		--      x1 = x >> word_size-1  (unsigned)
 		--      return = (x + x1) >>= log2(divisor)
 		let 
-		    bits = fromIntegral (machRepBitWidth rep) - 1
+		    bits = fromIntegral (widthInBits rep) - 1
 		    shr = if p == 1 then MO_U_Shr rep else MO_S_Shr rep
 		    x1 = CmmMachOp shr [x, CmmLit (CmmInt bits rep)]
 		    x2 = if p == 1 then x1 else
@@ -503,18 +502,18 @@ exactLog2 x_
 -- -----------------------------------------------------------------------------
 -- widening / narrowing
 
-narrowU :: MachRep -> Integer -> Integer
-narrowU I8  x = fromIntegral (fromIntegral x :: Word8)
-narrowU I16 x = fromIntegral (fromIntegral x :: Word16)
-narrowU I32 x = fromIntegral (fromIntegral x :: Word32)
-narrowU I64 x = fromIntegral (fromIntegral x :: Word64)
+narrowU :: Width -> Integer -> Integer
+narrowU W8  x = fromIntegral (fromIntegral x :: Word8)
+narrowU W16 x = fromIntegral (fromIntegral x :: Word16)
+narrowU W32 x = fromIntegral (fromIntegral x :: Word32)
+narrowU W64 x = fromIntegral (fromIntegral x :: Word64)
 narrowU _ _ = panic "narrowTo"
 
-narrowS :: MachRep -> Integer -> Integer
-narrowS I8  x = fromIntegral (fromIntegral x :: Int8)
-narrowS I16 x = fromIntegral (fromIntegral x :: Int16)
-narrowS I32 x = fromIntegral (fromIntegral x :: Int32)
-narrowS I64 x = fromIntegral (fromIntegral x :: Int64)
+narrowS :: Width -> Integer -> Integer
+narrowS W8  x = fromIntegral (fromIntegral x :: Int8)
+narrowS W16 x = fromIntegral (fromIntegral x :: Int16)
+narrowS W32 x = fromIntegral (fromIntegral x :: Int32)
+narrowS W64 x = fromIntegral (fromIntegral x :: Int64)
 narrowS _ _ = panic "narrowTo"
 
 -- -----------------------------------------------------------------------------

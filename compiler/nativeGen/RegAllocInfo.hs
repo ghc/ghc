@@ -38,7 +38,6 @@ module RegAllocInfo (
 import BlockId
 import Cmm
 import CLabel
-import MachOp           ( MachRep(..), wordRep )
 import MachInstrs
 import MachRegs
 import Outputable
@@ -212,13 +211,13 @@ regUsage instr = case instr of
     GMUL   sz s1 s2 dst	-> mkRU [s1,s2] [dst]
     GDIV   sz s1 s2 dst	-> mkRU [s1,s2] [dst]
 
-    GCMP   sz src1 src2	-> mkRUR [src1,src2]
-    GABS   sz src dst	-> mkRU [src] [dst]
-    GNEG   sz src dst	-> mkRU [src] [dst]
-    GSQRT  sz src dst	-> mkRU [src] [dst]
-    GSIN   sz _ _ src dst	-> mkRU [src] [dst]
-    GCOS   sz _ _ src dst	-> mkRU [src] [dst]
-    GTAN   sz _ _ src dst	-> mkRU [src] [dst]
+    GCMP   sz src1 src2   -> mkRUR [src1,src2]
+    GABS   sz src dst     -> mkRU [src] [dst]
+    GNEG   sz src dst     -> mkRU [src] [dst]
+    GSQRT  sz src dst     -> mkRU [src] [dst]
+    GSIN   sz _ _ src dst -> mkRU [src] [dst]
+    GCOS   sz _ _ src dst -> mkRU [src] [dst]
+    GTAN   sz _ _ src dst -> mkRU [src] [dst]
 #endif
 
 #if x86_64_TARGET_ARCH
@@ -797,14 +796,14 @@ mkSpillInstr reg delta slot
 #ifdef i386_TARGET_ARCH
     let off_w = (off-delta) `div` 4
     in case regClass reg of
-	   RcInteger -> MOV I32 (OpReg reg) (OpAddr (spRel off_w))
-	   _         -> GST F80 reg (spRel off_w) {- RcFloat/RcDouble -}
+	   RcInteger -> MOV II32 (OpReg reg) (OpAddr (spRel off_w))
+	   _         -> GST FF80 reg (spRel off_w) {- RcFloat/RcDouble -}
 #endif
 #ifdef x86_64_TARGET_ARCH
     let off_w = (off-delta) `div` 8
     in case regClass reg of
-	   RcInteger -> MOV I64 (OpReg reg) (OpAddr (spRel off_w))
-	   RcDouble  -> MOV F64 (OpReg reg) (OpAddr (spRel off_w))
+	   RcInteger -> MOV II64 (OpReg reg) (OpAddr (spRel off_w))
+	   RcDouble  -> MOV FF64 (OpReg reg) (OpAddr (spRel off_w))
 		-- ToDo: will it work to always spill as a double?
 		-- does that cause a stall if the data was a float?
 #endif
@@ -819,8 +818,8 @@ mkSpillInstr reg delta slot
 #endif
 #ifdef powerpc_TARGET_ARCH
     let sz = case regClass reg of
-                RcInteger -> I32
-                RcDouble -> F64
+                RcInteger -> II32
+                RcDouble  -> FF64
     in ST sz reg (AddrRegImm sp (ImmInt (off-delta)))
 #endif
 
@@ -839,27 +838,27 @@ mkLoadInstr reg delta slot
 #if i386_TARGET_ARCH
 	let off_w = (off-delta) `div` 4
         in case regClass reg of {
-              RcInteger -> MOV I32 (OpAddr (spRel off_w)) (OpReg reg);
-              _         -> GLD F80 (spRel off_w) reg} {- RcFloat/RcDouble -}
+              RcInteger -> MOV II32 (OpAddr (spRel off_w)) (OpReg reg);
+              _         -> GLD FF80 (spRel off_w) reg} {- RcFloat/RcDouble -}
 #endif
 #if x86_64_TARGET_ARCH
 	let off_w = (off-delta) `div` 8
         in case regClass reg of
-              RcInteger -> MOV I64 (OpAddr (spRel off_w)) (OpReg reg)
-              _         -> MOV F64 (OpAddr (spRel off_w)) (OpReg reg)
+              RcInteger -> MOV II64 (OpAddr (spRel off_w)) (OpReg reg)
+              _         -> MOV FF64 (OpAddr (spRel off_w)) (OpReg reg)
 #endif
 #if sparc_TARGET_ARCH
         let{off_w = 1 + (off `div` 4);
             sz = case regClass reg of {
-                   RcInteger -> I32;
-		   RcFloat   -> F32;
+                   RcInteger -> II32;
+		   RcFloat   -> FF32;
                    RcDouble  -> F64}}
         in LD sz (fpRel (- off_w)) reg
 #endif
 #if powerpc_TARGET_ARCH
     let sz = case regClass reg of
-                RcInteger -> I32
-                RcDouble -> F64
+                RcInteger -> II32
+                RcDouble  -> FF64
     in LD sz reg (AddrRegImm sp (ImmInt (off-delta)))
 #endif
 
@@ -870,11 +869,11 @@ mkRegRegMoveInstr
 mkRegRegMoveInstr src dst
 #if i386_TARGET_ARCH || x86_64_TARGET_ARCH
     = case regClass src of
-        RcInteger -> MOV wordRep (OpReg src) (OpReg dst)
+        RcInteger -> MOV wordSize (OpReg src) (OpReg dst)
 #if i386_TARGET_ARCH
         RcDouble  -> GMOV src dst
 #else
-        RcDouble  -> MOV F64 (OpReg src) (OpReg dst)
+        RcDouble  -> MOV FF64 (OpReg src) (OpReg dst)
 #endif
 #elif powerpc_TARGET_ARCH
     = MR dst src

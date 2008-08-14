@@ -63,15 +63,13 @@ middleLiveness m = middle m
         middle (MidStore addr rval)          = gen addr . gen rval
         middle (MidUnsafeCall tgt ress args) = gen tgt . gen args . kill ress
         middle (MidAddToContext ra args)     = gen ra . gen args
-        middle (CopyIn _ formals _)          = kill formals
-        middle (CopyOut _ actuals)           = gen actuals
 
 lastLiveness :: Last -> (BlockId -> CmmLive) -> CmmLive
 lastLiveness l env = last l
-  where last (LastReturn)            = emptyUniqSet
-        last (LastJump e)            = gen e $ emptyUniqSet
-        last (LastBranch id)         = env id
-        last (LastCall tgt (Just k)) = gen tgt $ env k
-        last (LastCall tgt Nothing)  = gen tgt $ emptyUniqSet
-        last (LastCondBranch e t f)  = gen e $ unionUniqSets (env t) (env f)
+  where last (LastReturn _)            = emptyUniqSet
+        last (LastJump e _)            = gen e $ emptyUniqSet
+        last (LastBranch id)           = env id
+        last (LastCall tgt (Just k) _) = gen tgt $ env k
+        last (LastCall tgt Nothing _)  = gen tgt $ emptyUniqSet
+        last (LastCondBranch e t f)    = gen e $ unionUniqSets (env t) (env f)
         last (LastSwitch e tbl) = gen e $ unionManyUniqSets $ map env (catMaybes tbl)

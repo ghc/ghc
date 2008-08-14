@@ -45,9 +45,9 @@
 	}
 
 #if defined(PROFILING)
-#define UPD_FRAME_PARAMS W_ unused1, W_ unused2, "ptr" W_ unused3
+#define UPD_FRAME_PARAMS W_ unused1, W_ unused2, P_ unused3
 #else
-#define UPD_FRAME_PARAMS "ptr" W_ unused1
+#define UPD_FRAME_PARAMS P_ unused1
 #endif
 
 /* this bitmap indicates that the first word of an update frame is a

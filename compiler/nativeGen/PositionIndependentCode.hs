@@ -56,7 +56,6 @@ module PositionIndependentCode (
 #include "nativeGen/NCG.h"
 
 import Cmm
-import MachOp           ( MachOp(MO_Add), wordRep, MachRep(..) )
 import CLabel           ( CLabel, pprCLabel,
                           mkDynamicLinkerLabel, DynamicLinkerLabelInfo(..),
                           dynamicLinkerLabelInfo, mkPicBaseLabel,
@@ -118,7 +117,7 @@ cmmMakeDynamicReference dflags addImport referenceKind lbl
         AccessViaSymbolPtr -> do
               let symbolPtr = mkDynamicLinkerLabel SymbolPtr lbl
               addImport symbolPtr
-              return $ CmmLoad (cmmMakePicReference symbolPtr) wordRep
+              return $ CmmLoad (cmmMakePicReference symbolPtr) bWord
         AccessDirectly -> case referenceKind of
                 -- for data, we might have to make some calculations:
               DataReference -> return $ cmmMakePicReference lbl  
@@ -142,7 +141,7 @@ cmmMakePicReference :: CLabel -> CmmExpr
         -- everything gets relocated at runtime
 
 cmmMakePicReference lbl
-    | (opt_PIC || not opt_Static) && absoluteLabel lbl = CmmMachOp (MO_Add wordRep) [
+    | (opt_PIC || not opt_Static) && absoluteLabel lbl = CmmMachOp (MO_Add wordWidth) [
             CmmReg (CmmGlobal PicBaseReg),
             CmmLit $ picRelative lbl
         ]
@@ -552,12 +551,12 @@ pprImportedSymbol importedLbl
         ptext symbolSize <+> pprCLabel_asm lbl
     ]
 
--- PLT code stubs are generated automatically be the dynamic linker.
+-- PLT code stubs are generated automatically by the dynamic linker.
     | otherwise = empty
     where
-      symbolSize = case wordRep of
-		     I32 -> sLit "\t.long"
-		     I64 -> sLit "\t.quad"
+      symbolSize = case wordWidth of
+		     W32 -> sLit "\t.long"
+		     W64 -> sLit "\t.quad"
 		     _ -> panic "Unknown wordRep in pprImportedSymbol"
 
 #else
@@ -616,7 +615,7 @@ initializePicBase picReg
     (CmmProc info lab params (ListGraph blocks) : statics)
     = do
         gotOffLabel <- getNewLabelNat
-        tmp <- getNewRegNat wordRep
+        tmp <- getNewRegNat $ intSize wordWidth
         let 
             gotOffset = CmmData Text [
                             CmmDataLabel gotOffLabel,
@@ -628,7 +627,7 @@ initializePicBase picReg
                                              (ImmCLbl mkPicBaseLabel)
             BasicBlock bID insns = head blocks
             b' = BasicBlock bID (FETCHPC picReg
-                               : LD wordRep tmp
+                               : LD wordSize tmp
                                     (AddrRegImm picReg offsetToOffset)
                                : ADD picReg picReg (RIReg tmp)
                                : insns)

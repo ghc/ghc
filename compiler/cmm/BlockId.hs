@@ -1,9 +1,13 @@
 module BlockId
   ( BlockId(..), mkBlockId 	-- ToDo: BlockId should be abstract, but it isn't yet
-  , BlockEnv, emptyBlockEnv, lookupBlockEnv, extendBlockEnv, mkBlockEnv
+  , BlockEnv, emptyBlockEnv, lookupBlockEnv, extendBlockEnv, mkBlockEnv, mapBlockEnv
   , BlockSet, emptyBlockSet, elemBlockSet, extendBlockSet, sizeBlockSet, mkBlockSet
+  , foldBlockEnv, blockLbl, infoTblLbl
   ) where
 
+import CLabel
+import IdInfo
+import Name
 import Outputable
 import UniqFM
 import Unique
@@ -36,6 +40,11 @@ instance Show BlockId where
 instance Outputable BlockId where
   ppr = ppr . getUnique
 
+blockLbl :: BlockId -> CLabel
+blockLbl id = mkEntryLabel (mkFCallName (getUnique id) "block") NoCafRefs
+
+infoTblLbl :: BlockId -> CLabel
+infoTblLbl id = mkInfoTableLabel (mkFCallName (getUnique id) "block") NoCafRefs
 
 type BlockEnv a = UniqFM {- BlockId -} a
 emptyBlockEnv :: BlockEnv a
@@ -46,6 +55,10 @@ lookupBlockEnv :: BlockEnv a -> BlockId -> Maybe a
 lookupBlockEnv = lookupUFM
 extendBlockEnv :: BlockEnv a -> BlockId -> a -> BlockEnv a
 extendBlockEnv = addToUFM
+mapBlockEnv :: (a -> b) -> BlockEnv a -> BlockEnv b
+mapBlockEnv = mapUFM
+foldBlockEnv :: (BlockId -> a -> b -> b) -> b -> BlockEnv a -> b
+foldBlockEnv f = foldUFM_Directly (\u x y -> f (mkBlockId u) x y)
 
 type BlockSet = UniqSet BlockId
 emptyBlockSet :: BlockSet

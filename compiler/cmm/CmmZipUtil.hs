@@ -14,7 +14,7 @@ import UniqSet
 -- | Compute the predecessors of each /reachable/ block
 zipPreds :: LastNode l => LGraph m l -> BlockEnv BlockSet
 zipPreds g = foldl add emptyBlockEnv (postorder_dfs g)
-    where add env block@(Block id _) =
+    where add env block@(Block id _ _) =
             foldl (\env sid ->
                        let preds = lookupBlockEnv env sid `orElse` emptyBlockSet
                        in  extendBlockEnv env sid (extendBlockSet preds id))

@@ -51,6 +51,7 @@ module CLabel (
 
 	mkModuleInitLabel,
 	mkPlainModuleInitLabel,
+	mkModuleInitTableLabel,
 
 	mkSplitMarkerLabel,
 	mkDirty_MUT_VAR_Label,
@@ -67,6 +68,7 @@ module CLabel (
 	mkRtsSlowTickyCtrLabel,
 
 	moduleRegdLabel,
+	moduleRegTableLabel,
 
 	mkSelectorInfoLabel,
 	mkSelectorEntryLabel,
@@ -77,6 +79,7 @@ module CLabel (
 	mkRtsRetLabel,
 	mkRtsCodeLabel,
 	mkRtsDataLabel,
+	mkRtsGcPtrLabel,
 
 	mkRtsInfoLabelFS,
 	mkRtsEntryLabelFS,
@@ -103,16 +106,18 @@ module CLabel (
         mkHpcTicksLabel,
         mkHpcModuleNameLabel,
 
+        hasCAF,
 	infoLblToEntryLbl, entryLblToInfoLbl,
 	needsCDecl, isAsmTemp, maybeAsmTemp, externallyVisibleCLabel,
         isMathFun,
-	CLabelType(..), labelType, labelDynamic,
+ 	isCFunctionLabel, isGcPtrLabel, labelDynamic,
 
 	pprCLabel
     ) where
 
 #include "HsVersions.h"
 
+import IdInfo
 import StaticFlags
 import Packages
 import DataCon
@@ -155,6 +160,7 @@ CLabel is an abstract type that supports the following operations:
 data CLabel
   = IdLabel	    		-- A family of labels related to the
 	Name			-- definition of a particular Id or Con
+        CafInfo
 	IdLabelInfo
 
   | CaseLabel			-- A family of labels related to a particular
@@ -177,7 +183,10 @@ data CLabel
 	-- because we don't always recompile modules which depend on a module
 	-- whose version has changed.
 
-  | PlainModuleInitLabel	-- without the vesrion & way info
+  | PlainModuleInitLabel	-- without the version & way info
+	Module
+
+  | ModuleInitTableLabel	-- table of imported modules to init
 	Module
 
   | ModuleRegdLabel
@@ -262,7 +271,8 @@ data RtsLabelInfo
   | RtsEntry      LitString	-- misc rts entry points
   | RtsRetInfo    LitString	-- misc rts ret info tables
   | RtsRet        LitString	-- misc rts return points
-  | RtsData       LitString	-- misc rts data bits, eg CHARLIKE_closure
+  | RtsData       LitString	-- misc rts data bits
+  | RtsGcPtr      LitString	-- GcPtrs eg CHARLIKE_closure
   | RtsCode       LitString	-- misc rts code
 
   | RtsInfoFS     FastString	-- misc rts info tables
@@ -292,29 +302,29 @@ data DynamicLinkerLabelInfo
 -- Constructing CLabels
 
 -- These are always local:
-mkSRTLabel		name 	= IdLabel name  SRT
-mkSlowEntryLabel      	name 	= IdLabel name  Slow
-mkRednCountsLabel     	name 	= IdLabel name  RednCounts
+mkSRTLabel		name c 	= IdLabel name  c SRT
+mkSlowEntryLabel      	name c 	= IdLabel name  c Slow
+mkRednCountsLabel     	name c 	= IdLabel name  c RednCounts
 
 -- These have local & (possibly) external variants:
-mkLocalClosureLabel	name 	= IdLabel name  Closure
-mkLocalInfoTableLabel  	name 	= IdLabel name  InfoTable
-mkLocalEntryLabel	name 	= IdLabel name  Entry
-mkLocalClosureTableLabel name	= IdLabel name ClosureTable
+mkLocalClosureLabel	name c 	= IdLabel name  c Closure
+mkLocalInfoTableLabel  	name c 	= IdLabel name  c InfoTable
+mkLocalEntryLabel	name c 	= IdLabel name  c Entry
+mkLocalClosureTableLabel name c = IdLabel name  c ClosureTable
 
-mkClosureLabel name             = IdLabel name Closure
-mkInfoTableLabel name           = IdLabel name InfoTable
-mkEntryLabel name               = IdLabel name Entry
-mkClosureTableLabel name        = IdLabel name ClosureTable
-mkLocalConInfoTableLabel    con = IdLabel con ConInfoTable
-mkLocalConEntryLabel	    con = IdLabel con ConEntry
-mkLocalStaticInfoTableLabel con = IdLabel con StaticInfoTable
-mkLocalStaticConEntryLabel  con = IdLabel con StaticConEntry
-mkConInfoTableLabel name        = IdLabel    name ConInfoTable
-mkStaticInfoTableLabel name     = IdLabel    name StaticInfoTable
+mkClosureLabel name         c     = IdLabel name c Closure
+mkInfoTableLabel name       c     = IdLabel name c InfoTable
+mkEntryLabel name           c     = IdLabel name c Entry
+mkClosureTableLabel name    c     = IdLabel name c ClosureTable
+mkLocalConInfoTableLabel    c con = IdLabel con c ConInfoTable
+mkLocalConEntryLabel	    c con = IdLabel con c ConEntry
+mkLocalStaticInfoTableLabel c con = IdLabel con c StaticInfoTable
+mkLocalStaticConEntryLabel  c con = IdLabel con c StaticConEntry
+mkConInfoTableLabel name    c     = IdLabel    name c ConInfoTable
+mkStaticInfoTableLabel name c     = IdLabel    name c StaticInfoTable
 
-mkConEntryLabel name            = IdLabel name ConEntry
-mkStaticConEntryLabel name      = IdLabel name StaticConEntry
+mkConEntryLabel name        c     = IdLabel name c ConEntry
+mkStaticConEntryLabel name  c     = IdLabel name c StaticConEntry
 
 mkLargeSRTLabel	uniq 	= LargeSRTLabel uniq
 mkBitmapLabel	uniq 	= LargeBitmapLabel uniq
@@ -334,6 +344,9 @@ mkModuleInitLabel mod way        = ModuleInitLabel mod way
 mkPlainModuleInitLabel :: Module -> CLabel
 mkPlainModuleInitLabel mod       = PlainModuleInitLabel mod
 
+mkModuleInitTableLabel :: Module -> CLabel
+mkModuleInitTableLabel mod       = ModuleInitTableLabel mod
+
 	-- Some fixed runtime system labels
 
 mkSplitMarkerLabel		= RtsLabel (RtsCode (sLit "__stg_split_marker"))
@@ -350,6 +363,7 @@ mkCAFBlackHoleInfoTableLabel	= RtsLabel (RtsInfo (sLit "stg_CAF_BLACKHOLE"))
 mkRtsPrimOpLabel primop		= RtsLabel (RtsPrimOp primop)
 
 moduleRegdLabel			= ModuleRegdLabel
+moduleRegTableLabel             = ModuleInitTableLabel	
 
 mkSelectorInfoLabel  upd off	= RtsLabel (RtsSelectorInfoTable upd off)
 mkSelectorEntryLabel upd off	= RtsLabel (RtsSelectorEntry   upd off)
@@ -383,6 +397,7 @@ mkRtsRetInfoLabel   str = RtsLabel (RtsRetInfo   str)
 mkRtsRetLabel       str = RtsLabel (RtsRet       str)
 mkRtsCodeLabel      str = RtsLabel (RtsCode      str)
 mkRtsDataLabel      str = RtsLabel (RtsData      str)
+mkRtsGcPtrLabel     str = RtsLabel (RtsGcPtr     str)
 
 mkRtsInfoLabelFS    str = RtsLabel (RtsInfoFS    str)
 mkRtsEntryLabelFS   str = RtsLabel (RtsEntryFS   str)
@@ -422,9 +437,9 @@ mkDeadStripPreventer lbl = DeadStripPreventer lbl
 -- Converting between info labels and entry/ret labels.
 
 infoLblToEntryLbl :: CLabel -> CLabel 
-infoLblToEntryLbl (IdLabel n InfoTable) = IdLabel n Entry
-infoLblToEntryLbl (IdLabel n ConInfoTable) = IdLabel n ConEntry
-infoLblToEntryLbl (IdLabel n StaticInfoTable) = IdLabel n StaticConEntry
+infoLblToEntryLbl (IdLabel n c InfoTable) = IdLabel n c Entry
+infoLblToEntryLbl (IdLabel n c ConInfoTable) = IdLabel n c ConEntry
+infoLblToEntryLbl (IdLabel n c StaticInfoTable) = IdLabel n c StaticConEntry
 infoLblToEntryLbl (CaseLabel n CaseReturnInfo) = CaseLabel n CaseReturnPt
 infoLblToEntryLbl (RtsLabel (RtsInfo s)) = RtsLabel (RtsEntry s)
 infoLblToEntryLbl (RtsLabel (RtsRetInfo s)) = RtsLabel (RtsRet s)
@@ -433,15 +448,21 @@ infoLblToEntryLbl (RtsLabel (RtsRetInfoFS s)) = RtsLabel (RtsRetFS s)
 infoLblToEntryLbl _ = panic "CLabel.infoLblToEntryLbl"
 
 entryLblToInfoLbl :: CLabel -> CLabel 
-entryLblToInfoLbl (IdLabel n Entry) = IdLabel n InfoTable
-entryLblToInfoLbl (IdLabel n ConEntry) = IdLabel n ConInfoTable
-entryLblToInfoLbl (IdLabel n StaticConEntry) = IdLabel n StaticInfoTable
+entryLblToInfoLbl (IdLabel n c Entry) = IdLabel n c InfoTable
+entryLblToInfoLbl (IdLabel n c ConEntry) = IdLabel n c ConInfoTable
+entryLblToInfoLbl (IdLabel n c StaticConEntry) = IdLabel n c StaticInfoTable
 entryLblToInfoLbl (CaseLabel n CaseReturnPt) = CaseLabel n CaseReturnInfo
 entryLblToInfoLbl (RtsLabel (RtsEntry s)) = RtsLabel (RtsInfo s)
 entryLblToInfoLbl (RtsLabel (RtsRet s)) = RtsLabel (RtsRetInfo s)
 entryLblToInfoLbl (RtsLabel (RtsEntryFS s)) = RtsLabel (RtsInfoFS s)
 entryLblToInfoLbl (RtsLabel (RtsRetFS s)) = RtsLabel (RtsRetInfoFS s)
 entryLblToInfoLbl l = pprPanic "CLabel.entryLblToInfoLbl" (pprCLabel l)
+
+-- -----------------------------------------------------------------------------
+-- Does a CLabel refer to a CAF?
+hasCAF :: CLabel -> Bool
+hasCAF (IdLabel _ MayHaveCafRefs Closure) = True
+hasCAF _                                  = False
 
 -- -----------------------------------------------------------------------------
 -- Does a CLabel need declaring before use or not?
@@ -452,13 +473,14 @@ needsCDecl :: CLabel -> Bool
   -- False <=> it's pre-declared; don't bother
   -- don't bother declaring SRT & Bitmap labels, we always make sure
   -- they are defined before use.
-needsCDecl (IdLabel _ SRT)		= False
+needsCDecl (IdLabel _ _ SRT)		= False
 needsCDecl (LargeSRTLabel _)		= False
 needsCDecl (LargeBitmapLabel _)		= False
-needsCDecl (IdLabel _ _)		= True
+needsCDecl (IdLabel _ _ _)		= True
 needsCDecl (CaseLabel _ _)	        = True
 needsCDecl (ModuleInitLabel _ _)	= True
 needsCDecl (PlainModuleInitLabel _)	= True
+needsCDecl (ModuleInitTableLabel _)	= True
 needsCDecl ModuleRegdLabel		= False
 
 needsCDecl (StringLitLabel _)		= False
@@ -520,12 +542,11 @@ externallyVisibleCLabel (StringLitLabel _) = False
 externallyVisibleCLabel (AsmTempLabel _)   = False
 externallyVisibleCLabel (ModuleInitLabel _ _) = True
 externallyVisibleCLabel (PlainModuleInitLabel _)= True
+externallyVisibleCLabel (ModuleInitTableLabel _)= False
 externallyVisibleCLabel ModuleRegdLabel    = False
 externallyVisibleCLabel (RtsLabel _)	   = True
 externallyVisibleCLabel (ForeignLabel _ _ _) = True
-externallyVisibleCLabel (IdLabel name SRT)   = False
-                         -- SRTs don't need to be external
-externallyVisibleCLabel (IdLabel name _)     = isExternalName name
+externallyVisibleCLabel (IdLabel name _ _)     = isExternalName name
 externallyVisibleCLabel (CC_Label _)	   = True
 externallyVisibleCLabel (CCS_Label _)	   = True
 externallyVisibleCLabel (DynamicLinkerLabel _ _)  = False
@@ -540,13 +561,25 @@ externallyVisibleCLabel (LargeSRTLabel _) = False
 -- For generating correct types in label declarations:
 
 data CLabelType
-  = CodeLabel
-  | DataLabel
+  = CodeLabel	-- Address of some executable instructions
+  | DataLabel	-- Address of data, not a GC ptr
+  | GcPtrLabel	-- Address of a (presumably static) GC object
+
+isCFunctionLabel :: CLabel -> Bool
+isCFunctionLabel lbl = case labelType lbl of
+			CodeLabel -> True
+			_other	  -> False
+
+isGcPtrLabel :: CLabel -> Bool
+isGcPtrLabel lbl = case labelType lbl of
+			GcPtrLabel -> True
+			_other	   -> False
 
 labelType :: CLabel -> CLabelType
 labelType (RtsLabel (RtsSelectorInfoTable _ _)) = DataLabel
 labelType (RtsLabel (RtsApInfoTable _ _))       = DataLabel
 labelType (RtsLabel (RtsData _))              = DataLabel
+labelType (RtsLabel (RtsGcPtr _))             = GcPtrLabel
 labelType (RtsLabel (RtsCode _))              = CodeLabel
 labelType (RtsLabel (RtsInfo _))              = DataLabel
 labelType (RtsLabel (RtsEntry _))             = CodeLabel
@@ -563,20 +596,19 @@ labelType (CaseLabel _ CaseReturnInfo)        = DataLabel
 labelType (CaseLabel _ _)	              = CodeLabel
 labelType (ModuleInitLabel _ _)               = CodeLabel
 labelType (PlainModuleInitLabel _)            = CodeLabel
+labelType (ModuleInitTableLabel _)            = DataLabel
 labelType (LargeSRTLabel _)                   = DataLabel
 labelType (LargeBitmapLabel _)                = DataLabel
-
-labelType (IdLabel _ info) = idInfoLabelType info
-labelType _        = DataLabel
+labelType (IdLabel _ _ info) = idInfoLabelType info
+labelType _                = DataLabel
 
 idInfoLabelType info =
   case info of
     InfoTable  	  -> DataLabel
-    Closure    	  -> DataLabel
+    Closure    	  -> GcPtrLabel
     ConInfoTable  -> DataLabel
     StaticInfoTable -> DataLabel
     ClosureTable  -> DataLabel
--- krc: aie! a ticky counter label is data
     RednCounts    -> DataLabel
     _	          -> CodeLabel
 
@@ -593,7 +625,7 @@ labelDynamic :: PackageId -> CLabel -> Bool
 labelDynamic this_pkg lbl =
   case lbl of
    RtsLabel _  	     -> not opt_Static && (this_pkg /= rtsPackageId) -- i.e., is the RTS in a DLL or not?
-   IdLabel n k       -> isDllName this_pkg n
+   IdLabel n _ k       -> isDllName this_pkg n
 #if mingw32_TARGET_OS
    ForeignLabel _ _ d  -> d
 #else
@@ -603,6 +635,7 @@ labelDynamic this_pkg lbl =
 #endif
    ModuleInitLabel m _    -> not opt_Static && this_pkg /= (modulePackageId m)
    PlainModuleInitLabel m -> not opt_Static && this_pkg /= (modulePackageId m)
+   ModuleInitTableLabel m -> not opt_Static && this_pkg /= (modulePackageId m)
    
    -- Note that DynamicLinkerLabels do NOT require dynamic linking themselves.
    _ 		     -> False
@@ -720,6 +753,7 @@ pprCLbl (LargeBitmapLabel u)  = text "b" <> pprUnique u <> pp_cSEP <> ptext (sLi
 
 pprCLbl (RtsLabel (RtsCode str))   = ptext str
 pprCLbl (RtsLabel (RtsData str))   = ptext str
+pprCLbl (RtsLabel (RtsGcPtr str))  = ptext str
 pprCLbl (RtsLabel (RtsCodeFS str)) = ftext str
 pprCLbl (RtsLabel (RtsDataFS str)) = ftext str
 
@@ -789,7 +823,7 @@ pprCLbl ModuleRegdLabel
 pprCLbl (ForeignLabel str _ _)
   = ftext str
 
-pprCLbl (IdLabel name  flavor) = ppr name <> ppIdFlavor flavor
+pprCLbl (IdLabel name _ flavor) = ppr name <> ppIdFlavor flavor
 
 pprCLbl (CC_Label cc) 		= ppr cc
 pprCLbl (CCS_Label ccs) 	= ppr ccs
@@ -799,6 +833,8 @@ pprCLbl (ModuleInitLabel mod way)
 	<> char '_' <> text way
 pprCLbl (PlainModuleInitLabel mod)
    = ptext (sLit "__stginit_") <> ppr mod
+pprCLbl (ModuleInitTableLabel mod)
+   = ptext (sLit "__stginittable_") <> ppr mod
 
 pprCLbl (HpcTicksLabel mod)
   = ptext (sLit "_hpc_tickboxes_")  <> ppr mod <> ptext (sLit "_hpc")

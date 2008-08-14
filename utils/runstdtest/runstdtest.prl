@@ -249,7 +249,7 @@ else
     $PostScriptLines
     hit='NO'
     for out_file in @PgmStdoutFile ; do
-	if sed "s/\\r\$//" $TmpPrefix/runtest$$.1 | cmp -s \$out_file - ; then
+	if sed "s/\$//" $TmpPrefix/runtest$$.1 | cmp -s \$out_file - ; then
 	    hit='YES'
 	fi
     done
@@ -275,7 +275,7 @@ fi
 
 hit='NO'
 for out_file in @PgmStderrFile ; do
-    if sed "s/\\r\$//" $TmpPrefix/runtest$$.2 | cmp -s \$out_file - ; then
+    if sed "s/\$//" $TmpPrefix/runtest$$.2 | cmp -s \$out_file - ; then
 	hit='YES'
     fi
 done

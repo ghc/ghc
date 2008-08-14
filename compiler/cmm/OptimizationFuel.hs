@@ -128,7 +128,7 @@ fuelDecrementState new_optimizer old new s =
         optimizer = if diffFuel old new > 0 then new_optimizer else fs_lastpass s
 
 -- lGraphOfGraph is here because we need uniques to implement it.
-lGraphOfGraph :: Graph m l -> FuelMonad (LGraph m l)
-lGraphOfGraph (Graph tail blocks) =
+lGraphOfGraph :: Graph m l -> Int -> FuelMonad (LGraph m l)
+lGraphOfGraph (Graph tail blocks) args =
   do entry <- liftM BlockId $ getUniqueM
-     return $ LGraph entry (insertBlock (Block entry tail) blocks)
+     return $ LGraph entry args (insertBlock (Block entry Nothing tail) blocks)

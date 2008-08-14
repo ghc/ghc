@@ -26,7 +26,6 @@ import CmmCPSGen
 import CmmUtils
 
 import ClosureInfo
-import MachOp
 import CLabel
 import SMRep
 import Constants
@@ -118,7 +117,7 @@ cpsProc uniqSupply (CmmProc info ident params (ListGraph blocks)) = cps_procs
        block_uniques = uniques
       proc_uniques = map (map (map uniqsFromSupply . listSplitUniqSupply) . listSplitUniqSupply) $ listSplitUniqSupply uniqSupply2
 
-      stack_use = CmmLocal (LocalReg stack_use_unique (cmmRegRep spReg) GCKindPtr)
+      stack_use = CmmLocal (LocalReg stack_use_unique (cmmRegType spReg))
       stack_check_block_id = BlockId stack_check_block_unique
       stack_check_block = make_stack_check stack_check_block_id info stack_use (blockId $ head blocks)
 
@@ -171,7 +170,7 @@ cpsProc uniqSupply (CmmProc info ident params (ListGraph blocks)) = cps_procs
       -- This is an association list instead of a UniqFM because
       -- CLabel's don't have a 'Uniqueable' instance.
       formats :: [(CLabel,              -- key
-                   (CmmFormalsWithoutKinds,         -- arguments
+                   (CmmFormals,         -- arguments
                     Maybe CLabel,       -- label in top slot
                     [Maybe LocalReg]))] -- slots
       formats = selectContinuationFormat live continuations
@@ -200,7 +199,7 @@ make_stack_check stack_check_block_id info stack_use next_block_id =
             -- then great, well check the stack.
             CmmInfo (Just gc_block) _ _
                 -> [CmmCondBranch
-                    (CmmMachOp (MO_U_Lt $ cmmRegRep spReg)
+                    (CmmMachOp (MO_U_Lt (typeWidth (cmmRegType spReg)))
                      [CmmReg stack_use, CmmReg spLimReg])
                     gc_block]
             -- If we aren't given a stack check handler,
@@ -277,7 +276,7 @@ gatherBlocksIntoContinuation live proc_points blocks start =
 
 selectContinuationFormat :: BlockEnv CmmLive
                   -> [Continuation (Either C_SRT CmmInfo)]
-                  -> [(CLabel, (CmmFormalsWithoutKinds, Maybe CLabel, [Maybe LocalReg]))]
+                  -> [(CLabel, (CmmFormals, Maybe CLabel, [Maybe LocalReg]))]
 selectContinuationFormat live continuations =
     map (\c -> (continuationLabel c, selectContinuationFormat' c)) continuations
     where
@@ -301,7 +300,7 @@ selectContinuationFormat live continuations =
 
       unknown_block = panic "unknown BlockId in selectContinuationFormat"
 
-processFormats :: [(CLabel, (CmmFormalsWithoutKinds, Maybe CLabel, [Maybe LocalReg]))]
+processFormats :: [(CLabel, (CmmFormals, Maybe CLabel, [Maybe LocalReg]))]
                -> Maybe UpdateFrame
                -> [Continuation (Either C_SRT CmmInfo)]
                -> (WordOff, WordOff, [(CLabel, ContinuationFormat)])
@@ -330,7 +329,7 @@ processFormats formats update_frame continuations =
       update_size [] = 0
       update_size (expr:exprs) = width + update_size exprs
           where
-            width = machRepByteWidth (cmmExprRep expr) `quot` wORD_SIZE
+            width = (widthInBytes $ typeWidth $ cmmExprType expr) `quot` wORD_SIZE
             -- TODO: it would be better if we had a machRepWordWidth
 
       -- TODO: get rid of "+ 1" etc.
@@ -340,7 +339,7 @@ processFormats formats update_frame continuations =
       stack_size (Nothing:formats) = 1 + stack_size formats -- one dead word
       stack_size (Just reg:formats) = width + stack_size formats
           where
-            width = machRepByteWidth (localRegRep reg) `quot` wORD_SIZE
+            width = (widthInBytes $ typeWidth $ localRegType reg) `quot` wORD_SIZE
             -- TODO: it would be better if we had a machRepWordWidth
 
 continuationMaxStack :: [(CLabel, ContinuationFormat)]
@@ -360,14 +359,14 @@ continuationMaxStack formats (Continuation _ label _ False blocks) =
                    map stmt_arg_size (brokenBlockStmts block))
 
       final_arg_size (FinalReturn args) =
-          argumentsSize (cmmExprRep . kindlessCmm) args
+          argumentsSize (cmmExprType . hintlessCmm) args
       final_arg_size (FinalJump _ args) =
-          argumentsSize (cmmExprRep . kindlessCmm) args
+          argumentsSize (cmmExprType . hintlessCmm) args
       final_arg_size (FinalCall next _ _ args _ _ True) = 0
       final_arg_size (FinalCall next _ _ args _ _ False) =
           -- We have to account for the stack used when we build a frame
           -- for the *next* continuation from *this* continuation
-          argumentsSize (cmmExprRep . kindlessCmm) args +
+          argumentsSize (cmmExprType . hintlessCmm) args +
           continuation_frame_size next_format
           where 
             next_format = maybe unknown_format id $ lookup next' formats
@@ -376,7 +375,7 @@ continuationMaxStack formats (Continuation _ label _ False blocks) =
       final_arg_size _ = 0
 
       stmt_arg_size (CmmJump _ args) =
-          argumentsSize (cmmExprRep . kindlessCmm) args
+          argumentsSize (cmmExprType . hintlessCmm) args
       stmt_arg_size (CmmCall _ _ _ (CmmSafe _) _) =
           panic "Safe call in processFormats"
       stmt_arg_size (CmmReturn _) =

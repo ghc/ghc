@@ -28,7 +28,6 @@ module NCGMonad (
 import BlockId
 import CLabel		( CLabel, mkAsmTempLabel )
 import MachRegs
-import MachOp		( MachRep )
 import UniqSupply
 import Unique		( Unique )
 import DynFlags
@@ -102,10 +101,10 @@ getBlockIdNat = do u <- getUniqueNat; return (BlockId u)
 getNewLabelNat :: NatM CLabel
 getNewLabelNat = do u <- getUniqueNat; return (mkAsmTempLabel u)
 
-getNewRegNat :: MachRep -> NatM Reg
+getNewRegNat :: Size -> NatM Reg
 getNewRegNat rep = do u <- getUniqueNat; return (mkVReg u rep)
 
-getNewRegPairNat :: MachRep -> NatM (Reg,Reg)
+getNewRegPairNat :: Size -> NatM (Reg,Reg)
 getNewRegPairNat rep = do 
   u <- getUniqueNat
   let lo = mkVReg u rep; hi = getHiVRegFromLo lo
@@ -114,7 +113,7 @@ getNewRegPairNat rep = do
 getPicBaseMaybeNat :: NatM (Maybe Reg)
 getPicBaseMaybeNat = NatM (\state -> (natm_pic state, state))
 
-getPicBaseNat :: MachRep -> NatM Reg
+getPicBaseNat :: Size -> NatM Reg
 getPicBaseNat rep = do
   mbPicBase <- getPicBaseMaybeNat
   case mbPicBase of

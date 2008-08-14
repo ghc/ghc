@@ -71,13 +71,15 @@ import SimplCore        ( core2core )
 import TidyPgm
 import CorePrep		( corePrepPgm )
 import CoreToStg	( coreToStg )
+import qualified StgCmm	( codeGen )
 import StgSyn
 import CostCentre
-import TyCon		( isDataTyCon )
+import TyCon		( TyCon, isDataTyCon )
 import Name		( Name, NamedThing(..) )
 import SimplStg		( stg2stg )
 import CodeGen		( codeGen )
 import Cmm              ( Cmm )
+import PprCmm		( pprCmms )
 import CmmParse		( parseCmmFile )
 import CmmCPS
 import CmmCPSZ
@@ -648,7 +650,7 @@ hscGenHardCode cgguts mod_summary
                      cg_dir_imps = dir_imps,
                      cg_foreign  = foreign_stubs,
                      cg_dep_pkgs = dependencies,
-		     cg_hpc_info = hpc_info } = cgguts
+                     cg_hpc_info = hpc_info } = cgguts
              dflags = hsc_dflags hsc_env
              location = ms_location mod_summary
              data_tycons = filter isDataTyCon tycons
@@ -664,11 +666,20 @@ hscGenHardCode cgguts mod_summary
          (stg_binds, cost_centre_info)
              <- {-# SCC "CoreToStg" #-}
                 myCoreToStg dflags this_mod prepd_binds	
+
+         ------------------  Try new code gen route ----------
+         cmms <- tryNewCodeGen hsc_env this_mod data_tycons
+                               dir_imps cost_centre_info
+                               stg_binds hpc_info
+
          ------------------  Code generation ------------------
-         cmms <- {-# SCC "CodeGen" #-}
-                      codeGen dflags this_mod data_tycons
-                              dir_imps cost_centre_info
-                              stg_binds hpc_info
+         cmms <- if dopt Opt_TryNewCodeGen (hsc_dflags hsc_env)
+                 then pprTrace "cmms" (ppr cmms) $ return cmms
+                 else {-# SCC "CodeGen" #-}
+                       codeGen dflags this_mod data_tycons
+                               dir_imps cost_centre_info
+                               stg_binds hpc_info
+
          --- Optionally run experimental Cmm transformations ---
          cmms <- optionallyConvertAndOrCPS hsc_env cmms
                  -- unless certain dflags are on, the identity function
@@ -732,6 +743,39 @@ hscCmmFile hsc_env filename = do
                               ml_hi_file  = panic "hscCmmFile: no hi file",
                               ml_obj_file = panic "hscCmmFile: no obj file" }
 
+-------------------- Stuff for new code gen ---------------------
+
+tryNewCodeGen	:: HscEnv -> Module -> [TyCon] -> [Module]
+		-> CollectedCCs
+		-> [(StgBinding,[(Id,[Id])])]
+		-> HpcInfo
+		-> IO [Cmm]
+tryNewCodeGen hsc_env this_mod data_tycons imported_mods 
+	      cost_centre_info stg_binds hpc_info
+  | not (dopt Opt_TryNewCodeGen (hsc_dflags hsc_env))
+  = return []
+  | otherwise
+  = do	{ let dflags = hsc_dflags hsc_env
+        ; prog <- StgCmm.codeGen dflags this_mod data_tycons imported_mods 
+		 	 cost_centre_info stg_binds hpc_info
+	; dumpIfSet_dyn dflags Opt_D_dump_cmmz "Cmm produced by new codegen" 
+		(pprCmms prog)
+
+	; prog <- return $ map (runTx $ runCmmOpts cmmCfgOptsZ) prog
+		-- Control flow optimisation
+
+	; prog <- mapM (protoCmmCPSZ hsc_env) prog
+		-- The main CPS conversion
+
+	; prog <- return $ map (runTx $ runCmmOpts cmmCfgOptsZ) prog
+		-- Control flow optimisation, again
+
+	; dumpIfSet_dyn dflags Opt_D_dump_cmmz "New Cmm" 
+		(pprCmms prog)
+
+	; return $ map cmmOfZgraph prog }
+
+
 optionallyConvertAndOrCPS :: HscEnv -> [Cmm] -> IO [Cmm]
 optionallyConvertAndOrCPS hsc_env cmms =
     do let dflags = hsc_dflags hsc_env
@@ -741,7 +785,7 @@ optionallyConvertAndOrCPS hsc_env cmms =
                else return cmms
          ---------  Optionally convert to CPS (MDA) -----------
        cmms <- if not (dopt Opt_ConvertToZipCfgAndBack dflags) &&
-                  dopt Opt_RunCPSZ dflags
+                  dopt Opt_RunCPS dflags
                then cmmCPS dflags cmms
                else return cmms
        return cmms

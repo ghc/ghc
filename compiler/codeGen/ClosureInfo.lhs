@@ -37,7 +37,7 @@ module ClosureInfo (
 	slopSize, 
 
 	closureName, infoTableLabelFromCI,
-	closureLabelFromCI, closureSRT,
+	closureLabelFromCI,
 	closureLFInfo, isLFThunk,closureSMRep, closureUpdReqd, 
 	closureNeedsUpdSpace, closureIsThunk,
 	closureSingleEntry, closureReEntrant, isConstrClosure_maybe,
@@ -76,6 +76,7 @@ import Packages
 import PackageConfig
 import StaticFlags
 import Id
+import IdInfo
 import DataCon
 import Name
 import OccName
@@ -576,28 +577,29 @@ data CallMethod
 	Int 				--   Its arity
 
 getCallMethod :: Name		-- Function being applied
+              -> CafInfo        -- Can it refer to CAF's?
 	      -> LambdaFormInfo	-- Its info
 	      -> Int		-- Number of available arguments
 	      -> CallMethod
 
-getCallMethod name lf_info n_args
+getCallMethod name _ lf_info n_args
   | nodeMustPointToIt lf_info && opt_Parallel
   =	-- If we're parallel, then we must always enter via node.  
 	-- The reason is that the closure may have been 	
 	-- fetched since we allocated it.
     EnterIt
 
-getCallMethod name (LFReEntrant _ arity _ _) n_args
+getCallMethod name caf (LFReEntrant _ arity _ _) n_args
   | n_args == 0    = ASSERT( arity /= 0 )
 		     ReturnIt	-- No args at all
   | n_args < arity = SlowCall	-- Not enough args
-  | otherwise      = DirectEntry (enterIdLabel name) arity
+  | otherwise      = DirectEntry (enterIdLabel name caf) arity
 
-getCallMethod name (LFCon con) n_args
+getCallMethod name _ (LFCon con) n_args
   = ASSERT( n_args == 0 )
     ReturnCon con
 
-getCallMethod name (LFThunk _ _ updatable std_form_info is_fun) n_args
+getCallMethod name caf (LFThunk _ _ updatable std_form_info is_fun) n_args
   | is_fun 	-- it *might* be a function, so we must "call" it (which is
                 -- always safe)
   = SlowCall	-- We cannot just enter it [in eval/apply, the entry code
@@ -620,12 +622,12 @@ getCallMethod name (LFThunk _ _ updatable std_form_info is_fun) n_args
 
   | otherwise	-- Jump direct to code for single-entry thunks
   = ASSERT( n_args == 0 )
-    JumpToIt (thunkEntryLabel name std_form_info updatable)
+    JumpToIt (thunkEntryLabel name caf std_form_info updatable)
 
-getCallMethod name (LFUnknown True) n_args
+getCallMethod name _ (LFUnknown True) n_args
   = SlowCall -- Might be a function
 
-getCallMethod name (LFUnknown False) n_args
+getCallMethod name _ (LFUnknown False) n_args
   | n_args > 0 
   = WARN( True, ppr name <+> ppr n_args ) 
     SlowCall	-- Note [Unsafe coerce complications]
@@ -633,15 +635,15 @@ getCallMethod name (LFUnknown False) n_args
   | otherwise
   = EnterIt -- Not a function
 
-getCallMethod name (LFBlackHole _) n_args
+getCallMethod name _ (LFBlackHole _) n_args
   = SlowCall	-- Presumably the black hole has by now
 		-- been updated, but we don't know with
 		-- what, so we slow call it
 
-getCallMethod name (LFLetNoEscape 0) n_args
+getCallMethod name _ (LFLetNoEscape 0) n_args
   = JumpToIt (enterReturnPtLabel (nameUnique name))
 
-getCallMethod name (LFLetNoEscape arity) n_args
+getCallMethod name _ (LFLetNoEscape arity) n_args
   | n_args == arity = DirectEntry (enterReturnPtLabel (nameUnique name)) arity
   | otherwise = pprPanic "let-no-escape: " (ppr name <+> ppr arity)
 
@@ -882,10 +884,10 @@ isToplevClosure _ = False
 Label generation.
 
 \begin{code}
-infoTableLabelFromCI :: ClosureInfo -> CLabel
+infoTableLabelFromCI :: ClosureInfo -> CafInfo -> CLabel
 infoTableLabelFromCI (ClosureInfo { closureName = name,
 				    closureLFInfo = lf_info, 
-				    closureSMRep = rep })
+				    closureSMRep = rep }) caf
   = case lf_info of
 	LFBlackHole info -> info
 
@@ -895,32 +897,32 @@ infoTableLabelFromCI (ClosureInfo { closureName = name,
 	LFThunk _ _ upd_flag (ApThunk arity) _ -> 
 		mkApInfoTableLabel upd_flag arity
 
-	LFThunk{}      -> mkLocalInfoTableLabel name
+	LFThunk{}      -> mkLocalInfoTableLabel name caf
 
-	LFReEntrant _ _ _ _ -> mkLocalInfoTableLabel name
+	LFReEntrant _ _ _ _ -> mkLocalInfoTableLabel name caf
 
 	other -> panic "infoTableLabelFromCI"
 
 infoTableLabelFromCI (ConInfo { closureCon = con, 
-				closureSMRep = rep })
-  | isStaticRep rep = mkStaticInfoTableLabel  name
-  | otherwise	    = mkConInfoTableLabel     name
+				closureSMRep = rep }) caf
+  | isStaticRep rep = mkStaticInfoTableLabel  name caf
+  | otherwise	    = mkConInfoTableLabel     name caf
   where
     name = dataConName con
 
 -- ClosureInfo for a closure (as opposed to a constructor) is always local
-closureLabelFromCI (ClosureInfo { closureName = nm }) = mkLocalClosureLabel nm
-closureLabelFromCI _ = panic "closureLabelFromCI"
+closureLabelFromCI (ClosureInfo { closureName = nm }) caf = mkLocalClosureLabel nm caf
+closureLabelFromCI _ _ = panic "closureLabelFromCI"
 
 -- thunkEntryLabel is a local help function, not exported.  It's used from both
 -- entryLabelFromCI and getCallMethod.
 
-thunkEntryLabel thunk_id (ApThunk arity) is_updatable
+thunkEntryLabel thunk_id _ (ApThunk arity) is_updatable
   = enterApLabel is_updatable arity
-thunkEntryLabel thunk_id (SelectorThunk offset) upd_flag
+thunkEntryLabel thunk_id _ (SelectorThunk offset) upd_flag
   = enterSelectorLabel upd_flag offset
-thunkEntryLabel thunk_id _ is_updatable
-  = enterIdLabel thunk_id
+thunkEntryLabel thunk_id caf _ is_updatable
+  = enterIdLabel thunk_id caf
 
 enterApLabel is_updatable arity
   | tablesNextToCode = mkApInfoTableLabel is_updatable arity

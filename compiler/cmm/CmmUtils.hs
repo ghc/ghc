@@ -17,6 +17,9 @@ module CmmUtils(
 	CmmStmts, noStmts, oneStmt, mkStmts, plusStmts, stmtList,
 	isNopStmt,
 
+	primRepCmmType, primRepForeignHint,
+	typeCmmType, typeForeignHint,
+
 	isTrivialCmmExpr, hasNoGlobalRegs,
 
 	cmmRegOff, cmmLabelOff, cmmOffset, cmmOffsetLit, cmmIndex,
@@ -26,17 +29,54 @@ module CmmUtils(
 
 	mkLblExpr,
 
-        loadArgsIntoTemps, maybeAssignTemp,
+        maybeAssignTemp, loadArgsIntoTemps
   ) where
 
 #include "HsVersions.h"
 
+import TyCon	( PrimRep(..) )
+import Type	( Type, typePrimRep )
+
 import CLabel
 import Cmm
-import MachOp
 import OrdList
 import Outputable
 import Unique
+
+---------------------------------------------------
+--
+--	CmmTypes
+--
+---------------------------------------------------
+
+primRepCmmType :: PrimRep -> CmmType
+primRepCmmType VoidRep    = panic "primRepCmmType:VoidRep"
+primRepCmmType PtrRep     = gcWord
+primRepCmmType IntRep	  = bWord
+primRepCmmType WordRep	  = bWord
+primRepCmmType Int64Rep   = b64
+primRepCmmType Word64Rep  = b64
+primRepCmmType AddrRep    = bWord
+primRepCmmType FloatRep   = f32
+primRepCmmType DoubleRep  = f64
+
+typeCmmType :: Type -> CmmType
+typeCmmType ty = primRepCmmType (typePrimRep ty)
+
+primRepForeignHint :: PrimRep -> ForeignHint
+primRepForeignHint VoidRep	= panic "primRepForeignHint:VoidRep"
+primRepForeignHint PtrRep	= AddrHint
+primRepForeignHint IntRep	= SignedHint
+primRepForeignHint WordRep	= NoHint
+primRepForeignHint Int64Rep	= SignedHint
+primRepForeignHint Word64Rep	= NoHint
+primRepForeignHint AddrRep     = AddrHint -- NB! AddrHint, but NonPtrArg
+primRepForeignHint FloatRep	= NoHint
+primRepForeignHint DoubleRep	= NoHint
+
+typeForeignHint :: Type -> ForeignHint
+typeForeignHint = primRepForeignHint . typePrimRep
+
 
 ---------------------------------------------------
 --
@@ -115,12 +155,11 @@ hasNoGlobalRegs _ = False
 ---------------------------------------------------
 
 cmmOffsetExpr :: CmmExpr -> CmmExpr -> CmmExpr
--- assumes base and offset have the same MachRep
+-- assumes base and offset have the same CmmType
 cmmOffsetExpr e (CmmLit (CmmInt n _)) = cmmOffset e (fromInteger n)
-cmmOffsetExpr e byte_off = CmmMachOp (MO_Add (cmmExprRep e)) [e, byte_off]
+cmmOffsetExpr e byte_off = CmmMachOp (MO_Add (cmmExprWidth e)) [e, byte_off]
 
 -- NB. Do *not* inspect the value of the offset in these smart constructors!!!
---
 -- because the offset is sometimes involved in a loop in the code generator
 -- (we don't know the real Hp offset until we've generated code for the entire
 -- basic block, for example).  So we cannot eliminate zero offsets at this
@@ -136,9 +175,9 @@ cmmOffset (CmmMachOp (MO_Add rep) [expr, CmmLit (CmmInt byte_off1 _rep)]) byte_o
   = CmmMachOp (MO_Add rep) 
 	      [expr, CmmLit (CmmInt (byte_off1 + toInteger byte_off2) rep)]
 cmmOffset expr byte_off
-  = CmmMachOp (MO_Add rep) [expr, CmmLit (CmmInt (toInteger byte_off) rep)]
+  = CmmMachOp (MO_Add width) [expr, CmmLit (CmmInt (toInteger byte_off) width)]
   where
-    rep = cmmExprRep expr
+    width = cmmExprWidth expr
 
 -- Smart constructor for CmmRegOff.  Same caveats as cmmOffset above.
 cmmRegOff :: CmmReg -> Int -> CmmExpr
@@ -156,21 +195,27 @@ cmmLabelOff lbl 0        = CmmLabel lbl
 cmmLabelOff lbl byte_off = CmmLabelOff lbl byte_off
 
 -- | Useful for creating an index into an array, with a staticaly known offset.
-cmmIndex :: MachRep -> CmmExpr -> Int -> CmmExpr
-cmmIndex rep base idx = cmmOffset base (idx * machRepByteWidth rep)
+-- The type is the element type; used for making the multiplier
+cmmIndex :: Width	-- Width w
+	 -> CmmExpr	-- Address of vector of items of width w
+	 -> Int		-- Which element of the vector (0 based)
+	 -> CmmExpr	-- Address of i'th element
+cmmIndex width base idx = cmmOffset base (idx * widthInBytes width)
 
 -- | Useful for creating an index into an array, with an unknown offset.
-cmmIndexExpr :: MachRep -> CmmExpr -> CmmExpr -> CmmExpr
-cmmIndexExpr rep base (CmmLit (CmmInt n _)) = cmmIndex rep base (fromInteger n)
-cmmIndexExpr rep base idx =
+cmmIndexExpr :: Width		-- Width w
+	     -> CmmExpr		-- Address of vector of items of width w
+	     -> CmmExpr		-- Which element of the vector (0 based)
+	     -> CmmExpr		-- Address of i'th element
+cmmIndexExpr width base (CmmLit (CmmInt n _)) = cmmIndex width base (fromInteger n)
+cmmIndexExpr width base idx =
   cmmOffsetExpr base byte_off
   where
-    idx_rep = cmmExprRep idx
-    byte_off = CmmMachOp (MO_Shl idx_rep) [
-		  idx, CmmLit (mkIntCLit (machRepLogWidth rep))]
+    idx_w = cmmExprWidth idx
+    byte_off = CmmMachOp (MO_Shl idx_w) [idx, CmmLit (mkIntCLit (widthInLog width))]
 
-cmmLoadIndex :: MachRep -> CmmExpr -> Int -> CmmExpr
-cmmLoadIndex rep expr ix = CmmLoad (cmmIndex rep expr ix) rep
+cmmLoadIndex :: CmmType -> CmmExpr -> Int -> CmmExpr
+cmmLoadIndex ty expr ix = CmmLoad (cmmIndex (typeWidth ty) expr ix) ty
 
 ---------------------------------------------------
 --
@@ -179,10 +224,10 @@ cmmLoadIndex rep expr ix = CmmLoad (cmmIndex rep expr ix) rep
 ---------------------------------------------------
 
 mkIntCLit :: Int -> CmmLit
-mkIntCLit i = CmmInt (toInteger i) wordRep
+mkIntCLit i = CmmInt (toInteger i) wordWidth
 
 zeroCLit :: CmmLit
-zeroCLit = CmmInt 0 wordRep
+zeroCLit = CmmInt 0 wordWidth
 
 mkLblExpr :: CLabel -> CmmExpr
 mkLblExpr lbl = CmmLit (CmmLabel lbl)
@@ -194,20 +239,21 @@ mkLblExpr lbl = CmmLit (CmmLabel lbl)
 ---------------------------------------------------
 
 loadArgsIntoTemps :: [Unique]
-                  -> CmmActuals
-                  -> ([Unique], [CmmStmt], CmmActuals)
+                  -> HintedCmmActuals
+                  -> ([Unique], [CmmStmt], HintedCmmActuals)
 loadArgsIntoTemps uniques [] = (uniques, [], [])
-loadArgsIntoTemps uniques ((CmmKinded e hint):args) =
+loadArgsIntoTemps uniques ((CmmHinted e hint):args) =
     (uniques'',
      new_stmts ++ remaining_stmts,
-     (CmmKinded new_e hint) : remaining_e)
+     (CmmHinted new_e hint) : remaining_e)
     where
       (uniques', new_stmts, new_e) = maybeAssignTemp uniques e
       (uniques'', remaining_stmts, remaining_e) =
           loadArgsIntoTemps uniques' args
 
+
 maybeAssignTemp :: [Unique] -> CmmExpr -> ([Unique], [CmmStmt], CmmExpr)
 maybeAssignTemp uniques e
     | hasNoGlobalRegs e = (uniques, [], e)
     | otherwise         = (tail uniques, [CmmAssign local e], CmmReg local)
-    where local = CmmLocal (LocalReg (head uniques) (cmmExprRep e) GCKindNonPtr)
+    where local = CmmLocal (LocalReg (head uniques) (cmmExprType e))
