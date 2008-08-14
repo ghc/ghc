@@ -1247,7 +1247,13 @@ These considerations lead to the following definition of an orphan module:
 
 
 
-<para>GHC will warn you if you are creating an orphan module, if you add `-fwarn-orphan-modules`.
+<para>If you use the flag <option>-fwarn-orphans</option>, GHC will warn you 
+if you are creating an orphan module.
+Like any warning, you can switch the warning off with <option>-fno-warn-orphans</option>, 
+and <option>-Werror</option>
+will make the compilation fail if the warning is issued.
+</para>
+<para>
 You can identify an orphan module by looking in its interface
 file, <filename>M.hi</filename>, using the
 <link linkend="modes"><option>--show-iface</option> mode</link>.  If there is a <literal>[orphan module]</literal> on the

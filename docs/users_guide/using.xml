@@ -1179,7 +1179,8 @@ f foo = foo { x = 6 }
 	  <para>The trouble with orphans is that GHC must pro-actively read the interface
 	    files for all orphan modules, just in case their instances or rules
 	    play a role, whether or not the module's interface would otherwise 
-	    be of any use.  Other things being equal, avoid orphan modules.</para>
+	    be of any use.  See <xref linkend="orphan-modules"/> for details.
+            </para>
 	</listitem>
       </varlistentry>
 
