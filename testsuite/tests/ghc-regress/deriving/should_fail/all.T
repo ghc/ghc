@@ -14,4 +14,8 @@ test('drvfail012', normal, compile_fail, [''])
 test('drvfail013', normal, compile_fail, [''])
 test('drvfail014', normal, compile_fail, [''])
 test('drvfail015', normal, compile_fail, [''])
+test('drvfail016',
+     extra_clean(['drvfail016.hi-boot', 'drvfail016.o-boot']),
+     run_command,
+     ['$MAKE --no-print-directory -s drvfail016'])
 test('T2394', normal, compile_fail, [''])
