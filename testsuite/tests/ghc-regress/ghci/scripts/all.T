@@ -35,6 +35,7 @@ test('ghci023', normal, ghci_script, ['ghci023.script'])
 execfile(in_testdir('ghci024.py')) # load function prepare024
 test('ghci024',
      [prepare024,
+      skip_if_fast,
       if_platform("powerpc-apple-darwin", expect_broken(1845)),
       extra_clean(['ghci024.stdout'])],
      ghci_script,
