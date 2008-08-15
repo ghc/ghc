@@ -64,7 +64,9 @@ binary-dist: $(foreach P,$(WITH_STAGE1),binary-dist.$P)
 	echo $(WHERE_AM_I)/Makefile >> $(BIN_DIST_LIST)
 	set -e; for d in $(SUBDIRS); do $(MAKE) -C $$d binary-dist WHERE_AM_I=$(WHERE_AM_I)/$$d; done
 
-clean distclean:: $(foreach P,$(WITH_EITHER),clean.$P)
+clean:: $(foreach P,$(WITH_EITHER),clean.$P)
+
+distclean:: $(foreach P,$(WITH_EITHER),distclean.$P)
 
 with-bootstrapping-compiler: \
     $(foreach P,$(WITH_BOOTSTRAPPING_COMPILER),with-bootstrapping-compiler.$P)
@@ -76,6 +78,10 @@ install:: $(foreach P,$(WITH_STAGE1),install.$P)
 $(foreach P,$(WITH_EITHER),clean.$P): \
 clean.%:
 	$(MAKE) -C $* clean
+
+$(foreach P,$(WITH_EITHER),distclean.$P): \
+distclean.%:
+	$(MAKE) -C $* distclean
 
 $(foreach P,$(WITH_BOOTSTRAPPING_COMPILER),with-bootstrapping-compiler.$P): \
 with-bootstrapping-compiler.%:
