@@ -1,0 +1,1 @@
+ghc-pkg: unregistering testpkg-2.0 would break the following packages: testpkg-3.0 (use --force to override)
