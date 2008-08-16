@@ -85,8 +85,7 @@ test('readwrite001',
 test('readwrite002',
      [omit_ways(['ghci']), 
       set_stdin('readwrite002.hs'),
-      extra_clean(['readwrite002.inout']),
-      if_platform('i386-unknown-mingw32', skip)], # see #1198
+      extra_clean(['readwrite002.inout'])],
      compile_and_run, ['-cpp'])
 
 test('hGetBuf001', compose(only_compiler_types(['ghc']),
