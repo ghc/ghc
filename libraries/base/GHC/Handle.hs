@@ -38,7 +38,7 @@ module GHC.Handle (
 
   stdin, stdout, stderr,
   IOMode(..), openFile, openBinaryFile, fdToHandle_stat, fdToHandle, fdToHandle',
-  hFileSize, hSetFileSize, hIsEOF, isEOF, hLookAhead, hSetBuffering, hSetBinaryMode,
+  hFileSize, hSetFileSize, hIsEOF, isEOF, hLookAhead, hLookAhead', hSetBuffering, hSetBinaryMode,
   hFlush, hDuplicate, hDuplicateTo,
 
   hClose, hClose_help,
@@ -1245,8 +1245,11 @@ isEOF = hIsEOF stdin
 --  * 'isEOFError' if the end of file has been reached.
 
 hLookAhead :: Handle -> IO Char
-hLookAhead handle = do
-  wantReadableHandle "hLookAhead"  handle $ \handle_ -> do
+hLookAhead handle =
+  wantReadableHandle "hLookAhead"  handle hLookAhead'
+
+hLookAhead' :: Handle__ -> IO Char
+hLookAhead' handle_ = do
   let ref     = haBuffer handle_
       fd      = haFD handle_
       is_line = haBufferMode handle_ == LineBuffering
@@ -1256,7 +1259,7 @@ hLookAhead handle = do
   new_buf <- if bufferEmpty buf
                 then fillReadBuffer fd True (haIsStream handle_) buf
                 else return buf
-  
+
   writeIORef ref new_buf
 
   (c,_) <- readCharFromBuffer (bufBuf buf) (bufRPtr buf)

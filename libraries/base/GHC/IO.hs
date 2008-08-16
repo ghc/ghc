@@ -93,7 +93,11 @@ hWaitForInput h msecs = do
                      fdReady (haFD handle_) 0 {- read -}
                                 (fromIntegral msecs)
                                 (fromIntegral $ fromEnum $ haIsStream handle_)
-                return (r /= 0)
+                if r /= 0 then do -- Call hLookAhead' to throw an EOF
+                                  -- exception if appropriate
+                                  hLookAhead' handle_
+                                  return True
+                          else return False
 
 foreign import ccall safe "fdReady"
   fdReady :: CInt -> CInt -> CInt -> CInt -> IO CInt
