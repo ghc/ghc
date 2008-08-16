@@ -112,8 +112,7 @@ test('1288', [ skip_if_not_windows, omit_ways(['ghci']),
                extra_clean(['1288_c.o']) ],
              compile_and_run, ['1288_c.c'])
 test('1288', [ skip_if_not_windows, only_ways(['ghci']),
-               cmd_prefix('$MAKE --no-print-directory -C ' + getTestDir() +
-                          ' 1288_ghci_setup && '),
+               cmd_prefix('$MAKE --no-print-directory 1288_ghci_setup && '),
                extra_clean(['1288_ghci_c.c', '1288_ghci_c.o']) ],
              compile_and_run, ['1288_ghci_c.o'])
 
@@ -121,7 +120,6 @@ test('2276', [ skip_if_not_windows, omit_ways(['ghci']),
                extra_clean(['2276_c.o']) ],
              compile_and_run, ['2276_c.c'])
 test('2276', [ skip_if_not_windows, only_ways(['ghci']),
-               cmd_prefix('$MAKE --no-print-directory -C ' + getTestDir() +
-                          ' 2276_ghci_setup && '),
+               cmd_prefix('$MAKE --no-print-directory 2276_ghci_setup && '),
                extra_clean(['2276_ghci_c.c', '2276_ghci_c.o']) ],
              compile_and_run, ['-fobject-code 2276_ghci_c.o'])
