@@ -324,7 +324,7 @@ sub init_TARGET_STUFF {
 
     #--------------------------------------------------------#
     } elsif ( $TargetPlatform =~ /^i386-apple-darwin.*/m ) {
-				# Apple PowerPC Darwin/MacOS X.
+				# Apple i386 Darwin/MacOS X.
     $T_STABBY	    = 0; # 1 iff .stab things (usually if a.out format)
     $T_US	    = '_'; # _ if symbols have an underscore on the front
     $T_PRE_APP	    = 'DOESNT APPLY'; # regexp that says what comes before APP/NO_APP
@@ -353,7 +353,7 @@ sub init_TARGET_STUFF {
 
     #--------------------------------------------------------#
     } elsif ( $TargetPlatform =~ /^x86_64-apple-darwin.*/m ) {
-				# Apple PowerPC Darwin/MacOS X.
+				# Apple amd64 Darwin/MacOS X.
     $T_STABBY	    = 0; # 1 iff .stab things (usually if a.out format)
     $T_US	    = '_'; # _ if symbols have an underscore on the front
     $T_PRE_APP	    = 'DOESNT APPLY'; # regexp that says what comes before APP/NO_APP
