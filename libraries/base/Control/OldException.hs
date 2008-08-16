@@ -748,7 +748,7 @@ instance New.Exception Exception where
   toException (ExitException exc)    = SomeException exc
   toException (IOException exc)      = SomeException exc
   toException (NoMethodError err)    = SomeException (New.NoMethodError err)
-  toException NonTermination         = SomeException NonTermination
+  toException NonTermination         = SomeException New.NonTermination
   toException (PatternMatchFail err) = SomeException (New.PatternMatchFail err)
   toException (RecConError err)      = SomeException (New.RecConError err)
   toException (RecSelError err)      = SomeException (New.RecSelError err)
