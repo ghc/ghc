@@ -33,12 +33,7 @@ test('hGetPosn001',
 test('hIsEOF001',   normal, compile_and_run, [''])
 test('hIsEOF002', extra_clean(['hIsEOF002.out']), compile_and_run, ['-cpp'])
 
-# hReady is broken for files (always returns False) on Unix platforms
-# (bug #1063) , but is broken in a different way on Windows (always
-# returns True) (bug #1198).
-test('hReady001',
-     if_compiler_type('ghc', expect_broken(1063)),
-     compile_and_run, ['-cpp'])
+test('hReady001', normal, compile_and_run, ['-cpp'])
 
 test('hSeek001', normal, compile_and_run, [''])
 test('hSeek002', normal, compile_and_run, ['-cpp'])

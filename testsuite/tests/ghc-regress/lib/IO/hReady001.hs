@@ -1,7 +1,6 @@
 -- !!! hReady test
 
- -- hReady should probably return False at the end of a file,
- -- but in GHC it returns True (known bug).
+ -- hReady should throw and EOF exception at the end of a file. Trac #1063.
 
 import IO
 #ifdef i386_unknown_mingw32
@@ -15,4 +14,5 @@ main = do
 #endif
  hReady h >>= print
  hSeek h SeekFromEnd 0
- hReady h >>= print
+ (hReady h >> return ()) `catch` print
+
