@@ -1053,6 +1053,7 @@ loadModule' files = do
   prev_context <- io $ GHC.getContext session
 
   -- unload first
+  io $ GHC.abandonAll session
   discardActiveBreakPoints
   io (GHC.setTargets session [])
   io (GHC.load session LoadAllTargets)
