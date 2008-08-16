@@ -72,6 +72,12 @@ import Control.Arrow (ArrowZero(..)) -- work around nhc98 typechecker problem
 import GHC.Exts (build)
 #endif
 
+#if defined(__GLASGOW_HASKELL__)
+import GHC.Arr
+#elif defined(__HUGS__)
+import Hugs.Array
+#endif
+
 -- | Data structures that can be folded.
 --
 -- Minimal complete definition: 'foldMap' or 'foldr'.
@@ -146,6 +152,11 @@ instance Foldable [] where
         foldl = Prelude.foldl
         foldr1 = Prelude.foldr1
         foldl1 = Prelude.foldl1
+
+#ifndef __NHC__
+instance Ix i => Foldable (Array i) where
+    foldr f z = Prelude.foldr f z . elems
+#endif
 
 -- | Fold over the elements of a structure,
 -- associating to the right, but strictly.

@@ -100,7 +100,7 @@ import GHC.IOBase       (IORef,newIORef,unsafePerformIO)
 -- These imports are so we can define Typeable instances
 -- It'd be better to give Typeable instances in the modules themselves
 -- but they all have to be compiled before Typeable
-import GHC.IOBase       ( IO, MVar, Handle, block )
+import GHC.IOBase       ( IOArray, IO, MVar, Handle, block )
 import GHC.ST           ( ST )
 import GHC.STRef        ( STRef )
 import GHC.Ptr          ( Ptr, FunPtr )
@@ -118,11 +118,12 @@ import Hugs.IORef       ( IORef, newIORef, readIORef, writeIORef )
 import Hugs.IOExts      ( unsafePerformIO )
         -- For the Typeable instance
 import Hugs.Array       ( Array )
+import Hugs.IOArray
 import Hugs.ConcBase    ( MVar )
 #endif
 
 #ifdef __NHC__
-import NHC.IOExtras (IORef,newIORef,readIORef,writeIORef,unsafePerformIO)
+import NHC.IOExtras (IOArray,IORef,newIORef,readIORef,writeIORef,unsafePerformIO)
 import IO (Handle)
 import Ratio (Ratio)
         -- For the Typeable instance
@@ -491,8 +492,8 @@ INSTANCE_TYPEABLE1(IO,ioTc,"IO")
 INSTANCE_TYPEABLE1(MVar,mvarTc,"MVar" )
 #endif
 
--- Types defined in GHC.Arr
 INSTANCE_TYPEABLE2(Array,arrayTc,"Array")
+INSTANCE_TYPEABLE2(IOArray,iOArrayTc,"IOArray")
 
 #ifdef __GLASGOW_HASKELL__
 -- Hugs has these too, but their Typeable<n> instances are defined

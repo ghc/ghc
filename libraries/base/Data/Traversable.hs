@@ -43,6 +43,12 @@ import Control.Applicative
 import Data.Foldable (Foldable())
 import Data.Monoid (Monoid)
 
+#if defined(__GLASGOW_HASKELL__)
+import GHC.Arr
+#elif defined(__HUGS__)
+import Hugs.Array
+#endif
+
 -- | Functors representing data structures that can be traversed from
 -- left to right.
 --
@@ -103,6 +109,11 @@ instance Traversable [] where
           where cons_f x ys = (:) <$> f x <*> ys
 
         mapM = Prelude.mapM
+
+#ifndef __NHC__
+instance Ix i => Traversable (Array i) where
+    traverse f arr = listArray (bounds arr) `fmap` traverse f (elems arr)
+#endif
 
 -- general functions
 
