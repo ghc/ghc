@@ -82,9 +82,11 @@ BUILD_FLAGS=$(patsubst %, --ghc-option=%, $(EXTRA_HC_OPTS))
 # no library to register
 
 ifeq "$(stage)" "1"
+ifeq "$(ghc_ge_609)" "NO"
 # GHC 6.9+ can handle cross-package recompilation checking, but
 # we don't rely on the bootstrapping compiler being able to do this.
 TOUCH_MAIN = $(RM) dist-stage1/build/ghc/ghc-tmp/Main.o
+endif
 endif
 
 boot.stage.%:
