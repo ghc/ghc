@@ -1,4 +1,5 @@
 
+import Control.Monad
 import Data.Maybe
 import Distribution.PackageDescription
 import Distribution.PackageDescription.Parse
@@ -124,7 +125,11 @@ doInstall verbosity distPref enableShellWrappers strip
               lbi_reg = lbi { installDirTemplates = i_reg,
                               withPrograms = progs' }
           (copyHook simpleUserHooks) pd     lbi_copy userHooks copyFlags
-          (regHook simpleUserHooks)  pd_reg lbi_reg  userHooks registerFlags
+          -- Cabal prints a scary "Package contains no library to register"
+          -- message if we call register but this is an executable package.
+          -- We therefore don't call it if we don't have a library for it.
+          when (isJust (library pd_reg)) $
+            (regHook simpleUserHooks)  pd_reg lbi_reg  userHooks registerFlags
           return ()
 
 replaceTopdir :: FilePath -> FilePath -> FilePath
