@@ -89,7 +89,7 @@ TOUCH_MAIN = $(RM) dist-stage1/build/ghc/ghc-tmp/Main.o
 endif
 endif
 
-dist-stage%: boot.stage.%
+dist-stage1 dist-stage2 dist-stage3: dist-stage%: boot.stage.%
 
 boot.stage.%:
 	$(CABAL) configure --distpref dist-stage$*         \
