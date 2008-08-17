@@ -531,7 +531,7 @@ ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 DEFAULT_TMPDIR		= /C/TEMP
 endif
 
-# FPTOOLS_TOP: the top of the fptools hierarchy, absolute path.
+# FPTOOLS_TOP_ABS: the top of the fptools hierarchy, absolute path.
 # On Windows this is a c:/foo/bar style path.
 FPTOOLS_TOP_ABS		= @hardtop@
 
