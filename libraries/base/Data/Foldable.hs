@@ -76,6 +76,8 @@ import GHC.Exts (build)
 import GHC.Arr
 #elif defined(__HUGS__)
 import Hugs.Array
+#elif defined(__NHC__)
+import Array
 #endif
 
 -- | Data structures that can be folded.
@@ -153,10 +155,8 @@ instance Foldable [] where
         foldr1 = Prelude.foldr1
         foldl1 = Prelude.foldl1
 
-#ifndef __NHC__
 instance Ix i => Foldable (Array i) where
-    foldr f z = Prelude.foldr f z . elems
-#endif
+        foldr f z = Prelude.foldr f z . elems
 
 -- | Fold over the elements of a structure,
 -- associating to the right, but strictly.

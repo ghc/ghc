@@ -47,6 +47,8 @@ import Data.Monoid (Monoid)
 import GHC.Arr
 #elif defined(__HUGS__)
 import Hugs.Array
+#elif defined(__NHC__)
+import Array
 #endif
 
 -- | Functors representing data structures that can be traversed from
@@ -110,10 +112,8 @@ instance Traversable [] where
 
         mapM = Prelude.mapM
 
-#ifndef __NHC__
 instance Ix i => Traversable (Array i) where
-    traverse f arr = listArray (bounds arr) `fmap` traverse f (elems arr)
-#endif
+        traverse f arr = listArray (bounds arr) `fmap` traverse f (elems arr)
 
 -- general functions
 
