@@ -14,13 +14,7 @@
 # Setting .SUFFIXES to empty disables them all.
 MAKEFLAGS += --no-builtin-rules
 
-# GHC_TOP is the *relative* path to the fptools toplevel directory from the
-# location where a project Makefile was invoked. It is set by looking at the
-# current value of TOP.
-#
-GHC_TOP := $(TOP)
-
-# $(FPTOOLS_TOP) is the old name for $(GHC_TOP), kept for backwards compat
+# $(FPTOOLS_TOP) is the old name for $(TOP), kept for backwards compat
 FPTOOLS_TOP := $(TOP)
 
 
