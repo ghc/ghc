@@ -89,6 +89,8 @@ TOUCH_MAIN = $(RM) dist-stage1/build/ghc/ghc-tmp/Main.o
 endif
 endif
 
+dist-stage%: boot.stage.%
+
 boot.stage.%:
 	$(CABAL) configure --distpref dist-stage$*         \
 	                   $(INSTALL_DIRS_CONFIGURE_FLAGS) \
@@ -98,7 +100,7 @@ boot.stage.%:
 	                   --datadir='$$libdir'            \
 	                   --datasubdir=.
 
-build.stage.%:
+build.stage.%: dist-stage%
 	$(TOUCH_MAIN)
 	$(CABAL) build     --distpref dist-stage$* $(BUILD_FLAGS)
 	$(INSTALL_PACKAGE) install '$(GHC_PKG_PROG)' 'XXX/package.conf' "" \

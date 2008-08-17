@@ -131,8 +131,6 @@ stage1 : $(GCC_LIB_DEP) check-all
 	  $(MAKE) --no-print-directory -C $$i $(MFLAGS) all; \
 	  if [ $$? -eq 0 -o $$x_on_err -eq 0 ] ;  then true; else exit 1; fi; \
 	done
-	$(MAKE) -C ghc stage=1 boot
-	$(MAKE) -C ghc stage=1
 	$(MAKE) -C rts boot
 	$(MAKE) -C rts
 	$(MAKE) -C libraries all
@@ -151,14 +149,10 @@ stage2 : check-all
 ifeq "$(HADDOCK_DOCS)" "YES"
 	$(MAKE) -C compiler stage=2 doc
 endif
-	$(MAKE) -C ghc      stage=2 boot
-	$(MAKE) -C ghc      stage=2
 
 stage3 : check-all
 	$(MAKE) -C compiler stage=3 boot
 	$(MAKE) -C compiler stage=3
-	$(MAKE) -C ghc      stage=3 boot
-	$(MAKE) -C ghc      stage=3
 
 bootstrap  : bootstrap2
 

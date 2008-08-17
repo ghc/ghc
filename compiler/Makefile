@@ -186,6 +186,7 @@ boot.stage.%: $(PRIMOP_BITS) $(CONFIG_HS) parser/Parser.y
 build.stage.%:
 	$(MAKE) -f Makefile-stage$* stage=$*
 	$(CABAL) register  --distpref dist-stage$* --inplace
+	$(MAKE) -C ../ghc stage=$*
 
 doc.stage.%:
 	$(CABAL) haddock --distpref dist-stage$*
