@@ -595,7 +595,7 @@ DIST_CLEAN_FILES += config.cache config.status mk/config.h mk/stamp-h \
 	docs/users_guide/ug-book.xml extra-gcc-opts
 
 # don't clean config.mk: it's needed when cleaning stuff later on
-LATE_DIST_CLEAN_FILES += mk/config.mk 
+LATE_DIST_CLEAN_FILES += mk/config.mk mk/are-validating.mk
 
 # VERSION is shipped in a source dist
 MAINTAINER_CLEAN_FILES += VERSION

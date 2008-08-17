@@ -73,7 +73,9 @@ fi
 
 thisdir=`utils/pwd/pwd forwardslash`
 
-make Validating=YES -j$threads ValidateHpc=$hpc ValidateSlow=$slow
+echo "Validating=YES" > mk/are-validating.mk
+
+make -j$threads ValidateHpc=$hpc ValidateSlow=$slow
 fi # testsuite-only
 
 if [ "$hpc" = YES ]
@@ -86,7 +88,7 @@ then
     rm -f $HPCTIXFILE
 fi
 
-make Validating=YES -C testsuite/tests/ghc-regress fast stage=2 CLEANUP=1 THREADS=$threads 2>&1 | tee testlog
+make -C testsuite/tests/ghc-regress fast stage=2 CLEANUP=1 THREADS=$threads 2>&1 | tee testlog
 
 if [ "$hpc" = YES ]
 then
