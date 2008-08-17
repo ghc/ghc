@@ -286,19 +286,17 @@ def _namebase( opts, nb ):
 
 # ---
 
-def skip_if_tag( tag ):
-   return lambda opts, t=tag: _skip_if_tag(opts, t)
-
-def _skip_if_tag( opts, tag ):
+def if_tag( tag, f ):
     if tag in config.compiler_tags:
-	opts.skip = 1
-	
-def skip_unless_tag( tag ):
-   return lambda opts, t=tag: _skip_unless_tag(opts, t)
+        return f
+    else:
+        return normal
 
-def _skip_unless_tag( opts, tag ):
+def unless_tag( tag, f ):
     if not (tag in config.compiler_tags):
-	opts.skip = 1
+        return f
+    else:
+        return normal
 
 # ---
 def alone(opts):
