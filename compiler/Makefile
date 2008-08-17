@@ -55,6 +55,7 @@ stage2 ::
 stage3 ::
 	$(MAKE) stage=3
 
+ifeq "$(CLEAN_ALL_STAGES)" "YES"
 clean distclean::
 	$(RM) -f prelude/primops.txt
 	$(RM) -f $(PRIMOP_BITS)
@@ -62,6 +63,7 @@ clean distclean::
 	$(RM) -f parser/Parser.y
 	$(RM) -rf stage1 stage2plus
 	$(RM) -f $(STAGE3_PACKAGE_CONF)
+endif
 
 ifeq "$(CLEAN_ALL_STAGES)" "YES"
 clean distclean:: clean.stage.1 clean.stage.2 clean.stage.3
