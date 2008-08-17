@@ -13,9 +13,9 @@ test('TH_1tuple', normal, compile_fail, ['-v0'])
 test('TH_repE1', normal, compile, [''])
 test('TH_repE2', normal, compile_and_run, [''])
 test('TH_repE3', normal, compile, [''])
-test('TH_repPrim', if_compiler_lt('ghc','6.9', skip), compile, ['-v0'])
+test('TH_repPrim', normal, compile, ['-v0'])
 test('TH_spliceGuard', normal, compile, ['-v0'])
-test('TH_repPrimOutput', if_compiler_lt('ghc','6.9', skip), compile_and_run, [''])
+test('TH_repPrimOutput', normal, compile_and_run, [''])
 test('TH_repGuard', normal, compile, ['-v0'])
 test('TH_repGuardOutput', normal, compile_and_run, [''])
 test('TH_repPatSig', normal, compile_fail, [''])
@@ -50,7 +50,7 @@ test('TH_reifyDecl2', normal, compile, ['-v0'])
 
 test('TH_reifyType1', normal, compile, [''])
 test('TH_reifyType2', normal, compile, [''])
-test('TH_reifyMkName', if_compiler_lt('ghc', '6.9', expect_fail), compile, [''])
+test('TH_reifyMkName', normal, compile, [''])
 
 test('TH_spliceDecl1', normal, compile, ['-v0'])
 test('TH_spliceDecl2', normal, compile, ['-v0'])
@@ -83,20 +83,20 @@ test('TH_where', normal, compile_and_run, [''])
 
 test('TH_spliceInst', normal, compile, ['-v0'])
 
-test('TH_exn1', if_compiler_lt('ghc','6.9', namebase('TH_exn1-6.8')), compile_fail, ['-v0'])
+test('TH_exn1', normal, compile_fail, ['-v0'])
 
 test('TH_dupdecl', normal, compile_fail, ['-v0'])
-test('TH_exn2', if_compiler_lt('ghc','6.9', namebase('TH_exn2-6.8')), compile_fail, ['-v0'])
+test('TH_exn2', normal, compile_fail, ['-v0'])
 
 test('TH_recover', normal, compile_and_run, [''])
 test('TH_dataD1', normal, compile_fail, ['-v0'])
 
 test('TH_ppr1', normal, compile_and_run, ['-fglasgow-exts'])
 
-test('TH_fail', if_compiler_lt('ghc','6.9', namebase('TH_fail-6.8')), compile_fail, ['-v0'])
+test('TH_fail', normal, compile_fail, ['-v0'])
 test('TH_scopedTvs', normal, compile_fail, ['-v0'])
 
-test('TH_runIO', if_compiler_lt('ghc','6.9', namebase('TH_runIO-6.8')), compile_fail, ['-v0'])
+test('TH_runIO', normal, compile_fail, ['-v0'])
 
 test('TH_ghci1', normal, ghci_script, ['TH_ghci1.script'])
 

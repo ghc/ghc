@@ -51,8 +51,7 @@ test('rn037', normal, compile, [''])
 # Missing:
 # test('rn038', normal, compile, [''])
 
-test('rn039', if_compiler_lt('ghc', '6.9', namebase('rn039-6.8')),
-              compile, [''])
+test('rn039', normal, compile, [''])
 test('rn040', normal, compile, ['-fwarn-unused-binds -fwarn-unused-matches'])
 test('rn041', normal, compile, [''])
 test('rn042',
@@ -96,11 +95,10 @@ test('rn059',
 test('rn060', normal, compile, [''])
 test('rn061', normal, compile, [''])
 test('rn062', normal, compile, [''])
-test('rn063', if_compiler_lt('ghc', '6.9', expect_fail), compile, [''])
+test('rn063', normal, compile, [''])
 test('rn064', normal, compile, [''])
 test('rn065',
-     [if_compiler_lt('ghc', '6.9', expect_fail),
-      extra_clean(['Rn065A.hi', 'Rn065A.o'])],
+     extra_clean(['Rn065A.hi', 'Rn065A.o']),
      multimod_compile,
      ['rn065', '-v0'])
 
@@ -108,7 +106,7 @@ test('rn066',
      extra_clean(['Rn066_A.hi', 'Rn066_A.o']),
      multimod_compile, ['rn066', '-v0'])
 
-test('T1972', if_compiler_lt('ghc', '6.9', expect_fail), compile, [''])
+test('T1972', expect_fail, compile, [''])
 test('T2205', normal, compile, [''])
 
 test('2334', normal, compile, [''])

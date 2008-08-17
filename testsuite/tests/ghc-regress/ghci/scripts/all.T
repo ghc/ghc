@@ -48,7 +48,7 @@ test('ghci028', normal, ghci_script, ['ghci028.script'])
 test('ghci029', normal, ghci_script, ['ghci029.script'])
 test('ghci030', normal, ghci_script, ['ghci030.script'])
 test('ghci031', expect_broken(2138), ghci_script, ['ghci031.script'])
-test('ghci032', if_compiler_lt('ghc', '6.9', skip), ghci_script, ['ghci032.script'])
+test('ghci032', normal, ghci_script, ['ghci032.script'])
 test('ghci033', normal, ghci_script, ['ghci033.script'])
 test('2452', normal, ghci_script, ['2452.script'])
 

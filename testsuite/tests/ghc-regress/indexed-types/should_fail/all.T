@@ -26,12 +26,12 @@ test('Simple16', normal, compile_fail, [''])
 test('TyFamArity1', normal, compile_fail, [''])
 test('TyFamArity2', normal, compile_fail, [''])
 test('TyFamUndec', normal, compile_fail, [''])
-test('T2334', if_compiler_lt('ghc', '6.9', expect_fail), compile_fail, [''])
-test('T1900', if_compiler_lt('ghc', '6.9', expect_fail), compile_fail, [''])
-test('T2157', if_compiler_lt('ghc', '6.9', expect_fail), compile_fail, [''])
-test('T2203a', if_compiler_lt('ghc', '6.9', expect_fail), compile_fail, [''])
+test('T2334', normal, compile_fail, [''])
+test('T1900', normal, compile_fail, [''])
+test('T2157', normal, compile_fail, [''])
+test('T2203a', normal, compile_fail, [''])
 
-test('GADTwrong1', if_compiler_lt('ghc', '6.9', expect_fail), compile_fail, [''])
+test('GADTwrong1', normal, compile_fail, [''])
 
 test('Over',
      extra_clean(['OverA.hi', 'OverA.o',
@@ -40,4 +40,4 @@ test('Over',
      multimod_compile_fail,
      ['OverD', '-no-hs-main -c -v0'])
 
-test('SkolemOccursLoop', if_compiler_lt('ghc', '6.9', skip), compile_fail, [''])
+test('SkolemOccursLoop', normal, compile_fail, [''])

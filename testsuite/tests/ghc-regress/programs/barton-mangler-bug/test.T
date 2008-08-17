@@ -9,7 +9,6 @@ test('barton-mangler-bug',
                    'Plot.hi',              'Plot.o',
                    'PlotExample.hi',       'PlotExample.o',
                    'TypesettingTricks.hi', 'TypesettingTricks.o']),
-      omit_compiler_types(['hugs']),
-      if_compiler_lt('ghc', '6.9', omit_ways(['profc']))],
+      omit_compiler_types(['hugs'])],
      multimod_compile_and_run, ['Main', ''])
 

@@ -1,5 +1,0 @@
-l = (_t1::[Maybe Integer])
-Just 1
-r = GHC.IOBase.IORef (GHC.STRef.STRef (_t2::GHC.Prim.MutVar#
-                                              GHC.Prim.RealWorld [Maybe Integer]))
-r = GHC.IOBase.IORef (GHC.STRef.STRef _)

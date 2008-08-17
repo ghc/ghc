@@ -15,15 +15,12 @@ test('rebindable5', normal, compile_and_run, [''])
 
 # rebindable6 has become expected failures
 # following Trac #1537
-test('rebindable6', if_compiler_lt('ghc', '6.9', skip), compile_fail, [''])
+test('rebindable6', normal, compile_fail, [''])
 
 test('rebindable7', normal, compile_and_run, [''])
-test('rebindable8', if_compiler_lt('ghc', '6.9', expect_broken(1537)),
-                    compile, [''])
-test('rebindable9', if_compiler_lt('ghc', '6.9', expect_broken(1537)),
-                    compile, [''])
+test('rebindable8', normal, compile, [''])
+test('rebindable9', normal, compile, [''])
 
 # Tests from Oleg
 test('DoRestrictedM', normal, compile, [''])
-test('DoParamM', compose(if_compiler_lt('ghc', '6.9', skip), reqlib('mtl')),
-     compile_fail, [''])
+test('DoParamM', reqlib('mtl'), compile_fail, [''])

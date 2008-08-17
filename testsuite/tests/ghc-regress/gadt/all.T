@@ -27,8 +27,7 @@ test('gadt17',
 test('gadt18', normal, compile, [''])
 test('gadt19', normal, compile, [''])
 test('gadt20', normal, compile, [''])
-test('gadt21', if_compiler_lt('ghc','6.9', namebase('gadt21-6.8')), 
-     compile_fail, [''])
+test('gadt21', normal, compile_fail, [''])
 test('gadt22', normal, compile, [''])
 
 test('gadt23',
@@ -43,11 +42,11 @@ test('type-rep', skip_if_fast, compile_and_run, [''])
 test('equal', normal, compile, [''])
 test('nbe', normal, compile, [''])
 test('while', normal, compile_and_run, [''])
-test('rw', if_compiler_lt('ghc','6.9', namebase('rw-6.8')), compile_fail, [''])
+test('rw', normal, compile_fail, [''])
 test('lazypat', normal, compile_fail, [''])
-test('lazypatok', if_compiler_ge('ghc','6.9', expect_fail), compile, [''])
+test('lazypatok', expect_fail, compile, [''])
 test('tc', normal, compile_and_run, [''])
-test('arrow', if_compiler_lt('ghc', '6.9', skip), compile, [''])
+test('arrow', normal, compile, [''])
 test('tdpe', normal, compile, [''])
 test('Nilsson', skip_if_fast, compile, [''])
 
@@ -74,7 +73,7 @@ test('set', normal, compile, [''])
 
 test('scoped', expect_broken(1823), compile, [''])
 
-test('gadt-escape1', if_compiler_lt('ghc', '6.9', skip), compile_fail, [''])
+test('gadt-escape1', normal, compile_fail, [''])
 
 # New ones from Dimitrios
 

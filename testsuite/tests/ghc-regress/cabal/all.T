@@ -1,9 +1,8 @@
 setTestOpts(compose(alone,only_compiler_types(['ghc'])))
 
 test('ghcpkg01',
-     composes([extra_clean(['local01.package.conf',
-                            'local01.package.conf.old']),
-               if_compiler_lt('ghc', '6.9', skip)]),
+     extra_clean(['local01.package.conf',
+                  'local01.package.conf.old']),
      run_command,
      ['$MAKE -s --no-print-directory ghcpkg01'])
 test('ghcpkg02',

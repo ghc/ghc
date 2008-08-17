@@ -12,7 +12,7 @@ test('Simple8', expect_fail, compile, [''])
 test('Simple9', normal, compile, [''])
 test('Simple10', normal, compile, [''])
 test('Simple11', normal, compile, [''])
-test('Simple12', if_compiler_lt('ghc','6.9',expect_fail), compile, [''])
+test('Simple12', normal, compile, [''])
 test('Simple13', normal, compile, [''])
 test('Simple14', expect_fail, compile, [''])
 test('Simple15', normal, compile, [''])
@@ -57,10 +57,10 @@ test('Kind', normal, compile, [''])
 
 test('GADT1', expect_fail, compile, [''])
 test('GADT2', normal, compile, [''])
-test('GADT3', if_compiler_ge('ghc', '6.9', expect_fail), compile, [''])
-test('GADT4', if_compiler_lt('ghc', '6.9', expect_fail), compile, [''])
-test('GADT5', if_compiler_lt('ghc', '6.9', expect_fail), compile, [''])
-test('GADT6', if_compiler_lt('ghc', '6.9', expect_fail), compile, [''])
+test('GADT3', expect_fail, compile, [''])
+test('GADT4', normal, compile, [''])
+test('GADT5', normal, compile, [''])
+test('GADT6', normal, compile, [''])
 test('GADT7', expect_fail, compile, [''])
 test('GADT8', normal, compile, [''])
 test('GADT9', normal, compile, [''])
@@ -71,7 +71,7 @@ test('GADT13', expect_fail, compile, [''])
 
 test('Class1', normal, compile, [''])
 test('Class2', normal, compile, [''])
-test('Class3', if_compiler_lt('ghc', '6.9', expect_fail), compile, [''])
+test('Class3', normal, compile, [''])
 
 test('Refl', normal, compile, [''])
 test('Refl2', normal, compile, [''])
@@ -98,11 +98,10 @@ test('ColGivenCheck', normal, compile, [''])
 test('ColGivenCheck2', normal, compile, [''])
 
 test('InstEqContext', normal, compile, [''])
-test('InstEqContext2', if_compiler_lt('ghc', '6.9', expect_fail),
-                       compile, [''])
+test('InstEqContext2', normal, compile, [''])
 test('InstEqContext3', normal, compile, [''])
 
-test('InstContextNorm', if_compiler_lt('ghc', '6.9', expect_fail), compile, [''])
+test('InstContextNorm', normal, compile, [''])
 
 test('HO', normal, compile, [''])
 
@@ -113,4 +112,5 @@ test('GivenCheckTop', normal, compile, [''])
 
 test('Gentle', normal, compile, [''])
 test('T1981', normal, compile, [''])
-test('T2238', if_compiler_lt('ghc', '6.9', expect_fail), compile, [''])
+test('T2238', normal, compile, [''])
+
