@@ -80,6 +80,14 @@ CONFIGURE_FLAGS_STAGE2 += --flags=-stage1
 
 CONFIGURE_FLAGS_STAGE1 += --flags=-ghci
 
+ifeq "$(GhcWithNativeCodeGen)" "YES"
+CONFIGURE_FLAGS_STAGE1 += --flags=ncg
+CONFIGURE_FLAGS_STAGE2 += --flags=ncg
+else
+CONFIGURE_FLAGS_STAGE1 += --flags=-ncg
+CONFIGURE_FLAGS_STAGE2 += --flags=-ncg
+endif
+
 ifeq "$(GhcWithInterpreter)" "YES"
 CONFIGURE_FLAGS_STAGE2 += --flags=ghci
 

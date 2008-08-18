@@ -26,6 +26,9 @@ Flag editline
 Flag ghci
     Description: Build GHCi support.
 
+Flag ncg
+    Description: Build the NCG.
+
 Flag stage1
     Description: Is this stage 1?
 
@@ -59,6 +62,9 @@ Library
         Build-Depends: template-haskell
         CPP-Options: -DGHCI
         Include-Dirs: ../libffi/build/include
+
+    if !flag(ncg)
+        CPP-Options: -DOMIT_NATIVE_CODEGEN
 
     -- GHC 6.4.2 needs to be able to find WCsubst.c, which needs to be
     -- able to find WCsubst.h
@@ -98,7 +104,6 @@ Library
         hsSyn
         iface
         main
-        nativeGen
         parser
         prelude
         profiling
@@ -269,24 +274,6 @@ Library
         StaticFlags
         SysTools
         TidyPgm
-        AsmCodeGen
-        MachCodeGen
-        MachInstrs
-        MachRegs
-        NCGMonad
-        PositionIndependentCode
-        PprMach
-        RegAllocColor
-        RegAllocInfo
-        RegAllocLinear
-        RegAllocStats
-        RegArchBase
-        RegArchX86
-        RegCoalesce
-        RegLiveness
-        RegSpill
-        RegSpillClean
-        RegSpillCost
         Ctype
         HaddockLex
         HaddockParse
@@ -417,6 +404,30 @@ Library
         VectType
         VectUtils
         Vectorise
+
+    if flag(ncg)
+        hs-source-dirs:
+            nativeGen
+
+        Exposed-Modules:
+            AsmCodeGen
+            MachCodeGen
+            MachInstrs
+            MachRegs
+            NCGMonad
+            PositionIndependentCode
+            PprMach
+            RegAllocColor
+            RegAllocInfo
+            RegAllocLinear
+            RegAllocStats
+            RegArchBase
+            RegArchX86
+            RegCoalesce
+            RegLiveness
+            RegSpill
+            RegSpillClean
+            RegSpillCost
 
     if flag(ghci)
         Exposed-Modules:
