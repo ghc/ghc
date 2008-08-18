@@ -98,7 +98,11 @@ ppExport _ = []
 
 
 ppSig :: Sig Name -> [String]
-ppSig (TypeSig name sig) = [operator (out name) ++ " :: " ++ out sig]
+ppSig (TypeSig name sig) = [operator (out name) ++ " :: " ++ out typ]
+    where
+        typ = case unL sig of
+                   HsForAllTy Explicit a b c -> HsForAllTy Implicit a b c
+                   x -> x
 ppSig _ = []
 
 
