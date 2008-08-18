@@ -109,7 +109,7 @@ ppSynonym x = [out x]
 -- note: does not yet output documentation for class methods
 ppClass :: TyClDecl Name -> [String]
 ppClass x = out x{tcdSigs=[]} :
-            map (out . addContext . unL) (tcdSigs x)
+            concatMap (ppSig . addContext . unL) (tcdSigs x)
     where
         addContext (TypeSig name (L l sig)) = TypeSig name (L l $ f sig)
         f (HsForAllTy a b con d) = HsForAllTy a b (reL $ context : unL con) d
