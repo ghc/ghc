@@ -1,0 +1,2 @@
+ghc-pkg: package has duplicate dependencies: testpkg-1.2.3.4 (use --force to override)
+package has duplicate dependencies: testpkg-1.2.3.4 (ignoring)

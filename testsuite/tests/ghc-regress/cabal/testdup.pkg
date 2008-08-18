@@ -1,0 +1,4 @@
+name: testdup
+version: 1.0
+license: BSD3
+depends: testpkg-1.2.3.4 testpkg-1.2.3.4 

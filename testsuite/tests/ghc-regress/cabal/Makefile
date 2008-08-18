@@ -97,6 +97,17 @@ ghcpkg05 :
 	$(LOCAL_GHC_PKG05b) unregister testpkg-3.0
 	$(LOCAL_GHC_PKG05b) unregister testpkg-2.0
 
+# Test for #2330: reject duplicate dependencies
+PKGCONF06=local06.package.conf
+LOCAL_GHC_PKG06 = $(GHC_PKG_INPLACE) -f $(PKGCONF06)
+
+ghcpkg06 :
+	rm -f $(PKGCONF06)
+	echo "[]" >$(PKGCONF06)
+	$(LOCAL_GHC_PKG06) register --force test.pkg >/dev/null 2>&1 
+	if $(LOCAL_GHC_PKG06) register testdup.pkg; then false else true; fi
+	$(LOCAL_GHC_PKG06) register --force testdup.pkg
+
 PKGCONF1750=local1750.package.conf
 LOCAL_GHC_PKG1750 = $(GHC_PKG_INPLACE) -f $(PKGCONF1750)
 

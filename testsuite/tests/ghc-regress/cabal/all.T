@@ -29,6 +29,11 @@ test('ghcpkg05',
                    'local05b.package.conf.old'])],
      run_command,
      ['$MAKE -s --no-print-directory ghcpkg05'])
+test('ghcpkg06',
+     [extra_clean(['local06.package.conf',
+                   'local06.package.conf.old'])],
+     run_command,
+     ['$MAKE -s --no-print-directory ghcpkg06'])
 
 # Test that we *can* compile a module that also belongs to a package
 # (this was disallowed in GHC 6.4 and earlier)
