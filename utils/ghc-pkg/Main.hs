@@ -43,13 +43,7 @@ import System.Exit ( exitWith, ExitCode(..) )
 import System.Environment ( getArgs, getProgName, getEnv )
 import System.IO
 import System.IO.Error (try)
-import Data.List ( isPrefixOf, isSuffixOf, intersperse, sortBy, nub,
-                   unfoldr, break, partition )
-#if __GLASGOW_HASKELL__ > 604
-import Data.List ( isInfixOf )
-#else
-import Data.List ( tails )
-#endif
+import Data.List
 import Control.Concurrent
 
 #ifdef mingw32_HOST_OS
@@ -849,6 +843,7 @@ validatePackageConfig pkg db_stack auto_ghci_libs update force = do
   checkPackageId pkg
   checkDuplicates db_stack pkg update force
   mapM_ (checkDep db_stack force) (depends pkg)
+  checkDuplicateDepends force (depends pkg)
   mapM_ (checkDir force) (importDirs pkg)
   mapM_ (checkDir force) (libraryDirs pkg)
   mapM_ (checkDir force) (includeDirs pkg)
@@ -915,6 +910,14 @@ checkDep db_stack force pkgid
 
         all_pkgs = allPackagesInStack db_stack
         pkgids = map package all_pkgs
+
+checkDuplicateDepends :: Force -> [PackageIdentifier] -> IO ()
+checkDuplicateDepends force deps
+  | null dups = return ()
+  | otherwise = dieOrForceAll force ("package has duplicate dependencies: " ++
+                                     unwords (map display dups))
+  where
+       dups = [ p | (p:_:_) <- group (sort deps) ]
 
 realVersion :: PackageIdentifier -> Bool
 realVersion pkgid = versionBranch (pkgVersion pkgid) /= []
