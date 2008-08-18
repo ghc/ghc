@@ -293,6 +293,21 @@ state variables that have specific values for each OS thread
 libraries (OpenGL, for example) will not work from a thread created using
 'forkIO'. They work fine in threads created using 'forkOS' or when called
 from @main@ or from a @foreign export@.
+
+In terms of performance, 'forkOS' (aka bound) threads are much more
+expensive than 'forkIO' (aka unbound) threads, because a 'forkOS'
+thread is tied to a particular OS thread, whereas a 'forkIO' thread
+can be run by any OS thread.  Context-switching between a 'forkOS'
+thread and a 'forkIO' thread is many times more expensive than between
+two 'forkIO' threads.
+
+Note in particular that the main program thread (the thread running
+@Main.main@) is always a bound thread, so for good concurrency
+performance you should ensure that the main thread is not doing
+repeated communication with other threads in the system.  Typically
+this means forking subthreads to do the work using 'forkIO', and
+waiting for the results in the main thread.
+
 -}
 
 -- | 'True' if bound threads are supported.
@@ -302,29 +317,25 @@ from @main@ or from a @foreign export@.
 foreign import ccall rtsSupportsBoundThreads :: Bool
 
 
-{- |
-Like 'forkIO', this sparks off a new thread to run the 'IO' computation passed as the
-first argument, and returns the 'ThreadId' of the newly created
-thread.
+{- | 
+Like 'forkIO', this sparks off a new thread to run the 'IO'
+computation passed as the first argument, and returns the 'ThreadId'
+of the newly created thread.
 
-However, @forkOS@ uses operating system-supplied multithreading support to create
-a new operating system thread. The new thread is /bound/, which means that
-all foreign calls made by the 'IO' computation are guaranteed to be executed
-in this new operating system thread; also, the operating system thread is not
-used for any other foreign calls.
+However, 'forkOS' creates a /bound/ thread, which is necessary if you
+need to call foreign (non-Haskell) libraries that make use of
+thread-local state, such as OpenGL (see "Control.Concurrent#boundthreads").
 
-This means that you can use all kinds of foreign libraries from this thread 
-(even those that rely on thread-local state), without the limitations of 'forkIO'.
-
-Just to clarify, 'forkOS' is /only/ necessary if you need to associate
-a Haskell thread with a particular OS thread.  It is not necessary if
-you only need to make non-blocking foreign calls (see
-"Control.Concurrent#osthreads").  Neither is it necessary if you want
-to run threads in parallel on a multiprocessor: threads created with
-'forkIO' will be shared out amongst the running CPUs (using GHC,
-@-threaded@, and the @+RTS -N@ runtime option).
-
+Using 'forkOS' instead of 'forkIO' makes no difference at all to the
+scheduling behaviour of the Haskell runtime system.  It is a common
+misconception that you need to use 'forkOS' instead of 'forkIO' to
+avoid blocking all the Haskell threads when making a foreign call;
+this isn't the case.  To allow foreign calls to be made without
+blocking all the Haskell threads (with GHC), it is only necessary to
+use the @-threaded@ option when linking your program, and to make sure
+the foreign import is not marked @unsafe@.
 -}
+
 forkOS :: IO () -> IO ThreadId
 
 foreign export ccall forkOS_entry
