@@ -93,7 +93,7 @@ import Control.Monad    ( unless )
 import System.IO.Error as IO ( catch, isDoesNotExistError )
 import System.Directory ( doesDirectoryExist, createDirectory,
                           getModificationTime )
-import System.FilePath hiding ( searchPathSeparator )
+import System.FilePath
 import Data.Char        ( isUpper, isAlphaNum, isSpace, ord, isDigit )
 import Data.Ratio       ( (%) )
 import System.Time      ( ClockTime )
@@ -874,17 +874,7 @@ parseSearchPath path = split path
 #endif
             _                                 -> chunk'
 
-        (chunk', rest') = break (==searchPathSeparator) s
-
--- | A platform-specific character used to separate search path strings in
--- environment variables. The separator is a colon (\":\") on Unix and
--- Macintosh, and a semicolon (\";\") on the Windows operating system.
-searchPathSeparator :: Char
-#if mingw32_HOST_OS || mingw32_TARGET_OS
-searchPathSeparator = ';'
-#else
-searchPathSeparator = ':'
-#endif
+        (chunk', rest') = break isSearchPathSeparator s
 
 data Direction = Forwards | Backwards
 
