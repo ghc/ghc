@@ -106,7 +106,7 @@ test('rn066',
      extra_clean(['Rn066_A.hi', 'Rn066_A.o']),
      multimod_compile, ['rn066', '-v0'])
 
-test('T1972', expect_fail, compile, [''])
+test('T1972', normal, compile, [''])
 test('T2205', normal, compile, [''])
 
 test('2334', normal, compile, [''])
