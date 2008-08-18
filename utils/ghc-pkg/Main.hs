@@ -426,7 +426,7 @@ getPkgDatabases modify my_flags = do
                 Right path
                   | last cs == ""  -> init cs ++ sys_databases
                   | otherwise      -> cs
-                  where cs = splitSearchPath path
+                  where cs = parseSearchPath path
 
         -- The "global" database is always the one at the bottom of the stack.
         -- This is the database we modify by default.
@@ -1198,3 +1198,23 @@ writeFileAtomic targetFile content = do
     --TODO: remove this when takeDirectory/splitFileName is fixed
     --      to always return a valid dir
     (targetDir_,targetName) = splitFileName targetFile
+
+-- | The function splits the given string to substrings
+-- using 'isSearchPathSeparator'.
+parseSearchPath :: String -> [FilePath]
+parseSearchPath path = split path
+  where
+    split :: String -> [String]
+    split s =
+      case rest' of
+        []     -> [chunk]
+        _:rest -> chunk : split rest
+      where
+        chunk =
+          case chunk' of
+#ifdef mingw32_HOST_OS
+            ('\"':xs@(_:_)) | last xs == '\"' -> init xs
+#endif
+            _                                 -> chunk'
+
+        (chunk', rest') = break isSearchPathSeparator s
