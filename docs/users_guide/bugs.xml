@@ -105,7 +105,21 @@ main = do args &lt;- getArgs
       <sect3 id="infelicities-Modules">
 	<title>Module system and interface files</title>
 	
-	<para>None known.</para>
+	<para>GHC requires the use of <literal>hs-boot</literal>
+	  files to cut the recursive loops among mutually recursive modules
+	  as described in <xref linkend="mutual-recursion"/>.  This more of an infelicity
+	    than a bug: the Haskell Report says 
+	  (<ulink url="http://haskell.org/onlinereport/modules.html#sect5.7">Section 5.7</ulink>) "Depending on the Haskell
+	implementation used, separate compilation of mutually
+	recursive modules may require that imported modules contain
+	additional information so that they may be referenced before
+	they are compiled. Explicit type signatures for all exported
+	values may be necessary to deal with mutual recursion. The
+	precise details of separate compilation are not defined by
+	this Report."
+
+	</para>
+
     </sect3>
 
     <sect3 id="infelicities-numbers">
