@@ -924,12 +924,21 @@ else # not UseStage1 or BootingFromHc
 
 HC	        = @WithHc@
 MKDEPENDHS	= $(GHC)
-BOOTSTRAPPING_PACKAGE_CONF_HC_OPTS = -package-conf $(BOOTSTRAPPING_CONF)
-BOOTSTRAPPING_PACKAGE_CONF_MKDEPENDHS_OPTS = -package-conf $(BOOTSTRAPPING_CONF)
 GhcVersion	= @GhcVersion@
 GhcPatchLevel	= @GhcPatchLevel@
 GhcMajVersion	= @GhcMajVersion@
 GhcMinVersion	= @GhcMinVersion@
+
+# We build a few packages using the installed GHC as part of the
+# bootstrapping process.  These are installed into a local
+# package.conf file, $(BOOTSTRAPPING_CONF).  When we invoke the
+# installed GHC we need to pass it -package-conf $(BOOTSTRAPPING_CONF).
+# So the following variables expand to -package-conf $(BOOTSTRAPPING_CONF)
+# when $(HC) does *not* point to one of the GHC binaries built in
+# the local tree.
+#
+BOOTSTRAPPING_PACKAGE_CONF_HC_OPTS =$(if $(findstring $(GHC_COMPILER_DIR_ABS), $(HC)),,-package-conf $(BOOTSTRAPPING_CONF))
+BOOTSTRAPPING_PACKAGE_CONF_MKDEPENDHS_OPTS =$(if $(findstring $(GHC_COMPILER_DIR_ABS), $(MKDEPENDHS)),,-package-conf $(BOOTSTRAPPING_CONF))
 
 # Some useful GHC version predicates:
 ghc_ge_605 = @ghc_ge_605@
