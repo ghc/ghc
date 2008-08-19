@@ -162,6 +162,9 @@ extern Capability *capabilities;
 //
 extern Capability *last_free_capability;
 
+// GC indicator, in scope for the scheduler
+extern volatile StgWord waiting_for_gc;
+
 // Acquires a capability at a return point.  If *cap is non-NULL, then
 // this is taken as a preference for the Capability we wish to
 // acquire.

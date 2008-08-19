@@ -1405,7 +1405,8 @@ scheduleDoGC (Capability *cap, Task *task USED_IF_THREADS, rtsBool force_major)
     StgTSO *t;
     rtsBool heap_census;
 #ifdef THREADED_RTS
-    static volatile StgWord waiting_for_gc;
+    /* extern static volatile StgWord waiting_for_gc; 
+       lives inside capability.c */
     rtsBool was_waiting;
     nat i;
 #endif
@@ -1422,6 +1423,10 @@ scheduleDoGC (Capability *cap, Task *task USED_IF_THREADS, rtsBool force_major)
     // the other tasks to sleep and stay asleep.
     //
 	
+    /*  Other capabilities are prevented from running yet more Haskell
+	threads if waiting_for_gc is set. Tested inside
+	yieldCapability() and releaseCapability() in Capability.c */
+
     was_waiting = cas(&waiting_for_gc, 0, 1);
     if (was_waiting) {
 	do {

@@ -40,6 +40,9 @@ Capability *capabilities = NULL;
 // locking, so we don't do that.
 Capability *last_free_capability;
 
+/* GC indicator, in scope for the scheduler, init'ed to false */
+volatile StgWord waiting_for_gc = 0;
+
 #if defined(THREADED_RTS)
 STATIC_INLINE rtsBool
 globalWorkToDo (void)
@@ -276,6 +279,21 @@ releaseCapability_ (Capability* cap)
 	return;
     }
 
+    /* if waiting_for_gc was the reason to release the cap: thread
+       comes from yieldCap->releaseAndQueueWorker. Unconditionally set
+       cap. free and return (see default after the if-protected other
+       special cases). Thread will wait on cond.var and re-acquire the
+       same cap after GC (GC-triggering cap. calls releaseCap and
+       enters the spare_workers case)
+    */
+    if (waiting_for_gc) {
+      last_free_capability = cap; // needed?
+      trace(TRACE_sched | DEBUG_sched, 
+	    "GC pending, set capability %d free", cap->no);
+      return;
+    } 
+
+
     // If the next thread on the run queue is a bound thread,
     // give this Capability to the appropriate Task.
     if (!emptyRunQueue(cap) && cap->run_queue_hd->bound) {
@@ -453,7 +471,14 @@ yieldCapability (Capability** pCap, Task *task)
 
     // The fast path has no locking, if we don't enter this while loop
 
-    while ( cap->returning_tasks_hd != NULL || !anyWorkForMe(cap,task) ) {
+    while ( waiting_for_gc
+	    /* i.e. another capability triggered HeapOverflow, is busy
+	       getting capabilities (stopping their owning tasks) */
+	    || cap->returning_tasks_hd != NULL 
+	        /* cap reserved for another task */
+	    || !anyWorkForMe(cap,task) 
+	        /* cap/task have no work */
+	    ) {
 	debugTrace(DEBUG_sched, "giving up capability %d", cap->no);
 
 	// We must now release the capability and wait to be woken up
