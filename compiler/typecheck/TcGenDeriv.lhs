@@ -12,7 +12,7 @@ This is where we do all the grimy bindings' generation.
 
 \begin{code}
 module TcGenDeriv (
-	DerivAuxBind(..), DerivAuxBinds, isDupAux,
+	DerivAuxBinds, isDupAux,
 
 	gen_Bounded_binds,
 	gen_Enum_binds,
@@ -57,15 +57,21 @@ import Data.List	( partition, intersperse )
 type DerivAuxBinds = [DerivAuxBind]
 
 data DerivAuxBind		-- Please add these auxiliary top-level bindings
-  = DerivAuxBind (LHsBind RdrName)
-  | GenCon2Tag TyCon		-- The con2Tag for given TyCon
+  = GenCon2Tag TyCon		-- The con2Tag for given TyCon
   | GenTag2Con TyCon		-- ...ditto tag2Con
   | GenMaxTag  TyCon		-- ...and maxTag
+
+	-- Scrap your boilerplate
+  | MkDataCon DataCon		-- For constructor C we get $cC :: Constr
+  | MkTyCon   TyCon		-- For tycon T we get       $tT :: DataType
+
 
 isDupAux :: DerivAuxBind -> DerivAuxBind -> Bool
 isDupAux (GenCon2Tag tc1) (GenCon2Tag tc2) = tc1 == tc2
 isDupAux (GenTag2Con tc1) (GenTag2Con tc2) = tc1 == tc2
 isDupAux (GenMaxTag tc1)  (GenMaxTag tc2)  = tc1 == tc2
+isDupAux (MkDataCon dc1)  (MkDataCon dc2)  = dc1 == dc2
+isDupAux (MkTyCon tc1)    (MkTyCon tc2)    = tc1 == tc2
 isDupAux _                _                = False
 \end{code}
 
@@ -1132,9 +1138,8 @@ gen_Data_binds :: SrcSpan
 gen_Data_binds loc tycon
   = (listToBag [gfoldl_bind, gunfold_bind, toCon_bind, dataTypeOf_bind],
 		-- Auxiliary definitions: the data type and constructors
-     DerivAuxBind datatype_bind : map mk_con_bind data_cons)
+     MkTyCon tycon : map MkDataCon data_cons)
   where
-    tycon_name = tyConName tycon
     data_cons  = tyConDataCons tycon
     n_cons     = length data_cons
     one_constr = n_cons == 1
@@ -1181,40 +1186,8 @@ gen_Data_binds loc tycon
                         loc
                         dataTypeOf_RDR
 			[nlWildPat]
-                        (nlHsVar data_type_name)
+                        (nlHsVar (mk_data_type_name tycon))
 
-	------------  $dT
-    data_type_name = mkAuxBinderName tycon_name mkDataTOcc
-    datatype_bind  = mkVarBind
-                       loc
-                       data_type_name
-		       (           nlHsVar mkDataType_RDR 
-                         `nlHsApp` nlHsLit (mkHsString (showSDoc (ppr tycon)))
-                         `nlHsApp` nlList constrs
-                       )
-    constrs = [nlHsVar (mk_constr_name con) | con <- data_cons]
-
-
-	------------  $cT1 etc
-    mk_constr_name con = mkAuxBinderName (dataConName con) mkDataCOcc
-    mk_con_bind dc = DerivAuxBind $ 
-		     mkVarBind
-                       loc
-                       (mk_constr_name dc) 
-		       (nlHsApps mkConstr_RDR (constr_args dc))
-    constr_args dc =
-	 [ -- nlHsIntLit (toInteger (dataConTag dc)),		-- Tag
-	   nlHsVar data_type_name,				-- DataType
-	   nlHsLit (mkHsString (occNameString dc_occ)),	-- String name
-           nlList  labels,					-- Field labels
-	   nlHsVar fixity]					-- Fixity
-	where
-          labels   = map (nlHsLit . mkHsString . getOccString)
-                         (dataConFieldLabels dc)
-	  dc_occ   = getOccName dc
-	  is_infix = isDataSymOcc dc_occ
-	  fixity | is_infix  = infix_RDR
-		 | otherwise = prefix_RDR
 
 gfoldl_RDR, gunfold_RDR, toConstr_RDR, dataTypeOf_RDR, mkConstr_RDR,
     mkDataType_RDR, conIndex_RDR, prefix_RDR, infix_RDR :: RdrName
@@ -1248,10 +1221,6 @@ fiddling around.
 
 \begin{code}
 genAuxBind :: SrcSpan -> DerivAuxBind -> LHsBind RdrName
-
-genAuxBind _loc (DerivAuxBind bind) 
-  = bind
-
 genAuxBind loc (GenCon2Tag tycon)
   | lots_of_constructors
   = mk_FunBind loc rdr_name [([], get_tag_rhs)]
@@ -1301,6 +1270,38 @@ genAuxBind loc (GenMaxTag tycon)
     rdr_name = maxtag_RDR tycon
     max_tag =  case (tyConDataCons tycon) of
 		 data_cons -> toInteger ((length data_cons) - fIRST_TAG)
+
+genAuxBind loc (MkTyCon tycon)	--  $dT
+  = mkVarBind loc (mk_data_type_name tycon)
+		  ( nlHsVar mkDataType_RDR 
+                    `nlHsApp` nlHsLit (mkHsString (showSDoc (ppr tycon)))
+                    `nlHsApp` nlList constrs )
+  where
+    constrs = [nlHsVar (mk_constr_name con) | con <- tyConDataCons tycon]
+
+genAuxBind loc (MkDataCon dc)	--  $cT1 etc
+  = mkVarBind loc (mk_constr_name dc) 
+		  (nlHsApps mkConstr_RDR constr_args)
+  where
+    constr_args 
+       = [ -- nlHsIntLit (toInteger (dataConTag dc)),	  -- Tag
+	   nlHsVar (mk_data_type_name (dataConTyCon dc)), -- DataType
+	   nlHsLit (mkHsString (occNameString dc_occ)),	  -- String name
+           nlList  labels,				  -- Field labels
+	   nlHsVar fixity]				  -- Fixity
+
+    labels   = map (nlHsLit . mkHsString . getOccString)
+                   (dataConFieldLabels dc)
+    dc_occ   = getOccName dc
+    is_infix = isDataSymOcc dc_occ
+    fixity | is_infix  = infix_RDR
+	   | otherwise = prefix_RDR
+
+mk_data_type_name :: TyCon -> RdrName 	-- $tT
+mk_data_type_name tycon = mkAuxBinderName (tyConName tycon) mkDataTOcc
+
+mk_constr_name :: DataCon -> RdrName	-- $cC
+mk_constr_name con = mkAuxBinderName (dataConName con) mkDataCOcc
 \end{code}
 
 %************************************************************************
