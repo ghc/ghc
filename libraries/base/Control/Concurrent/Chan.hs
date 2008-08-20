@@ -63,9 +63,9 @@ data ChItem a = ChItem a (Stream a)
 newChan :: IO (Chan a)
 newChan = do
    hole  <- newEmptyMVar
-   read  <- newMVar hole
-   write <- newMVar hole
-   return (Chan read write)
+   readVar  <- newMVar hole
+   writeVar <- newMVar hole
+   return (Chan readVar writeVar)
 
 -- To put an element on a channel, a new hole at the write end is created.
 -- What was previously the empty @MVar@ at the back of the channel is then
@@ -74,16 +74,16 @@ newChan = do
 
 -- |Write a value to a 'Chan'.
 writeChan :: Chan a -> a -> IO ()
-writeChan (Chan _read write) val = do
+writeChan (Chan _ writeVar) val = do
   new_hole <- newEmptyMVar
-  modifyMVar_ write $ \old_hole -> do
+  modifyMVar_ writeVar $ \old_hole -> do
     putMVar old_hole (ChItem val new_hole)
     return new_hole
 
 -- |Read the next value from the 'Chan'.
 readChan :: Chan a -> IO a
-readChan (Chan read _write) = do
-  modifyMVar read $ \read_end -> do
+readChan (Chan readVar _) = do
+  modifyMVar readVar $ \read_end -> do
     (ChItem val new_read_end) <- readMVar read_end
         -- Use readMVar here, not takeMVar,
         -- else dupChan doesn't work
@@ -94,24 +94,24 @@ readChan (Chan read _write) = do
 -- a kind of broadcast channel, where data written by anyone is seen by
 -- everyone else.
 dupChan :: Chan a -> IO (Chan a)
-dupChan (Chan _read write) = do
-   hole     <- readMVar write
-   new_read <- newMVar hole
-   return (Chan new_read write)
+dupChan (Chan _ writeVar) = do
+   hole       <- readMVar writeVar
+   newReadVar <- newMVar hole
+   return (Chan newReadVar writeVar)
 
 -- |Put a data item back onto a channel, where it will be the next item read.
 unGetChan :: Chan a -> a -> IO ()
-unGetChan (Chan read _write) val = do
+unGetChan (Chan readVar _) val = do
    new_read_end <- newEmptyMVar
-   modifyMVar_ read $ \read_end -> do
+   modifyMVar_ readVar $ \read_end -> do
      putMVar new_read_end (ChItem val read_end)
      return new_read_end
 
 -- |Returns 'True' if the supplied 'Chan' is empty.
 isEmptyChan :: Chan a -> IO Bool
-isEmptyChan (Chan read write) = do
-   withMVar read $ \r -> do
-     w <- readMVar write
+isEmptyChan (Chan readVar writeVar) = do
+   withMVar readVar $ \r -> do
+     w <- readMVar writeVar
      let eq = r == w
      eq `seq` return eq
 

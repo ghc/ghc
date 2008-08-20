@@ -69,8 +69,6 @@ module System.Mem.Weak (
 
 import Prelude
 
-import Data.Typeable
-
 #ifdef __HUGS__
 import Hugs.Weak
 #endif

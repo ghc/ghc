@@ -99,7 +99,6 @@ import GHC.Exception
 import GHC.Conc         ( ThreadId(..), myThreadId, killThread, yield,
                           threadDelay, forkIO, childHandler )
 import qualified GHC.Conc
-import GHC.TopHandler   ( reportStackOverflow, reportError )
 import GHC.IOBase       ( IO(..) )
 import GHC.IOBase       ( unsafeInterleaveIO )
 import GHC.IOBase       ( newIORef, readIORef, writeIORef )
@@ -344,6 +343,7 @@ foreign export ccall forkOS_entry
 foreign import ccall "forkOS_entry" forkOS_entry_reimported
     :: StablePtr (IO ()) -> IO ()
 
+forkOS_entry :: StablePtr (IO ()) -> IO ()
 forkOS_entry stableAction = do
         action <- deRefStablePtr stableAction
         action
@@ -351,6 +351,7 @@ forkOS_entry stableAction = do
 foreign import ccall forkOS_createThread
     :: StablePtr (IO ()) -> IO CInt
 
+failNonThreaded :: IO a
 failNonThreaded = fail $ "RTS doesn't support multiple OS threads "
                        ++"(use ghc -threaded when linking)"
 
@@ -431,7 +432,7 @@ runInUnboundThread action = do
         then do
             mv <- newEmptyMVar
             forkIO (Exception.try action >>= putMVar mv)
-            takeMVar mv >>= \either -> case either of
+            takeMVar mv >>= \ei -> case ei of
                 Left exception -> Exception.throw (exception :: SomeException)
                 Right result -> return result
         else action

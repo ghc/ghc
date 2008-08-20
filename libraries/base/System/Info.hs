@@ -27,8 +27,8 @@ import Data.Version
 -- | The version of 'compilerName' with which the program was compiled
 -- or is being interpreted.
 compilerVersion :: Version
-compilerVersion = Version {versionBranch=[maj,min], versionTags=[]}
-  where (maj,min) = compilerVersionRaw `divMod` 100
+compilerVersion = Version {versionBranch=[major, minor], versionTags=[]}
+  where (major, minor) = compilerVersionRaw `divMod` 100
 
 -- | The operating system on which the program is running.
 os :: String

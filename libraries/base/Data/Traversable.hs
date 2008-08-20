@@ -103,7 +103,7 @@ class (Functor t, Foldable t) => Traversable t where
 -- instances for Prelude types
 
 instance Traversable Maybe where
-        traverse f Nothing = pure Nothing
+        traverse _ Nothing = pure Nothing
         traverse f (Just x) = Just <$> f x
 
 instance Traversable [] where

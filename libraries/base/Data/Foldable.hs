@@ -143,10 +143,10 @@ class Foldable t where
 -- instances for Prelude types
 
 instance Foldable Maybe where
-        foldr f z Nothing = z
+        foldr _ z Nothing = z
         foldr f z (Just x) = f x z
 
-        foldl f z Nothing = z
+        foldl _ z Nothing = z
         foldl f z (Just x) = f z x
 
 instance Foldable [] where
@@ -161,25 +161,25 @@ instance Ix i => Foldable (Array i) where
 -- | Fold over the elements of a structure,
 -- associating to the right, but strictly.
 foldr' :: Foldable t => (a -> b -> b) -> b -> t a -> b
-foldr' f z xs = foldl f' id xs z
+foldr' f z0 xs = foldl f' id xs z0
   where f' k x z = k $! f x z
 
 -- | Monadic fold over the elements of a structure,
 -- associating to the right, i.e. from right to left.
 foldrM :: (Foldable t, Monad m) => (a -> b -> m b) -> b -> t a -> m b
-foldrM f z xs = foldl f' return xs z
+foldrM f z0 xs = foldl f' return xs z0
   where f' k x z = f x z >>= k
 
 -- | Fold over the elements of a structure,
 -- associating to the left, but strictly.
 foldl' :: Foldable t => (a -> b -> a) -> a -> t b -> a
-foldl' f z xs = foldr f' id xs z
+foldl' f z0 xs = foldr f' id xs z0
   where f' x k z = k $! f z x
 
 -- | Monadic fold over the elements of a structure,
 -- associating to the left, i.e. from left to right.
 foldlM :: (Foldable t, Monad m) => (a -> b -> m a) -> a -> t b -> m a
-foldlM f z xs = foldr f' return xs z
+foldlM f z0 xs = foldr f' return xs z0
   where f' x k z = f z x >>= k
 
 -- | Map each element of a structure to an action, evaluate

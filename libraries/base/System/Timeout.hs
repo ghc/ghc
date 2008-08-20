@@ -20,12 +20,11 @@ module System.Timeout ( timeout ) where
 
 #ifdef __GLASGOW_HASKELL__
 import Prelude             (Show(show), IO, Ord((<)), Eq((==)), Int,
-                            (.), otherwise, fmap)
+                            otherwise, fmap)
 import Data.Maybe          (Maybe(..))
-import Control.Monad       (Monad(..), guard)
+import Control.Monad       (Monad(..))
 import Control.Concurrent  (forkIO, threadDelay, myThreadId, killThread)
 import Control.Exception   (Exception, handleJust, throwTo, bracket)
-import Data.Dynamic        (Typeable, fromDynamic)
 import Data.Typeable
 import Data.Unique         (Unique, newUnique)
 

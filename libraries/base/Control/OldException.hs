@@ -376,8 +376,8 @@ catchDyn :: Typeable exception => IO a -> (exception -> IO a) -> IO a
 #ifdef __NHC__
 catchDyn m k = m        -- can't catch dyn exceptions in nhc98
 #else
-catchDyn m k = New.catch m handle
-  where handle ex = case ex of
+catchDyn m k = New.catch m handler
+  where handler ex = case ex of
                            (DynException dyn) ->
                                 case fromDynamic dyn of
                                     Just exception  -> k exception
@@ -699,9 +699,6 @@ data Exception
         -- record update in the source program.
 INSTANCE_TYPEABLE0(Exception,exceptionTc,"Exception")
 
-nonTermination :: SomeException
-nonTermination = New.toException NonTermination
-
 -- helper type for simplifying the type casting logic below
 data Caster = forall e . ExceptionBase.Exception e => Caster (e -> Exception)
 
@@ -709,8 +706,8 @@ instance New.Exception Exception where
   -- We need to collect all the sorts of exceptions that used to be
   -- bundled up into the Exception type, and rebundle them for
   -- legacy handlers.
-  fromException (SomeException exc) = foldr tryCast Nothing casters where
-    tryCast (Caster f) e = case cast exc of
+  fromException (SomeException exc0) = foldr tryCast Nothing casters where
+    tryCast (Caster f) e = case cast exc0 of
       Just exc -> Just (f exc)
       _        -> e
     casters =

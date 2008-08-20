@@ -179,9 +179,6 @@ cleanUp = do
   hFlush stdout `catchAny` \_ -> return ()
   hFlush stderr `catchAny` \_ -> return ()
 
-cleanUpAndExit :: Int -> IO a
-cleanUpAndExit r = do cleanUp; safeExit r
-
 -- we have to use unsafeCoerce# to get the 'IO a' result type, since the
 -- compiler doesn't let us declare that as the result type of a foreign export.
 safeExit :: Int -> IO a

@@ -112,6 +112,6 @@ writeSampleVar svar v = do
 --
 isEmptySampleVar :: SampleVar a -> IO Bool
 isEmptySampleVar svar = do
-   (readers,val) <- readMVar svar
+   (readers, _) <- readMVar svar
    return (readers == 0)
 

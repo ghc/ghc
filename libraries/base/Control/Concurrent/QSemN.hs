@@ -36,8 +36,8 @@ INSTANCE_TYPEABLE0(QSemN,qSemNTc,"QSemN")
 
 -- |Build a new 'QSemN' with a supplied initial quantity.
 newQSemN :: Int -> IO QSemN 
-newQSemN init = do
-   sem <- newMVar (init,[])
+newQSemN initial = do
+   sem <- newMVar (initial, [])
    return (QSemN sem)
 
 -- |Wait for the specified quantity to become available
