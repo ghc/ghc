@@ -227,16 +227,8 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
    -- NOTE: accept -} at the end of a LINE pragma, for compatibility
    -- with older versions of GHC which generated these.
 
--- We only want RULES pragmas to be picked up when explicit forall
--- syntax is enabled is on, because the contents of the pragma always
--- uses it. If it's not on then we're sure to get a parse error.
--- (ToDo: we should really emit a warning when ignoring pragmas)
--- XXX Now that we can enable this without the -fglasgow-exts hammer,
--- is it better just to let the parse error happen?
-<0>
-  "{-#" $whitechar* (RULES|rules) / { ifExtension explicitForallEnabled } { token ITrules_prag }
-
 <0,option_prags> {
+  "{-#" $whitechar* (RULES|rules)       { token ITrules_prag }
   "{-#" $whitechar* (INLINE|inline)	{ token (ITinline_prag True) }
   "{-#" $whitechar* (NO(T?)INLINE|no(t?)inline)
   					{ token (ITinline_prag False) }
@@ -264,7 +256,7 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
                     { nested_comment lexToken }
 
   -- ToDo: should only be valid inside a pragma:
-  "#-}" 				{ token ITclose_prag}
+  "#-}" 				{ endPrag }
 }
 
 <option_prags> {
@@ -649,7 +641,7 @@ reservedWordsFM = listToUFM $
 	( "where",	ITwhere, 	0 ),
 	( "_scc_",	ITscc, 		0 ),		-- ToDo: remove
 
-    ( "forall",	ITforall,	 bit explicitForallBit),
+    ( "forall",	ITforall,	 bit explicitForallBit .|. bit inRulePragBit),
 	( "mdo",	ITmdo,		 bit recursiveDoBit),
 	( "family",	ITfamily,	 bit tyFamBit),
     ( "group",  ITgroup,     bit transformComprehensionsBit),
@@ -692,7 +684,7 @@ reservedSymsFM = listToUFM $
         -- For data T (a::*) = MkT
        ,("*", ITstar, \i -> kindSigsEnabled i || tyFamEnabled i)
         -- For 'forall a . t'
-       ,(".", ITdot, explicitForallEnabled)
+       ,(".", ITdot, \i -> explicitForallEnabled i || inRulePrag i)
 
        ,("-<",  ITlarrowtail, arrowsEnabled)
        ,(">-",  ITrarrowtail, arrowsEnabled)
@@ -864,6 +856,18 @@ withLexedDocType lexDocComment = do
       Just ('*', input) -> lexDocSection (n+1) input
       Just (_,   _)     -> lexDocComment input (ITdocSection n) True
       Nothing -> do setInput input; lexToken -- eof reached, lex it normally
+
+-- RULES pragmas turn on the forall and '.' keywords, and we turn them
+-- off again at the end of the pragma.
+rulePrag :: Action
+rulePrag span buf len = do
+  setExts (.|. inRulePragBit)
+  return (L span ITrules_prag)
+
+endPrag :: Action
+endPrag span buf len = do
+  setExts (.&. complement (bit inRulePragBit))
+  return (L span ITclose_prag)
 
 -- docCommentEnd
 -------------------------------------------------------------------------------
@@ -1463,6 +1467,9 @@ extension p = P $ \s -> POk s (p $! extsBitmap s)
 getExts :: P Int
 getExts = P $ \s -> POk s (extsBitmap s)
 
+setExts :: (Int -> Int) -> P ()
+setExts f = P $ \s -> POk s{ extsBitmap = f (extsBitmap s) } ()
+
 setSrcLoc :: SrcLoc -> P ()
 setSrcLoc new_loc = P $ \s -> POk s{loc=new_loc} ()
 
@@ -1588,6 +1595,7 @@ unboxedTuplesBit = 15 -- (# and #)
 standaloneDerivingBit = 16 -- standalone instance deriving declarations
 transformComprehensionsBit = 17
 qqBit	   = 18 -- enable quasiquoting
+inRulePragBit = 19
 
 genericsEnabled, ffiEnabled, parrEnabled :: Int -> Bool
 always           _     = True
@@ -1609,6 +1617,7 @@ unboxedTuplesEnabled flags = testBit flags unboxedTuplesBit
 standaloneDerivingEnabled flags = testBit flags standaloneDerivingBit
 transformComprehensionsEnabled flags = testBit flags transformComprehensionsBit
 qqEnabled        flags = testBit flags qqBit
+inRulePrag       flags = testBit flags inRulePragBit
 
 -- PState for parsing options pragmas
 --
