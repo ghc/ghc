@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -XNoImplicitPrelude #-}
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 -- XXX -fno-warn-unused-imports needed for the GHC.Tuple import below. Sigh.
 -----------------------------------------------------------------------------
 -- |

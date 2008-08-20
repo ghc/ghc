@@ -63,6 +63,7 @@ Other Prelude modules are much easier with fewer complex dependencies.
 
 \begin{code}
 {-# OPTIONS_GHC -XNoImplicitPrelude #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_HADDOCK hide #-}
 -----------------------------------------------------------------------------
 -- |
