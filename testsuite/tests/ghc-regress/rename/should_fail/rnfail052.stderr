@@ -10,6 +10,7 @@ rnfail052.hs:9:21:
 rnfail052.hs:12:14:
     Not in scope: type variable `forall'
     Perhaps you intended to use -XRankNTypes or similar flag
+    to enable explicit-forall syntax: forall <tvs>. <type>?
 
 rnfail052.hs:12:21: Not in scope: type variable `a'
 
