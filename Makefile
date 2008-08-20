@@ -389,7 +389,9 @@ endif
 
 	$(RM) -f $(BIN_DIST_NAME)
 	ln -s . $(BIN_DIST_NAME)
-	tar cf $(BIN_DIST_TAR) -T $(BIN_DIST_LIST)
+# h means "follow symlinks", e.g. if aclocal.m4 is a symlink to a source
+# tree then we want to include the real file, not a symlink to it
+	tar hcf $(BIN_DIST_TAR) -T $(BIN_DIST_LIST)
 	cd $(BIN_DIST_PREP_DIR) && tar rf $(BIN_DIST_TAR) $(BIN_DIST_NAME)
 	bzip2 < $(BIN_DIST_TAR) > $(BIN_DIST_TAR_BZ2)
 	tar tf $(BIN_DIST_TAR) | sort > bin-manifest-$(ProjectVersion)
