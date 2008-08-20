@@ -185,7 +185,7 @@ class Typeable a => Data a where
   --
   -- The default definition for 'gfoldl' is @'const' 'id'@, which is
   -- suitable for abstract datatypes with no substructures.
-  gfoldl  :: (forall a b. Data a => c (a -> b) -> a -> c b)
+  gfoldl  :: (forall d b. Data d => c (d -> b) -> d -> c b)
                 -- ^ defines how nonempty constructor applications are
                 -- folded.  It takes the folded tail of the constructor
                 -- application and its head, i.e., an immediate subterm,
@@ -236,7 +236,7 @@ class Typeable a => Data a where
   -- The default definition is @'const' 'Nothing'@, which is appropriate
   -- for non-unary type constructors.
   dataCast1 :: Typeable1 t
-            => (forall a. Data a => c (t a))
+            => (forall d. Data d => c (t d))
             -> Maybe (c a)
   dataCast1 _ = Nothing
 
@@ -247,7 +247,7 @@ class Typeable a => Data a where
   -- The default definition is @'const' 'Nothing'@, which is appropriate
   -- for non-binary type constructors.
   dataCast2 :: Typeable2 t
-            => (forall a b. (Data a, Data b) => c (t a b))
+            => (forall d e. (Data d, Data e) => c (t d e))
             -> Maybe (c a)
   dataCast2 _ = Nothing
 
@@ -271,21 +271,21 @@ class Typeable a => Data a where
   -- to instantiate the type constructor c in the type of gfoldl,
   -- and perform injections ID and projections unID accordingly.
   --
-  gmapT f x = unID (gfoldl k ID x)
+  gmapT f x0 = unID (gfoldl k ID x0)
     where
       k (ID c) x = ID (c (f x))
 
 
   -- | A generic query with a left-associative binary operator
-  gmapQl :: (r -> r' -> r) -> r -> (forall a. Data a => a -> r') -> a -> r
+  gmapQl :: (r -> r' -> r) -> r -> (forall d. Data d => d -> r') -> a -> r
   gmapQl o r f = unCONST . gfoldl k z
     where
       k c x = CONST $ (unCONST c) `o` f x
       z _   = CONST r
 
   -- | A generic query with a right-associative binary operator
-  gmapQr :: (r' -> r -> r) -> r -> (forall a. Data a => a -> r') -> a -> r
-  gmapQr o r f x = unQr (gfoldl k (const (Qr id)) x) r
+  gmapQr :: (r' -> r -> r) -> r -> (forall d. Data d => d -> r') -> a -> r
+  gmapQr o r0 f x0 = unQr (gfoldl k (const (Qr id)) x0) r0
     where
       k (Qr c) x = Qr (\r -> c (f x `o` r))
 
@@ -293,16 +293,16 @@ class Typeable a => Data a where
   -- | A generic query that processes the immediate subterms and returns a list
   -- of results.  The list is given in the same order as originally specified
   -- in the declaratoin of the data constructors.
-  gmapQ :: (forall a. Data a => a -> u) -> a -> [u]
+  gmapQ :: (forall d. Data d => d -> u) -> a -> [u]
   gmapQ f = gmapQr (:) [] f
 
 
   -- | A generic query that processes one child by index (zero-based)
-  gmapQi :: Int -> (forall a. Data a => a -> u) -> a -> u
+  gmapQi :: Int -> (forall d. Data d => d -> u) -> a -> u
   gmapQi i f x = case gfoldl k z x of { Qi _ q -> fromJust q }
     where
       k (Qi i' q) a = Qi (i'+1) (if i==i' then Just (f a) else q)
-      z f           = Qi 0 Nothing
+      z _           = Qi 0 Nothing
 
 
   -- | A generic monadic transformation that maps over the immediate subterms
@@ -310,7 +310,7 @@ class Typeable a => Data a where
   -- The default definition instantiates the type constructor @c@ in
   -- the type of 'gfoldl' to the monad datatype constructor, defining
   -- injection and projection using 'return' and '>>='.
-  gmapM   :: Monad m => (forall a. Data a => a -> m a) -> a -> m a
+  gmapM   :: Monad m => (forall d. Data d => d -> m d) -> a -> m a
 
   -- Use immediately the monad datatype constructor 
   -- to instantiate the type constructor c in the type of gfoldl,
@@ -324,7 +324,7 @@ class Typeable a => Data a where
 
 
   -- | Transformation of at least one immediate subterm does not fail
-  gmapMp :: MonadPlus m => (forall a. Data a => a -> m a) -> a -> m a
+  gmapMp :: MonadPlus m => (forall d. Data d => d -> m d) -> a -> m a
 
 {-
 
@@ -338,14 +338,14 @@ this end, we couple the monadic computation with a Boolean.
                 if b then return x' else mzero
     where
       z g = Mp (return (g,False))
-      k (Mp c) x
-        = Mp ( c >>= \(h,b) ->
-                 (f x >>= \x' -> return (h x',True))
-                 `mplus` return (h x,b)
+      k (Mp c) y
+        = Mp ( c >>= \(h, b) ->
+                 (f y >>= \y' -> return (h y', True))
+                 `mplus` return (h y, b)
              )
 
   -- | Transformation of one immediate subterm with success
-  gmapMo :: MonadPlus m => (forall a. Data a => a -> m a) -> a -> m a
+  gmapMo :: MonadPlus m => (forall d. Data d => d -> m d) -> a -> m a
 
 {-
 
@@ -361,11 +361,11 @@ was transformed successfully.
                 if b then return x' else mzero
     where
       z g = Mp (return (g,False))
-      k (Mp c) x
+      k (Mp c) y
         = Mp ( c >>= \(h,b) -> if b
-                        then return (h x,b)
-                        else (f x >>= \x' -> return (h x',True))
-                             `mplus` return (h x,b)
+                        then return (h y, b)
+                        else (f y >>= \y' -> return (h y',True))
+                             `mplus` return (h y, b)
              )
 
 
@@ -404,7 +404,7 @@ fromConstr = fromConstrB undefined
 
 -- | Build a term and use a generic function for subterms
 fromConstrB :: Data a
-            => (forall a. Data a => a)
+            => (forall d. Data d => d)
             -> Constr
             -> a
 fromConstrB f = unID . gunfold k z
@@ -415,7 +415,7 @@ fromConstrB f = unID . gunfold k z
 
 -- | Monadic variation on 'fromConstrB'
 fromConstrM :: (Monad m, Data a)
-            => (forall a. Data a => m a)
+            => (forall d. Data d => m d)
             -> Constr
             -> m a
 fromConstrM f = gunfold k z
@@ -762,5 +762,5 @@ tyconModule x = let (a,b) = break ((==) '.') x
                       then b
                       else a ++ tyconModule' (tail b)
   where
-    tyconModule' x = let x' = tyconModule x
-                      in if x' == "" then "" else ('.':x')
+    tyconModule' y = let y' = tyconModule y
+                      in if y' == "" then "" else ('.':y')

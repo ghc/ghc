@@ -76,11 +76,11 @@ Applying the same scheme we obtain an accumulating gfoldl.
 -- | gfoldl with accumulation
 
 gfoldlAccum :: Data d
-            => (forall d r. Data d => a -> c (d -> r) -> d -> (a, c r))
+            => (forall e r. Data e => a -> c (e -> r) -> e -> (a, c r))
             -> (forall g. a -> g -> (a, c g))
             -> a -> d -> (a, c d)
 
-gfoldlAccum k z a d = unA (gfoldl k' z' d) a
+gfoldlAccum k z a0 d = unA (gfoldl k' z' d) a0
  where
   k' c y = A (\a -> let (a', c') = unA c a in k a' c' y)
   z' f   = A (\a -> z a f)
@@ -92,10 +92,10 @@ newtype A a c d = A { unA :: a -> (a, c d) }
 
 -- | gmapT with accumulation
 gmapAccumT :: Data d
-           => (forall d. Data d => a -> d -> (a,d))
+           => (forall e. Data e => a -> e -> (a,e))
            -> a -> d -> (a, d)
-gmapAccumT f a d = let (a',d') = gfoldlAccum k z a d
-                    in (a',unID d')
+gmapAccumT f a0 d0 = let (a1, d1) = gfoldlAccum k z a0 d0
+                     in (a1, unID d1)
  where
   k a (ID c) d = let (a',d') = f a d
                   in (a', ID (c d'))
@@ -104,7 +104,7 @@ gmapAccumT f a d = let (a',d') = gfoldlAccum k z a d
 
 -- | gmapM with accumulation
 gmapAccumM :: (Data d, Monad m)
-           => (forall d. Data d => a -> d -> (a, m d))
+           => (forall e. Data e => a -> e -> (a, m e))
            -> a -> d -> (a, m d)
 gmapAccumM f = gfoldlAccum k z
  where
@@ -117,24 +117,24 @@ gmapAccumM f = gfoldlAccum k z
 gmapAccumQl :: Data d
             => (r -> r' -> r)
             -> r
-            -> (forall d. Data d => a -> d -> (a,r'))
+            -> (forall e. Data e => a -> e -> (a,r'))
             -> a -> d -> (a, r)
-gmapAccumQl o r f a d = let (a',r) = gfoldlAccum k z a d
-                         in (a',unCONST r)
+gmapAccumQl o r0 f a0 d0 = let (a1, r1) = gfoldlAccum k z a0 d0
+                           in (a1, unCONST r1)
  where
-  k a (CONST c) d = let (a',r') = f a d
-                     in (a', CONST (c `o` r'))
-  z a _ = (a, CONST r)
+  k a (CONST c) d = let (a', r) = f a d
+                     in (a', CONST (c `o` r))
+  z a _ = (a, CONST r0)
 
 
 -- | gmapQr with accumulation
 gmapAccumQr :: Data d
             => (r' -> r -> r)
             -> r
-            -> (forall d. Data d => a -> d -> (a,r'))
+            -> (forall e. Data e => a -> e -> (a,r'))
             -> a -> d -> (a, r)
-gmapAccumQr o r f a d = let (a',l) = gfoldlAccum k z a d
-                         in (a',unQr l r)
+gmapAccumQr o r0 f a0 d0 = let (a1, l) = gfoldlAccum k z a0 d0
+                           in (a1, unQr l r0)
  where
   k a (Qr c) d = let (a',r') = f a d
                   in (a', Qr (\r -> c (r' `o` r)))
@@ -143,7 +143,7 @@ gmapAccumQr o r f a d = let (a',l) = gfoldlAccum k z a d
 
 -- | gmapQ with accumulation
 gmapAccumQ :: Data d
-           => (forall d. Data d => a -> d -> (a,q))
+           => (forall e. Data e => a -> e -> (a,q))
            -> a -> d -> (a, [q])
 gmapAccumQ f = gmapAccumQr (:) [] f
 
@@ -232,7 +232,7 @@ couples of immediate subterms from the two given input terms.)
 
 -}
 
-geq x y = geq' x y
+geq x0 y0 = geq' x0 y0
   where
     geq' :: GenericQ (GenericQ Bool)
     geq' x y =     (toConstr x == toConstr y)
