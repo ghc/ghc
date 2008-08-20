@@ -143,8 +143,9 @@ hGetChar handle =
            else do (c,_) <- readCharFromBuffer raw 0
                    return c
 
-hGetcBuffered fd ref buf@Buffer{ bufBuf=b, bufRPtr=r, bufWPtr=w }
- = do (c,r) <- readCharFromBuffer b r
+hGetcBuffered :: FD -> IORef Buffer -> Buffer -> IO Char
+hGetcBuffered _ ref buf@Buffer{ bufBuf=b, bufRPtr=r0, bufWPtr=w }
+ = do (c, r) <- readCharFromBuffer b r0
       let new_buf | r == w    = buf{ bufRPtr=0, bufWPtr=0 }
                   | otherwise = buf{ bufRPtr=r }
       writeIORef ref new_buf
@@ -192,7 +193,7 @@ hGetLineBuffered handle_ = do
 hGetLineBufferedLoop :: Handle__ -> IORef Buffer -> Buffer -> [String]
                      -> IO String
 hGetLineBufferedLoop handle_ ref
-        buf@Buffer{ bufRPtr=r, bufWPtr=w, bufBuf=raw } xss =
+        buf@Buffer{ bufRPtr=r0, bufWPtr=w, bufBuf=raw0 } xss =
   let
         -- find the end-of-line character, if there is one
         loop raw r
@@ -203,13 +204,13 @@ hGetLineBufferedLoop handle_ ref
                    then return (True, r) -- NB. not r': don't include the '\n'
                    else loop raw r'
   in do
-  (eol, off) <- loop raw r
+  (eol, off) <- loop raw0 r0
 
 #ifdef DEBUG_DUMP
-  puts ("hGetLineBufferedLoop: r=" ++ show r ++ ", w=" ++ show w ++ ", off=" ++ show off ++ "\n")
+  puts ("hGetLineBufferedLoop: r=" ++ show r0 ++ ", w=" ++ show w ++ ", off=" ++ show off ++ "\n")
 #endif
 
-  xs <- unpack raw r off
+  xs <- unpack raw0 r0 off
 
   -- if eol == True, then off is the offset of the '\n'
   -- otherwise off == w and the buffer is now empty.
@@ -233,11 +234,11 @@ hGetLineBufferedLoop handle_ ref
                 Just new_buf ->
                      hGetLineBufferedLoop handle_ ref new_buf (xs:xss)
 
-
+maybeFillReadBuffer :: FD -> Bool -> Bool -> Buffer -> IO (Maybe Buffer)
 maybeFillReadBuffer fd is_line is_stream buf
   = catch 
-     (do buf <- fillReadBuffer fd is_line is_stream buf
-         return (Just buf)
+     (do buf' <- fillReadBuffer fd is_line is_stream buf
+         return (Just buf')
      )
      (\e -> do if isEOFError e 
                   then return Nothing 
@@ -245,14 +246,14 @@ maybeFillReadBuffer fd is_line is_stream buf
 
 
 unpack :: RawBuffer -> Int -> Int -> IO [Char]
-unpack buf r 0   = return ""
-unpack buf (I# r) (I# len) = IO $ \s -> unpack [] (len -# 1#) s
+unpack _   _      0        = return ""
+unpack buf (I# r) (I# len) = IO $ \s -> unpackRB [] (len -# 1#) s
    where
-    unpack acc i s
+    unpackRB acc i s
      | i <# r  = (# s, acc #)
      | otherwise = 
           case readCharArray# buf i s of
-            (# s, ch #) -> unpack (C# ch : acc) (i -# 1#) s
+          (# s', ch #) -> unpackRB (C# ch : acc) (i -# 1#) s'
 
 
 hGetLineUnBuffered :: Handle -> IO String
@@ -340,6 +341,7 @@ lazyRead handle =
                   (IOError (Just handle) IllegalOperation "lazyRead"
                         "illegal handle type" Nothing)
 
+lazyRead' :: Handle -> Handle__ -> IO (Handle__, [Char])
 lazyRead' h handle_ = do
   let ref = haBuffer handle_
       fd  = haFD handle_
@@ -357,8 +359,8 @@ lazyRead' h handle_ = do
         let raw = bufBuf buf
         r <- readRawBuffer "lazyRead" fd (haIsStream handle_) raw 0 1
         if r == 0
-           then do (handle_,_) <- hClose_help handle_ 
-                   return (handle_, "")
+           then do (handle_', _) <- hClose_help handle_ 
+                   return (handle_', "")
            else do (c,_) <- readCharFromBuffer raw 0
                    rest <- lazyRead h
                    return (handle_, c : rest)
@@ -368,17 +370,20 @@ lazyRead' h handle_ = do
 
 -- we never want to block during the read, so we call fillReadBuffer with
 -- is_line==True, which tells it to "just read what there is".
+lazyReadBuffered :: Handle -> Handle__ -> FD -> IORef Buffer -> Buffer
+                 -> IO (Handle__, [Char])
 lazyReadBuffered h handle_ fd ref buf = do
    catch 
-        (do buf <- fillReadBuffer fd True{-is_line-} (haIsStream handle_) buf
-            lazyReadHaveBuffer h handle_ fd ref buf
+        (do buf' <- fillReadBuffer fd True{-is_line-} (haIsStream handle_) buf
+            lazyReadHaveBuffer h handle_ fd ref buf'
         )
         -- all I/O errors are discarded.  Additionally, we close the handle.
-        (\e -> do (handle_,_) <- hClose_help handle_
-                  return (handle_, "")
+        (\_ -> do (handle_', _) <- hClose_help handle_
+                  return (handle_', "")
         )
 
-lazyReadHaveBuffer h handle_ fd ref buf = do
+lazyReadHaveBuffer :: Handle -> Handle__ -> FD -> IORef Buffer -> Buffer -> IO (Handle__, [Char])
+lazyReadHaveBuffer h handle_ _ ref buf = do
    more <- lazyRead h
    writeIORef ref buf{ bufRPtr=0, bufWPtr=0 }
    s <- unpackAcc (bufBuf buf) (bufRPtr buf) (bufWPtr buf) more
@@ -386,14 +391,14 @@ lazyReadHaveBuffer h handle_ fd ref buf = do
 
 
 unpackAcc :: RawBuffer -> Int -> Int -> [Char] -> IO [Char]
-unpackAcc buf r 0 acc  = return acc
-unpackAcc buf (I# r) (I# len) acc = IO $ \s -> unpack acc (len -# 1#) s
+unpackAcc _   _      0        acc  = return acc
+unpackAcc buf (I# r) (I# len) acc0 = IO $ \s -> unpackRB acc0 (len -# 1#) s
    where
-    unpack acc i s
+    unpackRB acc i s
      | i <# r  = (# s, acc #)
      | otherwise = 
           case readCharArray# buf i s of
-            (# s, ch #) -> unpack (C# ch : acc) (i -# 1#) s
+          (# s', ch #) -> unpackRB (C# ch : acc) (i -# 1#) s'
 
 -- ---------------------------------------------------------------------------
 -- hPutChar
@@ -421,6 +426,7 @@ hPutChar handle c = do
                   writeRawBufferPtr "hPutChar" fd (haIsStream handle_) buf 0 1
                   return ()
 
+hPutcBuffered :: Handle__ -> Bool -> Char -> IO ()
 hPutcBuffered handle_ is_line c = do
   let ref = haBuffer handle_
   buf <- readIORef ref
@@ -436,7 +442,7 @@ hPutcBuffered handle_ is_line c = do
 
 
 hPutChars :: Handle -> [Char] -> IO ()
-hPutChars handle [] = return ()
+hPutChars _      [] = return ()
 hPutChars handle (c:cs) = hPutChar handle c >> hPutChars handle cs
 
 -- ---------------------------------------------------------------------------
@@ -583,6 +589,8 @@ commitBuffer hdl raw sz@(I# _) count@(I# _) flush release = do
 --
 -- This hack is a fairly big win for hPutStr performance.  --SDM 18/9/2001
 --
+commitBuffer' :: RawBuffer -> Int -> Int -> Bool -> Bool -> Handle__
+              -> IO Buffer
 commitBuffer' raw sz@(I# _) count@(I# _) flush release
   handle_@Handle__{ haFD=fd, haBuffer=ref, haBuffers=spare_buf_ref } = do
 
@@ -591,7 +599,7 @@ commitBuffer' raw sz@(I# _) count@(I# _) flush release
             ++ ", flush=" ++ show flush ++ ", release=" ++ show release ++"\n")
 #endif
 
-      old_buf@Buffer{ bufBuf=old_raw, bufRPtr=r, bufWPtr=w, bufSize=size }
+      old_buf@Buffer{ bufBuf=old_raw, bufWPtr=w, bufSize=size }
           <- readIORef ref
 
       buf_ret <-
@@ -688,12 +696,13 @@ hPutBuf' handle ptr count can_block
   | count <  0 = illegalBufferSize handle "hPutBuf" count
   | otherwise = 
     wantWritableHandle "hPutBuf" handle $ 
-      \ handle_@Handle__{ haFD=fd, haBuffer=ref, haIsStream=is_stream } -> 
+      \ Handle__{ haFD=fd, haBuffer=ref, haIsStream=is_stream } -> 
           bufWrite fd ref is_stream ptr count can_block
 
+bufWrite :: FD -> IORef Buffer -> Bool -> Ptr a -> Int -> Bool -> IO Int
 bufWrite fd ref is_stream ptr count can_block =
   seq count $ seq fd $ do  -- strictness hack
-  old_buf@Buffer{ bufBuf=old_raw, bufRPtr=r, bufWPtr=w, bufSize=size }
+  old_buf@Buffer{ bufBuf=old_raw, bufWPtr=w, bufSize=size }
      <- readIORef ref
 
   -- enough room in handle buffer?
@@ -717,7 +726,7 @@ bufWrite fd ref is_stream ptr count can_block =
                            else writeChunkNonBlocking fd is_stream ptr count
 
 writeChunk :: FD -> Bool -> Ptr CChar -> Int -> IO ()
-writeChunk fd is_stream ptr bytes = loop 0 bytes 
+writeChunk fd is_stream ptr bytes0 = loop 0 bytes0
  where
   loop :: Int -> Int -> IO ()
   loop _   bytes | bytes <= 0 = return ()
@@ -729,7 +738,13 @@ writeChunk fd is_stream ptr bytes = loop 0 bytes
     loop (off + r) (bytes - r)
 
 writeChunkNonBlocking :: FD -> Bool -> Ptr a -> Int -> IO Int
-writeChunkNonBlocking fd is_stream ptr bytes = loop 0 bytes 
+writeChunkNonBlocking fd
+#ifndef mingw32_HOST_OS
+                         _
+#else
+                         is_stream
+#endif
+                                   ptr bytes0 = loop 0 bytes0
  where
   loop :: Int -> Int -> IO Int
   loop off bytes | bytes <= 0 = return off
@@ -775,12 +790,13 @@ hGetBuf h ptr count
   | count <  0 = illegalBufferSize h "hGetBuf" count
   | otherwise = 
       wantReadableHandle "hGetBuf" h $ 
-        \ handle_@Handle__{ haFD=fd, haBuffer=ref, haIsStream=is_stream } -> do
+        \ Handle__{ haFD=fd, haBuffer=ref, haIsStream=is_stream } -> do
             bufRead fd ref is_stream ptr 0 count
 
 -- small reads go through the buffer, large reads are satisfied by
 -- taking data first from the buffer and then direct from the file
 -- descriptor.
+bufRead :: FD -> IORef Buffer -> Bool -> Ptr a -> Int -> Int -> IO Int
 bufRead fd ref is_stream ptr so_far count =
   seq fd $ seq so_far $ seq count $ do -- strictness hack
   buf@Buffer{ bufBuf=raw, bufWPtr=w, bufRPtr=r, bufSize=sz } <- readIORef ref
@@ -823,7 +839,7 @@ bufRead fd ref is_stream ptr so_far count =
         return (so_far' + rest)
 
 readChunk :: FD -> Bool -> Ptr a -> Int -> IO Int
-readChunk fd is_stream ptr bytes = loop 0 bytes 
+readChunk fd is_stream ptr bytes0 = loop 0 bytes0
  where
   loop :: Int -> Int -> IO Int
   loop off bytes | bytes <= 0 = return off
@@ -855,9 +871,11 @@ hGetBufNonBlocking h ptr count
   | count <  0 = illegalBufferSize h "hGetBufNonBlocking" count
   | otherwise = 
       wantReadableHandle "hGetBufNonBlocking" h $ 
-        \ handle_@Handle__{ haFD=fd, haBuffer=ref, haIsStream=is_stream } -> do
+        \ Handle__{ haFD=fd, haBuffer=ref, haIsStream=is_stream } -> do
             bufReadNonBlocking fd ref is_stream ptr 0 count
 
+bufReadNonBlocking :: FD -> IORef Buffer -> Bool -> Ptr a -> Int -> Int
+                   -> IO Int
 bufReadNonBlocking fd ref is_stream ptr so_far count =
   seq fd $ seq so_far $ seq count $ do -- strictness hack
   buf@Buffer{ bufBuf=raw, bufWPtr=w, bufRPtr=r, bufSize=sz } <- readIORef ref
@@ -866,13 +884,13 @@ bufReadNonBlocking fd ref is_stream ptr so_far count =
                 then do rest <- readChunkNonBlocking fd is_stream ptr count
                         return (so_far + rest)
                 else do buf' <- fillReadBufferWithoutBlocking fd is_stream buf
-                        case buf' of { Buffer{ bufWPtr=w }  ->
-                        if (w == 0) 
+                        case buf' of { Buffer{ bufWPtr=w' }  ->
+                        if (w' == 0) 
                            then return so_far
                            else do writeIORef ref buf'
                                    bufReadNonBlocking fd ref is_stream ptr
-                                         so_far (min count w)
-                                  -- NOTE: new count is 'min count w'
+                                         so_far (min count w')
+                                  -- NOTE: new count is    min count w'
                                   -- so we will just copy the contents of the
                                   -- buffer in the recursive call, and not
                                   -- loop again.

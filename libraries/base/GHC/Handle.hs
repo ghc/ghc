@@ -74,7 +74,7 @@ import GHC.List
 import GHC.IOBase
 import GHC.Exception
 import GHC.Enum
-import GHC.Num          ( Integer(..), Num(..) )
+import GHC.Num          ( Integer, Num(..) )
 import GHC.Show
 #if defined(DEBUG_DUMP)
 import GHC.Pack
@@ -96,7 +96,8 @@ import GHC.Conc
 -- Are files opened by default in text or binary mode, if the user doesn't
 -- specify?
 
-dEFAULT_OPEN_IN_BINARY_MODE = False :: Bool
+dEFAULT_OPEN_IN_BINARY_MODE :: Bool
+dEFAULT_OPEN_IN_BINARY_MODE = False
 
 -- ---------------------------------------------------------------------------
 -- Creating a new handle
@@ -171,6 +172,8 @@ withAllHandles__ fun h@(DuplexHandle _ r w) act = do
   withHandle__' fun h r act
   withHandle__' fun h w act
 
+withHandle__' :: String -> Handle -> MVar Handle__ -> (Handle__ -> IO Handle__)
+              -> IO ()
 withHandle__' fun h m act =
    block $ do
    h_ <- takeMVar m
@@ -181,13 +184,14 @@ withHandle__' fun h m act =
    putMVar m h'
    return ()
 
+augmentIOError :: IOException -> String -> Handle -> IOException
 augmentIOError (IOError _ iot _ str fp) fun h
   = IOError (Just h) iot fun str filepath
   where filepath
           | Just _ <- fp = fp
           | otherwise = case h of
-                          FileHandle fp _     -> Just fp
-                          DuplexHandle fp _ _ -> Just fp
+                          FileHandle path _     -> Just path
+                          DuplexHandle path _ _ -> Just path
 
 -- ---------------------------------------------------------------------------
 -- Wrapper for write operations.
@@ -205,6 +209,7 @@ wantWritableHandle'
 wantWritableHandle' fun h m act
    = withHandle_' fun h m (checkWritableHandle act)
 
+checkWritableHandle :: (Handle__ -> IO a) -> Handle__ -> IO a
 checkWritableHandle act handle_
   = case haType handle_ of
       ClosedHandle         -> ioe_closedHandle
@@ -238,6 +243,7 @@ wantReadableHandle'
 wantReadableHandle' fun h m act
   = withHandle_' fun h m (checkReadableHandle act)
 
+checkReadableHandle :: (Handle__ -> IO a) -> Handle__ -> IO a
 checkReadableHandle act handle_ =
     case haType handle_ of
       ClosedHandle         -> ioe_closedHandle
@@ -263,6 +269,7 @@ wantSeekableHandle fun h@(DuplexHandle _ _ _) _act =
 wantSeekableHandle fun h@(FileHandle _ m) act =
   withHandle_' fun h m (checkSeekableHandle act)
 
+checkSeekableHandle :: (Handle__ -> IO a) -> Handle__ -> IO a
 checkSeekableHandle act handle_ =
     case haType handle_ of
       ClosedHandle      -> ioe_closedHandle
@@ -297,6 +304,7 @@ ioe_notSeekable_notBin = ioException
       "seek operations on text-mode handles are not allowed on this platform"
         Nothing)
 
+ioe_finalizedHandle :: FilePath -> Handle__
 ioe_finalizedHandle fp = throw
    (IOError Nothing IllegalOperation ""
         "handle is finalized" (Just fp))
@@ -344,6 +352,7 @@ handleFinalizer fp m = do
 -- ---------------------------------------------------------------------------
 -- Grimy buffer operations
 
+checkBufferInvariants :: Handle__ -> IO ()
 #ifdef DEBUG
 checkBufferInvariants h_ = do
  let ref = haBuffer h_
@@ -359,7 +368,7 @@ checkBufferInvariants h_ = do
    then error "buffer invariant violation"
    else return ()
 #else
-checkBufferInvariants h_ = return ()
+checkBufferInvariants _ = return ()
 #endif
 
 newEmptyBuffer :: RawBuffer -> BufferState -> Int -> Buffer
@@ -370,18 +379,18 @@ allocateBuffer :: Int -> BufferState -> IO Buffer
 allocateBuffer sz@(I# size) state = IO $ \s -> 
    -- We sometimes need to pass the address of this buffer to
    -- a "safe" foreign call, hence it must be immovable.
-  case newPinnedByteArray# size s of { (# s, b #) ->
-  (# s, newEmptyBuffer b state sz #) }
+  case newPinnedByteArray# size s of { (# s', b #) ->
+  (# s', newEmptyBuffer b state sz #) }
 
 writeCharIntoBuffer :: RawBuffer -> Int -> Char -> IO Int
 writeCharIntoBuffer slab (I# off) (C# c)
   = IO $ \s -> case writeCharArray# slab off c s of 
-                 s -> (# s, I# (off +# 1#) #)
+               s' -> (# s', I# (off +# 1#) #)
 
 readCharFromBuffer :: RawBuffer -> Int -> IO (Char, Int)
 readCharFromBuffer slab (I# off)
   = IO $ \s -> case readCharArray# slab off s of 
-                 (# s, c #) -> (# s, (C# c, I# (off +# 1#)) #)
+                 (# s', c #) -> (# s', (C# c, I# (off +# 1#)) #)
 
 getBuffer :: FD -> BufferState -> IO (IORef Buffer, BufferMode)
 getBuffer fd state = do
@@ -472,6 +481,8 @@ fillReadBuffer fd is_line is_stream
 -- appears to be what GHC has done for a long time, and I suspect it
 -- is more useful than line buffering in most cases.
 
+fillReadBufferLoop :: FD -> Bool -> Bool -> Buffer -> RawBuffer -> Int -> Int
+                   -> IO Buffer
 fillReadBufferLoop fd is_line is_stream buf b w size = do
   let bytes = size - w
   if bytes == 0  -- buffer full?
@@ -775,9 +786,10 @@ foreign import ccall safe "__hscore_PrelHandle_write"
 -- or output channel respectively.  The third manages output to the
 -- standard error channel. These handles are initially open.
 
-fd_stdin  = 0 :: FD
-fd_stdout = 1 :: FD
-fd_stderr = 2 :: FD
+fd_stdin, fd_stdout, fd_stderr :: FD
+fd_stdin  = 0
+fd_stdout = 1
+fd_stderr = 2
 
 -- | A handle managing input from the Haskell program's standard input channel.
 stdin :: Handle
@@ -812,6 +824,7 @@ stderr = unsafePerformIO $ do
 -- ---------------------------------------------------------------------------
 -- Opening and Closing Files
 
+addFilePathToIOError :: String -> FilePath -> IOException -> IOException
 addFilePathToIOError fun fp (IOError h iot _ str _)
   = IOError h iot fun str (Just fp)
 
@@ -862,6 +875,7 @@ openBinaryFile fp m =
     (openFile' fp m True)
     (\e -> ioError (addFilePathToIOError "openBinaryFile" fp e))
 
+openFile' :: String -> IOMode -> Bool -> IO Handle
 openFile' filepath mode binary =
   withCString filepath $ \ f ->
 
@@ -913,6 +927,8 @@ openFile' filepath mode binary =
     return h
 
 
+std_flags, output_flags, read_flags, write_flags, rw_flags,
+    append_flags :: CInt
 std_flags    = o_NONBLOCK   .|. o_NOCTTY
 output_flags = std_flags    .|. o_CREAT
 read_flags   = std_flags    .|. o_RDONLY 
@@ -1090,7 +1106,7 @@ mkDuplexHandle fd is_stream filepath binary = do
   addMVarFinalizer write_side (handleFinalizer filepath write_side)
   return (DuplexHandle filepath read_side write_side)
    
-
+initBufferState :: HandleType -> BufferState
 initBufferState ReadHandle = ReadBuffer
 initBufferState _          = WriteBuffer
 
@@ -1119,6 +1135,7 @@ hClose h@(DuplexHandle _ r w) = do
      Nothing -> return ()
      Just e  -> throwIO e
 
+hClose' :: Handle -> MVar Handle__ -> IO (Maybe SomeException)
 hClose' h m = withHandle' "hClose" h m $ hClose_help
 
 -- hClose_help is also called by lazyRead (in PrelIO) when EOF is read
@@ -1175,6 +1192,7 @@ hClose_handle_ handle_ = do
             maybe_exception)
 
 {-# NOINLINE noBuffer #-}
+noBuffer :: Buffer
 noBuffer = unsafePerformIO $ allocateBuffer 1 ReadBuffer
 
 -----------------------------------------------------------------------------
@@ -1252,7 +1270,6 @@ hLookAhead' :: Handle__ -> IO Char
 hLookAhead' handle_ = do
   let ref     = haBuffer handle_
       fd      = haFD handle_
-      is_line = haBufferMode handle_ == LineBuffering
   buf <- readIORef ref
 
   -- fill up the read buffer if necessary
@@ -1660,6 +1677,8 @@ dupHandle h other_side h_ = do
                 Just r -> withHandle_' "dupHandle" h r (return . haFD)
   dupHandle_ other_side h_ new_fd
 
+dupHandleTo :: Maybe (MVar Handle__) -> Handle__ -> Handle__
+            -> IO (Handle__, Handle__)
 dupHandleTo other_side hto_ h_ = do
   flushBuffer h_
   -- Windows' dup2 does not return the new descriptor, unlike Unix
@@ -1719,6 +1738,7 @@ hShow :: Handle -> IO String
 hShow h@(FileHandle path _) = showHandle' path False h
 hShow h@(DuplexHandle path _ _) = showHandle' path True h
 
+showHandle' :: String -> Bool -> Handle -> IO String
 showHandle' filepath is_duplex h = 
   withHandle_ "showHandle" h $ \hdl_ ->
     let

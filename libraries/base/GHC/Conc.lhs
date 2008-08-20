@@ -205,7 +205,7 @@ GHC note: the new thread inherits the /blocked/ state of the parent
 -}
 forkIO :: IO () -> IO ThreadId
 forkIO action = IO $ \ s -> 
-   case (fork# action_plus s) of (# s1, id #) -> (# s1, ThreadId id #)
+   case (fork# action_plus s) of (# s1, tid #) -> (# s1, ThreadId tid #)
  where
   action_plus = catchException action childHandler
 
@@ -224,7 +224,7 @@ equivalent).
 -}
 forkOnIO :: Int -> IO () -> IO ThreadId
 forkOnIO (I# cpu) action = IO $ \ s -> 
-   case (forkOn# cpu action_plus s) of (# s1, id #) -> (# s1, ThreadId id #)
+   case (forkOn# cpu action_plus s) of (# s1, tid #) -> (# s1, ThreadId tid #)
  where
   action_plus = catchException action childHandler
 
@@ -300,13 +300,13 @@ a pending 'throwTo'.  This is arguably undesirable behaviour.
 
  -}
 throwTo :: Exception e => ThreadId -> e -> IO ()
-throwTo (ThreadId id) ex = IO $ \ s ->
-   case (killThread# id (toException ex) s) of s1 -> (# s1, () #)
+throwTo (ThreadId tid) ex = IO $ \ s ->
+   case (killThread# tid (toException ex) s) of s1 -> (# s1, () #)
 
 -- | Returns the 'ThreadId' of the calling thread (GHC only).
 myThreadId :: IO ThreadId
 myThreadId = IO $ \s ->
-   case (myThreadId# s) of (# s1, id #) -> (# s1, ThreadId id #)
+   case (myThreadId# s) of (# s1, tid #) -> (# s1, ThreadId tid #)
 
 
 -- |The 'yield' action allows (forces, in a co-operative multitasking
@@ -439,7 +439,7 @@ bindSTM (STM m) k = STM ( \s ->
 thenSTM :: STM a -> STM b -> STM b
 thenSTM (STM m) k = STM ( \s ->
   case m s of 
-    (# new_s, a #) -> unSTM k new_s
+    (# new_s, _ #) -> unSTM k new_s
   )
 
 returnSTM :: a -> STM a
@@ -634,8 +634,8 @@ putMVar (MVar mvar#) x = IO $ \ s# ->
 tryTakeMVar :: MVar a -> IO (Maybe a)
 tryTakeMVar (MVar m) = IO $ \ s ->
     case tryTakeMVar# m s of
-        (# s, 0#, _ #) -> (# s, Nothing #)      -- MVar is empty
-        (# s, _,  a #) -> (# s, Just a  #)      -- MVar is full
+        (# s', 0#, _ #) -> (# s', Nothing #)      -- MVar is empty
+        (# s', _,  a #) -> (# s', Just a  #)      -- MVar is full
 
 -- |A non-blocking version of 'putMVar'.  The 'tryPutMVar' function
 -- attempts to put the value @a@ into the 'MVar', returning 'True' if
@@ -661,7 +661,7 @@ isEmptyMVar (MVar mv#) = IO $ \ s# ->
 -- "System.Mem.Weak" for more about finalizers.
 addMVarFinalizer :: MVar a -> IO () -> IO ()
 addMVarFinalizer (MVar m) finalizer = 
-  IO $ \s -> case mkWeak# m () finalizer s of { (# s1, w #) -> (# s1, () #) }
+  IO $ \s -> case mkWeak# m () finalizer s of { (# s1, _ #) -> (# s1, () #) }
 
 withMVar :: MVar a -> (a -> IO b) -> IO b
 withMVar m io = 
@@ -730,7 +730,7 @@ threadWaitRead fd
 #endif
   | otherwise = IO $ \s -> 
         case fromIntegral fd of { I# fd# ->
-        case waitRead# fd# s of { s -> (# s, () #)
+        case waitRead# fd# s of { s' -> (# s', () #)
         }}
 
 -- | Block the current thread until data can be written to the
@@ -742,7 +742,7 @@ threadWaitWrite fd
 #endif
   | otherwise = IO $ \s -> 
         case fromIntegral fd of { I# fd# ->
-        case waitWrite# fd# s of { s -> (# s, () #)
+        case waitWrite# fd# s of { s' -> (# s', () #)
         }}
 
 -- | Suspends the current thread for a given number of microseconds
@@ -757,7 +757,7 @@ threadDelay time
   | threaded  = waitForDelayEvent time
   | otherwise = IO $ \s -> 
         case fromIntegral time of { I# time# ->
-        case delay# time# s of { s -> (# s, () #)
+        case delay# time# s of { s' -> (# s', () #)
         }}
 
 
@@ -1045,7 +1045,7 @@ service_loop wakeup readfds writefds ptimeval old_reqs old_delays = do
 
   -- pick up new delay requests
   new_delays <- atomicModifyIORef pendingDelays (\a -> ([],a))
-  let  delays = foldr insertDelay old_delays new_delays
+  let  delays0 = foldr insertDelay old_delays new_delays
 
   -- build the FDSets for select()
   fdZero readfds
@@ -1078,7 +1078,7 @@ service_loop wakeup readfds writefds ptimeval old_reqs old_delays = do
              else
                 return (False,delays')
 
-  (wakeup_all,delays') <- do_select delays
+  (wakeup_all,delays') <- do_select delays0
 
   exit <-
     if wakeup_all then return False
@@ -1108,8 +1108,9 @@ service_loop wakeup readfds writefds ptimeval old_reqs old_delays = do
 
   service_loop wakeup readfds writefds ptimeval reqs' delays'
 
-io_MANAGER_WAKEUP = 0xff :: CChar
-io_MANAGER_DIE    = 0xfe :: CChar
+io_MANAGER_WAKEUP, io_MANAGER_DIE :: CChar
+io_MANAGER_WAKEUP = 0xff
+io_MANAGER_DIE    = 0xfe
 
 stick :: IORef Fd
 {-# NOINLINE stick #-}
@@ -1135,18 +1136,21 @@ foreign import ccall "setIOManagerPipe"
 -- -----------------------------------------------------------------------------
 -- IO requests
 
-buildFdSets maxfd readfds writefds [] = return maxfd
-buildFdSets maxfd readfds writefds (Read fd m : reqs)
+buildFdSets :: Fd -> Ptr CFdSet -> Ptr CFdSet -> [IOReq] -> IO Fd
+buildFdSets maxfd _       _        [] = return maxfd
+buildFdSets maxfd readfds writefds (Read fd _ : reqs)
   | fd >= fD_SETSIZE =  error "buildFdSets: file descriptor out of range"
   | otherwise        =  do
         fdSet fd readfds
         buildFdSets (max maxfd fd) readfds writefds reqs
-buildFdSets maxfd readfds writefds (Write fd m : reqs)
+buildFdSets maxfd readfds writefds (Write fd _ : reqs)
   | fd >= fD_SETSIZE =  error "buildFdSets: file descriptor out of range"
   | otherwise        =  do
         fdSet fd writefds
         buildFdSets (max maxfd fd) readfds writefds reqs
 
+completeRequests :: [IOReq] -> Ptr CFdSet -> Ptr CFdSet -> [IOReq]
+                 -> IO [IOReq]
 completeRequests [] _ _ reqs' = return reqs'
 completeRequests (Read fd m : reqs) readfds writefds reqs' = do
   b <- fdIsSet fd readfds
@@ -1159,9 +1163,10 @@ completeRequests (Write fd m : reqs) readfds writefds reqs' = do
     then do putMVar m (); completeRequests reqs readfds writefds reqs'
     else completeRequests reqs readfds writefds (Write fd m : reqs')
 
+wakeupAll :: [IOReq] -> IO ()
 wakeupAll [] = return ()
-wakeupAll (Read  fd m : reqs) = do putMVar m (); wakeupAll reqs
-wakeupAll (Write fd m : reqs) = do putMVar m (); wakeupAll reqs
+wakeupAll (Read  _ m : reqs) = do putMVar m (); wakeupAll reqs
+wakeupAll (Write _ m : reqs) = do putMVar m (); wakeupAll reqs
 
 waitForReadEvent :: Fd -> IO ()
 waitForReadEvent fd = do
@@ -1184,7 +1189,7 @@ waitForWriteEvent fd = do
 -- and return the smallest delay to wait for.  The queue of pending
 -- delays is kept ordered.
 getDelay :: USecs -> Ptr CTimeVal -> [DelayReq] -> IO ([DelayReq], Ptr CTimeVal)
-getDelay now ptimeval [] = return ([],nullPtr)
+getDelay _   _        [] = return ([],nullPtr)
 getDelay now ptimeval all@(d : rest) 
   = case d of
      Delay time m | now >= time -> do
@@ -1197,7 +1202,7 @@ getDelay now ptimeval all@(d : rest)
         setTimevalTicks ptimeval (delayTime d - now)
         return (all,ptimeval)
 
-newtype CTimeVal = CTimeVal ()
+data CTimeVal
 
 foreign import ccall unsafe "sizeofTimeVal"
   sizeofTimeVal :: Int
@@ -1216,7 +1221,7 @@ foreign import ccall unsafe "setTimevalTicks"
 
 -- ToDo: move to System.Posix.Internals?
 
-newtype CFdSet = CFdSet ()
+data CFdSet
 
 foreign import ccall safe "select"
   c_select :: CInt -> Ptr CFdSet -> Ptr CFdSet -> Ptr CFdSet -> Ptr CTimeVal
@@ -1227,12 +1232,6 @@ foreign import ccall unsafe "hsFD_SETSIZE"
 
 fD_SETSIZE :: Fd
 fD_SETSIZE = fromIntegral c_fD_SETSIZE
-
-foreign import ccall unsafe "hsFD_CLR"
-  c_fdClr :: CInt -> Ptr CFdSet -> IO ()
-
-fdClr :: Fd -> Ptr CFdSet -> IO ()
-fdClr (Fd fd) fdset = c_fdClr fd fdset
 
 foreign import ccall unsafe "hsFD_ISSET"
   c_fdIsSet :: CInt -> Ptr CFdSet -> IO CInt

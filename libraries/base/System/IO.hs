@@ -169,6 +169,7 @@ import Data.List
 import Data.Maybe
 import Foreign.C.Error
 import Foreign.C.String
+import Foreign.C.Types
 import System.Posix.Internals
 #endif
 
@@ -510,12 +511,10 @@ pathSeparator = '/'
 
 #ifndef __NHC__
 -- XXX Copied from GHC.Handle
+std_flags, output_flags, rw_flags :: CInt
 std_flags    = o_NONBLOCK   .|. o_NOCTTY
 output_flags = std_flags    .|. o_CREAT
-read_flags   = std_flags    .|. o_RDONLY
-write_flags  = output_flags .|. o_WRONLY
 rw_flags     = output_flags .|. o_RDWR
-append_flags = write_flags  .|. o_APPEND
 #endif
 
 #ifdef __NHC__

@@ -691,7 +691,6 @@ INLINE int __hscore_fstat(int fd, struct_stat *buf) {
 
 #if !defined(__MINGW32__)
 INLINE int  hsFD_SETSIZE(void) { return FD_SETSIZE; }
-INLINE void hsFD_CLR(int fd, fd_set *fds) { FD_CLR(fd, fds); }
 INLINE int  hsFD_ISSET(int fd, fd_set *fds) { return FD_ISSET(fd, fds); }
 INLINE void hsFD_SET(int fd, fd_set *fds) { FD_SET(fd, fds); }
 INLINE HsInt sizeof_fd_set(void) { return sizeof(fd_set); }

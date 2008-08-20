@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -XNoImplicitPrelude #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 #include "Typeable.h"
 
@@ -106,7 +107,6 @@ module Control.Exception.Base (
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
 import GHC.IOBase
-import GHC.List
 import GHC.Show
 import GHC.IOBase
 import GHC.Exception hiding ( Exception )

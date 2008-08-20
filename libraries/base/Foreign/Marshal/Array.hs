@@ -152,8 +152,8 @@ pokeArray :: Storable a => Ptr a -> [a] -> IO ()
 #ifndef __GLASGOW_HASKELL__
 pokeArray ptr vals =  zipWithM_ (pokeElemOff ptr) [0..] vals
 #else
-pokeArray ptr vals = go vals 0#
-  where go [] n#         = return ()
+pokeArray ptr vals0 = go vals0 0#
+  where go [] _          = return ()
         go (val:vals) n# = do pokeElemOff ptr (I# n#) val; go vals (n# +# 1#)
 #endif
 
@@ -166,7 +166,7 @@ pokeArray0 marker ptr vals  = do
   pokeArray ptr vals
   pokeElemOff ptr (length vals) marker
 #else
-pokeArray0 marker ptr vals = go vals 0#
+pokeArray0 marker ptr vals0 = go vals0 0#
   where go [] n#         = pokeElemOff ptr (I# n#) marker
         go (val:vals) n# = do pokeElemOff ptr (I# n#) val; go vals (n# +# 1#)
 #endif

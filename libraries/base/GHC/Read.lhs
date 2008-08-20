@@ -67,7 +67,7 @@ import {-# SOURCE #-} GHC.Unicode       ( isDigit )
 #endif
 import GHC.Num
 import GHC.Real
-import GHC.Float
+import GHC.Float ()
 import GHC.Show
 import GHC.Base
 import GHC.Arr

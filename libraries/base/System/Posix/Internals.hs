@@ -112,6 +112,7 @@ fdStat fd =
 fdType :: FD -> IO FDType
 fdType fd = do (ty,_,_) <- fdStat fd; return ty
 
+statGetType :: Ptr CStat -> IO FDType
 statGetType p_stat = do
   c_mode <- st_mode p_stat :: IO CMode
   case () of
@@ -123,7 +124,7 @@ statGetType p_stat = do
         | s_isblk c_mode        -> return RawDevice
         | otherwise             -> ioError ioe_unknownfiletype
     
-
+ioe_unknownfiletype :: IOException
 ioe_unknownfiletype = IOError Nothing UnsupportedOperation "fdType"
                         "unknown file type" Nothing
 
@@ -171,27 +172,27 @@ fdIsTTY fd = c_isatty fd >>= return.toBool
 setEcho :: FD -> Bool -> IO ()
 setEcho fd on = do
   tcSetAttr fd $ \ p_tios -> do
-    c_lflag <- c_lflag p_tios :: IO CTcflag
-    let new_c_lflag
-         | on        = c_lflag .|. fromIntegral const_echo
-         | otherwise = c_lflag .&. complement (fromIntegral const_echo)
-    poke_c_lflag p_tios (new_c_lflag :: CTcflag)
+    lflag <- c_lflag p_tios :: IO CTcflag
+    let new_lflag
+         | on        = lflag .|. fromIntegral const_echo
+         | otherwise = lflag .&. complement (fromIntegral const_echo)
+    poke_c_lflag p_tios (new_lflag :: CTcflag)
 
 getEcho :: FD -> IO Bool
 getEcho fd = do
   tcSetAttr fd $ \ p_tios -> do
-    c_lflag <- c_lflag p_tios :: IO CTcflag
-    return ((c_lflag .&. fromIntegral const_echo) /= 0)
+    lflag <- c_lflag p_tios :: IO CTcflag
+    return ((lflag .&. fromIntegral const_echo) /= 0)
 
 setCooked :: FD -> Bool -> IO ()
 setCooked fd cooked = 
   tcSetAttr fd $ \ p_tios -> do
 
     -- turn on/off ICANON
-    c_lflag <- c_lflag p_tios :: IO CTcflag
-    let new_c_lflag | cooked    = c_lflag .|. (fromIntegral const_icanon)
-                    | otherwise = c_lflag .&. complement (fromIntegral const_icanon)
-    poke_c_lflag p_tios (new_c_lflag :: CTcflag)
+    lflag <- c_lflag p_tios :: IO CTcflag
+    let new_lflag | cooked    = lflag .|. (fromIntegral const_icanon)
+                  | otherwise = lflag .&. complement (fromIntegral const_icanon)
+    poke_c_lflag p_tios (new_lflag :: CTcflag)
 
     -- set VMIN & VTIME to 1/0 respectively
     when (not cooked) $ do
@@ -293,7 +294,7 @@ foreign import ccall unsafe "consUtils.h get_console_echo__"
 -- Turning on non-blocking for a file descriptor
 
 #if !defined(mingw32_HOST_OS) && !defined(__MINGW32__)
-
+setNonBlockingFD :: FD -> IO ()
 setNonBlockingFD fd = do
   flags <- throwErrnoIfMinus1Retry "setNonBlockingFD"
                  (c_fcntl_read fd const_f_getfl)

@@ -690,22 +690,22 @@ instance Enum Word64 where
     enumFromThenTo      = integralEnumFromThenTo
 
 instance Integral Word64 where
-    quot    x@(W64# x#) y@(W64# y#)
+    quot    (W64# x#) y@(W64# y#)
         | y /= 0                    = W64# (x# `quotWord64#` y#)
         | otherwise                 = divZeroError
-    rem     x@(W64# x#) y@(W64# y#)
+    rem     (W64# x#) y@(W64# y#)
         | y /= 0                    = W64# (x# `remWord64#` y#)
         | otherwise                 = divZeroError
-    div     x@(W64# x#) y@(W64# y#)
+    div     (W64# x#) y@(W64# y#)
         | y /= 0                    = W64# (x# `quotWord64#` y#)
         | otherwise                 = divZeroError
-    mod     x@(W64# x#) y@(W64# y#)
+    mod     (W64# x#) y@(W64# y#)
         | y /= 0                    = W64# (x# `remWord64#` y#)
         | otherwise                 = divZeroError
-    quotRem x@(W64# x#) y@(W64# y#)
+    quotRem (W64# x#) y@(W64# y#)
         | y /= 0                    = (W64# (x# `quotWord64#` y#), W64# (x# `remWord64#` y#))
         | otherwise                 = divZeroError
-    divMod  x@(W64# x#) y@(W64# y#)
+    divMod  (W64# x#) y@(W64# y#)
         | y /= 0                    = (W64# (x# `quotWord64#` y#), W64# (x# `remWord64#` y#))
         | otherwise                 = divZeroError
     toInteger (W64# x#)             = word64ToInteger x#
