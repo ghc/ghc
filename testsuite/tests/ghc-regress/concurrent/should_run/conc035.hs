@@ -13,9 +13,10 @@ trapHandler inVar caughtVar =
   `E.catch`
   (trapExc inVar caughtVar)
 
-trapExc :: MVar Int -> MVar () -> E.Exception -> IO ()
+trapExc :: MVar Int -> MVar () -> E.SomeException -> IO ()
 -- If we have been killed then we are done
-trapExc inVar caughtVar (E.AsyncException E.ThreadKilled) = return ()
+trapExc inVar caughtVar  e
+  | Just E.ThreadKilled <- E.fromException e  = return ()
 -- Otherwise...
 trapExc inVar caughtVar e =
   do putStrLn ("Exception: " ++ show e)

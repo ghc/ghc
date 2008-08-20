@@ -23,7 +23,7 @@ main = do
      putStrLn "newThread started"
      sleep 1
      putMVar th "child"
-  threadDelay 500000 >> putMVar th "main" `catch` \_ -> return ()
+  threadDelay 500000 >> putMVar th "main"
 	-- tests that the other thread doing an unsafe call to 
 	-- sleep(3) has blocked this thread.  Not sure if this
 	-- is a useful test.

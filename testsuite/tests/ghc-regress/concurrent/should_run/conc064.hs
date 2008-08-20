@@ -8,7 +8,7 @@ main = do
          test master 10
 
 test tid 0 = return ()
-test tid n = handle (const (test tid (n-1))) $ do
+test tid n = handle (\(e::NonTermination) -> test tid (n-1)) $ do
                  sequence $ replicate 3 $
                          forkIO $ do t <- myThreadId
                                      --putStrLn ("Start " ++ show t)

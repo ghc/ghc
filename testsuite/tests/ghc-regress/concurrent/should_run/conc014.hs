@@ -11,10 +11,12 @@ main = do
   (do 
      error "wibble"
 	`Control.Exception.catch`
-	    (\e -> do putMVar m (); sum [1..10000] `seq` putStrLn "done.")
+	    (\e -> let _ = e::ErrorCall in
+                   do putMVar m (); sum [1..10000] `seq` putStrLn "done.")
      myDelay 500000
    )
-    `Control.Exception.catch` (\e -> putStrLn ("caught: " ++ show e))
+    `Control.Exception.catch` 
+       \e -> putStrLn ("caught: " ++ show (e::SomeException))
 
 -- compensate for the fact that threadDelay is non-interruptible
 -- on Windows with the threaded RTS in 6.6.

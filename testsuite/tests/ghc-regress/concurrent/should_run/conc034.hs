@@ -21,8 +21,8 @@ main = do
 	-- can't see that a and b are both bottom, otherwise the
 	-- simplifier will go to town here, resulting in something like
 	-- a = a and b = a.
-  forkIO (Control.Exception.try (print a) >> return ())
+  forkIO (print a)
 	-- we need a try in the child thread too, because it might 
 	-- get sent the NonTermination exception first.
   r <- Control.Exception.try (print b)
-  print r
+  print (r::Either SomeException ())

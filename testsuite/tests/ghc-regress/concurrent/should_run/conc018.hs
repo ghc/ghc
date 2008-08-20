@@ -10,6 +10,6 @@ main = do
 		m <- newMVar ()
 		putMVar m ()
 	     )
-	     (\e -> print e)
+	     (\e -> print (e::SomeException))
 	   )
   threadDelay 200000

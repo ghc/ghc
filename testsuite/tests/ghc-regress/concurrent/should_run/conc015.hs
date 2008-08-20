@@ -26,12 +26,14 @@ main = do
         print =<< blocked
 	sum [1..10000] `seq` -- give 'foo' a chance to be raised
   	  (unblock (do print =<< blocked; myDelay 500000))
-		`Control.Exception.catch` (\e -> putStrLn ("caught1: " ++ show e))
+		`Control.Exception.catch` 
+                    \e -> putStrLn ("caught1: " ++ show (e::SomeException))
      )
     takeMVar m2
    )
     `Control.Exception.catch`
-    (\e -> do print =<< blocked; putStrLn ("caught2: " ++ show e))
+       \e -> do print =<< blocked
+                putStrLn ("caught2: " ++ show (e::SomeException))
 
 -- compensate for the fact that threadDelay is non-interruptible
 -- on Windows with the threaded RTS in 6.6.
