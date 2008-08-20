@@ -987,7 +987,8 @@ unknownNameErr rdr_name
 	 , extra ]
   where
     extra | rdr_name == forall_tv_RDR 
-	  = ptext (sLit "Perhaps you intended to use -XRankNTypes or similar flag")
+	  = vcat [ptext (sLit "Perhaps you intended to use -XRankNTypes or similar flag"),
+		  ptext (sLit "to enable explicit-forall syntax: forall <tvs>. <type>?")]
 	  | otherwise = empty
 
 unknownSubordinateErr :: SDoc -> RdrName -> SDoc
