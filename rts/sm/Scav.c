@@ -745,7 +745,7 @@ linear_scan:
 	info = get_itbl((StgClosure *)p);
 	
 	q = p;
-        switch (((volatile StgWord *)info)[1] & 0xffff) {
+        switch (info->type) {
 	    
         case MVAR_CLEAN:
         case MVAR_DIRTY:
