@@ -215,14 +215,14 @@ foldlP     :: (a -> b -> a) -> a -> [:b:] -> a
 foldlP f z  = snd . loop (foldEFL (flip f)) z
 
 foldl1P        :: (a -> a -> a) -> [:a:] -> a
-foldl1P f [::]  = error "Prelude.foldl1P: empty array"
+foldl1P _ [::]  = error "Prelude.foldl1P: empty array"
 foldl1P f a     = snd $ loopFromTo 1 (lengthP a - 1) (foldEFL f) (a!:0) a
 
 scanlP     :: (a -> b -> a) -> a -> [:b:] -> [:a:]
 scanlP f z  = fst . loop (scanEFL (flip f)) z
 
 scanl1P        :: (a -> a -> a) -> [:a:] -> [:a:]
-scanl1P f [::]  = error "Prelude.scanl1P: empty array"
+scanl1P _ [::]  = error "Prelude.scanl1P: empty array"
 scanl1P f a     = fst $ loopFromTo 1 (lengthP a - 1) (scanEFL f) (a!:0) a
 
 foldrP :: (a -> b -> b) -> b -> [:a:] -> b
@@ -353,9 +353,9 @@ unzipP   :: [:(a, b):] -> ([:a:], [:b:])
 unzipP a  = (fst $ loop (mapEFL fst) noAL a, fst $ loop (mapEFL snd) noAL a)
 -- FIXME: these two functions should be optimised using a tupled custom loop
 unzip3P   :: [:(a, b, c):] -> ([:a:], [:b:], [:c:])
-unzip3P a  = (fst $ loop (mapEFL fst3) noAL a, 
-              fst $ loop (mapEFL snd3) noAL a,
-              fst $ loop (mapEFL trd3) noAL a)
+unzip3P x  = (fst $ loop (mapEFL fst3) noAL x, 
+              fst $ loop (mapEFL snd3) noAL x,
+              fst $ loop (mapEFL trd3) noAL x)
              where
                fst3 (a, _, _) = a
                snd3 (_, b, _) = b
@@ -420,13 +420,13 @@ instance Read a => Read [:a:]  where
 -- properly fuse the following definitions.
 
 enumFromToP     :: Enum a => a -> a -> [:a:]
-enumFromToP x y  = mapP toEnum (eftInt (fromEnum x) (fromEnum y))
+enumFromToP x0 y0  = mapP toEnum (eftInt (fromEnum x0) (fromEnum y0))
   where
     eftInt x y = scanlP (+) x $ replicateP (y - x + 1) 1
 
 enumFromThenToP       :: Enum a => a -> a -> a -> [:a:]
-enumFromThenToP x y z  = 
-  mapP toEnum (efttInt (fromEnum x) (fromEnum y) (fromEnum z))
+enumFromThenToP x0 y0 z0  = 
+  mapP toEnum (efttInt (fromEnum x0) (fromEnum y0) (fromEnum z0))
   where
     efttInt x y z = scanlP (+) x $ 
                       replicateP (abs (z - x) `div` abs delta + 1) delta
@@ -623,8 +623,8 @@ loopFromTo :: Int                        -- from index
 loopFromTo from to mf start arr = runST (do
   marr      <- newArray (to - from + 1) noElem
   (n', acc) <- trans from to marr arr mf start
-  arr       <- mkPArr n' marr
-  return (arr, acc))
+  arr'      <- mkPArr n' marr
+  return (arr', acc))
   where
     noElem = error "GHC.PArr.loopFromTo: I do not exist!"
              -- unlike standard Haskell arrays, this value represents an
@@ -681,13 +681,13 @@ noAL  = ()
 --
 mapEFL   :: (e -> e') -> (e -> () -> (Maybe e', ()))
 {-# INLINE mapEFL #-}
-mapEFL f  = \e a -> (Just $ f e, ())
+mapEFL f  = \e _ -> (Just $ f e, ())
 
 -- `loop' mutator that filter elements according to a predicate
 --
 filterEFL   :: (e -> Bool) -> (e -> () -> (Maybe e, ()))
 {-# INLINE filterEFL #-}
-filterEFL p  = \e a -> if p e then (Just e, ()) else (Nothing, ())
+filterEFL p  = \e _ -> if p e then (Just e, ()) else (Nothing, ())
 
 -- `loop' mutator for array folding
 --

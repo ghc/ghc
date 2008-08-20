@@ -63,6 +63,7 @@ class (Monad m) => MonadFix m where
 instance MonadFix Maybe where
     mfix f = let a = f (unJust a) in a
              where unJust (Just x) = x
+                   unJust Nothing  = error "mfix Maybe: Nothing"
 
 -- List:
 instance MonadFix [] where

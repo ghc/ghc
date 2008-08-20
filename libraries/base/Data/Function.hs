@@ -80,4 +80,4 @@ fix f = let x = f x in x
 --   flip on (g . f)
 
 on :: (b -> b -> c) -> (a -> b) -> a -> a -> c
-(*) `on` f = \x y -> f x * f y
+(.*.) `on` f = \x y -> f x .*. f y

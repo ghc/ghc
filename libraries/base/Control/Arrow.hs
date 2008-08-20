@@ -164,7 +164,7 @@ class Arrow a => ArrowZero a where
         zeroArrow :: a b c
 
 instance MonadPlus m => ArrowZero (Kleisli m) where
-        zeroArrow = Kleisli (\x -> mzero)
+        zeroArrow = Kleisli (\_ -> mzero)
 
 class ArrowZero a => ArrowPlus a where
         (<+>) :: a b c -> a b c -> a b c
@@ -255,7 +255,7 @@ instance Monad m => ArrowApply (Kleisli m) where
 newtype ArrowApply a => ArrowMonad a b = ArrowMonad (a () b)
 
 instance ArrowApply a => Monad (ArrowMonad a) where
-        return x = ArrowMonad (arr (\z -> x))
+        return x = ArrowMonad (arr (\_ -> x))
         ArrowMonad m >>= f = ArrowMonad (m >>>
                         arr (\x -> let ArrowMonad h = f x in (h, ())) >>>
                         app)

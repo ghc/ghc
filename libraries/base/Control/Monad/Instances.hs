@@ -1,4 +1,5 @@
 {-# OPTIONS_NHC98 --prelude #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Control.Monad.Instances
