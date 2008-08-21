@@ -852,7 +852,13 @@ runPhase cc_phase _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
 
         let verb = getVerbFlag dflags
 
-	pkg_extra_cc_opts <- getPackageExtraCcOpts dflags pkgs
+        -- cc-options are not passed when compiling .hc files.  Our
+        -- hc code doesn't not #include any header files anyway, so these
+        -- options aren't necessary.
+	pkg_extra_cc_opts <-
+          if cc_phase `eqPhase` HCc
+             then return []
+             else getPackageExtraCcOpts dflags pkgs
 
 #ifdef darwin_TARGET_OS
         pkg_framework_paths <- getPackageFrameworkPath dflags pkgs
