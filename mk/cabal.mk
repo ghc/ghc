@@ -2,9 +2,7 @@
 include $(TOP)/mk/cabal-flags.mk
 include $(TOP)/mk/bindist.mk
 
-# XXX We would like to turn this on, but Cabal generates paths files
-#     that are not -Wall clean!
-# SRC_HC_OPTS      += -Wall
+SRC_HC_OPTS      += -Wall
 
 ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 INSTALL_FLAGS =
