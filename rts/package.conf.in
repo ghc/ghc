@@ -106,9 +106,8 @@ ld-options:
          , "-u", "_base_GHCziIOBase_stackOverflow_closure"
          , "-u", "_base_GHCziIOBase_heapOverflow_closure"
          , "-u", "_base_ControlziExceptionziBase_nonTermination_closure"
-         , "-u", "_base_GHCziIOBase_BlockedOnDeadMVar_closure"
-         , "-u", "_base_GHCziIOBase_BlockedIndefinitely_closure"
-         , "-u", "_base_GHCziIOBase_Deadlock_closure"
+         , "-u", "_base_GHCziIOBase_blockedOnDeadMVar_closure"
+         , "-u", "_base_GHCziIOBase_blockedIndefinitely_closure"
          , "-u", "_base_ControlziExceptionziBase_nestedAtomically_closure"
          , "-u", "_base_GHCziWeak_runFinalizzerBatch_closure"
 #else
@@ -140,9 +139,8 @@ ld-options:
          , "-u", "base_GHCziIOBase_stackOverflow_closure"
          , "-u", "base_GHCziIOBase_heapOverflow_closure"
          , "-u", "base_ControlziExceptionziBase_nonTermination_closure"
-         , "-u", "base_GHCziIOBase_BlockedOnDeadMVar_closure"
-         , "-u", "base_GHCziIOBase_BlockedIndefinitely_closure"
-         , "-u", "base_GHCziIOBase_Deadlock_closure"
+         , "-u", "base_GHCziIOBase_blockedOnDeadMVar_closure"
+         , "-u", "base_GHCziIOBase_blockedIndefinitely_closure"
          , "-u", "base_ControlziExceptionziBase_nestedAtomically_closure"
          , "-u", "base_GHCziWeak_runFinalizzerBatch_closure"
 #endif

@@ -3152,7 +3152,7 @@ resurrectThreads (StgTSO *threads)
 	case BlockedOnException:
 	    /* Called by GC - sched_mutex lock is currently held. */
 	    throwToSingleThreaded(cap, tso,
-				  (StgClosure *)BlockedOnDeadMVar_closure);
+				  (StgClosure *)blockedOnDeadMVar_closure);
 	    break;
 	case BlockedOnBlackHole:
 	    throwToSingleThreaded(cap, tso,
@@ -3160,7 +3160,7 @@ resurrectThreads (StgTSO *threads)
 	    break;
 	case BlockedOnSTM:
 	    throwToSingleThreaded(cap, tso,
-				  (StgClosure *)BlockedIndefinitely_closure);
+				  (StgClosure *)blockedIndefinitely_closure);
 	    break;
 	case NotBlocked:
 	    /* This might happen if the thread was blocked on a black hole
