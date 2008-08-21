@@ -538,7 +538,7 @@ opTyErr op ty@(HsOpTy ty1 _ _)
 	 2 extra
   where
     extra | op == dot_tv_RDR && forall_head ty1
-	  = ptext (sLit "Perhaps you intended to use -XRankNTypes or similar flag")
+	  = perhapsForallMsg
 	  | otherwise 
 	  = ptext (sLit "Use -XTypeOperators to allow operators in types")
 

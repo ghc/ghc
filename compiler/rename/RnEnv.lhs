@@ -30,7 +30,7 @@ module RnEnv (
 	mapFvRn, mapFvRnCPS,
 	warnUnusedMatches, warnUnusedModules, warnUnusedImports, 
 	warnUnusedTopBinds, warnUnusedLocalBinds,
-	dataTcOccs, unknownNameErr
+	dataTcOccs, unknownNameErr, perhapsForallMsg
     ) where
 
 #include "HsVersions.h"
@@ -986,10 +986,13 @@ unknownNameErr rdr_name
 			  <+> quotes (ppr rdr_name))
 	 , extra ]
   where
-    extra | rdr_name == forall_tv_RDR 
-	  = vcat [ptext (sLit "Perhaps you intended to use -XRankNTypes or similar flag"),
-		  ptext (sLit "to enable explicit-forall syntax: forall <tvs>. <type>?")]
-	  | otherwise = empty
+    extra | rdr_name == forall_tv_RDR = perhapsForallMsg
+	  | otherwise 		      = empty
+
+perhapsForallMsg :: SDoc
+perhapsForallMsg 
+  = vcat [ ptext (sLit "Perhaps you intended to use -XRankNTypes or similar flag")
+	 , ptext (sLit "to enable explicit-forall syntax: forall <tvs>. <type>")]
 
 unknownSubordinateErr :: SDoc -> RdrName -> SDoc
 unknownSubordinateErr doc op	-- Doc is "method of class" or 
