@@ -2,6 +2,7 @@
 module Main(main) where
 
 import Control.Exception
+import Prelude hiding (catch)
 import Char
 import Ratio
 
@@ -510,8 +511,8 @@ testEnumRatioInt = do
 --
 
 
-mayBomb x = catchJust errorCalls x (\e -> putStrLn ("error " ++ show e))
-   `Control.Exception.catch` (\e -> putStrLn ("Fail: " ++ show e))
+mayBomb x = catch x (\(ErrorCall e) -> putStrLn ("error " ++ show e))
+   `catch` (\e -> putStrLn ("Fail: " ++ show (e :: SomeException)))
 
 test :: Show a => String -> String -> a -> IO ()
 test test_nm expected val = do
