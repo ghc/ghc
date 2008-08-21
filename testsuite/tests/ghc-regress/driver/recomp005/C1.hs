@@ -1,4 +1,4 @@
-{-# -XRankNTypes #-}
+
 module C (f, g) where
 
 import A
