@@ -48,7 +48,11 @@ test('break013', normal, ghci_script, ['break013.script'])
 test('break014', normal, ghci_script, ['break014.script'])
 test('break015', expect_broken(1457), ghci_script, ['break015.script'])
 test('break016', normal, ghci_script, ['break016.script'])
-test('break017', skip_if_fast, ghci_script, ['break017.script'])
+test('break017',
+     [skip_if_fast,
+      expect_broken(2475)],
+     ghci_script,
+     ['break017.script'])
 test('break018', normal, ghci_script, ['break018.script'])
 test('break019', normal, ghci_script, ['break019.script'])
 test('break020', normal, ghci_script, ['break020.script'])
