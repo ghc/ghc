@@ -29,7 +29,7 @@ module Rules (
 	addIdSpecialisations, 
 	
 	-- * Misc. CoreRule helpers
-        rulesOfBinds,
+        rulesOfBinds, pprRulesForUser,
         
         lookupRule, mkLocalRule, roughTopNames
     ) where
@@ -152,6 +152,22 @@ ruleCantMatch (t       : ts) (a       : as) = ruleCantMatch ts as
 ruleCantMatch ts	     as		    = False
 \end{code}
 
+\begin{code}
+pprRulesForUser :: [CoreRule] -> SDoc
+-- (a) tidy the rules
+-- (b) sort them into order based on the rule name
+-- (c) suppress uniques (unless -dppr-debug is on)
+-- This combination makes the output stable so we can use in testing
+-- It's here rather than in PprCore because it calls tidyRules
+pprRulesForUser rules
+  = withPprStyle defaultUserStyle $
+    pprRules $
+    sortLe le_rule  $
+    tidyRules emptyTidyEnv rules
+  where 
+    le_rule r1 r2 = ru_name r1 <= ru_name r2
+\end{code}
+
 
 %************************************************************************
 %*									*
@@ -168,7 +184,6 @@ mkSpecInfo rules = SpecInfo rules (rulesFreeVars rules)
 extendSpecInfo :: SpecInfo -> [CoreRule] -> SpecInfo
 extendSpecInfo (SpecInfo rs1 fvs1) rs2
   = SpecInfo (rs2 ++ rs1) (rulesFreeVars rs2 `unionVarSet` fvs1)
-
 addSpecInfo :: SpecInfo -> SpecInfo -> SpecInfo
 addSpecInfo (SpecInfo rs1 fvs1) (SpecInfo rs2 fvs2) 
   = SpecInfo (rs1 ++ rs2) (fvs1 `unionVarSet` fvs2)

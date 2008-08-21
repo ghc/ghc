@@ -22,11 +22,10 @@ import CoreUtils
 import CoreUnfold	( couldBeSmallEnoughToInline )
 import CoreLint		( showPass, endPass )
 import CoreFVs 		( exprsFreeVars )
-import CoreTidy		( tidyRules )
-import PprCore		( pprRules )
 import WwLib		( mkWorkerArgs )
 import DataCon		( dataConRepArity, dataConUnivTyVars )
 import Coercion	
+import Rules
 import Type		hiding( substTy )
 import Id		( Id, idName, idType, isDataConWorkId_maybe, idArity,
 			  mkUserLocal, mkSysLocal, idUnfolding, isLocalId )
@@ -34,7 +33,6 @@ import Var
 import VarEnv
 import VarSet
 import Name
-import Rules		( addIdSpecialisations, mkLocalRule, rulesOfBinds )
 import OccName		( mkSpecOcc )
 import ErrUtils		( dumpIfSet_dyn )
 import DynFlags		( DynFlags(..), DynFlag(..) )
@@ -463,8 +461,7 @@ specConstrProgram dflags us binds
 	endPass dflags "SpecConstr" Opt_D_dump_spec binds'
 
 	dumpIfSet_dyn dflags Opt_D_dump_rules "Top-level specialisations"
-		  (withPprStyle defaultUserStyle $
-		   pprRules (tidyRules emptyTidyEnv (rulesOfBinds binds')))
+		      (pprRulesForUser (rulesOfBinds binds'))
 
 	return binds'
   where

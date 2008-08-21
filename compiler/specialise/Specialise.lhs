@@ -28,12 +28,10 @@ import CoreSubst	( Subst, mkEmptySubst, extendTvSubstList, lookupIdSubst,
 import VarSet
 import VarEnv
 import CoreSyn
+import Rules
 import CoreUtils	( applyTypeToArgs, mkPiTypes )
 import CoreFVs		( exprFreeVars, exprsFreeVars, idFreeVars )
-import CoreTidy		( tidyRules )
 import CoreLint		( showPass, endPass )
-import Rules		( addIdSpecialisations, mkLocalRule, lookupRule, emptyRuleBase, rulesOfBinds )
-import PprCore		( pprRules )
 import UniqSupply	( UniqSupply,
 			  UniqSM, initUs_,
 			  MonadUnique(..)
@@ -588,8 +586,7 @@ specProgram dflags us binds = do
 	endPass dflags "Specialise" Opt_D_dump_spec binds'
 
 	dumpIfSet_dyn dflags Opt_D_dump_rules "Top-level specialisations"
-		  (withPprStyle defaultUserStyle $
-		   pprRules (tidyRules emptyTidyEnv (rulesOfBinds binds')))
+		      (pprRulesForUser (rulesOfBinds binds'))
 
 	return binds'
   where
@@ -866,7 +863,9 @@ specDefn subst calls (fn, rhs)
 		       where
 		 	 mk_ty_arg rhs_tyvar Nothing   = Type (mkTyVarTy rhs_tyvar)
 			 mk_ty_arg _	     (Just ty) = Type ty
-	   rhs_subst  = extendTvSubstList subst (spec_tyvars `zip` [ty | Just ty <- call_ts])
+
+           spec_ty_args = [ty | Just ty <- call_ts]
+	   rhs_subst  = extendTvSubstList subst (spec_tyvars `zip` spec_ty_args)
 
 	(rhs_subst', rhs_dicts') <- cloneBinders rhs_subst rhs_dicts
 	let
@@ -885,7 +884,9 @@ specDefn subst calls (fn, rhs)
 	let
 		-- The rule to put in the function's specialisation is:
 		--	forall b,d, d1',d2'.  f t1 b t3 d d1' d2' = f1 b d  
-           spec_env_rule = mkLocalRule (mkFastString ("SPEC " ++ showSDoc (ppr fn)))
+	   rule_name = mkFastString ("SPEC " ++ showSDoc (ppr fn <+> ppr spec_ty_args))
+           spec_env_rule = mkLocalRule 
+	   		        rule_name
 				inline_prag 	-- Note [Auto-specialisation and RULES]
 			 	(idName fn)
 			        (poly_tyvars ++ rhs_dicts')
