@@ -35,7 +35,6 @@ Word32
 Word64
 ArithException
 AsyncException
-Exception
 IOArray () ()
 IOUArray () ()
 PackedString

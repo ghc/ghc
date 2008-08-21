@@ -61,7 +61,6 @@ main = do
 
    print (typeOf (undefined :: ArithException))
    print (typeOf (undefined :: AsyncException))
-   print (typeOf (undefined :: Exception))
    print (typeOf (undefined :: (IOArray () ())))
    print (typeOf (undefined :: (IOUArray () ())))
    print (typeOf (undefined :: PackedString))
