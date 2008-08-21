@@ -22,7 +22,7 @@ binary-dist:
 	# Executables
 	-find . -name "*.wrapper"                   -exec echo $(WHERE_AM_I)/{} \; >> $(BIN_DIST_LIST) 2> /dev/null
 	-find $(EXE_DIST_DIR)/setup-config          -exec echo $(WHERE_AM_I)/{} \; >> $(BIN_DIST_LIST) 2> /dev/null
-	-find $(EXE_DIST_DIR) -perm /a+x            -exec echo $(WHERE_AM_I)/{} \; >> $(BIN_DIST_LIST) 2> /dev/null
+	-find $(EXE_DIST_DIR) -type f -perm /a+x    -exec echo $(WHERE_AM_I)/{} \; >> $(BIN_DIST_LIST) 2> /dev/null
 	# And anything else
 ifneq "$(BINDIST_EXTRAS)" ""
 	for FILE in $(BINDIST_EXTRAS); do if [ -e $$FILE ]; then echo $(WHERE_AM_I)/$$FILE >> $(BIN_DIST_LIST); fi; done
