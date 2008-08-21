@@ -4,6 +4,8 @@ import Foreign
 
 import System.IO (hFlush,stdout)
 
+import Prelude hiding (catch)
+
 -- !!! Try to get two threads into a knot depending on each other.
 
 -- This should result in the main thread being sent a NonTermination
@@ -21,8 +23,9 @@ main = do
 	-- can't see that a and b are both bottom, otherwise the
 	-- simplifier will go to town here, resulting in something like
 	-- a = a and b = a.
-  forkIO (print a)
-	-- we need a try in the child thread too, because it might 
+  forkIO (print a `catch` \NonTermination -> return ())
+	-- we need to catch in the child thread too, because it might 
 	-- get sent the NonTermination exception first.
   r <- Control.Exception.try (print b)
-  print (r::Either SomeException ())
+  print (r :: Either NonTermination ())
+
