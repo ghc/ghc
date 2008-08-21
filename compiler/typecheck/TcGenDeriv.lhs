@@ -1297,10 +1297,10 @@ genAuxBind loc (MkDataCon dc)	--  $cT1 etc
     fixity | is_infix  = infix_RDR
 	   | otherwise = prefix_RDR
 
-mk_data_type_name :: TyCon -> RdrName 	-- $tT
+mk_data_type_name :: TyCon -> RdrName 	-- "$tT"
 mk_data_type_name tycon = mkAuxBinderName (tyConName tycon) mkDataTOcc
 
-mk_constr_name :: DataCon -> RdrName	-- $cC
+mk_constr_name :: DataCon -> RdrName	-- "$cC"
 mk_constr_name con = mkAuxBinderName (dataConName con) mkDataCOcc
 \end{code}
 
