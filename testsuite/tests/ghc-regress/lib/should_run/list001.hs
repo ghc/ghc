@@ -13,19 +13,19 @@ main = do
 
   -- head
   print (head [1,2,3,4], head "a")
-  catch (print (head [] :: String)) (\_ -> putStr "head []\n")
+  catch (print (head [] :: String)) (\(ErrorCall _) -> putStr "head []\n")
 
   -- tail
   print (tail [1,2,3,4], tail "a")
-  catch (print (tail [] :: String)) (\_ -> putStr "tail []\n")
+  catch (print (tail [] :: String)) (\(ErrorCall _) -> putStr "tail []\n")
 
   -- init
   print (init [1,2,3,4], init "a")
-  catch (print (init [] :: String)) (\_ -> putStr "init []\n")
+  catch (print (init [] :: String)) (\(ErrorCall _) -> putStr "init []\n")
 
   -- last
   print (last [1,2,3,4], last "a")
-  catch (print (last [] :: String)) (\_ -> putStr "last []\n")
+  catch (print (last [] :: String)) (\(ErrorCall _) -> putStr "last []\n")
 
   -- null
   print [null [], null "abc"]
@@ -38,7 +38,7 @@ main = do
 
   -- foldl1
   print (foldl1 (+) [1..10])
-  catch (print (foldl1 (+) [] :: Int)) (\_ -> putStr "foldl1 []\n")
+  catch (print (foldl1 (+) [] :: Int)) (\(ErrorCall _) -> putStr "foldl1 []\n")
 
   -- scanl
   print (scanl  (+) 1 [1..10])
@@ -49,7 +49,7 @@ main = do
 
   -- foldr1
   print (foldr1 (+) [1..10])
-  catch (print (foldr1 (+) [] :: Int)) (\_ -> putStr "foldr1 []\n")
+  catch (print (foldr1 (+) [] :: Int)) (\(ErrorCall _) -> putStr "foldr1 []\n")
 
   -- scanr
   print (scanr  (+) 1 [1..10])
@@ -63,18 +63,18 @@ main = do
 
   -- take
   print (take 4 (repeat "x"), take 0 (repeat "x"), take 5 [1..4])
-  catch (print (take (-1) [1..10])) (\_ -> putStr "take (-1)\n")
+  catch (print (take (-1) [1..10])) (\(ErrorCall _) -> putStr "take (-1)\n")
 
   -- replicate
   print [replicate 2 "abc", replicate 0 "abc", replicate 3 []]
 
   -- drop
   print [drop 5 [1..10], drop 0 [1..10], drop 5 [1..4]]
-  catch (print (drop (-1) [1..10])) (\_ -> putStr "drop (-1)\n")
+  catch (print (drop (-1) [1..10])) (\(ErrorCall _) -> putStr "drop (-1)\n")
 
   -- splitAt
   print [splitAt 5 [1..10], splitAt 5 [1..4]]
-  catch (print (splitAt (-1) [1..10])) (\_ -> putStr "splitAt (-1)\n")
+  catch (print (splitAt (-1) [1..10])) (\(ErrorCall _) -> putStr "splitAt (-1)\n")
 
   -- scan
   print (span (<5) [1..10])
@@ -108,11 +108,11 @@ main = do
 
   -- maximum
   print (maximum [1..10])
-  catch (print (maximum [] :: Int)) (\_ -> putStr "maximum []\n")
+  catch (print (maximum [] :: Int)) (\(ErrorCall _) -> putStr "maximum []\n")
 
   -- minimum
   print (minimum [1..10])
-  catch (print (minimum [] :: Int)) (\_ -> putStr "minimum []\n")
+  catch (print (minimum [] :: Int)) (\(ErrorCall _) -> putStr "minimum []\n")
 
   -- concatMap
   print (concatMap (:[]) [(1::Int)..10])
