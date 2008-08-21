@@ -47,7 +47,8 @@ module GHC.IOBase(
     throwIO, block, unblock, blocked, catchAny, catchException,
     evaluate,
     ErrorCall(..), AssertionFailed(..), assertError, untangle,
-    BlockedOnDeadMVar(..), BlockedIndefinitely(..), Deadlock(..)
+    BlockedOnDeadMVar(..), BlockedIndefinitely(..), Deadlock(..),
+    blockedOnDeadMVar, blockedIndefinitely
   ) where
 
 import GHC.ST
@@ -641,6 +642,9 @@ instance Exception BlockedOnDeadMVar
 instance Show BlockedOnDeadMVar where
     showsPrec _ BlockedOnDeadMVar = showString "thread blocked indefinitely"
 
+blockedOnDeadMVar :: SomeException -- for the RTS
+blockedOnDeadMVar = toException BlockedOnDeadMVar
+
 -----
 
 data BlockedIndefinitely = BlockedIndefinitely
@@ -650,6 +654,9 @@ instance Exception BlockedIndefinitely
 
 instance Show BlockedIndefinitely where
     showsPrec _ BlockedIndefinitely = showString "thread blocked indefinitely"
+
+blockedIndefinitely :: SomeException -- for the RTS
+blockedIndefinitely = toException BlockedIndefinitely
 
 -----
 
