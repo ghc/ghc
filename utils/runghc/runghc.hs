@@ -57,8 +57,8 @@ getGhcLoc args = case args of
                  ('-' : 'f' : ghc) : args' -> f ghc args'
                  -- If you need the first GHC flag to be a -f flag then
                  -- you can pass -- first
-                 "--" : args -> (Nothing, args)
-                 args        -> (Nothing, args)
+                 "--" : args' -> (Nothing, args')
+                 _            -> (Nothing, args)
     where f ghc args' = -- If there is another -f flag later on then
                         -- that overrules the one that we've already
                         -- found
