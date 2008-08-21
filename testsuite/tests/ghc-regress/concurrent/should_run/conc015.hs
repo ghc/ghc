@@ -24,7 +24,7 @@ main = do
     block (do
 	putMVar m ()
         print =<< blocked
-	sum [1..10000] `seq` -- give 'foo' a chance to be raised
+	sum [1..100000] `seq` -- give 'foo' a chance to be raised
   	  (unblock (do print =<< blocked; myDelay 500000))
 		`Control.Exception.catch` 
                     \e -> putStrLn ("caught1: " ++ show (e::SomeException))
