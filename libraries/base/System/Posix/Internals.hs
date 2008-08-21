@@ -319,9 +319,6 @@ foreign import ccall unsafe "HsBase.h access"
 foreign import ccall unsafe "HsBase.h chmod"
    c_chmod :: CString -> CMode -> IO CInt
 
-foreign import ccall unsafe "HsBase.h chdir"
-   c_chdir :: CString -> IO CInt
-
 foreign import ccall unsafe "HsBase.h close"
    c_close :: CInt -> IO CInt
 
@@ -339,9 +336,6 @@ foreign import ccall unsafe "HsBase.h dup2"
 
 foreign import ccall unsafe "HsBase.h __hscore_fstat"
    c_fstat :: CInt -> Ptr CStat -> IO CInt
-
-foreign import ccall unsafe "HsBase.h getcwd"
-   c_getcwd   :: Ptr CChar -> CSize -> IO (Ptr CChar)
 
 foreign import ccall unsafe "HsBase.h isatty"
    c_isatty :: CInt -> IO CInt
@@ -371,9 +365,6 @@ foreign import ccall unsafe "HsBase.h read"
 
 foreign import ccall unsafe "HsBase.h rewinddir"
    c_rewinddir :: Ptr CDir -> IO ()
-
-foreign import ccall unsafe "HsBase.h rmdir"
-   c_rmdir :: CString -> IO CInt
 
 foreign import ccall unsafe "HsBase.h __hscore_stat"
    c_stat :: CString -> Ptr CStat -> IO CInt
