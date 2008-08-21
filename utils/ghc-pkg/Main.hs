@@ -54,7 +54,7 @@ import GHC.ConsoleHandler
 import System.Posix
 #endif
 
-import IO ( isPermissionError, isDoesNotExistError )
+import IO ( isPermissionError )
 
 #if defined(GLOB)
 import System.Process(runInteractiveCommand)
@@ -409,7 +409,7 @@ getPkgDatabases modify my_flags = do
                    user_conf = dir </> subdir </> "package.conf"
                user_exists <- doesFileExist user_conf
                return (Just (user_conf,user_exists))
-       Left ex ->
+       Left _ ->
                return Nothing
 
   -- If the user database doesn't exist, and this command isn't a
@@ -434,7 +434,7 @@ getPkgDatabases modify my_flags = do
 
   let db_flags = [ f | Just f <- map is_db_flag my_flags ]
          where is_db_flag FlagUser
-                      | Just (user_conf,user_exists) <- mb_user_conf 
+                      | Just (user_conf, _user_exists) <- mb_user_conf 
                       = Just user_conf
                is_db_flag FlagGlobal     = Just virt_global_conf
                is_db_flag (FlagConfig f) = Just f
@@ -550,7 +550,7 @@ modifyPackage
   -> Force
   -> IO ()
 modifyPackage fn pkgid my_flags force = do
-  (db_stack, Just to_modify) <- getPkgDatabases True{-modify-} my_flags
+  (db_stack, Just _to_modify) <- getPkgDatabases True{-modify-} my_flags
   ((db_name, pkgs), ps) <- fmap head $ findPackagesByDB db_stack (Id pkgid)
 --  let ((db_name, pkgs) : rest_of_stack) = db_stack
 --  ps <- findPackages [(db_name,pkgs)] (Id pkgid)
@@ -563,7 +563,8 @@ modifyPackage fn pkgid my_flags force = do
 
   let
       old_broken = brokenPackages (allPackagesInStack db_stack)
-      rest_of_stack = [ (nm,pkgs) | (nm,pkgs) <- db_stack, nm /= db_name ]
+      rest_of_stack = [ (nm, mypkgs)
+                      | (nm, mypkgs) <- db_stack, nm /= db_name ]
       new_stack = (db_name,new_config) : rest_of_stack
       new_broken = map package (brokenPackages (allPackagesInStack new_stack))
       newly_broken = filter (`notElem` map package old_broken) new_broken
@@ -666,7 +667,7 @@ findPackagesByDB :: PackageDBStack -> PackageArg
                  -> IO [(NamedPackageDB, [InstalledPackageInfo])]
 findPackagesByDB db_stack pkgarg
   = case [ (db, matched)
-         | db@(db_name,pkgs) <- db_stack,
+         | db@(_, pkgs) <- db_stack,
            let matched = filter (pkgarg `matchesPkg`) pkgs,
            not (null matched) ] of
         [] -> die ("cannot find package " ++ pkg_msg pkgarg)
@@ -783,8 +784,8 @@ brokenPackages pkgs = go [] pkgs
  where
    go avail not_avail =
      case partition (depsAvailable avail) not_avail of
-        ([],        not_avail) -> not_avail
-        (new_avail, not_avail) -> go (new_avail ++ avail) not_avail
+        ([],        not_avail') -> not_avail'
+        (new_avail, not_avail') -> go (new_avail ++ avail) not_avail'
 
    depsAvailable :: [InstalledPackageInfo] -> InstalledPackageInfo
                  -> Bool
@@ -1141,11 +1142,13 @@ catchIO io handler = io `Exception.catch` handler'
           handler' e                           = Exception.throw e
 #endif
 
+#if mingw32_HOST_OS || mingw32_TARGET_OS
 throwIOIO :: Exception.IOException -> IO a
 #if __GLASGOW_HASKELL__ >= 609
 throwIOIO = Exception.throwIO
 #else
 throwIOIO ioe = Exception.throwIO (Exception.IOException ioe)
+#endif
 #endif
 
 catchError :: IO a -> (String -> IO a) -> IO a

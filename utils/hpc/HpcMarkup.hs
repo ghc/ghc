@@ -12,7 +12,6 @@ import Trace.Hpc.Util
 import HpcFlags
 import HpcUtils
 
-import System.Environment
 import System.Directory
 import Data.List
 import Data.Maybe(fromJust)
@@ -22,6 +21,7 @@ import qualified HpcSet as Set
 
 ------------------------------------------------------------------------------
 
+markup_options :: FlagOptSeq
 markup_options 
         = excludeOpt
         . includeOpt
@@ -30,7 +30,8 @@ markup_options
         . funTotalsOpt
         . altHighlightOpt
         . destDirOpt
-       	 
+
+markup_plugin :: Plugin
 markup_plugin = Plugin { name = "markup"
 	      	       , usage = "[OPTION] .. <TIX_FILE> [<MODULE> [<MODULE> ..]]" 
 		       , options = markup_options 
@@ -75,14 +76,14 @@ markup_main flags (prog:modNames) = do
       index_alt  = "hpc_index_alt"
       index_exp  = "hpc_index_exp"
 
-  let writeSummary name cmp = do
+  let writeSummary filename cmp = do
         let mods' = sortBy cmp mods
 
 
 
    
-        putStrLn $ "Writing: " ++ (name ++ ".html")
-        writeFile (dest_dir ++ "/" ++ name ++ ".html") $ 
+        putStrLn $ "Writing: " ++ (filename ++ ".html")
+        writeFile (dest_dir ++ "/" ++ filename ++ ".html") $ 
   	    "<html>" ++
 	    "<style type=\"text/css\">" ++
 	    "table.bar { background-color: #f25913; }\n" ++
@@ -107,13 +108,13 @@ markup_main flags (prog:modNames) = do
 	    "<th>%</th>" ++
 	    "<th colspan=2>covered / total</th>" ++
 	    "</tr>" ++
-	    concat [ showModuleSummary (modName,fileName,summary)
-	    	   | (modName,fileName,summary) <- mods'
+	    concat [ showModuleSummary (modName,fileName,modSummary)
+	    	   | (modName,fileName,modSummary) <- mods'
 	           ] ++
 	    "<tr></tr>" ++
    	    showTotalSummary (mconcat
-	    		     	 [ summary 
-				 | (_,_,summary) <- mods'
+	    		     	 [ modSummary 
+				 | (_,_,modSummary) <- mods'
 				 ])
 		   ++ "</table></html>\n"
 
@@ -132,7 +133,8 @@ markup_main flags (prog:modNames) = do
 		(percent (expTicked s1) (expTotal s1))
 
 
-markup_main flags [] = hpcError markup_plugin $ "no .tix file or executable name specified" 
+markup_main _ []
+    = hpcError markup_plugin $ "no .tix file or executable name specified" 
 
 genHtmlFromMod
   :: String
@@ -145,7 +147,7 @@ genHtmlFromMod dest_dir flags tix theFunTotals invertOutput = do
   let theHsPath = srcDirs flags
   let modName0 = tixModuleName tix 
 
-  (Mix origFile _ mixHash tabStop mix') <- readMixWithFlags flags (Right tix)
+  (Mix origFile _ _ tabStop mix') <- readMixWithFlags flags (Right tix)
 
   let arr_tix :: Array Int Integer
       arr_tix = listArray (0,length (tixModuleTixs tix) - 1)
@@ -176,7 +178,7 @@ genHtmlFromMod dest_dir flags tix theFunTotals invertOutput = do
              ]
 
 
-  let summary = foldr (.) id 
+  let modSummary = foldr (.) id 
       	     [ \ st -> 
 	       case boxLabel of
 	         ExpBox False
@@ -228,7 +230,7 @@ genHtmlFromMod dest_dir flags tix theFunTotals invertOutput = do
 		     "</style>",
   	    	     "<pre>"] ++ addLines content' ++ "\n</pre>\n</html>\n";
 
-  summary `seq` return (modName0,fileName,summary)
+  modSummary `seq` return (modName0,fileName,modSummary)
 
 data Loc = Loc !Int !Int
      	 deriving (Eq,Ord,Show)
@@ -288,8 +290,8 @@ addMarkup tabStop cs loc os ((t1,t2,tik0):ticks) | loc == t1 =
   where
 
   addTo (t,tik) []             = [(t,tik)]
-  addTo (t,tik) ((t',tik'):xs) | t <= t' = (t,tik):(t',tik'):xs
-  	 	 	       | t > t'  = (t',tik):(t',tik'):xs 
+  addTo (t,tik) ((t',tik'):xs) | t <= t'   = (t,tik):(t',tik'):xs
+  	 	 	       | otherwise = (t',tik):(t',tik'):xs 
 
 addMarkup tabStop0 cs loc os ((t1,_t2,_tik):ticks) | loc > t1 =
 	  -- throw away this tick, because it is from a previous place ??
@@ -392,22 +394,22 @@ data ModuleSummary = ModuleSummary
 
 
 showModuleSummary :: (String, String, ModuleSummary) -> String
-showModuleSummary (modName,fileName,summary) =
+showModuleSummary (modName,fileName,modSummary) =
   "<tr>\n" ++ 
   "<td>&nbsp;&nbsp;<tt>module <a href=\"" ++ fileName ++ "\">" 
   			      ++ modName ++ "</a></tt></td>\n" ++
-   showSummary (topFunTicked summary) (topFunTotal summary) ++
-   showSummary (altTicked summary) (altTotal summary) ++
-   showSummary (expTicked summary) (expTotal summary) ++
+   showSummary (topFunTicked modSummary) (topFunTotal modSummary) ++
+   showSummary (altTicked modSummary) (altTotal modSummary) ++
+   showSummary (expTicked modSummary) (expTotal modSummary) ++
   "</tr>\n"
 
 showTotalSummary :: ModuleSummary -> String
-showTotalSummary summary =
+showTotalSummary modSummary =
   "<tr style=\"background: #e0e0e0\">\n" ++ 
   "<th align=left>&nbsp;&nbsp;Program Coverage Total</tt></th>\n" ++
-   showSummary (topFunTicked summary) (topFunTotal summary) ++
-   showSummary (altTicked summary) (altTotal summary) ++
-   showSummary (expTicked summary) (expTotal summary) ++
+   showSummary (topFunTicked modSummary) (topFunTotal modSummary) ++
+   showSummary (altTicked modSummary) (altTotal modSummary) ++
+   showSummary (expTicked modSummary) (expTotal modSummary) ++
   "</tr>\n"
 
 showSummary :: (Integral t) => t -> t -> String
@@ -422,7 +424,7 @@ showSummary ticked total =
      where
         showP Nothing = "-&nbsp;"
         showP (Just x) = show x ++ "%"
-        bar 0 inner = bar 100 "invbar"
+        bar 0 _     = bar 100 "invbar"
         bar w inner = "<table cellpadding=0 cellspacing=0 width=\"100\" class=\"bar\">" ++
 			 "<tr><td><table cellpadding=0 cellspacing=0 width=\"" ++ show w ++ "%\">" ++
 		              "<tr><td height=12 class=" ++ show inner ++ "></td></tr>" ++

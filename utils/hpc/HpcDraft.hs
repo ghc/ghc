@@ -9,11 +9,11 @@ import HpcFlags
 import Control.Monad
 import qualified HpcSet as Set
 import qualified HpcMap as Map
-import System.Environment
 import HpcUtils
 import Data.Tree
 
 ------------------------------------------------------------------------------
+draft_options :: FlagOptSeq
 draft_options 
         = excludeOpt
         . includeOpt
@@ -21,6 +21,7 @@ draft_options
         . hpcDirOpt
         . outputOpt
        	 
+draft_plugin :: Plugin
 draft_plugin = Plugin { name = "draft"
 	      	       , usage = "[OPTION] .. <TIX_FILE>" 
 		       , options = draft_options 
@@ -33,6 +34,7 @@ draft_plugin = Plugin { name = "draft"
 ------------------------------------------------------------------------------
 
 draft_main :: Flags -> [String] -> IO ()
+draft_main _        []              = error "draft_main: unhandled case: []"
 draft_main hpcflags (progName:mods) = do
   let hpcflags1 = hpcflags 
       		{ includeMods = Set.fromList mods 
@@ -55,15 +57,14 @@ draft_main hpcflags (progName:mods) = do
 
 makeDraft :: Flags -> TixModule -> IO String
 makeDraft hpcflags tix = do 
-  let mod  = tixModuleName tix
-      hash = tixModuleHash tix
+  let modu = tixModuleName tix
       tixs = tixModuleTixs tix
 
-  mix@(Mix filepath timestamp hash tabstop entries) <- readMixWithFlags hpcflags (Right tix)
+  (Mix filepath _ _ _ entries) <- readMixWithFlags hpcflags (Right tix)
 
   let forest = createMixEntryDom 
-              [ (span,(box,v > 0))
-              | ((span,box),v) <- zip entries tixs
+              [ (srcspan,(box,v > 0))
+              | ((srcspan,box),v) <- zip entries tixs
               ]
 
 --  let show' (span,stuff) = show (span,stuff,grabHpcPos hsMap span)
@@ -95,22 +96,25 @@ makeDraft hpcflags tix = do
           where
                   txt = grabHpcPos hsMap pos
 
-      showPleaseTick d (TickInside [str] pos pleases) =
+      showPleaseTick d (TickInside [str] _ pleases) =
                      spaces d ++ "inside \"" ++ str ++ "\" {\n" ++
                      showPleaseTicks (d + 2) pleases ++
                      spaces d ++ "}"
+
+      showPleaseTick _ (TickInside _ _ _)
+          = error "showPleaseTick: Unhandled case TickInside"
 
       showPleaseTicks d pleases = unlines (map (showPleaseTick d) pleases)
 
       spaces d = take d (repeat ' ')
 
-  return $ "module " ++ show (fixPackageSuffix mod) ++ " {\n" ++
+  return $ "module " ++ show (fixPackageSuffix modu) ++ " {\n" ++
          showPleaseTicks 2 non_ticked ++ "}"
 
 fixPackageSuffix :: String -> String
-fixPackageSuffix mod = case span (/= '/') mod of
-                         (before,'/':after) -> before ++ ":" ++ after
-                         _                  -> mod
+fixPackageSuffix modu = case span (/= '/') modu of
+                        (before,'/':after) -> before ++ ":" ++ after
+                        _                  -> modu
 
 data PleaseTick
    = TickFun [String] HpcPos
@@ -118,6 +122,8 @@ data PleaseTick
    | TickInside [String] HpcPos [PleaseTick]
     deriving Show
 
+mkTickInside :: [String] -> HpcPos -> [PleaseTick]
+             -> [PleaseTick] -> [PleaseTick]
 mkTickInside _ _ []        = id
 mkTickInside nm pos inside = (TickInside nm pos inside :)
 
@@ -127,11 +133,11 @@ findNotTickedFromTree (Node (pos,(TopLevelBox nm,False):_) _)
   = [ TickFun nm pos ]
 findNotTickedFromTree (Node (pos,(LocalBox nm,False):_) _)
   = [ TickFun nm pos ]
-findNotTickedFromTree (Node (pos,(TopLevelBox nm,True):others) children)
+findNotTickedFromTree (Node (pos,(TopLevelBox nm,True):_) children)
   = mkTickInside nm pos (findNotTickedFromList children) []                           
 findNotTickedFromTree (Node (pos,_:others) children) = 
                       findNotTickedFromTree (Node (pos,others) children)
-findNotTickedFromTree (Node (pos,[]) children) = findNotTickedFromList children
+findNotTickedFromTree (Node (_, []) children) = findNotTickedFromList children
 
 findNotTickedFromList :: [MixEntryDom [(BoxLabel,Bool)]] -> [PleaseTick]
 findNotTickedFromList = concatMap findNotTickedFromTree

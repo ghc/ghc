@@ -10,6 +10,7 @@ import qualified Data.Map as Map
 lookup :: Ord key => key -> Map key elt -> Maybe elt
 fromList :: Ord key => [(key,elt)] -> Map key elt
 fromListWith :: Ord k => (a -> a -> a) -> [(k, a)] -> Map k a
+toList :: Ord key => Map key elt -> [(key,elt)]
 
 #if __GLASGOW_HASKELL__ < 604
 type Map key elt = Map.FiniteMap key elt

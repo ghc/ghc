@@ -24,28 +24,33 @@ lexer (c:cs) line column
   | isAlpha c = lexerKW  cs [c] line (succ column)
   | isDigit c = lexerINT cs [c] line (succ column)
   | otherwise = error "lexer failure"
-lexer [] line colunm = []
+lexer [] _ _ = []
 
+lexerKW :: String -> String -> Int -> Int -> [(Int,Int,Token)]
 lexerKW  (c:cs) s line column
   | isAlpha c = lexerKW cs (s ++ [c]) line (succ column)
 lexerKW  other s line column = (line,column,ID s) : lexer other line column
 
+lexerINT :: String -> String -> Int -> Int -> [(Int,Int,Token)]
 lexerINT  (c:cs) s line column
   | isDigit c = lexerINT cs (s ++ [c]) line (succ column)
 lexerINT  other s line column = (line,column,INT (read s)) : lexer other line column
 
 -- not technically correct for the new column count, but a good approximation.
+lexerSTR :: String -> Int -> Int -> [(Int,Int,Token)]
 lexerSTR cs line column
   = case lex ('"' : cs) of
       [(str,rest)] -> (line,succ column,STR (read str))
                    : lexer rest line (length (show str) + column + 1)
       _ -> error "bad string"
 
+lexerCAT :: String -> String -> Int -> Int -> [(Int,Int,Token)]
 lexerCAT (c:cs) s line column
   | c == ']'  =  (line,column,CAT s) : lexer cs line (succ column)
   | otherwise = lexerCAT cs (s ++ [c]) line (succ column)
-lexerCAT  other s line column = error "lexer failure in CAT"
+lexerCAT  [] _ _ _ = error "lexer failure in CAT"
 
+test :: IO ()
 test = do
           t <- readFile "EXAMPLE.tc"
           print (initLexer t)

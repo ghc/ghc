@@ -13,15 +13,16 @@ import HpcFlags
 import Control.Monad
 import qualified HpcSet as Set
 import qualified HpcMap as Map
-import System.Environment
 
 ------------------------------------------------------------------------------
+sum_options :: FlagOptSeq
 sum_options 
         = excludeOpt
         . includeOpt
         . outputOpt
 	. unionModuleOpt 
 
+sum_plugin :: Plugin
 sum_plugin = Plugin { name = "sum"
 	      	       , usage = "[OPTION] .. <TIX_FILE> [<TIX_FILE> [<TIX_FILE> ..]]" 
 		       , options = sum_options 
@@ -31,6 +32,7 @@ sum_plugin = Plugin { name = "sum"
 		       , final_flags = default_final_flags
 		       }
 
+combine_options :: FlagOptSeq
 combine_options 
         = excludeOpt
         . includeOpt
@@ -39,6 +41,7 @@ combine_options
         . combineFunOptInfo
 	. unionModuleOpt 
 
+combine_plugin :: Plugin
 combine_plugin = Plugin { name = "combine"
 	      	       , usage = "[OPTION] .. <TIX_FILE> <TIX_FILE>" 
 		       , options = combine_options 
@@ -48,6 +51,7 @@ combine_plugin = Plugin { name = "combine"
 		       , final_flags = default_final_flags
 		       }
 
+map_options :: FlagOptSeq
 map_options 
         = excludeOpt
         . includeOpt
@@ -56,6 +60,7 @@ map_options
         . mapFunOptInfo
 	. unionModuleOpt 
 
+map_plugin :: Plugin
 map_plugin = Plugin { name = "map"
 	      	       , usage = "[OPTION] .. <TIX_FILE> "
 		       , options = map_options 
@@ -68,7 +73,7 @@ map_plugin = Plugin { name = "map"
 ------------------------------------------------------------------------------
 
 sum_main :: Flags -> [String] -> IO ()
-sum_main flags [] = hpcError sum_plugin $ "no .tix file specified" 
+sum_main _     [] = hpcError sum_plugin $ "no .tix file specified" 
 sum_main flags (first_file:more_files) = do
   Just tix <- readTix first_file
 
@@ -95,7 +100,7 @@ combine_main flags [first_file,second_file] = do
   case outputFile flags of
     "-" -> putStrLn (show tix)
     out -> writeTix out tix
-combine_main flags [] = hpcError combine_plugin $ "need exactly two .tix files to combine"
+combine_main _     _ = hpcError combine_plugin $ "need exactly two .tix files to combine"
 
 map_main :: Flags -> [String] -> IO ()
 map_main flags [first_file] = do
@@ -111,8 +116,8 @@ map_main flags [first_file] = do
   case outputFile flags of
     "-" -> putStrLn (show tix')
     out -> writeTix out tix'
-map_main flags [] = hpcError map_plugin $ "no .tix file specified" 
-map_main flags _  = hpcError map_plugin $ "to many .tix files specified" 
+map_main _     [] = hpcError map_plugin $ "no .tix file specified" 
+map_main _     _  = hpcError map_plugin $ "to many .tix files specified" 
 
 mergeTixFile :: Flags -> (Integer -> Integer -> Integer) -> Tix -> String -> IO Tix
 mergeTixFile flags fn tix file_name = do

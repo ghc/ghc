@@ -39,11 +39,11 @@ parseArgs :: [String]
               Bool,      -- enable shell wrappers?
               Bool)      -- strip exe?
 parseArgs = f normal defaultDistPref False True
-    where f v dp esw strip (('-':'v':val):args)
+    where f _ dp esw strip (('-':'v':val):args)
               = f (readEOrFail flagToVerbosity val) dp esw strip args
           f v _  esw strip ("--distpref":dp:args) = f v dp esw strip args
           f v dp _   strip ("--enable-shell-wrappers":args) = f v dp True strip args
-          f v dp esw strip ("--disable-executable-stripping":args) = f v dp esw False args
+          f v dp esw _     ("--disable-executable-stripping":args) = f v dp esw False args
           f v dp esw strip [] = (v, dp, esw, strip)
           f _ _  _   _     args = error ("Bad arguments: " ++ show args)
 

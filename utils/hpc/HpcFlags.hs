@@ -3,7 +3,6 @@
 module HpcFlags where
 
 import System.Console.GetOpt
-import Data.Maybe ( fromMaybe )
 import qualified HpcSet as Set
 import Data.Char
 import Trace.Hpc.Tix
@@ -30,6 +29,7 @@ data Flags = Flags
   , mergeModule		:: MergeFun	-- module-wise merge
   }
 
+default_flags :: Flags
 default_flags = Flags
   { outputFile		= "-"
   , includeMods         = Set.empty
@@ -54,6 +54,7 @@ default_flags = Flags
 -- We do this after reading flags, because the defaults
 -- depends on if specific flags we used.
 
+default_final_flags :: Flags -> Flags
 default_final_flags flags = flags 
   { srcDirs = if null (srcDirs flags)
     	      then ["."]
@@ -71,6 +72,10 @@ anArg flag detail argtype fn = (:) $ Option [] [flag] (ReqArg fn argtype) detail
 infoArg :: String -> FlagOptSeq
 infoArg info = (:) $ Option [] [] (NoArg $ id) info
 
+excludeOpt, includeOpt, hpcDirOpt, srcDirOpt, destDirOpt, outputOpt,
+    perModuleOpt, decListOpt, xmlOutputOpt, funTotalsOpt,
+    altHighlightOpt, combineFunOpt, combineFunOptInfo, mapFunOpt,
+    mapFunOptInfo, unionModuleOpt :: FlagOptSeq
 excludeOpt      = anArg "exclude"    "exclude MODULE and/or PACKAGE" "[PACKAGE:][MODULE]"  
                 $ \ a f -> f { excludeMods = a `Set.insert` excludeMods f }
 
@@ -125,12 +130,13 @@ unionModuleOpt = noArg "union"
 -------------------------------------------------------------------------------
 
 readMixWithFlags :: Flags -> Either String TixModule -> IO Mix
-readMixWithFlags flags mod = readMix [ dir ++  "/" ++ hpcDir flags
-                                     | dir <- srcDirs flags 
-                                     ] mod
+readMixWithFlags flags modu = readMix [ dir ++  "/" ++ hpcDir flags
+                                      | dir <- srcDirs flags 
+                                      ] modu
 
 -------------------------------------------------------------------------------
 
+command_usage :: Plugin -> IO ()
 command_usage plugin = 
   putStrLn $
 				       "Usage: hpc " ++ (name plugin) ++ " " ++ 
@@ -213,9 +219,10 @@ data PostFun = ID | INV | ZERO
 thePostFun :: PostFun -> Integer -> Integer
 thePostFun ID   x = x
 thePostFun INV  0 = 1
-thePostFun INV  n = 0
-thePostFun ZERO x = 0
+thePostFun INV  _ = 0
+thePostFun ZERO _ = 0
 
+postFuns :: [(String, PostFun)]
 postFuns = [ (show pos,pos) 
 	     | pos <- [ID .. ZERO]
 	   ]
@@ -228,6 +235,7 @@ theMergeFun :: (Ord a) => MergeFun -> Set.Set a -> Set.Set a -> Set.Set a
 theMergeFun INTERSECTION = Set.intersection
 theMergeFun UNION        = Set.union
 
+mergeFuns :: [(String, MergeFun)]
 mergeFuns = [ (show pos,pos) 
 	     | pos <- [INTERSECTION,UNION]
 	   ]

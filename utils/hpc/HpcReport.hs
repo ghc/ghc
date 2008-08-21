@@ -5,9 +5,7 @@
 
 module HpcReport (report_plugin) where
 
-import System.Exit
 import Prelude hiding (exp)
-import System(getArgs)
 import List(sort,intersperse,sortBy)
 import HpcFlags
 import Trace.Hpc.Mix
@@ -104,8 +102,8 @@ allBinCounts mi =
 
 accumCounts :: [(BoxLabel,Integer)] -> ModInfo -> ModInfo
 accumCounts [] mi = mi
-accumCounts ((bl,btc):etc) mi | single bl =
-  accumCounts etc mi'
+accumCounts ((bl,btc):etc) mi
+ | single bl = accumCounts etc mi'
   where
   mi' = case bl of
         ExpBox False ->   mi{exp = inc (exp mi)}
@@ -120,6 +118,7 @@ accumCounts ((bl,btc):etc) mi | single bl =
        , tixCount = tc + bit (btc>0) }
   upd dp dps =
     if btc>0 then dps else dp:dps
+accumCounts [_] _ = error "accumCounts: Unhandled case: [_] _"
 accumCounts ((bl0,btc0):(bl1,btc1):etc) mi =
   accumCounts etc mi'
   where
@@ -159,7 +158,7 @@ modInfo hpcflags qualDecList tix@(TixModule moduleName _ _ tickCounts) = do
          else mi
 
 modReport :: Flags -> TixModule -> IO ()
-modReport hpcflags tix@(TixModule moduleName _ _ tickCounts) = do
+modReport hpcflags tix@(TixModule moduleName _ _ _) = do
   mi <- modInfo hpcflags False tix
   if xmlOutput hpcflags 
     then putStrLn $ "  <module name = " ++ show moduleName  ++ ">"
@@ -201,6 +200,7 @@ modDecList hpcflags mi0 =
   showDecPath dp = putStrLn ("     "++
                              concat (intersperse "." dp))
 
+report_plugin :: Plugin
 report_plugin = Plugin { name = "report"
 	      	       , usage = "[OPTION] .. <TIX_FILE> [<MODULE> [<MODULE> ..]]" 
 		       , options = report_options 
@@ -222,12 +222,12 @@ report_main hpcflags (progName:mods) = do
     Just (Tix tickCounts) ->
     	   makeReport hpcflags1 progName 
 		    $ sortBy (\ mod1 mod2 -> tixModuleName mod1 `compare` tixModuleName mod2)
-	   	    $ [ tix
-	   	      | tix@(TixModule m _h _ tcs) <- tickCounts
+	   	    $ [ tix'
+	   	      | tix'@(TixModule m _ _ _) <- tickCounts
 		      , allowModule hpcflags1 m 
 		      ]
     Nothing -> hpcError report_plugin  $ "unable to find tix file for:" ++ progName
-report_main hpcflags [] = 
+report_main _ [] = 
         hpcError report_plugin $ "no .tix file or executable name specified" 
 
 makeReport :: Flags -> String -> [TixModule] -> IO ()
@@ -256,12 +256,15 @@ element tag attrs = putStrLn $
 			   	   | (x,y) <- attrs
 				   ] ++ "/>"
 
+xmlBT :: BoxTixCounts -> [(String, String)]
 xmlBT (BT b t) = [("boxes",show b),("count",show t)]
 
+xmlBBT :: BinBoxTixCounts -> [(String, String)]
 xmlBBT (BBT b tt tf bt) = [("boxes",show b),("true",show tt),("false",show tf),("count",show (tt + tf + bt))]
 
 ------------------------------------------------------------------------------
 
+report_options :: FlagOptSeq
 report_options 
         = perModuleOpt
         . decListOpt

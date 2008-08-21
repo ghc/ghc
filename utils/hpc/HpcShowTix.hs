@@ -2,12 +2,12 @@ module HpcShowTix (showtix_plugin) where
 
 import Trace.Hpc.Mix
 import Trace.Hpc.Tix
-import Trace.Hpc.Util
 
 import HpcFlags
 
 import qualified HpcSet as Set
 
+showtix_options :: FlagOptSeq
 showtix_options 
         = excludeOpt
         . includeOpt
@@ -15,6 +15,7 @@ showtix_options
         . hpcDirOpt
         . outputOpt
 
+showtix_plugin :: Plugin
 showtix_plugin = Plugin { name = "show"
 	      	       , usage = "[OPTION] .. <TIX_FILE> [<MODULE> [<MODULE> ..]]" 
 		       , options = showtix_options 
@@ -25,8 +26,8 @@ showtix_plugin = Plugin { name = "show"
 		       }
 
 
-
-showtix_main flags [] = hpcError showtix_plugin $ "no .tix file or executable name specified" 
+showtix_main :: Flags -> [String] -> IO ()
+showtix_main _     [] = hpcError showtix_plugin $ "no .tix file or executable name specified" 
 showtix_main flags (prog:modNames) = do
   let hpcflags1 = flags 
       		{ includeMods = Set.fromList modNames
@@ -50,10 +51,10 @@ showtix_main flags (prog:modNames) = do
        sequence_ [ sequence_ [ putStrLn (rjust 5 (show ix) ++ " " ++
                                          rjust 10 (show count) ++ " " ++
                                          ljust 20  modName ++ " " ++ rjust 20 (show pos) ++ " " ++ show lab)
-                             | (count,ix,(pos,lab)) <- zip3 tixs [(0::Int)..] entries
+                             | (count,ix,(pos,lab)) <- zip3 tixs' [(0::Int)..] entries
                              ]
-                 | ( TixModule modName hash _ tixs
-                   , Mix _file _timestamp _hash _tab entries
+                 | ( TixModule modName _hash1 _ tixs'
+                   , Mix _file _timestamp _hash2 _tab entries
                    ) <- tixs_mixs
                  ]
        

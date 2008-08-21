@@ -1,7 +1,6 @@
 -- (c) 2007 Andy Gill
 
 -- Main driver for Hpc
-import Trace.Hpc.Tix
 import HpcFlags
 import System.Environment
 import System.Exit
@@ -36,7 +35,7 @@ helpList =
 		]
 
 section :: String -> [String] -> String
-section msg []   = ""
+section _   []   = ""
 section msg cmds = msg ++ ":\n" 
         ++ unlines [ take 14 ("  " ++ cmd ++ repeat ' ') ++ summary hook
 	   	   | cmd <- cmds
@@ -48,10 +47,10 @@ dispatch :: [String] -> IO ()
 dispatch [] = do
 	     helpList
 	     exitWith ExitSuccess
-dispatch (txt:args) = do
+dispatch (txt:args0) = do
      case lookup txt hooks' of
-       Just plugin -> parse plugin args
-       _ -> parse help_plugin (txt:args)
+       Just plugin -> parse plugin args0
+       _ -> parse help_plugin (txt:args0)
   where
      parse plugin args =
               case getOpt Permute (options plugin []) args of
@@ -68,12 +67,15 @@ dispatch (txt:args) = do
 			           $ foldr (.) id o 
 			     	   $ init_flags plugin
 			 implementation plugin flags ns
+
+main :: IO ()
 main = do 
  args <- getArgs
  dispatch args
 
 ------------------------------------------------------------------------------
 
+hooks :: [Plugin]
 hooks = [ help_plugin
         , report_plugin 
 	, markup_plugin
@@ -86,10 +88,12 @@ hooks = [ help_plugin
 	, version_plugin
         ]
 
+hooks' :: [(String, Plugin)]
 hooks' = [ (name hook,hook) | hook <- hooks ]
 
 ------------------------------------------------------------------------------
 
+help_plugin :: Plugin
 help_plugin = Plugin { name = "help"
 		   , usage = "[<HPC_COMMAND>]"
 		   , summary = "Display help for hpc or a single command"
@@ -99,10 +103,11 @@ help_plugin = Plugin { name = "help"
 		   , final_flags = default_final_flags
 		   }
 
-help_main flags [] = do
+help_main :: Flags -> [String] -> IO ()
+help_main _ [] = do
 	    helpList
 	    exitWith ExitSuccess	    
-help_main flags (sub_txt:_) = do
+help_main _ (sub_txt:_) = do
     case lookup sub_txt hooks' of
       Nothing -> do
 	  putStrLn $ "no such hpc command : " ++ sub_txt
@@ -111,10 +116,12 @@ help_main flags (sub_txt:_) = do
 	  command_usage plugin'
 	  exitWith ExitSuccess
 
+help_options :: FlagOptSeq
 help_options   = id
 
 ------------------------------------------------------------------------------
 
+version_plugin :: Plugin
 version_plugin = Plugin { name = "version"
 		   , usage = ""
 		   , summary = "Display version for hpc"
@@ -124,6 +131,7 @@ version_plugin = Plugin { name = "version"
 		   , final_flags = default_final_flags
 		   }
 
+version_main :: Flags -> [String] -> IO ()
 version_main _ _ = putStrLn $ "hpc tools, version 0.6"
 
 

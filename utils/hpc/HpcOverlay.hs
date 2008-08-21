@@ -9,11 +9,13 @@ import Trace.Hpc.Util
 import HpcMap as Map
 import Data.Tree
 
+overlay_options :: FlagOptSeq
 overlay_options 
         = srcDirOpt
         . hpcDirOpt
         . outputOpt
 
+overlay_plugin :: Plugin
 overlay_plugin = Plugin { name = "overlay"
 	      	       , usage = "[OPTION] .. <OVERLAY_FILE> [<OVERLAY_FILE> [...]]" 
 		       , options = overlay_options 
@@ -23,19 +25,19 @@ overlay_plugin = Plugin { name = "overlay"
 		       , final_flags = default_final_flags
 		       }
 
-
-overlay_main flags [] = hpcError overlay_plugin $ "no overlay file specified" 
+overlay_main :: Flags -> [String] -> IO ()
+overlay_main _     [] = hpcError overlay_plugin $ "no overlay file specified" 
 overlay_main flags files = do
   specs <- mapM hpcParser files
-  let spec@(Spec globals modules) = concatSpec specs
+  let (Spec globals modules) = concatSpec specs
 
   let modules1 = Map.fromListWith (++) [ (m,info) | (m,info) <- modules ]
 
   mod_info <-
-     sequence [ do mix@(Mix origFile _ _ _ _) <- readMixWithFlags flags (Left mod)
+     sequence [ do mix@(Mix origFile _ _ _ _) <- readMixWithFlags flags (Left modu)
 	           content <- readFileFromPath (hpcError overlay_plugin) origFile (srcDirs flags)
-	           processModule mod content mix mod_spec globals
-              | (mod,mod_spec) <- Map.toList modules1
+	           processModule modu content mix mod_spec globals
+              | (modu, mod_spec) <- Map.toList modules1
               ]
 
 
@@ -52,7 +54,7 @@ processModule :: String		-- ^ module name
               -> [Tick] 	-- ^ local ticks
               -> [ExprTick]	-- ^ global ticks
               -> IO TixModule 
-processModule modName modContents (Mix filepath timestamp hash tabstop entries) locals globals = do
+processModule modName modContents (Mix _ _ hash _ entries) locals globals = do
 
    let hsMap :: Map.Map Int String
        hsMap = Map.fromList (zip [1..] $ lines modContents)
@@ -71,7 +73,7 @@ processModule modName modContents (Mix filepath timestamp hash tabstop entries) 
 
    -- TODO: rename plzTick => plzExprTick, plzTopPick => plzTick
    let plzTick :: HpcPos -> BoxLabel -> ExprTick -> Bool
-       plzTick pos (ExpBox _) (TickExpression _ match q g)  =
+       plzTick pos (ExpBox _) (TickExpression _ match q _)  =
                      qualifier pos q
                   && case match of
 			Nothing -> True
@@ -81,7 +83,7 @@ processModule modName modContents (Mix filepath timestamp hash tabstop entries) 
 
        plzTopTick :: HpcPos -> BoxLabel -> Tick -> Bool
        plzTopTick pos label  (ExprTick ignore)           = plzTick pos label ignore
-       plzTopTick pos _      (TickFunction fn q g)   =
+       plzTopTick pos _      (TickFunction fn q _)   =
                     qualifier pos q && pos `inside` fn
        plzTopTick pos label  (InsideFunction fn igs)   =
          pos `inside` fn && any (plzTopTick pos label) igs
@@ -95,11 +97,11 @@ processModule modName modContents (Mix filepath timestamp hash tabstop entries) 
               ]
 
 
-   let show' (span,stuff) = show (span,stuff,grabHpcPos hsMap span)
+   -- let show' (srcspan,stuff) = show (srcspan,stuff,grabHpcPos hsMap span)
 
    let forest = createMixEntryDom
-              [ (span,ix)
-              | ((span,_),ix) <- zip entries [0..]
+              [ (srcspan,ix)
+              | ((srcspan,_),ix) <- zip entries [0..]
               ]
 
 
@@ -131,9 +133,9 @@ processModule modName modContents (Mix filepath timestamp hash tabstop entries) 
    return $ TixModule modName hash (length tixs') tixs'
 
 qualifier :: HpcPos -> Maybe Qualifier -> Bool
-qualifier pos Nothing = True
+qualifier _   Nothing = True
 qualifier pos (Just (OnLine n)) = n == l1 && n == l2
-  where (l1,c1,l2,c2) = fromHpcPos pos
+  where (l1,_,l2,_) = fromHpcPos pos
 qualifier pos (Just (AtPosition l1' c1' l2' c2')) 
 	  = (l1', c1', l2', c2') == fromHpcPos pos
 
