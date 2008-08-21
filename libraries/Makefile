@@ -42,14 +42,14 @@ include $(TOP)/mk/cabal-flags.mk
 # Any libraries listed here should also be in ../packages
 
 SUBDIRS  = ghc-prim $(INTEGER_LIBRARY) base base3-compat array packedstring
-SUBDIRS += containers bytestring old-locale old-time filepath directory
+SUBDIRS += containers bytestring old-locale old-time filepath 
 ifeq "$(GhcLibsWithUnix)" "YES"
 SUBDIRS += unix
 endif
 ifeq "$(Windows)" "YES"
 SUBDIRS += $(wildcard Win32)
 endif
-SUBDIRS += process pretty hpc template-haskell editline Cabal random haskell98
+SUBDIRS += directory process pretty hpc template-haskell editline Cabal random haskell98
 
 # Set GhcBootLibs=YES from the command line to work with just the libraries
 # needed to bootstrap GHC.
