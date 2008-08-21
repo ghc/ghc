@@ -127,6 +127,9 @@ install:
 	                   --distpref dist-stage2                         \
 	                   $(INSTALL_FLAGS)
 
+install-docs:
+	@:
+
 include $(TOP)/mk/bindist.mk
 EXE_DIST_DIR = dist-stage$(stage)
 
