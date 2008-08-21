@@ -2,6 +2,7 @@
 module Main(main) where
 
 import Control.Exception
+import Prelude hiding (catch)
 import Int
 
 main = do
@@ -258,5 +259,5 @@ testEnumInt64 = do
 --
 
 
-mayBomb x = catchJust errorCalls x (\e -> putStrLn ("error " ++ show e))
-  `Control.Exception.catch` (\e -> putStrLn ("Fail: " ++ show e))
+mayBomb x = catch x (\(ErrorCall e) -> putStrLn ("error " ++ show e))
+  `catch` (\e -> putStrLn ("Fail: " ++ show (e :: SomeException)))
