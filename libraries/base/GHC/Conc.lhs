@@ -690,19 +690,19 @@ withMVar m io =
 asyncRead :: Int -> Int -> Int -> Ptr a -> IO (Int, Int)
 asyncRead  (I# fd) (I# isSock) (I# len) (Ptr buf) =
   IO $ \s -> case asyncRead# fd isSock len buf s of 
-               (# s, len#, err# #) -> (# s, (I# len#, I# err#) #)
+               (# s', len#, err# #) -> (# s', (I# len#, I# err#) #)
 
 asyncWrite :: Int -> Int -> Int -> Ptr a -> IO (Int, Int)
 asyncWrite  (I# fd) (I# isSock) (I# len) (Ptr buf) =
   IO $ \s -> case asyncWrite# fd isSock len buf s of 
-               (# s, len#, err# #) -> (# s, (I# len#, I# err#) #)
+               (# s', len#, err# #) -> (# s', (I# len#, I# err#) #)
 
 asyncDoProc :: FunPtr (Ptr a -> IO Int) -> Ptr a -> IO Int
 asyncDoProc (FunPtr proc) (Ptr param) = 
     -- the 'length' value is ignored; simplifies implementation of
     -- the async*# primops to have them all return the same result.
   IO $ \s -> case asyncDoProc# proc param s  of 
-               (# s, len#, err# #) -> (# s, I# err# #)
+               (# s', len#, err# #) -> (# s', I# err# #)
 
 -- to aid the use of these primops by the IO Handle implementation,
 -- provide the following convenience funs:
@@ -910,13 +910,13 @@ service_loop wakeup old_delays = do
   case r of
     0xffffffff -> do c_maperrno; throwErrno "service_loop"
     0 -> do
-        r <- c_readIOManagerEvent
+        r2 <- c_readIOManagerEvent
         exit <- 
-              case r of
-                _ | r == io_MANAGER_WAKEUP -> return False
-                _ | r == io_MANAGER_DIE    -> return True
+              case r2 of
+                _ | r2 == io_MANAGER_WAKEUP -> return False
+                _ | r2 == io_MANAGER_DIE    -> return True
                 0 -> return False -- spurious wakeup
-                r -> do start_console_handler (r `shiftR` 1); return False
+                _ -> do start_console_handler (r2 `shiftR` 1); return False
         if exit
           then return ()
           else service_cont wakeup delays'
@@ -960,19 +960,20 @@ toWin32ConsoleEvent ev =
 win32ConsoleHandler :: MVar (ConsoleEvent -> IO ())
 win32ConsoleHandler = unsafePerformIO (newMVar (error "win32ConsoleHandler"))
 
+-- XXX Is this actually needed?
 stick :: IORef HANDLE
 {-# NOINLINE stick #-}
 stick = unsafePerformIO (newIORef nullPtr)
 
 wakeupIOManager = do 
-  hdl <- readIORef stick
+  _hdl <- readIORef stick
   c_sendIOManagerEvent io_MANAGER_WAKEUP
 
 -- Walk the queue of pending delays, waking up any that have passed
 -- and return the smallest delay to wait for.  The queue of pending
 -- delays is kept ordered.
 getDelay :: USecs -> [DelayReq] -> IO ([DelayReq], DWORD)
-getDelay now [] = return ([], iNFINITE)
+getDelay _   [] = return ([], iNFINITE)
 getDelay now all@(d : rest) 
   = case d of
      Delay time m | now >= time -> do
