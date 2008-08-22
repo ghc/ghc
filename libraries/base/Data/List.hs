@@ -571,27 +571,25 @@ genericLength (_:l)     =  1 + genericLength l
 -- | The 'genericTake' function is an overloaded version of 'take', which
 -- accepts any 'Integral' value as the number of elements to take.
 genericTake             :: (Integral i) => i -> [a] -> [a]
-genericTake 0 _         =  []
+genericTake n _ | n <= 0 = []
 genericTake _ []        =  []
-genericTake n (x:xs) | n > 0  =  x : genericTake (n-1) xs
-genericTake _  _        =  error "List.genericTake: negative argument"
+genericTake n (x:xs)    =  x : genericTake (n-1) xs
 
 -- | The 'genericDrop' function is an overloaded version of 'drop', which
 -- accepts any 'Integral' value as the number of elements to drop.
 genericDrop             :: (Integral i) => i -> [a] -> [a]
-genericDrop 0 xs        =  xs
+genericDrop n xs | n <= 0 = xs
 genericDrop _ []        =  []
-genericDrop n (_:xs) | n > 0  =  genericDrop (n-1) xs
-genericDrop _ _         =  error "List.genericDrop: negative argument"
+genericDrop n (_:xs)    =  genericDrop (n-1) xs
+
 
 -- | The 'genericSplitAt' function is an overloaded version of 'splitAt', which
 -- accepts any 'Integral' value as the position at which to split.
 genericSplitAt          :: (Integral i) => i -> [b] -> ([b],[b])
-genericSplitAt 0 xs     =  ([],xs)
+genericSplitAt n xs | n <= 0 =  ([],xs)
 genericSplitAt _ []     =  ([],[])
-genericSplitAt n (x:xs) | n > 0  =  (x:xs',xs'') where
-                               (xs',xs'') = genericSplitAt (n-1) xs
-genericSplitAt _ _      =  error "List.genericSplitAt: negative argument"
+genericSplitAt n (x:xs) =  (x:xs',xs'') where
+    (xs',xs'') = genericSplitAt (n-1) xs
 
 -- | The 'genericIndex' function is an overloaded version of '!!', which
 -- accepts any 'Integral' value as the index.
