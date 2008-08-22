@@ -39,7 +39,7 @@ extern SpinLock gc_alloc_block_sync;
 #endif
 
 #if defined(PROF_SPIN) && defined(THREADED_RTS)
-StgWord64 whitehole_spin;
+extern StgWord64 whitehole_spin;
 #endif
 
 #define WORK_UNIT_WORDS 128
