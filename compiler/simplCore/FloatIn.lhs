@@ -291,21 +291,21 @@ fiExpr to_drop (_,AnnLet (AnnNonRec id rhs@(rhs_fvs, ann_rhs)) body)
 
 	-- Push rhs_binds into the right hand side of the binding
     rhs'     = fiExpr rhs_binds rhs
-    rhs_fvs' = rhs_fvs `unionVarSet` floatedBindsFVs rhs_binds
+    rhs_fvs' = rhs_fvs `unionVarSet` floatedBindsFVs rhs_binds `unionVarSet` rule_fvs
+			-- Don't forget the rule_fvs; the binding mentions them!
 
 fiExpr to_drop (_,AnnLet (AnnRec bindings) body)
   = fiExpr new_to_drop body
   where
-    rhss = map snd bindings
-
+    (ids, rhss) = unzip bindings
     rhss_fvs = map freeVarsOf rhss
     body_fvs = freeVarsOf body
 
 	-- See Note [extra_fvs (1,2)]
-    extra_fvs = foldr (unionVarSet . get_extras) emptyVarSet bindings
-    get_extras (id, (rhs_fvs, rhs)) 
-	| noFloatIntoRhs rhs = idRuleVars id `unionVarSet` rhs_fvs
-	| otherwise	     = idRuleVars id
+    rule_fvs = foldr (unionVarSet . idRuleVars) emptyVarSet ids
+    extra_fvs = rule_fvs `unionVarSet` 
+		unionVarSets [ fvs | (fvs, rhs) <- rhss
+			     , noFloatIntoRhs rhs ]
 
     (shared_binds:extra_binds:body_binds:rhss_binds) 
 	= sepBindsByDropPoint False (extra_fvs:body_fvs:rhss_fvs) to_drop
@@ -316,8 +316,9 @@ fiExpr to_drop (_,AnnLet (AnnRec bindings) body)
 		  extra_binds ++	-- Note [extra_fvs (1,2)]
 		  shared_binds		-- Used in more than one place
 
-    rhs_fvs' = unionVarSet (unionVarSets rhss_fvs)
-			   (unionVarSets (map floatedBindsFVs rhss_binds))
+    rhs_fvs' = unionVarSets rhss_fvs `unionVarSet`
+	       unionVarSets (map floatedBindsFVs rhss_binds) `unionVarSet`
+	       rule_fvs		-- Don't forget the rule variables!
 
     -- Push rhs_binds into the right hand side of the binding
     fi_bind :: [FloatingBinds]	    -- one per "drop pt" conjured w/ fvs_of_rhss
