@@ -1,10 +1,2 @@
 
 TH_reifyMkName.hs:9:2: TyConI (TySynD Foo.C [] (ConT GHC.Types.Int))
-Loading package ghc-prim ... linking ... done.
-Loading package integer ... linking ... done.
-Loading package base ... linking ... done.
-Loading package array-0.1 ... linking ... done.
-Loading package containers-0.1 ... linking ... done.
-Loading package packedstring-0.1 ... linking ... done.
-Loading package pretty-1.0 ... linking ... done.
-Loading package template-haskell ... linking ... done.

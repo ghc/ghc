@@ -12,7 +12,7 @@
 
 module ShouldCompile where
 
-import Control.Monad.ST
+import GHC.ST
 
 data Q s a chain = Node s a chain
 
