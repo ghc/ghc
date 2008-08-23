@@ -1,5 +1,6 @@
 \begin{code}
 {-# OPTIONS_GHC -XNoImplicitPrelude #-}
+{-# OPTIONS_GHC -fno-warn-unused-imports #-}
 {-# OPTIONS_HADDOCK hide #-}
 -----------------------------------------------------------------------------
 -- |

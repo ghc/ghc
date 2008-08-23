@@ -1,5 +1,6 @@
 \begin{code}
 {-# OPTIONS_GHC -XNoImplicitPrelude #-}
+{-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 {-# OPTIONS_HADDOCK not-home #-}
 -----------------------------------------------------------------------------
 -- |
@@ -702,7 +703,7 @@ asyncDoProc (FunPtr proc) (Ptr param) =
     -- the 'length' value is ignored; simplifies implementation of
     -- the async*# primops to have them all return the same result.
   IO $ \s -> case asyncDoProc# proc param s  of 
-               (# s', len#, err# #) -> (# s', I# err# #)
+               (# s', _len#, err# #) -> (# s', I# err# #)
 
 -- to aid the use of these primops by the IO Handle implementation,
 -- provide the following convenience funs:
@@ -923,13 +924,15 @@ service_loop wakeup old_delays = do
 
     _other -> service_cont wakeup delays' -- probably timeout        
 
+service_cont :: HANDLE -> [DelayReq] -> IO ()
 service_cont wakeup delays = do
   atomicModifyIORef prodding (\_ -> (False,False))
   service_loop wakeup delays
 
 -- must agree with rts/win32/ThrIOManager.c
-io_MANAGER_WAKEUP = 0xffffffff :: Word32
-io_MANAGER_DIE    = 0xfffffffe :: Word32
+io_MANAGER_WAKEUP, io_MANAGER_DIE :: Word32
+io_MANAGER_WAKEUP = 0xffffffff
+io_MANAGER_DIE    = 0xfffffffe
 
 data ConsoleEvent
  = ControlC
@@ -948,6 +951,7 @@ start_console_handler r =
                     return ()
      Nothing -> return ()
 
+toWin32ConsoleEvent :: Num a => a -> Maybe ConsoleEvent
 toWin32ConsoleEvent ev = 
    case ev of
        0 {- CTRL_C_EVENT-}        -> Just ControlC
@@ -965,6 +969,7 @@ stick :: IORef HANDLE
 {-# NOINLINE stick #-}
 stick = unsafePerformIO (newIORef nullPtr)
 
+wakeupIOManager :: IO ()
 wakeupIOManager = do 
   _hdl <- readIORef stick
   c_sendIOManagerEvent io_MANAGER_WAKEUP
@@ -994,7 +999,8 @@ getDelay now all@(d : rest)
 type HANDLE       = Ptr ()
 type DWORD        = Word32
 
-iNFINITE = 0xFFFFFFFF :: DWORD -- urgh
+iNFINITE :: DWORD
+iNFINITE = 0xFFFFFFFF -- urgh
 
 foreign import ccall unsafe "getIOManagerEvent" -- in the RTS (ThrIOManager.c)
   c_getIOManagerEvent :: IO HANDLE

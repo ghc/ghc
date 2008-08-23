@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-unused-imports #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Control.Concurrent
@@ -491,7 +492,8 @@ waitFd fd write = do
         fdReady (fromIntegral fd) write (fromIntegral iNFINITE) 0
    return ()
 
-iNFINITE = 0xFFFFFFFF :: CInt -- urgh
+iNFINITE :: CInt
+iNFINITE = 0xFFFFFFFF -- urgh
 
 foreign import ccall safe "fdReady"
   fdReady :: CInt -> CInt -> CInt -> CInt -> IO CInt

@@ -1,4 +1,6 @@
 {-# OPTIONS_GHC -XNoImplicitPrelude -#include "HsBase.h" #-}
+{-# OPTIONS_GHC -fno-warn-unused-matches #-}
+{-# OPTIONS_GHC -fno-warn-unused-binds #-}
 {-# OPTIONS_HADDOCK hide #-}
 
 #undef DEBUG_DUMP
@@ -685,6 +687,8 @@ readRawBufferPtrNoBlock :: String -> FD -> Bool -> Ptr CChar -> Int -> CInt -> I
 readRawBufferPtrNoBlock = readRawBufferPtr
 -- Async versions of the read/write primitives, for the non-threaded RTS
 
+asyncReadRawBuffer :: String -> FD -> Bool -> RawBuffer -> Int -> CInt
+                   -> IO CInt
 asyncReadRawBuffer loc fd is_stream buf off len = do
     (l, rc) <- asyncReadBA (fromIntegral fd) (if is_stream then 1 else 0) 
                  (fromIntegral len) off buf
@@ -693,6 +697,8 @@ asyncReadRawBuffer loc fd is_stream buf off len = do
         ioError (errnoToIOError loc (Errno (fromIntegral rc)) Nothing Nothing)
       else return (fromIntegral l)
 
+asyncReadRawBufferPtr :: String -> FD -> Bool -> Ptr CChar -> Int -> CInt
+                      -> IO CInt
 asyncReadRawBufferPtr loc fd is_stream buf off len = do
     (l, rc) <- asyncRead (fromIntegral fd) (if is_stream then 1 else 0) 
                         (fromIntegral len) (buf `plusPtr` off)
@@ -701,6 +707,8 @@ asyncReadRawBufferPtr loc fd is_stream buf off len = do
         ioError (errnoToIOError loc (Errno (fromIntegral rc)) Nothing Nothing)
       else return (fromIntegral l)
 
+asyncWriteRawBuffer :: String -> FD -> Bool -> RawBuffer -> Int -> CInt
+                    -> IO CInt
 asyncWriteRawBuffer loc fd is_stream buf off len = do
     (l, rc) <- asyncWriteBA (fromIntegral fd) (if is_stream then 1 else 0) 
                         (fromIntegral len) off buf
@@ -709,6 +717,8 @@ asyncWriteRawBuffer loc fd is_stream buf off len = do
         ioError (errnoToIOError loc (Errno (fromIntegral rc)) Nothing Nothing)
       else return (fromIntegral l)
 
+asyncWriteRawBufferPtr :: String -> FD -> Bool -> CString -> Int -> CInt
+                       -> IO CInt
 asyncWriteRawBufferPtr loc fd is_stream buf off len = do
     (l, rc) <- asyncWrite (fromIntegral fd) (if is_stream then 1 else 0) 
                   (fromIntegral len) (buf `plusPtr` off)
@@ -719,6 +729,8 @@ asyncWriteRawBufferPtr loc fd is_stream buf off len = do
 
 -- Blocking versions of the read/write primitives, for the threaded RTS
 
+blockingReadRawBuffer :: String -> CInt -> Bool -> RawBuffer -> Int -> CInt
+                      -> IO CInt
 blockingReadRawBuffer loc fd True buf off len = 
   throwErrnoIfMinus1Retry loc $
     safe_recv_rawBuffer fd buf off len
@@ -726,6 +738,8 @@ blockingReadRawBuffer loc fd False buf off len =
   throwErrnoIfMinus1Retry loc $
     safe_read_rawBuffer fd buf off len
 
+blockingReadRawBufferPtr :: String -> CInt -> Bool -> CString -> Int -> CInt
+                         -> IO CInt
 blockingReadRawBufferPtr loc fd True buf off len = 
   throwErrnoIfMinus1Retry loc $
     safe_recv_off fd buf off len
@@ -733,6 +747,8 @@ blockingReadRawBufferPtr loc fd False buf off len =
   throwErrnoIfMinus1Retry loc $
     safe_read_off fd buf off len
 
+blockingWriteRawBuffer :: String -> CInt -> Bool -> RawBuffer -> Int -> CInt
+                       -> IO CInt
 blockingWriteRawBuffer loc fd True buf off len = 
   throwErrnoIfMinus1Retry loc $
     safe_send_rawBuffer fd buf off len
@@ -740,6 +756,8 @@ blockingWriteRawBuffer loc fd False buf off len =
   throwErrnoIfMinus1Retry loc $
     safe_write_rawBuffer fd buf off len
 
+blockingWriteRawBufferPtr :: String -> CInt -> Bool -> CString -> Int -> CInt
+                          -> IO CInt
 blockingWriteRawBufferPtr loc fd True buf off len = 
   throwErrnoIfMinus1Retry loc $
     safe_send_off fd buf off len
@@ -1056,9 +1074,11 @@ mkFileHandle fd is_stream filepath ha_type binary = do
   -- turn off buffering.  We don't correctly handle the case of switching
   -- from read mode to write mode on a buffered text-mode handle, see bug
   -- \#679.
-  bmode <- case ha_type of
-                ReadWriteHandle | not binary -> return NoBuffering
-                _other                       -> return bmode
+  bmode2 <- case ha_type of
+                 ReadWriteHandle | not binary -> return NoBuffering
+                 _other                       -> return bmode
+#else
+  let bmode2 = bmode
 #endif
 
   spares <- newIORef BufferListNil
@@ -1067,7 +1087,7 @@ mkFileHandle fd is_stream filepath ha_type binary = do
                         haType = ha_type,
                         haIsBin = binary,
                         haIsStream = is_stream,
-                        haBufferMode = bmode,
+                        haBufferMode = bmode2,
                         haBuffer = buf,
                         haBuffers = spares,
                         haOtherSide = Nothing

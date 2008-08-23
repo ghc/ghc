@@ -25,7 +25,9 @@ module System.Posix.Internals where
 
 #include "HsBaseConfig.h"
 
+#if ! (defined(mingw32_HOST_OS) || defined(__MINGW32__))
 import Control.Monad
+#endif
 import System.Posix.Types
 
 import Foreign
@@ -140,12 +142,13 @@ foreign import stdcall unsafe "HsBase.h closesocket"
 #endif
 
 fdGetMode :: FD -> IO IOMode
-fdGetMode fd = do
 #if defined(mingw32_HOST_OS) || defined(__MINGW32__)
+fdGetMode _ = do
     -- We don't have a way of finding out which flags are set on FDs
     -- on Windows, so make a handle that thinks that anything goes.
     let flags = o_RDWR
 #else
+fdGetMode fd = do
     flags <- throwErrnoIfMinus1Retry "fdGetMode" 
                 (c_fcntl_read fd const_f_getfl)
 #endif
@@ -261,6 +264,7 @@ setCooked fd cooked = do
    then ioError (ioe_unk_error "setCooked" "failed to set buffering")
    else return ()
 
+ioe_unk_error :: String -> String -> IOException
 ioe_unk_error loc msg 
  = IOError Nothing OtherError loc msg Nothing
 
@@ -294,8 +298,8 @@ foreign import ccall unsafe "consUtils.h get_console_echo__"
 -- ---------------------------------------------------------------------------
 -- Turning on non-blocking for a file descriptor
 
-#if !defined(mingw32_HOST_OS) && !defined(__MINGW32__)
 setNonBlockingFD :: FD -> IO ()
+#if !defined(mingw32_HOST_OS) && !defined(__MINGW32__)
 setNonBlockingFD fd = do
   flags <- throwErrnoIfMinus1Retry "setNonBlockingFD"
                  (c_fcntl_read fd const_f_getfl)
@@ -308,7 +312,7 @@ setNonBlockingFD fd = do
 #else
 
 -- bogus defns for win32
-setNonBlockingFD fd = return ()
+setNonBlockingFD _ = return ()
 
 #endif
 
@@ -505,11 +509,10 @@ foreign import ccall unsafe "HsBase.h __hscore_poke_lflag" poke_c_lflag :: Ptr C
 foreign import ccall unsafe "HsBase.h __hscore_ptr_c_cc" ptr_c_cc  :: Ptr CTermios -> IO (Ptr Word8)
 #endif
 
+s_issock :: CMode -> Bool
 #if !defined(mingw32_HOST_OS) && !defined(__MINGW32__)
-foreign import ccall unsafe "HsBase.h __hscore_s_issock" c_s_issock :: CMode -> CInt
-s_issock :: CMode -> Bool
 s_issock cmode = c_s_issock cmode /= 0
+foreign import ccall unsafe "HsBase.h __hscore_s_issock" c_s_issock :: CMode -> CInt
 #else
-s_issock :: CMode -> Bool
-s_issock cmode = False
+s_issock _ = False
 #endif

@@ -37,7 +37,6 @@ import Foreign.C
 import GHC.IOBase
 import GHC.Conc
 import GHC.Handle
-import Data.Typeable
 import Control.Concurrent.MVar
 
 data Handler
@@ -84,6 +83,7 @@ installHandler handler
           STG_SIG_DFL -> return Default
           STG_SIG_IGN -> return Ignore
           STG_SIG_HAN -> return (Catch old_h)
+          _           -> error "installHandler: Bad threaded rc value"
       return (new_h, prev_handler)
 
   | otherwise =
@@ -105,6 +105,7 @@ installHandler handler
          -- stable pointer is no longer in use, free it.
         freeStablePtr osptr
         return (Catch (\ ev -> oldh (fromConsoleEvent ev)))
+     _           -> error "installHandler: Bad non-threaded rc value"
   where
    fromConsoleEvent ev =
      case ev of

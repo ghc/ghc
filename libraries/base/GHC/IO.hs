@@ -35,7 +35,9 @@ import Foreign.C
 import System.IO.Error
 import Data.Maybe
 import Control.Monad
+#ifndef mingw32_HOST_OS
 import System.Posix.Internals
+#endif
 
 import GHC.Enum
 import GHC.Base
