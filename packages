@@ -22,6 +22,7 @@ libraries/packedstring                  packages/packedstring           darcs
 libraries/pretty                        packages/pretty                 darcs
 libraries/process                       packages/process                darcs
 libraries/random                        packages/random                 darcs
+libraries/st                            packages/st                     darcs
 libraries/template-haskell              packages/template-haskell       darcs
 libraries/unix                          packages/unix                   darcs
 libraries/Win32                         packages/Win32                  darcs
