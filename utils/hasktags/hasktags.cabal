@@ -15,5 +15,5 @@ cabal-version: >=1.2
 
 Executable hasktags
     Main-Is: HaskTags.hs
-    Build-Depends: haskell98, base
+    Build-Depends: haskell98, base, getopt
 

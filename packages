@@ -12,6 +12,7 @@ libraries/containers                    packages/containers             darcs
 libraries/directory                     packages/directory              darcs
 libraries/editline                      packages/editline               darcs
 libraries/filepath                      packages/filepath               darcs
+libraries/getopt                        packages/getopt                 darcs
 libraries/ghc-prim                      packages/ghc-prim               darcs
 libraries/haskell98                     packages/haskell98              darcs
 libraries/hpc                           packages/hpc                    darcs
