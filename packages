@@ -8,6 +8,7 @@ libraries/base                          packages/base                   darcs
 libraries/base3-compat                  packages/base3-compat           darcs
 libraries/bytestring                    packages/bytestring             darcs
 libraries/Cabal                         packages/Cabal                  darcs
+libraries/concurrent                    packages/concurrent             darcs
 libraries/containers                    packages/containers             darcs
 libraries/directory                     packages/directory              darcs
 libraries/editline                      packages/editline               darcs
@@ -25,6 +26,8 @@ libraries/process                       packages/process                darcs
 libraries/random                        packages/random                 darcs
 libraries/st                            packages/st                     darcs
 libraries/template-haskell              packages/template-haskell       darcs
+libraries/timeout                       packages/timeout                darcs
+libraries/unique                        packages/unique                 darcs
 libraries/unix                          packages/unix                   darcs
 libraries/Win32                         packages/Win32                  darcs
 libraries/HUnit             extralibs   packages/HUnit                  darcs
