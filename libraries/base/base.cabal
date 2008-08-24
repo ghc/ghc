@@ -128,7 +128,6 @@ Library {
         Foreign.Storable,
         Numeric,
         Prelude,
-        System.Console.GetOpt,
         System.CPUTime,
         System.Environment,
         System.Exit,
