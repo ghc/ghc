@@ -284,7 +284,7 @@ install-docs ::
 
 binary-dist::
 	-rm -rf $(BIN_DIST_DIR)
-	-$(RM) $(BIN_DIST_TARBALL)
+	-$(RM) $(BIN_DIST_TAR_BZ2)
 
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 
@@ -304,8 +304,8 @@ binary-dist :: tar-binary-dist
 
 .PHONY: tar-binary-dist
 tar-binary-dist:
-	( cd $(BIN_DIST_TOPDIR_ABS); tar cf - $(BIN_DIST_NAME) | bzip2 > $(BIN_DIST_TARBALL) )
-	( cd $(BIN_DIST_TOPDIR_ABS); bunzip2 -c $(BIN_DIST_TARBALL) | tar tf - | sed "s/^ghc-$(ProjectVersion)/fptools/" | sort >$(FPTOOLS_TOP_ABS)/bin-manifest-$(ProjectVersion) )
+	( cd $(BIN_DIST_TOPDIR_ABS); tar cf - $(BIN_DIST_NAME) | bzip2 > $(BIN_DIST_TAR_BZ2) )
+	( cd $(BIN_DIST_TOPDIR_ABS); bunzip2 -c $(BIN_DIST_TAR_BZ2) | tar tf - | sed "s/^ghc-$(ProjectVersion)/fptools/" | sort >$(FPTOOLS_TOP_ABS)/bin-manifest-$(ProjectVersion) )
 
 else
 
@@ -405,7 +405,7 @@ endif
 	tar tf $(BIN_DIST_TAR) | sort > bin-manifest-$(ProjectVersion)
 endif
 
-PUBLISH_FILES = $(BIN_DIST_TARBALL)
+PUBLISH_FILES = $(BIN_DIST_TAR_BZ2)
 
 # Upload the distribution and documentation
 ifneq "$(ISCC)" ""
