@@ -59,8 +59,7 @@ Library {
             GHC.TopHandler,
             GHC.Unicode,
             GHC.Weak,
-            GHC.Word,
-            System.Timeout
+            GHC.Word
         extensions: MagicHash, ExistentialQuantification, Rank2Types,
                     ScopedTypeVariables, UnboxedTuples,
                     ForeignFunctionInterface, UnliftedFFITypes,
@@ -72,12 +71,6 @@ Library {
         Control.Applicative,
         Control.Arrow,
         Control.Category,
-        Control.Concurrent,
-        Control.Concurrent.Chan,
-        Control.Concurrent.MVar,
-        Control.Concurrent.QSem,
-        Control.Concurrent.QSemN,
-        Control.Concurrent.SampleVar,
         Control.Exception,
         Control.Exception.Base
         Control.OldException,
@@ -107,7 +100,6 @@ Library {
         Data.Traversable
         Data.Tuple,
         Data.Typeable,
-        Data.Unique,
         Data.Version,
         Data.Word,
         Debug.Trace,
