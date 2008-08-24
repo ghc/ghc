@@ -299,6 +299,14 @@ binary-dist::
 	$(MKDIRHIER) $(BIN_DIST_DIR)/icons
 	cp distrib/hsicon.ico $(BIN_DIST_DIR)/icons
 
+# Tar up the distribution and build a manifest
+binary-dist :: tar-binary-dist
+
+.PHONY: tar-binary-dist
+tar-binary-dist:
+	( cd $(BIN_DIST_TOPDIR_ABS); tar cf - $(BIN_DIST_NAME) | bzip2 > $(BIN_DIST_TARBALL) )
+	( cd $(BIN_DIST_TOPDIR_ABS); bunzip2 -c $(BIN_DIST_TARBALL) | tar tf - | sed "s/^ghc-$(ProjectVersion)/fptools/" | sort >$(FPTOOLS_TOP_ABS)/bin-manifest-$(ProjectVersion) )
+
 else
 
 .PHONY: binary-dist
@@ -396,15 +404,6 @@ endif
 	bzip2 < $(BIN_DIST_TAR) > $(BIN_DIST_TAR_BZ2)
 	tar tf $(BIN_DIST_TAR) | sort > bin-manifest-$(ProjectVersion)
 endif
-
-# XXX Presumably we still need to do this for Windows?
-## Tar up the distribution and build a manifest
-#binary-dist :: tar-binary-dist
-#
-#.PHONY: tar-binary-dist
-#tar-binary-dist:
-#	( cd $(BIN_DIST_TOPDIR_ABS); tar cf - $(BIN_DIST_NAME) | bzip2 >$(BIN_DIST_TARBALL) )
-#	( cd $(BIN_DIST_TOPDIR_ABS); bunzip2 -c $(BIN_DIST_TARBALL) | tar tf - | sed "s/^ghc-$(ProjectVersion)/fptools/" | sort >$(FPTOOLS_TOP_ABS)/bin-manifest-$(ProjectVersion) )
 
 PUBLISH_FILES = $(BIN_DIST_TARBALL)
 
