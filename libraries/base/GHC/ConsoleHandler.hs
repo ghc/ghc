@@ -37,7 +37,7 @@ import Foreign.C
 import GHC.IOBase
 import GHC.Conc
 import GHC.Handle
-import Control.Concurrent.MVar
+import Control.Exception (onException)
 
 data Handler
  = Default
@@ -140,4 +140,13 @@ flushConsole h =
 
 foreign import ccall unsafe "consUtils.h flush_input_console__"
         flush_console_fd :: CInt -> IO CInt
+
+-- XXX Copied from Control.Concurrent.MVar
+modifyMVar :: MVar a -> (a -> IO (a,b)) -> IO b
+modifyMVar m io =
+  block $ do
+    a      <- takeMVar m
+    (a',b) <- unblock (io a) `onException` putMVar m a
+    putMVar m a'
+    return b
 #endif /* mingw32_HOST_OS */
