@@ -2,7 +2,7 @@
 set -e
 
 # Check that we have all boot packages.
-for dir in `grep "^[^# ][^ ]*  *[^ ][^ ]*$" packages | sed "s/ .*//"`
+for dir in `grep "^[^# ][^ ]*  *[^ ][^ ]*  *[^ ][^ ]*$" packages | sed "s/ .*//"`
 do
     if test ! -d $dir
     then
