@@ -20,7 +20,10 @@ test('TH_repGuard', normal, compile, ['-v0'])
 test('TH_repGuardOutput', normal, compile_and_run, [''])
 test('TH_repPatSig', normal, compile_fail, [''])
 
-test('TH_spliceE5', normal, multimod_compile_and_run, ['TH_spliceE5.hs', '-v0'])
+test('TH_spliceE5',
+     extra_clean(['TH_spliceE5_Lib.hi', 'TH_spliceE5_Lib.o']),
+     multimod_compile_and_run,
+     ['TH_spliceE5.hs', '-v0'])
 # Testing profiling with TH is a bit tricky; we've already disabled
 # the prof way above, and also we want to add options specifically for
 # profiling (-osuf p_o) because this is necessary when mixing
@@ -29,11 +32,10 @@ test('TH_spliceE5', normal, multimod_compile_and_run, ['TH_spliceE5.hs', '-v0'])
 test('TH_spliceE5_prof',
      [req_profiling,
       omit_ways(['ghci']),
-      extra_clean(['TH_spliceE5_Lib.p_o', 'TH_spliceE5_Lib.hi',
-                   'TH_spliceE5_Lib.o',
-                   'TH_spliceE5.hi', 'TH_spliceE5.p_o'])],
+      extra_clean(['TH_spliceE5_prof_Lib.p_o', 'TH_spliceE5_prof_Lib.hi',
+                   'TH_spliceE5_prof_Lib.o'])],
      multimod_compile_and_run,
-     ['TH_spliceE5.hs', '-v0 -prof -auto-all -osuf p_o'])
+     ['TH_spliceE5_prof.hs', '-v0 -prof -auto-all -osuf p_o'])
 
 test('TH_spliceD1',
      extra_clean(['TH_spliceD1_Lib.hi', 'TH_spliceD1_Lib.o']),
