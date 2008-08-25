@@ -171,15 +171,10 @@ test('tc167', only_compiler_types(['ghc']), compile, [''])
 test('tc168', only_compiler_types(['ghc']), compile, ['-ddump-types'])
 test('tc169', normal, compile, [''])
 
-# The bug in tc170 is triggered only by batch compilation
-# which we do by steam here, with a pair of tests.  Make sure
-# we run one way only, so we can be sure to have the right kind
-# of interface file for the second part of the test.
-test('Tc170_Aux', compose(no_clean, only_ways(['optc','optasm'])), compile, [''])
 test('tc170',
-     [only_ways(['optc','optasm']),
-      extra_clean(['Tc170_Aux.comp.stderr', 'Tc170_Aux.hi', 'Tc170_Aux.o'])],
-     compile, [''])
+     extra_clean(['Tc170_Aux.hi', 'Tc170_Aux.o']),
+     run_command,
+     ['$MAKE -s --no-print-directory tc170'])
 
 test('tc171', normal, compile, [''])
 test('tc172', normal, compile, [''])

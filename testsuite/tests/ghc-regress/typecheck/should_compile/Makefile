@@ -2,6 +2,11 @@ TOP=../../../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
+tc170:
+	$(RM) Tc170_Aux.hi Tc170_Aux.o tc170.hi tc170.o
+	$(TEST_HC) -c -fasm Tc170_Aux.hs
+	$(TEST_HC) -c -fasm tc170.hs
+
 tc173:
 	$(RM) Tc173a.o Tc173a.hi Tc173b.o Tc173b.hi
 	$(TEST_HC) -c -fglasgow-exts -XUndecidableInstances -XOverlappingInstances Tc173a.hs
