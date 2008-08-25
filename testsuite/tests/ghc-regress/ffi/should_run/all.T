@@ -97,10 +97,10 @@ test('ffi017', normal, compile_and_run, [''])
 test('ffi018', [ omit_ways(['ghci']), extra_clean(['ffi018_c.o']) ],
                compile_and_run, ['ffi018_c.c'])
 
-test('ffi018', [ only_ways(['ghci']),
-                 cmd_prefix('$MAKE ffi018_ghci_setup && '),
-                 extra_clean(['ffi018_ghci_c.c', 'ffi018_ghci_c.o']) ],
-               compile_and_run, ['ffi018_ghci_c.o'])
+test('ffi018_ghci', [ only_ways(['ghci']),
+                      cmd_prefix('$MAKE ffi018_ghci_setup && '),
+                      extra_clean(['ffi018_ghci_c.o']) ],
+                    compile_and_run, ['ffi018_ghci_c.o'])
 
 test('ffi019', normal, compile_and_run, [''])
 
@@ -110,15 +110,15 @@ test('1679', normal, compile_and_run, [''])
 test('1288', [ skip_if_not_windows, omit_ways(['ghci']),
                extra_clean(['1288_c.o']) ],
              compile_and_run, ['1288_c.c'])
-test('1288', [ skip_if_not_windows, only_ways(['ghci']),
-               cmd_prefix('$MAKE --no-print-directory 1288_ghci_setup && '),
-               extra_clean(['1288_ghci_c.c', '1288_ghci_c.o']) ],
-             compile_and_run, ['1288_ghci_c.o'])
+test('1288_ghci', [ skip_if_not_windows, only_ways(['ghci']),
+                    cmd_prefix('$MAKE --no-print-directory 1288_ghci_setup && '),
+                    extra_clean(['1288_ghci_c.o']) ],
+                  compile_and_run, ['1288_ghci_c.o'])
 
 test('2276', [ skip_if_not_windows, omit_ways(['ghci']), 
                extra_clean(['2276_c.o']) ],
              compile_and_run, ['2276_c.c'])
-test('2276', [ skip_if_not_windows, only_ways(['ghci']),
-               cmd_prefix('$MAKE --no-print-directory 2276_ghci_setup && '),
-               extra_clean(['2276_ghci_c.c', '2276_ghci_c.o']) ],
-             compile_and_run, ['-fobject-code 2276_ghci_c.o'])
+test('2276_ghci', [ skip_if_not_windows, only_ways(['ghci']),
+                    cmd_prefix('$MAKE --no-print-directory 2276_ghci_setup && '),
+                    extra_clean(['2276_ghci_c.o']) ],
+                  compile_and_run, ['-fobject-code 2276_ghci_c.o'])
