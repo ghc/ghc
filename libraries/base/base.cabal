@@ -13,7 +13,9 @@ build-type: Configure
 extra-tmp-files:
                 config.log config.status autom4te.cache
                 include/HsBaseConfig.h
-
+extra-source-files:
+                config.guess config.sub install-sh
+                aclocal.m4 configure.ac configure
 
 Library {
     if impl(ghc) {
