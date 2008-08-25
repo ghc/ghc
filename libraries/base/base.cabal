@@ -21,13 +21,6 @@ Library {
     if impl(ghc) {
         build-depends: rts, ghc-prim, integer
         exposed-modules:
-            Data.Generics,
-            Data.Generics.Aliases,
-            Data.Generics.Basics,
-            Data.Generics.Instances,
-            Data.Generics.Schemes,
-            Data.Generics.Text,
-            Data.Generics.Twins,
             Foreign.Concurrent,
             GHC.Arr,
             GHC.Base,
