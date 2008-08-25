@@ -272,7 +272,7 @@ gHC_TOP_HANDLER	= mkBaseModule (fsLit "GHC.TopHandler")
 sYSTEM_IO	= mkBaseModule (fsLit "System.IO")
 dYNAMIC		= mkBaseModule (fsLit "Data.Dynamic")
 tYPEABLE	= mkBaseModule (fsLit "Data.Typeable")
-gENERICS	= mkBaseModule (fsLit "Data.Generics.Basics")
+gENERICS	= mkSybModule (fsLit "Data.Generics.Basics")
 dOTNET		= mkBaseModule (fsLit "GHC.Dotnet")
 rEAD_PREC	= mkBaseModule (fsLit "Text.ParserCombinators.ReadPrec")
 lEX		    = mkBaseModule (fsLit "Text.Read.Lex")
@@ -313,6 +313,9 @@ mkBaseModule m = mkModule basePackageId (mkModuleNameFS m)
 
 mkBaseModule_ :: ModuleName -> Module
 mkBaseModule_ m = mkModule basePackageId m
+
+mkSybModule :: FastString -> Module
+mkSybModule m = mkModule sybPackageId (mkModuleNameFS m)
 
 mkMainModule :: FastString -> Module
 mkMainModule m = mkModule mainPackageId (mkModuleNameFS m)

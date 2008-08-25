@@ -389,6 +389,7 @@ findWiredInPackages dflags pkgs preload this_package = do
                             (basePackageId, [""]),
                             (rtsPackageId, [""]),
                             (haskell98PackageId, [""]),
+                            (sybPackageId, [""]),
                             (thPackageId, [""]),
                             (dphSeqPackageId, [""]),
                             (dphParPackageId, [""]),

@@ -41,7 +41,7 @@ include $(TOP)/mk/cabal-flags.mk
 
 # Any libraries listed here should also be in ../packages
 
-SUBDIRS  = ghc-prim $(INTEGER_LIBRARY) base concurrent unique timeout st getopt base3-compat array packedstring
+SUBDIRS  = ghc-prim $(INTEGER_LIBRARY) base syb concurrent unique timeout st getopt base3-compat array packedstring
 SUBDIRS += containers bytestring old-locale old-time filepath 
 ifeq "$(GhcLibsWithUnix)" "YES"
 SUBDIRS += unix
