@@ -62,7 +62,7 @@ test('rn043',
      extra_clean(['Rn043_A.hi', 'Rn043_A.o', 'Rn043_B.hi', 'Rn043_B.o']),
      multimod_compile, ['rn043', '-v0'])
 test('rn044',
-     extra_clean(['Rn043_A.hi', 'Rn043_A.o', 'Rn043_B.hi', 'Rn043_B.o']),
+     extra_clean(['Rn044_A.hi', 'Rn044_A.o', 'Rn044_B.hi', 'Rn044_B.o']),
      multimod_compile, ['rn044', '-v0'])
 test('rn045', normal, compile, [''])
 test('rn046', normal, compile, ['-W'])

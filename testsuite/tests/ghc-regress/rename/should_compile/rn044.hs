@@ -3,5 +3,6 @@
 
 module ShouldCompile (module M) where
 
- import qualified Rn043_A as M 	-- M.x
- import Rn043_B as M  		-- x, M.x
+import qualified Rn044_A as M  -- M.x
+import Rn044_B as M            -- x, M.x
+
