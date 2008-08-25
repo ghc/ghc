@@ -82,9 +82,16 @@ doIt ghc args = do
                  hClose h
                  doIt ghc (ghc_args ++ [filename])
         filename : prog_args -> do
-            let xflag = if takeExtension filename == ".lhs"
-                        then []
-                        else ["-x", "hs"]
+            -- If the file exists, and is not a .lhs file, then we
+            -- want to treat it as a .hs file.
+            --
+            -- If the file doesn't exist then GHC is going to look for
+            -- filename.hs and filename.lhs, and use the appropriate
+            -- type.
+            exists <- doesFileExist filename
+            let xflag = if exists && (takeExtension filename /= ".lhs")
+                        then ["-x", "hs"]
+                        else []
                 c1 = ":set prog " ++ show filename
                 c2 = ":main " ++ show prog_args
             res <- rawSystem ghc (["-ignore-dot-ghci"] ++
