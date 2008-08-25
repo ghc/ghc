@@ -29,22 +29,19 @@ LINK_TARGET = $(LINK)-$(ProjectVersion)
 INSTALLED_SCRIPT=$(DESTDIR)$(bindir)/$(LINK_TARGET)
 install::
 	$(RM) -f $(INSTALLED_SCRIPT)
-	echo "#!$(SHELL)"                                          >> $(INSTALLED_SCRIPT)
-	echo "GHCBIN=$(libexecdir)/ghc-$(ProjectVersion)"          >> $(INSTALLED_SCRIPT)
-	echo "TOPDIROPT=-B$(libdir)"                               >> $(INSTALLED_SCRIPT)
-	echo 'exec $$GHCBIN $$TOPDIROPT --interactive $${1+"$$@"}' >> $(INSTALLED_SCRIPT)
+	echo "#!$(SHELL)"                                   >> $(INSTALLED_SCRIPT)
+	echo 'exec $(bindir)/ghc --interactive $${1+"$$@"}' >> $(INSTALLED_SCRIPT)
 	$(EXECUTABLE_FILE) $(INSTALLED_SCRIPT)
 endif
 
 ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
-INPLACE_SCRIPT=ghci-inplace
+INPLACE_SCRIPT = ghci
+INPLACE_GHC = $(FPTOOLS_TOP_ABS)/ghc/stage2-inplace/ghc
 CLEAN_FILES += $(INPLACE_SCRIPT)
 all::
 	$(RM) -f $(INPLACE_SCRIPT)
-	echo "#!$(SHELL)"                                                              >> $(INPLACE_SCRIPT)
-	echo "GHCBIN=$(FPTOOLS_TOP_ABS)/$(GHC_COMPILER_DIR_REL)/ghc-$(ProjectVersion)" >> $(INPLACE_SCRIPT)
-	echo "TOPDIROPT=$(FPTOOLS_TOP_ABS)"                                            >> $(INPLACE_SCRIPT)
-	echo 'exec $$GHCPKGBIN --global-conf $$PKGCONF $${1+"$$@"}'                    >> $(INPLACE_SCRIPT)
+	echo "#!$(SHELL)"                                    >> $(INPLACE_SCRIPT)
+	echo "exec $(INPLACE_GHC) --interactive $${1+"$$@"}" >> $(INPLACE_SCRIPT)
 	$(EXECUTABLE_FILE) $(INPLACE_SCRIPT)
 endif
 
