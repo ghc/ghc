@@ -610,9 +610,14 @@ else
 
 # Unix: override libdir and datadir to put ghc-specific stuff in
 # a subdirectory with the version number included.
+#
+# datadir is set to libdir here as GHC needs package.conf and unlit
+# to be in the same place (and things like ghc-pkg need to agree on
+# where package.conf is, so we just set it globally).
+#
 datarootdir := $(datadir0)
-datadir     := $(datadir0)/ghc-$(ProjectVersion)
 libdir      := $(libdir0)/ghc-$(ProjectVersion)
+datadir     := $(libdir)
 
 # New autoconf (>= 2.60?) make a configure with --docdir=DIR etc flags.
 # However, in order to support older autoconf's we don't use them.
