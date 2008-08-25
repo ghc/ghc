@@ -15,6 +15,10 @@ install-docs :: $(PAGE)
 .PHONY: binary-dist binary-dist.doc.%
 
 binary-dist: $(foreach SUBDIR,$(SUBDIRS),binary-dist.doc.$(SUBDIR))
+ifeq "$(WHERE_AM_I)" ""
+	echo "I don't know where I am" >&2
+	exit 1
+endif
 	echo $(WHERE_AM_I)/Makefile >> $(BIN_DIST_LIST)
 	echo $(WHERE_AM_I)/$(PAGE)  >> $(BIN_DIST_LIST)
 

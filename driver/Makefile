@@ -26,6 +26,10 @@ INSTALL_DATAS += ghc-usage.txt ghci-usage.txt
 CLEAN_FILES += stamp-pkg-conf-rts
 
 binary-dist:
+ifeq "$(WHERE_AM_I)" ""
+	echo "I don't know where I am" >&2
+	exit 1
+endif
 	for FILE in Makefile $(INSTALL_DATAS); do echo $(WHERE_AM_I)/$$FILE >> $(BIN_DIST_LIST); done
 	set -e; for d in $(SUBDIRS); do $(MAKE) -C $$d binary-dist WHERE_AM_I=$(WHERE_AM_I)/$$d; done
 

@@ -5,6 +5,10 @@ EXE_DIST_DIR = dist-install
 # XXX This is a bit of a mess. Really we should be just asking Cabal
 # what it would install and putting those files in the bindist.
 binary-dist:
+ifeq "$(WHERE_AM_I)" ""
+	echo "I don't know where I am" >&2
+	exit 1
+endif
 	# General bits
 	-find . -name Makefile                      -exec echo $(WHERE_AM_I)/{} \; >> $(BIN_DIST_LIST) 2> /dev/null
 	-find . -name LICENSE                       -exec echo $(WHERE_AM_I)/{} \; >> $(BIN_DIST_LIST) 2> /dev/null

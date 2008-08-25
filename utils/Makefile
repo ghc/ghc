@@ -61,6 +61,10 @@ endif
 WITH_EITHER = $(sort $(WITH_BOOTSTRAPPING_COMPILER) $(WITH_STAGE1))
 
 binary-dist: $(foreach P,$(WITH_STAGE1),binary-dist.$P)
+ifeq "$(WHERE_AM_I)" ""
+	echo "I don't know where I am" >&2
+	exit 1
+endif
 	echo $(WHERE_AM_I)/Makefile >> $(BIN_DIST_LIST)
 	set -e; for d in $(SUBDIRS); do $(MAKE) -C $$d binary-dist WHERE_AM_I=$(WHERE_AM_I)/$$d; done
 

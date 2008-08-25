@@ -387,6 +387,10 @@ BIN_DIST_LIBDIR=$(BIN_DIST_DIR)/libraries
 
 BINDIST_EXTRAS += ifBuildable/ifBuildable
 binary-dist: $(foreach SUBDIR,$(SUBDIRS),binary-dist.library.$(SUBDIR))
+ifeq "$(WHERE_AM_I)" ""
+	echo "I don't know where I am" >&2
+	exit 1
+endif
 	echo $(WHERE_AM_I)/Makefile >> $(BIN_DIST_LIST)
 # XXX This needs to be changed: This ifBuildable is built with the
 # bootstrapping compiler, so isn't OS X friendly. It should be made into
