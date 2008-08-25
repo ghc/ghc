@@ -41,6 +41,7 @@
 ^libraries/array(/|$)
 ^libraries/arrows(/|$)
 ^libraries/base(/|$)
+^libraries/base3-compat(/|$)
 ^libraries/bytestring(/|$)
 ^libraries/cgi(/|$)
 ^libraries/concurrent(/|$)
@@ -49,6 +50,7 @@
 ^libraries/editline(/|$)
 ^libraries/fgl(/|$)
 ^libraries/filepath(/|$)
+^libraries/getopt(/|$)
 ^libraries/ghc-prim(/|$)
 ^libraries/haskell-src(/|$)
 ^libraries/haskell98(/|$)
@@ -71,9 +73,11 @@
 ^libraries/regex-base(/|$)
 ^libraries/regex-compat(/|$)
 ^libraries/regex-posix(/|$)
+^libraries/st(/|$)
 ^libraries/stm(/|$)
 ^libraries/template-haskell(/|$)
 ^libraries/time(/|$)
+^libraries/timeout(/|$)
 ^libraries/unique(/|$)
 ^libraries/unix(/|$)
 ^libraries/xhtml(/|$)
@@ -161,10 +165,13 @@
 ^compiler/utils/Fingerprint_hsc.c$
 ^mk/build.mk$
 ^mk/validate.mk$
+^mk/are-validating.mk$
 ^mk/config.h.in$
 ^mk/config.h$
 ^mk/config.mk$
 ^mk/stamp-h$
+^stage3.package.conf$
+^inplace-datadir(/|$)
 (^|/)autom4te.cache($|/)
 ^rts/AutoApply.*cmm$
 ^rts/sm/Evac_thr.c$
@@ -186,6 +193,13 @@ package.conf.installed$
 # Common log file names; testlog is made by validate
 ^testlog
 ^log
+^utils/[a-zA-Z0-9-]+/dist-install(/|$)
+^utils/[a-zA-Z0-9-]+/dist-inplace(/|$)
+^utils/[a-zA-Z0-9-]+/install-inplace(/|$)
+^compiler/Makefile-stage[1-3](/|$)
+^compiler/dist-stage[1-3](/|$)
+^ghc/dist-stage[1-3](/|$)
+^ghc/stage[1-3]-inplace(/|$)
 ^utils/ext-core/Driver$
 ^utils/ext-core/PrimEnv.hs$
 ^utils/genapply/genapply$
@@ -203,10 +217,8 @@ package.conf.installed$
 ^utils/hpc/HpcParser.hs$
 ^utils/hpc/hpc$
 ^utils/hpc/hpc-inplace$
-^utils/hsc2hs/hsc2hs-bin$
-^utils/hsc2hs/hsc2hs-inplace$
-^utils/hsc2hs/hsc2hs-inplace.bin$
-^utils/hsc2hs/hsc2hs-inplace.hs$
+^utils/hsc2hs(/|$)
+^utils/haddock(/|$)
 ^utils/lndir/lndir$
 ^utils/mkdependC/mkdependC$
 ^utils/mkdirhier/mkdirhier$
