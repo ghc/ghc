@@ -39,9 +39,13 @@ sub pushall {
     my $remotepath;
     my $path;
     my $tag;
+    my @repos;
     
     open IN, "< packages" or die "Can't open packages file";
-    while (<IN>) {
+    @repos = <IN>;
+    close IN;
+
+    foreach (@repos) {
         chomp;
         if (/^([^# ]+) +(?:([^ ]+) +)?([^ ]+) +([^ ]+)$/) {
             $localpath = $1;
@@ -69,7 +73,6 @@ sub pushall {
             die "Bad line: $_";
         }
     }
-    close IN;
 }
 
 sub main {

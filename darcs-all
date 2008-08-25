@@ -55,9 +55,13 @@ sub darcsall {
     my $localpath;
     my $path;
     my $tag;
+    my @repos;
 
     open IN, "< packages" or die "Can't open packages file";
-    while (<IN>) {
+    @repos = <IN>;
+    close IN;
+
+    foreach (@repos) {
         chomp;
         if (/^([^# ]+) +(?:([^ ]+) +)?([^ ]+) +([^ ]+)$/) {
             $localpath = $1;
@@ -77,7 +81,6 @@ sub darcsall {
             die "Bad line: $_";
         }
     }
-    close IN;
 }
 
 sub darcsget {
@@ -86,6 +89,7 @@ sub darcsget {
     my $remotepath;
     my $path;
     my $tag;
+    my @repos;
 
     if (! grep /(?:--complete|--partial)/, @_) {
         warning("adding --partial, to override use --complete");
@@ -96,7 +100,10 @@ sub darcsget {
     }
 
     open IN, "< packages" or die "Can't open packages file";
-    while (<IN>) {
+    @repos = <IN>;
+    close IN;
+
+    foreach (@repos) {
         chomp;
         if (/^([^ ]+) +(?:([^ ]+) +)?([^ ]+) +([^ ]+)$/) {
             $localpath = $1;
@@ -123,7 +130,6 @@ sub darcsget {
             die "Bad line: $_";
         }
     }
-    close IN;
 }
 
 sub main {
