@@ -207,9 +207,6 @@ def _extra_run_opts( opts, v ):
 
 # -----
 
-def no_clean( opts ):
-    opts.cleanup = '';
-
 def extra_clean( files ):
     return lambda opts, v=files: _extra_clean(opts, v);
 
