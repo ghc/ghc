@@ -20,7 +20,7 @@ Executable runghc
     Main-Is: runghc.hs
 
     if flag(base3)
-        Build-Depends: base       >= 3   && < 4,
+        Build-Depends: base       >= 3   && < 5,
                        directory  >= 1   && < 1.1,
                        process    >= 1   && < 1.1
     else

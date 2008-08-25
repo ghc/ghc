@@ -17,7 +17,7 @@ Flag base3
 Executable pwd
     Main-Is: pwd.hs
     if flag(base3)
-        Build-Depends: base       >= 3   && < 4,
+        Build-Depends: base       >= 3   && < 5,
                        directory  >= 1   && < 1.1
     else
         Build-Depends: base < 3

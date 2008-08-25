@@ -13,19 +13,29 @@ Category: Development
 build-type: Simple
 cabal-version: >=1.2
 
+Flag base4
+    Description: Choose the even newer, even smaller, split-up base package.
+
 Flag base3
     Description: Choose the new smaller, split-up base package.
 
 Executable hpc
     Main-Is: Hpc.hs
     Other-Modules: HpcParser
+
+    if flag(base4)
+        Build-Depends: base       >= 4   && < 5
     if flag(base3)
-        Build-Depends: base       >= 3   && < 4,
-                       directory  >= 1   && < 1.1,
+        Build-Depends: base       >= 3   && < 4
+    if !flag(base3) && !flag(base4)
+        Build-Depends: base       < 3
+
+    if flag(base4)
+        Build-Depends: getopt     >= 0.1 && < 0.2
+    if flag(base3) || flag(base4)
+        Build-Depends: directory  >= 1   && < 1.1,
                        containers >= 0.1 && < 0.2,
                        array      >= 0.1 && < 0.2
-    else
-        Build-Depends: base < 3
     Build-Depends: haskell98, hpc
     Extensions: CPP
 
