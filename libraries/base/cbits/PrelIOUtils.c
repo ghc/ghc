@@ -6,6 +6,8 @@
 
 #define INLINE
 #include "HsBase.h"
+#include "Stg.h"
+#include "RtsMessages.h"
 
 void errorBelch2(const char*s, char *t)
 {
