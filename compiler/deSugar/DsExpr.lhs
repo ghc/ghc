@@ -564,7 +564,7 @@ dsExplicitList :: PostTcType -> [LHsExpr Id] -> DsM CoreExpr
 dsExplicitList elt_ty xs = do
     dflags <- getDOptsDs
     xs' <- mapM dsLExpr xs
-    if not (dopt Opt_RewriteRules dflags)
+    if not (dopt Opt_EnableRewriteRules dflags)
         then return $ mkListExpr elt_ty xs'
         else mkBuildExpr elt_ty (mkSplitExplicitList (thisPackage dflags) xs')
   where

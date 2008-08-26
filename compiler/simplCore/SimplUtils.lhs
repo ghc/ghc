@@ -797,7 +797,7 @@ activeInline env id
 activeRule :: DynFlags -> SimplEnv -> Maybe (Activation -> Bool)
 -- Nothing => No rules at all
 activeRule dflags env
-  | not (dopt Opt_RewriteRules dflags)
+  | not (dopt Opt_EnableRewriteRules dflags)
   = Nothing	-- Rewriting is off
   | otherwise
   = case getMode env of

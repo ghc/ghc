@@ -212,7 +212,7 @@ rnLPatAndThen var@(NM varf) (L loc p) cont =
                -- (e.g. in the pattern (x, x -> y) x needs to be bound in the rhs of the tuple)
                                      
          SigPatIn pat ty -> do
-             patsigs <- doptM Opt_PatternSignatures
+             patsigs <- doptM Opt_ScopedTypeVariables
              if patsigs
               then rnLPatAndThen var pat
                       (\ pat' -> do { (ty', fvs1) <- rnHsTypeFVs tvdoc ty
@@ -580,7 +580,7 @@ checkTupSize tup_size
 patSigErr :: Outputable a => a -> SDoc
 patSigErr ty
   =  (ptext (sLit "Illegal signature in pattern:") <+> ppr ty)
-	$$ nest 4 (ptext (sLit "Use -XPatternSignatures to permit it"))
+	$$ nest 4 (ptext (sLit "Use -XScopedTypeVariables to permit it"))
 
 dupFieldErr :: String -> RdrName -> SDoc
 dupFieldErr str dup

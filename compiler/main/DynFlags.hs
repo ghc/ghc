@@ -229,7 +229,6 @@ data DynFlag
    | Opt_MagicHash
    | Opt_EmptyDataDecls
    | Opt_KindSignatures
-   | Opt_PatternSignatures
    | Opt_ParallelListComp
    | Opt_TransformListComp
    | Opt_GeneralizedNewtypeDeriving
@@ -261,7 +260,7 @@ data DynFlag
    | Opt_UnboxStrictFields
    | Opt_MethodSharing
    | Opt_DictsCheap
-   | Opt_RewriteRules
+   | Opt_EnableRewriteRules		-- Apply rewrite rules during simplification
    | Opt_Vectorise
    | Opt_RegsGraph                      -- do graph coloring register allocation
    | Opt_RegsIterative                  -- do iterative coalescing graph coloring register allocation
@@ -794,8 +793,8 @@ optLevelFlags
     , ([0],     Opt_OmitInterfacePragmas)
 
     , ([1,2],   Opt_IgnoreAsserts)
-    , ([1,2],   Opt_RewriteRules)       -- Off for -O0; see Note [Scoping for Builtin rules]
-                                        --              in PrelRules
+    , ([1,2],   Opt_EnableRewriteRules)  -- Off for -O0; see Note [Scoping for Builtin rules]
+                                         --              in PrelRules
     , ([1,2],   Opt_DoEtaReduction)
     , ([1,2],   Opt_CaseMerge)
     , ([1,2],   Opt_Strictness)
@@ -1470,6 +1469,12 @@ deprecatedForLanguage lang turn_on
       flag | turn_on    = lang
            | otherwise = "No"++lang
 
+useInstead :: String -> Bool -> Deprecated
+useInstead flag turn_on
+  = Deprecated ("Use -f" ++ no ++ flag ++ " instead")
+  where
+    no = if turn_on then "" else "no-"
+
 -- | These @-f\<blah\>@ flags can all be reversed with @-fno-\<blah\>@
 fFlags :: [(String, DynFlag, Bool -> Deprecated)]
 fFlags = [
@@ -1518,7 +1523,8 @@ fFlags = [
   ( "print-bind-result",                Opt_PrintBindResult, const Supported ),
   ( "force-recomp",                     Opt_ForceRecomp, const Supported ),
   ( "hpc-no-auto",                      Opt_Hpc_No_Auto, const Supported ),
-  ( "rewrite-rules",                    Opt_RewriteRules, const Supported ),
+  ( "rewrite-rules",                    Opt_EnableRewriteRules, useInstead "enable-rewrite-rules" ),
+  ( "enable-rewrite-rules",             Opt_EnableRewriteRules, const Supported ),
   ( "break-on-exception",               Opt_BreakOnException, const Supported ),
   ( "break-on-error",                   Opt_BreakOnError, const Supported ),
   ( "print-evld-with-show",             Opt_PrintEvldWithShow, const Supported ),
@@ -1583,7 +1589,6 @@ xFlags = [
   ( "PolymorphicComponents",            Opt_PolymorphicComponents, const Supported ),
   ( "ExistentialQuantification",        Opt_ExistentialQuantification, const Supported ),
   ( "KindSignatures",                   Opt_KindSignatures, const Supported ),
-  ( "PatternSignatures",                Opt_PatternSignatures, const Supported ),
   ( "EmptyDataDecls",                   Opt_EmptyDataDecls, const Supported ),
   ( "ParallelListComp",                 Opt_ParallelListComp, const Supported ),
   ( "TransformListComp",                Opt_TransformListComp, const Supported ),
@@ -1620,6 +1625,11 @@ xFlags = [
   ( "ExtendedDefaultRules",             Opt_ExtendedDefaultRules, const Supported ),
   ( "ImplicitParams",                   Opt_ImplicitParams, const Supported ),
   ( "ScopedTypeVariables",              Opt_ScopedTypeVariables, const Supported ),
+
+  -- -XPatternSignatures is deprecated; now -XScopedTypeVariables enables pattern signatures  
+  ( "PatternSignatures",                Opt_ScopedTypeVariables, 
+    deprecatedForLanguage "ScopedTypeVariables" ),
+
   ( "UnboxedTuples",                    Opt_UnboxedTuples, const Supported ),
   ( "StandaloneDeriving",               Opt_StandaloneDeriving, const Supported ),
   ( "DeriveDataTypeable",               Opt_DeriveDataTypeable, const Supported ),
@@ -1675,7 +1685,6 @@ glasgowExtsFlags = [
            , Opt_ParallelListComp
            , Opt_EmptyDataDecls
            , Opt_KindSignatures
-           , Opt_PatternSignatures
            , Opt_GeneralizedNewtypeDeriving
            , Opt_TypeFamilies ]
 

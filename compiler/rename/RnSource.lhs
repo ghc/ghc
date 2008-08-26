@@ -174,7 +174,9 @@ rnSrcDecls shadowP group@(HsGroup {hs_valds  = val_decls,
    -- (H) Rename Everything else
 
    (rn_inst_decls,    src_fvs2) <- rnList rnSrcInstDecl   inst_decls ;
-   (rn_rule_decls,    src_fvs3) <- rnList rnHsRuleDecl    rule_decls ;
+   (rn_rule_decls,    src_fvs3) <- setOptM Opt_ScopedTypeVariables $
+   		      		   rnList rnHsRuleDecl    rule_decls ;
+			   -- Inside RULES, scoped type variables are on
    (rn_foreign_decls, src_fvs4) <- rnList rnHsForeignDecl foreign_decls ;
    (rn_default_decls, src_fvs5) <- rnList rnDefaultDecl   default_decls ;
    (rn_deriv_decls,   src_fvs6) <- rnList rnSrcDerivDecl  deriv_decls ;

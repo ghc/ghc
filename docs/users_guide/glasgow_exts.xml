@@ -6674,15 +6674,7 @@ data S = S {-# UNPACK #-} !Int {-# UNPACK #-} !Int
 
 <para>
 The programmer can specify rewrite rules as part of the source program
-(in a pragma).  GHC applies these rewrite rules wherever it can, provided (a) 
-the <option>-O</option> flag (<xref linkend="options-optimise"/>) is on, 
-and (b) the <option>-fno-rewrite-rules</option> flag
-(<xref linkend="options-f"/>) is not specified, and (c) the
-<option>-fglasgow-exts</option> (<xref linkend="options-language"/>)
-flag is active.
-</para>
-
-<para>
+(in a pragma).  
 Here is an example:
 
 <programlisting>
@@ -6802,17 +6794,40 @@ variables it mentions, though of course they need to be in scope.
 <listitem>
 
 <para>
- Rules are automatically exported from a module, just as instance declarations are.
+ All rules are implicitly exported from the module, and are therefore
+in force in any module that imports the module that defined the rule, directly
+or indirectly.  (That is, if A imports B, which imports C, then C's rules are
+in force when compiling A.)  The situation is very similar to that for instance
+declarations.
 </para>
 </listitem>
 
+<listitem>
+
+<para>
+Inside a RULE "<literal>forall</literal>" is treated as a keyword, regardless of
+any other flag settings.  Furthermore, inside a RULE, the language extension
+<option>-XScopedTypeVariables</option> is automatically enabled; see 
+<xref linkend="scoped-type-variables"/>.
+</para>
+</listitem>
+<listitem>
+
+<para>
+Like other pragmas, RULE pragmas are always checked for scope errors, and
+are typechecked. Typechecking means that the LHS and RHS of a rule are typechecked, 
+and must have the same type.  However, rules are only <emphasis>enabled</emphasis>
+if the <option>-fenable-rewrite-rules</option> flag is 
+on (see <xref linkend="rule-semantics"/>).
+</para>
+</listitem>
 </itemizedlist>
 
 </para>
 
 </sect2>
 
-<sect2>
+<sect2 id="rule-semantics">
 <title>Semantics</title>
 
 <para>
@@ -6820,9 +6835,17 @@ From a semantic point of view:
 
 <itemizedlist>
 <listitem>
-
 <para>
-Rules are only applied if you use the <option>-O</option> flag.
+Rules are enabled (that is, used during optimisation)
+by the <option>-fenable-rewrite-rules</option> flag.
+This flag is implied by <option>-O</option>, and may be switched
+off (as usual) by <option>-fno-enable-rewrite-rules</option>.
+(NB: enabling <option>-fenable-rewrite-rules</option> without <option>-O</option> 
+may not do what you expect, though, because without <option>-O</option> GHC 
+ignores all optimisation information in interface files;
+see <option>-fignore-interface-pragmas</option>, <xref linkend="options-f"/>.)
+Note that <option>-fenable-rewrite-rules</option> is an <emphasis>optimisation</emphasis> flag, and
+has no effect on parsing or typechecking.
 </para>
 </listitem>
 
@@ -6833,14 +6856,6 @@ When GHC finds an expression that is a substitution instance of the LHS
 of a rule, it replaces the expression by the (appropriately-substituted) RHS.
 By "a substitution instance" we mean that the LHS can be made equal to the
 expression by substituting for the pattern variables.
-
-</para>
-</listitem>
-<listitem>
-
-<para>
- The LHS and RHS of a rule are typechecked, and must have the
-same type.
 
 </para>
 </listitem>
@@ -6939,17 +6954,6 @@ pragma on <literal>f</literal>, to ensure
 that it is not inlined until its RULEs have had a chance to fire.
 </para>
 </listitem>
-<listitem>
-
-<para>
- All rules are implicitly exported from the module, and are therefore
-in force in any module that imports the module that defined the rule, directly
-or indirectly.  (That is, if A imports B, which imports C, then C's rules are
-in force when compiling A.)  The situation is very similar to that for instance
-declarations.
-</para>
-</listitem>
-
 </itemizedlist>
 
 </para>

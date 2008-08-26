@@ -308,8 +308,8 @@ renameDeriv is_boot gen_binds insts
 
   | otherwise
   = discardWarnings $ 	 -- Discard warnings about unused bindings etc
-    do	{ (rn_gen, dus_gen) <- setOptM Opt_PatternSignatures $	-- Type signatures in patterns 
-								-- are used in the generic binds
+    do	{ (rn_gen, dus_gen) <- setOptM Opt_ScopedTypeVariables $  -- Type signatures in patterns 
+								  -- are used in the generic binds
 			       rnTopBinds (ValBindsIn gen_binds [])
 	; keepAliveSetTc (duDefs dus_gen)	-- Mark these guys to be kept alive
 

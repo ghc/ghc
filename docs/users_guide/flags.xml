@@ -828,12 +828,6 @@
 	      <entry><option>-XNoKindSignatures</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-XPatternSignatures</option></entry>
-	      <entry>Enable <link linkend="pattern-type-sigs">pattern type signatures</link>.</entry>
-	      <entry>dynamic</entry>
-	      <entry><option>-XNoPatternSignatures</option></entry>
-	    </row>
-	    <row>
 	      <entry><option>-XEmptyDataDecls</option></entry>
 	      <entry>Enable empty data declarations.</entry>
 	      <entry>dynamic</entry>
