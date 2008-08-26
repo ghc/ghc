@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -XScopedTypeVariables -XPatternSignatures #-}
+{-# OPTIONS_GHC -XScopedTypeVariables #-}
 
 module Foo where
 

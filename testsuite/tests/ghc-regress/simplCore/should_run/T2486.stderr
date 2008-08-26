@@ -7,22 +7,22 @@ Imported rules
 
 
 ==================== Top-level specialisations ====================
-"SPEC Main.fib" ALWAYS
+"SPEC Main.fib [GHC.Types.Double]" ALWAYS
     forall {$dNum :: GHC.Num.Num GHC.Types.Double
             $dOrd :: GHC.Classes.Ord GHC.Types.Double}
       Main.fib @ GHC.Types.Double $dNum $dOrd
       = $sfib
-"SPEC Main.fib" ALWAYS
+"SPEC Main.fib [GHC.Types.Int]" ALWAYS
     forall {$dNum :: GHC.Num.Num GHC.Types.Int
             $dOrd :: GHC.Classes.Ord GHC.Types.Int}
       Main.fib @ GHC.Types.Int $dNum $dOrd
       = $sfib
-"SPEC Main.tak" ALWAYS
+"SPEC Main.tak [GHC.Types.Double]" ALWAYS
     forall {$dNum :: GHC.Num.Num GHC.Types.Double
             $dOrd :: GHC.Classes.Ord GHC.Types.Double}
       Main.tak @ GHC.Types.Double $dNum $dOrd
       = $stak
-"SPEC Main.tak" ALWAYS
+"SPEC Main.tak [GHC.Types.Int]" ALWAYS
     forall {$dNum :: GHC.Num.Num GHC.Types.Int
             $dOrd :: GHC.Classes.Ord GHC.Types.Int}
       Main.tak @ GHC.Types.Int $dNum $dOrd
