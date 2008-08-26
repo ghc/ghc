@@ -71,7 +71,6 @@ module SrcLoc (
 import Util
 import Outputable
 import FastString
-import System.FilePath
 \end{code}
 
 %************************************************************************
@@ -165,9 +164,6 @@ cmpSrcLoc (UnhelpfulLoc _)  _other            = LT
 cmpSrcLoc (SrcLoc s1 l1 c1) (SrcLoc s2 l2 c2)      
   = (s1 `compare` s2) `thenCmp` (l1 `compare` l2) `thenCmp` (c1 `compare` c2)
 cmpSrcLoc (SrcLoc _ _ _) _other = GT
-
-pprFastFilePath :: FastString -> SDoc
-pprFastFilePath path = text $ normalise $ unpackFS path
 
 instance Outputable SrcLoc where
     ppr (SrcLoc src_path src_line src_col)

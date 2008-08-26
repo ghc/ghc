@@ -41,6 +41,7 @@ module Outputable (
 
 	pprInfixVar, pprPrefixVar,
 	pprHsChar, pprHsString, pprHsInfix, pprHsVar,
+    pprFastFilePath,
 
         -- * Controlling the style in which output is printed
 	BindingSite(..),
@@ -74,6 +75,7 @@ import Panic
 import Data.Word	( Word32 )
 import System.IO	( Handle, stderr, stdout, hFlush )
 import Data.Char        ( ord )
+import System.FilePath
 \end{code}
 
 
@@ -599,6 +601,9 @@ isOperator ppr_v
         ('_':_)   -> False              -- Not an operator
         (c:_)     -> not (isAlpha c)    -- Starts with non-alpha
         _         -> False
+
+pprFastFilePath :: FastString -> SDoc
+pprFastFilePath path = text $ normalise $ unpackFS path
 \end{code}
 
 %************************************************************************
