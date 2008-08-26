@@ -32,10 +32,9 @@ module ErrUtils (
 #include "HsVersions.h"
 
 import Bag		( Bag, bagToList, isEmptyBag, emptyBag )
-import SrcLoc		( SrcSpan )
 import Util		( sortLe )
 import Outputable
-import SrcLoc		( srcSpanStart, noSrcSpan )
+import SrcLoc
 import DynFlags		( DynFlags(..), DynFlag(..), dopt )
 import StaticFlags	( opt_ErrorSpans )
 
@@ -197,21 +196,24 @@ printBagOfWarnings dflags bag_of_warns
 		EQ -> True
 		GT -> False
 
-handleFlagWarnings :: DynFlags -> [String] -> IO ()
+handleFlagWarnings :: DynFlags -> [Located String] -> IO ()
 handleFlagWarnings dflags warns
  = when (dopt Opt_WarnDeprecatedFlags dflags)
         (handleFlagWarnings' dflags warns)
 
-handleFlagWarnings' :: DynFlags -> [String] -> IO ()
+handleFlagWarnings' :: DynFlags -> [Located String] -> IO ()
 handleFlagWarnings' _ [] = return ()
 handleFlagWarnings' dflags warns
- = do -- It would be nicer if warns :: [Message], but that has circular
+ = do -- It would be nicer if warns :: [Located Message], but that has circular
       -- import problems.
-      let warns' = map text warns
-      mapM_ (log_action dflags SevWarning noSrcSpan defaultUserStyle) warns'
+      mapM_ (handleFlagWarning dflags) warns
       when (dopt Opt_WarnIsError dflags) $
           do errorMsg dflags $ text "\nFailing due to -Werror.\n"
              exitWith (ExitFailure 1)
+
+handleFlagWarning :: DynFlags -> Located String -> IO ()
+handleFlagWarning dflags (L loc warn)
+ = log_action dflags SevWarning loc defaultUserStyle (text warn)
 
 ghcExit :: DynFlags -> Int -> IO ()
 ghcExit dflags val

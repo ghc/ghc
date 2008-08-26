@@ -46,8 +46,7 @@ import StringBuffer	( hGetStringBuffer )
 import BasicTypes	( SuccessFlag(..) )
 import Maybes		( expectJust )
 import ParserCoreUtils	( getCoreModuleName )
-import SrcLoc		( unLoc )
-import SrcLoc		( Located(..) )
+import SrcLoc
 import FastString
 
 import Exception
@@ -616,12 +615,12 @@ runPhase (Unlit sf) _stop hsc_env _basename _suff input_fn get_output_fn maybe_l
 -- Cpp phase : (a) gets OPTIONS out of file
 --	       (b) runs cpp if necessary
 
-runPhase (Cpp sf) _stop hsc_env basename suff input_fn get_output_fn maybe_loc
+runPhase (Cpp sf) _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
   = do let dflags0 = hsc_dflags hsc_env
        src_opts <- getOptionsFromFile dflags0 input_fn
-       (dflags, unhandled_flags, warns) <- parseDynamicFlags dflags0 (map unLoc src_opts)
+       (dflags, unhandled_flags, warns) <- parseDynamicFlags dflags0 src_opts
        handleFlagWarnings dflags warns
-       checkProcessArgsResult unhandled_flags (basename <.> suff)
+       checkProcessArgsResult unhandled_flags
 
        if not (dopt Opt_Cpp dflags) then
            -- no need to preprocess CPP, just pass input file along

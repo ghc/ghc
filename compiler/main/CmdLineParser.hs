@@ -13,12 +13,15 @@ module CmdLineParser (
         processArgs, OptKind(..),
         CmdLineP(..), getCmdLineState, putCmdLineState,
         Flag(..), Deprecated(..),
+        errorsToGhcException
   ) where
 
 #include "HsVersions.h"
 
 import Util
+import Outputable
 import Panic
+import SrcLoc
 
 data Flag m = Flag
     {
@@ -44,36 +47,36 @@ data OptKind m                      -- Suppose the flag is -f
 
 processArgs :: Monad m
             => [Flag m] -- cmdline parser spec
-            -> [String]              -- args
+            -> [Located String]      -- args
             -> m (
-                  [String],  -- spare args
-                  [String],  -- errors
-                  [String]   -- warnings
+                  [Located String],  -- spare args
+                  [Located String],  -- errors
+                  [Located String]   -- warnings
                  )
 processArgs spec args = process spec args [] [] []
   where
     process _spec [] spare errs warns =
       return (reverse spare, reverse errs, reverse warns)
 
-    process spec (dash_arg@('-' : arg) : args) spare errs warns =
+    process spec (locArg@(L loc dash_arg@('-' : arg)) : args) spare errs warns =
       case findArg spec arg of
         Just (rest, action, deprecated) ->
            let warns' = case deprecated of
                         Deprecated warning ->
-                            ("Warning: " ++ dash_arg ++ " is deprecated: " ++ warning) : warns
+                            L loc ("Warning: " ++ dash_arg ++ " is deprecated: " ++ warning) : warns
                         Supported -> warns
            in case processOneArg action rest arg args of
-              Left err            -> process spec args spare (err:errs) warns'
+              Left err            -> process spec args spare (L loc err : errs) warns'
               Right (action,rest) -> do action
                                         process spec rest spare errs warns'
-        Nothing -> process spec args (dash_arg : spare) errs warns
+        Nothing -> process spec args (locArg : spare) errs warns
 
     process spec (arg : args) spare errs warns =
       process spec args (arg : spare) errs warns
 
 
-processOneArg :: OptKind m -> String -> String -> [String]
-              -> Either String (m (), [String])
+processOneArg :: OptKind m -> String -> String -> [Located String]
+              -> Either String (m (), [Located String])
 processOneArg action rest arg args
   = let dash_arg = '-' : arg
         rest_no_eq = dropEq rest
@@ -83,11 +86,11 @@ processOneArg action rest arg args
         HasArg f | notNull rest_no_eq -> Right (f rest_no_eq, args)
                  | otherwise    -> case args of
                                     [] -> missingArgErr dash_arg
-                                    (arg1:args1) -> Right (f arg1, args1)
+                                    (L _ arg1:args1) -> Right (f arg1, args1)
 
         SepArg f -> case args of
                         [] -> unknownFlagErr dash_arg
-                        (arg1:args1) -> Right (f arg1, args1)
+                        (L _ arg1:args1) -> Right (f arg1, args1)
 
         Prefix f | notNull rest_no_eq -> Right (f rest_no_eq, args)
                  | otherwise  -> unknownFlagErr dash_arg
@@ -168,3 +171,12 @@ getCmdLineState :: CmdLineP s s
 getCmdLineState   = CmdLineP $ \s -> (s,s)
 putCmdLineState :: s -> CmdLineP s ()
 putCmdLineState s = CmdLineP $ \_ -> ((),s)
+
+-- ---------------------------------------------------------------------
+-- Utils
+
+errorsToGhcException :: [Located String] -> GhcException
+errorsToGhcException errs =
+   let errors = vcat [ ppr l <> text ": " <> text e | L l e <- errs ]
+   in UsageError (showSDoc errors)
+

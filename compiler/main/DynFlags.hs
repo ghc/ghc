@@ -83,7 +83,7 @@ import Panic
 import UniqFM           ( UniqFM )
 import Util
 import Maybes           ( orElse )
-import SrcLoc           ( SrcSpan )
+import SrcLoc
 import FastString
 import Outputable
 import {-# SOURCE #-} ErrUtils ( Severity(..), Message, mkLocMessage )
@@ -1690,7 +1690,8 @@ glasgowExtsFlags = [
 -- -----------------------------------------------------------------------------
 -- Parsing the dynamic flags.
 
-parseDynamicFlags :: DynFlags -> [String] -> IO (DynFlags, [String], [String])
+parseDynamicFlags :: DynFlags -> [Located String]
+                  -> IO (DynFlags, [Located String], [Located String])
 parseDynamicFlags dflags args = do
   -- XXX Legacy support code
   -- We used to accept things like
@@ -1699,14 +1700,13 @@ parseDynamicFlags dflags args = do
   --     optdep -f -optdepdepend
   --     optdep -f -optdep depend
   -- but the spaces trip up proper argument handling. So get rid of them.
-  let f ("-optdep" : x : xs) = ("-optdep" ++ x) : f xs
+  let f (L p "-optdep" : L _ x : xs) = (L p ("-optdep" ++ x)) : f xs
       f (x : xs) = x : f xs
       f xs = xs
       args' = f args
   let ((leftover, errs, warns), dflags')
           = runCmdLine (processArgs dynamic_flags args') dflags
-  when (not (null errs)) $ do
-    ghcError (UsageError (unlines errs))
+  when (not (null errs)) $ ghcError $ errorsToGhcException errs
   return (dflags', leftover, warns)
 
 type DynP = CmdLineP DynFlags

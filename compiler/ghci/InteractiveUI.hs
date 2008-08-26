@@ -42,6 +42,7 @@ import SrcLoc
 
 -- Other random utilities
 import ErrUtils
+import CmdLineParser
 import Digraph
 import BasicTypes hiding (isTopLevel)
 import Panic      hiding (showException)
@@ -1503,13 +1504,12 @@ newDynFlags :: [String] -> GHCi ()
 newDynFlags minus_opts = do
       dflags <- getDynFlags
       let pkg_flags = packageFlags dflags
-      (dflags', leftovers, warns) <- io $ GHC.parseDynamicFlags dflags minus_opts
+      (dflags', leftovers, warns) <- io $ GHC.parseDynamicFlags dflags $ map noLoc minus_opts
       io $ handleFlagWarnings dflags' warns
 
       if (not (null leftovers))
-		then ghcError (CmdLineError ("unrecognised flags: " ++ 
-						unwords leftovers))
-		else return ()
+        then ghcError $ errorsToGhcException leftovers
+        else return ()
 
       new_pkgs <- setDynFlags dflags'
 

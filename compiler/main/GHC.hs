@@ -2000,8 +2000,8 @@ preprocessFile hsc_env src_fn mb_phase (Just (buf, _time))
 	let 
 	    local_opts = getOptions dflags buf src_fn
 	--
-	(dflags', leftovers, warns) <- parseDynamicFlags dflags (map unLoc local_opts)
-        checkProcessArgsResult leftovers src_fn
+	(dflags', leftovers, warns) <- parseDynamicFlags dflags local_opts
+        checkProcessArgsResult leftovers
         handleFlagWarnings dflags' warns
 
 	let

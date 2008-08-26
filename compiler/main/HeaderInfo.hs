@@ -185,13 +185,14 @@ getOptions' dflags buf filename
 -----------------------------------------------------------------------------
 -- Complain about non-dynamic flags in OPTIONS pragmas
 
-checkProcessArgsResult :: [String] -> FilePath -> IO ()
-checkProcessArgsResult flags filename
-  = do when (notNull flags) (ghcError (ProgramError (
-          showSDoc (hang (text filename <> char ':')
-                      4 (text "unknown flags in  {-# OPTIONS #-} pragma:" <+>
-                          hsep (map text flags)))
-        )))
+checkProcessArgsResult :: [Located String] -> IO ()
+checkProcessArgsResult flags
+  = when (notNull flags) $
+        ghcError $ ProgramError $ showSDoc $ vcat $ map f flags
+    where f (L loc flag)
+              = hang (ppr loc <> char ':') 4
+                     (text "unknown flag in  {-# OPTIONS #-} pragma:" <+>
+                      text flag)
 
 -----------------------------------------------------------------------------
 

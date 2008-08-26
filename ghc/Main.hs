@@ -41,6 +41,7 @@ import BasicTypes	( failed )
 import ErrUtils
 import FastString
 import Outputable
+import SrcLoc
 import Util
 import Panic
 
@@ -77,7 +78,8 @@ main =
         mbMinusB | null minusB_args = Nothing
                  | otherwise = Just (drop 2 (last minusB_args))
 
-  (argv2, staticFlagWarnings) <- parseStaticFlags argv1
+  let argv1' = map (mkGeneralLocated "on the commandline") argv1
+  (argv2, staticFlagWarnings) <- parseStaticFlags argv1'
 
   -- 2. Parse the "mode" flags (--make, --interactive etc.)
   (cli_mode, argv3, modeFlagWarnings) <- parseModeFlags argv2
@@ -156,7 +158,7 @@ main =
      -- To simplify the handling of filepaths, we normalise all filepaths right 
      -- away - e.g., for win32 platforms, backslashes are converted
      -- into forward slashes.
-    normal_fileish_paths = map normalise fileish_args
+    normal_fileish_paths = map (normalise . unLoc) fileish_args
     (srcs, objs)         = partition_args normal_fileish_paths [] []
 
   -- Note: have v_Ld_inputs maintain the order in which 'objs' occurred on 
@@ -362,15 +364,15 @@ isCompManagerMode _             = False
 -- -----------------------------------------------------------------------------
 -- Parsing the mode flag
 
-parseModeFlags :: [String] -> IO (CmdLineMode, [String], [String])
+parseModeFlags :: [Located String]
+               -> IO (CmdLineMode, [Located String], [Located String])
 parseModeFlags args = do
   let ((leftover, errs, warns), (mode, _, flags')) =
 	 runCmdLine (processArgs mode_flags args) (StopBefore StopLn, "", []) 
-  when (not (null errs)) $ do
-    ghcError (UsageError (unlines errs))
+  when (not (null errs)) $ ghcError $ errorsToGhcException errs
   return (mode, flags' ++ leftover, warns)
 
-type ModeM = CmdLineP (CmdLineMode, String, [String])
+type ModeM = CmdLineP (CmdLineMode, String, [Located String])
   -- mode flags sometimes give rise to new DynFlags (eg. -C, see below)
   -- so we collect the new ones and return them.
 
@@ -441,7 +443,8 @@ updateMode f flag = do
 addFlag :: String -> ModeM ()
 addFlag s = do
   (m, f, flags') <- getCmdLineState
-  putCmdLineState (m, f, s:flags')
+  -- XXX Can we get a useful Loc?
+  putCmdLineState (m, f, mkGeneralLocated "addFlag" s : flags')
 
 
 -- ----------------------------------------------------------------------------

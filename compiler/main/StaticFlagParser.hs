@@ -16,6 +16,7 @@ module StaticFlagParser (parseStaticFlags) where
 import StaticFlags
 import CmdLineParser
 import Config
+import SrcLoc
 import Util
 import Panic
 
@@ -27,23 +28,24 @@ import Data.List
 -----------------------------------------------------------------------------
 -- Static flags
 
-parseStaticFlags :: [String] -> IO ([String], [String])
+parseStaticFlags :: [Located String] -> IO ([Located String], [Located String])
 parseStaticFlags args = do
   ready <- readIORef v_opt_C_ready
   when ready $ ghcError (ProgramError "Too late for parseStaticFlags: call it before newSession")
 
   (leftover, errs, warns1) <- processArgs static_flags args
-  when (not (null errs)) $ ghcError (UsageError (unlines errs))
+  when (not (null errs)) $ ghcError $ errorsToGhcException errs
 
     -- deal with the way flags: the way (eg. prof) gives rise to
     -- further flags, some of which might be static.
   way_flags <- findBuildTag
+  let way_flags' = map (mkGeneralLocated "in way flags") way_flags
 
     -- if we're unregisterised, add some more flags
   let unreg_flags | cGhcUnregisterised == "YES" = unregFlags
 		  | otherwise = []
 
-  (more_leftover, errs, warns2) <- processArgs static_flags (unreg_flags ++ way_flags)
+  (more_leftover, errs, warns2) <- processArgs static_flags (unreg_flags ++ way_flags')
 
     -- see sanity code in staticOpts
   writeIORef v_opt_C_ready True
@@ -52,16 +54,19 @@ parseStaticFlags args = do
     -- Be careful to do this *after* all processArgs,
     -- because evaluating tablesNextToCode involves looking at the global
     -- static flags.  Those pesky global variables...
-  let cg_flags | tablesNextToCode = ["-optc-DTABLES_NEXT_TO_CODE"]
-	       | otherwise	  = []
+  let cg_flags | tablesNextToCode = map (mkGeneralLocated "in cg_flags")
+                                        ["-optc-DTABLES_NEXT_TO_CODE"]
+               | otherwise        = []
 
     -- HACK: -fexcess-precision is both a static and a dynamic flag.  If
     -- the static flag parser has slurped it, we must return it as a 
     -- leftover too.  ToDo: make -fexcess-precision dynamic only.
-  let excess_prec | opt_SimplExcessPrecision = ["-fexcess-precision"]
-                  | otherwise                = []
+  let excess_prec
+       | opt_SimplExcessPrecision = map (mkGeneralLocated "in excess_prec")
+                                        ["-fexcess-precision"]
+       | otherwise                = []
 
-  when (not (null errs)) $ ghcError (UsageError (unlines errs))
+  when (not (null errs)) $ ghcError $ errorsToGhcException errs
   return (excess_prec ++ cg_flags ++ more_leftover ++ leftover,
           warns1 ++ warns2)
 
@@ -181,8 +186,8 @@ isStaticFlag f =
     "funfolding-keeness-factor"
      ]
 
-unregFlags :: [String]
-unregFlags = 
+unregFlags :: [Located String]
+unregFlags = map (mkGeneralLocated "in unregFlags")
    [ "-optc-DNO_REGS"
    , "-optc-DUSE_MINIINTERPRETER"
    , "-fno-asm-mangling"

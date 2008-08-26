@@ -58,6 +58,7 @@ module SrcLoc (
 	
 	-- ** Constructing Located
 	noLoc,
+    mkGeneralLocated,
 	
 	-- ** Deconstructing Located
 	getLoc, unLoc, 
@@ -452,6 +453,9 @@ getLoc (L l _) = l
 
 noLoc :: e -> Located e
 noLoc e = L noSrcSpan e
+
+mkGeneralLocated :: String -> e -> Located e
+mkGeneralLocated s e = L (mkGeneralSrcSpan (fsLit s)) e
 
 combineLocs :: Located a -> Located b -> SrcSpan
 combineLocs a b = combineSrcSpans (getLoc a) (getLoc b)
