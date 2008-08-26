@@ -1626,7 +1626,6 @@ xFlags = [
   ( "ImplicitParams",                   Opt_ImplicitParams, const Supported ),
   ( "ScopedTypeVariables",              Opt_ScopedTypeVariables, const Supported ),
 
-  -- -XPatternSignatures is deprecated; now -XScopedTypeVariables enables pattern signatures  
   ( "PatternSignatures",                Opt_ScopedTypeVariables, 
     deprecatedForLanguage "ScopedTypeVariables" ),
 
