@@ -35,6 +35,7 @@ import Packages		( dumpPackages )
 import DriverPhases	( Phase(..), isSourceFilename, anyHsc,
 			  startPhase, isHaskellSrcFilename )
 import StaticFlags
+import StaticFlagParser
 import DynFlags
 import BasicTypes	( failed )
 import ErrUtils

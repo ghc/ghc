@@ -245,6 +245,7 @@ import HscMain
 import HscTypes
 import DynFlags
 import StaticFlags
+import StaticFlagParser
 import SysTools     ( initSysTools, cleanTempFiles, cleanTempFilesExcept,
                       cleanTempDirs )
 import Module
