@@ -272,6 +272,7 @@ test('T2433', extra_clean(['T2433_Help.hi', 'T2433_Help.o']),
      multimod_compile, ['T2433', '-v0'])
 test('T2494', normal, compile_fail, ['']) 
 test('T2494-2', normal, compile, ['']) 
+test('T2497', normal, compile, ['']) 
      
 
 # Omitting temporarily
