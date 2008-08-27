@@ -993,25 +993,25 @@ checkValidType ctxt ty = do
     rankn    <- doptM Opt_RankNTypes
     polycomp <- doptM Opt_PolymorphicComponents
     let 
-	rank | rankn = Arbitrary
-	     | rank2 = Rank 2
-	     | otherwise
-	     = case ctxt of	-- Haskell 98
-		 GenPatCtxt	-> Rank 0
-		 LamPatSigCtxt	-> Rank 0
-		 BindPatSigCtxt	-> Rank 0
-		 DefaultDeclCtxt-> Rank 0
-		 ResSigCtxt	-> Rank 0
-		 TySynCtxt _    -> Rank 0
-		 ExprSigCtxt 	-> Rank 1
-		 FunSigCtxt _   -> Rank 1
-		 ConArgCtxt _   -> if polycomp
-                           then Rank 2
+	gen_rank n | rankn     = ArbitraryRank
+	           | rank2     = Rank 2
+	           | otherwise = Rank n
+	rank
+	  = case ctxt of
+		 GenPatCtxt	-> MustBeMonoType
+		 DefaultDeclCtxt-> MustBeMonoType
+		 ResSigCtxt	-> MustBeMonoType
+		 LamPatSigCtxt	-> gen_rank 0
+		 BindPatSigCtxt	-> gen_rank 0
+		 TySynCtxt _    -> gen_rank 0
+		 ExprSigCtxt 	-> gen_rank 1
+		 FunSigCtxt _   -> gen_rank 1
+		 ConArgCtxt _   | polycomp -> gen_rank 2
                                 -- We are given the type of the entire
                                 -- constructor, hence rank 1
-                           else Rank 1
-		 ForSigCtxt _	-> Rank 1
-		 SpecInstCtxt   -> Rank 1
+ 				| otherwise -> gen_rank 1
+		 ForSigCtxt _	-> gen_rank 1
+		 SpecInstCtxt   -> gen_rank 1
 
 	actual_kind = typeKind ty
 
@@ -1037,34 +1037,39 @@ checkValidType ctxt ty = do
     traceTc (text "checkValidType done" <+> ppr ty)
 
 checkValidMonoType :: Type -> TcM ()
-checkValidMonoType ty = check_mono_type ty
+checkValidMonoType ty = check_mono_type MustBeMonoType ty
 \end{code}
 
 
 \begin{code}
-data Rank = Rank Int | Arbitrary
+data Rank = ArbitraryRank	  -- Any rank ok
+          | MustBeMonoType  	  -- Monotype regardless of flags
+	  | TyConArgMonoType	  -- Monotype but could be poly if -XImpredicativeTypes
+          | Rank Int		  -- Rank n, but could be more with -XRankNTypes
 
-decRank :: Rank -> Rank
-decRank Arbitrary = Arbitrary
-decRank (Rank n)  = Rank (n-1)
+decRank :: Rank -> Rank		  -- Function arguments
+decRank (Rank 0)   = Rank 0
+decRank (Rank n)   = Rank (n-1)
+decRank other_rank = other_rank
 
 nonZeroRank :: Rank -> Bool
-nonZeroRank (Rank 0) = False
-nonZeroRank _        = True
+nonZeroRank ArbitraryRank = True
+nonZeroRank (Rank n) 	  = n>0
+nonZeroRank _        	  = False
 
 ----------------------------------------
 data UbxTupFlag = UT_Ok	| UT_NotOk
 	-- The "Ok" version means "ok if UnboxedTuples is on"
 
 ----------------------------------------
-check_mono_type :: Type -> TcM ()	-- No foralls anywhere
-					-- No unlifted types of any kind
-check_mono_type ty
-   = do { check_type (Rank 0) UT_NotOk ty
+check_mono_type :: Rank -> Type -> TcM ()	-- No foralls anywhere
+				      		-- No unlifted types of any kind
+check_mono_type rank ty
+   = do { check_type rank UT_NotOk ty
 	; checkTc (not (isUnLiftedType ty)) (unliftedArgErr ty) }
 
 check_type :: Rank -> UbxTupFlag -> Type -> TcM ()
--- The args say what the *type* context requires, independent
+-- The args say what the *type context* requires, independent
 -- of *flag* settings.  You test the flag settings at usage sites.
 -- 
 -- Rank is allowed rank for function args
@@ -1072,7 +1077,7 @@ check_type :: Rank -> UbxTupFlag -> Type -> TcM ()
 
 check_type rank ubx_tup ty
   | not (null tvs && null theta)
-  = do	{ checkTc (nonZeroRank rank) (forAllTyErr ty)
+  = do	{ checkTc (nonZeroRank rank) (forAllTyErr rank ty)
 		-- Reject e.g. (Maybe (?x::Int => Int)), 
 		-- with a decent error message
 	; check_valid_theta SigmaCtxt theta
@@ -1113,7 +1118,7 @@ check_type rank ubx_tup ty@(TyConApp tc tys)
 	; liberal <- doptM Opt_LiberalTypeSynonyms
 	; if not liberal || isOpenSynTyCon tc then
 		-- For H98 and synonym families, do check the type args
-		mapM_ check_mono_type tys
+		mapM_ (check_mono_type TyConArgMonoType) tys
 
 	  else	-- In the liberal case (only for closed syns), expand then check
 	  case tcView ty of   
@@ -1126,7 +1131,7 @@ check_type rank ubx_tup ty@(TyConApp tc tys)
 	; checkTc (ubx_tup_ok ub_tuples_allowed) ubx_tup_msg
 
 	; impred <- doptM Opt_ImpredicativeTypes	
-	; let rank' = if impred then rank else Rank 0
+	; let rank' = if impred then ArbitraryRank else TyConArgMonoType
 		-- c.f. check_arg_type
 		-- However, args are allowed to be unlifted, or
 		-- more unboxed tuples, so can't use check_arg_ty
@@ -1170,13 +1175,29 @@ check_arg_type :: Rank -> Type -> TcM ()
 
 check_arg_type rank ty 
   = do	{ impred <- doptM Opt_ImpredicativeTypes
-	; let rank' = if impred then rank else Rank 0	-- Monotype unless impredicative
+	; let rank' = if impred then ArbitraryRank  -- Arg of tycon can have arby rank, regardless
+	              else case rank of 	    -- Predictive => must be monotype
+	      	        MustBeMonoType -> MustBeMonoType 
+			_	       -> TyConArgMonoType
+			-- Make sure that MustBeMonoType is propagated, 
+			-- so that we don't suggest -XImpredicativeTypes in
+			--    (Ord (forall a.a)) => a -> a
+
 	; check_type rank' UT_NotOk ty
 	; checkTc (not (isUnLiftedType ty)) (unliftedArgErr ty) }
 
 ----------------------------------------
-forAllTyErr, unliftedArgErr, ubxArgTyErr :: Type -> SDoc
-forAllTyErr     ty = sep [ptext (sLit "Illegal polymorphic or qualified type:"), ppr ty]
+forAllTyErr :: Rank -> Type -> SDoc
+forAllTyErr rank ty 
+   = vcat [ hang (ptext (sLit "Illegal polymorphic or qualified type:")) 2 (ppr ty)
+          , suggestion ]
+  where
+    suggestion = case rank of
+    	       	   Rank _ -> ptext (sLit "Perhaps you intended to use -XRankNTypes or -XRank2Types")
+    	       	   TyConArgMonoType -> ptext (sLit "Perhaps you intended to use -XImpredicativeTypes")
+		   _ -> empty      -- Polytype is always illegal
+
+unliftedArgErr, ubxArgTyErr :: Type -> SDoc
 unliftedArgErr  ty = sep [ptext (sLit "Illegal unlifted type:"), ppr ty]
 ubxArgTyErr     ty = sep [ptext (sLit "Illegal unboxed tuple type as function argument:"), ppr ty]
 
@@ -1269,7 +1290,7 @@ check_pred_ty dflags ctxt pred@(ClassP cls tys)
        ; checkTc (arity == n_tys) arity_err
 
 		-- Check the form of the argument types
-       ; mapM_ check_mono_type tys
+       ; mapM_ checkValidMonoType tys
        ; checkTc (check_class_pred_tys dflags ctxt tys)
 		 (predTyVarErr pred $$ how_to_allow)
        }
@@ -1286,11 +1307,11 @@ check_pred_ty dflags _ pred@(EqPred ty1 ty2)
        ; checkTc (dopt Opt_TypeFamilies dflags) (eqPredTyErr pred)
 
 		-- Check the form of the argument types
-       ; check_mono_type ty1
-       ; check_mono_type ty2
+       ; checkValidMonoType ty1
+       ; checkValidMonoType ty2
        }
 
-check_pred_ty _ SigmaCtxt (IParam _ ty) = check_mono_type ty
+check_pred_ty _ SigmaCtxt (IParam _ ty) = checkValidMonoType ty
 	-- Implicit parameters only allowed in type
 	-- signatures; not in instance decls, superclasses etc
 	-- The reason for not allowing implicit params in instances is a bit
@@ -1479,7 +1500,6 @@ checkValidInstHead ty	-- Should be a source type
         Just (clas,tys) -> do
 
     dflags <- getDOpts
-    mapM_ check_mono_type tys
     check_inst_head dflags clas tys
     return (clas, tys)
     }}
@@ -1499,7 +1519,7 @@ check_inst_head dflags clas tys
          -- May not contain type family applications
        ; mapM_ checkTyFamFreeness tys
 
-       ; mapM_ check_mono_type tys
+       ; mapM_ checkValidMonoType tys
 	-- For now, I only allow tau-types (not polytypes) in 
 	-- the head of an instance decl.  
 	-- 	E.g.  instance C (forall a. a->a) is rejected
