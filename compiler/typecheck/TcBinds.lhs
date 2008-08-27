@@ -154,7 +154,7 @@ tcValBinds top_lvl (ValBindsOut binds sigs) thing_inside
               ; ty_sigs = filter isVanillaLSig sigs
               ; sig_fn  = mkTcSigFun ty_sigs }
 
-        ; poly_ids <- mapM tcTySig ty_sigs
+        ; poly_ids <- checkNoErrs (mapAndRecoverM tcTySig ty_sigs)
                 -- No recovery from bad signatures, because the type sigs
                 -- may bind type variables, so proceeding without them
                 -- can lead to a cascade of errors

@@ -244,10 +244,9 @@ lot of kinding and type checking code with ordinary algebraic data types (and
 GADTs).
 
 \begin{code}
-tcFamInstDecl :: LTyClDecl Name -> TcM (Maybe TyThing)   -- Nothing if error
+tcFamInstDecl :: LTyClDecl Name -> TcM TyThing
 tcFamInstDecl (L loc decl)
   =	-- Prime error recovery, set source location
-    recoverM (return Nothing)		        $
     setSrcSpan loc				$
     tcAddDeclCtxt decl				$
     do { -- type families require -XTypeFamilies and can't be in an
@@ -261,8 +260,7 @@ tcFamInstDecl (L loc decl)
        ; tc <- tcFamInstDecl1 decl
        ; checkValidTyCon tc	-- Remember to check validity;
 				-- no recursion to worry about here
-       ; return (Just (ATyCon tc))
-       }
+       ; return (ATyCon tc) }
 
 tcFamInstDecl1 :: TyClDecl Name -> TcM TyCon
 
@@ -1076,10 +1074,10 @@ checkValidDataCon tc con
   = setSrcSpan (srcLocSpan (getSrcLoc con))	$
     addErrCtxt (dataConCtxt con)		$ 
     do	{ checkTc (dataConTyCon con == tc) (badDataConTyCon con)
-	; checkValidType ctxt (dataConUserType con)
 	; checkValidMonoType (dataConOrigResTy con)
 		-- Disallow MkT :: T (forall a. a->a)
 		-- Reason: it's really the argument of an equality constraint
+	; checkValidType ctxt (dataConUserType con)
 	; when (isNewTyCon tc) (checkNewDataCon con)
     }
   where

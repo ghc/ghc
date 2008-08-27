@@ -149,13 +149,12 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
 
                 -- (1) Do class and family instance declarations
        ; let { idxty_decls = filter (isFamInstDecl . unLoc) tycl_decls }
-       ; local_info_tycons <- mapM tcLocalInstDecl1  inst_decls
-       ; idx_tycons        <- mapM tcIdxTyInstDeclTL idxty_decls
+       ; local_info_tycons <- mapAndRecoverM tcLocalInstDecl1  inst_decls
+       ; idx_tycons        <- mapAndRecoverM tcIdxTyInstDeclTL idxty_decls
 
-       ; let { (local_infos,
-                at_tycons)     = unzip local_info_tycons
-             ; local_info      = concat local_infos
-             ; at_idx_tycon    = concat at_tycons ++ catMaybes idx_tycons
+       ; let { (local_info,
+                at_tycons_s)   = unzip local_info_tycons
+             ; at_idx_tycon    = concat at_tycons_s ++ idx_tycons
              ; clas_decls      = filter (isClassDecl.unLoc) tycl_decls
              ; implicit_things = concatMap implicitTyThings at_idx_tycon
              }
@@ -204,12 +203,11 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
                addErr $ assocInClassErr (tcdName decl)
          ; return tything
          }
-    isAssocFamily (Just (ATyCon tycon)) =
+    isAssocFamily (ATyCon tycon) =
       case tyConFamInst_maybe tycon of
         Nothing       -> panic "isAssocFamily: no family?!?"
         Just (fam, _) -> isTyConAssoc fam
-    isAssocFamily (Just _             ) = panic "isAssocFamily: no tycon?!?"
-    isAssocFamily Nothing               = False
+    isAssocFamily _ = panic "isAssocFamily: no tycon?!?"
 
 assocInClassErr :: Name -> SDoc
 assocInClassErr name =
@@ -231,15 +229,13 @@ addFamInsts tycons thing_inside
 
 \begin{code}
 tcLocalInstDecl1 :: LInstDecl Name
-                 -> TcM ([InstInfo Name], [TyThing]) -- [] if there was an error
+                 -> TcM (InstInfo Name, [TyThing])
         -- A source-file instance declaration
         -- Type-check all the stuff before the "where"
         --
         -- We check for respectable instance type, and context
 tcLocalInstDecl1 (L loc (InstDecl poly_ty binds uprags ats))
-  = -- Prime error recovery, set source location
-    recoverM (return ([], []))          $
-    setSrcSpan loc		        $
+  = setSrcSpan loc		        $
     addErrCtxt (instDeclCtxt1 poly_ty)  $
 
     do  { is_boot <- tcIsHsBoot
@@ -248,14 +244,16 @@ tcLocalInstDecl1 (L loc (InstDecl poly_ty binds uprags ats))
 
         ; (tyvars, theta, tau) <- tcHsInstHead poly_ty
 
-        -- Next, process any associated types.
-        ; idx_tycons <- mapM tcFamInstDecl ats
-
         -- Now, check the validity of the instance.
         ; (clas, inst_tys) <- checkValidInstHead tau
         ; checkValidInstance tyvars theta clas inst_tys
-        ; checkValidAndMissingATs clas (tyvars, inst_tys)
-                                  (zip ats idx_tycons)
+
+        -- Next, process any associated types.
+        ; idx_tycons <- recoverM (return []) $
+	  	     do { idx_tycons <- checkNoErrs $ mapAndRecoverM tcFamInstDecl ats
+		     	; checkValidAndMissingATs clas (tyvars, inst_tys)
+                          			  (zip ats idx_tycons)
+			; return idx_tycons }
 
         -- Finally, construct the Core representation of the instance.
         -- (This no longer includes the associated types.)
@@ -267,9 +265,9 @@ tcLocalInstDecl1 (L loc (InstDecl poly_ty binds uprags ats))
               dfun           = mkDictFunId dfun_name tyvars theta' clas inst_tys
               ispec          = mkLocalInstance dfun overlap_flag
 
-        ; return ([InstInfo { iSpec  = ispec,
-                              iBinds = VanillaInst binds uprags }],
-                  catMaybes idx_tycons)
+        ; return (InstInfo { iSpec  = ispec,
+                              iBinds = VanillaInst binds uprags },
+                  idx_tycons)
         }
   where
     -- We pass in the source form and the type checked form of the ATs.  We
@@ -278,7 +276,7 @@ tcLocalInstDecl1 (L loc (InstDecl poly_ty binds uprags ats))
     checkValidAndMissingATs :: Class
                             -> ([TyVar], [TcType])     -- instance types
                             -> [(LTyClDecl Name,       -- source form of AT
-                                 Maybe TyThing)]       -- Core form of AT
+                                 TyThing)]    	       -- Core form of AT
                             -> TcM ()
     checkValidAndMissingATs clas inst_tys ats
       = do { -- Issue a warning for each class AT that is not defined in this
@@ -296,9 +294,7 @@ tcLocalInstDecl1 (L loc (InstDecl poly_ty binds uprags ats))
            ; mapM_ (checkIndexes clas inst_tys) ats
            }
 
-    checkIndexes _    _        (_, Nothing)             =
-      return () -- skip, we already had an error here
-    checkIndexes clas inst_tys (hsAT, Just (ATyCon tycon)) =
+    checkIndexes clas inst_tys (hsAT, ATyCon tycon) =
 -- !!!TODO: check that this does the Right Thing for indexed synonyms, too!
       checkIndexes' clas inst_tys hsAT
                     (tyConTyVars tycon,

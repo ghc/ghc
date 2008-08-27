@@ -575,7 +575,7 @@ mapAndRecoverM :: (a -> TcRn b) -> [a] -> TcRn [b]
 -- Drop elements of the input that fail, so the result
 -- list can be shorter than the argument list
 mapAndRecoverM _ []     = return []
-mapAndRecoverM f (x:xs) = do { mb_r <- tryM (f x)
+mapAndRecoverM f (x:xs) = do { mb_r <- try_m (f x)
 			     ; rs <- mapAndRecoverM f xs
 			     ; return (case mb_r of
 					  Left _  -> rs
