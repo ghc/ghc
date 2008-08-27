@@ -82,7 +82,7 @@ executable haddock
   main-is:              Main.hs
   hs-source-dirs:       src
   extensions:           CPP, PatternGuards, DeriveDataTypeable,
-                        PatternSignatures, MagicHash
+                        ScopedTypeVariables, MagicHash
   ghc-options:          -funbox-strict-fields -O2
 
   other-modules:
@@ -122,7 +122,7 @@ executable haddock
 library
   hs-source-dirs:       src
   extensions:           CPP, PatternGuards, DeriveDataTypeable,
-                        PatternSignatures, MagicHash
+                        ScopedTypeVariables, MagicHash
   exposed-modules:      Distribution.Haddock
   other-modules:
     Haddock.Types
