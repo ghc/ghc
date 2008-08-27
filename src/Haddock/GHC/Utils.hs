@@ -12,15 +12,10 @@
 module Haddock.GHC.Utils where
 
 
-#if __GLASGOW_HASKELL__ >= 609
-import Distribution.Text
-#endif
-
 import Data.Char
 import Data.Version
 import qualified Data.Map as Map
 
-import GHC
 import HsSyn
 import SrcLoc
 import Outputable
@@ -42,18 +37,20 @@ moduleString = moduleNameString . moduleName
 
 
 -- return the name of the package, with version info
+modulePackageString :: Module -> String
 modulePackageString = packageIdString . modulePackageId
 
 
 -- return the (name,version) of the package
-modulePackageInfo mod = case unpackPackageId pkg of
+modulePackageInfo :: Module -> (String, [Char])
+modulePackageInfo modu = case unpackPackageId pkg of
                           Nothing -> (packageIdString pkg, "")
 #if __GLASGOW_HASKELL__ >= 609
                           Just x -> (display $ pkgName x, showVersion (pkgVersion x))
 #else
                           Just x -> (pkgName x, showVersion (pkgVersion x))
 #endif
-  where pkg = modulePackageId mod
+  where pkg = modulePackageId modu
 
 
 mkModuleNoPackage :: String -> Module

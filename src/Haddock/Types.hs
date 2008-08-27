@@ -11,15 +11,12 @@
 module Haddock.Types where
 
 
-import Haddock.GHC.Utils
 import Haddock.DocName
 
 import Data.Map (Map)
 import qualified Data.Map as Map
 
 import GHC hiding (NoLink)
-import Outputable
-import OccName
 import Name
 
 

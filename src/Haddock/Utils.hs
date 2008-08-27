@@ -6,9 +6,6 @@
 --
 
 
-{-# LANGUAGE PatternSignatures #-}
-
-
 module Haddock.Utils (
 
   -- * Misc utilities

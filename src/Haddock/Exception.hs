@@ -25,6 +25,7 @@ instance Show HaddockException where
   show (HaddockException str) = str
 
 
+throwE :: String -> a
 #if __GLASGOW_HASKELL__ >= 609
 instance Exception HaddockException
 throwE str = throw (HaddockException str)

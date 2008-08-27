@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 --
 -- Haddock - A Haskell Documentation Tool
 --
@@ -14,7 +15,6 @@ module Haddock.InterfaceFile (
 
 import Haddock.DocName ()
 import Haddock.Types
-import Haddock.Exception
 
 import Data.List
 import Data.Word
@@ -32,10 +32,8 @@ import UniqSupply
 import UniqFM
 import IfaceEnv
 import Module
-import Packages
 import HscTypes
 import FastMutInt
-import InstEnv
 import HsDoc
 import FastString
 import Unique
@@ -75,17 +73,17 @@ initBinMemSize = 1024*1024
 
 writeInterfaceFile :: FilePath -> InterfaceFile -> IO ()
 writeInterfaceFile filename iface = do 
-  bh <- openBinMem initBinMemSize
-  put_ bh binaryInterfaceMagic
-  put_ bh binaryInterfaceVersion
+  bh0 <- openBinMem initBinMemSize
+  put_ bh0 binaryInterfaceMagic
+  put_ bh0 binaryInterfaceVersion
 
   -- remember where the dictionary pointer will go
-  dict_p_p <- tellBin bh
-  put_ bh dict_p_p	
+  dict_p_p <- tellBin bh0
+  put_ bh0 dict_p_p
 
   -- remember where the symbol table pointer will go
-  symtab_p_p <- tellBin bh
-  put_ bh symtab_p_p
+  symtab_p_p <- tellBin bh0
+  put_ bh0 symtab_p_p
 
   -- Make some intial state
 #if __GLASGOW_HASKELL__ >= 609
@@ -107,7 +105,7 @@ writeInterfaceFile filename iface = do
 #endif
 
   -- put the main thing
-  bh <- return $ setUserData bh ud
+  bh <- return $ setUserData bh0 ud
   put_ bh iface
 
   -- write the symtab pointer at the fornt of the file
@@ -117,13 +115,13 @@ writeInterfaceFile filename iface = do
 
   -- write the symbol table itself
 #if __GLASGOW_HASKELL__ >= 609
-  symtab_next <- readFastMutInt symtab_next
-  symtab_map  <- readIORef symtab_map
+  symtab_next' <- readFastMutInt symtab_next
+  symtab_map'  <- readIORef symtab_map
 #else
-  symtab_next <- readFastMutInt (ud_symtab_next ud)
-  symtab_map  <- readIORef (ud_symtab_map ud)
+  symtab_next' <- readFastMutInt (ud_symtab_next ud)
+  symtab_map'  <- readIORef (ud_symtab_map ud)
 #endif
-  putSymbolTable bh symtab_next symtab_map
+  putSymbolTable bh symtab_next' symtab_map'
 
   -- write the dictionary pointer at the fornt of the file
   dict_p <- tellBin bh
@@ -150,10 +148,10 @@ writeInterfaceFile filename iface = do
 -- registers all read names in the name cache of the session.
 readInterfaceFile :: Maybe Session -> FilePath -> IO (Either String InterfaceFile)
 readInterfaceFile mbSession filename = do
-  bh <- readBinMem filename
+  bh0 <- readBinMem filename
 
-  magic   <- get bh
-  version <- get bh
+  magic   <- get bh0
+  version <- get bh0
 
   case () of
     _ | magic /= binaryInterfaceMagic -> return . Left $
@@ -163,15 +161,15 @@ readInterfaceFile mbSession filename = do
       | otherwise -> do
 
       -- get the dictionary
-      dict_p <- get bh
-      data_p <- tellBin bh		
-      seekBin bh dict_p
-      dict <- getDictionary bh
-      seekBin bh data_p		
+      dict_p <- get bh0
+      data_p <- tellBin bh0
+      seekBin bh0 dict_p
+      dict <- getDictionary bh0
+      seekBin bh0 data_p
 
-      -- initialise the user-data field of bh
+      -- initialise the user-data field of bh0
       ud <- newReadState dict
-      bh <- return (setUserData bh ud)
+      bh1 <- return (setUserData bh0 ud)
 
       -- get the name cache from ghc if we have a ghc session,
       -- otherwise create a new one
@@ -186,11 +184,11 @@ readInterfaceFile mbSession filename = do
           return (initNameCache u [], Nothing)
 
       -- get the symbol table
-      symtab_p <- get bh
-      data_p   <- tellBin bh
-      seekBin bh symtab_p
-      (nc', symtab) <- getSymbolTable bh theNC
-      seekBin bh data_p
+      symtab_p <- get bh1
+      data_p'  <- tellBin bh1
+      seekBin bh1 symtab_p
+      (nc', symtab) <- getSymbolTable bh1 theNC
+      seekBin bh1 data_p'
 
       -- write back the new name cache if we have a ghc session
       case mbRef of
@@ -198,11 +196,11 @@ readInterfaceFile mbSession filename = do
         Nothing  -> return ()
 
       -- set the symbol table
-      let ud = getUserData bh
-      bh <- return $! setUserData bh ud{ud_symtab = symtab}
+      let ud' = getUserData bh1
+      bh2 <- return $! setUserData bh1 ud'{ud_symtab = symtab}
 
       -- load the actual data
-      iface <- get bh
+      iface <- get bh2
       return (Right iface)
 
 
@@ -240,14 +238,14 @@ putFastString BinDictionary { bin_dict_next = j_r,
                               bin_dict_map  = out_r}  bh f
   = do
     out <- readIORef out_r
-    let uniq = getUnique f
-    case lookupUFM out uniq of
+    let unique = getUnique f
+    case lookupUFM out unique of
         Just (j, _)  -> put_ bh j
         Nothing -> do
            j <- readFastMutInt j_r
            put_ bh j
            writeFastMutInt j_r (j + 1)
-           writeIORef out_r $! addToUFM out uniq (j, f)
+           writeIORef out_r $! addToUFM out unique (j, f)
 
 
 data BinDictionary = BinDictionary {
@@ -282,28 +280,28 @@ fromOnDiskName
    -> NameCache
    -> OnDiskName
    -> (NameCache, Name)
-fromOnDiskName arr nc (pid, mod_name, occ) =
+fromOnDiskName _ nc (pid, mod_name, occ) =
   let 
-        mod   = mkModule pid mod_name
+        modu  = mkModule pid mod_name
         cache = nsNames nc
   in
-  case lookupOrigNameCache cache  mod occ of
+  case lookupOrigNameCache cache modu occ of
      Just name -> (nc, name)
      Nothing   -> 
         let 
                 us        = nsUniqs nc
-                uniq      = uniqFromSupply us
-                name      = mkExternalName uniq mod occ noSrcSpan
-                new_cache = extendNameCache cache mod occ name
+                u         = uniqFromSupply us
+                name      = mkExternalName u modu occ noSrcSpan
+                new_cache = extendNameCache cache modu occ name
         in        
         case splitUniqSupply us of { (us',_) -> 
         ( nc{ nsUniqs = us', nsNames = new_cache }, name )
         }
 
 serialiseName :: BinHandle -> Name -> UniqFM (Int,Name) -> IO ()
-serialiseName bh name symtab = do
-  let mod = nameModule name
-  put_ bh (modulePackageId mod, moduleName mod, nameOccName name)
+serialiseName bh name _ = do
+  let modu = nameModule name
+  put_ bh (modulePackageId modu, moduleName modu, nameOccName name)
 
 
 -------------------------------------------------------------------------------
@@ -323,20 +321,20 @@ instance Binary InterfaceFile where
 
 
 instance Binary InstalledInterface where
-  put_ bh (InstalledInterface mod info docMap exps visExps) = do
-    put_ bh mod
+  put_ bh (InstalledInterface modu info docMap exps visExps) = do
+    put_ bh modu
     put_ bh info
     put_ bh (Map.toList docMap)
     put_ bh exps
     put_ bh visExps
 
   get bh = do
-    mod     <- get bh
+    modu    <- get bh
     info    <- get bh
     docMap  <- get bh
     exps    <- get bh
     visExps <- get bh
-    return (InstalledInterface mod info (Map.fromList docMap) exps visExps)
+    return (InstalledInterface modu info (Map.fromList docMap) exps visExps)
 
 
 instance Binary DocOption where
@@ -403,8 +401,11 @@ instance (Binary id) => Binary (HsDoc id) where
     put_ bh (DocURL am) = do
             putByte bh 12
             put_ bh am
-    put_ bh (DocAName an) = do
+    put_ bh (DocPic x) = do
             putByte bh 13
+            put_ bh x
+    put_ bh (DocAName an) = do
+            putByte bh 14
             put_ bh an
     get bh = do
             h <- getByte bh
@@ -449,6 +450,9 @@ instance (Binary id) => Binary (HsDoc id) where
                     am <- get bh
                     return (DocURL am)
               13 -> do
+                    x <- get bh
+                    return (DocPic x)
+              14 -> do
                     an <- get bh
                     return (DocAName an)
               _ -> fail "invalid binary data found"
