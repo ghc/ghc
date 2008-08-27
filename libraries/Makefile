@@ -295,8 +295,9 @@ doc: $(foreach SUBDIR,$(DOC_SUBDIRS),doc.library.$(SUBDIR))
 
 # Making hyperlinked source only works if we have hscolour
 ifneq "$(HSCOLOUR)" ""
-CABAL_HADDOCK_FLAGS=--hyperlink-source
+CABAL_HADDOCK_FLAGS += --hyperlink-source
 endif
+CABAL_HADDOCK_FLAGS += --with-haddock=$(FPTOOLS_ABS_TOP)/utils/haddock/install-inplace/bin/haddock
 
 $(foreach SUBDIR,$(DOC_SUBDIRS),doc.library.$(SUBDIR)):\
 doc.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
