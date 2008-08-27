@@ -28,7 +28,6 @@ SRCS	= \
 	System/IO.hs System/IO/Error.hs System/IO/Unsafe.hs \
 	System/Environment.hs System/Exit.hs \
 	System/Mem.hs System/Info.hs \
-	System/Console/GetOpt.hs \
 	System/CPUTime.hsc System/Timeout.hs \
 	Foreign/Ptr.hs Foreign/StablePtr.hs Foreign/Storable.hs \
 	Foreign/ForeignPtr.hs Foreign/C/Types.hs \
