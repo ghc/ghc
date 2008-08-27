@@ -1665,6 +1665,7 @@ mkPState buf loc flags  =
 	       .|. qqBit        `setBitIf` dopt Opt_QuasiQuotes flags
 	       .|. ipBit        `setBitIf` dopt Opt_ImplicitParams flags
 	       .|. explicitForallBit `setBitIf` dopt Opt_ScopedTypeVariables flags
+	       .|. explicitForallBit `setBitIf` dopt Opt_LiberalTypeSynonyms flags
 	       .|. explicitForallBit `setBitIf` dopt Opt_PolymorphicComponents flags
 	       .|. explicitForallBit `setBitIf` dopt Opt_ExistentialQuantification flags
 	       .|. explicitForallBit `setBitIf` dopt Opt_Rank2Types flags

@@ -164,6 +164,38 @@ documentation</ulink> describes all the libraries that come with GHC.
 
       <varlistentry>
 	<term>
+          <option>-XRank2Types</option>
+          <indexterm><primary><option>-XRank2Types</option></primary></indexterm>
+        </term>
+	<term>
+          <option>-XRankNTypes</option>
+          <indexterm><primary><option>-XRankNTypes</option></primary></indexterm>
+        </term>
+	<term>
+          <option>-XPolymorphicComponents</option>
+          <indexterm><primary><option>-XPolymorphicComponents</option></primary></indexterm>
+        </term>
+	<listitem>
+	  <para> These flags control higher-rank polymorphism.  
+	    See <xref linkend="universal-quantification"/>.</para>
+	  <para>New reserved words: <literal>forall</literal>.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+          <option>-XLiberalTypeSynonyms</option>
+          <indexterm><primary><option>-XLiberalTypeSynonyms</option></primary></indexterm>
+        </term>
+	<listitem>
+	  <para> Allow more liberal type synonyms.
+	    See <xref linkend="type-synonyms"/>.</para>
+	  <para>New reserved words: <literal>forall</literal>.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
           <option>-XOverlappingInstances</option>
           <indexterm><primary><option>-XOverlappingInstances</option></primary></indexterm>
         </term>
@@ -180,8 +212,7 @@ documentation</ulink> describes all the libraries that come with GHC.
           <indexterm><primary><option>-fcontext-stack</option></primary></indexterm>
         </term>
 	<listitem>
-	  <para> See <xref linkend="instance-decls"/>.  Only relevant
-          if you also use <option>-fglasgow-exts</option>.</para>
+	  <para> See <xref linkend="instance-decls"/>. </para>
 	</listitem>
       </varlistentry>
 
@@ -1716,9 +1747,12 @@ to be written infix, very much like expressions.  More specifically:
 <title>Liberalised type synonyms</title>
 
 <para>
-Type synonyms are like macros at the type level, and
+Type synonyms are like macros at the type level, but Haskell 98 imposes many rules
+on individual synonym declarations.
+With the <option>-XLiberalTypeSynonyms</option> extension,
 GHC does validity checking on types <emphasis>only after expanding type synonyms</emphasis>.
-That means that GHC can be very much more liberal about type synonyms than Haskell 98:
+That means that GHC can be very much more liberal about type synonyms than Haskell 98. 
+
 <itemizedlist>
 <listitem> <para>You can write a <literal>forall</literal> (including overloading)
 in a type synonym, thus:
@@ -1735,7 +1769,8 @@ in a type synonym, thus:
 </listitem>
 
 <listitem><para>
-You can write an unboxed tuple in a type synonym:
+If you also use <option>-XUnboxedTuples</option>, 
+you can write an unboxed tuple in a type synonym:
 <programlisting>
   type Pr = (# Int, Int #)
 
