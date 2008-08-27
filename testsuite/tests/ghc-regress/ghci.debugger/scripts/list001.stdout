@@ -1,5 +1,6 @@
 Not stopped at a breakpoint; nothing to list
-module 'Data.List' is not interpreted
+module 'Data.List' is from another package;
+this command requires an interpreted module
 cannot list source code for map: module GHC.Base is not interpreted
 1  mymap f [] = []
 2  mymap f (x:xs) = f x:mymap f xs
