@@ -131,6 +131,16 @@ documentation</ulink> describes all the libraries that come with GHC.
 
       <varlistentry>
 	<term>
+          <option>-XMagicHash</option>:
+        </term>
+	<listitem>
+	  <para> Allow "&num;" as a <link linkend="magic-hash">postfix modifier on identifiers</link>.
+          </para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
           <option>-XMonomorphismRestriction</option>,<option>-XMonoPatBinds</option>:
         </term>
 	<listitem>
@@ -308,7 +318,8 @@ documentation</ulink> describes all the libraries that come with GHC.
 <sect1 id="primitives">
   <title>Unboxed types and primitive operations</title>
 
-<para>GHC is built on a raft of primitive data types and operations.
+<para>GHC is built on a raft of primitive data types and operations;
+"primitive" in the sense that they cannot be defined in Haskell itself.
 While you really can use this stuff to write fast code,
   we generally find it a lot less painful, and more satisfying in the
   long run, to use higher-level language features and libraries.  With
@@ -316,28 +327,21 @@ While you really can use this stuff to write fast code,
   unboxed version in any case.  And if it isn't, we'd like to know
   about it.</para>
 
-<para>We do not currently have good, up-to-date documentation about the
-primitives, perhaps because they are mainly intended for internal use.
-There used to be a long section about them here in the User Guide, but it
-became out of date, and wrong information is worse than none.</para>
+<para>All these primitive data types and operations are exported by the 
+library <literal>GHC.Prim</literal>, for which there is 
+<ulink url="../libraries/base/GHC.Prim.html">detailed online documentation</ulink>.
+(This documentation is generated from the file <filename>compiler/prelude/primops.txt.pp</filename>.)
+</para>
+<para>
+If you want to mention any of the primitive data types or operations in your
+program, you must first import <literal>GHC.Prim</literal> to bring them
+into scope.  Many of them have names ending in "&num;", and to mention such
+names you need the <option>-XMagicHash</option> extension (<xref linkend="magic-hash"/>).
+</para>
 
-<para>The Real Truth about what primitive types there are, and what operations
-work over those types, is held in the file
-<filename>compiler/prelude/primops.txt.pp</filename>.
-This file is used directly to generate GHC's primitive-operation definitions, so
-it is always correct!  It is also intended for processing into text.</para>
-
-<para>Indeed,
-the result of such processing is part of the description of the 
- <ulink
-      url="http://www.haskell.org/ghc/docs/papers/core.ps.gz">External
-	 Core language</ulink>.
-So that document is a good place to look for a type-set version.
-We would be very happy if someone wanted to volunteer to produce an XML
-back end to the program that processes <filename>primops.txt</filename> so that
-we could include the results here in the User Guide.</para>
-
-<para>What follows here is a brief summary of some main points.</para>
+<para>The primops make extensive use of <link linkend="glasgow-unboxed">unboxed types</link> 
+and <link linkend="unboxed-tuples">unboxed tuples</link>, which
+we briefly summarise here. </para>
   
 <sect2 id="glasgow-unboxed">
 <title>Unboxed types
@@ -366,26 +370,15 @@ would use in C: <literal>Int&num;</literal> (long int),
 know and love&mdash;usually one instruction.
 </para>
 
-<para> For some primitive types we have special syntax for literals.
-Anything that would be an integer lexeme followed by a
-<literal>&num;</literal> is an <literal>Int&num;</literal> literal, e.g.
-<literal>32&num;</literal> and <literal>-0x3A&num;</literal>. Likewise,
-any non-negative integer literal followed by
-<literal>&num;&num;</literal> is a <literal>Word&num;</literal> literal.
-Likewise, any floating point literal followed by a
-<literal>&num;</literal> is a <literal>Float&num;</literal> literal, and
-followed by <literal>&num;&num;</literal> is a
-<literal>Double&num;</literal>. Finally, a string literal followed by a
-<literal>&num;</literal>, e.g. <literal>&quot;foo&quot;&num;</literal>,
-is a <literal>Addr&num;</literal> literal.
-</para>
-
 <para>
 Primitive (unboxed) types cannot be defined in Haskell, and are
 therefore built into the language and compiler.  Primitive types are
 always unlifted; that is, a value of a primitive type cannot be
-bottom.  We use the convention that primitive types, values, and
-operations have a <literal>&num;</literal> suffix.
+bottom.  We use the convention (but it is only a convention) 
+that primitive types, values, and
+operations have a <literal>&num;</literal> suffix (see <xref linkend="magic-hash"/>).
+For some primitive types we have special syntax for literals, also
+described in the <link linkend="magic-hash">same section</link>.
 </para>
 
 <para>
@@ -562,7 +555,39 @@ Indeed, the bindings can even be recursive.
 <sect1 id="syntax-extns">
 <title>Syntactic extensions</title>
  
+    <sect2 id="magic-hash">
+      <title>The magic hash</title>
+      <para>The language extension <option>-XMagicHash</option> allows "&num;" as a
+	postfix modifier to identifiers.  Thus, "x&num;" is a valid variable, and "T&num;" is
+	a valid type constructor or data constructor.</para>
+
+      <para>The hash sign does not change sematics at all.  We tend to use variable
+	names ending in "&num;" for unboxed values or types (e.g. <literal>Int&num;</literal>), 
+	but there is no requirement to do so; they are just plain ordinary variables.
+	Nor does the <option>-XMagicHash</option> extension bring anything into scope.
+	For example, to bring <literal>Int&num;</literal> into scope you must 
+	import <literal>GHC.Prim</literal> (see <xref linkend="primitives"/>); 
+	the <option>-XMagicHash</option> extension
+	then allows you to <emphasis>refer</emphasis> to the <literal>Int&num;</literal>
+	that is now in scope.</para>
+      <para> The <option>-XMagicHash</option> also enables some new forms of literals (see <xref linkend="glasgow-unboxed"/>):
+	<itemizedlist> 
+	  <listitem><para> <literal>'x'&num;</literal> has type <literal>Char&num;</literal></para> </listitem>
+	  <listitem><para> <literal>&quot;foo&quot;&num;</literal> has type <literal>Addr&num;</literal></para> </listitem>
+	  <listitem><para> <literal>3&num;</literal> has type <literal>Int&num;</literal>. In general,
+	  any Haskell 98 integer lexeme followed by a <literal>&num;</literal> is an <literal>Int&num;</literal> literal, e.g.
+            <literal>-0x3A&num;</literal> as well as <literal>32&num;</literal></para>.</listitem>
+	  <listitem><para> <literal>3&num;&num;</literal> has type <literal>Word&num;</literal>. In general,
+	  any non-negative Haskell 98 integer lexeme followed by <literal>&num;&num;</literal> 
+	      is a <literal>Word&num;</literal>. </para> </listitem>
+	  <listitem><para> <literal>3.2&num;</literal> has type <literal>Float&num;</literal>.</para> </listitem>
+	  <listitem><para> <literal>3.2&num;&num;</literal> has type <literal>Double&num;</literal></para> </listitem>
+	  </itemizedlist>
+      </para>
+   </sect2>
+
     <!-- ====================== HIERARCHICAL MODULES =======================  -->
+
 
     <sect2 id="hierarchical-modules">
       <title>Hierarchical Modules</title>

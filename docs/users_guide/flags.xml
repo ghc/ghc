@@ -787,7 +787,7 @@
 	    </row>
 	    <row>
 	      <entry><option>-XMagicHash</option></entry>
-	      <entry>Enable the &ldquo;magic hash&rdquo;.</entry>
+	      <entry>Allow "#" as a <link linkend="magic-hash">postfix modifier on identifiers</link>.</entry>
 	      <entry>dynamic</entry>
 	      <entry><option>-XNoMagicHash</option></entry>
 	    </row>
