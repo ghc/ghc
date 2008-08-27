@@ -25,6 +25,7 @@ import CoreSubst	( Subst, mkEmptySubst, extendTvSubstList, lookupIdSubst,
 			  substBndr, substBndrs, substTy, substInScope,
 			  cloneIdBndr, cloneIdBndrs, cloneRecIdBndrs
 			) 
+import SimplUtils	( interestingArg )
 import VarSet
 import VarEnv
 import CoreSyn
@@ -486,8 +487,6 @@ of this is permanently ruled out.
 Still, this is no great hardship, because we intend to eliminate
 overloading altogether anyway!
 
-
-
 A note about non-tyvar dictionaries
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Some Ids have types like
@@ -512,7 +511,7 @@ Should we specialise wrt this compound-type dictionary?  We used to say
 But it is simpler and more uniform to specialise wrt these dicts too;
 and in future GHC is likely to support full fledged type signatures 
 like
-	f ;: Eq [(a,b)] => ...
+	f :: Eq [(a,b)] => ...
 
 
 %************************************************************************
@@ -1091,6 +1090,7 @@ mkCallUDs subst f args
 	--  *don't* say what the value of the implicit param is!
   || not (spec_tys `lengthIs` n_tyvars)
   || not ( dicts   `lengthIs` n_dicts)
+  || not (any interestingArg dicts)	-- Note [Interesting dictionary arguments]
   || maybeToBool (lookupRule (\_act -> True) (substInScope subst) emptyRuleBase f args)
 	-- There's already a rule covering this call.  A typical case
 	-- is where there's an explicit user-provided rule.  Then
@@ -1112,8 +1112,21 @@ mkCallUDs subst f args
     mk_spec_ty tyvar ty 
 	| tyvar `elemVarSet` constrained_tyvars = Just ty
 	| otherwise				= Nothing
+\end{code}
 
-------------------------------------------------------------			
+Note [Interesting dictionary arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this
+	 \a.\d:Eq a.  let f = ... in ...(f d)...
+There really is not much point in specialising f wrt the dictionary d,
+because the code for the specialised f is not improved at all, because
+d is lambda-bound.  We simply get junk specialisations.
+
+We re-use the function SimplUtils.interestingArg function to determine
+what sort of dictionary arguments have *some* information in them.
+
+
+\begin{code}
 plusUDs :: UsageDetails -> UsageDetails -> UsageDetails
 plusUDs (MkUD {dict_binds = db1, calls = calls1, ud_fvs = fvs1})
 	(MkUD {dict_binds = db2, calls = calls2, ud_fvs = fvs2})
