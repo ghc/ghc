@@ -30,12 +30,13 @@ import MkCore
 import CoreUtils
 import CoreFVs
 
-import TcHsSyn		( mkArbitraryType )	-- Mis-placed?
+import TcHsSyn	( mkArbitraryType )	-- Mis-placed?
 import TcType
 import OccurAnal
 import CostCentre
 import Module
 import Id
+import Name	( localiseName )
 import Var	( TyVar )
 import VarSet
 import Rules
@@ -333,6 +334,9 @@ dsSpec all_tvs dicts tvs poly_id mono_id mono_bind
 	; spec_name <- newLocalName poly_name
 	; ds_spec_expr  <- dsExpr spec_expr
 	; let (bndrs, body) = collectBinders (occurAnalyseExpr ds_spec_expr)
+	      -- ds_spec_expr may look like
+	      --     /\a. f a Int dOrdInt
+	      -- or  /\a.\d:Ord a. let { dl::Ord [a] = dOrdList a d } in f [a] dl
 		-- The occurrence-analysis does two things
 		-- (a) identifies unused binders: Note [Unused spec binders]
 		-- (b) sorts dict bindings into NonRecs 
@@ -358,7 +362,9 @@ dsSpec all_tvs dicts tvs poly_id mono_id mono_bind
 		  spec_rhs    = Let (NonRec local_poly poly_f_body) ds_spec_expr
 		  poly_f_body = mkLams (tvs ++ dicts) f_body
 			   	
-		  extra_dict_bndrs = filter isDictId (varSetElems (exprFreeVars ds_spec_expr))
+		  extra_dict_bndrs = [localise d 
+		  		     | d <- varSetElems (exprFreeVars ds_spec_expr)
+		  		     , isDictId d]
 			-- Note [Const rule dicts]
 
 		  rule =  mkLocalRule (mkFastString ("SPEC " ++ showSDoc (ppr poly_name)))
@@ -384,6 +390,9 @@ dsSpec all_tvs dicts tvs poly_id mono_id mono_bind
 
     decomp_msg = hang (ptext (sLit "Specialisation too complicated to desugar; ignored"))
 		    2 (ppr spec_expr)
+
+    localise d = mkLocalId (localiseName (idName d)) (idType d)
+    	     -- See Note [Constant rule dicts]
 
 mkArbitraryTypeEnv :: [TyVar] -> [([TyVar], a, b, c)] -> DsM (TyVarEnv Type)
 -- If any of the tyvars is missing from any of the lists in 
@@ -442,6 +451,9 @@ And from that we want the rule
 	RULE forall dInt. f Int dInt = f_spec
 	f_spec = let f = <rhs> in f Int dInt
 
+But be careful!  That dInt might be GHC.Base.$fOrdInt, which is an External
+Name, and you can't bind them in a lambda or forall without getting things
+confused. Hence the use of 'localise' to make it Internal.
 
 
 %************************************************************************
