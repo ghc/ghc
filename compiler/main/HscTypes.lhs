@@ -255,7 +255,10 @@ hscEPS hsc_env = readIORef (hsc_EPS hsc_env)
 -- module.  If so, use this instead of the file contents (this
 -- is for use in an IDE where the file hasn't been saved by
 -- the user yet).
-data Target = Target TargetId (Maybe (StringBuffer,ClockTime))
+data Target = Target
+      TargetId                          -- module or filename
+      Bool                              -- object code allowed?
+      (Maybe (StringBuffer,ClockTime))  -- in-memory text buffer?
 
 data TargetId
   = TargetModule ModuleName
@@ -268,7 +271,8 @@ data TargetId
   deriving Eq
 
 pprTarget :: Target -> SDoc
-pprTarget (Target id _) = pprTargetId id
+pprTarget (Target id obj _) = 
+   (if obj then char '*' else empty) <> pprTargetId id
 
 instance Outputable Target where
     ppr = pprTarget

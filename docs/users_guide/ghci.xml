@@ -302,12 +302,29 @@ Ok, modules loaded: A, B, C, D.
     confusion, because non-exported top-level definitions of a module
     are only available for use in expressions at the prompt when the
     module is interpreted (see <xref linkend="ghci-scope" />).  For
-    this reason, if you ask GHCi to load a filename rather than a
-    module name (e.g. <literal>:load Main.hs</literal> rather than
-    <literal>:load Main</literal>) then any existing object file will
-    be ignored and the module will be interpreted rather than
-    compiled.  Using <literal>-fobject-code</literal> disables this
-    behaviour (see <xref linkend="ghci-obj" />).</para>
+    this reason, you might sometimes want to force GHCi to load a
+    module using the interpreter.  This can be done by prefixing
+      a <literal>*</literal> to the module name or filename when
+      using <literal>:load</literal>, for example</para>
+
+<screen>
+Prelude> :load *A
+Compiling A                ( A.hs, interpreted )
+*A>
+</screen>
+
+<para>When the <literal>*</literal> is used, GHCi ignores any
+  pre-compiled object code and interprets the module.  If you have
+  already loaded a number of modules as object code and decide that
+  you wanted to interpret one of them, instead of re-loading the whole
+  set you can use <literal>:add *M</literal> to specify that you want
+  <literal>M</literal> to be interpreted (note that this might cause
+  other modules to be interpreted too, because compiled modules cannot
+  depend on interpreted ones).</para>
+
+<para>To always compile everything to object code and never use the
+  interpreter, use the <literal>-fobject-code</literal> option (see
+  <xref linkend="ghci-obj" />).</para>
 
     <para>HINT: since GHCi will only use a compiled object file if it
     can be sure that the compiled version is up-to-date, a good technique
@@ -552,9 +569,9 @@ Compiling Main             ( Main.hs, interpreted )
       <para>NOTE: for technical reasons, GHCi can only support the
       <literal>*</literal>-form for modules that are interpreted.
       Compiled modules and package modules can only contribute their
-      exports to the current scope.  This is why GHCi will always
-      interpret, not compile, a module if you specify its filename
-      rather than its module name to <literal>:load</literal>.</para>
+      exports to the current scope.  To ensure that GHCi loads the
+      interpreted version of a module, add the <literal>*</literal>
+      when loading the module, e.g. <literal>:load *M</literal>.</para>
 
       <para>The scope is manipulated using the
       <literal>:module</literal> command.  For example, if the current
@@ -1477,7 +1494,7 @@ a :: a
 <screen>
 *Main> :set -fbreak-on-exception
 *Main> :trace qsort ("abc" ++ undefined)
-"Stopped at &lt;exception thrown&gt;
+&ldquo;Stopped at &lt;exception thrown&gt;
 _exception :: e
 [&lt;exception thrown&gt;] *Main&gt; :hist
 -1  : qsort.hs:3:24-38
@@ -1762,13 +1779,16 @@ $ ghci -lm
 
       <varlistentry>
 	<term>
-          <literal>:add</literal> <replaceable>module</replaceable> ...
+          <literal>:add</literal> <optional><literal>*</literal></optional><replaceable>module</replaceable> ...
           <indexterm><primary><literal>:add</literal></primary></indexterm>
         </term>
 	<listitem>
 	  <para>Add <replaceable>module</replaceable>(s) to the
 	  current <firstterm>target set</firstterm>, and perform a
-	  reload.</para>
+	  reload.  Normally pre-compiled code for the module will be
+	  loaded if available, or otherwise the module will be
+	  compiled to byte-code.  Using the <literal>*</literal>
+	  prefix forces the module to be loaded as byte-code.</para>
 	</listitem>
       </varlistentry>
 
@@ -2139,7 +2159,7 @@ Prelude> :. cmds.ghci
 
       <varlistentry>
 	<term>
-          <literal>:load</literal> <replaceable>module</replaceable> ...
+          <literal>:load</literal> <optional><literal>*</literal></optional><replaceable>module</replaceable> ...
           <indexterm><primary><literal>:load</literal></primary></indexterm>
         </term>
 	<listitem>
@@ -2155,6 +2175,11 @@ Prelude> :. cmds.ghci
 	  <literal>:load</literal> can be used without any arguments
 	  to unload all the currently loaded modules and
 	  bindings.</para>
+
+          <para>Normally pre-compiled code for a module will be loaded
+	  if available, or otherwise the module will be compiled to
+	  byte-code.  Using the <literal>*</literal> prefix forces a
+	  module to be loaded as byte-code.</para>
 
 	  <para>After a <literal>:load</literal> command, the current
 	  context is set to:</para>

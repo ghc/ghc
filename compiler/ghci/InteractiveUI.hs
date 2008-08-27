@@ -199,7 +199,7 @@ helpText =
  "   <statement>                 evaluate/run <statement>\n" ++
  "   :                           repeat last command\n" ++
  "   :{\\n ..lines.. \\n:}\\n       multiline command\n" ++
- "   :add <filename> ...         add module(s) to the current target set\n" ++
+ "   :add [*]<module> ...        add module(s) to the current target set\n" ++
  "   :browse[!] [[*]<mod>]       display the names defined by module <mod>\n" ++
  "                               (!: more details; *: all top-level names)\n" ++
  "   :cd <dir>                   change directory to <dir>\n" ++
@@ -212,7 +212,7 @@ helpText =
  "   :help, :?                   display this list of commands\n" ++
  "   :info [<name> ...]          display information about the given names\n" ++
  "   :kind <type>                show the kind of <type>\n" ++
- "   :load <filename> ...        load module(s) and their dependents\n" ++
+ "   :load [*]<module> ...       load module(s) and their dependents\n" ++
  "   :main [<arguments> ...]     run the main function with the given arguments\n" ++
  "   :module [+/-] [*]<mod> ...  set the context for expression evaluation\n" ++
  "   :quit                       exit GHCi\n" ++
@@ -916,9 +916,11 @@ addModule files = do
   files <- mapM expandPath files
   targets <- mapM (\m -> io (GHC.guessTarget m Nothing)) files
   session <- getSession
-  io (mapM_ (GHC.addTarget session) targets)
+  -- remove old targets with the same id; e.g. for :add *M
+  io $ mapM_ (GHC.removeTarget session) [ tid | Target tid _ _ <- targets ]
+  io $ mapM_ (GHC.addTarget session) targets
   prev_context <- io $ GHC.getContext session
-  ok <- io (GHC.load session LoadAllTargets)
+  ok <- io $ GHC.load session LoadAllTargets
   afterLoad ok session False prev_context
 
 changeDirectory :: String -> GHCi ()
@@ -981,7 +983,7 @@ chooseEditFile =
               Just file -> return file
               Nothing   -> ghcError (CmdLineError "No files to edit.")
           
-  where fromTarget (GHC.Target (GHC.TargetFile f _) _) = Just f
+  where fromTarget (GHC.Target (GHC.TargetFile f _) _ _) = Just f
         fromTarget _ = Nothing -- when would we get a module target?
 
 defineMacro :: Bool{-overwrite-} -> String -> GHCi ()
@@ -1141,9 +1143,9 @@ setContextAfterLoad session prev keep_ctxt ms = do
 	[]    -> Nothing
 	(m:_) -> Just m
 
-   summary `matches` Target (TargetModule m) _
+   summary `matches` Target (TargetModule m) _ _
 	= GHC.ms_mod_name summary == m
-   summary `matches` Target (TargetFile f _) _ 
+   summary `matches` Target (TargetFile f _) _ _ 
 	| Just f' <- GHC.ml_hs_file (GHC.ms_location summary)	= f == f'
    _ `matches` _
 	= False
@@ -1890,9 +1892,12 @@ wantInterpretedModule :: String -> GHCi Module
 wantInterpretedModule str = do
    session <- getSession
    modl <- lookupModule str
+   dflags <- getDynFlags
+   when (GHC.modulePackageId modl /= thisPackage dflags) $
+      ghcError (CmdLineError ("module '" ++ str ++ "' is from another package;\nthis command requires an interpreted module"))
    is_interpreted <- io (GHC.moduleIsInterpreted session modl)
    when (not is_interpreted) $
-       ghcError (CmdLineError ("module '" ++ str ++ "' is not interpreted"))
+       ghcError (CmdLineError ("module '" ++ str ++ "' is not interpreted; try \':add *" ++ str ++ "' first"))
    return modl
 
 wantNameFromInterpretedModule :: (Name -> SDoc -> GHCi ()) -> String

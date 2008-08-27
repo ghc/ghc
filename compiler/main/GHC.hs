@@ -463,7 +463,7 @@ removeTarget :: Session -> TargetId -> IO ()
 removeTarget s target_id
   = modifySession s (\h -> h{ hsc_targets = filter (hsc_targets h) })
   where
-   filter targets = [ t | t@(Target id _) <- targets, id /= target_id ]
+   filter targets = [ t | t@(Target id _ _) <- targets, id /= target_id ]
 
 -- Attempts to guess what Target a string refers to.  This function implements
 -- the --make/GHCi command-line syntax for filenames: 
@@ -475,29 +475,36 @@ removeTarget s target_id
 -- 	- otherwise interpret the string as a module name
 --
 guessTarget :: String -> Maybe Phase -> IO Target
-guessTarget file (Just phase)
-   = return (Target (TargetFile file (Just phase)) Nothing)
-guessTarget file Nothing
+guessTarget str (Just phase)
+   = return (Target (TargetFile str (Just phase)) True Nothing)
+guessTarget str Nothing
    | isHaskellSrcFilename file
-   = return (Target (TargetFile file Nothing) Nothing)
-   | looksLikeModuleName file
-   = return (Target (TargetModule (mkModuleName file)) Nothing)
+   = return (target (TargetFile file Nothing))
    | otherwise
    = do exists <- doesFileExist hs_file
 	if exists
-	   then return (Target (TargetFile hs_file Nothing) Nothing)
+	   then return (target (TargetFile hs_file Nothing))
 	   else do
 	exists <- doesFileExist lhs_file
 	if exists
-	   then return (Target (TargetFile lhs_file Nothing) Nothing)
+	   then return (target (TargetFile lhs_file Nothing))
 	   else do
+        if looksLikeModuleName file
+           then return (target (TargetModule (mkModuleName file)))
+           else do
         throwGhcException
                  (ProgramError (showSDoc $
                  text "target" <+> quotes (text file) <+> 
                  text "is not a module name or a source file"))
      where 
+         (file,obj_allowed)
+                | '*':rest <- str = (rest, False)
+                | otherwise       = (str,  True)
+
 	 hs_file  = file <.> "hs"
 	 lhs_file = file <.> "lhs"
+
+         target tid = Target tid obj_allowed Nothing
 
 -- -----------------------------------------------------------------------------
 -- Extending the program scope
@@ -1705,15 +1712,17 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
 	old_summary_map = mkNodeMap old_summaries
 
 	getRootSummary :: Target -> IO ModSummary
-	getRootSummary (Target (TargetFile file mb_phase) maybe_buf)
+	getRootSummary (Target (TargetFile file mb_phase) obj_allowed maybe_buf)
 	   = do exists <- doesFileExist file
 		if exists 
-		    then summariseFile hsc_env old_summaries file mb_phase maybe_buf
+		    then summariseFile hsc_env old_summaries file mb_phase 
+                                       obj_allowed maybe_buf
 		    else throwErrMsg $ mkPlainErrMsg noSrcSpan $
 			   text "can't find file:" <+> text file
-	getRootSummary (Target (TargetModule modl) maybe_buf)
+	getRootSummary (Target (TargetModule modl) obj_allowed maybe_buf)
  	   = do maybe_summary <- summariseModule hsc_env old_summary_map False 
-					   (L rootLoc modl) maybe_buf excl_mods
+					   (L rootLoc modl) obj_allowed 
+                                           maybe_buf excl_mods
 		case maybe_summary of
 		   Nothing -> packageModErr modl
 		   Just s  -> return s
@@ -1749,12 +1758,13 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
 		loop ss done
 	    else
 		do { multiRootsErr summs; return [] }
-	  | otherwise	      = do { mb_s <- summariseModule hsc_env old_summary_map 
-						 is_boot wanted_mod Nothing excl_mods
-				   ; case mb_s of
-					Nothing -> loop ss done
-					Just s  -> loop (msDeps s ++ ss) 
-							(addToFM done key [s]) }
+	  | otherwise
+          = do mb_s <- summariseModule hsc_env old_summary_map 
+                                       is_boot wanted_mod True
+                                       Nothing excl_mods
+               case mb_s of
+                   Nothing -> loop ss done
+                   Just s  -> loop (msDeps s ++ ss) (addToFM done key [s])
 	  where
 	    key = (unLoc wanted_mod, if is_boot then HsBootFile else HsSrcFile)
 
@@ -1793,10 +1803,11 @@ summariseFile
 	-> [ModSummary]			-- old summaries
 	-> FilePath			-- source file name
 	-> Maybe Phase			-- start phase
+        -> Bool                         -- object code allowed?
 	-> Maybe (StringBuffer,ClockTime)
 	-> IO ModSummary
 
-summariseFile hsc_env old_summaries file mb_phase maybe_buf
+summariseFile hsc_env old_summaries file mb_phase obj_allowed maybe_buf
 	-- we can use a cached summary if one is available and the
 	-- source file hasn't changed,  But we have to look up the summary
 	-- by source file, rather than module name as we do in summarise.
@@ -1816,7 +1827,8 @@ summariseFile hsc_env old_summaries file mb_phase maybe_buf
 	if ms_hs_date old_summary == src_timestamp 
 	   then do -- update the object-file timestamp
         	  obj_timestamp <-
-                    if isObjectTarget (hscTarget (hsc_dflags hsc_env)) -- bug #1205
+                    if isObjectTarget (hscTarget (hsc_dflags hsc_env)) 
+                        || obj_allowed -- bug #1205
                         then getObjTimestamp location False
                         else return Nothing
 		  return old_summary{ ms_obj_date = obj_timestamp }
@@ -1849,7 +1861,8 @@ summariseFile hsc_env old_summaries file mb_phase maybe_buf
         -- when the user asks to load a source file by name, we only
         -- use an object file if -fobject-code is on.  See #1205.
 	obj_timestamp <-
-            if isObjectTarget (hscTarget (hsc_dflags hsc_env))
+            if isObjectTarget (hscTarget (hsc_dflags hsc_env)) 
+               || obj_allowed -- bug #1205
                 then modificationTimeIfExists (ml_obj_file location)
                 else return Nothing
 
@@ -1875,11 +1888,13 @@ summariseModule
 	  -> NodeMap ModSummary	-- Map of old summaries
 	  -> IsBootInterface	-- True <=> a {-# SOURCE #-} import
 	  -> Located ModuleName	-- Imported module to be summarised
+          -> Bool               -- object code allowed?
 	  -> Maybe (StringBuffer, ClockTime)
 	  -> [ModuleName]		-- Modules to exclude
 	  -> IO (Maybe ModSummary)	-- Its new summary
 
-summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod) maybe_buf excl_mods
+summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod) 
+                obj_allowed maybe_buf excl_mods
   | wanted_mod `elem` excl_mods
   = return Nothing
 
@@ -1910,7 +1925,11 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod) maybe_buf exc
     check_timestamp old_summary location src_fn src_timestamp
 	| ms_hs_date old_summary == src_timestamp = do
 		-- update the object-file timestamp
-	   	obj_timestamp <- getObjTimestamp location is_boot
+                obj_timestamp <- 
+                    if isObjectTarget (hscTarget (hsc_dflags hsc_env)) 
+                       || obj_allowed -- bug #1205
+                       then getObjTimestamp location is_boot
+                       else return Nothing
 		return (Just old_summary{ ms_obj_date = obj_timestamp })
 	| otherwise = 
 		-- source changed: re-summarise.
@@ -1965,7 +1984,12 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod) maybe_buf exc
                               $$ text "Expected:" <+> quotes (ppr wanted_mod)
 
 		-- Find the object timestamp, and return the summary
-	obj_timestamp <- getObjTimestamp location is_boot
+             
+	obj_timestamp <-
+           if isObjectTarget (hscTarget (hsc_dflags hsc_env)) 
+              || obj_allowed -- bug #1205
+              then getObjTimestamp location is_boot
+              else return Nothing
 
 	return (Just ( ModSummary { ms_mod       = mod, 
 				    ms_hsc_src   = hsc_src,
