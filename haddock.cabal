@@ -57,19 +57,24 @@ data-files:
 	html/minus.gif
 	html/plus.gif
 
-
+flag ghc-paths
+  description: Should we use ghc-paths to find GHC? This is always enabled, except when building in a GHC tree.
+  default: True
+  manual: True
 
 executable haddock
   build-depends:
     base,
     haskell98,
     ghc >= 6.8.2 && <= 6.9,
-    ghc-paths,
     filepath,
     directory,
     pretty,
     containers,
     array
+
+  if flag(ghc-paths)
+    build-depends: ghc-paths
 
   if impl(ghc >= 6.9)
     build-depends: Cabal >= 1.5
