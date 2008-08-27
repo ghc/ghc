@@ -22,6 +22,7 @@ test('simpl018', normal, compile, [''])
 test('simpl019', normal, compile, [''])
 
 test('simpl-T1370', normal, compile, [''])
+test('T2520', normal, compile, [''])
 
 
 test('spec001', skip_if_fast, compile, [''])
