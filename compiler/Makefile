@@ -150,7 +150,7 @@ COMMON_CONFIGURE_FLAGS += --ghc-option=-DOMIT_NATIVE_CODEGEN
 endif
 
 ifeq "$(TargetOS_CPP)" "openbsd"
-COMMON_CONFIGURE_FLAGS += --ld-options="-Xlinker -E"
+COMMON_CONFIGURE_FLAGS += --ld-options=-E
 endif
 
 ifeq "$(GhcUnregisterised)" "NO"
