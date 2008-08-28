@@ -84,7 +84,9 @@ install::
 	       -x c $(PACKAGE_CPP_OPTS) package.conf.in \
 	    | grep -v '^#pragma GCC' \
 	    | sed -e 's/""//g' -e 's/:[   ]*,/: /g' \
-	    | $(DESTDIR)$(bindir)/ghc-pkg --global-conf $(DESTDIR)$(datadir)/package.conf update - --force
+	    | $(GHC_PKG_INSTALL_PROG) --global-conf $(DESTDIR)$(datadir)/package.conf update - --force
+
+GHC_PKG_INSTALL_PROG = $(FPTOOLS_TOP_ABS)/utils/ghc-pkg/dist-install/build/ghc-pkg/ghc-pkg
 
 # we could be more accurate here and add a dependency on
 # driver/package.conf, but that doesn't work too well because of
