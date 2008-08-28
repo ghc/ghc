@@ -31,9 +31,9 @@ import UniqFM
 --				Smith, Ramsey, Holloway - PLDI 2004.
 --
 type Triv k cls color
-	=  cls 			-- ^ the class of the node we're trying to color.
-	-> UniqSet k		-- ^ the node's neighbors.
-	-> UniqSet color 	-- ^ the node's exclusions.
+	=  cls 			-- the class of the node we're trying to color.
+	-> UniqSet k		-- the node's neighbors.
+	-> UniqSet color 	-- the node's exclusions.
 	-> Bool		
 
 
