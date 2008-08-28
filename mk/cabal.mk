@@ -43,10 +43,13 @@ with-stage-2:
 	$(CABAL) build     --distpref dist-install $(DYN_FLAGS) $(BUILD_FLAGS)
 
 install:
-	$(INSTALL_PACKAGE) install UNUSED UNUSED '$(DESTDIR)' '$(prefix)' \
+	$(INSTALL_PACKAGE) install                                        \
+	                   '$(DESTDIR)$(bindir)/ghc-pkg'                  \
+	                   '$(DESTDIR)$(datadir)/package.conf'            \
+	                   '$(DESTDIR)' '$(prefix)'                       \
 	                   '$(prefix)' '$(bindir)' '$(libdir)'            \
-                       '$(libexecdir)' '$(dynlibdir)' '$(datadir)'    \
-                       '$(docdir)' '$(htmldir)' '$(haddockdir)'       \
+	                   '$(libexecdir)' '$(dynlibdir)' '$(datadir)'    \
+	                   '$(docdir)' '$(htmldir)' '$(haddockdir)'       \
 	                   --distpref dist-install                        \
 	                   $(INSTALL_FLAGS)
 
