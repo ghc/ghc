@@ -127,6 +127,9 @@ install:
 	                   --distpref dist-stage2                         \
 	                   $(INSTALL_FLAGS)
 
+html:
+	@:
+
 install-docs:
 	@:
 

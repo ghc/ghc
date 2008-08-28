@@ -452,6 +452,9 @@ primop-primop-info.hs-incl: prelude/primops.txt
 primop-usage.hs-incl: prelude/primops.txt
 	$(GENPRIMOP) --usage              < $< > $@
 
+html:
+	$(MAKE) doc stage=2
+
 install-docs:
 	@:
 
