@@ -44,7 +44,7 @@ with-stage-2:
 
 install:
 	$(INSTALL_PACKAGE) install                                        \
-	                   '$(DESTDIR)$(bindir)/ghc-pkg'                  \
+	                   '$(GHC_PKG_INSTALL_PROG)'                      \
 	                   '$(DESTDIR)$(datadir)/package.conf'            \
 	                   '$(DESTDIR)' '$(prefix)'                       \
 	                   '$(prefix)' '$(bindir)' '$(libdir)'            \

@@ -2,6 +2,8 @@
 nothing=
 space=$(nothing) $(nothing)
 
+GHC_PKG_INSTALL_PROG = $(FPTOOLS_TOP_ABS)/utils/ghc-pkg/dist-install/build/ghc-pkg/ghc-pkg
+
 LIBRARIES_ABS = $(FPTOOLS_TOP_ABS)/libraries
 UTILS_ABS     = $(FPTOOLS_TOP_ABS)/utils
 CABAL = $(LIBRARIES_ABS)/cabal-bin $(GHC) $(LIBRARIES_ABS)/bootstrapping.conf
