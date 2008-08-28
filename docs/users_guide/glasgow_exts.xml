@@ -52,297 +52,19 @@ documentation</ulink> describes all the libraries that come with GHC.
    <para> Language options recognised by Cabal can also be enabled using the <literal>LANGUAGE</literal> pragma,
    thus <literal>{-# LANGUAGE TemplateHaskell #-}</literal> (see <xref linkend="language-pragma"/>>). </para>
 
-    <para>Turning on an option that enables special syntax
-    <emphasis>might</emphasis> cause working Haskell 98 code to fail
-    to compile, perhaps because it uses a variable name which has
-    become a reserved word.  So, together with each option below, we
-    list the special syntax which is enabled by this option.  We use
-    notation and nonterminal names from the Haskell 98 lexical syntax
-    (see the Haskell 98 Report).  There are two classes of special
-    syntax:</para>
-
-    <itemizedlist>
-      <listitem>
-	<para>New reserved words and symbols: character sequences
-        which are no longer available for use as identifiers in the
-        program.</para>
-      </listitem>
-      <listitem>
-	<para>Other special syntax: sequences of characters that have
-	a different meaning when this particular option is turned
-	on.</para>
-      </listitem>
-    </itemizedlist>
-
-    <para>We are only listing syntax changes here that might affect
-    existing working programs (i.e. "stolen" syntax).  Many of these
-    extensions will also enable new context-free syntax, but in all
-    cases programs written to use the new syntax would not be
-    compilable without the option enabled.</para>
-
-    <variablelist>
-
-      <varlistentry>
-	<term>
-          <option>-fglasgow-exts</option>:
+    <para>The flag <option>-fglasgow-exts</option>:
           <indexterm><primary><option>-fglasgow-exts</option></primary></indexterm>
-        </term>
-	<listitem>
-	  <para>This simultaneously enables all of the extensions to
-          Haskell 98 described in <xref
-          linkend="ghc-language-features"/>, except where otherwise
-          noted. We are trying to move away from this portmanteau flag, 
-	  and towards enabling features individually.</para>
-
-	  <para>New reserved words: <literal>forall</literal> (only in
-	  types), <literal>mdo</literal>.</para>
-
-	  <para>Other syntax stolen:
-	      <replaceable>varid</replaceable>{<literal>&num;</literal>},
-	      <replaceable>char</replaceable><literal>&num;</literal>,	    
-	      <replaceable>string</replaceable><literal>&num;</literal>,    
-	      <replaceable>integer</replaceable><literal>&num;</literal>,    
-	      <replaceable>float</replaceable><literal>&num;</literal>,    
-	      <replaceable>float</replaceable><literal>&num;&num;</literal>,    
-	      <literal>(&num;</literal>, <literal>&num;)</literal>,	    
-	      <literal>|)</literal>, <literal>{|</literal>.</para>
-
-	  <para>Implies these specific language options: 
+	  simultaneously enables the following extensions: 
 	    <option>-XForeignFunctionInterface</option>,
 	    <option>-XImplicitParams</option>,
 	    <option>-XScopedTypeVariables</option>,
 	    <option>-XGADTs</option>, 
-	    <option>-XTypeFamilies</option>. </para>
-	</listitem>
-      </varlistentry>
+	    <option>-XTypeFamilies</option>.
+	    Enabling these options is the <emphasis>only</emphasis> 
+	    effect of <options>-fglasgow-exts</options>
+          We are trying to move away from this portmanteau flag, 
+	  and towards enabling features individually.</para>
 
-      <varlistentry>
-	<term>
-          <option>-XForeignFunctionInterface</option>:
-          <indexterm><primary><option>-XForeignFunctionInterface</option></primary></indexterm>
-        </term>
-	<listitem>
-	  <para>This option enables the language extension defined in the
-	  Haskell 98 Foreign Function Interface Addendum.</para>
-
-	  <para>New reserved words: <literal>foreign</literal>.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term>
-          <option>-XMagicHash</option>:
-        </term>
-	<listitem>
-	  <para> Allow "&num;" as a <link linkend="magic-hash">postfix modifier on identifiers</link>.
-          </para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term>
-          <option>-XMonomorphismRestriction</option>,<option>-XMonoPatBinds</option>:
-        </term>
-	<listitem>
-	  <para> These two flags control how generalisation is done.
-	    See <xref linkend="monomorphism"/>.
-          </para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term>
-          <option>-XExtendedDefaultRules</option>:
-          <indexterm><primary><option>-XExtendedDefaultRules</option></primary></indexterm>
-        </term>
-	<listitem>
-	  <para> Use GHCi's extended default rules in a regular module (<xref linkend="extended-default-rules"/>).
-          Independent of the <option>-fglasgow-exts</option>
-          flag. </para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term>
-          <option>-XRank2Types</option>
-          <indexterm><primary><option>-XRank2Types</option></primary></indexterm>
-        </term>
-	<term>
-          <option>-XRankNTypes</option>
-          <indexterm><primary><option>-XRankNTypes</option></primary></indexterm>
-        </term>
-	<term>
-          <option>-XPolymorphicComponents</option>
-          <indexterm><primary><option>-XPolymorphicComponents</option></primary></indexterm>
-        </term>
-	<listitem>
-	  <para> These flags control higher-rank polymorphism.  
-	    See <xref linkend="universal-quantification"/>.</para>
-	  <para>New reserved words: <literal>forall</literal>.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term>
-          <option>-XLiberalTypeSynonyms</option>
-          <indexterm><primary><option>-XLiberalTypeSynonyms</option></primary></indexterm>
-        </term>
-	<listitem>
-	  <para> Allow more liberal type synonyms.
-	    See <xref linkend="type-synonyms"/>.</para>
-	  <para>New reserved words: <literal>forall</literal>.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term>
-          <option>-XOverlappingInstances</option>
-          <indexterm><primary><option>-XOverlappingInstances</option></primary></indexterm>
-        </term>
-	<term>
-          <option>-XUndecidableInstances</option>
-          <indexterm><primary><option>-XUndecidableInstances</option></primary></indexterm>
-        </term>
-	<term>
-          <option>-XIncoherentInstances</option>
-          <indexterm><primary><option>-XIncoherentInstances</option></primary></indexterm>
-        </term>
-	<term>
-          <option>-fcontext-stack=N</option>
-          <indexterm><primary><option>-fcontext-stack</option></primary></indexterm>
-        </term>
-	<listitem>
-	  <para> See <xref linkend="instance-decls"/>. </para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term>
-          <option>-finline-phase</option>
-          <indexterm><primary><option>-finline-phase</option></primary></indexterm>
-        </term>
-	<listitem>
-	  <para>See <xref linkend="rewrite-rules"/>.  Only relevant if
-          you also use <option>-fglasgow-exts</option>.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term>
-          <option>-XArrows</option>
-          <indexterm><primary><option>-XArrows</option></primary></indexterm>
-        </term>
-	<listitem>
-	  <para>See <xref linkend="arrow-notation"/>.  Independent of
-          <option>-fglasgow-exts</option>.</para>
-
-	  <para>New reserved words/symbols: <literal>rec</literal>,
-	  <literal>proc</literal>, <literal>-&lt;</literal>,
-	  <literal>&gt;-</literal>, <literal>-&lt;&lt;</literal>,
-	  <literal>&gt;&gt;-</literal>.</para>
-
-	  <para>Other syntax stolen: <literal>(|</literal>,
-	  <literal>|)</literal>.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term>
-          <option>-XGenerics</option>
-          <indexterm><primary><option>-XGenerics</option></primary></indexterm>
-        </term>
-	<listitem>
-	  <para>See <xref linkend="generic-classes"/>.  Independent of
-          <option>-fglasgow-exts</option>.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term><option>-XNoImplicitPrelude</option></term>
-	<listitem>
-	  <para><indexterm><primary>-XNoImplicitPrelude
-          option</primary></indexterm> GHC normally imports
-          <filename>Prelude.hi</filename> files for you.  If you'd
-          rather it didn't, then give it a
-          <option>-XNoImplicitPrelude</option> option.  The idea is
-          that you can then import a Prelude of your own.  (But don't
-          call it <literal>Prelude</literal>; the Haskell module
-          namespace is flat, and you must not conflict with any
-          Prelude module.)</para>
-
-	  <para>Even though you have not imported the Prelude, most of
-          the built-in syntax still refers to the built-in Haskell
-          Prelude types and values, as specified by the Haskell
-          Report.  For example, the type <literal>[Int]</literal>
-          still means <literal>Prelude.[] Int</literal>; tuples
-          continue to refer to the standard Prelude tuples; the
-          translation for list comprehensions continues to use
-          <literal>Prelude.map</literal> etc.</para>
-
-	  <para>However, <option>-XNoImplicitPrelude</option> does
-	  change the handling of certain built-in syntax: see <xref
-	  linkend="rebindable-syntax"/>.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term><option>-XImplicitParams</option></term>
-	<listitem>
-	  <para>Enables implicit parameters (see <xref
-	  linkend="implicit-parameters"/>).  Currently also implied by 
-	  <option>-fglasgow-exts</option>.</para>
-
-	  <para>Syntax stolen:
-	  <literal>?<replaceable>varid</replaceable></literal>,
-	  <literal>%<replaceable>varid</replaceable></literal>.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term><option>-XOverloadedStrings</option></term>
-	<listitem>
-	  <para>Enables overloaded string literals (see <xref
-	  linkend="overloaded-strings"/>).</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term><option>-XScopedTypeVariables</option></term>
-	<listitem>
-	  <para>Enables lexically-scoped type variables (see <xref
-	  linkend="scoped-type-variables"/>).  Implied by
-	  <option>-fglasgow-exts</option>.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term><option>-XTemplateHaskell</option></term>
-	<listitem>
-	  <para>Enables Template Haskell (see <xref
-	  linkend="template-haskell"/>).  This flag must
-	  be given explicitly; it is no longer implied by
-	  <option>-fglasgow-exts</option>.</para>
-
-	  <para>Syntax stolen: <literal>[|</literal>,
-	  <literal>[e|</literal>, <literal>[p|</literal>,
-	  <literal>[d|</literal>, <literal>[t|</literal>,
-	  <literal>$(</literal>,
-	  <literal>$<replaceable>varid</replaceable></literal>.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term><option>-XQuasiQuotes</option></term>
-	<listitem>
-	  <para>Enables quasiquotation (see <xref
-	  linkend="th-quasiquotation"/>).</para>
-
-	  <para>Syntax stolen:
-	  <literal>[:<replaceable>varid</replaceable>|</literal>.</para>
-	</listitem>
-      </varlistentry>
-
-    </variablelist>
   </sect1>
 
 <!-- UNBOXED TYPES AND PRIMITIVE OPERATIONS -->
@@ -1303,21 +1025,28 @@ output = [ x
    <!-- ===================== REBINDABLE SYNTAX ===================  -->
 
 <sect2 id="rebindable-syntax">
-<title>Rebindable syntax</title>
+<title>Rebindable syntax and the implicit Prelude import</title>
 
-      <para>GHC allows most kinds of built-in syntax to be rebound by
-      the user, to facilitate replacing the <literal>Prelude</literal>
-      with a home-grown version, for example.</para>
+ <para><indexterm><primary>-XNoImplicitPrelude
+ option</primary></indexterm> GHC normally imports
+ <filename>Prelude.hi</filename> files for you.  If you'd
+ rather it didn't, then give it a
+ <option>-XNoImplicitPrelude</option> option.  The idea is
+ that you can then import a Prelude of your own.  (But don't
+ call it <literal>Prelude</literal>; the Haskell module
+ namespace is flat, and you must not conflict with any
+ Prelude module.)</para>
 
-            <para>You may want to define your own numeric class
+            <para>Suppose you are importing a Prelude of your own
+	      in order to define your own numeric class
             hierarchy.  It completely defeats that purpose if the
             literal "1" means "<literal>Prelude.fromInteger
             1</literal>", which is what the Haskell Report specifies.
-            So the <option>-XNoImplicitPrelude</option> flag causes
+            So the <option>-XNoImplicitPrelude</option> 
+	      flag <emphasis>also</emphasis> causes
             the following pieces of built-in syntax to refer to
             <emphasis>whatever is in scope</emphasis>, not the Prelude
             versions:
-
 	    <itemizedlist>
 	      <listitem>
 		<para>An integer literal <literal>368</literal> means
@@ -1646,6 +1375,144 @@ import "network" Network.Socket
     packages when APIs change.  It can lead to fragile dependencies in
     the common case: modules occasionally move from one package to
     another, rendering any package-qualified imports broken.</para>
+</sect2>
+
+<sect2 id="syntax-stolen">
+<title>Summary of stolen syntax</title>
+
+    <para>Turning on an option that enables special syntax
+    <emphasis>might</emphasis> cause working Haskell 98 code to fail
+    to compile, perhaps because it uses a variable name which has
+    become a reserved word.  This section lists the syntax that is
+    "stolen" by language extensions.
+     We use
+    notation and nonterminal names from the Haskell 98 lexical syntax
+    (see the Haskell 98 Report).  
+    We only list syntax changes here that might affect
+    existing working programs (i.e. "stolen" syntax).  Many of these
+    extensions will also enable new context-free syntax, but in all
+    cases programs written to use the new syntax would not be
+    compilable without the option enabled.</para>
+
+<para>There are two classes of special
+    syntax:
+
+    <itemizedlist>
+      <listitem>
+	<para>New reserved words and symbols: character sequences
+        which are no longer available for use as identifiers in the
+        program.</para>
+      </listitem>
+      <listitem>
+	<para>Other special syntax: sequences of characters that have
+	a different meaning when this particular option is turned
+	on.</para>
+      </listitem>
+    </itemizedlist>
+    
+The following syntax is stolen:
+
+    <variablelist>
+      <varlistentry>
+	<term>
+          <literal>forall</literal>
+          <indexterm><primary><literal>forall</literal></primary></indexterm>
+	</term>
+	<listitem><para>
+	Stolen (in types) by: <option>-XScopedTypeVariables</option>,
+	    <option>-XLiberalTypeSynonyms</option>,
+	    <option>-XRank2Types</option>,
+	    <option>-XRankNTypes</option>,
+	    <option>-XPolymorphicComponents</option>,
+	    <option>-XExistentialQuantification</option>
+	  </para></listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+          <literal>mdo</literal>
+          <indexterm><primary><literal>mdo</literal></primary></indexterm>
+	</term>
+	<listitem><para>
+	Stolen by: <option>-XRecursiveDo</option>,
+	  </para></listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+          <literal>foreign</literal>
+          <indexterm><primary><literal>foreign</literal></primary></indexterm>
+	</term>
+	<listitem><para>
+	Stolen by: <option>-XForeignFunctionInterface</option>,
+	  </para></listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+          <literal>rec</literal>,
+	  <literal>proc</literal>, <literal>-&lt;</literal>,
+	  <literal>&gt;-</literal>, <literal>-&lt;&lt;</literal>,
+	  <literal>&gt;&gt;-</literal>, and <literal>(|</literal>,
+	  <literal>|)</literal> brackets
+          <indexterm><primary><literal>proc</literal></primary></indexterm>
+	</term>
+	<listitem><para>
+	Stolen by: <option>-XArrows</option>,
+	  </para></listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+	  <literal>?<replaceable>varid</replaceable></literal>,
+	  <literal>%<replaceable>varid</replaceable></literal>
+          <indexterm><primary>implicit parameters</primary></indexterm>
+	</term>
+	<listitem><para>
+	Stolen by: <option>-XImplicitParams</option>,
+	  </para></listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+	  <literal>[|</literal>,
+	  <literal>[e|</literal>, <literal>[p|</literal>,
+	  <literal>[d|</literal>, <literal>[t|</literal>,
+	  <literal>$(</literal>,
+	  <literal>$<replaceable>varid</replaceable></literal>
+          <indexterm><primary>Template Haskell</primary></indexterm>
+	</term>
+	<listitem><para>
+	Stolen by: <option>-XTemplateHaskell</option>,
+	  </para></listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+	  <literal>[:<replaceable>varid</replaceable>|</literal>
+          <indexterm><primary>quasi-quotation</primary></indexterm>
+	</term>
+	<listitem><para>
+	Stolen by: <option>-XQuasiQuotes</option>,
+	  </para></listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+	      <replaceable>varid</replaceable>{<literal>&num;</literal>},
+	      <replaceable>char</replaceable><literal>&num;</literal>,	    
+	      <replaceable>string</replaceable><literal>&num;</literal>,    
+	      <replaceable>integer</replaceable><literal>&num;</literal>,    
+	      <replaceable>float</replaceable><literal>&num;</literal>,    
+	      <replaceable>float</replaceable><literal>&num;&num;</literal>,    
+	      <literal>(&num;</literal>, <literal>&num;)</literal>,	    
+	</term>
+	<listitem><para>
+	Stolen by: <option>-XMagicHash</option>,
+	  </para></listitem>
+      </varlistentry>
+    </variablelist>
+</para>
 </sect2>
 </sect1>
 
