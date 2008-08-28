@@ -183,7 +183,7 @@ type ConstrDescription = CmmLit
 type FunType = StgHalfWord
 type FunArity = StgHalfWord
 type SlowEntry = CmmLit
-  -- ^We would like this to be a CLabel but
+  -- We would like this to be a CLabel but
   -- for now the parser sets this to zero on an INFO_TABLE_FUN.
 type SelectorOffset = StgWord
 

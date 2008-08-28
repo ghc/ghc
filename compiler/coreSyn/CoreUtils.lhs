@@ -1474,7 +1474,7 @@ hashExpr :: CoreExpr -> Int
 hashExpr e = fromIntegral (hash_expr (1,emptyVarEnv) e .&. 0x7fffffff)
              -- UniqFM doesn't like negative Ints
 
-type HashEnv = (Int, VarEnv Int)  -- ^ Hash code for bound variables
+type HashEnv = (Int, VarEnv Int)  -- Hash code for bound variables
 
 hash_expr :: HashEnv -> CoreExpr -> Word32
 -- Word32, because we're expecting overflows here, and overflowing

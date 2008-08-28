@@ -289,7 +289,7 @@ mkTcTyVar name kind details
 %************************************************************************
 
 \begin{code}
-type CoVar = Var	-- ^ A coercion variable is simply a type 
+type CoVar = Var -- A coercion variable is simply a type 
 			-- variable of kind @ty1 :=: ty2@. Hence its
 			-- 'varType' is always @PredTy (EqPred t1 t2)@
 
