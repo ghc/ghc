@@ -843,22 +843,26 @@ gen_Read_binds get_fixity loc tycon
 	con_str = data_con_str data_con
 	
 	prefix_parser = mk_parser prefix_prec prefix_stmts body
-       	prefix_stmts		-- T a b c
-       	  = (if not (isSym con_str) then
-		  [bindLex (ident_pat con_str)]
-	     else [read_punc "(", bindLex (symbol_pat con_str), read_punc ")"])
-       	    ++ read_args
+
+	read_prefix_con
+	    | isSym con_str = [read_punc "(", bindLex (symbol_pat con_str), read_punc ")"]
+	    | otherwise     = [bindLex (ident_pat con_str)]
      	 
+	read_infix_con
+	    | isSym con_str = [bindLex (symbol_pat con_str)]
+	    | otherwise     = [read_punc "`", bindLex (ident_pat con_str), read_punc "`"]
+
+       	prefix_stmts		-- T a b c
+       	  = read_prefix_con ++ read_args
+
        	infix_stmts 		-- a %% b, or  a `T` b 
        	  = [read_a1]
-   	    ++	(if isSym con_str
-		 then [bindLex (symbol_pat con_str)]
-		 else [read_punc "`", bindLex (ident_pat con_str), read_punc "`"])
+   	    ++ read_infix_con
 	    ++ [read_a2]
      
        	record_stmts		-- T { f1 = a, f2 = b }
-       	  = [bindLex (ident_pat (wrapOpParens con_str)),
-       	     read_punc "{"]
+       	  = read_prefix_con 
+	    ++ [read_punc "{"]
        	    ++ concat (intersperse [read_punc ","] field_stmts)
        	    ++ [read_punc "}"]
      
