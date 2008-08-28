@@ -2,6 +2,7 @@
 
 set -e
 
+HADDOCK=../utils/haddock/install-inplace/bin/haddock
 HADDOCK_ARGS=
 NAMES=
 
@@ -22,9 +23,9 @@ do
 done
 
 # Now create the combined contents and index pages
-haddock --gen-index --gen-contents -o . \
-        -t "Haskell Hierarchical Libraries" \
-        $HADDOCK_ARGS
+$HADDOCK --gen-index --gen-contents -o . \
+         -t "Haskell Hierarchical Libraries" \
+         $HADDOCK_ARGS
 
 # Unhandled Windows help stuff?:
 

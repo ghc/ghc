@@ -29,10 +29,6 @@ ifneq "$(ALEX)" ""
 COMMON_CONFIGURE_FLAGS += --with-alex=$(ALEX)
 endif
 
-ifneq "$(HADDOCK)" ""
-COMMON_CONFIGURE_FLAGS += --with-haddock=$(HADDOCK)
-endif
-
 ifneq "$(HAPPY)" ""
 COMMON_CONFIGURE_FLAGS += --with-happy=$(HAPPY)
 endif

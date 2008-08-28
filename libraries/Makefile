@@ -197,10 +197,6 @@ endif
 
 all: build
 
-ifeq "$(HADDOCK_DOCS)" "YES"
-all: doc
-endif
-
 .PHONY: rebuild.library.%
 .PHONY: remake.library.%
 
@@ -297,7 +293,7 @@ doc: $(foreach SUBDIR,$(DOC_SUBDIRS),doc.library.$(SUBDIR))
 ifneq "$(HSCOLOUR)" ""
 CABAL_HADDOCK_FLAGS += --hyperlink-source
 endif
-CABAL_HADDOCK_FLAGS += --with-haddock=$(FPTOOLS_ABS_TOP)/utils/haddock/install-inplace/bin/haddock
+CABAL_HADDOCK_FLAGS += --with-haddock=$(FPTOOLS_TOP_ABS)/utils/haddock/install-inplace/bin/haddock
 
 $(foreach SUBDIR,$(DOC_SUBDIRS),doc.library.$(SUBDIR)):\
 doc.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \

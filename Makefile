@@ -125,7 +125,6 @@ stage1 : $(GCC_LIB_DEP) check-all
 	$(MAKE) -C rts boot
 	$(MAKE) -C rts
 	$(MAKE) -C libraries all
-	$(MAKE) -C utils with-stage-1
 
 # When making distributions (i.e., whether with binary-dist or using the 
 # vanilla install target to create an installer package), we can have problems
@@ -137,8 +136,10 @@ stage1 : $(GCC_LIB_DEP) check-all
 stage2 : check-all
 	$(MAKE) -C compiler stage=2 boot
 	$(MAKE) -C compiler stage=2
+	$(MAKE) -C utils with-stage-2
 ifeq "$(HADDOCK_DOCS)" "YES"
-	$(MAKE) -C compiler stage=2 doc
+	$(MAKE) -C libraries doc
+	$(MAKE) -C compiler  doc stage=2
 endif
 
 stage3 : check-all

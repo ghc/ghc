@@ -14,14 +14,14 @@ INSTALL_FLAGS =
 endif
 endif
 
-# Tell stage1 to make a dynamically-linked binary, but no wrapper.  We assume
+# Tell stage2 to make a dynamically-linked binary, but no wrapper.  We assume
 # that in an installation the shared libs will be installed somewhere that
 # the system can find them.
 ifeq "$(BuildSharedLibs)" "YES"
 DYN_FLAGS = --ghc-option=-dynamic --ghc-option=-dynload --ghc-option=deploy
 endif
 
-.PHONY: default all with-bootstrapping-compiler with-stage-1 clean distclean
+.PHONY: default all with-bootstrapping-compiler with-stage-2 clean distclean
 
 default all: with-bootstrapping-compiler
 
@@ -34,12 +34,12 @@ with-bootstrapping-compiler:
 	$(CABAL) build     --distpref dist-inplace $(BUILD_FLAGS)
 	$(CABAL) install   --distpref dist-inplace $(INSTALL_FLAGS)
 
-with-stage-1:
+with-stage-2:
 	$(CABAL) configure --distpref dist-install         \
 	                   $(INSTALL_DIRS_CONFIGURE_FLAGS) \
-	                   $(USE_STAGE1_CONFIGURE_FLAGS)   \
+	                   $(USE_STAGE2_CONFIGURE_FLAGS)   \
 	                   $(COMMON_CONFIGURE_FLAGS)       \
-	                   $(EXTRA_STAGE1_CONFIGURE_FLAGS)
+	                   $(EXTRA_STAGE2_CONFIGURE_FLAGS)
 	$(CABAL) build     --distpref dist-install $(DYN_FLAGS) $(BUILD_FLAGS)
 
 install:

@@ -59,11 +59,13 @@ doInstall verbosity distPref enableShellWrappers strip
        do let userHooks = simpleUserHooks
               copyto = if null destdir then NoCopyDest else CopyTo destdir
               copyFlags = defaultCopyFlags {
+                              copyDistPref = toFlag distPref,
                               copyUseWrapper = toFlag enableShellWrappers,
                               copyDest = toFlag copyto,
                               copyVerbosity = toFlag verbosity
                           }
               registerFlags = defaultRegisterFlags {
+                                  regDistPref = toFlag distPref,
                                   regPackageDB = toFlag GlobalPackageDB,
                                   regVerbosity = toFlag verbosity,
                                   regGenScript = toFlag $ False,

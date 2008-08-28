@@ -3,13 +3,13 @@ TOP=../..
 ENABLE_SHELL_WRAPPERS = YES
 EXTRA_CLEAN = Version.hs
 EXTRA_INPLACE_CONFIGURE_FLAGS = $(INPLACE_GHC_DATADIR_CONFIGURE_FLAGS)
-EXTRA_STAGE1_CONFIGURE_FLAGS = --datasubdir=.
+EXTRA_STAGE2_CONFIGURE_FLAGS = --datasubdir=.
 
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/cabal.mk
 
 with-bootstrapping-compiler: Version.hs
-with-stage-1: Version.hs
+with-stage-2: Version.hs
 
 Version.hs: Makefile $(TOP)/mk/config.mk
 	$(RM) -f Version.hs

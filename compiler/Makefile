@@ -199,7 +199,9 @@ build.stage.%:
 	$(MAKE) -C ../ghc stage=$*
 
 doc.stage.%:
-	$(CABAL) haddock --distpref dist-stage$*
+	$(CABAL) haddock --distpref dist-stage$* \
+	                 --haddock-option=--optghc=-DSTAGE=$* \
+	                 --with-haddock=$(FPTOOLS_TOP_ABS)/utils/haddock/install-inplace/bin/haddock
 
 # XXX We ought to actually install the (stage 2) library
 install:

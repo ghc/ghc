@@ -52,15 +52,15 @@ endif
 
 WITH_BOOTSTRAPPING_COMPILER = installPackage ghc-pkg hsc2hs hpc
 
-WITH_STAGE1 = installPackage ghc-pkg hasktags runghc hpc pwd haddock
+WITH_STAGE2 = installPackage ghc-pkg hasktags runghc hpc pwd haddock
 ifneq "$(NO_INSTALL_HSC2HS)" "YES"
-WITH_STAGE1 += hsc2hs
+WITH_STAGE2 += hsc2hs
 endif
 
 # sort removes duplicates - we don't actually care about the order
-WITH_EITHER = $(sort $(WITH_BOOTSTRAPPING_COMPILER) $(WITH_STAGE1))
+WITH_EITHER = $(sort $(WITH_BOOTSTRAPPING_COMPILER) $(WITH_STAGE2))
 
-binary-dist: $(foreach P,$(WITH_STAGE1),binary-dist.$P)
+binary-dist: $(foreach P,$(WITH_STAGE2),binary-dist.$P)
 ifeq "$(WHERE_AM_I)" ""
 	echo "I don't know where I am" >&2
 	exit 1
@@ -75,9 +75,10 @@ distclean:: $(foreach P,$(WITH_EITHER),distclean.$P)
 with-bootstrapping-compiler: \
     $(foreach P,$(WITH_BOOTSTRAPPING_COMPILER),with-bootstrapping-compiler.$P)
 
-with-stage-1: $(foreach P,$(WITH_STAGE1),with-stage-1.$P)
+with-stage-2: $(foreach P,$(WITH_STAGE2),with-stage-2.$P)
+	$(MAKE) -C haddock install-inplace
 
-install:: $(foreach P,$(WITH_STAGE1),install.$P)
+install:: $(foreach P,$(WITH_STAGE2),install.$P)
 
 $(foreach P,$(WITH_EITHER),clean.$P): \
 clean.%:
@@ -91,15 +92,15 @@ $(foreach P,$(WITH_BOOTSTRAPPING_COMPILER),with-bootstrapping-compiler.$P): \
 with-bootstrapping-compiler.%:
 	$(MAKE) -C $* with-bootstrapping-compiler
 
-$(foreach P,$(WITH_STAGE1),with-stage-1.$P): \
-with-stage-1.%:
-	$(MAKE) -C $* with-stage-1
+$(foreach P,$(WITH_STAGE2),with-stage-2.$P): \
+with-stage-2.%:
+	$(MAKE) -C $* with-stage-2
 
-$(foreach P,$(WITH_STAGE1),install.$P): \
+$(foreach P,$(WITH_STAGE2),install.$P): \
 install.%:
 	$(MAKE) -C $* install
 
-$(foreach P,$(WITH_STAGE1),binary-dist.$P): \
+$(foreach P,$(WITH_STAGE2),binary-dist.$P): \
 binary-dist.%:
 	$(MAKE) -C $* binary-dist WHERE_AM_I=$(WHERE_AM_I)/$*
 
