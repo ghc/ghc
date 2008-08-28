@@ -1,2 +1,2 @@
 
-$executablename -B$datadir ${1+"$@"}
+$executablename -B$datadir -l$datadir ${1+"$@"}

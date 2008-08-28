@@ -38,7 +38,9 @@ import System.Exit
 import System.Environment
 
 import GHC
+#ifdef GHC_PATHS
 import GHC.Paths
+#endif
 import DynFlags
 import Bag
 import ErrUtils
@@ -137,7 +139,12 @@ main = handleTopExceptions $ do
 
       let libDir
             | Just dir <- getGhcLibDir flags = dir
-            | otherwise = libdir -- from GHC.Paths
+            | otherwise =
+#ifdef GHC_PATHS
+                libdir -- from GHC.Paths
+#else
+                error "No GhcLibDir"
+#endif
 
       -- initialize GHC
       (session, dynflags) <- startGhc libDir (ghcFlags flags)

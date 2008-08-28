@@ -25,6 +25,7 @@ import GHC
 import DynFlags hiding (Option)
 import Packages hiding (package)
 import StaticFlags
+import SrcLoc
 
 
 -- | Start a GHC session with the -haddock flag set. Also turn off 
@@ -33,7 +34,7 @@ startGhc :: String -> [String] -> IO (Session, DynFlags)
 startGhc libDir flags = do
   -- TODO: handle warnings?
 #if __GLASGOW_HASKELL__ >= 609 
-  (restFlags, _) <- parseStaticFlags flags
+  (restFlags, _) <- parseStaticFlags (map noLoc flags)
 #else
   restFlags <- parseStaticFlags flags
 #endif
