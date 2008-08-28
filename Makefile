@@ -74,16 +74,7 @@ endif
 
 SUBDIRS = gmp libffi includes utils driver docs rts compiler ghc libraries libraries/Cabal/doc
 
-check-all: check-tools check-packages
-
-check-tools:
-	@:
-ifeq "$(HADDOCK_DOCS)" "YES"
-ifeq "$(HADDOCK)"      ""
-	echo "Couldn't find haddock" >&2
-	exit 1
-endif
-endif
+check-all: check-packages
 
 # Sanity check that all the boot libraries are in the tree, to catch
 # failure to run darcs-all.
