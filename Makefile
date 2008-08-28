@@ -460,7 +460,7 @@ binary-dist::
 
 ifeq "$(darwin_TARGET_OS)" "1"
 
-.PHONY: framework-pkg, framework-binary-dist
+.PHONY: framework-pkg framework-binary-dist
 
 framework-pkg:
 	$(MAKE) -C distrib/MacOS framework-pkg
