@@ -12,6 +12,10 @@ SRC_HC_OPTS += -w
 
 INPLACE_PKG_CONF = $(FPTOOLS_TOP_ABS)/ghc/inplace-datadir/package.conf
 
+ifneq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
+INSTALL_INPLACE_FLAGS += --enable-shell-wrappers
+endif
+
 install-inplace:
 	$(INSTALL_PACKAGE) install '$(GHC_PKG_PROG)' '$(INPLACE_PKG_CONF)' ''  \
 	    '$(FPTOOLS_TOP_ABS)/utils/haddock/install-inplace' \
@@ -24,5 +28,6 @@ install-inplace:
 	    '$$prefix/doc'                                     \
 	    '$$prefix/html'                                    \
 	    '$$prefix/haddock'                                 \
-	    --distpref dist-install --enable-shell-wrappers
+	    --distpref dist-install                            \
+	    $(INSTALL_INPLACE_FLAGS)
 
