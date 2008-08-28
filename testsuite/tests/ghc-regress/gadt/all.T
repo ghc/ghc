@@ -50,10 +50,10 @@ test('arrow', normal, compile, [''])
 test('tdpe', normal, compile, [''])
 test('Nilsson', skip_if_fast, compile, [''])
 
-# 'records' is done twice, so that even in fast mode we check it works
-# The second way tests that running it works too
-test('records', normal, compile, [''])
-test('records', skip_if_fast, compile_and_run, [''])
+if config.fast:
+    test('records', normal, compile, [''])
+else:
+    test('records', normal, compile_and_run, [''])
 test('ubx-records', skip_if_fast, compile_and_run, [''])
 test('records-fail1', normal, compile_fail, [''])
 
