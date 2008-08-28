@@ -56,6 +56,7 @@ install:
 clean:
 	-$(CABAL) clean --distpref dist-inplace
 	-$(CABAL) clean --distpref dist-install
+	$(RM) -rf install-inplace
 ifneq "$(EXTRA_CLEAN)" ""
 	$(RM) -f $(EXTRA_CLEAN)
 endif
