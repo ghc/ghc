@@ -71,7 +71,7 @@ unpackPackageId p
         (pid:_) -> Just pid
   where str = packageIdString p
 
--- | Turn a 'PackageConfig', which contains GHC 'ModuleName's into a Cabal specific
+-- | Turn a 'PackageConfig', which contains GHC 'Module.ModuleName's into a Cabal specific
 -- 'InstalledPackageInfo' which contains Cabal 'Distribution.ModuleName.ModuleName's
 packageConfigToInstalledPackageInfo :: PackageConfig -> InstalledPackageInfo
 packageConfigToInstalledPackageInfo
@@ -83,7 +83,7 @@ packageConfigToInstalledPackageInfo
           convert = fromJust . simpleParse . moduleNameString
 
 -- | Turn an 'InstalledPackageInfo', which contains Cabal 'Distribution.ModuleName.ModuleName's
--- into a GHC specific 'PackageConfig' which contains GHC 'ModuleName's
+-- into a GHC specific 'PackageConfig' which contains GHC 'Module.ModuleName's
 installedPackageInfoToPackageConfig :: InstalledPackageInfo -> PackageConfig
 installedPackageInfoToPackageConfig
     (pkgconf@(InstalledPackageInfo { exposedModules = e,
