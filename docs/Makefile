@@ -1,10 +1,7 @@
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
 
-SUBDIRS = man docbook-cheat-sheet users_guide
-ifneq "$(DOING_BIN_DIST)" "YES"
-SUBDIRS += ext-core storage-mgt
-endif
+SUBDIRS = man docbook-cheat-sheet users_guide ext-core storage-mgt
 
 PAGE = index.html
 
