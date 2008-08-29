@@ -45,7 +45,7 @@ sub pushall {
     @repos = <IN>;
     close IN;
 
-    foreach (@repos) {
+    REPO: foreach (@repos) {
         chomp;
         if (/^([^# ]+) +(?:([^ ]+) +)?([^ ]+) +([^ ]+)$/) {
             $localpath = $1;
@@ -56,7 +56,13 @@ sub pushall {
                 $path = "$reporoot/$localpath";
             }
             else {
-                $path = "$reporoot/$remotepath";
+                if ($remotepath =~ /^http:/) {
+                    message "Ignoring $localpath; remote is http URL";
+                    next REPO;
+                }
+                else {
+                    $path = "$reporoot/$remotepath";
+                }
             }
 
             if (-d "$localpath/_darcs") {
