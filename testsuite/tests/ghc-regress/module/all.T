@@ -180,7 +180,7 @@ test('mod124',
      multimod_compile_fail, ['mod124', '-v0'])
 
 test('mod125',
-     extra_clean(['Mod124_A.hi', 'Mod124_A.o']),
+     extra_clean(['Mod125_A.hi', 'Mod125_A.o']),
      multimod_compile_fail, ['mod125', '-v0'])
 
 test('mod126',
