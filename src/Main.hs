@@ -33,9 +33,16 @@ import Data.Dynamic
 import Data.Maybe
 import Data.IORef
 import qualified Data.Map as Map
+import Data.Version
 import System.IO
 import System.Exit
 import System.Environment
+import System.FilePath
+#ifdef IN_GHC_TREE
+import Foreign
+import Foreign.C
+import Data.Int
+#endif
 
 import GHC
 #ifdef GHC_PATHS
@@ -140,10 +147,10 @@ main = handleTopExceptions $ do
       let libDir
             | Just dir <- getGhcLibDir flags = dir
             | otherwise =
-#ifdef GHC_PATHS
-                libdir -- from GHC.Paths
+#ifdef IN_GHC_TREE
+                error "No GhcLibDir found"
 #else
-                error "No GhcLibDir"
+                libdir -- from GHC.Paths
 #endif
 
       -- initialize GHC
@@ -200,7 +207,17 @@ render flags interfaces installedIfaces = do
     verbose = Flag_Verbose `elem` flags
 
   libdir <- case [str | Flag_Lib str <- flags] of
-		[] -> getDataDir -- provided by Cabal
+		[] ->
+#ifdef IN_GHC_TREE
+                      do m <- getExecDir
+                         case m of
+                             Nothing -> error "No libdir found"
+                             Just d ->
+                                 return (d </> ".." </> "share"
+                                           </> ("haddock-" ++ showVersion version))
+#else
+                      getDataDir -- provided by Cabal
+#endif
 		fs -> return (last fs)
 
   let css_file = case [str | Flag_CSS str <- flags] of
@@ -350,3 +367,21 @@ getPrologue flags
 		Left err -> throwE err
 		Right doc -> return (Just doc)
 	_otherwise -> throwE "multiple -p/--prologue options"
+
+getExecDir :: IO (Maybe String)
+#if defined(mingw32_HOST_OS)
+getExecDir = allocaArray len $ \buf -> do
+    ret <- getModuleFileName nullPtr buf len
+    if ret == 0
+        then return Nothing
+        else do s <- peekCString buf
+                return (Just (dropFileName s))
+  where len = 2048 -- Plenty, PATH_MAX is 512 under Win32.
+
+foreign import stdcall unsafe  "GetModuleFileNameA"
+  getModuleFileName :: Ptr () -> CString -> Int -> IO Int32
+#else
+getExecDir = return Nothing
+#endif
+
+

@@ -57,9 +57,9 @@ data-files:
 	html/minus.gif
 	html/plus.gif
 
-flag ghc-paths
-  description: Should we use ghc-paths to find GHC? This is always enabled, except when building in a GHC tree.
-  default: True
+flag in-ghc-tree
+  description: Are we in a GHC tree?
+  default: False
   manual: True
 
 executable haddock
@@ -73,9 +73,11 @@ executable haddock
     containers,
     array
 
-  if flag(ghc-paths)
+  if flag(in-ghc-tree)
+    cpp-options: -DIN_GHC_TREE
+    extensions: ForeignFunctionInterface
+  else
     build-depends: ghc-paths
-    cpp-options: -DGHC_PATHS
 
   if impl(ghc >= 6.9)
     build-depends: Cabal >= 1.5, getopt

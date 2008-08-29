@@ -1,8 +1,8 @@
 
 TOP=../..
 ENABLE_SHELL_WRAPPERS = YES
-EXTRA_INPLACE_CONFIGURE_FLAGS += --flags=-ghc-paths
-EXTRA_STAGE2_CONFIGURE_FLAGS += --flags=-ghc-paths
+EXTRA_INPLACE_CONFIGURE_FLAGS += --flags=in-ghc-tree
+EXTRA_STAGE2_CONFIGURE_FLAGS += --flags=in-ghc-tree
 
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/cabal.mk
