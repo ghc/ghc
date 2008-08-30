@@ -3,7 +3,7 @@
 # actually get built
 .                                       ghc                             git
 utils/hsc2hs                            hsc2hs                          darcs
-utils/haddock                           http://code.haskell.org/haddock darcs
+utils/haddock                           haddock2                        darcs
 libraries/array                         packages/array                  darcs
 libraries/base                          packages/base                   darcs
 libraries/base3-compat                  packages/base3-compat           darcs
