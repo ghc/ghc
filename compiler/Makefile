@@ -160,6 +160,13 @@ COMMON_CONFIGURE_FLAGS += --ld-option=-Wl,--relax
 endif
 endif
 
+# We need to turn on profiling either if we have been asked to
+# (GhcLibProfiled = YES) or if we want GHC itself to be compiled with
+# profiling enabled (GhcProfiled = YES).
+ifneq "$(GhcLibProfiled) $(GhcProfiled)" "NO NO"
+CONFIGURE_FLAGS_STAGE2 += --enable-library-profiling
+endif
+
 ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 # The #include is vital for the via-C route with older compilers, else the C
 # compiler doesn't realise that the stcall foreign imports are indeed
