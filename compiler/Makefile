@@ -165,6 +165,10 @@ endif
 # profiling enabled (GhcProfiled = YES).
 ifneq "$(GhcLibProfiled) $(GhcProfiled)" "NO NO"
 CONFIGURE_FLAGS_STAGE2 += --enable-library-profiling
+# And if we're profiling GHC then we want lots of SCCs
+ifeq "$(GhcProfiled)" "YES"
+CONFIGURE_FLAGS_STAGE2 += --ghc-option=-auto-all
+endif
 endif
 
 ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
