@@ -317,10 +317,11 @@ rnValBindsRHSGen trim bound_names (ValBindsIn mbinds sigs) = do
    sigs' <- renameSigs (Just (mkNameSet bound_names)) okBindSig sigs
    -- rename the RHSes
    binds_w_dus <- mapBagM (rnBind (mkSigTvFn sigs') trim) mbinds
-   let (anal_binds, anal_dus) = depAnalBinds binds_w_dus
-       (valbind', valbind'_dus) = (ValBindsOut anal_binds sigs',
-                                   usesOnly (hsSigsFVs sigs') `plusDU` anal_dus)
-   return (valbind', valbind'_dus)
+   case depAnalBinds binds_w_dus of
+       (anal_binds, anal_dus) ->
+           do let valbind' = ValBindsOut anal_binds sigs'
+                  valbind'_dus = usesOnly (hsSigsFVs sigs') `plusDU` anal_dus
+              return (valbind', valbind'_dus)
 
 rnValBindsRHSGen _ _ b = pprPanic "rnValBindsRHSGen" (ppr b)
 
