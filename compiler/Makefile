@@ -116,8 +116,7 @@ ifeq "$(GhciWithDebugger)" "YES"
 CONFIGURE_FLAGS_STAGE2 += --ghc-option=-DDEBUGGER
 endif
 
-# Enable editline if either:
-#   - we're building stage 1 and $(GhcHasEditline)="YES"
+# Enable editline if:
 #   - we're building stage 2/3, and we have built the editline package
 #
 # But we don't enable editline on Windows, as Windows terminals have
@@ -127,11 +126,7 @@ ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 CONFIGURE_FLAGS_STAGE1 += --flags=-editline
 CONFIGURE_FLAGS_STAGE2 += --flags=-editline
 else
-ifeq "$(GhcHasEditline)" "YES"
-CONFIGURE_FLAGS_STAGE1 += --flags=editline
-else
 CONFIGURE_FLAGS_STAGE1 += --flags=-editline
-endif
 ifeq "$(wildcard $(FPTOOLS_TOP_ABS)/libraries/editline/unbuildable)" ""
 CONFIGURE_FLAGS_STAGE2 += --flags=editline
 else
