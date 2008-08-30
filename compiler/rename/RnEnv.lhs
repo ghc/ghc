@@ -868,11 +868,9 @@ checkShadowedNames doc_str (global_env,local_env) loc_rdr_names
 \begin{code}
 -- A useful utility
 mapFvRn :: (a -> RnM (b, FreeVars)) -> [a] -> RnM ([b], FreeVars)
-mapFvRn f xs = mappM f xs	`thenM` \ stuff ->
-	       let
-		  (ys, fvs_s) = unzip stuff
-	       in
-	       returnM (ys, plusFVs fvs_s)
+mapFvRn f xs = do stuff <- mappM f xs
+                  case unzip stuff of
+                      (ys, fvs_s) -> returnM (ys, plusFVs fvs_s)
 
 -- because some of the rename functions are CPSed:
 -- maps the function across the list from left to right; 
