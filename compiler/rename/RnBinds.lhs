@@ -495,11 +495,13 @@ rnBind _ trim (L loc (PatBind { pat_lhs = pat,
 
 	; (grhss', fvs) <- rnGRHSs PatBindRhs grhss
 		-- No scoped type variables for pattern bindings
+	; let fvs' = trim fvs
 
-	; return (L loc (PatBind { pat_lhs = pat, 
+	; fvs' `seq`
+      return (L loc (PatBind { pat_lhs = pat,
                                   pat_rhs = grhss', 
 				     pat_rhs_ty = placeHolderType, 
-                                  bind_fvs = trim fvs }), 
+                                  bind_fvs = fvs' }),
 		  bndrs, pat_fvs `plusFV` fvs) }
 
 rnBind sig_fn 
@@ -517,13 +519,15 @@ rnBind sig_fn
 	; (matches', fvs) <- bindSigTyVarsFV (sig_fn plain_name) $
 				-- bindSigTyVars tests for Opt_ScopedTyVars
 			     rnMatchGroup (FunRhs plain_name inf) matches
+	; let fvs' = trim fvs
 
 	; checkPrecMatch inf plain_name matches'
 
-	; return (L loc (FunBind { fun_id = name, 
+	; fvs' `seq`
+      return (L loc (FunBind { fun_id = name,
                                   fun_infix = inf, 
                                   fun_matches = matches',
-				     bind_fvs = trim fvs, 
+				     bind_fvs = fvs',
                                   fun_co_fn = idHsWrapper, 
                                   fun_tick = Nothing }), 
 		  [plain_name], fvs)
