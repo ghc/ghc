@@ -6,8 +6,9 @@
 
 #define INLINE
 #include "HsBase.h"
-#include "Stg.h"
-#include "RtsMessages.h"
+#ifdef __GLASGOW_HASKELL__
+# include "Stg.h"
+# include "RtsMessages.h"
 
 void errorBelch2(const char*s, char *t)
 {
@@ -18,3 +19,4 @@ void debugBelch2(const char*s, char *t)
 {
     debugBelch(s,t);
 }
+#endif /* __GLASGOW_HASKELL__ */
