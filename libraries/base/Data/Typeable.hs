@@ -536,6 +536,9 @@ instance Typeable7 (,,,,,,) where
 
 INSTANCE_TYPEABLE1(Ptr,ptrTc,"Ptr")
 INSTANCE_TYPEABLE1(FunPtr,funPtrTc,"FunPtr")
+#ifndef __GLASGOW_HASKELL__
+INSTANCE_TYPEABLE1(ForeignPtr,foreignPtrTc,"ForeignPtr")
+#endif
 INSTANCE_TYPEABLE1(StablePtr,stablePtrTc,"StablePtr")
 INSTANCE_TYPEABLE1(IORef,iORefTc,"IORef")
 
