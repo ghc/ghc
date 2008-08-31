@@ -122,15 +122,9 @@ endif
 # But we don't enable editline on Windows, as Windows terminals have
 # editline-like support builtin.
 #
-ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
-CONFIGURE_FLAGS_STAGE1 += --flags=-editline
-CONFIGURE_FLAGS_STAGE2 += --flags=-editline
-else
-CONFIGURE_FLAGS_STAGE1 += --flags=-editline
+ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 ifeq "$(wildcard $(FPTOOLS_TOP_ABS)/libraries/editline/unbuildable)" ""
 CONFIGURE_FLAGS_STAGE2 += --flags=editline
-else
-CONFIGURE_FLAGS_STAGE2 += --flags=-editline
 endif
 endif
 

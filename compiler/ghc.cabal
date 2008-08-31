@@ -25,6 +25,8 @@ Flag dynlibs
 
 Flag editline
     Description: Use editline
+    Default: False
+    Manual: True
 
 Flag ghci
     Description: Build GHCi support.
