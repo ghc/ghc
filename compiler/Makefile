@@ -78,14 +78,9 @@ clean.stage.%:
 CONFIGURE_FLAGS_STAGE1 += --flags=stage1
 CONFIGURE_FLAGS_STAGE2 += --flags=-stage1
 
-CONFIGURE_FLAGS_STAGE1 += --flags=-ghci
-
 ifeq "$(GhcWithNativeCodeGen)" "YES"
 CONFIGURE_FLAGS_STAGE1 += --flags=ncg
 CONFIGURE_FLAGS_STAGE2 += --flags=ncg
-else
-CONFIGURE_FLAGS_STAGE1 += --flags=-ncg
-CONFIGURE_FLAGS_STAGE2 += --flags=-ncg
 endif
 
 ifeq "$(GhcWithInterpreter)" "YES"
@@ -99,8 +94,6 @@ CONFIGURE_FLAGS_STAGE2 += --enable-shared
 # function which sets the keepCAFs flag for the RTS before any Haskell
 # code is run.
 CONFIGURE_FLAGS_STAGE2 += --flags=dynlibs
-else
-CONFIGURE_FLAGS_STAGE2 += --flags=-dynlibs
 endif
 
 ifeq "$(GhcEnableTablesNextToCode) $(GhcUnregisterised)" "YES NO"
@@ -127,9 +120,6 @@ ifeq "$(wildcard $(FPTOOLS_TOP_ABS)/libraries/editline/unbuildable)" ""
 CONFIGURE_FLAGS_STAGE2 += --flags=editline
 endif
 endif
-
-else
-CONFIGURE_FLAGS_STAGE2 += --flags=-ghci
 endif
 
 ifeq "$(GhcWithNativeCodeGen)" "NO"

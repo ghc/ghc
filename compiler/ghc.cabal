@@ -22,6 +22,8 @@ Flag base3
 
 Flag dynlibs
     Description: Dynamic library support
+    Default: False
+    Manual: True
 
 Flag editline
     Description: Use editline
@@ -30,9 +32,13 @@ Flag editline
 
 Flag ghci
     Description: Build GHCi support.
+    Default: False
+    Manual: True
 
 Flag ncg
     Description: Build the NCG.
+    Default: False
+    Manual: True
 
 Flag stage1
     Description: Is this stage 1?
