@@ -49,6 +49,7 @@ import ParserCoreUtils	( getCoreModuleName )
 import SrcLoc
 import FastString
 
+import Data.Either
 import Exception
 import Data.IORef	( readIORef, writeIORef, IORef )
 import GHC.Exts		( Int(..) )
@@ -295,17 +296,7 @@ link LinkBinary dflags batch_attempt_linking hpt
 
             exe_file = exeFileName dflags
 
-        -- if the modification time on the executable is later than the
-        -- modification times on all of the objects, then omit linking
-        -- (unless the -fforce-recomp flag was given).
-        e_exe_time <- IO.try $ getModificationTime exe_file
-        extra_ld_inputs <- readIORef v_Ld_inputs
-        extra_times <- mapM (IO.try . getModificationTime) extra_ld_inputs
-        let other_times = map linkableTime linkables
-                       ++ [ t' | Right t' <- extra_times ]
-            linking_needed = case e_exe_time of
-                               Left _  -> True
-                               Right t -> any (t <) other_times
+        linking_needed <- linkingNeeded dflags linkables pkg_deps
 
         if not (dopt Opt_ForceRecomp dflags) && not linking_needed
            then do debugTraceMsg dflags 2 (text exe_file <+> ptext (sLit "is up to date, linking not required."))
@@ -338,6 +329,51 @@ link other _ _ _ = panicBadLink other
 panicBadLink :: GhcLink -> a
 panicBadLink other = panic ("link: GHC not built to link this way: " ++
                             show other)
+
+
+linkingNeeded :: DynFlags -> [Linkable] -> [PackageId] -> IO Bool
+linkingNeeded dflags linkables pkg_deps = do
+        -- if the modification time on the executable is later than the
+        -- modification times on all of the objects and libraries, then omit
+        -- linking (unless the -fforce-recomp flag was given).
+  let exe_file = exeFileName dflags
+  e_exe_time <- IO.try $ getModificationTime exe_file
+  case e_exe_time of
+    Left _  -> return True
+    Right t -> do
+        -- first check object files and extra_ld_inputs
+        extra_ld_inputs <- readIORef v_Ld_inputs
+        e_extra_times <- mapM (IO.try . getModificationTime) extra_ld_inputs
+        let (errs,extra_times) = splitEithers e_extra_times
+        let obj_times =  map linkableTime linkables ++ extra_times
+        if not (null errs) || any (t <) obj_times
+            then return True 
+            else do
+
+        -- next, check libraries. XXX this only checks Haskell libraries,
+        -- not extra_libraries or -l things from the command line.
+        let pkg_map = pkgIdMap (pkgState dflags)
+            pkg_hslibs  = [ (libraryDirs c, lib)
+                          | Just c <- map (lookupPackage pkg_map) pkg_deps,
+                            lib <- packageHsLibs dflags c ]
+
+        pkg_libfiles <- mapM (uncurry findHSLib) pkg_hslibs
+        if any isNothing pkg_libfiles then return True else do
+        e_lib_times <- mapM (IO.try . getModificationTime)
+                          (catMaybes pkg_libfiles)
+        let (lib_errs,lib_times) = splitEithers e_lib_times
+        if not (null lib_errs) || any (t <) lib_times
+           then return True
+           else return False
+
+findHSLib :: [String] -> String -> IO (Maybe FilePath)
+findHSLib dirs lib = do
+  let batch_lib_file = "lib" ++ lib <.> "a"
+  found <- filterM doesFileExist (map (</> batch_lib_file) dirs)
+  case found of
+    [] -> return Nothing
+    (x:_) -> return (Just x)
+
 -- -----------------------------------------------------------------------------
 -- Compile files in one-shot mode.
 

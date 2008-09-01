@@ -26,6 +26,7 @@ module Packages (
 	getPreloadPackagesAnd,
 
         collectIncludeDirs, collectLibraryPaths, collectLinkOpts,
+        packageHsLibs,
 
 	-- * Utils
 	isDllName
@@ -641,14 +642,17 @@ getPackageLinkOpts dflags pkgs =
 collectLinkOpts :: DynFlags -> [PackageConfig] -> [String]
 collectLinkOpts dflags ps = concat (map all_opts ps)
   where
+      	libs p     = packageHsLibs dflags p ++ extraLibraries p
+	all_opts p = map ("-l" ++) (libs p) ++ ldOptions p
+
+packageHsLibs :: DynFlags -> PackageConfig -> [String]
+packageHsLibs dflags p = map (mkDynName . addSuffix) (hsLibraries p)
+  where
         tag = buildTag dflags
         rts_tag = rtsBuildTag dflags
 
 	mkDynName | opt_Static = id
 		  | otherwise = (++ ("-ghc" ++ cProjectVersion))
-      	libs p     = map (mkDynName . addSuffix) (hsLibraries p)
-      	                 ++ extraLibraries p
-	all_opts p = map ("-l" ++) (libs p) ++ ldOptions p
 
         addSuffix rts@"HSrts"    = rts       ++ (expandTag rts_tag)
         addSuffix other_lib      = other_lib ++ (expandTag tag)
