@@ -135,7 +135,6 @@ import GHC.Base
 import GHC.Num
 import GHC.Show
 import GHC.IOBase ( IO )
-import qualified GHC.IOBase as ExceptionBase
 import qualified GHC.IOBase as New
 import GHC.Conc hiding (setUncaughtExceptionHandler,
                         getUncaughtExceptionHandler)
@@ -150,7 +149,7 @@ import Hugs.Prelude     as New (ExitCode(..))
 #endif
 
 import qualified Control.Exception as New
-import           Control.Exception ( throw, SomeException(..), block, unblock, evaluate, throwIO )
+import           Control.Exception ( toException, fromException, throw, block, unblock, evaluate, throwIO )
 import System.IO.Error  hiding ( catch, try )
 import System.IO.Unsafe (unsafePerformIO)
 import Data.Dynamic
@@ -255,7 +254,7 @@ assert False _ = throw (UserError "" "Assertion failed")
 catch   :: IO a                 -- ^ The computation to run
         -> (Exception -> IO a)  -- ^ Handler to invoke if an exception is raised
         -> IO a
--- note: bundling the exceptions is done in the ExceptionBase.Exception
+-- note: bundling the exceptions is done in the New.Exception
 -- instance of Exception; see below.
 catch = New.catch
 
@@ -700,14 +699,14 @@ data Exception
 INSTANCE_TYPEABLE0(Exception,exceptionTc,"Exception")
 
 -- helper type for simplifying the type casting logic below
-data Caster = forall e . ExceptionBase.Exception e => Caster (e -> Exception)
+data Caster = forall e . New.Exception e => Caster (e -> Exception)
 
 instance New.Exception Exception where
   -- We need to collect all the sorts of exceptions that used to be
   -- bundled up into the Exception type, and rebundle them for
   -- legacy handlers.
-  fromException (SomeException exc0) = foldr tryCast Nothing casters where
-    tryCast (Caster f) e = case cast exc0 of
+  fromException exc0 = foldr tryCast Nothing casters where
+    tryCast (Caster f) e = case fromException exc0 of
       Just exc -> Just (f exc)
       _        -> e
     casters =
@@ -732,24 +731,24 @@ instance New.Exception Exception where
        Caster (\(New.RecUpdError err) -> RecUpdError err)]
 
   -- Unbundle exceptions.
-  toException (ArithException exc)   = SomeException exc
-  toException (ArrayException exc)   = SomeException exc
-  toException (AssertionFailed err)  = SomeException (New.AssertionFailed err)
-  toException (AsyncException exc)   = SomeException exc
-  toException BlockedOnDeadMVar      = SomeException New.BlockedOnDeadMVar
-  toException BlockedIndefinitely    = SomeException New.BlockedIndefinitely
-  toException NestedAtomically       = SomeException New.NestedAtomically
-  toException Deadlock               = SomeException New.Deadlock
-  toException (DynException exc)     = SomeException exc
-  toException (ErrorCall err)        = SomeException (New.ErrorCall err)
-  toException (ExitException exc)    = SomeException exc
-  toException (IOException exc)      = SomeException exc
-  toException (NoMethodError err)    = SomeException (New.NoMethodError err)
-  toException NonTermination         = SomeException New.NonTermination
-  toException (PatternMatchFail err) = SomeException (New.PatternMatchFail err)
-  toException (RecConError err)      = SomeException (New.RecConError err)
-  toException (RecSelError err)      = SomeException (New.RecSelError err)
-  toException (RecUpdError err)      = SomeException (New.RecUpdError err)
+  toException (ArithException exc)   = toException exc
+  toException (ArrayException exc)   = toException exc
+  toException (AssertionFailed err)  = toException (New.AssertionFailed err)
+  toException (AsyncException exc)   = toException exc
+  toException BlockedOnDeadMVar      = toException New.BlockedOnDeadMVar
+  toException BlockedIndefinitely    = toException New.BlockedIndefinitely
+  toException NestedAtomically       = toException New.NestedAtomically
+  toException Deadlock               = toException New.Deadlock
+  toException (DynException exc)     = toException exc
+  toException (ErrorCall err)        = toException (New.ErrorCall err)
+  toException (ExitException exc)    = toException exc
+  toException (IOException exc)      = toException exc
+  toException (NoMethodError err)    = toException (New.NoMethodError err)
+  toException NonTermination         = toException New.NonTermination
+  toException (PatternMatchFail err) = toException (New.PatternMatchFail err)
+  toException (RecConError err)      = toException (New.RecConError err)
+  toException (RecSelError err)      = toException (New.RecSelError err)
+  toException (RecUpdError err)      = toException (New.RecUpdError err)
 
 instance Show Exception where
   showsPrec _ (IOException err)          = shows err
