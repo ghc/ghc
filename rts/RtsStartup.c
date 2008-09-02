@@ -225,6 +225,12 @@ hs_init(int *argc, char **argv[])
     /* initialise the stable pointer table */
     initStablePtrTable();
 
+    /* Add some GC roots (using stable pointers): these are needed by
+     * all foreign export stubs, so they have to be treated as 
+     */
+    getStablePtr((StgPtr)base_GHCziTopHandler_runIO_closure);
+    getStablePtr((StgPtr)base_GHCziTopHandler_runNonIO_closure);
+
     /* initialise the shared Typeable store */
     initTypeableStore();
 
