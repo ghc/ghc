@@ -16,6 +16,7 @@ extra-tmp-files:
 extra-source-files:
                 config.guess config.sub install-sh
                 aclocal.m4 configure.ac configure
+                include/CTypes.h
 
 Library {
     if impl(ghc) {
