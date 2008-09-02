@@ -710,8 +710,7 @@ instance New.Exception Exception where
       Just exc -> Just (f exc)
       _        -> e
     casters =
-      [Caster (\e -> e),
-       Caster (\exc -> ArithException exc),
+      [Caster (\exc -> ArithException exc),
        Caster (\exc -> ArrayException exc),
        Caster (\(New.AssertionFailed err) -> AssertionFailed err),
        Caster (\exc -> AsyncException exc),
