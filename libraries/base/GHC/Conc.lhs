@@ -266,6 +266,7 @@ terms of 'throwTo':
 
 > killThread tid = throwTo tid ThreadKilled
 
+Killthread is a no-op if the target thread has already completed.
 -}
 killThread :: ThreadId -> IO ()
 killThread tid = throwTo tid ThreadKilled
