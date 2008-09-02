@@ -198,9 +198,10 @@ if ($PostScript ne '') {
     local($to_do);
     $PostScriptLines = `cat $PostScript`;
     $PostScriptLines =~ s/\r//g;
-    $* = 1;
-    $PostScriptLines =~ s#\$o1#$TmpPrefix/runtest$$.1#g;
-    $PostScriptLines =~ s#\$o2#$TmpPrefix/runtest$$.2#g;
+    $PostScriptLines =~ s#\$o1#$TmpPrefix/runtest$$.1#gm;
+    $PostScriptLines =~ s#\$o2#$TmpPrefix/runtest$$.2#gm;
+# The postfix 'm' deals with recent versions of 
+# Perl that removed the $* feature
 } else {
     $PostScriptLines = '';
 }
