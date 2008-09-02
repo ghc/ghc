@@ -91,3 +91,4 @@ test('Session', normal, compile_and_run, [''])
 test('CasePrune', normal, compile_and_run, [''])
 
 test('T1999', expect_fail, compile, [''])
+test('T1999a', expect_fail, compile, [''])
