@@ -342,7 +342,7 @@ nubBy eq l              = nubBy' l []
 -- 'y' is the potential new element
 elem_by :: (a -> a -> Bool) -> a -> [a] -> Bool
 elem_by _  _ []         =  False
-elem_by eq y (x:xs)     =  x `eq` y || elem_by eq y xs
+elem_by eq y (x:xs)     =  y `eq` x || elem_by eq y xs
 #endif
 
 
