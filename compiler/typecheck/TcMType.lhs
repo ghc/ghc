@@ -33,8 +33,8 @@ module TcMType (
   --------------------------------
   -- Instantiation
   tcInstTyVar, tcInstType, tcInstTyVars, tcInstBoxyTyVar,
-  tcInstSigTyVars,
-  tcInstSkolTyVar, tcInstSkolTyVars, tcInstSkolType, 
+  tcInstSigType,
+  tcInstSkolTyVars, tcInstSkolType, 
   tcSkolSigType, tcSkolSigTyVars, occurCheckErr,
 
   --------------------------------
@@ -430,17 +430,17 @@ tcSkolSigTyVars :: SkolemInfo -> [TyVar] -> [TcTyVar]
 tcSkolSigTyVars info tyvars = [ mkSkolTyVar (tyVarName tv) (tyVarKind tv) info
 			      | tv <- tyvars ]
 
-tcInstSkolTyVar :: SkolemInfo -> Maybe SrcSpan -> TyVar -> TcM TcTyVar
+tcInstSkolTyVar :: SkolemInfo -> (Name -> SrcSpan) -> TyVar -> TcM TcTyVar
 -- Instantiate the tyvar, using 
 --	* the occ-name and kind of the supplied tyvar, 
 --	* the unique from the monad,
 --	* the location either from the tyvar (mb_loc = Nothing)
 --	  or from mb_loc (Just loc)
-tcInstSkolTyVar info mb_loc tyvar
+tcInstSkolTyVar info get_loc tyvar
   = do	{ uniq <- newUnique
 	; let old_name = tyVarName tyvar
 	      kind     = tyVarKind tyvar
-	      loc      = mb_loc `orElse` getSrcSpan old_name
+	      loc      = get_loc old_name
 	      new_name = mkInternalName uniq (nameOccName old_name) loc
 	; return (mkSkolTyVar new_name kind info) }
 
@@ -448,12 +448,21 @@ tcInstSkolTyVars :: SkolemInfo -> [TyVar] -> TcM [TcTyVar]
 -- Get the location from the monad
 tcInstSkolTyVars info tyvars 
   = do 	{ span <- getSrcSpanM
-	; mapM (tcInstSkolTyVar info (Just span)) tyvars }
+	; mapM (tcInstSkolTyVar info (const span)) tyvars }
 
 tcInstSkolType :: SkolemInfo -> TcType -> TcM ([TcTyVar], TcThetaType, TcType)
 -- Instantiate a type with fresh skolem constants
 -- Binding location comes from the monad
 tcInstSkolType info ty = tcInstType (tcInstSkolTyVars info) ty
+
+tcInstSigType :: Bool -> SkolemInfo -> TcType -> TcM ([TcTyVar], TcThetaType, TcRhoType)
+-- Instantiate with skolems or meta SigTvs; depending on use_skols
+-- Always take location info from the supplied tyvars
+tcInstSigType use_skols skol_info ty
+  = tcInstType (mapM inst_tyvar) ty
+  where
+    inst_tyvar | use_skols = tcInstSkolTyVar skol_info getSrcSpan
+    	       | otherwise = instMetaTyVar (SigTv skol_info)
 \end{code}
 
 
@@ -563,16 +572,6 @@ tcInstTyVars tyvars
 %************************************************************************
 
 \begin{code}
-tcInstSigTyVars :: Bool -> SkolemInfo -> [TyVar] -> TcM [TcTyVar]
--- Instantiate with skolems or meta SigTvs; depending on use_skols
--- Always take location info from the supplied tyvars
-tcInstSigTyVars use_skols skol_info tyvars 
-  | use_skols
-  = mapM (tcInstSkolTyVar skol_info Nothing) tyvars
-
-  | otherwise
-  = mapM (instMetaTyVar (SigTv skol_info)) tyvars
-
 zonkSigTyVar :: TcTyVar -> TcM TcTyVar
 zonkSigTyVar sig_tv 
   | isSkolemTyVar sig_tv 

@@ -41,7 +41,7 @@ module TcType (
   -- Splitters  
   -- These are important because they do not look through newtypes
   tcView,
-  tcSplitForAllTys, tcSplitPhiTy, 
+  tcSplitForAllTys, tcSplitPhiTy, tcSplitPredFunTy_maybe,
   tcSplitFunTy_maybe, tcSplitFunTys, tcFunArgTy, tcFunResultTy, tcSplitFunTysN,
   tcSplitTyConApp, tcSplitTyConApp_maybe, tcTyConAppTyCon, tcTyConAppArgs,
   tcSplitAppTy_maybe, tcSplitAppTy, tcSplitAppTys, repSplitAppTy_maybe,
@@ -660,16 +660,24 @@ tcIsForAllTy ty | Just ty' <- tcView ty = tcIsForAllTy ty'
 tcIsForAllTy (ForAllTy tv _) = not (isCoVar tv)
 tcIsForAllTy _               = False
 
-tcSplitPhiTy :: Type -> (ThetaType, Type)
-tcSplitPhiTy ty = split ty ty []
- where
-  split orig_ty ty tvs | Just ty' <- tcView ty = split orig_ty ty' tvs
+tcSplitPredFunTy_maybe :: Type -> Maybe (PredType, Type)
+-- Split off the first predicate argument from a type
+tcSplitPredFunTy_maybe ty | Just ty' <- tcView ty = tcSplitPredFunTy_maybe ty'
+tcSplitPredFunTy_maybe (ForAllTy tv ty)
+  | isCoVar tv = Just (coVarPred tv, ty)
+tcSplitPredFunTy_maybe (FunTy arg res)
+  | Just p <- tcSplitPredTy_maybe arg = Just (p, res)
+tcSplitPredFunTy_maybe _
+  = Nothing
 
-  split _       (ForAllTy tv ty) ts
-        | isCoVar tv = split ty ty (coVarPred tv : ts)
-  split _        (FunTy arg res) ts 
-	| Just p <- tcSplitPredTy_maybe arg = split res res (p:ts)
-  split orig_ty _               ts = (reverse ts, orig_ty)
+tcSplitPhiTy :: Type -> (ThetaType, Type)
+tcSplitPhiTy ty
+  = split ty []
+  where
+    split ty ts 
+      = case tcSplitPredFunTy_maybe ty of
+	  Just (pred, ty) -> split ty (pred:ts)
+	  Nothing         -> (reverse ts, ty)
 
 tcSplitSigmaTy :: Type -> ([TyVar], ThetaType, Type)
 tcSplitSigmaTy ty = case tcSplitForAllTys ty of

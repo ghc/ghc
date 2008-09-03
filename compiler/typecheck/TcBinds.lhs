@@ -6,7 +6,7 @@
 
 \begin{code}
 module TcBinds ( tcLocalBinds, tcTopBinds, 
-                 tcHsBootSigs, tcMonoBinds, 
+                 tcHsBootSigs, tcMonoBinds, tcPolyBinds,
                  TcPragFun, tcSpecPrag, tcPrags, mkPragFun, 
                  TcSigInfo(..), TcSigFun, mkTcSigFun,
                  badBootDeclErr ) where
@@ -165,26 +165,29 @@ tcValBinds top_lvl (ValBindsOut binds sigs) thing_inside
                 -- the Ids declared with type signatures
         ; poly_rec <- doptM Opt_RelaxedPolyRec
         ; (binds', thing) <- tcExtendIdEnv poly_ids $
-                             tc_val_binds poly_rec top_lvl sig_fn prag_fn 
+                             tcBindGroups poly_rec top_lvl sig_fn prag_fn 
                                           binds thing_inside
 
         ; return (ValBindsOut binds' sigs, thing) }
 
 ------------------------
-tc_val_binds :: Bool -> TopLevelFlag -> TcSigFun -> TcPragFun
+tcBindGroups :: Bool -> TopLevelFlag -> TcSigFun -> TcPragFun
              -> [(RecFlag, LHsBinds Name)] -> TcM thing
              -> TcM ([(RecFlag, LHsBinds TcId)], thing)
 -- Typecheck a whole lot of value bindings,
 -- one strongly-connected component at a time
+-- Here a "strongly connected component" has the strightforward
+-- meaning of a group of bindings that mention each other, 
+-- ignoring type signatures (that part comes later)
 
-tc_val_binds _ _ _ _ [] thing_inside
+tcBindGroups _ _ _ _ [] thing_inside
   = do  { thing <- thing_inside
         ; return ([], thing) }
 
-tc_val_binds poly_rec top_lvl sig_fn prag_fn (group : groups) thing_inside
+tcBindGroups poly_rec top_lvl sig_fn prag_fn (group : groups) thing_inside
   = do  { (group', (groups', thing))
                 <- tc_group poly_rec top_lvl sig_fn prag_fn group $ 
-                   tc_val_binds poly_rec top_lvl sig_fn prag_fn groups thing_inside
+                   tcBindGroups poly_rec top_lvl sig_fn prag_fn groups thing_inside
         ; return (group' ++ groups', thing) }
 
 ------------------------
@@ -209,12 +212,12 @@ tc_group poly_rec top_lvl sig_fn prag_fn (Recursive, binds) thing_inside
         ; return ([(Recursive, unionManyBags binds1)], thing) }
 
   | otherwise           -- Recursive group, with gla-exts
-  =     -- To maximise polymorphism (with -fglasgow-exts), we do a new 
+  =     -- To maximise polymorphism (with -XRelaxedPolyRec), we do a new 
         -- strongly-connected-component analysis, this time omitting 
         -- any references to variables with type signatures.
         --
-        -- Notice that the bindInsts thing covers *all* the bindings in the original
-        -- group at once; an earlier one may use a later one!
+        -- Notice that the bindInsts thing covers *all* the bindings in
+        -- the original group at once; an earlier one may use a later one!
     do  { traceTc (text "tc_group rec" <+> pprLHsBinds binds)
         ; (binds1,thing) <- bindLocalInsts top_lvl $
                             go (stronglyConnCompFromEdgedVertices (mkEdges sig_fn binds))
@@ -560,8 +563,14 @@ tcMonoBinds [L b_loc (FunBind { fun_id = L nm_loc name, fun_infix = inf,
                         -- Note that the scoped_tvs and the (sig_tvs sig) 
                         -- may have different Names. That's quite ok.
 
+	; traceTc (text "tcMoonBinds" <+> ppr scoped_tvs $$ ppr tc_sig)
         ; (co_fn, matches') <- tcExtendTyVarEnv2 rhs_tvs $
                                tcMatchesFun mono_name inf matches mono_ty
+	     -- Note that "mono_ty" might actually be a polymorphic type,
+	     -- if the original function had a signature like
+	     --    forall a. Eq a => forall b. Ord b => ....
+	     -- But that's ok: tcMatchesFun can deal with that
+	     -- It happens, too!  See Note [Polymorphic methods] in TcClassDcl.
 
         ; let fun_bind' = FunBind { fun_id = L nm_loc mono_id, 
                                     fun_infix = inf, fun_matches = matches',
@@ -1120,9 +1129,8 @@ tcInstSig :: Bool -> Name -> TcM TcSigInfo
 tcInstSig use_skols name
   = do  { poly_id <- tcLookupId name    -- Cannot fail; the poly ids are put into 
                                         -- scope when starting the binding group
-        ; let skol_info = SigSkol (FunSigCtxt name)
-              inst_tyvars = tcInstSigTyVars use_skols skol_info
-        ; (tvs, theta, tau) <- tcInstType inst_tyvars (idType poly_id)
+	; let skol_info = SigSkol (FunSigCtxt name)
+        ; (tvs, theta, tau) <- tcInstSigType use_skols skol_info (idType poly_id)
         ; loc <- getInstLoc (SigOrigin skol_info)
         ; return (TcSigInfo { sig_id = poly_id,
                               sig_tvs = tvs, sig_theta = theta, sig_tau = tau, 

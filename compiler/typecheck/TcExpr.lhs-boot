@@ -15,7 +15,7 @@ tcMonoExpr ::
        -> BoxyRhoType
        -> TcM (LHsExpr TcId)
 
-tcInferRho :: 
+tcInferRho, tcInferRhoNC :: 
   	  LHsExpr Name
        -> TcM (LHsExpr TcId, TcRhoType)
 

@@ -12,7 +12,7 @@
 --     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
 -- for details
 
-module TcExpr ( tcPolyExpr, tcPolyExprNC, tcMonoExpr, tcInferRho, tcSyntaxOp ) where
+module TcExpr ( tcPolyExpr, tcPolyExprNC, tcMonoExpr, tcInferRho, tcInferRhoNC, tcSyntaxOp ) where
 
 #include "HsVersions.h"
 
@@ -79,20 +79,20 @@ tcPolyExpr, tcPolyExprNC
 -- to do so himself.
 
 tcPolyExpr expr res_ty 	
-  = addErrCtxt (exprCtxt (unLoc expr)) $
+  = addErrCtxt (exprCtxt expr) $
     (do {traceTc (text "tcPolyExpr") ; tcPolyExprNC expr res_ty })
 
 tcPolyExprNC expr res_ty 
   | isSigmaTy res_ty
   = do	{ traceTc (text "tcPolyExprNC" <+> ppr res_ty)
-	; (gen_fn, expr') <- tcGen res_ty emptyVarSet (\_ -> tcPolyExprNC expr)
+	; (gen_fn, expr') <- tcGen res_ty emptyVarSet Nothing (tcPolyExprNC expr)
 		-- Note the recursive call to tcPolyExpr, because the
 		-- type may have multiple layers of for-alls
 		-- E.g. forall a. Eq a => forall b. Ord b => ....
 	; return (mkLHsWrap gen_fn expr') }
 
   | otherwise
-  = tcMonoExpr expr res_ty
+  = tcMonoExprNC expr res_ty
 
 ---------------
 tcPolyExprs :: [LHsExpr Name] -> [TcType] -> TcM [LHsExpr TcId]
@@ -104,21 +104,27 @@ tcPolyExprs (expr:exprs) (ty:tys)
 tcPolyExprs exprs tys = pprPanic "tcPolyExprs" (ppr exprs $$ ppr tys)
 
 ---------------
-tcMonoExpr :: LHsExpr Name	-- Expression to type check
-	   -> BoxyRhoType 	-- Expected type (could be a type variable)
-				-- Definitely no foralls at the top
-				-- Can contain boxes, which will be filled in
-	   -> TcM (LHsExpr TcId)
+tcMonoExpr, tcMonoExprNC 
+    :: LHsExpr Name	-- Expression to type check
+    -> BoxyRhoType 	-- Expected type (could be a type variable)
+			-- Definitely no foralls at the top
+			-- Can contain boxes, which will be filled in
+    -> TcM (LHsExpr TcId)
 
-tcMonoExpr (L loc expr) res_ty
+tcMonoExpr expr res_ty
+  = addErrCtxt (exprCtxt expr) $
+    tcMonoExprNC expr res_ty
+
+tcMonoExprNC (L loc expr) res_ty
   = ASSERT( not (isSigmaTy res_ty) )
     setSrcSpan loc $
     do	{ expr' <- tcExpr expr res_ty
 	; return (L loc expr') }
 
 ---------------
-tcInferRho :: LHsExpr Name -> TcM (LHsExpr TcId, TcRhoType)
-tcInferRho expr	= tcInfer (tcMonoExpr expr)
+tcInferRho, tcInferRhoNC :: LHsExpr Name -> TcM (LHsExpr TcId, TcRhoType)
+tcInferRho   expr = tcInfer (tcMonoExpr expr)
+tcInferRhoNC expr = tcInfer (tcMonoExprNC expr)
 \end{code}
 
 
@@ -130,6 +136,9 @@ tcInferRho expr	= tcInfer (tcMonoExpr expr)
 
 \begin{code}
 tcExpr :: HsExpr Name -> BoxyRhoType -> TcM (HsExpr TcId)
+tcExpr e res_ty | debugIsOn && isSigmaTy res_ty     -- Sanity check
+       	        = pprPanic "tcExpr: sigma" (ppr res_ty $$ ppr e)
+
 tcExpr (HsVar name)     res_ty = tcId (OccurrenceOf name) name res_ty
 
 tcExpr (HsLit lit)	res_ty = do { let lit_ty = hsLitType lit
@@ -137,7 +146,7 @@ tcExpr (HsLit lit)	res_ty = do { let lit_ty = hsLitType lit
 				    ; return $ mkHsWrapCoI coi (HsLit lit)
 				    }
 
-tcExpr (HsPar expr)     res_ty = do { expr' <- tcMonoExpr expr res_ty
+tcExpr (HsPar expr)     res_ty = do { expr' <- tcMonoExprNC expr res_ty
 				    ; return (HsPar expr') }
 
 tcExpr (HsSCC lbl expr) res_ty = do { expr' <- tcMonoExpr expr res_ty
@@ -191,9 +200,8 @@ tcExpr in_expr@(ExprWithTySig expr sig_ty) res_ty
  = do	{ sig_tc_ty <- tcHsSigType ExprSigCtxt sig_ty
 
 	-- Remember to extend the lexical type-variable environment
-	; (gen_fn, expr') <- tcGen sig_tc_ty emptyVarSet (\ skol_tvs res_ty ->
-		             tcExtendTyVarEnv2 (hsExplicitTvs sig_ty `zip` mkTyVarTys skol_tvs) $
-			     tcPolyExprNC expr res_ty)
+	; (gen_fn, expr') <- tcGen sig_tc_ty emptyVarSet (Just ExprSigCtxt) $
+			     tcMonoExprNC expr
 
 	; co_fn <- tcSubExp ExprSigOrigin sig_tc_ty res_ty
 	; return (mkHsWrap co_fn (ExprWithTySigOut (mkLHsWrap gen_fn expr') sig_ty)) }
@@ -238,7 +246,7 @@ tcExpr in_expr@(SectionL arg1 lop@(L loc op)) res_ty
            then do (op', [arg1']) <- tcApp op 1 (tcArgs lop [arg1]) res_ty
                    return (SectionL arg1' (L loc op'))
            else do (co_fn, (op', arg1'))
-                       <- subFunTys doc 1 res_ty
+                       <- subFunTys doc 1 res_ty Nothing
                         $ \ [arg2_ty'] res_ty' ->
                               tcApp op 2 (tc_args arg2_ty') res_ty'
                    return (mkHsWrap co_fn (SectionL arg1' (L loc op')))
@@ -256,7 +264,7 @@ tcExpr in_expr@(SectionL arg1 lop@(L loc op)) res_ty
 --	\ x -> op x expr
  
 tcExpr in_expr@(SectionR lop@(L loc op) arg2) res_ty
-  = do	{ (co_fn, (op', arg2')) <- subFunTys doc 1 res_ty $ \ [arg1_ty'] res_ty' ->
+  = do	{ (co_fn, (op', arg2')) <- subFunTys doc 1 res_ty Nothing $ \ [arg1_ty'] res_ty' ->
 				   tcApp op 2 (tc_args arg1_ty') res_ty'
 	; return (mkHsWrap co_fn (SectionR (L loc op') arg2')) }
   where
@@ -286,8 +294,7 @@ tcExpr (HsCase scrut matches) exp_ty
 	   --
 	   -- But now, in the GADT world, we need to typecheck the scrutinee
 	   -- first, to get type info that may be refined in the case alternatives
-	  (scrut', scrut_ty) <- addErrCtxt (caseScrutCtxt scrut)
-				 	   (tcInferRho scrut)
+	  (scrut', scrut_ty) <- tcInferRho scrut
 
 	; traceTc (text "HsCase" <+> ppr scrut_ty)
 	; matches' <- tcMatchesCase match_ctxt scrut_ty matches exp_ty
@@ -297,8 +304,7 @@ tcExpr (HsCase scrut matches) exp_ty
 		      mc_body = tcBody }
 
 tcExpr (HsIf pred b1 b2) res_ty
-  = do	{ pred' <- addErrCtxt (predCtxt pred) $
-		   tcMonoExpr pred boolTy
+  = do	{ pred' <- tcMonoExpr pred boolTy
 	; b1' <- tcMonoExpr b1 res_ty
 	; b2' <- tcMonoExpr b2 res_ty
 	; return (HsIf pred' b1' b2') }
@@ -1169,10 +1175,7 @@ checkMissingFields data_con rbinds
 
 Boring and alphabetical:
 \begin{code}
-caseScrutCtxt expr
-  = hang (ptext (sLit "In the scrutinee of a case expression:")) 4 (ppr expr)
-
-exprCtxt expr
+exprCtxt (L _ expr)
   = hang (ptext (sLit "In the expression:")) 4 (ppr expr)
 
 fieldCtxt field_name
@@ -1182,9 +1185,6 @@ funAppCtxt fun arg arg_no
   = hang (hsep [ ptext (sLit "In the"), speakNth arg_no, ptext (sLit "argument of"), 
 		    quotes (ppr fun) <> text ", namely"])
 	 4 (quotes (ppr arg))
-
-predCtxt expr
-  = hang (ptext (sLit "In the predicate expression:")) 4 (ppr expr)
 
 nonVanillaUpd tycon
   = vcat [ptext (sLit "Record update for the non-Haskell-98 data type") 

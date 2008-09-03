@@ -123,8 +123,7 @@ tc_cmd env (HsLet binds (L body_loc body)) res_ty
 
 tc_cmd env in_cmd@(HsCase scrut matches) (stk, res_ty)
   = addErrCtxt (cmdCtxt in_cmd) $ do
-      (scrut', scrut_ty) <- addErrCtxt (caseScrutCtxt scrut) $
-                              tcInferRho scrut 
+      (scrut', scrut_ty) <- tcInferRho scrut 
       matches' <- tcMatchesCase match_ctxt scrut_ty matches res_ty
       return (HsCase scrut' matches')
   where
@@ -340,10 +339,6 @@ arrowTyConKind = mkArrowKinds [liftedTypeKind, liftedTypeKind] liftedTypeKind
 \begin{code}
 cmdCtxt :: HsExpr Name -> SDoc
 cmdCtxt cmd = ptext (sLit "In the command:") <+> ppr cmd
-
-caseScrutCtxt :: LHsExpr Name -> SDoc
-caseScrutCtxt cmd
-  = hang (ptext (sLit "In the scrutinee of a case command:")) 4 (ppr cmd)
 
 nonEmptyCmdStkErr :: HsExpr Name -> SDoc
 nonEmptyCmdStkErr cmd

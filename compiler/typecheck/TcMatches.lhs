@@ -12,7 +12,7 @@ module TcMatches ( tcMatchesFun, tcGRHSsPat, tcMatchesCase, tcMatchLambda,
 		   tcDoStmt, tcMDoStmt, tcGuardStmt
        ) where
 
-import {-# SOURCE #-}	TcExpr( tcSyntaxOp, tcInferRho, tcMonoExpr, tcPolyExpr )
+import {-# SOURCE #-}	TcExpr( tcSyntaxOp, tcInferRhoNC, tcMonoExpr, tcPolyExpr )
 
 import HsSyn
 import TcRnMonad
@@ -73,7 +73,7 @@ tcMatchesFun fun_name inf matches exp_ty
 		-- This is one of two places places we call subFunTys
 		-- The point is that if expected_y is a "hole", we want 
 		-- to make pat_tys and rhs_ty as "holes" too.
-	; subFunTys doc n_pats exp_ty     $ \ pat_tys rhs_ty -> 
+	; subFunTys doc n_pats exp_ty (Just (FunSigCtxt fun_name)) $ \ pat_tys rhs_ty -> 
 	  tcMatches match_ctxt pat_tys rhs_ty matches
 	}
   where
@@ -105,7 +105,7 @@ tcMatchesCase ctxt scrut_ty matches res_ty
 
 tcMatchLambda :: MatchGroup Name -> BoxyRhoType -> TcM (HsWrapper, MatchGroup TcId)
 tcMatchLambda match res_ty 
-  = subFunTys doc n_pats res_ty 	$ \ pat_tys rhs_ty ->
+  = subFunTys doc n_pats res_ty Nothing	$ \ pat_tys rhs_ty ->
     tcMatches match_ctxt pat_tys rhs_ty match
   where
     n_pats = matchGroupArity match
@@ -267,7 +267,7 @@ tcDoStmts ctxt _ _ _ = pprPanic "tcDoStmts" (pprStmtContext ctxt)
 tcBody :: LHsExpr Name -> BoxyRhoType -> TcM (LHsExpr TcId)
 tcBody body res_ty
   = do	{ traceTc (text "tcBody" <+> ppr res_ty)
-	; body' <- tcPolyExpr body res_ty
+	; body' <- tcMonoExpr body res_ty
 	; return body' 
         } 
 \end{code}
@@ -327,7 +327,7 @@ tcGuardStmt _ (ExprStmt guard _ _) res_ty thing_inside
 	; return (ExprStmt guard' noSyntaxExpr boolTy, thing) }
 
 tcGuardStmt _ (BindStmt pat rhs _ _) res_ty thing_inside
-  = do	{ (rhs', rhs_ty) <- tcInferRho rhs
+  = do	{ (rhs', rhs_ty) <- tcInferRhoNC rhs	-- Stmt has a context already
 	; (pat', thing)  <- tcLamPat pat rhs_ty res_ty thing_inside
 	; return (BindStmt pat' rhs' noSyntaxExpr noSyntaxExpr, thing) }
 
@@ -404,7 +404,7 @@ tcLcStmt m_tc ctxt (TransformStmt (stmts, binders) usingExpr maybeByExpr) elt_ty
                         return (usingExpr', Nothing)
                     Just byExpr -> do
                         -- We must infer a type such that e :: t and then check that usingExpr :: forall a. (a -> t) -> [a] -> [a]
-                        (byExpr', tTy) <- tcInferRho byExpr
+                        (byExpr', tTy) <- tcInferRhoNC byExpr
                         usingExpr' <- tcPolyExpr usingExpr (mkForAllTy alphaTyVar ((alphaTy `mkFunTy` tTy) `mkFunTy` (alphaListTy `mkFunTy` alphaListTy)))
                         return (usingExpr', Just byExpr')
             
@@ -428,7 +428,7 @@ tcLcStmt m_tc ctxt (GroupStmt (stmts, bindersMap) groupByClause) elt_ty thing_in
                             tcPolyExpr usingExpr (mkForAllTy alphaTyVar (alphaListTy `mkFunTy` alphaListListTy)) >>= (return . GroupByNothing)
                         GroupBySomething eitherUsingExpr byExpr -> do
                             -- We must infer a type such that byExpr :: t
-                            (byExpr', tTy) <- tcInferRho byExpr
+                            (byExpr', tTy) <- tcInferRhoNC byExpr
                             
                             -- If it exists, we then check that usingExpr :: forall a. (a -> t) -> [a] -> [[a]]
                             let expectedUsingType = mkForAllTy alphaTyVar ((alphaTy `mkFunTy` tTy) `mkFunTy` (alphaListTy `mkFunTy` alphaListListTy))
@@ -464,7 +464,7 @@ tcLcStmt _ _ stmt _ _
 tcDoStmt :: TcStmtChecker
 
 tcDoStmt _ (BindStmt pat rhs bind_op fail_op) res_ty thing_inside
-  = do	{ (rhs', rhs_ty) <- tcInferRho rhs
+  = do	{ (rhs', rhs_ty) <- tcInferRhoNC rhs
 		-- We should use type *inference* for the RHS computations, 
                 -- becuase of GADTs. 
 		-- 	do { pat <- rhs; <rest> }
@@ -495,7 +495,7 @@ tcDoStmt _ (BindStmt pat rhs bind_op fail_op) res_ty thing_inside
 
 
 tcDoStmt _ (ExprStmt rhs then_op _) res_ty thing_inside
-  = do	{ (rhs', rhs_ty) <- tcInferRho rhs
+  = do	{ (rhs', rhs_ty) <- tcInferRhoNC rhs
 
   	-- Deal with rebindable syntax; (>>) :: rhs_ty -> new_res_ty -> res_ty
 	; (then_op', new_res_ty) <-

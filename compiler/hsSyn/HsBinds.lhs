@@ -340,7 +340,7 @@ data HsWrapper
   | WpCast Coercion		-- A cast:  [] `cast` co
 				-- Guaranteed not the identity coercion
 
-  | WpApp Var			-- [] d		the 'd' is a type-class dictionary
+  | WpApp Var			-- [] d		the 'd' is a type-class dictionary or coercion variable
   | WpTyApp Type		-- [] t		the 't' is a type or corecion
   | WpLam Var	 		-- \d. []	the 'd' is a type-class dictionary or coercion variable
   | WpTyLam TyVar 		-- \a. []	the 'a' is a type variable (not coercion var)

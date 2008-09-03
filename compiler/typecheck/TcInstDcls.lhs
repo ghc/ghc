@@ -21,6 +21,7 @@ import FamInst
 import FamInstEnv
 import TcDeriv
 import TcEnv
+import RnEnv	( lookupImportedName )
 import TcHsType
 import TcUnify
 import TcSimplify
@@ -37,9 +38,9 @@ import Name
 import NameSet
 import DynFlags
 import SrcLoc
-import ListSetOps
 import Util
 import Outputable
+import Maybes
 import Bag
 import BasicTypes
 import HscTypes
@@ -48,6 +49,8 @@ import FastString
 import Data.Maybe
 import Control.Monad
 import Data.List
+
+#include "HsVersions.h"
 \end{code}
 
 Typechecking instance declarations is done in two passes. The first
@@ -60,67 +63,178 @@ pass, when the class-instance envs and GVE contain all the info from
 all the instance and value decls.  Indeed that's the reason we need
 two passes over the instance decls.
 
-Here is the overall algorithm.
-Assume that we have an instance declaration
 
-    instance c => k (t tvs) where b
+Note [How instance declarations are translated]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Here is how we translation instance declarations into Core
 
-\begin{enumerate}
-\item
-$LIE_c$ is the LIE for the context of class $c$
-\item
-$betas_bar$ is the free variables in the class method type, excluding the
-   class variable
-\item
-$LIE_cop$ is the LIE constraining a particular class method
-\item
-$tau_cop$ is the tau type of a class method
-\item
-$LIE_i$ is the LIE for the context of instance $i$
-\item
-$X$ is the instance constructor tycon
-\item
-$gammas_bar$ is the set of type variables of the instance
-\item
-$LIE_iop$ is the LIE for a particular class method instance
-\item
-$tau_iop$ is the tau type for this instance of a class method
-\item
-$alpha$ is the class variable
-\item
-$LIE_cop' = LIE_cop [X gammas_bar \/ alpha, fresh betas_bar]$
-\item
-$tau_cop' = tau_cop [X gammas_bar \/ alpha, fresh betas_bar]$
-\end{enumerate}
+Running example:
+	class C a where
+	   op1, op2 :: Ix b => a -> b -> b
+	   op2 = <dm-rhs>
 
-ToDo: Update the list above with names actually in the code.
+	instance C a => C [a]
+	   {-# INLINE [2] op1 #-}
+	   op1 = <rhs>
+===>
+	-- Method selectors
+	op1,op2 :: forall a. C a => forall b. Ix b => a -> b -> b
+	op1 = ...
+	op2 = ...
 
-\begin{enumerate}
-\item
-First, make the LIEs for the class and instance contexts, which means
-instantiate $thetaC [X inst_tyvars \/ alpha ]$, yielding LIElistC' and LIEC',
-and make LIElistI and LIEI.
-\item
-Then process each method in turn.
-\item
-order the instance methods according to the ordering of the class methods
-\item
-express LIEC' in terms of LIEI, yielding $dbinds_super$ or an error
-\item
-Create final dictionary function from bindings generated already
-\begin{pseudocode}
-df = lambda inst_tyvars
-       lambda LIEI
-         let Bop1
-             Bop2
-             ...
-             Bopn
-         and dbinds_super
-              in <op1,op2,...,opn,sd1,...,sdm>
-\end{pseudocode}
-Here, Bop1 \ldots Bopn bind the methods op1 \ldots opn,
-and $dbinds_super$ bind the superclass dictionaries sd1 \ldots sdm.
-\end{enumerate}
+	-- Default methods get the 'self' dictionary as argument
+	-- so they can call other methods at the same type
+	-- Default methods get the same type as their method selector
+	$dmop2 :: forall a. C a => forall b. Ix b => a -> b -> b
+	$dmop2 = /\a. \(d:C a). /\b. \(d2: Ix b). <dm-rhs>
+	       -- NB: type variables 'a' and 'b' are *both* in scope in <dm-rhs>
+	       -- Note [Tricky type variable scoping]
+
+	-- A top-level definition for each instance method
+	-- Here op1_i, op2_i are the "instance method Ids"
+	{-# INLINE [2] op1_i #-}  -- From the instance decl bindings
+	op1_i, op2_i :: forall a. C a => forall b. Ix b => [a] -> b -> b
+	op1_i = <rhs>	-- Source code; run the type checker on this
+	       -- NB: Type variable 'a' (but not 'b') is in scope in <rhs>
+	       -- Note [Tricky type variable scoping]
+
+	op2_i = /\a \d:C a. $dmop2 [a] (df_i a d) 
+
+	-- The dictionary function itself
+	{-# INLINE df_i #-}	-- Always inline dictionary functions
+	df_i :: forall a. C a -> C [a]
+	df_i = /\a. \d:C a. MkC (op1_i a d) ($dmop2 a d)
+		-- But see Note [Default methods in instances]
+		-- We can't apply the type checker to the default-nmethod call
+
+* The dictionary function itself is inlined as vigorously as we
+  possibly can, so that we expose that dictionary constructor to
+  selectors as much as poss.  That is why the op_i stuff is in 
+  *separate* bindings, so that the df_i binding is small enough
+  to inline.  See Note [Inline dfuns unconditionally].
+
+* Note that df_i may be mutually recursive with both op1_i and op2_i.
+  It's crucial that df_i is not chosen as the loop breaker, even 
+  though op1_i has a (user-specified) INLINE pragma.
+  Not even once!  Else op1_i, op2_i may be inlined into df_i.
+
+* Instead the idea is to inline df_i into op1_i, which may then select
+  methods from the MkC record, and thereby break the recursion with
+  df_i, leaving a *self*-recurisve op1_i.  (If op1_i doesn't call op at
+  the same type, it won't mention df_i, so there won't be recursion in
+  the first place.)  
+
+* If op1_i is marked INLINE by the user there's a danger that we won't
+  inline df_i in it, and that in turn means that (since it'll be a
+  loop-breaker because df_i isn't), op1_i will ironically never be 
+  inlined.  We need to fix this somehow -- perhaps allowing inlining
+  of INLINE funcitons inside other INLINE functions.
+
+Note [Tricky type variable scoping]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In our example
+	class C a where
+	   op1, op2 :: Ix b => a -> b -> b
+	   op2 = <dm-rhs>
+
+	instance C a => C [a]
+	   {-# INLINE [2] op1 #-}
+	   op1 = <rhs>
+
+note that 'a' and 'b' are *both* in scope in <dm-rhs>, but only 'a' is
+in scope in <rhs>.  In particular, we must make sure that 'b' is in
+scope when typechecking <dm-rhs>.  This is achieved by subFunTys,
+which brings appropriate tyvars into scope. This happens for both
+<dm-rhs> and for <rhs>, but that doesn't matter: the *renamer* will have
+complained if 'b' is mentioned in <rhs>.
+
+Note [Inline dfuns unconditionally]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The code above unconditionally inlines dict funs.  Here's why.
+Consider this program:
+
+    test :: Int -> Int -> Bool
+    test x y = (x,y) == (y,x) || test y x
+    -- Recursive to avoid making it inline.
+
+This needs the (Eq (Int,Int)) instance.  If we inline that dfun
+the code we end up with is good:
+
+    Test.$wtest =
+        \r -> case ==# [ww ww1] of wild {
+                PrelBase.False -> Test.$wtest ww1 ww;
+                PrelBase.True ->
+                  case ==# [ww1 ww] of wild1 {
+                    PrelBase.False -> Test.$wtest ww1 ww;
+                    PrelBase.True -> PrelBase.True [];
+                  };
+            };
+    Test.test = \r [w w1]
+            case w of w2 {
+              PrelBase.I# ww ->
+                  case w1 of w3 { PrelBase.I# ww1 -> Test.$wtest ww ww1; };
+            };
+
+If we don't inline the dfun, the code is not nearly as good:
+
+    (==) = case PrelTup.$fEq(,) PrelBase.$fEqInt PrelBase.$fEqInt of tpl {
+              PrelBase.:DEq tpl1 tpl2 -> tpl2;
+            };
+
+    Test.$wtest =
+        \r [ww ww1]
+            let { y = PrelBase.I#! [ww1]; } in
+            let { x = PrelBase.I#! [ww]; } in
+            let { sat_slx = PrelTup.(,)! [y x]; } in
+            let { sat_sly = PrelTup.(,)! [x y];
+            } in
+              case == sat_sly sat_slx of wild {
+                PrelBase.False -> Test.$wtest ww1 ww;
+                PrelBase.True -> PrelBase.True [];
+              };
+
+    Test.test =
+        \r [w w1]
+            case w of w2 {
+              PrelBase.I# ww ->
+                  case w1 of w3 { PrelBase.I# ww1 -> Test.$wtest ww ww1; };
+            };
+
+Why didn't GHC inline $fEq in those days?  Because it looked big:
+
+    PrelTup.zdfEqZ1T{-rcX-}
+        = \ @ a{-reT-} :: * @ b{-reS-} :: *
+            zddEq{-rf6-} _Ks :: {PrelBase.Eq{-23-} a{-reT-}}
+            zddEq1{-rf7-} _Ks :: {PrelBase.Eq{-23-} b{-reS-}} ->
+            let {
+              zeze{-rf0-} _Kl :: (b{-reS-} -> b{-reS-} -> PrelBase.Bool{-3c-})
+              zeze{-rf0-} = PrelBase.zeze{-01L-}@ b{-reS-} zddEq1{-rf7-} } in
+            let {
+              zeze1{-rf3-} _Kl :: (a{-reT-} -> a{-reT-} -> PrelBase.Bool{-3c-})
+              zeze1{-rf3-} = PrelBase.zeze{-01L-} @ a{-reT-} zddEq{-rf6-} } in
+            let {
+              zeze2{-reN-} :: ((a{-reT-}, b{-reS-}) -> (a{-reT-}, b{-reS-})-> PrelBase.Bool{-3c-})
+              zeze2{-reN-} = \ ds{-rf5-} _Ks :: (a{-reT-}, b{-reS-})
+                               ds1{-rf4-} _Ks :: (a{-reT-}, b{-reS-}) ->
+                             case ds{-rf5-}
+                             of wild{-reW-} _Kd { (a1{-rf2-} _Ks, a2{-reZ-} _Ks) ->
+                             case ds1{-rf4-}
+                             of wild1{-reX-} _Kd { (b1{-rf1-} _Ks, b2{-reY-} _Ks) ->
+                             PrelBase.zaza{-r4e-}
+                               (zeze1{-rf3-} a1{-rf2-} b1{-rf1-})
+                               (zeze{-rf0-} a2{-reZ-} b2{-reY-})
+                             }
+                             } } in
+            let {
+              a1{-reR-} :: ((a{-reT-}, b{-reS-})-> (a{-reT-}, b{-reS-})-> PrelBase.Bool{-3c-})
+              a1{-reR-} = \ a2{-reV-} _Ks :: (a{-reT-}, b{-reS-})
+                            b1{-reU-} _Ks :: (a{-reT-}, b{-reS-}) ->
+                          PrelBase.not{-r6I-} (zeze2{-reN-} a2{-reV-} b1{-reU-})
+            } in
+              PrelBase.zdwZCDEq{-r8J-} @ (a{-reT-}, b{-reS-}) a1{-reR-} zeze2{-reN-})
+
+and it's not as bad as it seems, because it's further dramatically
+simplified: only zeze2 is extracted and its body is simplified.
 
 
 %************************************************************************
@@ -392,67 +506,6 @@ tcInstDecls2 tycl_decls inst_decls
         ; return (binds, tcl_env) }
 \end{code}
 
-======= New documentation starts here (Sept 92) ==============
-
-The main purpose of @tcInstDecl2@ is to return a @HsBinds@ which defines
-the dictionary function for this instance declaration. For example
-
-        instance Foo a => Foo [a] where
-                op1 x = ...
-                op2 y = ...
-
-might generate something like
-
-        dfun.Foo.List dFoo_a = let op1 x = ...
-                                   op2 y = ...
-                               in
-                                   Dict [op1, op2]
-
-HOWEVER, if the instance decl has no context, then it returns a
-bigger @HsBinds@ with declarations for each method.  For example
-
-        instance Foo [a] where
-                op1 x = ...
-                op2 y = ...
-
-might produce
-
-        dfun.Foo.List a = Dict [Foo.op1.List a, Foo.op2.List a]
-        const.Foo.op1.List a x = ...
-        const.Foo.op2.List a y = ...
-
-This group may be mutually recursive, because (for example) there may
-be no method supplied for op2 in which case we'll get
-
-        const.Foo.op2.List a = default.Foo.op2 (dfun.Foo.List a)
-
-that is, the default method applied to the dictionary at this type.
-What we actually produce in either case is:
-
-        AbsBinds [a] [dfun_theta_dicts]
-                 [(dfun.Foo.List, d)] ++ (maybe) [(const.Foo.op1.List, op1), ...]
-                 { d = (sd1,sd2, ..., op1, op2, ...)
-                   op1 = ...
-                   op2 = ...
-                 }
-
-The "maybe" says that we only ask AbsBinds to make global constant methods
-if the dfun_theta is empty.
-
-For an instance declaration, say,
-
-        instance (C1 a, C2 b) => C (T a b) where
-                ...
-
-where the {\em immediate} superclasses of C are D1, D2, we build a dictionary
-function whose type is
-
-        (C1 a, C2 b, D1 (T a b), D2 (T a b)) => C (T a b)
-
-Notice that we pass it the superclass dictionaries at the instance type; this
-is the ``Mark Jones optimisation''.  The stuff before the "=>" here
-is the @dfun_theta@ below.
-
 
 \begin{code}
 tcInstDecl2 :: InstInfo Name -> TcM (LHsBinds Id)
@@ -617,15 +670,18 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = VanillaInst monobinds uprags })
 
         -- Typecheck the methods
     let -- These insts are in scope; quite a few, eh?
-        dfun_insts      = dfun_eqs ++ dfun_dicts
-        wanted_sc_insts = wanted_sc_eqs   ++ sc_dicts
-        given_sc_eqs    = map (updateEqInstCoercion (mkGivenCo . TyVarTy . fromWantedCo "tcInstDecl2") ) wanted_sc_eqs
-        given_sc_insts  = given_sc_eqs   ++ sc_dicts
-        avail_insts     = dfun_insts ++ given_sc_insts
-
-    (meth_ids, meth_binds) <- tcMethods origin clas inst_tyvars'
-                                 dfun_theta' inst_tys' this_dict avail_insts
-                                 op_items monobinds uprags
+        dfun_insts      = dfun_eqs      ++ dfun_dicts
+        wanted_sc_insts = wanted_sc_eqs ++ sc_dicts
+        this_dict_id  	= instToId this_dict
+        sc_dict_ids   	= map instToId sc_dicts
+	dfun_dict_ids 	= map instToId dfun_dicts
+	prag_fn		= mkPragFun uprags 
+	tc_meth 	= tcInstanceMethod loc clas inst_tyvars'
+			  		   (dfun_covars ++ dfun_dict_ids)
+                   	  	           dfun_theta' inst_tys'
+					   this_dict_id 
+                        	           monobinds prag_fn
+    (meth_exprs, meth_binds) <- mapAndUnzipM tc_meth op_items 
 
     -- Figure out bindings for the superclass context
     -- Don't include this_dict in the 'givens', else
@@ -643,8 +699,6 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = VanillaInst monobinds uprags })
     -- Create the result bindings
     let
         dict_constr   = classDataCon clas
-        scs_and_meths = map instToId sc_dicts ++ meth_ids
-        this_dict_id  = instToId this_dict
         inline_prag | null dfun_insts  = []
                     | otherwise        = [L loc (InlinePrag (Inline AlwaysActive True))]
                 -- Always inline the dfun; this is an experimental decision
@@ -659,7 +713,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = VanillaInst monobinds uprags })
                 --      See Note [Inline dfuns] below
 
         dict_rhs = mkHsConApp dict_constr (inst_tys' ++ mkTyVarTys sc_covars)
-                                          (map HsVar scs_and_meths)
+                                          (map HsVar sc_dict_ids ++ meth_exprs)
                 -- We don't produce a binding for the dict_constr; instead we
                 -- rely on the simplifier to unfold this saturated application
                 -- We do this rather than generate an HsCon directly, because
@@ -668,16 +722,15 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = VanillaInst monobinds uprags })
                 -- than needing to be repeated here.
 
         dict_bind  = noLoc (VarBind this_dict_id dict_rhs)
-        all_binds  = dict_bind `consBag` (sc_binds `unionBags` meth_binds)
 
         main_bind = noLoc $ AbsBinds
                             (inst_tyvars' ++ dfun_covars)
-                            (map instToId dfun_dicts)
+                            dfun_dict_ids
                             [(inst_tyvars' ++ dfun_covars, dfun_id, this_dict_id, inline_prag ++ prags)]
-                            all_binds
+                            (dict_bind `consBag` sc_binds)
 
     showLIE (text "instance")
-    return (unitBag main_bind)
+    return (main_bind `consBag` unionManyBags meth_binds)
 
 mkCoVars :: [PredType] -> TcM [TyVar]
 mkCoVars = newCoVars . map unEqPred
@@ -690,159 +743,119 @@ mkMetaCoVars = mapM eqPredToCoVar
   where
     eqPredToCoVar (EqPred ty1 ty2) = newMetaCoVar ty1 ty2
     eqPredToCoVar _                = panic "TcInstDcls.mkMetaCoVars"
-
-tcMethods :: InstOrigin -> Class -> [TcTyVar] -> TcThetaType -> [TcType]
-          -> Inst -> [Inst] -> [(Id, DefMeth)] -> LHsBindsLR Name Name
-          -> [LSig Name]
-          -> TcM ([Id], Bag (LHsBind Id))
-tcMethods origin clas inst_tyvars' dfun_theta' inst_tys'
-          this_dict extra_insts op_items monobinds uprags = do
-    -- Check that all the method bindings come from this class
-    let
-        sel_names = [idName sel_id | (sel_id, _) <- op_items]
-        bad_bndrs = collectHsBindBinders monobinds `minusList` sel_names
-
-    mapM (addErrTc . badMethodErr clas) bad_bndrs
-
-    -- Make the method bindings
-    let
-        mk_method_id (sel_id, _) = mkMethId origin clas sel_id inst_tys'
-
-    (meth_insts, meth_ids) <- mapAndUnzipM mk_method_id op_items
-
-        -- And type check them
-        -- It's really worth making meth_insts available to the tcMethodBind
-        -- Consider     instance Monad (ST s) where
-        --                {-# INLINE (>>) #-}
-        --                (>>) = ...(>>=)...
-        -- If we don't include meth_insts, we end up with bindings like this:
-        --      rec { dict = MkD then bind ...
-        --            then = inline_me (... (GHC.Base.>>= dict) ...)
-        --            bind = ... }
-        -- The trouble is that (a) 'then' and 'dict' are mutually recursive,
-        -- and (b) the inline_me prevents us inlining the >>= selector, which
-        -- would unravel the loop.  Result: (>>) ends up as a loop breaker, and
-        -- is not inlined across modules. Rather ironic since this does not
-        -- happen without the INLINE pragma!
-        --
-        -- Solution: make meth_insts available, so that 'then' refers directly
-        --           to the local 'bind' rather than going via the dictionary.
-        --
-        -- BUT WATCH OUT!  If the method type mentions the class variable, then
-        -- this optimisation is not right.  Consider
-        --      class C a where
-        --        op :: Eq a => a
-        --
-        --      instance C Int where
-        --        op = op
-        -- The occurrence of 'op' on the rhs gives rise to a constraint
-        --      op at Int
-        -- The trouble is that the 'meth_inst' for op, which is 'available', also
-        -- looks like 'op at Int'.  But they are not the same.
-    let
-        prag_fn        = mkPragFun uprags
-        all_insts      = extra_insts ++ catMaybes meth_insts
-        sig_fn _       = Just []        -- No scoped type variables, but every method has
-                                        -- a type signature, in effect, so that we check
-                                        -- the method has the right type
-        tc_method_bind = tcMethodBind origin inst_tyvars' dfun_theta' this_dict 
-				      all_insts sig_fn prag_fn monobinds
-
-    meth_binds_s <- zipWithM tc_method_bind op_items meth_ids
-
-    return (meth_ids, unionManyBags meth_binds_s)
 \end{code}
 
 
-                ------------------------------
-        [Inline dfuns] Inlining dfuns unconditionally
-                ------------------------------
 
-The code above unconditionally inlines dict funs.  Here's why.
-Consider this program:
+tcInstanceMethod
+- Make the method bindings, as a [(NonRec, HsBinds)], one per method
+- Remembering to use fresh Name (the instance method Name) as the binder
+- Bring the instance method Ids into scope, for the benefit of tcInstSig
+- Use sig_fn mapping instance method Name -> instance tyvars
+- Ditto prag_fn
+- Use tcValBinds to do the checking
 
-    test :: Int -> Int -> Bool
-    test x y = (x,y) == (y,x) || test y x
-    -- Recursive to avoid making it inline.
+\begin{code}
+tcInstanceMethod :: SrcSpan -> Class -> [TcTyVar] -> [Var]
+	 	 -> TcThetaType -> [TcType] -> Id
+          	 -> LHsBinds Name -> TcPragFun
+	  	 -> (Id, DefMeth)
+          	 -> TcM (HsExpr Id, LHsBinds Id)
+	-- The returned inst_meth_ids all have types starting
+	--	forall tvs. theta => ...
 
-This needs the (Eq (Int,Int)) instance.  If we inline that dfun
-the code we end up with is good:
+tcInstanceMethod loc clas tyvars dfun_lam_vars theta inst_tys this_dict_id
+	         binds_in prag_fn (sel_id, dm_info)
+  = do	{ uniq <- newUnique
+	; let (sel_tyvars,sel_rho) = tcSplitForAllTys (idType sel_id)
+	      rho_ty = ASSERT( length sel_tyvars == length inst_tys )
+		       substTyWith sel_tyvars inst_tys sel_rho
+	      (first_pred, meth_tau) = tcSplitPredFunTy_maybe rho_ty
+			`orElse` pprPanic "tcInstanceMethod" (ppr sel_id)
+				       
+		      -- The first predicate should be of form (C a b)
+		      -- where C is the class in question
+	      meth_ty 	= mkSigmaTy tyvars theta meth_tau
+	      meth_name = mkInternalName uniq sel_occ loc	-- Same OccName
+	      meth_id   = mkLocalId meth_name meth_ty
 
-    Test.$wtest =
-        \r -> case ==# [ww ww1] of wild {
-                PrelBase.False -> Test.$wtest ww1 ww;
-                PrelBase.True ->
-                  case ==# [ww1 ww] of wild1 {
-                    PrelBase.False -> Test.$wtest ww1 ww;
-                    PrelBase.True -> PrelBase.True [];
-                  };
-            };
-    Test.test = \r [w w1]
-            case w of w2 {
-              PrelBase.I# ww ->
-                  case w1 of w3 { PrelBase.I# ww1 -> Test.$wtest ww ww1; };
-            };
+	; MASSERT( case getClassPredTys_maybe first_pred of
+			{ Just (clas1, _tys) -> clas == clas1 ; Nothing -> False } )
 
-If we don't inline the dfun, the code is not nearly as good:
 
-    (==) = case PrelTup.$fEq(,) PrelBase.$fEqInt PrelBase.$fEqInt of tpl {
-              PrelBase.:DEq tpl1 tpl2 -> tpl2;
-            };
+	; case (findMethodBind sel_name meth_name binds_in, dm_info) of
+		-- There is a user-supplied method binding, so use it
+	    (Just user_bind, _) -> typecheck_meth meth_id user_bind
 
-    Test.$wtest =
-        \r [ww ww1]
-            let { y = PrelBase.I#! [ww1]; } in
-            let { x = PrelBase.I#! [ww]; } in
-            let { sat_slx = PrelTup.(,)! [y x]; } in
-            let { sat_sly = PrelTup.(,)! [x y];
-            } in
-              case == sat_sly sat_slx of wild {
-                PrelBase.False -> Test.$wtest ww1 ww;
-                PrelBase.True -> PrelBase.True [];
-              };
+		-- The user didn't supply a method binding, so we have to make 
+		-- up a default binding, in a way depending on the default-method info
 
-    Test.test =
-        \r [w w1]
-            case w of w2 {
-              PrelBase.I# ww ->
-                  case w1 of w3 { PrelBase.I# ww1 -> Test.$wtest ww ww1; };
-            };
+	    (Nothing, GenDefMeth) -> do		-- Derivable type classes stuff
+			{ meth_bind <- mkGenericDefMethBind clas inst_tys sel_id meth_name
+			; typecheck_meth meth_id meth_bind }
 
-Why doesn't GHC inline $fEq?  Because it looks big:
+	    (Nothing, NoDefMeth) -> do		-- No default method in the class
+			{ warn <- doptM Opt_WarnMissingMethods		
+                        ; warnTc (warn  -- Warn only if -fwarn-missing-methods
+				  && reportIfUnused (getOccName sel_id))
+					-- Don't warn about _foo methods
+			         (omittedMethodWarn sel_id) 
+			; return (mk_error_rhs meth_tau, emptyBag) }
 
-    PrelTup.zdfEqZ1T{-rcX-}
-        = \ @ a{-reT-} :: * @ b{-reS-} :: *
-            zddEq{-rf6-} _Ks :: {PrelBase.Eq{-23-} a{-reT-}}
-            zddEq1{-rf7-} _Ks :: {PrelBase.Eq{-23-} b{-reS-}} ->
-            let {
-              zeze{-rf0-} _Kl :: (b{-reS-} -> b{-reS-} -> PrelBase.Bool{-3c-})
-              zeze{-rf0-} = PrelBase.zeze{-01L-}@ b{-reS-} zddEq1{-rf7-} } in
-            let {
-              zeze1{-rf3-} _Kl :: (a{-reT-} -> a{-reT-} -> PrelBase.Bool{-3c-})
-              zeze1{-rf3-} = PrelBase.zeze{-01L-} @ a{-reT-} zddEq{-rf6-} } in
-            let {
-              zeze2{-reN-} :: ((a{-reT-}, b{-reS-}) -> (a{-reT-}, b{-reS-})-> PrelBase.Bool{-3c-})
-              zeze2{-reN-} = \ ds{-rf5-} _Ks :: (a{-reT-}, b{-reS-})
-                               ds1{-rf4-} _Ks :: (a{-reT-}, b{-reS-}) ->
-                             case ds{-rf5-}
-                             of wild{-reW-} _Kd { (a1{-rf2-} _Ks, a2{-reZ-} _Ks) ->
-                             case ds1{-rf4-}
-                             of wild1{-reX-} _Kd { (b1{-rf1-} _Ks, b2{-reY-} _Ks) ->
-                             PrelBase.zaza{-r4e-}
-                               (zeze1{-rf3-} a1{-rf2-} b1{-rf1-})
-                               (zeze{-rf0-} a2{-reZ-} b2{-reY-})
-                             }
-                             } } in
-            let {
-              a1{-reR-} :: ((a{-reT-}, b{-reS-})-> (a{-reT-}, b{-reS-})-> PrelBase.Bool{-3c-})
-              a1{-reR-} = \ a2{-reV-} _Ks :: (a{-reT-}, b{-reS-})
-                            b1{-reU-} _Ks :: (a{-reT-}, b{-reS-}) ->
-                          PrelBase.not{-r6I-} (zeze2{-reN-} a2{-reV-} b1{-reU-})
-            } in
-              PrelBase.zdwZCDEq{-r8J-} @ (a{-reT-}, b{-reS-}) a1{-reR-} zeze2{-reN-})
+	    (Nothing, DefMeth) -> do	-- An polymorphic default method
+			{   -- Build the typechecked version directly, 
+			    -- without calling typecheck_method; 
+			    -- see Note [Default methods in instances]
+			  dm_name <- lookupImportedName (mkDefMethRdrName sel_name)
+					-- Might not be imported, but will be an OrigName
+			; dm_id   <- tcLookupId dm_name
+			; return (wrap dm_wrapper dm_id, emptyBag) } }
+  where
+    sel_name = idName sel_id
+    sel_occ  = nameOccName sel_name
+    tv_names = map tyVarName tyvars
+    prags    = prag_fn sel_name
 
-and it's not as bad as it seems, because it's further dramatically
-simplified: only zeze2 is extracted and its body is simplified.
+    typecheck_meth :: Id -> LHsBind Name -> TcM (HsExpr Id, LHsBinds Id)
+    typecheck_meth meth_id bind
+	= do { tc_binds <- tcMethodBind tv_names prags meth_id bind
+	     ; return (wrap meth_wrapper meth_id, tc_binds) }
+
+    mk_error_rhs tau = HsApp (mkLHsWrap (WpTyApp tau) error_id) error_msg
+    error_id     = L loc (HsVar nO_METHOD_BINDING_ERROR_ID) 
+    error_msg    = L loc (HsLit (HsStringPrim (mkFastString error_string)))
+    error_string = showSDoc (hcat [ppr loc, text "|", ppr sel_id ])
+
+    wrap wrapper id = mkHsWrap wrapper (HsVar id)
+    meth_wrapper = mkWpApps dfun_lam_vars `WpCompose` mkWpTyApps (mkTyVarTys tyvars)
+    dm_wrapper   = WpApp this_dict_id `WpCompose` mkWpTyApps inst_tys 
+
+omittedMethodWarn :: Id -> SDoc
+omittedMethodWarn sel_id
+  = ptext (sLit "No explicit method nor default method for") <+> quotes (ppr sel_id)
+\end{code}
+
+Note [Default methods in instances]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this
+
+   class Baz v x where
+      foo :: x -> x
+      foo y = y
+
+   instance Baz Int Int
+
+From the class decl we get
+
+   $dmfoo :: forall v x. Baz v x => x -> x
+
+Notice that the type is ambiguous.  That's fine, though. The instance decl generates
+
+   $dBazIntInt = MkBaz ($dmfoo Int Int $dBazIntInt)
+
+BUT this does mean we must generate the dictionary translation directly, rather
+than generating source-code and type-checking it.  That was the bug ing
+Trac #1061. In any case it's less work to generate the translated version!
 
 
 %************************************************************************
