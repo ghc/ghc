@@ -1,7 +1,7 @@
 
 {-# OPTIONS_GHC -XNoImplicitPrelude #-}
 
-module GHC.Bool where
+module GHC.Bool (Bool(..)) where
 
 -- We need Inl etc behind the scenes for the Bool definition
 import GHC.Generics ()

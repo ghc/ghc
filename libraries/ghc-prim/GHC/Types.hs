@@ -1,7 +1,7 @@
 
 {-# OPTIONS_GHC -XNoImplicitPrelude #-}
 
-module GHC.Types where
+module GHC.Types (Char(..), Int(..), Float(..), Double(..)) where
 
 import GHC.Prim
 -- We need Inl etc behind the scenes for the type definitions
