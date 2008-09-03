@@ -53,10 +53,6 @@ Library
     if !flag(base3) && !flag(base4)
         Build-Depends: base       < 3
 
-    if flag(base4)
-        Build-Depends: concurrent >= 0.1 && < 0.2,
-                       st         >= 0.1 && < 0.2
-
     if flag(base3) || flag(base4)
         Build-Depends: directory  >= 1   && < 1.1,
                        process    >= 1   && < 1.1,
