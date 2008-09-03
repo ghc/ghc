@@ -90,5 +90,9 @@ test('gadt-escape1', normal, compile_fail, [''])
 test('Session', normal, compile_and_run, [''])
 test('CasePrune', normal, compile_and_run, [''])
 
-test('T1999', expect_fail, compile, [''])
+test('T1999', normal, compile, [''])
+# T1999 has not offically been fixed, but's started working 
+# after the new-instance-decl patch.
+
 test('T1999a', expect_fail, compile, [''])
+# This version of T1999 still fails; the bug is still there
