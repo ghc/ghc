@@ -54,20 +54,16 @@ infixr 1 ^>>, >>^
 infixr 1 ^<<, <<^
 
 -- | The basic arrow class.
---   Any instance must define either 'arr' or 'pure' (which are synonyms),
---   as well as 'first'.  The other combinators have sensible
---   default definitions, which may be overridden for efficiency.
+--
+--   Minimal complete definition: 'arr' and 'first'.
+--
+--   The other combinators have sensible default definitions,
+--   which may be overridden for efficiency.
 
 class Category a => Arrow a where
 
-        -- | Lift a function to an arrow: you must define either this
-        --   or 'pure'.
+        -- | Lift a function to an arrow.
         arr :: (b -> c) -> a b c
-        arr = pure
-
-        -- | A synonym for 'arr': you must define one or other of them.
-        pure :: (b -> c) -> a b c
-        pure = arr
 
         -- | Send the first component of the input through the argument
         --   arrow, and copy the rest unchanged to the output.
