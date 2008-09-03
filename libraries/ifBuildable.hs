@@ -33,7 +33,7 @@ getMustBeBuildables :: FilePath -> IO [String]
 getMustBeBuildables packagesFile
  = do xs <- readFile packagesFile
       let nonCommentLines = filter (("#" /=) . take 1) $ lines xs
-          requiredLines = filter ((2 == ) . length) $ map words nonCommentLines
+          requiredLines = filter ((3 == ) . length) $ map words nonCommentLines
           requiredLibraries = [ x | 'l':'i':'b':'r':'a':'r':'i':'e':'s':'/':x
                                     <- map head requiredLines ]
       return $ filter ("editline" /=) requiredLibraries
