@@ -508,30 +508,10 @@ INSTANCE_TYPEABLE3(STArray,sTArrayTc,"STArray")
 #ifndef __NHC__
 INSTANCE_TYPEABLE2((,),pairTc,"(,)")
 INSTANCE_TYPEABLE3((,,),tup3Tc,"(,,)")
-
-tup4Tc :: TyCon
-tup4Tc = mkTyCon "(,,,)"
-
-instance Typeable4 (,,,) where
-  typeOf4 _ = mkTyConApp tup4Tc []
-
-tup5Tc :: TyCon
-tup5Tc = mkTyCon "(,,,,)"
-
-instance Typeable5 (,,,,) where
-  typeOf5 _ = mkTyConApp tup5Tc []
-
-tup6Tc :: TyCon
-tup6Tc = mkTyCon "(,,,,,)"
-
-instance Typeable6 (,,,,,) where
-  typeOf6 _ = mkTyConApp tup6Tc []
-
-tup7Tc :: TyCon
-tup7Tc = mkTyCon "(,,,,,,)"
-
-instance Typeable7 (,,,,,,) where
-  typeOf7 _ = mkTyConApp tup7Tc []
+INSTANCE_TYPEABLE4((,,,),tup4Tc,"(,,,)")
+INSTANCE_TYPEABLE5((,,,,),tup5Tc,"(,,,,)")
+INSTANCE_TYPEABLE6((,,,,,),tup6Tc,"(,,,,,)")
+INSTANCE_TYPEABLE7((,,,,,,),tup7Tc,"(,,,,,,)")
 #endif /* __NHC__ */
 
 INSTANCE_TYPEABLE1(Ptr,ptrTc,"Ptr")
