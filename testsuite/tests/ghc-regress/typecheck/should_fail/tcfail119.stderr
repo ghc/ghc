@@ -3,4 +3,3 @@ tcfail119.hs:11:7:
     Couldn't match expected type `Bool' against inferred type `[Char]'
     In the pattern: "Foo"
     In the definition of `b': b x "Foo" = ()
-    In the definition for method `b'

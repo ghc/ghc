@@ -1,4 +1,5 @@
 
 tcfail199.hs:5:0:
     Couldn't match expected type `IO t' against inferred type `[Char]'
+    In the expression: main
     When checking the type of the function `main'

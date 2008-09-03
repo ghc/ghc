@@ -14,6 +14,9 @@
 
     /Bjorn Bringert -}
 
+-- August 08: on reflection I think a complaint about overlapping
+-- insances for line 8 is absolutely right, so I've changed this to
+-- expected-failure
 
 module ShouldCompile  where
 

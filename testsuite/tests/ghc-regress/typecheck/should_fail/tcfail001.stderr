@@ -2,5 +2,4 @@
 tcfail001.hs:9:1:
     The equation(s) for `op' have one argument,
     but its type `[a]' has none
-    In the definition for method `op'
     In the instance declaration for `A [a]'

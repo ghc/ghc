@@ -30,4 +30,4 @@ T2494.hs:15:32:
       Expected type: Maybe b
       Inferred type: Maybe a
     In the second argument of `foo', namely `x'
-    When checking the transformation rule "foo/foo"
+    In the expression: foo (f . g) x
