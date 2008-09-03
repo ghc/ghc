@@ -55,7 +55,8 @@ Library {
             GHC.TopHandler,
             GHC.Unicode,
             GHC.Weak,
-            GHC.Word
+            GHC.Word,
+            System.Timeout
         extensions: MagicHash, ExistentialQuantification, Rank2Types,
                     ScopedTypeVariables, UnboxedTuples,
                     ForeignFunctionInterface, UnliftedFFITypes,
@@ -67,12 +68,21 @@ Library {
         Control.Applicative,
         Control.Arrow,
         Control.Category,
+        Control.Concurrent,
+        Control.Concurrent.Chan,
+        Control.Concurrent.MVar,
+        Control.Concurrent.QSem,
+        Control.Concurrent.QSemN,
+        Control.Concurrent.SampleVar,
         Control.Exception,
         Control.Exception.Base
         Control.OldException,
         Control.Monad,
         Control.Monad.Fix,
         Control.Monad.Instances,
+        Control.Monad.ST
+        Control.Monad.ST.Lazy
+        Control.Monad.ST.Strict
         Data.Bits,
         Data.Bool,
         Data.Char,
@@ -92,10 +102,14 @@ Library {
         Data.Monoid,
         Data.Ord,
         Data.Ratio,
+        Data.STRef
+        Data.STRef.Lazy
+        Data.STRef.Strict
         Data.String,
         Data.Traversable
         Data.Tuple,
         Data.Typeable,
+        Data.Unique,
         Data.Version,
         Data.Word,
         Debug.Trace,
@@ -116,6 +130,7 @@ Library {
         Foreign.Storable,
         Numeric,
         Prelude,
+        System.Console.GetOpt
         System.CPUTime,
         System.Environment,
         System.Exit,
