@@ -25,7 +25,7 @@ import NewDemand        ( isStrictDmd )
 import PprCore          ( pprParendExpr, pprCoreExpr )
 import CoreUnfold       ( mkUnfolding, callSiteInline, CallCtxt(..) )
 import CoreUtils
-import Rules            ( lookupRule )
+import Rules            ( lookupRule, getRules )
 import BasicTypes       ( isMarkedStrict )
 import CostCentre       ( currentCCS )
 import TysPrim          ( realWorldStatePrimTy )
@@ -1033,12 +1033,13 @@ completeCall env var cont
         -- is recursive, and hence a loop breaker:
         --      foldr k z (build g) = g k z
         -- So it's up to the programmer: rules can cause divergence
-        ; rules <- getRules
+        ; rule_base <- getSimplRules
         ; let   in_scope   = getInScope env
+	  	rules      = getRules rule_base var
                 maybe_rule = case activeRule dflags env of
                                 Nothing     -> Nothing  -- No rules apply
                                 Just act_fn -> lookupRule act_fn in_scope
-                                                          rules var args
+                                                          var args rules 
         ; case maybe_rule of {
             Just (rule, rule_rhs) -> do
                 tick (RuleFired (ru_name rule))

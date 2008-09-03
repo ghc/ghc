@@ -23,7 +23,7 @@ module SimplEnv (
 	mkSimplEnv, extendIdSubst, SimplEnv.extendTvSubst, 
 	zapSubstEnv, setSubstEnv, 
 	getInScope, setInScope, setInScopeSet, modifyInScope, addNewInScopeIds,
-	getRules, 
+	getSimplRules, 
 
 	SimplSR(..), mkContEx, substId, lookupRecBndr,
 

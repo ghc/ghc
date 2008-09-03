@@ -29,7 +29,7 @@ module Rules (
 	addIdSpecialisations, 
 	
 	-- * Misc. CoreRule helpers
-        rulesOfBinds, pprRulesForUser,
+        rulesOfBinds, getRules, pprRulesForUser,
         
         lookupRule, mkLocalRule, roughTopNames
     ) where
@@ -196,6 +196,18 @@ addIdSpecialisations id rules
 -- | Gather all the rules for locally bound identifiers from the supplied bindings
 rulesOfBinds :: [CoreBind] -> [CoreRule]
 rulesOfBinds binds = concatMap (concatMap idCoreRules . bindersOf) binds
+
+getRules :: RuleBase -> Id -> [CoreRule]
+	-- The rules for an Id come from two places:
+	--	(a) the ones it is born with (idCoreRules fn)
+	--	(b) rules added in subsequent modules (extra_rules)
+	-- PrimOps, for example, are born with a bunch of rules under (a)
+getRules rule_base fn
+  | isLocalId fn  = idCoreRules fn
+  | otherwise     = WARN( not (isPrimOpId fn) && notNull (idCoreRules fn), 
+ 			  ppr fn <+> ppr (idCoreRules fn) )
+		    idCoreRules fn ++ (lookupNameEnv rule_base (idName fn) `orElse` [])
+	-- Only PrimOpIds have rules inside themselves, and perhaps more besides
 \end{code}
 
 
@@ -256,37 +268,17 @@ in the Simplifier works better as it is.  Reason: the 'args' passed
 to lookupRule are the result of a lazy substitution
 
 \begin{code}
--- | The main rule matching function. Attempts to apply all the active
--- rules in a given 'RuleBase' to this instance of an application
--- in a given context, returning the rule applied and the resulting
--- expression if successful.
-lookupRule :: (Activation -> Bool)  -- ^ Activation test
-           -> InScopeSet                -- ^ Variables that are in scope at this point
-	   -> RuleBase	                -- ^ Imported rules
-	   -> Id                        -- ^ Function 'Id' to lookup a rule by
-	   -> [CoreExpr]                -- ^ Arguments to function
-	   -> Maybe (CoreRule, CoreExpr)
--- See Note [Extra argsin rule matching]
-lookupRule is_active in_scope rule_base fn args
-  = matchRules is_active in_scope fn args (getRules rule_base fn)
+-- | The main rule matching function. Attempts to apply all (active)
+-- supplied rules to this instance of an application in a given
+-- context, returning the rule applied and the resulting expression if
+-- successful.
+lookupRule :: (Activation -> Bool) -> InScopeSet
+	    -> Id -> [CoreExpr]
+	    -> [CoreRule] -> Maybe (CoreRule, CoreExpr)
 
-getRules :: RuleBase -> Id -> [CoreRule]
-	-- The rules for an Id come from two places:
-	--	(a) the ones it is born with (idCoreRules fn)
-	--	(b) rules added in subsequent modules (extra_rules)
-	-- PrimOps, for example, are born with a bunch of rules under (a)
-getRules rule_base fn
-  | isLocalId fn  = idCoreRules fn
-  | otherwise     = WARN( not (isPrimOpId fn) && notNull (idCoreRules fn), 
- 			  ppr fn <+> ppr (idCoreRules fn) )
-		    idCoreRules fn ++ (lookupNameEnv rule_base (idName fn) `orElse` [])
-	-- Only PrimOpIds have rules inside themselves, and perhaps more besides
-
-matchRules :: (Activation -> Bool) -> InScopeSet
-	   -> Id -> [CoreExpr]
-	   -> [CoreRule] -> Maybe (CoreRule, CoreExpr)
+-- See Note [Extra args in rule matching]
 -- See comments on matchRule
-matchRules is_active in_scope fn args rules
+lookupRule is_active in_scope fn args rules
   = -- pprTrace "matchRules" (ppr fn <+> ppr rules) $
     case go [] rules of
 	[]     -> Nothing
@@ -299,7 +291,7 @@ matchRules is_active in_scope fn args rules
     go ms (r:rs) = case (matchRule is_active in_scope args rough_args r) of
 			Just e  -> go ((r,e):ms) rs
 			Nothing -> -- pprTrace "match failed" (ppr r $$ ppr args $$ 
-				   --	ppr [(arg_id, unfoldingTemplate unf) | Var arg_id <- args, let unf = idUnfolding arg_id, isCheapUnfolding unf] )
+				   -- 	ppr [(arg_id, unfoldingTemplate unf) | Var arg_id <- args, let unf = idUnfolding arg_id, isCheapUnfolding unf] )
 				   go ms         rs
 
 findBest :: (Id, [CoreExpr])

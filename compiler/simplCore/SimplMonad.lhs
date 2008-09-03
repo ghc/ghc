@@ -8,7 +8,7 @@ module SimplMonad (
 	-- The monad
 	SimplM,
 	initSmpl,
-	getDOptsSmpl, getRules, getFamEnvs,
+	getDOptsSmpl, getSimplRules, getFamEnvs,
 
         -- Unique supply
         MonadUnique(..), newId,
@@ -130,8 +130,8 @@ instance MonadUnique SimplM where
 getDOptsSmpl :: SimplM DynFlags
 getDOptsSmpl = SM (\st_env us sc -> (st_flags st_env, us, sc))
 
-getRules :: SimplM RuleBase
-getRules = SM (\st_env us sc -> (st_rules st_env, us, sc))
+getSimplRules :: SimplM RuleBase
+getSimplRules = SM (\st_env us sc -> (st_rules st_env, us, sc))
 
 getFamEnvs :: SimplM (FamInstEnv, FamInstEnv)
 getFamEnvs = SM (\st_env us sc -> (st_fams st_env, us, sc))
