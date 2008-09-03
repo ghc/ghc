@@ -1066,14 +1066,19 @@ addDLL( char *dll_name )
    sprintf(buf, "%s.DLL", dll_name);
    instance = LoadLibrary(buf);
    if (instance == NULL) {
-	 sprintf(buf, "%s.DRV", dll_name);	// KAA: allow loading of drivers (like winspool.drv)
-	 instance = LoadLibrary(buf);
-	 if (instance == NULL) {
-		stgFree(buf);
-
-	    /* LoadLibrary failed; return a ptr to the error msg. */
-	    return "addDLL: unknown error";
-   	 }
+       if (GetLastError() != ERROR_MOD_NOT_FOUND) goto error;
+       // KAA: allow loading of drivers (like winspool.drv)
+       sprintf(buf, "%s.DRV", dll_name);
+       instance = LoadLibrary(buf);
+       if (instance == NULL) {
+           if (GetLastError() != ERROR_MOD_NOT_FOUND) goto error;
+           // #1883: allow loading of unix-style libfoo.dll DLLs
+           sprintf(buf, "lib%s.DLL", dll_name);
+           instance = LoadLibrary(buf);
+           if (instance == NULL) {
+               goto error;
+           }
+       }
    }
    stgFree(buf);
 
@@ -1089,6 +1094,13 @@ addDLL( char *dll_name )
 #  else
    barf("addDLL: not implemented on this platform");
 #  endif
+
+error:
+   stgFree(buf);
+   sysErrorBelch(dll_name);
+               
+   /* LoadLibrary failed; return a ptr to the error msg. */
+   return "addDLL: could not load DLL";
 }
 
 /* -----------------------------------------------------------------------------

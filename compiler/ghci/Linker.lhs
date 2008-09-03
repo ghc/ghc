@@ -456,21 +456,20 @@ preloadLib dflags lib_paths framework_paths lib_spec
   where
     preloadFailed :: String -> [String] -> LibrarySpec -> IO ()
     preloadFailed sys_errmsg paths spec
-       = do maybePutStr dflags
-    	       ("failed.\nDynamic linker error message was:\n   " 
-                    ++ sys_errmsg  ++ "\nWhilst trying to load:  " 
-                    ++ showLS spec ++ "\nDirectories to search are:\n"
-                    ++ unlines (map ("   "++) paths) )
-            give_up
+       = do maybePutStr dflags "failed.\n"
+            ghcError $
+	      CmdLineError (
+                    "user specified .o/.so/.DLL could not be loaded ("
+                    ++ sys_errmsg ++ ")\nWhilst trying to load:  "
+                    ++ showLS spec ++ "\nAdditional directories searched:"
+                    ++ (if null paths then " (none)" else
+                        (concat (intersperse "\n" (map ("   "++) paths)))))
     
     -- Not interested in the paths in the static case.
     preload_static _paths name
        = do b <- doesFileExist name
             if not b then return False
                      else loadObj name >> return True
-    
-    give_up = ghcError $ 
-	      CmdLineError "user specified .o/.so/.DLL could not be loaded."
 \end{code}
 
 
