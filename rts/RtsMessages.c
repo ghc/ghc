@@ -239,7 +239,12 @@ rtsSysErrorMsgFn(const char *s, va_list ap)
 	}
 	vfprintf(stderr, s, ap);
 	if (syserr) {
+#if defined(cygwin32_HOST_OS) || defined (mingw32_HOST_OS)
+            // Win32 error messages have a terminating \n
+	    fprintf(stderr, ": %s", syserr);
+#else
 	    fprintf(stderr, ": %s\n", syserr);
+#endif
 	} else {
 	    fprintf(stderr, "\n");
 	}
