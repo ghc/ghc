@@ -2,6 +2,24 @@
 
 use strict;
 
+# Usage:
+#
+# ./darcs-all [-q] [-s] [--dph] [--extra] [--nofib] [--testsuite] get [darcs get flags]
+#   This gets the GHC core repos, if they do not already exist.
+#   -q says to be quite, and -s to be silent.
+#   --dph, --extra, --nofib, --testsuite also get the dph library,
+#                                        extralibs, nofib and testsuite
+#                                        repos respectively
+#   The darcs get flag you are most likely to want is --complete. By
+#   default we pass darcs the --partial flag.
+#
+# ./darcs-all [-q] [-s] cmd [darcs cmd flags]
+#   This runs the darcs "cmd" command, with any flags you give, in all
+#   of the repos you have checked out. e.g.
+#       ./darcs-all pull
+#       ./darcs-all -q send --dry-run
+#   -q says to be quite, and -s to be silent.
+
 # Figure out where to get the other repositories from,
 # based on where this GHC repo came from.
 my $defaultrepo = `cat _darcs/prefs/defaultrepo`;
