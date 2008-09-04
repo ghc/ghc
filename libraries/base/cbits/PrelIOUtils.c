@@ -5,9 +5,14 @@
  */
 
 #define INLINE
-#include "HsBase.h"
+
 #ifdef __GLASGOW_HASKELL__
 # include "Stg.h"
+#endif
+
+#include "HsBase.h"
+
+#ifdef __GLASGOW_HASKELL__
 # include "RtsMessages.h"
 
 void errorBelch2(const char*s, char *t)
