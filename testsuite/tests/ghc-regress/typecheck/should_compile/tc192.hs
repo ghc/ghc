@@ -27,7 +27,7 @@ comp1 f g = proc x -> do
 -- comp1 f g = (f >>> g)
 
 comp :: Arrow (~>) => (b~>c, c~>d)~>(b~>d)
-comp = pure (uncurry (>>>))
+comp = arr (uncurry (>>>))
 
 -- app :: Arrow (~>) => (b c, b)~>c
 
@@ -56,7 +56,7 @@ comp5 g f = (g *** f) >>> comp
 
 lam,lam2 :: Arrow (~>) => (e,b)~>c -> e~>(b~>c)
 
-lam f = pure $ \ e -> pure (pair e) >>> f
+lam f = arr $ \ e -> arr (pair e) >>> f
 
 pair = (,)
 
