@@ -497,7 +497,7 @@ rnBind _ trim (L loc (PatBind { pat_lhs = pat,
 		-- No scoped type variables for pattern bindings
 	; let fvs' = trim fvs
 
-	; fvs' `seq`
+	; fvs' `seq` -- See Note [Free-variable space leak]
       return (L loc (PatBind { pat_lhs = pat,
                                   pat_rhs = grhss', 
 				     pat_rhs_ty = placeHolderType, 
@@ -523,7 +523,7 @@ rnBind sig_fn
 
 	; checkPrecMatch inf plain_name matches'
 
-	; fvs' `seq`
+	; fvs' `seq` -- See Note [Free-variable space leak]
       return (L loc (FunBind { fun_id = name,
                                   fun_infix = inf, 
                                   fun_matches = matches',
@@ -534,7 +534,20 @@ rnBind sig_fn
       }
 
 rnBind _ _ b = pprPanic "rnBind" (ppr b)
-		
+
+{-
+Note [Free-variable space leak]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We have
+    fvs' = trim fvs
+and we seq fvs' before turning it as part of a record.
+
+The reason is that trim is sometimes something like
+    \xs -> intersectNameSet (mkNameSet bound_names) xs
+and we don't want to retain the list bound_names. This showed up in
+trac ticket #1136.
+-}
+
 ---------------------
 depAnalBinds :: Bag (LHsBind Name, [Name], Uses)
 	     -> ([(RecFlag, LHsBinds Name)], DefUses)
