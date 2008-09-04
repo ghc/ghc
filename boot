@@ -6,7 +6,7 @@ for dir in `grep "^[^# ][^ ]*  *[^ ][^ ]*  *[^ ][^ ]*$" packages | sed "s/ .*//"
 do
     if test ! -d $dir
     then
-        echo "Looks like you're missing libraries/$dir." >&2
+        echo "Looks like you're missing $dir." >&2
         echo "Maybe you haven't done './darcs-all get'?" >&2
         exit 1
     fi
