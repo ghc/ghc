@@ -229,9 +229,7 @@ INLINE int __hscore_s_isdir(mode_t m)  { return S_ISDIR(m);  }
 INLINE int __hscore_s_isfifo(mode_t m) { return S_ISFIFO(m); }
 INLINE int __hscore_s_isblk(mode_t m)  { return S_ISBLK(m);  }
 INLINE int __hscore_s_ischr(mode_t m)  { return S_ISCHR(m);  }
-#ifdef S_ISSOCK
 INLINE int __hscore_s_issock(mode_t m) { return S_ISSOCK(m); }
-#endif
 #endif
 
 #if !defined(_MSC_VER) && !defined(__MINGW32__) && !defined(_WIN32)
