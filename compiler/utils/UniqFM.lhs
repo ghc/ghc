@@ -643,7 +643,9 @@ functionality, but may do a few needless evaluations.
 
 \begin{code}
 mkLeafUFM :: FastInt -> a -> UniqFM a
-mkLeafUFM i a	  = LeafUFM i a
+mkLeafUFM i a =
+  ASSERT (iBox i >= 0) -- Note [Uniques must be positive]
+  LeafUFM i a
 
 -- The *ONLY* ways of building a NodeUFM.
 
@@ -848,3 +850,21 @@ use_snd :: a -> b -> b
 use_snd _ b = b
 \end{code}
 
+{- Note [Uniques must be positive]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The getCommonNodeUFMData function assumes that the nodes use
+positive uniques. Specifically, the inner `loop' shifts the
+low bits out of two uniques until the shifted uniques are the same.
+At the same time, it computes a new delta, by shifting
+to the left.
+
+The failure case I (JPD) encountered:
+If one of the uniques is negative, the shifting may continue
+until all 64 bits have been shifted out, resulting in a new delta
+of 0, which is wrong and can trigger later assertion failures.
+
+Where do the negative uniques come from? Both Simom M and
+I have run into this problem when hashing a data structure.
+In both cases, we have avoided the problem by ensuring that
+the hashes remain positive.
+-}
