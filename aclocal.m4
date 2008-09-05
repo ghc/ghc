@@ -254,27 +254,6 @@ AC_SUBST(HappyVersion)
 ])
 
 dnl
-dnl Check for Haddock and version.  If there's no installed Haddock, we look
-dnl for a haddock source tree and point the build system at that instead.
-dnl
-AC_DEFUN([FPTOOLS_HADDOCK],
-[AC_PATH_PROG(HaddockCmd,haddock,)
-dnl Darn, I forgot to make Haddock print out its version number when
-dnl invoked with -v.  We could try generating some HTML and grepping
-dnl through that to find the version number, but I think we'll make
-dnl do without it for now.
-# Haddock is passed to Cabal, so we need a native path
-if test "x$HostPlatform"  = "xi386-unknown-mingw32" && \
-   test "${OSTYPE}"      != "msys"                  && \
-   test "${HaddockCmd}"  != ""
-then
-    # Canonicalise to <drive>:/path/to/gcc
-    HaddockCmd=`cygpath -m ${HaddockCmd}`
-    AC_MSG_NOTICE([normalized haddock command to $HaddockCmd])
-fi
-])
-
-dnl
 dnl Check for Alex and version.  If we're building GHC, then we need
 dnl at least Alex version 2.0.1.
 dnl

@@ -270,13 +270,6 @@ ifneq "$(HS_PPS)" ""
 
 CLEAN_FILES += $(HS_PPS) $(addsuffix .tmp, $(HS_SRCS))
 
-ifeq "$(HADDOCK)" ""
-html ::
-	@echo Haddock must be installed in order to build HTML library documentation.
-	@echo Please install Haddock and re-configure.
-	@exit 1
-endif
-
 html :: $(HTML_DOC)
 
 extraclean :: 

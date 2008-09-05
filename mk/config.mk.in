@@ -1186,11 +1186,6 @@ ALEX_VERSION		= @AlexVersion@
 GHC_ALEX_OPTS		= -g
 
 #
-# Haddock
-# 
-HADDOCK			= @HaddockCmd@
-
-#
 # Options for compiling in different `ways'. 
 # 
 # To configure up your own way, have a look at some of the standard ways
