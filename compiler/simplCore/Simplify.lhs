@@ -566,7 +566,10 @@ completeBind env top_lvl old_bndr new_bndr new_rhs
     old_info    = idInfo old_bndr
     occ_info    = occInfo old_info
     wkr		= substWorker env (workerInfo old_info)
-    omit_unfolding = isNonRuleLoopBreaker occ_info || not (activeInline env old_bndr)
+    omit_unfolding = isNonRuleLoopBreaker occ_info 
+		   --       or not (activeInline env old_bndr)
+    		   -- Do *not* trim the unfolding in SimplGently, else
+		   -- the specialiser can't see it!
 
 -----------------
 addPolyBind :: TopLevelFlag -> SimplEnv -> OutBind -> SimplEnv
