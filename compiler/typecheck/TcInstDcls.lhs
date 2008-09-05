@@ -94,18 +94,27 @@ Running example:
 	-- Here op1_i, op2_i are the "instance method Ids"
 	{-# INLINE [2] op1_i #-}  -- From the instance decl bindings
 	op1_i, op2_i :: forall a. C a => forall b. Ix b => [a] -> b -> b
-	op1_i = <rhs>	-- Source code; run the type checker on this
-	       -- NB: Type variable 'a' (but not 'b') is in scope in <rhs>
-	       -- Note [Tricky type variable scoping]
+	op1_i = /\a. \(d:C a). 
+	       let local_op1 :: forall a. (C a, C [a])
+	       	   	     => forall b. Ix b => [a] -> b -> b
+	             -- Note [Subtle interaction of recursion and overlap]
+	           local_op1 = <rhs>
+	       	     -- Source code; run the type checker on this
+		     -- NB: Type variable 'a' (but not 'b') is in scope in <rhs>
+		     -- Note [Tricky type variable scoping]
+
+	       in local_op1 a d (df_i a d)
 
 	op2_i = /\a \d:C a. $dmop2 [a] (df_i a d) 
 
 	-- The dictionary function itself
 	{-# INLINE df_i #-}	-- Always inline dictionary functions
 	df_i :: forall a. C a -> C [a]
-	df_i = /\a. \d:C a. MkC (op1_i a d) ($dmop2 a d)
+	df_i = /\a. \d:C a. letrec d' = MkC (op1_i  a   d)
+                                            ($dmop2 [a] d')
+	       	    	    in d'
 		-- But see Note [Default methods in instances]
-		-- We can't apply the type checker to the default-nmethod call
+		-- We can't apply the type checker to the default-method call
 
 * The dictionary function itself is inlined as vigorously as we
   possibly can, so that we expose that dictionary constructor to
@@ -129,6 +138,47 @@ Running example:
   loop-breaker because df_i isn't), op1_i will ironically never be 
   inlined.  We need to fix this somehow -- perhaps allowing inlining
   of INLINE funcitons inside other INLINE functions.
+
+Note [Subtle interaction of recursion and overlap]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this
+  class C a where { op1,op2 :: a -> a }
+  instance C a => C [a] where
+    op1 x = op2 x ++ op2 x
+    op2 x = ...
+  intance C [Int] where
+    ...
+
+When type-checking the C [a] instance, we need a C [a] dictionary (for
+the call of op2).  If we look up in the instance environment, we find
+an overlap.  And in *general* the right thing is to complain (see Note
+[Overlapping instances] in InstEnv).  But in *this* case it's wrong to
+complain, because we just want to delegate to the op2 of this same
+instance.  
+
+Why is this justified?  Because we generate a (C [a]) constraint in 
+a context in which 'a' cannot be instantiated to anything that matches
+other overlapping instances, or else we would not be excecuting this
+version of op1 in the first place.
+
+It might even be a bit disguised:
+
+  nullFail :: C [a] => [a] -> [a]
+  nullFail x = op2 x ++ op2 x
+
+  instance C a => C [a] where
+    op1 x = nullFail x
+
+Precisely this is used in package 'regex-base', module Context.hs.
+See the overlapping instances for RegexContext, and the fact that they
+call 'nullFail' just like the example above.  The DoCon package also
+does the same thing; it shows up in module Fraction.hs
+
+Conclusion: when typechecking the methods in a C [a] instance, we want
+to have C [a] available.  That is why we have the strange local let in
+the definition of op1_i in the example above.  We can typecheck the
+defintion of local_op1, and then supply the "this" argument via an 
+explicit call to the dfun (which in turn will be inlined).
 
 Note [Tricky type variable scoping]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -478,7 +528,7 @@ tcLocalInstDecl1 (L loc (InstDecl poly_ty binds uprags ats))
 
 %************************************************************************
 %*                                                                      *
-\subsection{Type-checking instance declarations, pass 2}
+      Type-checking instance declarations, pass 2
 %*                                                                      *
 %************************************************************************
 
@@ -565,7 +615,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = NewTypeDerived })
         ; sc_binds <- addErrCtxt superClassCtxt $
                       tcSimplifySuperClasses inst_loc dfun_dicts (rep_dict:sc_dicts)
 
-        ; let coerced_rep_dict = mkHsWrap the_coercion (HsVar (instToId rep_dict))
+        ; let coerced_rep_dict = wrapId the_coercion (instToId rep_dict)
 
         ; body <- make_body cls_tycon cls_inst_tys sc_dicts coerced_rep_dict
         ; let dict_bind = noLoc $ VarBind (instToId this_dict) (noLoc body)
@@ -679,15 +729,17 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = VanillaInst monobinds uprags })
 	tc_meth 	= tcInstanceMethod loc clas inst_tyvars'
 			  		   (dfun_covars ++ dfun_dict_ids)
                    	  	           dfun_theta' inst_tys'
-					   this_dict_id 
-                        	           monobinds prag_fn
+					   this_dict_id dfun_id
+                        	           prag_fn monobinds
     (meth_exprs, meth_binds) <- mapAndUnzipM tc_meth op_items 
 
     -- Figure out bindings for the superclass context
     -- Don't include this_dict in the 'givens', else
     -- wanted_sc_insts get bound by just selecting  from this_dict!!
-    sc_binds <- addErrCtxt superClassCtxt
-                   (tcSimplifySuperClasses inst_loc dfun_insts wanted_sc_insts)
+    sc_binds <- addErrCtxt superClassCtxt $
+                tcSimplifySuperClasses inst_loc dfun_insts 
+		   			   	wanted_sc_insts
+		-- Note [Recursive superclasses]
 
     -- It's possible that the superclass stuff might unified one
     -- of the inst_tyavars' with something in the envt
@@ -745,7 +797,20 @@ mkMetaCoVars = mapM eqPredToCoVar
     eqPredToCoVar _                = panic "TcInstDcls.mkMetaCoVars"
 \end{code}
 
+Note [Recursive superclasses]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+See Trac #1470 for why we would *like* to add "this_dict" to the 
+available instances here.  But we can't do so because then the superclases
+get satisfied by selection from this_dict, and that leads to an immediate
+loop.  What we need is to add this_dict to Avails without adding its 
+superclasses, and we currently have no way to do that.
 
+
+%************************************************************************
+%*                                                                      *
+      Type-checking an instance method
+%*                                                                      *
+%************************************************************************
 
 tcInstanceMethod
 - Make the method bindings, as a [(NonRec, HsBinds)], one per method
@@ -757,50 +822,41 @@ tcInstanceMethod
 
 \begin{code}
 tcInstanceMethod :: SrcSpan -> Class -> [TcTyVar] -> [Var]
-	 	 -> TcThetaType -> [TcType] -> Id
-          	 -> LHsBinds Name -> TcPragFun
+	 	 -> TcThetaType -> [TcType]
+		 -> Id -> Id 
+          	 -> TcPragFun -> LHsBinds Name 
 	  	 -> (Id, DefMeth)
           	 -> TcM (HsExpr Id, LHsBinds Id)
 	-- The returned inst_meth_ids all have types starting
 	--	forall tvs. theta => ...
 
-tcInstanceMethod loc clas tyvars dfun_lam_vars theta inst_tys this_dict_id
-	         binds_in prag_fn (sel_id, dm_info)
+tcInstanceMethod loc clas tyvars dfun_lam_vars theta inst_tys 
+		 this_dict_id dfun_id
+	         prag_fn binds_in (sel_id, dm_info)
   = do	{ uniq <- newUnique
-	; let (sel_tyvars,sel_rho) = tcSplitForAllTys (idType sel_id)
-	      rho_ty = ASSERT( length sel_tyvars == length inst_tys )
-		       substTyWith sel_tyvars inst_tys sel_rho
-	      (first_pred, meth_tau) = tcSplitPredFunTy_maybe rho_ty
-			`orElse` pprPanic "tcInstanceMethod" (ppr sel_id)
-				       
-		      -- The first predicate should be of form (C a b)
-		      -- where C is the class in question
-	      meth_ty 	= mkSigmaTy tyvars theta meth_tau
-	      meth_name = mkInternalName uniq sel_occ loc	-- Same OccName
-	      meth_id   = mkLocalId meth_name meth_ty
+	; let local_meth_name = mkInternalName uniq sel_occ loc	-- Same OccName
+	      tc_body = tcInstanceMethodBody clas tyvars dfun_lam_vars theta inst_tys
+					     this_dict_id dfun_id sel_id 
+					     prags local_meth_name
 
-	; MASSERT( case getClassPredTys_maybe first_pred of
-			{ Just (clas1, _tys) -> clas == clas1 ; Nothing -> False } )
-
-
-	; case (findMethodBind sel_name meth_name binds_in, dm_info) of
+	; case (findMethodBind sel_name local_meth_name binds_in, dm_info) of
 		-- There is a user-supplied method binding, so use it
-	    (Just user_bind, _) -> typecheck_meth meth_id user_bind
+	    (Just user_bind, _) -> tc_body user_bind
 
 		-- The user didn't supply a method binding, so we have to make 
 		-- up a default binding, in a way depending on the default-method info
 
 	    (Nothing, GenDefMeth) -> do		-- Derivable type classes stuff
-			{ meth_bind <- mkGenericDefMethBind clas inst_tys sel_id meth_name
-			; typecheck_meth meth_id meth_bind }
+			{ meth_bind <- mkGenericDefMethBind clas inst_tys sel_id local_meth_name
+			; tc_body meth_bind }
 
 	    (Nothing, NoDefMeth) -> do		-- No default method in the class
 			{ warn <- doptM Opt_WarnMissingMethods		
                         ; warnTc (warn  -- Warn only if -fwarn-missing-methods
 				  && reportIfUnused (getOccName sel_id))
 					-- Don't warn about _foo methods
-			         (omittedMethodWarn sel_id) 
-			; return (mk_error_rhs meth_tau, emptyBag) }
+			         omitted_meth_warn
+			; return (error_rhs, emptyBag) }
 
 	    (Nothing, DefMeth) -> do	-- An polymorphic default method
 			{   -- Build the typechecked version directly, 
@@ -809,30 +865,73 @@ tcInstanceMethod loc clas tyvars dfun_lam_vars theta inst_tys this_dict_id
 			  dm_name <- lookupImportedName (mkDefMethRdrName sel_name)
 					-- Might not be imported, but will be an OrigName
 			; dm_id   <- tcLookupId dm_name
-			; return (wrap dm_wrapper dm_id, emptyBag) } }
+			; return (wrapId dm_wrapper dm_id, emptyBag) } }
   where
     sel_name = idName sel_id
     sel_occ  = nameOccName sel_name
-    tv_names = map tyVarName tyvars
     prags    = prag_fn sel_name
 
-    typecheck_meth :: Id -> LHsBind Name -> TcM (HsExpr Id, LHsBinds Id)
-    typecheck_meth meth_id bind
-	= do { tc_binds <- tcMethodBind tv_names prags meth_id bind
-	     ; return (wrap meth_wrapper meth_id, tc_binds) }
-
-    mk_error_rhs tau = HsApp (mkLHsWrap (WpTyApp tau) error_id) error_msg
+    error_rhs    = HsApp (mkLHsWrap (WpTyApp meth_tau) error_id) error_msg
+    meth_tau     = funResultTy (applyTys (idType sel_id) inst_tys)
     error_id     = L loc (HsVar nO_METHOD_BINDING_ERROR_ID) 
     error_msg    = L loc (HsLit (HsStringPrim (mkFastString error_string)))
     error_string = showSDoc (hcat [ppr loc, text "|", ppr sel_id ])
 
-    wrap wrapper id = mkHsWrap wrapper (HsVar id)
-    meth_wrapper = mkWpApps dfun_lam_vars `WpCompose` mkWpTyApps (mkTyVarTys tyvars)
-    dm_wrapper   = WpApp this_dict_id `WpCompose` mkWpTyApps inst_tys 
+    dm_wrapper   = WpApp this_dict_id <.> mkWpTyApps inst_tys 
 
-omittedMethodWarn :: Id -> SDoc
-omittedMethodWarn sel_id
-  = ptext (sLit "No explicit method nor default method for") <+> quotes (ppr sel_id)
+    omitted_meth_warn :: SDoc
+    omitted_meth_warn = ptext (sLit "No explicit method nor default method for")
+                        <+> quotes (ppr sel_id)
+
+---------------
+tcInstanceMethodBody :: Class -> [TcTyVar] -> [Var]
+	 	     -> TcThetaType -> [TcType]
+		     -> Id -> Id -> Id
+          	     -> [LSig Name] -> Name -> LHsBind Name 
+          	     -> TcM (HsExpr Id, LHsBinds Id)
+tcInstanceMethodBody clas tyvars dfun_lam_vars theta inst_tys
+		     this_dict_id dfun_id sel_id 
+		     prags local_meth_name bind@(L loc _)
+  = do	{ uniq <- newUnique
+	; let (sel_tyvars,sel_rho) = tcSplitForAllTys (idType sel_id)
+	      rho_ty = ASSERT( length sel_tyvars == length inst_tys )
+		       substTyWith sel_tyvars inst_tys sel_rho
+
+	      (first_pred, meth_tau) = tcSplitPredFunTy_maybe rho_ty
+			`orElse` pprPanic "tcInstanceMethod" (ppr sel_id)
+
+	      meth_name = mkInternalName uniq (getOccName local_meth_name) loc
+	      meth_ty = mkSigmaTy tyvars theta meth_tau
+	      meth_id = mkLocalId meth_name meth_ty
+	      
+	      local_meth_ty = mkSigmaTy tyvars (theta ++ [first_pred]) meth_tau
+	      local_meth_id = mkLocalId local_meth_name local_meth_ty
+
+	      tv_names = map tyVarName tyvars
+    	
+		      -- The first predicate should be of form (C a b)
+		      -- where C is the class in question
+	; MASSERT( case getClassPredTys_maybe first_pred of
+			{ Just (clas1, _tys) -> clas == clas1 ; Nothing -> False } )
+
+	; local_meth_bind <- tcMethodBind tv_names prags local_meth_id bind
+
+	; let full_bind = unitBag $ L loc $
+	      		  VarBind meth_id $ L loc $
+	      		  mkHsWrap (mkWpTyLams tyvars <.> mkWpLams dfun_lam_vars) $
+			  HsLet (HsValBinds (ValBindsOut [(NonRecursive, local_meth_bind)] [])) $ L loc $ 
+			  mkHsWrap (WpLet this_dict_bind <.> WpApp this_dict_id) $
+			  wrapId meth_wrapper local_meth_id
+	      this_dict_bind = unitBag $ L loc $
+	      		       VarBind this_dict_id $ L loc $
+	      		       wrapId meth_wrapper dfun_id
+
+        ; return (wrapId meth_wrapper meth_id, full_bind) } 
+  where
+    meth_wrapper = mkWpApps dfun_lam_vars <.> mkWpTyApps (mkTyVarTys tyvars)
+
+wrapId :: HsWrapper -> id -> HsExpr id
+wrapId wrapper id = mkHsWrap wrapper (HsVar id)
 \end{code}
 
 Note [Default methods in instances]
