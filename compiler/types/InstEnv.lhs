@@ -15,7 +15,7 @@ module InstEnv (
 
 	InstEnv, emptyInstEnv, extendInstEnv, 
 	extendInstEnvList, lookupInstEnv, instEnvElts,
-	classInstances, 
+	classInstances, instanceBindFun,
 	instanceCantMatch, roughMatchTcs
     ) where
 
@@ -375,7 +375,7 @@ extendInstEnv inst_env ins_item@(Instance { is_cls = cls_nm, is_tcs = mb_tcs })
 
 %************************************************************************
 %*									*
-\subsection{Looking up an instance}
+	Looking up an instance
 %*									*
 %************************************************************************
 
@@ -481,32 +481,11 @@ lookupInstEnv (pkg_ie, home_ie) cls tys
 		)
 		-- Unification will break badly if the variables overlap
 		-- They shouldn't because we allocate separate uniques for them
-        case tcUnifyTys bind_fn tpl_tys tys of
+        case tcUnifyTys instanceBindFun tpl_tys tys of
 	    Just _   -> find ms (item:us) rest
 	    Nothing  -> find ms us	  rest
 
 ---------------
-bind_fn :: TyVar -> BindFlag
-bind_fn tv | isTcTyVar tv && isExistentialTyVar tv = Skolem
-	   | otherwise	 		 	   = BindMe
-	-- The key_tys can contain skolem constants, and we can guarantee that those
-	-- are never going to be instantiated to anything, so we should not involve
-	-- them in the unification test.  Example:
-	--	class Foo a where { op :: a -> Int }
-	--	instance Foo a => Foo [a] 	-- NB overlap
-	--	instance Foo [Int]		-- NB overlap
-	-- 	data T = forall a. Foo a => MkT a
-	--	f :: T -> Int
-	--	f (MkT x) = op [x,x]
-	-- The op [x,x] means we need (Foo [a]).  Without the filterVarSet we'd
-	-- complain, saying that the choice of instance depended on the instantiation
-	-- of 'a'; but of course it isn't *going* to be instantiated.
-	--
-	-- We do this only for pattern-bound skolems.  For example we reject
-	--	g :: forall a => [a] -> Int
-	--	g x = op x
-	-- on the grounds that the correct instance depends on the instantiation of 'a'
-
 ---------------
 insert_overlapping :: InstMatch -> [InstMatch] -> [InstMatch]
 -- Add a new solution, knocking out strictly less specific ones
@@ -535,3 +514,40 @@ insert_overlapping new_item (item:items)
 			_         -> True
 \end{code}
 
+
+%************************************************************************
+%*									*
+	Binding decisions
+%*									*
+%************************************************************************
+
+\begin{code}
+instanceBindFun :: TyVar -> BindFlag
+instanceBindFun tv | isTcTyVar tv && isExistentialTyVar tv = Skolem
+	           | otherwise	 		 	= BindMe
+   -- Note [Binding when looking up instances]
+\end{code}
+
+Note [Binding when looking up instances]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When looking up in the instance environment, or family-instance environment,
+we are careful about multiple matches, as described above in 
+Note [Overlapping instances]
+
+The key_tys can contain skolem constants, and we can guarantee that those
+are never going to be instantiated to anything, so we should not involve
+them in the unification test.  Example:
+	class Foo a where { op :: a -> Int }
+	instance Foo a => Foo [a] 	-- NB overlap
+	instance Foo [Int]		-- NB overlap
+	data T = forall a. Foo a => MkT a
+	f :: T -> Int
+	f (MkT x) = op [x,x]
+The op [x,x] means we need (Foo [a]).  Without the filterVarSet we'd
+complain, saying that the choice of instance depended on the instantiation
+of 'a'; but of course it isn't *going* to be instantiated.
+
+We do this only for pattern-bound skolems.  For example we reject
+	g :: forall a => [a] -> Int
+	g x = op x
+on the grounds that the correct instance depends on the instantiation of 'a'

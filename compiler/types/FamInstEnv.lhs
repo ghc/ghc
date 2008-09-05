@@ -23,7 +23,6 @@ module FamInstEnv (
 #include "HsVersions.h"
 
 import InstEnv
-import TcType
 import Unify
 import Type
 import TypeRep
@@ -314,17 +313,11 @@ lookupFamInstEnvUnify (pkg_ie, home_ie) fam tys
 		)
 		-- Unification will break badly if the variables overlap
 		-- They shouldn't because we allocate separate uniques for them
-        case tcUnifyTys bind_fn tpl_tys tys of
+        case tcUnifyTys instanceBindFun tpl_tys tys of
 	    Just subst -> let rep_tys = substTyVars subst (tyConTyVars tycon)
                           in
                           ((item, rep_tys), subst) : find rest
 	    Nothing    -> find rest
-
--- See explanation at @InstEnv.bind_fn@.
---
-bind_fn :: TyVar -> BindFlag
-bind_fn tv | isTcTyVar tv && isExistentialTyVar tv = Skolem
-	   | otherwise	 		 	   = BindMe
 \end{code}
 
 %************************************************************************
