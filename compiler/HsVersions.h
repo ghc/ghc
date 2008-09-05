@@ -51,7 +51,7 @@ name = Util.global (value);
 -- We have to actually use all the variables we are given or we may get
 -- unused variable warnings when DEBUG is off.
 #define ASSERT(e)      if False && (not (e)) then panic "ASSERT" else
-#define ASSERT2(e,msg) if False && (not (e)) then pprPanic "ASSERT2" (msg) else
+#define ASSERT2(e,msg) if False && (const False (e,msg)) then pprPanic "ASSERT2" (msg) else
 #define MASSERT(e)      ASSERT(e) return ()
 #define MASSERT2(e,msg) ASSERT2(e,msg) return ()
 #define ASSERTM(e)       do { let { _mbool = (e) } }
