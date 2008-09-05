@@ -341,7 +341,11 @@ data HsWrapper
 				-- Guaranteed not the identity coercion
 
   | WpApp Var			-- [] d		the 'd' is a type-class dictionary or coercion variable
+
   | WpTyApp Type		-- [] t		the 't' is a type or corecion
+    	    			--      ToDo: it'd be tidier if 't' was always a type (not coercion),
+				--	      but that is inconvenient in Inst.instCallDicts
+
   | WpLam Var	 		-- \d. []	the 'd' is a type-class dictionary or coercion variable
   | WpTyLam TyVar 		-- \a. []	the 'a' is a type variable (not coercion var)
   | WpInline			-- inline_me []   Wrap inline around the thing
