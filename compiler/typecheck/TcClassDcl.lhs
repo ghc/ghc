@@ -294,8 +294,9 @@ Note [Silly default-method bind]
 When we pass the default method binding to the type checker, it must
 look like    op2 = e
 not  	     $dmop2 = e
-otherwise the "$dm" stuff comes out in the interface file.  So we
-typecheck the former, and wrap it in a let, thus
+otherwise the "$dm" stuff comes out error messages.  But we want the
+"$dm" to come out in the interface file.  So we typecheck the former,
+and wrap it in a let, thus
 	  $dmop2 = let op2 = e in op2
 This makes the error messages right.
 
