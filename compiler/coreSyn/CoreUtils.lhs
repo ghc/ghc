@@ -154,12 +154,16 @@ applyTypeToArgs e op_ty (Type ty : args)
     go rev_tys (Type ty : args) = go (ty:rev_tys) args
     go rev_tys rest_args        = applyTypeToArgs e op_ty' rest_args
 			 	where
-				  op_ty' = applyTys op_ty (reverse rev_tys)
+				  op_ty' = applyTysD msg op_ty (reverse rev_tys)
+				  msg = panic_msg e op_ty
 
 applyTypeToArgs e op_ty (_ : args)
   = case (splitFunTy_maybe op_ty) of
 	Just (_, res_ty) -> applyTypeToArgs e res_ty args
-	Nothing -> pprPanic "applyTypeToArgs" (pprCoreExpr e $$ ppr op_ty)
+	Nothing -> pprPanic "applyTypeToArgs" (panic_msg e op_ty)
+
+panic_msg :: CoreExpr -> Type -> SDoc
+panic_msg e op_ty = pprCoreExpr e $$ ppr op_ty
 \end{code}
 
 %************************************************************************

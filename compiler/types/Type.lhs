@@ -39,7 +39,7 @@ module Type (
         splitNewTyConApp_maybe, splitNewTyConApp,
 
         mkForAllTy, mkForAllTys, splitForAllTy_maybe, splitForAllTys, 
-	applyTy, applyTys, isForAllTy, dropForAlls,
+	applyTy, applyTys, applyTysD, isForAllTy, dropForAlls,
 	
 	-- (Newtypes)
 	newTyConInstRhs,
@@ -742,15 +742,18 @@ applyTys :: Type -> [Type] -> Type
 -- > foo = case undefined :: R of
 -- >            R f -> f ()
 
-applyTys orig_fun_ty []      = orig_fun_ty
-applyTys orig_fun_ty arg_tys 
+applyTys ty args = applyTysD empty ty args
+
+applyTysD :: SDoc -> Type -> [Type] -> Type	-- Debug version
+applyTysD _   orig_fun_ty []      = orig_fun_ty
+applyTysD doc orig_fun_ty arg_tys 
   | n_tvs == n_args 	-- The vastly common case
   = substTyWith tvs arg_tys rho_ty
   | n_tvs > n_args 	-- Too many for-alls
   = substTyWith (take n_args tvs) arg_tys 
 		(mkForAllTys (drop n_args tvs) rho_ty)
   | otherwise		-- Too many type args
-  = ASSERT2( n_tvs > 0, ppr orig_fun_ty )	-- Zero case gives infnite loop!
+  = ASSERT2( n_tvs > 0, doc $$ ppr orig_fun_ty )	-- Zero case gives infnite loop!
     applyTys (substTyWith tvs (take n_tvs arg_tys) rho_ty)
 	     (drop n_tvs arg_tys)
   where
