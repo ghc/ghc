@@ -22,7 +22,8 @@ Library {
         GHC.Unit
     c-sources:
         cbits/longlong.c
-    extensions: CPP, MagicHash, ForeignFunctionInterface, UnliftedFFITypes
+    extensions: CPP, MagicHash, ForeignFunctionInterface, UnliftedFFITypes,
+                UnboxedTuples, EmptyDataDecls, NoImplicitPrelude
     -- We need to set the package name to ghc-prim (without a version number)
     -- as it's magic.
     ghc-options: -package-name ghc-prim
