@@ -656,15 +656,6 @@ uUnrefined subst tv1 ty2 (TyVarTy tv2)
 	; b2 <- tvBindFlag tv2
 	; case (b1,b2) of
 	    (BindMe, _) 	 -> bind tv1 ty2
-
-	    (AvoidMe, BindMe)	 -> bind tv2 ty1
-	    (AvoidMe, _)	 -> bind tv1 ty2
-
-	    (WildCard, WildCard) -> return subst
-	    (WildCard, Skolem)   -> return subst
-	    (WildCard, _)	 -> bind tv2 ty1
-
-	    (Skolem, WildCard)	 -> return subst
 	    (Skolem, Skolem)	 -> failWith (misMatch ty1 ty2)
 	    (Skolem, _)		 -> bind tv2 ty1
 	}
@@ -704,11 +695,25 @@ bindTv :: TvSubstEnv -> TyVar -> Type -> UM TvSubstEnv
 bindTv subst tv ty	-- ty is not a type variable
   = do  { b <- tvBindFlag tv
 	; case b of
-	    Skolem   -> failWith (misMatch (TyVarTy tv) ty)
-	    WildCard -> return subst
-	    _other   -> return $ extendVarEnv subst tv ty
+	    Skolem -> failWith (misMatch (TyVarTy tv) ty)
+	    BindMe -> return $ extendVarEnv subst tv ty
 	}
 \end{code}
+
+%************************************************************************
+%*									*
+		Binding decisions
+%*									*
+%************************************************************************
+
+\begin{code}
+data BindFlag 
+  = BindMe	-- A regular type variable
+
+  | Skolem	-- This type variable is a skolem constant
+		-- Don't bind it; it only matches itself
+\end{code}
+
 
 %************************************************************************
 %*									*
@@ -717,16 +722,6 @@ bindTv subst tv ty	-- ty is not a type variable
 %************************************************************************
 
 \begin{code}
-data BindFlag 
-  = BindMe	-- A regular type variable
-  | AvoidMe	-- Like BindMe but, given the choice, avoid binding it
-
-  | Skolem	-- This type variable is a skolem constant
-		-- Don't bind it; it only matches itself
-
-  | WildCard 	-- This type variable matches anything,
-		-- and does not affect the substitution
-
 newtype UM a = UM { unUM :: (TyVar -> BindFlag)
 		         -> MaybeErr Message a }
 
