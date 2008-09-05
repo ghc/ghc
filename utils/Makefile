@@ -50,6 +50,15 @@ boot ::
 	$(MAKE) -C genprimopcode
 endif
 
+############################################
+
+# The utils may be built with the bootstrapping compiler, for use during
+# the build, or with the stage2 compiler, for installing. Some of them
+# are built with both; we can't install the utils built with the
+# bootstrapping compiler as they may use different versions of C
+# libraries. The reason we use stage2 rather than stage1 is that some
+# utils, e.g. haddock, need the GHC API package.
+
 WITH_BOOTSTRAPPING_COMPILER = installPackage ghc-pkg hsc2hs hpc
 
 WITH_STAGE2 = installPackage ghc-pkg hasktags runghc hpc pwd haddock
