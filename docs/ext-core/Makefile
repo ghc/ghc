@@ -1,6 +1,11 @@
 TOP = ../..
+include $(TOP)/mk/boilerplate.mk
 
 all: ps
+
+install-docs:
+	-mkdir     $(docdir)/ext-core
+	cp core.ps $(docdir)/ext-core/
 
 #	General makefile for Latex stuff
 
@@ -37,7 +42,6 @@ include $(TOP)/mk/bindist.mk
 # dummy targets
 boot:
 install:
-install-docs:
 html:
 chm:
 HxS:
