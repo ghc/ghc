@@ -88,3 +88,37 @@ USE_STAGE2_CONFIGURE_FLAGS =            \
 
 BUILD_FLAGS = $(addprefix --ghc-option=,$(SRC_HC_OPTS))
 
+
+# We now define various i* variables, which are used for the paths
+# when installing Cabal libraries
+ifeq "$(RelocatableBuild)" "YES"
+# On Windows we want to make moveable bindists, but we need to tell
+# ghc-pkg where the haddock docs are. Therefore we completely ignore
+# where the user tells us to put the haddock documentation and put it
+# somewhere whose relative location we know. When installing we need
+# to give Cabal a real path, though.
+iprefix             = $$topdir
+ibindir             = $$topdir
+ilibdir             = $$topdir
+ilibexecdir         = $$topdir
+idynlibdir          = $$topdir
+idatadir            = $$topdir
+idocdir             = $$topdir/doc/libraries/$$pkg
+ihaddockdir         = $$topdir/doc/libraries/$$pkg
+ihtmldir            = $$httptopdir/doc/libraries/$$pkg
+html_installed_root = $(prefix)/doc/libraries
+else
+# On non-Windows we can just give absolute paths all the time, and
+# thus obey the htmldir that we are given.
+iprefix             = $(prefix)
+ibindir             = $(bindir)
+ilibdir             = $(libdir)
+ilibexecdir         = $(libexecdir)
+idynlibdir          = $(dynlibdir)
+idatadir            = $(datadir)
+idocdir             = $(docdir)/libraries/$$pkg
+ihaddockdir         = $(htmldir)/libraries/$$pkg
+ihtmldir            = $(htmldir)/libraries/$$pkg
+html_installed_root = $(htmldir)/libraries
+endif
+

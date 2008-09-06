@@ -193,9 +193,8 @@ doc.stage.%:
 	                 --haddock-option=--optghc=-DSTAGE=$* \
 	                 --with-haddock=$(FPTOOLS_TOP_ABS)/utils/haddock/install-inplace/bin/haddock
 
-# XXX We ought to actually install the (stage 2) library
 install:
-	@:
+	$(INSTALL_PACKAGE) install '$(GHC_PKG_INSTALL_PROG)' '$(DESTDIR)$(datadir)/package.conf' '$(DESTDIR)' '$(prefix)' '$(iprefix)' '$(ibindir)' '$(ilibdir)' '$(ilibexecdir)' '$(idynlibdir)' '$(idatadir)' '$(idocdir)' '$(ihtmldir)' '$(ihaddockdir)' --distpref dist-stage2
 
 # -----------------------------------------------------------------------------
 # Create compiler configuration

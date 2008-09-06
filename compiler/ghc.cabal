@@ -3,7 +3,7 @@ Name: ghc
 Version: 6.9
 Copyright: XXX
 -- License: XXX
-License-File: XXX
+License-File: ../LICENSE
 Author: XXX
 Maintainer: glasgow-haskell-users@haskell.org
 Homepage: http://www.haskell.org/ghc/
