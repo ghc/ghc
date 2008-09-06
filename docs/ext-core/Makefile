@@ -1,5 +1,7 @@
 TOP = ../..
 
+all: ps
+
 #	General makefile for Latex stuff
 
 LATEX=latex \\nonstopmode \\input
@@ -33,7 +35,6 @@ maintainer-clean: distclean
 include $(TOP)/mk/bindist.mk
 
 # dummy targets
-all:
 boot:
 install:
 install-docs:
