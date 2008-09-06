@@ -4,8 +4,8 @@ include $(TOP)/mk/boilerplate.mk
 all: ps
 
 install-docs:
-	-mkdir     $(docdir)/ext-core
-	cp core.ps $(docdir)/ext-core/
+	-mkdir        $(docdir)/ext-core
+	cp core.ps.gz $(docdir)/ext-core/
 
 #	General makefile for Latex stuff
 
@@ -13,7 +13,7 @@ LATEX=latex \\nonstopmode \\input
 BIBTEX=bibtex
 
 dvi: core.dvi
-ps: core.ps
+ps: core.ps core.ps.gz
 
 core.dvi:	core.tex
 		-$(LATEX) core.tex
@@ -23,8 +23,11 @@ core.dvi:	core.tex
 
 ######## General rules
 .SUFFIXES:
-.PRECIOUS: %.tex %.ps %.bbl
+.PRECIOUS: %.tex %.ps %.ps.gz %.bbl
 
+
+%.gz: %
+	gzip < $< > $@
 
 %.ps: %.dvi
 	dvips -f < $< > $@
