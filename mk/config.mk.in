@@ -188,6 +188,9 @@ XMLDocWays=
 # Should we build haddock docs?
 HADDOCK_DOCS = YES
 
+# Should we build latex docs?
+LATEX_DOCS = NO
+
 # Mac OS X deployment target (to cross-compile for older OS versions)
 #
 MACOSX_DEPLOYMENT_VERSION = @MACOSX_DEPLOYMENT_VERSION@

@@ -1,11 +1,15 @@
 TOP = ../..
 include $(TOP)/mk/boilerplate.mk
 
+ifeq "$(LATEX_DOCS)" "YES"
 all: ps
 
 install-docs:
 	-mkdir        $(docdir)/ext-core
 	cp core.ps.gz $(docdir)/ext-core/
+else
+all:
+endif
 
 #	General makefile for Latex stuff
 
