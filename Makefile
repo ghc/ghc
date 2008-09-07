@@ -382,6 +382,7 @@ endif
 	echo "XSLTPROC = $(XSLTPROC)"                     >> $(BIN_DIST_VARFILE)
 	echo "TARGETPLATFORM = $(TARGETPLATFORM)"         >> $(BIN_DIST_VARFILE)
 	echo "HADDOCK_DOCS = $(HADDOCK_DOCS)"             >> $(BIN_DIST_VARFILE)
+	echo "LATEX_DOCS = $(LATEX_DOCS)"                 >> $(BIN_DIST_VARFILE)
 	echo "INTEGER_LIBRARY = $(INTEGER_LIBRARY)"       >> $(BIN_DIST_VARFILE)
 	cat distrib/Makefile-bin-vars.in                  >> $(BIN_DIST_VARFILE)
 

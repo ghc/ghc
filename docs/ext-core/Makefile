@@ -44,6 +44,7 @@ distclean: clean
 
 maintainer-clean: distclean
 
+BINDIST_EXTRAS += core.ps.gz
 include $(TOP)/mk/bindist.mk
 
 # dummy targets
