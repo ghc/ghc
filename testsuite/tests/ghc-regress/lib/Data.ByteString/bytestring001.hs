@@ -20,6 +20,7 @@ import System.IO.Unsafe
 import System.Random
 
 import Control.Monad        ( liftM2 )
+import Control.Monad.Instances ()
 
 import Text.Printf
 import Debug.Trace
