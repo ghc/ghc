@@ -184,6 +184,7 @@ other dynamic, non-language, flag settings:
   -fno-force-recomp
   -fno-hpc-no-auto
   -fno-rewrite-rules
+  -fno-enable-rewrite-rules
   -fprint-bind-contents
   -fno-run-cps
   -fno-convert-to-zipper-and-back
@@ -206,7 +207,6 @@ active language flags:
   -XPolymorphicComponents
   -XExistentialQuantification
   -XKindSignatures
-  -XPatternSignatures
   -XEmptyDataDecls
   -XParallelListComp
   -XForeignFunctionInterface
@@ -224,6 +224,7 @@ active language flags:
   -XRelaxedPolyRec
   -XImplicitParams
   -XScopedTypeVariables
+  -XPatternSignatures
   -XUnboxedTuples
   -XStandaloneDeriving
   -XDeriveDataTypeable
