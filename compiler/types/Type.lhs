@@ -128,7 +128,7 @@ module Type (
         isEmptyTvSubst,
 
 	-- ** Performing substitution on types
-	substTy, substTys, substTyWith, substTheta, 
+	substTy, substTys, substTyWith, substTysWith, substTheta, 
 	substPred, substTyVar, substTyVars, substTyVarBndr, deShadowTy, lookupTyVar,
 
 	-- * Pretty-printing
@@ -1513,6 +1513,12 @@ instance Outputable TvSubst where
 substTyWith :: [TyVar] -> [Type] -> Type -> Type
 substTyWith tvs tys = ASSERT( length tvs == length tys )
 		      substTy (zipOpenTvSubst tvs tys)
+
+-- | Type substitution making use of an 'TvSubst' that
+-- is assumed to be open, see 'zipOpenTvSubst'
+substTysWith :: [TyVar] -> [Type] -> [Type] -> [Type]
+substTysWith tvs tys = ASSERT( length tvs == length tys )
+		       substTys (zipOpenTvSubst tvs tys)
 
 -- | Substitute within a 'Type'
 substTy :: TvSubst -> Type  -> Type

@@ -28,7 +28,7 @@ module TcRnTypes(
 	ArrowCtxt(NoArrowCtxt), newArrowScope, escapeArrowScope,
 
 	-- Insts
-	Inst(..), InstOrigin(..), InstLoc(..), 
+	Inst(..), EqInstCo, InstOrigin(..), InstLoc(..), 
 	pprInstLoc, pprInstArising, instLocSpan, instLocOrigin,
 	LIE, emptyLIE, unitLIE, plusLIE, consLIE, instLoc, instSpan,
 	plusLIEs, mkLIE, isEmptyLIE, lieToList, listToLIE,
@@ -700,27 +700,26 @@ data Inst
 				  --  	co :: ty1 ~ ty2
 	tci_left  :: TcType,      -- ty1    -- both types are...
 	tci_right :: TcType,      -- ty2    -- ...free of boxes
-	tci_co    :: Either    	  -- co
-			TcTyVar	  --  - a wanted equation, with a hole, to be 
-				  --    filled with a witness for the equality;
-                                  --    for equation arising from deferring
-                                  --    unification, 'ty1' is the actual and
-                                  --    'ty2' the expected type
-			Coercion, --  - a given equation, with a coercion
-				  --	witnessing the equality;
-				  --    a coercion that originates from a
-				  --    signature or a GADT is a CoVar, but
-                                  --    after normalisation of coercions, they
-				  --    can be arbitrary Coercions involving
-                                  --    constructors and pseudo-constructors 
-                                  --    like sym and trans.
+	tci_co    :: EqInstCo,  	  -- co
 	tci_loc   :: InstLoc,
 
 	tci_name  :: Name	-- Debugging help only: this makes it easier to
 				-- follow where a constraint is used in a morass
-				-- of trace messages!  Unlike other Insts, it has
-				-- no semantic significance whatsoever.
+				-- of trace messages!  Unlike other Insts, it 
+                                -- has no semantic significance whatsoever.
     }
+
+type EqInstCo = Either 	  -- Distinguish between given and wanted coercions
+		  TcTyVar   --  - a wanted equation, with a hole, to be filled
+			    --    with a witness for the equality; for equation
+                            --    arising from deferring unification, 'ty1' is
+                            --    the actual and 'ty2' the expected type
+		  Coercion  --  - a given equation, with a coercion witnessing
+                            --    the equality; a coercion that originates
+                            --    from a signature or a GADT is a CoVar, but
+                            --    after normalisation of coercions, they can
+			    --    be arbitrary Coercions involving constructors 
+                            --    and pseudo-constructors like sym and trans.
 \end{code}
 
 @Insts@ are ordered by their class/type info, rather than by their

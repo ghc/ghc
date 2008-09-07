@@ -7,7 +7,7 @@ The @Inst@ type: dictionaries or method instances
 
 \begin{code}
 module Inst ( 
-	Inst, 
+	Inst,
 
 	pprInstances, pprDictsTheta, pprDictsInFull,	-- User error messages
 	showLIE, pprInst, pprInsts, pprInstInFull,	-- Debugging messages
@@ -40,9 +40,10 @@ module Inst (
 	InstOrigin(..), InstLoc, pprInstLoc,
 
 	mkWantedCo, mkGivenCo,
-	fromWantedCo, fromGivenCo,
-	eitherEqInst, mkEqInst, mkEqInsts, mkWantedEqInst,
-	finalizeEqInst, writeWantedCoercion,
+	isWantedCo, fromWantedCo, fromGivenCo, eqInstCoType,
+        mkIdEqInstCo, mkSymEqInstCo, mkLeftTransEqInstCo,
+        mkRightTransEqInstCo, mkAppEqInstCo,
+	eitherEqInst, mkEqInst, mkEqInsts, mkWantedEqInst, finalizeEqInst, 
 	eqInstType, updateEqInstCoercion,
 	eqInstCoercion,	eqInstTys
     ) where
@@ -90,6 +91,7 @@ import Data.List
 
 import Control.Monad
 \end{code}
+
 
 
 Selection
@@ -935,21 +937,99 @@ syntaxNameCtxt name orig ty tidy_env = do
 %*									*
 %************************************************************************
 
+Operations on EqInstCo.
+
 \begin{code}
-mkGivenCo   :: Coercion -> Either TcTyVar Coercion
+mkGivenCo   :: Coercion -> EqInstCo
 mkGivenCo   =  Right
 
-mkWantedCo  :: TcTyVar  -> Either TcTyVar Coercion
+mkWantedCo  :: TcTyVar  -> EqInstCo
 mkWantedCo  =  Left
 
-fromGivenCo :: Either TcTyVar Coercion -> Coercion
+isWantedCo :: EqInstCo -> Bool
+isWantedCo (Left _) = True
+isWantedCo _        = False
+
+fromGivenCo :: EqInstCo -> Coercion
 fromGivenCo (Right co) 	 = co
 fromGivenCo _		 = panic "fromGivenCo: not a wanted coercion"
 
-fromWantedCo :: String -> Either TcTyVar Coercion -> TcTyVar
+fromWantedCo :: String -> EqInstCo -> TcTyVar
 fromWantedCo _ (Left covar) = covar
-fromWantedCo msg _	    = panic ("fromWantedCo: not a wanted coercion: " ++ msg)
+fromWantedCo msg _	    = 
+  panic ("fromWantedCo: not a wanted coercion: " ++ msg)
 
+eqInstCoType :: EqInstCo -> TcType
+eqInstCoType (Left cotv) = mkTyVarTy cotv
+eqInstCoType (Right co)  = co
+\end{code}
+
+Coercion transformations on EqInstCo.  These transformations work differently
+depending on whether a EqInstCo is for a wanted or local equality:
+
+  Local : apply the inverse of the specified coercion
+  Wanted: obtain a fresh coercion hole (meta tyvar) and update the old hole
+          to be the specified coercion applied to the new coercion hole
+
+\begin{code}
+-- Coercion transformation: co = id
+--
+mkIdEqInstCo :: EqInstCo -> Type -> TcM ()
+mkIdEqInstCo (Left cotv) t
+  = writeMetaTyVar cotv t
+mkIdEqInstCo (Right _) _
+  = return ()
+
+-- Coercion transformation: co = sym co'
+--
+mkSymEqInstCo :: EqInstCo -> (Type, Type) -> TcM EqInstCo
+mkSymEqInstCo (Left cotv) (ty1, ty2)
+  = do { cotv' <- newMetaCoVar ty1 ty2
+       ; writeMetaTyVar cotv (mkSymCoercion (TyVarTy cotv'))
+       ; return $ Left cotv'
+       }
+mkSymEqInstCo (Right co) _ 
+  = return $ Right (mkSymCoercion co)
+
+-- Coercion transformation: co = co' |> given_co
+--
+mkLeftTransEqInstCo :: EqInstCo -> Coercion -> (Type, Type) -> TcM EqInstCo
+mkLeftTransEqInstCo (Left cotv) given_co (ty1, ty2)
+  = do { cotv' <- newMetaCoVar ty1 ty2
+       ; writeMetaTyVar cotv (TyVarTy cotv' `mkTransCoercion` given_co)
+       ; return $ Left cotv'
+       }
+mkLeftTransEqInstCo (Right co) given_co _ 
+  = return $ Right (co `mkTransCoercion` mkSymCoercion given_co)
+
+-- Coercion transformation: co = given_co |> co'
+--
+mkRightTransEqInstCo :: EqInstCo -> Coercion -> (Type, Type) -> TcM EqInstCo
+mkRightTransEqInstCo (Left cotv) given_co (ty1, ty2)
+  = do { cotv' <- newMetaCoVar ty1 ty2
+       ; writeMetaTyVar cotv (given_co `mkTransCoercion` TyVarTy cotv')
+       ; return $ Left cotv'
+       }
+mkRightTransEqInstCo (Right co) given_co _ 
+  = return $ Right (mkSymCoercion given_co `mkTransCoercion` co)
+
+-- Coercion transformation: co = col cor
+--
+mkAppEqInstCo :: EqInstCo -> (Type, Type) -> (Type, Type)
+              -> TcM (EqInstCo, EqInstCo)
+mkAppEqInstCo (Left cotv) (ty1_l, ty2_l) (ty1_r, ty2_r)
+  = do { cotv_l <- newMetaCoVar ty1_l ty2_l
+       ; cotv_r <- newMetaCoVar ty1_r ty2_r
+       ; writeMetaTyVar cotv (mkAppCoercion (TyVarTy cotv_l) (TyVarTy cotv_r))
+       ; return (Left cotv_l, Left cotv_r)
+       }
+mkAppEqInstCo (Right co) _ _
+  = return (Right $ mkLeftCoercion co, Right $ mkRightCoercion co)
+\end{code}
+
+Operations on entire EqInst.
+
+\begin{code}
 eitherEqInst :: Inst 	            -- given or wanted EqInst
 	     -> (TcTyVar  -> a)     -- 	result if wanted
 	     -> (Coercion -> a)     --	result if given
@@ -960,20 +1040,26 @@ eitherEqInst (EqInst {tci_co = either_co}) withWanted withGiven
 		Right co    -> withGiven  co
 eitherEqInst i _ _ = pprPanic "eitherEqInst" (ppr i)
 
-mkEqInsts :: [PredType] -> [Either TcTyVar Coercion] -> TcM [Inst]
+mkEqInsts :: [PredType] -> [EqInstCo] -> TcM [Inst]
 mkEqInsts preds cos = zipWithM mkEqInst preds cos
 
-mkEqInst :: PredType -> Either TcTyVar Coercion -> TcM Inst
+mkEqInst :: PredType -> EqInstCo -> TcM Inst
 mkEqInst (EqPred ty1 ty2) co
 	= do { uniq <- newUnique
 	     ; src_span <- getSrcSpanM
 	     ; err_ctxt <- getErrCtxt
 	     ; let loc  = InstLoc EqOrigin src_span err_ctxt
 	           name = mkName uniq src_span
-	           inst = EqInst {tci_left = ty1, tci_right = ty2, tci_co = co, tci_loc = loc, tci_name = name} 
+	           inst = EqInst { tci_left = ty1
+                                 , tci_right = ty2
+                                 , tci_co = co
+                                 , tci_loc = loc
+                                 , tci_name = name
+                                 } 
 	     ; return inst
 	     }
-	where mkName uniq src_span = mkInternalName uniq (mkVarOcc "co") src_span
+	where 
+          mkName uniq src_span = mkInternalName uniq (mkVarOcc "co") src_span
 mkEqInst pred _ = pprPanic "mkEqInst" (ppr pred)
 
 mkWantedEqInst :: PredType -> TcM Inst
@@ -983,40 +1069,36 @@ mkWantedEqInst pred@(EqPred ty1 ty2)
        }
 mkWantedEqInst pred = pprPanic "mkWantedEqInst" (ppr pred)
 
--- type inference:
---	We want to promote the wanted EqInst to a given EqInst
---	in the signature context.
---	This means we have to give the coercion a name
---	and fill it in as its own name.
-finalizeEqInst 
-	:: Inst			-- wanted
-	-> TcM Inst		-- given
-finalizeEqInst wanted@(EqInst {tci_left = ty1, tci_right = ty2, tci_name = name})
-  	= do { let var = Var.mkCoVar name (PredTy $ EqPred ty1 ty2)
-       	     ; writeWantedCoercion wanted (TyVarTy var)
-	     ; let given = wanted { tci_co = mkGivenCo $ TyVarTy var }
-	     ; return given
-             }
-finalizeEqInst i = pprPanic "finalizeEqInst" (ppr i)
+-- Turn a wanted into a local EqInst (needed during type inference for
+-- signatures) 
+--
+-- * Give it a name and change the coercion around.
+--
+finalizeEqInst :: Inst			-- wanted
+	       -> TcM Inst		-- given
+finalizeEqInst wanted@(EqInst{tci_left = ty1, tci_right = ty2, tci_name = name})
+  = do { let var = Var.mkCoVar name (PredTy $ EqPred ty1 ty2)
 
-writeWantedCoercion 
-	:: Inst 	-- wanted EqInst
-	-> Coercion 	-- coercion to fill the hole with
-	-> TcM ()	
-writeWantedCoercion wanted co
-  	= do { let cotv = fromWantedCo "writeWantedCoercion" $ tci_co wanted
-	     ; writeMetaTyVar cotv co
-	     }
+         -- fill the coercion hole
+       ; let cotv = fromWantedCo "writeWantedCoercion" $ tci_co wanted
+       ; writeMetaTyVar cotv (TyVarTy var)
+
+         -- set the new coercion
+       ; let given = wanted { tci_co = mkGivenCo $ TyVarTy var }
+       ; return given
+       }
+
+finalizeEqInst i = pprPanic "finalizeEqInst" (ppr i)
 
 eqInstType :: Inst -> TcType
 eqInstType inst = eitherEqInst inst mkTyVarTy id
 
-eqInstCoercion :: Inst -> Either TcTyVar Coercion
+eqInstCoercion :: Inst -> EqInstCo
 eqInstCoercion = tci_co
 
 eqInstTys :: Inst -> (TcType, TcType)
 eqInstTys inst = (tci_left inst, tci_right inst)
 
-updateEqInstCoercion :: (Either TcTyVar Coercion -> Either TcTyVar Coercion) -> Inst -> Inst
+updateEqInstCoercion :: (EqInstCo -> EqInstCo) -> Inst -> Inst
 updateEqInstCoercion f inst = inst {tci_co = f $ tci_co inst}
 \end{code}
