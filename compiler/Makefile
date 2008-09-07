@@ -451,6 +451,14 @@ install-docs:
 # binary-dist
 #
 
+# Ideally we'd get these from the Cabal file's Install-Includes:
+BINDIST_EXTRAS += HsVersions.h
+ifeq "$(stage)" "1"
+BINDIST_EXTRAS += stage1/ghc_boot_platform.h
+else
+BINDIST_EXTRAS += stage2plus/ghc_boot_platform.h
+endif
+
 include $(TOP)/mk/bindist.mk
 LIB_DIST_DIR = dist-stage$(stage)
 

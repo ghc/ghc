@@ -1,4 +1,5 @@
 TOP = ../..
+include $(TOP)/mk/boilerplate.mk
 
 #	General makefile for Latex stuff
 
