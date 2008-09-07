@@ -4,8 +4,21 @@ ENABLE_SHELL_WRAPPERS = YES
 EXTRA_INPLACE_CONFIGURE_FLAGS += --flags=in-ghc-tree
 EXTRA_STAGE2_CONFIGURE_FLAGS += --flags=in-ghc-tree
 
+# Ideally we'd automatically find these from the .cabal file:
+BINDIST_EXTRAS += html/haddock-DEBUG.css \
+                  html/haddock.css       \
+                  html/haddock-util.js   \
+                  html/haskell_icon.gif  \
+                  html/minus.gif         \
+                  html/plus.gif
+
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/cabal.mk
+
+# bindist.mk isn't expecting a library to be in the same package as an
+# executable, so we have to help it out
+LIB_DIST_DIR = $(EXE_DIST_DIR)
+
 SRC_HC_OPTS += -w
 
 .PHONY: install-inplace
