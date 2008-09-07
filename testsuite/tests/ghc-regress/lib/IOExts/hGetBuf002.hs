@@ -4,7 +4,7 @@ import Foreign
 import CForeign
 
 main = do
-  h <- openBinaryFile "hGetBuf001.hs" ReadMode
+  h <- openBinaryFile "hGetBuf002.hs" ReadMode
 
   let sz = 42
       loop = do
