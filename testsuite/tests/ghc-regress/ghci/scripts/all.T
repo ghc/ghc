@@ -32,14 +32,11 @@ test('ghci021', normal, ghci_script, ['ghci021.script'])
 test('ghci022', normal, ghci_script, ['ghci022.script'])
 
 test('ghci023', normal, ghci_script, ['ghci023.script'])
-execfile(in_testdir('ghci024.py')) # load function prepare024
 test('ghci024',
-     [prepare024,
-      skip_if_fast,
-      if_platform("powerpc-apple-darwin", expect_broken(1845)),
-      extra_clean(['ghci024.stdout'])],
-     ghci_script,
-     ['ghci024.script'])
+     [skip_if_fast,
+      if_platform("powerpc-apple-darwin", expect_broken(1845))],
+     run_command,
+     ['$MAKE -s --no-print-directory ghci024'])
 test('ghci025', normal, ghci_script, ['ghci025.script'])
 test('ghci026', normal, ghci_script, ['ghci026.script'])
 
