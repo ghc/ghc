@@ -165,7 +165,7 @@ copy_tag_nolock(StgClosure **p, const StgInfoTable *info,
  * pointer of an object, but reserve some padding after it.  This is
  * used to optimise evacuation of BLACKHOLEs.
  */
-static void
+static rtsBool
 copyPart(StgClosure **p, StgClosure *src, nat size_to_reserve, nat size_to_copy, step *stp)
 {
     StgPtr to, from;
@@ -184,7 +184,7 @@ spin:
     if (IS_FORWARDING_PTR(info)) {
 	src->header.info = (const StgInfoTable *)info;
 	evacuate(p); // does the failed_to_evac stuff
-	return ;
+	return rtsFalse;
     }
 #else
     info = (W_)src->header.info;
@@ -214,6 +214,8 @@ spin:
     if (size_to_reserve - size_to_copy > 0)
 	LDV_FILL_SLOP(to + size_to_copy - 1, (int)(size_to_reserve - size_to_copy)); 
 #endif
+
+    return rtsTrue;
 }
 
 
@@ -697,14 +699,18 @@ loop:
       {
 	  StgTSO *new_tso;
 	  StgPtr r, s;
+          rtsBool mine;
 
-	  copyPart(p,(StgClosure *)tso, tso_sizeW(tso), sizeofW(StgTSO), stp);
-	  new_tso = (StgTSO *)*p;
-	  move_TSO(tso, new_tso);
-	  for (r = tso->sp, s = new_tso->sp;
-	       r < tso->stack+tso->stack_size;) {
-	      *s++ = *r++;
-	  }
+	  mine = copyPart(p,(StgClosure *)tso, tso_sizeW(tso), 
+                          sizeofW(StgTSO), stp);
+          if (mine) {
+              new_tso = (StgTSO *)*p;
+              move_TSO(tso, new_tso);
+              for (r = tso->sp, s = new_tso->sp;
+                   r < tso->stack+tso->stack_size;) {
+                  *s++ = *r++;
+              }
+          }
 	  return;
       }
     }
