@@ -1091,16 +1091,17 @@ addDLL( char *dll_name )
    opened_dlls     = o_dll;
 
    return NULL;
-#  else
-   barf("addDLL: not implemented on this platform");
-#  endif
 
 error:
    stgFree(buf);
    sysErrorBelch(dll_name);
-               
+
    /* LoadLibrary failed; return a ptr to the error msg. */
    return "addDLL: could not load DLL";
+
+#  else
+   barf("addDLL: not implemented on this platform");
+#  endif
 }
 
 /* -----------------------------------------------------------------------------
