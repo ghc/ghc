@@ -174,7 +174,7 @@ CONFIGURE_FLAGS_STAGE2 += $(USE_STAGE1_CONFIGURE_FLAGS)
 CONFIGURE_FLAGS_STAGE3 += $(USE_STAGE2_CONFIGURE_FLAGS)
 
 boot.stage.%: $(PRIMOP_BITS) $(CONFIG_HS) parser/Parser.y
-	test -e $(STAGE3_PACKAGE_CONF) || echo "[]" > $(STAGE3_PACKAGE_CONF)
+	test -f $(STAGE3_PACKAGE_CONF) || echo "[]" > $(STAGE3_PACKAGE_CONF)
 	$(CABAL) configure --distpref dist-stage$* \
 	                   $(CONFIGURE_FLAGS_STAGE$*) \
 	                   $(INSTALL_DIRS_CONFIGURE_FLAGS) \
