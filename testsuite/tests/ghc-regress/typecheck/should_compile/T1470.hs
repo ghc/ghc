@@ -1,5 +1,7 @@
 {-# LANGUAGE MultiParamTypeClasses, FlexibleContexts, FlexibleInstances, OverlappingInstances, UndecidableInstances #-}
 
+-- Trac #1470
+
 module Foo where
 
 class Sat a
