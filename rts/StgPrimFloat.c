@@ -1,5 +1,6 @@
 /* -----------------------------------------------------------------------------
  *
+ * (c) Lennart Augustsson
  * (c) The GHC Team, 1998-2000
  *
  * Miscellaneous support for floating-point primitives
