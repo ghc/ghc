@@ -247,7 +247,7 @@ checkClosure( StgClosure* p )
 {
     const StgInfoTable *info;
 
-    ASSERT(LOOKS_LIKE_INFO_PTR(p->header.info));
+    ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
 
     p = UNTAG_CLOSURE(p);
     /* Is it a static closure (i.e. in the data segment)? */
@@ -587,7 +587,7 @@ checkHeap(bdescr *bd)
 	    
 	    /* skip over slop */
 	    while (p < bd->free &&
-		   (*p < 0x1000 || !LOOKS_LIKE_INFO_PTR((void*)*p))) { p++; } 
+		   (*p < 0x1000 || !LOOKS_LIKE_INFO_PTR(*p))) { p++; } 
 	}
     }
 }
@@ -628,7 +628,7 @@ checkHeapChunk(StgPtr start, StgPtr end)
   nat size;
 
   for (p=start; p<end; p+=size) {
-    ASSERT(LOOKS_LIKE_INFO_PTR((void*)*p));
+    ASSERT(LOOKS_LIKE_INFO_PTR(*p));
     size = checkClosure((StgClosure *)p);
     /* This is the smallest size of closure that can live in the heap. */
     ASSERT( size >= MIN_PAYLOAD_SIZE + sizeofW(StgHeader) );
@@ -834,7 +834,7 @@ checkStaticObjects ( StgClosure* static_objects )
         StgClosure *indirectee = UNTAG_CLOSURE(((StgIndStatic *)p)->indirectee);
 
 	ASSERT(LOOKS_LIKE_CLOSURE_PTR(indirectee));
-	ASSERT(LOOKS_LIKE_INFO_PTR(indirectee->header.info));
+	ASSERT(LOOKS_LIKE_INFO_PTR((StgWord)indirectee->header.info));
 	p = *IND_STATIC_LINK((StgClosure *)p);
 	break;
       }

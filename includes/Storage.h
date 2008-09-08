@@ -359,15 +359,8 @@ void dirty_MUT_VAR(StgRegTable *reg, StgClosure *p);
    make sense...
    -------------------------------------------------------------------------- */
 
-#define LOOKS_LIKE_INFO_PTR(p) \
-    (p && (IS_FORWARDING_PTR(p) || LOOKS_LIKE_INFO_PTR_NOT_NULL(p)))
-
-#define LOOKS_LIKE_INFO_PTR_NOT_NULL(p) \
-   (((StgInfoTable *)(INFO_PTR_TO_STRUCT(p)))->type != INVALID_OBJECT && \
-    ((StgInfoTable *)(INFO_PTR_TO_STRUCT(p)))->type < N_CLOSURE_TYPES)
-
-#define LOOKS_LIKE_CLOSURE_PTR(p) \
-  (LOOKS_LIKE_INFO_PTR((UNTAG_CLOSURE((StgClosure *)(p)))->header.info))
+INLINE_HEADER rtsBool LOOKS_LIKE_INFO_PTR (StgWord p);
+INLINE_HEADER rtsBool LOOKS_LIKE_CLOSURE_PTR (void *p); // XXX StgClosure*
 
 /* -----------------------------------------------------------------------------
    Macros for calculating how big a closure will be (used during allocation)
@@ -598,5 +591,21 @@ extern StgTSO     * RTS_VAR(resurrected_threads);
 #define IS_FORWARDING_PTR(p) ((((StgWord)p) & 1) != 0)
 #define MK_FORWARDING_PTR(p) (((StgWord)p) | 1)
 #define UN_FORWARDING_PTR(p) (((StgWord)p) - 1)
+
+INLINE_HEADER rtsBool LOOKS_LIKE_INFO_PTR_NOT_NULL (StgWord p)
+{
+    StgInfoTable *info = INFO_PTR_TO_STRUCT(p);
+    return info->type != INVALID_OBJECT && info->type < N_CLOSURE_TYPES;
+}
+
+INLINE_HEADER rtsBool LOOKS_LIKE_INFO_PTR (StgWord p)
+{
+    return p && (IS_FORWARDING_PTR(p) || LOOKS_LIKE_INFO_PTR_NOT_NULL(p));
+}
+
+INLINE_HEADER rtsBool LOOKS_LIKE_CLOSURE_PTR (void *p)
+{
+    return LOOKS_LIKE_INFO_PTR((StgWord)(UNTAG_CLOSURE((StgClosure *)(p)))->header.info);
+}
 
 #endif /* STORAGE_H */
