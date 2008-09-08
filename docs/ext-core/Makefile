@@ -2,11 +2,11 @@ TOP = ../..
 include $(TOP)/mk/boilerplate.mk
 
 ifeq "$(LATEX_DOCS)" "YES"
-all: ps
+all: pdf
 
 install-docs:
-	-mkdir        $(docdir)/ext-core
-	cp core.ps.gz $(docdir)/ext-core/
+	-mkdir      $(docdir)/ext-core
+	cp core.pdf $(docdir)/ext-core/
 else
 all:
 endif
@@ -18,6 +18,7 @@ BIBTEX=bibtex
 
 dvi: core.dvi
 ps: core.ps core.ps.gz
+pdf: core.pdf
 
 core.dvi:	core.tex
 		-$(LATEX) core.tex
@@ -27,7 +28,7 @@ core.dvi:	core.tex
 
 ######## General rules
 .SUFFIXES:
-.PRECIOUS: %.tex %.ps %.ps.gz %.bbl
+.PRECIOUS: %.tex %.ps %.ps.gz %.pdf %.bbl
 
 
 %.gz: %
@@ -36,15 +37,20 @@ core.dvi:	core.tex
 %.ps: %.dvi
 	dvips -f < $< > $@
 
+%.pdf: %.ps
+	ps2pdf $< $@
+
 clean:
 	$(RM) *.aux *.log
 
 distclean: clean
-	$(RM) prims.tex *.dvi *.ps *.bbl *.blg *.gz
+	$(RM) prims.tex *.dvi *.ps *.pdf *.bbl *.blg *.gz
 
 maintainer-clean: distclean
 
-BINDIST_EXTRAS += core.ps.gz
+ifeq "$(LATEX_DOCS)" "YES"
+BINDIST_EXTRAS += core.pdf
+endif
 include $(TOP)/mk/bindist.mk
 
 # dummy targets
