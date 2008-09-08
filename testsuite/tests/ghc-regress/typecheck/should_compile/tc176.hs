@@ -18,6 +18,10 @@
 -- instances for line 8 is absolutely right, so I've changed this to
 -- expected-failure
 
+-- Sept 08: on further reflection (!) I'm changing it back
+-- See Note [Subtle interaction of recursion and overlap]
+-- in TcInstDcls
+
 module ShouldCompile  where
 
 class FromStr a where

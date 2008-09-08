@@ -187,7 +187,7 @@ test('tc173',
 
 test('tc174', only_compiler_types(['ghc']), compile, [''])
 test('tc175', normal, compile, [''])
-test('tc176', normal, compile_fail, [''])
+test('tc176', normal, compile, [''])
 test('tc177', normal, compile, [''])
 test('tc178', normal, compile, [''])
 test('tc179', normal, compile, [''])
