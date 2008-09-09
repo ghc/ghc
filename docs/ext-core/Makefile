@@ -9,6 +9,7 @@ install-docs:
 	cp core.pdf $(docdir)/ext-core/
 else
 all:
+install-docs:
 endif
 
 #	General makefile for Latex stuff
