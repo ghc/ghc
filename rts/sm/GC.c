@@ -724,6 +724,11 @@ GarbageCollect ( rtsBool force_major_gc )
   // Update the stable pointer hash table.
   updateStablePtrTable(major_gc);
 
+  // Remove useless sparks from the spark pools
+#ifdef THREADED_RTS
+  pruneSparkQueues();
+#endif
+
   // check sanity after GC 
   IF_DEBUG(sanity, checkSanity());
 

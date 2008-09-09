@@ -168,8 +168,8 @@ newSpark (StgRegTable *reg, StgClosure *p)
  * spark pool and the spark pool only contains sparkable closures 
  * -------------------------------------------------------------------------- */
 
-void
-markSparkQueue (evac_fn evac, void *user, Capability *cap)
+static void
+pruneSparkQueue (Capability *cap)
 { 
     StgClosure *spark, **sparkp, **to_sparkp;
     nat n, pruned_sparks; // stats only
@@ -190,7 +190,6 @@ markSparkQueue (evac_fn evac, void *user, Capability *cap)
         ASSERT(*sparkp!=NULL);
         ASSERT(LOOKS_LIKE_CLOSURE_PTR(((StgClosure *)*sparkp)));
         // ToDo?: statistics gathering here (also for GUM!)
-        evac(user,sparkp);
         spark = *sparkp;
         if (!closure_SHOULD_SPARK(spark)) {
             pruned_sparks++;
@@ -210,13 +209,20 @@ markSparkQueue (evac_fn evac, void *user, Capability *cap)
 	
     PAR_TICKY_MARK_SPARK_QUEUE_END(n);
 	
-    debugTrace(DEBUG_sched, 
-               "marked %d sparks, pruned %d sparks",
-               n, pruned_sparks);
+    debugTrace(DEBUG_sched, "pruned %d sparks", pruned_sparks);
     
     debugTrace(DEBUG_sched,
                "new spark queue len=%d; (hd=%p; tl=%p)",
                sparkPoolSize(pool), pool->hd, pool->tl);
+}
+
+void
+pruneSparkQueues (void)
+{
+    nat i;
+    for (i = 0; i < n_capabilities; i++) {
+        pruneSparkQueue(&capabilities[i]);
+    }
 }
 
 void
@@ -228,7 +234,7 @@ traverseSparkQueue (evac_fn evac, void *user, Capability *cap)
     pool = &(cap->r.rSparks);
     sparkp = pool->hd;
     while (sparkp != pool->tl) {
-        evac(sparkp, user);
+        evac(user, sparkp);
         sparkp++;
         if (sparkp == pool->lim) {
             sparkp = pool->base;
