@@ -996,6 +996,9 @@ compact(StgClosure *static_objects)
     // any threads resurrected during this GC
     thread((void *)&resurrected_threads);
 
+    // the blackhole queue
+    thread((void *)&blackhole_queue);
+
     // the task list
     {
 	Task *task;
