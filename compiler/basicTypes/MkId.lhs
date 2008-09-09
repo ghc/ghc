@@ -1162,7 +1162,7 @@ patErrorName             = mkWiredInIdName cONTROL_EXCEPTION_BASE (fsLit "patErr
 noMethodBindingErrorName = mkWiredInIdName cONTROL_EXCEPTION_BASE (fsLit "noMethodBindingError")
                                            noMethodBindingErrorIdKey nO_METHOD_BINDING_ERROR_ID
 nonExhaustiveGuardsErrorName 
-  = mkWiredInIdName gHC_ERR (fsLit "nonExhaustiveGuardsError") 
+  = mkWiredInIdName cONTROL_EXCEPTION_BASE (fsLit "nonExhaustiveGuardsError") 
                     nonExhaustiveGuardsErrorIdKey nON_EXHAUSTIVE_GUARDS_ERROR_ID
 \end{code}
 
