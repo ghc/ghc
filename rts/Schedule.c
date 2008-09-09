@@ -969,10 +969,10 @@ scheduleDetectDeadlock (Capability *cap, Task *task)
  * Send pending messages (PARALLEL_HASKELL only)
  * ------------------------------------------------------------------------- */
 
+#if defined(PARALLEL_HASKELL)
 static StgTSO *
 scheduleSendPendingMessages(void)
 {
-#if defined(PARALLEL_HASKELL)
 
 # if defined(PAR) // global Mem.Mgmt., omit for now
     if (PendingFetches != END_BF_QUEUE) {
@@ -985,8 +985,8 @@ scheduleSendPendingMessages(void)
 	// packets which have become too old...
 	sendOldBuffers(); 
     }
-#endif
 }
+#endif
 
 /* ----------------------------------------------------------------------------
  * Activate spark threads (PARALLEL_HASKELL only)
@@ -1402,7 +1402,6 @@ scheduleNeedHeapProfile( rtsBool ready_to_gc STG_UNUSED )
 static Capability *
 scheduleDoGC (Capability *cap, Task *task USED_IF_THREADS, rtsBool force_major)
 {
-    StgTSO *t;
     rtsBool heap_census;
 #ifdef THREADED_RTS
     /* extern static volatile StgWord waiting_for_gc; 
@@ -2211,7 +2210,7 @@ threadStackUnderflow (Task *task STG_UNUSED, StgTSO *tso)
     new_tso_size_w = round_to_mblocks(tso_size_w/2);
 
     debugTrace(DEBUG_sched, "thread %ld: reducing TSO size from %lu words to %lu",
-               tso->id, tso_size_w, new_tso_size_w);
+               (long)tso->id, tso_size_w, new_tso_size_w);
 
     bd = Bdescr((StgPtr)tso);
     new_bd = splitLargeBlock(bd, new_tso_size_w / BLOCK_SIZE_W);
