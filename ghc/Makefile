@@ -134,5 +134,5 @@ install-docs:
 	@:
 
 include $(TOP)/mk/bindist.mk
-EXE_DIST_DIR = dist-stage$(stage)
+EXE_DIST_DIR = dist-stage2
 

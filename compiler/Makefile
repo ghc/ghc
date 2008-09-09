@@ -460,5 +460,5 @@ BINDIST_EXTRAS += stage2plus/ghc_boot_platform.h
 endif
 
 include $(TOP)/mk/bindist.mk
-LIB_DIST_DIR = dist-stage$(stage)
+LIB_DIST_DIR = dist-stage2
 
