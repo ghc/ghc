@@ -595,8 +595,8 @@ callSiteInline dflags active_inline id lone_variable arg_infos cont_info
 			= case cont_info of
 			    BoringCtxt -> not is_top && n_vals_wanted > 0	-- Note [Nested functions] 
 			    CaseCtxt   -> not lone_variable || not is_value	-- Note [Lone variables]
-			    ArgCtxt {} -> True
-				-- Was: n_vals_wanted > 0; but see test eyeball/inline1.hs
+			    ArgCtxt {} -> n_vals_wanted > 0 
+				-- See Note [Inlining in ArgCtxt]
 
 		    small_enough = (size - discount) <= opt_UF_UseThreshold
 		    discount = computeDiscount n_vals_wanted arg_discounts 
@@ -639,6 +639,19 @@ constructor occurs just once, albeit possibly in multiple case
 branches.  Then inlining it doesn't increase allocation, but it does
 increase the chance that the constructor won't be allocated at all in
 the branches that don't use it.
+
+Note [Inlining in ArgCtxt]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+The condition (n_vals_wanted > 0) here is very important, because otherwise
+we end up inlining top-level stuff into useless places; eg
+   x = I# 3#
+   f = \y.  g x
+This can make a very big difference: it adds 16% to nofib 'integer' allocs,
+and 20% to 'power'.
+
+At one stage I replaced this condition by 'True' (leading to the above 
+slow-down).  The motivation was test eyeball/inline1.hs; but that seems
+to work ok now.
 
 Note [Lone variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
