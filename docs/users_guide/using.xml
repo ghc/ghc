@@ -1906,7 +1906,7 @@ statements or clauses.
 
   <para>GHC can dump its optimized intermediate code (said to be in &ldquo;Core&rdquo; format) 
   to a file as a side-effect of compilation. Non-GHC back-end tools can read and process Core files; these files have the suffix
-  <filename>.hcr</filename>. The Core format is described in <ulink url="../ext-core/core.ps.gz">
+  <filename>.hcr</filename>. The Core format is described in <ulink url="../ext-core/core.pdf">
   <citetitle>An External Representation for the GHC Core Language</citetitle></ulink>, 
   and sample tools
   for manipulating Core files (in Haskell) are in the GHC source distribution 
