@@ -157,8 +157,8 @@ fiExpr to_drop (_,AnnApp fun arg)
     [drop_here, fun_drop, arg_drop] = sepBindsByDropPoint False [freeVarsOf fun, freeVarsOf arg] to_drop
 \end{code}
 
-We are careful about lambdas: 
-
+Note [Floating in past a lambda group]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 * We must be careful about floating inside inside a value lambda.  
   That risks losing laziness.
   The float-out pass might rescue us, but then again it might not.
@@ -174,24 +174,30 @@ We are careful about lambdas:
   This is bad as now f is an updatable closure (update PAP)
   and has arity 0.
 
+* Hack alert!  We only float in through one-shot lambdas, 
+  not (as you might guess) through lone big lambdas.  
+  Reason: we float *out* past big lambdas (see the test in the Lam
+  case of FloatOut.floatExpr) and we don't want to float straight
+  back in again.
+  
+  It *is* important to float into one-shot lambdas, however;
+  see the remarks with noFloatIntoRhs.
+
 So we treat lambda in groups, using the following rule:
 
-	Float inside a group of lambdas only if
-	they are all either type lambdas or one-shot lambdas.
+ Float in if (a) there is at least one Id, 
+         and (b) there are no non-one-shot Ids
 
-	Otherwise drop all the bindings outside the group.
+ Otherwise drop all the bindings outside the group.
+
+This is what the 'go' function in the AnnLam case is doing.
+
+Urk! if all are tyvars, and we don't float in, we may miss an 
+      opportunity to float inside a nested case branch
 
 \begin{code}
-	-- Hack alert!  We only float in through one-shot lambdas, 
-	-- not (as you might guess) through big lambdas.  
-	-- Reason: we float *out* past big lambdas (see the test in the Lam
-	-- case of FloatOut.floatExpr) and we don't want to float straight
-	-- back in again.
-	--
-	-- It *is* important to float into one-shot lambdas, however;
-	-- see the remarks with noFloatIntoRhs.
 fiExpr to_drop lam@(_, AnnLam _ _)
-  | all is_one_shot bndrs 	-- Float in
+  | go False bndrs 	-- Float in
   = mkLams bndrs (fiExpr to_drop body)
 
   | otherwise	 	-- Dump it all here
@@ -199,6 +205,12 @@ fiExpr to_drop lam@(_, AnnLam _ _)
 
   where
     (bndrs, body) = collectAnnBndrs lam
+
+    go seen_one_shot_id [] = seen_one_shot_id
+    go seen_one_shot_id (b:bs)
+      | isTyVar       b = go seen_one_shot_id bs
+      | isOneShotBndr b = go True bs
+      | otherwise       = False	 -- Give up at a non-one-shot Id
 \end{code}
 
 We don't float lets inwards past an SCC.
