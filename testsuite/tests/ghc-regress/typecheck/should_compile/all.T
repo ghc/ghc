@@ -284,6 +284,7 @@ test('LoopOfTheDay2', normal, compile, [''])
 test('LoopOfTheDay3', normal, compile, [''])
 
 test('T1470', expect_broken(1470), compile, [''])
+test('T2572', normal, compile, [''])
 
 test('T2412',
      extra_clean(['T2412.hi-boot', 'T2412.o-boot',
