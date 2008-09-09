@@ -34,13 +34,13 @@ StgWord8 mblock_map[MBLOCK_MAP_SIZE]; // initially all zeros
 #elif SIZEOF_VOID_P == 8
 static MBlockMap dummy_mblock_map;
 MBlockMap *mblock_cache = &dummy_mblock_map;
-int mblock_map_count = 0;
+nat mblock_map_count = 0;
 MBlockMap **mblock_maps = NULL;
 
 static MBlockMap *
 findMBlockMap(void *p)
 {
-    int i;
+    nat i;
     StgWord32 hi = (StgWord32) (((StgWord)p) >> 32);
     for( i = 0; i < mblock_map_count; i++ )
     {
@@ -85,6 +85,95 @@ markHeapAlloced(void *p)
     mblock_cache = map;
 #endif
 }
+
+/* ----------------------------------------------------------------------------
+   Debugging code for traversing the allocated MBlocks
+   
+   This is used for searching for lost blocks when a memory leak is
+   detected; see Blocks.c:findUnmarkedBlock().
+   ------------------------------------------------------------------------ */
+
+#ifdef DEBUG
+
+#if SIZEOF_VOID_P == 4
+
+STATIC_INLINE
+void * mapEntryToMBlock(nat i)
+{
+    return (void *)((StgWord)i << MBLOCK_SHIFT);
+}
+
+void * getFirstMBlock(void)
+{
+    nat i;
+
+    for (i = 0; i < MBLOCK_MAP_SIZE; i++) {
+        if (mblock_map[i]) return mapEntryToMBlock(i);
+    }
+    return NULL;
+}
+
+void * getNextMBlock(void *mblock)
+{
+    nat i;
+
+    for (i = MBLOCK_MAP_ENTRY(mblock) + 1; i < MBLOCK_MAP_SIZE; i++) {
+        if (mblock_map[i]) return mapEntryToMBlock(i);
+    }
+    return NULL;
+}
+
+#elif SIZEOF_VOID_P == 8
+
+STATIC_INLINE
+void * mapEntryToMBlock(MBlockMap *map, nat i)
+{
+    return (void *)(((StgWord)map->addrHigh32) << 32) + 
+        ((StgWord)i << MBLOCK_SHIFT);
+}
+
+void * getFirstMBlock(void)
+{
+    MBlockMap *map;
+    nat i, j;
+
+    for (j = 0; j < mblock_map_count; j++)  {
+        map = mblock_maps[j];
+        for (i = 0; i < MBLOCK_MAP_SIZE; i++) {
+            if (map->mblocks[i]) return mapEntryToMBlock(map,i);
+        }
+    }
+    return NULL;
+}
+
+void * getNextMBlock(void *mblock)
+{
+    MBlockMap *map;
+    nat i, j;
+
+    for (j = 0; j < mblock_map_count; j++)  {
+        map = mblock_maps[j];
+        if (map->addrHigh32 == (StgWord)mblock >> 32) break;
+    }
+    if (j == mblock_map_count) return NULL;
+
+    for (; j < mblock_map_count; j++) {
+        map = mblock_maps[j];
+        if (map->addrHigh32 == (StgWord)mblock >> 32) {
+            i = MBLOCK_MAP_ENTRY(mblock) + 1;
+        } else {
+            i = 0;
+        }
+        for (; i < MBLOCK_MAP_SIZE; i++) {
+            if (map->mblocks[i]) return mapEntryToMBlock(map,i);
+        }
+    }
+    return NULL;
+}
+
+#endif // SIZEOF_VOID_P
+
+#endif // DEBUG
 
 /* -----------------------------------------------------------------------------
    Allocate new mblock(s)

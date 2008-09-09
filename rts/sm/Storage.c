@@ -1270,6 +1270,51 @@ stepBlocks (step *stp)
 	    countAllocdBlocks(stp->large_objects);
 }
 
+// If memInventory() calculates that we have a memory leak, this
+// function will try to find the block(s) that are leaking by marking
+// all the ones that we know about, and search through memory to find
+// blocks that are not marked.  In the debugger this can help to give
+// us a clue about what kind of block leaked.  In the future we might
+// annotate blocks with their allocation site to give more helpful
+// info.
+static void
+findMemoryLeak (void)
+{
+  nat g, s, i;
+  for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+      for (i = 0; i < n_capabilities; i++) {
+	  markBlocks(capabilities[i].mut_lists[g]);
+      }
+      markBlocks(generations[g].mut_list);
+      for (s = 0; s < generations[g].n_steps; s++) {
+	  markBlocks(generations[g].steps[s].blocks);
+	  markBlocks(generations[g].steps[s].large_objects);
+      }
+  }
+
+  for (i = 0; i < n_nurseries; i++) {
+      markBlocks(nurseries[i].blocks);
+      markBlocks(nurseries[i].large_objects);
+  }
+
+#ifdef PROFILING
+  // TODO:
+  // if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_RETAINER) {
+  //    markRetainerBlocks();
+  // }
+#endif
+
+  // count the blocks allocated by the arena allocator
+  // TODO:
+  // markArenaBlocks();
+
+  // count the blocks containing executable memory
+  markBlocks(exec_block);
+
+  reportUnmarkedBlocks();
+}
+
+
 void
 memInventory (rtsBool show)
 {
@@ -1327,8 +1372,6 @@ memInventory (rtsBool show)
 
   leak = live_blocks + free_blocks != mblocks_allocated * BLOCKS_PER_MBLOCK;
 
-  ASSERT(n_alloc_blocks == live_blocks);
-
   if (show || leak)
   {
       if (leak) { 
@@ -1357,6 +1400,13 @@ memInventory (rtsBool show)
                      mblocks_allocated * BLOCKS_PER_MBLOCK, mblocks_allocated);
       }
   }
+
+  if (leak) {
+      debugBelch("\n");
+      findMemoryLeak();
+  }
+  ASSERT(n_alloc_blocks == live_blocks);
+  ASSERT(!leak);
 }
 
 

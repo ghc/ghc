@@ -14,6 +14,8 @@
 #ifdef DEBUG
 extern void checkFreeListSanity(void);
 nat         countFreeList(void);
+void        markBlocks (bdescr *bd);
+void        reportUnmarkedBlocks (void);
 #endif
 
 extern lnat n_alloc_blocks;   // currently allocated blocks

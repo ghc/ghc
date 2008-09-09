@@ -16,6 +16,11 @@ extern void * getMBlock(void);
 extern void * getMBlocks(nat n);
 extern void freeAllMBlocks(void);
 
+#ifdef DEBUG
+extern void *getFirstMBlock(void);
+extern void *getNextMBlock(void *mblock);
+#endif
+
 /* -----------------------------------------------------------------------------
    The HEAP_ALLOCED() test.
 

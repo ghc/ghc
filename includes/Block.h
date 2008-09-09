@@ -92,7 +92,8 @@ typedef struct bdescr_ {
 #define BF_EXEC	     32
 /* Block contains only a small amount of live data */
 #define BF_FRAGMENTED 64
-
+/* we know about this block (for finding leaks) */
+#define BF_KNOWN     128
 
 /* Finding the block descriptor for a given block -------------------------- */
 

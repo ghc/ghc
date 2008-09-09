@@ -727,4 +727,36 @@ countFreeList(void)
   }
   return total_blocks;
 }
+
+void
+markBlocks (bdescr *bd)
+{
+    for (; bd != NULL; bd = bd->link) {
+        bd->flags |= BF_KNOWN;
+    }
+}
+
+void
+reportUnmarkedBlocks (void)
+{
+    void *mblock;
+    bdescr *bd;
+
+    debugBelch("Unreachable blocks:\n");
+    for (mblock = getFirstMBlock(); mblock != NULL;
+         mblock = getNextMBlock(mblock)) {
+        for (bd = FIRST_BDESCR(mblock); bd <= LAST_BDESCR(mblock); ) {
+            if (!(bd->flags & BF_KNOWN) && bd->free != (P_)-1) {
+                debugBelch("  %p\n",bd);
+            }
+            if (bd->blocks >= BLOCKS_PER_MBLOCK) {
+                mblock += (BLOCKS_TO_MBLOCKS(bd->blocks) - 1) * MBLOCK_SIZE;
+                break;
+            } else {
+                bd += bd->blocks;
+            }
+        }
+    }
+}
+
 #endif
