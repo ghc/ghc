@@ -1871,7 +1871,7 @@ scheduleThreadOn(Capability *cap, StgWord cpu USED_IF_THREADS, StgTSO *tso)
     if (cpu == cap->no) {
 	appendToRunQueue(cap,tso);
     } else {
-	migrateThreadToCapability_lock(&capabilities[cpu],tso);
+	wakeupThreadOnCapability(cap, &capabilities[cpu], tso);
     }
 #else
     appendToRunQueue(cap,tso);
@@ -2312,8 +2312,6 @@ checkBlackHoles (Capability *cap)
 	if (type != BLACKHOLE && type != CAF_BLACKHOLE) {
 	    IF_DEBUG(sanity,checkTSO(t));
 	    t = unblockOne(cap, t);
-	    // urk, the threads migrate to the current capability
-	    // here, but we'd like to keep them on the original one.
 	    *prev = t;
 	    any_woke_up = rtsTrue;
 	} else {

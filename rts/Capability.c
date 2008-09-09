@@ -540,57 +540,40 @@ yieldCapability (Capability** pCap, Task *task)
  * ------------------------------------------------------------------------- */
 
 void
-wakeupThreadOnCapability (Capability *cap, StgTSO *tso)
+wakeupThreadOnCapability (Capability *my_cap, 
+                          Capability *other_cap, 
+                          StgTSO *tso)
 {
-    ASSERT(tso->cap == cap);
-    ASSERT(tso->bound ? tso->bound->cap == cap : 1);
-    ASSERT_LOCK_HELD(&cap->lock);
+    ACQUIRE_LOCK(&other_cap->lock);
 
-    tso->cap = cap;
+    // ASSUMES: cap->lock is held (asserted in wakeupThreadOnCapability)
+    if (tso->bound) {
+	ASSERT(tso->bound->cap == tso->cap);
+    	tso->bound->cap = other_cap;
+    }
+    tso->cap = other_cap;
 
-    if (cap->running_task == NULL) {
+    ASSERT(tso->bound ? tso->bound->cap == other_cap : 1);
+
+    if (other_cap->running_task == NULL) {
 	// nobody is running this Capability, we can add our thread
 	// directly onto the run queue and start up a Task to run it.
-	appendToRunQueue(cap,tso);
 
-	// start it up
-	cap->running_task = myTask(); // precond for releaseCapability_()
-	trace(TRACE_sched, "resuming capability %d", cap->no);
-	releaseCapability_(cap);
+	other_cap->running_task = myTask(); 
+            // precond for releaseCapability_() and appendToRunQueue()
+
+	appendToRunQueue(other_cap,tso);
+
+	trace(TRACE_sched, "resuming capability %d", other_cap->no);
+	releaseCapability_(other_cap);
     } else {
-	appendToWakeupQueue(cap,tso);
+	appendToWakeupQueue(my_cap,other_cap,tso);
 	// someone is running on this Capability, so it cannot be
 	// freed without first checking the wakeup queue (see
 	// releaseCapability_).
     }
-}
 
-void
-wakeupThreadOnCapability_lock (Capability *cap, StgTSO *tso)
-{
-    ACQUIRE_LOCK(&cap->lock);
-    migrateThreadToCapability (cap, tso);
-    RELEASE_LOCK(&cap->lock);
-}
-
-void
-migrateThreadToCapability (Capability *cap, StgTSO *tso)
-{
-    // ASSUMES: cap->lock is held (asserted in wakeupThreadOnCapability)
-    if (tso->bound) {
-	ASSERT(tso->bound->cap == tso->cap);
-    	tso->bound->cap = cap;
-    }
-    tso->cap = cap;
-    wakeupThreadOnCapability(cap,tso);
-}
-
-void
-migrateThreadToCapability_lock (Capability *cap, StgTSO *tso)
-{
-    ACQUIRE_LOCK(&cap->lock);
-    migrateThreadToCapability (cap, tso);
-    RELEASE_LOCK(&cap->lock);
+    RELEASE_LOCK(&other_cap->lock);
 }
 
 /* ----------------------------------------------------------------------------
@@ -818,7 +801,7 @@ markSomeCapabilities (evac_fn evac, void *user, nat i0, nat delta)
 	}
 
 #if defined(THREADED_RTS)
-        markSparkQueue (evac, user, cap);
+        traverseSparkQueue (evac, user, cap);
 #endif
     }
 

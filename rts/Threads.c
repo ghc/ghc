@@ -510,7 +510,7 @@ unblockOne_ (Capability *cap, StgTSO *tso,
       context_switch = 1;
   } else {
       // we'll try to wake it up on the Capability it was last on.
-      wakeupThreadOnCapability_lock(tso->cap, tso);
+      wakeupThreadOnCapability(cap, tso->cap, tso);
   }
 #else
   appendToRunQueue(cap,tso);

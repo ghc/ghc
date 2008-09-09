@@ -202,11 +202,8 @@ void waitForCapability (Task *task, Mutex *mutex, Capability **pCap);
 // Wakes up a thread on a Capability (probably a different Capability
 // from the one held by the current Task).
 //
-void wakeupThreadOnCapability (Capability *cap, StgTSO *tso);
-void wakeupThreadOnCapability_lock (Capability *cap, StgTSO *tso);
-
-void migrateThreadToCapability (Capability *cap, StgTSO *tso);
-void migrateThreadToCapability_lock (Capability *cap, StgTSO *tso);
+void wakeupThreadOnCapability (Capability *my_cap, Capability *other_cap,
+                               StgTSO *tso);
 
 // Wakes up a worker thread on just one Capability, used when we
 // need to service some global event.
@@ -252,6 +249,8 @@ recordMutableCap (StgClosure *p, Capability *cap, nat gen)
 {
     bdescr *bd;
 
+    // We must own this Capability in order to modify its mutable list.
+    ASSERT(cap->running_task == myTask());
     bd = cap->mut_lists[gen];
     if (bd->free >= bd->start + BLOCK_SIZE_W) {
 	bdescr *new_bd;

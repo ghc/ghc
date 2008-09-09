@@ -237,16 +237,21 @@ appendToBlockedQueue(StgTSO *tso)
 #endif
 
 #if defined(THREADED_RTS)
+// Assumes: my_cap is owned by the current Task.  We hold
+// other_cap->lock, but we do not necessarily own other_cap; another
+// Task may be running on it.
 INLINE_HEADER void
-appendToWakeupQueue (Capability *cap, StgTSO *tso)
+appendToWakeupQueue (Capability *my_cap, Capability *other_cap, StgTSO *tso)
 {
     ASSERT(tso->_link == END_TSO_QUEUE);
-    if (cap->wakeup_queue_hd == END_TSO_QUEUE) {
-	cap->wakeup_queue_hd = tso;
+    if (other_cap->wakeup_queue_hd == END_TSO_QUEUE) {
+	other_cap->wakeup_queue_hd = tso;
     } else {
-	setTSOLink(cap, cap->wakeup_queue_tl, tso);
+        // my_cap is passed to setTSOLink() because it may need to
+        // write to the mutable list.
+	setTSOLink(my_cap, other_cap->wakeup_queue_tl, tso);
     }
-    cap->wakeup_queue_tl = tso;
+    other_cap->wakeup_queue_tl = tso;
 }
 #endif
 
