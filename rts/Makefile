@@ -217,9 +217,6 @@ sm/Compact_CC_OPTS += -w
 win32/ConsoleHandler_CC_OPTS += -w
 win32/ThrIOManager_CC_OPTS += -w
 win32/Ticker_CC_OPTS += -w
-Threads_CC_OPTS += -w
-Capability_CC_OPTS += -w
-Schedule_CC_OPTS += -w
 # The above warning supression flags are a temporary kludge.
 # While working on this module you are encouraged to remove it and fix
 # any warnings in the module. See
