@@ -793,6 +793,14 @@ checkGlobalTSOList (rtsBool checkTSOs)
           ASSERT(get_itbl(tso)->type == TSO);
           if (checkTSOs)
               checkTSO(tso);
+
+          // If this TSO is dirty and in an old generation, it better
+          // be on the mutable list.
+          if (tso->what_next == ThreadRelocated) continue;
+          if (tso->flags & (TSO_DIRTY|TSO_LINK_DIRTY)) {
+              ASSERT(Bdescr((P_)tso)->gen_no == 0 || tso->flags & TSO_MARKED);
+              tso->flags &= ~TSO_MARKED;
+          }
       }
   }
 }
@@ -812,8 +820,25 @@ checkMutableList( bdescr *mut_bd, nat gen )
 	for (q = bd->start; q < bd->free; q++) {
 	    p = (StgClosure *)*q;
 	    ASSERT(!HEAP_ALLOCED(p) || Bdescr((P_)p)->gen_no == gen);
+            if (get_itbl(p)->type == TSO) {
+                ((StgTSO *)p)->flags |= TSO_MARKED;
+            }
 	}
     }
+}
+
+void
+checkMutableLists (void)
+{
+    nat g, i;
+
+    for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+        checkMutableList(generations[g].mut_list, g);
+        for (i = 0; i < n_capabilities; i++) {
+            checkMutableList(capabilities[i].mut_lists[g], g);
+        }
+    }
+    checkGlobalTSOList(rtsTrue);
 }
 
 /*

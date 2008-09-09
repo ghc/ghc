@@ -268,8 +268,9 @@ GarbageCollect ( rtsBool force_major_gc )
   memInventory(traceClass(DEBUG_gc));
 #endif
 
-  // check stack sanity *before* GC (ToDo: check all threads) 
+  // check stack sanity *before* GC
   IF_DEBUG(sanity, checkFreeListSanity());
+  IF_DEBUG(sanity, checkMutableLists());
 
   // Initialise all our gc_thread structures
   for (t = 0; t < n_gc_threads; t++) {
