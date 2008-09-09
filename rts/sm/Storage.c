@@ -1395,6 +1395,14 @@ checkSanity( void )
 	    
 	checkFreeListSanity();
     }
+
+#if defined(THREADED_RTS)
+    // check the stacks too in threaded mode, because we don't do a
+    // full heap sanity check in this case (see checkHeap())
+    checkGlobalTSOList(rtsTrue);
+#else
+    checkGlobalTSOList(rtsFalse);
+#endif
 }
 
 /* Nursery sanity check */

@@ -494,8 +494,6 @@ GarbageCollect ( rtsBool force_major_gc )
           sweep(&oldest_gen->steps[0]);
   }
 
-  IF_DEBUG(sanity, checkGlobalTSOList(rtsFalse));
-
   /* run through all the generations/steps and tidy up 
    */
   copied = 0;
