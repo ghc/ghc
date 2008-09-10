@@ -19,8 +19,7 @@ module DataCon (
 	dataConUnivTyVars, dataConExTyVars, dataConAllTyVars, 
 	dataConEqSpec, eqSpecPreds, dataConEqTheta, dataConDictTheta, dataConStupidTheta, 
 	dataConInstArgTys, dataConOrigArgTys, dataConOrigResTy,
-	dataConInstOrigArgTys, dataConInstOrigDictsAndArgTys,
-	dataConRepArgTys, 
+	dataConInstOrigArgTys, dataConRepArgTys, 
 	dataConFieldLabels, dataConFieldType,
 	dataConStrictMarks, dataConExStricts,
 	dataConSourceArity, dataConRepArity,
@@ -761,8 +760,8 @@ dataConInstArgTys dc@(MkData {dcRepArgTys = rep_arg_tys,
    ASSERT2 ( null ex_tvs && null eq_spec, ppr dc )        
    map (substTyWith univ_tvs inst_tys) rep_arg_tys
 
--- | Returns just the instantiated /value/ arguments of a 'DataCon',
--- as opposed to including the dictionary args as in 'dataConInstOrigDictsAndArgTys'
+-- | Returns just the instantiated /value/ argument types of a 'DataCon',
+-- (excluding dictionary args)
 dataConInstOrigArgTys 
 	:: DataCon	-- Works for any DataCon
 	-> [Type]	-- Includes existential tyvar args, but NOT
@@ -776,23 +775,6 @@ dataConInstOrigArgTys dc@(MkData {dcOrigArgTys = arg_tys,
   = ASSERT2( length tyvars == length inst_tys
           , ptext (sLit "dataConInstOrigArgTys") <+> ppr dc $$ ppr tyvars $$ ppr inst_tys )
     map (substTyWith tyvars inst_tys) arg_tys
-  where
-    tyvars = univ_tvs ++ ex_tvs
-
--- | Returns just the instantiated dicts and /value/ arguments for a 'DataCon',
--- as opposed to excluding the dictionary args as in 'dataConInstOrigArgTys'
-dataConInstOrigDictsAndArgTys 
-	:: DataCon	-- Works for any DataCon
-	-> [Type]	-- Includes existential tyvar args, but NOT
-			-- equality constraints or dicts
-	-> [Type]
-dataConInstOrigDictsAndArgTys dc@(MkData {dcOrigArgTys = arg_tys,
-				  dcDictTheta = dicts,       
-			          dcUnivTyVars = univ_tvs, 
-			          dcExTyVars = ex_tvs}) inst_tys
-  = ASSERT2( length tyvars == length inst_tys
-          , ptext (sLit "dataConInstOrigDictsAndArgTys") <+> ppr dc $$ ppr tyvars $$ ppr inst_tys )
-    map (substTyWith tyvars inst_tys) (mkPredTys dicts ++ arg_tys)
   where
     tyvars = univ_tvs ++ ex_tvs
 \end{code}

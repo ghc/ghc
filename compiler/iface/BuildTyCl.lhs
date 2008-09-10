@@ -148,13 +148,16 @@ mkNewTyConRhs tycon_name tycon con
         -- non-recursive newtypes
     all_coercions = True
     tvs    = tyConTyVars tycon
-    rhs_ty = ASSERT(not (null (dataConInstOrigDictsAndArgTys con (mkTyVarTys tvs)))) 
-	     -- head (dataConInstOrigArgTys con (mkTyVarTys tvs))
-	     head (dataConInstOrigDictsAndArgTys con (mkTyVarTys tvs))
+    inst_con_ty = applyTys (dataConUserType con) (mkTyVarTys tvs)
+    rhs_ty = ASSERT( isFunTy inst_con_ty ) funArgTy inst_con_ty
 	-- Instantiate the data con with the 
 	-- type variables from the tycon
-	-- NB: a newtype DataCon has no existentials; hence the
-	--     call to dataConInstOrigArgTys has the right type args
+	-- NB: a newtype DataCon has a type that must look like
+	--        forall tvs.  <arg-ty> -> T tvs
+	-- Note that we *can't* use dataConInstOrigArgTys here because
+	-- the newtype arising from   class Foo a => Bar a where {}
+  	-- has a single argument (Foo a) that is a *type class*, so
+	-- dataConInstOrigArgTys returns [].
 
     etad_tvs :: [TyVar]	-- Matched lazily, so that mkNewTypeCoercion can
     etad_rhs :: Type	-- return a TyCon without pulling on rhs_ty
