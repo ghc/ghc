@@ -698,7 +698,7 @@ printThreadBlockage(StgTSO *tso)
     break;
 #if defined(mingw32_HOST_OS)
     case BlockedOnDoProc:
-    debugBelch("is blocked on proc (request: %ld)", tso->block_info.async_result->reqID);
+    debugBelch("is blocked on proc (request: %u)", tso->block_info.async_result->reqID);
     break;
 #endif
   case BlockedOnDelay:
