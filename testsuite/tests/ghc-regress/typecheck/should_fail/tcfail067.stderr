@@ -37,19 +37,19 @@ tcfail067.hs:60:9:
     In the instance declaration for `Num (SubRange a)'
 
 tcfail067.hs:61:11:
-    Could not deduce (Ord a) from the context (Num a, Num (SubRange a))
+    Could not deduce (Ord a) from the context (Num (SubRange a), Num a)
       arising from a use of `numSubRangeNegate' at tcfail067.hs:61:11-27
     Possible fix:
-      add (Ord a) to the context of the type signature for `negate'
+      add (Ord a) to the context of the instance declaration
     In the expression: numSubRangeNegate
     In the definition of `negate': negate = numSubRangeNegate
     In the instance declaration for `Num (SubRange a)'
 
 tcfail067.hs:65:18:
-    Could not deduce (Ord a) from the context (Num a, Num (SubRange a))
+    Could not deduce (Ord a) from the context (Num (SubRange a), Num a)
       arising from a use of `SubRange' at tcfail067.hs:65:18-72
     Possible fix:
-      add (Ord a) to the context of the type signature for `fromInteger'
+      add (Ord a) to the context of the instance declaration
     In the expression:
         SubRange (fromInteger a, fromInteger a) (fromInteger a)
     In the definition of `fromInteger':
