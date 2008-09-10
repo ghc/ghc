@@ -524,6 +524,7 @@ writeMetaTyVar tyvar ty
     -- TOM: It should also work for coercions
     -- ASSERT2( k2 `isSubKind` k1, (ppr tyvar <+> ppr k1) $$ (ppr ty <+> ppr k2) )
     do	{ ASSERTM2( do { details <- readMetaTyVar tyvar; return (isFlexi details) }, ppr tyvar )
+	; traceTc (text "writeMetaTyVar" <+> ppr tyvar <+> text ":=" <+> ppr ty)
 	; writeMutVar (metaTvRef tyvar) (Indirect ty) }
   where
     _k1 = tyVarKind tyvar
@@ -997,18 +998,22 @@ checkValidType ctxt ty = do
 	           | otherwise = Rank n
 	rank
 	  = case ctxt of
-		 GenPatCtxt	-> MustBeMonoType
 		 DefaultDeclCtxt-> MustBeMonoType
 		 ResSigCtxt	-> MustBeMonoType
 		 LamPatSigCtxt	-> gen_rank 0
 		 BindPatSigCtxt	-> gen_rank 0
 		 TySynCtxt _    -> gen_rank 0
+		 GenPatCtxt	-> gen_rank 1
+			-- This one is a bit of a hack
+			-- See the forall-wrapping in TcClassDcl.mkGenericInstance		
+
 		 ExprSigCtxt 	-> gen_rank 1
 		 FunSigCtxt _   -> gen_rank 1
 		 ConArgCtxt _   | polycomp -> gen_rank 2
                                 -- We are given the type of the entire
                                 -- constructor, hence rank 1
  				| otherwise -> gen_rank 1
+
 		 ForSigCtxt _	-> gen_rank 1
 		 SpecInstCtxt   -> gen_rank 1
 
