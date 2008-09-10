@@ -85,7 +85,8 @@ tcPolyExpr expr res_ty
 tcPolyExprNC expr res_ty 
   | isSigmaTy res_ty
   = do	{ traceTc (text "tcPolyExprNC" <+> ppr res_ty)
-	; (gen_fn, expr') <- tcGen res_ty emptyVarSet Nothing (tcPolyExprNC expr)
+	; (gen_fn, expr') <- tcGen res_ty emptyVarSet Nothing $ \ _ res_ty ->
+			     tcPolyExprNC expr res_ty
 		-- Note the recursive call to tcPolyExpr, because the
 		-- type may have multiple layers of for-alls
 		-- E.g. forall a. Eq a => forall b. Ord b => ....
@@ -200,8 +201,10 @@ tcExpr in_expr@(ExprWithTySig expr sig_ty) res_ty
  = do	{ sig_tc_ty <- tcHsSigType ExprSigCtxt sig_ty
 
 	-- Remember to extend the lexical type-variable environment
-	; (gen_fn, expr') <- tcGen sig_tc_ty emptyVarSet (Just ExprSigCtxt) $
-			     tcMonoExprNC expr
+	; (gen_fn, expr') <- tcGen sig_tc_ty emptyVarSet (Just ExprSigCtxt) $ \ skol_tvs res_ty ->
+		             tcExtendTyVarEnv2 (hsExplicitTvs sig_ty `zip` mkTyVarTys skol_tvs) $
+				-- See Note [More instantiated than scoped] in TcBinds
+			     tcMonoExprNC expr res_ty
 
 	; co_fn <- tcSubExp ExprSigOrigin sig_tc_ty res_ty
 	; return (mkHsWrap co_fn (ExprWithTySigOut (mkLHsWrap gen_fn expr') sig_ty)) }

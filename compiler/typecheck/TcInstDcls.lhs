@@ -40,7 +40,6 @@ import DynFlags
 import SrcLoc
 import Util
 import Outputable
-import Maybes
 import Bag
 import BasicTypes
 import HscTypes
@@ -95,15 +94,17 @@ Running example:
 	{-# INLINE [2] op1_i #-}  -- From the instance decl bindings
 	op1_i, op2_i :: forall a. C a => forall b. Ix b => [a] -> b -> b
 	op1_i = /\a. \(d:C a). 
-	       let local_op1 :: forall a. (C a, C [a])
-	       	   	     => forall b. Ix b => [a] -> b -> b
+	       let this :: C [a]
+		   this = df_i a d
+
+		   local_op1 :: forall b. Ix b => [a] -> b -> b
 	             -- Note [Subtle interaction of recursion and overlap]
 	           local_op1 = <rhs>
 	       	     -- Source code; run the type checker on this
 		     -- NB: Type variable 'a' (but not 'b') is in scope in <rhs>
 		     -- Note [Tricky type variable scoping]
 
-	       in local_op1 a d (df_i a d)
+	       in local_op1 a d
 
 	op2_i = /\a \d:C a. $dmop2 [a] (df_i a d) 
 
@@ -175,10 +176,12 @@ call 'nullFail' just like the example above.  The DoCon package also
 does the same thing; it shows up in module Fraction.hs
 
 Conclusion: when typechecking the methods in a C [a] instance, we want
-to have C [a] available.  That is why we have the strange local let in
-the definition of op1_i in the example above.  We can typecheck the
-defintion of local_op1, and then supply the "this" argument via an 
-explicit call to the dfun (which in turn will be inlined).
+to have C [a] available.  That is why we have the strange local
+definition for 'this' in the definition of op1_i in the example above.
+We can typecheck the defintion of local_op1, and when doing tcSimplifyCheck
+we supply 'this' as a given dictionary.  Only needed, though, if there
+are some type variales involved; otherwise there can be no overlap and
+none of this arises.
 
 Note [Tricky type variable scoping]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -602,18 +605,22 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = NewTypeDerived })
               the_coercion = make_coercion cls_tycon initial_cls_inst_tys nt_tycon tc_args
                                 -- Coercion of kind (Foo Int (Tree [a]) ~ Foo Int (N a)
 
-        ; inst_loc   <- getInstLoc origin
         ; sc_loc     <- getInstLoc InstScOrigin
-        ; dfun_dicts <- newDictBndrs inst_loc theta
         ; sc_dicts   <- newDictBndrs sc_loc sc_theta'
+        ; inst_loc   <- getInstLoc origin
+        ; dfun_dicts <- newDictBndrs inst_loc theta
         ; this_dict  <- newDictBndr inst_loc (mkClassPred cls cls_inst_tys)
         ; rep_dict   <- newDictBndr inst_loc rep_pred
 
         -- Figure out bindings for the superclass context from dfun_dicts
         -- Don't include this_dict in the 'givens', else
-        -- wanted_sc_insts get bound by just selecting from this_dict!!
+        -- sc_dicst get bound by just selecting from this_dict!!
         ; sc_binds <- addErrCtxt superClassCtxt $
                       tcSimplifySuperClasses inst_loc dfun_dicts (rep_dict:sc_dicts)
+
+	-- It's possible that the superclass stuff might unified something
+	-- in the envt with one of the clas_tyvars
+	; checkSigTyVars class_tyvars
 
         ; let coerced_rep_dict = wrapId the_coercion (instToId rep_dict)
 
@@ -701,48 +708,38 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = VanillaInst monobinds uprags })
 
         -- Instantiate the super-class context with inst_tys
         sc_theta' = substTheta (zipOpenTvSubst class_tyvars inst_tys') sc_theta
-        (eq_sc_theta',dict_sc_theta')     = partition isEqPred sc_theta'
         origin    = SigOrigin rigid_info
-        (eq_dfun_theta',dict_dfun_theta') = partition isEqPred dfun_theta'
 
          -- Create dictionary Ids from the specified instance contexts.
-    sc_loc        <- getInstLoc InstScOrigin
-    sc_dicts      <- newDictBndrs sc_loc dict_sc_theta'
-    inst_loc      <- getInstLoc origin
-    sc_covars     <- mkMetaCoVars eq_sc_theta'
-    wanted_sc_eqs <- mkEqInsts eq_sc_theta' (map mkWantedCo sc_covars)
-    dfun_covars   <- mkCoVars eq_dfun_theta'
-    dfun_eqs      <- mkEqInsts eq_dfun_theta' (map mkGivenCo $ mkTyVarTys dfun_covars)
-    dfun_dicts    <- newDictBndrs inst_loc dict_dfun_theta'
-    this_dict     <- newDictBndr inst_loc (mkClassPred clas inst_tys')
+    sc_loc      <- getInstLoc InstScOrigin
+    sc_dicts    <- newDictOccs sc_loc sc_theta'		-- These are wanted
+    inst_loc    <- getInstLoc origin
+    dfun_dicts  <- newDictBndrs inst_loc dfun_theta'	-- Includes equalities
+    this_dict   <- newDictBndr inst_loc (mkClassPred clas inst_tys')
                 -- Default-method Ids may be mentioned in synthesised RHSs,
                 -- but they'll already be in the environment.
 
         -- Typecheck the methods
-    let -- These insts are in scope; quite a few, eh?
-        dfun_insts      = dfun_eqs      ++ dfun_dicts
-        wanted_sc_insts = wanted_sc_eqs ++ sc_dicts
-        this_dict_id  	= instToId this_dict
-        sc_dict_ids   	= map instToId sc_dicts
-	dfun_dict_ids 	= map instToId dfun_dicts
-	prag_fn		= mkPragFun uprags 
-	tc_meth 	= tcInstanceMethod loc clas inst_tyvars'
-			  		   (dfun_covars ++ dfun_dict_ids)
-                   	  	           dfun_theta' inst_tys'
-					   this_dict_id dfun_id
-                        	           prag_fn monobinds
-    (meth_exprs, meth_binds) <- mapAndUnzipM tc_meth op_items 
+    let this_dict_id  	= instToId this_dict
+	dfun_lam_vars   = map instToVar dfun_dicts	-- Includes equalities
+	prag_fn	= mkPragFun uprags 
+	tc_meth = tcInstanceMethod loc clas inst_tyvars'
+			  	   dfun_dicts
+                   	  	   dfun_theta' inst_tys'
+				   this_dict dfun_id
+                        	   prag_fn monobinds
+    (meth_exprs, meth_binds) <- tcExtendTyVarEnv inst_tyvars'  $
+				mapAndUnzipM tc_meth op_items 
 
     -- Figure out bindings for the superclass context
     -- Don't include this_dict in the 'givens', else
-    -- wanted_sc_insts get bound by just selecting  from this_dict!!
+    -- sc_dicts get bound by just selecting  from this_dict!!
     sc_binds <- addErrCtxt superClassCtxt $
-                tcSimplifySuperClasses inst_loc dfun_insts 
-		   			   	wanted_sc_insts
+                tcSimplifySuperClasses inst_loc dfun_dicts sc_dicts
 		-- Note [Recursive superclasses]
 
-    -- It's possible that the superclass stuff might unified one
-    -- of the inst_tyavars' with something in the envt
+	-- It's possible that the superclass stuff might unified something
+	-- in the envt with one of the inst_tyvars'
     checkSigTyVars inst_tyvars'
 
     -- Deal with 'SPECIALISE instance' pragmas
@@ -751,7 +748,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = VanillaInst monobinds uprags })
     -- Create the result bindings
     let
         dict_constr   = classDataCon clas
-        inline_prag | null dfun_insts  = []
+        inline_prag | null dfun_dicts  = []
                     | otherwise        = [L loc (InlinePrag (Inline AlwaysActive True))]
                 -- Always inline the dfun; this is an experimental decision
                 -- because it makes a big performance difference sometimes.
@@ -764,8 +761,11 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = VanillaInst monobinds uprags })
                 --
                 --      See Note [Inline dfuns] below
 
-        dict_rhs = mkHsConApp dict_constr (inst_tys' ++ mkTyVarTys sc_covars)
-                                          (map HsVar sc_dict_ids ++ meth_exprs)
+        sc_dict_vars  = map instToVar sc_dicts
+        dict_bind     = L loc (VarBind this_dict_id dict_rhs)
+        dict_rhs      = foldl (\ f a -> L loc (HsApp f (L loc a))) inst_constr meth_exprs
+ 	inst_constr   = L loc $ wrapId (mkWpApps sc_dict_vars <.> mkWpTyApps inst_tys')
+				       (dataConWrapId dict_constr)
                 -- We don't produce a binding for the dict_constr; instead we
                 -- rely on the simplifier to unfold this saturated application
                 -- We do this rather than generate an HsCon directly, because
@@ -773,28 +773,15 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = VanillaInst monobinds uprags })
                 -- member) are dealt with by the common MkId.mkDataConWrapId code rather
                 -- than needing to be repeated here.
 
-        dict_bind  = noLoc (VarBind this_dict_id dict_rhs)
 
         main_bind = noLoc $ AbsBinds
-                            (inst_tyvars' ++ dfun_covars)
-                            dfun_dict_ids
-                            [(inst_tyvars' ++ dfun_covars, dfun_id, this_dict_id, inline_prag ++ prags)]
+                            inst_tyvars'
+                            dfun_lam_vars
+                            [(inst_tyvars', dfun_id, this_dict_id, inline_prag ++ prags)]
                             (dict_bind `consBag` sc_binds)
 
     showLIE (text "instance")
     return (main_bind `consBag` unionManyBags meth_binds)
-
-mkCoVars :: [PredType] -> TcM [TyVar]
-mkCoVars = newCoVars . map unEqPred
-  where
-    unEqPred (EqPred ty1 ty2) = (ty1, ty2)
-    unEqPred _                = panic "TcInstDcls.mkCoVars"
-
-mkMetaCoVars :: [PredType] -> TcM [TyVar]
-mkMetaCoVars = mapM eqPredToCoVar
-  where
-    eqPredToCoVar (EqPred ty1 ty2) = newMetaCoVar ty1 ty2
-    eqPredToCoVar _                = panic "TcInstDcls.mkMetaCoVars"
 \end{code}
 
 Note [Recursive superclasses]
@@ -821,23 +808,36 @@ tcInstanceMethod
 - Use tcValBinds to do the checking
 
 \begin{code}
-tcInstanceMethod :: SrcSpan -> Class -> [TcTyVar] -> [Var]
+tcInstanceMethod :: SrcSpan -> Class -> [TcTyVar] -> [Inst]
 	 	 -> TcThetaType -> [TcType]
-		 -> Id -> Id 
+		 -> Inst -> Id
           	 -> TcPragFun -> LHsBinds Name 
 	  	 -> (Id, DefMeth)
           	 -> TcM (HsExpr Id, LHsBinds Id)
 	-- The returned inst_meth_ids all have types starting
 	--	forall tvs. theta => ...
 
-tcInstanceMethod loc clas tyvars dfun_lam_vars theta inst_tys 
-		 this_dict_id dfun_id
-	         prag_fn binds_in (sel_id, dm_info)
-  = do	{ uniq <- newUnique
-	; let local_meth_name = mkInternalName uniq sel_occ loc	-- Same OccName
-	      tc_body = tcInstanceMethodBody clas tyvars dfun_lam_vars theta inst_tys
-					     this_dict_id dfun_id sel_id 
-					     prags local_meth_name
+tcInstanceMethod loc clas tyvars dfun_dicts theta inst_tys 
+		 this_dict dfun_id prag_fn binds_in (sel_id, dm_info)
+  = do	{ cloned_this <- cloneDict this_dict
+		-- Need to clone the dict in case it is floated out, and
+		-- then clashes with its friends
+	; uniq1 <- newUnique
+	; let local_meth_name = mkInternalName uniq1 sel_occ loc   -- Same OccName
+	      this_dict_bind  = L loc $ VarBind (instToId cloned_this) $ 
+				L loc $ wrapId meth_wrapper dfun_id
+	      mb_this_bind | null tyvars = Nothing
+			   | otherwise   = Just (cloned_this, this_dict_bind)
+		-- Only need the this_dict stuff if there are type variables
+		-- involved; otherwise overlap is not possible
+		-- See Note [Subtle interaction of recursion and overlap]	
+
+	      tc_body rn_bind = do { (meth_id, tc_binds) <- tcInstanceMethodBody 
+						InstSkol clas tyvars dfun_dicts theta inst_tys
+						mb_this_bind sel_id 
+						local_meth_name
+						meth_sig_fn meth_prag_fn rn_bind
+				   ; return (wrapId meth_wrapper meth_id, tc_binds) }
 
 	; case (findMethodBind sel_name local_meth_name binds_in, dm_info) of
 		-- There is a user-supplied method binding, so use it
@@ -869,12 +869,21 @@ tcInstanceMethod loc clas tyvars dfun_lam_vars theta inst_tys
   where
     sel_name = idName sel_id
     sel_occ  = nameOccName sel_name
-    prags    = prag_fn sel_name
+    this_dict_id = instToId this_dict
 
-    error_rhs    = HsApp (mkLHsWrap (WpTyApp meth_tau) error_id) error_msg
-    meth_tau     = funResultTy (applyTys (idType sel_id) inst_tys)
-    error_id     = L loc (HsVar nO_METHOD_BINDING_ERROR_ID) 
+    meth_prag_fn _ = prag_fn sel_name
+    meth_sig_fn _  = Just []	-- The 'Just' says "yes, there's a type sig"
+			-- But there are no scoped type variables from local_method_id
+			-- Only the ones from the instance decl itself, which are already
+			-- in scope.  Example:
+			--	class C a where { op :: forall b. Eq b => ... }
+			-- 	instance C [c] where { op = <rhs> }
+			-- In <rhs>, 'c' is scope but 'b' is not!
+
+    error_rhs    = HsApp error_fun error_msg
+    error_fun    = L loc $ wrapId (WpTyApp meth_tau) nO_METHOD_BINDING_ERROR_ID
     error_msg    = L loc (HsLit (HsStringPrim (mkFastString error_string)))
+    meth_tau     = funResultTy (applyTys (idType sel_id) inst_tys)
     error_string = showSDoc (hcat [ppr loc, text "|", ppr sel_id ])
 
     dm_wrapper   = WpApp this_dict_id <.> mkWpTyApps inst_tys 
@@ -883,52 +892,9 @@ tcInstanceMethod loc clas tyvars dfun_lam_vars theta inst_tys
     omitted_meth_warn = ptext (sLit "No explicit method nor default method for")
                         <+> quotes (ppr sel_id)
 
----------------
-tcInstanceMethodBody :: Class -> [TcTyVar] -> [Var]
-	 	     -> TcThetaType -> [TcType]
-		     -> Id -> Id -> Id
-          	     -> [LSig Name] -> Name -> LHsBind Name 
-          	     -> TcM (HsExpr Id, LHsBinds Id)
-tcInstanceMethodBody clas tyvars dfun_lam_vars theta inst_tys
-		     this_dict_id dfun_id sel_id 
-		     prags local_meth_name bind@(L loc _)
-  = do	{ uniq <- newUnique
-	; let (sel_tyvars,sel_rho) = tcSplitForAllTys (idType sel_id)
-	      rho_ty = ASSERT( length sel_tyvars == length inst_tys )
-		       substTyWith sel_tyvars inst_tys sel_rho
-
-	      (first_pred, meth_tau) = tcSplitPredFunTy_maybe rho_ty
-			`orElse` pprPanic "tcInstanceMethod" (ppr sel_id)
-
-	      meth_name = mkInternalName uniq (getOccName local_meth_name) loc
-	      meth_ty = mkSigmaTy tyvars theta meth_tau
-	      meth_id = mkLocalId meth_name meth_ty
-	      
-	      local_meth_ty = mkSigmaTy tyvars (theta ++ [first_pred]) meth_tau
-	      local_meth_id = mkLocalId local_meth_name local_meth_ty
-
-	      tv_names = map tyVarName tyvars
-    	
-		      -- The first predicate should be of form (C a b)
-		      -- where C is the class in question
-	; MASSERT( case getClassPredTys_maybe first_pred of
-			{ Just (clas1, _tys) -> clas == clas1 ; Nothing -> False } )
-
-	; local_meth_bind <- tcMethodBind tv_names prags local_meth_id bind
-
-	; let full_bind = unitBag $ L loc $
-	      		  VarBind meth_id $ L loc $
-	      		  mkHsWrap (mkWpTyLams tyvars <.> mkWpLams dfun_lam_vars) $
-			  HsLet (HsValBinds (ValBindsOut [(NonRecursive, local_meth_bind)] [])) $ L loc $ 
-			  mkHsWrap (WpLet this_dict_bind <.> WpApp this_dict_id) $
-			  wrapId meth_wrapper local_meth_id
-	      this_dict_bind = unitBag $ L loc $
-	      		       VarBind this_dict_id $ L loc $
-	      		       wrapId meth_wrapper dfun_id
-
-        ; return (wrapId meth_wrapper meth_id, full_bind) } 
-  where
+    dfun_lam_vars = map instToVar dfun_dicts
     meth_wrapper = mkWpApps dfun_lam_vars <.> mkWpTyApps (mkTyVarTys tyvars)
+
 
 wrapId :: HsWrapper -> id -> HsExpr id
 wrapId wrapper id = mkHsWrap wrapper (HsVar id)

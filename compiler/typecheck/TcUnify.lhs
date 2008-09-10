@@ -123,8 +123,8 @@ subFunTys error_herald n_pats res_ty mb_ctxt thing_inside
         | isSigmaTy res_ty      -- Do this before checking n==0, because we
                                 -- guarantee to return a BoxyRhoType, not a
                                 -- BoxySigmaType
-        = do { (gen_fn, (co_fn, res)) <- tcGen res_ty emptyVarSet mb_ctxt $ 
-                                         loop n args_so_far
+        = do { (gen_fn, (co_fn, res)) <- tcGen res_ty emptyVarSet mb_ctxt $ \ _ res_ty ->
+                                         loop n args_so_far res_ty
              ; return (gen_fn <.> co_fn, res) }
 
     loop 0 args_so_far res_ty
@@ -770,7 +770,7 @@ tc_sub1 orig act_sty act_ty exp_ib exp_sty exp_ty
     if exp_ib then      -- SKOL does not apply if exp_ty is inside a box
         defer_to_boxy_matching orig act_sty act_ty exp_ib exp_sty exp_ty
     else do
-        { (gen_fn, co_fn) <- tcGen exp_ty act_tvs Nothing $ \ body_exp_ty ->
+        { (gen_fn, co_fn) <- tcGen exp_ty act_tvs Nothing $ \ _ body_exp_ty ->
                              tc_sub orig act_sty act_ty False body_exp_ty body_exp_ty
         ; return (gen_fn <.> co_fn) }
     }
@@ -896,21 +896,21 @@ wrapFunResCoercion arg_tys co_fn_res
 %************************************************************************
 
 \begin{code}
-tcGen :: BoxySigmaType                          -- expected_ty
-      -> TcTyVarSet                             -- Extra tyvars that the universally
-                                                --      quantified tyvars of expected_ty
-                                                --      must not be unified
-      -> Maybe UserTypeCtxt			-- Just ctxt => this polytype arose directly from
-      	       					-- 	        a user type sig; bring tyvars into scope
-						-- Nothing => a higher order situation
-      -> (BoxyRhoType -> TcM result)
+tcGen :: BoxySigmaType                -- expected_ty
+      -> TcTyVarSet                   -- Extra tyvars that the universally
+                                      --      quantified tyvars of expected_ty
+                                      --      must not be unified
+      -> Maybe UserTypeCtxt	      -- Just ctxt => this polytype arose directly
+      	       			      -- 	        from a user type sig
+				      -- Nothing => a higher order situation
+      -> ([TcTyVar] -> BoxyRhoType -> TcM result)
       -> TcM (HsWrapper, result)
         -- The expression has type: spec_ty -> expected_ty
 
 tcGen expected_ty extra_tvs mb_ctxt thing_inside        -- We expect expected_ty to be a forall-type
                                           		-- If not, the call is a no-op
   = do  { traceTc (text "tcGen")
-        ; ((tvs', theta', rho'), skol_info, scoped_tvs) <- instantiate expected_ty
+        ; ((tvs', theta', rho'), skol_info) <- instantiate expected_ty
 
         ; when debugIsOn $
               traceTc (text "tcGen" <+> vcat [
@@ -922,10 +922,7 @@ tcGen expected_ty extra_tvs mb_ctxt thing_inside        -- We expect expected_ty
 
         -- Type-check the arg and unify with poly type
         ; (result, lie) <- getLIE $ 
-	  	   	   tcExtendTyVarEnv2 (scoped_tvs `zip` mkTyVarTys tvs') $ 
-		   		-- Extend the lexical type-variable environment 
-				-- if we're in a user-type context
-			   thing_inside rho'
+			   thing_inside tvs' rho'
 
         -- Check that the "forall_tvs" havn't been constrained
         -- The interesting bit here is that we must include the free variables
@@ -953,23 +950,22 @@ tcGen expected_ty extra_tvs mb_ctxt thing_inside        -- We expect expected_ty
   where
     free_tvs = tyVarsOfType expected_ty `unionVarSet` extra_tvs
 
-    instantiate :: TcType -> TcM (([TcTyVar],ThetaType,TcRhoType), SkolemInfo, [Name])
+    instantiate :: TcType -> TcM (([TcTyVar],ThetaType,TcRhoType), SkolemInfo)
     instantiate expected_ty
-      | Just ctxt <- mb_ctxt
+      | Just ctxt <- mb_ctxt	-- This case split is the wohle reason for mb_ctxt
       = do { let skol_info = SigSkol ctxt
-      	         tv_names  = map tyVarName (fst (tcSplitForAllTys expected_ty))
            ; stuff <- tcInstSigType True skol_info expected_ty
-	   ; return (stuff, skol_info, tv_names) }
+	   ; return (stuff, skol_info) }
 
       | otherwise   -- We want the GenSkol info in the skolemised type variables to
                     -- mention the *instantiated* tyvar names, so that we get a
 		    -- good error message "Rigid variable 'a' is bound by (forall a. a->a)"
 		    -- Hence the tiresome but innocuous fixM
-      = fixM $ \ ~(_, skol_info, _) ->
+      = fixM $ \ ~(_, skol_info) ->
         do { stuff@(forall_tvs, theta, rho_ty) <- tcInstSkolType skol_info expected_ty
                 -- Get loation from *monad*, not from expected_ty
            ; let skol_info = GenSkol forall_tvs (mkPhiTy theta rho_ty)
-           ; return (stuff, skol_info, []) }
+           ; return (stuff, skol_info) }
 \end{code}
 
 
