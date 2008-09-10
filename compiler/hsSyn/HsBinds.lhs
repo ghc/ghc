@@ -131,8 +131,9 @@ data HsBindLR idL idR
     }
 
   | AbsBinds {					-- Binds abstraction; TRANSLATION
-       abs_tvs     :: [TyVar],  
-	abs_dicts   :: [DictId],
+        abs_tvs     :: [TyVar],  
+	abs_dicts   :: [DictId],		-- Includes equality constraints
+
        -- AbsBinds only gets used when idL = idR after renaming,
        -- but these need to be idL's for the collect... code in HsUtil to have
        -- the right type
@@ -383,13 +384,13 @@ c1 <.> c2    = c1 `WpCompose` c2
 mkWpTyApps :: [Type] -> HsWrapper
 mkWpTyApps tys = mk_co_fn WpTyApp (reverse tys)
 
-mkWpApps :: [Id] -> HsWrapper
+mkWpApps :: [Var] -> HsWrapper
 mkWpApps ids = mk_co_fn WpApp (reverse ids)
 
 mkWpTyLams :: [TyVar] -> HsWrapper
 mkWpTyLams ids = mk_co_fn WpTyLam ids
 
-mkWpLams :: [Id] -> HsWrapper
+mkWpLams :: [Var] -> HsWrapper
 mkWpLams ids = mk_co_fn WpLam ids
 
 mk_co_fn :: (a -> HsWrapper) -> [a] -> HsWrapper
