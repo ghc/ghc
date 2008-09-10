@@ -1860,10 +1860,12 @@ setOptLevel n dflags
 --    -fdicts-cheap                     always inline dictionaries
 --    -fmax-simplifier-iterations20     this is necessary sometimes
 --    -fno-spec-constr-threshold        run SpecConstr even for big loops
+--    -fno-spec-constr-count            SpecConstr as much as possible
 --
 setDPHOpt :: DynFlags -> DynFlags
 setDPHOpt dflags = setOptLevel 2 (dflags { maxSimplIterations  = 20
                                          , specConstrThreshold = Nothing
+                                         , specConstrCount     = Nothing
                                          })
                    `dopt_set`   Opt_DictsCheap
                    `dopt_unset` Opt_MethodSharing
