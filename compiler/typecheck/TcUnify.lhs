@@ -2039,7 +2039,7 @@ check_sig_tyvars
 check_sig_tyvars _ []
   = return ()
 check_sig_tyvars extra_tvs sig_tvs
-  = ASSERT( all isSkolemTyVar sig_tvs )
+  = ASSERT( all isTcTyVar sig_tvs && all isSkolemTyVar sig_tvs )
     do  { gbl_tvs <- tcGetGlobalTyVars
         ; traceTc (text "check_sig_tyvars" <+> (vcat [text "sig_tys" <+> ppr sig_tvs,
                                       text "gbl_tvs" <+> ppr gbl_tvs,

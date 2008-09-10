@@ -421,7 +421,7 @@ pprUserTypeCtxt SpecInstCtxt    = ptext (sLit "a SPECIALISE instance pragma")
 tidySkolemTyVar :: TidyEnv -> TcTyVar -> (TidyEnv, TcTyVar)
 -- Tidy the type inside a GenSkol, preparatory to printing it
 tidySkolemTyVar env tv
-  = ASSERT( isSkolemTyVar tv || isSigTyVar tv )
+  = ASSERT( isTcTyVar tv && (isSkolemTyVar tv || isSigTyVar tv ) )
     (env1, mkTcTyVar (tyVarName tv) (tyVarKind tv) info1)
   where
     (env1, info1) = case tcTyVarDetails tv of
@@ -508,7 +508,7 @@ isTyConableTyVar tv
 	SkolemTv {}	    -> False
 	
 isSkolemTyVar tv 
-  = ASSERT( isTcTyVar tv )
+  = ASSERT2( isTcTyVar tv, ppr tv )
     case tcTyVarDetails tv of
 	SkolemTv _         -> True
  	MetaTv _ _         -> False

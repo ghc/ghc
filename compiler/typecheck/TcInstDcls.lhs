@@ -588,7 +588,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = NewTypeDerived })
               rigid_info   = InstSkol
               origin       = SigOrigin rigid_info
               inst_ty      = idType dfun_id
-        ; (tvs, theta, inst_head_ty) <- tcSkolSigType rigid_info inst_ty
+        ; (inst_tvs', theta, inst_head_ty) <- tcSkolSigType rigid_info inst_ty
                 -- inst_head_ty is a PredType
 
         ; let (cls, cls_inst_tys) = tcSplitDFunHead inst_head_ty
@@ -620,7 +620,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = NewTypeDerived })
 
 	-- It's possible that the superclass stuff might unified something
 	-- in the envt with one of the clas_tyvars
-	; checkSigTyVars class_tyvars
+	; checkSigTyVars inst_tvs'
 
         ; let coerced_rep_dict = wrapId the_coercion (instToId rep_dict)
 
@@ -628,8 +628,8 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = NewTypeDerived })
         ; let dict_bind = noLoc $ VarBind (instToId this_dict) (noLoc body)
 
         ; return (unitBag $ noLoc $
-                  AbsBinds  tvs (map instToVar dfun_dicts)
-                            [(tvs, dfun_id, instToId this_dict, [])]
+                  AbsBinds inst_tvs' (map instToVar dfun_dicts)
+                            [(inst_tvs', dfun_id, instToId this_dict, [])]
                             (dict_bind `consBag` sc_binds)) }
   where
       -----------------------
