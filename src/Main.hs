@@ -144,13 +144,16 @@ main = handleTopExceptions $ do
   if not (null fileArgs)
     then do
 
-      let libDir
-            | Just dir <- getGhcLibDir flags = dir
-            | otherwise =
+      libDir <- case getGhcLibDir flags of
+                Just dir -> return dir
+                Nothing ->
 #ifdef IN_GHC_TREE
-                error "No GhcLibDir found"
+                    do m <- getExecDir
+                       case m of
+                           Nothing -> error "No GhcLibDir found"
+                           Just d -> return (d </> "..")
 #else
-                libdir -- from GHC.Paths
+                    return libdir -- from GHC.Paths
 #endif
 
       -- initialize GHC
