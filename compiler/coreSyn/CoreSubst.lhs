@@ -254,7 +254,8 @@ instance Outputable Subst where
 %************************************************************************
 
 \begin{code}
--- | Apply a substititon to an entire 'CoreExpr'. Rememeber, you may only apply the substitution /once/: see "CoreSubst#apply_once"
+-- | Apply a substititon to an entire 'CoreExpr'. Rememeber, you may only 
+-- apply the substitution /once/: see "CoreSubst#apply_once"
 substExpr :: Subst -> CoreExpr -> CoreExpr
 substExpr subst expr
   = go expr
