@@ -334,7 +334,7 @@ mkDataConIds wrap_name wkr_name data_con
         --      ...(let w = C x in ...(w p q)...)...
         -- we want to see that w is strict in its two arguments
 
-    wrap_unf = mkTopUnfolding $ Note InlineMe $
+    wrap_unf = mkImplicitUnfolding $ Note InlineMe $
               mkLams wrap_tvs $ 
               mkLams eq_args $
               mkLams dict_args $ mkLams id_args $
@@ -602,8 +602,10 @@ mkRecordSelId tycon field_label
     info = noCafIdInfo
            `setCafInfo`           caf_info
            `setArityInfo`         arity
-           `setUnfoldingInfo`     mkTopUnfolding rhs_w_str
+           `setUnfoldingInfo`     unfolding
            `setAllStrictnessInfo` Just strict_sig
+
+    unfolding = mkImplicitUnfolding rhs_w_str
 
         -- Allocate Ids.  We do it a funny way round because field_dict_tys is
         -- almost always empty.  Also note that we use max_dict_tys
@@ -862,7 +864,7 @@ mkDictSelId no_unf name clas
                 `setArityInfo`          1
                 `setAllStrictnessInfo`  Just strict_sig
                 `setUnfoldingInfo`      (if no_unf then noUnfolding
-						   else mkTopUnfolding rhs)
+						   else mkImplicitUnfolding rhs)
 
         -- We no longer use 'must-inline' on record selectors.  They'll
         -- inline like crazy if they scrutinise a constructor
