@@ -212,9 +212,7 @@ render flags interfaces installedIfaces = do
                       do m <- getExecDir
                          case m of
                              Nothing -> error "No libdir found"
-                             Just d ->
-                                 return (d </> ".." </> "share"
-                                           </> ("haddock-" ++ showVersion version))
+                             Just d -> return (d </> ".." </> "share")
 #else
                       getDataDir -- provided by Cabal
 #endif
