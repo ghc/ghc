@@ -607,8 +607,15 @@ zonkCoFn env (WpLam id)     = do { id' <- zonkDictBndr env id
 				 ; let env1 = extendZonkEnv1 env id'
 				 ; return (env1, WpLam id') }
 zonkCoFn env (WpTyLam tv)   = ASSERT( isImmutableTyVar tv )
-			      do { return (env, WpTyLam tv) }
-zonkCoFn env (WpApp id)     = do { return (env, WpApp (zonkIdOcc env id)) }
+			      return (env, WpTyLam tv)
+zonkCoFn env (WpApp v)
+	| isTcTyVar v  	    = do { co <- zonkTcTyVar v
+				 ; return (env, WpTyApp co) }
+		-- Yuk!  A mutable coercion variable is a TcTyVar 
+		--	 not a CoVar, so don't use isCoVar!
+		-- Yuk!  A WpApp can't hold the zonked type,
+		--	 so we switch to WpTyApp
+	| otherwise	    = return (env, WpApp (zonkIdOcc env v))
 zonkCoFn env (WpTyApp ty)   = do { ty' <- zonkTcTypeToType env ty
 				 ; return (env, WpTyApp ty') }
 zonkCoFn env (WpLet bs)     = do { (env1, bs') <- zonkRecMonoBinds env bs
