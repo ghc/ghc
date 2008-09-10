@@ -296,9 +296,9 @@ rnLPatAndThen var@(NM varf) (L loc p) cont =
               ; rnLPatsAndThen var pats $ \ patslist ->
                 lcont (TuplePat patslist boxed placeHolderType) }
 
-         TypePat name -> 
-           do { (name', fvs1) <- rnHsTypeFVs (text "In a type pattern") name
-	      ; (res, fvs2) <- lcont (TypePat name')
+         TypePat ty -> 
+           do { (ty', fvs1) <- rnHsTypeFVs (text "In a type pattern") ty
+	      ; (res, fvs2) <- lcont (TypePat ty')
 	      ; return (res, fvs1 `plusFV` fvs2) }
 
          p -> pprPanic "rnLPatAndThen" (ppr p)
