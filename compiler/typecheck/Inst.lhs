@@ -15,6 +15,7 @@ module Inst (
 	tidyInsts, tidyMoreInsts,
 
 	newDictBndr, newDictBndrs, newDictBndrsO,
+	newDictOccs, newDictOcc,
 	instCall, instStupidTheta,
 	cloneDict, mkOverLit,
 	newIPDict, newMethod, newMethodFromName, newMethodWithGivenTy, 
@@ -280,16 +281,41 @@ newDictBndrs :: InstLoc -> TcThetaType -> TcM [Inst]
 newDictBndrs inst_loc theta = mapM (newDictBndr inst_loc) theta
 
 newDictBndr :: InstLoc -> TcPredType -> TcM Inst
+-- Makes a "given"
 newDictBndr inst_loc pred@(EqPred ty1 ty2)
   = do { uniq <- newUnique 
+	; let name = mkPredName uniq inst_loc pred 
+	      co = mkGivenCo $ TyVarTy (Var.mkCoVar name (PredTy pred))
+	; return (EqInst {tci_name  = name, 
+			  tci_loc   = inst_loc, 
+			  tci_left  = ty1, 
+			  tci_right = ty2, 
+			  tci_co    = co }) }
+
+newDictBndr inst_loc pred = newDict inst_loc pred
+
+-------------------
+newDictOccs :: InstLoc -> TcThetaType -> TcM [Inst]
+newDictOccs inst_loc theta = mapM (newDictOcc inst_loc) theta
+
+newDictOcc :: InstLoc -> TcPredType -> TcM Inst
+-- Makes a "wanted"
+newDictOcc inst_loc pred@(EqPred ty1 ty2)
+  = do	{ uniq <- newUnique 
+	; cotv <- newMetaCoVar ty1 ty2
 	; let name = mkPredName uniq inst_loc pred 
 	; return (EqInst {tci_name  = name, 
 			  tci_loc   = inst_loc, 
 			  tci_left  = ty1, 
 			  tci_right = ty2, 
-			  tci_co    = mkGivenCo $ TyVarTy (Var.mkCoVar name (PredTy pred))})
-       }
-newDictBndr inst_loc pred
+			  tci_co    = Left cotv }) }
+
+newDictOcc inst_loc pred = newDict inst_loc pred
+
+----------------
+newDict :: InstLoc -> TcPredType -> TcM Inst
+-- Always makes a Dict, not an EqInst
+newDict inst_loc pred
   = do 	{ uniq <- newUnique 
 	; let name = mkPredName uniq inst_loc pred 
 	; return (Dict {tci_name = name, tci_pred = pred, tci_loc = inst_loc}) }
@@ -336,15 +362,12 @@ instCallDicts _ [] = return idHsWrapper
 instCallDicts loc (EqPred ty1 ty2 : preds)
   = do  { traceTc (text "instCallDicts" <+> ppr (EqPred ty1 ty2))
 	; coi <- boxyUnify ty1 ty2
---	; coi <- unifyType ty1 ty2
 	; let co = fromCoI coi ty1
 	; co_fn <- instCallDicts loc preds
 	; return (co_fn <.> WpTyApp co) }
 
 instCallDicts loc (pred : preds)
-  = do	{ uniq <- newUnique
-	; let name = mkPredName uniq loc pred 
-	      dict = Dict {tci_name = name, tci_pred = pred, tci_loc = loc}
+  = do	{ dict <- newDict loc pred
 	; extendLIE dict
 	; co_fn <- instCallDicts loc preds
 	; return (co_fn <.> WpApp (instToId dict)) }
@@ -352,8 +375,8 @@ instCallDicts loc (pred : preds)
 -------------
 cloneDict :: Inst -> TcM Inst
 cloneDict dict@(Dict nm _ _) = do { uniq <- newUnique
-				     ; return (dict {tci_name = setNameUnique nm uniq}) }
-cloneDict eq@(EqInst {})	= return eq
+				  ; return (dict {tci_name = setNameUnique nm uniq}) }
+cloneDict eq@(EqInst {})     = return eq
 cloneDict other = pprPanic "cloneDict" (ppr other)
 
 -- For vanilla implicit parameters, there is only one in scope
@@ -362,15 +385,10 @@ cloneDict other = pprPanic "cloneDict" (ppr other)
 -- scope, so we make up a new namea.
 newIPDict :: InstOrigin -> IPName Name -> Type 
 	  -> TcM (IPName Id, Inst)
-newIPDict orig ip_name ty = do
-    inst_loc <- getInstLoc orig
-    uniq <- newUnique
-    let
-	pred = IParam ip_name ty
-        name = mkPredName uniq inst_loc pred 
-	dict = Dict {tci_name = name, tci_pred = pred, tci_loc = inst_loc}
-    
-    return (mapIPName (\_ -> instToId dict) ip_name, dict)
+newIPDict orig ip_name ty
+  = do	{ inst_loc <- getInstLoc orig
+	; dict <- newDict inst_loc (IParam ip_name ty)
+	; return (mapIPName (\_ -> instToId dict) ip_name, dict) }
 \end{code}
 
 
