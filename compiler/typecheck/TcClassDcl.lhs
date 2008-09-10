@@ -271,7 +271,7 @@ tcMethodBind tyvars prags meth_id bind
 				    (unitBag bind)
 
        ; ASSERT( ids == [meth_id] )	-- Binding for ONE method
-	 return (unionManyBags tc_binds) }
+	 return tc_binds }
 \end{code}
 
 Note [Polymorphic methods]

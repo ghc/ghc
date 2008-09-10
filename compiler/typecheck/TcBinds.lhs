@@ -203,15 +203,19 @@ tc_group _ top_lvl sig_fn prag_fn (NonRecursive, binds) thing_inside
         -- A single non-recursive binding
         -- We want to keep non-recursive things non-recursive
         -- so that we desugar unlifted bindings correctly
- =  do  { (binds, thing) <- tc_haskell98 top_lvl sig_fn prag_fn NonRecursive binds thing_inside
-        ; return ([(NonRecursive, b) | b <- binds], thing) }
+ =  do  { (binds1, lie_binds, thing) <- tc_haskell98 top_lvl sig_fn prag_fn 
+    	  	   	      	     		     NonRecursive binds thing_inside
+        ; return ( [(NonRecursive, unitBag b) | b <- bagToList binds1]
+	  	     ++ [(Recursive, lie_binds)]  -- TcDictBinds have scrambled dependency order
+		 , thing) }
 
 tc_group poly_rec top_lvl sig_fn prag_fn (Recursive, binds) thing_inside
   | not poly_rec        -- Recursive group, normal Haskell 98 route
-  = do  { (binds1, thing) <- tc_haskell98 top_lvl sig_fn prag_fn Recursive binds thing_inside
-        ; return ([(Recursive, unionManyBags binds1)], thing) }
+  = do  { (binds1, lie_binds, thing) <- tc_haskell98 top_lvl sig_fn prag_fn 
+    	  	   	      	     		     Recursive binds thing_inside
+        ; return ([(Recursive, binds1 `unionBags` lie_binds)], thing) }
 
-  | otherwise           -- Recursive group, with gla-exts
+  | otherwise           -- Recursive group, with -XRelaxedPolyRec
   =     -- To maximise polymorphism (with -XRelaxedPolyRec), we do a new 
         -- strongly-connected-component analysis, this time omitting 
         -- any references to variables with type signatures.
@@ -219,16 +223,16 @@ tc_group poly_rec top_lvl sig_fn prag_fn (Recursive, binds) thing_inside
         -- Notice that the bindInsts thing covers *all* the bindings in
         -- the original group at once; an earlier one may use a later one!
     do  { traceTc (text "tc_group rec" <+> pprLHsBinds binds)
-        ; (binds1,thing) <- bindLocalInsts top_lvl $
+        ; (binds1,lie_binds,thing) <- bindLocalInsts top_lvl $
                             go (stronglyConnCompFromEdgedVertices (mkEdges sig_fn binds))
-        ; return ([(Recursive, unionManyBags binds1)], thing) }
+        ; return ([(Recursive, binds1 `unionBags` lie_binds)], thing) }
                 -- Rec them all together
   where
---  go :: SCC (LHsBind Name) -> TcM ([LHsBind TcId], [TcId], thing)
+--  go :: SCC (LHsBind Name) -> TcM (LHsBinds TcId, [TcId], thing)
     go (scc:sccs) = do  { (binds1, ids1) <- tc_scc scc
                         ; (binds2, ids2, thing) <- tcExtendIdEnv ids1 $ go sccs
-                        ; return (binds1 ++ binds2, ids1 ++ ids2, thing) }
-    go []         = do  { thing <- thing_inside; return ([], [], thing) }
+                        ; return (binds1 `unionBags` binds2, ids1 ++ ids2, thing) }
+    go []         = do  { thing <- thing_inside; return (emptyBag, [], thing) }
 
     tc_scc (AcyclicSCC bind) = tc_sub_group NonRecursive (unitBag bind)
     tc_scc (CyclicSCC binds) = tc_sub_group Recursive    (listToBag binds)
@@ -236,17 +240,20 @@ tc_group poly_rec top_lvl sig_fn prag_fn (Recursive, binds) thing_inside
     tc_sub_group = tcPolyBinds top_lvl sig_fn prag_fn Recursive
 
 tc_haskell98 :: TopLevelFlag -> TcSigFun -> TcPragFun -> RecFlag
-             -> LHsBinds Name -> TcM a -> TcM ([LHsBinds TcId], a)
+             -> LHsBinds Name -> TcM a -> TcM (LHsBinds TcId, TcDictBinds, a)
 tc_haskell98 top_lvl sig_fn prag_fn rec_flag binds thing_inside
-  = bindLocalInsts top_lvl $ do
-    { (binds1, ids) <- tcPolyBinds top_lvl sig_fn prag_fn rec_flag rec_flag binds
-    ; thing <- tcExtendIdEnv ids thing_inside
-    ; return (binds1, ids, thing) }
+  = bindLocalInsts top_lvl $ 
+    do { (binds1, ids) <- tcPolyBinds top_lvl sig_fn prag_fn rec_flag rec_flag binds
+       ; thing <- tcExtendIdEnv ids thing_inside
+       ; return (binds1, ids, thing) }
 
 ------------------------
-bindLocalInsts :: TopLevelFlag -> TcM ([LHsBinds TcId], [TcId], a) -> TcM ([LHsBinds TcId], a)
+bindLocalInsts :: TopLevelFlag
+	       -> TcM (LHsBinds TcId, [TcId],      a)
+	       -> TcM (LHsBinds TcId, TcDictBinds, a)
 bindLocalInsts top_lvl thing_inside
-  | isTopLevel top_lvl = do { (binds, _, thing) <- thing_inside; return (binds, thing) }
+  | isTopLevel top_lvl
+  = do { (binds, _, thing) <- thing_inside; return (binds, emptyBag, thing) }
         -- For the top level don't bother with all this bindInstsOfLocalFuns stuff. 
         -- All the top level things are rec'd together anyway, so it's fine to
         -- leave them to the tcSimplifyTop, and quite a bit faster too
@@ -254,7 +261,7 @@ bindLocalInsts top_lvl thing_inside
   | otherwise   -- Nested case
   = do  { ((binds, ids, thing), lie) <- getLIE thing_inside
         ; lie_binds <- bindInstsOfLocalFuns lie ids
-        ; return (binds ++ [lie_binds], thing) }
+        ; return (binds, lie_binds, thing) }
 
 ------------------------
 mkEdges :: TcSigFun -> LHsBinds Name
@@ -289,7 +296,7 @@ tcPolyBinds :: TopLevelFlag -> TcSigFun -> TcPragFun
             -> RecFlag                  -- Whether it's recursive after breaking
                                         -- dependencies based on type signatures
             -> LHsBinds Name
-            -> TcM ([LHsBinds TcId], [TcId])
+            -> TcM (LHsBinds TcId, [TcId])
 
 -- Typechecks a single bunch of bindings all together, 
 -- and generalises them.  The bunch may be only part of a recursive
@@ -334,7 +341,7 @@ tcPolyBinds top_lvl sig_fn prag_fn rec_group rec_tc binds
               mk_export (_,    Just sig, mono_id) _       = ([], sig_id sig,             mono_id, [])
                         -- ToDo: prags for unlifted bindings
 
-        ; return ( [unitBag $ L loc $ AbsBinds [] [] exports binds'],
+        ; return ( unitBag $ L loc $ AbsBinds [] [] exports binds',
                    [poly_id | (_, poly_id, _, _) <- exports]) } -- Guaranteed zonked
 
     else do     -- The normal lifted case: GENERALISE
@@ -355,7 +362,7 @@ tcPolyBinds top_lvl sig_fn prag_fn rec_group rec_tc binds
                                     dict_vars exports
                                     (dict_binds `unionBags` binds')
 
-  ; return ([unitBag abs_bind], poly_ids)       -- poly_ids are guaranteed zonked by mkExport
+  ; return (unitBag abs_bind, poly_ids)       -- poly_ids are guaranteed zonked by mkExport
   } }
 
 
@@ -439,11 +446,11 @@ tcSpecPrag poly_id hs_ty inl
 -- signature-less binder given type (forall a.a), to minimise 
 -- subsequent error messages
 recoveryCode :: [Name] -> (Name -> Maybe [Name])
-             -> TcM ([Bag (LHsBindLR Id Var)], [Id])
+             -> TcM (LHsBinds TcId, [Id])
 recoveryCode binder_names sig_fn
   = do  { traceTc (text "tcBindsWithSigs: error recovery" <+> ppr binder_names)
         ; poly_ids <- mapM mk_dummy binder_names
-        ; return ([], poly_ids) }
+        ; return (emptyBag, poly_ids) }
   where
     mk_dummy name 
         | isJust (sig_fn name) = tcLookupId name        -- Had signature; look it up
