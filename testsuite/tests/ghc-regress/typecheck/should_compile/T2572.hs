@@ -1,4 +1,4 @@
- {-# OPTIONS LANGUAGE ScopedTypeVariables #-}
+ {-# LANGUAGE RankNTypes, ScopedTypeVariables #-}
 
 -- Trac #2572
 
