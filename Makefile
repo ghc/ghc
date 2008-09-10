@@ -3,6 +3,7 @@ TOP=../..
 ENABLE_SHELL_WRAPPERS = YES
 EXTRA_INPLACE_CONFIGURE_FLAGS += --flags=in-ghc-tree
 EXTRA_STAGE2_CONFIGURE_FLAGS += --flags=in-ghc-tree
+EXTRA_STAGE2_CONFIGURE_FLAGS += --datasubdir=.
 
 # Ideally we'd automatically find these from the .cabal file:
 BINDIST_EXTRAS += html/haddock-DEBUG.css \
