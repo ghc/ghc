@@ -202,7 +202,7 @@ data DynFlag
    | Opt_TemplateHaskell
    | Opt_QuasiQuotes
    | Opt_ImplicitParams
-   | Opt_Generics
+   | Opt_Generics			-- "Derivable type classes"
    | Opt_ImplicitPrelude
    | Opt_ScopedTypeVariables
    | Opt_UnboxedTuples
@@ -1645,12 +1645,13 @@ xFlags = [
   ( "PackageImports",                   Opt_PackageImports, const Supported )
   ]
 
-impliedFlags :: [(DynFlag, [DynFlag])]
-impliedFlags = [
-   ( Opt_GADTs,               [Opt_RelaxedPolyRec] )    -- We want type-sig variables to
-                                                        --      be completely rigid for GADTs
- , ( Opt_ScopedTypeVariables, [Opt_RelaxedPolyRec] )    -- Ditto for scoped type variables; see
-                                                        --      Note [Scoped tyvars] in TcBinds
+impliedFlags :: [(DynFlag, DynFlag)]
+impliedFlags
+  = [ (Opt_GADTs,               Opt_RelaxedPolyRec)  -- We want type-sig variables to
+                                                     --      be completely rigid for GADTs
+
+    , (Opt_ScopedTypeVariables, Opt_RelaxedPolyRec)  -- Ditto for scoped type variables; see
+                                                     --      Note [Scoped tyvars] in TcBinds
   ]
 
 glasgowExtsFlags :: [DynFlag]
@@ -1718,10 +1719,13 @@ upd f = do
 
 --------------------------
 setDynFlag, unSetDynFlag :: DynFlag -> DynP ()
-setDynFlag f = upd (\dfs -> foldl dopt_set (dopt_set dfs f) deps)
+setDynFlag f = do { upd (\dfs -> dopt_set dfs f)
+		  ; mapM_ setDynFlag deps }
   where
-    deps = [ d | (f', ds) <- impliedFlags, f' == f, d <- ds ]
+    deps = [ d | (f', d) <- impliedFlags, f' == f ]
         -- When you set f, set the ones it implies
+	-- NB: use setDynFlag recursively, in case the implied flags
+	--     implies further flags
         -- When you un-set f, however, we don't un-set the things it implies
         --      (except for -fno-glasgow-exts, which is treated specially)
 
