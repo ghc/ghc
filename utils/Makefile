@@ -69,6 +69,10 @@ endif
 # sort removes duplicates - we don't actually care about the order
 WITH_EITHER = $(sort $(WITH_BOOTSTRAPPING_COMPILER) $(WITH_STAGE2))
 
+# We need to build pwd with stage 2, as it goes in bindists, but we
+# don't actually want to install it
+DO_NOT_INSTALL = pwd
+
 binary-dist: $(foreach P,$(WITH_STAGE2),binary-dist.$P)
 ifeq "$(WHERE_AM_I)" ""
 	echo "I don't know where I am" >&2
@@ -87,7 +91,7 @@ with-bootstrapping-compiler: \
 with-stage-2: $(foreach P,$(WITH_STAGE2),with-stage-2.$P)
 	$(MAKE) -C haddock install-inplace
 
-install:: $(foreach P,$(WITH_STAGE2),install.$P)
+install:: $(foreach P,$(filter-out $(DO_NOT_INSTALL),$(WITH_STAGE2)),install.$P)
 
 $(foreach P,$(WITH_EITHER),clean.$P): \
 clean.%:
