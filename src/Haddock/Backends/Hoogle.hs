@@ -73,7 +73,7 @@ typeSig name flds = operator name ++ " :: " ++ concat (intersperse " -> " flds)
 
 
 operator :: String -> String
-operator (x:xs) | not (isAlphaNum x) && x `notElem` " ([{" = "(" ++ x:xs ++ ")"
+operator (x:xs) | not (isAlphaNum x) && x `notElem` "_' ([{" = "(" ++ x:xs ++ ")"
 operator x = x
 
 
