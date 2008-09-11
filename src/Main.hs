@@ -42,12 +42,11 @@ import System.FilePath
 import Foreign
 import Foreign.C
 import Data.Int
+#else
+import GHC.Paths
 #endif
 
 import GHC
-#ifdef GHC_PATHS
-import GHC.Paths
-#endif
 import DynFlags
 import Bag
 import ErrUtils
