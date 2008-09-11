@@ -926,12 +926,14 @@ stgAllocForGMP (size_t size_in_bytes)
 static void *
 stgReallocForGMP (void *ptr, size_t old_size, size_t new_size)
 {
+    size_t min_size;
     void *new_stuff_ptr = stgAllocForGMP(new_size);
     nat i = 0;
     char *p = (char *) ptr;
     char *q = (char *) new_stuff_ptr;
 
-    for (; i < old_size; i++, p++, q++) {
+    min_size = old_size < new_size ? old_size : new_size;
+    for (; i < min_size; i++, p++, q++) {
 	*q = *p;
     }
 
