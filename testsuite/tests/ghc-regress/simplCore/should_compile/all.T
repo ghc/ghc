@@ -20,6 +20,10 @@ test('simpl016', normal, compile, [''])
 test('simpl017', normal, compile, [''])
 test('simpl018', normal, compile, [''])
 test('simpl019', normal, compile, [''])
+test('simpl020',
+     extra_clean(['Simpl020_A.hi', 'Simpl020_A.o']),
+     multimod_compile,
+     ['simpl020', '-v0 -XFlexibleInstances -XUndecidableInstances'])
 
 test('simpl-T1370', normal, compile, [''])
 test('T2520', normal, compile, [''])

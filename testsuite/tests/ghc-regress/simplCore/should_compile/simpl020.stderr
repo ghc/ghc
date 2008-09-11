@@ -1,0 +1,8 @@
+
+Simpl020_A.hs:25:9:
+    Warning: No explicit method nor default method for `toGUIObject'
+    In the instance declaration for `GUIObject ()'
+
+Simpl020_A.hs:25:9:
+    Warning: No explicit method nor default method for `cset'
+    In the instance declaration for `GUIObject ()'
