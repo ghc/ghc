@@ -250,9 +250,6 @@ vectExpr (_, AnnCase scrut bndr ty alts)
   where
     scrut_ty = exprType (deAnnotate scrut)
 
-vectExpr (_, AnnCase _ _ _ _)
-  = panic "vectExpr: case"
-
 vectExpr (_, AnnLet (AnnNonRec bndr rhs) body)
   = do
       vrhs <- localV . inBind bndr $ vectPolyExpr rhs
@@ -274,12 +271,11 @@ vectExpr (_, AnnLet (AnnRec bs) body)
                       $ vectExpr rhs
 
 vectExpr e@(fvs, AnnLam bndr _)
-  | not (isId bndr) = pprPanic "vectExpr" (ppr $ deAnnotate e)
-  | otherwise = vectLam fvs bs body
+  | isId bndr = vectLam fvs bs body
   where
     (bs,body) = collectAnnValBinders e
 
-vectExpr e = pprPanic "vectExpr" (ppr $ deAnnotate e)
+vectExpr e = traceNoV "vectExpr: can't vectorise" (ppr $ deAnnotate e)
 
 vectLam :: VarSet -> [Var] -> CoreExprWithFVs -> VM VExpr
 vectLam fvs bs body
@@ -302,7 +298,7 @@ vectLam fvs bs body
 
 vectTyAppExpr :: CoreExprWithFVs -> [Type] -> VM VExpr
 vectTyAppExpr (_, AnnVar v) tys = vectPolyVar v tys
-vectTyAppExpr e _ = pprPanic "vectTyAppExpr" (ppr $ deAnnotate e)
+vectTyAppExpr e _ = traceNoV "vectTyAppExpr: can't vectorise" (ppr $ deAnnotate e)
 
 -- We convert
 --

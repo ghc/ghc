@@ -86,7 +86,7 @@ vectType ty@(ForAllTy _ _)
   where
     (tyvars, mono_ty) = splitForAllTys ty
 
-vectType ty = pprPanic "vectType:" (ppr ty)
+vectType ty = traceNoV "vectType: can't vectorise" (ppr ty)
 
 vectAndBoxType :: Type -> VM Type
 vectAndBoxType ty = vectType ty >>= boxType
