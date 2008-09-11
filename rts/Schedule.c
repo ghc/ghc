@@ -1912,7 +1912,7 @@ scheduleWaitThread (StgTSO* tso, /*[out]*/HaskellObj* ret, Capability *cap)
  * ------------------------------------------------------------------------- */
 
 #if defined(THREADED_RTS)
-void
+void OSThreadProcAttr
 workerStart(Task *task)
 {
     Capability *cap;

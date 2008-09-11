@@ -70,7 +70,9 @@ StgWord findRetryFrameHelper (StgTSO *tso);
  * Called from STG :  NO
  * Locks assumed   :  none
  */
-void workerStart(Task *task);
+#if defined(THREADED_RTS)
+void OSThreadProcAttr workerStart(Task *task);
+#endif
 
 #if defined(GRAN)
 void    awaken_blocked_queue(StgBlockingQueueElement *q, StgClosure *node);
