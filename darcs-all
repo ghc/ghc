@@ -20,6 +20,8 @@ use strict;
 #       ./darcs-all -q send --dry-run
 #   -q says to be quite, and -s to be silent.
 
+$| = 1; # autoflush stdout after each print, to avoid output after die
+
 # Figure out where to get the other repositories from,
 # based on where this GHC repo came from.
 my $defaultrepo = `cat _darcs/prefs/defaultrepo`;
