@@ -22,12 +22,12 @@ install ::
 
 install::
 	$(MAKE) -C includes  install      DOING_BIN_DIST=YES
-	$(MAKE) -C driver    install      DOING_BIN_DIST=YES
 	$(MAKE) -C utils     install      DOING_BIN_DIST=YES
 	$(MAKE) -C rts       install      DOING_BIN_DIST=YES
 	$(MAKE) -C libraries install      DOING_BIN_DIST=YES
 	$(MAKE) -C compiler  install      DOING_BIN_DIST=YES
 	$(MAKE) -C ghc       install      DOING_BIN_DIST=YES
+	$(MAKE) -C driver    install      DOING_BIN_DIST=YES
 	$(MAKE) -C gmp       install      DOING_BIN_DIST=YES
 	$(MAKE) -C docs      install-docs DOING_BIN_DIST=YES
 	$(MAKE) -C libraries/Cabal/doc install-docs DOING_BIN_DIST=YES
