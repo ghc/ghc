@@ -7,7 +7,7 @@
 #define INLINE
 
 #ifdef __GLASGOW_HASKELL__
-# include "Stg.h"
+# include "Rts.h"
 #endif
 
 #include "HsBase.h"
