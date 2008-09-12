@@ -16,7 +16,6 @@ module Language.Core.Overrides (override) where
 import Language.Core.Core
 import Language.Core.Encoding
 import Language.Core.ParsecParser
-import Language.Core.Prims
 
 import Data.Generics
 import System.FilePath
@@ -57,16 +56,20 @@ wiredInFileName (M (_,_,leafName)) =
 mungePackageName :: Module -> Module
 -- for now: just substitute "base-extcore" for "base"
 -- and "GHC" for "GHC_ExtCore" in every module name
-mungePackageName m@(Module mn _ _) = everywhere (mkT mungeMname)
+mungePackageName m@(Module _ _ _) = everywhere (mkT mungeMname)
     (everywhere (mkT mungePname) 
        (everywhere (mkT mungeVarName) m))
   where mungePname (P s) | s == zEncodeString overriddenPname =
            (P "base")
         mungePname p = p
+{- TODO: Commented out because this code should eventually
+   be completely rewritten. No time to do it now.
         -- rewrite uses of fake primops
         mungeVarName (Var (Just mn', v))
           | mn' == mn && v `elem` (fst (unzip newPrimVars)) =
             Var (Just primMname, v)
+-}
+        mungeVarName :: Exp -> Exp
         mungeVarName e = e
 
 mungeMname :: AnMname -> AnMname
