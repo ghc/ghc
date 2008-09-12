@@ -10,7 +10,7 @@ maintainer:          chevalier@alum.wellesley.edu
 stability:           alpha
 build-depends:       base, containers, directory, filepath, mtl, parsec, pretty
 exposed-modules:     Language.Core.Check, Language.Core.Dependencies, Language.Core.Core, Language.Core.Interp, Language.Core.Overrides, Language.Core.ParsecParser, Language.Core.Prep, Language.Core.Prims, Language.Core.Printer, Language.Core.Merge, Language.Core.ElimDeadCode, Language.Core.Encoding, Language.Core.Env
-other-modules:       Language.Core.PrimCoercions, Language.Core.PrimEnv, Language.Core.Utils, Language.Core.CoreUtils
+other-modules:       Language.Core.PrimCoercions, Language.Core.PrimEnv, Language.Core.Utils, Language.Core.CoreUtils, Language.Core.Environments
 extensions:          DeriveDataTypeable PatternGuards PatternSignatures
 ghc-options:         -Wall -O2
 tested-with:         GHC ==6.8.2

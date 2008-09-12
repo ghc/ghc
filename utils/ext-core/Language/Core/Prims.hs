@@ -7,7 +7,7 @@
 module Language.Core.Prims(initialEnv, primEnv, primId, bv,
              tIntzh, tInt64zh, tCharzh, tFloatzh, tAddrzh, tDoublezh, tcStatezh,
              tWordzh, tWord64zh, tByteArrayzh,
-             tcStablePtrzh, tcIO, mkInitialEnv, mkTypeEnv, tRWS, tBool,
+             tcStablePtrzh, tcIO, mkInitialEnv, mkTypeEnv, tRWS, tBool, tcBool,
              ioBaseMname) where
 
 import Control.Monad
