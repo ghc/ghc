@@ -259,42 +259,22 @@ preludeVars (Modules { dph_Combinators    = dph_Combinators
     , mk gHC_PARR (fsLit "+:+")        dph_Combinators (fsLit "appPA")
     , mk gHC_PARR (fsLit "emptyP")     dph_PArray (fsLit "emptyPA")
 
-    , mk dph_Prelude_Int  (fsLit "plus") dph_Prelude_Int (fsLit "plusV")
-    , mk dph_Prelude_Int  (fsLit "minus") dph_Prelude_Int (fsLit "minusV")
-    , mk dph_Prelude_Int  (fsLit "mult")  dph_Prelude_Int (fsLit "multV")
-    , mk dph_Prelude_Int  (fsLit "intDiv")  dph_Prelude_Int (fsLit "intDivV")
-    , mk dph_Prelude_Int  (fsLit "intMod")  dph_Prelude_Int (fsLit "intModV")
-    , mk dph_Prelude_Int  (fsLit "intSquareRoot")  dph_Prelude_Int (fsLit "intSquareRootV")
-    , mk dph_Prelude_Int  (fsLit "intSumP")  dph_Prelude_Int (fsLit "intSumPA")
-    , mk dph_Prelude_Int  (fsLit "enumFromToP")  dph_Prelude_Int (fsLit "enumFromToPA")
-    , mk dph_Prelude_Int  (fsLit "upToP") dph_Prelude_Int (fsLit "upToPA")
+    , mk' dph_Prelude_Int "div"  "divV"
+    , mk' dph_Prelude_Int "mod"  "modV"
+    , mk' dph_Prelude_Int "sqrt" "sqrtV"
+    , mk' dph_Prelude_Int "enumFromToP" "enumFromToPA"
+    , mk' dph_Prelude_Int "upToP" "upToPA"
+    ]
+    ++ vars_Ord dph_Prelude_Int
+    ++ vars_Num dph_Prelude_Int
 
-    , mk dph_Prelude_Int  (fsLit "eq") dph_Prelude_Int (fsLit "eqV")
-    , mk dph_Prelude_Int  (fsLit "neq") dph_Prelude_Int (fsLit "neqV")
-    , mk dph_Prelude_Int  (fsLit "le")  dph_Prelude_Int (fsLit "leV")
-    , mk dph_Prelude_Int  (fsLit "lt") dph_Prelude_Int (fsLit "ltV")
-    , mk dph_Prelude_Int  (fsLit "ge") dph_Prelude_Int (fsLit "geV")
-    , mk dph_Prelude_Int  (fsLit "gt")  dph_Prelude_Int (fsLit "gtV")
-
-    , mk dph_Prelude_Double  (fsLit "plus") dph_Prelude_Double (fsLit "plusV")
-    , mk dph_Prelude_Double  (fsLit "minus") dph_Prelude_Double (fsLit "minusV")
-    , mk dph_Prelude_Double  (fsLit "mult")  dph_Prelude_Double (fsLit "multV")
-    , mk dph_Prelude_Double  (fsLit "divide")  dph_Prelude_Double (fsLit "divideV")
-    , mk dph_Prelude_Double  (fsLit  "squareRoot")  dph_Prelude_Double (fsLit "squareRootV")    
-    , mk dph_Prelude_Double  (fsLit "doubleSumP")  dph_Prelude_Double (fsLit "doubleSumPA")
-    , mk dph_Prelude_Double  (fsLit "minIndexP") 
-         dph_Prelude_Double  (fsLit "minIndexPA")
-    , mk dph_Prelude_Double  (fsLit "maxIndexP")
-         dph_Prelude_Double  (fsLit "maxIndexPA")
-
-    , mk dph_Prelude_Double  (fsLit "eq") dph_Prelude_Double (fsLit "eqV")
-    , mk dph_Prelude_Double  (fsLit "neq") dph_Prelude_Double (fsLit "neqV")
-    , mk dph_Prelude_Double  (fsLit "le")  dph_Prelude_Double (fsLit "leV")
-    , mk dph_Prelude_Double  (fsLit "lt") dph_Prelude_Double (fsLit "ltV")
-    , mk dph_Prelude_Double  (fsLit "ge") dph_Prelude_Double (fsLit "geV")
-    , mk dph_Prelude_Double  (fsLit "gt")  dph_Prelude_Double (fsLit "gtV")
-
-    , mk dph_Prelude_Bool  (fsLit "andP")  dph_Prelude_Bool (fsLit "andPA")
+    ++ vars_Ord dph_Prelude_Double
+    ++ vars_Num dph_Prelude_Double
+    ++ vars_Fractional dph_Prelude_Double
+    ++ vars_Floating dph_Prelude_Double
+    ++ vars_RealFrac dph_Prelude_Double
+    ++
+    [ mk dph_Prelude_Bool  (fsLit "andP")  dph_Prelude_Bool (fsLit "andPA")
     , mk dph_Prelude_Bool  (fsLit "orP")  dph_Prelude_Bool (fsLit "orPA")
 
     -- FIXME: temporary
@@ -304,7 +284,62 @@ preludeVars (Modules { dph_Combinators    = dph_Combinators
     , mk dph_Prelude_PArr (fsLit "combineP")    dph_Combinators (fsLit "combine2PA")
     ]
   where
-    mk = (,,,)
+    mk  = (,,,)
+    mk' mod v v' = mk mod (fsLit v) mod (fsLit v')
+
+    vars_Ord mod = [mk' mod "=="  "eqV"
+                   ,mk' mod "/=" "neqV"
+                   ,mk' mod "<="  "leV"
+                   ,mk' mod "<"   "ltV"
+                   ,mk' mod ">="  "geV"
+                   ,mk' mod ">"   "gtV"
+                   ,mk' mod "min" "minV"
+                   ,mk' mod "max" "maxV"
+                   ,mk' mod "minimumP" "minimumPA"
+                   ,mk' mod "maximumP" "maximumPA"
+                   ,mk' mod "minIndexP" "minIndexPA"
+                   ,mk' mod "maxIndexP" "maxIndexPA"
+                   ]
+
+    vars_Num mod = [mk' mod "+"        "plusV"
+                   ,mk' mod "-"        "minusV"
+                   ,mk' mod "*"        "multV"
+                   ,mk' mod "negate"   "negateV"
+                   ,mk' mod "abs"      "absV"
+                   ,mk' mod "sumP"     "sumPA"
+                   ,mk' mod "productP" "productPA"
+                   ]
+
+    vars_Fractional mod = [mk' mod "/"     "divideV"
+                          ,mk' mod "recip" "recipV"
+                          ]
+
+    vars_Floating mod = [mk' mod "pi" "pi"
+                        ,mk' mod "exp" "expV"
+                        ,mk' mod "sqrt" "sqrtV"
+                        ,mk' mod "log" "logV"
+                        ,mk' mod "sin" "sinV"
+                        ,mk' mod "tan" "tanV"
+                        ,mk' mod "cos" "cosV"
+                        ,mk' mod "asin" "asinV"
+                        ,mk' mod "atan" "atanV"
+                        ,mk' mod "acos" "acosV"
+                        ,mk' mod "sinh" "sinhV"
+                        ,mk' mod "tanh" "tanhV"
+                        ,mk' mod "cosh" "coshV"
+                        ,mk' mod "asinh" "asinhV"
+                        ,mk' mod "atanh" "atanhV"
+                        ,mk' mod "acosh" "acoshV"
+                        ,mk' mod "**"    "powV"
+                        ,mk' mod "logBase" "logBaseV"
+                        ]
+
+    vars_RealFrac mod = [mk' mod "fromInt" "fromIntV"
+                        ,mk' mod "truncate" "truncateV"
+                        ,mk' mod "round" "roundV"
+                        ,mk' mod "ceiling" "ceilingV"
+                        ,mk' mod "floor" "floorV"
+                        ]
 
 initBuiltinTyCons :: Builtins -> DsM [(Name, TyCon)]
 initBuiltinTyCons bi
