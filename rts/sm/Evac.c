@@ -837,6 +837,11 @@ selector_chain:
         if (bd->flags & BF_EVACUATED) {
             unchain_thunk_selectors(prev_thunk_selector, (StgClosure *)p);
             *q = (StgClosure *)p;
+            // shortcut, behave as for:  if (evac) evacuate(q);
+            if (evac && bd->step < gct->evac_step) {
+                gct->failed_to_evac = rtsTrue;
+                TICK_GC_FAILED_PROMOTION();
+            }
             return;
         }
         // we don't update THUNK_SELECTORS in the compacted
