@@ -1,6 +1,8 @@
 {-# OPTIONS -Wall -fno-warn-missing-signatures #-}
 
-module Language.Core.ParsecParser (parseCore) where
+module Language.Core.ParsecParser (parseCore, coreModuleName, coreTcon, 
+  coreQualifiedGen, upperName, identifier, coreType, coreKind,
+  coreTbinds, parens, braces, topVbind) where
 
 import Language.Core.Core
 import Language.Core.Check
