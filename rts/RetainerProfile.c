@@ -1843,7 +1843,7 @@ computeRetainerSet( void )
     // for retainer profilng.
     for (weak = weak_ptr_list; weak != NULL; weak = weak->link)
 	// retainRoot((StgClosure *)weak);
-	retainRoot((StgClosure **)&weak, NULL);
+	retainRoot(NULL, (StgClosure **)&weak);
 
     // Consider roots from the stable ptr table.
     markStablePtrTable(retainRoot, NULL);
