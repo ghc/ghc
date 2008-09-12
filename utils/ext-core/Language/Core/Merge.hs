@@ -92,11 +92,9 @@ fixupName subst _ oldVar | Just newVar <- lookup oldVar subst = newVar
 -- We don't alter unqualified names, since we just need to make sure
 -- everything can go in the Main module.
 fixupName _ _ vr@(Nothing,_) = vr
--- Nor do we alter anything defined in the Main module
--- or in the primitive or Bool modules
--- (because we basically treat the Bool type as primitive.)
+-- Nor do we alter anything defined in the Main module or the primitive module.
 fixupName _ _ vr@(Just mn, _) | mn == mainMname || mn == wrapperMainMname ||
-                            mn == primMname || mn == boolMname = vr
+                            mn == primMname = vr
 -- For a variable that is defined by only one module in scope, we 
 -- give it a name that is just its unqualified name, without the original
 -- module and package names.
