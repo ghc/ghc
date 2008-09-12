@@ -39,11 +39,14 @@ import System.IO
 import System.Exit
 import System.Environment
 import System.FilePath
-#ifdef IN_GHC_TREE
+
+#if defined(mingw32_HOST_OS)
 import Foreign
 import Foreign.C
 import Data.Int
-#else
+#endif
+
+#ifndef IN_GHC_TREE
 import GHC.Paths
 #endif
 
