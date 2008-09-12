@@ -83,6 +83,12 @@ ifneq "$(BootingFromHc)" "YES"
 PKGCONF_DEP = $(STAMP_PKG_CONF)
 endif
 
+ifeq "$(USE_NEW_MKDEPEND_FLAGS)" "YES"
+MKDEPENDHS_FLAGS = -dep-makefile .depend $(foreach way,$(WAYS),-dep-suffix $(way))
+else
+MKDEPENDHS_FLAGS = -optdep-f -optdep.depend $(foreach way,$(WAYS),-optdep-s -optdep$(way))
+endif
+
 depend :: $(MKDEPENDHS_SRCS) $(MKDEPENDC_SRCS) $(PKGCONF_DEP)
 	@$(RM) .depend
 	@touch .depend
@@ -93,7 +99,7 @@ ifneq "$(MKDEPENDC_SRCS)" ""
 	$(MKDEPENDC) -f .depend $(MKDEPENDC_OPTS) $(foreach way,$(WAYS),-s $(way)) -- $(CC_OPTS) -- $(MKDEPENDC_SRCS) 
 endif
 ifneq "$(MKDEPENDHS_SRCS)" ""
-	$(MKDEPENDHS) -M -optdep-f -optdep.depend $(foreach way,$(WAYS),-optdep-s -optdep$(way)) $(foreach obj,$(MKDEPENDHS_OBJ_SUFFICES),-osuf $(obj)) $(MKDEPENDHS_OPTS) $(filter-out -split-objs, $(HC_OPTS)) $(MKDEPENDHS_SRCS)
+	$(MKDEPENDHS) -M $(MKDEPENDHS_FLAGS) $(foreach obj,$(MKDEPENDHS_OBJ_SUFFICES),-osuf $(obj)) $(MKDEPENDHS_OPTS) $(filter-out -split-objs, $(HC_OPTS)) $(MKDEPENDHS_SRCS)
 endif
 
 
