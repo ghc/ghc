@@ -2192,7 +2192,7 @@ static StgTSO *
 threadStackUnderflow (Task *task STG_UNUSED, StgTSO *tso)
 {
     bdescr *bd, *new_bd;
-    lnat new_tso_size_w, tso_size_w;
+    lnat free_w, tso_size_w;
     StgTSO *new_tso;
 
     tso_size_w = tso_sizeW(tso);
@@ -2207,19 +2207,19 @@ threadStackUnderflow (Task *task STG_UNUSED, StgTSO *tso)
     // while we are moving the TSO:
     lockClosure((StgClosure *)tso);
 
-    new_tso_size_w = round_to_mblocks(tso_size_w/2);
-
-    debugTrace(DEBUG_sched, "thread %ld: reducing TSO size from %lu words to %lu",
-               (long)tso->id, tso_size_w, new_tso_size_w);
+    // this is the number of words we'll free
+    free_w = round_to_mblocks(tso_size_w/2);
 
     bd = Bdescr((StgPtr)tso);
-    new_bd = splitLargeBlock(bd, new_tso_size_w / BLOCK_SIZE_W);
-    new_bd->free = bd->free;
+    new_bd = splitLargeBlock(bd, free_w / BLOCK_SIZE_W);
     bd->free = bd->start + TSO_STRUCT_SIZEW;
 
     new_tso = (StgTSO *)new_bd->start;
     memcpy(new_tso,tso,TSO_STRUCT_SIZE);
-    new_tso->stack_size = new_tso_size_w - TSO_STRUCT_SIZEW;
+    new_tso->stack_size = new_bd->free - new_tso->stack;
+
+    debugTrace(DEBUG_sched, "thread %ld: reducing TSO size from %lu words to %lu",
+               (long)tso->id, tso_size_w, tso_sizeW(new_tso));
 
     tso->what_next = ThreadRelocated;
     tso->_link = new_tso; // no write barrier reqd: same generation
