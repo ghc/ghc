@@ -5,6 +5,7 @@ import Language.Core.Encoding
 
 import Data.Generics
 import Data.List (elemIndex)
+import Data.Char
 
 data Module 
  = Module AnMname [Tdef] [Vdefg]
@@ -102,7 +103,7 @@ data CoercionKind =
 -- either type constructors or coercion names onto either
 -- kinds or coercion kinds.
 data KindOrCoercion = Kind Kind | Coercion CoercionKind
-  
+
 data Lit = Literal CoreLit Ty
   deriving (Data, Typeable, Eq)
 
@@ -251,7 +252,15 @@ tUtuple ts = foldl Tapp (Tcon (tcUtuple (length ts))) ts
 
 isUtupleTy :: Ty -> Bool
 isUtupleTy (Tapp t _) = isUtupleTy t
-isUtupleTy (Tcon tc) = tc `elem` [tcUtuple n | n <- [1..maxUtuple]]
+isUtupleTy (Tcon tc) = 
+  case tc of
+    (Just pm, 'Z':rest) | pm == primMname && last rest == 'H' -> 
+       let mid = take ((length rest) - 1) rest in
+         all isDigit mid && (let num = read mid in
+                               1 <= num && num <= maxUtuple)
+    _ -> False
+-- The above is ugly, but less ugly than this:
+--tc `elem` [tcUtuple n | n <- [1..maxUtuple]]
 isUtupleTy _ = False
 
 dcUtuple :: Int -> Qual Dcon
