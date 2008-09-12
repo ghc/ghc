@@ -7,7 +7,7 @@
 TOP=..
 include $(TOP)/mk/boilerplate.mk
 
-SUBDIRS = mangler split ghci
+SUBDIRS = mangler split ghc ghci
 
 INPLACE_PKG_CONF = $(INPLACE_DATA_DIR)/package.conf
 # Used to signal that we are inplace, as opposed to installed:

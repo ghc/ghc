@@ -72,7 +72,7 @@ else
 SUBDIRS_BUILD = includes utils driver docs compiler libraries/Cabal/doc
 endif
 
-SUBDIRS = gmp libffi includes utils driver docs rts compiler ghc libraries libraries/Cabal/doc
+SUBDIRS = gmp libffi includes utils docs rts compiler ghc driver libraries libraries/Cabal/doc
 
 check-all: check-packages
 
