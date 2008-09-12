@@ -1,7 +1,9 @@
-{-# OPTIONS -Wall -fno-warn-name-shadowing #-}
-{- 
+{-# OPTIONS -fno-warn-name-shadowing #-}
+{-
 Preprocess a module to normalize it in the following ways:
 	(1) Saturate all constructor and primop applications. 
+              (as well as external calls; this is probably already
+               guaranteed, but paranoia is good)
 	(2) Arrange that any non-trivial expression of unlifted kind ('#')
              is turned into the scrutinee of a Case.
 After these preprocessing steps, Core can be interpreted (or given an operational semantics)
@@ -13,13 +15,15 @@ module Language.Core.Prep where
 
 import Data.Either
 import Data.List
+import Data.Generics
+import qualified Data.Map as M
 
-import Language.Core.Prims
 import Language.Core.Core
 import Language.Core.Env
 import Language.Core.Check
 import Language.Core.Environments
 import Language.Core.Encoding
+import Language.Core.Utils
 
 prepModule :: Menv -> Module -> Module
 prepModule globalEnv (Module mn tdefs vdefgs) = 
@@ -69,6 +73,7 @@ prepModule globalEnv (Module mn tdefs vdefgs) =
     prepAlt env (Alit l e) = Alit l (prepExp env e)
     prepAlt env (Adefault e) = Adefault (prepExp env e)
 
+    ntEnv = mkNtEnv globalEnv
 
     unwindApp env (App e1 e2) as = unwindApp env e1 (Left e2:as)
     unwindApp env (Appt e t) as  = unwindApp env e (Right t:as)
@@ -80,16 +85,41 @@ prepModule globalEnv (Module mn tdefs vdefgs) =
 	      ts = [t | Right t <- as]
               n = length [e | Left e <- as]
     unwindApp env (op@(Var(qv@(_,p)))) as | isPrimVar qv =
-	etaExpand (snd (unzip extraTbs)) (drop n atys) (rewindApp env op as)
+	k $ etaExpand (snd (unzip extraTbs)) (drop n atys) (k1 (rewindApp env op as))
         where -- TODO: avoid copying code. these two cases are the same
 
               -- etaExpand needs to add the type arguments too! Bah!
-              (tbs, atys0, _) = (maybe (error "unwindApp") splitTy (elookup (venv_ primEnv) p))
+              primEnv = case elookup globalEnv primMname of
+                              Just es -> venv_ es
+                              _       -> error "eek"
+              (_, _, resTy') = (maybe (error "unwindApp") splitTy (elookup primEnv p))
+              (tbs, atys0, _resTy) = (maybe (error "unwindApp") (splitTy . (substNewtys ntEnv)) (elookup primEnv p))
+              -- The magic here is so we know to eta-expand applications of
+              -- primops whose return types are newtypes.
+              -- There are no actual GHC primops that have this property, but
+              -- a back-end tool writer (for example: me) might want to add
+              -- such a primop.
+              -- If this code wasn't here, and we had a primop 
+              -- foo# :: Int -> IO (),
+              -- we would see (foo# 5) and think it was fully applied, when 
+              -- actually we need to rewrite it as:
+              -- (\ (s::State# RealWorld#) -> foo# 5 s)
+              -- (This code may be a very good case against introducing such
+              -- primops.)
+              (k,k1) = case newtypeCoercion_maybe ntEnv resTy' of
+                         Just co -> case splitTyConApp_maybe resTy' of
+                                      Just (_, args) -> ((\ e -> Cast e (SymCoercion (mkTapp co args))), (\ e1 -> Cast e1 (mkTapp co args)))
+                                      _ -> ((\ e -> Cast e (SymCoercion co)), (\ e1 -> Cast e1 co))
+                         _       -> (id,id) 
               n_args = length ts
               (appliedTbs, extraTbs) = (take n_args tbs, drop n_args tbs)
               atys = map (substl (map fst appliedTbs) ts) atys0
               ts = [t | Right t <- as]
               n = length [e | Left e <- as]
+    unwindApp env (op@(External _ t)) as =
+        etaExpand [] (drop n atys) (rewindApp env op as)
+          where (_,atys,_) = splitTy t
+                n = length as -- assumes all args are term args
     unwindApp env op as = rewindApp env op as
 
 
@@ -183,3 +213,37 @@ boundVarsAlt :: Alt -> [Var]
 boundVarsAlt (Acon _ _ vbs e) = (map fst vbs) `union` (boundVars e)
 boundVarsAlt (Alit _ e) = boundVars e
 boundVarsAlt (Adefault e) = boundVars e
+
+mkNtEnv :: Menv -> NtEnv
+mkNtEnv menv = 
+  foldl M.union M.empty $
+        map (\ (mn,e) ->
+                 foldr (\ (key,thing) rest ->
+                            case thing of
+                              Kind _ -> rest
+                              Coercion (DefinedCoercion _ (lhs,rhs)) -> 
+                                  case splitTyConApp_maybe lhs of
+                                    Just ((_,tc1),_) -> M.insert tc1 (rhs,Tcon (Just mn, key)) rest
+                                    _ -> rest) M.empty (etolist (tcenv_ e))) (etolist menv)
+
+substNewtys :: NtEnv -> Ty -> Ty
+substNewtys ntEnv = everywhere'Except (mkT go)
+                 where go t | Just ((_,tc),_) <- splitTyConApp_maybe t =
+                         case M.lookup tc ntEnv of
+                           Just (rhs,_) -> rhs
+                           Nothing  -> t
+                       go t = t
+
+newtypeCoercion_maybe :: NtEnv -> Ty -> Maybe Ty
+newtypeCoercion_maybe ntEnv t | Just ((_,tc),_) <- splitTyConApp_maybe t = 
+  case M.lookup tc ntEnv of
+    Just (_, coercion) -> Just coercion
+    Nothing               -> Nothing
+newtypeCoercion_maybe _ _ = Nothing
+
+-- first element: rep type
+-- second element: coercion tcon
+type NtEnv  = M.Map Tcon (Ty, Ty)
+
+mkTapp :: Ty -> [Ty] -> Ty
+mkTapp = foldl Tapp
