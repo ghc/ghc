@@ -1,3 +1,4 @@
+{-# LANGUAGE ForeignFunctionInterface #-}
 --
 -- Haddock - A Haskell Documentation Tool
 --
