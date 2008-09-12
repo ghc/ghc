@@ -182,7 +182,7 @@ basicKnownKeyNames
         -- Parallel array operations
 	nullPName, lengthPName, replicatePName,	singletonPName, mapPName,
 	filterPName, zipPName, crossMapPName, indexPName,
-	toPName, bpermutePName, bpermuteDftPName, indexOfPName,
+	toPName, emptyPName, appPName,
 
 	-- FFI primitive types that are not wired-in.
 	stablePtrTyConName, ptrTyConName, funPtrTyConName,
@@ -705,8 +705,8 @@ readClassName	   = clsQual gHC_READ (fsLit "Read") readClassKey
 -- parallel array types and functions
 enumFromToPName, enumFromThenToPName, nullPName, lengthPName,
     singletonPName, replicatePName, mapPName, filterPName,
-    zipPName, crossMapPName, indexPName, toPName, bpermutePName,
-    bpermuteDftPName, indexOfPName :: Name
+    zipPName, crossMapPName, indexPName, toPName,
+    emptyPName, appPName :: Name
 enumFromToPName	   = varQual gHC_PARR (fsLit "enumFromToP") enumFromToPIdKey
 enumFromThenToPName= varQual gHC_PARR (fsLit "enumFromThenToP") enumFromThenToPIdKey
 nullPName	  = varQual gHC_PARR (fsLit "nullP")      	 nullPIdKey
@@ -719,9 +719,8 @@ zipPName	  = varQual gHC_PARR (fsLit "zipP")       	 zipPIdKey
 crossMapPName	  = varQual gHC_PARR (fsLit "crossMapP")     	 crossMapPIdKey
 indexPName	  = varQual gHC_PARR (fsLit "!:")	       	 indexPIdKey
 toPName	          = varQual gHC_PARR (fsLit "toP")	       	 toPIdKey
-bpermutePName     = varQual gHC_PARR (fsLit "bpermuteP")    bpermutePIdKey
-bpermuteDftPName  = varQual gHC_PARR (fsLit "bpermuteDftP") bpermuteDftPIdKey
-indexOfPName      = varQual gHC_PARR (fsLit "indexOfP")     indexOfPIdKey
+emptyPName        = varQual gHC_PARR (fsLit "emptyP")            emptyPIdKey
+appPName          = varQual gHC_PARR (fsLit "+:+")               appPIdKey
 
 -- IOBase things
 ioTyConName, ioDataConName, thenIOName, bindIOName, returnIOName,
@@ -1177,8 +1176,7 @@ groupWithIdKey        = mkPreludeMiscIdUnique 70
 -- Parallel array functions
 singletonPIdKey, nullPIdKey, lengthPIdKey, replicatePIdKey, mapPIdKey,
     filterPIdKey, zipPIdKey, crossMapPIdKey, indexPIdKey, toPIdKey,
-    enumFromToPIdKey, enumFromThenToPIdKey,
-    bpermutePIdKey, bpermuteDftPIdKey, indexOfPIdKey :: Unique
+    enumFromToPIdKey, enumFromThenToPIdKey, emptyPIdKey, appPIdKey :: Unique
 singletonPIdKey               = mkPreludeMiscIdUnique 79
 nullPIdKey	              = mkPreludeMiscIdUnique 80
 lengthPIdKey		      = mkPreludeMiscIdUnique 81
@@ -1191,9 +1189,8 @@ indexPIdKey		      = mkPreludeMiscIdUnique 87
 toPIdKey		      = mkPreludeMiscIdUnique 88
 enumFromToPIdKey              = mkPreludeMiscIdUnique 89
 enumFromThenToPIdKey          = mkPreludeMiscIdUnique 90
-bpermutePIdKey		      = mkPreludeMiscIdUnique 91
-bpermuteDftPIdKey	      = mkPreludeMiscIdUnique 92
-indexOfPIdKey		      = mkPreludeMiscIdUnique 93
+emptyPIdKey                   = mkPreludeMiscIdUnique 91
+appPIdKey                     = mkPreludeMiscIdUnique 92
 
 -- dotnet interop
 unmarshalObjectIdKey, marshalObjectIdKey, marshalStringIdKey,

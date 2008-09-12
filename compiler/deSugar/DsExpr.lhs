@@ -315,20 +315,20 @@ dsExpr (HsIf guard_expr then_expr else_expr)
 dsExpr (ExplicitList elt_ty xs) 
   = dsExplicitList elt_ty xs
 
--- we create a list from the array elements and convert them into a list using
--- `PrelPArr.toP'
+-- We desugar [:x1, ..., xn:] as
+--   singletonP x1 +:+ ... +:+ singletonP xn
 --
---  * the main disadvantage to this scheme is that `toP' traverses the list
---   twice: once to determine the length and a second time to put to elements
---   into the array; this inefficiency could be avoided by exposing some of
---   the innards of `PrelPArr' to the compiler (ie, have a `PrelPArrBase') so
---   that we can exploit the fact that we already know the length of the array
---   here at compile time
---
+dsExpr (ExplicitPArr ty []) = do
+    emptyP <- dsLookupGlobalId emptyPName
+    return (Var emptyP `App` Type ty)
 dsExpr (ExplicitPArr ty xs) = do
-    toP <- dsLookupGlobalId toPName
-    coreList <- dsExpr (ExplicitList ty xs)
-    return (mkApps (Var toP) [Type ty, coreList])
+    singletonP <- dsLookupGlobalId singletonPName
+    appP       <- dsLookupGlobalId appPName
+    xs'        <- mapM dsLExpr xs
+    return . foldr1 (binary appP) $ map (unary singletonP) xs'
+  where
+    unary  fn x   = mkApps (Var fn) [Type ty, x]
+    binary fn x y = mkApps (Var fn) [Type ty, x, y]
 
 dsExpr (ExplicitTuple expr_list boxity) = do
     core_exprs <- mapM dsLExpr expr_list
