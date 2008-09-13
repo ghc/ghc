@@ -20,12 +20,9 @@
 #   [ -e foo/configure.ac ] && ( cd foo && autoreconf )
 #   make make.library.foo
 
-.PHONY: default_target show
+.PHONY: default_target
 
 default_target: all
-
-show:
-	@echo '$(VALUE)="$($(VALUE))"'
 
 # make doesn't give us an easy way to get the libraries built in
 # dependency order the first time, but not rebuild base (for example)
