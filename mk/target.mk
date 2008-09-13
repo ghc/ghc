@@ -500,15 +500,6 @@ ifneq "$(TAGS_C_SRCS)" ""
 endif
 	@( DEREFFED=`ls -l Makefile | sed -e 's/.*-> \(.*\)/\1/g'` && $(RM) `dirname $$DEREFFED`/TAGS && $(CP) TAGS `dirname $$DEREFFED` ) 2>/dev/null || echo TAGS file generated, perhaps copy over to source tree?
 
-#------------------------------------------------------------
-# 			Makefile debugging
-# to see the effective value used for a Makefile variable, do
-#  make show VALUE=MY_VALUE
-#
-
-show:
-	@echo '$(VALUE)="$($(VALUE))"'
-
 ################################################################################
 #
 #			DocBook XML Documentation

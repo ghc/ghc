@@ -22,6 +22,15 @@ FPTOOLS_TOP := $(TOP)
 #		THIS RULE MUST REMAIN FIRST!
 default: all
 
+#------------------------------------------------------------
+# 			Makefile debugging
+# to see the effective value used for a Makefile variable, do
+#  make show VALUE=MY_VALUE
+#
+
+show:
+	@echo '$(VALUE)="$($(VALUE))"'
+
 # -----------------------------------------------------------------------------
 # Misc bits
 
