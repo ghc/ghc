@@ -1,6 +1,5 @@
 import Control.Monad.Fix
 import Data.IORef
-import GHC.Base (breakpoint, breakpointCond)
 
 data N a = N (IORef Bool, N a, a, N a)
 
@@ -27,7 +26,7 @@ traverse d (N (v, b, i, f)) =
                   return (i:is)
 
 l2dll :: [a] -> IO (N a)
-l2dll (x:xs) = mdo c      <- breakpoint$ newNode l x f
+l2dll (x:xs) = mdo c      <- newNode l x f
                    (f, l) <- l2dll' c xs
                    return c
 
