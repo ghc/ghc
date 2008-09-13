@@ -146,11 +146,14 @@ ifneq "$(GhcLibProfiled) $(GhcProfiled)" "NO NO"
 CONFIGURE_FLAGS_STAGE2 += --enable-library-profiling
 # And if we're profiling GHC then we want lots of SCCs.
 # We also don't want to waste time building the non-profiling library,
-# either normally or for ghci.
+# either normally or for ghci. Unfortunately this means that we have to
+# tell ghc-pkg --force as it gets upset when libHSghc-6.9.a doesn't
+# exist.
 ifeq "$(GhcProfiled)" "YES"
 CONFIGURE_FLAGS_STAGE2 += --ghc-option=-auto-all
 CONFIGURE_FLAGS_STAGE2 += --disable-library-vanilla
 CONFIGURE_FLAGS_STAGE2 += --disable-library-for-ghci
+CONFIGURE_FLAGS_STAGE2 += --ghc-pkg-option=--force
 endif
 endif
 
