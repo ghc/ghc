@@ -513,7 +513,7 @@ Zonking makes sure that the instance types are fully zonked.
 
 \begin{code}
 zonkInst :: Inst -> TcM Inst
-zonkInst dict@(Dict { tci_pred = pred}) = do
+zonkInst dict@(Dict {tci_pred = pred}) = do
     new_pred <- zonkTcPredType pred
     return (dict {tci_pred = new_pred})
 
@@ -544,7 +544,7 @@ zonkInst eqinst@(EqInst {tci_left = ty1, tci_right = ty2})
 		  (\co    -> liftM mkGivenCo $ zonkTcType co)
        ; ty1' <- zonkTcType ty1
        ; ty2' <- zonkTcType ty2
-       ; return (eqinst {tci_co = co', tci_left= ty1', tci_right = ty2' })
+       ; return (eqinst {tci_co = co', tci_left = ty1', tci_right = ty2' })
        }
 
 zonkInsts :: [Inst] -> TcRn [Inst]

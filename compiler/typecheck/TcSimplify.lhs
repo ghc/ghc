@@ -1090,18 +1090,16 @@ checkLoop :: RedEnv
 -- Postcondition: returned Insts are zonked
 
 checkLoop env wanteds
-  = go env wanteds (return ())
-  where go env wanteds elim_skolems
+  = go env wanteds
+  where go env wanteds
 	  = do  {  -- We do need to zonk the givens; cf Note [Zonking RedEnv]
                 ; env'     <- zonkRedEnv env
 		; wanteds' <- zonkInsts  wanteds
 	
-		; (improved, binds, irreds, elim_more_skolems)
-                    <- reduceContext env' wanteds'
-                ; let elim_skolems' = elim_skolems >> elim_more_skolems
+		; (improved, binds, irreds) <- reduceContext env' wanteds'
 
 		; if not improved then
-	 	    elim_skolems' >> return (irreds, binds)
+	 	    return (irreds, binds)
 		  else do
 	
 		-- If improvement did some unification, we go round again.
@@ -1110,7 +1108,7 @@ checkLoop env wanteds
 		-- variable which might have been unified, so we'd get an 
                 -- infinite loop if we started again with wanteds!  
                 -- See Note [LOOP]
-		{ (irreds1, binds1) <- go env' irreds elim_skolems'
+		{ (irreds1, binds1) <- go env' irreds
 		; return (irreds1, binds `unionBags` binds1) } }
 \end{code}
 
@@ -1359,9 +1357,7 @@ tcSimplifyRestricted doc top_lvl bndrs tau_tvs wanteds
 	-- HOWEVER, some unification may take place, if we instantiate
 	-- 	    a method Inst with an equality constraint
 	; let env = mkNoImproveRedEnv doc (\_ -> ReduceMe AddSCs)
-	; (_imp, _binds, constrained_dicts, elim_skolems) 
-            <- reduceContext env wanteds'
-        ; elim_skolems
+	; (_imp, _binds, constrained_dicts) <- reduceContext env wanteds'
 
 	-- Next, figure out the tyvars we will quantify over
 	; tau_tvs' <- zonkTcTyVarsAndFV (varSetElems tau_tvs)
@@ -1410,8 +1406,7 @@ tcSimplifyRestricted doc top_lvl bndrs tau_tvs wanteds
 			   (is_nested_group || isDict inst) = Stop
 		          | otherwise  	         = ReduceMe AddSCs
 	      env = mkNoImproveRedEnv doc try_me
-	; (_imp, binds, irreds, elim_skolems) <- reduceContext env wanteds'
-        ; elim_skolems
+	; (_imp, binds, irreds) <- reduceContext env wanteds'
 
 	-- See "Notes on implicit parameters, Question 4: top level"
 	; ASSERT( all (isFreeWrtTyVars qtvs) irreds )	-- None should be captured
@@ -1588,8 +1583,7 @@ tcSimplifyIPs given_ips wanteds
 		-- Unusually for checking, we *must* zonk the given_ips
 
 	; let env = mkRedEnv doc try_me given_ips'
-	; (improved, binds, irreds, elim_skolems) <- reduceContext env wanteds'
-        ; elim_skolems
+	; (improved, binds, irreds) <- reduceContext env wanteds'
 
 	; if not improved then 
 		ASSERT( all is_free irreds )
@@ -1762,53 +1756,47 @@ reduceContext :: RedEnv
 	      -> [Inst]			-- Wanted
 	      -> TcM (ImprovementDone,
 		      TcDictBinds,	-- Dictionary bindings
-		      [Inst],		-- Irreducible
-                      TcM ())           -- Undo skolems from SkolemOccurs
+		      [Inst])		-- Irreducible
 
-reduceContext env wanteds
+reduceContext env wanteds0
   = do	{ traceTc (text "reduceContext" <+> (vcat [
 	     text "----------------------",
 	     red_doc env,
 	     text "given" <+> ppr (red_givens env),
-	     text "wanted" <+> ppr wanteds,
+	     text "wanted" <+> ppr wanteds0,
 	     text "----------------------"
 	     ]))
-
-
-	; let givens 		 	   = red_givens env
-	      (given_eqs0, given_dicts0)   = partition isEqInst givens
-	      (wanted_eqs0, wanted_non_eqs) = partition isEqInst wanteds
-	      (wanted_implics0, wanted_dicts) = partition isImplicInst wanted_non_eqs
 
           -- We want to add as wanted equalities those that (transitively) 
           -- occur in superclass contexts of wanted class constraints.
           -- See Note [Ancestor Equalities]
-	; ancestor_eqs <- ancestorEqualities wanted_dicts
-        ; let wanted_eqs = wanted_eqs0 ++ ancestor_eqs
+	; ancestor_eqs <- ancestorEqualities wanteds0
 	; traceTc $ text "reduceContext: ancestor eqs" <+> ppr ancestor_eqs
 
-	  -- 1. Normalise the *given* *equality* constraints
-	; (given_eqs, eliminate_skolems) <- normaliseGivenEqs given_eqs0
+          -- Normalise and solve all equality constraints as far as possible
+          -- and normalise all dictionary constraints wrt to the reduced
+          -- equalities.  The returned wanted constraints include the
+          -- irreducible wanted equalities.
+        ; let wanteds = wanteds0 ++ ancestor_eqs
+              givens  = red_givens env
+        ; (givens', 
+           wanteds', 
+           normalise_binds,
+           eq_improved)     <- tcReduceEqs givens wanteds
 
-	  -- 2. Normalise the *given* *dictionary* constraints
-	  --    wrt. the toplevel and given equations
-	; (given_dicts, given_binds) <- normaliseGivenDicts given_eqs
-                                                            given_dicts0
-
-          -- 5. Build the Avail mapping from "given_dicts"
+          -- Build the Avail mapping from "given_dicts"
 	; (init_state, _) <- getLIE $ do 
-		{ init_state <- foldlM addGiven emptyAvails given_dicts
+		{ init_state <- foldlM addGiven emptyAvails givens'
 		; return init_state
                 }
 
-	-- !!! ToDo: what to do with the "extra_givens"?  For the
-	-- moment I'm simply discarding them, which is probably wrong
-
-          -- 6. Solve the *wanted* *dictionary* constraints (not implications)
-	  --    This may expose some further equational constraints...
+          -- Solve the *wanted* *dictionary* constraints (not implications)
+	  -- This may expose some further equational constraints...
+	; let (wanted_implics, wanted_dicts) = partition isImplicInst wanteds'
 	; (avails, extra_eqs) <- getLIE (reduceList env wanted_dicts init_state)
-	; (dict_binds, bound_dicts, dict_irreds) 
-            <- extractResults avails wanted_dicts
+	; (dict_binds, 
+           bound_dicts, 
+           dict_irreds)       <- extractResults avails wanted_dicts
 	; traceTc $ text "reduceContext extractresults" <+> vcat
 		      [ppr avails, ppr wanted_dicts, ppr dict_binds]
 
@@ -1816,21 +1804,29 @@ reduceContext env wanteds
 	  -- as "given"   all the dicts that were originally given, 
 	  --		  *or* for which we now have bindings, 
 	  --		  *or* which are now irreds
-	; let implic_env = env { red_givens = givens ++ bound_dicts 
-                                              ++ dict_irreds }
+	; let implic_env = env { red_givens = givens ++ bound_dicts ++
+                                              dict_irreds }
 	; (implic_binds_s, implic_irreds_s) 
-            <- mapAndUnzipM (reduceImplication implic_env) wanted_implics0
+            <- mapAndUnzipM (reduceImplication implic_env) wanted_implics
 	; let implic_binds  = unionManyBags implic_binds_s
 	      implic_irreds = concat implic_irreds_s
 
-	  -- Normalise the wanted equality constraints
-	; eq_irreds <- normaliseWantedEqs given_eqs (wanted_eqs ++ extra_eqs)
+          -- Collect all irreducible instances, and determine whether we should
+          -- go round again.  We do so in either of three cases:
+          -- (1) If dictionary reduction or equality solving led to
+          --     improvement (i.e., instantiated type variables).
+          -- (2) If we managed to normalise any dicts, there is merit in going
+          --     around gain, because reduceList may be able to get further.
+          -- (3) If we uncovered extra equalities.  We will try to solve them
+          --     in the next iteration.
+	; let all_irreds       = dict_irreds ++ implic_irreds ++ extra_eqs
+              improvedFlexible = availsImproved avails ||
+                                 eq_improved
+              improvedDicts    = not $ isEmptyBag normalise_binds
+              extraEqs         = (not . null) extra_eqs
+              improved         = improvedFlexible || improvedDicts || extraEqs
 
-	  -- Normalise the wanted dictionaries
-	; let irreds = dict_irreds ++ implic_irreds
-              eqs    = eq_irreds ++ given_eqs
-	; (norm_irreds, normalise_binds) <- normaliseWantedDicts eqs irreds
-		
+{- Old story
 	  -- Figure out whether we should go round again.  We do so in either
           -- two cases:
           -- (1) If any of the mutable tyvars in givens or irreds has been
@@ -1838,31 +1834,18 @@ reduceContext env wanteds
           --     again, because we may make further progress.
           -- (2) If we managed to normalise any dicts, there is merit in going
           --     around gain, because reduceList may be able to get further.
-	  -- 
-	  -- ToDo: We may have exposed new
-	  --	   equality constraints and should probably go round again
-	  --	   then as well.  But currently we are dropping them on the
-	  --	   floor anyway.
 
-	; let all_irreds = norm_irreds ++ eq_irreds
 	; improvedMetaTy <- anyM isFilledMetaTyVar $ varSetElems $
 		            tyVarsOfInsts (givens ++ all_irreds)
         ; let improvedDicts = not $ isEmptyBag normalise_binds
               improved      = improvedMetaTy || improvedDicts
-
-	-- The old plan (fragile)
-	-- improveed   = availsImproved avails 
-	--		 || (not $ isEmptyBag normalise_binds1)
-	--		 || (not $ isEmptyBag normalise_binds2)
-	--		 || (any isEqInst irreds)
+ -}
 
 	; traceTc (text "reduceContext end" <+> (vcat [
 	     text "----------------------",
 	     red_doc env,
 	     text "given" <+> ppr givens,
-	     text "given_eqs" <+> ppr given_eqs,
-	     text "wanted" <+> ppr wanteds,
-	     text "wanted_dicts" <+> ppr wanted_dicts,
+	     text "wanted" <+> ppr wanteds0,
 	     text "----",
 	     text "avails" <+> pprAvails avails,
 	     text "improved =" <+> ppr improved,
@@ -1873,11 +1856,9 @@ reduceContext env wanteds
 	     ]))
 
 	; return (improved, 
-                  given_binds `unionBags` normalise_binds
-                              `unionBags` dict_binds 
-                              `unionBags` implic_binds, 
-                  all_irreds,
-                  eliminate_skolems) 
+                  normalise_binds `unionBags` dict_binds 
+                                  `unionBags` implic_binds, 
+                  all_irreds) 
         }
 
 tcImproveOne :: Avails -> Inst -> TcM ImprovementDone
@@ -2368,8 +2349,8 @@ extendAvails avails@(Avails imp env) inst avail
 availsInsts :: Avails -> [Inst]
 availsInsts (Avails _ avails) = keysFM avails
 
-_availsImproved :: Avails -> ImprovementDone
-_availsImproved (Avails imp _) = imp
+availsImproved :: Avails -> ImprovementDone
+availsImproved (Avails imp _) = imp
 \end{code}
 
 Extracting the bindings from a bunch of Avails.
