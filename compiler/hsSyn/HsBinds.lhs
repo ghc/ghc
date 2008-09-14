@@ -81,40 +81,44 @@ type LHsBindLR idL idR = Located (HsBindLR idL idR)
 type LHsBindsLR idL idR = Bag (LHsBindLR idL idR)
 
 data HsBindLR idL idR
-  = FunBind {	-- FunBind is used for both functions 	f x = e
-		-- and variables			f = \x -> e
--- Reason 1: Special case for type inference: see TcBinds.tcMonoBinds
---
--- Reason 2: instance decls can only have FunBinds, which is convenient
---	     If you change this, you'll need to change e.g. rnMethodBinds
-
--- But note that the form	f :: a->a = ...
--- parses as a pattern binding, just like
---			(f :: a -> a) = ... 
+  = -- | FunBind is used for both functions   @f x = e@
+    -- and variables                          @f = \x -> e@
+    --
+    -- Reason 1: Special case for type inference: see 'TcBinds.tcMonoBinds'.
+    --
+    -- Reason 2: Instance decls can only have FunBinds, which is convenient.
+    --           If you change this, you'll need to change e.g. rnMethodBinds
+    --
+    -- But note that the form                 @f :: a->a = ...@
+    -- parses as a pattern binding, just like
+    --                                        @(f :: a -> a) = ... @
+    FunBind {
 
 	fun_id :: Located idL,
 
-	fun_infix :: Bool,	-- True => infix declaration
+	fun_infix :: Bool,	-- ^ True => infix declaration
 
-	fun_matches :: MatchGroup idR,	-- The payload
+	fun_matches :: MatchGroup idR,	-- ^ The payload
 
-	fun_co_fn :: HsWrapper,	-- Coercion from the type of the MatchGroup to the type of
+	fun_co_fn :: HsWrapper,	-- ^ Coercion from the type of the MatchGroup to the type of
 				-- the Id.  Example:
+                                -- @
 				--	f :: Int -> forall a. a -> a
 				--	f x y = y
+                                -- @
 				-- Then the MatchGroup will have type (Int -> a' -> a')
 				-- (with a free type variable a').  The coercion will take
 				-- a CoreExpr of this type and convert it to a CoreExpr of
 				-- type 	Int -> forall a'. a' -> a'
 				-- Notice that the coercion captures the free a'.
 
-	bind_fvs :: NameSet,	-- After the renamer, this contains a superset of the 
+	bind_fvs :: NameSet,	-- ^ After the renamer, this contains a superset of the
 				-- Names of the other binders in this binding group that 
 				-- are free in the RHS of the defn
 				-- Before renaming, and after typechecking, 
 				-- the field is unused; it's just an error thunk
 
-        fun_tick :: Maybe (Int,[idR])   -- This is the (optional) module-local tick number. 
+        fun_tick :: Maybe (Int,[idR])   -- ^ This is the (optional) module-local tick number.
     }
 
   | PatBind {	-- The pattern is never a simple variable;
