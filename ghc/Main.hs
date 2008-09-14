@@ -14,7 +14,7 @@ module Main (main) where
 
 -- The official GHC API
 import qualified GHC
-import GHC		( Session, DynFlags(..), HscTarget(..), 
+import GHC		( DynFlags(..), HscTarget(..),
                           GhcMode(..), GhcLink(..),
 			  LoadHowMuch(..), dopt, DynFlag(..) )
 import CmdLineParser
@@ -34,16 +34,17 @@ import HscTypes
 import Packages		( dumpPackages )
 import DriverPhases	( Phase(..), isSourceFilename, anyHsc,
 			  startPhase, isHaskellSrcFilename )
+import BasicTypes       ( failed )
 import StaticFlags
 import StaticFlagParser
 import DynFlags
-import BasicTypes	( failed )
 import ErrUtils
 import FastString
 import Outputable
 import SrcLoc
 import Util
 import Panic
+import MonadUtils       ( liftIO )
 
 -- Standard Haskell libraries
 import System.IO
@@ -68,8 +69,8 @@ import Data.Maybe
 
 main :: IO ()
 main =
-  GHC.defaultErrorHandler defaultDynFlags $ do
   
+  GHC.defaultErrorHandler defaultDynFlags $ do
   -- 1. extract the -B flag from the args
   argv0 <- getArgs
 
@@ -101,9 +102,9 @@ main =
     _                       -> return ()
 
   -- start our GHC session
-  session <- GHC.newSession mbMinusB
+  GHC.runGhc mbMinusB $ do
 
-  dflags0 <- GHC.getSessionDynFlags session
+  dflags0 <- GHC.getSessionDynFlags
 
   -- set the default GhcMode, HscTarget and GhcLink.  The HscTarget
   -- can be further adjusted on a module by module basis, using only
@@ -112,21 +113,21 @@ main =
   let dflt_target = hscTarget dflags0
       (mode, lang, link)
          = case cli_mode of
-		DoInteractive	-> (CompManager, HscInterpreted, LinkInMemory)
-		DoEval _	-> (CompManager, HscInterpreted, LinkInMemory)
-		DoMake		-> (CompManager, dflt_target,    LinkBinary)
-		DoMkDependHS	-> (MkDepend,    dflt_target,    LinkBinary)
-		_		-> (OneShot,     dflt_target,    LinkBinary)
+        	DoInteractive	-> (CompManager, HscInterpreted, LinkInMemory)
+        	DoEval _	-> (CompManager, HscInterpreted, LinkInMemory)
+        	DoMake		-> (CompManager, dflt_target,    LinkBinary)
+        	DoMkDependHS	-> (MkDepend,    dflt_target,    LinkBinary)
+        	_		-> (OneShot,     dflt_target,    LinkBinary)
 
   let dflags1 = dflags0{ ghcMode   = mode,
                   	 hscTarget = lang,
                          ghcLink   = link,
-			 -- leave out hscOutName for now
-	                 hscOutName = panic "Main.main:hscOutName not set",
-		  	 verbosity = case cli_mode of
-				 	 DoEval _ -> 0
-				 	 _other   -> 1
-			}
+        		 -- leave out hscOutName for now
+                         hscOutName = panic "Main.main:hscOutName not set",
+        	  	 verbosity = case cli_mode of
+        			 	 DoEval _ -> 0
+        			 	 _other   -> 1
+        		}
 
       -- turn on -fimplicit-import-qualified for GHCi now, so that it
       -- can be overriden from the command-line
@@ -135,24 +136,24 @@ main =
                | otherwise                 = dflags1
         where imp_qual_enabled = dflags1 `dopt_set` Opt_ImplicitImportQualified
 
-	-- The rest of the arguments are "dynamic"
-	-- Leftover ones are presumably files
+        -- The rest of the arguments are "dynamic"
+        -- Leftover ones are presumably files
   (dflags2, fileish_args, dynamicFlagWarnings) <- GHC.parseDynamicFlags dflags1a argv3
 
   let flagWarnings = staticFlagWarnings
                   ++ modeFlagWarnings
                   ++ dynamicFlagWarnings
-  handleFlagWarnings dflags2 flagWarnings
+  liftIO $ handleFlagWarnings dflags2 flagWarnings
 
-	-- make sure we clean up after ourselves
+        -- make sure we clean up after ourselves
   GHC.defaultCleanupHandler dflags2 $ do
 
-  showBanner cli_mode dflags2
+  liftIO $ showBanner cli_mode dflags2
 
   -- we've finished manipulating the DynFlags, update the session
-  GHC.setSessionDynFlags session dflags2
-  dflags3 <- GHC.getSessionDynFlags session
-  hsc_env <- GHC.sessionHscEnv      session
+  GHC.setSessionDynFlags dflags2
+  dflags3 <- GHC.getSessionDynFlags
+  hsc_env <- GHC.getSession
 
   let
      -- To simplify the handling of filepaths, we normalise all filepaths right 
@@ -163,40 +164,44 @@ main =
 
   -- Note: have v_Ld_inputs maintain the order in which 'objs' occurred on 
   --       the command-line.
-  mapM_ (consIORef v_Ld_inputs) (reverse objs)
+  liftIO $ mapM_ (consIORef v_Ld_inputs) (reverse objs)
 
-	---------------- Display configuration -----------
+        ---------------- Display configuration -----------
   when (verbosity dflags3 >= 4) $
-	dumpPackages dflags3
+        liftIO $ dumpPackages dflags3
 
   when (verbosity dflags3 >= 3) $ do
-	hPutStrLn stderr ("Hsc static flags: " ++ unwords staticFlags)
+        liftIO $ hPutStrLn stderr ("Hsc static flags: " ++ unwords staticFlags)
 
-	---------------- Final sanity checking -----------
-  checkOptions cli_mode dflags3 srcs objs
+        ---------------- Final sanity checking -----------
+  liftIO $ checkOptions cli_mode dflags3 srcs objs
 
   ---------------- Do the business -----------
   let alreadyHandled = panic (show cli_mode ++
                               " should already have been handled")
-  case cli_mode of
-    ShowUsage              -> showGhcUsage dflags3 cli_mode
-    PrintLibdir            -> putStrLn (topDir dflags3)
-    ShowSupportedLanguages -> alreadyHandled
-    ShowVersion            -> alreadyHandled
-    ShowNumVersion         -> alreadyHandled
-    ShowInterface f        -> doShowIface dflags3 f
-    DoMake                 -> doMake session srcs
-    DoMkDependHS           -> doMkDependHS session (map fst srcs)
-    StopBefore p           -> oneShot hsc_env p srcs
-    DoInteractive          -> interactiveUI session srcs Nothing
-    DoEval exprs           -> interactiveUI session srcs $ Just $ reverse exprs
 
-  dumpFinalStats dflags3
-  exitWith ExitSuccess
+  handleSourceError (\e -> do
+       GHC.printExceptionAndWarnings e
+       liftIO $ exitWith (ExitFailure 1)) $
+    case cli_mode of
+       ShowUsage              -> liftIO $ showGhcUsage dflags3 cli_mode
+       PrintLibdir            -> liftIO $ putStrLn (topDir dflags3)
+       ShowSupportedLanguages -> alreadyHandled
+       ShowVersion            -> alreadyHandled
+       ShowNumVersion         -> alreadyHandled
+       ShowInterface f        -> liftIO $ doShowIface dflags3 f
+       DoMake                 -> doMake srcs
+       DoMkDependHS           -> doMkDependHS (map fst srcs)
+       StopBefore p           -> oneShot hsc_env p srcs >> GHC.printWarnings
+       DoInteractive          -> interactiveUI srcs Nothing
+       DoEval exprs           -> interactiveUI srcs $ Just $ reverse exprs
+
+  liftIO $ dumpFinalStats dflags3
+  liftIO $ exitWith ExitSuccess
 
 #ifndef GHCI
-interactiveUI :: a -> b -> c -> IO ()
-interactiveUI _ _ _ = 
+interactiveUI :: b -> c -> Ghc ()
+interactiveUI _ _ =
   ghcError (CmdLineError "not built for interactive use")
 #endif
 
@@ -244,6 +249,9 @@ looks_like_an_input m =  isSourceFilename m
 -- -----------------------------------------------------------------------------
 -- Option sanity checks
 
+-- | Ensure sanity of options.
+--
+-- Throws 'UsageError' or 'CmdLineError' if not.
 checkOptions :: CmdLineMode -> DynFlags -> [(String,Maybe Phase)] -> [String] -> IO ()
      -- Final sanity checking before kicking off a compilation (pipeline).
 checkOptions cli_mode dflags srcs objs = do
@@ -450,9 +458,9 @@ addFlag s = do
 -- ----------------------------------------------------------------------------
 -- Run --make mode
 
-doMake :: Session -> [(String,Maybe Phase)] -> IO ()
-doMake _    []    = ghcError (UsageError "no input files")
-doMake sess srcs  = do 
+doMake :: [(String,Maybe Phase)] -> Ghc ()
+doMake []    = ghcError (UsageError "no input files")
+doMake srcs  = do
     let (hs_srcs, non_hs_srcs) = partition haskellish srcs
 
 	haskellish (f,Nothing) = 
@@ -460,14 +468,19 @@ doMake sess srcs  = do
 	haskellish (_,Just phase) = 
 	  phase `notElem` [As, Cc, CmmCpp, Cmm, StopLn]
 
-    hsc_env <- GHC.sessionHscEnv sess
-    o_files <- mapM (compileFile hsc_env StopLn) non_hs_srcs
-    mapM_ (consIORef v_Ld_inputs) (reverse o_files)
+    hsc_env <- GHC.getSession
+    o_files <- mapM (\x -> do
+                        f <- compileFile hsc_env StopLn x
+                        GHC.printWarnings
+                        return f)
+                 non_hs_srcs
+    liftIO $ mapM_ (consIORef v_Ld_inputs) (reverse o_files)
 
     targets <- mapM (uncurry GHC.guessTarget) hs_srcs
-    GHC.setTargets sess targets
-    ok_flag <- GHC.load sess LoadAllTargets
-    when (failed ok_flag) (exitWith (ExitFailure 1))
+    GHC.setTargets targets
+    ok_flag <- GHC.load LoadAllTargets
+
+    when (failed ok_flag) (liftIO $ exitWith (ExitFailure 1))
     return ()
 
 
