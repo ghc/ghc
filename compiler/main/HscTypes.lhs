@@ -6,8 +6,18 @@
 \begin{code}
 -- | Types for the per-module compiler
 module HscTypes ( 
+        -- * 'Ghc' monad stuff
+        Ghc(..), GhcT(..), liftGhcT,
+        GhcMonad(..), WarnLogMonad(..),
+        liftIO,
+        ioMsgMaybe, ioMsg,
+        logWarnings, clearWarnings, hasWarnings,
+        SourceError, GhcApiError, mkSrcErr, srcErrorMessages, mkApiErr,
+        handleSourceError,
+        reflectGhc, reifyGhc,
+
 	-- * Sessions and compilation state
-	Session(..), withSession, modifySession, 
+	Session(..), withSession, modifySession,
         HscEnv(..), hscEPS,
 	FinderCache, FindResult(..), ModLocationCache,
 	Target(..), TargetId(..), pprTarget, pprTargetId,
@@ -132,6 +142,16 @@ import UniqSupply	( UniqSupply )
 import FastString
 import StringBuffer	( StringBuffer )
 import Fingerprint
+import MonadUtils
+import Bag              ( emptyBag, unionBags, isEmptyBag )
+import Data.Dynamic     ( Typeable )
+import qualified Data.Dynamic as Dyn
+#if __GLASGOW_HASKELL__ < 609
+import Data.Dynamic     ( toDyn, fromDyn, fromDynamic )
+#else
+import Bag              ( bagToList )
+#endif
+import ErrUtils         ( ErrorMessages, WarningMessages, Messages )
 
 import System.FilePath
 import System.Time	( ClockTime )
@@ -139,6 +159,7 @@ import Data.IORef
 import Data.Array       ( Array, array )
 import Data.List
 import Control.Monad    ( mplus, guard, liftM )
+import Exception
 \end{code}
 
 
@@ -154,13 +175,278 @@ import Control.Monad    ( mplus, guard, liftM )
 -- session.  A compilation session consists of a set of modules
 -- constituting the current program or library, the context for
 -- interactive evaluation, and various caches.
-newtype Session = Session (IORef HscEnv)
+data Session = Session !(IORef HscEnv) !(IORef WarningMessages)
 
-withSession :: Session -> (HscEnv -> IO a) -> IO a
-withSession (Session ref) f = do h <- readIORef ref; f h
+mkSrcErr :: ErrorMessages -> SourceError
+srcErrorMessages :: SourceError -> ErrorMessages
+mkApiErr :: SDoc -> GhcApiError
 
-modifySession :: Session -> (HscEnv -> HscEnv) -> IO ()
-modifySession (Session ref) f = do h <- readIORef ref; writeIORef ref $! f h
+#if __GLASGOW_HASKELL__ >= 609
+
+-- | A source error is an error that is caused by one or more errors in the
+-- source code.  A 'SourceError' is thrown by many functions in the
+-- compilation pipeline.  Inside GHC these errors are merely printed via
+-- 'log_action', but API clients may treat them differently, for example,
+-- insert them into a list box.  If you want the default behaviour, use the
+-- idiom:
+--
+-- > handleSourceError printExceptionAndWarnings $ do
+-- >   ... api calls that may fail ...
+--
+-- The 'SourceError's error messages can be accessed via 'srcErrorMessages'.
+-- This list may be empty if the compiler failed due to @-Werror@
+-- ('Opt_WarnIsError').
+--
+-- See 'printExceptionAndWarnings' for more information on what to take care
+-- of when writing a custom error handler.
+data SourceError = SourceError ErrorMessages
+
+instance Show SourceError where
+  show (SourceError msgs) = unlines . map show . bagToList $ msgs
+    -- ToDo: is there some nicer way to print this?
+
+sourceErrorTc :: Dyn.TyCon
+sourceErrorTc = Dyn.mkTyCon "SourceError"
+{-# NOINLINE sourceErrorTc #-}
+instance Typeable SourceError where
+  typeOf _ = Dyn.mkTyConApp sourceErrorTc []
+
+instance Exception SourceError
+
+mkSrcErr = SourceError
+
+-- | Perform the given action and call the exception handler if the action
+-- throws a 'SourceError'.  See 'SourceError' for more information.
+handleSourceError :: (ExceptionMonad m) =>
+                     (SourceError -> m a) -- ^ exception handler
+                  -> m a -- ^ action to perform
+                  -> m a
+handleSourceError handler act =
+  gcatch act (\(e :: SourceError) -> handler e)
+
+srcErrorMessages (SourceError msgs) = msgs
+
+-- | XXX: what exactly is an API error?
+data GhcApiError = GhcApiError SDoc
+
+instance Show GhcApiError where
+  show (GhcApiError msg) = showSDoc msg
+
+ghcApiErrorTc :: Dyn.TyCon
+ghcApiErrorTc = Dyn.mkTyCon "GhcApiError"
+{-# NOINLINE ghcApiErrorTc #-}
+instance Typeable GhcApiError where
+  typeOf _ = Dyn.mkTyConApp ghcApiErrorTc []
+
+instance Exception GhcApiError
+
+mkApiErr = GhcApiError
+
+#else
+------------------------------------------------------------------------
+-- implementation for bootstrapping without extensible exceptions
+
+data SourceException = SourceException ErrorMessages
+sourceExceptionTc :: Dyn.TyCon
+sourceExceptionTc = Dyn.mkTyCon "SourceException"
+{-# NOINLINE sourceExceptionTc #-}
+instance Typeable SourceException where
+  typeOf _ = Dyn.mkTyConApp sourceExceptionTc []
+
+-- Source error has to look like a normal exception.  Throwing a DynException
+-- directly would not allow us to use the Exception monad.  We also cannot
+-- make it part of GhcException as that would lead to circular imports.
+
+type SourceError = Exception
+type GhcApiError = Exception
+
+mkSrcErr msgs = DynException . toDyn $ SourceException msgs
+
+mkApiErr = IOException . userError . showSDoc
+
+srcErrorMessages (DynException ms) =
+    let SourceException msgs = (fromDyn ms (panic "SourceException expected"))
+    in msgs
+srcErrorMessages _ = panic "SourceError expected"
+
+handleSourceError :: ExceptionMonad m => (Exception -> m a) -> m a -> m a
+handleSourceError handler act =
+  gcatch act
+         (\e -> case e of
+                  DynException dyn
+                    | Just (SourceException _) <- fromDynamic dyn
+                        -> handler e
+                  _ -> throw e)
+#endif
+
+-- | A monad that allows logging of warnings.
+class Monad m => WarnLogMonad m where
+  setWarnings  :: WarningMessages -> m ()
+  getWarnings :: m WarningMessages
+
+logWarnings :: WarnLogMonad m => WarningMessages -> m ()
+logWarnings warns = do
+    warns0 <- getWarnings
+    setWarnings (unionBags warns warns0)
+
+-- | Clear the log of 'Warnings'.
+clearWarnings :: WarnLogMonad m => m ()
+clearWarnings = setWarnings emptyBag
+
+-- | Returns true if there were any warnings.
+hasWarnings :: WarnLogMonad m => m Bool
+hasWarnings = getWarnings >>= return . not . isEmptyBag
+
+-- | A monad that has all the features needed by GHC API calls.
+--
+-- In short, a GHC monad
+--
+--   - allows embedding of IO actions,
+--
+--   - can log warnings,
+--
+--   - allows handling of (extensible) exceptions, and
+--
+--   - maintains a current session.
+--
+-- If you do not use 'Ghc' or 'GhcT', make sure to call 'GHC.initGhcMonad'
+-- before any call to the GHC API functions can occur.
+--
+class (Functor m, MonadIO m, WarnLogMonad m, ExceptionMonad m)
+    => GhcMonad m where
+  getSession :: m HscEnv
+  setSession :: HscEnv -> m ()
+
+-- | Call the argument with the current session.
+withSession :: GhcMonad m => (HscEnv -> m a) -> m a
+withSession f = getSession >>= f
+
+-- | Set the current session to the result of applying the current session to
+-- the argument.
+modifySession :: GhcMonad m => (HscEnv -> HscEnv) -> m ()
+modifySession f = do h <- getSession
+                     setSession $! f h
+
+-- | A minimal implementation of a 'GhcMonad'.  If you need a custom monad,
+-- e.g., to maintain additional state consider wrapping this monad or using
+-- 'GhcT'.
+newtype Ghc a = Ghc { unGhc :: Session -> IO a }
+
+instance Functor Ghc where
+  fmap f m = Ghc $ \s -> f `fmap` unGhc m s
+
+instance Monad Ghc where
+  return a = Ghc $ \_ -> return a
+  m >>= g  = Ghc $ \s -> do a <- unGhc m s; unGhc (g a) s
+
+instance MonadIO Ghc where
+  liftIO ioA = Ghc $ \_ -> ioA
+
+instance ExceptionMonad Ghc where
+  gcatch act handle =
+      Ghc $ \s -> unGhc act s `gcatch` \e -> unGhc (handle e) s
+#if __GLASGOW_HASKELL__ < 609
+  gcatchDyn act handler =
+      Ghc $ \s -> unGhc act s `gcatchDyn` \e -> unGhc (handler e) s
+#endif
+instance WarnLogMonad Ghc where
+  setWarnings warns = Ghc $ \(Session _ wref) -> writeIORef wref warns
+  -- | Return 'Warnings' accumulated so far.
+  getWarnings       = Ghc $ \(Session _ wref) -> readIORef wref
+
+instance GhcMonad Ghc where
+  getSession = Ghc $ \(Session r _) -> readIORef r
+  setSession s' = Ghc $ \(Session r _) -> writeIORef r s'
+
+-- | A monad transformer to add GHC specific features to another monad.
+--
+-- Note that the wrapped monad must support IO and handling of exceptions.
+newtype GhcT m a = GhcT { unGhcT :: Session -> m a }
+liftGhcT :: Monad m => m a -> GhcT m a
+liftGhcT m = GhcT $ \_ -> m
+
+instance Functor m => Functor (GhcT m) where
+  fmap f m = GhcT $ \s -> f `fmap` unGhcT m s
+
+instance Monad m => Monad (GhcT m) where
+  return x = GhcT $ \_ -> return x
+  m >>= k  = GhcT $ \s -> do a <- unGhcT m s; unGhcT (k a) s
+
+instance MonadIO m => MonadIO (GhcT m) where
+  liftIO ioA = GhcT $ \_ -> liftIO ioA
+
+instance ExceptionMonad m => ExceptionMonad (GhcT m) where
+  gcatch act handle =
+      GhcT $ \s -> unGhcT act s `gcatch` \e -> unGhcT (handle e) s
+#if __GLASGOW_HASKELL__ < 609
+  gcatchDyn _act _handler = error "cannot use GhcT in stage1"
+#endif
+
+instance MonadIO m => WarnLogMonad (GhcT m) where
+  setWarnings warns = GhcT $ \(Session _ wref) -> liftIO $ writeIORef wref warns
+  -- | Return 'Warnings' accumulated so far.
+  getWarnings       = GhcT $ \(Session _ wref) -> liftIO $ readIORef wref
+
+instance (Functor m, ExceptionMonad m, MonadIO m) => GhcMonad (GhcT m) where
+  getSession = GhcT $ \(Session r _) -> liftIO $ readIORef r
+  setSession s' = GhcT $ \(Session r _) -> liftIO $ writeIORef r s'
+
+-- | Lift an IO action returning errors messages into a 'GhcMonad'.
+--
+-- In order to reduce dependencies to other parts of the compiler, functions
+-- outside the "main" parts of GHC return warnings and errors as a parameter
+-- and signal success via by wrapping the result in a 'Maybe' type.  This
+-- function logs the returned warnings and propagates errors as exceptions
+-- (of type 'SourceError').
+--
+-- This function assumes the following invariants:
+--
+--  1. If the second result indicates success (is of the form 'Just x'),
+--     there must be no error messages in the first result.
+--
+--  2. If there are no error messages, but the second result indicates failure
+--     there should be warnings in the first result.  That is, if the action
+--     failed, it must have been due to the warnings (i.e., @-Werror@).
+ioMsgMaybe :: GhcMonad m =>
+              IO (Messages, Maybe a) -> m a
+ioMsgMaybe ioA = do
+  ((warns,errs), mb_r) <- liftIO ioA
+  logWarnings warns
+  case mb_r of
+    Nothing -> throw (mkSrcErr errs)
+    Just r  -> ASSERT( isEmptyBag errs ) return r
+
+-- | Lift a non-failing IO action into a 'GhcMonad'.
+--
+-- Like 'ioMsgMaybe', but assumes that the action will never return any error
+-- messages.
+ioMsg :: GhcMonad m => IO (Messages, a) -> m a
+ioMsg ioA = do
+    ((warns,errs), r) <- liftIO ioA
+    logWarnings warns
+    ASSERT( isEmptyBag errs ) return r
+
+-- | Reflect a computation in the 'Ghc' monad into the 'IO' monad.
+--
+-- You can use this to call functions returning an action in the 'Ghc' monad
+-- inside an 'IO' action.  This is needed for some (too restrictive) callback
+-- arguments of some library functions:
+--
+-- > libFunc :: String -> (Int -> IO a) -> IO a
+-- > ghcFunc :: Int -> Ghc a
+-- >
+-- > ghcFuncUsingLibFunc :: String -> Ghc a -> Ghc a
+-- > ghcFuncUsingLibFunc str =
+-- >   reifyGhc $ \s ->
+-- >     libFunc $ \i -> do
+-- >       reflectGhc (ghcFunc i) s
+--
+reflectGhc :: Ghc a -> Session -> IO a
+reflectGhc m = unGhc m
+
+-- > Dual to 'reflectGhc'.  See its documentation.
+reifyGhc :: (Session -> IO a) -> Ghc a
+reifyGhc act = Ghc $ act
 \end{code}
 
 \begin{code}
