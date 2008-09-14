@@ -9,6 +9,7 @@ module ErrUtils (
 	Severity(..),
 
 	ErrMsg, WarnMsg, throwErrMsg, handleErrMsg,
+    ErrorMessages, WarningMessages,
 	errMsgSpans, errMsgContext, errMsgShortDoc, errMsgExtraInfo,
 	Messages, errorsFound, emptyMessages,
 	mkErrMsg, mkPlainErrMsg, mkLongErrMsg, mkWarnMsg, mkPlainWarnMsg,
@@ -136,6 +137,9 @@ mkPlainWarnMsg :: SrcSpan -> Message -> ErrMsg
 mkPlainWarnMsg locn msg = mkWarnMsg locn alwaysQualify msg
 
 type Messages = (Bag WarnMsg, Bag ErrMsg)
+
+type WarningMessages = Bag WarnMsg
+type ErrorMessages   = Bag ErrMsg
 
 emptyMessages :: Messages
 emptyMessages = (emptyBag, emptyBag)
