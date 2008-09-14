@@ -15,6 +15,7 @@ module ErrUtils (
 	mkErrMsg, mkPlainErrMsg, mkLongErrMsg, mkWarnMsg, mkPlainWarnMsg,
 	printErrorsAndWarnings, printBagOfErrors, printBagOfWarnings,
     handleFlagWarnings,
+	warnIsErrorMsg,
 
 	ghcExit,
 	doIfSet, doIfSet_dyn, 
@@ -143,6 +144,9 @@ type ErrorMessages   = Bag ErrMsg
 
 emptyMessages :: Messages
 emptyMessages = (emptyBag, emptyBag)
+
+warnIsErrorMsg :: ErrMsg
+warnIsErrorMsg = mkPlainErrMsg noSrcSpan (text "\nFailing due to -Werror.\n")
 
 errorsFound :: DynFlags -> Messages -> Bool
 -- The dyn-flags are used to see if the user has specified
