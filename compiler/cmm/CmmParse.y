@@ -53,6 +53,7 @@ import FastString
 import Panic
 import Constants
 import Outputable
+import Bag              ( emptyBag, unitBag )
 
 import Control.Monad
 import Data.Array
@@ -1092,7 +1093,7 @@ initEnv = listToUFM [
     Var (CmmLit (CmmInt (fromIntegral stdInfoTableSizeB) wordRep) ))
   ]
 
-parseCmmFile :: DynFlags -> FilePath -> IO (Maybe Cmm)
+parseCmmFile :: DynFlags -> FilePath -> IO (Messages, Maybe Cmm)
 parseCmmFile dflags filename = do
   showPass dflags "ParseCmm"
   buf <- hGetStringBuffer filename
@@ -1102,14 +1103,17 @@ parseCmmFile dflags filename = do
 		-- reset the lex_state: the Lexer monad leaves some stuff
 		-- in there we don't want.
   case unP cmmParse init_state of
-    PFailed span err -> do printError span err; return Nothing
+    PFailed span err -> do
+        let msg = mkPlainErrMsg span err
+        return ((emptyBag, unitBag msg), Nothing)
     POk pst code -> do
-	cmm <- initC dflags no_module (getCmm (unEC code initEnv [] >> return ()))
-	let ms = getMessages pst
-	printErrorsAndWarnings dflags ms
-        when (errorsFound dflags ms) $ exitWith (ExitFailure 1)
-        dumpIfSet_dyn dflags Opt_D_dump_cmm "Cmm" (ppr cmm)
-	return (Just cmm)
+        cmm <- initC dflags no_module (getCmm (unEC code initEnv [] >> return ()))
+        let ms = getMessages pst
+        if (errorsFound dflags ms)
+         then return (ms, Nothing)
+         else do
+           dumpIfSet_dyn dflags Opt_D_dump_cmm "Cmm" (ppr cmm)
+           return (ms, Just cmm)
   where
 	no_module = panic "parseCmmFile: no module"
 }
