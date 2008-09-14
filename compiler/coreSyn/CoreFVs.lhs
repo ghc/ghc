@@ -194,7 +194,7 @@ expr_fvs (Let (Rec pairs) body)
 
 ---------
 rhs_fvs :: (Id,CoreExpr) -> FV
-rhs_fvs (bndr, rhs) = expr_fvs rhs `union` someVars (idRuleVars bndr)
+rhs_fvs (bndr, rhs) = expr_fvs rhs `union` someVars (bndrRuleVars bndr)
 	-- Treat any RULES as extra RHSs of the binding
 
 ---------
@@ -373,6 +373,10 @@ varTypeTyVars var
 idFreeVars :: Id -> VarSet
 idFreeVars id = ASSERT( isId id) idRuleVars id `unionVarSet` varTypeTyVars id
 
+bndrRuleVars ::Var -> VarSet
+bndrRuleVars v | isTyVar v = emptyVarSet
+	       | otherwise = idRuleVars v
+
 idRuleVars ::Id -> VarSet
 idRuleVars id = ASSERT( isId id) specInfoFreeVars (idSpecialisation id)
 \end{code}
@@ -425,7 +429,7 @@ freeVars (Case scrut bndr ty alts)
 			     rhs2 = freeVars rhs
 
 freeVars (Let (NonRec binder rhs) body)
-  = (freeVarsOf rhs2 `unionFVs` body_fvs `unionFVs` idRuleVars binder,
+  = (freeVarsOf rhs2 `unionFVs` body_fvs `unionFVs` bndrRuleVars binder,
 		-- Remember any rules; cf rhs_fvs above
      AnnLet (AnnNonRec binder rhs2) body2)
   where
