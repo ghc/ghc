@@ -799,8 +799,9 @@ simpleOptExpr subst expr
     ----------------------
     go_nonrec subst b (Type ty') body
       | isTyVar b = go (extendTvSubst subst b ty') body
+	-- let a::* = TYPE ty in <body>
     go_nonrec subst b r' body
-      | isId b
+      | isId b	-- let x = e in <body>
       , exprIsTrivial r' || safe_to_inline (idOccInfo b)
       = go (extendIdSubst subst b r') body
     go_nonrec subst b r' body

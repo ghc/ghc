@@ -605,7 +605,8 @@ addNonRecWithUnf :: SimplEnv
              	  -> SimplEnv
 -- Add suitable IdInfo to the Id, add the binding to the floats, and extend the in-scope set
 addNonRecWithUnf env new_bndr rhs unfolding wkr
-  = final_id `seq`      -- This seq forces the Id, and hence its IdInfo,
+  = ASSERT( isId new_bndr )
+    final_id `seq`      -- This seq forces the Id, and hence its IdInfo,
 	                -- and hence any inner substitutions
     addNonRec env final_id rhs
 	-- The addNonRec adds it to the in-scope set too
@@ -822,10 +823,10 @@ simplCast env body co0 cont0
 
        add_coerce co1 (s1, _k2) (CoerceIt co2 cont)
          | (_l1, t1) <- coercionKind co2
-                --      coerce T1 S1 (coerce S1 K1 e)
+		-- 	e |> (g1 :: S1~L) |> (g2 :: L~T1)
                 -- ==>
-                --      e,                      if T1=K1
-                --      coerce T1 K1 e,         otherwise
+                --      e,                       if T1=T2
+                --      e |> (g1 . g2 :: T1~T2)  otherwise
                 --
                 -- For example, in the initial form of a worker
                 -- we may find  (coerce T (coerce S (\x.e))) y
@@ -835,7 +836,7 @@ simplCast env body co0 cont0
          | otherwise           = CoerceIt (mkTransCoercion co1 co2) cont
 
        add_coerce co (s1s2, _t1t2) (ApplyTo dup (Type arg_ty) arg_se cont)
-                -- (f `cast` g) ty  --->   (f ty) `cast` (g @ ty)
+                -- (f |> g) ty  --->   (f ty) |> (g @ ty)
                 -- This implements the PushT rule from the paper
          | Just (tyvar,_) <- splitForAllTy_maybe s1s2
          , not (isCoVar tyvar)
@@ -848,12 +849,12 @@ simplCast env body co0 cont0
        add_coerce co (s1s2, _t1t2) (ApplyTo dup arg arg_se cont)
          | not (isTypeArg arg)  -- This implements the Push rule from the paper
          , isFunTy s1s2   -- t1t2 must be a function type, becuase it's applied
-                -- co : s1s2 :=: t1t2
-                --      (coerce (T1->T2) (S1->S2) F) E
+                --      (e |> (g :: s1s2 ~ t1->t2)) f
                 -- ===>
-                --      coerce T2 S2 (F (coerce S1 T1 E))
+                --      (e (f |> (arg g :: t1~s1))
+		--	|> (res g :: s2->t2)
                 --
-                -- t1t2 must be a function type, T1->T2, because it's applied
+                -- t1t2 must be a function type, t1->t2, because it's applied
                 -- to something but s1s2 might conceivably not be
                 --
                 -- When we build the ApplyTo we can't mix the out-types
@@ -864,9 +865,9 @@ simplCast env body co0 cont0
                 -- Example of use: Trac #995
          = ApplyTo dup new_arg (zapSubstEnv env) (addCoerce co2 cont)
          where
-           -- we split coercion t1->t2 :=: s1->s2 into t1 :=: s1 and
-           -- t2 :=: s2 with left and right on the curried form:
-           --    (->) t1 t2 :=: (->) s1 s2
+           -- we split coercion t1->t2 ~ s1->s2 into t1 ~ s1 and
+           -- t2 ~ s2 with left and right on the curried form:
+           --    (->) t1 t2 ~ (->) s1 s2
            [co1, co2] = decomposeCo 2 co
            new_arg    = mkCoerce (mkSymCoercion co1) arg'
            arg'       = substExpr (arg_se `setInScope` env) arg
@@ -937,7 +938,8 @@ simplNonRecE env bndr (rhs, rhs_se) (bndrs, body) cont
                      (StrictBind bndr bndrs body env cont) }
 
   | otherwise
-  = do  { (env1, bndr1) <- simplNonRecBndr env bndr
+  = ASSERT( not (isTyVar bndr) )
+    do  { (env1, bndr1) <- simplNonRecBndr env bndr
         ; let (env2, bndr2) = addBndrRules env1 bndr bndr1
         ; env3 <- simplLazyBind env2 NotTopLevel NonRecursive bndr bndr2 rhs rhs_se
         ; simplLam env3 bndrs body cont }
