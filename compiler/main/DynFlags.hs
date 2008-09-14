@@ -1,14 +1,12 @@
 
------------------------------------------------------------------------------
---
+-- |
 -- Dynamic flags
 --
 --
 -- (c) The University of Glasgow 2005
 --
------------------------------------------------------------------------------
 
--- | Most flags are dynamic flags, which means they can change from
+-- Most flags are dynamic flags, which means they can change from
 -- compilation to compilation using @OPTIONS_GHC@ pragmas, and in a
 -- multi-session GHC each session can be using different dynamic
 -- flags.  Dynamic flags can also be set at the prompt in GHCi.
@@ -331,7 +329,7 @@ data DynFlags = DynFlags {
 
   dphBackend            :: DPHBackend,
 
-  thisPackage           :: PackageId,
+  thisPackage           :: PackageId,   -- ^ name of package currently being compiled
 
   -- ways
   wayNames              :: [WayName],   -- ^ Way flags from the command line
@@ -1691,8 +1689,15 @@ glasgowExtsFlags = [
 -- -----------------------------------------------------------------------------
 -- Parsing the dynamic flags.
 
-parseDynamicFlags :: DynFlags -> [Located String]
-                  -> IO (DynFlags, [Located String], [Located String])
+-- | Parse dynamic flags from a list of command line argument.  Returns the
+-- the parsed 'DynFlags', the left-over arguments, and a list of warnings.
+-- Throws a 'UsageError' if errors occurred during parsing (such as unknown
+-- flags or missing arguments).
+parseDynamicFlags :: Monad m =>
+                     DynFlags -> [Located String]
+                  -> m (DynFlags, [Located String], [Located String])
+                     -- ^ Updated 'DynFlags', left-over arguments, and
+                     -- list of warnings.
 parseDynamicFlags dflags args = do
   -- XXX Legacy support code
   -- We used to accept things like
