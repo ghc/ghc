@@ -28,6 +28,21 @@ import Data.List
 -----------------------------------------------------------------------------
 -- Static flags
 
+-- | Parses GHC's static flags from a list of command line arguments.
+--
+-- These flags are static in the sense that they can be set only once and they
+-- are global, meaning that they affect every instance of GHC running;
+-- multiple GHC threads will use the same flags.
+--
+-- This function must be called before any session is started, i.e., before
+-- the first call to 'GHC.withGhc'.
+--
+-- Static flags are more of a hack and are static for more or less historical
+-- reasons.  In the long run, most static flags should eventually become
+-- dynamic flags.
+--
+-- XXX: can we add an auto-generated list of static flags here?
+--
 parseStaticFlags :: [Located String] -> IO ([Located String], [Located String])
 parseStaticFlags args = do
   ready <- readIORef v_opt_C_ready
