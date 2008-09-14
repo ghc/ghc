@@ -33,13 +33,16 @@ One per \tr{import} declaration in a module.
 \begin{code}
 type LImportDecl name = Located (ImportDecl name)
 
+-- | A single Haskell @import@ declaration.
 data ImportDecl name
-  = ImportDecl	  (Located ModuleName)		-- module name
-                  (Maybe FastString)            -- package qualifier
-		  Bool				-- True <=> {-# SOURCE #-} import
-		  Bool				-- True => qualified
-		  (Maybe ModuleName)		-- as Module
-		  (Maybe (Bool, [LIE name]))	-- (True => hiding, names)
+  = ImportDecl {
+      ideclName      :: Located ModuleName, -- ^ Module name.
+      ideclPkgQual   :: Maybe FastString,   -- ^ Package qualifier.
+      ideclSource    :: Bool,               -- ^ True <=> {-# SOURCE #-} import
+      ideclQualified :: Bool,               -- ^ True => qualified
+      ideclAs        :: Maybe ModuleName,   -- ^ as Module
+      ideclHiding    :: Maybe (Bool, [LIE name]) -- ^ (True => hiding, names)
+    }
 \end{code}
 
 \begin{code}
@@ -66,9 +69,6 @@ instance (Outputable name) => Outputable (ImportDecl name) where
 			= parens (interpp'SP spec)
 	pp_spec (Just (True, spec))
 			= ptext (sLit "hiding") <+> parens (interpp'SP spec)
-
-ideclName :: ImportDecl name -> Located ModuleName
-ideclName (ImportDecl mod_nm _ _ _ _ _) = mod_nm
 \end{code}
 
 %************************************************************************
