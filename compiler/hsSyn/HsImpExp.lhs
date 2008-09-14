@@ -80,15 +80,16 @@ instance (Outputable name) => Outputable (ImportDecl name) where
 \begin{code}
 type LIE name = Located (IE name)
 
+-- | Imported or exported entity.
 data IE name
   = IEVar               name
-  | IEThingAbs          name		 -- Class/Type (can't tell)
-  | IEThingAll          name		 -- Class/Type plus all methods/constructors
-  | IEThingWith         name [name]	 -- Class/Type plus some methods/constructors
-  | IEModuleContents    ModuleName	 -- (Export Only)
-  | IEGroup             Int (HsDoc name) -- Doc section heading
-  | IEDoc               (HsDoc name)     -- Some documentation
-  | IEDocNamed          String           -- Reference to named doc
+  | IEThingAbs          name		 -- ^ Class/Type (can't tell)
+  | IEThingAll          name		 -- ^ Class/Type plus all methods/constructors
+  | IEThingWith         name [name]	 -- ^ Class/Type plus some methods/constructors
+  | IEModuleContents    ModuleName	 -- ^ (Export Only)
+  | IEGroup             Int (HsDoc name) -- ^ Doc section heading
+  | IEDoc               (HsDoc name)     -- ^ Some documentation
+  | IEDocNamed          String           -- ^ Reference to named doc
 \end{code}
 
 \begin{code}
