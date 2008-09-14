@@ -482,7 +482,9 @@ lookupFamInst tycon tys
 initV :: PackageId -> HscEnv -> ModGuts -> VectInfo -> VM a -> IO (Maybe (VectInfo, a))
 initV pkg hsc_env guts info p
   = do
-      Just r <- initDs hsc_env (mg_module guts)
+         -- XXX: ignores error messages and warnings, check that this is
+         -- indeed ok (the use of "Just r" suggests so)
+      (_,Just r) <- initDs hsc_env (mg_module guts)
                                (mg_rdr_env guts)
                                (mg_types guts)
                                go
