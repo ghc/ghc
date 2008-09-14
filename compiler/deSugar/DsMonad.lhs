@@ -156,7 +156,7 @@ data DsMetaVal
 initDs  :: HscEnv
 	-> Module -> GlobalRdrEnv -> TypeEnv
 	-> DsM a
-	-> IO (Maybe a)
+	-> IO (Messages, Maybe a)
 -- Print errors and warnings, if any arise
 
 initDs hsc_env mod rdr_env type_env thing_inside
@@ -170,7 +170,6 @@ initDs hsc_env mod rdr_env type_env thing_inside
 	-- Display any errors and warnings 
 	-- Note: if -Werror is used, we don't signal an error here.
 	; msgs <- readIORef msg_var
-        ; printErrorsAndWarnings dflags msgs 
 
 	; let final_res | errorsFound dflags msgs = Nothing
 		        | otherwise = case either_res of
@@ -180,7 +179,7 @@ initDs hsc_env mod rdr_env type_env thing_inside
 		-- a UserError exception.  Then it should have put an error
 		-- message in msg_var, so we just discard the exception
 
-	; return final_res }
+	; return (msgs, final_res) }
 
 initDsTc :: DsM a -> TcM a
 initDsTc thing_inside

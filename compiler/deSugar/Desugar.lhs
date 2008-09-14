@@ -49,7 +49,7 @@ import Data.IORef
 %************************************************************************
 
 \begin{code}
-deSugar :: HscEnv -> ModLocation -> TcGblEnv -> IO (Maybe ModGuts)
+deSugar :: HscEnv -> ModLocation -> TcGblEnv -> IO (Messages, Maybe ModGuts)
 -- Can modify PCS by faulting in more declarations
 
 deSugar hsc_env 
@@ -80,23 +80,27 @@ deSugar hsc_env
 	; let auto_scc = mkAutoScc mod export_set
         ; let target = hscTarget dflags
         ; let hpcInfo = emptyHpcInfo other_hpc_info
-	; mb_res <- case target of
-	             HscNothing -> return (Just ([], [], NoStubs, hpcInfo, emptyModBreaks))
-                     _        -> do (binds_cvr,ds_hpc_info, modBreaks) 
-					      <- if (opt_Hpc 
-							|| target == HscInterpreted)
-						     && (not (isHsBoot hsc_src))							
-                                                 then addCoverageTicksToBinds dflags mod mod_loc (typeEnvTyCons type_env) binds 
-                                                 else return (binds, hpcInfo, emptyModBreaks)
-                                    initDs hsc_env mod rdr_env type_env $ do
-		                        { core_prs <- dsTopLHsBinds auto_scc binds_cvr
-		                        ; (ds_fords, foreign_prs) <- dsForeigns fords
-		                        ; let all_prs = foreign_prs ++ core_prs
-		                        ; ds_rules <- mapM dsRule rules
-		                        ; return (all_prs, catMaybes ds_rules, ds_fords, ds_hpc_info, modBreaks)
-		                        }
+	; (msgs, mb_res)
+              <- case target of
+	           HscNothing ->
+                       return (emptyMessages,
+                               Just ([], [], NoStubs, hpcInfo, emptyModBreaks))
+                   _        -> do
+                     (binds_cvr,ds_hpc_info, modBreaks)
+			 <- if (opt_Hpc
+				  || target == HscInterpreted)
+			       && (not (isHsBoot hsc_src))
+                              then addCoverageTicksToBinds dflags mod mod_loc (typeEnvTyCons type_env) binds 
+                              else return (binds, hpcInfo, emptyModBreaks)
+                     initDs hsc_env mod rdr_env type_env $ do
+		         core_prs <- dsTopLHsBinds auto_scc binds_cvr
+	                 (ds_fords, foreign_prs) <- dsForeigns fords
+	                 let all_prs = foreign_prs ++ core_prs
+		         ds_rules <- mapM dsRule rules
+		         return (all_prs, catMaybes ds_rules, ds_fords, ds_hpc_info, modBreaks)
+
 	; case mb_res of {
-	   Nothing -> return Nothing ;
+	   Nothing -> return (msgs, Nothing) ;
 	   Just (all_prs, ds_rules, ds_fords,ds_hpc_info, modBreaks) -> do
 
 	{ 	-- Add export flags to bindings
@@ -142,7 +146,7 @@ deSugar hsc_env
                 mg_modBreaks    = modBreaks,
                 mg_vect_info    = noVectInfo
               }
-        ; return (Just mod_guts)
+        ; return (msgs, Just mod_guts)
 	}}}
 
 mkAutoScc :: Module -> NameSet -> AutoScc
@@ -162,25 +166,25 @@ mkAutoScc mod exports
 deSugarExpr :: HscEnv
 	    -> Module -> GlobalRdrEnv -> TypeEnv 
  	    -> LHsExpr Id
-	    -> IO (Maybe CoreExpr)
+	    -> IO (Messages, Maybe CoreExpr)
 -- Prints its own errors; returns Nothing if error occurred
 
-deSugarExpr hsc_env this_mod rdr_env type_env tc_expr
-  = do	{ let dflags = hsc_dflags hsc_env
-	; showPass dflags "Desugar"
+deSugarExpr hsc_env this_mod rdr_env type_env tc_expr = do
+    let dflags = hsc_dflags hsc_env
+    showPass dflags "Desugar"
 
-	-- Do desugaring
-	; mb_core_expr <- initDs hsc_env this_mod rdr_env type_env $
-			  dsLExpr tc_expr
+    -- Do desugaring
+    (msgs, mb_core_expr) <- initDs hsc_env this_mod rdr_env type_env $
+                                   dsLExpr tc_expr
 
-	; case mb_core_expr of {
-	    Nothing   -> return Nothing ;
-	    Just expr -> do {
+    case mb_core_expr of
+      Nothing   -> return (msgs, Nothing)
+      Just expr -> do
 
-		-- Dump output
-	  dumpIfSet_dyn dflags Opt_D_dump_ds "Desugared" (pprCoreExpr expr)
+        -- Dump output
+        dumpIfSet_dyn dflags Opt_D_dump_ds "Desugared" (pprCoreExpr expr)
 
-        ; return (Just expr) } } }
+        return (msgs, Just expr)
 
 --		addExportFlags
 -- Set the no-discard flag if either 
