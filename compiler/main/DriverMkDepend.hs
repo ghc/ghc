@@ -16,10 +16,10 @@ module DriverMkDepend (
 #include "HsVersions.h"
 
 import qualified GHC
-import GHC              ( Session, ModSummary(..) )
+import GHC              ( ModSummary(..), GhcMonad )
 import DynFlags
 import Util
-import HscTypes         ( HscEnv, IsBootInterface, msObjFilePath, msHsFilePath )
+import HscTypes         ( HscEnv, IsBootInterface, msObjFilePath, msHsFilePath, getSession )
 import SysTools         ( newTempName )
 import qualified SysTools
 import Module
@@ -33,8 +33,8 @@ import FastString
 
 import Exception
 import ErrUtils         ( debugTraceMsg, putMsg )
+import MonadUtils       ( liftIO )
 
-import System.Exit      ( ExitCode(..), exitWith )
 import System.Directory
 import System.FilePath
 import System.IO
@@ -48,37 +48,42 @@ import Data.Maybe       ( isJust )
 --
 -----------------------------------------------------------------
 
-doMkDependHS :: Session -> [FilePath] -> IO ()
-doMkDependHS session srcs
-  = do  {       -- Initialisation
-          dflags <- GHC.getSessionDynFlags session
-        ; files <- beginMkDependHS dflags
+doMkDependHS :: GhcMonad m => [FilePath] -> m ()
+doMkDependHS srcs = do
+    -- Initialisation
+    dflags <- GHC.getSessionDynFlags
+    files <- liftIO $ beginMkDependHS dflags
 
-                -- Do the downsweep to find all the modules
-        ; targets <- mapM (\s -> GHC.guessTarget s Nothing) srcs
-        ; GHC.setTargets session targets
-        ; let excl_mods = depExcludeMods dflags
-        ; r <- GHC.depanal session excl_mods True {- Allow dup roots -}
-        ; case r of
-            Nothing -> exitWith (ExitFailure 1)
-            Just mod_summaries -> do {
+    -- Do the downsweep to find all the modules
+    targets <- mapM (\s -> GHC.guessTarget s Nothing) srcs
+    GHC.setTargets targets
+    let excl_mods = depExcludeMods dflags
+    mod_summaries <- GHC.depanal excl_mods True {- Allow dup roots -}
 
-                -- Sort into dependency order
-                -- There should be no cycles
-          let sorted = GHC.topSortModuleGraph False mod_summaries Nothing
+    -- Sort into dependency order
+    -- There should be no cycles
+    let sorted = GHC.topSortModuleGraph False mod_summaries Nothing
 
-                -- Print out the dependencies if wanted
-        ; debugTraceMsg dflags 2 (text "Module dependencies" $$ ppr sorted)
+    -- Print out the dependencies if wanted
+    liftIO $ debugTraceMsg dflags 2 (text "Module dependencies" $$ ppr sorted)
 
-                -- Prcess them one by one, dumping results into makefile
-                -- and complaining about cycles
-        ; mapM (processDeps dflags session excl_mods (mkd_tmp_hdl files)) sorted
+    -- Prcess them one by one, dumping results into makefile
+    -- and complaining about cycles
+    hsc_env <- getSession
+    mapM (liftIO . processDeps dflags hsc_env excl_mods (mkd_tmp_hdl files)) sorted
 
-                -- If -ddump-mod-cycles, show cycles in the module graph
-        ; dumpModCycles dflags mod_summaries
+    -- If -ddump-mod-cycles, show cycles in the module graph
+    liftIO $ dumpModCycles dflags mod_summaries
 
-                -- Tidy up
-        ; endMkDependHS dflags files }}
+    -- Tidy up
+    liftIO $ endMkDependHS dflags files
+
+    -- Unconditional exiting is a bad idea.  If an error occurs we'll get an
+    --exception; if that is not caught it's fine, but at least we have a
+    --chance to find out exactly what went wrong.  Uncomment the following
+    --line if you disagree.
+
+    --`GHC.ghcCatch` \_ -> io $ exitWith (ExitFailure 1)
 
 -----------------------------------------------------------------
 --
@@ -149,7 +154,7 @@ beginMkDependHS dflags = do
 -----------------------------------------------------------------
 
 processDeps :: DynFlags
-            -> Session
+            -> HscEnv
             -> [ModuleName]
             -> Handle           -- Write dependencies to here
             -> SCC ModSummary
@@ -173,9 +178,8 @@ processDeps _ _ _ _ (CyclicSCC nodes)
   =     -- There shouldn't be any cycles; report them
     ghcError (ProgramError (showSDoc $ GHC.cyclicModuleErr nodes))
 
-processDeps dflags session excl_mods hdl (AcyclicSCC node)
-  = do  { hsc_env <- GHC.sessionHscEnv session
-        ; let extra_suffixes = depSuffixes dflags
+processDeps dflags hsc_env excl_mods hdl (AcyclicSCC node)
+  = do  { let extra_suffixes = depSuffixes dflags
               include_pkg_deps = depIncludePkgDeps dflags
               src_file  = msHsFilePath node
               obj_file  = msObjFilePath node
