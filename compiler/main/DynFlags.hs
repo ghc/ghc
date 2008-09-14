@@ -310,7 +310,7 @@ data DynFlags = DynFlags {
   stgToDo               :: Maybe [StgToDo],  -- similarly
   hscTarget             :: HscTarget,
   hscOutName            :: String,      -- ^ Name of the output file
-  extCoreName           :: String,      -- ^ Name of the .core output file
+  extCoreName           :: String,      -- ^ Name of the .hcr output file
   verbosity             :: Int,         -- ^ Verbosity level: see "DynFlags#verbosity_levels"
   optLevel              :: Int,         -- ^ Optimisation level
   simplPhases           :: Int,         -- ^ Number of simplifier phases
