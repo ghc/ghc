@@ -481,7 +481,9 @@ lvlBind :: TopLevelFlag		-- Used solely to decide whether to clone
 	-> LvlM (LevelledBind, LevelEnv)
 
 lvlBind top_lvl ctxt_lvl env (AnnNonRec bndr rhs@(rhs_fvs,_))
-  | isInlineCtxt ctxt_lvl		-- Don't do anything inside InlineMe
+  |  isTyVar bndr 		-- Don't do anything for TyVar binders
+				--   (simplifier gets rid of them pronto)
+  || isInlineCtxt ctxt_lvl	-- Don't do anything inside InlineMe
   = do rhs' <- lvlExpr ctxt_lvl env rhs
        return (NonRec (TB bndr ctxt_lvl) rhs', env)
 
