@@ -136,11 +136,11 @@ throwGhcException = Exception.throwDyn
 throwGhcException = Exception.throw
 #endif
 
-handleGhcException :: (GhcException -> IO a) -> IO a -> IO a
+handleGhcException :: ExceptionMonad m => (GhcException -> m a) -> m a -> m a
 #if __GLASGOW_HASKELL__ < 609
-handleGhcException = flip Exception.catchDyn
+handleGhcException = flip gcatchDyn
 #else
-handleGhcException = Exception.handle
+handleGhcException = ghandle
 #endif
 
 ghcExceptionTc :: TyCon
