@@ -1098,7 +1098,7 @@ checkLoop env wanteds
 	
 		; (improved, binds, irreds) <- reduceContext env' wanteds'
 
-		; if not improved then
+		; if null irreds || not improved then
 	 	    return (irreds, binds)
 		  else do
 	
@@ -1783,6 +1783,8 @@ reduceContext env wanteds0
            wanteds', 
            normalise_binds,
            eq_improved)     <- tcReduceEqs givens wanteds
+	; traceTc $ text "reduceContext: tcReduceEqs" <+> vcat
+		      [ppr givens', ppr wanteds', ppr normalise_binds]
 
           -- Build the Avail mapping from "given_dicts"
 	; (init_state, _) <- getLIE $ do 
@@ -1797,7 +1799,7 @@ reduceContext env wanteds0
 	; (dict_binds, 
            bound_dicts, 
            dict_irreds)       <- extractResults avails wanted_dicts
-	; traceTc $ text "reduceContext extractresults" <+> vcat
+	; traceTc $ text "reduceContext: extractResults" <+> vcat
 		      [ppr avails, ppr wanted_dicts, ppr dict_binds]
 
 	  -- Solve the wanted *implications*.  In doing so, we can provide
@@ -1812,34 +1814,21 @@ reduceContext env wanteds0
 	      implic_irreds = concat implic_irreds_s
 
           -- Collect all irreducible instances, and determine whether we should
-          -- go round again.  We do so in either of three cases:
+          -- go round again.  We do so in either of two cases:
           -- (1) If dictionary reduction or equality solving led to
           --     improvement (i.e., instantiated type variables).
-          -- (2) If we managed to normalise any dicts, there is merit in going
-          --     around gain, because reduceList may be able to get further.
-          -- (3) If we uncovered extra equalities.  We will try to solve them
+          -- (2) If we uncovered extra equalities.  We will try to solve them
           --     in the next iteration.
+
 	; let all_irreds       = dict_irreds ++ implic_irreds ++ extra_eqs
-              improvedFlexible = availsImproved avails ||
-                                 eq_improved
-              improvedDicts    = not $ isEmptyBag normalise_binds
+      	      avails_improved  = availsImproved avails
+              improvedFlexible = avails_improved || eq_improved
               extraEqs         = (not . null) extra_eqs
-              improved         = improvedFlexible || improvedDicts || extraEqs
-
-{- Old story
-	  -- Figure out whether we should go round again.  We do so in either
-          -- two cases:
-          -- (1) If any of the mutable tyvars in givens or irreds has been
-          --     filled in by improvement, there is merit in going around 
-          --     again, because we may make further progress.
-          -- (2) If we managed to normalise any dicts, there is merit in going
-          --     around gain, because reduceList may be able to get further.
-
-	; improvedMetaTy <- anyM isFilledMetaTyVar $ varSetElems $
-		            tyVarsOfInsts (givens ++ all_irreds)
-        ; let improvedDicts = not $ isEmptyBag normalise_binds
-              improved      = improvedMetaTy || improvedDicts
- -}
+              improved         = improvedFlexible || extraEqs
+              --
+              improvedHint  = (if avails_improved then " [AVAILS]" else "") ++
+                              (if eq_improved then " [EQ]" else "") ++
+                              (if extraEqs then " [EXTRA EQS]" else "")
 
 	; traceTc (text "reduceContext end" <+> (vcat [
 	     text "----------------------",
@@ -1848,7 +1837,7 @@ reduceContext env wanteds0
 	     text "wanted" <+> ppr wanteds0,
 	     text "----",
 	     text "avails" <+> pprAvails avails,
-	     text "improved =" <+> ppr improved,
+	     text "improved =" <+> ppr improved <+> text improvedHint,
 	     text "(all) irreds = " <+> ppr all_irreds,
 	     text "dict-binds = " <+> ppr dict_binds,
 	     text "implic-binds = " <+> ppr implic_binds,
@@ -1873,33 +1862,44 @@ tcImproveOne avails inst
 		-- Avails has all the superclasses etc (good)
 		-- It also has all the intermediates of the deduction (good)
 		-- It does not have duplicates (good)
-		-- NB that (?x::t1) and (?x::t2) will be held separately in avails
-		--    so that improve will see them separate
+		-- NB that (?x::t1) and (?x::t2) will be held separately in 
+                --    avails so that improve will see them separate
 	; traceTc (text "improveOne" <+> ppr inst)
 	; unifyEqns eqns }
 
-unifyEqns :: [(Equation,(PredType,SDoc),(PredType,SDoc))] 
+unifyEqns :: [(Equation, (PredType, SDoc), (PredType, SDoc))] 
 	  -> TcM ImprovementDone
 unifyEqns [] = return False
 unifyEqns eqns
   = do	{ traceTc (ptext (sLit "Improve:") <+> vcat (map pprEquationDoc eqns))
-        ; mapM_ unify eqns
-	; return True }
+        ; improved <- mapM unify eqns
+	; return $ or improved
+        }
   where
     unify ((qtvs, pairs), what1, what2)
-         = addErrCtxtM (mkEqnMsg what1 what2) $ do
-           (_, _, tenv) <- tcInstTyVars (varSetElems qtvs)
-           mapM_ (unif_pr tenv) pairs
-    unif_pr tenv (ty1,ty2) =  unifyType (substTy tenv ty1) (substTy tenv ty2)
+         = addErrCtxtM (mkEqnMsg what1 what2) $ 
+             do { let freeTyVars = unionVarSets (map tvs_pr pairs) 
+                                   `minusVarSet` qtvs
+                ; (_, _, tenv) <- tcInstTyVars (varSetElems qtvs)
+                ; mapM_ (unif_pr tenv) pairs
+                ; anyM isFilledMetaTyVar $ varSetElems freeTyVars
+                }
+
+    unif_pr tenv (ty1, ty2) = unifyType (substTy tenv ty1) (substTy tenv ty2)
+
+    tvs_pr (ty1, ty2) = tyVarsOfType ty1 `unionVarSet` tyVarsOfType ty2
 
 pprEquationDoc :: (Equation, (PredType, SDoc), (PredType, SDoc)) -> SDoc
-pprEquationDoc (eqn, (p1, _), (p2, _)) = vcat [pprEquation eqn, nest 2 (ppr p1), nest 2 (ppr p2)]
+pprEquationDoc (eqn, (p1, _), (p2, _)) 
+  = vcat [pprEquation eqn, nest 2 (ppr p1), nest 2 (ppr p2)]
 
 mkEqnMsg :: (TcPredType, SDoc) -> (TcPredType, SDoc) -> TidyEnv
          -> TcM (TidyEnv, SDoc)
 mkEqnMsg (pred1,from1) (pred2,from2) tidy_env
-  = do	{ pred1' <- zonkTcPredType pred1; pred2' <- zonkTcPredType pred2
-	; let { pred1'' = tidyPred tidy_env pred1'; pred2'' = tidyPred tidy_env pred2' }
+  = do	{ pred1' <- zonkTcPredType pred1
+        ; pred2' <- zonkTcPredType pred2
+	; let { pred1'' = tidyPred tidy_env pred1'
+              ; pred2'' = tidyPred tidy_env pred2' }
 	; let msg = vcat [ptext (sLit "When using functional dependencies to combine"),
 			  nest 2 (sep [ppr pred1'' <> comma, nest 2 from1]), 
 			  nest 2 (sep [ppr pred2'' <> comma, nest 2 from2])]
