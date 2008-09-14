@@ -44,6 +44,7 @@ module Inst (
 	isWantedCo, fromWantedCo, fromGivenCo, eqInstCoType,
         mkIdEqInstCo, mkSymEqInstCo, mkLeftTransEqInstCo,
         mkRightTransEqInstCo, mkAppEqInstCo,
+        isValidWantedEqInst,
 	eitherEqInst, mkEqInst, mkEqInsts, mkWantedEqInst, finalizeEqInst, 
 	eqInstType, updateEqInstCoercion,
 	eqInstCoercion,	eqInstTys
@@ -1048,6 +1049,12 @@ mkAppEqInstCo (Right co) _ _
 Operations on entire EqInst.
 
 \begin{code}
+-- For debugging, make sure the cotv of a wanted is not filled.
+--
+isValidWantedEqInst (EqInst {tci_co = Left cotv})
+  = liftM not $ isFilledMetaTyVar cotv
+isValidWantedEqInst _ = return True
+
 eitherEqInst :: Inst 	            -- given or wanted EqInst
 	     -> (TcTyVar  -> a)     -- 	result if wanted
 	     -> (Coercion -> a)     --	result if given

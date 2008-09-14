@@ -1783,7 +1783,7 @@ reduceContext env wanteds0
            wanteds', 
            normalise_binds,
            eq_improved)     <- tcReduceEqs givens wanteds
-	; traceTc $ text "reduceContext: tcReduceEqs" <+> vcat
+	; traceTc $ text "reduceContext: tcReduceEqs result" <+> vcat
 		      [ppr givens', ppr wanteds', ppr normalise_binds]
 
           -- Build the Avail mapping from "given_dicts"
@@ -2163,10 +2163,16 @@ reduceImplication env
 	-- SLPJ Sept 07: what if improvement happened inside the checkLoop?
 	-- Then we must iterate the outer loop too!
 
-	; traceTc (text "reduceImplication condition" <+> ppr ((isEmptyLHsBinds binds) || (null irreds)))
+        ; let backOff = isEmptyLHsBinds binds &&   -- no new bindings
+                        (not $ null irreds)   &&   -- but still some irreds
+                        all (not . isEqInst) wanteds  
+                          -- we may have instantiated a cotv 
+                          -- => must make a new implication constraint!
 
---	Progress is no longer measered by the number of bindings
-	; if (isEmptyLHsBinds binds) && (not $ null irreds) then 	-- No progress
+	; traceTc $ text "reduceImplication condition" <+> ppr backOff
+
+          -- Progress is no longer measered by the number of bindings
+	; if backOff then 	-- No progress
 		-- If there are any irreds, we back off and do nothing
 		return (emptyBag, [orig_implic])
 	  else do

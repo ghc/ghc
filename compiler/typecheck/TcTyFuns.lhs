@@ -283,7 +283,10 @@ no further propoagation is possible.
 --
 normaliseEqs :: [Inst] -> TcM EqConfig
 normaliseEqs eqs 
-  = do { (eqss, skolemss) <- mapAndUnzipM normEqInst eqs
+  = do { ASSERTM2( allM isValidWantedEqInst eqs, ppr eqs )
+       ; traceTc $ ptext (sLit "normaliseEqs")
+
+       ; (eqss, skolemss) <- mapAndUnzipM normEqInst eqs
        ; return $ emptyEqConfig { eqs = concat eqss
                                 , skolems = unionVarSets skolemss 
                                 }
@@ -297,7 +300,9 @@ normaliseEqs eqs
 --
 normaliseDicts :: Bool -> [Inst] -> TcM EqConfig
 normaliseDicts isWanted insts
-  = do { (insts', eqss, bindss, skolemss) <- mapAndUnzip4M (normDict isWanted) 
+  = do { traceTc $ ptext (sLit "normaliseDicts") <+>
+                   ptext (if isWanted then sLit "[Wanted]" else sLit "[Local]")
+       ; (insts', eqss, bindss, skolemss) <- mapAndUnzip4M (normDict isWanted) 
                                                            insts
        ; return $ emptyEqConfig { eqs     = concat eqss
                                 , locals  = if isWanted then [] else insts'
@@ -311,7 +316,9 @@ normaliseDicts isWanted insts
 --
 propagateEqs :: EqConfig -> TcM EqConfig
 propagateEqs eqCfg@(EqConfig {eqs = todoEqs}) 
-  = propagate todoEqs (eqCfg {eqs = []})
+  = do { traceTc $ ptext (sLit "propagateEqs")
+       ; propagate todoEqs (eqCfg {eqs = []})
+       }
 
 -- |Finalise a set of equalities and associated dictionaries after
 -- propagation.  The returned Boolean value is `True' iff any flexible
@@ -332,10 +339,13 @@ finaliseEqsAndDicts (EqConfig { eqs     = eqs
                               , wanteds = wanteds
                               , binds   = binds
                               })
-  = do { (eqs', subst_binds, locals', wanteds') <- substitute eqs locals wanteds
+  = do { traceTc $ ptext (sLit "finaliseEqsAndDicts")
+       ; (eqs', subst_binds, locals', wanteds') <- substitute eqs locals wanteds
        ; (eqs'', improved) <- instantiateAndExtract eqs'
        ; final_binds <- filterM nonTrivialDictBind $
                           bagToList (subst_binds `unionBags` binds)
+
+       ; ASSERTM2( allM isValidWantedEqInst eqs'', ppr eqs'' )
        ; return (locals', eqs'' ++ wanteds', listToBag final_binds, improved)
        }
   where
@@ -379,41 +389,50 @@ re-orient on finilisation).
 \begin{code}
 data RewriteInst
   = RewriteVar  -- Form (2) above
-    { rwi_var   :: TyVar    -- may be rigid or flexible
-    , rwi_right :: TcType   -- contains no synonym family applications
-    , rwi_co    :: EqInstCo -- the wanted or given coercion
-    , rwi_loc   :: InstLoc
-    , rwi_name  :: Name     -- no semantic significance (cf. TcRnTypes.EqInst)
+    { rwi_var     :: TyVar    -- may be rigid or flexible
+    , rwi_right   :: TcType   -- contains no synonym family applications
+    , rwi_co      :: EqInstCo -- the wanted or given coercion
+    , rwi_loc     :: InstLoc
+    , rwi_name    :: Name     -- no semantic significance (cf. TcRnTypes.EqInst)
+    , rwi_swapped :: Bool     -- swapped orientation of original EqInst
     }
   | RewriteFam  -- Forms (1) above
-    { rwi_fam   :: TyCon    -- synonym family tycon
-    , rwi_args  :: [Type]   -- contain no synonym family applications
-    , rwi_right :: TcType   -- contains no synonym family applications
-    , rwi_co    :: EqInstCo -- the wanted or given coercion
-    , rwi_loc   :: InstLoc
-    , rwi_name  :: Name     -- no semantic significance (cf. TcRnTypes.EqInst)
+    { rwi_fam     :: TyCon    -- synonym family tycon
+    , rwi_args    :: [Type]   -- contain no synonym family applications
+    , rwi_right   :: TcType   -- contains no synonym family applications
+    , rwi_co      :: EqInstCo -- the wanted or given coercion
+    , rwi_loc     :: InstLoc
+    , rwi_name    :: Name     -- no semantic significance (cf. TcRnTypes.EqInst)
+    , rwi_swapped :: Bool     -- swapped orientation of original EqInst
     }
 
 isWantedRewriteInst :: RewriteInst -> Bool
 isWantedRewriteInst = isWantedCo . rwi_co
 
-rewriteInstToInst :: RewriteInst -> Inst
+rewriteInstToInst :: RewriteInst -> TcM Inst
 rewriteInstToInst eq@(RewriteVar {rwi_var = tv})
-  = EqInst
-    { tci_left  = mkTyVarTy tv
-    , tci_right = rwi_right eq
-    , tci_co    = rwi_co    eq
-    , tci_loc   = rwi_loc   eq
-    , tci_name  = rwi_name  eq
-    }
+  = deriveEqInst eq (mkTyVarTy tv) (rwi_right eq) (rwi_co eq)
 rewriteInstToInst eq@(RewriteFam {rwi_fam = fam, rwi_args = args})
-  = EqInst
-    { tci_left  = mkTyConApp fam args
-    , tci_right = rwi_right eq
-    , tci_co    = rwi_co    eq
-    , tci_loc   = rwi_loc   eq
-    , tci_name  = rwi_name  eq
-    }
+  = deriveEqInst eq (mkTyConApp fam args) (rwi_right eq) (rwi_co eq)
+
+-- Derive an EqInst based from a RewriteInst, possibly swapping the types
+-- around. 
+--
+deriveEqInst :: RewriteInst -> TcType -> TcType -> EqInstCo -> TcM Inst
+deriveEqInst rewrite ty1 ty2 co
+  = do { co_adjusted <- if not swapped then return co 
+                                       else mkSymEqInstCo co (ty2, ty1)
+       ; return $ EqInst
+                  { tci_left  = left
+                  , tci_right = right
+                  , tci_co    = co_adjusted
+                  , tci_loc   = rwi_loc rewrite
+                  , tci_name  = rwi_name rewrite
+                  }
+       }
+  where
+    swapped       = rwi_swapped rewrite
+    (left, right) = if not swapped then (ty1, ty2) else (ty2, ty1)
 \end{code}
 
 The following functions turn an arbitrary equality into a set of normal
@@ -448,13 +467,13 @@ normEqInst inst
       -- left-to-right rule with type family head
     go (TyConApp con args) ty2 co 
       | isOpenSynTyCon con
-      = mkRewriteFam con args ty2 co
+      = mkRewriteFam False con args ty2 co
 
       -- right-to-left rule with type family head
     go ty1 ty2@(TyConApp con args) co 
       | isOpenSynTyCon con
       = do { co' <- mkSymEqInstCo co (ty2, ty1)
-           ; mkRewriteFam con args ty1 co'
+           ; mkRewriteFam True con args ty1 co'
            }
 
       -- no outermost family
@@ -480,7 +499,7 @@ normEqInst inst
                       ty1_skolems `unionVarSet` ty2_skolems)
            }
 
-    mkRewriteFam con args ty2 co
+    mkRewriteFam swapped con args ty2 co
       = do { (args', cargs, args_eqss, args_skolemss) 
                <- mapAndUnzip4M (flattenType inst) args
            ; (ty2', co2, ty2_eqs, ty2_skolems) <- flattenType inst ty2
@@ -490,12 +509,13 @@ normEqInst inst
                  eqTys     = (mkTyConApp con args', ty2')
            ; (co', all_eqs') <- adjustCoercions co rewriteCo eqTys all_eqs
            ; let thisRewriteFam = RewriteFam 
-                                  { rwi_fam   = con
-                                  , rwi_args  = args'
-                                  , rwi_right = ty2'
-                                  , rwi_co    = co'
-                                  , rwi_loc   = tci_loc inst
-                                  , rwi_name  = tci_name inst
+                                  { rwi_fam     = con
+                                  , rwi_args    = args'
+                                  , rwi_right   = ty2'
+                                  , rwi_co      = co'
+                                  , rwi_loc     = tci_loc inst
+                                  , rwi_name    = tci_name inst
+                                  , rwi_swapped = swapped
                                   }
            ; return $ (thisRewriteFam : all_eqs',
                        unionVarSets (ty2_skolems:args_skolemss))
@@ -555,12 +575,12 @@ checkOrientation ty1 ty2 co inst
       -- two tvs, left greater => unchanged
     go ty1@(TyVarTy tv1) ty2@(TyVarTy tv2)
       | tv1 > tv2
-      = mkRewriteVar tv1 ty2 co
+      = mkRewriteVar False tv1 ty2 co
 
       -- two tvs, right greater => swap
       | otherwise
       = do { co' <- mkSymEqInstCo co (ty2, ty1)
-           ; mkRewriteVar tv2 ty1 co'
+           ; mkRewriteVar True tv2 ty1 co'
            }
 
       -- only lhs is a tv => unchanged
@@ -568,7 +588,7 @@ checkOrientation ty1 ty2 co inst
       | ty1 `tcPartOfType` ty2      -- occurs check!
       = occurCheckErr ty1 ty2
       | otherwise 
-      = mkRewriteVar tv1 ty2 co
+      = mkRewriteVar False tv1 ty2 co
 
       -- only rhs is a tv => swap
     go ty1 ty2@(TyVarTy tv2)
@@ -576,7 +596,7 @@ checkOrientation ty1 ty2 co inst
       = occurCheckErr ty2 ty1
       | otherwise 
       = do { co' <- mkSymEqInstCo co (ty2, ty1)
-           ; mkRewriteVar tv2 ty1 co'
+           ; mkRewriteVar True tv2 ty1 co'
            }
 
       -- type applications => decompose
@@ -596,13 +616,14 @@ checkOrientation ty1 ty2 co inst
       = ASSERT( (not . isForAllTy $ ty1) && (not . isForAllTy $ ty2) )
         eqInstMisMatch inst
 
-    mkRewriteVar tv ty co = return [RewriteVar 
-                                    { rwi_var   = tv
-                                    , rwi_right = ty
-                                    , rwi_co    = co
-                                    , rwi_loc   = tci_loc inst
-                                    , rwi_name  = tci_name inst
-                                    }]
+    mkRewriteVar swapped tv ty co = return [RewriteVar 
+                                            { rwi_var     = tv
+                                            , rwi_right   = ty
+                                            , rwi_co      = co
+                                            , rwi_loc     = tci_loc inst
+                                            , rwi_name    = tci_name inst
+                                            , rwi_swapped = swapped
+                                            }]
 
 flattenType :: Inst     -- context to get location  & name
             -> Type     -- the type to flatten
@@ -617,6 +638,10 @@ flattenType inst ty
       -- look through synonyms
     go ty | Just ty' <- tcView ty = go ty'
 
+      -- type variable => nothing to do
+    go ty@(TyVarTy _)
+      = return (ty, ty, [] , emptyVarSet)
+
       -- type family application 
       -- => flatten to "gamma :: F t1'..tn' ~ alpha" (alpha & gamma fresh)
     go ty@(TyConApp con args)
@@ -626,12 +651,13 @@ flattenType inst ty
            ; let alphaTy = mkTyVarTy alpha
            ; cotv <- newMetaCoVar (mkTyConApp con args') alphaTy
            ; let thisRewriteFam = RewriteFam 
-                                  { rwi_fam   = con
-                                  , rwi_args  = args'
-                                  , rwi_right = alphaTy
-                                  , rwi_co    = mkWantedCo cotv
-                                  , rwi_loc   = tci_loc inst
-                                  , rwi_name  = tci_name inst
+                                  { rwi_fam     = con
+                                  , rwi_args    = args'
+                                  , rwi_right   = alphaTy
+                                  , rwi_co      = mkWantedCo cotv
+                                  , rwi_loc     = tci_loc inst
+                                  , rwi_name    = tci_name inst
+                                  , rwi_swapped = True
                                   }
            ; return (alphaTy,
                      mkTyConApp con cargs `mkTransCoercion` mkTyVarTy cotv,
@@ -671,10 +697,19 @@ flattenType inst ty
                      skolems_l `unionVarSet` skolems_r)
            }
 
-      -- free of type families => leave as is
-    go ty
-      = ASSERT( not . isForAllTy $ ty )
-        return (ty, ty, [] , emptyVarSet)
+      -- forall type => panic if the body contains a type family
+      -- !!!TODO: As long as the family does not contain a quantified variable
+      --          we might pull it out, but what if it does contain a quantified
+      --          variable???
+    go ty@(ForAllTy _ body)
+      | null (tyFamInsts body)
+      = return (ty, ty, [] , emptyVarSet)
+      | otherwise
+      = panic "TcTyFuns.flattenType: synonym family in a rank-n type"
+
+      -- we should never see a predicate type
+    go (PredTy _)
+      = panic "TcTyFuns.flattenType: unexpected PredType"
 
 adjustCoercions :: EqInstCo            -- coercion of original equality
                 -> Coercion            -- coercion witnessing the rewrite
@@ -832,13 +867,7 @@ applyTop eq@(RewriteFam {rwi_fam = fam, rwi_args = args})
            Nothing                -> return Nothing
            Just (lhs, rewrite_co) 
              -> do { co' <- mkRightTransEqInstCo co rewrite_co (lhs, rhs)
-                   ; let eq' = EqInst 
-                               { tci_left  = lhs
-                               , tci_right = rhs
-                               , tci_co    = co'
-                               , tci_loc   = rwi_loc eq
-                               , tci_name  = rwi_name eq
-                               }
+                   ; eq' <- deriveEqInst eq lhs rhs co'
                    ; liftM Just $ normEqInst eq'
                    }
        }
@@ -873,13 +902,7 @@ applySubstFam eq1@(RewriteFam {rwi_fam = fam1, rwi_args = args1})
 -- !!!Check whether anything breaks by making tcEqTypes look through synonyms.
 -- !!!Should be ok and we don't want three type equalities.
   = do { co2' <- mkRightTransEqInstCo co2 co1 (lhs, rhs)
-       ; let eq2' = EqInst 
-                    { tci_left  = lhs
-                    , tci_right = rhs
-                    , tci_co    = co2'
-                    , tci_loc   = rwi_loc eq2
-                    , tci_name  = rwi_name eq2
-                    }
+       ; eq2' <- deriveEqInst eq2 lhs rhs co2'
        ; liftM Just $ normEqInst eq2'
        }
   where
@@ -911,13 +934,7 @@ applySubstVarVar eq1@(RewriteVar {rwi_var = tv1})
   | tv1 == tv2 &&
     (isWantedRewriteInst eq2 || not (isWantedRewriteInst eq1))
   = do { co2' <- mkRightTransEqInstCo co2 co1 (lhs, rhs)
-       ; let eq2' = EqInst 
-                    { tci_left  = lhs
-                    , tci_right = rhs
-                    , tci_co    = co2'
-                    , tci_loc   = rwi_loc eq2
-                    , tci_name  = rwi_name eq2
-                    }
+       ; eq2' <- deriveEqInst eq2 lhs rhs co2'
        ; liftM Just $ normEqInst eq2'
        }
   where
@@ -1067,27 +1084,29 @@ instantiateAndExtract eqs
        ; wanteds' <- mapM inst wanteds
        ; let residuals = catMaybes wanteds'
              improved  = length wanteds /= length residuals
-       ; return (map rewriteInstToInst residuals, improved)
+       ; residuals' <- mapM rewriteInstToInst residuals
+       ; return (residuals', improved)
        }
   where
     inst eq@(RewriteVar {rwi_var = tv1, rwi_right = ty2, rwi_co = co})
 
         -- co :: alpha ~ t
       | isMetaTyVar tv1
-      = doInst tv1 ty2 co eq
+      = doInst (rwi_swapped eq) tv1 ty2 co eq
 
         -- co :: a ~ alpha
       | Just tv2 <- tcGetTyVar_maybe ty2
       , isMetaTyVar tv2
-      = doInst tv2 (mkTyVarTy tv1) co eq
+      = doInst (not $ rwi_swapped eq) tv2 (mkTyVarTy tv1) co eq
 
     inst eq = return $ Just eq
 
-    doInst _  _  (Right ty)  _eq = pprPanic "TcTyFuns.doInst: local eq: " 
-                                           (ppr ty)
-    doInst tv ty (Left cotv) eq  = do { lookupTV <- lookupTcTyVar tv
-                                      ; uMeta False tv lookupTV ty cotv
-                                      }
+    doInst _swapped _tv _ty (Right ty) _eq 
+      = pprPanic "TcTyFuns.doInst: local eq: " (ppr ty)
+    doInst swapped tv ty (Left cotv) eq
+      = do { lookupTV <- lookupTcTyVar tv
+           ; uMeta swapped tv lookupTV ty cotv
+           }
       where
         -- meta variable has been filled already
         -- => ignore (must be a skolem that was introduced by flattening locals)
