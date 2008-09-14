@@ -25,7 +25,7 @@ module HscMain
 
     -- The new interface
     , parseFile
-    , typecheckModule
+    , typecheckModule'
     , typecheckRenameModule
     , deSugarModule
     , makeSimpleIface
@@ -46,7 +46,7 @@ import PrelNames	( iNTERACTIVE )
 import {- Kind parts of -} Type		( Kind )
 import CoreLint		( lintUnfolding )
 import DsMeta		( templateHaskellNames )
-import SrcLoc		( SrcSpan, noSrcLoc, interactiveSrcLoc, srcLocSpan )
+import SrcLoc		( SrcSpan, noSrcLoc, interactiveSrcLoc, srcLocSpan, noSrcSpan )
 import VarSet
 import VarEnv		( emptyTidyEnv )
 #endif
@@ -102,13 +102,16 @@ import MkExternalCore	( emitExternalCore )
 import FastString
 import LazyUniqFM		( emptyUFM )
 import UniqSupply       ( initUs_ )
-import Bag		( unitBag )
+import Bag		( unitBag, emptyBag, unionBags )
+import Exception
+import MonadUtils
 
 import Control.Monad
 import System.Exit
 import System.IO
 import Data.IORef
 \end{code}
+#include "HsVersions.h"
 
 
 %************************************************************************
@@ -153,64 +156,57 @@ knownKeyNames = map getName wiredInThings
 
 \begin{code}
 -- | parse a file, returning the abstract syntax
-parseFile :: HscEnv -> ModSummary -> IO (Maybe (Located (HsModule RdrName)))
-parseFile hsc_env mod_summary
- = do 
-       maybe_parsed <- myParseModule dflags hspp_file hspp_buf
-       case maybe_parsed of
-         Left err
-             -> do printBagOfErrors dflags (unitBag err)
-                   return Nothing
-         Right rdr_module
-             -> return (Just rdr_module)
+parseFile :: GhcMonad m => HscEnv -> ModSummary -> m (Located (HsModule RdrName))
+parseFile hsc_env mod_summary = do
+    maybe_parsed <- liftIO $ myParseModule dflags hspp_file hspp_buf
+    case maybe_parsed of
+      Left err -> do throw (mkSrcErr (unitBag err))
+      Right rdr_module
+               -> return rdr_module
   where
            dflags    = hsc_dflags hsc_env
            hspp_file = ms_hspp_file mod_summary
            hspp_buf  = ms_hspp_buf  mod_summary
 
 -- | Rename and typecheck a module
-typecheckModule :: HscEnv -> ModSummary -> Located (HsModule RdrName)
-                -> IO (Maybe TcGblEnv)
-typecheckModule hsc_env mod_summary rdr_module
- = do 
-        (tc_msgs, maybe_tc_result) 
-                <- {-# SCC "Typecheck-Rename" #-}
-                   tcRnModule hsc_env (ms_hsc_src mod_summary) False rdr_module
-        printErrorsAndWarnings dflags tc_msgs
-        return maybe_tc_result
-  where
-        dflags = hsc_dflags hsc_env
+typecheckModule' :: GhcMonad m =>
+                   HscEnv -> ModSummary -> Located (HsModule RdrName)
+                -> m TcGblEnv
+typecheckModule' hsc_env mod_summary rdr_module = do
+      r <- {-# SCC "Typecheck-Rename" #-}
+           ioMsgMaybe $ tcRnModule hsc_env (ms_hsc_src mod_summary) False rdr_module
+      return r
 
+-- XXX: should this really be a Maybe X?  Check under which circumstances this
+-- can become a Nothing and decide whether this should instead throw an
+-- exception/signal an error.
 type RenamedStuff = 
         (Maybe (HsGroup Name, [LImportDecl Name], Maybe [LIE Name],
                 Maybe (HsDoc Name), HaddockModInfo Name))
 
--- | Rename and typecheck a module, additinoally returning the renamed syntax
-typecheckRenameModule :: HscEnv -> ModSummary -> Located (HsModule RdrName)
-                -> IO (Maybe (TcGblEnv, RenamedStuff))
-typecheckRenameModule hsc_env mod_summary rdr_module
- = do 
-        (tc_msgs, maybe_tc_result) 
-                <- {-# SCC "Typecheck-Rename" #-}
-                   tcRnModule hsc_env (ms_hsc_src mod_summary) True rdr_module
-        printErrorsAndWarnings dflags tc_msgs
-        case maybe_tc_result of
-           Nothing -> return Nothing
-           Just tc_result -> do
-              let rn_info = do decl <- tcg_rn_decls tc_result
-                               imports <- tcg_rn_imports tc_result
-                               let exports = tcg_rn_exports tc_result
-	      		       let doc = tcg_doc tc_result
-	      		       let hmi = tcg_hmi tc_result
-                               return (decl,imports,exports,doc,hmi)
-              return (Just (tc_result, rn_info))
-  where
-        dflags = hsc_dflags hsc_env
+-- | Rename and typecheck a module, additionally returning the renamed syntax
+typecheckRenameModule
+    :: GhcMonad m =>
+       HscEnv -> ModSummary -> Located (HsModule RdrName)
+    -> m (TcGblEnv, RenamedStuff)
+typecheckRenameModule hsc_env mod_summary rdr_module = do
+    tc_result
+          <- {-# SCC "Typecheck-Rename" #-}
+             ioMsgMaybe $ tcRnModule hsc_env (ms_hsc_src mod_summary) True rdr_module
+
+    let rn_info = do decl <- tcg_rn_decls tc_result
+                     imports <- tcg_rn_imports tc_result
+                     let exports = tcg_rn_exports tc_result
+                     let doc = tcg_doc tc_result
+        	     let hmi = tcg_hmi tc_result
+                     return (decl,imports,exports,doc,hmi)
+
+    return (tc_result, rn_info)
 
 -- | Convert a typechecked module to Core
-deSugarModule :: HscEnv -> ModSummary -> TcGblEnv -> IO (Maybe ModGuts)
-deSugarModule hsc_env mod_summary tc_result
- = deSugar hsc_env (ms_location mod_summary) tc_result
+deSugarModule :: GhcMonad m => HscEnv -> ModSummary -> TcGblEnv -> m ModGuts
+deSugarModule hsc_env mod_summary tc_result = do
+    ioMsgMaybe $ deSugar hsc_env (ms_location mod_summary) tc_result
 
 -- | Make a 'ModIface' from the results of typechecking.  Used when
 -- not optimising, and the interface doesn't need to contain any
@@ -287,16 +283,25 @@ data InteractiveStatus
 
 
 -- I want Control.Monad.State! --Lemmih 03/07/2006
-newtype Comp a = Comp {runComp :: CompState -> IO (a, CompState)}
+newtype Comp a = Comp {runComp :: CompState -> IORef Messages -> IO (a, CompState)}
 
 instance Monad Comp where
-    g >>= fn = Comp $ \s -> runComp g s >>= \(a,s') -> runComp (fn a) s'
-    return a = Comp $ \s -> return (a,s)
+    g >>= fn = Comp $ \s r -> runComp g s r >>= \(a,s') -> runComp (fn a) s' r
+    return a = Comp $ \s _ -> return (a,s)
     fail = error
 
-evalComp :: Comp a -> CompState -> IO a
-evalComp comp st = do (val,_st') <- runComp comp st
-                      return val
+evalComp :: Comp a -> CompState -> IO (Messages, a)
+evalComp comp st = do r <- newIORef emptyMessages
+                      (val,_st') <- runComp comp st r
+                      msgs <- readIORef r
+                      return (msgs, val)
+
+logMsgs :: Messages -> Comp ()
+logMsgs (warns', errs') = Comp $ \s r -> do
+                           (warns, errs) <- readIORef r
+                           writeIORef r $! ( warns' `unionBags` warns
+                                           , errs' `unionBags` errs )
+                           return ((), s)
 
 data CompState
     = CompState
@@ -306,29 +311,29 @@ data CompState
     }
 
 get :: Comp CompState
-get = Comp $ \s -> return (s,s)
+get = Comp $ \s _ -> return (s,s)
 
 modify :: (CompState -> CompState) -> Comp ()
-modify f = Comp $ \s -> return ((), f s)
+modify f = Comp $ \s _ -> return ((), f s)
 
 gets :: (CompState -> a) -> Comp a
 gets getter = do st <- get
                  return (getter st)
 
-liftIO :: IO a -> Comp a
-liftIO ioA = Comp $ \s -> do a <- ioA
-                             return (a,s)
+instance MonadIO Comp where
+  liftIO ioA = Comp $ \s _ -> do a <- ioA; return (a,s)
 
 type NoRecomp result = ModIface -> Comp result
 
 -- FIXME: The old interface and module index are only using in 'batch' and
 --        'interactive' mode. They should be removed from 'oneshot' mode.
-type Compiler result =  HscEnv
+type Compiler result =  GhcMonad m =>
+                        HscEnv
                      -> ModSummary
                      -> Bool                -- True <=> source unchanged
                      -> Maybe ModIface      -- Old interface, if available
                      -> Maybe (Int,Int)     -- Just (i,n) <=> module i of n (for msgs)
-                     -> IO (Maybe result)
+                     -> m result
 
 --------------------------------------------------------------
 -- Compilers
@@ -340,7 +345,7 @@ hscCompileOneShot hsc_env mod_summary src_changed mb_old_iface mb_i_of_n
   = do
      -- One-shot mode needs a knot-tying mutable variable for interface files.
      -- See TcRnTypes.TcGblEnv.tcg_type_env_var.
-    type_env_var <- newIORef emptyNameEnv
+    type_env_var <- liftIO $ newIORef emptyNameEnv
     let 
        mod = ms_mod mod_summary
        hsc_env' = hsc_env{ hsc_type_env_var = Just (mod, type_env_var) }
@@ -395,7 +400,8 @@ hscCompiler
         -> Compiler result
 hscCompiler norecomp messenger recomp hsc_env mod_summary 
             source_unchanged mbOldIface mbModIndex
-    = flip evalComp (CompState hsc_env mod_summary mbOldIface) $
+   = ioMsgMaybe $
+      flip evalComp (CompState hsc_env mod_summary mbOldIface) $
       do (recomp_reqd, mbCheckedIface)
              <- {-# SCC "checkOldIface" #-}
                 liftIO $ checkOldIface hsc_env mod_summary
@@ -496,17 +502,17 @@ hscFileFrontEnd :: Comp (Maybe TcGblEnv)
 hscFileFrontEnd =
     do hsc_env <- gets compHscEnv
        mod_summary <- gets compModSummary
-       liftIO $ do
+
              -------------------
              -- PARSE
              -------------------
        let dflags = hsc_dflags hsc_env
            hspp_file = ms_hspp_file mod_summary
            hspp_buf  = ms_hspp_buf  mod_summary
-       maybe_parsed <- myParseModule dflags hspp_file hspp_buf
+       maybe_parsed <- liftIO $ myParseModule dflags hspp_file hspp_buf
        case maybe_parsed of
          Left err
-             -> do printBagOfErrors dflags (unitBag err)
+             -> do logMsgs (emptyBag, unitBag err)
                    return Nothing
          Right rdr_module
              -------------------
@@ -514,8 +520,9 @@ hscFileFrontEnd =
              -------------------
              -> do (tc_msgs, maybe_tc_result) 
                        <- {-# SCC "Typecheck-Rename" #-}
-                          tcRnModule hsc_env (ms_hsc_src mod_summary) False rdr_module
-                   printErrorsAndWarnings dflags tc_msgs
+                          liftIO $ tcRnModule hsc_env (ms_hsc_src mod_summary)
+                                              False rdr_module
+                   logMsgs tc_msgs
                    return maybe_tc_result
 
 --------------------------------------------------------------
@@ -526,12 +533,14 @@ hscDesugar :: TcGblEnv -> Comp (Maybe ModGuts)
 hscDesugar tc_result
   = do mod_summary <- gets compModSummary
        hsc_env <- gets compHscEnv
-       liftIO $ do
+
           -------------------
           -- DESUGAR
           -------------------
-       ds_result   <- {-# SCC "DeSugar" #-} 
-                      deSugar hsc_env (ms_location mod_summary) tc_result
+       (msgs, ds_result)
+           <- {-# SCC "DeSugar" #-}
+              liftIO $ deSugar hsc_env (ms_location mod_summary) tc_result
+       logMsgs msgs
        return ds_result
 
 --------------------------------------------------------------
@@ -562,7 +571,7 @@ hscSimpleIface tc_result
        maybe_old_iface <- gets compOldIface
        liftIO $ do
        details <- mkBootModDetailsTc hsc_env tc_result
-       (new_iface, no_change) 
+       (new_iface, no_change)
            <- {-# SCC "MkFinalIface" #-}
               mkIfaceTc hsc_env (fmap mi_iface_hash maybe_old_iface) details tc_result
        -- And the answer is ...
@@ -719,17 +728,15 @@ hscInteractive _ = panic "GHC not compiled with interpreter"
 
 ------------------------------
 
-hscCmmFile :: HscEnv -> FilePath -> IO Bool
+hscCmmFile :: GhcMonad m => HscEnv -> FilePath -> m ()
 hscCmmFile hsc_env filename = do
-  dflags <- return $ hsc_dflags hsc_env
-  maybe_cmm <- parseCmmFile dflags filename
-  case maybe_cmm of
-    Nothing -> return False
-    Just cmm -> do
-        cmms <- optionallyConvertAndOrCPS hsc_env [cmm]
-        rawCmms <- cmmToRawCmm cmms
-	codeOutput dflags no_mod no_loc NoStubs [] rawCmms
-	return True
+    dflags <- return $ hsc_dflags hsc_env
+    cmm <- ioMsgMaybe $
+             parseCmmFile dflags filename
+    cmms <- liftIO $ optionallyConvertAndOrCPS hsc_env [cmm]
+    rawCmms <- liftIO $ cmmToRawCmm cmms
+    liftIO $ codeOutput dflags no_mod no_loc NoStubs [] rawCmms
+    return ()
   where
 	no_mod = panic "hscCmmFile: no_mod"
 	no_loc = ModLocation{ ml_hs_file  = Just filename,
@@ -794,7 +801,7 @@ myParseModule dflags src_filename maybe_src_buf
 	POk pst rdr_module -> do {
 
       let {ms = getMessages pst};
-      printErrorsAndWarnings dflags ms;
+      printErrorsAndWarnings dflags ms; -- XXX
       when (errorsFound dflags ms) $ exitWith (ExitFailure 1);
       
       dumpIfSet_dyn dflags Opt_D_dump_parsed "Parser" (ppr rdr_module) ;
@@ -858,113 +865,108 @@ A naked expression returns a singleton Name [it].
 \begin{code}
 #ifdef GHCI
 hscStmt		-- Compile a stmt all the way to an HValue, but don't run it
-  :: HscEnv
+  :: GhcMonad m =>
+     HscEnv
   -> String			-- The statement
-  -> IO (Maybe ([Id], HValue))
+  -> m (Maybe ([Id], HValue))
+     -- ^ 'Nothing' <==> empty statement (or comment only), but no parse error
+hscStmt hsc_env stmt = do
+    maybe_stmt <- hscParseStmt (hsc_dflags hsc_env) stmt
+    case maybe_stmt of
+      Nothing -> return Nothing
+      Just parsed_stmt -> do  -- The real stuff
 
-hscStmt hsc_env stmt
-  = do	{ maybe_stmt <- hscParseStmt (hsc_dflags hsc_env) stmt
-	; case maybe_stmt of {
-      	     Nothing	  -> return Nothing ;	-- Parse error
-      	     Just Nothing -> return Nothing ;	-- Empty line
-      	     Just (Just parsed_stmt) -> do {	-- The real stuff
+             -- Rename and typecheck it
+	let icontext = hsc_IC hsc_env
+	(ids, tc_expr) <- ioMsgMaybe $ tcRnStmt hsc_env icontext parsed_stmt
+	    -- Desugar it
+	let rdr_env  = ic_rn_gbl_env icontext
+	    type_env = mkTypeEnv (map AnId (ic_tmp_ids icontext))
+	ds_expr <- ioMsgMaybe $
+                     deSugarExpr hsc_env iNTERACTIVE rdr_env type_env tc_expr
 
-		-- Rename and typecheck it
-	  let icontext = hsc_IC hsc_env
-	; maybe_tc_result <- tcRnStmt hsc_env icontext parsed_stmt
+	-- Then desugar, code gen, and link it
+	let src_span = srcLocSpan interactiveSrcLoc
+	hval <- liftIO $ compileExpr hsc_env src_span ds_expr
 
-	; case maybe_tc_result of {
-		Nothing -> return Nothing ;
-		Just (ids, tc_expr) -> do {
+	return $ Just (ids, hval)
 
-	 	-- Desugar it
-	; let rdr_env  = ic_rn_gbl_env icontext
-	      type_env = mkTypeEnv (map AnId (ic_tmp_ids icontext))
-	; mb_ds_expr <- deSugarExpr hsc_env iNTERACTIVE rdr_env type_env tc_expr
-	
-	; case mb_ds_expr of {
-		Nothing -> return Nothing ;
-		Just ds_expr -> do {
-
-		-- Then desugar, code gen, and link it
-	; let src_span = srcLocSpan interactiveSrcLoc
-	; hval <- compileExpr hsc_env src_span ds_expr
-
-	; return (Just (ids, hval))
-	}}}}}}}
 
 hscTcExpr	-- Typecheck an expression (but don't run it)
-  :: HscEnv
+  :: GhcMonad m =>
+     HscEnv
   -> String			-- The expression
-  -> IO (Maybe Type)
+  -> m Type
 
-hscTcExpr hsc_env expr
-  = do	{ maybe_stmt <- hscParseStmt (hsc_dflags hsc_env) expr
-	; let icontext = hsc_IC hsc_env
-	; case maybe_stmt of {
-	     Nothing      -> return Nothing ;	-- Parse error
-	     Just (Just (L _ (ExprStmt expr _ _)))
-			-> tcRnExpr hsc_env icontext expr ;
-	     Just _ -> do { errorMsg (hsc_dflags hsc_env) (text "not an expression:" <+> quotes (text expr)) ;
-			        return Nothing } ;
-      	     } }
+hscTcExpr hsc_env expr = do
+    maybe_stmt <- hscParseStmt (hsc_dflags hsc_env) expr
+    let icontext = hsc_IC hsc_env
+    case maybe_stmt of
+      Just (L _ (ExprStmt expr _ _)) -> do
+          ty <- ioMsgMaybe $ tcRnExpr hsc_env icontext expr
+          return ty
+      _ -> do throw $ mkSrcErr $ unitBag $ mkPlainErrMsg
+                        noSrcSpan
+                        (text "not an expression:" <+> quotes (text expr))
 
-hscKcType	-- Find the kind of a type
-  :: HscEnv
-  -> String			-- The type
-  -> IO (Maybe Kind)
+-- | Find the kind of a type
+hscKcType
+  :: GhcMonad m =>
+     HscEnv
+  -> String			-- ^ The type
+  -> m Kind
 
-hscKcType hsc_env str
-  = do	{ maybe_type <- hscParseType (hsc_dflags hsc_env) str
-	; let icontext = hsc_IC hsc_env
-	; case maybe_type of {
-	     Just ty -> tcRnType hsc_env icontext ty ;
-      	     Nothing -> return Nothing } }
+hscKcType hsc_env str = do
+    ty <- hscParseType (hsc_dflags hsc_env) str
+    let icontext = hsc_IC hsc_env
+    ioMsgMaybe $ tcRnType hsc_env icontext ty
+
 #endif
 \end{code}
 
 \begin{code}
 #ifdef GHCI
-hscParseStmt :: DynFlags -> String -> IO (Maybe (Maybe (LStmt RdrName)))
+hscParseStmt :: GhcMonad m => DynFlags -> String -> m (Maybe (LStmt RdrName))
 hscParseStmt = hscParseThing parseStmt
 
-hscParseType :: DynFlags -> String -> IO (Maybe (LHsType RdrName))
+hscParseType :: GhcMonad m => DynFlags -> String -> m (LHsType RdrName)
 hscParseType = hscParseThing parseType
 #endif
 
-hscParseIdentifier :: DynFlags -> String -> IO (Maybe (Located RdrName))
+hscParseIdentifier :: GhcMonad m => DynFlags -> String -> m (Located RdrName)
 hscParseIdentifier = hscParseThing parseIdentifier
 
-hscParseThing :: Outputable thing
+hscParseThing :: (Outputable thing, GhcMonad m)
 	      => Lexer.P thing
 	      -> DynFlags -> String
-	      -> IO (Maybe thing)
+	      -> m thing
 	-- Nothing => Parse error (message already printed)
 	-- Just x  => success
 hscParseThing parser dflags str
- = showPass dflags "Parser" >>
+ = (liftIO $ showPass dflags "Parser") >>
       {-# SCC "Parser" #-} do
 
-      buf <- stringToStringBuffer str
+      buf <- liftIO $ stringToStringBuffer str
 
       let loc  = mkSrcLoc (fsLit "<interactive>") 1 0
 
-      case unP parser (mkPState buf loc dflags) of {
+      case unP parser (mkPState buf loc dflags) of
 
-	PFailed span err -> do { printError span err;
-                                 return Nothing };
+	PFailed span err -> do
+          let msg = mkPlainErrMsg span err
+          throw (mkSrcErr (unitBag msg))
 
-	POk pst thing -> do {
+	POk pst thing -> do
 
-      let {ms = getMessages pst};
-      printErrorsAndWarnings dflags ms;
-      when (errorsFound dflags ms) $ exitWith (ExitFailure 1);
+          let ms@(warns, errs) = getMessages pst
+          logWarnings warns
+          when (errorsFound dflags ms) $ -- handle -Werror
+            throw (mkSrcErr errs)
 
-      --ToDo: can't free the string buffer until we've finished this
-      -- compilation sweep and all the identifiers have gone away.
-      dumpIfSet_dyn dflags Opt_D_dump_parsed "Parser" (ppr thing);
-      return (Just thing)
-      }}
+          --ToDo: can't free the string buffer until we've finished this
+          -- compilation sweep and all the identifiers have gone away.
+          liftIO $ dumpIfSet_dyn dflags Opt_D_dump_parsed "Parser" (ppr thing)
+          return thing
 \end{code}
 
 %************************************************************************
