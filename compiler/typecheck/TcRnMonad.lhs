@@ -148,11 +148,10 @@ initTcPrintErrors	-- Used from the interactive loop only
        :: HscEnv
        -> Module 
        -> TcM r
-       -> IO (Maybe r)
+       -> IO (Messages, Maybe r)
 initTcPrintErrors env mod todo = do
   (msgs, res) <- initTc env HsSrcFile False mod todo
-  printErrorsAndWarnings (hsc_dflags env) msgs
-  return res
+  return (msgs, res)
 \end{code}
 
 %************************************************************************

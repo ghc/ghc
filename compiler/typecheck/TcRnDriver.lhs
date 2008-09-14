@@ -974,7 +974,7 @@ setInteractiveContext hsc_env icxt thing_inside
 tcRnStmt :: HscEnv
 	 -> InteractiveContext
 	 -> LStmt RdrName
-	 -> IO (Maybe ([Id], LHsExpr Id))
+	 -> IO (Messages, Maybe ([Id], LHsExpr Id))
 		-- The returned [Id] is the list of new Ids bound by
                 -- this statement.  It can be used to extend the
                 -- InteractiveContext via extendInteractiveContext.
@@ -1207,7 +1207,7 @@ tcRnExpr just finds the type of an expression
 tcRnExpr :: HscEnv
 	 -> InteractiveContext
 	 -> LHsExpr RdrName
-	 -> IO (Maybe Type)
+	 -> IO (Messages, Maybe Type)
 tcRnExpr hsc_env ictxt rdr_expr
   = initTcPrintErrors hsc_env iNTERACTIVE $ 
     setInteractiveContext hsc_env ictxt $ do {
@@ -1236,7 +1236,7 @@ tcRnType just finds the kind of a type
 tcRnType :: HscEnv
 	 -> InteractiveContext
 	 -> LHsType RdrName
-	 -> IO (Maybe Kind)
+	 -> IO (Messages, Maybe Kind)
 tcRnType hsc_env ictxt rdr_type
   = initTcPrintErrors hsc_env iNTERACTIVE $ 
     setInteractiveContext hsc_env ictxt $ do {
@@ -1263,7 +1263,7 @@ tcRnType hsc_env ictxt rdr_type
 
 \begin{code}
 #ifdef GHCI
--- ASSUMES that the module is either in the HomePackageTable or is
+-- | ASSUMES that the module is either in the 'HomePackageTable' or is
 -- a package module with an interface on disk.  If neither of these is
 -- true, then the result will be an error indicating the interface
 -- could not be found.
@@ -1296,7 +1296,7 @@ tcGetModuleExports mod directlyImpMods
        ; ifaceExportNames (mi_exports iface)
        }
 
-tcRnLookupRdrName :: HscEnv -> RdrName -> IO (Maybe [Name])
+tcRnLookupRdrName :: HscEnv -> RdrName -> IO (Messages, Maybe [Name])
 tcRnLookupRdrName hsc_env rdr_name 
   = initTcPrintErrors hsc_env iNTERACTIVE $ 
     setInteractiveContext hsc_env (hsc_IC hsc_env) $ 
@@ -1331,7 +1331,7 @@ lookup_rdr_name rdr_name = do {
     return good_names
  }
 
-tcRnLookupName :: HscEnv -> Name -> IO (Maybe TyThing)
+tcRnLookupName :: HscEnv -> Name -> IO (Messages, Maybe TyThing)
 tcRnLookupName hsc_env name
   = initTcPrintErrors hsc_env iNTERACTIVE $ 
     setInteractiveContext hsc_env (hsc_IC hsc_env) $
@@ -1351,7 +1351,7 @@ tcRnLookupName' name = do
 
 tcRnGetInfo :: HscEnv
 	    -> Name
-	    -> IO (Maybe (TyThing, Fixity, [Instance]))
+	    -> IO (Messages, Maybe (TyThing, Fixity, [Instance]))
 
 -- Used to implemnent :info in GHCi
 --
