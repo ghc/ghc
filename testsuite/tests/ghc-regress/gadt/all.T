@@ -92,3 +92,5 @@ test('CasePrune', normal, compile_and_run, [''])
 
 test('T1999', normal, compile, [''])
 test('T1999a', normal, compile, [''])
+
+test('T2587', normal, compile, [''])
