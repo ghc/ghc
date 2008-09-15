@@ -126,7 +126,7 @@ mk_val_app (Var f `App` Type ty1 `App` Type _ `App` arg1) arg2 _ res_ty
   where
     case_bndr = case arg1 of
                    Var v1 | isLocalId v1 -> v1        -- Note [Desugaring seq (2) and (3)]
-                   _                            -> mkWildId ty1
+                   _                     -> mkWildId ty1
 
 mk_val_app fun arg arg_ty _        -- See Note [CoreSyn let/app invariant]
   | not (needsCaseBinding arg_ty arg)
@@ -135,7 +135,7 @@ mk_val_app fun arg arg_ty _        -- See Note [CoreSyn let/app invariant]
 mk_val_app fun arg arg_ty res_ty
   = Case arg (mkWildId arg_ty) res_ty [(DEFAULT,[],App fun (Var arg_id))]
   where
-    arg_id = mkWildId arg_ty        -- Lots of shadowing, but it doesn't matter,
+    arg_id = mkWildId arg_ty    -- Lots of shadowing, but it doesn't matter,
                                 -- because 'fun ' should not have a free wild-id
 \end{code}
 
