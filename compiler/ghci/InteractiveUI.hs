@@ -21,9 +21,10 @@ import Debugger
 
 -- The GHC interface
 import qualified GHC hiding (resume, runStmt)
-import GHC              ( Session, LoadHowMuch(..), Target(..),  TargetId(..),
+import GHC              ( LoadHowMuch(..), Target(..),  TargetId(..),
                           Module, ModuleName, TyThing(..), Phase,
-                          BreakIndex, SrcSpan, Resume, SingleStep )
+                          BreakIndex, SrcSpan, Resume, SingleStep,
+                          Ghc, handleSourceError )
 import PprTyThing
 import DynFlags
 
@@ -33,7 +34,7 @@ import PackageConfig
 import UniqFM
 #endif
 
-import HscTypes		( implicitTyThings )
+import HscTypes		( implicitTyThings, reflectGhc, reifyGhc )
 import qualified RdrName ( getGRE_NameQualifier_maybes ) -- should this come via GHC?
 import Outputable       hiding (printForUser, printForUserPartWay)
 import Module           -- for ModuleEnv
@@ -54,6 +55,7 @@ import NameSet
 import Maybes		( orElse )
 import FastString
 import Encoding
+import MonadUtils       ( liftIO )
 
 #ifndef mingw32_HOST_OS
 import System.Posix hiding (getEnv)
@@ -290,9 +292,9 @@ findEditor = do
         return ""
 #endif
 
-interactiveUI :: Session -> [(FilePath, Maybe Phase)] -> Maybe [String]
-              -> IO ()
-interactiveUI session srcs maybe_exprs = do
+interactiveUI :: [(FilePath, Maybe Phase)] -> Maybe [String]
+              -> Ghc ()
+interactiveUI srcs maybe_exprs = do
    -- HACK! If we happen to get into an infinite loop (eg the user
    -- types 'let x=x in x' at the prompt), then the thread will block
    -- on a blackhole, and become unreachable during GC.  The GC will
@@ -301,14 +303,14 @@ interactiveUI session srcs maybe_exprs = do
    -- it refers to might be finalized, including the standard Handles.
    -- This sounds like a bug, but we don't have a good solution right
    -- now.
-   newStablePtr stdin
-   newStablePtr stdout
-   newStablePtr stderr
+   liftIO $ newStablePtr stdin
+   liftIO $ newStablePtr stdout
+   liftIO $ newStablePtr stderr
 
     -- Initialise buffering for the *interpreted* I/O system
-   initInterpBuffering session
+   initInterpBuffering
 
-   when (isNothing maybe_exprs) $ do
+   liftIO $ when (isNothing maybe_exprs) $ do
         -- Only for GHCi (not runghc and ghc -e):
 
         -- Turn buffering off for the compiled program's stdout/stderr
@@ -338,12 +340,12 @@ interactiveUI session srcs maybe_exprs = do
 #endif
 
    -- initial context is just the Prelude
-   prel_mod <- GHC.findModule session (GHC.mkModuleName "Prelude") Nothing
-   GHC.setContext session [] [prel_mod]
+   prel_mod <- GHC.findModule (GHC.mkModuleName "Prelude") Nothing
+   GHC.setContext [] [prel_mod]
 
-   default_editor <- findEditor
+   default_editor <- liftIO $ findEditor
 
-   cwd <- getCurrentDirectory
+   cwd <- liftIO $ getCurrentDirectory
 
    startGHCi (runGHCi srcs maybe_exprs)
         GHCiState{ progname = "<interactive>",
@@ -351,7 +353,7 @@ interactiveUI session srcs maybe_exprs = do
                    prompt = "%s> ",
                    stop = "",
                    editor = default_editor,
-                   session = session,
+--                   session = session,
                    options = [],
                    prelude = prel_mod,
                    break_ctr = 0,
@@ -365,10 +367,11 @@ interactiveUI session srcs maybe_exprs = do
                  }
 
 #ifdef USE_EDITLINE
-   Readline.stifleHistory 100
-   withGhcAppData (\dir -> Readline.writeHistory (dir </> "ghci_history"))
-                  (return True)
-   Readline.resetTerminal Nothing
+   liftIO $ do
+     Readline.stifleHistory 100
+     withGhcAppData (\dir -> Readline.writeHistory (dir </> "ghci_history"))
+                    (return True)
+     Readline.resetTerminal Nothing
 #endif
 
    return ()
@@ -566,9 +569,8 @@ decodeStringAsUTF8 str =
 
 mkPrompt :: GHCi String
 mkPrompt = do
-  session <- getSession
-  (toplevs,exports) <- io (GHC.getContext session)
-  resumes <- io $ GHC.getResumeContext session
+  (toplevs,exports) <- GHC.getContext
+  resumes <- GHC.getResumeContext
   -- st <- getGHCiState
 
   context_bit <-
@@ -580,7 +582,7 @@ mkPrompt = do
                    then return (brackets (ppr (GHC.resumeSpan r)) <> space)
                    else do
                         let hist = GHC.resumeHistory r !! (ix-1)
-                        span <- io$ GHC.getHistorySpan session hist
+                        span <- GHC.getHistorySpan hist
                         return (brackets (ppr (negate ix) <> char ':' 
                                           <+> ppr span) <> space)
   let
@@ -658,9 +660,15 @@ runCommands' eh getCmd = do
   case mb_cmd of 
     Nothing -> return ()
     Just c  -> do
-      b <- ghciHandle eh (doCommand c)
+      b <- ghciHandle eh $
+             handleSourceError printErrorAndKeepGoing
+               (doCommand c)
       if b then return () else runCommands' eh getCmd
   where
+    printErrorAndKeepGoing err = do
+        GHC.printExceptionAndWarnings err
+        return True
+
     noSpace q = q >>= maybe (return Nothing)
                             (\c->case removeSpaces c of 
                                    ""   -> noSpace q
@@ -713,12 +721,11 @@ runStmt stmt step
 afterRunStmt :: (SrcSpan -> Bool) -> GHC.RunResult -> GHCi Bool
 afterRunStmt _ (GHC.RunException e) = throw e
 afterRunStmt step_here run_result = do
-  session     <- getSession
-  resumes <- io $ GHC.getResumeContext session
+  resumes <- GHC.getResumeContext
   case run_result of
      GHC.RunOk names -> do
         show_types <- isOptionSet ShowType
-        when show_types $ printTypeOfNames session names
+        when show_types $ printTypeOfNames names
      GHC.RunBreak _ names mb_info 
          | isNothing  mb_info || 
            step_here (GHC.resumeSpan $ head resumes) -> do
@@ -727,8 +734,8 @@ afterRunStmt step_here run_result = do
 --               printTypeOfNames session names
                let namesSorted = sortBy compareNames names
                tythings <- catMaybes `liftM` 
-                              io (mapM (GHC.lookupName session) namesSorted)
-               docs <- io$ pprTypeAndContents session [id | AnId id <- tythings]
+                              mapM GHC.lookupName namesSorted
+               docs <- pprTypeAndContents [id | AnId id <- tythings]
                printForUserPartWay docs
                maybe (return ()) runBreakCmd mb_info
                -- run the command set with ":set stop <cmd>"
@@ -758,17 +765,17 @@ runBreakCmd info = do
               | otherwise -> do enqueueCommands [cmd]; return ()
               where cmd = onBreakCmd loc
 
-printTypeOfNames :: Session -> [Name] -> GHCi ()
-printTypeOfNames session names
- = mapM_ (printTypeOfName session) $ sortBy compareNames names
+printTypeOfNames :: [Name] -> GHCi ()
+printTypeOfNames names
+ = mapM_ (printTypeOfName ) $ sortBy compareNames names
 
 compareNames :: Name -> Name -> Ordering
 n1 `compareNames` n2 = compareWith n1 `compare` compareWith n2
     where compareWith n = (getOccString n, getSrcSpan n)
 
-printTypeOfName :: Session -> Name -> GHCi ()
-printTypeOfName session n
-   = do maybe_tything <- io (GHC.lookupName session n)
+printTypeOfName :: Name -> GHCi ()
+printTypeOfName n
+   = do maybe_tything <- GHC.lookupName n
         case maybe_tything of
             Nothing    -> return ()
             Just thing -> printTyThing thing
@@ -819,8 +826,7 @@ lookupCommand' str = do
 
 getCurrentBreakSpan :: GHCi (Maybe SrcSpan)
 getCurrentBreakSpan = do
-  session <- getSession
-  resumes <- io $ GHC.getResumeContext session
+  resumes <- GHC.getResumeContext
   case resumes of
     [] -> return Nothing
     (r:_) -> do
@@ -829,13 +835,12 @@ getCurrentBreakSpan = do
            then return (Just (GHC.resumeSpan r))
            else do
                 let hist = GHC.resumeHistory r !! (ix-1)
-                span <- io $ GHC.getHistorySpan session hist
+                span <- GHC.getHistorySpan hist
                 return (Just span)
 
 getCurrentBreakModule :: GHCi (Maybe Module)
 getCurrentBreakModule = do
-  session <- getSession
-  resumes <- io $ GHC.getResumeContext session
+  resumes <- GHC.getResumeContext
   case resumes of
     [] -> return Nothing
     (r:_) -> do
@@ -859,19 +864,19 @@ help _ = io (putStr helpText)
 info :: String -> GHCi ()
 info "" = ghcError (CmdLineError "syntax: ':i <thing-you-want-info-about>'")
 info s  = do { let names = words s
-	     ; session <- getSession
 	     ; dflags <- getDynFlags
 	     ; let pefas = dopt Opt_PrintExplicitForalls dflags
-	     ; mapM_ (infoThing pefas session) names }
+	     ; mapM_ (infoThing pefas) names }
   where
-    infoThing pefas session str = io $ do
-	names     <- GHC.parseName session str
-	mb_stuffs <- mapM (GHC.getInfo session) names
+    infoThing pefas str = do
+	names     <- GHC.parseName str
+	mb_stuffs <- mapM GHC.getInfo names
 	let filtered = filterOutChildren (\(t,_f,_i) -> t) (catMaybes mb_stuffs)
-	unqual <- GHC.getPrintUnqual session
-	putStrLn (showSDocForUser unqual $
-     		   vcat (intersperse (text "") $
-		         map (pprInfo pefas) filtered))
+	unqual <- GHC.getPrintUnqual
+	liftIO $
+          putStrLn (showSDocForUser unqual $
+     		     vcat (intersperse (text "") $
+		           map (pprInfo pefas) filtered))
 
   -- Filter out names whose parent is also there Good
   -- example is '[]', which is both a type and data
@@ -914,14 +919,13 @@ addModule :: [FilePath] -> GHCi ()
 addModule files = do
   revertCAFs			-- always revert CAFs on load/add.
   files <- mapM expandPath files
-  targets <- mapM (\m -> io (GHC.guessTarget m Nothing)) files
-  session <- getSession
+  targets <- mapM (\m -> GHC.guessTarget m Nothing) files
   -- remove old targets with the same id; e.g. for :add *M
-  io $ mapM_ (GHC.removeTarget session) [ tid | Target tid _ _ <- targets ]
-  io $ mapM_ (GHC.addTarget session) targets
-  prev_context <- io $ GHC.getContext session
-  ok <- io $ GHC.load session LoadAllTargets
-  afterLoad ok session False prev_context
+  mapM_ GHC.removeTarget [ tid | Target tid _ _ <- targets ]
+  mapM_ GHC.addTarget targets
+  prev_context <- GHC.getContext
+  ok <- trySuccess $ GHC.load LoadAllTargets
+  afterLoad ok False prev_context
 
 changeDirectory :: String -> GHCi ()
 changeDirectory "" = do
@@ -931,17 +935,22 @@ changeDirectory "" = do
      Left _e -> return ()
      Right dir -> changeDirectory dir
 changeDirectory dir = do
-  session <- getSession
-  graph <- io (GHC.getModuleGraph session)
+  graph <- GHC.getModuleGraph
   when (not (null graph)) $
 	io $ putStr "Warning: changing directory causes all loaded modules to be unloaded,\nbecause the search path has changed.\n"
-  prev_context <- io $ GHC.getContext session
-  io (GHC.setTargets session [])
-  io (GHC.load session LoadAllTargets)
-  setContextAfterLoad session prev_context False []
-  io (GHC.workingDirectoryChanged session)
+  prev_context <- GHC.getContext
+  GHC.setTargets []
+  GHC.load LoadAllTargets
+  setContextAfterLoad prev_context False []
+  GHC.workingDirectoryChanged
   dir <- expandPath dir
   io (setCurrentDirectory dir)
+
+trySuccess :: GHC.GhcMonad m => m SuccessFlag -> m SuccessFlag
+trySuccess act =
+    handleSourceError (\e -> do GHC.printExceptionAndWarnings e
+                                return Failed) $ do
+      act
 
 editFile :: String -> GHCi ()
 editFile str =
@@ -965,10 +974,9 @@ editFile str =
 -- of those.
 chooseEditFile :: GHCi String
 chooseEditFile =
-  do session <- getSession
-     let hasFailed x = io $ fmap not $ GHC.isLoaded session $ GHC.ms_mod_name x
+  do let hasFailed x = fmap not $ GHC.isLoaded $ GHC.ms_mod_name x
 
-     graph <- io (GHC.getModuleGraph session)
+     graph <- GHC.getModuleGraph
      failed_graph <- filterM hasFailed graph
      let order g  = flattenSCCs $ GHC.topSortModuleGraph True g Nothing
          pick xs  = case xs of
@@ -978,7 +986,7 @@ chooseEditFile =
      case pick (order failed_graph) of
        Just file -> return file
        Nothing   -> 
-         do targets <- io (GHC.getTargets session)
+         do targets <- GHC.getTargets
             case msum (map fromTarget targets) of
               Just file -> return file
               Nothing   -> ghcError (CmdLineError "No files to edit.")
@@ -1009,12 +1017,10 @@ defineMacro overwrite s = do
   let new_expr = '(' : definition ++ ") :: String -> IO String"
 
   -- compile the expression
-  cms <- getSession
-  maybe_hv <- io (GHC.compileExpr cms new_expr)
-  case maybe_hv of
-     Nothing -> return ()
-     Just hv -> io (writeIORef macros_ref --
-		    (filtered ++ [(macro_name, runMacro hv, Nothing, completeNone)]))
+  handleSourceError (\e -> GHC.printExceptionAndWarnings e) $ do
+    hv <- GHC.compileExpr new_expr
+    io (writeIORef macros_ref --
+	(filtered ++ [(macro_name, runMacro hv, Nothing, completeNone)]))
 
 runMacro :: GHC.HValue{-String -> IO String-} -> String -> GHCi Bool
 runMacro fun s = do
@@ -1035,14 +1041,11 @@ undefineMacro str = mapM_ undef (words str)
 cmdCmd :: String -> GHCi ()
 cmdCmd str = do
   let expr = '(' : str ++ ") :: IO String"
-  session <- getSession
-  maybe_hv <- io (GHC.compileExpr session expr)
-  case maybe_hv of
-    Nothing -> return ()
-    Just hv -> do 
-        cmds <- io $ (unsafeCoerce# hv :: IO String)
-        enqueueCommands (lines cmds)
-        return ()
+  handleSourceError (\e -> GHC.printExceptionAndWarnings e) $ do
+    hv <- GHC.compileExpr expr
+    cmds <- io $ (unsafeCoerce# hv :: IO String)
+    enqueueCommands (lines cmds)
+    return ()
 
 loadModule :: [(FilePath, Maybe Phase)] -> GHCi SuccessFlag
 loadModule fs = timeIt (loadModule' fs)
@@ -1052,85 +1055,82 @@ loadModule_ fs = do loadModule (zip fs (repeat Nothing)); return ()
 
 loadModule' :: [(FilePath, Maybe Phase)] -> GHCi SuccessFlag
 loadModule' files = do
-  session <- getSession
-  prev_context <- io $ GHC.getContext session
+  prev_context <- GHC.getContext
 
   -- unload first
-  io $ GHC.abandonAll session
+  GHC.abandonAll
   discardActiveBreakPoints
-  io (GHC.setTargets session [])
-  io (GHC.load session LoadAllTargets)
+  GHC.setTargets []
+  GHC.load LoadAllTargets
 
   -- expand tildes
   let (filenames, phases) = unzip files
   exp_filenames <- mapM expandPath filenames
   let files' = zip exp_filenames phases
-  targets <- io (mapM (uncurry GHC.guessTarget) files')
+  targets <- mapM (uncurry GHC.guessTarget) files'
 
   -- NOTE: we used to do the dependency anal first, so that if it
   -- fails we didn't throw away the current set of modules.  This would
   -- require some re-working of the GHC interface, so we'll leave it
   -- as a ToDo for now.
 
-  io (GHC.setTargets session targets)
-  doLoad session False prev_context LoadAllTargets
+  GHC.setTargets targets
+  doLoad False prev_context LoadAllTargets
 
 checkModule :: String -> GHCi ()
 checkModule m = do
   let modl = GHC.mkModuleName m
-  session <- getSession
-  prev_context <- io $ GHC.getContext session
-  result <- io (GHC.checkModule session modl False)
-  case result of
-    Nothing -> io $ putStrLn "Nothing"
-    Just r  -> io $ putStrLn (showSDoc (
-	case GHC.checkedModuleInfo r of
-	   Just cm | Just scope <- GHC.modInfoTopLevelScope cm -> 
+  prev_context <- GHC.getContext
+  ok <- handleSourceError (\e -> GHC.printExceptionAndWarnings e >> return False) $ do
+          r <- GHC.typecheckModule =<< GHC.parseModule modl
+          io $ putStrLn (showSDoc (
+	   case GHC.moduleInfo r of
+	     cm | Just scope <- GHC.modInfoTopLevelScope cm ->
 		let
 		    (local,global) = partition ((== modl) . GHC.moduleName . GHC.nameModule) scope
 		in
 			(text "global names: " <+> ppr global) $$
 		        (text "local  names: " <+> ppr local)
-	   _ -> empty))
-  afterLoad (successIf (isJust result)) session False prev_context
+	     _ -> empty))
+          return True
+  afterLoad (successIf ok) False prev_context
 
 reloadModule :: String -> GHCi ()
 reloadModule m = do
-  session <- getSession
-  prev_context <- io $ GHC.getContext session
-  doLoad session True prev_context $ 
+  prev_context <- GHC.getContext
+  doLoad True prev_context $
         if null m then LoadAllTargets 
                   else LoadUpTo (GHC.mkModuleName m)
   return ()
 
-doLoad :: Session -> Bool -> ([Module],[Module]) -> LoadHowMuch -> GHCi SuccessFlag
-doLoad session retain_context prev_context howmuch = do
+doLoad :: Bool -> ([Module],[Module]) -> LoadHowMuch -> GHCi SuccessFlag
+doLoad retain_context prev_context howmuch = do
   -- turn off breakpoints before we load: we can't turn them off later, because
   -- the ModBreaks will have gone away.
   discardActiveBreakPoints
-  ok <- io (GHC.load session howmuch)
-  afterLoad ok session retain_context prev_context
+  ok <- trySuccess $ GHC.load howmuch
+  afterLoad ok retain_context prev_context
   return ok
 
-afterLoad :: SuccessFlag -> Session -> Bool -> ([Module],[Module]) -> GHCi ()
-afterLoad ok session retain_context prev_context = do
+afterLoad :: SuccessFlag -> Bool -> ([Module],[Module]) -> GHCi ()
+afterLoad ok retain_context prev_context = do
   revertCAFs  -- always revert CAFs on load.
   discardTickArrays
-  loaded_mod_summaries <- getLoadedModules session
+  loaded_mod_summaries <- getLoadedModules
   let loaded_mods = map GHC.ms_mod loaded_mod_summaries
       loaded_mod_names = map GHC.moduleName loaded_mods
   modulesLoadedMsg ok loaded_mod_names
 
-  setContextAfterLoad session prev_context retain_context loaded_mod_summaries
+  setContextAfterLoad prev_context retain_context loaded_mod_summaries
 
 
-setContextAfterLoad :: Session -> ([Module],[Module]) -> Bool -> [GHC.ModSummary] -> GHCi ()
-setContextAfterLoad session prev keep_ctxt [] = do
+setContextAfterLoad :: ([Module],[Module]) -> Bool -> [GHC.ModSummary] -> GHCi ()
+setContextAfterLoad prev keep_ctxt [] = do
   prel_mod <- getPrelude
-  setContextKeepingPackageModules session prev keep_ctxt ([], [prel_mod])
-setContextAfterLoad session prev keep_ctxt ms = do
+  setContextKeepingPackageModules prev keep_ctxt ([], [prel_mod])
+setContextAfterLoad prev keep_ctxt ms = do
   -- load a target if one is available, otherwise load the topmost module.
-  targets <- io (GHC.getTargets session)
+  targets <- GHC.getTargets
   case [ m | Just m <- map (findTarget ms) targets ] of
 	[]    -> 
 	  let graph' = flattenSCCs (GHC.topSortModuleGraph True ms Nothing) in
@@ -1151,25 +1151,24 @@ setContextAfterLoad session prev keep_ctxt ms = do
 	= False
 
    load_this summary | m <- GHC.ms_mod summary = do
-	b <- io (GHC.moduleIsInterpreted session m)
-	if b then setContextKeepingPackageModules session prev keep_ctxt ([m], [])
+	b <- GHC.moduleIsInterpreted m
+	if b then setContextKeepingPackageModules prev keep_ctxt ([m], [])
        	     else do
                 prel_mod <- getPrelude
-                setContextKeepingPackageModules session prev keep_ctxt ([],[prel_mod,m])
+                setContextKeepingPackageModules prev keep_ctxt ([],[prel_mod,m])
 
 -- | Keep any package modules (except Prelude) when changing the context.
 setContextKeepingPackageModules
-        :: Session
-        -> ([Module],[Module])          -- previous context
+        :: ([Module],[Module])          -- previous context
         -> Bool                         -- re-execute :module commands
         -> ([Module],[Module])          -- new context
         -> GHCi ()
-setContextKeepingPackageModules session prev_context keep_ctxt (as,bs) = do
+setContextKeepingPackageModules prev_context keep_ctxt (as,bs) = do
   let (_,bs0) = prev_context
   prel_mod <- getPrelude
   let pkg_modules = filter (\p -> not (isHomeModule p) && p /= prel_mod) bs0
   let bs1 = if null as then nub (prel_mod : bs) else bs
-  io $ GHC.setContext session as (nub (bs1 ++ pkg_modules))
+  GHC.setContext as (nub (bs1 ++ pkg_modules))
   if keep_ctxt
      then do
           st <- getGHCiState
@@ -1198,22 +1197,18 @@ modulesLoadedMsg ok mods = do
 
 typeOfExpr :: String -> GHCi ()
 typeOfExpr str 
-  = do cms <- getSession
-       maybe_ty <- io (GHC.exprType cms str)
-       case maybe_ty of
-	  Nothing -> return ()
-	  Just ty -> do dflags <- getDynFlags
-		        let pefas = dopt Opt_PrintExplicitForalls dflags
-                        printForUser $ text str <+> dcolon
-					<+> pprTypeForUser pefas ty
+  = handleSourceError (\e -> GHC.printExceptionAndWarnings e) $ do
+       ty <- GHC.exprType str
+       dflags <- getDynFlags
+       let pefas = dopt Opt_PrintExplicitForalls dflags
+       printForUser $ text str <+> dcolon
+       		<+> pprTypeForUser pefas ty
 
 kindOfType :: String -> GHCi ()
 kindOfType str 
-  = do cms <- getSession
-       maybe_ty <- io (GHC.typeKind cms str)
-       case maybe_ty of
-	  Nothing    -> return ()
-	  Just ty    -> printForUser $ text str <+> dcolon <+> ppr ty
+  = handleSourceError (\e -> GHC.printExceptionAndWarnings e) $ do
+       ty <- GHC.typeKind str
+       printForUser $ text str <+> dcolon <+> ppr ty
           
 quit :: String -> GHCi Bool
 quit _ = return True
@@ -1234,8 +1229,7 @@ browseCmd bang m =
         m <- lookupModule s
         browseModule bang m True
     [] -> do
-        s <- getSession
-        (as,bs) <- io $ GHC.getContext s
+        (as,bs) <- GHC.getContext
                 -- Guess which module the user wants to browse.  Pick
                 -- modules that are interpreted first.  The most
                 -- recently-added module occurs last, it seems.
@@ -1251,21 +1245,20 @@ browseCmd bang m =
 -- with sorted, sort items alphabetically
 browseModule :: Bool -> Module -> Bool -> GHCi ()
 browseModule bang modl exports_only = do
-  s <- getSession
   -- :browse! reports qualifiers wrt current context
-  current_unqual <- io (GHC.getPrintUnqual s)
+  current_unqual <- GHC.getPrintUnqual
   -- Temporarily set the context to the module we're interested in,
   -- just so we can get an appropriate PrintUnqualified
-  (as,bs) <- io (GHC.getContext s)
+  (as,bs) <- GHC.getContext
   prel_mod <- getPrelude
-  io (if exports_only then GHC.setContext s [] [prel_mod,modl]
-                      else GHC.setContext s [modl] [])
-  target_unqual <- io (GHC.getPrintUnqual s)
-  io (GHC.setContext s as bs)
+  if exports_only then GHC.setContext [] [prel_mod,modl]
+                  else GHC.setContext [modl] []
+  target_unqual <- GHC.getPrintUnqual
+  GHC.setContext as bs
 
   let unqual = if bang then current_unqual else target_unqual
 
-  mb_mod_info <- io $ GHC.getModuleInfo s modl
+  mb_mod_info <- GHC.getModuleInfo modl
   case mb_mod_info of
     Nothing -> ghcError (CmdLineError ("unknown module: " ++
                                 GHC.moduleNameString (GHC.moduleName modl)))
@@ -1291,10 +1284,10 @@ browseModule bang modl exports_only = do
                       | otherwise
                       = occ_sort names
 
-        mb_things <- io $ mapM (GHC.lookupName s) sorted_names
+        mb_things <- mapM GHC.lookupName sorted_names
         let filtered_things = filterOutChildren (\t -> t) (catMaybes mb_things)
 
-        rdr_env <- io $ GHC.getGRE s
+        rdr_env <- GHC.getGRE
 
         let pefas              = dopt Opt_PrintExplicitForalls dflags
             things | bang      = catMaybes mb_things
@@ -1360,9 +1353,8 @@ setContext str
 playCtxtCmd :: Bool -> (CtxtCmd, [String], [String]) -> GHCi ()
 playCtxtCmd fail (cmd, as, bs)
   = do
-    s <- getSession
     (as',bs') <- do_checks fail
-    (prev_as,prev_bs) <- io $ GHC.getContext s
+    (prev_as,prev_bs) <- GHC.getContext
     (new_as, new_bs) <-
       case cmd of
         SetContext -> do
@@ -1378,7 +1370,7 @@ playCtxtCmd fail (cmd, as, bs)
           let new_as = prev_as \\ (as' ++ bs')
               new_bs = prev_bs \\ (as' ++ bs')
           return (new_as, new_bs)
-    io $ GHC.setContext s new_as new_bs
+    GHC.setContext new_as new_bs
   where
     do_checks True = do
       as' <- mapM wantInterpretedModule as
@@ -1519,13 +1511,12 @@ newDynFlags minus_opts = do
       -- and link the new packages.
       dflags <- getDynFlags
       when (packageFlags dflags /= pkg_flags) $ do
-        io $ hPutStrLn stderr "package flags have changed, ressetting and loading new packages..."
-        session <- getSession
-        io (GHC.setTargets session [])
-        io (GHC.load session LoadAllTargets)
+        io $ hPutStrLn stderr "package flags have changed, resetting and loading new packages..."
+        GHC.setTargets []
+        GHC.load LoadAllTargets
         io (linkPackages dflags new_pkgs)
         -- package flags changed, we can't re-use any of the old context
-        setContextAfterLoad session ([],[]) False []
+        setContextAfterLoad ([],[]) False []
       return ()
 
 
@@ -1603,22 +1594,20 @@ showCmd str = do
 
 showModules :: GHCi ()
 showModules = do
-  session <- getSession
-  loaded_mods <- getLoadedModules session
+  loaded_mods <- getLoadedModules
         -- we want *loaded* modules only, see #1734
-  let show_one ms = do m <- io (GHC.showModule session ms); io (putStrLn m)
+  let show_one ms = do m <- GHC.showModule ms; io (putStrLn m)
   mapM_ show_one loaded_mods
 
-getLoadedModules :: GHC.Session -> GHCi [GHC.ModSummary]
-getLoadedModules session = do
-  graph <- io (GHC.getModuleGraph session)
-  filterM (io . GHC.isLoaded session . GHC.ms_mod_name) graph
+getLoadedModules :: GHCi [GHC.ModSummary]
+getLoadedModules = do
+  graph <- GHC.getModuleGraph
+  filterM (GHC.isLoaded . GHC.ms_mod_name) graph
 
 showBindings :: GHCi ()
 showBindings = do
-  s <- getSession
-  bindings <- io (GHC.getBindings s)
-  docs     <- io$ pprTypeAndContents s 
+  bindings <- GHC.getBindings
+  docs     <- pprTypeAndContents
                   [ id | AnId id <- sortBy compareTyThings bindings]
   printForUserPartWay docs
 
@@ -1637,8 +1626,7 @@ showBkptTable = do
 
 showContext :: GHCi ()
 showContext = do
-   session <- getSession
-   resumes <- io $ GHC.getResumeContext session
+   resumes <- GHC.getResumeContext
    printForUser $ vcat (map pp_resume (reverse resumes))
   where
    pp_resume resume =
@@ -1734,19 +1722,16 @@ completeMacro w = do
   return (filter (w `isPrefixOf`) (map cmdName cmds))
 
 completeIdentifier w = do
-  s <- restoreSession
-  rdrs <- GHC.getRdrNamesInScope s
+  rdrs <- withRestoredSession GHC.getRdrNamesInScope
   return (filter (w `isPrefixOf`) (map (showSDoc.ppr) rdrs))
 
 completeModule w = do
-  s <- restoreSession
-  dflags <- GHC.getSessionDynFlags s
+  dflags <- withRestoredSession GHC.getSessionDynFlags
   let pkg_mods = allExposedModules dflags
   return (filter (w `isPrefixOf`) (map (showSDoc.ppr) pkg_mods))
 
 completeHomeModule w = do
-  s <- restoreSession
-  g <- GHC.getModuleGraph s
+  g <- withRestoredSession GHC.getModuleGraph
   let home_mods = map GHC.ms_mod_name g
   return (filter (w `isPrefixOf`) (map (showSDoc.ppr) home_mods))
 
@@ -1864,14 +1849,16 @@ showException (SomeException e) =
 
 ghciHandle :: (SomeException -> GHCi a) -> GHCi a -> GHCi a
 ghciHandle h (GHCi m) = GHCi $ \s -> 
-   Exception.catch (m s) 
+   gcatch (m s)
 	(\e -> unGHCi (ghciUnblock (h e)) s)
 
 ghciUnblock :: GHCi a -> GHCi a
-ghciUnblock (GHCi a) = GHCi $ \s -> Exception.unblock (a s)
+ghciUnblock (GHCi a) =
+    GHCi $ \s -> reifyGhc $ \gs ->
+                   Exception.unblock (reflectGhc (a s) gs)
 
 ghciTry :: GHCi a -> GHCi (Either SomeException a)
-ghciTry (GHCi m) = GHCi $ \s -> Exception.try (m s) 
+ghciTry (GHCi m) = GHCi $ \s -> gtry (m s)
 
 -- ----------------------------------------------------------------------------
 -- Utils
@@ -1890,12 +1877,11 @@ expandPathIO path =
 
 wantInterpretedModule :: String -> GHCi Module
 wantInterpretedModule str = do
-   session <- getSession
    modl <- lookupModule str
    dflags <- getDynFlags
    when (GHC.modulePackageId modl /= thisPackage dflags) $
       ghcError (CmdLineError ("module '" ++ str ++ "' is from another package;\nthis command requires an interpreted module"))
-   is_interpreted <- io (GHC.moduleIsInterpreted session modl)
+   is_interpreted <- GHC.moduleIsInterpreted modl
    when (not is_interpreted) $
        ghcError (CmdLineError ("module '" ++ str ++ "' is not interpreted; try \':add *" ++ str ++ "' first"))
    return modl
@@ -1903,9 +1889,9 @@ wantInterpretedModule str = do
 wantNameFromInterpretedModule :: (Name -> SDoc -> GHCi ()) -> String
                               -> (Name -> GHCi ())
                               -> GHCi ()
-wantNameFromInterpretedModule noCanDo str and_then = do
-   session <- getSession
-   names <- io $ GHC.parseName session str
+wantNameFromInterpretedModule noCanDo str and_then =
+  handleSourceError (GHC.printExceptionAndWarnings) $ do
+   names <- GHC.parseName str
    case names of
       []    -> return ()
       (n:_) -> do
@@ -1914,7 +1900,7 @@ wantNameFromInterpretedModule noCanDo str and_then = do
                then noCanDo n $ ppr n <>
                                 text " is not defined in an interpreted module"
                else do
-            is_interpreted <- io (GHC.moduleIsInterpreted session modl)
+            is_interpreted <- GHC.moduleIsInterpreted modl
             if not is_interpreted
                then noCanDo n $ text "module " <> ppr modl <>
                                 text " is not interpreted"
@@ -1930,8 +1916,7 @@ forceCmd  = pprintCommand False True
 
 pprintCommand :: Bool -> Bool -> String -> GHCi ()
 pprintCommand bind force str = do
-  session <- getSession
-  io $ pprintClosureCommand session bind force str
+  pprintClosureCommand bind force str
 
 stepCmd :: String -> GHCi ()
 stepCmd []         = doContinue (const True) GHC.SingleStep
@@ -1987,8 +1972,7 @@ doContinue pred step = do
 
 abandonCmd :: String -> GHCi ()
 abandonCmd = noArgs $ do
-  s <- getSession
-  b <- io $ GHC.abandon s -- the prompt will change to indicate the new context
+  b <- GHC.abandon -- the prompt will change to indicate the new context
   when (not b) $ io $ putStrLn "There is no computation running."
   return ()
 
@@ -2016,8 +2000,7 @@ historyCmd arg
   | otherwise       = io $ putStrLn "Syntax:  :history [num]"
   where
   history num = do
-    s <- getSession
-    resumes <- io $ GHC.getResumeContext s
+    resumes <- GHC.getResumeContext
     case resumes of
       [] -> io $ putStrLn "Not stopped at a breakpoint"
       (r:_) -> do
@@ -2027,7 +2010,7 @@ historyCmd arg
           [] -> io $ putStrLn $ 
                    "Empty history. Perhaps you forgot to use :trace?"
           _  -> do
-                 spans <- mapM (io . GHC.getHistorySpan s) took
+                 spans <- mapM GHC.getHistorySpan took
                  let nums  = map (printf "-%-3d:") [(1::Int)..]
                      names = map GHC.historyEnclosingDecl took
                  printForUser (vcat(zipWith3 
@@ -2043,22 +2026,20 @@ bold c | do_bold   = text start_bold <> c <> text end_bold
 
 backCmd :: String -> GHCi ()
 backCmd = noArgs $ do
-  s <- getSession
-  (names, _, span) <- io $ GHC.back s
+  (names, _, span) <- GHC.back
   printForUser $ ptext (sLit "Logged breakpoint at") <+> ppr span
-  printTypeOfNames s names
+  printTypeOfNames names
    -- run the command set with ":set stop <cmd>"
   st <- getGHCiState
   enqueueCommands [stop st]
 
 forwardCmd :: String -> GHCi ()
 forwardCmd = noArgs $ do
-  s <- getSession
-  (names, ix, span) <- io $ GHC.forward s
+  (names, ix, span) <- GHC.forward
   printForUser $ (if (ix == 0)
                     then ptext (sLit "Stopped at")
                     else ptext (sLit "Logged breakpoint at")) <+> ppr span
-  printTypeOfNames s names
+  printTypeOfNames names
    -- run the command set with ":set stop <cmd>"
   st <- getGHCiState
   enqueueCommands [stop st]
@@ -2066,18 +2047,17 @@ forwardCmd = noArgs $ do
 -- handle the "break" command
 breakCmd :: String -> GHCi ()
 breakCmd argLine = do
-   session <- getSession
-   breakSwitch session $ words argLine
+   breakSwitch $ words argLine
 
-breakSwitch :: Session -> [String] -> GHCi ()
-breakSwitch _session [] = do
+breakSwitch :: [String] -> GHCi ()
+breakSwitch [] = do
    io $ putStrLn "The break command requires at least one argument."
-breakSwitch session (arg1:rest) 
+breakSwitch (arg1:rest)
    | looksLikeModuleName arg1 && not (null rest) = do
         mod <- wantInterpretedModule arg1
         breakByModule mod rest
    | all isDigit arg1 = do
-        (toplevel, _) <- io $ GHC.getContext session 
+        (toplevel, _) <- GHC.getContext
         case toplevel of
            (mod : _) -> breakByModuleLine mod (read arg1) rest
            [] -> do 
@@ -2207,8 +2187,7 @@ listCmd "" = do
       Just span
        | GHC.isGoodSrcSpan span -> io $ listAround span True
        | otherwise ->
-          do s <- getSession
-             resumes <- io $ GHC.getResumeContext s
+          do resumes <- GHC.getResumeContext
              case resumes of
                  [] -> panic "No resumes"
                  (r:_) ->
@@ -2223,8 +2202,7 @@ listCmd str = list2 (words str)
 
 list2 :: [String] -> GHCi ()
 list2 [arg] | all isDigit arg = do
-    session <- getSession
-    (toplevel, _) <- io $ GHC.getContext session 
+    (toplevel, _) <- GHC.getContext
     case toplevel of
         [] -> io $ putStrLn "No module to list"
         (mod : _) -> listModuleLine mod (read arg)
@@ -2254,8 +2232,7 @@ list2  _other =
 
 listModuleLine :: Module -> Int -> GHCi ()
 listModuleLine modl line = do
-   session <- getSession
-   graph <- io (GHC.getModuleGraph session)
+   graph <- GHC.getModuleGraph
    let this = filter ((== modl) . GHC.ms_mod) graph
    case this of
      [] -> panic "listModuleLine"
@@ -2359,8 +2336,7 @@ mkTickArray ticks
 
 lookupModule :: String -> GHCi Module
 lookupModule modName
-   = do session <- getSession 
-        io (GHC.findModule session (GHC.mkModuleName modName) Nothing)
+   = GHC.findModule (GHC.mkModuleName modName) Nothing
 
 -- don't reset the counter back to zero?
 discardActiveBreakPoints :: GHCi ()
@@ -2388,8 +2364,7 @@ turnOffBreak loc = do
 
 getModBreak :: Module -> GHCi (GHC.BreakArray, Array Int SrcSpan)
 getModBreak mod = do
-   session <- getSession
-   Just mod_info <- io $ GHC.getModuleInfo session mod
+   Just mod_info <- GHC.getModuleInfo mod
    let modBreaks  = GHC.modInfoModBreaks mod_info
    let array      = GHC.modBreaks_flags modBreaks
    let ticks      = GHC.modBreaks_locs  modBreaks
