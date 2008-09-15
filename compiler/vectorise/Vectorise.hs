@@ -370,11 +370,13 @@ vectAlgCase tycon _ty_args scrut bndr ty alts
       let (vect_scrut,  lift_scrut)  = vscrut
           (vect_bodies, lift_bodies) = unzip vbodies
 
-      let vect_case = Case vect_scrut (mkWildId (exprType vect_scrut)) vty
+      vdummy <- newDummyVar (exprType vect_scrut)
+      ldummy <- newDummyVar (exprType lift_scrut)
+      let vect_case = Case vect_scrut vdummy vty
                            (zipWith3 mk_vect_alt vect_dcs vect_bndrss vect_bodies)
 
       lbody <- combinePA vty len sel indices lift_bodies
-      let lift_case = Case lift_scrut (mkWildId (exprType lift_scrut)) lty
+      let lift_case = Case lift_scrut ldummy lty
                            [(DataAlt arr_dc, shape_bndrs ++ concat lift_bndrss,
                              lbody)]
 

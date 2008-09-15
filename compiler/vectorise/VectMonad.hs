@@ -336,7 +336,7 @@ newLocalVar fs ty
       return $ mkSysLocal fs u ty
 
 newDummyVar :: Type -> VM Var
-newDummyVar = newLocalVar (fsLit "ds")
+newDummyVar = newLocalVar (fsLit "vv")
 
 newTyVar :: FastString -> Kind -> VM Var
 newTyVar fs k
