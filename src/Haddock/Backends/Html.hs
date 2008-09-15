@@ -36,7 +36,7 @@ import System.IO             ( IOMode(..), hClose, hGetBuf, hPutBuf, openFile )
 import Data.Map              ( Map )
 import qualified Data.Map as Map hiding ( Map )
 
-import GHC hiding ( NoLink )
+import GHC hiding ( NoLink, moduleInfo )
 import Name
 import Module
 import PackageConfig
