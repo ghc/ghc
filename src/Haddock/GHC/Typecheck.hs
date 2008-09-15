@@ -34,19 +34,19 @@ type FullyCheckedMod = (ParsedSource,
 
 
 -- TODO: make it handle cleanup
-typecheckFiles :: Session -> [FilePath] -> IO [GhcModule]
-typecheckFiles session files = do 
+typecheckFiles :: [FilePath] -> Ghc [GhcModule]
+typecheckFiles files = do
 
   -- load all argument files
 
   targets <- mapM (\f -> guessTarget f Nothing) files
-  setTargets session targets
+  setTargets targets
 
-  flag <- load session LoadAllTargets
+  flag <- load LoadAllTargets
   when (failed flag) $ 
     throwE "Failed to load all needed modules"
 
-  modgraph <- getModuleGraph session
+  modgraph <- getModuleGraph
 
   let mods = concatMap flattenSCC $ topSortModuleGraph False modgraph Nothing
       getModFile = fromJust . ml_hs_file . ms_location
@@ -55,12 +55,18 @@ typecheckFiles session files = do
 
   -- typecheck the argument modules
 
-  ghcMods <- forM mods' $ \(mod, flags, file) -> do
-    mbMod <- checkModule session (moduleName mod) False
-    case mbMod of
-      Just (CheckedModule a (Just b) (Just c) (Just d) _) 
-        -> return $ mkGhcModule (mod, file, (a,b,c,d)) flags
-      _ -> throwE ("Failed to check module: " ++ moduleString mod)
+  ghcMods <- forM mods' $ \(mod, flags, file) ->
+    handleSourceError
+        (\err -> do
+           printExceptionAndWarnings err
+           throwE ("Failed to check module: " ++ moduleString mod)) $
+      do tc_mod <- typecheckModule =<< parseModule (moduleName mod)
+         let Just renamed_src = renamedSource tc_mod
+         return $ mkGhcModule (mod, file, (parsedSource tc_mod,
+                                           renamed_src,
+                                           typecheckedSource tc_mod,
+                                           moduleInfo tc_mod))
+                              flags
 
   return ghcMods
 
