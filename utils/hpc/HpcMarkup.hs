@@ -60,11 +60,6 @@ markup_main flags (prog:modNames) = do
     Nothing -> hpcError markup_plugin $ "unable to find tix file for: " ++ prog
     Just a -> return a
 
-#if __GLASGOW_HASKELL__ >= 604 
-  -- create the dest_dir if needed
-  createDirectoryIfMissing True dest_dir
-#endif
-
   mods <-
      sequence [ genHtmlFromMod dest_dir hpcflags1 tix theFunTotals invertOutput
 	      | tix <- tixs
@@ -79,11 +74,9 @@ markup_main flags (prog:modNames) = do
   let writeSummary filename cmp = do
         let mods' = sortBy cmp mods
 
-
-
-   
         putStrLn $ "Writing: " ++ (filename ++ ".html")
-        writeFile (dest_dir ++ "/" ++ filename ++ ".html") $ 
+
+        writeFileUsing (dest_dir ++ "/" ++ filename ++ ".html") $ 
   	    "<html>" ++
 	    "<style type=\"text/css\">" ++
 	    "table.bar { background-color: #f25913; }\n" ++
@@ -211,7 +204,7 @@ genHtmlFromMod dest_dir flags tix theFunTotals invertOutput = do
   let addLines = unlines . map (uncurry addLine) . zip [1 :: Int ..] . lines
   let fileName = modName0 ++ ".hs.html"
   putStrLn $ "Writing: " ++ fileName
-  writeFile (dest_dir ++ "/" ++ fileName) $
+  writeFileUsing (dest_dir ++ "/" ++ fileName) $
   	    unlines [ "<html><style type=\"text/css\">",
 		     "span.lineno { color: white; background: #aaaaaa; border-right: solid white 12px }",
 		     if invertOutput
@@ -447,6 +440,23 @@ instance Monoid ModuleSummary where
 	  (ModuleSummary eTik2 eTot2 tTik2 tTot2 aTik2 aTot2)
      = ModuleSummary (eTik1 + eTik2) (eTot1 + eTot2) (tTik1 + tTik2) (tTot1 + tTot2) (aTik1 + aTik2) (aTot1 + aTot2)
 
+
+------------------------------------------------------------------------------
+
+writeFileUsing :: String -> String -> IO ()
+writeFileUsing filename text = do
+  let dest_dir = reverse . dropWhile (\ x -> x /= '/') . reverse $ filename
+
+-- We need to check for the dest_dir each time, because we use sub-dirs for
+-- packages, and a single .tix file might contain information about
+-- many package.
+
+#if __GLASGOW_HASKELL__ >= 604 
+  -- create the dest_dir if needed
+  createDirectoryIfMissing True dest_dir
+#endif
+
+  writeFile filename text
 
 ------------------------------------------------------------------------------
 -- global color pallete
