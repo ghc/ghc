@@ -23,6 +23,7 @@ import {-# SOURCE #-}	Match( matchWrapper )
 import DsMonad
 import DsGRHSs
 import DsUtils
+import OccurAnal
 
 import HsSyn		-- lots of things
 import CoreSyn		-- lots of things
@@ -32,12 +33,11 @@ import CoreFVs
 
 import TcHsSyn	( mkArbitraryType )	-- Mis-placed?
 import TcType
-import OccurAnal
 import CostCentre
 import Module
 import Id
 import Name	( localiseName )
-import Var	( TyVar )
+import Var	( Var, TyVar )
 import VarSet
 import Rules
 import VarEnv
@@ -333,27 +333,17 @@ dsSpec all_tvs dicts tvs poly_id mono_id mono_bind
     do	{ let poly_name = idName poly_id
 	; spec_name <- newLocalName poly_name
 	; ds_spec_expr  <- dsExpr spec_expr
-	; let (bndrs, body) = collectBinders (occurAnalyseExpr ds_spec_expr)
-	      -- ds_spec_expr may look like
-	      --     /\a. f a Int dOrdInt
-	      -- or  /\a.\d:Ord a. let { dl::Ord [a] = dOrdList a d } in f [a] dl
-		-- The occurrence-analysis does two things
-		-- (a) identifies unused binders: Note [Unused spec binders]
-		-- (b) sorts dict bindings into NonRecs 
-		--	so they can be inlined by decomposeRuleLhs
-	      mb_lhs = decomposeRuleLhs body
+	; case (decomposeRuleLhs ds_spec_expr) of {
+	    Nothing -> do { warnDs decomp_msg; return Nothing } ;
+
+	    Just (bndrs, _fn, args) ->
 
 	-- Check for dead binders: Note [Unused spec binders]
-	; case filter isDeadBinder bndrs of {
-		bs | not (null bs) -> do { warnDs (dead_msg bs); return Nothing }
-		   | otherwise -> 
+	  case filter isDeadBinder bndrs of {
+		bs | not (null bs) -> do { warnDs (dead_msg bs); return Nothing } 
+		   | otherwise -> do
 
-	  case mb_lhs of
-	    Nothing -> do { warnDs decomp_msg; return Nothing }
-
-	    Just (_, args) -> do {
-
-	  f_body <- fix_up (Let mono_bind (Var mono_id))
+	{ f_body <- fix_up (Let mono_bind (Var mono_id))
 
 	; let	  local_poly  = setIdNotExported poly_id
 			-- Very important to make the 'f' non-exported,
@@ -372,7 +362,7 @@ dsSpec all_tvs dicts tvs poly_id mono_id mono_bind
 			        (extra_dict_bndrs ++ bndrs) args
 				(mkVarApps (Var spec_id) bndrs)
 	; return (Just (addInlineInfo inl spec_id spec_rhs, rule))
-	} } }
+	} } } }
   where
 	-- Bind to Any any of all_ptvs that aren't 
 	-- relevant for this particular function 
@@ -463,19 +453,31 @@ confused. Hence the use of 'localise' to make it Internal.
 %************************************************************************
 
 \begin{code}
-decomposeRuleLhs :: CoreExpr -> Maybe (Id, [CoreExpr])
+decomposeRuleLhs :: CoreExpr -> Maybe ([Var], Id, [CoreExpr])
+-- Take apart the LHS of a RULE.  It's suuposed to look like
+--     /\a. f a Int dOrdInt
+-- or  /\a.\d:Ord a. let { dl::Ord [a] = dOrdList a d } in f [a] dl
+-- That is, the RULE binders are lambda-bound
 -- Returns Nothing if the LHS isn't of the expected shape
 decomposeRuleLhs lhs 
-  = go emptyVarEnv (occurAnalyseExpr lhs)	-- Occurrence analysis sorts out the dict
-						-- bindings so we know if they are recursive
+  = case (decomp emptyVarEnv body) of
+	Nothing 	-> Nothing
+	Just (fn, args) -> Just (bndrs, fn, args)
   where
+    occ_lhs = occurAnalyseExpr lhs
+		-- The occurrence-analysis does two things
+		-- (a) identifies unused binders: Note [Unused spec binders]
+		-- (b) sorts dict bindings into NonRecs 
+		--	so they can be inlined by 'decomp'
+    (bndrs, body) = collectBinders occ_lhs
+
         -- Substitute dicts in the LHS args, so that there 
         -- aren't any lets getting in the way
         -- Note that we substitute the function too; we might have this as
         -- a LHS:       let f71 = M.f Int in f71
-    go env (Let (NonRec dict rhs) body) 
-        = go (extendVarEnv env dict (simpleSubst env rhs)) body
-    go env body 
+    decomp env (Let (NonRec dict rhs) body) 
+        = decomp (extendVarEnv env dict (simpleSubst env rhs)) body
+    decomp env body 
         = case collectArgs (simpleSubst env body) of
             (Var fn, args) -> Just (fn, args)
             _              -> Nothing

@@ -17,7 +17,6 @@ import MkIface
 import Id
 import Name
 import CoreSyn
-import OccurAnal
 import PprCore
 import DsMonad
 import DsExpr
@@ -255,16 +254,16 @@ ppr_ds_rules rules
 dsRule :: LRuleDecl Id -> DsM (Maybe CoreRule)
 dsRule (L loc (HsRule name act vars lhs _tv_lhs rhs _fv_rhs))
   = putSrcSpanDs loc $ 
-    do	{ let bndrs = [var | RuleBndr (L _ var) <- vars]
+    do	{ let bndrs' = [var | RuleBndr (L _ var) <- vars]
 	; lhs'  <- dsLExpr lhs
 	; rhs'  <- dsLExpr rhs
 
-	; case decomposeRuleLhs (occurAnalyseExpr lhs') of {
-		Nothing -> do { warnDs msg; return Nothing } ;
-		Just (fn_id, args) -> do
-	
 	-- Substitute the dict bindings eagerly,
 	-- and take the body apart into a (f args) form
+	; case decomposeRuleLhs (mkLams bndrs' lhs') of {
+		Nothing -> do { warnDs msg; return Nothing } ;
+		Just (bndrs, fn_id, args) -> do
+	
 	{ let local_rule = isLocalId fn_id
 		-- NB: isLocalId is False of implicit Ids.  This is good becuase
 		-- we don't want to attach rules to the bindings of implicit Ids, 
