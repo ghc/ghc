@@ -107,6 +107,15 @@ infixr 9 `thenCmp`
 %*                                                                      *
 %************************************************************************
 
+These booleans are global constants, set by CPP flags.  They allow us to
+recompile a single module (this one) to change whether or not debug output
+appears. They sometimes let us avoid even running CPP elsewhere.
+
+It's important that the flags are literal constants (True/False). Then,
+with -0, tests of the flags in other modules will simplify to the correct
+branch of the conditional, thereby dropping debug code altogether when
+the flags are off.
+
 \begin{code}
 ghciSupported :: Bool
 #ifdef GHCI

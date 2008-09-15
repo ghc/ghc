@@ -36,6 +36,7 @@ import Name
 import OccName		( mkSpecOcc )
 import ErrUtils		( dumpIfSet_dyn )
 import DynFlags		( DynFlags(..), DynFlag(..) )
+import StaticFlags	( opt_PprStyle_Debug )
 import StaticFlags	( opt_SpecInlineJoinPoints )
 import BasicTypes	( Activation(..) )
 import Maybes		( orElse, catMaybes, isJust, isNothing )
@@ -1021,10 +1022,14 @@ specialise env bind_calls (fn, arg_bndrs, body, arg_occs)
 	; let spec_count' = length pats + spec_count
 	; case sc_count env of
 	    Just max | spec_count' > max
-		-> pprTrace "SpecConstr: too many specialisations for one function (see -fspec-constr-count):" 
-			 (vcat [ptext (sLit "Function:") <+> ppr fn,
-				ptext (sLit "Specialisations:") <+> ppr (pats ++ [p | OS p _ _ _ <- specs])])
-			 return (nullUsage, spec_info)
+		-> WARN( True, msg ) return (nullUsage, spec_info)
+		where
+		   msg = vcat [ sep [ ptext (sLit "SpecConstr: specialisation of") <+> quotes (ppr fn)
+		       	            , nest 2 (ptext (sLit "limited by bound of")) <+> int max ]
+			      , ptext (sLit "Use -fspec-constr-count=n to set the bound")
+			      , extra ]
+	           extra | not opt_PprStyle_Debug = ptext (sLit "Use -dppr-debug to see specialisations")
+		   	 | otherwise = ptext (sLit "Specialisations:") <+> ppr (pats ++ [p | OS p _ _ _ <- specs])
 
 	    _normal_case -> do {
 
