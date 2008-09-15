@@ -1051,6 +1051,7 @@ Operations on entire EqInst.
 \begin{code}
 -- For debugging, make sure the cotv of a wanted is not filled.
 --
+isValidWantedEqInst :: Inst -> TcM Bool
 isValidWantedEqInst (EqInst {tci_co = Left cotv})
   = liftM not $ isFilledMetaTyVar cotv
 isValidWantedEqInst _ = return True
