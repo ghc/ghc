@@ -57,6 +57,7 @@ import ErrUtils
 #if __GLASGOW_HASKELL__ >= 609
 import Panic (handleGhcException)
 import Util
+import MonadUtils ( MonadIO(..) )
 #else
 import Util hiding (handle)
 #endif
@@ -160,30 +161,31 @@ main = handleTopExceptions $ do
 #endif
 
       -- initialize GHC
-      (session, dynflags) <- startGhc libDir (ghcFlags flags)
+      startGhc libDir (ghcFlags flags) $ \dynflags -> do
 
-      -- get packages supplied with --read-interface
-      packages <- readInterfaceFiles (Just session) (ifacePairs flags)
+        -- get packages supplied with --read-interface
+        packages <- readInterfaceFiles nameCacheFromGhc (ifacePairs flags)
 
-      -- typecheck argument modules using GHC
-      modules <- typecheckFiles session fileArgs
+        -- typecheck argument modules using GHC
+        modules <- typecheckFiles fileArgs
 
-      -- combine the link envs of the external packages into one
-      let extLinks = Map.unions (map (ifLinkEnv . fst) packages)
+        -- combine the link envs of the external packages into one
+        let extLinks = Map.unions (map (ifLinkEnv . fst) packages)
 
-      -- create the interfaces -- this is the core part of Haddock
-      let (interfaces, homeLinks, messages) = createInterfaces modules extLinks flags
-      mapM_ putStrLn messages
+        liftIO $ do
+        -- create the interfaces -- this is the core part of Haddock
+        let (interfaces, homeLinks, messages) = createInterfaces modules extLinks flags
+        mapM_ putStrLn messages
 
-      -- render the interfaces
-      renderStep packages interfaces
+        -- render the interfaces
+        renderStep packages interfaces
  
-      -- last but not least, dump the interface file
-      dumpInterfaceFile (map toInstalledIface interfaces) homeLinks flags
+        -- last but not least, dump the interface file
+        dumpInterfaceFile (map toInstalledIface interfaces) homeLinks flags
 
     else do
       -- get packages supplied with --read-interface
-      packages <- readInterfaceFiles Nothing (ifacePairs flags)
+      packages <- readInterfaceFiles freshNameCache (ifacePairs flags)
 
       -- render even though there are no input files (usually contents/index)
       renderStep packages []
@@ -293,17 +295,19 @@ render flags interfaces installedIfaces = do
 -------------------------------------------------------------------------------
 
 
-readInterfaceFiles :: Maybe Session -> [(FilePath, FilePath)] ->
-                      IO [(InterfaceFile, FilePath)]
-readInterfaceFiles session pairs = do
+readInterfaceFiles :: MonadIO m =>
+                      NameCacheAccessor m
+                   -> [(FilePath, FilePath)] ->
+                      m [(InterfaceFile, FilePath)]
+readInterfaceFiles name_cache_accessor pairs = do
   mbPackages <- mapM tryReadIface pairs
   return (catMaybes mbPackages)
   where
     -- try to read an interface, warn if we can't
     tryReadIface (html, iface) = do
-      eIface <- readInterfaceFile session iface
+      eIface <- readInterfaceFile name_cache_accessor iface
       case eIface of
-        Left err -> do
+        Left err -> liftIO $ do
           putStrLn ("Warning: Cannot read " ++ iface ++ ":")
           putStrLn ("   " ++ show err)
           putStrLn "Skipping this interface."
