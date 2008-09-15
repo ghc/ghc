@@ -549,7 +549,7 @@ normDict isWanted inst@(Dict {tci_pred = ClassP clas args})
        ; eqs' <- if isWanted then return eqs else mapM wantedToLocal eqs
        ; return (inst', eqs', bind, unionVarSets args_skolemss)
        }}
-normDict isWanted inst
+normDict _isWanted inst
   = return (inst, [], emptyBag, emptyVarSet)
 -- !!!TODO: Still need to normalise IP constraints.
 
@@ -1032,7 +1032,7 @@ substitute eqs locals wanteds = subst eqs [] emptyBag locals wanteds
       -- We have, co :: tv ~ ty 
       -- => apply [ty/tv] to right-hand side of eq2
       --    (but only if tv actually occurs in the right-hand side of eq2)
-    substEq (RewriteVar {rwi_var = tv, rwi_right = ty, rwi_co = co}) 
+    substEq (RewriteVar {rwi_var = tv, rwi_right = ty}) 
             coSubst tySubst eq2
       | tv `elemVarSet` tyVarsOfType (rwi_right eq2)
       = do { let co1Subst = mkSymCoercion $ substTy coSubst (rwi_right eq2)
@@ -1055,7 +1055,7 @@ substitute eqs locals wanteds = subst eqs [] emptyBag locals wanteds
       -- We have, co :: tv ~ ty 
       -- => apply [ty/tv] to dictionary predicate
       --    (but only if tv actually occurs in the predicate)
-    substDict (RewriteVar {rwi_var = tv, rwi_right = ty, rwi_co = co}) 
+    substDict (RewriteVar {rwi_var = tv}) 
               coSubst tySubst isWanted dict
       | isClassDict dict
       , tv `elemVarSet` tyVarsOfPred (tci_pred dict)
@@ -1275,7 +1275,9 @@ warnDroppingLoopyEquality ty1 ty2
   = do { env0 <- tcInitTidyEnv
        ; ty1 <- zonkTcType ty1
        ; ty2 <- zonkTcType ty2
+       ; let (env1 , tidy_ty1) = tidyOpenType env0 ty1
+	     (_env2, tidy_ty2) = tidyOpenType env1 ty2
        ; addWarnTc $ hang (ptext (sLit "Dropping loopy given equality"))
-		       2 (ppr ty1 <+> text "~" <+> ppr ty2)
+		       2 (quotes (ppr tidy_ty1 <+> text "~" <+> ppr tidy_ty2))
        }
 \end{code}
