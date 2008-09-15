@@ -8,7 +8,7 @@
 
 module Haddock.InterfaceFile (
   InterfaceFile(..),
-  readInterfaceFile,
+  readInterfaceFile, nameCacheFromGhc, freshNameCache, NameCacheAccessor,
   writeInterfaceFile
 ) where
 
@@ -37,6 +37,7 @@ import FastMutInt
 import HsDoc
 import FastString
 import Unique
+import MonadUtils ( MonadIO(..) )
 
 
 data InterfaceFile = InterfaceFile {
@@ -142,16 +143,42 @@ writeInterfaceFile filename iface = do
   writeBinMem bh filename
   return ()
 
+type NameCacheAccessor m = (m NameCache, NameCache -> m ())
+
+nameCacheFromGhc :: NameCacheAccessor Ghc
+nameCacheFromGhc = ( read_from_session , write_to_session )
+  where
+    read_from_session = do
+       ref <- withSession (return . hsc_NC)
+       liftIO $ readIORef ref
+    write_to_session nc' = do
+       ref <- withSession (return . hsc_NC)
+       liftIO $ writeIORef ref nc'
+
+freshNameCache :: NameCacheAccessor IO
+freshNameCache = ( create_fresh_nc , \_ -> return () )
+  where
+    create_fresh_nc = do
+       u  <- mkSplitUniqSupply 'a' -- ??
+       return (initNameCache u [])
 
 -- | Read a Haddock (@.haddock@) interface file. Return either an 
--- 'InterfaceFile' or an error message. If given a GHC 'Session', the function
--- registers all read names in the name cache of the session.
-readInterfaceFile :: Maybe Session -> FilePath -> IO (Either String InterfaceFile)
-readInterfaceFile mbSession filename = do
-  bh0 <- readBinMem filename
+-- 'InterfaceFile' or an error message.
+--
+-- This function can be called in two ways.  Within a GHC session it will
+-- update the use and update the session's name cache.  Outside a GHC session
+-- a new empty name cache is used.  The function is therefore generic in the
+-- monad being used.  The exact monad is whichever monad the first
+-- argument, the getter and setter of the name cache, requires.
+--
+readInterfaceFile :: MonadIO m =>
+                     NameCacheAccessor m
+                  -> FilePath -> m (Either String InterfaceFile)
+readInterfaceFile (get_name_cache, set_name_cache) filename = do
+  bh0 <- liftIO $ readBinMem filename
 
-  magic   <- get bh0
-  version <- get bh0
+  magic   <- liftIO $ get bh0
+  version <- liftIO $ get bh0
 
   case () of
     _ | magic /= binaryInterfaceMagic -> return . Left $
@@ -160,49 +187,40 @@ readInterfaceFile mbSession filename = do
       "Interface file is of wrong version: " ++ filename
       | otherwise -> do
 
-      -- get the dictionary
-      dict_p <- get bh0
-      data_p <- tellBin bh0
-      seekBin bh0 dict_p
-      dict <- getDictionary bh0
-      seekBin bh0 data_p
+      dict  <- get_dictionary bh0
+      bh1   <- init_handle_user_data bh0 dict
 
-      -- initialise the user-data field of bh0
-      ud <- newReadState dict
-      bh1 <- return (setUserData bh0 ud)
-
-      -- get the name cache from ghc if we have a ghc session,
-      -- otherwise create a new one
-      (theNC, mbRef) <- case mbSession of
-        Just session -> do
-          ref <- withSession session (return . hsc_NC)
-          nc <- readIORef ref
-          return (nc, Just ref)
-        Nothing -> do
-          -- construct an empty name cache
-          u  <- mkSplitUniqSupply 'a' -- ??
-          return (initNameCache u [], Nothing)
-
-      -- get the symbol table
-      symtab_p <- get bh1
-      data_p'  <- tellBin bh1
-      seekBin bh1 symtab_p
-      (nc', symtab) <- getSymbolTable bh1 theNC
-      seekBin bh1 data_p'
-
-      -- write back the new name cache if we have a ghc session
-      case mbRef of
-        Just ref -> writeIORef ref nc'
-        Nothing  -> return ()
+      theNC <- get_name_cache
+      (nc', symtab) <- get_symbol_table bh1 theNC
+      set_name_cache nc'
 
       -- set the symbol table
       let ud' = getUserData bh1
       bh2 <- return $! setUserData bh1 ud'{ud_symtab = symtab}
 
       -- load the actual data
-      iface <- get bh2
+      iface <- liftIO $ get bh2
       return (Right iface)
+ where
+   get_dictionary bin_handle = liftIO $ do
+      dict_p <- get bin_handle
+      data_p <- tellBin bin_handle
+      seekBin bin_handle dict_p
+      dict <- getDictionary bin_handle
+      seekBin bin_handle data_p
+      return dict
 
+   init_handle_user_data bin_handle dict = liftIO $ do
+      ud <- newReadState dict
+      return (setUserData bin_handle ud)
+
+   get_symbol_table bh1 theNC = liftIO $ do
+      symtab_p <- get bh1
+      data_p'  <- tellBin bh1
+      seekBin bh1 symtab_p
+      (nc', symtab) <- getSymbolTable bh1 theNC
+      seekBin bh1 data_p'
+      return (nc', symtab)
 
 -------------------------------------------------------------------------------
 -- Symbol table
