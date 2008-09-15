@@ -289,16 +289,17 @@ linkDependencies hsc_env span needed_mods = do
 
 -- | Temporarily extend the linker state.
 
-withExtendedLinkEnv :: [(Name,HValue)] -> IO a -> IO a
+withExtendedLinkEnv :: (MonadIO m, ExceptionMonad m) =>
+                       [(Name,HValue)] -> m a -> m a
 withExtendedLinkEnv new_env action
-    = bracket_ set_new_env
-               reset_old_env
-               action
+    = gbracket set_new_env
+               (\_ -> reset_old_env)
+               (\_ -> action)
     where set_new_env = do 
-            pls <- readIORef v_PersistentLinkerState
+            pls <- liftIO $ readIORef v_PersistentLinkerState
             let new_closure_env = extendClosureEnv (closure_env pls) new_env
                 new_pls = pls { closure_env = new_closure_env }
-            writeIORef v_PersistentLinkerState new_pls
+            liftIO $ writeIORef v_PersistentLinkerState new_pls
             return ()
 
         -- Remember that the linker state might be side-effected
@@ -306,7 +307,7 @@ withExtendedLinkEnv new_env action
         -- lose those changes (we might have linked a new module or
         -- package), so the reset action only removes the names we
         -- added earlier.
-          reset_old_env = do
+          reset_old_env = liftIO $ do
             modifyIORef v_PersistentLinkerState $ \pls ->
                 let cur = closure_env pls
                     new = delListFromNameEnv cur (map fst new_env)
