@@ -801,7 +801,16 @@ optLevelFlags
 
     , ([2],     Opt_LiberateCase)
     , ([2],     Opt_SpecConstr)
-    , ([2],     Opt_StaticArgumentTransformation)
+
+--     , ([2],     Opt_StaticArgumentTransformation)
+-- Max writes: I think it's probably best not to enable SAT with -O2 for the
+-- 6.10 release. The version of SAT in HEAD at the moment doesn't incorporate
+-- several improvements to the heuristics, and I'm concerned that without
+-- those changes SAT will interfere with some attempts to write "high
+-- performance Haskell", as we saw in some posts on Haskell-Cafe earlier
+-- this year. In particular, the version in HEAD lacks the tail call
+-- criterion, so many things that look like reasonable loops will be
+-- turned into functions with extra (unneccesary) thunk creation.
 
     , ([0,1,2], Opt_DoLambdaEtaExpansion)
                 -- This one is important for a tiresome reason:
