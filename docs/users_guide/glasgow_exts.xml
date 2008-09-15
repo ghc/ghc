@@ -5316,6 +5316,8 @@ For more details, see
 &ldquo;Generalising Monads to Arrows&rdquo;,
 John Hughes, in <citetitle>Science of Computer Programming</citetitle> 37,
 pp67&ndash;111, May 2000.
+The paper that introduced arrows: a friendly introduction, motivated with
+programming examples.
 </para>
 </listitem>
 
@@ -5323,6 +5325,7 @@ pp67&ndash;111, May 2000.
 <para>
 &ldquo;<ulink url="http://www.soi.city.ac.uk/~ross/papers/notation.html">A New Notation for Arrows</ulink>&rdquo;,
 Ross Paterson, in <citetitle>ICFP</citetitle>, Sep 2001.
+Introduced the notation described here.
 </para>
 </listitem>
 
@@ -5334,17 +5337,42 @@ Palgrave, 2003.
 </para>
 </listitem>
 
-</itemizedlist>
-and the arrows web page at
+<listitem>
+<para>
+&ldquo;<ulink url="http://www.cs.chalmers.se/~rjmh/afp-arrows.pdf">Programming with Arrows</ulink>&rdquo;,
+John Hughes, in <citetitle>5th International Summer School on
+Advanced Functional Programming</citetitle>,
+<citetitle>Lecture Notes in Computer Science</citetitle> vol. 3622,
+Springer, 2004.
+This paper includes another introduction to the notation,
+with practical examples.
+</para>
+</listitem>
+
+<listitem>
+<para>
+&ldquo;<ulink url="http://www.haskell.org/ghc/docs/papers/arrow-rules.pdf">Type and Translation Rules for Arrow Notation in GHC</ulink>&rdquo;,
+Ross Paterson and Simon Peyton Jones, September 16, 2004.
+A terse enumeration of the formal rules used
+(extracted from comments in the source code).
+</para>
+</listitem>
+
+<listitem>
+<para>
+The arrows web page at
 <ulink url="http://www.haskell.org/arrows/"><literal>http://www.haskell.org/arrows/</literal></ulink>.
+</para>
+</listitem>
+
+</itemizedlist>
 With the <option>-XArrows</option> flag, GHC supports the arrow
-notation described in the second of these papers.
-What follows is a brief introduction to the notation;
-it won't make much sense unless you've read Hughes's paper.
-This notation is translated to ordinary Haskell,
-using combinators from the
+notation described in the second of these papers,
+translating it using combinators from the
 <ulink url="../libraries/base/Control-Arrow.html"><literal>Control.Arrow</literal></ulink>
 module.
+What follows is a brief introduction to the notation;
+it won't make much sense unless you've read Hughes's paper.
 </para>
 
 <para>The extension adds a new kind of expression for defining arrows:
@@ -5618,7 +5646,8 @@ We could define our own operator
 <programlisting>
 untilA :: ArrowChoice a => a e () -> a e Bool -> a e ()
 untilA body cond = proc x ->
-        if cond x then returnA -&lt; ()
+        b &lt;- cond -&lt; x
+        if b then returnA -&lt; ()
         else do
                 body -&lt; x
                 untilA body cond -&lt; x
