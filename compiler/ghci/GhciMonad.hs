@@ -25,7 +25,9 @@ import Module
 import ObjLink
 import Linker
 import StaticFlags
+import MonadUtils       ( MonadIO, liftIO )
 
+import Exception
 import Data.Maybe
 import Numeric
 import Data.Array
@@ -52,7 +54,6 @@ data GHCiState = GHCiState
         prompt         :: String,
 	editor         :: String,
         stop           :: String,
-	session        :: GHC.Session,
 	options        :: [GHCiOption],
         prelude        :: GHC.Module,
         break_ctr      :: !Int,
@@ -126,10 +127,21 @@ recordBreak brkLoc = do
                         }
       return (False, oldCounter)
 
-newtype GHCi a = GHCi { unGHCi :: IORef GHCiState -> IO a }
+newtype GHCi a = GHCi { unGHCi :: IORef GHCiState -> Ghc a }
 
-startGHCi :: GHCi a -> GHCiState -> IO a
-startGHCi g state = do ref <- newIORef state; unGHCi g ref
+reflectGHCi :: (Session, IORef GHCiState) -> GHCi a -> IO a
+reflectGHCi (s, gs) m = unGhc (unGHCi m gs) s
+
+reifyGHCi :: ((Session, IORef GHCiState) -> IO a) -> GHCi a
+reifyGHCi f = GHCi f'
+  where
+    -- f' :: IORef GHCiState -> Ghc a
+    f' gs = reifyGhc (f'' gs)
+    -- f'' :: IORef GHCiState -> Session -> IO a
+    f'' gs s = f (s, gs)
+
+startGHCi :: GHCi a -> GHCiState -> Ghc a
+startGHCi g state = do ref <- liftIO $ newIORef state; unGHCi g ref
 
 instance Monad GHCi where
   (GHCi m) >>= k  =  GHCi $ \s -> m s >>= \a -> unGHCi (k a) s
@@ -139,42 +151,69 @@ instance Functor GHCi where
     fmap f m = m >>= return . f
 
 ghciHandleGhcException :: (GhcException -> GHCi a) -> GHCi a -> GHCi a
-ghciHandleGhcException h (GHCi m) = GHCi $ \s -> 
-   handleGhcException (\e -> unGHCi (h e) s) (m s)
+ghciHandleGhcException = handleGhcException
 
 getGHCiState :: GHCi GHCiState
-getGHCiState   = GHCi $ \r -> readIORef r
+getGHCiState   = GHCi $ \r -> liftIO $ readIORef r
 setGHCiState :: GHCiState -> GHCi ()
-setGHCiState s = GHCi $ \r -> writeIORef r s
+setGHCiState s = GHCi $ \r -> liftIO $ writeIORef r s
+
+liftGhc :: Ghc a -> GHCi a
+liftGhc m = GHCi $ \_ -> m
+
+instance MonadIO GHCi where
+  liftIO m = liftGhc $ liftIO m
+
+instance GhcMonad GHCi where
+  setSession s' = liftGhc $ setSession s'
+  getSession    = liftGhc $ getSession
+
+instance ExceptionMonad GHCi where
+  gcatch m h = GHCi $ \r -> unGHCi m r `gcatch` (\e -> unGHCi (h e) r)
+  gbracket acq rel ib =
+      GHCi $ \r -> gbracket (unGHCi acq r)
+                            (\x -> unGHCi (rel x) r)
+                            (\x -> unGHCi (ib x) r)
+  gfinally th cu =
+      GHCi $ \r -> gfinally (unGHCi th r) (unGHCi cu r)
+
+instance WarnLogMonad GHCi where
+  setWarnings warns = liftGhc $ setWarnings warns
+  getWarnings = liftGhc $ getWarnings
 
 -- for convenience...
-getSession :: GHCi Session
-getSession = getGHCiState >>= return . session
 getPrelude :: GHCi Module
 getPrelude = getGHCiState >>= return . prelude
 
-GLOBAL_VAR(saved_sess, no_saved_sess, GHC.Session)
+GLOBAL_VAR(saved_sess, no_saved_sess, Session)
 
 no_saved_sess :: Session
 no_saved_sess = error "no saved_ses"
 
 saveSession :: GHCi ()
-saveSession = getSession >>= io . writeIORef saved_sess
+saveSession =
+    liftGhc $ do
+      reifyGhc $ \s ->
+        writeIORef saved_sess s
 
 splatSavedSession :: GHCi ()
 splatSavedSession = io (writeIORef saved_sess no_saved_sess)
 
-restoreSession :: IO Session
-restoreSession = readIORef saved_sess
+-- restoreSession :: IO Session
+-- restoreSession = readIORef saved_sess
+
+withRestoredSession :: Ghc a -> IO a
+withRestoredSession ghc = do
+    s <- readIORef saved_sess
+    reflectGhc ghc s
 
 getDynFlags :: GHCi DynFlags
 getDynFlags = do
-  s <- getSession
-  io (GHC.getSessionDynFlags s)
+  GHC.getSessionDynFlags
+
 setDynFlags :: DynFlags -> GHCi [PackageId]
 setDynFlags dflags = do 
-  s <- getSession 
-  io (GHC.setSessionDynFlags s dflags)
+  GHC.setSessionDynFlags dflags
 
 isOptionSet :: GHCiOption -> GHCi Bool
 isOptionSet opt
@@ -192,18 +231,16 @@ unsetOption opt
       setGHCiState (st{ options = filter (/= opt) (options st) })
 
 io :: IO a -> GHCi a
-io m = GHCi (\_ -> m)
+io = liftIO
 
 printForUser :: SDoc -> GHCi ()
 printForUser doc = do
-  session <- getSession
-  unqual <- io (GHC.getPrintUnqual session)
+  unqual <- GHC.getPrintUnqual
   io $ Outputable.printForUser stdout unqual doc
 
 printForUserPartWay :: SDoc -> GHCi ()
 printForUserPartWay doc = do
-  session <- getSession
-  unqual <- io (GHC.getPrintUnqual session)
+  unqual <- GHC.getPrintUnqual
   io $ Outputable.printForUserPartWay stdout opt_PprUserLength unqual doc
 
 withVirtualPath :: GHCi a -> GHCi a
@@ -219,15 +256,18 @@ withVirtualPath m = do
 
 runStmt :: String -> GHC.SingleStep -> GHCi GHC.RunResult
 runStmt expr step = withVirtualPath$ do
-  session <- getSession
-  st      <- getGHCiState
-  io$ withProgName (progname st) $ withArgs (args st) $
-                    GHC.runStmt session expr step
+  st <- getGHCiState
+  reifyGHCi $ \x ->
+    withProgName (progname st) $
+    withArgs (args st) $
+      reflectGHCi x $ do
+        GHC.handleSourceError (\e -> do GHC.printExceptionAndWarnings e
+                                        return GHC.RunFailed) $ do
+          GHC.runStmt expr step
 
 resume :: GHC.SingleStep -> GHCi GHC.RunResult
 resume step = withVirtualPath$ do
-  session <- getSession
-  io$ GHC.resume session step
+  GHC.resume step
 
 
 -- --------------------------------------------------------------------------
@@ -252,7 +292,7 @@ foreign import ccall unsafe "getAllocations" getAllocations :: IO Int64
 
 printTimes :: Integer -> Integer -> IO ()
 printTimes allocs psecs
-   = do let secs = (fromIntegral psecs / (10^12)) :: Float
+   = do let secs = (fromIntegral psecs / (10^(12::Integer))) :: Float
 	    secs_str = showFFloat (Just 2) secs
 	putStrLn (showSDoc (
 		 parens (text (secs_str "") <+> text "secs" <> comma <+> 
@@ -294,10 +334,10 @@ GLOBAL_VAR(stderr_ptr, error "no stderr_ptr", Ptr ())
 -- of the Handle rather than referring to it from its static address
 -- each time.  There's no safe workaround for this.
 
-initInterpBuffering :: GHC.Session -> IO ()
-initInterpBuffering session
- = do -- make sure these are linked
-      dflags <- GHC.getSessionDynFlags session
+initInterpBuffering :: Ghc ()
+initInterpBuffering = do -- make sure these are linked
+    dflags <- GHC.getSessionDynFlags
+    liftIO $ do
       initDynLinker dflags
 
         -- ToDo: we should really look up these names properly, but
