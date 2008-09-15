@@ -17,6 +17,7 @@ import Util
 -- into the GHC API instead
 import Name (nameOccName)
 import OccName (pprOccName)
+import MonadUtils
 
 import Data.Maybe
 import Panic
@@ -40,8 +41,7 @@ data TagsKind = ETags | CTags
 
 ghciCreateTagsFile :: TagsKind -> FilePath -> GHCi ()
 ghciCreateTagsFile kind file = do
-  session <- getSession
-  io $ createTagsFile session kind file
+  createTagsFile kind file
 
 -- ToDo: 
 -- 	- remove restriction that all modules must be interpreted
@@ -51,22 +51,22 @@ ghciCreateTagsFile kind file = do
 --	- extract createTagsFile so it can be used from the command-line
 --	  (probably need to fix first problem before this is useful).
 --
-createTagsFile :: Session -> TagsKind -> FilePath -> IO ()
-createTagsFile session tagskind tagFile = do
-  graph <- GHC.getModuleGraph session
+createTagsFile :: TagsKind -> FilePath -> GHCi ()
+createTagsFile tagskind tagFile = do
+  graph <- GHC.getModuleGraph
   let ms = map GHC.ms_mod graph
       tagModule m = do 
-        is_interpreted <- GHC.moduleIsInterpreted session m
+        is_interpreted <- GHC.moduleIsInterpreted m
         -- should we just skip these?
         when (not is_interpreted) $
           ghcError (CmdLineError ("module '" 
                                 ++ GHC.moduleNameString (GHC.moduleName m)
                                 ++ "' is not interpreted"))
-        mbModInfo <- GHC.getModuleInfo session m
+        mbModInfo <- GHC.getModuleInfo m
         unqual <-
           case mbModInfo of
              Just minf -> do
-                mb_print_unqual <- GHC.mkPrintUnqualifiedForModule session minf
+                mb_print_unqual <- GHC.mkPrintUnqualifiedForModule minf
                 return (fromMaybe GHC.alwaysQualify mb_print_unqual)
              Nothing ->
                 return GHC.alwaysQualify
@@ -75,9 +75,9 @@ createTagsFile session tagskind tagFile = do
           _            -> return []
 
   mtags <- mapM tagModule ms
-  either_res <- collateAndWriteTags tagskind tagFile $ concat mtags
+  either_res <- liftIO $ collateAndWriteTags tagskind tagFile $ concat mtags
   case either_res of
-    Left e  -> hPutStrLn stderr $ ioeGetErrorString e
+    Left e  -> liftIO $ hPutStrLn stderr $ ioeGetErrorString e
     Right _ -> return ()
 
 listTags :: PrintUnqualified -> GHC.ModuleInfo -> [TagInfo]
