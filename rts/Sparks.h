@@ -9,17 +9,45 @@
 #ifndef SPARKS_H
 #define SPARKS_H
 
+#if defined(PARALLEL_HASKELL)
+#error Sparks.c using new internal structure, needs major overhaul!
+#endif
+
+/* typedef for SparkPool in RtsTypes.h */
+
 #if defined(THREADED_RTS)
+
+/* INVARIANTS, in this order: bottom/top consistent, reasonable size,
+   topBound consistent, space pointer, space accessible to us */
+#define ASSERT_SPARK_POOL_INVARIANTS(p)         \
+  ASSERT((p)->bottom >= (p)->top);              \
+  ASSERT((p)->size > 0);                        \
+  ASSERT((p)->size > (p)->bottom - (p)->top);	\
+  ASSERT((p)->topBound <= (p)->top);            \
+  ASSERT((p)->elements != NULL);                \
+  ASSERT(*((p)->elements) || 1);                \
+  ASSERT(*((p)->elements - 1  + ((p)->size)) || 1);
+
+// missing in old interface. Currently called by initSparkPools
+// internally.
+SparkPool* initPool(StgWord size);
+
+// special case: accessing our own pool, at the write end
+// otherwise, we can always steal from our pool as the others do...
+StgClosure* reclaimSpark(Capability *cap);
+
+rtsBool looksEmpty(SparkPool* deque);
+
+// rest: same as old interface
 StgClosure * findSpark         (Capability *cap);
 void         initSparkPools    (void);
-void         freeSparkPool     (StgSparkPool *pool);
+void         freeSparkPool     (SparkPool *pool);
 void         createSparkThread (Capability *cap, StgClosure *p);
 void         pruneSparkQueues  (void);
 void         traverseSparkQueue(evac_fn evac, void *user, Capability *cap);
 
-INLINE_HEADER void     discardSparks  (StgSparkPool *pool);
-INLINE_HEADER nat      sparkPoolSize  (StgSparkPool *pool);
-INLINE_HEADER rtsBool  emptySparkPool (StgSparkPool *pool);
+INLINE_HEADER void     discardSparks  (SparkPool *pool);
+INLINE_HEADER nat      sparkPoolSize  (SparkPool *pool);
 
 INLINE_HEADER void     discardSparksCap  (Capability *cap);
 INLINE_HEADER nat      sparkPoolSizeCap  (Capability *cap);
@@ -32,46 +60,33 @@ INLINE_HEADER rtsBool  emptySparkPoolCap (Capability *cap);
 
 #if defined(PARALLEL_HASKELL) || defined(THREADED_RTS)
 
-INLINE_HEADER rtsBool
-emptySparkPool (StgSparkPool *pool)
-{
-    return (pool->hd == pool->tl);
-}
+INLINE_HEADER rtsBool  
+emptySparkPool (SparkPool *pool) 
+{ return looksEmpty(pool); }
 
 INLINE_HEADER rtsBool
 emptySparkPoolCap (Capability *cap) 
-{ return emptySparkPool(&cap->r.rSparks); }
+{ return looksEmpty(cap->sparks); }
 
 INLINE_HEADER nat
-sparkPoolSize (StgSparkPool *pool) 
+sparkPoolSize (SparkPool *pool) 
 {
-    if (pool->hd <= pool->tl) {
-	return (pool->tl - pool->hd);
-    } else {
-	return (pool->lim - pool->hd + pool->tl - pool->base);
-    }
+  return (pool->bottom - pool->top);
 }
 
 INLINE_HEADER nat
 sparkPoolSizeCap (Capability *cap) 
-{ return sparkPoolSize(&cap->r.rSparks); }
+{ return sparkPoolSize(cap->sparks); }
 
 INLINE_HEADER void
-discardSparks (StgSparkPool *pool)
+discardSparks (SparkPool *pool)
 {
-    pool->hd = pool->tl;
+    pool->top = pool->bottom = 0;
 }
 
 INLINE_HEADER void
 discardSparksCap (Capability *cap) 
-{ return discardSparks(&cap->r.rSparks); }
-
-
-#elif defined(THREADED_RTS) 
-
-INLINE_HEADER rtsBool
-emptySparkPoolCap (Capability *cap STG_UNUSED)
-{ return rtsTrue; }
+{ return discardSparks(cap->sparks); }
 
 #endif
 

@@ -23,6 +23,7 @@
 #ifndef CAPABILITY_H
 #define CAPABILITY_H
 
+#include "RtsTypes.h"
 #include "RtsFlags.h"
 #include "Task.h"
 
@@ -98,6 +99,9 @@ struct Capability_ {
     StgTRecChunk *free_trec_chunks;
     StgTRecHeader *free_trec_headers;
     nat transaction_tokens;
+
+    SparkPool *sparks;
+
 }; // typedef Capability, defined in RtsAPI.h
 
 

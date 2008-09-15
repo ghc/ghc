@@ -1,10 +1,39 @@
 /* ---------------------------------------------------------------------------
  *
- * (c) The GHC Team, 2000-2006
+ * (c) The GHC Team, 2000-2008
  *
  * Sparking support for PARALLEL_HASKELL and THREADED_RTS versions of the RTS.
  *
- * -------------------------------------------------------------------------*/
+ * The implementation uses Double-Ended Queues with lock-free access
+ * (thereby often called "deque") as described in
+ *
+ * D.Chase and Y.Lev, Dynamic Circular Work-Stealing Deque.
+ * SPAA'05, July 2005, Las Vegas, USA.
+ * ACM 1-58113-986-1/05/0007
+ *
+ * Author: Jost Berthold MSRC 07-09/2008
+ *
+ * The DeQue is held as a circular array with known length. Positions
+ * of top (read-end) and bottom (write-end) always increase, and the
+ * array is accessed with indices modulo array-size. While this bears
+ * the risk of overflow, we assume that (with 64 bit indices), a
+ * program must run very long to reach that point.
+ * 
+ * The write end of the queue (position bottom) can only be used with
+ * mutual exclusion, i.e. by exactly one caller at a time.  At this
+ * end, new items can be enqueued using pushBottom()/newSpark(), and
+ * removed using popBottom()/reclaimSpark() (the latter implying a cas
+ * synchronisation with potential concurrent readers for the case of
+ * just one element).
+ * 
+ * Multiple readers can steal()/findSpark() from the read end
+ * (position top), and are synchronised without a lock, based on a cas
+ * of the top position. One reader wins, the others return NULL for a
+ * failure.
+ * 
+ * Both popBottom and steal also return NULL when the queue is empty.
+ * 
+ -------------------------------------------------------------------------*/
 
 #include "PosixSource.h"
 #include "Rts.h"
@@ -14,22 +43,52 @@
 #include "RtsFlags.h"
 #include "RtsUtils.h"
 #include "ParTicky.h"
-# if defined(PARALLEL_HASKELL)
-# include "ParallelRts.h"
-# include "GranSimRts.h"   // for GR_...
-# elif defined(GRAN)
-# include "GranSimRts.h"
-# endif
-#include "Sparks.h"
 #include "Trace.h"
+
+#include "SMP.h" // for cas
+
+#include "Sparks.h"
 
 #if defined(THREADED_RTS) || defined(PARALLEL_HASKELL)
 
-static INLINE_ME void bump_hd (StgSparkPool *p)
-{ p->hd++; if (p->hd == p->lim) p->hd = p->base; }
+/* internal helpers ... */
 
-static INLINE_ME void bump_tl (StgSparkPool *p)
-{ p->tl++; if (p->tl == p->lim) p->tl = p->base; }
+StgWord roundUp2(StgWord val);
+
+StgWord roundUp2(StgWord val) {
+  StgWord rounded = 1;
+
+  /* StgWord is unsigned anyway, only catch 0 */
+  if (val == 0) {
+    barf("DeQue,roundUp2: invalid size 0 requested");
+  }
+  /* at least 1 bit set, shift up to its place */
+  do {
+    rounded = rounded << 1;
+  } while (0 != (val = val>>1));
+  return rounded;
+}
+
+INLINE_HEADER
+rtsBool casTop(StgPtr addr, StgWord old, StgWord new);
+
+#if !defined(THREADED_RTS)
+/* missing def. in non THREADED RTS, and makes no sense anyway... */
+StgWord cas(StgPtr addr,StgWord old,StgWord new);
+StgWord cas(StgPtr addr,StgWord old,StgWord new) { 
+  barf("cas: not implemented without multithreading");
+  old = new = *addr; /* to avoid gcc warnings */
+}
+#endif
+
+INLINE_HEADER
+rtsBool casTop(StgWord* addr, StgWord old, StgWord new) {
+  StgWord res = cas((StgPtr) addr, old, new);
+  return ((res == old));
+}
+
+/* or simply like this */
+#define CASTOP(addr,old,new) ((old) == cas(((StgPtr)addr),(old),(new)))
 
 /* -----------------------------------------------------------------------------
  * 
@@ -37,15 +96,28 @@ static INLINE_ME void bump_tl (StgSparkPool *p)
  *
  * -------------------------------------------------------------------------- */
 
-static void 
-initSparkPool(StgSparkPool *pool)
-{
-    pool->base = stgMallocBytes(RtsFlags.ParFlags.maxLocalSparks
-				* sizeof(StgClosure *),
-				"initSparkPools");
-    pool->lim = pool->base + RtsFlags.ParFlags.maxLocalSparks;
-    pool->hd  = pool->base;
-    pool->tl  = pool->base;
+/* constructor */
+SparkPool* initPool(StgWord size) {
+
+  StgWord realsize; 
+  SparkPool *q;
+
+  realsize = roundUp2(size); /* to compute modulo as a bitwise & */
+
+  q = (SparkPool*) stgMallocBytes(sizeof(SparkPool),   /* admin fields */
+			      "newSparkPool");
+  q->elements = (StgClosurePtr*) 
+                stgMallocBytes(realsize * sizeof(StgClosurePtr), /* dataspace */
+			       "newSparkPool:data space");
+  q->top=0;
+  q->bottom=0;
+  q->topBound=0; /* read by writer, updated each time top is read */
+
+  q->size = realsize;  /* power of 2 */
+  q->moduloSize = realsize - 1; /* n % size == n & moduloSize  */
+
+  ASSERT_SPARK_POOL_INVARIANTS(q); 
+  return q;
 }
 
 void
@@ -55,17 +127,71 @@ initSparkPools( void )
     /* walk over the capabilities, allocating a spark pool for each one */
     nat i;
     for (i = 0; i < n_capabilities; i++) {
-	initSparkPool(&capabilities[i].r.rSparks);
+      capabilities[i].sparks = initPool(RtsFlags.ParFlags.maxLocalSparks);
     }
 #else
     /* allocate a single spark pool */
-    initSparkPool(&MainCapability.r.rSparks);
+    MainCapability->sparks = initPool(RtsFlags.ParFlags.maxLocalSparks);
 #endif
 }
 
 void
-freeSparkPool(StgSparkPool *pool) {
-    stgFree(pool->base);
+freeSparkPool(SparkPool *pool) {
+  /* should not interfere with concurrent findSpark() calls! And
+     nobody should use the pointer any more. We cross our fingers...*/
+  stgFree(pool->elements);
+  stgFree(pool);
+}
+
+/* reclaimSpark(cap): remove a spark from the write end of the queue.
+ * Returns the removed spark, and NULL if a race is lost or the pool
+ * empty.
+ *
+ * If only one spark is left in the pool, we synchronise with
+ * concurrently stealing threads by using cas to modify the top field.
+ * This routine should NEVER be called by a task which does not own
+ * the capability. Can this be checked here?
+ */
+StgClosure* reclaimSpark(Capability *cap) {
+  SparkPool *deque = cap->sparks;
+  /* also a bit tricky, has to avoid concurrent steal() calls by
+     accessing top with cas, when there is only one element left */
+  StgWord t, b;
+  StgClosurePtr* pos;
+  long  currSize;
+  StgClosurePtr removed;
+
+  ASSERT_SPARK_POOL_INVARIANTS(deque); 
+
+  b = deque->bottom;
+  /* "decrement b as a test, see what happens" */
+  deque->bottom = --b; 
+  pos = (deque->elements) + (b & (deque->moduloSize));
+  t = deque->top; /* using topBound would give an *upper* bound, we
+		     need a lower bound. We use the real top here, but
+		     can update the topBound value */
+  deque->topBound = t;
+  currSize = b - t;
+  if (currSize < 0) { /* was empty before decrementing b, set b
+			 consistently and abort */
+    deque->bottom = t;
+    return NULL;
+  }
+  removed = *pos;
+  if (currSize > 0) { /* no danger, still elements in buffer after b-- */
+    return removed;
+  } 
+  /* otherwise, has someone meanwhile stolen the same (last) element?
+     Check and increment top value to know  */
+  if ( !(CASTOP(&(deque->top),t,t+1)) ) {
+    removed = NULL; /* no success, but continue adjusting bottom */
+  }
+  deque->bottom = t+1; /* anyway, empty now. Adjust bottom consistently. */
+  deque->topBound = t+1; /* ...and cached top value as well */
+
+  ASSERT_SPARK_POOL_INVARIANTS(deque); 
+
+  return removed;
 }
 
 /* -----------------------------------------------------------------------------
@@ -73,32 +199,80 @@ freeSparkPool(StgSparkPool *pool) {
  * findSpark: find a spark on the current Capability that we can fork
  * into a thread.
  *
- * -------------------------------------------------------------------------- */
+ * May be called by concurrent threads, which synchronise on top
+ * variable. Returns a spark, or NULL if pool empty or race lost.
+ *
+ -------------------------------------------------------------------------- */
+
+StgClosurePtr steal(SparkPool *deque);
+
+/* steal an element from the read end. Synchronises multiple callers
+   by failing with NULL return. Returns NULL when deque is empty. */
+StgClosurePtr steal(SparkPool *deque) {
+  StgClosurePtr* pos;
+  StgClosurePtr* arraybase;
+  StgWord sz;
+  StgClosurePtr stolen;
+  StgWord b,t; 
+
+  ASSERT_SPARK_POOL_INVARIANTS(deque); 
+
+  b = deque->bottom;
+  t = deque->top;
+  if (b - t <= 0 ) { 
+    return NULL; /* already looks empty, abort */
+  }
+
+  /* now access array, see pushBottom() */
+  arraybase = deque->elements;
+  sz = deque->moduloSize;
+  pos = arraybase + (t & sz);  
+  stolen = *pos;
+
+  /* now decide whether we have won */
+  if ( !(CASTOP(&(deque->top),t,t+1)) ) {
+    /* lost the race, someon else has changed top in the meantime */
+    stolen = NULL;    
+  }  /* else: OK, top has been incremented by the cas call */
+
+
+  ASSERT_SPARK_POOL_INVARIANTS(deque); 
+  /* return NULL or stolen element */
+  return stolen;
+}
 
 StgClosure *
 findSpark (Capability *cap)
 {
-    StgSparkPool *pool;
-    StgClosure *spark;
-    
-    pool = &(cap->r.rSparks);
-    ASSERT_SPARK_POOL_INVARIANTS(pool);
+  SparkPool *deque = (cap->sparks);
+  StgClosure *stolen;
 
-    while (pool->hd != pool->tl) {
-	spark = *pool->hd;
-	bump_hd(pool);
-	if (closure_SHOULD_SPARK(spark)) {
-#ifdef GRAN
-	    if (RtsFlags.ParFlags.ParStats.Sparks) 
-		DumpRawGranEvent(CURRENT_PROC, CURRENT_PROC, 
-				 GR_STEALING, ((StgTSO *)NULL), spark, 
-				 0, 0 /* spark_queue_len(ADVISORY_POOL) */);
-#endif
-	    return spark;
-	}
-    }
-    // spark pool is now empty
-    return NULL;
+  ASSERT_SPARK_POOL_INVARIANTS(deque); 
+
+  do { 
+    /* keep trying until good spark found or pool looks empty. 
+       TODO is this a good idea? */
+
+    stolen = steal(deque);
+    
+  } while ( ( !stolen /* nothing stolen*/
+	      || !closure_SHOULD_SPARK(stolen)) /* spark not OK */
+	    && !looksEmpty(deque)); /* run empty, give up */
+
+  /* return stolen element */
+  return stolen;
+}
+
+
+/* "guesses" whether a deque is empty. Can return false negatives in
+   presence of concurrent steal() calls, and false positives in
+   presence of a concurrent pushBottom().*/
+rtsBool looksEmpty(SparkPool* deque) {
+  StgWord t = deque->top;
+  StgWord b = deque->bottom;
+  /* try to prefer false negatives by reading top first */
+  return (b - t <= 0);
+  /* => array is *never* completely filled, always 1 place free! */
 }
 
 /* -----------------------------------------------------------------------------
@@ -123,11 +297,64 @@ createSparkThread (Capability *cap, StgClosure *p)
  * -------------------------------------------------------------------------- */
 
 #define DISCARD_NEW
+void pushBottom(SparkPool* deque, StgClosurePtr elem);
 
+/* enqueue an element. Should always succeed by resizing the array
+   (not implemented yet, silently fails in that case). */
+void pushBottom(SparkPool* deque, StgClosurePtr elem) {
+  StgWord t;
+  StgClosurePtr* pos;
+  StgWord sz = deque->moduloSize; 
+  StgWord b = deque->bottom;
+
+  ASSERT_SPARK_POOL_INVARIANTS(deque); 
+
+  /* we try to avoid reading deque->top (accessed by all) and use
+     deque->topBound (accessed only by writer) instead. 
+     This is why we do not just call empty(deque) here.
+  */
+  t = deque->topBound;
+  if ( b - t >= sz ) { /* nota bene: sz == deque->size - 1, thus ">=" */
+    /* could be full, check the real top value in this case */
+    t = deque->top;
+    deque->topBound = t;
+    if (b - t >= sz) { /* really no space left :-( */
+      /* reallocate the array, copying the values. Concurrent steal()s
+	 will in the meantime use the old one and modify only top.
+	 This means: we cannot safely free the old space! Can keep it
+	 on a free list internally here...
+
+	 Potential bug in combination with steal(): if array is
+	 replaced, it is unclear which one concurrent steal operations
+	 use. Must read the array base address in advance in steal().
+      */
+#if defined(DISCARD_NEW)
+      ASSERT_SPARK_POOL_INVARIANTS(deque); 
+      return; /* for now, silently fail */
+#else
+      /* could make room by incrementing the top position here.  In
+       * this case, should use CASTOP. If this fails, someone else has
+       * removed something, and new room will be available.
+       */
+      ASSERT_SPARK_POOL_INVARIANTS(deque); 
+#endif
+    }
+  }
+  pos = (deque->elements) + (b & sz);
+  *pos = elem;
+  (deque->bottom)++;
+
+  ASSERT_SPARK_POOL_INVARIANTS(deque); 
+  return;
+}
+
+
+/* this is called as a direct C-call from Stg => we need to keep the
+   pool in a register (???) */
 StgInt
 newSpark (StgRegTable *reg, StgClosure *p)
 {
-    StgSparkPool *pool = &(reg->rSparks);
+    SparkPool *pool = (reg->rCurrentTSO->cap->sparks);
 
     /* I am not sure whether this is the right thing to do.
      * Maybe it is better to exploit the tag information
@@ -138,82 +365,125 @@ newSpark (StgRegTable *reg, StgClosure *p)
     ASSERT_SPARK_POOL_INVARIANTS(pool);
 
     if (closure_SHOULD_SPARK(p)) {
-#ifdef DISCARD_NEW
-	StgClosure **new_tl;
-	new_tl = pool->tl + 1;
-	if (new_tl == pool->lim) { new_tl = pool->base; }
-	if (new_tl != pool->hd) {
-	    *pool->tl = p;
-	    pool->tl = new_tl;
-	} else if (!closure_SHOULD_SPARK(*pool->hd)) {
-	    // if the old closure is not sparkable, discard it and
-	    // keep the new one.  Otherwise, keep the old one.
-	    *pool->tl = p;
-	    bump_hd(pool);
-	}
-#else  /* DISCARD OLD */
-	*pool->tl = p;
-	bump_tl(pool);
-	if (pool->tl == pool->hd) { bump_hd(pool); }
-#endif
+      pushBottom(pool,p);
     }	
 
     ASSERT_SPARK_POOL_INVARIANTS(pool);
     return 1;
 }
 
-/* -----------------------------------------------------------------------------
- * Mark all nodes pointed to by sparks in the spark queues (for GC) Does an
- * implicit slide i.e. after marking all sparks are at the beginning of the
- * spark pool and the spark pool only contains sparkable closures 
+
+
+/* --------------------------------------------------------------------------
+ * Remove all sparks from the spark queues which should not spark any
+ * more.  Called after GC. We assume exclusive access to the structure
+ * and replace  all sparks in the queue, see explanation below. At exit,
+ * the spark pool only contains sparkable closures.
  * -------------------------------------------------------------------------- */
 
 static void
 pruneSparkQueue (Capability *cap)
 { 
-    StgClosure *spark, **sparkp, **to_sparkp;
+    SparkPool *pool;
+    StgClosurePtr spark, evacspark, *elements;
     nat n, pruned_sparks; // stats only
-    StgSparkPool *pool;
+    StgWord botInd,oldBotInd,currInd; // indices in array (always < size)
     
     PAR_TICKY_MARK_SPARK_QUEUE_START();
     
     n = 0;
     pruned_sparks = 0;
     
-    pool = &(cap->r.rSparks);
+    pool = cap->sparks;
     
+    debugTrace(DEBUG_sched,
+               "markSparkQueue: current spark queue len=%d; (hd=%ld; tl=%ld)",
+               sparkPoolSize(pool), pool->bottom, pool->top);
     ASSERT_SPARK_POOL_INVARIANTS(pool);
-    
-    sparkp = pool->hd;
-    to_sparkp = pool->hd;
-    while (sparkp != pool->tl) {
-        ASSERT(*sparkp!=NULL);
-        ASSERT(LOOKS_LIKE_CLOSURE_PTR(((StgClosure *)*sparkp)));
-        // ToDo?: statistics gathering here (also for GUM!)
-        spark = *sparkp;
-        if (!closure_SHOULD_SPARK(spark)) {
-            pruned_sparks++;
-        } else{
-            *to_sparkp++ = spark;
-            if (to_sparkp == pool->lim) {
-                to_sparkp = pool->base;
-            }
-            n++;
-        }
-        sparkp++;
-        if (sparkp == pool->lim) {
-            sparkp = pool->base;
-        }
-    }
-    pool->tl = to_sparkp;
-	
+
+    elements = pool->elements;
+
+    /* We have exclusive access to the structure here, so we can reset
+       bottom and top counters, and prune invalid sparks. Contents are
+       copied in-place if they are valuable, otherwise discarded. The
+       routine uses "real" indices t and b, starts by computing them
+       as the modulus size of top and bottom,
+
+       Copying:
+
+       At the beginning, the pool structure can look like this:
+       ( bottom % size >= top % size , no wrap-around)
+                  t          b
+       ___________***********_________________
+
+       or like this ( bottom % size < top % size, wrap-around )
+                  b         t
+       ***********__________******************
+       As we need to remove useless sparks anyway, we make one pass
+       between t and b, moving valuable content to b and subsequent
+       cells (wrapping around when the size is reached).
+
+                     b      t
+       ***********OOO_______XX_X__X?**********
+                     ^____move?____/
+
+       After this movement, botInd becomes the new bottom, and old
+       bottom becomes the new top index, both as indices in the array
+       size range.
+    */
+    // starting here
+    currInd = (pool->top) & (pool->moduloSize); // mod
+
+    // copies of evacuated closures go to space from botInd on
+    // we keep oldBotInd to know when to stop
+    oldBotInd = botInd = (pool->bottom) & (pool->moduloSize); // mod
+
+    // on entry to loop, we are within the bounds
+    ASSERT( currInd < pool->size && botInd  < pool->size );
+
+    while (currInd != oldBotInd ) {
+      /* must use != here, wrap-around at size
+	 subtle: loop not entered if queue empty
+       */
+
+      /* check element at currInd. if valuable, evacuate and move to
+	 botInd, otherwise move on */
+      spark = elements[currInd];
+
+      /* if valuable work: shift inside the pool */
+      if ( closure_SHOULD_SPARK(spark) ) {
+	elements[botInd] = spark; // keep entry (new address)
+	botInd++;
+	n++;
+      } else { 
+	pruned_sparks++; // discard spark
+      }
+      currInd++;
+
+      // in the loop, we may reach the bounds, and instantly wrap around
+      ASSERT( currInd <= pool->size && botInd <= pool->size );
+      if ( currInd == pool->size ) { currInd = 0; }
+      if ( botInd == pool->size )  { botInd = 0;  }
+
+    } // while-loop over spark pool elements
+
+    ASSERT(currInd == oldBotInd);
+
+    pool->top = oldBotInd; // where we started writing
+    pool->topBound = pool->top;
+
+    pool->bottom = (oldBotInd <= botInd) ? botInd : (botInd + pool->size); 
+    // first free place we did not use (corrected by wraparound)
+
     PAR_TICKY_MARK_SPARK_QUEUE_END(n);
-	
+
     debugTrace(DEBUG_sched, "pruned %d sparks", pruned_sparks);
     
     debugTrace(DEBUG_sched,
-               "new spark queue len=%d; (hd=%p; tl=%p)",
-               sparkPoolSize(pool), pool->hd, pool->tl);
+               "new spark queue len=%d; (hd=%ld; tl=%ld)",
+               sparkPoolSize(pool), pool->bottom, pool->top);
+
+    ASSERT_SPARK_POOL_INVARIANTS(pool);
 }
 
 void
@@ -225,21 +495,50 @@ pruneSparkQueues (void)
     }
 }
 
+/* GC for the spark pool, called inside Capability.c for all
+   capabilities in turn. Blindly "evac"s complete spark pool. */
 void
 traverseSparkQueue (evac_fn evac, void *user, Capability *cap)
 {
     StgClosure **sparkp;
-    StgSparkPool *pool;
+    SparkPool *pool;
+    StgWord top,bottom, modMask;
     
-    pool = &(cap->r.rSparks);
-    sparkp = pool->hd;
-    while (sparkp != pool->tl) {
-        evac(user, sparkp);
-        sparkp++;
-        if (sparkp == pool->lim) {
-            sparkp = pool->base;
-        }
+    pool = cap->sparks;
+
+    ASSERT_SPARK_POOL_INVARIANTS(pool);
+
+    top = pool->top;
+    bottom = pool->bottom;
+    sparkp = pool->elements;
+    modMask = pool->moduloSize;
+
+    while (top < bottom) {
+    /* call evac for all closures in range (wrap-around via modulo)
+     * In GHC-6.10, evac takes an additional 1st argument to hold a
+     * GC-specific register, see rts/sm/GC.c::mark_root()
+     */
+      evac( user , sparkp + (top & modMask) ); 
+      top++;
     }
+
+    debugTrace(DEBUG_sched,
+               "traversed spark queue, len=%d; (hd=%ld; tl=%ld)",
+               sparkPoolSize(pool), pool->bottom, pool->top);
+}
+
+/* ----------------------------------------------------------------------------
+
+ * balanceSparkPoolsCaps: takes an array of capabilities (usually: all
+ * capabilities) and its size. Accesses all spark pools and equally
+ * distributes the sparks among them.
+ *
+ * Could be called after GC, before Cap. release, from scheduler. 
+ * -------------------------------------------------------------------------- */
+void balanceSparkPoolsCaps(nat n_caps, Capability caps[]);
+
+void balanceSparkPoolsCaps(nat n_caps, Capability caps[]) {
+  barf("not implemented");
 }
 
 #else
@@ -258,6 +557,8 @@ newSpark (StgRegTable *reg STG_UNUSED, StgClosure *p STG_UNUSED)
 /* -----------------------------------------------------------------------------
  * 
  * GRAN & PARALLEL_HASKELL stuff beyond here.
+ *
+ *  TODO "nuke" this!
  *
  * -------------------------------------------------------------------------- */
 

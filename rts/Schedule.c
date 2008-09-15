@@ -137,17 +137,17 @@ static Capability *schedule (Capability *initialCapability, Task *task);
 // scheduler clearer.
 //
 static void schedulePreLoop (void);
-#if defined(THREADED_RTS)
-static void schedulePushWork(Capability *cap, Task *task);
-#endif
 static void scheduleStartSignalHandlers (Capability *cap);
 static void scheduleCheckBlockedThreads (Capability *cap);
 static void scheduleCheckWakeupThreads(Capability *cap USED_IF_NOT_THREADS);
 static void scheduleCheckBlackHoles (Capability *cap);
 static void scheduleDetectDeadlock (Capability *cap, Task *task);
-#if defined(PARALLEL_HASKELL)
+#if defined(PARALLEL_HASKELL) || defined(THREADED_RTS)
+static void schedulePushWork(Capability *cap, Task *task);
 static rtsBool scheduleGetRemoteWork(Capability *cap);
+#if defined(PARALLEL_HASKELL)
 static void scheduleSendPendingMessages(void);
+#endif
 static void scheduleActivateSpark(Capability *cap);
 #endif
 static void schedulePostRunThread(Capability *cap, StgTSO *t);
@@ -291,13 +291,15 @@ schedule (Capability *initialCapability, Task *task)
       } else {
 	  // Yield the capability to higher-priority tasks if necessary.
 	  yieldCapability(&cap, task);
+	  /* inside yieldCapability, attempts to steal work from other
+	     capabilities, unless the capability has own work. 
+	     See (REMARK) below.
+	  */
       }
 #endif
-      
-#if defined(THREADED_RTS)
-      schedulePushWork(cap,task);
-#endif
 
+    /* THIS WAS THE PLACE FOR THREADED_RTS::schedulePushWork(cap,task) */
+      
     // Check whether we have re-entered the RTS from Haskell without
     // going via suspendThread()/resumeThread (i.e. a 'safe' foreign
     // call).
@@ -365,21 +367,7 @@ schedule (Capability *initialCapability, Task *task)
 	barf("sched_state: %d", sched_state);
     }
 
-#if defined(THREADED_RTS)
-    // If the run queue is empty, take a spark and turn it into a thread.
-    {
-	if (emptyRunQueue(cap)) {
-	    StgClosure *spark;
-	    spark = findSpark(cap);
-	    if (spark != NULL) {
-		debugTrace(DEBUG_sched,
-			   "turning spark of closure %p into a thread",
-			   (StgClosure *)spark);
-		createSparkThread(cap,spark);	  
-	    }
-	}
-    }
-#endif // THREADED_RTS
+    /* this was the place to activate a spark, now below... */
 
     scheduleStartSignalHandlers(cap);
 
@@ -393,11 +381,19 @@ schedule (Capability *initialCapability, Task *task)
 
     scheduleCheckBlockedThreads(cap);
 
-#if defined(PARALLEL_HASKELL)
-    /* message processing and work distribution goes here */ 
+#if defined(THREADED_RTS) || defined(PARALLEL_HASKELL)
+    /* work distribution in multithreaded and parallel systems 
 
+       REMARK: IMHO best location for work-stealing as well.
+       tests above might yield some new jobs, so no need to steal a
+       spark in some cases. I believe the yieldCapability.. above
+       should be moved here.
+    */
+
+#if defined(PARALLEL_HASKELL)
     /* if messages have been buffered... a NOOP in THREADED_RTS */
     scheduleSendPendingMessages();
+#endif
 
     /* If the run queue is empty,...*/
     if (emptyRunQueue(cap)) {
@@ -406,6 +402,7 @@ schedule (Capability *initialCapability, Task *task)
 
 	/* if this did not work, try to steal a spark from someone else */
       if (emptyRunQueue(cap)) {
+#if defined(PARALLEL_HASKELL)
 	receivedFinish = scheduleGetRemoteWork(cap);
 	continue; //  a new round, (hopefully) with new work
 	/* 
@@ -414,10 +411,20 @@ schedule (Capability *initialCapability, Task *task)
 			b) (blocking) awaits and receives messages
 	   
 	   in Eden, this is only the blocking receive, as b) in GUM.
-	*/
-      }
-    } 
 
+ 	   in Threaded-RTS, this does plain nothing. Stealing routine
+	        is inside Capability.c and called from
+	        yieldCapability() at the very beginning, see REMARK.
+	*/
+#endif
+      }
+    } else { /* i.e. run queue was (initially) not empty */
+      schedulePushWork(cap,task);
+      /* work pushing, currently relevant only for THREADED_RTS:
+	 (pushes threads, wakes up idle capabilities for stealing) */
+    }
+
+#if defined(PARALLEL_HASKELL)
     /* since we perform a blocking receive and continue otherwise,
        either we never reach here or we definitely have work! */
     // from here: non-empty run queue
@@ -430,7 +437,9 @@ schedule (Capability *initialCapability, Task *task)
 				above, waits for messages as well! */
       processMessages(cap, &receivedFinish);
     }
-#endif // PARALLEL_HASKELL
+#endif // PARALLEL_HASKELL: non-empty run queue!
+
+#endif /* THREADED_RTS || PARALLEL_HASKELL */
 
     scheduleDetectDeadlock(cap,task);
 #if defined(THREADED_RTS)
@@ -679,11 +688,15 @@ schedulePreLoop(void)
  * Push work to other Capabilities if we have some.
  * -------------------------------------------------------------------------- */
 
-#if defined(THREADED_RTS)
+#if defined(THREADED_RTS) || defined(PARALLEL_HASKELL)
 static void
 schedulePushWork(Capability *cap USED_IF_THREADS, 
 		 Task *task      USED_IF_THREADS)
 {
+  /* following code not for PARALLEL_HASKELL. I kept the call general,
+     future GUM versions might use pushing in a distributed setup */
+#if defined(THREADED_RTS)
+
     Capability *free_caps[n_capabilities], *cap0;
     nat i, n_free_caps;
 
@@ -726,7 +739,12 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
 	StgTSO *prev, *t, *next;
 	rtsBool pushed_to_all;
 
-	debugTrace(DEBUG_sched, "excess threads on run queue and %d free capabilities, sharing...", n_free_caps);
+	debugTrace(DEBUG_sched, 
+		   "cap %d: %s and %d free capabilities, sharing...", 
+		   cap->no, 
+		   (!emptyRunQueue(cap) && cap->run_queue_hd->_link != END_TSO_QUEUE)?
+		   "excess threads on run queue":"sparks to share (>=2)",
+		   n_free_caps);
 
 	i = 0;
 	pushed_to_all = rtsFalse;
@@ -760,6 +778,9 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
 	    cap->run_queue_tl = prev;
 	}
 
+#ifdef SPARK_PUSHING
+	/* JB I left this code in place, it would work but is not necessary */
+
 	// If there are some free capabilities that we didn't push any
 	// threads to, then try to push a spark to each one.
 	if (!pushed_to_all) {
@@ -775,16 +796,23 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
 		}
 	    }
 	}
+#endif /* SPARK_PUSHING */
 
 	// release the capabilities
 	for (i = 0; i < n_free_caps; i++) {
 	    task->cap = free_caps[i];
 	    releaseCapability(free_caps[i]);
 	}
+	// now wake them all up, and they might steal sparks if
+	// the did not get a thread
+	prodAllCapabilities();
     }
     task->cap = cap; // reset to point to our Capability.
+
+#endif /* THREADED_RTS */
+
 }
-#endif
+#endif /* THREADED_RTS || PARALLEL_HASKELL */
 
 /* ----------------------------------------------------------------------------
  * Start any pending signal handlers
@@ -965,7 +993,7 @@ scheduleDetectDeadlock (Capability *cap, Task *task)
  * ------------------------------------------------------------------------- */
 
 #if defined(PARALLEL_HASKELL)
-static StgTSO *
+static void
 scheduleSendPendingMessages(void)
 {
 
@@ -984,10 +1012,10 @@ scheduleSendPendingMessages(void)
 #endif
 
 /* ----------------------------------------------------------------------------
- * Activate spark threads (PARALLEL_HASKELL only)
+ * Activate spark threads (PARALLEL_HASKELL and THREADED_RTS)
  * ------------------------------------------------------------------------- */
 
-#if defined(PARALLEL_HASKELL)
+#if defined(PARALLEL_HASKELL) || defined(THREADED_RTS)
 static void
 scheduleActivateSpark(Capability *cap)
 {
@@ -1012,14 +1040,14 @@ scheduleActivateSpark(Capability *cap)
       createSparkThread(cap,spark); // defined in Sparks.c
     }
 }
-#endif // PARALLEL_HASKELL
+#endif // PARALLEL_HASKELL || THREADED_RTS
 
 /* ----------------------------------------------------------------------------
  * Get work from a remote node (PARALLEL_HASKELL only)
  * ------------------------------------------------------------------------- */
     
-#if defined(PARALLEL_HASKELL)
-static rtsBool
+#if defined(PARALLEL_HASKELL) || defined(THREADED_RTS)
+static rtsBool /* return value used in PARALLEL_HASKELL only */
 scheduleGetRemoteWork(Capability *cap)
 {
 #if defined(PARALLEL_HASKELL)
@@ -1057,7 +1085,7 @@ scheduleGetRemoteWork(Capability *cap)
 
 #endif /* PARALLEL_HASKELL */
 }
-#endif // PARALLEL_HASKELL
+#endif // PARALLEL_HASKELL || THREADED_RTS
 
 /* ----------------------------------------------------------------------------
  * After running a thread...
@@ -1482,6 +1510,14 @@ scheduleDoGC (Capability *cap, Task *task USED_IF_THREADS, rtsBool force_major)
         heapCensus();
 	performHeapProfile = rtsFalse;
     }
+
+#ifdef SPARKBALANCE
+    /* JB 
+       Once we are all together... this would be the place to balance all
+       spark pools. No concurrent stealing or adding of new sparks can
+       occur. Should be defined in Sparks.c. */
+    balanceSparkPoolsCaps(n_capabilities, capabilities);
+#endif
 
 #if defined(THREADED_RTS)
     // release our stash of capabilities.

@@ -54,6 +54,55 @@ globalWorkToDo (void)
 #endif
 
 #if defined(THREADED_RTS)
+rtsBool stealWork( Capability *cap) {
+  /* use the normal Sparks.h interface (internally modified to enable
+     concurrent stealing) 
+     and immediately turn the spark into a thread when successful
+  */
+  Capability *robbed;
+  SparkPool *pool;
+  StgClosurePtr spark;
+  rtsBool success = rtsFalse;
+  nat i = 0;
+
+  debugTrace(DEBUG_sched,
+	     "cap %d: Trying to steal work from other capabilities", 
+	     cap->no);
+
+  if (n_capabilities == 1) { return rtsFalse; } // makes no sense...
+
+  /* visit cap.s 0..n-1 in sequence until a theft succeeds. We could
+     start at a random place instead of 0 as well.  */
+  for ( i=0 ; i < n_capabilities ; i++ ) {
+    robbed = &capabilities[i];
+    if (cap == robbed)  // ourselves...
+      continue;
+
+    if (emptySparkPoolCap(robbed)) // nothing to steal here
+      continue;
+    
+    spark = findSpark(robbed);
+
+    if (spark == NULL && !emptySparkPoolCap(robbed)) {
+      spark = findSpark(robbed); // lost race in concurrent access, try again
+    }
+    if (spark != NULL) {
+      debugTrace(DEBUG_sched,
+		 "cap %d: Stole a spark from capability %d",
+		 cap->no, robbed->no);
+
+      createSparkThread(cap,spark);
+      success = rtsTrue;
+      break; // got one, leave the loop
+    }
+ // otherwise: no success, try next one
+  }
+  debugTrace(DEBUG_sched,
+	     "Leaving work stealing routine (%s)",
+	     success?"one spark stolen":"thefts did not succeed");
+  return success;
+}
+
 STATIC_INLINE rtsBool
 anyWorkForMe( Capability *cap, Task *task )
 {
@@ -73,9 +122,11 @@ anyWorkForMe( Capability *cap, Task *task )
 	if (emptyRunQueue(cap)) {
 	    return !emptySparkPoolCap(cap)
 		|| !emptyWakeupQueue(cap)
-		|| globalWorkToDo();
-	} else
+		|| globalWorkToDo()
+  	        || stealWork(cap); /* if all false: try to steal work */
+	} else {
 	    return cap->run_queue_hd->bound == NULL;
+	}
     }
 }
 #endif
@@ -778,7 +829,7 @@ void
 freeCapability (Capability *cap) {
     stgFree(cap->mut_lists);
 #if defined(THREADED_RTS) || defined(PARALLEL_HASKELL)
-    freeSparkPool(&cap->r.rSparks);
+    freeSparkPool(cap->sparks);
 #endif
 }
 
