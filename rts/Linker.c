@@ -1613,47 +1613,36 @@ static int ocAllocateSymbolExtras( ObjectCode* oc, int count, int first )
     aligned = (oc->fileSize + 3) & ~3;
 
 #ifdef USE_MMAP
-    #ifndef linux_HOST_OS /* mremap is a linux extension */
-        #error ocAllocateSymbolExtras doesnt want USE_MMAP to be defined
-    #endif
-
     pagesize = getpagesize();
     n = ROUND_UP( oc->fileSize, pagesize );
     m = ROUND_UP( aligned + sizeof (SymbolExtra) * count, pagesize );
 
-    /* If we have a half-page-size file and map one page of it then
-     * the part of the page after the size of the file remains accessible.
-     * If, however, we map in 2 pages, the 2nd page is not accessible
-     * and will give a "Bus Error" on access.  To get around this, we check
-     * if we need any extra pages for the jump islands and map them in
-     * anonymously.  We must check that we actually require extra pages
-     * otherwise the attempt to mmap 0 pages of anonymous memory will
-     * fail -EINVAL.
+    /* we try to use spare space at the end of the last page of the
+     * image for the jump islands, but if there isn't enough space
+     * then we have to map some (anonymously, remembering MAP_32BIT).
      */
-
-    if( m > n )
+    if( m > n ) // we need to allocate more pages
     {
-      /* The effect of this mremap() call is only the ensure that we have
-       * a sufficient number of virtually contiguous pages.  As returned from
-       * mremap, the pages past the end of the file are not backed.  We give
-       * them a backing by using MAP_FIXED to map in anonymous pages.
-       */
-      oc->image = mremap( oc->image, n, m, MREMAP_MAYMOVE );
-
-      if( oc->image == MAP_FAILED )
-      {
-        errorBelch( "Unable to mremap for Jump Islands\n" );
-        return 0;
-      }
-
-      if( mmap( oc->image + n, m - n, PROT_READ | PROT_WRITE | PROT_EXEC,
-                MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, 0, 0 ) == MAP_FAILED )
-      {
-        errorBelch( "Unable to mmap( MAP_FIXED ) for Jump Islands\n" );
-        return 0;
-      }
+        oc->symbol_extras = mmap (NULL, sizeof(SymbolExtra) * count,
+                                  PROT_EXEC|PROT_READ|PROT_WRITE,
+                                  MAP_PRIVATE|MAP_ANONYMOUS|EXTRA_MAP_FLAGS,
+                                  0, 0);
+        if (oc->symbol_extras == MAP_FAILED)
+        {
+            errorBelch( "Unable to mmap() for jump islands\n" );
+            return 0;
+        }
+#ifdef x86_64_HOST_ARCH
+        if (oc->symbol_extras > 0x80000000)
+        {
+            barf("mmap() returned memory outside 2Gb");
+        }
+#endif
     }
-
+    else
+    {
+        oc->symbol_extras = (SymbolExtra *) (oc->image + aligned);
+    }
 #else
     oc->image -= misalignment;
     oc->image = stgReallocBytes( oc->image,
@@ -1661,9 +1650,10 @@ static int ocAllocateSymbolExtras( ObjectCode* oc, int count, int first )
                                  aligned + sizeof (SymbolExtra) * count,
                                  "ocAllocateSymbolExtras" );
     oc->image += misalignment;
-#endif /* USE_MMAP */
 
     oc->symbol_extras = (SymbolExtra *) (oc->image + aligned);
+#endif /* USE_MMAP */
+
     memset( oc->symbol_extras, 0, sizeof (SymbolExtra) * count );
   }
   else
