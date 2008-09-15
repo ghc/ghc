@@ -36,7 +36,6 @@ module Type (
 	mkTyConApp, mkTyConTy, 
 	tyConAppTyCon, tyConAppArgs, 
 	splitTyConApp_maybe, splitTyConApp, 
-        splitNewTyConApp_maybe, splitNewTyConApp,
 
         mkForAllTy, mkForAllTys, splitForAllTy_maybe, splitForAllTys, 
 	applyTy, applyTys, applyTysD, isForAllTy, dropForAlls,
@@ -533,20 +532,6 @@ splitTyConApp_maybe ty | Just ty' <- coreView ty = splitTyConApp_maybe ty'
 splitTyConApp_maybe (TyConApp tc tys) = Just (tc, tys)
 splitTyConApp_maybe (FunTy arg res)   = Just (funTyCon, [arg,res])
 splitTyConApp_maybe _                 = Nothing
-
--- | Sometimes we do NOT want to look through a @newtype@.  When case matching
--- on a newtype we want a convenient way to access the arguments of a @newtype@
--- constructor so as to properly form a coercion, and so we use 'splitNewTyConApp'
--- instead of 'splitTyConApp_maybe'
-splitNewTyConApp :: Type -> (TyCon, [Type])
-splitNewTyConApp ty = case splitNewTyConApp_maybe ty of
-			Just stuff -> stuff
-			Nothing	   -> pprPanic "splitNewTyConApp" (ppr ty)
-splitNewTyConApp_maybe :: Type -> Maybe (TyCon, [Type])
-splitNewTyConApp_maybe ty | Just ty' <- tcView ty = splitNewTyConApp_maybe ty'
-splitNewTyConApp_maybe (TyConApp tc tys) = Just (tc, tys)
-splitNewTyConApp_maybe (FunTy arg res)   = Just (funTyCon, [arg,res])
-splitNewTyConApp_maybe _                 = Nothing
 
 newTyConInstRhs :: TyCon -> [Type] -> Type
 -- ^ Unwrap one 'layer' of newtype on a type constructor and it's arguments, using an 

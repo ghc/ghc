@@ -384,7 +384,7 @@ ppr_termM1 RefWrap{}     = panic "ppr_termM1 - RefWrap"
 ppr_termM1 NewtypeWrap{} = panic "ppr_termM1 - NewtypeWrap"
 
 pprNewtypeWrap y p NewtypeWrap{ty=ty, wrapped_term=t} 
-  | Just (tc,_) <- splitNewTyConApp_maybe ty
+  | Just (tc,_) <- tcSplitTyConApp_maybe ty
   , ASSERT(isNewTyCon tc) True
   , Just new_dc <- tyConSingleDataCon_maybe tc = do 
          real_term <- y max_prec t
@@ -679,7 +679,7 @@ cvObtainTerm hsc_env bound force mb_ty hval = runTR hsc_env $ do
                     let (t:tt) = unpointed in t : reOrderTerms pointed tt tys
   
   expandNewtypes t@Term{ ty=ty, subTerms=tt }
-   | Just (tc, args) <- splitNewTyConApp_maybe ty
+   | Just (tc, args) <- tcSplitTyConApp_maybe ty
    , isNewTyCon tc
    , wrapped_type    <- newTyConInstRhs tc args
    , Just dc         <- tyConSingleDataCon_maybe tc
@@ -827,8 +827,8 @@ congruenceNewtypes lhs rhs
          (l1',r1') <- congruenceNewtypes l1 r1
          return (mkFunTy l1' l2', mkFunTy r1' r2')
 -- TyconApp Inductive case; this is the interesting bit.
-    | Just (tycon_l, _) <- splitNewTyConApp_maybe lhs
-    , Just (tycon_r, _) <- splitNewTyConApp_maybe rhs 
+    | Just (tycon_l, _) <- tcSplitTyConApp_maybe lhs
+    , Just (tycon_r, _) <- tcSplitTyConApp_maybe rhs 
     , tycon_l /= tycon_r 
     = do rhs' <- upgrade tycon_l rhs
          return (lhs, rhs')

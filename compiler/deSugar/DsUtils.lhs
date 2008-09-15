@@ -46,6 +46,7 @@ import {-# SOURCE #-}	DsExpr( dsExpr )
 
 import HsSyn
 import TcHsSyn
+import TcType( tcSplitTyConApp )
 import CoreSyn
 import DsMonad
 
@@ -287,7 +288,8 @@ mkCoAlgCaseMatchResult var ty match_alts
     (con1, arg_ids1, match_result1) = ASSERT( notNull match_alts ) head match_alts
     arg_id1 	= ASSERT( notNull arg_ids1 ) head arg_ids1
     var_ty      = idType var
-    (tc, ty_args) = splitNewTyConApp var_ty
+    (tc, ty_args) = tcSplitTyConApp var_ty	-- Don't look through newtypes
+    	 	    		    		-- (not that splitTyConApp does, these days)
     newtype_rhs = unwrapNewTypeBody tc ty_args (Var var)
 		
 	-- Stuff for data types
