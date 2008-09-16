@@ -26,6 +26,7 @@ import TyCon
 import FiniteMap
 
 import Data.Array
+import Data.Maybe
 import System.IO   (FilePath)
 import System.Directory ( createDirectoryIfMissing )
 
@@ -61,12 +62,20 @@ addCoverageTicksToBinds dflags mod mod_loc tyCons binds = do
 
   if "boot" `isSuffixOf` orig_file then return (binds, emptyHpcInfo False, emptyModBreaks) else do
 
+  -- Now, we try look for a file generated from a .hsc file to a .hs file, by peeking ahead.
+
+  let top_pos = catMaybes $ foldrBag (\ (L pos _) rest -> srcSpanFileName_maybe pos : rest) [] binds
+  let orig_file2 = case top_pos of
+		     (file_name:_) 
+		       | ".hsc" `isSuffixOf` unpackFS file_name -> unpackFS file_name
+		     _ -> orig_file
+
   let mod_name = moduleNameString (moduleName mod)
 
   let (binds1,_,st)
 		 = unTM (addTickLHsBinds binds) 
 		   (TTE
-		       { fileName    = mkFastString orig_file
+		       { fileName    = mkFastString orig_file2
 		      , declPath     = []
                       , inScope      = emptyVarSet
 		      , blackList    = listToFM [ (getSrcSpan (tyConName tyCon),()) 
@@ -89,14 +98,14 @@ addCoverageTicksToBinds dflags mod mod_loc tyCons binds = do
 
      let tabStop = 1 -- <tab> counts as a normal char in GHC's location ranges.
      createDirectoryIfMissing True hpc_mod_dir
-     modTime <- getModificationTime orig_file
+     modTime <- getModificationTime orig_file2
      let entries' = [ (hpcPos, box) 
                     | (span,_,box) <- entries, hpcPos <- [mkHpcPos span] ]
      when (length entries' /= tickBoxCount st) $ do
        panic "the number of .mix entries are inconsistent"
-     let hashNo = mixHash orig_file modTime tabStop entries'
+     let hashNo = mixHash orig_file2 modTime tabStop entries'
      mixCreate hpc_mod_dir mod_name 
-     	       $ Mix orig_file modTime (toHash hashNo) tabStop entries'
+     	       $ Mix orig_file2 modTime (toHash hashNo) tabStop entries'
      return $ hashNo 
    else do
      return $ 0
