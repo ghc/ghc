@@ -2437,12 +2437,16 @@ When pattern-matching against data constructors drawn from a GADT,
 for example in a <literal>case</literal> expression, the following rules apply:
 <itemizedlist>
 <listitem><para>The type of the scrutinee must be rigid.</para></listitem>
-<listitem><para>The type of the result of the <literal>case</literal> expression must be rigid.</para></listitem>
+<listitem><para>The type of the entire <literal>case</literal> expression must be rigid.</para></listitem>
 <listitem><para>The type of any free variable mentioned in any of
 the <literal>case</literal> alternatives must be rigid.</para></listitem>
 </itemizedlist>
 A type is "rigid" if it is completely known to the compiler at its binding site.  The easiest
 way to ensure that a variable a rigid type is to give it a type signature.
+For more precise details see <ulink url="http://research.microsoft.com/%7Esimonpj/papers/gadt">
+Simple unification-based type inference for GADTs
+</ulink>. The criteria implemented by GHC are given in the Appendix.
+
 </para></listitem>
 
 </itemizedlist>
