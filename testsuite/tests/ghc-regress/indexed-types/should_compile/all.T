@@ -55,9 +55,9 @@ test('NewTyCo',
 test('Infix', normal, compile, [''])
 test('Kind', normal, compile, [''])
 
-test('GADT1', expect_fail, compile, [''])
+test('GADT1', normal, compile, [''])
 test('GADT2', normal, compile, [''])
-test('GADT3', expect_fail, compile, [''])
+test('GADT3', normal, compile, [''])
 test('GADT4', normal, compile, [''])
 test('GADT5', normal, compile, [''])
 test('GADT6', normal, compile, [''])

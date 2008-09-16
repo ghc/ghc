@@ -90,8 +90,5 @@ test('gadt-escape1', normal, compile_fail, [''])
 test('Session', normal, compile_and_run, [''])
 test('CasePrune', normal, compile_and_run, [''])
 
-test('T1999', expect_fail, compile, [''])
-# T1999 now failing again
-
-test('T1999a', expect_fail, compile, [''])
-# This version of T1999 still fails; the bug is still there
+test('T1999', normal, compile, [''])
+test('T1999a', normal, compile, [''])
