@@ -17,6 +17,7 @@ import Data.List
 import Data.Maybe(fromJust)
 import Data.Array
 import Data.Monoid
+import Control.Monad
 import qualified HpcSet as Set
 
 ------------------------------------------------------------------------------
@@ -453,7 +454,8 @@ writeFileUsing filename text = do
 
 #if __GLASGOW_HASKELL__ >= 604 
   -- create the dest_dir if needed
-  createDirectoryIfMissing True dest_dir
+  when (not (null dest_dir)) $
+    createDirectoryIfMissing True dest_dir
 #endif
 
   writeFile filename text
