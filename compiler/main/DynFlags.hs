@@ -21,7 +21,7 @@ module DynFlags (
         Option(..),
         DynLibLoader(..),
         fFlags, xFlags,
-        DPHBackend(..),
+        dphPackage,
 
         -- ** Manipulating DynFlags
         defaultDynFlags,                -- DynFlags
@@ -892,7 +892,7 @@ data CoreToDo           -- These are diff core-to-core passes,
   | CoreCSE
   | CoreDoRuleCheck Int{-CompilerPhase-} String -- Check for non-application of rules
                                                 -- matching this string
-  | CoreDoVectorisation DPHBackend
+  | CoreDoVectorisation PackageId
   | CoreDoNothing                -- Useful when building up
   | CoreDoPasses [CoreToDo]      -- lists of these things
 
@@ -947,7 +947,7 @@ getCoreToDo dflags
 
     vectorisation
       = runWhen (dopt Opt_Vectorise dflags)
-        $ CoreDoPasses [ simpl_gently, CoreDoVectorisation (dphBackend dflags) ]
+        $ CoreDoPasses [ simpl_gently, CoreDoVectorisation (dphPackage dflags) ]
 
 
                 -- By default, we have 2 phases before phase 0.
@@ -1887,6 +1887,12 @@ setDPHBackend backend
     dph_packages DPHThis = []
     dph_packages DPHPar  = ["dph-prim-par", "dph-par"]
     dph_packages DPHSeq  = ["dph-prim-seq", "dph-seq"]
+
+dphPackage :: DynFlags -> PackageId
+dphPackage dflags = case dphBackend dflags of
+                      DPHPar  -> dphParPackageId
+                      DPHSeq  -> dphSeqPackageId
+                      DPHThis -> thisPackage dflags
 
 setMainIs :: String -> DynP ()
 setMainIs arg
