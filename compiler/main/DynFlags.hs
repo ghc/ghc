@@ -1440,6 +1440,9 @@ dynamic_flags = [
   , Flag "fdph-par"
          (NoArg (setDPHBackend DPHPar))
          Supported
+  , Flag "fdph-this"
+         (NoArg (setDPHBackend DPHThis))
+         Supported
 
         ------ Compiler flags -----------------------------------------------
 
@@ -1872,16 +1875,18 @@ setDPHOpt dflags = setOptLevel 2 (dflags { maxSimplIterations  = 20
 
 data DPHBackend = DPHPar
                 | DPHSeq
+                | DPHThis
+        deriving(Eq, Ord, Enum, Show)
 
 setDPHBackend :: DPHBackend -> DynP ()
 setDPHBackend backend 
   = do
       upd $ \dflags -> dflags { dphBackend = backend }
-      exposePackage $ "dph-prim-" ++ suffix backend
-      exposePackage $ "dph-"      ++ suffix backend
+      mapM_ exposePackage (dph_packages backend)
   where
-    suffix DPHPar = "par"
-    suffix DPHSeq = "seq"
+    dph_packages DPHThis = []
+    dph_packages DPHPar  = ["dph-prim-par", "dph-par"]
+    dph_packages DPHSeq  = ["dph-prim-seq", "dph-seq"]
 
 setMainIs :: String -> DynP ()
 setMainIs arg

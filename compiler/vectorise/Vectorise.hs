@@ -53,6 +53,7 @@ vectorise backend hsc_env _ _ guts
 
     backendPackage DPHSeq  = dphSeqPackageId
     backendPackage DPHPar  = dphParPackageId
+    backendPackage DPHThis = thisPackage dflags
 
 vectModule :: ModGuts -> VM ModGuts
 vectModule guts
