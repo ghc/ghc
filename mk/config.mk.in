@@ -922,6 +922,7 @@ ifneq "$(findstring YES, $(UseStage1) $(BootingFromHc))" ""
 # some variables appropriately:
 HC		=$(GHC_STAGE1)
 MKDEPENDHS	=$(GHC_STAGE1)
+USE_NEW_MKDEPEND_FLAGS = YES
 GhcVersion	= @ProjectVersion@
 GhcPatchLevel	= @ProjectPatchLevel@
 # oops, these are wrong:
@@ -934,8 +935,14 @@ ghc_ge_609 = YES
 
 else # not UseStage1 or BootingFromHc
 
+# Some useful GHC version predicates:
+ghc_ge_605 = @ghc_ge_605@
+ghc_ge_607 = @ghc_ge_607@
+ghc_ge_609 = @ghc_ge_609@
+
 HC	        = @WithHc@
 MKDEPENDHS	= $(GHC)
+USE_NEW_MKDEPEND_FLAGS = $(ghc_ge_609)
 GhcVersion	= @GhcVersion@
 GhcPatchLevel	= @GhcPatchLevel@
 GhcMajVersion	= @GhcMajVersion@
@@ -951,11 +958,6 @@ GhcMinVersion	= @GhcMinVersion@
 #
 BOOTSTRAPPING_PACKAGE_CONF_HC_OPTS =$(if $(findstring inplace, $(HC)),,-package-conf $(BOOTSTRAPPING_CONF))
 BOOTSTRAPPING_PACKAGE_CONF_MKDEPENDHS_OPTS =$(if $(findstring inplace, $(MKDEPENDHS)),,-package-conf $(BOOTSTRAPPING_CONF))
-
-# Some useful GHC version predicates:
-ghc_ge_605 = @ghc_ge_605@
-ghc_ge_607 = @ghc_ge_607@
-ghc_ge_609 = @ghc_ge_609@
 endif
 
 # Canonicalised ghc version number, used for easy (integer) version
