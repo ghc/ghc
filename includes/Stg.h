@@ -81,7 +81,8 @@
  * 'Portable' inlining:
  * INLINE_HEADER is for inline functions in header files (macros)
  * STATIC_INLINE is for inline functions in source files
- * EXTERN_INLINE is for functions that we want to inline sometimes
+ * EXTERN_INLINE is for functions that we want to inline sometimes 
+ * (we also compile a static version of the function; see Inlines.c)
  */
 #if defined(__GNUC__) || defined( __INTEL_COMPILER)
 
@@ -89,11 +90,24 @@
 # define INLINE_ME inline
 # define STATIC_INLINE INLINE_HEADER
 
-# if defined(KEEP_INLINES)
-#  define EXTERN_INLINE inline
-# else
-#  define EXTERN_INLINE extern inline
-# endif
+// The special "extern inline" behaviour is now only supported by gcc
+// when _GNUC_GNU_INLINE__ is defined, and you have to use
+// __attribute__((gnu_inline)).  So when we don't have this, we use
+// ordinary static inline.
+//
+#if defined(__GNUC_GNU_INLINE__)
+#  if defined(KEEP_INLINES)
+#    define EXTERN_INLINE inline
+#  else
+#    define EXTERN_INLINE extern inline __attribute__((gnu_inline))
+#  endif
+#else
+#  if defined(KEEP_INLINES)
+#    define EXTERN_INLINE
+#  else
+#    define EXTERN_INLINE INLINE_HEADER
+#  endif
+#endif
 
 #elif defined(_MSC_VER)
 

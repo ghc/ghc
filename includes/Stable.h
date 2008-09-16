@@ -20,7 +20,7 @@
    External C Interface
    -------------------------------------------------------------------------- */
 
-extern StgPtr         deRefStablePtr(StgStablePtr stable_ptr);
+EXTERN_INLINE StgPtr  deRefStablePtr(StgStablePtr stable_ptr);
 extern void           freeStablePtr(StgStablePtr sp);
 extern StgStablePtr   splitStablePtr(StgStablePtr sp);
 extern StgStablePtr   getStablePtr(StgPtr p);
@@ -40,19 +40,12 @@ extern DLL_IMPORT_RTS snEntry *stable_ptr_table;
 
 extern void freeStablePtr(StgStablePtr sp);
 
-#if defined(__GNUC__)
-# ifndef RTS_STABLE_C
-extern inline
-# endif
+EXTERN_INLINE
 StgPtr deRefStablePtr(StgStablePtr sp)
 {
     ASSERT(stable_ptr_table[(StgWord)sp].ref > 0);
     return stable_ptr_table[(StgWord)sp].addr;
 }
-#else
-/* No support for 'extern inline' */
-extern StgPtr deRefStablePtr(StgStablePtr sp);
-#endif
 
 extern void    initStablePtrTable    ( void );
 extern void    exitStablePtrTable    ( void );
