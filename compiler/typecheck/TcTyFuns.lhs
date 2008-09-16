@@ -442,17 +442,21 @@ deriveEqInst rewrite ty1 ty2 co
 
 instance Outputable RewriteInst where
   ppr (RewriteFam {rwi_fam = fam, rwi_args = args, rwi_right = rhs, rwi_co =co})
-    = hsep [ ppr co <+> text "::" 
+    = hsep [ pprEqInstCo co <+> text "::" 
            , ppr (mkTyConApp fam args)
            , text "~>"
            , ppr rhs
            ]
   ppr (RewriteVar {rwi_var = tv, rwi_right = rhs, rwi_co =co})
-    = hsep [ ppr co <+> text "::" 
+    = hsep [ pprEqInstCo co <+> text "::" 
            , ppr tv
            , text "~>"
            , ppr rhs
            ]
+
+pprEqInstCo :: EqInstCo -> SDoc
+pprEqInstCo (Left cotv) = ptext (sLit "Wanted") <+> ppr cotv
+pprEqInstCo (Right co)  = ptext (sLit "Local") <+> ppr co
 \end{code}
 
 The following functions turn an arbitrary equality into a set of normal
@@ -579,7 +583,13 @@ checkOrientation :: Type -> Type -> EqInstCo -> Inst -> TcM [RewriteInst]
 -- NB: We cannot assume that the two types already have outermost type
 --     synonyms expanded due to the recursion in the case of type applications.
 checkOrientation ty1 ty2 co inst
-  = go ty1 ty2
+  = do { traceTc $ ptext (sLit "checkOrientation of ") <+> 
+                   pprEqInstCo co <+> text "::" <+> 
+                   ppr ty1 <+> text "~" <+> ppr ty2
+       ; eqs <- go ty1 ty2
+       ; traceTc $ ptext (sLit "checkOrientation returns") <+> ppr eqs
+       ; return eqs
+       }
   where
       -- look through synonyms
     go ty1 ty2 | Just ty1' <- tcView ty1 = go ty1' ty2
@@ -1050,8 +1060,7 @@ substitute eqs locals wanteds = subst eqs [] emptyBag locals wanteds
       = return (res, binds, locals, wanteds)
     subst (eq@(RewriteVar {rwi_var = tv, rwi_right = ty, rwi_co = co}):eqs) 
           res binds locals wanteds
-      = do { traceTc $ ptext (sLit "TcTyFuns.substitute:") <+> ppr tv <+>
-                       ptext (sLit "->") <+> ppr ty
+      = do { traceTc $ ptext (sLit "TcTyFuns.substitute:") <+> ppr eq
            ; let coSubst = zipOpenTvSubst [tv] [eqInstCoType co]
                  tySubst = zipOpenTvSubst [tv] [ty]
            ; eqs'               <- mapM (substEq eq coSubst tySubst) eqs

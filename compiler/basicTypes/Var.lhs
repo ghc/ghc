@@ -273,8 +273,7 @@ mkTyVar name kind = ASSERT( not (isCoercionKind kind ) )
 
 mkTcTyVar :: Name -> Kind -> TcTyVarDetails -> TyVar
 mkTcTyVar name kind details
-  = -- TOM: no longer valid assertion? 
-    -- ASSERT( not (isCoercionKind kind) )
+  = -- NB: 'kind' may be a coercion kind; cf, 'TcMType.newMetaCoVar'
     TcTyVar {	varName    = name,
 		realUnique = getKeyFastInt (nameUnique name),
 		varType  = kind,
@@ -391,8 +390,9 @@ isLocalIdVar (LocalId {}) = True
 isLocalIdVar _            = False
 
 isCoVar :: Var -> Bool
-isCoVar (v@(TyVar {})) = isCoercionVar v
-isCoVar _              = False
+isCoVar (v@(TyVar {}))             = isCoercionVar v
+isCoVar (TcTyVar {varType = kind}) = isCoercionKind kind  -- used during solving
+isCoVar _                          = False
 
 -- | 'isLocalVar' returns @True@ for type variables as well as local 'Id's
 -- These are the variables that we need to pay attention to when finding free

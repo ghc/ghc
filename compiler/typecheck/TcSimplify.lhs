@@ -1673,7 +1673,7 @@ data RedEnv
 	   , red_try_me :: Inst -> WhatToDo
 	   , red_improve :: Bool		-- True <=> do improvement
 	   , red_givens :: [Inst]		-- All guaranteed rigid
-						-- Always dicts
+						-- Always dicts & equalities
 						-- but see Note [Rigidity]
 	   , red_stack  :: (Int, [Inst])	-- Recursion stack (for err msg)
 						-- See Note [RedStack]
@@ -1806,8 +1806,12 @@ reduceContext env wanteds0
 	  -- as "given"   all the dicts that were originally given, 
 	  --		  *or* for which we now have bindings, 
 	  --		  *or* which are now irreds
-	; let implic_env = env { red_givens = givens ++ bound_dicts ++
-                                              dict_irreds }
+          -- NB: Equality irreds need to be converted, as the recursive 
+          --     invocation of the solver will still treat them as wanteds
+          --     otherwise.
+	; let implic_env = env { red_givens 
+                                   = givens ++ bound_dicts ++
+                                     map wantedToLocalEqInst dict_irreds }
 	; (implic_binds_s, implic_irreds_s) 
             <- mapAndUnzipM (reduceImplication implic_env) wanted_implics
 	; let implic_binds  = unionManyBags implic_binds_s
@@ -1928,6 +1932,12 @@ reduceList env@(RedEnv {red_stack = (n,stk)}) wanteds state
     -- Base case: we're done!
 reduce :: RedEnv -> Inst -> Avails -> TcM Avails
 reduce env wanted avails
+
+    -- We don't reduce equalities here (and they must not end up as irreds
+    -- in the Avails!)
+  | isEqInst wanted
+  = return avails
+
     -- It's the same as an existing inst, or a superclass thereof
   | Just _ <- findAvail avails wanted
   = do { traceTc (text "reduce: found " <+> ppr wanted)
@@ -2388,6 +2398,9 @@ extractResults (Avails _ avails) wanteds
       = return (binds, bound_dicts, irreds)
 
     go binds bound_dicts irreds done (w:ws)
+      | isEqInst w
+      = go binds bound_dicts (w:irreds) done' ws
+
       | Just done_ids@(done_id : rest_done_ids) <- lookupFM done w
       = if w_id `elem` done_ids then
 	   go binds bound_dicts irreds done ws

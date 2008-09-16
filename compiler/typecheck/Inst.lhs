@@ -45,7 +45,8 @@ module Inst (
         mkIdEqInstCo, mkSymEqInstCo, mkLeftTransEqInstCo,
         mkRightTransEqInstCo, mkAppEqInstCo,
         isValidWantedEqInst,
-	eitherEqInst, mkEqInst, mkEqInsts, mkWantedEqInst, finalizeEqInst, 
+	eitherEqInst, mkEqInst, mkEqInsts, mkWantedEqInst,
+        wantedToLocalEqInst, finalizeEqInst, 
 	eqInstType, updateEqInstCoercion,
 	eqInstCoercion,	eqInstTys
     ) where
@@ -1094,6 +1095,15 @@ mkWantedEqInst pred@(EqPred ty1 ty2)
        ; mkEqInst pred (Left cotv)
        }
 mkWantedEqInst pred = pprPanic "mkWantedEqInst" (ppr pred)
+
+-- Turn a wanted equality into a local that propagates the uninstantiated
+-- coercion variable as witness.  We need this to propagate wanted irreds into
+-- attempts to solve implication constraints.
+--
+wantedToLocalEqInst :: Inst -> Inst
+wantedToLocalEqInst eq@(EqInst {tci_co = Left cotv})
+  = eq {tci_co = Right (mkTyVarTy cotv)}
+wantedToLocalEqInst eq = eq
 
 -- Turn a wanted into a local EqInst (needed during type inference for
 -- signatures) 
