@@ -49,13 +49,8 @@ vectTyCon tc
   | isFunTyCon tc        = builtin closureTyCon
   | isBoxedTupleTyCon tc = return tc
   | isUnLiftedTyCon tc   = return tc
-  | otherwise = do
-                  r <- lookupTyCon tc
-                  case r of
-                    Just tc' -> return tc'
-
-                    -- FIXME: just for now
-                    Nothing  -> pprTrace "ccTyCon:" (ppr tc) $ return tc
+  | otherwise            = maybeCantVectoriseM "Tycon not vectorised:" (ppr tc)
+                         $ lookupTyCon tc
 
 vectAndLiftType :: Type -> VM (Type, Type)
 vectAndLiftType ty | Just ty' <- coreView ty = vectAndLiftType ty'
@@ -86,7 +81,7 @@ vectType ty@(ForAllTy _ _)
   where
     (tyvars, mono_ty) = splitForAllTys ty
 
-vectType ty = traceNoV "vectType: can't vectorise" (ppr ty)
+vectType ty = cantVectorise "Can't vectorise type" (ppr ty)
 
 vectAndBoxType :: Type -> VM Type
 vectAndBoxType ty = vectType ty >>= boxType
@@ -161,7 +156,7 @@ vectTyConDecl :: TyCon -> VM TyCon
 vectTyConDecl tc
   = do
       name' <- cloneName mkVectTyConOcc name
-      rhs'  <- vectAlgTyConRhs (algTyConRhs tc)
+      rhs'  <- vectAlgTyConRhs tc (algTyConRhs tc)
 
       liftDs $ buildAlgTyCon name'
                              tyvars
@@ -176,22 +171,24 @@ vectTyConDecl tc
     tyvars = tyConTyVars tc
     rec_flag = boolToRecFlag (isRecursiveTyCon tc)
 
-vectAlgTyConRhs :: AlgTyConRhs -> VM AlgTyConRhs
-vectAlgTyConRhs (DataTyCon { data_cons = data_cons
-                           , is_enum   = is_enum
-                           })
+vectAlgTyConRhs :: TyCon -> AlgTyConRhs -> VM AlgTyConRhs
+vectAlgTyConRhs _ (DataTyCon { data_cons = data_cons
+                             , is_enum   = is_enum
+                             })
   = do
       data_cons' <- mapM vectDataCon data_cons
       zipWithM_ defDataCon data_cons data_cons'
       return $ DataTyCon { data_cons = data_cons'
                          , is_enum   = is_enum
                          }
-vectAlgTyConRhs _ = panic "vectAlgTyConRhs"
+vectAlgTyConRhs tc _ = cantVectorise "Can't vectorise type definition:" (ppr tc)
 
 vectDataCon :: DataCon -> VM DataCon
 vectDataCon dc
-  | not . null $ dataConExTyVars dc = pprPanic "vectDataCon: existentials" (ppr dc)
-  | not . null $ dataConEqSpec   dc = pprPanic "vectDataCon: eq spec" (ppr dc)
+  | not . null $ dataConExTyVars dc
+        = cantVectorise "Can't vectorise constructor (existentials):" (ppr dc)
+  | not . null $ dataConEqSpec   dc
+        = cantVectorise "Can't vectorise constructor (eq spec):" (ppr dc)
   | otherwise
   = do
       name'    <- cloneName mkVectDataConOcc name

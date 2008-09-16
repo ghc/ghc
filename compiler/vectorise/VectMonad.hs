@@ -3,7 +3,7 @@ module VectMonad (
   VM,
 
   noV, traceNoV, tryV, maybeV, traceMaybeV, orElseV, fixV, localV, closedV,
-  initV,
+  initV, cantVectorise, maybeCantVectorise, maybeCantVectoriseM,
   liftDs,
   cloneName, cloneId, cloneVar,
   newExportedVar, newLocalVar, newDummyVar, newTyVar,
@@ -206,6 +206,25 @@ instance Monad VM where
                                         Yes genv' lenv' x -> runVM (f x) bi genv' lenv'
                                         No                -> return No
 
+
+cantVectorise :: String -> SDoc -> a
+cantVectorise s d = pgmError
+                  . showSDocDump
+                  $ vcat [text "*** Vectorisation error ***",
+                          nest 4 $ sep [text s, nest 4 d]]
+
+maybeCantVectorise :: String -> SDoc -> Maybe a -> a
+maybeCantVectorise s d Nothing  = cantVectorise s d
+maybeCantVectorise _ _ (Just x) = x
+
+maybeCantVectoriseM :: Monad m => String -> SDoc -> m (Maybe a) -> m a
+maybeCantVectoriseM s d p
+  = do
+      r <- p
+      case r of
+        Just x  -> return x
+        Nothing -> cantVectorise s d
+
 noV :: VM a
 noV = VM $ \_ _ _ -> return No
 
@@ -360,8 +379,8 @@ lookupVar v
       case r of
         Just e  -> return (Local e)
         Nothing -> liftM Global
-                 $  traceMaybeV "lookupVar" (ppr v)
-                                (readGEnv $ \env -> lookupVarEnv (global_vars env) v)
+                . maybeCantVectoriseM "Variable not vectorised:" (ppr v)
+                . readGEnv $ \env -> lookupVarEnv (global_vars env) v
 
 lookupTyCon :: TyCon -> VM (Maybe TyCon)
 lookupTyCon tc

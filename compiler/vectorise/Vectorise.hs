@@ -275,7 +275,7 @@ vectExpr e@(fvs, AnnLam bndr _)
   where
     (bs,body) = collectAnnValBinders e
 
-vectExpr e = traceNoV "vectExpr: can't vectorise" (ppr $ deAnnotate e)
+vectExpr e = cantVectorise "Can't vectorise expression" (ppr $ deAnnotate e)
 
 vectLam :: VarSet -> [Var] -> CoreExprWithFVs -> VM VExpr
 vectLam fvs bs body
@@ -298,7 +298,8 @@ vectLam fvs bs body
 
 vectTyAppExpr :: CoreExprWithFVs -> [Type] -> VM VExpr
 vectTyAppExpr (_, AnnVar v) tys = vectPolyVar v tys
-vectTyAppExpr e _ = traceNoV "vectTyAppExpr: can't vectorise" (ppr $ deAnnotate e)
+vectTyAppExpr e tys = cantVectorise "Can't vectorise expression"
+                        (ppr $ deAnnotate e `mkTyApps` tys)
 
 -- We convert
 --

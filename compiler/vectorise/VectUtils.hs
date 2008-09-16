@@ -124,9 +124,10 @@ mkPArrayType :: Type -> VM Type
 mkPArrayType ty
   | Just tycon <- splitPrimTyCon ty
   = do
-      arr <- traceMaybeV "mkPArrayType" (ppr tycon)
-           $ lookupPrimPArray tycon
-      return $ mkTyConApp arr []
+      r <- lookupPrimPArray tycon
+      case r of
+        Just arr -> return $ mkTyConApp arr []
+        Nothing  -> cantVectorise "Primitive tycon not vectorised" (ppr tycon)
 mkPArrayType ty = mkBuiltinTyConApp parrayTyCon [ty]
 
 mkBuiltinCo :: (Builtins -> TyCon) -> VM Coercion
@@ -153,7 +154,9 @@ mkVScrut (ve, le)
 
 prDFunOfTyCon :: TyCon -> VM CoreExpr
 prDFunOfTyCon tycon
-  = liftM Var (traceMaybeV "prDictOfTyCon" (ppr tycon) (lookupTyConPR tycon))
+  = liftM Var
+  . maybeCantVectoriseM "No PR dictionary for tycon" (ppr tycon)
+  $ lookupTyConPR tycon
 
 paDictArgType :: TyVar -> VM (Maybe Type)
 paDictArgType tv = go (TyVarTy tv) (tyVarKind tv)
@@ -189,9 +192,11 @@ paDictOfTyApp (TyVarTy tv) ty_args
       paDFunApply dfun ty_args
 paDictOfTyApp (TyConApp tc _) ty_args
   = do
-      dfun <- traceMaybeV "paDictOfTyApp" (ppr tc) (lookupTyConPA tc)
+      dfun <- maybeCantVectoriseM "No PA dictionary for tycon" (ppr tc)
+            $ lookupTyConPA tc
       paDFunApply (Var dfun) ty_args
-paDictOfTyApp ty _ = pprPanic "paDictOfTyApp" (ppr ty)
+paDictOfTyApp ty _
+  = cantVectorise "Can't construct PA dictionary for type" (ppr ty)
 
 paDFunType :: TyCon -> VM Type
 paDFunType tc
@@ -221,10 +226,9 @@ pa_pack      = (packPAVar,      "packPA")
 paMethod :: PAMethod -> Type -> VM CoreExpr
 paMethod (_method, name) ty
   | Just tycon <- splitPrimTyCon ty
-  = do
-      fn <- traceMaybeV "paMethod" (ppr tycon <+> text name)
-          $ lookupPrimMethod tycon name
-      return (Var fn)
+  = liftM Var
+  . maybeCantVectoriseM "No PA method" (text name <+> text "for" <+> ppr tycon)
+  $ lookupPrimMethod tycon name
 
 paMethod (method, _name) ty
   = do
