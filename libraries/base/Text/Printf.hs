@@ -1,7 +1,7 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Text.Printf
--- Copyright   :  (c) Lennart Augustsson, 2004
+-- Copyright   :  (c) Lennart Augustsson, 2004-2008
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
 -- 
 -- Maintainer  :  lennart@augustsson.net
@@ -147,10 +147,8 @@ instance PrintfArg Int32 where
 instance PrintfArg Int64 where
     toUPrintf = uInteger
 
-#ifndef __NHC__
 instance PrintfArg Word where
     toUPrintf = uInteger
-#endif
 
 instance PrintfArg Word8 where
     toUPrintf = uInteger
@@ -226,7 +224,7 @@ fmt cs us =
 		'f' -> adjust' (dfmt' c prec u)
 		'g' -> adjust' (dfmt' c prec u)
 		'G' -> adjust' (dfmt' c prec u)
-		's' -> adjust  ("", tostr u)
+		's' -> adjust  ("", tostr prec u)
 		_   -> perror ("bad formatting char " ++ [c])
 		 ) ++ uprintf cs'' us''
 
@@ -245,9 +243,9 @@ toint (UInteger _ i) = fromInteger i
 toint (UChar c)      = fromEnum c
 toint _		     = baderr
 
-tostr :: UPrintf -> String
-tostr (UString s) = s
-tostr _		  = baderr
+tostr :: Int -> UPrintf -> String
+tostr n (UString s) = if n >= 0 then take n s else s
+tostr _ _		  = baderr
 
 itosb :: Integer -> Integer -> String
 itosb b n = 
@@ -265,27 +263,36 @@ getSpecs :: Bool -> Bool -> Bool -> String -> [UPrintf] -> (Int, Int, Bool, Bool
 getSpecs _ z s ('-':cs) us = getSpecs True z s cs us
 getSpecs l z _ ('+':cs) us = getSpecs l z True cs us
 getSpecs l _ s ('0':cs) us = getSpecs l True s cs us
-getSpecs l z s ('*':cs) us = 
-        case us of
-        [] -> argerr
-        nu : us' ->
-	    let n = toint nu
-		(p, cs'', us'') =
+getSpecs l z s ('*':cs) us =
+	let (us', n) = getStar us
+	    ((p, cs''), us'') =
 		    case cs of
-                    '.':'*':r -> case us' of { [] -> argerr; pu:us''' -> (toint pu, r, us''') }
-		    '.':r     -> let (n', cs') = stoi 0 r in (n', cs', us')
-		    _         -> (-1, cs, us')
-	    in  (n, p, l, z, s, cs'', us'')
+                    '.':'*':r -> let (us''', p') = getStar us'
+		    	      	 in  ((p', r), us''')
+		    '.':r     -> (stoi 0 r, us')
+		    _         -> ((-1, cs), us')
+	in  (n, p, l, z, s, cs'', us'')
 getSpecs l z s ('.':cs) us =
-	let (p, cs') = stoi 0 cs
-	in  (0, p, l, z, s, cs', us)
+	let ((p, cs'), us') = 
+	        case cs of
+		'*':cs'' -> let (us'', p') = getStar us in ((p', cs''), us'')
+                _ ->        (stoi 0 cs, us)
+	in  (0, p, l, z, s, cs', us')
 getSpecs l z s cs@(c:_) us | isDigit c =
 	let (n, cs') = stoi 0 cs
-	    (p, cs'') = case cs' of
-			'.':r -> stoi 0 r
-			_     -> (-1, cs')
-	in  (n, p, l, z, s, cs'', us)
+	    ((p, cs''), us') = case cs' of
+	    	 	       '.':'*':r -> let (us'', p') = getStar us in ((p', r), us'')
+		               '.':r -> (stoi 0 r, us)
+			       _     -> ((-1, cs'), us)
+	in  (n, p, l, z, s, cs'', us')
 getSpecs l z s cs       us = (0, -1, l, z, s, cs, us)
+
+getStar :: [UPrintf] -> ([UPrintf], Int)
+getStar us =
+    case us of
+    [] -> argerr
+    nu : us' -> (us', toint nu)
+
 
 dfmt' :: Char -> Int -> UPrintf -> (String, String)
 dfmt' c p (UDouble d) = dfmt c p d
