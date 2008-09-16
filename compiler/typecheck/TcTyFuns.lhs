@@ -656,7 +656,14 @@ flattenType inst ty
   = go ty
   where
       -- look through synonyms
-    go ty | Just ty' <- tcView ty = go ty'
+    go ty | Just ty' <- tcView ty 
+      = do { (ty_flat, co, eqs, skolems) <- go ty'
+           ; if null eqs
+             then     -- unchanged, keep the old type with folded synonyms
+               return (ty, ty, [], emptyVarSet)
+             else 
+               return (ty_flat, co, eqs, skolems)
+           }
 
       -- type variable => nothing to do
     go ty@(TyVarTy _)
@@ -687,34 +694,45 @@ flattenType inst ty
 
       -- data constructor application => flatten subtypes
       -- NB: Special cased for efficiency - could be handled as type application
-    go (TyConApp con args)
+    go ty@(TyConApp con args)
       = do { (args', cargs, args_eqss, args_skolemss) <- mapAndUnzip4M go args
-           ; return (mkTyConApp con args', 
-                     mkTyConApp con cargs,
-                     concat args_eqss,
-                     unionVarSets args_skolemss)
+           ; if null args_eqss
+             then     -- unchanged, keep the old type with folded synonyms
+               return (ty, ty, [], emptyVarSet)
+             else 
+               return (mkTyConApp con args', 
+                       mkTyConApp con cargs,
+                       concat args_eqss,
+                       unionVarSets args_skolemss)
            }
 
       -- function type => flatten subtypes
       -- NB: Special cased for efficiency - could be handled as type application
-    go (FunTy ty_l ty_r)
+    go ty@(FunTy ty_l ty_r)
       = do { (ty_l', co_l, eqs_l, skolems_l) <- go ty_l
            ; (ty_r', co_r, eqs_r, skolems_r) <- go ty_r
-           ; return (mkFunTy ty_l' ty_r', 
-                     mkFunTy co_l co_r,
-                     eqs_l ++ eqs_r, 
-                     skolems_l `unionVarSet` skolems_r)
+           ; if null eqs_l && null eqs_r
+             then     -- unchanged, keep the old type with folded synonyms
+               return (ty, ty, [], emptyVarSet)
+             else 
+               return (mkFunTy ty_l' ty_r', 
+                       mkFunTy co_l co_r,
+                       eqs_l ++ eqs_r, 
+                       skolems_l `unionVarSet` skolems_r)
            }
 
       -- type application => flatten subtypes
-    go (AppTy ty_l ty_r)
---      | Just (ty_l, ty_r) <- repSplitAppTy_maybe ty
+    go ty@(AppTy ty_l ty_r)
       = do { (ty_l', co_l, eqs_l, skolems_l) <- go ty_l
            ; (ty_r', co_r, eqs_r, skolems_r) <- go ty_r
-           ; return (mkAppTy ty_l' ty_r', 
-                     mkAppTy co_l co_r, 
-                     eqs_l ++ eqs_r, 
-                     skolems_l `unionVarSet` skolems_r)
+           ; if null eqs_l && null eqs_r
+             then     -- unchanged, keep the old type with folded synonyms
+               return (ty, ty, [], emptyVarSet)
+             else 
+               return (mkAppTy ty_l' ty_r', 
+                       mkAppTy co_l co_r, 
+                       eqs_l ++ eqs_r, 
+                       skolems_l `unionVarSet` skolems_r)
            }
 
       -- forall type => panic if the body contains a type family
