@@ -1633,7 +1633,7 @@ static int ocAllocateSymbolExtras( ObjectCode* oc, int count, int first )
             return 0;
         }
 #ifdef x86_64_HOST_ARCH
-        if (oc->symbol_extras > 0x80000000)
+        if ((StgWord)oc->symbol_extras > 0x80000000)
         {
             barf("mmap() returned memory outside 2Gb");
         }
