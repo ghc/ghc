@@ -844,7 +844,7 @@ getBaseDir = do let len = (2048::Int) -- plenty, PATH_MAX is 512 under Win32.
                                     return (Just (rootDir s))
   where
     rootDir s = case splitFileName $ normalise s of
-                (d, "ghc.exe") ->
+                (d, ghc_exe) | map toLower ghc_exe == "ghc.exe" ->
                     case splitFileName $ takeDirectory d of
                     -- installed ghc.exe is in $topdir/bin/ghc.exe
                     (d', "bin") -> takeDirectory d'
