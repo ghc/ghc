@@ -122,3 +122,5 @@ test('2276_ghci', [ skip_if_not_windows, only_ways(['ghci']),
                     cmd_prefix('$MAKE --no-print-directory 2276_ghci_setup && '),
                     extra_clean(['2276_ghci_c.o']) ],
                   compile_and_run, ['-fobject-code 2276_ghci_c.o'])
+
+test('2469', normal, compile_and_run, ['-optc-std=gnu99'])
