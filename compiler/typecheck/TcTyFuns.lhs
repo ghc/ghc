@@ -269,6 +269,10 @@ emptyEqConfig = EqConfig
                 , binds   = emptyBag
                 , skolems = emptyVarSet
                 }
+
+instance Outputable EqConfig where
+  ppr (EqConfig {eqs = eqs, locals = locals, wanteds = wanteds, binds = binds})
+    = vcat [ppr eqs, ppr locals, ppr wanteds, ppr binds]
 \end{code}
 
 The set of operations on an equality configuration.  We obtain the initialise
@@ -284,7 +288,7 @@ no further propoagation is possible.
 normaliseEqs :: [Inst] -> TcM EqConfig
 normaliseEqs eqs 
   = do { ASSERTM2( allM isValidWantedEqInst eqs, ppr eqs )
-       ; traceTc $ ptext (sLit "normaliseEqs")
+       ; traceTc $ ptext (sLit "Entering normaliseEqs")
 
        ; (eqss, skolemss) <- mapAndUnzipM normEqInst eqs
        ; return $ emptyEqConfig { eqs = concat eqss
@@ -300,7 +304,7 @@ normaliseEqs eqs
 --
 normaliseDicts :: Bool -> [Inst] -> TcM EqConfig
 normaliseDicts isWanted insts
-  = do { traceTc $ ptext (sLit "normaliseDicts") <+>
+  = do { traceTc $ ptext (sLit "Entering normaliseDicts") <+>
                    ptext (if isWanted then sLit "[Wanted]" else sLit "[Local]")
        ; (insts', eqss, bindss, skolemss) <- mapAndUnzip4M (normDict isWanted) 
                                                            insts
@@ -316,7 +320,9 @@ normaliseDicts isWanted insts
 --
 propagateEqs :: EqConfig -> TcM EqConfig
 propagateEqs eqCfg@(EqConfig {eqs = todoEqs}) 
-  = do { traceTc $ ptext (sLit "propagateEqs")
+  = do { traceTc $ hang (ptext (sLit "Entering propagateEqs:"))
+                     4 (ppr eqCfg)
+
        ; propagate todoEqs (eqCfg {eqs = []})
        }
 
@@ -433,6 +439,20 @@ deriveEqInst rewrite ty1 ty2 co
   where
     swapped       = rwi_swapped rewrite
     (left, right) = if not swapped then (ty1, ty2) else (ty2, ty1)
+
+instance Outputable RewriteInst where
+  ppr (RewriteFam {rwi_fam = fam, rwi_args = args, rwi_right = rhs, rwi_co =co})
+    = hsep [ ppr co <+> text "::" 
+           , ppr (mkTyConApp fam args)
+           , text "~>"
+           , ppr rhs
+           ]
+  ppr (RewriteVar {rwi_var = tv, rwi_right = rhs, rwi_co =co})
+    = hsep [ ppr co <+> text "::" 
+           , ppr tv
+           , text "~>"
+           , ppr rhs
+           ]
 \end{code}
 
 The following functions turn an arbitrary equality into a set of normal
@@ -481,9 +501,9 @@ normEqInst inst
       = do { (ty1', co1, ty1_eqs, ty1_skolems) <- flattenType inst ty1
            ; (ty2', co2, ty2_eqs, ty2_skolems) <- flattenType inst ty2
            ; let ty12_eqs  = ty1_eqs ++ ty2_eqs
-                 rewriteCo = co1 `mkTransCoercion` mkSymCoercion co2
+                 sym_co2   = mkSymCoercion co2
                  eqTys     = (ty1', ty2')
-           ; (co', ty12_eqs') <- adjustCoercions co rewriteCo eqTys ty12_eqs
+           ; (co', ty12_eqs') <- adjustCoercions co co1 sym_co2 eqTys ty12_eqs
            ; eqs <- checkOrientation ty1' ty2' co' inst
            ; if isLoopyEquality eqs ty12_eqs' 
              then do { if isWantedCo (tci_co inst)
@@ -503,11 +523,11 @@ normEqInst inst
       = do { (args', cargs, args_eqss, args_skolemss) 
                <- mapAndUnzip4M (flattenType inst) args
            ; (ty2', co2, ty2_eqs, ty2_skolems) <- flattenType inst ty2
-           ; let rewriteCo = mkTyConApp con cargs `mkTransCoercion` 
-                             mkSymCoercion co2
+           ; let co1       = mkTyConApp con cargs
+                 sym_co2   = mkSymCoercion co2
                  all_eqs   = concat args_eqss ++ ty2_eqs
                  eqTys     = (mkTyConApp con args', ty2')
-           ; (co', all_eqs') <- adjustCoercions co rewriteCo eqTys all_eqs
+           ; (co', all_eqs') <- adjustCoercions co co1 sym_co2 eqTys all_eqs
            ; let thisRewriteFam = RewriteFam 
                                   { rwi_fam     = con
                                   , rwi_args    = args'
@@ -712,7 +732,8 @@ flattenType inst ty
       = panic "TcTyFuns.flattenType: unexpected PredType"
 
 adjustCoercions :: EqInstCo            -- coercion of original equality
-                -> Coercion            -- coercion witnessing the rewrite
+                -> Coercion            -- coercion witnessing the left rewrite
+                -> Coercion            -- coercion witnessing the right rewrite
                 -> (Type, Type)        -- types of flattened equality
                 -> [RewriteInst]       -- equalities from flattening
                 -> TcM (EqInstCo,      -- coercion for flattened equality
@@ -720,17 +741,17 @@ adjustCoercions :: EqInstCo            -- coercion of original equality
 -- Depending on whether we flattened a local or wanted equality, that equality's
 -- coercion and that of the new equalities produced during flattening are
 -- adjusted .
-adjustCoercions co rewriteCo eqTys all_eqs
-
+adjustCoercions (Left cotv) co1 co2 (ty_l, ty_r) all_eqs
     -- wanted => generate a fresh coercion variable for the flattened equality
-  | isWantedCo co 
-  = do { co' <- mkRightTransEqInstCo co rewriteCo eqTys
-       ; return (co', all_eqs)
+  = do { cotv' <- newMetaCoVar ty_l ty_r
+       ; writeMetaTyVar cotv $ 
+           (co1 `mkTransCoercion` TyVarTy cotv' `mkTransCoercion` co2)
+       ; return (Left cotv', all_eqs)
        }
 
+adjustCoercions co@(Right _) _co1 _co2 _eqTys all_eqs
     -- local => turn all new equalities into locals and update (but not zonk)
     --          the skolem
-  | otherwise
   = do { all_eqs' <- mapM wantedToLocal all_eqs
        ; return (co, all_eqs')
        }
@@ -1059,8 +1080,7 @@ substitute eqs locals wanteds = subst eqs [] emptyBag locals wanteds
               coSubst tySubst isWanted dict
       | isClassDict dict
       , tv `elemVarSet` tyVarsOfPred (tci_pred dict)
-      = do { let co1Subst = mkSymCoercion $ 
-                              PredTy (substPred coSubst (tci_pred dict))
+      = do { let co1Subst = PredTy (substPred coSubst (tci_pred dict))
                  pred'    = substPred tySubst (tci_pred dict)
            ; (dict', binds) <- mkDictBind dict isWanted co1Subst pred'
            ; return (binds, dict')
