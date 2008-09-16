@@ -38,7 +38,6 @@ module Module
 	haskell98PackageId,
 	sybPackageId,
 	thPackageId,
-        ndpPackageId,
         dphSeqPackageId,
         dphParPackageId,
 	mainPackageId,
@@ -318,7 +317,7 @@ packageIdString = unpackFS . packageIdFS
 
 integerPackageId, primPackageId,
   basePackageId, rtsPackageId, haskell98PackageId, sybPackageId,
-  thPackageId, ndpPackageId, dphSeqPackageId, dphParPackageId,
+  thPackageId, dphSeqPackageId, dphParPackageId,
   mainPackageId  :: PackageId
 primPackageId      = fsToPackageId (fsLit "ghc-prim")
 integerPackageId   = fsToPackageId (fsLit "integer")
@@ -327,7 +326,6 @@ rtsPackageId	   = fsToPackageId (fsLit "rts")
 haskell98PackageId = fsToPackageId (fsLit "haskell98")
 sybPackageId       = fsToPackageId (fsLit "syb")
 thPackageId        = fsToPackageId (fsLit "template-haskell")
-ndpPackageId       = fsToPackageId (fsLit "ndp")
 dphSeqPackageId    = fsToPackageId (fsLit "dph-seq")
 dphParPackageId    = fsToPackageId (fsLit "dph-par")
 

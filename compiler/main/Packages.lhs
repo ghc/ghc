@@ -393,8 +393,7 @@ findWiredInPackages dflags pkgs preload this_package = do
                             (sybPackageId, [""]),
                             (thPackageId, [""]),
                             (dphSeqPackageId, [""]),
-                            (dphParPackageId, [""]),
-                            (ndpPackageId, ["-seq", "-par"]) ]
+                            (dphParPackageId, [""])]
 
         matches :: PackageConfig -> (PackageId, [String]) -> Bool
         pc `matches` (pid, suffixes)
