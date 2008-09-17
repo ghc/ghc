@@ -358,7 +358,8 @@ lvlExpr ctxt_lvl env (_, AnnCase expr case_bndr ty alts) = do
 @lvlMFE@ is just like @lvlExpr@, except that it might let-bind
 the expression, so that it can itself be floated.
 
-[NOTE: unlifted MFEs]
+Note [Unlifted MFEs]
+~~~~~~~~~~~~~~~~~~~~~
 We don't float unlifted MFEs, which potentially loses big opportunites.
 For example:
 	\x -> f (h y)
@@ -377,7 +378,7 @@ lvlMFE _ _ _ (_, AnnType ty)
 
 
 lvlMFE strict_ctxt ctxt_lvl env ann_expr@(fvs, _)
-  |  isUnLiftedType ty			-- Can't let-bind it; see [NOTE: unlifted MFEs]
+  |  isUnLiftedType ty			-- Can't let-bind it; see Note [Unlifted MFEs]
   || isInlineCtxt ctxt_lvl		-- Don't float out of an __inline__ context
   || exprIsTrivial expr			-- Never float if it's trivial
   || not good_destination
