@@ -569,13 +569,13 @@ mkDataTypeEqn :: InstOrigin -> Bool -> [Var] -> Class -> [Type]
 		
 mkDataTypeEqn orig mayDeriveDataTypeable tvs cls cls_tys
               tycon tc_args rep_tc rep_tc_args mtheta
-  | Just err <- checkSideConditions mayDeriveDataTypeable cls cls_tys rep_tc
+  = case checkSideConditions mayDeriveDataTypeable cls cls_tys rep_tc of
 	-- NB: pass the *representation* tycon to checkSideConditions
-  = baleOut (derivingThingErr cls cls_tys (mkTyConApp tycon tc_args) err)
-
-  | otherwise 
-  = ASSERT( null cls_tys )
-    mk_data_eqn orig tvs cls tycon tc_args rep_tc rep_tc_args mtheta
+	CanDerive -> mk_data_eqn orig tvs cls tycon tc_args rep_tc rep_tc_args mtheta
+	NonDerivableClass	-> bale_out (nonStdErr cls)
+	DerivableClassError msg -> bale_out msg
+  where
+    bale_out msg = baleOut (derivingThingErr cls cls_tys (mkTyConApp tycon tc_args) msg)
 
 mk_data_eqn, mk_typeable_eqn
    :: InstOrigin -> [TyVar] -> Class 
@@ -648,17 +648,25 @@ mk_typeable_eqn orig tvs cls tycon tc_args rep_tc _rep_tc_args mtheta
 -- the data constructors - but we need to be careful to fall back to the
 -- family tycon (with indexes) in error messages.
 
-checkSideConditions :: Bool -> Class -> [TcType] -> TyCon -> Maybe SDoc
+data DerivStatus = CanDerive
+     		 | NonDerivableClass
+		 | DerivableClassError SDoc
+
+checkSideConditions :: Bool -> Class -> [TcType] -> TyCon -> DerivStatus
 checkSideConditions mayDeriveDataTypeable cls cls_tys rep_tc
   | notNull cls_tys	
-  = Just ty_args_why	-- e.g. deriving( Foo s )
+  = DerivableClassError ty_args_why	-- e.g. deriving( Foo s )
   | otherwise
   = case sideConditions cls of
-	Just cond -> cond (mayDeriveDataTypeable, rep_tc)
-	Nothing   -> Just non_std_why
+	Nothing   -> NonDerivableClass
+	Just cond -> case (cond (mayDeriveDataTypeable, rep_tc)) of
+	     	        Nothing  -> CanDerive
+			Just err -> DerivableClassError err
   where
     ty_args_why	= quotes (ppr (mkClassPred cls cls_tys)) <+> ptext (sLit "is not a class")
-    non_std_why = quotes (ppr cls) <+> ptext (sLit "is not a derivable class")
+
+nonStdErr :: Class -> SDoc
+nonStdErr cls = quotes (ppr cls) <+> ptext (sLit "is not a derivable class")
 
 sideConditions :: Class -> Maybe Condition
 sideConditions cls
@@ -814,17 +822,20 @@ mkNewTypeEqn orig mayDeriveDataTypeable newtype_deriving tvs
 	; return (if isJust mtheta then Just (Right spec)
 				   else Just (Left spec)) }
 
-  | isNothing mb_std_err	-- Use the standard H98 method
-  = mk_data_eqn orig tvs cls tycon tc_args rep_tycon rep_tc_args mtheta
-
-  	-- Otherwise we can't derive
-  | newtype_deriving = baleOut cant_derive_err -- Too hard
-  | otherwise        = baleOut std_err		-- Just complain about being a non-std instance
+  | otherwise
+  = case check_conditions of
+      CanDerive -> mk_data_eqn orig tvs cls tycon tc_args rep_tycon rep_tc_args mtheta
+      		   	       	-- Use the standard H98 method
+      DerivableClassError msg -> bale_out msg		   -- Error with standard class
+      NonDerivableClass 	-- Must use newtype deriving
+      	| newtype_deriving    -> bale_out cant_derive_err  -- Too hard, even with newtype deriving
+      	| otherwise           -> bale_out non_std_err      -- Try newtype deriving!
   where
-	mb_std_err = checkSideConditions mayDeriveDataTypeable cls cls_tys rep_tycon
-	std_err = derivingThingErr cls cls_tys tc_app $
-		  vcat [fromJust mb_std_err,
-			ptext (sLit "Try -XGeneralizedNewtypeDeriving for GHC's newtype-deriving extension")]
+	check_conditions = checkSideConditions mayDeriveDataTypeable cls cls_tys rep_tycon
+	bale_out msg = baleOut (derivingThingErr cls cls_tys tc_app msg)
+
+	non_std_err = nonStdErr cls $$
+		      ptext (sLit "Try -XGeneralizedNewtypeDeriving for GHC's newtype-deriving extension")
 
 	-- Here is the plan for newtype derivings.  We see
 	--	  newtype T a1...an = MkT (t ak+1...an) deriving (.., C s1 .. sm, ...)
@@ -958,22 +969,21 @@ mkNewTypeEqn orig mayDeriveDataTypeable newtype_deriving tvs
 		-- (d) in case of newtype family instances, the eta-dropped
 		--      arguments must be type variables (not more complex indexes)
 
-	cant_derive_err = derivingThingErr cls cls_tys tc_app
-				(vcat [ptext (sLit "even with cunning newtype deriving:"),
-					if isRecursiveTyCon tycon then
-					  ptext (sLit "the newtype may be recursive")
-					else empty,
-					if not right_arity then 
-					  quotes (ppr (mkClassPred cls cls_tys)) <+> ptext (sLit "does not have arity 1")
-					else empty,
-					if not (n_tyargs_to_keep >= 0) then 
-					  ptext (sLit "the type constructor has wrong kind")
-					else if not (n_args_to_keep >= 0) then
-					  ptext (sLit "the representation type has wrong kind")
-					else if not eta_ok then 
-					  ptext (sLit "the eta-reduction property does not hold")
-					else empty
-				      ])
+	cant_derive_err = vcat [ptext (sLit "even with cunning newtype deriving:"),
+				if isRecursiveTyCon tycon then
+				  ptext (sLit "the newtype may be recursive")
+				else empty,
+				if not right_arity then 
+				  quotes (ppr (mkClassPred cls cls_tys)) <+> ptext (sLit "does not have arity 1")
+				else empty,
+				if not (n_tyargs_to_keep >= 0) then 
+				  ptext (sLit "the type constructor has wrong kind")
+				else if not (n_args_to_keep >= 0) then
+				  ptext (sLit "the representation type has wrong kind")
+				else if not eta_ok then 
+				  ptext (sLit "the eta-reduction property does not hold")
+				else empty
+				]
 \end{code}
 
 
