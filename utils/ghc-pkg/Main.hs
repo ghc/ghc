@@ -35,6 +35,7 @@ import Text.PrettyPrint
 import qualified Control.Exception as Exception
 import Data.Maybe
 
+import Data.Bits
 import Data.Char ( isSpace, toLower )
 import Control.Monad
 import System.Directory ( doesDirectoryExist, getDirectoryContents,
@@ -46,15 +47,17 @@ import System.IO.Error (try)
 import Data.List
 import Control.Concurrent
 
+import Foreign.C
 #ifdef mingw32_HOST_OS
 import Foreign
-import Foreign.C.String
 import GHC.ConsoleHandler
 #else
-import System.Posix
+import System.Posix hiding (fdToHandle)
 #endif
 
 import IO ( isPermissionError )
+import System.Posix.Internals
+import GHC.Handle (fdToHandle)
 
 #if defined(GLOB)
 import System.Process(runInteractiveCommand)
@@ -1161,7 +1164,7 @@ catchError io handler = io `Exception.catch` handler'
           handler' e                         = Exception.throw e
 #endif
 
-onException :: IO a -> IO () -> IO a
+onException :: IO a -> IO b -> IO a
 #if __GLASGOW_HASKELL__ >= 609
 onException = Exception.onException
 #else
@@ -1174,26 +1177,26 @@ onException io what = io `Exception.catch` \e -> do what
 -- to use text files here, rather than binary files.
 writeFileAtomic :: FilePath -> String -> IO ()
 writeFileAtomic targetFile content = do
-  (tmpFile, tmpHandle) <- openTempFile targetDir template
-  do  hPutStr tmpHandle content
-      hClose tmpHandle
+  (newFile, newHandle) <- openNewFile targetDir template
+  do  hPutStr newHandle content
+      hClose newHandle
 #if mingw32_HOST_OS || mingw32_TARGET_OS
-      renameFile tmpFile targetFile
+      renameFile newFile targetFile
         -- If the targetFile exists then renameFile will fail
         `catchIO` \err -> do
           exists <- doesFileExist targetFile
           if exists
             then do removeFile targetFile
                     -- Big fat hairy race condition
-                    renameFile tmpFile targetFile
+                    renameFile newFile targetFile
                     -- If the removeFile succeeds and the renameFile fails
                     -- then we've lost the atomic property.
             else throwIOIO err
 #else
-      renameFile tmpFile targetFile
+      renameFile newFile targetFile
 #endif
-   `onException` do hClose tmpHandle
-                    removeFile tmpFile
+   `onException` do hClose newHandle
+                    removeFile newFile
   where
     template = targetName <.> "tmp"
     targetDir | null targetDir_ = "."
@@ -1201,6 +1204,57 @@ writeFileAtomic targetFile content = do
     --TODO: remove this when takeDirectory/splitFileName is fixed
     --      to always return a valid dir
     (targetDir_,targetName) = splitFileName targetFile
+
+-- Ugh, this is a copy/paste of code from the base library, but
+-- if uses 666 rather than 600 for the permissions.
+openNewFile :: FilePath -> String -> IO (FilePath, Handle)
+openNewFile dir template = do
+  pid <- c_getpid
+  findTempName pid
+  where
+    -- We split off the last extension, so we can use .foo.ext files
+    -- for temporary files (hidden on Unix OSes). Unfortunately we're
+    -- below filepath in the hierarchy here.
+    (prefix,suffix) =
+       case break (== '.') $ reverse template of
+         -- First case: template contains no '.'s. Just re-reverse it.
+         (rev_suffix, "")       -> (reverse rev_suffix, "")
+         -- Second case: template contains at least one '.'. Strip the
+         -- dot from the prefix and prepend it to the suffix (if we don't
+         -- do this, the unique number will get added after the '.' and
+         -- thus be part of the extension, which is wrong.)
+         (rev_suffix, '.':rest) -> (reverse rest, '.':reverse rev_suffix)
+         -- Otherwise, something is wrong, because (break (== '.')) should
+         -- always return a pair with either the empty string or a string
+         -- beginning with '.' as the second component.
+         _                      -> error "bug in System.IO.openTempFile"
+
+    oflags = rw_flags .|. o_EXCL
+
+    findTempName x = do
+      fd <- withCString filepath $ \ f ->
+              c_open f oflags 0o666
+      if fd < 0
+       then do
+         errno <- getErrno
+         if errno == eEXIST
+           then findTempName (x+1)
+           else ioError (errnoToIOError "openNewBinaryFile" errno Nothing (Just dir))
+       else do
+         -- XXX We want to tell fdToHandle what the filepath is,
+         -- as any exceptions etc will only be able to report the
+         -- fd currently
+         h <- fdToHandle fd `onException` c_close fd
+         return (filepath, h)
+      where
+        filename        = prefix ++ show x ++ suffix
+        filepath        = dir `combine` filename
+
+-- XXX Copied from GHC.Handle
+std_flags, output_flags, rw_flags :: CInt
+std_flags    = o_NONBLOCK   .|. o_NOCTTY
+output_flags = std_flags    .|. o_CREAT
+rw_flags     = output_flags .|. o_RDWR
 
 -- | The function splits the given string to substrings
 -- using 'isSearchPathSeparator'.
