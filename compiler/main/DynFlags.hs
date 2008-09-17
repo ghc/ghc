@@ -1366,7 +1366,7 @@ dynamic_flags = [
   , Flag "dasm-lint"               (NoArg (setDynFlag Opt_DoAsmLinting))
          Supported
   , Flag "dshow-passes"
-         (NoArg (do setDynFlag Opt_ForceRecomp
+         (NoArg (do forceRecompile
                     setVerbosity (Just 2)))
          Supported
   , Flag "dfaststring-stats"       (NoArg (setDynFlag Opt_D_faststring_stats))
@@ -1756,24 +1756,31 @@ unSetDynFlag f = upd (\dfs -> dopt_unset dfs f)
 --------------------------
 setDumpFlag :: DynFlag -> OptKind DynP
 setDumpFlag dump_flag
-  | force_recomp   = NoArg (setDynFlag Opt_ForceRecomp >> setDynFlag dump_flag)
-  | otherwise      = NoArg (setDynFlag dump_flag)
+  = NoArg (setDynFlag dump_flag >> when want_recomp forceRecompile)
   where
-        -- Whenver we -ddump, switch off the recompilation checker,
-        -- else you don't see the dump!
-        -- However, certain dumpy-things are really interested in what's going
+	-- Certain dumpy-things are really interested in what's going
         -- on during recompilation checking, so in those cases we
         -- don't want to turn it off.
-   force_recomp = dump_flag `notElem` [Opt_D_dump_if_trace,
-                                       Opt_D_dump_hi_diffs]
+    want_recomp = dump_flag `notElem` [Opt_D_dump_if_trace,
+                          	       Opt_D_dump_hi_diffs]
+
+forceRecompile :: DynP ()
+-- Whenver we -ddump, force recompilation (by switching off the 
+-- recompilation checker), else you don't see the dump! However, 
+-- don't switch it off in --make mode, else *everything* gets
+-- recompiled which probably isn't what you want
+forceRecompile = do { dfs <- getCmdLineState
+	       	    ; when (force_recomp dfs) (setDynFlag Opt_ForceRecomp) }
+	where
+	  force_recomp dfs = isOneShot (ghcMode dfs)
 
 setVerboseCore2Core :: DynP ()
-setVerboseCore2Core = do setDynFlag Opt_ForceRecomp
-                         setDynFlag Opt_D_verbose_core2core
+setVerboseCore2Core = do setDynFlag Opt_D_verbose_core2core 
+		         forceRecompile
                          upd (\s -> s { shouldDumpSimplPhase = const True })
 
 setDumpSimplPhases :: String -> DynP ()
-setDumpSimplPhases s = do setDynFlag Opt_ForceRecomp
+setDumpSimplPhases s = do forceRecompile
                           upd (\s -> s { shouldDumpSimplPhase = spec })
   where
     spec :: SimplifierMode -> Bool
