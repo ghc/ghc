@@ -19,3 +19,4 @@ test('drvfail016',
      run_command,
      ['$MAKE --no-print-directory -s drvfail016'])
 test('T2394', normal, compile_fail, [''])
+test('T2604', normal, compile_fail, [''])
