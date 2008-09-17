@@ -35,7 +35,6 @@ import Text.PrettyPrint
 import qualified Control.Exception as Exception
 import Data.Maybe
 
-import Data.Bits
 import Data.Char ( isSpace, toLower )
 import Control.Monad
 import System.Directory ( doesDirectoryExist, getDirectoryContents,
@@ -47,9 +46,9 @@ import System.IO.Error (try)
 import Data.List
 import Control.Concurrent
 
+import Foreign
 import Foreign.C
 #ifdef mingw32_HOST_OS
-import Foreign
 import GHC.ConsoleHandler
 #else
 import System.Posix hiding (fdToHandle)
