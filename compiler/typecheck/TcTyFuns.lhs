@@ -347,7 +347,7 @@ finaliseEqsAndDicts (EqConfig { eqs     = eqs
                               })
   = do { traceTc $ ptext (sLit "finaliseEqsAndDicts")
        ; (eqs', subst_binds, locals', wanteds') <- substitute eqs locals wanteds
-       ; (eqs'', improved) <- instantiateAndExtract eqs'
+       ; (eqs'', improved) <- instantiateAndExtract eqs' (null locals)
        ; final_binds <- filterM nonTrivialDictBind $
                           bagToList (subst_binds `unionBags` binds)
 
@@ -1125,16 +1125,19 @@ Return all remaining wanted equalities.  The Boolean result component is True
 if at least one instantiation of a flexible was performed.
 
 \begin{code}
-instantiateAndExtract :: [RewriteInst] -> TcM ([Inst], Bool)
-instantiateAndExtract eqs
-  = do { let wanteds = filter (isWantedCo . rwi_co) eqs
-       ; wanteds' <- mapM inst wanteds
+instantiateAndExtract :: [RewriteInst] -> Bool -> TcM ([Inst], Bool)
+instantiateAndExtract eqs localsEmpty
+  = do { wanteds' <- mapM inst wanteds
        ; let residuals = catMaybes wanteds'
              improved  = length wanteds /= length residuals
        ; residuals' <- mapM rewriteInstToInst residuals
        ; return (residuals', improved)
        }
   where
+    wanteds      = filter (isWantedCo . rwi_co) eqs
+    checkingMode = length eqs > length wanteds || not localsEmpty
+                     -- no local equalities or dicts => checking mode
+
     inst eq@(RewriteVar {rwi_var = tv1, rwi_right = ty2, rwi_co = co})
 
         -- co :: alpha ~ t
@@ -1145,6 +1148,14 @@ instantiateAndExtract eqs
       | Just tv2 <- tcGetTyVar_maybe ty2
       , isMetaTyVar tv2
       = doInst (not $ rwi_swapped eq) tv2 (mkTyVarTy tv1) co eq
+
+        -- co :: F args ~ alpha, and we are in checking mode (ie, no locals)
+    inst eq@(RewriteFam {rwi_fam = fam, rwi_args = args, rwi_right = ty2, 
+                         rwi_co = co})
+      | checkingMode
+      , Just tv2 <- tcGetTyVar_maybe ty2
+      , isMetaTyVar tv2
+      = doInst (not $ rwi_swapped eq) tv2 (mkTyConApp fam args) co eq
 
     inst eq = return $ Just eq
 
