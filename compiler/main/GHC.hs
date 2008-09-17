@@ -43,7 +43,8 @@ module GHC (
 
 	-- * Loading\/compiling the program
 	depanal,
-	load, loadWithCompiler, LoadHowMuch(..), SuccessFlag(..),	-- also does depanal
+	load, loadWithLogger, LoadHowMuch(..), SuccessFlag(..),	-- also does depanal
+        defaultWarnErrLogger, WarnErrLogger,
 	workingDirectoryChanged,
         parseModule, typecheckModule, desugarModule, loadModule,
         ParsedModule, TypecheckedModule, DesugaredModule, -- all abstract
@@ -651,47 +652,38 @@ data LoadHowMuch
    | LoadUpTo ModuleName
    | LoadDependenciesOf ModuleName
 
--- | Try to load the program.  Calls 'loadWithCompiler' with the default
+-- | Try to load the program.  Calls 'loadWithLogger' with the default
 -- compiler that just immediately logs all warnings and errors.
 load :: GhcMonad m => LoadHowMuch -> m SuccessFlag
 load how_much =
-    loadWithCompiler defaultCompiler how_much
-  where
-    defaultCompiler env mod_summary mod_index mod_count
-                    mb_old_iface mb_linkable =
-      handleSourceError logErrorsAndRethrowException $ do
-         home_mod_info <- compile env mod_summary mod_index mod_count
-                                  mb_old_iface mb_linkable
-         printWarnings
-         return home_mod_info
+    loadWithLogger defaultWarnErrLogger how_much
 
-    logErrorsAndRethrowException err = do
-        printExceptionAndWarnings err
-        throw err
+-- | A function called to log warnings and errors.
+type WarnErrLogger = GhcMonad m => Maybe SourceError -> m ()
+
+defaultWarnErrLogger :: WarnErrLogger
+defaultWarnErrLogger Nothing = printWarnings
+defaultWarnErrLogger (Just e) = printExceptionAndWarnings e
 
 -- | Try to load the program.  If a Module is supplied, then just
 -- attempt to load up to this target.  If no Module is supplied,
 -- then try to load all targets.
 --
--- The first argument is a function that is called to compile a single module.
--- The arguments are the same as 'DriverPipeline.compile'.  Use this function
--- to intercept warns and errors from a single module compilation.  (Don't
--- forget to actually call 'DriverPipeline.compile' inside that function.
--- XXX: this could be enforced by changing 'ModuleCompiler' to return a static
--- capability which can only be obtained by calling 'DriverPipeline.compile'.)
+-- The first argument is a function that is called after compiling each
+-- module to print wanrings and errors.
 
-loadWithCompiler :: GhcMonad m => ModuleCompiler -> LoadHowMuch -> m SuccessFlag
-loadWithCompiler module_compiler how_much = do
+loadWithLogger :: GhcMonad m => WarnErrLogger -> LoadHowMuch -> m SuccessFlag
+loadWithLogger logger how_much = do
     -- Dependency analysis first.  Note that this fixes the module graph:
     -- even if we don't get a fully successful upsweep, the full module
     -- graph is still retained in the Session.  We can tell which modules
     -- were successfully loaded by inspecting the Session's HPT.
     mod_graph <- depanal [] False
-    load2 how_much mod_graph module_compiler
+    load2 how_much mod_graph logger
 
-load2 :: GhcMonad m => LoadHowMuch -> [ModSummary] -> ModuleCompiler 
+load2 :: GhcMonad m => LoadHowMuch -> [ModSummary] -> WarnErrLogger
       -> m SuccessFlag
-load2 how_much mod_graph mod_comp = do
+load2 how_much mod_graph logger = do
         guessOutputFile
 	hsc_env <- getSession
 
@@ -818,7 +810,7 @@ load2 how_much mod_graph mod_comp = do
 	liftIO $ debugTraceMsg dflags 2 (hang (text "Ready for upsweep")
 				   2 (ppr mg))
         (upsweep_ok, hsc_env1, modsUpswept)
-           <- upsweep mod_comp
+           <- upsweep logger
                       (hsc_env { hsc_HPT = emptyHomePackageTable })
 	              pruned_hpt stable_mods cleanup mg
 
@@ -1426,7 +1418,7 @@ findPartiallyCompletedCycles modsDone theGraph
 
 upsweep
     :: GhcMonad m =>
-       ModuleCompiler           -- ^ See argument to 'loadWithCompiler'.
+       WarnErrLogger            -- ^ Called to print warnings and errors.
     -> HscEnv			-- ^ Includes initially-empty HPT
     -> HomePackageTable		-- ^ HPT from last time round (pruned)
     -> ([ModuleName],[ModuleName]) -- ^ stable modules (see checkStability)
@@ -1436,7 +1428,7 @@ upsweep
          HscEnv,		-- With an updated HPT
          [ModSummary])	-- Mods which succeeded
 
-upsweep mod_comp hsc_env old_hpt stable_mods cleanup sccs = do
+upsweep logger hsc_env old_hpt stable_mods cleanup sccs = do
    (res, hsc_env, done) <- upsweep' hsc_env old_hpt [] sccs 1 (length sccs)
    return (res, hsc_env, reverse done)
  where
@@ -1457,13 +1449,18 @@ upsweep mod_comp hsc_env old_hpt stable_mods cleanup sccs = do
 	--		       (moduleEnvElts (hsc_HPT hsc_env)))
 
         mb_mod_info
-            <- gtry $ gfinally
-                 (upsweep_mod mod_comp hsc_env old_hpt stable_mods mod mod_index nmods)
-                 (liftIO cleanup) -- Remove unwanted tmp files between compilations
+            <- handleSourceError
+                   (\err -> do logger (Just err); return Nothing) $ do
+                 mod_info <- upsweep_mod hsc_env old_hpt stable_mods
+                                         mod mod_index nmods
+                 logger Nothing -- log warnings
+                 return (Just mod_info)
+
+        liftIO cleanup -- Remove unwanted tmp files between compilations
 
         case mb_mod_info of
-          Left (_ :: SomeException) -> return (Failed, hsc_env, done)
-          Right mod_info -> do
+          Nothing -> return (Failed, hsc_env, done)
+          Just mod_info -> do
 		let this_mod = ms_mod_name mod
 
 			-- Add new info to hsc_env
@@ -1488,22 +1485,10 @@ upsweep mod_comp hsc_env old_hpt stable_mods cleanup sccs = do
 
 		upsweep' hsc_env2 old_hpt1 done' mods (mod_index+1) nmods
 
--- | Same type as 'DriverPipeline.compile'.  See its documentation for
--- argument description.
-type ModuleCompiler = GhcMonad m =>
-                   HscEnv
-                -> ModSummary
-                -> Int
-                -> Int
-                -> Maybe ModIface
-                -> Maybe Linkable
-                -> m HomeModInfo
-
 -- | Compile a single module.  Always produce a Linkable for it if
 -- successful.  If no compilation happened, return the old Linkable.
 upsweep_mod :: GhcMonad m =>
-               ModuleCompiler
-            -> HscEnv
+               HscEnv
             -> HomePackageTable
 	    -> ([ModuleName],[ModuleName])
             -> ModSummary
@@ -1511,7 +1496,7 @@ upsweep_mod :: GhcMonad m =>
             -> Int  -- total number of modules
             -> m HomeModInfo
 
-upsweep_mod compile hsc_env old_hpt (stable_obj, stable_bco) summary mod_index nmods
+upsweep_mod hsc_env old_hpt (stable_obj, stable_bco) summary mod_index nmods
    =    let 
        	    this_mod_name = ms_mod_name summary
 	    this_mod    = ms_mod summary
