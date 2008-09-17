@@ -21,7 +21,7 @@ import Coercion
 import FamInstEnv       ( topNormaliseType )
 import DataCon          ( dataConRepStrictness, dataConUnivTyVars )
 import CoreSyn
-import NewDemand        ( isStrictDmd )
+import NewDemand        ( isStrictDmd, splitStrictSig )
 import PprCore          ( pprParendExpr, pprCoreExpr )
 import CoreUnfold       ( mkUnfolding, callSiteInline, CallCtxt(..) )
 import CoreUtils
@@ -511,6 +511,13 @@ makeTrivial env expr
   = do  { var <- newId (fsLit "a") (exprType expr)
         ; env' <- completeNonRecX env False var var expr
         ; return (env', substExpr env' (Var var)) }
+	-- The substitution is needed becase we're constructing a new binding
+	--     a = rhs
+	-- And if rhs is of form (rhs1 |> co), then we might get
+	--     a1 = rhs1
+	--     a = a1 |> co
+	-- and now a's RHS is trivial and can be substituted out, and that
+	-- is what completeNonRecX will do
 \end{code}
 
 
@@ -606,13 +613,19 @@ addNonRecWithUnf :: SimplEnv
 -- Add suitable IdInfo to the Id, add the binding to the floats, and extend the in-scope set
 addNonRecWithUnf env new_bndr rhs unfolding wkr
   = ASSERT( isId new_bndr )
+    WARN( new_arity < old_arity || new_arity < dmd_arity, 
+          (ppr final_id <+> ppr old_arity <+> ppr new_arity <+> ppr dmd_arity) $$ ppr rhs )
     final_id `seq`      -- This seq forces the Id, and hence its IdInfo,
 	                -- and hence any inner substitutions
     addNonRec env final_id rhs
 	-- The addNonRec adds it to the in-scope set too
   where
+	dmd_arity = length $ fst $ splitStrictSig $ idNewStrictness new_bndr
+	old_arity = idArity new_bndr
+
         --      Arity info
-        new_bndr_info = idInfo new_bndr `setArityInfo` exprArity rhs
+	new_arity = exprArity rhs
+        new_bndr_info = idInfo new_bndr `setArityInfo` new_arity
 
         --      Unfolding info
         -- Add the unfolding *only* for non-loop-breakers
