@@ -47,27 +47,28 @@ clean.stage.%:
 CONFIGURE_FLAGS_STAGE1 += --flags=-ghci
 
 ifeq "$(GhcWithInterpreter)" "YES"
-CONFIGURE_FLAGS_STAGE2 += --flags=ghci
+CONFIGURE_FLAGS_STAGE2PLUS += --flags=ghci
 else
-CONFIGURE_FLAGS_STAGE2 += --flags=-ghci
+CONFIGURE_FLAGS_STAGE2PLUS += --flags=-ghci
 endif
 
 ifeq "$(GhcProfiled)" "YES"
-CONFIGURE_FLAGS_STAGE2 += --enable-executable-profiling
+CONFIGURE_FLAGS_STAGE2PLUS += --enable-executable-profiling
 endif
 ifeq "$(GhcDebugged)" "YES"
-CONFIGURE_FLAGS_STAGE2 += --ghc-option=-debug
+CONFIGURE_FLAGS_STAGE2PLUS += --ghc-option=-debug
 endif
 ifeq "$(GhcThreaded)" "YES"
 # Use threaded RTS with GHCi, so threads don't get blocked at the prompt.
-CONFIGURE_FLAGS_STAGE2 += --ghc-option=-threaded
+CONFIGURE_FLAGS_STAGE2PLUS += --ghc-option=-threaded
 endif
 
 ifeq "$(BuildSharedLibs)" "YES"
-CONFIGURE_FLAGS_STAGE2 += --ghc-option=-dynamic
+CONFIGURE_FLAGS_STAGE2PLUS += --ghc-option=-dynamic
 endif
 
-CONFIGURE_FLAGS_STAGE3 = $(CONFIGURE_FLAGS_STAGE2)
+CONFIGURE_FLAGS_STAGE2 = $(CONFIGURE_FLAGS_STAGE2PLUS)
+CONFIGURE_FLAGS_STAGE3 = $(CONFIGURE_FLAGS_STAGE2PLUS)
 
 CONFIGURE_FLAGS_STAGE1 += $(USE_BOOT_CONFIGURE_FLAGS)
 CONFIGURE_FLAGS_STAGE2 += $(USE_STAGE1_CONFIGURE_FLAGS)
