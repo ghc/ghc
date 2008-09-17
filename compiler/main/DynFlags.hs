@@ -450,6 +450,11 @@ data GhcMode
   | MkDepend            -- ^ @ghc -M@, see "Finder" for why we need this
   deriving Eq
 
+instance Outputable GhcMode where
+  ppr CompManager = ptext (sLit "CompManager")
+  ppr OneShot     = ptext (sLit "OneShot")
+  ppr MkDepend    = ptext (sLit "MkDepend")
+
 isOneShot :: GhcMode -> Bool
 isOneShot OneShot = True
 isOneShot _other  = False
