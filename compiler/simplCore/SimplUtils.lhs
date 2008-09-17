@@ -934,10 +934,16 @@ There are some particularly delicate points here:
 
   So it's important to to the right thing.
 
-* We need to be careful if we just look at f's arity. Currently (Dec07),
-  f's arity is visible in its own RHS (see Note [Arity robustness] in 
-  SimplEnv) so we must *not* trust the arity when checking that 'f' is
-  a value.  Instead, look at the unfolding. 
+* Note [Arity care]: we need to be careful if we just look at f's
+  arity. Currently (Dec07), f's arity is visible in its own RHS (see
+  Note [Arity robustness] in SimplEnv) so we must *not* trust the
+  arity when checking that 'f' is a value.  Otherwise we will
+  eta-reduce
+      f = \x. f x
+  to
+      f = f
+  Which might change a terminiating program (think (f `seq` e)) to a 
+  non-terminating one.  So we check for being a loop breaker first.
 
   However for GlobalIds we can look at the arity; and for primops we
   must, since they have no unfolding.  
@@ -950,6 +956,11 @@ There are some particularly delicate points here:
   with both type and dictionary lambdas; hence the slightly 
   ad-hoc isDictId
 
+* Never *reduce* arity. For example
+      f = \xy. g x y
+  Then if h has arity 1 we don't want to eta-reduce because then
+  f's arity would decrease, and that is bad
+
 These delicacies are why we don't use exprIsTrivial and exprIsHNF here.
 Alas.
 
@@ -958,6 +969,8 @@ tryEtaReduce :: [OutBndr] -> OutExpr -> Maybe OutExpr
 tryEtaReduce bndrs body 
   = go (reverse bndrs) body
   where
+    incoming_arity = count isId bndrs
+
     go (b : bs) (App fun arg) | ok_arg b arg = go bs fun	-- Loop round
     go []       fun           | ok_fun fun   = Just fun		-- Success!
     go _        _			     = Nothing		-- Failure!
@@ -971,11 +984,11 @@ tryEtaReduce bndrs body
 	&& (ok_fun_id fun_id || all ok_lam bndrs)
     ok_fun _fun = False
 
-    ok_fun_id fun
-	| isLocalId fun       = isEvaldUnfolding (idUnfolding fun)
-	| isDataConWorkId fun = True
-	| isGlobalId fun      = idArity fun > 0
-        | otherwise           = panic "tryEtaReduce/ok_fun_id"
+    ok_fun_id fun = fun_arity fun >= incoming_arity
+
+    fun_arity fun 	      -- See Note [Arity care]
+       | isLocalId fun && isLoopBreaker (idOccInfo fun) = 0
+       | otherwise = idArity fun   	      
 
     ok_lam v = isTyVar v || isDictId v
 
