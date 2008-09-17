@@ -89,8 +89,8 @@ data Subst
 	--		Types.TvSubstEnv
 	--
 	-- INVARIANT 3: See Note [Extending the Subst]
+\end{code}
 
-{-
 Note [Extending the Subst]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 For a core Subst, which binds Ids as well, we make a different choice for Ids
@@ -118,6 +118,13 @@ In consequence:
   so we only extend the in-scope set.  Then we must look up in the in-scope
   set when we find the occurrence of x.
 
+* The requirement to look up the Id in the in-scope set means that we
+  must NOT take no-op short cut in the case the substitution is empty.
+  We must still look up every Id in the in-scope set.
+
+* (However, we don't need to do so for expressions found in the IdSubst
+  itself, whose range is assumed to be correct wrt the in-scope set.)
+
 Why do we make a different choice for the IdSubstEnv than the TvSubstEnv?
 
 * For Ids, we change the IdInfo all the time (e.g. deleting the
@@ -129,8 +136,8 @@ Why do we make a different choice for the IdSubstEnv than the TvSubstEnv?
 
 * For TyVars, only coercion variables can possibly change, and they are 
   easy to spot
--}
 
+\begin{code}
 -- | An environment for substituting for 'Id's
 type IdSubstEnv = IdEnv CoreExpr
 
@@ -256,6 +263,9 @@ instance Outputable Subst where
 \begin{code}
 -- | Apply a substititon to an entire 'CoreExpr'. Rememeber, you may only 
 -- apply the substitution /once/: see "CoreSubst#apply_once"
+--
+-- Do *not* attempt to short-cut in the case of an empty substitution!
+-- See Note [Extending the Subst]
 substExpr :: Subst -> CoreExpr -> CoreExpr
 substExpr subst expr
   = go expr
@@ -493,11 +503,7 @@ substWorker subst (HasWorker w a)
 ------------------
 -- | Substitutes for the 'Id's within the 'WorkerInfo' given the new function 'Id'
 substSpec :: Subst -> Id -> SpecInfo -> SpecInfo
-
-substSpec subst new_fn spec@(SpecInfo rules rhs_fvs)
-  | isEmptySubst subst
-  = spec
-  | otherwise
+substSpec subst new_fn (SpecInfo rules rhs_fvs)
   = seqSpecInfo new_rules `seq` new_rules
   where
     new_name = idName new_fn

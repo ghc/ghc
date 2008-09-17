@@ -284,10 +284,6 @@ setSubstEnv env tvs ids = env { seTvSubst = tvs, seIdSubst = ids }
 
 mkContEx :: SimplEnv -> InExpr -> SimplSR
 mkContEx (SimplEnv { seTvSubst = tvs, seIdSubst = ids }) e = ContEx tvs ids e
-
-isEmptySimplSubst :: SimplEnv -> Bool
-isEmptySimplSubst (SimplEnv { seTvSubst = tvs, seIdSubst = ids })
-  = isEmptyVarEnv tvs && isEmptyVarEnv ids
 \end{code}
 
 
@@ -713,8 +709,8 @@ mkCoreSubst (SimplEnv { seInScope = in_scope, seTvSubst = tv_env, seIdSubst = id
     fiddle (ContEx tv id e) = CoreSubst.substExpr (mk_subst tv id) e
 
 substExpr :: SimplEnv -> CoreExpr -> CoreExpr
-substExpr env expr
-  | isEmptySimplSubst env = expr
-  | otherwise	          = CoreSubst.substExpr (mkCoreSubst env) expr
+substExpr env expr = CoreSubst.substExpr (mkCoreSubst env) expr
+  -- Do *not* short-cut in the case of an empty substitution
+  -- See CoreSubst: Note [Extending the Subst]
 \end{code}
 
