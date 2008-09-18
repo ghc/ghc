@@ -2,8 +2,8 @@
 \begin{code}
 {-# OPTIONS -Wall #-}
 
+import Control.Exception
 import Control.Monad
-import Data.List
 import Distribution.PackageDescription
 import Distribution.Simple
 import Distribution.Simple.LocalBuildInfo
@@ -16,9 +16,9 @@ import Control.Exception (try)
 
 main :: IO ()
 main = do
-   let hooks = defaultUserHooks {
+   let hooks = simpleUserHooks {
                  buildHook = build_primitive_sources 
-                           $ buildHook defaultUserHooks
+                           $ buildHook simpleUserHooks
             }
    defaultMainWithHooks hooks
 \end{code}
@@ -58,7 +58,7 @@ maybeUpdateFile source target = do
   r <- rawSystem "cmp" ["-s" {-quiet-}, source, target]
   case r of
     ExitSuccess   -> removeFile source
-    ExitFailure _ -> do try (removeFile target); renameFile source target
+    ExitFailure _ -> do (try :: IO () -> IO (Either IOException ())) (removeFile target); renameFile source target
 
 
 \end{code}

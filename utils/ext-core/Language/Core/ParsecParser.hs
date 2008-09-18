@@ -132,7 +132,7 @@ coreTbindGen sep = (parens (do
                     (sep >> identifier >>= (return . (\ tv -> (tv,Klifted))))
 
 coreCdefs :: Parser [Cdef]
-coreCdefs = sepBy1 coreCdef (symbol ";")
+coreCdefs = sepBy coreCdef (symbol ";")
 
 coreCdef :: Parser Cdef
 coreCdef = do
@@ -472,13 +472,22 @@ coreAlt = conAlt <|> litAlt <|> defaultAlt
 conAlt :: Parser Alt
 conAlt = do
   conName <- coreQualifiedCon
-  tBinds  <- many (parens coreAtTbind)
-  whiteSpace -- necessary b/c otherwise we parse the next list as empty
-  vBinds  <- many (parens lambdaBind)
   whiteSpace
+  (tBinds, vBinds) <- caseVarBinds
   try (symbol "->")
   rhs     <- try coreFullExp
   return $ Acon conName tBinds vBinds rhs
+
+caseVarBinds :: Parser ([Tbind], [Vbind])
+caseVarBinds = do
+     maybeFirstTbind <- optionMaybe coreAtTbind
+     case maybeFirstTbind of
+        Just tb -> do
+           (tbs,vbs) <- caseVarBinds
+           return (tb:tbs, vbs)
+        Nothing -> do
+           vbs <- many (parens lambdaBind)
+           return ([], vbs)
 
 litAlt :: Parser Alt
 litAlt = do

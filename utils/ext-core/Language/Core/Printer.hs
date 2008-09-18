@@ -1,4 +1,4 @@
-{-# OPTIONS -Werror -Wall -fno-warn-missing-signatures #-}
+{-# OPTIONS -Wall -fno-warn-missing-signatures #-}
 
 module Language.Core.Printer where
 
