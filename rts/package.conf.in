@@ -61,9 +61,6 @@ extra-libraries:		"m"		/* for ldexp() */
 
 #ifdef INSTALLING
 include-dirs:		INCLUDE_DIR GMP_INCLUDE_DIRS PAPI_INCLUDE_DIR
-# ifdef mingw32_HOST_OS
-			, INCLUDE_DIR"/mingw"
-# endif
 #else /* !INSTALLING */
 include-dirs:		FPTOOLS_TOP_ABS"/includes"
              		FPTOOLS_TOP_ABS"/rts"
