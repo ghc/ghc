@@ -24,18 +24,19 @@ test('TH_spliceE5',
      extra_clean(['TH_spliceE5_Lib.hi', 'TH_spliceE5_Lib.o']),
      multimod_compile_and_run,
      ['TH_spliceE5.hs', '-v0'])
+
 # Testing profiling with TH is a bit tricky; we've already disabled
 # the prof way above, and also we want to add options specifically for
 # profiling (-osuf p_o) because this is necessary when mixing
 # profiling w/ TH.  Furthermore we must have built the program the
-# normal way first, so this is a bit of a hack.
+# normal way first, which is why the work is done by a Makefile rule.
 test('TH_spliceE5_prof',
      [req_profiling,
       omit_ways(['ghci']),
       extra_clean(['TH_spliceE5_prof_Lib.p_o', 'TH_spliceE5_prof_Lib.hi',
-                   'TH_spliceE5_prof_Lib.o'])],
-     multimod_compile_and_run,
-     ['TH_spliceE5_prof.hs', '-v0 -prof -auto-all -osuf p_o'])
+                   'TH_spliceE5_prof_Lib.o','TH_spliceE5_prof.p_o'])],
+     run_command,
+     ['$MAKE -s --no-print-directory TH_spliceE5_prof'])
 
 test('TH_spliceD1',
      extra_clean(['TH_spliceD1_Lib.hi', 'TH_spliceD1_Lib.o']),
