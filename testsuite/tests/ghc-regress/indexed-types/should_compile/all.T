@@ -11,7 +11,7 @@ test('Simple7', normal, compile, [''])
 test('Simple8', expect_fail, compile, [''])
 test('Simple9', normal, compile, [''])
 test('Simple10', normal, compile, [''])
-test('Simple11', expect_fail, compile, [''])
+test('Simple11', normal, compile, [''])
 test('Simple12', normal, compile, [''])
 test('Simple13', expect_fail, compile, [''])
 test('Simple14', expect_fail, compile, [''])
@@ -69,7 +69,7 @@ test('GADT11', normal, compile, [''])
 test('GADT12', expect_fail, compile, [''])
 test('GADT13', expect_fail, compile, [''])
 
-test('Class1', expect_fail, compile, [''])
+test('Class1', normal, compile, [''])
 test('Class2', normal, compile, [''])
 test('Class3', normal, compile, [''])
 
@@ -80,11 +80,11 @@ test('Rules1', normal, compile, [''])
 
 test('Numerals', normal, compile, [''])
 
-test('ColInference', expect_fail, compile, [''])
-test('ColInference2', expect_fail, compile, [''])
-test('ColInference3', expect_fail, compile, [''])
-test('ColInference4', expect_fail, compile, [''])
-test('ColInference5', expect_fail, compile, [''])
+test('ColInference', normal, compile, [''])
+test('ColInference2', normal, compile, [''])
+test('ColInference3', normal, compile, [''])
+test('ColInference4', normal, compile, [''])
+test('ColInference5', normal, compile, [''])
 test('ColInference6', normal, compile, [''])
 
 test('ClassEqContext', normal, compile, [''])
@@ -92,14 +92,14 @@ test('ClassEqContext2', normal, compile, [''])
 test('ClassEqContext3', normal, compile, [''])
 
 test('Col', normal, compile, [''])
-test('Col2', expect_fail, compile, [''])
+test('Col2', normal, compile, [''])
 
 test('ColGivenCheck', normal, compile, [''])
-test('ColGivenCheck2', expect_fail, compile, [''])
+test('ColGivenCheck2', normal, compile, [''])
 
-test('InstEqContext', expect_fail, compile, [''])
+test('InstEqContext', normal, compile, [''])
 test('InstEqContext2', normal, compile, [''])
-test('InstEqContext3', expect_fail, compile, [''])
+test('InstEqContext3', normal, compile, [''])
 
 test('InstContextNorm', expect_fail, compile, [''])
 
