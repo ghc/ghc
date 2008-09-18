@@ -510,7 +510,11 @@ makeTrivial env expr
   | otherwise           -- See Note [Take care] below
   = do  { var <- newId (fsLit "a") (exprType expr)
         ; env' <- completeNonRecX env False var var expr
-        ; return (env', substExpr env' (Var var)) }
+--	  pprTrace "makeTrivial" (vcat [ppr var <+> ppr (exprArity (substExpr env' (Var var)))
+--	  	   		       , ppr expr
+--	  	   		       , ppr (substExpr env' (Var var))
+--				       , ppr (idArity (fromJust (lookupInScope (seInScope env') var))) ]) $
+	; return (env', substExpr env' (Var var)) }
 	-- The substitution is needed becase we're constructing a new binding
 	--     a = rhs
 	-- And if rhs is of form (rhs1 |> co), then we might get
@@ -1842,7 +1846,7 @@ mkDupableCont env (ApplyTo _ arg se cont)
     do  { (env', dup_cont, nodup_cont) <- mkDupableCont env cont
         ; arg' <- simplExpr (se `setInScope` env') arg
         ; (env'', arg'') <- makeTrivial env' arg'
-        ; let app_cont = ApplyTo OkToDup arg'' (zapSubstEnv env') dup_cont
+        ; let app_cont = ApplyTo OkToDup arg'' (zapSubstEnv env'') dup_cont
         ; return (env'', app_cont, nodup_cont) }
 
 mkDupableCont env cont@(Select _ case_bndr [(_, bs, _rhs)] _ _)
