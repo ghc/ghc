@@ -145,6 +145,7 @@ data DynFlag
    | Opt_D_dump_BCOs
    | Opt_D_dump_vect
    | Opt_D_dump_hpc
+   | Opt_D_dump_rtti
    | Opt_D_source_stats
    | Opt_D_verbose_core2core
    | Opt_D_verbose_stg2stg
@@ -1356,6 +1357,8 @@ dynamic_flags = [
   , Flag "ddump-to-file"           (setDumpFlag Opt_DumpToFile)
          Supported
   , Flag "ddump-hi-diffs"          (setDumpFlag Opt_D_dump_hi_diffs)
+         Supported
+  , Flag "ddump-rtti"      	   (setDumpFlag Opt_D_dump_rtti)
          Supported
 
   , Flag "dcore-lint"              (NoArg (setDynFlag Opt_DoCoreLinting))

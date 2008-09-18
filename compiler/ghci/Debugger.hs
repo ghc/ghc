@@ -53,13 +53,15 @@ pprintClosureCommand bindThings force str = do
   let ids = [id | AnId id <- tythings]
 
   -- Obtain the terms and the recovered type information
-  (terms, substs) <- unzip `liftM` mapM go ids
-  
+  (terms, substs0) <- unzip `liftM` mapM go ids
+
   -- Apply the substitutions obtained after recovering the types
   modifySession $ \hsc_env ->
-         hsc_env{hsc_IC = foldr (flip substInteractiveContext)
-                                (hsc_IC hsc_env)
-                                (map skolemiseSubst substs)}
+    let (substs, skol_vars) = unzip$ map skolemiseSubst substs0
+        hsc_ic' = foldr (flip substInteractiveContext)
+                        (extendInteractiveContext (hsc_IC hsc_env) [] (unionVarSets skol_vars))
+                        substs
+     in hsc_env{hsc_IC = hsc_ic'}
   -- Finally, print the Terms
   unqual  <- GHC.getPrintUnqual
   docterms <- mapM showTerm terms
@@ -68,13 +70,12 @@ pprintClosureCommand bindThings force str = do
                     ids
                     docterms)
  where
-
    -- Do the obtainTerm--bindSuspensions-computeSubstitution dance
    go :: GhcMonad m => Id -> m (Term, TvSubst)
    go id = do
-       term_    <- GHC.obtainTerm force id
+       term_    <- GHC.obtainTermFromId maxBound force id
        term     <- tidyTermTyVars term_
-       term'    <- if bindThings && 
+       term'    <- if bindThings &&
                       False == isUnliftedTypeKind (termType term)
                      then bindSuspensions term
                      else return term
@@ -84,6 +85,11 @@ pprintClosureCommand bindThings force str = do
        let reconstructed_type = termType term
        mb_subst <- withSession $ \hsc_env ->
                      liftIO $ improveRTTIType hsc_env (idType id) (reconstructed_type)
+       maybe (return ())
+             (\subst -> traceOptIf Opt_D_dump_rtti
+                   (fsep $ [text "RTTI Improvement for", ppr id,
+                           text "is the substitution:" , ppr subst]))
+             mb_subst
        return (term', fromMaybe emptyTvSubst mb_subst)
 
    tidyTermTyVars :: GhcMonad m => Term -> m Term
@@ -110,11 +116,10 @@ bindSuspensions t = do
       availNames_var  <- liftIO $ newIORef availNames
       (t', stuff)     <- liftIO $ foldTerm (nameSuspensionsAndGetInfos availNames_var) t
       let (names, tys, hvals) = unzip3 stuff
-      let tys' = map (fst.skolemiseTy) tys
+          (tys', skol_vars)   = unzip $ map skolemiseTy tys
       let ids = [ mkGlobalId VanillaGlobal name ty vanillaIdInfo
                 | (name,ty) <- zip names tys']
-          new_tyvars   = tyVarsOfTypes tys'
-          new_ic       = extendInteractiveContext ictxt ids new_tyvars
+          new_ic = extendInteractiveContext ictxt ids (unionVarSets skol_vars)
       liftIO $ extendLinkEnv (zip names hvals)
       modifySession $ \_ -> hsc_env {hsc_IC = new_ic }
       return t'
@@ -194,7 +199,7 @@ showTerm term = do
     name <- newGrimName userName
     let ictxt    = hsc_IC hsc_env
         tmp_ids  = ic_tmp_ids ictxt
-        id       = mkGlobalId VanillaGlobal name (sigmaType ty) vanillaIdInfo
+        id       = mkGlobalId VanillaGlobal name ty vanillaIdInfo
         new_ic   = ictxt { ic_tmp_ids = id : tmp_ids }
     return (hsc_env {hsc_IC = new_ic }, name)
 
@@ -215,9 +220,17 @@ pprTypeAndContents ids = do
   if pcontents 
     then do
       let depthBound = 100
-      terms      <- mapM (GHC.obtainTermB depthBound False) ids
+      terms      <- mapM (GHC.obtainTermFromId depthBound False) ids
       docs_terms <- mapM showTerm terms
       return $ vcat $ zipWith (\ty cts -> ty <+> equals <+> cts)
                              (map (pprTyThing pefas . AnId) ids)
                              docs_terms
     else return $  vcat $ map (pprTyThing pefas . AnId) ids
+
+--------------------------------------------------------------
+-- Utils 
+
+traceOptIf :: GhcMonad m => DynFlag -> SDoc -> m ()
+traceOptIf flag doc = do
+  dflags <- GHC.getSessionDynFlags
+  when (dopt flag dflags) $ liftIO $ printForUser stderr alwaysQualify doc

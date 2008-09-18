@@ -1089,11 +1089,11 @@ extendInteractiveContext
         -> TyVarSet
         -> InteractiveContext
 extendInteractiveContext ictxt ids tyvars
-  = ictxt { ic_tmp_ids =  ic_tmp_ids ictxt ++ ids,
+  = ictxt { ic_tmp_ids =  snub((ic_tmp_ids ictxt \\ ids) ++ ids),
                           -- NB. must be this way around, because we want
                           -- new ids to shadow existing bindings.
             ic_tyvars   = ic_tyvars ictxt `unionVarSet` tyvars }
-
+    where snub = map head . group . sort
 
 substInteractiveContext :: InteractiveContext -> TvSubst -> InteractiveContext
 substInteractiveContext ictxt subst | isEmptyTvSubst subst = ictxt

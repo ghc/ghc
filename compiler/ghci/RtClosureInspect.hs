@@ -7,65 +7,50 @@
 -----------------------------------------------------------------------------
 
 module RtClosureInspect(
-  
      cvObtainTerm,      -- :: HscEnv -> Int -> Bool -> Maybe Type -> HValue -> IO Term
-
-     Term(..),
-     isTerm,
-     isSuspension,
-     isPrim,
-     isNewtypeWrap,
-     pprTerm, 
-     cPprTerm, 
-     cPprTermBase,
-     CustomTermPrinter,
-     termType,
-     foldTerm, 
-     TermFold(..), 
-     idTermFold, 
-     idTermFoldM,
-     isFullyEvaluated, 
-     isPointed,
-     isFullyEvaluatedTerm,
-     mapTermType,
-     termTyVars,
---     unsafeDeepSeq, 
      cvReconstructType,
      improveRTTIType,
-     sigmaType,
-     Closure(..),
-     getClosureData,
-     ClosureType(..),
-     isConstr,
-     isIndirection
- ) where 
+
+     Term(..),
+     isTerm, isSuspension, isPrim, isFun, isFunLike, isNewtypeWrap,
+     isFullyEvaluated, isFullyEvaluatedTerm,
+     termType, mapTermType, termTyVars,
+     foldTerm, TermFold(..), foldTermM, TermFoldM(..), idTermFold,
+     pprTerm, cPprTerm, cPprTermBase, CustomTermPrinter,
+
+--     unsafeDeepSeq,
+
+     Closure(..), getClosureData, ClosureType(..), isConstr, isIndirection,
+
+     sigmaType
+ ) where
 
 #include "HsVersions.h"
 
 import ByteCodeItbls    ( StgInfoTable )
 import qualified ByteCodeItbls as BCI( StgInfoTable(..) )
-import HscTypes         ( HscEnv )
+import HscTypes
 import Linker
 
 import DataCon
 import Type
+import TypeRep         -- I know I know, this is cheating
 import Var
 import TcRnMonad
 import TcType
 import TcMType
 import TcUnify
 import TcEnv
-import DriverPhases
+
 import TyCon
 import Name
 import VarEnv
 import Util
 import VarSet
-
 import TysPrim
 import PrelNames
 import TysWiredIn
-
+import DynFlags
 import Outputable
 import FastString
 import Panic
@@ -80,7 +65,7 @@ import Control.Monad
 import Data.Maybe
 import Data.Array.Base
 import Data.Ix
-import Data.List        ( partition )
+import Data.List
 import qualified Data.Sequence as Seq
 import Data.Monoid
 import Data.Sequence hiding (null, length, index, take, drop, splitAt, reverse)
@@ -91,11 +76,8 @@ import System.IO
 ---------------------------------------------
 -- * A representation of semi evaluated Terms
 ---------------------------------------------
-{-
 
--}
-
-data Term = Term { ty        :: Type 
+data Term = Term { ty        :: RttiType
                  , dc        :: Either String DataCon
                                -- Carries a text representation if the datacon is
                                -- not exported by the .hi file, which is the case 
@@ -103,21 +85,26 @@ data Term = Term { ty        :: Type
                  , val       :: HValue 
                  , subTerms  :: [Term] }
 
-          | Prim { ty        :: Type
+          | Prim { ty        :: RttiType
                  , value     :: [Word] }
 
           | Suspension { ctype    :: ClosureType
-                       , ty       :: Type
+                       , ty       :: RttiType
                        , val      :: HValue
                        , bound_to :: Maybe Name   -- Useful for printing
                        }
-          | NewtypeWrap{ ty           :: Type
+          | NewtypeWrap{       -- At runtime there are no newtypes, and hence no
+                               -- newtype constructors. A NewtypeWrap is just a
+                               -- made-up tag saying "heads up, there used to be
+                               -- a newtype constructor here".
+                         ty           :: RttiType
                        , dc           :: Either String DataCon
                        , wrapped_term :: Term }
-          | RefWrap    { ty           :: Type
+          | RefWrap    {       -- The contents of a reference
+                         ty           :: RttiType
                        , wrapped_term :: Term }
 
-isTerm, isSuspension, isPrim, isNewtypeWrap :: Term -> Bool
+isTerm, isSuspension, isPrim, isFun, isFunLike, isNewtypeWrap :: Term -> Bool
 isTerm Term{} = True
 isTerm   _    = False
 isSuspension Suspension{} = True
@@ -127,7 +114,13 @@ isPrim   _    = False
 isNewtypeWrap NewtypeWrap{} = True
 isNewtypeWrap _             = False
 
-termType :: Term -> Type
+isFun Suspension{ctype=Fun} = True
+isFun _ = False
+
+isFunLike s@Suspension{ty=ty} = isFun s || isFunTy ty
+isFunLike _ = False
+
+termType :: Term -> RttiType
 termType t = ty t
 
 isFullyEvaluatedTerm :: Term -> Bool
@@ -153,6 +146,7 @@ data ClosureType = Constr
                  | PAP 
                  | Indirection Int 
                  | MutVar Int
+                 | MVar   Int
                  | Other  Int
  deriving (Show, Eq)
 
@@ -209,7 +203,8 @@ readCType i
  | i' == aP_CODE                           = AP
  | i == AP_STACK                           = AP
  | i' == pAP_CODE                          = PAP
- | i == MUT_VAR_CLEAN || i == MUT_VAR_DIRTY     = MutVar i'
+ | i == MUT_VAR_CLEAN || i == MUT_VAR_DIRTY= MutVar i'
+ | i == MVAR_CLEAN    || i == MVAR_DIRTY   = MVar i'
  | otherwise                               = Other  i'
   where i' = fromIntegral i
  
@@ -234,11 +229,6 @@ isFullyEvaluated a = do
     _      -> return False
   where amapM f = sequence . amap' f
 
-amap' :: (t -> b) -> Array Int t -> [b]
-amap' f (Array i0 i _ arr#) = map g [0 .. i - i0]
-    where g (I# i#) = case indexArray# arr# i# of
-                          (# e #) -> f e
-
 -- TODO: Fix it. Probably the otherwise case is failing, trace/debug it
 {-
 unsafeDeepSeq :: a -> b -> b
@@ -251,37 +241,30 @@ unsafeDeepSeq = unsafeDeepSeq1 2
                         closure -> foldl' (flip unsafeDeepSeq) b (ptrs closure)
         where tipe = unsafePerformIO (getClosureType a)
 -}
-isPointed :: Type -> Bool
-isPointed t | Just (t, _) <- splitTyConApp_maybe t 
-            = not$ isUnliftedTypeKind (tyConKind t)
-isPointed _ = True
-
-extractUnboxed  :: [Type] -> Closure -> [[Word]]
-extractUnboxed tt clos = go tt (nonPtrs clos)
-   where sizeofType t
-           | Just (tycon,_) <- splitTyConApp_maybe t
-           = ASSERT (isPrimTyCon tycon) sizeofTyCon tycon
-           | otherwise = pprPanic "Expected a TcTyCon" (ppr t)
-         go [] _ = []
-         go (t:tt) xx 
-           | (x, rest) <- splitAt (sizeofType t) xx
-           = x : go tt rest
-
-sizeofTyCon :: TyCon -> Int -- in *words*
-sizeofTyCon = primRepSizeW . tyConPrimRep
 
 -----------------------------------
 -- * Traversals for Terms
 -----------------------------------
-type TermProcessor a b = Type -> Either String DataCon -> HValue -> [a] -> b
+type TermProcessor a b = RttiType -> Either String DataCon -> HValue -> [a] -> b
 
 data TermFold a = TermFold { fTerm        :: TermProcessor a a
-                           , fPrim        :: Type -> [Word] -> a
-                           , fSuspension  :: ClosureType -> Type -> HValue
+                           , fPrim        :: RttiType -> [Word] -> a
+                           , fSuspension  :: ClosureType -> RttiType -> HValue
                                             -> Maybe Name -> a
-                           , fNewtypeWrap :: Type -> Either String DataCon
+                           , fNewtypeWrap :: RttiType -> Either String DataCon
                                             -> a -> a
-                           , fRefWrap     :: Type -> a -> a
+                           , fRefWrap     :: RttiType -> a -> a
+                           }
+
+
+data TermFoldM m a =
+                   TermFoldM {fTermM        :: TermProcessor a (m a)
+                            , fPrimM        :: RttiType -> [Word] -> m a
+                            , fSuspensionM  :: ClosureType -> RttiType -> HValue
+                                             -> Maybe Name -> m a
+                            , fNewtypeWrapM :: RttiType -> Either String DataCon
+                                            -> a -> m a
+                            , fRefWrapM     :: RttiType -> a -> m a
                            }
 
 foldTerm :: TermFold a -> Term -> a
@@ -291,6 +274,14 @@ foldTerm tf (Suspension ct ty v b) = fSuspension tf ct ty v b
 foldTerm tf (NewtypeWrap ty dc t)  = fNewtypeWrap tf ty dc (foldTerm tf t)
 foldTerm tf (RefWrap ty t)         = fRefWrap tf ty (foldTerm tf t)
 
+
+foldTermM :: Monad m => TermFoldM m a -> Term -> m a
+foldTermM tf (Term ty dc v tt) = mapM (foldTermM tf) tt >>= fTermM tf ty dc v
+foldTermM tf (Prim ty    v   ) = fPrimM tf ty v
+foldTermM tf (Suspension ct ty v b) = fSuspensionM tf ct ty v b
+foldTermM tf (NewtypeWrap ty dc t)  = foldTermM tf t >>=  fNewtypeWrapM tf ty dc
+foldTermM tf (RefWrap ty t)         = foldTermM tf t >>= fRefWrapM tf ty
+
 idTermFold :: TermFold Term
 idTermFold = TermFold {
               fTerm = Term,
@@ -299,22 +290,23 @@ idTermFold = TermFold {
               fNewtypeWrap = NewtypeWrap,
               fRefWrap = RefWrap
                       }
-idTermFoldM :: Monad m => TermFold (m Term)
-idTermFoldM = TermFold {
-              fTerm       = \ty dc v tt -> sequence tt >>= return . Term ty dc v,
-              fPrim       = (return.). Prim,
-              fSuspension = (((return.).).). Suspension,
-              fNewtypeWrap= \ty dc t -> NewtypeWrap ty dc `liftM` t,
-              fRefWrap    = \ty t -> RefWrap ty `liftM` t
-                       }
 
-mapTermType :: (Type -> Type) -> Term -> Term
+mapTermType :: (RttiType -> Type) -> Term -> Term
 mapTermType f = foldTerm idTermFold {
           fTerm       = \ty dc hval tt -> Term (f ty) dc hval tt,
           fSuspension = \ct ty hval n ->
                           Suspension ct (f ty) hval n,
           fNewtypeWrap= \ty dc t -> NewtypeWrap (f ty) dc t,
           fRefWrap    = \ty t -> RefWrap (f ty) t}
+
+mapTermTypeM :: Monad m =>  (RttiType -> m Type) -> Term -> m Term
+mapTermTypeM f = foldTermM TermFoldM {
+          fTermM       = \ty dc hval tt -> f ty >>= \ty' -> return $ Term ty'  dc hval tt,
+          fPrimM       = (return.) . Prim,
+          fSuspensionM = \ct ty hval n ->
+                          f ty >>= \ty' -> return $ Suspension ct ty' hval n,
+          fNewtypeWrapM= \ty dc t -> f ty >>= \ty' -> return $ NewtypeWrap ty' dc t,
+          fRefWrapM    = \ty t -> f ty >>= \ty' -> return $ RefWrap ty' t}
 
 termTyVars :: Term -> TyVarSet
 termTyVars = foldTerm TermFold {
@@ -375,9 +367,10 @@ ppr_termM _ _ t = ppr_termM1 t
 ppr_termM1 :: Monad m => Term -> m SDoc
 ppr_termM1 Prim{value=words, ty=ty} = 
     return$ text$ repPrim (tyConAppTyCon ty) words
-ppr_termM1 Suspension{bound_to=Nothing} = return$ char '_'
+ppr_termM1 Suspension{ty=ty, bound_to=Nothing} = 
+    return (char '_' <+> ifPprDebug (text "::" <> ppr ty))
 ppr_termM1 Suspension{ty=ty, bound_to=Just n}
-  | Just _ <- splitFunTy_maybe ty = return$ ptext (sLit "<function>")
+--  | Just _ <- splitFunTy_maybe ty = return$ ptext (sLit("<function>")
   | otherwise = return$ parens$ ppr n <> text "::" <> ppr ty
 ppr_termM1 Term{}        = panic "ppr_termM1 - Term"
 ppr_termM1 RefWrap{}     = panic "ppr_termM1 - RefWrap"
@@ -440,15 +433,15 @@ cPprTermBase y =
            ifTerm _ _ _ _  = return Nothing
 
            isIntegerTy ty  = fromMaybe False $ do
-             (tc,_) <- splitTyConApp_maybe ty 
+             (tc,_) <- tcSplitTyConApp_maybe ty 
              return (tyConName tc == integerTyConName)
 
            isTupleTy ty    = fromMaybe False $ do 
-             (tc,_) <- splitTyConApp_maybe ty 
+             (tc,_) <- tcSplitTyConApp_maybe ty 
              return (isBoxedTupleTyCon tc)
 
            isTyCon a_tc ty = fromMaybe False $ do 
-             (tc,_) <- splitTyConApp_maybe ty
+             (tc,_) <- tcSplitTyConApp_maybe ty
              return (a_tc == tc)
 
            coerceShow f _p = return . text . show . f . unsafeCoerce# . val
@@ -527,18 +520,47 @@ The function congruenceNewtypes takes a shot at (b)
 -- The Type Reconstruction monad
 type TR a = TcM a
 
+-- A (non-mutable) tau type containing
+-- existentially quantified tyvars.
+--    (since GHC type language currently does not support
+--     existentials, we leave these variables unquantified)
+type RttiType = Type
+
+-- An incomplete type as stored in GHCi:
+--  no polymorphism: no quantifiers & all tyvars are skolem.
+type GhciType = Type
+{-
 runTR :: HscEnv -> TR a -> IO a
-runTR hsc_env c = do 
+runTR hsc_env c = do
   mb_term <- runTR_maybe hsc_env c
   case mb_term of 
-    Nothing -> panic "Can't unify"
+    Nothing -> panic "RTTI: Failed to reconstruct a term"
+    Just x  -> return x
+-}
+
+runTR :: HscEnv -> TR a -> IO a
+runTR hsc_env thing = do
+  mb_val <- runTR_maybe hsc_env thing
+  case mb_val of
+    Nothing -> error "RTTI error: probably due to :forcing an undefined"
     Just x  -> return x
 
 runTR_maybe :: HscEnv -> TR a -> IO (Maybe a)
 runTR_maybe hsc_env = fmap snd . initTc hsc_env HsSrcFile False  iNTERACTIVE
 
 traceTR :: SDoc -> TR ()
-traceTR = liftTcM . traceTc
+traceTR = liftTcM . traceOptTcRn Opt_D_dump_rtti
+
+
+-- Semantically different to recoverM in TcRnMonad 
+-- recoverM retains the errors in the first action,
+--  whereas recoverTc here does not
+recoverTR :: TR a -> TR a -> TR a
+recoverTR recover thing = do 
+  (_,mb_res) <- tryTcErrs thing
+  case mb_res of 
+    Nothing  -> recover
+    Just res -> return res
 
 trIO :: IO a -> TR a 
 trIO = liftTcM . liftIO
@@ -547,13 +569,14 @@ liftTcM :: TcM a -> TR a
 liftTcM = id
 
 newVar :: Kind -> TR TcType
-newVar = liftTcM . fmap mkTyVarTy . newBoxyTyVar
+newVar = liftTcM . liftM mkTyVarTy . newBoxyTyVar
 
 -- | Returns the instantiated type scheme ty', and the substitution sigma 
 --   such that sigma(ty') = ty 
 instScheme :: Type -> TR (TcType, TvSubst)
-instScheme ty | (tvs, _rho) <- tcSplitForAllTys ty = liftTcM$ do
-   (tvs',_theta,ty') <- tcInstType (mapM tcInstTyVar) ty
+instScheme ty = liftTcM$ do
+   (tvs, _, _)      <- tcInstType return ty
+   (tvs',_,ty') <- tcInstType (mapM tcInstTyVar) ty
    return (ty', zipTopTvSubst tvs' (mkTyVarTys tvs))
 
 -- Adds a constraint of the form t1 == t2
@@ -562,34 +585,64 @@ instScheme ty | (tvs, _rho) <- tcSplitForAllTys ty = liftTcM$ do
 -- Before unification, congruenceNewtypes needs to
 -- do its magic.
 addConstraint :: TcType -> TcType -> TR ()
-addConstraint t1 t2  = congruenceNewtypes t1 t2 >>= uncurry boxyUnify 
-		       >> return () -- TOMDO: what about the coercion?
-				    -- we should consider family instances 
+addConstraint actual expected = do
+    traceTR $ fsep [text "add constraint:", ppr actual, equals, ppr expected]
+    recoverTR (traceTR $ fsep [text "Failed to unify", ppr actual,
+                                    text "with", ppr expected])
+              (congruenceNewtypes actual expected >>=
+                           uncurry boxyUnify >> return ())
+     -- TOMDO: what about the coercion?
+     -- we should consider family instances
 
 -- Type & Term reconstruction 
-cvObtainTerm :: HscEnv -> Int -> Bool -> Maybe Type -> HValue -> IO Term
-cvObtainTerm hsc_env bound force mb_ty hval = runTR hsc_env $ do
-   tv <- newVar argTypeKind
-   case mb_ty of
-     Nothing ->      go bound tv tv hval 
-                >>= zonkTerm 
-                >>= return . expandNewtypes
-     Just ty | isMonomorphic ty ->     go bound ty ty hval 
-                                   >>= zonkTerm
-                                   >>= return . expandNewtypes
-     Just ty -> do 
-              (ty',rev_subst) <- instScheme (sigmaType ty)
-              addConstraint tv ty'
-              term <- go bound tv tv hval >>= zonkTerm
-              --restore original Tyvars
-              return$ expandNewtypes $ mapTermType (substTy rev_subst) term
+cvObtainTerm :: HscEnv -> Int -> Bool -> RttiType -> HValue -> IO Term
+cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
+  -- we quantify existential tyvars as universal,
+  -- as this is needed to be able to manipulate
+  -- them properly
+   let sigma_old_ty = sigmaType old_ty
+   traceTR (text "Term reconstruction started with initial type " <> ppr old_ty)
+   term <-
+     if isMonomorphic sigma_old_ty
+      then do
+        new_ty <- go max_depth sigma_old_ty sigma_old_ty hval >>= zonkTerm
+        return $ fixFunDictionaries $ expandNewtypes new_ty
+      else do
+              (old_ty', rev_subst) <- instScheme sigma_old_ty
+              my_ty <- newVar argTypeKind
+              when (check1 sigma_old_ty) (traceTR (text "check1 passed") >>
+                                          addConstraint my_ty old_ty')
+              term  <- go max_depth my_ty sigma_old_ty hval
+              zterm <- zonkTerm term
+              let new_ty = termType zterm
+              if isMonomorphic new_ty || check2 (sigmaType new_ty) sigma_old_ty
+                 then do
+                      traceTR (text "check2 passed")
+                      addConstraint (termType term) old_ty'
+                      zterm' <- zonkTerm term
+                      return ((fixFunDictionaries . expandNewtypes . mapTermType (substTy rev_subst)) zterm')
+                 else do
+                      traceTR (text "check2 failed" <+> parens
+                                       (ppr zterm <+> text "::" <+> ppr new_ty))
+                      -- we have unsound types. Replace constructor types in
+                      -- subterms with tyvars
+                      zterm' <- mapTermTypeM
+                                 (\ty -> case tcSplitTyConApp_maybe ty of
+                                           Just (tc, _:_) | tc /= funTyCon
+                                               -> newVar argTypeKind
+                                           _   -> return ty)
+                                 zterm
+                      zonkTerm zterm'
+   traceTR (text "Term reconstruction completed. Term obtained: " <> ppr term)
+   return term
     where 
-  go bound _ _ _ | seq bound False = undefined
-  go 0 tv _ty a = do
+  go :: Int -> Type -> Type -> HValue -> TcM Term
+  go max_depth _ _ _ | seq max_depth False = undefined
+  go 0 my_ty _old_ty a = do
     clos <- trIO $ getClosureData a
-    return (Suspension (tipe clos) tv a Nothing)
-  go bound tv ty a = do 
-    let monomorphic = not(isTyVarTy tv)   
+    return (Suspension (tipe clos) my_ty a Nothing)
+  go max_depth my_ty old_ty a = do 
+    let monomorphic = not(isTyVarTy my_ty)   
     -- This ^^^ is a convention. The ancestor tests for
     -- monomorphism and passes a type instead of a tv
     clos <- trIO $ getClosureData a
@@ -598,21 +651,31 @@ cvObtainTerm hsc_env bound force mb_ty hval = runTR hsc_env $ do
 -- NB. this won't attempt to force a BLACKHOLE.  Even with :force, we never
 -- force blackholes, because it would almost certainly result in deadlock,
 -- and showing the '_' is more useful.
-      t | isThunk t && force -> seq a $ go (pred bound) tv ty a
--- We always follow indirections 
-      Indirection _ -> go bound tv ty $! (ptrs clos ! 0)
+      t | isThunk t && force -> traceTR (text "Forcing a " <> text (show t)) >>
+                                seq a (go (pred max_depth) my_ty old_ty a)
+-- We always follow indirections
+      Indirection i -> do traceTR (text "Following an indirection" <> parens (int i) )
+                          go max_depth my_ty old_ty $! (ptrs clos ! 0)
 -- We also follow references
-      MutVar _ | Just (tycon,[world,ty_contents]) <- splitTyConApp_maybe ty
-                -- , tycon == mutVarPrimTyCon 
+      MutVar _ | Just (tycon,[world,contents_ty]) <- tcSplitTyConApp_maybe old_ty
              -> do
+                  -- Deal with the MutVar# primitive
+                  -- It does not have a constructor at all, 
+                  -- so we simulate the following one
+                  -- MutVar# :: contents_ty -> MutVar# s contents_ty
+         traceTR (text "Following a MutVar")
+         contents_tv <- newVar liftedTypeKind
          contents <- trIO$ IO$ \w -> readMutVar# (unsafeCoerce# a) w
-         tv' <- newVar liftedTypeKind
-         addConstraint tv (mkTyConApp tycon [world,tv'])
-         x <- go bound tv' ty_contents contents
-         return (RefWrap ty x)
+         ASSERT(isUnliftedTypeKind $ typeKind my_ty) return ()
+         (mutvar_ty,_) <- instScheme $ sigmaType $ mkFunTy 
+                            contents_ty (mkTyConApp tycon [world,contents_ty])
+         addConstraint (mkFunTy contents_tv my_ty) mutvar_ty
+         x <- go (pred max_depth) contents_tv contents_ty contents
+         return (RefWrap my_ty x)
 
  -- The interesting case
       Constr -> do
+        traceTR (text "entering a constructor")
         Right dcname <- dataConInfoPtrToName (infoPtr clos)
         (_,mb_dc)    <- tryTcErrs (tcLookupDataCon dcname)
         case mb_dc of
@@ -624,94 +687,107 @@ cvObtainTerm hsc_env bound force mb_ty hval = runTR hsc_env $ do
                        let tag = showSDoc (ppr dcname)
                        vars     <- replicateM (length$ elems$ ptrs clos) 
                                               (newVar (liftedTypeKind))
-                       subTerms <- sequence [appArr (go (pred bound) tv tv) (ptrs clos) i 
+                       subTerms <- sequence [appArr (go (pred max_depth) tv tv) (ptrs clos) i 
                                               | (i, tv) <- zip [0..] vars]
-                       return (Term tv (Left ('<' : tag ++ ">")) a subTerms)
-          Just dc -> do 
-            let extra_args = length(dataConRepArgTys dc) - 
-                             length(dataConOrigArgTys dc)
-                subTtypes  = matchSubTypes dc ty
-                (subTtypesP, subTtypesNP) = partition isPointed subTtypes
-            subTermTvs <- sequence
-                 [ if isMonomorphic t then return t 
-                                      else (newVar k)
-                   | (t,k) <- zip subTtypesP (map typeKind subTtypesP)]
+                       return (Term my_ty (Left ('<' : tag ++ ">")) a subTerms)
+          Just dc -> do
+            let subTtypes  = matchSubTypes dc old_ty
+                (subTtypesP, subTtypesNP) = partition (isLifted |.| isRefType) subTtypes
+            subTermTvs    <- mapMif (not . isMonomorphic)
+                                    (\t -> newVar (typeKind t))
+                                    subTtypes
             -- It is vital for newtype reconstruction that the unification step
-            --  is done right here, _before_ the subterms are RTTI reconstructed
+            -- is done right here, _before_ the subterms are RTTI reconstructed
             when (not monomorphic) $ do
-                  let myType = mkFunTys (reOrderTerms subTermTvs 
-                                                      subTtypesNP 
-                                                      subTtypes) 
-                                        tv
-                  (signatureType,_) <- instScheme(dataConRepType dc) 
-                  addConstraint myType signatureType
-            subTermsP <- sequence $ drop extra_args 
-                                -- \^^^  all extra arguments are pointed
-                  [ appArr (go (pred bound) tv t) (ptrs clos) i
+
+                       -- When we already have all the information, avoid solving
+                       -- unnecessary constraints. Propagation of type information
+                       -- to subterms is already being done via matching.
+               let myType = mkFunTys subTermTvs my_ty
+               (signatureType,_) <- instScheme (rttiView $ dataConUserType dc)
+               addConstraint myType signatureType
+            subTermsP <- sequence
+                  [ appArr (go (pred max_depth) tv t) (ptrs clos) i
                    | (i,tv,t) <- zip3 [0..] subTermTvs subTtypesP]
             let unboxeds   = extractUnboxed subTtypesNP clos
                 subTermsNP = map (uncurry Prim) (zip subTtypesNP unboxeds)      
-                subTerms   = reOrderTerms subTermsP subTermsNP 
-                                (drop extra_args subTtypes)
-            return (Term tv (Right dc) a subTerms)
+                subTerms   = reOrderTerms subTermsP subTermsNP subTtypes
+            return (Term my_ty (Right dc) a subTerms)
 -- The otherwise case: can be a Thunk,AP,PAP,etc.
       tipe_clos ->
-         return (Suspension tipe_clos tv a Nothing)
+         return (Suspension tipe_clos my_ty a Nothing)
 
   matchSubTypes dc ty
-    | Just (_,ty_args) <- splitTyConApp_maybe (repType ty) 
---     assumption:             ^^^ looks through newtypes 
-    , isVanillaDataCon dc  --TODO non-vanilla case
-    = dataConInstArgTys dc ty_args
+    | ty' <- repType ty     -- look through newtypes
+    , Just (tc,ty_args) <- tcSplitTyConApp_maybe ty'
+    , dc `elem` tyConDataCons tc
+      -- It is necessary to check that dc is actually a constructor for tycon tc,
+      -- because it may be the case that tc is a recursive newtype and tcSplitTyConApp
+      -- has not removed it. In that case, we happily give up and don't match
+    = myDataConInstArgTys dc ty_args
     | otherwise = dataConRepArgTys dc
 
--- This is used to put together pointed and nonpointed subterms in the 
---  correct order.
+  -- put together pointed and nonpointed subterms in the
+  --  correct order.
   reOrderTerms _ _ [] = []
   reOrderTerms pointed unpointed (ty:tys) 
-   | isPointed ty = ASSERT2(not(null pointed)
+   | isLifted ty || isRefType ty
+                  = ASSERT2(not(null pointed)
                             , ptext (sLit "reOrderTerms") $$ 
                                         (ppr pointed $$ ppr unpointed))
                     let (t:tt) = pointed in t : reOrderTerms tt unpointed tys
    | otherwise    = ASSERT2(not(null unpointed)
-                           , ptext (sLit "reOrderTerms") $$ 
+                           , ptext (sLit "Reorderterms") $$ 
                                        (ppr pointed $$ ppr unpointed))
                     let (t:tt) = unpointed in t : reOrderTerms pointed tt tys
-  
-  expandNewtypes t@Term{ ty=ty, subTerms=tt }
-   | Just (tc, args) <- tcSplitTyConApp_maybe ty
-   , isNewTyCon tc
-   , wrapped_type    <- newTyConInstRhs tc args
-   , Just dc         <- tyConSingleDataCon_maybe tc
-   , t'              <- expandNewtypes t{ ty = wrapped_type
-                                        , subTerms = map expandNewtypes tt }
-   = NewtypeWrap ty (Right dc) t'
 
-   | otherwise = t{ subTerms = map expandNewtypes tt }
+  -- insert NewtypeWraps around newtypes
+  expandNewtypes = foldTerm idTermFold { fTerm = worker } where
+   worker ty dc hval tt
+     | Just (tc, args) <- tcSplitTyConApp_maybe ty
+     , isNewTyCon tc
+     , wrapped_type    <- newTyConInstRhs tc args
+     , Just dc'        <- tyConSingleDataCon_maybe tc
+     , t'              <- worker wrapped_type dc hval tt
+     = NewtypeWrap ty (Right dc') t'
+     | otherwise = Term ty dc hval tt
 
-  expandNewtypes t = t
+
+   -- Avoid returning types where predicates have been expanded to dictionaries.
+  fixFunDictionaries = foldTerm idTermFold {fSuspension = worker} where
+      worker ct ty hval n | isFunTy ty = Suspension ct (dictsView ty) hval n
+                          | otherwise  = Suspension ct ty hval n
 
 
 -- Fast, breadth-first Type reconstruction
-cvReconstructType :: HscEnv -> Int -> Maybe Type -> HValue -> IO (Maybe Type)
-cvReconstructType hsc_env max_depth mb_ty hval = runTR_maybe hsc_env $ do
-   tv <- newVar argTypeKind
-   case mb_ty of
-     Nothing -> do search (isMonomorphic `fmap` zonkTcType tv)
-                          (uncurry go)
-                          (Seq.singleton (tv, hval))
-                          max_depth
-                   zonkTcType tv  -- TODO untested!
-     Just ty | isMonomorphic ty -> return ty
-     Just ty -> do
-              (ty',rev_subst) <- instScheme (sigmaType ty)
-              addConstraint tv ty'
-              search (isMonomorphic `fmap` zonkTcType tv)
-                     (\(ty,a) -> go ty a)
-                     (Seq.singleton (tv, hval))
-                     max_depth
-              substTy rev_subst `fmap` zonkTcType tv
-    where 
+cvReconstructType :: HscEnv -> Int -> GhciType -> HValue -> IO (Maybe Type)
+cvReconstructType hsc_env max_depth old_ty hval = runTR_maybe hsc_env $ do
+   traceTR (text "RTTI started with initial type " <> ppr old_ty)
+   let sigma_old_ty = sigmaType old_ty
+   new_ty <-
+       if isMonomorphic sigma_old_ty
+        then return old_ty
+        else do
+          (old_ty', rev_subst) <- instScheme sigma_old_ty
+          my_ty <- newVar argTypeKind
+          when (check1 sigma_old_ty) (traceTR (text "check1 passed") >>
+                                      addConstraint my_ty old_ty')
+          search (isMonomorphic `fmap` zonkTcType my_ty)
+                 (\(ty,a) -> go ty a)
+                 (Seq.singleton (my_ty, hval))
+                 max_depth
+          new_ty <- zonkTcType my_ty
+          if isMonomorphic new_ty || check2 (sigmaType new_ty) sigma_old_ty
+            then do
+                 traceTR (text "check2 passed")
+                 addConstraint my_ty old_ty'
+                 new_ty' <- zonkTcType my_ty
+                 return (substTy rev_subst new_ty')
+            else traceTR (text "check2 failed" <+> parens (ppr new_ty)) >>
+                 return old_ty
+   traceTR (text "RTTI completed. Type obtained:" <+> ppr new_ty)
+   return new_ty
+    where
 --  search :: m Bool -> ([a] -> [a] -> [a]) -> [a] -> m ()
   search _ _ _ 0 = traceTR (text "Failed to reconstruct a type after " <>
                                 int max_depth <> text " steps")
@@ -724,16 +800,15 @@ cvReconstructType hsc_env max_depth mb_ty hval = runTR_maybe hsc_env $ do
 
    -- returns unification tasks,since we are going to want a breadth-first search
   go :: Type -> HValue -> TR [(Type, HValue)]
-  go tv a = do
+  go my_ty a = do
     clos <- trIO $ getClosureData a
     case tipe clos of
-      Indirection _ -> go tv $! (ptrs clos ! 0)
+      Indirection _ -> go my_ty $! (ptrs clos ! 0)
       MutVar _ -> do
          contents <- trIO$ IO$ \w -> readMutVar# (unsafeCoerce# a) w
          tv'   <- newVar liftedTypeKind
          world <- newVar liftedTypeKind
-         addConstraint tv (mkTyConApp mutVarPrimTyCon [world,tv'])
---         x <- go tv' ty_contents contents
+         addConstraint my_ty (mkTyConApp mutVarPrimTyCon [world,tv'])
          return [(tv', contents)]
       Constr -> do
         Right dcname <- dataConInfoPtrToName (infoPtr clos)
@@ -746,44 +821,187 @@ cvReconstructType hsc_env max_depth mb_ty hval = runTR_maybe hsc_env $ do
                         return$ appArr (\e->(tv,e)) (ptrs clos) i
 
           Just dc -> do
-            let extra_args = length(dataConRepArgTys dc) -
-                             length(dataConOrigArgTys dc)
             subTtypes <- mapMif (not . isMonomorphic)
                                 (\t -> newVar (typeKind t))
                                 (dataConRepArgTys dc)
 
             -- It is vital for newtype reconstruction that the unification step
             -- is done right here, _before_ the subterms are RTTI reconstructed
-            let myType         = mkFunTys subTtypes tv
-            (signatureType,_) <- instScheme(dataConRepType dc) 
+            let myType         = mkFunTys subTtypes my_ty
+            (signatureType,_) <- instScheme(rttiView $ dataConUserType dc)
             addConstraint myType signatureType
             return $ [ appArr (\e->(t,e)) (ptrs clos) i
-                       | (i,t) <- drop extra_args $ 
-                                     zip [0..] (filter isPointed subTtypes)]
+                       | (i,t) <- zip [0..] (filter (isLifted |.| isRefType) subTtypes)]
       _ -> return []
 
 -- Compute the difference between a base type and the type found by RTTI
 -- improveType <base_type> <rtti_type>
 -- The types can contain skolem type variables, which need to be treated as normal vars.
 -- In particular, we want them to unify with things.
-improveRTTIType :: HscEnv -> Type -> Type -> IO (Maybe TvSubst)
-improveRTTIType hsc_env ty rtti_ty = runTR_maybe hsc_env $ do
-    let (_,ty0)     = splitForAllTys ty
-        ty_tvs      = varSetElems $ tyVarsOfType ty0
-    let (_,rtti_ty0)= splitForAllTys rtti_ty
-        rtti_tvs    = varSetElems $ tyVarsOfType rtti_ty0
-    (ty_tvs',_,ty')<- tcInstType (mapM tcInstTyVar) (mkSigmaTy ty_tvs   [] ty0)
-    (_,_,rtti_ty') <- tcInstType (mapM tcInstTyVar) (mkSigmaTy rtti_tvs [] rtti_ty0)
+improveRTTIType :: HscEnv -> RttiType -> RttiType -> IO (Maybe TvSubst)
+improveRTTIType hsc_env _ty rtti_ty = runTR_maybe hsc_env $ do
+    traceTR $ fsep [text "improveRttiType", ppr _ty, ppr rtti_ty]
+    (ty_tvs,  _, _)   <- tcInstType return ty
+    (ty_tvs', _, ty') <- tcInstType (mapM tcInstTyVar) ty
+    (_, _, rtti_ty')  <- tcInstType (mapM tcInstTyVar) (sigmaType rtti_ty)
     boxyUnify rtti_ty' ty'
-    tvs1_contents  <- zonkTcTyVars ty_tvs'
-    let subst = uncurry zipTopTvSubst
-                  (unzip [(tv,ty) | tv <- ty_tvs, ty <- tvs1_contents
-                                  , getTyVar_maybe ty /= Just tv
-                                  , not(isTyVarTy ty)])
---    liftIO $ hPutStrLn stderr $ showSDocDebug $ text "unify " <+> sep [ppr ty, ppr rtti_ty, equals, ppr subst ]
+    tvs1_contents     <- zonkTcTyVars ty_tvs'
+    let subst = (uncurry zipTopTvSubst . unzip)
+                 [(tv,ty) | (tv,ty) <- zip ty_tvs tvs1_contents
+                          , getTyVar_maybe ty /= Just tv
+                          --, not(isTyVarTy ty)
+                          ]
     return subst
+ where ty = sigmaType _ty
+
+myDataConInstArgTys :: DataCon -> [Type] -> [Type]
+myDataConInstArgTys dc args
+    | null (dataConExTyVars dc) && null (dataConEqTheta dc) = dataConInstArgTys dc args
+    | otherwise = dataConRepArgTys dc
+
+isRefType :: Type -> Bool
+isRefType ty
+   | Just (tc, _) <- tcSplitTyConApp_maybe ty' = isRefTyCon tc
+   | otherwise = False
+  where ty'= repType ty
+
+isRefTyCon :: TyCon -> Bool
+isRefTyCon tc = tc `elem` [mutVarPrimTyCon, mVarPrimTyCon, tVarPrimTyCon]
+
+-- Soundness checks
+--------------------
+{-
+This is not formalized anywhere, so hold to your seats!
+RTTI in the presence of newtypes can be a tricky and unsound business.
+
+Example:
+~~~~~~~~~
+Suppose we are doing RTTI for a partially evaluated
+closure t, the real type of which is t :: MkT Int, for
+
+   newtype MkT a = MkT [Maybe a]
+
+The table below shows the results of RTTI and the improvement
+calculated for different combinations of evaluatedness and :type t.
+Regard the two first columns as input and the next two as output.
+
+  # |     t     |  :type t  | rtti(t)  | improv.    | result
+    ------------------------------------------------------------
+  1 |     _     |    t b    |    a     | none       | OK
+  2 |     _     |   MkT b   |    a     | none       | OK
+  3 |     _     |   t Int   |    a     | none       | OK
+
+  If t is not evaluated at *all*, we are safe.
+
+  4 |  (_ : _)  |    t b    |   [a]    | t = []     | UNSOUND
+  5 |  (_ : _)  |   MkT b   |  MkT a   | none       | OK (compensating for the missing newtype)
+  6 |  (_ : _)  |   t Int   |  [Int]   | t = []     | UNSOUND
+
+  If a is a minimal whnf, we run into trouble. Note that
+  row 5 above does newtype enrichment on the ty_rtty parameter.
+
+  7 | (Just _:_)|    t b    |[Maybe a] | t = [],    | UNSOUND
+    |                       |          | b = Maybe a|
+
+  8 | (Just _:_)|   MkT b   |  MkT a   |  none      | OK
+  9 | (Just _:_)|   t Int   |   FAIL   |  none      | OK
+
+  And if t is any more evaluated than whnf, we are still in trouble.
+  Because constraints are solved in top-down order, when we reach the
+  Maybe subterm what we got is already unsound. This explains why the
+  row 9 fails to complete.
+
+  10 | (Just _:_)|  t Int  | [Maybe a]   |  FAIL    | OK
+  11 | (Just 1:_)|  t Int  | [Maybe Int] |  FAIL    | OK
+
+  We can undo the failure in row 9 by leaving out the constraint
+  coming from the type signature of t (i.e., the 2nd column).
+  Note that this type information is still used
+  to calculate the improvement. But we fail
+  when trying to calculate the improvement, as there is no unifier for
+  t Int = [Maybe a] or t Int = [Maybe Int].
+
+
+  Another set of examples with t :: [MkT (Maybe Int)]  \equiv  [[Maybe (Maybe Int)]]
+
+  # |     t     |    :type t    |  rtti(t)    | improvement | result
+    ---------------------------------------------------------------------
+  1 |(Just _:_) | [t (Maybe a)] | [[Maybe b]] | t = []      |
+    |           |               |             | b = Maybe a |
+
+The checks:
+~~~~~~~~~~~
+Consider a function obtainType that takes a value and a type and produces
+the Term representation and a substitution (the improvement).
+Assume an auxiliar rtti' function which does the actual job if recovering
+the type, but which may produce a false type.
+
+In pseudocode:
+
+  rtti' :: a -> IO Type  -- Does not use the static type information
+
+  obtainType :: a -> Type -> IO (Maybe (Term, Improvement))
+  obtainType v old_ty = do
+       rtti_ty <- rtti' v
+       if monomorphic rtti_ty || (check rtti_ty old_ty)
+        then ...
+         else return Nothing
+  where check rtti_ty old_ty = check1 rtti_ty &&
+                              check2 rtti_ty old_ty
+
+  check1 :: Type -> Bool
+  check2 :: Type -> Type -> Bool
+
+Now, if rtti' returns a monomorphic type, we are safe.
+If that is not the case, then we consider two conditions.
+
+
+1. To prevent the class of unsoundness displayed by
+   rows 4 and 7 in the example: no higher kind tyvars
+   accepted.
+
+  check1 (t a)   = NO
+  check1 (t Int) = NO
+  check1 ([] a)  = YES
+
+2. To prevent the class of unsoundness shown by row 6,
+   the rtti type should be structurally more
+   defined than the old type we are comparing it to.
+  check2 :: OldType -> NewTy            pe -> Bool
+  check2 a  _        = True
+  check2 [a] a       = True
+  check2 [a] (t Int) = False
+  check2 [a] (t a)   = False  -- By check1 we never reach this equation
+  check2 [Int] a     = True
+  check2 [Int] (t Int) = True
+  check2 [Maybe a]   (t Int) = False
+  check2 [Maybe Int] (t Int) = True
+  check2 (Maybe [a])   (m [Int]) = False
+  check2 (Maybe [Int]) (m [Int]) = True
+
+-}
+
+check1 :: Type -> Bool
+check1 ty | (tvs, _, _) <- tcSplitSigmaTy ty = not $ any isHigherKind (map tyVarKind tvs)
+ where
+   isHigherKind = not . null . fst . splitKindFunTys
+
+check2 :: Type -> Type -> Bool
+check2 sigma_rtti_ty sigma_old_ty
+  | Just (_, rttis) <- tcSplitTyConApp_maybe rtti_ty
+  = case () of
+      _ | Just (_,olds) <- tcSplitTyConApp_maybe old_ty
+        -> and$ zipWith check2 rttis olds
+      _ | Just _ <- splitAppTy_maybe old_ty
+        -> isMonomorphicOnNonPhantomArgs rtti_ty
+      _ -> True
+  | otherwise = True
+  where (_, _ , rtti_ty) = tcSplitSigmaTy sigma_rtti_ty
+        (_, _ , old_ty)  = tcSplitSigmaTy sigma_old_ty
+
 
 -- Dealing with newtypes
+--------------------------
 {-
  congruenceNewtypes does a parallel fold over two Type values, 
  compensating for missing newtypes on both sides. 
@@ -813,53 +1031,112 @@ Therefore, congruenceNewtypes is sound only if the types
 recovered by the RTTI mechanism are unified Top-Down.
 -}
 congruenceNewtypes ::  TcType -> TcType -> TR (TcType,TcType)
-congruenceNewtypes lhs rhs 
+congruenceNewtypes lhs rhs = go lhs rhs >>= \rhs' -> return (lhs,rhs')
+ where
+   go l r
  -- TyVar lhs inductive case
-    | Just tv <- getTyVar_maybe lhs 
-    = recoverTc (return (lhs,rhs)) $ do  
+    | Just tv <- getTyVar_maybe l
+    = recoverTR (return r) $ do
          Indirect ty_v <- readMetaTyVar tv
-         (_lhs1, rhs1) <- congruenceNewtypes ty_v rhs
-         return (lhs, rhs1)
+         traceTR $ fsep [text "(congruence) Following indirect tyvar:",
+                          ppr tv, equals, ppr ty_v]
+         go ty_v r
 -- FunTy inductive case
-    | Just (l1,l2) <- splitFunTy_maybe lhs
-    , Just (r1,r2) <- splitFunTy_maybe rhs
-    = do (l2',r2') <- congruenceNewtypes l2 r2
-         (l1',r1') <- congruenceNewtypes l1 r1
-         return (mkFunTy l1' l2', mkFunTy r1' r2')
+    | Just (l1,l2) <- splitFunTy_maybe l
+    , Just (r1,r2) <- splitFunTy_maybe r
+    = do r2' <- go l2 r2
+         r1' <- go l1 r1
+         return (mkFunTy r1' r2')
 -- TyconApp Inductive case; this is the interesting bit.
     | Just (tycon_l, _) <- tcSplitTyConApp_maybe lhs
     , Just (tycon_r, _) <- tcSplitTyConApp_maybe rhs 
     , tycon_l /= tycon_r 
-    = do rhs' <- upgrade tycon_l rhs
-         return (lhs, rhs')
+    = upgrade tycon_l r
 
-    | otherwise = return (lhs,rhs)
+    | otherwise = return r
 
     where upgrade :: TyCon -> Type -> TR Type
           upgrade new_tycon ty
-            | not (isNewTyCon new_tycon) = return ty 
-            | otherwise = do 
+            | not (isNewTyCon new_tycon) = do
+              traceTR (text "(Upgrade) Not matching newtype evidence: " <>
+                       ppr new_tycon <> text " for " <> ppr ty)
+              return ty 
+            | otherwise = do
+               traceTR (text "(Upgrade) upgraded " <> ppr ty <>
+                        text " in presence of newtype evidence " <> ppr new_tycon)
                vars <- mapM (newVar . tyVarKind) (tyConTyVars new_tycon)
                let ty' = mkTyConApp new_tycon vars
-               liftTcM (unifyType ty (repType ty'))
+               liftTcM (boxyUnify ty (repType ty'))
         -- assumes that reptype doesn't ^^^^ touch tyconApp args 
                return ty'
 
 
---------------------------------------------------------------------------------
--- Semantically different to recoverM in TcRnMonad 
--- recoverM retains the errors in the first action,
---  whereas recoverTc here does not
-recoverTc :: TcM a -> TcM a -> TcM a
-recoverTc recover thing = do 
-  (_,mb_res) <- tryTcErrs thing
-  case mb_res of 
-    Nothing  -> recover
-    Just res -> return res
+zonkTerm :: Term -> TcM Term
+zonkTerm = foldTermM TermFoldM{
+              fTermM = \ty dc v tt -> zonkTcType ty    >>= \ty' ->
+                                      return (Term ty' dc v tt)
+             ,fSuspensionM = \ct ty v b -> zonkTcType ty >>= \ty ->
+                                           return (Suspension ct ty v b)
+             ,fNewtypeWrapM= \ty dc t -> zonkTcType ty >>= \ty' ->
+                                         return$ NewtypeWrap ty' dc t
+             ,fRefWrapM    = \ty t ->
+                               return RefWrap `ap` zonkTcType ty `ap` return t
+             ,fPrimM       = (return.) . Prim
+             }
 
-isMonomorphic :: Type -> Bool
-isMonomorphic ty | (tvs, ty') <- splitForAllTys ty
-                 = null tvs && (isEmptyVarSet . tyVarsOfType) ty'
+--------------------------------------------------------------------------------
+-- representation types for thetas
+rttiView :: Type -> Type
+rttiView ty | Just ty' <- coreView ty  = rttiView ty'
+rttiView ty
+  | (tvs, theta, tau) <- tcSplitSigmaTy ty
+  =  mkForAllTys tvs (mkFunTys [predTypeRep p | p <- theta, isClassPred p] tau)
+
+-- Restore Class predicates out of a representation type
+dictsView :: Type -> Type
+-- dictsView ty = ty
+dictsView (FunTy (TyConApp tc_dict args) ty)
+  | Just c <- tyConClass_maybe tc_dict
+  = FunTy (PredTy (ClassP c args)) (dictsView ty)
+dictsView ty
+  | Just (tc_fun, [TyConApp tc_dict args, ty2]) <- tcSplitTyConApp_maybe ty
+  , Just c <- tyConClass_maybe tc_dict
+  = mkTyConApp tc_fun [PredTy (ClassP c args), dictsView ty2]
+dictsView ty = ty
+
+
+-- Use only for RTTI types
+isMonomorphic :: RttiType -> Bool
+isMonomorphic ty = noExistentials && noUniversals
+ where (tvs, _, ty')     = tcSplitSigmaTy ty
+       noExistentials = isEmptyVarSet (tyVarsOfType ty')
+       noUniversals   = null tvs
+
+-- Use only for RTTI types
+isMonomorphicOnNonPhantomArgs :: RttiType -> Bool
+isMonomorphicOnNonPhantomArgs ty
+  | Just (tc, all_args) <- tcSplitTyConApp_maybe (repType ty)
+  , phantom_vars  <- tyConPhantomTyVars tc
+  , concrete_args <- [ arg | (tyv,arg) <- tyConTyVars tc `zip` all_args
+                           , tyv `notElem` phantom_vars]
+  = all isMonomorphicOnNonPhantomArgs concrete_args
+  | Just (ty1, ty2) <- splitFunTy_maybe ty
+  = all isMonomorphicOnNonPhantomArgs [ty1,ty2]
+  | otherwise = isMonomorphic ty
+
+tyConPhantomTyVars :: TyCon -> [TyVar]
+tyConPhantomTyVars tc
+  | isAlgTyCon tc
+  , Just dcs <- tyConDataCons_maybe tc
+  , dc_vars  <- concatMap dataConUnivTyVars dcs
+  = tyConTyVars tc \\ dc_vars
+tyConPhantomTyVars _ = []
+
+-- Is this defined elsewhere?
+-- Generalize the type: find all free tyvars and wrap in the appropiate ForAll.
+sigmaType :: Type -> Type
+sigmaType ty = mkSigmaTy (varSetElems$ tyVarsOfType ty) [] ty
+
 
 mapMif :: Monad m => (a -> Bool) -> (a -> m a) -> [a] -> m [a]
 mapMif pred f xx = sequence $ mapMif_ pred f xx
@@ -870,27 +1147,37 @@ mapMif pred f xx = sequence $ mapMif_ pred f xx
 unlessM :: Monad m => m Bool -> m () -> m ()
 unlessM condM acc = condM >>= \c -> unless c acc
 
+
 -- Strict application of f at index i
 appArr :: Ix i => (e -> a) -> Array i e -> Int -> a
 appArr f a@(Array _ _ _ ptrs#) i@(I# i#)
- = ASSERT (i < length(elems a))
+ = ASSERT2 (i < length(elems a), ppr(length$ elems a, i))
    case indexArray# ptrs# i# of
        (# e #) -> f e
 
-zonkTerm :: Term -> TcM Term
-zonkTerm = foldTerm idTermFoldM {
-              fTerm = \ty dc v tt -> sequence tt      >>= \tt ->
-                                     zonkTcType ty    >>= \ty' ->
-                                     return (Term ty' dc v tt)
-             ,fSuspension = \ct ty v b -> zonkTcType ty >>= \ty ->
-                                          return (Suspension ct ty v b)
-             ,fNewtypeWrap= \ty dc t -> 
-                   return NewtypeWrap `ap` zonkTcType ty `ap` return dc `ap` t}
+amap' :: (t -> b) -> Array Int t -> [b]
+amap' f (Array i0 i _ arr#) = map g [0 .. i - i0]
+    where g (I# i#) = case indexArray# arr# i# of
+                          (# e #) -> f e
 
 
--- Is this defined elsewhere?
--- Generalize the type: find all free tyvars and wrap in the appropiate ForAll.
-sigmaType :: Type -> Type
-sigmaType ty = mkSigmaTy (varSetElems$ tyVarsOfType (dropForAlls ty)) [] ty
+isLifted :: Type -> Bool
+isLifted =  not . isUnLiftedType
+
+extractUnboxed  :: [Type] -> Closure -> [[Word]]
+extractUnboxed tt clos = go tt (nonPtrs clos)
+   where sizeofType t
+           | Just (tycon,_) <- tcSplitTyConApp_maybe t
+           = ASSERT (isPrimTyCon tycon) sizeofTyCon tycon
+           | otherwise = pprPanic "Expected a TcTyCon" (ppr t)
+         go [] _ = []
+         go (t:tt) xx 
+           | (x, rest) <- splitAt (sizeofType t) xx
+           = x : go tt rest
+
+sizeofTyCon :: TyCon -> Int -- in *words*
+sizeofTyCon = primRepSizeW . tyConPrimRep
 
 
+(|.|) :: (a -> Bool) -> (a -> Bool) -> a -> Bool
+(f |.| g) x = f x || g x

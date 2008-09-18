@@ -30,7 +30,7 @@ module InteractiveEval (
         isModuleInterpreted,
 	compileExpr, dynCompileExpr,
 	lookupName,
-        Term(..), obtainTerm, obtainTerm1, obtainTermB, reconstructType,
+        Term(..), obtainTermFromId, obtainTermFromVal, reconstructType,
         skolemiseSubst, skolemiseTy
 #endif
         ) where
@@ -83,6 +83,7 @@ import Exception
 import Control.Concurrent
 import Data.List (sortBy)
 import Foreign.StablePtr
+import System.IO
 
 -- -----------------------------------------------------------------------------
 -- running a statement interactively
@@ -637,26 +638,46 @@ rttiEnvironment hsc_env@HscEnv{hsc_IC=ic} = do
    let InteractiveContext{ic_tmp_ids=tmp_ids} = ic
        incompletelyTypedIds = 
            [id | id <- tmp_ids
-               , not $ null [v | v <- varSetElems$ tyVarsOfType (idType id)
-                              , isSkolemTyVar v]
+               , not $ noSkolems id
                , (occNameFS.nameOccName.idName) id /= result_fs]
-   tys <- reconstructType hsc_env 10 `mapM` incompletelyTypedIds
-          -- map termType `fmap` (obtainTerm hsc_env False `mapM` incompletelyTypedIds)
-   
-   improvs <- sequence [improveRTTIType hsc_env ty ty'
-                 | (ty, Just ty') <- zip (map idType incompletelyTypedIds) tys]
-   let ic' = foldr (\mb_subst ic' ->
-                        maybe (WARN(True, text ("RTTI failed to calculate the "
-                                           ++  "improvement for a type")) ic')
-                              (substInteractiveContext ic' . skolemiseSubst)
-                              mb_subst)
-                   ic
-                   improvs
-   return hsc_env{hsc_IC=ic'}
+   hsc_env' <- foldM improveTypes hsc_env (map idName incompletelyTypedIds)
+   return hsc_env'
+    where
+     noSkolems = null . filter isSkolemTyVar . varSetElems . tyVarsOfType . idType
+     improveTypes hsc_env@HscEnv{hsc_IC=ic} name = do
+      let InteractiveContext{ic_tmp_ids=tmp_ids} = ic
+          Just id = find (\i -> idName i == name) tmp_ids
+      if noSkolems id
+         then return hsc_env
+         else do
+           mb_new_ty <- reconstructType hsc_env 10 id
+           let old_ty = idType id
+           case mb_new_ty of
+             Nothing -> return hsc_env
+             Just new_ty -> do
+              mb_subst <- improveRTTIType hsc_env old_ty new_ty
+              case mb_subst of
+               Nothing -> return $
+                        WARN(True, text (":print failed to calculate the "
+                                           ++ "improvement for a type")) hsc_env
+               Just subst -> do
+                 when (dopt Opt_D_dump_rtti (hsc_dflags hsc_env)) $
+                      printForUser stderr alwaysQualify $
+                      fsep [text "RTTI Improvement for", ppr id, equals, ppr subst]
 
-skolemiseSubst :: TvSubst -> TvSubst
-skolemiseSubst subst = subst `setTvSubstEnv` 
-                        mapVarEnv (fst.skolemiseTy) (getTvSubstEnv subst)
+                 let (subst', skols) = skolemiseSubst subst
+                     ic' = extendInteractiveContext
+                               (substInteractiveContext ic subst') [] skols
+                 return hsc_env{hsc_IC=ic'}
+
+skolemiseSubst :: TvSubst -> (TvSubst, TyVarSet)
+skolemiseSubst subst = let
+    varenv               = getTvSubstEnv subst
+    all_together         = mapVarEnv skolemiseTy varenv
+    (varenv', skol_vars) = ( mapVarEnv fst all_together
+                           , map snd (varEnvElts all_together))
+    in (subst `setTvSubstEnv` varenv', unionVarSets skol_vars)
+                        
 
 skolemiseTy :: Type -> (Type, TyVarSet)
 skolemiseTy ty = (substTy subst ty, mkVarSet new_tyvars)
@@ -969,23 +990,20 @@ isModuleInterpreted mod_summary = withSession $ \hsc_env ->
 ----------------------------------------------------------------------------
 -- RTTI primitives
 
-obtainTerm1 :: HscEnv -> Bool -> Maybe Type -> a -> IO Term
-obtainTerm1 hsc_env force mb_ty x = 
-              cvObtainTerm hsc_env maxBound force mb_ty (unsafeCoerce# x)
+obtainTermFromVal :: HscEnv -> Int -> Bool -> Type -> a -> IO Term
+obtainTermFromVal hsc_env bound force ty x =
+              cvObtainTerm hsc_env bound force ty (unsafeCoerce# x)
 
-obtainTermB :: HscEnv -> Int -> Bool -> Id -> IO Term
-obtainTermB hsc_env bound force id =  do
-              hv <- Linker.getHValue hsc_env (varName id) 
-              cvObtainTerm hsc_env bound force (Just$ idType id) hv
-
-obtainTerm :: HscEnv -> Bool -> Id -> IO Term
-obtainTerm hsc_env force id =  do
-              hv <- Linker.getHValue hsc_env (varName id) 
-              cvObtainTerm hsc_env maxBound force (Just$ idType id) hv
+obtainTermFromId :: HscEnv -> Int -> Bool -> Id -> IO Term
+obtainTermFromId hsc_env bound force id =  do
+              hv <- Linker.getHValue hsc_env (varName id)
+              cvObtainTerm hsc_env bound force (idType id) hv
 
 -- Uses RTTI to reconstruct the type of an Id, making it less polymorphic
 reconstructType :: HscEnv -> Int -> Id -> IO (Maybe Type)
 reconstructType hsc_env bound id = do
               hv <- Linker.getHValue hsc_env (varName id) 
-              cvReconstructType hsc_env bound (Just$ idType id) hv
+              cvReconstructType hsc_env bound (idType id) hv
+
 #endif /* GHCI */
+

@@ -106,7 +106,7 @@ module GHC (
         isModuleInterpreted,
 	InteractiveEval.compileExpr, HValue, dynCompileExpr,
 	lookupName,
-        GHC.obtainTerm, GHC.obtainTerm1, GHC.obtainTermB, reconstructType,
+        GHC.obtainTermFromId, GHC.obtainTermFromVal, reconstructType,
         modInfoModBreaks,
         ModBreaks(..), BreakIndex,
         BreakInfo(breakInfo_number, breakInfo_module),
@@ -2555,18 +2555,14 @@ getHistorySpan :: GhcMonad m => History -> m SrcSpan
 getHistorySpan h = withSession $ \hsc_env ->
                           return$ InteractiveEval.getHistorySpan hsc_env h
 
-obtainTerm :: GhcMonad m => Bool -> Id -> m Term
-obtainTerm force id = withSession $ \hsc_env ->
-                        liftIO $ InteractiveEval.obtainTerm hsc_env force id
-
-obtainTerm1 :: GhcMonad m => Bool -> Maybe Type -> a -> m Term
-obtainTerm1 force mb_ty a =
+obtainTermFromVal :: GhcMonad m => Int ->  Bool -> Type -> a -> m Term
+obtainTermFromVal bound force ty a =
     withSession $ \hsc_env ->
-      liftIO $ InteractiveEval.obtainTerm1 hsc_env force mb_ty a
+      liftIO $ InteractiveEval.obtainTermFromVal hsc_env bound force ty a
 
-obtainTermB :: GhcMonad m => Int -> Bool -> Id -> m Term
-obtainTermB bound force id =
+obtainTermFromId :: GhcMonad m => Int -> Bool -> Id -> m Term
+obtainTermFromId bound force id =
     withSession $ \hsc_env ->
-      liftIO $ InteractiveEval.obtainTermB hsc_env bound force id
+      liftIO $ InteractiveEval.obtainTermFromId hsc_env bound force id
 
 #endif
