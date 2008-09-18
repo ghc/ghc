@@ -30,7 +30,6 @@ import Type
 import TypeRep 	( Type(..) )
 import TyCon
 import HsSyn
-import Id
 import VarEnv
 import VarSet
 import Var
@@ -333,35 +332,26 @@ propagateEqs eqCfg@(EqConfig {eqs = todoEqs})
 -- set of instances are the locals (without equalities) and the second set are
 -- all residual wanteds, including equalities. 
 --
--- Remove all identity dictinary bindings (i.e., those whose source and target
--- dictionary are the same).  This is important for termination, as
--- TcSimplify.reduceContext takes the presence of dictionary bindings as an
--- indicator that there was some improvement.
---
 finaliseEqsAndDicts :: EqConfig 
                     -> TcM ([Inst], [Inst], TcDictBinds, Bool)
 finaliseEqsAndDicts (EqConfig { eqs     = eqs
                               , locals  = locals
                               , wanteds = wanteds
                               , binds   = binds
+                              , skolems = skolems
                               })
   = do { traceTc $ ptext (sLit "finaliseEqsAndDicts")
        ; (eqs', subst_binds, locals', wanteds') <- substitute eqs locals wanteds
-       ; (eqs'', improved) <- instantiateAndExtract eqs' (null locals)
-       ; final_binds <- filterM nonTrivialDictBind $
-                          bagToList (subst_binds `unionBags` binds)
+       ; (eqs'', improved) <- instantiateAndExtract eqs' (null locals) skolems
+       ; let final_binds = subst_binds `unionBags` binds
 
+         -- Assert that all cotvs of wanted equalities are still unfilled, and
+         -- zonk all final insts, to make any improvement visible
        ; ASSERTM2( allM isValidWantedEqInst eqs'', ppr eqs'' )
-       ; return (locals', eqs'' ++ wanteds', listToBag final_binds, improved)
+       ; zonked_locals  <- zonkInsts locals'
+       ; zonked_wanteds <- zonkInsts (eqs'' ++ wanteds')
+       ; return (zonked_locals, zonked_wanteds, final_binds, improved)
        }
-  where
-    nonTrivialDictBind (L _ (VarBind { var_id = ide1
-                                     , var_rhs = L _ (HsWrap _ (HsVar ide2))}))
-      = do { ty1 <- zonkTcType (idType ide1)
-           ; ty2 <- zonkTcType (idType ide2)
-           ; return $ not (ty1 `tcEqType` ty2)
-           }
-    nonTrivialDictBind _ = return True
 \end{code}
 
 
@@ -1041,10 +1031,26 @@ implied by one variable equality exhaustively before turning to the next and
 We also apply the same substitutions to the local and wanted class and IP
 dictionaries.
 
-NB: Given that we apply the substitution corresponding to a single equality
-exhaustively, before turning to the next, and because we eliminate recursive
-equalities, all opportunities for subtitution will have been exhausted after
-we have considered each equality once.
+The treatment of flexibles in wanteds is quite subtle.  We absolutely want to
+substitute them into right-hand sides of equalities, to avoid getting two
+competing instantiations for a type variables; e.g., consider
+
+  F s ~ alpha, alpha ~ t
+
+If we don't substitute `alpha ~ t', we may instantiate t with `F s' instead.
+This would be bad as `F s' is less useful, eg, as an argument to a class
+constraint.
+
+However, there is no reason why we would want to *substitute* `alpha ~ t' into a
+class constraint.  We rather wait until `alpha' is instantiated to `t` and
+save the extra dictionary binding that substitution would introduce.
+Moreover, we may substitute wanted equalities only into wanted dictionaries.
+
+NB: 
+* Given that we apply the substitution corresponding to a single equality
+  exhaustively, before turning to the next, and because we eliminate recursive
+  equalities, all opportunities for subtitution will have been exhausted after
+  we have considered each equality once.
 
 \begin{code}
 substitute :: [RewriteInst]       -- equalities
@@ -1058,19 +1064,35 @@ substitute eqs locals wanteds = subst eqs [] emptyBag locals wanteds
   where
     subst [] res binds locals wanteds 
       = return (res, binds, locals, wanteds)
+
     subst (eq@(RewriteVar {rwi_var = tv, rwi_right = ty, rwi_co = co}):eqs) 
           res binds locals wanteds
       = do { traceTc $ ptext (sLit "TcTyFuns.substitute:") <+> ppr eq
+
            ; let coSubst = zipOpenTvSubst [tv] [eqInstCoType co]
                  tySubst = zipOpenTvSubst [tv] [ty]
-           ; eqs'               <- mapM (substEq eq coSubst tySubst) eqs
-           ; res'               <- mapM (substEq eq coSubst tySubst) res
-           ; (lbinds, locals')  <- mapAndUnzipM 
-                                     (substDict eq coSubst tySubst False) 
-                                     locals
-           ; (wbinds, wanteds') <- mapAndUnzipM 
-                                     (substDict eq coSubst tySubst True) 
-                                     wanteds
+           ; eqs' <- mapM (substEq eq coSubst tySubst) eqs
+           ; res' <- mapM (substEq eq coSubst tySubst) res
+
+             -- only susbtitute local equalities into local dictionaries
+           ; (lbinds, locals')  <- if not (isWantedCo co)
+                                   then 
+                                     mapAndUnzipM 
+                                       (substDict eq coSubst tySubst False) 
+                                       locals
+                                   else
+                                     return ([], locals)
+
+              -- flexible tvs in wanteds will be instantiated anyway, there is
+              -- no need to substitute them into dictionaries
+           ; (wbinds, wanteds') <- if not (isMetaTyVar tv && isWantedCo co)
+                                   then
+                                     mapAndUnzipM 
+                                       (substDict eq coSubst tySubst True) 
+                                       wanteds
+                                   else
+                                     return ([], wanteds)
+
            ; let binds' = unionManyBags $ binds : lbinds ++ wbinds
            ; subst eqs' (eq:res') binds' locals' wanteds'
            }
@@ -1103,8 +1125,7 @@ substitute eqs locals wanteds = subst eqs [] emptyBag locals wanteds
       -- We have, co :: tv ~ ty 
       -- => apply [ty/tv] to dictionary predicate
       --    (but only if tv actually occurs in the predicate)
-    substDict (RewriteVar {rwi_var = tv}) 
-              coSubst tySubst isWanted dict
+    substDict (RewriteVar {rwi_var = tv}) coSubst tySubst isWanted dict
       | isClassDict dict
       , tv `elemVarSet` tyVarsOfPred (tci_pred dict)
       = do { let co1Subst = PredTy (substPred coSubst (tci_pred dict))
@@ -1122,16 +1143,17 @@ substitute eqs locals wanteds = subst eqs [] emptyBag locals wanteds
 For any *wanted* variable equality of the form co :: alpha ~ t or co :: a ~
 alpha, we instantiate alpha with t or a, respectively, and set co := id.
 Return all remaining wanted equalities.  The Boolean result component is True
-if at least one instantiation of a flexible was performed.
+if at least one instantiation of a flexible that is *not* a skolem from
+flattening was performed.
 
 \begin{code}
-instantiateAndExtract :: [RewriteInst] -> Bool -> TcM ([Inst], Bool)
-instantiateAndExtract eqs localsEmpty
-  = do { wanteds' <- mapM inst wanteds
-       ; let residuals = catMaybes wanteds'
-             improved  = length wanteds /= length residuals
+instantiateAndExtract :: [RewriteInst] -> Bool -> TyVarSet -> TcM ([Inst], Bool)
+instantiateAndExtract eqs localsEmpty skolems
+  = do { results <- mapM inst wanteds
+       ; let residuals    = [eq | Left eq <- results]
+             only_skolems = and [tv `elemVarSet` skolems | Right tv <- results]
        ; residuals' <- mapM rewriteInstToInst residuals
-       ; return (residuals', improved)
+       ; return (residuals', not only_skolems)
        }
   where
     wanteds      = filter (isWantedCo . rwi_co) eqs
@@ -1152,12 +1174,16 @@ instantiateAndExtract eqs localsEmpty
         -- co :: F args ~ alpha, and we are in checking mode (ie, no locals)
     inst eq@(RewriteFam {rwi_fam = fam, rwi_args = args, rwi_right = ty2, 
                          rwi_co = co})
-      | checkingMode
-      , Just tv2 <- tcGetTyVar_maybe ty2
+      | Just tv2 <- tcGetTyVar_maybe ty2
       , isMetaTyVar tv2
+      , checkingMode || tv2 `elemVarSet` skolems
+                        -- !!!TODO: this is too liberal, even if tv2 is in 
+                        -- skolems we shouldn't instantiate if tvs occurs 
+                        -- in other equalities that may propagate it into the
+                        -- environment
       = doInst (not $ rwi_swapped eq) tv2 (mkTyConApp fam args) co eq
 
-    inst eq = return $ Just eq
+    inst eq = return $ Left eq
 
     doInst _swapped _tv _ty (Right ty) _eq 
       = pprPanic "TcTyFuns.doInst: local eq: " (ppr ty)
@@ -1167,9 +1193,14 @@ instantiateAndExtract eqs localsEmpty
            }
       where
         -- meta variable has been filled already
-        -- => ignore (must be a skolem that was introduced by flattening locals)
-        uMeta _swapped _tv (IndirectTv _) _ty _cotv
-          = return Nothing
+        -- => keep the equality
+        uMeta _swapped tv (IndirectTv fill_ty) ty _cotv
+          = do { traceTc $ 
+                   ptext (sLit "flexible") <+> ppr tv <+>
+                   ptext (sLit "already filled with") <+> ppr fill_ty <+>
+                   ptext (sLit "meant to fill with") <+> ppr ty
+               ; return $ Left eq
+               }
 
         -- type variable meets type variable
         -- => check that tv2 hasn't been updated yet and choose which to update
@@ -1191,7 +1222,7 @@ instantiateAndExtract eqs localsEmpty
         -- signature skolem meets non-variable type
         -- => cannot update (retain the equality)!
         uMeta _swapped _tv (DoneTv (MetaTv (SigTv _) _)) _non_tv_ty _cotv
-          = return $ Just eq
+          = return $ Left eq
 
         -- updatable meta variable meets non-variable type
         -- => occurs check, monotype check, and kinds match check, then update
@@ -1206,7 +1237,7 @@ instantiateAndExtract eqs localsEmpty
                    Just ty' ->
                      do { checkUpdateMeta swapped tv ref ty'  -- update meta var
                         ; writeMetaTyVar cotv ty'             -- update co var
-                        ; return Nothing
+                        ; return $ Right tv
                         }
                }
 
@@ -1218,35 +1249,38 @@ instantiateAndExtract eqs localsEmpty
         uMetaVar swapped tv1 (MetaTv _ ref) tv2 (SkolemTv _) cotv
           = do { checkUpdateMeta swapped tv1 ref (mkTyVarTy tv2)
                ; writeMetaTyVar cotv (mkTyVarTy tv2)
-               ; return Nothing
+               ; return $ Right tv1
                }
 
         -- meta variable meets meta variable 
         -- => be clever about which of the two to update 
         --   (from TcUnify.uUnfilledVars minus boxy stuff)
         uMetaVar swapped tv1 (MetaTv info1 ref1) tv2 (MetaTv info2 ref2) cotv
-          = do { case (info1, info2) of
-                   -- Avoid SigTvs if poss
-                   (SigTv _, _      ) | k1_sub_k2 -> update_tv2
-                   (_,       SigTv _) | k2_sub_k1 -> update_tv1
+          = do { tv <- case (info1, info2) of
+                         -- Avoid SigTvs if poss
+                         (SigTv _, _      ) | k1_sub_k2 -> update_tv2
+                         (_,       SigTv _) | k2_sub_k1 -> update_tv1
 
-                   (_,   _) | k1_sub_k2 -> if k2_sub_k1 && nicer_to_update_tv1
-                                           then update_tv1 	-- Same kinds
-                                           else update_tv2
-                            | k2_sub_k1 -> update_tv1
-                            | otherwise -> kind_err
+                         (_,   _) | k1_sub_k2 -> if k2_sub_k1 && 
+                                                    nicer_to_update_tv1
+                                                 then update_tv1  -- Same kinds
+                                                 else update_tv2
+                                  | k2_sub_k1 -> update_tv1
+                                  | otherwise -> kind_err >> return tv1
               -- Update the variable with least kind info
               -- See notes on type inference in Kind.lhs
               -- The "nicer to" part only applies if the two kinds are the same,
               -- so we can choose which to do.
 
                ; writeMetaTyVar cotv (mkTyVarTy tv2)
-               ; return Nothing
+               ; return $ Right tv
                }
           where
                 -- Kinds should be guaranteed ok at this point
             update_tv1 = updateMeta tv1 ref1 (mkTyVarTy tv2)
+                         >> return tv1
             update_tv2 = updateMeta tv2 ref2 (mkTyVarTy tv1)
+                         >> return tv2
 
             kind_err = addErrCtxtM (unifyKindCtxt swapped tv1 (mkTyVarTy tv2)) $
                        unifyKindMisMatch k1 k2
