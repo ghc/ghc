@@ -281,8 +281,8 @@ changequote([, ])dnl
 ])
 if test ! -f compiler/cmm/CmmLex.hs || test ! -f compiler/parser/Lexer.hs
 then
-    FP_COMPARE_VERSIONS([$fptools_cv_alex_version],[-lt],[2.0.1],
-      [AC_MSG_ERROR([Alex version 2.0.1 or later is required to compile GHC.])])[]dnl
+    FP_COMPARE_VERSIONS([$fptools_cv_alex_version],[-lt],[2.1.0],
+      [AC_MSG_ERROR([Alex version 2.1.0 or later is required to compile GHC.])])[]dnl
 fi
 AlexVersion=$fptools_cv_alex_version;
 AC_SUBST(AlexVersion)
