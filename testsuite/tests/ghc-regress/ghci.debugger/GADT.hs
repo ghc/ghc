@@ -3,8 +3,8 @@ data NonEmpty
 
 data SafeList x y where
      Nil :: SafeList x Empty
-     Cons:: x -> SafeList x y  -> SafeList x NonEmpty
---  deriving Show
+     Cons:: Eq x => x -> SafeList x y  -> SafeList x NonEmpty
+     One :: Eq x => x -> SafeList x Empty -> SafeList x NonEmpty
 
 safeHead :: SafeList x NonEmpty -> x
 safeHead (Cons x _) = x
