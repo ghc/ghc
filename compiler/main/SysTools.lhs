@@ -225,6 +225,7 @@ initSysTools mbMinusB dflags0
               -- gcc can cope
               --      (see comments with declarations of global variables)
               gcc_b_arg = Option ("-B" ++ installed "gcc-lib/")
+              gcc_mingw_include_arg = Option ("-I" ++ installed "include/mingw/")
               (gcc_prog,gcc_args)
                 | isWindowsHost && am_installed
                     -- We tell gcc where its specs file + exes are (-B)
@@ -236,7 +237,7 @@ initSysTools mbMinusB dflags0
                     -- the path, possibly including those from a cygwin
                     -- install on the target, which is exactly what we're
                     -- trying to avoid.
-                    = (installed_bin "gcc", [gcc_b_arg])
+                    = (installed_bin "gcc", [gcc_b_arg, gcc_mingw_include_arg])
                 | otherwise = (cGCC, [])
               perl_path
                 | isWindowsHost && am_installed = installed_bin cGHC_PERL
@@ -268,7 +269,7 @@ initSysTools mbMinusB dflags0
                      [ Option "--dlltool-name",
                        Option (installed "gcc-lib/" </> "dlltool"),
                        Option "--driver-name",
-                       Option gcc_prog, gcc_b_arg ])
+                       Option gcc_prog, gcc_b_arg, gcc_mingw_include_arg ])
                 | otherwise    = (cMKDLL, [])
 
         -- cpp is derived from gcc on all platforms
