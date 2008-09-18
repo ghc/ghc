@@ -75,6 +75,7 @@
 ^libraries/regex-posix(/|$)
 ^libraries/st(/|$)
 ^libraries/stm(/|$)
+^libraries/syb(/|$)
 ^libraries/template-haskell(/|$)
 ^libraries/time(/|$)
 ^libraries/timeout(/|$)
