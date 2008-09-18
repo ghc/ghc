@@ -1,6 +1,5 @@
 Name: ghc
--- XXX Version number!
-Version: 6.9
+Version: @ProjectVersion@
 Copyright: XXX
 -- License: XXX
 License-File: ../LICENSE

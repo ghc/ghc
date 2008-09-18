@@ -71,6 +71,11 @@ else
 clean distclean:: clean.stage.$(stage)
 endif
 
+ifeq "$(CLEAN_ALL_STAGES)" "YES"
+distclean::
+	$(RM) -f ghc.cabal
+endif
+
 clean.stage.%:
 	-$(CABAL) clean --distpref dist-stage$*
 	$(RM) -f Makefile-stage$*

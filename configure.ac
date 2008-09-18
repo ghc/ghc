@@ -1276,6 +1276,6 @@ else
 fi
 AC_SUBST(HavePapi)
 
-AC_CONFIG_FILES([mk/config.mk ghc.spec extra-gcc-opts docs/users_guide/ug-book.xml])
+AC_CONFIG_FILES([mk/config.mk compiler/ghc.cabal ghc/ghc-bin.cabal ghc.spec extra-gcc-opts docs/users_guide/ug-book.xml])
 AC_CONFIG_COMMANDS([mk/stamp-h],[echo timestamp > mk/stamp-h])
 AC_OUTPUT

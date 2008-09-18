@@ -34,10 +34,16 @@ stage2 ::
 stage3 ::
 	$(MAKE) stage=3
 
+
 ifeq "$(CLEAN_ALL_STAGES)" "YES"
 clean distclean:: clean.stage.1 clean.stage.2 clean.stage.3
 else
 clean distclean:: clean.stage.$(stage)
+endif
+
+ifeq "$(CLEAN_ALL_STAGES)" "YES"
+distclean::
+	$(RM) -f ghc-bin.cabal
 endif
 
 clean.stage.%:
