@@ -1,11 +1,11 @@
 t = O (_t1::t)
 ()
-t = O ((_t2::a) : (_t3::[a]))
+t = O ((_t2::a1) : (_t3::[a1]))
 ()
-t = O ((_t4::a1) : (_t5::a1) : (_t6::[a1]))
+t = O ((_t4::a11) : (_t5::a11) : (_t6::[a11]))
 ()
-t = O ((_t7::Maybe [a]) : Just [(_t8::a),(_t9::a)] :
-       (_t10::[Maybe [a]]))
+t = O ((_t7::Maybe [a1]) : Just [(_t8::a1),(_t9::a1)] :
+       (_t10::[Maybe [a1]]))
 ()
 t = O ((_t11::Maybe [Integer]) : Just [2,(_t12::Integer)] :
        (_t13::[Maybe [Integer]]))

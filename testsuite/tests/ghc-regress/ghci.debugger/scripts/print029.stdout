@@ -4,5 +4,5 @@ MkT2 Stopped at print029.hs:4:0-6
 _result :: t Int = _
 Stopped at print029.hs:4:6
 _result :: t Int = _
-x :: [Maybe Int] = [Just 1]
+x :: t Int = [Just 1]
 x = [Just 1]

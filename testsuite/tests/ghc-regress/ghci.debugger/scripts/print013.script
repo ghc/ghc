@@ -3,7 +3,7 @@
 :set -fglasgow-exts
 :l ../GADT
 
-let d = Dict 1
+let d = DictN 1
 :p d
 seq _t1 ()
 :p d
