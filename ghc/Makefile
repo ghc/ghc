@@ -47,8 +47,12 @@ distclean::
 endif
 
 clean.stage.%:
-	-$(CABAL) clean --distpref dist-stage$*
 	$(RM) -rf stage$*-inplace
+# This is a bit naughty. We ought to use:
+#	-$(CABAL) clean --distpref dist-stage$*
+# but that won't work if the Cabal file (a generated file) doesn't
+# exist. So we do this instead:
+	$(RM) -rf dist-stage$*
 
 CONFIGURE_FLAGS_STAGE1 += --flags=-ghci
 
