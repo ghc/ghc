@@ -296,6 +296,7 @@ data DynFlag
    | Opt_KeepSFiles
    | Opt_KeepRawSFiles
    | Opt_KeepTmpFiles
+   | Opt_KeepRawTokenStream
 
    deriving (Eq, Show)
 

@@ -198,6 +198,11 @@ module GHC (
 	-- * Exceptions
 	GhcException(..), showGhcException,
 
+        -- * Token stream manipulations
+        Token,
+        getTokenStream, getRichTokenStream,
+        showRichTokenStream, addSourceToTokens,
+
 	-- * Miscellaneous
 	--sessionHscEnv,
 	cyclicModuleErr,
@@ -269,13 +274,14 @@ import Bag		( unitBag, listToBag, emptyBag, isEmptyBag )
 import ErrUtils
 import MonadUtils
 import Util
-import StringBuffer	( StringBuffer, hGetStringBuffer )
+import StringBuffer	( StringBuffer, hGetStringBuffer, nextChar )
 import Outputable
 import BasicTypes
 import Maybes		( expectJust, mapCatMaybes )
 import HaddockParse
 import HaddockLex       ( tokenise )
 import FastString
+import Lexer
 
 import Control.Concurrent
 import System.Directory ( getModificationTime, doesFileExist,
@@ -1717,7 +1723,7 @@ topSortModuleGraph
 --
 --   True:	eliminate the hi-boot nodes, and instead pretend
 --		the a source-import of Foo is an import of Foo
---		The resulting graph has no hi-boot nodes, but can by cyclic
+--		The resulting graph has no hi-boot nodes, but can be cyclic
 
 topSortModuleGraph drop_hs_boot_nodes summaries mb_root_mod
   = map (fmap summaryNodeSummary) $ stronglyConnCompG initial_graph
@@ -2440,11 +2446,84 @@ pprParenSymName a = parenSymOcc (getOccName a) (ppr (getName a))
 -- :browse will use either lm_toplev or inspect lm_interface, depending
 -- on whether the module is interpreted or not.
 
--- This is for reconstructing refactored source code
--- Calls the lexer repeatedly.
--- ToDo: add comment tokens to token stream
-getTokenStream :: Session -> Module -> IO [Located Token]
 #endif
+
+-- Extract the filename, stringbuffer content and dynflags associed to a module
+--
+-- XXX: Explain pre-conditions
+getModuleSourceAndFlags :: GhcMonad m => Module -> m (String, StringBuffer, DynFlags)
+getModuleSourceAndFlags mod = do
+  m <- getModSummary (moduleName mod)
+  case ml_hs_file $ ms_location m of
+    Nothing -> throw $ mkApiErr (text "No source available for module " <+> ppr mod)
+    Just sourceFile -> do
+        source <- liftIO $ hGetStringBuffer sourceFile
+        return (sourceFile, source, ms_hspp_opts m)
+
+
+-- | Return module source as token stream, including comments.
+--
+-- The module must be in the module graph and its source must be available.
+-- Throws a 'HscTypes.SourceError' on parse error.
+getTokenStream :: GhcMonad m => Module -> m [Located Token]
+getTokenStream mod = do
+  (sourceFile, source, flags) <- getModuleSourceAndFlags mod
+  let startLoc = mkSrcLoc (mkFastString sourceFile) 0 0
+  case lexTokenStream source startLoc flags of
+    POk _ ts  -> return ts
+    PFailed span err -> throw $ mkSrcErr (unitBag $ mkPlainErrMsg span err)
+
+-- | Give even more information on the source than 'getTokenStream'
+-- This function allows reconstructing the source completely with
+-- 'showRichTokenStream'.
+getRichTokenStream :: GhcMonad m => Module -> m [(Located Token, String)]
+getRichTokenStream mod = do
+  (sourceFile, source, flags) <- getModuleSourceAndFlags mod
+  let startLoc = mkSrcLoc (mkFastString sourceFile) 0 0
+  case lexTokenStream source startLoc flags of
+    POk _ ts -> return $ addSourceToTokens startLoc source ts
+    PFailed span err -> throw $ mkSrcErr (unitBag $ mkPlainErrMsg span err)
+
+-- | Given a source location and a StringBuffer corresponding to this
+-- location, return a rich token stream with the source associated to the
+-- tokens.
+addSourceToTokens :: SrcLoc -> StringBuffer -> [Located Token]
+                  -> [(Located Token, String)]
+addSourceToTokens _ _ [] = []
+addSourceToTokens loc buf (t@(L span _) : ts)
+    | not (isGoodSrcSpan span) = (t,"") : addSourceToTokens loc buf ts
+    | otherwise = (t,str) : addSourceToTokens newLoc newBuf ts
+    where
+      (newLoc, newBuf, str) = go "" loc buf
+      start = srcSpanStart span
+      end = srcSpanEnd span
+      go acc loc buf | loc < start = go acc nLoc nBuf
+                     | start <= loc && loc < end = go (ch:acc) nLoc nBuf
+                     | otherwise = (loc, buf, reverse acc)
+          where (ch, nBuf) = nextChar buf
+                nLoc = advanceSrcLoc loc ch
+
+
+-- | Take a rich token stream such as produced from 'getRichTokenStream' and
+-- return source code almost identical to the original code (except for
+-- insignificant whitespace.)
+showRichTokenStream :: [(Located Token, String)] -> String
+showRichTokenStream ts = go startLoc ts ""
+    where sourceFile = srcSpanFile (getLoc . fst . head $ ts)
+          startLoc = mkSrcLoc sourceFile 0 0
+          go _ [] = id
+          go loc ((L span _, str):ts)
+              | not (isGoodSrcSpan span) = go loc ts
+              | locLine == tokLine = ((replicate (tokCol - locCol) ' ') ++)
+                                     . (str ++)
+                                     . go tokEnd ts
+              | otherwise = ((replicate (tokLine - locLine) '\n') ++)
+                            . ((replicate tokCol ' ') ++)
+                            . (str ++)
+                            . go tokEnd ts
+              where (locLine, locCol) = (srcLocLine loc, srcLocCol loc)
+                    (tokLine, tokCol) = (srcSpanStartLine span, srcSpanStartCol span)
+                    tokEnd = srcSpanEnd span
 
 -- -----------------------------------------------------------------------------
 -- Interactive evaluation

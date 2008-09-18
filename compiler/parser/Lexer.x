@@ -41,7 +41,8 @@ module Lexer (
    popContext, pushCurrentContext, setLastToken, setSrcLoc,
    getLexState, popLexState, pushLexState,
    extension, standaloneDerivingEnabled, bangPatEnabled,
-   addWarning
+   addWarning,
+   lexTokenStream
   ) where
 
 import Bag
@@ -148,12 +149,12 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
 -- space followed by a Haddock comment symbol (docsym) (in which case we'd
 -- have a Haddock comment). The rules then munch the rest of the line.
 
-"-- " ~[$docsym \#] .* ;
-"--" [^$symbol : \ ] .* ;
+"-- " ~[$docsym \#] .* { lineCommentToken }
+"--" [^$symbol : \ ] .* { lineCommentToken }
 
 -- Next, match Haddock comments if no -haddock flag
 
-"-- " [$docsym \#] .* / { ifExtension (not . haddockEnabled) } ;
+"-- " [$docsym \#] .* / { ifExtension (not . haddockEnabled) } { lineCommentToken }
 
 -- Now, when we've matched comments that begin with 2 dashes and continue
 -- with a different character, we need to match comments that begin with three
@@ -161,17 +162,17 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
 -- make sure that the first non-dash character isn't a symbol, and munch the
 -- rest of the line.
 
-"---"\-* [^$symbol :] .* ;
+"---"\-* [^$symbol :] .* { lineCommentToken }
 
 -- Since the previous rules all match dashes followed by at least one
 -- character, we also need to match a whole line filled with just dashes.
 
-"--"\-* / { atEOL } ;
+"--"\-* / { atEOL } { lineCommentToken }
 
 -- We need this rule since none of the other single line comment rules
 -- actually match this case.
 
-"-- " / { atEOL } ;
+"-- " / { atEOL } { lineCommentToken }
 
 -- 'bol' state: beginning of a line.  Slurp up all the whitespace (including
 -- blank lines) until we find a non-whitespace character, then do layout
@@ -277,7 +278,7 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
 }
 
 <0> {
-  "-- #" .* ;
+  "-- #" .* { lineCommentToken }
 }
 
 <0,option_prags> {
@@ -575,6 +576,8 @@ data Token
   | ITdocSection      Int String -- a section heading
   | ITdocOptions      String     -- doc options (prune, ignore-exports, etc)
   | ITdocOptionsOld   String     -- doc options declared "-- # ..."-style
+  | ITlineComment     String     -- comment starting by "--"
+  | ITblockComment    String     -- comment in {- -}
 
 #ifdef DEBUG
   deriving Show -- debugging
@@ -802,6 +805,11 @@ multiline_doc_comment span buf _len = withLexedDocType (worker "")
             | otherwise -> input
           Nothing -> input
 
+lineCommentToken :: Action
+lineCommentToken span buf len = do
+  b <- extension rawTokenStreamEnabled
+  if b then strtoken ITlineComment span buf len else lexToken
+
 {-
   nested comments require traversing by hand, they can't be parsed
   using regular expressions.
@@ -809,20 +817,24 @@ multiline_doc_comment span buf _len = withLexedDocType (worker "")
 nested_comment :: P (Located Token) -> Action
 nested_comment cont span _str _len = do
   input <- getInput
-  go (1::Int) input
+  go "" (1::Int) input
   where
-    go 0 input = do setInput input; cont
-    go n input = case alexGetChar input of
+    go commentAcc 0 input = do setInput input
+                               b <- extension rawTokenStreamEnabled
+                               if b
+                                 then docCommentEnd input commentAcc ITblockComment _str span
+                                 else cont
+    go commentAcc n input = case alexGetChar input of
       Nothing -> errBrace input span
       Just ('-',input) -> case alexGetChar input of
         Nothing  -> errBrace input span
-        Just ('\125',input) -> go (n-1) input
-        Just (_,_)          -> go n input
+        Just ('\125',input) -> go commentAcc (n-1) input
+        Just (_,_)          -> go ('-':commentAcc) n input
       Just ('\123',input) -> case alexGetChar input of
         Nothing  -> errBrace input span
-        Just ('-',input) -> go (n+1) input
-        Just (_,_)       -> go n input
-      Just (_,input) -> go n input
+        Just ('-',input) -> go ('-':'\123':commentAcc) (n+1) input
+        Just (_,_)       -> go ('\123':commentAcc) n input
+      Just (c,input) -> go (c:commentAcc) n input
 
 nested_doc_comment :: Action
 nested_doc_comment span buf _len = withLexedDocType (go "")
@@ -1596,6 +1608,7 @@ standaloneDerivingBit = 16 -- standalone instance deriving declarations
 transformComprehensionsBit = 17
 qqBit	   = 18 -- enable quasiquoting
 inRulePragBit = 19
+rawTokenStreamBit = 20 -- producing a token stream with all comments included
 
 genericsEnabled, ffiEnabled, parrEnabled :: Int -> Bool
 always           _     = True
@@ -1618,6 +1631,7 @@ standaloneDerivingEnabled flags = testBit flags standaloneDerivingBit
 transformComprehensionsEnabled flags = testBit flags transformComprehensionsBit
 qqEnabled        flags = testBit flags qqBit
 inRulePrag       flags = testBit flags inRulePragBit
+rawTokenStreamEnabled flags = testBit flags rawTokenStreamBit
 
 -- PState for parsing options pragmas
 --
@@ -1679,7 +1693,8 @@ mkPState buf loc flags  =
 	       .|. unicodeSyntaxBit `setBitIf` dopt Opt_UnicodeSyntax flags
 	       .|. unboxedTuplesBit `setBitIf` dopt Opt_UnboxedTuples flags
 	       .|. standaloneDerivingBit `setBitIf` dopt Opt_StandaloneDeriving flags
-           .|. transformComprehensionsBit `setBitIf` dopt Opt_TransformListComp flags
+               .|. transformComprehensionsBit `setBitIf` dopt Opt_TransformListComp flags
+               .|. rawTokenStreamBit `setBitIf` dopt Opt_KeepRawTokenStream flags
       --
       setBitIf :: Int -> Bool -> Int
       b `setBitIf` cond | cond      = bit b
@@ -1795,4 +1810,13 @@ reportLexError loc1 loc2 buf str
   if c == '\0' -- decoding errors are mapped to '\0', see utf8DecodeChar#
     then failLocMsgP loc2 loc2 (str ++ " (UTF-8 decoding error)")
     else failLocMsgP loc1 loc2 (str ++ " at character " ++ show c)
+
+lexTokenStream :: StringBuffer -> SrcLoc -> DynFlags -> ParseResult [Located Token]
+lexTokenStream buf loc dflags = unP go initState
+    where initState = mkPState buf loc (dopt_set (dopt_unset dflags Opt_Haddock) Opt_KeepRawTokenStream)
+          go = do
+            ltok <- lexer return
+            case ltok of
+              L _ ITeof -> return []
+              _ -> liftM (ltok:) go
 }
