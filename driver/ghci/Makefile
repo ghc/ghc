@@ -21,7 +21,7 @@ GHCII_SCRIPT=$(DESTDIR)$(bindir)/ghcii.sh
 install::
 	$(RM) -f $(GHCII_SCRIPT)
 	echo "#!$(SHELL)"                                  >> $(GHCII_SCRIPT)
-	echo 'exec "$$0"/../ghc --interactive $${1+"$$@"}' >> $(GHCII_SCRIPT)
+	echo 'exec "$$0"/../ghc-$(ProjectVersion) --interactive $${1+"$$@"}' >> $(GHCII_SCRIPT)
 	chmod +x $(GHCII_SCRIPT)
 else
 LINK = ghci
@@ -30,7 +30,7 @@ INSTALLED_SCRIPT=$(DESTDIR)$(bindir)/$(LINK_TARGET)
 install::
 	$(RM) -f $(INSTALLED_SCRIPT)
 	echo "#!$(SHELL)"                                   >> $(INSTALLED_SCRIPT)
-	echo 'exec $(bindir)/ghc --interactive $${1+"$$@"}' >> $(INSTALLED_SCRIPT)
+	echo 'exec $(bindir)/ghc-$(ProjectVersion) --interactive $${1+"$$@"}' >> $(INSTALLED_SCRIPT)
 	$(EXECUTABLE_FILE) $(INSTALLED_SCRIPT)
 endif
 
