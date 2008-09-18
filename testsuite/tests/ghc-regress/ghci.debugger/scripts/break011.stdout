@@ -1,8 +1,8 @@
 *** Exception: foo
 Stopped at <exception thrown>
-_exception :: e = GHC.IOBase.ErrorCall ('f' : _)
+_exception :: e = _
 Stopped at <exception thrown>
-_exception :: e = ErrorCall ('f' : _)
+_exception :: e = _
 -1  : main (../Test7.hs:2:17-27)
 -2  : main (../Test7.hs:2:7-28)
 <end of history>
@@ -16,8 +16,13 @@ _result :: a
 Stopped at <exception thrown>
 _exception :: e
 already at the beginning of the history
-_exception = ErrorCall ['f','o','o']
-_exception :: Exception = ErrorCall ['f','o','o']
+_exception = SomeException (GHC.Exception.:DException _
+                                                      (GHC.Show.:DShow _ _ _) _ _)
+                           (ErrorCall ['f','o','o'])
+_exception ::
+  SomeException = SomeException (GHC.Exception.:DException _
+                                                           (GHC.Show.:DShow ...) ....)
+                                (ErrorCall ['f',....])
 _result :: a = _
-*** Exception: foo
+*** Exception: RTTI error: probably due to :forcing an undefined
 *** Exception: foo

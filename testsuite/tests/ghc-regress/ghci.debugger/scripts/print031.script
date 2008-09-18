@@ -7,5 +7,5 @@ f a
 :step
 -- ghc crashes now when the type for x is recovered 
 -- and unifyRTTI fails to compute a substitution
-x
+:p x  
 :q

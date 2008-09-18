@@ -4,9 +4,4 @@ MkT2 Stopped at print029.hs:4:0-6
 _result :: t Int = _
 Stopped at print029.hs:4:6
 _result :: t Int = _
-x :: t Int = _ : _
-No instance for (Show (t Int))
-  arising from a use of `print' at <interactive>:1:0
-Possible fix: add an instance declaration for (Show (t Int))
-In a 'do' expression: print it
-
+x :: t Int = : _ _

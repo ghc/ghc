@@ -7,5 +7,4 @@ f a
 -- Unsound! A false type is assigned to x
 -- reconstructType is forced to stop too soon
 -- because the elements of the list in x are not evaluated yet
-x
 :q

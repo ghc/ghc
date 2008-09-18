@@ -1,9 +1,9 @@
 "Stopped at <exception thrown>
-_exception :: e = GHC.IOBase.ErrorCall _
+_exception :: e = _
 Logged breakpoint at ../QSort.hs:6:23-37
 _result :: [Char]
 a :: Char
 as :: [Char]
+*** Exception: RTTI error: probably due to :forcing an undefined
+*** Exception: RTTI error: probably due to :forcing an undefined
 as = 'b' : 'c' : (_t1::[Char])
-*** Exception: Prelude.undefined
-as = 'b' : 'c' : (_t2::[Char])
