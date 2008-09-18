@@ -522,6 +522,18 @@ VERSION :
 
 dist :: VERSION
 
+# Use:
+#     $(call copy_generated_compiler_file,cmm,CmmLex,x)
+# to copy the generated file that replaces compiler/cmm/CmmLex.x
+# XXX Should this be unconditional? Do we want to support making a src dist
+# from an unbuilt tree?
+copy_generated_compiler_file = \
+  if test -f $(FPTOOLS_TOP_ABS)/compiler/dist-stage2/build/$2.hs; \
+  then \
+    $(CP) $(FPTOOLS_TOP_ABS)/compiler/dist-stage2/build/$2.hs compiler/$1/ ; \
+    mv compiler/$1/$2.$3 compiler/$1/$2.$3.source ; \
+  fi
+
 dist ::
 	$(RM) -rf $(SRC_DIST_DIR)
 	$(RM) $(SRC_DIST_NAME).tar.gz
@@ -531,6 +543,14 @@ dist ::
 	  && for i in $(SRC_DIST_FILES); do $(LN_S) $(FPTOOLS_TOP_ABS)/$$i .; done \
 	  && $(MAKE) distclean \
 	  && if test -f $(FPTOOLS_TOP_ABS)/libraries/haskell-src/dist/build/Language/Haskell/Parser.hs; then $(CP) $(FPTOOLS_TOP_ABS)/libraries/haskell-src/dist/build/Language/Haskell/Parser.hs libraries/haskell-src/Language/Haskell/ ; mv libraries/haskell-src/Language/Haskell/Parser.ly libraries/haskell-src/Language/Haskell/Parser.ly.source ; fi \
+	  && $(call copy_generated_compiler_file,cmm,CmmLex,x) \
+	  && $(call copy_generated_compiler_file,cmm,CmmParse,y) \
+	  && $(call copy_generated_compiler_file,parser,HaddockLex,x) \
+	  && $(call copy_generated_compiler_file,parser,HaddockParse,y) \
+	  && $(call copy_generated_compiler_file,parser,Lexer,x) \
+	  && $(call copy_generated_compiler_file,parser,ParsePkgCore,y) \
+	  && $(call copy_generated_compiler_file,parser,Parser,y.pp) \
+	  && $(call copy_generated_compiler_file,parser,ParserCore,y) \
 	  && $(RM) -rf compiler/stage[123] mk/build.mk \
 	  && $(FIND) $(SRC_DIST_DIRS) \( -name _darcs -o -name SRC -o -name "autom4te*" -o -name "*~" -o -name ".cvsignore" -o -name "\#*" -o -name ".\#*" -o -name "log" -o -name "*-SAVE" -o -name "*.orig" -o -name "*.rej" \) -print | xargs $(RM) -rf \
 	)
