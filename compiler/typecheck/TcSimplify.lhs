@@ -1021,11 +1021,11 @@ tryHardCheckLoop :: SDoc
 	     -> TcM ([Inst], TcDictBinds)
 
 tryHardCheckLoop doc wanteds
-  = do { (irreds,binds) <- checkLoop (mkRedEnv doc try_me []) wanteds
+  = do { (irreds,binds) <- checkLoop (mkInferRedEnv doc try_me) wanteds
        ; return (irreds,binds)
        }
   where
-    try_me _ = ReduceMe AddSCs
+    try_me _ = ReduceMe
 	-- Here's the try-hard bit
 
 -----------------------------------------------------------
@@ -1041,7 +1041,7 @@ gentleCheckLoop inst_loc givens wanteds
   where
     env = mkRedEnv (pprInstLoc inst_loc) try_me givens
 
-    try_me inst | isMethodOrLit inst = ReduceMe AddSCs
+    try_me inst | isMethodOrLit inst = ReduceMe
 		| otherwise	     = Stop
 	-- When checking against a given signature 
 	-- we MUST be very gentle: Note [Check gently]
@@ -1052,8 +1052,8 @@ gentleInferLoop doc wanteds
   = do 	{ (irreds, binds) <- checkLoop env wanteds
 	; return (irreds, binds) }
   where
-    env = mkRedEnv doc try_me []
-    try_me inst | isMethodOrLit inst = ReduceMe AddSCs
+    env = mkInferRedEnv doc try_me
+    try_me inst | isMethodOrLit inst = ReduceMe
 		| otherwise	     = Stop
 \end{code}
 
@@ -1201,30 +1201,87 @@ Alas!  Alack! We can do the same for (instance D Int):
 	ds2 = $p1 dc
 
 And now we've defined the superclass in terms of itself.
-
-Solution: never generate a superclass selectors at all when
-satisfying the superclass context of an instance declaration.
-
 Two more nasty cases are in
 	tcrun021
 	tcrun033
 
+Solution: 
+  - Satisfy the superclass context *all by itself* 
+    (tcSimplifySuperClasses)
+  - And do so completely; i.e. no left-over constraints
+    to mix with the constraints arising from method declarations
+
+
+Note [Recursive instances and superclases]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this code, which arises in the context of "Scrap Your 
+Boilerplate with Class".  
+
+    class Sat a
+    class Data ctx a
+    instance  Sat (ctx Char)             => Data ctx Char
+    instance (Sat (ctx [a]), Data ctx a) => Data ctx [a]
+
+    class Data Maybe a => Foo a
+
+    instance Foo t => Sat (Maybe t)
+
+    instance Data Maybe a => Foo a
+    instance Foo a        => Foo [a]
+    instance                 Foo [Char]
+
+In the instance for Foo [a], when generating evidence for the superclasses
+(ie in tcSimplifySuperClasses) we need a superclass (Data Maybe [a]).
+Using the instance for Data, we therefore need
+        (Sat (Maybe [a], Data Maybe a)
+But we are given (Foo a), and hence its superclass (Data Maybe a).
+So that leaves (Sat (Maybe [a])).  Using the instance for Sat means
+we need (Foo [a]).  And that is the very dictionary we are bulding
+an instance for!  So we must put that in the "givens".  So in this
+case we have
+	Given:  Foo a, Foo [a]
+	Watend: Data Maybe [a]
+
+BUT we must *not not not* put the *superclasses* of (Foo [a]) in
+the givens, which is what 'addGiven' would normally do. Why? Because
+(Data Maybe [a]) is the superclass, so we'd "satisfy" the wanted 
+by selecting a superclass from Foo [a], which simply makes a loop.
+
+On the other hand we *must* put the superclasses of (Foo a) in
+the givens, as you can see from the derivation described above.
+
+Conclusion: in the very special case of tcSimplifySuperClasses
+we have one 'given' (namely the "this" dictionary) whose superclasses
+must not be added to 'givens' by addGiven.  That is the *whole* reason
+for the red_given_scs field in RedEnv, and the function argument to
+addGiven.
+
 \begin{code}
-tcSimplifySuperClasses 
+tcSimplifySuperClasses
 	:: InstLoc 
+	-> Inst		-- The dict whose superclasses 
+			-- are being figured out
 	-> [Inst]	-- Given 
 	-> [Inst]	-- Wanted
 	-> TcM TcDictBinds
-tcSimplifySuperClasses loc givens sc_wanteds
+tcSimplifySuperClasses loc this givens sc_wanteds
   = do	{ traceTc (text "tcSimplifySuperClasses")
 	; (irreds,binds1) <- checkLoop env sc_wanteds
 	; let (tidy_env, tidy_irreds) = tidyInsts irreds
 	; reportNoInstances tidy_env (Just (loc, givens)) tidy_irreds
 	; return binds1 }
   where
-    env = mkRedEnv (pprInstLoc loc) try_me givens
-    try_me _ = ReduceMe NoSCs
-	-- Like tryHardCheckLoop, but with NoSCs
+    env =  RedEnv { red_doc = pprInstLoc loc, 
+		    red_try_me = try_me,
+	     	    red_givens = this:givens, 
+	     	    red_given_scs = add_scs,
+	     	    red_stack = (0,[]),
+	     	    red_improve = False }  -- No unification vars
+    add_scs g | g==this   = NoSCs
+	      | otherwise = AddSCs
+
+    try_me _ = ReduceMe  -- Try hard, so we completely solve the superclass 
+    	       		 -- constraints right here. See Note [SUPERCLASS-LOOP 1]
 \end{code}
 
 
@@ -1356,7 +1413,7 @@ tcSimplifyRestricted doc top_lvl bndrs tau_tvs wanteds
 	-- BUT do no improvement!  See Plan D above
 	-- HOWEVER, some unification may take place, if we instantiate
 	-- 	    a method Inst with an equality constraint
-	; let env = mkNoImproveRedEnv doc (\_ -> ReduceMe AddSCs)
+	; let env = mkNoImproveRedEnv doc (\_ -> ReduceMe)
 	; (_imp, _binds, constrained_dicts) <- reduceContext env wanteds'
 
 	-- Next, figure out the tyvars we will quantify over
@@ -1404,7 +1461,7 @@ tcSimplifyRestricted doc top_lvl bndrs tau_tvs wanteds
 	; let is_nested_group = isNotTopLevel top_lvl
 	      try_me inst | isFreeWrtTyVars qtvs inst,
 			   (is_nested_group || isDict inst) = Stop
-		          | otherwise  	         = ReduceMe AddSCs
+		          | otherwise  	                    = ReduceMe 
 	      env = mkNoImproveRedEnv doc try_me
 	; (_imp, binds, irreds) <- reduceContext env wanteds'
 
@@ -1524,9 +1581,9 @@ tcSimplifyRuleLhs wanteds
 	  }
 
 	-- Sigh: we need to reduce inside implications
-    red_env = mkRedEnv doc try_me []
+    red_env = mkInferRedEnv doc try_me
     doc = ptext (sLit "Implication constraint in RULE lhs")
-    try_me inst | isMethodOrLit inst = ReduceMe AddSCs
+    try_me inst | isMethodOrLit inst = ReduceMe
 		| otherwise	     = Stop	-- Be gentle
 \end{code}
 
@@ -1598,7 +1655,7 @@ tcSimplifyIPs given_ips wanteds
 
 	-- Simplify any methods that mention the implicit parameter
     try_me inst | is_free inst = Stop
-		| otherwise    = ReduceMe NoSCs
+		| otherwise    = ReduceMe
 \end{code}
 
 
@@ -1675,6 +1732,9 @@ data RedEnv
 	   , red_givens :: [Inst]		-- All guaranteed rigid
 						-- Always dicts & equalities
 						-- but see Note [Rigidity]
+ 
+ 	   , red_given_scs :: Inst -> WantSCs	-- See Note [Recursive instances and superclases]
+ 
 	   , red_stack  :: (Int, [Inst])	-- Recursion stack (for err msg)
 						-- See Note [RedStack]
   }
@@ -1697,6 +1757,16 @@ mkRedEnv :: SDoc -> (Inst -> WhatToDo) -> [Inst] -> RedEnv
 mkRedEnv doc try_me givens
   = RedEnv { red_doc = doc, red_try_me = try_me,
 	     red_givens = givens, 
+	     red_given_scs = const AddSCs,
+	     red_stack = (0,[]),
+	     red_improve = True }	
+
+mkInferRedEnv :: SDoc -> (Inst -> WhatToDo) -> RedEnv
+-- No givens at all
+mkInferRedEnv doc try_me
+  = RedEnv { red_doc = doc, red_try_me = try_me,
+	     red_givens = [], 
+	     red_given_scs = const AddSCs,
 	     red_stack = (0,[]),
 	     red_improve = True }	
 
@@ -1705,15 +1775,16 @@ mkNoImproveRedEnv :: SDoc -> (Inst -> WhatToDo) -> RedEnv
 mkNoImproveRedEnv doc try_me
   = RedEnv { red_doc = doc, red_try_me = try_me,
 	     red_givens = [], 
+	     red_given_scs = const AddSCs,
 	     red_stack = (0,[]),
 	     red_improve = True }	
 
 data WhatToDo
- = ReduceMe WantSCs	-- Try to reduce this
-			-- If there's no instance, add the inst to the 
-			-- irreductible ones, but don't produce an error 
-			-- message of any kind.
-			-- It might be quite legitimate such as (Eq a)!
+ = ReduceMe 	-- Try to reduce this
+		-- If there's no instance, add the inst to the 
+		-- irreductible ones, but don't produce an error 
+		-- message of any kind.
+		-- It might be quite legitimate such as (Eq a)!
 
  | Stop		-- Return as irreducible unless it can
 			-- be reduced to a constant in one step
@@ -1788,7 +1859,8 @@ reduceContext env wanteds0
 
           -- Build the Avail mapping from "given_dicts"
 	; (init_state, _) <- getLIE $ do 
-		{ init_state <- foldlM addGiven emptyAvails givens'
+		{ init_state <- foldlM (addGiven (red_given_scs env)) 
+		  	     	       emptyAvails givens'
 		; return init_state
                 }
 
@@ -1950,18 +2022,18 @@ reduce env wanted avails
 	    Stop -> try_simple (addIrred NoSCs);
 			-- See Note [No superclasses for Stop]
 
-	    ReduceMe want_scs -> do	-- It should be reduced
+	    ReduceMe -> do	-- It should be reduced
 		{ (avails, lookup_result) <- reduceInst env avails wanted
 		; case lookup_result of
-		    NoInstance -> addIrred want_scs avails wanted
+		    NoInstance -> addIrred AddSCs avails wanted
 			     -- Add it and its superclasses
 		    	     
-		    GenInst [] rhs -> addWanted want_scs avails wanted rhs []
+		    GenInst [] rhs -> addWanted AddSCs avails wanted rhs []
 
 		    GenInst wanteds' rhs
 			  -> do	{ avails1 <- addIrred NoSCs avails wanted
 				; avails2 <- reduceList env wanteds' avails1
-				; addWanted want_scs avails2 wanted rhs wanteds' } }
+				; addWanted AddSCs avails2 wanted rhs wanteds' } }
 		-- Temporarily do addIrred *before* the reduceList, 
 		-- which has the effect of adding the thing we are trying
 		-- to prove to the database before trying to prove the things it
@@ -1981,47 +2053,6 @@ reduce env wanted avails
 	        GenInst [] rhs -> addWanted AddSCs avails wanted rhs []
 	        _              -> do_this_otherwise avails wanted }
 \end{code}
-
-
-Note [SUPERCLASS-LOOP 2]
-~~~~~~~~~~~~~~~~~~~~~~~~
-But the above isn't enough.  Suppose we are *given* d1:Ord a,
-and want to deduce (d2:C [a]) where
-
-	class Ord a => C a where
-	instance Ord [a] => C [a] where ...
-
-Then we'll use the instance decl to deduce C [a] from Ord [a], and then add the
-superclasses of C [a] to avails.  But we must not overwrite the binding
-for Ord [a] (which is obtained from Ord a) with a superclass selection or we'll just
-build a loop! 
-
-Here's another variant, immortalised in tcrun020
-	class Monad m => C1 m
-	class C1 m => C2 m x
-	instance C2 Maybe Bool
-For the instance decl we need to build (C1 Maybe), and it's no good if
-we run around and add (C2 Maybe Bool) and its superclasses to the avails 
-before we search for C1 Maybe.
-
-Here's another example 
- 	class Eq b => Foo a b
-	instance Eq a => Foo [a] a
-If we are reducing
-	(Foo [t] t)
-
-we'll first deduce that it holds (via the instance decl).  We must not
-then overwrite the Eq t constraint with a superclass selection!
-
-At first I had a gross hack, whereby I simply did not add superclass constraints
-in addWanted, though I did for addGiven and addIrred.  This was sub-optimal,
-becuase it lost legitimate superclass sharing, and it still didn't do the job:
-I found a very obscure program (now tcrun021) in which improvement meant the
-simplifier got two bites a the cherry... so something seemed to be an Stop
-first time, but reducible next time.
-
-Now we implement the Right Solution, which is to check for loops directly 
-when adding superclasses.  It's a bit like the occurs check in unification.
 
 
 Note [RECURSIVE DICTIONARIES]
@@ -2060,6 +2091,47 @@ and it'll even run!  The trick is to put the thing we are trying to prove
 (in this case Eq (D []) into the database before trying to prove its
 contributing clauses.
 	
+Note [SUPERCLASS-LOOP 2]
+~~~~~~~~~~~~~~~~~~~~~~~~
+We need to be careful when adding "the constaint we are trying to prove".
+Suppose we are *given* d1:Ord a, and want to deduce (d2:C [a]) where
+
+	class Ord a => C a where
+	instance Ord [a] => C [a] where ...
+
+Then we'll use the instance decl to deduce C [a] from Ord [a], and then add the
+superclasses of C [a] to avails.  But we must not overwrite the binding
+for Ord [a] (which is obtained from Ord a) with a superclass selection or we'll just
+build a loop! 
+
+Here's another variant, immortalised in tcrun020
+	class Monad m => C1 m
+	class C1 m => C2 m x
+	instance C2 Maybe Bool
+For the instance decl we need to build (C1 Maybe), and it's no good if
+we run around and add (C2 Maybe Bool) and its superclasses to the avails 
+before we search for C1 Maybe.
+
+Here's another example 
+ 	class Eq b => Foo a b
+	instance Eq a => Foo [a] a
+If we are reducing
+	(Foo [t] t)
+
+we'll first deduce that it holds (via the instance decl).  We must not
+then overwrite the Eq t constraint with a superclass selection!
+
+At first I had a gross hack, whereby I simply did not add superclass constraints
+in addWanted, though I did for addGiven and addIrred.  This was sub-optimal,
+becuase it lost legitimate superclass sharing, and it still didn't do the job:
+I found a very obscure program (now tcrun021) in which improvement meant the
+simplifier got two bites a the cherry... so something seemed to be an Stop
+first time, but reducible next time.
+
+Now we implement the Right Solution, which is to check for loops directly 
+when adding superclasses.  It's a bit like the occurs check in unification.
+
+
 
 %************************************************************************
 %*									*
@@ -2141,7 +2213,7 @@ reduceImplication env
 		      	   	  tci_tyvars = tvs,
 		      	   	  tci_given = extra_givens, tci_wanted = wanteds })
   = do	{ 	-- Solve the sub-problem
-	; let try_me _ = ReduceMe AddSCs  -- Note [Freeness and implications]
+	; let try_me _ = ReduceMe  -- Note [Freeness and implications]
 	      env' = env { red_givens = extra_givens ++ red_givens env
 			 , red_doc = sep [ptext (sLit "reduceImplication for") 
                                             <+> ppr name,
@@ -2446,9 +2518,10 @@ addWanted want_scs avails wanted rhs_expr wanteds
   where
     avail = Rhs rhs_expr wanteds
 
-addGiven :: Avails -> Inst -> TcM Avails
-addGiven avails given = addAvailAndSCs AddSCs avails given (Given given)
-	-- Always add superclasses for 'givens'
+addGiven :: (Inst -> WantSCs) -> Avails -> Inst -> TcM Avails
+addGiven want_scs avails given = addAvailAndSCs (want_scs given) avails given (Given given)
+	-- Conditionally add superclasses for 'givens'
+	-- See Note [Recursive instances and superclases]
 	--
 	-- No ASSERT( not (given `elemAvails` avails) ) because in an instance
 	-- decl for Ord t we can add both Ord t and Eq t as 'givens', 

@@ -96,9 +96,9 @@ Running example:
 	op1_i = /\a. \(d:C a). 
 	       let this :: C [a]
 		   this = df_i a d
+	             -- Note [Subtle interaction of recursion and overlap]
 
 		   local_op1 :: forall b. Ix b => [a] -> b -> b
-	             -- Note [Subtle interaction of recursion and overlap]
 	           local_op1 = <rhs>
 	       	     -- Source code; run the type checker on this
 		     -- NB: Type variable 'a' (but not 'b') is in scope in <rhs>
@@ -614,9 +614,10 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = NewTypeDerived })
 
         -- Figure out bindings for the superclass context from dfun_dicts
         -- Don't include this_dict in the 'givens', else
-        -- sc_dicst get bound by just selecting from this_dict!!
+        -- sc_dicts get bound by just selecting from this_dict!!
         ; sc_binds <- addErrCtxt superClassCtxt $
-                      tcSimplifySuperClasses inst_loc dfun_dicts (rep_dict:sc_dicts)
+                      tcSimplifySuperClasses inst_loc this_dict dfun_dicts 
+					     (rep_dict:sc_dicts)
 
 	-- It's possible that the superclass stuff might unified something
 	-- in the envt with one of the clas_tyvars
@@ -735,7 +736,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = VanillaInst monobinds uprags })
     -- Don't include this_dict in the 'givens', else
     -- sc_dicts get bound by just selecting  from this_dict!!
     sc_binds <- addErrCtxt superClassCtxt $
-                tcSimplifySuperClasses inst_loc dfun_dicts sc_dicts
+                tcSimplifySuperClasses inst_loc this_dict dfun_dicts sc_dicts
 		-- Note [Recursive superclasses]
 
 	-- It's possible that the superclass stuff might unified something
