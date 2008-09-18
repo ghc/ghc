@@ -95,7 +95,11 @@
 // __attribute__((gnu_inline)).  So when we don't have this, we use
 // ordinary static inline.
 //
-#if defined(__GNUC_GNU_INLINE__)
+// Apple's gcc defines __GNUC_GNU_INLINE__ without providing
+// gnu_inline, so we exclude MacOS X and fall through to the safe
+// version.
+//
+#if defined(__GNUC_GNU_INLINE__) && !defined(__APPLE__)
 #  if defined(KEEP_INLINES)
 #    define EXTERN_INLINE inline
 #  else
