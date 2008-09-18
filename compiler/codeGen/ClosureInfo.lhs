@@ -623,11 +623,15 @@ getCallMethod name (LFThunk _ _ updatable std_form_info is_fun) n_args
     JumpToIt (thunkEntryLabel name std_form_info updatable)
 
 getCallMethod name (LFUnknown True) n_args
-  = SlowCall -- might be a function
+  = SlowCall -- Might be a function
 
 getCallMethod name (LFUnknown False) n_args
-  = ASSERT2 ( n_args == 0, ppr name <+> ppr n_args ) 
-    EnterIt -- Not a function
+  | n_args > 0 
+  = WARN( True, ppr name <+> ppr n_args ) 
+    SlowCall	-- Note [Unsafe coerce complications]
+
+  | otherwise
+  = EnterIt -- Not a function
 
 getCallMethod name (LFBlackHole _) n_args
   = SlowCall	-- Presumably the black hole has by now
@@ -676,6 +680,29 @@ isKnownFun (LFReEntrant _ _ _ _) = True
 isKnownFun (LFLetNoEscape _) = True
 isKnownFun _ = False
 \end{code}
+
+Note [Unsafe coerce complications]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In some (badly-optimised) DPH code we see this
+   Module X:    rr :: Int = error Int "Urk"
+   Module Y:    ...((X.rr |> g) True) ...
+     where g is an (unsafe) coercion of kind (Int ~ Bool->Bool), say
+
+It's badly optimised, because knowing that 'X.rr' is bottom, we should
+have dumped the application to True.  But it should still work. These
+strange unsafe coercions arise from the case-of-error transformation:
+	(case (error Int "foo") of { ... }) True
+--->	(error Int "foo" |> g) True
+
+Anyway, the net effect is that in STG-land, when casts are discarded,
+we *can* see a value of type Int applied to an argument.  This only happens
+if (a) the programmer made a mistake, or (b) the value of type Int is
+actually bottom.
+
+So it's wrong to trigger an ASSERT failure in this circumstance.  Instead
+we now emit a WARN -- mainly to draw attention to a probably-badly-optimised
+program fragment -- and do the conservative thing which is SlowCall.
+
 
 -----------------------------------------------------------------------------
 SRT-related stuff
