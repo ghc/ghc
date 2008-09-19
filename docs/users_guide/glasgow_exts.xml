@@ -3440,14 +3440,36 @@ Notice that we gave a type signature to <literal>f</literal>, so GHC had to
 <emphasis>check</emphasis> that <literal>f</literal> has the specified type.  
 Suppose instead we do not give a type signature, asking GHC to <emphasis>infer</emphasis>
 it instead.  In this case, GHC will refrain from
-simplifying the constraint <literal>C Int [Int]</literal> (for the same reason
+simplifying the constraint <literal>C Int [b]</literal> (for the same reason
 as before) but, rather than rejecting the program, it will infer the type
 <programlisting>
-  f :: C Int b => [b] -> [b]
+  f :: C Int [b] => [b] -> [b]
 </programlisting>
 That postpones the question of which instance to pick to the 
 call site for <literal>f</literal>
 by which time more is known about the type <literal>b</literal>.
+You can write this type signature yourself if you use the 
+<link linkend="flexible-contexts"><option>-XFlexibleContexts</option></link>
+flag.
+</para>
+<para>
+Exactly the same situation can arise in instance declarations themselves.  Suppose we have
+<programlisting>
+  class Foo a where
+     f :: a -> a
+  instance Foo [b] where
+     f x = ...
+</programlisting>
+and, as before, the constraint <literal>C Int [b]</literal> arises from <literal>f</literal>'s
+right hand side.  GHC will reject the instance, complaining as before that it does not know how to resolve
+the constraint <literal>C Int [b]</literal>, because it matches more than one instance
+declaration.  The solution is to postpone the choice by adding the constraint to the context
+of the instance declaration, thus:
+<programlisting>
+  instance C Int [b] => Foo [b] where
+     f x = ...
+</programlisting>
+(You need <link linkend="instance-rules"><option>-XFlexibleInstances</option></link> to do this.)
 </para>
 <para>
 The willingness to be overlapped or incoherent is a property of 
@@ -3622,9 +3644,11 @@ to work since it gets translated into an equality comparison.
 
 <sect3 id="flexible-contexts"><title>The context of a type signature</title>
 <para>
-Unlike Haskell 98, constraints in types do <emphasis>not</emphasis> have to be of
-the form <emphasis>(class type-variable)</emphasis> or
-<emphasis>(class (type-variable type-variable ...))</emphasis>.  Thus,
+The <option>-XFlexibleContexts</option> flag lifts the Haskell 98 restriction
+that the type-class constraints in a type signature must have the 
+form <emphasis>(class type-variable)</emphasis> or
+<emphasis>(class (type-variable type-variable ...))</emphasis>. 
+With <option>-XFlexibleContexts</option>
 these type signatures are perfectly OK
 <programlisting>
   g :: Eq [a] => ...
