@@ -513,7 +513,7 @@ SRC_DIST_FILES += \
 #   - remove a bunch of other files that we know shouldn't be in the dist
 #   - tar up first the extralibs package, then the main source package
 
-EXTRA_LIBS=$(patsubst %, $(SRC_DIST_NAME)/libraries/%, $(shell cat libraries/extra-packages))
+EXTRA_LIBS=$(patsubst %, $(SRC_DIST_NAME)/%, $(shell grep -E "extralibs|dph" packages | grep -v "^#" | sed "s/ .*//"))
 
 SRC_DIST_TARBALL = ghc-$(ProjectVersion)-src.tar.bz2
 SRC_DIST_EXTRALIBS_TARBALL = ghc-$(ProjectVersion)-src-extralibs.tar.bz2
