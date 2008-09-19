@@ -122,7 +122,10 @@ test('tcfail134', normal, compile_fail, [''])
 test('tcfail135', normal, compile_fail, [''])
 test('tcfail136', normal, compile_fail, [''])
 test('tcfail137', normal, compile_fail, [''])
-test('tcfail138', normal, compile_fail, [''])
+
+test('tcfail138', normal, compile, [''])
+# Now works; see notes in file
+
 test('tcfail139', normal, compile_fail, [''])
 test('tcfail140', expect_broken(451), compile_fail, [''])
 test('tcfail141', only_compiler_types(['ghc']), compile_fail, [''])
