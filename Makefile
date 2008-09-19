@@ -336,6 +336,7 @@ binary-dist::
 	$(MAKE) -C driver              binary-dist WHERE_AM_I=$(WHERE_AM_I)/driver
 	$(MAKE) -C utils               binary-dist WHERE_AM_I=$(WHERE_AM_I)/utils
 	$(MAKE) -C docs                binary-dist WHERE_AM_I=$(WHERE_AM_I)/docs
+	$(MAKE) -C libffi              binary-dist WHERE_AM_I=$(WHERE_AM_I)/libffi
 	$(MAKE) -C libraries           binary-dist WHERE_AM_I=$(WHERE_AM_I)/libraries
 	$(MAKE) -C libraries/Cabal/doc binary-dist WHERE_AM_I=$(WHERE_AM_I)/libraries/Cabal/doc
 # Now thinks get messier. Some files we need to move around, rename or
