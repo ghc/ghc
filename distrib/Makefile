@@ -25,6 +25,7 @@ install::
 	$(MAKE) -C utils     install      DOING_BIN_DIST=YES
 	$(MAKE) -C rts       install      DOING_BIN_DIST=YES
 	$(MAKE) -C libraries install      DOING_BIN_DIST=YES
+	$(MAKE) -C libffi    install      DOING_BIN_DIST=YES
 	$(MAKE) -C compiler  install      DOING_BIN_DIST=YES
 	$(MAKE) -C ghc       install      DOING_BIN_DIST=YES
 	$(MAKE) -C driver    install      DOING_BIN_DIST=YES
