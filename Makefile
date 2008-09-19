@@ -533,6 +533,12 @@ copy_generated_compiler_file = \
     $(CP) $(FPTOOLS_TOP_ABS)/compiler/dist-stage2/build/$2.hs compiler/$1/ ; \
     mv compiler/$1/$2.$3 compiler/$1/$2.$3.source ; \
   fi
+copy_generated_util_file = \
+  if test -f $(FPTOOLS_TOP_ABS)/utils/$1/dist-install/build/$1/$1-tmp/$2.hs; \
+  then \
+    $(CP) $(FPTOOLS_TOP_ABS)/utils/$1/dist-install/build/$1/$1-tmp/$2.hs utils/$1/ ; \
+    mv utils/$1/$2.$3 utils/$1/$2.$3.source ; \
+  fi
 
 dist ::
 	$(RM) -rf $(SRC_DIST_DIR)
@@ -551,6 +557,7 @@ dist ::
 	  && $(call copy_generated_compiler_file,parser,Lexer,x) \
 	  && $(call copy_generated_compiler_file,parser,Parser,y.pp) \
 	  && $(call copy_generated_compiler_file,parser,ParserCore,y) \
+	  && $(call copy_generated_util_file,hpc,HpcParser,y) \
 	  && $(RM) -rf compiler/stage[123] mk/build.mk \
 	  && $(FIND) $(SRC_DIST_DIRS) \( -name _darcs -o -name SRC -o -name "autom4te*" -o -name "*~" -o -name ".cvsignore" -o -name "\#*" -o -name ".\#*" -o -name "log" -o -name "*-SAVE" -o -name "*.orig" -o -name "*.rej" \) -print | xargs $(RM) -rf \
 	)
