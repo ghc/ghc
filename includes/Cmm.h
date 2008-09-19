@@ -25,7 +25,7 @@
  *       - Hp += n  ==> Hp_adj(n)
  *       - R1.i   ==>  R1   (similarly for R1.w, R1.cl etc.)
  *       - You need to explicitly dereference variables; eg. 
- *             context_switch   ==>  CInt[context_switch]
+ *             alloc_blocks   ==>  CInt[alloc_blocks]
  *       - convert all word offsets into byte offsets:
  *         	- e ==> WDS(e)
  *       - sizeofW(StgFoo)  ==>  SIZEOF_StgFoo

@@ -619,7 +619,6 @@ extern StgWord rts_stop_on_exception[];
 extern StgWord rts_breakpoint_io_action[];
 
 // Schedule.c
-extern int RTS_VAR(context_switch);
 extern StgWord RTS_VAR(blocked_queue_hd), RTS_VAR(blocked_queue_tl);
 extern StgWord RTS_VAR(sleeping_queue);
 extern StgWord RTS_VAR(blackhole_queue);

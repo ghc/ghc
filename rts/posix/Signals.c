@@ -226,14 +226,14 @@ generic_handler(int sig)
 	stg_exit(EXIT_FAILURE);
     }
     
+    MainCapability.context_switch = 1;
+
 #endif /* THREADED_RTS */
 
     // re-establish the signal handler, and carry on
     sigemptyset(&signals);
     sigaddset(&signals, sig);
     sigprocmask(SIG_UNBLOCK, &signals, NULL);
-
-    context_switch = 1;
 }
 
 /* -----------------------------------------------------------------------------

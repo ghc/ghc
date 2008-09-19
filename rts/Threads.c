@@ -507,14 +507,14 @@ unblockOne_ (Capability *cap, StgTSO *tso,
       appendToRunQueue(cap,tso);
       // we're holding a newly woken thread, make sure we context switch
       // quickly so we can migrate it if necessary.
-      context_switch = 1;
+      cap->context_switch = 1;
   } else {
       // we'll try to wake it up on the Capability it was last on.
       wakeupThreadOnCapability(cap, tso->cap, tso);
   }
 #else
   appendToRunQueue(cap,tso);
-  context_switch = 1;
+  cap->context_switch = 1;
 #endif
 
   debugTrace(DEBUG_sched,

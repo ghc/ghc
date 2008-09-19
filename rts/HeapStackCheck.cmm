@@ -66,7 +66,7 @@ import LeaveCriticalSection;
             CLOSE_NURSERY();					\
             CurrentNursery = bdescr_link(CurrentNursery);	\
             OPEN_NURSERY();					\
-            if (CInt[context_switch] != 0 :: CInt) {		\
+            if (Capability_context_switch(MyCapability()) != 0 :: CInt) { \
                 R1 = ThreadYielding;				\
                 goto sched;					\
             } else {						\

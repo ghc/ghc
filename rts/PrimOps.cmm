@@ -970,7 +970,7 @@ forkzh_fast
   foreign "C" scheduleThread(MyCapability() "ptr", threadid "ptr") [];
 
   // switch at the earliest opportunity
-  CInt[context_switch] = 1 :: CInt;
+  Capability_context_switch(MyCapability()) = 1 :: CInt;
   
   RET_P(threadid);
 }
@@ -999,7 +999,7 @@ forkOnzh_fast
   foreign "C" scheduleThreadOn(MyCapability() "ptr", cpu, threadid "ptr") [];
 
   // switch at the earliest opportunity
-  CInt[context_switch] = 1 :: CInt;
+  Capability_context_switch(MyCapability()) = 1 :: CInt;
   
   RET_P(threadid);
 }

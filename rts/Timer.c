@@ -47,7 +47,7 @@ handle_tick(int unused STG_UNUSED)
       ticks_to_ctxt_switch--;
       if (ticks_to_ctxt_switch <= 0) {
 	  ticks_to_ctxt_switch = RtsFlags.ConcFlags.ctxtSwitchTicks;
-	  context_switch = 1;	/* schedule a context switch */
+	  setContextSwitches();	/* schedule a context switch */
       }
   }
 

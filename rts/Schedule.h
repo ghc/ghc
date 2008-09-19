@@ -89,11 +89,6 @@ void    awaken_blocked_queue(StgTSO *q);
 void    initThread(StgTSO *tso, nat stack_size);
 #endif
 
-/* Context switch flag.
- * Locks required  : none (conflicts are harmless)
- */
-extern int RTS_VAR(context_switch);
-
 /* The state of the scheduler.  This is used to control the sequence
  * of events during shutdown, and when the runtime is interrupted
  * using ^C.

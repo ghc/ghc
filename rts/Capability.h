@@ -66,6 +66,10 @@ struct Capability_ {
     // each GC.
     bdescr **mut_lists;
 
+    // Context switch flag. We used to have one global flag, now one 
+    // per capability. Locks required  : none (conflicts are harmless)
+    int context_switch;
+
 #if defined(THREADED_RTS)
     // Worker Tasks waiting in the wings.  Singly-linked.
     Task *spare_workers;
@@ -231,6 +235,9 @@ rtsBool tryGrabCapability (Capability *cap, Task *task);
 extern void grabCapability (Capability **pCap);
 
 #endif /* !THREADED_RTS */
+
+// cause all capabilities to context switch as soon as possible.
+void setContextSwitches(void);
 
 // Free a capability on exit
 void freeCapability (Capability *cap);

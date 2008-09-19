@@ -161,6 +161,7 @@ initCapability( Capability *cap, nat i )
     cap->free_trec_chunks = END_STM_CHUNK_LIST;
     cap->free_trec_headers = NO_TREC;
     cap->transaction_tokens = 0;
+    cap->context_switch = 0;
 }
 
 /* ---------------------------------------------------------------------------
@@ -215,6 +216,19 @@ initCapabilities( void )
     // a worker Task to each Capability, which will quickly put the
     // Capability on the free list when it finds nothing to do.
     last_free_capability = &capabilities[0];
+}
+
+/* ----------------------------------------------------------------------------
+ * setContextSwitches: cause all capabilities to context switch as
+ * soon as possible.
+ * ------------------------------------------------------------------------- */
+
+void setContextSwitches(void)
+{
+  nat i;
+  for (i=0; i < n_capabilities; i++) {
+    capabilities[i].context_switch = 1;
+  }
 }
 
 /* ----------------------------------------------------------------------------
@@ -568,6 +582,7 @@ wakeupThreadOnCapability (Capability *my_cap,
 	releaseCapability_(other_cap);
     } else {
 	appendToWakeupQueue(my_cap,other_cap,tso);
+        other_cap->context_switch = 1;
 	// someone is running on this Capability, so it cannot be
 	// freed without first checking the wakeup queue (see
 	// releaseCapability_).

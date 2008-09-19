@@ -89,11 +89,6 @@ StgTSO *blackhole_queue = NULL;
  */
 rtsBool blackholes_need_checking = rtsFalse;
 
-/* flag set by signal handler to precipitate a context switch
- * LOCK: none (just an advisory flag)
- */
-int context_switch = 0;
-
 /* flag that tracks whether we have done any execution in this time slice.
  * LOCK: currently none, perhaps we should lock (but needs to be
  * updated in the fast path of the scheduler).
@@ -504,7 +499,7 @@ schedule (Capability *initialCapability, Task *task)
      */
     if (RtsFlags.ConcFlags.ctxtSwitchTicks == 0
 	&& !emptyThreadQueues(cap)) {
-	context_switch = 1;
+	cap->context_switch = 1;
     }
 	 
 run_thread:
@@ -1179,12 +1174,12 @@ scheduleHandleHeapOverflow( Capability *cap, StgTSO *t )
 	       "--<< thread %ld (%s) stopped: HeapOverflow",
 	       (long)t->id, whatNext_strs[t->what_next]);
 
-    if (context_switch) {
+    if (cap->context_switch) {
         // Sometimes we miss a context switch, e.g. when calling
         // primitives in a tight loop, MAYBE_GC() doesn't check the
         // context switch flag, and we end up waiting for a GC.
         // See #1984, and concurrent/should_run/1984
-        context_switch = 0;
+        cap->context_switch = 0;
         addToRunQueue(cap,t);
     } else {
         pushOnRunQueue(cap,t);
@@ -1234,7 +1229,7 @@ scheduleHandleYield( Capability *cap, StgTSO *t, nat prev_what_next )
     // the CPU because the tick always arrives during GC).  This way
     // penalises threads that do a lot of allocation, but that seems
     // better than the alternative.
-    context_switch = 0;
+    cap->context_switch = 0;
     
     /* put the thread back on the run queue.  Then, if we're ready to
      * GC, check whether this is the last task to stop.  If so, wake
@@ -1435,6 +1430,7 @@ scheduleDoGC (Capability *cap, Task *task USED_IF_THREADS, rtsBool force_major)
 	return cap;  // NOTE: task->cap might have changed here
     }
 
+    setContextSwitches();
     for (i=0; i < n_capabilities; i++) {
 	debugTrace(DEBUG_sched, "ready_to_gc, grabbing all the capabilies (%d/%d)", i, n_capabilities);
 	if (cap != &capabilities[i]) {
@@ -1445,7 +1441,6 @@ scheduleDoGC (Capability *cap, Task *task USED_IF_THREADS, rtsBool force_major)
 	    // all the Capabilities, but even so it's a slightly
 	    // unsavoury invariant.
 	    task->cap = pcap;
-	    context_switch = 1;
 	    waitForReturnCapability(&pcap, task);
 	    if (pcap != &capabilities[i]) {
 		barf("scheduleDoGC: got the wrong capability");
@@ -1954,7 +1949,6 @@ initScheduler(void)
 
   blackhole_queue   = END_TSO_QUEUE;
 
-  context_switch = 0;
   sched_state    = SCHED_RUNNING;
   recent_activity = ACTIVITY_YES;
 
@@ -2247,7 +2241,7 @@ void
 interruptStgRts(void)
 {
     sched_state = SCHED_INTERRUPTING;
-    context_switch = 1;
+    setContextSwitches();
     wakeUpRts();
 }
 
