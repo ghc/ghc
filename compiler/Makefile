@@ -189,7 +189,13 @@ CONFIGURE_FLAGS_STAGE1 += $(USE_BOOT_CONFIGURE_FLAGS)
 CONFIGURE_FLAGS_STAGE2 += $(USE_STAGE1_CONFIGURE_FLAGS)
 CONFIGURE_FLAGS_STAGE3 += $(USE_STAGE2_CONFIGURE_FLAGS)
 
-boot.stage.%: $(PRIMOP_BITS) $(CONFIG_HS) parser/Parser.y
+# In a source dist we don't need to worry about Parser.y(.pp) as we have
+# the .hs file pre-generated
+ifneq "$(wildcard parser/Parser.y.pp)" ""
+PARSER_Y = parser/Parser.y
+endif
+
+boot.stage.%: $(PRIMOP_BITS) $(CONFIG_HS) $(PARSER_Y)
 	test -f $(STAGE3_PACKAGE_CONF) || echo "[]" > $(STAGE3_PACKAGE_CONF)
 	$(CABAL) configure --distpref dist-stage$* \
 	                   $(CONFIGURE_FLAGS_STAGE$*) \
