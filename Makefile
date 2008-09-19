@@ -545,10 +545,10 @@ dist ::
 	  && if test -f $(FPTOOLS_TOP_ABS)/libraries/haskell-src/dist/build/Language/Haskell/Parser.hs; then $(CP) $(FPTOOLS_TOP_ABS)/libraries/haskell-src/dist/build/Language/Haskell/Parser.hs libraries/haskell-src/Language/Haskell/ ; mv libraries/haskell-src/Language/Haskell/Parser.ly libraries/haskell-src/Language/Haskell/Parser.ly.source ; fi \
 	  && $(call copy_generated_compiler_file,cmm,CmmLex,x) \
 	  && $(call copy_generated_compiler_file,cmm,CmmParse,y) \
+	  && $(call copy_generated_compiler_file,main,ParsePkgConf,y) \
 	  && $(call copy_generated_compiler_file,parser,HaddockLex,x) \
 	  && $(call copy_generated_compiler_file,parser,HaddockParse,y) \
 	  && $(call copy_generated_compiler_file,parser,Lexer,x) \
-	  && $(call copy_generated_compiler_file,parser,ParsePkgCore,y) \
 	  && $(call copy_generated_compiler_file,parser,Parser,y.pp) \
 	  && $(call copy_generated_compiler_file,parser,ParserCore,y) \
 	  && $(RM) -rf compiler/stage[123] mk/build.mk \
