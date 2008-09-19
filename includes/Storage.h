@@ -204,7 +204,7 @@ doYouWantToGC( void )
 }
 
 /* memory allocator for executable memory */
-extern void *allocateExec (nat bytes);
+extern void* allocateExec(unsigned int len, void **exec_addr);
 extern void freeExec (void *p);
 
 /* for splitting blocks groups in two */

@@ -90,6 +90,7 @@ createAdjustor (int cconv,
     ffi_type *result_type;
     ffi_closure *cl;
     int r, abi;
+    void *code;
 
     n_args = strlen(typeString) - 1;
     cif = stgMallocBytes(sizeof(ffi_cif), "createAdjustor");
@@ -115,13 +116,15 @@ createAdjustor (int cconv,
     r = ffi_prep_cif(cif, abi, n_args, result_type, arg_types);
     if (r != FFI_OK) barf("ffi_prep_cif failed: %d", r);
     
-    // ToDo: use ffi_closure_alloc()
-    cl = allocateExec(sizeof(ffi_closure));
+    cl = allocateExec(sizeof(ffi_closure), &code);
+    if (cl == NULL) {
+        barf("createAdjustor: failed to allocate memory");
+    }
 
     r = ffi_prep_closure(cl, cif, (void*)wptr, hptr/*userdata*/);
     if (r != FFI_OK) barf("ffi_prep_closure failed: %d", r);
 
-    return (void*)cl;
+    return (void*)code;
 }
 
 #else // To end of file...
@@ -329,6 +332,7 @@ createAdjustor(int cconv, StgStablePtr hptr,
               )
 {
   void *adjustor = NULL;
+  void *code;
 
   switch (cconv)
   {
@@ -346,7 +350,7 @@ createAdjustor(int cconv, StgStablePtr hptr,
      <c>: 	ff e0             jmp    %eax        	   # and jump to it.
 		# the callee cleans up the stack
     */
-    adjustor = allocateExec(14);
+    adjustor = allocateExec(14,&code);
     {
 	unsigned char *const adj_code = (unsigned char *)adjustor;
 	adj_code[0x00] = (unsigned char)0x58;  /* popl %eax  */
@@ -391,7 +395,7 @@ createAdjustor(int cconv, StgStablePtr hptr,
     That's (thankfully) the case here with the restricted set of 
     return types that we support.
   */
-    adjustor = allocateExec(17);
+    adjustor = allocateExec(17,&code);
     {
 	unsigned char *const adj_code = (unsigned char *)adjustor;
 
@@ -416,7 +420,7 @@ createAdjustor(int cconv, StgStablePtr hptr,
           
           We offload most of the work to AdjustorAsm.S.
         */
-        AdjustorStub *adjustorStub = allocateExec(sizeof(AdjustorStub));
+        AdjustorStub *adjustorStub = allocateExec(sizeof(AdjustorStub),&code);
         adjustor = adjustorStub;
 
         extern void adjustorCode(void);
@@ -514,7 +518,7 @@ createAdjustor(int cconv, StgStablePtr hptr,
 	}
 
 	if (i < 6) {
-	    adjustor = allocateExec(0x30);
+	    adjustor = allocateExec(0x30,&code);
 
 	    *(StgInt32 *)adjustor        = 0x49c1894d;
 	    *(StgInt32 *)(adjustor+0x4)  = 0x8948c889;
@@ -528,7 +532,7 @@ createAdjustor(int cconv, StgStablePtr hptr,
 	}
 	else
 	{
-	    adjustor = allocateExec(0x40);
+	    adjustor = allocateExec(0x40,&code);
 
 	    *(StgInt32 *)adjustor        = 0x35ff5141;
 	    *(StgInt32 *)(adjustor+0x4)  = 0x00000020;
@@ -575,7 +579,7 @@ createAdjustor(int cconv, StgStablePtr hptr,
      similarly, and local variables should be accessed via %fp, not %sp. In a
      nutshell: This should work! (Famous last words! :-)
   */
-    adjustor = allocateExec(4*(11+1));
+    adjustor = allocateExec(4*(11+1),&code);
     {
         unsigned long *const adj_code = (unsigned long *)adjustor;
 
@@ -652,7 +656,7 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
       4 bytes (getting rid of the nop), hence saving memory. [ccshan]
   */
     ASSERT(((StgWord64)wptr & 3) == 0);
-    adjustor = allocateExec(48);
+    adjustor = allocateExec(48,&code);
     {
 	StgWord64 *const code = (StgWord64 *)adjustor;
 
@@ -757,7 +761,7 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
             */
                     // allocate space for at most 4 insns per parameter
                     // plus 14 more instructions.
-        adjustor = allocateExec(4 * (4*n + 14));
+        adjustor = allocateExec(4 * (4*n + 14),&code);
         code = (unsigned*)adjustor;
         
         *code++ = 0x48000008; // b *+8
@@ -916,7 +920,7 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
 #ifdef FUNDESCS
         adjustorStub = stgMallocBytes(sizeof(AdjustorStub), "createAdjustor");
 #else
-        adjustorStub = allocateExec(sizeof(AdjustorStub));
+        adjustorStub = allocateExec(sizeof(AdjustorStub),&code);
 #endif
         adjustor = adjustorStub;
             
@@ -1089,7 +1093,7 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
   }
 
   /* Have fun! */
-  return adjustor;
+  return code;
 }
 
 
@@ -1167,7 +1171,8 @@ if ( *(unsigned char*)ptr != 0xe8 ) {
 #else
  ASSERT(0);
 #endif
- *((unsigned char*)ptr) = '\0';
+ // Can't write to this memory, it is only executable:
+ // *((unsigned char*)ptr) = '\0';
 
  freeExec(ptr);
 }

@@ -28,14 +28,16 @@ moan64 msg pp_rep
 
 newExec :: Storable a => [a] -> IO (FunPtr ())
 newExec code
-   = do ptr <- _allocateExec (fromIntegral $ codeSize undefined code)
+   = alloca $ \pcode -> do
+        ptr <- _allocateExec (fromIntegral $ codeSize undefined code) pcode
         pokeArray ptr code
-        return (castPtrToFunPtr ptr)
+        code <- peek pcode
+        return (castPtrToFunPtr code)
    where
    codeSize :: Storable a => a -> [a] -> Int
    codeSize dummy array = sizeOf(dummy) * length array
 
 foreign import ccall unsafe "allocateExec"
-  _allocateExec :: CUInt -> IO (Ptr a)  
+  _allocateExec :: CUInt -> Ptr (Ptr a) -> IO (Ptr a)  
 \end{code}
 

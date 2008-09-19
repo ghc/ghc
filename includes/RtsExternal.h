@@ -111,7 +111,7 @@ void sendIOManagerEvent (HsWord32 event);
 extern void setIOManagerPipe (int fd);
 #endif
 
-extern void* allocateExec(unsigned int len);
+extern void* allocateExec(unsigned int len, void **exec_addr);
 
 // Breakpoint stuff
 

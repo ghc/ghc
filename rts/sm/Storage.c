@@ -35,6 +35,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "ffi.h"
+
 /* 
  * All these globals require sm_mutex to access in THREADED_RTS mode.
  */
@@ -45,6 +47,8 @@ rtsBool       keepCAFs;
 bdescr *pinned_object_block;    /* allocate pinned objects into this block */
 nat alloc_blocks;		/* number of allocate()d blocks since GC */
 nat alloc_blocks_lim;		/* approximate limit on alloc_blocks */
+
+static bdescr *exec_block;
 
 generation *generations = NULL;	/* all the generations */
 generation *g0		= NULL; /* generation 0, for convenience */
@@ -260,6 +264,8 @@ initStorage( void )
   /* initialise the allocate() interface */
   alloc_blocks = 0;
   alloc_blocks_lim = RtsFlags.GcFlags.minAllocAreaSize;
+
+  exec_block = NULL;
 
   /* Tell GNU multi-precision pkg about our custom alloc functions */
   mp_set_memory_functions(stgAllocForGMP, stgReallocForGMP, stgDeallocForGMP);
@@ -1134,9 +1140,37 @@ calcNeeded(void)
          should be modified to use allocateExec instead of VirtualAlloc.
    ------------------------------------------------------------------------- */
 
-static bdescr *exec_block;
+#if defined(linux_HOST_OS)
 
-void *allocateExec (nat bytes)
+// On Linux we need to use libffi for allocating executable memory,
+// because it knows how to work around the restrictions put in place
+// by SELinux.
+
+void *allocateExec (nat bytes, void **exec_ret)
+{
+    void **ret, **exec;
+    ACQUIRE_SM_LOCK;
+    ret = ffi_closure_alloc (sizeof(void *) + (size_t)bytes, (void**)&exec);
+    RELEASE_SM_LOCK;
+    if (ret == NULL) return ret;
+    *ret = ret; // save the address of the writable mapping, for freeExec().
+    *exec_ret = exec + 1;
+    return (ret + 1);
+}
+
+// freeExec gets passed the executable address, not the writable address. 
+void freeExec (void *addr)
+{
+    void *writable;
+    writable = *((void**)addr - 1);
+    ACQUIRE_SM_LOCK;
+    ffi_closure_free (writable);
+    RELEASE_SM_LOCK
+}
+
+#else
+
+void *allocateExec (nat bytes, void **exec_ret)
 {
     void *ret;
     nat n;
@@ -1172,6 +1206,7 @@ void *allocateExec (nat bytes)
     exec_block->free += n + 1;
 
     RELEASE_SM_LOCK
+    *exec_ret = ret;
     return ret;
 }
 
@@ -1208,6 +1243,8 @@ void freeExec (void *addr)
 
     RELEASE_SM_LOCK
 }    
+
+#endif /* mingw32_HOST_OS */
 
 /* -----------------------------------------------------------------------------
    Debugging
