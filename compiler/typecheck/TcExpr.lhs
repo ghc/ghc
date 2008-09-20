@@ -1210,7 +1210,7 @@ badFieldsUpd rbinds
 naughtyRecordSel sel_id
   = ptext (sLit "Cannot use record selector") <+> quotes (ppr sel_id) <+> 
     ptext (sLit "as a function due to escaped type variables") $$ 
-    ptext (sLit "Probably fix: use pattern-matching syntax instead")
+    ptext (sLit "Probable fix: use pattern-matching syntax instead")
 
 notSelector field
   = hsep [quotes (ppr field), ptext (sLit "is not a record selector")]
