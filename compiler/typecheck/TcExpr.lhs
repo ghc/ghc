@@ -315,9 +315,18 @@ tcExpr (HsIf pred b1 b2) res_ty
 tcExpr (HsDo do_or_lc stmts body _) res_ty
   = tcDoStmts do_or_lc stmts body res_ty
 
-tcExpr in_expr@(ExplicitList _ exprs) res_ty	-- Non-empty list
+tcExpr in_expr@(ExplicitList _ exprs) res_ty
   = do 	{ (elt_ty, coi) <- boxySplitListTy res_ty
 	; exprs' <- mapM (tc_elt elt_ty) exprs
+	; when (null exprs) (zapToMonotype elt_ty >> return ())
+		-- If there are no expressions in the comprehension
+		-- we must still fill in the box
+		--
+		-- The GHC front end never generates an empty ExplicitList
+		-- (instead it generates the [] data constructor) but
+		-- Template Haskell might.  We could fix the bit of 
+		-- TH that generates ExplicitList, but it seems less
+		-- fragile to just handle the case here.
 	; return $ mkHsWrapCoI coi (ExplicitList elt_ty exprs') }
   where
     tc_elt elt_ty expr = tcPolyExpr expr elt_ty
