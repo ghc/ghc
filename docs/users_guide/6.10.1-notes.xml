@@ -739,5 +739,469 @@ Prelude&gt;
     </itemizedlist>
   </sect2>
 
+  <sect2> 
+    <title>Boot Libraries</title>
+
+    <sect3>
+      <title>array</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            Version number 0.2.0.0 (was 0.1.0.0)
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+      <title>base</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            Version number 4.0.0.0 (was 3.0.2.0)
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            We also ship a base version 3.0.3.0, so legacy code should
+            continue to work.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            There is a new module <literal>Control.Category</literal>.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>&gt;&gt;&gt;</literal> is no longer a method of the
+            <literal>Arrow</literal> class; instead
+            <literal>Category</literal> is a superclass of
+            <literal>Arrow</literal>.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>pure</literal> is no longer a method of the
+            <literal>Arrow</literal> class; use <literal>arr</literal>
+            instead.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>Control.Exception</literal> now uses extensible
+            exceptions. The old style of exceptions are still available
+            in <literal>Control.OldException</literal>, but we expect to
+            remove them in a future release.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            There is a new function
+            <literal>System.Exit.exitSuccess :: IO a</literal>
+            analogous to the existing
+            <literal>System.Exit.exitFailure :: IO a</literal>.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            There are new functions
+            <literal>Data.Either.lefts :: [Either a b] -&gt; [a]</literal>,
+            <literal>Data.Either.rights :: [Either a b] -&gt; [b]</literal>
+            and
+            <literal>
+            Data.Either.partitionEithers :: [Either a b] -&gt; ([a], [b])
+            </literal>.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            The new function
+            <literal>Data.List.subsequences :: [a] -&gt; [[a]]</literal>
+            gives all sublists of a list, e.g.
+            <literal>
+            subsequences "abc" ==
+            ["","a","b","ab","c","ac","bc","abc"]
+            </literal>.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            The new function
+            <literal>Data.List.permutations :: [a] -&gt; [[a]]</literal>
+            gives all permutations of a list, e.g.
+            <literal>
+            permutations "abc" ==
+            ["abc","bac","cba","bca","cab","acb"]
+            </literal>.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            The new functions
+            <literal>Data.Traversable.mapAccumL</literal> and
+            <literal>Data.Traversable.mapAccumR</literal> generalise their
+            <literal>Data.List</literal> counterparts to work on any
+            <literal>Traversable</literal> type.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            The new function
+            <literal>Control.Exception.blocked :: IO Bool</literal>
+            tells you whether or not exceptions are blocked (as controlled
+            by <literal>Control.Exception.(un)block</literal>).
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            There is a new function
+            <literal>traceShow :: Show a => a -> b -> b</literal> in
+            <literal>Debug.Trace</literal>.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            The type of <literal>Control.Monad.forever</literal> has
+            been generalised from
+            <literal>Monad m =&gt; m a -&gt; m ()</literal> to
+            <literal>Monad m =&gt; m a -&gt; m b</literal>.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            The new value <literal>GHC.Exts.maxTupleSize</literal>
+            tells you the largest tuple size that can be used. This is
+            mostly of use in Template Haskell programs.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>GHC.Exts</literal> now exports
+            <literal>Down(..)</literal>,
+            <literal>groupWith</literal>,
+            <literal>sortWith</literal> and
+            <literal>the</literal> which are used in the desugaring of
+            generalised comprehensions.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>GHC.Exts</literal> no longer exports the
+            <literal>Integer</literal> internals. If you want them then
+            you need to get them directly from the
+            new <literal>integer</literal> package.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            The new function <literal>GHC.Conc.threadStatus</literal>
+            allows you to ask whether a thread is running, blocked on
+            an MVar, etc.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            The <literal>Data.Generics</literal> hierarchy has been
+            moved to a new package <literal>syb</literal>.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            The <literal>GHC.Prim</literal> and
+            <literal>GHC.PrimopWrappers</literal> modules have been
+            moved into a new <literal>ghc-prim</literal> package.
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+      <title>bytestring</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            Version number 0.9.0.1.2 (was 0.9.0.1.1)
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+      <title>Cabal</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            Version number 1.6.0.0 (was 1.2.4.0)
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            Many API changes. See the Cabal docs for more information.
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+      <title>containers</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            Version number 0.2.0.0 (was 0.1.0.2)
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            Various result type now use <literal>Maybe</literal> rather
+            than allowing any Monad.
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+      <title>directory</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            Version number 1.0.0.2 (was 1.0.0.1)
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            No longer defines the UNICODE CPP symbol for packages that
+            use it.
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+      <title>editline</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            This is a new bootlib, version 0.2.0.0.
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+      <title>filepath</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            Version number 1.1.0.1 (was 1.1.0.0)
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+      <title>ghc-prim</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            This is a new bootlib, version 0.1.0.0.
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+      <title>haskell98</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            Version number 1.0.1.0 (unchanged)
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+      <title>hpc</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            Version number 0.5.0.2 (was 0.5.0.1)
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+      <title>integer</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            This is a new bootlib, version 0.1.0.0.
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+      <title>old-locale</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            Version number 1.0.0.1 (was 1.0.0.0)
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+      <title>old-time</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            Version number 1.0.0.1 (was 1.0.0.0)
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+      <title>packedstring</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            Version number 0.1.0.1 (was 0.1.0.0)
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+      <title>pretty</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            Version number 1.0.1.0 (was 1.0.0.0)
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            There is a new combinator
+            <literal>zeroWidthText :: String -&gt; Doc</literal>
+            for printing things like ANSI escape sequences.
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+      <title>process</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            Version number 1.0.1.0 (was 1.0.0.1)
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            The <literal>System.Process</literal> API has been overhauled.
+            The new API is a superset of the old API, however.
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+      <title>random</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            Version number 1.0.0.1 (was 1.0.0.0)
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+      <title>readline</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            This is no longer a bootlib; editline replaces it.
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+      <title>syb</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            This is a new bootlib, version 0.1.0.0.
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+      <title>template-haskell</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            Version number 2.3.0.0 (was 2.2.0.0)
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            The datatypes now have support for Word primitives.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>currentModule :: Q String</literal> has been
+            replaced with
+            <literal>location :: Q Loc</literal>, where
+            <literal>Loc</literal> is a new datatype.
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+      <title>unix</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            Version number 2.3.1.0 (was 2.3.0.1)
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            The <literal>System.Posix.Terminal.BaudRate</literal> type
+            now includes <literal>B57600</literal> and
+            <literal>B115200</literal> constructors.
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+      <title>Win32</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            Version number 2.2.0.0 (was 2.1.1.1)
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            No longer defines the UNICODE CPP symbol for packages that
+            use it.
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+  </sect2>
 </sect1>
 
