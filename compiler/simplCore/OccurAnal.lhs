@@ -20,6 +20,7 @@ module OccurAnal (
 import CoreSyn
 import CoreFVs
 import CoreUtils        ( exprIsTrivial, isDefaultAlt )
+import Coercion		( mkSymCoercion )
 import Id
 import IdInfo
 import BasicTypes
@@ -769,8 +770,8 @@ occAnal env expr@(Lam _ _)
     is_one_shot b   = isId b && isOneShotBndr b
 
 occAnal env (Case scrut bndr ty alts)
-  = case occ_anal_scrut scrut alts                  of { (scrut_usage, scrut') ->
-    case mapAndUnzip (occAnalAlt alt_env bndr) alts of { (alts_usage_s, alts')   ->
+  = case occ_anal_scrut scrut alts     of { (scrut_usage, scrut') ->
+    case mapAndUnzip occ_anal_alt alts of { (alts_usage_s, alts')   ->
     let
         alts_usage  = foldr1 combineAltsUsageDetails alts_usage_s
         alts_usage' = addCaseBndrUsage alts_usage
@@ -779,6 +780,8 @@ occAnal env (Case scrut bndr ty alts)
     in
     total_usage `seq` (total_usage, Case scrut' tagged_bndr ty alts') }}
   where
+	-- Note [Case binder usage]	
+	-- ~~~~~~~~~~~~~~~~~~~~~~~~
         -- The case binder gets a usage of either "many" or "dead", never "one".
         -- Reason: we like to inline single occurrences, to eliminate a binding,
         -- but inlining a case binder *doesn't* eliminate a binding.
@@ -787,18 +790,27 @@ occAnal env (Case scrut bndr ty alts)
         -- into
         --      case x of w { (p,q) -> f (p,q) }
     addCaseBndrUsage usage = case lookupVarEnv usage bndr of
-                                Nothing  -> usage
-                                Just occ -> extendVarEnv usage bndr (markMany occ)
+                                Nothing -> usage
+                                Just _  -> extendVarEnv usage bndr NoOccInfo
 
     alt_env = setVanillaCtxt env
         -- Consider     x = case v of { True -> (p,q); ... }
         -- Then it's fine to inline p and q
 
+    bndr_swap = case scrut of
+		  Var v           -> Just (v, Var bndr)
+		  Cast (Var v) co -> Just (v, Cast (Var bndr) (mkSymCoercion co))
+		  _other          -> Nothing
+
+    occ_anal_alt = occAnalAlt alt_env bndr bndr_swap
+
     occ_anal_scrut (Var v) (alt1 : other_alts)
-                                | not (null other_alts) || not (isDefaultAlt alt1)
-                                = (mkOneOcc env v True, Var v)
-    occ_anal_scrut scrut _alts  = occAnal vanillaCtxt scrut
-                                        -- No need for rhsCtxt
+        | not (null other_alts) || not (isDefaultAlt alt1)
+        = (mkOneOcc env v True, Var v)	-- The 'True' says that the variable occurs
+					-- in an interesting context; the case has
+					-- at least one non-default alternative
+    occ_anal_scrut scrut _alts  
+	= occAnal vanillaCtxt scrut    -- No need for rhsCtxt
 
 occAnal env (Let bind body)
   = case occAnal env body                of { (body_usage, body') ->
@@ -900,38 +912,104 @@ appSpecial env n ctxt args
 \end{code}
 
 
-Case alternatives
-~~~~~~~~~~~~~~~~~
-If the case binder occurs at all, the other binders effectively do too.
-For example
-        case e of x { (a,b) -> rhs }
-is rather like
-        let x = (a,b) in rhs
-If e turns out to be (e1,e2) we indeed get something like
-        let a = e1; b = e2; x = (a,b) in rhs
+Note [Binder swap]
+~~~~~~~~~~~~~~~~~~
+We do these two transformations right here:
 
-Note [Aug 06]: I don't think this is necessary any more, and it helpe
-               to know when binders are unused.  See esp the call to
-               isDeadBinder in Simplify.mkDupableAlt
+ (1)   case x of b { pi -> ri }
+    ==>
+      case x of b { pi -> let x=b in ri }
+
+ (2)  case (x |> co) of b { pi -> ri }
+    ==>
+      case (x |> co) of b { pi -> let x = b |> sym co in ri }
+
+    Why (2)?  See Note [Ccase of cast]
+
+In both cases, in a particular alternative (pi -> ri), we only 
+add the binding if
+  (a) x occurs free in (pi -> ri)
+	(ie it occurs in ri, but is not bound in pi)
+  (b) the pi does not bind b (or the free vars of co)
+  (c) x is not a 
+We need (a) and (b) for the inserted binding to be correct.
+
+Notice that (a) rapidly becomes false, so no bindings are injected.
+
+Notice the deliberate shadowing of 'x'. But we must call localiseId 
+on 'x' first, in case it's a GlobalId, or has an External Name.
+See, for example, SimplEnv Note [Global Ids in the substitution].
+
+For the alternatives where we inject the binding, we can transfer
+all x's OccInfo to b.  And that is the point.
+
+The reason for doing these transformations here is because it allows
+us to adjust the OccInfo for 'x' and 'b' as we go.
+
+  * Suppose the only occurrences of 'x' are the scrutinee and in the
+    ri; then this transformation makes it occur just once, and hence
+    get inlined right away.
+
+  * If we do this in the Simplifier, we don't know whether 'x' is used
+    in ri, so we are forced to pessimistically zap b's OccInfo even
+    though it is typically dead (ie neither it nor x appear in the
+    ri).  There's nothing actually wrong with zapping it, except that
+    it's kind of nice to know which variables are dead.  My nose
+    tells me to keep this information as robustly as possible.
+
+The Maybe (Id,CoreExpr) passed to occAnalAlt is the extra let-binding
+{x=b}; it's Nothing if the binder-swap doesn't happen.
+
+Note [Case of cast]
+~~~~~~~~~~~~~~~~~~~
+Consider        case (x `cast` co) of b { I# ->
+                ... (case (x `cast` co) of {...}) ...
+We'd like to eliminate the inner case.  That is the motivation for
+equation (2) in Note [Binder swap].  When we get to the inner case, we
+inline x, cancel the casts, and away we go.
+
+Note [Binders in case alternatives]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+    case x of y { (a,b) -> f y }
+We treat 'a', 'b' as dead, because they don't physically occur in the
+case alternative.  (Indeed, a variable is dead iff it doesn't occur in
+its scope in the output of OccAnal.)  This invariant is It really
+helpe to know when binders are unused.  See esp the call to
+isDeadBinder in Simplify.mkDupableAlt
+
+In this example, though, the Simplifier will bring 'a' and 'b' back to
+life, beause it binds 'y' to (a,b) (imagine got inlined and
+scrutinised y).
 
 \begin{code}
 occAnalAlt :: OccEnv
            -> CoreBndr
+	   -> Maybe (Id, CoreExpr)  -- Note [Binder swap]
            -> CoreAlt
            -> (UsageDetails, Alt IdWithOccInfo)
-occAnalAlt env _case_bndr (con, bndrs, rhs)
+occAnalAlt env case_bndr mb_scrut_var (con, bndrs, rhs)
   = case occAnal env rhs of { (rhs_usage, rhs') ->
     let
-        (final_usage, tagged_bndrs) = tagBinders rhs_usage bndrs
-        final_bndrs = tagged_bndrs      -- See Note [Aug06] above
-{-
-        final_bndrs | case_bndr `elemVarEnv` final_usage = bndrs
-                    | otherwise                         = tagged_bndrs
-                -- Leave the binders untagged if the case
-                -- binder occurs at all; see note above
--}
+        (alt_usg, tagged_bndrs) = tagBinders rhs_usage bndrs
+        bndrs' = tagged_bndrs      -- See Note [Binders in case alternatives]
     in
-    (final_usage, (con, final_bndrs, rhs')) }
+    case mb_scrut_var of
+	Just (scrut_var, scrut_rhs)		-- See Note [Binder swap]
+	  | scrut_var `localUsedIn` alt_usg	-- (a) Fast path, usually false
+	  , not (any shadowing bndrs)		-- (b) 
+	  -> (addOneOcc usg_wo_scrut case_bndr NoOccInfo,
+			-- See Note [Case binder usage] for the NoOccInfo
+	      (con, bndrs', Let (NonRec scrut_var' scrut_rhs) rhs'))
+	  where
+	   (usg_wo_scrut, scrut_var') = tagBinder alt_usg (localiseId scrut_var)
+			-- Note the localiseId; we're making a new binding
+			-- for it, and it might have an External Name, or
+			-- even be a GlobalId
+	   shadowing bndr = bndr `elemVarSet` rhs_fvs
+	   rhs_fvs = exprFreeVars scrut_rhs
+
+	_other -> (alt_usg, (con, bndrs', rhs')) }
 \end{code}
 
 
@@ -1022,6 +1100,8 @@ addAppCtxt (OccEnv encl ctxt) args
 
 \begin{code}
 type UsageDetails = IdEnv OccInfo       -- A finite map from ids to their usage
+		-- INVARIANT: never IAmDead
+		-- (Deadness is signalled by not being in the map at all)
 
 (+++), combineAltsUsageDetails
         :: UsageDetails -> UsageDetails -> UsageDetails
@@ -1040,8 +1120,9 @@ addOneOcc usage id info
 emptyDetails :: UsageDetails
 emptyDetails = (emptyVarEnv :: UsageDetails)
 
-usedIn :: Id -> UsageDetails -> Bool
-v `usedIn` details =  isExportedId v || v `elemVarEnv` details
+localUsedIn, usedIn :: Id -> UsageDetails -> Bool
+v `localUsedIn` details = v `elemVarEnv` details
+v `usedIn`      details =  isExportedId v || v `localUsedIn` details
 
 type IdWithOccInfo = Id
 
@@ -1099,8 +1180,7 @@ mkOneOcc _env id int_cxt
 
 markMany, markInsideLam, markInsideSCC :: OccInfo -> OccInfo
 
-markMany IAmDead = IAmDead
-markMany _       = NoOccInfo
+markMany _  = NoOccInfo
 
 markInsideSCC occ = markMany occ
 
@@ -1109,19 +1189,18 @@ markInsideLam occ                       = occ
 
 addOccInfo, orOccInfo :: OccInfo -> OccInfo -> OccInfo
 
-addOccInfo IAmDead info2       = info2
-addOccInfo info1 IAmDead       = info1
-addOccInfo _     _             = NoOccInfo
+addOccInfo a1 a2  = ASSERT( not (isDeadOcc a1 || isDeadOcc a2) )
+		    NoOccInfo	-- Both branches are at least One
+				-- (Argument is never IAmDead)
 
 -- (orOccInfo orig new) is used
 -- when combining occurrence info from branches of a case
 
-orOccInfo IAmDead info2 = info2
-orOccInfo info1 IAmDead = info1
 orOccInfo (OneOcc in_lam1 _ int_cxt1)
           (OneOcc in_lam2 _ int_cxt2)
   = OneOcc (in_lam1 || in_lam2)
            False        -- False, because it occurs in both branches
            (int_cxt1 && int_cxt2)
-orOccInfo _     _       = NoOccInfo
+orOccInfo a1 a2 = ASSERT( not (isDeadOcc a1 || isDeadOcc a2) )
+		  NoOccInfo
 \end{code}

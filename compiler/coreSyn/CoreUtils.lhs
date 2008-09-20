@@ -18,7 +18,7 @@ module CoreUtils (
 	-- * Constructing expressions
 	mkInlineMe, mkSCC, mkCoerce, mkCoerceI,
 	bindNonRec, needsCaseBinding,
-	mkIfThenElse, mkAltExpr, mkPiType, mkPiTypes,
+	mkAltExpr, mkPiType, mkPiTypes,
 
 	-- * Taking expressions apart
 	findDefault, findAlt, isDefaultAlt, mergeAlts, trimConArgs,
@@ -71,7 +71,6 @@ import NewDemand
 import Type
 import Coercion
 import TyCon
-import TysWiredIn
 import CostCentre
 import BasicTypes
 import Unique
@@ -298,13 +297,6 @@ mkAltExpr (LitAlt lit) [] []
   = Lit lit
 mkAltExpr (LitAlt _) _ _ = panic "mkAltExpr LitAlt"
 mkAltExpr DEFAULT _ _ = panic "mkAltExpr DEFAULT"
-
-mkIfThenElse :: CoreExpr -> CoreExpr -> CoreExpr -> CoreExpr
-mkIfThenElse guard then_expr else_expr
--- Not going to be refining, so okay to take the type of the "then" clause
-  = Case guard (mkWildId boolTy) (exprType then_expr) 
-	 [ (DataAlt falseDataCon, [], else_expr),	-- Increasing order of tag!
-    	   (DataAlt trueDataCon,  [], then_expr) ]
 \end{code}
 
 

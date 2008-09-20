@@ -29,7 +29,7 @@ module Id (
 	mkGlobalId, mkVanillaGlobal, mkVanillaGlobalWithInfo,
 	mkLocalId, mkLocalIdWithInfo,
 	mkSysLocal, mkSysLocalM, mkUserLocal, mkUserLocalM,
-	mkTemplateLocals, mkTemplateLocalsNum, mkWildId, mkTemplateLocal,
+	mkTemplateLocals, mkTemplateLocalsNum, mkTemplateLocal,
 	mkWorkerId, mkExportedLocalId,
 
 	-- ** Taking an Id apart
@@ -38,9 +38,12 @@ module Id (
 	recordSelectorFieldLabel,
 
 	-- ** Modifying an Id
-	setIdName, setIdUnique, Id.setIdType, setIdExported, setIdNotExported, 
-	globaliseId, setIdInfo, lazySetIdInfo, modifyIdInfo, maybeModifyIdInfo,
+	setIdName, setIdUnique, Id.setIdType, 
+	setIdExported, setIdNotExported, 
+	globaliseId, localiseId, 
+	setIdInfo, lazySetIdInfo, modifyIdInfo, maybeModifyIdInfo,
 	zapLamIdInfo, zapDemandIdInfo, zapFragileIdInfo, transferPolyIdInfo,
+	
 
 	-- ** Predicates on Ids
 	isImplicitId, isDeadBinder, isDictId, isStrictId,
@@ -86,7 +89,7 @@ module Id (
 	setIdWorkerInfo,
 	setIdSpecialisation,
 	setIdCafInfo,
-	setIdOccInfo,
+	setIdOccInfo, zapIdOccInfo,
 
 #ifdef OLD_STRICTNESS
 	setIdStrictness, 
@@ -185,6 +188,17 @@ setIdExported = setIdVarExported
 setIdNotExported :: Id -> Id
 setIdNotExported = setIdVarNotExported
 
+localiseId :: Id -> Id
+-- Make an with the same unique and type as the 
+-- incoming Id, but with an *Internal* Name and *LocalId* flavour
+localiseId id 
+  | isLocalId id && isInternalName name
+  = id
+  | otherwise
+  = mkLocalIdWithInfo (localiseName name) (idType id) (idInfo id)
+  where
+    name = idName id
+
 globaliseId :: GlobalIdDetails -> Id -> Id
 globaliseId = globaliseIdVar
 
@@ -274,10 +288,6 @@ Make some local @Ids@ for a template @CoreExpr@.  These have bogus
 instantiated before use.
  
 \begin{code}
--- | Make a /wild Id/. This is typically used when you need a binder that you don't expect to use
-mkWildId :: Type -> Id
-mkWildId ty = mkSysLocal (fsLit "wild") (mkBuiltinUnique 1) ty
-
 -- | Workers get local names. "CoreTidy" will externalise these if necessary
 mkWorkerId :: Unique -> Id -> Type -> Id
 mkWorkerId uniq unwrkr ty
@@ -603,6 +613,9 @@ idOccInfo id = occInfo (idInfo id)
 
 setIdOccInfo :: Id -> OccInfo -> Id
 setIdOccInfo id occ_info = modifyIdInfo (`setOccInfo` occ_info) id
+
+zapIdOccInfo :: Id -> Id
+zapIdOccInfo b = b `setIdOccInfo` NoOccInfo
 \end{code}
 
 

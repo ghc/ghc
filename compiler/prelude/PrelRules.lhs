@@ -20,7 +20,8 @@ module PrelRules ( primOpRules, builtinRules ) where
 #include "HsVersions.h"
 
 import CoreSyn
-import Id		( mkWildId, idUnfolding )
+import MkCore		( mkWildCase )
+import Id		( idUnfolding )
 import Literal		( Literal(..), mkMachInt, mkMachWord
 			, literalType
 			, word2IntLit, int2WordLit
@@ -340,7 +341,7 @@ litEq op_name is_eq
     rule_fn _    	    = Nothing
     
     do_lit_eq lit expr
-      = Just (Case expr (mkWildId (literalType lit)) boolTy
+      = Just (mkWildCase expr (literalType lit) boolTy
 		    [(DEFAULT,    [], val_if_neq),
 		     (LitAlt lit, [], val_if_eq)])
     val_if_eq  | is_eq     = trueVal

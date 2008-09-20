@@ -18,7 +18,6 @@ import UniqSupply	( UniqSupply )
 import SimplMonad	( SimplCount, zeroSimplCount )
 import Id
 import VarEnv
-import Name		( localiseName )
 import Util             ( notNull )
 \end{code}
 
@@ -171,10 +170,10 @@ libCaseBind env (Rec pairs)
 	-- processing the rhs with an *un-extended* environment, so
 	-- that the same process doesn't occur for ever!
 	--
-    extended_env = addRecBinds env [ (adjust binder, libCase env_body rhs)
+    extended_env = addRecBinds env [ (localiseId binder, libCase env_body rhs)
 				   | (binder, rhs) <- pairs ]
 
-	-- Two subtle things: 
+	-- The call to localiseId is needed for two subtle reasons
 	-- (a)  Reset the export flags on the binders so
 	-- 	that we don't get name clashes on exported things if the 
 	-- 	local binding floats out to top level.  This is most unlikely
@@ -184,7 +183,6 @@ libCaseBind env (Rec pairs)
 	-- (b)  Make the name an Internal one.  External Names should never be
 	--	nested; if it were floated to the top level, we'd get a name
 	-- 	clash at code generation time.
-    adjust bndr = setIdNotExported (setIdName bndr (localiseName (idName bndr)))
 
     rhs_small_enough (id,rhs)
 	=  idArity id > 0	-- Note [Only functions!]

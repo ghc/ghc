@@ -27,7 +27,6 @@ module VarEnv (
 	-- ** Operations on InScopeSets
 	emptyInScopeSet, mkInScopeSet, delInScopeSet,
 	extendInScopeSet, extendInScopeSetList, extendInScopeSetSet, 
-	modifyInScopeSet,
 	getInScopeVars, lookupInScope, elemInScopeSet, uniqAway, 
 
 	-- * The RnEnv2 type
@@ -66,7 +65,18 @@ import FastString
 \begin{code}
 -- | A set of variables that are in scope at some point
 data InScopeSet = InScope (VarEnv Var) FastInt
-	-- The Int# is a kind of hash-value used by uniqAway
+	-- The (VarEnv Var) is just a VarSet.  But we write it like
+	-- this to remind ourselves that you can look up a Var in 
+	-- the InScopeSet. Typically the InScopeSet contains the
+	-- canonical version of the variable (e.g. with an informative
+	-- unfolding), so this lookup is useful.
+	--
+	-- INVARIANT: the VarEnv maps (the Unique of) a variable to 
+	--	      a variable with the same Uniqua.  (This was not
+	--	      the case in the past, when we had a grevious hack
+	--	      mapping var1 to var2.	
+	-- 
+	-- The FastInt is a kind of hash-value used by uniqAway
 	-- For example, it might be the size of the set
 	-- INVARIANT: it's not zero; we use it as a multiplier in uniqAway
 
@@ -94,37 +104,16 @@ extendInScopeSetSet :: InScopeSet -> VarEnv Var -> InScopeSet
 extendInScopeSetSet (InScope in_scope n) vs
    = InScope (in_scope `plusVarEnv` vs) (n +# iUnbox (sizeUFM vs))
 
--- | Replace the first 'Var' with the second in the set of in-scope variables
-modifyInScopeSet :: InScopeSet -> Var -> Var -> InScopeSet
--- Exploit the fact that the in-scope "set" is really a map
--- 	Make old_v map to new_v
--- QUESTION: shouldn't we add a mapping from new_v to new_v as it is presumably now in scope? - MB 08
-modifyInScopeSet (InScope in_scope n) old_v new_v = InScope (extendVarEnv in_scope old_v new_v) (n +# _ILIT(1))
-
 delInScopeSet :: InScopeSet -> Var -> InScopeSet
 delInScopeSet (InScope in_scope n) v = InScope (in_scope `delVarEnv` v) n
 
 elemInScopeSet :: Var -> InScopeSet -> Bool
 elemInScopeSet v (InScope in_scope _) = v `elemVarEnv` in_scope
 
--- | If the given variable was even added to the 'InScopeSet', or if it was the \"from\" argument
--- of any 'modifyInScopeSet' operation, returns that variable with all appropriate modifications
--- applied to it. Otherwise, return @Nothing@
+-- | Look up a variable the 'InScopeSet'.  This lets you map from 
+-- the variable's identity (unique) to its full value.
 lookupInScope :: InScopeSet -> Var -> Maybe Var
--- It's important to look for a fixed point
--- When we see (case x of y { I# v -> ... })
--- we add  [x -> y] to the in-scope set (Simplify.simplCaseBinder and
--- modifyInScopeSet).
---
--- When we lookup up an occurrence of x, we map to y, but then
--- we want to look up y in case it has acquired more evaluation information by now.
-lookupInScope (InScope in_scope _) v 
-  = go v
-  where
-    go v = case lookupVarEnv in_scope v of
-		Just v' | v == v'   -> Just v'	-- Reached a fixed point
-			| otherwise -> go v'
-		Nothing		    -> Nothing
+lookupInScope (InScope in_scope _) v  = lookupVarEnv in_scope v
 \end{code}
 
 \begin{code}

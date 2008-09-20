@@ -14,6 +14,7 @@ import Type hiding      ( substTy, extendTvSubst )
 import SimplEnv
 import SimplUtils
 import MkId		( rUNTIME_ERROR_ID )
+import FamInstEnv	( FamInstEnv )
 import Id
 import Var
 import IdInfo
@@ -365,6 +366,9 @@ simplNonRecX :: SimplEnv
              -> SimplM SimplEnv
 
 simplNonRecX env bndr new_rhs
+  | isDeadBinder bndr	-- Not uncommon; e.g. case (a,b) of b { (p,q) -> p }
+  = return env		-- 		 Here b is dead, and we avoid creating
+  | otherwise		--		 the binding b = (a,b)
   = do  { (env', bndr') <- simplBinder env bndr
         ; completeNonRecX env' (isStrictId bndr) bndr bndr' new_rhs }
 
@@ -1191,235 +1195,6 @@ all this at once is TOO HARD!
 %*                                                                      *
 %************************************************************************
 
-Blob of helper functions for the "case-of-something-else" situation.
-
-\begin{code}
----------------------------------------------------------
---      Eliminate the case if possible
-
-rebuildCase :: SimplEnv
-            -> OutExpr          -- Scrutinee
-            -> InId             -- Case binder
-            -> [InAlt]          -- Alternatives (inceasing order)
-            -> SimplCont
-            -> SimplM (SimplEnv, OutExpr)
-
---------------------------------------------------
---      1. Eliminate the case if there's a known constructor
---------------------------------------------------
-
-rebuildCase env scrut case_bndr alts cont
-  | Just (con,args) <- exprIsConApp_maybe scrut
-        -- Works when the scrutinee is a variable with a known unfolding
-        -- as well as when it's an explicit constructor application
-  = knownCon env scrut (DataAlt con) args case_bndr alts cont
-
-  | Lit lit <- scrut    -- No need for same treatment as constructors
-                        -- because literals are inlined more vigorously
-  = knownCon env scrut (LitAlt lit) [] case_bndr alts cont
-
-
---------------------------------------------------
---      2. Eliminate the case if scrutinee is evaluated
---------------------------------------------------
-
-rebuildCase env scrut case_bndr [(_, bndrs, rhs)] cont
-  -- See if we can get rid of the case altogether
-  -- See the extensive notes on case-elimination above
-  -- mkCase made sure that if all the alternatives are equal,
-  -- then there is now only one (DEFAULT) rhs
- | all isDeadBinder bndrs       -- bndrs are [InId]
-
-        -- Check that the scrutinee can be let-bound instead of case-bound
- , exprOkForSpeculation scrut
-                -- OK not to evaluate it
-                -- This includes things like (==# a# b#)::Bool
-                -- so that we simplify
-                --      case ==# a# b# of { True -> x; False -> x }
-                -- to just
-                --      x
-                -- This particular example shows up in default methods for
-                -- comparision operations (e.g. in (>=) for Int.Int32)
-        || exprIsHNF scrut                      -- It's already evaluated
-        || var_demanded_later scrut             -- It'll be demanded later
-
---      || not opt_SimplPedanticBottoms)        -- Or we don't care!
---      We used to allow improving termination by discarding cases, unless -fpedantic-bottoms was on,
---      but that breaks badly for the dataToTag# primop, which relies on a case to evaluate
---      its argument:  case x of { y -> dataToTag# y }
---      Here we must *not* discard the case, because dataToTag# just fetches the tag from
---      the info pointer.  So we'll be pedantic all the time, and see if that gives any
---      other problems
---      Also we don't want to discard 'seq's
-  = do  { tick (CaseElim case_bndr)
-        ; env' <- simplNonRecX env case_bndr scrut
-        ; simplExprF env' rhs cont }
-  where
-        -- The case binder is going to be evaluated later,
-        -- and the scrutinee is a simple variable
-    var_demanded_later (Var v) = isStrictDmd (idNewDemandInfo case_bndr)
-                                 && not (isTickBoxOp v)
-                                    -- ugly hack; covering this case is what
-                                    -- exprOkForSpeculation was intended for.
-    var_demanded_later _       = False
-
-
---------------------------------------------------
---      3. Catch-all case
---------------------------------------------------
-
-rebuildCase env scrut case_bndr alts cont
-  = do  {       -- Prepare the continuation;
-                -- The new subst_env is in place
-          (env', dup_cont, nodup_cont) <- prepareCaseCont env alts cont
-
-        -- Simplify the alternatives
-        ; (scrut', case_bndr', alts') <- simplAlts env' scrut case_bndr alts dup_cont
-
-	-- Check for empty alternatives
-	; if null alts' then
-		-- This isn't strictly an error, although it is unusual. 
-		-- It's possible that the simplifer might "see" that 
-		-- an inner case has no accessible alternatives before 
-		-- it "sees" that the entire branch of an outer case is 
-		-- inaccessible.  So we simply put an error case here instead.
-	    pprTrace "mkCase: null alts" (ppr case_bndr <+> ppr scrut) $
-	    let res_ty' = contResultType env' (substTy env' (coreAltsType alts)) dup_cont
-		lit = mkStringLit "Impossible alternative"
-	    in return (env', mkApps (Var rUNTIME_ERROR_ID) [Type res_ty', lit])
-
-	  else do
-	{ case_expr <- mkCase scrut' case_bndr' alts'
-
-	-- Notice that rebuild gets the in-scope set from env, not alt_env
-	-- The case binder *not* scope over the whole returned case-expression
-	; rebuild env' case_expr nodup_cont } }
-\end{code}
-
-simplCaseBinder checks whether the scrutinee is a variable, v.  If so,
-try to eliminate uses of v in the RHSs in favour of case_bndr; that
-way, there's a chance that v will now only be used once, and hence
-inlined.
-
-Note [no-case-of-case]
-~~~~~~~~~~~~~~~~~~~~~~
-We *used* to suppress the binder-swap in case expressoins when 
--fno-case-of-case is on.  Old remarks:
-    "This happens in the first simplifier pass,
-    and enhances full laziness.  Here's the bad case:
-            f = \ y -> ...(case x of I# v -> ...(case x of ...) ... )
-    If we eliminate the inner case, we trap it inside the I# v -> arm,
-    which might prevent some full laziness happening.  I've seen this
-    in action in spectral/cichelli/Prog.hs:
-             [(m,n) | m <- [1..max], n <- [1..max]]
-    Hence the check for NoCaseOfCase."
-However, now the full-laziness pass itself reverses the binder-swap, so this
-check is no longer necessary.
-
-Note [Suppressing the case binder-swap]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-There is another situation when it might make sense to suppress the
-case-expression binde-swap. If we have
-
-    case x of w1 { DEFAULT -> case x of w2 { A -> e1; B -> e2 }
-                   ...other cases .... }
-
-We'll perform the binder-swap for the outer case, giving
-
-    case x of w1 { DEFAULT -> case w1 of w2 { A -> e1; B -> e2 }
-                   ...other cases .... }
-
-But there is no point in doing it for the inner case, because w1 can't
-be inlined anyway.  Furthermore, doing the case-swapping involves
-zapping w2's occurrence info (see paragraphs that follow), and that
-forces us to bind w2 when doing case merging.  So we get
-
-    case x of w1 { A -> let w2 = w1 in e1
-                   B -> let w2 = w1 in e2
-                   ...other cases .... }
-
-This is plain silly in the common case where w2 is dead.
-
-Even so, I can't see a good way to implement this idea.  I tried
-not doing the binder-swap if the scrutinee was already evaluated
-but that failed big-time:
-
-        data T = MkT !Int
-
-        case v of w  { MkT x ->
-        case x of x1 { I# y1 ->
-        case x of x2 { I# y2 -> ...
-
-Notice that because MkT is strict, x is marked "evaluated".  But to
-eliminate the last case, we must either make sure that x (as well as
-x1) has unfolding MkT y1.  THe straightforward thing to do is to do
-the binder-swap.  So this whole note is a no-op.
-
-Note [zapOccInfo]
-~~~~~~~~~~~~~~~~~
-If we replace the scrutinee, v, by tbe case binder, then we have to nuke
-any occurrence info (eg IAmDead) in the case binder, because the
-case-binder now effectively occurs whenever v does.  AND we have to do
-the same for the pattern-bound variables!  Example:
-
-        (case x of { (a,b) -> a }) (case x of { (p,q) -> q })
-
-Here, b and p are dead.  But when we move the argment inside the first
-case RHS, and eliminate the second case, we get
-
-        case x of { (a,b) -> a b }
-
-Urk! b is alive!  Reason: the scrutinee was a variable, and case elimination
-happened.
-
-Indeed, this can happen anytime the case binder isn't dead:
-        case <any> of x { (a,b) ->
-        case x of { (p,q) -> p } }
-Here (a,b) both look dead, but come alive after the inner case is eliminated.
-The point is that we bring into the envt a binding
-        let x = (a,b)
-after the outer case, and that makes (a,b) alive.  At least we do unless
-the case binder is guaranteed dead.
-
-Note [Case of cast]
-~~~~~~~~~~~~~~~~~~~
-Consider        case (v `cast` co) of x { I# ->
-                ... (case (v `cast` co) of {...}) ...
-We'd like to eliminate the inner case.  We can get this neatly by
-arranging that inside the outer case we add the unfolding
-        v |-> x `cast` (sym co)
-to v.  Then we should inline v at the inner case, cancel the casts, and away we go
-
-Note [Improving seq]
-~~~~~~~~~~~~~~~~~~~
-Consider
-        type family F :: * -> *
-        type instance F Int = Int
-
-        ... case e of x { DEFAULT -> rhs } ...
-
-where x::F Int.  Then we'd like to rewrite (F Int) to Int, getting
-
-        case e `cast` co of x'::Int
-           I# x# -> let x = x' `cast` sym co
-                    in rhs
-
-so that 'rhs' can take advantage of the form of x'.  Notice that Note
-[Case of cast] may then apply to the result.
-
-This showed up in Roman's experiments.  Example:
-  foo :: F Int -> Int -> Int
-  foo t n = t `seq` bar n
-     where
-       bar 0 = 0
-       bar n = bar (n - case t of TI i -> i)
-Here we'd like to avoid repeated evaluating t inside the loop, by
-taking advantage of the `seq`.
-
-At one point I did transformation in LiberateCase, but it's more robust here.
-(Otherwise, there's a danger that we'll simply drop the 'seq' altogether, before
-LiberateCase gets to see it.)
-
 Note [Case elimination]
 ~~~~~~~~~~~~~~~~~~~~~~~
 The case-elimination transformation discards redundant case expressions.
@@ -1506,35 +1281,233 @@ wrong to drop even unnecessary evaluations, and in practice they
 may be a result of 'seq' so we *definitely* don't want to drop those.
 I don't really know how to improve this situation.
 
+\begin{code}
+---------------------------------------------------------
+--      Eliminate the case if possible
+
+rebuildCase :: SimplEnv
+            -> OutExpr          -- Scrutinee
+            -> InId             -- Case binder
+            -> [InAlt]          -- Alternatives (inceasing order)
+            -> SimplCont
+            -> SimplM (SimplEnv, OutExpr)
+
+--------------------------------------------------
+--      1. Eliminate the case if there's a known constructor
+--------------------------------------------------
+
+rebuildCase env scrut case_bndr alts cont
+  | Just (con,args) <- exprIsConApp_maybe scrut
+        -- Works when the scrutinee is a variable with a known unfolding
+        -- as well as when it's an explicit constructor application
+  = knownCon env scrut (DataAlt con) args case_bndr alts cont
+
+  | Lit lit <- scrut    -- No need for same treatment as constructors
+                        -- because literals are inlined more vigorously
+  = knownCon env scrut (LitAlt lit) [] case_bndr alts cont
+
+
+--------------------------------------------------
+--      2. Eliminate the case if scrutinee is evaluated
+--------------------------------------------------
+
+rebuildCase env scrut case_bndr [(_, bndrs, rhs)] cont
+  -- See if we can get rid of the case altogether
+  -- See Note [Case eliminiation] 
+  -- mkCase made sure that if all the alternatives are equal,
+  -- then there is now only one (DEFAULT) rhs
+ | all isDeadBinder bndrs       -- bndrs are [InId]
+
+        -- Check that the scrutinee can be let-bound instead of case-bound
+ , exprOkForSpeculation scrut
+                -- OK not to evaluate it
+                -- This includes things like (==# a# b#)::Bool
+                -- so that we simplify
+                --      case ==# a# b# of { True -> x; False -> x }
+                -- to just
+                --      x
+                -- This particular example shows up in default methods for
+                -- comparision operations (e.g. in (>=) for Int.Int32)
+        || exprIsHNF scrut                      -- It's already evaluated
+        || var_demanded_later scrut             -- It'll be demanded later
+
+--      || not opt_SimplPedanticBottoms)        -- Or we don't care!
+--      We used to allow improving termination by discarding cases, unless -fpedantic-bottoms was on,
+--      but that breaks badly for the dataToTag# primop, which relies on a case to evaluate
+--      its argument:  case x of { y -> dataToTag# y }
+--      Here we must *not* discard the case, because dataToTag# just fetches the tag from
+--      the info pointer.  So we'll be pedantic all the time, and see if that gives any
+--      other problems
+--      Also we don't want to discard 'seq's
+  = do  { tick (CaseElim case_bndr)
+        ; env' <- simplNonRecX env case_bndr scrut
+        ; simplExprF env' rhs cont }
+  where
+        -- The case binder is going to be evaluated later,
+        -- and the scrutinee is a simple variable
+    var_demanded_later (Var v) = isStrictDmd (idNewDemandInfo case_bndr)
+                                 && not (isTickBoxOp v)
+                                    -- ugly hack; covering this case is what
+                                    -- exprOkForSpeculation was intended for.
+    var_demanded_later _       = False
+
+
+--------------------------------------------------
+--      3. Catch-all case
+--------------------------------------------------
+
+rebuildCase env scrut case_bndr alts cont
+  = do  {       -- Prepare the continuation;
+                -- The new subst_env is in place
+          (env', dup_cont, nodup_cont) <- prepareCaseCont env alts cont
+
+        -- Simplify the alternatives
+        ; (scrut', case_bndr', alts') <- simplAlts env' scrut case_bndr alts dup_cont
+
+	-- Check for empty alternatives
+	; if null alts' then
+		-- This isn't strictly an error, although it is unusual. 
+		-- It's possible that the simplifer might "see" that 
+		-- an inner case has no accessible alternatives before 
+		-- it "sees" that the entire branch of an outer case is 
+		-- inaccessible.  So we simply put an error case here instead.
+	    pprTrace "mkCase: null alts" (ppr case_bndr <+> ppr scrut) $
+	    let res_ty' = contResultType env' (substTy env' (coreAltsType alts)) dup_cont
+		lit = mkStringLit "Impossible alternative"
+	    in return (env', mkApps (Var rUNTIME_ERROR_ID) [Type res_ty', lit])
+
+	  else do
+	{ case_expr <- mkCase scrut' case_bndr' alts'
+
+	-- Notice that rebuild gets the in-scope set from env, not alt_env
+	-- The case binder *not* scope over the whole returned case-expression
+	; rebuild env' case_expr nodup_cont } }
+\end{code}
+
+simplCaseBinder checks whether the scrutinee is a variable, v.  If so,
+try to eliminate uses of v in the RHSs in favour of case_bndr; that
+way, there's a chance that v will now only be used once, and hence
+inlined.
+
+Historical note: we use to do the "case binder swap" in the Simplifier
+so there were additional complications if the scrutinee was a variable.
+Now the binder-swap stuff is done in the occurrence analyer; see
+OccurAnal Note [Binder swap].
+
+Note [zapOccInfo]
+~~~~~~~~~~~~~~~~~
+If the case binder is not dead, then neither are the pattern bound
+variables:  
+        case <any> of x { (a,b) ->
+        case x of { (p,q) -> p } }
+Here (a,b) both look dead, but come alive after the inner case is eliminated.
+The point is that we bring into the envt a binding
+        let x = (a,b)
+after the outer case, and that makes (a,b) alive.  At least we do unless
+the case binder is guaranteed dead.
+
+Note [Improving seq]
+~~~~~~~~~~~~~~~~~~~
+Consider
+        type family F :: * -> *
+        type instance F Int = Int
+
+        ... case e of x { DEFAULT -> rhs } ...
+
+where x::F Int.  Then we'd like to rewrite (F Int) to Int, getting
+
+        case e `cast` co of x'::Int
+           I# x# -> let x = x' `cast` sym co
+                    in rhs
+
+so that 'rhs' can take advantage of the form of x'.  Notice that Note
+[Case of cast] may then apply to the result.
+
+This showed up in Roman's experiments.  Example:
+  foo :: F Int -> Int -> Int
+  foo t n = t `seq` bar n
+     where
+       bar 0 = 0
+       bar n = bar (n - case t of TI i -> i)
+Here we'd like to avoid repeated evaluating t inside the loop, by
+taking advantage of the `seq`.
+
+At one point I did transformation in LiberateCase, but it's more robust here.
+(Otherwise, there's a danger that we'll simply drop the 'seq' altogether, before
+LiberateCase gets to see it.)
+
+
+Historical note [no-case-of-case]
+~~~~~~~~~~~~~~~~~~~~~~
+We *used* to suppress the binder-swap in case expressoins when 
+-fno-case-of-case is on.  Old remarks:
+    "This happens in the first simplifier pass,
+    and enhances full laziness.  Here's the bad case:
+            f = \ y -> ...(case x of I# v -> ...(case x of ...) ... )
+    If we eliminate the inner case, we trap it inside the I# v -> arm,
+    which might prevent some full laziness happening.  I've seen this
+    in action in spectral/cichelli/Prog.hs:
+             [(m,n) | m <- [1..max], n <- [1..max]]
+    Hence the check for NoCaseOfCase."
+However, now the full-laziness pass itself reverses the binder-swap, so this
+check is no longer necessary.
+
+Historical note [Suppressing the case binder-swap]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+There is another situation when it might make sense to suppress the
+case-expression binde-swap. If we have
+
+    case x of w1 { DEFAULT -> case x of w2 { A -> e1; B -> e2 }
+                   ...other cases .... }
+
+We'll perform the binder-swap for the outer case, giving
+
+    case x of w1 { DEFAULT -> case w1 of w2 { A -> e1; B -> e2 }
+                   ...other cases .... }
+
+But there is no point in doing it for the inner case, because w1 can't
+be inlined anyway.  Furthermore, doing the case-swapping involves
+zapping w2's occurrence info (see paragraphs that follow), and that
+forces us to bind w2 when doing case merging.  So we get
+
+    case x of w1 { A -> let w2 = w1 in e1
+                   B -> let w2 = w1 in e2
+                   ...other cases .... }
+
+This is plain silly in the common case where w2 is dead.
+
+Even so, I can't see a good way to implement this idea.  I tried
+not doing the binder-swap if the scrutinee was already evaluated
+but that failed big-time:
+
+        data T = MkT !Int
+
+        case v of w  { MkT x ->
+        case x of x1 { I# y1 ->
+        case x of x2 { I# y2 -> ...
+
+Notice that because MkT is strict, x is marked "evaluated".  But to
+eliminate the last case, we must either make sure that x (as well as
+x1) has unfolding MkT y1.  THe straightforward thing to do is to do
+the binder-swap.  So this whole note is a no-op.
+
 
 \begin{code}
-simplCaseBinder :: SimplEnv -> OutExpr -> OutId -> [InAlt]
-                -> SimplM (SimplEnv, OutExpr, OutId)
-simplCaseBinder env0 scrut0 case_bndr0 alts
-  = do  { (env1, case_bndr1) <- simplBinder env0 case_bndr0
+improveSeq :: (FamInstEnv, FamInstEnv) -> SimplEnv
+	   -> OutExpr -> InId -> OutId -> [InAlt]
+	   -> SimplM (SimplEnv, OutExpr, OutId)
+-- Note [Improving seq]
+improveSeq fam_envs env scrut case_bndr case_bndr1 [(DEFAULT,_,_)]
+  | Just (co, ty2) <- topNormaliseType fam_envs (idType case_bndr1)
+  =  do { case_bndr2 <- newId (fsLit "nt") ty2
+        ; let rhs  = DoneEx (Var case_bndr2 `Cast` mkSymCoercion co)
+              env2 = extendIdSubst env case_bndr rhs
+        ; return (env2, scrut `Cast` co, case_bndr2) }
 
-        ; fam_envs <- getFamEnvs
-        ; (env2, scrut2, case_bndr2) <- improve_seq fam_envs env1 scrut0
-                                                case_bndr0 case_bndr1 alts
-                        -- Note [Improving seq]
+improveSeq _ env scrut _ case_bndr1 _
+  = return (env, scrut, case_bndr1)
 
-        ; let (env3, case_bndr3) = improve_case_bndr env2 scrut2 case_bndr2
-                        -- Note [Case of cast]
-
-        ; return (env3, scrut2, case_bndr3) }
-  where
-
-    improve_seq fam_envs env scrut case_bndr case_bndr1 [(DEFAULT,_,_)]
-        | Just (co, ty2) <- topNormaliseType fam_envs (idType case_bndr1)
-        =  do { case_bndr2 <- newId (fsLit "nt") ty2
-              ; let rhs  = DoneEx (Var case_bndr2 `Cast` mkSymCoercion co)
-                    env2 = extendIdSubst env case_bndr rhs
-              ; return (env2, scrut `Cast` co, case_bndr2) }
-
-    improve_seq _ env scrut _ case_bndr1 _
-        = return (env, scrut, case_bndr1)
-
-
+{-
     improve_case_bndr env scrut case_bndr
         -- See Note [no-case-of-case]
 	--  | switchIsOn (getSwitchChecker env) NoCaseOfCase
@@ -1555,12 +1528,9 @@ simplCaseBinder env0 scrut0 case_bndr0 alts
 
             _ -> (env, case_bndr)
         where
-          case_bndr' = zapOccInfo case_bndr
+          case_bndr' = zapIdOccInfo case_bndr
           env1       = modifyInScope env case_bndr case_bndr'
-
-
-zapOccInfo :: InId -> InId      -- See Note [zapOccInfo]
-zapOccInfo b = b `setIdOccInfo` NoOccInfo
+-}
 \end{code}
 
 
@@ -1616,10 +1586,15 @@ simplAlts :: SimplEnv
 
 simplAlts env scrut case_bndr alts cont'
   = -- pprTrace "simplAlts" (ppr alts $$ ppr (seIdSubst env)) $
-    do  { let alt_env = zapFloats env
-        ; (alt_env', scrut', case_bndr') <- simplCaseBinder alt_env scrut case_bndr alts
+    do  { let env0 = zapFloats env
 
-        ; (imposs_deflt_cons, in_alts) <- prepareAlts alt_env' scrut case_bndr' alts
+        ; (env1, case_bndr1) <- simplBinder env0 case_bndr
+
+        ; fam_envs <- getFamEnvs
+	; (alt_env', scrut', case_bndr') <- improveSeq fam_envs env1 scrut 
+						       case_bndr case_bndr1 alts
+
+        ; (imposs_deflt_cons, in_alts) <- prepareAlts alt_env' scrut' case_bndr' alts
 
         ; alts' <- mapM (simplAlt alt_env' imposs_deflt_cons case_bndr' cont') in_alts
         ; return (scrut', case_bndr', alts') }
@@ -1685,6 +1660,7 @@ simplAlt env _ case_bndr' cont' (DataAlt con, vs, rhs)
               evald_v  = zapped_v `setIdUnfolding` evaldUnfolding
           go _ _ = pprPanic "cat_evals" (ppr con $$ ppr vs $$ ppr the_strs)
 
+	-- See Note [zapOccInfo]
         -- zap_occ_info: if the case binder is alive, then we add the unfolding
         --      case_bndr = C vs
         -- to the envt; so vs are now very much alive
@@ -1693,15 +1669,15 @@ simplAlt env _ case_bndr' cont' (DataAlt con, vs, rhs)
         --   ==>  case e of t { (a,b) -> ...(a)... }
         -- Look, Ma, a is alive now.
     zap_occ_info | isDeadBinder case_bndr' = \ident -> ident
-                 | otherwise               = zapOccInfo
+                 | otherwise               = zapIdOccInfo
 
 addBinderUnfolding :: SimplEnv -> Id -> CoreExpr -> SimplEnv
 addBinderUnfolding env bndr rhs
-  = modifyInScope env bndr (bndr `setIdUnfolding` mkUnfolding False rhs)
+  = modifyInScope env (bndr `setIdUnfolding` mkUnfolding False rhs)
 
 addBinderOtherCon :: SimplEnv -> Id -> [AltCon] -> SimplEnv
 addBinderOtherCon env bndr cons
-  = modifyInScope env bndr (bndr `setIdUnfolding` mkOtherCon cons)
+  = modifyInScope env (bndr `setIdUnfolding` mkOtherCon cons)
 \end{code}
 
 
@@ -1770,8 +1746,7 @@ knownAlt env scrut the_args bndr (DataAlt dc, bs, rhs) cont
                                 -- args are aready OutExprs, but bs are InIds
 
         ; env'' <- simplNonRecX env' bndr bndr_rhs
-        ; -- pprTrace "knownCon2" (ppr bs $$ ppr rhs $$ ppr (seIdSubst env'')) $
-          simplExprF env'' rhs cont }
+        ; simplExprF env'' rhs cont }
   where
     -- Ugh!
     bind_args env' _ [] _  = return env'
@@ -1782,7 +1757,7 @@ knownAlt env scrut the_args bndr (DataAlt dc, bs, rhs) cont
 
     bind_args env' dead_bndr (b:bs') (arg : args)
       = ASSERT( isId b )
-        do { let b' = if dead_bndr then b else zapOccInfo b
+        do { let b' = if dead_bndr then b else zapIdOccInfo b
              -- Note that the binder might be "dead", because it doesn't
              -- occur in the RHS; and simplNonRecX may therefore discard
              -- it via postInlineUnconditionally.

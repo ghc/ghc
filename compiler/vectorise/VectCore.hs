@@ -14,10 +14,10 @@ module VectCore (
 #include "HsVersions.h"
 
 import CoreSyn
+import MkCore	      ( mkWildCase )
 import CoreUtils      ( exprType )
 import DataCon        ( DataCon )
 import Type           ( Type )
-import Id             ( mkWildId )
 import Var
 
 type Vect a = (a,a)
@@ -84,9 +84,9 @@ vCaseProd :: VExpr -> Type -> Type
           -> DataCon -> DataCon -> [Var] -> [VVar] -> VExpr -> VExpr
 vCaseProd (vscrut, lscrut) vty lty vdc ldc sh_bndrs bndrs
           (vbody,lbody)
-  = (Case vscrut (mkWildId $ exprType vscrut) vty
+  = (mkWildCase vscrut (exprType vscrut) vty
           [(DataAlt vdc, vbndrs, vbody)],
-     Case lscrut (mkWildId $ exprType lscrut) lty
+     mkWildCase lscrut (exprType lscrut) lty
           [(DataAlt ldc, sh_bndrs ++ lbndrs, lbody)])
   where
     (vbndrs, lbndrs) = unzip bndrs

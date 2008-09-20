@@ -36,7 +36,6 @@ import TcType
 import CostCentre
 import Module
 import Id
-import Name	( localiseName )
 import Var	( Var, TyVar )
 import VarSet
 import Rules
@@ -352,7 +351,7 @@ dsSpec all_tvs dicts tvs poly_id mono_id mono_bind
 		  spec_rhs    = Let (NonRec local_poly poly_f_body) ds_spec_expr
 		  poly_f_body = mkLams (tvs ++ dicts) f_body
 			   	
-		  extra_dict_bndrs = [localise d 
+		  extra_dict_bndrs = [localiseId d  -- See Note [Constant rule dicts]
 		  		     | d <- varSetElems (exprFreeVars ds_spec_expr)
 		  		     , isDictId d]
 			-- Note [Const rule dicts]
@@ -380,9 +379,7 @@ dsSpec all_tvs dicts tvs poly_id mono_id mono_bind
 
     decomp_msg = hang (ptext (sLit "Specialisation too complicated to desugar; ignored"))
 		    2 (ppr spec_expr)
-
-    localise d = mkLocalId (localiseName (idName d)) (idType d)
-    	     -- See Note [Constant rule dicts]
+    	     
 
 mkArbitraryTypeEnv :: [TyVar] -> [([TyVar], a, b, c)] -> DsM (TyVarEnv Type)
 -- If any of the tyvars is missing from any of the lists in 
@@ -443,7 +440,7 @@ And from that we want the rule
 
 But be careful!  That dInt might be GHC.Base.$fOrdInt, which is an External
 Name, and you can't bind them in a lambda or forall without getting things
-confused. Hence the use of 'localise' to make it Internal.
+confused. Hence the use of 'localiseId' to make it Internal.
 
 
 %************************************************************************

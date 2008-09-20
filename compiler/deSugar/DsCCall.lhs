@@ -22,6 +22,7 @@ import CoreSyn
 import DsMonad
 
 import CoreUtils
+import MkCore
 import Var
 import Id
 import MkId
@@ -142,7 +143,7 @@ unboxArg arg
     tc `hasKey` boolTyConKey
   = do prim_arg <- newSysLocalDs intPrimTy
        return (Var prim_arg,
-              \ body -> Case (Case arg (mkWildId arg_ty) intPrimTy
+              \ body -> Case (mkWildCase arg arg_ty intPrimTy
                                        [(DataAlt falseDataCon,[],mkIntLit 0),
                                         (DataAlt trueDataCon, [],mkIntLit 1)])
                                         -- In increasing tag order!
@@ -284,8 +285,8 @@ boxResult augment mbTopCon result_ty
 			      mkApps (Var toIOCon)
 			    	     [ Type io_res_ty, 
 			    	       Lam state_id $
-			    	       Case (App the_call (Var state_id))
-			    	     	     (mkWildId ccall_res_ty)
+			    	       mkWildCase (App the_call (Var state_id))
+			    	     	     ccall_res_ty
 			                     (coreAltType the_alt) 
 			    	     	     [the_alt]
 			    	     ]
@@ -298,10 +299,10 @@ boxResult augment _mbTopCon result_ty
        res <- resultWrapper result_ty
        (ccall_res_ty, the_alt) <- mk_alt return_result (augment res)
        let
-           wrap = \ the_call -> Case (App the_call (Var realWorldPrimId)) 
-                                     (mkWildId ccall_res_ty)
-                                     (coreAltType the_alt)
-                                     [the_alt]
+           wrap = \ the_call -> mkWildCase (App the_call (Var realWorldPrimId)) 
+                                     	   ccall_res_ty
+                                     	   (coreAltType the_alt)
+                                     	   [the_alt]
        return (realWorldStatePrimTy `mkFunTy` ccall_res_ty, wrap)
   where
     return_result _ [ans] = ans
@@ -371,7 +372,7 @@ resultWrapper result_ty
   -- Base case 3: the boolean type
   | Just (tc,_) <- maybe_tc_app, tc `hasKey` boolTyConKey
   = return
-     (Just intPrimTy, \e -> Case e (mkWildId intPrimTy)
+     (Just intPrimTy, \e -> mkWildCase e intPrimTy
                                    boolTy
                                    [(DEFAULT             ,[],Var trueDataConId ),
                                     (LitAlt (mkMachInt 0),[],Var falseDataConId)])

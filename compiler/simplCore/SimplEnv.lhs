@@ -271,9 +271,12 @@ addNewInScopeIds env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst }) v
 	-- _delete_ it from the substitution when going inside
 	-- the (\x -> ...)!
 
-modifyInScope :: SimplEnv -> CoreBndr -> CoreBndr -> SimplEnv
-modifyInScope env@(SimplEnv {seInScope = in_scope}) v v'
-  = env {seInScope = modifyInScopeSet in_scope v v'}
+modifyInScope :: SimplEnv -> CoreBndr -> SimplEnv
+-- The variable should already be in scope, but 
+-- replace the existing version with this new one
+-- which has more information
+modifyInScope env@(SimplEnv {seInScope = in_scope}) v 
+  = env {seInScope = extendInScopeSet in_scope v}
 
 ---------------------
 zapSubstEnv :: SimplEnv -> SimplEnv
@@ -440,20 +443,25 @@ floatBinds (Floats bs _) = fromOL bs
 %*									*
 %************************************************************************
 
+Note [Global Ids in the substitution]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We look up even a global (eg imported) Id in the substitution. Consider
+   case X.g_34 of b { (a,b) ->  ... case X.g_34 of { (p,q) -> ...} ... }
+The binder-swap in the occurence analyser will add a binding
+for a LocalId version of g (with the same unique though):
+   case X.g_34 of b { (a,b) ->  let g_34 = b in 
+				... case X.g_34 of { (p,q) -> ...} ... }
+So we want to look up the inner X.g_34 in the substitution, where we'll
+find that it has been substituted by b.  (Or conceivably cloned.)
 
 \begin{code}
 substId :: SimplEnv -> InId -> SimplSR
 -- Returns DoneEx only on a non-Var expression
 substId (SimplEnv { seInScope = in_scope, seIdSubst = ids }) v 
-  | not (isLocalId v) 
-  = DoneId v
-  | otherwise	-- A local Id
-  = case lookupVarEnv ids v of
+  = case lookupVarEnv ids v of		-- Note [Global Ids in the substitution]
 	Nothing		      -> DoneId (refine in_scope v)
 	Just (DoneId v)       -> DoneId (refine in_scope v)
-	Just (DoneEx (Var v)) 
-	       | isLocalId v  -> DoneId (refine in_scope v)
-	       | otherwise    -> DoneId v
+	Just (DoneEx (Var v)) -> DoneId (refine in_scope v)
 	Just res	      -> res	-- DoneEx non-var, or ContEx
   where
 
@@ -461,9 +469,11 @@ substId (SimplEnv { seInScope = in_scope, seIdSubst = ids }) v
 	-- Even though it isn't in the substitution, it may be in
 	-- the in-scope set with better IdInfo
 refine :: InScopeSet -> Var -> Var
-refine in_scope v = case lookupInScope in_scope v of
+refine in_scope v 
+  | isLocalId v = case lookupInScope in_scope v of
 			 Just v' -> v'
 			 Nothing -> WARN( True, ppr v ) v	-- This is an error!
+  | otherwise = v
 
 lookupRecBndr :: SimplEnv -> InId -> OutId
 -- Look up an Id which has been put into the envt by simplRecBndrs,
@@ -519,7 +529,7 @@ simplLamBndr env bndr
     old_unf = idUnfolding bndr
     (env1, id1) = substIdBndr env bndr
     id2  = id1 `setIdUnfolding` substUnfolding env old_unf
-    env2 = modifyInScope env1 id1 id2
+    env2 = modifyInScope env1 id2
 
 ---------------
 simplNonRecBndr :: SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)
@@ -644,7 +654,7 @@ addBndrRules :: SimplEnv -> InBndr -> OutBndr -> (SimplEnv, OutBndr)
 -- Rules are added back in to to the bin
 addBndrRules env in_id out_id
   | isEmptySpecInfo old_rules = (env, out_id)
-  | otherwise = (modifyInScope env out_id final_id, final_id)
+  | otherwise = (modifyInScope env final_id, final_id)
   where
     subst     = mkCoreSubst env
     old_rules = idSpecialisation in_id

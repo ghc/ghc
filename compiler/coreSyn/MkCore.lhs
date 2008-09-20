@@ -4,7 +4,7 @@ module MkCore (
         -- * Constructing normal syntax
         mkCoreLet, mkCoreLets,
         mkCoreApp, mkCoreApps, mkCoreConApps,
-        mkCoreLams,
+        mkCoreLams, mkWildCase, mkIfThenElse,
         
         -- * Constructing boxed literals
         mkWordExpr, mkWordExprWord,
@@ -48,7 +48,6 @@ import HscTypes
 
 import TysWiredIn
 import PrelNames
-import MkId             ( seqId )
 
 import Type
 import TypeRep
@@ -57,6 +56,7 @@ import DataCon          ( DataCon, dataConWorkId )
 
 import FastString
 import UniqSupply
+import Unique		( mkBuiltinUnique )
 import BasicTypes
 import Util             ( notNull, zipEqual )
 import Panic
@@ -121,22 +121,50 @@ mkCoreConApps con args = mkCoreApps (Var (dataConWorkId con)) args
 -----------
 mk_val_app :: CoreExpr -> CoreExpr -> Type -> Type -> CoreExpr
 mk_val_app (Var f `App` Type ty1 `App` Type _ `App` arg1) arg2 _ res_ty
-  | f == seqId                -- Note [Desugaring seq (1), (2)]
+  | f `hasKey` seqIdKey            -- Note [Desugaring seq (1), (2)]
   = Case arg1 case_bndr res_ty [(DEFAULT,[],arg2)]
   where
     case_bndr = case arg1 of
                    Var v1 | isLocalId v1 -> v1        -- Note [Desugaring seq (2) and (3)]
-                   _                     -> mkWildId ty1
+                   _                     -> mkWildBinder ty1
 
 mk_val_app fun arg arg_ty _        -- See Note [CoreSyn let/app invariant]
   | not (needsCaseBinding arg_ty arg)
   = App fun arg                -- The vastly common case
 
 mk_val_app fun arg arg_ty res_ty
-  = Case arg (mkWildId arg_ty) res_ty [(DEFAULT,[],App fun (Var arg_id))]
+  = Case arg arg_id res_ty [(DEFAULT,[],App fun (Var arg_id))]
   where
-    arg_id = mkWildId arg_ty    -- Lots of shadowing, but it doesn't matter,
-                                -- because 'fun ' should not have a free wild-id
+    arg_id = mkWildBinder arg_ty    
+	-- Lots of shadowing, but it doesn't matter,
+        -- because 'fun ' should not have a free wild-id
+	--
+	-- This is Dangerous.  But this is the only place we play this 
+	-- game, mk_val_app returns an expression that does not have
+	-- have a free wild-id.  So the only thing that can go wrong
+	-- is if you take apart this case expression, and pass a 
+	-- fragmet of it as the fun part of a 'mk_val_app'.
+
+
+-- | Make a /wildcard binder/. This is typically used when you need a binder 
+-- that you expect to use only at a *binding* site.  Do not use it at
+-- occurrence sites because it has a single, fixed unique, and it's very
+-- easy to get into difficulties with shadowing.  That's why it is used so little.
+mkWildBinder :: Type -> Id
+mkWildBinder ty = mkSysLocal (fsLit "wild") (mkBuiltinUnique 1) ty
+
+mkWildCase :: CoreExpr -> Type -> Type -> [CoreAlt] -> CoreExpr
+-- Make a case expression whose case binder is unused
+-- The alts should not have any occurrences of WildId
+mkWildCase scrut scrut_ty res_ty alts 
+  = Case scrut (mkWildBinder scrut_ty) res_ty alts
+
+mkIfThenElse :: CoreExpr -> CoreExpr -> CoreExpr -> CoreExpr
+mkIfThenElse guard then_expr else_expr
+-- Not going to be refining, so okay to take the type of the "then" clause
+  = mkWildCase guard boolTy (exprType then_expr) 
+	 [ (DataAlt falseDataCon, [], else_expr),	-- Increasing order of tag!
+    	   (DataAlt trueDataCon,  [], then_expr) ]
 \end{code}
 
 Note [Desugaring seq (1)]  cf Trac #1031

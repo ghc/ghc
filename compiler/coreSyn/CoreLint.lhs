@@ -256,6 +256,8 @@ lintCoreExpr :: CoreExpr -> LintM OutType
 lintCoreExpr (Var var)
   = do	{ checkL (not (var == oneTupleDataConId))
 		 (ptext (sLit "Illegal one-tuple"))
+
+	; checkDeadIdOcc var
 	; var' <- lookupIdInScope var
         ; return (idType var')
         }
@@ -422,6 +424,17 @@ checkKinds tyvar arg_ty
     tyvar_kind = tyVarKind tyvar
     arg_kind | isCoVar tyvar = coercionKindPredTy arg_ty
 	     | otherwise     = typeKind arg_ty
+
+checkDeadIdOcc :: Id -> LintM ()
+-- Occurrences of an Id should never be dead....
+-- except when we are checking a case pattern
+checkDeadIdOcc id
+  | isDeadOcc (idOccInfo id)
+  = do { in_case <- inCasePat
+       ; checkL in_case
+		(ptext (sLit "Occurrence of a dead Id") <+> ppr id) }
+  | otherwise
+  = return ()
 \end{code}
 
 
@@ -665,6 +678,12 @@ addErr subst errs_so_far msg locs
 addLoc :: LintLocInfo -> LintM a -> LintM a
 addLoc extra_loc m =
   LintM (\ loc subst errs -> unLintM m (extra_loc:loc) subst errs)
+
+inCasePat :: LintM Bool		-- A slight hack; see the unique call site
+inCasePat = LintM $ \ loc _ errs -> (Just (is_case_pat loc), errs)
+  where
+    is_case_pat (CasePat {} : _) = True
+    is_case_pat _other           = False
 
 addInScopeVars :: [Var] -> LintM a -> LintM a
 addInScopeVars vars m

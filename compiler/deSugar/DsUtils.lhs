@@ -301,11 +301,10 @@ mkCoAlgCaseMatchResult var ty match_alts
 	      | otherwise
 	      = CanFail
 
-    wild_var = mkWildId (idType var)
     sorted_alts  = sortWith get_tag match_alts
     get_tag (con, _, _) = dataConTag con
     mk_case fail = do alts <- mapM (mk_alt fail) sorted_alts
-                      return (Case (Var var) wild_var ty (mk_default fail ++ alts))
+                      return (mkWildCase (Var var) (idType var) ty (mk_default fail ++ alts))
 
     mk_alt fail (con, args, MatchResult _ body_fn) = do
           body <- body_fn fail
@@ -352,7 +351,7 @@ mkCoAlgCaseMatchResult var ty match_alts
     mk_parrCase fail = do
       lengthP <- dsLookupGlobalId lengthPName
       alt <- unboxAlt
-      return (Case (len lengthP) (mkWildId intTy) ty [alt])
+      return (mkWildCase (len lengthP) intTy ty [alt])
       where
 	elemTy      = case splitTyConApp (idType var) of
 		        (_, [elemTy]) -> elemTy
@@ -364,9 +363,8 @@ mkCoAlgCaseMatchResult var ty match_alts
 	  l      <- newSysLocalDs intPrimTy
 	  indexP <- dsLookupGlobalId indexPName
 	  alts   <- mapM (mkAlt indexP) sorted_alts
-	  return (DataAlt intDataCon, [l], (Case (Var l) wild ty (dft : alts)))
+	  return (DataAlt intDataCon, [l], mkWildCase (Var l) intPrimTy ty (dft : alts))
           where
-	    wild = mkWildId intPrimTy
 	    dft  = (DEFAULT, [], fail)
 	--
 	-- each alternative matches one array length (corresponding to one

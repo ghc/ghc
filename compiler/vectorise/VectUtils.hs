@@ -30,7 +30,6 @@ import TypeRep
 import TyCon
 import DataCon
 import Var
-import Id                 ( mkWildId )
 import MkId               ( unwrapFamInstScrut )
 import TysWiredIn
 import BasicTypes         ( Boxity(..) )
@@ -430,7 +429,7 @@ mkVectEnv :: [Type] -> [Var] -> (Type, CoreExpr, CoreExpr -> CoreExpr -> CoreExp
 mkVectEnv []   []  = (unitTy, Var unitDataConId, \_ body -> body)
 mkVectEnv [ty] [v] = (ty, Var v, \env body -> Let (NonRec v env) body)
 mkVectEnv tys  vs  = (ty, mkCoreTup (map Var vs),
-                        \env body -> Case env (mkWildId ty) (exprType body)
+                        \env body -> mkWildCase env ty (exprType body)
                                        [(DataAlt (tupleCon Boxed (length vs)), vs, body)])
   where
     ty = mkCoreTupTy tys
@@ -460,7 +459,7 @@ mkLiftEnv lc tys vs
 
           bind env body = let scrut = unwrapFamInstScrut env_tc env_tyargs env
                           in
-                          return $ Case scrut (mkWildId (exprType scrut))
+                          return $ mkWildCase scrut (exprType scrut)
                                         (exprType body)
                                         [(DataAlt env_con, lc : bndrs, body)]
       return (env, bind)

@@ -12,6 +12,7 @@ import VectCore
 import HscTypes          ( TypeEnv, extendTypeEnvList, typeEnvTyCons )
 import CoreSyn
 import CoreUtils
+import MkCore		 ( mkWildCase )
 import BuildTyCl
 import DataCon
 import TyCon
@@ -23,7 +24,6 @@ import OccName
 import MkId
 import BasicTypes        ( StrictnessMark(..), boolToRecFlag )
 import Var               ( Var, TyVar )
-import Id                ( mkWildId )
 import Name              ( Name, getOccName )
 import NameEnv
 import TysWiredIn
@@ -458,7 +458,7 @@ buildToPRepr repr vect_tc prepr_tc _
             expr
       = do
           (vars, bodies) <- mapAndUnzipM to_unboxed prods
-          return . Case expr (mkWildId (exprType expr)) res_ty
+          return . mkWildCase expr (exprType expr) res_ty
                  $ zipWith4 mk_alt cons vars (tyConDataCons tycon) bodies
       where
         mk_alt con vars sum_con body
@@ -467,7 +467,7 @@ buildToPRepr repr vect_tc prepr_tc _
         ty_args = map (Type . reprType) prods
 
     to_repr (EnumRepr { enum_data_con = data_con }) expr
-      = return . Case expr (mkWildId (exprType expr)) res_ty
+      = return . mkWildCase expr (exprType expr) res_ty
                $ map mk_alt cons
       where
         mk_alt con = (DataAlt con, [], mkConApp data_con [mkDataConTag con])
@@ -475,7 +475,7 @@ buildToPRepr repr vect_tc prepr_tc _
     to_repr prod expr
       = do
           (vars, body) <- to_unboxed prod
-          return $ Case expr (mkWildId (exprType expr)) res_ty
+          return $ mkWildCase expr (exprType expr) res_ty
                    [(DataAlt con, vars, body)]
 
     to_unboxed (ProdRepr { prod_components = tys
@@ -518,7 +518,7 @@ buildFromPRepr repr vect_tc prepr_tc _
           vars   <- mapM (newLocalVar (fsLit "x")) (map reprType prods)
           bodies <- sequence . zipWith3 from_unboxed prods cons
                              $ map Var vars
-          return . Case expr (mkWildId (reprType repr)) res_ty
+          return . mkWildCase expr (reprType repr) res_ty
                  $ zipWith3 sum_alt (tyConDataCons tycon) vars bodies
       where
         sum_alt data_con var body = (DataAlt data_con, [var], body)
@@ -527,11 +527,11 @@ buildFromPRepr repr vect_tc prepr_tc _
       = do
           var <- newLocalVar (fsLit "n") intPrimTy
 
-          let res = Case (Var var) (mkWildId intPrimTy) res_ty
+          let res = mkWildCase (Var var) intPrimTy res_ty
                   $ (DEFAULT, [], error_expr)
                   : zipWith mk_alt (tyConDataCons vect_tc) cons
 
-          return $ Case expr (mkWildId (reprType repr)) res_ty
+          return $ mkWildCase expr (reprType repr) res_ty
                    [(DataAlt data_con, [var], res)]
       where
         mk_alt data_con con = (LitAlt (mkDataConTagLit data_con), [], con)
@@ -548,7 +548,7 @@ buildFromPRepr repr vect_tc prepr_tc _
               expr
       = do
           vars <- mapM (newLocalVar (fsLit "y")) tys
-          return $ Case expr (mkWildId (reprType prod)) res_ty
+          return $ mkWildCase expr (reprType prod) res_ty
                    [(DataAlt data_con, vars, con `mkVarApps` vars)]
 
     from_unboxed (IdRepr _) con expr
@@ -583,7 +583,7 @@ buildToArrPRepr repr vect_tc prepr_tc arr_tc
 
       return . Lam arg
              . mkCoerce co
-             $ Case scrut (mkWildId (mkTyConApp arr_tc var_tys)) res_ty
+             $ mkWildCase scrut (mkTyConApp arr_tc var_tys) res_ty
                [(DataAlt arr_dc, shape_vars ++ concat repr_vars, result)]
   where
     var_tys = mkTyVarTys $ tyConTyVars vect_tc
@@ -683,7 +683,7 @@ buildFromArrPRepr repr vect_tc prepr_tc arr_tc
           result <- go prods repr_vars vars body
 
           let scrut = unwrapFamInstScrut tycon ty_args expr
-          return . Case scrut (mkWildId scrut_ty) res_ty
+          return . mkWildCase scrut scrut_ty res_ty
                  $ [(DataAlt data_con, shape_vars ++ vars, result)]
       where
         ty_args  = map reprType prods
@@ -715,7 +715,7 @@ buildFromArrPRepr repr vect_tc prepr_tc arr_tc
           let scrut    = unwrapFamInstScrut tycon tys expr
               scrut_ty = mkTyConApp tycon tys
 
-          return $ Case scrut (mkWildId scrut_ty) res_ty
+          return $ mkWildCase scrut scrut_ty res_ty
                    [(DataAlt data_con, shape_vars ++ repr_vars, body)]
 
     from_prod (EnumRepr { enum_arr_tycon = tycon
@@ -728,7 +728,7 @@ buildFromArrPRepr repr vect_tc prepr_tc arr_tc
       = let scrut    = unwrapFamInstScrut tycon [] expr
             scrut_ty = mkTyConApp tycon []
         in
-        return $ Case scrut (mkWildId scrut_ty) res_ty
+        return $ mkWildCase scrut scrut_ty res_ty
                  [(DataAlt data_con, shape_vars, body)]
 
     from_prod (IdRepr _)
