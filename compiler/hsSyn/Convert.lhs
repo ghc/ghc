@@ -51,14 +51,14 @@ convertToHsDecls loc ds = initCvt loc (mapM cvtTop ds)
 convertToHsExpr :: SrcSpan -> TH.Exp -> Either Message (LHsExpr RdrName)
 convertToHsExpr loc e 
   = case initCvt loc (cvtl e) of
-	Left msg  -> Left (msg $$ (ptext (sLit "When converting TH expression")
+	Left msg  -> Left (msg $$ (ptext (sLit "When splicing TH expression:")
 				    <+> text (show e)))
 	Right res -> Right res
 
 convertToPat :: SrcSpan -> TH.Pat -> Either Message (LPat RdrName)
 convertToPat loc e
   = case initCvt loc (cvtPat e) of
-        Left msg  -> Left (msg $$ (ptext (sLit "When converting TH pattern")
+        Left msg  -> Left (msg $$ (ptext (sLit "When splicing TH pattern:")
                                     <+> text (show e)))
         Right res -> Right res
 
@@ -412,6 +412,8 @@ cvtDD (FromThenToR x y z) = do { x' <- cvtl x; y' <- cvtl y; z' <- cvtl z; retur
 
 cvtHsDo :: HsStmtContext Name.Name -> [TH.Stmt] -> CvtM (HsExpr RdrName)
 cvtHsDo do_or_lc stmts
+  | null stmts = failWith (ptext (sLit "Empty stmt list in do-block"))
+  | otherwise
   = do	{ stmts' <- cvtStmts stmts
 	; let body = case last stmts' of
 			L _ (ExprStmt body _ _) -> body
