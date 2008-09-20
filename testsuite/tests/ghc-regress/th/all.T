@@ -66,6 +66,16 @@ test('TH_spliceDecl4',
      multimod_compile,
      ['TH_spliceDecl4', '-v0'])
 
+test('T2597a',
+     extra_clean(['T2597a_Lib.hi', 'T2597a_Lib.o']),
+     multimod_compile,
+     ['T2597a', '-v0'])
+
+test('T2597b',
+     extra_clean(['T2597b_Lib.hi', 'T2597b_Lib.o']),
+     multimod_compile_fail,
+     ['T2597b', '-v0'])
+
 test('TH_spliceE1', normal, compile_and_run, [''])
 test('TH_spliceExpr1', normal, compile, ['-v0'])
 test('TH_spliceE3', normal, compile, ['-v0'])

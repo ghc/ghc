@@ -1,0 +1,7 @@
+
+T2597b.hs:8:7:
+    Empty stmt list in do-block
+    When splicing generated code into the program
+    When splicing TH expression: DoE []
+    In the expression: $mkBug2
+    In the definition of `bug2': bug2 = $mkBug2
