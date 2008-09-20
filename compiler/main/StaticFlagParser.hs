@@ -176,7 +176,6 @@ isStaticFlag f =
     "fgransim",
     "fno-hi-version-check",
     "dno-black-holing",
-    "fno-method-sharing",
     "fno-state-hack",
     "fno-ds-multi-tyvar",
     "fruntime-types",
