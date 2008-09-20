@@ -861,7 +861,7 @@ Note [NO TYVARS]
 
 The excitement comes when simplifying the bindings for h.  Initially
 try to simplify {y @ [[t1]] t2, 0 @ t1}, with initial qtvs = {t2}.
-From this we get t1:=:t2, but also various bindings.  We can't forget
+From this we get t1~t2, but also various bindings.  We can't forget
 the bindings (because of [LOOP]), but in fact t1 is what g is
 polymorphic in.  
 

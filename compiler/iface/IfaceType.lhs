@@ -238,7 +238,7 @@ ppr_tc tc		   = ppr tc
 -------------------
 instance Outputable IfacePredType where
 	-- Print without parens
-  ppr (IfaceEqPred ty1 ty2)= hsep [ppr ty1, ptext (sLit ":=:"), ppr ty2]
+  ppr (IfaceEqPred ty1 ty2)= hsep [ppr ty1, ptext (sLit "~"), ppr ty2]
   ppr (IfaceIParam ip ty)  = hsep [ppr ip, dcolon, ppr ty]
   ppr (IfaceClassP cls ts) = parenSymOcc (getOccName cls) (ppr cls)
 			     <+> sep (map pprParendIfaceType ts)

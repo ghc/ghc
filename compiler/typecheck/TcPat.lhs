@@ -568,7 +568,7 @@ the split arguments for the representation tycon :R123Map as {Int, c, w}
 
 In other words, boxySplitTyConAppWithFamily implicitly takes the coercion 
 
-  Co123Map a b v :: {Map (a, b) v :=: :R123Map a b v}
+  Co123Map a b v :: {Map (a, b) v ~ :R123Map a b v}
 
 moving between representation and family type into account.  To produce type
 correct Core, this coercion needs to be used to case the type of the scrutinee
@@ -594,7 +594,7 @@ to express the local scope of GADT refinements.
 
 \begin{code}
 --	Running example:
--- MkT :: forall a b c. (a:=:[b]) => b -> c -> T a
+-- MkT :: forall a b c. (a~[b]) => b -> c -> T a
 -- 	 with scrutinee of type (T ty)
 
 tcConPat :: PatState -> SrcSpan -> DataCon -> TyCon 

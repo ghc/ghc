@@ -740,12 +740,12 @@ dataConInstPat :: (DataCon -> [Type])      -- function used to find arg tys
 --    ...
 --
 --  has representation type 
---   forall a. forall a1. forall b. (a :=: (a1,b)) => 
+--   forall a. forall a1. forall b. (a ~ (a1,b)) => 
 --     Int -> b -> T a
 --
 --  dataConInstPat fss us T1 (a1',b') will return
 --
---  ([a1'', b''], [c :: (a1', b'):=:(a1'', b'')], [x :: Int, y :: b''])
+--  ([a1'', b''], [c :: (a1', b')~(a1'', b'')], [x :: Int, y :: b''])
 --
 --  where the double-primed variables are created with the FastStrings and
 --  Uniques given as fss and us
@@ -801,7 +801,7 @@ exprIsConApp_maybe (Cast expr co)
 
 	-- The transformation applies iff we have
 	--	(C e1 ... en) `cast` co
-	-- where co :: (T t1 .. tn) :=: (T s1 ..sn)
+	-- where co :: (T t1 .. tn) ~ (T s1 ..sn)
 	-- That is, with a T at the top of both sides
 	-- The left-hand one must be a T, because exprIsConApp returned True
 	-- but the right-hand one might not be.  (Though it usually will.)

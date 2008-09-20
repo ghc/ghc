@@ -74,14 +74,14 @@ import FastString
 -- | A 'Coercion' represents a 'Type' something should be coerced to.
 type Coercion     = Type
 
--- | A 'CoercionKind' is always of form @ty1 :=: ty2@ and indicates the
+-- | A 'CoercionKind' is always of form @ty1 ~ ty2@ and indicates the
 -- types that a 'Coercion' will work on.
 type CoercionKind = Kind
 
 ------------------------------
 
--- | This breaks a 'Coercion' with 'CoercionKind' @T A B C :=: T D E F@ into
--- a list of 'Coercion's of kinds @A :=: D@, @B :=: E@ and @E :=: F@. Hence:
+-- | This breaks a 'Coercion' with 'CoercionKind' @T A B C ~ T D E F@ into
+-- a list of 'Coercion's of kinds @A ~ D@, @B ~ E@ and @E ~ F@. Hence:
 --
 -- > decomposeCo 3 c = [right (left (left c)), right (left c), right c]
 decomposeCo :: Arity -> Coercion -> [Coercion]
@@ -134,7 +134,7 @@ splitCoercionKind_maybe _ = Nothing
 
 -- | If it is the case that
 --
--- > c :: (t1 :=: t2)
+-- > c :: (t1 ~ t2)
 --
 -- i.e. the kind of @c@ is a 'CoercionKind' relating @t1@ and @t2@, then @coercionKind c = (t1, t2)@.
 -- See also 'coercionKindPredTy'
@@ -218,8 +218,8 @@ mkFunCoercion    co1 co2 = mkFunTy co1 co2
 
 mkSymCoercion :: Coercion -> Coercion
 -- ^ Create a symmetric version of the given 'Coercion' that asserts equality between
--- the same types but in the other "direction", so a kind of @t1 :=: t2@ becomes the
--- kind @t2 :=: t1@.
+-- the same types but in the other "direction", so a kind of @t1 ~ t2@ becomes the
+-- kind @t2 ~ t1@.
 --
 -- This function attempts to simplify the generated 'Coercion' by removing redundant applications
 -- of @sym@. This is done by pushing this new @sym@ down into the 'Coercion' and exploiting the fact that 
@@ -405,7 +405,7 @@ mkNewTypeCoercion name tycon tvs rhs_ty
 		(TyConApp tycon args, substTyWith tvs args rhs_ty)
 
 -- | Create a coercion identifying a @data@, @newtype@ or @type@ representation type
--- and its family instance.  It has the form @Co tvs :: F ts :=: R tvs@, where @Co@ is 
+-- and its family instance.  It has the form @Co tvs :: F ts ~ R tvs@, where @Co@ is 
 -- the coercion tycon built here, @F@ the family tycon and @R@ the (derived)
 -- representation tycon.
 mkFamInstCoercion :: Name	-- ^ Unique name for the coercion tycon
@@ -420,7 +420,7 @@ mkFamInstCoercion name tvs family instTys rep_tycon
     coArity = length tvs
     rule args = (substTyWith tvs args $		     -- with sigma = [tys/tvs],
 		   TyConApp family instTys,	     --       sigma (F ts)
-		 TyConApp rep_tycon args)	     --   :=: R tys
+		 TyConApp rep_tycon args)	     --   ~ R tys
 
 --------------------------------------
 -- Coercion Type Constructors...
@@ -478,7 +478,7 @@ splitCoercionKindOf :: Type -> ((Type,Type), (Type,Type))
 -- Helper for left and right.  Finds coercion kind of its input and
 -- returns the left and right projections of the coercion...
 --
--- if c :: t1 s1 :=: t2 s2 then splitCoercionKindOf c = ((t1, t2), (s1, s2))
+-- if c :: t1 s1 ~ t2 s2 then splitCoercionKindOf c = ((t1, t2), (s1, s2))
 splitCoercionKindOf co
   | Just (ty1, ty2) <- splitCoercionKind_maybe (coercionKindPredTy co)
   , Just (ty_fun1, ty_arg1) <- splitAppTy_maybe ty1

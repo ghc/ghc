@@ -188,7 +188,7 @@ tyConFamInst_maybe). A coercion allows you to move between
 representation and family type.  It is accessible from :R123Map via
 tyConFamilyCoercion_maybe and has kind
 
-  Co123Map a b v :: {Map (a, b) v :=: :R123Map a b v}
+  Co123Map a b v :: {Map (a, b) v ~ :R123Map a b v}
 
 The wrapper and worker of MapPair get the types
 

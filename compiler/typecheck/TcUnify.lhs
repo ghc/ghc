@@ -1294,8 +1294,8 @@ Note [TyCon app]
 When we find two TyConApps, the argument lists are guaranteed equal
 length.  Reason: intially the kinds of the two types to be unified is
 the same. The only way it can become not the same is when unifying two
-AppTys (f1 a1):=:(f2 a2).  In that case there can't be a TyConApp in
-the f1,f2 (because it'd absorb the app).  If we unify f1:=:f2 first,
+AppTys (f1 a1)~(f2 a2).  In that case there can't be a TyConApp in
+the f1,f2 (because it'd absorb the app).  If we unify f1~f2 first,
 which we do, that ensures that f1,f2 have the same kind; and that
 means a1,a2 have the same kind.  And now the argument repeats.
 
@@ -1870,7 +1870,7 @@ kindSimpleKind :: Bool -> Kind -> TcM SimpleKind
 -- (kindSimpleKind True k) returns a simple kind sk such that sk <: k
 -- If the flag is False, it requires k <: sk
 -- E.g.         kindSimpleKind False ?? = *
--- What about (kv -> *) :=: ?? -> *
+-- What about (kv -> *) ~ ?? -> *
 kindSimpleKind orig_swapped orig_kind
   = go orig_swapped orig_kind
   where

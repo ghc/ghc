@@ -164,7 +164,7 @@ Why might the wrapper have anything to do?  Two reasons:
 	\$wMkT :: a -> T [a]
 	\$wMkT a x = MkT [a] a [a] x
   The third argument is a coerion
-	[a] :: [a]:=:[a]
+	[a] :: [a]~[a]
 
 INVARIANT: the dictionary constructor for a class
 	   never has a wrapper.
@@ -246,14 +246,14 @@ data DataCon
 
 	-- 	*** As represented internally
 	--  data T a where
-	--    MkT :: forall a. forall x y. (a:=:(x,y),x~y,Ord x) => x -> y -> T a
+	--    MkT :: forall a. forall x y. (a~(x,y),x~y,Ord x) => x -> y -> T a
 	-- 
 	-- The next six fields express the type of the constructor, in pieces
 	-- e.g.
 	--
 	--	dcUnivTyVars  = [a]
 	--	dcExTyVars    = [x,y]
-	--	dcEqSpec      = [a:=:(x,y)]
+	--	dcEqSpec      = [a~(x,y)]
 	--	dcEqTheta     = [x~y]	
 	--	dcDictTheta   = [Ord x]
 	--	dcOrigArgTys  = [a,List b]
@@ -286,9 +286,9 @@ data DataCon
 					-- _as written by the programmer_
 		-- This field allows us to move conveniently between the two ways
 		-- of representing a GADT constructor's type:
-		--	MkT :: forall a b. (a :=: [b]) => b -> T a
+		--	MkT :: forall a b. (a ~ [b]) => b -> T a
 		--	MkT :: forall b. b -> T [b]
-		-- Each equality is of the form (a :=: ty), where 'a' is one of 
+		-- Each equality is of the form (a ~ ty), where 'a' is one of 
 		-- the universally quantified type variables
 					
 		-- The next two fields give the type context of the data constructor
@@ -346,7 +346,7 @@ data DataCon
 	dcRepTyCon  :: TyCon,		-- Result tycon, T
 
 	dcRepType   :: Type,	-- Type of the constructor
-				-- 	forall a x y. (a:=:(x,y), x~y, Ord x) =>
+				-- 	forall a x y. (a~(x,y), x~y, Ord x) =>
                                 --        x -> y -> T a
 				-- (this is *not* of the constructor wrapper Id:
 				--  see Note [Data con representation] below)
@@ -355,7 +355,7 @@ data DataCon
 	--	case (e :: T t) of
         --        MkT x y co1 co2 (d:Ord x) (v:r) (w:F s) -> ...
 	-- It's convenient to apply the rep-type of MkT to 't', to get
-	--	forall x y. (t:=:(x,y), x~y, Ord x) => x -> y -> T t
+	--	forall x y. (t~(x,y), x~y, Ord x) => x -> y -> T t
 	-- and use that to check the pattern.  Mind you, this is really only
 	-- used in CoreLint.
 

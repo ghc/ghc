@@ -571,7 +571,7 @@ tcInstDecl2 :: InstInfo Name -> TcM (LHsBinds Id)
 --      newtype N a = MkN (Tree [a]) deriving( Foo Int )
 --
 -- The newtype gives an FC axiom looking like
---      axiom CoN a ::  N a :=: Tree [a]
+--      axiom CoN a ::  N a ~ Tree [a]
 --   (see Note [Newtype coercions] in TyCon for this unusual form of axiom)
 --
 -- So all need is to generate a binding looking like:
@@ -637,7 +637,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = NewTypeDerived })
       --        make_coercion
       -- The inst_head looks like (C s1 .. sm (T a1 .. ak))
       -- But we want the coercion (C s1 .. sm (sym (CoT a1 .. ak)))
-      --        with kind (C s1 .. sm (T a1 .. ak)  :=:  C s1 .. sm <rep_ty>)
+      --        with kind (C s1 .. sm (T a1 .. ak)  ~  C s1 .. sm <rep_ty>)
       --        where rep_ty is the (eta-reduced) type rep of T
       -- So we just replace T with CoT, and insert a 'sym'
       -- NB: we know that k will be >= arity of CoT, because the latter fully eta-reduced

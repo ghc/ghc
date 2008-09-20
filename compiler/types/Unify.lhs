@@ -384,7 +384,7 @@ dataConCannotMatch tys con
 data Refinement = Reft InScopeSet InternalReft 
 
 type InternalReft = TyVarEnv (Coercion, Type)
--- INVARIANT:   a->(co,ty)   then   co :: (a:=:ty)
+-- INVARIANT:   a->(co,ty)   then   co :: (a~ty)
 -- Not necessarily idemopotent
 
 instance Outputable Refinement where
@@ -401,7 +401,7 @@ isEmptyRefinement (Reft _ env) = isEmptyVarEnv env
 refineType :: Refinement -> Type -> Maybe (Coercion, Type)
 -- Apply the refinement to the type.
 -- If (refineType r ty) = (co, ty')
--- Then co :: ty:=:ty'
+-- Then co :: ty~ty'
 -- Nothing => the refinement does nothing to this type
 refineType (Reft in_scope env) ty
   | not (isEmptyVarEnv env),		-- Common case
@@ -427,7 +427,7 @@ refinePred (Reft in_scope env) pred
 refineResType :: Refinement -> Type -> Maybe (Coercion, Type)
 -- Like refineType, but returns the 'sym' coercion
 -- If (refineResType r ty) = (co, ty')
--- Then co :: ty':=:ty
+-- Then co :: ty'~ty
 refineResType reft ty
   = case refineType reft ty of
       Just (co, ty1) -> Just (mkSymCoercion co, ty1)
@@ -617,8 +617,8 @@ uVar :: TvSubstEnv	-- An existing substitution to extend
      -> UM TvSubstEnv
 
 -- PRE-CONDITION: in the call (uVar swap r tv1 ty), we know that
---	if swap=False	(tv1:=:ty)
---	if swap=True	(ty:=:tv1)
+--	if swap=False	(tv1~ty)
+--	if swap=True	(ty~tv1)
 
 uVar subst tv1 ty
  = -- Check to see whether tv1 is refined by the substitution
@@ -640,7 +640,7 @@ uUnrefined subst tv1 ty2 ty2'
   = uUnrefined subst tv1 ty2 ty2''	-- Unwrap synonyms
 		-- This is essential, in case we have
 		--	type Foo a = a
-		-- and then unify a :=: Foo a
+		-- and then unify a ~ Foo a
 
 uUnrefined subst tv1 ty2 (TyVarTy tv2)
   | tv1 == tv2		-- Same type variable

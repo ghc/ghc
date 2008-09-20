@@ -164,6 +164,8 @@ data HsExpr id
   -- Record update
   | RecordUpd   (LHsExpr id)
                 (HsRecordBinds id)
+--		(HsMatchGroup Id)  -- Filled in by the type checker to be 
+--				   -- a match that does the job
                 [DataCon]          -- Filled in by the type checker to the
                                    -- _non-empty_ list of DataCons that have
                                    -- all the upd'd fields

@@ -112,7 +112,7 @@ import Constants
 -- 4) Class declarations: @class Foo where@ creates the @Foo@ type constructor of kind @*@
 --
 -- 5) Type coercions! This is because we represent a coercion from @t1@ to @t2@ as a 'Type', where
---    that type has kind @t1 :=: t2@. See "Coercion" for more on this
+--    that type has kind @t1 ~ t2@. See "Coercion" for more on this
 --
 -- This data type also encodes a number of primitive, built in type constructors such as those
 -- for function and tuple types.
@@ -211,7 +211,7 @@ data TyCon
 	tyConExtName :: Maybe FastString	-- ^ @Just e@ for foreign-imported types, holds the name of the imported thing
     }
 
-  -- | Type coercions, such as @(:=:)@, @sym@, @trans@, @left@ and @right@.
+  -- | Type coercions, such as @(~)@, @sym@, @trans@, @left@ and @right@.
   -- INVARIANT: coercions are always fully applied
   | CoercionTyCon {	
 	tyConUnique :: Unique,
@@ -393,7 +393,7 @@ newtype, to the newtype itself. For example,
 
    newtype T a = MkT (a -> a)
 
-the NewTyCon for T will contain nt_co = CoT where CoT t : T t :=: t ->
+the NewTyCon for T will contain nt_co = CoT where CoT t : T t ~ t ->
 t.  This TyCon is a CoercionTyCon, so it does not have a kind on its
 own; it basically has its own typing rule for the fully-applied
 version.  If the newtype T has k type variables then CoT has arity at
@@ -403,11 +403,11 @@ ending with the same type variables as the left hand side, we
 
    newtype S a = MkT [a]
 
-then we would generate the arity 0 coercion CoS : S :=: [].  The
+then we would generate the arity 0 coercion CoS : S ~ [].  The
 primary reason we do this is to make newtype deriving cleaner.
 
 In the paper we'd write
-	axiom CoT : (forall t. T t) :=: (forall t. [t])
+	axiom CoT : (forall t. T t) ~ (forall t. [t])
 and then when we used CoT at a particular type, s, we'd say
 	CoT @ s
 which encodes as (TyConApp instCoercionTyCon [TyConApp CoT [], s])
@@ -418,7 +418,7 @@ be saturated, but which encodes as
 	TyConApp CoT [s]
 In the vocabulary of the paper it's as if we had axiom declarations
 like
-	axiom CoT t :  T t :=: [t]
+	axiom CoT t :  T t ~ [t]
 
 Note [Newtype eta]
 ~~~~~~~~~~~~~~~~~~

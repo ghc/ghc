@@ -93,7 +93,7 @@ buildAlgTyCon tc_name tvs stupid_theta rhs is_rec want_generics gadt_syn
 --
 -- (1) create a coercion that identifies the family instance type and the
 --     representation type from Step (1); ie, it is of the form 
---	   `Co tvs :: F ts :=: R tvs', where `Co' is the name of the coercion,
+--	   `Co tvs :: F ts ~ R tvs', where `Co' is the name of the coercion,
 --	   `F' the family tycon and `R' the (derived) representation tycon,
 --	   and
 -- (2) produce a `TyConParent' value containing the parent and coercion

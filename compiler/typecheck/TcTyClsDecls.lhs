@@ -878,7 +878,7 @@ tcResultType _ tc_tvs dc_tvs (ResTyGADT res_ty)
 	-- E.g.  data T a b c where
 	--	   MkT :: forall x y z. T (x,y) z z
 	-- Then we generate
-	--	([a,z,c], [x,y], [a:=:(x,y), c:=:z], T)
+	--	([a,z,c], [x,y], [a~(x,y), c~z], T)
 
   = do	{ (dc_tycon, res_tys) <- tcLHsConResTy res_ty
 
