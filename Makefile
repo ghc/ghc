@@ -30,6 +30,12 @@ ifneq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 INSTALL_INPLACE_FLAGS += --enable-shell-wrappers
 endif
 
+ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
+INPLACE_DATADIR = '$$prefix'
+else
+INPLACE_DATADIR = '$$prefix/share'
+endif
+
 install-inplace:
 	$(INSTALL_PACKAGE) install '$(GHC_PKG_PROG)' '$(INPLACE_PKG_CONF)' ''  \
 	    '$(FPTOOLS_TOP_ABS)/utils/haddock/install-inplace' \
@@ -38,7 +44,7 @@ install-inplace:
 	    '$$prefix/lib'                                     \
 	    '$$prefix/libexec'                                 \
 	    '$$prefix/dynlib'                                  \
-	    '$$prefix/share'                                   \
+	    $(INPLACE_DATADIR)                                 \
 	    '$$prefix/doc'                                     \
 	    '$$prefix/html'                                    \
 	    '$$prefix/haddock'                                 \
