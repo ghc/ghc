@@ -25,6 +25,9 @@ done
 # Alas, darcs doesn't handle file permissions, so fix a few of them.
 for f in boot darcs-all push-all validate
 do
-    test -f $f && chmod +x $f
+    if test -f $f
+    then
+        chmod +x $f
+    fi
 done
 
