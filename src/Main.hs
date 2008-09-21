@@ -220,7 +220,7 @@ render flags interfaces installedIfaces = do
                       do m <- getExecDir
                          case m of
                              Nothing -> error "No libdir found"
-                             Just d -> return (d </> ".." </> "share")
+                             Just d -> return (d </> "..")
 #else
                       getDataDir -- provided by Cabal
 #endif
