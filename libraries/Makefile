@@ -359,7 +359,7 @@ endif
 # a Cabal package if we keep it. However, once we drop extralibs we can
 # probably remove it anyway.
 	echo $(WHERE_AM_I)/ifBuildable/ifBuildable >> $(BIN_DIST_LIST)
-	for FILE in dph/dph-prim-interface/interface/*.h dph/dph/LICENSE; do if [ -e $$FILE ]; then echo $(WHERE_AM_I)/$$FILE >> $(BIN_DIST_LIST); fi; done
+	for FILE in dph/dph-prim-interface/interface/*.h dph/dph/LICENSE; do if [ -f $$FILE ]; then echo $(WHERE_AM_I)/$$FILE >> $(BIN_DIST_LIST); fi; done
 ifeq "$(HADDOCK_DOCS)" "YES"
 	for FILE in gen_contents_index index.html doc-index*.html; do echo $(WHERE_AM_I)/$$FILE >> $(BIN_DIST_LIST); done
 endif
