@@ -97,11 +97,11 @@ throwErrMsg = throwDyn
 throwErrMsg = throw
 #endif
 
-handleErrMsg :: (ErrMsg -> IO a) -> IO a -> IO a
+handleErrMsg :: ExceptionMonad m => (ErrMsg -> m a) -> m a -> m a
 #if __GLASGOW_HASKELL__ < 609
-handleErrMsg = flip catchDyn
+handleErrMsg = flip gcatchDyn
 #else
-handleErrMsg = handle
+handleErrMsg = ghandle
 #endif
 
 -- So we can throw these things as exceptions

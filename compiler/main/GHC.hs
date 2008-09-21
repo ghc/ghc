@@ -310,11 +310,11 @@ import Prelude hiding (init)
 -- Unless you want to handle exceptions yourself, you should wrap this around
 -- the top level of your program.  The default handlers output the error
 -- message(s) to stderr and exit cleanly.
-defaultErrorHandler :: DynFlags -> IO a -> IO a
+defaultErrorHandler :: (ExceptionMonad m, MonadIO m) => DynFlags -> m a -> m a
 defaultErrorHandler dflags inner =
   -- top-level exception handler: any unrecognised exception is a compiler bug.
 #if __GLASGOW_HASKELL__ < 609
-  handle (\exception -> do
+  ghandle (\exception -> liftIO $ do
            hFlush stdout
            case exception of
                 -- an IO exception probably isn't our fault, so don't panic
@@ -328,7 +328,7 @@ defaultErrorHandler dflags inner =
            exitWith (ExitFailure 1)
          ) $
 #else
-  handle (\(SomeException exception) -> do
+  ghandle (\(SomeException exception) -> liftIO $ do
            hFlush stdout
            case cast exception of
                 -- an IO exception probably isn't our fault, so don't panic
@@ -349,12 +349,13 @@ defaultErrorHandler dflags inner =
   -- program errors: messages with locations attached.  Sometimes it is
   -- convenient to just throw these as exceptions.
   handleErrMsg
-            (\em -> do printBagOfErrors dflags (unitBag em)
-                       exitWith (ExitFailure 1)) $
+            (\em -> liftIO $ do
+                      printBagOfErrors dflags (unitBag em)
+                      exitWith (ExitFailure 1)) $
 
   -- error messages propagated as exceptions
   handleGhcException
-            (\ge -> do
+            (\ge -> liftIO $ do
   		hFlush stdout
   		case ge of
 		     PhaseFailed _ code -> exitWith code
