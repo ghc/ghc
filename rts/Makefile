@@ -405,6 +405,7 @@ sm/Evac_HC_OPTS += -optc-funroll-loops
 
 ifneq "$(findstring thr, $(way))" ""
 EXTRA_SRCS += sm/Evac_thr.c sm/Scav_thr.c
+CLEAN_FILES += sm/Evac_thr.c sm/Scav_thr.c
 
 sm/Evac_thr.c : sm/Evac.c
 	cp $< $@
