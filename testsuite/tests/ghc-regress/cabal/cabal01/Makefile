@@ -37,3 +37,5 @@ cabal01:
 	echo dist:
 	ls dist
 	$(GHC_PKG_INPLACE) unregister test
+	if [ "$(CLEANUP)" != "" ]; then $(MAKE) clean; fi
+

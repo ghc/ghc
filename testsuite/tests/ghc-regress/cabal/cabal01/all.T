@@ -5,8 +5,12 @@ if config.have_profiling:
 else:
     prof = ''
 
+if default_testopts.cleanup != '':
+   cleanup = 'CLEANUP=1'
+else:
+   cleanup = ''
+
 test('cabal01',
      normal,
-     run_command, ['$MAKE -s --no-print-directory cabal01 PROF=' + prof])
-if default_testopts.cleanup != '':
-    runCmd('$MAKE -C ' + in_testdir('') + ' clean')
+     run_command, 
+     ['$MAKE -s --no-print-directory cabal01 PROF=' + prof + ' ' + cleanup])
