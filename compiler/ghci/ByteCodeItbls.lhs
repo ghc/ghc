@@ -19,7 +19,6 @@ module ByteCodeItbls ( ItblEnv, ItblPtr(..), itblCode, mkITbls
 
 #include "HsVersions.h"
 
-import ByteCodeFFI	( newExec )
 import Name		( Name, getName )
 import NameEnv
 import SMRep		( typeCgRep )
@@ -128,7 +127,7 @@ make_constr_itbls cons
                             }
                -- Make a piece of code to jump to "entry_label".
                -- This is the only arch-dependent bit.
-           addrCon <- newExec [conInfoTbl]
+           addrCon <- newExec pokeConItbl conInfoTbl
                     --putStrLn ("SIZE of itbl is " ++ show (sizeOf itbl))
                     --putStrLn ("# ptrs  of itbl is " ++ show ptrs)
                     --putStrLn ("# nptrs of itbl is " ++ show nptrs_really)
@@ -305,10 +304,15 @@ instance Storable StgConInfoTable where
 #endif
               , infoTable = itbl
               }
-   poke ptr itbl 
-      = runState (castPtr ptr) $ do
+   poke = error "poke(StgConInfoTable): use pokeConItbl instead"
+
+
+pokeConItbl :: Ptr StgConInfoTable -> Ptr StgConInfoTable -> StgConInfoTable
+            -> IO ()
+pokeConItbl wr_ptr ex_ptr itbl 
+      = runState (castPtr wr_ptr) $ do
 #ifdef GHCI_TABLES_NEXT_TO_CODE
-           store (conDesc itbl `minusPtr` (ptr `plusPtr` conInfoTableSizeB))
+           store (conDesc itbl `minusPtr` (ex_ptr `plusPtr` conInfoTableSizeB))
 #endif
            store (infoTable itbl)
 #ifndef GHCI_TABLES_NEXT_TO_CODE
@@ -427,4 +431,18 @@ load :: Storable a => PtrIO a
 load = do addr <- advance
           lift (peek addr)
 
+
+newExec :: Storable a => (Ptr a -> Ptr a -> a -> IO ()) -> a -> IO (FunPtr ())
+newExec poke_fn obj
+   = alloca $ \pcode -> do
+        wr_ptr <- _allocateExec (fromIntegral (sizeOf obj)) pcode
+        ex_ptr <- peek pcode
+        poke_fn wr_ptr ex_ptr obj
+        return (castPtrToFunPtr ex_ptr)
+   where
+   codeSize :: Storable a => a -> [a] -> Int
+   codeSize dummy array = sizeOf(dummy) * length array
+
+foreign import ccall unsafe "allocateExec"
+  _allocateExec :: CUInt -> Ptr (Ptr a) -> IO (Ptr a)  
 \end{code}
