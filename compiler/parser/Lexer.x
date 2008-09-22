@@ -20,6 +20,17 @@
 --    - M... should be 3 tokens, not 1.
 --    - pragma-end should be only valid in a pragma
 
+--   qualified operator NOTES.
+--   
+--   - If M.(+) is a single lexeme, then..
+--     - Probably (+) should be a single lexeme too, for consistency.
+--       Otherwise ( + ) would be a prefix operator, but M.( + ) would not be.
+--     - But we have to rule out reserved operators, otherwise (..) becomes
+--       a different lexeme.
+--     - Should we therefore also rule out reserved operators in the qualified
+--       form?  This is quite difficult to achieve.  We don't do it for
+--       qualified varids.
+
 {
 {-# OPTIONS -w #-}
 -- The above warning supression flag is a temporary kludge.
@@ -365,13 +376,15 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
   @conid "#"+       / { ifExtension magicHashEnabled } { idtoken conid }
 }
 
--- ToDo: M.(,,,)
-
+-- ToDo: - move `var` and (sym) into lexical syntax?
+--       - remove backquote from $special?
 <0> {
-  @qual @varsym			{ idtoken qvarsym }
-  @qual @consym			{ idtoken qconsym }
-  @varsym			{ varsym }
-  @consym			{ consym }
+  @qual @varsym       / { ifExtension oldQualOps } { idtoken qvarsym }
+  @qual @consym       / { ifExtension oldQualOps } { idtoken qconsym }
+  @qual \( @varsym \) / { ifExtension newQualOps } { idtoken prefixqvarsym }
+  @qual \( @consym \) / { ifExtension newQualOps } { idtoken prefixqconsym }
+  @varsym                                          { varsym }
+  @consym                                          { consym }
 }
 
 -- For the normal boxed literals we need to be careful
@@ -527,6 +540,8 @@ data Token
   | ITqconid  (FastString,FastString)
   | ITqvarsym (FastString,FastString)
   | ITqconsym (FastString,FastString)
+  | ITprefixqvarsym (FastString,FastString)
+  | ITprefixqconsym (FastString,FastString)
 
   | ITdupipvarid   FastString	-- GHC extension: implicit param: ?x
 
@@ -924,14 +939,14 @@ close_brace span _str _len = do
   popContext
   return (L span ITccurly)
 
-qvarid buf len = ITqvarid $! splitQualName buf len
-qconid buf len = ITqconid $! splitQualName buf len
+qvarid buf len = ITqvarid $! splitQualName buf len False
+qconid buf len = ITqconid $! splitQualName buf len False
 
-splitQualName :: StringBuffer -> Int -> (FastString,FastString)
+splitQualName :: StringBuffer -> Int -> Bool -> (FastString,FastString)
 -- takes a StringBuffer and a length, and returns the module name
 -- and identifier parts of a qualified name.  Splits at the *last* dot,
 -- because of hierarchical module names.
-splitQualName orig_buf len = split orig_buf orig_buf
+splitQualName orig_buf len parens = split orig_buf orig_buf
   where
     split buf dot_buf
 	| orig_buf `byteDiff` buf >= len  = done dot_buf
@@ -951,7 +966,9 @@ splitQualName orig_buf len = split orig_buf orig_buf
 
     done dot_buf =
 	(lexemeToFastString orig_buf (qual_size - 1),
-	 lexemeToFastString dot_buf (len - qual_size))
+	 if parens -- Prelude.(+)
+            then lexemeToFastString (stepOn dot_buf) (len - qual_size - 2)
+            else lexemeToFastString dot_buf (len - qual_size))
       where
 	qual_size = orig_buf `byteDiff` dot_buf
 
@@ -973,8 +990,10 @@ varid span buf len =
 conid buf len = ITconid fs
   where fs = lexemeToFastString buf len
 
-qvarsym buf len = ITqvarsym $! splitQualName buf len
-qconsym buf len = ITqconsym $! splitQualName buf len
+qvarsym buf len = ITqvarsym $! splitQualName buf len False
+qconsym buf len = ITqconsym $! splitQualName buf len False
+prefixqvarsym buf len = ITprefixqvarsym $! splitQualName buf len True
+prefixqconsym buf len = ITprefixqconsym $! splitQualName buf len True
 
 varsym = sym ITvarsym
 consym = sym ITconsym
@@ -1609,6 +1628,7 @@ transformComprehensionsBit = 17
 qqBit	   = 18 -- enable quasiquoting
 inRulePragBit = 19
 rawTokenStreamBit = 20 -- producing a token stream with all comments included
+newQualOpsBit = 21 -- Haskell' qualified operator syntax, e.g. Prelude.(+)
 
 genericsEnabled, ffiEnabled, parrEnabled :: Int -> Bool
 always           _     = True
@@ -1632,6 +1652,8 @@ transformComprehensionsEnabled flags = testBit flags transformComprehensionsBit
 qqEnabled        flags = testBit flags qqBit
 inRulePrag       flags = testBit flags inRulePragBit
 rawTokenStreamEnabled flags = testBit flags rawTokenStreamBit
+newQualOps       flags = testBit flags newQualOpsBit
+oldQualOps flags = not (newQualOps flags)
 
 -- PState for parsing options pragmas
 --
@@ -1695,6 +1717,7 @@ mkPState buf loc flags  =
 	       .|. standaloneDerivingBit `setBitIf` dopt Opt_StandaloneDeriving flags
                .|. transformComprehensionsBit `setBitIf` dopt Opt_TransformListComp flags
                .|. rawTokenStreamBit `setBitIf` dopt Opt_KeepRawTokenStream flags
+               .|. newQualOpsBit `setBitIf` dopt Opt_NewQualifiedOperators flags
       --
       setBitIf :: Int -> Bool -> Int
       b `setBitIf` cond | cond      = bit b

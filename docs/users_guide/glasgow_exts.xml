@@ -52,16 +52,42 @@ documentation</ulink> describes all the libraries that come with GHC.
    <para> Language options recognised by Cabal can also be enabled using the <literal>LANGUAGE</literal> pragma,
    thus <literal>{-# LANGUAGE TemplateHaskell #-}</literal> (see <xref linkend="language-pragma"/>>). </para>
 
-    <para>The flag <option>-fglasgow-exts</option>:
+    <para>The flag <option>-fglasgow-exts</option>
           <indexterm><primary><option>-fglasgow-exts</option></primary></indexterm>
-	  simultaneously enables the following extensions: 
-	    <option>-XForeignFunctionInterface</option>,
-	    <option>-XImplicitParams</option>,
-	    <option>-XScopedTypeVariables</option>,
-	    <option>-XGADTs</option>, 
-	    <option>-XTypeFamilies</option>.
+	  is equivalent to enabling the following extensions: 
+          <option>-XPrintExplicitForalls</option>,
+          <option>-XForeignFunctionInterface</option>,
+          <option>-XUnliftedFFITypes</option>,
+          <option>-XGADTs</option>,
+          <option>-XImplicitParams</option>,
+          <option>-XScopedTypeVariables</option>,
+          <option>-XUnboxedTuples</option>,
+          <option>-XTypeSynonymInstances</option>,
+          <option>-XStandaloneDeriving</option>,
+          <option>-XDeriveDataTypeable</option>,
+          <option>-XFlexibleContexts</option>,
+          <option>-XFlexibleInstances</option>,
+          <option>-XConstrainedClassMethods</option>,
+          <option>-XMultiParamTypeClasses</option>,
+          <option>-XFunctionalDependencies</option>,
+          <option>-XMagicHash</option>,
+          <option>-XPolymorphicComponents</option>,
+          <option>-XExistentialQuantification</option>,
+          <option>-XUnicodeSyntax</option>,
+          <option>-XPostfixOperators</option>,
+          <option>-XPatternGuards</option>,
+          <option>-XLiberalTypeSynonyms</option>,
+          <option>-XRankNTypes</option>,
+          <option>-XImpredicativeTypes</option>,
+          <option>-XTypeOperators</option>,
+          <option>-XRecursiveDo</option>,
+          <option>-XParallelListComp</option>,
+          <option>-XEmptyDataDecls</option>,
+          <option>-XKindSignatures</option>,
+          <option>-XGeneralizedNewtypeDeriving</option>,
+          <option>-XTypeFamilies</option>.
 	    Enabling these options is the <emphasis>only</emphasis> 
-	    effect of <options>-fglasgow-exts</options>
+	    effect of <options>-fglasgow-exts</options>.
           We are trying to move away from this portmanteau flag, 
 	  and towards enabling features individually.</para>
 
@@ -338,6 +364,43 @@ Indeed, the bindings can even be recursive.
 	  </itemizedlist>
       </para>
    </sect2>
+
+    <sect2>
+      <title>New qualified operator syntax</title>
+
+      <para>A new syntax for referencing qualified operators is
+        planned to be introduced by Haskell', and is enabled in GHC
+        with
+        the <option>-XNewQualifiedOperators</option><indexterm><primary><option>-XNewQualifiedOperators</option></primary></indexterm>
+        option.  In the new syntax, the prefix form of a qualified
+        operator is
+        written <literal><replaceable>module</replaceable>.(<replaceable>symbol</replaceable>)</literal>
+        (in Haskell 98 this would
+        be <literal>(<replaceable>module</replaceable>.<replaceable>symbol</replaceable>)</literal>),
+        and the infix form is
+        written <literal>`<replaceable>module</replaceable>.(<replaceable>symbol</replaceable>)`</literal>
+        (in Haskell 98 this would
+        be <literal>`<replaceable>module</replaceable>.<replaceable>symbol</replaceable>`</literal>.
+        For example:
+<programlisting>
+  add x y = Prelude.(+) x y
+  subtract y = (`Prelude.(-)` y)
+</programlisting>
+        The new form of qualified operators is intended to regularise
+        the syntax by eliminating odd cases
+        like <literal>Prelude..</literal>.  For example,
+        when <literal>NewQualifiedOperators</literal> is on, it is possible to
+        write the enerated sequence <literal>[Monday..]</literal>
+        without spaces, whereas in Haskell 98 this would be a
+        reference to the operator &lsquo;<literal>.</literal>&lsquo;
+        from module <literal>Monday</literal>.</para>
+
+      <para>When <option>-XNewQualifiedOperators</option> is on, the old Haskell
+        98 syntax for qualified operators is not accepted, so this
+        option may cause existing Haskell 98 code to break.</para>
+
+    </sect2>
+        
 
     <!-- ====================== HIERARCHICAL MODULES =======================  -->
 
