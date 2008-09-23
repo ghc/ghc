@@ -203,7 +203,8 @@ vectDataCon dc
                             []              -- no existential tvs for now
                             []              -- no eq spec for now
                             []              -- no context
-                            arg_tys
+                            arg_tys 
+			    (mkFamilyTyConApp tycon' (mkTyVarTys univ_tvs))
                             tycon'
   where
     name        = dataConName dc
@@ -826,16 +827,18 @@ buildPArrayDataCon orig_name vect_tc repr_tc
       repr_tys  <- arrReprTys  repr
 
       let tys = shape_tys ++ repr_tys
+	  tvs = tyConTyVars vect_tc
 
       liftDs $ buildDataCon dc_name
                             False                  -- not infix
                             (map (const NotMarkedStrict) tys)
                             []                     -- no field labels
-                            (tyConTyVars vect_tc)
+                            tvs
                             []                     -- no existentials
                             []                     -- no eq spec
                             []                     -- no context
                             tys
+			    (mkFamilyTyConApp repr_tc (mkTyVarTys tvs))
                             repr_tc
 
 mkPADFun :: TyCon -> VM Var

@@ -494,11 +494,15 @@ tcIfaceDataCons tycon_name tycon _ if_cons
  	; arg_tys <- forkM (mk_doc name) (mapM tcIfaceType args)
 	; lbl_names <- mapM lookupIfaceTop field_lbls
 
+	-- Remember, tycon is the representation tycon
+	; let orig_res_ty = mkFamilyTyConApp tycon 
+				(substTyVars (mkTopTvSubst eq_spec) univ_tyvars)
+
 	; buildDataCon name is_infix {- Not infix -}
 		       stricts lbl_names
 		       univ_tyvars ex_tyvars 
                        eq_spec theta 
-		       arg_tys tycon
+		       arg_tys orig_res_ty tycon
 	}
     mk_doc con_name = ptext (sLit "Constructor") <+> ppr con_name
 

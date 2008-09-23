@@ -183,14 +183,15 @@ buildDataCon :: Name -> Bool
             -> [(TyVar,Type)]           -- Equality spec
 	    -> ThetaType		-- Does not include the "stupid theta"
 					-- or the GADT equalities
-	    -> [Type] -> TyCon
+	    -> [Type] -> Type		-- Argument and result types
+	    -> TyCon			-- Rep tycon
 	    -> TcRnIf m n DataCon
 -- A wrapper for DataCon.mkDataCon that
 --   a) makes the worker Id
 --   b) makes the wrapper Id if necessary, including
 --	allocating its unique (hence monadic)
 buildDataCon src_name declared_infix arg_stricts field_lbls
-	     univ_tvs ex_tvs eq_spec ctxt arg_tys tycon
+	     univ_tvs ex_tvs eq_spec ctxt arg_tys res_ty rep_tycon
   = do	{ wrap_name <- newImplicitBinder src_name mkDataConWrapperOcc
 	; work_name <- newImplicitBinder src_name mkDataConWorkerOcc
 	-- This last one takes the name of the data constructor in the source
@@ -198,11 +199,11 @@ buildDataCon src_name declared_infix arg_stricts field_lbls
 	-- space, and puts it into the VarName name space
 
 	; let
-		stupid_ctxt = mkDataConStupidTheta tycon arg_tys univ_tvs
+		stupid_ctxt = mkDataConStupidTheta rep_tycon arg_tys univ_tvs
 		data_con = mkDataCon src_name declared_infix
 				     arg_stricts field_lbls
 				     univ_tvs ex_tvs eq_spec ctxt
-				     arg_tys tycon
+				     arg_tys res_ty rep_tycon
 				     stupid_ctxt dc_ids
 		dc_ids = mkDataConIds wrap_name work_name data_con
 
@@ -271,7 +272,8 @@ buildClass no_unf class_name tvs sc_theta fds ats sig_stuff tc_isrec
 				   [{- No labelled fields -}]
 				   tvs [{- no existentials -}]
                                    [{- No GADT equalities -}] sc_theta 
-                                   op_tys
+                                   op_tys 
+				   (mkTyConApp rec_tycon (mkTyVarTys tvs))
 				   rec_tycon
 
 	; let n_value_preds   = count (not . isEqPred) sc_theta

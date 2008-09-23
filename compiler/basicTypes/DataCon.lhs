@@ -317,7 +317,8 @@ data DataCon
 
 	dcOrigArgTys :: [Type],		-- Original argument types
 					-- (before unboxing and flattening of strict fields)
-	dcOrigResTy :: Type,		-- Original result type
+	dcOrigResTy :: Type,		-- Original result type, as seen by the user
+		-- INVARIANT: mentions only dcUnivTyVars
 		-- NB: for a data instance, the original user result type may 
 		-- differ from the DataCon's representation TyCon.  Example
 		--	data instance T [a] where MkT :: a -> T [a]
@@ -466,14 +467,17 @@ instance Show DataCon where
 mkDataCon :: Name 
 	  -> Bool	        -- ^ Is the constructor declared infix?
 	  -> [StrictnessMark]   -- ^ Strictness annotations written in the source file
-	  -> [FieldLabel]       -- ^ Field labels for the constructor, if it is a record, otherwise empty
+	  -> [FieldLabel]       -- ^ Field labels for the constructor, if it is a record, 
+				--   otherwise empty
 	  -> [TyVar]            -- ^ Universally quantified type variables
 	  -> [TyVar]            -- ^ Existentially quantified type variables
 	  -> [(TyVar,Type)]     -- ^ GADT equalities
 	  -> ThetaType          -- ^ Theta-type occuring before the arguments proper
-	  -> [Type]             -- ^ Argument types
-	  -> TyCon              -- ^ Type constructor we are for
-	  -> ThetaType          -- ^ The "stupid theta", context of the data declaration e.g. @data Eq a => T a ...@
+	  -> [Type]             -- ^ Original argument types
+	  -> Type		-- ^ Original result type
+	  -> TyCon              -- ^ Representation type constructor
+	  -> ThetaType          -- ^ The "stupid theta", context of the data declaration 
+				--   e.g. @data Eq a => T a ...@
 	  -> DataConIds         -- ^ The Ids of the actual builder functions
 	  -> DataCon
   -- Can get the tag from the TyCon
@@ -483,7 +487,7 @@ mkDataCon name declared_infix
 	  fields
 	  univ_tvs ex_tvs 
 	  eq_spec theta
-	  orig_arg_tys tycon
+	  orig_arg_tys orig_res_ty rep_tycon
 	  stupid_theta ids
 -- Warning: mkDataCon is not a good place to check invariants. 
 -- If the programmer writes the wrong result type in the decl, thus:
@@ -506,7 +510,7 @@ mkDataCon name declared_infix
 		  dcStupidTheta = stupid_theta, 
 		  dcEqTheta = eq_theta, dcDictTheta = dict_theta,
 		  dcOrigArgTys = orig_arg_tys, dcOrigResTy = orig_res_ty,
-		  dcRepTyCon = tycon, 
+		  dcRepTyCon = rep_tycon, 
 		  dcRepArgTys = rep_arg_tys,
 		  dcStrictMarks = arg_stricts, 
 		  dcRepStrictness = rep_arg_stricts,
@@ -525,21 +529,11 @@ mkDataCon name declared_infix
     real_arg_tys 	   = dict_tys ++ orig_arg_tys
     real_stricts 	   = map mk_dict_strict_mark dict_theta ++ arg_stricts
 
-	-- Example
-	--   data instance T (b,c) where 
-	--	TI :: forall e. e -> T (e,e)
-	--
-	-- The representation tycon looks like this:
-	--   data :R7T b c where 
-	--	TI :: forall b1 c1. (b1 ~ c1) => b1 -> :R7T b1 c1
-	-- In this case orig_res_ty = T (e,e)
-    orig_res_ty = mkFamilyTyConApp tycon (substTyVars (mkTopTvSubst eq_spec) univ_tvs)
-
 	-- Representation arguments and demands
 	-- To do: eliminate duplication with MkId
     (rep_arg_stricts, rep_arg_tys) = computeRep real_stricts real_arg_tys
 
-    tag = assoc "mkDataCon" (tyConDataCons tycon `zip` [fIRST_TAG..]) con
+    tag = assoc "mkDataCon" (tyConDataCons rep_tycon `zip` [fIRST_TAG..]) con
     ty  = mkForAllTys univ_tvs $ mkForAllTys ex_tvs $ 
 	  mkFunTys (mkPredTys (eqSpecPreds eq_spec)) $
 	  mkFunTys (mkPredTys eq_theta) $
@@ -547,7 +541,7 @@ mkDataCon name declared_infix
 		--	because they might be flattened..
 		--	but the equality predicates are not
 	  mkFunTys rep_arg_tys $
-	  mkTyConApp tycon (mkTyVarTys univ_tvs)
+	  mkTyConApp rep_tycon (mkTyVarTys univ_tvs)
 
 eqSpecPreds :: [(TyVar,Type)] -> ThetaType
 eqSpecPreds spec = [ mkEqPred (mkTyVarTy tv, ty) | (tv,ty) <- spec ]
@@ -690,7 +684,8 @@ dataConRepStrictness dc = dcRepStrictness dc
 -- 4) The /original/ result type of the 'DataCon'
 dataConSig :: DataCon -> ([TyVar], ThetaType, [Type], Type)
 dataConSig (MkData {dcUnivTyVars = univ_tvs, dcExTyVars = ex_tvs, dcEqSpec = eq_spec,
-		    dcEqTheta  = eq_theta, dcDictTheta = dict_theta, dcOrigArgTys = arg_tys, dcOrigResTy = res_ty})
+		    dcEqTheta  = eq_theta, dcDictTheta = dict_theta, 
+		    dcOrigArgTys = arg_tys, dcOrigResTy = res_ty})
   = (univ_tvs ++ ex_tvs, eqSpecPreds eq_spec ++ eq_theta ++ dict_theta, arg_tys, res_ty)
 
 -- | The \"full signature\" of the 'DataCon' returns, in order:
@@ -703,13 +698,15 @@ dataConSig (MkData {dcUnivTyVars = univ_tvs, dcExTyVars = ex_tvs, dcEqSpec = eq_
 --
 -- 4) The result of 'dataConDictTheta'
 --
--- 5) The original argument types to the 'DataCon' (i.e. before any change of the representation of the type)
+-- 5) The original argument types to the 'DataCon' (i.e. before 
+--    any change of the representation of the type)
 --
 -- 6) The original result type of the 'DataCon'
 dataConFullSig :: DataCon 
 	       -> ([TyVar], [TyVar], [(TyVar,Type)], ThetaType, ThetaType, [Type], Type)
 dataConFullSig (MkData {dcUnivTyVars = univ_tvs, dcExTyVars = ex_tvs, dcEqSpec = eq_spec,
-			dcEqTheta = eq_theta, dcDictTheta = dict_theta, dcOrigArgTys = arg_tys, dcOrigResTy = res_ty})
+			dcEqTheta = eq_theta, dcDictTheta = dict_theta, 
+			dcOrigArgTys = arg_tys, dcOrigResTy = res_ty})
   = (univ_tvs, ex_tvs, eq_spec, eq_theta, dict_theta, arg_tys, res_ty)
 
 dataConOrigResTy :: DataCon -> Type

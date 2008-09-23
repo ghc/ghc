@@ -250,7 +250,8 @@ pcDataConWithFixity declared_infix dc_name tyvars arg_tys tycon
 		[] 	-- No existential type variables
 		[]	-- No equality spec
 		[]	-- No theta
-		arg_tys tycon
+		arg_tys (mkTyConApp tycon (mkTyVarTys tyvars)) 
+		tycon
 		[]	-- No stupid theta
 		(mkDataConIds bogus_wrap_name wrk_name data_con)
 		

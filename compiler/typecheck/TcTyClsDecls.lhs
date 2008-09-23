@@ -297,10 +297,10 @@ tcFamInstDecl1 (decl@TySynonym {tcdLName = L loc tc_name})
   -- "newtype instance" and "data instance"
 tcFamInstDecl1 (decl@TyData {tcdND = new_or_data, tcdLName = L loc tc_name,
 			     tcdCons = cons})
-  = kcIdxTyPats decl $ \k_tvs k_typats resKind family ->
+  = kcIdxTyPats decl $ \k_tvs k_typats resKind fam_tycon ->
     do { -- check that the family declaration is for the right kind
-	 unless (isAlgTyCon family) $
-	   addErr (wrongKindOfFamily family)
+	 unless (isAlgTyCon fam_tycon) $
+	   addErr (wrongKindOfFamily fam_tycon)
 
        ; -- (1) kind check the data declaration as usual
        ; k_decl <- kcDataDecl decl k_tvs
@@ -308,7 +308,7 @@ tcFamInstDecl1 (decl@TyData {tcdND = new_or_data, tcdLName = L loc tc_name,
 	     k_cons = tcdCons k_decl
 
          -- result kind must be '*' (otherwise, we have too few patterns)
-       ; checkTc (isLiftedTypeKind resKind) $ tooFewParmsErr (tyConArity family)
+       ; checkTc (isLiftedTypeKind resKind) $ tooFewParmsErr (tyConArity fam_tycon)
 
          -- (2) type check indexed data type declaration
        ; tcTyVarBndrs k_tvs $ \t_tvs -> do {  -- turn kinded into proper tyvars
@@ -319,31 +319,29 @@ tcFamInstDecl1 (decl@TyData {tcdND = new_or_data, tcdLName = L loc tc_name,
        ; stupid_theta <- tcHsKindedContext k_ctxt
 
          -- (3) Check that
-         --     - left-hand side contains no type family applications
-         --       (vanilla synonyms are fine, though, and we checked for
-         --       foralls earlier)
+         --     (a) left-hand side contains no type family applications
+         --         (vanilla synonyms are fine, though, and we checked for
+         --         foralls earlier)
        ; mapM_ checkTyFamFreeness t_typats
 
-	 --     - we don't use GADT syntax for indexed types
-       ; checkTc h98_syntax (badGadtIdxTyDecl tc_name)
-
-	 --     - a newtype has exactly one constructor
+	 --     (b) a newtype has exactly one constructor
        ; checkTc (new_or_data == DataType || isSingleton k_cons) $
-	   newtypeConError tc_name (length k_cons)
+	         newtypeConError tc_name (length k_cons)
 
          -- (4) construct representation tycon
        ; rep_tc_name <- newFamInstTyConName tc_name loc
        ; let ex_ok = True	-- Existentials ok for type families!
-       ; fixM (\ tycon -> do 
-	     { data_cons <- mapM (addLocM (tcConDecl unbox_strict ex_ok tycon t_tvs))
-				  k_cons
+       ; fixM (\ rep_tycon -> do 
+	     { let orig_res_ty = mkTyConApp fam_tycon t_typats
+	     ; data_cons <- tcConDecls unbox_strict ex_ok rep_tycon
+				       (t_tvs, orig_res_ty) k_cons
 	     ; tc_rhs <-
 		 case new_or_data of
 		   DataType -> return (mkDataTyConRhs data_cons)
 		   NewType  -> ASSERT( not (null data_cons) )
-			       mkNewTyConRhs rep_tc_name tycon (head data_cons)
+			       mkNewTyConRhs rep_tc_name rep_tycon (head data_cons)
 	     ; buildAlgTyCon rep_tc_name t_tvs stupid_theta tc_rhs Recursive
-			     False h98_syntax (Just (family, t_typats))
+			     False h98_syntax (Just (fam_tycon, t_typats))
                  -- We always assume that indexed types are recursive.  Why?
                  -- (1) Due to their open nature, we can never be sure that a
                  -- further instance might not introduce a new recursive
@@ -373,8 +371,8 @@ kcIdxTyPats :: TyClDecl Name
 	    -> TcM a
 kcIdxTyPats decl thing_inside
   = kcHsTyVars (tcdTyVars decl) $ \tvs -> 
-    do { family <- tcLookupLocatedTyCon (tcdLName decl)
-       ; let { (kinds, resKind) = splitKindFunTys (tyConKind family)
+    do { fam_tycon <- tcLookupLocatedTyCon (tcdLName decl)
+       ; let { (kinds, resKind) = splitKindFunTys (tyConKind fam_tycon)
 	     ; hs_typats	= fromJust $ tcdTyPats decl }
 
          -- we may not have more parameters than the kind indicates
@@ -384,7 +382,7 @@ kcIdxTyPats decl thing_inside
          -- type functions can have a higher-kinded result
        ; let resultKind = mkArrowKinds (drop (length hs_typats) kinds) resKind
        ; typats <- zipWithM kcCheckHsType hs_typats kinds
-       ; thing_inside tvs typats resultKind family
+       ; thing_inside tvs typats resultKind fam_tycon
        }
   where
 \end{code}
@@ -746,16 +744,16 @@ tcTyClDecl1 calc_isrec
 	    (emptyConDeclsErr tc_name)
     
   ; tycon <- fixM (\ tycon -> do 
-	{ data_cons <- mapM (addLocM (tcConDecl unbox_strict ex_ok tycon final_tvs))
-			     cons
+	{ let res_ty = mkTyConApp tycon (mkTyVarTys final_tvs)
+	; data_cons <- tcConDecls unbox_strict ex_ok 
+				  tycon (final_tvs, res_ty) cons
 	; tc_rhs <-
 	    if null cons && is_boot 	-- In a hs-boot file, empty cons means
 	    then return AbstractTyCon	-- "don't know"; hence Abstract
 	    else case new_or_data of
 		   DataType -> return (mkDataTyConRhs data_cons)
-		   NewType  -> 
-                       ASSERT( not (null data_cons) )
-                       mkNewTyConRhs tc_name tycon (head data_cons)
+		   NewType  -> ASSERT( not (null data_cons) )
+                               mkNewTyConRhs tc_name tycon (head data_cons)
 	; buildAlgTyCon tc_name final_tvs stupid_theta tc_rhs is_rec
 	    (want_generic && canDoGenerics data_cons) h98_syntax Nothing
 	})
@@ -819,30 +817,33 @@ tcTyClDecl1 _
 tcTyClDecl1 _ d = pprPanic "tcTyClDecl1" (ppr d)
 
 -----------------------------------
+tcConDecls :: Bool -> Bool -> TyCon -> ([TyVar], Type)
+	   -> [LConDecl Name] -> TcM [DataCon]
+tcConDecls unbox ex_ok rep_tycon res_tmpl cons
+  = mapM (addLocM (tcConDecl unbox ex_ok rep_tycon res_tmpl)) cons
+
 tcConDecl :: Bool 		-- True <=> -funbox-strict_fields
 	  -> Bool		-- True <=> -XExistentialQuantificaton or -XGADTs
-	  -> TyCon -> [TyVar] 
+	  -> TyCon 		-- Representation tycon
+	  -> ([TyVar], Type)	-- Return type template (with its template tyvars)
 	  -> ConDecl Name 
 	  -> TcM DataCon
 
-tcConDecl unbox_strict existential_ok tycon tc_tvs	-- Data types
+tcConDecl unbox_strict existential_ok rep_tycon res_tmpl 	-- Data types
 	  (ConDecl name _ tvs ctxt details res_ty _)
   = addErrCtxt (dataConCtxt name)	$ 
     tcTyVarBndrs tvs			$ \ tvs' -> do 
     { ctxt' <- tcHsKindedContext ctxt
     ; checkTc (existential_ok || (null tvs && null (unLoc ctxt)))
 	      (badExistential name)
-    ; (univ_tvs, ex_tvs, eq_preds, data_tc) <- tcResultType tycon tc_tvs tvs' res_ty
+    ; (univ_tvs, ex_tvs, eq_preds, res_ty') <- tcResultType res_tmpl tvs' res_ty
     ; let 
-	-- Tiresome: tidy the tyvar binders, since tc_tvs and tvs' may have the same OccNames
 	tc_datacon is_infix field_lbls btys
-	  = do { let bangs = map getBangStrictness btys
-	       ; arg_tys <- mapM tcHsBangType btys
+	  = do { (arg_tys, stricts) <- mapAndUnzipM (tcConArg unbox_strict) btys
     	       ; buildDataCon (unLoc name) is_infix
-    		    (argStrictness unbox_strict bangs arg_tys)
-    		    (map unLoc field_lbls)
+    		    stricts field_lbls
     		    univ_tvs ex_tvs eq_preds ctxt' arg_tys
-		    data_tc }
+		    res_ty' rep_tycon }
 		-- NB:	we put data_tc, the type constructor gotten from the
 		--	constructor type signature into the data constructor;
 		--	that way checkValidDataCon can complain if it's wrong.
@@ -852,73 +853,83 @@ tcConDecl unbox_strict existential_ok tycon tc_tvs	-- Data types
 	InfixCon bty1 bty2 -> tc_datacon True  [] [bty1,bty2]
 	RecCon fields      -> tc_datacon False field_names btys
 			   where
-			      field_names = map cd_fld_name fields
+			      field_names = map (unLoc . cd_fld_name) fields
 			      btys        = map cd_fld_type fields
     }
 
-tcResultType :: TyCon
-	     -> [TyVar] 	-- data T a b c = ...
+-- Example
+--   data instance T (b,c) where 
+--	TI :: forall e. e -> T (e,e)
+--
+-- The representation tycon looks like this:
+--   data :R7T b c where 
+--	TI :: forall b1 c1. (b1 ~ c1) => b1 -> :R7T b1 c1
+-- In this case orig_res_ty = T (e,e)
+
+tcResultType :: ([TyVar], Type)	-- Template for result type; e.g.
+				-- data T a b c = ...  gives ([a,b,c], T a b)
 	     -> [TyVar] 	-- where MkT :: forall a b c. ...
 	     -> ResType Name
 	     -> TcM ([TyVar],	 	-- Universal
 		     [TyVar],		-- Existential (distinct OccNames from univs)
 		     [(TyVar,Type)],	-- Equality predicates
-		     TyCon)		-- TyCon given in the ResTy
+		     Type)		-- Typechecked return type
 	-- We don't check that the TyCon given in the ResTy is
 	-- the same as the parent tycon, becuase we are in the middle
 	-- of a recursive knot; so it's postponed until checkValidDataCon
 
-tcResultType decl_tycon tc_tvs dc_tvs ResTyH98
-  = return (tc_tvs, dc_tvs, [], decl_tycon)
+tcResultType (tmpl_tvs, res_ty) dc_tvs ResTyH98
+  = return (tmpl_tvs, dc_tvs, [], res_ty)
 	-- In H98 syntax the dc_tvs are the existential ones
 	--	data T a b c = forall d e. MkT ...
 	-- The {a,b,c} are tc_tvs, and {d,e} are dc_tvs
 
-tcResultType _ tc_tvs dc_tvs (ResTyGADT res_ty)
-	-- E.g.  data T a b c where
-	--	   MkT :: forall x y z. T (x,y) z z
+tcResultType (tmpl_tvs, res_tmpl) dc_tvs (ResTyGADT res_ty)
+	-- E.g.  data T [a] b c where
+	--	   MkT :: forall x y z. T [(x,y)] z z
 	-- Then we generate
-	--	([a,z,c], [x,y], [a~(x,y), c~z], T)
+	--	Univ tyvars	Eq-spec
+	--	    a              a~(x,y)
+	--	    b		   b~z
+	--	    z		   
+	-- Existentials are the leftover type vars: [x,y]
+  = do	{ res_ty' <- tcHsKindedType res_ty
+	; let Just subst = tcMatchTy (mkVarSet tmpl_tvs) res_tmpl res_ty'
 
-  = do	{ (dc_tycon, res_tys) <- tcLHsConResTy res_ty
-
-	; let univ_tvs = choose_univs [] tidy_tc_tvs res_tys
-		-- Each univ_tv is either a dc_tv or a tc_tv
+		-- *Lazily* figure out the univ_tvs etc
+		-- Each univ_tv is either a dc_tv or a tmpl_tv
+	      (univ_tvs, eq_spec) = foldr choose ([], []) tidy_tmpl_tvs
+	      choose tmpl (univs, eqs)
+		| Just ty <- lookupTyVar subst tmpl 
+		= case tcGetTyVar_maybe ty of
+		    Just tv | not (tv `elem` univs)
+			    -> (tv:univs,   eqs)
+		    _other  -> (tmpl:univs, (tmpl,ty):eqs)
+		| otherwise = pprPanic "tcResultType" (ppr res_ty)
 	      ex_tvs = dc_tvs `minusList` univ_tvs
-	      eq_spec = [ (tv, ty) | (tv,ty) <- univ_tvs `zip` res_tys, 
-				      tv `elem` tc_tvs]
-	; return (univ_tvs, ex_tvs, eq_spec, dc_tycon) }
-  where
-  	-- choose_univs uses the res_ty itself if it's a type variable
-	-- and hasn't already been used; otherwise it uses one of the tc_tvs
-    choose_univs _ tc_tvs []
-	= ASSERT( null tc_tvs ) []
-    choose_univs used (tc_tv:tc_tvs) (res_ty:res_tys) 
-	| Just tv <- tcGetTyVar_maybe res_ty, not (tv `elem` used)
-	= tv    : choose_univs (tv:used) tc_tvs res_tys
-	| otherwise
-	= tc_tv : choose_univs used tc_tvs res_tys
 
-	-- NB: tc_tvs and dc_tvs are distinct, but
+	; return (univ_tvs, ex_tvs, eq_spec, res_ty') }
+  where
+	-- NB: tmpl_tvs and dc_tvs are distinct, but
 	-- we want them to be *visibly* distinct, both for
 	-- interface files and general confusion.  So rename
 	-- the tc_tvs, since they are not used yet (no 
 	-- consequential renaming needed)
-    choose_univs _ _ _ = panic "tcResultType/choose_univs"
-    init_occ_env     = initTidyOccEnv (map getOccName dc_tvs)
-    (_, tidy_tc_tvs) = mapAccumL tidy_one init_occ_env tc_tvs
-    tidy_one env tv  = (env', setTyVarName tv (tidyNameOcc name occ'))
+    (_, tidy_tmpl_tvs) = mapAccumL tidy_one init_occ_env tmpl_tvs
+    init_occ_env       = initTidyOccEnv (map getOccName dc_tvs)
+    tidy_one env tv    = (env', setTyVarName tv (tidyNameOcc name occ'))
 	      where
 		 name = tyVarName tv
 		 (env', occ') = tidyOccName env (getOccName name) 
 
-	      -------------------
-argStrictness :: Bool		-- True <=> -funbox-strict_fields
-	      -> [HsBang]
-	      -> [TcType] -> [StrictnessMark]
-argStrictness unbox_strict bangs arg_tys
- = ASSERT( length bangs == length arg_tys )
-   zipWith (chooseBoxingStrategy unbox_strict) arg_tys bangs
+-------------------
+tcConArg :: Bool		-- True <=> -funbox-strict_fields
+	   -> LHsType Name
+	   -> TcM (TcType, StrictnessMark)
+tcConArg unbox_strict bty
+  = do  { arg_ty <- tcHsBangType bty
+	; let bang = getBangStrictness bty
+	; return (arg_ty, chooseBoxingStrategy unbox_strict arg_ty bang) }
 
 -- We attempt to unbox/unpack a strict field when either:
 --   (i)  The field is marked '!!', or
@@ -997,6 +1008,13 @@ checkValidTyCl decl
 --	(b) has the same type for 'f'
 -- module alpha conversion of the quantified type variables
 -- of the constructor.
+--
+-- Note that we allow existentials to match becuase the
+-- fields can never meet. E.g
+--	data T where
+--	  T1 { f1 :: b, f2 :: a, f3 ::Int } :: T
+--	  T2 { f1 :: c, f2 :: c, f3 ::Int } :: T  
+-- Here we do not complain about f1,f2 because they are existential
 
 checkValidTyCon :: TyCon -> TcM ()
 checkValidTyCon tc 
@@ -1073,7 +1091,13 @@ checkValidDataCon :: TyCon -> DataCon -> TcM ()
 checkValidDataCon tc con
   = setSrcSpan (srcLocSpan (getSrcLoc con))	$
     addErrCtxt (dataConCtxt con)		$ 
-    do	{ checkTc (dataConTyCon con == tc) (badDataConTyCon con)
+    do	{ let tc_tvs = tyConTyVars tc
+	      res_ty_tmpl = mkFamilyTyConApp tc (mkTyVarTys tc_tvs)
+	      actual_res_ty = dataConOrigResTy con
+	; checkTc (isJust (tcMatchTy (mkVarSet tc_tvs)
+				res_ty_tmpl
+				actual_res_ty))
+		  (badDataConTyCon con res_ty_tmpl actual_res_ty)
 	; checkValidMonoType (dataConOrigResTy con)
 		-- Disallow MkT :: T (forall a. a->a)
 		-- Reason: it's really the argument of an equality constraint
@@ -1240,11 +1264,11 @@ sortLocated things = sortLe le things
   where
     le (L l1 _) (L l2 _) = l1 <= l2
 
-badDataConTyCon :: DataCon -> SDoc
-badDataConTyCon data_con
+badDataConTyCon :: DataCon -> Type -> Type -> SDoc
+badDataConTyCon data_con res_ty_tmpl actual_res_ty
   = hang (ptext (sLit "Data constructor") <+> quotes (ppr data_con) <+>
-		ptext (sLit "returns type") <+> quotes (ppr (dataConTyCon data_con)))
-       2 (ptext (sLit "instead of its parent type"))
+		ptext (sLit "returns type") <+> quotes (ppr actual_res_ty))
+       2 (ptext (sLit "instead of an instance of its parent type") <+> quotes (ppr res_ty_tmpl))
 
 badGadtDecl :: Name -> SDoc
 badGadtDecl tc_name
@@ -1298,12 +1322,13 @@ badFamInstDecl tc_name
 	   quotes (ppr tc_name)
 	 , nest 2 (parens $ ptext (sLit "Use -XTypeFamilies to allow indexed type families")) ]
 
+{-
 badGadtIdxTyDecl :: Name -> SDoc
 badGadtIdxTyDecl tc_name
   = vcat [ ptext (sLit "Illegal generalised algebraic data declaration for") <+>
 	   quotes (ppr tc_name)
 	 , nest 2 (parens $ ptext (sLit "Family instances can not yet use GADT declarations")) ]
-
+-}
 tooManyParmsErr :: Located Name -> SDoc
 tooManyParmsErr tc_name
   = ptext (sLit "Family instance has too many parameters:") <+> 

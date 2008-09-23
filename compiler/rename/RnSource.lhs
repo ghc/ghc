@@ -661,23 +661,26 @@ rnTyClDecl (tydecl@TyData {tcdND = new_or_data, tcdCtxt = context,
         } }
 
   | otherwise	          -- GADT
-  = ASSERT( none typatsMaybe )    -- GADTs cannot have type patterns for now
-    do	{ tycon' <- if isFamInstDecl tydecl
+  = do	{ tycon' <- if isFamInstDecl tydecl
 		    then lookupLocatedOccRn     tycon -- may be imported family
 		    else lookupLocatedTopBndrRn tycon
 	; checkTc (null (unLoc context)) (badGadtStupidTheta tycon)
-    	; tyvars' <- bindTyVarsRn data_doc tyvars 
-				  (\ tyvars' -> return tyvars')
+    	; (tyvars', typats')
+		<- bindTyVarsRn data_doc tyvars $ \ tyvars' -> do
+		   { typats' <- rnTyPats data_doc typatsMaybe
+		   ; return (tyvars', typats') }
 		-- For GADTs, the type variables in the declaration 
 		-- do not scope over the constructor signatures
 		-- 	data T a where { T1 :: forall b. b-> b }
+
 	; (derivs', deriv_fvs) <- rn_derivs derivs
 	; condecls' <- rnConDecls (unLoc tycon') condecls
 		-- No need to check for duplicate constructor decls
 		-- since that is done by RnNames.extendGlobalRdrEnvRn
+
 	; returnM (TyData {tcdND = new_or_data, tcdCtxt = noLoc [], 
 			   tcdLName = tycon', tcdTyVars = tyvars', 
-			   tcdTyPats = Nothing, tcdKindSig = sig,
+			   tcdTyPats = typats', tcdKindSig = sig,
 			   tcdCons = condecls', tcdDerivs = derivs'}, 
 	     	   plusFVs (map conDeclFVs condecls') `plusFV` 
 		   deriv_fvs			      `plusFV`
@@ -690,10 +693,6 @@ rnTyClDecl (tydecl@TyData {tcdND = new_or_data, tcdCtxt = context,
 		     [] 		   -> True
 		     L _ (ConDecl { con_res = ResTyH98 }) : _  -> True
 		     _    		   -> False
-
-    none Nothing   = True
-    none (Just []) = True
-    none _         = False
 
     data_doc = text "In the data type declaration for" <+> quotes (ppr tycon)
 
