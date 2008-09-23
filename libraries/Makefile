@@ -204,8 +204,7 @@ dph/%:
 
 $(foreach SUBDIR,$(SUBDIRS), \
 		  stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).$(SUBDIR)): \
-stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).%: cabal-bin \
-                                                          bootstrapping.conf
+stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).%: cabal-bin
 	-$(RM) -f stamp/configure.library.*.$* $*/unbuildable
 	$(MKDIRHIER) `dirname $@`
 	( cd $* && $(CABAL) configure $(ALL_CONFIGURE_FLAGS) ) \
@@ -222,7 +221,7 @@ stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).%: cabal-bin \
 # every time.
 $(foreach SUBDIR,$(SUBDIRS),make.library.$(SUBDIR)):\
 make.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
-                cabal-bin ifBuildable/ifBuildable bootstrapping.conf
+                cabal-bin ifBuildable/ifBuildable
 	if $(IFBUILDABLE) $*; then \
 	  cd $* && \
 	  cmp -s $(MAKEFILE_LOCAL) Makefile.local || cp $(MAKEFILE_LOCAL) .; \
@@ -238,7 +237,7 @@ MAKEFILE_LOCAL = $(FPTOOLS_TOP_ABS)/libraries/Makefile.local
 # Build the library using 'setup build' (not the default)
 $(foreach SUBDIR,$(SUBDIRS),build.library.$(SUBDIR)):\
 build.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
-                 cabal-bin ifBuildable/ifBuildable bootstrapping.conf
+                 cabal-bin ifBuildable/ifBuildable
 	if $(IFBUILDABLE) $*; then \
 	  cd $* && \
 	  $(CABAL) build $(BUILD_FLAGS); \
@@ -263,7 +262,7 @@ CABAL_HADDOCK_FLAGS += --with-haddock=$(FPTOOLS_TOP_ABS)/utils/haddock/install-i
 
 $(foreach SUBDIR,$(DOC_SUBDIRS),doc.library.$(SUBDIR)):\
 doc.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
-               cabal-bin ifBuildable/ifBuildable bootstrapping.conf
+               cabal-bin ifBuildable/ifBuildable
 	if $(IFBUILDABLE) $*; then \
 	  cd $* && $(CABAL) haddock --html-location='../$$pkg' \
 	                            $(CABAL_HADDOCK_FLAGS); \
