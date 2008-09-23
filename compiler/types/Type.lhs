@@ -739,8 +739,8 @@ applyTysD doc orig_fun_ty arg_tys
 		(mkForAllTys (drop n_args tvs) rho_ty)
   | otherwise		-- Too many type args
   = ASSERT2( n_tvs > 0, doc $$ ppr orig_fun_ty )	-- Zero case gives infnite loop!
-    applyTys (substTyWith tvs (take n_tvs arg_tys) rho_ty)
-	     (drop n_tvs arg_tys)
+    applyTysD doc (substTyWith tvs (take n_tvs arg_tys) rho_ty)
+	          (drop n_tvs arg_tys)
   where
     (tvs, rho_ty) = splitForAllTys orig_fun_ty 
     n_tvs = length tvs

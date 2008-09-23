@@ -154,7 +154,8 @@ applyTypeToArgs e op_ty (Type ty : args)
     go rev_tys rest_args        = applyTypeToArgs e op_ty' rest_args
 			 	where
 				  op_ty' = applyTysD msg op_ty (reverse rev_tys)
-				  msg = panic_msg e op_ty
+				  msg = ptext (sLit "applyTypeToArgs") <+> 
+		    			panic_msg e op_ty
 
 applyTypeToArgs e op_ty (_ : args)
   = case (splitFunTy_maybe op_ty) of
