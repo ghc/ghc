@@ -428,3 +428,9 @@ test200:
 	test -f $(DEPFILE)
 	$(TEST_HC) -M -dep-makefile $(DEPFILE) D.hs B/C.hs A.hs
 	test -f $(DEPFILE)
+
+# -----------------------------------------------------------------------------
+
+2566::
+	if $(TEST_HC) -c foo.bar; then false else true; fi
+

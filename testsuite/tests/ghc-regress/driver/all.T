@@ -178,8 +178,16 @@ test('driver081.2', normal, run_command,
      ['$MAKE -s --no-print-directory test081.2'])
 cleanall()
 
+test('driver100', normal, run_command,
+     ['$MAKE -s --no-print-directory test100'])
+cleanall()
+
 test('driver200', normal, run_command,
      ['$MAKE -s --no-print-directory test200'])
+cleanall()
+
+test('2566', normal, run_command,
+     ['$MAKE -s --no-print-directory 2566'])
 cleanall()
 
 test('pragma001', normal, compile, [''])
