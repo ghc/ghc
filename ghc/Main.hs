@@ -261,7 +261,7 @@ checkOptions cli_mode dflags srcs objs = do
 
    when (notNull (filter isRTSWay (wayNames dflags))
          && isInterpretiveMode cli_mode) $
-        putStrLn ("Warning: -debug, -threaded and -ticky are ignored by GHCi")
+        hPutStrLn stderr ("Warning: -debug, -threaded and -ticky are ignored by GHCi")
 
 	-- -prof and --interactive are not a good combination
    when (notNull (filter (not . isRTSWay) (wayNames dflags))
@@ -280,9 +280,14 @@ checkOptions cli_mode dflags srcs objs = do
 	then ghcError (UsageError "can't apply -o to multiple source files")
 	else do
 
+   let not_linking = not (isLinkMode cli_mode) || isNoLink (ghcLink dflags)
+
+   when (not_linking && not (null objs)) $
+        hPutStrLn stderr ("Warning: the following files would be used as linker inputs, but linking is not being done: " ++ unwords objs)
+
 	-- Check that there are some input files
 	-- (except in the interactive case)
-   if null srcs && null objs && needsInputsMode cli_mode
+   if null srcs && (null objs || not_linking) && needsInputsMode cli_mode
 	then ghcError (UsageError "no input files")
 	else do
 
@@ -360,6 +365,8 @@ needsInputsMode _		= False
 isLinkMode :: CmdLineMode -> Bool
 isLinkMode (StopBefore StopLn) = True
 isLinkMode DoMake	       = True
+isLinkMode DoInteractive       = True
+isLinkMode (DoEval _)          = True
 isLinkMode _   		       = False
 
 isCompManagerMode :: CmdLineMode -> Bool
