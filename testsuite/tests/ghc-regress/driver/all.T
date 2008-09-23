@@ -193,3 +193,4 @@ cleanall()
 test('pragma001', normal, compile, [''])
 test('pragma002', normal, compile, [''])
 
+test('2499', normal, compile_fail, [''])
