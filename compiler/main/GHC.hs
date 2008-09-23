@@ -2188,7 +2188,7 @@ preprocessFile hsc_env src_fn mb_phase (Just (buf, _time))
 	    local_opts = getOptions dflags buf src_fn
 	--
 	(dflags', leftovers, warns)
-            <- parseDynamicFlags dflags local_opts
+            <- parseDynamicNoPackageFlags dflags local_opts
         liftIO $ checkProcessArgsResult leftovers -- XXX: throws exceptions
         liftIO $ handleFlagWarnings dflags' warns -- XXX: throws exceptions
 

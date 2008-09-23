@@ -38,6 +38,7 @@ module DynFlags (
 
         -- ** Parsing DynFlags
         parseDynamicFlags,
+        parseDynamicNoPackageFlags,
         allFlags,
 
         supportedLanguages, languageOptions,
@@ -1225,20 +1226,6 @@ dynamic_flags = [
   , Flag "no-recomp"      (NoArg (setDynFlag   Opt_ForceRecomp))
          (Deprecated "Use -fforce-recomp instead")
 
-        ------- Packages ----------------------------------------------------
-  , Flag "package-conf"   (HasArg extraPkgConf_) Supported
-  , Flag "no-user-package-conf" (NoArg (unSetDynFlag Opt_ReadUserPackageConf))
-         Supported
-  , Flag "package-name"   (HasArg (upd . setPackageName)) Supported
-  , Flag "package"        (HasArg exposePackage) Supported
-  , Flag "hide-package"   (HasArg hidePackage) Supported
-  , Flag "hide-all-packages" (NoArg (setDynFlag Opt_HideAllPackages))
-         Supported
-  , Flag "ignore-package" (HasArg ignorePackage)
-         Supported
-  , Flag "syslib"         (HasArg exposePackage)
-         (Deprecated "Use -package instead")
-
         ------ HsCpp opts ---------------------------------------------------
   , Flag "D"              (AnySuffix (upd . addOptP)) Supported
   , Flag "U"              (AnySuffix (upd . addOptP)) Supported
@@ -1473,6 +1460,23 @@ dynamic_flags = [
  ++ map (mkFlag False "fno-" unSetDynFlag) fFlags
  ++ map (mkFlag True  "X"    setDynFlag  ) xFlags
  ++ map (mkFlag False "XNo"  unSetDynFlag) xFlags
+
+package_flags :: [Flag DynP]
+package_flags = [
+        ------- Packages ----------------------------------------------------
+    Flag "package-conf"   (HasArg extraPkgConf_) Supported
+  , Flag "no-user-package-conf" (NoArg (unSetDynFlag Opt_ReadUserPackageConf))
+         Supported
+  , Flag "package-name"   (HasArg (upd . setPackageName)) Supported
+  , Flag "package"        (HasArg exposePackage) Supported
+  , Flag "hide-package"   (HasArg hidePackage) Supported
+  , Flag "hide-all-packages" (NoArg (setDynFlag Opt_HideAllPackages))
+         Supported
+  , Flag "ignore-package" (HasArg ignorePackage)
+         Supported
+  , Flag "syslib"         (HasArg exposePackage)
+         (Deprecated "Use -package instead")
+  ]
 
 mkFlag :: Bool                  -- ^ True <=> it should be turned on
        -> String                -- ^ The flag prefix
@@ -1712,7 +1716,7 @@ glasgowExtsFlags = [
 -- -----------------------------------------------------------------------------
 -- Parsing the dynamic flags.
 
--- | Parse dynamic flags from a list of command line argument.  Returns the
+-- | Parse dynamic flags from a list of command line arguments.  Returns the
 -- the parsed 'DynFlags', the left-over arguments, and a list of warnings.
 -- Throws a 'UsageError' if errors occurred during parsing (such as unknown
 -- flags or missing arguments).
@@ -1721,7 +1725,21 @@ parseDynamicFlags :: Monad m =>
                   -> m (DynFlags, [Located String], [Located String])
                      -- ^ Updated 'DynFlags', left-over arguments, and
                      -- list of warnings.
-parseDynamicFlags dflags args = do
+parseDynamicFlags dflags args = parseDynamicFlags_ dflags args True
+
+-- | Like 'parseDynamicFlags' but does not allow the package flags (-package,
+-- -hide-package, -ignore-package, -hide-all-packages, -package-conf).
+parseDynamicNoPackageFlags :: Monad m =>
+                     DynFlags -> [Located String]
+                  -> m (DynFlags, [Located String], [Located String])
+                     -- ^ Updated 'DynFlags', left-over arguments, and
+                     -- list of warnings.
+parseDynamicNoPackageFlags dflags args = parseDynamicFlags_ dflags args False
+
+parseDynamicFlags_ :: Monad m =>
+                      DynFlags -> [Located String] -> Bool
+                  -> m (DynFlags, [Located String], [Located String])
+parseDynamicFlags_ dflags args pkg_flags = do
   -- XXX Legacy support code
   -- We used to accept things like
   --     optdep-f  -optdepdepend
@@ -1733,8 +1751,12 @@ parseDynamicFlags dflags args = do
       f (x : xs) = x : f xs
       f xs = xs
       args' = f args
+   
+      flag_spec | pkg_flags = dynamic_flags ++ package_flags
+                | otherwise = dynamic_flags
+
   let ((leftover, errs, warns), dflags')
-          = runCmdLine (processArgs dynamic_flags args') dflags
+          = runCmdLine (processArgs flag_spec args') dflags
   when (not (null errs)) $ ghcError $ errorsToGhcException errs
   return (dflags', leftover, warns)
 
