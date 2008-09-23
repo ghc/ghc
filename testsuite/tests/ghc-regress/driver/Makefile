@@ -80,6 +80,16 @@ test018:
 	$(TEST_HC) -c F018.hs -odir obj018
 	test -f obj018/TestStub018_stub$(OBJSUFFIX)
 
+# test -outputdir
+test019:
+	$(RM) -rf out019
+	$(TEST_HC) -c F.hs -outputdir out019
+	test -f out019/TestStub.hi
+	test -f out019/TestStub$(OBJSUFFIX)
+	test -f out019/TestStub_stub$(OBJSUFFIX)
+	test -f out019/TestStub_stub.c
+	test -f out019/TestStub_stub.h
+
 # -----------------------------------------------------------------------------
 # One-shot compilation, hierarchical modules
 

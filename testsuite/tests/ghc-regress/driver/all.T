@@ -42,6 +42,10 @@ test('driver018',
                   'obj018']),
      run_command,
      ['$MAKE -s --no-print-directory test018'])
+test('driver019',
+     extra_clean(['out019/TestStub.hi','out019/TestStub.o','out019/TestStub_stub.c','out019/TestStub_stub.h','out019/TestStub_stub.o']),
+     run_command,
+     ['$MAKE -s --no-print-directory test019'])
 test('driver021', normal, run_command,
      ['$MAKE -s --no-print-directory test021'])
 cleanall()
