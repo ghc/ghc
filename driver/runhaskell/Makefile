@@ -6,7 +6,7 @@ install::
 	cp $(DESTDIR)$(bindir)/runghc.exe $(DESTDIR)$(bindir)/runhaskell.exe
 else
 install::
-	ln -s runghc $(DESTDIR)$(bindir)/runhaskell
+	ln -sf runghc $(DESTDIR)$(bindir)/runhaskell
 endif
 
 include $(TOP)/mk/bindist.mk
