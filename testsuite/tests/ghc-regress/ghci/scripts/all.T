@@ -47,6 +47,7 @@ test('ghci030', normal, ghci_script, ['ghci030.script'])
 test('ghci031', expect_broken(2138), ghci_script, ['ghci031.script'])
 test('ghci032', normal, ghci_script, ['ghci032.script'])
 test('ghci033', normal, ghci_script, ['ghci033.script'])
+test('ghci034', normal, ghci_script, ['ghci034.script'])
 test('2452', normal, ghci_script, ['2452.script'])
 
 test('1914',
