@@ -35,6 +35,6 @@ endif
 	find . -name "*.js"                         -exec echo $(WHERE_AM_I)/{} \; >> $(BIN_DIST_LIST) 2> /dev/null
 	# And anything else
 ifneq "$(BINDIST_EXTRAS)" ""
-	for FILE in $(BINDIST_EXTRAS); do if [ -e $$FILE ]; then echo $(WHERE_AM_I)/$$FILE >> $(BIN_DIST_LIST); fi; done
+	for FILE in $(BINDIST_EXTRAS); do if [ -f $$FILE ]; then echo $(WHERE_AM_I)/$$FILE >> $(BIN_DIST_LIST); fi; done
 endif
 

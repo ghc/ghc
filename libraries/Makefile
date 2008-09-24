@@ -17,7 +17,7 @@
 # To add a new library to the tree, do
 #
 #   darcs get http://darcs.haskell.org/packages/foo
-#   [ -e foo/configure.ac ] && ( cd foo && autoreconf )
+#   [ -f foo/configure.ac ] && ( cd foo && autoreconf )
 #   make make.library.foo
 
 .PHONY: default_target
