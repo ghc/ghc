@@ -36,13 +36,13 @@ stage3 ::
 
 
 ifeq "$(CLEAN_ALL_STAGES)" "YES"
-clean distclean:: clean.stage.1 clean.stage.2 clean.stage.3
+clean distclean maintainer-clean:: clean.stage.1 clean.stage.2 clean.stage.3
 else
-clean distclean:: clean.stage.$(stage)
+clean distclean maintainer-clean:: clean.stage.$(stage)
 endif
 
 ifeq "$(CLEAN_ALL_STAGES)" "YES"
-distclean::
+distclean maintainer-clean::
 	$(RM) -f ghc-bin.cabal
 endif
 

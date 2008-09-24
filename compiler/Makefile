@@ -56,7 +56,7 @@ stage3 ::
 	$(MAKE) stage=3
 
 ifeq "$(CLEAN_ALL_STAGES)" "YES"
-clean distclean::
+clean distclean maintainer-clean::
 	$(RM) -f prelude/primops.txt
 	$(RM) -f $(PRIMOP_BITS)
 	$(RM) -f $(CONFIG_HS)
@@ -66,13 +66,13 @@ clean distclean::
 endif
 
 ifeq "$(CLEAN_ALL_STAGES)" "YES"
-clean distclean:: clean.stage.1 clean.stage.2 clean.stage.3
+clean distclean maintainer-clean:: clean.stage.1 clean.stage.2 clean.stage.3
 else
-clean distclean:: clean.stage.$(stage)
+clean distclean maintainer-clean:: clean.stage.$(stage)
 endif
 
 ifeq "$(CLEAN_ALL_STAGES)" "YES"
-distclean::
+distclean maintainer-clean::
 	$(RM) -f ghc.cabal
 endif
 

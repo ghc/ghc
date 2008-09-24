@@ -276,8 +276,9 @@ ifneq "$(HSCOLOUR)" ""
 	if $(IFBUILDABLE) $* && [ -d $*/dist/doc/html/*/src/ ]; then cp hscolour.css $*/dist/doc/html/*/src/; fi
 endif
 
-.PHONY: distclean clean clean.library.%
+.PHONY: maintainer-clean distclean clean clean.library.%
 
+maintainer-clean: clean
 distclean: clean
 
 clean: $(foreach SUBDIR,$(SUBDIRS),clean.library.$(SUBDIR))
@@ -296,7 +297,7 @@ ifneq "$(wildcard dph)" ""
 	$(MAKE) -C dph clean
 endif
 
-distclean:
+maintainer-clean distclean:
 	$(RM) $(foreach lib, $(SUBDIRS), $(lib)/.depend $(lib)/.depend.bak)
 
 $(foreach SUBDIR,$(SUBDIRS),clean.library.$(SUBDIR)): \
