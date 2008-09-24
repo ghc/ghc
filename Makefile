@@ -296,8 +296,8 @@ binary-dist :: tar-binary-dist
 
 .PHONY: tar-binary-dist
 tar-binary-dist:
-	( cd $(BIN_DIST_TOPDIR_ABS); tar cf - $(BIN_DIST_NAME) | bzip2 > $(BIN_DIST_TAR_BZ2) )
-	( cd $(BIN_DIST_TOPDIR_ABS); bunzip2 -c $(BIN_DIST_TAR_BZ2) | tar tf - | sed "s/^ghc-$(ProjectVersion)/fptools/" | sort >$(FPTOOLS_TOP_ABS)/bin-manifest-$(ProjectVersion) )
+	( cd $(BIN_DIST_TOPDIR_ABS); $(TAR) cf - $(BIN_DIST_NAME) | bzip2 > $(BIN_DIST_TAR_BZ2) )
+	( cd $(BIN_DIST_TOPDIR_ABS); bunzip2 -c $(BIN_DIST_TAR_BZ2) | $(TAR) tf - | sed "s/^ghc-$(ProjectVersion)/fptools/" | sort >$(FPTOOLS_TOP_ABS)/bin-manifest-$(ProjectVersion) )
 
 else
 
@@ -393,10 +393,10 @@ endif
 	ln -s . $(BIN_DIST_NAME)
 # h means "follow symlinks", e.g. if aclocal.m4 is a symlink to a source
 # tree then we want to include the real file, not a symlink to it
-	tar hcf $(BIN_DIST_TAR) -T $(BIN_DIST_LIST)
-	cd $(BIN_DIST_PREP_DIR) && tar rf $(BIN_DIST_TAR) $(BIN_DIST_NAME)
+	$(TAR) hcf $(BIN_DIST_TAR) -T $(BIN_DIST_LIST)
+	cd $(BIN_DIST_PREP_DIR) && $(TAR) rf $(BIN_DIST_TAR) $(BIN_DIST_NAME)
 	bzip2 < $(BIN_DIST_TAR) > $(BIN_DIST_TAR_BZ2)
-	tar tf $(BIN_DIST_TAR) | sort > bin-manifest-$(ProjectVersion)
+	$(TAR) tf $(BIN_DIST_TAR) | sort > bin-manifest-$(ProjectVersion)
 endif
 
 PUBLISH_FILES = $(BIN_DIST_TAR_BZ2)
@@ -562,9 +562,9 @@ dist ::
 	  && $(RM) -rf compiler/stage[123] mk/build.mk \
 	  && $(FIND) $(SRC_DIST_DIRS) \( -name _darcs -o -name SRC -o -name "autom4te*" -o -name "*~" -o -name ".cvsignore" -o -name "\#*" -o -name ".\#*" -o -name "log" -o -name "*-SAVE" -o -name "*.orig" -o -name "*.rej" \) -print | xargs $(RM) -rf \
 	)
-	tar chf - $(EXTRA_LIBS) | bzip2 >$(FPTOOLS_TOP_ABS)/$(SRC_DIST_EXTRALIBS_TARBALL)
+	$(TAR) chf - $(EXTRA_LIBS) | bzip2 >$(FPTOOLS_TOP_ABS)/$(SRC_DIST_EXTRALIBS_TARBALL)
 	$(RM) -rf $(EXTRA_LIBS)
-	tar chf - $(SRC_DIST_NAME) 2>$src_log | bzip2 >$(FPTOOLS_TOP_ABS)/$(SRC_DIST_TARBALL)
+	$(TAR) chf - $(SRC_DIST_NAME) 2>$src_log | bzip2 >$(FPTOOLS_TOP_ABS)/$(SRC_DIST_TARBALL)
 
 # Upload the distribution(s)
 # Retrying is to work around buggy firewalls that corrupt large file transfers
@@ -606,7 +606,7 @@ hc-file-bundle :
 	echo ghc-$(ProjectVersion)/compiler/parser/ParserCore.hs >> hc-files-to-go
 	echo ghc-$(ProjectVersion)/compiler/main/ParsePkgConf.hs >> hc-files-to-go
 	echo ghc-$(ProjectVersion)/libraries/haskell-src/Language/Haskell/Parser.hs >> hc-files-to-go
-	tar czf ghc-$(ProjectVersion)-$(TARGETPLATFORM)-hc.tar.gz `cat hc-files-to-go`
+	$(TAR) czf ghc-$(ProjectVersion)-$(TARGETPLATFORM)-hc.tar.gz `cat hc-files-to-go`
 
 # -----------------------------------------------------------------------------
 # Cleaning
