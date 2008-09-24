@@ -576,7 +576,7 @@ AC_DEFUN([FP_CHECK_PROG],
 # ------------
 # Find a non-WinDoze version of the "find" utility.
 AC_DEFUN([FP_PROG_FIND],
-[AC_PATH_PROG([fp_prog_find], [find])
+[AC_PATH_PROGS([fp_prog_find], [gfind find], find)
 echo foo > conftest.txt
 $fp_prog_find conftest.txt -print > conftest.out 2>&1
 if grep '^conftest.txt$' conftest.out > /dev/null 2>&1 ; then
