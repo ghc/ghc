@@ -410,8 +410,9 @@ test081.2:
 
 # Test for overlap between home module and package module
 test100:
-	$(RM) A.hi A$(OBJSUFFIX) A.hc
-	$(TEST_HC) --make -ioverlap Overlap
+	$(RM) overlap/List.hi overlap/List.o
+	$(RM) overlap/Overlap.hi overlap/Overlap.o
+	$(TEST_HC) -v0 --make -ioverlap Overlap
 
 # -----------------------------------------------------------------------------
 # dependency-generation tests
