@@ -863,7 +863,8 @@ help _ = io (putStr helpText)
 
 info :: String -> GHCi ()
 info "" = ghcError (CmdLineError "syntax: ':i <thing-you-want-info-about>'")
-info s  = do { let names = words s
+info s  = handleSourceError GHC.printExceptionAndWarnings $ do
+             { let names = words s
 	     ; dflags <- getDynFlags
 	     ; let pefas = dopt Opt_PrintExplicitForalls dflags
 	     ; mapM_ (infoThing pefas) names }
