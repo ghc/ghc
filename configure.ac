@@ -1003,9 +1003,6 @@ if test "$BootingFromHc" = "NO"; then
 FPTOOLS_HAPPY
 fi;
 
-dnl ** check for installed haddock
-FPTOOLS_HADDOCK
-
 dnl ** check for installed alex binary + version
 dnl    (don't do it if we're booting from .hc files though.)
 if test "$BootingFromHc" = "NO"; then
