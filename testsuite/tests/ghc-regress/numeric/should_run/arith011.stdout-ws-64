@@ -594,13 +594,13 @@ negate 2 = -2
 negate 3 = -3
 #
 testReal
-toRational -3 = (-3)%1
-toRational -2 = (-2)%1
-toRational -1 = (-1)%1
-toRational 0 = 0%1
-toRational 1 = 1%1
-toRational 2 = 2%1
-toRational 3 = 3%1
+toRational -3 = (-3) % 1
+toRational -2 = (-2) % 1
+toRational -1 = (-1) % 1
+toRational 0 = 0 % 1
+toRational 1 = 1 % 1
+toRational 2 = 2 % 1
+toRational 3 = 3 % 1
 #
 testIntegral
 -3 `divMod`  -3 = (1,0)
@@ -2138,13 +2138,13 @@ negate 2 = -2
 negate 3 = -3
 #
 testReal
-toRational -3 = (-3)%1
-toRational -2 = (-2)%1
-toRational -1 = (-1)%1
-toRational 0 = 0%1
-toRational 1 = 1%1
-toRational 2 = 2%1
-toRational 3 = 3%1
+toRational -3 = (-3) % 1
+toRational -2 = (-2) % 1
+toRational -1 = (-1) % 1
+toRational 0 = 0 % 1
+toRational 1 = 1 % 1
+toRational 2 = 2 % 1
+toRational 3 = 3 % 1
 #
 testIntegral
 -3 `divMod`  -3 = (1,0)
@@ -3682,13 +3682,13 @@ negate 2 = -2
 negate 3 = -3
 #
 testReal
-toRational -3 = (-3)%1
-toRational -2 = (-2)%1
-toRational -1 = (-1)%1
-toRational 0 = 0%1
-toRational 1 = 1%1
-toRational 2 = 2%1
-toRational 3 = 3%1
+toRational -3 = (-3) % 1
+toRational -2 = (-2) % 1
+toRational -1 = (-1) % 1
+toRational 0 = 0 % 1
+toRational 1 = 1 % 1
+toRational 2 = 2 % 1
+toRational 3 = 3 % 1
 #
 testIntegral
 -3 `divMod`  -3 = (1,0)
@@ -5226,13 +5226,13 @@ negate 2 = -2
 negate 3 = -3
 #
 testReal
-toRational -3 = (-3)%1
-toRational -2 = (-2)%1
-toRational -1 = (-1)%1
-toRational 0 = 0%1
-toRational 1 = 1%1
-toRational 2 = 2%1
-toRational 3 = 3%1
+toRational -3 = (-3) % 1
+toRational -2 = (-2) % 1
+toRational -1 = (-1) % 1
+toRational 0 = 0 % 1
+toRational 1 = 1 % 1
+toRational 2 = 2 % 1
+toRational 3 = 3 % 1
 #
 testIntegral
 -3 `divMod`  -3 = (1,0)
@@ -6770,13 +6770,13 @@ negate 2 = -2
 negate 3 = -3
 #
 testReal
-toRational -3 = (-3)%1
-toRational -2 = (-2)%1
-toRational -1 = (-1)%1
-toRational 0 = 0%1
-toRational 1 = 1%1
-toRational 2 = 2%1
-toRational 3 = 3%1
+toRational -3 = (-3) % 1
+toRational -2 = (-2) % 1
+toRational -1 = (-1) % 1
+toRational 0 = 0 % 1
+toRational 1 = 1 % 1
+toRational 2 = 2 % 1
+toRational 3 = 3 % 1
 #
 testIntegral
 -3 `divMod`  -3 = (1,0)
@@ -8314,13 +8314,13 @@ negate 2 = 254
 negate 3 = 253
 #
 testReal
-toRational 253 = 253%1
-toRational 254 = 254%1
-toRational 255 = 255%1
-toRational 0 = 0%1
-toRational 1 = 1%1
-toRational 2 = 2%1
-toRational 3 = 3%1
+toRational 253 = 253 % 1
+toRational 254 = 254 % 1
+toRational 255 = 255 % 1
+toRational 0 = 0 % 1
+toRational 1 = 1 % 1
+toRational 2 = 2 % 1
+toRational 3 = 3 % 1
 #
 testIntegral
 253 `divMod`  253 = (1,0)
@@ -9858,13 +9858,13 @@ negate 2 = 65534
 negate 3 = 65533
 #
 testReal
-toRational 65533 = 65533%1
-toRational 65534 = 65534%1
-toRational 65535 = 65535%1
-toRational 0 = 0%1
-toRational 1 = 1%1
-toRational 2 = 2%1
-toRational 3 = 3%1
+toRational 65533 = 65533 % 1
+toRational 65534 = 65534 % 1
+toRational 65535 = 65535 % 1
+toRational 0 = 0 % 1
+toRational 1 = 1 % 1
+toRational 2 = 2 % 1
+toRational 3 = 3 % 1
 #
 testIntegral
 65533 `divMod`  65533 = (1,0)
@@ -11402,13 +11402,13 @@ negate 2 = 4294967294
 negate 3 = 4294967293
 #
 testReal
-toRational 4294967293 = 4294967293%1
-toRational 4294967294 = 4294967294%1
-toRational 4294967295 = 4294967295%1
-toRational 0 = 0%1
-toRational 1 = 1%1
-toRational 2 = 2%1
-toRational 3 = 3%1
+toRational 4294967293 = 4294967293 % 1
+toRational 4294967294 = 4294967294 % 1
+toRational 4294967295 = 4294967295 % 1
+toRational 0 = 0 % 1
+toRational 1 = 1 % 1
+toRational 2 = 2 % 1
+toRational 3 = 3 % 1
 #
 testIntegral
 4294967293 `divMod`  4294967293 = (1,0)
@@ -12946,13 +12946,13 @@ negate 2 = 18446744073709551614
 negate 3 = 18446744073709551613
 #
 testReal
-toRational 18446744073709551613 = 18446744073709551613%1
-toRational 18446744073709551614 = 18446744073709551614%1
-toRational 18446744073709551615 = 18446744073709551615%1
-toRational 0 = 0%1
-toRational 1 = 1%1
-toRational 2 = 2%1
-toRational 3 = 3%1
+toRational 18446744073709551613 = 18446744073709551613 % 1
+toRational 18446744073709551614 = 18446744073709551614 % 1
+toRational 18446744073709551615 = 18446744073709551615 % 1
+toRational 0 = 0 % 1
+toRational 1 = 1 % 1
+toRational 2 = 2 % 1
+toRational 3 = 3 % 1
 #
 testIntegral
 18446744073709551613 `divMod`  18446744073709551613 = (1,0)
@@ -14487,13 +14487,13 @@ negate 2 = -2
 negate 3 = -3
 #
 testReal
-toRational -3 = (-3)%1
-toRational -2 = (-2)%1
-toRational -1 = (-1)%1
-toRational 0 = 0%1
-toRational 1 = 1%1
-toRational 2 = 2%1
-toRational 3 = 3%1
+toRational -3 = (-3) % 1
+toRational -2 = (-2) % 1
+toRational -1 = (-1) % 1
+toRational 0 = 0 % 1
+toRational 1 = 1 % 1
+toRational 2 = 2 % 1
+toRational 3 = 3 % 1
 #
 testIntegral
 -3 `divMod`  -3 = (1,0)
