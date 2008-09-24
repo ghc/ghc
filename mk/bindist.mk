@@ -25,7 +25,12 @@ endif
 	# Executables
 	-$(FIND) . -name "*.wrapper"                   -exec echo $(WHERE_AM_I)/{} \; >> $(BIN_DIST_LIST) 2> /dev/null
 	-$(FIND) $(EXE_DIST_DIR)/setup-config          -exec echo $(WHERE_AM_I)/{} \; >> $(BIN_DIST_LIST) 2> /dev/null
-	-$(FIND) $(EXE_DIST_DIR) -type f -perm /a+x    -exec echo $(WHERE_AM_I)/{} \; >> $(BIN_DIST_LIST) 2> /dev/null
+	# We want the executable files, which in theory would be -perm /a+x
+	# ("any execute bit is set") but that doesn't work on some solaris
+	# and OS X machines, so we use -perm -100 instead ("the user execute
+	# bit is set"). In practice, this is extremely unlikely not to be the
+	# same set of files.
+	-$(FIND) $(EXE_DIST_DIR) -type f -perm -100    -exec echo $(WHERE_AM_I)/{} \; >> $(BIN_DIST_LIST) 2> /dev/null
 	# Docs
 	# This gives us both docbook docs, and haddock docs
 	$(FIND) . -name "*.haddock"                    -exec echo $(WHERE_AM_I)/{} \; >> $(BIN_DIST_LIST) 2> /dev/null
