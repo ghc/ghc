@@ -1,7 +1,7 @@
 -- test :browse! functionality
 :browse! *T
 -- defined locally
-T.length :: GHC.Integer.Integer
+T.length :: GHC.Integer.Internals.Integer
 class N a
 class S a
 class C a b where
@@ -56,7 +56,7 @@ Prelude.length :: [a] -> GHC.Types.Int
 T.length :: Data.ByteString.Internal.ByteString -> GHC.Types.Int
 :browse! T
 -- defined locally
-T.length :: GHC.Integer.Integer
+T.length :: GHC.Integer.Internals.Integer
 class N a
 class S a
 class C a b where
@@ -70,7 +70,7 @@ c3 :: (C a b) => a1 -> b
 c4 :: (C a b) => a1 -> b
 :browse! T -- with -fglasgow-exts
 -- defined locally
-T.length :: GHC.Integer.Integer
+T.length :: GHC.Integer.Internals.Integer
 class N a
 class S a
 class C a b where
