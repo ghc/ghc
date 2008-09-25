@@ -21,6 +21,8 @@ test('rebindable7', normal, compile_and_run, [''])
 test('rebindable8', normal, compile, [''])
 test('rebindable9', normal, compile, [''])
 
+test('T303', normal, compile, [''])
+
 # Tests from Oleg
 test('DoRestrictedM', normal, compile, [''])
 test('DoParamM', reqlib('mtl'), compile_fail, [''])
