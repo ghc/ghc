@@ -12,6 +12,7 @@ build-type: Simple
 Library {
     build-depends: ghc-prim
     exposed-modules: GHC.Integer
+                     GHC.Integer.Internals
     extensions: CPP, MagicHash, UnboxedTuples,
                 ForeignFunctionInterface, UnliftedFFITypes
     -- We need to set the package name to integer (without a version number)

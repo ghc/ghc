@@ -68,6 +68,8 @@ import GHC.Prim (
 #endif
  )
 
+import GHC.Integer.Internals (Integer(..))
+
 #if WORD_SIZE_IN_BITS < 64
 import GHC.IntWord64 (
             Int64#, Word64#,
@@ -89,19 +91,6 @@ default ()              -- Double isn't available yet,
 \subsection{The @Integer@ type}
 %*                                                      *
 %*********************************************************
-
-\begin{code}
--- | Arbitrary-precision integers.
-data Integer
-   = S# Int#                            -- small integers
-#ifndef ILX
-   | J# Int# ByteArray#                 -- large integers
-#else
-   | J# Void BigInteger                 -- .NET big ints
-
-foreign type dotnet "BigInteger" BigInteger
-#endif
-\end{code}
 
 Convenient boxed Integer PrimOps.
 
