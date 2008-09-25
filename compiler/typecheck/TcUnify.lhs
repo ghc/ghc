@@ -1192,13 +1192,13 @@ u_tys outer nb1 orig_ty1 ty1 nb2 orig_ty2 ty2
     go outer _ (PredTy p1) _ (PredTy p2)
         = uPred outer nb1 p1 nb2 p2
 
-        -- Type constructors must match
+        -- Non-synonym type constructors must match
     go _ _ (TyConApp con1 tys1) _ (TyConApp con2 tys2)
       | con1 == con2 && not (isOpenSynTyCon con1)
       = do { cois <- uTys_s nb1 tys1 nb2 tys2
            ; return $ mkTyConAppCoI con1 tys1 cois
            }
-        -- See Note [TyCon app]
+        -- Family synonyms See Note [TyCon app]
       | con1 == con2 && identicalOpenSynTyConApp
       = do { cois <- uTys_s nb1 tys1' nb2 tys2'
            ; return $ mkTyConAppCoI con1 tys1 (replicate n IdCo ++ cois)
@@ -1209,6 +1209,29 @@ u_tys outer nb1 orig_ty1 ty1 nb2 orig_ty2 ty2
         (idxTys2, tys2')         = splitAt n tys2
         identicalOpenSynTyConApp = idxTys1 `tcEqTypes` idxTys2
         -- See Note [OpenSynTyCon app]
+
+        -- If we can reduce a family app => proceed with reduct
+        -- NB: We use isOpenSynTyCon, not isOpenSynTyConApp as we also must
+        --     defer oversaturated applications!
+    go outer sty1 ty1@(TyConApp con1 _) sty2 ty2
+      | isOpenSynTyCon con1
+      = do { (coi1, ty1') <- tcNormaliseFamInst ty1
+           ; case coi1 of
+               IdCo -> defer    -- no reduction, see [Deferred Unification]
+               _    -> liftM (coi1 `mkTransCoI`) $ go outer sty1 ty1' sty2 ty2
+           }
+
+        -- If we can reduce a family app => proceed with reduct
+        -- NB: We use isOpenSynTyCon, not isOpenSynTyConApp as we also must
+        --     defer oversaturated applications!
+    go outer sty1 ty1 sty2 ty2@(TyConApp con2 _)
+      | isOpenSynTyCon con2
+      = do { (coi2, ty2') <- tcNormaliseFamInst ty2
+           ; case coi2 of
+               IdCo -> defer    -- no reduction, see [Deferred Unification]
+               _    -> liftM (`mkTransCoI` mkSymCoI coi2) $ 
+                         go outer sty1 ty1 sty2 ty2'
+           }
 
         -- Functions; just check the two parts
     go _ _ (FunTy fun1 arg1) _ (FunTy fun2 arg2)
@@ -1235,35 +1258,11 @@ u_tys outer nb1 orig_ty1 ty1 nb2 orig_ty2 ty2
            ; coi_t <- uTys nb1 t1 nb2 t2
            ; return $ mkAppTyCoI s1 coi_s t1 coi_t }
 
-        -- One or both outermost constructors are type family applications.
-        -- If we can normalise them away, proceed as usual; otherwise, we
-        -- need to defer unification by generating a wanted equality constraint.
-    go outer sty1 ty1 sty2 ty2
-      | ty1_is_fun || ty2_is_fun
-      = do { (coi1, ty1') <- if ty1_is_fun then tcNormaliseFamInst ty1
-                                           else return (IdCo, ty1)
-           ; (coi2, ty2') <- if ty2_is_fun then tcNormaliseFamInst ty2
-                                           else return (IdCo, ty2)
-           ; coi <- if isOpenSynTyConApp ty1' || isOpenSynTyConApp ty2'
-                    then do { -- One type family app can't be reduced yet
-                              -- => defer
-                            ; ty1'' <- zonkTcType ty1'
-                            ; ty2'' <- zonkTcType ty2'
-                            ; if tcEqType ty1'' ty2''
-                              then return IdCo
-                              else -- see [Deferred Unification]
-                                defer_unification outer False orig_ty1 orig_ty2
-                            }
-                     else -- unification can proceed
-                          go outer sty1 ty1' sty2 ty2'
-           ; return $ coi1 `mkTransCoI` coi `mkTransCoI` (mkSymCoI coi2)
-           }
-        where
-          ty1_is_fun = isOpenSynTyConApp ty1
-          ty2_is_fun = isOpenSynTyConApp ty2
-
         -- Anything else fails
     go outer _ _ _ _ = bale_out outer
+
+    defer = defer_unification outer False orig_ty1 orig_ty2
+
 
 ----------
 uPred :: Outer -> InBox -> PredType -> InBox -> PredType -> TcM CoercionI

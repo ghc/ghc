@@ -470,22 +470,29 @@ normEqInst :: Inst -> TcM ([RewriteInst], TyVarSet)
 -- Normalise one equality.
 normEqInst inst
   = ASSERT( isEqInst inst )
-    go ty1 ty2 (eqInstCoercion inst)
+    do { traceTc $ ptext (sLit "normEqInst of ") <+> 
+                   pprEqInstCo co <+> text "::" <+> 
+                   ppr ty1 <+> text "~" <+> ppr ty2
+       ; res <- go ty1 ty2 co
+       ; traceTc $ ptext (sLit "normEqInst returns") <+> ppr res
+       ; return res
+       }
   where
     (ty1, ty2) = eqInstTys inst
+    co         = eqInstCoercion inst
 
       -- look through synonyms
     go ty1 ty2 co | Just ty1' <- tcView ty1 = go ty1' ty2 co
     go ty1 ty2 co | Just ty2' <- tcView ty2 = go ty1 ty2' co
 
       -- left-to-right rule with type family head
-    go (TyConApp con args) ty2 co 
-      | isOpenSynTyCon con
+    go ty1@(TyConApp con args) ty2 co 
+      | isOpenSynTyConApp ty1           -- only if not oversaturated
       = mkRewriteFam False con args ty2 co
 
       -- right-to-left rule with type family head
     go ty1 ty2@(TyConApp con args) co 
-      | isOpenSynTyCon con
+      | isOpenSynTyConApp ty2           -- only if not oversaturated
       = do { co' <- mkSymEqInstCo co (ty2, ty1)
            ; mkRewriteFam True con args ty1 co'
            }
@@ -573,13 +580,7 @@ checkOrientation :: Type -> Type -> EqInstCo -> Inst -> TcM [RewriteInst]
 -- NB: We cannot assume that the two types already have outermost type
 --     synonyms expanded due to the recursion in the case of type applications.
 checkOrientation ty1 ty2 co inst
-  = do { traceTc $ ptext (sLit "checkOrientation of ") <+> 
-                   pprEqInstCo co <+> text "::" <+> 
-                   ppr ty1 <+> text "~" <+> ppr ty2
-       ; eqs <- go ty1 ty2
-       ; traceTc $ ptext (sLit "checkOrientation returns") <+> ppr eqs
-       ; return eqs
-       }
+  = go ty1 ty2
   where
       -- look through synonyms
     go ty1 ty2 | Just ty1' <- tcView ty1 = go ty1' ty2
@@ -669,10 +670,10 @@ flattenType inst ty
     go ty@(TyVarTy _)
       = return (ty, ty, [] , emptyVarSet)
 
-      -- type family application 
+      -- type family application & family arity matches number of args
       -- => flatten to "gamma :: F t1'..tn' ~ alpha" (alpha & gamma fresh)
     go ty@(TyConApp con args)
-      | isOpenSynTyCon con
+      | isOpenSynTyConApp ty   -- only if not oversaturated
       = do { (args', cargs, args_eqss, args_skolemss) <- mapAndUnzip4M go args
            ; alpha <- newFlexiTyVar (typeKind ty)
            ; let alphaTy = mkTyVarTy alpha
@@ -695,6 +696,7 @@ flattenType inst ty
       -- data constructor application => flatten subtypes
       -- NB: Special cased for efficiency - could be handled as type application
     go ty@(TyConApp con args)
+      | not (isOpenSynTyCon con)   -- don't match oversaturated family apps
       = do { (args', cargs, args_eqss, args_skolemss) <- mapAndUnzip4M go args
            ; if null args_eqss
              then     -- unchanged, keep the old type with folded synonyms
@@ -722,7 +724,10 @@ flattenType inst ty
            }
 
       -- type application => flatten subtypes
-    go ty@(AppTy ty_l ty_r)
+    go ty
+      | Just (ty_l, ty_r) <- repSplitAppTy_maybe ty
+                             -- need to use the smart split as ty may be an
+                             -- oversaturated family application
       = do { (ty_l', co_l, eqs_l, skolems_l) <- go ty_l
            ; (ty_r', co_r, eqs_r, skolems_r) <- go ty_r
            ; if null eqs_l && null eqs_r
@@ -748,6 +753,8 @@ flattenType inst ty
       -- we should never see a predicate type
     go (PredTy _)
       = panic "TcTyFuns.flattenType: unexpected PredType"
+
+    go _ = panic "TcTyFuns: suppress bogus warning"
 
 adjustCoercions :: EqInstCo            -- coercion of original equality
                 -> Coercion            -- coercion witnessing the left rewrite

@@ -1007,8 +1007,9 @@ is_tc uniq ty = case tcSplitTyConApp_maybe ty of
 --     hence no 'coreView'.  This could, however, be changed without breaking
 --     any code.
 isOpenSynTyConApp :: TcTauType -> Bool
-isOpenSynTyConApp (TyConApp tc _) = isOpenSynTyCon tc
-isOpenSynTyConApp _other          = False
+isOpenSynTyConApp (TyConApp tc tys) = isOpenSynTyCon tc && 
+                                      length tys == tyConArity tc 
+isOpenSynTyConApp _other            = False
 \end{code}
 
 
