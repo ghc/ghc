@@ -303,10 +303,15 @@ normaliseEqs eqs
 --
 normaliseDicts :: Bool -> [Inst] -> TcM EqConfig
 normaliseDicts isWanted insts
-  = do { traceTc $ ptext (sLit "Entering normaliseDicts") <+>
-                   ptext (if isWanted then sLit "[Wanted]" else sLit "[Local]")
+  = do { traceTc $ hang (ptext (sLit "Entering normaliseDicts") <+>
+                         ptext (if isWanted then sLit "[Wanted] for" 
+                                            else sLit "[Local] for"))
+                     4 (ppr insts)
        ; (insts', eqss, bindss, skolemss) <- mapAndUnzip4M (normDict isWanted) 
                                                            insts
+
+       ; traceTc $ hang (ptext (sLit "normaliseDicts returns"))
+                     4 (ppr insts' $$ ppr eqss)
        ; return $ emptyEqConfig { eqs     = concat eqss
                                 , locals  = if isWanted then [] else insts'
                                 , wanteds = if isWanted then insts' else []
@@ -809,17 +814,23 @@ mkDictBind dict isWanted rewriteCo pred
   where
     loc = tci_loc dict
 
--- gamma :: Fam args ~ alpha
--- => alpha :: Fam args ~ alpha, with alpha := Fam args
+-- gamma ::^l Fam args ~ alpha
+-- => gamma ::^w Fam args ~ alpha, with alpha := Fam args & gamma := Fam args
 --    (the update of alpha will not be apparent during propagation, as we
 --    never follow the indirections of meta variables; it will be revealed
 --    when the equality is zonked)
+--
+--  NB: It's crucial to update *both* alpha and gamma, as gamma may already
+--      have escaped into some other coercions during normalisation.
+--
 wantedToLocal :: RewriteInst -> TcM RewriteInst
 wantedToLocal eq@(RewriteFam {rwi_fam   = fam, 
                               rwi_args  = args, 
-                              rwi_right = alphaTy@(TyVarTy alpha)})
+                              rwi_right = TyVarTy alpha,
+                              rwi_co    = Left gamma})
   = do { writeMetaTyVar alpha (mkTyConApp fam args)
-       ; return $ eq {rwi_co = mkGivenCo alphaTy}
+       ; writeMetaTyVar gamma (mkTyConApp fam args)
+       ; return $ eq {rwi_co = mkGivenCo $ mkTyVarTy gamma}
        }
 wantedToLocal _ = panic "TcTyFuns.wantedToLocal"
 \end{code}
@@ -1156,7 +1167,9 @@ flattening was performed.
 \begin{code}
 instantiateAndExtract :: [RewriteInst] -> Bool -> TyVarSet -> TcM ([Inst], Bool)
 instantiateAndExtract eqs localsEmpty skolems
-  = do { results <- mapM inst wanteds
+  = do { traceTc $ hang (ptext (sLit "instantiateAndExtract:"))
+                     4 (ppr eqs $$ ppr skolems)
+       ; results <- mapM inst wanteds
        ; let residuals    = [eq | Left eq <- results]
              only_skolems = and [tv `elemVarSet` skolems | Right tv <- results]
        ; residuals' <- mapM rewriteInstToInst residuals
@@ -1167,16 +1180,19 @@ instantiateAndExtract eqs localsEmpty skolems
     checkingMode = length eqs > length wanteds || not localsEmpty
                      -- no local equalities or dicts => checking mode
 
+        -- co :: alpha ~ t or co :: a ~ alpha
     inst eq@(RewriteVar {rwi_var = tv1, rwi_right = ty2, rwi_co = co})
-
-        -- co :: alpha ~ t
-      | isMetaTyVar tv1
-      = doInst (rwi_swapped eq) tv1 ty2 co eq
-
-        -- co :: a ~ alpha
-      | Just tv2 <- tcGetTyVar_maybe ty2
-      , isMetaTyVar tv2
-      = doInst (not $ rwi_swapped eq) tv2 (mkTyVarTy tv1) co eq
+      = do { flexi_tv1       <- isFlexible tv1
+           ; maybe_flexi_tv2 <- isFlexibleTy ty2
+           ; case (flexi_tv1, maybe_flexi_tv2) of
+               (True, _) 
+                 -> -- co :: alpha ~ t
+                    doInst (rwi_swapped eq) tv1 ty2 co eq
+               (False, Just tv2) 
+                 -> -- co :: a ~ alpha                  
+                    doInst (not $ rwi_swapped eq) tv2 (mkTyVarTy tv1) co eq
+               _ -> return $ Left eq
+           }
 
         -- co :: F args ~ alpha, and we are in checking mode (ie, no locals)
     inst eq@(RewriteFam {rwi_fam = fam, rwi_args = args, rwi_right = ty2, 
@@ -1191,6 +1207,19 @@ instantiateAndExtract eqs localsEmpty skolems
       = doInst (not $ rwi_swapped eq) tv2 (mkTyConApp fam args) co eq
 
     inst eq = return $ Left eq
+
+    -- tv is a meta var and not filled
+    isFlexible tv
+      | isMetaTyVar tv = liftM isFlexi $ readMetaTyVar tv
+      | otherwise      = return False
+
+    -- type is a tv that is a meta var and not filled
+    isFlexibleTy ty
+      | Just tv <- tcGetTyVar_maybe ty = do {flexi <- isFlexible tv
+                                            ; if flexi then return $ Just tv 
+                                                       else return Nothing
+                                            }
+      | otherwise                      = return Nothing
 
     doInst _swapped _tv _ty (Right ty) _eq 
       = pprPanic "TcTyFuns.doInst: local eq: " (ppr ty)
