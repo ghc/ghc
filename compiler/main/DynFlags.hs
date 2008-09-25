@@ -1751,8 +1751,9 @@ parseDynamicFlags_ dflags args pkg_flags = do
       f (x : xs) = x : f xs
       f xs = xs
       args' = f args
-   
-      flag_spec | pkg_flags = dynamic_flags ++ package_flags
+
+      -- Note: -ignore-package (package_flags) must precede -i* (dynamic_flags)
+      flag_spec | pkg_flags = package_flags ++ dynamic_flags
                 | otherwise = dynamic_flags
 
   let ((leftover, errs, warns), dflags')
