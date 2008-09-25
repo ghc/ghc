@@ -1,2 +1,1 @@
-ghc: cannot use `-V' with `--print-libdir'
-Usage: For basic information, try the `--help' option.
+The Glorious Glasgow Haskell Compilation System
