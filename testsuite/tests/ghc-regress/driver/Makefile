@@ -435,3 +435,12 @@ test200:
 2566::
 	if $(TEST_HC) -c foo.bar; then false else true; fi
 
+.PHONY: mode001
+mode001:
+	$(TEST_HC) --interactive --help | head -1
+	$(TEST_HC) --help --interactive | head -1
+	$(TEST_HC) --version --help     | head -1
+	$(TEST_HC) --help --version        | sed "s/, version.*//"
+	$(TEST_HC) --interactive --version | sed "s/, version.*//"
+	$(TEST_HC) --version --interactive | sed "s/, version.*//"
+

@@ -196,3 +196,7 @@ test('pragma001', normal, compile, [''])
 test('pragma002', normal, compile, [''])
 
 test('2499', normal, compile_fail, [''])
+
+test('mode001', normal, run_command,
+     ['$MAKE -s --no-print-directory mode001'])
+
