@@ -450,10 +450,21 @@ updateDoEval expr _              = DoEval [expr]
 updateMode :: (CmdLineMode -> CmdLineMode) -> String -> ModeM ()
 updateMode f flag = do
   (old_mode, old_flag, flags') <- getCmdLineState
-  if notNull old_flag && flag /= old_flag
-      then ghcError (UsageError
+  let new_mode = f old_mode
+  if null old_flag || flag == old_flag || overridingMode new_mode
+      then putCmdLineState (new_mode, flag, flags')
+      else if overridingMode old_mode then return ()
+      else ghcError (UsageError
                ("cannot use `" ++ old_flag ++ "' with `" ++ flag ++ "'"))
-      else putCmdLineState (f old_mode, flag, flags')
+
+-- This returns true for modes that override other modes, e.g.
+-- "--interactive --help" and "--help --interactive" are both equivalent
+-- to "--help"
+overridingMode :: CmdLineMode -> Bool
+overridingMode ShowUsage      = True
+overridingMode ShowVersion    = True
+overridingMode ShowNumVersion = True
+overridingMode _              = False
 
 addFlag :: String -> ModeM ()
 addFlag s = do
