@@ -24,6 +24,7 @@ test('Simple20', normal, compile, [''])
 test('Simple21', normal, compile, [''])
 test('Simple22', normal, compile, [''])
 test('Simple23', normal, compile, [''])
+test('Simple24', normal, compile, [''])
 
 test('ind1', normal, compile, [''])
 test('ind2',
