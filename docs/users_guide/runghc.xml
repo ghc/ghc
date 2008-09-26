@@ -11,7 +11,7 @@
 
     <para>The runghc commandline looks like:</para>
 <screen>
-runghc [runghc flags] [GHC flags] module [program flags]
+runghc [runghc flags] [GHC flags] module [program args]
 </screen>
     <para>The only runghc flag currently is
     <literal>-f /path/to/ghc</literal>,
@@ -27,7 +27,11 @@ runghc [runghc flags] [GHC flags] module [program flags]
     <literal>--</literal> flag if it doesn't get it right. For example,
     <literal>runghc -- -fglasgow-exts Foo</literal> means runghc
     won't try to use <literal>glasgow-exts</literal> as the path to GHC,
-    but instead will pass the flag to GHC.
+    but instead will pass the flag to GHC. If a GHC flag doesn't start
+    with a dash then you need to prefix it with
+    <literal>--ghc-arg=</literal> or runghc will think that it is the
+    program to run, e.g.
+    <literal>runghc -package-conf --ghc-arg=foo.conf Main.hs</literal>.
     </para>
 
   </sect1>
