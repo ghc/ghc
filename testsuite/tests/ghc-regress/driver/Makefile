@@ -437,6 +437,8 @@ test200:
 
 .PHONY: mode001
 mode001:
+	$(TEST_HC) --make --help        | head -1
+	$(TEST_HC) --help --make        | head -1
 	$(TEST_HC) --interactive --help | head -1
 	$(TEST_HC) --help --interactive | head -1
 	$(TEST_HC) --version --help     | head -1
