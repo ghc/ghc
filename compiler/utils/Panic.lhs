@@ -219,22 +219,16 @@ tryUser action = tryJust tc_errors action
 	tc_errors e@(Exception.IOException ioe) | isUserError ioe = Just e
 	tc_errors _other = Nothing
 #else
-tryUser :: IO a -> IO (Either ErrorCall a)
+tryUser :: IO a -> IO (Either IOException a)
 tryUser io =
     do ei <- try io
        case ei of
            Right v -> return (Right v)
            Left se@(SomeException ex) ->
-               case cast ex of
-               -- Look for good old fashioned ErrorCall's
-               Just errorCall -> return (Left errorCall)
-               Nothing ->
-                   case cast ex of
-                   -- And also for user errors in IO errors.
-                   -- Sigh.
+                case cast ex of
                    Just ioe
                     | isUserError ioe ->
-                       return (Left (ErrorCall (ioeGetErrorString ioe)))
+                       return (Left ioe)
                    _ -> throw se
 #endif
 \end{code}

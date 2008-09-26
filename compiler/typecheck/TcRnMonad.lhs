@@ -546,7 +546,7 @@ discardWarnings thing_inside
 #if __GLASGOW_HASKELL__ < 609
 try_m :: TcRn r -> TcRn (Either Exception r)
 #else
-try_m :: TcRn r -> TcRn (Either ErrorCall r)
+try_m :: TcRn r -> TcRn (Either IOException r)
 #endif
 -- Does try_m, with a debug-trace on failure
 try_m thing 

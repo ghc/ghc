@@ -98,7 +98,7 @@ fixM f = IOEnv (\ env -> fixIO (\ r -> unIOEnv (f r) env))
 #if __GLASGOW_HASKELL__ < 609
 tryM :: IOEnv env r -> IOEnv env (Either Exception r)
 #else
-tryM :: IOEnv env r -> IOEnv env (Either ErrorCall r)
+tryM :: IOEnv env r -> IOEnv env (Either IOException r)
 #endif
 -- Reflect UserError exceptions (only) into IOEnv monad
 -- Other exceptions are not caught; they are simply propagated as exns
