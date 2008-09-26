@@ -465,6 +465,216 @@
           <replaceable>file</replaceable>.  If
           <replaceable>file</replaceable> is omitted, then the output
           is sent to <constant>stderr</constant>.</para>
+
+    <para>
+        If you use the <literal>-t</literal> flag then, when your
+        program finishes, you will see something like this:
+    </para>
+
+<programlisting>
+&lt;&lt;ghc: 36169392 bytes, 69 GCs, 603392/1065272 avg/max bytes residency (2 samples), 3M in use, 0.00 INIT (0.00 elapsed), 0.02 MUT (0.02 elapsed), 0.07 GC (0.07 elapsed) :ghc&gt;&gt;
+</programlisting>
+
+    <para>
+        This tells you:
+    </para>
+
+    <itemizedlist>
+      <listitem>
+        <para>
+          The total bytes allocated by the program. This may be less
+          than the peak memory use, as some may be freed. 
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          The total number of garbage collections that occurred.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          The average and maximum space used by your program.
+          This is only checked during major garbage collections, so it
+          is only an approximation; the number of samples tells you how
+          many times it is checked.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          The peak memory the RTS has allocated from the OS. 
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          The amount of CPU time and elapsed wall clock time while
+          initialising the runtime system (INIT), running the program
+          itself (MUT, the mutator), and garbage collecting (GC).
+        </para>
+      </listitem>
+    </itemizedlist>
+
+    <para>
+        If you use the <literal>-s</literal> flag then, when your
+        program finishes, you will see something like this (the exact
+        details will vary depending on what sort of RTS you have, e.g.
+        you will only see profiling data if your RTS is compiled for
+        profiling):
+    </para>
+
+<programlisting>
+      36,169,392 bytes allocated in the heap
+       4,057,632 bytes copied during GC
+       1,065,272 bytes maximum residency (2 sample(s))
+          54,312 bytes maximum slop
+               3 MB total memory in use (0 MB lost due to fragmentation)
+
+  Generation 0:    67 collections,     0 parallel,  0.04s,  0.03s elapsed
+  Generation 1:     2 collections,     0 parallel,  0.03s,  0.04s elapsed
+
+  INIT  time    0.00s  (  0.00s elapsed)
+  MUT   time    0.01s  (  0.02s elapsed)
+  GC    time    0.07s  (  0.07s elapsed)
+  EXIT  time    0.00s  (  0.00s elapsed)
+  Total time    0.08s  (  0.09s elapsed)
+
+  %GC time      89.5%  (75.3% elapsed)
+
+  Alloc rate    4,520,608,923 bytes per MUT second
+
+  Productivity  10.5% of total user, 9.1% of total elapsed
+</programlisting>
+
+    <itemizedlist>
+      <listitem>
+        <para>
+        The "bytes allocated in the heap" is the total bytes allocated
+        by the program. This may be less than the peak memory use, as
+        some may be freed.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+        GHC uses a copying garbage collector. "bytes copied during GC" 
+        tells you how many bytes it had to copy during garbage collection.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+        The maximum space actually used by your program is the
+        "bytes maximum residency" figure. This is only checked during
+        major garbage collections, so it is only an approximation;
+        the number of samples tells you how many times it is checked.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+        The "bytes maximum slop" tells you the most space that is ever
+        wasted due to the way GHC packs data into so-called "megablocks".
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+        The "total memory in use" tells you the peak memory the RTS has
+        allocated from the OS.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+        Next there is information about the garbage collections done.
+        For each generation it says how many garbage collections were
+        done, how many of those collections used multiple threads,
+        the total CPU time used for garbage collecting that generation,
+        and the total wall clock time elapsed while garbage collecting
+        that generation.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+        Next there is the CPU time and wall clock time elapsedm broken
+        down by what the runtiem system was doing at the time.
+        INIT is the runtime system initialisation.
+        MUT is the mutator time, i.e. the time spent actually running
+        your code.
+        GC is the time spent doing garbage collection.
+        RP is the time spent doing retainer profiling.
+        PROF is the time spent doing other profiling.
+        EXIT is the runtime system shutdown time.
+        And finally, Total is, of course, the total.
+        </para>
+        <para>
+        %GC time tells you what percentage GC is of Total.
+        "Alloc rate" tells you the "bytes allocated in the heap" divided
+        by the MUT CPU time.
+        "Productivity" tells you what percentage of the Total CPU and wall
+        clock elapsed times are spent in the mutator (MUT).
+        </para>
+      </listitem>
+    </itemizedlist>
+
+    <para>
+        The <literal>-S</literal> flag, as well as giving the same
+        output as the <literal>-s</literal> flag, prints information
+        about each GC as it happens:
+    </para>
+
+<programlisting>
+    Alloc    Copied     Live    GC    GC     TOT     TOT  Page Flts
+    bytes     bytes     bytes  user  elap    user    elap
+   528496     47728    141512  0.01  0.02    0.02    0.02    0    0  (Gen:  1)
+[...]
+   524944    175944   1726384  0.00  0.00    0.08    0.11    0    0  (Gen:  0)
+</programlisting>
+
+    <para>
+        For each garbage collection, we print:
+    </para>
+
+    <itemizedlist>
+      <listitem>
+        <para>
+          How many bytes we allocated this garbage collection.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          How many bytes we copied this garbage collection.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          How many bytes are currently live.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          How long this garbage collection took (CPU time and elapsed
+          wall clock time).
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          How long the program has been running (CPU time and elapsed
+          wall clock time).
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          How many page faults occured this garbage collection.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          How many page faults occured since the end of the last garbage
+          collection.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          Which generation is being garbage collected.
+        </para>
+      </listitem>
+    </itemizedlist>
+
 	</listitem>
       </varlistentry>
     </variablelist>
