@@ -1017,6 +1017,7 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
 	    // Not stop_at_atomically... fall through and abort the
 	    // transaction.
 	    
+	case CATCH_STM_FRAME:
 	case CATCH_RETRY_FRAME:
 	    // IF we find an ATOMICALLY_FRAME then we abort the
 	    // current transaction and propagate the exception.  In
