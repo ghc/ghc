@@ -11,7 +11,6 @@ Basically, the things need to be in class @Uniquable@, and we use the
 @getUnique@ method to grab their @Uniques@.
 
 \begin{code}
-{-# OPTIONS -Wall -fno-warn-name-shadowing -Werror #-}
 module LazyUniqFM (
 	-- * Lazy unique-keyed mappings
 	UniqFM,   	-- abstract type
