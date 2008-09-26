@@ -517,8 +517,6 @@ Right hand sides are missing them. We can either (a) drop them from the lhs, or
 The function congruenceNewtypes takes a shot at (b)
 -}
 
--- The Type Reconstruction monad
-type TR a = TcM a
 
 -- A (non-mutable) tau type containing
 -- existentially quantified tyvars.
@@ -529,20 +527,17 @@ type RttiType = Type
 -- An incomplete type as stored in GHCi:
 --  no polymorphism: no quantifiers & all tyvars are skolem.
 type GhciType = Type
-{-
-runTR :: HscEnv -> TR a -> IO a
-runTR hsc_env c = do
-  mb_term <- runTR_maybe hsc_env c
-  case mb_term of 
-    Nothing -> panic "RTTI: Failed to reconstruct a term"
-    Just x  -> return x
--}
+
+
+-- The Type Reconstruction monad
+--------------------------------
+type TR a = TcM a
 
 runTR :: HscEnv -> TR a -> IO a
 runTR hsc_env thing = do
   mb_val <- runTR_maybe hsc_env thing
   case mb_val of
-    Nothing -> error "RTTI error: probably due to :forcing an undefined"
+    Nothing -> error "unable to :print the term"
     Just x  -> return x
 
 runTR_maybe :: HscEnv -> TR a -> IO (Maybe a)
@@ -594,7 +589,9 @@ addConstraint actual expected = do
      -- TOMDO: what about the coercion?
      -- we should consider family instances
 
--- Type & Term reconstruction 
+
+-- Type & Term reconstruction
+------------------------------
 cvObtainTerm :: HscEnv -> Int -> Bool -> RttiType -> HValue -> IO Term
 cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
   -- we quantify existential tyvars as universal,
@@ -760,6 +757,7 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
 
 
 -- Fast, breadth-first Type reconstruction
+------------------------------------------
 cvReconstructType :: HscEnv -> Int -> GhciType -> HValue -> IO (Maybe Type)
 cvReconstructType hsc_env max_depth old_ty hval = runTR_maybe hsc_env $ do
    traceTR (text "RTTI started with initial type " <> ppr old_ty)
