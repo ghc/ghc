@@ -88,9 +88,10 @@ CONFIGURE_FLAGS_STAGE1 += $(foreach flag, $(GhcStage1HcOpts), --ghc-option=$(fla
 CONFIGURE_FLAGS_STAGE2 += $(foreach flag, $(GhcStage2HcOpts), --ghc-option=$(flag))
 CONFIGURE_FLAGS_STAGE3 += $(foreach flag, $(GhcStage3HcOpts), --ghc-option=$(flag))
 
+BUILD_FLAGS += $(patsubst %, --ghc-option=%, $(SRC_HC_OPTS))
 # Allow EXTRA_HC_OPTS to be used from the command line to add options 
 # when building (e.g. -v)
-BUILD_FLAGS=$(patsubst %, --ghc-option=%, $(EXTRA_HC_OPTS))
+BUILD_FLAGS += $(patsubst %, --ghc-option=%, $(EXTRA_HC_OPTS))
 
 # XXX In stage2+ we should really use the inplace ghc-pkg
 # It works because installPackage doesn't actually use ghc-pkg, as there's
