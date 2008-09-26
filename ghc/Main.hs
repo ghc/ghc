@@ -83,23 +83,28 @@ main =
   (argv2, staticFlagWarnings) <- parseStaticFlags argv1'
 
   -- 2. Parse the "mode" flags (--make, --interactive etc.)
-  (cli_mode, argv3, modeFlagWarnings) <- parseModeFlags argv2
+  (m_uber_mode, cli_mode, argv3, modeFlagWarnings) <- parseModeFlags argv2
 
   -- If all we want to do is to show the version number then do it
   -- now, before we start a GHC session etc.
   -- If we do it later then bootstrapping gets confused as it tries
   -- to find out what version of GHC it's using before package.conf
   -- exists, so starting the session fails.
-  case cli_mode of
-    ShowInfo                -> do showInfo
-                                  exitWith ExitSuccess
-    ShowSupportedLanguages  -> do showSupportedLanguages
-                                  exitWith ExitSuccess
-    ShowVersion             -> do showVersion
-                                  exitWith ExitSuccess
-    ShowNumVersion          -> do putStrLn cProjectVersion
-                                  exitWith ExitSuccess
-    _                       -> return ()
+  case m_uber_mode of
+    -- ShowUsage currently has to be handled specially, as it needs to
+    -- actually start up GHC so that it can find the usage.txt files
+    -- in the libdir. It would be nice to embed the text in the
+    -- executable so that we don't have to do that, and things are more
+    -- uniform here.
+    Just ShowUsage -> return ()
+    Just um ->
+        do case um of
+               ShowInfo                -> showInfo
+               ShowSupportedLanguages  -> showSupportedLanguages
+               ShowVersion             -> showVersion
+               ShowNumVersion          -> putStrLn cProjectVersion
+           exitWith ExitSuccess
+    Nothing -> return ()
 
   -- start our GHC session
   GHC.runGhc mbMinusB $ do
@@ -140,6 +145,11 @@ main =
         -- Leftover ones are presumably files
   (dflags2, fileish_args, dynamicFlagWarnings) <- GHC.parseDynamicFlags dflags1a argv3
 
+  -- As noted earlier, currently we hvae to handle ShowUsage down here
+  case m_uber_mode of
+      Just ShowUsage -> liftIO $ showGhcUsage dflags2 cli_mode
+      _              -> return ()
+
   let flagWarnings = staticFlagWarnings
                   ++ modeFlagWarnings
                   ++ dynamicFlagWarnings
@@ -177,18 +187,11 @@ main =
   liftIO $ checkOptions cli_mode dflags3 srcs objs
 
   ---------------- Do the business -----------
-  let alreadyHandled = panic (show cli_mode ++
-                              " should already have been handled")
-
   handleSourceError (\e -> do
        GHC.printExceptionAndWarnings e
-       liftIO $ exitWith (ExitFailure 1)) $
+       liftIO $ exitWith (ExitFailure 1)) $ do
     case cli_mode of
-       ShowUsage              -> liftIO $ showGhcUsage dflags3 cli_mode
        PrintLibdir            -> liftIO $ putStrLn (topDir dflags3)
-       ShowSupportedLanguages -> alreadyHandled
-       ShowVersion            -> alreadyHandled
-       ShowNumVersion         -> alreadyHandled
        ShowInterface f        -> liftIO $ doShowIface dflags3 f
        DoMake                 -> doMake srcs
        DoMkDependHS           -> doMkDependHS (map fst srcs)
@@ -326,13 +329,16 @@ verifyOutputFiles dflags = do
 -----------------------------------------------------------------------------
 -- GHC modes of operation
 
-data CmdLineMode
+data UberMode
   = ShowUsage               -- ghc -?
-  | PrintLibdir             -- ghc --print-libdir
-  | ShowInfo                -- ghc --info
-  | ShowSupportedLanguages  -- ghc --supported-languages
   | ShowVersion             -- ghc -V/--version
   | ShowNumVersion          -- ghc --numeric-version
+  | ShowSupportedLanguages  -- ghc --supported-languages
+  | ShowInfo                -- ghc --info
+  deriving (Show)
+
+data CmdLineMode
+  = PrintLibdir             -- ghc --print-libdir
   | ShowInterface String    -- ghc --show-iface
   | DoMkDependHS            -- ghc -M
   | StopBefore Phase        -- ghc -E | -C | -S
@@ -380,35 +386,39 @@ isCompManagerMode _             = False
 -- Parsing the mode flag
 
 parseModeFlags :: [Located String]
-               -> IO (CmdLineMode, [Located String], [Located String])
+               -> IO (Maybe UberMode,
+                      CmdLineMode,
+                      [Located String],
+                      [Located String])
 parseModeFlags args = do
-  let ((leftover, errs, warns), (mode, _, flags')) =
-	 runCmdLine (processArgs mode_flags args) (StopBefore StopLn, "", []) 
+  let ((leftover, errs, warns), (mUberMode, mode, _, flags')) =
+          runCmdLine (processArgs mode_flags args)
+                     (Nothing, StopBefore StopLn, "", [])
   when (not (null errs)) $ ghcError $ errorsToGhcException errs
-  return (mode, flags' ++ leftover, warns)
+  return (mUberMode, mode, flags' ++ leftover, warns)
 
-type ModeM = CmdLineP (CmdLineMode, String, [Located String])
+type ModeM = CmdLineP (Maybe UberMode, CmdLineMode, String, [Located String])
   -- mode flags sometimes give rise to new DynFlags (eg. -C, see below)
   -- so we collect the new ones and return them.
 
 mode_flags :: [Flag ModeM]
 mode_flags =
   [  ------- help / version ----------------------------------------------
-    Flag "?"                    (PassFlag (setMode ShowUsage))
+    Flag "?"                    (NoArg (setUberMode ShowUsage))
          Supported
-  , Flag "-help"                (PassFlag (setMode ShowUsage))
+  , Flag "-help"                (NoArg (setUberMode ShowUsage))
+         Supported
+  , Flag "V"                    (NoArg (setUberMode ShowVersion))
+         Supported
+  , Flag "-version"             (NoArg (setUberMode ShowVersion))
+         Supported
+  , Flag "-numeric-version"     (NoArg (setUberMode ShowNumVersion))
+         Supported
+  , Flag "-info"                (NoArg (setUberMode ShowInfo))
+         Supported
+  , Flag "-supported-languages" (NoArg (setUberMode ShowSupportedLanguages))
          Supported
   , Flag "-print-libdir"        (PassFlag (setMode PrintLibdir))
-         Supported
-  , Flag "V"                    (PassFlag (setMode ShowVersion))
-         Supported
-  , Flag "-version"             (PassFlag (setMode ShowVersion))
-         Supported
-  , Flag "-numeric-version"     (PassFlag (setMode ShowNumVersion))
-         Supported
-  , Flag "-info"                (PassFlag (setMode ShowInfo))
-         Supported
-  , Flag "-supported-languages" (PassFlag (setMode ShowSupportedLanguages))
          Supported
 
       ------- interfaces ----------------------------------------------------
@@ -440,6 +450,11 @@ mode_flags =
          Supported
   ]
 
+setUberMode :: UberMode -> ModeM ()
+setUberMode m = do
+    (_, cmdLineMode, flag, flags') <- getCmdLineState
+    putCmdLineState (Just m, cmdLineMode, flag, flags')
+
 setMode :: CmdLineMode -> String -> ModeM ()
 setMode m flag = updateMode (\_ -> m) flag
 
@@ -449,28 +464,17 @@ updateDoEval expr _              = DoEval [expr]
 
 updateMode :: (CmdLineMode -> CmdLineMode) -> String -> ModeM ()
 updateMode f flag = do
-  (old_mode, old_flag, flags') <- getCmdLineState
-  let new_mode = f old_mode
-  if null old_flag || flag == old_flag || overridingMode new_mode
-      then putCmdLineState (new_mode, flag, flags')
-      else if overridingMode old_mode then return ()
+  (m_uber_mode, old_mode, old_flag, flags') <- getCmdLineState
+  if null old_flag || flag == old_flag
+      then putCmdLineState (m_uber_mode, f old_mode, flag, flags')
       else ghcError (UsageError
                ("cannot use `" ++ old_flag ++ "' with `" ++ flag ++ "'"))
 
--- This returns true for modes that override other modes, e.g.
--- "--interactive --help" and "--help --interactive" are both equivalent
--- to "--help"
-overridingMode :: CmdLineMode -> Bool
-overridingMode ShowUsage      = True
-overridingMode ShowVersion    = True
-overridingMode ShowNumVersion = True
-overridingMode _              = False
-
 addFlag :: String -> ModeM ()
 addFlag s = do
-  (m, f, flags') <- getCmdLineState
+  (u, m, f, flags') <- getCmdLineState
   -- XXX Can we get a useful Loc?
-  putCmdLineState (m, f, mkGeneralLocated "addFlag" s : flags')
+  putCmdLineState (u, m, f, mkGeneralLocated "addFlag" s : flags')
 
 
 -- ----------------------------------------------------------------------------
