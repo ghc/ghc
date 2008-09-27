@@ -680,7 +680,8 @@ getVerbFlag dflags
   | verbosity dflags >= 3  = "-v"
   | otherwise =  ""
 
-setObjectDir, setHiDir, setStubDir, setObjectSuf, setHiSuf, setHcSuf, parseDynLibLoaderMode,
+setObjectDir, setHiDir, setStubDir, setOutputDir,
+         setObjectSuf, setHiSuf, setHcSuf, parseDynLibLoaderMode,
          setPgmP, setPgmL, setPgmF, setPgmc, setPgmm, setPgms, setPgma, setPgml, setPgmdll, setPgmwindres,
          addOptL, addOptP, addOptF, addOptc, addOptm, addOpta, addOptl, addOptwindres,
          addCmdlineFramework, addHaddockOpts
@@ -693,6 +694,7 @@ setHiDir      f d = d{ hiDir      = Just f}
 setStubDir    f d = d{ stubDir    = Just f, includePaths = f : includePaths d }
   -- -stubdir D adds an implicit -I D, so that gcc can find the _stub.h file
   -- \#included from the .hc file when compiling with -fvia-C.
+setOutputDir  f = setObjectDir f . setHiDir f . setStubDir f
 
 setObjectSuf  f d = d{ objectSuf  = f}
 setHiSuf      f d = d{ hiSuf      = f}
@@ -1198,6 +1200,7 @@ dynamic_flags = [
   , Flag "hidir"          (HasArg (upd . setHiDir)) Supported
   , Flag "tmpdir"         (HasArg (upd . setTmpDir)) Supported
   , Flag "stubdir"        (HasArg (upd . setStubDir)) Supported
+  , Flag "outputdir"      (HasArg (upd . setOutputDir)) Supported
   , Flag "ddump-file-prefix" (HasArg (upd . setDumpPrefixForce . Just))
          Supported
 

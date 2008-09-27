@@ -374,6 +374,20 @@ $ ghc -c parse/Foo.hs parse/Bar.hs gurgle/Bumble.hs -odir `arch`
 	  </listitem>
 	</varlistentry>
 
+        <varlistentry>
+          <term>
+            <option>-outputdir</option> <replaceable>dir</replaceable>
+            <indexterm><primary><option>-outputdir</option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>The <option>-outputdir</option> option is shorthand for
+              the combination
+              of <option>-odir</option>, <option>-hidir</option>,
+              and <option>-stubdir</option>.
+            </para>
+          </listitem>
+        </varlistentry>
+
 	<varlistentry>
 	  <term>
             <option>-osuf</option> <replaceable>suffix</replaceable>

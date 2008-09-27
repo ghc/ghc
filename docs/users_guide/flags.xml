@@ -254,7 +254,7 @@
 	    </row>
 	    <row>
 	      <entry><option>-odir</option> <replaceable>dir</replaceable></entry>
-	      <entry>set output directory</entry>
+	      <entry>set directory for object files</entry>
 	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
@@ -273,6 +273,12 @@
 	    <row>
 	      <entry><option>-stubdir</option> <replaceable>dir</replaceable></entry>
 	      <entry>redirect FFi stub files</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-outputdir</option> <replaceable>dir</replaceable></entry>
+	      <entry>set output directory</entry>
 	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
