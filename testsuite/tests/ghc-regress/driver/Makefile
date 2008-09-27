@@ -446,12 +446,19 @@ test200:
 	if $(TEST_HC) -c foo.bar; then false else true; fi
 
 .PHONY: mode001
+# We use
+#     sed '2,$$d'
+# rather than
+#     head -1
+# as the latter gives
+#     ghc: <stdout>: hFlush: resource vanished (Broken pipe)
+# on OS X
 mode001:
-	$(TEST_HC) --make --help        | head -1
-	$(TEST_HC) --help --make        | head -1
-	$(TEST_HC) --interactive --help | head -1
-	$(TEST_HC) --help --interactive | head -1
-	$(TEST_HC) --version --help     | head -1
+	$(TEST_HC) --make --help        | sed '2,$$d'
+	$(TEST_HC) --help --make        | sed '2,$$d'
+	$(TEST_HC) --interactive --help | sed '2,$$d'
+	$(TEST_HC) --help --interactive | sed '2,$$d'
+	$(TEST_HC) --version --help     | sed '2,$$d'
 	$(TEST_HC) --help --version        | sed "s/, version.*//"
 	$(TEST_HC) --interactive --version | sed "s/, version.*//"
 	$(TEST_HC) --version --interactive | sed "s/, version.*//"
