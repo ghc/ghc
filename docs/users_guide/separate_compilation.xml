@@ -299,7 +299,7 @@
 	    <replaceable>dir</replaceable>.  For example:</para>
 
 <screen>
-$ ghc -c parse/Foo.hs parse/Bar.hs gurgle/Bumble.hs -odir `arch`
+$ ghc -c parse/Foo.hs parse/Bar.hs gurgle/Bumble.hs -odir `uname -m`
 </screen>
 
 	    <para>The object files, <filename>Foo.o</filename>,
@@ -579,9 +579,9 @@ $ ghc -c parse/Foo.hs parse/Bar.hs gurgle/Bumble.hs -odir `arch`
             the same as the old one; this is friendly to
             <command>make</command>.  When an interface does change,
             it is often enlightening to be informed.  The
-            <option>-ddump-hi-diffs</option> option will make GHC run
-            <command>diff</command> on the old and new
-            <filename>.hi</filename> files.</para>
+            <option>-ddump-hi-diffs</option> option will make GHC
+            report the differences between the old and
+            new <filename>.hi</filename> files.</para>
 	  </listitem>
 	</varlistentry>
 
@@ -661,24 +661,24 @@ $ ghc -c parse/Foo.hs parse/Bar.hs gurgle/Bumble.hs -odir `arch`
       <literal>B</literal>, say) may conceivably not change
       <filename>B.hi</filename> one jot.  So now&hellip;</para>
 
-      <para>GHC keeps a version number on each interface file, and on
-      each type signature within the interface file.  It also keeps in
-      every interface file a list of the version numbers of everything
-      it used when it last compiled the file.  If the source file's
-      modification date is earlier than the <filename>.o</filename>
-      file's date (i.e. the source hasn't changed since the file was
-      last compiled), and the recompilation checking is on, GHC will be
-      clever.  It compares the version numbers on the things it needs
-      this time with the version numbers on the things it needed last
-      time (gleaned from the interface file of the module being
-      compiled); if they are all the same it stops compiling rather
-      early in the process saying &ldquo;Compilation IS NOT
-      required&rdquo;.  What a beautiful sight!</para>
+      <para>GHC calculates a fingerprint (in fact an MD5 hash) of each
+      interface file, and of each declaration within the interface
+      file.  It also keeps in every interface file a list of the
+      fingerprints of everything it used when it last compiled the
+      file.  If the source file's modification date is earlier than
+      the <filename>.o</filename> file's date (i.e. the source hasn't
+      changed since the file was last compiled), and the recompilation
+      checking is on, GHC will be clever.  It compares the fingerprints
+      on the things it needs this time with the fingerprints
+      on the things it needed last time (gleaned from the
+      interface file of the module being compiled); if they are all
+      the same it stops compiling early in the process saying
+      &ldquo;Compilation IS NOT required&rdquo;.  What a beautiful
+      sight!</para>
 
-      <para>Patrick Sansom had a workshop paper about how all this is
-      done (though the details have changed quite a bit). <ulink
-      url="mailto:sansom@dcs.gla.ac.uk">Ask him</ulink> if you want a
-      copy.</para>
+      <para>You can read
+      about <ulink url="http://hackage.haskell.org/trac/ghc/wiki/Commentary/Compiler/RecompilationAvoidance">how
+          all this works</ulink> in the GHC commentary.</para>
 
     </sect2>
 
