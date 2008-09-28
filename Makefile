@@ -1,9 +1,19 @@
 
 TOP=../..
+include $(TOP)/mk/boilerplate.mk
+
 ENABLE_SHELL_WRAPPERS = YES
 EXTRA_INPLACE_CONFIGURE_FLAGS += --flags=in-ghc-tree
 EXTRA_STAGE2_CONFIGURE_FLAGS += --flags=in-ghc-tree
 EXTRA_STAGE2_CONFIGURE_FLAGS += --datasubdir=.
+# If we are profiling GHC then we didn't bother to build the GHC API for
+# profiling, so we need to use profiling when building haddock
+ifeq "$(GhcProfiled)" "YES"
+EXTRA_STAGE2_CONFIGURE_FLAGS += --disable-library-for-ghci
+EXTRA_STAGE2_CONFIGURE_FLAGS += --disable-library-vanilla
+EXTRA_STAGE2_CONFIGURE_FLAGS += --enable-library-profiling
+EXTRA_STAGE2_CONFIGURE_FLAGS += --enable-executable-profiling
+endif
 
 # Ideally we'd automatically find these from the .cabal file:
 BINDIST_EXTRAS += html/haddock-DEBUG.css \
@@ -13,7 +23,6 @@ BINDIST_EXTRAS += html/haddock-DEBUG.css \
                   html/minus.gif         \
                   html/plus.gif
 
-include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/cabal.mk
 
 # bindist.mk isn't expecting a library to be in the same package as an
