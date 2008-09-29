@@ -108,7 +108,7 @@ test('HO', normal, compile, [''])
 
 test('GivenCheck', normal, compile, [''])
 test('GivenCheckSwap', normal, compile, [''])
-test('GivenCheckDecomp', expect_fail, compile, [''])
+test('GivenCheckDecomp', normal, compile, [''])
 test('GivenCheckTop', normal, compile, [''])
 
 test('Gentle', normal, compile, [''])
