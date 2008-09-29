@@ -884,8 +884,11 @@ mapSubstRules eq eqs
        }
   where
     substRules eq1 eq2
-      = do {   -- try the SubstFam rule
-             optEqs <- applySubstFam eq1 eq2
+      = do {traceTc $ hang (ptext (sLit "Trying subst rules with"))
+                        4 (ppr eq1 $$ ppr eq2)
+
+               -- try the SubstFam rule
+           ; optEqs <- applySubstFam eq1 eq2
            ; case optEqs of
                Just (eqs, skolems) -> return (eqs, [], skolems)
                Nothing             -> do 
@@ -953,6 +956,8 @@ applySubstFam :: RewriteInst
               -> TcM (Maybe ([RewriteInst], TyVarSet))
 applySubstFam eq1@(RewriteFam {rwi_fam = fam1, rwi_args = args1})
               eq2@(RewriteFam {rwi_fam = fam2, rwi_args = args2})
+
+    -- rule matches => rewrite
   | fam1 == fam2 && tcEqTypes args1 args2 &&
     (isWantedRewriteInst eq2 || not (isWantedRewriteInst eq1))
 -- !!!TODO: tcEqTypes is insufficient as it does not look through type synonyms
@@ -962,11 +967,18 @@ applySubstFam eq1@(RewriteFam {rwi_fam = fam1, rwi_args = args1})
        ; eq2' <- deriveEqInst eq2 lhs rhs co2'
        ; liftM Just $ normEqInst eq2'
        }
+
+    -- rule would match with eq1 and eq2 swapped => put eq2 into todo list
+  | fam1 == fam2 && tcEqTypes args1 args2 &&
+    (isWantedRewriteInst eq1 || not (isWantedRewriteInst eq2))
+  = return $ Just ([eq2], emptyVarSet)
+
   where
     lhs = rwi_right eq1
     rhs = rwi_right eq2
     co1 = eqInstCoType (rwi_co eq1)
     co2 = rwi_co eq2
+
 applySubstFam _ _ = return Nothing
 \end{code}
 
@@ -988,17 +1000,26 @@ applySubstVarVar :: RewriteInst
                  -> TcM (Maybe ([RewriteInst], TyVarSet))
 applySubstVarVar eq1@(RewriteVar {rwi_var = tv1})
                  eq2@(RewriteVar {rwi_var = tv2})
+
+    -- rule matches => rewrite
   | tv1 == tv2 &&
     (isWantedRewriteInst eq2 || not (isWantedRewriteInst eq1))
   = do { co2' <- mkRightTransEqInstCo co2 co1 (lhs, rhs)
        ; eq2' <- deriveEqInst eq2 lhs rhs co2'
        ; liftM Just $ normEqInst eq2'
        }
+
+    -- rule would match with eq1 and eq2 swapped => put eq2 into todo list
+  | tv1 == tv2 &&
+    (isWantedRewriteInst eq1 || not (isWantedRewriteInst eq2))
+  = return $ Just ([eq2], emptyVarSet)
+
   where
     lhs = rwi_right eq1
     rhs = rwi_right eq2
     co1 = eqInstCoType (rwi_co eq1)
     co2 = rwi_co eq2
+
 applySubstVarVar _ _ = return Nothing
 \end{code}
 
@@ -1016,6 +1037,8 @@ co2' is returned.  (The equality co1 is not returned as it remain unaltered.)
 
 \begin{code}
 applySubstVarFam :: RewriteInst -> RewriteInst -> TcM (Maybe RewriteInst)
+
+  -- rule matches => rewrite
 applySubstVarFam eq1@(RewriteVar {rwi_var = tv1})
                  eq2@(RewriteFam {rwi_fam = fam2, rwi_args = args2})
   | tv1 `elemVarSet` tyVarsOfTypes args2
@@ -1030,6 +1053,13 @@ applySubstVarFam eq1@(RewriteVar {rwi_var = tv1})
     rhs2 = rwi_right eq2
     co1  = eqInstCoType (rwi_co eq1)
     co2  = rwi_co eq2
+
+  -- rule would match with eq1 and eq2 swapped => put eq2 into todo list
+applySubstVarFam eq1@(RewriteFam {rwi_fam = fam1, rwi_args = args1})
+                 eq2@(RewriteVar {rwi_var = tv2})
+  | tv2 `elemVarSet` tyVarsOfTypes args1
+  = return $ Just eq2
+
 applySubstVarFam _ _ = return Nothing
 \end{code}
 
