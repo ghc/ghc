@@ -1055,7 +1055,7 @@ applySubstVarFam eq1@(RewriteVar {rwi_var = tv1})
     co2  = rwi_co eq2
 
   -- rule would match with eq1 and eq2 swapped => put eq2 into todo list
-applySubstVarFam eq1@(RewriteFam {rwi_fam = fam1, rwi_args = args1})
+applySubstVarFam (RewriteFam {rwi_args = args1})
                  eq2@(RewriteVar {rwi_var = tv2})
   | tv2 `elemVarSet` tyVarsOfTypes args1
   = return $ Just eq2
