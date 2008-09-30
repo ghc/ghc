@@ -112,8 +112,8 @@ my_mmap (void *addr, lnat size)
 	vm_protect(mach_task_self(),(vm_address_t)ret,size,FALSE,VM_PROT_READ|VM_PROT_WRITE);
     }
 #else
-    ret = mmap(addr, size, PROT_READ | PROT_WRITE | PROT_EXEC, 
-	       MAP_ANON | MAP_PRIVATE, -1, 0);
+    ret = mmap(addr, size, PROT_READ | PROT_WRITE, 
+               MAP_ANON | MAP_PRIVATE, -1, 0);
 #endif
 
     if (ret == (void *)-1) {
