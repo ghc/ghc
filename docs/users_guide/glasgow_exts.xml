@@ -859,11 +859,6 @@ and improve termination (Section 3.2 of the paper).
 </para>
 
 <para>
-The web page: <ulink url="http://www.cse.ogi.edu/PacSoft/projects/rmb/">http://www.cse.ogi.edu/PacSoft/projects/rmb/</ulink>
-contains up to date information on recursive monadic bindings.
-</para>
-
-<para>
 Historical note: The old implementation of the mdo-notation (and most
 of the existing documents) used the name
 <literal>MonadRec</literal> for the class and the corresponding library.
