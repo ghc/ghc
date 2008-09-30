@@ -51,7 +51,7 @@ rts_mkInt8 (Capability *cap, HsInt8 i)
   StgClosure *p = (StgClosure *)allocateLocal(cap,CONSTR_sizeW(0,1));
   SET_HDR(p, I8zh_con_info, CCS_SYSTEM);
   /* Make sure we mask out the bits above the lowest 8 */
-  p->payload[0]  = (StgClosure *)(StgInt)((unsigned)i & 0xff);
+  p->payload[0]  = (StgClosure *)(StgInt)i;
   return p;
 }
 
@@ -61,7 +61,7 @@ rts_mkInt16 (Capability *cap, HsInt16 i)
   StgClosure *p = (StgClosure *)allocateLocal(cap,CONSTR_sizeW(0,1));
   SET_HDR(p, I16zh_con_info, CCS_SYSTEM);
   /* Make sure we mask out the relevant bits */
-  p->payload[0]  = (StgClosure *)(StgInt)((unsigned)i & 0xffff);
+  p->payload[0]  = (StgClosure *)(StgInt)i;
   return p;
 }
 
@@ -70,7 +70,7 @@ rts_mkInt32 (Capability *cap, HsInt32 i)
 {
   StgClosure *p = (StgClosure *)allocateLocal(cap,CONSTR_sizeW(0,1));
   SET_HDR(p, I32zh_con_info, CCS_SYSTEM);
-  p->payload[0]  = (StgClosure *)(StgInt)((unsigned)i & 0xffffffff);
+  p->payload[0]  = (StgClosure *)(StgInt)i;
   return p;
 }
 
