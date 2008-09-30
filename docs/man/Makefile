@@ -23,7 +23,7 @@ $(MAN_PAGE).$(MAN_SECTION): flags.xsl flags.xml
 
 # Insert the commands and the library directory into the man page
 flags.xsl: gen_flags.xsl.pl
-	perl gen_flags.xsl.pl "$(GHC_COMMANDS)" "$(libdir)" > $@
+	$(PERL) gen_flags.xsl.pl "$(GHC_COMMANDS)" "$(libdir)" > $@
 
 # Re-use the flags documentation from the user's guide by injecting some
 # entities after the XML declaration to make it a stand-alone document.
