@@ -70,8 +70,9 @@ endif
 WITH_EITHER = $(sort $(WITH_BOOTSTRAPPING_COMPILER) $(WITH_STAGE2))
 
 # We need to build pwd with stage 2, as it goes in bindists, but we
-# don't actually want to install it
-DO_NOT_INSTALL = pwd
+# don't actually want to install it. Likewise the installPackage
+# program.
+DO_NOT_INSTALL = pwd installPackage
 
 binary-dist: $(foreach P,$(WITH_STAGE2),binary-dist.$P)
 ifeq "$(WHERE_AM_I)" ""
