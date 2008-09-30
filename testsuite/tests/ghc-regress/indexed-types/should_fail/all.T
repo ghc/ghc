@@ -30,6 +30,7 @@ test('T2334', normal, compile_fail, [''])
 test('T1900', normal, compile_fail, [''])
 test('T2157', normal, compile_fail, [''])
 test('T2203a', normal, compile_fail, [''])
+test('T2627b', normal, compile_fail, [''])
 
 test('GADTwrong1', normal, compile_fail, [''])
 

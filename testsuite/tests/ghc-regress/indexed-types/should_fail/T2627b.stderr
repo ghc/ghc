@@ -1,0 +1,7 @@
+
+T2627b.hs:20:13:
+    Couldn't match expected type `a'
+           against inferred type `Dual (Dual a)'
+    In the pattern: Wr a r
+    In the definition of `conn':
+        conn (Rd k) (Wr a r) = conn undefined undefined
