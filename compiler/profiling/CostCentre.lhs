@@ -39,6 +39,7 @@ module CostCentre (
 import Var		( Id )
 import Name
 import Module		( Module )
+import Unique
 import Outputable	
 import FastTypes
 import FastString
@@ -226,12 +227,14 @@ mkAutoCC id mod is_caf
     }
   where 
         name = getName id
-        -- beware: we might be making an auto CC for a compiler-generated
-        -- thing (like a CAF when -caf-all is on), so include the uniq.
-        -- See bug #249, tests prof001, prof002
-        str | isSystemName name = mkFastString (showSDoc (ppr name))
-            | otherwise         = occNameFS (getOccName id)
-
+        -- beware: only external names are guaranteed to have unique
+        -- Occnames.  If the name is not external, we must append its
+        -- Unique.
+        -- See bug #249, tests prof001, prof002,  also #2411
+        str | isExternalName name = occNameFS (getOccName id)
+            | otherwise           = mkFastString $ showSDoc $
+                                      ftext (occNameFS (getOccName id))
+                                      <> char '_' <> pprUnique (getUnique name)
 mkAllCafsCC :: Module -> CostCentre
 mkAllCafsCC m = AllCafsCC  { cc_mod = m }
 
