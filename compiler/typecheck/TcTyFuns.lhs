@@ -1194,16 +1194,26 @@ Return all remaining wanted equalities.  The Boolean result component is True
 if at least one instantiation of a flexible that is *not* a skolem from
 flattening was performed.
 
+We need to instantiate all flexibles that arose as skolems during flattening
+of wanteds before we instantiate any other flexibles. Consider F delta ~
+alpha, F alpha ~ delta, where alpha is a skolem and delta a free flexible. We
+need to produce F (F delta) ~ delta (and not F (F alpha) ~ alpha). Otherwise,
+we may wrongly claim to having performed an improvement, which can lead to
+non-termination of the combined class-family solver.
+
 \begin{code}
 instantiateAndExtract :: [RewriteInst] -> Bool -> TyVarSet -> TcM ([Inst], Bool)
 instantiateAndExtract eqs localsEmpty skolems
   = do { traceTc $ hang (ptext (sLit "instantiateAndExtract:"))
                      4 (ppr eqs $$ ppr skolems)
-       ; results <- mapM inst wanteds
-       ; let residuals    = [eq | Left eq <- results]
-             only_skolems = and [tv `elemVarSet` skolems | Right tv <- results]
+           -- start by *only* instantiating skolem flexibles from flattening
+       ; unflat_wanteds <- liftM catMaybes $ 
+                             mapM (inst (`elemVarSet` skolems)) wanteds
+           -- only afterwards instantiate free flexibles
+       ; residuals <- liftM catMaybes $ mapM (inst (const True)) unflat_wanteds
+       ; let improvement = length residuals < length unflat_wanteds
        ; residuals' <- mapM rewriteInstToInst residuals
-       ; return (residuals', not only_skolems)
+       ; return (residuals', improvement)
        }
   where
     wanteds      = filter (isWantedCo . rwi_co) eqs
@@ -1211,9 +1221,9 @@ instantiateAndExtract eqs localsEmpty skolems
                      -- no local equalities or dicts => checking mode
 
         -- co :: alpha ~ t or co :: a ~ alpha
-    inst eq@(RewriteVar {rwi_var = tv1, rwi_right = ty2, rwi_co = co})
-      = do { flexi_tv1       <- isFlexible tv1
-           ; maybe_flexi_tv2 <- isFlexibleTy ty2
+    inst mayInst eq@(RewriteVar {rwi_var = tv1, rwi_right = ty2, rwi_co = co})
+      = do { flexi_tv1       <- isFlexible mayInst tv1
+           ; maybe_flexi_tv2 <- isFlexibleTy mayInst ty2
            ; case (flexi_tv1, maybe_flexi_tv2) of
                (True, _) 
                  -> -- co :: alpha ~ t
@@ -1221,31 +1231,31 @@ instantiateAndExtract eqs localsEmpty skolems
                (False, Just tv2) 
                  -> -- co :: a ~ alpha                  
                     doInst (not $ rwi_swapped eq) tv2 (mkTyVarTy tv1) co eq
-               _ -> return $ Left eq
+               _ -> return $ Just eq
            }
 
         -- co :: F args ~ alpha, and we are in checking mode (ie, no locals)
-    inst eq@(RewriteFam {rwi_fam = fam, rwi_args = args, rwi_right = ty2, 
-                         rwi_co = co})
+    inst mayInst eq@(RewriteFam {rwi_fam = fam, rwi_args = args, 
+                                 rwi_right = ty2, rwi_co = co})
       | Just tv2 <- tcGetTyVar_maybe ty2
       , isMetaTyVar tv2
-      , checkingMode || tv2 `elemVarSet` skolems
+      , mayInst tv2 && (checkingMode || tv2 `elemVarSet` skolems)
                         -- !!!TODO: this is too liberal, even if tv2 is in 
                         -- skolems we shouldn't instantiate if tvs occurs 
                         -- in other equalities that may propagate it into the
                         -- environment
       = doInst (not $ rwi_swapped eq) tv2 (mkTyConApp fam args) co eq
 
-    inst eq = return $ Left eq
+    inst _mayInst eq = return $ Just eq
 
     -- tv is a meta var and not filled
-    isFlexible tv
-      | isMetaTyVar tv = liftM isFlexi $ readMetaTyVar tv
-      | otherwise      = return False
+    isFlexible mayInst tv
+      | isMetaTyVar tv && mayInst tv = liftM isFlexi $ readMetaTyVar tv
+      | otherwise                    = return False
 
     -- type is a tv that is a meta var and not filled
-    isFlexibleTy ty
-      | Just tv <- tcGetTyVar_maybe ty = do {flexi <- isFlexible tv
+    isFlexibleTy mayInst ty
+      | Just tv <- tcGetTyVar_maybe ty = do {flexi <- isFlexible mayInst tv
                                             ; if flexi then return $ Just tv 
                                                        else return Nothing
                                             }
@@ -1265,7 +1275,7 @@ instantiateAndExtract eqs localsEmpty skolems
                    ptext (sLit "flexible") <+> ppr tv <+>
                    ptext (sLit "already filled with") <+> ppr fill_ty <+>
                    ptext (sLit "meant to fill with") <+> ppr ty
-               ; return $ Left eq
+               ; return $ Just eq
                }
 
         -- type variable meets type variable
@@ -1288,7 +1298,7 @@ instantiateAndExtract eqs localsEmpty skolems
         -- signature skolem meets non-variable type
         -- => cannot update (retain the equality)!
         uMeta _swapped _tv (DoneTv (MetaTv (SigTv _) _)) _non_tv_ty _cotv
-          = return $ Left eq
+          = return $ Just eq
 
         -- updatable meta variable meets non-variable type
         -- => occurs check, monotype check, and kinds match check, then update
@@ -1298,12 +1308,13 @@ instantiateAndExtract eqs localsEmpty skolems
                              
                ; case mb_ty' of
                    Nothing  -> 
-                     -- normalisation shouldn't leave families in non_tv_ty
-                     panic "TcTyFuns.uMeta: unexpected synonym family"
+                     -- there may be a family in non_tv_ty due to an unzonked,
+                     -- but updated skolem for a local equality
+                     return $ Just eq
                    Just ty' ->
                      do { checkUpdateMeta swapped tv ref ty'  -- update meta var
                         ; writeMetaTyVar cotv ty'             -- update co var
-                        ; return $ Right tv
+                        ; return Nothing
                         }
                }
 
@@ -1315,38 +1326,36 @@ instantiateAndExtract eqs localsEmpty skolems
         uMetaVar swapped tv1 (MetaTv _ ref) tv2 (SkolemTv _) cotv
           = do { checkUpdateMeta swapped tv1 ref (mkTyVarTy tv2)
                ; writeMetaTyVar cotv (mkTyVarTy tv2)
-               ; return $ Right tv1
+               ; return Nothing
                }
 
         -- meta variable meets meta variable 
         -- => be clever about which of the two to update 
         --   (from TcUnify.uUnfilledVars minus boxy stuff)
         uMetaVar swapped tv1 (MetaTv info1 ref1) tv2 (MetaTv info2 ref2) cotv
-          = do { tv <- case (info1, info2) of
-                         -- Avoid SigTvs if poss
-                         (SigTv _, _      ) | k1_sub_k2 -> update_tv2
-                         (_,       SigTv _) | k2_sub_k1 -> update_tv1
+          = do { case (info1, info2) of
+                   -- Avoid SigTvs if poss
+                   (SigTv _, _      ) | k1_sub_k2 -> update_tv2
+                   (_,       SigTv _) | k2_sub_k1 -> update_tv1
 
-                         (_,   _) | k1_sub_k2 -> if k2_sub_k1 && 
-                                                    nicer_to_update_tv1
-                                                 then update_tv1  -- Same kinds
-                                                 else update_tv2
-                                  | k2_sub_k1 -> update_tv1
-                                  | otherwise -> kind_err >> return tv1
+                   (_,   _) | k1_sub_k2 -> if k2_sub_k1 && 
+                                              nicer_to_update_tv1
+                                           then update_tv1  -- Same kinds
+                                           else update_tv2
+                            | k2_sub_k1 -> update_tv1
+                            | otherwise -> kind_err
               -- Update the variable with least kind info
               -- See notes on type inference in Kind.lhs
               -- The "nicer to" part only applies if the two kinds are the same,
               -- so we can choose which to do.
 
                ; writeMetaTyVar cotv (mkTyVarTy tv2)
-               ; return $ Right tv
+               ; return Nothing
                }
           where
                 -- Kinds should be guaranteed ok at this point
             update_tv1 = updateMeta tv1 ref1 (mkTyVarTy tv2)
-                         >> return tv1
             update_tv2 = updateMeta tv2 ref2 (mkTyVarTy tv1)
-                         >> return tv2
 
             kind_err = addErrCtxtM (unifyKindCtxt swapped tv1 (mkTyVarTy tv2)) $
                        unifyKindMisMatch k1 k2
