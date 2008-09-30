@@ -41,7 +41,6 @@ INSTALL_LIBS += $(STATIC_LIB)
 # We have to add the GHC version to the name of our dynamic libs, because
 # they will be residing in the system location along with dynamic libs from
 # other GHC installations.
-ifeq "$(BuildSharedLibs)" "YES"
 ifeq "$(Windows)" "YES"
 DYNAMIC_PROG = libffi.dll.a
 DYNAMIC_LIBS = libffi-3.dll
@@ -50,10 +49,6 @@ else
 DYNAMIC_PROG =
 DYNAMIC_LIBS = libffi.so libffi.so.5 libffi.so.5.0.5
 endif
-else
-DYNAMIC_PROG =
-DYNAMIC_LIBS =
-endif
 
 ifeq "$(BuildSharedLibs)" "YES"
 EnableShared=yes
@@ -61,8 +56,10 @@ else
 EnableShared=no
 endif
 
+ifeq "$(BuildSharedLibs)" "YES"
 INSTALL_LIBS  += $(DYNAMIC_LIBS)
 INSTALL_PROGS += $(DYNAMIC_PROGS)
+endif
 
 install all :: $(INSTALL_HEADERS) $(INSTALL_LIBS) $(INSTALL_PROGS)
 
