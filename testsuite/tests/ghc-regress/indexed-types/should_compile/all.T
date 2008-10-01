@@ -103,7 +103,7 @@ test('InstEqContext', normal, compile, [''])
 test('InstEqContext2', normal, compile, [''])
 test('InstEqContext3', normal, compile, [''])
 
-test('InstContextNorm', expect_fail, compile, [''])
+test('InstContextNorm', normal, compile, [''])
 
 test('HO', normal, compile, [''])
 
