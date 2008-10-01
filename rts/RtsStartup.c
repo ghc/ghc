@@ -225,11 +225,19 @@ hs_init(int *argc, char **argv[])
     /* initialise the stable pointer table */
     initStablePtrTable();
 
-    /* Add some GC roots (using stable pointers): these are needed by
-     * all foreign export stubs, so they have to be treated as 
+    /* Add some GC roots for things in the base package that the RTS
+     * knows about.  We don't know whether these turn out to be CAFs
+     * or refer to CAFs, but we have to assume that they might.
      */
     getStablePtr((StgPtr)base_GHCziTopHandler_runIO_closure);
     getStablePtr((StgPtr)base_GHCziTopHandler_runNonIO_closure);
+    getStablePtr((StgPtr)stackOverflow_closure);
+    getStablePtr((StgPtr)heapOverflow_closure);
+    getStablePtr((StgPtr)runFinalizerBatch_closure);
+    getStablePtr((StgPtr)unpackCString_closure);
+    getStablePtr((StgPtr)blockedOnDeadMVar_closure);
+    getStablePtr((StgPtr)nonTermination_closure);
+    getStablePtr((StgPtr)blockedIndefinitely_closure);
 
     /* initialise the shared Typeable store */
     initTypeableStore();
