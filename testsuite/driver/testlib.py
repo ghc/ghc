@@ -4,6 +4,7 @@
 
 import sys
 import os
+import errno
 import string
 import re
 import traceback
@@ -463,12 +464,19 @@ def clean_full_paths(names):
             try:
                 # Remove files...
                 os.remove(name)
-            except OSError:
+            except OSError, e1:
                 try:
                     # ... and empty directories
                     os.rmdir(name)
-                except OSError:
-                    pass
+                except OSError, e2:
+                    # We don't want to fail here, but we do want to know
+                    # what went wrong, so print out the exceptions.
+                    # ENOENT isn't a problem, though, as we clean files
+                    # that don't necessarily exist.
+                    if e1.errno != errno.ENOENT:
+                        print e1
+                    if e2.errno != errno.ENOENT:
+                        print e2
 
 def do_test(name, way, func, args):
     full_name = name + '(' + way + ')'
