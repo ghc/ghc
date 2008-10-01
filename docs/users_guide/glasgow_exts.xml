@@ -365,7 +365,7 @@ Indeed, the bindings can even be recursive.
       </para>
    </sect2>
 
-    <sect2>
+    <sect2 id="new-qualified-operators">
       <title>New qualified operator syntax</title>
 
       <para>A new syntax for referencing qualified operators is
