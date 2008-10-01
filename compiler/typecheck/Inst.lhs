@@ -40,15 +40,11 @@ module Inst (
 
 	InstOrigin(..), InstLoc, pprInstLoc,
 
-	mkWantedCo, mkGivenCo,
-	isWantedCo, fromWantedCo, fromGivenCo, eqInstCoType,
-        mkIdEqInstCo, mkSymEqInstCo, mkLeftTransEqInstCo,
-        mkRightTransEqInstCo, mkAppEqInstCo,
-        isValidWantedEqInst,
-	eitherEqInst, mkEqInst, mkEqInsts, mkWantedEqInst,
-        wantedToLocalEqInst, finalizeEqInst, 
-	eqInstType, updateEqInstCoercion,
-	eqInstCoercion,	eqInstTys
+	mkWantedCo, mkGivenCo, isWantedCo, eqInstCoType, mkIdEqInstCo, 
+        mkSymEqInstCo, mkLeftTransEqInstCo, mkRightTransEqInstCo, mkAppEqInstCo,
+        wantedEqInstIsUnsolved, eitherEqInst, mkEqInst, mkWantedEqInst,
+        wantedToLocalEqInst, finalizeEqInst, eqInstType, eqInstCoercion,
+        eqInstTys
     ) where
 
 #include "HsVersions.h"
@@ -121,8 +117,11 @@ instToVar (Dict {tci_name = nm, tci_pred = pred})
 instToVar (ImplicInst {tci_name = nm, tci_tyvars = tvs, tci_given = givens,
 		       tci_wanted = wanteds})
   = mkLocalId nm (mkImplicTy tvs givens wanteds)
-instToVar i@(EqInst {})
-  = eitherEqInst i id (\(TyVarTy covar) -> covar)
+instToVar inst@(EqInst {})
+  = eitherEqInst inst id assertCoVar
+  where
+    assertCoVar (TyVarTy cotv) = cotv
+    assertCoVar coty           = pprPanic "Inst.instToVar" (ppr coty)
 
 instType :: Inst -> Type
 instType (LitInst {tci_ty = ty})  = ty
@@ -970,15 +969,6 @@ isWantedCo :: EqInstCo -> Bool
 isWantedCo (Left _) = True
 isWantedCo _        = False
 
-fromGivenCo :: EqInstCo -> Coercion
-fromGivenCo (Right co) 	 = co
-fromGivenCo _		 = panic "fromGivenCo: not a wanted coercion"
-
-fromWantedCo :: String -> EqInstCo -> TcTyVar
-fromWantedCo _ (Left covar) = covar
-fromWantedCo msg _	    = 
-  panic ("fromWantedCo: not a wanted coercion: " ++ msg)
-
 eqInstCoType :: EqInstCo -> TcType
 eqInstCoType (Left cotv) = mkTyVarTy cotv
 eqInstCoType (Right co)  = co
@@ -1050,12 +1040,12 @@ mkAppEqInstCo (Right co) _ _
 Operations on entire EqInst.
 
 \begin{code}
--- For debugging, make sure the cotv of a wanted is not filled.
+-- |A wanted equality is unsolved as long as its cotv is unfilled.
 --
-isValidWantedEqInst :: Inst -> TcM Bool
-isValidWantedEqInst (EqInst {tci_co = Left cotv})
+wantedEqInstIsUnsolved :: Inst -> TcM Bool
+wantedEqInstIsUnsolved (EqInst {tci_co = Left cotv})
   = liftM not $ isFilledMetaTyVar cotv
-isValidWantedEqInst _ = return True
+wantedEqInstIsUnsolved _ = return True
 
 eitherEqInst :: Inst 	            -- given or wanted EqInst
 	     -> (TcTyVar  -> a)     -- 	result if wanted
@@ -1066,9 +1056,6 @@ eitherEqInst (EqInst {tci_co = either_co}) withWanted withGiven
 		Left  covar -> withWanted covar
 		Right co    -> withGiven  co
 eitherEqInst i _ _ = pprPanic "eitherEqInst" (ppr i)
-
-mkEqInsts :: [PredType] -> [EqInstCo] -> TcM [Inst]
-mkEqInsts preds cos = zipWithM mkEqInst preds cos
 
 mkEqInst :: PredType -> EqInstCo -> TcM Inst
 mkEqInst (EqPred ty1 ty2) co
@@ -1112,11 +1099,11 @@ wantedToLocalEqInst eq = eq
 --
 finalizeEqInst :: Inst			-- wanted
 	       -> TcM Inst		-- given
-finalizeEqInst wanted@(EqInst{tci_left = ty1, tci_right = ty2, tci_name = name})
+finalizeEqInst wanted@(EqInst{tci_left = ty1, tci_right = ty2, 
+                              tci_name = name, tci_co = Left cotv})
   = do { let var = Var.mkCoVar name (PredTy $ EqPred ty1 ty2)
 
          -- fill the coercion hole
-       ; let cotv = fromWantedCo "writeWantedCoercion" $ tci_co wanted
        ; writeMetaTyVar cotv (TyVarTy var)
 
          -- set the new coercion
@@ -1134,7 +1121,4 @@ eqInstCoercion = tci_co
 
 eqInstTys :: Inst -> (TcType, TcType)
 eqInstTys inst = (tci_left inst, tci_right inst)
-
-updateEqInstCoercion :: (EqInstCo -> EqInstCo) -> Inst -> Inst
-updateEqInstCoercion f inst = inst {tci_co = f $ tci_co inst}
 \end{code}

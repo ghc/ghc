@@ -286,7 +286,7 @@ no further propoagation is possible.
 --
 normaliseEqs :: [Inst] -> TcM EqConfig
 normaliseEqs eqs 
-  = do { ASSERTM2( allM isValidWantedEqInst eqs, ppr eqs )
+  = do { ASSERTM2( allM wantedEqInstIsUnsolved eqs, ppr eqs )
        ; traceTc $ ptext (sLit "Entering normaliseEqs")
 
        ; (eqss, skolemss) <- mapAndUnzipM normEqInst eqs
@@ -352,7 +352,7 @@ finaliseEqsAndDicts (EqConfig { eqs     = eqs
 
          -- Assert that all cotvs of wanted equalities are still unfilled, and
          -- zonk all final insts, to make any improvement visible
-       ; ASSERTM2( allM isValidWantedEqInst eqs'', ppr eqs'' )
+       ; ASSERTM2( allM wantedEqInstIsUnsolved eqs'', ppr eqs'' )
        ; zonked_locals  <- zonkInsts locals'
        ; zonked_wanteds <- zonkInsts (eqs'' ++ wanteds')
        ; return (zonked_locals, zonked_wanteds, final_binds, improved)
