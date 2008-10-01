@@ -288,7 +288,7 @@ mkTcTyVar name kind details
 %************************************************************************
 
 \begin{code}
-type CoVar = Var -- A coercion variable is simply a type 
+type CoVar = TyVar -- A coercion variable is simply a type 
 			-- variable of kind @ty1 :=: ty2@. Hence its
 			-- 'varType' is always @PredTy (EqPred t1 t2)@
 
@@ -310,16 +310,9 @@ mkCoVar name kind = ASSERT( isCoercionKind kind )
 			}
 
 mkWildCoVar :: Kind -> TyVar
--- ^ Create a type variable that is never referred to, so its unique doesn't matter
-mkWildCoVar kind 
-  = ASSERT( isCoercionKind kind )
-    TyVar { varName = mkSysTvName wild_uniq (fsLit "co_wild"),
-            realUnique = _ILIT(1),
-            varType = kind,
-            isCoercionVar = True }
-  where
-    wild_uniq = mkBuiltinUnique 1
-
+-- ^ Create a type variable that is never referred to, so its unique doesn't 
+-- matter
+mkWildCoVar = mkCoVar (mkSysTvName (mkBuiltinUnique 1) (fsLit "co_wild"))
 \end{code}
 
 %************************************************************************

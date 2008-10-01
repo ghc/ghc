@@ -763,8 +763,11 @@ zonkQuantifiedTyVar :: TcTyVar -> TcM TcTyVar
 --
 -- We leave skolem TyVars alone; they are immutable.
 zonkQuantifiedTyVar tv
-  | ASSERT( isTcTyVar tv ) 
-    isSkolemTyVar tv = return tv
+  | ASSERT2( isTcTyVar tv, ppr tv ) 
+    isSkolemTyVar tv 
+  = do { kind <- zonkTcType (tyVarKind tv)
+       ; return $ setTyVarKind tv kind
+       }
 	-- It might be a skolem type variable, 
 	-- for example from a user type signature
 
@@ -896,12 +899,14 @@ zonkType unbound_var_fn ty
 
 	-- The two interesting cases!
     go (TyVarTy tyvar) | isTcTyVar tyvar = zonk_tc_tyvar unbound_var_fn tyvar
-		       | otherwise	 = return (TyVarTy tyvar)
+		       | otherwise	 = liftM TyVarTy $ 
+                                             zonkTyVar unbound_var_fn tyvar
 		-- Ordinary (non Tc) tyvars occur inside quantified types
 
     go (ForAllTy tyvar ty) = ASSERT( isImmutableTyVar tyvar ) do
                              ty' <- go ty
-                             return (ForAllTy tyvar ty')
+                             tyvar' <- zonkTyVar unbound_var_fn tyvar
+                             return (ForAllTy tyvar' ty')
 
     go_pred (ClassP c tys)   = do tys' <- mapM go tys
                                   return (ClassP c tys')
@@ -911,7 +916,7 @@ zonkType unbound_var_fn ty
                                   ty2' <- go ty2
                                   return (EqPred ty1' ty2')
 
-zonk_tc_tyvar :: (TcTyVar -> TcM Type)		-- What to do for an unbound mutable variable
+zonk_tc_tyvar :: (TcTyVar -> TcM Type)	-- What to do for an unbound mutable var
  	      -> TcTyVar -> TcM TcType
 zonk_tc_tyvar unbound_var_fn tyvar 
   | not (isMetaTyVar tyvar)	-- Skolems
@@ -922,6 +927,18 @@ zonk_tc_tyvar unbound_var_fn tyvar
 	; case cts of
 	    Flexi       -> unbound_var_fn tyvar    -- Unbound meta type variable
 	    Indirect ty -> zonkType unbound_var_fn ty  }
+
+-- Zonk the kind of a non-TC tyvar in case it is a coercion variable (their
+-- kind contains types).
+--
+zonkTyVar :: (TcTyVar -> TcM Type)      -- What to do for an unbound mutable var
+ 	  -> TyVar -> TcM TyVar
+zonkTyVar unbound_var_fn tv 
+  | isCoVar tv
+  = do { kind <- zonkType unbound_var_fn (tyVarKind tv)
+       ; return $ setTyVarKind tv kind
+       }
+  | otherwise = return tv
 \end{code}
 
 

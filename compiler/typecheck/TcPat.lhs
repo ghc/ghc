@@ -617,10 +617,6 @@ tcConPat pstate con_span data_con tycon pat_ty arg_pats thing_inside
                 where
                   uwScrut = unwrapFamInstScrutinee tycon ctxt_res_tys res_pat
 
-        ; traceTc $ case sym_coi of
-                      IdCo -> text "sym_coi:IdCo" 
-                      ACo co -> text "sym_coi: ACoI" <+> ppr co
-
 	  -- Add the stupid theta
 	; addDataConStupidTheta data_con ctxt_res_tys
 
@@ -655,7 +651,7 @@ tcConPat pstate con_span data_con tycon pat_ty arg_pats thing_inside
           -- ex_tvs was non-null.
 --        ; unless (null theta') $
           -- FIXME: AT THE MOMENT WE CHEAT!  We only perform the rigidity test
-          --   if we explicit or implicit (by a GADT def) have equality 
+          --   if we explicitly or implicitly (by a GADT def) have equality 
           --   constraints.
         ; let eq_preds = [mkEqPred (mkTyVarTy tv, ty) | (tv, ty) <- eq_spec]
 	      theta'   = substTheta tenv (eq_preds ++ full_theta)
@@ -665,8 +661,8 @@ tcConPat pstate con_span data_con tycon pat_ty arg_pats thing_inside
 	      pstate' | no_equalities = pstate
 		      | otherwise     = pstate { pat_eqs = True }
 
-	; unless no_equalities (checkTc (isRigidTy pat_ty)
-                                        (nonRigidMatch data_con))
+	; unless no_equalities $ 
+            checkTc (isRigidTy pat_ty) (nonRigidMatch data_con)
 
 	; ((arg_pats', inner_tvs, res), lie_req) <- getLIE $
 		tcConArgs data_con arg_tys' arg_pats pstate' thing_inside
@@ -718,7 +714,6 @@ tcConPat pstate con_span data_con tycon pat_ty arg_pats thing_inside
 	      pat_ty					-- family inst type
       | otherwise
       = pat
-
 
 tcConArgs :: DataCon -> [TcSigmaType]
 	  -> Checker (HsConPatDetails Name) (HsConPatDetails Id)

@@ -2211,7 +2211,8 @@ Note that
 reduceImplication env
 	orig_implic@(ImplicInst { tci_name = name, tci_loc = inst_loc,
 		      	   	  tci_tyvars = tvs,
-		      	   	  tci_given = extra_givens, tci_wanted = wanteds })
+		      	   	  tci_given = extra_givens, tci_wanted = wanteds
+                                })
   = do	{ 	-- Solve the sub-problem
 	; let try_me _ = ReduceMe  -- Note [Freeness and implications]
 	      env' = env { red_givens = extra_givens ++ red_givens env
@@ -2225,13 +2226,6 @@ reduceImplication env
 			[ ppr (red_givens env), ppr extra_givens, 
 			  ppr wanteds])
 	; (irreds, binds) <- checkLoop env' wanteds
-	; let   (extra_eq_givens, extra_dict_givens) = partition isEqInst extra_givens
-			-- SLPJ Sept 07: I think this is bogus; currently
-			-- there are no Eqinsts in extra_givens
-		dict_ids = map instToId extra_dict_givens 
-
-		-- Note [Reducing implication constraints]
-		-- Tom -- update note, put somewhere!
 
 	; traceTc (text "reduceImplication result" <+> vcat
 			[ppr irreds, ppr binds])
@@ -2251,8 +2245,6 @@ reduceImplication env
                           -- we may have instantiated a cotv 
                           -- => must make a new implication constraint!
 
-	; traceTc $ text "reduceImplication condition" <+> ppr backOff
-
           -- Progress is no longer measered by the number of bindings
 	; if backOff then 	-- No progress
 		-- If there are any irreds, we back off and do nothing
@@ -2271,13 +2263,22 @@ reduceImplication env
 		--  equations depending on whether we solve
 		--  dictionary constraints or equational constraints
 
-		eq_tyvars = varSetElems $ tyVarsOfTypes $ map eqInstType extra_eq_givens
+	        (extra_eq_givens, extra_dict_givens) 
+                  = partition isEqInst extra_givens
+			-- SLPJ Sept 07: I think this is bogus; currently
+			-- there are no Eqinsts in extra_givens
+		dict_ids = map instToId extra_dict_givens 
+
+		-- Note [Reducing implication constraints]
+		-- Tom -- update note, put somewhere!
+	; let	eq_tyvars = varSetElems $ tyVarsOfTypes $ 
+                              map eqInstType extra_eq_givens
 			-- SLPJ Sept07: this looks Utterly Wrong to me, but I think
 			--	        that current extra_givens has no EqInsts, so
 			--		it makes no difference
 		co  = wrap_inline	-- Note [Always inline implication constraints]
 		      <.> mkWpTyLams tvs
-		      <.> mkWpLams eq_tyvars
+		      <.> mkWpTyLams eq_tyvars
 		      <.> mkWpLams dict_ids
 		      <.> WpLet (binds `unionBags` bind)
 		wrap_inline | null dict_ids = idHsWrapper

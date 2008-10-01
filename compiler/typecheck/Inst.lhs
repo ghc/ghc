@@ -287,7 +287,7 @@ newDictBndr :: InstLoc -> TcPredType -> TcM Inst
 newDictBndr inst_loc pred@(EqPred ty1 ty2)
   = do { uniq <- newUnique 
 	; let name = mkPredName uniq inst_loc pred 
-	      co = mkGivenCo $ TyVarTy (Var.mkCoVar name (PredTy pred))
+	      co   = mkGivenCo $ TyVarTy (Var.mkCoVar name (PredTy pred))
 	; return (EqInst {tci_name  = name, 
 			  tci_loc   = inst_loc, 
 			  tci_left  = ty1, 

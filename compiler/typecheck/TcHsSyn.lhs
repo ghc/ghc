@@ -251,11 +251,22 @@ zonkDictBndrs :: ZonkEnv -> [Var] -> TcM [Var]
 zonkDictBndrs env ids = mappM (zonkDictBndr env) ids
 
 zonkDictBndr :: ZonkEnv -> Var -> TcM Var
-zonkDictBndr env var | isTyVar var = return var
+zonkDictBndr env var | isTyVar var = zonkTyVarBndr env var
 		     | otherwise   = zonkIdBndr env var
 
 zonkTopBndrs :: [TcId] -> TcM [Id]
 zonkTopBndrs ids = zonkIdBndrs emptyZonkEnv ids
+
+-- Zonk the kind of a non-TC tyvar in case it is a coercion variable (their
+-- kind contains types).
+--
+zonkTyVarBndr :: ZonkEnv -> TyVar -> TcM TyVar
+zonkTyVarBndr env tv
+  | isCoVar tv
+  = do { kind <- zonkTcTypeToType env (tyVarKind tv)
+       ; return $ setTyVarKind tv kind
+       }
+  | otherwise = return tv
 \end{code}
 
 
@@ -607,7 +618,8 @@ zonkCoFn env (WpLam id)     = do { id' <- zonkDictBndr env id
 				 ; let env1 = extendZonkEnv1 env id'
 				 ; return (env1, WpLam id') }
 zonkCoFn env (WpTyLam tv)   = ASSERT( isImmutableTyVar tv )
-			      return (env, WpTyLam tv)
+                              do { tv' <- zonkTyVarBndr env tv
+			         ; return (env, WpTyLam tv') }
 zonkCoFn env (WpApp v)
 	| isTcTyVar v  	    = do { co <- zonkTcTyVar v
 				 ; return (env, WpTyApp co) }
