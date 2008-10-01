@@ -1652,12 +1652,20 @@ tcSimplifyIPs given_ips wanteds
 	; let env = mkRedEnv doc try_me given_ips'
 	; (improved, binds, irreds) <- reduceContext env wanteds'
 
-	; if not improved then 
+	; if null irreds || not improved then 
 		ASSERT( all is_free irreds )
 		do { extendLIEs irreds
 		   ; return binds }
-	  else
-		tcSimplifyIPs given_ips wanteds }
+	  else do
+        -- If improvement did some unification, we go round again.
+        -- We start again with irreds, not wanteds
+        -- Using an instance decl might have introduced a fresh type
+        -- variable which might have been unified, so we'd get an 
+        -- infinite loop if we started again with wanteds!  
+        -- See Note [LOOP]
+        { binds1 <- tcSimplifyIPs given_ips' irreds
+        ; return $ binds `unionBags` binds1
+        } }
   where
     doc	   = text "tcSimplifyIPs" <+> ppr given_ips
     ip_set = mkNameSet (ipNamesOfInsts given_ips)
@@ -1905,12 +1913,16 @@ reduceContext env wanteds0
           --     improvement (i.e., instantiated type variables).
           -- (2) If we uncovered extra equalities.  We will try to solve them
           --     in the next iteration.
+          -- (3) If we reduced dictionaries (i.e., got dictionary bindings),
+          --     they may have exposed further opportunities to normalise
+          --     family applications.  See Note [Dictionary Improvement]
 
 	; let all_irreds       = dict_irreds ++ implic_irreds ++ extra_eqs
       	      avails_improved  = availsImproved avails
               improvedFlexible = avails_improved || eq_improved
               extraEqs         = (not . null) extra_eqs
-              improved         = improvedFlexible || extraEqs
+              reduced_dicts    = not (isEmptyBag dict_binds)
+              improved         = improvedFlexible || extraEqs || reduced_dicts
               --
               improvedHint  = (if avails_improved then " [AVAILS]" else "") ++
                               (if eq_improved then " [EQ]" else "") ++
@@ -1991,6 +2003,44 @@ mkEqnMsg (pred1,from1) (pred2,from2) tidy_env
 			  nest 2 (sep [ppr pred2'' <> comma, nest 2 from2])]
 	; return (tidy_env, msg) }
 \end{code}
+
+Note [Dictionary Improvement]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In reduceContext, we first reduce equalities and then class constraints.
+However, the letter may expose further opportunities for the former.  Hence,
+we need to go around again if dictionary reduction produced any dictionary
+bindings.  The following example demonstrated the point:
+
+  data EX _x _y (p :: * -> *)
+  data ANY
+
+  class Base p
+
+  class Base (Def p) => Prop p where
+   type Def p
+
+  instance Base ()
+  instance Prop () where
+   type Def () = ()
+
+  instance (Base (Def (p ANY))) => Base (EX _x _y p)
+  instance (Prop (p ANY)) => Prop (EX _x _y p) where
+   type Def (EX _x _y p) = EX _x _y p
+
+  data FOO x
+  instance Prop (FOO x) where
+   type Def (FOO x) = ()
+
+  data BAR
+  instance Prop BAR where
+   type Def BAR = EX () () FOO
+
+During checking the last instance declaration, we need to check the superclass
+cosntraint Base (Def BAR), which family normalisation reduced to 
+Base (EX () () FOO).  Chasing the instance for Base (EX _x _y p), gives us
+Base (Def (FOO ANY)), which again requires family normalisation of Def to
+Base () before we can finish.
+
 
 The main context-reduction function is @reduce@.  Here's its game plan.
 
