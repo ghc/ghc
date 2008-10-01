@@ -711,7 +711,7 @@ parseDynLibLoaderMode f d =
    ("wrapped", "")      -> d{ dynLibLoader = Wrapped Nothing }
    ("wrapped:", "hard") -> d{ dynLibLoader = Wrapped Nothing }
    ("wrapped:", flex)   -> d{ dynLibLoader = Wrapped (Just flex) }
-   (_,_)                -> error "Unknown dynlib loader"
+   _                    -> ghcError (CmdLineError ("Unknown dynlib loader: " ++ f))
 
 setDumpPrefixForce f d = d { dumpPrefixForce = f}
 
