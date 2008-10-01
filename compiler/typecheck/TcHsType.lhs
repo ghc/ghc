@@ -35,6 +35,7 @@ import TcIface
 import TcType
 import {- Kind parts of -} Type
 import Var
+import Coercion
 import TyCon
 import Class
 import Name
@@ -763,16 +764,17 @@ tcPatSig :: UserTypeCtxt
 	 -> LHsType Name
 	 -> BoxySigmaType
 	 -> TcM (TcType,	   -- The type to use for "inside" the signature
-		 [(Name,TcType)])  -- The new bit of type environment, binding
+		 [(Name, TcType)], -- The new bit of type environment, binding
 				   -- the scoped type variables
+                 CoercionI)        -- Coercion due to unification with actual ty
 tcPatSig ctxt sig res_ty
   = do	{ (sig_tvs, sig_ty) <- tcHsPatSigType ctxt sig
 
 	; if null sig_tvs then do {
 		-- The type signature binds no type variables, 
 		-- and hence is rigid, so use it to zap the res_ty
-		  boxyUnify sig_ty res_ty
-		; return (sig_ty, [])
+		  coi <- boxyUnify sig_ty res_ty
+		; return (sig_ty, [], coi)
 
 	} else do {
 		-- Type signature binds at least one scoped type variable
@@ -795,7 +797,8 @@ tcPatSig ctxt sig res_ty
 		-- unifying, and reading out the results.
 		-- This is a strictly local operation.
 	; box_tvs <- mapM tcInstBoxyTyVar sig_tvs
-	; boxyUnify (substTyWith sig_tvs (mkTyVarTys box_tvs) sig_ty) res_ty
+	; coi <- boxyUnify (substTyWith sig_tvs (mkTyVarTys box_tvs) sig_ty) 
+                           res_ty
 	; sig_tv_tys <- mapM readFilledBox box_tvs
 
 		-- Check that each is bound to a distinct type variable,
@@ -805,7 +808,7 @@ tcPatSig ctxt sig res_ty
 	; check binds_in_scope tv_binds
 	
 		-- Phew!
-	; return (res_ty, tv_binds)
+	; return (res_ty, tv_binds, coi)
 	} }
   where
     check _ [] = return ()

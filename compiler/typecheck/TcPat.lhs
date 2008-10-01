@@ -422,7 +422,10 @@ tc_pat pstate (orig@(ViewPat expr pat _)) overall_pat_ty thing_inside
 -- Type signatures in patterns
 -- See Note [Pattern coercions] below
 tc_pat pstate (SigPatIn pat sig_ty) pat_ty thing_inside
-  = do	{ (inner_ty, tv_binds) <- tcPatSig (patSigCtxt pstate) sig_ty pat_ty
+  = do	{ (inner_ty, tv_binds, coi) <- tcPatSig (patSigCtxt pstate) sig_ty 
+                                                                    pat_ty
+        ; unless (isIdentityCoercion coi) $ 
+            failWithTc (badSigPat pat_ty)
 	; (pat', tvs, res) <- tcExtendTyVarEnv2 tv_binds $
 			      tc_lpat pat inner_ty pstate thing_inside
 	; return (SigPatOut pat' inner_ty, tvs, res) }
@@ -991,6 +994,10 @@ polyPatSig :: TcType -> SDoc
 polyPatSig sig_ty
   = hang (ptext (sLit "Illegal polymorphic type signature in pattern:"))
        2 (ppr sig_ty)
+
+badSigPat :: TcType -> SDoc
+badSigPat pat_ty = ptext (sLit "Pattern signature must exactly match:") <+> 
+                   ppr pat_ty
 
 badTypePat :: Pat Name -> SDoc
 badTypePat pat = ptext (sLit "Illegal type pattern") <+> ppr pat
