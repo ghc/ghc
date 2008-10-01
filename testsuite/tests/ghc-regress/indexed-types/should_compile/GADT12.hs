@@ -1,4 +1,5 @@
-{-# LANGUAGE TypeFamilies, GADTs, PatternSignatures, KindSignatures, EmptyDataDecls #-}
+{-# LANGUAGE TypeFamilies, GADTs, ScopedTypeVariables, KindSignatures #-}
+{-# LANGUAGE EmptyDataDecls #-}
 
 module ShouldCompile where
 
