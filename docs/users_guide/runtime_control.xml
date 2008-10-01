@@ -682,12 +682,44 @@
   </sect2>
 
   <sect2>
-    <title>RTS options for profiling and parallelism</title>
+    <title>RTS options for concurrency and parallelism</title>
 
-    <para>The RTS options related to profiling are described in <xref
-    linkend="rts-options-heap-prof"/>, those for concurrency in
+    <para>The RTS options related to concurrency are described in
       <xref linkend="using-concurrent" />, and those for parallelism in
       <xref linkend="parallel-options"/>.</para>
+  </sect2>
+
+  <sect2>
+    <title>RTS options for profiling</title>
+
+    <para>Most profiling runtime options are only available when you
+    compile your program for profiling (see
+    <xref linkend="prof-compiler-options" />, and
+    <xref linkend="rts-options-heap-prof" /> for the runtime options).
+    However, there is one profiling option that is available
+    for ordinary non-profiled executables:</para>
+
+    <variablelist>
+      <varlistentry>
+        <term>
+          <option>-hT</option>
+          <indexterm><primary><option>-hT</option></primary><secondary>RTS
+              option</secondary></indexterm>
+        </term>
+        <listitem>
+          <para>Generates a basic heap profile, in the
+            file <literal><replaceable>prog</replaceable>.hp</literal>.
+            To produce the heap profile graph,
+            use <command>hp2ps</command> (see <xref linkend="hp2ps"
+                                                    />).  The basic heap profile is broken down by data
+            constructor, with other types of closures (functions, thunks,
+            etc.) grouped into broad categories
+            (e.g. <literal>FUN</literal>, <literal>THUNK</literal>).  To
+            get a more detailed profile, use the full profiling
+            support (<xref linkend="profiling" />).</para>
+        </listitem>
+      </varlistentry>
+    </variablelist>
   </sect2>
 
   <sect2 id="rts-options-debugging">
