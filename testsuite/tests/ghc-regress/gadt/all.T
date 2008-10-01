@@ -95,3 +95,4 @@ test('T1999a', normal, compile, [''])
 
 test('T2587', normal, compile, [''])
 test('T2040', normal, compile, [''])
+test('T2151', normal, compile, [''])
