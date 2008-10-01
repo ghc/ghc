@@ -205,55 +205,58 @@ traverseWeakPtrList(void)
                       }
 
                       ASSERT(get_itbl(t)->type == TSO);
-                      switch (t->what_next) {
-                      case ThreadRelocated:
+                      if (t->what_next == ThreadRelocated) {
                           next = t->_link;
                           *prev = next;
                           continue;
-                      case ThreadKilled:
-                      case ThreadComplete:
-                          // finshed or died.  The thread might still
-                          // be alive, but we don't keep it on the
-                          // all_threads list.  Don't forget to
-                          // stub out its global_link field.
-                          next = t->global_link;
-                          t->global_link = END_TSO_QUEUE;
+                      }
+
+                      next = t->global_link;
+
+                      // This is a good place to check for blocked
+                      // exceptions.  It might be the case that a thread is
+                      // blocked on delivering an exception to a thread that
+                      // is also blocked - we try to ensure that this
+                      // doesn't happen in throwTo(), but it's too hard (or
+                      // impossible) to close all the race holes, so we
+                      // accept that some might get through and deal with
+                      // them here.  A GC will always happen at some point,
+                      // even if the system is otherwise deadlocked.
+                      //
+                      // If an unreachable thread has blocked
+                      // exceptions, we really want to perform the
+                      // blocked exceptions rather than throwing
+                      // BlockedIndefinitely exceptions.  This is the
+                      // only place we can discover such threads.
+                      // The target thread might even be
+                      // ThreadFinished or ThreadKilled.  Bugs here
+                      // will only be seen when running on a
+                      // multiprocessor.
+                      if (t->blocked_exceptions != END_TSO_QUEUE) {
+                          if (tmp == NULL) {
+                              evacuate((StgClosure **)&t);
+                              flag = rtsTrue;
+                          }
+                          t->global_link = exception_threads;
+                          exception_threads = t;
                           *prev = next;
                           continue;
-                      default:
-                          ;
                       }
-	      
+
                       if (tmp == NULL) {
                           // not alive (yet): leave this thread on the
                           // old_all_threads list.
                           prev = &(t->global_link);
-                          next = t->global_link;
                       } 
                       else {
                           // alive
-                          next = t->global_link;
                           *prev = next;
 
-                          // This is a good place to check for blocked
-                          // exceptions.  It might be the case that a thread is
-                          // blocked on delivering an exception to a thread that
-                          // is also blocked - we try to ensure that this
-                          // doesn't happen in throwTo(), but it's too hard (or
-                          // impossible) to close all the race holes, so we
-                          // accept that some might get through and deal with
-                          // them here.  A GC will always happen at some point,
-                          // even if the system is otherwise deadlocked.
-                          if (t->blocked_exceptions != END_TSO_QUEUE) {
-                              t->global_link = exception_threads;
-                              exception_threads = t;
-                          } else {
-                              // move this thread onto the correct threads list.
-                              step *new_step;
-                              new_step = Bdescr((P_)t)->step;
-                              t->global_link = new_step->threads;
-                              new_step->threads  = t;
-                          }
+                          // move this thread onto the correct threads list.
+                          step *new_step;
+                          new_step = Bdescr((P_)t)->step;
+                          t->global_link = new_step->threads;
+                          new_step->threads  = t;
                       }
                   }
               }
@@ -277,10 +280,21 @@ traverseWeakPtrList(void)
 
                   for (t = stp->old_threads; t != END_TSO_QUEUE; t = next) {
                       next = t->global_link;
-                      tmp = t;
-                      evacuate((StgClosure **)&tmp);
-                      tmp->global_link = resurrected_threads;
-                      resurrected_threads = tmp;
+
+                      // ThreadFinished and ThreadComplete: we have to keep
+                      // these on the all_threads list until they
+                      // become garbage, because they might get
+                      // pending exceptions.
+                      switch (t->what_next) {
+                      case ThreadKilled:
+                      case ThreadComplete:
+                          continue;
+                      default:
+                          tmp = t;
+                          evacuate((StgClosure **)&tmp);
+                          tmp->global_link = resurrected_threads;
+                          resurrected_threads = tmp;
+                      }
                   }
               }
           }
