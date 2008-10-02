@@ -216,8 +216,6 @@ package.conf.installed$
 ^utils/hasktags/hasktags-inplace$
 ^utils/hp2ps/hp2ps$
 ^utils/hpc/HpcParser.hs$
-^utils/hpc/hpc$
-^utils/hpc/hpc-inplace$
 ^utils/hsc2hs(/|$)
 ^utils/haddock(/|$)
 ^utils/lndir/lndir$
