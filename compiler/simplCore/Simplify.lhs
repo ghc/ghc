@@ -1668,8 +1668,7 @@ simplAlt env _ case_bndr' cont' (DataAlt con, vs, rhs)
         --        case e of t { (a,b) -> ...(case t of (p,q) -> p)... }
         --   ==>  case e of t { (a,b) -> ...(a)... }
         -- Look, Ma, a is alive now.
-    zap_occ_info | isDeadBinder case_bndr' = \ident -> ident
-                 | otherwise               = zapIdOccInfo
+    zap_occ_info = zapCasePatIdOcc case_bndr'
 
 addBinderUnfolding :: SimplEnv -> Id -> CoreExpr -> SimplEnv
 addBinderUnfolding env bndr rhs
@@ -1678,6 +1677,14 @@ addBinderUnfolding env bndr rhs
 addBinderOtherCon :: SimplEnv -> Id -> [AltCon] -> SimplEnv
 addBinderOtherCon env bndr cons
   = modifyInScope env (bndr `setIdUnfolding` mkOtherCon cons)
+
+zapCasePatIdOcc :: Id -> Id -> Id
+-- Consider  case e of b { (a,b) -> ... }
+-- Then if we bind b to (a,b) in "...", and b is not dead,
+-- then we must zap the deadness info on a,b
+zapCasePatIdOcc case_bndr
+  | isDeadBinder case_bndr = \ pat_id -> pat_id
+  | otherwise	 	   = \ pat_id -> zapIdOccInfo pat_id
 \end{code}
 
 
@@ -1727,9 +1734,8 @@ knownAlt env scrut _ bndr (LitAlt _, bs, rhs) cont
         ; simplExprF env' rhs cont }
 
 knownAlt env scrut the_args bndr (DataAlt dc, bs, rhs) cont
-  = do  { let dead_bndr  = isDeadBinder bndr    -- bndr is an InId
-              n_drop_tys = length (dataConUnivTyVars dc)
-        ; env' <- bind_args env dead_bndr bs (drop n_drop_tys the_args)
+  = do  { let n_drop_tys = length (dataConUnivTyVars dc)
+        ; env' <- bind_args env bs (drop n_drop_tys the_args)
         ; let
                 -- It's useful to bind bndr to scrut, rather than to a fresh
                 -- binding      x = Con arg1 .. argn
@@ -1748,25 +1754,27 @@ knownAlt env scrut the_args bndr (DataAlt dc, bs, rhs) cont
         ; env'' <- simplNonRecX env' bndr bndr_rhs
         ; simplExprF env'' rhs cont }
   where
-    -- Ugh!
-    bind_args env' _ [] _  = return env'
+    zap_occ = zapCasePatIdOcc bndr    -- bndr is an InId
 
-    bind_args env' dead_bndr (b:bs') (Type ty : args)
+                  -- Ugh!
+    bind_args env' [] _  = return env'
+
+    bind_args env' (b:bs') (Type ty : args)
       = ASSERT( isTyVar b )
-        bind_args (extendTvSubst env' b ty) dead_bndr bs' args
+        bind_args (extendTvSubst env' b ty) bs' args
 
-    bind_args env' dead_bndr (b:bs') (arg : args)
+    bind_args env' (b:bs') (arg : args)
       = ASSERT( isId b )
-        do { let b' = if dead_bndr then b else zapIdOccInfo b
+        do { let b' = zap_occ b
              -- Note that the binder might be "dead", because it doesn't
              -- occur in the RHS; and simplNonRecX may therefore discard
              -- it via postInlineUnconditionally.
              -- Nevertheless we must keep it if the case-binder is alive,
              -- because it may be used in the con_app.  See Note [zapOccInfo]
            ; env'' <- simplNonRecX env' b' arg
-           ; bind_args env'' dead_bndr bs' args }
+           ; bind_args env'' bs' args }
 
-    bind_args _ _ _ _ =
+    bind_args _ _ _ =
       pprPanic "bind_args" $ ppr dc $$ ppr bs $$ ppr the_args $$
                              text "scrut:" <+> ppr scrut
 \end{code}
