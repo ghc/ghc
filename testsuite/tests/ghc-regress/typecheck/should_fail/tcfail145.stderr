@@ -1,4 +1,6 @@
 
-tcfail145.hs:9:0:
-    Occurs check: cannot construct the infinite type: a = [a]
-    When generalising the type(s) for `foo'
+tcfail145.hs:9:5:
+    Pattern signature must exactly match: forall a. a -> a
+    In the pattern: f :: forall a. [a] -> [a]
+    In the definition of `foo':
+        foo (f :: forall a. [a] -> [a]) = f undefined
