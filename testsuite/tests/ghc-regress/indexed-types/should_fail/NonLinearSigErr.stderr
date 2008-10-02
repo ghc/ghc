@@ -1,0 +1,3 @@
+
+NonLinearSigErr.hs:6:0:
+    Repeat variable occurrence may not have a kind signature: `a'

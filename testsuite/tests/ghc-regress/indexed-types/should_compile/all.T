@@ -26,6 +26,8 @@ test('Simple22', normal, compile, [''])
 test('Simple23', normal, compile, [''])
 test('Simple24', normal, compile, [''])
 
+test('NonLinearLHS', normal, compile, [''])
+
 test('ind1', normal, compile, [''])
 test('ind2',
      extra_clean(['Ind2_help.hi', 'Ind2_help.o']),

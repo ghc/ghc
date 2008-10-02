@@ -26,11 +26,7 @@ test('Simple16', normal, compile_fail, [''])
 test('TyFamArity1', normal, compile_fail, [''])
 test('TyFamArity2', normal, compile_fail, [''])
 test('TyFamUndec', normal, compile_fail, [''])
-test('T2334', normal, compile_fail, [''])
-test('T1900', normal, compile_fail, [''])
-test('T2157', normal, compile_fail, [''])
-test('T2203a', normal, compile_fail, [''])
-test('T2627b', normal, compile_fail, [''])
+test('NonLinearSigErr', normal, compile_fail, [''])
 
 test('GADTwrong1', normal, compile_fail, [''])
 
@@ -42,3 +38,9 @@ test('Over',
      ['OverD', '-no-hs-main -c -v0'])
 
 test('SkolemOccursLoop', expect_fail, compile_fail, [''])
+
+test('T2334', normal, compile_fail, [''])
+test('T1900', normal, compile_fail, [''])
+test('T2157', normal, compile_fail, [''])
+test('T2203a', normal, compile_fail, [''])
+test('T2627b', normal, compile_fail, [''])
