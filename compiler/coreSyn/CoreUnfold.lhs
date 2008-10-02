@@ -586,10 +586,13 @@ callSiteInline dflags active_inline id lone_variable arg_infos cont_info
 		  -> True
 
 	  	  | otherwise
-		  -> some_benefit && small_enough
+		  -> some_benefit && small_enough && inline_enough_args
 
 		  where
 		    enough_args	= n_val_args >= n_vals_wanted
+                    inline_enough_args =
+                      not (dopt Opt_InlineIfEnoughArgs dflags) || enough_args
+
 
 		    some_benefit = or arg_infos || really_interesting_cont
 				-- There must be something interesting
