@@ -43,12 +43,13 @@ import OccName
 import Outputable
 import Bag
 import FastString
-import SrcLoc		( Located(..), unLoc, noLoc )
+import SrcLoc
 import DynFlags	( DynFlag(..) )
 import Maybe            ( isNothing )
 import BasicTypes       ( Boxity(..) )
 
 import ListSetOps    (findDupsEq)
+import List
 
 import Control.Monad
 \end{code}
@@ -640,8 +641,9 @@ rnTyClDecl (tydecl@TyData {tcdND = new_or_data, tcdCtxt = context,
   | is_vanilla	          -- Normal Haskell data type decl
   = ASSERT( isNothing sig )	-- In normal H98 form, kind signature on the 
 				-- data type is syntactically illegal
-    bindTyVarsRn data_doc tyvars		$ \ tyvars' ->
-    do	{ tycon' <- if isFamInstDecl tydecl
+    do  { tyvars <- pruneTyVars tydecl
+        ; bindTyVarsRn data_doc tyvars                  $ \ tyvars' -> do
+    	{ tycon' <- if isFamInstDecl tydecl
 		    then lookupLocatedOccRn     tycon -- may be imported family
 		    else lookupLocatedTopBndrRn tycon
 	; context' <- rnContext data_doc context
@@ -661,7 +663,7 @@ rnTyClDecl (tydecl@TyData {tcdND = new_or_data, tcdCtxt = context,
 		   (if isFamInstDecl tydecl
 		   then unitFV (unLoc tycon')	-- type instance => use
 		   else emptyFVs)) 
-        }
+        } }
 
   | otherwise	          -- GADT
   = ASSERT( none typatsMaybe )    -- GADTs cannot have type patterns for now
@@ -705,10 +707,11 @@ rnTyClDecl (tydecl@TyData {tcdND = new_or_data, tcdCtxt = context,
 			  returnM (Just ds', extractHsTyNames_s ds')
 
 -- "type" and "type instance" declarations
-rnTyClDecl tydecl@(TySynonym {tcdLName = name, tcdTyVars = tyvars,
+rnTyClDecl tydecl@(TySynonym {tcdLName = name,
 			      tcdTyPats = typatsMaybe, tcdSynRhs = ty})
-  = bindTyVarsRn syn_doc tyvars		        $ \ tyvars' ->
-    do { name' <- if isFamInstDecl tydecl
+  = do { tyvars <- pruneTyVars tydecl
+       ; bindTyVarsRn syn_doc tyvars                    $ \ tyvars' -> do
+       { name' <- if isFamInstDecl tydecl
 		  then lookupLocatedOccRn     name -- may be imported family
 		  else lookupLocatedTopBndrRn name
        ; typats' <- rnTyPats syn_doc typatsMaybe
@@ -720,7 +723,7 @@ rnTyClDecl tydecl@(TySynonym {tcdLName = name, tcdTyVars = tyvars,
 		   (if isFamInstDecl tydecl
 		   then unitFV (unLoc name')	-- type instance => use
 		   else emptyFVs))
-       }
+       } }
   where
     syn_doc = text "In the declaration for type synonym" <+> quotes (ppr name)
 
@@ -799,6 +802,37 @@ badGadtStupidTheta _
 %*********************************************************
 
 \begin{code}
+-- Remove any duplicate type variables in family instances may have non-linear
+-- left-hand sides.  Complain if any, but the first occurence of a type
+-- variable has a user-supplied kind signature.
+--
+pruneTyVars :: TyClDecl RdrName -> RnM [LHsTyVarBndr RdrName]
+pruneTyVars tydecl
+  | isFamInstDecl tydecl
+  = do { let pruned_tyvars = nubBy eqLTyVar tyvars
+       ; assertNoSigsInRepeats tyvars
+       ; return pruned_tyvars
+       }
+  | otherwise 
+  = return tyvars
+  where
+    tyvars = tcdTyVars tydecl
+
+    assertNoSigsInRepeats []       = return ()
+    assertNoSigsInRepeats (tv:tvs)
+      = do { let offending_tvs = [ tv' | tv'@(L _ (KindedTyVar _ _)) <- tvs
+                                       , tv' `eqLTyVar` tv]
+           ; checkErr (null offending_tvs) $
+               illegalKindSig (head offending_tvs)
+           ; assertNoSigsInRepeats tvs
+           }
+
+    illegalKindSig tv
+      = hsep [ptext (sLit "Repeat variable occurrence may not have a"), 
+              ptext (sLit "kind signature:"), quotes (ppr tv)]
+
+    tv1 `eqLTyVar` tv2 = hsLTyVarLocName tv1 `eqLocated` hsLTyVarLocName tv2
+
 -- Although, we are processing type patterns here, all type variables will
 -- already be in scope (they are the same as in the 'tcdTyVars' field of the
 -- type declaration to which these patterns belong)
