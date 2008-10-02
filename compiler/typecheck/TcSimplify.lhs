@@ -1886,6 +1886,8 @@ reduceContext env wanteds0
 	  -- This may expose some further equational constraints...
 	; let (wanted_implics, wanted_dicts) = partition isImplicInst wanteds'
 	; (avails, extra_eqs) <- getLIE (reduceList env wanted_dicts init_state)
+	  	   -- The getLIE is reqd because reduceList does improvement
+		   -- (via extendAvails) which may in turn do unification
 	; (dict_binds, 
            bound_dicts, 
            dict_irreds)       <- extractResults avails wanted_dicts

@@ -208,11 +208,6 @@ data TcGblEnv
 		-- The binds, rules and foreign-decl fiels are collected
 		-- initially in un-zonked form and are finally zonked in tcRnSrcDecls
 
-		-- The next fields accumulate the payload of the
-		-- module The binds, rules and foreign-decl fiels are
-		-- collected initially in un-zonked form and are
-		-- finally zonked in tcRnSrcDecls
-
         tcg_rn_imports :: Maybe [LImportDecl Name],
         tcg_rn_exports :: Maybe [Located (IE Name)],
 	tcg_rn_decls :: Maybe (HsGroup Name),	-- renamed decls, maybe
