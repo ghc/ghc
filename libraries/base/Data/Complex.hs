@@ -44,6 +44,9 @@ module Data.Complex
 import Prelude
 
 import Data.Typeable
+#ifdef __GLASGOW_HASKELL__
+import Data.Data (Data)
+#endif
 
 #ifdef __HUGS__
 import Hugs.Prelude(Num(fromInt), Fractional(fromDouble))
