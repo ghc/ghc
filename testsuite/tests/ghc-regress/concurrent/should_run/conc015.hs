@@ -29,6 +29,7 @@ main = do
 		`Control.Exception.catch` 
                     \e -> putStrLn ("caught1: " ++ show (e::SomeException))
      )
+    threadDelay 10000
     takeMVar m2
    )
     `Control.Exception.catch`
