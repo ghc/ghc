@@ -90,6 +90,7 @@ Library {
         Data.Dynamic,
         Data.Either,
         Data.Eq,
+        Data.Data,
         Data.Fixed,
         Data.Foldable
         Data.Function,
