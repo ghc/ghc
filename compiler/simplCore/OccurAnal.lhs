@@ -629,7 +629,7 @@ occAnalRhs env id rhs
   = occAnal ctxt rhs
   where
     ctxt | certainly_inline id = env
-         | otherwise           = rhsCtxt
+         | otherwise           = rhsCtxt env
         -- Note that we generally use an rhsCtxt.  This tells the occ anal n
         -- that it's looking at an RHS, which has an effect in occAnalApp
         --
@@ -763,7 +763,7 @@ occAnal env expr@(Lam _ _)
     (really_final_usage,
      mkLams tagged_binders body') }
   where
-    env_body        = vanillaCtxt                       -- Body is (no longer) an RhsContext
+    env_body        = vanillaCtxt env        -- Body is (no longer) an RhsContext
     (binders, body) = collectBinders expr
     binders'        = oneShotGroup env binders
     linear          = all is_one_shot binders'
@@ -793,7 +793,7 @@ occAnal env (Case scrut bndr ty alts)
                                 Nothing -> usage
                                 Just _  -> extendVarEnv usage bndr NoOccInfo
 
-    alt_env = setVanillaCtxt env
+    alt_env = mkAltEnv env bndr_swap
         -- Consider     x = case v of { True -> (p,q); ... }
         -- Then it's fine to inline p and q
 
@@ -810,7 +810,7 @@ occAnal env (Case scrut bndr ty alts)
 					-- in an interesting context; the case has
 					-- at least one non-default alternative
     occ_anal_scrut scrut _alts  
-	= occAnal vanillaCtxt scrut    -- No need for rhsCtxt
+	= occAnal (vanillaCtxt env) scrut    -- No need for rhsCtxt
 
 occAnal env (Let bind body)
   = case occAnal env body                of { (body_usage, body') ->
@@ -818,11 +818,11 @@ occAnal env (Let bind body)
        (final_usage, mkLets new_binds body') }}
 
 occAnalArgs :: OccEnv -> [CoreExpr] -> (UsageDetails, [CoreExpr])
-occAnalArgs _env args
+occAnalArgs env args
   = case mapAndUnzip (occAnal arg_env) args of  { (arg_uds_s, args') ->
     (foldr (+++) emptyDetails arg_uds_s, args')}
   where
-    arg_env = vanillaCtxt
+    arg_env = vanillaCtxt env
 \end{code}
 
 Applications are dealt with specially because we want
@@ -896,12 +896,12 @@ appSpecial :: OccEnv
 appSpecial env n ctxt args
   = go n args
   where
-    arg_env = vanillaCtxt
+    arg_env = vanillaCtxt env
 
     go _ [] = (emptyDetails, [])        -- Too few args
 
     go 1 (arg:args)                     -- The magic arg
-      = case occAnal (setCtxt arg_env ctxt) arg of      { (arg_uds, arg') ->
+      = case occAnal (setCtxtTy arg_env ctxt) arg of    { (arg_uds, arg') ->
         case occAnalArgs env args of                    { (args_uds, args') ->
         (arg_uds +++ args_uds, arg':args') }}
 
@@ -924,24 +924,21 @@ We do these two transformations right here:
     ==>
       case (x |> co) of b { pi -> let x = b |> sym co in ri }
 
-    Why (2)?  See Note [Ccase of cast]
+    Why (2)?  See Note [Case of cast]
 
 In both cases, in a particular alternative (pi -> ri), we only 
 add the binding if
   (a) x occurs free in (pi -> ri)
 	(ie it occurs in ri, but is not bound in pi)
   (b) the pi does not bind b (or the free vars of co)
-  (c) x is not a 
 We need (a) and (b) for the inserted binding to be correct.
-
-Notice that (a) rapidly becomes false, so no bindings are injected.
-
-Notice the deliberate shadowing of 'x'. But we must call localiseId 
-on 'x' first, in case it's a GlobalId, or has an External Name.
-See, for example, SimplEnv Note [Global Ids in the substitution].
 
 For the alternatives where we inject the binding, we can transfer
 all x's OccInfo to b.  And that is the point.
+
+Notice that 
+  * The deliberate shadowing of 'x'. 
+  * That (a) rapidly becomes false, so no bindings are injected.
 
 The reason for doing these transformations here is because it allows
 us to adjust the OccInfo for 'x' and 'b' as we go.
@@ -959,6 +956,19 @@ us to adjust the OccInfo for 'x' and 'b' as we go.
 
 The Maybe (Id,CoreExpr) passed to occAnalAlt is the extra let-binding
 {x=b}; it's Nothing if the binder-swap doesn't happen.
+
+Note [Binder swap on GlobalId scrutinees]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When the scrutinee is a GlobalId we must take care in two ways
+
+ i) In order to *know* whether 'x' occurs free in the RHS, we need its
+    occurrence info. BUT, we don't gather occurrence info for
+    GlobalIds.  That's what the (small) occ_scrut_ids set in OccEnv is
+    for: it says "gather occurrence info for these.
+
+ ii) We must call localiseId on 'x' first, in case it's a GlobalId, or
+     has an External Name. See, for example, SimplEnv Note [Global Ids in
+     the substitution].
 
 Note [Case of cast]
 ~~~~~~~~~~~~~~~~~~~
@@ -1005,7 +1015,7 @@ occAnalAlt env case_bndr mb_scrut_var (con, bndrs, rhs)
 	   (usg_wo_scrut, scrut_var') = tagBinder alt_usg (localiseId scrut_var)
 			-- Note the localiseId; we're making a new binding
 			-- for it, and it might have an External Name, or
-			-- even be a GlobalId
+			-- even be a GlobalId; Note [Binder swap on GlobalId scrutinees]
 	   shadowing bndr = bndr `elemVarSet` rhs_fvs
 	   rhs_fvs = exprFreeVars scrut_rhs
 
@@ -1021,8 +1031,15 @@ occAnalAlt env case_bndr mb_scrut_var (con, bndrs, rhs)
 
 \begin{code}
 data OccEnv
-  = OccEnv OccEncl      -- Enclosing context information
-           CtxtTy       -- Tells about linearity
+  = OccEnv { occ_encl 	   :: !OccEncl      -- Enclosing context information
+    	   , occ_ctxt 	   :: !CtxtTy       -- Tells about linearity
+	   , occ_scrut_ids :: !GblScrutIds }
+
+type GblScrutIds = IdSet  -- GlobalIds that are scrutinised, and for which
+     		   	  -- we want to gather occurence info; see
+			  -- Note [Binder swap for GlobalId scrutinee]
+			  -- No need to prune this if there's a shadowing binding
+			  -- because it's OK for it to be too big
 
 -- OccEncl is used to control whether to inline into constructor arguments
 -- For example:
@@ -1049,24 +1066,36 @@ type CtxtTy = [Bool]
         --                      the CtxtTy inside applies
 
 initOccEnv :: OccEnv
-initOccEnv = OccEnv OccRhs []
+initOccEnv = OccEnv { occ_encl = OccRhs
+	      	    , occ_ctxt = []
+		    , occ_scrut_ids = emptyVarSet }
 
-vanillaCtxt :: OccEnv
-vanillaCtxt = OccEnv OccVanilla []
+vanillaCtxt :: OccEnv -> OccEnv
+vanillaCtxt env = OccEnv { occ_encl = OccVanilla, occ_ctxt = []
+	      	         , occ_scrut_ids = occ_scrut_ids env }
 
-rhsCtxt :: OccEnv
-rhsCtxt     = OccEnv OccRhs     []
+rhsCtxt :: OccEnv -> OccEnv
+rhsCtxt env = OccEnv { occ_encl = OccRhs, occ_ctxt = []
+	      	     , occ_scrut_ids = occ_scrut_ids env }
+
+mkAltEnv :: OccEnv -> Maybe (Id, CoreExpr) -> OccEnv
+-- Does two things: a) makes the occ_ctxt = OccVanilla
+-- 	    	    b) extends the scrut_ids if necessary
+mkAltEnv env (Just (scrut_id, _))
+  | not (isLocalId scrut_id) 
+  = OccEnv { occ_encl      = OccVanilla
+	   , occ_scrut_ids = extendVarSet (occ_scrut_ids env) scrut_id
+	   , occ_ctxt      = occ_ctxt env }
+mkAltEnv env _
+  | isRhsEnv env = env { occ_encl = OccVanilla }
+  | otherwise    = env
+
+setCtxtTy :: OccEnv -> CtxtTy -> OccEnv
+setCtxtTy env ctxt = env { occ_ctxt = ctxt }
 
 isRhsEnv :: OccEnv -> Bool
-isRhsEnv (OccEnv OccRhs     _) = True
-isRhsEnv (OccEnv OccVanilla _) = False
-
-setVanillaCtxt :: OccEnv -> OccEnv
-setVanillaCtxt (OccEnv OccRhs ctxt_ty) = OccEnv OccVanilla ctxt_ty
-setVanillaCtxt other_env               = other_env
-
-setCtxt :: OccEnv -> CtxtTy -> OccEnv
-setCtxt (OccEnv encl _) ctxt = OccEnv encl ctxt
+isRhsEnv (OccEnv { occ_encl = OccRhs })     = True
+isRhsEnv (OccEnv { occ_encl = OccVanilla }) = False
 
 oneShotGroup :: OccEnv -> [CoreBndr] -> [CoreBndr]
         -- The result binders have one-shot-ness set that they might not have had originally.
@@ -1074,7 +1103,7 @@ oneShotGroup :: OccEnv -> [CoreBndr] -> [CoreBndr]
         -- linearity context knows that c,n are one-shot, and it records that fact in
         -- the binder. This is useful to guide subsequent float-in/float-out tranformations
 
-oneShotGroup (OccEnv _encl ctxt) bndrs
+oneShotGroup (OccEnv { occ_ctxt = ctxt }) bndrs
   = go ctxt bndrs []
   where
     go _ [] rev_bndrs = reverse rev_bndrs
@@ -1088,8 +1117,8 @@ oneShotGroup (OccEnv _encl ctxt) bndrs
     go ctxt (bndr:bndrs) rev_bndrs = go ctxt bndrs (bndr:rev_bndrs)
 
 addAppCtxt :: OccEnv -> [Arg CoreBndr] -> OccEnv
-addAppCtxt (OccEnv encl ctxt) args
-  = OccEnv encl (replicate (valArgCount args) True ++ ctxt)
+addAppCtxt env@(OccEnv { occ_ctxt = ctxt }) args
+  = env { occ_ctxt = replicate (valArgCount args) True ++ ctxt }
 \end{code}
 
 %************************************************************************
@@ -1174,9 +1203,10 @@ setBinderOcc usage bndr
 
 \begin{code}
 mkOneOcc :: OccEnv -> Id -> InterestingCxt -> UsageDetails
-mkOneOcc _env id int_cxt
+mkOneOcc env id int_cxt
   | isLocalId id = unitVarEnv id (OneOcc False True int_cxt)
-  | otherwise    = emptyDetails
+  | id `elemVarSet` occ_scrut_ids env = unitVarEnv id NoOccInfo
+  | otherwise       		      = emptyDetails
 
 markMany, markInsideLam, markInsideSCC :: OccInfo -> OccInfo
 
