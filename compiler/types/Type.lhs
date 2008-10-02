@@ -1147,14 +1147,16 @@ coreEqType t1 t2
 
 \begin{code}
 tcEqType :: Type -> Type -> Bool
--- ^ Type equality on source types. Does not look through @newtypes@ or 'PredType's
+-- ^ Type equality on source types. Does not look through @newtypes@ or 
+-- 'PredType's, but it does look through type synonyms.
 tcEqType t1 t2 = isEqual $ cmpType t1 t2
 
 tcEqTypes :: [Type] -> [Type] -> Bool
 tcEqTypes tys1 tys2 = isEqual $ cmpTypes tys1 tys2
 
 tcCmpType :: Type -> Type -> Ordering
--- ^ Type ordering on source types. Does not look through @newtypes@ or 'PredType's
+-- ^ Type ordering on source types. Does not look through @newtypes@ or 
+-- 'PredType's, but it does look through type synonyms.
 tcCmpType t1 t2 = cmpType t1 t2
 
 tcCmpTypes :: [Type] -> [Type] -> Ordering

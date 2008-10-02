@@ -231,9 +231,6 @@ tcReduceEqs locals wanteds
 We maintain normalised equalities together with the skolems introduced as
 intermediates during flattening of equalities as well as 
 
-!!!TODO: We probably now can do without the skolem set.  It's not used during
-finalisation in the current code.
-
 \begin{code}
 -- |Configuration of normalised equalities used during solving.
 --
@@ -383,9 +380,6 @@ The types t, t1, ..., tn may not contain any occurrences of synonym
 families.  Moreover, in Forms (2) & (3), the left-hand side may not occur in
 the right-hand side, and the relation x > y is an arbitrary, but total order
 on type variables
-
-!!!TODO: We may need to keep track of swapping for error messages (and to
-re-orient on finilisation).
 
 \begin{code}
 data RewriteInst
@@ -960,9 +954,6 @@ applySubstFam eq1@(RewriteFam {rwi_fam = fam1, rwi_args = args1})
     -- rule matches => rewrite
   | fam1 == fam2 && tcEqTypes args1 args2 &&
     (isWantedRewriteInst eq2 || not (isWantedRewriteInst eq1))
--- !!!TODO: tcEqTypes is insufficient as it does not look through type synonyms
--- !!!Check whether anything breaks by making tcEqTypes look through synonyms.
--- !!!Should be ok and we don't want three type equalities.
   = do { co2' <- mkRightTransEqInstCo co2 co1 (lhs, rhs)
        ; eq2' <- deriveEqInst eq2 lhs rhs co2'
        ; liftM Just $ normEqInst eq2'
@@ -1240,7 +1231,7 @@ instantiateAndExtract eqs localsEmpty skolems
       | Just tv2 <- tcGetTyVar_maybe ty2
       , isMetaTyVar tv2
       , mayInst tv2 && (checkingMode || tv2 `elemVarSet` skolems)
-                        -- !!!TODO: this is too liberal, even if tv2 is in 
+                        -- !!!FIXME: this is too liberal, even if tv2 is in 
                         -- skolems we shouldn't instantiate if tvs occurs 
                         -- in other equalities that may propagate it into the
                         -- environment

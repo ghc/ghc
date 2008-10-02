@@ -1883,7 +1883,9 @@ reduceContext env wanteds0
                 }
 
           -- Solve the *wanted* *dictionary* constraints (not implications)
-	  -- This may expose some further equational constraints...
+	  -- This may expose some further equational constraints in the course
+          -- of improvement due to functional dependencies if any of the
+          -- involved unifications gets deferred.
 	; let (wanted_implics, wanted_dicts) = partition isImplicInst wanteds'
 	; (avails, extra_eqs) <- getLIE (reduceList env wanted_dicts init_state)
 	  	   -- The getLIE is reqd because reduceList does improvement
