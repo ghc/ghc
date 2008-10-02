@@ -60,7 +60,6 @@ createInterface ghcMod flags modMap = do
       famMap        = Map.empty --mkFamMap decls'
       ignoreExps    = Flag_IgnoreAllExports `elem` flags
       exportedNames = ghcExportedNames ghcMod
-      origEnv       = Map.fromList [ (nameOccName n, n) | n <- exportedNames ]
       instances     = ghcInstances ghcMod
 
   warnAboutFilteredDecls mod decls
@@ -91,7 +90,6 @@ createInterface ghcMod flags modMap = do
     ifaceSubMap          = subMap,
     ifaceExportItems     = prunedExportItems,
     ifaceRnExportItems   = [],
-    ifaceEnv             = origEnv, 
     ifaceExports         = exportedNames,
     ifaceVisibleExports  = visibleNames, 
     ifaceDeclMap         = declMap,
