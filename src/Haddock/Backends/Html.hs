@@ -1618,13 +1618,9 @@ topDeclBox ((_,_,maybe_source_url), (_,_,maybe_wiki_url), iface)
                                                (Just name) (Just loc) url
                            in anchor ! [href url'] << toHtml "Source"
 
-        -- for source links, we want to point to the original module,
-        -- because only that will have the source.
-        origMod = case Map.lookup (nameOccName name) (ifaceEnv iface) of
-          Just n -> case nameModule_maybe n of
-            Just m -> m
-            Nothing -> mod
-          _ -> error "This shouldn't happen (topDeclBox)"
+        -- For source links, we want to point to the original module,
+        -- because only that will have the source.  
+        origMod = nameModule name
 
         wikiLink =
           case maybe_wiki_url of
