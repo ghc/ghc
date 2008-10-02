@@ -1620,6 +1620,9 @@ topDeclBox ((_,_,maybe_source_url), (_,_,maybe_wiki_url), iface)
 
         -- For source links, we want to point to the original module,
         -- because only that will have the source.  
+
+        -- TODO: do something about type instances. They will point to
+        -- the module defining the type family, which is wrong.
         origMod = nameModule name
 
         wikiLink =
