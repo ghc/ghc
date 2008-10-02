@@ -53,6 +53,7 @@ module GHC (
         parsedSource, coreModule,
         compileToCoreModule, compileToCoreSimplified,
         compileCoreToObj,
+        getModSummary,
 
 	-- * Parsing Haddock comments
 	parseHaddockComment,
@@ -1013,6 +1014,14 @@ type TypecheckedSource = LHsBinds Id
 --     - default methods are turned into top-level decls.
 --     - dictionary bindings
 
+-- | Return the 'ModSummary' of a module with the given name.
+--
+-- The module must be part of the module graph (see 'hsc_mod_graph' and
+-- 'ModuleGraph').  If this is not the case, this function will throw an
+-- 'GhcApiError'.
+--
+-- Note that the module graph may contain several 'ModSummary's matching the
+-- same name (for example both a @.hs@ and a @.hs-boot@).
 getModSummary :: GhcMonad m => ModuleName -> m ModSummary
 getModSummary mod = do
    mg <- liftM hsc_mod_graph getSession
@@ -1023,9 +1032,8 @@ getModSummary mod = do
 -- | Parse a module.
 --
 -- Throws a 'SourceError' on parse error.
-parseModule :: GhcMonad m => ModuleName -> m ParsedModule
-parseModule mod = do
-   ms <- getModSummary mod
+parseModule :: GhcMonad m => ModSummary -> m ParsedModule
+parseModule ms = do
    hsc_env0 <- getSession
    let hsc_env = hsc_env0 { hsc_dflags = ms_hspp_opts ms }
    rdr_module <- parseFile hsc_env ms
@@ -1195,9 +1203,8 @@ compileCore simplify fn = do
      Just modSummary -> do
        -- Now we have the module name;
        -- parse, typecheck and desugar the module
-       let mod = ms_mod_name modSummary
        mod_guts <- coreModule `fmap`
-                      (desugarModule =<< typecheckModule =<< parseModule mod)
+                      (desugarModule =<< typecheckModule =<< parseModule modSummary)
        liftM gutsToCoreModule $
          if simplify
           then do

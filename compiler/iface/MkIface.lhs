@@ -303,7 +303,7 @@ mkIface_ hsc_env maybe_old_fingerprint
 	      		   	     , isNothing (ifRuleOrph r) ]
 
 	; when (not (isEmptyBag orph_warnings))
-	       (do { printErrorsAndWarnings dflags errs_and_warns
+	       (do { printErrorsAndWarnings dflags errs_and_warns -- XXX
 	       	   ; when (errorsFound dflags errs_and_warns) 
 		          (exitWith (ExitFailure 1)) })
 

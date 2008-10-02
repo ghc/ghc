@@ -1083,7 +1083,7 @@ checkModule m = do
   let modl = GHC.mkModuleName m
   prev_context <- GHC.getContext
   ok <- handleSourceError (\e -> GHC.printExceptionAndWarnings e >> return False) $ do
-          r <- GHC.typecheckModule =<< GHC.parseModule modl
+          r <- GHC.typecheckModule =<< GHC.parseModule =<< GHC.getModSummary modl
           io $ putStrLn (showSDoc (
 	   case GHC.moduleInfo r of
 	     cm | Just scope <- GHC.modInfoTopLevelScope cm ->
