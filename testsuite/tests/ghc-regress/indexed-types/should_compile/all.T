@@ -119,3 +119,4 @@ test('OversatDecomp', normal, compile, [''])
 
 test('T2219', normal, compile, [''])
 test('T2627', normal, compile, [''])
+test('T2448', normal, compile, [''])
