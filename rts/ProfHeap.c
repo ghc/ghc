@@ -397,10 +397,25 @@ void freeProfiling1 (void)
 
 void initProfiling2 (void)
 {
+    char *prog;
+
+    prog = stgMallocBytes(strlen(prog_name) + 1, "initProfiling2");
+    strcpy(prog, prog_name);
+#ifdef mingw32_HOST_OS
+    // on Windows, drop the .exe suffix if there is one
+    {
+        char *suff;
+        suff = strrchr(prog,'.');
+        if (suff != NULL && !strcmp(suff,".exe")) {
+            *suff = '\0';
+        }
+    }
+#endif
+
   if (RtsFlags.ProfFlags.doHeapProfile) {
     /* Initialise the log file name */
-    hp_filename = stgMallocBytes(strlen(prog_name) + 6, "hpFileName");
-    sprintf(hp_filename, "%s.hp", prog_name);
+    hp_filename = stgMallocBytes(strlen(prog) + 6, "hpFileName");
+    sprintf(hp_filename, "%s.hp", prog);
     
     /* open the log file */
     if ((hp_file = fopen(hp_filename, "w")) == NULL) {
@@ -411,6 +426,8 @@ void initProfiling2 (void)
     }
   }
   
+  stgFree(prog);
+
   initHeapProfiling();
 }
 
