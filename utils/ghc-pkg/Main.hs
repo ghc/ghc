@@ -32,7 +32,11 @@ import Prelude
 
 import System.Console.GetOpt
 import Text.PrettyPrint
+#if __GLASGOW_HASKELL__ >= 609
 import qualified Control.Exception as Exception
+#else
+import qualified Control.Exception.Extensible as Exception
+#endif
 import Data.Maybe
 
 import Data.Char ( isSpace, toLower )
@@ -1108,10 +1112,11 @@ installSignalHandlers :: IO ()
 installSignalHandlers = do
   threadid <- myThreadId
   let
-      interrupt = throwTo threadid (Exception.ErrorCall "interrupted")
+      interrupt = Exception.throwTo threadid
+                                    (Exception.ErrorCall "interrupted")
   --
 #if !defined(mingw32_HOST_OS)
-  installHandler sigQUIT (Catch interrupt) Nothing 
+  installHandler sigQUIT (Catch interrupt) Nothing
   installHandler sigINT  (Catch interrupt) Nothing
   return ()
 #elif __GLASGOW_HASKELL__ >= 603
@@ -1136,40 +1141,16 @@ isInfixOf needle haystack = any (isPrefixOf needle) (tails haystack)
 #endif
 
 catchIO :: IO a -> (Exception.IOException -> IO a) -> IO a
-#if __GLASGOW_HASKELL__ >= 609
 catchIO = Exception.catch
-#else
-catchIO io handler = io `Exception.catch` handler'
-    where handler' (Exception.IOException ioe) = handler ioe
-          handler' e                           = Exception.throw e
-#endif
 
 #if mingw32_HOST_OS || mingw32_TARGET_OS
 throwIOIO :: Exception.IOException -> IO a
-#if __GLASGOW_HASKELL__ >= 609
 throwIOIO = Exception.throwIO
-#else
-throwIOIO ioe = Exception.throwIO (Exception.IOException ioe)
-#endif
 #endif
 
 catchError :: IO a -> (String -> IO a) -> IO a
-#if __GLASGOW_HASKELL__ >= 609
 catchError io handler = io `Exception.catch` handler'
     where handler' (Exception.ErrorCall err) = handler err
-#else
-catchError io handler = io `Exception.catch` handler'
-    where handler' (Exception.ErrorCall err) = handler err
-          handler' e                         = Exception.throw e
-#endif
-
-onException :: IO a -> IO b -> IO a
-#if __GLASGOW_HASKELL__ >= 609
-onException = Exception.onException
-#else
-onException io what = io `Exception.catch` \e -> do what
-                                                    Exception.throw e
-#endif
 
 
 -- copied from Cabal's Distribution.Simple.Utils, except that we want
@@ -1194,8 +1175,8 @@ writeFileAtomic targetFile content = do
 #else
       renameFile newFile targetFile
 #endif
-   `onException` do hClose newHandle
-                    removeFile newFile
+   `Exception.onException` do hClose newHandle
+                              removeFile newFile
   where
     template = targetName <.> "tmp"
     targetDir | null targetDir_ = "."
@@ -1249,7 +1230,7 @@ openNewFile dir template = do
 #else
               fdToHandle (fromIntegral fd)
 #endif
-              `onException` c_close fd
+              `Exception.onException` c_close fd
          return (filepath, h)
       where
         filename        = prefix ++ show x ++ suffix
