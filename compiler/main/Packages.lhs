@@ -37,7 +37,7 @@ where
 
 import PackageConfig	
 import ParsePkgConf	( loadPackageConfig )
-import DynFlags		( dopt, DynFlag(..), DynFlags(..), PackageFlag(..) )
+import DynFlags		( dopt, DynFlag(..), DynFlags(..), PackageFlag(..), GhcLink(..) )
 import StaticFlags	( opt_Static )
 import Config		( cProjectVersion )
 import Name		( Name, nameModule_maybe )
@@ -563,7 +563,7 @@ mkPackageState dflags orig_pkg_db preload0 this_package = do
 
       -- add base & rts to the preload packages
       basicLinkedPackages
-       | dopt Opt_AutoLinkPackages dflags
+       | dopt Opt_AutoLinkPackages dflags && (ghcLink dflags) /= LinkDynLib
           = filter (flip elemUFM pkg_db) [basePackageId, rtsPackageId]
        | otherwise = []
       -- but in any case remove the current package from the set of
