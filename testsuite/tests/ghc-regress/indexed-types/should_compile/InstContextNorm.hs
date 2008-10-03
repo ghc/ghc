@@ -30,3 +30,7 @@ data BAR
 
 instance Prop BAR where
  type Def BAR = EX () () FOO
+  
+  -- Needs Base (Def BAR)
+  -- And (Def Bar = Ex () () FOO)
+  -- so we need Base (Def (Foo ANY))
