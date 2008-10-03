@@ -17,7 +17,7 @@ module Panic
 
      panic, panicFastInt, assertPanic, trace,
      
-     Exception.Exception(..), showException, try, tryMost, tryUser, throwTo,
+     Exception.Exception(..), showException, try, tryMost, throwTo,
 
      installSignalHandlers, interruptTargetThread
    ) where
@@ -40,7 +40,6 @@ import Control.Concurrent ( MVar, ThreadId, withMVar, newMVar )
 import Data.Dynamic
 import Debug.Trace	( trace )
 import System.IO.Unsafe	( unsafePerformIO )
-import System.IO.Error hiding ( try )
 import System.Exit
 import System.Environment
 \end{code}
@@ -171,21 +170,6 @@ tryMost action = do r <- try action
                                         -- Anything else is rethrown
                                         Nothing -> throwIO se
                         Right v -> return (Right v)
-
--- | tryUser is like try, but catches only UserErrors.
--- These are the ones that are thrown by the TcRn monad 
--- to signal an error in the program being compiled
-tryUser :: IO a -> IO (Either IOException a)
-tryUser io =
-    do ei <- try io
-       case ei of
-           Right v -> return (Right v)
-           Left se ->
-                case fromException se of
-                   Just ioe
-                    | isUserError ioe ->
-                       return (Left ioe)
-                   _ -> throw se
 \end{code}
 
 Standard signal handlers for catching ^C, which just throw an

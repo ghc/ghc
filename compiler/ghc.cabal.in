@@ -88,7 +88,8 @@ Library
     Extensions: CPP, MagicHash, UnboxedTuples, PatternGuards,
                 ForeignFunctionInterface, EmptyDataDecls,
                 TypeSynonymInstances, MultiParamTypeClasses,
-                FlexibleInstances, Rank2Types, ScopedTypeVariables
+                FlexibleInstances, Rank2Types, ScopedTypeVariables,
+                DeriveDataTypeable
 
     Include-Dirs: . parser utils
 

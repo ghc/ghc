@@ -40,7 +40,6 @@ import StaticFlags
 import FastString
 import Panic
 import Util
-import Exception
 
 import System.IO
 import Data.IORef
@@ -543,7 +542,7 @@ discardWarnings thing_inside
 
 
 \begin{code}
-try_m :: TcRn r -> TcRn (Either IOException r)
+try_m :: TcRn r -> TcRn (Either IOEnvFailure r)
 -- Does try_m, with a debug-trace on failure
 try_m thing 
   = do { mb_r <- tryM thing ;

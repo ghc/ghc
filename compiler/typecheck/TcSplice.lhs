@@ -596,15 +596,9 @@ runMeta convert expr
 	    Right v -> return v
 	    Left se ->
                     case fromException se of
-                    Just (ErrorCall "IOEnv failure") ->
+                    Just IOEnvFailure ->
                         failM -- Error already in Tc monad
-                    _ ->
-                        case fromException se of
-                        Just ioe
-                         | isUserError ioe &&
-                           (ioeGetErrorString ioe == "IOEnv failure") ->
-                            failM -- Error already in Tc monad
-                        _ -> failWithTc (mk_msg "run" se)	-- Exception
+                    _ -> failWithTc (mk_msg "run" se)	-- Exception
         }}}
   where
     mk_msg s exn = vcat [text "Exception when trying to" <+> text s <+> text "compile-time code:",
@@ -633,11 +627,10 @@ like that.  Here's how it's processed:
 
   * The TcM monad is an instance of Quasi (see TcSplice), and it implements
     (qReport True s) by using addErr to add an error message to the bag of errors.
-    The 'fail' in TcM raises a UserError, with the uninteresting string
-	"IOEnv failure"
+    The 'fail' in TcM raises an IOEnvFailure exception
 
   * So, when running a splice, we catch all exceptions; then for 
-	- a UserError "IOEnv failure", we assume the error is already 
+	- an IOEnvFailure exception, we assume the error is already 
 		in the error-bag (above)
 	- other errors, we add an error to the bag
     and then fail

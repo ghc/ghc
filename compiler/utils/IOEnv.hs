@@ -12,6 +12,7 @@ module IOEnv (
 
         -- Errors
         failM, failWithM,
+        IOEnvFailure(..),
 
         -- Getting at the environment
         getEnv, setEnv, updEnv,
@@ -27,6 +28,7 @@ import Exception
 import Panic
 
 import Data.IORef       ( IORef, newIORef, readIORef, writeIORef, modifyIORef )
+import Data.Typeable
 import System.IO.Unsafe ( unsafeInterleaveIO )
 import System.IO        ( fixIO )
 import MonadUtils
@@ -65,12 +67,18 @@ thenM_ :: IOEnv env a -> IOEnv env b -> IOEnv env b
 thenM_ (IOEnv m) f = IOEnv (\ env -> do { m env ; unIOEnv f env })
 
 failM :: IOEnv env a
-failM = IOEnv (\ _ -> ioError (userError "IOEnv failure"))
+failM = IOEnv (\ _ -> throwIO IOEnvFailure)
 
 failWithM :: String -> IOEnv env a
 failWithM s = IOEnv (\ _ -> ioError (userError s))
 
+data IOEnvFailure = IOEnvFailure
+    deriving Typeable
 
+instance Show IOEnvFailure where
+    show IOEnvFailure = "IOEnv failure"
+
+instance Exception IOEnvFailure
 
 ----------------------------------------------------------------------
 -- Fundmantal combinators specific to the monad
@@ -95,7 +103,7 @@ fixM f = IOEnv (\ env -> fixIO (\ r -> unIOEnv (f r) env))
 
 
 ---------------------------
-tryM :: IOEnv env r -> IOEnv env (Either IOException r)
+tryM :: IOEnv env r -> IOEnv env (Either IOEnvFailure r)
 -- Reflect UserError exceptions (only) into IOEnv monad
 -- Other exceptions are not caught; they are simply propagated as exns
 --
@@ -103,7 +111,10 @@ tryM :: IOEnv env r -> IOEnv env (Either IOException r)
 -- to UserErrors.  But, say, pattern-match failures in GHC itself should
 -- not be caught here, else they'll be reported as errors in the program
 -- begin compiled!
-tryM (IOEnv thing) = IOEnv (\ env -> tryUser (thing env))
+tryM (IOEnv thing) = IOEnv (\ env -> tryIOEnvFailure (thing env))
+
+tryIOEnvFailure :: IO a -> IO (Either IOEnvFailure a)
+tryIOEnvFailure = try
 
 -- XXX We shouldn't be catching everything, e.g. timeouts
 tryAllM :: IOEnv env r -> IOEnv env (Either SomeException r)
