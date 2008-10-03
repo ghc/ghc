@@ -60,7 +60,7 @@ typecheckFiles files = do
         (\err -> do
            printExceptionAndWarnings err
            throwE ("Failed to check module: " ++ moduleString mod)) $
-      do tc_mod <- typecheckModule =<< parseModule (moduleName mod)
+      do tc_mod <- typecheckModule =<< parseModule =<< getModSummary (moduleName mod)
          let Just renamed_src = renamedSource tc_mod
          return $ mkGhcModule (mod, file, (parsedSource tc_mod,
                                            renamed_src,
