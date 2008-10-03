@@ -56,6 +56,8 @@ module TysWiredIn (
 	parrTyCon_RDR, parrTyConName
     ) where
 
+#include "HsVersions.h"
+
 import {-# SOURCE #-} MkId( mkDataConIds )
 
 -- friends:
@@ -66,8 +68,7 @@ import TysPrim
 import Constants	( mAX_TUPLE_SIZE )
 import Module		( Module )
 import RdrName
-import Name		( Name, BuiltInSyntax(..), nameUnique, nameOccName, 
-			  nameModule, mkWiredInName )
+import Name
 import OccName		( mkTcOccFS, mkDataOccFS, mkTupleOcc, mkDataConWorkerOcc,
 			  tcName, dataName )
 import DataCon		( DataCon, mkDataCon, dataConWorkId, dataConSourceArity )
@@ -254,7 +255,8 @@ pcDataConWithFixity declared_infix dc_name tyvars arg_tys tycon
 		(mkDataConIds bogus_wrap_name wrk_name data_con)
 		
 
-    modu      = nameModule dc_name
+    modu     = ASSERT( isExternalName dc_name ) 
+	       nameModule dc_name
     wrk_occ  = mkDataConWorkerOcc (nameOccName dc_name)
     wrk_key  = incrUnique (nameUnique dc_name)
     wrk_name = mkWiredInName modu wrk_occ wrk_key

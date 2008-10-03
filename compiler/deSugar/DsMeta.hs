@@ -28,6 +28,8 @@ module DsMeta( dsBracket,
 	       quoteExpName, quotePatName
 	        ) where
 
+#include "HsVersions.h"
+
 import {-# SOURCE #-}	DsExpr ( dsExpr )
 
 import MatchLit
@@ -949,7 +951,7 @@ globalVar name
 	; MkC uni <- coreIntLit (getKey (getUnique name))
 	; rep2 mkNameLName [occ,uni] }
   where
-      mod = nameModule name
+      mod = ASSERT( isExternalName name) nameModule name
       name_mod = moduleNameString (moduleName mod)
       name_pkg = packageIdString (modulePackageId mod)
       name_occ = nameOccName name

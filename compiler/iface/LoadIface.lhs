@@ -120,7 +120,8 @@ loadInterfaceForName doc name
         { this_mod <- getModule
         ; MASSERT2( not (nameIsLocalOrFrom this_mod name), ppr name <+> parens doc )
         }
-  ; initIfaceTcRn $ loadSysInterface doc (nameModule name)
+  ; ASSERT2( isExternalName name, ppr name ) 
+    initIfaceTcRn $ loadSysInterface doc (nameModule name)
   }
 
 -- | An 'IfM' function to load the home interface for a wired-in thing,

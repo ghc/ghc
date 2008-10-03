@@ -370,7 +370,7 @@ mkHashFun
 mkHashFun hsc_env eps
   = \name -> 
       let 
-        mod = nameModule name
+        mod = ASSERT2( isExternalName name, ppr name ) nameModule name
         occ = nameOccName name
         iface = lookupIfaceByModule (hsc_dflags hsc_env) hpt pit mod `orElse` 
                    pprPanic "lookupVers2" (ppr mod <+> ppr occ)
@@ -411,8 +411,9 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
 	       , let out = localOccs $ freeNamesDeclABI abi
                ]
 
+       name_module n = ASSERT( isExternalName n ) nameModule n
        localOccs = map (getUnique . getParent . getOccName) 
-                        . filter ((== this_mod) . nameModule)
+                        . filter ((== this_mod) . name_module)
                         . nameSetToList
           where getParent occ = lookupOccEnv parent_map occ `orElse` occ
 
@@ -442,7 +443,8 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
           | isWiredInName name  =  putNameLiterally bh name 
            -- wired-in names don't have fingerprints
           | otherwise
-          = let hash | nameModule name /= this_mod =  global_hash_fn name
+          = ASSERT( isExternalName name )
+	    let hash | nameModule name /= this_mod =  global_hash_fn name
                      | otherwise = 
                         snd (lookupOccEnv local_env (getOccName name)
                            `orElse` pprPanic "urk! lookup local fingerprint" 
@@ -698,9 +700,9 @@ lookupOccEnvL env k = lookupOccEnv env k `orElse` []
 -- used when we want to fingerprint a structure without depending on the
 -- fingerprints of external Names that it refers to.
 putNameLiterally :: BinHandle -> Name -> IO ()
-putNameLiterally bh name = do
-  put_ bh $! nameModule name
-  put_ bh $! nameOccName name
+putNameLiterally bh name = ASSERT( isExternalName name ) 
+  do { put_ bh $! nameModule name
+     ; put_ bh $! nameOccName name }
 
 computeFingerprint :: Binary a
                    => DynFlags 
@@ -927,10 +929,12 @@ mkIfaceExports exports
 	--     else the plusFM will simply discard one!  They
 	--     should have been combined by now.
     add env (Avail n)
-      = add_one env (nameModule n) (Avail (nameOccName n))
+      = ASSERT( isExternalName n ) 
+        add_one env (nameModule n) (Avail (nameOccName n))
 
     add env (AvailTC tc ns)
-      = foldl add_for_mod env mods
+      = ASSERT( all isExternalName ns ) 
+	foldl add_for_mod env mods
       where
 	tc_occ = nameOccName tc
 	mods   = nub (map nameModule ns)
@@ -1368,7 +1372,7 @@ instanceToIfaceInst (Instance { is_dfun = dfun_id, is_flag = oflag,
     do_rough (Just n) = Just (toIfaceTyCon_name n)
 
     dfun_name = idName dfun_id
-    mod       = nameModule dfun_name
+    mod       = ASSERT( isExternalName dfun_name ) nameModule dfun_name
     is_local name = nameIsLocalOrFrom mod name
 
 	-- Compute orphanhood.  See Note [Orphans] in IfaceSyn

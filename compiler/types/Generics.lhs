@@ -398,7 +398,7 @@ mkGenericNames tycon
   where
     tc_name  = tyConName tycon
     tc_occ   = nameOccName tc_name
-    tc_mod   = nameModule tc_name
+    tc_mod   = ASSERT( isExternalName tc_name ) nameModule tc_name
     from_RDR = mkOrig tc_mod (mkGenOcc1 tc_occ)
     to_RDR   = mkOrig tc_mod (mkGenOcc2 tc_occ)
 \end{code}

@@ -265,7 +265,7 @@ nameToCLabel n suffix
         else qual_name
   where
         pkgid = modulePackageId mod
-        mod = nameModule n
+        mod = ASSERT( isExternalName n ) nameModule n
         package_part = unpackFS (zEncodeFS (packageIdFS (modulePackageId mod)))
         module_part  = unpackFS (zEncodeFS (moduleNameFS (moduleName mod)))
         occ_part     = unpackFS (zEncodeFS (occNameFS (nameOccName n)))

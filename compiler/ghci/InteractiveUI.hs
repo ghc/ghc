@@ -1088,7 +1088,8 @@ checkModule m = do
 	   case GHC.moduleInfo r of
 	     cm | Just scope <- GHC.modInfoTopLevelScope cm ->
 		let
-		    (local,global) = partition ((== modl) . GHC.moduleName . GHC.nameModule) scope
+		    (local,global) = ASSERT( all isExternalName scope )
+		    		     partition ((== modl) . GHC.moduleName . GHC.nameModule) scope
 		in
 			(text "global names: " <+> ppr global) $$
 		        (text "local  names: " <+> ppr local)
@@ -1275,7 +1276,8 @@ browseModule bang modl exports_only = do
                 -- We would like to improve this; see #1799.
             sorted_names = loc_sort local ++ occ_sort external
                 where 
-                (local,external) = partition ((==modl) . nameModule) names
+                (local,external) = ASSERT( all isExternalName names )
+				   partition ((==modl) . nameModule) names
                 occ_sort = sortBy (compare `on` nameOccName) 
                 -- try to sort by src location.  If the first name in
                 -- our list has a good source location, then they all should.
@@ -1896,7 +1898,7 @@ wantNameFromInterpretedModule noCanDo str and_then =
    case names of
       []    -> return ()
       (n:_) -> do
-            let modl = GHC.nameModule n
+            let modl = ASSERT( isExternalName n ) GHC.nameModule n
             if not (GHC.isExternalName n)
                then noCanDo n $ ppr n <>
                                 text " is not defined in an interpreted module"
@@ -2068,7 +2070,8 @@ breakSwitch (arg1:rest)
         wantNameFromInterpretedModule noCanDo arg1 $ \name -> do
         let loc = GHC.srcSpanStart (GHC.nameSrcSpan name)
         if GHC.isGoodSrcLoc loc
-               then findBreakAndSet (GHC.nameModule name) $ 
+               then ASSERT( isExternalName name ) 
+	       	    findBreakAndSet (GHC.nameModule name) $ 
                          findBreakByCoord (Just (GHC.srcLocFile loc))
                                           (GHC.srcLocLine loc, 
                                            GHC.srcLocCol loc)
@@ -2215,7 +2218,8 @@ list2 [arg] = do
         let loc = GHC.srcSpanStart (GHC.nameSrcSpan name)
         if GHC.isGoodSrcLoc loc
                then do
-                  tickArray <- getTickArray (GHC.nameModule name)
+                  tickArray <- ASSERT( isExternalName name )
+		  	       getTickArray (GHC.nameModule name)
                   let mb_span = findBreakByCoord (Just (GHC.srcLocFile loc))
                                         (GHC.srcLocLine loc, GHC.srcLocCol loc)
                                         tickArray

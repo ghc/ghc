@@ -800,7 +800,7 @@ dataConIdentity dc = bytesFS (packageIdFS (modulePackageId mod)) ++
                   fromIntegral (ord ':') : bytesFS (moduleNameFS (moduleName mod)) ++
                   fromIntegral (ord '.') : bytesFS (occNameFS (nameOccName name))
   where name = dataConName dc
-        mod  = nameModule name
+        mod  = ASSERT( isExternalName name ) nameModule name
 \end{code}
 
 \begin{code}

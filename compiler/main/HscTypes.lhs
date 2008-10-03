@@ -105,7 +105,7 @@ import {-# SOURCE #-}  InteractiveEval ( Resume )
 #endif
 
 import RdrName
-import Name		( Name, NamedThing, getName, nameOccName, nameModule )
+import Name
 import NameEnv
 import NameSet	
 import OccName		( OccName, OccEnv, lookupOccEnv, mkOccEnv, emptyOccEnv, 
@@ -1160,7 +1160,7 @@ mkPrintUnqualified dflags env = (qual_name, qual_mod)
 
 	| otherwise = panic "mkPrintUnqualified"
       where
-	right_name gre = nameModule (gre_name gre) == mod
+	right_name gre = nameModule_maybe (gre_name gre) == Just mod
 
         unqual_gres = lookupGRE_RdrName (mkRdrUnqual occ) env
         qual_gres   = filter right_name (lookupGlobalRdrEnv env occ)
@@ -1330,7 +1330,7 @@ lookupType dflags hpt pte name
        lookupNameEnv (md_types (hm_details hm)) name
   | otherwise
   = lookupNameEnv pte name
-  where mod = nameModule name
+  where mod = ASSERT( isExternalName name ) nameModule name
 	this_pkg = thisPackage dflags
 
 -- | As 'lookupType', but with a marginally easier-to-use interface

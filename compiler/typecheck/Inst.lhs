@@ -859,7 +859,8 @@ record_dfun_usage :: Id -> TcRn ()
 record_dfun_usage dfun_id 
   = do	{ hsc_env <- getTopEnv
 	; let  dfun_name = idName dfun_id
-	       dfun_mod  = nameModule dfun_name
+	       dfun_mod  = ASSERT( isExternalName dfun_name ) 
+	         	   nameModule dfun_name
 	; if isInternalName dfun_name ||    -- Internal name => defined in this module
 	     modulePackageId dfun_mod /= thisPackage (hsc_dflags hsc_env)
 	  then return () -- internal, or in another package

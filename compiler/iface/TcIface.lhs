@@ -127,7 +127,8 @@ checkWiredInTyCon tc
   = return ()
   | otherwise
   = do	{ mod <- getModule
-	; unless (mod == nameModule tc_name)
+	; ASSERT( isExternalName tc_name ) 
+	  unless (mod == nameModule tc_name)
 		 (initIfaceTcRn (loadWiredInHomeIface tc_name))
 		-- Don't look for (non-existent) Float.hi when
 		-- compiling Float.lhs, which mentions Float of course
@@ -144,7 +145,8 @@ importDecl name
     do	{ traceIf nd_doc
 
 	-- Load the interface, which should populate the PTE
-	; mb_iface <- loadInterface nd_doc (nameModule name) ImportBySystem
+	; mb_iface <- ASSERT2( isExternalName name, ppr name ) 
+	  	      loadInterface nd_doc (nameModule name) ImportBySystem
 	; case mb_iface of {
 		Failed err_msg  -> return (Failed err_msg) ;
 		Succeeded _ -> do
@@ -1047,7 +1049,8 @@ ifCheckWiredInThing name
 		-- we may typecheck GHC.Base.hi. At that point, GHC.Base is not in
 		-- the HPT, so without the test we'll demand-load it into the PIT!
 		-- C.f. the same test in checkWiredInTyCon above
-	; unless (mod == nameModule name)
+	; ASSERT2( isExternalName name, ppr name ) 
+	  unless (mod == nameModule name)
 		 (loadWiredInHomeIface name) }
 
 tcIfaceTyCon :: IfaceTyCon -> IfL TyCon

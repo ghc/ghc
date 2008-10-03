@@ -940,7 +940,7 @@ reifyName thing
 	-- have free variables, we may need to generate NameL's for them.
   where
     name    = getName thing
-    mod     = nameModule name
+    mod     = ASSERT( isExternalName name ) nameModule name
     pkg_str = packageIdString (modulePackageId mod)
     mod_str = moduleNameString (moduleName mod)
     occ_str = occNameString occ

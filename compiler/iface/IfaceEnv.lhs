@@ -212,7 +212,8 @@ lookupOrigNameCache nc mod occ	-- The normal case
 
 extendOrigNameCache :: OrigNameCache -> Name -> OrigNameCache
 extendOrigNameCache nc name 
-  = extendNameCache nc (nameModule name) (nameOccName name) name
+  = ASSERT2( isExternalName name, ppr name ) 
+    extendNameCache nc (nameModule name) (nameOccName name) name
 
 extendNameCache :: OrigNameCache -> Module -> OccName -> Name -> OrigNameCache
 extendNameCache nc mod occ name

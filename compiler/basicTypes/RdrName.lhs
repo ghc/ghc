@@ -143,7 +143,8 @@ setRdrNameSpace :: RdrName -> NameSpace -> RdrName
 setRdrNameSpace (Unqual occ) ns = Unqual (setOccNameSpace ns occ)
 setRdrNameSpace (Qual m occ) ns = Qual m (setOccNameSpace ns occ)
 setRdrNameSpace (Orig m occ) ns = Orig m (setOccNameSpace ns occ)
-setRdrNameSpace (Exact n)    ns = Orig (nameModule n)
+setRdrNameSpace (Exact n)    ns = ASSERT( isExternalName n ) 
+		       	          Orig (nameModule n)
 				       (setOccNameSpace ns (nameOccName n))
 \end{code}
 
@@ -163,7 +164,8 @@ mkOrig mod occ = Orig mod occ
 -- is derived from that of it's parent using the supplied function
 mkDerivedRdrName :: Name -> (OccName -> OccName) -> RdrName
 mkDerivedRdrName parent mk_occ
-  = mkOrig (nameModule parent) (mk_occ (nameOccName parent))
+  = ASSERT2( isExternalName parent, ppr parent )
+    mkOrig (nameModule parent) (mk_occ (nameOccName parent))
 
 ---------------
 	-- These two are used when parsing source files
@@ -556,7 +558,7 @@ hideSomeUnquals rdr_env occs
     qual_gre gre@(GRE { gre_name = name, gre_prov = LocalDef })
 	= gre { gre_prov = Imported [imp_spec] }
 	where	-- Local defs get transfomed to (fake) imported things
-	  mod = moduleName (nameModule name)
+	  mod = ASSERT2( isExternalName name, ppr name) moduleName (nameModule name)
 	  imp_spec = ImpSpec { is_item = ImpAll, is_decl = decl_spec }
 	  decl_spec = ImpDeclSpec { is_mod = mod, is_as = mod, 
 				    is_qual = True, 

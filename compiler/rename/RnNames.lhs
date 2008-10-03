@@ -1006,7 +1006,7 @@ finishWarnings dflags mod_warn tcg_env
 		      (parens imp_msg) <> colon,
 		      (ppr deprec_txt) ])
 	where
-	  name_mod = nameModule name
+	  name_mod = ASSERT2( isExternalName name, ppr name ) nameModule name
 	  imp_mod  = importSpecModule imp_spec
 	  imp_msg  = ptext (sLit "imported from") <+> ppr imp_mod <> extra
 	  extra | imp_mod == moduleName name_mod = empty
@@ -1024,7 +1024,7 @@ lookupImpDeprec :: DynFlags -> HomePackageTable -> PackageIfaceTable
 	        -> GlobalRdrElt -> Maybe WarningTxt
 -- The name is definitely imported, so look in HPT, PIT
 lookupImpDeprec dflags hpt pit gre
-  = case lookupIfaceByModule dflags hpt pit (nameModule name) of
+  = case lookupIfaceByModule dflags hpt pit mod of
 	Just iface -> mi_warn_fn iface name `mplus` 	-- Bleat if the thing, *or
 		      case gre_par gre of	
 			ParentIs p -> mi_warn_fn iface p	-- its parent*, is warn'd
@@ -1032,7 +1032,8 @@ lookupImpDeprec dflags hpt pit gre
 
 	Nothing -> Nothing	-- See Note [Used names with interface not loaded]
   where
-	name = gre_name gre
+    name = gre_name gre
+    mod = ASSERT2( isExternalName name, ppr name ) nameModule name
 \end{code}
 
 Note [Used names with interface not loaded]
@@ -1343,7 +1344,7 @@ printMinimalImports imps
 	where
 	  all_used avail_occs = all (`elem` map nameOccName ns) avail_occs
 	  doc = text "Compute minimal imports from" <+> ppr n
-	  n_mod = nameModule n
+	  n_mod = ASSERT( isExternalName n ) nameModule n
 \end{code}
 
 
