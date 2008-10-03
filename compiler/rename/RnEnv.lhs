@@ -41,7 +41,7 @@ import HsSyn
 import RdrHsSyn		( extractHsTyRdrTyVars )
 import RdrName
 import HscTypes		( availNames, ModIface(..), FixItem(..), lookupFixity)
-import TcEnv		( tcLookupDataCon )
+import TcEnv		( tcLookupDataCon, isBrackStage )
 import TcRnMonad
 import Name		( Name, nameIsLocalOrFrom, mkInternalName, isWiredInName,
 			  nameSrcLoc, nameSrcSpan, nameOccName, nameModule, isExternalName )
@@ -140,7 +140,16 @@ newTopSrcBinder this_mod (L loc rdr_name)
 	         (addErrAt loc (badQualBndrErr rdr_name))
 	 	-- Binders should not be qualified; if they are, and with a different
 		-- module name, we we get a confusing "M.T is not in scope" error later
-	; newGlobalBinder this_mod (rdrNameOcc rdr_name) loc }
+
+	; stage <- getStage
+	; if isBrackStage stage then
+	        -- We are inside a TH bracket, so make an *Internal* name
+		-- See Note [Top-level Names in Template Haskell decl quotes] in RnNames
+	     do { uniq <- newUnique
+	        ; return (mkInternalName uniq (rdrNameOcc rdr_name) loc) } 
+	  else	
+	  	-- Normal case
+	     newGlobalBinder this_mod (rdrNameOcc rdr_name) loc }
 \end{code}
 
 %*********************************************************

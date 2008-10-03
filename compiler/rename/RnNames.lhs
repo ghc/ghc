@@ -14,6 +14,7 @@ module RnNames (
 
 import DynFlags
 import HsSyn
+import TcEnv		( isBrackStage )
 import RnEnv
 import RnHsDoc          ( rnHsDoc )
 import IfaceEnv		( ifaceExportNames )
@@ -268,44 +269,57 @@ From the top-level declarations of this module produce
 	* the ImportAvails
 created by its bindings.  
 	
-Note [Shadowing in extendGlobalRdrEnvRn]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Usually when etending the GlobalRdrEnv we complain if a new binding
-duplicates an existing one.  By adding the bindings one at a time, 
-this check also complains if we add two new bindings for the same name.
-(Remember that in Template Haskell the duplicates might *already be* 
-in the GlobalRdrEnv from higher up the module.)
-
-But with a Template Haskell quotation we want to *shadow*:
+Note [Top-level Names in Template Haskell decl quotes]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider a Template Haskell declaration quotation like this:
+      module M where
 	f x = h [d| f = 3 |]
-Here the inner binding for 'f' simply shadows the outer one.
-And that applies even if the binding for 'f' is in a where-clause,
-and hence is in the *local* RdrEnv not the *global* RdrEnv.
+When renaming the declarations inside [d| ...|], we treat the
+top level binders specially in two ways
 
-Hence the shadowP boolean passed in. 
+1.  We give them an Internal name, not (as usual) an External one.
+    Otherwise the NameCache gets confused by a second allocation of
+    M.f.  (We used to invent a fake module ThFake to avoid this, but
+    that had other problems, notably in getting the correct answer for
+    nameIsLocalOrFrom in lookupFixity. So we now leave tcg_module 
+    unaffected.)
+
+2.  We make them *shadow* the outer bindings. If we don't do that,
+    we'll get a complaint when extending the GlobalRdrEnv, saying that
+    there are two bindings for 'f'.
+
+    This shadowing applies even if the binding for 'f' is in a
+    where-clause, and hence is in the *local* RdrEnv not the *global*
+    RdrEnv.
+
+We find out whether we are inside a [d| ... |] by testing the TH
+stage. This is a slight hack, because the stage field was really meant for
+the type checker, and here we are not interested in the fields of Brack,
+hence the error thunks in thRnBrack.
 
 \begin{code}
-extendGlobalRdrEnvRn :: Bool	-- Note [Shadowing in extendGlobalRdrEnvRn]
-               	     -> [AvailInfo]
+extendGlobalRdrEnvRn :: [AvailInfo]
 	       	     -> MiniFixityEnv
 	       	     -> RnM (TcGblEnv, TcLclEnv)
   -- Updates both the GlobalRdrEnv and the FixityEnv
   -- We return a new TcLclEnv only becuase we might have to
-  -- delete some bindings from it; see Note [Shadowing in extendGlobalRdrEnvRn]
+  -- delete some bindings from it; 
+  -- see Note [Top-level Names in Template Haskell decl quotes]
 
-extendGlobalRdrEnvRn shadowP avails new_fixities
+extendGlobalRdrEnvRn avails new_fixities
   = do	{ (gbl_env, lcl_env) <- getEnvs
+        ; stage <- getStage
 	; let rdr_env = tcg_rdr_env gbl_env
 	      fix_env = tcg_fix_env gbl_env
 
 		-- Delete new_occs from global and local envs
-		-- We are going to shadow them
-		-- See Note [Shadowing in extendGlobalRdrEnvRn]
+		-- If we are in a TemplateHaskell decl bracket, 
+		--    we are going to shadow them
+		-- See Note [Top-level Names in Template Haskell decl quotes]
+	      shadowP  = isBrackStage stage
 	      new_occs = map (nameOccName . gre_name) gres
 	      rdr_env1 = hideSomeUnquals rdr_env new_occs
 	      lcl_env1 = lcl_env { tcl_rdr = delListFromOccEnv (tcl_rdr lcl_env) new_occs }
-	
- 		-- Note [Shadowing in extendGlobalRdrEnvRn]
 	      (rdr_env2, lcl_env2) | shadowP   = (rdr_env1, lcl_env1)
 				   | otherwise = (rdr_env,  lcl_env)
 
@@ -941,7 +955,9 @@ isModuleExported implicit_prelude mod (GRE { gre_name = name, gre_prov = prov })
 	-- every module that imports the Prelude
   | otherwise
   = case prov of
-	LocalDef    -> moduleName (nameModule name) == mod
+	LocalDef | Just name_mod <- nameModule_maybe name
+		 -> moduleName name_mod == mod
+		 | otherwise -> False
 	Imported is -> any unQualSpecOK is && any (qualSpecOK mod) is
 
 -------------------------------

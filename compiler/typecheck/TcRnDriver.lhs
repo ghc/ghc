@@ -294,8 +294,7 @@ tcRnExtCore hsc_env (HsExtCore this_mod decls src_binds)
        --              (in fact, it might not even need to be in the scope of
        --               this tcg_env at all)
    avails  <- getLocalNonValBinders (mkFakeGroup ldecls) ;
-   tc_envs <- extendGlobalRdrEnvRn False avails 
-			           emptyFsEnv {- no fixity decls -} ;
+   tc_envs <- extendGlobalRdrEnvRn avails emptyFsEnv {- no fixity decls -} ;
 
    setEnvs tc_envs $ do {
 
@@ -747,8 +746,8 @@ monad; it augments it and returns the new TcGblEnv.
 rnTopSrcDecls :: HsGroup RdrName -> TcM (TcGblEnv, HsGroup Name)
 -- Fails if there are any errors
 rnTopSrcDecls group
- = do { -- Rename the source decls (with no shadowing; error on duplicates)
-	(tcg_env, rn_decls) <- checkNoErrs $ rnSrcDecls False group ;
+ = do { -- Rename the source decls
+	(tcg_env, rn_decls) <- checkNoErrs $ rnSrcDecls group ;
 
         -- save the renamed syntax, if we want it
 	let { tcg_env'

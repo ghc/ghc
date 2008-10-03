@@ -25,13 +25,14 @@ import RnBinds   ( rnLocalBindsAndThen, rnValBindsLHS, rnValBindsRHS,
                    rnMatchGroup, makeMiniFixityEnv) 
 import HsSyn
 import TcRnMonad
+import TcEnv		( thRnBrack )
 import RnEnv
 import RnTypes		( rnHsTypeFVs, 
 			  mkOpFormRn, mkOpAppRn, mkNegAppRn, checkSectionPrec)
 import RnPat
 import DynFlags		( DynFlag(..) )
 import BasicTypes	( FixityDirection(..) )
-import PrelNames	( thFAKE, hasKey, assertIdKey, assertErrorName,
+import PrelNames	( hasKey, assertIdKey, assertErrorName,
 			  loopAName, choiceAName, appAName, arrAName, composeAName, firstAName,
 			  negateName, thenMName, bindMName, failMName, groupWithName )
 
@@ -594,31 +595,15 @@ rnBracket (TypBr t) = do { (t', fvs) <- rnHsTypeFVs doc t
 rnBracket (DecBr group) 
   = do { gbl_env  <- getGblEnv
 
-	; let new_gbl_env = gbl_env { -- Set the module to thFAKE.  The top-level names from the bracketed 
-	                              -- declarations will go into the name cache, and we don't want them to 
-	                              -- confuse the Names for the current module.  
-	                              -- By using a pretend module, thFAKE, we keep them safely out of the way.
-                                     tcg_mod = thFAKE,
-                        
-                                     -- The emptyDUs is so that we just collect uses for this group alone
-                                     -- in the call to rnSrcDecls below
-                                     tcg_dus = emptyDUs }
-       ; setGblEnv new_gbl_env $ do {
-
-	-- In this situation we want to *shadow* top-level bindings.
-	--	foo = 1
-	--	bar = [d| foo = 1 |]
-	-- If we don't shadow, we'll get an ambiguity complaint when we do 
-	-- a lookupTopBndrRn (which uses lookupGreLocalRn) on the binder of the 'foo'
-	--
-	-- Furthermore, arguably if the splice does define foo, that should hide
-	-- any foo's further out
-	--
-	-- The shadowing is acheived by calling rnSrcDecls with True as the shadowing flag
-       ; (tcg_env, group') <- rnSrcDecls True group       
+	; let new_gbl_env = gbl_env { tcg_dus = emptyDUs }
+	      		  -- The emptyDUs is so that we just collect uses for this
+                          -- group alone in the call to rnSrcDecls below
+       ; (tcg_env, group') <- setGblEnv new_gbl_env $ 
+       	 	   	      setStage thRnBrack $
+			      rnSrcDecls group      
 
        -- Discard the tcg_env; it contains only extra info about fixity
-	; return (DecBr group', allUses (tcg_dus tcg_env)) } }
+	; return (DecBr group', allUses (tcg_dus tcg_env)) }
 \end{code}
 
 %************************************************************************

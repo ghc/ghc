@@ -295,9 +295,8 @@ rOOT_MAIN	= mkMainModule (fsLit ":Main") -- Root module for initialisation
 	-- use himself.  The z-encoding for ':' is "ZC", so the z-encoded
 	-- module name still starts with a capital letter, which keeps
 	-- the z-encoded version consistent.
-iNTERACTIVE, thFAKE :: Module
+iNTERACTIVE :: Module
 iNTERACTIVE    = mkMainModule (fsLit ":Interactive")
-thFAKE         = mkMainModule (fsLit ":THFake")
 
 pRELUDE_NAME, mAIN_NAME :: ModuleName
 pRELUDE_NAME   = mkModuleNameFS (fsLit "Prelude")

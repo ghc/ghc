@@ -353,6 +353,12 @@ type GlobalRdrEnv = OccEnv [GlobalRdrElt]
 --
 -- INVARIANT: All the members of the list have distinct 
 --	      'gre_name' fields; that is, no duplicate Names
+--
+-- INVARIANT: Imported provenance => Name is an ExternalName
+-- 	      However LocalDefs can have an InternalName.  This
+--	      happens only when type-checking a [d| ... |] Template
+--	      Haskell quotation; see this note in RnNames
+--	      Note [Top-level Names in Template Haskell decl quotes]
 
 -- | An element of the 'GlobalRdrEnv'
 data GlobalRdrElt 
@@ -461,16 +467,17 @@ pickGREs rdr_name gres
 
     pick :: GlobalRdrElt -> Maybe GlobalRdrElt
     pick gre@(GRE {gre_prov = LocalDef, gre_name = n}) 	-- Local def
-	| rdr_is_unqual		 		= Just gre
-	| Just (mod,_) <- rdr_is_qual, 
-	  mod == moduleName (nameModule n)	= Just gre
-	| otherwise 				= Nothing
+	| rdr_is_unqual		 	   = Just gre
+	| Just (mod,_) <- rdr_is_qual 	      	-- Qualified name
+	, Just n_mod <- nameModule_maybe n   -- Binder is External
+	, mod == moduleName n_mod  	   = Just gre
+	| otherwise 			   = Nothing
     pick gre@(GRE {gre_prov = Imported [is]})	-- Single import (efficiency)
 	| rdr_is_unqual,
-	  not (is_qual (is_decl is))		= Just gre
+	  not (is_qual (is_decl is))	= Just gre
 	| Just (mod,_) <- rdr_is_qual, 
-	  mod == is_as (is_decl is)		= Just gre
-	| otherwise     			= Nothing
+	  mod == is_as (is_decl is)	= Just gre
+	| otherwise     		= Nothing
     pick gre@(GRE {gre_prov = Imported is})	-- Multiple import
 	| null filtered_is = Nothing
 	| otherwise	   = Just (gre {gre_prov = Imported filtered_is})

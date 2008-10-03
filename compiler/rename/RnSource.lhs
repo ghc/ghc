@@ -94,13 +94,8 @@ Checks the @(..)@ etc constraints in the export list.
 \begin{code}
 -- Brings the binders of the group into scope in the appropriate places;
 -- does NOT assume that anything is in scope already
---
--- The Bool determines whether (True) names in the group shadow existing
--- Unquals in the global environment (used in Template Haskell) or
--- (False) whether duplicates are reported as an error
-rnSrcDecls :: Bool -> HsGroup RdrName -> RnM (TcGblEnv, HsGroup Name)
-
-rnSrcDecls shadowP group@(HsGroup {hs_valds  = val_decls,
+rnSrcDecls :: HsGroup RdrName -> RnM (TcGblEnv, HsGroup Name)
+rnSrcDecls group@(HsGroup {hs_valds  = val_decls,
                                    hs_tyclds = tycl_decls,
                                    hs_instds = inst_decls,
                                    hs_derivds = deriv_decls,
@@ -119,7 +114,7 @@ rnSrcDecls shadowP group@(HsGroup {hs_valds  = val_decls,
    -- (B) Bring top level binders (and their fixities) into scope,
    --     *except* for the value bindings, which get brought in below.
    avails <- getLocalNonValBinders group ;
-   tc_envs <- extendGlobalRdrEnvRn shadowP avails local_fix_env ;
+   tc_envs <- extendGlobalRdrEnvRn avails local_fix_env ;
    setEnvs tc_envs $ do {
 
    failIfErrsM ; -- No point in continuing if (say) we have duplicate declarations
@@ -139,7 +134,7 @@ rnSrcDecls shadowP group@(HsGroup {hs_valds  = val_decls,
    let { lhs_binders = map unLoc $ collectHsValBinders new_lhs;
          lhs_avails = map Avail lhs_binders
        } ;
-   (tcg_env, tcl_env) <- extendGlobalRdrEnvRn shadowP lhs_avails local_fix_env ;
+   (tcg_env, tcl_env) <- extendGlobalRdrEnvRn lhs_avails local_fix_env ;
    setEnvs (tcg_env, tcl_env) $ do {
 
    --  Now everything is in scope, as the remaining renaming assumes.

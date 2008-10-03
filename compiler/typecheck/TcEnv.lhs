@@ -39,7 +39,7 @@ module TcEnv(
 
 	-- Template Haskell stuff
 	checkWellStaged, spliceOK, bracketOK, tcMetaTy, thLevel, 
-	topIdLvl, thTopLevelId,
+	topIdLvl, thTopLevelId, thRnBrack, isBrackStage,
 
 	-- New Ids
 	newLocalName, newDFunName, newFamInstTyConName, 
@@ -121,8 +121,6 @@ tcLookupGlobal name
 
 		Just mod | mod == tcg_mod env 	-- Names from this module 
 			 -> notFound name env -- should be in tcg_type_env
-			 | mod == thFAKE	-- Names bound in TH declaration brackets
-			 -> notFound name env -- should be in tcg_env
 			 | otherwise
 		         -> tcImportDecl name	-- Go find it in an interface
 	}}}}}
@@ -588,6 +586,17 @@ tcMetaTy :: Name -> TcM Type
 tcMetaTy tc_name = do
     t <- tcLookupTyCon tc_name
     return (mkTyConApp t [])
+
+thRnBrack :: ThStage
+-- Used *only* to indicate that we are inside a TH bracket during renaming
+-- Tested by TcEnv.isBrackStage
+-- This is a slight hack, used to ensure that 
+--   * top-level 
+thRnBrack = Brack (panic "thRnBrack1") (panic "thRnBrack2") (panic "thRnBrack3") 
+
+isBrackStage :: ThStage -> Bool
+isBrackStage (Brack {}) = True
+isBrackStage _other     = False
 
 thTopLevelId :: Id -> Bool
 -- See Note [What is a top-level Id?] in TcSplice
