@@ -83,26 +83,16 @@ data ErrMsg = ErrMsg {
 	-- NB  Pretty.Doc not SDoc: we deal with the printing style (in ptic 
 	-- whether to qualify an External Name) at the error occurrence
 
-#if __GLASGOW_HASKELL__ >= 609
 instance Exception ErrMsg
-#endif
 
 instance Show ErrMsg where
     show em = showSDoc (errMsgShortDoc em)
 
 throwErrMsg :: ErrMsg -> a
-#if __GLASGOW_HASKELL__ < 609
-throwErrMsg = throwDyn
-#else
 throwErrMsg = throw
-#endif
 
 handleErrMsg :: ExceptionMonad m => (ErrMsg -> m a) -> m a -> m a
-#if __GLASGOW_HASKELL__ < 609
-handleErrMsg = flip gcatchDyn
-#else
 handleErrMsg = ghandle
-#endif
 
 -- So we can throw these things as exceptions
 errMsgTc :: TyCon

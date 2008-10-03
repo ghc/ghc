@@ -146,11 +146,7 @@ import MonadUtils
 import Bag              ( emptyBag, unionBags, isEmptyBag )
 import Data.Dynamic     ( Typeable )
 import qualified Data.Dynamic as Dyn
-#if __GLASGOW_HASKELL__ < 609
-import Data.Dynamic     ( toDyn, fromDyn, fromDynamic )
-#else
 import Bag              ( bagToList )
-#endif
 import ErrUtils         ( ErrorMessages, WarningMessages, Messages )
 
 import System.FilePath
@@ -180,8 +176,6 @@ data Session = Session !(IORef HscEnv) !(IORef WarningMessages)
 mkSrcErr :: ErrorMessages -> SourceError
 srcErrorMessages :: SourceError -> ErrorMessages
 mkApiErr :: SDoc -> GhcApiError
-
-#if __GLASGOW_HASKELL__ >= 609
 
 -- | A source error is an error that is caused by one or more errors in the
 -- source code.  A 'SourceError' is thrown by many functions in the
@@ -241,43 +235,6 @@ instance Typeable GhcApiError where
 instance Exception GhcApiError
 
 mkApiErr = GhcApiError
-
-#else
-------------------------------------------------------------------------
--- implementation for bootstrapping without extensible exceptions
-
-data SourceException = SourceException ErrorMessages
-sourceExceptionTc :: Dyn.TyCon
-sourceExceptionTc = Dyn.mkTyCon "SourceException"
-{-# NOINLINE sourceExceptionTc #-}
-instance Typeable SourceException where
-  typeOf _ = Dyn.mkTyConApp sourceExceptionTc []
-
--- Source error has to look like a normal exception.  Throwing a DynException
--- directly would not allow us to use the Exception monad.  We also cannot
--- make it part of GhcException as that would lead to circular imports.
-
-type SourceError = Exception
-type GhcApiError = Exception
-
-mkSrcErr msgs = DynException . toDyn $ SourceException msgs
-
-mkApiErr = IOException . userError . showSDoc
-
-srcErrorMessages (DynException ms) =
-    let SourceException msgs = (fromDyn ms (panic "SourceException expected"))
-    in msgs
-srcErrorMessages _ = panic "SourceError expected"
-
-handleSourceError :: ExceptionMonad m => (Exception -> m a) -> m a -> m a
-handleSourceError handler act =
-  gcatch act
-         (\e -> case e of
-                  DynException dyn
-                    | Just (SourceException _) <- fromDynamic dyn
-                        -> handler e
-                  _ -> throw e)
-#endif
 
 -- | A monad that allows logging of warnings.
 class Monad m => WarnLogMonad m where
@@ -345,10 +302,6 @@ instance MonadIO Ghc where
 instance ExceptionMonad Ghc where
   gcatch act handle =
       Ghc $ \s -> unGhc act s `gcatch` \e -> unGhc (handle e) s
-#if __GLASGOW_HASKELL__ < 609
-  gcatchDyn act handler =
-      Ghc $ \s -> unGhc act s `gcatchDyn` \e -> unGhc (handler e) s
-#endif
 instance WarnLogMonad Ghc where
   setWarnings warns = Ghc $ \(Session _ wref) -> writeIORef wref warns
   -- | Return 'Warnings' accumulated so far.
@@ -378,9 +331,6 @@ instance MonadIO m => MonadIO (GhcT m) where
 instance ExceptionMonad m => ExceptionMonad (GhcT m) where
   gcatch act handle =
       GhcT $ \s -> unGhcT act s `gcatch` \e -> unGhcT (handle e) s
-#if __GLASGOW_HASKELL__ < 609
-  gcatchDyn _act _handler = error "cannot use GhcT in stage1"
-#endif
 
 instance MonadIO m => WarnLogMonad (GhcT m) where
   setWarnings warns = GhcT $ \(Session _ wref) -> liftIO $ writeIORef wref warns

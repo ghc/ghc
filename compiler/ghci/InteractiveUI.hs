@@ -85,7 +85,6 @@ import System.Directory
 import System.IO
 import System.IO.Error as IO
 import Data.Char
-import Data.Dynamic
 import Data.Array
 import Control.Monad as Monad
 import Text.Printf
@@ -1820,28 +1819,15 @@ handler exception = do
   ghciHandle handler (showException exception >> return False)
 
 showException :: SomeException -> GHCi ()
-#if __GLASGOW_HASKELL__ < 609
-showException (DynException dyn) =
-  case fromDynamic dyn of
-    Nothing               -> io (putStrLn ("*** Exception: (unknown)"))
-    Just Interrupted      -> io (putStrLn "Interrupted.")
-    Just (CmdLineError s) -> io (putStrLn s)	 -- omit the location for CmdLineError
-    Just ph@PhaseFailed{} -> io (putStrLn (showGhcException ph "")) -- ditto
-    Just other_ghc_ex     -> io (print other_ghc_ex)
-
-showException other_exception
-  = io (putStrLn ("*** Exception: " ++ show other_exception))
-#else
-showException (SomeException e) =
-  io $ case cast e of
+showException se =
+  io $ case fromException se of
        Just Interrupted         -> putStrLn "Interrupted."
        -- omit the location for CmdLineError:
        Just (CmdLineError s)    -> putStrLn s
        -- ditto:
        Just ph@(PhaseFailed {}) -> putStrLn (showGhcException ph "")
        Just other_ghc_ex        -> print other_ghc_ex
-       Nothing                  -> putStrLn ("*** Exception: " ++ show e)
-#endif
+       Nothing                  -> putStrLn ("*** Exception: " ++ show se)
 
 -----------------------------------------------------------------------------
 -- recursive exception handlers

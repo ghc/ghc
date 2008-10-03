@@ -63,7 +63,6 @@ import Maybe
 import BasicTypes
 import Panic
 import FastString
-import Data.Typeable (cast)
 import Exception
 
 import qualified Language.Haskell.TH as TH
@@ -71,11 +70,7 @@ import qualified Language.Haskell.TH as TH
 import qualified Language.Haskell.TH.Syntax as TH
 
 import GHC.Exts		( unsafeCoerce#, Int#, Int(..) )
-#if __GLASGOW_HASKELL__ < 609
-import qualified Exception ( userErrors )
-#else
 import System.IO.Error
-#endif
 \end{code}
 
 Note [Template Haskell levels]
@@ -599,24 +594,17 @@ runMeta convert expr
 
 	; case either_tval of
 	    Right v -> return v
-#if __GLASGOW_HASKELL__ < 609
-	    Left exn | Just s <- Exception.userErrors exn
-		     , s == "IOEnv failure" 
-		     -> failM	-- Error already in Tc monad
-		     | otherwise -> failWithTc (mk_msg "run" exn)	-- Exception
-#else
-	    Left (SomeException exn) ->
-                    case cast exn of
+	    Left se ->
+                    case fromException se of
                     Just (ErrorCall "IOEnv failure") ->
                         failM -- Error already in Tc monad
                     _ ->
-                        case cast exn of
+                        case fromException se of
                         Just ioe
                          | isUserError ioe &&
                            (ioeGetErrorString ioe == "IOEnv failure") ->
                             failM -- Error already in Tc monad
-                        _ -> failWithTc (mk_msg "run" exn)	-- Exception
-#endif
+                        _ -> failWithTc (mk_msg "run" se)	-- Exception
         }}}
   where
     mk_msg s exn = vcat [text "Exception when trying to" <+> text s <+> text "compile-time code:",

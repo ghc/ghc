@@ -135,6 +135,10 @@ cabal-bin: cabal-bin.hs
 
 bootstrapping.conf: cabal-bin
 	echo "[]" > $@.tmp
+	-cd extensible-exceptions && $(CABAL) clean     --distpref=dist-bootstrapping
+	cd extensible-exceptions && $(CABAL) configure --distpref=dist-bootstrapping --with-compiler=$(GHC) --with-hc-pkg=$(GHC_PKG) --package-db=$(HERE_ABS)/$@.tmp
+	cd extensible-exceptions && $(CABAL) build     --distpref=dist-bootstrapping
+	cd extensible-exceptions && $(CABAL) install   --distpref=dist-bootstrapping --inplace
 	-cd filepath && $(CABAL) clean     --distpref=dist-bootstrapping
 	cd filepath && $(CABAL) configure --distpref=dist-bootstrapping --with-compiler=$(GHC) --with-hc-pkg=$(GHC_PKG) --package-db=$(HERE_ABS)/$@.tmp
 	cd filepath && $(CABAL) build     --distpref=dist-bootstrapping

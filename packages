@@ -27,6 +27,7 @@ libraries/Cabal                         packages/Cabal                  darcs
 libraries/containers                    packages/containers             darcs
 libraries/directory                     packages/directory              darcs
 libraries/editline                      packages/editline               darcs
+libraries/extensible-exceptions         packages/extensible-exceptions  darcs
 libraries/filepath                      packages/filepath               darcs
 libraries/ghc-prim                      packages/ghc-prim               darcs
 libraries/haskell98                     packages/haskell98              darcs

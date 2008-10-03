@@ -350,32 +350,13 @@ sandboxIO dflags statusMVar thing =
 -- not "Interrupted", we unset the exception flag before throwing.
 --
 rethrow :: DynFlags -> IO a -> IO a
-#if __GLASGOW_HASKELL__ < 609
-rethrow dflags io = Exception.catch io $ \e -> do -- NB. not catchDyn
-                case e of
-                   -- If -fbreak-on-error, we break unconditionally,
-                   --  but with care of not breaking twice 
-                   _ | dopt Opt_BreakOnError dflags && 
-                       not(dopt Opt_BreakOnException dflags)
-                        -> poke exceptionFlag 1
-
-                   -- If it is an "Interrupted" exception, we allow
-                   --  a possible break by way of -fbreak-on-exception
-                   DynException d | Just Interrupted <- fromDynamic d
-                        -> return ()
-
-                   -- In any other case, we don't want to break
-                   _    -> poke exceptionFlag 0
-
-                Exception.throwIO e
-#else
-rethrow dflags io = Exception.catch io $ \se@(SomeException e) -> do
+rethrow dflags io = Exception.catch io $ \se -> do
                    -- If -fbreak-on-error, we break unconditionally,
                    --  but with care of not breaking twice 
                 if dopt Opt_BreakOnError dflags &&
                    not (dopt Opt_BreakOnException dflags)
                     then poke exceptionFlag 1
-                    else case cast e of
+                    else case fromException se of
                          -- If it is an "Interrupted" exception, we allow
                          --  a possible break by way of -fbreak-on-exception
                          Just Interrupted -> return ()
@@ -383,7 +364,6 @@ rethrow dflags io = Exception.catch io $ \se@(SomeException e) -> do
                          _ -> poke exceptionFlag 0
 
                 Exception.throwIO se
-#endif
 
 withInterruptsSentTo :: ThreadId -> IO r -> IO r
 withInterruptsSentTo thread get_result = do

@@ -543,11 +543,7 @@ discardWarnings thing_inside
 
 
 \begin{code}
-#if __GLASGOW_HASKELL__ < 609
-try_m :: TcRn r -> TcRn (Either Exception r)
-#else
 try_m :: TcRn r -> TcRn (Either IOException r)
-#endif
 -- Does try_m, with a debug-trace on failure
 try_m thing 
   = do { mb_r <- tryM thing ;

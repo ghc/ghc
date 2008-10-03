@@ -17,8 +17,7 @@ module Panic
 
      panic, panicFastInt, assertPanic, trace,
      
-     Exception.Exception(..), showException, try, tryJust, tryMost, tryUser,
-     catchJust, throwTo,
+     Exception.Exception(..), showException, try, tryMost, tryUser, throwTo,
 
      installSignalHandlers, interruptTargetThread
    ) where
@@ -50,11 +49,7 @@ GHC's own exception type.
 
 \begin{code}
 ghcError :: GhcException -> a
-#if __GLASGOW_HASKELL__ >= 609
 ghcError e = Exception.throw e
-#else
-ghcError e = Exception.throwDyn e
-#endif
 
 -- error messages all take the form
 --
@@ -76,9 +71,7 @@ data GhcException
   | ProgramError String		-- error in the user's code, probably
   deriving Eq
 
-#if __GLASGOW_HASKELL__ >= 609
 instance Exception GhcException
-#endif
 
 progName :: String
 progName = unsafePerformIO (getProgName)
@@ -87,16 +80,8 @@ progName = unsafePerformIO (getProgName)
 short_usage :: String
 short_usage = "Usage: For basic information, try the `--help' option."
 
-#if __GLASGOW_HASKELL__ < 609
-showException :: Exception.Exception -> String
--- Show expected dynamic exceptions specially
-showException (Exception.DynException d) | Just e <- fromDynamic d 
-					 = show (e::GhcException)
-showException other_exn	       	 	 = show other_exn
-#else
 showException :: Exception e => e -> String
 showException = show
-#endif
 
 instance Show GhcException where
   showsPrec _ e@(ProgramError _) = showGhcException e
@@ -130,18 +115,10 @@ showGhcException (Panic s)
 	         ++ "Please report this as a GHC bug:  http://www.haskell.org/ghc/reportabug\n")
 
 throwGhcException :: GhcException -> a
-#if __GLASGOW_HASKELL__ < 609
-throwGhcException = Exception.throwDyn
-#else
 throwGhcException = Exception.throw
-#endif
 
 handleGhcException :: ExceptionMonad m => (GhcException -> m a) -> m a -> m a
-#if __GLASGOW_HASKELL__ < 609
-handleGhcException = flip gcatchDyn
-#else
 handleGhcException = ghandle
-#endif
 
 ghcExceptionTc :: TyCon
 ghcExceptionTc = mkTyCon "GhcException"
@@ -175,62 +152,40 @@ assertPanic file line =
 -- exceptions.  Used when we want soft failures when reading interface
 -- files, for example.
 
-#if __GLASGOW_HASKELL__ < 609
-tryMost :: IO a -> IO (Either Exception.Exception a)
-tryMost action = do r <- try action; filter r
-  where
-   filter (Left e@(Exception.DynException d))
-	    | Just ghc_ex <- fromDynamic d
-		= case ghc_ex of
-		    Interrupted -> Exception.throw e
-		    Panic _     -> Exception.throw e
-		    _other      -> return (Left e)
-   filter other 
-     = return other
-#else
 -- XXX I'm not entirely sure if this is catching what we really want to catch
 tryMost :: IO a -> IO (Either SomeException a)
 tryMost action = do r <- try action
                     case r of
-                        Left se@(SomeException e) ->
-                            case cast e of
+                        Left se ->
+                            case fromException se of
                                 -- Some GhcException's we rethrow,
                                 Just Interrupted -> throwIO se
                                 Just (Panic _)   -> throwIO se
                                 -- others we return
                                 Just _           -> return (Left se)
                                 Nothing ->
-                                    case cast e of
+                                    case fromException se of
                                         -- All IOExceptions are returned
                                         Just (_ :: IOException) ->
                                             return (Left se)
                                         -- Anything else is rethrown
                                         Nothing -> throwIO se
                         Right v -> return (Right v)
-#endif
 
 -- | tryUser is like try, but catches only UserErrors.
 -- These are the ones that are thrown by the TcRn monad 
 -- to signal an error in the program being compiled
-#if __GLASGOW_HASKELL__ < 609
-tryUser :: IO a -> IO (Either Exception.Exception a)
-tryUser action = tryJust tc_errors action
-  where 
-	tc_errors e@(Exception.IOException ioe) | isUserError ioe = Just e
-	tc_errors _other = Nothing
-#else
 tryUser :: IO a -> IO (Either IOException a)
 tryUser io =
     do ei <- try io
        case ei of
            Right v -> return (Right v)
-           Left se@(SomeException ex) ->
-                case cast ex of
+           Left se ->
+                case fromException se of
                    Just ioe
                     | isUserError ioe ->
                        return (Left ioe)
                    _ -> throw se
-#endif
 \end{code}
 
 Standard signal handlers for catching ^C, which just throw an
@@ -242,11 +197,7 @@ installSignalHandlers.
 installSignalHandlers :: IO ()
 installSignalHandlers = do
   let
-#if __GLASGOW_HASKELL__ < 609
-      interrupt_exn = Exception.DynException (toDyn Interrupted)
-#else
       interrupt_exn = (toException Interrupted)
-#endif
 
       interrupt = do
 	withMVar interruptTargetThread $ \targets ->

@@ -298,9 +298,6 @@ import Data.IORef
 import System.FilePath
 import System.IO
 import System.IO.Error	( try, isDoesNotExistError )
-#if __GLASGOW_HASKELL__ >= 609
-import Data.Typeable (cast)
-#endif
 import Prelude hiding (init)
 
 
@@ -314,38 +311,22 @@ import Prelude hiding (init)
 defaultErrorHandler :: (ExceptionMonad m, MonadIO m) => DynFlags -> m a -> m a
 defaultErrorHandler dflags inner =
   -- top-level exception handler: any unrecognised exception is a compiler bug.
-#if __GLASGOW_HASKELL__ < 609
   ghandle (\exception -> liftIO $ do
            hFlush stdout
-           case exception of
-                -- an IO exception probably isn't our fault, so don't panic
-                IOException _ ->
-                  fatalErrorMsg dflags (text (show exception))
-                AsyncException StackOverflow ->
-                  fatalErrorMsg dflags (text "stack overflow: use +RTS -K<size> to increase it")
-                ExitException _ -> throw exception
-                _ ->
-                  fatalErrorMsg dflags (text (show (Panic (show exception))))
-           exitWith (ExitFailure 1)
-         ) $
-#else
-  ghandle (\(SomeException exception) -> liftIO $ do
-           hFlush stdout
-           case cast exception of
+           case fromException exception of
                 -- an IO exception probably isn't our fault, so don't panic
                 Just (ioe :: IOException) ->
                   fatalErrorMsg dflags (text (show ioe))
-                _ -> case cast exception of
+                _ -> case fromException exception of
                      Just StackOverflow ->
                          fatalErrorMsg dflags (text "stack overflow: use +RTS -K<size> to increase it")
-                     _ -> case cast exception of
+                     _ -> case fromException exception of
                           Just (ex :: ExitCode) -> throw ex
                           _ ->
                               fatalErrorMsg dflags
                                   (text (show (Panic (show exception))))
            exitWith (ExitFailure 1)
          ) $
-#endif
 
   -- program errors: messages with locations attached.  Sometimes it is
   -- convenient to just throw these as exceptions.
