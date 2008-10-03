@@ -68,7 +68,6 @@ import TyCon
 import TypeRep
 import Class
 import Name
-import PrelNames
 import NameEnv
 import OccName
 import HscTypes
@@ -590,8 +589,7 @@ tcMetaTy tc_name = do
 thRnBrack :: ThStage
 -- Used *only* to indicate that we are inside a TH bracket during renaming
 -- Tested by TcEnv.isBrackStage
--- This is a slight hack, used to ensure that 
---   * top-level 
+-- See Note [Top-level Names in Template Haskell decl quotes]
 thRnBrack = Brack (panic "thRnBrack1") (panic "thRnBrack2") (panic "thRnBrack3") 
 
 isBrackStage :: ThStage -> Bool

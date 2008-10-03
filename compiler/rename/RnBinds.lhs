@@ -312,7 +312,6 @@ rnValBindsRHSGen :: (FreeVars -> FreeVars)  -- for trimming free var sets
 
 rnValBindsRHSGen trim bound_names (ValBindsIn mbinds sigs) = do
    -- rename the sigs
-   env <- getGblEnv
    sigs' <- renameSigs (Just (mkNameSet bound_names)) okBindSig sigs
    -- rename the RHSes
    binds_w_dus <- mapBagM (rnBind (mkSigTvFn sigs') trim) mbinds
