@@ -115,6 +115,13 @@ if ! [ -d bin ] ; then
   exit 1;
 fi;
 
+if [ "`$mingw_bin/windres.exe --version | sed '1p;d'`" = "GNU windres 2.17.50 20060824" ]
+then
+  echo "Bad windres version for $mingw_bin/windres.exe."
+  echo "2.15.91 and 2.18.50 are known to work."
+  exit 1
+fi
+
 echo "Removing configure script files...not needed"
 rm -f config.guess config.sub configure configure.ac mkdirhier
 rm -f Makefile-bin.in Makefile.in aclocal.m4 install-sh
