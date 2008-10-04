@@ -103,9 +103,10 @@ polar z          =  (magnitude z, phase z)
 {-# SPECIALISE magnitude :: Complex Double -> Double #-}
 magnitude :: (RealFloat a) => Complex a -> a
 magnitude (x:+y) =  scaleFloat k
-                     (sqrt ((scaleFloat mk x)^(2::Int) + (scaleFloat mk y)^(2::Int)))
+                     (sqrt (sqr (scaleFloat mk x) + sqr (scaleFloat mk y)))
                     where k  = max (exponent x) (exponent y)
                           mk = - k
+                          sqr z = z * z
 
 -- | The phase of a complex number, in the range @(-'pi', 'pi']@.
 -- If the magnitude is zero, then so is the phase.
