@@ -86,15 +86,23 @@ framework-pkg:
 		   CURRENT_PROJECT_VERSION=$(CURRENT_PROJECT_VERSION)\
 	    	   SHORT_VERSION_STRING=$(SHORT_VERSION_STRING)\
 	 	   FRAMEWORK_VERSION=$(FRAMEWORK_VERSION)\
-		   CURRENT_LIBRARY_VERSION=$(FRAMEWORK_VERSION)
+		   CURRENT_LIBRARY_VERSION=$(FRAMEWORK_VERSION)\
+		   COMMAND_MODE=unix2003
 	xcodebuild -target GHC-systemwide install\
 		   CURRENT_PROJECT_VERSION=$(CURRENT_PROJECT_VERSION)\
 	    	   SHORT_VERSION_STRING=$(SHORT_VERSION_STRING)\
 	 	   FRAMEWORK_VERSION=$(FRAMEWORK_VERSION)\
-		   CURRENT_LIBRARY_VERSION=$(FRAMEWORK_VERSION)
+		   CURRENT_LIBRARY_VERSION=$(FRAMEWORK_VERSION)\
+		   COMMAND_MODE=unix2003
 	-$(RM) -f GHC-system.pmdoc/*-contents.xml
 	$(PACKAGEMAKER) -v --doc GHC-system.pmdoc\
 			$(PACKAGEMAKER_TARGET) -o $(TOP)/$(PACKAGE_NAME)
+
+# If we don't specify COMMAND_MODE=unix2003 then xcodebuild defaults
+# to setting it to legacy, which means that ar builds archives
+# without a table of contents. That makes the build fail later on.
+
+
 
 # Instead of making 'binary-dist' a Makefile dependency, we let xcodebuild call
 # 'make binary-dist'.  This has the advantage that xcode knows the framework
