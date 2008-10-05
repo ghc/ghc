@@ -12,7 +12,10 @@ bindir      = @bindir@
 libdir      = @libdir@/$(package)-$(version)
 libexecdir  = $(libdir)
 datarootdir = @datarootdir@
-datadir     = @datadir@/$(package)-$(version)
+# datadir is set to libdir here as GHC needs package.conf and unlit
+# to be in the same place (and things like ghc-pkg need to agree on
+# where package.conf is, so we just set it globally).
+datadir     = $(libdir)
 
 platform    = @TargetPlatform@
 prefix      = @prefix@
