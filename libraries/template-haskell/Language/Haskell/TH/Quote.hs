@@ -4,7 +4,7 @@ module Language.Haskell.TH.Quote(
         dataToQa, dataToExpQ, dataToPatQ
     ) where
 
-import Data.Generics
+import Data.Data
 import Language.Haskell.TH.Lib
 import Language.Haskell.TH.Syntax
 

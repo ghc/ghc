@@ -51,8 +51,8 @@ module Language.Haskell.TH.Syntax(
 import Data.PackedString
 import GHC.Base		( Int(..), Int#, (<#), (==#) )
 
-import Data.Generics (Data(..), Typeable, mkConstr, mkDataType)
-import qualified Data.Generics as Generics
+import Data.Data (Data(..), Typeable, mkConstr, mkDataType)
+import qualified Data.Data as Data
 import Data.IORef
 import GHC.IOBase	( unsafePerformIO )
 import Control.Monad (liftM)
@@ -354,14 +354,14 @@ instance Data NameFlavour where
      toConstr (NameG _ _ _) = con_NameG
      dataTypeOf _ = ty_NameFlavour
 
-con_NameS, con_NameQ, con_NameU, con_NameL, con_NameG :: Generics.Constr
-con_NameS = mkConstr ty_NameFlavour "NameS" [] Generics.Prefix
-con_NameQ = mkConstr ty_NameFlavour "NameQ" [] Generics.Prefix
-con_NameU = mkConstr ty_NameFlavour "NameU" [] Generics.Prefix
-con_NameL = mkConstr ty_NameFlavour "NameL" [] Generics.Prefix
-con_NameG = mkConstr ty_NameFlavour "NameG" [] Generics.Prefix
+con_NameS, con_NameQ, con_NameU, con_NameL, con_NameG :: Data.Constr
+con_NameS = mkConstr ty_NameFlavour "NameS" [] Data.Prefix
+con_NameQ = mkConstr ty_NameFlavour "NameQ" [] Data.Prefix
+con_NameU = mkConstr ty_NameFlavour "NameU" [] Data.Prefix
+con_NameL = mkConstr ty_NameFlavour "NameL" [] Data.Prefix
+con_NameG = mkConstr ty_NameFlavour "NameG" [] Data.Prefix
 
-ty_NameFlavour :: Generics.DataType
+ty_NameFlavour :: Data.DataType
 ty_NameFlavour = mkDataType "Language.Haskell.TH.Syntax.NameFlavour"
                             [con_NameS, con_NameQ, con_NameU,
                              con_NameL, con_NameG]
