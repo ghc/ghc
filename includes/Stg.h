@@ -35,9 +35,6 @@
 // Turn on C99 for .hc code.  This gives us the INFINITY and NAN
 // constants from math.h, which we occasionally need to use in .hc (#1861)
 # define _ISOC99_SOURCE
-
-// Turning on _ISOC99_SOURCE means S_ISSOCK gets defined on Linux
-# define _BSD_SOURCE
 #endif
 
 #if IN_STG_CODE == 0
