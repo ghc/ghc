@@ -497,9 +497,11 @@ hscEPS hsc_env = readIORef (hsc_EPS hsc_env)
 -- is for use in an IDE where the file hasn't been saved by
 -- the user yet).
 data Target = Target
-      TargetId                          -- module or filename
-      Bool                              -- object code allowed?
-      (Maybe (StringBuffer,ClockTime))  -- in-memory text buffer?
+      { targetId           :: TargetId  -- ^ module or filename
+      , targetAllowObjCode :: Bool      -- ^ object code allowed?
+      , targetContents     :: Maybe (StringBuffer,ClockTime)
+                                        -- ^ in-memory text buffer?
+      }
 
 data TargetId
   = TargetModule ModuleName
