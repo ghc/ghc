@@ -1132,20 +1132,6 @@ instance (Data a, Data b) => Data (Either a b) where
 
 ------------------------------------------------------------------------------
 
-
---
--- A last resort for functions
---
-
-instance (Data a, Data b) => Data (a -> b) where
-  toConstr _   = error "toConstr"
-  gunfold _ _  = error "gunfold"
-  dataTypeOf _ = mkNorepType "Prelude.(->)"
-  dataCast2 f  = gcast2 f
-
-
-------------------------------------------------------------------------------
-
 tuple0Constr :: Constr
 tuple0Constr = mkConstr tuple0DataType "()" [] Prefix
 
