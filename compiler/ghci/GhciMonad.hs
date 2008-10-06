@@ -170,12 +170,8 @@ instance GhcMonad GHCi where
 
 instance ExceptionMonad GHCi where
   gcatch m h = GHCi $ \r -> unGHCi m r `gcatch` (\e -> unGHCi (h e) r)
-  gbracket acq rel ib =
-      GHCi $ \r -> gbracket (unGHCi acq r)
-                            (\x -> unGHCi (rel x) r)
-                            (\x -> unGHCi (ib x) r)
-  gfinally th cu =
-      GHCi $ \r -> gfinally (unGHCi th r) (unGHCi cu r)
+  gblock (GHCi m)   = GHCi $ \r -> gblock (m r)
+  gunblock (GHCi m) = GHCi $ \r -> gunblock (m r)
 
 instance WarnLogMonad GHCi where
   setWarnings warns = liftGhc $ setWarnings warns

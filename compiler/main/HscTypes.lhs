@@ -302,6 +302,9 @@ instance MonadIO Ghc where
 instance ExceptionMonad Ghc where
   gcatch act handle =
       Ghc $ \s -> unGhc act s `gcatch` \e -> unGhc (handle e) s
+  gblock (Ghc m)   = Ghc $ \s -> gblock (m s)
+  gunblock (Ghc m) = Ghc $ \s -> gunblock (m s)
+
 instance WarnLogMonad Ghc where
   setWarnings warns = Ghc $ \(Session _ wref) -> writeIORef wref warns
   -- | Return 'Warnings' accumulated so far.
@@ -331,6 +334,8 @@ instance MonadIO m => MonadIO (GhcT m) where
 instance ExceptionMonad m => ExceptionMonad (GhcT m) where
   gcatch act handle =
       GhcT $ \s -> unGhcT act s `gcatch` \e -> unGhcT (handle e) s
+  gblock (GhcT m) = GhcT $ \s -> gblock (m s)
+  gunblock (GhcT m) = GhcT $ \s -> gunblock (m s)
 
 instance MonadIO m => WarnLogMonad (GhcT m) where
   setWarnings warns = GhcT $ \(Session _ wref) -> liftIO $ writeIORef wref warns

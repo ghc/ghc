@@ -26,13 +26,26 @@ tryIO = try
 -- | A monad that can catch exceptions.  A minimal definition
 -- requires a definition of 'gcatch'.
 --
--- Although, 'gbracket' and 'gfinally' could be modelled on top of 'gcatch',
--- they are included in the type class since GHC needs special implementations
--- of these in order to properly handle asynchronous exceptions.
+-- Implementations on top of 'IO' should implement 'gblock' and 'gunblock' to
+-- eventually call the primitives 'Control.Exception.block' and
+-- 'Control.Exception.unblock' respectively.  These are used for
+-- implementations that support asynchronous exceptions.  The default
+-- implementations of 'gbracket' and 'gfinally' use 'gblock' and 'gunblock'
+-- thus rarely require overriding.
+--
 class Monad m => ExceptionMonad m where
+
   -- | Generalised version of 'Control.Exception.catch', allowing an arbitrary
   -- exception handling monad instead of just 'IO'.
   gcatch :: Exception e => m a -> (e -> m a) -> m a
+
+  -- | Generalised version of 'Control.Exception.block', allowing an arbitrary
+  -- exception handling monad instead of just 'IO'.
+  gblock :: m a -> m a
+
+  -- | Generalised version of 'Control.Exception.unblock', allowing an
+  -- arbitrary exception handling monad instead of just 'IO'.
+  gunblock :: m a -> m a
 
   -- | Generalised version of 'Control.Exception.bracket', allowing an arbitrary
   -- exception handling monad instead of just 'IO'.
@@ -42,22 +55,26 @@ class Monad m => ExceptionMonad m where
   -- exception handling monad instead of just 'IO'.
   gfinally :: m a -> m b -> m a
 
-  gbracket acquire release in_between = do
-      a <- acquire
-      r <- in_between a `gonException` release a
-      release a
-      return r
+  gblock = id
+  gunblock = id
 
-  gfinally thing cleanup = do
-      r <- thing `gonException` cleanup
-      cleanup
-      return r
+  gbracket before after thing =
+    gblock (do
+      a <- before
+      r <- gunblock (thing a) `gonException` after a
+      after a
+      return r)
+
+  a `gfinally` sequel =
+    gblock (do
+      r <- gunblock a `gonException` sequel
+      sequel
+      return r)
 
 instance ExceptionMonad IO where
   gcatch    = catch
-  gbracket  = bracket
-  gfinally  = finally
-
+  gblock    = block
+  gunblock  = unblock
 
 gtry :: (ExceptionMonad m, Exception e) => m a -> m (Either e a)
 gtry act = gcatch (act >>= \a -> return (Right a))
