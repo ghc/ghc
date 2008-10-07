@@ -1188,8 +1188,8 @@ runPhase_MoveBinary dflags input_fn dep_packages
 	  Wrapped wrapmode ->
 	      do
 		let (o_base, o_ext) = splitExtension input_fn
-		let wrapped_executable | o_ext == "exe" = (o_base ++ "_real") <.> o_ext
-				       | otherwise = input_fn ++ "_real"
+		let wrapped_executable | o_ext == "exe" = (o_base ++ ".dyn") <.> o_ext
+				       | otherwise = input_fn ++ ".dyn"
 		behaviour <- wrapper_behaviour dflags wrapmode dep_packages
 
                 -- THINKME isn't this possible to do a bit nicer?

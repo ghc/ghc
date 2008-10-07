@@ -16,7 +16,7 @@
 /* All defining behavior string */
 char behaviour[]=BEHAVIOUR;
 
-#define REAL_EXT "_real"
+#define REAL_EXT ".dyn"
 #define REAL_EXT_S (sizeof(REAL_EXT)-1)
 
 void *smalloc(size_t size);
