@@ -121,14 +121,9 @@ import GHC.Arr               -- So we can give Data instance for Array
 # ifdef __HUGS__
 import Hugs.Prelude( Ratio(..) )
 # endif
-import System.IO
 import Foreign.Ptr
 import Foreign.ForeignPtr
-import Foreign.StablePtr
-import Control.Monad.ST
-import Control.Concurrent
 import Data.Array
-import Data.IORef
 #endif
 
 #include "Typeable.h"
