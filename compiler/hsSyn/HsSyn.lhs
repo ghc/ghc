@@ -47,23 +47,35 @@ import Module		( Module, ModuleName )
 import FastString
 \end{code}
 
-All we actually declare here is the top-level structure for a module.
 \begin{code}
+-- | All we actually declare here is the top-level structure for a module.
 data HsModule name
-  = HsModule
-	(Maybe (Located ModuleName))-- Nothing => "module X where" is omitted
-				--	(in which case the next field is Nothing too)
-	(Maybe [LIE name])	-- Export list; Nothing => export list omitted, so export everything
-				-- Just [] => export *nothing*
-				-- Just [...] => as you would expect...
-	[LImportDecl name]	-- We snaffle interesting stuff out of the
-				-- imported interfaces early on, adding that
-				-- info to TyDecls/etc; so this list is
-				-- often empty, downstream.
-	[LHsDecl name]		-- Type, class, value, and interface signature decls
-	(Maybe WarningTxt)	-- reason/explanation for warning/deprecation of this module
-	(HaddockModInfo name)   -- Haddock module info
-	(Maybe (HsDoc name))    -- Haddock module description
+  = HsModule {
+      hsmodName :: Maybe (Located ModuleName),
+        -- ^ @Nothing@: \"module X where\" is omitted (in which case the next
+        --     field is Nothing too)
+      hsmodExports :: Maybe [LIE name],
+        -- ^ Export list
+        --
+        --  - @Nothing@: export list omitted, so export everything
+        --
+        --  - @Just []@: export /nothing/
+        --
+        --  - @Just [...]@: as you would expect...
+        --
+      hsmodImports :: [LImportDecl name],
+        -- ^ We snaffle interesting stuff out of the imported interfaces early
+        -- on, adding that info to TyDecls/etc; so this list is often empty,
+        -- downstream.
+      hsmodDecls :: [LHsDecl name],
+        -- ^ Type, class, value, and interface signature decls
+      hsmodDeprecMessage :: Maybe WarningTxt,
+        -- ^ reason\/explanation for warning/deprecation of this module
+      hsmodHaddockModInfo :: HaddockModInfo name,
+        -- ^ Haddock module info
+      hsmodHaddockModDescr :: Maybe (HsDoc name)
+        -- ^ Haddock module description
+   }
 
 data HaddockModInfo name = HaddockModInfo { 
 	hmi_description :: Maybe (HsDoc name),
