@@ -56,6 +56,47 @@
       </listitem>
       <listitem>
         <para>
+          FFI change: header files are now <emphasis>not
+            used</emphasis> when compiling via C.
+            The <option>-#include</option> flag,
+            the <literal>includes</literal> field
+            in <literal>.cabal</literal> files, and header files
+            specified in a <literal>foreign import</literal>
+            declaration all have no effect when compiling Haskell
+          source code.</para>
+
+        <para>This change has important ramifications if you are
+          calling FFI functions that are defined by macros (or renamed
+          by macros).  If you need to call one of these functions,
+          then write a C wrapper for the function and call the wrapper
+          using the FFI instead.  In this way, your code will work
+          with GHC 6.10.1, and will also work
+          with <option>-fasm</option> in older GHCs.</para>
+
+        <para>This change was made for several reasons.
+          Firstly, <option>-fvia-C</option> now behaves consistently
+          with <option>-fasm</option>, which is important because we
+          intend to stop compiling via C in the future.  Also, we
+          don't need to worry about the interactions between header
+          files, or CPP options necessary to expose certain functions
+          from the system header files (this was becoming quite a
+          headache).  We don't need to worry about needing header
+          files when inlining FFI calls across module or package
+          boundaries; calls can now be inlined freely.  One downside
+          is that you don't get a warning from the C compiler when you
+          call a function via the FFI at the wrong type.
+        </para>
+
+        <para>Another consequence of this change is that
+          calling <emphasis>varargs</emphasis> functions (such
+          as <literal>printf</literal>) via the FFI no longer works.
+          It has never been officially supported (the FFI spec outlaws
+          it), but in GHC 6.10.1 it may now really cause a crash on
+          certain platforms.  Again, to call one of these functions
+          use appropriate fixed-argument C wrappers.</para>
+      </listitem>
+      <listitem>
+        <para>
           There is a new languages extension PackageImports which allows
           imports to be qualified with the package they should come
           from, e.g.
@@ -64,7 +105,10 @@
 import "network" Network.Socket
 </programlisting>
         <para>
-          See <xref linkend="package-imports" /> for more details.
+          Note that this feature is not intended for general use, it
+          was added for constructing backwards-compatibility packages
+          such as the <literal>base-3.0.3.0</literal> package.  See
+          <xref linkend="package-imports" /> for more details.
         </para>
       </listitem>
       <listitem>
@@ -73,30 +117,6 @@ import "network" Network.Socket
           notice changes in other packages meant that recompilation is
           needed. This is now handled properly, using MD5 checksums of
           the interface ABIs.
-        </para>
-      </listitem>
-      <listitem>
-        <para>
-          When compiling with <literal>-fvia-C</literal>, we no longer
-          use the C header files. Instead we rely on all the type
-          information being given as part of the FFI import declaration.
-          This makes it more consistent with <literal>-fasm</literal>.
-        </para>
-        <para>
-          This means that, unlike <literal>-fasm</literal>,
-          <literal>-fvia-C</literal> is no longer able to
-          call varargs functions.
-        </para>
-        <para>
-          Also, if you were using <literal>-fvia-C</literal> because
-          your program didn't work with <literal>-fasm</literal>, then
-          it probably won't work with <literal>-fvia-C</literal> either
-          now.
-        </para>
-        <para>
-          We recommend using <literal>-fasm</literal> (the default).
-          We expect to remove the <literal>-fvia-C</literal>
-          functionality in the 6.12 release.
         </para>
       </listitem>
       <listitem>
@@ -576,8 +596,9 @@ Prelude&gt;
       </listitem>
       <listitem>
         <para>
-          GHCi can now use libffi to make FFI calls, which means that
-          it now works on all platforms that libffi supports.
+          GHCi now uses libffi to make FFI calls, which means that the
+          FFI now works in GHCi on a much wider range of platforms
+          (all those platforms that libffi supports).
         </para>
       </listitem>
     </itemizedlist>
@@ -585,8 +606,34 @@ Prelude&gt;
 
   <sect2>
     <title>Runtime system changes</title>
-
+    
     <itemizedlist>
+      <listitem>
+        <para>
+          The garbage collector can now use multiple threads in parallel.
+          The new <literal>-g<replaceable>n</replaceable></literal> RTS
+          flag controls it, e.g. run your program with
+          <literal>+RTS -g2 -RTS</literal> to use 2 threads.
+          The <option>-g</option> option is implied by the
+          usual <option>-N</option> option, so normally there will be
+          no need to specify it separately, although occasionally it
+          is useful to turn it off with <option>-g1</option>.</para>
+        <para>Do let us know if you experience strange effects,
+          especially an increase in GC time when using the parallel GC
+          (use <option>+RTS -s -RTS</option> to measure GC time).
+          See <xref linkend="rts-options-gc" /> for more details.</para>
+      </listitem>
+      <listitem>
+        <para>
+          It is now possible to generate a heap profile without
+          recompiling your program for profiling.  Run the program
+          with <option>+RTS -hT</option> to generate a basic heap
+          profile, and use <command>hp2ps</command> as usual to
+          convert the heap profile into a <literal>.ps</literal> file
+          for viewing.  See <xref linkend="rts-profiling" /> for more
+          details.
+        </para>
+      </listitem>
       <listitem>
         <para>
           If the user presses control-C while running a Haskell program
@@ -596,16 +643,6 @@ Prelude&gt;
       <listitem>
         <para>
           We now ignore SIGPIPE by default.
-        </para>
-      </listitem>
-      <listitem>
-        <para>
-          The garbage collector can now use multiple threads in parallel.
-          The new <literal>-g<replaceable>n</replaceable></literal> RTS
-          flag controls it, e.g. run your program with
-          <literal>+RTS -g2 -RTS</literal> to use 2 threads.
-          Don't use more threads than you have CPUs.
-          Only major GCs are parallelised; minor GCs are still sequential.
         </para>
       </listitem>
       <listitem>
@@ -662,6 +699,12 @@ Prelude&gt;
     <title>ghc-pkg</title>
 
     <itemizedlist>
+      <listitem>
+        <para>ghc-pkg will refuse to unregister a package on which
+          other packages depend, unless
+          the <option>&ndash;&ndash;force</option> option is also
+          supplied.</para>
+      </listitem>
       <listitem>
         <para>
           ghc-pkg now has a <literal>-no-user-package-conf</literal>
@@ -766,6 +809,11 @@ Prelude&gt;
             We also ship a base version 3.0.3.0, so legacy code should
             continue to work.
           </para>
+        </listitem>
+        <listitem>
+          <para>The <literal>Show</literal> instance
+            for <literal>Ratio</literal> now puts spaces around
+            the <literal>%</literal>, as required by Haskell 98.</para>
         </listitem>
         <listitem>
           <para>
