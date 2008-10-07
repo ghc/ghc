@@ -111,6 +111,14 @@ the minimal testing procedure, please do further testing as necessary.
 When you are satisfied that you haven't broken anything, go ahead and
 push/send your patches.
 EOF
+        if grep -q "^[^#]" mk/validate.mk
+        then
+            cat <<EOF
+
+WARNING: You seem to have things set in mk/validate.mk. Please check
+that it is OK before pushing.
+EOF
+        fi
     else
         cat <<EOF
 I didn't find any problems, but this wasn't a complete validate run,
