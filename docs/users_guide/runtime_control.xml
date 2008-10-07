@@ -689,7 +689,7 @@
       <xref linkend="parallel-options"/>.</para>
   </sect2>
 
-  <sect2>
+  <sect2 id="rts-profiling">
     <title>RTS options for profiling</title>
 
     <para>Most profiling runtime options are only available when you
