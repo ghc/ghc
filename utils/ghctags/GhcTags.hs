@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -XCPP -XPatternGuards -Wall #-}
+{-# OPTIONS_GHC -XCPP -XPatternGuards -XScopedTypeVariables -Wall #-}
 module Main where
 
 import GHC hiding (flags)
@@ -12,8 +12,9 @@ import ErrUtils         ( printBagOfErrors )
 import DynFlags         ( defaultDynFlags )
 import SrcLoc
 import Bag
-import Util             ( handle, handleDyn )
+import Exception --        ( ghandle )
 import FastString
+import MonadUtils       ( liftIO )
 
 import Prelude hiding (mapM)
 import Control.Monad hiding (mapM)
@@ -81,16 +82,16 @@ main = do
                            then Just `liftM` openFile "TAGS" openFileMode
                            else return Nothing
 
-        GHC.defaultErrorHandler defaultDynFlags $ do
-          session <- newSession (Just ghc_topdir)
-          dflags <- getSessionDynFlags session
-          (pflags, _) <- parseDynamicFlags dflags{ verbosity=1 } ghcArgs
-          let dflags2 = pflags { hscTarget = HscNothing } -- don't generate anything
-          GHC.defaultCleanupHandler dflags2 $ do
+        GHC.defaultErrorHandler defaultDynFlags $
+          runGhc (Just ghc_topdir) $ do
+            dflags <- getSessionDynFlags
+            (pflags, _, _) <- parseDynamicFlags dflags{ verbosity=1 } (map noLoc ghcArgs)
+            let dflags2 = pflags { hscTarget = HscNothing } -- don't generate anything
+            GHC.defaultCleanupHandler dflags2 $ do
   
-          setSessionDynFlags session dflags2
-          targetsAtOneGo session hsfiles (ctags_hdl,etags_hdl)
-          mapM_ (mapM hClose) [ctags_hdl, etags_hdl]
+              setSessionDynFlags dflags2
+              targetsAtOneGo hsfiles (ctags_hdl,etags_hdl)
+              mapM_ (mapM (liftIO . hClose)) [ctags_hdl, etags_hdl]
 
 ----------------------------------------------
 ----------  ARGUMENT PROCESSING --------------
@@ -145,47 +146,44 @@ options = [ Option "" ["topdir"]
 --- LOADING HASKELL SOURCE
 --- (these bits actually run the compiler and produce abstract syntax)
 
-safeLoad :: Session -> LoadHowMuch -> IO SuccessFlag
+safeLoad :: LoadHowMuch -> Ghc SuccessFlag
 -- like GHC.load, but does not stop process on exception
-safeLoad session mode = do
-  dflags <- getSessionDynFlags session
-  handle (\_exception -> return Failed ) $
-    handleDyn (\dyn -> do printBagOfErrors dflags (unitBag dyn)
-	  		  return Failed) $ load session mode
+safeLoad mode = do
+  dflags <- getSessionDynFlags
+  ghandle (\(e :: SomeException) -> liftIO (print e) >> return Failed ) $
+    handleSourceError (\e -> printExceptionAndWarnings e >> return Failed) $
+      load mode
 
 
-targetsAtOneGo :: Session -> [FileName] -> (Maybe Handle, Maybe Handle) -> IO ()
+targetsAtOneGo :: [FileName] -> (Maybe Handle, Maybe Handle) -> Ghc ()
 -- load a list of targets
-targetsAtOneGo session hsfiles handles = do
+targetsAtOneGo hsfiles handles = do
   targets <- mapM (\f -> guessTarget f Nothing) hsfiles
-  setTargets session targets
-  mb_modgraph <- depanal session [] False
-  case mb_modgraph of
-    Nothing -> exitWith (ExitFailure 1)
-    Just modgraph -> do
-        let mods = flattenSCCs $ topSortModuleGraph False modgraph Nothing
-        graphData session mods handles
+  setTargets targets
+  modgraph <- depanal [] False
+  let mods = flattenSCCs $ topSortModuleGraph False modgraph Nothing
+  graphData mods handles
 
 fileTarget :: FileName -> Target
-fileTarget filename = Target (TargetFile filename Nothing) Nothing
+fileTarget filename = Target (TargetFile filename Nothing) True Nothing
 
 ---------------------------------------------------------------
 ----- CRAWLING ABSTRACT SYNTAX TO SNAFFLE THE DEFINITIONS -----
 
-graphData :: Session -> ModuleGraph -> (Maybe Handle, Maybe Handle) -> IO ()
-graphData session graph handles = do
+graphData :: ModuleGraph -> (Maybe Handle, Maybe Handle) -> Ghc ()
+graphData graph handles = do
     mapM_ foundthings graph
     where foundthings ms =
               let filename = msHsFilePath ms
                   modname = moduleName $ ms_mod ms
-              in  do putStrLn ("loading " ++ filename)
-                     mb_mod <- checkAndLoadModule session ms False
-                     case mb_mod of
+              in  do liftIO $ putStrLn ("loading " ++ filename)
+                     mod <- loadModule =<< typecheckModule =<< parseModule ms
+                     case mod of
                        _ | isBootSummary ms -> return ()
-                       Just mod | Just s <- renamedSource mod ->
-                         writeTagsData handles (fileData filename modname s)
+                       _ | Just s <- renamedSource mod ->
+                         liftIO $ writeTagsData handles (fileData filename modname s)
                        _otherwise ->
-                         exitWith (ExitFailure 1)
+                         liftIO $ exitWith (ExitFailure 1)
 
 fileData :: FileName -> ModuleName -> RenamedSource -> FileData
 fileData filename modname (group, _imports, _lie, _doc, _haddock) =
