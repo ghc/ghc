@@ -29,7 +29,7 @@ import TysWiredIn      ( unitTyCon, unitDataCon,
                          doubleTyCon, doubleTyConName,
                          boolTyCon, boolTyConName, trueDataCon, falseDataCon,
                          parrTyConName )
-import PrelNames       ( gHC_PARR )
+import PrelNames       ( word8TyConName, gHC_PARR )
 import BasicTypes      ( Boxity(..) )
 
 import FastString
@@ -57,6 +57,7 @@ data Modules = Modules {
                  , dph_Combinators :: Module
                  , dph_Prelude_PArr :: Module
                  , dph_Prelude_Int :: Module
+                 , dph_Prelude_Word8 :: Module
                  , dph_Prelude_Double :: Module
                  , dph_Prelude_Bool :: Module
                  , dph_Prelude_Tuple :: Module
@@ -73,6 +74,7 @@ dph_Modules pkg = Modules {
 
   , dph_Prelude_PArr   = mk (fsLit "Data.Array.Parallel.Prelude.Base.PArr")
   , dph_Prelude_Int    = mk (fsLit "Data.Array.Parallel.Prelude.Base.Int")
+  , dph_Prelude_Word8  = mk (fsLit "Data.Array.Parallel.Prelude.Base.Word8")
   , dph_Prelude_Double = mk (fsLit "Data.Array.Parallel.Prelude.Base.Double")
   , dph_Prelude_Bool   = mk (fsLit "Data.Array.Parallel.Prelude.Base.Bool")
   , dph_Prelude_Tuple  = mk (fsLit "Data.Array.Parallel.Prelude.Base.Tuple")
@@ -240,6 +242,7 @@ preludeVars :: Modules -> [(Module, FastString, Module, FastString)]
 preludeVars (Modules { dph_Combinators    = dph_Combinators
                      , dph_PArray         = dph_PArray
                      , dph_Prelude_Int    = dph_Prelude_Int
+                     , dph_Prelude_Word8  = dph_Prelude_Word8
                      , dph_Prelude_Double = dph_Prelude_Double
                      , dph_Prelude_Bool   = dph_Prelude_Bool 
                      , dph_Prelude_PArr   = dph_Prelude_PArr
@@ -267,6 +270,13 @@ preludeVars (Modules { dph_Combinators    = dph_Combinators
     ]
     ++ vars_Ord dph_Prelude_Int
     ++ vars_Num dph_Prelude_Int
+
+    ++ vars_Ord dph_Prelude_Word8
+    ++ vars_Num dph_Prelude_Word8
+    ++
+    [ mk' dph_Prelude_Word8 "div" "divV"
+    , mk' dph_Prelude_Word8 "mod" "modV"
+    ]
 
     ++ vars_Ord dph_Prelude_Double
     ++ vars_Num dph_Prelude_Double
@@ -345,16 +355,20 @@ initBuiltinTyCons :: Builtins -> DsM [(Name, TyCon)]
 initBuiltinTyCons bi
   = do
       -- parr <- externalTyCon dph_Prelude_PArr (fsLit "PArr")
+      dft_tcs <- defaultTyCons
       return $ (tyConName funTyCon, closureTyCon bi)
              : (parrTyConName,      parrayTyCon bi)
 
              -- FIXME: temporary
              : (tyConName $ parrayTyCon bi, parrayTyCon bi)
 
-             : [(tyConName tc, tc) | tc <- defaultTyCons]
+             : [(tyConName tc, tc) | tc <- dft_tcs]
 
-defaultTyCons :: [TyCon]
-defaultTyCons = [intTyCon, boolTyCon, doubleTyCon]
+defaultTyCons :: DsM [TyCon]
+defaultTyCons
+  = do
+      word8 <- dsLookupTyCon word8TyConName
+      return [intTyCon, boolTyCon, doubleTyCon, word8]
 
 initBuiltinDataCons :: Builtins -> [(Name, DataCon)]
 initBuiltinDataCons _ = [(dataConName dc, dc)| dc <- defaultDataCons]
@@ -382,6 +396,7 @@ builtinPAs bi@(Builtins { dphModules = mods })
     , mk unitTyConName                  (dph_Instances mods) (fsLit "dPA_Unit")
 
     , mk intTyConName                   (dph_Instances mods) (fsLit "dPA_Int")
+    , mk word8TyConName                 (dph_Instances mods) (fsLit "dPA_Word8")
     , mk doubleTyConName                (dph_Instances mods) (fsLit "dPA_Double")
     , mk boolTyConName                  (dph_Instances mods) (fsLit "dPA_Bool")
     ]
@@ -408,6 +423,7 @@ builtinPRs bi@(Builtins { dphModules = mods }) =
 
     -- temporary
   , mk intTyConName          (dph_Instances mods) (fsLit "dPR_Int")
+  , mk word8TyConName        (dph_Instances mods) (fsLit "dPR_Word8")
   , mk doubleTyConName       (dph_Instances mods) (fsLit "dPR_Double")
   ]
 
