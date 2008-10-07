@@ -87,7 +87,7 @@ documentation</ulink> describes all the libraries that come with GHC.
           <option>-XGeneralizedNewtypeDeriving</option>,
           <option>-XTypeFamilies</option>.
 	    Enabling these options is the <emphasis>only</emphasis> 
-	    effect of <options>-fglasgow-exts</options>.
+	    effect of <option>-fglasgow-exts</option>.
           We are trying to move away from this portmanteau flag, 
 	  and towards enabling features individually.</para>
 
