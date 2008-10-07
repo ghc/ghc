@@ -247,7 +247,7 @@ GhcStage3HcOpts=-O2
 
 GhcProfiled=NO
 GhcDebugged=NO
-GhcLibProfiled=NO
+GhcLibProfiled=$(if $(filter p,$(GhcLibWays)),YES,NO)
 
 # Build shared and/or static libs?
 BuildSharedLibs=@BuildSharedLibs@
