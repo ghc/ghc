@@ -108,7 +108,8 @@ stamp.ffi.configure:
 	# libffi.so needs to be built with the correct soname.
 	# NOTE: this builds libffi_convience.so with the incorrect
 	# soname, but we don't need that anyway!
-	sed -i -e s/soname_spec=.*/soname_spec="$(HS_DYN_LIB_NAME)"/ build/libtool
+	$(CP) build/libtool build/libtool.orig
+	sed -e s/soname_spec=.*/soname_spec="$(HS_DYN_LIB_NAME)"/ build/libtool.orig > build/libtool
 	touch $@
 
 ffi.h: stamp.ffi.configure
@@ -122,7 +123,7 @@ stamp.ffi.build: stamp.ffi.configure
 $(STATIC_LIB) $(DYNAMIC_LIBS) $(DYNAMIC_PROG): stamp.ffi.build
 
 libHSffi.a libHSffi_p.a: $(STATIC_LIB)
-	cp $(STATIC_LIB) $@
+	$(CP) $(STATIC_LIB) $@
 
 all :: libHSffi.a libHSffi_p.a
 
@@ -139,7 +140,7 @@ all :: HSffi.o
 
 ifeq "$(BuildSharedLibs)" "YES"
 $(HS_DYN_LIB_NAME): $(DYNAMIC_LIBS)
-	cp $(word 1,$(DYNAMIC_LIBS)) $(HS_DYN_LIB_NAME)
+	$(CP) $(word 1,$(DYNAMIC_LIBS)) $(HS_DYN_LIB_NAME)
 
 all :: $(HS_DYN_LIB_NAME)
 endif
