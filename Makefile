@@ -573,11 +573,11 @@ ifneq "$(PublishLocation)" ""
 dist ::
 	@for i in 0 1 2 3 4 5 6 7 8 9; do \
 		echo "Try $$i: $(PublishCp) $(SRC_DIST_EXTRALIBS_TARBALL) $(PublishLocation)/dist"; \
-		if $(PublishCp) $(SRC_DIST_EXTRALIBS_TARBALL) $(PublishLocation)/dist; then break; fi\
+		if $(PublishCp) $(SRC_DIST_EXTRALIBS_TARBALL) $(PublishLocation)/dist; then break; fi; \
 	done
 	@for i in 0 1 2 3 4 5 6 7 8 9; do \
 		echo "Try $$i: $(PublishCp) $(SRC_DIST_TARBALL) $(PublishLocation)/dist"; \
-		if $(PublishCp) $(SRC_DIST_TARBALL) $(PublishLocation)/dist; then break; fi\
+		if $(PublishCp) $(SRC_DIST_TARBALL) $(PublishLocation)/dist; then break; fi; \
 	done
 endif
 
