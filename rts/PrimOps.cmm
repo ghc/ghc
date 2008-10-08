@@ -193,7 +193,7 @@ newMutVarzh_fast
 
 atomicModifyMutVarzh_fast
 {
-    W_ mv, z, x, y, r;
+    W_ mv, f, z, x, y, r, h;
     /* Args: R1 :: MutVar#,  R2 :: a -> (a,b) */
 
     /* If x is the current contents of the MutVar#, then 
@@ -232,19 +232,15 @@ atomicModifyMutVarzh_fast
 
    HP_CHK_GEN_TICKY(SIZE, R1_PTR & R2_PTR, atomicModifyMutVarzh_fast);
 
-#if defined(THREADED_RTS)
-    ACQUIRE_LOCK(atomic_modify_mutvar_mutex "ptr") [R1,R2];
-#endif
-
-   x = StgMutVar_var(R1);
+   mv = R1;
+   f = R2;
 
    TICK_ALLOC_THUNK_2();
    CCCS_ALLOC(THUNK_2_SIZE);
    z = Hp - THUNK_2_SIZE + WDS(1);
    SET_HDR(z, stg_ap_2_upd_info, W_[CCCS]);
    LDV_RECORD_CREATE(z);
-   StgThunk_payload(z,0) = R2;
-   StgThunk_payload(z,1) = x;
+   StgThunk_payload(z,0) = f;
 
    TICK_ALLOC_THUNK_1();
    CCCS_ALLOC(THUNK_1_SIZE);
@@ -253,9 +249,6 @@ atomicModifyMutVarzh_fast
    LDV_RECORD_CREATE(y);
    StgThunk_payload(y,0) = z;
 
-   StgMutVar_var(R1) = y;
-   foreign "C" dirty_MUT_VAR(BaseReg "ptr", R1 "ptr") [R1];
-
    TICK_ALLOC_THUNK_1();
    CCCS_ALLOC(THUNK_1_SIZE);
    r = y - THUNK_1_SIZE;
@@ -263,9 +256,19 @@ atomicModifyMutVarzh_fast
    LDV_RECORD_CREATE(r);
    StgThunk_payload(r,0) = z;
 
-#if defined(THREADED_RTS)
-    RELEASE_LOCK(atomic_modify_mutvar_mutex "ptr") [];
+ retry:
+   x = StgMutVar_var(mv);
+   StgThunk_payload(z,1) = x;
+#ifdef THREADED_RTS
+   (h) = foreign "C" cas(mv + SIZEOF_StgHeader + OFFSET_StgMutVar_var, x, y) [];
+   if (h != x) { goto retry; }
+#else
+   StgMutVar_var(mv) = y;
 #endif
+
+   if (GET_INFO(mv) == stg_MUT_VAR_CLEAN_info) {
+     foreign "C" dirty_MUT_VAR(BaseReg "ptr", mv "ptr") [];
+   }
 
    RET_P(r);
 }
