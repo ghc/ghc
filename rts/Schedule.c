@@ -150,7 +150,7 @@ static rtsBool scheduleGetRemoteWork(Capability *cap);
 static void scheduleSendPendingMessages(void);
 static void scheduleActivateSpark(Capability *cap);
 #endif
-static void schedulePostRunThread(StgTSO *t);
+static void schedulePostRunThread(Capability *cap, StgTSO *t);
 static rtsBool scheduleHandleHeapOverflow( Capability *cap, StgTSO *t );
 static void scheduleHandleStackOverflow( Capability *cap, Task *task, 
 					 StgTSO *t);
@@ -622,7 +622,7 @@ run_thread:
     CCCS = CCS_SYSTEM;
 #endif
     
-    schedulePostRunThread(t);
+    schedulePostRunThread(cap,t);
 
     t = threadStackUnderflow(task,t);
 
@@ -1064,7 +1064,7 @@ scheduleGetRemoteWork(Capability *cap)
  * ------------------------------------------------------------------------- */
 
 static void
-schedulePostRunThread (StgTSO *t)
+schedulePostRunThread (Capability *cap, StgTSO *t)
 {
     // We have to be able to catch transactions that are in an
     // infinite loop as a result of seeing an inconsistent view of
@@ -1085,8 +1085,7 @@ schedulePostRunThread (StgTSO *t)
             // ATOMICALLY_FRAME, aborting the (nested)
             // transaction, and saving the stack of any
             // partially-evaluated thunks on the heap.
-            throwToSingleThreaded_(&capabilities[0], t, 
-                                   NULL, rtsTrue, NULL);
+            throwToSingleThreaded_(cap, t, NULL, rtsTrue, NULL);
             
             ASSERT(get_itbl((StgClosure *)t->sp)->type == ATOMICALLY_FRAME);
         }
