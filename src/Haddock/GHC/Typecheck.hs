@@ -17,9 +17,11 @@ import Haddock.GHC.Utils
 import Data.Maybe
 import Control.Monad
 import GHC
+import HscTypes ( msHsFilePath )
 import Digraph
 import BasicTypes
 import SrcLoc
+import MonadUtils ( liftIO )
 
 import Data.List
 
@@ -36,39 +38,31 @@ type FullyCheckedMod = (ParsedSource,
 -- TODO: make it handle cleanup
 typecheckFiles :: [FilePath] -> Ghc [GhcModule]
 typecheckFiles files = do
-
-  -- load all argument files
-
-  targets <- mapM (\f -> guessTarget f Nothing) files
-  setTargets targets
-
-  flag <- load LoadAllTargets
-  when (failed flag) $ 
-    throwE "Failed to load all needed modules"
-
-  modgraph <- getModuleGraph
-
-  let mods = concatMap flattenSCC $ topSortModuleGraph False modgraph Nothing
-      getModFile = fromJust . ml_hs_file . ms_location
-      mods'= [ (ms_mod modsum, ms_hspp_opts modsum, getModFile modsum) |
-               modsum <- mods ]
-
-  -- typecheck the argument modules
-
-  ghcMods <- forM mods' $ \(mod, flags, file) ->
-    handleSourceError
-        (\err -> do
-           printExceptionAndWarnings err
-           throwE ("Failed to check module: " ++ moduleString mod)) $
-      do tc_mod <- typecheckModule =<< parseModule =<< getModSummary (moduleName mod)
-         let Just renamed_src = renamedSource tc_mod
-         return $ mkGhcModule (mod, file, (parsedSource tc_mod,
-                                           renamed_src,
-                                           typecheckedSource tc_mod,
-                                           moduleInfo tc_mod))
-                              flags
-
-  return ghcMods
+    targets <- mapM (\f -> guessTarget f Nothing) files
+    setTargets targets
+    modgraph <- depanal [] False
+    let ordered_mods = flattenSCCs $ topSortModuleGraph False modgraph Nothing
+    process_mods ordered_mods
+  where
+    process_mods mods =
+      forM mods $ \modsum ->
+        handleSourceError
+          (\err -> do
+             printExceptionAndWarnings err
+             throwE ("Failed to check module: " ++ moduleString (ms_mod modsum))) $
+        do
+          liftIO $ putStrLn $ "Processing " ++ moduleString (ms_mod modsum)
+          let filename = msHsFilePath modsum
+          let flags = ms_hspp_opts modsum
+          tc_mod <- loadModule =<< typecheckModule =<< parseModule modsum
+          let Just renamed_src = renamedSource tc_mod
+          return $ mkGhcModule (ms_mod modsum,
+                                filename,
+                                (parsedSource tc_mod,
+                                 renamed_src,
+                                 typecheckedSource tc_mod,
+                                 moduleInfo tc_mod))
+                                flags
 
 -- | Dig out what we want from the typechecker output
 mkGhcModule :: CheckedMod -> DynFlags -> GhcModule 
