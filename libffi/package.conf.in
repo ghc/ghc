@@ -1,0 +1,39 @@
+#include "ghcconfig.h"
+#include "RtsConfig.h"
+
+name:		PACKAGE
+version:	1.0
+license:	BSD3
+maintainer:	glasgow-haskell-users@haskell.org
+exposed:	True
+
+exposed-modules:
+hidden-modules:
+import-dirs:
+
+#ifdef INSTALLING
+library-dirs:		LIB_DIR
+#else /* !INSTALLING */
+library-dirs:		FPTOOLS_TOP_ABS"/libffi"
+#endif
+
+hs-libraries:   "HSffi"
+
+extra-libraries:		"m"		/* for ldexp() */
+
+#ifdef INSTALLING
+include-dirs:		INCLUDE_DIR
+#else /* !INSTALLING */
+include-dirs:		FPTOOLS_TOP_ABS"/libffi/build/include"
+#endif
+
+depends:
+hugs-options:
+cc-options:
+
+framework-dirs:
+frameworks:
+
+haddock-interfaces:
+haddock-html:
+

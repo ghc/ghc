@@ -140,6 +140,7 @@ ifeq "$(NON_HS_PACKAGE)" ""
 SRC_HC_OPTS	+= -XGenerics
 endif
 
+ifndef DONT_WANT_STD_LIBRARY
 ifndef LIBRARY
 ifeq "$(_way:%_dyn=YES)" "YES"
 LIBRARY      	= libHS$(PACKAGE)$(_way:%_dyn=%)-ghc$(ProjectVersion)$(soext)
@@ -147,11 +148,13 @@ else
 LIBRARY      	= libHS$(PACKAGE)$(_way).a
 endif
 endif
+endif
 
 ifeq "$(WAYS)" ""
 WAYS = $(GhcLibWays)
 endif
 
+ifdef LIBRARY
 all :: $(LIBRARY)
 
 # POSSIBLE alternative version using --make:
@@ -175,6 +178,7 @@ all :: $(LIBRARY)
 ifeq "$(DLLized)" "YES"
 INSTALL_PROGS += $(DLL_NAME)
 INSTALL_LIBS += $(patsubst %.a,%_imp.a, $(LIBRARY))
+endif
 endif
 
 # The interface files are put inside the $(libdir), since they

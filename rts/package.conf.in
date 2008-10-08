@@ -25,13 +25,11 @@ library-dirs:		FPTOOLS_TOP_ABS"/rts" GMP_LIB_DIRS PAPI_LIB_DIR
 # if !defined(HAVE_LIBGMP) && !defined(HAVE_FRAMEWORK_GMP)
 			, FPTOOLS_TOP_ABS"/gmp"
 # endif
-                        , FPTOOLS_TOP_ABS"/libffi"
 #endif
 
 hs-libraries:   "HSrts"
 
 extra-libraries:		"m"		/* for ldexp() */
-			      , "ffi"
 #ifndef HAVE_FRAMEWORK_GMP
 			      , "gmp"
 #ifdef HAVE_LIBDL
@@ -69,7 +67,7 @@ include-dirs:		FPTOOLS_TOP_ABS"/includes"
 #endif
 
 includes:		Stg.h
-depends:	 	
+depends:	 	ffi-1.0
 hugs-options:
 cc-options:
 

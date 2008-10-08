@@ -102,9 +102,9 @@ endif
 stage1 : $(GCC_LIB_DEP) check-all
 	$(MAKE) -C libraries boot
 	$(MAKE) -C gmp       all
-	$(MAKE) -C libffi    all
 	$(MAKE) -C utils/mkdependC boot
 	$(MAKE) -C utils with-bootstrapping-compiler
+	$(MAKE) -C libffi    all
 	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
 	for i in $(SUBDIRS_BUILD); do \
 	  echo "------------------------------------------------------------------------"; \
