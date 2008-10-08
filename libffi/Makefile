@@ -132,10 +132,8 @@ all :: libHSffi.a libHSffi_p.a
 # compiler/ghci/Linker.lhs:emptyPLS) we generate an empty HSffi.o
 
 HSffi.o: libHSffi.a
-	ld -r -o HSffi.o /dev/null # this is intentional
-#	$(RM) -fr unpack
-#	(mkdir unpack; cd unpack; ar x ../libHSffi.a; ld -r -o ../HSffi.o *.o)
-#	$(RM) -fr unpack
+	touch empty.c
+	$(CC) -c empty.c -o HSffi.o
 
 all :: HSffi.o
 
@@ -147,7 +145,7 @@ all :: $(HS_DYN_LIB_NAME)
 endif
 
 clean distclean maintainer-clean ::
-	$(RM) -f stamp.ffi.configure stamp.ffi.build ffi.h
+	$(RM) -f stamp.ffi.configure stamp.ffi.build ffi.h empty.c
 	$(RM) -f libffi.a libffi.la $(DYNAMIC_PROG) $(DYNAMIC_LIBS) $(ORIG_DYNAMIC_LIBS)
 	$(RM) -rf build
 
