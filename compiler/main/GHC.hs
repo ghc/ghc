@@ -998,17 +998,18 @@ type TypecheckedSource = LHsBinds Id
 -- | Return the 'ModSummary' of a module with the given name.
 --
 -- The module must be part of the module graph (see 'hsc_mod_graph' and
--- 'ModuleGraph').  If this is not the case, this function will throw an
+-- 'ModuleGraph').  If this is not the case, this function will throw a
 -- 'GhcApiError'.
 --
--- Note that the module graph may contain several 'ModSummary's matching the
--- same name (for example both a @.hs@ and a @.hs-boot@).
+-- This function ignores boot modules and requires that there is only one
+-- non-boot module with the given name.
 getModSummary :: GhcMonad m => ModuleName -> m ModSummary
 getModSummary mod = do
    mg <- liftM hsc_mod_graph getSession
-   case [ ms | ms <- mg, ms_mod_name ms == mod ] of
+   case [ ms | ms <- mg, ms_mod_name ms == mod, not (isBootSummary ms) ] of
      [] -> throw $ mkApiErr (text "Module not part of module graph")
-     (ms:_) -> return ms
+     [ms] -> return ms
+     multiple -> throw $ mkApiErr (text "getModSummary is ambiguous: " <+> ppr multiple)
 
 -- | Parse a module.
 --
