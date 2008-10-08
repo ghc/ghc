@@ -276,6 +276,8 @@ preludeVars (Modules { dph_Combinators    = dph_Combinators
     ++
     [ mk' dph_Prelude_Word8 "div" "divV"
     , mk' dph_Prelude_Word8 "mod" "modV"
+    , mk' dph_Prelude_Word8 "fromInt" "fromIntV"
+    , mk' dph_Prelude_Word8 "toInt" "toIntV"
     ]
 
     ++ vars_Ord dph_Prelude_Double
