@@ -6,7 +6,8 @@
 
 
 module Haddock.GHC.Typecheck (
-  typecheckFiles  
+  typecheckFiles,
+  mkGhcModule
 ) where
 
 
