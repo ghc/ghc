@@ -44,7 +44,7 @@ module Type (
 	newTyConInstRhs,
 	
 	-- (Type families)
-        tyFamInsts,
+        tyFamInsts, predFamInsts,
 
         -- (Source types)
         mkPredTy, mkPredTys, mkFamilyTyConApp,
@@ -887,6 +887,14 @@ tyFamInsts (TyConApp tc tys)
 tyFamInsts (FunTy ty1 ty2)      = tyFamInsts ty1 ++ tyFamInsts ty2
 tyFamInsts (AppTy ty1 ty2)      = tyFamInsts ty1 ++ tyFamInsts ty2
 tyFamInsts (ForAllTy _ ty)      = tyFamInsts ty
+tyFamInsts (PredTy pty)         = predFamInsts pty
+
+-- | Finds type family instances occuring in a predicate type after expanding 
+-- synonyms.
+predFamInsts :: PredType -> [(TyCon, [Type])]
+predFamInsts (ClassP _cla tys) = concat (map tyFamInsts tys)
+predFamInsts (IParam _ ty)     = tyFamInsts ty
+predFamInsts (EqPred ty1 ty2)  = tyFamInsts ty1 ++ tyFamInsts ty2
 \end{code}
 
 
