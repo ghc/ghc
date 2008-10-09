@@ -113,28 +113,28 @@ data Interface = Interface {
   ifaceOrigFilename    :: FilePath,
 
   -- | Textual information about the module 
-  ifaceInfo            :: HaddockModInfo Name,
+  ifaceInfo            :: !(HaddockModInfo Name),
 
   -- | The documentation header for this module
-  ifaceDoc             :: Maybe (HsDoc Name),
+  ifaceDoc             :: !(Maybe (HsDoc Name)),
 
   -- | The renamed documentation header for this module
   ifaceRnDoc           :: Maybe (HsDoc DocName),
 
   -- | The Haddock options for this module (prune, ignore-exports, etc)
-  ifaceOptions         :: [DocOption],
+  ifaceOptions         :: ![DocOption],
 
   ifaceDeclMap         :: Map Name (LHsDecl Name, Maybe (HsDoc Name)),
   ifaceRnDocMap        :: Map Name (HsDoc DocName),
 
-  ifaceExportItems     :: [ExportItem Name],
+  ifaceExportItems     :: ![ExportItem Name],
   ifaceRnExportItems   :: [ExportItem DocName],
 
   -- | All the names that are defined in this module
-  ifaceLocals          :: [Name],
+  ifaceLocals          :: ![Name],
 
   -- | All the names that are exported by this module
-  ifaceExports         :: [Name],
+  ifaceExports         :: ![Name],
 
   -- | All the visible names exported by this module
   -- For a name to be visible, it has to:
@@ -143,12 +143,12 @@ data Interface = Interface {
   --   exception that it can't be from another package.
   -- Basically, a visible name is a name that will show up in the documentation
   -- for this module.
-  ifaceVisibleExports  :: [Name],
+  ifaceVisibleExports  :: ![Name],
 
-  ifaceSubMap          :: Map Name [Name],
+  ifaceSubMap          :: !(Map Name [Name]),
 
   -- | The instances exported by this module
-  ifaceInstances       :: [Instance]
+  ifaceInstances       :: ![Instance]
 }
 
 
