@@ -611,14 +611,16 @@ tcConPat pstate con_span data_con tycon pat_ty arg_pats thing_inside
 	  -- Instantiate the constructor type variables [a->ty]
 	  -- This may involve doing a family-instance coercion, and building a
 	  -- wrapper 
-	; (ctxt_res_tys, coi) <- boxySplitTyConAppWithFamily tycon pat_ty
+	; (ctxt_res_tys, coi, unwrap_ty) <- boxySplitTyConAppWithFamily tycon 
+                                                                        pat_ty
         ; let sym_coi = mkSymCoI coi  -- boxy split coercion oriented wrongly
 	      pat_ty' = mkTyConApp tycon ctxt_res_tys
                                       -- pat_ty' /= pat_ty iff coi /= IdCo
               
               wrap_res_pat res_pat = mkCoPatCoI sym_coi uwScrut pat_ty
                 where
-                  uwScrut = unwrapFamInstScrutinee tycon ctxt_res_tys res_pat
+                  uwScrut = unwrapFamInstScrutinee tycon ctxt_res_tys
+                                                   unwrap_ty res_pat
 
 	  -- Add the stupid theta
 	; addDataConStupidTheta data_con ctxt_res_tys
@@ -687,12 +689,26 @@ tcConPat pstate con_span data_con tycon pat_ty arg_pats thing_inside
     boxySplitTyConAppWithFamily tycon pat_ty =
       traceTc traceMsg >>
       case tyConFamInst_maybe tycon of
-        Nothing                   -> boxySplitTyConApp tycon pat_ty
+        Nothing                   -> 
+          do { (scrutinee_arg_tys, coi1) <- boxySplitTyConApp tycon pat_ty
+             ; return (scrutinee_arg_tys, coi1, pat_ty)
+             }
 	Just (fam_tycon, instTys) -> 
-	  do { (scrutinee_arg_tys, coi) <- boxySplitTyConApp fam_tycon pat_ty
+	  do { (scrutinee_arg_tys, coi1) <- boxySplitTyConApp fam_tycon pat_ty
 	     ; (_, freshTvs, subst) <- tcInstTyVars (tyConTyVars tycon)
-	     ; boxyUnifyList (substTys subst instTys) scrutinee_arg_tys
-	     ; return (freshTvs, coi)
+             ; let instTys' = substTys subst instTys
+	     ; cois <- boxyUnifyList instTys' scrutinee_arg_tys
+             ; let coi = if isIdentityCoercion coi1
+                         then  -- pat_ty was splittable
+                               -- => boxyUnifyList had real work to do
+                           mkTyConAppCoI fam_tycon instTys' cois
+                         else  -- pat_ty was not splittable
+                               -- => scrutinee_arg_tys are fresh tvs and
+                               --    boxyUnifyList just instantiated those
+                           coi1
+	     ; return (freshTvs, coi, mkTyConApp fam_tycon instTys')
+                                      -- this is /= pat_ty 
+                                      -- iff cois is non-trivial
 	     }
       where
         traceMsg = sep [ text "tcConPat:boxySplitTyConAppWithFamily:" <+>
@@ -704,8 +720,8 @@ tcConPat pstate con_span data_con tycon pat_ty arg_pats thing_inside
     -- Wraps the pattern (which must be a ConPatOut pattern) in a coercion
     -- pattern if the tycon is an instance of a family.
     --
-    unwrapFamInstScrutinee :: TyCon -> [Type] -> Pat Id -> Pat Id
-    unwrapFamInstScrutinee tycon args pat
+    unwrapFamInstScrutinee :: TyCon -> [Type] -> Type -> Pat Id -> Pat Id
+    unwrapFamInstScrutinee tycon args unwrap_ty pat
       | Just co_con <- tyConFamilyCoercion_maybe tycon 
 --      , not (isNewTyCon tycon)       -- newtypes are explicitly unwrapped by
 				     -- the desugarer
@@ -714,7 +730,7 @@ tcConPat pstate con_span data_con tycon pat_ty arg_pats thing_inside
           --	 wants a located pattern.
       = CoPat (WpCast $ mkTyConApp co_con args)       -- co fam ty to repr ty
 	      (pat {pat_ty = mkTyConApp tycon args})    -- representation type
-	      pat_ty					-- family inst type
+	      unwrap_ty					-- family inst type
       | otherwise
       = pat
 
