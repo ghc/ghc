@@ -1219,6 +1219,7 @@ pushAtom _ _ (AnnLit lit)
         MachFloat _   -> code FloatArg
         MachDouble _  -> code DoubleArg
         MachChar _    -> code NonPtrArg
+	MachNullAddr  -> code NonPtrArg
         MachStr s     -> pushStr s
         l             -> pprPanic "pushAtom" (ppr l)
      where
