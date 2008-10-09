@@ -1,6 +1,3 @@
-#include "ghcconfig.h"
-#include "RtsConfig.h"
-
 name:		PACKAGE
 version:	1.0
 license:	BSD3
