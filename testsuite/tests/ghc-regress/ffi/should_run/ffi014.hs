@@ -7,7 +7,13 @@ import Control.Monad
 import Foreign.Ptr
 import Data.IORef
 
-main = replicateM 100 (putStrLn "." >> forkOS thread >> thread)
+main = do
+  ms <- replicateM 100 $ do putStrLn "." 
+       		      	    m <- newEmptyMVar 
+			    forkOS (thread >> putMVar m ())
+			    thread
+			    return m
+  mapM takeMVar ms
 
 thread = do var <- newIORef 0
             let f = modifyIORef var (1+)
