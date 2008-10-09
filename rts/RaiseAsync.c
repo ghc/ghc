@@ -576,12 +576,8 @@ performBlockedException (Capability *cap, StgTSO *source, StgTSO *target)
    This is for use when we raise an exception in another thread, which
    may be blocked.
 
-   Precondition: we have exclusive access to the TSO, which entails
-   holding a lock on the object that owns the queue, if the TSO is
-   blocked.  e.g. if the thread is blocked on an MVar, we must hold a
-   lock on the MVar before calling removeFromQueues().
-
-   This has nothing to do with the UnblockThread event in GranSim. -- HWL
+   Precondition: we have exclusive access to the TSO, via the same set
+   of conditions as throwToSingleThreaded() (c.f.).
    -------------------------------------------------------------------------- */
 
 static void
@@ -606,9 +602,6 @@ removeFromQueues(Capability *cap, StgTSO *tso)
       goto done;
 
   case BlockedOnBlackHole:
-      // we have exclusive access to this TSO, which implies that we
-      // must hold sched_mutex:
-      ASSERT_LOCK_HELD(&sched_mutex);
       removeThreadFromQueue(cap, &blackhole_queue, tso);
       goto done;
 
