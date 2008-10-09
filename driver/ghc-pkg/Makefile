@@ -1,0 +1,18 @@
+TOP=../..
+include $(TOP)/mk/boilerplate.mk
+
+ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+SCRIPT_DIR = $(DESTDIR)$(bindir)
+SCRIPT_BASE = ghc-pkg
+SCRIPT_VERSIONED_BASE = $(SCRIPT_BASE)-$(ProjectVersion)
+SCRIPT           = $(SCRIPT_DIR)/$(SCRIPT_BASE)
+SCRIPT_VERSIONED = $(SCRIPT_DIR)/$(SCRIPT_VERSIONED_BASE)
+
+install::
+	mv $(SCRIPT) $(SCRIPT_VERSIONED)
+	ln -s $(SCRIPT_VERSIONED_BASE) $(SCRIPT)
+endif
+
+include $(TOP)/mk/bindist.mk
+
+include $(TOP)/mk/target.mk
