@@ -57,7 +57,7 @@ LIBFFI_DIR := $(subst .tar.gz,,$(LIBFFI_TARBALL))
 BINDIST_STAMPS = stamp.ffi
 INSTALL_HEADERS += ffi.h
 STATIC_LIB = libffi.a
-INSTALL_LIBS += $(STATIC_LIB)
+INSTALL_LIBS += libHSffi.a
 
 # We have to add the GHC version to the name of our dynamic libs, because
 # they will be residing in the system location along with dynamic libs from
@@ -80,8 +80,10 @@ EnableShared=no
 endif
 
 ifeq "$(BuildSharedLibs)" "YES"
-INSTALL_LIBS  += $(DYNAMIC_LIBS)
-INSTALL_PROGS += $(DYNAMIC_PROGS)
+INSTALL_LIBS  += $(HS_DYN_LIB_NAME)
+ifeq "$(Windows)" "YES"
+INSTALL_PROGS += $(HS_DYN_LIB_NAME).a
+endif
 endif
 
 install all :: $(INSTALL_HEADERS) $(INSTALL_LIBS) $(INSTALL_PROGS)

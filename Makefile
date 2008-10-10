@@ -104,7 +104,6 @@ stage1 : $(GCC_LIB_DEP) check-all
 	$(MAKE) -C gmp       all
 	$(MAKE) -C utils/mkdependC boot
 	$(MAKE) -C utils with-bootstrapping-compiler
-	$(MAKE) -C libffi    all
 	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
 	for i in $(SUBDIRS_BUILD); do \
 	  echo "------------------------------------------------------------------------"; \
@@ -122,6 +121,7 @@ stage1 : $(GCC_LIB_DEP) check-all
 	  $(MAKE) --no-print-directory -C $$i $(MFLAGS) all; \
 	  if [ $$? -eq 0 -o $$x_on_err -eq 0 ] ;  then true; else exit 1; fi; \
 	done
+	$(MAKE) -C libffi    all
 	$(MAKE) -C rts boot
 	$(MAKE) -C rts
 	$(MAKE) -C libraries all
