@@ -389,9 +389,17 @@ static void unpark_tso(Capability *cap, StgTSO *tso) {
 static void unpark_waiters_on(Capability *cap, StgTVar *s) {
   StgTVarWatchQueue *q;
   TRACE("unpark_waiters_on tvar=%p", s);
-  for (q = s -> first_watch_queue_entry; 
-       q != END_STM_WATCH_QUEUE; 
+  StgTVarWatchQueue *trail;
+  // unblock TSOs in reverse order, to be a bit fairer (#2319)
+  for (q = s -> first_watch_queue_entry, trail = q;
+       q != END_STM_WATCH_QUEUE;
        q = q -> next_queue_entry) {
+    trail = q;
+  }
+  q = trail;
+  for (;
+       q != END_STM_WATCH_QUEUE; 
+       q = q -> prev_queue_entry) {
     if (watcher_is_tso(q)) {
       unpark_tso(cap, (StgTSO *)(q -> closure));
     }
