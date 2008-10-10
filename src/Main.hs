@@ -101,15 +101,13 @@ handleHaddockExceptions inner =
 
 handleGhcExceptions inner = 
   -- compilation errors: messages with locations attached
-#if __GLASGOW_HASKELL__ >= 609
-  handleErrMsg (\e -> do
-#else
+#if __GLASGOW_HASKELL__ < 609
  handleDyn (\e -> do
-#endif
     putStrLn "haddock: Compilation error(s):"
     printBagOfErrors defaultDynFlags (unitBag e)
     exitFailure
   ) $
+#endif
 
   -- error messages propagated as exceptions
 #if __GLASGOW_HASKELL__ >= 609
