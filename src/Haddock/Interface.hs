@@ -39,7 +39,7 @@ import SrcLoc
 
 
 -- | Turn a topologically sorted list of module names/filenames into interfaces. Also
--- return the home link environment created in the process, and any error messages.
+-- return the home link environment created in the process.
 #if __GLASGOW_HASKELL__ >= 609
 createInterfaces :: [String] -> LinkEnv -> [Flag] -> Ghc ([Interface], LinkEnv)
 createInterfaces modules externalLinks flags = do
