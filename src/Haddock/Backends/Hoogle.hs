@@ -198,6 +198,7 @@ markupTag = Markup {
   markupModule        = box (TagInline "a") . str,
   markupEmphasis      = box (TagInline "i"),
   markupMonospaced    = box (TagInline "tt"),
+  markupPic           = const $ str " ",
   markupUnorderedList = box (TagL 'u'),
   markupOrderedList   = box (TagL 'o'),
   markupDefList       = box (TagL 'u') . map (\(a,b) -> TagInline "i" a : Str " " : b),

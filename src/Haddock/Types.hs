@@ -188,7 +188,8 @@ data DocMarkup id a = Markup {
   markupDefList       :: [(a,a)] -> a,
   markupCodeBlock     :: a -> a,
   markupURL           :: String -> a,
-  markupAName         :: String -> a
+  markupAName         :: String -> a,
+  markupPic           :: String -> a
 }
 
 

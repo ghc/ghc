@@ -330,6 +330,7 @@ markup m (DocDefList ds)       = markupDefList m (map (markupPair m) ds)
 markup m (DocCodeBlock d)      = markupCodeBlock m (markup m d)
 markup m (DocURL url)          = markupURL m url
 markup m (DocAName ref)        = markupAName m ref
+markup m (DocPic img)          = markupPic m img
 
 markupPair :: DocMarkup id a -> (HsDoc id, HsDoc id) -> (a, a)
 markupPair m (a,b) = (markup m a, markup m b)
@@ -349,8 +350,9 @@ idMarkup = Markup {
   markupOrderedList   = DocOrderedList,
   markupDefList       = DocDefList,
   markupCodeBlock     = DocCodeBlock,
-  markupURL	      = DocURL,
-  markupAName	      = DocAName
+  markupURL           = DocURL,
+  markupAName         = DocAName,
+  markupPic           = DocPic
   }
 
 -- | Since marking up is just a matter of mapping 'Doc' into some

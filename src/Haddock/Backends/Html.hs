@@ -1496,6 +1496,7 @@ parHtmlMarkup ppId = Markup {
   markupEmphasis      = emphasize . toHtml,
   markupMonospaced    = tt . toHtml,
   markupUnorderedList = ulist . concatHtml . map (li <<),
+  markupPic           = \path -> image ! [src path],
   markupOrderedList   = olist . concatHtml . map (li <<),
   markupDefList       = dlist . concatHtml . map markupDef,
   markupCodeBlock     = pre,

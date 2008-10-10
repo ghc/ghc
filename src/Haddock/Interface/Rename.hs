@@ -188,6 +188,7 @@ renameDoc doc = case doc of
     doc' <- renameDoc doc
     return (DocCodeBlock doc')
   DocURL str -> return (DocURL str) 
+  DocPic str -> return (DocPic str)
   DocAName str -> return (DocAName str)
 
 
