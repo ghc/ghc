@@ -1340,6 +1340,13 @@ primop	ReadTVarOp "readTVar#" GenPrimOp
    with
    out_of_line	= True
 
+primop ReadTVarIOOp "readTVarIO#" GenPrimOp
+       TVar# s a
+    -> State# s -> (# State# s, a #)
+   {Read contents of {\tt TVar\#} outside an STM transaction}
+   with
+   out_of_line	= True
+
 primop	WriteTVarOp "writeTVar#" GenPrimOp
        TVar# s a
     -> a

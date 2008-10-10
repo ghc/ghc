@@ -643,6 +643,7 @@ typedef struct _RtsSymbolVal {
       SymX(raisezh_fast)			\
       SymX(raiseIOzh_fast)			\
       SymX(readTVarzh_fast)			\
+      SymX(readTVarIOzh_fast)			\
       SymX(remIntegerzh_fast)			\
       SymX(resetNonBlockingFd)			\
       SymX(resumeThread)			\

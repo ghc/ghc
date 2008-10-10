@@ -1455,6 +1455,17 @@ readTVarzh_fast
   RET_P(result);
 }
 
+readTVarIOzh_fast
+{
+    W_ result;
+
+again:
+    result = StgTVar_current_value(R1);
+    if (%INFO_PTR(result) == stg_TREC_HEADER_info) {
+        goto again;
+    }
+    RET_P(result);
+}
 
 writeTVarzh_fast
 {

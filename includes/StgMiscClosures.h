@@ -600,6 +600,7 @@ RTS_FUN(catchSTMzh_fast);
 RTS_FUN(atomicallyzh_fast);
 RTS_FUN(newTVarzh_fast);
 RTS_FUN(readTVarzh_fast);
+RTS_FUN(readTVarIOzh_fast);
 RTS_FUN(writeTVarzh_fast);
 RTS_FUN(checkzh_fast);
 

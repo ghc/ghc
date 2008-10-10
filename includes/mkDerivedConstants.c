@@ -353,6 +353,8 @@ main(int argc, char *argv[])
     closure_field(StgTVarWatchQueue, next_queue_entry);
     closure_field(StgTVarWatchQueue, prev_queue_entry);
 
+    closure_field(StgTVar, current_value);
+
     closure_size(StgWeak);
     closure_field(StgWeak,link);
     closure_field(StgWeak,key);
