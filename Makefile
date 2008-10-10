@@ -45,6 +45,11 @@ else
 INPLACE_DATADIR = '$$prefix/share'
 endif
 
+
+ifeq "$(BuildSharedLibs)" "YES"
+DYN_FLAGS = --ghc-option=-dynamic
+endif
+
 install-inplace:
 	$(INSTALL_PACKAGE) install '$(GHC_PKG_PROG)' '$(INPLACE_PKG_CONF)' ''  \
 	    '$(FPTOOLS_TOP_ABS)/utils/haddock/install-inplace' \
@@ -59,4 +64,6 @@ install-inplace:
 	    '$$prefix/haddock'                                 \
 	    --distpref dist-install                            \
 	    $(INSTALL_INPLACE_FLAGS)
-
+ifeq "$(BuildSharedLibs)" "YES"
+	    mv dist-install/build/haddock/haddock.dyn dist-install/build/haddock/haddock # remove the wrapper
+endif
