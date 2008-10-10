@@ -72,6 +72,7 @@ module GHC.Conc
         , newTVar       -- :: a -> STM (TVar a)
         , newTVarIO     -- :: a -> STM (TVar a)
         , readTVar      -- :: TVar a -> STM a
+        , readTVarIO    -- :: TVar a -> IO a
         , writeTVar     -- :: a -> TVar a -> STM ()
         , unsafeIOToSTM -- :: IO a -> STM a
 
@@ -549,6 +550,16 @@ newTVarIO :: a -> IO (TVar a)
 newTVarIO val = IO $ \s1# ->
     case newTVar# val s1# of
          (# s2#, tvar# #) -> (# s2#, TVar tvar# #)
+
+-- |Return the current value stored in a TVar.
+-- This is equivalent to
+--
+-- >  readTVarIO = atomically . readTVar
+--
+-- but works much faster, because it doesn't perform a complete
+-- transaction, it just reads the current value of the 'TVar'.
+readTVarIO :: TVar a -> IO a
+readTVarIO (TVar tvar#) = IO $ \s# -> readTVarIO# tvar# s#
 
 -- |Return the current value stored in a TVar
 readTVar :: TVar a -> STM a
