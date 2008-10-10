@@ -57,7 +57,16 @@ binaryInterfaceMagic = 0xD0Cface
 -- Instead of adding one, we add three to all version numbers
 -- when one of our own (stored) datatypes is changed. 
 binaryInterfaceVersion :: Word16
+#if __GLASGOW_HASKELL__ == 608 && __GHC_PATCHLEVEL__ == 2
 binaryInterfaceVersion = 2
+#endif         
+#if __GLASGOW_HASKELL__ == 608 && __GHC_PATCHLEVEL__ == 3
+binaryInterfaceVersion = 3
+#endif           
+#if __GLASGOW_HASKELL__ >= 609
+binaryInterfaceVersion = 4
+#endif
+
 
 initBinMemSize :: Int
 initBinMemSize = 1024*1024
