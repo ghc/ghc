@@ -21,3 +21,6 @@ ghc-e005:
 2228:
 	$(TEST_HC) -ignore-dot-ghci -e ":main" 2228.hs
 
+2636:
+	$(TEST_HC) -ignore-dot-ghci -e ":main" 2636.hs; if [ "$?" != 0 ]; then true; else false; fi
+
