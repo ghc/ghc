@@ -4,6 +4,8 @@ DONT_WANT_STD_GHCI_LIB_RULE=YES
 DONT_WANT_STD_LIBRARY=YES
 
 include $(TOP)/mk/boilerplate.mk
+# Override haddock generation for this package
+HADDOCK_DOCS=NO
 
 # We package libffi as Haskell package for two reasons: 
 
