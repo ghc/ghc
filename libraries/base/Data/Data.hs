@@ -14,7 +14,8 @@
 -- with instances for many datatypes. It corresponds to a merge between
 -- the previous "Data.Generics.Basics" and almost all of 
 -- "Data.Generics.Instances". The instances that are not present
--- in this module are available in "Data.Generics.Instances".
+-- in this module were moved to the @Data.Generics.Instances@ module
+-- in the @syb@ package.
 --
 --
 -----------------------------------------------------------------------------
