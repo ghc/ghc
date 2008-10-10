@@ -22,6 +22,7 @@ module HeaderInfo ( getImports
 
 #include "HsVersions.h"
 
+import HscTypes
 import Parser		( parseHeader )
 import Lexer
 import FastString
@@ -70,8 +71,8 @@ getImports dflags buf filename source_filename = do
 	      in
 	      return (source_imps, ordinary_imps, mod)
   
-parseError :: SrcSpan -> Message -> a
-parseError span err = throwErrMsg $ mkPlainErrMsg span err
+parseError :: SrcSpan -> Message -> IO a
+parseError span err = throwOneError $ mkPlainErrMsg span err
 
 -- we aren't interested in package imports here, filter them out
 isHomeImp :: ImportDecl name -> Bool

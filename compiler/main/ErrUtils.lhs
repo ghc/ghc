@@ -8,7 +8,7 @@ module ErrUtils (
 	Message, mkLocMessage, printError,
 	Severity(..),
 
-	ErrMsg, WarnMsg, throwErrMsg, handleErrMsg,
+	ErrMsg, WarnMsg,
     ErrorMessages, WarningMessages,
 	errMsgSpans, errMsgContext, errMsgShortDoc, errMsgExtraInfo,
 	Messages, errorsFound, emptyMessages,
@@ -42,10 +42,8 @@ import StaticFlags	( opt_ErrorSpans )
 
 import Control.Monad
 import System.Exit	( ExitCode(..), exitWith )
-import Data.Dynamic
 import Data.List
 import System.IO
-import Exception
 
 -- -----------------------------------------------------------------------------
 -- Basic error messages: just render a message with a source location.
@@ -83,23 +81,8 @@ data ErrMsg = ErrMsg {
 	-- NB  Pretty.Doc not SDoc: we deal with the printing style (in ptic 
 	-- whether to qualify an External Name) at the error occurrence
 
-instance Exception ErrMsg
-
 instance Show ErrMsg where
     show em = showSDoc (errMsgShortDoc em)
-
-throwErrMsg :: ErrMsg -> a
-throwErrMsg = throw
-
-handleErrMsg :: ExceptionMonad m => (ErrMsg -> m a) -> m a -> m a
-handleErrMsg = ghandle
-
--- So we can throw these things as exceptions
-errMsgTc :: TyCon
-errMsgTc = mkTyCon "ErrMsg"
-{-# NOINLINE errMsgTc #-}
-instance Typeable ErrMsg where
-  typeOf _ = mkTyConApp errMsgTc []
 
 type WarnMsg = ErrMsg
 

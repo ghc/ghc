@@ -13,7 +13,7 @@ module HscTypes (
         ioMsgMaybe, ioMsg,
         logWarnings, clearWarnings, hasWarnings,
         SourceError, GhcApiError, mkSrcErr, srcErrorMessages, mkApiErr,
-        handleSourceError,
+        throwOneError, handleSourceError,
         reflectGhc, reifyGhc,
 
 	-- * Sessions and compilation state
@@ -143,11 +143,10 @@ import FastString
 import StringBuffer	( StringBuffer )
 import Fingerprint
 import MonadUtils
-import Bag              ( emptyBag, unionBags, isEmptyBag )
 import Data.Dynamic     ( Typeable )
 import qualified Data.Dynamic as Dyn
-import Bag              ( bagToList )
-import ErrUtils         ( ErrorMessages, WarningMessages, Messages )
+import Bag
+import ErrUtils
 
 import System.FilePath
 import System.Time	( ClockTime )
@@ -176,6 +175,9 @@ data Session = Session !(IORef HscEnv) !(IORef WarningMessages)
 mkSrcErr :: ErrorMessages -> SourceError
 srcErrorMessages :: SourceError -> ErrorMessages
 mkApiErr :: SDoc -> GhcApiError
+
+throwOneError :: MonadIO m => ErrMsg -> m ab
+throwOneError err = liftIO $ throwIO $ mkSrcErr $ unitBag err
 
 -- | A source error is an error that is caused by one or more errors in the
 -- source code.  A 'SourceError' is thrown by many functions in the
@@ -368,7 +370,7 @@ ioMsgMaybe ioA = do
   ((warns,errs), mb_r) <- liftIO ioA
   logWarnings warns
   case mb_r of
-    Nothing -> throw (mkSrcErr errs)
+    Nothing -> liftIO $ throwIO (mkSrcErr errs)
     Just r  -> ASSERT( isEmptyBag errs ) return r
 
 -- | Lift a non-failing IO action into a 'GhcMonad'.

@@ -328,13 +328,6 @@ defaultErrorHandler dflags inner =
            exitWith (ExitFailure 1)
          ) $
 
-  -- program errors: messages with locations attached.  Sometimes it is
-  -- convenient to just throw these as exceptions.
-  handleErrMsg
-            (\em -> liftIO $ do
-                      printBagOfErrors dflags (unitBag em)
-                      exitWith (ExitFailure 1)) $
-
   -- error messages propagated as exceptions
   handleGhcException
             (\ge -> liftIO $ do
@@ -1864,7 +1857,7 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
 		if exists 
 		    then summariseFile hsc_env old_summaries file mb_phase 
                                        obj_allowed maybe_buf
-		    else throwErrMsg $ mkPlainErrMsg noSrcSpan $
+		    else throwOneError $ mkPlainErrMsg noSrcSpan $
 			   text "can't find file:" <+> text file
 	getRootSummary (Target (TargetModule modl) obj_allowed maybe_buf)
  	   = do maybe_summary <- summariseModule hsc_env old_summary_map False 
@@ -2128,7 +2121,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
         (srcimps, the_imps, L mod_loc mod_name) <- liftIO $ getImports dflags' buf hspp_fn src_fn
 
 	when (mod_name /= wanted_mod) $
-		throwErrMsg $ mkPlainErrMsg mod_loc $ 
+		throwOneError $ mkPlainErrMsg mod_loc $ 
 			      text "File name does not match module name:" 
 			      $$ text "Saw:" <+> quotes (ppr mod_name)
                               $$ text "Expected:" <+> quotes (ppr wanted_mod)
@@ -2204,21 +2197,21 @@ preprocessFile hsc_env src_fn mb_phase (Just (buf, _time))
 noModError :: DynFlags -> SrcSpan -> ModuleName -> FindResult -> IO ab
 -- ToDo: we don't have a proper line number for this error
 noModError dflags loc wanted_mod err
-  = throwErrMsg $ mkPlainErrMsg loc $ cannotFindModule dflags wanted_mod err
+  = throwOneError $ mkPlainErrMsg loc $ cannotFindModule dflags wanted_mod err
 				
-noHsFileErr :: SrcSpan -> String -> a
+noHsFileErr :: GhcMonad m => SrcSpan -> String -> m a
 noHsFileErr loc path
-  = throwErrMsg $ mkPlainErrMsg loc $ text "Can't find" <+> text path
+  = throwOneError $ mkPlainErrMsg loc $ text "Can't find" <+> text path
  
-packageModErr :: ModuleName -> a
+packageModErr :: GhcMonad m => ModuleName -> m a
 packageModErr mod
-  = throwErrMsg $ mkPlainErrMsg noSrcSpan $
+  = throwOneError $ mkPlainErrMsg noSrcSpan $
 	text "module" <+> quotes (ppr mod) <+> text "is a package module"
 
 multiRootsErr :: [ModSummary] -> IO ()
 multiRootsErr [] = panic "multiRootsErr"
 multiRootsErr summs@(summ1:_)
-  = throwErrMsg $ mkPlainErrMsg noSrcSpan $
+  = throwOneError $ mkPlainErrMsg noSrcSpan $
 	text "module" <+> quotes (ppr mod) <+> 
 	text "is defined in multiple files:" <+>
 	sep (map text files)
