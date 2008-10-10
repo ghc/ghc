@@ -161,6 +161,7 @@ main = handleTopExceptions $ do
                     return libdir -- from GHC.Paths
 #endif
 
+#if __GLASGOW_HASKELL__ >= 609
       -- initialize GHC
       startGhc libDir (ghcFlags flags) $ \dynflags -> do
 
@@ -179,7 +180,25 @@ main = handleTopExceptions $ do
  
           -- last but not least, dump the interface file
           dumpInterfaceFile (map toInstalledIface interfaces) homeLinks flags
+#else
+      -- initialize GHC
+      (session, dynflags) <- startGhc libDir (ghcFlags flags)
 
+      -- get packages supplied with --read-interface
+      packages <- readInterfaceFiles (nameCacheFromGhc session) (ifacePairs flags)
+
+      -- combine the link envs of the external packages into one
+      let extLinks = Map.unions (map (ifLinkEnv . fst) packages)
+
+      -- create the interfaces -- this is the core part of Haddock
+      (interfaces, homeLinks) <- createInterfaces session fileArgs extLinks flags
+
+      -- render the interfaces
+      renderStep packages interfaces
+ 
+      -- last but not least, dump the interface file
+      dumpInterfaceFile (map toInstalledIface interfaces) homeLinks flags
+#endif
     else do
       -- get packages supplied with --read-interface
       packages <- readInterfaceFiles freshNameCache (ifacePairs flags)

@@ -23,6 +23,7 @@ import Haddock.Options
 import Haddock.GHC.Utils
 import Haddock.GHC.Typecheck
 import Haddock.Exception
+import Haddock.Utils
 
 import qualified Data.Map as Map
 import Data.Map (Map)
@@ -35,17 +36,21 @@ import HscTypes ( msHsFilePath )
 import Digraph
 import BasicTypes
 import SrcLoc
-import MonadUtils ( liftIO )
 
 
 -- | Turn a topologically sorted list of module names/filenames into interfaces. Also
 -- return the home link environment created in the process, and any error messages.
+#if __GLASGOW_HASKELL__ >= 609
 createInterfaces :: [String] -> LinkEnv -> [Flag] -> Ghc ([Interface], LinkEnv)
 createInterfaces modules externalLinks flags = do
-
   -- part 1, create interfaces
   interfaces <- createInterfaces' modules flags
-
+#else
+createInterfaces :: Session -> [String] -> LinkEnv -> [Flag] -> IO ([Interface], LinkEnv)
+createInterfaces session modules externalLinks flags = do
+  -- part 1, create interfaces
+  interfaces <- createInterfaces' session modules flags
+#endif
   -- part 2, build link environment
   let homeLinks = buildHomeLinks interfaces
       links     = homeLinks `Map.union` externalLinks
@@ -63,6 +68,7 @@ createInterfaces modules externalLinks flags = do
   return (interfaces'', homeLinks)  
 
 
+#if __GLASGOW_HASKELL__ >= 609
 createInterfaces' :: [String] -> [Flag] -> Ghc [Interface]
 createInterfaces' modules flags = do
   targets <- mapM (\f -> guessTarget f Nothing) modules
@@ -71,6 +77,23 @@ createInterfaces' modules flags = do
   let orderedMods = flattenSCCs $ topSortModuleGraph False modgraph Nothing
   (ifaces, _) <- foldM (\(ifaces, modMap) modsum -> do
     interface <- processModule modsum flags modMap
+#else
+createInterfaces' :: Session -> [String] -> [Flag] -> IO [Interface]
+createInterfaces' session modules flags = do
+  targets <- mapM (\f -> guessTarget f Nothing) modules
+  setTargets session targets
+  mbGraph <- depanal session [] False
+  modgraph <- case mbGraph of
+    Just graph -> return graph
+    Nothing -> throwE "Failed to create dependecy graph"
+  let orderedMods = flattenSCCs $ topSortModuleGraph False modgraph Nothing
+  (ifaces, _) <- foldM (\(ifaces, modMap) modsum -> do
+    interface <- processModule session modsum flags modMap
+#endif
+    return $ (interface : ifaces , Map.insert (ifaceMod interface) interface modMap)
+    ) ([], Map.empty) orderedMods
+  return (reverse ifaces)
+
 {-    liftIO $ do
      putStrLn . ppModInfo $ ifaceInfo interface
      putStrLn . show $ fmap pretty (ifaceDoc interface)
@@ -84,9 +107,6 @@ createInterfaces' modules flags = do
      mapM (putStrLn . pretty) (ifaceInstances interface)
      mapM (\(a,b) -> putStrLn $ pretty a ++ pretty b)  (Map.toList $ ifaceSubMap interface)
      mapM (putStrLn . pretty) (ifaceInstances interface)-}
-    return $ (interface : ifaces , Map.insert (ifaceMod interface) interface modMap)
-    ) ([], Map.empty) orderedMods
-  return (reverse ifaces)
 
 {-
 
@@ -106,6 +126,7 @@ ppExportItem (ExportModule mod) = pretty mod
 ppModInfo (HaddockModInfo a b c d) = show (fmap pretty a) ++ show b ++ show c ++ show d 
 -}
 
+#if __GLASGOW_HASKELL__ >= 609
 processModule :: ModSummary -> [Flag] -> ModuleMap -> Ghc Interface
 processModule modsum flags modMap = 
 
@@ -128,8 +149,20 @@ processModule modsum flags modMap =
        let (interface, msg) = runWriter $ createInterface ghcMod flags modMap
        liftIO $ mapM_ putStrLn msg
        return interface
+#else
+processModule :: Session -> ModSummary -> [Flag] -> ModuleMap -> IO Interface
+processModule session modsum flags modMap = do
+  let filename = msHsFilePath modsum
+  mbMod <- checkAndLoadModule session modsum False
+  ghcMod <- case mbMod of
+    Just (CheckedModule a (Just b) (Just c) (Just d) _)
+      -> return $ mkGhcModule (ms_mod modsum, filename, (a,b,c,d)) (ms_hspp_opts modsum)
+    _ -> throwE ("Failed to check module: " ++ (moduleString $ ms_mod modsum))
+  let (interface, msg) = runWriter $ createInterface ghcMod flags modMap
+  mapM_ putStrLn msg
+  return interface
+#endif
 
- 
 -- | Build a mapping which for each original name, points to the "best"
 -- place to link to in the documentation.  For the definition of
 -- "best", we use "the module nearest the bottom of the dependency

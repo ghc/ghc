@@ -30,16 +30,21 @@ import SrcLoc
 
 -- | Start a GHC session with the -haddock flag set. Also turn off 
 -- compilation and linking.  
+#if __GLASGOW_HASKELL__ >= 609 
 startGhc :: String -> [String] -> (DynFlags -> Ghc a) -> IO a
 startGhc libDir flags ghcActs = do
   -- TODO: handle warnings?
-#if __GLASGOW_HASKELL__ >= 609 
   (restFlags, _) <- parseStaticFlags (map noLoc flags)
-#else
-  restFlags <- parseStaticFlags flags
-#endif
   runGhc (Just libDir) $ do
     dynflags  <- getSessionDynFlags
+#else
+startGhc :: String -> [String] -> IO (Session, DynFlags)
+startGhc libDir flags = do
+  restFlags <- parseStaticFlags flags
+  session <- newSession (Just libDir)
+  dynflags <- getSessionDynFlags session
+  do
+#endif
     let dynflags' = dopt_set dynflags Opt_Haddock
     let dynflags'' = dynflags' {
         hscTarget = HscAsm,
@@ -47,8 +52,13 @@ startGhc libDir flags ghcActs = do
         ghcLink   = NoLink
       }
     dynflags''' <- parseGhcFlags dynflags'' restFlags flags
+#if __GLASGOW_HASKELL__ >= 609 
     setSessionDynFlags dynflags'''
     ghcActs dynflags'''
+#else
+    setSessionDynFlags session dynflags'''
+    return (session, dynflags''')
+#endif
 
 
 -- | Expose the list of packages to GHC. Then initialize GHC's package state

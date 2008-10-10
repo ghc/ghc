@@ -36,7 +36,11 @@ import System.IO             ( IOMode(..), hClose, hGetBuf, hPutBuf, openFile )
 import Data.Map              ( Map )
 import qualified Data.Map as Map hiding ( Map )
 
+#if __GLASGOW_HASKELL__ >= 609
 import GHC hiding ( NoLink, moduleInfo )
+#else
+import GHC hiding ( NoLink )
+#endif
 import Name
 import Module
 import PackageConfig

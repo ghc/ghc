@@ -15,6 +15,7 @@ module Haddock.InterfaceFile (
 
 import Haddock.DocName ()
 import Haddock.Types
+import Haddock.Utils
 
 import Data.List
 import Data.Word
@@ -37,7 +38,6 @@ import FastMutInt
 import HsDoc
 import FastString
 import Unique
-import MonadUtils ( MonadIO(..) )
 
 
 data InterfaceFile = InterfaceFile {
@@ -57,16 +57,7 @@ binaryInterfaceMagic = 0xD0Cface
 -- Instead of adding one, we add three to all version numbers
 -- when one of our own (stored) datatypes is changed. 
 binaryInterfaceVersion :: Word16
-#if __GLASGOW_HASKELL__ == 608 && __GHC_PATCHLEVEL__ == 2
 binaryInterfaceVersion = 2
-#endif
-#if __GLASGOW_HASKELL__ == 608 && __GHC_PATCHLEVEL__ == 3
-binaryInterfaceVersion = 3
-#endif
-#if __GLASGOW_HASKELL__ >= 609
-binaryInterfaceVersion = 4
-#endif
-
 
 initBinMemSize :: Int
 initBinMemSize = 1024*1024
@@ -145,6 +136,8 @@ writeInterfaceFile filename iface = do
 
 type NameCacheAccessor m = (m NameCache, NameCache -> m ())
 
+
+#if __GLASGOW_HASKELL__ >= 609
 nameCacheFromGhc :: NameCacheAccessor Ghc
 nameCacheFromGhc = ( read_from_session , write_to_session )
   where
@@ -154,6 +147,16 @@ nameCacheFromGhc = ( read_from_session , write_to_session )
     write_to_session nc' = do
        ref <- withSession (return . hsc_NC)
        liftIO $ writeIORef ref nc'
+#else
+nameCacheFromGhc :: Session -> NameCacheAccessor IO
+nameCacheFromGhc session = ( read_from_session , write_to_session )
+  where
+    read_from_session = readIORef . hsc_NC =<< sessionHscEnv session
+    write_to_session nc' = do
+      ref <- liftM hsc_NC $ sessionHscEnv session
+      writeIORef ref nc'
+#endif
+
 
 freshNameCache :: NameCacheAccessor IO
 freshNameCache = ( create_fresh_nc , \_ -> return () )

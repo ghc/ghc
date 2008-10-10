@@ -36,6 +36,9 @@ module Haddock.Utils (
 
   -- * Binary extras
 --  FormatVersion, mkFormatVersion  
+  
+  -- * MTL stuff
+  MonadIO(..)
  ) where
 
 import Haddock.Types
@@ -63,6 +66,14 @@ import System.Environment ( getProgName )
 import System.Exit ( exitWith, ExitCode(..) )
 import System.IO ( hPutStr, stderr )
 import System.IO.Unsafe	 ( unsafePerformIO )
+
+#if __GLASGOW_HASKELL__ >= 609
+import MonadUtils ( MonadIO(..) )
+#else
+class Monad m => MonadIO m where
+    liftIO :: IO a -> m a                                              
+instance MonadIO IO where liftIO = id
+#endif
 
 -- -----------------------------------------------------------------------------
 -- Some Utilities
