@@ -16,8 +16,6 @@ library-dirs:		FPTOOLS_TOP_ABS"/libffi"
 
 hs-libraries:   "HSffi"
 
-extra-libraries:		"m"		/* for ldexp() */
-
 #ifdef INSTALLING
 include-dirs:		INCLUDE_DIR
 #else /* !INSTALLING */
