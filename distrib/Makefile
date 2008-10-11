@@ -45,7 +45,7 @@ denounce:
 	@echo =======================================================================
 	@echo Installation of $(package)-$(version) was successful.
 	@echo
-ifneq "$(GREPPED_PATH)" ""
+ifeq "$(GREPPED_PATH)" ""
 	@echo To use, add $(bindir) to your PATH.
 	@echo
 endif
