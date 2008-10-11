@@ -38,7 +38,7 @@ install :: postinstall denounce
 
 # Look to see if $(bindir) is in $(PATH). Assumes there are no funky
 # characters.
-GREPPED_PATH=$(shell echo "$(PATH)" | grep "\(^\|:\)$(bindir)\(:\|$$\)")
+GREPPED_PATH=$(shell echo ":$(PATH):" | grep ":$(bindir):")
 
 denounce:
 	@echo
