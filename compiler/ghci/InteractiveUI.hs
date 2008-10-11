@@ -666,7 +666,7 @@ runCommands' eh getCmd = do
   where
     printErrorAndKeepGoing err = do
         GHC.printExceptionAndWarnings err
-        return True
+        return False
 
     noSpace q = q >>= maybe (return Nothing)
                             (\c->case removeSpaces c of 
