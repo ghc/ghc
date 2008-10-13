@@ -2,16 +2,18 @@
 
 set -e
 
-HADDOCK=../utils/haddock/install-inplace/bin/haddock
 HADDOCK_ARGS=
 NAMES=
 
 case $* in
 --inplace)
+    HADDOCK=../utils/haddock/install-inplace/bin/haddock
     HADDOCK_FILES=`ls -1 */dist/doc/html/*/*.haddock | sort`
     ;;
 *)
-    HADDOCK_FILES=`ls -1 */*.haddock | sort`
+    HADDOCK=../../../../bin/haddock
+    # We don't want the GHC API to swamp the index
+    HADDOCK_FILES=`ls -1 */*.haddock | grep -v "ghc/" | sort`
     ;;
 esac
 
