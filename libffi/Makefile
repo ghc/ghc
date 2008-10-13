@@ -57,6 +57,15 @@ LIBFFI_TARBALL := $(firstword $(wildcard libffi*.tar.gz))
 LIBFFI_DIR := $(subst .tar.gz,,$(LIBFFI_TARBALL))
 
 BINDIST_STAMPS = stamp.ffi
+
+ifeq "$(BuildSharedLibs)" "YES"
+STAMP_BUILD = stamp.ffi.build-shared
+STAMP_CONFIGURE = stamp.ffi.configure-shared
+else
+STAMP_BUILD = stamp.ffi.build
+STAMP_CONFIGURE = stamp.ffi.configure
+endif
+
 INSTALL_HEADERS += ffi.h
 STATIC_LIB = libffi.a
 INSTALL_LIBS += libHSffi.a HSffi.o
@@ -95,7 +104,7 @@ install all :: $(INSTALL_HEADERS) $(INSTALL_LIBS) $(INSTALL_PROGS)
 # will use cygwin symbolic linkks which cannot be read by mingw gcc.
 # The same trick is played by the GMP build in ../gmp.
 
-stamp.ffi.configure:
+$(STAMP_CONFIGURE):
 	$(RM) -rf $(LIBFFI_DIR) build
 	$(TAR) -zxf $(LIBFFI_TARBALL)
 	mv $(LIBFFI_DIR) build
@@ -116,15 +125,15 @@ stamp.ffi.configure:
 	sed -e s/soname_spec=.*/soname_spec="$(HS_DYN_LIB_NAME)"/ build/libtool.orig > build/libtool
 	touch $@
 
-ffi.h: stamp.ffi.configure
+ffi.h: $(STAMP_CONFIGURE)
 	$(CP) build/include/ffi.h .
 
-stamp.ffi.build: stamp.ffi.configure
+$(STAMP_BUILD): $(STAMP_CONFIGURE)
 	$(MAKE) -C build MAKEFLAGS=
 	(cd build; ./libtool --mode=install cp libffi.la $(FPTOOLS_TOP_ABS)/libffi)
 	touch $@
 
-$(STATIC_LIB) $(DYNAMIC_LIBS) $(DYNAMIC_PROG): stamp.ffi.build
+$(STATIC_LIB) $(DYNAMIC_LIBS) $(DYNAMIC_PROG): $(STAMP_BUILD)
 
 libHSffi.a libHSffi_p.a: $(STATIC_LIB)
 	$(CP) $(STATIC_LIB) $@
@@ -150,7 +159,7 @@ all :: $(HS_DYN_LIB_NAME)
 endif
 
 clean distclean maintainer-clean ::
-	$(RM) -f stamp.ffi.configure stamp.ffi.build ffi.h empty.c
+	$(RM) -f stamp.ffi.* ffi.h empty.c
 	$(RM) -f libffi.a libffi.la $(DYNAMIC_PROG) $(DYNAMIC_LIBS) $(ORIG_DYNAMIC_LIBS)
 	$(RM) -rf build
 
