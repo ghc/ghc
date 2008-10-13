@@ -1,15 +1,19 @@
 Name: ghc
 Version: @ProjectVersion@
-Copyright: XXX
--- License: XXX
+License: BSD3
 License-File: ../LICENSE
-Author: XXX
+Author: The GHC Team
 Maintainer: glasgow-haskell-users@haskell.org
 Homepage: http://www.haskell.org/ghc/
-Synopsis: XXX
+Synopsis: The GHC API
 Description:
-        XXX
-Category: XXX
+    GHC's functionality can be useful for more things than just
+    compiling Haskell programs. Important use cases are programs
+    that analyse (and perhaps transform) Haskell code. Others
+    include loading Haskell code dynamically in a GHCi-like manner.
+    For this reason, a lot of GHC's functionality is made available
+    through this package.
+Category: Development
 Build-Type: Simple
 Cabal-Version: >= 1.2
 
