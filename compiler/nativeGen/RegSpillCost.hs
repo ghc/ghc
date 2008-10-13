@@ -21,6 +21,7 @@ import RegLiveness
 import RegAllocInfo
 import MachInstrs
 import MachRegs
+import BlockId
 import Cmm
 
 import UniqFM
@@ -78,7 +79,7 @@ slurpSpillCostInfo cmm
 	--	the info table from the CmmProc
  	countBlock info (BasicBlock blockId instrs)
 		| LiveInfo _ _ blockLive	<- info
-		, Just rsLiveEntry		<- lookupUFM blockLive blockId
+		, Just rsLiveEntry		<- lookupBlockEnv blockLive blockId
 		= countLIs rsLiveEntry instrs
 
 		| otherwise

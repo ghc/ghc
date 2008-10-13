@@ -66,7 +66,9 @@ cgOpApp (StgFCallOp fcall _) stg_args res_ty
 
 cgOpApp (StgPrimOp TagToEnumOp) [arg] res_ty 
   = ASSERT(isEnumerationTyCon tycon)
-    do	{ amode <- getArgAmode arg
+    do	{ args' <- getNonVoidArgAmodes [arg]
+        ; let amode = case args' of [amode] -> amode
+                                    _ -> panic "TagToEnumOp had void arg"
 	; emitReturn [tagToClosure tycon amode] }
    where
 	  -- If you're reading this code in the attempt to figure
@@ -79,8 +81,8 @@ cgOpApp (StgPrimOp TagToEnumOp) [arg] res_ty
 cgOpApp (StgPrimOp primop) args res_ty
   | primOpOutOfLine primop
   = do	{ cmm_args <- getNonVoidArgAmodes args
-	; let fun = CmmLit (CmmLabel (mkRtsPrimOpLabel primop))
-	; emitCall fun cmm_args }
+        ; let fun = CmmLit (CmmLabel (mkRtsPrimOpLabel primop))
+        ; pprTrace "cgOpApp" (ppr primop) $ emitCall PrimOp fun cmm_args }
 
   | ReturnsPrim VoidRep <- result_info
   = do cgPrimOp [] primop args 

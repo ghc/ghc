@@ -122,6 +122,7 @@ static_flags = [
   , Flag "dppr-user-length"  (AnySuffix addOpt) Supported
   , Flag "dopt-fuel"         (AnySuffix addOpt) Supported
   , Flag "dno-debug-output"  (PassFlag addOpt) Supported
+  , Flag "dstub-dead-values" (PassFlag addOpt) Supported
       -- rest of the debugging flags are dynamic
 
         --------- Profiling --------------------------------------------------

@@ -45,7 +45,6 @@ import CLabel
 
 
 import ForeignCall
-import Unique
 import Outputable
 import FastString
 
@@ -125,7 +124,7 @@ pprTop 	:: (Outputable d, Outputable info, Outputable i)
 
 pprTop (CmmProc info lbl params graph )
 
-  = vcat [ pprCLabel lbl <> parens (commafy $ map ppr params) <+> lbrace
+  = vcat [ pprCLabel lbl <> parens (commafy $ map ppr params)
          , nest 8 $ lbrace <+> ppr info $$ rbrace
          , nest 4 $ ppr graph
          , rbrace ]
@@ -154,13 +153,14 @@ instance Outputable CmmSafety where
 pprInfo :: CmmInfo -> SDoc
 pprInfo (CmmInfo _gc_target update_frame CmmNonInfoTable) =
     vcat [{-ptext (sLit "gc_target: ") <>
-                maybe (ptext (sLit "<none>")) pprBlockId gc_target,-}
+                maybe (ptext (sLit "<none>")) ppr gc_target,-}
           ptext (sLit "update_frame: ") <>
                 maybe (ptext (sLit "<none>")) pprUpdateFrame update_frame]
 pprInfo (CmmInfo _gc_target update_frame
-         (CmmInfoTable (ProfilingInfo closure_type closure_desc) tag info)) =
+         (CmmInfoTable stat_clos (ProfilingInfo closure_type closure_desc) tag info)) =
     vcat [{-ptext (sLit "gc_target: ") <>
-                maybe (ptext (sLit "<none>")) pprBlockId gc_target,-}
+                maybe (ptext (sLit "<none>")) ppr gc_target,-}
+          ptext (sLit "has static closure: ") <> ppr stat_clos <+>
           ptext (sLit "update_frame: ") <>
                 maybe (ptext (sLit "<none>")) pprUpdateFrame update_frame,
           ptext (sLit "type: ") <> pprLit closure_type,
@@ -228,7 +228,7 @@ pprUpdateFrame (UpdateFrame expr args) =
 --      lbl: stmt ; stmt ; .. 
 pprBBlock :: Outputable stmt => GenBasicBlock stmt -> SDoc
 pprBBlock (BasicBlock ident stmts) =
-    hang (pprBlockId ident <> colon) 4 (vcat (map ppr stmts))
+    hang (ppr ident <> colon) 4 (vcat (map ppr stmts))
 
 -- --------------------------------------------------------------------------
 -- Statements. C-- usually, exceptions to this should be obvious.
@@ -302,7 +302,7 @@ instance (Outputable a) => Outputable (CmmHinted a) where
 --
 genBranch :: BlockId -> SDoc
 genBranch ident = 
-    ptext (sLit "goto") <+> pprBlockId ident <> semi
+    ptext (sLit "goto") <+> ppr ident <> semi
 
 -- --------------------------------------------------------------------------
 -- Conditional. [1], section 6.4
@@ -314,7 +314,7 @@ genCondBranch expr ident =
     hsep [ ptext (sLit "if")
          , parens(ppr expr)
          , ptext (sLit "goto")
-         , pprBlockId ident <> semi ]
+         , ppr ident <> semi ]
 
 -- --------------------------------------------------------------------------
 -- A tail call. [1], Section 6.9
@@ -381,7 +381,7 @@ genSwitch expr maybe_ids
           in hsep [ ptext (sLit "case")
                   , hcat (punctuate comma (map int is))
                   , ptext (sLit ": goto")
-                  , pprBlockId (head [ id | Just id <- ids]) <> semi ]
+                  , ppr (head [ id | Just id <- ids]) <> semi ]
 
 -- --------------------------------------------------------------------------
 -- Expressions
@@ -514,6 +514,8 @@ pprLit lit = case lit of
     CmmLabelOff clbl i -> pprCLabel clbl <> ppr_offset i
     CmmLabelDiffOff clbl1 clbl2 i -> pprCLabel clbl1 <> char '-'  
                                   <> pprCLabel clbl2 <> ppr_offset i
+    CmmBlock id        -> ppr id
+    CmmHighStackMark -> text "<highSp>"
 
 pprLit1 :: CmmLit -> SDoc
 pprLit1 lit@(CmmLabelOff {}) = parens (pprLit lit)
@@ -613,12 +615,6 @@ pprSection s = case s of
     OtherSection s'   -> section <+> doubleQuotes (text s')
  where
     section = ptext (sLit "section")
-
--- --------------------------------------------------------------------------
--- Basic block ids
---
-pprBlockId :: BlockId -> SDoc
-pprBlockId b = ppr $ getUnique b
 
 -----------------------------------------------------------------------------
 

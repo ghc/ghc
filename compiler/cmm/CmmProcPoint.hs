@@ -85,8 +85,8 @@ calculateNewProcPoints  owners block =
             then unitUniqSet child_id
             else emptyUniqSet
           where
-            parent_owners = lookupWithDefaultUFM owners emptyUniqSet parent_id
-            child_owners = lookupWithDefaultUFM owners emptyUniqSet child_id
+            parent_owners = lookupWithDefaultBEnv owners emptyUniqSet parent_id
+            child_owners = lookupWithDefaultBEnv owners emptyUniqSet child_id
             needs_proc_point =
                 -- only if parent isn't dead
                 (not $ isEmptyUniqSet parent_owners) &&
@@ -99,11 +99,11 @@ calculateOwnership :: BlockEnv BrokenBlock
                    -> [BrokenBlock]
                    -> BlockEnv (UniqSet BlockId)
 calculateOwnership blocks_ufm proc_points blocks =
-    fixedpoint dependants update (map brokenBlockId blocks) emptyUFM
+    fixedpoint dependants update (map brokenBlockId blocks) emptyBlockEnv
     where
       dependants :: BlockId -> [BlockId]
       dependants ident =
-          brokenBlockTargets $ lookupWithDefaultUFM
+          brokenBlockTargets $ lookupWithDefaultBEnv
                                  blocks_ufm unknown_block ident
 
       update :: BlockId
@@ -113,16 +113,16 @@ calculateOwnership blocks_ufm proc_points blocks =
       update ident cause owners =
           case (cause, ident `elementOfUniqSet` proc_points) of
             (Nothing, True) ->
-                Just $ addToUFM owners ident (unitUniqSet ident)
+                Just $ extendBlockEnv owners ident (unitUniqSet ident)
             (Nothing, False) -> Nothing
             (Just cause', True) -> Nothing
             (Just cause', False) ->
                 if (sizeUniqSet old) == (sizeUniqSet new)
                    then Nothing
-                   else Just $ addToUFM owners ident new
+                   else Just $ extendBlockEnv owners ident new
                 where
-                  old = lookupWithDefaultUFM owners emptyUniqSet ident
+                  old = lookupWithDefaultBEnv owners emptyUniqSet ident
                   new = old `unionUniqSets`
-                        lookupWithDefaultUFM owners emptyUniqSet cause'
+                        lookupWithDefaultBEnv owners emptyUniqSet cause'
 
       unknown_block = panic "unknown BlockId in calculateOwnership"

@@ -10,11 +10,10 @@
 -----------------------------------------------------------------------------
 
 module StgCmmForeign (
-  cgForeignCall,
+  cgForeignCall, loadThreadState, saveThreadState,
   emitPrimCall, emitCCall,
   emitSaveThreadState, -- will be needed by the Cmm parser
   emitLoadThreadState, -- ditto
-  emitCloseNursery,
   emitOpenNursery,
  ) where
 
@@ -27,18 +26,23 @@ import StgCmmMonad
 import StgCmmUtils
 import StgCmmClosure
 
-import MkZipCfgCmm
+import BlockId
 import Cmm
 import CmmUtils
+import MkZipCfg
+import MkZipCfgCmm hiding (CmmAGraph)
 import Type
 import TysPrim
+import UniqSupply
 import CLabel
 import SMRep
 import ForeignCall
 import Constants
 import StaticFlags
+import FastString
 import Maybes
 import Outputable
+import ZipCfgCmmRep
 
 import Control.Monad
 
@@ -64,8 +68,9 @@ cgForeignCall results result_hints (CCall (CCallSpec target cconv safety)) stg_a
 		   DynamicTarget    ->  case args of fn:rest -> (rest, fn)
 	      call_target = ForeignTarget cmm_target fc
 	
-	; srt <- getSRTInfo (panic "emitForeignCall")	-- SLPJ: Not sure what SRT 
-							-- is right here
+	; srt <- getSRTInfo NoSRT	-- SLPJ: Not sure what SRT 
+					-- is right here
+                                        -- JD: Does it matter in the new codegen?
 	; emitForeignCall safety results call_target call_args srt CmmMayReturn }
   where
 	-- in the stdcall calling convention, the symbol needs @size appended
@@ -111,50 +116,18 @@ emitForeignCall
         -> CmmReturnInfo	-- This can say "never returns"
 				--   only RTS procedures do this
 	-> FCode ()
-emitForeignCall safety results target args _srt _ret
-  | not (playSafe safety) = trace "emitForeignCall; ret is undone" $ do
+emitForeignCall safety results target args _srt ret
+  | not (playSafe safety) = do -- trace "emitForeignCall; ret is undone" $ do
     let (caller_save, caller_load) = callerSaveVolatileRegs
+    updfr_off <- getUpdFrameOff
     emit caller_save
-    emit (mkUnsafeCall target results args)
+    emit $ mkUnsafeCall target results args
     emit caller_load
 
-  | otherwise = panic "ToDo: emitForeignCall'"
-
-{-
   | otherwise = do
-    -- Both 'id' and 'new_base' are KindNonPtr because they're
-    -- RTS only objects and are not subject to garbage collection
-    id <- newTemp bWord
-    new_base <- newTemp (cmmRegType (CmmGlobal BaseReg))
+    updfr_off <- getUpdFrameOff
     temp_target <- load_target_into_temp target
-    let (caller_save, caller_load) = callerSaveVolatileRegs 
-    emitSaveThreadState
-    emit caller_save
-    -- The CmmUnsafe arguments are only correct because this part
-    -- of the code hasn't been moved into the CPS pass yet.
-    -- Once that happens, this function will just emit a (CmmSafe srt) call,
-    -- and the CPS will will be the one to convert that
-    -- to this sequence of three CmmUnsafe calls.
-    emit (mkCmmCall (CmmCallee suspendThread CCallConv)
-                       [ (id,AddrHint) ]
-                       [ (CmmReg (CmmGlobal BaseReg), AddrHint) ]
-                       CmmUnsafe
-                       ret)
-    emit (mkCmmCall temp_target results args CmmUnsafe ret)
-    emit (mkCmmCall (CmmCallee resumeThread CCallConv)
-                       [ (new_base, AddrHint) ]
-                       [ (CmmReg (CmmLocal id), AddrHint) ]
-                       CmmUnsafe
-                       ret )
-    -- Assign the result to BaseReg: we
-    -- might now have a different Capability!
-    emit (mkAssign (CmmGlobal BaseReg) (CmmReg (CmmLocal new_base)))
-    emit caller_load
-    emitLoadThreadState
-
-suspendThread = CmmLit (CmmLabel (mkRtsCodeLabel SLIT("suspendThread")))
-resumeThread  = CmmLit (CmmLabel (mkRtsCodeLabel SLIT("resumeThread")))
--}
+    emit $ mkSafeCall temp_target results args updfr_off
 
 
 {-
@@ -170,23 +143,23 @@ load_args_into_temps = mapM arg_assign_temp
   where arg_assign_temp (e,hint) = do
 	   tmp <- maybe_assign_temp e
 	   return (tmp,hint)
+-}
 	
-load_target_into_temp (CmmCallee expr conv) = do 
+load_target_into_temp (ForeignTarget expr conv) = do 
   tmp <- maybe_assign_temp expr
-  return (CmmCallee tmp conv)
-load_target_into_temp other_target =
+  return (ForeignTarget tmp conv)
+load_target_into_temp other_target@(PrimTarget _) =
   return other_target
 
 maybe_assign_temp e
   | hasNoGlobalRegs e = return e
-  | otherwise          = do 
+  | otherwise         = do 
 	-- don't use assignTemp, it uses its own notion of "trivial"
 	-- expressions, which are wrong here.
         -- this is a NonPtr because it only duplicates an existing
 	reg <- newTemp (cmmExprType e) --TODO FIXME NOW
 	emit (mkAssign (CmmLocal reg) e)
 	return (CmmReg (CmmLocal reg))
--}
 
 -- -----------------------------------------------------------------------------
 -- Save/restore the thread state in the TSO
@@ -194,23 +167,34 @@ maybe_assign_temp e
 -- This stuff can't be done in suspendThread/resumeThread, because it
 -- refers to global registers which aren't available in the C world.
 
-emitSaveThreadState :: FCode ()
-emitSaveThreadState = do
+saveThreadState :: CmmAGraph
+saveThreadState =
   -- CurrentTSO->sp = Sp;
-  emit $ mkStore (cmmOffset stgCurrentTSO tso_SP) stgSp
-  emitCloseNursery
+  mkStore (cmmOffset stgCurrentTSO tso_SP) stgSp
+  <*> closeNursery
+  -- and save the current cost centre stack in the TSO when profiling:
+  <*> if opt_SccProfilingOn then
+	mkStore (cmmOffset stgCurrentTSO tso_CCCS) curCCS
+      else mkNop
+
+emitSaveThreadState :: BlockId -> FCode ()
+emitSaveThreadState bid = do
+  -- CurrentTSO->sp = Sp;
+  emit $ mkStore (cmmOffset stgCurrentTSO tso_SP)
+                 (CmmStackSlot (CallArea (Young bid)) (widthInBytes (typeWidth gcWord)))
+  emit closeNursery
   -- and save the current cost centre stack in the TSO when profiling:
   when opt_SccProfilingOn $
 	emit (mkStore (cmmOffset stgCurrentTSO tso_CCCS) curCCS)
 
    -- CurrentNursery->free = Hp+1;
-emitCloseNursery :: FCode ()
-emitCloseNursery = emit $ mkStore nursery_bdescr_free (cmmOffsetW stgHp 1)
+closeNursery :: CmmAGraph
+closeNursery = mkStore nursery_bdescr_free (cmmOffsetW stgHp 1)
 
-emitLoadThreadState :: FCode ()
-emitLoadThreadState = do
-  tso <- newTemp gcWord -- TODO FIXME NOW
-  emit $ catAGraphs [
+loadThreadState :: LocalReg -> CmmAGraph
+loadThreadState tso = do
+  -- tso <- newTemp gcWord -- TODO FIXME NOW
+  catAGraphs [
 	-- tso = CurrentTSO;
   	mkAssign (CmmLocal tso) stgCurrentTSO,
 	-- Sp = tso->sp;
@@ -218,16 +202,18 @@ emitLoadThreadState = do
 	                      bWord),
 	-- SpLim = tso->stack + RESERVED_STACK_WORDS;
 	mkAssign spLim (cmmOffsetW (cmmOffset (CmmReg (CmmLocal tso)) tso_STACK)
-			            rESERVED_STACK_WORDS)
-    ]
-  emitOpenNursery
-  -- and load the current cost centre stack from the TSO when profiling:
-  when opt_SccProfilingOn $
-	emit (mkStore curCCSAddr 
-		(CmmLoad (cmmOffset (CmmReg (CmmLocal tso)) tso_CCCS) ccsType))
+			            rESERVED_STACK_WORDS),
+        openNursery,
+        -- and load the current cost centre stack from the TSO when profiling:
+        if opt_SccProfilingOn then
+	  mkStore curCCSAddr
+                  (CmmLoad (cmmOffset (CmmReg (CmmLocal tso)) tso_CCCS) ccsType)
+        else mkNop]
+emitLoadThreadState :: LocalReg -> FCode ()
+emitLoadThreadState tso = emit $ loadThreadState tso
 
-emitOpenNursery :: FCode ()
-emitOpenNursery = emit $ catAGraphs [
+openNursery :: CmmAGraph
+openNursery = catAGraphs [
         -- Hp = CurrentNursery->free - 1;
 	mkAssign hp (cmmOffsetW (CmmLoad nursery_bdescr_free bWord) (-1)),
 
@@ -246,7 +232,8 @@ emitOpenNursery = emit $ catAGraphs [
 		)
 	    )
    ]
-
+emitOpenNursery :: FCode ()
+emitOpenNursery = emit openNursery
 
 nursery_bdescr_free   = cmmOffset stgCurrentNursery oFFSET_bdescr_free
 nursery_bdescr_start  = cmmOffset stgCurrentNursery oFFSET_bdescr_start
@@ -285,7 +272,7 @@ currentNursery 	  = CmmGlobal CurrentNursery
 
 getFCallArgs :: [StgArg] -> FCode [(CmmExpr, ForeignHint)]
 -- (a) Drop void args
--- (b) Add foriegn-call shim code
+-- (b) Add foreign-call shim code
 -- It's (b) that makes this differ from getNonVoidArgAmodes
 
 getFCallArgs args
@@ -295,7 +282,7 @@ getFCallArgs args
     get arg | isVoidRep arg_rep 
 	    = return Nothing
 	    | otherwise
-	    = do { cmm <- getArgAmode arg
+	    = do { cmm <- getArgAmode (NonVoid arg)
 		 ; return (Just (add_shim arg_ty cmm, hint)) }
 	    where
 	      arg_ty  = stgArgType arg

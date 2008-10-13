@@ -107,7 +107,7 @@ module CLabel (
         mkHpcModuleNameLabel,
 
         hasCAF,
-	infoLblToEntryLbl, entryLblToInfoLbl,
+	infoLblToEntryLbl, entryLblToInfoLbl, cvtToClosureLbl, cvtToSRTLbl,
 	needsCDecl, isAsmTemp, maybeAsmTemp, externallyVisibleCLabel,
         isMathFun,
  	isCFunctionLabel, isGcPtrLabel, labelDynamic,
@@ -458,11 +458,23 @@ entryLblToInfoLbl (RtsLabel (RtsEntryFS s)) = RtsLabel (RtsInfoFS s)
 entryLblToInfoLbl (RtsLabel (RtsRetFS s)) = RtsLabel (RtsRetInfoFS s)
 entryLblToInfoLbl l = pprPanic "CLabel.entryLblToInfoLbl" (pprCLabel l)
 
+cvtToClosureLbl   (IdLabel n c InfoTable) = IdLabel n c Closure
+cvtToClosureLbl   (IdLabel n c Entry)     = IdLabel n c Closure
+cvtToClosureLbl   (IdLabel n c ConEntry)  = IdLabel n c Closure
+cvtToClosureLbl l@(IdLabel n c Closure)   = l
+cvtToClosureLbl l = pprPanic "cvtToClosureLbl" (pprCLabel l)
+
+cvtToSRTLbl   (IdLabel n c InfoTable) = mkSRTLabel n c
+cvtToSRTLbl   (IdLabel n c Entry)     = mkSRTLabel n c
+cvtToSRTLbl   (IdLabel n c ConEntry)  = mkSRTLabel n c
+cvtToSRTLbl l@(IdLabel n c Closure)   = mkSRTLabel n c
+cvtToSRTLbl l = pprPanic "cvtToSRTLbl" (pprCLabel l)
+
 -- -----------------------------------------------------------------------------
 -- Does a CLabel refer to a CAF?
 hasCAF :: CLabel -> Bool
-hasCAF (IdLabel _ MayHaveCafRefs Closure) = True
-hasCAF _                                  = False
+hasCAF (IdLabel _ MayHaveCafRefs _) = True
+hasCAF _                            = False
 
 -- -----------------------------------------------------------------------------
 -- Does a CLabel need declaring before use or not?
@@ -823,7 +835,7 @@ pprCLbl ModuleRegdLabel
 pprCLbl (ForeignLabel str _ _)
   = ftext str
 
-pprCLbl (IdLabel name _ flavor) = ppr name <> ppIdFlavor flavor
+pprCLbl (IdLabel name cafs flavor) = ppr name <> ppIdFlavor flavor
 
 pprCLbl (CC_Label cc) 		= ppr cc
 pprCLbl (CCS_Label ccs) 	= ppr ccs

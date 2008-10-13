@@ -59,7 +59,7 @@ diffFuel (OptimizationFuel f) (OptimizationFuel f') = f - f'
 -- type OptimizationFuel = State# () -- would like this, but it won't work
 data OptimizationFuel = OptimizationFuel
   deriving Show
-tankFilledTo _ = undefined -- should be impossible to evaluate
+tankFilledTo _ = panic "tankFilledTo" -- should be impossible to evaluate
   -- realWorld# might come in handy, too...
 canRewriteWithFuel OptimizationFuel = True
 maybeRewriteWithFuel _ ma = ma
@@ -131,4 +131,5 @@ fuelDecrementState new_optimizer old new s =
 lGraphOfGraph :: Graph m l -> Int -> FuelMonad (LGraph m l)
 lGraphOfGraph (Graph tail blocks) args =
   do entry <- liftM BlockId $ getUniqueM
-     return $ LGraph entry args (insertBlock (Block entry Nothing tail) blocks)
+     return $ LGraph entry args
+                     (insertBlock (Block entry emptyStackInfo tail) blocks)

@@ -5,13 +5,12 @@ module CmmCvt
 where
 
 import BlockId
-import ClosureInfo (C_SRT(..))
 import Cmm
 import CmmExpr
 import MkZipCfgCmm hiding (CmmGraph)
+import ZipCfg       -- imported for reverse conversion
 import ZipCfgCmmRep -- imported for reverse conversion
 import CmmZipUtil
-import ForeignCall
 import PprCmm()
 import qualified ZipCfg as G
 
@@ -19,7 +18,6 @@ import FastString
 import Monad
 import Outputable
 import Panic
-import UniqSet
 import UniqSupply
 
 import Maybe
@@ -39,18 +37,23 @@ toZgraph fun_name args g@(ListGraph (BasicBlock id ss : other_blocks)) =
            let (offset, entry) = mkEntry id Native args in
            labelAGraph id offset $
               entry <*> mkStmts ss <*> foldr addBlock emptyAGraph other_blocks
-  where addBlock (BasicBlock id ss) g = mkLabel id Nothing  <*> mkStmts ss <*> g
+  where addBlock (BasicBlock id ss) g =
+          mkLabel id emptyStackInfo <*> mkStmts ss <*> g
+        updfr_sz = panic "upd frame size lost in cmm conversion"
         mkStmts (CmmNop        : ss)  = mkNop        <*> mkStmts ss 
         mkStmts (CmmComment s  : ss)  = mkComment s  <*> mkStmts ss
         mkStmts (CmmAssign l r : ss)  = mkAssign l r <*> mkStmts ss
         mkStmts (CmmStore  l r : ss)  = mkStore  l r <*> mkStmts ss
         mkStmts (CmmCall (CmmCallee f conv) res args (CmmSafe srt) CmmMayReturn : ss) =
-            mkCall f conv (map hintlessCmm res) (map hintlessCmm args) srt <*> mkStmts ss 
+            mkCall f conv' (map hintlessCmm res) (map hintlessCmm args) updfr_sz
+            <*> mkStmts ss 
+              where conv' = Foreign (ForeignConvention conv [] []) -- JD: DUBIOUS
         mkStmts (CmmCall (CmmPrim {}) _ _ (CmmSafe _) _ : _) =
             panic "safe call to a primitive CmmPrim CallishMachOp"
         mkStmts (CmmCall f res args CmmUnsafe CmmMayReturn : ss) =
                       mkUnsafeCall (convert_target f res args)
-			(strip_hints res) (strip_hints args) <*> mkStmts ss
+			(strip_hints res) (strip_hints args)
+                      <*> mkStmts ss
         mkStmts (CmmCondBranch e l : fbranch) =
             mkCmmIfThenElse e (mkBranch l) (mkStmts fbranch)
         mkStmts (last : []) = mkLast last
@@ -58,14 +61,15 @@ toZgraph fun_name args g@(ListGraph (BasicBlock id ss : other_blocks)) =
         mkStmts (_ : _ : _) = bad "last node not at end"
         bad msg = pprPanic (msg ++ " in function " ++ fun_name) (ppr g)
         mkLast (CmmCall (CmmCallee f conv) []     args _ CmmNeverReturns) =
-            mkFinalCall f conv $ map hintlessCmm args
+            mkFinalCall f conv (map hintlessCmm args) updfr_sz
         mkLast (CmmCall (CmmPrim {}) _ _ _ CmmNeverReturns) =
             panic "Call to CmmPrim never returns?!"
         mkLast (CmmSwitch scrutinee table) = mkSwitch scrutinee table
         -- SURELY, THESE HINTLESS ARGS ARE WRONG AND WILL BE FIXED WHEN CALLING
         -- CONVENTIONS ARE HONORED?
-        mkLast (CmmJump tgt args)          = mkJump   tgt $ map hintlessCmm args
-        mkLast (CmmReturn ress)            = mkReturn $ map hintlessCmm ress
+        mkLast (CmmJump tgt args)          = mkJump   tgt (map hintlessCmm args) updfr_sz
+        mkLast (CmmReturn ress)            =
+          mkReturnSimple (map hintlessCmm ress) updfr_sz
         mkLast (CmmBranch tgt)             = mkBranch tgt
         mkLast (CmmCall _f (_:_) _args _ CmmNeverReturns) =
                    panic "Call never returns but has results?!"
@@ -104,7 +108,7 @@ ofZgraph g = ListGraph $ swallow blocks
           showblocks = "LGraph has " ++ show (length blocks) ++ " blocks:" ++
                        concat (map (\(G.Block id _ _) -> " " ++ show id) blocks)
           cscomm = "Call successors are" ++
-                   (concat $ map (\id -> " " ++ show id) $ uniqSetToList call_succs)
+                   (concat $ map (\id -> " " ++ show id) $ blockSetToList call_succs)
           swallow [] = []
           swallow (G.Block id _ t : rest) = tail id [] t rest
           tail id prev' (G.ZTail m t)             rest = tail id (mid m : prev') t rest
@@ -113,15 +117,13 @@ ofZgraph g = ListGraph $ swallow blocks
           mid (MidComment s)  = CmmComment s
           mid (MidAssign l r) = CmmAssign l r
           mid (MidStore  l r) = CmmStore  l r
-          mid (MidUnsafeCall target ress args)
+          mid (MidForeignCall _ target ress args)
 		= CmmCall (cmm_target target)
 			  (add_hints conv Results   ress) 
 			  (add_hints conv Arguments args) 
 			  CmmUnsafe CmmMayReturn
 		where
 		  conv = get_conv target
-          mid m@(MidAddToContext {}) = pcomment (ppr m)
-          pcomment p = scomment $ showSDoc p
           block' id prev'
               | id == G.lg_entry g = BasicBlock id $ extend_entry    (reverse prev')
               | otherwise          = BasicBlock id $ extend_block id (reverse prev')
@@ -130,7 +132,7 @@ ofZgraph g = ListGraph $ swallow blocks
             case l of
               LastBranch tgt ->
                   case n of
-                    -- THIS IS NOW WRONG -- LABELS CAN SHOW UP ELSEWHERE IN THE GRAPH
+                    -- THIS OPT IS WRONG -- LABELS CAN SHOW UP ELSEWHERE IN THE GRAPH
                     --G.Block id' _ t : bs
                     --    | tgt == id', unique_pred id' 
                     --    -> tail id prev' t bs -- optimize out redundant labels
@@ -138,6 +140,10 @@ ofZgraph g = ListGraph $ swallow blocks
               LastCondBranch expr tid fid ->
                   case n of
                     G.Block id' _ t : bs
+                      -- It would be better to handle earlier, but we still must
+                      -- generate correct code here.
+                      | id' == fid, tid == fid, unique_pred id' ->
+                                 tail id prev' t bs
                       | id' == fid, unique_pred id' ->
                                  tail id (CmmCondBranch expr tid : prev') t bs
                       | id' == tid, unique_pred id',
@@ -145,16 +151,8 @@ ofZgraph g = ListGraph $ swallow blocks
                                  tail id (CmmCondBranch e'   fid : prev') t bs
                     _ -> let instrs' = CmmBranch fid : CmmCondBranch expr tid : prev'
                          in block' id instrs' : swallow n
-              LastJump expr _      -> endblock $ CmmJump expr []
-              LastReturn _         -> endblock $ CmmReturn []
               LastSwitch arg ids   -> endblock $ CmmSwitch arg $ ids
-              LastCall e cont _ ->
-                let tgt = CmmCallee e CCallConv in
-                case cont of
-                  Nothing ->
-                      endblock $ CmmCall tgt [] [] CmmUnsafe CmmNeverReturns
-                  Just _ ->
-                       endblock $ CmmCall tgt [] [] (CmmSafe NoC_SRT) CmmMayReturn
+              LastCall e _ _ _ -> endblock $ CmmJump e []
           exit id prev' n = -- highly irregular (assertion violation?)
               let endblock stmt = block' id (stmt : prev') : swallow n in
               case n of [] -> endblock (scomment "procedure falls off end")
@@ -169,7 +167,7 @@ ofZgraph g = ListGraph $ swallow blocks
                     let id = G.blockId b
                     in  case lookupBlockEnv preds id of
                           Nothing -> single
-                          Just s -> if sizeUniqSet s == 1 then
+                          Just s -> if sizeBlockSet s == 1 then
                                         extendBlockSet single id
                                     else single
               in  G.fold_blocks add emptyBlockSet g
@@ -177,7 +175,8 @@ ofZgraph g = ListGraph $ swallow blocks
           call_succs = 
               let add b succs =
                       case G.last (G.unzip b) of
-                        G.LastOther (LastCall _ (Just id) _) -> extendBlockSet succs id
+                        G.LastOther (LastCall _ (Just id) _ _) ->
+                          extendBlockSet succs id
                         _ -> succs
               in  G.fold_blocks add emptyBlockSet g
           _is_call_succ id = elemBlockSet id call_succs

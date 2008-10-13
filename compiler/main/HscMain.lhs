@@ -81,6 +81,7 @@ import CodeGen		( codeGen )
 import Cmm              ( Cmm )
 import PprCmm		( pprCmms )
 import CmmParse		( parseCmmFile )
+import CmmBuildInfoTables
 import CmmCPS
 import CmmCPSZ
 import CmmInfo
@@ -667,14 +668,12 @@ hscGenHardCode cgguts mod_summary
              <- {-# SCC "CoreToStg" #-}
                 myCoreToStg dflags this_mod prepd_binds	
 
-         ------------------  Try new code gen route ----------
-         cmms <- tryNewCodeGen hsc_env this_mod data_tycons
-                               dir_imps cost_centre_info
-                               stg_binds hpc_info
-
          ------------------  Code generation ------------------
          cmms <- if dopt Opt_TryNewCodeGen (hsc_dflags hsc_env)
-                 then pprTrace "cmms" (ppr cmms) $ return cmms
+                 then do cmms <- tryNewCodeGen hsc_env this_mod data_tycons
+                                 dir_imps cost_centre_info
+                                 stg_binds hpc_info
+                         pprTrace "cmms" (ppr cmms) $ return cmms
                  else {-# SCC "CodeGen" #-}
                        codeGen dflags this_mod data_tycons
                                dir_imps cost_centre_info
@@ -764,14 +763,17 @@ tryNewCodeGen hsc_env this_mod data_tycons imported_mods
 	; prog <- return $ map (runTx $ runCmmOpts cmmCfgOptsZ) prog
 		-- Control flow optimisation
 
-	; prog <- mapM (protoCmmCPSZ hsc_env) prog
+        -- Note: Have to thread the module's SRT through all the procedures
+        -- because we greedily build it as we go.
+        ; us <- mkSplitUniqSupply 'S'
+        ; let topSRT = initUs_ us emptySRT
+	; (topSRT, prog) <- foldM (protoCmmCPSZ hsc_env) (topSRT, []) prog
 		-- The main CPS conversion
 
-	; prog <- return $ map (runTx $ runCmmOpts cmmCfgOptsZ) prog
+	; prog <- return $ map (runTx $ runCmmOpts cmmCfgOptsZ) (srtToData topSRT : prog)
 		-- Control flow optimisation, again
 
-	; dumpIfSet_dyn dflags Opt_D_dump_cmmz "New Cmm" 
-		(pprCmms prog)
+	; dumpIfSet_dyn dflags Opt_D_dump_cmmz "New Cmm" (pprCmms prog)
 
 	; return $ map cmmOfZgraph prog }
 
@@ -802,7 +804,9 @@ testCmmConversion hsc_env cmm =
        let cvtm = do g <- cmmToZgraph cmm
                      return $ cfopts g
        let zgraph = initUs_ us cvtm
-       cps_zgraph <- protoCmmCPSZ hsc_env zgraph
+       us <- mkSplitUniqSupply 'S'
+       let topSRT = initUs_ us emptySRT
+       (topSRT, [cps_zgraph]) <- protoCmmCPSZ hsc_env (topSRT, []) zgraph
        let chosen_graph = if dopt Opt_RunCPSZ dflags then cps_zgraph else zgraph
        dumpIfSet_dyn dflags Opt_D_dump_cmmz "C-- Zipper Graph" (ppr chosen_graph)
        showPass dflags "Convert from Z back to Cmm"

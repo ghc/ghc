@@ -140,6 +140,12 @@ pprTop top@(CmmData _section (CmmDataLabel lbl : lits)) =
   pprDataExterns lits $$
   pprWordArray lbl lits  
 
+-- Floating info table for safe a foreign call.
+pprTop top@(CmmData _section d@(_ : _))
+  | CmmDataLabel lbl : lits <- reverse d = 
+  pprDataExterns lits $$
+  pprWordArray lbl lits  
+
 -- these shouldn't appear?
 pprTop (CmmData _ _) = panic "PprC.pprTop: can't handle this data"
 
@@ -432,6 +438,8 @@ pprLit lit = case lit of
                 -- these constants come from <math.h>
                 -- see #1861
 
+    CmmBlock bid       -> mkW_ <> pprCLabelAddr (infoTblLbl bid)
+    CmmHighStackMark   -> panic "PprC printing high stack mark"
     CmmLabel clbl      -> mkW_ <> pprCLabelAddr clbl
     CmmLabelOff clbl i -> mkW_ <> pprCLabelAddr clbl <> char '+' <> int i
     CmmLabelDiffOff clbl1 clbl2 i

@@ -51,14 +51,14 @@ import Data.List
 
 layOutDynConstr, layOutStaticConstr
 	:: DataCon -> [(PrimRep, a)]
-	-> (ClosureInfo, [(a, VirtualHpOffset)])
+	-> (ClosureInfo, [(NonVoid a, VirtualHpOffset)])
 -- No Void arguments in result
 
 layOutDynConstr    = layOutConstr False
 layOutStaticConstr = layOutConstr True
 
 layOutConstr :: Bool -> DataCon -> [(PrimRep, a)]
-	     -> (ClosureInfo, [(a, VirtualHpOffset)])
+	     -> (ClosureInfo, [(NonVoid a, VirtualHpOffset)])
 layOutConstr is_static data_con args
    = (mkConInfo is_static data_con tot_wds ptr_wds,
       things_w_offsets)
@@ -78,13 +78,16 @@ allocDynClosure
 	-> CmmExpr 		-- Cost Centre to blame for this alloc
 				-- (usually the same; sometimes "OVERHEAD")
 
-	-> [(StgArg, VirtualHpOffset)]	-- Offsets from start of the object
-					-- ie Info ptr has offset zero.
-					-- No void args in here
-	-> FCode LocalReg
+	-> [(NonVoid StgArg, VirtualHpOffset)]	-- Offsets from start of the object
+					        -- ie Info ptr has offset zero.
+					        -- No void args in here
+	-> FCode (LocalReg, CmmAGraph)
 
 -- allocDynClosure allocates the thing in the heap, 
 -- and modifies the virtual Hp to account for this.
+-- The second return value is the graph that sets the value of the
+-- returned LocalReg, which should point to the closure after executing
+-- the graph.
 
 -- Note [Return a LocalReg]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -132,7 +135,7 @@ allocDynClosure cl_info use_cc _blame_cc args_w_offsets
 	-- Assign to a temporary and return
 	-- Note [Return a LocalReg]
 	; hp_rel <- getHpRelOffset info_offset
-	; assignTemp hp_rel }
+	; getCodeR $ assignTemp hp_rel }
 
 emitSetDynHdr :: CmmExpr -> CmmExpr -> CmmExpr -> FCode ()
 emitSetDynHdr base info_ptr ccs 
@@ -210,7 +213,7 @@ mkStaticClosure :: CLabel -> CostCentreStack -> [CmmLit]
 mkStaticClosure info_lbl ccs payload padding_wds static_link_field saved_info_field
   =  [CmmLabel info_lbl]
   ++ variable_header_words
-  ++ payload
+  ++ concatMap padLitToWord payload
   ++ padding_wds
   ++ static_link_field
   ++ saved_info_field
@@ -220,6 +223,19 @@ mkStaticClosure info_lbl ccs payload padding_wds static_link_field saved_info_fi
 	++ staticParHdr
 	++ staticProfHdr ccs
 	++ staticTickyHdr
+
+-- JD: Simon had ellided this padding, but without it the C back end asserts failure.
+-- Maybe it's a bad assertion, and this padding is indeed unnecessary?
+padLitToWord :: CmmLit -> [CmmLit]
+padLitToWord lit = lit : padding pad_length
+  where width = typeWidth (cmmLitType lit)
+        pad_length = wORD_SIZE - widthInBytes width :: Int
+
+        padding n | n <= 0 = []
+                  | n `rem` 2 /= 0 = CmmInt 0 W8  : padding (n-1)
+                  | n `rem` 4 /= 0 = CmmInt 0 W16 : padding (n-2)
+                  | n `rem` 8 /= 0 = CmmInt 0 W32 : padding (n-4)
+                  | otherwise      = CmmInt 0 W64 : padding (n-8)
 
 -----------------------------------------------------------
 --		Heap overflow checking
@@ -286,7 +302,7 @@ These are used in the following circumstances
 	Here, the info table needed by the call 
 	to gc_1p should be the *same* as the
 	one for the call to f; the C-- optimiser 
-	spots this sharing opportunity
+	spots this sharing opportunity)
 
    (b) No canned sequence for results of f
        Note second info table
@@ -318,24 +334,30 @@ These are used in the following circumstances
 --------------------------------------------------------------
 -- A heap/stack check at a function or thunk entry point.
 
-entryHeapCheck :: LocalReg	-- Function
-	       -> [LocalReg]	-- Args (empty for thunk)
+entryHeapCheck :: LocalReg	-- Function (closure environment)
+	       -> Int           -- Arity -- not same as length args b/c of voids
+	       -> [LocalReg]	-- Non-void args (empty for thunk)
 	       -> C_SRT
 	       -> FCode ()
 	       -> FCode ()
 
-entryHeapCheck fun args srt code
-  = heapCheck gc_call code	-- The 'fun' keeps relevant CAFs alive
+entryHeapCheck fun arity args srt code
+  = do updfr_sz <- getUpdFrameOff
+       heapCheck True (gc_call updfr_sz) code   -- The 'fun' keeps relevant CAFs alive
   where
-    gc_call 
-	| null args = mkJump (CmmReg (CmmGlobal GCEnter1)) [CmmReg (CmmLocal fun)]
-	| otherwise = case gc_lbl args of
-			Just lbl -> mkJump (CmmLit (CmmLabel (mkRtsCodeLabel lbl)))
-					   (map (CmmReg . CmmLocal) (fun:args))
-			Nothing  -> mkCmmCall generic_gc [] [] srt
+    fun_expr = CmmReg (CmmLocal fun)
+    -- JD: ugh... we should only do the following for dynamic closures
+    args' = fun_expr : map (CmmReg . CmmLocal) args
+    gc_call updfr_sz
+	| arity == 0 = mkJumpGC (CmmReg (CmmGlobal GCEnter1)) args' updfr_sz
+	| otherwise  = case gc_lbl (fun : args) of
+		 	 Just lbl -> mkJumpGC (CmmLit (CmmLabel (mkRtsCodeLabel lbl)))
+					      args' updfr_sz
+			 Nothing  -> mkCall generic_gc GC [] [] updfr_sz
 
     gc_lbl :: [LocalReg] -> Maybe LitString
-    gc_lbl [reg] 
+{-
+    gc_lbl [reg]
 	| isGcPtrType ty  = Just (sLit "stg_gc_unpt_r1") -- "stg_gc_fun_1p"
 	| isFloatType ty  = case width of
 			      W32 -> Just (sLit "stg_gc_f1") -- "stg_gc_fun_f1"
@@ -348,6 +370,7 @@ entryHeapCheck fun args srt code
 	where
 	  ty = localRegType reg
 	  width = typeWidth ty
+-}
 
     gc_lbl regs = gc_lbl_ptrs (map (isGcPtrType . localRegType) regs)
 
@@ -360,19 +383,19 @@ entryHeapCheck fun args srt code
 
 altHeapCheck :: [LocalReg] -> C_SRT -> FCode a -> FCode a
 altHeapCheck regs srt code
-  = heapCheck gc_call code
+  = do updfr_sz <- getUpdFrameOff
+       heapCheck False (gc_call updfr_sz) code
   where
-    gc_call
-	| null regs = mkCmmCall generic_gc [] [] srt
+    gc_call updfr_sz
+	| null regs = mkCall generic_gc GC [] [] updfr_sz
 
 	| Just gc_lbl <- rts_label regs	-- Canned call
-	= mkCmmCall (CmmLit (CmmLabel (mkRtsCodeLabel gc_lbl)))
-		    regs
-		    (map (CmmReg . CmmLocal) regs)
-		    srt
+	= mkCall    (CmmLit (CmmLabel (mkRtsCodeLabel gc_lbl))) GC
+		    regs (map (CmmReg . CmmLocal) regs) updfr_sz
 	| otherwise		-- No canned call, and non-empty live vars
-	= mkCmmCall generic_gc [] [] srt
+	= mkCall generic_gc GC [] [] updfr_sz
 
+{-
     rts_label [reg] 
 	| isGcPtrType ty  = Just (sLit "stg_gc_unpt_r1")
 	| isFloatType ty  = case width of
@@ -381,23 +404,26 @@ altHeapCheck regs srt code
 			      _other -> Nothing
 	| otherwise	  = case width of
 			      W32 -> Just (sLit "stg_gc_unbx_r1")
-			      W64 -> Just (sLit "stg_gc_unbx_l1")
+			      W64 -> Just (sLit "stg_gc_l1") -- "stg_gc_fun_unbx_l1"
 			      _other -> Nothing	-- Narrow cases
 	where
 	  ty = localRegType reg
 	  width = typeWidth ty
+-}
 
     rts_label _ = Nothing
 
 
 generic_gc :: CmmExpr	-- The generic GC procedure; no params, no resuls
-generic_gc = CmmLit (CmmLabel (mkRtsCodeLabel (sLit "stg_gc_fun")))
+generic_gc = CmmLit (CmmLabel (mkRtsCodeLabel (sLit "stg_gc_noregs")))
+-- JD: TEMPORARY -- UNTIL THOSE FUNCTIONS EXIST...
+-- generic_gc = CmmLit (CmmLabel (mkRtsCodeLabel (sLit "stg_gc_fun")))
 
 -------------------------------
-heapCheck :: CmmAGraph -> FCode a -> FCode a
-heapCheck do_gc code
+heapCheck :: Bool -> CmmAGraph -> FCode a -> FCode a
+heapCheck checkStack do_gc code
   = getHeapUsage $ \ hpHw ->
-    do	{ emit (do_checks hpHw do_gc)
+    do	{ emit $ do_checks checkStack hpHw do_gc
 	     	-- Emit heap checks, but be sure to do it lazily so 
 		-- that the conditionals on hpHw don't cause a black hole
 	; tickyAllocHeap hpHw
@@ -405,20 +431,27 @@ heapCheck do_gc code
 	; setRealHp hpHw
 	; code }
 
-do_checks :: WordOff	-- Heap headroom
-	  -> CmmAGraph	-- What to do on failure
-	  -> CmmAGraph
-do_checks 0 _ 
-  = mkNop
-do_checks alloc do_gc
-  = withFreshLabel "gc" $ \ blk_id ->
-    mkLabel blk_id Nothing
-    <*>	mkAssign hpReg bump_hp
-    <*> mkCmmIfThen hp_oflo 
-		(save_alloc
-	     <*> do_gc
-	     <*> mkBranch blk_id)
-		-- Bump heap pointer, and test for heap exhaustion
+do_checks :: Bool       -- Should we check the stack?
+          -> WordOff	-- Heap headroom
+          -> CmmAGraph	-- What to do on failure
+          -> CmmAGraph
+do_checks checkStack alloc do_gc
+  = withFreshLabel "gc" $ \ loop_id ->
+    withFreshLabel "gc" $ \ gc_id   ->
+      mkLabel loop_id emptyStackInfo
+      <*> (let hpCheck = if alloc == 0 then mkNop
+                         else mkAssign hpReg bump_hp <*>
+                              mkCmmIfThen hp_oflo (save_alloc <*> mkBranch gc_id)
+           in if checkStack then
+                mkCmmIfThenElse sp_oflo (mkBranch gc_id) hpCheck
+              else hpCheck)
+      <*> mkComment (mkFastString "outOfLine should follow:")
+      <*> outOfLine (mkLabel gc_id emptyStackInfo
+                     <*> mkComment (mkFastString "outOfLine here")
+                     <*> do_gc
+                     <*> mkBranch loop_id)
+		-- Test for stack pointer exhaustion, then
+		-- bump heap pointer, and test for heap exhaustion
 		-- Note that we don't move the heap pointer unless the 
 		-- stack check succeeds.  Otherwise we might end up
 		-- with slop at the end of the current block, which can 
@@ -427,6 +460,11 @@ do_checks alloc do_gc
     alloc_lit = CmmLit (mkIntCLit (alloc*wORD_SIZE))	-- Bytes
     bump_hp   = cmmOffsetExprB (CmmReg hpReg) alloc_lit
 
+	-- Sp overflow if (Sp - CmmHighStack < SpLim)
+    sp_oflo = CmmMachOp mo_wordULt 
+		  [CmmMachOp (MO_Sub (typeWidth (cmmRegType spReg)))
+                             [CmmReg spReg, CmmLit CmmHighStackMark],
+                   CmmReg spLimReg]
 	-- Hp overflow if (Hp > HpLim)
 	-- (Hp has been incremented by now)
 	-- HpLim points to the LAST WORD of valid allocation space.

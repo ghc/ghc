@@ -52,6 +52,7 @@ import BlockId
 import Cmm
 import CmmExpr
 import MkZipCfgCmm
+import ZipCfg hiding (last, unzip, zip)
 import CLabel
 import CmmUtils
 import PprCmm		( {- instances -} )
@@ -307,15 +308,17 @@ emitRtsCall'
    -> FCode ()
 emitRtsCall' res fun args _vols safe
   = --error "emitRtsCall'"
-    do { emit caller_save
-       ; emit call
+    do { updfr_off <- getUpdFrameOff
+       ; emit caller_save
+       ; emit $ call updfr_off
        ; emit caller_load }
   where
-    call = if safe then
-             mkCall fun_expr CCallConv res' args' undefined
-           else
-             mkUnsafeCall (ForeignTarget fun_expr
-                            (ForeignConvention CCallConv arg_hints res_hints)) res' args'
+    call updfr_off =
+      if safe then
+        mkCall fun_expr Native res' args' updfr_off
+      else
+        mkUnsafeCall (ForeignTarget fun_expr
+                         (ForeignConvention CCallConv arg_hints res_hints)) res' args'
     (args', arg_hints) = unzip args
     (res',  res_hints) = unzip res
     (caller_save, caller_load) = callerSaveVolatileRegs
@@ -633,7 +636,7 @@ mkCmmSwitch via_C tag_expr branches mb_deflt lo_tag hi_tag
     mk_switch tag_expr' (sortLe le branches) mb_deflt 
 	      lo_tag hi_tag via_C
 	  -- Sort the branches before calling mk_switch
-    <*> mkLabel join_lbl Nothing
+    <*> mkLabel join_lbl emptyStackInfo
 
   where
     (t1,_) `le` (t2,_) = t1 <= t2
@@ -706,9 +709,9 @@ mk_switch tag_expr branches mb_deflt lo_tag hi_tag via_C
   | Just deflt <- mb_deflt, (hi_tag - highest_branch) >= n_branches
   = mkCmmIfThenElse 
 	(cmmUGtWord tag_expr (CmmLit (mkIntCLit highest_branch)))
+	(mkBranch deflt)
 	(mk_switch tag_expr branches mb_deflt 
 			lo_tag highest_branch via_C)
-	(mkBranch deflt)
 
   | otherwise	-- Use an if-tree
   = mkCmmIfThenElse 
@@ -788,6 +791,7 @@ mkCmmLitSwitch scrut  branches deflt
     label_code join_lbl deflt		$ \ deflt ->
     label_branches join_lbl branches	$ \ branches ->
     mk_lit_switch scrut' deflt (sortLe le branches)
+    <*> mkLabel join_lbl emptyStackInfo
   where
     le (t1,_) (t2,_) = t1 <= t2
 
@@ -795,12 +799,12 @@ mk_lit_switch :: CmmExpr -> BlockId
  	      -> [(Literal,BlockId)]
 	      -> CmmAGraph
 mk_lit_switch scrut deflt [(lit,blk)] 
-  = mkCbranch
-	(CmmMachOp (MO_Ne rep) [scrut, CmmLit cmm_lit])
-	deflt blk
+  = mkCbranch (CmmMachOp ne [scrut, CmmLit cmm_lit]) deflt blk
   where
     cmm_lit = mkSimpleLit lit
-    rep     = typeWidth (cmmLitType cmm_lit)
+    cmm_ty  = cmmLitType cmm_lit
+    rep     = typeWidth cmm_ty
+    ne      = if isFloatType cmm_ty then MO_F_Ne rep else MO_Ne rep
 
 mk_lit_switch scrut deflt_blk_id branches
   = mkCmmIfThenElse cond
@@ -846,7 +850,7 @@ label_code :: BlockId -> CmmAGraph -> (BlockId -> CmmAGraph) -> CmmAGraph
 --  [L: code; goto J] fun L
 label_code join_lbl code thing_inside
   = withFreshLabel "switch" 	$ \lbl -> 
-    outOfLine (mkLabel lbl Nothing <*> code <*> mkBranch join_lbl)
+    outOfLine (mkLabel lbl emptyStackInfo <*> code <*> mkBranch join_lbl)
     <*> thing_inside lbl
  
 
@@ -881,10 +885,12 @@ getSRTInfo (SRT off len bmp)
   = do 	{ id <- newUnique
 	; top_srt <- getSRTLabel
         ; let srt_desc_lbl = mkLargeSRTLabel id
-	; emitRODataLits srt_desc_lbl
-             ( cmmLabelOffW top_srt off
-	       : mkWordCLit (fromIntegral len)
-	       : map mkWordCLit bmp)
+        -- JD: We're not constructing and emitting SRTs in the back end,
+        -- which renders this code wrong (and it now names a now-non-existent label).
+	-- ; emitRODataLits srt_desc_lbl
+        --      ( cmmLabelOffW top_srt off
+	--        : mkWordCLit (fromIntegral len)
+	--        : map mkWordCLit bmp)
 	; return (C_SRT srt_desc_lbl 0 srt_escape) }
 
   | otherwise

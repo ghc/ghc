@@ -246,9 +246,8 @@ regAlloc (CmmData sec d)
 		, Nothing )
 	
 regAlloc (CmmProc (LiveInfo info _ _) lbl params (ListGraph []))
-	= return
-		( CmmProc info lbl params (ListGraph [])
-		, Nothing )
+	= return ( CmmProc info lbl params (ListGraph [])
+		 , Nothing )
 	
 regAlloc (CmmProc static lbl params (ListGraph comps))
 	| LiveInfo info (Just first_id) block_live	<- static
@@ -350,7 +349,7 @@ processBlock block_live (BasicBlock id instrs)
 initBlock :: BlockId -> RegM ()
 initBlock id
  = do	block_assig	<- getBlockAssigR
-  	case lookupUFM block_assig id of
+  	case lookupBlockEnv block_assig id of
 	        -- no prior info about this block: assume everything is
 	        -- free and the assignment is empty.
 	 	Nothing
@@ -775,13 +774,13 @@ joinToTargets block_live new_blocks instr (dest:dests) = do
 	regsOfLoc (InBoth r _) = [r]
 	regsOfLoc (InMem _)    = []
   -- in
-  case lookupUFM block_assig dest of
+  case lookupBlockEnv block_assig dest of
 	-- Nothing <=> this is the first time we jumped to this
 	-- block.
 	Nothing -> do
 	  freeregs <- getFreeRegsR
 	  let freeregs' = foldr releaseReg freeregs to_free 
-	  setBlockAssigR (addToUFM block_assig dest 
+	  setBlockAssigR (extendBlockEnv block_assig dest 
 				(freeregs',adjusted_assig))
 	  joinToTargets block_live new_blocks instr dests
 
@@ -1114,5 +1113,5 @@ my_fromJust :: String -> SDoc -> Maybe a -> a
 my_fromJust _ _ (Just x) = x
 my_fromJust s p Nothing = pprPanic ("fromJust: " ++ s) p
 
-lookItUp :: Uniquable b => String -> UniqFM a -> b -> a
-lookItUp str fm x = my_fromJust str (ppr (getUnique x)) (lookupUFM fm x)
+lookItUp :: String -> BlockMap a -> BlockId -> a
+lookItUp str fm x = my_fromJust str (ppr x) (lookupBlockEnv fm x)

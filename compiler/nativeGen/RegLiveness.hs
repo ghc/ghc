@@ -58,10 +58,10 @@ type RegMap a = UniqFM a
 emptyRegMap :: UniqFM a
 emptyRegMap = emptyUFM
 
-type BlockMap a = UniqFM a
+type BlockMap a = BlockEnv a
 
-emptyBlockMap :: UniqFM a
-emptyBlockMap = emptyUFM
+emptyBlockMap :: BlockEnv a
+emptyBlockMap = emptyBlockEnv
 
 
 -- | A top level thing which carries liveness information.
@@ -200,7 +200,7 @@ slurpConflicts live
 
 	slurpBlock info rs (BasicBlock blockId instrs)	
 		| LiveInfo _ _ blockLive	<- info
-		, Just rsLiveEntry		<- lookupUFM blockLive blockId
+		, Just rsLiveEntry		<- lookupBlockEnv blockLive blockId
 		, (conflicts, moves)		<- slurpLIs rsLiveEntry rs instrs
 		= (consBag rsLiveEntry conflicts, moves)
 
@@ -346,7 +346,8 @@ stripLive live
 
  where	stripCmm (CmmData sec ds)	= CmmData sec ds
  	stripCmm (CmmProc (LiveInfo info _ _) label params (ListGraph comps))
-		= CmmProc info label params (ListGraph $ concatMap stripComp comps)
+		= CmmProc info label params
+                          (ListGraph $ concatMap stripComp comps)
 
 	stripComp  (BasicBlock _ blocks)	= map stripBlock blocks
 	stripBlock (BasicBlock i instrs)	= BasicBlock i (map stripLI instrs)
@@ -411,7 +412,7 @@ patchEraseLive patchF cmm
 	patchCmm (CmmProc info label params (ListGraph comps))
 	 | LiveInfo static id blockMap	<- info
 	 = let 	patchRegSet set	= mkUniqSet $ map patchF $ uniqSetToList set
-		blockMap'	= mapUFM patchRegSet blockMap
+		blockMap'	= mapBlockEnv patchRegSet blockMap
 
 		info'		= LiveInfo static id blockMap'
 	   in	CmmProc info' label params $ ListGraph $ map patchComp comps
@@ -480,7 +481,7 @@ regLiveness (CmmData i d)
 
 regLiveness (CmmProc info lbl params (ListGraph []))
 	= returnUs $ CmmProc
-			(LiveInfo info Nothing emptyUFM)
+			(LiveInfo info Nothing emptyBlockEnv)
 			lbl params (ListGraph [])
 
 regLiveness (CmmProc info lbl params (ListGraph blocks@(first : _)))
@@ -496,9 +497,8 @@ regLiveness (CmmProc info lbl params (ListGraph blocks@(first : _)))
 			 -> panic "RegLiveness.regLiveness: no blocks in scc list")
 		 $ ann_sccs
 
-   in	returnUs $ CmmProc
-			(LiveInfo info (Just first_id) block_live)
-			lbl params (ListGraph liveBlocks)
+   in	returnUs $ CmmProc (LiveInfo info (Just first_id) block_live)
+			   lbl params (ListGraph liveBlocks)
 
 
 sccBlocks :: [NatBasicBlock] -> [SCC NatBasicBlock]
@@ -569,8 +569,8 @@ livenessSCCs blockmap done
                 -- BlockMaps for equality.
 	    equalBlockMaps a b
 	        = a' == b'
-	      where a' = map f $ ufmToList a
-	            b' = map f $ ufmToList b
+	      where a' = map f $ blockEnvToList a
+	            b' = map f $ blockEnvToList b
 	            f (key,elt) = (key, uniqSetToList elt)
 
 
@@ -586,7 +586,7 @@ livenessBlock blockmap (BasicBlock block_id instrs)
  = let
  	(regsLiveOnEntry, instrs1)
  		= livenessBack emptyUniqSet blockmap [] (reverse instrs)
- 	blockmap'	= addToUFM blockmap block_id regsLiveOnEntry
+ 	blockmap'	= extendBlockEnv blockmap block_id regsLiveOnEntry
 
 	instrs2		= livenessForward regsLiveOnEntry instrs1
 
@@ -686,9 +686,9 @@ liveness1 liveregs blockmap instr
 	    not_a_branch = null targets
 
 	    targetLiveRegs target
-                  = case lookupUFM blockmap target of
+                  = case lookupBlockEnv blockmap target of
                                 Just ra -> ra
-                                Nothing -> emptyBlockMap
+                                Nothing -> emptyRegMap
 
             live_from_branch = unionManyUniqSets (map targetLiveRegs targets)
 

@@ -6,8 +6,10 @@
 -- for details
 
 module CmmInfo (
+  emptyContInfoTable,
   cmmToRawCmm,
-  mkInfoTable
+  mkInfoTable,
+  mkBareInfoTable
 ) where
 
 #include "HsVersions.h"
@@ -23,6 +25,7 @@ import CgInfoTbls
 import CgCallConv
 import CgUtils
 import SMRep
+import ZipCfgCmmRep
 
 import Constants
 import Outputable
@@ -32,6 +35,13 @@ import UniqSupply
 import Panic
 
 import Data.Bits
+
+-- When we split at proc points, we need an empty info table.
+emptyContInfoTable :: CmmInfo
+emptyContInfoTable =
+  CmmInfo Nothing Nothing (CmmInfoTable False (ProfilingInfo zero zero) rET_SMALL
+                                              (ContInfo [] NoC_SRT))
+    where zero = CmmInt 0 wordWidth
 
 cmmToRawCmm :: [Cmm] -> IO [RawCmm]
 cmmToRawCmm cmm = do
@@ -81,7 +91,7 @@ mkInfoTable uniq (CmmProc (CmmInfo _ _ info) entry_label arguments blocks) =
       -- Code without an info table.  Easy.
       CmmNonInfoTable -> [CmmProc [] entry_label arguments blocks]
 
-      CmmInfoTable (ProfilingInfo ty_prof cl_prof) type_tag type_info ->
+      CmmInfoTable _ (ProfilingInfo ty_prof cl_prof) type_tag type_info ->
           let info_label = entryLblToInfoLbl entry_label
               ty_prof'   = makeRelativeRefTo info_label ty_prof
               cl_prof'   = makeRelativeRefTo info_label cl_prof
@@ -143,6 +153,17 @@ mkInfoTable uniq (CmmProc (CmmInfo _ _ info) entry_label arguments blocks) =
                                      then liveness_tag
                                      else type_tag
                 (srt_label, srt_bitmap) = mkSRTLit info_label srt
+
+-- Generate a bare info table, not attached to any procedure.
+mkBareInfoTable :: CLabel -> Unique -> CmmInfoTable -> [CmmTopZ]
+mkBareInfoTable lbl uniq info =
+  case mkInfoTable uniq (CmmProc (CmmInfo Nothing Nothing info) lbl [] (ListGraph [])) of
+    [CmmProc d _ _ _] ->
+      ASSERT (tablesNextToCode)
+      [CmmData Data (d ++ [CmmDataLabel (entryLblToInfoLbl lbl)])]
+    [CmmData d s]     -> [CmmData d s]
+    _ -> panic "mkBareInfoTable expected to produce only data"
+
 
 -- Handle the differences between tables-next-to-code
 -- and not tables-next-to-code

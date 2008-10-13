@@ -74,6 +74,7 @@ module StaticFlags (
 	opt_EmitExternalCore,
 	v_Ld_inputs,
 	tablesNextToCode,
+        opt_StubDeadValues,
 
     -- For the parser
     addOpt, removeOpt, addWay, findBuildTag, v_opt_C_ready
@@ -242,6 +243,8 @@ opt_HistorySize :: Int
 opt_HistorySize			= lookup_def_int "-fhistory-size" 20
 opt_OmitBlackHoling :: Bool
 opt_OmitBlackHoling		= lookUp  (fsLit "-dno-black-holing")
+opt_StubDeadValues  :: Bool
+opt_StubDeadValues		= lookUp  (fsLit "-dstub-dead-values")
 
 -- Simplifier switches
 opt_SimplNoPreInlining :: Bool

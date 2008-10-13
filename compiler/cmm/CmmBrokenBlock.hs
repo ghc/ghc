@@ -420,4 +420,4 @@ cmmBlockFromBrokenBlock (BrokenBlock ident _ stmts _ exit) =
 -----------------------------------------------------------------------------
 -- | Build a mapping so we can lookup a 'BrokenBlock' by its 'BlockId'
 blocksToBlockEnv :: [BrokenBlock] -> BlockEnv BrokenBlock
-blocksToBlockEnv blocks = listToUFM $ map (\b -> (brokenBlockId b, b)) blocks
+blocksToBlockEnv blocks = mkBlockEnv $ map (\b -> (brokenBlockId b, b)) blocks

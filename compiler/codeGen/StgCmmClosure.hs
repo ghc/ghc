@@ -73,7 +73,7 @@ import ClosureInfo (ArgDescr(..), C_SRT(..), Liveness(..))
 
 import StgSyn
 import SMRep
-import Cmm	( ClosureTypeInfo(..) )
+import Cmm	( ClosureTypeInfo(..), ConstrDescription )
 import CmmExpr
 
 import CLabel
@@ -236,7 +236,7 @@ mkLFLetNoEscape = LFLetNoEscape
 
 -------------
 mkLFReEntrant :: TopLevelFlag	-- True of top level
-	      -> [Id]		-- Free vars
+	      -> [Id]	        -- Free vars
 	      -> [Id] 		-- Args
 	      -> ArgDescr	-- Argument descriptor
 	      -> LambdaFormInfo
@@ -335,8 +335,10 @@ tagForArity arity | isSmallFamily arity = arity
                   | otherwise           = 0
 
 lfDynTag :: LambdaFormInfo -> DynTag
-lfDynTag (LFCon con)               = tagForCon con
-lfDynTag (LFReEntrant _ arity _ _) = tagForArity arity
+-- Return the tag in the low order bits of a variable bound
+-- to this LambdaForm
+lfDynTag (LFCon con)               = pprTrace "tagForCon" (ppr con <+> ppr (tagForCon con)) $ tagForCon con
+lfDynTag (LFReEntrant _ arity _ _) = pprTrace "reentrant" (ppr arity) $ tagForArity arity
 lfDynTag _other                    = 0
 
 
@@ -506,7 +508,8 @@ getCallMethod name caf (LFReEntrant _ arity _ _) n_args
   | n_args == 0    = ASSERT( arity /= 0 )
 		     ReturnIt	-- No args at all
   | n_args < arity = SlowCall	-- Not enough args
-  | otherwise      = DirectEntry (enterIdLabel name caf) arity
+  | otherwise      = pprTrace "getCallMethod" (ppr name <+> ppr arity) $
+                     DirectEntry (enterIdLabel name caf) arity
 
 getCallMethod _name _ LFUnLifted n_args
   = ASSERT( n_args == 0 ) ReturnIt
@@ -675,7 +678,8 @@ data ClosureInfo
 	closureSMRep  :: !SMRep,	  -- representation used by storage mgr
 	closureSRT    :: !C_SRT,	  -- What SRT applies to this closure
 	closureType   :: !Type,		  -- Type of closure (ToDo: remove)
-	closureDescr  :: !String	  -- closure description (for profiling)
+	closureDescr  :: !String,	  -- closure description (for profiling)
+        closureCafs   :: !CafInfo         -- whether the closure may have CAFs
     }
 
   -- Constructor closures don't have a unique info table label (they use
@@ -720,7 +724,8 @@ mkClosureInfo is_static id lf_info tot_wds ptr_wds srt_info descr
 		  closureSMRep = sm_rep, 
 		  closureSRT = srt_info,
 		  closureType = idType id,
-		  closureDescr = descr }
+		  closureDescr = descr,
+                  closureCafs = idCafInfo id }
   where
     name   = idName id
     sm_rep = chooseSMRep is_static lf_info tot_wds ptr_wds
@@ -743,39 +748,49 @@ mkConInfo is_static data_con tot_wds ptr_wds
 
 cafBlackHoleClosureInfo :: ClosureInfo -> ClosureInfo
 cafBlackHoleClosureInfo (ClosureInfo { closureName = nm,
-				       closureType = ty })
+				       closureType = ty,
+				       closureCafs = cafs })
   = ClosureInfo { closureName   = nm,
 		  closureLFInfo = LFBlackHole mkCAFBlackHoleInfoTableLabel,
 		  closureSMRep  = BlackHoleRep,
 		  closureSRT    = NoC_SRT,
 		  closureType   = ty,
-		  closureDescr  = "" }
+		  closureDescr  = "", 
+		  closureCafs   = cafs }
 cafBlackHoleClosureInfo _ = panic "cafBlackHoleClosureInfo"
 
 seCafBlackHoleClosureInfo :: ClosureInfo -> ClosureInfo
 seCafBlackHoleClosureInfo (ClosureInfo { closureName = nm,
-				         closureType = ty })
+				         closureType = ty,
+				         closureCafs = cafs })
   = ClosureInfo { closureName   = nm,
 		  closureLFInfo = LFBlackHole mkSECAFBlackHoleInfoTableLabel,
 		  closureSMRep  = BlackHoleRep,
 		  closureSRT    = NoC_SRT,
 		  closureType   = ty,
-		  closureDescr  = ""  }
+		  closureDescr  = "",
+		  closureCafs   = cafs }
 seCafBlackHoleClosureInfo _ = panic "seCafBlackHoleClosureInfo"
 
 --------------------------------------
 --   Extracting ClosureTypeInfo
 --------------------------------------
 
-closureTypeInfo :: ClosureInfo -> ClosureTypeInfo
-closureTypeInfo cl_info
+-- JD: I've added the continuation arguments not for fun but because
+-- I don't want to pipe the monad in here (circular module dependencies),
+-- and I don't want to pull this code out of this module, which would
+-- require us to expose a bunch of abstract types.
+
+closureTypeInfo ::
+  ClosureInfo -> ((ConstrDescription -> ClosureTypeInfo) -> DataCon -> CLabel -> a) ->
+  (ClosureTypeInfo -> a) -> a
+closureTypeInfo cl_info k_with_con_name k_simple
    = case cl_info of
 	ConInfo { closureCon = con } 
-		-> ConstrInfo (ptrs, nptrs)
-			      (fromIntegral (dataConTagZ con))
-		              con_name
+		-> k_with_con_name (ConstrInfo (ptrs, nptrs)
+			              (fromIntegral (dataConTagZ con))) con info_lbl
 		where
-		  con_name = panic "closureTypeInfo"
+		  --con_name = panic "closureTypeInfo"
 			-- Was: 
 			-- cstr <- mkByteStringCLit $ dataConIdentity con
 			-- con_name = makeRelativeRefTo info_lbl cstr
@@ -783,23 +798,23 @@ closureTypeInfo cl_info
     	ClosureInfo { closureName   = name,
                       closureLFInfo = LFReEntrant _ arity _ arg_descr,
                       closureSRT    = srt }
-		-> FunInfo (ptrs, nptrs)
-	                   srt 
-	                   (fromIntegral arity)
-	                   arg_descr 
-	                   (CmmLabel (mkSlowEntryLabel name (clHasCafRefs cl_info)))
+		-> k_simple $ FunInfo (ptrs, nptrs)
+	                        srt 
+	                        (fromIntegral arity)
+	                        arg_descr 
+	                        (CmmLabel (mkSlowEntryLabel name (clHasCafRefs cl_info)))
   
   	ClosureInfo { closureLFInfo = LFThunk _ _ _ (SelectorThunk offset) _, 
                       closureSRT    = srt }
- 		-> ThunkSelectorInfo (fromIntegral offset) srt
+ 		-> k_simple $ ThunkSelectorInfo (fromIntegral offset) srt
 
     	ClosureInfo { closureLFInfo = LFThunk {}, 
                       closureSRT    = srt }
-		-> ThunkInfo (ptrs, nptrs) srt
+		-> k_simple $ ThunkInfo (ptrs, nptrs) srt
 
         _ -> panic "unexpected lambda form in mkCmmInfo"
   where
---    info_lbl = infoTableLabelFromCI cl_info
+    info_lbl = infoTableLabelFromCI cl_info
     ptrs     = fromIntegral $ closurePtrsSize cl_info
     size     = fromIntegral $ closureNonHdrSize cl_info
     nptrs    = size - ptrs
@@ -1092,9 +1107,7 @@ getPredTyDescription (EqPred ty1 _ty2) = getTyDescription ty1	-- Urk?
 --   SRTs/CAFs
 --------------------------------------
 
--- This is horrible, but we need to know whether a closure may have CAFs.
+-- We need to know whether a closure may have CAFs.
 clHasCafRefs :: ClosureInfo -> CafInfo
-clHasCafRefs (ClosureInfo {closureSRT = srt}) = 
-  case srt of NoC_SRT -> NoCafRefs
-              _       -> MayHaveCafRefs
+clHasCafRefs (ClosureInfo {closureCafs = cafs}) = cafs
 clHasCafRefs (ConInfo {}) = NoCafRefs

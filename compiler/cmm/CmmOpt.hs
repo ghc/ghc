@@ -543,7 +543,8 @@ narrowS _ _ = panic "narrowTo"
 -}
 
 cmmLoopifyForC :: RawCmmTop -> RawCmmTop
-cmmLoopifyForC p@(CmmProc info entry_lbl [] (ListGraph blocks@(BasicBlock top_id _ : _)))
+cmmLoopifyForC p@(CmmProc info entry_lbl []
+                 (ListGraph blocks@(BasicBlock top_id _ : _)))
   | null info = p  -- only if there's an info table, ignore case alts
   | otherwise =  
 --  pprTrace "jump_lbl" (ppr jump_lbl <+> ppr entry_lbl) $

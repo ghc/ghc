@@ -33,7 +33,9 @@ import Cmm()
 import CmmExpr
 import CoreSyn
 import DataCon
+import ForeignCall
 import Id
+import PrimOp
 import TyCon
 import CostCentre	( CostCentreStack, currentCCS )
 import Maybes
@@ -50,16 +52,16 @@ cgExpr	:: StgExpr -> FCode ()
 cgExpr (StgApp fun args)     = cgIdApp fun args
 cgExpr (StgOpApp op args ty) = cgOpApp op args ty
 cgExpr (StgConApp con args)  = cgConApp con args
-
 cgExpr (StgSCC cc expr)   = do { emitSetCCC cc; cgExpr expr }
 cgExpr (StgTick m n expr) = do { emit (mkTickBox m n); cgExpr expr }
-cgExpr (StgLit lit)       = emitReturn [CmmLit (mkSimpleLit lit)]
+cgExpr (StgLit lit)       = do cmm_lit <- cgLit lit
+                               emitReturn [CmmLit cmm_lit]
 
-cgExpr (StgLet binds expr)  	       = do { emit (mkComment $ mkFastString "calling cgBind"); cgBind binds; emit (mkComment $ mkFastString "calling cgExpr"); cgExpr expr }
+cgExpr (StgLet binds expr)  	       = do { cgBind binds; cgExpr expr }
 cgExpr (StgLetNoEscape _ _ binds expr) = do { cgLneBinds binds; cgExpr expr }
 
-cgExpr (StgCase expr _live_vars _save_vars bndr srt alt_type alts)
-  = cgCase expr bndr srt alt_type alts
+cgExpr (StgCase expr _live_vars _save_vars bndr srt alt_type alts) =
+  cgCase expr bndr srt alt_type alts
 
 cgExpr (StgLam {}) = panic "cgExpr: StgLam"
 
@@ -68,7 +70,7 @@ cgExpr (StgLam {}) = panic "cgExpr: StgLam"
 ------------------------------------------------------------------------
 
 {- Generating code for a let-no-escape binding, aka join point is very
-very similar to whatwe do for a case expression.  The duality is
+very similar to what we do for a case expression.  The duality is
 between
 	let-no-escape x = b
 	in e
@@ -86,8 +88,8 @@ cgLneBinds :: StgBinding -> FCode ()
 cgLneBinds (StgNonRec bndr rhs)
   = do	{ local_cc <- saveCurrentCostCentre
 		-- See Note [Saving the current cost centre]
-	; (bndr,info) <- cgLetNoEscapeRhs local_cc bndr rhs 
-	; addBindC bndr info }
+	; info <- cgLetNoEscapeRhs local_cc bndr rhs 
+	; addBindC (cg_id info) info }
 
 cgLneBinds (StgRec pairs)
   = do	{ local_cc <- saveCurrentCostCentre
@@ -98,16 +100,24 @@ cgLneBinds (StgRec pairs)
 
 	; addBindsC new_bindings }
 
+
 -------------------------
-cgLetNoEscapeRhs
+cgLetNoEscapeRhs, cgLetNoEscapeRhsBody
     :: Maybe LocalReg	-- Saved cost centre
     -> Id
     -> StgRhs
-    -> FCode (Id, CgIdInfo)
+    -> FCode CgIdInfo
 
-cgLetNoEscapeRhs local_cc bndr (StgRhsClosure cc _bi _ _upd srt args body)
-  = cgLetNoEscapeClosure bndr local_cc cc srt args body
-cgLetNoEscapeRhs local_cc bndr (StgRhsCon cc con args)
+cgLetNoEscapeRhs local_cc bndr rhs =
+  do { (info, rhs_body) <- getCodeR $ cgLetNoEscapeRhsBody local_cc bndr rhs 
+     ; let (bid, _) = expectJust "cgLetNoEscapeRhs" $ maybeLetNoEscape info
+     ; emit (outOfLine $ mkLabel bid emptyStackInfo <*> rhs_body)
+     ; return info
+     }
+
+cgLetNoEscapeRhsBody local_cc bndr (StgRhsClosure cc _bi _ _upd srt args body)
+  = cgLetNoEscapeClosure bndr local_cc cc srt (nonVoidIds args) body
+cgLetNoEscapeRhsBody local_cc bndr (StgRhsCon cc con args)
   = cgLetNoEscapeClosure bndr local_cc cc NoSRT [] (StgConApp con args)
 	-- For a constructor RHS we want to generate a single chunk of 
 	-- code which can be jumped to from many places, which will 
@@ -120,9 +130,9 @@ cgLetNoEscapeClosure
 	-> Maybe LocalReg	-- Slot for saved current cost centre
 	-> CostCentreStack   	-- XXX: *** NOT USED *** why not?
 	-> SRT
-	-> [Id]			-- Args (as in \ args -> body)
+	-> [NonVoid Id]		-- Args (as in \ args -> body)
     	-> StgExpr		-- Body (as in above)
-	-> FCode (Id, CgIdInfo)
+	-> FCode CgIdInfo
 
 cgLetNoEscapeClosure bndr cc_slot _unused_cc srt args body
   = do  { arg_regs <- forkProc $ do	
@@ -133,7 +143,7 @@ cgLetNoEscapeClosure bndr cc_slot _unused_cc srt args body
 			-- Using altHeapCheck just reduces
 			-- instructions to save on stack
 		; return arg_regs }
-	; return (bndr, lneIdInfo bndr arg_regs) }
+	; return $ lneIdInfo bndr arg_regs}
 
 
 ------------------------------------------------------------------------
@@ -253,6 +263,11 @@ data GcPlan
 
 -------------------------------------
 cgCase :: StgExpr -> Id -> SRT -> AltType -> [StgAlt] -> FCode ()
+-- cgCase (OpApp ) bndr srt AlgAlt [(DataAlt flase, a2]
+  -- | isBoolTy (idType bndr)
+  -- , isDeadBndr bndr
+  -- = 
+
 cgCase scrut bndr srt alt_type alts 
   = do	{ up_hp_usg <- getVirtHp	-- Upstream heap usage
 	; let ret_bndrs = chooseReturnBndrs bndr alt_type alts
@@ -270,7 +285,7 @@ cgCase scrut bndr srt alt_type alts
 	; restoreCurrentCostCentre mb_cc
 
 	; bindArgsToRegs ret_bndrs
-	; cgAlts gc_plan bndr alt_type alts }
+	; cgAlts gc_plan (NonVoid bndr) alt_type alts }
 
 -----------------
 maybeSaveCostCentre :: Bool -> FCode (Maybe LocalReg)
@@ -279,17 +294,25 @@ maybeSaveCostCentre simple_scrut
   | otherwise    = return Nothing
 
 
-
 -----------------
 isSimpleScrut :: StgExpr -> AltType -> Bool
--- Simple scrutinee, does not allocate
-isSimpleScrut (StgOpApp _ _ _) _           = True
-isSimpleScrut (StgLit _)       _           = True
-isSimpleScrut (StgApp _ [])    (PrimAlt _) = True
+-- Simple scrutinee, does not block or allocate; hence safe to amalgamate
+-- heap usage from alternatives into the stuff before the case
+-- NB: if you get this wrong, and claim that the expression doesn't allocate
+--     when it does, you'll deeply mess up allocation
+isSimpleScrut (StgOpApp op _ _) _          = isSimpleOp op
+isSimpleScrut (StgLit _)       _           = True	-- case 1# of { 0# -> ..; ... }
+isSimpleScrut (StgApp _ [])    (PrimAlt _) = True	-- case x# of { 0# -> ..; ... }
 isSimpleScrut _		       _           = False
 
+isSimpleOp :: StgOp -> Bool
+-- True iff the op cannot block or allocate
+isSimpleOp (StgFCallOp (CCall (CCallSpec _ _ safe)) _) = not (playSafe safe)
+isSimpleOp (StgFCallOp (DNCall _) _)                   = False         -- Safe!
+isSimpleOp (StgPrimOp op)      			       = not (primOpOutOfLine op)
+
 -----------------
-chooseReturnBndrs :: Id -> AltType -> [StgAlt] -> [Id]
+chooseReturnBndrs :: Id -> AltType -> [StgAlt] -> [NonVoid Id]
 -- These are the binders of a case that are assigned
 -- by the evaluation of the scrutinee
 -- Only non-void ones come back
@@ -300,19 +323,16 @@ chooseReturnBndrs _bndr (UbxTupAlt _) [(_, ids, _, _)]
   = nonVoidIds ids	-- 'bndr' is not assigned!
 
 chooseReturnBndrs bndr (AlgAlt _) _alts
-  = [bndr]		-- Only 'bndr' is assigned
+  = nonVoidIds [bndr]	-- Only 'bndr' is assigned
 
 chooseReturnBndrs bndr PolyAlt _alts
-  = [bndr]		-- Only 'bndr' is assigned
+  = nonVoidIds [bndr]	-- Only 'bndr' is assigned
 
 chooseReturnBndrs _ _ _ = panic "chooseReturnBndrs"
 	-- UbxTupALt has only one alternative
 
-nonVoidIds :: [Id] -> [Id]
-nonVoidIds ids = [id | id <- ids, not (isVoidRep (idPrimRep id))]
-
 -------------------------------------
-cgAlts :: GcPlan -> Id -> AltType -> [StgAlt] -> FCode ()
+cgAlts :: GcPlan -> NonVoid Id -> AltType -> [StgAlt] -> FCode ()
 -- At this point the result of the case are in the binders
 cgAlts gc_plan _bndr PolyAlt [(_, _, _, rhs)]
   = maybeAltHeapCheck gc_plan (cgExpr rhs)
@@ -347,7 +367,7 @@ cgAlts gc_plan bndr (AlgAlt tycon) alts
 	   	         | (DataAlt con, cmm) <- tagged_cmms ]
 
                     -- Is the constructor tag in the node reg?
-	; if isSmallFamily fam_sz
+        ; if isSmallFamily fam_sz
 	  then let	-- Yes, bndr_reg has constr. tag in ls bits
                    tag_expr = cmmConstrTag1 (CmmReg bndr_reg)
                    branches' = [(tag+1,branch) | (tag,branch) <- branches]
@@ -366,7 +386,7 @@ cgAlts _ _ _ _ = panic "cgAlts"
 	-- UbxTupAlt and PolyAlt have only one alternative
 
 -------------------
-cgAltRhss :: GcPlan -> Id -> [StgAlt] -> FCode [(AltCon, CmmAGraph)]
+cgAltRhss :: GcPlan -> NonVoid Id -> [StgAlt] -> FCode [(AltCon, CmmAGraph)]
 cgAltRhss gc_plan bndr alts
   = forkAlts (map cg_alt alts)
   where
@@ -375,7 +395,7 @@ cgAltRhss gc_plan bndr alts
     cg_alt (con, bndrs, _uses, rhs)
       = getCodeR		  $
 	maybeAltHeapCheck gc_plan $
-	do { bindConArgs con base_reg bndrs
+	do { pprTrace "binding args for" (ppr bndr <+> ppr con) $ bindConArgs con base_reg bndrs
 	   ; cgExpr rhs
 	   ; return con }
 
@@ -392,19 +412,28 @@ maybeAltHeapCheck (GcInAlts regs srt) code
 
 cgConApp :: DataCon -> [StgArg] -> FCode ()
 cgConApp con stg_args
+  | isUnboxedTupleCon con	-- Unboxed tuple: assign and return
+  = do { arg_exprs <- getNonVoidArgAmodes stg_args
+       ; tickyUnboxedTupleReturn (length arg_exprs)
+       ; emitReturn arg_exprs }
+
+  | otherwise	--  Boxed constructors; allocate and return
   = ASSERT( stg_args `lengthIs` dataConRepArity con )
-    do	{ idinfo <- buildDynCon (dataConWorkId con) currentCCS con stg_args
+    do	{ (idinfo, init) <- buildDynCon (dataConWorkId con) currentCCS con stg_args
 	   	-- The first "con" says that the name bound to this closure is
 		-- is "con", which is a bit of a fudge, but it only affects profiling
 
+        ; emit init
 	; emitReturn [idInfoToAmode idinfo] }
 
+
 cgIdApp :: Id -> [StgArg] -> FCode ()
+cgIdApp fun_id [] | isVoidId fun_id = emitReturn []
 cgIdApp fun_id args
   = do 	{ fun_info <- getCgIdInfo fun_id
-	; case maybeLetNoEscape fun_info of
-		Just (blk_id, lne_regs) -> cgLneJump blk_id lne_regs args
-		Nothing -> cgTailCall fun_id fun_info args }
+        ; case maybeLetNoEscape fun_info of
+            Just (blk_id, lne_regs) -> cgLneJump blk_id lne_regs args
+            Nothing -> cgTailCall fun_id fun_info args }
 
 cgLneJump :: BlockId -> [LocalReg] -> [StgArg] -> FCode ()
 cgLneJump blk_id lne_regs args	-- Join point; discard sequel
@@ -416,35 +445,40 @@ cgTailCall :: Id -> CgIdInfo -> [StgArg] -> FCode ()
 cgTailCall fun_id fun_info args
   = case (getCallMethod fun_name (idCafInfo fun_id) lf_info (length args)) of
 
-	    -- A value in WHNF, so we can just return it.  
+	    -- A value in WHNF, so we can just return it.
       	ReturnIt -> emitReturn [fun]	-- ToDo: does ReturnIt guarantee tagged?
     
       	EnterIt -> ASSERT( null args )	-- Discarding arguments
-      		do { [ret,call] <- forkAlts [
+      		do { let fun' = CmmLoad fun (cmmExprType fun)
+                   ; [ret,call] <- forkAlts [
       			getCode $ emitReturn [fun],	-- Is tagged; no need to untag
-      			getCode $ emitCall (entryCode fun) [fun]]	-- Not tagged
+      			getCode $ do emit (mkAssign nodeReg fun)
+                                     emitCall Native (entryCode fun') []]  -- Not tagged
       		   ; emit (mkCmmIfThenElse (cmmIsTagged fun) ret call) }
 
       	SlowCall -> do 	    -- A slow function call via the RTS apply routines
       		{ tickySlowCall lf_info args
+                ; emit $ mkComment $ mkFastString "slowCall"
       		; slowCall fun args }
     
       	-- A direct function call (possibly with some left-over arguments)
       	DirectEntry lbl arity -> do
 		{ tickyDirectCall arity args
  		; if node_points then
-                    do call <- getCode $ directCall lbl arity args
-                       emit (mkAssign nodeReg fun <*> call)
+                    do emit $ mkComment $ mkFastString "directEntry"
+                       emit (mkAssign nodeReg fun)
+                       directCall lbl arity args
                     -- directCall lbl (arity+1) (StgVarArg fun_id : args))
                     -- >>= (emit . (mkComment (mkFastString "DirectEntry") <*>))
-		  else directCall lbl arity	 args }
+		  else do emit $ mkComment $ mkFastString "directEntry else"
+                          directCall lbl arity args }
 
 	JumpToIt {} -> panic "cgTailCall"	-- ???
 
   where
-    fun_name 	= idName fun_id
-    fun         = idInfoToAmode fun_info
-    lf_info     = cgIdInfoLF fun_info
+    fun_name 	= idName            fun_id
+    fun         = idInfoToAmode     fun_info
+    lf_info     = cgIdInfoLF        fun_info
     node_points = nodeMustPointToIt lf_info
 
 

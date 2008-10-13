@@ -13,7 +13,7 @@ module StgCmmMonad (
 	returnFC, fixC, nopC, whenC, 
 	newUnique, newUniqSupply, 
 
-	emit, emitData, emitProc, emitSimpleProc,
+	emit, emitData, emitProc, emitProcWithConvention, emitSimpleProc,
 
 	getCmm, cgStmtsToBlocks,
 	getCodeR, getCode, getHeapUsage,
@@ -27,6 +27,8 @@ module StgCmmMonad (
 
 	setSRTLabel, getSRTLabel, 
 	setTickyCtrLabel, getTickyCtrLabel,
+
+	withUpdFrameOff, getUpdFrameOff, initUpdFrameOff,
 
 	HeapUsage(..), VirtualHpOffset,	initHpUsage,
 	getHpUsage,  setHpUsage, heapHWM,
@@ -50,6 +52,7 @@ module StgCmmMonad (
 import StgCmmClosure
 import DynFlags
 import MkZipCfgCmm
+import ZipCfgCmmRep (UpdFrameOffset)
 import BlockId
 import Cmm
 import CLabel
@@ -157,12 +160,13 @@ fixC fcode = FCode (
 
 data CgInfoDownwards	-- information only passed *downwards* by the monad
   = MkCgInfoDown {
-	cgd_dflags  :: DynFlags,
-	cgd_mod     :: Module,		-- Module being compiled
-	cgd_statics :: CgBindings,	-- [Id -> info] : static environment
-	cgd_srt_lbl :: CLabel,		-- Label of the current top-level SRT
-	cgd_ticky   :: CLabel,		-- Current destination for ticky counts
-	cgd_sequel  :: Sequel		-- What to do at end of basic block
+	cgd_dflags     :: DynFlags,
+	cgd_mod        :: Module,	  -- Module being compiled
+	cgd_statics    :: CgBindings,	  -- [Id -> info] : static environment
+	cgd_srt_lbl    :: CLabel,	  -- Label of the current top-level SRT
+	cgd_updfr_off  :: UpdFrameOffset, -- Size of current update frame
+	cgd_ticky      :: CLabel,	  -- Current destination for ticky counts
+	cgd_sequel     :: Sequel	  -- What to do at end of basic block
   }
 
 type CgBindings = IdEnv CgIdInfo
@@ -173,10 +177,10 @@ data CgIdInfo
 			-- Can differ from the Id at occurrence sites by 
 			-- virtue of being externalised, for splittable C
 	, cg_lf  :: LambdaFormInfo 
-	, cg_loc :: CgLoc
+	, cg_loc :: CgLoc		     -- CmmExpr for the *tagged* value
 	, cg_rep :: PrimRep		     -- Cache for (idPrimRep id)
         , cg_tag :: {-# UNPACK #-} !DynTag   -- Cache for (lfDynTag cg_lf)
-         }
+        }
 
 data CgLoc
   = CmmLoc CmmExpr	-- A stable CmmExpr; that is, one not mentioning
@@ -206,20 +210,27 @@ data Sequel
 	[LocalReg]	-- Put result(s) in these regs and fall through
 			-- 	NB: no void arguments here
 	C_SRT		-- Here are the statics live in the continuation
-
+			-- E.g.  case (case x# of 0# -> a; DEFAULT -> b) of {
+			-- 	    r -> <blah>
+			-- When compiling the nested case, remember to put the
+			-- result in r, and fall through  
 
 
 initCgInfoDown :: DynFlags -> Module -> CgInfoDownwards
 initCgInfoDown dflags mod
-  = MkCgInfoDown {	cgd_dflags  = dflags,
-			cgd_mod     = mod,
-			cgd_statics = emptyVarEnv,
-			cgd_srt_lbl = error "initC: srt_lbl",
-			cgd_ticky   = mkTopTickyCtrLabel,
-			cgd_sequel  = initSequel }
+  = MkCgInfoDown {	cgd_dflags    = dflags,
+			cgd_mod       = mod,
+			cgd_statics   = emptyVarEnv,
+			cgd_srt_lbl   = error "initC: srt_lbl",
+			cgd_updfr_off = initUpdFrameOff,
+			cgd_ticky     = mkTopTickyCtrLabel,
+			cgd_sequel    = initSequel }
 
 initSequel :: Sequel
 initSequel = Return False
+
+initUpdFrameOff :: UpdFrameOffset
+initUpdFrameOff = widthInBytes wordWidth -- space for the RA
 
 
 --------------------------------------------------------
@@ -240,7 +251,7 @@ data CgState
 				-- the info-down part
 
      cgs_hp_usg  :: HeapUsage,
-     
+
      cgs_uniqs :: UniqSupply }
 
 data HeapUsage =
@@ -253,10 +264,10 @@ type VirtualHpOffset = WordOff
 
 initCgState :: UniqSupply -> CgState
 initCgState uniqs
-  = MkCgState { cgs_stmts = mkNop, cgs_tops = nilOL,
-		cgs_binds = emptyVarEnv, 
-		cgs_hp_usg = initHpUsage,
-		cgs_uniqs = uniqs }
+  = MkCgState { cgs_stmts      = mkNop, cgs_tops = nilOL,
+		cgs_binds      = emptyVarEnv, 
+		cgs_hp_usg     = initHpUsage,
+		cgs_uniqs      = uniqs }
 
 stateIncUsage :: CgState -> CgState -> CgState
 -- stateIncUsage@ e1 e2 incorporates in e1 
@@ -408,6 +419,26 @@ setSRTLabel srt_lbl code
 	withInfoDown code (info { cgd_srt_lbl = srt_lbl})
 
 -- ----------------------------------------------------------------------------
+-- Get/set the size of the update frame
+
+-- We keep track of the size of the update frame so that we
+-- can set the stack pointer to the proper address on return
+-- (or tail call) from the closure.
+-- There should be at most one update frame for each closure.
+-- Note: I'm including the size of the original return address
+-- in the size of the update frame -- hence the default case on `get'.
+
+withUpdFrameOff :: UpdFrameOffset -> FCode () -> FCode ()
+withUpdFrameOff size code
+  = do	{ info  <- getInfoDown
+	; withInfoDown code (info {cgd_updfr_off = size }) }
+
+getUpdFrameOff :: FCode UpdFrameOffset
+getUpdFrameOff
+  = do	{ info  <- getInfoDown
+	; return $ cgd_updfr_off info }
+
+-- ----------------------------------------------------------------------------
 -- Get/set the current ticky counter label
 
 getTickyCtrLabel :: FCode CLabel
@@ -440,7 +471,8 @@ forkClosureBody body_code
   = do	{ info <- getInfoDown
 	; us   <- newUniqSupply
 	; state <- getState
-   	; let	body_info_down = info { cgd_sequel = initSequel }
+   	; let	body_info_down = info { cgd_sequel    = initSequel
+                                      , cgd_updfr_off = initUpdFrameOff }
 		fork_state_in = (initCgState us) { cgs_binds = cgs_binds state }
 		((),fork_state_out)
 		    = doFCode body_code body_info_down fork_state_in
@@ -455,8 +487,9 @@ forkStatics body_code
   = do	{ info  <- getInfoDown
 	; us    <- newUniqSupply
 	; state <- getState
-	; let	rhs_info_down = info { cgd_statics = cgs_binds state,
-				       cgd_sequel  = initSequel }
+	; let	rhs_info_down = info { cgd_statics = cgs_binds state
+				     , cgd_sequel  = initSequel 
+			             , cgd_updfr_off = initUpdFrameOff }
 		(result, fork_state_out) = doFCode body_code rhs_info_down 
 						   (initCgState us)
 	; setState (state `addCodeBlocksFrom` fork_state_out)
@@ -473,9 +506,9 @@ forkProc body_code
   = do	{ info_down <- getInfoDown
 	; us    <- newUniqSupply
 	; state <- getState
-	; let	fork_state_in = (initCgState us) 
-					{ cgs_binds = cgs_binds state }
-		(result, fork_state_out) = doFCode body_code info_down fork_state_in
+   	; let	info_down' = info_down { cgd_sequel = initSequel }
+                fork_state_in = (initCgState us) { cgs_binds = cgs_binds state }
+		(result, fork_state_out) = doFCode body_code info_down' fork_state_in
   	; setState $ state `addCodeBlocksFrom` fork_state_out
 	; return result }
 
@@ -562,20 +595,22 @@ emitData sect lits
   where
     data_block = CmmData sect lits
 
-emitProc :: CmmInfo -> CLabel -> CmmFormals -> CmmAGraph -> FCode ()
-emitProc info lbl args blocks
+emitProcWithConvention :: Convention -> CmmInfo -> CLabel -> CmmFormals ->
+                          CmmAGraph -> FCode ()
+emitProcWithConvention conv info lbl args blocks
   = do  { us <- newUniqSupply
-        ; let (offset, entry) = mkEntry (mkBlockId $ uniqFromSupply us) Native args
+        ; let (offset, entry) = mkEntry (mkBlockId $ uniqFromSupply us) conv args
               blks = initUs_ us $ lgraphOfAGraph offset $ entry <*> blocks
-        -- ; blks <- cgStmtsToBlocks blocks
         ; let proc_block = CmmProc info lbl args blks
         ; state <- getState
         ; setState $ state { cgs_tops = cgs_tops state `snocOL` proc_block } }
 
+emitProc :: CmmInfo -> CLabel -> CmmFormals -> CmmAGraph -> FCode ()
+emitProc = emitProcWithConvention Native
+
 emitSimpleProc :: CLabel -> CmmAGraph -> FCode ()
--- Emit a procedure whose body is the specified code; no info table
-emitSimpleProc lbl code
-  = emitProc (CmmInfo Nothing Nothing CmmNonInfoTable) lbl [] code
+emitSimpleProc lbl code = 
+  emitProc (CmmInfo Nothing Nothing CmmNonInfoTable) lbl [] code
 
 getCmm :: FCode () -> FCode CmmZ
 -- Get all the CmmTops (there should be no stmts)

@@ -2,6 +2,7 @@ module ZipCfg
     ( 	-- These data types and names are carefully thought out
       Graph(..), LGraph(..), FGraph(..)
     , Block(..), ZBlock(..), ZHead(..), ZTail(..), ZLast(..)
+    , StackInfo(..), emptyStackInfo
     , insertBlock
     , HavingSuccessors, succs, fold_succs
     , LastNode, mkBranchNode, isBranchNode, branchNodeTarget
@@ -37,14 +38,14 @@ where
 #include "HsVersions.h"
 
 import BlockId ( BlockId, BlockEnv, emptyBlockEnv, lookupBlockEnv, extendBlockEnv
-               , BlockSet, emptyBlockSet, elemBlockSet, extendBlockSet)
+               , BlockSet, emptyBlockSet, unitBlockSet, elemBlockSet, extendBlockSet
+               , delFromBlockEnv, foldBlockEnv', mapBlockEnv
+               , eltsBlockEnv, isNullBEnv, plusBlockEnv)
 import CmmExpr ( UserOfLocalRegs(..) )
 import PprCmm()
 
 import Outputable hiding (empty)
 import Panic
-import UniqFM
-import UniqSet
 
 import Maybe
 import Prelude hiding (zip, unzip, last)
@@ -78,7 +79,7 @@ the data constructor 'LastExit'.  A graph may contain at most one
 'LastExit' node, and a graph representing a full procedure should not
 contain any 'LastExit' nodes.  'LastExit' nodes are used only to splice
 graphs together, either during graph construction (see module 'MkZipCfg')
-or during optimization (see module 'ZipDataflow0').
+or during optimization (see module 'ZipDataflow').
 
 A graph is parameterized over the types of middle and last nodes.  Each of
 these types will typically be instantiated with a subset of C-- statements
@@ -151,16 +152,29 @@ instance UserOfLocalRegs a => UserOfLocalRegs (ZLast a) where
     foldRegsUsed _f z LastExit      = z
 
 
-data ZHead m   = ZFirst BlockId  (Maybe Int)
+data ZHead m   = ZFirst BlockId StackInfo
                | ZHead (ZHead m) m
     -- ZHead is a (reversed) sequence of middle nodes labeled by a BlockId
 data ZTail m l = ZLast (ZLast l) | ZTail m (ZTail m l)
     -- ZTail is a sequence of middle nodes followed by a last node
 
 -- | Blocks and flow graphs; see Note [Kinds of graphs]
--- In addition to its id, the block carries the number of bytes of stack space
--- used for incoming parameters on entry to the block.
-data Block m l = Block BlockId (Maybe Int) (ZTail m l)
+
+-- For each block, we may need two pieces of information about the stack:
+-- 1. If the block is a procpoint, how many bytes are used to pass
+--    arguments on the stack?
+-- 2. If the block succeeds a call, we need to generate an infotable
+--    that describes the stack layout... but only up to the update frame!
+-- Note that a block can be a proc point without requiring an infotable.
+data StackInfo = StackInfo { argBytes  :: Maybe Int
+                           , returnOff :: Maybe Int }
+  deriving ( Eq )
+emptyStackInfo :: StackInfo
+emptyStackInfo = StackInfo Nothing Nothing
+
+data Block m l = Block { bid       :: BlockId
+                       , stackInfo :: StackInfo
+                       , tail      :: ZTail m l }
 
 data Graph m l = Graph { g_entry :: (ZTail m l), g_blocks :: (BlockEnv (Block m l)) }
 
@@ -284,8 +298,8 @@ fold_layout ::
 fold_blocks :: (Block m l -> a -> a) -> a -> LGraph m l -> a
 
 -- | Fold from first to last
-fold_fwd_block ::
-  (BlockId -> a -> a) -> (m -> a -> a) -> (ZLast l -> a -> a) -> Block m l -> a -> a
+fold_fwd_block :: (BlockId -> StackInfo -> a -> a) -> (m -> a -> a) ->
+                  (ZLast l -> a -> a) -> Block m l -> a -> a
 
 map_one_block :: (BlockId -> BlockId) -> (m -> m') -> (l -> l') -> Block m l -> Block m' l'
 
@@ -378,7 +392,7 @@ unzip (Block id off t) = ZBlock (ZFirst id off) t
 
 head_id :: ZHead m -> BlockId
 head_id (ZFirst id _) = id
-head_id (ZHead  h  _) = head_id h
+head_id (ZHead  h  _)   = head_id h
 
 last (ZBlock _ t) = lastTail t
 
@@ -394,7 +408,7 @@ tailOfLast l = ZLast (LastOther l) -- tedious to write in every client
 focus :: BlockId -> LGraph m l -> FGraph m l -- focus on edge out of node with id 
 focus id (LGraph entry _ blocks) =
     case lookupBlockEnv blocks id of
-      Just b -> FGraph entry (unzip b) (delFromUFM blocks id)
+      Just b -> FGraph entry (unzip b) (delFromBlockEnv blocks id)
       Nothing -> panic "asked for nonexistent block in flow graph"
 
 entry   :: LGraph m l -> FGraph m l         -- focus on edge out of entry node 
@@ -403,7 +417,7 @@ entry g@(LGraph eid _ _) = focus eid g
 -- | pull out a block satisfying the predicate, if any
 splitp_blocks :: (Block m l -> Bool) -> BlockEnv (Block m l) ->
                  Maybe (Block m l, BlockEnv (Block m l))
-splitp_blocks p blocks = lift $ foldUFM scan (Nothing, emptyBlockEnv) blocks 
+splitp_blocks p blocks = lift $ foldBlockEnv' scan (Nothing, emptyBlockEnv) blocks 
     where scan b (yes, no) =
               case yes of
                 Nothing | p b -> (Just b, no)
@@ -422,14 +436,14 @@ insertBlock b bs =
 
 -- | Used in assertions; tells if a graph has exactly one exit
 single_exit :: LGraph l m -> Bool
-single_exit g = foldUFM check 0 (lg_blocks g) == 1
+single_exit g = foldBlockEnv' check 0 (lg_blocks g) == 1
     where check block count = case last (unzip block) of
                                 LastExit -> count + (1 :: Int)
                                 _ -> count
 
 -- | Used in assertions; tells if a graph has exactly one exit
 single_exitg :: Graph l m -> Bool
-single_exitg (Graph tail blocks) = foldUFM add (exit_count (lastTail tail)) blocks == 1
+single_exitg (Graph tail blocks) = foldBlockEnv' add (exit_count (lastTail tail)) blocks == 1
     where add block count = count + exit_count (last (unzip block))
           exit_count LastExit = 1 :: Int
           exit_count _        = 0
@@ -456,12 +470,12 @@ single_exitg (Graph tail blocks) = foldUFM add (exit_count (lastTail tail)) bloc
 --	C -> D
 -- @
 -- Then ordinary dfs would give [A,B,D,C] which has a back ref from C to D.
--- Better to geot [A,B,C,D]
+-- Better to get [A,B,C,D]
 
 
 postorder_dfs g@(LGraph _ _ blockenv) =
     let FGraph id eblock _ = entry g in
-     zip eblock : postorder_dfs_from_except blockenv eblock (unitUniqSet id)
+     zip eblock : postorder_dfs_from_except blockenv eblock (unitBlockSet id)
 
 postorder_dfs_from_except :: (HavingSuccessors b, LastNode l)
                           => BlockEnv (Block m l) -> b -> BlockSet -> [Block m l]
@@ -507,10 +521,10 @@ fold_layout f z g@(LGraph eid _ _) = fold (postorder_dfs g) z
 
 -- | The rest of the traversals are straightforward
 
-map_blocks f (LGraph eid off blocks) = LGraph eid off (mapUFM f blocks)
+map_blocks f (LGraph eid off blocks) = LGraph eid off (mapBlockEnv f blocks)
 
 map_nodes idm middle last (LGraph eid off blocks) =
-  LGraph (idm eid) off (mapUFM (map_one_block idm middle last) blocks)
+  LGraph (idm eid) off (mapBlockEnv (map_one_block idm middle last) blocks)
 
 map_one_block idm middle last (Block id off t) = Block (idm id) off (tail t)
     where tail (ZTail m t) = ZTail (middle m) (tail t)
@@ -520,18 +534,18 @@ map_one_block idm middle last (Block id off t) = Block (idm id) off (tail t)
 
 mapM_blocks f (LGraph eid off blocks) = blocks' >>= return . LGraph eid off
     where blocks' =
-            foldUFM (\b mblocks -> do { blocks <- mblocks
+            foldBlockEnv' (\b mblocks -> do { blocks <- mblocks
                                       ; b <- f b
                                       ; return $ insertBlock b blocks })
                     (return emptyBlockEnv) blocks
 
-fold_blocks f z (LGraph _ _ blocks) = foldUFM f z blocks
-fold_fwd_block first middle last (Block id _ t) z = tail t (first id z)
+fold_blocks f z (LGraph _ _ blocks) = foldBlockEnv' f z blocks
+fold_fwd_block first middle last (Block id off t) z = tail t (first id off z)
     where tail (ZTail m t) z = tail t (middle m z)
           tail (ZLast l)   z = last l z
 
 of_block_list e off blocks = LGraph e off $ foldr insertBlock emptyBlockEnv blocks 
-to_block_list (LGraph _ _ blocks) = eltsUFM blocks
+to_block_list (LGraph _ _ blocks) = eltsBlockEnv blocks
 
 
 -- We want to be able to scrutinize a single-entry, single-exit 'LGraph' for
@@ -544,7 +558,7 @@ prepare_for_splicing ::
 prepare_for_splicing g single multi =
   let FGraph _ gentry gblocks = entry g 
       ZBlock _ etail = gentry
-  in if isNullUFM gblocks then
+  in if isNullBEnv gblocks then
          case last gentry of
            LastExit -> single etail
            _ -> panic "bad single block"
@@ -560,7 +574,7 @@ prepare_for_splicing' ::
   Graph m l -> (ZTail m l -> a) -> (ZTail m l -> ZHead m -> BlockEnv (Block m l) -> a)
   -> a
 prepare_for_splicing' (Graph etail gblocks) single multi =
-   if isNullUFM gblocks then
+   if isNullBEnv gblocks then
        case lastTail etail of
          LastExit -> single etail
          _ -> panic "bad single block"
@@ -634,7 +648,7 @@ splice_head_only' head (Graph tail gblocks) =
 --- Translation
 
 translate txm txl (LGraph eid off blocks) =
-    do blocks' <- foldUFM txblock (return emptyBlockEnv) blocks
+    do blocks' <- foldBlockEnv' txblock (return emptyBlockEnv) blocks
        return $ LGraph eid off blocks'
     where
       -- txblock ::
@@ -647,10 +661,10 @@ translate txm txl (LGraph eid off blocks) =
       txtail h (ZTail m t) blocks' =
         do m' <- txm m 
            let (g, h') = splice_head h m' 
-           txtail h' t (plusUFM (lg_blocks g) blocks')
+           txtail h' t (plusBlockEnv (lg_blocks g) blocks')
       txtail h (ZLast (LastOther l)) blocks' =
         do l' <- txl l
-           return $ plusUFM (lg_blocks (splice_head_only h l')) blocks'
+           return $ plusBlockEnv (lg_blocks (splice_head_only h l')) blocks'
       txtail h (ZLast LastExit) blocks' =
         return $ insertBlock (zipht h (ZLast LastExit)) blocks'
 
@@ -672,6 +686,9 @@ instance (Outputable m, Outputable l, LastNode l) => Outputable (LGraph m l) whe
 instance (Outputable m, Outputable l, LastNode l) => Outputable (Block m l) where
     ppr = pprBlock
 
+instance Outputable StackInfo where
+    ppr = pprStackInfo
+
 instance (Outputable l) => Outputable (ZLast l) where
     ppr = pprLast
 
@@ -683,8 +700,15 @@ pprLast :: (Outputable l) => ZLast l -> SDoc
 pprLast LastExit = text "<exit>"
 pprLast (LastOther l) = ppr l
 
+pprStackInfo :: StackInfo -> SDoc
+pprStackInfo cs =
+  text "<arg bytes:" <+> ppr (argBytes  cs) <+>
+  text "ret offset:" <+> ppr (returnOff cs) <> text ">"
+
 pprBlock :: (Outputable m, Outputable l, LastNode l) => Block m l -> SDoc
-pprBlock (Block id args tail) = ppr id <> parens (ppr args) <> colon $$ ppr tail
+pprBlock (Block id stackInfo tail) =
+  ppr id <>  parens (ppr stackInfo) <> colon
+         $$  (nest 3 (ppr tail))
 
 pprLgraph :: (Outputable m, Outputable l, LastNode l) => LGraph m l -> SDoc
 pprLgraph g = text "{" <> text "offset" <> parens (ppr $ lg_argoffset g) $$

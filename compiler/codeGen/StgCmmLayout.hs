@@ -17,7 +17,8 @@ module StgCmmLayout (
 	mkArgDescr, 
 	emitCall, emitReturn,
 
-	emitClosureCodeAndInfoTable,
+	emitClosureProcAndInfoTable,
+	emitClosureAndInfoTable,
 
 	slowCall, directCall, 
 
@@ -47,6 +48,7 @@ import CmmUtils
 import Cmm
 import CLabel
 import StgSyn
+import DataCon
 import Id
 import Name
 import TyCon		( PrimRep(..) )
@@ -62,7 +64,7 @@ import Constants
 import Util
 import Data.List
 import Outputable
-import FastString	( LitString, sLit )
+import FastString	( mkFastString, LitString, sLit )
 
 ------------------------------------------------------------------------
 --		Call and return sequences
@@ -77,21 +79,24 @@ emitReturn :: [CmmExpr] -> FCode ()
 --	p=x; q=y; 
 emitReturn results 
   = do  { adjustHpBackwards
-	; sequel <- getSequel; 
+	; sequel    <- getSequel;
+	; updfr_off <- getUpdFrameOff
 	; case sequel of
-	    Return _        -> emit (mkReturn results)
-	    AssignTo regs _ -> emit (mkMultiAssign regs results)
+	    Return _        -> emit (mkReturnSimple results updfr_off)
+	    AssignTo regs _ -> emit (mkMultiAssign  regs results)
     }
 
-emitCall :: CmmExpr -> [CmmExpr] -> FCode ()
+emitCall :: Convention -> CmmExpr -> [CmmExpr] -> FCode ()
 -- (cgCall fun args) makes a call to the entry-code of 'fun', 
 -- passing 'args', and returning the results to the current sequel
-emitCall fun args
+emitCall conv fun args
   = do	{ adjustHpBackwards
-	; sequel <- getSequel;
+	; sequel <- getSequel
+	; updfr_off <- getUpdFrameOff
+        ; emit $ mkComment $ mkFastString "emitcall"
 	; case sequel of
-	    Return _              -> emit (mkJump fun args)
-	    AssignTo res_regs srt -> emit (mkCmmCall fun res_regs args srt)
+	    Return _              -> emit (mkForeignJump conv fun args updfr_off)
+	    AssignTo res_regs srt -> emit (mkCall fun conv res_regs args updfr_off)
     }
 
 adjustHpBackwards :: FCode ()
@@ -132,7 +137,7 @@ directCall :: CLabel -> Arity -> [StgArg] -> FCode ()
 -- Both arity and args include void args
 directCall lbl arity stg_args 
   = do	{ cmm_args <- getNonVoidArgAmodes stg_args
-	; direct_call lbl arity cmm_args (argsLReps stg_args) }
+	; direct_call "directCall" lbl arity cmm_args (argsLReps stg_args) }
 
 slowCall :: CmmExpr -> [StgArg] -> FCode ()
 -- (slowCall fun args) applies fun to args, returning the results to Sequel
@@ -141,36 +146,42 @@ slowCall fun stg_args
 	; slow_call fun cmm_args (argsLReps stg_args) }
 
 --------------
-direct_call :: CLabel -> Arity -> [CmmExpr] -> [LRep] -> FCode ()
--- NB1: (length args) maybe less than (length reps), because
+direct_call :: String -> CLabel -> Arity -> [CmmExpr] -> [LRep] -> FCode ()
+-- NB1: (length args) may be less than (length reps), because
 --     the args exclude the void ones
 -- NB2: 'arity' refers to the *reps* 
-direct_call lbl arity args reps
-  | null rest_args
-  = ASSERT( arity == length args) 
-    emitCall target args
+direct_call caller lbl arity args reps
+  | debugIsOn && arity > length reps	-- Too few args
+  =  	    -- Caller should ensure that there enough args!  
+    pprPanic "direct_call" (text caller <+> ppr arity <+> ppr lbl <+> ppr (length reps)
+	     	  	    <+> ppr args <+> ppr reps )
 
-  | otherwise
+  | null rest_reps     -- Precisely the right number of arguments
+  = emitCall Native target args
+
+  | otherwise		-- Over-saturated call
   = ASSERT( arity == length initial_reps )
     do	{ pap_id <- newTemp gcWord
 	; let srt = pprTrace "Urk! SRT for over-sat call" 
 			     (ppr lbl) NoC_SRT
 		-- XXX: what if rest_args contains static refs?
 	; withSequel (AssignTo [pap_id] srt)
-		     (emitCall target args)
+		     (emitCall Native target fast_args)
 	; slow_call (CmmReg (CmmLocal pap_id)) 
 		    rest_args rest_reps }
   where
     target = CmmLit (CmmLabel lbl)
     (initial_reps, rest_reps) = splitAt arity reps
     arg_arity = count isNonV initial_reps
-    (_, rest_args) = splitAt arg_arity args
+    (fast_args, rest_args) = splitAt arg_arity args
 
 --------------
 slow_call :: CmmExpr -> [CmmExpr] -> [LRep] -> FCode ()
 slow_call fun args reps
-  = direct_call (mkRtsApFastLabel rts_fun) (arity+1) 
-		(fun : args) (P : reps)
+  = do call <- getCode $ direct_call "slow_call" (mkRtsApFastLabel rts_fun) arity args reps
+       emit $ mkComment $ mkFastString ("slow_call for " ++ showSDoc (ppr fun) ++
+                                        " with pat " ++ showSDoc (ptext rts_fun))
+       emit (mkAssign nodeReg fun <*> call)
   where
     (rts_fun, arity) = slowCallPattern reps
 
@@ -207,6 +218,13 @@ data LRep = P 	-- GC Ptr
 	  | V	-- Void
 	  | F	-- Float
 	  | D	-- Double
+instance Outputable LRep where
+  ppr P = text "P"
+  ppr N = text "N"
+  ppr L = text "L"
+  ppr V = text "V"
+  ppr F = text "F"
+  ppr D = text "D"
 
 toLRep :: PrimRep -> LRep
 toLRep VoidRep 	 = V
@@ -254,7 +272,7 @@ mkVirtHeapOffsets
   -> [(PrimRep,a)]	-- Things to make offsets for
   -> (WordOff,		-- _Total_ number of words allocated
       WordOff,		-- Number of words allocated for *pointers*
-      [(a, VirtualHpOffset)])
+      [(NonVoid a, VirtualHpOffset)])
 
 -- Things with their offsets from start of object in order of
 -- increasing offset; BUT THIS MAY BE DIFFERENT TO INPUT ORDER
@@ -279,7 +297,7 @@ mkVirtHeapOffsets is_thunk things
 
     computeOffset wds_so_far (rep, thing)
       = (wds_so_far + lRepSizeW (toLRep rep), 
-	 (thing, hdr_size + wds_so_far))
+	 (NonVoid thing, hdr_size + wds_so_far))
 
 
 -------------------------------------------------------------------------
@@ -437,12 +455,36 @@ mkRegLiveness regs ptrs nptrs
 -- Here we make an info table of type 'CmmInfo'.  The concrete
 -- representation as a list of 'CmmAddr' is handled later
 -- in the pipeline by 'cmmToRawCmm'.
+-- When loading the free variables, a function closure pointer may be tagged,
+-- so we must take it into account.
 
-emitClosureCodeAndInfoTable :: ClosureInfo -> CmmFormals
-			    -> CmmAGraph -> FCode ()
-emitClosureCodeAndInfoTable cl_info args body
- = do	{ info <- mkCmmInfo cl_info
-	; emitProc info (infoLblToEntryLbl info_lbl) args body }
+emitClosureProcAndInfoTable :: Bool                    -- top-level? 
+                            -> Id                      -- name of the closure
+                            -> ClosureInfo             -- lots of info abt the closure
+                            -> [NonVoid Id]            -- incoming arguments
+                            -> ((LocalReg, [LocalReg]) -> FCode ()) -- function body
+                            -> FCode ()
+emitClosureProcAndInfoTable top_lvl bndr cl_info args body
+ = do	{ let lf_info = closureLFInfo cl_info
+	-- Bind the binder itself, but only if it's not a top-level
+        -- binding. We need non-top let-bindings to refer to the
+        -- top-level binding, which this binding would incorrectly shadow.
+        ; node <- if top_lvl then return $ idToReg (NonVoid bndr)
+                  else bindToReg (NonVoid bndr) lf_info
+        ; arg_regs <-
+            pprTrace "bindArgsToRegs" (ppr args) $
+            bindArgsToRegs args
+        ; emitClosureAndInfoTable cl_info (node : arg_regs) $ body (node, arg_regs)
+        }
+
+-- Data constructors need closures, but not with all the argument handling
+-- needed for functions. The shared part goes here.
+emitClosureAndInfoTable :: ClosureInfo -> [LocalReg] -> FCode () -> FCode ()
+emitClosureAndInfoTable cl_info args body
+  = do { info <- mkCmmInfo cl_info
+       ; blks <- getCode body
+       ; emitProc info (infoLblToEntryLbl info_lbl) args blks
+       }
   where
     info_lbl = infoTableLabelFromCI cl_info
 
@@ -450,14 +492,18 @@ emitClosureCodeAndInfoTable cl_info args body
 -- Not used for return points.  (The 'smRepClosureTypeInt' call would panic.)
 mkCmmInfo :: ClosureInfo -> FCode CmmInfo
 mkCmmInfo cl_info
-  = do	{ prof <- if opt_SccProfilingOn then
+  = do	{ info <- closureTypeInfo cl_info k_with_con_name return 
+        ; prof <- if opt_SccProfilingOn then
                     do fd_lit <- mkStringCLit (closureTypeDescr cl_info)
 	               ad_lit <- mkStringCLit (closureValDescr  cl_info)
 	               return $ ProfilingInfo fd_lit ad_lit
                   else return $ ProfilingInfo (mkIntCLit 0) (mkIntCLit 0)
-	; return (CmmInfo gc_target Nothing (CmmInfoTable prof cl_type info)) }
+	; return (CmmInfo gc_target Nothing
+                   (CmmInfoTable (isStaticClosure cl_info) prof cl_type info)) }
   where
-    info = closureTypeInfo cl_info
+    k_with_con_name con_info con info_lbl =
+      do cstr <- mkByteStringCLit $ dataConIdentity con
+         return $ con_info $ makeRelativeRefTo info_lbl cstr
     cl_type  = smRepClosureTypeInt (closureSMRep cl_info)
 
     -- The gc_target is to inform the CPS pass when it inserts a stack check.

@@ -14,7 +14,6 @@ import qualified ZipCfg as Z
 import CmmZipUtil
 
 import Maybe
-import UniqSet
 import FastString
 
 ----------------------------------------------------------------
@@ -54,23 +53,21 @@ pprCmmGraphLikeCmm g = vcat (swallow blocks)
                       | id' == tid, Just e' <- maybeInvertCmmExpr expr, isNothing out->
                           tail id (ft tid : ppr (CmmCondBranch e'   fid) : prev') Nothing t bs
                     _ -> endblock $ with_out out l
-                l@(G.LastJump   {}) -> endblock $ with_out out l
-                l@(G.LastReturn {}) -> endblock $ with_out out l
-                l@(G.LastSwitch {}) -> endblock $ with_out out l
-                l@(G.LastCall _ _ _)-> endblock $ with_out out l
+                l@(G.LastSwitch {})   -> endblock $ with_out out l
+                l@(G.LastCall _ _ _ _)-> endblock $ with_out out l
           exit id prev' n = -- highly irregular (assertion violation?)
               let endblock stmt = block' id (stmt : prev') : swallow n in
               endblock (text "// <exit>")
           preds = zipPreds g
           entry_has_no_pred = case lookupBlockEnv preds (Z.lg_entry g) of
                                 Nothing -> True
-                                Just s -> isEmptyUniqSet s
+                                Just s -> isEmptyBlockSet s
           single_preds =
               let add b single =
                     let id = Z.blockId b
                     in  case lookupBlockEnv preds id of
                           Nothing -> single
-                          Just s -> if sizeUniqSet s == 1 then
+                          Just s -> if sizeBlockSet s == 1 then
                                         extendBlockSet single id
                                     else single
               in  Z.fold_blocks add emptyBlockSet g
@@ -79,21 +76,14 @@ pprCmmGraphLikeCmm g = vcat (swallow blocks)
 with_out :: Maybe (G.Convention, CmmActuals) -> G.Last -> SDoc
 with_out Nothing l = ptext (sLit "??no-arguments??") <+> ppr l
 with_out (Just (conv, args)) l = last l
-    where last (G.LastCall e k _) =
+    where last (G.LastCall e k _ _) =
               hcat [ptext (sLit "... = foreign "),
                     doubleQuotes(ppr conv), space,
                     ppr_target e, parens ( commafy $ map ppr args ),
                     ptext (sLit " \"safe\""),
-                    case k of Nothing -> ptext (sLit " never returns")
-                              Just _ -> empty,
+                    text " returns to " <+> ppr k,
                     semi ]
-          last (G.LastReturn _) = ppr (CmmReturn $ noHints args)
-          last (G.LastJump e _) = ppr (CmmJump e $ noHints args)
           last l = ppr l
           ppr_target (CmmLit lit) = pprLit lit
           ppr_target fn'          = parens (ppr fn')
           commafy xs = hsep $ punctuate comma xs
-
--- Anything that uses this is bogus!
-noHints :: [a] -> [CmmHinted a]
-noHints = map (\v -> CmmHinted v NoHint)

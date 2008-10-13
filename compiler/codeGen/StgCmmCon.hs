@@ -27,6 +27,7 @@ import StgCmmProf
 
 import Cmm
 import CLabel
+import MkZipCfgCmm (CmmAGraph, mkNop)
 import SMRep
 import CostCentre
 import Constants
@@ -47,7 +48,7 @@ import Char		( ord )
 cgTopRhsCon :: Id		-- Name of thing bound to this RHS
 	    -> DataCon		-- Id
 	    -> [StgArg]		-- Args
-	    -> FCode (Id, CgIdInfo)
+	    -> FCode CgIdInfo
 cgTopRhsCon id con args
   = do { 
 #if mingw32_TARGET_OS
@@ -67,7 +68,7 @@ cgTopRhsCon id con args
 			= layOutStaticConstr con (addArgReps args)
 
 	    get_lit (arg, _offset) = do { CmmLit lit <- getArgAmode arg
-					; return lit }
+				        ; return lit }
 
 	; payload <- mapM get_lit nv_args_w_offsets
 		-- NB1: nv_args_w_offsets is sorted into ptrs then non-ptrs
@@ -83,7 +84,7 @@ cgTopRhsCon id con args
 	; emitDataLits closure_label closure_rep
 
 		-- RETURN
-	; return (id, litIdInfo id lf_info (CmmLabel closure_label)) }
+	; return $ litIdInfo id lf_info (CmmLabel closure_label) }
 
 
 ---------------------------------------------------------------
@@ -96,7 +97,8 @@ buildDynCon :: Id		  -- Name of the thing to which this constr will
 				  -- current CCS if currentOrSubsumedCCS
 	    -> DataCon		  -- The data constructor
 	    -> [StgArg] 	  -- Its args
-	    -> FCode CgIdInfo	  -- Return details about how to find it
+	    -> FCode (CgIdInfo, CmmAGraph)
+               -- Return details about how to find it and initialization code
 
 {- We used to pass a boolean indicating whether all the
 args were of size zero, so we could use a static
@@ -121,7 +123,8 @@ premature looking at the args will cause the compiler to black-hole!
 
 buildDynCon binder _cc con []
   = return (litIdInfo binder (mkConLFInfo con)
-		(CmmLabel (mkClosureLabel (dataConName con) (idCafInfo binder))))
+		(CmmLabel (mkClosureLabel (dataConName con) (idCafInfo binder))),
+            mkNop)
 
 -------- buildDynCon: Charlike and Intlike constructors -----------
 {- The following three paragraphs about @Char@-like and @Int@-like
@@ -155,7 +158,7 @@ buildDynCon binder _cc con [arg]
 	      offsetW = (val_int - mIN_INTLIKE) * (fixedHdrSize + 1)
 		-- INTLIKE closures consist of a header and one word payload
 	      intlike_amode = cmmLabelOffW intlike_lbl offsetW
-	; return (litIdInfo binder (mkConLFInfo con) intlike_amode) }
+	; return (litIdInfo binder (mkConLFInfo con) intlike_amode, mkNop) }
 
 buildDynCon binder _cc con [arg]
   | maybeCharLikeCon con 
@@ -167,14 +170,14 @@ buildDynCon binder _cc con [arg]
 	      offsetW = (val_int - mIN_CHARLIKE) * (fixedHdrSize + 1)
 		-- CHARLIKE closures consist of a header and one word payload
 	      charlike_amode = cmmLabelOffW charlike_lbl offsetW
-	; return (litIdInfo binder (mkConLFInfo con) charlike_amode) }
+	; return (litIdInfo binder (mkConLFInfo con) charlike_amode, mkNop) }
 
 -------- buildDynCon: the general case -----------
 buildDynCon binder ccs con args
   = do	{ let (cl_info, args_w_offsets) = layOutDynConstr con (addArgReps args)
 		-- No void args in args_w_offsets
-	; tmp <- allocDynClosure cl_info use_cc blame_cc args_w_offsets
- 	; return (regIdInfo binder lf_info tmp) }
+	; (tmp, init) <- allocDynClosure cl_info use_cc blame_cc args_w_offsets
+ 	; return (regIdInfo binder lf_info tmp, init) }
   where
     lf_info = mkConLFInfo con
 
@@ -204,10 +207,11 @@ bindConArgs (DataAlt con) base args
 
           -- The binding below forces the masking out of the tag bits
           -- when accessing the constructor field.
-    bind_arg :: (Id, VirtualHpOffset) -> FCode LocalReg
+    bind_arg :: (NonVoid Id, VirtualHpOffset) -> FCode LocalReg
     bind_arg (arg, offset) 
 	= do { emit $ mkTaggedObjectLoad (idToReg arg) base offset tag
-	     ; bindArgToReg arg }
+	     ; pprTrace "bind_arg gets tag" (ppr arg <+> ppr tag) $
+               bindArgToReg arg }
 
 bindConArgs _other_con _base args
   = ASSERT( null args ) return []

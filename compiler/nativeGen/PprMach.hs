@@ -474,7 +474,7 @@ pprImm (ImmCLbl l)    = pprCLabel_asm l
 pprImm (ImmIndex l i) = pprCLabel_asm l <> char '+' <> int i
 pprImm (ImmLit s)     = s
 
-pprImm (ImmFloat _) = ptext (sLit "naughty float immediate")
+pprImm (ImmFloat _)  = ptext (sLit "naughty float immediate")
 pprImm (ImmDouble _) = ptext (sLit "naughty double immediate")
 
 pprImm (ImmConstantSum a b) = pprImm a <> char '+' <> pprImm b

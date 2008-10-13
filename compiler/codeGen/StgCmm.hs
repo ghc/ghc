@@ -104,43 +104,25 @@ variable. -}
 cgTopBinding :: DynFlags -> (StgBinding,[(Id,[Id])]) -> FCode ()
 cgTopBinding dflags (StgNonRec id rhs, _srts)
   = do	{ id' <- maybeExternaliseId dflags id
-	--; mapM_ (mkSRT [id']) srts
-	; (id,info) <- cgTopRhs id' rhs
-	; addBindC id info 	-- Add the *un-externalised* Id to the envt,
-				-- so we find it when we look up occurrences
+	; info <- cgTopRhs id' rhs
+	; addBindC (cg_id info) info -- Add the *un-externalised* Id to the envt,
+				     -- so we find it when we look up occurrences
 	}
 
 cgTopBinding dflags (StgRec pairs, _srts)
   = do	{ let (bndrs, rhss) = unzip pairs
 	; bndrs' <- mapFCs (maybeExternaliseId dflags) bndrs
 	; let pairs' = zip bndrs' rhss
-	--; mapM_ (mkSRT bndrs')  srts
 	; fixC (\ new_binds -> do 
 		{ addBindsC new_binds
 		; mapFCs ( \ (b,e) -> cgTopRhs b e ) pairs' })
 	; return () }
 
---mkSRT :: [Id] -> (Id,[Id]) -> FCode ()
---mkSRT these (id,ids)
---  | null ids = nopC
---  | otherwise
---  = do	{ ids <- mapFCs remap ids
---	; id  <- remap id
---	; emitRODataLits (mkSRTLabel (idName id) (idCafInfo id))
---		         (map (\id -> CmmLabel $ mkClosureLabel (idName id) (idCafInfo id)) ids)
---	}
---  where
---	-- Sigh, better map all the ids against the environment in 
---	-- case they've been externalised (see maybeExternaliseId below).
---    remap id = case filter (==id) these of
---		(id':_) -> returnFC id'
---		[] -> do { info <- getCgIdInfo id; return (cgIdInfoId info) }
-
 -- Urgh!  I tried moving the forkStatics call from the rhss of cgTopRhs
 -- to enclose the listFCs in cgTopBinding, but that tickled the
 -- statics "error" call in initC.  I DON'T UNDERSTAND WHY!
 
-cgTopRhs :: Id -> StgRhs -> FCode (Id, CgIdInfo)
+cgTopRhs :: Id -> StgRhs -> FCode CgIdInfo
 	-- The Id is passed along for setting up a binding...
 	-- It's already been externalised if necessary
 
@@ -151,7 +133,6 @@ cgTopRhs bndr (StgRhsClosure cc bi fvs upd_flag srt args body)
   = ASSERT(null fvs)    -- There should be no free variables
     setSRTLabel (mkSRTLabel (idName bndr) (idCafInfo bndr)) $
     forkStatics (cgTopRhsClosure bndr cc bi upd_flag srt args body)
-
 
 
 ---------------------------------------------------------------
@@ -213,14 +194,17 @@ mkModuleInit way cost_centre_info this_mod main_mod imported_mods hpc_info
           -- In this way, Hpc enabled modules can interact seamlessly with
 	  -- not Hpc enabled moduled, provided Main is compiled with Hpc.
 
-        ; emitSimpleProc real_init_lbl $ withFreshLabel "ret_block" $ \retId -> catAGraphs
-		[ check_already_done retId
+        ; updfr_sz <- getUpdFrameOff
+        ; tail <- getCode (pushUpdateFrame imports
+                       (do updfr_sz' <- getUpdFrameOff
+                           emit $ mkReturn (ret_e updfr_sz') [] (pop_ret_loc updfr_sz')))
+        ; emitSimpleProc real_init_lbl $ (withFreshLabel "ret_block" $ \retId -> catAGraphs
+		[ check_already_done retId updfr_sz
 		, init_prof
 		, init_hpc
-		, catAGraphs $ map (registerImport way) all_imported_mods
-                , mkBranch retId ]
+                , tail])
  	    -- Make the "plain" procedure jump to the "real" init procedure
-	; emitSimpleProc plain_init_lbl jump_to_init
+	; emitSimpleProc plain_init_lbl (jump_to_init updfr_sz)
 
 	-- When compiling the module in which the 'main' function lives,
 	-- (that is, this_mod == main_mod)
@@ -233,14 +217,14 @@ mkModuleInit way cost_centre_info this_mod main_mod imported_mods hpc_info
 
 
 	; whenC (this_mod == main_mod)
-		(emitSimpleProc plain_main_init_lbl rec_descent_init)
+		(emitSimpleProc plain_main_init_lbl (rec_descent_init updfr_sz))
     }
   where
     plain_init_lbl = mkPlainModuleInitLabel this_mod
     real_init_lbl  = mkModuleInitLabel this_mod way
     plain_main_init_lbl = mkPlainModuleInitLabel rOOT_MAIN
 
-    jump_to_init = mkJump (mkLblExpr real_init_lbl) []
+    jump_to_init updfr_sz = mkJump (mkLblExpr real_init_lbl) [] updfr_sz
 
 
     -- Main refers to GHC.TopHandler.runIO, so make sure we call the
@@ -249,34 +233,30 @@ mkModuleInit way cost_centre_info this_mod main_mod imported_mods hpc_info
 	| this_mod == main_mod = [gHC_TOP_HANDLER]
 	| otherwise	       = []
     all_imported_mods = imported_mods ++ extra_imported_mods
+    imports = map (\mod -> mkLblExpr (mkModuleInitLabel mod way))
+                  (filter (gHC_PRIM /=) all_imported_mods)
 
     mod_reg_val = CmmLoad (mkLblExpr moduleRegdLabel) bWord
-    check_already_done retId
+    check_already_done retId updfr_sz
      = mkCmmIfThenElse (cmmNeWord (CmmLit zeroCLit) mod_reg_val)
-		       (mkLabel retId Nothing <*> mkReturn []) mkNop
+		       (mkLabel retId emptyStackInfo
+                    <*> mkReturn (ret_e updfr_sz) [] (pop_ret_loc updfr_sz)) mkNop
 	<*>  	-- Set mod_reg to 1 to record that we've been here
 	    mkStore (mkLblExpr moduleRegdLabel) (CmmLit (mkIntCLit 1))
 
                     -- The return-code pops the work stack by 
-                    -- incrementing Sp, and then jumpd to the popped item
-    ret_code = mkAssign spReg (cmmRegOffW spReg 1)
-               <*> mkJump (CmmLoad (cmmRegOffW spReg (-1)) bWord) []
+                    -- incrementing Sp, and then jumps to the popped item
+    ret_e updfr_sz = CmmLoad (CmmStackSlot (CallArea Old) updfr_sz) gcWord
+    ret_code updfr_sz = mkJump (ret_e updfr_sz) [] (pop_ret_loc updfr_sz)
+      -- mkAssign spReg (cmmRegOffW spReg 1) <*>
+      -- mkJump (CmmLoad (cmmRegOffW spReg (-1)) bWord) [] updfr_sz
 
-    rec_descent_init = if opt_SccProfilingOn || isHpcUsed hpc_info
-		       then jump_to_init
-		       else ret_code
+    pop_ret_loc updfr_sz = updfr_sz - widthInBytes (typeWidth bWord)
 
------------------------
-registerImport :: String -> Module -> CmmAGraph
-registerImport way mod
-  | mod == gHC_PRIM
-  = mkNop
-  | otherwise 	-- Push the init procedure onto the work stack
-  = mkCmmCall init_lbl [] [] NoC_SRT
-  where
-    init_lbl = mkLblExpr $ mkModuleInitLabel mod way
-
-
+    rec_descent_init updfr_sz =
+      if opt_SccProfilingOn || isHpcUsed hpc_info
+      then jump_to_init updfr_sz
+      else ret_code updfr_sz
 
 ---------------------------------------------------------------
 --	Generating static stuff for algebraic data types
@@ -351,8 +331,7 @@ cgDataCon data_con
 	    (dyn_cl_info, arg_things) = layOutDynConstr data_con arg_reps
 
 	    emit_info cl_info ticky_code
-		= do { code_blks <- getCode (mk_code ticky_code)
-		     ; emitClosureCodeAndInfoTable cl_info [] code_blks }
+		= emitClosureAndInfoTable cl_info [] $ mk_code ticky_code
 
 	    mk_code ticky_code
 	      = 	-- NB: We don't set CC when entering data (WDP 94/06)

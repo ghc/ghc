@@ -19,7 +19,6 @@ import OptimizationFuel
 import Control.Monad
 import Maybes
 import Outputable
-import UniqFM
 import UniqSupply
 
 {-
@@ -74,7 +73,7 @@ type DFM fact a = DFM' FuelMonad fact a
 
 runDFM :: Monad m => DataflowLattice f -> DFM' m f a -> m a
 runDFM lattice (DFM' f) =
-  (f lattice $ DFState NoChange emptyBlockEnv (fact_bot lattice)[] NoChange)
+  (f lattice $ DFState NoChange emptyBlockEnv (fact_bot lattice) [] NoChange)
   >>= return . fst
 
 class DataflowAnalysis m where
@@ -153,7 +152,7 @@ instance Monad m => DataflowAnalysis (DFM' m) where
   botFact = DFM' f
     where f lattice s = return (fact_bot lattice, s)
   forgetFact id = DFM' f 
-    where f _ s = return ((), s { df_facts = delFromUFM (df_facts s) id })
+    where f _ s = return ((), s { df_facts = delFromBlockEnv (df_facts s) id })
   addLastOutFact pair = DFM' f
     where f _ s = return ((), s { df_last_outs = pair : df_last_outs s })
   bareLastOutFacts = DFM' f
@@ -175,7 +174,7 @@ instance Monad m => DataflowAnalysis (DFM' m) where
                                     text "env is", pprFacts facts]) 
                   ; setFact id a }
          }
-    where pprFacts env = vcat (map pprFact (ufmToList env))
+    where pprFacts env = vcat (map pprFact (blockEnvToList env))
           pprFact (id, a) = hang (ppr id <> colon) 4 (ppr a)
 
   lattice = DFM' f

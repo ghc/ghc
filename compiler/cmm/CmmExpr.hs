@@ -1,15 +1,15 @@
 
 module CmmExpr
     ( CmmType	-- Abstract 
- 	  , b8, b16, b32, b64, f32, f64, bWord, bHalfWord, gcWord
- 	  , cInt, cLong
- 	  , cmmBits, cmmFloat
- 	  , typeWidth, cmmEqType, cmmEqType_ignoring_ptrhood
- 	  , isFloatType, isGcPtrType, isWord32, isWord64, isFloat64, isFloat32
+    , b8, b16, b32, b64, f32, f64, bWord, bHalfWord, gcWord
+    , cInt, cLong
+    , cmmBits, cmmFloat
+    , typeWidth, cmmEqType, cmmEqType_ignoring_ptrhood
+    , isFloatType, isGcPtrType, isWord32, isWord64, isFloat64, isFloat32
  
     , Width(..)
- 	  , widthInBits, widthInBytes, widthInLog
- 	  , wordWidth, halfWordWidth, cIntWidth, cLongWidth
+    , widthInBits, widthInBytes, widthInLog, widthFromBytes
+    , wordWidth, halfWordWidth, cIntWidth, cLongWidth
  
     , CmmExpr(..), cmmExprType, cmmExprWidth, maybeInvertCmmExpr
     , CmmReg(..), cmmRegType
@@ -21,7 +21,7 @@ module CmmExpr
     , DefinerOfSlots, UserOfSlots, foldSlotsDefd, foldSlotsUsed
     , RegSet, emptyRegSet, elemRegSet, extendRegSet, deleteFromRegSet, mkRegSet
             , plusRegSet, minusRegSet, timesRegSet
-    , Area(..), AreaId(..), SubArea, StackSlotMap, getSlot
+    , Area(..), AreaId(..), SubArea, SubAreaSet, AreaMap, StackSlotMap, getSlot
  
    -- MachOp
     , MachOp(..) 
@@ -98,7 +98,9 @@ data AreaId
   | Young BlockId
   deriving (Eq, Ord)
 
-type SubArea = (Area, Int, Int) -- area, offset, width
+type SubArea    = (Area, Int, Int) -- area, offset, width
+type SubAreaSet = FiniteMap Area [SubArea]
+type AreaMap    = FiniteMap Area Int
 
 data CmmLit
   = CmmInt Integer  Width
@@ -119,6 +121,8 @@ data CmmLit
         -- It is also used inside the NCG during when generating
         -- position-independent code. 
   | CmmLabelDiffOff CLabel CLabel Int   -- label1 - label2 + offset
+  | CmmBlock BlockId			-- Code label
+  | CmmHighStackMark -- stands for the max stack space used during a procedure
   deriving Eq
 
 cmmExprType :: CmmExpr -> CmmType
@@ -135,6 +139,8 @@ cmmLitType (CmmFloat _ width)   = cmmFloat width
 cmmLitType (CmmLabel lbl) 	= cmmLabelType lbl
 cmmLitType (CmmLabelOff lbl _)  = cmmLabelType lbl
 cmmLitType (CmmLabelDiffOff {}) = bWord
+cmmLitType (CmmBlock _) 	= bWord
+cmmLitType (CmmHighStackMark)   = bWord
 
 cmmLabelType :: CLabel -> CmmType
 cmmLabelType lbl | isGcPtrLabel lbl = gcWord
@@ -243,6 +249,10 @@ instance UserOfLocalRegs a => UserOfLocalRegs [a] where
 instance DefinerOfLocalRegs a => DefinerOfLocalRegs [a] where
   foldRegsDefd _ set [] = set
   foldRegsDefd f set (x:xs) = foldRegsDefd f (foldRegsDefd f set x) xs
+
+instance DefinerOfLocalRegs a => DefinerOfLocalRegs (Maybe a) where
+  foldRegsDefd _ set Nothing  = set
+  foldRegsDefd f set (Just x) = foldRegsDefd f set x
 
 
 -----------------------------------------------------------------------------
@@ -604,6 +614,15 @@ widthInBytes W32  = 4
 widthInBytes W64  = 8
 widthInBytes W128 = 16
 widthInBytes W80  = 10
+
+widthFromBytes :: Int -> Width
+widthFromBytes 1  = W8
+widthFromBytes 2  = W16
+widthFromBytes 4  = W32
+widthFromBytes 8  = W64
+widthFromBytes 16 = W128
+widthFromBytes 10 = W80
+widthFromBytes n  = pprPanic "no width for given number of bytes" (ppr n)
 
 -- log_2 of the width in bytes, useful for generating shifts.
 widthInLog :: Width -> Int

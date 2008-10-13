@@ -96,6 +96,7 @@ module MachRegs (
 
 #include "../includes/MachRegs.h"
 
+import BlockId
 import Cmm
 import CgUtils          ( get_GlobalReg_addr )
 import CLabel           ( CLabel, mkMainCapabilityLabel )
@@ -237,6 +238,7 @@ litToImm (CmmLabelDiffOff l1 l2 off)
                              = ImmConstantSum
                                (ImmConstantDiff (ImmCLbl l1) (ImmCLbl l2))
                                (ImmInt off)
+litToImm (CmmBlock id)       = ImmCLbl (infoTblLbl id)
 
 -- -----------------------------------------------------------------------------
 -- Addressing modes

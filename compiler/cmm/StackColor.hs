@@ -33,11 +33,11 @@ fold_edge_facts_b f comp graph env z =
     head_fold (ZFirst id _) out z = f (bt_first_in comp out id) (f out z)
 
 foldConflicts :: (RegSet -> a -> a) -> a -> LGraph Middle Last -> FuelMonad a
-foldConflicts f z g =
+foldConflicts f z g@(LGraph entry _ _) =
   do env <- dualLiveness emptyBlockSet g
      let lookup id = lookupBlockEnv env id `orElse` fact_bot dualLiveLattice
          f' dual z = f (on_stack dual) z
-     return $ fold_edge_facts_b f' (dualLiveTransfers emptyBlockSet) g lookup z
+     return $ fold_edge_facts_b f' (dualLiveTransfers entry emptyBlockSet) g lookup z
   --let env = runDFA dualLiveLattice (run_b_anal dualLiveness g >> getAllFacts)
   --    lookup id = lookupBlockEnv env id `orElse` fact_bot dualLiveLattice
   --    f' dual z = f (on_stack dual) z

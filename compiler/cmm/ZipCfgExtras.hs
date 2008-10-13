@@ -71,6 +71,6 @@ foldM_fwd_block first middle last (Block id _ t) z = do { z <- first id z; tail 
 
 splitp_blocks :: (Block m l -> Bool) -> BlockEnv (Block m l) ->
                  Maybe (Block m l, BlockEnv (Block m l))
-splitp_blocks = undefined -- implemented in ZipCfg but not exported
+splitp_blocks = panic "splitp_blocks" -- implemented in ZipCfg but not exported
 is_exit :: Block m l -> Bool
-is_exit = undefined -- implemented in ZipCfg but not exported
+is_exit = panic "is_exit" -- implemented in ZipCfg but not exported

@@ -219,7 +219,7 @@ collectNonProcPointTargets proc_points blocks current_targets new_blocks =
                 new_targets
                 (map (:[]) targets)
     where
-      blocks' = map (lookupWithDefaultUFM blocks (panic "TODO")) new_blocks
+      blocks' = map (lookupWithDefaultBEnv blocks (panic "TODO")) new_blocks
       targets =
         -- Note the subtlety that since the extra branch after a call
         -- will always be to a block that is a proc-point,
@@ -241,8 +241,8 @@ gatherBlocksIntoContinuation live proc_points blocks start =
   Continuation info_table clabel params is_gc_cont body
     where
       children = (collectNonProcPointTargets proc_points blocks (unitUniqSet start) [start]) `minusUniqSet` (unitUniqSet start)
-      start_block = lookupWithDefaultUFM blocks unknown_block start
-      children_blocks = map (lookupWithDefaultUFM blocks unknown_block) (uniqSetToList children)
+      start_block = lookupWithDefaultBEnv blocks unknown_block start
+      children_blocks = map (lookupWithDefaultBEnv blocks unknown_block) (uniqSetToList children)
       unknown_block = panic "unknown block in gatherBlocksIntoContinuation"
       body = start_block : children_blocks
 
@@ -268,7 +268,7 @@ gatherBlocksIntoContinuation live proc_points blocks start =
                  ContinuationEntry args _ _ -> args
                  ControlEntry ->
                      uniqSetToList $
-                     lookupWithDefaultUFM live unknown_block start
+                     lookupWithDefaultBEnv live unknown_block start
                      -- it's a proc-point, pass lives in parameter registers
 
 --------------------------------------------------------------------------------
@@ -282,7 +282,7 @@ selectContinuationFormat live continuations =
     where
       -- User written continuations
       selectContinuationFormat' (Continuation
-                          (Right (CmmInfo _ _ (CmmInfoTable _ _ (ContInfo format srt))))
+                          (Right (CmmInfo _ _ (CmmInfoTable _ _ _ (ContInfo format srt))))
                           label formals _ _) =
           (formals, Just label, format)
       -- Either user written non-continuation code
@@ -296,7 +296,7 @@ selectContinuationFormat live continuations =
           in (formals,
               Just label,
               map Just $ uniqSetToList $
-              lookupWithDefaultUFM live unknown_block ident)
+              lookupWithDefaultBEnv live unknown_block ident)
 
       unknown_block = panic "unknown BlockId in selectContinuationFormat"
 
@@ -388,10 +388,11 @@ applyContinuationFormat :: [(CLabel, ContinuationFormat)]
                  -> Continuation CmmInfo
 
 -- User written continuations
-applyContinuationFormat formats (Continuation
-                          (Right (CmmInfo gc update_frame (CmmInfoTable prof tag (ContInfo _ srt))))
-                          label formals is_gc blocks) =
-    Continuation (CmmInfo gc update_frame (CmmInfoTable prof tag (ContInfo format srt)))
+applyContinuationFormat formats
+   (Continuation (Right (CmmInfo gc update_frame
+                             (CmmInfoTable clos prof tag (ContInfo _ srt))))
+                 label formals is_gc blocks) =
+    Continuation (CmmInfo gc update_frame (CmmInfoTable clos prof tag (ContInfo format srt)))
                  label formals is_gc blocks
     where
       format = continuation_stack $ maybe unknown_block id $ lookup label formats
@@ -405,7 +406,7 @@ applyContinuationFormat formats (Continuation
 -- CPS generated continuations
 applyContinuationFormat formats (Continuation
                           (Left srt) label formals is_gc blocks) =
-    Continuation (CmmInfo gc Nothing (CmmInfoTable prof tag (ContInfo (continuation_stack $ format) srt)))
+    Continuation (CmmInfo gc Nothing (CmmInfoTable undefined prof tag (ContInfo (continuation_stack $ format) srt)))
                  label formals is_gc blocks
     where
       gc = Nothing -- Generated continuations never need a stack check

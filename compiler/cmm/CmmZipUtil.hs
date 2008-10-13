@@ -9,7 +9,6 @@ import Prelude hiding (last, unzip)
 import ZipCfg
 
 import Maybes
-import UniqSet
 
 -- | Compute the predecessors of each /reachable/ block
 zipPreds :: LastNode l => LGraph m l -> BlockEnv BlockSet
@@ -32,7 +31,7 @@ givesUniquePredecessorTo g = \id -> elemBlockSet id singlePreds
           add_pred pair@(single, multi) id =
               if elemBlockSet id multi then pair
               else if elemBlockSet id single then
-                       (delOneFromUniqSet single id, extendBlockSet multi id)
+                       (removeBlockSet single id, extendBlockSet multi id)
                    else
                        (extendBlockSet single id, multi)
               

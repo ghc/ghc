@@ -22,7 +22,6 @@ import CLabel
 import Maybe
 import Outputable
 import PprCmm
-import Unique
 import Constants
 import FastString
 
@@ -59,7 +58,7 @@ lintCmmTop (CmmData {})
 
 lintCmmBlock :: BlockSet -> GenBasicBlock CmmStmt -> CmmLint ()
 lintCmmBlock labels (BasicBlock id stmts)
-  = addLintInfo (text "in basic block " <> ppr (getUnique id)) $
+  = addLintInfo (text "in basic block " <> ppr id) $
 	mapM_ (lintCmmStmt labels) stmts
 
 -- -----------------------------------------------------------------------------
@@ -88,19 +87,10 @@ lintCmmExpr expr =
 
 -- Check for some common byte/word mismatches (eg. Sp + 1)
 cmmCheckMachOp   :: MachOp -> [CmmExpr] -> [CmmType] -> CmmLint CmmType
-cmmCheckMachOp  op args@[CmmReg reg, CmmLit (CmmInt i _)] _
-  | isWordOffsetReg reg && isOffsetOp op && i `rem` fromIntegral wORD_SIZE /= 0
-  = cmmLintDubiousWordOffset (CmmMachOp op args)
 cmmCheckMachOp op [lit@(CmmLit (CmmInt { })), reg@(CmmReg _)] tys
   = cmmCheckMachOp op [reg, lit] tys
 cmmCheckMachOp op _ tys
   = return (machOpResultType op tys)
-
-isWordOffsetReg  :: CmmReg -> Bool
-isWordOffsetReg (CmmGlobal Sp) = True
--- No warnings for unaligned arithmetic, which is used to tag dynamic constructor closures.
---isWordOffsetReg (CmmGlobal Hp) = True
-isWordOffsetReg _ = False
 
 isOffsetOp :: MachOp -> Bool
 isOffsetOp (MO_Add _) = True

@@ -37,6 +37,7 @@ module StgCmmProf (
 	-- For REP_xxx constants, which are MachReps
 
 import StgCmmClosure
+import StgCmmEnv
 import StgCmmUtils
 import StgCmmMonad
 import SMRep
@@ -185,10 +186,10 @@ profAlloc words ccs
 -- Setting the cost centre in a new closure
 
 chooseDynCostCentres :: CostCentreStack
-		     -> [Id] 	 	-- Args
+		     -> [Id] 	        -- Args
 		     -> StgExpr		-- Body
 		     -> FCode (CmmExpr, CmmExpr)
--- Called when alllcating a closure
+-- Called when allocating a closure
 -- Tells which cost centre to put in the object, and which
 -- to blame the cost of allocation on
 chooseDynCostCentres ccs args body = do

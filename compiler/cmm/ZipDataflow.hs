@@ -30,7 +30,6 @@ import qualified ZipCfg as G
 import Maybes
 import Outputable
 import Panic
-import UniqFM
 
 import Control.Monad
 import Maybe
@@ -148,10 +147,6 @@ newtype LastOutFacts a = LastOutFacts [(BlockId, a)]
 
 -- | A backward rewrite takes the same inputs as a backward transfer,
 -- but instead of producing a fact, it produces a replacement graph or Nothing.
--- The type of the replacement graph is given as a type parameter 'g'
--- of kind * -> * -> *.  This design offers great flexibility to clients, 
--- but it might be worth simplifying this module by replacing this type
--- parameter with AGraph everywhere (SLPJ 19 May 2008).
 
 data BackwardRewrites middle last a = BackwardRewrites
     { br_first  :: a              -> BlockId -> Maybe (AGraph middle last)
@@ -433,11 +428,11 @@ areturn g = liftToDFM $ liftUniq $ graphOfAGraph g
 -- want to stress out the finite map more than necessary
 lgraphToGraph :: LastNode l => LGraph m l -> Graph m l
 lgraphToGraph (LGraph eid _ blocks) =
-    if flip any (eltsUFM blocks) $ \block -> any (== eid) (succs block) then
+    if flip any (eltsBlockEnv blocks) $ \block -> any (== eid) (succs block) then
         Graph (ZLast (mkBranchNode eid)) blocks
     else -- common case: entry is not a branch target
         let Block _ _ entry = lookupBlockEnv blocks eid `orElse` panic "missing entry!"
-        in  Graph entry (delFromUFM blocks eid)
+        in  Graph entry (delFromBlockEnv blocks eid)
     
 
 class (Outputable m, Outputable l, LastNode l, Outputable (LGraph m l)) => DebugNodes m l
@@ -453,7 +448,7 @@ fwd_pure_anal :: (DebugNodes m l, LastNode l, Outputable a)
 fwd_pure_anal name env transfers in_fact g =
     do (fp, _) <- anal_f name env transfers panic_rewrites in_fact g panic_fuel
        return fp
-  where -- definitiely a case of "I love lazy evaluation"
+  where -- definitely a case of "I love lazy evaluation"
     anal_f = forward_sol (\_ _ -> Nothing) panic_depth
     panic_rewrites = panic "pure analysis asked for a rewrite function"
     panic_fuel     = panic "pure analysis asked for fuel"
@@ -643,7 +638,8 @@ forward_rew check_maybe = forw
             in do { solve depth name start transfers rewrites in_fact g fuel
                   ; eid <- freshBlockId "temporary entry id"
                   ; (rewritten, fuel) <-
-                      rew_tail (ZFirst eid Nothing) in_fact entry emptyBlockEnv fuel
+                      rew_tail (ZFirst eid emptyStackInfo)
+                               in_fact entry emptyBlockEnv fuel
                   ; (rewritten, fuel) <- rewrite_blocks blocks rewritten fuel
                   ; a <- finish
                   ; return (a, lgraphToGraph (LGraph eid 0 rewritten), fuel)
@@ -682,7 +678,7 @@ forward_rew check_maybe = forw
                                ; (outfact, g, fuel) <- inner_rew getExitFact a g fuel
                                ; let (blocks, h) = splice_head' h g
                                ; (rewritten, fuel) <-
-                                 rew_tail h outfact t (blocks `plusUFM` rewritten) fuel
+                                 rew_tail h outfact t (blocks `plusBlockEnv` rewritten) fuel
                                ; rewrite_blocks bs rewritten fuel }
 
           rew_tail head in' (G.ZTail m t) rewritten fuel =
@@ -694,7 +690,7 @@ forward_rew check_maybe = forw
                            ; g <- areturn g
                            ; (a, g, fuel) <- inner_rew getExitFact in' g fuel
                            ; let (blocks, h) = G.splice_head' head g
-                           ; rew_tail h a t (blocks `plusUFM` rewritten) fuel
+                           ; rew_tail h a t (blocks `plusBlockEnv` rewritten) fuel
                            }
           rew_tail h in' (G.ZLast l) rewritten fuel = 
             my_trace "Rewriting last node" (ppr l) $
@@ -705,7 +701,7 @@ forward_rew check_maybe = forw
                            ; g <- areturn g
                            ; ((), g, fuel) <- inner_rew (return ()) in' g fuel
                            ; let g' = G.splice_head_only' h g
-                           ; return (G.lg_blocks g' `plusUFM` rewritten, fuel)
+                           ; return (G.lg_blocks g' `plusBlockEnv` rewritten, fuel)
                            }
           either_last rewrites in' (LastExit) = fr_exit rewrites in'
           either_last rewrites in' (LastOther l) = fr_last rewrites in' l
@@ -805,13 +801,16 @@ backward_sol check_maybe = back
                     ; (a, fuel) <-
                       case check_maybe fuel $ last_rew env l of
                         Nothing -> return (last_in env l, fuel)
-                        Just g -> subsolve g exit_fact fuel
+                        Just g -> do g' <- areturn g
+                                     my_trace "analysis rewrites last node"
+                                      (ppr l <+> pprGraph g') $
+                                      subsolve g exit_fact fuel
                     ; set_head_fact h a fuel
                     ; return fuel }
 
          in do { fuel <- run "backward" name set_block_fact blocks fuel
                ; eid <- freshBlockId "temporary entry id"
-               ; fuel <- set_block_fact (Block eid Nothing entry) fuel
+               ; fuel <- set_block_fact (Block eid emptyStackInfo entry) fuel
                ; a <- getFact eid
                ; forgetFact eid
                ; return (a, fuel)
@@ -823,14 +822,20 @@ backward_sol check_maybe = back
                                                      ppr (bt_first_in transfers a id)) $
                            setFact id $ bt_first_in transfers a id
                          ; return fuel }
-           Just g  -> do { (a, fuel) <- subsolve g a fuel
-                         ; setFact id a
+           Just g  -> do { g' <- areturn g
+                         ; (a, fuel) <- my_trace "analysis rewrites first node"
+                                      (ppr id <+> pprGraph g') $
+                                      subsolve g a fuel
+                         ; setFact id $ bt_first_in transfers a id
                          ; return fuel
                          }
        set_head_fact (G.ZHead h m) a fuel =
          case check_maybe fuel $ br_middle rewrites a m of
            Nothing -> set_head_fact h (bt_middle_in transfers a m) fuel
-           Just g -> do { (a, fuel) <- subsolve g a fuel
+           Just g -> do { g' <- areturn g
+                        ; (a, fuel) <- my_trace "analysis rewrites middle node"
+                                      (ppr m <+> pprGraph g') $
+                                      subsolve g a fuel
                         ; set_head_fact h a fuel }
 
        fixed_point g exit_fact fuel =
@@ -898,11 +903,13 @@ backward_rew check_maybe = back
            in do { (FP env in_fact _ _ _, _) <-    -- don't drop the entry fact!
                      solve depth name start transfers rewrites g exit_fact fuel
                  --; env <- getAllFacts
-                 ; my_trace "facts after solving" (ppr env) $ return ()
+                 -- ; my_trace "facts after solving" (ppr env) $ return ()
                  ; eid <- freshBlockId "temporary entry id"
                  ; (rewritten, fuel) <- rewrite_blocks True blocks emptyBlockEnv fuel
                  -- We can't have the fact check fail on the bogus entry, which _may_ change
-                 ; (rewritten, fuel) <- rewrite_blocks False [Block eid Nothing entry] rewritten fuel
+                 ; (rewritten, fuel) <-
+                     rewrite_blocks False [Block eid emptyStackInfo entry]
+                                    rewritten fuel
                  ; my_trace "eid" (ppr eid) $ return ()
                  ; my_trace "exit_fact" (ppr exit_fact) $ return ()
                  ; my_trace "in_fact" (ppr in_fact) $ return ()
@@ -940,7 +947,7 @@ backward_rew check_maybe = back
                    ; g <- areturn g
                    ; (a, g, fuel) <- inner_rew g exit_fact fuel
                    ; let G.Graph t new_blocks = g
-                   ; let rewritten' = new_blocks `plusUFM` rewritten
+                   ; let rewritten' = new_blocks `plusBlockEnv` rewritten
                    ; propagate check fuel h a t rewritten' -- continue at entry of g
                    } 
           either_last _env (LastExit)    = br_exit rewrites 
@@ -961,10 +968,11 @@ backward_rew check_maybe = back
                    ; (a, g, fuel) <- inner_rew g a fuel
                    ; let Graph t newblocks = G.splice_tail g tail
                    ; my_trace "propagating facts" (ppr a) $
-                     propagate check fuel h a t (newblocks `plusUFM` rewritten) }
+                     propagate check fuel h a t (newblocks `plusBlockEnv` rewritten) }
           propagate check fuel (ZFirst id off) a tail rewritten =
             case maybeRewriteWithFuel fuel $ br_first rewrites a id of
-              Nothing -> do { if check then checkFactMatch id $ bt_first_in transfers a id
+              Nothing -> do { if check then
+                                checkFactMatch id $ bt_first_in transfers a id
                               else return ()
                             ; return (insertBlock (Block id off tail) rewritten, fuel) }
               Just g ->
@@ -973,9 +981,10 @@ backward_rew check_maybe = back
                    ; my_trace "Rewrote first node"
                      (f4sep [ppr id <> colon, text "to", pprGraph g]) $ return ()
                    ; (a, g, fuel) <- inner_rew g a fuel
-                   ; if check then checkFactMatch id a else return ()
+                   ; if check then checkFactMatch id (bt_first_in transfers a id)
+                     else return ()
                    ; let Graph t newblocks = G.splice_tail g tail
-                   ; let r = insertBlock (Block id off t) (newblocks `plusUFM` rewritten)
+                   ; let r = insertBlock (Block id off t) (newblocks `plusBlockEnv` rewritten)
                    ; return (r, fuel) }
       in  fixed_pt_and_fuel
 
@@ -1013,12 +1022,16 @@ run dir name do_block blocks b =
    where
      -- N.B. Each iteration starts with the same transaction limit;
      -- only the rewrites in the final iteration actually count
-     trace_block b block =
-         my_trace "about to do" (text name <+> text "on" <+> ppr (blockId block)) $
-         do_block block b
+     trace_block (b, cnt) block =
+         do b' <- my_trace "about to do" (text name <+> text "on" <+>
+                     ppr (blockId block) <+> ppr cnt) $
+                    do_block block b
+            return (b', cnt + 1)
      iterate n = 
          do { markFactsUnchanged
-            ; b <- foldM trace_block b blocks
+            ; (b, _) <-
+                 my_trace "block count:" (ppr (length blocks)) $
+                   foldM trace_block (b, 0 :: Int) blocks
             ; changed <- factsStatus
             ; facts <- getAllFacts
             ; let depth = 0 -- was nesting depth
@@ -1043,7 +1056,7 @@ run dir name do_block blocks b =
      pprBlock (Block id off t) = nest 2 (pprFact' (id, off, t))
      pprFacts depth n env =
          my_nest depth (text "facts for iteration" <+> pp_i n <+> text "are:" $$
-                        (nest 2 $ vcat $ map pprFact $ ufmToList env))
+                        (nest 2 $ vcat $ map pprFact $ blockEnvToList env))
      pprFact  (id, a) = hang (ppr id <> colon) 4 (ppr a)
      pprFact' (id, off, a) = hang (ppr id <> parens (ppr off) <> colon) 4 (ppr a)
 
@@ -1058,10 +1071,10 @@ subAnalysis' :: (Monad (m f), DataflowAnalysis m, Outputable f) =>
 subAnalysis' m =
     do { a <- subAnalysis $
                do { a <- m; facts <- getAllFacts
-                  ; my_trace "after sub-analysis facts are" (pprFacts facts) $
+                  ; -- my_trace "after sub-analysis facts are" (pprFacts facts) $
                     return a }
        ; facts <- getAllFacts
-       ; my_trace "in parent analysis facts are" (pprFacts facts) $
+       ; -- my_trace "in parent analysis facts are" (pprFacts facts) $
          return a }
-  where pprFacts env = nest 2 $ vcat $ map pprFact $ ufmToList env
+  where pprFacts env = nest 2 $ vcat $ map pprFact $ blockEnvToList env
         pprFact (id, a) = hang (ppr id <> colon) 4 (ppr a)

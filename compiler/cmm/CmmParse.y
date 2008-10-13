@@ -247,7 +247,7 @@ info	:: { ExtFCode (CLabel, CmmInfoTable, [Maybe LocalReg]) }
 		-- ptrs, nptrs, closure type, description, type
 		{ do prof <- profilingInfo $11 $13
 		     return (mkRtsEntryLabelFS $3,
-			CmmInfoTable prof (fromIntegral $9)
+			CmmInfoTable False prof (fromIntegral $9)
 				     (ThunkInfo (fromIntegral $5, fromIntegral $7) NoC_SRT),
 			[]) }
 	
@@ -255,7 +255,7 @@ info	:: { ExtFCode (CLabel, CmmInfoTable, [Maybe LocalReg]) }
 		-- ptrs, nptrs, closure type, description, type, fun type
 		{ do prof <- profilingInfo $11 $13
 		     return (mkRtsEntryLabelFS $3,
-			CmmInfoTable prof (fromIntegral $9)
+			CmmInfoTable False prof (fromIntegral $9)
 				     (FunInfo (fromIntegral $5, fromIntegral $7) NoC_SRT
 				      0  -- Arity zero
 				      (ArgSpec (fromIntegral $15))
@@ -269,7 +269,7 @@ info	:: { ExtFCode (CLabel, CmmInfoTable, [Maybe LocalReg]) }
 		-- ptrs, nptrs, closure type, description, type, fun type, arity
 		{ do prof <- profilingInfo $11 $13
 		     return (mkRtsEntryLabelFS $3,
-			CmmInfoTable prof (fromIntegral $9)
+			CmmInfoTable False prof (fromIntegral $9)
 				     (FunInfo (fromIntegral $5, fromIntegral $7) NoC_SRT (fromIntegral $17)
 				      (ArgSpec (fromIntegral $15))
 				      zeroCLit),
@@ -284,7 +284,7 @@ info	:: { ExtFCode (CLabel, CmmInfoTable, [Maybe LocalReg]) }
 		     -- but that's the way the old code did it we can fix it some other time.
 		     desc_lit <- code $ mkStringCLit $13
 		     return (mkRtsEntryLabelFS $3,
-			CmmInfoTable prof (fromIntegral $11)
+			CmmInfoTable False prof (fromIntegral $11)
 				     (ConstrInfo (fromIntegral $5, fromIntegral $7) (fromIntegral $9) desc_lit),
 			[]) }
 	
@@ -292,7 +292,7 @@ info	:: { ExtFCode (CLabel, CmmInfoTable, [Maybe LocalReg]) }
 		-- selector, closure type, description, type
 		{ do prof <- profilingInfo $9 $11
 		     return (mkRtsEntryLabelFS $3,
-			CmmInfoTable prof (fromIntegral $7)
+			CmmInfoTable False prof (fromIntegral $7)
 				     (ThunkSelectorInfo (fromIntegral $5) NoC_SRT),
 			[]) }
 
@@ -300,7 +300,7 @@ info	:: { ExtFCode (CLabel, CmmInfoTable, [Maybe LocalReg]) }
 		-- closure type (no live regs)
 		{ do let infoLabel = mkRtsInfoLabelFS $3
 		     return (mkRtsRetLabelFS $3,
-			CmmInfoTable (ProfilingInfo zeroCLit zeroCLit) (fromIntegral $5)
+			CmmInfoTable False (ProfilingInfo zeroCLit zeroCLit) (fromIntegral $5)
 				     (ContInfo [] NoC_SRT),
 			[]) }
 
@@ -308,7 +308,7 @@ info	:: { ExtFCode (CLabel, CmmInfoTable, [Maybe LocalReg]) }
 		-- closure type, live regs
 		{ do live <- sequence (map (liftM Just) $7)
 		     return (mkRtsRetLabelFS $3,
-			CmmInfoTable (ProfilingInfo zeroCLit zeroCLit) (fromIntegral $5)
+			CmmInfoTable False (ProfilingInfo zeroCLit zeroCLit) (fromIntegral $5)
 			             (ContInfo live NoC_SRT),
 			live) }
 

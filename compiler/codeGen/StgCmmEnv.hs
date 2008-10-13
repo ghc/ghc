@@ -14,6 +14,8 @@ module StgCmmEnv (
 	litIdInfo, lneIdInfo, regIdInfo,
 	idInfoToAmode,
 
+        NonVoid(..), isVoidId, nonVoidIds,
+
 	addBindC, addBindsC,
 
 	bindArgsToRegs, bindToReg, rebindToReg,
@@ -25,6 +27,7 @@ module StgCmmEnv (
 
 #include "HsVersions.h"
 
+import TyCon
 import StgCmmMonad
 import StgCmmUtils
 import StgCmmClosure
@@ -39,11 +42,28 @@ import PprCmm		( {- instance Outputable -} )
 import Id
 import VarEnv
 import Maybes
+import Monad
 import Name
 import StgSyn
 import Outputable
 
+-------------------------------------
+--	Non-void types
+-------------------------------------
+-- We frequently need the invariant that an Id or a an argument
+-- is of a non-void type. This type is a witness to the invariant.
 
+newtype NonVoid a = NonVoid a
+  deriving (Eq, Show)
+
+instance (Outputable a) => Outputable (NonVoid a) where
+  ppr (NonVoid a) = ppr a
+
+isVoidId :: Id -> Bool
+isVoidId = isVoidRep . idPrimRep
+
+nonVoidIds :: [Id] -> [NonVoid Id]
+nonVoidIds ids = [NonVoid id | id <- ids, not (isVoidRep (idPrimRep id))]
 
 -------------------------------------
 --	Manipulating CgIdInfo
@@ -65,15 +85,16 @@ lneIdInfo id regs
     blk_id = mkBlockId (idUnique id)
 
 litIdInfo :: Id -> LambdaFormInfo -> CmmLit -> CgIdInfo
-litIdInfo id lf_info lit = mkCgIdInfo id lf_info (CmmLit lit)
+litIdInfo id lf_info lit = --mkCgIdInfo id lf_info (CmmLit lit)
+  mkCgIdInfo id lf_info (addDynTag (CmmLit lit) (lfDynTag lf_info))
 
 regIdInfo :: Id -> LambdaFormInfo -> LocalReg -> CgIdInfo
-regIdInfo id lf_info reg = mkCgIdInfo id lf_info (CmmReg (CmmLocal reg))
+regIdInfo id lf_info reg =
+  mkCgIdInfo id lf_info (addDynTag (CmmReg (CmmLocal reg)) (lfDynTag lf_info))
 
 idInfoToAmode :: CgIdInfo -> CmmExpr
 -- Returns a CmmExpr for the *tagged* pointer
-idInfoToAmode (CgIdInfo { cg_loc = CmmLoc e, cg_tag = tag })
-  = addDynTag e tag
+idInfoToAmode (CgIdInfo { cg_loc = CmmLoc e }) = e
 idInfoToAmode cg_info
   = pprPanic "idInfoToAmode" (ppr (cg_id cg_info))	-- LneLoc
 
@@ -105,10 +126,10 @@ addBindC name stuff_to_bind = do
 	binds <- getBinds
 	setBinds $ extendVarEnv binds name stuff_to_bind
 
-addBindsC :: [(Id, CgIdInfo)] -> FCode ()
+addBindsC :: [CgIdInfo] -> FCode ()
 addBindsC new_bindings = do
 	binds <- getBinds
-	let new_binds = foldl (\ binds (name,info) -> extendVarEnv binds name info)
+	let new_binds = foldl (\ binds info -> extendVarEnv binds (cg_id info) info)
 			      binds
 			      new_bindings
 	setBinds new_binds
@@ -155,10 +176,11 @@ cgLookupPanic id
 
 
 --------------------
-getArgAmode :: StgArg -> FCode CmmExpr
-getArgAmode (StgVarArg var)  = do { info  <- getCgIdInfo var; return (idInfoToAmode info) }
-getArgAmode (StgLitArg lit)  = return (CmmLit (mkSimpleLit lit))
-getArgAmode (StgTypeArg _)   = panic "getArgAmode: type arg"
+getArgAmode :: NonVoid StgArg -> FCode CmmExpr
+getArgAmode (NonVoid (StgVarArg var))  =
+  do { info  <- getCgIdInfo var; return (idInfoToAmode info) }
+getArgAmode (NonVoid (StgLitArg lit))  = liftM CmmLit $ cgLit lit
+getArgAmode (NonVoid (StgTypeArg _))   = panic "getArgAmode: type arg"
 
 getNonVoidArgAmodes :: [StgArg] -> FCode [CmmExpr]
 -- NB: Filters out void args, 
@@ -166,7 +188,7 @@ getNonVoidArgAmodes :: [StgArg] -> FCode [CmmExpr]
 getNonVoidArgAmodes [] = return []
 getNonVoidArgAmodes (arg:args)
   | isVoidRep (argPrimRep arg) = getNonVoidArgAmodes args
-  | otherwise = do { amode  <- getArgAmode  arg 
+  | otherwise = do { amode  <- getArgAmode (NonVoid arg)
 	 	   ; amodes <- getNonVoidArgAmodes args
 	 	   ; return ( amode : amodes ) }
 
@@ -175,27 +197,27 @@ getNonVoidArgAmodes (arg:args)
 --	Interface functions for binding and re-binding names
 ------------------------------------------------------------------------
 
-bindToReg :: Id -> LambdaFormInfo -> FCode LocalReg
+bindToReg :: NonVoid Id -> LambdaFormInfo -> FCode LocalReg
 -- Bind an Id to a fresh LocalReg
-bindToReg id lf_info
-  = do	{ let reg = idToReg id
-	; addBindC id (regIdInfo id lf_info reg)
+bindToReg nvid@(NonVoid id) lf_info
+  = do	{ let reg = idToReg nvid
+	; addBindC id (mkCgIdInfo id lf_info (CmmReg (CmmLocal reg)))
 	; return reg }
 
-rebindToReg :: Id -> FCode LocalReg
+rebindToReg :: NonVoid Id -> FCode LocalReg
 -- Like bindToReg, but the Id is already in scope, so 
 -- get its LF info from the envt
-rebindToReg id 
+rebindToReg nvid@(NonVoid id)
   = do	{ info <- getCgIdInfo id
-	; bindToReg id (cgIdInfoLF info) }
+	; bindToReg nvid (cgIdInfoLF info) }
 
-bindArgToReg :: Id -> FCode LocalReg
-bindArgToReg id = bindToReg id (mkLFArgument id)
+bindArgToReg :: NonVoid Id -> FCode LocalReg
+bindArgToReg nvid@(NonVoid id) = bindToReg nvid (mkLFArgument id)
 
-bindArgsToRegs :: [Id] -> FCode [LocalReg]
+bindArgsToRegs :: [NonVoid Id] -> FCode [LocalReg]
 bindArgsToRegs args = mapM bindArgToReg args
 
-idToReg :: Id -> LocalReg
+idToReg :: NonVoid Id -> LocalReg
 -- Make a register from an Id, typically a function argument,
 -- free variable, or case binder
 --
@@ -203,7 +225,8 @@ idToReg :: Id -> LocalReg
 --
 -- By now the Ids should be uniquely named; else one would worry
 -- about accidental collision 
-idToReg id = LocalReg (idUnique id) 
-		      (primRepCmmType (idPrimRep id))
+idToReg (NonVoid id) = LocalReg (idUnique id) 
+                        (case idPrimRep id of VoidRep -> pprPanic "idToReg" (ppr id)
+                                              _ -> primRepCmmType (idPrimRep id))
 
 

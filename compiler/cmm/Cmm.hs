@@ -13,7 +13,8 @@ module Cmm (
         cmmMapGraph, cmmTopMapGraph,
         cmmMapGraphM, cmmTopMapGraphM,
         CmmInfo(..), UpdateFrame(..),
-        CmmInfoTable(..), ClosureTypeInfo(..), ProfilingInfo(..), ClosureTypeTag,
+        CmmInfoTable(..), HasStaticClosure, ClosureTypeInfo(..), ConstrDescription,
+        ProfilingInfo(..), ClosureTypeTag,
         GenBasicBlock(..), CmmBasicBlock, blockId, blockStmts, mapBlockStmts,
         CmmReturnInfo(..),
         CmmStmt(..), CmmActual, CmmActuals, CmmFormal, CmmFormals, 
@@ -137,7 +138,8 @@ cmmTopMapGraph f (CmmProc h l args g) = CmmProc h l args (f g)
 cmmTopMapGraph _ (CmmData s ds)       = CmmData s ds
 
 cmmMapGraphM f (Cmm tops) = mapM (cmmTopMapGraphM f) tops >>= return . Cmm
-cmmTopMapGraphM f (CmmProc h l args g) = f (showSDoc $ ppr l) g >>= return . CmmProc h l args
+cmmTopMapGraphM f (CmmProc h l args g) =
+  f (showSDoc $ ppr l) g >>= return . CmmProc h l args
 cmmTopMapGraphM _ (CmmData s ds)       = return $ CmmData s ds
 
 -----------------------------------------------------------------------------
@@ -147,16 +149,20 @@ cmmTopMapGraphM _ (CmmData s ds)       = return $ CmmData s ds
 data CmmInfo
   = CmmInfo
       (Maybe BlockId)     -- GC target. Nothing <=> CPS won't do stack check
+                          -- JD: NOT USED BY NEW CODE GEN
       (Maybe UpdateFrame) -- Update frame
       CmmInfoTable        -- Info table
 
 -- Info table as a haskell data type
 data CmmInfoTable
   = CmmInfoTable
+      HasStaticClosure
       ProfilingInfo
       ClosureTypeTag -- Int
       ClosureTypeInfo
   | CmmNonInfoTable   -- Procedure doesn't need an info table
+
+type HasStaticClosure = Bool
 
 -- TODO: The GC target shouldn't really be part of CmmInfo
 -- as it doesn't appear in the resulting info table.

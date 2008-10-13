@@ -47,13 +47,13 @@ cmmLiveness blocks =
     fixedpoint (cmmBlockDependants sources)
                (cmmBlockUpdate blocks')
                (map blockId blocks)
-               (listToUFM [(blockId b, emptyUniqSet) | b <- blocks])
+               (mkBlockEnv [(blockId b, emptyUniqSet) | b <- blocks])
     where
       sources :: BlockSources
       sources = cmmBlockSources blocks
 
       blocks' :: BlockStmts
-      blocks' = listToUFM $ map block_name blocks
+      blocks' = mkBlockEnv $ map block_name blocks
 
       block_name :: CmmBasicBlock -> (BlockId, [CmmStmt])
       block_name b = (blockId b, blockStmts b)
@@ -75,7 +75,7 @@ cmmLivenessComment live (BasicBlock ident stmts) =
 -- need updating after a given block is updated in the liveness analysis
 -----------------------------------------------------------------------------
 cmmBlockSources :: [CmmBasicBlock] -> BlockSources
-cmmBlockSources blocks = foldr aux emptyUFM blocks
+cmmBlockSources blocks = foldr aux emptyBlockEnv blocks
     where
       aux :: CmmBasicBlock
           -> BlockSources
@@ -89,7 +89,7 @@ cmmBlockSources blocks = foldr aux emptyUFM blocks
                        -> BlockSources
                        -> BlockSources
       add_source_edges source target ufm =
-          addToUFM_Acc (flip addOneToUniqSet) unitUniqSet ufm target source
+          addToBEnv_Acc (flip addOneToUniqSet) unitUniqSet ufm target source
 
       branch_targets :: [CmmStmt] -> UniqSet BlockId
       branch_targets stmts =
@@ -107,7 +107,7 @@ cmmBlockSources blocks = foldr aux emptyUFM blocks
 -----------------------------------------------------------------------------
 cmmBlockDependants :: BlockSources -> BlockId -> [BlockId]
 cmmBlockDependants sources ident =
-    uniqSetToList $ lookupWithDefaultUFM sources emptyUniqSet ident
+    uniqSetToList $ lookupWithDefaultBEnv sources emptyUniqSet ident
 
 -----------------------------------------------------------------------------
 -- | Given the table of type 'BlockStmts' and a block that was updated,
@@ -122,14 +122,14 @@ cmmBlockUpdate ::
 cmmBlockUpdate blocks node _ state =
     if (sizeUniqSet old_live) == (sizeUniqSet new_live)
       then Nothing
-      else Just $ addToUFM state node new_live
+      else Just $ extendBlockEnv state node new_live
     where
       new_live, old_live :: CmmLive
       new_live = cmmStmtListLive state block_stmts
-      old_live = lookupWithDefaultUFM state missing_live node
+      old_live = lookupWithDefaultBEnv state missing_live node
 
       block_stmts :: [CmmStmt]
-      block_stmts = lookupWithDefaultUFM blocks missing_block node
+      block_stmts = lookupWithDefaultBEnv blocks missing_block node
 
       missing_live = panic "unknown block id during liveness analysis"
       missing_block = panic "unknown block id during liveness analysis"
@@ -187,14 +187,14 @@ cmmStmtLive _ (CmmCall target results arguments _ _) =
               (CmmCallee target _) -> cmmExprLive target
               (CmmPrim _) -> id
 cmmStmtLive other_live (CmmBranch target) =
-    addLive (lookupWithDefaultUFM other_live emptyUniqSet target)
+    addLive (lookupWithDefaultBEnv other_live emptyUniqSet target)
 cmmStmtLive other_live (CmmCondBranch expr target) =
     cmmExprLive expr .
-    addLive (lookupWithDefaultUFM other_live emptyUniqSet target)
+    addLive (lookupWithDefaultBEnv other_live emptyUniqSet target)
 cmmStmtLive other_live (CmmSwitch expr targets) =
     cmmExprLive expr .
     (foldr ((.) . (addLive .
-                   lookupWithDefaultUFM other_live emptyUniqSet))
+                   lookupWithDefaultBEnv other_live emptyUniqSet))
            id
            (mapCatMaybes id targets))
 cmmStmtLive _ (CmmJump expr params) =
