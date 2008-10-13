@@ -1494,8 +1494,14 @@ linkDynLib dflags o_files dep_packages = do
     -- because the RTS lib comes in several flavours and we want to be
     -- able to pick the flavour when a binary is linked.
     pkgs <- getPreloadPackagesAnd dflags dep_packages
-    let pkgs_no_rts = filter ((/= rtsPackageId) . packageConfigId) pkgs
 
+    -- On Windows we need to link the RTS import lib as Windows does
+    -- not allow undefined symbols.
+#if defined(mingw32_HOST_OS)
+    let pkgs_no_rts = filter ((/= rtsPackageId) . packageConfigId) pkgs
+#else
+    let pkgs_no_rts = pkgs
+#endif
     let pkg_lib_paths = collectLibraryPaths pkgs_no_rts
     let pkg_lib_path_opts = map ("-L"++) pkg_lib_paths
 
