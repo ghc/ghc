@@ -239,8 +239,11 @@ numCapabilities = unsafePerformIO $  do
                     n <- peek n_capabilities
                     return (fromIntegral n)
 
+#if defined(mingw32_HOST_OS) && defined(__PIC__)
+foreign import ccall "_imp__n_capabilities" n_capabilities :: Ptr CInt
+#else
 foreign import ccall "&n_capabilities" n_capabilities :: Ptr CInt
-
+#endif
 childHandler :: SomeException -> IO ()
 childHandler err = catchException (real_handler err) childHandler
 
