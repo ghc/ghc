@@ -1,14 +1,16 @@
 {-# OPTIONS_GHC -XCPP -XPatternGuards -XScopedTypeVariables -Wall #-}
 module Main where
 
+import Prelude hiding ( mod, id, mapM )
 import GHC hiding (flags)
+--import Packages
 import HscTypes         ( isBootSummary )
 import BasicTypes
 import Digraph          ( flattenSCCs )
 import DriverPhases     ( isHaskellSrcFilename )
 import HscTypes         ( msHsFilePath )
 import Name             ( getOccString )
-import ErrUtils         ( printBagOfErrors )
+--import ErrUtils         ( printBagOfErrors )
 import DynFlags         ( defaultDynFlags )
 import SrcLoc
 import Bag
@@ -16,16 +18,26 @@ import Exception --        ( ghandle )
 import FastString
 import MonadUtils       ( liftIO )
 
-import Prelude hiding (mapM)
+-- Every GHC comes with Cabal anyways, so this is not a bad new dependency
+import Distribution.Simple.GHC ( ghcOptions )
+import Distribution.Simple.Configure ( getPersistBuildConfig )
+import Distribution.PackageDescription ( library, libBuildInfo )
+import Distribution.Simple.LocalBuildInfo ( localPkgDescr, buildDir )
+
 import Control.Monad hiding (mapM)
 import System.Environment
 import System.Console.GetOpt
 import System.Exit
 import Data.Char
 import System.IO
-import Data.List as List
+import Data.List as List hiding ( group )
 import Data.Maybe
 import Data.Traversable (mapM)
+import Data.Map ( Map )
+import qualified Data.Map as M
+
+--import UniqFM
+--import Debug.Trace
 
 -- search for definitions of things 
 -- we do this by parsing the source and grabbing top-level definitions
@@ -43,7 +55,7 @@ type ThingName = String -- name of a defined entity in a Haskell program
 data FoundThing = FoundThing ModuleName ThingName SrcLoc
 
 -- Data we have obtained from a file (list of things we found)
-data FileData = FileData FileName [FoundThing]
+data FileData = FileData FileName [FoundThing] (Map Int String)
 --- invariant (not checked): every found thing has a source location in that file?
 
 
@@ -52,46 +64,65 @@ data FileData = FileData FileName [FoundThing]
 
 main :: IO ()
 main = do
-        progName <- getProgName
-        let usageString =
-              "Usage: " ++ progName ++ " [OPTION...] [-- GHC OPTION... --] [files...]"
-	args <- getArgs
-        let (ghcArgs, ourArgs, unbalanced) = splitArgs args
-	let (flags, filenames, errs) = getOpt Permute options ourArgs
-        let (hsfiles, otherfiles) = List.partition isHaskellSrcFilename filenames
-        let ghc_topdir = case [ d | FlagTopDir d <- flags ] of
-                                [] -> ""
-                                (x:_) -> x
-        mapM_ (\n -> putStr $ "Warning: ignoring non-Haskellish file " ++ n ++ "\n")
-              otherfiles
-	if unbalanced || errs /= [] || elem FlagHelp flags || hsfiles == []
-         then do
-           putStr $ unlines errs 
-	   putStr $ usageInfo usageString options
-	   exitWith (ExitFailure 1)
-         else return ()
+  progName <- getProgName
+  let usageString =
+        "Usage: " ++ progName ++ " [OPTION...] [-- GHC OPTION... --] [files...]"
+  args <- getArgs
+  let (ghcArgs', ourArgs, unbalanced) = splitArgs args
+  let (flags, filenames, errs) = getOpt Permute options ourArgs
+  let (hsfiles, otherfiles) = List.partition isHaskellSrcFilename filenames
 
-        let modes = getMode flags
-        let openFileMode = if elem FlagAppend flags
-		     then AppendMode
-		     else WriteMode
-        ctags_hdl <-  if CTags `elem` modes
-                           then Just `liftM` openFile "tags" openFileMode
-                           else return Nothing
-        etags_hdl <- if ETags `elem` modes
-                           then Just `liftM` openFile "TAGS" openFileMode
-                           else return Nothing
+  let ghc_topdir = case [ d | FlagTopDir d <- flags ] of
+                          [] -> ""
+                          (x:_) -> x
+  mapM_ (\n -> putStr $ "Warning: ignoring non-Haskellish file " ++ n ++ "\n")
+        otherfiles
+  if unbalanced || errs /= [] || elem FlagHelp flags || hsfiles == []
+   then do
+     putStr $ unlines errs
+     putStr $ usageInfo usageString options
+     exitWith (ExitFailure 1)
+   else return ()
 
-        GHC.defaultErrorHandler defaultDynFlags $
-          runGhc (Just ghc_topdir) $ do
-            dflags <- getSessionDynFlags
-            (pflags, _, _) <- parseDynamicFlags dflags{ verbosity=1 } (map noLoc ghcArgs)
-            let dflags2 = pflags { hscTarget = HscNothing } -- don't generate anything
-            GHC.defaultCleanupHandler dflags2 $ do
+  ghcArgs <- case [ d | FlagUseCabalConfig d <- flags ] of
+               [distPref] -> do
+                  cabalOpts <- flagsFromCabal distPref
+                  return (ghcArgs' ++ cabalOpts)
+               [] ->
+                  return ghcArgs'
+               _ -> error "Too many --use-cabal-config flags"
+  print ghcArgs
+
+  let modes = getMode flags
+  let openFileMode = if elem FlagAppend flags
+  	     then AppendMode
+  	     else WriteMode
+  ctags_hdl <-  if CTags `elem` modes
+                     then Just `liftM` openFile "tags" openFileMode
+                     else return Nothing
+  etags_hdl <- if ETags `elem` modes
+                     then Just `liftM` openFile "TAGS" openFileMode
+                     else return Nothing
+
+  GHC.defaultErrorHandler defaultDynFlags $
+    runGhc (Just ghc_topdir) $ do
+      --liftIO $ print "starting up session"
+      dflags <- getSessionDynFlags
+      (pflags, unrec, warns) <- parseDynamicFlags dflags{ verbosity=1 }
+                                          (map noLoc ghcArgs)
+      unless (null unrec) $
+        liftIO $ putStrLn $ "Unrecognised options:\n" ++ show (map unLoc unrec)
+      liftIO $ mapM_ putStrLn (map unLoc warns)
+      let dflags2 = pflags { hscTarget = HscNothing } -- don't generate anything
+      -- liftIO $ print ("pkgDB", case (pkgDatabase dflags2) of Nothing -> 0
+      --                                                        Just m -> sizeUFM m)
+      setSessionDynFlags dflags2
+      --liftIO $ print (length pkgs)
+
+      GHC.defaultCleanupHandler dflags2 $ do
   
-              setSessionDynFlags dflags2
-              targetsAtOneGo hsfiles (ctags_hdl,etags_hdl)
-              mapM_ (mapM (liftIO . hClose)) [ctags_hdl, etags_hdl]
+        targetsAtOneGo hsfiles (ctags_hdl,etags_hdl)
+        mapM_ (mapM (liftIO . hClose)) [ctags_hdl, etags_hdl]
 
 ----------------------------------------------
 ----------  ARGUMENT PROCESSING --------------
@@ -103,6 +134,8 @@ data Flag
    | FlagAppend
    | FlagHelp
    | FlagTopDir FilePath
+   | FlagUseCabalConfig FilePath
+   | FlagFilesFromCabal
   deriving (Ord, Eq, Show)
   -- ^Represents options passed to the program
 
@@ -121,7 +154,7 @@ getMode fs = go (concatMap modeLike fs)
 
 splitArgs :: [String] -> ([String], [String], Bool)
 -- ^Pull out arguments between -- for GHC
-splitArgs args = split [] [] False args
+splitArgs args0 = split [] [] False args0
     where split ghc' tags' unbal ("--" : args) = split tags' ghc' (not unbal) args
           split ghc' tags' unbal (arg : args) = split ghc' (arg:tags') unbal args
           split ghc' tags' unbal [] = (reverse ghc', reverse tags', unbal)
@@ -138,9 +171,24 @@ options = [ Option "" ["topdir"]
 	    (NoArg FlagBoth) ("generate both CTAGS and ETAGS")
 	  , Option "a" ["append"]
 	    (NoArg FlagAppend) ("append to existing CTAGS and/or ETAGS file(s)")
+          , Option "" ["use-cabal-config"]
+            (ReqArg FlagUseCabalConfig "DIR") "use local cabal configuration from dist dir"
+          , Option "" ["files-from-cabal"]
+            (NoArg FlagFilesFromCabal) "use files from cabal"
 	  , Option "h" ["help"] (NoArg FlagHelp) "This help"
 	  ]
 
+flagsFromCabal :: FilePath -> IO [String]
+flagsFromCabal distPref = do
+  lbi <- getPersistBuildConfig distPref
+  let pd = localPkgDescr lbi
+  case library pd of
+    Nothing -> error "no library"
+    Just lib ->
+      let bi = libBuildInfo lib
+          odir = buildDir lbi
+          opts = ghcOptions lbi bi odir
+      in return opts
 
 ----------------------------------------------------------------
 --- LOADING HASKELL SOURCE
@@ -149,7 +197,7 @@ options = [ Option "" ["topdir"]
 safeLoad :: LoadHowMuch -> Ghc SuccessFlag
 -- like GHC.load, but does not stop process on exception
 safeLoad mode = do
-  dflags <- getSessionDynFlags
+  _dflags <- getSessionDynFlags
   ghandle (\(e :: SomeException) -> liftIO (print e) >> return Failed ) $
     handleSourceError (\e -> printExceptionAndWarnings e >> return Failed) $
       load mode
@@ -176,21 +224,27 @@ graphData graph handles = do
     where foundthings ms =
               let filename = msHsFilePath ms
                   modname = moduleName $ ms_mod ms
-              in  do liftIO $ putStrLn ("loading " ++ filename)
+              in handleSourceError (\e -> do
+                                       printExceptionAndWarnings e
+                                       liftIO $ exitWith (ExitFailure 1)) $
+                  do liftIO $ putStrLn ("loading " ++ filename)
                      mod <- loadModule =<< typecheckModule =<< parseModule ms
                      case mod of
                        _ | isBootSummary ms -> return ()
                        _ | Just s <- renamedSource mod ->
-                         liftIO $ writeTagsData handles (fileData filename modname s)
+                         liftIO (writeTagsData handles =<< fileData filename modname s)
                        _otherwise ->
                          liftIO $ exitWith (ExitFailure 1)
 
-fileData :: FileName -> ModuleName -> RenamedSource -> FileData
-fileData filename modname (group, _imports, _lie, _doc, _haddock) =
+fileData :: FileName -> ModuleName -> RenamedSource -> IO FileData
+fileData filename modname (group, _imports, _lie, _doc, _haddock) = do
     -- lie is related to type checking and so is irrelevant
     -- imports contains import declarations and no definitions
     -- doc and haddock seem haddock-related; let's hope to ignore them
-    FileData filename (boundValues modname group)
+    ls <- lines `fmap` readFile filename
+    let line_map = M.fromAscList $ zip [1..] ls
+    evaluate line_map
+    return $ FileData filename (boundValues modname group) line_map
 
 boundValues :: ModuleName -> HsGroup Name -> [FoundThing]    
 -- ^Finds all the top-level definitions in a module
@@ -260,7 +314,7 @@ boundThings modname lbinding =
                _ -> error "boundThings"
         conArgs (PrefixCon ps) tl = foldr patThings tl ps
         conArgs (RecCon (HsRecFields { rec_flds = flds })) tl 
-             = foldr (\f tl -> patThings (hsRecFieldArg f) tl) tl flds
+             = foldr (\f tl' -> patThings (hsRecFieldArg f) tl') tl flds
         conArgs (InfixCon p1 p2) tl = patThings p1 $ patThings p2 tl
 
 
@@ -278,7 +332,7 @@ writectagsfile ctagsfile filedata = do
 	mapM_ (\x -> hPutStrLn ctagsfile $ dumpthing True  x) things
 
 getfoundthings :: FileData -> [FoundThing]
-getfoundthings (FileData _filename things) = things
+getfoundthings (FileData _filename things _src_lines) = things
 
 dumpthing :: Bool -> FoundThing -> String
 dumpthing showmod (FoundThing modname name loc) =
@@ -294,14 +348,21 @@ writeetagsfile :: Handle -> FileData -> IO ()
 writeetagsfile etagsfile = hPutStr etagsfile . e_dumpfiledata
 
 e_dumpfiledata :: FileData -> String
-e_dumpfiledata (FileData filename things) = 
+e_dumpfiledata (FileData filename things line_map) =
 	"\x0c\n" ++ filename ++ "," ++ (show thingslength) ++ "\n" ++ thingsdump
 	where 
-		thingsdump = concat $ map e_dumpthing things 
+		thingsdump = concat $ map (e_dumpthing line_map) things
 		thingslength = length thingsdump
 
-e_dumpthing :: FoundThing -> String
-e_dumpthing (FoundThing modname name loc) =
+e_dumpthing :: Map Int String -> FoundThing -> String
+e_dumpthing src_lines (FoundThing modname name loc) =
     tagline name ++ tagline (moduleNameString modname ++ "." ++ name)
-    where tagline n = n ++ "\x7f" ++ (show line) ++ "," ++ (show $ line+1) ++ "\n"
+    where tagline n = src_code ++ "\x7f"
+                      ++ n ++ "\x01"
+                      ++ (show line) ++ "," ++ (show $ column) ++ "\n"
           line = srcLocLine loc
+          column = srcLocCol loc
+          src_code = case M.lookup line src_lines of
+                       Just l -> take (column + length name) l
+                       Nothing -> --trace (show ("not found: ", moduleNameString modname, name, line, column)) 
+                                  name
