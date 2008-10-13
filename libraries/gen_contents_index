@@ -27,6 +27,7 @@ done
 # Now create the combined contents and index pages
 $HADDOCK --gen-index --gen-contents -o . \
          -t "Haskell Hierarchical Libraries" \
+         -p "prologue.txt" \
          $HADDOCK_ARGS
 
 # Unhandled Windows help stuff?:
