@@ -137,7 +137,11 @@ ioManagerStart (void)
     Capability *cap;
     if (io_manager_event == INVALID_HANDLE_VALUE) {
 	cap = rts_lock();
+#if defined(mingw32_HOST_OS) && defined(__PIC__)
+	rts_evalIO(cap,_imp__base_GHCziConc_ensureIOManagerIsRunning_closure,NULL);
+#else
 	rts_evalIO(cap,&base_GHCziConc_ensureIOManagerIsRunning_closure,NULL);
+#endif
 	rts_unlock(cap);
     }
 }

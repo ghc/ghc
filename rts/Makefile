@@ -94,7 +94,7 @@ EXCLUDED_SRCS += parallel/SysMan.c
 
 EXCLUDED_SRCS += dyn-wrapper.c
 
-# compile generatic patchable dyn-wrapper
+# compile generic patchable dyn-wrapper
 
 DYNWRAPPER_SRC = dyn-wrapper.c
 DYNWRAPPER_PROG = dyn-wrapper$(exeext)
@@ -177,7 +177,7 @@ LIB_DEPS=buildbase
 BASE_DIST_LIB=$(TOP)/libraries/base/dist/build
 
 # The following must be a one liner otherwise its evaluation won't be delayed until base/rts packages are properly registered
-LIB_LD_OPTS = -L$(shell $(GHC_PKG_INPLACE) field base library-dirs | sed -e 's/library-dirs: //') -l$(shell $(GHC_PKG_INPLACE) field base hs-libraries | sed -e 's/hs-libraries: //')-ghc$(ProjectVersion)$(soext) $(foreach lib,$(shell $(GHC_PKG_INPLACE) field rts extra-libraries | sed -e s/extra-libraries://),"-l$(lib)") $(foreach libdir,$(shell $(GHC_PKG_INPLACE) field rts library-dirs | sed -e s/library-dirs://),"-L$(libdir)")
+LIB_LD_OPTS = $(foreach lib,$(shell $(GHC_PKG_INPLACE) field base hs-libraries | sed -e 's/hs-libraries: //'),"-l$(lib)-ghc$(ProjectVersion)$(soext)") $(foreach lib,$(shell $(GHC_PKG_INPLACE) field rts extra-libraries | sed -e s/extra-libraries://),"-l$(lib)") $(foreach libdir,$(shell $(GHC_PKG_INPLACE) field base library-dirs | sed -e 's/library-dirs: //' | sed -e s,\\\\,/,g) $(shell $(GHC_PKG_INPLACE) field rts library-dirs | sed -e s/library-dirs:// | sed -e s/\\\\/\\\\\\\\/g),"-L$(libdir)")
 endif
 endif
 
@@ -459,6 +459,8 @@ ifeq "$(DYNAMIC_RTS) $(HOSTPLATFORM)" "YES i386-unknown-mingw32"
 # libHSrts.dll.a, the import library for dynamic linking required for
 # linking the dynamic version of base
 buildbase: $(LIBRARY).a
+	$(MAKE) way="" -C ../libraries/ make.library.ghc-prim
+	$(MAKE) way="" -C ../libraries/ make.library.integer-gmp
 	$(MAKE) way="" -C ../libraries/ make.library.base
 endif
 
