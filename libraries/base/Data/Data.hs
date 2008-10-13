@@ -17,6 +17,9 @@
 -- in this module were moved to the @Data.Generics.Instances@ module
 -- in the @syb@ package.
 --
+-- For more information, please visit the new
+-- SYB wiki: <http://www.cs.uu.nl/wiki/bin/view/GenericProgramming/SYB>.
+--
 --
 -----------------------------------------------------------------------------
 
