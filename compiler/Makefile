@@ -484,3 +484,14 @@ endif
 include $(TOP)/mk/bindist.mk
 LIB_DIST_DIR = dist-stage2
 
+#-----------------------------------------------------------------------------
+# etags generation
+
+GHCTAGS = $(TOP)/utils/ghctags/ghctags
+GHCTAGS_ROOT = main/GHC.hs
+
+# etags for stage2 is actually broken since it requires building
+# ghctags against an older ghc api
+etags: etags.stage.2
+etags.stage.%:
+	$(GHCTAGS) --topdir $(FPTOOLS_TOP_ABS) --etags --use-cabal-config=./dist-stage$* -- -DSTAGE=$* -- $(GHCTAGS_ROOT)
