@@ -353,7 +353,7 @@ tidyTypeEnv :: Bool 	-- Compiling without -O, so omit prags
 -- This truncates the type environment to include only the 
 -- exported Ids and things needed from them, which saves space
 
-tidyTypeEnv th omit_prags exports type_env final_ids 
+tidyTypeEnv omit_prags th exports type_env final_ids
  = let  type_env1 = filterNameEnv keep_it type_env
 	type_env2 = extendTypeEnvWithIds type_env1 final_ids
 	type_env3 | omit_prags = mapNameEnv (trimThing th exports) type_env2
