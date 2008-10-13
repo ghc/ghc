@@ -494,8 +494,9 @@ lowerSafeForeignCalls procpoints rst
          then lowerSafeCallBlock state' b
          else return (state' { s_blocks = insertBlock b blocks })
   State blocks' g_procpoints safeCalls <- fold_blocks block init g
-  return $ (ProcInfoTable (CmmProc info l args (LGraph entry off blocks')) g_procpoints
-               : safeCalls) : rst
+  return $ safeCalls
+           : [ProcInfoTable (CmmProc info l args (LGraph entry off blocks')) g_procpoints]
+           : rst
 
 -- Check for foreign calls -- if none, then we can avoid copying the block.
 hasSafeForeignCall :: CmmBlock -> Bool

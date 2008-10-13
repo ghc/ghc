@@ -143,8 +143,9 @@ pprTop top@(CmmData _section (CmmDataLabel lbl : lits)) =
 -- Floating info table for safe a foreign call.
 pprTop top@(CmmData _section d@(_ : _))
   | CmmDataLabel lbl : lits <- reverse d = 
-  pprDataExterns lits $$
-  pprWordArray lbl lits  
+  let lits' = reverse lits
+  in pprDataExterns lits' $$
+     pprWordArray lbl lits'
 
 -- these shouldn't appear?
 pprTop (CmmData _ _) = panic "PprC.pprTop: can't handle this data"
