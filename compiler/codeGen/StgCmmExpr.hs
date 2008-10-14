@@ -273,15 +273,15 @@ cgCase scrut bndr srt alt_type alts
 	; let ret_bndrs = chooseReturnBndrs bndr alt_type alts
 	      alt_regs  = map idToReg ret_bndrs
 	      simple_scrut = isSimpleScrut scrut alt_type
-	      gc_plan | not simple_scrut = GcInAlts alt_regs srt
-	              | isSingleton alts = NoGcInAlts
-		      | up_hp_usg > 0 	 = NoGcInAlts
-		      | otherwise	 = GcInAlts alt_regs srt
+	      gcInAlts | not simple_scrut = True
+	               | isSingleton alts = False
+		       | up_hp_usg > 0    = False
+		       | otherwise        = True
+              gc_plan = if gcInAlts then GcInAlts alt_regs srt else NoGcInAlts
 
 	; mb_cc <- maybeSaveCostCentre simple_scrut
 	; c_srt <- getSRTInfo srt
-	; withSequel (AssignTo alt_regs c_srt)
-		     (cgExpr scrut)
+	; withSequel (AssignTo alt_regs gcInAlts) (cgExpr scrut)
 	; restoreCurrentCostCentre mb_cc
 
 	; bindArgsToRegs ret_bndrs

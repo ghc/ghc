@@ -77,14 +77,18 @@ emitReturn :: [CmmExpr] -> FCode ()
 --	return (x,y)
 -- If the sequel is AssignTo [p,q]
 --	p=x; q=y; 
-emitReturn results 
-  = do  { adjustHpBackwards
-	; sequel    <- getSequel;
-	; updfr_off <- getUpdFrameOff
-	; case sequel of
-	    Return _        -> emit (mkReturnSimple results updfr_off)
-	    AssignTo regs _ -> emit (mkMultiAssign  regs results)
-    }
+emitReturn results
+  = do { sequel    <- getSequel;
+       ; updfr_off <- getUpdFrameOff
+       ; emit $ mkComment $ mkFastString "emitReturn"
+       ; case sequel of
+           Return _ ->
+             do { adjustHpBackwards
+                ; emit (mkReturnSimple results updfr_off) }
+           AssignTo regs adjust ->
+             do { if adjust then adjustHpBackwards else return ()
+                ; emit (mkMultiAssign  regs results) }
+       }
 
 emitCall :: Convention -> CmmExpr -> [CmmExpr] -> FCode ()
 -- (cgCall fun args) makes a call to the entry-code of 'fun', 
@@ -93,10 +97,10 @@ emitCall conv fun args
   = do	{ adjustHpBackwards
 	; sequel <- getSequel
 	; updfr_off <- getUpdFrameOff
-        ; emit $ mkComment $ mkFastString "emitcall"
+        ; emit $ mkComment $ mkFastString "emitCall"
 	; case sequel of
-	    Return _              -> emit (mkForeignJump conv fun args updfr_off)
-	    AssignTo res_regs srt -> emit (mkCall fun conv res_regs args updfr_off)
+	    Return _            -> emit (mkForeignJump conv fun args updfr_off)
+	    AssignTo res_regs _ -> emit (mkCall fun conv res_regs args updfr_off)
     }
 
 adjustHpBackwards :: FCode ()
@@ -165,7 +169,7 @@ direct_call caller lbl arity args reps
 	; let srt = pprTrace "Urk! SRT for over-sat call" 
 			     (ppr lbl) NoC_SRT
 		-- XXX: what if rest_args contains static refs?
-	; withSequel (AssignTo [pap_id] srt)
+	; withSequel (AssignTo [pap_id] True)
 		     (emitCall Native target fast_args)
 	; slow_call (CmmReg (CmmLocal pap_id)) 
 		    rest_args rest_reps }

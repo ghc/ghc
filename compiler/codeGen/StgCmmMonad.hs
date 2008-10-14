@@ -209,12 +209,10 @@ data Sequel
   | AssignTo 
 	[LocalReg]	-- Put result(s) in these regs and fall through
 			-- 	NB: no void arguments here
-	C_SRT		-- Here are the statics live in the continuation
-			-- E.g.  case (case x# of 0# -> a; DEFAULT -> b) of {
-			-- 	    r -> <blah>
-			-- When compiling the nested case, remember to put the
-			-- result in r, and fall through  
-
+        Bool            -- Should we adjust the heap pointer back to recover
+                        -- space that's unused on this path?
+                        -- We need to do this only if the expression may
+                        -- allocate (e.g. it's a foreign call or allocating primOp)
 
 initCgInfoDown :: DynFlags -> Module -> CgInfoDownwards
 initCgInfoDown dflags mod
