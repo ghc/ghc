@@ -2,10 +2,9 @@
 % (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-
-HsExpr: Abstract Haskell syntax: expressions
-
 \begin{code}
+
+-- | Abstract Haskell syntax for expressions.
 module HsExpr where
 
 #include "HsVersions.h"
@@ -35,14 +34,16 @@ import FastString
 %************************************************************************
 
 \begin{code}
+-- * Expressions proper
+
 type LHsExpr id = Located (HsExpr id)
 
 -------------------------
--- PostTcExpr is an evidence expression attached to the
--- syntax tree by the type checker (c.f. postTcType)
--- We use a PostTcTable where there are a bunch of pieces of
--- evidence, more than is convenient to keep individually
+-- | PostTcExpr is an evidence expression attached to the syntax tree by the
+-- type checker (c.f. postTcType).
 type PostTcExpr  = HsExpr Id
+-- | We use a PostTcTable where there are a bunch of pieces of evidence, more
+-- than is convenient to keep individually.
 type PostTcTable = [(Name, Id)]
 
 noPostTcExpr :: PostTcExpr
@@ -52,11 +53,12 @@ noPostTcTable :: PostTcTable
 noPostTcTable = []
 
 -------------------------
--- SyntaxExpr is like PostTcExpr, but it's filled in a little earlier,
+-- | SyntaxExpr is like 'PostTcExpr', but it's filled in a little earlier,
 -- by the renamer.  It's used for rebindable syntax.
--- E.g. (>>=) is filled in before the renamer by the appropriate Name
---      for (>>=), and then instantiated by the type checker with its
---      type args tec
+--
+-- E.g. @(>>=)@ is filled in before the renamer by the appropriate 'Name' for
+--      @(>>=)@, and then instantiated by the type checker with its type args
+--      tec
 
 type SyntaxExpr id = HsExpr id
 
@@ -66,29 +68,33 @@ noSyntaxExpr = HsLit (HsString (fsLit "noSyntaxExpr"))
 
 
 type SyntaxTable id = [(Name, SyntaxExpr id)]
--- *** Currently used only for CmdTop (sigh) ***
--- * Before the renamer, this list is noSyntaxTable
+-- ^ Currently used only for 'CmdTop' (sigh)
 --
--- * After the renamer, it takes the form [(std_name, HsVar actual_name)]
+-- * Before the renamer, this list is 'noSyntaxTable'
+--
+-- * After the renamer, it takes the form @[(std_name, HsVar actual_name)]@
 --   For example, for the 'return' op of a monad
---      normal case:            (GHC.Base.return, HsVar GHC.Base.return)
---      with rebindable syntax: (GHC.Base.return, return_22)
---              where return_22 is whatever "return" is in scope
 --
--- * After the type checker, it takes the form [(std_name, <expression>)]
---      where <expression> is the evidence for the method
+--    * normal case:            @(GHC.Base.return, HsVar GHC.Base.return)@
+--
+--    * with rebindable syntax: @(GHC.Base.return, return_22)@
+--              where @return_22@ is whatever @return@ is in scope
+--
+-- * After the type checker, it takes the form @[(std_name, <expression>)]@
+--      where @<expression>@ is the evidence for the method
 
 noSyntaxTable :: SyntaxTable id
 noSyntaxTable = []
 
 
 -------------------------
+-- | A Haskell expression.
 data HsExpr id
-  = HsVar     id                        -- variable
-  | HsIPVar   (IPName id)               -- implicit parameter
-  | HsOverLit (HsOverLit id)            -- Overloaded literals
+  = HsVar     id                        -- ^ variable
+  | HsIPVar   (IPName id)               -- ^ implicit parameter
+  | HsOverLit (HsOverLit id)            -- ^ Overloaded literals
 
-  | HsLit     HsLit                     -- Simple (non-overloaded) literals
+  | HsLit     HsLit                     -- ^ Simple (non-overloaded) literals
 
   | HsLam     (MatchGroup id)           -- Currently always a single match
 
@@ -679,13 +685,16 @@ matchGroupArity (MatchGroup (match:matches) _)
 hsLMatchPats :: LMatch id -> [LPat id]
 hsLMatchPats (L _ (Match pats _ _)) = pats
 
--- GRHSs are used both for pattern bindings and for Matches
+-- | GRHSs are used both for pattern bindings and for Matches
 data GRHSs id
-  = GRHSs [LGRHS id]             -- Guarded RHSs
-          (HsLocalBinds id)      -- The where clause
+  = GRHSs {
+      grhssGRHSs :: [LGRHS id],  -- ^ Guarded RHSs
+      grhssLocalBinds :: (HsLocalBinds id) -- ^ The where clause
+    }
 
 type LGRHS id = Located (GRHS id)
 
+-- | Guarded Right Hand Side.
 data GRHS id = GRHS [LStmt id]   -- Guards
                     (LHsExpr id) -- Right hand side
 \end{code}
