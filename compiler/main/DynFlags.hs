@@ -566,7 +566,7 @@ defaultDynFlags =
 
         opt_L                   = [],
         opt_P                   = (if opt_PIC
-                                   then ["-D__PIC__"]
+                                   then ["-D__PIC__", "-U __PIC__"] -- this list is reversed
                                    else []),
         opt_F                   = [],
         opt_c                   = [],
@@ -2162,18 +2162,18 @@ picCCOpts _dflags
       --     in dynamic libraries.
 
     | opt_PIC
-        = ["-fno-common", "-D__PIC__"]
+        = ["-fno-common", "-U __PIC__","-D__PIC__"]
     | otherwise
         = ["-mdynamic-no-pic"]
 #elif mingw32_TARGET_OS
       -- no -fPIC for Windows
     | opt_PIC
-        = ["-D__PIC__"]
+        = ["-U __PIC__","-D__PIC__"]
     | otherwise
         = []
 #else
     | opt_PIC
-        = ["-fPIC", "-D__PIC__"]
+        = ["-fPIC", "-U __PIC__", "-D__PIC__"]
     | otherwise
         = []
 #endif
