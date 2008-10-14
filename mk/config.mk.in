@@ -398,7 +398,7 @@ GhcRTSWays += debug
 endif
 
 ifeq "$(BuildSharedLibs)" "YES"
-GhcRTSWays += debug_dyn thr_dyn thr_debug_dyn
+GhcRTSWays += dyn debug_dyn thr_dyn thr_debug_dyn
 endif
 
 # Want the threaded versions unless we're unregisterised
