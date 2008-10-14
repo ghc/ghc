@@ -73,16 +73,16 @@ INSTALL_LIBS += libHSffi.a HSffi.o
 # We have to add the GHC version to the name of our dynamic libs, because
 # they will be residing in the system location along with dynamic libs from
 # other GHC installations.
+
+HS_DYN_LIB_NAME=libHSffi-ghc$(ProjectVersion)$(soext)
+
 ifeq "$(Windows)" "YES"
-DYNAMIC_PROG = libffi.dll.a
-DYNAMIC_LIBS = libffi-3.dll
-RENAME_LIBS  =
+DYNAMIC_PROG = $(HS_DYN_LIB_NAME).a
+DYNAMIC_LIBS = $(HS_DYN_LIB_NAME)
 else
 DYNAMIC_PROG =
 DYNAMIC_LIBS = libffi.so libffi.so.5 libffi.so.5.0.5
 endif
-
-HS_DYN_LIB_NAME=libHSffi-ghc$(ProjectVersion)$(soext)
 
 ifeq "$(BuildSharedLibs)" "YES"
 EnableShared=yes
@@ -109,6 +109,11 @@ $(STAMP_CONFIGURE):
 	$(TAR) -zxf $(LIBFFI_TARBALL)
 	mv $(LIBFFI_DIR) build
 	chmod +x ln
+	patch -p0 < libffi-dllize-3.0.6.patch
+
+	# This patch is just the resulting delta from running automake, autoreconf, libtoolize --force --copy
+	patch -p0 < libffi-autotools-update.patch
+
 	(set -o igncr 2>/dev/null) && set -o igncr; export SHELLOPTS; \
 	    PATH=`pwd`:$$PATH; \
 	    export PATH; \
@@ -123,6 +128,11 @@ $(STAMP_CONFIGURE):
 	# soname, but we don't need that anyway!
 	$(CP) build/libtool build/libtool.orig
 	sed -e s/soname_spec=.*/soname_spec="$(HS_DYN_LIB_NAME)"/ build/libtool.orig > build/libtool
+
+	# We don't want libtool's cygwin hacks
+	$(CP) build/libtool build/libtool.orig
+	sed -e s/dlname=\'\$$tdlname\'/dlname=\'\$$dlname\'/ build/libtool.orig > build/libtool
+
 	touch $@
 
 ffi.h: $(STAMP_CONFIGURE)
@@ -133,7 +143,7 @@ $(STAMP_BUILD): $(STAMP_CONFIGURE)
 	(cd build; ./libtool --mode=install cp libffi.la $(FPTOOLS_TOP_ABS)/libffi)
 	touch $@
 
-$(STATIC_LIB) $(DYNAMIC_LIBS) $(DYNAMIC_PROG): $(STAMP_BUILD)
+$(STATIC_LIB) $(DYNAMIC_LIBS): $(STAMP_BUILD)
 
 libHSffi.a libHSffi_p.a: $(STATIC_LIB)
 	$(CP) $(STATIC_LIB) $@
@@ -152,15 +162,27 @@ HSffi.o: libHSffi.a
 all :: HSffi.o
 
 ifeq "$(BuildSharedLibs)" "YES"
+ifeq "$(Windows)" "YES"
+# Windows libtool creates <soname>.dll, and as we already patched that
+# there is no need to copy from libffi.dll to libHSffi...dll.
+# However, the renaming is still required for the import library
+# libffi.dll.a.
+$(HS_DYN_LIB_NAME).a: $(STAMP_BUILD)
+	$(CP) libffi.dll.a $(HS_DYN_LIB_NAME).a
+all :: $(HS_DYN_LIB_NAME).a
+
+else
+# Rename libffi.so to libHSffi...so
 $(HS_DYN_LIB_NAME): $(DYNAMIC_LIBS)
 	$(CP) $(word 1,$(DYNAMIC_LIBS)) $(HS_DYN_LIB_NAME)
 
 all :: $(HS_DYN_LIB_NAME)
 endif
+endif
 
 clean distclean maintainer-clean ::
 	$(RM) -f stamp.ffi.* ffi.h empty.c
-	$(RM) -f libffi.a libffi.la $(DYNAMIC_PROG) $(DYNAMIC_LIBS) $(ORIG_DYNAMIC_LIBS)
+	$(RM) -f libffi.a libffi.la $(DYNAMIC_PROG) $(DYNAMIC_LIBS) $(HS_DYN_LIB_NAME) $(HS_DYN_LIB_NAME).a
 	$(RM) -rf build
 
 #-----------------------------------------------------------------------------
