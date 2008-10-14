@@ -546,30 +546,31 @@ emptyPackageIfaceTable = emptyModuleEnv
 
 -- | Information about modules in the package being compiled
 data HomeModInfo 
-  = HomeModInfo { hm_iface    :: !ModIface,     -- ^ The basic loaded interface file: every
-                                                -- loaded module has one of these, even if
-                                                -- it is imported from another package
-		  hm_details  :: !ModDetails,   -- ^ Extra information that has been created
-		                                -- from the 'ModIface' for the module,
-		                                -- typically during typechecking
-		  hm_linkable :: !(Maybe Linkable)
-		-- ^ The actual artifact we would like to link to access
-		-- things in this module.
-		--
-		-- 'hm_linkable' might be Nothing:
-		--
-		--   1. If this is an .hs-boot module
-		--
-		--   2. Temporarily during compilation if we pruned away
-		--      the old linkable because it was out of date.
-		--
-		-- After a complete compilation ('GHC.load'), all 'hm_linkable'
-		-- fields in the 'HomePackageTable' will be @Just@.
-		--
-		-- When re-linking a module ('HscMain.HscNoRecomp'), we construct
-		-- the 'HomeModInfo' by building a new 'ModDetails' from the
-		-- old 'ModIface' (only).
-        }
+  = HomeModInfo {
+      hm_iface    :: !ModIface,
+        -- ^ The basic loaded interface file: every loaded module has one of
+        -- these, even if it is imported from another package
+      hm_details  :: !ModDetails,
+        -- ^ Extra information that has been created from the 'ModIface' for
+	-- the module, typically during typechecking
+      hm_linkable :: !(Maybe Linkable)
+        -- ^ The actual artifact we would like to link to access things in
+	-- this module.
+	--
+	-- 'hm_linkable' might be Nothing:
+	--
+	--   1. If this is an .hs-boot module
+	--
+	--   2. Temporarily during compilation if we pruned away
+	--      the old linkable because it was out of date.
+	--
+	-- After a complete compilation ('GHC.load'), all 'hm_linkable' fields
+	-- in the 'HomePackageTable' will be @Just@.
+	--
+	-- When re-linking a module ('HscMain.HscNoRecomp'), we construct the
+	-- 'HomeModInfo' by building a new 'ModDetails' from the old
+	-- 'ModIface' (only).
+    }
 
 -- | Find the 'ModIface' for a 'Module', searching in both the loaded home
 -- and external package module information
