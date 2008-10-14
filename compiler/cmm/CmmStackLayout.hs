@@ -136,12 +136,20 @@ liveLastIn env l = liveInSlots (liveLastOut env l) l
 
 -- Don't forget to keep the outgoing parameters in the CallArea live,
 -- as well as the update frame.
+-- Note: We have to keep the update frame live at a call because of the
+-- case where the function doesn't return -- in that case, there won't
+-- be a return to keep the update frame live. We'd still better keep the
+-- info pointer in the update frame live at any call site;
+-- otherwise we could screw up the garbage collector.
 liveLastOut :: (BlockId -> SubAreaSet) -> Last -> SubAreaSet
 liveLastOut env l =
   case l of
-    LastCall _ Nothing  n _ -> 
+    LastCall _ Nothing n _ -> 
       add_area (CallArea Old) n out -- add outgoing args (includes upd frame)
-    LastCall _ (Just k) n _ -> add_area (CallArea (Young k)) n out
+    LastCall _ (Just k) n (Just upd_n) ->
+      add_area (CallArea Old) n (add_area (CallArea (Young k)) n out)
+    LastCall _ (Just k) n Nothing ->
+      add_area (CallArea (Young k)) n out
     _ -> out
   where out = joinOuts slotLattice env l
         add_area _ n live | n == 0 = live

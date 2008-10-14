@@ -87,7 +87,8 @@ data Last
         cml_target  :: CmmExpr,  -- never a CmmPrim to a CallishMachOp!
         cml_cont    :: Maybe BlockId,
             -- BlockId of continuation (Nothing for return or tail call)
-        cml_args    :: ByteOff,  -- bytes offset for youngest outgoing arg
+        cml_args    :: ByteOff,  -- byte offset for youngest outgoing arg
+                                 -- (includes update frame, which must be younger)
         cml_ret_off :: Maybe UpdFrameOffset}
           -- stack offset for return (update frames);
           -- The return offset should be Nothing only if we have to create
