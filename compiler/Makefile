@@ -486,8 +486,11 @@ LIB_DIST_DIR = dist-stage2
 
 #-----------------------------------------------------------------------------
 # etags generation
-
-GHCTAGS = $(TOP)/utils/ghctags/ghctags
+ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
+GHCTAGS = $(TOP)/utils/ghctags/ghctags.exe
+else
+GHCTAGS = $(TOP)/utils/ghctags/ghctags-inplace
+endif
 GHCTAGS_ROOT = main/GHC.hs
 
 # etags for stage2 is actually broken since it requires building
