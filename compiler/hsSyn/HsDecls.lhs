@@ -3,10 +3,7 @@
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 
-HsDecls: Abstract syntax: global declarations
 
-Definitions for: @TyDecl@ and @oCnDecl@, @ClassDecl@,
-@InstDecl@, @DefaultDecl@ and @ForeignDecl@.
 
 \begin{code}
 {-# OPTIONS -fno-warn-incomplete-patterns #-}
@@ -16,26 +13,44 @@ Definitions for: @TyDecl@ and @oCnDecl@, @ClassDecl@,
 --     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
 -- for details
 
+-- | Abstract syntax of global declarations.
+--
+-- Definitions for: @TyDecl@ and @ConDecl@, @ClassDecl@,
+-- @InstDecl@, @DefaultDecl@ and @ForeignDecl@.
 module HsDecls (
-	HsDecl(..), LHsDecl, TyClDecl(..), LTyClDecl, 
-	InstDecl(..), LInstDecl, DerivDecl(..), LDerivDecl, NewOrData(..),
-	FamilyFlavour(..),
-	RuleDecl(..), LRuleDecl, RuleBndr(..),
-	DefaultDecl(..), LDefaultDecl, SpliceDecl(..),
-	ForeignDecl(..), LForeignDecl, ForeignImport(..), ForeignExport(..),
-	CImportSpec(..), FoType(..),
-	ConDecl(..), ResType(..), ConDeclField(..), LConDecl,	
-	HsConDeclDetails, hsConDeclArgTys,
-	DocDecl(..), LDocDecl, docDeclDoc,
-	WarnDecl(..),  LWarnDecl,
-	HsGroup(..),  emptyRdrGroup, emptyRnGroup, appendGroups,
-	tcdName, tyClDeclNames, tyClDeclTyVars,
-	isClassDecl, isSynDecl, isDataDecl, isTypeDecl, isFamilyDecl,
-	isFamInstDecl, 
-	countTyClDecls,
-	instDeclATs,
-	collectRuleBndrSigTys, 
-    ) where
+  -- * Toplevel declarations
+  HsDecl(..), LHsDecl,
+  -- ** Class or type declarations
+  TyClDecl(..), LTyClDecl,
+  isClassDecl, isSynDecl, isDataDecl, isTypeDecl, isFamilyDecl,
+  isFamInstDecl, tcdName, tyClDeclNames, tyClDeclTyVars,
+  countTyClDecls,
+  -- ** Instance declarations
+  InstDecl(..), LInstDecl, NewOrData(..), FamilyFlavour(..),
+  instDeclATs,
+  -- ** Standalone deriving declarations
+  DerivDecl(..), LDerivDecl,
+  -- ** @RULE@ declarations
+  RuleDecl(..), LRuleDecl, RuleBndr(..),
+  collectRuleBndrSigTys,
+  -- ** @default@ declarations
+  DefaultDecl(..), LDefaultDecl,
+  -- ** Top-level template haskell splice
+  SpliceDecl(..),
+  -- ** Foreign function interface declarations
+  ForeignDecl(..), LForeignDecl, ForeignImport(..), ForeignExport(..),
+  CImportSpec(..), FoType(..),
+  -- ** Data-constructor declarations
+  ConDecl(..), LConDecl, ResType(..), ConDeclField(..),
+  HsConDeclDetails, hsConDeclArgTys,
+  -- ** Document comments
+  DocDecl(..), LDocDecl, docDeclDoc,
+  -- ** Deprecations
+  WarnDecl(..),  LWarnDecl,
+
+  -- * Grouping
+  HsGroup(..),  emptyRdrGroup, emptyRnGroup, appendGroups,
+) where
 
 -- friends:
 import {-# SOURCE #-}	HsExpr( HsExpr, pprExpr )
@@ -69,9 +84,10 @@ import Data.Maybe       ( isJust )
 \begin{code}
 type LHsDecl id = Located (HsDecl id)
 
+-- | A Haskell Declaration
 data HsDecl id
-  = TyClD	(TyClDecl id)
-  | InstD	(InstDecl  id)
+  = TyClD	(TyClDecl id)     -- ^ A type or class declaration.
+  | InstD	(InstDecl  id)    -- ^ An instance declaration.
   | DerivD      (DerivDecl id)
   | ValD	(HsBind id)
   | SigD	(Sig id)
@@ -96,7 +112,7 @@ data HsDecl id
 --
 -- The latter is for class methods only
 
--- A [HsDecl] is categorised into a HsGroup before being 
+-- | A 'HsDecl' is categorised into a 'HsGroup' before being
 -- fed to the renamer.
 data HsGroup id
   = HsGroup {
@@ -369,6 +385,7 @@ Interface file code:
 
 type LTyClDecl name = Located (TyClDecl name)
 
+-- | A type or class declaration.
 data TyClDecl name
   = ForeignType { 
 		tcdLName    :: Located name,
@@ -376,105 +393,122 @@ data TyClDecl name
 		tcdFoType   :: FoType
     }
 
-	-- type/data/newtype family T :: *->*
-  | TyFamily {  tcdFlavour:: FamilyFlavour,	        -- type, new, or data
+
+  | -- | @type/data/newtype family T :: *->*@
+    TyFamily {  tcdFlavour:: FamilyFlavour,	        -- type, new, or data
 		tcdLName  :: Located name,	        -- type constructor
 		tcdTyVars :: [LHsTyVarBndr name],	-- type variables
 		tcdKind   :: Maybe Kind			-- result kind
     }
 
-	-- Declares a data type or newtype, giving its construcors
-	-- 	data/newtype T a = <constrs>
-	--	data/newtype instance T [a] = <constrs>
-  | TyData {	tcdND     :: NewOrData,
-		tcdCtxt   :: LHsContext name,	 	-- Context
-		tcdLName  :: Located name,	 	-- Type constructor
 
-		tcdTyVars :: [LHsTyVarBndr name], 	-- Type variables
+  | -- | Declares a data type or newtype, giving its construcors
+    -- @
+    -- 	data/newtype T a = <constrs>
+    --	data/newtype instance T [a] = <constrs>
+    -- @
+    TyData {	tcdND     :: NewOrData,
+		tcdCtxt   :: LHsContext name,	 	-- ^ Context
+		tcdLName  :: Located name,	 	-- ^ Type constructor
+
+		tcdTyVars :: [LHsTyVarBndr name], 	-- ^ Type variables
 			
-		tcdTyPats :: Maybe [LHsType name],	-- Type patterns
-			-- Just [t1..tn] for data instance T t1..tn = ...
-			--	in this case tcdTyVars = fv( tcdTyPats )
-			-- Nothing for everything else
+		tcdTyPats :: Maybe [LHsType name],
+                        -- ^ Type patterns.
+                        --
+			-- @Just [t1..tn]@ for @data instance T t1..tn = ...@
+			--	in this case @tcdTyVars = fv( tcdTyPats )@.
+			-- @Nothing@ for everything else.
 
-		tcdKindSig:: Maybe Kind,		-- Optional kind sig 
-			-- (Just k) for a GADT-style 'data', or 'data
-			-- instance' decl with explicit kind sig
+		tcdKindSig:: Maybe Kind,
+                        -- ^ Optional kind signature.
+                        --
+			-- @(Just k)@ for a GADT-style @data@, or @data
+			-- instance@ decl with explicit kind sig
 
-		tcdCons	  :: [LConDecl name],	 	-- Data constructors
-			-- For data T a = T1 | T2 a          
-                        --   the LConDecls all have ResTyH98
-			-- For data T a where { T1 :: T a }  
-                        --   the LConDecls all have ResTyGADT
+		tcdCons	  :: [LConDecl name],
+                        -- ^ Data constructors
+                        --
+			-- For @data T a = T1 | T2 a@
+                        --   the 'LConDecl's all have 'ResTyH98'.
+			-- For @data T a where { T1 :: T a }@
+                        --   the 'LConDecls' all have 'ResTyGADT'.
 
 		tcdDerivs :: Maybe [LHsType name]
-			-- Derivings; Nothing => not specified
-			-- 	      Just [] => derive exactly what is asked
+			-- ^ Derivings; @Nothing@ => not specified,
+			-- 	        @Just []@ => derive exactly what is asked
+                        --
 			-- These "types" must be of form
+                        -- @
 			--	forall ab. C ty1 ty2
+                        -- @
 			-- Typically the foralls and ty args are empty, but they
 			-- are non-empty for the newtype-deriving case
     }
 
-  | TySynonym {	tcdLName  :: Located name,	        -- type constructor
-		tcdTyVars :: [LHsTyVarBndr name],	-- type variables
-		tcdTyPats :: Maybe [LHsType name],	-- Type patterns
+  | TySynonym {	tcdLName  :: Located name,	        -- ^ type constructor
+		tcdTyVars :: [LHsTyVarBndr name],	-- ^ type variables
+		tcdTyPats :: Maybe [LHsType name],	-- ^ Type patterns
 			-- See comments for tcdTyPats in TyData
 			-- 'Nothing' => vanilla type synonym
 
-		tcdSynRhs :: LHsType name	        -- synonym expansion
+		tcdSynRhs :: LHsType name	        -- ^ synonym expansion
     }
 
-  | ClassDecl {	tcdCtxt    :: LHsContext name, 	 	-- Context...
-		tcdLName   :: Located name,	    	-- Name of the class
-		tcdTyVars  :: [LHsTyVarBndr name],	-- Class type variables
-		tcdFDs     :: [Located (FunDep name)],	-- Functional deps
-		tcdSigs    :: [LSig name],		-- Methods' signatures
-		tcdMeths   :: LHsBinds name,		-- Default methods
-		tcdATs	   :: [LTyClDecl name],		-- Associated types; ie
+  | ClassDecl {	tcdCtxt    :: LHsContext name, 	 	-- ^ Context...
+		tcdLName   :: Located name,	    	-- ^ Name of the class
+		tcdTyVars  :: [LHsTyVarBndr name],	-- ^ Class type variables
+		tcdFDs     :: [Located (FunDep name)],	-- ^ Functional deps
+		tcdSigs    :: [LSig name],		-- ^ Methods' signatures
+		tcdMeths   :: LHsBinds name,		-- ^ Default methods
+		tcdATs	   :: [LTyClDecl name],		-- ^ Associated types; ie
 							--   only 'TyFamily' and
 							--   'TySynonym'; the
                                                         --   latter for defaults
-		tcdDocs    :: [LDocDecl name]		-- Haddock docs
+		tcdDocs    :: [LDocDecl name]		-- ^ Haddock docs
     }
 
 data NewOrData
-  = NewType			-- "newtype Blah ..."
-  | DataType			-- "data Blah ..."
+  = NewType			-- ^ @newtype Blah ...@
+  | DataType			-- ^ @data Blah ...@
   deriving( Eq )		-- Needed because Demand derives Eq
 
 data FamilyFlavour
-  = TypeFamily			-- "type family ..."
-  | DataFamily	                -- "data family ..."
+  = TypeFamily			-- ^ @type family ...@
+  | DataFamily	                -- ^ @data family ...@
 \end{code}
 
 Simple classifiers
 
 \begin{code}
-isDataDecl, isTypeDecl, isSynDecl, isClassDecl, isFamilyDecl, isFamInstDecl :: 
-  TyClDecl name -> Bool
-
--- data/newtype or data/newtype instance declaration
+-- | @True@ <=> argument is a @data@\/@newtype@ or @data@\/@newtype instance@
+-- declaration.
+isDataDecl :: TyClDecl name -> Bool
 isDataDecl (TyData {}) = True
 isDataDecl _other      = False
 
--- type or type instance declaration
+-- | type or type instance declaration
+isTypeDecl :: TyClDecl name -> Bool
 isTypeDecl (TySynonym {}) = True
 isTypeDecl _other	  = False
 
--- vanilla Haskell type synonym (ie, not a type instance)
+-- | vanilla Haskell type synonym (ie, not a type instance)
+isSynDecl :: TyClDecl name -> Bool
 isSynDecl (TySynonym {tcdTyPats = Nothing}) = True
 isSynDecl _other	                    = False
 
--- type class
+-- | type class
+isClassDecl :: TyClDecl name -> Bool
 isClassDecl (ClassDecl {}) = True
 isClassDecl _              = False
 
--- type family declaration
+-- | type family declaration
+isFamilyDecl :: TyClDecl name -> Bool
 isFamilyDecl (TyFamily {}) = True
 isFamilyDecl _other        = False
 
--- family instance (types, newtypes, and data types)
+-- | family instance (types, newtypes, and data types)
+isFamInstDecl :: TyClDecl name -> Bool
 isFamInstDecl tydecl
    | isTypeDecl tydecl
      || isDataDecl tydecl = isJust (tcdTyPats tydecl)
