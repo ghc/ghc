@@ -1703,11 +1703,12 @@ reachableBackwards mod summaries
 type SummaryNode = (ModSummary, Int, [Int])
 
 topSortModuleGraph
-	  :: Bool 		-- Drop hi-boot nodes? (see below)
+	  :: Bool
+          -- ^ Drop hi-boot nodes? (see below)
 	  -> [ModSummary]
 	  -> Maybe ModuleName
 	  -> [SCC ModSummary]
--- Calculate SCCs of the module graph, possibly dropping the hi-boot nodes
+-- ^ Calculate SCCs of the module graph, possibly dropping the hi-boot nodes
 -- The resulting list of strongly-connected-components is in topologically
 -- sorted order, starting with the module(s) at the bottom of the
 -- dependency graph (ie compile them first) and ending with the ones at
@@ -1715,10 +1716,10 @@ topSortModuleGraph
 --
 -- Drop hi-boot nodes (first boolean arg)? 
 --
---   False:	treat the hi-boot summaries as nodes of the graph,
+-- - @False@:	treat the hi-boot summaries as nodes of the graph,
 --		so the graph must be acyclic
 --
---   True:	eliminate the hi-boot nodes, and instead pretend
+-- - @True@:	eliminate the hi-boot nodes, and instead pretend
 --		the a source-import of Foo is an import of Foo
 --		The resulting graph has no hi-boot nodes, but can be cyclic
 
