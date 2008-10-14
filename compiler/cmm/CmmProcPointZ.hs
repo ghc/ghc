@@ -423,8 +423,22 @@ splitAtProcPoints entry_label callPPs procPoints procMap areaMap
                   l' = if elemBlockSet pp callPPs then entryLblToInfoLbl l else l
               return (extendBlockEnv env pp bid, b : bs)
          add_jumps (newGraphEnv) (ppId, blockEnv) =
-           do (jumpEnv, jumpBlocks) <-
-                 foldM add_jump_block (emptyBlockEnv, []) (fmToList procLabels)
+           do let needed_jumps = -- find which procpoints we currently branch to
+                    foldBlockEnv' add_if_branch_to_pp [] blockEnv
+                  add_if_branch_to_pp block rst =
+                    case last (unzip block) of
+                      LastOther (LastBranch id) -> add_if_pp id rst
+                      LastOther (LastCondBranch _ ti fi) ->
+                        add_if_pp ti (add_if_pp fi rst)
+                      LastOther (LastSwitch _ tbl) -> foldr add_if_pp rst (catMaybes tbl)
+                      _ -> rst
+                  add_if_pp id rst = case lookupFM procLabels id of
+                                       Just x -> (id, x) : rst
+                                       Nothing -> rst
+                     -- fmToList procLabels
+              (jumpEnv, jumpBlocks) <-
+                 foldM add_jump_block (emptyBlockEnv, []) needed_jumps
+                  -- update the entry block
               let (b_off, b) = -- get the stack offset on entry into the block and
                                -- remove the offset from the block (it goes in new graph)
                     case lookupBlockEnv blockEnv ppId of -- get the procpoint block
@@ -434,8 +448,10 @@ splitAtProcPoints entry_label callPPs procPoints procMap areaMap
                       Nothing -> panic "couldn't find entry block while splitting"
                   blockEnv' = extendBlockEnv blockEnv ppId b
                   off = if ppId == entry then e_off else b_off
+                  -- replace branches to procpoints with branches to jumps
                   LGraph _ _ blockEnv'' = 
                     replaceBranches jumpEnv $ LGraph ppId off blockEnv'
+                  -- add the jump blocks to the graph
                   blockEnv''' = foldl (flip insertBlock) blockEnv'' jumpBlocks
               let g' = LGraph ppId off blockEnv'''
               pprTrace "g' pre jumps" (ppr g') $

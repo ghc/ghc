@@ -43,7 +43,7 @@ import StaticFlags
 --    The SRT needs to be threaded because it is grown lazily.
 protoCmmCPSZ :: HscEnv -- Compilation env including
                        -- dynamic flags: -dcmm-lint -ddump-cps-cmm
-             -> (TopSRT, [CmmZ])  -- SRT table and 
+             -> (TopSRT, [CmmZ])  -- SRT table and accumulating list of compiled procs
              -> CmmZ              -- Input C-- with Procedures
              -> IO (TopSRT, [CmmZ]) -- Output CPS transformed C--
 protoCmmCPSZ hsc_env (topSRT, rst) (Cmm tops)
@@ -110,8 +110,8 @@ cpsTop hsc_env (CmmProc h l args g) =
        -- UGH... manifestSP can require updates to the procPointMap.
        -- We can probably do something quicker here for the update...
        procPointMap  <- run $ procPointAnalysis procPoints g
-       gs <- pprTrace "procPointMap" (ppr procPointMap) $
-               run $ splitAtProcPoints l callPPs procPoints procPointMap areaMap
+       dump Opt_D_dump_cmmz "procpoint map" procPointMap
+       gs <- run $ splitAtProcPoints l callPPs procPoints procPointMap areaMap
                                        (CmmProc h l args g)
        mapM (dump Opt_D_dump_cmmz "after splitting") gs
        let localCAFs = catMaybes $ map (localCAFInfo cafEnv) gs
