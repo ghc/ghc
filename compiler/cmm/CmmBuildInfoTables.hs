@@ -1,7 +1,8 @@
 module CmmBuildInfoTables
-    ( CAFSet, CAFEnv, cafAnal, localCAFInfo, mkTopCAFInfo
+    ( CAFSet, CAFEnv, CmmTopForInfoTables(..), cafAnal, localCAFInfo, mkTopCAFInfo
     , setInfoTableSRT, setInfoTableStackMap
     , TopSRT, emptySRT, srtToData
+    , bundleCAFs
     , finishInfoTables, lowerSafeForeignCalls, extendEnvsForSafeForeignCalls )
 where
 
@@ -331,6 +332,8 @@ to_SRT top_srt off len bmp
 -- doesn't have a static closure.
 -- (If it has a static closure, it will already have an SRT to
 --  keep its CAFs live.)
+-- Any procedure referring to a non-static CAF c must keep live the
+-- any CAF that is reachable from c.
 localCAFInfo :: CAFEnv -> CmmTopZ -> Maybe (CLabel, CAFSet)
 localCAFInfo _    t@(CmmData _ _) = Nothing
 localCAFInfo cafEnv (CmmProc (CmmInfo _ _ infoTbl) top_l _ (LGraph entry _ _)) =
@@ -369,23 +372,33 @@ mkTopCAFInfo localCAFs = foldl addToTop emptyFM g
 
 type StackLayout = [Maybe LocalReg]
 
--- Construct the SRTs for the given procedure.
-setInfoTableSRT :: CAFEnv -> FiniteMap CLabel CAFSet -> TopSRT ->
-                   CmmTopForInfoTables -> FuelMonad (TopSRT, [CmmTopForInfoTables])
-setInfoTableSRT cafEnv topCAFMap topSRT t@(ProcInfoTable p procpoints) =
+-- Bundle the CAFs used at a procpoint.
+bundleCAFs :: CAFEnv -> CmmTopForInfoTables -> (CAFSet, CmmTopForInfoTables)
+bundleCAFs cafEnv t@(ProcInfoTable _ procpoints) =
   case blockSetToList procpoints of
-    [bid] -> setSRT cafEnv topCAFMap topSRT t bid
-    _ -> panic "setInfoTableStackMap: unexpect number of procpoints"
-           -- until we stop splitting the graphs at procpoints in the native path
-setInfoTableSRT cafEnv topCAFMap topSRT t@(FloatingInfoTable info bid _) =
-  setSRT cafEnv topCAFMap topSRT t bid
-setInfoTableSRT _ _ topSRT t@(NoInfoTable _) = return (topSRT, [t])
+    [bid] -> (expectJust "bundleCAFs " (lookupBlockEnv cafEnv bid), t)
+    _     -> panic "setInfoTableStackMap: unexpect number of procpoints"
+             -- until we stop splitting the graphs at procpoints in the native path
+bundleCAFs cafEnv t@(FloatingInfoTable _ bid _) =
+  (expectJust "bundleCAFs " (lookupBlockEnv cafEnv bid), t)
+bundleCAFs _ t@(NoInfoTable _) = (emptyFM, t)
 
-setSRT :: CAFEnv -> FiniteMap CLabel CAFSet -> TopSRT ->
-          CmmTopForInfoTables -> BlockId -> FuelMonad (TopSRT, [CmmTopForInfoTables])
-setSRT cafEnv topCAFMap topSRT t bid =
-  do (topSRT, cafTable, srt) <- buildSRTs topSRT topCAFMap
-                                  (expectJust "sub_srt" $ lookupBlockEnv cafEnv bid)
+-- Construct the SRTs for the given procedure.
+setInfoTableSRT :: FiniteMap CLabel CAFSet -> TopSRT -> (CAFSet, CmmTopForInfoTables) ->
+                   FuelMonad (TopSRT, [CmmTopForInfoTables])
+setInfoTableSRT topCAFMap topSRT (cafs, t@(ProcInfoTable p procpoints)) =
+  case blockSetToList procpoints of
+    [bid] -> setSRT cafs topCAFMap topSRT t
+    _     -> panic "setInfoTableStackMap: unexpect number of procpoints"
+             -- until we stop splitting the graphs at procpoints in the native path
+setInfoTableSRT topCAFMap topSRT (cafs, t@(FloatingInfoTable info bid _)) =
+  setSRT cafs topCAFMap topSRT t
+setInfoTableSRT _ topSRT (_, t@(NoInfoTable _)) = return (topSRT, [t])
+
+setSRT :: CAFSet -> FiniteMap CLabel CAFSet -> TopSRT ->
+          CmmTopForInfoTables -> FuelMonad (TopSRT, [CmmTopForInfoTables])
+setSRT cafs topCAFMap topSRT t =
+  do (topSRT, cafTable, srt) <- buildSRTs topSRT topCAFMap cafs
      let t' = updInfo id (const srt) t
      case cafTable of
        Just tbl -> return (topSRT, [t', NoInfoTable tbl])

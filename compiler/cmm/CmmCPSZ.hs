@@ -52,9 +52,10 @@ protoCmmCPSZ hsc_env (topSRT, rst) (Cmm tops)
   | otherwise
   = do	let dflags = hsc_dflags hsc_env
         showPass dflags "CPSZ"
-        (cafEnvs, toTops) <- liftM unzip $ mapM (cpsTop hsc_env) tops
+        (cafEnvs, tops) <- liftM unzip $ mapM (cpsTop hsc_env) tops
         let topCAFEnv = mkTopCAFInfo (concat cafEnvs)
-        (topSRT, tops) <- foldM (\ z f -> f topCAFEnv z) (topSRT, []) toTops 
+        (topSRT, tops) <- foldM (toTops hsc_env topCAFEnv) (topSRT, []) tops
+        -- (topSRT, tops) <- foldM (\ z f -> f topCAFEnv z) (topSRT, []) toTops 
         let cmms = Cmm (reverse (concat tops))
         dumpIfSet_dyn dflags Opt_D_dump_cps_cmm "Post CPS Cmm" (ppr cmms)
         return (topSRT, cmms : rst)
@@ -68,9 +69,8 @@ global to one compiler session.
 
 cpsTop :: HscEnv -> CmmTopZ ->
           IO ([(CLabel, CAFSet)],
-              (FiniteMap CLabel CAFSet -> (TopSRT, [[CmmTopZ]]) -> IO (TopSRT, [[CmmTopZ]])))
-cpsTop _ p@(CmmData {}) =
-  return ([], (\ _ (topSRT, tops) -> return (topSRT, [p] : tops)))
+              [(CAFSet, CmmTopForInfoTables)])
+cpsTop _ p@(CmmData {}) = return ([], [(emptyFM, NoInfoTable p)])
 cpsTop hsc_env (CmmProc h l args g) =
     do 
        dump Opt_D_dump_cmmz "Pre Proc Points Added"  g
@@ -122,6 +122,10 @@ cpsTop hsc_env (CmmProc h l args g) =
        -- NO MORE GRAPH TRANSFORMATION AFTER HERE -- JUST MAKING INFOTABLES
        let gs' = map (setInfoTableStackMap slotEnv areaMap) gs
        mapM (dump Opt_D_dump_cmmz "after setInfoTableStackMap") gs'
+       let gs'' = map (bundleCAFs cafEnv) gs'
+       mapM (dump Opt_D_dump_cmmz "after bundleCAFs") gs''
+       return (localCAFs, gs'')
+{-
        -- Return: (a) CAFs used by this proc (b) a closure that will compute
        --  a new SRT for the procedure.
        let toTops topCAFEnv (topSRT, tops) =
@@ -130,9 +134,9 @@ cpsTop hsc_env (CmmProc h l args g) =
                          return (topSRT, gs : rst)
                 (topSRT, gs') <- run $ foldM setSRT (topSRT, []) gs'
                 gs' <- mapM finishInfoTables (concat gs')
-                pprTrace "localCAFs" (ppr localCAFs <+> ppr topSRT) $
-                  return (topSRT, concat gs' : tops)
+                return (topSRT, concat gs' : tops)
        return (localCAFs, toTops)
+-}
   where dflags = hsc_dflags hsc_env
         mbpprTrace x y z = if dopt Opt_D_dump_cmmz dflags then pprTrace x y z else z
         dump f txt g = dumpIfSet_dyn dflags f txt (ppr g)
@@ -142,3 +146,18 @@ cpsTop hsc_env (CmmProc h l args g) =
              g <- run $ pass g
              dump flag ("Post " ++ txt) $ g
              return g
+
+-- This probably belongs in CmmBuildInfoTables?
+-- We're just finishing the job here: once we know what CAFs are defined
+-- in non-static closures, we can build the SRTs.
+toTops :: HscEnv -> FiniteMap CLabel CAFSet -> (TopSRT, [[CmmTopZ]])
+                 -> [(CAFSet, CmmTopForInfoTables)] -> IO (TopSRT, [[CmmTopZ]])
+
+toTops hsc_env topCAFEnv (topSRT, tops) gs =
+  do let setSRT (topSRT, rst) g =
+           do (topSRT, gs) <- setInfoTableSRT topCAFEnv topSRT g
+              return (topSRT, gs : rst)
+     (topSRT, gs') <- run $ foldM setSRT (topSRT, []) gs
+     gs' <- mapM finishInfoTables (concat gs')
+     return (topSRT, concat gs' : tops)
+  where run = runFuelIO (hsc_OptFuel hsc_env)
