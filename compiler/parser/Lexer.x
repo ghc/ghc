@@ -240,7 +240,7 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
    -- with older versions of GHC which generated these.
 
 <0,option_prags> {
-  "{-#" $whitechar* (RULES|rules)       { token ITrules_prag }
+  "{-#" $whitechar* (RULES|rules)       { rulePrag }
   "{-#" $whitechar* (INLINE|inline)	{ token (ITinline_prag True) }
   "{-#" $whitechar* (NO(T?)INLINE|no(t?)inline)
   					{ token (ITinline_prag False) }
@@ -888,7 +888,7 @@ withLexedDocType lexDocComment = do
 -- off again at the end of the pragma.
 rulePrag :: Action
 rulePrag span buf len = do
-  setExts (.|. inRulePragBit)
+  setExts (.|. bit inRulePragBit)
   return (L span ITrules_prag)
 
 endPrag :: Action
