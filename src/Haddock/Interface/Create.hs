@@ -128,7 +128,13 @@ parseOption other = tell ["Unrecognised option: " ++ other] >> return Nothing
 -- Declarations
 --------------------------------------------------------------------------------
 
-type DeclWithDoc = (LHsDecl Name, Maybe (HsDoc Name))
+-- convenient short-hands
+
+type Decl = LHsDecl Name
+type Doc  = HsDoc Name
+
+
+type DeclWithDoc = (Decl, Maybe Doc)
 
 
 -- | A list of type or data instance declarations with an optional family
@@ -165,7 +171,7 @@ subordinates (TyClD d) = classDataSubs d
 subordinates _ = []
 
 
-classDataSubs :: TyClDecl Name -> [(Name, Maybe (HsDoc Name))]
+classDataSubs :: TyClDecl Name -> [(Name, Maybe Doc)]
 classDataSubs decl
   | isClassDecl decl = classMeths
   | isDataDecl  decl = recordFields
@@ -207,8 +213,8 @@ filterOutInstances = filter (\(L _ d, _) -> not (isInstD d))
 
 
 -- | Take all declarations in an 'HsGroup' and convert them into a list of
--- 'LHsDecl's
-declsFromGroup :: HsGroup Name -> [LHsDecl Name]
+-- 'Decl's
+declsFromGroup :: HsGroup Name -> [Decl]
 -- TODO: actually take all declarations
 declsFromGroup group = 
   decls hs_tyclds TyClD group ++
@@ -304,11 +310,11 @@ instToData inst = TyData {
 
 
 -- | Collect the docs and attach them to the right declaration
-collectDocs :: [LHsDecl Name] -> [DeclWithDoc]
+collectDocs :: [Decl] -> [(Decl, (Maybe Doc))]
 collectDocs decls = collect Nothing DocEmpty decls
 
 
-collect :: Maybe (LHsDecl Name) -> HsDoc Name -> [LHsDecl Name] -> [DeclWithDoc]
+collect :: Maybe Decl -> Doc -> [Decl] -> [(Decl, (Maybe Doc))]
 collect d doc_so_far [] =
    case d of
         Nothing -> []
@@ -330,7 +336,7 @@ collect d doc_so_far (e:es) =
         | otherwise -> finishedDoc d0 doc_so_far (collect (Just e) DocEmpty es)
 
 
-finishedDoc :: LHsDecl Name -> HsDoc Name -> [DeclWithDoc] -> [DeclWithDoc]
+finishedDoc :: Decl -> Doc -> [(Decl, (Maybe Doc))] -> [(Decl, (Maybe Doc))]
 finishedDoc d DocEmpty rest = (d, Nothing) : rest
 finishedDoc d doc rest | notDocDecl d = (d, Just doc) : rest
   where
@@ -362,7 +368,7 @@ mkExportItems
   :: ModuleMap
   -> Module			-- this module
   -> [Name]			-- exported names (orig)
-  -> [DeclWithDoc]
+  -> [(Decl, Maybe Doc)]
   -> Map Name DeclWithDoc -- maps local names to declarations
   -> Map Name Family
   -> Map Name [Name]	-- sub-map for this module
@@ -429,7 +435,7 @@ mkExportItems modMap this_mod exported_names decls declMap famMap sub_map
 		| otherwise -> return [ ExportModule m ]
 	     Nothing -> return [] -- already emitted a warning in visibleNames
 
-    findDecl :: Name -> Maybe (LHsDecl Name, Maybe (HsDoc Name))
+    findDecl :: Name -> Maybe (Decl, Maybe Doc)
     findDecl n 
 	    | m == this_mod = Map.lookup n declMap
       | otherwise = case Map.lookup m modMap of
@@ -439,7 +445,7 @@ mkExportItems modMap this_mod exported_names decls declMap famMap sub_map
         m = nameModule n
 
 
-fullContentsOfThisModule :: Module -> [(LHsDecl Name, Maybe (HsDoc Name))] -> [ExportItem Name]
+fullContentsOfThisModule :: Module -> [(Decl, Maybe Doc)] -> [ExportItem Name]
 fullContentsOfThisModule module_ decls = catMaybes (map mkExportItem decls)
   where
     mkExportItem (L _ (DocD (DocGroup lev doc)), _) = Just $ ExportGroup lev "" doc
@@ -451,7 +457,7 @@ fullContentsOfThisModule module_ decls = catMaybes (map mkExportItem decls)
 -- it might be an individual record selector or a class method.  In these
 -- cases we have to extract the required declaration (and somehow cobble 
 -- together a type signature for it...)
-extractDecl :: Name -> Module -> LHsDecl Name -> LHsDecl Name
+extractDecl :: Name -> Module -> Decl -> Decl
 extractDecl name mdl decl
   | Just n <- getMainDeclBinder (unLoc decl), n == name = decl
   | otherwise  =  
@@ -523,7 +529,7 @@ mkVisibleNames :: Module
              -> Map Name [Name]
              -> Maybe [IE Name]
              -> [DocOption]
-             -> Map Name (LHsDecl Name, Maybe (HsDoc Name))
+             -> Map Name (Decl, Maybe Doc)
              -> ErrMsgM [Name]
 
 mkVisibleNames mdl modMap localNames scope subMap maybeExps opts declMap 
@@ -582,7 +588,7 @@ allSubsOfName modMap name
 
 -- Named documentation
 
-findNamedDoc :: String -> [HsDecl Name] -> ErrMsgM (Maybe (HsDoc Name))
+findNamedDoc :: String -> [HsDecl Name] -> ErrMsgM (Maybe Doc)
 findNamedDoc name decls = search decls
 	where
     search [] = do
