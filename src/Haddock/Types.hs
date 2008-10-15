@@ -17,6 +17,11 @@ import GHC hiding (NoLink)
 import Name
 
 
+-- convenient short-hands
+type Decl = LHsDecl Name
+type Doc  = HsDoc Name
+
+
 {-! for DocOption derive: Binary !-}
 data DocOption
   = OptHide           -- ^ This module should not appear in the docs

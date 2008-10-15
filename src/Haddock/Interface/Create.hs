@@ -128,11 +128,6 @@ parseOption other = tell ["Unrecognised option: " ++ other] >> return Nothing
 -- Declarations
 --------------------------------------------------------------------------------
 
--- convenient short-hands
-
-type Decl = LHsDecl Name
-type Doc  = HsDoc Name
-
 
 type DeclWithDoc = (Decl, Maybe Doc)
 
