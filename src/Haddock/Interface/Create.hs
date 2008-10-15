@@ -57,7 +57,7 @@ createInterface ghcMod flags modMap = do
       decls         = topDecls group
       decls'        = filterOutInstances decls
       declMap       = mkDeclMap decls'
-      famMap        = Map.empty --mkFamMap decls'
+--      famMap        = mkFamMap decls'
       ignoreExps    = Flag_IgnoreAllExports `elem` flags
       exportedNames = ghcExportedNames ghcMod
       instances     = ghcInstances ghcMod
@@ -69,7 +69,7 @@ createInterface ghcMod flags modMap = do
                                  subMap exports opts declMap 
 
   exportItems <- mkExportItems modMap mod (ghcExportedNames ghcMod) decls' declMap
-                               famMap subMap opts exports ignoreExps instances
+                               subMap opts exports ignoreExps instances
 
   -- prune the export list to just those declarations that have
   -- documentation, if the 'prune' option is on.
@@ -137,9 +137,9 @@ type Doc  = HsDoc Name
 type DeclWithDoc = (Decl, Maybe Doc)
 
 
--- | A list of type or data instance declarations with an optional family
--- declaration.
-type Family = (Maybe DeclWithDoc, [DeclWithDoc])
+-- A list of type or data instance declarations with an optional family
+-- declaration. 
+-- type Family = (Maybe DeclWithDoc, [DeclWithDoc])
 
 
 -- | Make a map from names to declarations with documentation. The map excludes
@@ -370,7 +370,6 @@ mkExportItems
   -> [Name]			-- exported names (orig)
   -> [(Decl, Maybe Doc)]
   -> Map Name DeclWithDoc -- maps local names to declarations
-  -> Map Name Family
   -> Map Name [Name]	-- sub-map for this module
   -> [DocOption]
   -> Maybe [IE Name]
@@ -378,7 +377,7 @@ mkExportItems
   -> [Instance]
   -> ErrMsgM [ExportItem Name]
 
-mkExportItems modMap this_mod exported_names decls declMap famMap sub_map
+mkExportItems modMap this_mod exported_names decls declMap sub_map
               opts maybe_exps ignore_all_exports instances
   | isNothing maybe_exps || ignore_all_exports || OptIgnoreExports `elem` opts
     = everything_local_exported
