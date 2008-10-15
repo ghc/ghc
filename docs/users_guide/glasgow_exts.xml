@@ -3247,9 +3247,6 @@ sets of instance declarations.
 <sect2 id="instance-decls">
 <title>Instance declarations</title>
 
-<sect3 id="instance-rules">
-<title>Relaxed rules for instance declarations</title>
-
 <para>An instance declaration has the form
 <screen>
   instance ( <replaceable>assertion</replaceable><subscript>1</subscript>, ..., <replaceable>assertion</replaceable><subscript>n</subscript>) =&gt; <replaceable>class</replaceable> <replaceable>type</replaceable><subscript>1</subscript> ... <replaceable>type</replaceable><subscript>m</subscript> where ...
@@ -3259,19 +3256,73 @@ The part before the "<literal>=&gt;</literal>" is the
 "<literal>=&gt;</literal>" is the <emphasis>head</emphasis> of the instance declaration.
 </para>
 
+<sect3 id="flexible-instance-head">
+<title>Relaxed rules for the instance head</title>
+
 <para>
 In Haskell 98 the head of an instance declaration
 must be of the form <literal>C (T a1 ... an)</literal>, where
-<literal>C</literal> is the class, <literal>T</literal> is a type constructor,
+<literal>C</literal> is the class, <literal>T</literal> is a data type constructor,
 and the <literal>a1 ... an</literal> are distinct type variables.
-Furthermore, the assertions in the context of the instance declaration
+GHC relaxes these rules in two ways.
+<itemizedlist>
+<listitem>
+<para>
+The <option>-XFlexibleInstances</option> flag allows the head of the instance
+declaration to mention arbitrary nested types.
+For example, this becomes a legal instance declaration
+<programlisting>
+  instance C (Maybe Int) where ...
+</programlisting>
+See also the <link linkend="instance-overlap">rules on overlap</link>.
+</para></listitem>
+<listitem><para>
+With the <option>-XTypeSynonymInstances</option> flag, instance heads may use type
+synonyms. As always, using a type synonym is just shorthand for
+writing the RHS of the type synonym definition.  For example:
+
+
+<programlisting>
+  type Point = (Int,Int)
+  instance C Point   where ...
+  instance C [Point] where ...
+</programlisting>
+
+
+is legal.  However, if you added
+
+
+<programlisting>
+  instance C (Int,Int) where ...
+</programlisting>
+
+
+as well, then the compiler will complain about the overlapping
+(actually, identical) instance declarations.  As always, type synonyms
+must be fully applied.  You cannot, for example, write:
+
+<programlisting>
+  type P a = [[a]]
+  instance Monad P where ...
+</programlisting>
+
+</para></listitem>
+</itemizedlist>
+</para>
+</sect3>
+
+<sect3 id="instance-rules">
+<title>Relaxed rules for instance contexts</title>
+
+<para>In Haskell 98, the assertions in the context of the instance declaration
 must be of the form <literal>C a</literal> where <literal>a</literal>
 is a type variable that occurs in the head.
 </para>
+
 <para>
-The <option>-XFlexibleInstances</option> flag loosens these restrictions
-considerably.  Firstly, multi-parameter type classes are permitted.  Secondly,
-the context and head of the instance declaration can each consist of arbitrary
+The <option>-XFlexibleContexts</option> flag relaxes this rule, as well
+as the corresponding rule for type signatures (see <xref linkend="flexible-contexts"/>).
+With this flag the context of the instance declaration can each consist of arbitrary
 (well-kinded) assertions <literal>(C t1 ... tn)</literal> subject only to the
 following rules:
 <orderedlist>
@@ -3569,47 +3620,6 @@ hard to pin down.)  We are interested to receive feedback on these points.
 </para>
 </sect3>
 
-<sect3>
-<title>Type synonyms in the instance head</title>
-
-<para>
-<emphasis>Unlike Haskell 98, instance heads may use type
-synonyms</emphasis>.  (The instance "head" is the bit after the "=>" in an instance decl.)
-As always, using a type synonym is just shorthand for
-writing the RHS of the type synonym definition.  For example:
-
-
-<programlisting>
-  type Point = (Int,Int)
-  instance C Point   where ...
-  instance C [Point] where ...
-</programlisting>
-
-
-is legal.  However, if you added
-
-
-<programlisting>
-  instance C (Int,Int) where ...
-</programlisting>
-
-
-as well, then the compiler will complain about the overlapping
-(actually, identical) instance declarations.  As always, type synonyms
-must be fully applied.  You cannot, for example, write:
-
-
-<programlisting>
-  type P a = [[a]]
-  instance Monad P where ...
-</programlisting>
-
-
-This design decision is independent of all the others, and easily
-reversed, but it makes sense to me.
-
-</para>
-</sect3>
 
 
 </sect2>
@@ -4328,6 +4338,31 @@ class (F a ~ b) => C a b where
     </para>
   </sect3>
 
+  <sect3 id-="ty-fams-in-instances">
+    <title>Type families and instance declarations</title>
+    <para>Type families require us to extend the rules for 
+      the form of instance heads, which are given 
+      in <xref linkend="flexible-instance-head"/>.
+      Specifically:
+<itemizedlist>
+ <listitem><para>Data type families may appear in an instance head</para></listitem>
+ <listitem><para>Type synonym families may not appear (at all) in an instance head</para></listitem>
+</itemizedlist>
+The reason for the latter restriction is that there is no way to check for. Consider
+<programlisting>
+   type family F a
+   type instance F Bool = Int
+
+   class C a
+
+   instance C Int
+   instance C (F a)
+</programlisting>
+Now a constraint <literal>(C (F Bool))</literal> would match both instances.
+The situation is especially bad because the type instance for <literal>F Bool</literal>
+might be in another module, or even in a module that is not yet written.
+</para>
+</sect3>
 </sect2>
 
 </sect1>

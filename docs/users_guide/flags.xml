@@ -932,7 +932,7 @@
 	    </row>
 	    <row>
 	      <entry><option>-XTypeSynonymInstances</option></entry>
-	      <entry>Enable <link linkend="type-synonyms">type synonyms</link>.</entry>
+	      <entry>Enable <link linkend="type-synonym-instances">type synonyms</link>.</entry>
 	      <entry>dynamic</entry>
 	      <entry><option>-XNoTypeSynonymInstances</option></entry>
 	    </row>
