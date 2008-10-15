@@ -22,6 +22,11 @@ type Decl = LHsDecl Name
 type Doc  = HsDoc Name
 
 
+-- | A declaration that may have documentation, including its subordinates,
+-- which may also have documentation
+type DeclInfo = (Decl, Maybe Doc, [(Name, Maybe Doc)])
+
+
 {-! for DocOption derive: Binary !-}
 data DocOption
   = OptHide           -- ^ This module should not appear in the docs

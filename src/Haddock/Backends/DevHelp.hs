@@ -7,7 +7,7 @@
 module Haddock.Backends.DevHelp (ppDevHelpFile) where
 
 import Haddock.ModuleTree
-import Haddock.Types
+import Haddock.Types hiding (Doc)
 import Haddock.Utils
 
 import Module
