@@ -633,7 +633,7 @@ I am not convinced that this duplication is necessary or useful! -=chak
 data Inst
   = Dict {
 	tci_name :: Name,
-	tci_pred :: TcPredType,
+	tci_pred :: TcPredType,	  -- Class or implicit parameter only
 	tci_loc  :: InstLoc 
     }
 

@@ -423,7 +423,7 @@ makeDerivSpecs is_boot tycl_decls inst_decls deriv_decls
 ------------------------------------------------------------------
 deriveStandalone :: LDerivDecl Name -> TcM (Maybe EarlyDerivSpec)
 -- Standalone deriving declarations
---  e.g.   deriving instance show a => Show (T a)
+--  e.g.   deriving instance Show a => Show (T a)
 -- Rather like tcLocalInstDecl
 deriveStandalone (L loc (DerivDecl deriv_ty))
   = setSrcSpan loc                   $
