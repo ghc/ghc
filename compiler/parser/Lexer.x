@@ -1556,13 +1556,13 @@ alexGetChar (AI loc ofs s)
 		  DecimalNumber         -> digit
 		  LetterNumber          -> other_graphic
 		  OtherNumber           -> other_graphic
-		  ConnectorPunctuation  -> other_graphic
-		  DashPunctuation       -> other_graphic
+		  ConnectorPunctuation  -> symbol
+		  DashPunctuation       -> symbol
 		  OpenPunctuation       -> other_graphic
 		  ClosePunctuation      -> other_graphic
 		  InitialQuote          -> other_graphic
 		  FinalQuote            -> other_graphic
-		  OtherPunctuation      -> other_graphic
+		  OtherPunctuation      -> symbol
 		  MathSymbol            -> symbol
 		  CurrencySymbol        -> symbol
 		  ModifierSymbol        -> symbol
