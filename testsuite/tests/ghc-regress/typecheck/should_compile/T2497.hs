@@ -1,27 +1,14 @@
-{-# LANGUAGE RankNTypes #-}
 {-# OPTIONS_GHC -fwarn-unused-binds #-}
 
 module ShouldCompile() where
 
--- Trac #2497
+-- Trac #2497; test should compile without language
+-- 	       pragmas to swith on the forall
 {-# RULES "id" forall (x :: a). id x = x #-}
 
 
 
--- Trac #2494
-foo :: (forall m. Monad m => Maybe (m a) -> Maybe (m a)) -> Maybe a -> Maybe a
-foo _ x = x
-
-{-# RULES
-
-"foo/foo"
-  forall (f :: forall m. Monad m => Maybe (m a) -> Maybe (m a))
-         (g :: forall m. Monad m => Maybe (m a) -> Maybe (m a)) x.
-  foo f (foo g x) = foo (f . g) x
- #-}
-
-
--- Trac #2213
+-- Trac #2213; eq should not be reported as unused
 
 eq,beq :: Eq a => a -> a -> Bool
 eq = (==)    -- Used
