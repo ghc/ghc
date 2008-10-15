@@ -1,3 +1,5 @@
+{-# OPTIONS_HADDOCK hide #-}
+
 --
 -- Haddock - A Haskell Documentation Tool
 --
@@ -5,17 +7,12 @@
 --
 
 
-{-# OPTIONS_HADDOCK hide #-}
-
-
 module Haddock.Types where
 
 
 import Haddock.DocName
-
 import Data.Map (Map)
 import qualified Data.Map as Map
-
 import GHC hiding (NoLink)
 import Name
 
