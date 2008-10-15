@@ -820,7 +820,10 @@ mk_usage_info pit hsc_env this_mod direct_imports used_names
         | otherwise
         = case nameModule_maybe name of
              Nothing  -> pprTrace "mkUsageInfo: internal name?" (ppr name) mv_map
-             Just mod -> extendModuleEnv_C (++) mv_map mod [occ]
+             Just mod -> -- We use this fiddly lambda function rather than
+                         -- (++) as the argument to extendModuleEnv_C to
+                         -- avoid quadratic behaviour (trac #2680)
+                         extendModuleEnv_C (\xs _ -> occ:xs) mv_map mod [occ]
     		   where occ = nameOccName name
     
     -- We want to create a Usage for a home module if 
