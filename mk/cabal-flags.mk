@@ -1,6 +1,7 @@
 
 nothing=
 space=$(nothing) $(nothing)
+comma=,
 
 GHC_PKG_INSTALL_PROG = $(FPTOOLS_TOP_ABS)/utils/ghc-pkg/dist-install/build/ghc-pkg/ghc-pkg
 
@@ -10,6 +11,11 @@ CABAL = $(LIBRARIES_ABS)/cabal-bin $(GHC) $(LIBRARIES_ABS)/bootstrapping.conf
 INSTALL_PACKAGE = \
     $(UTILS_ABS)/installPackage/install-inplace/bin/installPackage
 STAGE3_PACKAGE_CONF = $(FPTOOLS_TOP_ABS)/stage3.package.conf
+
+# Euch, hideous hack:
+CABAL_DOTTED_VERSION = $(shell grep "^Version:" $(LIBRARIES_ABS)/Cabal/Cabal.cabal | sed "s/^Version: //")
+CABAL_VERSION = $(subst .,$(comma),$(CABAL_DOTTED_VERSION))
+CABAL_CONSTRAINT = --constraint="Cabal == $(CABAL_DOTTED_VERSION)"
 
 # We rely on all the CONFIGURE_ARGS being quoted with '...', and there
 # being no 's inside the values.
