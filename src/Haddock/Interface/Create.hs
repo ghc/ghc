@@ -142,10 +142,13 @@ type DeclWithDoc = (Decl, Maybe Doc)
 -- documentation declarations.
 -- Subordinate names are mapped to the parent declaration, but with the doc
 -- for the subordinate declaration.
-mkDeclMap :: [DeclWithDoc] -> Map Name DeclWithDoc
-mkDeclMap decls = Map.fromList [ (n, (L loc d, doc)) | (L loc d, doc) <- decls 
-                               , (n, doc) <- (declName d, doc) : subordinates d
-                               , not (isDocD d), not (isInstD d) ]
+mkDeclMap :: [(Decl, Maybe Doc)] -> Map Name DeclInfo
+mkDeclMap decls = Map.fromList . concat $
+  [ (declName d, (parent, doc, subs)) : subDecls
+  | (parent@(L loc d), doc) <- decls 
+  , let subs = subordinates d
+  , let subDecls = [ (n, (parent, doc', [])) | (n, doc') <- subs ]
+  , not (isDocD d), not (isInstD d) ]
 
 
 -- | Group type family instances together. Include the family declaration
@@ -159,7 +162,6 @@ mkFamMap decls =
                filter (isTyClD . unLoc . fst) decls
     ex ((L _ (TyClD d)), _) = d
 -}
-
 
 
 subordinates (TyClD d) = classDataSubs d
@@ -364,7 +366,7 @@ mkExportItems
   -> Module			-- this module
   -> [Name]			-- exported names (orig)
   -> [(Decl, Maybe Doc)]
-  -> Map Name DeclWithDoc -- maps local names to declarations
+  -> Map Name DeclInfo             -- maps local names to declarations
   -> Map Name [Name]	-- sub-map for this module
   -> [DocOption]
   -> Maybe [IE Name]
@@ -409,7 +411,7 @@ mkExportItems modMap this_mod exported_names decls declMap sub_map
       -- temp hack: we filter out separately declared ATs, since we haven't decided how
       -- to handle them yet. We should really give an warning message also, and filter the
       -- name out in mkVisibleNames...
-      | Just (decl, maybeDoc) <- findDecl t, t `notElem` declATs (unL decl) =
+      | Just (decl, maybeDoc, _) <- findDecl t, t `notElem` declATs (unL decl) =
           return [ ExportDecl (restrictTo subs (extractDecl t mdl decl)) maybeDoc [] ]
       | otherwise = return []
      where 
@@ -429,9 +431,9 @@ mkExportItems modMap this_mod exported_names decls declMap sub_map
 		| otherwise -> return [ ExportModule m ]
 	     Nothing -> return [] -- already emitted a warning in visibleNames
 
-    findDecl :: Name -> Maybe (Decl, Maybe Doc)
+    findDecl :: Name -> Maybe DeclInfo
     findDecl n 
-	    | m == this_mod = Map.lookup n declMap
+      | m == this_mod = Map.lookup n declMap
       | otherwise = case Map.lookup m modMap of
                       Just iface -> Map.lookup n (ifaceDeclMap iface) 
                       Nothing -> Nothing
@@ -523,7 +525,7 @@ mkVisibleNames :: Module
              -> Map Name [Name]
              -> Maybe [IE Name]
              -> [DocOption]
-             -> Map Name (Decl, Maybe Doc)
+             -> Map Name DeclInfo
              -> ErrMsgM [Name]
 
 mkVisibleNames mdl modMap localNames scope subMap maybeExps opts declMap 
