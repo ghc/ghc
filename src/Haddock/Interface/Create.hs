@@ -593,14 +593,13 @@ allSubsOfName modMap name
   | otherwise =  error $ "Main.allSubsOfName: unexpected unqual'd name"
 
 
--- Named documentation
-
+-- | Find a stand-alone documentation comment by its name
 findNamedDoc :: String -> [HsDecl Name] -> ErrMsgM (Maybe Doc)
 findNamedDoc name decls = search decls
-	where
+  where
     search [] = do
-		  tell ["Cannot find documentation for: $" ++ name]
-		  return Nothing
+      tell ["Cannot find documentation for: $" ++ name]
+      return Nothing
     search ((DocD (DocCommentNamed name' doc)):rest) 
       | name == name' = return (Just doc)
       | otherwise = search rest
