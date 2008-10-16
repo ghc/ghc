@@ -51,7 +51,7 @@ module Language.Haskell.TH.Syntax(
 import Data.PackedString
 import GHC.Base		( Int(..), Int#, (<#), (==#) )
 
-import Data.Data (Data(..), Typeable, mkConstr, mkDataType)
+import Data.Data (Data(..), Typeable, mkConstr, mkDataType, constrIndex)
 import qualified Data.Data as Data
 import Data.IORef
 import GHC.IOBase	( unsafePerformIO )
@@ -345,8 +345,29 @@ data NameFlavour
 				-- thing we are naming
   deriving ( Typeable )
 
+-- Although the NameFlavour type is abstract, the Data instance is not. The reason for this
+-- is that currently we use Data to serialize values in annotations, and in order for that to
+-- work for Template Haskell names introduced via the 'x syntax we need gunfold on NameFlavour
+-- to work. Bleh!
+--
+-- The long term solution to this is to use the binary package for annotation serialization and
+-- then remove this instance. However, to do _that_ we need to wait on binary to become stable, since
+-- boot libraries cannot be upgraded seperately from GHC itself.
+--
+-- This instance cannot be derived automatically due to bug #2701
 instance Data NameFlavour where
-     gunfold = error "gunfold"
+     gfoldl _ z NameS          = z NameS
+     gfoldl k z (NameQ mn)     = z NameQ `k` mn
+     gfoldl k z (NameU i)      = z (\(I# i') -> NameU i') `k` (I# i)
+     gfoldl k z (NameL i)      = z (\(I# i') -> NameL i') `k` (I# i)
+     gfoldl k z (NameG ns p m) = z NameG `k` ns `k` p `k` m
+     gunfold k z c = case constrIndex c of
+         1 -> z NameS
+         2 -> k $ z NameQ
+         3 -> k $ z (\(I# i) -> NameU i)
+         4 -> k $ z (\(I# i) -> NameL i)
+         5 -> k $ k $ k $ z NameG
+         _ -> error "gunfold: NameFlavour"
      toConstr NameS = con_NameS
      toConstr (NameQ _) = con_NameQ
      toConstr (NameU _) = con_NameU
