@@ -16,6 +16,7 @@ import Binary
 
 
 data DocName = Documented Name Module | Undocumented Name
+  deriving Eq
 
 
 docNameOcc :: DocName -> OccName

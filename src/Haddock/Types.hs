@@ -47,6 +47,9 @@ data ExportItem name
       -- | Maybe a doc comment
       expItemMbDoc :: Maybe (HsDoc name),
 
+      -- | Documentation for subordinate declarations
+      expItemSubDocs :: [(name, HsDoc name)],
+
       -- | Instances relevant to this declaration
       expItemInstances :: [InstHead name]
 	

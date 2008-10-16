@@ -369,9 +369,10 @@ renameTyClD d = case d of
 
       
 renameSig sig = case sig of 
-  TypeSig (L loc name) ltype -> do 
+  TypeSig lname ltype -> do 
+    lname' <- renameL lname
     ltype' <- renameLType ltype
-    return (TypeSig (L loc (keep name)) ltype')
+    return (TypeSig lname' ltype')
   -- we have filtered out all other kinds of signatures in Interface.Create
 
 
@@ -395,11 +396,12 @@ renameExportItem item = case item of
   ExportGroup lev id doc -> do
     doc' <- renameDoc doc
     return (ExportGroup lev id doc')
-  ExportDecl decl doc instances -> do
+  ExportDecl decl doc subs instances -> do
     decl' <- renameLDecl decl
     doc'  <- mapM renameDoc doc
+    subs' <- mapM renameSub subs
     instances' <- mapM renameInstHead instances
-    return (ExportDecl decl' doc' instances')
+    return (ExportDecl decl' doc' subs' instances')
   ExportNoDecl x y subs -> do
     y'    <- lookupRn id y
     subs' <- mapM (lookupRn id) subs
@@ -407,3 +409,9 @@ renameExportItem item = case item of
   ExportDoc doc -> do
     doc' <- renameDoc doc
     return (ExportDoc doc')
+
+
+renameSub (n,doc) = do
+  n' <- rename n
+  doc' <- renameDoc doc
+  return (n', doc')

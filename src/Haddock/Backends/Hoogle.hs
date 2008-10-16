@@ -81,7 +81,7 @@ operator x = x
 -- How to print each export
 
 ppExport :: ExportItem Name -> [String]
-ppExport (ExportDecl decl dc _) = doc dc ++ f (unL decl)
+ppExport (ExportDecl decl dc _ _) = doc dc ++ f (unL decl)
     where
         f (TyClD d@TyData{}) = ppData d
         f (TyClD d@ClassDecl{}) = ppClass d

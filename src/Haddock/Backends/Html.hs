@@ -553,7 +553,7 @@ ifaceToHtml maybe_source_url maybe_wiki_url iface
  
     exports = numberSectionHeadings (ifaceRnExportItems iface)
 
-    has_doc (ExportDecl _ doc _) = isJust doc
+    has_doc (ExportDecl _ doc _ _) = isJust doc
     has_doc (ExportNoDecl _ _ _) = False
     has_doc (ExportModule _) = False
     has_doc _ = True
@@ -630,8 +630,8 @@ numberSectionHeadings exports = go 1 exports
 processExport :: Bool -> LinksInfo -> DocMap -> (ExportItem DocName) -> HtmlTable
 processExport _ _ _ (ExportGroup lev id0 doc)
   = ppDocGroup lev (namedAnchor id0 << docToHtml doc)
-processExport summary links docMap (ExportDecl decl doc insts)
-  = ppDecl summary links decl doc insts docMap
+processExport summary links docMap (ExportDecl decl doc subdocs insts)
+  = ppDecl summary links decl doc insts docMap subdocs
 processExport summmary _ _ (ExportNoDecl _ y [])
   = declBox (ppDocName y)
 processExport summmary _ _ (ExportNoDecl _ y subs)
@@ -660,9 +660,10 @@ declWithDoc False links loc nm (Just doc) html_decl =
 		topDeclBox links loc nm html_decl </> docBox (docToHtml doc)
 
 
+-- TODO: use DeclInfo DocName or something
 ppDecl :: Bool -> LinksInfo -> LHsDecl DocName -> 
-          Maybe (HsDoc DocName) -> [InstHead DocName] -> DocMap -> HtmlTable
-ppDecl summ links (L loc decl) mbDoc instances docMap = case decl of
+          Maybe (HsDoc DocName) -> [InstHead DocName] -> DocMap -> [(DocName, HsDoc DocName)] -> HtmlTable
+ppDecl summ links (L loc decl) mbDoc instances docMap subdocs = case decl of
   TyClD d@(TyFamily {})          -> ppTyFam summ False links loc mbDoc d
   TyClD d@(TyData {})
     | Nothing <- tcdTyPats d     -> ppDataDecl summ links instances loc mbDoc d
@@ -670,7 +671,7 @@ ppDecl summ links (L loc decl) mbDoc instances docMap = case decl of
   TyClD d@(TySynonym {})
     | Nothing <- tcdTyPats d     -> ppTySyn summ links loc mbDoc d
     | Just _  <- tcdTyPats d     -> ppTyInst summ False links loc mbDoc d
-  TyClD d@(ClassDecl {})         -> ppClassDecl summ links instances loc mbDoc docMap d
+  TyClD d@(ClassDecl {})         -> ppClassDecl summ links instances loc mbDoc docMap subdocs d
   SigD (TypeSig (L _ n) (L _ t)) -> ppFunSig summ links loc mbDoc n t
   ForD d                         -> ppFor summ links loc mbDoc d
   InstD d                        -> Html.emptyTable
@@ -872,13 +873,11 @@ ppTyInstHeader summary associated decl =
 --------------------------------------------------------------------------------
     
 
-ppAssocType :: Bool -> LinksInfo -> DocMap -> LTyClDecl DocName -> HtmlTable
-ppAssocType summ links docMap (L loc decl) = 
+ppAssocType :: Bool -> LinksInfo -> Maybe (HsDoc DocName) -> LTyClDecl DocName -> HtmlTable
+ppAssocType summ links doc (L loc decl) = 
   case decl of
     TyFamily  {} -> ppTyFam summ True links loc doc decl
     TySynonym {} -> ppTySyn summ links loc doc decl
-  where
-    doc = Map.lookup (docNameOrig $ tcdName decl) docMap
 
 
 --------------------------------------------------------------------------------
@@ -970,8 +969,8 @@ ppFds fds =
 	fundep (vars1,vars2) = hsep (map ppDocName vars1) <+> toHtml "->" <+>
 			       hsep (map ppDocName vars2)
 
-ppShortClassDecl :: Bool -> LinksInfo -> TyClDecl DocName -> SrcSpan -> DocMap -> HtmlTable
-ppShortClassDecl summary links (ClassDecl lctxt lname tvs fds sigs _ ats _) loc docMap = 
+ppShortClassDecl :: Bool -> LinksInfo -> TyClDecl DocName -> SrcSpan -> [(DocName, HsDoc DocName)] -> HtmlTable
+ppShortClassDecl summary links (ClassDecl lctxt lname tvs fds sigs _ ats _) loc subdocs = 
   if null sigs && null ats
     then (if summary then declBox else topDeclBox links loc nm) hdr
     else (if summary then declBox else topDeclBox links loc nm) (hdr <+> keyword "where")
@@ -980,12 +979,12 @@ ppShortClassDecl summary links (ClassDecl lctxt lname tvs fds sigs _ ats _) loc 
 				bodyBox <<
 					aboves
 					(
-						map (ppAssocType summary links docMap) ats ++
+						[ ppAssocType summary links doc at | at <- ats
+                                                , let doc = lookup (tcdName $ unL at) subdocs ]  ++
 
-						[ ppFunSig summary links loc mbDoc n typ
+						[ ppFunSig summary links loc doc n typ
 						| L _ (TypeSig (L _ n) (L _ typ)) <- sigs
-						, let mbDoc = Map.lookup (docNameOrig n) docMap ] 
-
+						, let doc = lookup n subdocs ] 
 					)
 				)
   where
@@ -995,11 +994,11 @@ ppShortClassDecl summary links (ClassDecl lctxt lname tvs fds sigs _ ats _) loc 
 
 
 ppClassDecl :: Bool -> LinksInfo -> [InstHead DocName] -> SrcSpan ->
-               Maybe (HsDoc DocName) -> DocMap -> TyClDecl DocName -> 
+               Maybe (HsDoc DocName) -> DocMap -> [(DocName, HsDoc DocName)] -> TyClDecl DocName -> 
                HtmlTable
-ppClassDecl summary links instances loc mbDoc docMap
+ppClassDecl summary links instances loc mbDoc docMap subdocs
 	decl@(ClassDecl lctxt lname ltyvars lfds lsigs _ ats _)
-  | summary = ppShortClassDecl summary links decl loc docMap
+  | summary = ppShortClassDecl summary links decl loc subdocs
   | otherwise = classheader </> bodyBox << (classdoc </> body </> instancesBit)
   where 
     classheader
@@ -1024,9 +1023,10 @@ ppClassDecl summary links instances loc mbDoc docMap
     methodTable =
       abovesSep s8 [ ppFunSig summary links loc doc n typ
                    | L _ (TypeSig (L _ n) (L _ typ)) <- lsigs
-                   , let doc = Map.lookup (docNameOrig n) docMap ]
+                   , let doc = lookup n subdocs ]
 
-    atTable = abovesSep s8 $ map (ppAssocType summary links docMap) ats
+    atTable = abovesSep s8 $ [ ppAssocType summary links doc at | at <- ats
+                             , let doc = lookup (tcdName $ unL at) subdocs ]
 
     instId = collapseId (docNameOrig nm)
     instancesBit
