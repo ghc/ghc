@@ -204,6 +204,11 @@ library that uses thread-local storage, use 'Control.Concurrent.forkOS' instead.
 
 GHC note: the new thread inherits the /blocked/ state of the parent 
 (see 'Control.Exception.block').
+
+The newly created thread has an exception handler that discards the
+exceptions 'BlockedOnDeadMVar', 'BlockedIndefinitely', and
+'ThreadKilled', and passes all other exceptions to the uncaught
+exception handler (see 'setUncaughtExceptionHandler').
 -}
 forkIO :: IO () -> IO ThreadId
 forkIO action = IO $ \ s -> 
