@@ -1,11 +1,10 @@
+{-# OPTIONS_HADDOCK hide #-}
+
 --
 -- Haddock - A Haskell Documentation Tool
 --
 -- (c) Simon Marlow 2003
 --
-
-
-{-# OPTIONS_HADDOCK hide #-}
 
 
 module Haddock.DocName where
