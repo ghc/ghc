@@ -78,7 +78,7 @@ import ZipDataflow
 -- which may differ depending on whether there is an update frame.
 live_ptrs :: ByteOff -> BlockEnv SubAreaSet -> AreaMap -> BlockId -> [Maybe LocalReg]
 live_ptrs oldByte slotEnv areaMap bid =
-  pprTrace "live_ptrs for" (ppr bid <+> ppr youngByte <+> ppr liveSlots) $
+  -- pprTrace "live_ptrs for" (ppr bid <+> ppr youngByte <+> ppr liveSlots) $
   reverse $ slotsToList youngByte liveSlots []
   where slotsToList n [] results | n == oldByte = results -- at old end of stack frame
         slotsToList n (s : _) _  | n == oldByte =
@@ -181,24 +181,21 @@ type CAFEnv = BlockEnv CAFSet
 
 -- First, an analysis to find live CAFs.
 cafLattice :: DataflowLattice CAFSet
-cafLattice = DataflowLattice "live cafs" emptyFM add True
+cafLattice = DataflowLattice "live cafs" emptyFM add False
   where add new old = if sizeFM new' > sizeFM old then aTx new' else noTx new'
           where new' = new `plusFM` old
 
 cafTransfers :: BackwardTransfers Middle Last CAFSet
 cafTransfers = BackwardTransfers first middle last
     where first  live _ = live
-          middle live m = pprTrace "cafmiddle" (ppr m) $ foldExpDeepMiddle addCaf m live
+          middle live m = foldExpDeepMiddle addCaf m live
           last   env  l = foldExpDeepLast addCaf l (joinOuts cafLattice env l)
           addCaf e set = case e of
                  CmmLit (CmmLabel c)              -> add c set
                  CmmLit (CmmLabelOff c _)         -> add c set
                  CmmLit (CmmLabelDiffOff c1 c2 _) -> add c1 $ add c2 set
                  _ -> set
-          add l s = pprTrace "CAF analysis saw label" (ppr l) $
-                     if hasCAF l then
-                       pprTrace "has caf" (ppr l) $ addToFM s (cvtToClosureLbl l) ()
-                     else (pprTrace "no cafs" (ppr l) $ s)
+          add l s = if hasCAF l then addToFM s (cvtToClosureLbl l) () else s
 
 type CafFix a = FuelMonad (BackwardFixedPoint Middle Last CAFSet a)
 cafAnal :: LGraph Middle Last -> FuelMonad CAFEnv
@@ -263,8 +260,7 @@ buildSRTs topSRT topCAFMap cafs =
                mkSRT topSRT =
                  do localSRTs <- procpointSRT (lbl topSRT) (elt_map topSRT) cafs
                     return (topSRT, localSRTs)
-           in pprTrace "cafs" (ppr cafs) $
-              if length cafs > maxBmpSize then
+           in if length cafs > maxBmpSize then
                 mkSRT (foldl add_if_missing topSRT cafs)
               else -- make sure all the cafs are near the bottom of the srt
                 mkSRT (add_if_too_far topSRT cafs)

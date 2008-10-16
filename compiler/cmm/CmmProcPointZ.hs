@@ -366,8 +366,8 @@ add_CopyOuts protos procPoints g = fold_blocks mb_copy_out (return emptyBlockEnv
                   insert z succId m =
                     do (b, bmap) <- z
                        (b, bs)   <- insertBetween b m succId
-                       pprTrace "insert for succ" (ppr succId <> ppr m) $
-                        return $ (b, foldl (flip insertBlock) bmap bs)
+                       -- pprTrace "insert for succ" (ppr succId <> ppr m) $ do
+                       return $ (b, foldl (flip insertBlock) bmap bs)
                   finish (b@(Block bid _ _), bmap) =
                     return $ (extendBlockEnv bmap bid b)
           skip b@(Block bid _ _) bs =
@@ -402,7 +402,7 @@ splitAtProcPoints entry_label callPPs procPoints procMap areaMap
                where graph  = lookupBlockEnv graphEnv procId `orElse` emptyBlockEnv
                      graph' = extendBlockEnv graph bid b
      graphEnv_pre <- return $ fold_blocks addBlock emptyBlockEnv g
-     graphEnv <- return $ pprTrace "graphEnv" (ppr graphEnv_pre) graphEnv_pre
+     graphEnv <- return {- $ pprTrace "graphEnv" (ppr graphEnv_pre) -} graphEnv_pre
      -- Build a map from proc point BlockId to labels for their new procedures
      let add_label map pp = return $ addToFM map pp lbl
            where lbl = if pp == entry then entry_label else blockLbl pp
@@ -454,10 +454,10 @@ splitAtProcPoints entry_label callPPs procPoints procMap areaMap
                   -- add the jump blocks to the graph
                   blockEnv''' = foldl (flip insertBlock) blockEnv'' jumpBlocks
               let g' = LGraph ppId off blockEnv'''
-              pprTrace "g' pre jumps" (ppr g') $
-               return (extendBlockEnv newGraphEnv ppId g')
+              -- pprTrace "g' pre jumps" (ppr g') $ do
+              return (extendBlockEnv newGraphEnv ppId g')
      graphEnv_pre <- foldM add_jumps emptyBlockEnv $ blockEnvToList graphEnv
-     graphEnv <- return $ pprTrace "graphEnv with jump blocks" (ppr graphEnv_pre)
+     graphEnv <- return $ -- pprTrace "graphEnv with jump blocks" (ppr graphEnv_pre)
                                          graphEnv_pre
      let to_proc (bid, g@(LGraph g_entry _ blocks)) | elemBlockSet bid callPPs =
            if bid == entry then 
@@ -476,8 +476,8 @@ splitAtProcPoints entry_label callPPs procPoints procMap areaMap
            compare (expectJust "block_order" $ lookupBlockEnv block_order bid)
                    (expectJust "block_order" $ lookupBlockEnv block_order bid')
      procs <- return $ map to_proc $ sortBy sort_fn $ blockEnvToList graphEnv
-     return $ pprTrace "procLabels" (ppr procLabels)
-            $ pprTrace "splitting graphs" (ppr procs)
+     return -- $ pprTrace "procLabels" (ppr procLabels)
+            -- $ pprTrace "splitting graphs" (ppr procs)
             $ procs
 splitAtProcPoints _ _ _ _ _ t@(CmmData _ _) = return [t]
 

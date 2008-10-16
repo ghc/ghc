@@ -31,7 +31,7 @@ type CmmLive = RegSet
 
 -- | The dataflow lattice
 liveLattice :: DataflowLattice CmmLive
-liveLattice = DataflowLattice "live LocalReg's" emptyUniqSet add True
+liveLattice = DataflowLattice "live LocalReg's" emptyUniqSet add False
     where add new old =
             let join = unionUniqSets new old in
             (if sizeUniqSet join > sizeUniqSet old then aTx else noTx) join

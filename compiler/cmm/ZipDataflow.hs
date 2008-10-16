@@ -1008,7 +1008,7 @@ instance FixedPoint ForwardFixedPoint where
 
 
 dump_things :: Bool
-dump_things = True
+dump_things = False
 
 my_trace :: String -> SDoc -> a -> a
 my_trace = if dump_things then pprTrace else \_ _ a -> a

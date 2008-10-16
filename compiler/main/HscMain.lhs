@@ -773,9 +773,11 @@ tryNewCodeGen hsc_env this_mod data_tycons imported_mods
 	; prog <- return $ map (runTx $ runCmmOpts cmmCfgOptsZ) (srtToData topSRT : prog)
 		-- Control flow optimisation, again
 
-	; dumpIfSet_dyn dflags Opt_D_dump_cmmz "New Cmm" (pprCmms prog)
+	; dumpIfSet_dyn dflags Opt_D_dump_cmmz "Output Cmm" (pprCmms prog)
 
-	; return $ map cmmOfZgraph prog }
+	; let prog' = map cmmOfZgraph prog
+	; dumpIfSet_dyn dflags Opt_D_dump_cmmz "Raw Cmm" (ppr prog')
+	; return prog' }
 
 
 optionallyConvertAndOrCPS :: HscEnv -> [Cmm] -> IO [Cmm]

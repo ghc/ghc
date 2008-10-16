@@ -254,7 +254,7 @@ regAlloc (CmmProc static lbl params (ListGraph comps))
 	= do	
  		-- do register allocation on each component.
 		(final_blocks, stats)
-			<- linearRegAlloc block_live 
+			<- linearRegAlloc first_id block_live 
 			$ map (\b -> case b of 
 					BasicBlock _ [b]	-> AcyclicSCC b
 					BasicBlock _ bs		-> CyclicSCC  bs)
@@ -299,32 +299,43 @@ instance Outputable Loc where
 
 
 -- | Do register allocation on some basic blocks.
+--   But be careful to allocate a block in an SCC only if it has
+--   an entry in the block map or it is the first block.
 --
 linearRegAlloc
-	:: BlockMap RegSet		-- ^ live regs on entry to each basic block
+	:: BlockId                      -- ^ the first block
+        -> BlockMap RegSet		-- ^ live regs on entry to each basic block
 	-> [SCC LiveBasicBlock]		-- ^ instructions annotated with "deaths"
 	-> UniqSM ([NatBasicBlock], RegAllocStats)
 
-linearRegAlloc block_live sccs
+linearRegAlloc first_id block_live sccs
  = do	us	<- getUs
  	let (_, _, stats, blocks) =
 		runR emptyBlockMap initFreeRegs emptyRegMap emptyStackMap us
-			$ linearRA_SCCs block_live [] sccs
+			$ linearRA_SCCs first_id block_live [] sccs
 
 	return	(blocks, stats)
 
-linearRA_SCCs _ blocksAcc []
+linearRA_SCCs _ _ blocksAcc []
 	= return $ reverse blocksAcc
 
-linearRA_SCCs block_live blocksAcc (AcyclicSCC block : sccs) 
+linearRA_SCCs first_id block_live blocksAcc (AcyclicSCC block : sccs) 
  = do	blocks'	<- processBlock block_live block
-	linearRA_SCCs block_live 
+	linearRA_SCCs first_id block_live 
 		((reverse blocks') ++ blocksAcc)
 		sccs
 
-linearRA_SCCs block_live blocksAcc (CyclicSCC blocks : sccs) 
- = do	blockss' <- mapM (processBlock block_live) blocks
-	linearRA_SCCs block_live
+linearRA_SCCs first_id block_live blocksAcc (CyclicSCC blocks : sccs) 
+ = do	let process [] []         accum = return $ reverse accum
+            process [] next_round accum = process next_round [] accum
+            process (b@(BasicBlock id _) : blocks) next_round accum =
+              do block_assig <- getBlockAssigR
+                 if isJust (lookupBlockEnv block_assig id) || id == first_id
+                  then do b'  <- processBlock block_live b
+                          process blocks next_round (b' : accum)
+                  else process blocks (b : next_round) accum
+        blockss' <- process blocks [] (return [])
+	linearRA_SCCs first_id block_live
 		(reverse (concat blockss') ++ blocksAcc)
 		sccs
 		
@@ -422,11 +433,11 @@ raInsn block_live new_instrs (Instr instr (Just live))
 			   setAssigR (addToUFM (delFromUFM assig src) dst loc)
 
 	   -- we have elimianted this instruction
-	   {-
 	   freeregs <- getFreeRegsR
     	   assig <- getAssigR
-	   pprTrace "raInsn" (text "ELIMINATED: " <> docToSDoc (pprInstr instr) $$ ppr r_dying <+> ppr w_dying $$ text (show freeregs) $$ ppr assig) $ do
-	   -}
+          {-
+          pprTrace "raInsn" (text "ELIMINATED: " <> docToSDoc (pprInstr instr) $$ ppr r_dying <+> ppr w_dying $$ text (show freeregs) $$ ppr assig) $ do
+          -}
 	   return (new_instrs, [])
 
 	_ -> genRaInsn block_live new_instrs instr 

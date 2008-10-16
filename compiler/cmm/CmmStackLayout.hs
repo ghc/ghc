@@ -57,7 +57,7 @@ import ZipDataflow
 -- a single slot, on insertion.
 
 slotLattice :: DataflowLattice SubAreaSet
-slotLattice = DataflowLattice "live slots" emptyFM add True
+slotLattice = DataflowLattice "live slots" emptyFM add False
   where add new old = case foldFM addArea (False, old) new of
                         (True,  x) -> aTx  x
                         (False, x) -> noTx x
@@ -94,7 +94,8 @@ liveGen s set = liveGen' s set []
           a == a' && hi >= hi' && hi - w <= hi' - w'
 
 liveKill :: SubArea -> [SubArea] -> [SubArea]
-liveKill (a, hi, w) set = pprTrace "killing slots in area" (ppr a) $ liveKill' set []
+liveKill (a, hi, w) set = -- pprTrace "killing slots in area" (ppr a) $
+                          liveKill' set []
   where liveKill' [] z = z
         liveKill' (s'@(a', hi', w') : rst) z =
           if a /= a' || hi < lo' || lo > hi' then    -- no overlap
@@ -309,7 +310,8 @@ layout procPoints env g@(LGraph _ entrySp _) =
             start = case returnOff stackInfo of Just b  -> max b young
                                                 Nothing -> young
             z = allocSlotFrom ig areaSize start areaMap (CallArea (Young id))
-        in pprTrace "allocCallSlot for" (ppr id <+> ppr young <+> ppr (live_in t) <+> ppr z) z
+        in -- pprTrace "allocCallSlot for" (ppr id <+> ppr young <+> ppr (live_in t) <+> ppr z) 
+           z
       allocCallSlot areaMap _ = areaMap
       -- mid foreign calls need to have info tables placed on the stack
       allocMidCall m@(MidForeignCall (Safe bid _) _ _ _) t areaMap =
@@ -326,10 +328,11 @@ layout procPoints env g@(LGraph _ entrySp _) =
         where layout areaMap (ZTail m t) = layout (alloc m t areaMap) t
               layout areaMap (ZLast _)   = allocCallSlot areaMap b
       areaMap = foldl layoutAreas (addToFM emptyFM (CallArea Old) 0) (postorder_dfs g)
-  in pprTrace "ProcPoints" (ppr procPoints) $
-       pprTrace "Area SizeMap" (ppr areaSize) $
-         pprTrace "Entry SP" (ppr entrySp) $
-           pprTrace "Area Map" (ppr areaMap) $ areaMap
+  in -- pprTrace "ProcPoints" (ppr procPoints) $
+       -- pprTrace "Area SizeMap" (ppr areaSize) $
+         -- pprTrace "Entry SP" (ppr entrySp) $
+           -- pprTrace "Area Map" (ppr areaMap) $
+     areaMap
 
 -- After determining the stack layout, we can:
 -- 1. Replace references to stack Areas with addresses relative to the stack
@@ -345,7 +348,7 @@ manifestSP :: ProcPointSet -> BlockEnv Status -> AreaMap ->
 manifestSP procPoints procMap areaMap g@(LGraph entry args blocks) =
   liftM (LGraph entry args) blocks'
   where blocks' = foldl replB (return emptyBlockEnv) (postorder_dfs g)
-        slot a = pprTrace "slot" (ppr a) $
+        slot a = -- pprTrace "slot" (ppr a) $
                    lookupFM areaMap a `orElse` panic "unallocated Area"
         slot' (Just id) = slot $ CallArea (Young id)
         slot' Nothing   = slot $ CallArea Old
@@ -369,8 +372,8 @@ manifestSP procPoints procMap areaMap g@(LGraph entry args blocks) =
         replB :: FuelMonad (BlockEnv CmmBlock) -> CmmBlock -> FuelMonad (BlockEnv CmmBlock)
         replB blocks (Block id o t) =
           do bs <- replTail (Block id o) spIn t
-             pprTrace "spIn" (ppr id <+> ppr spIn)$
-              liftM (flip (foldr insertBlock) bs) blocks
+             -- pprTrace "spIn" (ppr id <+> ppr spIn) $ do
+             liftM (flip (foldr insertBlock) bs) blocks
           where spIn = sp_on_entry id
         replTail :: (ZTail Middle Last -> CmmBlock) -> Int -> (ZTail Middle Last) -> 
                     FuelMonad ([CmmBlock])
@@ -392,7 +395,7 @@ manifestSP procPoints procMap areaMap g@(LGraph entry args blocks) =
         fixSp h spOff l@(LastBranch k) =
           let succSp = sp_on_entry k in
           if succSp /= spOff then
-               pprTrace "updSp" (ppr k <> ppr spOff <> ppr (sp_on_entry k)) $
+               -- pprTrace "updSp" (ppr k <> ppr spOff <> ppr (sp_on_entry k)) $
                updSp h spOff succSp l
           else return $ [h (ZLast (LastOther (last spOff l)))]
         fixSp h spOff l = liftM (uncurry (:)) $ fold_succs succ l $ return (b, [])
