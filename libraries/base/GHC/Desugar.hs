@@ -13,10 +13,11 @@
 -----------------------------------------------------------------------------
 
 -- #hide
-module GHC.Desugar ((>>>)) where
+module GHC.Desugar ((>>>), AnnotationWrapper(..), toAnnotationWrapper) where
 
 import Control.Arrow    (Arrow(..))
 import Control.Category ((.))
+import Data.Data        (Data)
 import Prelude hiding ((.))
 
 -- A version of Control.Category.>>> overloaded on Arrow
@@ -28,3 +29,9 @@ import Prelude hiding ((.))
 --     Yes, this is a bit grotesque, but heck it works and the whole
 --     arrows stuff needs reworking anyway!
 f >>> g = g . f
+
+-- A wrapper data type that lets the typechecker get at the appropriate dictionaries for an annotation
+data AnnotationWrapper = forall a. (Data a) => AnnotationWrapper a
+
+toAnnotationWrapper :: (Data a) => a -> AnnotationWrapper
+toAnnotationWrapper what = AnnotationWrapper what
