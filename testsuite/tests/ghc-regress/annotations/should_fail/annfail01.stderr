@@ -1,0 +1,4 @@
+
+annfail01.hs:4:0: Not in scope: type constructor or class `Foo'
+
+annfail01.hs:5:0: Not in scope: `f'

@@ -1,0 +1,6 @@
+
+annfail07.hs:9:16:
+    Couldn't match expected type `[a]' against inferred type `Bool'
+    In the first argument of `head', namely `True'
+    In the expression: (head True)
+    In the annotation: {-# ANN f (head True) #-}

@@ -1,0 +1,8 @@
+
+annfail05.hs:11:0:
+    No instance for (Data.Data.Data NoInstances)
+      arising from an annotation at annfail05.hs:11:0-24
+    Possible fix:
+      add an instance declaration for (Data.Data.Data NoInstances)
+    In the expression: NoInstances
+    In the annotation: {-# ANN f NoInstances #-}

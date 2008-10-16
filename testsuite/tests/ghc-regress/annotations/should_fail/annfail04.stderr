@@ -1,0 +1,6 @@
+
+annfail04.hs:14:11:
+    GHC stage restriction: instance for `Thing Int'
+      is used in an annotation, and must be imported, not defined locally
+    In the expression: (thing :: Int)
+    In the annotation: {-# ANN f (thing :: Int) #-}

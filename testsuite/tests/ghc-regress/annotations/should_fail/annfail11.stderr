@@ -1,0 +1,4 @@
+
+annfail11.hs:3:0: Not in scope: `length'
+
+annfail11.hs:4:0: Not in scope: type constructor or class `Integer'

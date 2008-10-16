@@ -1,0 +1,12 @@
+
+annfail12.hs:5:0:
+    Exception when trying to run compile-time code:
+      You were meant to see this error!
+    In the expression:
+        (error "You were meant to see this error!" :: Int)
+    In the annotation:
+        {-# ANN f (error "You were meant to see this error!" :: Int) #-}
+Loading package ghc-prim ... linking ... done.
+Loading package integer ... linking ... done.
+Loading package base ... linking ... done.
+Loading package ffi-1.0 ... linking ... done.
