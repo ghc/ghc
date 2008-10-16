@@ -293,7 +293,7 @@ findEditor = do
 
 interactiveUI :: [(FilePath, Maybe Phase)] -> Maybe [String]
               -> Ghc ()
-interactiveUI srcs maybe_exprs = do
+interactiveUI srcs maybe_exprs = withTerminalReset $ do
    -- HACK! If we happen to get into an infinite loop (eg the user
    -- types 'let x=x in x' at the prompt), then the thread will block
    -- on a blackhole, and become unreachable during GC.  The GC will
@@ -382,6 +382,22 @@ withGhcAppData right left = do
       Right dir -> right dir
       _ -> left
 
+-- libedit doesn't always restore the terminal settings correctly (as of at 
+-- least 07/12/2008); see trac #2691.  Work around this by manually resetting
+-- the terminal outselves.
+withTerminalReset :: Ghc () -> Ghc ()
+#ifdef mingw32_HOST_OS
+withTerminalReset = id
+#else
+withTerminalReset f = do
+    isTTY <- liftIO $ hIsTerminalDevice stdout
+    if not isTTY
+        then f
+        else do
+            oldAttrs <- liftIO $ getTerminalAttributes stdOutput
+            f
+            liftIO $ setTerminalAttributes stdOutput oldAttrs Immediately
+#endif
 
 runGHCi :: [(FilePath, Maybe Phase)] -> Maybe [String] -> GHCi ()
 runGHCi paths maybe_exprs = do
