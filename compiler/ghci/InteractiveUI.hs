@@ -1739,7 +1739,8 @@ completeHomeModule w = do
 
 completeSetOptions w = do
   return (filter (w `isPrefixOf`) options)
-    where options = "args":"prog":allFlags
+    where options = "args":"prog":flagList
+          flagList = map head $ group $ sort allFlags
 
 completeFilename w = do
     ws <- Readline.filenameCompletionFunction w
