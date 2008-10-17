@@ -283,9 +283,10 @@ maintainer-clean: clean
 distclean: clean
 
 clean: $(foreach SUBDIR,$(SUBDIRS),clean.library.$(SUBDIR))
-	-cd filepath && $(CABAL) clean --distpref=dist-bootstrapping
-	-cd Cabal    && $(CABAL) clean --distpref=dist-bootstrapping
-	-cd hpc      && $(CABAL) clean --distpref=dist-bootstrapping
+	-cd extensible-exceptions && $(CABAL) clean --distpref=dist-bootstrapping
+	-cd filepath              && $(CABAL) clean --distpref=dist-bootstrapping
+	-cd Cabal                 && $(CABAL) clean --distpref=dist-bootstrapping
+	-cd hpc                   && $(CABAL) clean --distpref=dist-bootstrapping
 	$(RM) -rf bootstrapping
 	$(RM) -f bootstrapping.conf     bootstrapping.conf.old
 	$(RM) -f bootstrapping.conf.tmp bootstrapping.conf.tmp.old
