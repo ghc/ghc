@@ -64,7 +64,7 @@ data Middle
   | MidStore  CmmExpr CmmExpr    -- Assign to memory location.  Size is
                                  -- given by cmmExprType of the rhs.
 
-  | MidForeignCall               -- A foreign call;
+  | MidForeignCall               -- A foreign call; see Note [Foreign calls]
      ForeignSafety               -- Is it a safe or unsafe call?
      MidCallTarget               -- call target and convention
      CmmFormals                  -- zero or more results
@@ -142,6 +142,33 @@ data ValueDirection = Arguments | Results
   -- Arguments go with procedure definitions, jumps, and arguments to calls
   -- Results go with returns and with results of calls.
   deriving Eq
+ 
+{- Note [Foreign calls]
+~~~~~~~~~~~~~~~~~~~~~~~
+A MidForeign call is used *all* foreign calls, both *unsafe* and *safe*.
+Unsafe ones are easy: think of them as a "fat machine instruction".
+
+Safe ones are trickier.  A safe foreign call 
+     r = f(x)
+ultimately expands to
+     push "return address"	-- Never used to return to; 
+     	  	  		-- just points an info table
+     save registers into TSO
+     call suspendThread
+     r = f(x)			-- Make the call
+     call resumeThread
+     restore registers
+     pop "return address"
+We cannot "lower" a safe foreign call to this sequence of Cmms, because
+after we've saved Sp all the Cmm optimiser's assumptions are broken.
+Furthermore, currently the smart Cmm constructors know the calling
+conventions for Haskell, the garbage collector, etc, and "lower" them
+so that a LastCall passes no parameters or results.  But the smart 
+constructors do *not* (currently) know the foreign call conventions.
+
+For these reasons use MidForeignCall for all calls. The only annoying thing
+is that a safe foreign call needs an info table.
+-}
 
 ----------------------------------------------------------------------
 ----- Splicing between blocks

@@ -115,10 +115,10 @@ cgLetNoEscapeRhs local_cc bndr rhs =
      ; return info
      }
 
-cgLetNoEscapeRhsBody local_cc bndr (StgRhsClosure cc _bi _ _upd srt args body)
-  = cgLetNoEscapeClosure bndr local_cc cc srt (nonVoidIds args) body
+cgLetNoEscapeRhsBody local_cc bndr (StgRhsClosure cc _bi _ _upd _ args body)
+  = cgLetNoEscapeClosure bndr local_cc cc (nonVoidIds args) body
 cgLetNoEscapeRhsBody local_cc bndr (StgRhsCon cc con args)
-  = cgLetNoEscapeClosure bndr local_cc cc NoSRT [] (StgConApp con args)
+  = cgLetNoEscapeClosure bndr local_cc cc [] (StgConApp con args)
 	-- For a constructor RHS we want to generate a single chunk of 
 	-- code which can be jumped to from many places, which will 
 	-- return the constructor. It's easy; just behave as if it 
@@ -129,17 +129,15 @@ cgLetNoEscapeClosure
 	:: Id			-- binder
 	-> Maybe LocalReg	-- Slot for saved current cost centre
 	-> CostCentreStack   	-- XXX: *** NOT USED *** why not?
-	-> SRT
 	-> [NonVoid Id]		-- Args (as in \ args -> body)
     	-> StgExpr		-- Body (as in above)
 	-> FCode CgIdInfo
 
-cgLetNoEscapeClosure bndr cc_slot _unused_cc srt args body
+cgLetNoEscapeClosure bndr cc_slot _unused_cc args body
   = do  { arg_regs <- forkProc $ do	
 		{ restoreCurrentCostCentre cc_slot
 		; arg_regs <- bindArgsToRegs args
-		; c_srt <- getSRTInfo srt
-		; altHeapCheck arg_regs c_srt (cgExpr body)
+		; altHeapCheck arg_regs (cgExpr body)
 			-- Using altHeapCheck just reduces
 			-- instructions to save on stack
 		; return arg_regs }
@@ -262,11 +260,14 @@ data GcPlan
 			-- of the case alternative(s) into the upstream check
 
 -------------------------------------
+-- See Note [case on Bool]
 cgCase :: StgExpr -> Id -> SRT -> AltType -> [StgAlt] -> FCode ()
--- cgCase (OpApp ) bndr srt AlgAlt [(DataAlt flase, a2]
-  -- | isBoolTy (idType bndr)
-  -- , isDeadBndr bndr
-  -- = 
+{-
+cgCase (OpApp ) bndr srt AlgAlt [(DataAlt flase, a2]
+  | isBoolTy (idType bndr)
+  , isDeadBndr bndr
+  = 
+-}
 
 cgCase scrut bndr srt alt_type alts 
   = do	{ up_hp_usg <- getVirtHp	-- Upstream heap usage
@@ -280,10 +281,10 @@ cgCase scrut bndr srt alt_type alts
               gc_plan = if gcInAlts then GcInAlts alt_regs srt else NoGcInAlts
 
 	; mb_cc <- maybeSaveCostCentre simple_scrut
-	; c_srt <- getSRTInfo srt
 	; withSequel (AssignTo alt_regs gcInAlts) (cgExpr scrut)
 	; restoreCurrentCostCentre mb_cc
 
+  -- JD: We need Note: [Better Alt Heap Checks]
 	; bindArgsToRegs ret_bndrs
 	; cgAlts gc_plan (NonVoid bndr) alt_type alts }
 
@@ -402,9 +403,8 @@ cgAltRhss gc_plan bndr alts
 maybeAltHeapCheck :: GcPlan -> FCode a -> FCode a
 maybeAltHeapCheck NoGcInAlts code
   = code
-maybeAltHeapCheck (GcInAlts regs srt) code
-  = do 	{ c_srt <- getSRTInfo srt
-	; altHeapCheck regs c_srt code }
+maybeAltHeapCheck (GcInAlts regs _) code
+  = altHeapCheck regs code
 
 -----------------------------------------------------------------------------
 -- 	Tail calls
@@ -482,4 +482,77 @@ cgTailCall fun_id fun_info args
     node_points = nodeMustPointToIt lf_info
 
 
+{- Note [case on Bool]
+   ~~~~~~~~~~~~~~~~~~~
+A case on a Boolean value does two things:
+  1. It looks up the Boolean in a closure table and assigns the
+     result to the binder.
+  2. It branches to the True or False case through analysis
+     of the closure assigned to the binder.
+But the indirection through the closure table is unnecessary
+if the assignment to the binder will be dead code (use isDeadBndr).
 
+The following example illustrates how badly the code turns out:
+  STG:
+    case <=## [ww_s7Hx y_s7HD] of wild2_sbH8 {
+      GHC.Bool.False -> <true  code> // sbH8 dead
+      GHC.Bool.True  -> <false code> // sbH8 dead
+    };
+  Cmm:
+    _s7HD::F64 = F64[_sbH7::I64 + 7];  // MidAssign
+    _ccsW::I64 = %MO_F_Le_W64(_s7Hx::F64, _s7HD::F64);  // MidAssign
+    // emitReturn  // MidComment
+    _sbH8::I64 = I64[ghczmprim_GHCziBool_Bool_closure_tbl + (_ccsW::I64 << 3)];  // MidAssign
+    _ccsX::I64 = _sbH8::I64 & 7;  // MidAssign
+    if (_ccsX::I64 >= 2) goto ccsH; else goto ccsI;  // LastCondBranch
+
+The assignments to _sbH8 and _ccsX are completely unnecessary.
+Instead, we should branch based on the value of _ccsW.
+-}
+
+{- Note [Better Alt Heap Checks]
+If two function calls can share a return point, then they will also
+get the same info table. Therefore, it's worth our effort to make
+those opportunities appear as frequently as possible.
+
+Here are a few examples of how it should work:
+
+  STG:
+    case f x of
+      True  -> <True code -- including allocation>
+      False -> <False code>
+  Cmm:
+      r = call f(x) returns to L;
+   L:
+      if r & 7 >= 2 goto L1 else goto L2;
+   L1:
+      if Hp > HpLim then
+        r = gc(r);
+        goto L;
+      <True code -- including allocation>
+   L2:
+      <False code>
+Note that the code following both the call to f(x) and the code to gc(r)
+should be the same, which will allow the common blockifier to discover
+that they are the same. Therefore, both function calls will return to the same
+block, and they will use the same info table.        
+
+Here's an example of the Cmm code we want from a primOp.
+The primOp doesn't produce an info table for us to reuse, but that's okay:
+we should still generate the same code:
+  STG:
+    case f x of
+      0 -> <0-case code -- including allocation>
+      _ -> <default-case code>
+  Cmm:
+      r = a +# b;
+   L:
+      if r == 0 then goto L1 else goto L2;
+   L1:
+      if Hp > HpLim then
+        r = gc(r);
+        goto L;
+      <0-case code -- including allocation>
+   L2:
+      <default-case code>
+-}

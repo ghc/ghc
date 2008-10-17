@@ -119,17 +119,17 @@ middleDualLiveness live m =
 lastDualLiveness :: (BlockId -> DualLive) -> Last -> DualLive
 lastDualLiveness env l = last l
   where last (LastBranch id)          = env id
-        last l@(LastCall tgt Nothing  _ _) = changeRegs (gen l . kill l) empty
-        last l@(LastCall tgt (Just k) _ _) = 
+        last l@(LastCall _ Nothing  _ _) = changeRegs (gen l . kill l) empty
+        last l@(LastCall _ (Just k) _ _) = 
             -- nothing can be live in registers at this point, unless safe foreign call
             let live = env k
                 live_in = DualLive (on_stack live) (gen l emptyRegSet)
             in if isEmptyUniqSet (in_regs live) then live_in
                else pprTrace "Offending party:" (ppr k <+> ppr live) $
                     panic "live values in registers at call continuation"
-        last l@(LastCondBranch e t f)   =
+        last l@(LastCondBranch _ t f)   =
             changeRegs (gen l . kill l) $ dualUnion (env t) (env f)
-        last l@(LastSwitch e tbl)       = changeRegs (gen l . kill l) $ dualUnionList $
+        last l@(LastSwitch _ tbl)       = changeRegs (gen l . kill l) $ dualUnionList $
                                                              map env (catMaybes tbl)
         empty = fact_bot dualLiveLattice
                       
@@ -254,10 +254,10 @@ akill a live = foldRegsUsed deleteFromAvail live a
 middleAvail :: Middle -> AvailRegs -> AvailRegs
 middleAvail m = middle m
   where middle m live = middle' m $ foldRegsUsed deleteFromAvail live m
-        middle' (MidComment {})                 live = live
-        middle' (MidAssign lhs _expr)           live = akill lhs live
-        middle' (MidStore {})                   live = live
-        middle' (MidForeignCall _ _tgt ress _args) _ = AvailRegs emptyRegSet
+        middle' (MidComment {})       live = live
+        middle' (MidAssign lhs _expr) live = akill lhs live
+        middle' (MidStore {})         live = live
+        middle' (MidForeignCall {})   _    = AvailRegs emptyRegSet
 
 lastAvail :: AvailRegs -> Last -> LastOutFacts AvailRegs
 lastAvail _ (LastCall _ (Just k) _ _) = LastOutFacts [(k, AvailRegs emptyRegSet)]

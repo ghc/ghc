@@ -166,9 +166,6 @@ direct_call caller lbl arity args reps
   | otherwise		-- Over-saturated call
   = ASSERT( arity == length initial_reps )
     do	{ pap_id <- newTemp gcWord
-	; let srt = pprTrace "Urk! SRT for over-sat call" 
-			     (ppr lbl) NoC_SRT
-		-- XXX: what if rest_args contains static refs?
 	; withSequel (AssignTo [pap_id] True)
 		     (emitCall Native target fast_args)
 	; slow_call (CmmReg (CmmLocal pap_id)) 

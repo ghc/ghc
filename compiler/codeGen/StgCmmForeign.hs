@@ -117,7 +117,7 @@ emitForeignCall
 				--   only RTS procedures do this
 	-> FCode ()
 emitForeignCall safety results target args _srt ret
-  | not (playSafe safety) = do -- trace "emitForeignCall; ret is undone" $ do
+  | not (playSafe safety) = do
     let (caller_save, caller_load) = callerSaveVolatileRegs
     updfr_off <- getUpdFrameOff
     emit caller_save

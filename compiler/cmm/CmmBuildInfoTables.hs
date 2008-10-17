@@ -109,10 +109,10 @@ live_ptrs oldByte slotEnv areaMap bid =
           if off == w && widthInBytes (typeWidth ty) == w then
             (expectJust "add_slot" (lookupFM areaMap a), r, w) : rst
           else panic "live_ptrs: only part of a variable live at a proc point"
-        add_slot rst (CallArea Old, off, w) =
+        add_slot rst (CallArea Old, _, _) =
           rst -- the update frame (or return infotable) should be live
               -- would be nice to check that only that part of the callarea is live...
-        add_slot rst c@((CallArea _), _, _) =
+        add_slot rst ((CallArea _), _, _) =
           rst
           -- JD: THIS ISN'T CURRENTLY A CORRECTNESS PROBLEM, BUT WE SHOULD REALLY
           -- MAKE LIVENESS INFO AROUND CALLS MORE PRECISE -- FOR NOW, A 32-BIT
@@ -127,10 +127,10 @@ live_ptrs oldByte slotEnv areaMap bid =
 -- Construct the stack maps for the given procedure.
 setInfoTableStackMap :: SlotEnv -> AreaMap -> CmmTopForInfoTables -> CmmTopForInfoTables 
 setInfoTableStackMap _ _ t@(NoInfoTable _) = t
-setInfoTableStackMap slotEnv areaMap t@(FloatingInfoTable info bid updfr_off) =
+setInfoTableStackMap slotEnv areaMap t@(FloatingInfoTable _ bid updfr_off) =
   updInfo (const (live_ptrs updfr_off slotEnv areaMap bid)) id t
 setInfoTableStackMap slotEnv areaMap
-     t@(ProcInfoTable (CmmProc (CmmInfo _ _ infoTbl) _ _ g@(LGraph entry _ blocks))
+     t@(ProcInfoTable (CmmProc (CmmInfo _ _ infoTbl) _ _ g@(LGraph _ _ blocks))
                       procpoints) =
   case blockSetToList procpoints of
     [bid] ->
@@ -250,9 +250,7 @@ srtToData srt = Cmm [CmmData RelocatableReadOnlyData (CmmDataLabel (lbl srt) : t
 buildSRTs :: TopSRT -> FiniteMap CLabel CAFSet -> CAFSet ->
              FuelMonad (TopSRT, Maybe CmmTopZ, C_SRT)
 buildSRTs topSRT topCAFMap cafs =
-  -- This is surely the wrong way to get names, as in BlockId
-  do top_lbl <- getUniqueM >>= \ u -> return $ mkSRTLabel (mkFCallName u "srt") NoCafRefs
-     let liftCAF lbl () z = -- get CAFs for functions without static closures
+  do let liftCAF lbl () z = -- get CAFs for functions without static closures
            case lookupFM topCAFMap lbl of Just cafs -> z `plusFM` cafs
                                           Nothing   -> addToFM z lbl ()
          sub_srt topSRT localCafs =
@@ -292,7 +290,7 @@ buildSRTs topSRT topCAFMap cafs =
 -- Adapted from simpleStg/SRT.lhs, which expects Id's.
 procpointSRT :: CLabel -> FiniteMap CLabel Int -> [CLabel] ->
                 FuelMonad (Maybe CmmTopZ, C_SRT)
-procpointSRT top_srt top_table [] =
+procpointSRT _ _ [] =
  return (Nothing, NoC_SRT)
 procpointSRT top_srt top_table entries =
  do (top, srt) <- bitmap `seq` to_SRT top_srt offset len bitmap
@@ -331,7 +329,7 @@ to_SRT top_srt off len bmp
 -- Any procedure referring to a non-static CAF c must keep live the
 -- any CAF that is reachable from c.
 localCAFInfo :: CAFEnv -> CmmTopZ -> Maybe (CLabel, CAFSet)
-localCAFInfo _    t@(CmmData _ _) = Nothing
+localCAFInfo _      (CmmData _ _) = Nothing
 localCAFInfo cafEnv (CmmProc (CmmInfo _ _ infoTbl) top_l _ (LGraph entry _ _)) =
   case infoTbl of
     CmmInfoTable False _ _ _ ->
@@ -382,12 +380,12 @@ bundleCAFs _ t@(NoInfoTable _) = (emptyFM, t)
 -- Construct the SRTs for the given procedure.
 setInfoTableSRT :: FiniteMap CLabel CAFSet -> TopSRT -> (CAFSet, CmmTopForInfoTables) ->
                    FuelMonad (TopSRT, [CmmTopForInfoTables])
-setInfoTableSRT topCAFMap topSRT (cafs, t@(ProcInfoTable p procpoints)) =
+setInfoTableSRT topCAFMap topSRT (cafs, t@(ProcInfoTable _ procpoints)) =
   case blockSetToList procpoints of
-    [bid] -> setSRT cafs topCAFMap topSRT t
-    _     -> panic "setInfoTableStackMap: unexpect number of procpoints"
-             -- until we stop splitting the graphs at procpoints in the native path
-setInfoTableSRT topCAFMap topSRT (cafs, t@(FloatingInfoTable info bid _)) =
+    [_] -> setSRT cafs topCAFMap topSRT t
+    _   -> panic "setInfoTableStackMap: unexpect number of procpoints"
+           -- until we stop splitting the graphs at procpoints in the native path
+setInfoTableSRT topCAFMap topSRT (cafs, t@(FloatingInfoTable _ _ _)) =
   setSRT cafs topCAFMap topSRT t
 setInfoTableSRT _ topSRT (_, t@(NoInfoTable _)) = return (topSRT, [t])
 
@@ -406,7 +404,7 @@ updInfo toVars toSrt (ProcInfoTable (CmmProc info top_l top_args g) procpoints) 
   ProcInfoTable (CmmProc (updInfoTbl toVars toSrt info) top_l top_args g) procpoints
 updInfo toVars toSrt (FloatingInfoTable info bid updfr_off) =
   FloatingInfoTable (updInfoTbl toVars toSrt info) bid updfr_off
-updInfo toVars toSrt (NoInfoTable _) = panic "can't update NoInfoTable"
+updInfo _ _ (NoInfoTable _) = panic "can't update NoInfoTable"
 updInfo _ _ _ = panic "unexpected arg to updInfo"
 
 updInfoTbl :: (StackLayout -> StackLayout) -> (C_SRT -> C_SRT) -> CmmInfo -> CmmInfo 
@@ -418,7 +416,7 @@ updInfoTbl toVars toSrt (CmmInfo gc upd_fr (CmmInfoTable s p t typeinfo))
             (ThunkInfo  c s)        -> ThunkInfo c (toSrt s)
             (ThunkSelectorInfo x s) -> ThunkSelectorInfo x (toSrt s)
             (ContInfo v s)          -> ContInfo (toVars v) (toSrt s)
-updInfoTbl toVars toSrt t@(CmmInfo _ _ CmmNonInfoTable) = t
+updInfoTbl _ _ t@(CmmInfo _ _ CmmNonInfoTable) = t
   
 -- Lower the CmmTopForInfoTables type down to good old CmmTopZ
 -- by emitting info tables as data where necessary.
@@ -437,16 +435,16 @@ finishInfoTables (FloatingInfoTable (CmmInfo _ _ infotbl) bid _) =
 extendEnvsForSafeForeignCalls :: CAFEnv -> SlotEnv -> CmmGraph -> (CAFEnv, SlotEnv)
 extendEnvsForSafeForeignCalls cafEnv slotEnv g =
   fold_blocks block (cafEnv, slotEnv) g
-    where block b@(Block _ _ t) z =
+    where block b z =
             tail ( bt_last_in cafTransfers      (lookupFn cafEnv)  l
                  , bt_last_in liveSlotTransfers (lookupFn slotEnv) l)
                  z head
              where (head, last) = goto_end (G.unzip b)
                    l = case last of LastOther l -> l
                                     LastExit -> panic "extendEnvs lastExit"
-          tail lives z (ZFirst _ _) = z
+          tail _ z (ZFirst _ _) = z
           tail lives@(cafs, slots) (cafEnv, slotEnv)
-               (ZHead h m@(MidForeignCall (Safe bid updfr_off) _ _ _)) =
+               (ZHead h m@(MidForeignCall (Safe bid _) _ _ _)) =
             let slots'   = removeLiveSlotDefs slots m
                 slotEnv' = extendBlockEnv slotEnv bid slots'
                 cafEnv'  = extendBlockEnv cafEnv  bid cafs
@@ -489,11 +487,9 @@ data SafeState = State { s_blocks    :: BlockEnv CmmBlock
                        , s_safeCalls :: [CmmTopForInfoTables]}
 
 lowerSafeForeignCalls
-  :: ProcPointSet ->           [[CmmTopForInfoTables]] ->
-          CmmTopZ -> FuelMonad [[CmmTopForInfoTables]]
-lowerSafeForeignCalls _ rst t@(CmmData _ _) = return $ [NoInfoTable t] : rst
-lowerSafeForeignCalls procpoints rst
-                      t@(CmmProc info l args g@(LGraph entry off blocks)) = do
+  :: [[CmmTopForInfoTables]] -> CmmTopZ -> FuelMonad [[CmmTopForInfoTables]]
+lowerSafeForeignCalls rst t@(CmmData _ _) = return $ [NoInfoTable t] : rst
+lowerSafeForeignCalls rst (CmmProc info l args g@(LGraph entry off _)) = do
   let init = return $ State emptyBlockEnv emptyBlockSet []
   let block b@(Block bid _ _) z = do
         state@(State {s_pps = ppset, s_blocks = blocks}) <- z
@@ -510,7 +506,7 @@ lowerSafeForeignCalls procpoints rst
 -- Check for foreign calls -- if none, then we can avoid copying the block.
 hasSafeForeignCall :: CmmBlock -> Bool
 hasSafeForeignCall (Block _ _ t) = tail t
-  where tail (ZTail (MidForeignCall (Safe _ _) _ _ _) t) = True
+  where tail (ZTail (MidForeignCall (Safe _ _) _ _ _) _) = True
         tail (ZTail _ t) = tail t
         tail (ZLast _)   = False
 
@@ -536,7 +532,7 @@ lowerSafeCallBlock state b = tail (return state) (ZBlock head (ZLast last))
 -- to lower a safe foreign call to a sequence of unsafe calls.
 lowerSafeForeignCall ::
   SafeState -> Middle -> ZTail Middle Last -> FuelMonad (SafeState, ZTail Middle Last)
-lowerSafeForeignCall state m@(MidForeignCall (Safe infotable updfr) _ _ _) tail = do
+lowerSafeForeignCall state m@(MidForeignCall (Safe infotable _) _ _ _) tail = do
     let newTemp rep = getUniqueM >>= \u -> return (LocalReg u rep)
     -- Both 'id' and 'new_base' are KindNonPtr because they're
     -- RTS-only objects and are not subject to garbage collection

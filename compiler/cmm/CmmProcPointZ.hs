@@ -385,7 +385,7 @@ add_CopyOuts protos procPoints g = fold_blocks mb_copy_out (return emptyBlockEnv
 -- Input invariant: A block should only be reachable from a single ProcPoint.
 splitAtProcPoints :: CLabel -> ProcPointSet-> ProcPointSet -> BlockEnv Status ->
                      AreaMap -> CmmTopZ -> FuelMonad [CmmTopZ]
-splitAtProcPoints entry_label callPPs procPoints procMap areaMap
+splitAtProcPoints entry_label callPPs procPoints procMap _areaMap
                   (CmmProc (CmmInfo gc upd_fr info_tbl) top_l top_args
                            g@(LGraph entry e_off blocks)) =
   do -- Build a map from procpoints to the blocks they reach
@@ -402,7 +402,7 @@ splitAtProcPoints entry_label callPPs procPoints procMap areaMap
                where graph  = lookupBlockEnv graphEnv procId `orElse` emptyBlockEnv
                      graph' = extendBlockEnv graph bid b
      graphEnv_pre <- return $ fold_blocks addBlock emptyBlockEnv g
-     graphEnv <- return {- $ pprTrace "graphEnv" (ppr graphEnv_pre) -} graphEnv_pre
+     graphEnv <- {- pprTrace "graphEnv" (ppr graphEnv_pre) -} return graphEnv_pre
      -- Build a map from proc point BlockId to labels for their new procedures
      let add_label map pp = return $ addToFM map pp lbl
            where lbl = if pp == entry then entry_label else blockLbl pp
@@ -459,7 +459,7 @@ splitAtProcPoints entry_label callPPs procPoints procMap areaMap
      graphEnv_pre <- foldM add_jumps emptyBlockEnv $ blockEnvToList graphEnv
      graphEnv <- return $ -- pprTrace "graphEnv with jump blocks" (ppr graphEnv_pre)
                                          graphEnv_pre
-     let to_proc (bid, g@(LGraph g_entry _ blocks)) | elemBlockSet bid callPPs =
+     let to_proc (bid, g) | elemBlockSet bid callPPs =
            if bid == entry then 
              CmmProc (CmmInfo gc upd_fr info_tbl) top_l top_args g
            else
@@ -476,9 +476,9 @@ splitAtProcPoints entry_label callPPs procPoints procMap areaMap
            compare (expectJust "block_order" $ lookupBlockEnv block_order bid)
                    (expectJust "block_order" $ lookupBlockEnv block_order bid')
      procs <- return $ map to_proc $ sortBy sort_fn $ blockEnvToList graphEnv
-     return -- $ pprTrace "procLabels" (ppr procLabels)
-            -- $ pprTrace "splitting graphs" (ppr procs)
-            $ procs
+     return -- pprTrace "procLabels" (ppr procLabels)
+            -- pprTrace "splitting graphs" (ppr procs)
+            procs
 splitAtProcPoints _ _ _ _ _ t@(CmmData _ _) = return [t]
 
 ----------------------------------------------------------------

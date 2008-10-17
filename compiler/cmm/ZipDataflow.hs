@@ -900,7 +900,7 @@ backward_rew check_maybe = back
           rewrite start g exit_fact fuel =
            let Graph entry blockenv = g
                blocks = reverse $ G.postorder_dfs_from blockenv entry
-           in do { (FP env in_fact _ _ _, _) <-    -- don't drop the entry fact!
+           in do { (FP _ in_fact _ _ _, _) <-    -- don't drop the entry fact!
                      solve depth name start transfers rewrites g exit_fact fuel
                  --; env <- getAllFacts
                  -- ; my_trace "facts after solving" (ppr env) $ return ()
@@ -1070,11 +1070,11 @@ subAnalysis' :: (Monad (m f), DataflowAnalysis m, Outputable f) =>
                 m f a -> m f a
 subAnalysis' m =
     do { a <- subAnalysis $
-               do { a <- m; facts <- getAllFacts
+               do { a <- m; -- facts <- getAllFacts
                   ; -- my_trace "after sub-analysis facts are" (pprFacts facts) $
                     return a }
-       ; facts <- getAllFacts
+       -- ; facts <- getAllFacts
        ; -- my_trace "in parent analysis facts are" (pprFacts facts) $
          return a }
-  where pprFacts env = nest 2 $ vcat $ map pprFact $ blockEnvToList env
-        pprFact (id, a) = hang (ppr id <> colon) 4 (ppr a)
+  -- where pprFacts env = nest 2 $ vcat $ map pprFact $ blockEnvToList env
+        -- pprFact (id, a) = hang (ppr id <> colon) 4 (ppr a)

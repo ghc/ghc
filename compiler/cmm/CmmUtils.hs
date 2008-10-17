@@ -70,7 +70,7 @@ primRepForeignHint IntRep	= SignedHint
 primRepForeignHint WordRep	= NoHint
 primRepForeignHint Int64Rep	= SignedHint
 primRepForeignHint Word64Rep	= NoHint
-primRepForeignHint AddrRep     = AddrHint -- NB! AddrHint, but NonPtrArg
+primRepForeignHint AddrRep      = AddrHint -- NB! AddrHint, but NonPtrArg
 primRepForeignHint FloatRep	= NoHint
 primRepForeignHint DoubleRep	= NoHint
 

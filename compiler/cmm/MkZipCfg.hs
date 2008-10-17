@@ -310,7 +310,7 @@ withUnique ofU = AGraph f
                  f' g
 
 outOfLine (AGraph f) = AGraph f'
-    where f' g@(Graph tail' blocks') =
+    where f' (Graph tail' blocks') =
             do Graph emptyEntrance blocks <- f emptyGraph
                note_this_code_becomes_unreachable "outOfLine" (ppr tail') emptyEntrance
                return $ Graph tail' (blocks `plusBlockEnv` blocks')

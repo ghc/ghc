@@ -883,10 +883,10 @@ getSRTInfo (SRTEntries {}) = panic "getSRTInfo"
 getSRTInfo (SRT off len bmp)
   | len > hALF_WORD_SIZE_IN_BITS || bmp == [fromIntegral srt_escape]
   = do 	{ id <- newUnique
-	; top_srt <- getSRTLabel
+	-- ; top_srt <- getSRTLabel
         ; let srt_desc_lbl = mkLargeSRTLabel id
         -- JD: We're not constructing and emitting SRTs in the back end,
-        -- which renders this code wrong (and it now names a now-non-existent label).
+        -- which renders this code wrong (it now names a now-non-existent label).
 	-- ; emitRODataLits srt_desc_lbl
         --      ( cmmLabelOffW top_srt off
 	--        : mkWordCLit (fromIntegral len)

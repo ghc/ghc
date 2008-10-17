@@ -808,7 +808,7 @@ testCmmConversion hsc_env cmm =
        let zgraph = initUs_ us cvtm
        us <- mkSplitUniqSupply 'S'
        let topSRT = initUs_ us emptySRT
-       (topSRT, [cps_zgraph]) <- protoCmmCPSZ hsc_env (topSRT, []) zgraph
+       (_, [cps_zgraph]) <- protoCmmCPSZ hsc_env (topSRT, []) zgraph
        let chosen_graph = if dopt Opt_RunCPSZ dflags then cps_zgraph else zgraph
        dumpIfSet_dyn dflags Opt_D_dump_cmmz "C-- Zipper Graph" (ppr chosen_graph)
        showPass dflags "Convert from Z back to Cmm"

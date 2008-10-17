@@ -1,5 +1,5 @@
 module OptimizationFuel
-    ( OptimizationFuel ,  canRewriteWithFuel, maybeRewriteWithFuel, oneLessFuel
+    ( OptimizationFuel,  canRewriteWithFuel, maybeRewriteWithFuel, oneLessFuel
     , OptFuelState, initOptFuelState --, setTotalFuel
     , tankFilledTo, diffFuel
     , FuelConsumer

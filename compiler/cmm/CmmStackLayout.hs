@@ -147,7 +147,7 @@ liveLastOut env l =
   case l of
     LastCall _ Nothing n _ -> 
       add_area (CallArea Old) n out -- add outgoing args (includes upd frame)
-    LastCall _ (Just k) n (Just upd_n) ->
+    LastCall _ (Just k) n (Just _) ->
       add_area (CallArea Old) n (add_area (CallArea (Young k)) n out)
     LastCall _ (Just k) n Nothing ->
       add_area (CallArea (Young k)) n out
@@ -286,7 +286,7 @@ allocSlotFrom ig areaSize from areaMap area =
 -- Note: The stack pointer only has to be younger than the youngest live stack slot
 -- at proc points. Otherwise, the stack pointer can point anywhere.
 layout :: ProcPointSet -> SlotEnv -> LGraph Middle Last -> AreaMap
-layout procPoints env g@(LGraph _ entrySp _) =
+layout procPoints env g =
   let builder = areaBuilder
       ig = (igraph builder env g, builder)
       env' bid = lookupBlockEnv env bid `orElse` panic "unknown blockId in igraph"
@@ -386,7 +386,7 @@ manifestSP procPoints procMap areaMap g@(LGraph entry args blocks) =
         middle spOff m = mapExpDeepMiddle (replSlot spOff) m
         last   spOff l = mapExpDeepLast   (replSlot spOff) l
         replSlot spOff (CmmStackSlot a i) = CmmRegOff (CmmGlobal Sp) (spOff - (slot a + i))
-        replSlot spOff (CmmLit CmmHighStackMark) = -- replacing the high water mark
+        replSlot _ (CmmLit CmmHighStackMark) = -- replacing the high water mark
           CmmLit (CmmInt (toInteger (max 0 (sp_high - proc_entry_sp))) (typeWidth bWord))
         replSlot _ e = e
         -- The block must establish the SP expected at each successsor.
@@ -419,7 +419,7 @@ manifestSP procPoints procMap areaMap g@(LGraph entry args blocks) =
 maxSlot :: (Area -> Int) -> CmmGraph -> Int
 maxSlot slotOff g = fold_blocks (fold_fwd_block (\ _ _ x -> x) highSlot highSlot) 0 g
   where highSlot i z = foldSlotsUsed add (foldSlotsDefd add z i) i
-        add z (a, i, w) = max z (slotOff a + i)
+        add z (a, i, _) = max z (slotOff a + i)
 
 -----------------------------------------------------------------------------
 -- | Sanity check: stub pointers immediately after they die

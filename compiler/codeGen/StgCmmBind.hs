@@ -84,7 +84,7 @@ cgTopRhsClosure id ccs _ upd_flag srt args body = do
 	(_, _, fv_details) = mkVirtHeapOffsets (isLFThunk lf_info) 
 				               (addIdReps [])
   -- Don't drop the non-void args until the closure info has been made
-  ; forkClosureBody (closureCodeBody True id closure_info ccs srt_info
+  ; forkClosureBody (closureCodeBody True id closure_info ccs
                                      (nonVoidIds args) (length args) body fv_details)
 
   ; pprTrace "arity for" (ppr id <+> ppr (length args) <+> ppr args) $
@@ -293,7 +293,7 @@ mkRhsClosure bndr cc _ fvs upd_flag srt args body
 		-- forkClosureBody: (a) ensure that bindings in here are not seen elsewhere
 		-- 		    (b) ignore Sequel from context; use empty Sequel
 		-- And compile the body
-		closureCodeBody False bndr closure_info cc c_srt (nonVoidIds args)
+		closureCodeBody False bndr closure_info cc (nonVoidIds args)
                                 (length args) body fv_details
 
 	-- BUILD THE OBJECT
@@ -361,7 +361,6 @@ closureCodeBody :: Bool            -- whether this is a top-level binding
                 -> Id              -- the closure's name
 		-> ClosureInfo	   -- Lots of information about this closure
 		-> CostCentreStack -- Optional cost centre attached to closure
-		-> C_SRT
 	 	-> [NonVoid Id]    -- incoming args to the closure
 	 	-> Int             -- arity, including void args
 		-> StgExpr
@@ -381,12 +380,12 @@ closureCodeBody :: Bool            -- whether this is a top-level binding
   argSatisfactionCheck (by calling fetchAndReschedule).  
   There info if Node points to closure is available. -- HWL -}
 
-closureCodeBody top_lvl bndr cl_info cc srt args arity body fv_details
+closureCodeBody top_lvl bndr cl_info cc args arity body fv_details
   | length args == 0 -- No args i.e. thunk
   = emitClosureProcAndInfoTable top_lvl bndr cl_info [] $
-      (\ (node, _) -> thunkCode cl_info fv_details cc srt node arity body)
+      (\ (node, _) -> thunkCode cl_info fv_details cc node arity body)
 
-closureCodeBody top_lvl bndr cl_info cc srt args arity body fv_details
+closureCodeBody top_lvl bndr cl_info cc args arity body fv_details
   = ASSERT( length args > 0 )
     do	{ 	-- Allocate the global ticky counter,
 	   	-- and establish the ticky-counter 
@@ -407,7 +406,7 @@ closureCodeBody top_lvl bndr cl_info cc srt args arity body fv_details
 		; granYield arg_regs node_points
 
 			-- Main payload
-		; entryHeapCheck node arity arg_regs srt $ do
+		; entryHeapCheck node arity arg_regs $ do
 		{ enterCostCentre cl_info cc body
                 ; fv_bindings <- mapM bind_fv fv_details
 		; load_fvs node lf_info fv_bindings -- Load free vars out of closure *after*
@@ -454,15 +453,15 @@ mkSlowEntryCode _ [] = panic "entering a closure with no arguments?"
 
 -----------------------------------------
 thunkCode :: ClosureInfo -> [(NonVoid Id, VirtualHpOffset)] -> CostCentreStack ->
-             C_SRT -> LocalReg -> Int -> StgExpr -> FCode ()
-thunkCode cl_info fv_details cc srt node arity body 
+             LocalReg -> Int -> StgExpr -> FCode ()
+thunkCode cl_info fv_details cc node arity body 
   = do	{ let node_points = nodeMustPointToIt (closureLFInfo cl_info)
    	; tickyEnterThunk cl_info
 	; ldvEnterClosure cl_info  -- NB: Node always points when profiling
 	; granThunk node_points
 
         -- Heap overflow check
-	; entryHeapCheck node arity [] srt $ do
+	; entryHeapCheck node arity [] $ do
       	{	-- Overwrite with black hole if necessary
 		-- but *after* the heap-overflow check
 	  whenC (blackHoleOnEntry cl_info && node_points)

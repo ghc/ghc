@@ -432,10 +432,10 @@ raInsn block_live new_instrs (Instr instr (Just live))
 			 Just loc ->
 			   setAssigR (addToUFM (delFromUFM assig src) dst loc)
 
-	   -- we have elimianted this instruction
-	   freeregs <- getFreeRegsR
-    	   assig <- getAssigR
+	   -- we have eliminated this instruction
           {-
+	  freeregs <- getFreeRegsR
+    	  assig <- getAssigR
           pprTrace "raInsn" (text "ELIMINATED: " <> docToSDoc (pprInstr instr) $$ ppr r_dying <+> ppr w_dying $$ text (show freeregs) $$ ppr assig) $ do
           -}
 	   return (new_instrs, [])

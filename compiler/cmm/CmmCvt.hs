@@ -44,7 +44,7 @@ toZgraph fun_name args g@(ListGraph (BasicBlock id ss : other_blocks)) =
         mkStmts (CmmComment s  : ss)  = mkComment s  <*> mkStmts ss
         mkStmts (CmmAssign l r : ss)  = mkAssign l r <*> mkStmts ss
         mkStmts (CmmStore  l r : ss)  = mkStore  l r <*> mkStmts ss
-        mkStmts (CmmCall (CmmCallee f conv) res args (CmmSafe srt) CmmMayReturn : ss) =
+        mkStmts (CmmCall (CmmCallee f conv) res args (CmmSafe _) CmmMayReturn : ss) =
             mkCall f conv' (map hintlessCmm res) (map hintlessCmm args) updfr_sz
             <*> mkStmts ss 
               where conv' = Foreign (ForeignConvention conv [] []) -- JD: DUBIOUS

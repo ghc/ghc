@@ -116,7 +116,7 @@ cpsTop hsc_env (CmmProc h l args g) =
        mapM (dump Opt_D_dump_cmmz "after splitting") gs
        let localCAFs = catMaybes $ map (localCAFInfo cafEnv) gs
        mbpprTrace "localCAFs" (ppr localCAFs) $ return ()
-       gs <- liftM concat $ run $ foldM (lowerSafeForeignCalls procPoints) [] gs
+       gs <- liftM concat $ run $ foldM lowerSafeForeignCalls [] gs
        mapM (dump Opt_D_dump_cmmz "after lowerSafeForeignCalls") gs
 
        -- NO MORE GRAPH TRANSFORMATION AFTER HERE -- JUST MAKING INFOTABLES

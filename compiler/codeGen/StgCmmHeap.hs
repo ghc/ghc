@@ -337,11 +337,10 @@ These are used in the following circumstances
 entryHeapCheck :: LocalReg	-- Function (closure environment)
 	       -> Int           -- Arity -- not same as length args b/c of voids
 	       -> [LocalReg]	-- Non-void args (empty for thunk)
-	       -> C_SRT
 	       -> FCode ()
 	       -> FCode ()
 
-entryHeapCheck fun arity args srt code
+entryHeapCheck fun arity args code
   = do updfr_sz <- getUpdFrameOff
        heapCheck True (gc_call updfr_sz) code   -- The 'fun' keeps relevant CAFs alive
   where
@@ -381,8 +380,8 @@ entryHeapCheck fun arity args srt code
     gc_lbl_ptrs _ = Nothing
     			
 
-altHeapCheck :: [LocalReg] -> C_SRT -> FCode a -> FCode a
-altHeapCheck regs srt code
+altHeapCheck :: [LocalReg] -> FCode a -> FCode a
+altHeapCheck regs code
   = do updfr_sz <- getUpdFrameOff
        heapCheck False (gc_call updfr_sz) code
   where
