@@ -103,7 +103,7 @@ matchOneCon vars ty (eqn1 : eqns)	-- All eqns for a single constructor
   = do	{ (wraps, eqns') <- mapAndUnzipM shift (eqn1:eqns)
 	; arg_vars <- selectMatchVars (take (dataConSourceArity con1) 
 					    (eqn_pats (head eqns')))
-		-- Use the new arugment patterns as a source of 
+		-- Use the new argument patterns as a source of 
 		-- suggestions for the new variables
 	; match_result <- match (arg_vars ++ vars) ty eqns'
       	; return (con1, tvs1 ++ dicts1 ++ arg_vars, 
