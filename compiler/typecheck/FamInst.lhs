@@ -36,6 +36,16 @@ check whether the instances in the two modules are consistent, *unless* we can
 be certain that the instances of the two modules have already been checked for
 consistency during the compilation of modules that we import.
 
+Why do we need to check?  Consider 
+   module X1 where	  	  module X2 where
+    data T1			    data T2
+    type instance F T1 b = Int	    type instance F a T2 = Char
+    f1 :: F T1 a -> Int		    f2 :: Char -> F a T2
+    f1 x = x			    f2 x = x
+
+Now if we import both X1 and X2 we could make (f2 . f1) :: Int -> Char.
+Notice that neither instance is an orphan.
+
 How do we know which pairs of modules have already been checked?  Any pair of
 modules where both modules occur in the `HscTypes.dep_finsts' set (of the
 `HscTypes.Dependencies') of one of our directly imported modules must have
