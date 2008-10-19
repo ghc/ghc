@@ -9,6 +9,10 @@ case $* in
 --inplace)
     HADDOCK=../utils/haddock/install-inplace/bin/haddock
     HADDOCK_FILES=`ls -1 */dist/doc/html/*/*.haddock | sort`
+    if [ -d dph ]
+    then
+        HADDOCK_FILES="$HADDOCK_FILES `ls -1 dph/*/dist/doc/html/*/*.haddock | sort`"
+    fi
     ;;
 *)
     HADDOCK=../../../../bin/haddock
@@ -19,7 +23,7 @@ esac
 
 for HADDOCK_FILE in $HADDOCK_FILES
 do
-    NAME=`echo "$HADDOCK_FILE" | sed 's#/.*##'`
+    NAME=` echo "$HADDOCK_FILE" | sed 's#/dist/.*##' | sed 's#.*/##' `
     HADDOCK_ARGS="$HADDOCK_ARGS --read-interface=$NAME,$HADDOCK_FILE"
     NAMES="$NAMES $NAME"
 done
