@@ -294,7 +294,8 @@ mkDataConIds wrap_name wkr_name data_con
 
     id_arg1 = mkTemplateLocal 1 
                 (if null orig_arg_tys
-                    then ASSERT(not (null $ dataConDictTheta data_con)) mkPredTy $ head (dataConDictTheta data_con)
+                    then ASSERT(not (null $ dataConDictTheta data_con)) 
+			 mkPredTy $ head (dataConDictTheta data_con)
                     else head orig_arg_tys
                 )
 
@@ -335,12 +336,12 @@ mkDataConIds wrap_name wkr_name data_con
         -- we want to see that w is strict in its two arguments
 
     wrap_unf = mkImplicitUnfolding $ Note InlineMe $
-              mkLams wrap_tvs $ 
-              mkLams eq_args $
-              mkLams dict_args $ mkLams id_args $
-              foldr mk_case con_app 
-                    (zip (dict_args ++ id_args) all_strict_marks)
-                    i3 []
+               mkLams wrap_tvs $ 
+               mkLams eq_args $
+               mkLams dict_args $ mkLams id_args $
+               foldr mk_case con_app 
+                     (zip (dict_args ++ id_args) all_strict_marks)
+                     i3 []
 
     con_app _ rep_ids = wrapFamInstBody tycon res_ty_args $
                           Var wrk_id `mkTyApps`  res_ty_args
