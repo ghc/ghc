@@ -2125,10 +2125,17 @@ threadStackOverflow(Capability *cap, StgTSO *tso)
   }
 
   /* Try to double the current stack size.  If that takes us over the
-   * maximum stack size for this thread, then use the maximum instead.
-   * Finally round up so the TSO ends up as a whole number of blocks.
+   * maximum stack size for this thread, then use the maximum instead
+   * (that is, unless we're already at or over the max size and we
+   * can't raise the StackOverflow exception (see above), in which
+   * case just double the size). Finally round up so the TSO ends up as
+   * a whole number of blocks.
    */
-  new_stack_size = stg_min(tso->stack_size * 2, tso->max_stack_size);
+  if (tso->stack_size >= tso->max_stack_size) {
+      new_stack_size = tso->stack_size * 2;
+  } else { 
+      new_stack_size = stg_min(tso->stack_size * 2, tso->max_stack_size);
+  }
   new_tso_size   = (lnat)BLOCK_ROUND_UP(new_stack_size * sizeof(W_) + 
 				       TSO_STRUCT_SIZE)/sizeof(W_);
   new_tso_size = round_to_mblocks(new_tso_size);  /* Be MBLOCK-friendly */
