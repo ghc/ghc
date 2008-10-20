@@ -191,11 +191,13 @@ main = handleTopExceptions $ do
       -- create the interfaces -- this is the core part of Haddock
       (interfaces, homeLinks) <- createInterfaces session fileArgs extLinks flags
 
+      let visibleIfaces = [ i | i <- interfaces, OptHide `notElem` ifaceOptions i ]
+
       -- render the interfaces
-      renderStep packages interfaces
+      renderStep packages visibleIfaces
  
       -- last but not least, dump the interface file
-      dumpInterfaceFile (map toInstalledIface interfaces) homeLinks flags
+      dumpInterfaceFile (map toInstalledIface visibleIfaces) homeLinks flags
 #endif
     else do
       -- get packages supplied with --read-interface
@@ -212,7 +214,7 @@ main = handleTopExceptions $ do
 
 -- | Render the interfaces with whatever backend is specified in the flags 
 render :: [Flag] -> [Interface] -> [InstalledInterface] -> IO ()
-render flags interfaces installedIfaces = do
+render flags visibleIfaces installedIfaces = do
   let
     title = case [str | Flag_Heading str <- flags] of
 		[] -> ""
@@ -267,9 +269,6 @@ render flags interfaces installedIfaces = do
   prologue <- getPrologue flags
 
   let 
-    -- visible home-module interfaces
-    visibleIfaces = [ m | m <- interfaces, OptHide `notElem` (ifaceOptions m) ]
-
     -- *all* visible interfaces including external package modules
     allVisibleIfaces = map toInstalledIface visibleIfaces
                        ++ installedIfaces
