@@ -196,6 +196,20 @@ module GHC (
         srcSpanStartLine, srcSpanEndLine, 
         srcSpanStartCol, srcSpanEndCol,
 
+        -- ** Located
+	Located(..),
+
+	-- *** Constructing Located
+	noLoc, mkGeneralLocated,
+
+	-- *** Deconstructing Located
+	getLoc, unLoc,
+
+	-- *** Combining and comparing Located values
+	eqLocated, cmpLocated, combineLocs, addCLoc,
+        leftmost_smallest, leftmost_largest, rightmost,
+        spans, isSubspanOf,
+
 	-- * Exceptions
 	GhcException(..), showGhcException,
 
