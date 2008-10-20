@@ -58,7 +58,7 @@ module SrcLoc (
 	
 	-- ** Constructing Located
 	noLoc,
-    mkGeneralLocated,
+        mkGeneralLocated,
 	
 	-- ** Deconstructing Located
 	getLoc, unLoc, 
