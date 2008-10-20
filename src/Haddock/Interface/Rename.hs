@@ -130,10 +130,6 @@ runRnFM env rn = unRn rn lkp
 --------------------------------------------------------------------------------
 
 
-keep n = Undocumented n
-keepL (L loc n) = L loc (Undocumented n)
-
-
 rename = lookupRn id 
 renameL (L loc name) = return . L loc =<< rename name
 
@@ -341,12 +337,13 @@ renameTyClD d = case d of
   where
     renameLCon (L loc con) = return . L loc =<< renameCon con
     renameCon (ConDecl lname expl ltyvars lcontext details restype mbldoc) = do
+      lname'    <- renameL lname
       ltyvars'  <- mapM renameLTyVarBndr ltyvars
       lcontext' <- renameLContext lcontext
       details'  <- renameDetails details
       restype'  <- renameResType restype
       mbldoc'   <- mapM renameLDoc mbldoc
-      return (ConDecl (keepL lname) expl ltyvars' lcontext' details' restype' mbldoc') 
+      return (ConDecl lname' expl ltyvars' lcontext' details' restype' mbldoc') 
 
     renameDetails (RecCon fields) = return . RecCon =<< mapM renameField fields
     renameDetails (PrefixCon ps) = return . PrefixCon =<< mapM renameLType ps
@@ -356,14 +353,18 @@ renameTyClD d = case d of
       return (InfixCon a' b')
 
     renameField (ConDeclField name t doc) = do
+      name' <- renameL name
       t'   <- renameLType t
       doc' <- mapM renameLDoc doc
-      return (ConDeclField (keepL name) t' doc')
+      return (ConDeclField name' t' doc')
 
     renameResType (ResTyH98) = return ResTyH98
     renameResType (ResTyGADT t) = return . ResTyGADT =<< renameLType t
 
-    renameLFunDep (L loc (xs, ys)) = return (L loc (map keep xs, map keep ys))
+    renameLFunDep (L loc (xs, ys)) = do
+      xs' <- mapM rename xs
+      ys' <- mapM rename ys
+      return (L loc (xs', ys'))
    
     renameLSig (L loc sig) = return . L loc =<< renameSig sig
 
@@ -377,11 +378,13 @@ renameSig sig = case sig of
 
 
 renameForD (ForeignImport lname ltype x) = do
+  lname' <- renameL lname
   ltype' <- renameLType ltype
-  return (ForeignImport (keepL lname) ltype' x)
+  return (ForeignImport lname' ltype' x)
 renameForD (ForeignExport lname ltype x) = do
+  lname' <- renameL lname
   ltype' <- renameLType ltype
-  return (ForeignExport (keepL lname) ltype' x)
+  return (ForeignExport lname' ltype' x)
 
 
 renameInstD (InstDecl ltype _ _ lATs) = do
