@@ -29,6 +29,7 @@ import qualified Data.Map as Map
 import Data.Map (Map)
 import Data.List
 import Control.Monad
+import Control.Exception ( evaluate )
 
 import GHC
 import Name
@@ -148,6 +149,7 @@ processModule modsum flags modMap =
                              dynflags
        let (interface, msg) = runWriter $ createInterface ghcMod flags modMap
        liftIO $ mapM_ putStrLn msg
+       liftIO $ evaluate interface
        return interface
 #else
 processModule :: Session -> ModSummary -> [Flag] -> ModuleMap -> IO Interface
