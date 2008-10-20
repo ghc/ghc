@@ -393,10 +393,9 @@ withTerminalReset f = do
     isTTY <- liftIO $ hIsTerminalDevice stdout
     if not isTTY
         then f
-        else do
-            oldAttrs <- liftIO $ getTerminalAttributes stdOutput
-            f
-            liftIO $ setTerminalAttributes stdOutput oldAttrs Immediately
+        else gbracket (liftIO $ getTerminalAttributes stdOutput)
+                (\attrs -> liftIO $ setTerminalAttributes stdOutput attrs Immediately)
+                (const f)
 #endif
 
 runGHCi :: [(FilePath, Maybe Phase)] -> Maybe [String] -> GHCi ()
