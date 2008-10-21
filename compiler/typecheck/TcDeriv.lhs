@@ -74,13 +74,16 @@ data DerivSpec  = DS { ds_loc     :: SrcSpan
 		     , ds_theta   :: ThetaType
 		     , ds_cls     :: Class
 		     , ds_tys     :: [Type]
+		     , ds_tc      :: TyCon
 		     , ds_newtype :: Bool }
 	-- This spec implies a dfun declaration of the form
 	--	 df :: forall tvs. theta => C tys
 	-- The Name is the name for the DFun we'll build
 	-- The tyvars bind all the variables in the theta
-	-- For family indexes, the tycon is the *family* tycon
-	--		(not the representation tycon)
+	-- For family indexes, the tycon in 
+	--	 in ds_tys is the *family* tycon
+	--	 in ds_tc  is the *representation* tycon
+	-- For non-family tycons, both are the same
 
 	-- ds_newtype = True  <=> Newtype deriving
 	--		False <=> Vanilla deriving
@@ -372,20 +375,7 @@ mkGenericBinds is_boot
 %*									*
 %************************************************************************
 
-@makeDerivSpecs@ fishes around to find the info about needed derived
-instances.  Complicating factors:
-\begin{itemize}
-\item
-We can only derive @Enum@ if the data type is an enumeration
-type (all nullary data constructors).
-
-\item
-We can only derive @Ix@ if the data type is an enumeration {\em
-or} has just one data constructor (e.g., tuples).
-\end{itemize}
-
-[See Appendix~E in the Haskell~1.2 report.] This code here deals w/
-all those.
+@makeDerivSpecs@ fishes around to find the info about needed derived instances.
 
 \begin{code}
 makeDerivSpecs :: Bool 
@@ -401,7 +391,7 @@ makeDerivSpecs is_boot tycl_decls inst_decls deriv_decls
   | otherwise
   = do	{ eqns1 <- mapAndRecoverM deriveTyData all_tydata
 	; eqns2 <- mapAndRecoverM deriveStandalone deriv_decls
-	; return (catMaybes (eqns1 ++ eqns2)) }
+	; return (eqns1 ++ eqns2) }
   where
     extractTyDataPreds decls
       = [(p, d) | d@(L _ (TyData {tcdDerivs = Just preds})) <- decls, p <- preds]
@@ -421,7 +411,7 @@ makeDerivSpecs is_boot tycl_decls inst_decls deriv_decls
 				   2 (ptext (sLit "Use an instance declaration instead")))
 
 ------------------------------------------------------------------
-deriveStandalone :: LDerivDecl Name -> TcM (Maybe EarlyDerivSpec)
+deriveStandalone :: LDerivDecl Name -> TcM EarlyDerivSpec
 -- Standalone deriving declarations
 --  e.g.   deriving instance Show a => Show (T a)
 -- Rather like tcLocalInstDecl
@@ -448,23 +438,55 @@ deriveStandalone (L loc (DerivDecl deriv_ty))
                    (Just theta) }
 
 ------------------------------------------------------------------
-deriveTyData :: (LHsType Name, LTyClDecl Name) -> TcM (Maybe EarlyDerivSpec)
+deriveTyData :: (LHsType Name, LTyClDecl Name) -> TcM EarlyDerivSpec
 deriveTyData (L loc deriv_pred, L _ decl@(TyData { tcdLName = L _ tycon_name, 
 					           tcdTyVars = tv_names, 
 				    	           tcdTyPats = ty_pats }))
   = setSrcSpan loc     $	-- Use the location of the 'deriving' item
     tcAddDeclCtxt decl $
-    do	{ let hs_ty_args = ty_pats `orElse` map (nlHsTyVar . hsLTyVarName) tv_names
-	      hs_app     = nlHsTyConApp tycon_name hs_ty_args
-		-- We get kinding info for the tyvars by typechecking (T a b)
-		-- Hence forming a tycon application and then dis-assembling it
-	; (tvs, tc_app) <- tcHsQuantifiedType tv_names hs_app
+    do	{ (tvs, tc, tc_args) <- get_lhs ty_pats
 	; tcExtendTyVarEnv tvs $	-- Deriving preds may (now) mention
 					-- the type variables for the type constructor
+
     do	{ (deriv_tvs, cls, cls_tys) <- tcHsDeriv deriv_pred
 		-- The "deriv_pred" is a LHsType to take account of the fact that for
 		-- newtype deriving we allow deriving (forall a. C [a]).
-	; mkEqnHelp DerivOrigin (tvs++deriv_tvs) cls cls_tys tc_app Nothing } }
+
+	-- Given data T a b c = ... deriving( C d ),
+	-- we want to drop type variables from T so that (C d (T a)) is well-kinded
+	; let cls_tyvars = classTyVars cls
+	      kind = tyVarKind (last cls_tyvars)
+	      (arg_kinds, _) = splitKindFunTys kind
+	      n_args_to_drop = length arg_kinds	
+	      n_args_to_keep = tyConArity tc - n_args_to_drop
+	      inst_ty = mkTyConApp tc (take n_args_to_keep tc_args)
+	      inst_ty_kind = typeKind inst_ty
+
+	-- Check that the result really is well-kinded
+	; checkTc (n_args_to_keep >= 0 && (inst_ty_kind `eqKind` kind))
+		  (derivingKindErr tc cls cls_tys kind)
+
+	-- Type families can't be partially applied
+	-- e.g.   newtype instance T Int a = ... deriving( Monad )
+	; checkTc (not (isOpenTyCon tc) || n_args_to_drop == 0)
+		  (typeFamilyPapErr tc cls cls_tys inst_ty)
+
+	; mkEqnHelp DerivOrigin (tvs++deriv_tvs) cls cls_tys inst_ty Nothing } }
+  where
+	-- Tiresomely we must figure out the "lhs", which is awkward for type families
+	-- E.g.   data T a b = .. deriving( Eq )
+	-- 	    Here, the lhs is (T a b)
+	--	  data instance TF Int b = ... deriving( Eq )
+	--	    Here, the lhs is (TF Int b)
+	-- But if we just look up the tycon_name, we get is the *family*
+	-- tycon, but not pattern types -- they are in the *rep* tycon.
+    get_lhs Nothing     = do { tc <- tcLookupTyCon tycon_name
+			     ; let tvs = tyConTyVars tc
+			     ; return (tvs, tc, mkTyVarTys tvs) }
+    get_lhs (Just pats) = do { let hs_app = nlHsTyConApp tycon_name pats
+			     ; (tvs, tc_app) <- tcHsQuantifiedType tv_names hs_app
+			     ; let (tc, tc_args) = tcSplitTyConApp tc_app
+			     ; return (tvs, tc, tc_args) }
 
 deriveTyData _other
   = panic "derivTyData"	-- Caller ensures that only TyData can happen
@@ -473,7 +495,12 @@ deriveTyData _other
 mkEqnHelp :: InstOrigin -> [TyVar] -> Class -> [Type] -> Type
           -> Maybe ThetaType	-- Just    => context supplied (standalone deriving)
 				-- Nothing => context inferred (deriving on data decl)
-          -> TcRn (Maybe EarlyDerivSpec)
+          -> TcRn EarlyDerivSpec
+-- Make the EarlyDerivSpec for an instance
+--	forall tvs. theta => cls (tys ++ [ty])
+-- where the 'theta' is optional (that's the Maybe part)
+-- Assumes that this declaration is well-kinded
+
 mkEqnHelp orig tvs cls cls_tys tc_app mtheta
   | Just (tycon, tc_args) <- tcSplitTyConApp_maybe tc_app
   , isAlgTyCon tycon	-- Check for functions, primitive types etc
@@ -485,8 +512,6 @@ mkEqnHelp orig tvs cls cls_tys tc_app mtheta
 	-- check that all the data constructors are in scope.
 	-- No need for this when deriving Typeable, becuase we don't need
 	-- the constructors for that.
-	-- By this time we know that the thing is algebraic
-	--	because we've called checkInstHead in derivingStandalone
 	; rdr_env <- getGlobalRdrEnv
 	; let hidden_data_cons = isAbstractTyCon rep_tc || any not_in_scope (tyConDataCons rep_tc)
 	      not_in_scope dc  = null (lookupGRE_Name rdr_env (dataConName dc))
@@ -506,11 +531,8 @@ mkEqnHelp orig tvs cls cls_tys tc_app mtheta
 		             tvs cls cls_tys 
 			     tycon tc_args rep_tc rep_tc_args mtheta }
   | otherwise
-  = baleOut (derivingThingErr cls cls_tys tc_app
-	    (ptext (sLit "The last argument of the instance must be a data or newtype application")))
-
-baleOut :: Message -> TcM (Maybe a)
-baleOut err = do { addErrTc err;  return Nothing }
+  = failWithTc (derivingThingErr cls cls_tys tc_app
+	       (ptext (sLit "The last argument of the instance must be a data or newtype application")))
 \end{code}
 
 Note [Looking up family instances for deriving]
@@ -565,7 +587,7 @@ famInstNotFound tycon tys
 \begin{code}
 mkDataTypeEqn :: InstOrigin -> Bool -> [Var] -> Class -> [Type]
               -> TyCon -> [Type] -> TyCon -> [Type] -> Maybe ThetaType
-              -> TcRn (Maybe EarlyDerivSpec)	-- Return 'Nothing' if error
+              -> TcRn EarlyDerivSpec	-- Return 'Nothing' if error
 		
 mkDataTypeEqn orig mayDeriveDataTypeable tvs cls cls_tys
               tycon tc_args rep_tc rep_tc_args mtheta
@@ -575,12 +597,12 @@ mkDataTypeEqn orig mayDeriveDataTypeable tvs cls cls_tys
 	NonDerivableClass	-> bale_out (nonStdErr cls)
 	DerivableClassError msg -> bale_out msg
   where
-    bale_out msg = baleOut (derivingThingErr cls cls_tys (mkTyConApp tycon tc_args) msg)
+    bale_out msg = failWithTc (derivingThingErr cls cls_tys (mkTyConApp tycon tc_args) msg)
 
 mk_data_eqn, mk_typeable_eqn
    :: InstOrigin -> [TyVar] -> Class 
    -> TyCon -> [TcType] -> TyCon -> [TcType] -> Maybe ThetaType
-   -> TcM (Maybe EarlyDerivSpec)
+   -> TcM EarlyDerivSpec
 mk_data_eqn orig tvs cls tycon tc_args rep_tc rep_tc_args mtheta
   | getName cls `elem` typeableClassNames
   = mk_typeable_eqn orig tvs cls tycon tc_args rep_tc rep_tc_args mtheta
@@ -598,7 +620,7 @@ mk_data_eqn orig tvs cls tycon tc_args rep_tc rep_tc_args mtheta
 			-- See Note [Superclasses of derived instance]
 	      sc_constraints = substTheta (zipOpenTvSubst (classTyVars cls) inst_tys)
 					  (classSCTheta cls)
-	      inst_tys =  [mkTyConApp tycon tc_args]
+	      inst_tys = [mkTyConApp tycon tc_args]
 
 	      stupid_subst = zipTopTvSubst (tyConTyVars rep_tc) rep_tc_args
 	      stupid_constraints = substTheta stupid_subst (tyConStupidTheta rep_tc)
@@ -606,12 +628,12 @@ mk_data_eqn orig tvs cls tycon tc_args rep_tc rep_tc_args mtheta
 
 	      spec = DS { ds_loc = loc, ds_orig = orig
 			, ds_name = dfun_name, ds_tvs = tvs 
-			, ds_cls = cls, ds_tys = inst_tys
+			, ds_cls = cls, ds_tys = inst_tys, ds_tc = rep_tc
 			, ds_theta =  mtheta `orElse` all_constraints
 			, ds_newtype = False }
 
-  	; return (if isJust mtheta then Just (Right spec)	-- Specified context
-				   else Just (Left spec)) }	-- Infer context
+  	; return (if isJust mtheta then Right spec	-- Specified context
+				   else Left spec) }	-- Infer context
 
 mk_typeable_eqn orig tvs cls tycon tc_args rep_tc _rep_tc_args mtheta
 	-- The Typeable class is special in several ways
@@ -635,9 +657,9 @@ mk_typeable_eqn orig tvs cls tycon tc_args rep_tc _rep_tc_args mtheta
 			<> int (tyConArity tycon) <+> ppr tycon <> rparen)
 	; dfun_name <- new_dfun_name cls tycon
   	; loc <- getSrcSpanM
-	; return (Just $ Right $
+	; return (Right $
 		  DS { ds_loc = loc, ds_orig = orig, ds_name = dfun_name, ds_tvs = []
-		     , ds_cls = cls, ds_tys = [mkTyConApp tycon []] 
+		     , ds_cls = cls, ds_tys = [mkTyConApp tycon []], ds_tc = rep_tc
 		     , ds_theta = mtheta `orElse` [], ds_newtype = False })  }
 
 ------------------------------------------------------------------
@@ -807,7 +829,7 @@ a context for the Data instances:
 mkNewTypeEqn :: InstOrigin -> Bool -> Bool -> [Var] -> Class
              -> [Type] -> TyCon -> [Type] -> TyCon -> [Type]
              -> Maybe ThetaType
-             -> TcRn (Maybe EarlyDerivSpec)
+             -> TcRn EarlyDerivSpec
 mkNewTypeEqn orig mayDeriveDataTypeable newtype_deriving tvs
              cls cls_tys tycon tc_args rep_tycon rep_tc_args mtheta
   | can_derive_via_isomorphism && (newtype_deriving || std_class_via_iso cls)
@@ -815,12 +837,12 @@ mkNewTypeEqn orig mayDeriveDataTypeable newtype_deriving tvs
 	; dfun_name <- new_dfun_name cls tycon
   	; loc <- getSrcSpanM
 	; let spec = DS { ds_loc = loc, ds_orig = orig
-			, ds_name = dfun_name, ds_tvs = dict_tvs 
-			, ds_cls = cls, ds_tys = inst_tys
+			, ds_name = dfun_name, ds_tvs = varSetElems dfun_tvs 
+			, ds_cls = cls, ds_tys = inst_tys, ds_tc = rep_tycon
 			, ds_theta =  mtheta `orElse` all_preds
 			, ds_newtype = True }
-	; return (if isJust mtheta then Just (Right spec)
-				   else Just (Left spec)) }
+	; return (if isJust mtheta then Right spec
+				   else Left spec) }
 
   | otherwise
   = case check_conditions of
@@ -832,7 +854,7 @@ mkNewTypeEqn orig mayDeriveDataTypeable newtype_deriving tvs
       	| otherwise           -> bale_out non_std_err      -- Try newtype deriving!
   where
 	check_conditions = checkSideConditions mayDeriveDataTypeable cls cls_tys rep_tycon
-	bale_out msg = baleOut (derivingThingErr cls cls_tys tc_app msg)
+	bale_out msg = failWithTc (derivingThingErr cls cls_tys inst_ty msg)
 
 	non_std_err = nonStdErr cls $$
 		      ptext (sLit "Try -XGeneralizedNewtypeDeriving for GHC's newtype-deriving extension")
@@ -846,6 +868,8 @@ mkNewTypeEqn orig mayDeriveDataTypeable newtype_deriving tvs
 	--			with the last parameter missing
 	--	 (T a1 .. ak) matches the kind of C's last argument
 	--		(and hence so does t)
+	-- The latter kind-check has been done by deriveTyData already,
+	-- and tc_args are already trimmed
 	--
 	-- We generate the instance
 	--	 instance forall ({a1..ak} u fvs(s1..sm)).
@@ -865,15 +889,12 @@ mkNewTypeEqn orig mayDeriveDataTypeable newtype_deriving tvs
 	-- We generate the instance
 	--	instance Monad (ST s) => Monad (T s) where 
 
-	cls_tyvars = classTyVars cls
-	kind = tyVarKind (last cls_tyvars)
-		-- Kind of the thing we want to instance
-		--   e.g. argument kind of Monad, *->*
-
-	(arg_kinds, _) = splitKindFunTys kind
-	n_args_to_drop = length arg_kinds	
-		-- Want to drop 1 arg from (T s a) and (ST s a)
-		-- to get 	instance Monad (ST s) => Monad (T s)
+	nt_eta_arity = length (fst (newTyConEtadRhs rep_tycon))
+		-- For newtype T a b = MkT (S a a b), the TyCon machinery already
+		-- eta-reduces the represenation type, so we know that
+		-- 	T a ~ S a a
+		-- That's convenient here, because we may have to apply
+		-- it to fewer than its original complement of arguments
 
 	-- Note [Newtype representation]
 	-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -883,30 +904,21 @@ mkNewTypeEqn orig mayDeriveDataTypeable newtype_deriving tvs
 	--	newtype A = MkA B deriving( Num )
 	-- We want the Num instance of B, *not* the Num instance of Int,
 	-- when making the Num instance of A!
-	rep_ty		      = newTyConInstRhs rep_tycon rep_tc_args
-	(rep_fn, rep_ty_args) = tcSplitAppTys rep_ty
-
-	n_tyargs_to_keep = tyConArity tycon - n_args_to_drop
-	dropped_tc_args = drop n_tyargs_to_keep tc_args
-	dropped_tvs     = tyVarsOfTypes dropped_tc_args
-
-	n_args_to_keep = length rep_ty_args - n_args_to_drop
-	args_to_drop   = drop n_args_to_keep rep_ty_args
-	args_to_keep   = take n_args_to_keep rep_ty_args
-
-	rep_fn'  = mkAppTys rep_fn args_to_keep
-	rep_tys  = cls_tys ++ [rep_fn']
-	rep_pred = mkClassPred cls rep_tys
+	rep_inst_ty = newTyConInstRhs rep_tycon rep_tc_args
+	rep_tys     = cls_tys ++ [rep_inst_ty]
+	rep_pred    = mkClassPred cls rep_tys
 		-- rep_pred is the representation dictionary, from where
 		-- we are gong to get all the methods for the newtype
 		-- dictionary 
 
-	tc_app = mkTyConApp tycon (take n_tyargs_to_keep tc_args)
 
     -- Next we figure out what superclass dictionaries to use
     -- See Note [Newtype deriving superclasses] above
 
-	inst_tys = cls_tys ++ [tc_app]
+	cls_tyvars = classTyVars cls
+	dfun_tvs = tyVarsOfTypes tc_args
+	inst_ty = mkTyConApp tycon tc_args
+	inst_tys = cls_tys ++ [inst_ty]
 	sc_theta = substTheta (zipOpenTvSubst cls_tyvars inst_tys)
 			      (classSCTheta cls)
 
@@ -917,7 +929,6 @@ mkNewTypeEqn orig mayDeriveDataTypeable newtype_deriving tvs
 		--		instance C T
 		-- rather than
 		--		instance C Int => C T
-	dict_tvs = filterOut (`elemVarSet` dropped_tvs) tvs
 	all_preds = rep_pred : sc_theta		-- NB: rep_pred comes first
 
 	-------------------------------------------------------------------
@@ -933,10 +944,6 @@ mkNewTypeEqn orig mayDeriveDataTypeable newtype_deriving tvs
 	   && right_arity 			-- Well kinded;
 						-- eg not: newtype T ... deriving( ST )
 						--	because ST needs *2* type params
-	   && n_tyargs_to_keep >= 0		-- Type constructor has right kind:
-						-- eg not: newtype T = T Int deriving( Monad )
-	   && n_args_to_keep   >= 0		-- Rep type has right kind: 
-						-- eg not: newtype T a = T Int deriving( Monad )
 	   && eta_ok				-- Eta reduction works
 	   && not (isRecursiveTyCon tycon)	-- Does not work for recursive tycons:
 						--	newtype A = MkA [A]
@@ -952,22 +959,18 @@ mkNewTypeEqn orig mayDeriveDataTypeable newtype_deriving tvs
 			-- recursive newtypes too
 
 	-- Check that eta reduction is OK
-	eta_ok = (args_to_drop `tcEqTypes` dropped_tc_args)
-		-- (a) the dropped-off args are identical in the source and rep type
+	eta_ok = (nt_eta_arity <= length rep_tc_args)
+		-- (a) the newtype can be eta-reduced to match the number
+		--     of type argument actually supplied
 		--	  newtype T a b = MkT (S [a] b) deriving( Monad )
 		--     Here the 'b' must be the same in the rep type (S [a] b)
+		--     And the [a] must not mention 'b'.  That's all handled
+		--     by nt_eta_rity.
 
-	      && (tyVarsOfType rep_fn' `disjointVarSet` dropped_tvs)
-		-- (b) the remaining type args do not mention any of the dropped
-		--     type variables 
-
-	      && (tyVarsOfTypes cls_tys `disjointVarSet` dropped_tvs)
+	      && (tyVarsOfTypes cls_tys `subVarSet` dfun_tvs)
 		-- (c) the type class args do not mention any of the dropped type
 		--     variables 
-
-	      && all isTyVarTy dropped_tc_args
-		-- (d) in case of newtype family instances, the eta-dropped
-		--      arguments must be type variables (not more complex indexes)
+		--		newtype T a b = ... deriving( Monad b )
 
 	cant_derive_err = vcat [ptext (sLit "even with cunning newtype deriving:"),
 				if isRecursiveTyCon tycon then
@@ -976,12 +979,8 @@ mkNewTypeEqn orig mayDeriveDataTypeable newtype_deriving tvs
 				if not right_arity then 
 				  quotes (ppr (mkClassPred cls cls_tys)) <+> ptext (sLit "does not have arity 1")
 				else empty,
-				if not (n_tyargs_to_keep >= 0) then 
-				  ptext (sLit "the type constructor has wrong kind")
-				else if not (n_args_to_keep >= 0) then
-				  ptext (sLit "the representation type has wrong kind")
-				else if not eta_ok then 
-				  ptext (sLit "the eta-reduction property does not hold")
+				if not eta_ok then 
+				  ptext (sLit "cannot eta-reduce the representation type enough")
 				else empty
 				]
 \end{code}
@@ -1172,20 +1171,19 @@ the renamer.  What a great hack!
 genInst :: OverlapFlag -> DerivSpec -> TcM (InstInfo RdrName, DerivAuxBinds)
 genInst oflag spec
   | ds_newtype spec
-  = return (InstInfo { iSpec = mkInstance1 oflag spec 
+  = return (InstInfo { iSpec  = mkInstance1 oflag spec 
 		     , iBinds = NewTypeDerived }, [])
 
   | otherwise
-  = do	{ let loc		      = getSrcSpan (ds_name spec)
-	      inst		      = mkInstance1 oflag spec
-   	      (_,_,clas,[ty])         = instanceHead inst
-	      (visible_tycon, tyArgs) = tcSplitTyConApp ty 
+  = do	{ let loc	 = getSrcSpan (ds_name spec)
+	      inst	 = mkInstance1 oflag spec
+   	      clas       = ds_cls spec
+	      rep_tycon	 = ds_tc spec
 
           -- In case of a family instance, we need to use the representation
           -- tycon (after all, it has the data constructors)
-        ; (tycon, _) <- tcLookupFamInstExact visible_tycon tyArgs
 	; fix_env <- getFixityEnv
-	; let (meth_binds, aux_binds) = genDerivBinds loc fix_env clas tycon
+	; let (meth_binds, aux_binds) = genDerivBinds loc fix_env clas rep_tycon
 
 	-- Build the InstInfo
 	; return (InstInfo { iSpec = inst, 
@@ -1223,6 +1221,18 @@ genDerivBinds loc fix_env clas tycon
 %************************************************************************
 
 \begin{code}
+derivingKindErr :: TyCon -> Class -> [Type] -> Kind -> Message
+derivingKindErr tc cls cls_tys cls_kind
+  = hang (ptext (sLit "Cannot derive well-kinded instance of form")
+		<+> quotes (pprClassPred cls cls_tys <+> parens (ppr tc <+> ptext (sLit "..."))))
+       2 (ptext (sLit "Class") <+> quotes (ppr cls)
+	    <+> ptext (sLit "expects an argument of kind") <+> quotes (pprKind cls_kind))
+
+typeFamilyPapErr :: TyCon -> Class -> [Type] -> Type -> Message
+typeFamilyPapErr tc cls cls_tys inst_ty
+  = hang (ptext (sLit "Derived instance") <+> quotes (pprClassPred cls (cls_tys ++ [inst_ty])))
+       2 (ptext (sLit "requires illegal partial application of data type family") <+> ppr tc) 
+
 derivingThingErr :: Class -> [Type] -> Type -> Message -> Message
 derivingThingErr clas tys ty why
   = sep [hsep [ptext (sLit "Can't make a derived instance of"), 
