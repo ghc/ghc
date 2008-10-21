@@ -1322,6 +1322,14 @@ check_pred_ty dflags ctxt pred@(ClassP cls tys)
     arity_err  = arityErr "Class" class_name arity n_tys
     how_to_allow = parens (ptext (sLit "Use -XFlexibleContexts to permit this"))
 
+check_pred_ty _ (ClassSCCtxt _) (EqPred _ _)
+  =   -- We do not yet support superclass equalities.
+    failWithTc $
+      sep [ ptext (sLit "The current implementation of type families does not")
+          , ptext (sLit "support equality constraints in superclass contexts.")
+          , ptext (sLit "They are planned for a future release.")
+          ]
+
 check_pred_ty dflags _ pred@(EqPred ty1 ty2)
   = do {	-- Equational constraints are valid in all contexts if type
 		-- families are permitted
