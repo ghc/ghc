@@ -172,12 +172,14 @@ main = handleTopExceptions $ do
         -- create the interfaces -- this is the core part of Haddock
         (interfaces, homeLinks) <- createInterfaces fileArgs extLinks flags
 
+        let visibleIfaces = [ i | i <- interfaces, OptHide `notElem` ifaceOptions i ]
+ 
         liftIO $ do
           -- render the interfaces
-          renderStep packages interfaces
+          renderStep packages visibleIfaces
  
           -- last but not least, dump the interface file
-          dumpInterfaceFile (map toInstalledIface interfaces) homeLinks flags
+          dumpInterfaceFile (map toInstalledIface visibleIfaces) homeLinks flags
 #else
       -- initialize GHC
       (session, dynflags) <- startGhc libDir (ghcFlags flags)
