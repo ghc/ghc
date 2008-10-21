@@ -1,5 +1,6 @@
 
 gadt11.hs:9:2:
-    Data constructor `B1' returns type `X' instead of its parent type
+    Data constructor `B1' returns type `X []'
+      instead of an instance of its parent type `B a'
     In the definition of data constructor `B1'
     In the data type declaration for `B'
