@@ -1,0 +1,7 @@
+
+T2693.hs:10:14:
+    Couldn't match expected type `(a1, b)'
+           against inferred type `TFn a'
+    In the first argument of `fst', namely `x'
+    In the first argument of `(+)', namely `fst x'
+    In the expression: fst x + fst x
