@@ -376,6 +376,13 @@ lvlMFE ::  Bool			-- True <=> strict context [body of case or let]
 lvlMFE _ _ _ (_, AnnType ty)
   = return (Type ty)
 
+-- No point in floating out an expression wrapped in a coercion;
+-- If we do we'll transform  lvl = e |> co 
+--			 to  lvl' = e; lvl = lvl' |> co
+-- and then inline lvl.  Better just to float out the payload.
+lvlMFE strict_ctxt ctxt_lvl env (_, AnnCast e co)
+  = do	{ expr' <- lvlMFE strict_ctxt ctxt_lvl env e
+	; return (Cast expr' co) }
 
 lvlMFE strict_ctxt ctxt_lvl env ann_expr@(fvs, _)
   |  isUnLiftedType ty			-- Can't let-bind it; see Note [Unlifted MFEs]
