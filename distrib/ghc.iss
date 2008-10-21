@@ -15,14 +15,12 @@ ChangesEnvironment=yes
 
 [Files]
 Source: "ghc-@VERSION@\*"; DestDir: "{app}"; Flags: recursesubdirs
-Source: "ghc-@VERSION@\README.txt"; DestDir: "{app}"; Flags: isreadme
 
 [Icons]
 Name: "{group}\@VERSION@\GHCi"; Filename: "{app}\bin\ghci.exe"
 Name: "{group}\@VERSION@\GHC Documentation"; Filename: "{app}\doc\index.html"
 Name: "{group}\@VERSION@\GHC Library Documentation"; Filename: "{app}\doc\libraries\index.html"
 Name: "{group}\@VERSION@\GHC Flag Reference"; Filename: "{app}\doc\users_guide\flag-reference.html"
-Name: "{group}\@VERSION@\GHC Readme"; Filename: "{app}\README.txt"
 
 [Registry]
 ; set up icon associations
