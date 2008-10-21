@@ -1412,7 +1412,7 @@ tcSimplifyRestricted 	-- Used for restricted binding groups
 tcSimplifyRestricted doc top_lvl bndrs tau_tvs wanteds
 	-- Zonk everything in sight
   = do	{ traceTc (text "tcSimplifyRestricted")
-	; wanteds' <- zonkInsts wanteds
+	; wanteds_z <- zonkInsts wanteds
 
    	-- 'ReduceMe': Reduce as far as we can.  Don't stop at
 	-- dicts; the idea is to get rid of as many type
@@ -1424,7 +1424,7 @@ tcSimplifyRestricted doc top_lvl bndrs tau_tvs wanteds
 	-- HOWEVER, some unification may take place, if we instantiate
 	-- 	    a method Inst with an equality constraint
 	; let env = mkNoImproveRedEnv doc (\_ -> ReduceMe)
-	; (_imp, _binds, constrained_dicts) <- reduceContext env wanteds'
+	; (_imp, _binds, constrained_dicts) <- reduceContext env wanteds_z
 
 	-- Next, figure out the tyvars we will quantify over
 	; tau_tvs' <- zonkTcTyVarsAndFV (varSetElems tau_tvs)
@@ -1452,6 +1452,13 @@ tcSimplifyRestricted doc top_lvl bndrs tau_tvs wanteds
 		ppr _binds,
 		ppr constrained_tvs', ppr tau_tvs', ppr qtvs ])
 
+          -- Zonk wanteds again!  The first call to reduceContext may have
+          -- instantiated some variables. 
+          -- FIXME: If red_improve would work, we could propagate that into
+          --        the equality solver, too, to prevent instantating any
+          --        variables.
+	; wanteds_zz <- zonkInsts wanteds_z
+
 	-- The first step may have squashed more methods than
 	-- necessary, so try again, this time more gently, knowing the exact
 	-- set of type variables to quantify over.
@@ -1473,7 +1480,7 @@ tcSimplifyRestricted doc top_lvl bndrs tau_tvs wanteds
 			   (is_nested_group || isDict inst) = Stop
 		          | otherwise  	                    = ReduceMe 
 	      env = mkNoImproveRedEnv doc try_me
-	; (_imp, binds, irreds) <- reduceContext env wanteds'
+	; (_imp, binds, irreds) <- reduceContext env wanteds_zz
 
 	-- See "Notes on implicit parameters, Question 4: top level"
 	; ASSERT( all (isFreeWrtTyVars qtvs) irreds )	-- None should be captured
