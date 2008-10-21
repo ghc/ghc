@@ -977,7 +977,7 @@ makeImplicationBind :: InstLoc -> [TcTyVar]
 --	(ir1, .., irn) = f qtvs givens
 -- where f is (evidence for) the new implication constraint
 --	f :: forall qtvs. givens => (ir1, .., irn)
--- qtvs includes coercion variables.
+-- qtvs includes coercion variables
 --
 -- This binding must line up the 'rhs' in reduceImplication
 makeImplicationBind loc all_tvs
@@ -997,7 +997,7 @@ makeImplicationBind loc all_tvs
 	      name = mkInternalName uniq (mkVarOcc "ic") span
 	      implic_inst = ImplicInst { tci_name = name,
 					 tci_tyvars = all_tvs, 
-					 tci_given = (eq_givens ++ dict_givens),
+					 tci_given = eq_givens ++ dict_givens,
                                                        -- same order as binders
 					 tci_wanted = irreds, 
                                          tci_loc = loc }
