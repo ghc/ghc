@@ -26,10 +26,9 @@ import BasicTypes	( Boxity(..) )
 import Var              ( Var, isIdVar )
 import UniqSupply
 import Unique
-import Util		( zipWithEqual, notNull )
+import Util		( zipWithEqual )
 import Outputable
 import FastString
-import List		( zipWith4 )
 \end{code}
 
 
@@ -120,21 +119,23 @@ mkWwBodies :: Type				-- Type of original function
 --			  let x = (a,b) in
 --			  E
 
-mkWwBodies fun_ty demands res_info one_shots = do
-    (wrap_args,   wrap_fn_args, work_fn_args, res_ty) <- mkWWargs fun_ty demands one_shots'
-    (work_args,   wrap_fn_str,  work_fn_str) <- mkWWstr wrap_args
-    let (work_lam_args, work_call_args) = mkWorkerArgs work_args res_ty
+mkWwBodies fun_ty demands res_info one_shots
+  = do	{ let arg_info = demands `zip` (one_shots ++ repeat False)
+	; (wrap_args, wrap_fn_args, work_fn_args, res_ty) <- mkWWargs emptyTvSubst fun_ty arg_info
+	; (work_args, wrap_fn_str,  work_fn_str) <- mkWWstr wrap_args
+
         -- Don't do CPR if the worker doesn't have any value arguments
         -- Then the worker is just a constant, so we don't want to unbox it.
-    (wrap_fn_cpr, work_fn_cpr,  _cpr_res_ty)
-       <- if any isIdVar work_args then
-             mkWWcpr res_ty res_info
-          else
-             return (id, id, res_ty)
+	; (wrap_fn_cpr, work_fn_cpr,  _cpr_res_ty)
+	       <- if any isIdVar work_args then
+	             mkWWcpr res_ty res_info
+	          else
+	             return (id, id, res_ty)
 
-    return ([idNewDemandInfo v | v <- work_call_args, isIdVar v],
-              Note InlineMe . wrap_fn_args . wrap_fn_cpr . wrap_fn_str . applyToVars work_call_args . Var,
-              mkLams work_lam_args. work_fn_str . work_fn_cpr . work_fn_args)
+	; let (work_lam_args, work_call_args) = mkWorkerArgs work_args res_ty
+	; return ([idNewDemandInfo v | v <- work_call_args, isIdVar v],
+                  Note InlineMe . wrap_fn_args . wrap_fn_cpr . wrap_fn_str . applyToVars work_call_args . Var,
+                  mkLams work_lam_args. work_fn_str . work_fn_cpr . work_fn_args) }
         -- We use an INLINE unconditionally, even if the wrapper turns out to be
         -- something trivial like
         --      fw = ...
@@ -142,8 +143,6 @@ mkWwBodies fun_ty demands res_info one_shots = do
         -- The point is to propagate the coerce to f's call sites, so even though
         -- f's RHS is now trivial (size 1) we still want the __inline__ to prevent
         -- fw from being inlined into f's RHS
-  where
-    one_shots' = one_shots ++ repeat False
 \end{code}
 
 
@@ -183,7 +182,6 @@ mkWorkerArgs args res_ty
 %*									*
 %************************************************************************
 
-
 We really want to "look through" coerces.
 Reason: I've seen this situation:
 
@@ -210,20 +208,22 @@ Now we'll see that fw has arity 1, and will arity expand
 the \x to get what we want.
 
 \begin{code}
--- mkWWargs is driven off the function type and arity.
+-- mkWWargs just does eta expansion
+-- is driven off the function type and arity.
 -- It chomps bites off foralls, arrows, newtypes
 -- and keeps repeating that until it's satisfied the supplied arity
 
-mkWWargs :: Type
-	 -> [Demand]
-	 -> [Bool]			-- True for a one-shot arg; ** may be infinite **
+mkWWargs :: TvSubst		-- Freshening substitution to apply to the type
+				--   See Note [Freshen type variables]
+	 -> Type		-- The type of the function
+	 -> [(Demand,Bool)]	-- Demands and one-shot info for value arguments
 	 -> UniqSM  ([Var],		-- Wrapper args
 		     CoreExpr -> CoreExpr,	-- Wrapper fn
 		     CoreExpr -> CoreExpr,	-- Worker fn
 		     Type)			-- Type of wrapper body
 
-mkWWargs fun_ty demands one_shots
-  | Just (rep_ty, co) <- splitNewTypeRepCo_maybe fun_ty = do
+mkWWargs subst fun_ty arg_info
+  | Just (rep_ty, co) <- splitNewTypeRepCo_maybe fun_ty
    	-- The newtype case is for when the function has
 	-- a recursive newtype after the arrow (rare)
 	-- We check for arity >= 0 to avoid looping in the case
@@ -234,44 +234,46 @@ mkWWargs fun_ty demands one_shots
 	-- wrapped in a recursive newtype, at least if CPR analysis can look 
 	-- through such newtypes, which it probably can since they are 
 	-- simply coerces.
-    (wrap_args, wrap_fn_args, work_fn_args, res_ty) <- mkWWargs rep_ty demands one_shots
-    return (wrap_args,
-              \ e -> Cast (wrap_fn_args e) (mkSymCoercion co),
-              \ e -> work_fn_args (Cast e co),
-              res_ty)
-  | notNull demands = do
-    wrap_uniqs <- getUniquesM
-    let
-      (tyvars, tau)      = splitForAllTys fun_ty
-      (arg_tys, body_ty) = splitFunTys tau
+	--
+	-- Note (Sept 08): This case applies even if demands is empty.
+	--		   I'm not quite sure why; perhaps it makes it
+	--		   easier for CPR
+  = do { (wrap_args, wrap_fn_args, work_fn_args, res_ty)
+	    <-  mkWWargs subst rep_ty arg_info
+ 	; return (wrap_args,
+	     	  \e -> Cast (wrap_fn_args e) (mkSymCoercion co),
+     		  \e -> work_fn_args (Cast e co),
+     		  res_ty) } 
 
-      n_demands	= length demands
-      n_arg_tys	= length arg_tys
-      n_args    = n_demands `min` n_arg_tys
+  | null arg_info
+  = return ([], id, id, substTy subst fun_ty)
 
-      new_fun_ty    = mkFunTys (drop n_demands arg_tys) body_ty
-      new_demands   = drop n_arg_tys demands
-      new_one_shots = drop n_args one_shots
+  | Just (tv, fun_ty') <- splitForAllTy_maybe fun_ty
+  = do 	{ let (subst', tv') = substTyVarBndr subst tv
+		-- This substTyVarBndr clones the type variable when necy
+		-- See Note [Freshen type variables]
+  	; (wrap_args, wrap_fn_args, work_fn_args, res_ty)
+	     <- mkWWargs subst' fun_ty' arg_info
+	; return (tv' : wrap_args,
+        	  Lam tv' . wrap_fn_args,
+        	  work_fn_args . (`App` Type (mkTyVarTy tv')),
+        	  res_ty) }
 
-      val_args  = zipWith4 mk_wrap_arg wrap_uniqs arg_tys demands one_shots
-      wrap_args = tyvars ++ val_args
-{-     ASSERT( notNull tyvars || notNull arg_tys ) -}
-    if (null tyvars) && (null arg_tys) then
-        pprTrace "mkWWargs" (ppr fun_ty $$ ppr demands) 
-                return ([], id, id, fun_ty)
-     else do
-
-       (more_wrap_args, wrap_fn_args, work_fn_args, res_ty) <-
-             mkWWargs new_fun_ty new_demands new_one_shots
-
-       return (wrap_args ++ more_wrap_args,
-                 mkLams wrap_args . wrap_fn_args,
-                 work_fn_args . applyToVars wrap_args,
-                 res_ty)
+  | ((dmd,one_shot):arg_info') <- arg_info
+  , Just (arg_ty, fun_ty') <- splitFunTy_maybe fun_ty
+  = do	{ uniq <- getUniqueM
+	; let arg_ty' = substTy subst arg_ty
+	      id = mk_wrap_arg uniq arg_ty' dmd one_shot
+	; (wrap_args, wrap_fn_args, work_fn_args, res_ty)
+	      <- mkWWargs subst fun_ty' arg_info'
+	; return (id : wrap_args,
+	          Lam id . wrap_fn_args,
+        	  work_fn_args . (`App` Var id),
+        	  res_ty) }
 
   | otherwise
-  = return ([], id, id, fun_ty)
-
+  = WARN( True, ppr fun_ty )			-- Should not happen: if there is a demand
+    return ([], id, id, substTy subst fun_ty) 	-- then there should be a function arrow
 
 applyToVars :: [Var] -> CoreExpr -> CoreExpr
 applyToVars vars fn = mkVarApps fn vars
@@ -284,7 +286,23 @@ mk_wrap_arg uniq ty dmd one_shot
     set_one_shot False id = id
 \end{code}
 
+Note [Freshen type variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+mkWWargs may be given a type like  (a~b) => <blah>
+Which really means                 forall (co:a~b). <blah>
+Because the name of the coercion variable, 'co', isn't mentioned in <blah>,
+nested coercion foralls may all use the same variable; and sometimes do
+see Var.mkWildCoVar.
 
+However, when we do a worker/wrapper split, we must not use shadowed names,
+else we'll get
+   f = /\ co /\co. fw co co
+which is obviously wrong.  Actually, the same is true of type variables, which
+can in principle shadow, within a type (e.g. forall a. a -> forall a. a->a).
+But type variables *are* mentioned in <blah>, so we must substitute.
+
+That's why we carry the TvSubst through mkWWargs
+	
 %************************************************************************
 %*									*
 \subsection{Strictness stuff}
