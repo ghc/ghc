@@ -1915,22 +1915,24 @@ reduceContext env wanteds0
           -- go round again.  We do so in either of two cases:
           -- (1) If dictionary reduction or equality solving led to
           --     improvement (i.e., instantiated type variables).
-          -- (2) If we uncovered extra equalities.  We will try to solve them
-          --     in the next iteration.
-          -- (3) If we reduced dictionaries (i.e., got dictionary bindings),
+          -- (2) If we reduced dictionaries (i.e., got dictionary bindings),
           --     they may have exposed further opportunities to normalise
           --     family applications.  See Note [Dictionary Improvement]
+          --
+          -- NB: We do *not* go around for new extra_eqs.  Morally, we should,
+          --     but we can't without risking non-termination (see #2688).  By
+          --     not going around, we miss some legal programs mixing FDs and
+          --     TFs, but we never claimed to support such programs in the
+          --     current implementation anyway.
 
 	; let all_irreds       = dict_irreds ++ implic_irreds ++ extra_eqs
       	      avails_improved  = availsImproved avails
               improvedFlexible = avails_improved || eq_improved
-              extraEqs         = (not . null) extra_eqs
               reduced_dicts    = not (isEmptyBag dict_binds)
-              improved         = improvedFlexible || extraEqs || reduced_dicts
+              improved         = improvedFlexible || reduced_dicts
               --
               improvedHint  = (if avails_improved then " [AVAILS]" else "") ++
-                              (if eq_improved then " [EQ]" else "") ++
-                              (if extraEqs then " [EXTRA EQS]" else "")
+                              (if eq_improved then " [EQ]" else "")
 
 	; traceTc (text "reduceContext end" <+> (vcat [
 	     text "----------------------",
