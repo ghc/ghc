@@ -896,7 +896,7 @@ tcResultType (tmpl_tvs, res_tmpl) dc_tvs (ResTyGADT res_ty)
   = do	{ res_ty' <- tcHsKindedType res_ty
 	; let Just subst = tcMatchTy (mkVarSet tmpl_tvs) res_tmpl res_ty'
 
-		-- *Lazily* figure out the univ_tvs etc
+		-- /Lazily/ figure out the univ_tvs etc
 		-- Each univ_tv is either a dc_tv or a tmpl_tv
 	      (univ_tvs, eq_spec) = foldr choose ([], []) tidy_tmpl_tvs
 	      choose tmpl (univs, eqs)
