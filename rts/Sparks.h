@@ -17,6 +17,40 @@
 
 #if defined(THREADED_RTS)
 
+/* Spark pools: used to store pending sparks 
+ *  (THREADED_RTS & PARALLEL_HASKELL only)
+ * Implementation uses a DeQue to enable concurrent read accesses at
+ * the top end.
+ */
+typedef struct  SparkPool_ {
+  /* Size of elements array. Used for modulo calculation: we round up
+     to powers of 2 and use the dyadic log (modulo == bitwise &) */
+  StgWord size; 
+  StgWord moduloSize; /* bitmask for modulo */
+
+  /* top, index where multiple readers steal() (protected by a cas) */
+  volatile StgWord top;
+
+  /* bottom, index of next free place where one writer can push
+     elements. This happens unsynchronised. */
+  volatile StgWord bottom;
+  /* both position indices are continuously incremented, and used as
+     an index modulo the current array size. */
+  
+  /* lower bound on the current top value. This is an internal
+     optimisation to avoid unnecessarily accessing the top field
+     inside pushBottom */
+  volatile StgWord topBound;
+
+  /* The elements array */
+  StgClosurePtr* elements;
+  /*  Please note: the dataspace cannot follow the admin fields
+      immediately, as it should be possible to enlarge it without
+      disposing the old one automatically (as realloc would)! */
+
+} SparkPool;
+
+
 /* INVARIANTS, in this order: bottom/top consistent, reasonable size,
    topBound consistent, space pointer, space accessible to us */
 #define ASSERT_SPARK_POOL_INVARIANTS(p)         \
@@ -28,30 +62,25 @@
   ASSERT(*((p)->elements) || 1);                \
   ASSERT(*((p)->elements - 1  + ((p)->size)) || 1);
 
-// missing in old interface. Currently called by initSparkPools
-// internally.
-SparkPool* initPool(StgWord size);
+// Initialisation
+void initSparkPools (void);
 
-// special case: accessing our own pool, at the write end
-// otherwise, we can always steal from our pool as the others do...
-StgClosure* reclaimSpark(Capability *cap);
+// Take a spark from the "write" end of the pool.  Can be called
+// by the pool owner only.
+StgClosure* reclaimSpark(SparkPool *pool);
 
+// Returns True if the spark pool is empty (can give a false positive
+// if the pool is almost empty).
 rtsBool looksEmpty(SparkPool* deque);
 
-// rest: same as old interface
-StgClosure * findSpark         (Capability *cap);
-void         initSparkPools    (void);
+StgClosure * tryStealSpark     (SparkPool *pool);
 void         freeSparkPool     (SparkPool *pool);
 void         createSparkThread (Capability *cap, StgClosure *p);
 void         pruneSparkQueues  (void);
 void         traverseSparkQueue(evac_fn evac, void *user, Capability *cap);
 
-INLINE_HEADER void     discardSparks  (SparkPool *pool);
-INLINE_HEADER nat      sparkPoolSize  (SparkPool *pool);
-
-INLINE_HEADER void     discardSparksCap  (Capability *cap);
-INLINE_HEADER nat      sparkPoolSizeCap  (Capability *cap);
-INLINE_HEADER rtsBool  emptySparkPoolCap (Capability *cap);
+INLINE_HEADER void discardSparks  (SparkPool *pool);
+INLINE_HEADER nat  sparkPoolSize  (SparkPool *pool);
 #endif
 
 /* -----------------------------------------------------------------------------
@@ -64,29 +93,15 @@ INLINE_HEADER rtsBool
 emptySparkPool (SparkPool *pool) 
 { return looksEmpty(pool); }
 
-INLINE_HEADER rtsBool
-emptySparkPoolCap (Capability *cap) 
-{ return looksEmpty(cap->sparks); }
-
 INLINE_HEADER nat
 sparkPoolSize (SparkPool *pool) 
-{
-  return (pool->bottom - pool->top);
-}
-
-INLINE_HEADER nat
-sparkPoolSizeCap (Capability *cap) 
-{ return sparkPoolSize(cap->sparks); }
+{ return (pool->bottom - pool->top); }
 
 INLINE_HEADER void
 discardSparks (SparkPool *pool)
 {
-    pool->top = pool->bottom = 0;
+    pool->top = pool->topBound = pool->bottom = 0;
 }
-
-INLINE_HEADER void
-discardSparksCap (Capability *cap) 
-{ return discardSparks(cap->sparks); }
 
 #endif
 

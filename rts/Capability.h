@@ -23,9 +23,9 @@
 #ifndef CAPABILITY_H
 #define CAPABILITY_H
 
-#include "RtsTypes.h"
 #include "RtsFlags.h"
 #include "Task.h"
+#include "Sparks.h"
 
 struct Capability_ {
     // State required by the STG virtual machine when running Haskell
@@ -91,6 +91,13 @@ struct Capability_ {
     // woken up by another Capability.
     StgTSO *wakeup_queue_hd;
     StgTSO *wakeup_queue_tl;
+
+    SparkPool *sparks;
+
+    // Stats on spark creation/conversion
+    nat sparks_created;
+    nat sparks_converted;
+    nat sparks_pruned;
 #endif
 
     // Per-capability STM-related data
@@ -99,8 +106,6 @@ struct Capability_ {
     StgTRecChunk *free_trec_chunks;
     StgTRecHeader *free_trec_headers;
     nat transaction_tokens;
-
-    SparkPool *sparks;
 
 }; // typedef Capability, defined in RtsAPI.h
 
@@ -147,12 +152,16 @@ void initCapabilities (void);
 // ASSUMES: cap->running_task is the current Task.
 //
 #if defined(THREADED_RTS)
-void releaseCapability  (Capability* cap);
-void releaseCapability_ (Capability* cap); // assumes cap->lock is held
+void releaseCapability           (Capability* cap);
+void releaseAndWakeupCapability  (Capability* cap);
+void releaseCapability_ (Capability* cap, rtsBool always_wakeup); 
+// assumes cap->lock is held
 #else
 // releaseCapability() is empty in non-threaded RTS
 INLINE_HEADER void releaseCapability  (Capability* cap STG_UNUSED) {};
-INLINE_HEADER void releaseCapability_ (Capability* cap STG_UNUSED) {};
+INLINE_HEADER void releaseAndWakeupCapability  (Capability* cap STG_UNUSED) {};
+INLINE_HEADER void releaseCapability_ (Capability* cap STG_UNUSED, 
+                                       rtsBool always_wakeup STG_UNUSED) {};
 #endif
 
 #if !IN_STG_CODE
@@ -231,6 +240,14 @@ void shutdownCapability (Capability *cap, Task *task, rtsBool wait_foreign);
 //
 rtsBool tryGrabCapability (Capability *cap, Task *task);
 
+// Try to steal a spark from other Capabilities
+//
+rtsBool stealWork (Capability *cap);
+
+INLINE_HEADER rtsBool emptySparkPoolCap (Capability *cap);
+INLINE_HEADER nat     sparkPoolSizeCap  (Capability *cap);
+INLINE_HEADER void    discardSparksCap  (Capability *cap);
+
 #else // !THREADED_RTS
 
 // Grab a capability.  (Only in the non-threaded RTS; in the threaded
@@ -272,5 +289,19 @@ recordMutableCap (StgClosure *p, Capability *cap, nat gen)
     }
     *bd->free++ = (StgWord)p;
 }
+
+#if defined(THREADED_RTS)
+INLINE_HEADER rtsBool
+emptySparkPoolCap (Capability *cap) 
+{ return looksEmpty(cap->sparks); }
+
+INLINE_HEADER nat
+sparkPoolSizeCap (Capability *cap) 
+{ return sparkPoolSize(cap->sparks); }
+
+INLINE_HEADER void
+discardSparksCap (Capability *cap) 
+{ return discardSparks(cap->sparks); }
+#endif
 
 #endif /* CAPABILITY_H */

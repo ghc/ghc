@@ -641,6 +641,21 @@ stat_exit(int alloc)
 				TICK_TO_DBL(task->gc_etime));
 		}
 	    }
+
+            {
+                nat i;
+                lnat sparks_created   = 0;
+                lnat sparks_converted = 0;
+                lnat sparks_pruned    = 0;
+                for (i = 0; i < n_capabilities; i++) {
+                    sparks_created   += capabilities[i].sparks_created;
+                    sparks_converted += capabilities[i].sparks_converted;
+                    sparks_pruned    += capabilities[i].sparks_pruned;
+                }
+
+                statsPrintf("  SPARKS: %ld (%ld converted, %ld pruned)\n\n",
+                            sparks_created, sparks_converted, sparks_pruned);
+            }
 #endif
 
 	    statsPrintf("  INIT  time  %6.2fs  (%6.2fs elapsed)\n",

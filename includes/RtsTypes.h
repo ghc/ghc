@@ -1,8 +1,10 @@
-/*
-  Time-stamp: <2005-03-30 12:02:33 simonmar>
-
-  RTS specific types.
-*/
+/* -----------------------------------------------------------------------------
+ *
+ * (c) The GHC Team, 1998-2008
+ *
+ * RTS-specific types.
+ *
+ * ---------------------------------------------------------------------------*/
 
 /* -------------------------------------------------------------------------
    Generally useful typedefs
@@ -36,40 +38,6 @@ typedef enum {
 /* 
    Types specific to the parallel runtime system.
 */
-
-
-/* Spark pools: used to store pending sparks 
- *  (THREADED_RTS & PARALLEL_HASKELL only)
- * Implementation uses a DeQue to enable concurrent read accesses at
- * the top end.
- */
-typedef struct  SparkPool_ {
-  /* Size of elements array. Used for modulo calculation: we round up
-     to powers of 2 and use the dyadic log (modulo == bitwise &) */
-  StgWord size; 
-  StgWord moduloSize; /* bitmask for modulo */
-
-  /* top, index where multiple readers steal() (protected by a cas) */
-  StgWord top;
-
-  /* bottom, index of next free place where one writer can push
-     elements. This happens unsynchronised. */
-  StgWord bottom;
-  /* both position indices are continuously incremented, and used as
-     an index modulo the current array size. */
-  
-  /* lower bound on the current top value. This is an internal
-     optimisation to avoid unnecessarily accessing the top field
-     inside pushBottom */
-  StgWord topBound;
-
-  /* The elements array */
-  StgClosurePtr* elements;
-  /*  Please note: the dataspace cannot follow the admin fields
-      immediately, as it should be possible to enlarge it without
-      disposing the old one automatically (as realloc would)! */
-
-} SparkPool;
 
 typedef ullong        rtsTime;
 

@@ -6,9 +6,6 @@
  *
  * ---------------------------------------------------------------------------*/
 
-// Make static versions of inline functions in Stable.h:
-#define RTS_STABLE_C
-
 #include "PosixSource.h"
 #include "Rts.h"
 #include "Hash.h"
