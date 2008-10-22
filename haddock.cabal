@@ -89,7 +89,7 @@ executable haddock
   hs-source-dirs:       src
   extensions:           CPP, PatternGuards, DeriveDataTypeable,
                         ScopedTypeVariables, MagicHash
-  ghc-options:          -funbox-strict-fields -O2
+  ghc-options:          -funbox-strict-fields -O2 -Wall -Werror
 
   other-modules:
     Haddock.Interface
@@ -138,6 +138,8 @@ library
     Haddock.Utils
     Haddock.GHC.Utils
   
+  ghc-options: -Wall -Werror
+
   -- Cabal doesn't define __GHC_PATCHLEVEL__
   if impl(ghc == 6.8.3)
     cpp-options: -D__GHC_PATCHLEVEL__=3
