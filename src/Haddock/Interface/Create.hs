@@ -56,7 +56,6 @@ createInterface ghcMod flags modMap = do
       decls0        = declInfos . topDecls $ group
       decls         = filterOutInstances decls0
       declMap       = mkDeclMap decls
---      famMap        = mkFamMap decls'
       ignoreExps    = Flag_IgnoreAllExports `elem` flags
       exportedNames = ghcExportedNames ghcMod
       instances     = ghcInstances ghcMod
@@ -127,14 +126,6 @@ parseOption other = tell ["Unrecognised option: " ++ other] >> return Nothing
 --------------------------------------------------------------------------------
 
 
-type DeclWithDoc = (Decl, Maybe Doc)
-
-
--- A list of type or data instance declarations with an optional family
--- declaration. 
--- type Family = (Maybe DeclWithDoc, [DeclWithDoc])
-
-
 -- Make a map from names to 'DeclInfo's. Exclude declarations that don't
 -- have names (instances and stand-alone documentation comments). Include
 -- subordinate names, but map them to their parent declarations. 
@@ -149,19 +140,6 @@ mkDeclMap decls = Map.fromList . concat $
 declInfos :: [(Decl, Maybe Doc)] -> [DeclInfo]
 declInfos decls = [ (parent, doc, subordinates d)
                   | (parent@(L _ d), doc) <- decls]
-
-
--- | Group type family instances together. Include the family declaration
--- if found.
-{-mkFamMap :: [DeclWithDoc] -> Map Name Family
-mkFamMap decls = 
-  Map.fromList [ (tcdName $ ex $ head $ g, family g) | g <- groups ]
-  where
-    family g = first listToMaybe $ partition (isFamilyDecl . ex) g
-    groups   = groupBy (comparing (tcdName . ex)) $ 
-               filter (isTyClD . unLoc . fst) decls
-    ex ((L _ (TyClD d)), _) = d
--}
 
 
 subordinates (TyClD d) = classDataSubs d
@@ -205,7 +183,7 @@ declName (SigD sig) = fromJust $ sigNameNoLoc sig
 
 -- | The top-level declarations of a module that we care about, 
 -- ordered by source location, with documentation attached if it exists.
-topDecls :: HsGroup Name -> [DeclWithDoc] 
+topDecls :: HsGroup Name -> [(Decl, Maybe Doc)] 
 topDecls = filterClasses . filterDecls . collectDocs . sortByLoc . declsFromGroup
 
 
@@ -266,7 +244,7 @@ warnAboutFilteredDecls mod decls = do
 
 
 -- | Filter out declarations that we don't handle in Haddock
-filterDecls :: [DeclWithDoc] -> [DeclWithDoc]
+filterDecls :: [(Decl, Maybe Doc)] -> [(Decl, Maybe Doc)]
 filterDecls decls = filter (isHandled . unL . fst) decls
   where
     isHandled (ForD (ForeignImport {})) = True
@@ -279,26 +257,13 @@ filterDecls decls = filter (isHandled . unL . fst) decls
 
 
 -- | Go through all class declarations and filter their sub-declarations
-filterClasses :: [DeclWithDoc] -> [DeclWithDoc]
+filterClasses :: [(Decl, Maybe Doc)] -> [(Decl, Maybe Doc)]
 filterClasses decls = [ if isClassD d then (L loc (filterClass d), doc) else x 
                       | x@(L loc d, doc) <- decls ]
   where
     filterClass (TyClD c) =
       TyClD $ c { tcdSigs = filter isVanillaLSig $ tcdSigs c }  
 
-
---------------------------------------------------------------------------------
--- Instances
---------------------------------------------------------------------------------
-
-{-
-matchingInsts :: Name -> [Instances] -> [Instances]
-matchingInsts name instances = filter ((==) name . is_cls) instances
-
-
-instToData :: Instance -> LHsDecl Name
-instToData inst = TyData {
--}
 
 --------------------------------------------------------------------------------
 -- Collect docs
