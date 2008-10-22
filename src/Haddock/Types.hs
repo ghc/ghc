@@ -155,8 +155,6 @@ data Interface = Interface {
   -- for this module.
   ifaceVisibleExports  :: ![Name],
 
-  ifaceSubMap          :: !(Map Name [Name]),
-
   -- | The instances exported by this module
   ifaceInstances       :: ![Instance]
 }

@@ -53,7 +53,6 @@ createInterface ghcMod flags modMap = do
   let group         = ghcGroup ghcMod
       exports       = fmap (reverse . map unLoc) (ghcMbExports ghcMod)
       localNames    = ghcDefinedNames ghcMod
-      subMap        = mkSubMap group
       decls0        = declInfos . topDecls $ group
       decls         = filterOutInstances decls0
       declMap       = mkDeclMap decls
@@ -66,10 +65,10 @@ createInterface ghcMod flags modMap = do
 
   visibleNames <- mkVisibleNames mod modMap localNames 
                                  (ghcNamesInScope ghcMod) 
-                                 subMap exports opts declMap 
+                                 exports opts declMap 
 
   exportItems <- mkExportItems modMap mod (ghcExportedNames ghcMod) decls declMap
-                               subMap opts exports ignoreExps instances
+                               opts exports ignoreExps instances
 
   -- prune the export list to just those declarations that have
   -- documentation, if the 'prune' option is on.
@@ -87,7 +86,6 @@ createInterface ghcMod flags modMap = do
     ifaceOptions         = opts,
     ifaceLocals          = localNames,
     ifaceRnDocMap        = Map.empty,
-    ifaceSubMap          = subMap,
     ifaceExportItems     = prunedExportItems,
     ifaceRnExportItems   = [],
     ifaceExports         = exportedNames,
@@ -350,11 +348,6 @@ finishedDoc _ _ rest = rest
 sameDecl d1 d2 = getLoc d1 == getLoc d2
 
 
-mkSubMap :: HsGroup Name -> Map Name [Name]
-mkSubMap group = Map.fromList [ (name, subs) | L _ tycld <- hs_tyclds group,
- let name:subs = map unLoc (tyClDeclNames tycld) ]
-
-
 {-
 attachATs :: [IE Name] -> ([IE Name], [Name])
 attachATs exports = 
@@ -372,14 +365,13 @@ mkExportItems
   -> [Name]			-- exported names (orig)
   -> [DeclInfo]
   -> Map Name DeclInfo             -- maps local names to declarations
-  -> Map Name [Name]	-- sub-map for this module
   -> [DocOption]
   -> Maybe [IE Name]
   -> Bool				-- --ignore-all-exports flag
   -> [Instance]
   -> ErrMsgM [ExportItem Name]
 
-mkExportItems modMap this_mod exported_names decls declMap sub_map
+mkExportItems modMap this_mod exported_names decls declMap
               opts maybe_exps ignore_all_exports instances
   | isNothing maybe_exps || ignore_all_exports || OptIgnoreExports `elem` opts
     = everything_local_exported
@@ -533,13 +525,12 @@ mkVisibleNames :: Module
              -> ModuleMap
              -> [Name] 
              -> [Name]
-             -> Map Name [Name]
              -> Maybe [IE Name]
              -> [DocOption]
              -> Map Name DeclInfo
              -> ErrMsgM [Name]
 
-mkVisibleNames mdl modMap localNames scope subMap maybeExps opts declMap 
+mkVisibleNames mdl modMap localNames scope maybeExps opts declMap 
   -- if no export list, just return all local names 
   | Nothing <- maybeExps         = return (filter hasDecl localNames)
   | OptIgnoreExports `elem` opts = return localNames
@@ -557,7 +548,7 @@ mkVisibleNames mdl modMap localNames scope subMap maybeExps opts declMap
     IEThingAbs t -> return [t]
     IEThingAll t -> return (t : all_subs)
 	 where
-	      all_subs | nameModule t == mdl = Map.findWithDefault [] t subMap
+	      all_subs | nameModule t == mdl = subsOfName t declMap
 		       | otherwise = allSubsOfName modMap t
 
     IEThingWith t cs -> return (t : cs)
@@ -584,13 +575,18 @@ exportModuleMissingErr this mdl
 -- | For a given entity, find all the names it "owns" (ie. all the
 -- constructors and field names of a tycon, or all the methods of a
 -- class).
-allSubsOfName :: ModuleMap -> Name -> [Name]
-allSubsOfName modMap name 
-  | isExternalName name =
-    case Map.lookup (nameModule name) modMap of
-      Just iface -> Map.findWithDefault [] name (ifaceSubMap iface)
-      Nothing   -> []
-  | otherwise =  error $ "Main.allSubsOfName: unexpected unqual'd name"
+allSubsOfName :: Map Module Interface -> Name -> [Name]
+allSubsOfName ifaces name =
+  case Map.lookup (nameModule name) ifaces of
+    Just iface -> subsOfName name (ifaceDeclMap iface)
+    Nothing -> []
+
+
+subsOfName :: Name -> Map Name DeclInfo -> [Name]
+subsOfName n declMap =
+  case Map.lookup n declMap of
+    Just (_, _, subs) -> map fst subs
+    Nothing -> []
 
 
 -- | Find a stand-alone documentation comment by its name
