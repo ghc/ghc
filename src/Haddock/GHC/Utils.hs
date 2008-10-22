@@ -81,23 +81,28 @@ getMainDeclBinder (ForD (ForeignExport _ _ _)) = Nothing
 getMainDeclBinder _ = Nothing
 
 
+isTyClD :: HsDecl a -> Bool
 isTyClD (TyClD _) = True
 isTyClD _ = False
 
 
+isClassD :: HsDecl a -> Bool
 isClassD (TyClD d) = isClassDecl d
 isClassD _ = False
 
 
+isDocD :: HsDecl a -> Bool
 isDocD (DocD _) = True
 isDocD _ = False
 
 
+isInstD :: HsDecl a -> Bool
 isInstD (InstD _) = True
 isInstD (TyClD d) = isFamInstDecl d
 isInstD _ = False
 
 
+declATs :: HsDecl a -> [a]
 declATs (TyClD d) | isClassDecl d = map (tcdName . unL) $ tcdATs d
 declATs _ = []
 
