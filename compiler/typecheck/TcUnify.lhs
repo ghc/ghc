@@ -611,7 +611,10 @@ boxy_match tmpl_tvs orig_tmpl_ty boxy_tvs orig_boxy_ty subst
                         Nothing -> orig_boxy_ty
                         Just ty -> ty `boxyLub` orig_boxy_ty
 
-    go _ (TyVarTy tv) | isMetaTyVar tv
+    go _ (TyVarTy tv) | isTcTyVar tv && isMetaTyVar tv
+				-- NB: A TyVar (not TcTyVar) is possible here, representing
+				--     a skolem, because in this pure boxy_match function 
+				--     we don't instantiate foralls to TcTyVars; cf Trac #2714
         = subst         -- Don't fail if the template has more info than the target!
                         -- Otherwise, with tmpl_tvs = [a], matching (a -> Int) ~ (Bool -> beta)
                         -- would fail to instantiate 'a', because the meta-type-variable
