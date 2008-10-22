@@ -50,16 +50,15 @@ import Name
 import OccName
 import Binary
 import Module
-import PackageConfig
 
-import Control.Monad ( liftM, MonadPlus(..) )
-import Data.Char ( isAlpha, isSpace, toUpper, ord, chr )
+import Control.Monad ( liftM )
+import Data.Char ( isAlpha, ord, chr )
 import Numeric ( showIntAtBase )
 import Data.Map ( Map )
 import qualified Data.Map as Map hiding ( Map )
 import Data.IORef ( IORef, newIORef, readIORef )
-import Data.List ( intersect, isSuffixOf, intersperse )
-import Data.Maybe ( maybeToList, fromMaybe, isJust, fromJust )
+import Data.List ( isSuffixOf )
+import Data.Maybe ( fromJust )
 import Data.Word ( Word8 )
 import Data.Bits ( testBit )
 import System.Environment ( getProgName )
@@ -99,6 +98,7 @@ restrictTo names (L loc decl) = L loc $ case decl of
     case restrictCons names (tcdCons d) of
       []    -> TyClD (d { tcdND = DataType, tcdCons = [] }) 
       [con] -> TyClD (d { tcdCons = [con] })
+      _ -> error "Should not happen"
   TyClD d | isClassDecl d -> 
     TyClD (d { tcdSigs = restrictDecls names (tcdSigs d),
                tcdATs = restrictATs names (tcdATs d) })
@@ -122,7 +122,7 @@ restrictCons names decls = [ L p d | L p (Just d) <- map (fmap keep) decls ]
         field_avail (ConDeclField n _ _) = (unLoc n) `elem` names
         field_types flds = [ t | ConDeclField _ t _ <- flds ] 
       
-    keep d | otherwise = Nothing
+    keep _ | otherwise = Nothing
 
 restrictDecls :: [Name] -> [LSig Name] -> [LSig Name]
 restrictDecls names decls = filter keep decls
@@ -268,7 +268,7 @@ escapeURIChar p c
         myShowHex :: Int -> ShowS
         myShowHex n r =  case showIntAtBase 16 (toChrHex) n r of
             []  -> "00"
-            [c] -> ['0',c]
+            [a] -> ['0',a]
             cs  -> cs
         toChrHex d
             | d < 10    = chr (ord '0' + fromIntegral d)
@@ -280,6 +280,8 @@ escapeURIString p s = concatMap (escapeURIChar p) s
 isUnreserved :: Char -> Bool
 isUnreserved c = isAlphaNumChar c || (c `elem` "-_.~")
 
+
+isAlphaChar, isDigitChar, isAlphaNumChar :: Char -> Bool
 isAlphaChar c    = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
 isDigitChar c    = (c >= '0' && c <= '9')
 isAlphaNumChar c = isAlphaChar c || isDigitChar c
@@ -309,6 +311,7 @@ html_xrefs = unsafePerformIO (readIORef html_xrefs_ref)
 -----------------------------------------------------------------------------
 
 
+replace :: Eq a => a -> a -> [a] -> [a]
 replace a b xs = map (\x -> if x == a then b else x) xs 
 
 
@@ -355,11 +358,6 @@ idMarkup = Markup {
   markupPic           = DocPic
   }
 
--- | Since marking up is just a matter of mapping 'Doc' into some
--- other type, we can \'rename\' documentation by marking up 'Doc' into
--- the same thing, modifying only the identifiers embedded in it.
-
-mapIdent f = idMarkup { markupIdentifier = f }
 
 -----------------------------------------------------------------------------
 -- put here temporarily
