@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+
 --
 -- Haddock - A Haskell Documentation Tool
 --
