@@ -76,8 +76,8 @@ rtsBool looksEmpty(SparkPool* deque);
 StgClosure * tryStealSpark     (SparkPool *pool);
 void         freeSparkPool     (SparkPool *pool);
 void         createSparkThread (Capability *cap, StgClosure *p);
-void         pruneSparkQueues  (void);
 void         traverseSparkQueue(evac_fn evac, void *user, Capability *cap);
+void         pruneSparkQueue   (evac_fn evac, void *user, Capability *cap);
 
 INLINE_HEADER void discardSparks  (SparkPool *pool);
 INLINE_HEADER nat  sparkPoolSize  (SparkPool *pool);

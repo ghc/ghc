@@ -371,13 +371,14 @@ newSpark (StgRegTable *reg, StgClosure *p)
  * the spark pool only contains sparkable closures.
  * -------------------------------------------------------------------------- */
 
-static void
-pruneSparkQueue (Capability *cap)
+void
+pruneSparkQueue (evac_fn evac, void *user, Capability *cap)
 { 
     SparkPool *pool;
-    StgClosurePtr spark, *elements;
+    StgClosurePtr spark, tmp, *elements;
     nat n, pruned_sparks; // stats only
     StgWord botInd,oldBotInd,currInd; // indices in array (always < size)
+    const StgInfoTable *info;
     
     PAR_TICKY_MARK_SPARK_QUEUE_START();
     
@@ -440,14 +441,31 @@ pruneSparkQueue (Capability *cap)
 	 botInd, otherwise move on */
       spark = elements[currInd];
 
-      /* if valuable work: shift inside the pool */
-      if ( closure_SHOULD_SPARK(spark) ) {
-	elements[botInd] = spark; // keep entry (new address)
-	botInd++;
-	n++;
-      } else { 
-	pruned_sparks++; // discard spark
-        cap->sparks_pruned++;
+      // We have to be careful here: in the parallel GC, another
+      // thread might evacuate this closure while we're looking at it,
+      // so grab the info pointer just once.
+      info = spark->header.info;
+      if (IS_FORWARDING_PTR(info)) {
+          tmp = (StgClosure*)UN_FORWARDING_PTR(info);
+          /* if valuable work: shift inside the pool */
+          if (closure_SHOULD_SPARK(tmp)) {
+              elements[botInd] = tmp; // keep entry (new address)
+              botInd++;
+              n++;
+          } else {
+              pruned_sparks++; // discard spark
+              cap->sparks_pruned++;
+          }
+      } else {
+          if (!(closure_flags[INFO_PTR_TO_STRUCT(info)->type] & _NS)) {
+              elements[botInd] = spark; // keep entry (new address)
+              evac (user, &elements[botInd]);
+              botInd++;
+              n++;
+          } else {
+              pruned_sparks++; // discard spark
+              cap->sparks_pruned++;
+          }
       }
       currInd++;
 
@@ -475,15 +493,6 @@ pruneSparkQueue (Capability *cap)
                sparkPoolSize(pool), pool->bottom, pool->top);
 
     ASSERT_SPARK_POOL_INVARIANTS(pool);
-}
-
-void
-pruneSparkQueues (void)
-{
-    nat i;
-    for (i = 0; i < n_capabilities; i++) {
-        pruneSparkQueue(&capabilities[i]);
-    }
 }
 
 /* GC for the spark pool, called inside Capability.c for all

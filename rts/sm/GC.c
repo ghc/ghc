@@ -335,7 +335,8 @@ GarbageCollect ( rtsBool force_major_gc )
 
   // follow all the roots that the application knows about.
   gct->evac_step = 0;
-  markSomeCapabilities(mark_root, gct, gct->thread_index, n_gc_threads);
+  markSomeCapabilities(mark_root, gct, gct->thread_index, n_gc_threads,
+                       rtsTrue/*prune sparks*/);
 
 #if defined(RTS_USER_SIGNALS)
   // mark the signal handlers (signals should be already blocked)
@@ -724,11 +725,6 @@ GarbageCollect ( rtsBool force_major_gc )
   // Update the stable pointer hash table.
   updateStablePtrTable(major_gc);
 
-  // Remove useless sparks from the spark pools
-#ifdef THREADED_RTS
-  pruneSparkQueues();
-#endif
-
   // check sanity after GC 
   IF_DEBUG(sanity, checkSanity());
 
@@ -1009,7 +1005,8 @@ gc_thread_work (void)
 
     // Every thread evacuates some roots.
     gct->evac_step = 0;
-    markSomeCapabilities(mark_root, gct, gct->thread_index, n_gc_threads);
+    markSomeCapabilities(mark_root, gct, gct->thread_index, n_gc_threads,
+                         rtsTrue/*prune sparks*/);
 
     scavenge_until_all_done();
 }

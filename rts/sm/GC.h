@@ -32,8 +32,6 @@ extern long copied;
 extern nat mutlist_MUTVARS, mutlist_MUTARRS, mutlist_MVARS, mutlist_OTHERS;
 #endif
 
-extern void markSomeCapabilities (evac_fn evac, void *user, nat i0, nat delta);
-
 #ifdef THREADED_RTS
 extern SpinLock gc_alloc_block_sync;
 #endif

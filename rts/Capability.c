@@ -821,7 +821,8 @@ freeCapability (Capability *cap) {
    ------------------------------------------------------------------------ */
 
 void
-markSomeCapabilities (evac_fn evac, void *user, nat i0, nat delta)
+markSomeCapabilities (evac_fn evac, void *user, nat i0, nat delta, 
+                      rtsBool prune_sparks USED_IF_THREADS)
 {
     nat i;
     Capability *cap;
@@ -848,7 +849,11 @@ markSomeCapabilities (evac_fn evac, void *user, nat i0, nat delta)
 	}
 
 #if defined(THREADED_RTS)
-        traverseSparkQueue (evac, user, cap);
+        if (prune_sparks) {
+            pruneSparkQueue (evac, user, cap);
+        } else {
+            traverseSparkQueue (evac, user, cap);
+        }
 #endif
     }
 
@@ -859,22 +864,8 @@ markSomeCapabilities (evac_fn evac, void *user, nat i0, nat delta)
 #endif 
 }
 
-// This function is used by the compacting GC to thread all the
-// pointers from spark queues.
-void
-traverseSparkQueues (evac_fn evac USED_IF_THREADS, void *user USED_IF_THREADS)
-{
-#if defined(THREADED_RTS)
-    nat i;
-    for (i = 0; i < n_capabilities; i++) {
-        traverseSparkQueue (evac, user, &capabilities[i]);
-    }
-#endif // THREADED_RTS
-
-}
-
 void
 markCapabilities (evac_fn evac, void *user)
 {
-    markSomeCapabilities(evac, user, 0, 1);
+    markSomeCapabilities(evac, user, 0, 1, rtsFalse);
 }
