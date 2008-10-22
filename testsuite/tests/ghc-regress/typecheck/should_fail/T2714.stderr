@@ -1,0 +1,15 @@
+
+T2714.hs:8:4:
+    Couldn't match expected type `a' against inferred type `f b'
+      `a' is a rigid type variable bound by
+          the type signature for `f' at T2714.hs:7:7
+    In the expression: fmap
+    In the definition of `f': f = fmap
+
+T2714.hs:8:4:
+    Couldn't match expected type `c'
+           against inferred type `f (f b -> b)'
+      `c' is a rigid type variable bound by
+          the polymorphic type `forall c. c -> a' at T2714.hs:8:4
+    In the expression: fmap
+    In the definition of `f': f = fmap
