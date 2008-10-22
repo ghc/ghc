@@ -1,49 +1,54 @@
 
-   =============================================================
-    The (Interactive) Glasgow Haskell Compiler -- version 6.4
-   =============================================================
+   ==============================================================
+    The (Interactive) Glasgow Haskell Compiler -- version 6.10.1
+   ==============================================================
 
-The GHC Team is pleased to announce a new major release of GHC.  It
-has been a long time since the last major release (Dec 2003!), and a
-lot has happened:
+The GHC Team is pleased to announce a new major release of GHC. There
+have been a number of significant changes since the last major release,
+including:
 
-  - GADTs (Generalised Abstract Datatypes) are supported  
+ * Some new language features have been implemented:
+   * Record syntax: wild-card patterns, punning, and field disambiguation
+   * Generalised quasi-quotes
+   * Generalised list comprehensions
+   * View patterns
 
-  - STM (Software Transactional Memory) is implemented
+ * Type families have been completely re-implemented
 
-  - Full support for Cabal and a much improved package framework
+ * Now comes with Haddock 2, which supports all GHC extensions
 
-  - Better support for mutually-recursive modules
+ * Parallel garbage collection
 
-  - A complete rewrite of the back end
+ * Base provides extensible exceptions
 
-  - Accurate source locations in error messages
+ * The GHC API is easier to use
 
-  - Lots of new libraries
+ * External core (output only) now works again
+
+ * Data Parallel Haskell (DPH) comes as part of GHC
 
 The full release notes are here:
 
-  http://haskell.org/ghc/docs/6.4/html/users_guide/release-6-4.html
+  http://haskell.org/ghc/docs/6.10.1/html/users_guide/release-6-10-1.html
 
 How to get it
 ~~~~~~~~~~~~~
-The easy way is to go to the WWW page, which should be self-explanatory:
+
+The easy way is to go to the web page, which should be self-explanatory:
 
         http://www.haskell.org/ghc/
 
-We supply binary builds in the native package format for various
-flavours of Linux and BSD, and in Windows Installer (MSI) form
-for Windows folks.  Binary builds for other platforms are available
-as a .tar.gz which can be installed wherever you want.  The source
-distribution is also available from the same place.
+We supply binary builds in the native package format for many
+platforms, and the source distribution is available from the same
+place.
 
 Packages will appear as they are built - if the package for your
 system isn't available yet, please try again later.
 
 
-
 Background
 ~~~~~~~~~~
+
 Haskell is a standard lazy functional programming language; the
 current language version is Haskell 98, agreed in December 1998 and
 revised December 2002.
@@ -68,49 +73,56 @@ On-line GHC-related resources
 
 Relevant URLs on the World-Wide Web:
 
-GHC home page             http://www.haskell.org/ghc/
-Haskell home page         http://www.haskell.org/
-comp.lang.functional FAQ  http://www.cs.nott.ac.uk/~gmh/faq.html
+GHC home page              http://www.haskell.org/ghc/
+GHC developers' home page  http://hackage.haskell.org/trac/ghc/
+Haskell home page          http://www.haskell.org/
 
 
-
-System requirements
+Supported Platforms
 ~~~~~~~~~~~~~~~~~~~
-To compile programs with GHC, you need a machine with 64+MB memory, GCC
-and perl. This release is known to work on the following platforms:
 
-  * i386-unknown-{linux,*bsd,mingw32}
-  * sparc-sun-solaris2
-  * powerpc-apple-darwin (MacOS X)
-  * powerpc-apple-linux
+The list of platforms we support, and the people responsible for them,
+is here:
+
+   http://hackage.haskell.org/trac/ghc/wiki/Contributors
 
 Ports to other platforms are possible with varying degrees of
-difficulty.  The builder's guide on the web site gives a complete
-run-down of what ports work and how to go about porting to a new
-platform; it can be found at
+difficulty.  The Building Guide describes how to go about porting to a
+new platform:
 
-   http://hackage.haskell.org/trac/ghc/wiki/Building
+    http://hackage.haskell.org/trac/ghc/wiki/Building
+
+
+Developers
+~~~~~~~~~~
+
+We welcome new contributors.  Instructions on accessing our source
+code repository, and getting started with hacking on GHC, are
+available from the GHC's developer's site run by Trac:
+
+  http://hackage.haskell.org/trac/ghc/
 
 
 Mailing lists
 ~~~~~~~~~~~~~
+
 We run mailing lists for GHC users and bug reports; to subscribe, use
 the web interfaces at
 
-	http://www.haskell.org/mailman/listinfo/glasgow-haskell-users
-	http://www.haskell.org/mailman/listinfo/glasgow-haskell-bugs
+    http://www.haskell.org/mailman/listinfo/glasgow-haskell-users
+    http://www.haskell.org/mailman/listinfo/glasgow-haskell-bugs
 
 There are several other haskell and ghc-related mailing lists on
 www.haskell.org; for the full list, see
 
-	http://www.haskell.org/mailman/listinfo/
+    http://www.haskell.org/mailman/listinfo/
 
-Please report bugs using our SourceForge page at
-	
-	http://sourceforge.net/projects/ghc/
+Some GHC developers hang out on #haskell on IRC, too:
 
-or send them to glasgow-haskell-bugs@haskell.org.
+    http://www.haskell.org/haskellwiki/IRC_channel
 
-GHC users hang out on glasgow-haskell-users@haskell.org.  Bleeding
-edge CVS users party on cvs-ghc@haskell.org.
+Please report bugs using our bug tracking system.  Instructions on
+reporting bugs can be found here:
+
+    http://www.haskell.org/ghc/reportabug
 
