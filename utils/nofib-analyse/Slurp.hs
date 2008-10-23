@@ -33,6 +33,7 @@ data Results = Results {
         binary_size     :: Maybe Int,
         link_time       :: Maybe Float,
         run_time        :: [Float],
+        elapsed_time    :: [Float],
         mut_time        :: [Float],
         mut_elapsed_time :: [Float],
         instrs          :: Maybe Integer,
@@ -59,6 +60,7 @@ emptyResults = Results {
         binary_size     = Nothing,
         link_time       = Nothing,
         run_time        = [],
+        elapsed_time    = [],
         mut_time        = [],
         mut_elapsed_time = [],
         instrs          = Nothing,
@@ -203,7 +205,7 @@ combine2Results :: Results -> Results -> Results
 combine2Results
              Results{ compile_time = ct1, link_time = lt1,
                       module_size = ms1,
-                      run_time = rt1, mut_time = mt1,
+                      run_time = rt1, elapsed_time = et1, mut_time = mt1,
                       mut_elapsed_time = me1,
                       instrs = is1, mem_reads = mr1, mem_writes = mw1,
                       cache_misses = cm1,
@@ -215,7 +217,7 @@ combine2Results
                       run_status = rs1, compile_status = cs1 }
              Results{ compile_time = ct2, link_time = lt2,
                       module_size = ms2,
-                      run_time = rt2, mut_time = mt2,
+                      run_time = rt2, elapsed_time = et2, mut_time = mt2,
                       mut_elapsed_time = me2,
                       instrs = is2, mem_reads = mr2, mem_writes = mw2,
                       cache_misses = cm2,
@@ -229,6 +231,7 @@ combine2Results
                       module_size    = Map.unionWith (flip const) ms1 ms2,
                       link_time      = lt1 `mplus` lt2,
                       run_time       = rt1 ++ rt2,
+                      elapsed_time   = et1 ++ et2, 
                       mut_time       = mt1 ++ mt2,
                       mut_elapsed_time = me1 ++ me2,
                       instrs         = is1 `mplus` is2,
@@ -348,36 +351,36 @@ parse_run_time _ [] _ NotDone = []
 parse_run_time prog [] res ex = [(prog, res{run_status=ex})]
 parse_run_time prog (l:ls) res ex =
         case ghc1_re l of {
-           Just (allocations, _, _, _, _, _, initialisation, _, mut, mut_elapsed, gc, gc_elapsed) ->
-                got_run_result allocations initialisation mut mut_elapsed gc gc_elapsed [] [] [] [] []
+           Just (allocations, _, _, _, _, _, initialisation, init_elapsed, mut, mut_elapsed, gc, gc_elapsed) ->
+                got_run_result allocations initialisation init_elapsed mut mut_elapsed gc gc_elapsed [] [] [] [] []
                         Nothing Nothing Nothing Nothing Nothing;
            Nothing ->
 
         case ghc2_re l of {
-           Just (allocations, _, _, _, _, _, initialisation, _, mut, mut_elapsed, gc, gc_elapsed) ->
-                got_run_result allocations initialisation mut mut_elapsed gc gc_elapsed [] [] [] [] []
+           Just (allocations, _, _, _, _, _, initialisation, init_elapsed, mut, mut_elapsed, gc, gc_elapsed) ->
+                got_run_result allocations initialisation init_elapsed mut mut_elapsed gc gc_elapsed [] [] [] [] []
                         Nothing Nothing Nothing Nothing Nothing;
 
             Nothing ->
 
         case ghc3_re l of {
-           Just (allocations, _, _, _, _, gc_work', _, initialisation, _, mut, mut_elapsed, gc, gc_elapsed) ->
-                got_run_result allocations initialisation mut mut_elapsed gc gc_elapsed [] [] [] [] []
+           Just (allocations, _, _, _, _, gc_work', _, initialisation, init_elapsed, mut, mut_elapsed, gc, gc_elapsed) ->
+                got_run_result allocations initialisation init_elapsed mut mut_elapsed gc gc_elapsed [] [] [] [] []
                         (Just gc_work') Nothing Nothing Nothing Nothing;
 
             Nothing ->
 
         case ghc4_re l of {
-           Just (allocations, _, _, _, _, gc_work', _, initialisation, _, mut, mut_elapsed, gc, gc_elapsed, is, mem_rs, mem_ws, cache_misses') ->
-                got_run_result allocations initialisation mut mut_elapsed gc gc_elapsed [] [] [] [] []
+           Just (allocations, _, _, _, _, gc_work', _, initialisation, init_elapsed, mut, mut_elapsed, gc, gc_elapsed, is, mem_rs, mem_ws, cache_misses') ->
+                got_run_result allocations initialisation init_elapsed mut mut_elapsed gc gc_elapsed [] [] [] [] []
                         (Just gc_work') (Just is) (Just mem_rs)
                         (Just mem_ws) (Just cache_misses');
 
             Nothing ->
 
         case ghc5_re l of {
-           Just (allocations, _, _, _, _, gc_work', _, initialisation, _, mut, mut_elapsed, gc, gc_elapsed, gc0, gc0_elapsed, gc1, gc1_elapsed, bal) ->
-                got_run_result allocations initialisation mut mut_elapsed gc gc_elapsed
+           Just (allocations, _, _, _, _, gc_work', _, initialisation, init_elapsed, mut, mut_elapsed, gc, gc_elapsed, gc0, gc0_elapsed, gc1, gc1_elapsed, bal) ->
+                got_run_result allocations initialisation init_elapsed mut mut_elapsed gc gc_elapsed
                         [gc0] [gc0_elapsed] [gc1] [gc1_elapsed] [bal]
                         (Just gc_work') Nothing Nothing Nothing Nothing;
 
@@ -410,12 +413,14 @@ parse_run_time prog (l:ls) res ex =
 
         }}}}}}}}}
   where
-  got_run_result allocations initialisation mut mut_elapsed gc gc_elapsed gc0 gc0_elapsed gc1 gc1_elapsed bal gc_work' instrs' mem_rs mem_ws cache_misses'
+  got_run_result allocations initialisation init_elapsed mut mut_elapsed gc gc_elapsed gc0 gc0_elapsed gc1 gc1_elapsed bal gc_work' instrs' mem_rs mem_ws cache_misses'
       = -- trace ("got_run_result: " ++ initialisation ++ ", " ++ mut ++ ", " ++ gc) $
         let
           time = initialisation + mut + gc
+          etime = init_elapsed + mut_elapsed + gc_elapsed
           res' = combine2Results res
                         emptyResults{   run_time   = [time],
+                                        elapsed_time = [etime],
                                         mut_time   = [mut],
                                         mut_elapsed_time   = [mut_elapsed],
                                         gc_time    = [gc],
