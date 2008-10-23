@@ -106,8 +106,10 @@ struct Capability_ {
     StgTRecChunk *free_trec_chunks;
     StgTRecHeader *free_trec_headers;
     nat transaction_tokens;
-
-}; // typedef Capability, defined in RtsAPI.h
+} // typedef Capability is defined in RtsAPI.h
+  // Capabilities are stored in an array, so make sure that adjacent
+  // Capabilities don't share any cache-lines:
+  ATTRIBUTE_ALIGNED(64);
 
 
 #if defined(THREADED_RTS)

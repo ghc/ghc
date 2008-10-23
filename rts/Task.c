@@ -114,7 +114,8 @@ newTask (void)
 #endif
     Task *task;
 
-    task = stgMallocBytes(sizeof(Task), "newTask");
+#define ROUND_TO_CACHE_LINE(x) ((((x)+63) / 64) * 64)
+    task = stgMallocBytes(ROUND_TO_CACHE_LINE(sizeof(Task)), "newTask");
     
     task->cap  = NULL;
     task->stopped = rtsFalse;
