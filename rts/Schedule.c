@@ -479,6 +479,7 @@ run_thread:
 
     ASSERT_FULL_CAPABILITY_INVARIANTS(cap,task);
     ASSERT(t->cap == cap);
+    ASSERT(t->bound ? t->bound->cap == cap : 1);
 
     prev_what_next = t->what_next;
 
