@@ -980,7 +980,7 @@ Prelude&gt;
       <itemizedlist>
         <listitem>
           <para>
-            Version number 1.6.0.0 (was 1.2.4.0)
+            Version number 1.6.0.1 (was 1.2.4.0)
           </para>
         </listitem>
         <listitem>
@@ -1030,7 +1030,7 @@ Prelude&gt;
       <itemizedlist>
         <listitem>
           <para>
-            This is a new bootlib, version 0.2.0.0.
+            This is a new bootlib, version 0.2.1.0.
           </para>
         </listitem>
       </itemizedlist>
