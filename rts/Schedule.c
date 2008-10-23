@@ -399,6 +399,7 @@ schedule (Capability *initialCapability, Task *task)
     //     ASSERT_FULL_CAPABILITY_INVARIANTS(cap,task);
     }
 
+  yield:
     scheduleYield(&cap,task);
     if (emptyRunQueue(cap)) continue; // look for work again
 #endif
@@ -565,7 +566,7 @@ run_thread:
 	debugTrace(DEBUG_sched,
 		   "--<< thread %lu (%s) stopped: blocked",
 		   (unsigned long)t->id, whatNext_strs[t->what_next]);
-	continue;
+        goto yield;
     }
 #endif
 
