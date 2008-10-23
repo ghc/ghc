@@ -527,6 +527,10 @@ sub process_stats_file {
     $MaxResidency     = 0 unless defined($MaxResidency);
     $AvgResidency     = 0 unless defined($AvgResidency);
     $ResidencySamples = 0 unless defined($ResidencySamples);
+    $Gc0Time          = 0.0 unless defined($Gc0Time);
+    $Gc0Elapsed       = 0.0 unless defined($Gc0Elapsed);
+    $Gc1Time          = 0.0 unless defined($Gc1Time);
+    $Gc1Elapsed       = 0.0 unless defined($Gc1Elapsed);
 
     # a bit of tidying
     $BytesAlloc =~ s/,//g;
