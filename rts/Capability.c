@@ -63,7 +63,6 @@ stealWork (Capability *cap)
   */
   Capability *robbed;
   StgClosurePtr spark;
-  rtsBool success = rtsFalse;
   rtsBool retry;
   nat i = 0;
 
