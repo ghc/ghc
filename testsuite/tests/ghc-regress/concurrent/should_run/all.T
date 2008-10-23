@@ -10,10 +10,16 @@ test('conc003', normal, compile_and_run, [''])
 test('conc006', normal, compile_and_run, [''])
 test('conc027', normal, compile_and_run, [''])
 test('conc051', normal, compile_and_run, [''])
-test('conc069', only_ways(['ghci','threaded1','threaded2']), compile_and_run, [''])
+
+if ('threaded1' in config.run_ways):
+   threaded_ways = ['ghci','threaded1','threaded2']
+else:
+   threaded_ways = []
+
+test('conc069', only_ways(threaded_ways), compile_and_run, [''])
 # this test gives slightly different results for non-threaded ways, so omit
 # those for now.
-test('conc070', only_ways(['ghci','threaded1','threaded2']), compile_and_run, [''])
+test('conc070', only_ways(threaded_ways), compile_and_run, [''])
 
 # -----------------------------------------------------------------------------
 # These tests we only do for a full run
