@@ -15,17 +15,18 @@ endif
 #	General makefile for Latex stuff
 
 LATEX=latex \\nonstopmode \\input
+PDFLATEX=pdflatex
 BIBTEX=bibtex
 
 dvi: core.dvi
 ps: core.ps core.ps.gz
 pdf: core.pdf
 
-core.dvi:	core.tex
-		-$(LATEX) core.tex
-	        $(BIBTEX) core
-		-$(LATEX) core.tex
-		-$(LATEX) core.tex
+core.pdf: core.tex
+	$(PDFLATEX) core.tex
+	$(BIBTEX) core
+	$(PDFLATEX) core.tex
+	$(PDFLATEX) core.tex
 
 ######## General rules
 .SUFFIXES:
