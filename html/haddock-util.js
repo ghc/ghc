@@ -131,3 +131,9 @@ function perform_search(full)
         return ""; // should never be reached
     }
 }
+
+function setSynopsis(filename) {
+    if (parent.window.synopsis) {
+      parent.window.synopsis.location = filename;
+    }
+}

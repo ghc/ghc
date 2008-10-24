@@ -29,12 +29,14 @@ import qualified Haddock.Utils.Html as Html
 import Control.Exception     ( bracket )
 import Control.Monad         ( when, unless )
 import Data.Char             ( isUpper, toUpper )
-import Data.List             ( sortBy )
+import Data.List             ( sortBy, groupBy )
 import Data.Maybe
 import Foreign.Marshal.Alloc ( allocaBytes )
 import System.IO             ( IOMode(..), hClose, hGetBuf, hPutBuf, openFile )
 import Data.Map              ( Map )
 import qualified Data.Map as Map hiding ( Map )
+import Data.Function
+import Data.Ord              ( comparing )
 
 #if __GLASGOW_HASKELL__ >= 609
 import GHC hiding ( NoLink, moduleInfo )
@@ -76,7 +78,6 @@ ppHtml doctitle maybe_package ifaces odir prologue maybe_html_help_format
   let
 	visible_ifaces = filter visible ifaces
 	visible i = OptHide `notElem` ifaceOptions i
-
   when (not (isJust maybe_contents_url)) $ 
     ppHtmlContents odir doctitle maybe_package
         maybe_html_help_format maybe_index_url maybe_source_url maybe_wiki_url
@@ -146,7 +147,7 @@ copyHtmlBits odir libdir maybe_css = do
 	copyLibFile f = do
 	   copyFile (pathJoin [libhtmldir, f]) (pathJoin [odir, f])
   copyFile css_file css_destination
-  mapM_ copyLibFile [ iconFile, plusFile, minusFile, jsFile ]
+  mapM_ copyLibFile [ iconFile, plusFile, minusFile, jsFile, framesFile ]
 
 footer :: HtmlTable
 footer = 
@@ -331,6 +332,9 @@ ppHtmlContents odir doctitle
 	    footer
 	  )
   writeFile (pathJoin [odir, contentsHtmlFile]) (renderHtml html)
+
+  -- XXX: think of a better place for this?
+  ppHtmlContentsFrame odir doctitle ifaces
   
   -- Generate contents page for Html Help if requested
   case maybe_html_help_format of
@@ -412,6 +416,37 @@ mkNode ss (Node s leaf pkg short ts) depth id = htmlNode
 -- The URL for source and wiki links, and the current module
 type LinksInfo = (SourceURLs, WikiURLs)
 
+-- | Turn a module tree into a flat list of full module names.  E.g.,
+-- @
+--  A
+--  +-B
+--  +-C
+-- @
+-- becomes
+-- @["A", "A.B", "A.B.C"]@
+flatModuleTree :: [InstalledInterface] -> [Html]
+flatModuleTree ifaces =
+    map (uncurry ppModule' . head)
+            . groupBy ((==) `on` fst)
+            . sortBy (comparing fst)
+            $ mods
+  where
+    mods = [ (moduleString mod, mod) | mod <- map instMod ifaces ]
+    ppModule' txt mod =
+      anchor ! [href ((moduleHtmlFile mod)), target mainFrameName]
+        << toHtml txt
+
+ppHtmlContentsFrame odir doctitle ifaces = do
+  let mods = flatModuleTree ifaces
+      html =
+        header
+            (documentCharacterEncoding +++
+	     thetitle (toHtml doctitle) +++
+	     styleSheet +++
+	     (script ! [src jsFile, thetype "text/javascript"] $ noHtml)) +++
+        body << vanillaTable << p << (
+            foldr (+++) noHtml (map (+++br) mods))
+  writeFile (pathJoin [odir, frameIndexHtmlFile]) (renderHtml html)
 
 -- ---------------------------------------------------------------------------
 -- Generate the index
@@ -534,7 +569,12 @@ ppHtmlModule odir doctitle
 	header (documentCharacterEncoding +++
 		thetitle (toHtml mdl) +++
 		styleSheet +++
-		(script ! [src jsFile, thetype "text/javascript"] $ noHtml)) +++
+		(script ! [src jsFile, thetype "text/javascript"] $ noHtml) +++
+                (script ! [thetype "text/javascript"]
+                     -- XXX: quoting errors possible?
+                     << Html [HtmlString ("window.onload = function () {setSynopsis(\"mini_" 
+                                ++ moduleHtmlFile mod ++ "\")};")])
+               ) +++
         body << vanillaTable << (
 	    pageHeader mdl iface doctitle
 		maybe_source_url maybe_wiki_url
@@ -543,7 +583,22 @@ ppHtmlModule odir doctitle
 	    footer
          )
   writeFile (pathJoin [odir, moduleHtmlFile mod]) (renderHtml html)
+  ppHtmlModuleMiniSynopsis odir doctitle iface
 
+ppHtmlModuleMiniSynopsis :: FilePath -> String -> Interface -> IO ()
+ppHtmlModuleMiniSynopsis odir _doctitle iface = do
+  let mod = ifaceMod iface
+      html =
+        header
+          (documentCharacterEncoding +++
+	   thetitle (toHtml $ moduleString mod) +++
+	   styleSheet +++
+	   (script ! [src jsFile, thetype "text/javascript"] $ noHtml)) +++
+        body << thediv ! [ theclass "outer" ] << (
+           (thediv ! [theclass "mini-topbar"]
+             << toHtml (moduleString mod)) +++
+           miniSynopsis mod iface)
+  writeFile (pathJoin [odir, "mini_" ++ moduleHtmlFile mod]) (renderHtml html)
 
 ifaceToHtml :: SourceURLs -> WikiURLs -> Interface -> HtmlTable
 ifaceToHtml maybe_source_url maybe_wiki_url iface
@@ -592,6 +647,52 @@ ifaceToHtml maybe_source_url maybe_wiki_url iface
     bdy  = map (processExport False linksInfo docMap) exports
     linksInfo = (maybe_source_url, maybe_wiki_url)
 
+miniSynopsis :: Module -> Interface -> Html
+miniSynopsis mod iface =
+    thediv ! [ theclass "mini-synopsis" ]
+      << hsep (map (processForMiniSynopsis mod) $ exports)
+
+  where
+    exports = numberSectionHeadings (ifaceRnExportItems iface)
+
+processForMiniSynopsis :: Module -> ExportItem DocName -> Html
+processForMiniSynopsis mod (ExportDecl (L _loc decl0) _doc _insts) =
+  thediv ! [theclass "decl" ] <<
+  case decl0 of
+    TyClD d@(TyFamily{}) -> ppTyFamHeader True False d
+    TyClD d@(TyData{tcdTyPats = ps})
+      | Nothing <- ps    -> keyword "data" <++> ppTyClBinderWithVarsMini mod d
+      | Just _ <- ps     -> keyword "data" <++> keyword "instance"
+                                           <++> ppTyClBinderWithVarsMini mod d
+    TyClD d@(TySynonym{tcdTyPats = ps})
+      | Nothing <- ps    -> keyword "type" <++> ppTyClBinderWithVarsMini mod d
+      | Just _ <- ps     -> keyword "type" <++> keyword "instance"
+                                           <++> ppTyClBinderWithVarsMini mod d
+    TyClD d@(ClassDecl {}) ->
+                            keyword "class" <++> ppTyClBinderWithVarsMini mod d
+    SigD (TypeSig (L _ n) (L _ t)) ->
+        let nm = docNameOcc n
+        in ppNameMini mod nm
+    _ -> noHtml
+processForMiniSynopsis mod (ExportGroup lvl _id txt) =
+  let heading | lvl == 1 = h1
+              | lvl == 2 = h2
+              | lvl >= 3 = h3
+  in heading << docToHtml txt
+processForMiniSynopsis _ _ = noHtml
+
+ppNameMini :: Module -> OccName -> Html
+ppNameMini mod nm =
+    anchor ! [ href ( moduleHtmlFile mod ++ "#"
+                      ++ (escapeStr (anchorNameStr nm)))
+             , target mainFrameName ]
+      << ppBinder' nm
+
+ppTyClBinderWithVarsMini :: Module -> TyClDecl DocName -> Html
+ppTyClBinderWithVarsMini mod decl =
+  let n = unLoc $ tcdLName decl
+      ns = tyvarNames $ tcdTyVars decl
+  in ppTypeApp n ns (ppNameMini mod . docNameOcc) ppTyName
 
 ppModuleContents :: [ExportItem DocName] -> Maybe HtmlTable
 ppModuleContents exports
@@ -1542,9 +1643,12 @@ hsep :: [Html] -> Html
 hsep [] = noHtml
 hsep htmls = foldr1 (\a b -> a+++" "+++b) htmls
 
-infixr 8 <+>
+infixr 8 <+>, <++>
 (<+>) :: Html -> Html -> Html
 a <+> b = Html (getHtmlElements (toHtml a) ++ HtmlString " ": getHtmlElements (toHtml b))
+
+(<++>) :: Html -> Html -> Html
+a <++> b = a +++ spaceHtml +++ b
 
 keyword :: String -> Html
 keyword s = thespan ! [theclass "keyword"] << toHtml s

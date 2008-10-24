@@ -4,6 +4,7 @@ BODY {
   background-color: #ffffff;
   color: #000000;
   font-family: sans-serif;
+  padding: 0 0;
   } 
 
 A:link    { color: #0000e0; text-decoration: none }
@@ -264,4 +265,33 @@ TD.botbar A:visited {
 TD.botbar A:hover {
   background-color: #6060ff
   }
+
+/* --------- Mini Synopsis for Frame View --------- */
+
+.outer {
+  margin: 0 0;
+  padding: 0 0;
+}
+
+.mini-synopsis {
+  padding: 0.25em 0.25em;
+}
+
+.mini-synopsis H1 { font-size: 130%; }
+.mini-synopsis H2 { font-size: 110%; }
+.mini-synopsis H3 { font-size: 100%; }
+.mini-synopsis H1, .mini-synopsis H2, .mini-synopsis H3 {
+  margin-top: 0.5em;
+  margin-bottom: 0.25em;
+  padding: 0 0;
+}
+
+.mini-synopsis H1 { border-bottom: 1px solid #ccc; }
+
+.mini-topbar {
+  font-size: 130%;
+  background: #0077dd;
+  padding: 0.25em;
+}
+
 

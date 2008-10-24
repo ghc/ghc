@@ -1,0 +1,27 @@
+<html>
+<head>
+<script type="text/javascript"><!--
+/*
+
+  The synopsis frame needs to be updated using javascript, so we hide
+  it by default and only show it if javascript is enabled.
+
+  TODO: provide some means to disable it.
+*/
+function load() {
+  var d = document.getElementById("inner-fs");
+  d.rows = "50%,50%";
+}
+--></script>
+<frameset id="outer-fs" cols="25%,75%" onload="load()">
+  <frameset id="inner-fs" rows="100%,0%">
+
+    <frame src="index-frames.html" name="modules">
+    <frame src="" name="synopsis">
+
+  </frameset>
+  <frame src="index.html" name="main">
+
+</frameset>
+
+</html>

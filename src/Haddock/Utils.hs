@@ -17,9 +17,12 @@ module Haddock.Utils (
   -- * Filename utilities
   basename, dirname, splitFilename3, 
   moduleHtmlFile, nameHtmlRef,
-  contentsHtmlFile, indexHtmlFile, subIndexHtmlFile, pathJoin,
+  contentsHtmlFile, indexHtmlFile,
+  frameIndexHtmlFile,
+  moduleIndexFrameName, mainFrameName, synopsisFrameName,
+  subIndexHtmlFile, pathJoin,
   anchorNameStr,
-  cssFile, iconFile, jsFile, plusFile, minusFile,
+  cssFile, iconFile, jsFile, plusFile, minusFile, framesFile,
 
   -- * Miscellaneous utilities
   getProgramName, bye, die, dieMsg, noDieMsg, mapSnd, mapMaybeM, escapeStr,
@@ -195,6 +198,17 @@ contentsHtmlFile, indexHtmlFile :: String
 contentsHtmlFile = "index.html"
 indexHtmlFile = "doc-index.html"
 
+-- | The name of the module index file to be displayed inside a frame.
+-- Modules are display in full, but without indentation.  Clicking opens in
+-- the main window.
+frameIndexHtmlFile :: String
+frameIndexHtmlFile = "index-frames.html"
+
+moduleIndexFrameName, mainFrameName, synopsisFrameName :: String
+moduleIndexFrameName = "modules"
+mainFrameName = "main"
+synopsisFrameName = "synopsis"
+
 subIndexHtmlFile :: Char -> String
 subIndexHtmlFile a = "doc-index-" ++ b ++ ".html"
    where b | isAlpha a = [a]
@@ -216,12 +230,13 @@ pathJoin = foldr join []
 -- -----------------------------------------------------------------------------
 -- Files we need to copy from our $libdir
 
-cssFile, iconFile, jsFile, plusFile,minusFile :: String
+cssFile, iconFile, jsFile, plusFile, minusFile, framesFile :: String
 cssFile   = "haddock.css"
 iconFile  = "haskell_icon.gif"
 jsFile    = "haddock-util.js"
 plusFile  = "plus.gif"
 minusFile = "minus.gif"
+framesFile = "frames.html"
 
 -----------------------------------------------------------------------------
 -- misc.
