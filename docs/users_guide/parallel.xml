@@ -114,10 +114,10 @@ All these features are described in the papers mentioned earlier.
 
 <programlisting>
 infixr 0 `par`
-infixr 1 `seq`
+infixr 1 `pseq`
 
-par :: a -&#62; b -&#62; b
-seq :: a -&#62; b -&#62; b</programlisting>
+par  :: a -&#62; b -&#62; b
+pseq :: a -&#62; b -&#62; b</programlisting>
 
     <para>The expression <literal>(x `par` y)</literal>
       <emphasis>sparks</emphasis> the evaluation of <literal>x</literal>
@@ -136,23 +136,34 @@ import Control.Parallel
 
 nfib :: Int -&#62; Int
 nfib n | n &#60;= 1 = 1
-       | otherwise = par n1 (seq n2 (n1 + n2 + 1))
+       | otherwise = par n1 (pseq n2 (n1 + n2 + 1))
                      where n1 = nfib (n-1)
                            n2 = nfib (n-2)</programlisting>
 
     <para>For values of <varname>n</varname> greater than 1, we use
       <function>par</function> to spark a thread to evaluate <literal>nfib (n-1)</literal>,
-      and then we use <function>seq</function> to force the
+      and then we use <function>pseq</function> to force the
       parent thread to evaluate <literal>nfib (n-2)</literal> before going on
       to add together these two subexpressions.  In this divide-and-conquer
       approach, we only spark a new thread for one branch of the computation
       (leaving the parent to evaluate the other branch).  Also, we must use
-      <function>seq</function> to ensure that the parent will evaluate
+      <function>pseq</function> to ensure that the parent will evaluate
       <varname>n2</varname> <emphasis>before</emphasis> <varname>n1</varname>
       in the expression <literal>(n1 + n2 + 1)</literal>.  It is not sufficient
       to reorder the expression as <literal>(n2 + n1 + 1)</literal>, because
       the compiler may not generate code to evaluate the addends from left to
       right.</para>
+
+    <para>
+      Note that we use <literal>pseq</literal> rather
+      than <literal>seq</literal>.  The two are almost equivalent, but
+      differ in their runtime behaviour in a subtle
+      way: <literal>seq</literal> can evaluate its arguments in either
+      order, but <literal>pseq</literal> is required to evaluate its
+      first argument before its second, which makes it more suitable
+      for controlling the evaluation order in conjunction
+      with <literal>par</literal>.
+    </para>
 
     <para>When using <literal>par</literal>, the general rule of thumb is that
       the sparked computation should be required at a later time, but not too
@@ -160,6 +171,10 @@ nfib n | n &#60;= 1 = 1
       the cost of forking it in parallel will be too large relative to the
       amount of parallelism gained.  Getting these factors right is tricky in
       practice.</para>
+
+    <para>It is possible to glean a little information about how
+      well <literal>par</literal> is working from the runtime
+      statistics; see <xref linkend="rts-options-gc" />.</para>
 
     <para>More sophisticated combinators for expressing parallelism are
       available from the <ulink

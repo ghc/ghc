@@ -531,6 +531,8 @@
   Generation 0:    67 collections,     0 parallel,  0.04s,  0.03s elapsed
   Generation 1:     2 collections,     0 parallel,  0.03s,  0.04s elapsed
 
+  SPARKS: 359207 (557 converted, 149591 pruned)
+
   INIT  time    0.00s  (  0.00s elapsed)
   MUT   time    0.01s  (  0.02s elapsed)
   GC    time    0.07s  (  0.07s elapsed)
@@ -587,6 +589,17 @@
         and the total wall clock time elapsed while garbage collecting
         that generation.
         </para>
+      </listitem>
+      <listitem>
+        <para>The <literal>SPARKS</literal> statistic refers to the
+          use of <literal>Control.Parallel.par</literal> and related
+          functionality in the program.  Each spark represents a call
+          to <literal>par</literal>; a spark is "converted" when it is
+          executed in parallel; and a spark is "pruned" when it is
+          found to be already evaluated and is discarded from the pool
+          by the garbage collector.  Any remaining sparks are
+          discarded at the end of execution, so "converted" plus
+          "pruned" does not necessarily add up to the total.</para>
       </listitem>
       <listitem>
         <para>
