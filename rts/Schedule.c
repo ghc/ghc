@@ -2114,14 +2114,13 @@ exitScheduler(
 	boundTaskExiting(task);
 	stopTaskManager();
     }
-#else
-    freeCapability(&MainCapability);
 #endif
 }
 
 void
 freeScheduler( void )
 {
+    freeCapabilities();
     freeTaskManager();
     if (n_capabilities != 1) {
         stgFree(capabilities);

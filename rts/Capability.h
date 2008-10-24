@@ -262,8 +262,8 @@ extern void grabCapability (Capability **pCap);
 // cause all capabilities to context switch as soon as possible.
 void setContextSwitches(void);
 
-// Free a capability on exit
-void freeCapability (Capability *cap);
+// Free all capabilities
+void freeCapabilities (void);
 
 // FOr the GC:
 void markSomeCapabilities (evac_fn evac, void *user, nat i0, nat delta, 
