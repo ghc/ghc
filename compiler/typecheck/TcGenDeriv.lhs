@@ -688,9 +688,7 @@ gen_Ix_binds loc tycon
     data_con
       =	case tyConSingleDataCon_maybe tycon of -- just checking...
 	  Nothing -> panic "get_Ix_binds"
-	  Just dc | any isUnLiftedType (dataConOrigArgTys dc)
-		  -> pprPanic "Can't derive Ix for a single-constructor type with primitive argument types:" (ppr tycon)
-		  | otherwise -> dc
+	  Just dc -> dc
 
     con_arity    = dataConSourceArity data_con
     data_con_RDR = getRdrName data_con
@@ -898,9 +896,8 @@ gen_Read_binds get_fixity loc tycon
     data_con_str con = occNameString (getOccName con)
     
     read_punc c = bindLex (punc_pat c)
-    read_arg a ty 
-	| isUnLiftedType ty = pprPanic "Error in deriving:" (text "Can't read unlifted types yet:" <+> ppr ty)
-	| otherwise = noLoc (mkBindStmt (nlVarPat a) (nlHsVarApps step_RDR [readPrec_RDR]))
+    read_arg a ty = ASSERT( not (isUnLiftedType ty) )
+                    noLoc (mkBindStmt (nlVarPat a) (nlHsVarApps step_RDR [readPrec_RDR]))
     
     read_field lbl a = read_lbl lbl ++
     		       [read_punc "=",

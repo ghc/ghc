@@ -615,7 +615,9 @@ mk_data_eqn orig tvs cls tycon tc_args rep_tc rep_tc_args mtheta
 	          | data_con <- tyConDataCons rep_tc,
 	            arg_ty   <- ASSERT( isVanillaDataCon data_con )
 				dataConInstOrigArgTys data_con rep_tc_args,
-	            not (isUnLiftedType arg_ty) ] -- No constraints for unlifted types?
+	            not (isUnLiftedType arg_ty) ]
+			-- No constraints for unlifted types
+			-- Where they are legal we generate specilised function calls
 
 			-- See Note [Superclasses of derived instance]
 	      sc_constraints = substTheta (zipOpenTvSubst (classTyVars cls) inst_tys)
@@ -692,14 +694,14 @@ nonStdErr cls = quotes (ppr cls) <+> ptext (sLit "is not a derivable class")
 
 sideConditions :: Class -> Maybe Condition
 sideConditions cls
-  | cls_key == eqClassKey   = Just cond_std
-  | cls_key == ordClassKey  = Just cond_std
-  | cls_key == readClassKey = Just cond_std
-  | cls_key == showClassKey = Just cond_std
-  | cls_key == enumClassKey = Just (cond_std `andCond` cond_isEnumeration)
-  | cls_key == ixClassKey   = Just (cond_std `andCond` (cond_isEnumeration `orCond` cond_isProduct))
-  | cls_key == boundedClassKey = Just (cond_std `andCond` (cond_isEnumeration `orCond` cond_isProduct))
-  | cls_key == dataClassKey    = Just (cond_mayDeriveDataTypeable `andCond` cond_std)
+  | cls_key == eqClassKey      = Just cond_std
+  | cls_key == ordClassKey     = Just cond_std
+  | cls_key == showClassKey    = Just cond_std
+  | cls_key == readClassKey    = Just (cond_std `andCond` cond_noUnliftedArgs)
+  | cls_key == enumClassKey    = Just (cond_std `andCond` cond_isEnumeration)
+  | cls_key == ixClassKey      = Just (cond_std `andCond` cond_enumOrProduct)
+  | cls_key == boundedClassKey = Just (cond_std `andCond` cond_enumOrProduct)
+  | cls_key == dataClassKey    = Just (cond_mayDeriveDataTypeable `andCond` cond_std `andCond` cond_noUnliftedArgs)
   | getName cls `elem` typeableClassNames = Just (cond_mayDeriveDataTypeable `andCond` cond_typeableOK)
   | otherwise = Nothing
   where
@@ -737,6 +739,22 @@ cond_std (_, rep_tc)
     existential_why = quotes (pprSourceTyCon rep_tc) <+> 
 		      ptext (sLit "has non-Haskell-98 constructor(s)")
   
+cond_enumOrProduct :: Condition
+cond_enumOrProduct = cond_isEnumeration `orCond` 
+		       (cond_isProduct `andCond` cond_noUnliftedArgs)
+
+cond_noUnliftedArgs :: Condition
+-- For some classes (eg Eq, Ord) we allow unlifted arg types
+-- by generating specilaised code.  For others (eg Data) we don't.
+cond_noUnliftedArgs (_, tc)
+  | null bad_cons = Nothing
+  | otherwise     = Just why
+  where
+    bad_cons = [ con | con <- tyConDataCons tc
+		     , any isUnLiftedType (dataConOrigArgTys con) ]
+    why = ptext (sLit "Constructor") <+> quotes (ppr (head bad_cons))
+	  <+> ptext (sLit "has arguments of unlifted type")
+
 cond_isEnumeration :: Condition
 cond_isEnumeration (_, rep_tc)
   | isEnumerationTyCon rep_tc = Nothing
