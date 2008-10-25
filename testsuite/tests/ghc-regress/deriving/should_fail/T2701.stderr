@@ -1,0 +1,5 @@
+
+T2701.hs:10:31:
+    Can't make a derived instance of `Data Foo'
+      (Constructor `MkFoo' has arguments of unlifted type)
+    In the data type declaration for `Foo'
