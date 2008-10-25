@@ -295,11 +295,17 @@ instance Ppr Type where
     ppr ty = pprTyApp (split ty)
 
 pprTyApp :: (Type, [Type]) -> Doc
-pprTyApp (ArrowT, [arg1,arg2]) = sep [ppr arg1 <+> text "->", ppr arg2]
+pprTyApp (ArrowT, [arg1,arg2]) = sep [pprFunArgType arg1 <+> text "->", ppr arg2]
 pprTyApp (ListT, [arg]) = brackets (ppr arg)
 pprTyApp (TupleT n, args)
  | length args == n = parens (sep (punctuate comma (map ppr args)))
 pprTyApp (fun, args) = pprParendType fun <+> sep (map pprParendType args)
+
+pprFunArgType :: Type -> Doc	-- Should really use a precedence argument
+-- Everything except forall and (->) binds more tightly than (->)
+pprFunArgType ty@(ForallT {})                 = parens (ppr ty)
+pprFunArgType ty@((ArrowT `AppT` _) `AppT` _) = parens (ppr ty)
+pprFunArgType ty                              = ppr ty
 
 split :: Type -> (Type, [Type])    -- Split into function and args
 split t = go t []
