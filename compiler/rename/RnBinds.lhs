@@ -28,7 +28,6 @@ import RnPat          (rnPatsAndThen_LocalRightwards, rnBindPat,
                       )
                       
 import RnEnv
-import PrelNames	( mkUnboundName )
 import DynFlags	( DynFlag(..) )
 import Name
 import NameEnv
@@ -161,7 +160,7 @@ rnTopBindsLHS :: MiniFixityEnv
 rnTopBindsLHS fix_env binds = 
     (uncurry $ rnValBindsLHSFromDoc (topRecNameMaker fix_env)) (bindersAndDoc binds) binds
 
-rnTopBindsRHS :: [Name] -- the names bound by these binds
+rnTopBindsRHS :: NameSet	-- Names bound by these binds
               -> HsValBindsLR Name RdrName 
               -> RnM (HsValBinds Name, DefUses)
 rnTopBindsRHS bound_names binds = 
@@ -170,18 +169,17 @@ rnTopBindsRHS bound_names binds =
          then rnTopBindsBoot binds
          else rnValBindsRHSGen (\x -> x) -- don't trim free vars
                                bound_names binds }
-  
 
--- wrapper if we don't need to do anything in between the left and right,
+-- Wrapper if we don't need to do anything in between the left and right,
 -- or anything else in the scope of the left
 --
--- never used when there are fixity declarations
+-- Never used when there are fixity declarations
 rnTopBinds :: HsValBinds RdrName 
            -> RnM (HsValBinds Name, DefUses)
 rnTopBinds b = 
   do nl <- rnTopBindsLHS emptyFsEnv b
      let bound_names = map unLoc (collectHsValBinders nl)
-     bindLocalNames bound_names  $ rnTopBindsRHS bound_names nl
+     bindLocalNames bound_names $ rnTopBindsRHS (mkNameSet bound_names) nl
        
 
 rnTopBindsBoot :: HsValBindsLR Name RdrName -> RnM (HsValBinds Name, DefUses)
@@ -306,13 +304,13 @@ rnValBindsLHSFromDoc _ _ _ b = pprPanic "rnValBindsLHSFromDoc" (ppr b)
 rnValBindsRHSGen :: (FreeVars -> FreeVars)  -- for trimming free var sets
                      -- The trimming function trims the free vars we attach to a
                      -- binding so that it stays reasonably small
-                 -> [Name]  -- names bound by the LHSes
+                 -> NameSet	-- Names bound by the LHSes
                  -> HsValBindsLR Name RdrName
                  -> RnM (HsValBinds Name, DefUses)
 
 rnValBindsRHSGen trim bound_names (ValBindsIn mbinds sigs) = do
    -- rename the sigs
-   sigs' <- renameSigs (Just (mkNameSet bound_names)) okBindSig sigs
+   sigs' <- renameSigs (Just bound_names) okBindSig sigs
    -- rename the RHSes
    binds_w_dus <- mapBagM (rnBind (mkSigTvFn sigs') trim) mbinds
    case depAnalBinds binds_w_dus of
@@ -329,12 +327,12 @@ rnValBindsRHSGen _ _ b = pprPanic "rnValBindsRHSGen" (ppr b)
 -- it doesn't (and can't: we don't have the thing inside the binds) happen here
 --
 -- The client is also responsible for bringing the fixities into scope
-rnValBindsRHS :: [Name]  -- names bound by the LHSes
+rnValBindsRHS :: NameSet  -- names bound by the LHSes
               -> HsValBindsLR Name RdrName
               -> RnM (HsValBinds Name, DefUses)
 rnValBindsRHS bound_names binds = 
   rnValBindsRHSGen (\ fvs -> -- only keep the names the names from this group
-                    intersectNameSet (mkNameSet bound_names) fvs) bound_names binds
+                    intersectNameSet bound_names fvs) bound_names binds
 
 
 -- for local binds
@@ -359,7 +357,7 @@ rnValBindsAndThen binds@(ValBindsIn _ sigs) thing_inside
 	; bindLocalNamesFV_WithFixities bound_names new_fixities $ do
 
 	{      -- (C) Do the RHS and thing inside
-	  (binds', dus) <- rnValBindsRHS bound_names new_lhs 
+	  (binds', dus) <- rnValBindsRHS (mkNameSet bound_names) new_lhs 
         ; (result, result_fvs) <- thing_inside binds'
 
 		-- Report unused bindings based on the (accurate) 
@@ -721,7 +719,7 @@ renameSigs mb_names ok_sig sigs
 renameSig :: Maybe NameSet -> Sig RdrName -> RnM (Sig Name)
 -- FixitySig is renamed elsewhere.
 renameSig mb_names sig@(TypeSig v ty)
-  = do	{ new_v <- lookupSigLocOccRn mb_names sig v
+  = do	{ new_v <- lookupSigOccRn mb_names sig v
 	; new_ty <- rnHsSigType (quotes (ppr v)) ty
 	; return (TypeSig new_v new_ty) }
 
@@ -730,68 +728,17 @@ renameSig _ (SpecInstSig ty)
 	; return (SpecInstSig new_ty) }
 
 renameSig mb_names sig@(SpecSig v ty inl)
-  = do	{ new_v <- lookupSigLocOccRn mb_names sig v
+  = do	{ new_v <- lookupSigOccRn mb_names sig v
 	; new_ty <- rnHsSigType (quotes (ppr v)) ty
 	; return (SpecSig new_v new_ty inl) }
 
 renameSig mb_names sig@(InlineSig v s)
-  = do	{ new_v <- lookupSigLocOccRn mb_names sig v
+  = do	{ new_v <- lookupSigOccRn mb_names sig v
 	; return (InlineSig new_v s) }
 
 renameSig mb_names sig@(FixSig (FixitySig v f))
-  = do	{ new_v <- lookupSigLocOccRn mb_names sig v
+  = do	{ new_v <- lookupSigOccRn mb_names sig v
 	; return (FixSig (FixitySig new_v f)) }
-
--- lookupSigOccRn is used for type signatures and pragmas
--- Is this valid?
---   module A
---	import M( f )
---	f :: Int -> Int
---	f x = x
--- It's clear that the 'f' in the signature must refer to A.f
--- The Haskell98 report does not stipulate this, but it will!
--- So we must treat the 'f' in the signature in the same way
--- as the binding occurrence of 'f', using lookupBndrRn
---
--- However, consider this case:
---	import M( f )
---	f :: Int -> Int
---	g x = x
--- We don't want to say 'f' is out of scope; instead, we want to
--- return the imported 'f', so that later on the reanamer will
--- correctly report "misplaced type sig".
-
-lookupSigLocOccRn :: Maybe NameSet -> Sig RdrName -> Located RdrName -> RnM (Located Name)
-lookupSigLocOccRn mb_names sig = wrapLocM (lookupSigOccRn mb_names sig)
-
-lookupSigOccRn :: Maybe NameSet -> Sig RdrName -> RdrName -> RnM Name
-lookupSigOccRn mb_names sig v
-  = do 	{ mb_n <- lookupBndrRn_maybe v
-	; case mb_n of {
-	    Just n  -> case mb_names of {
-			Nothing 		     -> return n ;
-			Just ns | n `elemNameSet` ns -> return n 
-				| otherwise -> bale_out_with local_msg } ;
-		          
-	    Nothing -> do
-    	{ mb_n <- lookupGreRn_maybe v
-	; case mb_n of
-	    Just _  -> bale_out_with import_msg
-	    Nothing -> bale_out_with empty
-	} }}
-  where
-    bale_out_with msg 
-	= do { addErr (sep [ ptext (sLit "The") <+> hsSigDoc sig
-				<+> ptext (sLit "for") <+> quotes (ppr v)
-			   , nest 2 $ ptext (sLit "lacks an accompanying binding")]
-		       $$ nest 2 msg)
-	     ; return (mkUnboundName v) }
-
-    local_msg = parens $ ptext (sLit "The")  <+> hsSigDoc sig <+> ptext (sLit "must be given where")
-			 <+> quotes (ppr v) <+> ptext (sLit "is declared")
-
-    import_msg = parens $ ptext (sLit "You cannot give a") <+> hsSigDoc sig
-			  <+> ptext (sLit "an imported value")
 \end{code}
 
 

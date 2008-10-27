@@ -323,10 +323,10 @@ renameDeriv is_boot gen_binds insts
 	; let aux_binds = listToBag $ map (genAuxBind loc) $ 
 			  rm_dups [] $ concat deriv_aux_binds
 	; rn_aux_lhs <- rnTopBindsLHS emptyFsEnv (ValBindsIn aux_binds [])
-	; let aux_names =  map unLoc (collectHsValBinders rn_aux_lhs)
+	; let aux_names = map unLoc (collectHsValBinders rn_aux_lhs)
 
 	; bindLocalNames aux_names $ 
-    do	{ (rn_aux, _dus) <- rnTopBindsRHS aux_names rn_aux_lhs
+    do	{ (rn_aux, _dus) <- rnTopBindsRHS (mkNameSet aux_names) rn_aux_lhs
 	; rn_inst_infos <- mapM rn_inst_info inst_infos
 	; return (rn_inst_infos, rn_aux `plusHsValBinds` rn_gen) } }
 

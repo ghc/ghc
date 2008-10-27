@@ -6,11 +6,11 @@
 \begin{code}
 module RnEnv ( 
 	newTopSrcBinder, lookupFamInstDeclBndr,
-	lookupLocatedBndrRn, lookupBndrRn, lookupBndrRn_maybe,
 	lookupLocatedTopBndrRn, lookupTopBndrRn,
 	lookupLocatedOccRn, lookupOccRn, 
 	lookupLocatedGlobalOccRn, lookupGlobalOccRn,
 	lookupLocalDataTcNames, lookupSrcOcc_maybe,
+	lookupSigOccRn,
 	lookupFixityRn, lookupTyFixityRn, 
 	lookupInstDeclBndr, lookupRecordBndr, lookupConstructorFields,
 	lookupSyntaxName, lookupSyntaxTable, lookupImportedName,
@@ -55,6 +55,7 @@ import PrelNames	( mkUnboundName, rOOT_MAIN, iNTERACTIVE,
 			  consDataConKey, hasKey, forall_tv_RDR )
 import UniqSupply
 import BasicTypes	( IPName, mapIPName, Fixity )
+import ErrUtils		( Message )
 import SrcLoc
 import Outputable
 import Util
@@ -161,30 +162,12 @@ newTopSrcBinder this_mod (L loc rdr_name)
 Looking up a name in the RnEnv.
 
 \begin{code}
-lookupLocatedBndrRn :: Located RdrName -> RnM (Located Name)
-lookupLocatedBndrRn = wrapLocM lookupBndrRn
-
-lookupBndrRn :: RdrName -> RnM Name
-lookupBndrRn n = do nopt <- lookupBndrRn_maybe n
-                    case nopt of 
-                      Just n' -> return n'
-                      Nothing -> do traceRn $ text "lookupTopBndrRn"
-                                    unboundName n
-
 lookupTopBndrRn :: RdrName -> RnM Name
 lookupTopBndrRn n = do nopt <- lookupTopBndrRn_maybe n
                        case nopt of 
                          Just n' -> return n'
                          Nothing -> do traceRn $ text "lookupTopBndrRn"
                                        unboundName n
-
-lookupBndrRn_maybe :: RdrName -> RnM (Maybe Name)
--- NOTE: assumes that the SrcSpan of the binder has already been setSrcSpan'd
-lookupBndrRn_maybe rdr_name
-  = getLocalRdrEnv		`thenM` \ local_env ->
-    case lookupLocalRdrEnv local_env rdr_name of 
-	  Just name -> returnM (Just name)
-	  Nothing   -> lookupTopBndrRn_maybe rdr_name
 
 lookupLocatedTopBndrRn :: Located RdrName -> RnM (Located Name)
 lookupLocatedTopBndrRn = wrapLocM lookupTopBndrRn
@@ -385,9 +368,7 @@ lookupGlobalOccRn rdr_name
                -- and only happens for failed lookups
    if isQual rdr_name && allow_qual && mod == iNTERACTIVE
       then lookupQualifiedName rdr_name
-      else do 
-        traceRn $ text "lookupGlobalOccRn"
-        unboundName rdr_name
+      else unboundName rdr_name
   }
 
 lookupImportedName :: RdrName -> TcRnIf m n Name
@@ -496,6 +477,120 @@ lookupQualifiedName rdr_name
     doc = ptext (sLit "Need to find") <+> ppr rdr_name
 \end{code}
 
+lookupSigOccRn is used for type signatures and pragmas
+Is this valid?
+  module A
+	import M( f )
+	f :: Int -> Int
+	f x = x
+It's clear that the 'f' in the signature must refer to A.f
+The Haskell98 report does not stipulate this, but it will!
+So we must treat the 'f' in the signature in the same way
+as the binding occurrence of 'f', using lookupBndrRn
+
+However, consider this case:
+	import M( f )
+	f :: Int -> Int
+	g x = x
+We don't want to say 'f' is out of scope; instead, we want to
+return the imported 'f', so that later on the reanamer will
+correctly report "misplaced type sig".
+
+\begin{code}
+lookupSigOccRn :: Maybe NameSet	   -- Just ns => source file; these are the binders
+				   -- 	 	 in the same group
+				   -- Nothing => hs-boot file; signatures without 
+				   -- 		 binders are expected
+	       -> Sig RdrName
+	       -> Located RdrName -> RnM (Located Name)
+lookupSigOccRn mb_bound_names sig
+  = wrapLocM $ \ rdr_name -> 
+    do { mb_name <- lookupBindGroupOcc mb_bound_names (hsSigDoc sig) rdr_name
+       ; case mb_name of
+	   Left err   -> do { addErr err; return (mkUnboundName rdr_name) }
+	   Right name -> return name }
+
+lookupBindGroupOcc :: Maybe NameSet  -- Just ns => source file; these are the binders
+				     -- 	 	 in the same group
+				     -- Nothing => hs-boot file; signatures without 
+				     -- 		 binders are expected
+	           -> SDoc
+	           -> RdrName -> RnM (Either Message Name)
+-- Looks up the RdrName, expecting it to resolve to one of the 
+-- bound names passed in.  If not, return an appropriate error message
+lookupBindGroupOcc mb_bound_names what rdr_name
+  = do	{ local_env <- getLocalRdrEnv
+	; case lookupLocalRdrEnv local_env rdr_name of 
+  	    Just n  -> check_local_name n
+  	    Nothing -> do	-- Not defined in a nested scope
+
+        { env <- getGlobalRdrEnv 
+  	; let gres = lookupGlobalRdrEnv env (rdrNameOcc rdr_name)
+	; case (filter isLocalGRE gres) of
+	    (gre:_) -> check_local_name (gre_name gre)
+			-- If there is more than one local GRE for the 
+			-- same OccName, that will be reported separately
+	    [] | null gres -> bale_out_with empty
+	       | otherwise -> bale_out_with import_msg
+  	}}
+    where
+      check_local_name name 	-- The name is in scope, and not imported
+  	  = case mb_bound_names of
+  		  Just bound_names | not (name `elemNameSet` bound_names)
+				   -> bale_out_with local_msg
+	 	  _other -> return (Right name)
+
+      bale_out_with msg 
+  	= return (Left (sep [ ptext (sLit "The") <+> what
+  				<+> ptext (sLit "for") <+> quotes (ppr rdr_name)
+  			   , nest 2 $ ptext (sLit "lacks an accompanying binding")]
+  		       $$ nest 2 msg))
+
+      local_msg = parens $ ptext (sLit "The")  <+> what <+> ptext (sLit "must be given where")
+  			   <+> quotes (ppr rdr_name) <+> ptext (sLit "is declared")
+
+      import_msg = parens $ ptext (sLit "You cannot give a") <+> what
+    			  <+> ptext (sLit "for an imported value")
+
+---------------
+lookupLocalDataTcNames :: NameSet -> SDoc -> RdrName -> RnM [Name]
+-- GHC extension: look up both the tycon and data con 
+-- for con-like things
+-- Complain if neither is in scope
+lookupLocalDataTcNames bound_names what rdr_name
+  | Just n <- isExact_maybe rdr_name	
+	-- Special case for (:), which doesn't get into the GlobalRdrEnv
+  = return [n]	-- For this we don't need to try the tycon too
+  | otherwise
+  = do	{ mb_gres <- mapM (lookupBindGroupOcc (Just bound_names) what)
+			  (dataTcOccs rdr_name)
+	; let (errs, names) = splitEithers mb_gres
+	; when (null names) (addErr (head errs))	-- Bleat about one only
+	; return names }
+
+dataTcOccs :: RdrName -> [RdrName]
+-- If the input is a data constructor, return both it and a type
+-- constructor.  This is useful when we aren't sure which we are
+-- looking at.
+dataTcOccs rdr_name
+  | Just n <- isExact_maybe rdr_name		-- Ghastly special case
+  , n `hasKey` consDataConKey = [rdr_name]	-- see note below
+  | isDataOcc occ 	      = [rdr_name, rdr_name_tc]
+  | otherwise 	  	      = [rdr_name]
+  where    
+    occ 	= rdrNameOcc rdr_name
+    rdr_name_tc = setRdrNameSpace rdr_name tcName
+
+-- If the user typed "[]" or "(,,)", we'll generate an Exact RdrName,
+-- and setRdrNameSpace generates an Orig, which is fine
+-- But it's not fine for (:), because there *is* no corresponding type
+-- constructor.  If we generate an Orig tycon for GHC.Base.(:), it'll
+-- appear to be in scope (because Orig's simply allocate a new name-cache
+-- entry) and then we get an error when we use dataTcOccs in 
+-- TcRnDriver.tcRnGetInfo.  Large sigh.
+\end{code}
+
+
 %*********************************************************
 %*							*
 		Fixities
@@ -602,45 +697,6 @@ lookupFixityRn name
 lookupTyFixityRn :: Located Name -> RnM Fixity
 lookupTyFixityRn (L _ n) = lookupFixityRn n
 
----------------
-lookupLocalDataTcNames :: RdrName -> RnM [Name]
--- GHC extension: look up both the tycon and data con 
--- for con-like things
--- Complain if neither is in scope
-lookupLocalDataTcNames rdr_name
-  | Just n <- isExact_maybe rdr_name	
-	-- Special case for (:), which doesn't get into the GlobalRdrEnv
-  = return [n]	-- For this we don't need to try the tycon too
-  | otherwise
-  = do	{ mb_gres <- mapM lookupGreLocalRn (dataTcOccs rdr_name)
-	; case [gre_name gre | Just gre <- mb_gres] of
-	    [] -> do { 
-                      -- run for error reporting
-                    ; unboundName rdr_name
-		      ; return [] }
-	    names -> return names
-    }
-
-dataTcOccs :: RdrName -> [RdrName]
--- If the input is a data constructor, return both it and a type
--- constructor.  This is useful when we aren't sure which we are
--- looking at.
-dataTcOccs rdr_name
-  | Just n <- isExact_maybe rdr_name		-- Ghastly special case
-  , n `hasKey` consDataConKey = [rdr_name]	-- see note below
-  | isDataOcc occ 	      = [rdr_name_tc, rdr_name]
-  | otherwise 	  	      = [rdr_name]
-  where    
-    occ 	= rdrNameOcc rdr_name
-    rdr_name_tc = setRdrNameSpace rdr_name tcName
-
--- If the user typed "[]" or "(,,)", we'll generate an Exact RdrName,
--- and setRdrNameSpace generates an Orig, which is fine
--- But it's not fine for (:), because there *is* no corresponding type
--- constructor.  If we generate an Orig tycon for GHC.Base.(:), it'll
--- appear to be in scope (because Orig's simply allocate a new name-cache
--- entry) and then we get an error when we use dataTcOccs in 
--- TcRnDriver.tcRnGetInfo.  Large sigh.
 \end{code}
 
 %************************************************************************

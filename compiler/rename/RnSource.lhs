@@ -30,7 +30,7 @@ import RnEnv		( lookupLocalDataTcNames,
 			  bindLocalNames, checkDupRdrNames, mapFvRn,
 			)
 import RnNames       	( getLocalNonValBinders, extendGlobalRdrEnvRn )
-import HscTypes      	( GenAvailInfo(..) )
+import HscTypes      	( GenAvailInfo(..), availsToNameSet )
 import RnHsDoc          ( rnHsDoc, rnMbLHsDoc )
 import TcRnMonad
 
@@ -95,6 +95,7 @@ Checks the @(..)@ etc constraints in the export list.
 -- Brings the binders of the group into scope in the appropriate places;
 -- does NOT assume that anything is in scope already
 rnSrcDecls :: HsGroup RdrName -> RnM (TcGblEnv, HsGroup Name)
+-- Rename a HsGroup; used for normal source files *and* hs-boot files
 rnSrcDecls group@(HsGroup {hs_valds  = val_decls,
                                    hs_tyclds = tycl_decls,
                                    hs_instds = inst_decls,
@@ -113,8 +114,10 @@ rnSrcDecls group@(HsGroup {hs_valds  = val_decls,
 
    -- (B) Bring top level binders (and their fixities) into scope,
    --     *except* for the value bindings, which get brought in below.
-   avails <- getLocalNonValBinders group ;
-   tc_envs <- extendGlobalRdrEnvRn avails local_fix_env ;
+   --     However *do* include class ops, data constructors
+   --     And for hs-boot files *do* include the value signatures
+   tc_avails <- getLocalNonValBinders group ;
+   tc_envs <- extendGlobalRdrEnvRn tc_avails local_fix_env ;
    setEnvs tc_envs $ do {
 
    failIfErrsM ; -- No point in continuing if (say) we have duplicate declarations
@@ -131,10 +134,12 @@ rnSrcDecls group@(HsGroup {hs_valds  = val_decls,
    --     It uses the fixity env from (A) to bind fixities for view patterns.
    new_lhs <- rnTopBindsLHS local_fix_env val_decls ;
    -- bind the LHSes (and their fixities) in the global rdr environment
-   let { lhs_binders = map unLoc $ collectHsValBinders new_lhs;
-         lhs_avails = map Avail lhs_binders
+   let { val_binders = map unLoc $ collectHsValBinders new_lhs ;
+	 val_bndr_set = mkNameSet val_binders ;
+	 all_bndr_set = val_bndr_set `unionNameSets` availsToNameSet tc_avails ;
+         val_avails = map Avail val_binders 
        } ;
-   (tcg_env, tcl_env) <- extendGlobalRdrEnvRn lhs_avails local_fix_env ;
+   (tcg_env, tcl_env) <- extendGlobalRdrEnvRn val_avails local_fix_env ;
    setEnvs (tcg_env, tcl_env) $ do {
 
    --  Now everything is in scope, as the remaining renaming assumes.
@@ -154,18 +159,19 @@ rnSrcDecls group@(HsGroup {hs_valds  = val_decls,
 
    -- (F) Rename Value declarations right-hand sides
    traceRn (text "Start rnmono") ;
-   (rn_val_decls, bind_dus) <- rnTopBindsRHS lhs_binders new_lhs ;
+   (rn_val_decls, bind_dus) <- rnTopBindsRHS val_bndr_set new_lhs ;
    traceRn (text "finish rnmono" <+> ppr rn_val_decls) ;
 
    -- (G) Rename Fixity and deprecations
    
-   -- rename fixity declarations and error if we try to
+   -- Rename fixity declarations and error if we try to
    -- fix something from another module (duplicates were checked in (A))
-   rn_fix_decls                 <- rnSrcFixityDecls fix_decls ;
-   -- rename deprec decls;
+   rn_fix_decls <- rnSrcFixityDecls all_bndr_set fix_decls ;
+
+   -- Rename deprec decls;
    -- check for duplicates and ensure that deprecated things are defined locally
    -- at the moment, we don't keep these around past renaming
-   rn_warns <- rnSrcWarnDecls warn_decls ;
+   rn_warns <- rnSrcWarnDecls all_bndr_set warn_decls ;
 
    -- (H) Rename Everything else
 
@@ -259,14 +265,14 @@ rnDocDecl (DocGroup lev doc) = do
 %*********************************************************
 
 \begin{code}
-rnSrcFixityDecls :: [LFixitySig RdrName] -> RnM [LFixitySig Name]
+rnSrcFixityDecls :: NameSet -> [LFixitySig RdrName] -> RnM [LFixitySig Name]
 -- Rename the fixity decls, so we can put
 -- the renamed decls in the renamed syntax tree
 -- Errors if the thing being fixed is not defined locally.
 --
 -- The returned FixitySigs are not actually used for anything,
 -- except perhaps the GHCi API
-rnSrcFixityDecls fix_decls
+rnSrcFixityDecls bound_names fix_decls
   = do fix_decls <- mapM rn_decl fix_decls
        return (concat fix_decls)
   where
@@ -278,9 +284,10 @@ rnSrcFixityDecls fix_decls
     rn_decl (L loc (FixitySig (L name_loc rdr_name) fixity))
       = setSrcSpan name_loc $
                     -- this lookup will fail if the definition isn't local
-        do names <- lookupLocalDataTcNames rdr_name
+        do names <- lookupLocalDataTcNames bound_names what rdr_name
            return [ L loc (FixitySig (L name_loc name) fixity)
-                    | name <- names ]
+                  | name <- names ]
+    what = ptext (sLit "fixity signature")
 \end{code}
 
 
@@ -298,11 +305,11 @@ gather them together.
 
 \begin{code}
 -- checks that the deprecations are defined locally, and that there are no duplicates
-rnSrcWarnDecls :: [LWarnDecl RdrName] -> RnM Warnings
-rnSrcWarnDecls [] 
+rnSrcWarnDecls :: NameSet -> [LWarnDecl RdrName] -> RnM Warnings
+rnSrcWarnDecls _bound_names [] 
   = returnM NoWarnings
 
-rnSrcWarnDecls decls 
+rnSrcWarnDecls bound_names decls 
   = do { -- check for duplicates
        ; mappM_ (\ (lrdr:lrdr':_) -> addLocErr lrdr (dupWarnDecl lrdr')) warn_rdr_dups
        ; mappM (addLocM rn_deprec) decls	`thenM` \ pairs_s ->
@@ -310,9 +317,11 @@ rnSrcWarnDecls decls
  where
    rn_deprec (Warning rdr_name txt)
        -- ensures that the names are defined locally
-     = lookupLocalDataTcNames rdr_name	`thenM` \ names ->
+     = lookupLocalDataTcNames bound_names what rdr_name	`thenM` \ names ->
        returnM [(nameOccName name, txt) | name <- names]
    
+   what = ptext (sLit "deprecation")
+
    -- look for duplicates among the OccNames;
    -- we check that the names are defined above
    -- invt: the lists returned by findDupsEq always have at least two elements

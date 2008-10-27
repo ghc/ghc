@@ -1002,7 +1002,7 @@ rn_rec_stmt _ (L _ (LetStmt binds@(HsIPBinds _))) _
 rn_rec_stmt all_bndrs (L loc (LetStmt (HsValBinds binds'))) _ = do 
   (binds', du_binds) <- 
       -- fixities and unused are handled above in rn_rec_stmts_and_then
-      rnValBindsRHS all_bndrs binds'
+      rnValBindsRHS (mkNameSet all_bndrs) binds'
   returnM [(duDefs du_binds, duUses du_binds, 
 	    emptyNameSet, L loc (LetStmt (HsValBinds binds')))]
 
