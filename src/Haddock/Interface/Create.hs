@@ -411,6 +411,7 @@ fullContentsOfThisModule :: Module -> [DeclInfo] -> [ExportItem Name]
 fullContentsOfThisModule module_ decls = catMaybes (map mkExportItem decls)
   where
     mkExportItem (L _ (DocD (DocGroup lev doc)), _, _) = Just $ ExportGroup lev "" doc
+    mkExportItem (L _ (DocD (DocCommentNamed _ doc)), _, _)   = Just $ ExportDoc doc
     mkExportItem (decl, doc, subs) = Just $ ExportDecl decl doc subdocs []
       where subdocs = [ (n, doc) | (n, Just doc) <- subs ]
 
