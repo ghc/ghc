@@ -116,6 +116,7 @@ test('TH_ghci1', normal, ghci_script, ['TH_ghci1.script'])
 test('TH_scope', normal, compile, [''])
 test('T2632', normal, compile, [''])
 test('T2700', normal, compile, ['-v0'])
+test('T2713', normal, compile_fail, ['-v0'])
 
 test('T2386', extra_clean(['T2386_Lib.hi', 'T2386_Lib.o']),
 	      run_command,

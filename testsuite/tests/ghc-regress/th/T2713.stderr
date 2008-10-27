@@ -1,0 +1,4 @@
+
+T2713.hs:9:9:
+    The fixity signature for `.*.' lacks an accompanying binding
+      (The fixity signature must be given where `.*.' is declared)
