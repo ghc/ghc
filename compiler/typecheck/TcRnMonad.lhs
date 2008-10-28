@@ -410,11 +410,6 @@ extendFixityEnv new_bit
 getRecFieldEnv :: TcRn RecFieldEnv
 getRecFieldEnv = do { env <- getGblEnv; return (tcg_field_env env) }
 
-extendRecFieldEnv :: RecFieldEnv -> RnM a -> RnM a
-extendRecFieldEnv new_bit
-  = updGblEnv (\env@(TcGblEnv { tcg_field_env = old_env }) -> 
-		env {tcg_field_env = old_env `plusNameEnv` new_bit})	     
-
 getDeclaredDefaultTys :: TcRn (Maybe [Type])
 getDeclaredDefaultTys = do { env <- getGblEnv; return (tcg_default env) }
 \end{code}
