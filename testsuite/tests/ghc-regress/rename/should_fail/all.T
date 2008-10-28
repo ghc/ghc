@@ -69,4 +69,5 @@ test('rnfail055',
 test('rn_dup', normal, compile_fail, [''])
 test('T2310', normal, compile_fail, [''])
 test('T2490', normal, compile_fail, [''])
+test('T2723', normal, compile, [''])  # Warnings only
 
