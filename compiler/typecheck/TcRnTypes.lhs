@@ -13,7 +13,7 @@ module TcRnTypes(
 	IfGblEnv(..), IfLclEnv(..), 
 
 	-- Ranamer types
-	ErrCtxt, RecFieldEnv,
+	ErrCtxt, RecFieldEnv(..),
 	ImportAvails(..), emptyImportAvails, plusImportAvails, 
 	WhereFrom(..), mkModDeps,
 
@@ -225,11 +225,16 @@ data TcGblEnv
         tcg_hpc :: AnyHpcUsage -- True if any part of the prog uses hpc instrumentation.
     }
 
-type RecFieldEnv = NameEnv [Name]	-- Maps a constructor name *in this module*
-					-- to the fields for that constructor
+data RecFieldEnv 
+  = RecFields (NameEnv [Name])	-- Maps a constructor name *in this module*
+				-- to the fields for that constructor
+	      NameSet		-- Set of all fields declared *in this module*;
+				-- used to suppress name-shadowing complaints
+				-- when using record wild cards
+				-- E.g.  let fld = e in C {..}
 	-- This is used when dealing with ".." notation in record 
 	-- construction and pattern matching.
-	-- The FieldEnv deals *only* with constructors defined in *thie*
+	-- The FieldEnv deals *only* with constructors defined in *this*
 	-- module.  For imported modules, we get the same info from the
 	-- TypeEnv
 \end{code}

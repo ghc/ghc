@@ -41,8 +41,9 @@ import HsSyn
 import RdrHsSyn		( extractHsTyRdrTyVars )
 import RdrName
 import HscTypes		( availNames, ModIface(..), FixItem(..), lookupFixity)
-import TcEnv		( tcLookupDataCon, isBrackStage )
+import TcEnv		( tcLookupDataCon, tcLookupField, isBrackStage )
 import TcRnMonad
+import Id		( isRecordSelector )
 import Name		( Name, nameIsLocalOrFrom, mkInternalName, isWiredInName,
 			  nameSrcLoc, nameSrcSpan, nameOccName, nameModule, isExternalName )
 import NameSet
@@ -230,9 +231,16 @@ lookupInstDeclBndr cls rdr = lookup_located_sub_bndr is_op doc rdr
 -----------------------------------------------
 lookupRecordBndr :: Maybe (Located Name) -> Located RdrName -> RnM (Located Name)
 -- Used for record construction and pattern matching
--- When the -fdisambiguate-record-fields flag is on, take account of the
+-- When the -XDisambiguateRecordFields flag is on, take account of the
 -- constructor name to disambiguate which field to use; it's just the
 -- same as for instance decls
+-- 
+-- NB: Consider this:
+--	module Foo where { data R = R { fld :: Int } }
+--	module Odd where { import Foo; fld x = x { fld = 3 } }
+-- Arguably this should work, because the reference to 'fld' is
+-- unambiguous because there is only one field id 'fld' in scope.
+-- But currently it's rejected.
 lookupRecordBndr Nothing rdr_name
   = lookupLocatedGlobalOccRn rdr_name
 lookupRecordBndr (Just (L _ data_con)) rdr_name
@@ -261,7 +269,7 @@ lookupConstructorFields :: Name -> RnM [Name]
 lookupConstructorFields con_name
   = do	{ this_mod <- getModule
 	; if nameIsLocalOrFrom this_mod con_name then
-	  do { field_env <- getRecFieldEnv
+	  do { RecFields field_env _ <- getRecFieldEnv
 	     ; return (lookupNameEnv field_env con_name `orElse` []) }
 	  else 
 	  do { con <- tcLookupDataCon con_name
@@ -913,14 +921,31 @@ checkShadowedNames doc_str (global_env,local_env) loc_rdr_names
   where
     check_shadow (loc, occ)
 	| Just n <- mb_local = complain [ptext (sLit "bound at") <+> ppr (nameSrcLoc n)]
-	| not (null gres)    = complain (map pprNameProvenance gres)
-	| otherwise	     = return ()
+	| otherwise = do { gres' <- filterM is_shadowed_gre gres
+			 ; complain (map pprNameProvenance gres') }
 	where
+	  complain []      = return ()
 	  complain pp_locs = addWarnAt loc (shadowedNameWarn doc_str occ pp_locs)
 	  mb_local = lookupLocalRdrOcc local_env occ
           gres     = lookupGRE_RdrName (mkRdrUnqual occ) global_env
 		-- Make an Unqualified RdrName and look that up, so that
 		-- we don't find any GREs that are in scope qualified-only
+
+    is_shadowed_gre :: GlobalRdrElt -> RnM Bool	
+	-- Returns False for record selectors that are shadowed, when
+	-- punning or wild-cards are on (cf Trac #2723)
+    is_shadowed_gre gre@(GRE { gre_par = ParentIs _ })
+	= do { dflags <- getDOpts
+	     ; if (dopt Opt_RecordPuns dflags || dopt Opt_RecordWildCards dflags) 
+	       then do { is_fld <- is_rec_fld gre; return (not is_fld) }
+	       else return True }
+    is_shadowed_gre _other = return True
+
+    is_rec_fld gre	-- Return True for record selector ids
+	| isLocalGRE gre = do { RecFields _ fld_set <- getRecFieldEnv
+			      ; return (gre_name gre `elemNameSet` fld_set) }
+	| otherwise	 = do { sel_id <- tcLookupField (gre_name gre)
+			      ; return (isRecordSelector sel_id) }
 \end{code}
 
 

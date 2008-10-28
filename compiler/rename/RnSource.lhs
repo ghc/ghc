@@ -1047,14 +1047,16 @@ extendRecordFieldEnv decls
                     ; return $ unLoc x'}
 
     get (L _ (TyData { tcdCons = cons })) env = foldrM get_con env cons
-    get _     		             env = return env
+    get _     		                  env = return env
 
-    get_con (L _ (ConDecl { con_name = con, con_details = RecCon flds })) env
+    get_con (L _ (ConDecl { con_name = con, con_details = RecCon flds }))
+	    (RecFields env fld_set)
 	= do { con' <- lookup con
-            ; flds' <- mappM lookup (map cd_fld_name flds)
-            ; return $ extendNameEnv env con' flds' }
-    get_con _ env
-	= return env
+             ; flds' <- mappM lookup (map cd_fld_name flds)
+	     ; let env'    = extendNameEnv env con' flds'
+	           fld_set' = addListToNameSet fld_set flds'
+             ; return $ (RecFields env' fld_set') }
+    get_con _ env = return env
 \end{code}
 
 %*********************************************************

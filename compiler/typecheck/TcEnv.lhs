@@ -140,7 +140,7 @@ Then the renamer (which does not keep track of what is a record selector
 and what is not) will rename the definition thus
 	f_7 = e { f_7 = True }
 Now the type checker will find f_7 in the *local* type environment, not
-the global one. It's wrong, of course, but we want to report a tidy
+the global (imported) one. It's wrong, of course, but we want to report a tidy
 error, not in TcEnv.notFound.  -}
 
 tcLookupDataCon :: Name -> TcM DataCon

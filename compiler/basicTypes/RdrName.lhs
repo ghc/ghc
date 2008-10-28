@@ -367,6 +367,12 @@ data GlobalRdrElt
 	  gre_prov :: Provenance	-- ^ Why it's in scope
     }
 
+-- | The children of a Name are the things that are abbreviated by the ".."
+--   notation in export lists.  Specifically:
+--	TyCon	Children are * data constructors
+--			     * record field ids
+--	Class	Children are * class operations
+-- Each child has the parent thing as its Parent
 data Parent = NoParent | ParentIs Name
 	      deriving (Eq)
 
