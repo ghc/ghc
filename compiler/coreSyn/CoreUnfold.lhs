@@ -536,6 +536,10 @@ data CallCtxt = BoringCtxt
 				--	=> be keener to inline
 		-- INVARIANT: ArgCtxt False 0 ==> BoringCtxt
 
+	      | ValAppCtxt 	-- We're applied to at least one value arg
+				-- This arises when we have ((f x |> co) y)
+				-- Then the (f x) has argument 'x' but in a ValAppCtxt
+
 	      | CaseCtxt	-- We're the scrutinee of a case
 				-- that decomposes its scrutinee
 
@@ -543,6 +547,7 @@ instance Outputable CallCtxt where
   ppr BoringCtxt    = ptext (sLit "BoringCtxt")
   ppr (ArgCtxt _ _) = ptext (sLit "ArgCtxt")
   ppr CaseCtxt 	    = ptext (sLit "CaseCtxt")
+  ppr ValAppCtxt    = ptext (sLit "ValAppCtxt")
 
 callSiteInline dflags active_inline id lone_variable arg_infos cont_info
   = case idUnfolding id of {
@@ -610,8 +615,8 @@ callSiteInline dflags active_inline id lone_variable arg_infos cont_info
 			= case cont_info of
 			    BoringCtxt -> not is_top && n_vals_wanted > 0	-- Note [Nested functions] 
 			    CaseCtxt   -> not lone_variable || not is_value	-- Note [Lone variables]
-			    ArgCtxt {} -> n_vals_wanted > 0 
-				-- See Note [Inlining in ArgCtxt]
+			    ArgCtxt {} -> n_vals_wanted > 0 			-- Note [Inlining in ArgCtxt]
+			    ValAppCtxt -> True					-- Note [Cast then apply]
 
 		    small_enough = (size - discount) <= opt_UF_UseThreshold
 		    discount = computeDiscount n_vals_wanted arg_discounts 
@@ -619,7 +624,7 @@ callSiteInline dflags active_inline id lone_variable arg_infos cont_info
 		    res_discount' = case cont_info of
 					BoringCtxt  -> 0
 					CaseCtxt    -> res_discount
-					ArgCtxt _ _ -> 4 `min` res_discount
+					_other      -> 4 `min` res_discount
 			-- res_discount can be very large when a function returns
 			-- construtors; but we only want to invoke that large discount
 			-- when there's a case continuation.
@@ -654,6 +659,16 @@ constructor occurs just once, albeit possibly in multiple case
 branches.  Then inlining it doesn't increase allocation, but it does
 increase the chance that the constructor won't be allocated at all in
 the branches that don't use it.
+
+Note [Cast then apply]
+~~~~~~~~~~~~~~~~~~~~~~
+Consider
+   myIndex = __inline_me ( (/\a. <blah>) |> co )
+   co :: (forall a. a -> a) ~ (forall a. T a)
+     ... /\a.\x. case ((myIndex a) |> sym co) x of { ... } ...
+
+We need to inline myIndex to unravel this; but the actual call (myIndex a) has
+no value arguments.  The ValAppCtxt gives it enough incentive to inline.
 
 Note [Inlining in ArgCtxt]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~

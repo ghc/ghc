@@ -308,17 +308,17 @@ interestingCallContext :: SimplCont -> CallCtxt
 interestingCallContext cont
   = interesting cont
   where
-    interestingCtxt = ArgCtxt False 2	-- Give *some* incentive!
-
     interesting (Select _ bndr _ _ _)
-	| isDeadBinder bndr       = CaseCtxt
-	| otherwise	          = interestingCtxt
+	| isDeadBinder bndr = CaseCtxt
+	| otherwise	    = ArgCtxt False 2	-- If the binder is used, this
+						-- is like a strict let
 		
-    interesting (ApplyTo {})      = interestingCtxt
-				-- Can happen if we have (coerce t (f x)) y
-				-- Perhaps interestingCtxt is a bit over-keen, but I've
-				-- seen (coerce f) x, where f has an INLINE prag,
-				-- So we have to give some motivation for inlining it
+    interesting (ApplyTo _ arg _ cont)
+	| isTypeArg arg = interesting cont
+	| otherwise     = ValAppCtxt 	-- Can happen if we have (f Int |> co) y
+					-- If f has an INLINE prag we need to give it some
+					-- motivation to inline. See Note [Cast then apply]
+					-- in CoreUnfold
 
     interesting (StrictArg _ cci _ _)	= cci
     interesting (StrictBind {})	  	= BoringCtxt
