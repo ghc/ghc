@@ -251,17 +251,12 @@ boundValues :: ModuleName -> HsGroup Name -> [FoundThing]
 boundValues mod group =
   let vals = case hs_valds group of
                ValBindsOut nest _sigs ->
-                   [ x | (_rec, binds) <- nest, bind <- bagToList binds,
-                              x <- boundThings mod bind ]
+                   [ x | (_rec, binds) <- nest
+                       , bind <- bagToList binds
+                       , x <- boundThings mod bind ]
                _other -> error "boundValues"
-      tys = concat $ map tyBound (hs_tyclds group)
-            where tyBound ltcd = case unLoc ltcd of
-                                   ForeignType { tcdLName = n } -> [found n]
-                                   TyData { tcdLName = tycon, tcdCons = cons } ->
-                                       dataNames tycon cons
-                                   TySynonym { tcdLName = n } -> [found n]
-                                   ClassDecl {	tcdLName = n } -> [found n]
-                                   _ -> error "boundValues: tys"
+      tys = [ n | ns <- map (tyClDeclNames . unLoc) (hs_tyclds group)
+                , n <- map found ns ]
       fors = concat $ map forBound (hs_fords group)
              where forBound lford = case unLoc lford of
                                       ForeignImport n _ _ -> [found n]
