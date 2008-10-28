@@ -2005,7 +2005,7 @@ type</emphasis>.  For example:
 data T a where { T1 { f1::a, f2::(a,b) } :: T a }    -- b is existential
 upd1 t x = t { f1=x }   -- OK:   upd1 :: T a -> b -> T b
 upd2 t x = t { f2=x }   -- BAD   (f2's type mentions b, which is
-                                  existentially quantified)
+                        --        existentially quantified)
 
 data G a b where { G1 { g1::a, g2::c } :: G a [c] }
 upd3 g x = g { g1=x }   -- OK:   upd3 :: G a b -> c -> G c b
