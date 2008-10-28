@@ -1344,7 +1344,7 @@ lookupType dflags hpt pte name
 lookupTypeHscEnv :: HscEnv -> Name -> IO (Maybe TyThing)
 lookupTypeHscEnv hsc_env name = do
     eps <- readIORef (hsc_EPS hsc_env)
-    return $ lookupType dflags hpt (eps_PTE eps) name
+    return $! lookupType dflags hpt (eps_PTE eps) name
   where 
     dflags = hsc_dflags hsc_env
     hpt = hsc_HPT hsc_env

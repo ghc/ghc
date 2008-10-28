@@ -2413,9 +2413,7 @@ isDictonaryId id
 -- 'setContext'.
 lookupGlobalName :: GhcMonad m => Name -> m (Maybe TyThing)
 lookupGlobalName name = withSession $ \hsc_env -> do
-   eps <- liftIO $ readIORef (hsc_EPS hsc_env)
-   return $! lookupType (hsc_dflags hsc_env) 
-			(hsc_HPT hsc_env) (eps_PTE eps) name
+   liftIO $ lookupTypeHscEnv hsc_env name
 
 findGlobalAnns :: (GhcMonad m, Typeable a) => ([Word8] -> a) -> AnnTarget Name -> m [a]
 findGlobalAnns deserialize target = withSession $ \hsc_env -> do
