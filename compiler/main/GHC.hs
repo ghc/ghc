@@ -49,6 +49,7 @@ module GHC (
         parseModule, typecheckModule, desugarModule, loadModule,
         ParsedModule, TypecheckedModule, DesugaredModule, -- all abstract
 	TypecheckedSource, ParsedSource, RenamedSource,   -- ditto
+        TypecheckedMod, ParsedMod,
         moduleInfo, renamedSource, typecheckedSource,
         parsedSource, coreModule,
         compileToCoreModule, compileToCoreSimplified,
