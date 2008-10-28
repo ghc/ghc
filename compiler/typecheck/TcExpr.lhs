@@ -58,6 +58,7 @@ import Maybes
 import Outputable
 import FastString
 
+import Data.List( partition )
 import Control.Monad
 \end{code}
 
@@ -400,148 +401,202 @@ tcExpr expr@(RecordCon (L loc con_name) _ rbinds) res_ty
 	; (con_expr, rbinds') <- tcIdApp con_name arity check_fields res_ty
 
 	; return (RecordCon (L loc (dataConWrapId data_con)) con_expr rbinds') }
+\end{code}
 
--- The main complication with RecordUpd is that we need to explicitly
--- handle the *non-updated* fields.  Consider:
---
---	data T a b = MkT1 { fa :: a, fb :: b }
---		   | MkT2 { fa :: a, fc :: Int -> Int }
---		   | MkT3 { fd :: a }
---	
---	upd :: T a b -> c -> T a c
---	upd t x = t { fb = x}
---
--- The type signature on upd is correct (i.e. the result should not be (T a b))
--- because upd should be equivalent to:
---
---	upd t x = case t of 
---			MkT1 p q -> MkT1 p x
---			MkT2 a b -> MkT2 p b
---			MkT3 d   -> error ...
---
--- So we need to give a completely fresh type to the result record,
--- and then constrain it by the fields that are *not* updated ("p" above).
---
--- Note that because MkT3 doesn't contain all the fields being updated,
--- its RHS is simply an error, so it doesn't impose any type constraints
---
--- All this is done in STEP 4 below.
---
--- Note about GADTs
--- ~~~~~~~~~~~~~~~~
--- For record update we require that every constructor involved in the
--- update (i.e. that has all the specified fields) is "vanilla".  I
--- don't know how to do the update otherwise.
+Note [Type of a record update]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The main complication with RecordUpd is that we need to explicitly
+handle the *non-updated* fields.  Consider:
 
+	data T a b = MkT1 { fa :: a, fb :: b }
+		   | MkT2 { fa :: a, fc :: Int -> Int }
+		   | MkT3 { fd :: a }
+	
+	upd :: T a b -> c -> T a c
+	upd t x = t { fb = x}
 
-tcExpr expr@(RecordUpd record_expr rbinds _ _ _) res_ty = do
+The type signature on upd is correct (i.e. the result should not be (T a b))
+because upd should be equivalent to:
+
+	upd t x = case t of 
+			MkT1 p q -> MkT1 p x
+			MkT2 a b -> MkT2 p b
+			MkT3 d   -> error ...
+
+So we need to give a completely fresh type to the result record,
+and then constrain it by the fields that are *not* updated ("p" above).
+
+Note that because MkT3 doesn't contain all the fields being updated,
+its RHS is simply an error, so it doesn't impose any type constraints
+
+Note [Implict type sharing]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We also take into account any "implicit" non-update fields.  For example
+	data T a b where { MkT { f::a } :: T a a; ... }
+So the "real" type of MkT is: forall ab. (a~b) => a -> T a b
+
+Then consider
+	upd t x = t { f=x }
+We infer the type
+	upd :: T a b -> a -> T a b
+	upd (t::T a b) (x::a)
+	   = case t of { MkT (co:a~b) (_:a) -> MkT co x }
+We can't give it the more general type
+	upd :: T a b -> c -> T c b
+
+Note [Criteria for update]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+We want to allow update for existentials etc, provided the updated
+field isn't part of the existential. For example, this should be ok.
+  data T a where { MkT { f1::a, f2::b->b } :: T a }
+  f :: T a -> b -> T b
+  f t b = t { f1=b }
+The criterion we use is this:
+
+  The types of the updated fields
+  mention only the universally-quantified type variables
+  of the data constructor
+
+In principle one could go further, and allow
+  g :: T a -> T a
+  g t = t { f2 = \x -> x }
+because the expression is polymorphic...but that seems a bridge too far.
+
+Note [Data family example]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+    data instance T (a,b) = MkT { x::a, y::b }
+  --->
+    data :TP a b = MkT { a::a, y::b }
+    coTP a b :: T (a,b) ~ :TP a b
+
+Suppose r :: T (t1,t2), e :: t3
+Then  r { x=e } :: T (t3,t1)
+  --->
+      case r |> co1 of
+	MkT x y -> MkT e y |> co2
+      where co1 :: T (t1,t2) ~ :TP t1 t2
+	    co2 :: :TP t3 t2 ~ T (t3,t2)
+The wrapping with co2 is done by the constructor wrapper for MkT
+
+Outgoing invariants
+~~~~~~~~~~~~~~~~~~~
+In the outgoing (HsRecordUpd scrut binds cons in_inst_tys out_inst_tys):
+
+  * cons are the data constructors to be updated
+
+  * in_inst_tys, out_inst_tys have same length, and instantiate the
+	*representation* tycon of the data cons.  In Note [Data 
+	family example], in_inst_tys = [t1,t2], out_inst_tys = [t3,t2]
+	
+\begin{code}
+tcExpr expr@(RecordUpd record_expr rbinds _ _ _) res_ty
+  = do	{
 	-- STEP 0
 	-- Check that the field names are really field names
-    let 
-	field_names = hsRecFields rbinds
-
-    MASSERT( notNull field_names )
-    sel_ids <- mapM tcLookupField field_names
-	-- The renamer has already checked that they
-	-- are all in scope
-    let
-	bad_guys = [ setSrcSpan loc $ addErrTc (notSelector field_name) 
-		   | (fld, sel_id) <- rec_flds rbinds `zip` sel_ids,
-		     not (isRecordSelector sel_id), 	-- Excludes class ops
-		     let L loc field_name = hsRecFieldId fld
-		   ]
-
-    unless (null bad_guys) (sequence bad_guys >> failM)
+	  let upd_fld_names = hsRecFields rbinds
+	; MASSERT( notNull upd_fld_names )
+	; sel_ids <- mapM tcLookupField upd_fld_names
+			-- The renamer has already checked that
+			-- selectors are all in scope
+	; let bad_guys = [ setSrcSpan loc $ addErrTc (notSelector fld_name) 
+		       	 | (fld, sel_id) <- rec_flds rbinds `zip` sel_ids,
+		       	   not (isRecordSelector sel_id), 	-- Excludes class ops
+		       	   let L loc fld_name = hsRecFieldId fld ]
+	; unless (null bad_guys) (sequence bad_guys >> failM)
     
 	-- STEP 1
 	-- Figure out the tycon and data cons from the first field name
-    let
-		-- It's OK to use the non-tc splitters here (for a selector)
-	sel_id : _   	= sel_ids
-	(tycon, _)   	= recordSelectorFieldLabel sel_id	-- We've failed already if
-	data_cons    	= tyConDataCons tycon			-- it's not a field label
-		-- NB: for a data type family, the tycon is the instance tycon
+	; let	-- It's OK to use the non-tc splitters here (for a selector)
+	      sel_id : _  = sel_ids
+	      (tycon, _)  = recordSelectorFieldLabel sel_id	-- We've failed already if
+	      data_cons   = tyConDataCons tycon			-- it's not a field label
+	      	-- NB: for a data type family, the tycon is the instance tycon
 
-	relevant_cons   = filter is_relevant data_cons
-	is_relevant con = all (`elem` dataConFieldLabels con) field_names
+	      relevant_cons   = filter is_relevant data_cons
+	      is_relevant con = all (`elem` dataConFieldLabels con) upd_fld_names
+		-- A constructor is only relevant to this process if
+		-- it contains *all* the fields that are being updated
+		-- Other ones will cause a runtime error if they occur
 
+		-- Take apart a representative constructor
+	      con1 = ASSERT( not (null relevant_cons) ) head relevant_cons
+	      (con1_tvs, _, _, _, _, con1_arg_tys, _) = dataConFullSig con1
+	      con1_flds = dataConFieldLabels con1
+	      con1_res_ty = mkFamilyTyConApp tycon (mkTyVarTys con1_tvs)
+   	      
 	-- STEP 2
 	-- Check that at least one constructor has all the named fields
 	-- i.e. has an empty set of bad fields returned by badFields
-    checkTc (not (null relevant_cons))
-	    (badFieldsUpd rbinds)
+	; checkTc (not (null relevant_cons)) (badFieldsUpd rbinds)
 
-	-- Check that all relevant data cons are vanilla.  Doing record updates on 
-	-- GADTs and/or existentials is more than my tiny brain can cope with today
-    checkTc (all isVanillaDataCon relevant_cons)
-	    (nonVanillaUpd tycon)
+	-- STEP 3    Note [Criteria for update]
+	-- Check that each updated field is polymorphic; that is, its type
+	-- mentions only the universally-quantified variables of the data con
+	; let flds_w_tys = zipEqual "tcExpr:RecConUpd" con1_flds con1_arg_tys
+	      (upd_flds_w_tys, fixed_flds_w_tys) = partition is_updated flds_w_tys
+	      is_updated (fld,ty) = fld `elem` upd_fld_names
 
-	-- STEP 4
-	-- Use the un-updated fields to find a vector of booleans saying
-	-- which type arguments must be the same in updatee and result.
-	--
-	-- WARNING: this code assumes that all data_cons in a common tycon
-	-- have FieldLabels abstracted over the same tyvars.
-    let
-		-- A constructor is only relevant to this process if
-		-- it contains *all* the fields that are being updated
-	con1 = ASSERT( not (null relevant_cons) ) head relevant_cons	-- A representative constructor
-	(con1_tyvars, theta, con1_arg_tys, con1_res_ty) = dataConSig con1
-	con1_flds     = dataConFieldLabels con1
-	common_tyvars = exactTyVarsOfTypes [ty | (fld,ty) <- con1_flds `zip` con1_arg_tys
-					       , not (fld `elem` field_names) ]
+	      bad_upd_flds = filter bad_fld upd_flds_w_tys
+	      con1_tv_set = mkVarSet con1_tvs
+	      bad_fld (fld, ty) = fld `elem` upd_fld_names &&
+				      not (tyVarsOfType ty `subVarSet` con1_tv_set)
+	; checkTc (null bad_upd_flds) (badFieldTypes bad_upd_flds)
 
- 	is_common_tv tv = tv `elemVarSet` common_tyvars
+	-- STEP 4  Note [Type of a record update]
+	-- Figure out types for the scrutinee and result
+	-- Both are of form (T a b c), with fresh type variables, but with
+	-- common variables where the scrutinee and result must have the same type
+	-- These are variables that appear anywhere *except* in the updated fields
+	; let common_tvs = exactTyVarsOfTypes (map snd fixed_flds_w_tys)
+			   `unionVarSet` constrainedTyVars con1_tvs relevant_cons
+	      is_common_tv tv = tv `elemVarSet` common_tvs
 
-	mk_inst_ty tv result_inst_ty 
-	  | is_common_tv tv = return result_inst_ty		-- Same as result type
-	  | otherwise	    = newFlexiTyVarTy (tyVarKind tv)	-- Fresh type, of correct kind
+	      mk_inst_ty tv result_inst_ty 
+	        | is_common_tv tv = return result_inst_ty	    -- Same as result type
+	        | otherwise	  = newFlexiTyVarTy (tyVarKind tv)  -- Fresh type, of correct kind
 
-    MASSERT( null theta )	-- Vanilla datacon
-    (_, result_inst_tys, result_inst_env) <- tcInstTyVars con1_tyvars
-    scrut_inst_tys <- zipWithM mk_inst_ty con1_tyvars result_inst_tys
+	; (_, result_inst_tys, result_inst_env) <- tcInstTyVars con1_tvs
+	; scrut_inst_tys <- zipWithM mk_inst_ty con1_tvs result_inst_tys
 
-	-- STEP 3: Typecheck the update bindings.
-	-- Do this after checking for bad fields in case 
-	-- there's a field that doesn't match the constructor.
-    let
-	result_ty     = substTy result_inst_env con1_res_ty
-	con1_arg_tys' = map (substTy result_inst_env) con1_arg_tys
-	origin 	      = RecordUpdOrigin
+	; let result_ty     = substTy result_inst_env con1_res_ty
+	      con1_arg_tys' = map (substTy result_inst_env) con1_arg_tys
+	      scrut_subst   = zipTopTvSubst con1_tvs scrut_inst_tys
+	      scrut_ty      = substTy scrut_subst con1_res_ty
 
-    co_fn   <- tcSubExp origin result_ty res_ty
-    rbinds' <- tcRecordBinds con1 con1_arg_tys' rbinds
+	-- STEP 5
+	-- Typecheck the thing to be updated, and the bindings
+	; record_expr' <- tcMonoExpr record_expr scrut_ty
+	; rbinds'      <- tcRecordBinds con1 con1_arg_tys' rbinds
+	
+	; let origin = RecordUpdOrigin
+	; co_fn <- tcSubExp origin result_ty res_ty
 
-	-- STEP 5: Typecheck the expression to be updated
-    let
-	scrut_inst_env = zipTopTvSubst con1_tyvars scrut_inst_tys
-	scrut_ty = substTy scrut_inst_env con1_res_ty
-	-- This is one place where the isVanilla check is important
-	-- So that inst_tys matches the con1_tyvars
-
-    record_expr' <- tcMonoExpr record_expr scrut_ty
-
-	-- STEP 6: Figure out the LIE we need.  
-	-- We have to generate some dictionaries for the data type context, 
-	-- since we are going to do pattern matching over the data cons.
-	--
-	-- What dictionaries do we need?  The dataConStupidTheta tells us.
-    let
-	theta' = substTheta scrut_inst_env (dataConStupidTheta con1)
-
-    instStupidTheta origin theta'
+	-- STEP 6: Deal with the stupid theta
+	; let theta' = substTheta scrut_subst (dataConStupidTheta con1)
+	; instStupidTheta origin theta'
 
 	-- Step 7: make a cast for the scrutinee, in the case that it's from a type family
-    let scrut_co | Just co_con <- tyConFamilyCoercion_maybe tycon 
-		 = WpCast $ mkTyConApp co_con scrut_inst_tys
-		 | otherwise
-		 = idHsWrapper
+	; let scrut_co | Just co_con <- tyConFamilyCoercion_maybe tycon 
+		       = WpCast $ mkTyConApp co_con scrut_inst_tys
+		       | otherwise
+		       = idHsWrapper
 
 	-- Phew!
-    return (mkHsWrap co_fn (RecordUpd (mkLHsWrap scrut_co record_expr') rbinds'
-				       relevant_cons scrut_inst_tys result_inst_tys))
+	; return (mkHsWrap co_fn (RecordUpd (mkLHsWrap scrut_co record_expr') rbinds'
+				        relevant_cons scrut_inst_tys result_inst_tys)) }
+  where
+    constrainedTyVars :: [TyVar] -> [DataCon] -> TyVarSet
+    -- Universally-quantified tyvars that appear in any of the 
+    -- *implicit* arguments to the constructor
+    -- These tyvars must not change across the updates
+    -- See Note [Implict type sharing]
+    constrainedTyVars tvs1 cons
+      = mkVarSet [tv1 | con <- cons
+    		      , let (tvs, theta, _, _) = dataConSig con
+    			    bad_tvs = tyVarsOfTheta theta
+                      , (tv1,tv) <- tvs1 `zip` tvs	-- Discards existentials in tvs
+        	      , tv `elemVarSet` bad_tvs ]
 \end{code}
-
 
 %************************************************************************
 %*									*
@@ -1131,10 +1186,13 @@ tcRecordBinds data_con arg_tys (HsRecFields rbinds dd)
     do_bind fld@(HsRecField { hsRecFieldId = L loc field_lbl, hsRecFieldArg = rhs })
       | Just field_ty <- assocMaybe flds_w_tys field_lbl
       = addErrCtxt (fieldCtxt field_lbl)	$
-	do { rhs'   <- tcPolyExprNC rhs field_ty
-	   ; sel_id <- tcLookupField field_lbl
-	   ; ASSERT( isRecordSelector sel_id )
-	     return (Just (fld { hsRecFieldId = L loc sel_id, hsRecFieldArg = rhs' })) }
+	do { rhs' <- tcPolyExprNC rhs field_ty
+	   ; let field_id = mkUserLocal (nameOccName field_lbl)
+				        (nameUnique field_lbl)
+					field_ty loc
+		-- The field_id has the *unique* of the selector Id
+		-- but is a LocalId with the appropriate type of the RHS
+	   ; return (Just (fld { hsRecFieldId = L loc field_id, hsRecFieldArg = rhs' })) }
       | otherwise
       = do { addErrTc (badFieldCon data_con field_lbl)
 	   ; return Nothing }
@@ -1198,11 +1256,11 @@ funAppCtxt fun arg arg_no
 		    quotes (ppr fun) <> text ", namely"])
 	 4 (quotes (ppr arg))
 
-nonVanillaUpd tycon
-  = vcat [ptext (sLit "Record update for the non-Haskell-98 data type") 
-		<+> quotes (pprSourceTyCon tycon)
-		<+> ptext (sLit "is not (yet) supported"),
-	  ptext (sLit "Use pattern-matching instead")]
+badFieldTypes prs
+  = hang (ptext (sLit "Record update for insufficiently polymorphic field")
+			 <> plural prs <> colon)
+       2 (vcat [ ppr f <+> dcolon <+> ppr ty | (f,ty) <- prs ])
+
 badFieldsUpd rbinds
   = hang (ptext (sLit "No constructor has all these fields:"))
 	 4 (pprQuotedList (hsRecFields rbinds))

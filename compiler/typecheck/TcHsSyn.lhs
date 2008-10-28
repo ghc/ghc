@@ -766,9 +766,9 @@ zonkRecFields env (HsRecFields flds dd)
 	; return (HsRecFields flds' dd) }
   where
     zonk_rbind fld
-      = do { new_expr <- zonkLExpr env (hsRecFieldArg fld)
-	   ; return (fld { hsRecFieldArg = new_expr }) }
-	-- Field selectors have declared types; hence no zonking
+      = do { new_id   <- wrapLocM (zonkIdBndr env) (hsRecFieldId fld)
+	   ; new_expr <- zonkLExpr env (hsRecFieldArg fld)
+	   ; return (fld { hsRecFieldId = new_id, hsRecFieldArg = new_expr }) }
 
 -------------------------------------------------------------------------
 mapIPNameTc :: (a -> TcM b) -> IPName a -> TcM (IPName b)

@@ -26,6 +26,7 @@ import DsUtils
 import DsArrows
 import DsMonad
 import Name
+import NameEnv
 
 #ifdef GHCI
 import PrelNames
@@ -40,6 +41,7 @@ import TcHsSyn
 --     needs to see source types
 import TcType
 import Type
+import Coercion
 import CoreSyn
 import CoreUtils
 import MkCore
@@ -52,6 +54,7 @@ import DataCon
 import TysWiredIn
 import BasicTypes
 import PrelNames
+import Maybes
 import SrcLoc
 import Util
 import Bag
@@ -426,52 +429,96 @@ RHSs, and do not generate a Core constructor application directly, because the c
 might do some argument-evaluation first; and may have to throw away some
 dictionaries.
 
+Note [Update for GADTs]
+~~~~~~~~~~~~~~~~~~~~~~~
+Consider 
+   data T a b where
+     T1 { f1 :: a } :: T a Int
+
+Then the wrapper function for T1 has type 
+   $WT1 :: a -> T a Int
+But if x::T a b, then
+   x { f1 = v } :: T a b   (not T a Int!)
+So we need to cast (T a Int) to (T a b).  Sigh.
+
 \begin{code}
 dsExpr expr@(RecordUpd record_expr (HsRecFields { rec_flds = fields })
 		       cons_to_upd in_inst_tys out_inst_tys)
   | null fields
   = dsLExpr record_expr
   | otherwise
-  =	-- Record stuff doesn't work for existentials
-	-- The type checker checks for this, but we need 
-	-- worry only about the constructors that are to be updated
-    ASSERT2( notNull cons_to_upd && all isVanillaDataCon cons_to_upd, ppr expr )
+  = ASSERT2( notNull cons_to_upd, ppr expr )
 
     do	{ record_expr' <- dsLExpr record_expr
-	; let	-- Awkwardly, for families, the match goes 
-		-- from instance type to family type
-		tycon     = dataConTyCon (head cons_to_upd)
-		in_ty     = mkTyConApp tycon in_inst_tys
-		in_out_ty = mkFunTy in_ty
-				    (mkFamilyTyConApp tycon out_inst_tys)
-
-		mk_val_arg field old_arg_id 
-		  = case findField fields field  of
-		      (rhs:rest) -> ASSERT(null rest) rhs
-		      []	 -> nlHsVar old_arg_id
-
-		mk_alt con
-	 	  = ASSERT( isVanillaDataCon con )
-		    do 	{ arg_ids <- newSysLocalsDs (dataConInstOrigArgTys con in_inst_tys)
-			-- This call to dataConInstOrigArgTys won't work for existentials
-			-- but existentials don't have record types anyway
-			; let val_args = zipWithEqual "dsExpr:RecordUpd" mk_val_arg
-						(dataConFieldLabels con) arg_ids
-			      rhs = foldl (\a b -> nlHsApp a b)
-				          (nlHsTyApp (dataConWrapId con) out_inst_tys)
-				          val_args
-			      pat = mkPrefixConPat con (map nlVarPat arg_ids) in_ty
-
-			; return (mkSimpleMatch [pat] rhs) }
+	; field_binds' <- mapM ds_field fields
 
 	-- It's important to generate the match with matchWrapper,
 	-- and the right hand sides with applications of the wrapper Id
 	-- so that everything works when we are doing fancy unboxing on the
 	-- constructor aguments.
 	; alts <- mapM mk_alt cons_to_upd
-	; ([discrim_var], matching_code) <- matchWrapper RecUpd (MatchGroup alts in_out_ty)
+	; ([discrim_var], matching_code) 
+		<- matchWrapper RecUpd (MatchGroup alts in_out_ty)
 
-	; return (bindNonRec discrim_var record_expr' matching_code) }
+	; return (add_field_binds field_binds' $
+		  bindNonRec discrim_var record_expr' matching_code) }
+  where
+    ds_field :: HsRecField Id (LHsExpr Id) -> DsM (Id, CoreExpr)
+    ds_field rec_field = do { rhs <- dsLExpr (hsRecFieldArg rec_field)
+			    ; return (unLoc (hsRecFieldId rec_field), rhs) }
+
+    add_field_binds [] expr = expr
+    add_field_binds ((b,r):bs) expr = bindNonRec b r (add_field_binds bs expr)
+
+	-- Awkwardly, for families, the match goes 
+	-- from instance type to family type
+    tycon     = dataConTyCon (head cons_to_upd)
+    in_ty     = mkTyConApp tycon in_inst_tys
+    in_out_ty = mkFunTy in_ty (mkFamilyTyConApp tycon out_inst_tys)
+
+    mk_alt con
+      = do { let (univ_tvs, ex_tvs, eq_spec, 
+		  eq_theta, dict_theta, arg_tys, _) = dataConFullSig con
+		 subst = mkTopTvSubst (univ_tvs `zip` in_inst_tys)
+
+		-- I'm not bothering to clone the ex_tvs
+	   ; eqs_vars   <- mapM newPredVarDs (substTheta subst (eqSpecPreds eq_spec))
+	   ; theta_vars <- mapM newPredVarDs (substTheta subst (eq_theta ++ dict_theta))
+	   ; arg_ids    <- newSysLocalsDs (substTys subst arg_tys)
+	   ; let val_args = zipWithEqual "dsExpr:RecordUpd" mk_val_arg
+    					 (dataConFieldLabels con) arg_ids
+		 inst_con = noLoc $ HsWrap wrap (HsVar (dataConWrapId con))
+			-- Reconstruct with the WrapId so that unpacking happens
+		 wrap = mkWpApps theta_vars `WpCompose` 
+			mkWpTyApps (mkTyVarTys ex_tvs) `WpCompose`
+			mkWpTyApps [ty | (tv, ty) <- univ_tvs `zip` out_inst_tys
+				       , isNothing (lookupTyVar wrap_subst tv) ]
+    	         rhs = foldl (\a b -> nlHsApp a b) inst_con val_args
+
+			-- Tediously wrap the application in a cast
+			-- Note [Update for GADTs]
+		 wrapped_rhs | null eq_spec = rhs
+			     | otherwise    = mkLHsWrap (WpCast wrap_co) rhs
+		 wrap_co = mkTyConApp tycon [ lookup tv ty 
+					    | (tv,ty) <- univ_tvs `zip` out_inst_tys]
+		 lookup univ_tv ty = case lookupTyVar wrap_subst univ_tv of
+					Just ty' -> ty'
+					Nothing  -> ty
+		 wrap_subst = mkTopTvSubst [ (tv,mkSymCoercion (mkTyVarTy co_var))
+					   | ((tv,_),co_var) <- eq_spec `zip` eqs_vars ]
+		 
+    	         pat = noLoc $ ConPatOut { pat_con = noLoc con, pat_tvs = ex_tvs
+					 , pat_dicts = eqs_vars ++ theta_vars
+					 , pat_binds = emptyLHsBinds 
+					 , pat_args = PrefixCon $ map nlVarPat arg_ids
+					 , pat_ty = in_ty }
+	   ; return (mkSimpleMatch [pat] wrapped_rhs) }
+
+    upd_field_ids :: NameEnv Id	-- Maps field name to the LocalId of the field binding
+    upd_field_ids = mkNameEnv [ (idName field_id, field_id) 
+			      | rec_fld <- fields, let field_id = unLoc (hsRecFieldId rec_fld) ]
+    mk_val_arg field_name pat_arg_id 
+      = nlHsVar (lookupNameEnv upd_field_ids field_name `orElse` pat_arg_id)
 \end{code}
 
 Here is where we desugar the Template Haskell brackets and escapes
