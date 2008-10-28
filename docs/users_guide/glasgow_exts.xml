@@ -5322,9 +5322,13 @@ f xs = ys ++ ys
        ys :: [a]
        ys = reverse xs
 </programlisting>
-The type signature for <literal>f</literal> brings the type variable <literal>a</literal> into scope; it scopes over
-the entire definition of <literal>f</literal>.
-In particular, it is in scope at the type signature for <varname>ys</varname>. 
+The type signature for <literal>f</literal> brings the type variable <literal>a</literal> into scope,
+because of the explicit <literal>forall</literal> (<xref linkend="decl-type-sigs"/>).
+The type variables bound by a <literal>forall</literal> scope over
+the entire definition of the accompanying value declaration.
+In this example, the type variable <literal>a</literal> scopes over the whole 
+definition of <literal>f</literal>, including over
+the type signature for <varname>ys</varname>. 
 In Haskell 98 it is not possible to declare
 a type for <varname>ys</varname>; a major benefit of scoped type variables is that
 it becomes possible to do so.
