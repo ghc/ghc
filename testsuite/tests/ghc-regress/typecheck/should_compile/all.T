@@ -258,7 +258,7 @@ test('tc240', normal, compile, [''])
 test('tc241', normal, compile, [''])
 test('tc242', normal, compile, [''])
 test('tc243', normal, compile, [''])
-test('tc244', normal, compile, [''])
+test('tc244', if_compiler_lt('ghc', '6.11', expect_fail), compile, [''])
 
 test('FD1', normal, compile_fail, [''])
 test('FD2', normal, compile_fail, [''])
