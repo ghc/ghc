@@ -459,19 +459,34 @@ deriveTyData (L loc deriv_pred, L _ decl@(TyData { tcdLName = L _ tycon_name,
 	      (arg_kinds, _) = splitKindFunTys kind
 	      n_args_to_drop = length arg_kinds	
 	      n_args_to_keep = tyConArity tc - n_args_to_drop
-	      inst_ty = mkTyConApp tc (take n_args_to_keep tc_args)
-	      inst_ty_kind = typeKind inst_ty
-
+	      args_to_drop   = drop n_args_to_keep tc_args
+	      inst_ty        = mkTyConApp tc (take n_args_to_keep tc_args)
+	      inst_ty_kind   = typeKind inst_ty
+	      dropped_tvs    = mkVarSet (mapCatMaybes getTyVar_maybe args_to_drop)
+	      univ_tvs       = (mkVarSet tvs `extendVarSetList` deriv_tvs)
+					`minusVarSet` dropped_tvs
+ 
 	-- Check that the result really is well-kinded
 	; checkTc (n_args_to_keep >= 0 && (inst_ty_kind `eqKind` kind))
 		  (derivingKindErr tc cls cls_tys kind)
 
+	; checkTc (sizeVarSet dropped_tvs == n_args_to_drop && 		 -- (a)
+	           tyVarsOfTypes (inst_ty:cls_tys) `subVarSet` univ_tvs) -- (b)
+		  (derivingEtaErr cls cls_tys inst_ty)
+		-- Check that 
+		--  (a) The data type can be eta-reduced; eg reject:
+		--		data instance T a a = ... deriving( Monad )
+		--  (b) The type class args do not mention any of the dropped type
+		--      variables 
+		--		newtype T a s = ... deriving( ST s )
+
 	-- Type families can't be partially applied
-	-- e.g.   newtype instance T Int a = ... deriving( Monad )
+	-- e.g.   newtype instance T Int a = MkT [a] deriving( Monad )
+	-- Note [Deriving, type families, and partial applications]
 	; checkTc (not (isOpenTyCon tc) || n_args_to_drop == 0)
 		  (typeFamilyPapErr tc cls cls_tys inst_ty)
 
-	; mkEqnHelp DerivOrigin (tvs++deriv_tvs) cls cls_tys inst_ty Nothing } }
+	; mkEqnHelp DerivOrigin (varSetElems univ_tvs) cls cls_tys inst_ty Nothing } }
   where
 	-- Tiresomely we must figure out the "lhs", which is awkward for type families
 	-- E.g.   data T a b = .. deriving( Eq )
@@ -490,8 +505,37 @@ deriveTyData (L loc deriv_pred, L _ decl@(TyData { tcdLName = L _ tycon_name,
 
 deriveTyData _other
   = panic "derivTyData"	-- Caller ensures that only TyData can happen
+\end{code}
 
-------------------------------------------------------------------
+Note [Deriving, type families, and partial applications]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When there are no type families, it's quite easy:
+
+    newtype S a = MkS [a]
+    -- :CoS :: S  ~ []	-- Eta-reduced
+
+    instance Eq [a] => Eq (S a) 	-- by coercion sym (Eq (coMkS a)) : Eq [a] ~ Eq (S a)
+    instance Monad [] => Monad S	-- by coercion sym (Monad coMkS)  : Monad [] ~ Monad S 
+
+When type familes are involved it's trickier:
+
+    data family T a b
+    newtype instance T Int a = MkT [a] deriving( Eq, Monad )
+    -- :RT is the representation type for (T Int a)
+    --  :CoF:R1T a :: T Int a ~ :RT a	-- Not eta reduced
+    --  :Co:R1T    :: :RT ~ []		-- Eta-reduced
+
+    instance Eq [a] => Eq (T Int a) 	-- easy by coercion
+    instance Monad [] => Monad (T Int)	-- only if we can eta reduce???
+
+The "???" bit is that we don't build the :CoF thing in eta-reduced form
+Henc the current typeFamilyPapErr, even though the instance makes sense.
+After all, we can write it out
+    instance Monad [] => Monad (T Int)	-- only if we can eta reduce???
+      return x = MkT [x]
+      ... etc ...	
+
+\begin{code}
 mkEqnHelp :: InstOrigin -> [TyVar] -> Class -> [Type] -> Type
           -> Maybe ThetaType	-- Just    => context supplied (standalone deriving)
 				-- Nothing => context inferred (deriving on data decl)
@@ -673,19 +717,17 @@ mk_typeable_eqn orig tvs cls tycon tc_args rep_tc _rep_tc_args mtheta
 -- family tycon (with indexes) in error messages.
 
 data DerivStatus = CanDerive
-     		 | NonDerivableClass
-		 | DerivableClassError SDoc
+		 | DerivableClassError SDoc	-- Standard class, but can't do it
+     		 | NonDerivableClass		-- Non-standard class
 
 checkSideConditions :: Bool -> Class -> [TcType] -> TyCon -> DerivStatus
 checkSideConditions mayDeriveDataTypeable cls cls_tys rep_tc
-  | notNull cls_tys	
-  = DerivableClassError ty_args_why	-- e.g. deriving( Foo s )
-  | otherwise
-  = case sideConditions cls of
-	Nothing   -> NonDerivableClass
-	Just cond -> case (cond (mayDeriveDataTypeable, rep_tc)) of
-	     	        Nothing  -> CanDerive
-			Just err -> DerivableClassError err
+  | Just cond <- sideConditions cls
+  = case (cond (mayDeriveDataTypeable, rep_tc)) of
+	Just err -> DerivableClassError err	-- Class-specific error
+	Nothing  | null cls_tys -> CanDerive
+		 | otherwise    -> DerivableClassError ty_args_why	-- e.g. deriving( Eq s )
+  | otherwise = NonDerivableClass	-- Not a standard class
   where
     ty_args_why	= quotes (ppr (mkClassPred cls cls_tys)) <+> ptext (sLit "is not a class")
 
@@ -850,6 +892,7 @@ mkNewTypeEqn :: InstOrigin -> Bool -> Bool -> [Var] -> Class
              -> TcRn EarlyDerivSpec
 mkNewTypeEqn orig mayDeriveDataTypeable newtype_deriving tvs
              cls cls_tys tycon tc_args rep_tycon rep_tc_args mtheta
+-- Want: instance (...) => cls (cls_tys ++ [tycon tc_args]) where ...
   | can_derive_via_isomorphism && (newtype_deriving || std_class_via_iso cls)
   = do	{ traceTc (text "newtype deriving:" <+> ppr tycon <+> ppr rep_tys)
 	; dfun_name <- new_dfun_name cls tycon
@@ -934,7 +977,7 @@ mkNewTypeEqn orig mayDeriveDataTypeable newtype_deriving tvs
     -- See Note [Newtype deriving superclasses] above
 
 	cls_tyvars = classTyVars cls
-	dfun_tvs = tyVarsOfTypes tc_args
+	dfun_tvs = tyVarsOfTypes inst_tys
 	inst_ty = mkTyConApp tycon tc_args
 	inst_tys = cls_tys ++ [inst_ty]
 	sc_theta = substTheta (zipOpenTvSubst cls_tyvars inst_tys)
@@ -977,18 +1020,13 @@ mkNewTypeEqn orig mayDeriveDataTypeable newtype_deriving tvs
 			-- recursive newtypes too
 
 	-- Check that eta reduction is OK
-	eta_ok = (nt_eta_arity <= length rep_tc_args)
-		-- (a) the newtype can be eta-reduced to match the number
+	eta_ok = nt_eta_arity <= length rep_tc_args
+		-- The newtype can be eta-reduced to match the number
 		--     of type argument actually supplied
 		--	  newtype T a b = MkT (S [a] b) deriving( Monad )
 		--     Here the 'b' must be the same in the rep type (S [a] b)
 		--     And the [a] must not mention 'b'.  That's all handled
 		--     by nt_eta_rity.
-
-	      && (tyVarsOfTypes cls_tys `subVarSet` dfun_tvs)
-		-- (c) the type class args do not mention any of the dropped type
-		--     variables 
-		--		newtype T a b = ... deriving( Monad b )
 
 	cant_derive_err = vcat [ptext (sLit "even with cunning newtype deriving:"),
 				if isRecursiveTyCon tycon then
@@ -1245,6 +1283,12 @@ derivingKindErr tc cls cls_tys cls_kind
 		<+> quotes (pprClassPred cls cls_tys <+> parens (ppr tc <+> ptext (sLit "..."))))
        2 (ptext (sLit "Class") <+> quotes (ppr cls)
 	    <+> ptext (sLit "expects an argument of kind") <+> quotes (pprKind cls_kind))
+
+derivingEtaErr :: Class -> [Type] -> Type -> Message
+derivingEtaErr cls cls_tys inst_ty
+  = sep [ptext (sLit "Cannot eta-reduce to an instance of form"),
+	 nest 2 (ptext (sLit "instance (...) =>")
+		<+> pprClassPred cls (cls_tys ++ [inst_ty]))]
 
 typeFamilyPapErr :: TyCon -> Class -> [Type] -> Type -> Message
 typeFamilyPapErr tc cls cls_tys inst_ty
