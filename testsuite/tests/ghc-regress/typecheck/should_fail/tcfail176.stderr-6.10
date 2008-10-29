@@ -1,0 +1,6 @@
+
+tcfail176.hs:7:20:
+    Data constructor `Bug' returns type `Maybe'
+      instead of its parent type
+    In the definition of data constructor `Bug'
+    In the newtype declaration for `Bug'
