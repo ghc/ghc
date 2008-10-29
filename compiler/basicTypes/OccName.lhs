@@ -481,19 +481,24 @@ reportIfUnused occ = case occNameString occ of
 
 Here's our convention for splitting up the interface file name space:
 
-	d...		dictionary identifiers
-			(local variables, so no name-clash worries)
+   d...		dictionary identifiers
+   		(local variables, so no name-clash worries)
 
-	\$f...		dict-fun identifiers (from inst decls)
-	\$dm...		default methods
-	\$p...		superclass selectors
-	\$w...		workers
-	:T...		compiler-generated tycons for dictionaries
-	:D...		...ditto data cons
-        :Co...          ...ditto coercions
-	\$sf..		specialised version of f
+All of these other OccNames contain a mixture of alphabetic
+and symbolic characters, and hence cannot possibly clash with
+a user-written type or function name
 
-	in encoded form these appear as Zdfxxx etc
+   $f...	Dict-fun identifiers (from inst decls)
+   $dmop	Default method for 'op'
+   $pnC		n'th superclass selector for class C
+   $wf		Worker for functtoin 'f'
+   $sf..	Specialised version of f
+   T:C		Tycon for dictionary for class C
+   D:C		Data constructor for dictionary for class C
+   NTCo:T       Coercion connecting newtype T with its representation type
+   TFCo:R       Coercion connecting a data family to its respresentation type R
+
+In encoded form these appear as Zdfxxx etc
 
 	:...		keywords (export:, letrec: etc.)
 --- I THINK THIS IS WRONG!
@@ -535,15 +540,15 @@ mkDataConWrapperOcc = mk_simple_deriv varName  "$W"
 mkWorkerOcc         = mk_simple_deriv varName  "$w"
 mkDefaultMethodOcc  = mk_simple_deriv varName  "$dm"
 mkDerivedTyConOcc   = mk_simple_deriv tcName   ":"	-- The : prefix makes sure it classifies
-mkClassTyConOcc     = mk_simple_deriv tcName   ":T"	-- as a tycon/datacon
-mkClassDataConOcc   = mk_simple_deriv dataName ":D"	-- We go straight to the "real" data con
+mkClassTyConOcc     = mk_simple_deriv tcName   "T:"	-- as a tycon/datacon
+mkClassDataConOcc   = mk_simple_deriv dataName "D:"	-- We go straight to the "real" data con
 							-- for datacons from classes
 mkDictOcc	    = mk_simple_deriv varName  "$d"
 mkIPOcc		    = mk_simple_deriv varName  "$i"
 mkSpecOcc	    = mk_simple_deriv varName  "$s"
 mkForeignExportOcc  = mk_simple_deriv varName  "$f"
-mkNewTyCoOcc        = mk_simple_deriv tcName  ":Co"
-mkInstTyCoOcc       = mk_simple_deriv tcName  ":CoF"     -- derived from rep ty
+mkNewTyCoOcc        = mk_simple_deriv tcName  "NTCo:"	-- Coercion for newtypes
+mkInstTyCoOcc       = mk_simple_deriv tcName  "TFCo:"   -- Coercion for type functions
 mkEqPredCoOcc	    = mk_simple_deriv tcName  "$co"
 
 -- used in derived instances
@@ -603,7 +608,7 @@ mkInstTyTcOcc :: Int			-- ^ DFun Index
 	      -> OccName		-- ^ Family name, e.g. @Map@
 	      -> OccName		-- ^ Nice unique version, e.g. @:R23Map@
 mkInstTyTcOcc index occ
-   = mk_deriv tcName (":R" ++ show index) (occNameString occ)
+   = mk_deriv tcName ("R" ++ show index ++ ":") (occNameString occ)
 \end{code}
 
 \begin{code}
