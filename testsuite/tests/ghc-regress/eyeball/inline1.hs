@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fglasgow-exts -O -ddump-simpl #-}
+{-# OPTIONS_GHC -fglasgow-exts -O -ddump-simpl -fno-method-sharing #-}
 module Roman where
 
 import Control.Monad.ST
