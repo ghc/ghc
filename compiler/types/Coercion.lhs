@@ -576,6 +576,10 @@ coreEqCoercion = coreEqType
 -- 2. The identity coercion
 data CoercionI = IdCo | ACo Coercion
 
+instance Outputable CoercionI where
+  ppr IdCo     = ptext (sLit "IdCo")
+  ppr (ACo co) = ppr co
+
 isIdentityCoercion :: CoercionI -> Bool
 isIdentityCoercion IdCo = True
 isIdentityCoercion _    = False
