@@ -1,8 +1,8 @@
-d = DictN (GHC.Num.:DNum (GHC.Classes.:DEq (_t1::Integer
+d = DictN (GHC.Num.D:Num (GHC.Classes.D:Eq (_t1::Integer
                                                  -> Integer
                                                  -> Bool)
                                            (_t2::Integer -> Integer -> Bool))
-                         (GHC.Show.:DShow (_t3::Int -> Integer -> ShowS)
+                         (GHC.Show.D:Show (_t3::Int -> Integer -> ShowS)
                                           (_t4::Integer -> String) (_t5::[Integer] -> ShowS))
                          (_t6::Integer -> Integer -> Integer)
                          (_t7::Integer -> Integer -> Integer)
@@ -11,11 +11,11 @@ d = DictN (GHC.Num.:DNum (GHC.Classes.:DEq (_t1::Integer
                          (_t12::Integer -> Integer))
           (_t13::Integer)
 ()
-d = DictN (GHC.Num.:DNum (GHC.Classes.:DEq (_t14::Integer
+d = DictN (GHC.Num.D:Num (GHC.Classes.D:Eq (_t14::Integer
                                                   -> Integer
                                                   -> Bool)
                                            (_t15::Integer -> Integer -> Bool))
-                         (GHC.Show.:DShow (_t16::Int -> Integer -> ShowS)
+                         (GHC.Show.D:Show (_t16::Int -> Integer -> ShowS)
                                           (_t17::Integer -> String) (_t18::[Integer] -> ShowS))
                          (_t19::Integer -> Integer -> Integer)
                          (_t20::Integer -> Integer -> Integer)

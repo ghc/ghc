@@ -1,22 +1,22 @@
 Stopped at <exception thrown>
-_exception :: e = SomeException (GHC.Exception.:DException _
-                                                           (GHC.Show.:DShow ...) ....)
+_exception :: e = SomeException (GHC.Exception.D:Exception _
+                                                           (GHC.Show.D:Show ...) ....)
                                 _
 Stopped at <exception thrown>
-_exception :: e = SomeException (GHC.Exception.:DException _
-                                                           (GHC.Show.:DShow ...) ....)
+_exception :: e = SomeException (GHC.Exception.D:Exception _
+                                                           (GHC.Show.D:Show ...) ....)
                                 _
 *** Exception: user error (error)
 Stopped at <exception thrown>
-_exception :: e = SomeException (GHC.Exception.:DException _
-                                                           (GHC.Show.:DShow ...) ....)
+_exception :: e = SomeException (GHC.Exception.D:Exception _
+                                                           (GHC.Show.D:Show ...) ....)
                                 (GHC.IOBase.IOError Nothing GHC.IOBase.UserError ....)
 *** Exception: user error (error)
 Stopped at <exception thrown>
-_exception :: e = SomeException (GHC.Exception.:DException _
-                                                           (GHC.Show.:DShow ...) ....)
+_exception :: e = SomeException (GHC.Exception.D:Exception _
+                                                           (GHC.Show.D:Show ...) ....)
                                 (GHC.IOBase.IOError Nothing GHC.IOBase.UserError ....)
 Stopped at <exception thrown>
-_exception :: e = SomeException (GHC.Exception.:DException _
-                                                           (GHC.Show.:DShow ...) ....)
+_exception :: e = SomeException (GHC.Exception.D:Exception _
+                                                           (GHC.Show.D:Show ...) ....)
                                 (GHC.IOBase.IOError Nothing GHC.IOBase.UserError ....)
