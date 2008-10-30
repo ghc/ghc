@@ -117,10 +117,11 @@ test('TH_scope', normal, compile, [''])
 test('T2632', normal, compile, [''])
 test('T2700', normal, compile, ['-v0'])
 test('T2713', normal, compile_fail, ['-v0'])
+test('T2674', normal, compile_fail, ['-v0'])
+test('TH_emptycase', normal, compile_fail, ['-v0'])
 
 test('T2386', extra_clean(['T2386_Lib.hi', 'T2386_Lib.o']),
 	      run_command,
 	      ['$MAKE -s --no-print-directory T2386'] )
-test('TH_emptycase', exit_code(1), compile_and_run, [''])
 
 test('T2685', normal, multimod_compile, ['T2685','-v0'])
