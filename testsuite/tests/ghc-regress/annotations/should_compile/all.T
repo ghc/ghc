@@ -1,7 +1,7 @@
 # Annotations were implemented in GHC 6.9 and not supported in other compilers
 setTestOpts(if_compiler_lt('ghc', '6.9', skip));
 
-test('ann01', normal, compile, [''])
+test('ann01', normal, compile, ['-v0'])
 
 """"
 Helpful things to C+P:
