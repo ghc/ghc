@@ -327,6 +327,11 @@ cvtBind (TH.ValD (TH.VarP s) body ds)
 	; returnL $ mkFunBind s' [cl'] }
 
 cvtBind (TH.FunD nm cls)
+  | null cls
+  = failWith (ptext (sLit "Function binding for")
+    	     	    <+> quotes (text (TH.pprint nm))
+    	     	    <+> ptext (sLit "has no equations"))
+  | otherwise
   = do	{ nm' <- vNameL nm
 	; cls' <- mapM cvtClause cls
 	; returnL $ mkFunBind nm' cls' }
@@ -371,7 +376,9 @@ cvtl e = wrapL (cvt e)
     cvt (CondE x y z)  = do { x' <- cvtl x; y' <- cvtl y; z' <- cvtl z
 			    ; return $ HsIf x' y' z' }
     cvt (LetE ds e)    = do { ds' <- cvtDecs ds; e' <- cvtl e; return $ HsLet ds' e' }
-    cvt (CaseE e ms)   = do { e' <- cvtl e; ms' <- mapM cvtMatch ms
+    cvt (CaseE e ms)   
+       | null ms       = failWith (ptext (sLit "Case expression with no alternatives"))
+       | otherwise     = do { e' <- cvtl e; ms' <- mapM cvtMatch ms
 			    ; return $ HsCase e' (mkMatchGroup ms') }
     cvt (DoE ss)       = cvtHsDo DoExpr ss
     cvt (CompE ss)     = cvtHsDo ListComp ss
