@@ -53,7 +53,7 @@ tcProc pat cmd exp_ty
     do	{ ((exp_ty1, res_ty), coi) <- boxySplitAppTy exp_ty 
 	; ((arr_ty, arg_ty), coi1) <- boxySplitAppTy exp_ty1
 	; let cmd_env = CmdEnv { cmd_arr = arr_ty }
-	; (pat', cmd') <- tcProcPat pat arg_ty res_ty $
+	; (pat', cmd') <- tcPat ProcExpr pat arg_ty res_ty $
 			  tcCmdTop cmd_env cmd []
         ; let res_coi = mkTransCoI coi (mkAppTyCoI exp_ty1 coi1 res_ty IdCo)
 	; return (pat', cmd', res_coi) 
@@ -186,8 +186,8 @@ tc_cmd env cmd@(HsLam (MatchGroup [L mtch_loc (match@(Match pats _maybe_rhs_sig 
 		  (kappaUnderflow cmd)
 
 		-- Check the patterns, and the GRHSs inside
-	; (pats', grhss') <- setSrcSpan mtch_loc		$
-			     tcLamPats pats cmd_stk res_ty	$
+	; (pats', grhss') <- setSrcSpan mtch_loc			$
+			     tcPats LambdaExpr pats cmd_stk res_ty	$
 			     tc_grhss grhss
 
 	; let match' = L mtch_loc (Match pats' Nothing grhss')

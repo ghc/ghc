@@ -1020,10 +1020,10 @@ pp_dotdot = ptext (sLit " .. ")
 \begin{code}
 data HsMatchContext id  -- Context of a Match
   = FunRhs id Bool              -- Function binding for f; True <=> written infix
-  | CaseAlt                     -- Guard on a case alternative
-  | LambdaExpr                  -- Pattern of a lambda
-  | ProcExpr                    -- Pattern of a proc
-  | PatBindRhs                  -- Pattern binding
+  | CaseAlt                     -- Patterns and guards on a case alternative
+  | LambdaExpr                  -- Patterns of a lambda
+  | ProcExpr                    -- Patterns of a proc
+  | PatBindRhs                  -- Patterns in the *guards* of a pattern binding
   | RecUpd                      -- Record update [used only in DsExpr to
                                 --    tell matchWrapper what sort of
                                 --    runtime error message to generate]

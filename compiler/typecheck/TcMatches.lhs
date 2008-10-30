@@ -166,7 +166,7 @@ tcMatch ctxt pat_tys rhs_ty match
   where
     tc_match ctxt pat_tys rhs_ty match@(Match pats maybe_rhs_sig grhss)
       = add_match_ctxt match $
-        do { (pats', grhss') <- tcLamPats pats pat_tys rhs_ty $
+        do { (pats', grhss') <- tcPats (mc_what ctxt) pats pat_tys rhs_ty $
     			        tc_grhss ctxt maybe_rhs_sig grhss
 	   ; return (Match pats' Nothing grhss') }
 
@@ -326,9 +326,9 @@ tcGuardStmt _ (ExprStmt guard _ _) res_ty thing_inside
 	; thing  <- thing_inside res_ty
 	; return (ExprStmt guard' noSyntaxExpr boolTy, thing) }
 
-tcGuardStmt _ (BindStmt pat rhs _ _) res_ty thing_inside
+tcGuardStmt ctxt (BindStmt pat rhs _ _) res_ty thing_inside
   = do	{ (rhs', rhs_ty) <- tcInferRhoNC rhs	-- Stmt has a context already
-	; (pat', thing)  <- tcLamPat pat rhs_ty res_ty thing_inside
+	; (pat', thing)  <- tcPat (StmtCtxt ctxt) pat rhs_ty res_ty thing_inside
 	; return (BindStmt pat' rhs' noSyntaxExpr noSyntaxExpr, thing) }
 
 tcGuardStmt _ stmt _ _
@@ -342,10 +342,10 @@ tcLcStmt :: TyCon	-- The list/Parray type constructor ([] or PArray)
 	 -> TcStmtChecker
 
 -- A generator, pat <- rhs
-tcLcStmt m_tc _ (BindStmt pat rhs _ _) res_ty thing_inside
+tcLcStmt m_tc ctxt (BindStmt pat rhs _ _) res_ty thing_inside
  = do	{ (rhs', pat_ty) <- withBox liftedTypeKind $ \ ty ->
 			    tcMonoExpr rhs (mkTyConApp m_tc [ty])
-	; (pat', thing)  <- tcLamPat pat pat_ty res_ty thing_inside
+	; (pat', thing)  <- tcPat (StmtCtxt ctxt) pat pat_ty res_ty thing_inside
 	; return (BindStmt pat' rhs' noSyntaxExpr noSyntaxExpr, thing) }
 
 -- A boolean guard
@@ -463,7 +463,7 @@ tcLcStmt _ _ stmt _ _
 
 tcDoStmt :: TcStmtChecker
 
-tcDoStmt _ (BindStmt pat rhs bind_op fail_op) res_ty thing_inside
+tcDoStmt ctxt (BindStmt pat rhs bind_op fail_op) res_ty thing_inside
   = do	{ (rhs', rhs_ty) <- tcInferRhoNC rhs
 		-- We should use type *inference* for the RHS computations, 
                 -- becuase of GADTs. 
@@ -489,7 +489,7 @@ tcDoStmt _ (BindStmt pat rhs bind_op fail_op) res_ty thing_inside
 		      then return noSyntaxExpr
 		      else tcSyntaxOp DoOrigin fail_op (mkFunTy stringTy new_res_ty)
 
-	; (pat', thing) <- tcLamPat pat pat_ty new_res_ty thing_inside
+	; (pat', thing) <- tcPat (StmtCtxt ctxt) pat pat_ty new_res_ty thing_inside
 
 	; return (BindStmt pat' rhs' bind_op' fail_op', thing) }
 
@@ -522,9 +522,9 @@ tcDoStmt _ stmt _ _
 
 tcMDoStmt :: (LHsExpr Name -> TcM (LHsExpr TcId, TcType))	-- RHS inference
 	  -> TcStmtChecker
-tcMDoStmt tc_rhs _ (BindStmt pat rhs _ _) res_ty thing_inside
+tcMDoStmt tc_rhs ctxt (BindStmt pat rhs _ _) res_ty thing_inside
   = do	{ (rhs', pat_ty) <- tc_rhs rhs
-	; (pat', thing)  <- tcLamPat pat pat_ty res_ty thing_inside
+	; (pat', thing)  <- tcPat (StmtCtxt ctxt) pat pat_ty res_ty thing_inside
 	; return (BindStmt pat' rhs' noSyntaxExpr noSyntaxExpr, thing) }
 
 tcMDoStmt tc_rhs _ (ExprStmt rhs _ _) res_ty thing_inside

@@ -6,7 +6,7 @@
 TcPat: Typechecking patterns
 
 \begin{code}
-module TcPat ( tcLetPat, tcLamPat, tcLamPats, tcProcPat, tcOverloadedLit,
+module TcPat ( tcLetPat, tcPat, tcPats, tcOverloadedLit,
 	       addDataConStupidTheta, badFieldCon, polyPatSig ) where
 
 #include "HsVersions.h"
@@ -70,11 +70,12 @@ tcLetPat sig_fn pat pat_ty thing_inside
 	; return (pat', res) }
 
 -----------------
-tcLamPats :: [LPat Name]		-- Patterns,
-	  -> [BoxySigmaType]		--   and their types
-	  -> BoxyRhoType 		-- Result type,
-	  -> (BoxyRhoType -> TcM a)	--   and the checker for the body
-	  -> TcM ([LPat TcId], a)
+tcPats :: HsMatchContext Name
+       -> [LPat Name]		 -- Patterns,
+       -> [BoxySigmaType]	 --   and their types
+       -> BoxyRhoType 		 -- Result type,
+       -> (BoxyRhoType -> TcM a) --   and the checker for the body
+       -> TcM ([LPat TcId], a)
 
 -- This is the externally-callable wrapper function
 -- Typecheck the patterns, extend the environment to bind the variables,
@@ -87,17 +88,17 @@ tcLamPats :: [LPat Name]		-- Patterns,
 --   3. Check the body
 --   4. Check that no existentials escape
 
-tcLamPats pats tys res_ty thing_inside
-  = tc_lam_pats LamPat (zipEqual "tcLamPats" pats tys)
+tcPats ctxt pats tys res_ty thing_inside
+  = tc_lam_pats (APat ctxt) (zipEqual "tcLamPats" pats tys)
 	        res_ty thing_inside
 
-tcLamPat, tcProcPat :: LPat Name -> BoxySigmaType 
-                    -> BoxyRhoType             -- Result type
-                    -> (BoxyRhoType -> TcM a)  -- Checker for body, given
-                                               -- its result type
-                    -> TcM (LPat TcId, a)
-tcLamPat  = tc_lam_pat LamPat
-tcProcPat = tc_lam_pat ProcPat
+tcPat :: HsMatchContext Name
+      -> LPat Name -> BoxySigmaType 
+      -> BoxyRhoType             -- Result type
+      -> (BoxyRhoType -> TcM a)  -- Checker for body, given
+                                 -- its result type
+      -> TcM (LPat TcId, a)
+tcPat ctxt = tc_lam_pat (APat ctxt)
 
 tc_lam_pat :: PatCtxt -> LPat Name -> BoxySigmaType -> BoxyRhoType
            -> (BoxyRhoType -> TcM a) -> TcM (LPat TcId, a)
@@ -117,7 +118,7 @@ tc_lam_pats ctxt pat_ty_prs res_ty thing_inside
 	; (pats', ex_tvs, res) <- do { traceTc (text "tc_lam_pats" <+> (ppr pat_ty_prs $$ ppr res_ty)) 
 				  ; tcMultiple tc_lpat_pr pat_ty_prs init_state $ \ pstate' ->
 				    if (pat_eqs pstate' && (not $ isRigidTy res_ty))
-				     then nonRigidResult res_ty
+				     then nonRigidResult ctxt res_ty
 	     			     else thing_inside res_ty }
 
 	; let tys = map snd pat_ty_prs
@@ -154,10 +155,12 @@ data PatState = PS {
   }
 
 data PatCtxt 
-  = LamPat 
-  | ProcPat				-- The pattern in (proc pat -> ...)
-					--	see Note [Arrows and patterns]
+  = APat (HsMatchContext Name)
   | LetPat (Name -> Maybe TcRhoType)	-- Used for let(rec) bindings
+
+notProcPat :: PatCtxt -> Bool
+notProcPat (APat ProcExpr) = False
+notProcPat _	  	   = True
 
 patSigCtxt :: PatState -> UserTypeCtxt
 patSigCtxt (PS { pat_ctxt = LetPat _ }) = BindPatSigCtxt
@@ -647,8 +650,9 @@ tcConPat pstate con_span data_con tycon pat_ty arg_pats thing_inside
 
 	  else do   -- The general case, with existential, and local equality 
                     -- constraints
-	{ checkTc (case pat_ctxt pstate of { ProcPat -> False; _ -> True })
+	{ checkTc (notProcPat (pat_ctxt pstate))
 		  (existentialProcPat data_con)
+		  -- See Note [Arrows and patterns]
 
           -- Need to test for rigidity if *any* constraints in theta as class
           -- constraints may have superclass equality constraints.  However,
@@ -666,8 +670,8 @@ tcConPat pstate con_span data_con tycon pat_ty arg_pats thing_inside
 	      pstate' | no_equalities = pstate
 		      | otherwise     = pstate { pat_eqs = True }
 
-	; unless no_equalities $ 
-            checkTc (isRigidTy pat_ty) (nonRigidMatch data_con)
+	; unless no_equalities $ checkTc (isRigidTy pat_ty) $
+                                 nonRigidMatch (pat_ctxt pstate) data_con
 
 	; ((arg_pats', inner_tvs, res), lie_req) <- getLIE $
 		tcConArgs data_con arg_tys' arg_pats pstate' thing_inside
@@ -1029,17 +1033,30 @@ lazyPatErr _ tvs
     hang (ptext (sLit "A lazy (~) pattern cannot bind existential type variables"))
        2 (vcat (map pprSkolTvBinding tvs))
 
-nonRigidMatch :: DataCon -> SDoc
-nonRigidMatch con
+nonRigidMatch :: PatCtxt -> DataCon -> SDoc
+nonRigidMatch ctxt con
   =  hang (ptext (sLit "GADT pattern match in non-rigid context for") <+> quotes (ppr con))
-	2 (ptext (sLit "Solution: add a type signature"))
+	2 (ptext (sLit "Probable solution: add a type signature for") <+> what ctxt)
+  where
+     what (APat (FunRhs f _)) = quotes (ppr f)
+     what (APat CaseAlt)      = ptext (sLit "the scrutinee of the case expression")
+     what (APat LambdaExpr )  = ptext (sLit "the lambda expression")
+     what (APat (StmtCtxt _)) = ptext (sLit "the right hand side of a do/comprehension binding")
+     what _other	      = ptext (sLit "something")
 
-nonRigidResult :: Type -> TcM a
-nonRigidResult res_ty
+nonRigidResult :: PatCtxt -> Type -> TcM a
+nonRigidResult ctxt res_ty
   = do	{ env0 <- tcInitTidyEnv
 	; let (env1, res_ty') = tidyOpenType env0 res_ty
 	      msg = hang (ptext (sLit "GADT pattern match with non-rigid result type")
 				<+> quotes (ppr res_ty'))
-		  	 2 (ptext (sLit "Solution: add a type signature"))
+		  	 2 (ptext (sLit "Solution: add a type signature for")
+			   	  <+> what ctxt )
 	; failWithTcM (env1, msg) }
+  where
+     what (APat (FunRhs f _)) = quotes (ppr f)
+     what (APat CaseAlt)      = ptext (sLit "the entire case expression")
+     what (APat LambdaExpr)   = ptext (sLit "the lambda exression")
+     what (APat (StmtCtxt _)) = ptext (sLit "the entire do/comprehension expression")
+     what _other              = ptext (sLit "something")
 \end{code}
