@@ -95,8 +95,6 @@ strict workers.
 saBinds :: DynFlags -> [CoreBind] -> IO [CoreBind]
 saBinds dflags binds
   = do {
-	showPass dflags "Strictness analysis";
-
 	-- Mark each binder with its strictness
 #ifndef OMIT_STRANAL_STATS
 	let { (binds_w_strictness, sa_stats) = runState $ (saTopBinds binds) nullSaStats };
@@ -106,8 +104,7 @@ saBinds dflags binds
 	let { binds_w_strictness = unSaM $ saTopBindsBinds binds };
 #endif
 
-	endPass dflags "Strictness analysis" Opt_D_dump_stranal
-		binds_w_strictness
+	return binds_w_strictness
     }
 \end{code}
 

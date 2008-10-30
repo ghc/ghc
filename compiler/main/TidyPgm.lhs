@@ -142,6 +142,7 @@ mkBootModDetails hsc_env exports type_env insts fam_insts
 			     , md_insts     = insts'
 			     , md_fam_insts = fam_insts
 			     , md_rules     = []
+			     , md_anns      = []
 			     , md_exports   = exports
                              , md_vect_info = noVectInfo
                              })
@@ -260,6 +261,7 @@ tidyProgram hsc_env  (ModGuts { mg_module = mod, mg_exports = exports,
 				mg_rules = imp_rules,
                                 mg_vect_info = vect_info,
 				mg_dir_imps = dir_imps, 
+				mg_anns = anns,
                                 mg_deps = deps, 
 				mg_foreign = foreign_stubs,
 			        mg_hpc_info = hpc_info,
@@ -326,7 +328,8 @@ tidyProgram hsc_env  (ModGuts { mg_module = mod, mg_exports = exports,
 				md_insts     = tidy_insts,
 				md_fam_insts = fam_insts,
 				md_exports   = exports,
-                                md_vect_info = vect_info    -- is already tidy
+				md_anns      = anns,     -- are already tidy
+                                md_vect_info = vect_info --
                               })
 	}
 

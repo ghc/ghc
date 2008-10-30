@@ -45,6 +45,7 @@ import Inst
 import FamInst
 import InstEnv
 import FamInstEnv
+import TcAnnotations
 import TcBinds
 import TcDefaults
 import TcEnv
@@ -390,8 +391,10 @@ tcRnSrcDecls boot_iface decls
 	    -- Even tcSimplifyTop may do some unification.
         traceTc (text "Tc9") ;
 	let { (tcg_env, _) = tc_envs
-	    ; TcGblEnv { tcg_type_env = type_env, tcg_binds = binds, 
-		         tcg_rules = rules, tcg_fords = fords } = tcg_env
+	    ; TcGblEnv { tcg_type_env = type_env,
+		         tcg_binds = binds,
+		         tcg_rules = rules,
+		         tcg_fords = fords } = tcg_env
 	    ; all_binds = binds `unionBags` inst_binds } ;
 
 	failIfErrsM ;	-- Don't zonk if there have been errors
@@ -468,26 +471,32 @@ tcRnHsBootDecls decls
 	     Nothing    -> return ()
 
 		-- Rename the declarations
-	; (tcg_env, rn_group) <- rnTopSrcDecls first_group
+	; (tcg_env, HsGroup { 
+		   hs_tyclds = tycl_decls, 
+		   hs_instds = inst_decls,
+		   hs_derivds = deriv_decls,
+		   hs_fords  = _,
+		   hs_defds  = _, -- Todo: check no foreign decls, no rules,
+		   hs_ruleds = _, -- no default decls and no annotation decls
+		   hs_annds  = _,
+		   hs_valds  = val_binds }) <- rnTopSrcDecls first_group
 	; setGblEnv tcg_env $ do {
 
-	-- Todo: check no foreign decls, no rules, no default decls
 
 		-- Typecheck type/class decls
 	; traceTc (text "Tc2")
-	; let tycl_decls = hs_tyclds rn_group
 	; tcg_env <- tcTyAndClassDecls emptyModDetails tycl_decls
 	; setGblEnv tcg_env	$ do {
 
 		-- Typecheck instance decls
 	; traceTc (text "Tc3")
 	; (tcg_env, inst_infos, _deriv_binds) 
-            <- tcInstDecls1 tycl_decls (hs_instds rn_group) (hs_derivds rn_group)
+            <- tcInstDecls1 tycl_decls inst_decls deriv_decls
 	; setGblEnv tcg_env	$ do {
 
 		-- Typecheck value declarations
 	; traceTc (text "Tc5") 
-	; val_ids <- tcHsBootSigs (hs_valds rn_group)
+	; val_ids <- tcHsBootSigs val_binds
 
 		-- Wrap up
 		-- No simplification or zonking to do
@@ -770,6 +779,7 @@ tcTopSrcDecls boot_details
                    hs_derivds = deriv_decls,
 		   hs_fords  = foreign_decls,
 		   hs_defds  = default_decls,
+		   hs_annds  = annotation_decls,
 		   hs_ruleds = rule_decls,
 		   hs_valds  = val_binds })
  = do {		-- Type-check the type and class decls, and all imported decls
@@ -820,6 +830,9 @@ tcTopSrcDecls boot_details
         traceTc (text "Tc7") ;
 	(foe_binds, foe_decls) <- tcForeignExports foreign_decls ;
 
+                -- Annotations
+	annotations <- tcAnnotations annotation_decls ;
+
 		-- Rules
 	rules <- tcRules rule_decls ;
 
@@ -829,12 +842,13 @@ tcTopSrcDecls boot_details
 	let { all_binds = tc_val_binds	 `unionBags`
 			  tc_deriv_binds `unionBags`
 			  inst_binds	 `unionBags`
-			  foe_binds  ;
+			  foe_binds;
 
 		-- Extend the GblEnv with the (as yet un-zonked) 
 		-- bindings, rules, foreign decls
 	      tcg_env' = tcg_env {  tcg_binds = tcg_binds tcg_env `unionBags` all_binds,
 				    tcg_rules = tcg_rules tcg_env ++ rules,
+				    tcg_anns  = tcg_anns tcg_env ++ annotations,
 				    tcg_fords = tcg_fords tcg_env ++ foe_decls ++ fi_decls } } ;
   	return (tcg_env', tcl_env)
     }}}}}}

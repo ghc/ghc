@@ -14,7 +14,8 @@ TcSplice: Template Haskell splices
 -- for details
 
 module TcSplice( tcSpliceExpr, tcSpliceDecls, tcBracket,
-                 runQuasiQuoteExpr, runQuasiQuotePat ) where
+                 lookupThName_maybe,
+                 runQuasiQuoteExpr, runQuasiQuotePat, runAnnotation ) where
 
 #include "HsVersions.h"
 
@@ -41,12 +42,15 @@ import TcIface
 import TypeRep
 import Name
 import NameEnv
+import PrelNames
 import HscTypes
 import OccName
 import Var
 import Module
+import Annotations
 import TcRnMonad
 import Class
+import Inst
 import TyCon
 import DataCon
 import Id
@@ -55,6 +59,7 @@ import TysWiredIn
 import DsMeta
 import DsExpr
 import DsMonad hiding (Splice)
+import Serialized
 import ErrUtils
 import SrcLoc
 import Outputable
@@ -68,6 +73,11 @@ import Exception
 import qualified Language.Haskell.TH as TH
 -- THSyntax gives access to internal functions and data types
 import qualified Language.Haskell.TH.Syntax as TH
+
+#ifdef GHCI
+-- Because GHC.Desugar might not be in the base library of the bootstrapping compiler
+import GHC.Desugar      ( AnnotationWrapper(..) )
+#endif
 
 import GHC.Exts		( unsafeCoerce#, Int#, Int(..) )
 import System.IO.Error
@@ -164,8 +174,11 @@ tcSpliceExpr  :: HsSplice Name -> BoxyRhoType -> TcM (HsExpr TcId)
 kcSpliceType  :: HsSplice Name -> TcM (HsType Name, TcKind)
 	-- None of these functions add constraints to the LIE
 
+lookupThName_maybe :: TH.Name -> TcM (Maybe Name)
+
 runQuasiQuoteExpr :: HsQuasiQuote Name -> TcM (LHsExpr RdrName)
 runQuasiQuotePat  :: HsQuasiQuote Name -> TcM (LPat RdrName)
+runAnnotation     :: CoreAnnTarget -> LHsExpr Name -> TcM Annotation
 
 #ifndef GHCI
 tcBracket     x _ = pprPanic "Cant do tcBracket without GHCi"     (ppr x)
@@ -173,8 +186,11 @@ tcSpliceExpr  e   = pprPanic "Cant do tcSpliceExpr without GHCi"  (ppr e)
 tcSpliceDecls x   = pprPanic "Cant do tcSpliceDecls without GHCi" (ppr x)
 kcSpliceType  x   = pprPanic "Cant do kcSpliceType without GHCi"  (ppr x)
 
+lookupThName_maybe n = pprPanic "Cant do lookupThName_maybe without GHCi" (ppr n)
+
 runQuasiQuoteExpr q = pprPanic "Cant do runQuasiQuoteExpr without GHCi" (ppr q)
 runQuasiQuotePat  q = pprPanic "Cant do runQuasiQuotePat without GHCi" (ppr q)
+runAnnotation   _ q = pprPanic "Cant do runAnnotation without GHCi" (ppr q)
 #else
 \end{code}
 
@@ -285,7 +301,7 @@ tcSpliceExpr (HsSplice name expr) res_ty
 	Just next_level -> 
 
      case level of {
-	Comp 		       -> do { e <- tcTopSplice expr res_ty
+	Comp _ 		       -> do { e <- tcTopSplice expr res_ty
 				     ; return (unLoc e) } ;
 	Brack _ ps_var lie_var -> do
 
@@ -344,23 +360,74 @@ tcTopSplice expr res_ty = do
 tcTopSpliceExpr :: LHsExpr Name -> TcType -> TcM (LHsExpr Id)
 -- Type check an expression that is the body of a top-level splice
 --   (the caller will compile and run it)
-tcTopSpliceExpr expr meta_ty
-  = checkNoErrs $	-- checkNoErrs: must not try to run the thing
-			--	        if the type checker fails!
+tcTopSpliceExpr expr meta_ty 
+  = checkNoErrs $  -- checkNoErrs: must not try to run the thing
+                   -- if the type checker fails!
+    do { (expr', const_binds) <- tcSimplifyStagedExpr topSpliceStage $
+                                 (recordThUse >> tcMonoExpr expr meta_ty)
+          -- Zonk it and tie the knot of dictionary bindings
+       ; zonkTopLExpr (mkHsDictLet const_binds expr') }
+\end{code}
 
-    setStage topSpliceStage $ do
 
-	
-    do	{ recordThUse	-- Record that TH is used (for pkg depdendency)
+%************************************************************************
+%*									*
+	Annotations
+%*									*
+%************************************************************************
 
-	-- Typecheck the expression
-	; (expr', lie) <- getLIE (tcMonoExpr expr meta_ty)
-	
-	-- Solve the constraints
-	; const_binds <- tcSimplifyTop lie
-	
-	-- And zonk it
-	; zonkTopLExpr (mkHsDictLet const_binds expr') }
+\begin{code}
+runAnnotation target expr = do
+    expr_ty <- newFlexiTyVarTy liftedTypeKind
+    
+    -- Find the classes we want instances for in order to call toAnnotationWrapper
+    typeable_class <- tcLookupClass typeableClassName
+    data_class <- tcLookupClass dataClassName
+    
+    -- Check the instances we require live in another module (we want to execute it..)
+    -- and check identifiers live in other modules using TH stage checks. tcSimplifyStagedExpr
+    -- also resolves the LIE constraints to detect e.g. instance ambiguity
+    ((wrapper, expr'), const_binds) <- tcSimplifyStagedExpr topAnnStage $ do
+                expr' <- tcPolyExprNC expr expr_ty
+                -- By instantiating the call >here< it gets registered in the 
+		-- LIE consulted by tcSimplifyStagedExpr
+                -- and hence ensures the appropriate dictionary is bound by const_binds
+                wrapper <- instCall AnnOrigin [expr_ty] [mkClassPred data_class [expr_ty]]
+                return (wrapper, expr')
+
+    -- We manually wrap the typechecked expression in a call to toAnnotationWrapper
+    loc <- getSrcSpanM
+    to_annotation_wrapper_id <- tcLookupId toAnnotationWrapperName
+    let specialised_to_annotation_wrapper_expr = L loc (HsWrap wrapper (HsVar to_annotation_wrapper_id))
+        wrapped_expr' = mkHsDictLet const_binds $
+                        L loc (HsApp specialised_to_annotation_wrapper_expr expr')
+
+    -- If we have type checking problems then potentially zonking 
+    -- (and certainly compilation) may fail. Give up NOW!
+    failIfErrsM
+
+    -- Zonk the type variables out of that raw expression. Note that
+    -- in particular we don't call recordThUse, since we don't
+    -- necessarily use any code or definitions from that package.
+    zonked_wrapped_expr' <- zonkTopLExpr wrapped_expr'
+
+    -- Run the appropriately wrapped expression to get the value of
+    -- the annotation and its dictionaries. The return value is of
+    -- type AnnotationWrapper by construction, so this conversion is
+    -- safe
+    flip runMetaAW zonked_wrapped_expr' $ \annotation_wrapper ->
+        case annotation_wrapper of
+            AnnotationWrapper value | let serialized = toSerialized serializeWithData value ->
+                -- Got the value and dictionaries: build the serialized value and 
+		-- call it a day. We ensure that we seq the entire serialized value 
+		-- in order that any errors in the user-written code for the
+                -- annotation are exposed at this point.  This is also why we are 
+		-- doing all this stuff inside the context of runMeta: it has the 
+		-- facilities to deal with user error in a meta-level expression
+                seqSerialized serialized `seq` Annotation { 
+                    ann_target = target,
+                    ann_value = serialized
+                }
 \end{code}
 
 
@@ -420,7 +487,7 @@ runQuasiQuote (HsQuasiQuote _name quoter q_span quote) quote_selector desc meta_
 
       	-- Run the expression
       	; traceTc (text "About to run" <+> ppr zonked_q_expr)
-      	; result <- runMeta convert zonked_q_expr
+      	; result <- runMetaQ convert zonked_q_expr
       	; traceTc (text "Got result" <+> ppr result)
       	; showSplice desc zonked_q_expr (ppr result)
       	; return result
@@ -456,7 +523,7 @@ kcSpliceType (HsSplice name hs_expr)
 		Just next_level -> do 
 
 	{ case level of {
-		Comp 		       -> do { (t,k) <- kcTopSpliceType hs_expr 
+		Comp _ 		       -> do { (t,k) <- kcTopSpliceType hs_expr 
 					     ; return (unLoc t, k) } ;
 		Brack _ ps_var lie_var -> do
 
@@ -537,30 +604,49 @@ tcSpliceDecls expr
 %************************************************************************
 
 \begin{code}
+runMetaAW :: (AnnotationWrapper -> output)
+          -> LHsExpr Id         -- Of type AnnotationWrapper
+          -> TcM output
+runMetaAW k = runMeta False (\_ -> return . Right . k)
+    -- We turn off showing the code in meta-level exceptions because doing so exposes
+    -- the toAnnotationWrapper function that we slap around the users code
+
+runQThen :: (SrcSpan -> input -> Either Message output)
+         -> SrcSpan
+         -> TH.Q input
+         -> TcM (Either Message output)
+runQThen f expr_span what = TH.runQ what >>= (return . f expr_span)
+
+runMetaQ :: (SrcSpan -> input -> Either Message output)
+	 -> LHsExpr Id
+	 -> TcM output
+runMetaQ = runMeta True . runQThen
+
 runMetaE :: (SrcSpan -> TH.Exp -> Either Message (LHsExpr RdrName))
 	 -> LHsExpr Id 		-- Of type (Q Exp)
 	 -> TcM (LHsExpr RdrName)
-runMetaE  = runMeta
+runMetaE = runMetaQ
 
 runMetaP :: (SrcSpan -> TH.Pat -> Either Message (Pat RdrName))
          -> LHsExpr Id          -- Of type (Q Pat)
          -> TcM (Pat RdrName)
-runMetaP  = runMeta
+runMetaP = runMetaQ
 
 runMetaT :: (SrcSpan -> TH.Type -> Either Message (LHsType RdrName))
 	 -> LHsExpr Id 		-- Of type (Q Type)
 	 -> TcM (LHsType RdrName)	
-runMetaT = runMeta
+runMetaT = runMetaQ
 
 runMetaD :: (SrcSpan -> [TH.Dec] -> Either Message [LHsDecl RdrName])
 	 -> LHsExpr Id 		-- Of type Q [Dec]
 	 -> TcM [LHsDecl RdrName]
-runMetaD = runMeta 
+runMetaD = runMetaQ
 
-runMeta :: (SrcSpan -> th_syn -> Either Message hs_syn)
+runMeta :: Bool                 -- Whether code should be printed in the exception message
+        -> (SrcSpan -> input -> TcM (Either Message output))
 	-> LHsExpr Id 		-- Of type X
-	-> TcM hs_syn		-- Of type t
-runMeta convert expr
+	-> TcM output		-- Of type t
+runMeta show_code run_and_convert expr
   = do	{ 	-- Desugar
 	  ds_expr <- initDsTc (dsLExpr expr)
 	-- Compile and link it; might fail if linking fails
@@ -587,10 +673,10 @@ runMeta convert expr
 	; either_tval <- tryAllM $
             		 setSrcSpan expr_span $	-- Set the span so that qLocation can
 						-- see where this splice is
-	     do	{ th_syn <- TH.runQ (unsafeCoerce# hval)
-		; case convert expr_span th_syn of
+	     do	{ mb_result <- run_and_convert expr_span (unsafeCoerce# hval)
+		; case mb_result of
 		    Left err     -> failWithTc err
-		    Right hs_syn -> return hs_syn }
+		    Right result -> return $! result }
 
 	; case either_tval of
 	    Right v -> return v
@@ -603,7 +689,7 @@ runMeta convert expr
   where
     mk_msg s exn = vcat [text "Exception when trying to" <+> text s <+> text "compile-time code:",
 			 nest 2 (text (Panic.showException exn)),
-			 nest 2 (text "Code:" <+> ppr expr)]
+			 if show_code then nest 2 (text "Code:" <+> ppr expr) else empty]
 \end{code}
 
 Note [Exceptions in TH]
@@ -722,14 +808,17 @@ reify th_name
     ppr_ns _ = panic "reify/ppr_ns"
 
 lookupThName :: TH.Name -> TcM Name
-lookupThName th_name@(TH.Name occ flavour)
-  =  do { mb_ns <- mapM lookup [ thRdrName gns occ_str flavour 
-			       | gns <- guessed_nss]
-	; case catMaybes mb_ns of
-	    []    -> failWithTc (notInScope th_name)
-	    (n:_) -> return n }	-- Pick the first that works
-				-- E.g. reify (mkName "A") will pick the class A
-				-- 	in preference to the data constructor A
+lookupThName th_name = do
+    mb_name <- lookupThName_maybe th_name
+    case mb_name of
+        Nothing   -> failWithTc (notInScope th_name)
+        Just name -> return name
+
+lookupThName_maybe th_name
+  =  do { names <- mapMaybeM lookup (thRdrNameGuesses th_name)
+          -- Pick the first that works
+	  -- E.g. reify (mkName "A") will pick the class A in preference to the data constructor A
+	; return (listToMaybe names) }	
   where
     lookup rdr_name
 	= do { 	-- Repeat much of lookupOccRn, becase we want
@@ -742,11 +831,6 @@ lookupThName th_name@(TH.Name occ flavour)
 			       ; return (Just name) }
 		    	 | otherwise			-- Unqual, Qual
 		    	 -> lookupSrcOcc_maybe rdr_name }
-
-	-- guessed_ns are the name spaces guessed from looking at the TH name
-    guessed_nss | isLexCon (mkFastString occ_str) = [OccName.tcName,  OccName.dataName]
-	        | otherwise			  = [OccName.varName, OccName.tvName]
-    occ_str = TH.occString occ
 
 tcLookupTh :: Name -> TcM TcTyThing
 -- This is a specialised version of TcEnv.tcLookup; specialised mainly in that

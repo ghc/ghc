@@ -45,6 +45,10 @@ module HscTypes (
 	
 	PackageInstEnv, PackageRuleBase,
 
+
+        -- * Annotations
+        prepareAnnotations,
+
         -- * Interactive context
 	InteractiveContext(..), emptyInteractiveContext, 
 	icPrintUnqual, mkPrintUnqualified, extendInteractiveContext,
@@ -121,6 +125,7 @@ import Var
 import Id
 import Type		
 
+import Annotations
 import Class		( Class, classSelIds, classATs, classTyCon )
 import TyCon
 import DataCon		( DataCon, dataConImplicitIds, dataConWrapId )
@@ -623,6 +628,12 @@ hptRules :: HscEnv -> [(ModuleName, IsBootInterface)] -> [CoreRule]
 -- ^ Get rules from modules \"below\" this one (in the dependency sense)
 hptRules = hptSomeThingsBelowUs (md_rules . hm_details) False
 
+
+hptAnns :: HscEnv -> Maybe [(ModuleName, IsBootInterface)] -> [Annotation]
+-- ^ Get annotations from modules \"below\" this one (in the dependency sense)
+hptAnns hsc_env (Just deps) = hptSomeThingsBelowUs (md_anns . hm_details) False hsc_env deps
+hptAnns hsc_env Nothing = hptAllThings (md_anns . hm_details) hsc_env
+
 hptAllThings :: (HomeModInfo -> [a]) -> HscEnv -> [a]
 hptAllThings extract hsc_env = concatMap extract (eltsUFM (hsc_HPT hsc_env))
 
@@ -657,7 +668,32 @@ hptSomeThingsBelowUs extract include_hi_boot hsc_env deps
 
 	-- And get its dfuns
     , thing <- things ]
+\end{code}
 
+%************************************************************************
+%*									*
+\subsection{Dealing with Annotations}
+%*									*
+%************************************************************************
+
+\begin{code}
+prepareAnnotations :: HscEnv -> Maybe ModGuts -> IO AnnEnv
+-- ^ Deal with gathering annotations in from all possible places 
+--   and combining them into a single 'AnnEnv'
+prepareAnnotations hsc_env mb_guts
+  = do { eps <- hscEPS hsc_env
+       ; let -- Extract annotations from the module being compiled if supplied one
+            mb_this_module_anns = fmap (mkAnnEnv . mg_anns) mb_guts
+        -- Extract dependencies of the module if we are supplied one,
+        -- otherwise load annotations from all home package table
+        -- entries regardless of dependency ordering.
+            home_pkg_anns  = (mkAnnEnv . hptAnns hsc_env) $ fmap (dep_mods . mg_deps) mb_guts
+            other_pkg_anns = eps_ann_env eps
+            ann_env        = foldl1' plusAnnEnv $ catMaybes [mb_this_module_anns, 
+                                                             Just home_pkg_anns, 
+                                                             Just other_pkg_anns]
+
+       ; return ann_env }
 \end{code}
 
 %************************************************************************
@@ -760,6 +796,11 @@ data ModIface
 		
 		-- NOT STRICT!  we read this field lazily from the interface file
 
+	mi_anns  :: [IfaceAnnotation],
+	        -- ^ Annotations
+	
+		-- NOT STRICT!  we read this field lazily from the interface file
+
 		-- Type, class and variable declarations
 		-- The hash of an Id changes if its fixity or deprecations change
 		--	(as well as its type of course)
@@ -818,6 +859,8 @@ data ModDetails
         md_insts     :: ![Instance],    -- ^ 'DFunId's for the instances in this module
         md_fam_insts :: ![FamInst],
         md_rules     :: ![CoreRule],    -- ^ Domain may include 'Id's from other modules
+        md_anns      :: ![Annotation],  -- ^ Annotations present in this module: currently 
+                                        -- they only annotate things also declared in this module
         md_vect_info :: !VectInfo       -- ^ Module vectorisation information
      }
 
@@ -827,6 +870,7 @@ emptyModDetails = ModDetails { md_types = emptyTypeEnv,
 			       md_insts     = [],
 			       md_rules     = [],
 			       md_fam_insts = [],
+                               md_anns      = [],
                                md_vect_info = noVectInfo
                              } 
 
@@ -865,6 +909,7 @@ data ModGuts
 	mg_binds     :: ![CoreBind],	 -- ^ Bindings for this module
 	mg_foreign   :: !ForeignStubs,   -- ^ Foreign exports declared in this module
 	mg_warns     :: !Warnings,	 -- ^ Warnings declared in the module
+	mg_anns      :: [Annotation],    -- ^ Annotations declared in this module
 	mg_hpc_info  :: !HpcInfo,        -- ^ Coverage tick boxes in the module
         mg_modBreaks :: !ModBreaks,      -- ^ Breakpoints for the module
         mg_vect_info :: !VectInfo,       -- ^ Pool of vectorised declarations in the module
@@ -978,6 +1023,7 @@ emptyModIface mod
 	       mi_exp_hash = fingerprint0,
 	       mi_fixities = [],
 	       mi_warns    = NoWarnings,
+	       mi_anns     = [],
 	       mi_insts     = [],
 	       mi_fam_insts = [],
 	       mi_rules     = [],
@@ -1608,6 +1654,7 @@ type PackageRuleBase   = RuleBase
 type PackageInstEnv    = InstEnv
 type PackageFamInstEnv = FamInstEnv
 type PackageVectInfo   = VectInfo
+type PackageAnnEnv     = AnnEnv
 
 -- | Information about other packages that we have slurped in by reading
 -- their interface files
@@ -1658,6 +1705,8 @@ data ExternalPackageState
 	eps_rule_base    :: !PackageRuleBase,  -- ^ The total 'RuleEnv' accumulated
 					       -- from all the external-package modules
 	eps_vect_info    :: !PackageVectInfo,  -- ^ The total 'VectInfo' accumulated
+					       -- from all the external-package modules
+        eps_ann_env      :: !PackageAnnEnv,    -- ^ The total 'AnnEnv' accumulated
 					       -- from all the external-package modules
 
         eps_mod_fam_inst_env :: !(ModuleEnv FamInstEnv), -- ^ The family instances accumulated from external

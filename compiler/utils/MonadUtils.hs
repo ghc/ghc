@@ -9,10 +9,13 @@ module MonadUtils
         , MonadFix(..)
         , MonadIO(..)
         
+        , liftIO1, liftIO2, liftIO3, liftIO4
+        
         , mapAndUnzipM, mapAndUnzip3M, mapAndUnzip4M
         , mapAccumLM
         , mapSndM
         , concatMapM
+        , mapMaybeM
         , anyM, allM
         , foldlM, foldrM
         ) where
@@ -32,6 +35,8 @@ module MonadUtils
 ----------------------------------------------------------------------------------------
 -- Imports
 ----------------------------------------------------------------------------------------
+
+import Maybes
 
 #if HAVE_APPLICATIVE
 import Control.Applicative
@@ -77,8 +82,29 @@ instance MonadIO IO where liftIO = id
 #endif
 
 ----------------------------------------------------------------------------------------
+-- Lift combinators
+--  These are used throughout the compiler
+----------------------------------------------------------------------------------------
+
+-- | Lift an 'IO' operation with 1 argument into another monad
+liftIO1 :: MonadIO m => (a -> IO b) -> a -> m b
+liftIO1 = (.) liftIO
+
+-- | Lift an 'IO' operation with 2 arguments into another monad
+liftIO2 :: MonadIO m => (a -> b -> IO c) -> a -> b -> m c
+liftIO2 = ((.).(.)) liftIO
+
+-- | Lift an 'IO' operation with 3 arguments into another monad
+liftIO3 :: MonadIO m => (a -> b -> c -> IO d) -> a -> b -> c -> m d
+liftIO3 = ((.).((.).(.))) liftIO
+
+-- | Lift an 'IO' operation with 4 arguments into another monad
+liftIO4 :: MonadIO m => (a -> b -> c -> d -> IO e) -> a -> b -> c -> d -> m e
+liftIO4 = (((.).(.)).((.).(.))) liftIO
+
+----------------------------------------------------------------------------------------
 -- Common functions
---  These are used throught the compiler
+--  These are used throughout the compiler
 ----------------------------------------------------------------------------------------
 
 -- | mapAndUnzipM for triples
@@ -116,6 +142,10 @@ mapSndM f ((a,b):xs) = do { c <- f b; rs <- mapSndM f xs; return ((a,c):rs) }
 -- | Monadic version of concatMap
 concatMapM :: Monad m => (a -> m [b]) -> [a] -> m [b]
 concatMapM f xs = liftM concat (mapM f xs)
+
+-- | Monadic version of mapMaybe
+mapMaybeM :: (Monad m) => (a -> m (Maybe b)) -> [a] -> m [b]
+mapMaybeM f = liftM catMaybes . mapM f
 
 -- | Monadic version of 'any', aborts the computation at the first @True@ value
 anyM :: Monad m => (a -> m Bool) -> [a] -> m Bool

@@ -8,7 +8,7 @@ Loading interface files
 \begin{code}
 module LoadIface (
 	loadInterface, loadInterfaceForName, loadWiredInHomeIface, 
-	loadSrcInterface, loadSysInterface, loadOrphanModules, 
+	loadSrcInterface, loadSysInterface, loadUserInterface, loadOrphanModules, 
 	findAndReadIface, readIface,	-- Used when reading the module's old interface
 	loadDecls,	-- Should move to TcIface and be renamed
 	initExternalPackageState,
@@ -19,7 +19,7 @@ module LoadIface (
 #include "HsVersions.h"
 
 import {-# SOURCE #-}	TcIface( tcIfaceDecl, tcIfaceRules, tcIfaceInst, 
-				 tcIfaceFamInst, tcIfaceVectInfo )
+				 tcIfaceFamInst, tcIfaceVectInfo, tcIfaceAnnotations )
 
 import DynFlags
 import IfaceSyn
@@ -34,6 +34,7 @@ import PrelNames
 import PrelInfo
 import PrelRules
 import Rules
+import Annotations
 import InstEnv
 import FamInstEnv
 import Name
@@ -134,10 +135,19 @@ loadWiredInHomeIface name
   where
     doc = ptext (sLit "Need home interface for wired-in thing") <+> ppr name
 
--- | A wrapper for 'loadInterface' that throws an exception if it fails
+-- | Loads a system interface and throws an exception if it fails
 loadSysInterface :: SDoc -> Module -> IfM lcl ModIface
-loadSysInterface doc mod_name
-  = do	{ mb_iface <- loadInterface doc mod_name ImportBySystem
+loadSysInterface doc mod_name = loadInterfaceWithException doc mod_name ImportBySystem
+
+-- | Loads a user interface and throws an exception if it fails. The first parameter indicates
+-- whether we should import the boot variant of the module
+loadUserInterface :: Bool -> SDoc -> Module -> IfM lcl ModIface
+loadUserInterface is_boot doc mod_name = loadInterfaceWithException doc mod_name (ImportByUser is_boot)
+
+-- | A wrapper for 'loadInterface' that throws an exception if it fails
+loadInterfaceWithException :: SDoc -> Module -> WhereFrom -> IfM lcl ModIface
+loadInterfaceWithException doc mod_name where_from
+  = do	{ mb_iface <- loadInterface doc mod_name where_from
 	; case mb_iface of 
 	    Failed err      -> ghcError (ProgramError (showSDoc err))
 	    Succeeded iface -> return iface }
@@ -232,14 +242,15 @@ loadInterface doc_str mod from
 		; return (Failed err) } ;
 
 	-- Found and parsed!
-	    Succeeded (iface, file_path) 	-- Sanity check:
-		| ImportBySystem <- from,	--   system-importing...
-		  modulePackageId (mi_module iface) == thisPackage dflags,
-		  				--   a home-package module...
-		  Nothing <- mb_dep		--   that we know nothing about
-		-> return (Failed (badDepMsg mod))
-
-		| otherwise ->
+	-- We used to have a sanity check here that looked for:
+	--  * System importing ..
+	--  * a home package module ..
+	--  * that we know nothing about (mb_dep == Nothing)!
+	--
+	-- But this is no longer valid because thNameToGhcName allows users to
+	-- cause the system to load arbitrary interfaces (by supplying an appropriate
+	-- Template Haskell original-name).
+	    Succeeded (iface, file_path) ->
 
 	let 
 	    loc_doc = text file_path
@@ -267,6 +278,7 @@ loadInterface doc_str mod from
 	; new_eps_insts     <- mapM tcIfaceInst (mi_insts iface)
 	; new_eps_fam_insts <- mapM tcIfaceFamInst (mi_fam_insts iface)
 	; new_eps_rules     <- tcIfaceRules ignore_prags (mi_rules iface)
+	; new_eps_anns      <- tcIfaceAnnotations (mi_anns iface)
         ; new_eps_vect_info <- tcIfaceVectInfo mod (mkNameEnv new_eps_decls) 
                                                (mi_vect_info iface)
 
@@ -274,7 +286,8 @@ loadInterface doc_str mod from
 			        mi_decls     = panic "No mi_decls in PIT",
 				mi_insts     = panic "No mi_insts in PIT",
 				mi_fam_insts = panic "No mi_fam_insts in PIT",
-				mi_rules     = panic "No mi_rules in PIT"
+				mi_rules     = panic "No mi_rules in PIT",
+				mi_anns      = panic "No mi_anns in PIT"
                               }
                }
 
@@ -290,6 +303,8 @@ loadInterface doc_str mod from
 						      new_eps_fam_insts,
               eps_vect_info    = plusVectInfo (eps_vect_info eps) 
                                               new_eps_vect_info,
+              eps_ann_env      = extendAnnEnvList (eps_ann_env eps)
+                                                  new_eps_anns,
               eps_mod_fam_inst_env
 			       = let
 				   fam_inst_env = 
@@ -307,11 +322,16 @@ loadInterface doc_str mod from
 	; return (Succeeded final_iface)
     }}}}
 
+{-
+Used to be used for the loadInterface sanity check on system imports. That has been removed, but I'm leaving this in pending
+review of this decision by SPJ - MCB 10/2008
+
 badDepMsg :: Module -> SDoc
 badDepMsg mod 
   = hang (ptext (sLit "Interface file inconsistency:"))
        2 (sep [ptext (sLit "home-package module") <+> quotes (ppr mod) <+> ptext (sLit "is needed,"), 
 	       ptext (sLit "but is not listed in the dependencies of the interfaces directly imported by the module being compiled")])
+-}
 
 -----------------------------------------------------
 --	Loading type/class/value decls
@@ -481,6 +501,9 @@ findAndReadIface doc_str mod hi_boot_file
 	-- Found file, so read it
 	{ let { file_path = addBootSuffix_maybe hi_boot_file (ml_hi_file loc) }
 
+        -- If the interface is in the current package then if we could
+        -- load it would already be in the HPT and we assume that our
+        -- callers checked that.
         ; if thisPackage dflags == modulePackageId mod
                 && not (isOneShot (ghcMode dflags))
             then return (Failed (homeModError mod loc))
@@ -550,6 +573,7 @@ initExternalPackageState
       eps_mod_fam_inst_env
                        = emptyModuleEnv,
       eps_vect_info    = noVectInfo,
+      eps_ann_env      = emptyAnnEnv,
       eps_stats = EpsStats { n_ifaces_in = 0, n_decls_in = 0, n_decls_out = 0
 			   , n_insts_in = 0, n_insts_out = 0
 			   , n_rules_in = length builtinRules, n_rules_out = 0 }
@@ -636,6 +660,7 @@ pprModIface iface
 	, vcat (map pprExport (mi_exports iface))
 	, pprDeps (mi_deps iface)
 	, vcat (map pprUsage (mi_usages iface))
+	, vcat (map pprIfaceAnnotation (mi_anns iface))
 	, pprFixities (mi_fixities iface)
 	, vcat (map pprIfaceDecl (mi_decls iface))
 	, vcat (map ppr (mi_insts iface))
@@ -724,6 +749,10 @@ pprWarns (WarnAll txt)  = ptext (sLit "Warn all") <+> ppr txt
 pprWarns (WarnSome prs) = ptext (sLit "Warnings")
                         <+> vcat (map pprWarning prs)
     where pprWarning (name, txt) = ppr name <+> ppr txt
+
+pprIfaceAnnotation :: IfaceAnnotation -> SDoc
+pprIfaceAnnotation (IfaceAnnotation { ifAnnotatedTarget = target, ifAnnotatedValue = serialized })
+  = ppr target <+> ptext (sLit "annotated by") <+> ppr serialized
 \end{code}
 
 

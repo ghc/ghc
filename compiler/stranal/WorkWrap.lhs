@@ -36,7 +36,6 @@ import Unique		( hasKey )
 import BasicTypes	( RecFlag(..), isNonRec, isNeverActive )
 import VarEnv		( isEmptyVarEnv )
 import Maybes		( orElse )
-import DynFlags
 import WwLib
 import Util		( lengthIs, notNull )
 import Outputable
@@ -70,30 +69,9 @@ info for exported values).
 \end{enumerate}
 
 \begin{code}
+wwTopBinds :: UniqSupply -> [CoreBind] -> [CoreBind]
 
-wwTopBinds :: DynFlags 
-	   -> UniqSupply
-	   -> [CoreBind]
-	   -> IO [CoreBind]
-
-wwTopBinds dflags us binds
-  = do {
-	showPass dflags "Worker Wrapper binds";
-
-	-- Create worker/wrappers, and mark binders with their
-	-- "strictness info" [which encodes their worker/wrapper-ness]
-	let { binds' = workersAndWrappers us binds };
-
-	endPass dflags "Worker Wrapper binds" 
-		Opt_D_dump_worker_wrapper binds'
-    }
-\end{code}
-
-
-\begin{code}
-workersAndWrappers :: UniqSupply -> [CoreBind] -> [CoreBind]
-
-workersAndWrappers us top_binds
+wwTopBinds us top_binds
   = initUs_ us $ do
     top_binds' <- mapM wwBind top_binds
     return (concat top_binds')

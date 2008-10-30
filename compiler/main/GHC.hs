@@ -74,6 +74,7 @@ module GHC (
 	modInfoIsExportedName,
 	modInfoLookupName,
 	lookupGlobalName,
+	findGlobalAnns,
         mkPrintUnqualifiedForModule,
 
 	-- * Printing
@@ -278,6 +279,7 @@ import StaticFlagParser
 import qualified StaticFlags
 import SysTools     ( initSysTools, cleanTempFiles, cleanTempFilesExcept,
                       cleanTempDirs )
+import Annotations
 import Module
 import LazyUniqFM
 import UniqSet
@@ -304,6 +306,8 @@ import System.Directory ( getModificationTime, doesFileExist,
 import Data.Maybe
 import Data.List
 import qualified Data.List as List
+import Data.Typeable    ( Typeable )
+import Data.Word        ( Word8 )
 import Control.Monad
 import System.Exit	( exitWith, ExitCode(..) )
 import System.Time	( ClockTime, getClockTime )
@@ -1173,6 +1177,7 @@ mkModGuts coreModule = ModGuts {
   mg_binds = cm_binds coreModule,
   mg_foreign = NoStubs,
   mg_warns = NoWarnings,
+  mg_anns = [],
   mg_hpc_info = emptyHpcInfo False,
   mg_modBreaks = emptyModBreaks,
   mg_vect_info = noVectInfo,
@@ -2411,6 +2416,11 @@ lookupGlobalName name = withSession $ \hsc_env -> do
    eps <- liftIO $ readIORef (hsc_EPS hsc_env)
    return $! lookupType (hsc_dflags hsc_env) 
 			(hsc_HPT hsc_env) (eps_PTE eps) name
+
+findGlobalAnns :: (GhcMonad m, Typeable a) => ([Word8] -> a) -> AnnTarget Name -> m [a]
+findGlobalAnns deserialize target = withSession $ \hsc_env -> do
+    ann_env <- liftIO $ prepareAnnotations hsc_env Nothing
+    return (findAnns deserialize ann_env target)
 
 #ifdef GHCI
 -- | get the GlobalRdrEnv for a session

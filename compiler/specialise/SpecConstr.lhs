@@ -20,7 +20,6 @@ import CoreSyn
 import CoreSubst
 import CoreUtils
 import CoreUnfold	( couldBeSmallEnoughToInline )
-import CoreLint		( showPass, endPass )
 import CoreFVs 		( exprsFreeVars )
 import WwLib		( mkWorkerArgs )
 import DataCon		( dataConRepArity, dataConUnivTyVars )
@@ -33,8 +32,7 @@ import VarEnv
 import VarSet
 import Name
 import OccName		( mkSpecOcc )
-import ErrUtils		( dumpIfSet_dyn )
-import DynFlags		( DynFlags(..), DynFlag(..) )
+import DynFlags		( DynFlags(..) )
 import StaticFlags	( opt_PprStyle_Debug )
 import StaticFlags	( opt_SpecInlineJoinPoints )
 import BasicTypes	( Activation(..) )
@@ -451,19 +449,8 @@ unbox the strict fields, becuase T is polymorphic!)
 %************************************************************************
 
 \begin{code}
-specConstrProgram :: DynFlags -> UniqSupply -> [CoreBind] -> IO [CoreBind]
-specConstrProgram dflags us binds
-  = do
-	showPass dflags "SpecConstr"
-
-	let (binds', _) = initUs us (go (initScEnv dflags) binds)
-
-	endPass dflags "SpecConstr" Opt_D_dump_spec binds'
-
-	dumpIfSet_dyn dflags Opt_D_dump_rules "Top-level specialisations"
-		      (pprRulesForUser (rulesOfBinds binds'))
-
-	return binds'
+specConstrProgram :: DynFlags -> UniqSupply -> [CoreBind] -> [CoreBind]
+specConstrProgram dflags us binds = fst $ initUs us (go (initScEnv dflags) binds)
   where
     go _   []	        = return []
     go env (bind:binds) = do (env', bind') <- scTopBind env bind

@@ -77,11 +77,7 @@ To think about
 dmdAnalPgm :: DynFlags -> [CoreBind] -> IO [CoreBind]
 dmdAnalPgm dflags binds
   = do {
-	showPass dflags "Demand analysis" ;
 	let { binds_plus_dmds = do_prog binds } ;
-
-	endPass dflags "Demand analysis" 
-	 	Opt_D_dump_stranal binds_plus_dmds ;
 #ifdef OLD_STRICTNESS
 	-- Only if OLD_STRICTNESS is on, because only then is the old
 	-- strictness analyser run

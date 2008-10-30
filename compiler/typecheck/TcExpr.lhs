@@ -12,7 +12,7 @@
 --     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
 -- for details
 
-module TcExpr ( tcPolyExpr, tcPolyExprNC, tcMonoExpr, tcInferRho, tcInferRhoNC, tcSyntaxOp ) where
+module TcExpr ( tcPolyExpr, tcPolyExprNC, tcMonoExpr, tcMonoExprNC, tcInferRho, tcInferRhoNC, tcSyntaxOp, addExprErrCtxt ) where
 
 #include "HsVersions.h"
 
@@ -80,7 +80,7 @@ tcPolyExpr, tcPolyExprNC
 -- to do so himself.
 
 tcPolyExpr expr res_ty 	
-  = addErrCtxt (exprCtxt expr) $
+  = addExprErrCtxt expr $
     (do {traceTc (text "tcPolyExpr") ; tcPolyExprNC expr res_ty })
 
 tcPolyExprNC expr res_ty 
@@ -1245,7 +1245,10 @@ checkMissingFields data_con rbinds
 
 Boring and alphabetical:
 \begin{code}
-exprCtxt (L _ expr)
+addExprErrCtxt :: OutputableBndr id => LHsExpr id -> TcM a -> TcM a
+addExprErrCtxt expr = addErrCtxt (exprCtxt (unLoc expr))
+
+exprCtxt expr
   = hang (ptext (sLit "In the expression:")) 4 (ppr expr)
 
 fieldCtxt field_name

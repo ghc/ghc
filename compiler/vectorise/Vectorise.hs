@@ -7,16 +7,13 @@ import VectUtils
 import VectType
 import VectCore
 
-import DynFlags
 import HscTypes hiding      ( MonadThings(..) )
 
 import Module               ( PackageId )
-import CoreLint             ( showPass, endPass )
 import CoreSyn
 import CoreUtils
 import CoreFVs
-import SimplMonad           ( SimplCount, zeroSimplCount )
-import Rules                ( RuleBase )
+import CoreMonad            ( CoreM, getHscEnv, liftIO )
 import DataCon
 import TyCon
 import Type
@@ -37,18 +34,18 @@ import FastString
 import Control.Monad        ( liftM, liftM2, zipWithM )
 import Data.List            ( sortBy, unzip4 )
 
-vectorise :: PackageId -> HscEnv -> UniqSupply -> RuleBase -> ModGuts
-          -> IO (SimplCount, ModGuts)
-vectorise backend hsc_env _ _ guts
+vectorise :: PackageId -> ModGuts -> CoreM ModGuts
+vectorise backend guts = do
+    hsc_env <- getHscEnv
+    liftIO $ vectoriseIO backend hsc_env guts
+
+vectoriseIO :: PackageId -> HscEnv -> ModGuts -> IO ModGuts
+vectoriseIO backend hsc_env guts
   = do
-      showPass dflags "Vectorisation"
       eps <- hscEPS hsc_env
       let info = hptVectInfo hsc_env `plusVectInfo` eps_vect_info eps
       Just (info', guts') <- initV backend hsc_env guts info (vectModule guts)
-      endPass dflags "Vectorisation" Opt_D_dump_vect (mg_binds guts')
-      return (zeroSimplCount dflags, guts' { mg_vect_info = info' })
-  where
-    dflags = hsc_dflags hsc_env
+      return (guts' { mg_vect_info = info' })
 
 vectModule :: ModGuts -> VM ModGuts
 vectModule guts

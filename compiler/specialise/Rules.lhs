@@ -54,7 +54,7 @@ import VarSet
 import Name		( Name, NamedThing(..) )
 import NameEnv
 import Unify 		( ruleMatchTyX, MatchEnv(..) )
-import BasicTypes	( Activation, CompilerPhase, isActive )
+import BasicTypes	( Activation )
 import StaticFlags	( opt_PprStyle_Debug )
 import Outputable
 import FastString
@@ -184,6 +184,7 @@ mkSpecInfo rules = SpecInfo rules (rulesFreeVars rules)
 extendSpecInfo :: SpecInfo -> [CoreRule] -> SpecInfo
 extendSpecInfo (SpecInfo rs1 fvs1) rs2
   = SpecInfo (rs2 ++ rs1) (rulesFreeVars rs2 `unionVarSet` fvs1)
+
 addSpecInfo :: SpecInfo -> SpecInfo -> SpecInfo
 addSpecInfo (SpecInfo rs1 fvs1) (SpecInfo rs2 fvs2) 
   = SpecInfo (rs1 ++ rs2) (fvs1 `unionVarSet` fvs2)
@@ -807,12 +808,12 @@ This pass runs over the tree (without changing it) and reports such.
 \begin{code}
 -- | Report partial matches for rules beginning with the specified
 -- string for the purposes of error reporting
-ruleCheckProgram :: CompilerPhase               -- ^ Phase to check in
+ruleCheckProgram :: (Activation -> Bool)    -- ^ Rule activation test
                  -> String                      -- ^ Rule pattern
                  -> RuleBase                    -- ^ Database of rules
                  -> [CoreBind]                  -- ^ Bindings to check in
                  -> SDoc                        -- ^ Resulting check message
-ruleCheckProgram phase rule_pat rule_base binds 
+ruleCheckProgram is_active rule_pat rule_base binds 
   | isEmptyBag results
   = text "Rule check results: no rule application sites"
   | otherwise
@@ -821,10 +822,14 @@ ruleCheckProgram phase rule_pat rule_base binds
 	  vcat [ p $$ line | p <- bagToList results ]
 	 ]
   where
-    results = unionManyBags (map (ruleCheckBind (phase, rule_pat, rule_base)) binds)
+    results = unionManyBags (map (ruleCheckBind (RuleCheckEnv is_active rule_pat rule_base)) binds)
     line = text (replicate 20 '-')
 	  
-type RuleCheckEnv = (CompilerPhase, String, RuleBase) 	-- Phase and Pattern
+data RuleCheckEnv = RuleCheckEnv {
+    rc_is_active :: Activation -> Bool, 
+    rc_pattern :: String, 
+    rc_rule_base :: RuleBase
+}
 
 ruleCheckBind :: RuleCheckEnv -> CoreBind -> Bag SDoc
    -- The Bag returned has one SDoc for each call site found
@@ -853,15 +858,15 @@ ruleCheckFun :: RuleCheckEnv -> Id -> [CoreExpr] -> Bag SDoc
 -- Produce a report for all rules matching the predicate
 -- saying why it doesn't match the specified application
 
-ruleCheckFun (phase, pat, rule_base) fn args
+ruleCheckFun env fn args
   | null name_match_rules = emptyBag
-  | otherwise		  = unitBag (ruleAppCheck_help phase fn args name_match_rules)
+  | otherwise		  = unitBag (ruleAppCheck_help (rc_is_active env) fn args name_match_rules)
   where
-    name_match_rules = filter match (getRules rule_base fn)
-    match rule = pat `isPrefixOf` unpackFS (ruleName rule)
+    name_match_rules = filter match (getRules (rc_rule_base env) fn)
+    match rule = (rc_pattern env) `isPrefixOf` unpackFS (ruleName rule)
 
-ruleAppCheck_help :: CompilerPhase -> Id -> [CoreExpr] -> [CoreRule] -> SDoc
-ruleAppCheck_help phase fn args rules
+ruleAppCheck_help :: (Activation -> Bool) -> Id -> [CoreExpr] -> [CoreRule] -> SDoc
+ruleAppCheck_help is_active fn args rules
   = 	-- The rules match the pattern, so we want to print something
     vcat [text "Expression:" <+> ppr (mkApps (Var fn) args),
 	  vcat (map check_rule rules)]
@@ -885,7 +890,7 @@ ruleAppCheck_help phase fn args rules
 
     rule_info (Rule { ru_name = name, ru_act = act, 
 		      ru_bndrs = rule_bndrs, ru_args = rule_args})
-	| not (isActive phase act)    = text "active only in later phase"
+	| not (is_active act)    = text "active only in later phase"
 	| n_args < n_rule_args	      = text "too few arguments"
 	| n_mismatches == n_rule_args = text "no arguments match"
 	| n_mismatches == 0	      = text "all arguments match (considered individually), but rule as a whole does not"

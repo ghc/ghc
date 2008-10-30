@@ -75,6 +75,7 @@ import Data.Int
 import Data.Word
 import Data.IORef
 import Data.Char                ( ord, chr )
+import Data.Typeable
 import Control.Monad            ( when )
 import System.IO as IO
 import System.IO.Unsafe         ( unsafeInterleaveIO )
@@ -563,6 +564,27 @@ instance (Integral a, Binary a) => Binary (Ratio a) where
 instance Binary (Bin a) where
   put_ bh (BinPtr i) = put_ bh i
   get bh = do i <- get bh; return (BinPtr i)
+
+-- -----------------------------------------------------------------------------
+-- Instances for Data.Typeable stuff
+
+instance Binary TyCon where
+    put_ bh ty_con = do
+        let s = tyConString ty_con
+        put_ bh s
+    get bh = do
+        s <- get bh
+        return (mkTyCon s)
+
+instance Binary TypeRep where
+    put_ bh type_rep = do
+        let (ty_con, child_type_reps) = splitTyConApp type_rep
+        put_ bh ty_con
+        put_ bh child_type_reps
+    get bh = do
+        ty_con <- get bh
+        child_type_reps <- get bh
+        return (mkTyConApp ty_con child_type_reps)
 
 -- -----------------------------------------------------------------------------
 -- Lazy reading/writing

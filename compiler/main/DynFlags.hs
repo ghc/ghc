@@ -91,6 +91,7 @@ import Data.IORef       ( readIORef )
 import Control.Monad    ( when )
 
 import Data.Char
+import Data.List        ( intersperse )
 import System.FilePath
 import System.IO        ( stderr, hPutChar )
 
@@ -908,18 +909,44 @@ data CoreToDo           -- These are diff core-to-core passes,
   | CoreDoNothing                -- Useful when building up
   | CoreDoPasses [CoreToDo]      -- lists of these things
 
+
 data SimplifierMode             -- See comments in SimplMonad
   = SimplGently
   | SimplPhase Int [String]
+
+instance Outputable SimplifierMode where
+    ppr SimplGently       = ptext (sLit "gentle")
+    ppr (SimplPhase n ss) = int n <+> brackets (text (concat $ intersperse "," ss))
+
 
 data SimplifierSwitch
   = MaxSimplifierIterations Int
   | NoCaseOfCase
 
-data FloatOutSwitches
-  = FloatOutSw  Bool    -- True <=> float lambdas to top level
-                Bool    -- True <=> float constants to top level,
-                        --          even if they do not escape a lambda
+
+data FloatOutSwitches = FloatOutSwitches {
+        floatOutLambdas :: Bool,     -- ^ True <=> float lambdas to top level
+        floatOutConstants :: Bool    -- ^ True <=> float constants to top level,
+                                     --            even if they do not escape a lambda
+    }
+
+instance Outputable FloatOutSwitches where
+    ppr = pprFloatOutSwitches
+
+pprFloatOutSwitches :: FloatOutSwitches -> SDoc
+pprFloatOutSwitches sw = pp_not (floatOutLambdas sw) <+> text "lambdas" <> comma
+                     <+> pp_not (floatOutConstants sw) <+> text "constants"
+  where
+    pp_not True  = empty
+    pp_not False = text "not"
+
+-- | Switches that specify the minimum amount of floating out
+gentleFloatOutSwitches :: FloatOutSwitches
+gentleFloatOutSwitches = FloatOutSwitches False False
+
+-- | Switches that do not specify floating out of lambdas, just of constants
+constantsOnlyFloatOutSwitches :: FloatOutSwitches
+constantsOnlyFloatOutSwitches = FloatOutSwitches False True
 
 
 -- The core-to-core pass ordering is derived from the DynFlags:
@@ -1017,7 +1044,7 @@ getCoreToDo dflags
         -- so that overloaded functions have all their dictionary lambdas manifest
         CoreDoSpecialising,
 
-        runWhen full_laziness (CoreDoFloatOutwards (FloatOutSw False False)),
+        runWhen full_laziness (CoreDoFloatOutwards gentleFloatOutSwitches),
 
         CoreDoFloatInwards,
 
@@ -1047,8 +1074,7 @@ getCoreToDo dflags
                 ]),
 
         runWhen full_laziness
-          (CoreDoFloatOutwards (FloatOutSw False    -- Not lambdas
-                                           True)),  -- Float constants
+          (CoreDoFloatOutwards constantsOnlyFloatOutSwitches),
                 -- nofib/spectral/hartel/wang doubles in speed if you
                 -- do full laziness late in the day.  It only happens
                 -- after fusion and other stuff, so the early pass doesn't

@@ -9,7 +9,7 @@ Type checking of type signatures in interface files
 module TcIface ( 
 	tcImportDecl, checkWiredInTyCon, tcHiBootIface, typecheckIface, 
 	tcIfaceDecl, tcIfaceInst, tcIfaceFamInst, tcIfaceRules,
-	tcIfaceVectInfo, tcIfaceGlobal, tcExtCoreBindings
+	tcIfaceVectInfo, tcIfaceAnnotations, tcIfaceGlobal, tcExtCoreBindings
  ) where
 
 #include "HsVersions.h"
@@ -22,6 +22,7 @@ import TcRnMonad
 import Type
 import TypeRep
 import HscTypes
+import Annotations
 import InstEnv
 import FamInstEnv
 import CoreSyn
@@ -201,10 +202,11 @@ typecheckIface iface
 	; let type_env = mkNameEnv names_w_things
 	; writeMutVar tc_env_var type_env
 
-		-- Now do those rules and instances
+		-- Now do those rules, instances and annotations
 	; insts     <- mapM tcIfaceInst    (mi_insts     iface)
 	; fam_insts <- mapM tcIfaceFamInst (mi_fam_insts iface)
 	; rules     <- tcIfaceRules ignore_prags (mi_rules iface)
+	; anns      <- tcIfaceAnnotations  (mi_anns iface)
 
                 -- Vectorisation information
         ; vect_info <- tcIfaceVectInfo (mi_module iface) type_env 
@@ -220,6 +222,7 @@ typecheckIface iface
 			      , md_insts     = insts
 			      , md_fam_insts = fam_insts
 			      , md_rules     = rules
+			      , md_anns      = anns
                               , md_vect_info = vect_info
 			      , md_exports   = exports
 			      }
@@ -609,6 +612,34 @@ tcIfaceRule (IfaceRule {ifRuleName = name, ifActivation = act, ifRuleBndrs = bnd
     ifTopFreeName (IfaceApp f _)                    = ifTopFreeName f
     ifTopFreeName (IfaceExt n)                      = Just n
     ifTopFreeName _                                 = Nothing
+\end{code}
+
+
+%************************************************************************
+%*									*
+		Annotations
+%*									*
+%************************************************************************
+
+\begin{code}
+tcIfaceAnnotations :: [IfaceAnnotation] -> IfL [Annotation]
+tcIfaceAnnotations = mapM tcIfaceAnnotation
+
+tcIfaceAnnotation :: IfaceAnnotation -> IfL Annotation
+tcIfaceAnnotation (IfaceAnnotation target serialized) = do
+    target' <- tcIfaceAnnTarget target
+    return $ Annotation {
+        ann_target = target',
+        ann_value = serialized
+    }
+
+tcIfaceAnnTarget :: IfaceAnnTarget -> IfL (AnnTarget Name)
+tcIfaceAnnTarget (NamedTarget occ) = do
+    name <- lookupIfaceTop occ
+    return $ NamedTarget name
+tcIfaceAnnTarget (ModuleTarget mod) = do
+    return $ ModuleTarget mod
+
 \end{code}
 
 

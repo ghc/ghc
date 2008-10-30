@@ -1050,4 +1050,3 @@ showModuleIndex (Just (i,n)) = "[" ++ padded ++ " of " ++ n_str ++ "] "
         i_str = show i
         padded = replicate (length n_str - length i_str) ' ' ++ i_str
 \end{code}
-

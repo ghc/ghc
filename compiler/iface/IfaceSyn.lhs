@@ -10,7 +10,8 @@ module IfaceSyn (
 	IfaceDecl(..), IfaceClassOp(..), IfaceConDecl(..), IfaceConDecls(..),
 	IfaceExpr(..), IfaceAlt, IfaceNote(..), IfaceLetBndr(..),
 	IfaceBinding(..), IfaceConAlt(..), IfaceIdInfo(..),
-	IfaceInfoItem(..), IfaceRule(..), IfaceInst(..), IfaceFamInst(..),
+	IfaceInfoItem(..), IfaceRule(..), IfaceAnnotation(..), IfaceAnnTarget,
+	IfaceInst(..), IfaceFamInst(..),
 
 	-- Misc
         ifaceDeclSubBndrs, visibleIfConDecls,
@@ -27,12 +28,14 @@ module IfaceSyn (
 import IfaceType
 
 import NewDemand
+import Annotations
 import Class
 import NameSet 
 import Name
 import CostCentre
 import Literal
 import ForeignCall
+import Serialized
 import BasicTypes
 import Outputable
 import FastString
@@ -162,6 +165,14 @@ data IfaceRule
 	ifRuleRhs    :: IfaceExpr,
 	ifRuleOrph   :: Maybe OccName	-- Just like IfaceInst
     }
+
+data IfaceAnnotation
+  = IfaceAnnotation {
+        ifAnnotatedTarget :: IfaceAnnTarget,
+        ifAnnotatedValue :: Serialized
+  }
+
+type IfaceAnnTarget = AnnTarget OccName
 
 data IfaceIdInfo
   = NoInfo			-- When writing interface file without -O

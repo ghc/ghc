@@ -273,6 +273,7 @@ Library
         LoadIface
         MkIface
         TcIface
+        Annotations
         BreakArray
         CmdLineParser
         CodeOutput
@@ -326,6 +327,7 @@ Library
         RnPat
         RnSource
         RnTypes
+        CoreMonad
         CSE
         FloatIn
         FloatOut
@@ -355,6 +357,7 @@ Library
         WwLib
         FamInst
         Inst
+        TcAnnotations
         TcArrows
         TcBinds
         TcClassDcl
@@ -416,6 +419,7 @@ Library
         Outputable
         Panic
         Pretty
+        Serialized
         State
         StringBuffer
         Unicode

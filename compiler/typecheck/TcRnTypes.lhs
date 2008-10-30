@@ -21,7 +21,7 @@ module TcRnTypes(
 	TcTyThing(..), pprTcTyThingCategory, RefinementVisibility(..),
 
 	-- Template Haskell
-	ThStage(..), topStage, topSpliceStage,
+	ThStage(..), topStage, topAnnStage, topSpliceStage,
 	ThLevel, impLevel, topLevel,
 
 	-- Arrows
@@ -45,6 +45,7 @@ import HscTypes
 import Type
 import Coercion
 import TcType
+import Annotations
 import InstEnv
 import FamInstEnv
 import IOEnv
@@ -215,6 +216,7 @@ data TcGblEnv
 
 	tcg_binds     :: LHsBinds Id,	    -- Value bindings in this module
 	tcg_warns     :: Warnings,	    -- ...Warnings and deprecations
+	tcg_anns      :: [Annotation],      -- ...Annotations
 	tcg_insts     :: [Instance],	    -- ...Instances
 	tcg_fam_insts :: [FamInst],	    -- ...Family instances
 	tcg_rules     :: [LRuleDecl Id],    -- ...Rules
@@ -373,13 +375,14 @@ impLevel = 0	-- Imported things; they can be used inside a top level splice
 
 
 data ThStage
-  = Comp   				-- Ordinary compiling, at level topLevel
+  = Comp   ThLevel			-- Ordinary compiling, usually at level topLevel but annotations use a lower level
   | Splice ThLevel 			-- Inside a splice
   | Brack  ThLevel 			-- Inside brackets; 
 	   (TcRef [PendingSplice])	--   accumulate pending splices here
 	   (TcRef LIE)			--   and type constraints here
-topStage, topSpliceStage :: ThStage
-topStage       = Comp
+topStage, topAnnStage, topSpliceStage :: ThStage
+topStage       = Comp topLevel
+topAnnStage    = Comp (topLevel - 1)
 topSpliceStage = Splice (topLevel - 1)	-- Stage for the body of a top-level splice
 
 ---------------------------
@@ -890,6 +893,7 @@ data InstOrigin
   | ProcOrigin		-- Arising from a proc expression
   | ImplicOrigin SDoc	-- An implication constraint
   | EqOrigin		-- A type equality
+  | AnnOrigin           -- An annotation
 
 instance Outputable InstOrigin where
     ppr (OccurrenceOf name)   = hsep [ptext (sLit "a use of"), quotes (ppr name)]
@@ -914,4 +918,5 @@ instance Outputable InstOrigin where
     ppr (SigOrigin info)      = pprSkolInfo info
     ppr EqOrigin	      = ptext (sLit "a type equality")
     ppr InstSigOrigin         = panic "ppr InstSigOrigin"
+    ppr AnnOrigin             = ptext (sLit "an annotation")
 \end{code}

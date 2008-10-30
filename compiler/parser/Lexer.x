@@ -261,6 +261,7 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
   					{ token ITgenerated_prag }
   "{-#" $whitechar* (CORE|core)		{ token ITcore_prag }
   "{-#" $whitechar* (UNPACK|unpack)	{ token ITunpack_prag }
+  "{-#" $whitechar* (ANN|ann)	        { token ITann_prag }
 
   -- We ignore all these pragmas, but don't generate a warning for them
   -- CFILES is a hugs-only thing.
@@ -490,6 +491,7 @@ data Token
   | ITgenerated_prag
   | ITcore_prag                 -- hdaume: core annotations
   | ITunpack_prag
+  | ITann_prag
   | ITclose_prag
   | IToptions_prag String
   | ITinclude_prag String

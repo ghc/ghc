@@ -56,6 +56,7 @@ import LoadIface
 import Id
 import IdInfo
 import NewDemand
+import Annotations
 import CoreSyn
 import CoreFVs
 import Class
@@ -220,6 +221,7 @@ mkIface_ hsc_env maybe_old_fingerprint
 	 ModDetails{  md_insts 	   = insts, 
 		      md_fam_insts = fam_insts,
 		      md_rules 	   = rules,
+		      md_anns	   = anns,
                       md_vect_info = vect_info,
 		      md_types 	   = type_env,
 		      md_exports   = exports }
@@ -265,6 +267,7 @@ mkIface_ hsc_env maybe_old_fingerprint
 
 			mi_fixities = fixities,
 			mi_warns  = warns,
+			mi_anns     = mkIfaceAnnotations anns,
 			mi_globals  = Just rdr_env,
 
 			-- Left out deliberately: filled in by addVersionInfo
@@ -902,6 +905,17 @@ mk_usage_info pit hsc_env this_mod direct_imports used_names
                   -- The 'isNothing maybe_iface' check above saved us
                   -- from generating many of these usages (at least in
                   -- one-shot mode), but that's even more bogus!
+\end{code}
+
+\begin{code}
+mkIfaceAnnotations :: [Annotation] -> [IfaceAnnotation]
+mkIfaceAnnotations = map mkIfaceAnnotation
+
+mkIfaceAnnotation :: Annotation -> IfaceAnnotation
+mkIfaceAnnotation (Annotation { ann_target = target, ann_value = serialized }) = IfaceAnnotation { 
+        ifAnnotatedTarget = fmap nameOccName target,
+        ifAnnotatedValue = serialized
+    }
 \end{code}
 
 \begin{code}

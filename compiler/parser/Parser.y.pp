@@ -264,6 +264,7 @@ incorrect.
  '{-# DEPRECATED'  { L _ ITdeprecated_prag }
  '{-# WARNING'  { L _ ITwarning_prag }
  '{-# UNPACK'      { L _ ITunpack_prag }
+ '{-# ANN'      { L _ ITann_prag }
  '#-}'		   { L _ ITclose_prag }
 
  '..'		{ L _ ITdotdot }  			-- reserved symbols
@@ -561,6 +562,7 @@ topdecl :: { OrdList (LHsDecl RdrName) }
     | '{-# DEPRECATED' deprecations '#-}' { $2 }
     | '{-# WARNING' warnings '#-}'        { $2 }
 	| '{-# RULES' rules '#-}'		{ $2 }
+	| annotation { unitOL $1 }
       	| decl					{ unLoc $1 }
 
 	-- Template Haskell Extension
@@ -925,6 +927,13 @@ deprecation :: { OrdList (LHsDecl RdrName) }
 	: namelist STRING
 		{ toOL [ LL $ WarningD (Warning n (DeprecatedTxt (getSTRING $2)))
 		       | n <- unLoc $1 ] }
+
+-----------------------------------------------------------------------------
+-- Annotations
+annotation :: { LHsDecl RdrName }
+    : '{-# ANN' name_var aexp '#-}'      { LL (AnnD $ HsAnnotation (ValueAnnProvenance (unLoc $2)) $3) }
+    | '{-# ANN' 'type' tycon aexp '#-}'  { LL (AnnD $ HsAnnotation (TypeAnnProvenance (unLoc $3)) $4) }
+    | '{-# ANN' 'module' aexp '#-}'      { LL (AnnD $ HsAnnotation ModuleAnnProvenance $3) }
 
 
 -----------------------------------------------------------------------------

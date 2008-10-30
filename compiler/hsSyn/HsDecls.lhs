@@ -47,10 +47,13 @@ module HsDecls (
   DocDecl(..), LDocDecl, docDeclDoc,
   -- ** Deprecations
   WarnDecl(..),  LWarnDecl,
+  -- ** Annotations
+  AnnDecl(..), LAnnDecl, 
+  AnnProvenance(..), annProvenanceName_maybe, modifyAnnProvenanceNameM,
 
   -- * Grouping
-  HsGroup(..),  emptyRdrGroup, emptyRnGroup, appendGroups,
-) where
+  HsGroup(..),  emptyRdrGroup, emptyRnGroup, appendGroups
+    ) where
 
 -- friends:
 import {-# SOURCE #-}	HsExpr( HsExpr, pprExpr )
@@ -72,6 +75,7 @@ import Util
 import SrcLoc
 import FastString
 
+import Control.Monad    ( liftM )
 import Data.Maybe       ( isJust )
 \end{code}
 
@@ -94,6 +98,7 @@ data HsDecl id
   | DefD	(DefaultDecl id)
   | ForD        (ForeignDecl id)
   | WarningD	(WarnDecl id)
+  | AnnD	(AnnDecl id)
   | RuleD	(RuleDecl id)
   | SpliceD	(SpliceDecl id)
   | DocD	(DocDecl id)
@@ -128,6 +133,7 @@ data HsGroup id
 	hs_defds  :: [LDefaultDecl id],
 	hs_fords  :: [LForeignDecl id],
 	hs_warnds :: [LWarnDecl id],
+	hs_annds   :: [LAnnDecl id],
 	hs_ruleds :: [LRuleDecl id],
 
 	hs_docs   :: [LDocDecl id]
@@ -138,8 +144,8 @@ emptyRdrGroup = emptyGroup { hs_valds = emptyValBindsIn }
 emptyRnGroup  = emptyGroup { hs_valds = emptyValBindsOut }
 
 emptyGroup = HsGroup { hs_tyclds = [], hs_instds = [], hs_derivds = [],
-		       hs_fixds = [], hs_defds = [], hs_fords = [], 
-		       hs_warnds = [], hs_ruleds = [],
+		       hs_fixds = [], hs_defds = [], hs_annds = [],
+		       hs_fords = [], hs_warnds = [], hs_ruleds = [],
 		       hs_valds = error "emptyGroup hs_valds: Can't happen",
                        hs_docs = [] }
 
@@ -152,6 +158,7 @@ appendGroups
         hs_derivds = derivds1,
 	hs_fixds  = fixds1, 
 	hs_defds  = defds1,
+	hs_annds  = annds1,
 	hs_fords  = fords1, 
 	hs_warnds = warnds1,
 	hs_ruleds = rulds1,
@@ -163,6 +170,7 @@ appendGroups
         hs_derivds = derivds2,
 	hs_fixds  = fixds2, 
 	hs_defds  = defds2,
+	hs_annds  = annds2,
 	hs_fords  = fords2, 
 	hs_warnds = warnds2,
 	hs_ruleds = rulds2,
@@ -173,7 +181,8 @@ appendGroups
 	hs_tyclds = tyclds1 ++ tyclds2, 
 	hs_instds = instds1 ++ instds2,
         hs_derivds = derivds1 ++ derivds2,
-	hs_fixds  = fixds1 ++ fixds2, 
+	hs_fixds  = fixds1 ++ fixds2,
+	hs_annds  = annds1 ++ annds2,
 	hs_defds  = defds1 ++ defds2,
 	hs_fords  = fords1 ++ fords2, 
 	hs_warnds = warnds1 ++ warnds2,
@@ -192,6 +201,7 @@ instance OutputableBndr name => Outputable (HsDecl name) where
     ppr (SigD sd)               = ppr sd
     ppr (RuleD rd)              = ppr rd
     ppr (WarningD wd)           = ppr wd
+    ppr (AnnD ad)               = ppr ad
     ppr (SpliceD dd)            = ppr dd
     ppr (DocD doc)              = ppr doc
 
@@ -202,11 +212,13 @@ instance OutputableBndr name => Outputable (HsGroup name) where
                    hs_derivds = deriv_decls,
 		   hs_fixds  = fix_decls,
 		   hs_warnds = deprec_decls,
+		   hs_annds  = ann_decls,
 		   hs_fords  = foreign_decls,
 		   hs_defds  = default_decls,
 		   hs_ruleds = rule_decls })
 	= vcat [ppr_ds fix_decls, ppr_ds default_decls, 
-		ppr_ds deprec_decls, ppr_ds rule_decls,
+		ppr_ds deprec_decls, ppr_ds ann_decls,
+		ppr_ds rule_decls,
 		ppr val_decls,
 		ppr_ds tycl_decls, ppr_ds inst_decls,
                 ppr_ds deriv_decls,
@@ -1033,4 +1045,43 @@ data WarnDecl name = Warning name WarningTxt
 instance OutputableBndr name => Outputable (WarnDecl name) where
     ppr (Warning thing txt)
       = hsep [text "{-# DEPRECATED", ppr thing, doubleQuotes (ppr txt), text "#-}"]
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[AnnDecl]{Annotations}
+%*									*
+%************************************************************************
+
+\begin{code}
+type LAnnDecl name = Located (AnnDecl name)
+
+data AnnDecl name = HsAnnotation (AnnProvenance name) (Located (HsExpr name))
+
+instance (OutputableBndr name) => Outputable (AnnDecl name) where
+    ppr (HsAnnotation provenance expr) 
+      = hsep [text "{-#", pprAnnProvenance provenance, pprExpr (unLoc expr), text "#-}"]
+
+
+data AnnProvenance name = ValueAnnProvenance name
+                        | TypeAnnProvenance name
+                        | ModuleAnnProvenance
+
+annProvenanceName_maybe :: AnnProvenance name -> Maybe name
+annProvenanceName_maybe (ValueAnnProvenance name) = Just name
+annProvenanceName_maybe (TypeAnnProvenance name)  = Just name
+annProvenanceName_maybe ModuleAnnProvenance       = Nothing
+
+-- TODO: Replace with Traversable instance when GHC bootstrap version rises high enough
+modifyAnnProvenanceNameM :: Monad m => (before -> m after) -> AnnProvenance before -> m (AnnProvenance after)
+modifyAnnProvenanceNameM fm prov =
+    case prov of
+            ValueAnnProvenance name -> liftM ValueAnnProvenance (fm name)
+            TypeAnnProvenance name -> liftM TypeAnnProvenance (fm name)
+            ModuleAnnProvenance -> return ModuleAnnProvenance
+
+pprAnnProvenance :: OutputableBndr name => AnnProvenance name -> SDoc
+pprAnnProvenance ModuleAnnProvenance       = ptext (sLit "ANN module")
+pprAnnProvenance (ValueAnnProvenance name) = ptext (sLit "ANN") <+> ppr name
+pprAnnProvenance (TypeAnnProvenance name)  = ptext (sLit "ANN type") <+> ppr name
 \end{code}

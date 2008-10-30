@@ -3,6 +3,7 @@
 --
 -- The IO Monad with an environment
 --
+{-# LANGUAGE UndecidableInstances #-}
 
 module IOEnv (
         IOEnv, -- Instance of Monad
@@ -31,6 +32,7 @@ import Data.IORef       ( IORef, newIORef, readIORef, writeIORef, modifyIORef )
 import Data.Typeable
 import System.IO.Unsafe ( unsafeInterleaveIO )
 import System.IO        ( fixIO )
+import Control.Monad
 import MonadUtils
 
 ----------------------------------------------------------------------
@@ -130,6 +132,16 @@ tryMostM (IOEnv thing) = IOEnv (\ env -> tryMost (thing env))
 unsafeInterleaveM :: IOEnv env a -> IOEnv env a
 unsafeInterleaveM (IOEnv m) = IOEnv (\ env -> unsafeInterleaveIO (m env))
 
+
+----------------------------------------------------------------------
+-- MonadPlus
+----------------------------------------------------------------------
+
+-- For use if the user has imported Control.Monad.Error from MTL
+-- Requires UndecidableInstances
+instance MonadPlus IO => MonadPlus (IOEnv env) where
+    mzero = IOEnv (const mzero)
+    m `mplus` n = IOEnv (\env -> unIOEnv m env `mplus` unIOEnv n env)
 
 ----------------------------------------------------------------------
 -- Accessing input/output

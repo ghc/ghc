@@ -349,6 +349,8 @@ add gp@(HsGroup {hs_fords  = ts}) l (ForD d) ds
   = addl (gp { hs_fords = L l d : ts }) ds
 add gp@(HsGroup {hs_warnds  = ts})  l (WarningD d) ds
   = addl (gp { hs_warnds = L l d : ts }) ds
+add gp@(HsGroup {hs_annds  = ts}) l (AnnD d) ds
+  = addl (gp { hs_annds = L l d : ts }) ds
 add gp@(HsGroup {hs_ruleds  = ts}) l (RuleD d) ds
   = addl (gp { hs_ruleds = L l d : ts }) ds
 

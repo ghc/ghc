@@ -691,10 +691,10 @@ initialEnv :: FloatOutSwitches -> LevelEnv
 initialEnv float_lams = (float_lams, emptyVarEnv, emptySubst, emptyVarEnv)
 
 floatLams :: LevelEnv -> Bool
-floatLams (FloatOutSw float_lams _, _, _, _) = float_lams
+floatLams (fos, _, _, _) = floatOutLambdas fos
 
 floatConsts :: LevelEnv -> Bool
-floatConsts (FloatOutSw _ float_consts, _, _, _) = float_consts
+floatConsts (fos, _, _, _) = floatOutConstants fos
 
 extendLvlEnv :: LevelEnv -> [TaggedBndr Level] -> LevelEnv
 -- Used when *not* cloning

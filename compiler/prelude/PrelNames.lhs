@@ -203,6 +203,9 @@ basicKnownKeyNames
 	-- Other classes
 	randomClassName, randomGenClassName, monadPlusClassName,
 
+        -- Annotation type checking
+        toAnnotationWrapperName,
+
 	-- Booleans
 	andName, orName
 	
@@ -781,6 +784,10 @@ appAName	   = varQual aRROW (fsLit "app")	  appAIdKey
 choiceAName	   = varQual aRROW (fsLit "|||")	  choiceAIdKey
 loopAName	   = varQual aRROW (fsLit "loop")  loopAIdKey
 
+-- Annotation type checking
+toAnnotationWrapperName :: Name
+toAnnotationWrapperName = varQual gHC_DESUGAR (fsLit "toAnnotationWrapper") toAnnotationWrapperIdKey
+
 -- Other classes, needed for type defaulting
 monadPlusClassName, randomClassName, randomGenClassName,
     isStringClassName :: Name
@@ -1248,6 +1255,10 @@ loopAIdKey	= mkPreludeMiscIdUnique 124
 
 fromStringClassOpKey :: Unique
 fromStringClassOpKey	      = mkPreludeMiscIdUnique 125
+
+-- Annotation type checking
+toAnnotationWrapperIdKey :: Unique
+toAnnotationWrapperIdKey      = mkPreludeMiscIdUnique 126
 
 ---------------- Template Haskell -------------------
 --	USES IdUniques 200-399

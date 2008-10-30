@@ -102,7 +102,8 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
 		tcg_rn_decls   = maybe_rn_syntax emptyRnGroup,
 
 		tcg_binds    = emptyLHsBinds,
-		tcg_warns  = NoWarnings,
+		tcg_warns    = NoWarnings,
+		tcg_anns     = [],
 		tcg_insts    = [],
 		tcg_fam_insts= [],
 		tcg_rules    = [],

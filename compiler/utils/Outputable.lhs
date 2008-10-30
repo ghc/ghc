@@ -36,7 +36,7 @@ module Outputable (
 	printSDoc, printErrs, hPrintDump, printDump,
 	printForC, printForAsm, printForUser, printForUserPartWay,
 	pprCode, mkCodeStyle,
-	showSDoc, showSDocForUser, showSDocDebug, showSDocDump,
+	showSDoc, showSDocForUser, showSDocDebug, showSDocDump, showPpr,
 	showSDocUnqual, showsPrecSDoc,
 
 	pprInfixVar, pprPrefixVar,
@@ -333,6 +333,9 @@ showSDocDump d = show (d PprDump)
 
 showSDocDebug :: SDoc -> String
 showSDocDebug d = show (d PprDebug)
+
+showPpr :: Outputable a => a -> String
+showPpr = showSDoc . ppr
 \end{code}
 
 \begin{code}

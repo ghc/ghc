@@ -18,6 +18,7 @@ import IfaceEnv
 import HscTypes
 import BasicTypes
 import NewDemand
+import Annotations
 import IfaceSyn
 import Module
 import Name
@@ -373,6 +374,7 @@ instance Binary ModIface where
 		 mi_exp_hash  = exp_hash,
 		 mi_fixities  = fixities,
 		 mi_warns     = warns,
+		 mi_anns      = anns,
 		 mi_decls     = decls,
 		 mi_insts     = insts,
 		 mi_fam_insts = fam_insts,
@@ -392,6 +394,7 @@ instance Binary ModIface where
 	put_ bh exp_hash
 	put_ bh fixities
 	lazyPut bh warns
+	lazyPut bh anns
         put_ bh decls
 	put_ bh insts
 	put_ bh fam_insts
@@ -413,6 +416,7 @@ instance Binary ModIface where
 	exp_hash  <- get bh
 	fixities  <- {-# SCC "bin_fixities" #-} get bh
 	warns     <- {-# SCC "bin_warns" #-} lazyGet bh
+	anns      <- {-# SCC "bin_anns" #-} lazyGet bh
         decls 	  <- {-# SCC "bin_tycldecls" #-} get bh
 	insts     <- {-# SCC "bin_insts" #-} get bh
 	fam_insts <- {-# SCC "bin_fam_insts" #-} get bh
@@ -431,6 +435,7 @@ instance Binary ModIface where
 		 mi_usages    = usages,
 		 mi_exports   = exports,
 		 mi_exp_hash  = exp_hash,
+		 mi_anns      = anns,
 		 mi_fixities  = fixities,
 		 mi_warns     = warns,
 		 mi_decls     = decls,
@@ -1345,6 +1350,30 @@ instance Binary IfaceRule where
 	    a6 <- get bh
 	    a7 <- get bh
 	    return (IfaceRule a1 a2 a3 a4 a5 a6 a7)
+
+instance Binary IfaceAnnotation where
+    put_ bh (IfaceAnnotation a1 a2) = do
+        put_ bh a1
+        put_ bh a2
+    get bh = do
+        a1 <- get bh
+        a2 <- get bh
+        return (IfaceAnnotation a1 a2)
+
+instance Binary name => Binary (AnnTarget name) where
+    put_ bh (NamedTarget a) = do
+        putByte bh 0
+        put_ bh a
+    put_ bh (ModuleTarget a) = do
+        putByte bh 1
+        put_ bh a
+    get bh = do
+        h <- getByte bh
+        case h of
+          0 -> do a <- get bh
+                  return (NamedTarget a)
+          _ -> do a <- get bh
+                  return (ModuleTarget a)
 
 instance Binary IfaceVectInfo where
     put_ bh (IfaceVectInfo a1 a2 a3) = do

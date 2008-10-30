@@ -22,8 +22,8 @@ import RnHsSyn
 import RnTypes		( rnLHsType, rnLHsTypes, rnHsSigType, rnHsTypeFVs, rnContext )
 import RnBinds		( rnTopBindsLHS, rnTopBindsRHS, rnMethodBinds, renameSigs, mkSigTvFn,
                                 makeMiniFixityEnv)
-import RnEnv		( lookupLocalDataTcNames,
-			  lookupLocatedTopBndrRn, lookupLocatedOccRn,
+import RnEnv		( lookupLocalDataTcNames, lookupLocatedOccRn,
+			  lookupTopBndrRn, lookupLocatedTopBndrRn,
 			  lookupOccRn, newLocalsRn, 
 			  bindLocatedLocalsFV, bindPatSigTyVarsFV,
 			  bindTyVarsRn, extendTyVarEnvFVRn,
@@ -102,6 +102,7 @@ rnSrcDecls group@(HsGroup {hs_valds  = val_decls,
                                    hs_derivds = deriv_decls,
                                    hs_fixds  = fix_decls,
                                    hs_warnds  = warn_decls,
+                                   hs_annds  = ann_decls,
                                    hs_fords  = foreign_decls,
                                    hs_defds  = default_decls,
                                    hs_ruleds = rule_decls,
@@ -180,8 +181,9 @@ rnSrcDecls group@(HsGroup {hs_valds  = val_decls,
    		      		   rnList rnHsRuleDecl    rule_decls ;
 			   -- Inside RULES, scoped type variables are on
    (rn_foreign_decls, src_fvs4) <- rnList rnHsForeignDecl foreign_decls ;
-   (rn_default_decls, src_fvs5) <- rnList rnDefaultDecl   default_decls ;
-   (rn_deriv_decls,   src_fvs6) <- rnList rnSrcDerivDecl  deriv_decls ;
+   (rn_ann_decls,     src_fvs5) <- rnList rnAnnDecl       ann_decls ;
+   (rn_default_decls, src_fvs6) <- rnList rnDefaultDecl   default_decls ;
+   (rn_deriv_decls,   src_fvs7) <- rnList rnSrcDerivDecl  deriv_decls ;
       -- Haddock docs; no free vars
    rn_docs <- mapM (wrapLocM rnDocDecl) docs ;
 
@@ -194,12 +196,13 @@ rnSrcDecls group@(HsGroup {hs_valds  = val_decls,
 			     hs_warnds = [], -- warns are returned in the tcg_env
 	                                     -- (see below) not in the HsGroup
 			     hs_fords  = rn_foreign_decls,
+			     hs_annds   = rn_ann_decls,
 			     hs_defds  = rn_default_decls,
 			     hs_ruleds = rn_rule_decls,
                              hs_docs   = rn_docs } ;
 
-	other_fvs = plusFVs [src_fvs1, src_fvs2, src_fvs6, src_fvs3, 
-			     src_fvs4, src_fvs5] ;
+	other_fvs = plusFVs [src_fvs1, src_fvs2, src_fvs3, src_fvs4, 
+			     src_fvs5, src_fvs6, src_fvs7] ;
 	src_dus = bind_dus `plusDU` usesOnly other_fvs;
 		-- Note: src_dus will contain *uses* for locally-defined types
 		-- and classes, but no *defs* for them.  (Because rnTyClDecl 
@@ -338,7 +341,26 @@ dupWarnDecl (L loc _) rdr_name
 
 %*********************************************************
 %*							*
-\subsection{Source code declarations}
+\subsection{Annotation declarations}
+%*							*
+%*********************************************************
+
+\begin{code}
+rnAnnDecl :: AnnDecl RdrName -> RnM (AnnDecl Name, FreeVars)
+rnAnnDecl (HsAnnotation provenance expr) = do
+    (provenance', provenance_fvs) <- rnAnnProvenance provenance
+    (expr', expr_fvs) <- rnLExpr expr
+    return (HsAnnotation provenance' expr', provenance_fvs `plusFV` expr_fvs)
+
+rnAnnProvenance :: AnnProvenance RdrName -> RnM (AnnProvenance Name, FreeVars)
+rnAnnProvenance provenance = do
+    provenance' <- modifyAnnProvenanceNameM lookupTopBndrRn provenance
+    return (provenance', maybe emptyFVs unitFV (annProvenanceName_maybe provenance'))
+\end{code}
+
+%*********************************************************
+%*							*
+\subsection{Default declarations}
 %*							*
 %*********************************************************
 

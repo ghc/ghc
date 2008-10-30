@@ -16,7 +16,6 @@ import ErrUtils		( dumpIfSet_dyn )
 import CostCentre	( dupifyCC, CostCentre )
 import Id		( Id, idType )
 import Type		( isUnLiftedType )
-import CoreLint		( showPass, endPass )
 import SetLevels	( Level(..), LevelledExpr, LevelledBind,
 			  setLevels, ltMajLvl, ltLvl, isTopLvl )
 import UniqSupply       ( UniqSupply )
@@ -116,8 +115,6 @@ floatOutwards :: FloatOutSwitches
 
 floatOutwards float_sws dflags us pgm
   = do {
-	showPass dflags float_msg ;
-
 	let { annotated_w_levels = setLevels float_sws pgm us ;
 	      (fss, binds_s')    = unzip (map floatTopBind annotated_w_levels)
 	    } ;
@@ -132,15 +129,8 @@ floatOutwards float_sws dflags us pgm
 			int ntlets, ptext (sLit " Lets floated elsewhere; from "),
 			int lams,   ptext (sLit " Lambda groups")]);
 
-	endPass dflags float_msg  Opt_D_verbose_core2core (concat binds_s')
-			{- no specific flag for dumping float-out -} 
+	return (concat binds_s')
     }
-  where
-    float_msg = showSDoc (text "Float out" <+> parens (sws float_sws))
-    sws (FloatOutSw lam const) = pp_not lam   <+> text "lambdas" <> comma <+>
-				 pp_not const <+> text "constants"
-    pp_not True  = empty
-    pp_not False = text "not"
 
 floatTopBind :: LevelledBind -> (FloatStats, [CoreBind])
 floatTopBind bind

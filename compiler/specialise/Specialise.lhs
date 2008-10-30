@@ -14,7 +14,6 @@ module Specialise ( specProgram ) where
 
 #include "HsVersions.h"
 
-import DynFlags	( DynFlags, DynFlag(..) )
 import Id		( Id, idName, idType, mkUserLocal, idCoreRules,
 			  idInlinePragma, setInlinePragma, setIdUnfolding,
 			  isLocalId ) 
@@ -36,7 +35,6 @@ import CoreSyn
 import Rules
 import CoreUtils	( exprIsTrivial, applyTypeToArgs, mkPiTypes )
 import CoreFVs		( exprFreeVars, exprsFreeVars, idFreeVars )
-import CoreLint		( showPass, endPass )
 import UniqSupply	( UniqSupply,
 			  UniqSM, initUs_,
 			  MonadUnique(..)
@@ -45,7 +43,6 @@ import Name
 import MkId		( voidArgId, realWorldPrimId )
 import FiniteMap
 import Maybes		( catMaybes, isJust )
-import ErrUtils		( dumpIfSet_dyn )
 import Bag
 import Util
 import Outputable
@@ -578,20 +575,9 @@ Hence, the invariant is this:
 %************************************************************************
 
 \begin{code}
-specProgram :: DynFlags -> UniqSupply -> [CoreBind] -> IO [CoreBind]
-specProgram dflags us binds = do
-   
-	showPass dflags "Specialise"
-
-	let binds' = initSM us (do (binds', uds') <- go binds
-			           return (dumpAllDictBinds uds' binds'))
-
-	endPass dflags "Specialise" Opt_D_dump_spec binds'
-
-	dumpIfSet_dyn dflags Opt_D_dump_rules "Top-level specialisations"
-		      (pprRulesForUser (rulesOfBinds binds'))
-
-	return binds'
+specProgram :: UniqSupply -> [CoreBind] -> [CoreBind]
+specProgram us binds = initSM us (do (binds', uds') <- go binds
+			             return (dumpAllDictBinds uds' binds'))
   where
 	-- We need to start with a Subst that knows all the things
 	-- that are in scope, so that the substitution engine doesn't

@@ -10,14 +10,12 @@ module CSE (
 
 #include "HsVersions.h"
 
-import DynFlags	( DynFlag(..), DynFlags )
 import Id		( Id, idType, idInlinePragma, zapIdOccInfo )
 import CoreUtils	( hashExpr, cheapEqExpr, exprIsBig, mkAltExpr, exprIsCheap )
 import DataCon		( isUnboxedTupleCon )
 import Type		( tyConAppArgs )
 import CoreSyn
 import VarEnv	
-import CoreLint		( showPass, endPass )
 import Outputable
 import StaticFlags	( opt_PprStyle_Debug )
 import BasicTypes	( isAlwaysActive )
@@ -178,14 +176,8 @@ happen now that we don't look inside INLINEs (which wrappers are).
 %************************************************************************
 
 \begin{code}
-cseProgram :: DynFlags -> [CoreBind] -> IO [CoreBind]
-
-cseProgram dflags binds
-  = do {
-	showPass dflags "Common sub-expression";
-	let { binds' = cseBinds emptyCSEnv binds };
-	endPass dflags "Common sub-expression" 	Opt_D_dump_cse binds'	
-    }
+cseProgram :: [CoreBind] -> [CoreBind]
+cseProgram binds = cseBinds emptyCSEnv binds
 
 cseBinds :: CSEnv -> [CoreBind] -> [CoreBind]
 cseBinds _   []     = []

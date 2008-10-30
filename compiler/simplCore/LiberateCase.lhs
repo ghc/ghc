@@ -9,13 +9,8 @@ module LiberateCase ( liberateCase ) where
 #include "HsVersions.h"
 
 import DynFlags
-import HscTypes
-import CoreLint		( showPass, endPass )
 import CoreSyn
 import CoreUnfold	( couldBeSmallEnoughToInline )
-import Rules		( RuleBase )
-import UniqSupply	( UniqSupply )
-import SimplMonad	( SimplCount, zeroSimplCount )
 import Id
 import VarEnv
 import Util             ( notNull )
@@ -122,17 +117,8 @@ and the level of @h@ is zero (NB not one).
 %************************************************************************
 
 \begin{code}
-liberateCase :: HscEnv -> UniqSupply -> RuleBase -> ModGuts
-	     -> IO (SimplCount, ModGuts)
-liberateCase hsc_env _ _ guts
-  = do	{ let dflags = hsc_dflags hsc_env
-
-	; showPass dflags "Liberate case"
-	; let { env = initEnv dflags
-	      ; binds' = do_prog env (mg_binds guts) }
-	; endPass dflags "Liberate case" Opt_D_verbose_core2core binds'
-			{- no specific flag for dumping -} 
-	; return (zeroSimplCount dflags, guts { mg_binds = binds' }) }
+liberateCase :: DynFlags -> [CoreBind] -> [CoreBind]
+liberateCase dflags binds = do_prog (initEnv dflags) binds
   where
     do_prog _   [] = []
     do_prog env (bind:binds) = bind' : do_prog env' binds

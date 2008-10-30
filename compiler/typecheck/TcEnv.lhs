@@ -204,6 +204,11 @@ tcLookupFamInst tycon tys
        }
 \end{code}
 
+\begin{code}
+instance MonadThings (IOEnv (Env TcGblEnv TcLclEnv)) where
+    lookupThing = tcLookupGlobal
+\end{code}
+
 %************************************************************************
 %*									*
 		Extending the global environment
@@ -522,13 +527,13 @@ tcExtendRules lcl_rules thing_inside
 
 \begin{code}
 instance Outputable ThStage where
-   ppr Comp	     = text "Comp"
+   ppr (Comp l)	     = text "Comp" <+> int l
    ppr (Brack l _ _) = text "Brack" <+> int l
    ppr (Splice l)    = text "Splice" <+> int l
 
 
 thLevel :: ThStage -> ThLevel
-thLevel Comp	      = topLevel
+thLevel (Comp l)      = l
 thLevel (Splice l)    = l
 thLevel (Brack l _ _) = l
 
@@ -544,7 +549,7 @@ checkWellStaged pp_thing bind_lvl use_stage
   | bind_lvl == topLevel	-- GHC restriction on top level splices
   = failWithTc $ 
     sep [ptext (sLit "GHC stage restriction:") <+>  pp_thing,
-	 nest 2 (ptext (sLit "is used in a top-level splice, and must be imported, not defined locally"))]
+	 nest 2 (ptext (sLit "is used in") <+> use_lvl_doc <> ptext (sLit ", and must be imported, not defined locally"))]
 
   | otherwise			-- Badly staged
   = failWithTc $ 		-- E.g.  \x -> $(f x)
@@ -553,7 +558,9 @@ checkWellStaged pp_thing bind_lvl use_stage
 		ptext (sLit "but used at stage") <+> ppr use_lvl]
   where
     use_lvl = thLevel use_stage
-
+    use_lvl_doc | use_lvl == thLevel topStage    = ptext (sLit "a top-level splice")
+                | use_lvl == thLevel topAnnStage = ptext (sLit "an annotation")
+                | otherwise                      = panic "checkWellStaged"
 
 topIdLvl :: Id -> ThLevel
 -- Globals may either be imported, or may be from an earlier "chunk" 

@@ -14,7 +14,7 @@ This module converts Template Haskell syntax into HsSyn
 -- for details
 
 module Convert( convertToHsExpr, convertToPat, convertToHsDecls,
-                convertToHsType, thRdrName ) where
+                convertToHsType, thRdrNameGuesses ) where
 
 import HsSyn as Hs
 import qualified Class
@@ -619,13 +619,28 @@ thRdrName :: OccName.NameSpace -> String -> TH.NameFlavour -> RdrName
 -- 	 which will give confusing error messages later
 -- 
 -- The strict applications ensure that any buried exceptions get forced
-thRdrName _       occ (TH.NameG th_ns pkg mod) = (mkOrig $! (mkModule (mk_pkg pkg) (mk_mod mod))) $! (mk_occ (mk_ghc_ns th_ns) occ)
+thRdrName _       occ (TH.NameG th_ns pkg mod) = thOrigRdrName occ th_ns pkg mod
 thRdrName ctxt_ns occ (TH.NameL uniq)      = nameRdrName $! (((Name.mkInternalName $! (mk_uniq uniq)) $! (mk_occ ctxt_ns occ)) noSrcSpan)
 thRdrName ctxt_ns occ (TH.NameQ mod)       = (mkRdrQual  $! (mk_mod mod)) $! (mk_occ ctxt_ns occ)
 thRdrName ctxt_ns occ (TH.NameU uniq)      = mkRdrUnqual $! (mk_uniq_occ ctxt_ns occ uniq)
 thRdrName ctxt_ns occ TH.NameS
   | Just name <- isBuiltInOcc ctxt_ns occ  = nameRdrName $! name
   | otherwise			           = mkRdrUnqual $! (mk_occ ctxt_ns occ)
+
+thOrigRdrName :: String -> TH.NameSpace -> PkgName -> ModName -> RdrName
+thOrigRdrName occ th_ns pkg mod = (mkOrig $! (mkModule (mk_pkg pkg) (mk_mod mod))) $! (mk_occ (mk_ghc_ns th_ns) occ)
+
+thRdrNameGuesses :: TH.Name -> [RdrName]
+thRdrNameGuesses (TH.Name occ flavour)
+  -- This special case for NameG ensures that we don't generate duplicates in the output list
+  | TH.NameG th_ns pkg mod <- flavour = [thOrigRdrName occ_str th_ns pkg mod]
+  | otherwise                         = [ thRdrName gns occ_str flavour
+			                | gns <- guessed_nss]
+  where
+    -- guessed_ns are the name spaces guessed from looking at the TH name
+    guessed_nss | isLexCon (mkFastString occ_str) = [OccName.tcName,  OccName.dataName]
+	        | otherwise			  = [OccName.varName, OccName.tvName]
+    occ_str = TH.occString occ
 
 isBuiltInOcc :: OccName.NameSpace -> String -> Maybe Name.Name
 -- Built in syntax isn't "in scope" so an Unqual RdrName won't do
