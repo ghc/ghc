@@ -163,14 +163,16 @@ dsHsBind auto_scc rest (AbsBinds [] [] exports binds)
   where B is the *non-recursive* binding
 	fl = fg a b
 	gl = gg b
-	h  = h a b 
+	h  = h a b    -- See (b); note shadowing!
   
   Notice (a) g has a different number of type variables to f, so we must
 	     use the mkArbitraryType thing to fill in the gaps.  
 	     We use a type-let to do that.
 
 	 (b) The local variable h isn't in the exports, and rather than
-	     clone a fresh copy we simply replace h by (h a b).  
+	     clone a fresh copy we simply replace h by (h a b), where
+	     the two h's have different types!  Shadowing happens here,
+	     which looks confusing but works fine.
 
 	 (c) The result is *still* quadratic-sized if there are a lot of
 	     small bindings.  So if there are more than some small
