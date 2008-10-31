@@ -1,7 +1,7 @@
 
 gadt-escape1.hs:16:52:
     GADT pattern match with non-rigid result type `t'
-      Solution: add a type signature
+      Solution: add a type signature for the entire case expression
     In a case alternative: Hidden (ExpInt _) a -> a
     In the expression:
         case (hval :: Hidden) of { Hidden (ExpInt _) a -> a }
