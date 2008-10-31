@@ -519,6 +519,11 @@ registerPackage input my_flags auto_ghci_libs update force = do
   pkg <- parsePackageInfo expanded
   putStrLn "done."
 
+  let unversioned_deps = filter (not . realVersion) (depends pkg)
+  unless (null unversioned_deps) $
+      die ("Unversioned dependencies found: " ++
+           unwords (map display unversioned_deps))
+
   let truncated_stack = dropWhile ((/= to_modify).fst) db_stack
   -- truncate the stack for validation, because we don't allow
   -- packages lower in the stack to refer to those higher up.
