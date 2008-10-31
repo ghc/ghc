@@ -796,8 +796,8 @@ if test "$BootingFromHc" = "NO" -a -d "$srcdir/compiler"; then
   if test "$WithGhc" = ""; then
      AC_MSG_ERROR([GHC is required unless bootstrapping from .hc files.])
   fi
-  FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[6.4],
-    [AC_MSG_ERROR([GHC version 6.4 or later is required to compile GHC.])])dnl
+  FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[6.6],
+    [AC_MSG_ERROR([GHC version 6.6 or later is required to compile GHC.])])dnl
 fi;
 
 # This uses GHC, so put it after the "GHC is required" check above:
