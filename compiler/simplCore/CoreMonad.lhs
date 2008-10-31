@@ -36,7 +36,9 @@ module CoreMonad (
 #endif
   ) where
 
-import Name
+#ifdef GHCI
+import Name( Name )
+#endif
 import PrelNames        ( iNTERACTIVE )
 import HscTypes
 import Module           ( Module )
@@ -327,15 +329,16 @@ instance MonadThings CoreM where
 \subsection{Template Haskell interoperability}
 
 \begin{code}
-
 #ifdef GHCI
--- | Attempt to convert a Template Haskell name to one that GHC can understand. Original TH names such as those you get when you
--- use the @'foo@ syntax will be translated to their equivalent GHC name exactly. Qualified or unqualifed TH names will be dynamically
--- bound to names in the module being compiled, if possible. Exact TH names will be bound to the name they represent, exactly.
+-- | Attempt to convert a Template Haskell name to one that GHC can
+-- understand. Original TH names such as those you get when you use
+-- the @'foo@ syntax will be translated to their equivalent GHC name
+-- exactly. Qualified or unqualifed TH names will be dynamically bound
+-- to names in the module being compiled, if possible. Exact TH names
+-- will be bound to the name they represent, exactly.
 thNameToGhcName :: TH.Name -> CoreM (Maybe Name)
 thNameToGhcName th_name = do
     hsc_env <- getHscEnv
     liftIO $ initTcForLookup hsc_env (lookupThName_maybe th_name)
 #endif
-
 \end{code}
