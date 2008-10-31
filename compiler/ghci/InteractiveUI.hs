@@ -1499,10 +1499,13 @@ setPrompt value = do
   st <- getGHCiState
   if null value
       then io $ hPutStrLn stderr $ "syntax: :set prompt <prompt>, currently \"" ++ prompt st ++ "\""
-      else setGHCiState st{ prompt = remQuotes value }
-  where
-     remQuotes ('\"':xs) | not (null xs) && last xs == '\"' = init xs
-     remQuotes x = x
+      else case value of
+           '\"' : _ -> case reads value of
+                       [(value', xs)] | all isSpace xs ->
+                           setGHCiState (st { prompt = value' })
+                       _ ->
+                           io $ hPutStrLn stderr "Can't parse prompt string. Use Haskell syntax."
+           _ -> setGHCiState (st { prompt = value })
 
 setOptions wds =
    do -- first, deal with the GHCi opts (+s, +t, etc.)
