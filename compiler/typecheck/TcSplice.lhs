@@ -381,7 +381,7 @@ runAnnotation target expr = do
     expr_ty <- newFlexiTyVarTy liftedTypeKind
     
     -- Find the classes we want instances for in order to call toAnnotationWrapper
-    typeable_class <- tcLookupClass typeableClassName
+    _typeable_class <- tcLookupClass typeableClassName
     data_class <- tcLookupClass dataClassName
     
     -- Check the instances we require live in another module (we want to execute it..)
