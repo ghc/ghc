@@ -1,3 +1,17 @@
+Changed in version 2.3.0:
+
+  * Support for GHC 6.10.1
+
+  * Slightly improved space usage
+
+  * Fix a bug that made hidden modules show up in the contents & index pages
+
+  * Fix a bug that made Haddock load modules twice
+
+  * Improvements to the Hoogle output
+
+-----------------------------------------------------------------------------
+
 Changed in version 2.2.2:
 
   * Relax version dependency on ghc-paths
