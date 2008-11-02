@@ -1,0 +1,61 @@
+\begin{hcarentry}[updated]{Haddock}
+\label{haddock}
+\report{David Waern}%11/08
+\status{experimental, maintained}
+\makeheader
+
+Haddock is a widely used documentation-generation tool for Haskell
+library code.  Haddock generates documentation by parsing the Haskell
+source code directly and including documentation supplied by the
+programmer in the form of specially-formatted comments in the source
+code itself.  Haddock has direct support in Cabal~\cref{cabal}, and is used to
+generate the documentation for the hierarchical libraries that come
+with GHC, Hugs, and nhc98
+(\url{http://www.haskell.org/ghc/docs/latest/html/libraries}).
+
+The latest release is version 2.2.2, released August 5 2008.
+
+\Separate
+
+Recent changes:
+
+\begin{itemize}
+\item Support for GHC 6.8.3
+\item The Hoogle backend is back, thanks to Neil Mitchell.
+\item Show associated types in the documentation for class declarations
+\item Show associated types in the documentation for class declarations
+\item Show type family declarations
+\item Show type equality predicates
+\item Major bug fixes (#1 and #44)
+\item It is no longer required to specify the path to GHC's lib dir
+\item Remove unnecessary parenthesis in type signatures
+\end{itemize}
+
+\FuturePlans
+Currently, Haddock ignores comments on some language constructs like GADTs and
+Associated Type synonyms. Of course, the plan is to support comments
+for these constructs in the future.
+Haddock is also slightly more picky on where to put comments compared
+to the 0.x series. We want to fix this
+as well. Both of these plans require changes to the GHC parser. We
+want to investigate to what degree it is possible to
+decouple comment parsing from GHC and move it into Haddock, to not be bound by
+GHC releases.
+
+Other things we plan to add in future releases:
+
+\begin{itemize}
+\item Support for GHC 6.10.1
+\item HTML frames (à la Javadoc)
+\item Support for documenting re-exports from other packages 
+\end{itemize}
+
+\FurtherReading
+\begin{compactitem}
+\item Haddock's homepage:
+\url{http://www.haskell.org/haddock/}
+
+\item Haddock's developer WiKi and Trac:
+\url{http://trac.haskell.org/haddock}
+\end{compactitem}
+\end{hcarentry}
