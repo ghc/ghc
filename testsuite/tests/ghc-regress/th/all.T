@@ -124,4 +124,5 @@ test('T2386', extra_clean(['T2386_Lib.hi', 'T2386_Lib.o']),
 	      run_command,
 	      ['$MAKE -s --no-print-directory T2386'] )
 
-test('T2685', normal, multimod_compile, ['T2685','-v0'])
+test('T2685', extra_clean(['T2685a.hi','T2685a.o']), 
+              multimod_compile, ['T2685','-v0'])
