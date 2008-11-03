@@ -287,6 +287,7 @@ test('LoopOfTheDay3', normal, compile, [''])
 test('T1470', normal, compile, [''])
 test('T2572', normal, compile, [''])
 test('T2573', normal, compile, [''])
+test('T2735', normal, compile, [''])
 
 test('T2412',
      extra_clean(['T2412.hi-boot', 'T2412.o-boot',
