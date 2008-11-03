@@ -1189,9 +1189,11 @@ tcRecordBinds data_con arg_tys (HsRecFields rbinds dd)
 	do { rhs' <- tcPolyExprNC rhs field_ty
 	   ; let field_id = mkUserLocal (nameOccName field_lbl)
 				        (nameUnique field_lbl)
-					field_ty loc
-		-- The field_id has the *unique* of the selector Id
-		-- but is a LocalId with the appropriate type of the RHS
+					field_ty loc 
+		-- Yuk: the field_id has the *unique* of the selector Id
+		-- 	    (so we can find it easily)
+		--      but is a LocalId with the appropriate type of the RHS
+		--	    (so the desugarer knows the type of local binder to make)
 	   ; return (Just (fld { hsRecFieldId = L loc field_id, hsRecFieldArg = rhs' })) }
       | otherwise
       = do { addErrTc (badFieldCon data_con field_lbl)

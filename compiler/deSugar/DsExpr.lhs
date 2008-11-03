@@ -451,24 +451,32 @@ dsExpr expr@(RecordUpd record_expr (HsRecFields { rec_flds = fields })
 
     do	{ record_expr' <- dsLExpr record_expr
 	; field_binds' <- mapM ds_field fields
+	; let upd_fld_env :: NameEnv Id	-- Maps field name to the LocalId of the field binding
+	      upd_fld_env = mkNameEnv [(f,l) | (f,l,_) <- field_binds']
 
 	-- It's important to generate the match with matchWrapper,
 	-- and the right hand sides with applications of the wrapper Id
 	-- so that everything works when we are doing fancy unboxing on the
 	-- constructor aguments.
-	; alts <- mapM mk_alt cons_to_upd
+	; alts <- mapM (mk_alt upd_fld_env) cons_to_upd
 	; ([discrim_var], matching_code) 
 		<- matchWrapper RecUpd (MatchGroup alts in_out_ty)
 
 	; return (add_field_binds field_binds' $
 		  bindNonRec discrim_var record_expr' matching_code) }
   where
-    ds_field :: HsRecField Id (LHsExpr Id) -> DsM (Id, CoreExpr)
+    ds_field :: HsRecField Id (LHsExpr Id) -> DsM (Name, Id, CoreExpr)
+      -- Clone the Id in the HsRecField, because its Name is that
+      -- of the record selector, and we must not make that a lcoal binder
+      -- else we shadow other uses of the record selector
+      -- Hence 'lcl_id'.  Cf Trac #2735
     ds_field rec_field = do { rhs <- dsLExpr (hsRecFieldArg rec_field)
-			    ; return (unLoc (hsRecFieldId rec_field), rhs) }
+    	     	       	    ; let fld_id = unLoc (hsRecFieldId rec_field)
+    	     	       	    ; lcl_id <- newSysLocalDs (idType fld_id)
+			    ; return (idName fld_id, lcl_id, rhs) }
 
     add_field_binds [] expr = expr
-    add_field_binds ((b,r):bs) expr = bindNonRec b r (add_field_binds bs expr)
+    add_field_binds ((_,b,r):bs) expr = bindNonRec b r (add_field_binds bs expr)
 
 	-- Awkwardly, for families, the match goes 
 	-- from instance type to family type
@@ -476,7 +484,7 @@ dsExpr expr@(RecordUpd record_expr (HsRecFields { rec_flds = fields })
     in_ty     = mkTyConApp tycon in_inst_tys
     in_out_ty = mkFunTy in_ty (mkFamilyTyConApp tycon out_inst_tys)
 
-    mk_alt con
+    mk_alt upd_fld_env con
       = do { let (univ_tvs, ex_tvs, eq_spec, 
 		  eq_theta, dict_theta, arg_tys, _) = dataConFullSig con
 		 subst = mkTopTvSubst (univ_tvs `zip` in_inst_tys)
@@ -487,6 +495,8 @@ dsExpr expr@(RecordUpd record_expr (HsRecFields { rec_flds = fields })
 	   ; arg_ids    <- newSysLocalsDs (substTys subst arg_tys)
 	   ; let val_args = zipWithEqual "dsExpr:RecordUpd" mk_val_arg
     					 (dataConFieldLabels con) arg_ids
+                 mk_val_arg field_name pat_arg_id 
+                     = nlHsVar (lookupNameEnv upd_fld_env field_name `orElse` pat_arg_id)
 		 inst_con = noLoc $ HsWrap wrap (HsVar (dataConWrapId con))
 			-- Reconstruct with the WrapId so that unpacking happens
 		 wrap = mkWpApps theta_vars `WpCompose` 
@@ -514,11 +524,6 @@ dsExpr expr@(RecordUpd record_expr (HsRecFields { rec_flds = fields })
 					 , pat_ty = in_ty }
 	   ; return (mkSimpleMatch [pat] wrapped_rhs) }
 
-    upd_field_ids :: NameEnv Id	-- Maps field name to the LocalId of the field binding
-    upd_field_ids = mkNameEnv [ (idName field_id, field_id) 
-			      | rec_fld <- fields, let field_id = unLoc (hsRecFieldId rec_fld) ]
-    mk_val_arg field_name pat_arg_id 
-      = nlHsVar (lookupNameEnv upd_field_ids field_name `orElse` pat_arg_id)
 \end{code}
 
 Here is where we desugar the Template Haskell brackets and escapes
