@@ -47,6 +47,8 @@ test = do
   let mods = filter ((==) ".hs" . takeExtension) contents
   let outdir = "output"
   let mods' = map ("tests" </>) mods
+  runProcess "../dist/build/haddock/haddock" ["--version"] Nothing (Just [("HADDOCK_DATA_DIR", "../.")]) Nothing Nothing Nothing
+  runProcess "../dist/build/haddock/haddock" ["--ghc-version"] Nothing (Just [("HADDOCK_DATA_DIR", "../.")]) Nothing Nothing Nothing
   handle <- runProcess "../dist/build/haddock/haddock" (["-w", "-o", outdir, "-h", "--optghc=-fglasgow-exts", "--optghc=-w"] ++ mods') Nothing (Just [("HADDOCK_DATA_DIR", "../.")]) Nothing Nothing Nothing
   code <- waitForProcess handle
 
