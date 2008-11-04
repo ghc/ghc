@@ -94,8 +94,6 @@ class Category a => Arrow a where
         f &&& g = arr (\b -> (b,b)) >>> f *** g
 
 {-# RULES
-"identity"
-                arr id = id
 "compose/arr"   forall f g .
                 (arr f) . (arr g) = arr (f . g)
 "first/arr"     forall f .
@@ -217,9 +215,9 @@ class Arrow a => ArrowChoice a where
 "fanin/arr"     forall f g .
                 arr f ||| arr g = arr (f ||| g)
 "compose/left"  forall f g .
-                left f >>> left g = left (f >>> g)
+                left f . left g = left (f . g)
 "compose/right" forall f g .
-                right f >>> right g = right (f >>> g)
+                right f . right g = right (f . g)
  #-}
 
 instance ArrowChoice (->) where
