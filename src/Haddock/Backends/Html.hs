@@ -656,7 +656,7 @@ miniSynopsis mod iface =
     exports = numberSectionHeadings (ifaceRnExportItems iface)
 
 processForMiniSynopsis :: Module -> ExportItem DocName -> Html
-processForMiniSynopsis mod (ExportDecl (L _loc decl0) _doc _insts) =
+processForMiniSynopsis mod (ExportDecl (L _loc decl0) _doc _ _insts) =
   thediv ! [theclass "decl" ] <<
   case decl0 of
     TyClD d@(TyFamily{}) -> ppTyFamHeader True False d
