@@ -1,3 +1,17 @@
+Changed in version 2.4.0:
+
+  * Add frames to HTML output
+
+  * Build with GHC 6.8.2 and 6.8.3 again
+
+  * Support DocPic again
+
+  * Bug fixes
+
+  * Small improvements to the Hoogle output
+
+-----------------------------------------------------------------------------
+
 Changed in version 2.3.0:
 
   * Support for GHC 6.10.1
