@@ -714,7 +714,8 @@ scheduleYield (Capability **pcap, Task *task)
     Capability *cap = *pcap;
 
     // if we have work, and we don't need to give up the Capability, continue.
-    if (!emptyRunQueue(cap) && !shouldYieldCapability(cap,task))
+    if (!shouldYieldCapability(cap,task) && 
+        (!emptyRunQueue(cap) || blackholes_need_checking))
         return;
 
     // otherwise yield (sleep), and keep yielding if necessary.
