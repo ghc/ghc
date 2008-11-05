@@ -1,0 +1,73 @@
+--------------------------------------------
+-- Haddock 2.4.0
+--------------------------------------------
+
+A new version of Haddock, the Haskell documentation tool, is out.
+
+This is a later version than the Haddock shipped with GHC 6.10.1, which is
+version 2.3.0. That version will not be released on Hackage since it only
+builds with GHC 6.10.1 (by accident, actually).
+
+Compared to 2.3.0, this release contains some more fixes and support for HTML
+frames. 
+
+Please use the bug tracker to submit bug reports and feature requests.
+
+--------------------------------------------
+-- Changes in version 2.4.0
+--------------------------------------------
+
+  * Add framed view of the HTML documentation
+
+  * Build with GHC 6.8.2 and 6.8.3 again
+
+  * Support images in documentation comments again
+
+  * Small improvements to the Hoogle output
+
+  * A few bugs has been fixed
+
+--------------------------------------------
+-- Changes in version 2.3.0
+--------------------------------------------
+
+  * Support for GHC 6.10.1
+
+  * Slightly improved space usage
+
+  * Fix a bug that made hidden modules show up in the contents & index pages
+
+  * Fix a bug that made Haddock load modules twice
+
+  * Improvements to the Hoogle output
+
+--------------------------------------------
+-- Links
+--------------------------------------------
+
+Homepage:
+ http://www.haskell.org/haddock
+
+Hackage page:
+ http://hackage.haskell.org/cgi-bin/hackage-scripts/package/haddock-2.4.0
+
+Bugtracker and wiki:
+ http://trac.haskell.org/haddock
+
+Mailing list:
+ haskelldoc@haskell.org
+
+Code repository:
+ http://code.haskell.org/haddock
+
+--------------------------------------------
+-- Get Involved
+--------------------------------------------
+
+We welcome new contributors. To get involved, start by grabbing the code:
+
+ http://code.haskell.org/haddock
+
+Then take a look at the bug and feature tracker for things to work on:
+
+ http://trac.haskell.org/haddock
