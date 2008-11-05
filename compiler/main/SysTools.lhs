@@ -844,16 +844,17 @@ getBaseDir = do let len = (2048::Int) -- plenty, PATH_MAX is 512 under Win32.
                                     return (Just (rootDir s))
   where
     rootDir s = case splitFileName $ normalise s of
-                (d, ghc_exe) | map toLower ghc_exe == "ghc.exe" ->
+                (d, ghc_exe) | lower ghc_exe == "ghc.exe" ->
                     case splitFileName $ takeDirectory d of
                     -- installed ghc.exe is in $topdir/bin/ghc.exe
-                    (d', "bin") -> takeDirectory d'
+                    (d', bin) | lower bin == "bin" -> takeDirectory d'
                     -- inplace ghc.exe is in $topdir/ghc/stage1-inplace/ghc.exe
-                    (d', x) | "-inplace" `isSuffixOf` x -> 
+                    (d', x) | "-inplace" `isSuffixOf` lower x -> 
                         takeDirectory d' </> ".."
                     _ -> fail
                 _ -> fail
         where fail = panic ("can't decompose ghc.exe path: " ++ show s)
+              lower = map toLower
 
 foreign import stdcall unsafe "GetModuleFileNameA"
   getModuleFileName :: Ptr () -> CString -> Int -> IO Int32
