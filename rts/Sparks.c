@@ -387,6 +387,13 @@ pruneSparkQueue (evac_fn evac, void *user, Capability *cap)
     
     pool = cap->sparks;
     
+    // Take this opportunity to reset top/bottom modulo the size of
+    // the array, to avoid overflow.  This is only possible because no
+    // stealing is happening during GC.
+    pool->bottom  -= pool->top & ~pool->moduloSize;
+    pool->top     &= pool->moduloSize;
+    pool->topBound = pool->top;
+
     debugTrace(DEBUG_sched,
                "markSparkQueue: current spark queue len=%d; (hd=%ld; tl=%ld)",
                sparkPoolSize(pool), pool->bottom, pool->top);
