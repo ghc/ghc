@@ -9,9 +9,7 @@ This is a later version than the one shipped with GHC 6.10.1, which is version
 GHC 6.10.1 (by accident, actually).
 
 Besides adding back support for earlier GHC versions, this release contains
-some more fixes and support for HTML frames. If you have version 2.3.0, you can
-safely upgrade without worrying about loosing links to already installed
-packages, since the .haddock file format has not changed.
+some more fixes and support for HTML frames.
 
 Please use the bug tracker to submit bug reports or feature requests.
 
