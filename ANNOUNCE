@@ -4,14 +4,16 @@
 
 A new version of Haddock, the Haskell documentation tool, is out.
 
-This is a later version than the Haddock shipped with GHC 6.10.1, which is
-version 2.3.0. That version will not be released on Hackage since it only
-builds with GHC 6.10.1 (by accident, actually).
+This is a later version than the one shipped with GHC 6.10.1, which is version
+2.3.0. That version will not be released on Hackage since it only builds with
+GHC 6.10.1 (by accident, actually).
 
-Compared to 2.3.0, this release contains some more fixes and support for HTML
-frames. 
+Besides adding back support for earlier GHC versions, this release contains
+some more fixes and support for HTML frames. If you have version 2.3.0, you can
+safely upgrade without worrying about loosing links to already installed
+packages, since the .haddock file format has not changed.
 
-Please use the bug tracker to submit bug reports and feature requests.
+Please use the bug tracker to submit bug reports or feature requests.
 
 --------------------------------------------
 -- Changes in version 2.4.0
@@ -59,6 +61,20 @@ Mailing list:
 
 Code repository:
  http://code.haskell.org/haddock
+
+--------------------------------------------
+-- Contributors
+--------------------------------------------
+
+The persons who contributed to the 2.3.0 and 2.4.0 releases are:
+
+ Clemens Fruhwirth
+ Peter Gavin
+ Ian Lynagh
+ Neil Mitchell
+ Luke Plant
+ Thomas Schilling
+ David Waern
 
 --------------------------------------------
 -- Get Involved
