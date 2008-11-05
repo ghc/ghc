@@ -934,8 +934,13 @@ scheduleCheckBlackHoles (Capability *cap)
     {
 	ACQUIRE_LOCK(&sched_mutex);
 	if ( blackholes_need_checking ) {
-	    checkBlackHoles(cap);
 	    blackholes_need_checking = rtsFalse;
+            // important that we reset the flag *before* checking the
+            // blackhole queue, otherwise we could get deadlock.  This
+            // happens as follows: we wake up a thread that
+            // immediately runs on another Capability, blocks on a
+            // blackhole, and then we reset the blackholes_need_checking flag.
+	    checkBlackHoles(cap);
 	}
 	RELEASE_LOCK(&sched_mutex);
     }
