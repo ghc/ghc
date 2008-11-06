@@ -54,7 +54,7 @@ globalWorkToDo (void)
 #endif
 
 #if defined(THREADED_RTS)
-rtsBool
+StgClosure *
 stealWork (Capability *cap)
 {
   /* use the normal Sparks.h interface (internally modified to enable
@@ -70,7 +70,7 @@ stealWork (Capability *cap)
 	     "cap %d: Trying to steal work from other capabilities", 
 	     cap->no);
 
-  if (n_capabilities == 1) { return rtsFalse; } // makes no sense...
+  if (n_capabilities == 1) { return NULL; } // makes no sense...
 
   do {
       retry = rtsFalse;
@@ -85,7 +85,7 @@ stealWork (Capability *cap)
           if (emptySparkPoolCap(robbed)) // nothing to steal here
               continue;
 
-          spark = tryStealSpark(robbed->sparks);
+          spark = tryStealSpark(robbed);
           if (spark == NULL && !emptySparkPoolCap(robbed)) {
               // we conflicted with another thread while trying to steal;
               // try again later.
@@ -96,16 +96,31 @@ stealWork (Capability *cap)
               debugTrace(DEBUG_sched,
 		 "cap %d: Stole a spark from capability %d",
                          cap->no, robbed->no);
-
-              createSparkThread(cap,spark);
-              return rtsTrue;
+              return spark;
           }
           // otherwise: no success, try next one
       }
   } while (retry);
 
   debugTrace(DEBUG_sched, "No sparks stolen");
-  return rtsFalse;
+  return NULL;
+}
+
+// Returns True if any spark pool is non-empty at this moment in time
+// The result is only valid for an instant, of course, so in a sense
+// is immediately invalid, and should not be relied upon for
+// correctness.
+rtsBool
+anySparks (void)
+{
+    nat i;
+
+    for (i=0; i < n_capabilities; i++) {
+        if (!emptySparkPoolCap(&capabilities[i])) {
+            return rtsTrue;
+        }
+    }
+    return rtsFalse;
 }
 #endif
 

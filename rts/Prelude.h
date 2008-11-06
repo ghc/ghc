@@ -42,6 +42,7 @@ PRELUDE_CLOSURE(base_GHCziIOBase_blockedIndefinitely_closure);
 PRELUDE_CLOSURE(base_ControlziExceptionziBase_nonTermination_closure);
 PRELUDE_CLOSURE(base_ControlziExceptionziBase_nestedAtomically_closure);
 
+PRELUDE_CLOSURE(base_GHCziConc_runSparks_closure);
 PRELUDE_CLOSURE(base_GHCziConc_ensureIOManagerIsRunning_closure);
 
 PRELUDE_INFO(ghczmprim_GHCziTypes_Czh_static_info);

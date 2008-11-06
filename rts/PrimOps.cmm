@@ -2287,3 +2287,25 @@ getApStackValzh_fast
    }
    RET_NP(ok,val);
 }
+
+getSparkzh_fast
+{
+   W_ spark;
+
+#ifndef THREADED_RTS
+   RET_NP(0,ghczmprim_GHCziBool_False_closure);
+#else
+   (spark) = foreign "C" tryStealSpark(MyCapability());
+   if (spark != 0) {
+      RET_NP(1,spark);
+   } else {
+      (spark) = foreign "C" stealWork (MyCapability());
+      if (spark != 0) {
+         RET_NP(1,spark);
+      } else {
+         RET_NP(0,ghczmprim_GHCziBool_False_closure);
+
+      }
+   }
+#endif
+}

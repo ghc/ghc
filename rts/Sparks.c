@@ -44,6 +44,7 @@
 #include "RtsUtils.h"
 #include "ParTicky.h"
 #include "Trace.h"
+#include "Prelude.h"
 
 #include "SMP.h" // for cas
 
@@ -227,8 +228,9 @@ steal(SparkPool *deque)
 }
 
 StgClosure *
-tryStealSpark (SparkPool *pool)
+tryStealSpark (Capability *cap)
 {
+  SparkPool *pool = cap->sparks;
   StgClosure *stolen;
 
   do { 
@@ -264,13 +266,13 @@ looksEmpty(SparkPool* deque)
  * -------------------------------------------------------------------------- */
 
 void
-createSparkThread (Capability *cap, StgClosure *p)
+createSparkThread (Capability *cap)
 {
     StgTSO *tso;
 
-    tso = createGenThread (cap, RtsFlags.GcFlags.initialStkSize, p);
+    tso = createIOThread (cap, RtsFlags.GcFlags.initialStkSize, 
+                          &base_GHCziConc_runSparks_closure);
     appendToRunQueue(cap,tso);
-    cap->sparks_converted++;
 }
 
 /* -----------------------------------------------------------------------------

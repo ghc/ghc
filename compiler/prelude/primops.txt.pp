@@ -1633,6 +1633,12 @@ primop  ParOp "par#" GenPrimOp
       -- gets evaluted strictly, which it should *not* be
    has_side_effects = True
 
+primop GetSparkOp "getSpark#" GenPrimOp
+   State# s -> (# State# s, Int#, a #)
+   with
+   has_side_effects = True
+   out_of_line = True
+
 -- HWL: The first 4 Int# in all par... annotations denote:
 --   name, granularity info, size of result, degree of parallelism
 --      Same  structure as _seq_ i.e. returns Int#

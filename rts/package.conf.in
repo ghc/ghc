@@ -107,6 +107,8 @@ ld-options:
          , "-u", "_base_GHCziWeak_runFinalizzerBatch_closure"
          , "-u", "_base_GHCziTopHandler_runIO_closure"
          , "-u", "_base_GHCziTopHandler_runNonIO_closure"
+	 , "-u", "_base_GHCziConc_ensureIOManagerIsRunning_closure"
+	 , "-u", "_base_GHCziConc_runSparks_closure"
 #else
            "-u", "ghczmprim_GHCziTypes_Izh_static_info"
          , "-u", "ghczmprim_GHCziTypes_Czh_static_info"
@@ -142,12 +144,8 @@ ld-options:
          , "-u", "base_GHCziWeak_runFinalizzerBatch_closure"
          , "-u", "base_GHCziTopHandler_runIO_closure"
          , "-u", "base_GHCziTopHandler_runNonIO_closure"
-#endif
-
-#ifdef LEADING_UNDERSCORE
-	 , "-u", "_base_GHCziConc_ensureIOManagerIsRunning_closure"
-#else
 	 , "-u", "base_GHCziConc_ensureIOManagerIsRunning_closure"
+	 , "-u", "base_GHCziConc_runSparks_closure"
 #endif
 
 /*  Pick up static libraries in preference over dynamic if in earlier search

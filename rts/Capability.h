@@ -244,7 +244,11 @@ rtsBool tryGrabCapability (Capability *cap, Task *task);
 
 // Try to steal a spark from other Capabilities
 //
-rtsBool stealWork (Capability *cap);
+StgClosure *stealWork (Capability *cap);
+
+// True if any capabilities have sparks
+//
+rtsBool anySparks (void);
 
 INLINE_HEADER rtsBool emptySparkPoolCap (Capability *cap);
 INLINE_HEADER nat     sparkPoolSizeCap  (Capability *cap);

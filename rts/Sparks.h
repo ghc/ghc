@@ -73,9 +73,9 @@ StgClosure* reclaimSpark(SparkPool *pool);
 // if the pool is almost empty).
 rtsBool looksEmpty(SparkPool* deque);
 
-StgClosure * tryStealSpark     (SparkPool *pool);
+StgClosure * tryStealSpark     (Capability *cap);
 void         freeSparkPool     (SparkPool *pool);
-void         createSparkThread (Capability *cap, StgClosure *p);
+void         createSparkThread (Capability *cap);
 void         traverseSparkQueue(evac_fn evac, void *user, Capability *cap);
 void         pruneSparkQueue   (evac_fn evac, void *user, Capability *cap);
 

@@ -608,6 +608,7 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(initLinker)				\
       SymI_HasProto(unpackClosurezh_fast)               \
       SymI_HasProto(getApStackValzh_fast)               \
+      SymI_HasProto(getSparkzh_fast)                    \
       SymI_HasProto(int2Integerzh_fast)			\
       SymI_HasProto(integer2Intzh_fast)			\
       SymI_HasProto(integer2Wordzh_fast)		\

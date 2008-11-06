@@ -606,6 +606,7 @@ RTS_FUN(checkzh_fast);
 
 RTS_FUN(unpackClosurezh_fast);
 RTS_FUN(getApStackValzh_fast);
+RTS_FUN(getSparkzh_fast);
 
 RTS_FUN(noDuplicatezh_fast);
 

@@ -654,15 +654,9 @@ scheduleFindWork (Capability *cap)
     scheduleCheckBlockedThreads(cap);
 
 #if defined(THREADED_RTS) || defined(PARALLEL_HASKELL)
-    // Try to activate one of our own sparks
     if (emptyRunQueue(cap)) { scheduleActivateSpark(cap); }
 #endif
 
-#if defined(THREADED_RTS)
-    // Try to steak work if we don't have any
-    if (emptyRunQueue(cap)) { stealWork(cap); }
-#endif
-    
 #if defined(PARALLEL_HASKELL)
     // if messages have been buffered...
     scheduleSendPendingMessages();
@@ -1069,30 +1063,10 @@ scheduleSendPendingMessages(void)
 static void
 scheduleActivateSpark(Capability *cap)
 {
-    StgClosure *spark;
-
-/* We only want to stay here if the run queue is empty and we want some
-   work. We try to turn a spark into a thread, and add it to the run
-   queue, from where it will be picked up in the next iteration of the
-   scheduler loop.  
-*/
-    if (!emptyRunQueue(cap)) 
-      /* In the threaded RTS, another task might have pushed a thread
-	 on our run queue in the meantime ? But would need a lock.. */
-      return;
-
- 
-    // Really we should be using reclaimSpark() here, but
-    // experimentally it doesn't seem to perform as well as just
-    // stealing from our own spark pool:
-    // spark = reclaimSpark(cap->sparks);
-    spark = tryStealSpark(cap->sparks); // defined in Sparks.c
-
-    if (spark != NULL) {
-      debugTrace(DEBUG_sched,
-		 "turning spark of closure %p into a thread",
-		 (StgClosure *)spark);
-      createSparkThread(cap,spark); // defined in Sparks.c
+    if (anySparks())
+    {
+        createSparkThread(cap);
+        debugTrace(DEBUG_sched, "creating a spark thread");
     }
 }
 #endif // PARALLEL_HASKELL || THREADED_RTS
