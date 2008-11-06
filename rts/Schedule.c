@@ -700,7 +700,9 @@ shouldYieldCapability (Capability *cap, Task *task)
 //    - we need to yield this Capability to someone else 
 //      (see shouldYieldCapability())
 //
-// The return value indicates whether 
+// Careful: the scheduler loop is quite delicate.  Make sure you run
+// the tests in testsuite/concurrent (all ways) after modifying this,
+// and also check the benchmarks in nofib/parallel for regressions.
 
 static void
 scheduleYield (Capability **pcap, Task *task)
@@ -709,7 +711,9 @@ scheduleYield (Capability **pcap, Task *task)
 
     // if we have work, and we don't need to give up the Capability, continue.
     if (!shouldYieldCapability(cap,task) && 
-        (!emptyRunQueue(cap) || blackholes_need_checking))
+        (!emptyRunQueue(cap) ||
+         blackholes_need_checking ||
+         sched_state >= SCHED_INTERRUPTING))
         return;
 
     // otherwise yield (sleep), and keep yielding if necessary.
