@@ -10,16 +10,10 @@ module Haddock.GHC.Typecheck (
 ) where
 
 
-import Haddock.Exception
 import Haddock.Types
-import Haddock.GHC.Utils
 
 import Data.Maybe
-import Control.Monad
 import GHC
-import HscTypes ( msHsFilePath )
-import Digraph
-import BasicTypes
 import SrcLoc
 
 import Data.List
@@ -36,13 +30,13 @@ type FullyCheckedMod = (ParsedSource,
 
 -- | Dig out what we want from the typechecker output
 mkGhcModule :: CheckedMod -> DynFlags -> GhcModule 
-mkGhcModule (mod, file, checkedMod) dynflags = GhcModule {
-  ghcModule         = mod,
+mkGhcModule (mdl, file, checkedMod) dynflags = GhcModule {
+  ghcModule         = mdl,
   ghcFilename       = file,
   ghcMbDocOpts      = mbOpts,
   ghcHaddockModInfo = info,
   ghcMbDoc          = mbDoc,
-  ghcGroup          = group,
+  ghcGroup          = group_,
   ghcMbExports      = mbExports,
   ghcExportedNames  = modInfoExports modInfo,
   ghcDefinedNames   = map getName $ modInfoTyThings modInfo,
@@ -55,5 +49,5 @@ mkGhcModule (mod, file, checkedMod) dynflags = GhcModule {
 #else
     mbOpts = haddockOptions dynflags
 #endif
-    (group, _, mbExports, mbDoc, info) = renamed
+    (group_, _, mbExports, mbDoc, info) = renamed
     (parsed, renamed, _, modInfo) = checkedMod
