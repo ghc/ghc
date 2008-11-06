@@ -618,6 +618,7 @@ allocateInGen (generation *g, lnat n)
 	bd = allocGroup(req_blocks);
 	dbl_link_onto(bd, &stp->large_objects);
 	stp->n_large_blocks += bd->blocks; // might be larger than req_blocks
+	alloc_blocks += bd->blocks;
 	bd->gen_no  = g->no;
 	bd->step = stp;
 	bd->flags = BF_LARGE;
@@ -744,7 +745,9 @@ allocateLocal (Capability *cap, lnat n)
             bd->flags = 0;
             // NO: alloc_blocks++;
             // calcAllocated() uses the size of the nursery, and we've
-            // already bumpted nursery->n_blocks above.
+            // already bumpted nursery->n_blocks above.  We'll GC
+            // pretty quickly now anyway, because MAYBE_GC() will
+            // notice that CurrentNursery->link is NULL.
         } else {
             // we have a block in the nursery: take it and put
             // it at the *front* of the nursery list, and use it
