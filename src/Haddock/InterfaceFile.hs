@@ -37,9 +37,10 @@ import Module
 import HscTypes
 import FastMutInt
 import HsDoc
+#if __GLASGOW_HASKELL__ >= 609 
 import FastString
 import Unique
-
+#endif
 
 data InterfaceFile = InterfaceFile {
   ifLinkEnv         :: LinkEnv,

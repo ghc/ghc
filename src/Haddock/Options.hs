@@ -29,8 +29,8 @@ getUsage = do
 
 
 parseHaddockOpts :: [String] -> IO ([Flag], [String])
-parseHaddockOpts words =
-  case getOpt Permute (options True) words of
+parseHaddockOpts params =
+  case getOpt Permute (options True) params  of
     (flags, args, []) -> return (flags, args)
     (_, _, errors)    -> do 
       usage <- getUsage
