@@ -6,6 +6,7 @@
 
 module Haddock.Backends.HH (ppHHContents, ppHHIndex, ppHHProject) where
 
+ppHHContents, ppHHIndex, ppHHProject :: a
 ppHHContents = error "not yet"
 ppHHIndex = error "not yet"
 ppHHProject = error "not yet"

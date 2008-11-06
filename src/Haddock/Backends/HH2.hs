@@ -8,6 +8,7 @@
 module Haddock.Backends.HH2 (ppHH2Contents, ppHH2Index, ppHH2Files, ppHH2Collection) where
 
 
+ppHH2Contents, ppHH2Index, ppHH2Files, ppHH2Collection :: a
 ppHH2Contents = error "not yet"
 ppHH2Index = error "not yet"
 ppHH2Files = error "not yet"
