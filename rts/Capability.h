@@ -245,9 +245,9 @@ void shutdownCapability (Capability *cap, Task *task, rtsBool wait_foreign);
 //
 rtsBool tryGrabCapability (Capability *cap, Task *task);
 
-// Try to steal a spark from other Capabilities
+// Try to find a spark to run
 //
-StgClosure *stealWork (Capability *cap);
+StgClosure *findSpark (Capability *cap);
 
 // True if any capabilities have sparks
 //

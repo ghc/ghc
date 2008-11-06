@@ -55,7 +55,7 @@ globalWorkToDo (void)
 
 #if defined(THREADED_RTS)
 StgClosure *
-stealWork (Capability *cap)
+findSpark (Capability *cap)
 {
   /* use the normal Sparks.h interface (internally modified to enable
      concurrent stealing) 
@@ -66,11 +66,23 @@ stealWork (Capability *cap)
   rtsBool retry;
   nat i = 0;
 
+  // first try to get a spark from our own pool.
+  // We should be using reclaimSpark(), because it works without
+  // needing any atomic instructions:
+  //   spark = reclaimSpark(cap->sparks);
+  // However, measurements show that this makes at least one benchmark
+  // slower (prsa) and doesn't affect the others.
+  spark = tryStealSpark(cap);
+  if (spark != NULL) {
+      cap->sparks_converted++;
+      return spark;
+  }
+
+  if (n_capabilities == 1) { return NULL; } // makes no sense...
+
   debugTrace(DEBUG_sched,
 	     "cap %d: Trying to steal work from other capabilities", 
 	     cap->no);
-
-  if (n_capabilities == 1) { return NULL; } // makes no sense...
 
   do {
       retry = rtsFalse;
@@ -96,6 +108,7 @@ stealWork (Capability *cap)
               debugTrace(DEBUG_sched,
 		 "cap %d: Stole a spark from capability %d",
                          cap->no, robbed->no);
+              cap->sparks_converted++;
               return spark;
           }
           // otherwise: no success, try next one
