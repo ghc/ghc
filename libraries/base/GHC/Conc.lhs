@@ -37,6 +37,7 @@ module GHC.Conc
         , throwTo       -- :: ThreadId -> Exception -> IO ()
         , par           -- :: a -> b -> b
         , pseq          -- :: a -> b -> b
+        , runSparks
         , yield         -- :: IO ()
         , labelThread   -- :: ThreadId -> String -> IO ()
 
@@ -363,6 +364,13 @@ pseq  x y = x `seq` lazy y
 par :: a -> b -> b
 par  x y = case (par# x) of { _ -> lazy y }
 
+-- | Internal function used by the RTS to run sparks.
+runSparks :: IO ()
+runSparks = IO loop
+  where loop s = case getSpark# s of
+                   (# s', n, p #) ->
+                      if n ==# 0# then (# s', () #)
+                                  else p `seq` loop s'
 
 data BlockReason
   = BlockedOnMVar
