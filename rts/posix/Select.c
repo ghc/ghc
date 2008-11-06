@@ -244,6 +244,11 @@ awaitEvent(rtsBool wait)
       if (select_succeeded || unblock_all) {
 	  for(tso = blocked_queue_hd; tso != END_TSO_QUEUE; tso = next) {
 	      next = tso->_link;
+
+              if (tso->what_next == ThreadRelocated) {
+                  continue;
+              }
+
 	      switch (tso->why_blocked) {
 	      case BlockedOnRead:
 		  ready = unblock_all || FD_ISSET(tso->block_info.fd, &rfd);

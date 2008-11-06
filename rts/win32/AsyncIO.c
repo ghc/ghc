@@ -275,8 +275,21 @@ start:
 	    unsigned int rID = completedTable[i].reqID;
 	    
 	    prev = NULL;
-	    for(tso = blocked_queue_hd ; tso != END_TSO_QUEUE; prev = tso, tso = tso->_link) {
+	    for(tso = blocked_queue_hd ; tso != END_TSO_QUEUE; tso = tso->_link) {
 	
+                if (tso->what_next == ThreadRelocated) {
+                    /* Drop the TSO from blocked_queue */
+                    if (prev) {
+                        setTSOLink(&MainCapability, prev, tso->_link);
+                    } else {
+                        blocked_queue_hd = tso->_link;
+                    }
+                    if (blocked_queue_tl == tso) {
+                        blocked_queue_tl = prev ? prev : END_TSO_QUEUE;
+                    }
+                    continue;
+                }
+
 		switch(tso->why_blocked) {
 		case BlockedOnRead:
 		case BlockedOnWrite:
@@ -311,6 +324,8 @@ start:
 		    }
 		    break;
 		}
+
+                prev = tso;
 	    }
 	    /* Signal that there's completed table slots available */
 	    if ( !ReleaseSemaphore(completed_table_sema, 1, NULL) ) {
