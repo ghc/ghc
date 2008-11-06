@@ -15,4 +15,5 @@ projectName, projectUrl :: String
 projectName = "Haddock"
 projectUrl  = "http://www.haskell.org/haddock/"
 
+projectVersion :: String
 projectVersion = showVersion version
