@@ -389,6 +389,12 @@ pruneSparkQueue (evac_fn evac, void *user, Capability *cap)
     
     pool = cap->sparks;
     
+    // it is possible that top > bottom, indicating an empty pool.  We
+    // fix that here; this is only necessary because the loop below
+    // assumes it.
+    if (pool->top > pool->bottom)
+        pool->top = pool->bottom;
+
     // Take this opportunity to reset top/bottom modulo the size of
     // the array, to avoid overflow.  This is only possible because no
     // stealing is happening during GC.
