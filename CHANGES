@@ -1,3 +1,9 @@
+Changed in version 2.4.1:
+
+  * Depend on base 4.* when GHC >= 6.9, otherwise 3.*
+
+-----------------------------------------------------------------------------
+
 Changed in version 2.4.0:
 
   * Add framed view of the HTML documentation
