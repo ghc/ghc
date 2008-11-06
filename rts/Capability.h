@@ -109,7 +109,10 @@ struct Capability_ {
 } // typedef Capability is defined in RtsAPI.h
   // Capabilities are stored in an array, so make sure that adjacent
   // Capabilities don't share any cache-lines:
-  ATTRIBUTE_ALIGNED(64);
+#ifndef mingw32_HOST_OS
+  ATTRIBUTE_ALIGNED(64)
+#endif
+  ;
 
 
 #if defined(THREADED_RTS)
