@@ -51,16 +51,18 @@ typedef struct  SparkPool_ {
 } SparkPool;
 
 
-/* INVARIANTS, in this order: bottom/top consistent, reasonable size,
+/* INVARIANTS, in this order: reasonable size,
    topBound consistent, space pointer, space accessible to us */
 #define ASSERT_SPARK_POOL_INVARIANTS(p)         \
-  ASSERT((p)->bottom >= (p)->top);              \
   ASSERT((p)->size > 0);                        \
-  ASSERT((p)->size > (p)->bottom - (p)->top);	\
   ASSERT((p)->topBound <= (p)->top);            \
   ASSERT((p)->elements != NULL);                \
   ASSERT(*((p)->elements) || 1);                \
   ASSERT(*((p)->elements - 1  + ((p)->size)) || 1);
+
+// No: it is possible that top > bottom when using reclaimSpark()
+//  ASSERT((p)->bottom >= (p)->top);           
+//  ASSERT((p)->size > (p)->bottom - (p)->top);
 
 // Initialisation
 void initSparkPools (void);
