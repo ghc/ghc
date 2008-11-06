@@ -81,7 +81,7 @@ executable haddock
 
   if impl(ghc >= 6.9)
     build-depends: Cabal >= 1.5
-    build-depends: base >= 4.0.0.0 && < 5.0.0.0
+    build-depends: base >= 4.0.0.0 && < 4.1.0.0
   else
     build-depends: base < 4.0.0.0
 
