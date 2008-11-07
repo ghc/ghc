@@ -1497,7 +1497,7 @@ linkDynLib dflags o_files dep_packages = do
 
     -- On Windows we need to link the RTS import lib as Windows does
     -- not allow undefined symbols.
-#if defined(mingw32_HOST_OS)
+#if !defined(mingw32_HOST_OS)
     let pkgs_no_rts = filter ((/= rtsPackageId) . packageConfigId) pkgs
 #else
     let pkgs_no_rts = pkgs
