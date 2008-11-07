@@ -52,7 +52,7 @@ import StaticFlags
 import Linker
 import Util
 import NameSet
-import Maybes		( orElse )
+import Maybes		( orElse, expectJust )
 import FastString
 import Encoding
 import MonadUtils       ( liftIO )
@@ -2247,7 +2247,7 @@ listModuleLine modl line = do
    case this of
      [] -> panic "listModuleLine"
      summ:_ -> do
-           let filename = fromJust (ml_hs_file (GHC.ms_location summ))
+           let filename = expectJust "listModuleLine" (ml_hs_file (GHC.ms_location summ))
                loc = GHC.mkSrcLoc (mkFastString (filename)) line 0
            io $ listAround (GHC.srcLocSpan loc) False
 

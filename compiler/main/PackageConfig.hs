@@ -21,7 +21,7 @@ module PackageConfig (
 
 #include "HsVersions.h"
 
-import Data.Maybe
+import Maybes
 import Module
 import Distribution.InstalledPackageInfo
 import Distribution.ModuleName
@@ -80,7 +80,7 @@ packageConfigToInstalledPackageInfo
         pkgconf{ exposedModules = map convert e,
                  hiddenModules  = map convert h }
     where convert :: Module.ModuleName -> Distribution.ModuleName.ModuleName
-          convert = fromJust . simpleParse . moduleNameString
+          convert = (expectJust "packageConfigToInstalledPackageInfo") . simpleParse . moduleNameString
 
 -- | Turn an 'InstalledPackageInfo', which contains Cabal 'Distribution.ModuleName.ModuleName's
 -- into a GHC specific 'PackageConfig' which contains GHC 'Module.ModuleName's

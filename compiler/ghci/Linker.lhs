@@ -78,7 +78,6 @@ import System.Directory
 import Distribution.Package hiding (depends, PackageId)
 
 import Exception
-import Data.Maybe
 \end{code}
 
 
@@ -638,8 +637,7 @@ getLinkDeps hsc_env hpt _ maybe_normal_osuf span mods
 
     get_linkable maybe_normal_osuf mod_name	-- A home-package module
 	| Just mod_info <- lookupUFM hpt mod_name 
-	= ASSERT(isJust (hm_linkable mod_info))
-	  adjust_linkable (fromJust (hm_linkable mod_info))
+	= adjust_linkable (Maybes.expectJust "getLinkDeps" (hm_linkable mod_info))
 	| otherwise	
 	= do	-- It's not in the HPT because we are in one shot mode, 
 		-- so use the Finder to get a ModLocation...

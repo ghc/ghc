@@ -20,7 +20,7 @@ import LazyUniqFM
 import FiniteMap
 import FastString
 
-import Maybe
+import Maybes
 import Monad
 \end{code}
 
@@ -117,8 +117,8 @@ checkFamInstConsistency famInstMods directlyImpMods
     -- already loaded in the EPS or they are in the HPT.
     --
     check modInstsEnv (ModulePair m1 m2)
-      = let { instEnv1 = fromJust . lookupModuleEnv modInstsEnv $ m1
-	    ; instEnv2 = fromJust . lookupModuleEnv modInstsEnv $ m2
+      = let { instEnv1 = (expectJust "checkFamInstConsistency") . lookupModuleEnv modInstsEnv $ m1
+	    ; instEnv2 = (expectJust "checkFamInstConsistency") . lookupModuleEnv modInstsEnv $ m2
 	    ; insts1   = famInstEnvElts instEnv1
 	    }
         in
