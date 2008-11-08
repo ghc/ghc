@@ -47,7 +47,7 @@ startGhc libDir flags = do
 #endif
     let dynflags' = dopt_set dynflags Opt_Haddock
     let dynflags'' = dynflags' {
-        hscTarget = HscAsm,
+        hscTarget = HscNothing,
         ghcMode   = CompManager,
         ghcLink   = NoLink
       }
