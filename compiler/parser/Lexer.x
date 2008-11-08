@@ -709,7 +709,6 @@ reservedSymsFM = listToUFM $
        ,("-<<", ITLarrowtail, arrowsEnabled)
        ,(">>-", ITRarrowtail, arrowsEnabled)
 
-#if __GLASGOW_HASKELL__ >= 605
        ,("∷",   ITdcolon, unicodeSyntaxEnabled)
        ,("⇒",   ITdarrow, unicodeSyntaxEnabled)
        ,("∀",   ITforall, \i -> unicodeSyntaxEnabled i &&
@@ -720,7 +719,6 @@ reservedSymsFM = listToUFM $
         -- ToDo: ideally, → and ∷ should be "specials", so that they cannot
         -- form part of a large operator.  This would let us have a better
         -- syntax for kinds: ɑ∷*→* would be a legal kind signature. (maybe).
-#endif
        ]
 
 -- -----------------------------------------------------------------------------
