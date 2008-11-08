@@ -24,11 +24,6 @@ module MonadUtils
 -- Detection of available libraries
 ----------------------------------------------------------------------------------------
 
-#if __GLASGOW_HASKELL__ >= 606
-#define HAVE_APPLICATIVE 1
-#else
-#define HAVE_APPLICATIVE 0
-#endif
 -- we don't depend on MTL for now
 #define HAVE_MTL 0
 
@@ -38,36 +33,12 @@ module MonadUtils
 
 import Maybes
 
-#if HAVE_APPLICATIVE
 import Control.Applicative
-#endif
 #if HAVE_MTL
 import Control.Monad.Trans
 #endif
 import Control.Monad
 import Control.Monad.Fix
-
-----------------------------------------------------------------------------------------
--- Applicative
-----------------------------------------------------------------------------------------
-
-#if !HAVE_APPLICATIVE
-
-class Functor f => Applicative f where
-    pure  :: a -> f a
-    (<*>) :: f (a -> b) -> f a -> f b
-
-(<$>) :: Functor f => (a -> b) -> (f a -> f b)
-(<$>) = fmap
-
-infixl 4 <$>
-infixl 4 <*>
-
-instance Applicative IO where
-	pure = return
-	(<*>) = ap
-
-#endif
 
 ----------------------------------------------------------------------------------------
 -- MTL
