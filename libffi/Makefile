@@ -56,7 +56,7 @@ PLATFORM := $(shell echo $(HOSTPLATFORM) | sed 's/i[567]86/i486/g')
 LIBFFI_TARBALL := $(firstword $(wildcard libffi*.tar.gz))
 LIBFFI_DIR := $(subst .tar.gz,,$(LIBFFI_TARBALL))
 
-BINDIST_STAMPS = stamp.ffi
+BINDIST_STAMPS = stamp.ffi.build stamp.ffi.configure
 
 ifeq "$(BuildSharedLibs)" "YES"
 STAMP_BUILD = stamp.ffi.build-shared
@@ -81,7 +81,7 @@ DYNAMIC_PROG = $(HS_DYN_LIB_NAME).a
 DYNAMIC_LIBS = $(HS_DYN_LIB_NAME)
 else
 DYNAMIC_PROG =
-DYNAMIC_LIBS = libffi.so libffi.so.5 libffi.so.5.0.5
+DYNAMIC_LIBS = libffi.so libffi.so.5 libffi.so.5.0.7
 endif
 
 ifeq "$(BuildSharedLibs)" "YES"
@@ -141,12 +141,11 @@ ffi.h: $(STAMP_CONFIGURE)
 $(STAMP_BUILD): $(STAMP_CONFIGURE)
 	$(MAKE) -C build MAKEFLAGS=
 	(cd build; ./libtool --mode=install cp libffi.la $(FPTOOLS_TOP_ABS)/libffi)
+	$(CP) $(STATIC_LIB) libHSffi.a
+	$(CP) $(STATIC_LIB) libHSffi_p.a
 	touch $@
 
-$(STATIC_LIB) $(DYNAMIC_LIBS): $(STAMP_BUILD)
-
-libHSffi.a libHSffi_p.a: $(STATIC_LIB)
-	$(CP) $(STATIC_LIB) $@
+libHSffi.a libHSffi_p.a: $(STAMP_BUILD)
 
 all :: libHSffi.a libHSffi_p.a
 
@@ -191,6 +190,7 @@ clean distclean maintainer-clean ::
 
 include $(TOP)/mk/target.mk
 
+BINDIST_EXTRAS += package.conf.in
 BINDIST_EXTRAS += $(BINDIST_STAMPS)
 BINDIST_EXTRAS += $(INSTALL_PROGS)
 BINDIST_EXTRAS += $(INSTALL_LIBS)
