@@ -929,14 +929,12 @@ GhcPatchLevel	= @ProjectPatchLevel@
 GhcMajVersion	= @GhcMajVersion@
 GhcMinVersion	= @GhcMinVersion@
 
-ghc_ge_605 = YES
 ghc_ge_607 = YES
 ghc_ge_609 = YES
 
 else # not UseStage1 or BootingFromHc
 
 # Some useful GHC version predicates:
-ghc_ge_605 = @ghc_ge_605@
 ghc_ge_607 = @ghc_ge_607@
 ghc_ge_609 = @ghc_ge_609@
 

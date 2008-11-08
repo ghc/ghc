@@ -23,11 +23,6 @@ GHC_OPTS    += $(GhcStage$(stage)HcOpts)
 GHC_OPTS    += $(addprefix -optc, $(MACOSX_DEPLOYMENT_CC_OPTS))
 LIB_LD_OPTS += $(addprefix -optl, $(MACOSX_DEPLOYMENT_LD_OPTS))
 
-# Work around a bug "splitTyConApp e1{tv a2iZ}" in 6.4.2:
-ifeq "$(ghc_ge_605)" "NO"
-dist-stage1/build/IOEnv.o: GHC_OPTS += -O0
-endif
-
 # XXX These didn't work in the old build system, according to the
 # comment at least. We should actually handle them properly at some
 # point:

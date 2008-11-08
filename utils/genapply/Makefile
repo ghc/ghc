@@ -17,11 +17,7 @@ SRC_HC_OPTS += -package pretty
 endif
 
 # Try to get dependencies right...
-ifeq "$(ghc_ge_605)" "YES"
 SRC_HC_OPTS += -fforce-recomp
-else
-SRC_HC_OPTS += -no-recomp
-endif
 
 GenApply.o : $(GHC_INCLUDE_DIR)/ghcconfig.h
 GenApply.o : $(GHC_INCLUDE_DIR)/MachRegs.h

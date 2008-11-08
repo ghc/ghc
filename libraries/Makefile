@@ -116,9 +116,6 @@ subdirs:
 HERE_ABS=$(FPTOOLS_TOP_ABS)/libraries
 
 CABAL_GHC_FLAGS = -Wall
-ifeq "$(ghc_ge_605)" "NO"
-CABAL_GHC_FLAGS += -cpp
-endif
 
 BOOTSTRAPPING_FLAGS = $(CABAL_GHC_FLAGS) -DCABAL_VERSION=$(CABAL_VERSION) -odir $(HERE_ABS)/bootstrapping -hidir $(HERE_ABS)/bootstrapping -i$(HERE_ABS)/Cabal -i$(HERE_ABS)/filepath -i$(HERE_ABS)/hpc
 
