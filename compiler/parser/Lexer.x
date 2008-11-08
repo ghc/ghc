@@ -70,11 +70,9 @@ import Util		( maybePrefixMatch, readRational )
 
 import Control.Monad
 import Data.Bits
-import Data.Char 	( chr, ord, isSpace )
+import Data.Char
 import Data.Ratio
 import Debug.Trace
-
-import Unicode ( GeneralCategory(..), generalCategory, isPrint, isUpper )
 }
 
 $unispace    = \x05 -- Trick Alex into handling Unicode. See alexGetChar.

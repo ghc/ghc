@@ -109,8 +109,6 @@ Library
     c-sources:
         parser/cutils.c
         utils/md5.c
-        -- For GHC < 6.5:
-        cbits/unicode.c
 
     if flag(dynlibs)
         c-sources:
@@ -422,7 +420,6 @@ Library
         Serialized
         State
         StringBuffer
-        Unicode
         UniqFM
         UniqSet
         Util
