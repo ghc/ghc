@@ -225,10 +225,6 @@ mkGlobalThings decls things
 	 = (name, AClass cl)
     mk_thing (L _ decl, ~(ATyCon tc))
          = (tcdName decl, ATyCon tc)
-#if __GLASGOW_HASKELL__ < 605
--- Old GHCs don't understand that ~... matches anything
-    mk_thing _ = panic "mkGlobalThings: Can't happen"
-#endif
 \end{code}
 
 
