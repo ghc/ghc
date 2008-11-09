@@ -7,6 +7,9 @@
 
 module Distribution.Haddock (
   readInterfaceFile,
+  nameCacheFromGhc,
+  freshNameCache,
+  NameCacheAccessor,
   InterfaceFile(..),
   LinkEnv,
   InstalledInterface(..),
