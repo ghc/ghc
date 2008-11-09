@@ -1,6 +1,6 @@
-# Annotations were implemented in GHC 6.9 and not supported in other compilers
+# Annotations were implemented in GHC 6.11 and not supported in other compilers
 # These tests are very slow due to their use of package GHC
-setTestOpts(compose(skip_if_fast, if_compiler_lt('ghc', '6.9', skip)));
+setTestOpts(compose(skip_if_fast, if_compiler_lt('ghc', '6.11', skip)));
 
 runCmd('$MAKE -C ' + in_testdir('') + ' config')
 

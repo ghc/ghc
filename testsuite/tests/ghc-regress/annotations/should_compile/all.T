@@ -1,5 +1,5 @@
-# Annotations were implemented in GHC 6.9 and not supported in other compilers
-setTestOpts(if_compiler_lt('ghc', '6.9', skip));
+# Annotations were implemented in GHC 6.11 and not supported in other compilers
+setTestOpts(if_compiler_lt('ghc', '6.11', skip));
 
 test('ann01', normal, compile, ['-v0'])
 
