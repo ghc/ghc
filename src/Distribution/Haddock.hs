@@ -13,7 +13,7 @@ module Distribution.Haddock (
   InterfaceFile(..),
   LinkEnv,
   InstalledInterface(..),
-  module DocName
+  module Haddock.DocName
 ) where
 
 
