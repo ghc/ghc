@@ -927,6 +927,9 @@ AC_DEFUN([FP_PROG_GHC_PKG],
 [fp_ghc_pkg_guess=`echo $WithGhc | sed 's,ghc\(@<:@^/\\@:>@*\)$,ghc-pkg\1,'`
 if "$fp_ghc_pkg_guess" -l > /dev/null 2>&1; then
   fp_cv_matching_ghc_pkg=$fp_ghc_pkg_guess
+elif "$fp_ghc_pkg_guess" list > /dev/null 2>&1; then
+  # from 6.10, ghc-pkg doesn't support the old -l syntax any more
+  fp_cv_matching_ghc_pkg=$fp_ghc_pkg_guess
 else
   fp_cv_matching_ghc_pkg=no
 fi])
