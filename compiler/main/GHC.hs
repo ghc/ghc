@@ -659,6 +659,10 @@ data LoadHowMuch
 
 -- | Try to load the program.  Calls 'loadWithLogger' with the default
 -- compiler that just immediately logs all warnings and errors.
+--
+-- This function may throw a 'SourceError' if errors are encountered before
+-- the actual compilation starts (e.g., during dependency analysis).
+--
 load :: GhcMonad m => LoadHowMuch -> m SuccessFlag
 load how_much =
     loadWithLogger defaultWarnErrLogger how_much
@@ -676,7 +680,11 @@ defaultWarnErrLogger (Just e) = printExceptionAndWarnings e
 --
 -- The first argument is a function that is called after compiling each
 -- module to print wanrings and errors.
-
+--
+-- While compiling a module, all 'SourceError's are caught and passed to the
+-- logger, however, this function may still throw a 'SourceError' if
+-- dependency analysis failed (e.g., due to a parse error).
+--
 loadWithLogger :: GhcMonad m => WarnErrLogger -> LoadHowMuch -> m SuccessFlag
 loadWithLogger logger how_much = do
     -- Dependency analysis first.  Note that this fixes the module graph:
