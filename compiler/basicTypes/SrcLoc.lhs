@@ -296,7 +296,7 @@ isGoodSrcSpan SrcSpanPoint{} = True
 isGoodSrcSpan _ = False
 
 isOneLineSpan :: SrcSpan -> Bool
--- ^ True if the span is known to straddle more than one line.
+-- ^ True if the span is known to straddle only one line.
 -- For "bad" 'SrcSpan', it returns False
 isOneLineSpan s
   | isGoodSrcSpan s = srcSpanStartLine s == srcSpanEndLine s
