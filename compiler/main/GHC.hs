@@ -78,6 +78,9 @@ module GHC (
 	findGlobalAnns,
         mkPrintUnqualifiedForModule,
 
+        -- * Querying the environment
+        packageDbModules,
+
 	-- * Printing
 	PrintUnqualified, alwaysQualify,
 
@@ -283,6 +286,7 @@ import SysTools     ( initSysTools, cleanTempFiles, cleanTempFilesExcept,
 import Annotations
 import Module
 import LazyUniqFM
+import qualified UniqFM as UFM
 import UniqSet
 import Unique
 import FiniteMap
@@ -2426,6 +2430,23 @@ findGlobalAnns deserialize target = withSession $ \hsc_env -> do
 getGRE :: GhcMonad m => m GlobalRdrEnv
 getGRE = withSession $ \hsc_env-> return $ ic_rn_gbl_env (hsc_IC hsc_env)
 #endif
+
+-- -----------------------------------------------------------------------------
+
+-- | Return all /external/ modules available in the package database.
+-- Modules from the current session (i.e., from the 'HomePackageTable') are
+-- not included.
+packageDbModules :: GhcMonad m =>
+                    Bool  -- ^ Only consider exposed packages.
+                 -> m [Module]
+packageDbModules only_exposed = do
+   dflags <- getSessionDynFlags
+   let pkgs = UFM.eltsUFM (pkgIdMap (pkgState dflags))
+   return $
+     [ mkModule pid modname | p <- pkgs
+                            , not only_exposed || exposed p
+                            , pid <- [mkPackageId (package p)]
+                            , modname <- exposedModules p ]
 
 -- -----------------------------------------------------------------------------
 -- Misc exported utils
