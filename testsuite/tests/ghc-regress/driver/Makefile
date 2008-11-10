@@ -463,3 +463,7 @@ mode001:
 	$(TEST_HC) --interactive --version | sed "s/, version.*//"
 	$(TEST_HC) --version --interactive | sed "s/, version.*//"
 
+# Test for building DLLs with ghc -shared, see #2745
+shared001:
+	$(RM) Shared001.hi Shared001.o HSdll.dll.a HSdll.dll Shared001_stub.*
+	$(TEST_HC) -shared Shared001.hs
