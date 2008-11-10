@@ -19,10 +19,12 @@ data DocName = Documented Name Module | Undocumented Name
   deriving Eq
 
 
+-- | The 'OccName' belonging to this name
 docNameOcc :: DocName -> OccName
 docNameOcc = nameOccName . docNameOrig
 
 
+-- | The original definition site of this name
 docNameOrig :: DocName -> Name
 docNameOrig (Documented name _) = name
 docNameOrig (Undocumented name) = name
