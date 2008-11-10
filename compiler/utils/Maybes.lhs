@@ -35,14 +35,9 @@ infixr 4 `orElse`
 maybeToBool :: Maybe a -> Bool
 maybeToBool Nothing  = False
 maybeToBool (Just _) = True
-\end{code}
 
-@catMaybes@ takes a list of @Maybe@s and returns a list of
-the contents of all the @Just@s in it. @allMaybes@ collects
-a list of @Justs@ into a single @Just@, returning @Nothing@ if there
-are any @Nothings@.
-
-\begin{code}
+-- | Collects a list of @Justs@ into a single @Just@, returning @Nothing@ if
+-- there are any @Nothings@.
 allMaybes :: [Maybe a] -> Maybe [a]
 allMaybes [] = Just []
 allMaybes (Nothing : _)  = Nothing
@@ -50,12 +45,8 @@ allMaybes (Just x  : ms) = case allMaybes ms of
                            Nothing -> Nothing
                            Just xs -> Just (x:xs)
 
-\end{code}
-
-@firstJust@ takes a list of @Maybes@ and returns the
-first @Just@ if there is one, or @Nothing@ otherwise.
-
-\begin{code}
+-- | Takes a list of @Maybes@ and returns the first @Just@ if there is one, or
+-- @Nothing@ otherwise.
 firstJust :: [Maybe a] -> Maybe a
 firstJust [] = Nothing
 firstJust (Just x  : _)  = Just x
