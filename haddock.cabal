@@ -131,6 +131,7 @@ library
                         ScopedTypeVariables, MagicHash
   exposed-modules:      Distribution.Haddock
   other-modules:
+    Haddock.DocName
     Haddock.Types
     Haddock.InterfaceFile
     Haddock.Exception
