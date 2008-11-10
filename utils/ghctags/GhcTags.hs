@@ -331,7 +331,7 @@ getfoundthings (FileData _filename things _src_lines) = things
 
 dumpthing :: Bool -> FoundThing -> String
 dumpthing showmod (FoundThing modname name loc) =
-	fullname ++ "\t" ++ filename ++ "\t" ++ (show $ line + 1)
+	fullname ++ "\t" ++ filename ++ "\t" ++ (show line)
     where line = srcLocLine loc
           filename = unpackFS $ srcLocFile loc
           fullname = if showmod then moduleNameString modname ++ "." ++ name
