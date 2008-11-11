@@ -363,10 +363,7 @@ cmmNativeGen dflags us cmm count
 x86fp_kludge :: NatCmmTop -> NatCmmTop
 x86fp_kludge top@(CmmData _ _) = top
 x86fp_kludge top@(CmmProc info lbl params (ListGraph code)) = 
-	CmmProc info lbl params (ListGraph $ map bb_i386_insert_ffrees code)
-	where
-		bb_i386_insert_ffrees (BasicBlock id instrs) =
-			BasicBlock id (i386_insert_ffrees instrs)
+	CmmProc info lbl params (ListGraph $ i386_insert_ffrees code)
 #endif
 
 

@@ -557,19 +557,19 @@ data Operand
 #endif /* i386 or x86_64 */
 
 #if i386_TARGET_ARCH
-i386_insert_ffrees :: [Instr] -> [Instr]
-i386_insert_ffrees insns
-   | any is_G_instr insns
-   = concatMap ffree_before_nonlocal_transfers insns
+i386_insert_ffrees :: [GenBasicBlock Instr] -> [GenBasicBlock Instr]
+i386_insert_ffrees blocks
+   | or (map (any is_G_instr) [ instrs | BasicBlock id instrs <- blocks ])
+   = map ffree_before_nonlocal_transfers blocks
    | otherwise
-   = insns
-
-ffree_before_nonlocal_transfers insn
-   = case insn of
-        CALL _ _ -> [GFREE, insn]
-        JMP _    -> [GFREE, insn]
-        other    -> [insn]
-
+   = blocks
+  where
+   ffree_before_nonlocal_transfers (BasicBlock id insns) 
+     = BasicBlock id (foldr p [] insns)
+     where p insn r = case insn of
+                        CALL _ _ -> GFREE : insn : r
+                        JMP _    -> GFREE : insn : r
+                        other    -> insn : r
 
 -- if you ever add a new FP insn to the fake x86 FP insn set,
 -- you must update this too
