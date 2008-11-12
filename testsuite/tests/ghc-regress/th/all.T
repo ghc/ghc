@@ -25,6 +25,8 @@ test('TH_spliceE5',
      multimod_compile_and_run,
      ['TH_spliceE5.hs', '-v0'])
 
+test('TH_spliceE6', normal, compile, ['-v0'])
+
 # Testing profiling with TH is a bit tricky; we've already disabled
 # the prof way above, and also we want to add options specifically for
 # profiling (-osuf p_o) because this is necessary when mixing
