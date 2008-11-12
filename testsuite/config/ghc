@@ -47,6 +47,9 @@ if (ghc_with_threaded_rts == 1):
 	if (ghc_with_smp == 1):
 		config.run_ways.append('threaded2')
 
+if (ghc_with_profiling == 1 and ghc_with_threaded_rts == 1):
+        config.run_ways.append('profthreaded')
+
 config.way_flags = {
 	'normal'     : [],
 	'optc'       : ['-O -fvia-C'],
@@ -99,11 +102,9 @@ def get_compiler_info():
     config.compiler_maj_version = re.sub('^([0-9]+\.[0-9]+).*',r'\1', v[0])
     config.compiler_tags = v[1:]
 
-    # enable profthreaded only for GHC 6.9+ with profiling & threaded RTS:
-    if version_ge(config.compiler_version, '6.9') \
-          and ghc_with_profiling == 1 \
-          and ghc_with_threaded_rts == 1:
-        config.run_ways.append('profthreaded')
+    # remove profthreaded for GHC <6.9, it didn't work
+    if version_lt(config.compiler_version, '6.9'):
+        config.run_ways.remove('profthreaded')
 
     if version_ge(config.compiler_version, '6.9'):
         config.compiler_always_flags.append('-dno-debug-output')
