@@ -115,6 +115,7 @@ static int ocAllocateSymbolExtras_ELF ( ObjectCode* oc );
 static int ocVerifyImage_PEi386 ( ObjectCode* oc );
 static int ocGetNames_PEi386    ( ObjectCode* oc );
 static int ocResolve_PEi386     ( ObjectCode* oc );
+static void zapTrailingAtSign   ( unsigned char* sym );
 #elif defined(OBJFORMAT_MACHO)
 static int ocVerifyImage_MachO    ( ObjectCode* oc );
 static int ocGetNames_MachO       ( ObjectCode* oc );
@@ -1179,6 +1180,9 @@ lookupSymbol( char *lbl )
 #       elif defined(OBJFORMAT_PEi386)
         OpenedDLL* o_dll;
         void* sym;
+
+        zapTrailingAtSign ( lbl );
+
         for (o_dll = opened_dlls; o_dll != NULL; o_dll = o_dll->next) {
 	  /* debugBelch("look in %s for %s\n", o_dll->name, lbl); */
            if (lbl[0] == '_') {
@@ -2530,9 +2534,6 @@ ocResolve_PEi386 ( ObjectCode* oc )
                    + sym->Value);
          } else {
             copyName ( sym->Name, strtab, symbol, 1000-1 );
-            S = (UInt32) lookupSymbol( symbol );
-            if ((void*)S != NULL) goto foundit;
-            zapTrailingAtSign ( symbol );
             S = (UInt32) lookupSymbol( symbol );
             if ((void*)S != NULL) goto foundit;
 	    /* Newline first because the interactive linker has printed "linking..." */
