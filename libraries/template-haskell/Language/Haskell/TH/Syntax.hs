@@ -261,8 +261,8 @@ instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f, Lift g)
 
 
 trueName, falseName :: Name
-trueName  = mkNameG DataName "base" "GHC.Base" "True"
-falseName = mkNameG DataName "base" "GHC.Base" "False"
+trueName  = mkNameG DataName "ghc-prim" "GHC.Bool" "True"
+falseName = mkNameG DataName "ghc-prim" "GHC.Bool" "False"
 
 nothingName, justName :: Name
 nothingName = mkNameG DataName "base" "Data.Maybe" "Nothing"
