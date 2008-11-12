@@ -289,7 +289,7 @@ GarbageCollect ( rtsBool force_major_gc )
 
   /* Allocate a mark stack if we're doing a major collection.
    */
-  if (major_gc) {
+  if (major_gc && oldest_gen->steps[0].mark) {
       nat mark_stack_blocks;
       mark_stack_blocks = stg_max(MARK_STACK_BLOCKS, 
                                   oldest_gen->steps[0].n_old_blocks / 100);
