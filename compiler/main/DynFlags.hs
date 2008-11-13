@@ -430,6 +430,19 @@ data DynFlags = DynFlags {
   haddockOptions :: Maybe String
  }
 
+-- | The target code type of the compilation (if any).
+--
+-- 'HscNothing' can be used to avoid generating any output, however, note
+-- that:
+--
+--  * This will not run the desugaring step, thus no warnings generated in
+--    this step will be output.  In particular, this includes warnings
+--    related to pattern matching.
+--
+--  * At the moment switching from 'HscNothing' to 'HscInterpreted' without
+--    unloading first is not safe.  To unload use
+--    @GHC.setTargets [] >> GHC.load LoadAllTargets@.
+--
 data HscTarget
   = HscC
   | HscAsm

@@ -1576,65 +1576,75 @@ upsweep_mod hsc_env old_hpt (stable_obj, stable_bco) summary mod_index nmods
                         = compile hsc_env summary' mod_index nmods Nothing
 
         in
-	case target of
-
-            _any
+        case () of
+         _
                 -- Regardless of whether we're generating object code or
                 -- byte code, we can always use an existing object file
                 -- if it is *stable* (see checkStability).
-		| is_stable_obj, isJust old_hmi ->
-                        let Just hmi = old_hmi in
-		        return hmi
-			-- object is stable, and we have an entry in the
-			-- old HPT: nothing to do
+          | is_stable_obj, Just hmi <- old_hmi -> do
+                liftIO $ debugTraceMsg (hsc_dflags hsc_env) 5
+                           (text "skipping stable obj mod:" <+> ppr this_mod_name)
+                return hmi
+                -- object is stable, and we have an entry in the
+                -- old HPT: nothing to do
 
-		| is_stable_obj, isNothing old_hmi -> do
-		        linkable <- liftIO $ findObjectLinkable this_mod obj_fn
-					(expectJust "upsweep1" mb_obj_date)
-		        compile_it (Just linkable)
-			-- object is stable, but we need to load the interface
-			-- off disk to make a HMI.
+          | is_stable_obj, isNothing old_hmi -> do
+                liftIO $ debugTraceMsg (hsc_dflags hsc_env) 5
+                           (text "compiling stable on-disk mod:" <+> ppr this_mod_name)
+                linkable <- liftIO $ findObjectLinkable this_mod obj_fn
+                              (expectJust "upsweep1" mb_obj_date)
+                compile_it (Just linkable)
+                -- object is stable, but we need to load the interface
+                -- off disk to make a HMI.
 
-            HscInterpreted
-		| is_stable_bco -> 
-		        ASSERT(isJust old_hmi) -- must be in the old_hpt
-                        let Just hmi = old_hmi in
-			return hmi
-			-- BCO is stable: nothing to do
+          | not (isObjectTarget target), is_stable_bco ->
+                ASSERT(isJust old_hmi) -- must be in the old_hpt
+                let Just hmi = old_hmi in do
+                liftIO $ debugTraceMsg (hsc_dflags hsc_env) 5
+                           (text "skipping stable BCO mod:" <+> ppr this_mod_name)
+                return hmi
+                -- BCO is stable: nothing to do
 
-		| Just hmi <- old_hmi,
-		  Just l <- hm_linkable hmi, not (isObjectLinkable l),
-		  linkableTime l >= ms_hs_date summary ->
-			compile_it (Just l)
-			-- we have an old BCO that is up to date with respect
-			-- to the source: do a recompilation check as normal.
+          | not (isObjectTarget target),
+            Just hmi <- old_hmi,
+            Just l <- hm_linkable hmi,
+            not (isObjectLinkable l),
+            linkableTime l >= ms_hs_date summary -> do
+                liftIO $ debugTraceMsg (hsc_dflags hsc_env) 5
+                           (text "compiling non-stable BCO mod:" <+> ppr this_mod_name)
+                compile_it (Just l)
+                -- we have an old BCO that is up to date with respect
+                -- to the source: do a recompilation check as normal.
 
-		| otherwise -> 
-                        compile_it Nothing
-			-- no existing code at all: we must recompile.
-
-              -- When generating object code, if there's an up-to-date
-              -- object file on the disk, then we can use it.
-              -- However, if the object file is new (compared to any
-              -- linkable we had from a previous compilation), then we
-              -- must discard any in-memory interface, because this
-              -- means the user has compiled the source file
-              -- separately and generated a new interface, that we must
-              -- read from the disk.
-              --
-            obj | isObjectTarget obj,
-		  Just obj_date <- mb_obj_date, obj_date >= hs_date -> do
-                     case old_hmi of
-                        Just hmi 
-                          | Just l <- hm_linkable hmi,
-                            isObjectLinkable l && linkableTime l == obj_date
-                            -> compile_it (Just l)
-                        _otherwise -> do
-		          linkable <- liftIO $ findObjectLinkable this_mod obj_fn obj_date
+          -- When generating object code, if there's an up-to-date
+          -- object file on the disk, then we can use it.
+          -- However, if the object file is new (compared to any
+          -- linkable we had from a previous compilation), then we
+          -- must discard any in-memory interface, because this
+          -- means the user has compiled the source file
+          -- separately and generated a new interface, that we must
+          -- read from the disk.
+          --
+          | isObjectTarget target,
+            Just obj_date <- mb_obj_date,
+            obj_date >= hs_date -> do
+                case old_hmi of
+                  Just hmi
+                    | Just l <- hm_linkable hmi,
+                      isObjectLinkable l && linkableTime l == obj_date -> do
+                          liftIO $ debugTraceMsg (hsc_dflags hsc_env) 5
+                                     (text "compiling mod with new on-disk obj:" <+> ppr this_mod_name)
+                          compile_it (Just l)
+                  _otherwise -> do
+                          liftIO $ debugTraceMsg (hsc_dflags hsc_env) 5
+                                     (text "compiling mod with new on-disk obj2:" <+> ppr this_mod_name)
+                          linkable <- liftIO $ findObjectLinkable this_mod obj_fn obj_date
                           compile_it_discard_iface (Just linkable)
 
-	    _otherwise ->
-		  compile_it Nothing
+         _otherwise -> do
+                liftIO $ debugTraceMsg (hsc_dflags hsc_env) 5
+                           (text "compiling mod:" <+> ppr this_mod_name)
+                compile_it Nothing
 
 
 
