@@ -340,7 +340,14 @@ schedule (Capability *initialCapability, Task *task)
 #endif
 	/* scheduleDoGC() deletes all the threads */
 	cap = scheduleDoGC(cap,task,rtsFalse);
-	break;
+
+        // after scheduleDoGC(), we must be shutting down.  Either some
+        // other Capability did the final GC, or we did it above,
+        // either way we can fall through to the SCHED_SHUTTING_DOWN
+        // case now.
+        ASSERT(sched_state == SCHED_SHUTTING_DOWN);
+        // fall through
+
     case SCHED_SHUTTING_DOWN:
 	debugTrace(DEBUG_sched, "SCHED_SHUTTING_DOWN");
 	// If we are a worker, just exit.  If we're a bound thread
@@ -1466,6 +1473,13 @@ scheduleDoGC (Capability *cap, Task *task USED_IF_THREADS, rtsBool force_major)
     rtsBool was_waiting;
     nat i;
 #endif
+
+    if (sched_state == SCHED_SHUTTING_DOWN) {
+        // The final GC has already been done, and the system is
+        // shutting down.  We'll probably deadlock if we try to GC
+        // now.
+        return cap;
+    }
 
 #ifdef THREADED_RTS
     // In order to GC, there must be no threads running Haskell code.
