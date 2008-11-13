@@ -725,8 +725,6 @@ shutdownCapability (Capability *cap, Task *task, rtsBool safe)
 {
     nat i;
 
-    ASSERT(sched_state == SCHED_SHUTTING_DOWN);
-
     task->cap = cap;
 
     // Loop indefinitely until all the workers have exited and there
@@ -736,6 +734,8 @@ shutdownCapability (Capability *cap, Task *task, rtsBool safe)
     // isn't safe, for one thing).
 
     for (i = 0; /* i < 50 */; i++) {
+        ASSERT(sched_state == SCHED_SHUTTING_DOWN);
+
 	debugTrace(DEBUG_sched, 
 		   "shutting down capability %d, attempt %d", cap->no, i);
 	ACQUIRE_LOCK(&cap->lock);
