@@ -115,7 +115,8 @@ static int ocAllocateSymbolExtras_ELF ( ObjectCode* oc );
 static int ocVerifyImage_PEi386 ( ObjectCode* oc );
 static int ocGetNames_PEi386    ( ObjectCode* oc );
 static int ocResolve_PEi386     ( ObjectCode* oc );
-static void zapTrailingAtSign   ( unsigned char* sym );
+static void *lookupSymbolInDLLs ( unsigned char *lbl );
+static void zapTrailingAtSign   ( unsigned char *sym );
 #elif defined(OBJFORMAT_MACHO)
 static int ocVerifyImage_MachO    ( ObjectCode* oc );
 static int ocGetNames_MachO       ( ObjectCode* oc );
@@ -1178,32 +1179,18 @@ lookupSymbol( char *lbl )
 	}
 #       endif /* HAVE_DLFCN_H */
 #       elif defined(OBJFORMAT_PEi386)
-        OpenedDLL* o_dll;
         void* sym;
 
-        zapTrailingAtSign ( lbl );
+        sym = lookupSymbolInDLLs(lbl);
+        if (sym != NULL) { return sym; };
 
-        for (o_dll = opened_dlls; o_dll != NULL; o_dll = o_dll->next) {
-	  /* debugBelch("look in %s for %s\n", o_dll->name, lbl); */
-           if (lbl[0] == '_') {
-              /* HACK: if the name has an initial underscore, try stripping
-                 it off & look that up first. I've yet to verify whether there's
-                 a Rule that governs whether an initial '_' *should always* be
-                 stripped off when mapping from import lib name to the DLL name.
-              */
-              sym = GetProcAddress(o_dll->instance, (lbl+1));
-              if (sym != NULL) {
-		/*debugBelch("found %s in %s\n", lbl+1,o_dll->name);*/
-		return sym;
-	      }
-           }
-           sym = GetProcAddress(o_dll->instance, lbl);
-           if (sym != NULL) {
-	     /*debugBelch("found %s in %s\n", lbl,o_dll->name);*/
-	     return sym;
-	   }
-        }
+        // Also try looking up the symbol without the @N suffix.  Some
+        // DLLs have the suffixes on their symbols, some don't.
+        zapTrailingAtSign ( lbl );
+        sym = lookupSymbolInDLLs(lbl);
+        if (sym != NULL) { return sym; };
         return NULL;
+
 #       else
         ASSERT(2+2 == 5);
         return NULL;
@@ -2014,6 +2001,36 @@ zapTrailingAtSign ( UChar* sym )
    while (j > 0 && my_isdigit(sym[j])) j--;
    if (j > 0 && sym[j] == '@' && j != i) sym[j] = 0;
 #  undef my_isdigit
+}
+
+static void *
+lookupSymbolInDLLs ( UChar *lbl )
+{
+    OpenedDLL* o_dll;
+    void *sym;
+
+    for (o_dll = opened_dlls; o_dll != NULL; o_dll = o_dll->next) {
+        /* debugBelch("look in %s for %s\n", o_dll->name, lbl); */
+
+        if (lbl[0] == '_') {
+            /* HACK: if the name has an initial underscore, try stripping
+               it off & look that up first. I've yet to verify whether there's
+               a Rule that governs whether an initial '_' *should always* be
+               stripped off when mapping from import lib name to the DLL name.
+            */
+            sym = GetProcAddress(o_dll->instance, (lbl+1));
+            if (sym != NULL) {
+		/*debugBelch("found %s in %s\n", lbl+1,o_dll->name);*/
+		return sym;
+            }
+        }
+        sym = GetProcAddress(o_dll->instance, lbl);
+        if (sym != NULL) {
+            /*debugBelch("found %s in %s\n", lbl,o_dll->name);*/
+            return sym;
+	   }
+    }
+    return NULL;
 }
 
 
