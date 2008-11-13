@@ -97,7 +97,7 @@ void    initThread(StgTSO *tso, nat stack_size);
 #define SCHED_INTERRUPTING  1  /* ^C detected, before threads are deleted */
 #define SCHED_SHUTTING_DOWN 2  /* final shutdown */
 
-extern rtsBool RTS_VAR(sched_state);
+extern volatile StgWord RTS_VAR(sched_state);
 
 /* 
  * flag that tracks whether we have done any execution in this time slice.
@@ -113,7 +113,7 @@ extern rtsBool RTS_VAR(sched_state);
  * INACTIVE to DONE_GC happens under sched_mutex.  No lock required
  * to set it to ACTIVITY_YES.
  */
-extern nat recent_activity;
+extern volatile StgWord recent_activity;
 
 /* Thread queues.
  * Locks required  : sched_mutex

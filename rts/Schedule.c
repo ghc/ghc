@@ -92,13 +92,15 @@ rtsBool blackholes_need_checking = rtsFalse;
 /* flag that tracks whether we have done any execution in this time slice.
  * LOCK: currently none, perhaps we should lock (but needs to be
  * updated in the fast path of the scheduler).
+ *
+ * NB. must be StgWord, we do xchg() on it.
  */
-nat recent_activity = ACTIVITY_YES;
+volatile StgWord recent_activity = ACTIVITY_YES;
 
 /* if this flag is set as well, give up execution
- * LOCK: none (changes once, from false->true)
+ * LOCK: none (changes monotonically)
  */
-rtsBool sched_state = SCHED_RUNNING;
+volatile StgWord sched_state = SCHED_RUNNING;
 
 /*  This is used in `TSO.h' and gcc 2.96 insists that this variable actually 
  *  exists - earlier gccs apparently didn't.
