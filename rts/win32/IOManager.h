@@ -6,11 +6,7 @@
  */
 #ifndef __IOMANAGER_H__
 #define __IOMANAGER_H__
-/* On the yucky side..suppress -Wmissing-declarations warnings when
- * including <windows.h>
- */
-extern void* GetCurrentFiber ( void );
-extern void* GetFiberData ( void );
+
 #include <windows.h>
 
 /*
