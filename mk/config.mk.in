@@ -459,7 +459,7 @@ LIBM=@LIBM@
 
 # .NET interop support?
 #
-DotnetSupport=@DotnetSupport@
+DotnetSupport=NO
 
 # Build unix package?
 #

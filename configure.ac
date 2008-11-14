@@ -835,20 +835,6 @@ dnl if test x"$EnableWin32DLLs" = "xYES" ; then
 dnl  AC_DEFINE(HAVE_WIN32_DLL_SUPPORT)
 dnl fi
 
-dnl ** .NET interop support?
-dnl --------------------------------------------------------------
-AC_ARG_ENABLE(dotnet,
-[AC_HELP_STRING([--enable-dotnet],
-[Build .NET interop layer. [default=no]])],
-[ if test x"$enableval" = x"yes"; then
-        DotnetSupport=YES; AC_DEFINE([WANT_DOTNET_SUPPORT], [1], [Define to 1 if you want to include .NET interop support.])
-  else
-        DotnetSupport=NO
-  fi],
-[DotnetSupport=NO]
-)
-AC_SUBST(DotnetSupport)
-
 dnl ** Mac OS X: explicit deployment target
 dnl --------------------------------------------------------------
 AC_ARG_WITH([macosx-deployment-target],
