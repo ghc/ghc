@@ -34,6 +34,12 @@
    Atomic operations
    ------------------------------------------------------------------------- */
    
+#if !IN_STG_CODE
+// We only want write_barrier() declared in .hc files.  Defining the
+// other inline functions here causes type mismatch errors from gcc,
+// because the generated C code is assuming that there are no
+// prototypes in scope.
+
 /* 
  * The atomic exchange operation: xchg(p,w) exchanges the value
  * pointed to by p with the value w, returning the old value.
@@ -54,6 +60,8 @@ EXTERN_INLINE StgWord xchg(StgPtr p, StgWord w);
  */
 EXTERN_INLINE StgWord cas(StgVolatilePtr p, StgWord o, StgWord n);
 
+#endif // !IN_STG_CODE
+
 /*
  * Prevents write operations from moving across this call in either
  * direction.
@@ -63,6 +71,9 @@ EXTERN_INLINE void write_barrier(void);
 /* ----------------------------------------------------------------------------
    Implementations
    ------------------------------------------------------------------------- */
+
+#if !IN_STG_CODE
+
 /* 
  * NB: the xchg instruction is implicitly locked, so we do not need
  * a lock prefix here. 
@@ -148,6 +159,8 @@ cas(StgVolatilePtr p, StgWord o, StgWord n)
 #error cas() unimplemented on this architecture
 #endif
 }
+
+#endif // !IN_STG_CODE
 
 /*
  * Write barrier - ensure that all preceding writes have happened
