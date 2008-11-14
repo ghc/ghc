@@ -21,7 +21,7 @@ def f(opts):
 setTestOpts(f)
 
 test('tcrun006', normal, compile_and_run, [''])
-test('tcrun007', normal, compile_and_run, [''])
+test('tcrun007', normal, compile_and_run, ['-package syb'])
 test('tcrun008', normal, compile_and_run, [''])
 test('tcrun009', normal, compile_and_run, [''])
 test('tcrun010', normal, compile_and_run, [''])
