@@ -727,6 +727,7 @@ AC_ARG_ENABLE(shared,
 [AC_HELP_STRING([--enable-shared],
 [Build shared libraries, if available. [default=no]])],
 [ if test x"$enableval" = x"yes"; then
+        AC_MSG_WARN([--enable-shared is experimental and not fully supported at this time])
         BuildSharedLibs=YES
   else
         BuildSharedLibs=NO
