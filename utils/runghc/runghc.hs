@@ -76,7 +76,7 @@ doIt ghc args = do
            tmpdir <- getTemporaryDirectory
            bracket
              (openTempFile tmpdir "runghcXXXX.hs")
-             (\(filename,_) -> removeFile filename)
+             (\(filename,h) -> do hClose h; removeFile filename)
              $ \(filename,h) -> do
                  getContents >>= hPutStr h
                  hClose h
