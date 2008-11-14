@@ -16,14 +16,6 @@
  *      Unregisterised builds are ok, but only 1 CPU supported.
  */
 
-#ifdef CMINUSMINUS
-
-#define unlockClosure(ptr,info)                 \
-    prim %write_barrier() [];                   \
-    StgHeader_info(ptr) = info;    
-
-#else
-
 #if defined(THREADED_RTS)
 
 #if  defined(TICKY_TICKY)
@@ -202,7 +194,5 @@ xchg(StgPtr p, StgWord w)
 }
 
 #endif /* !THREADED_RTS */
-
-#endif /* CMINUSMINUS */
 
 #endif /* SMP_H */

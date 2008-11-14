@@ -9,6 +9,14 @@
 #ifndef SMPCLOSUREOPS_H
 #define SMPCLOSUREOPS_H
 
+#ifdef CMINUSMINUS
+
+#define unlockClosure(ptr,info)                 \
+    prim %write_barrier() [];                   \
+    StgHeader_info(ptr) = info;    
+
+#else
+
 EXTERN_INLINE StgInfoTable *lockClosure(StgClosure *p);
 EXTERN_INLINE void unlockClosure(StgClosure *p, const StgInfoTable *info);
 
@@ -64,5 +72,7 @@ EXTERN_INLINE void lockTSO(StgTSO *tso)
 EXTERN_INLINE void unlockTSO(StgTSO *tso);
 EXTERN_INLINE void unlockTSO(StgTSO *tso)
 { unlockClosure((StgClosure*)tso, (const StgInfoTable *)&stg_TSO_info); }
+
+#endif /* CMINUSMINUS */
 
 #endif /* SMPCLOSUREOPS_H */

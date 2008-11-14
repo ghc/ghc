@@ -301,7 +301,7 @@
 #include "ClosureTypes.h"
 #include "StgFun.h"
 #include "OSThreads.h"
-#include "SMP.h"
+#include "SMPClosureOps.h"
 
 /*
  * Need MachRegs, because some of the RTS code is conditionally
