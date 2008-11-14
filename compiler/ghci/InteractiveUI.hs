@@ -96,10 +96,6 @@ import GHC.TopHandler
 
 import Data.IORef	( IORef, readIORef, writeIORef )
 
-#ifdef USE_EDITLINE
-import System.Posix.Internals ( setNonBlockingFD )
-#endif
-
 -----------------------------------------------------------------------------
 
 ghciWelcomeMsg :: String
@@ -641,11 +637,8 @@ readlineLoop = do
                    return (Just str)
 
 withReadline :: IO a -> IO a
-withReadline = bracket_ stopTimer (do startTimer; setNonBlockingFD 0)
-     -- Two problems are being worked around here:
-     -- 1. readline sometimes puts stdin into blocking mode,
-     --    so we need to put it back for the IO library
-     -- 2. editline doesn't handle some of its system calls returning
+withReadline = bracket_ stopTimer startTimer
+     --    editline doesn't handle some of its system calls returning
      --    EINTR, so our timer signal confuses it, hence we turn off
      --    the timer signal when making calls to editline. (#2277)
      --    If editline is ever fixed, we can remove this.
