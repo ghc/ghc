@@ -6,10 +6,18 @@ import Control.Exception
 main = do
          master <- myThreadId
          test master 10
+         -- make sure we catch a final NonTermination exception to get
+         -- a consistent result.
+         threadDelay (10 * one_second)
 
 test tid 0 = return ()
-test tid n = handle (\(e::NonTermination) -> test tid (n-1)) $ do
-                 sequence $ replicate 3 $
+test tid n = do
+  e <- try threads
+  case e of
+    Left NonTermination -> test tid (n-1)
+    Right _ -> return ()
+ where
+    threads = do sequence $ replicate 3 $
                          forkIO $ do t <- myThreadId
                                      --putStrLn ("Start " ++ show t)
                                      threadDelay one_second
