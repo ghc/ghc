@@ -57,14 +57,17 @@ globalWorkToDo (void)
 StgClosure *
 findSpark (Capability *cap)
 {
-  /* use the normal Sparks.h interface (internally modified to enable
-     concurrent stealing) 
-     and immediately turn the spark into a thread when successful
-  */
   Capability *robbed;
   StgClosurePtr spark;
   rtsBool retry;
   nat i = 0;
+
+  if (!emptyRunQueue(cap)) {
+      // If there are other threads, don't try to run any new
+      // sparks: sparks might be speculative, we don't want to take
+      // resources away from the main computation.
+      return 0;
+  }
 
   // first try to get a spark from our own pool.
   // We should be using reclaimSpark(), because it works without
