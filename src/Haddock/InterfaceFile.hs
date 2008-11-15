@@ -60,13 +60,13 @@ binaryInterfaceMagic = 0xD0Cface
 -- when one of our own (stored) datatypes is changed. 
 binaryInterfaceVersion :: Word16
 #if __GLASGOW_HASKELL__ == 608 && __GHC_PATCHLEVEL__ == 2
-binaryInterfaceVersion = 2
+binaryInterfaceVersion = 5
 #endif         
 #if __GLASGOW_HASKELL__ == 608 && __GHC_PATCHLEVEL__ == 3
-binaryInterfaceVersion = 3
+binaryInterfaceVersion = 6
 #endif           
 #if __GLASGOW_HASKELL__ >= 609
-binaryInterfaceVersion = 4
+binaryInterfaceVersion = 7
 #endif
 
 
@@ -353,12 +353,13 @@ instance Binary InterfaceFile where
 
 
 instance Binary InstalledInterface where
-  put_ bh (InstalledInterface modu info docMap exps visExps) = do
+  put_ bh (InstalledInterface modu info docMap exps visExps opts) = do
     put_ bh modu
     put_ bh info
     put_ bh (Map.toList docMap)
     put_ bh exps
     put_ bh visExps
+    put_ bh opts
 
   get bh = do
     modu    <- get bh
@@ -366,7 +367,8 @@ instance Binary InstalledInterface where
     docMap  <- get bh
     exps    <- get bh
     visExps <- get bh
-    return (InstalledInterface modu info (Map.fromList docMap) exps visExps)
+    opts    <- get bh
+    return (InstalledInterface modu info (Map.fromList docMap) exps visExps opts)
 
 
 instance Binary DocOption where

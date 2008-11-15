@@ -167,7 +167,8 @@ data InstalledInterface = InstalledInterface {
   instInfo           :: HaddockModInfo Name,
   instDocMap         :: Map Name (HsDoc DocName),
   instExports        :: [Name],
-  instVisibleExports :: [Name]
+  instVisibleExports :: [Name],
+  instOptions        :: [DocOption]
 }
 
 
@@ -178,7 +179,8 @@ toInstalledIface interface = InstalledInterface {
   instInfo           = ifaceInfo           interface,
   instDocMap         = ifaceRnDocMap       interface,
   instExports        = ifaceExports        interface,
-  instVisibleExports = ifaceVisibleExports interface
+  instVisibleExports = ifaceVisibleExports interface,
+  instOptions        = ifaceOptions        interface
 }
 
 

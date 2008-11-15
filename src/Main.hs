@@ -172,14 +172,12 @@ main = handleTopExceptions $ do
         -- create the interfaces -- this is the core part of Haddock
         (interfaces, homeLinks) <- createInterfaces fileArgs extLinks flags
 
-        let visibleIfaces = [ i | i <- interfaces, OptHide `notElem` ifaceOptions i ]
- 
         liftIO $ do
           -- render the interfaces
-          renderStep packages visibleIfaces
+          renderStep packages interfaces
  
           -- last but not least, dump the interface file
-          dumpInterfaceFile (map toInstalledIface visibleIfaces) homeLinks flags
+          dumpInterfaceFile (map toInstalledIface interfaces) homeLinks flags
 #else
       -- initialize GHC
       (session, dynflags) <- startGhc libDir (ghcFlags flags)
@@ -193,13 +191,11 @@ main = handleTopExceptions $ do
       -- create the interfaces -- this is the core part of Haddock
       (interfaces, homeLinks) <- createInterfaces session fileArgs extLinks flags
 
-      let visibleIfaces = [ i | i <- interfaces, OptHide `notElem` ifaceOptions i ]
-
       -- render the interfaces
-      renderStep packages visibleIfaces
+      renderStep packages interfaces
  
       -- last but not least, dump the interface file
-      dumpInterfaceFile (map toInstalledIface visibleIfaces) homeLinks flags
+      dumpInterfaceFile (map toInstalledIface interfaces) homeLinks flags
 #endif
     else do
       -- get packages supplied with --read-interface
@@ -216,7 +212,7 @@ main = handleTopExceptions $ do
 
 -- | Render the interfaces with whatever backend is specified in the flags 
 render :: [Flag] -> [Interface] -> [InstalledInterface] -> IO ()
-render flags visibleIfaces installedIfaces = do
+render flags ifaces installedIfaces = do
   let
     title = case [str | Flag_Heading str <- flags] of
 		[] -> ""
@@ -271,11 +267,13 @@ render flags visibleIfaces installedIfaces = do
   prologue <- getPrologue flags
 
   let 
+    visibleIfaces    = [ i | i <- ifaces, OptHide `notElem` ifaceOptions i ]
+
     -- *all* visible interfaces including external package modules
-    allVisibleIfaces = map toInstalledIface visibleIfaces
-                       ++ installedIfaces
-    
-    packageMod       = ifaceMod (head visibleIfaces)
+    allIfaces        = map toInstalledIface ifaces ++ installedIfaces
+    allVisibleIfaces = [ i | i <- allIfaces, OptHide `notElem` instOptions i ]
+
+    packageMod       = ifaceMod (head ifaces)
     packageStr       = Just (modulePackageString packageMod)
     (pkgName,pkgVer) = modulePackageInfo packageMod
 
@@ -304,6 +302,7 @@ render flags visibleIfaces installedIfaces = do
 
   when (Flag_Hoogle `elem` flags) $ do
     ppHoogle pkgName pkgVer title prologue visibleIfaces odir
+
 
 -------------------------------------------------------------------------------
 -- Reading and dumping interface files
