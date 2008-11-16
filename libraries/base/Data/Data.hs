@@ -432,7 +432,7 @@ newtype Mp m x = Mp { unMp :: m (x, Bool) }
 
 -- | Build a term skeleton
 fromConstr :: Data a => Constr -> a
-fromConstr = fromConstrB undefined
+fromConstr = fromConstrB (error "Data.Data.fromConstr")
 
 
 -- | Build a term and use a generic function for subterms
