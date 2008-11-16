@@ -23,7 +23,7 @@ esac
 
 for HADDOCK_FILE in $HADDOCK_FILES
 do
-    NAME=` echo "$HADDOCK_FILE" | sed 's#/dist/.*##' | sed 's#.*/##' `
+    NAME=` echo "$HADDOCK_FILE" | sed 's#.*/##' | sed 's#\.haddock$##' `
     HADDOCK_ARGS="$HADDOCK_ARGS --read-interface=$NAME,$HADDOCK_FILE"
     NAMES="$NAMES $NAME"
 done
