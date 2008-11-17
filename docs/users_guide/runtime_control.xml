@@ -130,6 +130,35 @@
          own signal handlers.</para>
        </listitem>
      </varlistentry>
+
+     <varlistentry>
+       <term><option>-xm<replaceable>address</replaceable></option>
+       <indexterm><primary><option>-xm</option></primary><secondary>RTS
+       option</secondary></indexterm></term>
+       <listitem>
+         <para>
+           WARNING: this option is for working around memory
+           allocation problems only.  Do not use unless GHCi fails
+           with a message like &ldquo;<literal>failed to mmap() memory below 2Gb</literal>&rdquo;.  If you need to use this option to get GHCi working
+           on your machine, please file a bug.
+         </para>
+         
+         <para>
+           On 64-bit machines, the RTS needs to allocate memory in the
+           low 2Gb of the address space.  Support for this across
+           different operating systems is patchy, and sometimes fails.
+           This option is there to give the RTS a hint about where it
+           should be able to allocate memory in the low 2Gb of the
+           address space.  For example, <literal>+RTS -xm20000000
+           -RTS</literal> would hint that the RTS should allocate
+           starting at the 0.5Gb mark.  The default is to use the OS's
+           built-in support for allocating memory in the low 2Gb if
+           available (e.g. <literal>mmap</literal>
+           with <literal>MAP_32BIT</literal> on Linux), or
+           otherwise <literal>-xm40000000</literal>.
+         </para>
+       </listitem>
+     </varlistentry>
     </variablelist>
   </sect2>
 

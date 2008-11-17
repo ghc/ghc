@@ -28,6 +28,7 @@
 #include "Sparks.h"
 #include "RtsTypeable.h"
 #include "Timer.h"
+#include "Trace.h"
 
 #ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
@@ -167,6 +168,50 @@ static void machoInitSymbolsWithoutUnderscore( void );
  *                  default proto extern void sym(void);
  */
 #define X86_64_ELF_NONPIC_HACK 1
+
+/* Link objects into the lower 2Gb on x86_64.  GHC assumes the
+ * small memory model on this architecture (see gcc docs,
+ * -mcmodel=small).
+ *
+ * MAP_32BIT not available on OpenBSD/amd64
+ */
+#if defined(x86_64_HOST_ARCH) && defined(MAP_32BIT)
+#define TRY_MAP_32BIT MAP_32BIT
+#else
+#define TRY_MAP_32BIT 0
+#endif
+
+/*
+ * Due to the small memory model (see above), on x86_64 we have to map
+ * all our non-PIC object files into the low 2Gb of the address space
+ * (why 2Gb and not 4Gb?  Because all addresses must be reachable
+ * using a 32-bit signed PC-relative offset). On Linux we can do this
+ * using the MAP_32BIT flag to mmap(), however on other OSs
+ * (e.g. *BSD, see #2063, and also on Linux inside Xen, see #2512), we
+ * can't do this.  So on these systems, we have to pick a base address
+ * in the low 2Gb of the address space and try to allocate memory from
+ * there.
+ *
+ * We pick a default address based on the OS, but also make this
+ * configurable via an RTS flag (+RTS -xm)
+ */
+#if defined(x86_64_HOST_ARCH)
+
+#if defined(MAP_32BIT)
+// Try to use MAP_32BIT
+#define MMAP_32BIT_BASE_DEFAULT 0
+#else
+// A guess: 1Gb.
+#define MMAP_32BIT_BASE_DEFAULT 0x40000000
+#endif
+
+static void *mmap_32bit_base = MMAP_32BIT_BASE_DEFAULT;
+#endif
+
+/* MAP_ANONYMOUS is MAP_ANON on some systems, e.g. OpenBSD */
+#if !defined(MAP_ANONYMOUS) && defined(MAP_ANON)
+#define MAP_ANONYMOUS MAP_ANON
+#endif
 
 /* -----------------------------------------------------------------------------
  * Built-in symbols from the RTS
@@ -994,6 +1039,13 @@ initLinker( void )
     dl_prog_handle = dlopen(NULL, RTLD_LAZY);
 #   endif /* RTLD_DEFAULT */
 #   endif
+
+#if defined(x86_64_HOST_ARCH)
+    if (RtsFlags.MiscFlags.linkerMemBase != 0) {
+        // User-override for mmap_32bit_base
+        mmap_32bit_base = (void*)RtsFlags.MiscFlags.linkerMemBase;
+    }
+#endif
 }
 
 /* -----------------------------------------------------------------------------
@@ -1240,6 +1292,61 @@ void ghci_enquire ( char* addr )
 static unsigned int PLTSize(void);
 #endif
 
+static void *
+mmapForLinker (size_t bytes, nat flags, int fd)
+{
+   void *map_addr = NULL;
+   void *result;
+
+mmap_again:
+
+#if defined(x86_64_HOST_ARCH)
+   if (mmap_32bit_base != 0) {
+       map_addr = mmap_32bit_base;
+   }
+#endif
+
+   result = mmap(map_addr, bytes, PROT_EXEC|PROT_READ|PROT_WRITE,
+		    MAP_PRIVATE|TRY_MAP_32BIT|flags, fd, 0);
+
+   if (result == MAP_FAILED) {
+       sysErrorBelch("mmap");
+       stg_exit(EXIT_FAILURE);
+   }
+   
+#if defined(x86_64_HOST_ARCH)
+   if (mmap_32bit_base != 0) {
+       if (result == map_addr) {
+           mmap_32bit_base = map_addr + bytes;
+       } else {
+           if ((W_)result > 0x80000000) {
+               // oops, we were given memory over 2Gb
+               // ... try allocating memory somewhere else?;
+               barf("loadObj: failed to mmap() memory below 2Gb; asked for %lu bytes at 0x%p, got 0x%p.  Try specifying an address with +RTS -xm<addr> -RTS", bytes, map_addr, result);
+           } else {
+               // hmm, we were given memory somewhere else, but it's
+               // still under 2Gb so we can use it.  Next time, ask
+               // for memory right after the place we just got some
+               mmap_32bit_base = (void*)result + bytes;
+           }
+       }
+   } else {
+       if ((W_)result > 0x80000000) {
+           // oops, we were given memory over 2Gb
+           // ... try allocating memory somewhere else?;
+           debugTrace(DEBUG_linker,"MAP_32BIT didn't work; gave us %lu bytes at 0x%p", bytes, result);
+           munmap(result, bytes);
+           
+           // Set a base address and try again... (guess: 1Gb)
+           mmap_32bit_base = (void*)0x40000000;
+           goto mmap_again;
+       }
+   }
+#endif
+
+   return result;
+}
+
 /* -----------------------------------------------------------------------------
  * Load an obj (populate the global symbol table, but don't resolve yet)
  *
@@ -1253,7 +1360,6 @@ loadObj( char *path )
    int r, n;
 #ifdef USE_MMAP
    int fd, pagesize;
-   void *map_addr = NULL;
 #else
    FILE *f;
 #endif
@@ -1340,27 +1446,14 @@ loadObj( char *path )
 
    n = ROUND_UP(oc->fileSize, pagesize);
 
-   /* Link objects into the lower 2Gb on x86_64.  GHC assumes the
-    * small memory model on this architecture (see gcc docs,
-    * -mcmodel=small).
-    *
-    * MAP_32BIT not available on OpenBSD/amd64
-    */
-#if defined(x86_64_HOST_ARCH) && defined(MAP_32BIT)
-#define EXTRA_MAP_FLAGS MAP_32BIT
-#else
-#define EXTRA_MAP_FLAGS 0
-#endif
-
-   /* MAP_ANONYMOUS is MAP_ANON on some systems, e.g. OpenBSD */
-#if !defined(MAP_ANONYMOUS) && defined(MAP_ANON)
-#define MAP_ANONYMOUS MAP_ANON
-#endif
-
+#ifdef ia64_HOST_ARCH
    oc->image = mmap(map_addr, n, PROT_EXEC|PROT_READ|PROT_WRITE,
-		    MAP_PRIVATE|EXTRA_MAP_FLAGS, fd, 0);
+		    MAP_PRIVATE|TRY_MAP_32BIT, fd, 0);
    if (oc->image == MAP_FAILED)
       barf("loadObj: can't map `%s'", path);
+#else
+   oc->image = mmapForLinker(n, 0, fd);
+#endif
 
    close(fd);
 
@@ -1632,21 +1725,8 @@ static int ocAllocateSymbolExtras( ObjectCode* oc, int count, int first )
      */
     if( m > n ) // we need to allocate more pages
     {
-        oc->symbol_extras = mmap (NULL, sizeof(SymbolExtra) * count,
-                                  PROT_EXEC|PROT_READ|PROT_WRITE,
-                                  MAP_PRIVATE|MAP_ANONYMOUS|EXTRA_MAP_FLAGS,
-                                  0, 0);
-        if (oc->symbol_extras == MAP_FAILED)
-        {
-            errorBelch( "Unable to mmap() for jump islands\n" );
-            return 0;
-        }
-#ifdef x86_64_HOST_ARCH
-        if ((StgWord)oc->symbol_extras > 0x80000000)
-        {
-            barf("mmap() returned memory outside 2Gb");
-        }
-#endif
+        oc->symbol_extras = mmapForLinker(sizeof(SymbolExtra) * count, 
+                                          MAP_ANONYMOUS, 0);
     }
     else
     {
