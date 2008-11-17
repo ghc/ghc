@@ -460,6 +460,15 @@ schedule (Capability *initialCapability, Task *task)
     }
 #endif
 
+    // If we're shutting down, and this thread has not yet been
+    // killed, kill it now.  This sometimes happens when a finalizer
+    // thread is created by the final GC, or a thread previously
+    // in a foreign call returns.
+    if (sched_state >= SCHED_INTERRUPTING &&
+        !(t->what_next == ThreadComplete || t->what_next == ThreadKilled)) {
+        deleteThread_(cap,t);
+    }
+
     /* context switches are initiated by the timer signal, unless
      * the user specified "context switch as often as possible", with
      * +RTS -C0
