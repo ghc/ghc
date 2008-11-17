@@ -1164,7 +1164,7 @@ schedulePostRunThread (Capability *cap, StgTSO *t)
             // ATOMICALLY_FRAME, aborting the (nested)
             // transaction, and saving the stack of any
             // partially-evaluated thunks on the heap.
-            throwToSingleThreaded_(cap, t, NULL, rtsTrue, NULL);
+            throwToSingleThreaded_(cap, t, NULL, rtsTrue);
             
             ASSERT(get_itbl((StgClosure *)t->sp)->type == ATOMICALLY_FRAME);
         }

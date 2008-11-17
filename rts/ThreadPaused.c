@@ -231,8 +231,10 @@ threadPaused(Capability *cap, StgTSO *tso)
 			   (long)((StgPtr)frame - tso->sp));
 
 		// If this closure is already an indirection, then
-		// suspend the computation up to this point:
-		suspendComputation(cap,tso,(StgPtr)frame);
+		// suspend the computation up to this point.
+		// NB. check raiseAsync() to see what happens when
+		// we're in a loop (#2783).
+		suspendComputation(cap,tso,(StgUpdateFrame*)frame);
 
 		// Now drop the update frame, and arrange to return
 		// the value to the frame underneath:
@@ -242,8 +244,9 @@ threadPaused(Capability *cap, StgTSO *tso)
 
 		// And continue with threadPaused; there might be
 		// yet more computation to suspend.
-		threadPaused(cap,tso);
-		return;
+                frame = (StgClosure *)tso->sp + 2;
+                prev_was_update_frame = rtsFalse;
+                continue;
 	    }
 
 	    if (bh->header.info != &stg_CAF_BLACKHOLE_info) {

@@ -20,12 +20,11 @@ void throwToSingleThreaded (Capability *cap,
 void throwToSingleThreaded_ (Capability *cap, 
 			     StgTSO *tso, 
 			     StgClosure *exception, 
-			     rtsBool stop_at_atomically,
-			     StgPtr stop_here);
+			     rtsBool stop_at_atomically);
 
 void suspendComputation (Capability *cap, 
 			 StgTSO *tso, 
-			 StgPtr stop_here);
+			 StgUpdateFrame *stop_here);
 
 nat throwTo (Capability *cap,	         // the Capability we hold 
 	     StgTSO *source,	         // the TSO sending the exception
