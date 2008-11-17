@@ -1292,6 +1292,7 @@ void ghci_enquire ( char* addr )
 static unsigned int PLTSize(void);
 #endif
 
+#ifdef USE_MMAP
 static void *
 mmapForLinker (size_t bytes, nat flags, int fd)
 {
@@ -1346,6 +1347,7 @@ mmap_again:
 
    return result;
 }
+#endif // USE_MMAP
 
 /* -----------------------------------------------------------------------------
  * Load an obj (populate the global symbol table, but don't resolve yet)
