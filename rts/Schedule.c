@@ -466,7 +466,7 @@ schedule (Capability *initialCapability, Task *task)
     // in a foreign call returns.
     if (sched_state >= SCHED_INTERRUPTING &&
         !(t->what_next == ThreadComplete || t->what_next == ThreadKilled)) {
-        deleteThread_(cap,t);
+        deleteThread(cap,t);
     }
 
     /* context switches are initiated by the timer signal, unless
