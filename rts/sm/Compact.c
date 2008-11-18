@@ -621,8 +621,6 @@ thread_obj (StgInfoTable *info, StgPtr p)
     case MUT_VAR_CLEAN:
     case MUT_VAR_DIRTY:
     case CAF_BLACKHOLE:
-    case SE_CAF_BLACKHOLE:
-    case SE_BLACKHOLE:
     case BLACKHOLE:
     {
 	StgPtr end;

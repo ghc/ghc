@@ -566,8 +566,6 @@ genApply regstatus args =
 	text "     AP_STACK,",
 	text "     CAF_BLACKHOLE,",
 	text "     BLACKHOLE,",
-	text "     SE_BLACKHOLE,",
-	text "     SE_CAF_BLACKHOLE,",
         text "     THUNK,",
         text "     THUNK_1_0,",
         text "     THUNK_0_1,",

@@ -63,7 +63,6 @@ module CLabel (
 
 	mkTopTickyCtrLabel,
         mkCAFBlackHoleInfoTableLabel,
-        mkSECAFBlackHoleInfoTableLabel,
 	mkRtsPrimOpLabel,
 	mkRtsSlowTickyCtrLabel,
 
@@ -348,10 +347,6 @@ mkEMPTY_MVAR_infoLabel		= RtsLabel (RtsInfo (sLit "stg_EMPTY_MVAR"))
 
 mkTopTickyCtrLabel		= RtsLabel (RtsData (sLit "top_ct"))
 mkCAFBlackHoleInfoTableLabel	= RtsLabel (RtsInfo (sLit "stg_CAF_BLACKHOLE"))
-mkSECAFBlackHoleInfoTableLabel	= if opt_DoTickyProfiling then
-                                    RtsLabel (RtsInfo (sLit "stg_SE_CAF_BLACKHOLE"))
-                                  else  -- RTS won't have info table unless -ticky is on
-                                    panic "mkSECAFBlackHoleInfoTableLabel requires -ticky"
 mkRtsPrimOpLabel primop		= RtsLabel (RtsPrimOp primop)
 
 moduleRegdLabel			= ModuleRegdLabel

@@ -453,8 +453,6 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
     case CONSTR_0_2:
     case CAF_BLACKHOLE:
     case BLACKHOLE:
-    case SE_BLACKHOLE:
-    case SE_CAF_BLACKHOLE:
     case ARR_WORDS:
 	*first_child = NULL;
 	return;
@@ -958,8 +956,6 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
 	case CONSTR_0_2:
 	case CAF_BLACKHOLE:
 	case BLACKHOLE:
-	case SE_BLACKHOLE:
-	case SE_CAF_BLACKHOLE:
 	case ARR_WORDS:
 	    // one child (fixed), no SRT
 	case MUT_VAR_CLEAN:
@@ -1112,8 +1108,6 @@ isRetainer( StgClosure *c )
 	// blackholes
     case CAF_BLACKHOLE:
     case BLACKHOLE:
-    case SE_BLACKHOLE:
-    case SE_CAF_BLACKHOLE:
 	// indirection
     case IND_PERM:
     case IND_OLDGEN_PERM:

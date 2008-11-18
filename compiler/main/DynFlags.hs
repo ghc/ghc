@@ -275,6 +275,7 @@ data DynFlag
    | Opt_DryRun
    | Opt_DoAsmMangling
    | Opt_ExcessPrecision
+   | Opt_EagerBlackHoling
    | Opt_ReadUserPackageConf
    | Opt_NoHsMain
    | Opt_SplitObjs
@@ -1587,6 +1588,7 @@ fFlags = [
   ( "dicts-cheap",                      Opt_DictsCheap, const Supported ),
   ( "inline-if-enough-args",            Opt_InlineIfEnoughArgs, const Supported ),
   ( "excess-precision",                 Opt_ExcessPrecision, const Supported ),
+  ( "eager-blackholing",                Opt_EagerBlackHoling, const Supported ),
   ( "asm-mangling",                     Opt_DoAsmMangling, const Supported ),
   ( "print-bind-result",                Opt_PrintBindResult, const Supported ),
   ( "force-recomp",                     Opt_ForceRecomp, const Supported ),

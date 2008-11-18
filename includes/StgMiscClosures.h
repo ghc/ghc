@@ -89,11 +89,8 @@ RTS_INFO(stg_CAF_UNENTERED_info);
 RTS_INFO(stg_CAF_ENTERED_info);
 RTS_INFO(stg_WHITEHOLE_info);
 RTS_INFO(stg_BLACKHOLE_info);
+RTS_INFO(__stg_EAGER_BLACKHOLE_info);
 RTS_INFO(stg_CAF_BLACKHOLE_info);
-#ifdef TICKY_TICKY
-RTS_INFO(stg_SE_BLACKHOLE_info);
-RTS_INFO(stg_SE_CAF_BLACKHOLE_info);
-#endif
 
 #if defined(PAR) || defined(GRAN)
 RTS_INFO(stg_RBH_info);
@@ -148,11 +145,8 @@ RTS_ENTRY(stg_CAF_UNENTERED_entry);
 RTS_ENTRY(stg_CAF_ENTERED_entry);
 RTS_ENTRY(stg_WHITEHOLE_entry);
 RTS_ENTRY(stg_BLACKHOLE_entry);
+RTS_ENTRY(__stg_EAGER_BLACKHOLE_entry);
 RTS_ENTRY(stg_CAF_BLACKHOLE_entry);
-#ifdef TICKY_TICKY
-RTS_ENTRY(stg_SE_BLACKHOLE_entry);
-RTS_ENTRY(stg_SE_CAF_BLACKHOLE_entry);
-#endif
 #if defined(PAR) || defined(GRAN)
 RTS_ENTRY(stg_RBH_entry);
 #endif

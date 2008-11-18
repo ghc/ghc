@@ -23,6 +23,7 @@
 #define REGS_H
 
 typedef struct {
+  StgWord        stgEagerBlackholeInfo;
   StgFunPtr      stgGCEnter1;
   StgFunPtr      stgGCFun;
 } StgFunTable;
@@ -399,8 +400,9 @@ GLOBAL_REG_DECL(bdescr *,HpAlloc,REG_HpAlloc)
 
 #define FunReg ((StgFunTable *)((void *)BaseReg - sizeof(StgFunTable)))
 
-#define stg_gc_enter_1     (FunReg->stgGCEnter1)
-#define stg_gc_fun         (FunReg->stgGCFun)
+#define stg_EAGER_BLACKHOLE_info  (FunReg->stgEagerBlackholeInfo)
+#define stg_gc_enter_1            (FunReg->stgGCEnter1)
+#define stg_gc_fun                (FunReg->stgGCFun)
 
 /* -----------------------------------------------------------------------------
    For any registers which are denoted "caller-saves" by the C calling

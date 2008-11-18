@@ -384,13 +384,32 @@ INFO_TABLE(stg_CAF_BLACKHOLE,0,1,CAF_BLACKHOLE,"CAF_BLACKHOLE","CAF_BLACKHOLE")
     jump stg_block_blackhole;
 }
 
-#ifdef EAGER_BLACKHOLING
-INFO_TABLE(stg_SE_BLACKHOLE,0,1,SE_BLACKHOLE,"SE_BLACKHOLE","SE_BLACKHOLE")
-{ foreign "C" barf("SE_BLACKHOLE object entered!") never returns; }
+INFO_TABLE(__stg_EAGER_BLACKHOLE,0,1,BLACKHOLE,"EAGER_BLACKHOLE","EAGER_BLACKHOLE")
+{
+    TICK_ENT_BH();
 
-INFO_TABLE(stg_SE_CAF_BLACKHOLE,0,1,SE_CAF_BLACKHOLE,"SE_CAF_BLACKHOLE","SE_CAF_BLACKHOLE")
-{ foreign "C" barf("SE_CAF_BLACKHOLE object entered!") never returns; }
+#ifdef THREADED_RTS
+    // foreign "C" debugBelch("BLACKHOLE entry\n");
 #endif
+
+    /* Actually this is not necessary because R1 is about to be destroyed. */
+    LDV_ENTER(R1);
+
+#if defined(THREADED_RTS)
+    ACQUIRE_LOCK(sched_mutex "ptr");
+    // released in stg_block_blackhole_finally
+#endif
+
+    /* Put ourselves on the blackhole queue */
+    StgTSO__link(CurrentTSO) = W_[blackhole_queue];
+    W_[blackhole_queue] = CurrentTSO;
+
+    /* jot down why and on what closure we are blocked */
+    StgTSO_why_blocked(CurrentTSO) = BlockedOnBlackHole::I16;
+    StgTSO_block_info(CurrentTSO) = R1;
+
+    jump stg_block_blackhole;
+}
 
 /* ----------------------------------------------------------------------------
    Whiteholes are used for the "locked" state of a closure (see lockClosure())

@@ -69,8 +69,6 @@ StgWord16 closure_flags[] = {
 /* STOP_FRAME	   	= */ (     _BTM                                  ),
 /* CAF_BLACKHOLE   	= */ ( 	   _BTM|_NS|              _UPT           ),
 /* BLACKHOLE		= */ ( 	        _NS|              _UPT           ),
-/* SE_BLACKHOLE		= */ ( 	        _NS|              _UPT           ),
-/* SE_CAF_BLACKHOLE	= */ ( 	        _NS|              _UPT           ),
 /* MVAR_CLEAN	   	= */ (_HNF|     _NS|         _MUT|_UPT           ),
 /* MVAR_DIRTY	   	= */ (_HNF|     _NS|         _MUT|_UPT           ),
 /* ARR_WORDS		= */ (_HNF|     _NS|              _UPT           ),
@@ -87,7 +85,6 @@ StgWord16 closure_flags[] = {
 /* FETCH_ME		= */ (_HNF|     _NS|         _MUT|_UPT           ),
 /* FETCH_ME_BQ          = */ ( 	        _NS|         _MUT|_UPT           ),
 /* RBH                  = */ ( 	        _NS|         _MUT|_UPT           ),
-/* EVACUATED		= */ ( 0                                         ),
 /* REMOTE_REF		= */ (_HNF|     _NS|              _UPT           ),
 /* TVAR_WATCH_QUEUE     = */ (          _NS|         _MUT|_UPT           ),
 /* INVARIANT_CHECK_QUEUE= */ (          _NS|         _MUT|_UPT           ),
@@ -101,6 +98,6 @@ StgWord16 closure_flags[] = {
 /* WHITEHOLE		= */ ( 0                                         )
 };
 
-#if N_CLOSURE_TYPES != 73
+#if N_CLOSURE_TYPES != 70
 #error Closure types changed: update ClosureFlags.c!
 #endif

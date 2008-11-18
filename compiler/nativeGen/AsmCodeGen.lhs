@@ -768,6 +768,10 @@ cmmExprConFold referenceKind expr
            -- On powerpc (non-PIC), it's easier to jump directly to a label than
            -- to use the register table, so we replace these registers
            -- with the corresponding labels:
+        CmmReg (CmmGlobal EagerBlackholeInfo)
+          | not opt_PIC
+          -> cmmExprConFold referenceKind $
+             CmmLit (CmmLabel (mkRtsCodeLabel (sLit "__stg_EAGER_BLACKHOLE_INFO"))) 
         CmmReg (CmmGlobal GCEnter1)
           | not opt_PIC
           -> cmmExprConFold referenceKind $

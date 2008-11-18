@@ -312,10 +312,6 @@ checkClosure( StgClosure* p )
     case IND_PERM:
     case IND_OLDGEN:
     case IND_OLDGEN_PERM:
-#ifdef TICKY_TICKY
-    case SE_BLACKHOLE:
-    case SE_CAF_BLACKHOLE:
-#endif
     case BLACKHOLE:
     case CAF_BLACKHOLE:
     case STABLE_NAME:

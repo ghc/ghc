@@ -763,6 +763,7 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(stable_ptr_table)			\
       SymI_HasProto(stackOverflow)			\
       SymI_HasProto(stg_CAF_BLACKHOLE_info)		\
+      SymI_HasProto(__stg_EAGER_BLACKHOLE_info)		\
       SymI_HasProto(awakenBlockedQueue)			\
       SymI_HasProto(startTimer)                         \
       SymI_HasProto(stg_CHARLIKE_closure)		\

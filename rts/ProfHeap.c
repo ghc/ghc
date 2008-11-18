@@ -144,8 +144,6 @@ static char *type_names[] = {
     "STOP_FRAME",
     "CAF_BLACKHOLE",
     "BLACKHOLE",
-    "SE_BLACKHOLE",
-    "SE_CAF_BLACKHOLE",
     "MVAR_CLEAN",
     "MVAR_DIRTY",
     "ARR_WORDS",
@@ -162,7 +160,6 @@ static char *type_names[] = {
     "FETCH_ME",
     "FETCH_ME_BQ",
     "RBH",
-    "EVACUATED",
     "REMOTE_REF",
     "TVAR_WATCH_QUEUE",
     "INVARIANT_CHECK_QUEUE",
@@ -173,6 +170,7 @@ static char *type_names[] = {
     "ATOMICALLY_FRAME",
     "CATCH_RETRY_FRAME",
     "CATCH_STM_FRAME",
+    "WHITEHOLE",
     "N_CLOSURE_TYPES"
   };
 #endif
@@ -960,8 +958,6 @@ heapCensusChain( Census *census, bdescr *bd )
 	    case IND_OLDGEN:
 	    case IND_OLDGEN_PERM:
 	    case CAF_BLACKHOLE:
-	    case SE_CAF_BLACKHOLE:
-	    case SE_BLACKHOLE:
 	    case BLACKHOLE:
 	    case FUN_1_0:
 	    case FUN_0_1:

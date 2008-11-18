@@ -250,9 +250,6 @@ threadPaused(Capability *cap, StgTSO *tso)
 	    }
 
 	    if (bh->header.info != &stg_CAF_BLACKHOLE_info) {
-#if (!defined(LAZY_BLACKHOLING)) && defined(DEBUG)
-		debugBelch("Unexpected lazy BHing required at 0x%04lx\n",(long)bh);
-#endif
 		// zero out the slop so that the sanity checker can tell
 		// where the next closure is.
 		DEBUG_FILL_SLOP(bh);
@@ -261,7 +258,7 @@ threadPaused(Capability *cap, StgTSO *tso)
 		// We pretend that bh is now dead.
 		LDV_recordDead_FILL_SLOP_DYNAMIC((StgClosure *)bh);
 #endif
-
+                // an EAGER_BLACKHOLE gets turned into a BLACKHOLE here.
 #ifdef THREADED_RTS
                 cur_bh_info = (const StgInfoTable *)
                     cas((StgVolatilePtr)&bh->header.info, 

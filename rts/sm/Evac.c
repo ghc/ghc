@@ -626,8 +626,6 @@ loop:
       return;
 
   case CAF_BLACKHOLE:
-  case SE_CAF_BLACKHOLE:
-  case SE_BLACKHOLE:
   case BLACKHOLE:
       copyPart(p,q,BLACKHOLE_sizeW(),sizeofW(StgHeader),stp);
       return;
@@ -1038,8 +1036,6 @@ selector_loop:
       case THUNK_0_2:
       case THUNK_STATIC:
       case CAF_BLACKHOLE:
-      case SE_CAF_BLACKHOLE:
-      case SE_BLACKHOLE:
       case BLACKHOLE:
 	  // not evaluated yet 
 	  goto bale_out;

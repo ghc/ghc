@@ -565,6 +565,7 @@ pprGlobalReg gr
         CurrentTSO     -> ptext (sLit "CurrentTSO")
         CurrentNursery -> ptext (sLit "CurrentNursery")
         HpAlloc        -> ptext (sLit "HpAlloc")
+        EagerBlackholeInfo -> ptext (sLit "stg_EAGER_BLACKHOLE_info")
         GCEnter1       -> ptext (sLit "stg_gc_enter_1")
         GCFun          -> ptext (sLit "stg_gc_fun")
         BaseReg        -> ptext (sLit "BaseReg")

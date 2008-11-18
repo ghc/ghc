@@ -748,6 +748,7 @@ pprGlobalReg gr = case gr of
     CurrentNursery -> ptext (sLit "CurrentNursery")
     HpAlloc        -> ptext (sLit "HpAlloc")
     BaseReg        -> ptext (sLit "BaseReg")
+    EagerBlackholeInfo -> ptext (sLit "stg_EAGER_BLACKHOLE_info")
     GCEnter1       -> ptext (sLit "stg_gc_enter_1")
     GCFun          -> ptext (sLit "stg_gc_fun")
 

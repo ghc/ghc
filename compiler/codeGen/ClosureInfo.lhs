@@ -58,7 +58,7 @@ module ClosureInfo (
 	closureValDescr, closureTypeDescr,	-- profiling
 
 	isStaticClosure,
-	cafBlackHoleClosureInfo, seCafBlackHoleClosureInfo,
+	cafBlackHoleClosureInfo,
 
 	staticClosureNeedsLink,
     ) where
@@ -959,16 +959,6 @@ cafBlackHoleClosureInfo (ClosureInfo { closureName = nm,
 		  closureType   = ty,
 		  closureDescr  = "" }
 cafBlackHoleClosureInfo _ = panic "cafBlackHoleClosureInfo"
-
-seCafBlackHoleClosureInfo (ClosureInfo { closureName = nm,
-				         closureType = ty })
-  = ClosureInfo { closureName   = nm,
-		  closureLFInfo = LFBlackHole mkSECAFBlackHoleInfoTableLabel,
-		  closureSMRep  = BlackHoleRep,
-		  closureSRT    = NoC_SRT,
-		  closureType   = ty,
-		  closureDescr  = ""  }
-seCafBlackHoleClosureInfo _ = panic "seCafBlackHoleClosureInfo"
 \end{code}
 
 %************************************************************************

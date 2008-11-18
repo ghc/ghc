@@ -28,24 +28,6 @@
 #define USING_LIBBFD 1
 #endif
 
-/* Turn lazy blackholing and eager blackholing on/off.
- *
- * Using eager blackholing makes things easier to debug because
- * the blackholes are more predictable - but it's slower and less sexy.
- *
- * For now, do lazy and not eager.
- */
-
-/* TICKY_TICKY needs EAGER_BLACKHOLING to verify no double-entries of
- * single-entry thunks.
- */
-/* #if defined(TICKY_TICKY) || defined(THREADED_RTS) */
-#if defined(TICKY_TICKY)
-#  define EAGER_BLACKHOLING
-#else
-#  define LAZY_BLACKHOLING
-#endif
-
 /* -----------------------------------------------------------------------------
    Labels - entry labels & info labels point to the same place in
    TABLES_NEXT_TO_CODE, so we only generate the _info label.  Jumps

@@ -205,6 +205,7 @@ initCapability( Capability *cap, nat i )
     cap->sparks_pruned      = 0;
 #endif
 
+    cap->f.stgEagerBlackholeInfo = (W_)&__stg_EAGER_BLACKHOLE_info;
     cap->f.stgGCEnter1     = (F_)__stg_gc_enter_1;
     cap->f.stgGCFun        = (F_)__stg_gc_fun;
 

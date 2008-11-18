@@ -267,6 +267,7 @@ data GlobalReg
 		-- We keep the address of some commonly-called 
 		-- functions in the register table, to keep code
 		-- size down:
+  | EagerBlackholeInfo  -- stg_EAGER_BLACKHOLE_info
   | GCEnter1		-- stg_gc_enter_1
   | GCFun		-- stg_gc_fun
 

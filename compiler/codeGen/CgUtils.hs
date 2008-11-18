@@ -542,6 +542,7 @@ baseRegOffset HpLim		  = oFFSET_StgRegTable_rHpLim
 baseRegOffset CurrentTSO	  = oFFSET_StgRegTable_rCurrentTSO
 baseRegOffset CurrentNursery	  = oFFSET_StgRegTable_rCurrentNursery
 baseRegOffset HpAlloc		  = oFFSET_StgRegTable_rHpAlloc
+baseRegOffset EagerBlackholeInfo  = oFFSET_stgEagerBlackholeInfo
 baseRegOffset GCEnter1		  = oFFSET_stgGCEnter1
 baseRegOffset GCFun		  = oFFSET_stgGCFun
 baseRegOffset BaseReg		  = panic "baseRegOffset:BaseReg"

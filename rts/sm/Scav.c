@@ -504,8 +504,6 @@ scavenge_block (bdescr *bd)
 	break;
 
     case CAF_BLACKHOLE:
-    case SE_CAF_BLACKHOLE:
-    case SE_BLACKHOLE:
     case BLACKHOLE:
 	p += BLACKHOLE_sizeW();
 	break;
@@ -881,8 +879,6 @@ linear_scan:
 	}
 
 	case CAF_BLACKHOLE:
-	case SE_CAF_BLACKHOLE:
-	case SE_BLACKHOLE:
 	case BLACKHOLE:
 	case ARR_WORDS:
 	    break;
@@ -1197,8 +1193,6 @@ scavenge_one(StgPtr p)
     }
 
     case CAF_BLACKHOLE:
-    case SE_CAF_BLACKHOLE:
-    case SE_BLACKHOLE:
     case BLACKHOLE:
 	break;
 	

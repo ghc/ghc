@@ -306,14 +306,6 @@ printClosure( StgClosure *obj )
             debugBelch("BH\n"); 
             break;
 
-    case SE_BLACKHOLE:
-            debugBelch("SE_BH\n"); 
-            break;
-
-    case SE_CAF_BLACKHOLE:
-            debugBelch("SE_CAF_BH\n"); 
-            break;
-
     case ARR_WORDS:
         {
             StgWord i;

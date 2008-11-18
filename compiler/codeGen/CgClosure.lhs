@@ -50,6 +50,8 @@ import Module
 import ListSetOps
 import Util
 import BasicTypes
+import StaticFlags
+import DynFlags
 import Constants
 import Outputable
 import FastString
@@ -452,15 +454,9 @@ blackHoleIt :: ClosureInfo -> Code
 blackHoleIt closure_info = emitBlackHoleCode (closureSingleEntry closure_info)
 
 emitBlackHoleCode :: Bool -> Code
-emitBlackHoleCode is_single_entry 
-  | eager_blackholing = do 
-	tickyBlackHole (not is_single_entry)
-	stmtC (CmmStore (CmmReg nodeReg) (CmmLit (CmmLabel bh_lbl)))
-  | otherwise = 
-	nopC
-  where
-    bh_lbl | is_single_entry = mkRtsDataLabel (sLit "stg_SE_BLACKHOLE_info")
-	   | otherwise	     = mkRtsDataLabel (sLit "stg_BLACKHOLE_info")
+emitBlackHoleCode is_single_entry = do
+
+  dflags <- getDynFlags
 
 	-- If we wanted to do eager blackholing with slop filling,
 	-- we'd need to do it at the *end* of a basic block, otherwise
@@ -476,7 +472,16 @@ emitBlackHoleCode is_single_entry
         -- to bring back minimal ticky-ticky, so now EAGER_BLACKHOLING 
         -- is unconditionally disabled. -- krc 1/2007
 
-    eager_blackholing = False 
+  let eager_blackholing =  not opt_SccProfilingOn
+                        && dopt Opt_EagerBlackHoling dflags
+
+  if eager_blackholing
+     then do
+          tickyBlackHole (not is_single_entry)
+          let bh_info = CmmReg (CmmGlobal EagerBlackholeInfo)
+	  stmtC (CmmStore (CmmReg nodeReg) bh_info)
+     else
+          nopC
 \end{code}
 
 \begin{code}
@@ -571,8 +576,7 @@ link_caf cl_info is_upd = do
   ; returnFC hp_rel }
   where
     bh_cl_info :: ClosureInfo
-    bh_cl_info | is_upd    = cafBlackHoleClosureInfo   cl_info
-	       | otherwise = seCafBlackHoleClosureInfo cl_info
+    bh_cl_info = cafBlackHoleClosureInfo cl_info
 
     ind_static_info :: CmmExpr
     ind_static_info = mkLblExpr mkIndStaticInfoLabel
