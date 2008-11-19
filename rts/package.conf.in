@@ -22,7 +22,7 @@ library-dirs:		LIB_DIR GMP_LIB_DIRS PAPI_LIB_DIR
 # endif
 #else /* !INSTALLING */
 library-dirs:		FPTOOLS_TOP_ABS"/rts" GMP_LIB_DIRS PAPI_LIB_DIR
-# if !defined(HAVE_LIBGMP) && !defined(HAVE_FRAMEWORK_GMP)
+# if !defined(HAVE_LIB_GMP) && !defined(HAVE_FRAMEWORK_GMP)
 			, FPTOOLS_TOP_ABS"/gmp"
 # endif
 #endif
@@ -62,7 +62,9 @@ include-dirs:		INCLUDE_DIR GMP_INCLUDE_DIRS PAPI_INCLUDE_DIR
 #else /* !INSTALLING */
 include-dirs:		FPTOOLS_TOP_ABS"/includes"
              		FPTOOLS_TOP_ABS"/rts"
+# if !defined(HAVE_LIB_GMP) && !defined(HAVE_FRAMEWORK_GMP)
              		FPTOOLS_TOP_ABS"/gmp/gmpbuild"
+# endif
              		GMP_INCLUDE_DIRS
 #endif
 
