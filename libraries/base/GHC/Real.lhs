@@ -173,7 +173,8 @@ class  (Real a, Fractional a) => RealFrac a  where
     properFraction      :: (Integral b) => a -> (b,a)
     -- | @'truncate' x@ returns the integer nearest @x@ between zero and @x@
     truncate            :: (Integral b) => a -> b
-    -- | @'round' x@ returns the nearest integer to @x@
+    -- | @'round' x@ returns the nearest integer to @x@;
+    --   the even integer if @x@ is equidistant between two integers
     round               :: (Integral b) => a -> b
     -- | @'ceiling' x@ returns the least integer not less than @x@
     ceiling             :: (Integral b) => a -> b
