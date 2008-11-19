@@ -587,18 +587,20 @@ rts_unlock (Capability *cap)
     task = cap->running_task;
     ASSERT_FULL_CAPABILITY_INVARIANTS(cap,task);
 
-    // slightly delicate ordering of operations below, pay attention!
-
-    // We are no longer a bound task/thread.  This is important,
-    // because the GC can run when we release the Capability below,
-    // and we don't want it to treat this as a live TSO pointer.
-    task->tso = NULL;
-
     // Now release the Capability.  With the capability released, GC
     // may happen.  NB. does not try to put the current Task on the
     // worker queue.
-    releaseCapability(cap);
+    // NB. keep cap->lock held while we call boundTaskExiting().  This
+    // is necessary during shutdown, where we want the invariant that
+    // after shutdownCapability(), all the Tasks associated with the
+    // Capability have completed their shutdown too.  Otherwise we
+    // could have boundTaskExiting()/workerTaskStop() running at some
+    // random point in the future, which causes problems for
+    // freeTaskManager().
+    ACQUIRE_LOCK(&cap->lock);
+    releaseCapability_(cap,rtsFalse);
 
     // Finally, we can release the Task to the free list.
     boundTaskExiting(task);
+    RELEASE_LOCK(&cap->lock);
 }

@@ -2016,9 +2016,22 @@ workerStart(Task *task)
     // schedule() runs without a lock.
     cap = schedule(cap,task);
 
-    // On exit from schedule(), we have a Capability.
-    releaseCapability(cap);
+    // On exit from schedule(), we have a Capability, but possibly not
+    // the same one we started with.
+
+    // During shutdown, the requirement is that after all the
+    // Capabilities are shut down, all workers that are shutting down
+    // have finished workerTaskStop().  This is why we hold on to
+    // cap->lock until we've finished workerTaskStop() below.
+    //
+    // There may be workers still involved in foreign calls; those
+    // will just block in waitForReturnCapability() because the
+    // Capability has been shut down.
+    //
+    ACQUIRE_LOCK(&cap->lock);
+    releaseCapability_(cap,rtsFalse);
     workerTaskStop(task);
+    RELEASE_LOCK(&cap->lock);
 }
 #endif
 
@@ -2121,7 +2134,6 @@ exitScheduler(
 	    shutdownCapability(&capabilities[i], task, wait_foreign);
 	}
 	boundTaskExiting(task);
-	stopTaskManager();
     }
 #endif
 }
@@ -2129,11 +2141,23 @@ exitScheduler(
 void
 freeScheduler( void )
 {
-    freeCapabilities();
-    freeTaskManager();
-    if (n_capabilities != 1) {
-        stgFree(capabilities);
+    nat still_running;
+
+    ACQUIRE_LOCK(&sched_mutex);
+    still_running = freeTaskManager();
+    // We can only free the Capabilities if there are no Tasks still
+    // running.  We might have a Task about to return from a foreign
+    // call into waitForReturnCapability(), for example (actually,
+    // this should be the *only* thing that a still-running Task can
+    // do at this point, and it will block waiting for the
+    // Capability).
+    if (still_running == 0) {
+        freeCapabilities();
+        if (n_capabilities != 1) {
+            stgFree(capabilities);
+        }
     }
+    RELEASE_LOCK(&sched_mutex);
 #if defined(THREADED_RTS)
     closeMutex(&sched_mutex);
 #endif

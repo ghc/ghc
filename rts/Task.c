@@ -64,25 +64,16 @@ initTaskManager (void)
     }
 }
 
-
-void
-stopTaskManager (void)
-{
-    debugTrace(DEBUG_sched, 
-	       "stopping task manager, %d tasks still running",
-	       tasksRunning);
-    /* nothing to do */
-}
-
-
-void
+nat
 freeTaskManager (void)
 {
     Task *task, *next;
 
-    debugTrace(DEBUG_sched, "freeing task manager");
+    ASSERT_LOCK_HELD(&sched_mutex);
 
-    ACQUIRE_LOCK(&sched_mutex);
+    debugTrace(DEBUG_sched, "freeing task manager, %d tasks still running",
+               tasksRunning);
+
     for (task = all_tasks; task != NULL; task = next) {
         next = task->all_link;
         if (task->stopped) {
@@ -102,7 +93,8 @@ freeTaskManager (void)
 #if defined(THREADED_RTS)
     freeThreadLocalKey(&currentTaskKey);
 #endif
-    RELEASE_LOCK(&sched_mutex);
+
+    return tasksRunning;
 }
 
 
@@ -149,7 +141,6 @@ newTask (void)
     all_tasks = task;
 
     taskCount++;
-    workerCount++;
 
     return task;
 }
@@ -185,6 +176,7 @@ newBoundTask (void)
 void
 boundTaskExiting (Task *task)
 {
+    task->tso = NULL;
     task->stopped = rtsTrue;
     task->cap = NULL;
 
@@ -218,7 +210,11 @@ discardTask (Task *task)
     if (!task->stopped) {
 	debugTrace(DEBUG_sched, "discarding task %ld", (long)TASK_ID(task));
 	task->cap = NULL;
-	task->tso = NULL;
+        if (task->tso == NULL) {
+            workerCount--;
+        } else {
+            task->tso = NULL;
+        }
 	task->stopped = rtsTrue;
 	tasksRunning--;
 	task->next = task_free_list;
@@ -263,6 +259,7 @@ workerTaskStop (Task *task)
     taskTimeStamp(task);
     task->stopped = rtsTrue;
     tasksRunning--;
+    workerCount--;
 
     ACQUIRE_LOCK(&sched_mutex);
     task->next = task_free_list;
