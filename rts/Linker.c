@@ -1300,9 +1300,9 @@ mmapForLinker (size_t bytes, nat flags, int fd)
    void *map_addr = NULL;
    void *result;
 
+#if defined(x86_64_HOST_ARCH)
 mmap_again:
 
-#if defined(x86_64_HOST_ARCH)
    if (mmap_32bit_base != 0) {
        map_addr = mmap_32bit_base;
    }
