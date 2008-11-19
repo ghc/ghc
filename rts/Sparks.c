@@ -208,7 +208,9 @@ steal(SparkPool *deque)
   b = deque->bottom;
   t = deque->top;
 
-  if (b - t <= 0 ) { 
+  // NB. b and t are unsigned; we need a signed value for the test
+  // below.
+  if ((long)b - (long)t <= 0 ) { 
     return NULL; /* already looks empty, abort */
   }
 
@@ -259,7 +261,7 @@ looksEmpty(SparkPool* deque)
   StgWord t = deque->top;
   StgWord b = deque->bottom;
   /* try to prefer false negatives by reading top first */
-  return (b - t <= 0);
+  return ((long)b - (long)t <= 0);
   /* => array is *never* completely filled, always 1 place free! */
 }
 
@@ -304,7 +306,10 @@ pushBottom (SparkPool* deque, StgClosurePtr elem)
      This is why we do not just call empty(deque) here.
   */
   t = deque->topBound;
-  if ( b - t >= sz ) { /* nota bene: sz == deque->size - 1, thus ">=" */
+  if ( (StgInt)b - (StgInt)t >= (StgInt)sz ) { 
+    /* NB. 1. sz == deque->size - 1, thus ">="
+           2. signed comparison, it is possible that t > b
+    */
     /* could be full, check the real top value in this case */
     t = deque->top;
     deque->topBound = t;
