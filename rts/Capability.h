@@ -32,7 +32,11 @@ struct Capability_ {
     // code.  During STG execution, the BaseReg register always points
     // to the StgRegTable of the current Capability (&cap->r).
     StgFunTable f;
-    StgRegTable r;
+    StgRegTable r GNU_ATTRIBUTE(packed);
+       // packed eliminates any padding between f and r.  Not strictly
+       // necessary, but it means the negative offsets for accessing
+       // the fields of f when we are in STG code are as small as
+       // possible.
 
     nat no;  // capability number.
 
@@ -140,10 +144,12 @@ struct Capability_ {
 
 // Converts a *StgRegTable into a *Capability.
 //
+#define OFFSET(s_type, field) ((size_t)&(((s_type*)0)->field))
+
 INLINE_HEADER Capability *
 regTableToCapability (StgRegTable *reg)
 {
-    return (Capability *)((void *)((unsigned char*)reg - sizeof(StgFunTable)));
+    return (Capability *)((void *)((unsigned char*)reg - OFFSET(Capability,r)));
 }
 
 // Initialise the available capabilities.
