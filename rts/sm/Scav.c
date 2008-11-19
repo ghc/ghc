@@ -1680,24 +1680,34 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
 	// the indirection into an IND_PERM, so that evacuate will
 	// copy the indirection into the old generation instead of
 	// discarding it.
+        //
+        // Note [upd-black-hole]
+        // One slight hiccup is that the THUNK_SELECTOR machinery can
+        // overwrite the updatee with an IND.  In parallel GC, this
+        // could even be happening concurrently, so we can't check for
+        // the IND.  Fortunately if we assume that blackholing is
+        // happening (either lazy or eager), then we can be sure that
+        // the updatee is never a THUNK_SELECTOR and we're ok.
+        // NB. this is a new invariant: blackholing is not optional.
     {
         nat type;
         const StgInfoTable *i;
+        StgClosure *updatee;
 
-        i = ((StgUpdateFrame *)p)->updatee->header.info;
+        updatee = ((StgUpdateFrame *)p)->updatee;
+        i = updatee->header.info;
         if (!IS_FORWARDING_PTR(i)) {
-            type = get_itbl(((StgUpdateFrame *)p)->updatee)->type;
+            type = get_itbl(updatee)->type;
             if (type == IND) {
-                ((StgUpdateFrame *)p)->updatee->header.info = 
-                    (StgInfoTable *)&stg_IND_PERM_info;
+                updatee->header.info = &stg_IND_PERM_info;
             } else if (type == IND_OLDGEN) {
-                ((StgUpdateFrame *)p)->updatee->header.info = 
-                    (StgInfoTable *)&stg_IND_OLDGEN_PERM_info;
+                updatee->header.info = &stg_IND_OLDGEN_PERM_info;
             }            
-            evacuate(&((StgUpdateFrame *)p)->updatee);
-            p += sizeofW(StgUpdateFrame);
-            continue;
         }
+        evacuate(&((StgUpdateFrame *)p)->updatee);
+        ASSERT(GET_CLOSURE_TAG(((StgUpdateFrame *)p)->updatee) == 0);
+        p += sizeofW(StgUpdateFrame);
+        continue;
     }
 
       // small bitmap (< 32 entries, or 64 on a 64-bit machine) 

@@ -195,6 +195,10 @@ threadPaused(Capability *cap, StgTSO *tso)
     maybePerformBlockedException (cap, tso);
     if (tso->what_next == ThreadKilled) { return; }
 
+    // NB. Blackholing is *not* optional, we must either do lazy
+    // blackholing, or eager blackholing consistently.  See Note
+    // [upd-black-hole] in sm/Scav.c.
+
     stack_end = &tso->stack[tso->stack_size];
     
     frame = (StgClosure *)tso->sp;
