@@ -52,7 +52,12 @@ typedef struct  SparkPool_ {
 
 
 /* INVARIANTS, in this order: reasonable size,
-   topBound consistent, space pointer, space accessible to us */
+   topBound consistent, space pointer, space accessible to us.
+   
+   NB. This is safe to use only (a) on a spark pool owned by the
+   current thread, or (b) when there's only one thread running, or no
+   stealing going on (e.g. during GC).
+*/
 #define ASSERT_SPARK_POOL_INVARIANTS(p)         \
   ASSERT((p)->size > 0);                        \
   ASSERT((p)->topBound <= (p)->top);            \

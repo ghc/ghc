@@ -202,10 +202,12 @@ steal(SparkPool *deque)
   StgClosurePtr stolen;
   StgWord b,t; 
 
-  ASSERT_SPARK_POOL_INVARIANTS(deque); 
+// Can't do this on someone else's spark pool:
+// ASSERT_SPARK_POOL_INVARIANTS(deque); 
 
   b = deque->bottom;
   t = deque->top;
+
   if (b - t <= 0 ) { 
     return NULL; /* already looks empty, abort */
   }
@@ -222,7 +224,9 @@ steal(SparkPool *deque)
       return NULL;
   }  /* else: OK, top has been incremented by the cas call */
 
-  ASSERT_SPARK_POOL_INVARIANTS(deque); 
+// Can't do this on someone else's spark pool:
+// ASSERT_SPARK_POOL_INVARIANTS(deque); 
+
   /* return stolen element */
   return stolen;
 }
