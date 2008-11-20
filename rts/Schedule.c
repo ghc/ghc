@@ -1001,12 +1001,11 @@ scheduleDetectDeadlock (Capability *cap, Task *task)
 	// they are unreachable and will therefore be sent an
 	// exception.  Any threads thus released will be immediately
 	// runnable.
-	cap = scheduleDoGC (cap, task, rtsTrue/*force  major GC*/);
+	cap = scheduleDoGC (cap, task, rtsTrue/*force major GC*/);
+        // when force_major == rtsTrue. scheduleDoGC sets
+        // recent_activity to ACTIVITY_DONE_GC and turns off the timer
+        // signal.
 
-	recent_activity = ACTIVITY_DONE_GC;
-        // disable timer signals (see #1623)
-        stopTimer();
-	
 	if ( !emptyRunQueue(cap) ) return;
 
 #if defined(RTS_USER_SIGNALS) && !defined(THREADED_RTS)
@@ -1576,6 +1575,16 @@ scheduleDoGC (Capability *cap, Task *task USED_IF_THREADS, rtsBool force_major)
        occur. Should be defined in Sparks.c. */
     balanceSparkPoolsCaps(n_capabilities, capabilities);
 #endif
+
+    if (force_major)
+    {
+        // We've just done a major GC and we don't need the timer
+        // signal turned on any more (#1623).
+        // NB. do this *before* releasing the Capabilities, to avoid
+        // deadlocks!
+        recent_activity = ACTIVITY_DONE_GC;
+        stopTimer();
+    }
 
 #if defined(THREADED_RTS)
     // release our stash of capabilities.
