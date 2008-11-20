@@ -1294,11 +1294,17 @@ static unsigned int PLTSize(void);
 #endif
 
 #ifdef USE_MMAP
+#define ROUND_UP(x,size) ((x + size - 1) & ~(size - 1))
+
 static void *
 mmapForLinker (size_t bytes, nat flags, int fd)
 {
    void *map_addr = NULL;
    void *result;
+   int pagesize, size;
+
+   pagesize = getpagesize();
+   size = ROUND_UP(bytes, pagesize);
 
 #if defined(x86_64_HOST_ARCH)
 mmap_again:
@@ -1308,7 +1314,7 @@ mmap_again:
    }
 #endif
 
-   result = mmap(map_addr, bytes, PROT_EXEC|PROT_READ|PROT_WRITE,
+   result = mmap(map_addr, size, PROT_EXEC|PROT_READ|PROT_WRITE,
 		    MAP_PRIVATE|TRY_MAP_32BIT|flags, fd, 0);
 
    if (result == MAP_FAILED) {
@@ -1319,17 +1325,17 @@ mmap_again:
 #if defined(x86_64_HOST_ARCH)
    if (mmap_32bit_base != 0) {
        if (result == map_addr) {
-           mmap_32bit_base = map_addr + bytes;
+           mmap_32bit_base = map_addr + size;
        } else {
            if ((W_)result > 0x80000000) {
                // oops, we were given memory over 2Gb
                // ... try allocating memory somewhere else?;
-               barf("loadObj: failed to mmap() memory below 2Gb; asked for %lu bytes at %p, got %p.  Try specifying an address with +RTS -xm<addr> -RTS", bytes, map_addr, result);
+               barf("loadObj: failed to mmap() memory below 2Gb; asked for %lu bytes at %p, got %p.  Try specifying an address with +RTS -xm<addr> -RTS", size, map_addr, result);
            } else {
                // hmm, we were given memory somewhere else, but it's
                // still under 2Gb so we can use it.  Next time, ask
                // for memory right after the place we just got some
-               mmap_32bit_base = (void*)result + bytes;
+               mmap_32bit_base = (void*)result + size;
            }
        }
    } else {
@@ -1337,7 +1343,7 @@ mmap_again:
            // oops, we were given memory over 2Gb
            // ... try allocating memory somewhere else?;
            debugTrace(DEBUG_linker,"MAP_32BIT didn't work; gave us %lu bytes at 0x%p", bytes, result);
-           munmap(result, bytes);
+           munmap(result, size);
            
            // Set a base address and try again... (guess: 1Gb)
            mmap_32bit_base = (void*)0x40000000;
@@ -1360,9 +1366,9 @@ loadObj( char *path )
 {
    ObjectCode* oc;
    struct stat st;
-   int r, n;
+   int r;
 #ifdef USE_MMAP
-   int fd, pagesize;
+   int fd;
 #else
    FILE *f;
 #endif
@@ -1422,8 +1428,6 @@ loadObj( char *path )
    objects               = oc;
 
 #ifdef USE_MMAP
-#define ROUND_UP(x,size) ((x + size - 1) & ~(size - 1))
-
    /* On many architectures malloc'd memory isn't executable, so we need to use mmap. */
 
 #if defined(openbsd_HOST_OS)
@@ -1434,10 +1438,11 @@ loadObj( char *path )
    if (fd == -1)
       barf("loadObj: can't open `%s'", path);
 
-   pagesize = getpagesize();
-
 #ifdef ia64_HOST_ARCH
    /* The PLT needs to be right before the object */
+   {
+   int pagesize, n;
+   pagesize = getpagesize();
    n = ROUND_UP(PLTSize(), pagesize);
    oc->plt = mmap(NULL, n, PROT_EXEC|PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
    if (oc->plt == MAP_FAILED)
@@ -1445,17 +1450,15 @@ loadObj( char *path )
 
    oc->pltIndex = 0;
    map_addr = oc->plt + n;
-#endif
 
    n = ROUND_UP(oc->fileSize, pagesize);
-
-#ifdef ia64_HOST_ARCH
    oc->image = mmap(map_addr, n, PROT_EXEC|PROT_READ|PROT_WRITE,
 		    MAP_PRIVATE|TRY_MAP_32BIT, fd, 0);
    if (oc->image == MAP_FAILED)
       barf("loadObj: can't map `%s'", path);
+   }
 #else
-   oc->image = mmapForLinker(n, 0, fd);
+   oc->image = mmapForLinker(oc->fileSize, 0, fd);
 #endif
 
    close(fd);
