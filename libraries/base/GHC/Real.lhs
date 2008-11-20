@@ -449,16 +449,16 @@ lcm x y         =  abs ((x `quot` (gcd x y)) * y)
 
 {-# RULES
 "gcd/Int->Int->Int"             gcd = gcdInt
+"gcd/Integer->Integer->Integer" gcd = gcdInteger'
+"lcm/Integer->Integer->Integer" lcm = lcmInteger
  #-}
 
--- XXX these optimisation rules are disabled for now to make it easier
---     to experiment with other Integer implementations
--- "gcd/Integer->Integer->Integer" gcd = gcdInteger'
--- "lcm/Integer->Integer->Integer" lcm = lcmInteger
+-- XXX to use another Integer implementation, you might need to disable
+-- the gcd/Integer and lcm/Integer RULES above
 --
--- gcdInteger' :: Integer -> Integer -> Integer
--- gcdInteger' 0 0 = error "GHC.Real.gcdInteger': gcd 0 0 is undefined"
--- gcdInteger' a b = gcdInteger a b
+gcdInteger' :: Integer -> Integer -> Integer
+gcdInteger' 0 0 = error "GHC.Real.gcdInteger': gcd 0 0 is undefined"
+gcdInteger' a b = gcdInteger a b
 
 integralEnumFrom :: (Integral a, Bounded a) => a -> [a]
 integralEnumFrom n = map fromInteger [toInteger n .. toInteger (maxBound `asTypeOf` n)]
