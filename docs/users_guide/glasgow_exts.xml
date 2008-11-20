@@ -1232,7 +1232,7 @@ it is not clear which of the two types is intended.
 </para>
 <para>
 Haskell 98 regards all four as ambiguous, but with the
-<option>-fdisambiguate-record-fields</option> flag, GHC will accept
+<option>-XDisambiguateRecordFields</option> flag, GHC will accept
 the former two.  The rules are precisely the same as those for instance
 declarations in Haskell 98, where the method names on the left-hand side 
 of the method bindings in an instance declaration refer unambiguously
