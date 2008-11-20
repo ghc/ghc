@@ -1324,7 +1324,7 @@ mmap_again:
            if ((W_)result > 0x80000000) {
                // oops, we were given memory over 2Gb
                // ... try allocating memory somewhere else?;
-               barf("loadObj: failed to mmap() memory below 2Gb; asked for %lu bytes at 0x%p, got 0x%p.  Try specifying an address with +RTS -xm<addr> -RTS", bytes, map_addr, result);
+               barf("loadObj: failed to mmap() memory below 2Gb; asked for %lu bytes at %p, got %p.  Try specifying an address with +RTS -xm<addr> -RTS", bytes, map_addr, result);
            } else {
                // hmm, we were given memory somewhere else, but it's
                // still under 2Gb so we can use it.  Next time, ask
