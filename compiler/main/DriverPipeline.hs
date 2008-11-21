@@ -667,7 +667,7 @@ runPhase (Cpp sf) _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
        (dflags, unhandled_flags, warns)
            <- liftIO $ parseDynamicNoPackageFlags dflags0 src_opts
        liftIO $ handleFlagWarnings dflags warns  -- XXX: may exit the program
-       liftIO $ checkProcessArgsResult unhandled_flags -- XXX: may throw program error
+       checkProcessArgsResult unhandled_flags
 
        if not (dopt Opt_Cpp dflags) then
            -- no need to preprocess CPP, just pass input file along
@@ -726,8 +726,8 @@ runPhase (Hsc src_flavour) stop hsc_env basename suff input_fn get_output_fn _ma
                     m <- liftIO $ getCoreModuleName input_fn
                     return (Nothing, mkModuleName m, [], [])
 
-                _           -> liftIO $ do
-                    buf <- hGetStringBuffer input_fn
+                _           -> do
+                    buf <- liftIO $ hGetStringBuffer input_fn
                     (src_imps,imps,L _ mod_name) <- getImports dflags buf input_fn (basename <.> suff)
                     return (Just buf, mod_name, imps, src_imps)
 

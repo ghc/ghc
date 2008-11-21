@@ -2029,7 +2029,7 @@ summariseFile hsc_env old_summaries file mb_phase obj_allowed maybe_buf
 	(dflags', hspp_fn, buf)
 	    <- preprocessFile hsc_env file mb_phase maybe_buf
 
-        (srcimps,the_imps, L _ mod_name) <- liftIO $ getImports dflags' buf hspp_fn file
+        (srcimps,the_imps, L _ mod_name) <- getImports dflags' buf hspp_fn file
 
 	-- Make a ModLocation for this file
 	location <- liftIO $ mkHomeModLocation dflags mod_name file
@@ -2161,7 +2161,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
 	-- Preprocess the source file and get its imports
 	-- The dflags' contains the OPTIONS pragmas
 	(dflags', hspp_fn, buf) <- preprocessFile hsc_env src_fn Nothing maybe_buf
-        (srcimps, the_imps, L mod_loc mod_name) <- liftIO $ getImports dflags' buf hspp_fn src_fn
+        (srcimps, the_imps, L mod_loc mod_name) <- getImports dflags' buf hspp_fn src_fn
 
 	when (mod_name /= wanted_mod) $
 		throwOneError $ mkPlainErrMsg mod_loc $ 

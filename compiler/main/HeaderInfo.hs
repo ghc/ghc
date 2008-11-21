@@ -37,26 +37,39 @@ import ErrUtils
 import Util
 import Outputable
 import Pretty           ()
-import Panic
 import Maybes
-import Bag		( emptyBag, listToBag )
+import Bag		( emptyBag, listToBag, unitBag )
 
+import MonadUtils       ( MonadIO )
 import Exception
 import Control.Monad
-import System.Exit
 import System.IO
 import Data.List
 
-getImports :: DynFlags -> StringBuffer -> FilePath -> FilePath
-    -> IO ([Located ModuleName], [Located ModuleName], Located ModuleName)
+------------------------------------------------------------------------------
+
+-- | Parse the imports of a source file.
+--
+-- Throws a 'SourceError' if parsing fails.
+getImports :: GhcMonad m =>
+              DynFlags
+           -> StringBuffer -- ^ Parse this.
+           -> FilePath     -- ^ Filename the buffer came from.  Used for
+                           --   reporting parse error locations.
+           -> FilePath     -- ^ The original source filename (used for locations
+                           --   in the function result)
+           -> m ([Located ModuleName], [Located ModuleName], Located ModuleName)
+              -- ^ The source imports, normal imports, and the module name.
 getImports dflags buf filename source_filename = do
   let loc  = mkSrcLoc (mkFastString filename) 1 0
   case unP parseHeader (mkPState buf loc dflags) of
-	PFailed span err -> parseError span err
-	POk pst rdr_module -> do
-          let ms = getMessages pst
-          printErrorsAndWarnings dflags ms
-          when (errorsFound dflags ms) $ exitWith (ExitFailure 1)
+    PFailed span err -> parseError span err
+    POk pst rdr_module -> do
+      let ms@(warns, errs) = getMessages pst
+      logWarnings warns
+      if errorsFound dflags ms
+        then liftIO $ throwIO $ mkSrcErr errs
+        else
 	  case rdr_module of
 	    L _ (HsModule mb_mod _ imps _ _ _ _) ->
 	      let
@@ -71,7 +84,7 @@ getImports dflags buf filename source_filename = do
 	      in
 	      return (source_imps, ordinary_imps, mod)
   
-parseError :: SrcSpan -> Message -> IO a
+parseError :: GhcMonad m => SrcSpan -> Message -> m a
 parseError span err = throwOneError $ mkPlainErrMsg span err
 
 -- we aren't interested in package imports here, filter them out
@@ -186,14 +199,14 @@ getOptions' dflags buf filename
 -----------------------------------------------------------------------------
 -- Complain about non-dynamic flags in OPTIONS pragmas
 
-checkProcessArgsResult :: [Located String] -> IO ()
+checkProcessArgsResult :: MonadIO m => [Located String] -> m ()
 checkProcessArgsResult flags
   = when (notNull flags) $
-        ghcError $ ProgramError $ showSDoc $ vcat $ map f flags
-    where f (L loc flag)
-              = hang (ppr loc <> char ':') 4
-                     (text "unknown flag in  {-# OPTIONS #-} pragma:" <+>
-                      text flag)
+      liftIO $ throwIO $ mkSrcErr $ listToBag $ map mkMsg flags
+    where mkMsg (L loc flag)
+              = mkPlainErrMsg loc $
+                  (text "unknown flag in  {-# OPTIONS #-} pragma:" <+>
+                   text flag)
 
 -----------------------------------------------------------------------------
 
@@ -209,15 +222,15 @@ checkExtension (L l ext)
 
 languagePragParseError :: SrcSpan -> a
 languagePragParseError loc =
-  pgmError 
-   (showSDoc (mkLocMessage loc (
-     text "cannot parse LANGUAGE pragma: comma-separated list expected")))
+  throw $ mkSrcErr $ unitBag $
+     (mkPlainErrMsg loc $
+       text "cannot parse LANGUAGE pragma: comma-separated list expected")
 
 unsupportedExtnError :: SrcSpan -> String -> a
 unsupportedExtnError loc unsup =
-  pgmError (showSDoc (mkLocMessage loc (
-                text "unsupported extension: " <>
-                text unsup)))
+  throw $ mkSrcErr $ unitBag $
+    mkPlainErrMsg loc $
+        text "unsupported extension: " <> text unsup
 
 
 optionsErrorMsgs :: [String] -> [Located String] -> FilePath -> Messages
