@@ -107,7 +107,8 @@ sparkPoolSize (SparkPool *pool)
 INLINE_HEADER void
 discardSparks (SparkPool *pool)
 {
-    pool->top = pool->topBound = pool->bottom = 0;
+    pool->top = pool->bottom;
+//    pool->topBound = pool->top;
 }
 
 #endif
