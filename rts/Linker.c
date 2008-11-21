@@ -4674,7 +4674,7 @@ static void machoInitSymbolsWithoutUnderscore()
     void **p = symbolsWithoutUnderscore;
     __asm__ volatile(".globl _symbolsWithoutUnderscore\n.data\n_symbolsWithoutUnderscore:");
 
-#undef Sym
+#undef SymI_NeedsProto
 #define SymI_NeedsProto(x)  \
     __asm__ volatile(".long " # x);
 
@@ -4682,13 +4682,13 @@ static void machoInitSymbolsWithoutUnderscore()
 
     __asm__ volatile(".text");
     
-#undef Sym
+#undef SymI_NeedsProto
 #define SymI_NeedsProto(x)  \
     ghciInsertStrHashTable("(GHCi built-in symbols)", symhash, #x, *p++);
     
     RTS_MACHO_NOUNDERLINE_SYMBOLS
     
-#undef Sym
+#undef SymI_NeedsProto
 }
 #endif
 
