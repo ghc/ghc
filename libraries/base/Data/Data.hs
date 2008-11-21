@@ -54,6 +54,7 @@ module Data.Data (
         mkIntType,      -- :: String -> DataType
         mkFloatType,    -- :: String -> DataType
         mkStringType,   -- :: String -> DataType
+        mkNoRepType,    -- :: String -> DataType
         mkNorepType,    -- :: String -> DataType
         -- ** Observers
         dataTypeName,   -- :: DataType -> String
@@ -756,13 +757,20 @@ mkStringConstr dt str = case datarep dt of
 ------------------------------------------------------------------------------
 
 
--- | Constructs a non-representation for a non-presentable type
+-- | Deprecated version (misnamed)
+{-# DEPRECATED mkNorepType "Use mkNoRepType instead" #-}
 mkNorepType :: String -> DataType
 mkNorepType str = DataType
                         { tycon   = str
                         , datarep = NoRep
                         }
 
+-- | Constructs a non-representation for a non-presentable type
+mkNoRepType :: String -> DataType
+mkNoRepType str = DataType
+                        { tycon   = str
+                        , datarep = NoRep
+                        }
 
 -- | Test for a non-representable type
 isNorepType :: DataType -> Bool
@@ -1260,7 +1268,7 @@ instance (Data a, Data b, Data c, Data d, Data e, Data f, Data g)
 instance Typeable a => Data (Ptr a) where
   toConstr _   = error "toConstr"
   gunfold _ _  = error "gunfold"
-  dataTypeOf _ = mkNorepType "GHC.Ptr.Ptr"
+  dataTypeOf _ = mkNoRepType "GHC.Ptr.Ptr"
 
 
 ------------------------------------------------------------------------------
@@ -1268,7 +1276,7 @@ instance Typeable a => Data (Ptr a) where
 instance Typeable a => Data (ForeignPtr a) where
   toConstr _   = error "toConstr"
   gunfold _ _  = error "gunfold"
-  dataTypeOf _ = mkNorepType "GHC.ForeignPtr.ForeignPtr"
+  dataTypeOf _ = mkNoRepType "GHC.ForeignPtr.ForeignPtr"
 
 
 ------------------------------------------------------------------------------
@@ -1279,5 +1287,5 @@ instance (Typeable a, Data b, Ix a) => Data (Array a b)
   gfoldl f z a = z (listArray (bounds a)) `f` (elems a)
   toConstr _   = error "toConstr"
   gunfold _ _  = error "gunfold"
-  dataTypeOf _ = mkNorepType "Data.Array.Array"
+  dataTypeOf _ = mkNoRepType "Data.Array.Array"
 
