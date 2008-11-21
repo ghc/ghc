@@ -220,7 +220,7 @@ extern bdescr * splitLargeBlock (bdescr *bd, nat blocks);
 
    -------------------------------------------------------------------------- */
 
-extern void GarbageCollect(rtsBool force_major_gc);
+extern void GarbageCollect(rtsBool force_major_gc, nat gc_type, Capability *cap);
 
 /* -----------------------------------------------------------------------------
    Generational garbage collection support

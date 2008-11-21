@@ -40,6 +40,10 @@ extern SpinLock gc_alloc_block_sync;
 extern StgWord64 whitehole_spin;
 #endif
 
+void gcWorkerThread (Capability *cap);
+void initGcThreads (void);
+void waitForGcThreads (Capability *cap);
+
 #define WORK_UNIT_WORDS 128
 
 #endif /* GC_H */

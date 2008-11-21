@@ -26,6 +26,7 @@
 #include "Schedule.h"
 #include "Sparks.h"
 #include "Trace.h"
+#include "GC.h"
 
 // one global capability, this is the Capability for non-threaded
 // builds, and for +RTS -N1
@@ -190,6 +191,7 @@ initCapability( Capability *cap, nat i )
 
     cap->no = i;
     cap->in_haskell        = rtsFalse;
+    cap->in_gc             = rtsFalse;
 
     cap->run_queue_hd      = END_TSO_QUEUE;
     cap->run_queue_tl      = END_TSO_QUEUE;
@@ -358,14 +360,7 @@ releaseCapability_ (Capability* cap,
 	return;
     }
 
-    /* if waiting_for_gc was the reason to release the cap: thread
-       comes from yieldCap->releaseAndQueueWorker. Unconditionally set
-       cap. free and return (see default after the if-protected other
-       special cases). Thread will wait on cond.var and re-acquire the
-       same cap after GC (GC-triggering cap. calls releaseCap and
-       enters the spare_workers case)
-    */
-    if (waiting_for_gc) {
+    if (waiting_for_gc == PENDING_GC_SEQ) {
       last_free_capability = cap; // needed?
       trace(TRACE_sched | DEBUG_sched, 
 	    "GC pending, set capability %d free", cap->no);
@@ -557,6 +552,12 @@ yieldCapability (Capability** pCap, Task *task)
 {
     Capability *cap = *pCap;
 
+    if (waiting_for_gc == PENDING_GC_PAR) {
+	debugTrace(DEBUG_sched, "capability %d: becoming a GC thread", cap->no);
+        gcWorkerThread(cap);
+        return;
+    }
+
 	debugTrace(DEBUG_sched, "giving up capability %d", cap->no);
 
 	// We must now release the capability and wait to be woken up
@@ -655,58 +656,21 @@ wakeupThreadOnCapability (Capability *my_cap,
 }
 
 /* ----------------------------------------------------------------------------
- * prodCapabilities
+ * prodCapability
  *
- * Used to indicate that the interrupted flag is now set, or some
- * other global condition that might require waking up a Task on each
- * Capability.
+ * If a Capability is currently idle, wake up a Task on it.  Used to 
+ * get every Capability into the GC.
  * ------------------------------------------------------------------------- */
 
-static void
-prodCapabilities(rtsBool all)
+void
+prodCapability (Capability *cap, Task *task)
 {
-    nat i;
-    Capability *cap;
-    Task *task;
-
-    for (i=0; i < n_capabilities; i++) {
-	cap = &capabilities[i];
-	ACQUIRE_LOCK(&cap->lock);
-	if (!cap->running_task) {
-	    if (cap->spare_workers) {
-		trace(TRACE_sched, "resuming capability %d", cap->no);
-		task = cap->spare_workers;
-		ASSERT(!task->stopped);
-		giveCapabilityToTask(cap,task);
-		if (!all) {
-		    RELEASE_LOCK(&cap->lock);
-		    return;
-		}
-	    }
-	}
-	RELEASE_LOCK(&cap->lock);
+    ACQUIRE_LOCK(&cap->lock);
+    if (!cap->running_task) {
+        cap->running_task = task;
+        releaseCapability_(cap,rtsTrue);
     }
-    return;
-}
-
-void
-prodAllCapabilities (void)
-{
-    prodCapabilities(rtsTrue);
-}
-
-/* ----------------------------------------------------------------------------
- * prodOneCapability
- *
- * Like prodAllCapabilities, but we only require a single Task to wake
- * up in order to service some global event, such as checking for
- * deadlock after some idle time has passed.
- * ------------------------------------------------------------------------- */
-
-void
-prodOneCapability (void)
-{
-    prodCapabilities(rtsFalse);
+    RELEASE_LOCK(&cap->lock);
 }
 
 /* ----------------------------------------------------------------------------

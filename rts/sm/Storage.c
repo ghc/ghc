@@ -276,6 +276,10 @@ initStorage( void )
   whitehole_spin = 0;
 #endif
 
+  N = 0;
+
+  initGcThreads();
+
   IF_DEBUG(gc, statDescribeGens());
 
   RELEASE_SM_LOCK;

@@ -179,7 +179,9 @@ struct PAR_FLAGS {
   rtsBool        migrate;        /* migrate threads between capabilities */
   rtsBool        wakeupMigrate;  /* migrate a thread on wakeup */
   unsigned int	 maxLocalSparks;
-  nat            gcThreads;      /* number of threads for parallel GC */
+  rtsBool        parGcEnabled;   /* enable parallel GC */
+  rtsBool        parGcGen;       /* do parallel GC in this generation
+                                  * and higher only */
 };
 #endif /* THREADED_RTS */
 

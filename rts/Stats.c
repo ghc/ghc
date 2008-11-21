@@ -613,11 +613,11 @@ stat_exit(int alloc)
 	    }
 
 #if defined(THREADED_RTS)
-            if (RtsFlags.ParFlags.gcThreads > 1) {
+            if (RtsFlags.ParFlags.parGcEnabled) {
                 statsPrintf("\n  Parallel GC work balance: %.2f (%ld / %ld, ideal %d)\n", 
                             (double)GC_par_avg_copied / (double)GC_par_max_copied,
                             (lnat)GC_par_avg_copied, (lnat)GC_par_max_copied,
-                            RtsFlags.ParFlags.gcThreads
+                            RtsFlags.ParFlags.nNodes
                     );
             }
 #endif

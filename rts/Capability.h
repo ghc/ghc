@@ -50,6 +50,9 @@ struct Capability_ {
     // catching unsafe call-ins.
     rtsBool in_haskell;
 
+    // true if this Capability is currently in the GC
+    rtsBool in_gc;
+
     // The run queue.  The Task owning this Capability has exclusive
     // access to its run queue, so can wake up threads without
     // taking a lock, and the common path through the scheduler is
@@ -191,6 +194,8 @@ extern Capability *capabilities;
 extern Capability *last_free_capability;
 
 // GC indicator, in scope for the scheduler
+#define PENDING_GC_SEQ 1
+#define PENDING_GC_PAR 2
 extern volatile StgWord waiting_for_gc;
 
 // Acquires a capability at a return point.  If *cap is non-NULL, then
@@ -237,6 +242,7 @@ void wakeupThreadOnCapability (Capability *my_cap, Capability *other_cap,
 // need to service some global event.
 //
 void prodOneCapability (void);
+void prodCapability (Capability *cap, Task *task);
 
 // Similar to prodOneCapability(), but prods all of them.
 //

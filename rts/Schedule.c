@@ -31,6 +31,7 @@
 #include "Updates.h"
 #include "Proftimer.h"
 #include "ProfHeap.h"
+#include "GC.h"
 
 /* PARALLEL_HASKELL includes go here */
 
@@ -1478,7 +1479,7 @@ scheduleDoGC (Capability *cap, Task *task USED_IF_THREADS, rtsBool force_major)
 #ifdef THREADED_RTS
     /* extern static volatile StgWord waiting_for_gc; 
        lives inside capability.c */
-    rtsBool was_waiting;
+    rtsBool gc_type, prev_pending_gc;
     nat i;
 #endif
 
@@ -1490,6 +1491,16 @@ scheduleDoGC (Capability *cap, Task *task USED_IF_THREADS, rtsBool force_major)
     }
 
 #ifdef THREADED_RTS
+    if (sched_state < SCHED_INTERRUPTING
+        && RtsFlags.ParFlags.parGcEnabled
+        && N >= RtsFlags.ParFlags.parGcGen
+        && ! oldest_gen->steps[0].mark)
+    {
+        gc_type = PENDING_GC_PAR;
+    } else {
+        gc_type = PENDING_GC_SEQ;
+    }
+
     // In order to GC, there must be no threads running Haskell code.
     // Therefore, the GC thread needs to hold *all* the capabilities,
     // and release them after the GC has completed.  
@@ -1500,39 +1511,55 @@ scheduleDoGC (Capability *cap, Task *task USED_IF_THREADS, rtsBool force_major)
     // actually did the GC.  But it's quite hard to arrange for all
     // the other tasks to sleep and stay asleep.
     //
-	
+
     /*  Other capabilities are prevented from running yet more Haskell
 	threads if waiting_for_gc is set. Tested inside
 	yieldCapability() and releaseCapability() in Capability.c */
 
-    was_waiting = cas(&waiting_for_gc, 0, 1);
-    if (was_waiting) {
+    prev_pending_gc = cas(&waiting_for_gc, 0, gc_type);
+    if (prev_pending_gc) {
 	do {
-	    debugTrace(DEBUG_sched, "someone else is trying to GC...");
-	    if (cap) yieldCapability(&cap,task);
+	    debugTrace(DEBUG_sched, "someone else is trying to GC (%d)...", 
+                       prev_pending_gc);
+            ASSERT(cap);
+            yieldCapability(&cap,task);
 	} while (waiting_for_gc);
 	return cap;  // NOTE: task->cap might have changed here
     }
 
     setContextSwitches();
-    for (i=0; i < n_capabilities; i++) {
-	debugTrace(DEBUG_sched, "ready_to_gc, grabbing all the capabilies (%d/%d)", i, n_capabilities);
-	if (cap != &capabilities[i]) {
-	    Capability *pcap = &capabilities[i];
-	    // we better hope this task doesn't get migrated to
-	    // another Capability while we're waiting for this one.
-	    // It won't, because load balancing happens while we have
-	    // all the Capabilities, but even so it's a slightly
-	    // unsavoury invariant.
-	    task->cap = pcap;
-	    waitForReturnCapability(&pcap, task);
-	    if (pcap != &capabilities[i]) {
-		barf("scheduleDoGC: got the wrong capability");
-	    }
-	}
-    }
 
-    waiting_for_gc = rtsFalse;
+    // The final shutdown GC is always single-threaded, because it's
+    // possible that some of the Capabilities have no worker threads.
+    
+    if (gc_type == PENDING_GC_SEQ)
+    {
+        // single-threaded GC: grab all the capabilities
+        for (i=0; i < n_capabilities; i++) {
+            debugTrace(DEBUG_sched, "ready_to_gc, grabbing all the capabilies (%d/%d)", i, n_capabilities);
+            if (cap != &capabilities[i]) {
+                Capability *pcap = &capabilities[i];
+                // we better hope this task doesn't get migrated to
+                // another Capability while we're waiting for this one.
+                // It won't, because load balancing happens while we have
+                // all the Capabilities, but even so it's a slightly
+                // unsavoury invariant.
+                task->cap = pcap;
+                waitForReturnCapability(&pcap, task);
+                if (pcap != &capabilities[i]) {
+                    barf("scheduleDoGC: got the wrong capability");
+                }
+            }
+        }
+    }
+    else
+    {
+        // multi-threaded GC: make sure all the Capabilities donate one
+        // GC thread each.
+        debugTrace(DEBUG_sched, "ready_to_gc, grabbing GC threads");
+
+        waitForGcThreads(cap);
+    }
 #endif
 
     // so this happens periodically:
@@ -1545,23 +1572,23 @@ scheduleDoGC (Capability *cap, Task *task USED_IF_THREADS, rtsBool force_major)
      * state, then we should take the opportunity to delete all the
      * threads in the system.
      */
-    if (sched_state >= SCHED_INTERRUPTING) {
-	deleteAllThreads(&capabilities[0]);
+    if (sched_state == SCHED_INTERRUPTING) {
+	deleteAllThreads(cap);
 	sched_state = SCHED_SHUTTING_DOWN;
     }
     
     heap_census = scheduleNeedHeapProfile(rtsTrue);
 
-    /* everybody back, start the GC.
-     * Could do it in this thread, or signal a condition var
-     * to do it in another thread.  Either way, we need to
-     * broadcast on gc_pending_cond afterward.
-     */
 #if defined(THREADED_RTS)
     debugTrace(DEBUG_sched, "doing GC");
+    // reset waiting_for_gc *before* GC, so that when the GC threads
+    // emerge they don't immediately re-enter the GC.
+    waiting_for_gc = 0;
+    GarbageCollect(force_major || heap_census, gc_type, cap);
+#else
+    GarbageCollect(force_major || heap_census, 0, cap);
 #endif
-    GarbageCollect(force_major || heap_census);
-    
+
     if (heap_census) {
         debugTrace(DEBUG_sched, "performing heap census");
         heapCensus();
@@ -1587,12 +1614,14 @@ scheduleDoGC (Capability *cap, Task *task USED_IF_THREADS, rtsBool force_major)
     }
 
 #if defined(THREADED_RTS)
-    // release our stash of capabilities.
-    for (i = 0; i < n_capabilities; i++) {
-	if (cap != &capabilities[i]) {
-	    task->cap = &capabilities[i];
-	    releaseCapability(&capabilities[i]);
-	}
+    if (gc_type == PENDING_GC_SEQ) {
+        // release our stash of capabilities.
+        for (i = 0; i < n_capabilities; i++) {
+            if (cap != &capabilities[i]) {
+                task->cap = &capabilities[i];
+                releaseCapability(&capabilities[i]);
+            }
+        }
     }
     if (cap) {
 	task->cap = cap;
@@ -2131,7 +2160,13 @@ exitScheduler(
     // If we haven't killed all the threads yet, do it now.
     if (sched_state < SCHED_SHUTTING_DOWN) {
 	sched_state = SCHED_INTERRUPTING;
-	scheduleDoGC(NULL,task,rtsFalse);    
+#if defined(THREADED_RTS)
+        waitForReturnCapability(&task->cap,task);
+	scheduleDoGC(task->cap,task,rtsFalse);    
+        releaseCapability(task->cap);
+#else
+	scheduleDoGC(&MainCapability,task,rtsFalse);    
+#endif
     }
     sched_state = SCHED_SHUTTING_DOWN;
 
@@ -2184,13 +2219,17 @@ static void
 performGC_(rtsBool force_major)
 {
     Task *task;
+
     // We must grab a new Task here, because the existing Task may be
     // associated with a particular Capability, and chained onto the 
     // suspended_ccalling_tasks queue.
     ACQUIRE_LOCK(&sched_mutex);
     task = newBoundTask();
     RELEASE_LOCK(&sched_mutex);
-    scheduleDoGC(NULL,task,force_major);
+
+    waitForReturnCapability(&task->cap,task);
+    scheduleDoGC(task->cap,task,force_major);
+    releaseCapability(task->cap);
     boundTaskExiting(task);
 }
 

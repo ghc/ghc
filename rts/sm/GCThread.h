@@ -113,10 +113,9 @@ typedef struct step_workspace_ {
 typedef struct gc_thread_ {
 #ifdef THREADED_RTS
     OSThreadId id;                 // The OS thread that this struct belongs to
-    Mutex      wake_mutex;
-    Condition  wake_cond;          // So we can go to sleep between GCs
-    rtsBool    wakeup;
-    rtsBool    exit;
+    SpinLock   gc_spin;
+    SpinLock   mut_spin;
+    volatile rtsBool wakeup;
 #endif
     nat thread_index;              // a zero based index identifying the thread
 

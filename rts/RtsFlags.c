@@ -214,7 +214,8 @@ void initRtsFlagsDefaults(void)
     RtsFlags.ParFlags.nNodes	        = 1;
     RtsFlags.ParFlags.migrate           = rtsTrue;
     RtsFlags.ParFlags.wakeupMigrate     = rtsFalse;
-    RtsFlags.ParFlags.gcThreads         = 1;
+    RtsFlags.ParFlags.parGcEnabled      = 1;
+    RtsFlags.ParFlags.parGcGen          = 1;
 #endif
 
 #ifdef PAR
@@ -450,8 +451,9 @@ usage_text[] = {
 "",
 #endif /* DEBUG */
 #if defined(THREADED_RTS) && !defined(NOSMP)
-"  -N<n>     Use <n> OS threads (default: 1) (also sets -g)",
-"  -g<n>     Use <n> OS threads for GC (default: 1)",
+"  -N<n>     Use <n> OS threads (default: 1)",
+"  -q1       Use one OS thread for GC (turns off parallel GC)",
+"  -qg<n>    Use parallel GC only for generations >= <n> (default: 1)",
 "  -qm       Don't automatically migrate threads between CPUs",
 "  -qw       Migrate a thread to the current CPU when it is woken up",
 #endif
@@ -1132,8 +1134,6 @@ error = rtsTrue;
 		if (rts_argv[arg][2] != '\0') {
 		    RtsFlags.ParFlags.nNodes
 		      = strtol(rts_argv[arg]+2, (char **) NULL, 10);
-                    // set -g at the same time as -N by default
-		    RtsFlags.ParFlags.gcThreads = RtsFlags.ParFlags.nNodes;
 		    if (RtsFlags.ParFlags.nNodes <= 0) {
 		      errorBelch("bad value for -N");
 		      error = rtsTrue;
@@ -1149,15 +1149,17 @@ error = rtsTrue;
 
 	      case 'g':
 		THREADED_BUILD_ONLY(
-		if (rts_argv[arg][2] != '\0') {
-		    RtsFlags.ParFlags.gcThreads
-		      = strtol(rts_argv[arg]+2, (char **) NULL, 10);
-		    if (RtsFlags.ParFlags.gcThreads <= 0) {
-		      errorBelch("bad value for -g");
-		      error = rtsTrue;
-		    }
-		}
-		) break;
+		    switch (rts_argv[arg][2]) {
+                    case '1':
+                        // backwards compat only
+                        RtsFlags.ParFlags.parGcEnabled = rtsFalse;
+                        break;
+		    default:
+			errorBelch("unknown RTS option: %s",rts_argv[arg]);
+			error = rtsTrue;
+			break;
+                    }
+                    ) break;
 
 	      case 'q':
 		    switch (rts_argv[arg][2]) {
@@ -1165,6 +1167,18 @@ error = rtsTrue;
 			errorBelch("incomplete RTS option: %s",rts_argv[arg]);
 			error = rtsTrue;
 			break;
+                    case '1':
+                        RtsFlags.ParFlags.parGcEnabled = rtsFalse;
+                        break;
+                    case 'g':
+                        if (rts_argv[arg][3] != '\0') {
+                            RtsFlags.ParFlags.parGcGen
+                                = strtol(rts_argv[arg]+3, (char **) NULL, 10);
+                        } else {
+                            errorBelch("bad value for -qg");
+                            error = rtsTrue;
+                        }
+                        break;
 		    case 'm':
 			RtsFlags.ParFlags.migrate = rtsFalse;
 			break;
