@@ -1,2 +1,4 @@
-2499.hs:1:11-27: unknown flag in  {-# OPTIONS #-} pragma: -package
-2499.hs:1:11-27: unknown flag in  {-# OPTIONS #-} pragma: blargh
+
+2499.hs:1:11: unknown flag in  {-# OPTIONS #-} pragma: -package
+
+2499.hs:1:11: unknown flag in  {-# OPTIONS #-} pragma: blargh

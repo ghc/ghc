@@ -1,1 +1,3 @@
-read030.hs:1:13: unsupported extension: ExtensibleRecords
+
+read030.hs:1:13:
+    unsupported extension: ExtensibleRecords
