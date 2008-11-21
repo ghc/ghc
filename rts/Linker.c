@@ -1464,7 +1464,6 @@ loadObj( char *path )
    close(fd);
 
 #else /* !USE_MMAP */
-
    /* load the image into memory */
    f = fopen(path, "rb");
    if (!f)
@@ -1492,10 +1491,12 @@ loadObj( char *path )
    oc->image = stgMallocBytes(oc->fileSize, "loadObj(image)");
 #  endif
 
-   n = fread ( oc->image, 1, oc->fileSize, f );
-   if (n != oc->fileSize)
-      barf("loadObj: error whilst reading `%s'", path);
-
+   {
+       int n;
+       n = fread ( oc->image, 1, oc->fileSize, f );
+       if (n != oc->fileSize)
+           barf("loadObj: error whilst reading `%s'", path);
+   }
    fclose(f);
 #endif /* USE_MMAP */
 
