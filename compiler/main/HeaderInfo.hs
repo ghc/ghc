@@ -95,10 +95,12 @@ getImpMod (ImportDecl located_mod _ _ _ _ _) = located_mod
 -- Get options
 --------------------------------------------------------------
 
-
+-- | Parse OPTIONS and LANGUAGE pragmas of the source file.
+--
+-- Throws a 'SourceError' if flag parsing fails (including unsupported flags.)
 getOptionsFromFile :: DynFlags
-                   -> FilePath            -- input file
-                   -> IO [Located String] -- options, if any
+                   -> FilePath            -- ^ Input file
+                   -> IO [Located String] -- ^ Parsed options, if any.
 getOptionsFromFile dflags filename
     = Exception.bracket
 	      (openBinaryFile filename ReadMode)
@@ -119,7 +121,13 @@ getOptionsFromFile dflags filename
                                              else do opts' <- loop handle newBuf
                                                      return (opts++opts')
 
-getOptions :: DynFlags -> StringBuffer -> FilePath -> [Located String]
+-- | Parse OPTIONS and LANGUAGE pragmas of the source file.
+--
+-- Throws a 'SourceError' if flag parsing fails (including unsupported flags.)
+getOptions :: DynFlags
+           -> StringBuffer -- ^ Input Buffer
+           -> FilePath     -- ^ Source filename.  Used for location info.
+           -> [Located String] -- ^ Parsed options.
 getOptions dflags buf filename
     = case getOptions' dflags buf filename of
         (_,opts) -> opts
@@ -193,8 +201,11 @@ getOptions' dflags buf filename
                            _ -> [(buffer state,L (last_loc state) ITeof)]
 
 -----------------------------------------------------------------------------
--- Complain about non-dynamic flags in OPTIONS pragmas
 
+-- | Complain about non-dynamic flags in OPTIONS pragmas.
+--
+-- Throws a 'SourceError' if the input list is non-empty claiming that the
+-- input flags are unknown.
 checkProcessArgsResult :: MonadIO m => [Located String] -> m ()
 checkProcessArgsResult flags
   = when (notNull flags) $
