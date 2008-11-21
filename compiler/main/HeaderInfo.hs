@@ -1,13 +1,6 @@
-{-# OPTIONS -fno-warn-incomplete-patterns #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 -----------------------------------------------------------------------------
 --
--- Parsing the top of a Haskell source file to get its module name,
+-- | Parsing the top of a Haskell source file to get its module name,
 -- imports and options.
 --
 -- (c) Simon Marlow 2005
@@ -188,8 +181,11 @@ getOptions' dflags buf filename
                   (_,L _loc ITcomma):more -> parseLanguage more
                   (_,L _loc ITclose_prag):more -> parseToks more
                   (_,L loc _):_ -> languagePragParseError loc
+                  [] -> panic "getOptions'.parseLanguage(1) went past eof token"
           parseLanguage (tok:_)
               = languagePragParseError (getLoc tok)
+          parseLanguage []
+              = panic "getOptions'.parseLanguage(2) went past eof token"
           lexToken t = return t
           lexAll state = case unP (lexer lexToken) state of
                            POk _      t@(L _ ITeof) -> [(buffer state,t)]
