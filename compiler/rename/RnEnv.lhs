@@ -1029,7 +1029,7 @@ warnUnusedBinds names  = mappM_ warnUnusedName (filter reportable names)
 
 warnUnusedName :: (Name, Provenance) -> RnM ()
 warnUnusedName (name, LocalDef)
-  = addUnusedWarning name (srcLocSpan (nameSrcLoc name)) 
+  = addUnusedWarning name (nameSrcSpan name)
 		     (ptext (sLit "Defined but not used"))
 
 warnUnusedName (name, Imported is)
