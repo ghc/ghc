@@ -534,10 +534,10 @@ tcdName :: TyClDecl name -> name
 tcdName decl = unLoc (tcdLName decl)
 
 tyClDeclNames :: Eq name => TyClDecl name -> [Located name]
--- Returns all the *binding* names of the decl, along with their SrcLocs
--- The first one is guaranteed to be the name of the decl
--- For record fields, the first one counts as the SrcLoc
--- We use the equality to filter out duplicate field names
+-- ^ Returns all the /binding/ names of the decl, along with their SrcLocs.
+-- The first one is guaranteed to be the name of the decl. For record fields
+-- mentioned in multiple constructors, the SrcLoc will be from the first
+-- occurence.  We use the equality to filter out duplicate field names
 
 tyClDeclNames (TyFamily    {tcdLName = name})    = [name]
 tyClDeclNames (TySynonym   {tcdLName = name})    = [name]
@@ -693,22 +693,33 @@ type LConDecl name = Located (ConDecl name)
 
 data ConDecl name
   = ConDecl
-    { con_name      :: Located name	    -- Constructor name; this is used for the
-                                            -- DataCon itself, and for the user-callable wrapper Id
+    { con_name      :: Located name
+        -- ^ Constructor name.  This is used for the DataCon itself, and for
+        -- the user-callable wrapper Id.
 
-    , con_explicit  :: HsExplicitForAll     -- Is there an user-written forall? (cf. HStypes.HsForAllTy)
+    , con_explicit  :: HsExplicitForAll
+        -- ^ Is there an user-written forall? (cf. 'HsTypes.HsForAllTy')
 
-    , con_qvars     :: [LHsTyVarBndr name]  -- ResTyH98: the constructor's existential type variables
-					    -- ResTyGADT:    all the constructor's quantified type variables
+    , con_qvars     :: [LHsTyVarBndr name]
+        -- ^ Type variables.  Depending on 'con_res' this describes the
+	-- follewing entities
+        --
+        --  - ResTyH98: the constructor's existential type variables
+        --
+        --  - ResTyGADT: all the constructor's quantified type variables
 
-    , con_cxt       :: LHsContext name      -- The context.  This *does not* include the
-					    -- "stupid theta" which lives only in the TyData decl
+    , con_cxt       :: LHsContext name
+        -- ^ The context.  This /does not/ include the \"stupid theta\" which
+	-- lives only in the 'TyData' decl.
 
-    , con_details   :: HsConDeclDetails name	-- The main payload
+    , con_details   :: HsConDeclDetails name
+        -- ^ The main payload
 
-    , con_res       :: ResType name         -- Result type of the constructor
+    , con_res       :: ResType name
+        -- ^ Result type of the constructor
 
-    , con_doc       :: Maybe (LHsDoc name)  -- A possible Haddock comment
+    , con_doc       :: Maybe (LHsDoc name)
+        -- ^ A possible Haddock comment.
     }
 
 type HsConDeclDetails name = HsConDetails (LBangType name) [ConDeclField name]
