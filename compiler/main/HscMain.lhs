@@ -107,7 +107,6 @@ import Exception
 import MonadUtils
 
 import Control.Monad
-import System.Exit
 import System.IO
 import Data.IORef
 \end{code}
@@ -158,11 +157,12 @@ knownKeyNames = map getName wiredInThings
 -- | parse a file, returning the abstract syntax
 parseFile :: GhcMonad m => HscEnv -> ModSummary -> m (Located (HsModule RdrName))
 parseFile hsc_env mod_summary = do
-    maybe_parsed <- liftIO $ myParseModule dflags hspp_file hspp_buf
+    ((warns,errs), maybe_parsed) <- liftIO $ myParseModule dflags hspp_file hspp_buf
+    logWarnings warns
     case maybe_parsed of
-      Left err -> do throw (mkSrcErr (unitBag err))
-      Right rdr_module
-               -> return rdr_module
+      Nothing -> liftIO $ throwIO (mkSrcErr errs)
+      Just rdr_module
+              -> return rdr_module
   where
            dflags    = hsc_dflags hsc_env
            hspp_file = ms_hspp_file mod_summary
@@ -509,16 +509,18 @@ hscFileFrontEnd =
        let dflags = hsc_dflags hsc_env
            hspp_file = ms_hspp_file mod_summary
            hspp_buf  = ms_hspp_buf  mod_summary
-       maybe_parsed <- liftIO $ myParseModule dflags hspp_file hspp_buf
+       (ms@(warns,_), maybe_parsed)
+           <- liftIO $ myParseModule dflags hspp_file hspp_buf
        case maybe_parsed of
-         Left err
-             -> do logMsgs (emptyBag, unitBag err)
+         Nothing
+             -> do logMsgs ms
                    return Nothing
-         Right rdr_module
+         Just rdr_module
              -------------------
              -- RENAME and TYPECHECK
              -------------------
-             -> do (tc_msgs, maybe_tc_result) 
+             -> do logMsgs (warns, emptyBag)
+                   (tc_msgs, maybe_tc_result)
                        <- {-# SCC "Typecheck-Rename" #-}
                           liftIO $ tcRnModule hsc_env (ms_hsc_src mod_summary)
                                               False rdr_module
@@ -779,40 +781,35 @@ testCmmConversion hsc_env cmm =
        -- return cmm -- don't use the conversion
 
 myParseModule :: DynFlags -> FilePath -> Maybe StringBuffer
-              -> IO (Either ErrMsg (Located (HsModule RdrName)))
-myParseModule dflags src_filename maybe_src_buf
- =    --------------------------  Parser  ----------------
-      showPass dflags "Parser" >>
-      {-# SCC "Parser" #-} do
+              -> IO (Messages, Maybe (Located (HsModule RdrName)))
+myParseModule dflags src_filename maybe_src_buf =
+   --------------------------  Parser  ----------------
+   showPass dflags "Parser" >>
+   {-# SCC "Parser" #-} do
 
 	-- sometimes we already have the buffer in memory, perhaps
 	-- because we needed to parse the imports out of it, or get the 
 	-- module name.
-      buf <- case maybe_src_buf of
-		Just b  -> return b
-		Nothing -> hGetStringBuffer src_filename
+     buf <- case maybe_src_buf of
+	      Just b  -> return b
+	      Nothing -> hGetStringBuffer src_filename
 
-      let loc  = mkSrcLoc (mkFastString src_filename) 1 0
+     let loc  = mkSrcLoc (mkFastString src_filename) 1 0
 
-      case unP parseModule (mkPState buf loc dflags) of {
+     case unP parseModule (mkPState buf loc dflags) of
+       PFailed span err ->
+           return ((emptyBag, unitBag (mkPlainErrMsg span err)), Nothing);
 
-	PFailed span err -> return (Left (mkPlainErrMsg span err));
-
-	POk pst rdr_module -> do {
-
-      let {ms = getMessages pst};
-      printErrorsAndWarnings dflags ms; -- XXX
-      when (errorsFound dflags ms) $ exitWith (ExitFailure 1);
-      
-      dumpIfSet_dyn dflags Opt_D_dump_parsed "Parser" (ppr rdr_module) ;
-      
-      dumpIfSet_dyn dflags Opt_D_source_stats "Source Statistics"
-			   (ppSourceStats False rdr_module) ;
-      
-      return (Right rdr_module)
-	-- ToDo: free the string buffer later.
-      }}
-
+       POk pst rdr_module -> do
+          let ms = getMessages pst
+          if errorsFound dflags ms then
+            return (ms, Nothing)
+           else do
+            dumpIfSet_dyn dflags Opt_D_dump_parsed "Parser" (ppr rdr_module) ;
+            dumpIfSet_dyn dflags Opt_D_source_stats "Source Statistics"
+                                 (ppSourceStats False rdr_module) ;
+            return (ms, Just rdr_module)
+            -- ToDo: free the string buffer later.
 
 myCoreToStg :: DynFlags -> Module -> [CoreBind]
             -> IO ( [(StgBinding,[(Id,[Id])])]  -- output program
