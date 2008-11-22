@@ -14,7 +14,6 @@ module ErrUtils (
 	Messages, errorsFound, emptyMessages,
 	mkErrMsg, mkPlainErrMsg, mkLongErrMsg, mkWarnMsg, mkPlainWarnMsg,
 	printErrorsAndWarnings, printBagOfErrors, printBagOfWarnings,
-    handleFlagWarnings,
 	warnIsErrorMsg,
 
 	ghcExit,
@@ -176,25 +175,6 @@ printBagOfWarnings dflags bag_of_warns
 		LT -> True
 		EQ -> True
 		GT -> False
-
-handleFlagWarnings :: DynFlags -> [Located String] -> IO ()
-handleFlagWarnings dflags warns
- = when (dopt Opt_WarnDeprecatedFlags dflags)
-        (handleFlagWarnings' dflags warns)
-
-handleFlagWarnings' :: DynFlags -> [Located String] -> IO ()
-handleFlagWarnings' _ [] = return ()
-handleFlagWarnings' dflags warns
- = do -- It would be nicer if warns :: [Located Message], but that has circular
-      -- import problems.
-      mapM_ (handleFlagWarning dflags) warns
-      when (dopt Opt_WarnIsError dflags) $
-          do errorMsg dflags $ text "\nFailing due to -Werror.\n"
-             exitWith (ExitFailure 1)
-
-handleFlagWarning :: DynFlags -> Located String -> IO ()
-handleFlagWarning dflags (L loc warn)
- = log_action dflags SevWarning loc defaultUserStyle (text warn)
 
 ghcExit :: DynFlags -> Int -> IO ()
 ghcExit dflags val

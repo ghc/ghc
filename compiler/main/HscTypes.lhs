@@ -15,6 +15,7 @@ module HscTypes (
         SourceError, GhcApiError, mkSrcErr, srcErrorMessages, mkApiErr,
         throwOneError, handleSourceError,
         reflectGhc, reifyGhc,
+        handleFlagWarnings,
 
 	-- * Sessions and compilation state
 	Session(..), withSession, modifySession,
@@ -131,7 +132,8 @@ import TyCon
 import DataCon		( DataCon, dataConImplicitIds, dataConWrapId )
 import PrelNames	( gHC_PRIM )
 import Packages hiding ( Version(..) )
-import DynFlags		( DynFlags(..), isOneShot, HscTarget (..) )
+import DynFlags		( DynFlags(..), isOneShot, HscTarget (..), dopt,
+                          DynFlag(..) )
 import DriverPhases	( HscSource(..), isHsBoot, hscSourceString, Phase )
 import BasicTypes	( IPName, Fixity, defaultFixity, WarningTxt(..) )
 import OptimizationFuel	( OptFuelState )
@@ -141,7 +143,7 @@ import CoreSyn		( CoreRule )
 import Maybes		( orElse, expectJust, catMaybes )
 import Outputable
 import BreakArray
-import SrcLoc		( SrcSpan, Located )
+import SrcLoc		( SrcSpan, Located(..) )
 import LazyUniqFM		( lookupUFM, eltsUFM, emptyUFM )
 import UniqSupply	( UniqSupply )
 import FastString
@@ -158,7 +160,7 @@ import System.Time	( ClockTime )
 import Data.IORef
 import Data.Array       ( Array, array )
 import Data.List
-import Control.Monad    ( mplus, guard, liftM )
+import Control.Monad    ( mplus, guard, liftM, when )
 import Exception
 \end{code}
 
@@ -409,6 +411,24 @@ reflectGhc m = unGhc m
 -- > Dual to 'reflectGhc'.  See its documentation.
 reifyGhc :: (Session -> IO a) -> Ghc a
 reifyGhc act = Ghc $ act
+
+handleFlagWarnings :: GhcMonad m => DynFlags -> [Located String] -> m ()
+handleFlagWarnings dflags warns
+ = when (dopt Opt_WarnDeprecatedFlags dflags)
+        (handleFlagWarnings' dflags warns)
+
+handleFlagWarnings' :: GhcMonad m => DynFlags -> [Located String] -> m ()
+handleFlagWarnings' _ [] = return ()
+handleFlagWarnings' dflags warns
+ = do -- It would be nicer if warns :: [Located Message], but that has circular
+      -- import problems.
+      logWarnings $ listToBag (map mkFlagWarning warns)
+      when (dopt Opt_WarnIsError dflags) $
+        liftIO $ throwIO $ mkSrcErr emptyBag
+
+mkFlagWarning :: Located String -> WarnMsg
+mkFlagWarning (L loc warn)
+ = mkPlainWarnMsg loc (text warn)
 \end{code}
 
 \begin{code}

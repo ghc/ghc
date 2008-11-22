@@ -34,7 +34,8 @@ import PackageConfig
 import UniqFM
 #endif
 
-import HscTypes		( implicitTyThings, reflectGhc, reifyGhc )
+import HscTypes		( implicitTyThings, reflectGhc, reifyGhc
+                        , handleFlagWarnings )
 import qualified RdrName ( getGRE_NameQualifier_maybes ) -- should this come via GHC?
 import Outputable       hiding (printForUser, printForUserPartWay)
 import Module           -- for ModuleEnv
@@ -42,7 +43,6 @@ import Name
 import SrcLoc
 
 -- Other random utilities
-import ErrUtils
 import CmdLineParser
 import Digraph
 import BasicTypes hiding (isTopLevel)
@@ -1512,7 +1512,7 @@ newDynFlags minus_opts = do
       dflags <- getDynFlags
       let pkg_flags = packageFlags dflags
       (dflags', leftovers, warns) <- io $ GHC.parseDynamicFlags dflags $ map noLoc minus_opts
-      io $ handleFlagWarnings dflags' warns
+      handleFlagWarnings dflags' warns
 
       if (not (null leftovers))
         then ghcError $ errorsToGhcException leftovers

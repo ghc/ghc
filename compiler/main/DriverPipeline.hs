@@ -666,7 +666,7 @@ runPhase (Cpp sf) _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
        src_opts <- liftIO $ getOptionsFromFile dflags0 input_fn
        (dflags, unhandled_flags, warns)
            <- liftIO $ parseDynamicNoPackageFlags dflags0 src_opts
-       liftIO $ handleFlagWarnings dflags warns  -- XXX: may exit the program
+       handleFlagWarnings dflags warns
        checkProcessArgsResult unhandled_flags
 
        if not (dopt Opt_Cpp dflags) then

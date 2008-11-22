@@ -153,7 +153,11 @@ main =
   let flagWarnings = staticFlagWarnings
                   ++ modeFlagWarnings
                   ++ dynamicFlagWarnings
-  liftIO $ handleFlagWarnings dflags2 flagWarnings
+
+  handleSourceError (\e -> do
+       GHC.printExceptionAndWarnings e
+       liftIO $ exitWith (ExitFailure 1)) $
+    handleFlagWarnings dflags2 flagWarnings
 
         -- make sure we clean up after ourselves
   GHC.defaultCleanupHandler dflags2 $ do

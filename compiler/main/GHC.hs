@@ -2215,8 +2215,8 @@ preprocessFile hsc_env src_fn mb_phase (Just (buf, _time))
 	--
 	(dflags', leftovers, warns)
             <- parseDynamicNoPackageFlags dflags local_opts
-        liftIO $ checkProcessArgsResult leftovers -- XXX: throws exceptions
-        liftIO $ handleFlagWarnings dflags' warns -- XXX: throws exceptions
+        checkProcessArgsResult leftovers
+        handleFlagWarnings dflags' warns
 
 	let
 	    needs_preprocessing
