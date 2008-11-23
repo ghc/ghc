@@ -176,6 +176,12 @@ class TestOptions:
        # extra files to clean afterward
        self.clean_files = []
 
+       # which space field do we want to look at, and what bounds must
+       # it fall within?
+       self.space_field = None
+       self.space_min = None
+       self.space_max = None
+
        # should we run this test alone, i.e. not run it in parallel with
        # any other threads
        self.alone = 0

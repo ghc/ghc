@@ -216,6 +216,16 @@ def _extra_clean( opts, v ):
 
 # -----
 
+def space( field, min, max ):
+    return lambda opts, f=field, n=min, x=max: _space(opts, f, n, x);
+
+def _space( opts, f, n, x ):
+    opts.space_field = f
+    opts.space_min = n
+    opts.space_max = x
+
+# -----
+
 def skip_if_no_ghci(opts):
   if not ('ghci' in config.run_ways):
       opts.skip = 1
@@ -447,6 +457,7 @@ def test_common_work (name, opts, func, args):
                '.comp.stderr.normalised',   '.comp.stdout.normalised',
                '.interp.stderr',            '.interp.stdout',
                '.interp.stderr.normalised', '.interp.stdout.normalised',
+               '.stats',
                '.hi', '.o', '.prof', '.exe.prof', '.hc', '_stub.h', '_stub.c',
                '_stub.o', '.hp', '.exe.hp', '.ps', '.aux', '.hcr']))
 
@@ -653,6 +664,37 @@ def compile_and_run__( name, way, extra_hc_opts, top_mod ):
 
 def compile_and_run( name, way, extra_hc_opts ):
     return compile_and_run__( name, way, extra_hc_opts, '')
+
+def compile_and_run_space( name, way, extra_hc_opts ):
+    stats_file = name + '.stats'
+    opts = getTestOpts()
+    opts.extra_run_opts += ' +RTS -t' + stats_file + " --machine-readable -RTS"
+    setLocalTestOpts(opts)
+
+    result = compile_and_run__( name, way, extra_hc_opts, '')
+    if result != 'pass':
+        return 'fail'
+
+    f = open(stats_file)
+    contents = f.read()
+    f.close()
+
+    m = re.search('\("' + opts.space_field + '", "([0-9]+)"\)', contents)
+    if m == None:
+        print "Failed to find space field: ", opts.space_field
+        return 'fail'
+    val = int(m.group(1))
+
+    if val < opts.space_min:
+        print 'Space usage ', val, \
+              ' less than minimum allowed ', opts.space_min
+        return 'fail'
+    if val > opts.space_max:
+        print 'Space usage ', val, \
+              ' more than maximum allowed ', opts.space_max
+        return 'fail'
+    else:
+        return 'pass';
 
 def multimod_compile_and_run( name, way, top_mod, extra_hc_opts ):
     return compile_and_run__( name, way, extra_hc_opts, top_mod)
