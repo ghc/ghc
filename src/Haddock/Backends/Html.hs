@@ -1806,8 +1806,16 @@ s8, s15 :: HtmlTable
 s8  = tda [ theclass "s8" ]  << noHtml
 s15 = tda [ theclass "s15" ] << noHtml
 
+
+-- | Generate a named anchor
+--
+-- This actually generates two anchor tags, one with the name unescaped, and one
+-- with the name URI-escaped. This is needed because Opera 9.52 (and later
+-- versions) needs the name to be unescaped, while IE 7 needs it to be escaped.
+--
 namedAnchor :: String -> Html -> Html
-namedAnchor n = anchor ! [name (escapeStr n)]
+namedAnchor n = (anchor ! [name n]) . (anchor ! [name (escapeStr n)])
+
 
 --
 -- A section of HTML which is collapsible via a +/- button.
