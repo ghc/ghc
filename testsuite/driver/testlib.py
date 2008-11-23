@@ -1126,8 +1126,16 @@ def compare_outputs( kind, normaliser, extra_normaliser,
         actual_normalised_file = actual_file + ".normalised"
         write_file(actual_normalised_file, actual_str)
 
-        os.system( 'diff -u ' + expected_normalised_file + \
-                          ' ' + actual_normalised_file )
+        # Ignore whitespace when diffing. We should only get to this
+        # point if there are non-whitespace differences
+        r = os.system( 'diff -uw ' + expected_normalised_file + \
+                               ' ' + actual_normalised_file )
+
+        # If for some reason there were no non-whitespace differences,
+        # then do a full diff
+        if r == 0:
+            r = os.system( 'diff -u ' + expected_normalised_file + \
+                                  ' ' + actual_normalised_file )
 
         if config.accept:
             if expected_file == '':
