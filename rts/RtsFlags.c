@@ -208,6 +208,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.ConcFlags.ctxtSwitchTime	= 20;  /* In milliseconds */
 
     RtsFlags.MiscFlags.install_signal_handlers = rtsTrue;
+    RtsFlags.MiscFlags.machineReadable = rtsFalse;
     RtsFlags.MiscFlags.linkerMemBase    = 0;
 
 #ifdef THREADED_RTS
@@ -695,6 +696,10 @@ error = rtsTrue;
                   else if (strequal("install-signal-handlers=no",
                                &rts_argv[arg][2])) {
                       RtsFlags.MiscFlags.install_signal_handlers = rtsFalse;
+                  }
+                  else if (strequal("machine-readable",
+                               &rts_argv[arg][2])) {
+                      RtsFlags.MiscFlags.machineReadable = rtsTrue;
                   }
                   else if (strequal("info",
                                &rts_argv[arg][2])) {

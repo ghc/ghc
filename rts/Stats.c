@@ -726,9 +726,29 @@ stat_exit(int alloc)
 	}
 
 	if (RtsFlags.GcFlags.giveStats == ONELINE_GC_STATS) {
+      char *fmt1, *fmt2;
+      if (RtsFlags.MiscFlags.machineReadable) {
+          fmt1 = " [(\"bytes allocated\", \"%llu\")\n";
+          fmt2 = " ,(\"num_GCs\", \"%d\")\n"
+                 " ,(\"average_bytes_used\", \"%ld\")\n"
+                 " ,(\"max_bytes_used\", \"%ld\")\n"
+                 " ,(\"num_byte_usage_samples\", \"%ld\")\n"
+                 " ,(\"peak_megabytes_allocated\", \"%lu\")\n"
+                 " ,(\"init_cpu_seconds\", \"%.2f\")\n"
+                 " ,(\"init_wall_seconds\", \"%.2f\")\n"
+                 " ,(\"mutator_cpu_seconds\", \"%.2f\")\n"
+                 " ,(\"mutator_wall_seconds\", \"%.2f\")\n"
+                 " ,(\"GC_cpu_seconds\", \"%.2f\")\n"
+                 " ,(\"GC_wall_seconds\", \"%.2f\")\n"
+                 " ]\n";
+      }
+      else {
+          fmt1 = "<<ghc: %llu bytes, ";
+          fmt2 = "%d GCs, %ld/%ld avg/max bytes residency (%ld samples), %luM in use, %.2f INIT (%.2f elapsed), %.2f MUT (%.2f elapsed), %.2f GC (%.2f elapsed) :ghc>>\n";
+      }
 	  /* print the long long separately to avoid bugginess on mingwin (2001-07-02, mingw-0.5) */
-	  statsPrintf("<<ghc: %llu bytes, ", GC_tot_alloc*(ullong)sizeof(W_));
-	  statsPrintf("%d GCs, %ld/%ld avg/max bytes residency (%ld samples), %luM in use, %.2f INIT (%.2f elapsed), %.2f MUT (%.2f elapsed), %.2f GC (%.2f elapsed) :ghc>>\n",
+	  statsPrintf(fmt1, GC_tot_alloc*(ullong)sizeof(W_));
+	  statsPrintf(fmt2,
 		    total_collections,
 		    ResidencySamples == 0 ? 0 : 
 		        AvgResidency*sizeof(W_)/ResidencySamples, 
