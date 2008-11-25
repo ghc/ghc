@@ -675,7 +675,7 @@ def compile_and_run_space( name, way, extra_hc_opts ):
     if result != 'pass':
         return 'fail'
 
-    f = open(stats_file)
+    f = open(in_testdir(stats_file))
     contents = f.read()
     f.close()
 
