@@ -965,10 +965,13 @@ isSigmaTy (FunTy a _)    = isPredTy a
 isSigmaTy _              = False
 
 isOverloadedTy :: Type -> Bool
+-- Yes for a type of a function that might require evidence-passing
+-- Used only by bindInstsOfLocalFuns/Pats
+-- NB: be sure to check for type with an equality predicate; hence isCoVar
 isOverloadedTy ty | Just ty' <- tcView ty = isOverloadedTy ty'
-isOverloadedTy (ForAllTy _ ty) = isOverloadedTy ty
-isOverloadedTy (FunTy a _)     = isPredTy a
-isOverloadedTy _               = False
+isOverloadedTy (ForAllTy tv ty) = isCoVar tv || isOverloadedTy ty
+isOverloadedTy (FunTy a _)      = isPredTy a
+isOverloadedTy _                = False
 
 isPredTy :: Type -> Bool	-- Belongs in TcType because it does 
 				-- not look through newtypes, or predtypes (of course)
