@@ -100,7 +100,6 @@ import Control.Monad
 import Data.List
 import Data.IORef
 import System.FilePath
-import System.Exit	( exitWith, ExitCode(..) )
 \end{code}
 
 
@@ -116,8 +115,9 @@ mkIface :: HscEnv
 	-> Maybe Fingerprint	-- The old fingerprint, if we have it
 	-> ModDetails		-- The trimmed, tidied interface
 	-> ModGuts		-- Usages, deprecations, etc
-	-> IO (ModIface, 	-- The new one
-	       Bool)		-- True <=> there was an old Iface, and the 
+	-> IO (Messages,
+               Maybe (ModIface, -- The new one
+	              Bool))	-- True <=> there was an old Iface, and the
                                 --          new one is identical, so no need
                                 --          to write it
 
@@ -134,7 +134,7 @@ mkIface hsc_env maybe_old_fingerprint mod_details
         = mkIface_ hsc_env maybe_old_fingerprint
                    this_mod is_boot used_names deps rdr_env 
                    fix_env warns hpc_info dir_imp_mods mod_details
-	
+
 -- | make an interface from the results of typechecking only.  Useful
 -- for non-optimising compilation, or where we aren't generating any
 -- object code at all ('HscNothing').
@@ -142,8 +142,7 @@ mkIfaceTc :: HscEnv
           -> Maybe Fingerprint	-- The old fingerprint, if we have it
           -> ModDetails		-- gotten from mkBootModDetails, probably
           -> TcGblEnv		-- Usages, deprecations, etc
-	  -> IO (ModIface,
-	         Bool)
+	  -> IO (Messages, Maybe (ModIface, Bool))
 mkIfaceTc hsc_env maybe_old_fingerprint mod_details
   tc_result@TcGblEnv{ tcg_mod = this_mod,
                       tcg_src = hsc_src,
@@ -214,7 +213,7 @@ mkIface_ :: HscEnv -> Maybe Fingerprint -> Module -> IsBootInterface
          -> NameEnv FixItem -> Warnings -> HpcInfo
          -> ImportedMods
          -> ModDetails
-         -> IO (ModIface, Bool)
+	 -> IO (Messages, Maybe (ModIface, Bool))
 mkIface_ hsc_env maybe_old_fingerprint 
          this_mod is_boot used_names deps rdr_env fix_env src_warns hpc_info
          dir_imp_mods
@@ -305,10 +304,9 @@ mkIface_ hsc_env maybe_old_fingerprint
 	      		    	     | r <- iface_rules
 	      		   	     , isNothing (ifRuleOrph r) ]
 
-	; when (not (isEmptyBag orph_warnings))
-	       (do { printErrorsAndWarnings dflags errs_and_warns -- XXX
-	       	   ; when (errorsFound dflags errs_and_warns) 
-		          (exitWith (ExitFailure 1)) })
+	; if errorsFound dflags errs_and_warns
+            then return ( errs_and_warns, Nothing )
+            else do {
 
 -- XXX	; when (dopt Opt_D_dump_hi_diffs dflags) (printDump pp_diffs)
    
@@ -322,7 +320,7 @@ mkIface_ hsc_env maybe_old_fingerprint
                 -- with the old GlobalRdrEnv (mi_globals).
         ; let final_iface = new_iface{ mi_globals = Just rdr_env }
 
-	; return (final_iface, no_change_at_all) }
+	; return (errs_and_warns, Just (final_iface, no_change_at_all)) }}
   where
      r1 `le_rule`     r2 = ifRuleName      r1    <=    ifRuleName      r2
      i1 `le_inst`     i2 = ifDFun          i1 `le_occ` ifDFun          i2  

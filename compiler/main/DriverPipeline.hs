@@ -153,7 +153,7 @@ compile hsc_env0 summary mod_index nmods mb_old_iface maybe_old_linkable
            = ASSERT (isJust maybe_old_linkable)
              return maybe_old_linkable
 
-       handleBatch (HscRecomp hasStub)
+       handleBatch (HscRecomp hasStub _)
            | isHsBoot src_flavour
                = do when (isObjectTarget hsc_lang) $ -- interpreted reaches here too
                        liftIO $ SysTools.touch dflags' "Touching object file"
@@ -179,10 +179,10 @@ compile hsc_env0 summary mod_index nmods mb_old_iface maybe_old_linkable
 			           (hs_unlinked ++ stub_unlinked)
                     return (Just linkable)
 
-       handleInterpreted InteractiveNoRecomp
+       handleInterpreted HscNoRecomp
            = ASSERT (isJust maybe_old_linkable)
              return maybe_old_linkable
-       handleInterpreted (InteractiveRecomp hasStub comp_bc modBreaks)
+       handleInterpreted (HscRecomp hasStub (comp_bc, modBreaks))
            = do stub_unlinked <- getStubLinkable hasStub
                 let hs_unlinked = [BCOs comp_bc modBreaks]
                     unlinked_time = ms_hs_date summary
@@ -830,7 +830,7 @@ runPhase (Hsc src_flavour) stop hsc_env basename suff input_fn get_output_fn _ma
                     -- than the source file (else we wouldn't be in HscNoRecomp)
                     -- but we touch it anyway, to keep 'make' happy (we think).
                     return (StopLn, dflags', Just location4, o_file)
-          (HscRecomp hasStub)
+          (HscRecomp hasStub _)
               -> do when hasStub $
                          do stub_o <- compileStub hsc_env' mod location4
                             liftIO $ consIORef v_Ld_inputs stub_o

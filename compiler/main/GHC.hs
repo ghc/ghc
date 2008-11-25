@@ -1040,9 +1040,9 @@ getModSummary mod = do
 -- Throws a 'SourceError' on parse error.
 parseModule :: GhcMonad m => ModSummary -> m ParsedModule
 parseModule ms = do
-   hsc_env0 <- getSession
-   let hsc_env = hsc_env0 { hsc_dflags = ms_hspp_opts ms }
-   rdr_module <- parseFile hsc_env ms
+   rdr_module <- withTempSession
+                     (\e -> e { hsc_dflags = ms_hspp_opts ms }) $
+                   hscParse ms
    return (ParsedModule ms rdr_module)
 
 -- | Typecheck and rename a parsed module.
@@ -1050,12 +1050,11 @@ parseModule ms = do
 -- Throws a 'SourceError' if either fails.
 typecheckModule :: GhcMonad m => ParsedModule -> m TypecheckedModule
 typecheckModule pmod = do
-   let ms = modSummary pmod
-   hsc_env0 <- getSession
-   let hsc_env = hsc_env0 { hsc_dflags = ms_hspp_opts ms }
+ let ms = modSummary pmod
+ withTempSession (\e -> e { hsc_dflags = ms_hspp_opts ms }) $ do
    (tc_gbl_env, rn_info)
-       <- typecheckRenameModule hsc_env ms (parsedSource pmod)
-   details <- liftIO $ makeSimpleDetails hsc_env tc_gbl_env
+       <- hscTypecheckRename ms (parsedSource pmod)
+   details <- makeSimpleDetails tc_gbl_env
    return $
      TypecheckedModule {
        tm_internals_          = (tc_gbl_env, details),
@@ -1076,11 +1075,10 @@ typecheckModule pmod = do
 -- | Desugar a typechecked module.
 desugarModule :: GhcMonad m => TypecheckedModule -> m DesugaredModule
 desugarModule tcm = do
-   let ms = modSummary tcm
-   hsc_env0 <- getSession
-   let hsc_env = hsc_env0 { hsc_dflags = ms_hspp_opts ms }
+ let ms = modSummary tcm
+ withTempSession (\e -> e { hsc_dflags = ms_hspp_opts ms }) $ do
    let (tcg, _) = tm_internals tcm
-   guts <- deSugarModule hsc_env ms tcg
+   guts <- hscDesugar ms tcg
    return $
      DesugaredModule {
        dm_typechecked_module = tcm,
@@ -1094,16 +1092,17 @@ loadModule :: (TypecheckedMod mod, GhcMonad m) => mod -> m mod
 loadModule tcm = do
    let ms = modSummary tcm
    let mod = ms_mod_name ms
-   hsc_env0 <- getSession
-   let hsc_env = hsc_env0 { hsc_dflags = ms_hspp_opts ms }
    let (tcg, details) = tm_internals tcm
-   (iface,_) <- liftIO $ makeSimpleIface hsc_env Nothing tcg details
-   let mod_info = HomeModInfo {
-                    hm_iface = iface,
-                    hm_details = details,
-                    hm_linkable = Nothing }
-   let hpt_new = addToUFM (hsc_HPT hsc_env) mod mod_info
-   modifySession $ \_ -> hsc_env0{ hsc_HPT = hpt_new }
+   hpt_new <-
+       withTempSession (\e -> e { hsc_dflags = ms_hspp_opts ms }) $ do
+         (iface, _) <- makeSimpleIface Nothing tcg details
+         let mod_info = HomeModInfo {
+                          hm_iface = iface,
+                          hm_details = details,
+                          hm_linkable = Nothing }
+         hsc_env <- getSession
+         return $ addToUFM (hsc_HPT hsc_env) mod mod_info
+   modifySession $ \e -> e{ hsc_HPT = hpt_new }
    return tcm
 
 -- | This is the way to get access to the Core bindings corresponding
@@ -1132,11 +1131,9 @@ compileToCore fn = do
 -- whether to run the simplifier.
 -- The resulting .o, .hi, and executable files, if any, are stored in the
 -- current directory, and named according to the module name.
--- Returns True iff compilation succeeded.
 -- This has only so far been tested with a single self-contained module.
 compileCoreToObj :: GhcMonad m => Bool -> CoreModule -> m ()
 compileCoreToObj simplify cm@(CoreModule{ cm_module = mName }) = do
-  hscEnv      <- getSession
   dflags      <- getSessionDynFlags
   currentTime <- liftIO $ getClockTime
   cwd         <- liftIO $ getCurrentDirectory
@@ -1161,15 +1158,13 @@ compileCoreToObj simplify cm@(CoreModule{ cm_module = mName }) = do
          ms_hspp_buf = Nothing
       }
 
-  ioMsgMaybe $ flip evalComp (CompState{ compHscEnv=hscEnv,
-                                         compModSummary=modSummary,
-                                         compOldIface=Nothing}) $
-     let maybe_simplify mod_guts | simplify = hscSimplify mod_guts
-                                 | otherwise = return mod_guts
-     in maybe_simplify (mkModGuts cm)
-          >>= hscNormalIface
-          >>= hscWriteIface
-          >>= hscOneShot
+  let maybe_simplify mod_guts | simplify = hscSimplify mod_guts
+                              | otherwise = return mod_guts
+  guts <- maybe_simplify (mkModGuts cm)
+  (iface, changed, _details, cgguts)
+      <- hscNormalIface guts Nothing
+  hscWriteIface iface changed modSummary
+  hscGenHardCode cgguts modSummary
   return ()
 
 -- Makes a "vanilla" ModGuts.
@@ -1211,6 +1206,7 @@ compileCore simplify fn = do
        -- Now we have the module name;
        -- parse, typecheck and desugar the module
        mod_guts <- coreModule `fmap`
+                      -- TODO: space leaky: call hsc* directly?
                       (desugarModule =<< typecheckModule =<< parseModule modSummary)
        liftM gutsToCoreModule $
          if simplify
@@ -1218,11 +1214,7 @@ compileCore simplify fn = do
              -- If simplify is true: simplify (hscSimplify), then tidy
              -- (tidyProgram).
              hsc_env <- getSession
-             simpl_guts <- ioMsg $ evalComp (hscSimplify mod_guts)
-                                    (CompState{
-                                       compHscEnv = hsc_env,
-                                       compModSummary = modSummary,
-                                       compOldIface = Nothing})
+             simpl_guts <- hscSimplify mod_guts
              tidy_guts <- liftIO $ tidyProgram hsc_env simpl_guts
              return $ Left tidy_guts
           else

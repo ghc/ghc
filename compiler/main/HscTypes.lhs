@@ -18,7 +18,7 @@ module HscTypes (
         handleFlagWarnings,
 
 	-- * Sessions and compilation state
-	Session(..), withSession, modifySession,
+	Session(..), withSession, modifySession, withTempSession,
         HscEnv(..), hscEPS,
 	FinderCache, FindResult(..), ModLocationCache,
 	Target(..), TargetId(..), pprTarget, pprTargetId,
@@ -292,6 +292,16 @@ withSession f = getSession >>= f
 modifySession :: GhcMonad m => (HscEnv -> HscEnv) -> m ()
 modifySession f = do h <- getSession
                      setSession $! f h
+
+withSavedSession :: GhcMonad m => m a -> m a
+withSavedSession m = do
+  saved_session <- getSession
+  m `gfinally` setSession saved_session
+
+-- | Call an action with a temporarily modified Session.
+withTempSession :: GhcMonad m => (HscEnv -> HscEnv) -> m a -> m a
+withTempSession f m =
+  withSavedSession $ modifySession f >> m
 
 -- | A minimal implementation of a 'GhcMonad'.  If you need a custom monad,
 -- e.g., to maintain additional state consider wrapping this monad or using
