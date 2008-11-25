@@ -247,9 +247,9 @@ addTickLHsExprOptAlt oneOfMany (L pos e0)
         addTickHsExpr e0
 
 addBinTickLHsExpr :: (Bool -> BoxLabel) -> LHsExpr Id -> TM (LHsExpr Id)
-addBinTickLHsExpr boxLabel (L pos e0) = do
-    e1 <- addTickHsExpr e0
-    allocBinTickBox boxLabel $ L pos e1
+addBinTickLHsExpr boxLabel (L pos e0) =
+    allocBinTickBox boxLabel pos $
+        addTickHsExpr e0
 
 addTickHsExpr :: HsExpr Id -> TM (HsExpr Id)
 addTickHsExpr e@(HsVar id) = do freeVar id; return e
@@ -697,29 +697,28 @@ allocATickBox boxLabel pos fvs | isGoodSrcSpan' pos =
      )
 allocATickBox _boxLabel _pos _fvs = return Nothing
 
-allocBinTickBox :: (Bool -> BoxLabel) -> LHsExpr Id -> TM (LHsExpr Id)
-allocBinTickBox boxLabel (L pos e) | isGoodSrcSpan' pos = TM $ \ _env st ->
+allocBinTickBox :: (Bool -> BoxLabel) -> SrcSpan -> TM (HsExpr Id)
+                -> TM (LHsExpr Id)
+allocBinTickBox boxLabel pos m
+ | not opt_Hpc = allocTickBox (ExpBox False) pos m
+ | isGoodSrcSpan' pos =
+ do
+ e <- m
+ TM $ \ _env st ->
   let meT = (pos,[],boxLabel True)
       meF = (pos,[],boxLabel False)
       meE = (pos,[],ExpBox False)
       c = tickBoxCount st
       mes = mixEntries st
   in 
-     if opt_Hpc 
-        then ( L pos $ HsTick c [] $ L pos $ HsBinTick (c+1) (c+2) (L pos e)
+             ( L pos $ HsTick c [] $ L pos $ HsBinTick (c+1) (c+2) (L pos e)
            -- notice that F and T are reversed,
            -- because we are building the list in
            -- reverse...
              , noFVs
              , st {tickBoxCount=c+3 , mixEntries=meF:meT:meE:mes}
              )
-        else
-             ( L pos $ HsTick c [] $ L pos e
-             , noFVs
-             , st {tickBoxCount=c+1,mixEntries=meE:mes}
-             )
-
-allocBinTickBox _boxLabel e = return e
+allocBinTickBox _boxLabel pos m = do e <- m; return (L pos e)
 
 isGoodSrcSpan' :: SrcSpan -> Bool
 isGoodSrcSpan' pos
