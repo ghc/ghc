@@ -1,0 +1,10 @@
+Stopped at 2740.hs:(3,0)-(4,24)
+_result :: a = _
+Stopped at 2740.hs:3:10-12
+_result :: a = _
+x :: a = _
+y :: a = _
+x = (_t1::a)
+y = (_t2::a)
+x = 1
+y = 2
