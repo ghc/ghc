@@ -1992,8 +1992,14 @@ data Linkable = LM {
 					-- (i.e. when the bytecodes were produced,
 					--	 or the mod date on the files)
   linkableModule   :: Module,           -- ^ The linkable module itself
-  linkableUnlinked :: [Unlinked]        -- ^ Those files and chunks of code we have
-                                        -- yet to link
+  linkableUnlinked :: [Unlinked]
+    -- ^ Those files and chunks of code we have yet to link.
+    --
+    -- INVARIANT: A valid linkable always has at least one 'Unlinked' item.
+    -- If this list is empty, the Linkable represents a fake linkable, which
+    -- is generated in HscNothing mode to avoid recompiling modules.
+    --
+    -- XXX: Do items get removed from this list when they get linked?
  }
 
 isObjectLinkable :: Linkable -> Bool

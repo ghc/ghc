@@ -1567,6 +1567,19 @@ upsweep_mod hsc_env old_hpt (stable_obj, stable_bco) summary mod_index nmods
             compile_it_discard_iface 
                         = compile hsc_env summary' mod_index nmods Nothing
 
+            -- With the HscNothing target we create empty linkables to avoid
+            -- recompilation.  We have to detect these to recompile anyway if
+            -- the target changed since the last compile.
+            is_fake_linkable
+               | Just hmi <- old_hmi, Just l <- hm_linkable hmi =
+                  null (linkableUnlinked l)
+               | otherwise =
+                   -- we have no linkable, so it cannot be fake
+                   False
+
+            implies False _ = True
+            implies True x  = x
+
         in
         case () of
          _
@@ -1589,7 +1602,8 @@ upsweep_mod hsc_env old_hpt (stable_obj, stable_bco) summary mod_index nmods
                 -- object is stable, but we need to load the interface
                 -- off disk to make a HMI.
 
-          | not (isObjectTarget target), is_stable_bco ->
+          | not (isObjectTarget target), is_stable_bco,
+            (target /= HscNothing) `implies` not is_fake_linkable ->
                 ASSERT(isJust old_hmi) -- must be in the old_hpt
                 let Just hmi = old_hmi in do
                 liftIO $ debugTraceMsg (hsc_dflags hsc_env) 5
@@ -1601,6 +1615,7 @@ upsweep_mod hsc_env old_hpt (stable_obj, stable_bco) summary mod_index nmods
             Just hmi <- old_hmi,
             Just l <- hm_linkable hmi,
             not (isObjectLinkable l),
+            (target /= HscNothing) `implies` not is_fake_linkable,
             linkableTime l >= ms_hs_date summary -> do
                 liftIO $ debugTraceMsg (hsc_dflags hsc_env) 5
                            (text "compiling non-stable BCO mod:" <+> ppr this_mod_name)
