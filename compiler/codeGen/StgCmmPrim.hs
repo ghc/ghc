@@ -82,7 +82,7 @@ cgOpApp (StgPrimOp primop) args res_ty
   | primOpOutOfLine primop
   = do	{ cmm_args <- getNonVoidArgAmodes args
         ; let fun = CmmLit (CmmLabel (mkRtsPrimOpLabel primop))
-        ; pprTrace "cgOpApp" (ppr primop) $ emitCall PrimOp fun cmm_args }
+        ; emitCall PrimOp fun cmm_args }
 
   | ReturnsPrim VoidRep <- result_info
   = do cgPrimOp [] primop args 

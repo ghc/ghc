@@ -337,8 +337,8 @@ tagForArity arity | isSmallFamily arity = arity
 lfDynTag :: LambdaFormInfo -> DynTag
 -- Return the tag in the low order bits of a variable bound
 -- to this LambdaForm
-lfDynTag (LFCon con)               = pprTrace "tagForCon" (ppr con <+> ppr (tagForCon con)) $ tagForCon con
-lfDynTag (LFReEntrant _ arity _ _) = pprTrace "reentrant" (ppr arity) $ tagForArity arity
+lfDynTag (LFCon con)               = tagForCon con
+lfDynTag (LFReEntrant _ arity _ _) = tagForArity arity
 lfDynTag _other                    = 0
 
 
@@ -508,8 +508,7 @@ getCallMethod name caf (LFReEntrant _ arity _ _) n_args
   | n_args == 0    = ASSERT( arity /= 0 )
 		     ReturnIt	-- No args at all
   | n_args < arity = SlowCall	-- Not enough args
-  | otherwise      = pprTrace "getCallMethod" (ppr name <+> ppr arity) $
-                     DirectEntry (enterIdLabel name caf) arity
+  | otherwise      = DirectEntry (enterIdLabel name caf) arity
 
 getCallMethod _name _ LFUnLifted n_args
   = ASSERT( n_args == 0 ) ReturnIt

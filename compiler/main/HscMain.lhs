@@ -673,7 +673,7 @@ hscGenHardCode cgguts mod_summary
                  then do cmms <- tryNewCodeGen hsc_env this_mod data_tycons
                                  dir_imps cost_centre_info
                                  stg_binds hpc_info
-                         pprTrace "cmms" (ppr cmms) $ return cmms
+                         return cmms
                  else {-# SCC "CodeGen" #-}
                        codeGen dflags this_mod data_tycons
                                dir_imps cost_centre_info

@@ -396,7 +396,7 @@ cgAltRhss gc_plan bndr alts
     cg_alt (con, bndrs, _uses, rhs)
       = getCodeR		  $
 	maybeAltHeapCheck gc_plan $
-	do { pprTrace "binding args for" (ppr bndr <+> ppr con) $ bindConArgs con base_reg bndrs
+	do { bindConArgs con base_reg bndrs
 	   ; cgExpr rhs
 	   ; return con }
 

@@ -369,7 +369,7 @@ assign_regs args supply
 assign_reg :: CgRep -> AvailRegs -> Maybe (GlobalReg, AvailRegs)
 assign_reg FloatArg  (vs, f:fs, ds, ls) = Just (FloatReg f,   (vs, fs, ds, ls))
 assign_reg DoubleArg (vs, fs, d:ds, ls) = Just (DoubleReg d,  (vs, fs, ds, ls))
-assign_reg LongArg   (vs, fs, ds, l:ls) = pprTrace "longArg" (ppr l) $ Just (LongReg l,    (vs, fs, ds, ls))
+assign_reg LongArg   (vs, fs, ds, l:ls) = Just (LongReg l,    (vs, fs, ds, ls))
 assign_reg PtrArg    (v:vs, fs, ds, ls) = Just (VanillaReg v VGcPtr, (vs, fs, ds, ls))
 assign_reg NonPtrArg (v:vs, fs, ds, ls) = Just (VanillaReg v VNonGcPtr, (vs, fs, ds, ls))
     -- PtrArg and NonPtrArg both go in a vanilla register

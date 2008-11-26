@@ -472,9 +472,7 @@ emitClosureProcAndInfoTable top_lvl bndr cl_info args body
         -- top-level binding, which this binding would incorrectly shadow.
         ; node <- if top_lvl then return $ idToReg (NonVoid bndr)
                   else bindToReg (NonVoid bndr) lf_info
-        ; arg_regs <-
-            pprTrace "bindArgsToRegs" (ppr args) $
-            bindArgsToRegs args
+        ; arg_regs <- bindArgsToRegs args
         ; emitClosureAndInfoTable cl_info (node : arg_regs) $ body (node, arg_regs)
         }
 

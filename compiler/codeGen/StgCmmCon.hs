@@ -210,8 +210,7 @@ bindConArgs (DataAlt con) base args
     bind_arg :: (NonVoid Id, VirtualHpOffset) -> FCode LocalReg
     bind_arg (arg, offset) 
 	= do { emit $ mkTaggedObjectLoad (idToReg arg) base offset tag
-	     ; pprTrace "bind_arg gets tag" (ppr arg <+> ppr tag) $
-               bindArgToReg arg }
+	     ; bindArgToReg arg }
 
 bindConArgs _other_con _base args
   = ASSERT( null args ) return []

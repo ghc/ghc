@@ -47,8 +47,8 @@ protoCmmCPSZ :: HscEnv -- Compilation env including
              -> CmmZ              -- Input C-- with Procedures
              -> IO (TopSRT, [CmmZ]) -- Output CPS transformed C--
 protoCmmCPSZ hsc_env (topSRT, rst) (Cmm tops)
-  | not (dopt Opt_RunCPSZ (hsc_dflags hsc_env))
-  = return (topSRT, Cmm tops : rst)                -- Only if -frun-cps
+  | not (dopt Opt_TryNewCodeGen (hsc_dflags hsc_env))
+  = return (topSRT, Cmm tops : rst)                -- Only if -fnew-codegen
   | otherwise
   = do	let dflags = hsc_dflags hsc_env
         showPass dflags "CPSZ"

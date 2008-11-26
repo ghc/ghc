@@ -87,8 +87,7 @@ cgTopRhsClosure id ccs _ upd_flag srt args body = do
   ; forkClosureBody (closureCodeBody True id closure_info ccs
                                      (nonVoidIds args) (length args) body fv_details)
 
-  ; pprTrace "arity for" (ppr id <+> ppr (length args) <+> ppr args) $
-    returnFC cg_id_info }
+  ; returnFC cg_id_info }
 
 ------------------------------------------------------------------------
 --		Non-top-level bindings
@@ -154,8 +153,7 @@ cgRhs name (StgRhsCon maybe_cc con args)
   = buildDynCon name maybe_cc con args
 
 cgRhs name (StgRhsClosure cc bi fvs upd_flag srt args body)
-  = pprTrace "cgRhs closure" (ppr name <+> ppr args) $
-    mkRhsClosure name cc bi (nonVoidIds fvs) upd_flag srt args body
+  = mkRhsClosure name cc bi (nonVoidIds fvs) upd_flag srt args body
 
 ------------------------------------------------------------------------
 --		Non-constructor right hand sides
@@ -421,7 +419,7 @@ bind_fv (id, off) = do { reg <- rebindToReg id; return (reg, off) }
 
 load_fvs :: LocalReg -> LambdaFormInfo -> [(LocalReg, WordOff)] -> FCode ()
 load_fvs node lf_info = mapCs (\ (reg, off) ->
-      pprTrace "get tag for" (ppr reg <+> ppr tag) $ emit $ mkTaggedObjectLoad reg node off tag)
+      emit $ mkTaggedObjectLoad reg node off tag)
   where tag = lfDynTag lf_info
 
 -----------------------------------------
