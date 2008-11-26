@@ -462,7 +462,9 @@ pprKind = pprType
 pprParendKind = pprParendType
 
 ppr_type :: Prec -> Type -> SDoc
-ppr_type _ (TyVarTy tv)       = ppr tv
+ppr_type _ (TyVarTy tv)		-- Note [Infix type variables]
+  | isSymOcc (getOccName tv)  = parens (ppr tv)
+  | otherwise		      = ppr tv
 ppr_type _ (PredTy pred)      = ifPprDebug (ptext (sLit "<pred>")) <> (ppr pred)
 ppr_type p (TyConApp tc tys)  = ppr_tc_app p tc tys
 
@@ -552,4 +554,25 @@ pprTvBndr tv | isLiftedTypeKind kind = ppr tv
 	     where
 	       kind = tyVarKind tv
 \end{code}
+
+Note [Infix type variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In Haskell 98 you can say
+
+   f :: (a ~> b) -> b
+
+and the (~>) is considered a type variable.  However, the type
+pretty-printer in this module will just see (a ~> b) as
+
+   App (App (TyVarTy "~>") (TyVarTy "a")) (TyVarTy "b")
+
+So it'll print the type in prefix form.  To avoid confusion we must
+remember to parenthesise the operator, thus
+
+   (~>) a b -> b
+
+See Trac #2766.
+
+
+
 
