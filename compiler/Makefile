@@ -492,7 +492,7 @@ GHCTAGS = $(TOP)/utils/ghctags/ghctags.exe
 else
 GHCTAGS = $(TOP)/utils/ghctags/ghctags-inplace
 endif
-GHCTAGS_ROOT = main/GHC.hs
+GHCTAGS_ROOT = main/GHC.hs ghci/InteractiveUI.hs
 
 # etags for stage2 is actually broken since it requires building
 # ghctags against an older ghc api
