@@ -419,6 +419,8 @@ instance Ord GlobalReg where
    compare _ GCFun = GT
    compare BaseReg _ = LT
    compare _ BaseReg = GT
+   compare EagerBlackholeInfo _ = LT
+   compare _ EagerBlackholeInfo = GT
 
 -- convenient aliases
 spReg, hpReg, spLimReg, nodeReg :: CmmReg
