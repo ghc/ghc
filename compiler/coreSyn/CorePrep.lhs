@@ -178,7 +178,7 @@ addFloat :: Floats -> FloatingBind -> Floats
 addFloat (Floats ok_to_spec floats) new_float
   = Floats (combine ok_to_spec (check new_float)) (floats `snocOL` new_float)
   where
-    check (FloatLet _)  	      = OkToSpec
+    check (FloatLet _) = OkToSpec
     check (FloatCase _ _ ok_for_spec) 
 	| ok_for_spec  =  IfUnboxedOk
 	| otherwise    =  NotOkToSpec
@@ -324,7 +324,8 @@ corePrepArg :: CorePrepEnv -> CoreArg -> RhsDemand
 	   -> UniqSM (Floats, CoreArg)
 corePrepArg env arg dem = do
     (floats, arg') <- corePrepExprFloat env arg
-    if exprIsTrivial arg'
+    if exprIsTrivial arg' && allLazy NotTopLevel NonRecursive floats
+       -- Note [Floating unlifted arguments]
      then return (floats, arg')
      else do v <- newVar (exprType arg')
              (floats', v') <- mkLocalNonRec v dem floats arg'
@@ -341,7 +342,23 @@ exprIsTrivial (Note _ e)               = exprIsTrivial e
 exprIsTrivial (Cast e _)               = exprIsTrivial e
 exprIsTrivial (Lam b body) | isTyVar b = exprIsTrivial body
 exprIsTrivial _                        = False
+\end{code}
 
+Note [Floating unlifted arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider    C (let v* = expensive in v)
+
+where the "*" indicates "will be demanded".  Usually v will have been
+inlined by now, but let's suppose it hasn't (see Trac #2756).  Then we
+do *not* want to get
+
+     let v* = expensive in C v
+
+because that has different strictness.  Hence the use of 'allLazy'.
+(NB: the let v* turns into a FloatCase, in mkLocalNonRec.)
+
+
+\begin{code}
 -- ---------------------------------------------------------------------------
 -- Dealing with expressions
 -- ---------------------------------------------------------------------------
@@ -603,11 +620,11 @@ mkLocalNonRec bndr dem floats rhs
 
   | isStrict dem 
 	-- It's a strict let so we definitely float all the bindings
- = let		-- Don't make a case for a value binding,
+  = let		-- Don't make a case for a value binding,
 		-- even if it's strict.  Otherwise we get
 		-- 	case (\x -> e) of ...!
 	float | exprIsHNF rhs = FloatLet (NonRec bndr rhs)
-	      | otherwise	= FloatCase bndr rhs (exprOkForSpeculation rhs)
+	      | otherwise     = FloatCase bndr rhs (exprOkForSpeculation rhs)
     in
     return (addFloat floats float, evald_bndr)
 
