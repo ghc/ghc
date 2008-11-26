@@ -1,10 +1,13 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1993-2000
 %
-
-\section[GHC_Main]{Main driver for Glasgow Haskell compiler}
-
 \begin{code}
+-- | Main driver for the compiling plain Haskell source code.
+--
+-- This module implements compilation of a Haskell-only source file.  It is
+-- /not/ concerned with preprocessing of source files; this is handled in
+-- "DriverPipeline".
+--
 module HscMain
     ( newHscEnv, hscCmmFile
     , hscParseIdentifier
