@@ -58,7 +58,7 @@ module StgCmmClosure (
 	closureValDescr, closureTypeDescr,	-- profiling
 
 	isStaticClosure,
-	cafBlackHoleClosureInfo, seCafBlackHoleClosureInfo,
+	cafBlackHoleClosureInfo, 
 
 	staticClosureNeedsLink, clHasCafRefs 
     ) where
@@ -759,18 +759,6 @@ cafBlackHoleClosureInfo (ClosureInfo { closureName = nm,
 		  closureCafs   = cafs }
 cafBlackHoleClosureInfo _ = panic "cafBlackHoleClosureInfo"
 
-seCafBlackHoleClosureInfo :: ClosureInfo -> ClosureInfo
-seCafBlackHoleClosureInfo (ClosureInfo { closureName = nm,
-				         closureType = ty,
-				         closureCafs = cafs })
-  = ClosureInfo { closureName   = nm,
-		  closureLFInfo = LFBlackHole mkSECAFBlackHoleInfoTableLabel,
-		  closureSMRep  = BlackHoleRep,
-		  closureSRT    = NoC_SRT,
-		  closureType   = ty,
-		  closureDescr  = "",
-		  closureCafs   = cafs }
-seCafBlackHoleClosureInfo _ = panic "seCafBlackHoleClosureInfo"
 
 --------------------------------------
 --   Extracting ClosureTypeInfo

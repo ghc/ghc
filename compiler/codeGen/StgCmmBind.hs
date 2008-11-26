@@ -619,8 +619,7 @@ link_caf cl_info is_upd = do
   ; return hp_rel }
   where
     bh_cl_info :: ClosureInfo
-    bh_cl_info | is_upd    = cafBlackHoleClosureInfo   cl_info
-	       | otherwise = seCafBlackHoleClosureInfo cl_info
+    bh_cl_info = cafBlackHoleClosureInfo cl_info
 
     ind_static_info :: CmmExpr
     ind_static_info = mkLblExpr mkIndStaticInfoLabel
