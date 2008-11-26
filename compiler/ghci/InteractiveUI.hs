@@ -1210,8 +1210,7 @@ typeOfExpr str
        ty <- GHC.exprType str
        dflags <- getDynFlags
        let pefas = dopt Opt_PrintExplicitForalls dflags
-       printForUser $ text str <+> dcolon
-       		<+> pprTypeForUser pefas ty
+       printForUser $ sep [text str, nest 2 (dcolon <+> pprTypeForUser pefas ty)]
 
 kindOfType :: String -> GHCi ()
 kindOfType str 
