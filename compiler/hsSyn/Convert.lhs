@@ -532,7 +532,9 @@ cvtType ty = do { (head_ty, tys') <- split_ty_app ty
 		             | n == 1    -> failWith (ptext (sLit "Illegal 1-tuple type constructor"))
 		             | otherwise -> mk_apps (HsTyVar (getRdrName (tupleTyCon Boxed n))) tys'
 		    ArrowT | [x',y'] <- tys' -> returnL (HsFunTy x' y')
+		    	   | otherwise       -> mk_apps (HsTyVar (getRdrName funTyCon)) tys'
 		    ListT  | [x']    <- tys' -> returnL (HsListTy x')
+		    	   | otherwise       -> mk_apps (HsTyVar (getRdrName listTyCon)) tys'
 		    VarT nm -> do { nm' <- tName nm;    mk_apps (HsTyVar nm') tys' }
 		    ConT nm -> do { nm' <- tconName nm; mk_apps (HsTyVar nm') tys' }
 
