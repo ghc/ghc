@@ -738,7 +738,7 @@ load2 how_much mod_graph logger = do
 
 	-- If we can determine that any of the {-# SOURCE #-} imports
 	-- are definitely unnecessary, then emit a warning.
-	warnUnnecessarySourceImports dflags mg2_with_srcimps
+	warnUnnecessarySourceImports mg2_with_srcimps
 
  	let
 	    -- check the stability property for each module.
@@ -1845,9 +1845,9 @@ nodeMapElts = eltsFM
 -- components in the topological sort, then those imports can
 -- definitely be replaced by ordinary non-SOURCE imports: if SOURCE
 -- were necessary, then the edge would be part of a cycle.
-warnUnnecessarySourceImports :: GhcMonad m => DynFlags -> [SCC ModSummary] -> m ()
-warnUnnecessarySourceImports dflags sccs = 
-  liftIO $ printBagOfWarnings dflags (listToBag (concatMap (check.flattenSCC) sccs))
+warnUnnecessarySourceImports :: GhcMonad m => [SCC ModSummary] -> m ()
+warnUnnecessarySourceImports sccs =
+  logWarnings (listToBag (concatMap (check.flattenSCC) sccs))
   where check ms =
 	   let mods_in_this_cycle = map ms_mod_name ms in
 	   [ warn i | m <- ms, i <- ms_srcimps m,
