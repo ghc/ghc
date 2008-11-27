@@ -1592,7 +1592,7 @@ parHtmlMarkup ppId = Markup {
   markupString        = toHtml,
   markupAppend        = (+++),
   markupIdentifier    = tt . ppId . head,
-  markupModule        = \m -> ppModule (mkModuleNoPackage m) "",
+  markupModule        = \m -> let (mod,ref) = break (=='#') m in ppModule (mkModuleNoPackage mod) ref,
   markupEmphasis      = emphasize . toHtml,
   markupMonospaced    = tt . toHtml,
   markupUnorderedList = ulist . concatHtml . map (li <<),
