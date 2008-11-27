@@ -192,7 +192,11 @@ pprStmt :: CmmStmt -> SDoc
 
 pprStmt stmt = case stmt of
     CmmNop       -> empty
-    CmmComment s -> (hang (ptext (sLit "/*")) 3 (ftext s)) $$ ptext (sLit "*/")
+    CmmComment s -> empty -- (hang (ptext (sLit "/*")) 3 (ftext s)) $$ ptext (sLit "*/")
+                          -- XXX if the string contains "*/", we need to fix it
+                          -- XXX we probably want to emit these comments when
+                          -- some debugging option is on.  They can get quite
+                          -- large.
 
     CmmAssign dest src -> pprAssign dest src
 
