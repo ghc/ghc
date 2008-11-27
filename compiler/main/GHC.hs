@@ -1099,7 +1099,9 @@ loadModule tcm = do
          let mod_info = HomeModInfo {
                           hm_iface = iface,
                           hm_details = details,
-                          hm_linkable = Nothing }
+                          hm_linkable = Just (LM (ms_hs_date ms)
+                                                 (ms_mod ms)
+                                                 []) }
          hsc_env <- getSession
          return $ addToUFM (hsc_HPT hsc_env) mod mod_info
    modifySession $ \e -> e{ hsc_HPT = hpt_new }
