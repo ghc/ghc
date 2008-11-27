@@ -54,6 +54,26 @@ ppModule iface = "" : doc (ifaceDoc iface) ++
 ---------------------------------------------------------------------
 -- Utility functions
 
+dropHsDocTy :: HsType a -> HsType a
+dropHsDocTy = f
+    where
+        g (L src x) = L src (f x)
+        f (HsForAllTy a b c d) = HsForAllTy a b c (g d)
+        f (HsBangTy a b) = HsBangTy a (g b)
+        f (HsAppTy a b) = HsAppTy (g a) (g b)
+        f (HsFunTy a b) = HsFunTy (g a) (g b)
+        f (HsListTy a) = HsListTy (g a)
+        f (HsPArrTy a) = HsPArrTy (g a)
+        f (HsTupleTy a b) = HsTupleTy a (map g b)
+        f (HsOpTy a b c) = HsOpTy (g a) b (g c)
+        f (HsParTy a) = HsParTy (g a)
+        f (HsKindSig a b) = HsKindSig (g a) b
+        f (HsDocTy a b) = f $ unL a
+        f x = x
+
+outHsType :: OutputableBndr a => HsType a -> String
+outHsType = out . dropHsDocTy
+
 
 dropComment (' ':'-':'-':' ':_) = []
 dropComment (x:xs) = x : dropComment xs
@@ -66,10 +86,6 @@ out = f . unwords . map (dropWhile isSpace) . lines . showSDocUnqual . ppr
         f xs | " <document comment>" `isPrefixOf` xs = f $ drop 19 xs
         f (x:xs) = x : f xs
         f [] = []
-
-
-typeSig :: String -> [String] -> String
-typeSig name flds = operator name ++ " :: " ++ concat (intersperse " -> " flds)
 
 
 operator :: String -> String
@@ -94,7 +110,7 @@ ppExport _ = []
 
 
 ppSig :: Sig Name -> [String]
-ppSig (TypeSig name sig) = [operator (out name) ++ " :: " ++ out typ]
+ppSig (TypeSig name sig) = [operator (out name) ++ " :: " ++ outHsType typ]
     where
         typ = case unL sig of
                    HsForAllTy Explicit a b c -> HsForAllTy Implicit a b c
@@ -142,18 +158,22 @@ ppData x = showData x{tcdCons=[],tcdDerivs=Nothing} :
 ppCtor :: TyClDecl Name -> ConDecl Name -> [String]
 ppCtor dat con = ldoc (con_doc con) ++ f (con_details con)
     where
-        f (PrefixCon args) = [typeSig name $ map out args ++ [resType]]
+        f (PrefixCon args) = [typeSig name $ args ++ [resType]]
         f (InfixCon a1 a2) = f $ PrefixCon [a1,a2]
         f (RecCon recs) = f (PrefixCon $ map cd_fld_type recs) ++ concat
                           [ldoc (cd_fld_doc r) ++
-                           [out (unL $ cd_fld_name r) `typeSig` [resType, out $ cd_fld_type r]]
+                           [out (unL $ cd_fld_name r) `typeSig` [resType, cd_fld_type r]]
                           | r <- recs]
 
+        funs = foldr1 (\x y -> reL $ HsFunTy x y)
+        apps = foldl1 (\x y -> reL $ HsAppTy x y)
+
+        typeSig name flds = operator name ++ " :: " ++ outHsType (unL $ funs flds)
         name = out $ unL $ con_name con
 
         resType = case con_res con of
-            ResTyH98 -> unwords $ operator (out (tcdLName dat)) : map out (tcdTyVars dat)
-            ResTyGADT x -> out $ unL x
+            ResTyH98 -> apps $ map (reL . HsTyVar) $ unL (tcdLName dat) : [x | UserTyVar x <- map unL $ tcdTyVars dat]
+            ResTyGADT x -> x
 
 
 ---------------------------------------------------------------------
