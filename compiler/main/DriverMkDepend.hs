@@ -222,14 +222,14 @@ findDependency  :: HscEnv
                 -> IsBootInterface      -- Source import
                 -> Bool                 -- Record dependency on package modules
                 -> IO (Maybe FilePath)  -- Interface file file
-findDependency hsc_env _ imp is_boot _include_pkg_deps
+findDependency hsc_env _ imp is_boot include_pkg_deps
   = do  {       -- Find the module; this will be fast because
                 -- we've done it once during downsweep
           r <- findImportedModule hsc_env imp Nothing
         ; case r of
             Found loc _
                 -- Home package: just depend on the .hi or hi-boot file
-                | isJust (ml_hs_file loc)
+                | isJust (ml_hs_file loc) || include_pkg_deps
                 -> return (Just (addBootSuffix_maybe is_boot (ml_hi_file loc)))
 
                 -- Not in this package: we don't need a dependency
