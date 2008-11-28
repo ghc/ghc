@@ -408,7 +408,6 @@ data DynFlags = DynFlags {
   depIncludePkgDeps     :: Bool,
   depExcludeMods        :: [ModuleName],
   depSuffixes           :: [String],
-  depWarnings           :: Bool,
 
   --  Package flags
   extraPkgConfs         :: [FilePath],
@@ -624,7 +623,6 @@ defaultDynFlags =
         depIncludePkgDeps = False,
         depExcludeMods    = [],
         depSuffixes       = [],
-        depWarnings       = True,
         -- end of ghc -M values
         haddockOptions = Nothing,
         flags = [
@@ -769,9 +767,6 @@ addDepExcludeMod m d
 
 addDepSuffix :: FilePath -> DynFlags -> DynFlags
 addDepSuffix s d = d { depSuffixes = deOptDep s : depSuffixes d }
-
-setDepWarnings :: Bool -> DynFlags -> DynFlags
-setDepWarnings b d = d { depWarnings = b }
 
 -- XXX Legacy code:
 -- We used to use "-optdep-flag -optdeparg", so for legacy applications
@@ -1203,7 +1198,7 @@ dynamic_flags = [
   , Flag "dep-makefile"             (HasArg (upd . setDepMakefile)) Supported
   , Flag "optdep-f"                 (HasArg (upd . setDepMakefile))
          (Deprecated "Use -dep-makefile instead")
-  , Flag "optdep-w"                 (NoArg  (upd (setDepWarnings False)))
+  , Flag "optdep-w"                 (NoArg  (return ()))
          (Deprecated "-optdep-w doesn't do anything")
   , Flag "include-pkg-deps" (NoArg  (upd (setDepIncludePkgDeps True))) Supported
   , Flag "optdep--include-prelude"  (NoArg  (upd (setDepIncludePkgDeps True)))
