@@ -32,11 +32,7 @@ struct Capability_ {
     // code.  During STG execution, the BaseReg register always points
     // to the StgRegTable of the current Capability (&cap->r).
     StgFunTable f;
-    StgRegTable r GNU_ATTRIBUTE(packed);
-       // packed eliminates any padding between f and r.  Not strictly
-       // necessary, but it means the negative offsets for accessing
-       // the fields of f when we are in STG code are as small as
-       // possible.
+    StgRegTable r;
 
     nat no;  // capability number.
 
