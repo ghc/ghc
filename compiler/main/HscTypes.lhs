@@ -23,6 +23,8 @@ module HscTypes (
 	FinderCache, FindResult(..), ModLocationCache,
 	Target(..), TargetId(..), pprTarget, pprTargetId,
 	ModuleGraph, emptyMG,
+        -- ** Callbacks
+        GhcApiCallbacks(..), withLocalCallbacks,
 
         -- * Information about modules
 	ModDetails(..),	emptyModDetails,
@@ -442,7 +444,49 @@ mkFlagWarning (L loc warn)
 \end{code}
 
 \begin{code}
--- | HscEnv is like 'Session', except that some of the fields are immutable.
+-- | These functions are called in various places of the GHC API.
+--
+-- API clients can override any of these callbacks to change GHC's default
+-- behaviour.
+data GhcApiCallbacks
+  = GhcApiCallbacks {
+
+    -- | Called by 'load' after the compilating of each module.
+    --
+    -- The default implementation simply prints all warnings and errors to
+    -- @stderr@.  Don't forget to call 'clearWarnings' when implementing your
+    -- own call.
+    --
+    -- The first argument is the module that was compiled.
+    --
+    -- The second argument is @Nothing@ if no errors occured, but there may
+    -- have been warnings.  If it is @Just err@ at least one error has
+    -- occured.  If 'srcErrorMessages' is empty, compilation failed due to
+    -- @-Werror@.
+    reportModuleCompilationResult :: GhcMonad m =>
+                                     ModSummary -> Maybe SourceError
+                                  -> m ()
+  }
+
+-- | Temporarily modify the callbacks.  After the action is executed all
+-- callbacks are reset (not, however, any other modifications to the session
+-- state.)
+withLocalCallbacks :: GhcMonad m =>
+                      (GhcApiCallbacks -> GhcApiCallbacks)
+                   -> m a -> m a
+withLocalCallbacks f m = do
+  hsc_env <- getSession
+  let cb0 = hsc_callbacks hsc_env
+  let cb' = f cb0
+  setSession (hsc_env { hsc_callbacks = cb' `seq` cb' })
+  r <- m
+  setSession (hsc_env { hsc_callbacks = cb0 })
+  return r
+
+\end{code}
+
+\begin{code}
+-- | Hscenv is like 'Session', except that some of the fields are immutable.
 -- An HscEnv is used to compile a single module from plain Haskell source
 -- code (after preprocessing) to either C, assembly or C--.  Things like
 -- the module graph don't change during a single compilation.
@@ -456,6 +500,9 @@ data HscEnv
   = HscEnv { 
 	hsc_dflags :: DynFlags,
 		-- ^ The dynamic flag settings
+
+        hsc_callbacks :: GhcApiCallbacks,
+                -- ^ Callbacks for the GHC API.
 
 	hsc_targets :: [Target],
 		-- ^ The targets (or roots) of the current session

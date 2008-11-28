@@ -125,8 +125,8 @@ import Data.IORef
 %************************************************************************
 
 \begin{code}
-newHscEnv :: DynFlags -> IO HscEnv
-newHscEnv dflags
+newHscEnv :: GhcApiCallbacks -> DynFlags -> IO HscEnv
+newHscEnv callbacks dflags
   = do 	{ eps_var <- newIORef initExternalPackageState
 	; us      <- mkSplitUniqSupply 'r'
 	; nc_var  <- newIORef (initNameCache us knownKeyNames)
@@ -134,6 +134,7 @@ newHscEnv dflags
 	; mlc_var <- newIORef emptyModuleEnv
         ; optFuel <- initOptFuelState
 	; return (HscEnv { hsc_dflags = dflags,
+                           hsc_callbacks = callbacks,
 			   hsc_targets = [],
 			   hsc_mod_graph = [],
 			   hsc_IC      = emptyInteractiveContext,

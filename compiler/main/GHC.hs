@@ -17,7 +17,7 @@ module GHC (
         gcatch, gbracket, gfinally,
         clearWarnings, getWarnings, hasWarnings,
         printExceptionAndWarnings, printWarnings,
-        handleSourceError,
+        handleSourceError, defaultCallbacks, GhcApiCallbacks(..),
 
 	-- * Flags and settings
 	DynFlags(..), DynFlag(..), Severity(..), HscTarget(..), dopt,
@@ -467,9 +467,16 @@ initGhcMonad mb_top_dir = do
 
   dflags0 <- liftIO $ initDynFlags defaultDynFlags
   dflags <- liftIO $ initSysTools mb_top_dir dflags0
-  env <- liftIO $ newHscEnv dflags
+  env <- liftIO $ newHscEnv defaultCallbacks dflags
   setSession env
   clearWarnings
+
+defaultCallbacks :: GhcApiCallbacks
+defaultCallbacks =
+  GhcApiCallbacks {
+    reportModuleCompilationResult =
+        \_ mb_err -> defaultWarnErrLogger mb_err
+  }
 
 -- -----------------------------------------------------------------------------
 -- Flags & settings
@@ -664,8 +671,9 @@ data LoadHowMuch
 -- the actual compilation starts (e.g., during dependency analysis).
 --
 load :: GhcMonad m => LoadHowMuch -> m SuccessFlag
-load how_much =
-    loadWithLogger defaultWarnErrLogger how_much
+load how_much = do
+   mod_graph <- depanal [] False
+   load2 how_much mod_graph
 
 -- | A function called to log warnings and errors.
 type WarnErrLogger = GhcMonad m => Maybe SourceError -> m ()
@@ -691,12 +699,13 @@ loadWithLogger logger how_much = do
     -- even if we don't get a fully successful upsweep, the full module
     -- graph is still retained in the Session.  We can tell which modules
     -- were successfully loaded by inspecting the Session's HPT.
-    mod_graph <- depanal [] False
-    load2 how_much mod_graph logger
+    withLocalCallbacks (\cbs -> cbs { reportModuleCompilationResult =
+                                          \_ -> logger }) $
+      load how_much
 
-load2 :: GhcMonad m => LoadHowMuch -> [ModSummary] -> WarnErrLogger
+load2 :: GhcMonad m => LoadHowMuch -> [ModSummary]
       -> m SuccessFlag
-load2 how_much mod_graph logger = do
+load2 how_much mod_graph = do
         guessOutputFile
 	hsc_env <- getSession
 
@@ -823,8 +832,7 @@ load2 how_much mod_graph logger = do
 	liftIO $ debugTraceMsg dflags 2 (hang (text "Ready for upsweep")
 				   2 (ppr mg))
         (upsweep_ok, hsc_env1, modsUpswept)
-           <- upsweep logger
-                      (hsc_env { hsc_HPT = emptyHomePackageTable })
+           <- upsweep (hsc_env { hsc_HPT = emptyHomePackageTable })
 	              pruned_hpt stable_mods cleanup mg
 
 	-- Make modsDone be the summaries for each home module now
@@ -1433,8 +1441,7 @@ findPartiallyCompletedCycles modsDone theGraph
 
 upsweep
     :: GhcMonad m =>
-       WarnErrLogger            -- ^ Called to print warnings and errors.
-    -> HscEnv			-- ^ Includes initially-empty HPT
+       HscEnv			-- ^ Includes initially-empty HPT
     -> HomePackageTable		-- ^ HPT from last time round (pruned)
     -> ([ModuleName],[ModuleName]) -- ^ stable modules (see checkStability)
     -> IO ()			-- ^ How to clean up unwanted tmp files
@@ -1443,7 +1450,7 @@ upsweep
          HscEnv,		-- With an updated HPT
          [ModSummary])	-- Mods which succeeded
 
-upsweep logger hsc_env old_hpt stable_mods cleanup sccs = do
+upsweep hsc_env old_hpt stable_mods cleanup sccs = do
    (res, hsc_env, done) <- upsweep' hsc_env old_hpt [] sccs 1 (length sccs)
    return (res, hsc_env, reverse done)
  where
@@ -1462,13 +1469,14 @@ upsweep logger hsc_env old_hpt stable_mods cleanup sccs = do
    = do -- putStrLn ("UPSWEEP_MOD: hpt = " ++ 
 	--	     show (map (moduleUserString.moduleName.mi_module.hm_iface) 
 	--		       (moduleEnvElts (hsc_HPT hsc_env)))
+        let logger = reportModuleCompilationResult (hsc_callbacks hsc_env)
 
         mb_mod_info
             <- handleSourceError
-                   (\err -> do logger (Just err); return Nothing) $ do
+                   (\err -> do logger mod (Just err); return Nothing) $ do
                  mod_info <- upsweep_mod hsc_env old_hpt stable_mods
                                          mod mod_index nmods
-                 logger Nothing -- log warnings
+                 logger mod Nothing -- log warnings
                  return (Just mod_info)
 
         liftIO cleanup -- Remove unwanted tmp files between compilations

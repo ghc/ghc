@@ -16,7 +16,8 @@ module Main (main) where
 import qualified GHC
 import GHC		( DynFlags(..), HscTarget(..),
                           GhcMode(..), GhcLink(..),
-			  LoadHowMuch(..), dopt, DynFlag(..) )
+			  LoadHowMuch(..), dopt, DynFlag(..),
+                          defaultCallbacks )
 import CmdLineParser
 
 -- Implementations of the various modes (--show-iface, mkdependHS. etc.)
@@ -515,7 +516,7 @@ doMake srcs  = do
 
 doShowIface :: DynFlags -> FilePath -> IO ()
 doShowIface dflags file = do
-  hsc_env <- newHscEnv dflags
+  hsc_env <- newHscEnv defaultCallbacks dflags
   showIface hsc_env file
 
 -- ---------------------------------------------------------------------------
