@@ -25,6 +25,7 @@ module Main (main) where
 import Control.Exception
 import Data.Char
 import Data.List
+import Data.Monoid
 import System.Cmd
 import System.Directory
 import System.Environment
@@ -41,9 +42,10 @@ import Foreign.C.String
 main :: IO ()
 main = do
     args <- getArgs
-    case getGhcLoc args of
-        (Just ghc, args') -> doIt ghc args'
-        (Nothing, args') -> do
+    case parseRunGhcFlags args of
+        (Help, _) -> printUsage
+        (RunGhcFlags (Just ghc), args') -> doIt ghc args'
+        (RunGhcFlags Nothing, args') -> do
             mbPath <- getExecPath
             case mbPath of
                 Nothing  -> dieProg ("cannot find ghc")
@@ -51,20 +53,35 @@ main = do
                     let ghc = takeDirectory (normalise path) </> "ghc"
                     in doIt ghc args'
 
-getGhcLoc :: [String] -> (Maybe FilePath, [String])
-getGhcLoc args = case args of
-                 "-f" : ghc : args' -> f ghc args'
-                 ('-' : 'f' : ghc) : args' -> f ghc args'
-                 -- If you need the first GHC flag to be a -f flag then
-                 -- you can pass -- first
-                 "--" : args' -> (Nothing, args')
-                 _            -> (Nothing, args)
-    where f ghc args' = -- If there is another -f flag later on then
-                        -- that overrules the one that we've already
-                        -- found
-                        case getGhcLoc args' of
-                        (Nothing, _) -> (Just ghc, args')
-                        success -> success
+data RunGhcFlags = RunGhcFlags (Maybe FilePath) -- GHC location
+                 | Help -- Print help text
+
+instance Monoid RunGhcFlags where
+    mempty = RunGhcFlags Nothing
+    Help `mappend` _ = Help
+    _ `mappend` Help = Help
+    RunGhcFlags _ `mappend` right@(RunGhcFlags (Just _)) = right
+    left@(RunGhcFlags _) `mappend` RunGhcFlags Nothing = left
+
+parseRunGhcFlags :: [String] -> (RunGhcFlags, [String])
+parseRunGhcFlags = f mempty
+    where f flags ("-f" : ghc : args)
+              = f (flags `mappend` RunGhcFlags (Just ghc)) args
+          f flags (('-' : 'f' : ghc) : args)
+              = f (flags `mappend` RunGhcFlags (Just ghc)) args
+          f flags ("--help" : args) = f (flags `mappend` Help) args
+          -- If you need the first GHC flag to be a -f flag then
+          -- you can pass -- first
+          f flags ("--" : args) = (flags, args)
+          f flags         args  = (flags, args)
+
+printUsage :: IO ()
+printUsage = do
+    putStrLn "Usage: runghc [runghc flags] [GHC flags] module [program args]"
+    putStrLn ""
+    putStrLn "The runghc flags are"
+    putStrLn "    -f /path/to/ghc       Tell runghc where GHC is"
+    putStrLn "    --help                Print this usage information"
 
 doIt :: String -> [String] -> IO ()
 doIt ghc args = do

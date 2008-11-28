@@ -13,16 +13,17 @@
 <screen>
 runghc [runghc flags] [GHC flags] module [program args]
 </screen>
-    <para>The only runghc flag currently is
+    <para>The runghc flags are
     <literal>-f /path/to/ghc</literal>,
-    which tells runghc which GHC to use to run the program. If it is
+    which tells runghc which GHC to use to run the program,
+    and <literal>--help</literal>, which prints usage information. If it is
     not given then runghc will search for GHC in the directories in the
     system search path.</para>
 
     <para>runghc will try to work out where the boundaries between
     <literal>[runghc flags]</literal> and
     <literal>[GHC flags]</literal>, and
-    <literal>[GHC flags]</literal> and
+    <literal>[program args]</literal> and
     <literal>module</literal> are, but you can use a
     <literal>--</literal> flag if it doesn't get it right. For example,
     <literal>runghc -- -fglasgow-exts Foo</literal> means runghc
