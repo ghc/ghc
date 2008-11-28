@@ -19,7 +19,7 @@ module DriverPipeline (
 
 	-- Interfaces for the compilation manager (interpreted/batch-mode)
    preprocess, 
-   compile,
+   compile, compile',
    link, 
 
   ) where
@@ -182,7 +182,10 @@ compile hsc_env0 summary mod_index nmods mb_old_iface maybe_old_linkable
        handleInterpreted HscNoRecomp
            = ASSERT (isJust maybe_old_linkable)
              return maybe_old_linkable
-       handleInterpreted (HscRecomp hasStub (comp_bc, modBreaks))
+       handleInterpreted (HscRecomp _hasStub Nothing)
+           = ASSERT (isHsBoot src_flavour)
+             return maybe_old_linkable
+       handleInterpreted (HscRecomp hasStub (Just (comp_bc, modBreaks)))
            = do stub_unlinked <- getStubLinkable hasStub
                 let hs_unlinked = [BCOs comp_bc modBreaks]
                     unlinked_time = ms_hs_date summary

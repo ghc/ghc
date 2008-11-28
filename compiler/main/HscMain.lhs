@@ -17,6 +17,9 @@ module HscMain
     , hscStmt, hscTcExpr, hscKcType
     , compileExpr
 #endif
+    , HsCompiler(..)
+    , hscOneShotCompiler, hscNothingCompiler
+    , hscInteractiveCompiler, hscBatchCompiler
     , hscCompileOneShot     -- :: Compiler HscStatus
     , hscCompileBatch       -- :: Compiler (HscStatus, ModIface, ModDetails)
     , hscCompileNothing     -- :: Compiler (HscStatus, ModIface, ModDetails)
@@ -313,7 +316,8 @@ data HscStatus' a
 -- result type.  Therefore we need to artificially distinguish some types.  We
 -- do this by adding type tags which will simply be ignored by the caller.
 type HscStatus         = HscStatus' ()
-type InteractiveStatus = HscStatus' (CompiledByteCode, ModBreaks)
+type InteractiveStatus = HscStatus' (Maybe (CompiledByteCode, ModBreaks))
+    -- INVARIANT: result is @Nothing@ <=> input was a boot file
 
 type OneShotResult     = HscStatus
 type BatchResult       = (HscStatus, ModIface, ModDetails)
@@ -345,6 +349,9 @@ data HsCompiler a
     -- | Called to recompile the module.
     hscRecompile :: GhcMonad m =>
                     ModSummary -> Maybe Fingerprint -> m a,
+
+    hscBackend :: GhcMonad m =>
+                  TcGblEnv -> ModSummary -> Maybe Fingerprint -> m a,
 
     -- | Code generation for Boot modules.
     hscGenBootOutput :: GhcMonad m =>
@@ -390,12 +397,18 @@ genericHscRecompile compiler mod_summary mb_old_hash
       panic "GHC does not currently support reading External Core files"
   | otherwise = do
       tc_result <- hscFileFrontEnd mod_summary
-      case ms_hsc_src mod_summary of
-        HsBootFile ->
-            hscGenBootOutput compiler tc_result mod_summary mb_old_hash
-        _other     -> do
-            guts <- hscDesugar mod_summary tc_result
-            hscGenOutput compiler guts mod_summary mb_old_hash
+      hscBackend compiler tc_result mod_summary mb_old_hash
+
+genericHscBackend :: GhcMonad m =>
+                     HsCompiler a
+                  -> TcGblEnv -> ModSummary -> Maybe Fingerprint
+                  -> m a
+genericHscBackend compiler tc_result mod_summary mb_old_hash
+  | HsBootFile <- ms_hsc_src mod_summary =
+      hscGenBootOutput compiler tc_result mod_summary mb_old_hash
+  | otherwise = do
+      guts <- hscDesugar mod_summary tc_result
+      hscGenOutput compiler guts mod_summary mb_old_hash
 
 --------------------------------------------------------------
 -- Compilers
@@ -422,6 +435,8 @@ hscOneShotCompiler =
       return HscNoRecomp
 
   , hscRecompile = genericHscRecompile hscOneShotCompiler
+
+  , hscBackend = genericHscBackend hscOneShotCompiler
 
   , hscGenBootOutput = \tc_result mod_summary mb_old_iface -> do
        (iface, changed, _) <- hscSimpleIface tc_result mb_old_iface
@@ -455,6 +470,8 @@ hscBatchCompiler =
 
   , hscRecompile = genericHscRecompile hscBatchCompiler
 
+  , hscBackend = genericHscBackend hscBatchCompiler
+
   , hscGenBootOutput = \tc_result mod_summary mb_old_iface -> do
        (iface, changed, details)
            <- hscSimpleIface tc_result mb_old_iface
@@ -487,7 +504,11 @@ hscInteractiveCompiler =
 
   , hscRecompile = genericHscRecompile hscInteractiveCompiler
 
-  , hscGenBootOutput = \_ _ _ -> panic "hscCompileInteractive: HsBootFile"
+  , hscBackend = genericHscBackend hscInteractiveCompiler
+
+  , hscGenBootOutput = \tc_result _mod_summary mb_old_iface -> do
+       (iface, _changed, details) <- hscSimpleIface tc_result mb_old_iface
+       return (HscRecomp False Nothing, iface, details)
 
   , hscGenOutput = \guts0 mod_summary mb_old_iface -> do
        guts <- hscSimplify guts0
@@ -517,11 +538,14 @@ hscNothingCompiler =
           panic "hscCompileNothing: cannot do external core"
         _otherwise -> do
           tc_result <- hscFileFrontEnd mod_summary
-          hscGenBootOutput hscNothingCompiler tc_result mod_summary mb_old_hash
+          hscBackend hscNothingCompiler tc_result mod_summary mb_old_hash
 
-  , hscGenBootOutput = \tc_result _mod_summary mb_old_iface -> do
+  , hscBackend = \tc_result _mod_summary mb_old_iface -> do
        (iface, _changed, details) <- hscSimpleIface tc_result mb_old_iface
        return (HscRecomp False (), iface, details)
+
+  , hscGenBootOutput = \_ _ _ ->
+        panic "hscCompileNothing: hscGenBootOutput should not be called"
 
   , hscGenOutput = \_ _ _ ->
         panic "hscCompileNothing: hscGenOutput should not be called"
@@ -733,7 +757,8 @@ hscInteractive (iface, details, cgguts) mod_summary
          ------------------ Create f-x-dynamic C-side stuff ---
          (_istub_h_exists, istub_c_exists) 
              <- outputForeignStubs dflags this_mod location foreign_stubs
-         return (HscRecomp istub_c_exists (comp_bc, mod_breaks), iface, details)
+         return (HscRecomp istub_c_exists (Just (comp_bc, mod_breaks))
+                , iface, details)
 #else
 hscInteractive _ _ = panic "GHC not compiled with interpreter"
 #endif
