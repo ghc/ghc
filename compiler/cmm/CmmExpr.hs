@@ -387,6 +387,7 @@ instance Ord GlobalReg where
    compare CurrentTSO CurrentTSO = EQ
    compare CurrentNursery CurrentNursery = EQ
    compare HpAlloc HpAlloc = EQ
+   compare EagerBlackholeInfo EagerBlackholeInfo = EQ
    compare GCEnter1 GCEnter1 = EQ
    compare GCFun GCFun = EQ
    compare BaseReg BaseReg = EQ
