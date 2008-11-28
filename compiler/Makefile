@@ -212,6 +212,7 @@ build.stage.%:
 
 doc.stage.%:
 	$(CABAL) haddock --distpref dist-stage$* \
+					 --html-location='../$$pkg' \
 	                 --haddock-option=--optghc=-DSTAGE=$* \
 	                 --haddock-option=+RTS --haddock-option=-s --haddock-option=-c --haddock-option=-RTS \
 	                 --with-haddock=$(FPTOOLS_TOP_ABS)/utils/haddock/install-inplace/bin/haddock
