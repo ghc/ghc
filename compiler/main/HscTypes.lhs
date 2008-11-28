@@ -480,7 +480,8 @@ withLocalCallbacks f m = do
   let cb' = f cb0
   setSession (hsc_env { hsc_callbacks = cb' `seq` cb' })
   r <- m
-  setSession (hsc_env { hsc_callbacks = cb0 })
+  hsc_env' <- getSession
+  setSession (hsc_env' { hsc_callbacks = cb0 })
   return r
 
 \end{code}
