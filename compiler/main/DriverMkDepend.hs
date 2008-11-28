@@ -17,6 +17,7 @@ module DriverMkDepend (
 
 import qualified GHC
 import GHC              ( ModSummary(..), GhcMonad )
+import PrelNames
 import DynFlags
 import Util
 import HscTypes         ( HscEnv, IsBootInterface, msObjFilePath, msHsFilePath, getSession )
@@ -213,6 +214,9 @@ processDeps dflags hsc_env excl_mods hdl (AcyclicSCC node)
         -- regular imports
         ; mapM_ (do_imp False)
                 (filter (`notElem` excl_mods) (map unLoc (ms_imps node)))
+
+        ; when (dopt Opt_ImplicitPrelude (ms_hspp_opts node)) $
+            do_imp False pRELUDE_NAME
         }
 
 
