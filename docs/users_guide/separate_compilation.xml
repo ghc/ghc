@@ -1025,15 +1025,7 @@ M.o : X.hi-boot
 	<option>&ndash;&ndash;include-pkg-deps</option> option below).</para>
 
 	<para>The dependency generation phase of GHC can take some
-        additional options, which you may find useful.  For historical
-        reasons, each option passed to the dependency generator from
-        the GHC command line must be preceded by
-        <literal>-optdep</literal>.  For example, to pass <literal>-f
-        .depend</literal> to the dependency generator, you say
-
-<screen>
-ghc -M -optdep-f -optdep.depend ...
-</screen>
+        additional options, which you may find useful.
 
 	The options which affect dependency generation are:</para>
 
@@ -1042,15 +1034,7 @@ ghc -M -optdep-f -optdep.depend ...
 	    <term><option>-ddump-mod-cycles</option></term>
 	    <listitem>
 	      <para>Display a list of the cycles in the module graph. This is
-	  useful when trying to eliminate such cycles.  You do not need the <literal>-optdep</literal> prefix
-	  for this flag.</para>
-	    </listitem>
-	  </varlistentry>
-
-	  <varlistentry>
-	    <term><option>-w</option></term>
-	    <listitem>
-	      <para>Turn off warnings about interface file shadowing.</para>
+	  useful when trying to eliminate such cycles.</para>
 	    </listitem>
 	  </varlistentry>
 
@@ -1066,14 +1050,14 @@ ghc -M -optdep-f -optdep.depend ...
 	  </varlistentry>
 
 	  <varlistentry>
-	    <term><option>-f</option> <replaceable>file</replaceable></term>
+	    <term><option>-dep-makefile</option> <replaceable>file</replaceable></term>
 	    <listitem>
 	      <para>Use <replaceable>file</replaceable> as the makefile,
               rather than <filename>makefile</filename> or
               <filename>Makefile</filename>.  If
               <replaceable>file</replaceable> doesn't exist,
               <command>mkdependHS</command> creates it.  We often use
-              <option>-f .depend</option> to put the dependencies in
+              <option>-dep-makefile .depend</option> to put the dependencies in
               <filename>.depend</filename> and then
               <command>include</command> the file
               <filename>.depend</filename> into
@@ -1081,21 +1065,8 @@ ghc -M -optdep-f -optdep.depend ...
 	    </listitem>
 	  </varlistentry>
 
-<!-- Retired with the move away from 'mkdependHS'.
 	  <varlistentry>
-	    <term><option>-o &lt;osuf&gt;</option></term>
-	    <listitem>
-	      <para>Use <filename>.&lt;osuf&gt;</filename> as the
-              "target file" suffix ( default: <literal>o</literal>).
-              Multiple <option>-o</option> flags are permitted
-              (GHC2.05 onwards).  Thus "<option>-o hc -o o</option>"
-              will generate dependencies for <filename>.hc</filename>
-              and <filename>.o</filename> files.</para>
-	    </listitem>
-	  </varlistentry>
--->
-	  <varlistentry>
-	    <term><option>-s &lt;suf&gt;</option></term>
+	    <term><option>-dep-suffix &lt;suf&gt;</option></term>
 	    <listitem>
 	      <para>Make extra dependencies that declare that files
               with suffix
@@ -1104,13 +1075,14 @@ ghc -M -optdep-f -optdep.depend ...
               <filename>.&lt;suf&gt;&lowbar;hi</filename>, or (for
               <literal>&lcub;-&num; SOURCE &num;-&rcub;</literal>
               imports) on <filename>.hi-boot</filename>.  Multiple
-              <option>-s</option> flags are permitted.  For example,
-              <option>-o hc -s a -s b</option> will make dependencies
-              for <filename>.hc</filename> on
+              <option>-dep-suffix</option> flags are permitted.  For example,
+              <option>-dep-suffix a -dep-suffix b</option>
+              will make dependencies
+              for <filename>.hs</filename> on
               <filename>.hi</filename>,
-              <filename>.a&lowbar;hc</filename> on
+              <filename>.a&lowbar;hs</filename> on
               <filename>.a&lowbar;hi</filename>, and
-              <filename>.b&lowbar;hc</filename> on
+              <filename>.b&lowbar;hs</filename> on
               <filename>.b&lowbar;hi</filename>.  (Useful in
               conjunction with NoFib "ways".)</para>
 	    </listitem>
@@ -1124,35 +1096,6 @@ ghc -M -optdep-f -optdep.depend ...
               it.</para>
 	    </listitem>
 	  </varlistentry>
-
-	  <varlistentry>
-	    <term><option>-x</option></term>
-	    <listitem>
-	      <para>same as <option>&ndash;&ndash;exclude-module</option></para>
-	    </listitem>
-	  </varlistentry>
-
-<!-- Not currently implemented:
-	  <varlistentry>
-	    <term><option>&ndash;&ndash;exclude-directory=&lt;dirs&gt;</option></term>
-	    <listitem>
-	      <para>Regard the colon-separated list of directories
-              <filename>&lt;dirs&gt;</filename> as containing stable,
-              don't generate any dependencies on modules
-              therein.</para>
-	    </listitem>
-	  </varlistentry>
-
-	  <varlistentry>
-	    <term><option>&ndash;&ndash;include-module=&lt;file&gt;</option></term>
-	    <listitem>
-	      <para>Regard <filename>&lt;file&gt;</filename> as not
-              "stable"; i.e., generate dependencies on it (if
-              any). This option is normally used in conjunction with
-              the <option>&ndash;&ndash;exclude-directory</option> option.</para>
-	    </listitem>
-	  </varlistentry>
--->
 
 	  <varlistentry>
 	    <term><option>&ndash;&ndash;include-pkg-deps</option></term>

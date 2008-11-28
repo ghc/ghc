@@ -1954,12 +1954,6 @@
 	      <entry>-</entry>
 	    </row>
 	    <row>
-	      <entry><option>-optdep</option> <replaceable>option</replaceable></entry>
-	      <entry>pass <replaceable>option</replaceable> to the dependency generator</entry>
-	      <entry>dynamic</entry>
-	      <entry>-</entry>
-	    </row>
-	    <row>
 	      <entry><option>-optwindres</option> <replaceable>option</replaceable></entry>
 	      <entry>pass <replaceable>option</replaceable> to <literal>windres</literal>.</entry>
 	      <entry>dynamic</entry>
