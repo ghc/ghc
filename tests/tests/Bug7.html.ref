@@ -116,7 +116,9 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >data</SPAN
->  <A NAME="t%3AFoo"
+>  <A NAME="t:Foo"
+><A NAME="t%3AFoo"
+></A
 ></A
 ><B
 >Foo</B
@@ -139,7 +141,9 @@
 ><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
 ><TR
 ><TD CLASS="arg"
+><A NAME="v:Foo"
 ><A NAME="v%3AFoo"
+></A
 ></A
 ><B
 >Foo</B
@@ -184,7 +188,9 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >class</SPAN
->  <A NAME="t%3ABar"
+>  <A NAME="t:Bar"
+><A NAME="t%3ABar"
+></A
 ></A
 ><B
 >Bar</B

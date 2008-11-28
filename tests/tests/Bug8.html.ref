@@ -70,7 +70,9 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >data</SPAN
->  <A NAME="t%3ATyp"
+>  <A NAME="t:Typ"
+><A NAME="t%3ATyp"
+></A
 ></A
 ><B
 >Typ</B
@@ -88,7 +90,9 @@
 ><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
 ><TR
 ><TD CLASS="arg"
+><A NAME="v:Type"
 ><A NAME="v%3AType"
+></A
 ></A
 ><B
 >Type</B
@@ -100,7 +104,9 @@
 ></TR
 ><TR
 ><TD CLASS="arg"
+><A NAME="v:TFree"
 ><A NAME="v%3ATFree"
+></A
 ></A
 ><B
 >TFree</B

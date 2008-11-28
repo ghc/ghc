@@ -70,7 +70,9 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >class</SPAN
->  <A NAME="t%3AC"
+>  <A NAME="t:C"
+><A NAME="t%3AC"
+></A
 ></A
 ><B
 >C</B
@@ -94,7 +96,9 @@
 ><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
 ><TR
 ><TD CLASS="decl"
+><A NAME="v:f"
 ><A NAME="v%3Af"
+></A
 ></A
 ><B
 >f</B

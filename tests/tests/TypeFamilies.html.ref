@@ -140,7 +140,9 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >type family</SPAN
-> <A NAME="t%3AG"
+> <A NAME="t:G"
+><A NAME="t%3AG"
+></A
 ></A
 ><B
 >G</B
@@ -165,7 +167,9 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >class</SPAN
->  <A NAME="t%3AA"
+>  <A NAME="t:A"
+><A NAME="t%3AA"
+></A
 ></A
 ><B
 >A</B
@@ -196,7 +200,9 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >data</SPAN
-> <A NAME="t%3AB"
+> <A NAME="t:B"
+><A NAME="t%3AB"
+></A
 ></A
 ><B
 >B</B
@@ -229,7 +235,9 @@
 ><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
 ><TR
 ><TD CLASS="decl"
+><A NAME="v:f"
 ><A NAME="v%3Af"
+></A
 ></A
 ><B
 >f</B
@@ -279,7 +287,9 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >type family</SPAN
-> <A NAME="t%3AF"
+> <A NAME="t:F"
+><A NAME="t%3AF"
+></A
 ></A
 ><B
 >F</B
