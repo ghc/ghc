@@ -103,7 +103,26 @@ compile :: GhcMonad m =>
         -> Maybe Linkable  -- ^ old linkable, if we have one
         -> m HomeModInfo   -- ^ the complete HomeModInfo, if successful
 
-compile hsc_env0 summary mod_index nmods mb_old_iface maybe_old_linkable
+compile = compile' (hscCompileNothing, hscCompileInteractive, hscCompileBatch)
+
+type Compiler m a = HscEnv -> ModSummary -> Bool
+                  -> Maybe ModIface -> Maybe (Int, Int)
+                  -> m a
+
+compile' :: GhcMonad m =>
+           (Compiler m (HscStatus, ModIface, ModDetails),
+            Compiler m (InteractiveStatus, ModIface, ModDetails),
+            Compiler m (HscStatus, ModIface, ModDetails))
+        -> HscEnv
+        -> ModSummary      -- ^ summary for module being compiled
+        -> Int             -- ^ module N ...
+        -> Int             -- ^ ... of M
+        -> Maybe ModIface  -- ^ old interface, if we have one
+        -> Maybe Linkable  -- ^ old linkable, if we have one
+        -> m HomeModInfo   -- ^ the complete HomeModInfo, if successful
+
+compile' (nothingCompiler, interactiveCompiler, batchCompiler)
+        hsc_env0 summary mod_index nmods mb_old_iface maybe_old_linkable
  = do
    let dflags0     = ms_hspp_opts summary
        this_mod    = ms_mod summary
@@ -211,15 +230,13 @@ compile hsc_env0 summary mod_index nmods mb_old_iface maybe_old_linkable
                                      hm_linkable = linkable })
    -- run the compiler
    case hsc_lang of
-      HscInterpreted
-        | isHsBoot src_flavour -> 
-                runCompiler hscCompileNothing handleBatch
-        | otherwise -> 
-                runCompiler hscCompileInteractive handleInterpreted
+      HscInterpreted ->
+                runCompiler interactiveCompiler handleInterpreted
       HscNothing -> 
-                runCompiler hscCompileNothing handleBatch
+                runCompiler nothingCompiler handleBatch
       _other -> 
-                runCompiler hscCompileBatch handleBatch
+                runCompiler batchCompiler handleBatch
+
 
 -----------------------------------------------------------------------------
 -- stub .h and .c files (for foreign export support)

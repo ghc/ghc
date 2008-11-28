@@ -1100,17 +1100,21 @@ loadModule :: (TypecheckedMod mod, GhcMonad m) => mod -> m mod
 loadModule tcm = do
    let ms = modSummary tcm
    let mod = ms_mod_name ms
-   let (tcg, details) = tm_internals tcm
+   let (tcg, _details) = tm_internals tcm
    hpt_new <-
        withTempSession (\e -> e { hsc_dflags = ms_hspp_opts ms }) $ do
-         (iface, _) <- makeSimpleIface Nothing tcg details
-         let mod_info = HomeModInfo {
-                          hm_iface = iface,
-                          hm_details = details,
-                          hm_linkable = Just (LM (ms_hs_date ms)
-                                                 (ms_mod ms)
-                                                 []) }
+
+         let compilerBackend comp env ms' _ _mb_old_iface _ =
+               withTempSession (\_ -> env) $
+                 hscBackend comp tcg ms'
+                            Nothing
          hsc_env <- getSession
+         mod_info
+             <- compile' (compilerBackend hscNothingCompiler
+                         ,compilerBackend hscInteractiveCompiler
+                         ,compilerBackend hscBatchCompiler)
+                         hsc_env ms 1 1 Nothing Nothing
+         -- compile' shouldn't change the environment
          return $ addToUFM (hsc_HPT hsc_env) mod mod_info
    modifySession $ \e -> e{ hsc_HPT = hpt_new }
    return tcm
