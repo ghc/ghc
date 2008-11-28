@@ -22,7 +22,7 @@ module HscMain
     , hscCompileNothing     -- :: Compiler (HscStatus, ModIface, ModDetails)
     , hscCompileInteractive -- :: Compiler (InteractiveStatus, ModIface, ModDetails)
     , HscStatus' (..)
-    , InteractiveStatus, NothingStatus, OneShotStatus, BatchStatus
+    , InteractiveStatus, HscStatus
 
     -- The new interface
     , hscParse
@@ -312,17 +312,12 @@ data HscStatus' a
 -- functional dependencies, we have to parameterise the typeclass over the
 -- result type.  Therefore we need to artificially distinguish some types.  We
 -- do this by adding type tags which will simply be ignored by the caller.
-data HscOneShotTag = HscOneShotTag
-data HscNothingTag = HscNothingTag
-
-type OneShotStatus     = HscStatus' HscOneShotTag
-type BatchStatus       = HscStatus' ()
+type HscStatus         = HscStatus' ()
 type InteractiveStatus = HscStatus' (CompiledByteCode, ModBreaks)
-type NothingStatus     = HscStatus' HscNothingTag
 
-type OneShotResult = OneShotStatus
-type BatchResult   = (BatchStatus, ModIface, ModDetails)
-type NothingResult = (NothingStatus, ModIface, ModDetails)
+type OneShotResult     = HscStatus
+type BatchResult       = (HscStatus, ModIface, ModDetails)
+type NothingResult     = (HscStatus, ModIface, ModDetails)
 type InteractiveResult = (InteractiveStatus, ModIface, ModDetails)
 
 -- FIXME: The old interface and module index are only using in 'batch' and
@@ -335,36 +330,38 @@ type Compiler result =  GhcMonad m =>
                      -> Maybe (Int,Int)     -- Just (i,n) <=> module i of n (for msgs)
                      -> m result
 
-class HsCompiler a where
-  -- | The main interface.
-  hscCompile :: GhcMonad m =>
-                HscEnv -> ModSummary -> Bool
-             -> Maybe ModIface -> Maybe (Int, Int)
-             -> m a
+data HsCompiler a
+  = HsCompiler {
+    -- | The main interface.
+    hscCompile :: GhcMonad m =>
+                  HscEnv -> ModSummary -> Bool
+               -> Maybe ModIface -> Maybe (Int, Int)
+               -> m a,
 
-  -- | Called when no recompilation is necessary.
-  hscNoRecomp :: GhcMonad m =>
-                 ModIface -> m a
+    -- | Called when no recompilation is necessary.
+    hscNoRecomp :: GhcMonad m =>
+                   ModIface -> m a,
 
-  -- | Called to recompile the module.
-  hscRecompile :: GhcMonad m =>
-                  ModSummary -> Maybe Fingerprint -> m a
+    -- | Called to recompile the module.
+    hscRecompile :: GhcMonad m =>
+                    ModSummary -> Maybe Fingerprint -> m a,
 
-  -- | Code generation for Boot modules.
-  hscGenBootOutput :: GhcMonad m =>
-                      TcGblEnv -> ModSummary -> Maybe Fingerprint -> m a
+    -- | Code generation for Boot modules.
+    hscGenBootOutput :: GhcMonad m =>
+                        TcGblEnv -> ModSummary -> Maybe Fingerprint -> m a,
 
-  -- | Code generation for normal modules.
-  hscGenOutput :: GhcMonad m =>
-                  ModGuts  -> ModSummary -> Maybe Fingerprint -> m a
+    -- | Code generation for normal modules.
+    hscGenOutput :: GhcMonad m =>
+                    ModGuts  -> ModSummary -> Maybe Fingerprint -> m a
+  }
 
-
-genericHscCompile :: (HsCompiler a, GhcMonad m) =>
-                     (Maybe (Int,Int) -> Bool -> ModSummary -> m ())
+genericHscCompile :: GhcMonad m =>
+                     HsCompiler a
+                  -> (Maybe (Int,Int) -> Bool -> ModSummary -> m ())
                   -> HscEnv -> ModSummary -> Bool
                   -> Maybe ModIface -> Maybe (Int, Int)
                   -> m a
-genericHscCompile hscMessage
+genericHscCompile compiler hscMessage
                   hsc_env mod_summary source_unchanged
                   mb_old_iface0 mb_mod_index =
    withTempSession (\_ -> hsc_env) $ do
@@ -379,147 +376,159 @@ genericHscCompile hscMessage
      case mb_checked_iface of
        Just iface | not recomp_reqd
            -> do hscMessage mb_mod_index False mod_summary
-                 hscNoRecomp iface
+                 hscNoRecomp compiler iface
        _otherwise
            -> do hscMessage mb_mod_index True mod_summary
-                 hscRecompile mod_summary mb_old_hash
+                 hscRecompile compiler mod_summary mb_old_hash
 
-genericHscRecompile :: (HsCompiler a, GhcMonad m) =>
-                       ModSummary -> Maybe Fingerprint
+genericHscRecompile :: GhcMonad m =>
+                       HsCompiler a
+                    -> ModSummary -> Maybe Fingerprint
                     -> m a
-genericHscRecompile mod_summary mb_old_hash
+genericHscRecompile compiler mod_summary mb_old_hash
   | ExtCoreFile <- ms_hsc_src mod_summary =
       panic "GHC does not currently support reading External Core files"
   | otherwise = do
       tc_result <- hscFileFrontEnd mod_summary
       case ms_hsc_src mod_summary of
         HsBootFile ->
-            hscGenBootOutput tc_result mod_summary mb_old_hash
+            hscGenBootOutput compiler tc_result mod_summary mb_old_hash
         _other     -> do
             guts <- hscDesugar mod_summary tc_result
-            hscGenOutput guts mod_summary mb_old_hash
+            hscGenOutput compiler guts mod_summary mb_old_hash
 
 --------------------------------------------------------------
 -- Compilers
 --------------------------------------------------------------
 
-instance HsCompiler OneShotResult where
+hscOneShotCompiler :: HsCompiler OneShotResult
+hscOneShotCompiler =
+  HsCompiler {
 
-  hscCompile hsc_env mod_summary src_changed mb_old_iface mb_i_of_n = do
-     -- One-shot mode needs a knot-tying mutable variable for interface files.
-     -- See TcRnTypes.TcGblEnv.tcg_type_env_var.
-    type_env_var <- liftIO $ newIORef emptyNameEnv
-    let 
-       mod = ms_mod mod_summary
-       hsc_env' = hsc_env{ hsc_type_env_var = Just (mod, type_env_var) }
-    ---
-    genericHscCompile oneShotMsg hsc_env' mod_summary src_changed
-                      mb_old_iface mb_i_of_n
+    hscCompile = \hsc_env mod_summary src_changed mb_old_iface mb_i_of_n -> do
+       -- One-shot mode needs a knot-tying mutable variable for interface
+       -- files.  See TcRnTypes.TcGblEnv.tcg_type_env_var.
+      type_env_var <- liftIO $ newIORef emptyNameEnv
+      let
+         mod = ms_mod mod_summary
+         hsc_env' = hsc_env{ hsc_type_env_var = Just (mod, type_env_var) }
+      ---
+      genericHscCompile hscOneShotCompiler
+                        oneShotMsg hsc_env' mod_summary src_changed
+                        mb_old_iface mb_i_of_n
 
-  hscNoRecomp _old_iface = do
-    withSession (liftIO . dumpIfaceStats)
-    return HscNoRecomp
+  , hscNoRecomp = \_old_iface -> do
+      withSession (liftIO . dumpIfaceStats)
+      return HscNoRecomp
 
-  hscRecompile = genericHscRecompile
+  , hscRecompile = genericHscRecompile hscOneShotCompiler
 
-  hscGenBootOutput tc_result mod_summary mb_old_iface = do
-     (iface, changed, _) <- hscSimpleIface tc_result mb_old_iface
-     hscWriteIface iface changed mod_summary
-     return (HscRecomp False HscOneShotTag)
+  , hscGenBootOutput = \tc_result mod_summary mb_old_iface -> do
+       (iface, changed, _) <- hscSimpleIface tc_result mb_old_iface
+       hscWriteIface iface changed mod_summary
+       return (HscRecomp False ())
 
-  hscGenOutput guts0 mod_summary mb_old_iface = do
-     guts <- hscSimplify guts0
-     (iface, changed, _details, cgguts)
-         <- hscNormalIface guts mb_old_iface
-     hscWriteIface iface changed mod_summary
-     hasStub <- hscGenHardCode cgguts mod_summary
-     return (HscRecomp hasStub HscOneShotTag)
+  , hscGenOutput = \guts0 mod_summary mb_old_iface -> do
+       guts <- hscSimplify guts0
+       (iface, changed, _details, cgguts)
+           <- hscNormalIface guts mb_old_iface
+       hscWriteIface iface changed mod_summary
+       hasStub <- hscGenHardCode cgguts mod_summary
+       return (HscRecomp hasStub ())
+  }
 
 -- Compile Haskell, boot and extCore in OneShot mode.
-hscCompileOneShot :: Compiler OneShotStatus
-hscCompileOneShot = hscCompile
+hscCompileOneShot :: Compiler OneShotResult
+hscCompileOneShot = hscCompile hscOneShotCompiler
 
 --------------------------------------------------------------
 
-instance HsCompiler BatchResult where
+hscBatchCompiler :: HsCompiler BatchResult
+hscBatchCompiler =
+  HsCompiler {
 
-  hscCompile = genericHscCompile batchMsg
+    hscCompile = genericHscCompile hscBatchCompiler batchMsg
 
-  hscNoRecomp iface = do
-     details <- genModDetails iface
-     return (HscNoRecomp, iface, details)
+  , hscNoRecomp = \iface -> do
+       details <- genModDetails iface
+       return (HscNoRecomp, iface, details)
 
-  hscRecompile = genericHscRecompile
+  , hscRecompile = genericHscRecompile hscBatchCompiler
 
-  hscGenBootOutput tc_result mod_summary mb_old_iface = do
-     (iface, changed, details)
-         <- hscSimpleIface tc_result mb_old_iface
-     hscWriteIface iface changed mod_summary
-     return (HscRecomp False (), iface, details)
+  , hscGenBootOutput = \tc_result mod_summary mb_old_iface -> do
+       (iface, changed, details)
+           <- hscSimpleIface tc_result mb_old_iface
+       hscWriteIface iface changed mod_summary
+       return (HscRecomp False (), iface, details)
 
-  hscGenOutput guts0 mod_summary mb_old_iface = do
-     guts <- hscSimplify guts0
-     (iface, changed, details, cgguts)
-         <- hscNormalIface guts mb_old_iface
-     hscWriteIface iface changed mod_summary
-     hasStub <- hscGenHardCode cgguts mod_summary
-     return (HscRecomp hasStub (), iface, details)
+  , hscGenOutput = \guts0 mod_summary mb_old_iface -> do
+       guts <- hscSimplify guts0
+       (iface, changed, details, cgguts)
+           <- hscNormalIface guts mb_old_iface
+       hscWriteIface iface changed mod_summary
+       hasStub <- hscGenHardCode cgguts mod_summary
+       return (HscRecomp hasStub (), iface, details)
+  }
 
 -- Compile Haskell, boot and extCore in batch mode.
-hscCompileBatch :: Compiler (BatchStatus, ModIface, ModDetails)
-hscCompileBatch = hscCompile
+hscCompileBatch :: Compiler (HscStatus, ModIface, ModDetails)
+hscCompileBatch = hscCompile hscBatchCompiler
 
 --------------------------------------------------------------
 
-instance HsCompiler InteractiveResult where
+hscInteractiveCompiler :: HsCompiler InteractiveResult
+hscInteractiveCompiler =
+  HsCompiler {
+    hscCompile = genericHscCompile hscInteractiveCompiler batchMsg
 
-  hscCompile = genericHscCompile batchMsg
+  , hscNoRecomp = \iface -> do
+       details <- genModDetails iface
+       return (HscNoRecomp, iface, details)
 
-  hscNoRecomp iface = do
-     details <- genModDetails iface
-     return (HscNoRecomp, iface, details)
+  , hscRecompile = genericHscRecompile hscInteractiveCompiler
 
-  hscRecompile = genericHscRecompile
+  , hscGenBootOutput = \_ _ _ -> panic "hscCompileInteractive: HsBootFile"
 
-  hscGenBootOutput _ _ _ = panic "hscCompileInteractive: HsBootFile"
-
-  hscGenOutput guts0 mod_summary mb_old_iface = do
-     guts <- hscSimplify guts0
-     (iface, _changed, details, cgguts)
-         <- hscNormalIface guts mb_old_iface
-     hscInteractive (iface, details, cgguts) mod_summary
+  , hscGenOutput = \guts0 mod_summary mb_old_iface -> do
+       guts <- hscSimplify guts0
+       (iface, _changed, details, cgguts)
+           <- hscNormalIface guts mb_old_iface
+       hscInteractive (iface, details, cgguts) mod_summary
+  }
 
 -- Compile Haskell, extCore to bytecode.
 hscCompileInteractive :: Compiler (InteractiveStatus, ModIface, ModDetails)
-hscCompileInteractive = hscCompile
+hscCompileInteractive = hscCompile hscInteractiveCompiler
 
 --------------------------------------------------------------
 
-instance HsCompiler NothingResult where
+hscNothingCompiler :: HsCompiler NothingResult
+hscNothingCompiler =
+  HsCompiler {
+    hscCompile = genericHscCompile hscNothingCompiler batchMsg
 
-  hscCompile = genericHscCompile batchMsg
+  , hscNoRecomp = \iface -> do
+       details <- genModDetails iface
+       return (HscNoRecomp, iface, details)
 
-  hscNoRecomp iface = do
-     details <- genModDetails iface
-     return (HscNoRecomp, iface, details)
+  , hscRecompile = \mod_summary mb_old_hash ->
+      case ms_hsc_src mod_summary of
+        ExtCoreFile ->
+          panic "hscCompileNothing: cannot do external core"
+        _otherwise -> do
+          tc_result <- hscFileFrontEnd mod_summary
+          hscGenBootOutput hscNothingCompiler tc_result mod_summary mb_old_hash
 
-  hscRecompile mod_summary mb_old_hash
-    | ExtCoreFile <- ms_hsc_src mod_summary =
-        panic "hscCompileNothing: cannot do external core"
-    | otherwise = do
-        tc_result <- hscFileFrontEnd mod_summary
-        hscGenBootOutput tc_result mod_summary mb_old_hash
+  , hscGenBootOutput = \tc_result _mod_summary mb_old_iface -> do
+       (iface, _changed, details) <- hscSimpleIface tc_result mb_old_iface
+       return (HscRecomp False (), iface, details)
 
-  hscGenBootOutput tc_result _mod_summary mb_old_iface = do
-     (iface, _changed, details) <- hscSimpleIface tc_result mb_old_iface
-     return (HscRecomp False HscNothingTag, iface, details)
-
-  hscGenOutput _ _ _ =
-      panic "hscCompileNothing: hscGenOutput should not be called"
-
+  , hscGenOutput = \_ _ _ ->
+        panic "hscCompileNothing: hscGenOutput should not be called"
+  }
 -- Type-check Haskell and .hs-boot only (no external core)
-hscCompileNothing :: Compiler (NothingStatus, ModIface, ModDetails)
-hscCompileNothing = hscCompile
+hscCompileNothing :: Compiler (HscStatus, ModIface, ModDetails)
+hscCompileNothing = hscCompile hscNothingCompiler
 
 --------------------------------------------------------------
 -- NoRecomp handlers
