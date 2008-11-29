@@ -301,8 +301,8 @@ the paper \"Asynchronous exceptions in Haskell\"
 (<http://research.microsoft.com/~simonpj/Papers/asynch-exns.htm>).
 In the paper, 'throwTo' is non-blocking; but the library implementation adopts
 a more synchronous design in which 'throwTo' does not return until the exception
-is received by the target thread.  The trade-off is discussed in Section 8 of the paper.
-Like any blocking operation, 'throwTo' is therefore interruptible (see Section 4.3 of
+is received by the target thread.  The trade-off is discussed in Section 9 of the paper.
+Like any blocking operation, 'throwTo' is therefore interruptible (see Section 5.3 of
 the paper).
 
 There is currently no guarantee that the exception delivered by 'throwTo' will be
