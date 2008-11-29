@@ -5994,7 +5994,7 @@ main = do { print $ eval [$expr|1 + 2|]
 module Expr where
 
 import qualified Language.Haskell.TH as TH
-import Language.Haskell.TH.Quasi
+import Language.Haskell.TH.Quote
 
 data Expr  =  IntExpr Integer
            |  AntiIntExpr String
