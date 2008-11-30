@@ -52,7 +52,7 @@ import MonadUtils
 
 import Data.Either
 import Exception
-import Data.IORef	( readIORef, writeIORef, IORef )
+import Data.IORef	( readIORef )
 import GHC.Exts		( Int(..) )
 import System.Directory
 import System.FilePath
@@ -1068,13 +1068,13 @@ runPhase SplitMangle _stop hsc_env _basename _suff input_fn _get_output_fn maybe
 	-- Save the number of split files for future references
 	s <- readFile n_files_fn
 	let n_files = read s :: Int
-	writeIORef v_Split_info (split_s_prefix, n_files)
+	    dflags' = dflags { splitInfo = Just (split_s_prefix, n_files) }
 
 	-- Remember to delete all these files
 	addFilesToClean [ split_s_prefix ++ "__" ++ show n ++ ".s"
 			| n <- [1..n_files]]
 
-	return (SplitAs, dflags, maybe_loc, "**splitmangle**")
+	return (SplitAs, dflags', maybe_loc, "**splitmangle**")
 	  -- we don't use the filename
 
 -----------------------------------------------------------------------------
@@ -1132,7 +1132,9 @@ runPhase SplitAs _stop hsc_env _basename _suff _input_fn get_output_fn maybe_loc
 
         let as_opts = getOpts dflags opt_a
 
-        (split_s_prefix, n) <- readIORef v_Split_info
+        let (split_s_prefix, n) = case splitInfo dflags of
+                                  Nothing -> panic "No split info"
+                                  Just x -> x
 
         let split_s   n = split_s_prefix ++ "__" ++ show n <.> "s"
             split_obj n = split_odir </>
@@ -1726,5 +1728,3 @@ hscMaybeAdjustTarget dflags stop _ current_hsc_lang
 		-- otherwise, stick to the plan
 		 | otherwise = current_hsc_lang
 
-GLOBAL_VAR(v_Split_info, ("",0), (String,Int))
-	-- The split prefix and number of files

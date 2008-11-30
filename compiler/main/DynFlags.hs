@@ -347,6 +347,9 @@ data DynFlags = DynFlags {
   buildTag              :: String,      -- ^ The global \"way\" (e.g. \"p\" for prof)
   rtsBuildTag           :: String,      -- ^ The RTS \"way\"
 
+  -- For object splitting
+  splitInfo             :: Maybe (String,Int),
+
   -- paths etc.
   objectDir             :: Maybe String,
   hiDir                 :: Maybe String,
@@ -600,6 +603,7 @@ defaultDynFlags =
         wayNames                = panic "defaultDynFlags: No wayNames",
         buildTag                = panic "defaultDynFlags: No buildTag",
         rtsBuildTag             = panic "defaultDynFlags: No rtsBuildTag",
+        splitInfo               = Nothing,
         -- initSysTools fills all these in
         ghcUsagePath            = panic "defaultDynFlags: No ghciUsagePath",
         ghciUsagePath           = panic "defaultDynFlags: No ghciUsagePath",
