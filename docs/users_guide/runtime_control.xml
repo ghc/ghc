@@ -477,6 +477,10 @@
           <option>-S</option><optional><replaceable>file</replaceable></optional>
           <indexterm><primary><option>-S</option></primary><secondary>RTS option</secondary></indexterm>
         </term>
+	<term>
+          <option>--machine-readable</option>
+          <indexterm><primary><option>--machine-readable</option></primary><secondary>RTS option</secondary></indexterm>
+        </term>
 	<listitem>
 	  <para>These options produce runtime-system statistics, such
 	  as the amount of time spent executing the program and in the
@@ -541,6 +545,27 @@
         </para>
       </listitem>
     </itemizedlist>
+
+    <para>
+        You can also get this in a more future-proof, machine readable
+        format, with <literal>-t --machine-readable</literal>:
+    </para>
+
+<programlisting>
+ [("bytes allocated", "36169392")
+ ,("num_GCs", "69")
+ ,("average_bytes_used", "603392")
+ ,("max_bytes_used", "1065272")
+ ,("num_byte_usage_samples", "2")
+ ,("peak_megabytes_allocated", "3")
+ ,("init_cpu_seconds", "0.00")
+ ,("init_wall_seconds", "0.00")
+ ,("mutator_cpu_seconds", "0.02")
+ ,("mutator_wall_seconds", "0.02")
+ ,("GC_cpu_seconds", "0.07")
+ ,("GC_wall_seconds", "0.07")
+ ]
+</programlisting>
 
     <para>
         If you use the <literal>-s</literal> flag then, when your
