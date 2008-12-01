@@ -1172,7 +1172,7 @@ tuple3Constr :: Constr
 tuple3Constr = mkConstr tuple3DataType "(,,)" [] Infix
 
 tuple3DataType :: DataType
-tuple3DataType = mkDataType "Prelude.(,)" [tuple3Constr]
+tuple3DataType = mkDataType "Prelude.(,,)" [tuple3Constr]
 
 instance (Data a, Data b, Data c) => Data (a,b,c) where
   gfoldl f z (a,b,c) = z (,,) `f` a `f` b `f` c
