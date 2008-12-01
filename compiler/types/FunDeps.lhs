@@ -294,8 +294,9 @@ improveOne inst_env pred@(ClassP cls tys, _) preds
 	, not (instanceCantMatch inst_tcs trimmed_tcs)
 	, eqn <- checkClsFD qtvs fd cls_tvs tys_inst tys
 	, let p_inst = (mkClassPred cls tys_inst, 
-		        ptext (sLit "arising from the instance declaration at")
-			<+> ppr (getSrcLoc ispec))
+		        sep [ ptext (sLit "arising from the dependency") <+> quotes (pprFunDep fd)
+			    , ptext (sLit "in the instance declaration at") 
+			          <+> ppr (getSrcLoc ispec)])
 	]
 
 improveOne _ _ _

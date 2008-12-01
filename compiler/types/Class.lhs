@@ -10,7 +10,7 @@ module Class (
 	Class, ClassOpItem, 
 	DefMeth (..),
 
-	FunDep,	pprFundeps,
+	FunDep,	pprFundeps, pprFunDep,
 
 	mkClass, classTyVars, classArity,
 	classKey, className, classATs, classSelIds, classTyCon, classMethods,
@@ -174,9 +174,9 @@ instance Outputable DefMeth where
 
 pprFundeps :: Outputable a => [FunDep a] -> SDoc
 pprFundeps []  = empty
-pprFundeps fds = hsep (ptext (sLit "|") : punctuate comma (map ppr_fd fds))
-	       where
-		 ppr_fd (us, vs) = hsep [interppSP us, ptext (sLit "->"), 
-					 interppSP vs]
+pprFundeps fds = hsep (ptext (sLit "|") : punctuate comma (map pprFunDep fds))
+
+pprFunDep :: Outputable a => FunDep a -> SDoc
+pprFunDep (us, vs) = hsep [interppSP us, ptext (sLit "->"), interppSP vs]
 \end{code}
 
