@@ -18,6 +18,7 @@ module GHC (
         clearWarnings, getWarnings, hasWarnings,
         printExceptionAndWarnings, printWarnings,
         handleSourceError, defaultCallbacks, GhcApiCallbacks(..),
+        needsTemplateHaskell,
 
 	-- * Flags and settings
 	DynFlags(..), DynFlag(..), Severity(..), HscTarget(..), dopt,
@@ -2348,6 +2349,15 @@ workingDirectoryChanged = withSession $ (liftIO . flushFinderCaches)
 -- | Get the module dependency graph.
 getModuleGraph :: GhcMonad m => m ModuleGraph -- ToDo: DiGraph ModSummary
 getModuleGraph = liftM hsc_mod_graph getSession
+
+-- | Determines whether a set of modules requires Template Haskell.
+--
+-- Note that if the session's 'DynFlags' enabled Template Haskell when
+-- 'depanal' was called, then each module in the returned module graph will
+-- have Template Haskell enabled whether it is actually needed or not.
+needsTemplateHaskell :: ModuleGraph -> Bool
+needsTemplateHaskell ms =
+    any (dopt Opt_TemplateHaskell . ms_hspp_opts) ms
 
 -- | Return @True@ <==> module is loaded.
 isLoaded :: GhcMonad m => ModuleName -> m Bool

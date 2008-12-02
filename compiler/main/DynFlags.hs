@@ -439,23 +439,30 @@ data DynFlags = DynFlags {
 
 -- | The target code type of the compilation (if any).
 --
+-- Whenever you change the target, also make sure to set 'ghcLink' to
+-- something sensible.
+--
 -- 'HscNothing' can be used to avoid generating any output, however, note
 -- that:
 --
 --  * This will not run the desugaring step, thus no warnings generated in
---    this step will be output.  In particular, this includes warnings
---    related to pattern matching.
+--    this step will be output.  In particular, this includes warnings related
+--    to pattern matching.  You can run the desugarer manually using
+--    'GHC.desugarModule'.
 --
---  * At the moment switching from 'HscNothing' to 'HscInterpreted' without
---    unloading first is not safe.  To unload use
---    @GHC.setTargets [] >> GHC.load LoadAllTargets@.
+--  * If a program uses Template Haskell the typechecker may try to run code
+--    from an imported module.  This will fail if no code has been generated
+--    for this module.  You can use 'GHC.needsTemplateHaskell' to detect
+--    whether this might be the case and choose to either switch to a
+--    different target or avoid typechecking such modules.  (The latter may
+--    preferable for security reasons.)
 --
 data HscTarget
-  = HscC
-  | HscAsm
-  | HscJava
-  | HscInterpreted
-  | HscNothing
+  = HscC           -- ^ Generate C code.
+  | HscAsm         -- ^ Generate assembly using the native code generator.
+  | HscJava        -- ^ Generate Java bytecode.
+  | HscInterpreted -- ^ Generate bytecode.  (Requires 'LinkInMemory')
+  | HscNothing     -- ^ Don't generate any code.  See notes above.
   deriving (Eq, Show)
 
 -- | Will this target result in an object file on the disk?
@@ -489,7 +496,8 @@ isOneShot _other  = False
 data GhcLink
   = NoLink              -- ^ Don't link at all
   | LinkBinary          -- ^ Link object code into a binary
-  | LinkInMemory        -- ^ Use the in-memory dynamic linker
+  | LinkInMemory        -- ^ Use the in-memory dynamic linker (works for both
+                        --   bytecode and object code).
   | LinkDynLib          -- ^ Link objects into a dynamic lib (DLL on Windows, DSO on ELF platforms)
   deriving (Eq, Show)
 
