@@ -1120,7 +1120,13 @@ desugarModule tcm = do
 
 -- | Load a module.  Input doesn't need to be desugared.
 --
--- XXX: Describe usage.
+-- A module must be loaded before dependent modules can be typechecked.  This
+-- always includes generating a 'ModIface' and, depending on the
+-- 'DynFlags.hscTarget', may also include code generation.
+--
+-- This function will always cause recompilation and will always overwrite
+-- previous compilation results (potentially files on disk).
+--
 loadModule :: (TypecheckedMod mod, GhcMonad m) => mod -> m mod
 loadModule tcm = do
    let ms = modSummary tcm
