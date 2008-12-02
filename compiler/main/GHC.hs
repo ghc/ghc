@@ -43,7 +43,8 @@ module GHC (
 
 	-- * Loading\/compiling the program
 	depanal,
-	load, loadWithLogger, LoadHowMuch(..), SuccessFlag(..),	-- also does depanal
+	load, loadWithLogger, LoadHowMuch(..),
+	SuccessFlag(..), succeeded, failed,
         defaultWarnErrLogger, WarnErrLogger,
 	workingDirectoryChanged,
         parseModule, typecheckModule, desugarModule, loadModule,
