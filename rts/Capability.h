@@ -143,12 +143,10 @@ struct Capability_ {
 
 // Converts a *StgRegTable into a *Capability.
 //
-#define OFFSET(s_type, field) ((size_t)&(((s_type*)0)->field))
-
 INLINE_HEADER Capability *
 regTableToCapability (StgRegTable *reg)
 {
-    return (Capability *)((void *)((unsigned char*)reg - OFFSET(Capability,r)));
+    return (Capability *)((void *)((unsigned char*)reg - FIELD_OFFSET(Capability,r)));
 }
 
 // Initialise the available capabilities.

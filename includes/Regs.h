@@ -398,7 +398,7 @@ GLOBAL_REG_DECL(bdescr *,HpAlloc,REG_HpAlloc)
    -------------------------------------------------------------------------- */
 
 
-#define FunReg ((StgFunTable *)((void *)BaseReg - sizeof(StgFunTable)))
+#define FunReg ((StgFunTable *)((void *)BaseReg - FIELD_OFFSET(struct PartCapability_, r)))
 
 #define stg_EAGER_BLACKHOLE_info  (FunReg->stgEagerBlackholeInfo)
 #define stg_gc_enter_1            (FunReg->stgGCEnter1)

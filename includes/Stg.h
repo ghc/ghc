@@ -74,6 +74,10 @@
 #define BITS_PER_BYTE 8
 #define BITS_IN(x) (BITS_PER_BYTE * sizeof(x))
 
+/* Compute offsets of struct fields
+ */
+#define FIELD_OFFSET(s_type, field) ((StgWord)&(((s_type*)0)->field))
+
 /*
  * 'Portable' inlining:
  * INLINE_HEADER is for inline functions in header files (macros)
