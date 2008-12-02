@@ -1854,7 +1854,8 @@ type OrigIParamCache = FiniteMap (IPName OccName) (IPName Name)
 -- There will be a node for each source module, plus a node for each hi-boot
 -- module.
 --
--- The graph is not necessarily stored in topologically-sorted order.
+-- The graph is not necessarily stored in topologically-sorted order.  Use
+-- 'GHC.topSortModuleGraph' and 'Digraph.flattenSCC' to achieve this.
 type ModuleGraph = [ModSummary]
 
 emptyMG :: ModuleGraph

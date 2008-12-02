@@ -48,7 +48,7 @@ module GHC (
         defaultWarnErrLogger, WarnErrLogger,
 	workingDirectoryChanged,
         parseModule, typecheckModule, desugarModule, loadModule,
-        ParsedModule, TypecheckedModule, DesugaredModule, -- all abstract
+        ParsedModule(..), TypecheckedModule(..), DesugaredModule(..),
 	TypecheckedSource, ParsedSource, RenamedSource,   -- ditto
         TypecheckedMod, ParsedMod,
         moduleInfo, renamedSource, typecheckedSource,
@@ -640,6 +640,16 @@ parseHaddockComment string =
 
 -- | Perform a dependency analysis starting from the current targets
 -- and update the session with the new module graph.
+--
+-- Dependency analysis entails parsing the @import@ directives and may
+-- therefore require running certain preprocessors.
+--
+-- Note that each 'ModSummary' in the module graph caches its 'DynFlags'.
+-- These 'DynFlags' are determined by the /current/ session 'DynFlags' and the
+-- @OPTIONS@ and @LANGUAGE@ pragmas of the parsed module.  Thus if you want to
+-- changes to the 'DynFlags' to take effect you need to call this function
+-- again.
+--
 depanal :: GhcMonad m =>
            [ModuleName]  -- ^ excluded modules
         -> Bool          -- ^ allow duplicate roots
@@ -660,16 +670,29 @@ depanal excluded_mods allow_dup_roots = do
   modifySession $ \_ -> hsc_env { hsc_mod_graph = mod_graph }
   return mod_graph
 
+-- | Describes which modules of the module graph need to be loaded.
 data LoadHowMuch
    = LoadAllTargets
+     -- ^ Load all targets and its dependencies.
    | LoadUpTo ModuleName
+     -- ^ Load only the given module and its dependencies.
    | LoadDependenciesOf ModuleName
+     -- ^ Load only the dependencies of the given module, but not the module
+     -- itself.
 
--- | Try to load the program.  Calls 'loadWithLogger' with the default
--- compiler that just immediately logs all warnings and errors.
+-- | Try to load the program.  See 'LoadHowMuch' for the different modes.
 --
--- This function may throw a 'SourceError' if errors are encountered before
--- the actual compilation starts (e.g., during dependency analysis).
+-- This function implements the core of GHC's @--make@ mode.  It preprocesses,
+-- compiles and loads the specified modules, avoiding re-compilation wherever
+-- possible.  Depending on the target (see 'DynFlags.hscTarget') compilating
+-- and loading may result in files being created on disk.
+--
+-- Calls the 'reportModuleCompilationResult' callback after each compiling
+-- each module, whether successful or not.
+--
+-- Throw a 'SourceError' if errors are encountered before the actual
+-- compilation starts (e.g., during dependency analysis).  All other errors
+-- are reported using the callback.
 --
 load :: GhcMonad m => LoadHowMuch -> m SuccessFlag
 load how_much = do
@@ -1449,8 +1472,13 @@ upsweep
     -> IO ()			-- ^ How to clean up unwanted tmp files
     -> [SCC ModSummary]		-- ^ Mods to do (the worklist)
     -> m (SuccessFlag,
-         HscEnv,		-- With an updated HPT
-         [ModSummary])	-- Mods which succeeded
+         HscEnv,
+         [ModSummary])
+       -- ^ Returns:
+       --
+       --  1. A flag whether the complete upsweep was successful.
+       --  2. The 'HscEnv' with an updated HPT
+       --  3. A list of modules which succeeded loading.
 
 upsweep hsc_env old_hpt stable_mods cleanup sccs = do
    (res, hsc_env, done) <- upsweep' hsc_env old_hpt [] sccs 1 (length sccs)
@@ -1754,6 +1782,7 @@ topSortModuleGraph
           -- ^ Drop hi-boot nodes? (see below)
 	  -> [ModSummary]
 	  -> Maybe ModuleName
+             -- ^ Root module name.  If @Nothing@, use the full graph.
 	  -> [SCC ModSummary]
 -- ^ Calculate SCCs of the module graph, possibly dropping the hi-boot nodes
 -- The resulting list of strongly-connected-components is in topologically
