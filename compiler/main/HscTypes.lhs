@@ -111,6 +111,7 @@ import ByteCodeAsm	( CompiledByteCode )
 import {-# SOURCE #-}  InteractiveEval ( Resume )
 #endif
 
+import HsSyn
 import RdrName
 import Name
 import NameEnv
@@ -1873,8 +1874,8 @@ data ModSummary
         ms_location  :: ModLocation,		-- ^ Location of the various files belonging to the module
         ms_hs_date   :: ClockTime,		-- ^ Timestamp of source file
 	ms_obj_date  :: Maybe ClockTime,	-- ^ Timestamp of object, if we have one
-        ms_srcimps   :: [Located ModuleName],	-- ^ Source imports of the module
-        ms_imps      :: [Located ModuleName],	-- ^ Non-source imports of the module
+        ms_srcimps   :: [Located (ImportDecl RdrName)],	-- ^ Source imports of the module
+        ms_imps      :: [Located (ImportDecl RdrName)],	-- ^ Non-source imports of the module
         ms_hspp_file :: FilePath,		-- ^ Filename of preprocessed source file
         ms_hspp_opts :: DynFlags,               -- ^ Cached flags from @OPTIONS@, @INCLUDE@
                                                 -- and @LANGUAGE@ pragmas in the modules source code

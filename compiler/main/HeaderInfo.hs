@@ -15,6 +15,7 @@ module HeaderInfo ( getImports
 
 #include "HsVersions.h"
 
+import RdrName
 import HscTypes
 import Parser		( parseHeader )
 import Lexer
@@ -51,7 +52,7 @@ getImports :: GhcMonad m =>
                            --   reporting parse error locations.
            -> FilePath     -- ^ The original source filename (used for locations
                            --   in the function result)
-           -> m ([Located ModuleName], [Located ModuleName], Located ModuleName)
+           -> m ([Located (ImportDecl RdrName)], [Located (ImportDecl RdrName)], Located ModuleName)
               -- ^ The source imports, normal imports, and the module name.
 getImports dflags buf filename source_filename = do
   let loc  = mkSrcLoc (mkFastString filename) 1 0
@@ -68,28 +69,15 @@ getImports dflags buf filename source_filename = do
 	      let
                 main_loc = mkSrcLoc (mkFastString source_filename) 1 0
 		mod = mb_mod `orElse` L (srcLocSpan main_loc) mAIN_NAME
-                imps' = filter isHomeImp (map unLoc imps)
-	        (src_idecls, ord_idecls) = partition isSourceIdecl imps'
-		source_imps   = map getImpMod src_idecls
-		ordinary_imps = filter ((/= moduleName gHC_PRIM) . unLoc) 
-					(map getImpMod ord_idecls)
+	        (src_idecls, ord_idecls) = partition (ideclSource.unLoc) imps
+		ordinary_imps = filter ((/= moduleName gHC_PRIM) . unLoc . ideclName . unLoc) 
+					ord_idecls
 		     -- GHC.Prim doesn't exist physically, so don't go looking for it.
 	      in
-	      return (source_imps, ordinary_imps, mod)
+	      return (src_idecls, ordinary_imps, mod)
   
 parseError :: GhcMonad m => SrcSpan -> Message -> m a
 parseError span err = throwOneError $ mkPlainErrMsg span err
-
--- we aren't interested in package imports here, filter them out
-isHomeImp :: ImportDecl name -> Bool
-isHomeImp (ImportDecl _ (Just p) _ _ _ _) = p == fsLit "this"
-isHomeImp (ImportDecl _ Nothing  _ _ _ _) = True
-
-isSourceIdecl :: ImportDecl name -> Bool
-isSourceIdecl (ImportDecl _ _ s _ _ _) = s
-
-getImpMod :: ImportDecl name -> Located ModuleName
-getImpMod (ImportDecl located_mod _ _ _ _ _) = located_mod
 
 --------------------------------------------------------------
 -- Get options

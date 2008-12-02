@@ -17,6 +17,7 @@ module DriverMkDepend (
 
 import qualified GHC
 import GHC              ( ModSummary(..), GhcMonad )
+import HsSyn            ( ImportDecl(..) )
 import PrelNames
 import DynFlags
 import Util
@@ -186,8 +187,8 @@ processDeps dflags hsc_env excl_mods hdl (AcyclicSCC node)
               obj_file  = msObjFilePath node
               obj_files = insertSuffixes obj_file extra_suffixes
 
-              do_imp is_boot imp_mod
-                = do { mb_hi <- findDependency hsc_env src_file imp_mod
+              do_imp is_boot pkg_qual imp_mod
+                = do { mb_hi <- findDependency hsc_env pkg_qual imp_mod
                                                is_boot include_pkg_deps
                      ; case mb_hi of {
                            Nothing      -> return () ;
@@ -207,29 +208,30 @@ processDeps dflags hsc_env excl_mods hdl (AcyclicSCC node)
 
                 -- Emit a dependency for each import
 
-        -- SOURCE imports
-        ; mapM_ (do_imp True)
-                (filter (`notElem` excl_mods) (map unLoc (ms_srcimps node)))
+        ; let do_imps is_boot idecls = sequence_
+                    [ do_imp is_boot (ideclPkgQual i) mod
+                    | L _ i <- idecls,
+                      let mod = unLoc (ideclName i),
+                      mod `notElem` excl_mods ]
 
-        -- regular imports
-        ; mapM_ (do_imp False)
-                (filter (`notElem` excl_mods) (map unLoc (ms_imps node)))
+        ; do_imps True  (ms_srcimps node)
+        ; do_imps False (ms_imps node)
 
         ; when (dopt Opt_ImplicitPrelude (ms_hspp_opts node)) $
-            do_imp False pRELUDE_NAME
+            do_imp False Nothing pRELUDE_NAME
         }
 
 
 findDependency  :: HscEnv
-                -> FilePath             -- Importing module: used only for error msg
+                -> Maybe FastString     -- package qualifier, if any
                 -> ModuleName           -- Imported module
                 -> IsBootInterface      -- Source import
                 -> Bool                 -- Record dependency on package modules
                 -> IO (Maybe FilePath)  -- Interface file file
-findDependency hsc_env _ imp is_boot include_pkg_deps
+findDependency hsc_env pkg imp is_boot include_pkg_deps
   = do  {       -- Find the module; this will be fast because
                 -- we've done it once during downsweep
-          r <- findImportedModule hsc_env imp Nothing
+          r <- findImportedModule hsc_env imp pkg
         ; case r of
             Found loc _
                 -- Home package: just depend on the .hi or hi-boot file
@@ -359,7 +361,7 @@ pprCycle summaries = pp_group (CyclicSCC summaries)
           pp_ms loop_breaker $$ vcat (map pp_group groups)
         where
           (boot_only, others) = partition is_boot_only mss
-          is_boot_only ms = not (any in_group (ms_imps ms))
+          is_boot_only ms = not (any in_group (map (ideclName.unLoc) (ms_imps ms)))
           in_group (L _ m) = m `elem` group_mods
           group_mods = map (moduleName . ms_mod) mss
 
@@ -368,8 +370,8 @@ pprCycle summaries = pp_group (CyclicSCC summaries)
           groups = GHC.topSortModuleGraph True all_others Nothing
 
     pp_ms summary = text mod_str <> text (take (20 - length mod_str) (repeat ' '))
-                       <+> (pp_imps empty (ms_imps summary) $$
-                            pp_imps (ptext (sLit "{-# SOURCE #-}")) (ms_srcimps summary))
+                       <+> (pp_imps empty (map (ideclName.unLoc) (ms_imps summary)) $$
+                            pp_imps (ptext (sLit "{-# SOURCE #-}")) (map (ideclName.unLoc) (ms_srcimps summary)))
         where
           mod_str = moduleNameString (moduleName (ms_mod summary))
 

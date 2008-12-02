@@ -67,6 +67,7 @@ import TcType
 import InstEnv
 import FamInstEnv
 import TcRnMonad
+import HsSyn
 import HscTypes
 import Finder
 import DynFlags
@@ -1115,8 +1116,8 @@ checkDependencies hsc_env summary iface
    orM = foldr f (return False)
     where f m rest = do b <- m; if b then return True else rest
 
-   dep_missing (L _ mod) = do
-     find_res <- liftIO $ findImportedModule hsc_env mod Nothing
+   dep_missing (L _ (ImportDecl (L _ mod) pkg _ _ _ _)) = do
+     find_res <- liftIO $ findImportedModule hsc_env mod pkg
      case find_res of
         Found _ mod
           | pkg == this_pkg

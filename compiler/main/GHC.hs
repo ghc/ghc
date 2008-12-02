@@ -1333,7 +1333,7 @@ checkStability hpt sccs all_home_mods = foldl checkSCC ([],[]) sccs
 	scc_mods = map ms_mod_name scc
 	home_module m   = m `elem` all_home_mods && m `notElem` scc_mods
 
-        scc_allimps = nub (filter home_module (concatMap ms_allimps scc))
+        scc_allimps = nub (filter home_module (concatMap ms_home_allimps scc))
 	    -- all imports outside the current SCC, but in the home pkg
 	
 	stable_obj_imps = map (`elem` stable_obj) scc_allimps
@@ -1369,9 +1369,6 @@ checkStability hpt sccs all_home_mods = foldl checkSCC ([],[]) sccs
 			not (isObjectLinkable l) && 
 			linkableTime l >= ms_hs_date ms
 		_other  -> False
-
-ms_allimps :: ModSummary -> [ModuleName]
-ms_allimps ms = map unLoc (ms_srcimps ms ++ ms_imps ms)
 
 -- -----------------------------------------------------------------------------
 
@@ -1816,8 +1813,8 @@ moduleGraphNodes drop_hs_boot_nodes summaries = (graphFromEdgedVertices nodes, l
             | (s, key) <- numbered_summaries
              -- Drop the hi-boot ones if told to do so
             , not (isBootSummary s && drop_hs_boot_nodes)
-            , let out_keys = out_edge_keys hs_boot_key (map unLoc (ms_srcimps s)) ++
-                             out_edge_keys HsSrcFile   (map unLoc (ms_imps s)) ++
+            , let out_keys = out_edge_keys hs_boot_key (map unLoc (ms_home_srcimps s)) ++
+                             out_edge_keys HsSrcFile   (map unLoc (ms_home_imps s)) ++
                              (-- see [boot-edges] below
                               if drop_hs_boot_nodes || ms_hsc_src s == HsBootFile 
                               then [] 
@@ -1864,8 +1861,8 @@ warnUnnecessarySourceImports sccs =
   logWarnings (listToBag (concatMap (check.flattenSCC) sccs))
   where check ms =
 	   let mods_in_this_cycle = map ms_mod_name ms in
-	   [ warn i | m <- ms, i <- ms_srcimps m,
-			unLoc i `notElem`  mods_in_this_cycle ]
+	   [ warn i | m <- ms, i <- ms_home_srcimps m,
+	              unLoc i `notElem`  mods_in_this_cycle ]
 
 	warn :: Located ModuleName -> WarnMsg
 	warn (L loc mod) = 
@@ -1987,8 +1984,20 @@ msDeps :: ModSummary -> [(Located ModuleName, IsBootInterface)]
 -- Remember, this pass isn't doing the topological sort.  It's
 -- just gathering the list of all relevant ModSummaries
 msDeps s = 
-    concat [ [(m,True), (m,False)] | m <- ms_srcimps s ] 
-	 ++ [ (m,False) | m <- ms_imps s ] 
+    concat [ [(m,True), (m,False)] | m <- ms_home_srcimps s ] 
+	 ++ [ (m,False) | m <- ms_home_imps s ] 
+
+home_imps :: [Located (ImportDecl RdrName)] -> [Located ModuleName]
+home_imps imps = [ ideclName i |  L _ i <- imps, isNothing (ideclPkgQual i) ]
+
+ms_home_allimps :: ModSummary -> [ModuleName]
+ms_home_allimps ms = map unLoc (ms_home_srcimps ms ++ ms_home_imps ms)
+
+ms_home_srcimps :: ModSummary -> [Located ModuleName]
+ms_home_srcimps = home_imps . ms_srcimps
+
+ms_home_imps :: ModSummary -> [Located ModuleName]
+ms_home_imps = home_imps . ms_imps
 
 -----------------------------------------------------------------------------
 -- Summarising modules
