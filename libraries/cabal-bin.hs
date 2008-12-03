@@ -23,12 +23,12 @@ main = do
     unprocessedArgs <- getArgs
     let verbosity = verbose
     case unprocessedArgs of
-        ghc : packageConf : args ->
-            doit verbosity ghc packageConf args
+        ghc : packageConf : useCabalVersion : args ->
+            doit verbosity ghc packageConf useCabalVersion args
         _ -> die "Bad args"
 
-doit :: Verbosity -> FilePath -> FilePath -> [String] -> IO ()
-doit verbosity ghc packageConf args = do
+doit :: Verbosity -> FilePath -> FilePath -> String -> [String] -> IO ()
+doit verbosity ghc packageConf useCabalVersion args = do
     exists <- doesFileExist setupProg
     if exists then rawSystemExit verbosity setupProg args
               else do
@@ -42,16 +42,19 @@ doit verbosity ghc packageConf args = do
             _ | packageName pd == PackageName "Cabal" ->
                               -- Cabal is special...*sigh*
                               Simple.defaultMainArgs                     args
-              | otherwise  -> runSetup verbosity ghc packageConf args
+              | otherwise  ->
+                runSetup verbosity ghc packageConf useCabalVersion args
 
-runSetup :: Verbosity -> FilePath -> FilePath -> [String] -> IO ()
-runSetup verbosity ghc packageConf args = do
+runSetup :: Verbosity -> FilePath -> FilePath -> String -> [String] -> IO ()
+runSetup verbosity ghc packageConf useCabalVersion args = do
     -- Don't bother building Setup if we are cleaning. If we need to
     -- build Setup in order to build, and Setup isn't built already,
     -- then there shouldn't be anything to clean anyway.
     unless cleaning $
         rawSystemExit verbosity ghc ["-package-conf", packageConf,
-                                     "--make", "Setup", "-o", "Setup"]
+                                     "--make", "Setup",
+                                     "-package", "Cabal-" ++ useCabalVersion,
+                                     "-o", "Setup"]
     rawSystemExit verbosity "./Setup" args
   where cleaning = case args of
                    "clean" : _ -> True

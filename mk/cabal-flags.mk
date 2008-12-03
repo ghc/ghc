@@ -7,7 +7,7 @@ GHC_PKG_INSTALL_PROG = $(FPTOOLS_TOP_ABS)/utils/ghc-pkg/dist-install/build/ghc-p
 
 LIBRARIES_ABS = $(FPTOOLS_TOP_ABS)/libraries
 UTILS_ABS     = $(FPTOOLS_TOP_ABS)/utils
-CABAL = $(LIBRARIES_ABS)/cabal-bin $(GHC) $(LIBRARIES_ABS)/bootstrapping.conf
+CABAL = $(LIBRARIES_ABS)/cabal-bin $(GHC) $(LIBRARIES_ABS)/bootstrapping.conf $(CABAL_DOTTED_VERSION)
 INSTALL_PACKAGE = \
     $(UTILS_ABS)/installPackage/install-inplace/bin/installPackage
 STAGE3_PACKAGE_CONF = $(FPTOOLS_TOP_ABS)/stage3.package.conf
