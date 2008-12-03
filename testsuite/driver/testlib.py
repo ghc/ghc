@@ -449,7 +449,7 @@ def test_common_work (name, opts, func, args):
             skiptest (name,way)
 
     clean(map (lambda suff: name + suff,
-              ['', '.exe', '.genscript',
+              ['', '.exe', '.exe.manifest', '.genscript',
                '.stderr.normalised',        '.stdout.normalised',
                '.run.stderr',               '.run.stdout',
                '.run.stderr.normalised',    '.run.stdout.normalised',
