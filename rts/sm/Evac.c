@@ -943,7 +943,11 @@ selector_loop:
               // the original selector thunk, p.
               SET_INFO(p, (StgInfoTable *)info_ptr);
               LDV_RECORD_DEAD_FILL_SLOP_DYNAMIC((StgClosure *)p);
+#if defined(THREADED_RTS)
+              SET_INFO(p, &stg_WHITEHOLE_info);
+#else
               SET_INFO(p, &stg_BLACKHOLE_info);
+#endif
 #endif
 
               // the closure in val is now the "value" of the
