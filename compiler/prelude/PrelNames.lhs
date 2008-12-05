@@ -242,7 +242,7 @@ gHC_PRIM, gHC_TYPES, gHC_BOOL, gHC_UNIT, gHC_ORDERING, gHC_GENERICS, gHC_CLASSES
     dOTNET, rEAD_PREC, lEX, gHC_INT, gHC_WORD, mONAD, mONAD_FIX, aRROW,
     gHC_DESUGAR, rANDOM, gHC_EXTS, cONTROL_EXCEPTION_BASE :: Module
 gHC_PRIM	= mkPrimModule (fsLit "GHC.Prim")   -- Primitive types and values
-gHC_TYPES   = mkPrimModule (fsLit "GHC.Types")
+gHC_TYPES       = mkPrimModule (fsLit "GHC.Types")
 gHC_UNIT	= mkPrimModule (fsLit "GHC.Unit")
 gHC_BOOL	= mkPrimModule (fsLit "GHC.Bool")
 gHC_ORDERING	= mkPrimModule (fsLit "GHC.Ordering")
