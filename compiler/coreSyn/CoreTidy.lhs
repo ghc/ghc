@@ -176,15 +176,21 @@ tidyIdBndr env@(tidy_env, var_env) id
 	-- though we could extract it from the Id
 	-- 
 	-- All nested Ids now have the same IdInfo, namely vanillaIdInfo,
-	-- which should save some space.
+	-- which should save some space; except that we hang onto dead-ness
+	-- (at the moment, solely to make printing tidy core nicer)
 	-- But note that tidyLetBndr puts some of it back.
-        ty'          	  = tidyType env (idType id)
-	id'          	  = mkUserLocal occ' (idUnique id) ty' noSrcSpan
-				`setIdInfo` vanillaIdInfo
-	var_env'	  = extendVarEnv var_env id id'
+        ty'      = tidyType env (idType id)
+        name'    = mkInternalName (idUnique id) occ' noSrcSpan
+	id'      = mkLocalIdWithInfo name' ty' new_info
+	var_env' = extendVarEnv var_env id id'
+        new_info | isDeadOcc (idOccInfo id) = deadIdInfo
+	         | otherwise 	            = vanillaIdInfo
     in
      ((tidy_env', var_env'), id')
    }
+
+deadIdInfo :: IdInfo
+deadIdInfo = vanillaIdInfo `setOccInfo` IAmDead
 \end{code}
 
 \begin{code}
