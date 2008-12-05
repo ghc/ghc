@@ -159,8 +159,7 @@ static_flags = [
          Supported
 
         -- Pass all remaining "-f<blah>" options to hsc
-  , Flag "f"                      (AnySuffixPred (isStaticFlag) addOpt)
-         Supported
+  , Flag "f" (AnySuffixPred isStaticFlag addOpt) Supported
   ]
 
 isStaticFlag :: String -> Bool
@@ -178,6 +177,7 @@ isStaticFlag f =
     "fno-hi-version-check",
     "dno-black-holing",
     "fno-state-hack",
+    "fsimple-list-literals",
     "fno-ds-multi-tyvar",
     "fruntime-types",
     "fno-pre-inlining",

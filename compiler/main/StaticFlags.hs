@@ -43,6 +43,7 @@ module StaticFlags (
 	-- optimisation opts
 	opt_DsMultiTyVar,
 	opt_NoStateHack,
+        opt_SimpleListLiterals,
 	opt_SpecInlineJoinPoints,
 	opt_CprOff,
 	opt_SimplNoPreInlining,
@@ -227,8 +228,12 @@ opt_DsMultiTyVar		= not (lookUp (fsLit "-fno-ds-multi-tyvar"))
 opt_SpecInlineJoinPoints :: Bool
 opt_SpecInlineJoinPoints	= lookUp  (fsLit "-fspec-inline-join-points")
 
+opt_SimpleListLiterals :: Bool
+opt_SimpleListLiterals	        = lookUp  (fsLit "-fsimple-list-literals")
+
 opt_NoStateHack :: Bool
 opt_NoStateHack			= lookUp  (fsLit "-fno-state-hack")
+
 opt_CprOff :: Bool
 opt_CprOff			= lookUp  (fsLit "-fcpr-off")
 	-- Switch off CPR analysis in the new demand analyser

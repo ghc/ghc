@@ -47,6 +47,7 @@ import CoreUtils
 import MkCore
 
 import DynFlags
+import StaticFlags
 import CostCentre
 import Id
 import PrelInfo
@@ -609,6 +610,23 @@ allocation in some nofib programs. Specifically
 
 Of course, if rules aren't turned on then there is pretty much no
 point doing this fancy stuff, and it may even be harmful.
+
+=======>  Note by SLPJ Dec 08.
+
+I'm unconvinced that we should *ever* generate a build for an explicit
+list.  See the comments in GHC.Base about the foldr/cons rule, which 
+points out that (foldr k z [a,b,c]) may generate *much* less code than
+(a `k` b `k` c `k` z).
+
+Furthermore generating builds messes up the LHS of RULES. 
+Example: the foldr/single rule in GHC.Base
+   foldr k z [x] = ...
+We do not want to generate a build invocation on the LHS of this RULE!
+
+To test this I've added a (static) flag -fsimple-list-literals, which
+makes all list literals be generated via the simple route.  
+
+
 \begin{code}
 
 dsExplicitList :: PostTcType -> [LHsExpr Id] -> DsM CoreExpr
@@ -616,7 +634,7 @@ dsExplicitList :: PostTcType -> [LHsExpr Id] -> DsM CoreExpr
 dsExplicitList elt_ty xs = do
     dflags <- getDOptsDs
     xs' <- mapM dsLExpr xs
-    if not (dopt Opt_EnableRewriteRules dflags)
+    if  opt_SimpleListLiterals || not (dopt Opt_EnableRewriteRules dflags)
         then return $ mkListExpr elt_ty xs'
         else mkBuildExpr elt_ty (mkSplitExplicitList (thisPackage dflags) xs')
   where
