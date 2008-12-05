@@ -1082,9 +1082,16 @@ myCollectArgs expr
     go (Note (SCC _) _) _  = pprPanic "CoreToStg.myCollectArgs" (ppr expr)
     go (Cast e _)       as = go e as
     go (Note _ e)       as = go e as
+    go (Lam b e)        as
+       | isTyVar b         = go e as	-- Note [Collect args]
     go _                _  = pprPanic "CoreToStg.myCollectArgs" (ppr expr)
 \end{code}
 
+Note [Collect args]
+~~~~~~~~~~~~~~~~~~~
+This big-lambda case occurred following a rather obscure eta expansion.
+It all seems a bit yukky to me.
+     
 \begin{code}
 stgArity :: Id -> HowBound -> Arity
 stgArity _ (LetBound _ arity) = arity
