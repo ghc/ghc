@@ -189,6 +189,8 @@ addSpecInfo (SpecInfo rs1 fvs1) (SpecInfo rs2 fvs2)
   = SpecInfo (rs1 ++ rs2) (fvs1 `unionVarSet` fvs2)
 
 addIdSpecialisations :: Id -> [CoreRule] -> Id
+addIdSpecialisations id []
+  = id
 addIdSpecialisations id rules
   = setIdSpecialisation id $
     extendSpecInfo (idSpecialisation id) rules
