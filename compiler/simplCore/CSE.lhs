@@ -49,8 +49,8 @@ So we carry an extra var->var substitution which we apply *before* looking up in
 reverse mapping.
 
 
-[Note: SHADOWING]
-~~~~~~~~~~~~~~~~~
+Note [Shadowing]
+~~~~~~~~~~~~~~~~
 We have to be careful about shadowing.
 For example, consider
 	f = \x -> let y = x+x in
@@ -239,7 +239,7 @@ cseAlts :: CSEnv -> CoreExpr -> CoreBndr -> CoreBndr -> [CoreAlt] -> [CoreAlt]
 cseAlts env scrut' bndr _bndr' [(DataAlt con, args, rhs)]
   | isUnboxedTupleCon con
 	-- Unboxed tuples are special because the case binder isn't
-	-- a real values.  See Note [Unboxed tuple case binders]
+	-- a real value.  See Note [Unboxed tuple case binders]
   = [(DataAlt con, args'', tryForCSE new_env rhs)]
   where
     (env', args') = addBinders env args
@@ -347,7 +347,7 @@ addBinder (CS cs in_scope sub) v
 				        (CS emptyUFM in_scope		      sub,		       v)
 	-- This last case is the unusual situation where we have shadowing of
 	-- a type variable; we have to discard the CSE mapping
-	-- See "IMPORTANT NOTE" at the top 
+	-- See Note [Shadowing]
   where
     v' = uniqAway in_scope v
 
