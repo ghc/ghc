@@ -616,7 +616,6 @@ trivColorable :: RegClass -> UniqSet Reg -> UniqSet Reg -> Bool
 trivColorable classN conflicts exclusions
  = {-# SCC "trivColorable" #-}
    let
-	{-# INLINE   isSqueesed    #-}
 	isSqueesed cI cF ufm
 	  = case ufm of
 		NodeUFM _ _ left right

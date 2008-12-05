@@ -485,7 +485,6 @@ fwd_pure_anal name env transfers in_fact g =
 
 type Fuel = OptimizationFuel
 
-{-# INLINE forward_sol #-}
 forward_sol
         :: forall m l a . 
            (DebugNodes m l, LastNode l, Outputable a)
@@ -601,8 +600,6 @@ mk_set_or_save is_local (LastOutFacts l) = mapM_ set_or_save_one l
 
 
 
-
-{-# INLINE forward_rew #-}
 forward_rew
         :: forall m l a . 
            (DebugNodes m l, LastNode l, Outputable a)
@@ -748,7 +745,6 @@ rewrite_b_agraph depth start_facts name lattice transfers rewrites exit_fact g =
 
 
 
-{-# INLINE backward_sol #-}
 backward_sol
         :: forall m l a . 
            (DebugNodes m l, LastNode l, Outputable a)
@@ -867,7 +863,6 @@ bwd_pure_anal name env transfers g exit_fact =
 
 {- ================================================================ -}
 
-{-# INLINE backward_rew #-}
 backward_rew
         :: forall m l a . 
            (DebugNodes m l, LastNode l, Outputable a)
