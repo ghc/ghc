@@ -39,7 +39,6 @@ module Rules (
 import CoreSyn		-- All of it
 import OccurAnal	( occurAnalyseExpr )
 import CoreFVs		( exprFreeVars, exprsFreeVars, bindFreeVars, rulesFreeVars )
-import CoreUnfold	( isCheapUnfolding, unfoldingTemplate )
 import CoreUtils	( tcEqExprX, exprType )
 import PprCore		( pprRules )
 import Type		( Type, TvSubstEnv )
