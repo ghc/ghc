@@ -626,7 +626,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = NewTypeDerived })
         ; let coerced_rep_dict = wrapId the_coercion (instToId rep_dict)
 
         ; body <- make_body cls_tycon cls_inst_tys sc_dicts coerced_rep_dict
-        ; let dict_bind = noLoc $ VarBind (instToId this_dict) (noLoc body)
+	; let dict_bind = mkVarBind (instToId this_dict) (noLoc body)
 
         ; return (unitBag $ noLoc $
                   AbsBinds inst_tvs' (map instToVar dfun_dicts)
@@ -744,7 +744,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = VanillaInst monobinds uprags })
     checkSigTyVars inst_tyvars'
 
     -- Deal with 'SPECIALISE instance' pragmas
-    prags <- tcPrags dfun_id (filter isSpecInstLSig uprags)
+    prags <- tcPrags NonRecursive dfun_id (filter isSpecInstLSig uprags)
 
     -- Create the result bindings
     let
@@ -763,7 +763,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = VanillaInst monobinds uprags })
                 --      See Note [Inline dfuns] below
 
         sc_dict_vars  = map instToVar sc_dicts
-        dict_bind     = L loc (VarBind this_dict_id dict_rhs)
+        dict_bind     = mkVarBind this_dict_id dict_rhs
         dict_rhs      = foldl (\ f a -> L loc (HsApp f (L loc a))) inst_constr meth_exprs
  	inst_constr   = L loc $ wrapId (mkWpApps sc_dict_vars <.> mkWpTyApps inst_tys')
 				       (dataConWrapId dict_constr)
@@ -773,7 +773,6 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = VanillaInst monobinds uprags })
                 -- it means that the special cases (e.g. dictionary with only one
                 -- member) are dealt with by the common MkId.mkDataConWrapId code rather
                 -- than needing to be repeated here.
-
 
         main_bind = noLoc $ AbsBinds
                             inst_tyvars'
@@ -825,7 +824,7 @@ tcInstanceMethod loc clas tyvars dfun_dicts theta inst_tys
 		-- then clashes with its friends
 	; uniq1 <- newUnique
 	; let local_meth_name = mkInternalName uniq1 sel_occ loc   -- Same OccName
-	      this_dict_bind  = L loc $ VarBind (instToId cloned_this) $ 
+	      this_dict_bind  = mkVarBind (instToId cloned_this) $ 
 				L loc $ wrapId meth_wrapper dfun_id
 	      mb_this_bind | null tyvars = Nothing
 			   | otherwise   = Just (cloned_this, this_dict_bind)

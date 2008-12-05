@@ -344,10 +344,10 @@ zonk_bind env bind@(PatBind { pat_lhs = pat, pat_rhs = grhss, pat_rhs_ty = ty})
 	; new_ty    <- zonkTcTypeToType env ty
 	; return (bind { pat_lhs = new_pat, pat_rhs = new_grhss, pat_rhs_ty = new_ty }) }
 
-zonk_bind env (VarBind { var_id = var, var_rhs = expr })
+zonk_bind env (VarBind { var_id = var, var_rhs = expr, var_inline = inl })
   = zonkIdBndr env var 			`thenM` \ new_var ->
     zonkLExpr env expr			`thenM` \ new_expr ->
-    returnM (VarBind { var_id = new_var, var_rhs = new_expr })
+    returnM (VarBind { var_id = new_var, var_rhs = new_expr, var_inline = inl })
 
 zonk_bind env bind@(FunBind { fun_id = var, fun_matches = ms, fun_co_fn = co_fn })
   = wrapLocM (zonkIdBndr env) var	`thenM` \ new_var ->
@@ -608,7 +608,6 @@ zonk_cmd_top env (HsCmdTop cmd stack_tys ty ids)
 -------------------------------------------------------------------------
 zonkCoFn :: ZonkEnv -> HsWrapper -> TcM (ZonkEnv, HsWrapper)
 zonkCoFn env WpHole   = return (env, WpHole)
-zonkCoFn env WpInline = return (env, WpInline)
 zonkCoFn env (WpCompose c1 c2) = do { (env1, c1') <- zonkCoFn env c1
 				    ; (env2, c2') <- zonkCoFn env1 c2
 				    ; return (env2, WpCompose c1' c2') }

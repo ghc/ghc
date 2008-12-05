@@ -16,18 +16,16 @@ module WorkWrap ( wwTopBinds, mkWrapper ) where
 #include "HsVersions.h"
 
 import CoreSyn
-import CoreUnfold	( certainlyWillInline )
+import CoreUnfold	( certainlyWillInline, mkWwInlineRule )
 import CoreLint		( showPass, endPass )
 import CoreUtils	( exprType, exprIsHNF, exprArity )
 import Id		( Id, idType, isOneShotLambda, 
 			  setIdNewStrictness, mkWorkerId,
-			  setIdWorkerInfo, setInlinePragma,
-			  setIdArity, idInfo )
+			  setInlinePragma, setIdUnfolding, setIdArity, idInfo )
 import MkId		( lazyIdKey, lazyIdUnfolding )
 import Type		( Type )
-import IdInfo		( WorkerInfo(..), arityInfo,
-			  newDemandInfo, newStrictnessInfo, unfoldingInfo, inlinePragInfo
-			)
+import IdInfo		( arityInfo, newDemandInfo, newStrictnessInfo, 
+			  unfoldingInfo, inlinePragInfo	)
 import NewDemand        ( Demand(..), StrictSig(..), DmdType(..), DmdResult(..), 
 			  Demands(..), mkTopDmdType, isBotRes, returnsCPR, topSig, isAbsent
 			)
@@ -114,16 +112,12 @@ matching by looking for strict arguments of the correct type.
 \begin{code}
 wwExpr :: CoreExpr -> UniqSM CoreExpr
 
-wwExpr e@(Type _)             = return e
-wwExpr e@(Lit _)              = return e
-wwExpr e@(Note InlineMe expr) = return e
-	-- Don't w/w inside InlineMe's
-
+wwExpr e@(Type _) = return e
+wwExpr e@(Lit _)  = return e
 wwExpr e@(Var v)
   | v `hasKey` lazyIdKey = return lazyIdUnfolding
   | otherwise            = return e
 	-- HACK alert: Inline 'lazy' after strictness analysis
-	-- (but not inside InlineMe's)
 
 wwExpr (Lam binder expr)
   = Lam binder <$> wwExpr expr
@@ -172,7 +166,10 @@ The only reason this is monadised is for the unique supply.
 Note [Don't w/w inline things]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 It's very important to refrain from w/w-ing an INLINE function
-If we do so by mistake we transform
+because the wrapepr will then overwrite the InlineRule unfolding.
+
+It was wrong with the old InlineMe Note too: if we do so by mistake 
+we transform
 	f = __inline (\x -> E)
 into
 	f = __inline (\x -> case x of (a,b) -> fw E)
@@ -268,7 +265,7 @@ splitFun fn_id fn_info wrap_dmds res_info inline_prag rhs
                                 -- arity is consistent with the demand type goes through
 
 	wrap_rhs = wrap_fn work_id
-	wrap_id  = fn_id `setIdWorkerInfo` HasWorker work_id arity
+	wrap_id  = fn_id `setIdUnfolding` mkWwInlineRule wrap_rhs arity work_id
 
     ; return ([(work_id, work_rhs), (wrap_id, wrap_rhs)]) })
 	-- Worker first, because wrapper mentions it

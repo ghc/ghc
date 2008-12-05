@@ -53,7 +53,6 @@ import SrcLoc
 import DynFlags
 import Util
 import FastString
-import BasicTypes (Arity)
 
 import Control.Monad
 import Data.List
@@ -848,7 +847,6 @@ tcIfaceExpr (IfaceCast expr co) = do
 tcIfaceExpr (IfaceNote note expr) = do
     expr' <- tcIfaceExpr expr
     case note of
-        IfaceInlineMe     -> return (Note InlineMe   expr')
         IfaceSCC cc       -> return (Note (SCC cc)   expr')
         IfaceCoreNote n   -> return (Note (CoreNote n) expr')
 
@@ -942,43 +940,39 @@ tcIdInfo ignore_prags name ty info
     tcPrag info HsNoCafRefs         = return (info `setCafInfo`   NoCafRefs)
     tcPrag info (HsArity arity)     = return (info `setArityInfo` arity)
     tcPrag info (HsStrictness str)  = return (info `setAllStrictnessInfo` Just str)
+    tcPrag info (HsInline prag)    = return (info `setInlinePragInfo` prag)
 
 	-- The next two are lazy, so they don't transitively suck stuff in
-    tcPrag info (HsWorker nm arity) = tcWorkerInfo ty info nm arity
-    tcPrag info (HsInline inline_prag) = return (info `setInlinePragInfo` inline_prag)
-    tcPrag info (HsUnfold expr) = do
-          maybe_expr' <- tcPragExpr name expr
-	  let
-		-- maybe_expr' doesn't get looked at if the unfolding
-		-- is never inspected; so the typecheck doesn't even happen
-		unfold_info = case maybe_expr' of
-				Nothing    -> noUnfolding
-				Just expr' -> mkTopUnfolding expr' 
-          return (info `setUnfoldingInfoLazily` unfold_info)
+    tcPrag info (HsUnfold if_unf)  = do { unf <- tcUnfolding name ty info if_unf
+				        ; return (info `setUnfoldingInfoLazily` unf) }
 \end{code}
 
 \begin{code}
-tcWorkerInfo :: Type -> IdInfo -> Name -> Arity -> IfL IdInfo
-tcWorkerInfo ty info wkr arity
+tcUnfolding :: Name -> Type -> IdInfo -> IfaceUnfolding -> IfL Unfolding
+tcUnfolding name _ _ (IfCoreUnfold if_expr)
+  = do 	{ mb_expr <- tcPragExpr name if_expr
+	; return (case mb_expr of
+		    Nothing -> NoUnfolding
+		    Just expr -> mkTopUnfolding expr) }
+
+tcUnfolding name _ _ (IfInlineRule arity if_expr)
+  = do 	{ mb_expr <- tcPragExpr name if_expr
+	; return (case mb_expr of
+		    Nothing -> NoUnfolding
+		    Just expr -> mkInlineRule expr arity) }
+
+tcUnfolding name ty info (IfWrapper arity wkr)
   = do 	{ mb_wkr_id <- forkM_maybe doc (tcIfaceExtId wkr)
-
-	-- We return without testing maybe_wkr_id, but as soon as info is
-	-- looked at we will test it.  That's ok, because its outside the
-	-- knot; and there seems no big reason to further defer the
-	-- tcIfaceId lookup.  (Contrast with tcPragExpr, where postponing walking
-	-- over the unfolding until it's actually used does seem worth while.)
 	; us <- newUniqueSupply
-
 	; return (case mb_wkr_id of
-		     Nothing     -> info
-		     Just wkr_id -> add_wkr_info us wkr_id info) }
+		     Nothing     -> noUnfolding
+		     Just wkr_id -> make_inline_rule wkr_id us) }
   where
-    doc = text "Worker for" <+> ppr wkr
-    add_wkr_info us wkr_id info
-	= info `setUnfoldingInfoLazily`  mk_unfolding us wkr_id
-	       `setWorkerInfo`           HasWorker wkr_id arity
+    doc = text "Worker for" <+> ppr name
 
-    mk_unfolding us wkr_id = mkTopUnfolding (initUs_ us (mkWrapper ty strict_sig) wkr_id)
+    make_inline_rule wkr_id us 
+	= mkWwInlineRule (initUs_ us (mkWrapper ty strict_sig) wkr_id) 
+		         arity wkr_id
 
     	-- We are relying here on strictness info always appearing 
 	-- before worker info,  fingers crossed ....

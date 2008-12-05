@@ -210,7 +210,9 @@ tyVarsOfLIE   lie   = tyVarsOfInsts (lieToList lie)
 --------------------------
 instToDictBind :: Inst -> LHsExpr TcId -> TcDictBinds
 instToDictBind inst rhs 
-  = unitBag (L (instSpan inst) (VarBind (instToId inst) rhs))
+  = unitBag (L (instSpan inst) (VarBind { var_id = instToId inst
+					, var_rhs = rhs
+					, var_inline = False }))
 
 addInstToDictBind :: TcDictBinds -> Inst -> LHsExpr TcId -> TcDictBinds
 addInstToDictBind binds inst rhs = binds `unionBags` instToDictBind inst rhs

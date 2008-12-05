@@ -209,9 +209,6 @@ ppr_expr add_par (Let bind expr)
 ppr_expr add_par (Note (SCC cc) expr)
   = add_par (sep [pprCostCentreCore cc, pprCoreExpr expr])
 
-ppr_expr add_par (Note InlineMe expr)
-  = add_par $ ptext (sLit "__inline_me") <+> pprParendExpr expr
-
 ppr_expr add_par (Note (CoreNote s) expr)
   = add_par $ 
     sep [sep [ptext (sLit "__core_note"), pprHsString (mkFastString s)],
@@ -268,6 +265,9 @@ pprCoreBinder LambdaBind bndr
 
 -- Case bound things don't get a signature or a herald, unless we have debug on
 pprCoreBinder CaseBind bndr 
+  | isDeadBinder bndr	 -- False for tyvars
+  = ptext (sLit "_")
+  | otherwise
   = getPprStyle $ \ sty ->
     if debugStyle sty then
 	parens (pprTypedBinder bndr)
@@ -325,6 +325,10 @@ pprIdBndrInfo info
 \end{code}
 
 
+-----------------------------------------------------
+--	IdInfo
+-----------------------------------------------------
+
 \begin{code}
 pprIdDetails :: Id -> SDoc
 pprIdDetails id | isGlobalId id     = ppr (globalIdDetails id)
@@ -335,13 +339,13 @@ ppIdInfo :: Id -> IdInfo -> SDoc
 ppIdInfo _ info
   = brackets $
     vcat [  ppArityInfo a,
-	    ppWorkerInfo (workerInfo info),
 	    ppCafInfo (cafInfo info),
 #ifdef OLD_STRICTNESS
 	    ppStrictnessInfo s,
             ppCprInfo m,
 #endif
 	    pprNewStrictness (newStrictnessInfo info),
+	    pprInlineInfo (unfoldingInfo info),
 	    if null rules then empty
 	    else ptext (sLit "RULES:") <+> vcat (map pprRule rules)
 	-- Inline pragma, occ, demand, lbvar info
@@ -357,6 +361,38 @@ ppIdInfo _ info
     rules = specInfoRules (specInfo info)
 \end{code}
 
+-----------------------------------------------------
+--	Unfolding and UnfoldingGuidance
+-----------------------------------------------------
+
+\begin{code}
+instance Outputable UnfoldingGuidance where
+    ppr UnfoldNever	= ptext (sLit "NEVER")
+    ppr (UnfoldIfGoodArgs { ug_arity = v, ug_args = cs
+                          , ug_size = size, ug_res = discount })
+      = hsep [ ptext (sLit "IF_ARGS"), int v,
+	       brackets (hsep (map int cs)),
+	       int size,
+	       int discount ]
+
+instance Outputable Unfolding where
+  ppr NoUnfolding = ptext (sLit "No unfolding")
+  ppr (OtherCon cs) = ptext (sLit "OtherCon") <+> ppr cs
+  ppr (CompulsoryUnfolding e) = ptext (sLit "Compulsory") <+> ppr e
+  ppr (InlineRule { uf_tmpl = e, uf_is_value = hnf, uf_arity = arity, uf_worker = wkr })
+	= ptext (sLit "INLINE") <+> sep [ppr arity <+> ppr hnf <+> ppr wkr, ppr e]
+  ppr (CoreUnfolding e top hnf cheap g) 
+	= ptext (sLit "Unf") <+> sep [ppr top <+> ppr hnf <+> ppr cheap <+> ppr g, 
+				     ppr e]
+
+pprInlineInfo :: Unfolding -> SDoc	-- Print an inline RULE
+pprInlineInfo unf | isInlineRule unf = ppr unf
+		  | otherwise	     = empty
+\end{code}
+
+-----------------------------------------------------
+--	Rules
+-----------------------------------------------------
 
 \begin{code}
 instance Outputable CoreRule where

@@ -276,8 +276,7 @@ corePrepTopBind env (Rec pairs) = corePrepRecPairs TopLevel env pairs
 corePrepBind ::  CorePrepEnv -> CoreBind -> UniqSM (CorePrepEnv, Floats)
 	-- This one is used for *local* bindings
 corePrepBind env (NonRec bndr rhs) = do
-    rhs1 <- etaExpandRhs bndr rhs
-    (floats, rhs2) <- corePrepExprFloat env rhs1
+    (floats, rhs2) <- corePrepExprFloat env rhs
     (_, bndr') <- cloneBndr env bndr
     (floats', bndr'') <- mkLocalNonRec bndr' (bdrDem bndr) floats rhs2
         -- We want bndr'' in the envt, because it records
@@ -310,8 +309,7 @@ corePrepRhs :: TopLevelFlag -> RecFlag
 	    -> UniqSM (Floats, CoreExpr)
 -- Used for top-level bindings, and local recursive bindings
 corePrepRhs top_lvl is_rec env (bndr, rhs) = do
-    rhs' <- etaExpandRhs bndr rhs
-    floats_w_rhs <- corePrepExprFloat env rhs'
+    floats_w_rhs <- corePrepExprFloat env rhs
     floatRhs top_lvl is_rec bndr floats_w_rhs
 
 
@@ -322,14 +320,15 @@ corePrepRhs top_lvl is_rec env (bndr, rhs) = do
 -- This is where we arrange that a non-trivial argument is let-bound
 corePrepArg :: CorePrepEnv -> CoreArg -> RhsDemand
 	   -> UniqSM (Floats, CoreArg)
-corePrepArg env arg dem = do
-    (floats, arg') <- corePrepExprFloat env arg
-    if exprIsTrivial arg' && allLazy NotTopLevel NonRecursive floats
-       -- Note [Floating unlifted arguments]
-     then return (floats, arg')
-     else do v <- newVar (exprType arg')
-             (floats', v') <- mkLocalNonRec v dem floats arg'
-             return (floats', Var v')
+corePrepArg env arg dem
+  = do { (floats, arg') <- corePrepExprFloat env arg
+       ; if exprIsTrivial arg' && allLazy NotTopLevel NonRecursive floats
+              -- Note [Floating unlifted arguments]
+         then return (floats, arg')
+         else do { v <- newVar (exprType arg')
+		 	-- Note [Eta expand arguments]
+                 ; (floats', v') <- mkLocalNonRec v dem floats arg'
+                 ; return (floats', Var v') } }
 
 -- version that doesn't consider an scc annotation to be trivial.
 exprIsTrivial :: CoreExpr -> Bool
@@ -519,7 +518,6 @@ corePrepExprFloat env expr@(App _ _) = do
 	  ty = exprType fun
 
     ignore_note	(CoreNote _) = True 
-    ignore_note	InlineMe     = True
     ignore_note	_other       = False
 	-- We don't ignore SCCs, since they require some code generation
 
@@ -589,20 +587,60 @@ floatRhs :: TopLevelFlag -> RecFlag
 	 -> UniqSM (Floats, 	-- Floats out of this bind
 		    CoreExpr)	-- Final Rhs
 
-floatRhs top_lvl is_rec _bndr (floats, rhs)
+floatRhs top_lvl is_rec bndr (floats, rhs)
   | isTopLevel top_lvl || exprIsHNF rhs,	-- Float to expose value or 
     allLazy top_lvl is_rec floats 		-- at top level
   = 	-- Why the test for allLazy? 
 	--	v = f (x `divInt#` y)
 	-- we don't want to float the case, even if f has arity 2,
 	-- because floating the case would make it evaluated too early
-    return (floats, rhs)
+    do { us <- getUniquesM
+       ; let eta_rhs = etaExpand arity us rhs (idType bndr)
+              	-- For a GlobalId, take the Arity from the Id.
+		-- It was set in CoreTidy and must not change
+		-- For all others, just expand at will
+		-- See Note [Eta expansion]
+	     arity | isGlobalId bndr = idArity bndr
+	           | otherwise	     = exprArity rhs
+       ; return (floats, eta_rhs) }
     
   | otherwise = do
 	-- Don't float; the RHS isn't a value
     rhs' <- mkBinds floats rhs
     return (emptyFloats, rhs')
+\end{code}
 
+Note [Eta expansion]
+~~~~~~~~~~~~~~~~~~~~~
+Eta expand to match the arity claimed by the binder Remember,
+CorePrep must not change arity
+
+Eta expansion might not have happened already, because it is done by
+the simplifier only when there at least one lambda already.
+
+NB1:we could refrain when the RHS is trivial (which can happen
+    for exported things).  This would reduce the amount of code
+    generated (a little) and make things a little words for
+    code compiled without -O.  The case in point is data constructor
+    wrappers.
+
+NB2: we have to be careful that the result of etaExpand doesn't
+   invalidate any of the assumptions that CorePrep is attempting
+   to establish.  One possible cause is eta expanding inside of
+   an SCC note - we're now careful in etaExpand to make sure the
+   SCC is pushed inside any new lambdas that are generated.
+
+NB3: It's important to do eta expansion, and *then* ANF-ising
+		f = /\a -> g (h 3)	-- h has arity 2
+If we ANF first we get
+		f = /\a -> let s = h 3 in g s
+and now eta expansion gives
+		f = /\a -> \ y -> (let s = h 3 in g s) y
+which is horrible.
+Eta expanding first gives
+		f = /\a -> \y -> let s = h 3 in g s y
+
+\begin{code}
 -- mkLocalNonRec is used only for *nested*, *non-recursive* bindings
 mkLocalNonRec :: Id  -> RhsDemand 	-- Lhs: id with demand
 	      -> Floats -> CoreExpr	-- Rhs: let binds in body
@@ -648,50 +686,6 @@ mkBinds (Floats _ binds) body
     mk_bind (FloatCase bndr rhs _) body = Case rhs bndr (exprType body) [(DEFAULT, [], body)]
     mk_bind (FloatLet bind)        body = Let bind body
 
-etaExpandRhs :: CoreBndr -> CoreExpr -> UniqSM CoreExpr
-etaExpandRhs bndr rhs = do
-   	-- Eta expand to match the arity claimed by the binder
-	-- Remember, CorePrep must not change arity
-	--
-	-- Eta expansion might not have happened already, 
-	-- because it is done by the simplifier only when 
-	-- there at least one lambda already.
-	-- 
-	-- NB1:we could refrain when the RHS is trivial (which can happen
-	--     for exported things).  This would reduce the amount of code
-	--     generated (a little) and make things a little words for
-	--     code compiled without -O.  The case in point is data constructor
-	--     wrappers.
-	--
-	-- NB2: we have to be careful that the result of etaExpand doesn't
-	--    invalidate any of the assumptions that CorePrep is attempting
-	--    to establish.  One possible cause is eta expanding inside of
-	--    an SCC note - we're now careful in etaExpand to make sure the
-	--    SCC is pushed inside any new lambdas that are generated.
-	--
-	-- NB3: It's important to do eta expansion, and *then* ANF-ising
-	--		f = /\a -> g (h 3)	-- h has arity 2
-	-- If we ANF first we get
-	--		f = /\a -> let s = h 3 in g s
-	-- and now eta expansion gives
-	-- 		f = /\a -> \ y -> (let s = h 3 in g s) y
-	-- which is horrible.
-	-- Eta expanding first gives
-	--		f = /\a -> \y -> let s = h 3 in g s y
-	--
-    us <- getUniquesM
-    let eta_rhs = etaExpand arity us rhs (idType bndr)
-
-    ASSERT2( manifestArity eta_rhs == arity, (ppr bndr <+> ppr arity <+> ppr (exprArity rhs)) 
-					      $$ ppr rhs $$ ppr eta_rhs )
-	-- Assertion checks that eta expansion was successful
-      return eta_rhs
-  where
-	-- For a GlobalId, take the Arity from the Id.
-	-- It was set in CoreTidy and must not change
-	-- For all others, just expand at will
-    arity | isGlobalId bndr = idArity bndr
-	  | otherwise	    = exprArity rhs
 
 -- ---------------------------------------------------------------------------
 -- Eliminate Lam as a non-rhs (STG doesn't have such a thing)

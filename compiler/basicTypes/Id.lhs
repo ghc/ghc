@@ -68,7 +68,6 @@ module Id (
 	idArity, 
 	idNewDemandInfo, idNewDemandInfo_maybe,
 	idNewStrictness, idNewStrictness_maybe, 
-	idWorkerInfo,
 	idUnfolding,
 	idSpecialisation, idCoreRules, idHasRules,
 	idCafInfo,
@@ -86,7 +85,6 @@ module Id (
 	setIdArity,
 	setIdNewDemandInfo, 
 	setIdNewStrictness, zapIdNewStrictness,
-	setIdWorkerInfo,
 	setIdSpecialisation,
 	setIdCafInfo,
 	setIdOccInfo, zapIdOccInfo,
@@ -134,7 +132,6 @@ infixl 	1 `setIdUnfolding`,
 	  `setIdArity`,
 	  `setIdNewDemandInfo`,
 	  `setIdNewStrictness`,
-	  `setIdWorkerInfo`,
 	  `setIdSpecialisation`,
 	  `setInlinePragma`,
 	  `idCafInfo`
@@ -532,14 +529,6 @@ isStrictId id
   = ASSERT2( isId id, text "isStrictId: not an id: " <+> ppr id )
            (isStrictDmd (idNewDemandInfo id)) || 
            (isStrictType (idType id))
-
-	---------------------------------
-	-- WORKER ID
-idWorkerInfo :: Id -> WorkerInfo
-idWorkerInfo id = workerInfo (idInfo id)
-
-setIdWorkerInfo :: Id -> WorkerInfo -> Id
-setIdWorkerInfo id work_info = modifyIdInfo (`setWorkerInfo` work_info) id
 
 	---------------------------------
 	-- UNFOLDING

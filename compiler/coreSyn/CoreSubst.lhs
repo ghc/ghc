@@ -12,7 +12,7 @@ module CoreSubst (
 
         -- ** Substituting into expressions and related types
 	deShadowBinds,
-	substTy, substExpr, substSpec, substWorker,
+	substTy, substExpr, substSpec, substUnfolding,
 	lookupIdSubst, lookupTvSubst, 
 
         -- ** Operations on substitutions
@@ -211,7 +211,7 @@ lookupIdSubst (Subst in_scope ids _) v
   | Just e  <- lookupVarEnv ids       v = e
   | Just v' <- lookupInScope in_scope v = Var v'
 	-- Vital! See Note [Extending the Subst]
-  | otherwise = WARN( True, ptext (sLit "CoreSubst.lookupIdSubst") <+> ppr v ) 
+  | otherwise = WARN( True, ptext (sLit "CoreSubst.lookupIdSubst") <+> ppr v $$ ppr in_scope ) 
 		Var v
 
 -- | Find the substitution for a 'TyVar' in the 'Subst'
@@ -474,31 +474,40 @@ substIdInfo :: Subst -> Id -> IdInfo -> Maybe IdInfo
 substIdInfo subst new_id info
   | nothing_to_do = Nothing
   | otherwise     = Just (info `setSpecInfo`   	  substSpec subst new_id old_rules
-			       `setWorkerInfo` 	  substWorker subst old_wrkr
-			       `setUnfoldingInfo` noUnfolding)
+			       `setUnfoldingInfo` substUnfolding subst old_unf)
   where
     old_rules 	  = specInfo info
-    old_wrkr  	  = workerInfo info
-    nothing_to_do = isEmptySpecInfo old_rules &&
-		    not (workerExists old_wrkr) &&
-		    not (hasUnfolding (unfoldingInfo info))
+    old_unf	  = unfoldingInfo info
+    nothing_to_do = isEmptySpecInfo old_rules && isClosedUnfolding old_unf
     
 
 ------------------
--- | Substitutes for the 'Id's within the 'WorkerInfo'
-substWorker :: Subst -> WorkerInfo -> WorkerInfo
-	-- Seq'ing on the returned WorkerInfo is enough to cause all the 
-	-- substitutions to happen completely
+-- | Substitutes for the 'Id's within an unfolding
+substUnfolding :: Subst -> Unfolding -> Unfolding
+	-- Seq'ing on the returned Unfolding is enough to cause
+	-- all the substitutions to happen completely
+substUnfolding subst unf@(InlineRule { uf_tmpl = tmpl, uf_worker = mb_wkr })
+	-- Retain an InlineRule!
+  = seqExpr new_tmpl `seq` 
+    new_mb_wkr `seq`
+    unf { uf_tmpl = new_tmpl, uf_worker = new_mb_wkr }
+  where
+    new_tmpl   = substExpr subst tmpl
+    new_mb_wkr = case mb_wkr of
+		  Nothing -> Nothing
+		  Just w  -> subst_wkr w
 
-substWorker _ NoWorker
-  = NoWorker
-substWorker subst (HasWorker w a)
-  = case lookupIdSubst subst w of
-	Var w1 -> HasWorker w1 a
-	other  -> WARN( not (exprIsTrivial other), text "CoreSubst.substWorker:" <+> ppr w )
-		  NoWorker	-- Worker has got substituted away altogether
-				-- (This can happen if it's trivial, 
-				--  via postInlineUnconditionally, hence warning)
+    subst_wkr w = case lookupIdSubst subst w of
+		    Var w1 -> Just w1
+		    other  -> WARN( not (exprIsTrivial other), text "CoreSubst.substWorker:" <+> ppr w )
+			      Nothing	-- Worker has got substituted away altogether
+					-- (This can happen if it's trivial, 
+					--  via postInlineUnconditionally, hence warning)
+
+substUnfolding _ (CoreUnfolding {}) = NoUnfolding	-- Discard
+	-- Always zap a CoreUnfolding, to save substitution work
+
+substUnfolding _ unf = unf	-- Otherwise no substitution to do
 
 ------------------
 -- | Substitutes for the 'Id's within the 'WorkerInfo' given the new function 'Id'
@@ -512,7 +521,7 @@ substSpec subst new_fn (SpecInfo rules rhs_fvs)
     do_subst rule@(BuiltinRule {}) = rule
     do_subst rule@(Rule { ru_bndrs = bndrs, ru_args = args, ru_rhs = rhs })
 	= rule { ru_bndrs = bndrs', 
-		 ru_fn = new_name, 	-- Important: the function may have changed its name!
+		 ru_fn    = new_name, 	-- Important: the function may have changed its name!
 		 ru_args  = map (substExpr subst') args,
 		 ru_rhs   = substExpr subst' rhs }
 	where

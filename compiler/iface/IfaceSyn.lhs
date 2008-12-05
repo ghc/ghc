@@ -9,7 +9,7 @@ module IfaceSyn (
 
 	IfaceDecl(..), IfaceClassOp(..), IfaceConDecl(..), IfaceConDecls(..),
 	IfaceExpr(..), IfaceAlt, IfaceNote(..), IfaceLetBndr(..),
-	IfaceBinding(..), IfaceConAlt(..), IfaceIdInfo(..),
+	IfaceBinding(..), IfaceConAlt(..), IfaceIdInfo(..), IfaceUnfolding(..),
 	IfaceInfoItem(..), IfaceRule(..), IfaceAnnotation(..), IfaceAnnTarget,
 	IfaceInst(..), IfaceFamInst(..),
 
@@ -192,14 +192,17 @@ data IfaceInfoItem
   = HsArity	 Arity
   | HsStrictness StrictSig
   | HsInline     Activation
-  | HsUnfold	 IfaceExpr
+  | HsUnfold	 IfaceUnfolding
   | HsNoCafRefs
-  | HsWorker	 Name Arity	-- Worker, if any see IdInfo.WorkerInfo
-					-- for why we want arity here.
-	-- NB: we need IfaceExtName (not just OccName) because the worker
-	--     can simplify to a function in another module.
+
 -- NB: Specialisations and rules come in separately and are
 -- only later attached to the Id.  Partial reason: some are orphans.
+
+data IfaceUnfolding 
+  = IfCoreUnfold IfaceExpr
+  | IfInlineRule Arity IfaceExpr
+  | IfWrapper    Arity Name	  -- NB: we need a Name (not just OccName) because the worker
+				  --     can simplify to a function in another module.
 
 --------------------------------
 data IfaceExpr
@@ -218,7 +221,6 @@ data IfaceExpr
   | IfaceTick   Module Int
 
 data IfaceNote = IfaceSCC CostCentre
-	       | IfaceInlineMe
                | IfaceCoreNote String
 
 type IfaceAlt = (IfaceConAlt, [FastString], IfaceExpr)
@@ -629,7 +631,6 @@ pprIfaceApp fun	 	       args = sep (pprIfaceExpr parens fun : args)
 ------------------
 instance Outputable IfaceNote where
     ppr (IfaceSCC cc)     = pprCostCentreCore cc
-    ppr IfaceInlineMe     = ptext (sLit "__inline_me")
     ppr (IfaceCoreNote s) = ptext (sLit "__core_note") <+> pprHsString (mkFastString s)
 
 
@@ -646,13 +647,16 @@ instance Outputable IfaceIdInfo where
   ppr (HasInfo is) = ptext (sLit "{-") <+> fsep (map ppr is) <+> ptext (sLit "-}")
 
 instance Outputable IfaceInfoItem where
-  ppr (HsUnfold unf)  	 = ptext (sLit "Unfolding:") <+>
-				  	parens (pprIfaceExpr noParens unf)
+  ppr (HsUnfold unf)  	 = ptext (sLit "Unfolding:") <+> ppr unf
   ppr (HsInline act)     = ptext (sLit "Inline:") <+> ppr act
   ppr (HsArity arity)    = ptext (sLit "Arity:") <+> int arity
   ppr (HsStrictness str) = ptext (sLit "Strictness:") <+> pprIfaceStrictSig str
   ppr HsNoCafRefs	 = ptext (sLit "HasNoCafRefs")
-  ppr (HsWorker w a)	 = ptext (sLit "Worker:") <+> ppr w <+> int a
+
+instance Outputable IfaceUnfolding where
+  ppr (IfCoreUnfold e)   = parens (ppr e)
+  ppr (IfInlineRule a e) = ptext (sLit "INLINE:") <+> parens (ptext (sLit "arity") <+> int a) <+> parens (ppr e)
+  ppr (IfWrapper a wkr)  = ptext (sLit "Worker:") <+> ppr wkr <+> parens (ptext (sLit "arity") <+> int a)
 
 
 -- -----------------------------------------------------------------------------
@@ -756,9 +760,13 @@ freeNamesIfIdInfo NoInfo = emptyNameSet
 freeNamesIfIdInfo (HasInfo i) = fnList freeNamesItem i
 
 freeNamesItem :: IfaceInfoItem -> NameSet
-freeNamesItem (HsUnfold u)     = freeNamesIfExpr u
-freeNamesItem (HsWorker wkr _) = unitNameSet wkr
+freeNamesItem (HsUnfold u)     = freeNamesIfUnfold u
 freeNamesItem _                = emptyNameSet
+
+freeNamesIfUnfold :: IfaceUnfolding -> NameSet
+freeNamesIfUnfold (IfCoreUnfold e)   = freeNamesIfExpr e
+freeNamesIfUnfold (IfInlineRule _ e) = freeNamesIfExpr e
+freeNamesIfUnfold (IfWrapper _ v)    = unitNameSet v
 
 freeNamesIfExpr :: IfaceExpr -> NameSet
 freeNamesIfExpr (IfaceExt v)	  = unitNameSet v

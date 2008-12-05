@@ -547,6 +547,15 @@ checkHiBootIface
 		-- Check the exports of the boot module, one by one
 	; mapM_ check_export boot_exports
 
+		-- Check instance declarations
+	; mb_dfun_prs <- mapM check_inst boot_insts
+	; let tcg_env' = tcg_env { tcg_binds    = binds `unionBags` dfun_binds,
+				   tcg_type_env = extendTypeEnvWithIds local_type_env boot_dfuns }
+	      dfun_prs   = catMaybes mb_dfun_prs
+	      boot_dfuns = map fst dfun_prs
+	      dfun_binds = listToBag [ mkVarBind boot_dfun (nlHsVar dfun)
+				     | (boot_dfun, dfun) <- dfun_prs ]
+
 		-- Check for no family instances
 	; unless (null boot_fam_insts) $
 	    panic ("TcRnDriver.checkHiBootIface: Cannot handle family " ++
@@ -561,7 +570,7 @@ checkHiBootIface
 	      final_type_env = extendTypeEnvWithIds local_type_env boot_dfuns
 	      dfun_prs   = catMaybes mb_dfun_prs
 	      boot_dfuns = map fst dfun_prs
-	      dfun_binds = listToBag [ noLoc $ VarBind boot_dfun (nlHsVar dfun)
+	      dfun_binds = listToBag [ mkVarBind boot_dfun (nlHsVar dfun)
 				     | (boot_dfun, dfun) <- dfun_prs ]
 
         ; failIfErrsM
@@ -905,7 +914,7 @@ check_main dflags tcg_env
 						    (mkTyConApp ioTyCon [res_ty])
 	      ; co  = mkWpTyApps [res_ty]
 	      ; rhs = nlHsApp (mkLHsWrap co (nlHsVar run_main_id)) main_expr
-	      ; main_bind = noLoc (VarBind root_main_id rhs) }
+	      ; main_bind = mkVarBind root_main_id rhs }
 
 	; return (tcg_env { tcg_binds = tcg_binds tcg_env 
 					`snocBag` main_bind,

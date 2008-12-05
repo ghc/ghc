@@ -224,6 +224,8 @@ tcDefMeth rigid_info clas tyvars theta this_dict binds_in sig_fn prag_fn sel_id
 	      meth_sig_fn  _ = sig_fn sel_name
 	      meth_prag_fn _ = prag_fn sel_name
 
+		-- See Note [Silly default-method bind]
+		-- (possibly out of date)
 	; (top_dm_id, bind) <- tcInstanceMethodBody rigid_info
 			   clas tyvars [this_dict] theta (mkTyVarTys tyvars)
 			   Nothing sel_id
@@ -365,7 +367,6 @@ gives rise to the instance declarations
 
 	instance C 1 where
 	  op Unit      = ...
-
 
 \begin{code}
 mkGenericDefMethBind :: Class -> [Type] -> Id -> Name -> TcM (LHsBind Name)

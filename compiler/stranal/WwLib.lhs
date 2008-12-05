@@ -134,8 +134,8 @@ mkWwBodies fun_ty demands res_info one_shots
 
 	; let (work_lam_args, work_call_args) = mkWorkerArgs work_args res_ty
 	; return ([idNewDemandInfo v | v <- work_call_args, isIdVar v],
-                  Note InlineMe . wrap_fn_args . wrap_fn_cpr . wrap_fn_str . applyToVars work_call_args . Var,
-                  mkLams work_lam_args. work_fn_str . work_fn_cpr . work_fn_args) }
+              	  wrap_fn_args . wrap_fn_cpr . wrap_fn_str . applyToVars work_call_args . Var,
+              	  mkLams work_lam_args. work_fn_str . work_fn_cpr . work_fn_args) }
         -- We use an INLINE unconditionally, even if the wrapper turns out to be
         -- something trivial like
         --      fw = ...

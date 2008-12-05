@@ -131,7 +131,9 @@ data HsBindLR idL idR
 
   | VarBind {	-- Dictionary binding and suchlike 
 	var_id :: idL,		-- All VarBinds are introduced by the type checker
-	var_rhs :: LHsExpr idR	-- Located only for consistency
+	var_rhs :: LHsExpr idR,	-- Located only for consistency
+	var_inline :: Bool	-- True <=> inline this binding regardless
+				--	(used for implication constraints)
     }
 
   | AbsBinds {					-- Binds abstraction; TRANSLATION
@@ -353,7 +355,6 @@ data HsWrapper
 
   | WpLam Var	 		-- \d. []	the 'd' is a type-class dictionary or coercion variable
   | WpTyLam TyVar 		-- \a. []	the 'a' is a type variable (not coercion var)
-  | WpInline			-- inline_me []   Wrap inline around the thing
 
 	-- Non-empty bindings, so that the identity coercion
 	-- is always exactly WpHole
@@ -374,7 +375,6 @@ pprHsWrapper it wrap =
         help it (WpLam id)    = sep [ptext (sLit "\\") <> pprBndr LambdaBind id <> dot, it]
         help it (WpTyLam tv)  = sep [ptext (sLit "/\\") <> pprBndr LambdaBind tv <> dot, it]
         help it (WpLet binds) = sep [ptext (sLit "let") <+> braces (ppr binds), it]
-        help it WpInline      = sep [ptext (sLit "_inline_me_"), it]
     in
       -- in debug mode, print the wrapper
       -- otherwise just print what's inside

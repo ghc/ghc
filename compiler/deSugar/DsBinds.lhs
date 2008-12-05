@@ -29,6 +29,7 @@ import HsSyn		-- lots of things
 import CoreSyn		-- lots of things
 import MkCore
 import CoreUtils
+import CoreUnfold
 import CoreFVs
 
 import TcHsSyn	( mkArbitraryType )	-- Mis-placed?
@@ -48,7 +49,7 @@ import Bag
 import BasicTypes hiding ( TopLevel )
 import FastString
 import StaticFlags	( opt_DsMultiTyVar )
-import Util		( mapSnd, mapAndUnzip, lengthExceeds )
+import Util		( mapSnd, count, mapAndUnzip, lengthExceeds )
 
 import Control.Monad
 import Data.List
@@ -70,6 +71,7 @@ dsLHsBinds binds = ds_lhs_binds NoSccs binds
 
 ------------------------
 ds_lhs_binds :: AutoScc -> LHsBinds Id -> DsM [(Id,CoreExpr)]
+
 	 -- scc annotation policy (see below)
 ds_lhs_binds auto_scc binds =  foldM (dsLHsBind auto_scc) [] (bagToList binds)
 
@@ -85,25 +87,30 @@ dsHsBind :: AutoScc
 	 -> HsBind Id
 	 -> DsM [(Id,CoreExpr)] -- Result
 
-dsHsBind _ rest (VarBind var expr) = do
-    core_expr <- dsLExpr expr
+dsHsBind _ rest (VarBind var expr inline_regardless)
+  = do	{ core_expr <- dsLExpr expr
 
-        -- Dictionary bindings are always VarMonoBinds, so
-        -- we only need do this here
-    core_expr' <- addDictScc var core_expr
-    return ((var, core_expr') : rest)
+	        -- Dictionary bindings are always VarBinds,
+	        -- so we only need do this here
+	; core_expr' <- addDictScc var core_expr
+	; let var' | inline_regardless = var `setIdUnfolding` mkCompulsoryUnfolding core_expr'
+		   | otherwise	       = var
 
-dsHsBind _ rest (FunBind { fun_id = L _ fun, fun_matches = matches, 
-				  fun_co_fn = co_fn, fun_tick = tick, fun_infix = inf }) = do
-    (args, body) <- matchWrapper (FunRhs (idName fun) inf) matches
-    body' <- mkOptTickBox tick body
-    rhs <- dsCoercion co_fn (return (mkLams args body'))
-    return ((fun,rhs) : rest)
+	; return ((var', core_expr') : rest) }
 
-dsHsBind _ rest (PatBind { pat_lhs = pat, pat_rhs = grhss, pat_rhs_ty = ty }) = do
-    body_expr <- dsGuarded grhss ty
-    sel_binds <- mkSelectorBinds pat body_expr
-    return (sel_binds ++ rest)
+dsHsBind _ rest 
+	 (FunBind { fun_id = L _ fun, fun_matches = matches, 
+		    fun_co_fn = co_fn, fun_tick = tick, fun_infix = inf }) 
+ = do	{ (args, body) <- matchWrapper (FunRhs (idName fun) inf) matches
+	; body' <- mkOptTickBox tick body
+	; rhs   <- dsCoercion co_fn (return (mkLams args body'))
+	; return ((fun,rhs) : rest) }
+
+dsHsBind _ rest 
+	 (PatBind { pat_lhs = pat, pat_rhs = grhss, pat_rhs_ty = ty })
+  = do	{ body_expr <- dsGuarded grhss ty
+	; sel_binds <- mkSelectorBinds pat body_expr
+	; return (sel_binds ++ rest) }
 
 {-  Note [Rules and inlining]
     ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -132,10 +139,14 @@ dsHsBind _ rest (PatBind { pat_lhs = pat, pat_rhs = grhss, pat_rhs_ty = ty }) = 
 dsHsBind auto_scc rest (AbsBinds [] [] exports binds)
   = do	{ core_prs <- ds_lhs_binds NoSccs binds
 	; let env = mkABEnv exports
-	      do_one (lcl_id, rhs) | Just (_, gbl_id, _, prags) <- lookupVarEnv env lcl_id
-				   = addInlinePrags prags gbl_id $
-				     addAutoScc auto_scc gbl_id rhs
-				   | otherwise = (lcl_id, rhs)
+	      ar_env = mkArityEnv binds
+	      do_one (lcl_id, rhs) 
+		| Just (_, gbl_id, _, prags) <- lookupVarEnv env lcl_id
+		= makeCorePair gbl_id (lookupArity ar_env lcl_id) prags $
+		  addAutoScc auto_scc gbl_id rhs
+
+		| otherwise = (lcl_id, rhs)
+
 	      locals'  = [(lcl_id, Var gbl_id) | (_, gbl_id, lcl_id, _) <- exports]
 			-- Note [Rules and inlining]
 	; return (map do_one core_prs ++ locals' ++ rest) }
@@ -203,17 +214,18 @@ dsHsBind auto_scc rest (AbsBinds tyvars [] exports binds)
 		where
 		  fvs = exprSomeFreeVars (`elemVarSet` bndrs) rhs
 
+	      ar_env = mkArityEnv binds
 	      env = mkABEnv exports
 
 	      do_one (lcl_id, rhs) 
 		| Just (id_tvs, gbl_id, _, prags) <- lookupVarEnv env lcl_id
-		= (NonRec lcl_id (mkTyApps (Var gbl_id) (mkTyVarTys id_tvs)),
-		   addInlinePrags prags gbl_id $
-		   addAutoScc auto_scc gbl_id  $
-		   mkLams id_tvs $
-		   mkLets [ NonRec tv (Type (lookupVarEnv_NF arby_env tv))
-		          | tv <- tyvars, not (tv `elem` id_tvs)] $
-	           add_lets rhs)
+		= let rhs' = addAutoScc auto_scc gbl_id  $
+			     mkLams id_tvs $
+			     mkLets [ NonRec tv (Type (lookupVarEnv_NF arby_env tv))
+			            | tv <- tyvars, not (tv `elem` id_tvs)] $
+		             add_lets rhs
+		  in (NonRec lcl_id (mkTyApps (Var gbl_id) (mkTyVarTys id_tvs)),
+		      makeCorePair gbl_id (lookupArity ar_env lcl_id) prags rhs')
 		| otherwise
 		= (NonRec lcl_id (mkTyApps (Var non_exp_gbl_id) (mkTyVarTys tyvars)),
 		   (non_exp_gbl_id, mkLams tyvars (add_lets rhs)))
@@ -224,30 +236,35 @@ dsHsBind auto_scc rest (AbsBinds tyvars [] exports binds)
 
 	-- Another common case: one exported variable
 	-- Non-recursive bindings come through this way
+	-- So do self-recursive bindings, and recursive bindings
+	-- that have been chopped up with type signatures
 dsHsBind auto_scc rest
      (AbsBinds all_tyvars dicts [(tyvars, global, local, prags)] binds)
-  = ASSERT( all (`elem` tyvars) all_tyvars ) do
-    core_prs <- ds_lhs_binds NoSccs binds
-    let
-        -- Always treat the binds as recursive, because the typechecker
-        -- makes rather mixed-up dictionary bindings
-        core_bind = Rec core_prs
+  = ASSERT( all (`elem` tyvars) all_tyvars )
+    do	{ core_prs <- ds_lhs_binds NoSccs binds
+
+	; let	-- Always treat the binds as recursive, because the typechecker
+	        -- makes rather mixed-up dictionary bindings
+	        core_bind = Rec core_prs
+		inl_arity = lookupArity (mkArityEnv binds) local
     
-    mb_specs <- mapM (dsSpec all_tyvars dicts tyvars global local core_bind) prags
-    let
-        (spec_binds, rules) = unzip (catMaybes mb_specs)
-        global' = addIdSpecialisations global rules
-        rhs'    = mkLams tyvars $ mkLams dicts $ Let core_bind (Var local)
-        bind    = addInlinePrags prags global' $ addAutoScc auto_scc global' rhs'
+	; mb_specs <- mapM (dsSpec all_tyvars dicts tyvars global 
+				   local inl_arity core_bind) prags
+
+	; let   (spec_binds, rules) = unzip (catMaybes mb_specs)
+	        global'   = addIdSpecialisations global rules
+	        rhs       = addAutoScc auto_scc global $
+			    mkLams tyvars $ mkLams dicts $ Let core_bind (Var local)
+		main_bind = makeCorePair global' (inl_arity + length dicts) prags rhs
     
-    return (bind  : spec_binds ++ rest)
+	; return (main_bind : spec_binds ++ rest) }
 
 dsHsBind auto_scc rest (AbsBinds all_tyvars dicts exports binds)
   = do	{ core_prs <- ds_lhs_binds NoSccs binds
 	; let env = mkABEnv exports
-	      do_one (lcl_id,rhs) | Just (_, gbl_id, _, prags) <- lookupVarEnv env lcl_id
-			          = addInlinePrags prags lcl_id $
-				    addAutoScc auto_scc gbl_id rhs
+	      ar_env = mkArityEnv binds
+	      do_one (lcl_id,rhs) | Just (_, gbl_id, _, _prags) <- lookupVarEnv env lcl_id
+			          = (lcl_id, addAutoScc auto_scc gbl_id rhs)
 				  | otherwise = (lcl_id,rhs)
 	       
 		-- Rec because of mixed-up dictionary bindings
@@ -260,6 +277,12 @@ dsHsBind auto_scc rest (AbsBinds all_tyvars dicts exports binds)
 	      locals        = [local | (_, _, local, _) <- exports]
 	      local_tys     = map idType locals
 
+	      inl_prags :: [(Id, SrcSpan)]
+	      inl_prags = [(id, loc) | (_, id, _, prags) <- exports
+				     , L loc (InlinePrag {}) <- prags ]
+
+	; mapM_ discardedInlineWarning inl_prags
+
 	; poly_tup_id <- newSysLocalDs (exprType poly_tup_expr)
 
 	; let dict_args = map Var dicts
@@ -271,7 +294,8 @@ dsHsBind auto_scc rest (AbsBinds all_tyvars dicts exports binds)
 		     ; let substitute = substTyWith all_tyvars ty_args
 		     ; locals' <- newSysLocalsDs (map substitute local_tys)
 		     ; tup_id  <- newSysLocalDs  (substitute tup_ty)
-		     ; mb_specs <- mapM (dsSpec all_tyvars dicts tyvars global local core_bind) 
+		     ; mb_specs <- mapM (dsSpec all_tyvars dicts tyvars global local 
+					        (lookupArity ar_env local) core_bind) 
 				      	 prags
 		     ; let (spec_binds, rules) = unzip (catMaybes mb_specs)
 			   global' = addIdSpecialisations global rules
@@ -285,19 +309,60 @@ dsHsBind auto_scc rest (AbsBinds all_tyvars dicts exports binds)
 	      		| otherwise		  = dsMkArbitraryType all_tyvar
 
 	; export_binds_s <- mapM mk_bind (exports `zip` [0..])
-	     -- don't scc (auto-)annotate the tuple itself.
+	     -- Don't scc (auto-)annotate the tuple itself.
 
 	; return ((poly_tup_id, poly_tup_expr) : 
 		    (concat export_binds_s ++ rest)) }
 
-mkABEnv :: [([TyVar], Id, Id, [LPrag])] -> VarEnv ([TyVar], Id, Id, [LPrag])
+------------------------
+makeCorePair :: Id-> Arity -> [LPrag] -> CoreExpr -> (Id, CoreExpr)
+makeCorePair gbl_id arity prags rhs
+  = (addInline gbl_id arity rhs prags, rhs)
+
+------------------------
+discardedInlineWarning :: (Id, SrcSpan) -> DsM ()
+discardedInlineWarning (id, loc) 
+  = putSrcSpanDs loc $
+    warnDs $ sep [ ptext (sLit "Discarding INLINE pragma for") <+> ppr id
+		 , ptext (sLit "because it is bound by a pattern, or a mutual recursion") ]
+
+------------------------
+type AbsBindEnv = VarEnv ([TyVar], Id, Id, [LPrag])
+	-- Maps the "lcl_id" for an AbsBind to
+	-- its "gbl_id" and associated pragmas, if any
+
+mkABEnv :: [([TyVar], Id, Id, [LPrag])] -> AbsBindEnv
 -- Takes the exports of a AbsBinds, and returns a mapping
 --	lcl_id -> (tyvars, gbl_id, lcl_id, prags)
 mkABEnv exports = mkVarEnv [ (lcl_id, export) | export@(_, _, lcl_id, _) <- exports]
 
+mkArityEnv :: LHsBinds Id -> IdEnv Arity
+	-- Maps a local to the arity of its definition
+mkArityEnv binds = mkVarEnv (mapCatMaybes get_arity (bagToList binds))
+  where
+    get_arity (L _ (FunBind { fun_id = id, fun_matches = ms })) = Just (unLoc id, matchGroupArity ms)
+    get_arity _ = Nothing
 
+lookupArity :: IdEnv Arity -> Id -> Arity
+lookupArity ar_env id = lookupVarEnv ar_env id `orElse` 0
+
+addInline :: Id -> Arity -> CoreExpr -> [LPrag] -> Id
+addInline id arity rhs prags
+  = case [inl | L _ (InlinePrag inl) <- prags] of
+      []             -> id
+      (inl_spec : _) -> addInlineToId id arity rhs inl_spec
+
+addInlineToId :: Id -> Arity -> CoreExpr -> InlineSpec -> Id
+addInlineToId id inl_arity rhs (Inline phase is_inline)
+  = id `setInlinePragma` phase
+       `setIdUnfolding`  inline_rule
+  where
+    inline_rule | is_inline = mkInlineRule rhs inl_arity
+		| otherwise = noUnfolding
+
+------------------------
 dsSpec :: [TyVar] -> [DictId] -> [TyVar]
-       -> Id -> Id		-- Global, local
+       -> Id -> Id -> Arity		-- Global, local, arity of local
        -> CoreBind -> LPrag
        -> DsM (Maybe ((Id,CoreExpr), 	-- Binding for specialised Id
 		      CoreRule))	-- Rule for the Global Id
@@ -325,10 +390,10 @@ dsSpec :: [TyVar] -> [DictId] -> [TyVar]
 --
 -- It is *possible* that 'es' does not mention all of the dictionaries 'ds'
 -- (a bit silly, because then the 
-dsSpec _ _ _ _ _ _ (L _ (InlinePrag {}))
+dsSpec _ _ _ _ _ _ _ (L _ (InlinePrag {}))
   = return Nothing
 
-dsSpec all_tvs dicts tvs poly_id mono_id mono_bind
+dsSpec all_tvs dicts tvs poly_id mono_id inl_arity mono_bind
        (L loc (SpecPrag spec_expr spec_ty inl))
   = putSrcSpanDs loc $ 
     do	{ let poly_name = idName poly_id
@@ -350,6 +415,8 @@ dsSpec all_tvs dicts tvs poly_id mono_id mono_bind
 			-- Very important to make the 'f' non-exported,
 			-- else it won't be inlined!
 		  spec_id     = mkLocalId spec_name spec_ty
+		  spec_id1    = addInlineToId spec_id (inl_arity + count isDictId bndrs) 
+					      spec_rhs inl
 		  spec_rhs    = Let (NonRec local_poly poly_f_body) ds_spec_expr
 		  poly_f_body = mkLams (tvs ++ dicts) f_body
 			   	
@@ -362,7 +429,7 @@ dsSpec all_tvs dicts tvs poly_id mono_id mono_bind
 				AlwaysActive poly_name
 			        (extra_dict_bndrs ++ bndrs) args
 				(mkVarApps (Var spec_id) bndrs)
-	; return (Just (addInlineInfo inl spec_id spec_rhs, rule))
+	; return (Just ((spec_id1, spec_rhs), rule))
 	} } } }
   where
 	-- Bind to Any any of all_ptvs that aren't 
@@ -508,23 +575,6 @@ simpleSubst subst expr
     go (Let (Rec pairs) body)       = Let (Rec (mapSnd go pairs)) (go body)
     go (Case scrut bndr ty alts)    = Case (go scrut) bndr ty 
 					   [(c,bs,go r) | (c,bs,r) <- alts]
-
-addInlinePrags :: [LPrag] -> Id -> CoreExpr -> (Id,CoreExpr)
-addInlinePrags prags bndr rhs
-  = case [inl | L _ (InlinePrag inl) <- prags] of
-	[]      -> (bndr, rhs)
-	(inl:_) -> addInlineInfo inl bndr rhs
-
-addInlineInfo :: InlineSpec -> Id -> CoreExpr -> (Id,CoreExpr)
-addInlineInfo (Inline phase is_inline) bndr rhs
-  = (attach_phase bndr phase, wrap_inline is_inline rhs)
-  where
-    attach_phase bndr phase 
-	| isAlwaysActive phase = bndr	-- Default phase
-	| otherwise  	       = bndr `setInlinePragma` phase
-
-    wrap_inline True  body = mkInlineMe body
-    wrap_inline False body = body
 \end{code}
 
 
@@ -595,8 +645,6 @@ dsCoercion (WpApp v)         thing_inside
 		{- An Id -}		       ; return (App expr (Var v)) }
 dsCoercion (WpTyApp ty)      thing_inside = do { expr <- thing_inside
 					       ; return (App expr (Type ty)) }
-dsCoercion WpInline 	     thing_inside = do { expr <- thing_inside
-					       ; return (mkInlineMe expr) }
 dsCoercion (WpLet bs)        thing_inside = do { prs <- dsLHsBinds bs
 					       ; expr <- thing_inside
 					       ; return (Let (Rec prs) expr) }
