@@ -728,6 +728,30 @@ staticClosureNeedsLink (ConInfo { closureSMRep = sm_rep, closureCon = con })
 	   _other			-> True
 \end{code}
 
+Note [Entering error thunks]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this
+
+	fail :: Int
+	fail = error Int "Urk"
+
+	foo :: Bool -> Bool 
+	foo True  y = (fail `cast` Bool -> Bool) y
+	foo False y = False
+
+This looks silly, but it can arise from case-of-error.  Even if it
+does, we'd usually see that 'fail' is a bottoming function and would
+discard the extra argument 'y'.  But even if that does not occur,
+this program is still OK.  We will enter 'fail', which never returns.
+
+The WARN is just to alert me to the fact that we aren't spotting that
+'fail' is bottoming.
+
+(We are careful never to make a funtion value look like a data type,
+because we can't enter a function closure -- but that is not the 
+problem here.)
+
+
 Avoiding generating entries and info tables
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 At present, for every function we generate all of the following,
