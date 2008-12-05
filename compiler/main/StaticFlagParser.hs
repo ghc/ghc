@@ -180,6 +180,7 @@ isStaticFlag f =
     "fsimple-list-literals",
     "fno-ds-multi-tyvar",
     "fruntime-types",
+    "fpass-case-bndr-to-join-points",
     "fno-pre-inlining",
     "fexcess-precision",
     "static",

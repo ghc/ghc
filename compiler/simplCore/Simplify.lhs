@@ -35,6 +35,8 @@ import BasicTypes       ( TopLevelFlag(..), isTopLevel,
                           RecFlag(..), isNonRuleLoopBreaker )
 import Maybes           ( orElse )
 import Data.List        ( mapAccumL )
+import MonadUtils	( foldlM )
+import StaticFlags	( opt_PassCaseBndrToJoinPoints )
 import Outputable
 import FastString
 \end{code}
@@ -1888,39 +1890,96 @@ mkDupableAlts env case_bndr' the_alts
 
 mkDupableAlt :: SimplEnv -> OutId -> (AltCon, [CoreBndr], CoreExpr)
               -> SimplM (SimplEnv, (AltCon, [CoreBndr], CoreExpr))
-mkDupableAlt env case_bndr' (con, bndrs', rhs')
-  | exprIsDupable rhs'  -- Note [Small alternative rhs]
-  = return (env, (con, bndrs', rhs'))
+mkDupableAlt env case_bndr1 (con, bndrs1, rhs1)
+  | exprIsDupable rhs1  -- Note [Small alternative rhs]
+  = return (env, (con, bndrs1, rhs1))
   | otherwise
-  = do  { let rhs_ty'     = exprType rhs'
-              used_bndrs' = filter abstract_over (case_bndr' : bndrs')
-              abstract_over bndr
+  = do  { let abstract_over bndr
                   | isTyVar bndr = True -- Abstract over all type variables just in case
                   | otherwise    = not (isDeadBinder bndr)
                         -- The deadness info on the new Ids is preserved by simplBinders
 
-        ; (final_bndrs', final_args)    -- Note [Join point abstraction]
-                <- if (any isId used_bndrs')
-                   then return (used_bndrs', varsToCoreExprs used_bndrs')
-                    else do { rw_id <- newId (fsLit "w") realWorldStatePrimTy
-                            ; return ([rw_id], [Var realWorldPrimId]) }
+              inst_tys1 = tyConAppArgs (idType case_bndr1)
+              con_app dc = mkConApp dc (map Type inst_tys1 ++ varsToCoreExprs bndrs1)
 
-        ; join_bndr <- newId (fsLit "$j") (mkPiTypes final_bndrs' rhs_ty')
+	      (rhs2, final_bndrs)   -- See Note [Passing the case binder to join points]
+	         | isDeadBinder case_bndr1
+		 = (rhs1, filter abstract_over bndrs1)
+	         | opt_PassCaseBndrToJoinPoints, not (null bndrs1)
+		 = (rhs1, (case_bndr1 : filter abstract_over bndrs1))
+		 | otherwise 
+                 = case con of
+		     DataAlt dc -> (Let (NonRec case_bndr1 (con_app dc)) rhs1, bndrs1)
+		     LitAlt lit -> ASSERT( null bndrs1 ) (Let (NonRec case_bndr1 (Lit lit)) rhs1, [])
+		     DEFAULT    -> ASSERT( null bndrs1 ) (rhs1, [case_bndr1])
+
+        ; (final_bndrs1, final_args)    -- Note [Join point abstraction]
+                <- if (any isId final_bndrs)
+                   then return (final_bndrs, varsToCoreExprs final_bndrs)
+                    else do { rw_id <- newId (fsLit "w") realWorldStatePrimTy
+                            ; return (rw_id : final_bndrs,  
+			              Var realWorldPrimId : varsToCoreExprs final_bndrs) }
+
+        ; let rhs_ty1 = exprType rhs1
+        ; join_bndr <- newId (fsLit "$j") (mkPiTypes final_bndrs1 rhs_ty1)
                 -- Note [Funky mkPiTypes]
 
         ; let   -- We make the lambdas into one-shot-lambdas.  The
                 -- join point is sure to be applied at most once, and doing so
                 -- prevents the body of the join point being floated out by
                 -- the full laziness pass
-                really_final_bndrs     = map one_shot final_bndrs'
+                really_final_bndrs     = map one_shot final_bndrs1
                 one_shot v | isId v    = setOneShotLambda v
                            | otherwise = v
-                join_rhs  = mkLams really_final_bndrs rhs'
+                join_rhs  = mkLams really_final_bndrs rhs2
                 join_call = mkApps (Var join_bndr) final_args
 
-        ; return (addPolyBind NotTopLevel env (NonRec join_bndr join_rhs), (con, bndrs', join_call)) }
+	; env1 <- addPolyBind NotTopLevel env (NonRec join_bndr join_rhs)
+        ; return (env1, (con, bndrs1, join_call)) }
                 -- See Note [Duplicated env]
 \end{code}
+
+Note [Passing the case binder to join points]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have
+   case e of cb { C1 -> r1[cb]; C2 x y z -> r2[cb,x] }
+and we want to make join points for the two alternatives, 
+which mention the case binder 'cb'.  Should we pass 'cb' to
+the join point, or reconstruct it? Here are the two alternatives 
+for the C2 alternative:
+
+  Plan A(pass cb):         j2 cb x = r2[cb,x]
+
+  Plan B(reconstruct cb):  j2 x y z = let cb = C2 x y z in r2[cb,x]
+
+The advantge of Plan B is that we can "see" the definition of cb
+in r2, and that may be important when we inline stuff in r2.  The
+disadvantage is that if this optimisation doesn't happen, we end up
+re-allocating C2, when it already exists.  This does happen occasionally;
+an example is the function nofib/spectral/cichelli/Auxil.$whinsert.
+
+Plan B is always better if the constructor is nullary.
+
+In both cases we don't have liveness info for cb on a branch-by-branch
+basis, and it's possible that 'cb' is used in some branches but not
+others.  Well, the absence analyser will find that out later, so it's
+not too bad.
+
+Sadly, at the time of writing, neither choice seems an unequivocal
+win. Here are nofib results, for adding -fpass-case-bndr-to-join-points
+(all others are zero effect):
+
+        Program           Size    Allocs   Runtime   Elapsed
+--------------------------------------------------------------------------------
+       cichelli          +0.0%     -4.4%      0.13      0.13
+            pic          +0.0%     -0.7%      0.01      0.04
+      transform          -0.0%     +2.8%     -0.4%     -9.1%
+      wave4main          +0.0%    +10.5%     +3.1%     +3.4%
+--------------------------------------------------------------------------------
+            Min          -0.0%     -4.4%     -7.0%    -31.9%
+            Max          +0.1%    +10.5%     +3.1%    +15.0%
+ Geometric Mean          +0.0%     +0.1%     -1.7%     -6.1%
+
 
 Note [Duplicated env]
 ~~~~~~~~~~~~~~~~~~~~~
