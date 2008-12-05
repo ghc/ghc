@@ -566,8 +566,8 @@ data Activation = NeverActive
 data InlineSpec
   = Inline 
 	Activation	-- Says during which phases inlining is allowed
-	Bool 		-- True <=> make the RHS look small, so that when inlining
-			--	    is enabled, it will definitely actually happen
+	Bool 		-- True  <=> INLINE
+			-- False <=> NOINLINE
   deriving( Eq )
 
 defaultInlineSpec, alwaysInlineSpec, neverInlineSpec :: InlineSpec
