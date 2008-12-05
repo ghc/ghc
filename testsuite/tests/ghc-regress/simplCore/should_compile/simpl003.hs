@@ -39,4 +39,4 @@ mapI f (x:xs) = f x           `thenI` ( \ fx ->
 {-# INLINE failI #-}
 {-# INLINE thenI #-}
 {-# INLINE tickI #-}
-{-# INLINE mapI #-}
+-- {-# INLINE mapI #-}
