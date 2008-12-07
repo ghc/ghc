@@ -39,7 +39,11 @@ module Haddock.Utils (
 --  FormatVersion, mkFormatVersion  
   
   -- * MTL stuff
-  MonadIO(..)
+  MonadIO(..),
+  
+  -- * Logging
+  parseVerbosity,
+  out
  ) where
 
 import Haddock.Types
@@ -66,6 +70,8 @@ import System.Environment ( getProgName )
 import System.Exit ( exitWith, ExitCode(..) )
 import System.IO ( hPutStr, stderr )
 import System.IO.Unsafe	 ( unsafePerformIO )
+import Distribution.Verbosity
+import Distribution.ReadE
 
 #if __GLASGOW_HASKELL__ >= 609
 import MonadUtils ( MonadIO(..) )
@@ -74,6 +80,25 @@ class Monad m => MonadIO m where
     liftIO :: IO a -> m a                                              
 instance MonadIO IO where liftIO = id
 #endif
+
+
+-- -----------------------------------------------------------------------------
+-- Logging
+
+
+parseVerbosity :: String -> Either String Verbosity
+parseVerbosity str = runReadE flagToVerbosity str
+
+
+-- | Print a message to stdout, if it is not too verbose
+out :: MonadIO m
+    => Verbosity -- ^ program verbosity
+    -> Verbosity -- ^ message verbosity
+    -> String -> m ()
+out progVerbosity msgVerbosity msg
+  | msgVerbosity <= progVerbosity = liftIO $ putStrLn msg
+  | otherwise = return ()
+
 
 -- -----------------------------------------------------------------------------
 -- Some Utilities

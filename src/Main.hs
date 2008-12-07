@@ -40,6 +40,7 @@ import System.IO
 import System.Exit
 import System.Environment
 import System.FilePath
+import Distribution.Verbosity
 
 #if defined(mingw32_HOST_OS)
 import Foreign
@@ -137,6 +138,7 @@ main = handleTopExceptions $ do
   args <- getArgs
   (flags, fileArgs) <- parseHaddockOpts args
   handleEasyFlags flags fileArgs
+  verbosity <- getVerbosity flags
 
   let renderStep packages interfaces = do 
         updateHTMLXRefs packages
@@ -228,8 +230,6 @@ render flags ifaces installedIfaces = do
     maybe_wiki_urls = (listToMaybe [str | Flag_WikiBaseURL   str <- flags]
                       ,listToMaybe [str | Flag_WikiModuleURL str <- flags]
                       ,listToMaybe [str | Flag_WikiEntityURL str <- flags])
-
-    verbose = Flag_Verbose `elem` flags
 
   libdir <- case [str | Flag_Lib str <- flags] of
 		[] ->
@@ -354,6 +354,14 @@ getGhcLibDir flags =
   case [ dir | Flag_GhcLibDir dir <- flags ] of
     [] -> Nothing
     xs -> Just $ last xs
+
+
+getVerbosity flags =
+  case [ str | Flag_Verbosity str <- flags ] of
+    [] -> return normal
+    x:_ -> case parseVerbosity x of
+      Left e -> throwE e
+      Right v -> return v
 
 
 handleEasyFlags flags fileArgs = do

@@ -72,7 +72,7 @@ data Flag
   | Flag_WikiModuleURL String
   | Flag_WikiEntityURL String
   | Flag_Help
-  | Flag_Verbose
+  | Flag_Verbosity String
   | Flag_Version
   | Flag_UseContents String
   | Flag_GenContents
@@ -133,8 +133,8 @@ options backwardsCompat =
 	"display this help and exit",
     Option ['V']  ["version"]  (NoArg Flag_Version)
 	"output version information and exit",
-    Option ['v']  ["verbose"]  (NoArg Flag_Verbose)
-        "increase verbosity",
+    Option ['v']  ["verbosity"]  (ReqArg Flag_Verbosity "VERBOSITY")
+        "set verbosity level",
     Option [] ["use-contents"] (ReqArg Flag_UseContents "URL")
 	"use a separately-generated HTML contents page",
     Option [] ["gen-contents"] (NoArg Flag_GenContents)
