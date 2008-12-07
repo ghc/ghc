@@ -89,7 +89,7 @@ executable haddock
   hs-source-dirs:       src
   extensions:           CPP, PatternGuards, DeriveDataTypeable,
                         ScopedTypeVariables, MagicHash
-  ghc-options:          -funbox-strict-fields -O2 -Wall
+  ghc-options:          -funbox-strict-fields -O2
 
   other-modules:
     Haddock.Interface
