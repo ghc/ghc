@@ -242,7 +242,7 @@ render flags ifaces installedIfaces = do
                       getDataDir -- provided by Cabal
 #endif
     fs -> return (last fs)
-
+  let unicode = Flag_UseUnicode `elem` flags
   let css_file = case [str | Flag_CSS str <- flags] of
                    [] -> Nothing
                    fs -> Just (last fs)
@@ -300,7 +300,7 @@ render flags ifaces installedIfaces = do
     ppHtml title packageStr visibleIfaces odir
                 prologue maybe_html_help_format
                 maybe_source_urls maybe_wiki_urls
-                maybe_contents_url maybe_index_url
+                maybe_contents_url maybe_index_url unicode
     copyHtmlBits odir libDir css_file
 
   when (Flag_Hoogle `elem` flags) $ do
@@ -424,6 +424,9 @@ handleEasyFlags flags = do
   when (Flag_Help       `elem` flags) (bye usage)
   when (Flag_Version    `elem` flags) byeVersion
   when (Flag_GhcVersion `elem` flags) byeGhcVersion
+
+  when (Flag_UseUnicode `elem` flags && not (Flag_Html `elem` flags)) $
+  	throwE ("Unicode can only be enabled for HTML output.")
 
   when ((Flag_GenIndex `elem` flags || Flag_GenContents `elem` flags)
         && Flag_Html `elem` flags) $

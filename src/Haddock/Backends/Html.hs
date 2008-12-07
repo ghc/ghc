@@ -73,11 +73,12 @@ ppHtml	:: String
 	-> WikiURLs			-- the wiki URL (--wiki)
 	-> Maybe String			-- the contents URL (--use-contents)
 	-> Maybe String			-- the index URL (--use-index)
+	-> Bool                         -- whether to use unicode in output (--use-unicode)
 	-> IO ()
 
 ppHtml doctitle maybe_package ifaces odir prologue maybe_html_help_format
 	maybe_source_url maybe_wiki_url
-	maybe_contents_url maybe_index_url =  do
+	maybe_contents_url maybe_index_url unicode =  do
   let
 	visible_ifaces = filter visible ifaces
 	visible i = OptHide `notElem` ifaceOptions i
@@ -98,7 +99,7 @@ ppHtml doctitle maybe_package ifaces odir prologue maybe_html_help_format
 
   mapM_ (ppHtmlModule odir doctitle
 	   maybe_source_url maybe_wiki_url
-	   maybe_contents_url maybe_index_url) visible_ifaces
+	   maybe_contents_url maybe_index_url unicode) visible_ifaces
 
 ppHtmlHelpFiles	
     :: String                   -- doctitle
@@ -557,11 +558,11 @@ ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
 ppHtmlModule
 	:: FilePath -> String
 	-> SourceURLs -> WikiURLs
-	-> Maybe String -> Maybe String
+	-> Maybe String -> Maybe String -> Bool
 	-> Interface -> IO ()
 ppHtmlModule odir doctitle
   maybe_source_url maybe_wiki_url
-  maybe_contents_url maybe_index_url iface = do
+  maybe_contents_url maybe_index_url unicode iface = do
   let 
       mdl = ifaceMod iface
       mdl_str = moduleString mdl
@@ -579,14 +580,14 @@ ppHtmlModule odir doctitle
 	    pageHeader mdl_str iface doctitle
 		maybe_source_url maybe_wiki_url
 		maybe_contents_url maybe_index_url </> s15 </>
-	    ifaceToHtml maybe_source_url maybe_wiki_url iface </> s15 </>
+	    ifaceToHtml maybe_source_url maybe_wiki_url iface unicode </> s15 </>
 	    footer
          )
   writeFile (pathJoin [odir, moduleHtmlFile mdl]) (renderHtml html)
-  ppHtmlModuleMiniSynopsis odir doctitle iface
+  ppHtmlModuleMiniSynopsis odir doctitle iface unicode
 
-ppHtmlModuleMiniSynopsis :: FilePath -> String -> Interface -> IO ()
-ppHtmlModuleMiniSynopsis odir _doctitle iface = do
+ppHtmlModuleMiniSynopsis :: FilePath -> String -> Interface -> Bool -> IO ()
+ppHtmlModuleMiniSynopsis odir _doctitle iface unicode = do
   let mdl = ifaceMod iface
       html =
         header
@@ -596,12 +597,12 @@ ppHtmlModuleMiniSynopsis odir _doctitle iface = do
 	   (script ! [src jsFile, thetype "text/javascript"] $ noHtml)) +++
         body << thediv ! [ theclass "outer" ] << (
            (thediv ! [theclass "mini-topbar"]
-             << toHtml (moduleString mdl)) +++
-           miniSynopsis mdl iface)
-  writeFile (pathJoin [odir, "mini_" ++ moduleHtmlFile mdl]) (renderHtml html)
+             << toHtml (moduleString mod)) +++
+           miniSynopsis mod iface)
+  writeFile (pathJoin [odir, "mini_" ++ moduleHtmlFile mod]) (renderHtml html)
 
-ifaceToHtml :: SourceURLs -> WikiURLs -> Interface -> HtmlTable
-ifaceToHtml maybe_source_url maybe_wiki_url iface
+ifaceToHtml :: SourceURLs -> WikiURLs -> Interface -> Bool -> HtmlTable
+ifaceToHtml maybe_source_url maybe_wiki_url iface unicode
   = abovesSep s15 (contents ++ description: synopsis: maybe_doc_hdr: bdy)
   where
     docMap = ifaceRnDocMap iface
@@ -632,7 +633,7 @@ ifaceToHtml maybe_source_url maybe_wiki_url iface
       = (tda [theclass "section1"] << toHtml "Synopsis") </>
         s15 </>
             (tda [theclass "body"] << vanillaTable <<
-            abovesSep s8 (map (processExport True linksInfo docMap)
+            abovesSep s8 (map (processExport True linksInfo docMap unicode)
             (filter forSummary exports))
         )
 
@@ -644,22 +645,22 @@ ifaceToHtml maybe_source_url maybe_wiki_url iface
           ExportGroup _ _ _ : _ -> Html.emptyTable
           _ -> tda [ theclass "section1" ] << toHtml "Documentation"
 
-    bdy  = map (processExport False linksInfo docMap) exports
+    bdy  = map (processExport False linksInfo docMap unicode) exports
     linksInfo = (maybe_source_url, maybe_wiki_url)
 
 miniSynopsis :: Module -> Interface -> Html
-miniSynopsis mdl iface =
+miniSynopsis mod iface =
     thediv ! [ theclass "mini-synopsis" ]
-      << hsep (map (processForMiniSynopsis mdl) $ exports)
+      << hsep (map (processForMiniSynopsis mod) $ exports)
 
   where
     exports = numberSectionHeadings (ifaceRnExportItems iface)
 
 processForMiniSynopsis :: Module -> ExportItem DocName -> Html
-processForMiniSynopsis mdl (ExportDecl (L _loc decl0) _doc _ _insts) =
+processForMiniSynopsis mod (ExportDecl (L _loc decl0) _doc _ _insts) =
   thediv ! [theclass "decl" ] <<
   case decl0 of
-    TyClD d@(TyFamily{}) -> ppTyFamHeader True False d
+    TyClD d@(TyFamily{}) -> ppTyFamHeader True False d unicode
     TyClD d@(TyData{tcdTyPats = ps})
       | Nothing <- ps    -> keyword "data" <++> ppTyClBinderWithVarsMini mdl d
       | Just _ <- ps     -> keyword "data" <++> keyword "instance"
@@ -674,14 +675,12 @@ processForMiniSynopsis mdl (ExportDecl (L _loc decl0) _doc _ _insts) =
         let nm = docNameOcc n
         in ppNameMini mdl nm
     _ -> noHtml
-processForMiniSynopsis _ (ExportGroup lvl _id txt) =
-  let heading
-        | lvl == 1  = h1
-        | lvl == 2  = h2
-        | lvl >= 3  = h3
-        | otherwise = error "bad group level"
+processForMiniSynopsis mod (ExportGroup lvl _id txt) =
+  let heading | lvl == 1 = h1
+              | lvl == 2 = h2
+              | lvl >= 3 = h3
   in heading << docToHtml txt
-processForMiniSynopsis _ _ = noHtml
+processForMiniSynopsis _ _ _ = noHtml
 
 ppNameMini :: Module -> OccName -> Html
 ppNameMini mdl nm =
@@ -730,19 +729,19 @@ numberSectionHeadings exports = go 1 exports
 	go n (other:es)
 	  = other : go n es
 
-processExport :: Bool -> LinksInfo -> DocMap -> (ExportItem DocName) -> HtmlTable
-processExport _ _ _ (ExportGroup lev id0 doc)
+processExport :: Bool -> LinksInfo -> DocMap -> Bool -> (ExportItem DocName) -> HtmlTable
+processExport _ _ _ unicode (ExportGroup lev id0 doc)
   = ppDocGroup lev (namedAnchor id0 << docToHtml doc)
 processExport summary links docMap (ExportDecl decl doc subdocs insts)
   = ppDecl summary links decl doc insts docMap subdocs
-processExport _ _ _ (ExportNoDecl y [])
+processExport summmary _ _ (ExportNoDecl _ y [])
   = declBox (ppDocName y)
-processExport _ _ _ (ExportNoDecl y subs)
+processExport summmary _ _ (ExportNoDecl _ y subs)
   = declBox (ppDocName y <+> parenList (map ppDocName subs))
-processExport _ _ _ (ExportDoc doc)
+processExport _ _ _ unicode (ExportDoc doc)
   = docBox (docToHtml doc)
-processExport _ _ _ (ExportModule mdl)
-  = declBox (toHtml "module" <+> ppModule mdl "")
+processExport _ _ _ (ExportModule mod)
+  = declBox (toHtml "module" <+> ppModule mod "")
 
 forSummary :: (ExportItem DocName) -> Bool
 forSummary (ExportGroup _ _ _) = False
@@ -765,32 +764,32 @@ declWithDoc False links loc nm (Just doc) html_decl =
 
 -- TODO: use DeclInfo DocName or something
 ppDecl :: Bool -> LinksInfo -> LHsDecl DocName -> 
-          Maybe (HsDoc DocName) -> [InstHead DocName] -> DocMap -> [(DocName, Maybe (HsDoc DocName))] -> HtmlTable
+          Maybe (HsDoc DocName) -> [InstHead DocName] -> DocMap -> [(DocName, HsDoc DocName)] -> HtmlTable
 ppDecl summ links (L loc decl) mbDoc instances docMap subdocs = case decl of
   TyClD d@(TyFamily {})          -> ppTyFam summ False links loc mbDoc d
   TyClD d@(TyData {})
-    | Nothing <- tcdTyPats d     -> ppDataDecl summ links instances loc mbDoc d
+    | Nothing <- tcdTyPats d     -> ppDataDecl summ links instances loc mbDoc d unicode
     | Just _  <- tcdTyPats d     -> ppDataInst summ links loc mbDoc d 
   TyClD d@(TySynonym {})
-    | Nothing <- tcdTyPats d     -> ppTySyn summ links loc mbDoc d
-    | Just _  <- tcdTyPats d     -> ppTyInst summ False links loc mbDoc d
-  TyClD d@(ClassDecl {})         -> ppClassDecl summ links instances loc mbDoc docMap subdocs d
-  SigD (TypeSig (L _ n) (L _ t)) -> ppFunSig summ links loc mbDoc n t
-  ForD d                         -> ppFor summ links loc mbDoc d
+    | Nothing <- tcdTyPats d     -> ppTySyn summ links loc mbDoc d unicode
+    | Just _  <- tcdTyPats d     -> ppTyInst summ False links loc mbDoc d unicode
+  TyClD d@(ClassDecl {})         -> ppClassDecl summ links instances loc mbDoc docMap subdocs d unicode
+  SigD (TypeSig (L _ n) (L _ t)) -> ppFunSig summ links loc mbDoc n t unicode
+  ForD d                         -> ppFor summ links loc mbDoc d unicode
   InstD _                        -> Html.emptyTable
   _                              -> error "declaration not supported by ppDecl"
 
 ppFunSig :: Bool -> LinksInfo -> SrcSpan -> Maybe (HsDoc DocName) ->
-            DocName -> HsType DocName -> HtmlTable
-ppFunSig summary links loc mbDoc docname typ =
-  ppTypeOrFunSig summary links loc docname typ mbDoc 
-    (ppTypeSig summary occname typ, ppBinder False occname, dcolon)
+            DocName -> HsType DocName -> Bool -> HtmlTable
+ppFunSig summary links loc mbDoc docname typ unicode =
+  ppTypeOrFunSig summary links loc docname typ mbDoc
+    (ppTypeSig summary occname typ unicode, ppBinder False occname, dcolon unicode) unicode
   where
     occname = docNameOcc docname
 
 ppTypeOrFunSig :: Bool -> LinksInfo -> SrcSpan -> DocName -> HsType DocName ->
-                  Maybe (HsDoc DocName) -> (Html, Html, Html) -> HtmlTable
-ppTypeOrFunSig summary links loc docname typ doc (pref1, pref2, sep)
+                  Maybe (HsDoc DocName) -> (Html, Html, Html) -> Bool -> HtmlTable
+ppTypeOrFunSig summary links loc docname typ doc (pref1, pref2, sep) unicode
   | summary || noArgDocs typ = declWithDoc summary links loc docname doc pref1
   | otherwise = topDeclBox links loc docname pref2 </>
     (tda [theclass "body"] << vanillaTable <<  (
@@ -812,23 +811,23 @@ ppTypeOrFunSig summary links loc docname typ doc (pref1, pref2, sep)
     do_args leader (HsForAllTy Explicit tvs lctxt ltype)
       = (argBox (
           leader <+> 
-          hsep (keyword "forall" : ppTyVars tvs ++ [dot]) <+>
-          ppLContextNoArrow lctxt)
+          hsep (forallSymbol unicode : ppTyVars tvs ++ [dot]) <+>
+          ppLContextNoArrow lctxt unicode)
             <-> rdocBox noHtml) </> 
-            do_largs darrow ltype
+            do_largs (darrow unicode) ltype
     do_args leader (HsForAllTy Implicit _ lctxt ltype)
-      = (argBox (leader <+> ppLContextNoArrow lctxt)
+      = (argBox (leader <+> ppLContextNoArrow lctxt unicode)
           <-> rdocBox noHtml) </> 
-          do_largs darrow ltype
+          do_largs (darrow unicode) ltype
     do_args leader (HsFunTy (L _ (HsDocTy lt ldoc)) r)
-      = (argBox (leader <+> ppLType lt) <-> rdocBox (docToHtml (unLoc ldoc)))
-          </> do_largs arrow r
+      = (argBox (leader <+> ppLType unicode lt) <-> rdocBox (docToHtml (unLoc ldoc)))
+          </> do_largs (arrow unicode) r
     do_args leader (HsFunTy lt r)
-      = (argBox (leader <+> ppLType lt) <-> rdocBox noHtml) </> do_largs arrow r
+      = (argBox (leader <+> ppLType unicode lt) <-> rdocBox noHtml) </> do_largs (arrow unicode) r
     do_args leader (HsDocTy lt ldoc)
-      = (argBox (leader <+> ppLType lt) <-> rdocBox (docToHtml (unLoc ldoc)))
+      = (argBox (leader <+> ppLType unicode lt) <-> rdocBox (docToHtml (unLoc ldoc)))
     do_args leader t
-      = argBox (leader <+> ppType t) <-> rdocBox (noHtml)
+      = argBox (leader <+> ppType unicode t) <-> rdocBox (noHtml)
 
 
 ppTyVars :: [LHsTyVarBndr DocName] -> [Html]
@@ -846,19 +845,18 @@ ppFor _ _ _ _ _ = error "ppFor"
 
 
 -- we skip type patterns for now
-ppTySyn :: Bool -> LinksInfo -> SrcSpan -> Maybe Doc -> TyClDecl DocName -> HtmlTable
 ppTySyn summary links loc mbDoc (TySynonym (L _ name) ltyvars _ ltype) 
   = ppTypeOrFunSig summary links loc name (unLoc ltype) mbDoc 
-                   (full, hdr, spaceHtml +++ equals)
+                   (full, hdr, spaceHtml +++ equals) unicode
   where
     hdr  = hsep ([keyword "type", ppBinder summary occ] ++ ppTyVars ltyvars)
-    full = hdr <+> equals <+> ppLType ltype
+    full = hdr <+> equals <+> ppLType unicode ltype
     occ  = docNameOcc name
 ppTySyn _ _ _ _ _ = error "declaration not supported by ppTySyn"
 
 
-ppTypeSig :: Bool -> OccName -> HsType DocName -> Html
-ppTypeSig summary nm ty = ppBinder summary nm <+> dcolon <+> ppType ty
+ppTypeSig :: Bool -> OccName -> HsType DocName  -> Bool -> Html
+ppTypeSig summary nm ty unicode = ppBinder summary nm <+> dcolon unicode <+> ppType unicode ty
 
 
 ppTyName :: Name -> Html
@@ -872,8 +870,8 @@ ppTyName name
 --------------------------------------------------------------------------------
 
 
-ppTyFamHeader :: Bool -> Bool -> TyClDecl DocName -> Html
-ppTyFamHeader summary associated decl =
+ppTyFamHeader :: Bool -> Bool -> TyClDecl DocName -> Bool -> Html
+ppTyFamHeader summary associated decl unicode =
 
   (case tcdFlavour decl of
      TypeFamily
@@ -887,16 +885,16 @@ ppTyFamHeader summary associated decl =
   ppTyClBinderWithVars summary decl <+>
 
   case tcdKind decl of
-    Just kind -> dcolon <+> ppKind kind 
+    Just kind -> dcolon unicode  <+> ppKind kind 
     Nothing -> empty
 
 
 ppTyFam :: Bool -> Bool -> LinksInfo -> SrcSpan -> Maybe (HsDoc DocName) ->
-              TyClDecl DocName -> HtmlTable
-ppTyFam summary associated links loc mbDoc decl
+              TyClDecl DocName -> Bool -> HtmlTable
+ppTyFam summary associated links loc mbDoc decl unicode
   
   | summary = declWithDoc summary links loc docname mbDoc 
-              (ppTyFamHeader True associated decl)
+              (ppTyFamHeader True associated decl unicode)
   
   | associated, isJust mbDoc         = header_ </> bodyBox << doc 
   | associated                       = header_ 
@@ -908,7 +906,7 @@ ppTyFam summary associated links loc mbDoc decl
   where
     docname = tcdName decl
 
-    header_ = topDeclBox links loc docname (ppTyFamHeader summary associated decl)
+    header = topDeclBox links loc docname (ppTyFamHeader summary associated decl)
 
     doc = ndocBox . docToHtml . fromJust $ mbDoc 
 
@@ -918,7 +916,7 @@ ppTyFam summary associated links loc mbDoc decl
   	  tda [theclass "body"] << 
             collapsed thediv instId (
               spacedTable1 << (
-                aboves (map (declBox . ppInstHead) instances)
+                aboves (map (declBox . ppInstHead unicode) instances)
               )
             )
 
@@ -949,11 +947,11 @@ ppDataInst = undefined
 
  
 ppTyInst :: Bool -> Bool -> LinksInfo -> SrcSpan -> Maybe (HsDoc DocName) ->
-            TyClDecl DocName -> HtmlTable
-ppTyInst summary associated links loc mbDoc decl
+            TyClDecl DocName -> Bool -> HtmlTable
+ppTyInst summary associated links loc mbDoc decl unicode
   
   | summary = declWithDoc summary links loc docname mbDoc
-              (ppTyInstHeader True associated decl)
+              (ppTyInstHeader True associated decl unicode)
   
   | isJust mbDoc = header_ </> bodyBox << doc 
   | otherwise    = header_
@@ -961,7 +959,7 @@ ppTyInst summary associated links loc mbDoc decl
   where
     docname = tcdName decl
 
-    header_ = topDeclBox links loc docname (ppTyInstHeader summary associated decl)
+    header = topDeclBox links loc docname (ppTyInstHeader summary associated decl)
 
     doc = case mbDoc of
       Just d -> ndocBox (docToHtml d)
@@ -969,11 +967,11 @@ ppTyInst summary associated links loc mbDoc decl
 
 
 ppTyInstHeader :: Bool -> Bool -> TyClDecl DocName -> Html
-ppTyInstHeader _ _ decl =
+ppTyInstHeader summary associated decl =
 
   keyword "type instance" <+>
 
-  ppAppNameTypes (tcdName decl) typeArgs
+  ppAppNameTypes (tcdName decl) typeArgs unicode
   where
     typeArgs = map unLoc . fromJust . tcdTyPats $ decl
 
@@ -983,12 +981,11 @@ ppTyInstHeader _ _ decl =
 --------------------------------------------------------------------------------
     
 
-ppAssocType :: Bool -> LinksInfo -> Maybe (HsDoc DocName) -> LTyClDecl DocName -> HtmlTable
-ppAssocType summ links doc (L loc decl) = 
+ppAssocType :: Bool -> LinksInfo -> Maybe (HsDoc DocName) -> LTyClDecl DocName -> Bool -> HtmlTable
+ppAssocType summ links doc (L loc decl) unicode = 
   case decl of
     TyFamily  {} -> ppTyFam summ True links loc doc decl
     TySynonym {} -> ppTySyn summ links loc doc decl
-    _            -> error "declaration type not supported by ppAssocType" 
 
 
 --------------------------------------------------------------------------------
@@ -1008,8 +1005,8 @@ ppTyClBinderWithVars summ decl =
 
 
 -- | Print an application of a DocName and a list of HsTypes
-ppAppNameTypes :: DocName -> [HsType DocName] -> Html
-ppAppNameTypes n ts = ppTypeApp n ts ppDocName ppParendType
+ppAppNameTypes :: DocName -> [HsType DocName] -> Bool -> Html
+ppAppNameTypes n ts unicode = ppTypeApp n ts ppDocName (ppParendType unicode)
 
 
 -- | Print an application of a DocName and a list of Names 
@@ -1034,34 +1031,29 @@ ppTypeApp n ts ppDN ppT = ppDN n <+> hsep (map ppT ts)
 -- Contexts 
 -------------------------------------------------------------------------------
 
-
-ppLContext, ppLContextNoArrow :: Located (HsContext DocName) -> Html
 ppLContext        = ppContext        . unLoc
 ppLContextNoArrow = ppContextNoArrow . unLoc
-
 
 ppContextNoArrow :: HsContext DocName -> Html
 ppContextNoArrow []  = empty
 ppContextNoArrow cxt = pp_hs_context (map unLoc cxt) 
 
-
 ppContextNoLocs :: [HsPred DocName] -> Html
 ppContextNoLocs []  = empty
 ppContextNoLocs cxt = pp_hs_context cxt <+> darrow  
 
-
 ppContext :: HsContext DocName -> Html
 ppContext cxt = ppContextNoLocs (map unLoc cxt)
 
-
-pp_hs_context :: [HsPred DocName] -> Html
 pp_hs_context []  = empty
 pp_hs_context [p] = ppPred p
 pp_hs_context cxt = parenList (map ppPred cxt) 
 
+ppLPred = ppPred . unLoc
 
-ppPred :: HsPred DocName -> Html
+
 ppPred (HsClassP n ts) = ppAppNameTypes n (map unLoc ts)
+-- TODO: find out what happened to the Dupable/Linear distinction
 ppPred (HsEqualP t1 t2) = ppLType t1 <+> toHtml "~" <+> ppLType t2
 ppPred (HsIParam (IPName n) t) 
   = toHtml "?" +++ ppDocName n <+> dcolon <+> ppLType t
@@ -1072,26 +1064,20 @@ ppPred (HsIParam (IPName n) t)
 -------------------------------------------------------------------------------
 
 
-ppClassHdr :: Bool -> Located [LHsPred DocName] -> DocName
-           -> [Located (HsTyVarBndr DocName)] -> [Located ([DocName], [DocName])]
-           -> Html
 ppClassHdr summ lctxt n tvs fds = 
   keyword "class" 
-  <+> (if not . null . unLoc $ lctxt then ppLContext lctxt else empty)
+  <+> (if not . null . unLoc $ lctxt then ppLContext lctxt unicode else empty)
   <+> ppAppDocNameNames summ n (tyvarNames $ tvs)
-	<+> ppFds fds
+	<+> ppFds fds unicode
 
-
-ppFds :: [Located ([DocName], [DocName])] -> Html
 ppFds fds =
   if null fds then noHtml else 
 	char '|' <+> hsep (punctuate comma (map (fundep . unLoc) fds))
   where
-	fundep (vars1,vars2) = hsep (map ppDocName vars1) <+> toHtml "->" <+>
+	fundep (vars1,vars2) = hsep (map ppDocName vars1) <+> arrow unicode <+>
 			       hsep (map ppDocName vars2)
 
-
-ppShortClassDecl :: Bool -> LinksInfo -> TyClDecl DocName -> SrcSpan -> [(DocName, Maybe (HsDoc DocName))] -> HtmlTable
+ppShortClassDecl :: Bool -> LinksInfo -> TyClDecl DocName -> SrcSpan -> [(DocName, HsDoc DocName)] -> HtmlTable
 ppShortClassDecl summary links (ClassDecl lctxt lname tvs fds sigs _ ats _) loc subdocs = 
   if null sigs && null ats
     then (if summary then declBox else topDeclBox links loc nm) hdr
@@ -1101,32 +1087,32 @@ ppShortClassDecl summary links (ClassDecl lctxt lname tvs fds sigs _ ats _) loc 
 				bodyBox <<
 					aboves
 					(
-						[ ppAssocType summary links doc at | at <- ats
+						[ ppAssocType summary links doc at unicode | at <- ats
                                                 , let doc = join $ lookup (tcdName $ unL at) subdocs ]  ++
 
-						[ ppFunSig summary links loc doc n typ
+						[ ppFunSig summary links loc doc n typ unicode
 						| L _ (TypeSig (L _ n) (L _ typ)) <- sigs
 						, let doc = join $ lookup n subdocs ] 
 					)
 				)
   where
-    hdr = ppClassHdr summary lctxt (unLoc lname) tvs fds
+    hdr = ppClassHdr summary lctxt (unLoc lname) tvs fds unicode
     nm  = unLoc lname
 ppShortClassDecl _ _ _ _ _ = error "declaration type not supported by ppShortClassDecl"
     
 
 
 ppClassDecl :: Bool -> LinksInfo -> [InstHead DocName] -> SrcSpan ->
-               Maybe (HsDoc DocName) -> DocMap -> [(DocName, Maybe (HsDoc DocName))] -> TyClDecl DocName -> 
+               Maybe (HsDoc DocName) -> DocMap -> [(DocName, HsDoc DocName)] -> TyClDecl DocName -> 
                HtmlTable
 ppClassDecl summary links instances loc mbDoc _ subdocs
-	decl@(ClassDecl lctxt lname ltyvars lfds lsigs _ ats _)
-  | summary = ppShortClassDecl summary links decl loc subdocs
+	decl@(ClassDecl lctxt lname ltyvars lfds lsigs _ ats _) unicode
+  | summary = ppShortClassDecl summary links decl loc subdocs unicode
   | otherwise = classheader </> bodyBox << (classdoc </> body_ </> instancesBit)
   where 
     classheader
-      | null lsigs = topDeclBox links loc nm hdr
-      | otherwise  = topDeclBox links loc nm (hdr <+> keyword "where")
+      | null lsigs = topDeclBox links loc nm (hdr unicode)
+      | otherwise  = topDeclBox links loc nm (hdr unicode <+> keyword "where")
 
     nm   = unLoc $ tcdLName decl
 
@@ -1143,11 +1129,11 @@ ppClassDecl summary links instances loc mbDoc _ subdocs
                     s8 </> methHdr </> bodyBox << methodTable 
  
     methodTable =
-      abovesSep s8 [ ppFunSig summary links loc doc n typ
+      abovesSep s8 [ ppFunSig summary links loc doc n typ unicode
                    | L _ (TypeSig (L _ n) (L _ typ)) <- lsigs
                    , let doc = join $ lookup n subdocs ]
 
-    atTable = abovesSep s8 $ [ ppAssocType summary links doc at | at <- ats
+    atTable = abovesSep s8 $ [ ppAssocType summary links doc at unicode | at <- ats
                              , let doc = join $ lookup (tcdName $ unL at) subdocs ]
 
     instId = collapseId (getName nm)
@@ -1158,14 +1144,14 @@ ppClassDecl summary links instances loc mbDoc _ subdocs
            tda [theclass "body"] << 
              collapsed thediv instId (
              spacedTable1 << (
-               aboves (map (declBox . ppInstHead) instances)
+               aboves (map (declBox . ppInstHead unicode) instances)
              ))
 ppClassDecl _ _ _ _ _ _ _ _ = error "declaration type not supported by ppShortClassDecl"
 
 
-ppInstHead :: InstHead DocName -> Html
-ppInstHead ([],   n, ts) = ppAppNameTypes n ts 
-ppInstHead (ctxt, n, ts) = ppContextNoLocs ctxt <+> ppAppNameTypes n ts 
+ppInstHead :: Bool -> InstHead DocName -> Html
+ppInstHead unicode ([],   n, ts) = ppAppNameTypes n ts unicode
+ppInstHead unicode (ctxt, n, ts) = ppContextNoLocs ctxt unicode <+> ppAppNameTypes n ts unicode
 
 
 -- -----------------------------------------------------------------------------
@@ -1173,14 +1159,15 @@ ppInstHead (ctxt, n, ts) = ppContextNoLocs ctxt <+> ppAppNameTypes n ts
 
 
 -- TODO: print contexts
-ppShortDataDecl :: Bool -> LinksInfo -> SrcSpan -> TyClDecl DocName -> Html
-ppShortDataDecl summary links loc dataDecl 
+ppShortDataDecl :: Bool -> LinksInfo -> SrcSpan -> 
+                   Maybe (HsDoc DocName) -> TyClDecl DocName -> Html
+ppShortDataDecl summary links loc mbDoc dataDecl 
 
   | [lcon] <- cons, ResTyH98 <- resTy = 
-    ppDataHeader summary dataDecl 
-    <+> equals <+> ppShortConstr summary (unLoc lcon)
+    ppDataHeader summary dataDecl unicode
+    <+> equals <+> ppShortConstr summary (unLoc lcon) unicode
 
-  | [] <- cons = ppDataHeader summary dataDecl
+  | [] <- cons = ppDataHeader summary dataDecl unicode
 
   | otherwise = vanillaTable << (
       case resTy of 
@@ -1197,22 +1184,22 @@ ppShortDataDecl summary links loc dataDecl
   where
     dataHeader = 
       (if summary then declBox else topDeclBox links loc docname)
-      ((ppDataHeader summary dataDecl) <+> 
+      ((ppDataHeader summary dataDecl unicode) <+> 
       case resTy of ResTyGADT _ -> keyword "where"; _ -> empty)
 
-    doConstr c con = declBox (toHtml [c] <+> ppShortConstr summary (unLoc con))
-    doGADTConstr con = declBox (ppShortConstr summary (unLoc con))
+    doConstr c con = declBox (toHtml [c] <+> ppShortConstr summary (unLoc con) unicode)
+    doGADTConstr con = declBox (ppShortConstr summary (unLoc con) unicode)
 
     docname   = unLoc . tcdLName $ dataDecl
     cons      = tcdCons dataDecl
     resTy     = (con_res . unLoc . head) cons 
 
 ppDataDecl :: Bool -> LinksInfo -> [InstHead DocName] -> 
-              SrcSpan -> Maybe (HsDoc DocName) -> TyClDecl DocName -> HtmlTable
-ppDataDecl summary links instances loc mbDoc dataDecl
+              SrcSpan -> Maybe (HsDoc DocName) -> TyClDecl DocName -> Bool -> HtmlTable
+ppDataDecl summary links instances loc mbDoc dataDecl unicode
   
   | summary = declWithDoc summary links loc docname mbDoc 
-              (ppShortDataDecl summary links loc dataDecl)
+              (ppShortDataDecl summary links loc mbDoc dataDecl)
   
   | otherwise
       = (if validTable then (</>) else const) header_ $
@@ -1228,7 +1215,7 @@ ppDataDecl summary links instances loc mbDoc dataDecl
     cons      = tcdCons dataDecl
     resTy     = (con_res . unLoc . head) cons 
       
-    header_ = topDeclBox links loc docname (ppDataHeader summary dataDecl
+    header = topDeclBox links loc docname (ppDataHeader summary dataDecl
              <+> whereBit)
 
     whereBit 
@@ -1249,7 +1236,7 @@ ppDataDecl summary links instances loc mbDoc dataDecl
       | null cons = Html.emptyTable
       | otherwise = constrHdr </> ( 
           tda [theclass "body"] << constrTable << 
-	  aboves (map ppSideBySideConstr cons)
+	  aboves (map (ppSideBySideConstr unicode) cons)
         )
 
     instId = collapseId (getName docname)
@@ -1261,7 +1248,7 @@ ppDataDecl summary links instances loc mbDoc dataDecl
 	  tda [theclass "body"] << 
           collapsed thediv instId (
             spacedTable1 << (
-              aboves (map (declBox . ppInstHead) instances)
+              aboves (map (declBox . ppInstHead unicode) instances)
             )
           )
 
@@ -1273,15 +1260,14 @@ isRecCon lcon = case con_details (unLoc lcon) of
   RecCon _ -> True
   _ -> False
 
-
 ppShortConstr :: Bool -> ConDecl DocName -> Html
 ppShortConstr summary con = case con_res con of 
 
   ResTyH98 -> case con_details con of 
-    PrefixCon args -> header_ +++ hsep (ppBinder summary occ : map ppLParendType args)
-    RecCon fields -> header_ +++ ppBinder summary occ <+>
+    PrefixCon args -> header +++ hsep (ppBinder summary occ : map ppLParendType args)
+    RecCon fields -> header +++ ppBinder summary occ <+>
       braces (vanillaTable << aboves (map (ppShortField summary) fields))
-    InfixCon arg1 arg2 -> header_ +++ 
+    InfixCon arg1 arg2 -> header +++ 
       hsep [ppLParendType arg1, ppBinder summary occ, ppLParendType arg2]    
 
   ResTyGADT resTy -> case con_details con of 
@@ -1290,9 +1276,9 @@ ppShortConstr summary con = case con_res con of
     InfixCon arg1 arg2 -> doGADTCon [arg1, arg2] resTy 
     
   where
-    doGADTCon args resTy = ppBinder summary occ <+> dcolon <+> hsep [
-                             ppForAll forall ltvs lcontext,
-                             ppLType (foldr mkFunTy resTy args) ]
+    doGADTCon args resTy = ppBinder summary occ <+> dcolon unicode <+> hsep [
+                             ppForAll forall ltvs lcontext unicode,
+                             ppLType unicode (foldr mkFunTy resTy args) ]
 
     header_  = ppConstrHdr forall tyVars context
     occ      = docNameOcc . unLoc . con_name $ con
@@ -1303,33 +1289,33 @@ ppShortConstr summary con = case con_res con of
     forall   = con_explicit con
     mkFunTy a b = noLoc (HsFunTy a b)
 
-ppConstrHdr :: HsExplicitForAll -> [Name] -> HsContext DocName -> Html
-ppConstrHdr forall tvs ctxt
+ppConstrHdr :: HsExplicitForAll -> [Name] -> HsContext DocName -> Bool -> Html
+ppConstrHdr forall tvs ctxt unicode
  = (if null tvs then noHtml else ppForall)
    +++
-   (if null ctxt then noHtml else ppContextNoArrow ctxt <+> toHtml "=> ")
+   (if null ctxt then noHtml else ppContextNoArrow ctxt unicode <+> darrow unicode <+> toHtml " ")
   where
     ppForall = case forall of 
-      Explicit -> keyword "forall" <+> hsep (map ppName tvs) <+> toHtml ". "
+      Explicit -> forallSymbol unicode <+> hsep (map ppName tvs) <+> toHtml ". "
       Implicit -> empty
 
-ppSideBySideConstr :: LConDecl DocName -> HtmlTable
-ppSideBySideConstr (L _ con) = case con_res con of 
+ppSideBySideConstr :: Bool -> LConDecl DocName -> HtmlTable
+ppSideBySideConstr unicode (L _ con) = case con_res con of 
  
   ResTyH98 -> case con_details con of 
 
     PrefixCon args -> 
-      argBox (hsep ((header_ +++ ppBinder False occ) : map ppLParendType args)) 
+      argBox (hsep ((header +++ ppBinder False occ) : map ppLParendType args)) 
       <-> maybeRDocBox mbLDoc  
 
     RecCon fields -> 
-      argBox (header_ +++ ppBinder False occ) <->
+      argBox (header +++ ppBinder False occ) <->
       maybeRDocBox mbLDoc </>
       (tda [theclass "body"] << spacedTable1 <<
-      aboves (map ppSideBySideField fields))
+      aboves (map (ppSideBySideField unicode) fields))
 
     InfixCon arg1 arg2 -> 
-      argBox (hsep [header_+++ppLParendType arg1, ppBinder False occ, ppLParendType arg2])
+      argBox (hsep [header+++ppLParendType arg1, ppBinder False occ, ppLParendType arg2])
       <-> maybeRDocBox mbLDoc
  
   ResTyGADT resTy -> case con_details con of
@@ -1338,9 +1324,9 @@ ppSideBySideConstr (L _ con) = case con_res con of
     InfixCon arg1 arg2 -> doGADTCon [arg1, arg2] resTy 
 
  where 
-    doGADTCon args resTy = argBox (ppBinder False occ <+> dcolon <+> hsep [
-                               ppForAll forall ltvs (con_cxt con),
-                               ppLType (foldr mkFunTy resTy args) ]
+    doGADTCon args resTy = argBox (ppBinder False occ <+> dcolon unicode <+> hsep [
+                               ppForAll forall ltvs (con_cxt con) unicode,
+                               ppLType unicode (foldr mkFunTy resTy args) ]
                             ) <-> maybeRDocBox mbLDoc
 
 
@@ -1353,10 +1339,10 @@ ppSideBySideConstr (L _ con) = case con_res con of
     mbLDoc  = con_doc con
     mkFunTy a b = noLoc (HsFunTy a b)
 
-ppSideBySideField :: ConDeclField DocName -> HtmlTable
-ppSideBySideField (ConDeclField (L _ name) ltype mbLDoc) =
+ppSideBySideField :: Bool -> ConDeclField DocName ->  HtmlTable
+ppSideBySideField unicode (ConDeclField (L _ name) ltype mbLDoc) =
   argBox (ppBinder False (docNameOcc name)
-    <+> dcolon <+> ppLType ltype) <->
+    <+> dcolon unicode <+> ppLType unicode ltype) <->
   maybeRDocBox mbLDoc
 
 {-
@@ -1386,11 +1372,11 @@ ppHsFullConstr (HsRecDecl _ nm tvs ctxt fields doc) =
 		)
 -}
 
-ppShortField :: Bool -> ConDeclField DocName -> HtmlTable
-ppShortField summary (ConDeclField (L _ name) ltype _) 
+ppShortField :: Bool -> Bool -> ConDeclField DocName -> HtmlTable
+ppShortField summary unicode (ConDeclField (L _ name) ltype _)
   = tda [theclass "recfield"] << (
       ppBinder summary (docNameOcc name)
-      <+> dcolon <+> ppLType ltype
+      <+> dcolon unicode <+> ppLType unicode ltype
     )
 
 {-
@@ -1407,14 +1393,14 @@ expandField (HsFieldDecl ns ty doc) = [ HsFieldDecl [n] ty doc | n <- ns ]
 
 -- | Print the LHS of a data\/newtype declaration.
 -- Currently doesn't handle 'data instance' decls or kind signatures
-ppDataHeader :: Bool -> TyClDecl DocName -> Html
-ppDataHeader summary decl 
+ppDataHeader :: Bool -> TyClDecl DocName -> Bool -> Html
+ppDataHeader summary decl unicode
   | not (isDataDecl decl) = error "ppDataHeader: illegal argument"
   | otherwise = 
     -- newtype or data
     (if tcdND decl == NewType then keyword "newtype" else keyword "data") <+> 
     -- context
-    ppLContext (tcdCtxt decl) <+>
+    ppLContext (tcdCtxt decl) unicode <+>
     -- T a b c ..., or a :+: b
     ppTyClBinderWithVars summary decl
 
@@ -1489,12 +1475,17 @@ maybeParen ctxt_prec op_prec p | ctxt_prec >= op_prec = parens p
                                | otherwise            = p
 
 
-ppLType, ppLParendType :: Located (HsType DocName) -> Html
-ppLType       = ppType . unLoc
-ppLParendType = ppParendType . unLoc
+ppLTypes       = hsep . map ppLType
+ppLParendTypes = hsep . map ppLParendType
 
 
-ppType, ppParendType :: HsType DocName -> Html
+ppParendTypes = hsep . map ppParendType
+
+
+ppLType       unicode y = ppType unicode (unLoc y)
+ppLParendType unicode y = ppParendType unicode (unLoc y) 
+
+
 ppType ty       = ppr_mono_ty pREC_TOP ty
 ppParendType ty = ppr_mono_ty pREC_CON ty
 
@@ -1502,64 +1493,56 @@ ppParendType ty = ppr_mono_ty pREC_CON ty
 -- Drop top-level for-all type variables in user style
 -- since they are implicit in Haskell
 
-ppForAll :: HsExplicitForAll -> [Located (HsTyVarBndr DocName)]
-         -> Located (HsContext DocName) -> Html
-ppForAll expl tvs cxt 
+ppForAll exp tvs cxt 
   | show_forall = forall_part <+> ppLContext cxt
   | otherwise   = ppLContext cxt
   where
     show_forall = not (null tvs) && is_explicit
     is_explicit = case expl of {Explicit -> True; Implicit -> False}
-    forall_part = hsep (keyword "forall" : ppTyVars tvs) +++ dot 
+    forall_part = hsep (forallSymbol unicode : ppTyVars tvs) +++ dot 
 
-
-ppr_mono_lty :: Int -> LHsType DocName -> Html
 ppr_mono_lty ctxt_prec ty = ppr_mono_ty ctxt_prec (unLoc ty)
 
-
-ppr_mono_ty :: Int -> HsType DocName -> Html
-ppr_mono_ty ctxt_prec (HsForAllTy expl tvs ctxt ty)
+ppr_mono_ty ctxt_prec (HsForAllTy exp tvs ctxt ty)
   = maybeParen ctxt_prec pREC_FUN $
-    hsep [ppForAll expl tvs ctxt, ppr_mono_lty pREC_TOP ty]
+    hsep [ppForAll exp tvs ctxt, ppr_mono_lty pREC_TOP ty]
 
 -- gaw 2004
-ppr_mono_ty _         (HsBangTy b ty)     = ppBang b +++ ppLParendType ty
-ppr_mono_ty _         (HsTyVar name)      = ppDocName name
+ppr_mono_ty ctxt_prec (HsBangTy b ty)     = ppBang b +++ ppLParendType ty
+ppr_mono_ty ctxt_prec (HsTyVar name)      = ppDocName name
 ppr_mono_ty ctxt_prec (HsFunTy ty1 ty2)   = ppr_fun_ty ctxt_prec ty1 ty2
-ppr_mono_ty _         (HsTupleTy con tys) = tupleParens con (map ppLType tys)
-ppr_mono_ty _         (HsKindSig ty kind) = parens (ppr_mono_lty pREC_TOP ty <+> dcolon <+> ppKind kind)
-ppr_mono_ty _         (HsListTy ty)       = brackets (ppr_mono_lty pREC_TOP ty)
-ppr_mono_ty _         (HsPArrTy ty)       = pabrackets (ppr_mono_lty pREC_TOP ty)
-ppr_mono_ty _         (HsPredTy p)        = parens (ppPred p)
-ppr_mono_ty _         (HsNumTy n)         = toHtml (show n) -- generics only
-ppr_mono_ty _         (HsSpliceTy _)      = error "ppr_mono_ty-haddock"
+ppr_mono_ty ctxt_prec (HsTupleTy con tys) = tupleParens con (map ppLType tys)
+ppr_mono_ty ctxt_prec (HsKindSig ty kind) = parens (ppr_mono_lty pREC_TOP ty <+> dcolon <+> ppKind kind)
+ppr_mono_ty ctxt_prec (HsListTy ty)       = brackets (ppr_mono_lty pREC_TOP ty)
+ppr_mono_ty ctxt_prec (HsPArrTy ty)       = pabrackets (ppr_mono_lty pREC_TOP ty)
+ppr_mono_ty ctxt_prec (HsPredTy pred)     = parens (ppPred pred)
+ppr_mono_ty ctxt_prec (HsNumTy n)         = toHtml (show n) -- generics only
+ppr_mono_ty ctxt_prec (HsSpliceTy s)      = error "ppr_mono_ty-haddock"
 
-ppr_mono_ty ctxt_prec (HsAppTy fun_ty arg_ty)
+ppr_mono_ty ctxt_prec (HsAppTy fun_ty arg_ty) unicode 
   = maybeParen ctxt_prec pREC_CON $
-    hsep [ppr_mono_lty pREC_FUN fun_ty, ppr_mono_lty pREC_CON arg_ty]
+    hsep [ppr_mono_lty pREC_FUN fun_ty unicode, ppr_mono_lty pREC_CON arg_ty unicode]
 
-ppr_mono_ty ctxt_prec (HsOpTy ty1 op ty2)
+ppr_mono_ty ctxt_prec (HsOpTy ty1 op ty2) unicode 
   = maybeParen ctxt_prec pREC_FUN $
-    ppr_mono_lty pREC_OP ty1 <+> ppr_op <+> ppr_mono_lty pREC_OP ty2
+    ppr_mono_lty pREC_OP ty1 unicode <+> ppr_op <+> ppr_mono_lty pREC_OP ty2 unicode
   where
     ppr_op = if not (isSymOcc occName) then quote (ppLDocName op) else ppLDocName op
     occName = docNameOcc . unLoc $ op
 
-ppr_mono_ty ctxt_prec (HsParTy ty)
+ppr_mono_ty ctxt_prec (HsParTy ty) unicode 
 --  = parens (ppr_mono_lty pREC_TOP ty)
+  = ppr_mono_lty ctxt_prec ty unicode
+
+ppr_mono_ty ctxt_prec (HsDocTy ty doc)
   = ppr_mono_lty ctxt_prec ty
 
-ppr_mono_ty ctxt_prec (HsDocTy ty _)
-  = ppr_mono_lty ctxt_prec ty
-
-
-ppr_fun_ty :: Int -> LHsType DocName -> LHsType DocName -> Html 
 ppr_fun_ty ctxt_prec ty1 ty2
   = let p1 = ppr_mono_lty pREC_FUN ty1
         p2 = ppr_mono_lty pREC_TOP ty2
     in
     maybeParen ctxt_prec pREC_FUN $
-    hsep [p1, arrow <+> p2]
+    hsep [p1, arrow unicode <+> p2]
 
 
 -- ----------------------------------------------------------------------------
@@ -1850,7 +1833,7 @@ instHdr :: String -> HtmlTable
 instHdr id_ = 
   tda [ theclass "section4" ] << (collapsebutton id_ +++ toHtml " Instances")
 
-dcolon, arrow, darrow, dot :: Html
+dcolon, arrow, darrow :: Html
 dcolon = toHtml "::"
 arrow  = toHtml "->"
 darrow = toHtml "=>"

@@ -84,6 +84,7 @@ data Flag
   | Flag_GhcLibDir String
   | Flag_GhcVersion
   | Flag_NoWarnings
+  | Flag_UseUnicode
   deriving (Eq)
 
 
@@ -104,6 +105,7 @@ options backwardsCompat =
 --	"output in DocBook XML",
     Option ['h']  ["html"]     (NoArg Flag_Html)
 	"output in HTML",
+    Option ['U'] ["use-unicode"] (NoArg Flag_UseUnicode) "use Unicode in HTML output",
     Option []  ["hoogle"]     (NoArg Flag_Hoogle)
     "output for Hoogle",
     Option []  ["html-help"]    (ReqArg Flag_HtmlHelp "format")
