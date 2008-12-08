@@ -416,5 +416,5 @@ renameExportItem item = case item of
 
 renameSub (n,doc) = do
   n' <- rename n
-  doc' <- renameDoc doc
+  doc' <- mapM renameDoc doc
   return (n', doc')

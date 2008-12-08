@@ -27,7 +27,7 @@ import Haddock.GHC.Utils
 import qualified Haddock.Utils.Html as Html
 
 import Control.Exception     ( bracket )
-import Control.Monad         ( when, unless )
+import Control.Monad         ( when, unless, join )
 import Data.Char             ( isUpper, toUpper )
 import Data.List             ( sortBy, groupBy )
 import Data.Maybe
@@ -763,7 +763,7 @@ declWithDoc False links loc nm (Just doc) html_decl =
 
 -- TODO: use DeclInfo DocName or something
 ppDecl :: Bool -> LinksInfo -> LHsDecl DocName -> 
-          Maybe (HsDoc DocName) -> [InstHead DocName] -> DocMap -> [(DocName, HsDoc DocName)] -> HtmlTable
+          Maybe (HsDoc DocName) -> [InstHead DocName] -> DocMap -> [(DocName, Maybe (HsDoc DocName))] -> HtmlTable
 ppDecl summ links (L loc decl) mbDoc instances docMap subdocs = case decl of
   TyClD d@(TyFamily {})          -> ppTyFam summ False links loc mbDoc d
   TyClD d@(TyData {})
@@ -1070,7 +1070,7 @@ ppFds fds =
 	fundep (vars1,vars2) = hsep (map ppDocName vars1) <+> toHtml "->" <+>
 			       hsep (map ppDocName vars2)
 
-ppShortClassDecl :: Bool -> LinksInfo -> TyClDecl DocName -> SrcSpan -> [(DocName, HsDoc DocName)] -> HtmlTable
+ppShortClassDecl :: Bool -> LinksInfo -> TyClDecl DocName -> SrcSpan -> [(DocName, Maybe (HsDoc DocName))] -> HtmlTable
 ppShortClassDecl summary links (ClassDecl lctxt lname tvs fds sigs _ ats _) loc subdocs = 
   if null sigs && null ats
     then (if summary then declBox else topDeclBox links loc nm) hdr
@@ -1081,11 +1081,11 @@ ppShortClassDecl summary links (ClassDecl lctxt lname tvs fds sigs _ ats _) loc 
 					aboves
 					(
 						[ ppAssocType summary links doc at | at <- ats
-                                                , let doc = lookup (tcdName $ unL at) subdocs ]  ++
+                                                , let doc = join $ lookup (tcdName $ unL at) subdocs ]  ++
 
 						[ ppFunSig summary links loc doc n typ
 						| L _ (TypeSig (L _ n) (L _ typ)) <- sigs
-						, let doc = lookup n subdocs ] 
+						, let doc = join $ lookup n subdocs ] 
 					)
 				)
   where
@@ -1095,7 +1095,7 @@ ppShortClassDecl summary links (ClassDecl lctxt lname tvs fds sigs _ ats _) loc 
 
 
 ppClassDecl :: Bool -> LinksInfo -> [InstHead DocName] -> SrcSpan ->
-               Maybe (HsDoc DocName) -> DocMap -> [(DocName, HsDoc DocName)] -> TyClDecl DocName -> 
+               Maybe (HsDoc DocName) -> DocMap -> [(DocName, Maybe (HsDoc DocName))] -> TyClDecl DocName -> 
                HtmlTable
 ppClassDecl summary links instances loc mbDoc docMap subdocs
 	decl@(ClassDecl lctxt lname ltyvars lfds lsigs _ ats _)
@@ -1124,10 +1124,10 @@ ppClassDecl summary links instances loc mbDoc docMap subdocs
     methodTable =
       abovesSep s8 [ ppFunSig summary links loc doc n typ
                    | L _ (TypeSig (L _ n) (L _ typ)) <- lsigs
-                   , let doc = lookup n subdocs ]
+                   , let doc = join $ lookup n subdocs ]
 
     atTable = abovesSep s8 $ [ ppAssocType summary links doc at | at <- ats
-                             , let doc = lookup (tcdName $ unL at) subdocs ]
+                             , let doc = join $ lookup (tcdName $ unL at) subdocs ]
 
     instId = collapseId (docNameOrig nm)
     instancesBit

@@ -62,13 +62,11 @@ createInterface ghcMod flags modMap = do
 
   warnAboutFilteredDecls mod decls0
 
-  visibleNames <- mkVisibleNames mod modMap localNames 
-                                 (ghcNamesInScope ghcMod) 
-                                 exports opts declMap 
-
   exportItems <- mkExportItems modMap mod (ghcExportedNames ghcMod) decls declMap
                                opts exports ignoreExps instances
 
+  let visibleNames = mkVisibleNames exportItems
+  
   -- prune the export list to just those declarations that have
   -- documentation, if the 'prune' option is on.
   let 
@@ -377,15 +375,13 @@ mkExportItems modMap this_mod exported_names decls declMap
         t `notElem` declATs (unL decl) = return [ mkExportDecl t x ]
       | otherwise = return []
 
-
     mkExportDecl :: Name -> DeclInfo -> ExportItem Name
     mkExportDecl n (decl, doc, subs) = decl'
       where
-        decl' = ExportDecl (restrictTo subs' (extractDecl n mdl decl)) doc subdocs []
+        decl' = ExportDecl (restrictTo sub_names (extractDecl n mdl decl)) doc subs' []
         mdl = nameModule n
-        subs' = filter (`elem` exported_names) $ map fst subs
-        subdocs = [ (n, doc) | (n, Just doc) <- subs ]
-
+        subs' = filter ((`elem` exported_names) . fst) subs
+        sub_names = map fst subs'
 
     fullContentsOf m  
 	| m == this_mod = return (fullContentsOfThisModule this_mod decls)
@@ -412,8 +408,7 @@ fullContentsOfThisModule module_ decls = catMaybes (map mkExportItem decls)
   where
     mkExportItem (L _ (DocD (DocGroup lev doc)), _, _) = Just $ ExportGroup lev "" doc
     mkExportItem (L _ (DocD (DocCommentNamed _ doc)), _, _)   = Just $ ExportDoc doc
-    mkExportItem (decl, doc, subs) = Just $ ExportDecl decl doc subdocs []
-      where subdocs = [ (n, doc) | (n, Just doc) <- subs ]
+    mkExportItem (decl, doc, subs) = Just $ ExportDecl decl doc subs []
 
 --    mkExportItem _ = Nothing -- TODO: see if this is really needed
 
@@ -486,53 +481,18 @@ pruneExportItems items = filter hasDoc items
 	hasDoc _ = True
 
 
--- | Gather a list of original names exported from this module
-mkVisibleNames :: Module 
-             -> ModuleMap
-             -> [Name] 
-             -> [Name]
-             -> Maybe [IE Name]
-             -> [DocOption]
-             -> Map Name DeclInfo
-             -> ErrMsgM [Name]
+mkVisibleNames :: [ExportItem Name] -> [Name]
+mkVisibleNames exports = concatMap exportName exports
+  where
+    exportName e@ExportDecl {} =
+      case getMainDeclBinder $ unL $ expItemDecl e of
+        Just n -> n : subs
+        Nothing -> subs
+      where subs = map fst (expItemSubDocs e) 
+    exportName e@ExportNoDecl {} = expItemName e : expItemSubs e
+    exportName _ = []
 
-mkVisibleNames mdl modMap localNames scope maybeExps opts declMap 
-  -- if no export list, just return all local names 
-  | Nothing <- maybeExps         = return (filter hasDecl localNames)
-  | OptIgnoreExports `elem` opts = return localNames
-  | Just expspecs <- maybeExps = do
-      visibleNames <- mapM extract expspecs
-      return $ filter isNotPackageName (concat visibleNames)
- where
-  hasDecl name = isJust (Map.lookup name declMap)
-  isNotPackageName name = nameMod == mdl || isJust (Map.lookup nameMod modMap)
-    where nameMod = nameModule name
-
-  extract e = 
-   case e of
-    IEVar x -> return [x]
-    IEThingAbs t -> return [t]
-    IEThingAll t -> return (t : all_subs)
-	 where
-	      all_subs | nameModule t == mdl = subsOfName t declMap
-		       | otherwise = allSubsOfName modMap t
-
-    IEThingWith t cs -> return (t : cs)
-	
-    IEModuleContents m
-	| mkModule (modulePackageId mdl) m == mdl -> return localNames 
-	| otherwise -> let m' = mkModule (modulePackageId mdl) m in
-	  case Map.lookup m' modMap of
-	    Just mod
-		| OptHide `elem` ifaceOptions mod ->
-		    return (filter (`elem` scope) (ifaceExports mod))
-		| otherwise -> return []
-	    Nothing
-		-> tell (exportModuleMissingErr mdl m') >> return []
-  
-    _ -> return []
-
-
+      
 exportModuleMissingErr this mdl 
   = ["Warning: in export list of " ++ show (moduleString this)
 	 ++ ": module not found: " ++ show (moduleString mdl)]
