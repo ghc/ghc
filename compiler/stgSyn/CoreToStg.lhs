@@ -156,10 +156,11 @@ coreTopBindsToStg _        env [] = (env, emptyFVInfo, [])
 coreTopBindsToStg this_pkg env (b:bs)
   = (env2, fvs2, b':bs')
   where
-	-- env accumulates down the list of binds, fvs accumulates upwards
+	-- Notice the mutually-recursive "knot" here:
+	--   env accumulates down the list of binds, 
+	--   fvs accumulates upwards
 	(env1, fvs2, b' ) = coreTopBindToStg this_pkg env fvs1 b
   	(env2, fvs1, bs') = coreTopBindsToStg this_pkg env1 bs
-
 
 coreTopBindToStg
 	:: PackageId
@@ -180,14 +181,13 @@ coreTopBindToStg this_pkg env body_fvs (NonRec id rhs)
 	
 	bind = StgNonRec id stg_rhs
     in
-    ASSERT2(manifestArity rhs == stgRhsArity stg_rhs, ppr id $$ (ptext (sLit "rhs:")) <+> ppr rhs $$ (ptext (sLit "stg_rhs:"))<+> ppr stg_rhs $$ (ptext (sLit "Manifest:")) <+> (ppr $ manifestArity rhs) $$ (ptext (sLit "STG:")) <+>(ppr $ stgRhsArity stg_rhs) )
-    ASSERT2(consistentCafInfo id bind, ppr id $$ ppr rhs $$ ppr bind)
---    WARN(not (consistent caf_info bind), ppr id <+> ppr cafs <+> ppCafInfo caf_info)
+    ASSERT2(consistentCafInfo id bind, ppr id $$ ppr rhs $$ ppr bind )
     (env', fvs' `unionFVInfo` body_fvs, bind)
 
 coreTopBindToStg this_pkg env body_fvs (Rec pairs)
-  = let 
-	(binders, rhss) = unzip pairs
+  = ASSERT( not (null pairs) )
+    let 
+	binders = map fst pairs
 
 	extra_env' = [ (b, LetBound TopLet $! manifestArity rhs)
 		     | (b, rhs) <- pairs ]
@@ -201,9 +201,9 @@ coreTopBindToStg this_pkg env body_fvs (Rec pairs)
 
 	bind = StgRec (zip binders stg_rhss)
     in
-    ASSERT2(and [manifestArity rhs == stgRhsArity stg_rhs | (rhs,stg_rhs) <- rhss `zip` stg_rhss], ppr binders)
     ASSERT2(consistentCafInfo (head binders) bind, ppr binders)
     (env', fvs' `unionFVInfo` body_fvs, bind)
+
 
 -- Assertion helper: this checks that the CafInfo on the Id matches
 -- what CoreToStg has figured out about the binding's SRT.  The
@@ -229,16 +229,40 @@ coreToTopStgRhs
 	-> (Id,CoreExpr)
 	-> LneM (StgRhs, FreeVarsInfo)
 
-coreToTopStgRhs this_pkg scope_fv_info (bndr, rhs) = do
-    (new_rhs, rhs_fvs, _) <- coreToStgExpr rhs
-    lv_info <- freeVarsToLiveVars rhs_fvs
-    return (mkTopStgRhs is_static rhs_fvs (mkSRT lv_info) bndr_info new_rhs, rhs_fvs)
+coreToTopStgRhs this_pkg scope_fv_info (bndr, rhs)
+  = do { (new_rhs, rhs_fvs, _) <- coreToStgExpr rhs
+       ; lv_info <- freeVarsToLiveVars rhs_fvs
+
+       ; let stg_rhs   = mkTopStgRhs is_static rhs_fvs (mkSRT lv_info) bndr_info new_rhs
+             stg_arity = stgRhsArity stg_rhs
+       ; return (ASSERT2( arity_ok stg_arity, mk_arity_msg stg_arity) stg_rhs, 
+                 rhs_fvs) }
   where
     bndr_info = lookupFVInfo scope_fv_info bndr
     is_static = rhsIsStatic this_pkg rhs
 
-mkTopStgRhs :: Bool -> FreeVarsInfo -> SRT -> StgBinderInfo -> StgExpr
-	-> StgRhs
+	-- It's vital that the arity on a top-level Id matches
+	-- the arity of the generated STG binding, else an importing 
+	-- module will use the wrong calling convention
+	-- 	(Trac #2844 was an example where this happened)
+	-- NB1: we can't move the assertion further out without
+	--      blocking the "knot" tied in coreTopBindsToStg
+	-- NB2: the arity check is only needed for Ids with External
+	--	Names, because they are externally visible.  The CorePrep
+	--	pass introduces "sat" things with Local Names and does
+	--	not bother to set their Arity info, so don't fail for those
+    arity_ok stg_arity
+       | isExternalName (idName bndr) = id_arity == stg_arity
+       | otherwise      	      = True
+    id_arity  = idArity bndr
+    mk_arity_msg stg_arity
+        = vcat [ppr bndr, 
+                ptext (sLit "Id arity:") <+> ppr id_arity,
+                ptext (sLit "STG arity:") <+> ppr stg_arity]
+
+mkTopStgRhs :: Bool -> FreeVarsInfo
+	    -> SRT -> StgBinderInfo -> StgExpr
+   	    -> StgRhs
 
 mkTopStgRhs is_static rhs_fvs srt binder_info (StgLam _ bndrs body)
   = ASSERT( is_static )
@@ -247,7 +271,7 @@ mkTopStgRhs is_static rhs_fvs srt binder_info (StgLam _ bndrs body)
 		  ReEntrant
 		  srt
 		  bndrs body
-	
+
 mkTopStgRhs is_static _ _ _ (StgConApp con args)
   | is_static	 -- StgConApps can be updatable (see isCrossDllConApp)
   = StgRhsCon noCCS con args
