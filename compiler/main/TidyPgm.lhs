@@ -22,6 +22,7 @@ import VarEnv
 import VarSet
 import Var
 import Id
+import Class
 import IdInfo
 import InstEnv
 import NewDemand
@@ -304,10 +305,14 @@ tidyProgram hsc_env  (ModGuts { mg_module = mod, mg_exports = exports,
 		-- and indeed it does, but if omit_prags is on, ext_rules is
 		-- empty
 
+	      -- See Note [Injecting implicit bindings]
+    	      ; implicit_binds = getImplicitBinds type_env
+    	      ; all_tidy_binds = implicit_binds ++ tidy_binds
+
 	      ; alg_tycons = filter isAlgTyCon (typeEnvTyCons type_env)
 	      }
 
-   	; endPass dflags "Tidy Core" Opt_D_dump_simpl tidy_binds
+   	; endPass dflags "Tidy Core" Opt_D_dump_simpl all_tidy_binds
 	; dumpIfSet_core dflags Opt_D_dump_simpl
 		"Tidy Core Rules"
 		(pprRules tidy_rules)
@@ -316,7 +321,7 @@ tidyProgram hsc_env  (ModGuts { mg_module = mod, mg_exports = exports,
 
 	; return (CgGuts { cg_module   = mod, 
 			   cg_tycons   = alg_tycons,
-			   cg_binds    = tidy_binds,
+			   cg_binds    = all_tidy_binds,
 			   cg_dir_imps = dir_imp_mods,
 			   cg_foreign  = foreign_stubs,
 			   cg_dep_pkgs = dep_pkgs deps,
@@ -436,6 +441,59 @@ tidyInstances tidy_dfun ispecs
   where
     tidy ispec = setInstanceDFunId ispec $
 		 tidy_dfun (instanceDFunId ispec)
+\end{code}
+
+
+%************************************************************************
+%*									*
+	Implicit bindings
+%*									*
+%************************************************************************
+
+Note [Injecting implicit bindings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We inject the implict bindings right at the end, in CoreTidy.
+Some of these bindings, notably record selectors, are not
+constructed in an optimised form.  E.g. record selector for
+	data T = MkT { x :: {-# UNPACK #-} !Int }
+Then the unfolding looks like
+	x = \t. case t of MkT x1 -> let x = I# x1 in x
+This generates bad code unless it's first simplified a bit.  That is
+why CoreUnfold.mkImplicitUnfolding uses simleExprOpt to do a bit of
+optimisation first.  (Only matters when the selector is used curried;
+eg map x ys.)  See Trac #2070.
+
+At one time I tried injecting the implicit bindings *early*, at the
+beginning of SimplCore.  But that gave rise to real difficulty,
+becuase GlobalIds are supposed to have *fixed* IdInfo, but the
+simplifier and other core-to-core passes mess with IdInfo all the
+time.  The straw that broke the camels back was when a class selector
+got the wrong arity -- ie the simplifier gave it arity 2, whereas
+importing modules were expecting it to have arity 1 (Trac #2844).
+It's much safer just to inject them right at the end, after tidying.
+
+
+\begin{code}
+getImplicitBinds :: TypeEnv -> [CoreBind]
+getImplicitBinds type_env
+  = map get_defn (concatMap implicit_con_ids (typeEnvTyCons type_env)
+		  ++ concatMap other_implicit_ids (typeEnvElts type_env))
+	-- Put the constructor wrappers first, because
+	-- other implicit bindings (notably the fromT functions arising 
+	-- from generics) use the constructor wrappers.  At least that's
+	-- what External Core likes
+  where
+    implicit_con_ids tc = mapCatMaybes dataConWrapId_maybe (tyConDataCons tc)
+    
+    other_implicit_ids (ATyCon tc) = filter (not . isNaughtyRecordSelector) (tyConSelIds tc)
+	-- The "naughty" ones are not real functions at all
+	-- They are there just so we can get decent error messages
+	-- See Note  [Naughty record selectors] in MkId.lhs
+    other_implicit_ids (AClass cl) = classSelIds cl
+    other_implicit_ids _other      = []
+    
+    get_defn :: Id -> CoreBind
+    get_defn id = NonRec id (unfoldingTemplate (idUnfolding id))
 \end{code}
 
 

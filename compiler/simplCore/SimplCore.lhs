@@ -100,22 +100,18 @@ core2core hsc_env guts = do
     -- _theoretically_ be changed during the Core pipeline (it's part of ModGuts), which
     -- would mean our cached value would go out of date.
     let mod = mg_module guts
-    (guts, stats) <- runCoreM hsc_env ann_env imp_rule_base cp_us mod $ do
+    (guts2, stats) <- runCoreM hsc_env ann_env imp_rule_base cp_us mod $ do
         -- FIND BUILT-IN PASSES
         let builtin_core_todos = getCoreToDo dflags
 
-        -- Note [Injecting implicit bindings]
-        let implicit_binds = getImplicitBinds (mg_types guts1)
-            guts2 = guts1 { mg_binds = implicit_binds ++ mg_binds guts1 }
-
         -- DO THE BUSINESS
-        doCorePasses builtin_core_todos guts2
+        doCorePasses builtin_core_todos guts1
 
     Err.dumpIfSet_dyn dflags Opt_D_dump_simpl_stats
         "Grand total simplifier statistics"
         (pprSimplCount stats)
 
-    return guts
+    return guts2
 
 
 type CorePass = CoreToDo
@@ -302,48 +298,6 @@ observe do_pass = doPassM $ \binds -> do
     dflags <- getDynFlags
     liftIO $ do_pass dflags binds
     return binds
-\end{code}
-
-
-%************************************************************************
-%*									*
-	Implicit bindings
-%*									*
-%************************************************************************
-
-Note [Injecting implicit bindings]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We used to inject the implict bindings right at the end, in CoreTidy.
-But some of these bindings, notably record selectors, are not
-constructed in an optimised form.  E.g. record selector for
-	data T = MkT { x :: {-# UNPACK #-} !Int }
-Then the unfolding looks like
-	x = \t. case t of MkT x1 -> let x = I# x1 in x
-This generates bad code unless it's first simplified a bit.
-(Only matters when the selector is used curried; eg map x ys.)
-See Trac #2070.
-
-\begin{code}
-getImplicitBinds :: TypeEnv -> [CoreBind]
-getImplicitBinds type_env
-  = map get_defn (concatMap implicit_con_ids (typeEnvTyCons type_env)
-		  ++ concatMap other_implicit_ids (typeEnvElts type_env))
-	-- Put the constructor wrappers first, because
-	-- other implicit bindings (notably the fromT functions arising 
-	-- from generics) use the constructor wrappers.  At least that's
-	-- what External Core likes
-  where
-    implicit_con_ids tc = mapCatMaybes dataConWrapId_maybe (tyConDataCons tc)
-    
-    other_implicit_ids (ATyCon tc) = filter (not . isNaughtyRecordSelector) (tyConSelIds tc)
-	-- The "naughty" ones are not real functions at all
-	-- They are there just so we can get decent error messages
-	-- See Note  [Naughty record selectors] in MkId.lhs
-    other_implicit_ids (AClass cl) = classSelIds cl
-    other_implicit_ids _other      = []
-    
-    get_defn :: Id -> CoreBind
-    get_defn id = NonRec id (unfoldingTemplate (idUnfolding id))
 \end{code}
 
 
