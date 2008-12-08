@@ -23,10 +23,10 @@ import {-# SOURCE #-}	Match( matchWrapper )
 import DsMonad
 import DsGRHSs
 import DsUtils
-import OccurAnal
 
 import HsSyn		-- lots of things
 import CoreSyn		-- lots of things
+import CoreSubst
 import MkCore
 import CoreUtils
 import CoreUnfold
@@ -49,7 +49,7 @@ import Bag
 import BasicTypes hiding ( TopLevel )
 import FastString
 import StaticFlags	( opt_DsMultiTyVar )
-import Util		( mapSnd, count, mapAndUnzip, lengthExceeds )
+import Util		( count, mapAndUnzip, lengthExceeds )
 
 import Control.Monad
 import Data.List
@@ -526,55 +526,21 @@ decomposeRuleLhs :: CoreExpr -> Maybe ([Var], Id, [CoreExpr])
 -- That is, the RULE binders are lambda-bound
 -- Returns Nothing if the LHS isn't of the expected shape
 decomposeRuleLhs lhs 
-  = case (decomp emptyVarEnv body) of
-	Nothing 	-> Nothing
-	Just (fn, args) -> Just (bndrs, fn, args)
+  = case collectArgs body of
+        (Var fn, args) -> Just (bndrs, fn, args)
+	_other	       -> Nothing	-- Unexpected shape
   where
-    occ_lhs = occurAnalyseExpr lhs
-		-- The occurrence-analysis does two things
-		-- (a) identifies unused binders: Note [Unused spec binders]
-		-- (b) sorts dict bindings into NonRecs 
-		--	so they can be inlined by 'decomp'
-    (bndrs, body) = collectBinders occ_lhs
-
-        -- Substitute dicts in the LHS args, so that there 
-        -- aren't any lets getting in the way
-        -- Note that we substitute the function too; we might have this as
-        -- a LHS:       let f71 = M.f Int in f71
-    decomp env (Let (NonRec dict rhs) body) 
-        = decomp (extendVarEnv env dict (simpleSubst env rhs)) body
-    decomp env body 
-        = case collectArgs (simpleSubst env body) of
-            (Var fn, args) -> Just (fn, args)
-            _              -> Nothing
-
-simpleSubst :: IdEnv CoreExpr -> CoreExpr -> CoreExpr
--- Similar to CoreSubst.substExpr, except that 
--- (a) Takes no account of capture; at this point there is no shadowing
--- (b) Can have a GlobalId (imported) in its domain
--- (c) Ids only; no types are substituted
--- (d) Does not insist (as does CoreSubst.lookupIdSubst) that the 
---     in-scope set mentions all LocalIds mentioned in the argument of the subst
---
--- (b) and (d) are the reasons we can't use CoreSubst
--- 
--- (I had a note that (b) is "no longer relevant", and indeed it doesn't
---  look relevant here. Perhaps there was another caller of simpleSubst.)
-
-simpleSubst subst expr
-  = go expr
-  where
-    go (Var v)	       = lookupVarEnv subst v `orElse` Var v
-    go (Cast e co)     = Cast (go e) co
-    go (Type ty)       = Type ty
-    go (Lit lit)       = Lit lit
-    go (App fun arg)   = App (go fun) (go arg)
-    go (Note note e)   = Note note (go e)
-    go (Lam bndr body) = Lam bndr (go body)
-    go (Let (NonRec bndr rhs) body) = Let (NonRec bndr (go rhs)) (go body)
-    go (Let (Rec pairs) body)       = Let (Rec (mapSnd go pairs)) (go body)
-    go (Case scrut bndr ty alts)    = Case (go scrut) bndr ty 
-					   [(c,bs,go r) | (c,bs,r) <- alts]
+    (bndrs, body) = collectBinders (simpleOptExpr lhs)
+	-- simpleOptExpr occurrence-analyses and simplifies the lhs
+	-- and thereby
+	-- (a) identifies unused binders: Note [Unused spec binders]
+	-- (b) sorts dict bindings into NonRecs 
+	--	so they can be inlined by 'decomp'
+	-- (c) substitute trivial lets so that they don't get in the way
+	--     Note that we substitute the function too; we might 
+	--     have this as a LHS:  let f71 = M.f Int in f71
+        -- NB: tcSimplifyRuleLhs is very careful not to generate complicated
+	--     dictionary expressions that we might have to match
 \end{code}
 
 
