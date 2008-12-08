@@ -350,9 +350,10 @@ lookupLocatedGlobalOccRn = wrapLocM lookupGlobalOccRn
 
 lookupGlobalOccRn :: RdrName -> RnM Name
 -- lookupGlobalOccRn is like lookupOccRn, except that it looks in the global 
--- environment.  It's used only for
+-- environment.  It's called directly only for
 --	record field names
 --	class op names in class and instance decls
+-- 	names in export lists
 
 lookupGlobalOccRn rdr_name
   | not (isSrcRdrName rdr_name)
