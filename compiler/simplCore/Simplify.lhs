@@ -636,7 +636,6 @@ addNonRecWithUnf env new_bndr new_rhs new_unfolding
     addNonRec env final_id new_rhs
 		-- The addNonRec adds it to the in-scope set too
 
-
 ------------------------------
 simplUnfolding :: SimplEnv-> TopLevelFlag
 	       -> Id	-- Debug output only
@@ -651,7 +650,6 @@ simplUnfolding env top_lvl bndr occ_info old_unf new_rhs	-- Note [Setting the ne
     is_inline_rule = isInlineRule old_unf
     omit_unfolding = isNonRuleLoopBreaker occ_info
 \end{code}
-
 
 Note [Setting the new unfolding]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
