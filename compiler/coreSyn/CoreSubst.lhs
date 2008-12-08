@@ -24,7 +24,10 @@ module CoreSubst (
 
 	-- ** Substituting and cloning binders
 	substBndr, substBndrs, substRecBndrs,
-	cloneIdBndr, cloneIdBndrs, cloneRecIdBndrs
+	cloneIdBndr, cloneIdBndrs, cloneRecIdBndrs,
+
+	-- ** Simple expression optimiser
+	simpleOptExpr
     ) where
 
 #include "HsVersions.h"
@@ -32,6 +35,7 @@ module CoreSubst (
 import CoreSyn
 import CoreFVs
 import CoreUtils
+import OccurAnal( occurAnalyseExpr )
 
 import qualified Type
 import Type     ( Type, TvSubst(..), TvSubstEnv )
@@ -535,4 +539,86 @@ substVarSet subst fvs
     subst_fv subst fv 
 	| isId fv   = exprFreeVars (lookupIdSubst subst fv)
 	| otherwise = Type.tyVarsOfType (lookupTvSubst subst fv)
+\end{code}
+
+%************************************************************************
+%*									*
+	The Very Simple Optimiser
+%*									*
+%************************************************************************
+
+\begin{code}
+simpleOptExpr :: CoreExpr -> CoreExpr
+-- Return an occur-analysed and slightly optimised expression
+-- The optimisation is very straightforward: just
+-- inline non-recursive bindings that are used only once, 
+-- or where the RHS is trivial
+
+simpleOptExpr expr
+  = go init_subst (occurAnalyseExpr expr)
+  where
+    init_subst = mkEmptySubst (mkInScopeSet (exprFreeVars expr))
+	-- It's potentially to make a proper in-scope set
+	-- Consider  let x = ..y.. in \y. ...x...
+	-- Then we should remember to clone y before substituting
+	-- for x.  It's very unlikely to occur, because we probably
+	-- won't *be* substituting for x if it occurs inside a
+	-- lambda.  
+	--
+	-- It's a bit painful to call exprFreeVars, because it makes
+	-- three passes instead of two (occ-anal, and go)
+
+    go subst (Var v)          = lookupIdSubst subst v
+    go subst (App e1 e2)      = App (go subst e1) (go subst e2)
+    go subst (Type ty)        = Type (substTy subst ty)
+    go _     (Lit lit)        = Lit lit
+    go subst (Note note e)    = Note note (go subst e)
+    go subst (Cast e co)      = Cast (go subst e) (substTy subst co)
+    go subst (Let bind body)  = go_bind subst bind body
+    go subst (Lam bndr body)  = Lam bndr' (go subst' body)
+		              where
+			        (subst', bndr') = substBndr subst bndr
+
+    go subst (Case e b ty as) = Case (go subst e) b' 
+				     (substTy subst ty)
+				     (map (go_alt subst') as)
+			      where
+			  	 (subst', b') = substBndr subst b
+
+
+    ----------------------
+    go_alt subst (con, bndrs, rhs) = (con, bndrs', go subst' rhs)
+				 where
+				   (subst', bndrs') = substBndrs subst bndrs
+
+    ----------------------
+    go_bind subst (Rec prs) body = Let (Rec (bndrs' `zip` rhss'))
+				       (go subst' body)
+			    where
+			      (bndrs, rhss)    = unzip prs
+			      (subst', bndrs') = substRecBndrs subst bndrs
+			      rhss'	       = map (go subst') rhss
+
+    go_bind subst (NonRec b r) body = go_nonrec subst b (go subst r) body
+
+    ----------------------
+    go_nonrec subst b (Type ty') body
+      | isTyVar b = go (extendTvSubst subst b ty') body
+	-- let a::* = TYPE ty in <body>
+    go_nonrec subst b r' body
+      | isId b	-- let x = e in <body>
+      , exprIsTrivial r' || safe_to_inline (idOccInfo b)
+      = go (extendIdSubst subst b r') body
+    go_nonrec subst b r' body
+      = Let (NonRec b' r') (go subst' body)
+      where
+	(subst', b') = substBndr subst b
+
+    ----------------------
+	-- Unconditionally safe to inline
+    safe_to_inline :: OccInfo -> Bool
+    safe_to_inline IAmDead                  = True
+    safe_to_inline (OneOcc in_lam one_br _) = not in_lam && one_br
+    safe_to_inline (IAmALoopBreaker {})     = False
+    safe_to_inline NoOccInfo                = False
 \end{code}
