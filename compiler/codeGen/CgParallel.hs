@@ -1,10 +1,3 @@
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 -----------------------------------------------------------------------------
 --
 -- (c) The University of Glasgow -2006
@@ -27,6 +20,7 @@ import Id
 import Cmm
 import StaticFlags
 import Outputable
+import SMRep
 
 staticParHdr :: [CmmLit]
 -- Parallel header words in a static closure
@@ -42,7 +36,7 @@ staticGranHdr = []
 
 doGranAllocate :: CmmExpr -> Code	
 -- macro DO_GRAN_ALLOCATE
-doGranAllocate hp 
+doGranAllocate _hp
   | not opt_GranMacros = nopC
   | otherwise	       = panic "doGranAllocate"
 
@@ -62,12 +56,14 @@ granFetchAndReschedule regs node_reqd
   where
     liveness = mkRegLiveness regs 0 0
 
+fetch :: FCode ()
 fetch = panic "granFetch"
 	-- Was: absC (CMacroStmt GRAN_FETCH [])
 	--HWL: generate GRAN_FETCH macro for GrAnSim
  	--     currently GRAN_FETCH and GRAN_FETCH_AND_RESCHEDULE are miai
 
-reschedule liveness node_reqd = panic "granReschedule"
+reschedule :: StgWord -> Bool -> Code
+reschedule _liveness _node_reqd = panic "granReschedule"
 	-- Was: absC  (CMacroStmt GRAN_RESCHEDULE [
   	--                mkIntCLit (I# (word2Int# liveness_mask)), 
     	--		  mkIntCLit (if node_reqd then 1 else 0)])
@@ -96,7 +92,8 @@ granYield regs node_reqd
   where
      liveness = mkRegLiveness regs 0 0
 
-yield liveness = panic "granYield"
+yield :: StgWord -> Code
+yield _liveness = panic "granYield"
 	-- Was : absC (CMacroStmt GRAN_YIELD 
         --                  [mkIntCLit (I# (word2Int# liveness_mask))])
 
