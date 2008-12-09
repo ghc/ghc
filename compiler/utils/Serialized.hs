@@ -86,16 +86,16 @@ deserializeWithData' bytes = deserializeConstr bytes $ \constr_rep bytes ->
 serializeConstr :: ConstrRep -> [Word8] -> [Word8]
 serializeConstr (AlgConstr ix)   = serializeWord8 1 . serializeInt ix
 serializeConstr (IntConstr i)    = serializeWord8 2 . serializeInteger i
-serializeConstr (FloatConstr d)  = serializeWord8 3 . serializeDouble d
+serializeConstr (FloatConstr r)  = serializeWord8 3 . serializeRational r
 serializeConstr (StringConstr s) = serializeWord8 4 . serializeString s
 
 deserializeConstr :: [Word8] -> (ConstrRep -> [Word8] -> a) -> a
 deserializeConstr bytes k = deserializeWord8 bytes $ \constr_ix bytes ->
                             case constr_ix of
-                                1 -> deserializeInt     bytes $ \ix -> k (AlgConstr ix)
-                                2 -> deserializeInteger bytes $ \i  -> k (IntConstr i)
-                                3 -> deserializeDouble  bytes $ \d  -> k (FloatConstr d)
-                                4 -> deserializeString  bytes $ \s  -> k (StringConstr s)
+                                1 -> deserializeInt      bytes $ \ix -> k (AlgConstr ix)
+                                2 -> deserializeInteger  bytes $ \i  -> k (IntConstr i)
+                                3 -> deserializeRational bytes $ \r  -> k (FloatConstr r)
+                                4 -> deserializeString   bytes $ \s  -> k (StringConstr s)
                                 x -> error $ "deserializeConstr: unrecognised serialized constructor type " ++ show x ++ " in context " ++ show bytes
 
 
@@ -140,11 +140,11 @@ deserializeInt :: [Word8] -> (Int -> [Word8] -> a) -> a
 deserializeInt = deserializeFixedWidthNum
 
 
-serializeDouble :: Double -> [Word8] -> [Word8]
-serializeDouble = serializeString . show
+serializeRational :: (Real a) => a -> [Word8] -> [Word8]
+serializeRational = serializeString . show . toRational
 
-deserializeDouble :: [Word8] -> (Double -> [Word8] -> a) -> a
-deserializeDouble bytes k = deserializeString bytes (k . read)
+deserializeRational :: (Fractional a) => [Word8] -> (a -> [Word8] -> b) -> b
+deserializeRational bytes k = deserializeString bytes (k . fromRational . read)
 
 
 serializeInteger :: Integer -> [Word8] -> [Word8]
@@ -172,3 +172,4 @@ deserializeList deserialize_element bytes k = deserializeInt bytes $ \len bytes 
     go len bytes k
       | len <= 0  = k [] bytes
       | otherwise = deserialize_element bytes (\elt bytes -> go (len - 1) bytes (k . (elt:)))
+
