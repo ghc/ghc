@@ -143,7 +143,7 @@ builtin_commands = [
   ("reload", 	keepGoing reloadModule,  	Nothing, completeNone),
   ("run",	keepGoing runRun,		Nothing, completeIdentifier),
   ("set",	keepGoing setCmd,		Just flagWordBreakChars, completeSetOptions),
-  ("show",	keepGoing showCmd,		Nothing, completeNone),
+  ("show",	keepGoing showCmd,		Nothing, completeShowOptions),
   ("sprint",    keepGoing sprintCmd,            Nothing, completeIdentifier),
   ("step",      keepGoing stepCmd,              Nothing, completeIdentifier), 
   ("steplocal", keepGoing stepLocalCmd,         Nothing, completeIdentifier), 
@@ -1749,8 +1749,14 @@ completeHomeModule w = do
 
 completeSetOptions w = do
   return (filter (w `isPrefixOf`) options)
-    where options = "args":"prog":flagList
+    where options = "args":"prog":"prompt":"editor":"stop":flagList
           flagList = map head $ group $ sort allFlags
+
+completeShowOptions w = do
+  return (filter (w `isPrefixOf`) options)
+    where options =
+        ["args", "prog", "prompt", "editor", "stop", "modules", "bindings",
+         "linker", "breaks", "context", "packages", "languages"]
 
 completeFilename w = do
     ws <- Readline.filenameCompletionFunction w
@@ -1800,12 +1806,13 @@ allExposedModules dflags
  where
   pkg_db = pkgIdMap (pkgState dflags)
 #else
-completeMacro      = completeNone
-completeIdentifier = completeNone
-completeModule     = completeNone
-completeHomeModule = completeNone
-completeSetOptions = completeNone
-completeFilename   = completeNone
+completeMacro       = completeNone
+completeIdentifier  = completeNone
+completeModule      = completeNone
+completeHomeModule  = completeNone
+completeSetOptions  = completeNone
+completeShowOptions = completeNone
+completeFilename    = completeNone
 completeHomeModuleOrFile=completeNone
 #endif
 
