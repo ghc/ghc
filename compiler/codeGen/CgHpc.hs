@@ -1,10 +1,3 @@
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 -----------------------------------------------------------------------------
 --
 -- Code generation for coverage
@@ -26,9 +19,8 @@ import ForeignCall
 import ClosureInfo
 import FastString
 import HscTypes
+import Panic
 import Char
-import StaticFlags
-import PackageConfig 
 
 import Data.Word
 
@@ -65,7 +57,7 @@ hpcTable this_mod (HpcInfo hpc_tickCount _) = do
 		      else packageIdString (modulePackageId this_mod) ++ "/" ++
 			   module_name_str
 
-hpcTable this_mod (NoHpcInfo {}) = error "TODO: impossible"
+hpcTable _ (NoHpcInfo {}) = error "TODO: impossible"
 
 initHpc :: Module -> HpcInfo -> Code
 initHpc this_mod (HpcInfo tickCount hashNo)
@@ -89,4 +81,5 @@ initHpc this_mod (HpcInfo tickCount hashNo)
   where
        word32 i = CmmLit (CmmInt (fromIntegral (fromIntegral i :: Word32)) W32)
        mod_alloc = mkFastString "hs_hpc_module"
+initHpc _ (NoHpcInfo {}) = panic "initHpc: NoHpcInfo"
 
