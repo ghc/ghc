@@ -8,13 +8,6 @@
 --
 -----------------------------------------------------------------------------
 
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module StgCmmGran (
 	staticGranHdr,staticParHdr,
 	granThunk, granYield,
@@ -26,7 +19,6 @@ module StgCmmGran (
 -- I've left the calls, though, in case anyone wants to resurrect it
 
 import StgCmmMonad
-import Id
 import Cmm
 
 staticGranHdr :: [CmmLit]
@@ -37,16 +29,13 @@ staticParHdr = []
 
 doGranAllocate :: VirtualHpOffset -> FCode ()
 -- Must be lazy in the amount of allocation
-doGranAllocate n = return ()
-
-granFetchAndReschedule :: [(Id,GlobalReg)] -> Bool -> FCode ()
-granFetchAndReschedule regs node_reqd = return ()
+doGranAllocate _ = return ()
 
 granYield :: [LocalReg] -> Bool -> FCode ()
-granYield regs node_reqd = return ()
+granYield _regs _node_reqd = return ()
 
 granThunk :: Bool -> FCode ()
-granThunk node_points = return ()
+granThunk _node_points = return ()
 
 -----------------------------------------------------------------
 {-   ------- Everything below here is commented out -------------
