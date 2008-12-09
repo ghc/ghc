@@ -884,7 +884,7 @@ exprEtaExpandArity :: DynFlags -> CoreExpr -> Arity
 -- exprEtaExpandArity is used when eta expanding
 -- 	e  ==>  \xy -> e x y
 exprEtaExpandArity dflags e
-    = applyStateHack (exprType e) (arityDepth (arityType dicts_cheap e))
+    = applyStateHack e (arityType dicts_cheap e)
   where
     dicts_cheap = dopt Opt_DictsCheap dflags
 
@@ -897,7 +897,6 @@ exprBotStrictness_maybe e
 	AT _ ATop -> Nothing
 	AT a ABot -> Just (a, mkStrictSig (mkTopDmdType (replicate a topDmd) BotRes))
 \end{code}	
-
 
 Note [Definition of arity]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1005,11 +1004,13 @@ Then we expect that if f is applied to one arg, it'll be applied to two
 See also Id.isOneShotBndr.
 
 \begin{code}
-applyStateHack :: Type -> Arity -> Arity
-applyStateHack ty arity		-- Note [The state-transformer hack]
-  | opt_NoStateHack = arity
-  | otherwise       = go ty arity
-  where
+applyStateHack :: CoreExpr -> ArityType -> Arity
+applyStateHack e (AT orig_arity is_bot)
+  | opt_NoStateHack = orig_arity
+  | ABot <- is_bot  = orig_arity   -- Note [State hack and bottoming functions]
+  | otherwise       = go orig_ty orig_arity
+  where			-- Note [The state-transformer hack]
+    orig_ty = exprType e
     go :: Type -> Arity -> Arity
     go ty arity		-- This case analysis should match that in eta_expand
 	| Just (_, ty') <- splitForAllTy_maybe ty   = go ty' arity
@@ -1023,20 +1024,59 @@ applyStateHack ty arity		-- Note [The state-transformer hack]
 
 	| Just (arg,res) <- splitFunTy_maybe ty
 	, arity > 0 || isStateHackType arg = 1 + go res (arity-1)
-							 
+{-
+	= if arity > 0 then 1 + go res (arity-1)
+	  else if isStateHackType arg then
+		pprTrace "applystatehack" (vcat [ppr orig_arity, ppr orig_ty,
+						ppr ty, ppr res, ppr e]) $
+	        1 + go res (arity-1)
+          else WARN( arity > 0, ppr arity ) 0
+-}						 
 	| otherwise = WARN( arity > 0, ppr arity ) 0
 \end{code}
+
+Note [State hack and bottoming functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+It's a terrible idea to use the state hack on a bottoming function.
+Here's what happens (Trac #2861):
+
+  f :: String -> IO T
+  f = \p. error "..."
+
+Eta-expand, using the state hack:
+
+  f = \p. (\s. ((error "...") |> g1) s) |> g2
+  g1 :: IO T ~ (S -> (S,T))
+  g2 :: (S -> (S,T)) ~ IO T
+
+Extrude the g2
+
+  f' = \p. \s. ((error "...") |> g1) s
+  f = f' |> (String -> g2)
+
+Discard args for bottomming function
+
+  f' = \p. \s. ((error "...") |> g1 |> g3
+  g3 :: (S -> (S,T)) ~ (S,T)
+
+Extrude g1.g3
+
+  f'' = \p. \s. (error "...")
+  f' = f'' |> (String -> S -> g1.g3)
+
+And now we can repeat the whole loop.  Aargh!  The bug is in applying the
+state hack to a function which then swallows the argument.
 
 
 -------------------- Main arity code ----------------------------
 \begin{code}
--- If e has ArityType (AT as r), then the term 'e'
---  * Must be applied to at least (length as) *value* args 
+-- If e has ArityType (AT n r), then the term 'e'
+--  * Must be applied to at least n *value* args 
 --	before doing any significant work
---  * It will not diverge before being applied to (length as) 
+--  * It will not diverge before being applied to n
 --	value arguments
---  * If 'r' is ABot, then it guarantees to eventually diverge if 
---	applied to enough arguments (perhaps more than (length as)
+--  * If 'r' is ABot, then it guarantees to diverge if 
+--	applied to n arguments (or more)
 
 data ArityType = AT Arity ArityRes
 data ArityRes  = ATop			-- Know nothing
@@ -1044,9 +1084,6 @@ data ArityRes  = ATop			-- Know nothing
 
 vanillaArityType :: ArityType
 vanillaArityType = AT 0 ATop	-- Totally uninformative
-
-arityDepth :: ArityType -> Arity
-arityDepth (AT a _) = a
 
 incArity :: ArityType -> ArityType
 incArity (AT a r) = AT (a+1) r
