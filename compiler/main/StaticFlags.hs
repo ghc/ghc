@@ -26,9 +26,6 @@ module StaticFlags (
         opt_NoDebugOutput,
 
 	-- profiling opts
-	opt_AutoSccsOnAllToplevs,
-	opt_AutoSccsOnExportedToplevs,
-	opt_AutoSccsOnIndividualCafs,
 	opt_SccProfilingOn,
 	opt_DoTickyProfiling,
 
@@ -198,12 +195,6 @@ opt_NoDebugOutput               = lookUp  (fsLit "-dno-debug-output")
 
 
 -- profiling opts
-opt_AutoSccsOnAllToplevs :: Bool
-opt_AutoSccsOnAllToplevs	= lookUp  (fsLit "-fauto-sccs-on-all-toplevs")
-opt_AutoSccsOnExportedToplevs :: Bool
-opt_AutoSccsOnExportedToplevs	= lookUp  (fsLit "-fauto-sccs-on-exported-toplevs")
-opt_AutoSccsOnIndividualCafs :: Bool
-opt_AutoSccsOnIndividualCafs	= lookUp  (fsLit "-fauto-sccs-on-individual-cafs")
 opt_SccProfilingOn :: Bool
 opt_SccProfilingOn		= lookUp  (fsLit "-fscc-profiling")
 opt_DoTickyProfiling :: Bool

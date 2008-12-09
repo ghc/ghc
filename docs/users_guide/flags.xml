@@ -1454,20 +1454,20 @@
 	      <entry><option>-auto</option></entry>
 	      <entry>Auto-add <literal>_scc_</literal>s to all
 	      exported functions</entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry><option>-no-auto</option></entry>
 	    </row>
 	    <row>
 	      <entry><option>-auto-all</option></entry>
 	      <entry>Auto-add <literal>_scc_</literal>s to all
 	      top-level functions</entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry><option>-no-auto-all</option></entry>
 	    </row>
 	    <row>
 	      <entry><option>-caf-all</option></entry>
 	      <entry>Auto-add <literal>_scc_</literal>s to all CAFs</entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry><option>-no-caf-all</option></entry>
 	    </row>
 	    <row>

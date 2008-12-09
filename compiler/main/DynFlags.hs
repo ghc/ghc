@@ -268,6 +268,11 @@ data DynFlag
    | Opt_RegsGraph                      -- do graph coloring register allocation
    | Opt_RegsIterative                  -- do iterative coalescing graph coloring register allocation
 
+   -- profiling opts
+   | Opt_AutoSccsOnAllToplevs
+   | Opt_AutoSccsOnExportedToplevs
+   | Opt_AutoSccsOnIndividualCafs
+
    -- misc opts
    | Opt_Cpp
    | Opt_Pp
@@ -1482,6 +1487,38 @@ dynamic_flags = [
          Supported
   , Flag "fcontext-stack"
          (IntSuffix $ \n -> upd $ \dfs -> dfs{ ctxtStkDepth = n })
+         Supported
+
+        ------ Profiling ----------------------------------------------------
+
+  -- XXX Should the -f* flags be deprecated?
+  -- They don't seem to be documented
+  , Flag "fauto-sccs-on-all-toplevs"
+         (NoArg (setDynFlag Opt_AutoSccsOnAllToplevs))
+         Supported
+  , Flag "auto-all"
+         (NoArg (setDynFlag Opt_AutoSccsOnAllToplevs))
+         Supported
+  , Flag "no-auto-all"
+         (NoArg (unSetDynFlag Opt_AutoSccsOnAllToplevs))
+         Supported
+  , Flag "fauto-sccs-on-exported-toplevs"
+         (NoArg (setDynFlag Opt_AutoSccsOnExportedToplevs))
+         Supported
+  , Flag "auto"
+         (NoArg (setDynFlag Opt_AutoSccsOnExportedToplevs))
+         Supported
+  , Flag "no-auto"
+         (NoArg (unSetDynFlag Opt_AutoSccsOnExportedToplevs))
+         Supported
+  , Flag "fauto-sccs-on-individual-cafs"
+         (NoArg (setDynFlag Opt_AutoSccsOnIndividualCafs))
+         Supported
+  , Flag "caf-all"
+         (NoArg (setDynFlag Opt_AutoSccsOnIndividualCafs))
+         Supported
+  , Flag "no-caf-all"
+         (NoArg (unSetDynFlag Opt_AutoSccsOnIndividualCafs))
          Supported
 
         ------ DPH flags ----------------------------------------------------

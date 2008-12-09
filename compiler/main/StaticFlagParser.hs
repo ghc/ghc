@@ -125,22 +125,6 @@ static_flags = [
   , Flag "dstub-dead-values" (PassFlag addOpt) Supported
       -- rest of the debugging flags are dynamic
 
-        --------- Profiling --------------------------------------------------
-  , Flag "auto-all"       (NoArg (addOpt "-fauto-sccs-on-all-toplevs"))
-         Supported
-  , Flag "auto"           (NoArg (addOpt "-fauto-sccs-on-exported-toplevs"))
-         Supported
-  , Flag "caf-all"        (NoArg (addOpt "-fauto-sccs-on-individual-cafs"))
-         Supported
-         -- "ignore-sccs"  doesn't work  (ToDo)
-
-  , Flag "no-auto-all"    (NoArg (removeOpt "-fauto-sccs-on-all-toplevs"))
-         Supported
-  , Flag "no-auto"        (NoArg (removeOpt "-fauto-sccs-on-exported-toplevs"))
-         Supported
-  , Flag "no-caf-all"     (NoArg (removeOpt "-fauto-sccs-on-individual-cafs"))
-         Supported
-
         ----- Linker --------------------------------------------------------
   , Flag "static"         (PassFlag addOpt) Supported
   , Flag "dynamic"        (NoArg (removeOpt "-static")) Supported
@@ -165,9 +149,6 @@ static_flags = [
 isStaticFlag :: String -> Bool
 isStaticFlag f =
   f `elem` [
-    "fauto-sccs-on-all-toplevs",
-    "fauto-sccs-on-exported-toplevs",
-    "fauto-sccs-on-individual-cafs",
     "fscc-profiling",
     "fdicts-strict",
     "fspec-inline-join-points",

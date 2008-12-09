@@ -28,7 +28,6 @@ module SCCfinal ( stgMassageForProfiling ) where
 
 import StgSyn
 
-import StaticFlags      ( opt_AutoSccsOnIndividualCafs )
 import CostCentre       -- lots of things
 import Id
 import Name
@@ -40,24 +39,26 @@ import UniqSupply       ( uniqFromSupply )
 import VarSet
 import ListSetOps       ( removeDups )
 import Outputable
+import DynFlags
 \end{code}
 
 \begin{code}
 stgMassageForProfiling
-        :: PackageId
+        :: DynFlags
+        -> PackageId
         -> Module                       -- module name
         -> UniqSupply                   -- unique supply
         -> [StgBinding]                 -- input
         -> (CollectedCCs, [StgBinding])
 
-stgMassageForProfiling this_pkg mod_name us stg_binds
+stgMassageForProfiling dflags this_pkg mod_name us stg_binds
   = let
         ((local_ccs, extern_ccs, cc_stacks),
          stg_binds2)
           = initMM mod_name us (do_top_bindings stg_binds)
 
         (fixed_ccs, fixed_cc_stacks)
-          = if opt_AutoSccsOnIndividualCafs
+          = if dopt Opt_AutoSccsOnIndividualCafs dflags
             then ([],[])  -- don't need "all CAFs" CC
                           -- (for Prelude, we use PreludeCC)
             else ([all_cafs_cc], [all_cafs_ccs])
@@ -121,7 +122,7 @@ stgMassageForProfiling this_pkg mod_name us stg_binds
       | noCCSAttached no_cc || currentOrSubsumedCCS no_cc = do
         -- Top level CAF without a cost centre attached
         -- Attach CAF cc (collect if individual CAF ccs)
-        caf_ccs <- if opt_AutoSccsOnIndividualCafs
+        caf_ccs <- if dopt Opt_AutoSccsOnIndividualCafs dflags
                    then let cc = mkAutoCC binder modl CafCC
                             ccs = mkSingletonCCS cc
                                    -- careful: the binder might be :Main.main,
