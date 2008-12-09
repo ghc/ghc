@@ -221,7 +221,8 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
 
 <0,option_prags> \n				{ begin bol }
 
-"{-#" $whitechar* (line|LINE) 		{ begin line_prag2 }
+"{-#" $whitechar* (line|LINE) / { notFollowedByPragmaChar }
+                            { begin line_prag2 }
 
 -- single-line line pragmas, of the form
 --    # <line> "<file>" <extra-stuff> \n
@@ -238,32 +239,39 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
    -- with older versions of GHC which generated these.
 
 <0,option_prags> {
-  "{-#" $whitechar* (RULES|rules)       { rulePrag }
-  "{-#" $whitechar* (INLINE|inline)	{ token (ITinline_prag True) }
-  "{-#" $whitechar* (NO(T?)INLINE|no(t?)inline)
+  "{-#" $whitechar* (RULES|rules)  / { notFollowedByPragmaChar } { rulePrag }
+  "{-#" $whitechar* (INLINE|inline)	 / { notFollowedByPragmaChar }
+                    { token (ITinline_prag True) }
+  "{-#" $whitechar* (NO(T?)INLINE|no(t?)inline) / { notFollowedByPragmaChar }
   					{ token (ITinline_prag False) }
-  "{-#" $whitechar* (SPECIALI[SZ]E|speciali[sz]e)
+  "{-#" $whitechar* (SPECIALI[SZ]E|speciali[sz]e) / { notFollowedByPragmaChar }
   					{ token ITspec_prag }
   "{-#" $whitechar* (SPECIALI[SZ]E|speciali[sz]e)
-	$whitechar* (INLINE|inline)	{ token (ITspec_inline_prag True) }
+	$whitechar+ (INLINE|inline) / { notFollowedByPragmaChar }
+                    { token (ITspec_inline_prag True) }
   "{-#" $whitechar* (SPECIALI[SZ]E|speciali[sz]e)
-	$whitechar* (NO(T?)INLINE|no(t?)inline)
+	$whitechar+ (NO(T?)INLINE|no(t?)inline) / { notFollowedByPragmaChar }
 					{ token (ITspec_inline_prag False) }
-  "{-#" $whitechar* (SOURCE|source)	{ token ITsource_prag }
-  "{-#" $whitechar* (WARNING|warning)
+  "{-#" $whitechar* (SOURCE|source) / { notFollowedByPragmaChar }
+                    { token ITsource_prag }
+  "{-#" $whitechar* (WARNING|warning) / { notFollowedByPragmaChar }
   					{ token ITwarning_prag }
-  "{-#" $whitechar* (DEPRECATED|deprecated)
+  "{-#" $whitechar* (DEPRECATED|deprecated) / { notFollowedByPragmaChar }
   					{ token ITdeprecated_prag }
-  "{-#" $whitechar* (SCC|scc)		{ token ITscc_prag }
-  "{-#" $whitechar* (GENERATED|generated)
+  "{-#" $whitechar* (SCC|scc)  / { notFollowedByPragmaChar }
+                    { token ITscc_prag }
+  "{-#" $whitechar* (GENERATED|generated) / { notFollowedByPragmaChar }
   					{ token ITgenerated_prag }
-  "{-#" $whitechar* (CORE|core)		{ token ITcore_prag }
-  "{-#" $whitechar* (UNPACK|unpack)	{ token ITunpack_prag }
-  "{-#" $whitechar* (ANN|ann)	        { token ITann_prag }
+  "{-#" $whitechar* (CORE|core) / { notFollowedByPragmaChar }
+                    { token ITcore_prag }
+  "{-#" $whitechar* (UNPACK|unpack) / { notFollowedByPragmaChar }
+                    { token ITunpack_prag }
+  "{-#" $whitechar* (ANN|ann) / { notFollowedByPragmaChar }
+                    { token ITann_prag }
 
   -- We ignore all these pragmas, but don't generate a warning for them
   -- CFILES is a hugs-only thing.
-  "{-#" $whitechar* (OPTIONS_HUGS|options_hugs|OPTIONS_NHC98|options_nhc98|OPTIONS_JHC|options_jhc|CFILES|cfiles)
+  "{-#" $whitechar* (OPTIONS_HUGS|options_hugs|OPTIONS_NHC98|options_nhc98|OPTIONS_JHC|options_jhc|CFILES|cfiles) / { notFollowedByPragmaChar }
                     { nested_comment lexToken }
 
   -- ToDo: should only be valid inside a pragma:
@@ -271,19 +279,23 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
 }
 
 <option_prags> {
-  "{-#"  $whitechar* (OPTIONS|options)   { lex_string_prag IToptions_prag }
-  "{-#"  $whitechar* (OPTIONS_GHC|options_ghc)
+  "{-#"  $whitechar* (OPTIONS|options) / { notFollowedByPragmaChar }
+                                        { lex_string_prag IToptions_prag }
+  "{-#"  $whitechar* (OPTIONS_GHC|options_ghc) / { notFollowedByPragmaChar }
                                         { lex_string_prag IToptions_prag }
   "{-#"  $whitechar* (OPTIONS_HADDOCK|options_haddock)
+                   / { notFollowedByPragmaChar }
                                          { lex_string_prag ITdocOptions }
   "-- #"                                 { multiline_doc_comment }
-  "{-#"  $whitechar* (LANGUAGE|language) { token ITlanguage_prag }
-  "{-#"  $whitechar* (INCLUDE|include)   { lex_string_prag ITinclude_prag }
+  "{-#"  $whitechar* (LANGUAGE|language) / { notFollowedByPragmaChar }
+                                         { token ITlanguage_prag }
+  "{-#"  $whitechar* (INCLUDE|include) / { notFollowedByPragmaChar }
+                                         { lex_string_prag ITinclude_prag }
 }
 
 <0> {
   -- In the "0" mode we ignore these pragmas
-  "{-#"  $whitechar* (OPTIONS|options|OPTIONS_GHC|options_ghc|OPTIONS_HADDOCK|options_haddock|LANGUAGE|language|INCLUDE|include)
+  "{-#"  $whitechar* (OPTIONS|options|OPTIONS_GHC|options_ghc|OPTIONS_HADDOCK|options_haddock|LANGUAGE|language|INCLUDE|include) / { notFollowedByPragmaChar }
                      { nested_comment lexToken }
 }
 
@@ -766,6 +778,9 @@ notFollowedBy char _ _ _ (AI _ _ buf)
 
 notFollowedBySymbol _ _ _ (AI _ _ buf)
   = nextCharIs buf (`notElem` "!#$%&*+./<=>?@\\^|-~")
+
+notFollowedByPragmaChar _ _ _ (AI _ _ buf)
+  = nextCharIs buf (\c -> not (isAlphaNum c || c == '_'))
 
 -- We must reject doc comments as being ordinary comments everywhere.
 -- In some cases the doc comment will be selected as the lexeme due to
