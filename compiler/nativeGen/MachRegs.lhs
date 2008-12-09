@@ -229,7 +229,10 @@ data Imm
 strImmLit s = ImmLit (text s)
 
 litToImm :: CmmLit -> Imm
-litToImm (CmmInt i _)        = ImmInteger i
+litToImm (CmmInt i w)        = ImmInteger (narrowS w i)
+                -- narrow to the width: a CmmInt might be out of
+                -- range, but we assume that ImmInteger only contains
+                -- in-range values.  A signed value should be fine here.
 litToImm (CmmFloat f W32)    = ImmFloat f
 litToImm (CmmFloat f W64)    = ImmDouble f
 litToImm (CmmLabel l)        = ImmCLbl l

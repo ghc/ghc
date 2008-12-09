@@ -10,6 +10,7 @@ module CmmExpr
     , Width(..)
     , widthInBits, widthInBytes, widthInLog, widthFromBytes
     , wordWidth, halfWordWidth, cIntWidth, cLongWidth
+    , narrowU, narrowS
  
     , CmmExpr(..), cmmExprType, cmmExprWidth, maybeInvertCmmExpr
     , CmmReg(..), cmmRegType
@@ -54,6 +55,9 @@ import Outputable
 import Panic
 import Unique
 import UniqSet
+
+import Data.Word
+import Data.Int
 
 -----------------------------------------------------------------------------
 --		CmmExpr
@@ -636,6 +640,21 @@ widthInLog W64  = 3
 widthInLog W128 = 4
 widthInLog W80  = panic "widthInLog: F80"
 
+-- widening / narrowing
+
+narrowU :: Width -> Integer -> Integer
+narrowU W8  x = fromIntegral (fromIntegral x :: Word8)
+narrowU W16 x = fromIntegral (fromIntegral x :: Word16)
+narrowU W32 x = fromIntegral (fromIntegral x :: Word32)
+narrowU W64 x = fromIntegral (fromIntegral x :: Word64)
+narrowU _ _ = panic "narrowTo"
+
+narrowS :: Width -> Integer -> Integer
+narrowS W8  x = fromIntegral (fromIntegral x :: Int8)
+narrowS W16 x = fromIntegral (fromIntegral x :: Int16)
+narrowS W32 x = fromIntegral (fromIntegral x :: Int32)
+narrowS W64 x = fromIntegral (fromIntegral x :: Int64)
+narrowS _ _ = panic "narrowTo"
 
 -----------------------------------------------------------------------------
 --    		MachOp
