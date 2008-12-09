@@ -13,6 +13,7 @@
 #include "RtsFlags.h"
 #include "RtsUtils.h"
 #include "Ticky.h"
+#include "Schedule.h"
 
 #ifdef HAVE_TIME_H
 #include <time.h>
@@ -272,15 +273,14 @@ stackOverflow(void)
 void
 heapOverflow(void)
 {
-  /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
-  OutOfHeapHook(0/*unknown request size*/, 
-		RtsFlags.GcFlags.maxHeapSize * BLOCK_SIZE);
-  
-#if defined(TICKY_TICKY)
-  if (RtsFlags.TickyFlags.showTickyStats) PrintTickyInfo();
-#endif
+    if (!heap_overflow)
+    {
+        /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
+        OutOfHeapHook(0/*unknown request size*/,
+                      RtsFlags.GcFlags.maxHeapSize * BLOCK_SIZE);
 
-  stg_exit(EXIT_HEAPOVERFLOW);
+        heap_overflow = rtsTrue;
+    }
 }
 
 /* -----------------------------------------------------------------------------

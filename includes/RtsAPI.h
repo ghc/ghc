@@ -22,7 +22,8 @@ typedef enum {
     NoStatus,    /* not finished yet */
     Success,	 /* completed successfully */
     Killed,	 /* uncaught exception */
-    Interrupted  /* stopped in response to a call to interruptStgRts */
+    Interrupted, /* stopped in response to a call to interruptStgRts */
+    HeapExhausted /* out of memory */
 } SchedulerStatus;
 
 typedef StgClosure *HaskellObj;

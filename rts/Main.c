@@ -126,6 +126,9 @@ static void real_main(void)
       errorBelch("interrupted");
       exit_status = EXIT_INTERRUPTED;
       break;
+    case HeapExhausted:
+      exit_status = EXIT_HEAPOVERFLOW;
+      break;
     case Success:
       exit_status = EXIT_SUCCESS;
       break;

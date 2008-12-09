@@ -617,6 +617,13 @@ allocateInGen (generation *g, lnat n)
         if (RtsFlags.GcFlags.maxHeapSize > 0 && 
             req_blocks >= RtsFlags.GcFlags.maxHeapSize) {
             heapOverflow();
+            // heapOverflow() doesn't exit (see #2592), but we aren't
+            // in a position to do a clean shutdown here: we
+            // either have to allocate the memory or exit now.
+            // Allocating the memory would be bad, because the user
+            // has requested that we not exceed maxHeapSize, so we
+            // just exit.
+	    stg_exit(EXIT_HEAPOVERFLOW);
         }
 
 	bd = allocGroup(req_blocks);

@@ -139,6 +139,8 @@ extern  StgTSO *RTS_VAR(sleeping_queue);
  */
 extern rtsBool blackholes_need_checking;
 
+extern rtsBool heap_overflow;
+
 #if defined(THREADED_RTS)
 extern Mutex RTS_VAR(sched_mutex);
 #endif

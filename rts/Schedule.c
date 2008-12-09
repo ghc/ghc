@@ -90,6 +90,12 @@ StgTSO *blackhole_queue = NULL;
  */
 rtsBool blackholes_need_checking = rtsFalse;
 
+/* Set to true when the latest garbage collection failed to reclaim
+ * enough space, and the runtime should proceed to shut itself down in
+ * an orderly fashion (emitting profiling info etc.)
+ */
+rtsBool heap_overflow = rtsFalse;
+
 /* flag that tracks whether we have done any execution in this time slice.
  * LOCK: currently none, perhaps we should lock (but needs to be
  * updated in the fast path of the scheduler).
@@ -1436,7 +1442,11 @@ scheduleHandleThreadFinished (Capability *cap STG_UNUSED, Task *task, StgTSO *t)
 		  *(task->ret) = NULL;
 	      }
 	      if (sched_state >= SCHED_INTERRUPTING) {
-		  task->stat = Interrupted;
+                  if (heap_overflow) {
+                      task->stat = HeapExhausted;
+                  } else {
+                      task->stat = Interrupted;
+                  }
 	      } else {
 		  task->stat = Killed;
 	      }
@@ -1567,6 +1577,7 @@ scheduleDoGC (Capability *cap, Task *task USED_IF_THREADS, rtsBool force_major)
     
     IF_DEBUG(scheduler, printAllThreads());
 
+delete_threads_and_gc:
     /*
      * We now have all the capabilities; if we're in an interrupting
      * state, then we should take the opportunity to delete all the
@@ -1593,6 +1604,23 @@ scheduleDoGC (Capability *cap, Task *task USED_IF_THREADS, rtsBool force_major)
         debugTrace(DEBUG_sched, "performing heap census");
         heapCensus();
 	performHeapProfile = rtsFalse;
+    }
+
+    if (heap_overflow && sched_state < SCHED_INTERRUPTING) {
+        // GC set the heap_overflow flag, so we should proceed with
+        // an orderly shutdown now.  Ultimately we want the main
+        // thread to return to its caller with HeapExhausted, at which
+        // point the caller should call hs_exit().  The first step is
+        // to delete all the threads.
+        //
+        // Another way to do this would be to raise an exception in
+        // the main thread, which we really should do because it gives
+        // the program a chance to clean up.  But how do we find the
+        // main thread?  It should presumably be the same one that
+        // gets ^C exceptions, but that's all done on the Haskell side
+        // (GHC.TopHandler).
+	sched_state = SCHED_INTERRUPTING;
+        goto delete_threads_and_gc;
     }
 
 #ifdef SPARKBALANCE
