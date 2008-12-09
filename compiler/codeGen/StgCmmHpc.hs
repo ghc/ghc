@@ -6,31 +6,21 @@
 --
 -----------------------------------------------------------------------------
 
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module StgCmmHpc ( initHpc, mkTickBox ) where
 
 import StgCmmUtils
 import StgCmmMonad
 import StgCmmForeign
-import StgCmmClosure
 
 import MkZipCfgCmm
 import Cmm
 import CLabel
 import Module
 import CmmUtils
-import ForeignCall
 import FastString
 import HscTypes
 import Char
 import StaticFlags
-import PackageConfig 
 
 mkTickBox :: Module -> Int -> CmmAGraph
 mkTickBox mod n 
@@ -45,7 +35,7 @@ mkTickBox mod n
 
 initHpc :: Module -> HpcInfo -> FCode CmmAGraph
 -- Emit top-level tables for HPC and return code to initialise
-initHpc this_mod (NoHpcInfo {}) 
+initHpc _ (NoHpcInfo {})
   = return mkNop
 initHpc this_mod (HpcInfo tickCount hashNo)
   = getCode $ whenC opt_Hpc $
