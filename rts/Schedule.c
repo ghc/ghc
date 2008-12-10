@@ -777,9 +777,11 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
 
     // Check whether we have more threads on our run queue, or sparks
     // in our pool, that we could hand to another Capability.
-    if ((emptyRunQueue(cap) || cap->run_queue_hd->_link == END_TSO_QUEUE)
-	&& sparkPoolSizeCap(cap) < 2) {
-	return;
+    if (cap->run_queue_hd == END_TSO_QUEUE) {
+        if (sparkPoolSizeCap(cap) < 2) return;
+    } else {
+        if (cap->run_queue_hd->_link == END_TSO_QUEUE &&
+            sparkPoolSizeCap(cap) < 1) return;
     }
 
     // First grab as many free Capabilities as we can.
