@@ -127,3 +127,10 @@ test('2276_ghci', [ skip_if_not_windows, only_ways(['ghci']),
 test('2469', normal, compile_and_run, ['-optc-std=gnu99'])
 
 test('2594', omit_ways(['ghci']), compile_and_run, ['2594_c.c'])
+
+test('fptr01', [ omit_ways(['ghci']), extra_clean(['fptr01_c.o']) ],
+               compile_and_run, ['fptr01_c.c'])
+
+test('fptrfail01', [ compose(omit_ways(['ghci']), exit_code(1)),
+                     extra_clean(['fptrfail01_c.o']) ],
+                   compile_and_run, ['fptrfail01_c.c'])
