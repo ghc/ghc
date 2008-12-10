@@ -152,24 +152,6 @@ newForeignPtrEnv finalizer env p
        return fObj
 #endif /* __HUGS__ */
 
-#ifdef __GLASGOW_HASKELL__
-type FinalizerEnvPtr env a = FunPtr (Ptr env -> Ptr a -> IO ())
-
--- | like 'addForeignPtrFinalizerEnv' but allows the finalizer to be
--- passed an additional environment parameter to be passed to the
--- finalizer.  The environment passed to the finalizer is fixed by the
--- second argument to 'addForeignPtrFinalizerEnv'
-addForeignPtrFinalizerEnv ::
-  FinalizerEnvPtr env a -> Ptr env -> ForeignPtr a -> IO ()
-addForeignPtrFinalizerEnv finalizer env fptr = 
-  addForeignPtrConcFinalizer fptr 
-        (mkFinalizerEnv finalizer env (unsafeForeignPtrToPtr fptr))
-
-foreign import ccall "dynamic" 
-  mkFinalizerEnv :: FinalizerEnvPtr env a -> Ptr env -> Ptr a -> IO ()
-#endif
-
-
 #ifndef __GLASGOW_HASKELL__
 mallocForeignPtr :: Storable a => IO (ForeignPtr a)
 mallocForeignPtr = do
