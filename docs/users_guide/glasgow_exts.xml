@@ -3880,7 +3880,7 @@ data    instance T Int  = T1 Int | T2 Bool
 newtype instance T Char = TC Bool
 </programlisting>
       </para></listitem>
-      <listitem><para> A <data instance> can use GADT syntax for the data constructors,
+      <listitem><para> A <literal>data instance</literal> can use GADT syntax for the data constructors,
       and indeed can define a GADT.  For example:
 <programlisting>
 data family G a b
