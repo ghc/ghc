@@ -1302,6 +1302,7 @@ mmapForLinker (size_t bytes, nat flags, int fd)
    void *map_addr = NULL;
    void *result;
    int pagesize, size;
+   static nat fixed = 0;
 
    pagesize = getpagesize();
    size = ROUND_UP(bytes, pagesize);
@@ -1315,10 +1316,11 @@ mmap_again:
 #endif
 
    result = mmap(map_addr, size, PROT_EXEC|PROT_READ|PROT_WRITE,
-		    MAP_PRIVATE|TRY_MAP_32BIT|flags, fd, 0);
+		    MAP_PRIVATE|TRY_MAP_32BIT|fixed|flags, fd, 0);
 
    if (result == MAP_FAILED) {
-       sysErrorBelch("mmap");
+       sysErrorBelch("mmap %lu bytes at %p",(lnat)size,map_addr);
+       errorBelch("Try specifying an address with +RTS -xm<addr> -RTS");
        stg_exit(EXIT_FAILURE);
    }
    
@@ -1329,8 +1331,16 @@ mmap_again:
        } else {
            if ((W_)result > 0x80000000) {
                // oops, we were given memory over 2Gb
-               // ... try allocating memory somewhere else?;
-               barf("loadObj: failed to mmap() memory below 2Gb; asked for %lu bytes at %p, got %p.  Try specifying an address with +RTS -xm<addr> -RTS", size, map_addr, result);
+#if defined(freebsd_HOST_OS)
+               // Some platforms require MAP_FIXED.  This is normally
+               // a bad idea, because MAP_FIXED will overwrite
+               // existing mappings.
+               munmap(result,size);
+               fixed = MAP_FIXED;
+               goto mmap_again;
+#else
+               barf("loadObj: failed to mmap() memory below 2Gb; asked for %lu bytes at %p.  Try specifying an address with +RTS -xm<addr> -RTS", size, map_addr, result);
+#endif
            } else {
                // hmm, we were given memory somewhere else, but it's
                // still under 2Gb so we can use it.  Next time, ask
