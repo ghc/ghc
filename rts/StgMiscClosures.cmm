@@ -435,16 +435,16 @@ INFO_TABLE(stg_TSO, 0,0,TSO, "TSO", "TSO")
    live weak pointers with dead ones).
    ------------------------------------------------------------------------- */
 
-INFO_TABLE(stg_WEAK,0,4,WEAK,"WEAK","WEAK")
+INFO_TABLE(stg_WEAK,1,4,WEAK,"WEAK","WEAK")
 { foreign "C" barf("WEAK object entered!") never returns; }
 
 /*
  * It's important when turning an existing WEAK into a DEAD_WEAK
  * (which is what finalizeWeak# does) that we don't lose the link
  * field and break the linked list of weak pointers.  Hence, we give
- * DEAD_WEAK 4 non-pointer fields, the same as WEAK.
+ * DEAD_WEAK 5 non-pointer fields.
  */
-INFO_TABLE_CONSTR(stg_DEAD_WEAK,0,4,0,CONSTR,"DEAD_WEAK","DEAD_WEAK")
+INFO_TABLE_CONSTR(stg_DEAD_WEAK,0,5,0,CONSTR,"DEAD_WEAK","DEAD_WEAK")
 { foreign "C" barf("DEAD_WEAK object entered!") never returns; }
 
 /* ----------------------------------------------------------------------------

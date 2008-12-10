@@ -414,6 +414,9 @@ hs_exit_(rtsBool wait_foreign)
 
     /* stop all running tasks */
     exitScheduler(wait_foreign);
+
+    /* run C finalizers for all active weak pointers */
+    runAllCFinalizers(weak_ptr_list);
     
 #if defined(GRAN)
     /* end_gr_simulation prints global stats if requested -- HWL */

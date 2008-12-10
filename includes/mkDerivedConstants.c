@@ -376,6 +376,7 @@ main(int argc, char *argv[])
     closure_field(StgWeak,key);
     closure_field(StgWeak,value);
     closure_field(StgWeak,finalizer);
+    closure_field(StgWeak,cfinalizer);
 
     closure_size(StgDeadWeak);
     closure_field(StgDeadWeak,link);

@@ -190,6 +190,7 @@ typedef struct _StgStableName {
 
 typedef struct _StgWeak {	/* Weak v */
   StgHeader header;
+  StgClosure *cfinalizer;
   StgClosure *key;
   StgClosure *value;		/* v */
   StgClosure *finalizer;

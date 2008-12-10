@@ -297,9 +297,14 @@ mkWeakzh_fast
   w = Hp - SIZEOF_StgWeak + WDS(1);
   SET_HDR(w, stg_WEAK_info, W_[CCCS]);
 
-  StgWeak_key(w)       = R1;
-  StgWeak_value(w)     = R2;
-  StgWeak_finalizer(w) = R3;
+  // We don't care about cfinalizer here.
+  // Should StgWeak_cfinalizer(w) be stg_NO_FINALIZER_closure or
+  // something else?
+
+  StgWeak_key(w)        = R1;
+  StgWeak_value(w)      = R2;
+  StgWeak_finalizer(w)  = R3;
+  StgWeak_cfinalizer(w) = stg_NO_FINALIZER_closure;
 
   StgWeak_link(w)	= W_[weak_ptr_list];
   W_[weak_ptr_list] 	= w;
@@ -309,12 +314,65 @@ mkWeakzh_fast
   RET_P(w);
 }
 
+mkWeakForeignEnvzh_fast
+{
+  /* R1 = key
+     R2 = value
+     R3 = finalizer
+     R4 = pointer
+     R5 = has environment (0 or 1)
+     R6 = environment
+  */
+  W_ w, payload_words, words, p;
+
+  W_ key, val, fptr, ptr, flag, eptr;
+
+  key  = R1;
+  val  = R2;
+  fptr = R3;
+  ptr  = R4;
+  flag = R5;
+  eptr = R6;
+
+  ALLOC_PRIM( SIZEOF_StgWeak, R1_PTR & R2_PTR & R3_PTR, mkWeakForeignEnvzh_fast );
+
+  w = Hp - SIZEOF_StgWeak + WDS(1);
+  SET_HDR(w, stg_WEAK_info, W_[CCCS]);
+
+  payload_words = 4;
+  words         = BYTES_TO_WDS(SIZEOF_StgArrWords) + payload_words;
+  ("ptr" p)     = foreign "C" allocateLocal(MyCapability() "ptr", words) [];
+
+  TICK_ALLOC_PRIM(SIZEOF_StgArrWords,WDS(payload_words),0);
+  SET_HDR(p, stg_ARR_WORDS_info, W_[CCCS]);
+
+  StgArrWords_words(p)     = payload_words;
+  StgArrWords_payload(p,0) = fptr;
+  StgArrWords_payload(p,1) = ptr;
+  StgArrWords_payload(p,2) = eptr;
+  StgArrWords_payload(p,3) = flag;
+
+  // We don't care about the value here.
+  // Should StgWeak_value(w) be stg_NO_FINALIZER_closure or something else?
+
+  StgWeak_key(w)        = key;
+  StgWeak_value(w)      = val;
+  StgWeak_finalizer(w)  = stg_NO_FINALIZER_closure;
+  StgWeak_cfinalizer(w) = p;
+
+  StgWeak_link(w)   = W_[weak_ptr_list];
+  W_[weak_ptr_list] = w;
+
+  IF_DEBUG(weak, foreign "C" debugBelch(stg_weak_msg,w) []);
+
+  RET_P(w);
+}
 
 finalizzeWeakzh_fast
 {
   /* R1 = weak ptr
    */
-  W_ w, f;
+  W_ w, f, arr;
 
   w = R1;
 
@@ -342,8 +400,17 @@ finalizzeWeakzh_fast
   SET_INFO(w,stg_DEAD_WEAK_info);
   LDV_RECORD_CREATE(w);
 
-  f = StgWeak_finalizer(w);
+  f   = StgWeak_finalizer(w);
+  arr = StgWeak_cfinalizer(w);
+
   StgDeadWeak_link(w) = StgWeak_link(w);
+
+  if (arr != stg_NO_FINALIZER_closure) {
+    foreign "C" runCFinalizer(StgArrWords_payload(arr,0),
+                              StgArrWords_payload(arr,1),
+                              StgArrWords_payload(arr,2),
+                              StgArrWords_payload(arr,3)) [];
+  }
 
   /* return the finalizer */
   if (f == stg_NO_FINALIZER_closure) {

@@ -224,6 +224,7 @@ typedef struct _RtsSymbolVal {
 
 #if !defined(PAR)
 #define Maybe_Stable_Names      SymI_HasProto(mkWeakzh_fast)			\
+      				SymI_HasProto(mkWeakForeignEnvzh_fast)		\
       				SymI_HasProto(makeStableNamezh_fast)		\
       				SymI_HasProto(finalizzeWeakzh_fast)
 #else

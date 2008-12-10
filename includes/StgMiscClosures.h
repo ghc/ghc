@@ -582,6 +582,8 @@ RTS_FUN(isCurrentThreadBoundzh_fast);
 RTS_FUN(threadStatuszh_fast);
 
 RTS_FUN(mkWeakzh_fast);
+RTS_FUN(mkWeakForeignzh_fast);
+RTS_FUN(mkWeakForeignEnvzh_fast);
 RTS_FUN(finalizzeWeakzh_fast);
 RTS_FUN(deRefWeakzh_fast);
 
