@@ -3860,37 +3860,71 @@ data instance GMap (Either a b) v = GMapEither (GMap a v) (GMap b v)
       can be any number.
     </para>
     <para>
-      Data and newtype instance declarations are only legit when an
-      appropriate family declaration is in scope - just like class instances
-      require the class declaration to be visible.  Moreover, each instance
+      Data and newtype instance declarations are only permitted when an
+      appropriate family declaration is in scope - just as a class instance declaratoin
+      requires the class declaration to be visible.  Moreover, each instance
       declaration has to conform to the kind determined by its family
       declaration.  This implies that the number of parameters of an instance
       declaration matches the arity determined by the kind of the family.
-      Although, all data families are declared with
-      the <literal>data</literal> keyword, instances can be
-      either <literal>data</literal> or <literal>newtype</literal>s, or a mix
-      of both. 
     </para>
     <para>
+      A data family instance declaration can use the full exprssiveness of
+      ordinary <literal>data</literal> or <literal>newtype</literal> declarations:
+      <itemizedlist>
+      <listitem><para> Although, a data family is <emphasis>introduced</emphasis> with
+      the keyword "<literal>data</literal>", a data family <emphasis>instance</emphasis> can 
+      use either <literal>data</literal> or <literal>newtype</literal>. For example:
+<programlisting>
+data family T a
+data    instance T Int  = T1 Int | T2 Bool
+newtype instance T Char = TC Bool
+</programlisting>
+      </para></listitem>
+      <listitem><para> A <data instance> can use GADT syntax for the data constructors,
+      and indeed can define a GADT.  For example:
+<programlisting>
+data family G a b
+data instance G [a] b where
+   G1 :: c -> G [Int] b
+   G2 :: G [a] Bool
+</programlisting>
+      </para></listitem>
+      <listitem><para> You can use a <literal>deriving</literal> clause on a
+      <literal>data instance</literal> or <literal>newtype instance</literal>
+      declaration.
+      </para></listitem>
+      </itemizedlist>
+    </para>
+
+    <para>
       Even if type families are defined as toplevel declarations, functions
-      that perform different computations for different family instances still
+      that perform different computations for different family instances may still
       need to be defined as methods of type classes.  In particular, the
       following is not possible: 
 <programlisting>
 data family T a
 data instance T Int  = A
 data instance T Char = B
-nonsence :: T a -> Int
-nonsence A = 1             -- WRONG: These two equations together...
-nonsence B = 2             -- ...will produce a type error.
+foo :: T a -> Int
+foo A = 1             -- WRONG: These two equations together...
+foo B = 2             -- ...will produce a type error.
 </programlisting>
-      Given the functionality provided by GADTs (Generalised Algebraic Data
+Instead, you would have to write <literal>foo</literal> as a class operation, thus:
+<programlisting>
+class C a where 
+  foo :: T a -> Int
+instance Foo Int where
+  foo A = 1
+instance Foo Char where
+  foo B = 2
+</programlisting>
+      (Given the functionality provided by GADTs (Generalised Algebraic Data
       Types), it might seem as if a definition, such as the above, should be
       feasible.  However, type families are - in contrast to GADTs - are
       <emphasis>open;</emphasis> i.e., new instances can always be added,
       possibly in other 
       modules.  Supporting pattern matching across different data instances
-      would require a form of extensible case construct. 
+      would require a form of extensible case construct.)
     </para>
 
     <sect4 id="assoc-data-inst">
