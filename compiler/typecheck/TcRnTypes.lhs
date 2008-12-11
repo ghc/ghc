@@ -126,23 +126,24 @@ data Env gbl lcl	-- Changes as we move into an expression
 
 data TcGblEnv
   = TcGblEnv {
-	tcg_mod     :: Module,		-- Module being compiled
-	tcg_src     :: HscSource,	-- What kind of module 
-					-- (regular Haskell, hs-boot, ext-core)
+	tcg_mod     :: Module,         -- ^ Module being compiled
+	tcg_src     :: HscSource,
+          -- ^ What kind of module (regular Haskell, hs-boot, ext-core)
 
-	tcg_rdr_env :: GlobalRdrEnv,	-- Top level envt; used during renaming
-	tcg_default :: Maybe [Type],	-- Types used for defaulting
-					-- Nothing => no 'default' decl
+	tcg_rdr_env :: GlobalRdrEnv,   -- ^ Top level envt; used during renaming
+	tcg_default :: Maybe [Type],
+          -- ^ Types used for defaulting. @Nothing@ => no @default@ decl
 
-	tcg_fix_env   :: FixityEnv,	-- Just for things in this module
-	tcg_field_env :: RecFieldEnv,	-- Just for things in this module
+	tcg_fix_env   :: FixityEnv,	-- ^ Just for things in this module
+	tcg_field_env :: RecFieldEnv,	-- ^ Just for things in this module
 
-	tcg_type_env :: TypeEnv,	-- Global type env for the module we are compiling now
-		-- All TyCons and Classes (for this module) end up in here right away,
-		-- along with their derived constructors, selectors.
-		--
-		-- (Ids defined in this module start in the local envt, 
-		--  though they move to the global envt during zonking)
+	tcg_type_env :: TypeEnv,
+          -- ^ Global type env for the module we are compiling now.  All
+	  -- TyCons and Classes (for this module) end up in here right away,
+	  -- along with their derived constructors, selectors.
+	  --
+	  -- (Ids defined in this module start in the local envt, though they
+	  --  move to the global envt during zonking)
 
 	tcg_type_env_var :: TcRef TypeEnv,
 		-- Used only to initialise the interface-file
@@ -150,69 +151,84 @@ data TcGblEnv
 		-- bound in this module when dealing with hi-boot recursions
 		-- Updated at intervals (e.g. after dealing with types and classes)
 	
-	tcg_inst_env     :: InstEnv,	-- Instance envt for *home-package* 
-					-- modules; Includes the dfuns in 
-					-- tcg_insts
-	tcg_fam_inst_env :: FamInstEnv,	-- Ditto for family instances
+	tcg_inst_env     :: InstEnv,
+          -- ^ Instance envt for /home-package/ modules; Includes the dfuns in
+	  -- tcg_insts
+	tcg_fam_inst_env :: FamInstEnv,	-- ^ Ditto for family instances
 
 		-- Now a bunch of things about this module that are simply 
 		-- accumulated, but never consulted until the end.  
 		-- Nevertheless, it's convenient to accumulate them along 
 		-- with the rest of the info from this module.
-	tcg_exports :: [AvailInfo],	-- What is exported
-	tcg_imports :: ImportAvails,	-- Information about what was imported 
-					--    from where, including things bound
-					--    in this module
+	tcg_exports :: [AvailInfo],	-- ^ What is exported
+	tcg_imports :: ImportAvails,
+          -- ^ Information about what was imported from where, including
+	  -- things bound in this module.
 
-	tcg_dus :: DefUses,  	-- What is defined in this module and what is used.
-				-- The latter is used to generate 
-				--	(a) version tracking; no need to recompile if these
-				--		things have not changed version stamp
-				-- 	(b) unused-import info
+	tcg_dus :: DefUses,
+          -- ^ What is defined in this module and what is used.
+          -- The latter is used to generate
+          --
+          --  (a) version tracking; no need to recompile if these things have
+          --      not changed version stamp
+          --
+          --  (b) unused-import info
 
-	tcg_keep :: TcRef NameSet,	-- Locally-defined top-level names to keep alive
-		-- "Keep alive" means give them an Exported flag, so
-		-- that the simplifier does not discard them as dead 
-		-- code, and so that they are exposed in the interface file
-		-- (but not to export to the user).
-		--
-		-- Some things, like dict-fun Ids and default-method Ids are 
-		-- "born" with the Exported flag on, for exactly the above reason,
-		-- but some we only discover as we go.  Specifically:
-		--	* The to/from functions for generic data types
-		--	* Top-level variables appearing free in the RHS of an orphan rule
-		--	* Top-level variables appearing free in a TH bracket
+	tcg_keep :: TcRef NameSet,
+          -- ^ Locally-defined top-level names to keep alive.
+          --
+          -- "Keep alive" means give them an Exported flag, so that the
+          -- simplifier does not discard them as dead code, and so that they
+          -- are exposed in the interface file (but not to export to the
+          -- user).
+          --
+          -- Some things, like dict-fun Ids and default-method Ids are "born"
+          -- with the Exported flag on, for exactly the above reason, but some
+          -- we only discover as we go.  Specifically:
+          --
+          --   * The to/from functions for generic data types
+          --
+          --   * Top-level variables appearing free in the RHS of an orphan
+          --     rule
+          --
+          --   * Top-level variables appearing free in a TH bracket
 
-	tcg_inst_uses :: TcRef NameSet,	-- Home-package Dfuns actually used 
-		-- Used to generate version dependencies
-		-- This records usages, rather like tcg_dus, but it has to
-		-- be a mutable variable so it can be augmented 
-		-- when we look up an instance.  These uses of dfuns are
-		-- rather like the free variables of the program, but
-		-- are implicit instead of explicit.
+	tcg_inst_uses :: TcRef NameSet,
+          -- ^ Home-package Dfuns actually used.
+          --
+          -- Used to generate version dependencies This records usages, rather
+          -- like tcg_dus, but it has to be a mutable variable so it can be
+          -- augmented when we look up an instance.  These uses of dfuns are
+          -- rather like the free variables of the program, but are implicit
+          -- instead of explicit.
 
-	tcg_th_used :: TcRef Bool,	-- True <=> Template Haskell syntax used
-		-- We need this so that we can generate a dependency on the
-		-- Template Haskell package, becuase the desugarer is going to
-		-- emit loads of references to TH symbols.  It's rather like 
-		-- tcg_inst_uses; the reference is implicit rather than explicit,
-		-- so we have to zap a mutable variable.
+	tcg_th_used :: TcRef Bool,
+          -- ^ @True@ <=> Template Haskell syntax used.
+          --
+          -- We need this so that we can generate a dependency on the Template
+          -- Haskell package, becuase the desugarer is going to emit loads of
+          -- references to TH symbols.  It's rather like tcg_inst_uses; the
+          -- reference is implicit rather than explicit, so we have to zap a
+          -- mutable variable.
 
-	tcg_dfun_n  :: TcRef Int,	-- Allows us to number off the names of DFuns
-		-- It's convenient to allocate an External Name for a DFun, with
-		-- a permanently-fixed unique, just like other top-level functions
-		-- defined in this module.  But that means we need a canonical 
-		-- occurrence name, distinct from all other dfuns in this module,
-		-- and this name supply serves that purpose (df1, df2, etc).
+	tcg_dfun_n  :: TcRef Int,
+          -- ^ Allows us to number off the names of DFuns.
+          --
+          -- It's convenient to allocate an External Name for a DFun, with
+          -- a permanently-fixed unique, just like other top-level functions
+          -- defined in this module.  But that means we need a canonical
+          -- occurrence name, distinct from all other dfuns in this module,
+          -- and this name supply serves that purpose (df1, df2, etc).
 
-		-- The next fields accumulate the payload of the module
-		-- The binds, rules and foreign-decl fiels are collected
-		-- initially in un-zonked form and are finally zonked in tcRnSrcDecls
+	-- The next fields accumulate the payload of the module
+	-- The binds, rules and foreign-decl fiels are collected
+	-- initially in un-zonked form and are finally zonked in tcRnSrcDecls
 
         tcg_rn_imports :: Maybe [LImportDecl Name],
         tcg_rn_exports :: Maybe [Located (IE Name)],
-	tcg_rn_decls :: Maybe (HsGroup Name),	-- renamed decls, maybe
-		-- Nothing <=> Don't retain renamed decls
+	tcg_rn_decls :: Maybe (HsGroup Name),
+          -- ^ Renamed decls, maybe.  @Nothing@ <=> Don't retain renamed
+          -- decls.
 
 	tcg_binds     :: LHsBinds Id,	    -- Value bindings in this module
 	tcg_warns     :: Warnings,	    -- ...Warnings and deprecations
@@ -222,9 +238,10 @@ data TcGblEnv
 	tcg_rules     :: [LRuleDecl Id],    -- ...Rules
 	tcg_fords     :: [LForeignDecl Id], -- ...Foreign import & exports
 
-	tcg_doc :: Maybe (HsDoc Name), -- Maybe Haddock documentation
-        tcg_hmi :: HaddockModInfo Name, -- Haddock module information
-        tcg_hpc :: AnyHpcUsage -- True if any part of the prog uses hpc instrumentation.
+	tcg_doc :: Maybe (HsDoc Name), -- ^ Maybe Haddock documentation
+        tcg_hmi :: HaddockModInfo Name, -- ^ Haddock module information
+        tcg_hpc :: AnyHpcUsage -- ^ @True@ if any part of the prog uses hpc
+                               -- instrumentation.
     }
 
 data RecFieldEnv 
@@ -499,60 +516,70 @@ type ErrCtxt = [TidyEnv -> TcM (TidyEnv, Message)]
 %*									*
 %************************************************************************
 
-ImportAvails summarises what was imported from where, irrespective
-of whether the imported things are actually used or not
-It is used 	* when processing the export list
-		* when constructing usage info for the inteface file
-		* to identify the list of directly imported modules
-			for initialisation purposes and
-			for optimsed overlap checking of family instances
-		* when figuring out what things are really unused
-
 \begin{code}
+-- | 'ImportAvails' summarises what was imported from where, irrespective of
+-- whether the imported things are actually used or not.  It is used:
+--
+--  * when processing the export list,
+--
+--  * when constructing usage info for the interface file,
+--
+--  * to identify the list of directly imported modules for initialisation
+--    purposes and for optimised overlap checking of family instances,
+--
+--  * when figuring out what things are really unused
+--
 data ImportAvails 
    = ImportAvails {
 	imp_mods :: ModuleEnv [(ModuleName, Bool, SrcSpan)],
-		-- Domain is all directly-imported modules
-        -- The ModuleName is what the module was imported as, e.g. in
-        --     import Foo as Bar
-        -- it is Bar.
-		-- Bool means:
-		--   True => import was "import Foo ()"
-		--   False  => import was some other form
-		--
-		-- Used 
-		--   (a) to help construct the usage information in 
-		--       the interface file; if we import somethign we
-		--       need to recompile if the export version changes
-		--   (b) to specify what child modules to initialise
-                --
-                -- We need a full ModuleEnv rather than a ModuleNameEnv
-                -- here, because we might be importing modules of the
-                -- same name from different packages. (currently not the case,
-                -- but might be in the future).
+          -- ^ Domain is all directly-imported modules
+          -- The 'ModuleName' is what the module was imported as, e.g. in
+          -- @
+          --     import Foo as Bar
+          -- @
+          -- it is @Bar@.
+          --
+          -- The 'Bool' means:
+          --
+          --  - @True@ => import was @import Foo ()@
+          --
+          --  - @False@ => import was some other form
+          --
+          -- Used
+          --
+          --   (a) to help construct the usage information in the interface
+          --       file; if we import somethign we need to recompile if the
+          --       export version changes
+          --
+          --   (b) to specify what child modules to initialise
+          --
+          -- We need a full ModuleEnv rather than a ModuleNameEnv here,
+          -- because we might be importing modules of the same name from
+          -- different packages. (currently not the case, but might be in the
+          -- future).
 
 	imp_dep_mods :: ModuleNameEnv (ModuleName, IsBootInterface),
-		-- Home-package modules needed by the module being compiled
-		--
-		-- It doesn't matter whether any of these dependencies
-		-- are actually *used* when compiling the module; they
-		-- are listed if they are below it at all.  For
-		-- example, suppose M imports A which imports X.  Then
-		-- compiling M might not need to consult X.hi, but X
-		-- is still listed in M's dependencies.
+	  -- ^ Home-package modules needed by the module being compiled
+	  --
+	  -- It doesn't matter whether any of these dependencies
+	  -- are actually /used/ when compiling the module; they
+	  -- are listed if they are below it at all.  For
+	  -- example, suppose M imports A which imports X.  Then
+	  -- compiling M might not need to consult X.hi, but X
+	  -- is still listed in M's dependencies.
 
 	imp_dep_pkgs :: [PackageId],
-		-- Packages needed by the module being compiled, whether
-		-- directly, or via other modules in this package, or via
-		-- modules imported from other packages.
+          -- ^ Packages needed by the module being compiled, whether directly,
+          -- or via other modules in this package, or via modules imported
+          -- from other packages.
 
  	imp_orphs :: [Module],
-		-- Orphan modules below us in the import tree (and maybe
-		-- including us for imported modules) 
+          -- ^ Orphan modules below us in the import tree (and maybe including
+          -- us for imported modules)
 
  	imp_finsts :: [Module]
-		-- Family instance modules below us in the import tree  (and
-		-- maybe including us for imported modules)
+          -- ^ Family instance modules below us in the import tree (and maybe
+          -- including us for imported modules)
       }
 
 mkModDeps :: [(ModuleName, IsBootInterface)]
