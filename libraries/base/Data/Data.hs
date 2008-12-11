@@ -54,6 +54,7 @@ module Data.Data (
         mkIntType,      -- :: String -> DataType
         mkFloatType,    -- :: String -> DataType
         mkStringType,   -- :: String -> DataType
+        mkCharType,     -- :: String -> DataType
         mkNoRepType,    -- :: String -> DataType
         mkNorepType,    -- :: String -> DataType
         -- ** Observers
@@ -77,6 +78,7 @@ module Data.Data (
         mkIntConstr,    -- :: DataType -> Integer -> Constr
         mkFloatConstr,  -- :: DataType -> Double  -> Constr
         mkStringConstr, -- :: DataType -> String  -> Constr
+        mkCharConstr,   -- :: DataType -> Char -> Constr
         -- ** Observers
         constrType,     -- :: Constr   -> DataType
         ConstrRep(..),  -- instance of: Eq, Show
@@ -497,10 +499,12 @@ instance Eq Constr where
 
 
 -- | Public representation of datatypes
+{-# DEPRECATED StringRep "Use CharRep instead" #-}
 data DataRep = AlgRep [Constr]
              | IntRep
              | FloatRep
-             | StringRep
+             | StringRep -- ^ Deprecated. Please use 'CharRep' instead.
+             | CharRep
              | NoRep
 
             deriving (Eq,Show)
@@ -508,10 +512,12 @@ data DataRep = AlgRep [Constr]
 
 
 -- | Public representation of constructors
+{-# DEPRECATED StringConstr "Use CharConstr instead" #-}
 data ConstrRep = AlgConstr    ConIndex
                | IntConstr    Integer
                | FloatConstr  Double
-               | StringConstr String
+               | StringConstr String -- ^ Deprecated. Please use 'CharConstr' instead.
+               | CharConstr   Char
 
                deriving (Eq,Show)
 
@@ -564,6 +570,7 @@ repConstr dt cr =
         (IntRep,    IntConstr i)      -> mkIntConstr dt i
         (FloatRep,  FloatConstr f)    -> mkFloatConstr dt f
         (StringRep, StringConstr str) -> mkStringConstr dt str
+        (CharRep,   CharConstr c)     -> mkCharConstr dt c
         _ -> error "repConstr"
 
 
@@ -638,6 +645,7 @@ readConstr dt str =
         IntRep      -> mkReadCon (\i -> (mkPrimCon dt str (IntConstr i)))
         FloatRep    -> mkReadCon (\f -> (mkPrimCon dt str (FloatConstr f)))
         StringRep   -> Just (mkStringConstr dt str)
+        CharRep     -> mkReadCon (\c -> (mkPrimCon dt str (CharConstr c)))
         NoRep       -> Nothing
   where
 
@@ -708,9 +716,14 @@ mkFloatType :: String -> DataType
 mkFloatType = mkPrimType FloatRep
 
 
--- | Constructs the 'String' type
+-- | This function is now deprecated. Please use 'mkCharType' instead.
+{-# DEPRECATED mkStringType "Use mkCharType instead" #-}
 mkStringType :: String -> DataType
 mkStringType = mkPrimType StringRep
+
+-- | Constructs the 'Char' type
+mkCharType :: String -> DataType
+mkCharType = mkPrimType CharRep
 
 
 -- | Helper for 'mkIntType', 'mkFloatType', 'mkStringType'
@@ -743,11 +756,18 @@ mkFloatConstr dt f = case datarep dt of
                     FloatRep -> mkPrimCon dt (show f) (FloatConstr f)
                     _ -> error "mkFloatConstr"
 
-
+-- | This function is now deprecated. Please use 'mkCharConstr' instead.
+{-# DEPRECATED mkStringConstr "Use mkCharConstr instead" #-}
 mkStringConstr :: DataType -> String -> Constr
 mkStringConstr dt str = case datarep dt of
                        StringRep -> mkPrimCon dt str (StringConstr str)
                        _ -> error "mkStringConstr"
+
+-- | Makes a constructor for 'Char'.
+mkCharConstr :: DataType -> Char -> Constr
+mkCharConstr dt c = case datarep dt of
+                   CharRep -> mkPrimCon dt (show c) (CharConstr c)
+                   _ -> error "mkCharConstr"
 
 
 ------------------------------------------------------------------------------
@@ -839,12 +859,12 @@ instance Data Bool where
 ------------------------------------------------------------------------------
 
 charType :: DataType
-charType = mkStringType "Prelude.Char"
+charType = mkCharType "Prelude.Char"
 
 instance Data Char where
-  toConstr x = mkStringConstr charType [x]
+  toConstr x = mkCharConstr charType x
   gunfold _ z c = case constrRep c of
-                    (StringConstr [x]) -> z x
+                    (CharConstr x) -> z x
                     _ -> error "gunfold"
   dataTypeOf _ = charType
 
