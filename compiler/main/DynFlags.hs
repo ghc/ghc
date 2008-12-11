@@ -84,10 +84,11 @@ import Util
 import Maybes           ( orElse )
 import SrcLoc
 import FastString
+import FiniteMap
 import Outputable
 import {-# SOURCE #-} ErrUtils ( Severity(..), Message, mkLocMessage )
 
-import Data.IORef       ( readIORef )
+import Data.IORef
 import Control.Monad    ( when )
 
 import Data.Char
@@ -433,6 +434,12 @@ data DynFlags = DynFlags {
   pkgDatabase           :: Maybe (UniqFM PackageConfig),
   pkgState              :: PackageState,
 
+  -- Temporary files
+  -- These have to be IORefs, because the defaultCleanupHandler needs to
+  -- know what to clean when an exception happens
+  filesToClean          :: IORef [FilePath],
+  dirsToClean           :: IORef (FiniteMap FilePath FilePath),
+
   -- hsc dynamic flags
   flags                 :: [DynFlag],
 
@@ -539,10 +546,14 @@ initDynFlags dflags = do
  ways <- readIORef v_Ways
  build_tag <- readIORef v_Build_tag
  rts_build_tag <- readIORef v_RTS_Build_tag
+ refFilesToClean <- newIORef []
+ refDirsToClean <- newIORef emptyFM
  return dflags{
         wayNames        = ways,
         buildTag        = build_tag,
-        rtsBuildTag     = rts_build_tag
+        rtsBuildTag     = rts_build_tag,
+        filesToClean    = refFilesToClean,
+        dirsToClean     = refDirsToClean
         }
 
 -- | The normal 'DynFlags'. Note that they is not suitable for use in this form
@@ -641,6 +652,8 @@ defaultDynFlags =
         depExcludeMods    = [],
         depSuffixes       = [],
         -- end of ghc -M values
+        filesToClean   = panic "defaultDynFlags: No filesToClean",
+        dirsToClean    = panic "defaultDynFlags: No dirsToClean",
         haddockOptions = Nothing,
         flags = [
             Opt_AutoLinkPackages,

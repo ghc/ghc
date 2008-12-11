@@ -1071,8 +1071,8 @@ runPhase SplitMangle _stop hsc_env _basename _suff input_fn _get_output_fn maybe
 	    dflags' = dflags { splitInfo = Just (split_s_prefix, n_files) }
 
 	-- Remember to delete all these files
-	addFilesToClean [ split_s_prefix ++ "__" ++ show n ++ ".s"
-			| n <- [1..n_files]]
+	addFilesToClean dflags' [ split_s_prefix ++ "__" ++ show n ++ ".s"
+	                        | n <- [1..n_files]]
 
 	return (SplitAs, dflags', maybe_loc, "**splitmangle**")
 	  -- we don't use the filename

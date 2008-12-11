@@ -525,32 +525,30 @@ getExtraViaCOpts dflags = do
 %************************************************************************
 
 \begin{code}
-GLOBAL_VAR(v_FilesToClean, [],               [String] )
-GLOBAL_VAR(v_DirsToClean, emptyFM, FiniteMap FilePath FilePath )
-\end{code}
-
-\begin{code}
 cleanTempDirs :: DynFlags -> IO ()
 cleanTempDirs dflags
    = unless (dopt Opt_KeepTmpFiles dflags)
-   $ do ds <- readIORef v_DirsToClean
+   $ do let ref = dirsToClean dflags
+        ds <- readIORef ref
         removeTmpDirs dflags (eltsFM ds)
-        writeIORef v_DirsToClean emptyFM
+        writeIORef ref emptyFM
 
 cleanTempFiles :: DynFlags -> IO ()
 cleanTempFiles dflags
    = unless (dopt Opt_KeepTmpFiles dflags)
-   $ do fs <- readIORef v_FilesToClean
+   $ do let ref = filesToClean dflags
+        fs <- readIORef ref
         removeTmpFiles dflags fs
-        writeIORef v_FilesToClean []
+        writeIORef ref []
 
 cleanTempFilesExcept :: DynFlags -> [FilePath] -> IO ()
 cleanTempFilesExcept dflags dont_delete
    = unless (dopt Opt_KeepTmpFiles dflags)
-   $ do files <- readIORef v_FilesToClean
+   $ do let ref = filesToClean dflags
+        files <- readIORef ref
         let (to_keep, to_delete) = partition (`elem` dont_delete) files
         removeTmpFiles dflags to_delete
-        writeIORef v_FilesToClean to_keep
+        writeIORef ref to_keep
 
 
 -- find a temporary name that doesn't already exist.
@@ -565,14 +563,16 @@ newTempName dflags extn
       = do let filename = (prefix ++ show x) <.> extn
            b  <- doesFileExist filename
            if b then findTempName prefix (x+1)
-                else do consIORef v_FilesToClean filename -- clean it up later
+                else do -- clean it up later
+                        consIORef (filesToClean dflags) filename
                         return filename
 
 -- return our temporary directory within tmp_dir, creating one if we
 -- don't have one yet
 getTempDir :: DynFlags -> IO FilePath
 getTempDir dflags@(DynFlags{tmpDir=tmp_dir})
-  = do mapping <- readIORef v_DirsToClean
+  = do let ref = dirsToClean dflags
+       mapping <- readIORef ref
        case lookupFM mapping tmp_dir of
            Nothing ->
                do x <- getProcessID
@@ -583,7 +583,7 @@ getTempDir dflags@(DynFlags{tmpDir=tmp_dir})
                        = let dirname = prefix ++ show x
                          in do createDirectory dirname
                                let mapping' = addToFM mapping tmp_dir dirname
-                               writeIORef v_DirsToClean mapping'
+                               writeIORef ref mapping'
                                debugTraceMsg dflags 2 (ptext (sLit "Created temporary directory:") <+> text dirname)
                                return dirname
                             `IO.catch` \e ->
@@ -593,9 +593,9 @@ getTempDir dflags@(DynFlags{tmpDir=tmp_dir})
                   mkTempDir 0
            Just d -> return d
 
-addFilesToClean :: [FilePath] -> IO ()
+addFilesToClean :: DynFlags -> [FilePath] -> IO ()
 -- May include wildcards [used by DriverPipeline.run_phase SplitMangle]
-addFilesToClean files = mapM_ (consIORef v_FilesToClean) files
+addFilesToClean dflags files = mapM_ (consIORef (filesToClean dflags)) files
 
 removeTmpDirs :: DynFlags -> [FilePath] -> IO ()
 removeTmpDirs dflags ds
