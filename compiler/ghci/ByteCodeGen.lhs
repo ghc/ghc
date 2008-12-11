@@ -166,7 +166,7 @@ mkProtoBCO nm instrs_ordlist origin arity bitmap_size bitmap is_ret mallocd_bloc
         -- and if >= iNTERP_STACK_CHECK_THRESH, add an explicit
         -- stack check.  (The interpreter always does a stack check
         -- for iNTERP_STACK_CHECK_THRESH words at the start of each
-        -- BCO anyway, so we only need to add an explicit on in the
+        -- BCO anyway, so we only need to add an explicit one in the
         -- (hopefully rare) cases when the (overestimated) stack use
         -- exceeds iNTERP_STACK_CHECK_THRESH.
         maybe_with_stack_check
