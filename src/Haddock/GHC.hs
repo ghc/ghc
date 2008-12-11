@@ -52,12 +52,13 @@ startGhc libDir flags = do
         ghcLink   = NoLink
       }
     dynflags''' <- parseGhcFlags dynflags'' restFlags flags
-#if __GLASGOW_HASKELL__ >= 609 
-    setSessionDynFlags dynflags'''
-    ghcActs dynflags'''
+    defaultCleanupHandler dynflags''' $ do
+#if __GLASGOW_HASKELL__ >= 609
+        setSessionDynFlags dynflags'''
+        ghcActs dynflags'''
 #else
-    setSessionDynFlags session dynflags'''
-    return (session, dynflags''')
+        setSessionDynFlags session dynflags'''
+        return (session, dynflags''')
 #endif
 
 
