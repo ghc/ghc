@@ -373,7 +373,7 @@ defaultCleanupHandler :: (ExceptionMonad m, MonadIO m) =>
                          DynFlags -> m a -> m a
 defaultCleanupHandler dflags inner =
     -- make sure we clean up after ourselves
-    inner `gonException`
+    inner `gfinally`
           (liftIO $ do
               cleanTempFiles dflags
               cleanTempDirs dflags
