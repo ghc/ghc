@@ -1,0 +1,3 @@
+Heap exhausted;
+Current maximum heap size is 999424 bytes (0 MB);
+use `+RTS -M<size>' to increase it.
