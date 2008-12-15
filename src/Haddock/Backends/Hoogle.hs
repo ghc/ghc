@@ -75,6 +75,12 @@ outHsType :: OutputableBndr a => HsType a -> String
 outHsType = out . dropHsDocTy
 
 
+makeExplicit (HsForAllTy _ a b c) = HsForAllTy Explicit a b c
+makeExplicit x = x
+
+makeExplicitL (L src x) = L src (makeExplicit x)
+
+
 dropComment (' ':'-':'-':' ':_) = []
 dropComment (x:xs) = x : dropComment xs
 dropComment [] = []
@@ -165,10 +171,10 @@ ppCtor dat con = ldoc (con_doc con) ++ f (con_details con)
                            [out (unL $ cd_fld_name r) `typeSig` [resType, cd_fld_type r]]
                           | r <- recs]
 
-        funs = foldr1 (\x y -> reL $ HsFunTy x y)
+        funs = foldr1 (\x y -> reL $ HsFunTy (makeExplicitL x) (makeExplicitL y))
         apps = foldl1 (\x y -> reL $ HsAppTy x y)
 
-        typeSig name flds = operator name ++ " :: " ++ outHsType (unL $ funs flds)
+        typeSig name flds = operator name ++ " :: " ++ outHsType (makeExplicit $ unL $ funs flds)
         name = out $ unL $ con_name con
 
         resType = case con_res con of
