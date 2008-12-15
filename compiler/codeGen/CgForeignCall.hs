@@ -1,10 +1,3 @@
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 -----------------------------------------------------------------------------
 --
 -- Code generation for foreign calls.
@@ -85,7 +78,9 @@ emitForeignCall results (CCall (CCallSpec target cconv safety)) args live
 	= case target of
 	   StaticTarget lbl -> (args, CmmLit (CmmLabel 
 					(mkForeignLabel lbl call_size False)))
-	   DynamicTarget    ->  case args of (CmmHinted fn _):rest -> (rest, fn)
+	   DynamicTarget    ->  case args of
+	                        (CmmHinted fn _):rest -> (rest, fn)
+	                        [] -> panic "emitForeignCall: DynamicTarget []"
 
 	-- in the stdcall calling convention, the symbol needs @size appended
 	-- to it, where size is the total number of bytes of arguments.  We
@@ -112,7 +107,7 @@ emitForeignCall'
         -> C_SRT                -- the SRT of the calls continuation
         -> CmmReturnInfo
 	-> Code
-emitForeignCall' safety results target args vols srt ret
+emitForeignCall' safety results target args vols _srt ret
   | not (playSafe safety) = do
     temp_args <- load_args_into_temps args
     let (caller_save, caller_load) = callerSaveVolatileRegs vols
@@ -150,6 +145,7 @@ emitForeignCall' safety results target args vols srt ret
     stmtsC caller_load
     emitLoadThreadState
 
+suspendThread, resumeThread :: CmmExpr
 suspendThread = CmmLit (CmmLabel (mkRtsCodeLabel (sLit "suspendThread")))
 resumeThread  = CmmLit (CmmLabel (mkRtsCodeLabel (sLit "resumeThread")))
 
@@ -161,17 +157,20 @@ resumeThread  = CmmLit (CmmLabel (mkRtsCodeLabel (sLit "resumeThread")))
 --
 -- This is a HACK; really it should be done in the back end, but
 -- it's easier to generate the temporaries here.
+load_args_into_temps :: [CmmHinted CmmExpr] -> FCode [CmmHinted CmmExpr]
 load_args_into_temps = mapM arg_assign_temp
   where arg_assign_temp (CmmHinted e hint) = do
 	   tmp <- maybe_assign_temp e
 	   return (CmmHinted tmp hint)
 	
+load_target_into_temp :: CmmCallTarget -> FCode CmmCallTarget
 load_target_into_temp (CmmCallee expr conv) = do 
   tmp <- maybe_assign_temp expr
   return (CmmCallee tmp conv)
 load_target_into_temp other_target =
   return other_target
 
+maybe_assign_temp :: CmmExpr -> FCode CmmExpr
 maybe_assign_temp e
   | hasNoGlobalRegs e = return e
   | otherwise          = do 
@@ -188,6 +187,7 @@ maybe_assign_temp e
 -- This stuff can't be done in suspendThread/resumeThread, because it
 -- refers to global registers which aren't available in the C world.
 
+emitSaveThreadState :: Code
 emitSaveThreadState = do
   -- CurrentTSO->sp = Sp;
   stmtC $ CmmStore (cmmOffset stgCurrentTSO tso_SP) stgSp
@@ -197,8 +197,10 @@ emitSaveThreadState = do
 	stmtC (CmmStore (cmmOffset stgCurrentTSO tso_CCCS) curCCS)
 
    -- CurrentNursery->free = Hp+1;
+emitCloseNursery :: Code
 emitCloseNursery = stmtC $ CmmStore nursery_bdescr_free (cmmOffsetW stgHp 1)
 
+emitLoadThreadState :: Code
 emitLoadThreadState = do
   tso <- newTemp bWord -- TODO FIXME NOW
   stmtsC [
@@ -217,6 +219,7 @@ emitLoadThreadState = do
 	stmtC (CmmStore curCCSAddr 
 		(CmmLoad (cmmOffset (CmmReg (CmmLocal tso)) tso_CCCS) bWord))
 
+emitOpenNursery :: Code
 emitOpenNursery = stmtsC [
         -- Hp = CurrentNursery->free - 1;
 	CmmAssign hp (cmmOffsetW (CmmLoad nursery_bdescr_free gcWord) (-1)),
@@ -237,11 +240,12 @@ emitOpenNursery = stmtsC [
 	    )
    ]
 
-
+nursery_bdescr_free, nursery_bdescr_start, nursery_bdescr_blocks :: CmmExpr
 nursery_bdescr_free   = cmmOffset stgCurrentNursery oFFSET_bdescr_free
 nursery_bdescr_start  = cmmOffset stgCurrentNursery oFFSET_bdescr_start
 nursery_bdescr_blocks = cmmOffset stgCurrentNursery oFFSET_bdescr_blocks
 
+tso_SP, tso_STACK, tso_CCCS :: ByteOff
 tso_SP    = tsoFieldB     oFFSET_StgTSO_sp
 tso_STACK = tsoFieldB     oFFSET_StgTSO_stack
 tso_CCCS  = tsoProfFieldB oFFSET_StgTSO_CCCS
@@ -256,11 +260,13 @@ tsoFieldB off
 tsoProfFieldB :: ByteOff -> ByteOff
 tsoProfFieldB off = off + fixedHdrSize * wORD_SIZE
 
+stgSp, stgHp, stgCurrentTSO, stgCurrentNursery :: CmmExpr
 stgSp		  = CmmReg sp
 stgHp		  = CmmReg hp
 stgCurrentTSO	  = CmmReg currentTSO
 stgCurrentNursery = CmmReg currentNursery
 
+sp, spLim, hp, hpLim, currentTSO, currentNursery :: CmmReg
 sp		  = CmmGlobal Sp
 spLim		  = CmmGlobal SpLim
 hp		  = CmmGlobal Hp
