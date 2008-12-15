@@ -768,6 +768,7 @@ def simple_run( name, way, prog, args ):
    rm_no_fail(qualify(name,'run.stderr'))
    rm_no_fail(qualify(name, 'hp'))
    rm_no_fail(qualify(name,'ps'))
+   rm_no_fail(qualify(name, 'prof'))
    
    my_rts_flags = rts_flags(way)
 
@@ -796,10 +797,13 @@ def simple_run( name, way, prog, args ):
        return 'fail'
 
    check_hp = my_rts_flags.find("-h") != -1
+   check_prof = my_rts_flags.find("-p") != -1
 
-   if getTestOpts().ignore_output or (check_stderr_ok(name) and
-                                      check_stdout_ok(name) and
-                                      (not check_hp or exit_code > 127 or check_hp_ok(name))):
+   if getTestOpts().ignore_output or \
+      (check_stderr_ok(name) and
+       check_stdout_ok(name) and
+       (not check_hp or (exit_code > 127 and exit_code != 251) or check_hp_ok(name)) and
+       (not check_prof or check_prof_ok(name))):
        # exit_code > 127 probably indicates a crash, so don't try to run hp2ps.
        return 'pass'
    else:
@@ -1098,6 +1102,20 @@ def check_hp_ok(name):
     else:
         print "hp2ps error when processing heap profile for " + name
         return(False)
+
+def check_prof_ok(name):
+
+    prof_file = qualify(name,'prof')
+
+    if not os.path.exists(prof_file):
+        print prof_file + " does not exist"
+        return(False)
+
+    if os.path.getsize(qualify(name,'prof')) == 0:
+        print prof_file + " is empty"
+        return(False)
+
+    return(True)
 
 # Compare expected output to actual output, and optionally accept the
 # new output. Returns true if output matched or was accepted, false
