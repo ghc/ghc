@@ -190,8 +190,6 @@ tickyReturnOldCon arity
   = ifTicky $ do { bumpTickyCounter (sLit "RET_OLD_ctr")
 	         ; bumpHistogram (sLit "RET_OLD_hst") arity }
 tickyReturnNewCon arity 
-  | not opt_DoTickyProfiling = nopC
-  | otherwise
   = ifTicky $ do { bumpTickyCounter (sLit "RET_NEW_ctr")
 	         ; bumpHistogram (sLit "RET_NEW_hst") arity }
 
