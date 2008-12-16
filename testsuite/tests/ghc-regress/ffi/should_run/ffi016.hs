@@ -1,15 +1,17 @@
--- Tests ForeignPtrEnv finalizers
+-- Tests Foreign.Concurrent finalizers
 
 import Text.Printf
-import Foreign.ForeignPtr
+import Foreign.Concurrent as Conc
 import Foreign
 import GHC.TopHandler
 import Control.Concurrent
 import Data.List
 import System.Mem
 
+-- This finalizer calls back into Haskell, so we can't use
+-- the ordinary newForeignPtr.
 foreign export ccall fin :: Ptr Int -> Ptr Int -> IO ()
-foreign import ccall "&fin" finptr :: FinalizerEnvPtr Int Int
+foreign import ccall "fin" finptr :: Ptr Int -> Ptr Int -> IO ()
 
 fin :: Ptr Int -> Ptr Int -> IO ()
 fin envp ap = runIO $ do
@@ -21,6 +23,6 @@ fin envp ap = runIO $ do
 main = do
   a   <- new (55 :: Int)
   env <- new (66 :: Int)
-  fp  <- newForeignPtrEnv finptr env a
+  fp  <- Conc.newForeignPtr a (fin env a)
   performGC
   threadDelay 100000
