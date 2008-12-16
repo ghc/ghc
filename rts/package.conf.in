@@ -158,6 +158,10 @@ ld-options:
 	 , "-Wl,-search_paths_first"
 #endif
 
+#ifdef darwin_HOST_OS
+         , "-read_only_relocs", "warning"
+#endif
+
 framework-dirs:
 
 #ifdef HAVE_FRAMEWORK_GMP
