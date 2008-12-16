@@ -255,21 +255,6 @@ The rest of the prelude list functions are in GHC.List.
 ----------------------------------------------
 --      foldr/build/augment
 ----------------------------------------------
-
-Note [Inlining for foldr]
-~~~~~~~~~~~~~~~~~~~~~~~~~
-Inline foldr only in the final stage (0), after the foldr rules
-have had a chance
-
-Notice that we write foldr with just *two* arguments so that it'll inline
-when given just those two arguments.  Those are the ones that allow it to
-be specialised for its argument functions.  If you give it *three* args
-then a definition like 
-   unpack = foldr unpk_fn unpk_arg
-does not get foldr inlined.  But now 'unpack' will probably be inlined at
-every call site (being small and arity 1), and *that* will make foldr inline!
-So we get a copy of foldr at every call of unpack. This is particularly
-bad for literal strings.
   
 \begin{code}
 -- | 'foldr', applied to a binary operator, a starting value (typically
@@ -281,9 +266,10 @@ bad for literal strings.
 foldr            :: (a -> b -> b) -> b -> [a] -> b
 -- foldr _ z []     =  z
 -- foldr f z (x:xs) =  f x (foldr f z xs)
-{-# INLINE [0] foldr #-}    -- See Note [Inlining for foldr]
-foldr k z = go 
-          where
+{-# INLINE [0] foldr #-}
+-- Inline only in the final stage, after the foldr/cons rule has had a chance
+foldr k z xs = go xs
+             where
                go []     = z
                go (y:ys) = y `k` go ys
 
@@ -682,7 +668,7 @@ const x _               =  x
 -- | Function composition.
 {-# INLINE (.) #-}
 (.)       :: (b -> c) -> (a -> b) -> a -> c
-(.) f g = \x -> f (g x)
+(.) f g x = f (g x)
 
 -- | @'flip' f@ takes its (first) two arguments in the reverse order of @f@.
 flip                    :: (a -> b -> c) -> b -> a -> c
@@ -929,16 +915,9 @@ a `iShiftRL#` b | b >=# WORD_SIZE_IN_BITS# = 0#
 This code is needed for virtually all programs, since it's used for
 unpacking the strings of error messages.
 
-Note [Inlining for unpacking C strings]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We use NOINLINE on unpackCString# and unpackFoldrCString# because
-there is little or no gain from inlining them -- and there may be a 
-lot of calls (one for each literal string).
-
 \begin{code}
 unpackCString# :: Addr# -> [Char]
-{-# NOINLINE unpackCString# #-}
--- See Note [Inlining for unpacking C strings]
+{-# NOINLINE [1] unpackCString# #-}
 unpackCString# addr 
   = unpack 0#
   where
@@ -959,9 +938,9 @@ unpackAppendCString# addr rest
         ch = indexCharOffAddr# addr nh
 
 unpackFoldrCString# :: Addr# -> (Char  -> a -> a) -> a -> a 
-{-# NOINLINE unpackFoldrCString# #-}
--- See Note [Inlining for unpacking C strings]
--- Usually the unpack-list rule turns it into unpackCString#
+{-# NOINLINE [0] unpackFoldrCString# #-}
+-- Don't inline till right at the end;
+-- usually the unpack-list rule turns it into unpackCStringList
 -- It also has a BuiltInRule in PrelRules.lhs:
 --      unpackFoldrCString# "foo" c (unpackFoldrCString# "baz" c n)
 --        =  unpackFoldrCString# "foobaz" c n
@@ -1010,7 +989,7 @@ unpackNBytes#  addr len# = unpack [] (len# -# 1#)
             ch -> unpack (C# ch : acc) (i# -# 1#)
 
 {-# RULES
-"unpack"       [~1] forall a   . unpackCString# a             = build (unpackFoldrCString# a)
+"unpack"       [~1] forall a   . unpackCString# a                  = build (unpackFoldrCString# a)
 "unpack-list"  [1]  forall a   . unpackFoldrCString# a (:) [] = unpackCString# a
 "unpack-append"     forall a n . unpackFoldrCString# a (:) n  = unpackAppendCString# a n
 
