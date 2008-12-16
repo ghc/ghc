@@ -171,6 +171,7 @@ make_exp (Case e v ty alts) = do
   return $ C.Case scrut (make_vbind v) (make_ty ty) newAlts
 make_exp (Note (SCC _) e) = make_exp e >>= (return . C.Note "SCC") -- temporary
 make_exp (Note (CoreNote s) e) = make_exp e >>= (return . C.Note s)  -- hdaume: core annotations
+make_exp (Note InlineMe e) = make_exp e >>= (return . C.Note "InlineMe")
 make_exp _ = error "MkExternalCore died: make_exp"
 
 make_alt :: CoreAlt -> CoreM C.Alt

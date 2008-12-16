@@ -22,6 +22,7 @@ import CoreFVs
 import CoreUtils        ( exprIsTrivial, isDefaultAlt )
 import Coercion		( mkSymCoercion )
 import Id
+import IdInfo
 import BasicTypes
 
 import VarSet
@@ -398,6 +399,11 @@ occAnalRec (CyclicSCC nodes) (body_usage, binds)
                 where
                   new_fvs = extendFvs env emptyVarSet fvs
 
+idRuleRhsVars :: Id -> VarSet
+-- Just the variables free on the *rhs* of a rule
+-- See Note [Choosing loop breakers]
+idRuleRhsVars id = foldr (unionVarSet . ruleRhsFreeVars) emptyVarSet (idCoreRules id)
+
 extendFvs :: IdEnv IdSet -> IdSet -> IdSet -> IdSet
 -- (extendFVs env fvs s) returns (fvs `union` env(s))
 extendFvs env fvs id_set
@@ -493,8 +499,8 @@ reOrderCycle (bind : binds)
 
     score :: Node Details -> Int        -- Higher score => less likely to be picked as loop breaker
     score (ND bndr rhs _ _, _, _)
-        | isInlineRule (idUnfolding bndr) = 10
-                -- Note [INLINE pragmas]
+        | workerExists (idWorkerInfo bndr)      = 10
+                -- Note [Worker inline loop]
 
         | exprIsTrivial rhs        = 5  -- Practically certain to be inlined
                 -- Used to have also: && not (isExportedId bndr)
@@ -512,14 +518,34 @@ reOrderCycle (bind : binds)
 -- so it probably isn't worth the time to test on every binder
 --	| isNeverActive (idInlinePragma bndr) = -10
 
-        | isOneOcc (idOccInfo bndr) = 1  -- Likely to be inlined
+        | inlineCandidate bndr rhs = 2  -- Likely to be inlined
+                -- Note [Inline candidates]
 
-        | canUnfold (idUnfolding bndr) = 1
+        | not (neverUnfold (idUnfolding bndr)) = 1
                 -- the Id has some kind of unfolding
 
         | otherwise = 0
 
-	-- Checking for a constructor application
+    inlineCandidate :: Id -> CoreExpr -> Bool
+    inlineCandidate _  (Note InlineMe _) = True
+    inlineCandidate id _                 = isOneOcc (idOccInfo id)
+
+        -- Note [conapp]
+        --
+        -- It's really really important to inline dictionaries.  Real
+        -- example (the Enum Ordering instance from GHC.Base):
+        --
+        --      rec     f = \ x -> case d of (p,q,r) -> p x
+        --              g = \ x -> case d of (p,q,r) -> q x
+        --              d = (v, f, g)
+        --
+        -- Here, f and g occur just once; but we can't inline them into d.
+        -- On the other hand we *could* simplify those case expressions if
+        -- we didn't stupidly choose d as the loop breaker.
+        -- But we won't because constructor args are marked "Many".
+        -- Inlining dictionaries is really essential to unravelling
+        -- the loops in static numeric dictionaries, see GHC.Float.
+
         -- Cheap and cheerful; the simplifer moves casts out of the way
         -- The lambda case is important to spot x = /\a. C (f a)
         -- which comes up when C is a dictionary constructor and
@@ -698,6 +724,11 @@ occAnal _   expr@(Lit _) = (emptyDetails, expr)
 \end{code}
 
 \begin{code}
+occAnal env (Note InlineMe body)
+  = case occAnal env body of { (usage, body') ->
+    (mapVarEnv markMany usage, Note InlineMe body')
+    }
+
 occAnal env (Note note@(SCC _) body)
   = case occAnal env body of { (usage, body') ->
     (mapVarEnv markInsideSCC usage, Note note body')

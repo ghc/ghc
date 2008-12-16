@@ -114,7 +114,7 @@ Note [CSE for INLINE and NOINLINE]
 We are careful to do no CSE inside functions that the user has marked as
 INLINE or NOINLINE.  In terms of Core, that means 
 
-	a) we do not do CSE inside an InlineRule
+	a) we do not do CSE inside (Note InlineMe e)
 
 	b) we do not do CSE on the RHS of a binding b=e
 	   unless b's InlinePragma is AlwaysActive
@@ -218,6 +218,7 @@ cseExpr _   (Type t)               = Type t
 cseExpr _   (Lit lit)              = Lit lit
 cseExpr env (Var v)		   = Var (lookupSubst env v)
 cseExpr env (App f a)        	   = App (cseExpr env f) (tryForCSE env a)
+cseExpr _   (Note InlineMe e)      = Note InlineMe e    -- See Note [CSE for INLINE and NOINLINE]
 cseExpr env (Note n e)       	   = Note n (cseExpr env e)
 cseExpr env (Cast e co)            = Cast (cseExpr env e) co
 cseExpr env (Lam b e)	     	   = let (env', b') = addBinder env b

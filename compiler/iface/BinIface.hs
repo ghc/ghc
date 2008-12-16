@@ -1124,6 +1124,10 @@ instance Binary IfaceInfoItem where
 	    put_ bh ad
     put_ bh HsNoCafRefs = do
 	    putByte bh 4
+    put_ bh (HsWorker ae af) = do
+	    putByte bh 5
+	    put_ bh ae
+	    put_ bh af
     get bh = do
 	    h <- getByte bh
 	    case h of
@@ -1135,36 +1139,17 @@ instance Binary IfaceInfoItem where
 		      return (HsUnfold ad)
 	      3 -> do ad <- get bh
 		      return (HsInline ad)
-	      _ -> do return HsNoCafRefs
-
-instance Binary IfaceUnfolding where
-    put_ bh (IfCoreUnfold e) = do
-	putByte bh 0
-	put_ bh e
-    put_ bh (IfInlineRule a e) = do
-	putByte bh 1
-	put_ bh a
-	put_ bh e
-    put_ bh (IfWrapper a n) = do
-	putByte bh 2
-	put_ bh a
-	put_ bh n
-    get bh = do
-	h <- getByte bh
-	case h of
-	  0 -> do e <- get bh
-		  return (IfCoreUnfold e)
-	  1 -> do a <- get bh
-		  e <- get bh
-		  return (IfInlineRule a e)
-	  _ -> do a <- get bh
-		  n <- get bh
-		  return (IfWrapper a n)
+	      4 -> do return HsNoCafRefs
+	      _ -> do ae <- get bh
+		      af <- get bh
+		      return (HsWorker ae af)
 
 instance Binary IfaceNote where
     put_ bh (IfaceSCC aa) = do
 	    putByte bh 0
 	    put_ bh aa
+    put_ bh IfaceInlineMe = do
+	    putByte bh 3
     put_ bh (IfaceCoreNote s) = do
             putByte bh 4
             put_ bh s
@@ -1173,6 +1158,7 @@ instance Binary IfaceNote where
 	    case h of
 	      0 -> do aa <- get bh
 		      return (IfaceSCC aa)
+	      3 -> do return IfaceInlineMe
               4 -> do ac <- get bh
                       return (IfaceCoreNote ac)
               _ -> panic ("get IfaceNote " ++ show h)

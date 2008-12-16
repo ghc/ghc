@@ -352,7 +352,7 @@ tcPolyBinds top_lvl sig_fn prag_fn rec_group rec_tc binds
 
         -- BUILD THE POLYMORPHIC RESULT IDs
   ; let dict_vars = map instToVar dicts -- May include equality constraints
-  ; exports <- mapM (mkExport top_lvl rec_group prag_fn tyvars_to_gen (map varType dict_vars))
+  ; exports <- mapM (mkExport top_lvl prag_fn tyvars_to_gen (map varType dict_vars))
                     mono_bind_infos
 
   ; let poly_ids = [poly_id | (_, poly_id, _, _) <- exports]
@@ -367,7 +367,7 @@ tcPolyBinds top_lvl sig_fn prag_fn rec_group rec_tc binds
 
 
 --------------
-mkExport :: TopLevelFlag -> RecFlag -> TcPragFun -> [TyVar] -> [TcType]
+mkExport :: TopLevelFlag -> TcPragFun -> [TyVar] -> [TcType]
          -> MonoBindInfo
          -> TcM ([TyVar], Id, Id, [LPrag])
 -- mkExport generates exports with 
@@ -381,13 +381,13 @@ mkExport :: TopLevelFlag -> RecFlag -> TcPragFun -> [TyVar] -> [TcType]
 
 -- Pre-condition: the inferred_tvs are already zonked
 
-mkExport top_lvl rec_group prag_fn inferred_tvs dict_tys (poly_name, mb_sig, mono_id)
+mkExport top_lvl prag_fn inferred_tvs dict_tys (poly_name, mb_sig, mono_id)
   = do  { warn_missing_sigs <- doptM Opt_WarnMissingSigs
         ; let warn = isTopLevel top_lvl && warn_missing_sigs
         ; (tvs, poly_id) <- mk_poly_id warn mb_sig
                 -- poly_id has a zonked type
 
-        ; prags <- tcPrags rec_group poly_id (prag_fn poly_name)
+        ; prags <- tcPrags poly_id (prag_fn poly_name)
                 -- tcPrags requires a zonked poly_id
 
         ; return (tvs, poly_id, mono_id, prags) }
@@ -413,34 +413,24 @@ mkPragFun sigs = \n -> lookupNameEnv env n `orElse` []
           env = foldl add emptyNameEnv prs
           add env (n,p) = extendNameEnv_Acc (:) singleton env n p
 
-tcPrags :: RecFlag -> Id -> [LSig Name] -> TcM [LPrag]
--- Pre-condition: the poly_id is zonked
--- Reason: required by tcSubExp
-tcPrags rec_group poly_id prags = mapM tc_lprag prags
+tcPrags :: Id -> [LSig Name] -> TcM [LPrag]
+tcPrags poly_id prags = mapM (wrapLocM tc_prag) prags
   where
-    tc_lprag :: LSig Name -> TcM LPrag
-    tc_lprag (L loc prag) = setSrcSpan loc                $
-    	     	    	    addErrCtxt (pragSigCtxt prag) $ 
- 			    do { prag' <- tc_prag prag
-                               ; return (L loc prag') }
-
-    tc_prag (SpecSig _ hs_ty inl) = tcSpecPrag poly_id hs_ty inl
-    tc_prag (SpecInstSig hs_ty)   = tcSpecPrag poly_id hs_ty defaultInlineSpec
-    tc_prag (InlineSig _ inl)     = do { warnIfRecInline rec_group inl poly_id
-    	    	       	 	       ; return (InlinePrag inl) }
-    tc_prag (FixSig {})           = panic "tcPrag FixSig"
-    tc_prag (TypeSig {})          = panic "tcPrag TypeSig"
+    tc_prag prag = addErrCtxt (pragSigCtxt prag) $ 
+                   tcPrag poly_id prag
 
 pragSigCtxt :: Sig Name -> SDoc
 pragSigCtxt prag = hang (ptext (sLit "In the pragma")) 2 (ppr prag)
 
-warnIfRecInline :: RecFlag -> InlineSpec -> TcId -> TcM ()
-warnIfRecInline rec_group (Inline _ is_inline) poly_id
-  | is_inline && isRec rec_group = addWarnTc warn
-  | otherwise                    = return ()
-  where
-    warn = ptext (sLit "INLINE pragma for recursive binder") <+> quotes (ppr poly_id)
-    	   <+> ptext (sLit "may be discarded")
+tcPrag :: TcId -> Sig Name -> TcM Prag
+-- Pre-condition: the poly_id is zonked
+-- Reason: required by tcSubExp
+tcPrag poly_id (SpecSig _ hs_ty inl) = tcSpecPrag poly_id hs_ty inl
+tcPrag poly_id (SpecInstSig hs_ty)   = tcSpecPrag poly_id hs_ty defaultInlineSpec
+tcPrag _       (InlineSig _ inl)     = return (InlinePrag inl)
+tcPrag _       (FixSig {})           = panic "tcPrag FixSig"
+tcPrag _       (TypeSig {})          = panic "tcPrag TypeSig"
+
 
 tcSpecPrag :: TcId -> LHsType Name -> InlineSpec -> TcM Prag
 tcSpecPrag poly_id hs_ty inl

@@ -28,6 +28,7 @@ import VarEnv
 import VarSet
 import Name
 import Id
+import IdInfo
 import PprCore
 import ErrUtils
 import SrcLoc
@@ -227,7 +228,10 @@ lintSingleBinding top_lvl_flag rec_flag (binder,rhs)
    where
     binder_ty                  = idType binder
     maybeDmdTy                 = idNewStrictness_maybe binder
-    bndr_vars                  = varSetElems (idFreeVars binder)
+    bndr_vars                  = varSetElems (idFreeVars binder `unionVarSet` wkr_vars)
+    wkr_vars | workerExists wkr_info = unitVarSet (workerId wkr_info)
+	     | otherwise	     = emptyVarSet
+    wkr_info = idWorkerInfo binder
     lintBinder var | isId var  = lintIdBndr var $ \_ -> (return ())
 	           | otherwise = return ()
 \end{code}

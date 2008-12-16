@@ -10,12 +10,12 @@ module SimplUtils (
 
 	-- Inlining,
 	preInlineUnconditionally, postInlineUnconditionally, 
-	activeInline, activeRule, 
+	activeInline, activeRule, inlineMode,
 
 	-- The continuation type
 	SimplCont(..), DupFlag(..), ArgInfo(..),
 	contIsDupable, contResultType, contIsTrivial, contArgs, dropArgs, 
-	countValArgs, countArgs, 
+	countValArgs, countArgs, splitInlineCont,
 	mkBoringStop, mkLazyArgStop, contIsRhsOrArg,
 	interestingCallContext, interestingArgContext,
 
@@ -214,6 +214,24 @@ dropArgs :: Int -> SimplCont -> SimplCont
 dropArgs 0 cont = cont
 dropArgs n (ApplyTo _ _ _ cont) = dropArgs (n-1) cont
 dropArgs n other		= pprPanic "dropArgs" (ppr n <+> ppr other)
+
+--------------------
+splitInlineCont :: SimplCont -> Maybe (SimplCont, SimplCont)
+-- Returns Nothing if the continuation should dissolve an InlineMe Note
+-- Return Just (c1,c2) otherwise, 
+--	where c1 is the continuation to put inside the InlineMe 
+--	and   c2 outside
+
+-- Example: (__inline_me__ (/\a. e)) ty
+--	Here we want to do the beta-redex without dissolving the InlineMe
+-- See test simpl017 (and Trac #1627) for a good example of why this is important
+
+splitInlineCont (ApplyTo dup (Type ty) se c)
+  | Just (c1, c2) <- splitInlineCont c = Just (ApplyTo dup (Type ty) se c1, c2)
+splitInlineCont cont@(Stop {})         = Just (mkBoringStop, cont)
+splitInlineCont cont@(StrictBind {})   = Just (mkBoringStop, cont)
+splitInlineCont cont@(StrictArg  {})   = Just (mkBoringStop, cont)
+splitInlineCont _                      = Nothing
 \end{code}
 
 
@@ -341,7 +359,7 @@ mkArgInfo fun n_val_args call_cont
     vanilla_discounts, arg_discounts :: [Int]
     vanilla_discounts = repeat 0
     arg_discounts = case idUnfolding fun of
-			CoreUnfolding {uf_guidance = UnfoldIfGoodArgs {ug_args = discounts}}
+			CoreUnfolding _ _ _ _ (UnfoldIfGoodArgs _ discounts _ _)
 			      -> discounts ++ vanilla_discounts
 			_     -> vanilla_discounts
 
@@ -462,7 +480,13 @@ unboxed tuples and suchlike.
 
 INLINE pragmas
 ~~~~~~~~~~~~~~
-We don't simplify inside InlineRules (which come from INLINE pragmas).
+SimplGently is also used as the mode to simplify inside an InlineMe note.
+
+\begin{code}
+inlineMode :: SimplifierMode
+inlineMode = SimplGently
+\end{code}
+
 It really is important to switch off inlinings inside such
 expressions.  Consider the following example 
 

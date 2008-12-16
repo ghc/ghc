@@ -18,10 +18,12 @@ find, unsurprisingly, a Core expression.
 module CoreUnfold (
 	Unfolding, UnfoldingGuidance,	-- Abstract types
 
-	noUnfolding, mkImplicitUnfolding, 
-	mkTopUnfolding, mkUnfolding, 
-	mkInlineRule, mkWwInlineRule,
-	mkCompulsoryUnfolding, 
+	noUnfolding, mkTopUnfolding, mkImplicitUnfolding, mkUnfolding, 
+	mkCompulsoryUnfolding, seqUnfolding,
+	evaldUnfolding, mkOtherCon, otherCons,
+	unfoldingTemplate, maybeUnfoldingTemplate,
+	isEvaldUnfolding, isValueUnfolding, isCheapUnfolding, isCompulsoryUnfolding,
+	hasUnfolding, hasSomeUnfolding, neverUnfold,
 
 	couldBeSmallEnoughToInline, 
 	certainlyWillInline, smallEnoughToInline,
@@ -35,16 +37,15 @@ import DynFlags
 import CoreSyn
 import PprCore		()	-- Instances
 import OccurAnal
-import CoreSubst
+import CoreSubst 	( Subst, emptySubst, substTy, extendIdSubst, extendTvSubst
+			, lookupIdSubst, substBndr, substBndrs, substRecBndrs )
 import CoreUtils
 import Id
 import DataCon
 import Literal
 import PrimOp
 import IdInfo
-import BasicTypes	( Arity )
 import Type hiding( substTy, extendTvSubst )
-import Maybes
 import PrelNames
 import Bag
 import FastTypes
@@ -67,37 +68,24 @@ mkTopUnfolding expr = mkUnfolding True {- Top level -} expr
 mkImplicitUnfolding :: CoreExpr -> Unfolding
 -- For implicit Ids, do a tiny bit of optimising first
 mkImplicitUnfolding expr 
-  = CoreUnfolding (simpleOptExpr expr)
+  = CoreUnfolding (simpleOptExpr emptySubst expr)
 		  True
 		  (exprIsHNF expr)
 		  (exprIsCheap expr)
 		  (calcUnfoldingGuidance opt_UF_CreationThreshold expr)
 
-mkInlineRule :: CoreExpr -> Arity -> Unfolding
-mkInlineRule expr arity 
-  = InlineRule { uf_tmpl = simpleOptExpr expr, 
-    	         uf_is_top = True, 	 -- Conservative; this gets set more
-		 	     		 -- accuately by the simplifier (slight hack)
-					 -- in SimplEnv.substUnfolding
-                 uf_arity = arity, 
-		 uf_is_value = exprIsHNF expr,
-		 uf_worker = Nothing }
-
-mkWwInlineRule :: CoreExpr -> Arity -> Id -> Unfolding
-mkWwInlineRule expr arity wkr 
-  = InlineRule { uf_tmpl = simpleOptExpr expr, 
-    	         uf_is_top = True, 	 -- Conservative; see mkInlineRule
-                 uf_arity = arity, 
-		 uf_is_value = exprIsHNF expr,
-		 uf_worker = Just wkr }
-
 mkUnfolding :: Bool -> CoreExpr -> Unfolding
 mkUnfolding top_lvl expr
-  = CoreUnfolding { uf_tmpl = occurAnalyseExpr expr,
-		    uf_is_top = top_lvl,
-		    uf_is_value = exprIsHNF expr,
-		    uf_is_cheap = exprIsCheap expr,
-		    uf_guidance = calcUnfoldingGuidance opt_UF_CreationThreshold expr }
+  = CoreUnfolding (occurAnalyseExpr expr)
+		  top_lvl
+
+		  (exprIsHNF expr)
+			-- Already evaluated
+
+		  (exprIsCheap expr)
+			-- OK to inline inside a lambda
+
+		  (calcUnfoldingGuidance opt_UF_CreationThreshold expr)
 	-- Sometimes during simplification, there's a large let-bound thing	
 	-- which has been substituted, and so is now dead; so 'expr' contains
 	-- two copies of the thing while the occurrence-analysed expression doesn't
@@ -106,6 +94,14 @@ mkUnfolding top_lvl expr
 	--
 	-- This can occasionally mean that the guidance is very pessimistic;
 	-- it gets fixed up next round
+
+instance Outputable Unfolding where
+  ppr NoUnfolding = ptext (sLit "No unfolding")
+  ppr (OtherCon cs) = ptext (sLit "OtherCon") <+> ppr cs
+  ppr (CompulsoryUnfolding e) = ptext (sLit "Compulsory") <+> ppr e
+  ppr (CoreUnfolding e top hnf cheap g) 
+	= ptext (sLit "Unf") <+> sep [ppr top <+> ppr hnf <+> ppr cheap <+> ppr g, 
+				     ppr e]
 
 mkCompulsoryUnfolding :: CoreExpr -> Unfolding
 mkCompulsoryUnfolding expr	-- Used for things that absolutely must be unfolded
@@ -120,27 +116,75 @@ mkCompulsoryUnfolding expr	-- Used for things that absolutely must be unfolded
 %************************************************************************
 
 \begin{code}
+instance Outputable UnfoldingGuidance where
+    ppr UnfoldNever	= ptext (sLit "NEVER")
+    ppr (UnfoldIfGoodArgs v cs size discount)
+      = hsep [ ptext (sLit "IF_ARGS"), int v,
+	       brackets (hsep (map int cs)),
+	       int size,
+	       int discount ]
+\end{code}
+
+
+\begin{code}
 calcUnfoldingGuidance
 	:: Int		    	-- bomb out if size gets bigger than this
 	-> CoreExpr    		-- expression to look at
 	-> UnfoldingGuidance
 calcUnfoldingGuidance bOMB_OUT_SIZE expr
-  = case collectBinders expr of { (binders, body) ->
+  = case collect_val_bndrs expr of { (inline, val_binders, body) ->
     let
-        val_binders = filter isId binders
 	n_val_binders = length val_binders
+
+	max_inline_size = n_val_binders+2
+	-- The idea is that if there is an INLINE pragma (inline is True)
+	-- and there's a big body, we give a size of n_val_binders+2.  This
+	-- This is just enough to fail the no-size-increase test in callSiteInline,
+	--   so that INLINE things don't get inlined into entirely boring contexts,
+	--   but no more.
+
     in
     case (sizeExpr (iUnbox bOMB_OUT_SIZE) val_binders body) of
-      TooBig -> UnfoldNever
+
+      TooBig 
+	| not inline -> UnfoldNever
+		-- A big function with an INLINE pragma must
+		-- have an UnfoldIfGoodArgs guidance
+	| otherwise  -> UnfoldIfGoodArgs n_val_binders
+					 (map (const 0) val_binders)
+					 max_inline_size 0
+
       SizeIs size cased_args scrut_discount
-	-> UnfoldIfGoodArgs { ug_arity = n_val_binders
-	   		    , ug_args  = map discount_for val_binders
-			    , ug_size  = iBox size
-			    , ug_res   = iBox scrut_discount }
+	-> UnfoldIfGoodArgs
+			n_val_binders
+			(map discount_for val_binders)
+			final_size
+			(iBox scrut_discount)
 	where        
+	    boxed_size    = iBox size
+
+	    final_size | inline     = boxed_size `min` max_inline_size
+		       | otherwise  = boxed_size
+
+		-- Sometimes an INLINE thing is smaller than n_val_binders+2.
+		-- A particular case in point is a constructor, which has size 1.
+		-- We want to inline this regardless, hence the `min`
+
 	    discount_for b = foldlBag (\acc (b',n) -> if b==b' then acc+n else acc) 
 				      0 cased_args
 	}
+  where
+    collect_val_bndrs e = go False [] e
+	-- We need to be a bit careful about how we collect the
+	-- value binders.  In ptic, if we see 
+	--	__inline_me (\x y -> e)
+	-- We want to say "2 value binders".  Why?  So that 
+	-- we take account of information given for the arguments
+
+    go _      rev_vbs (Note InlineMe e)     = go True   rev_vbs     e
+    go inline rev_vbs (Lam b e) | isId b    = go inline (b:rev_vbs) e
+				| otherwise = go inline rev_vbs     e
+    go inline rev_vbs e			    = (inline, reverse rev_vbs, e)
 \end{code}
 
 \begin{code}
@@ -153,10 +197,21 @@ sizeExpr :: FastInt 	    -- Bomb out if it gets bigger than this
 sizeExpr bOMB_OUT_SIZE top_args expr
   = size_up expr
   where
-    size_up (Type _)           = sizeZero      -- Types cost nothing
+    size_up (Type _)           = sizeZero        -- Types cost nothing
     size_up (Var _)            = sizeOne
-    size_up (Note _ body)      = size_up body  -- Notes cost nothing
+
+    size_up (Note InlineMe _)  = sizeOne         -- Inline notes make it look very small
+	-- This can be important.  If you have an instance decl like this:
+	-- 	instance Foo a => Foo [a] where
+	--	   {-# INLINE op1, op2 #-}
+	--	   op1 = ...
+	--	   op2 = ...
+	-- then we'll get a dfun which is a pair of two INLINE lambdas
+
+    size_up (Note _      body) = size_up body  -- Other notes cost nothing
+    
     size_up (Cast e _)         = size_up e
+
     size_up (App fun (Type _)) = size_up fun
     size_up (App fun arg)      = size_up_app fun [arg]
 
@@ -429,17 +484,13 @@ couldBeSmallEnoughToInline threshold rhs = case calcUnfoldingGuidance threshold 
 
 certainlyWillInline :: Unfolding -> Bool
   -- Sees if the unfolding is pretty certain to inline	
-certainlyWillInline (CompulsoryUnfolding {}) = True
-certainlyWillInline (InlineRule {})          = True
-certainlyWillInline (CoreUnfolding 
-    { uf_is_cheap = is_cheap
-    , uf_guidance = UnfoldIfGoodArgs {ug_arity = n_vals, ug_size = size}})
+certainlyWillInline (CoreUnfolding _ _ _ is_cheap (UnfoldIfGoodArgs n_vals _ size _))
   = is_cheap && size - (n_vals +1) <= opt_UF_UseThreshold
 certainlyWillInline _
   = False
 
 smallEnoughToInline :: Unfolding -> Bool
-smallEnoughToInline (CoreUnfolding {uf_guidance = UnfoldIfGoodArgs {ug_size = size}})
+smallEnoughToInline (CoreUnfolding _ _ _ _ (UnfoldIfGoodArgs _ _ size _))
   = size <= opt_UF_UseThreshold
 smallEnoughToInline _
   = False
@@ -499,10 +550,7 @@ instance Outputable CallCtxt where
   ppr ValAppCtxt    = ptext (sLit "ValAppCtxt")
 
 callSiteInline dflags active_inline id lone_variable arg_infos cont_info
-  = let
-	n_val_args  = length arg_infos
-    in
-    case idUnfolding id of {
+  = case idUnfolding id of {
 	NoUnfolding -> Nothing ;
 	OtherCon _  -> Nothing ;
 
@@ -513,44 +561,13 @@ callSiteInline dflags active_inline id lone_variable arg_infos cont_info
 		-- compulsory unfoldings (see MkId.lhs).
 		-- We don't allow them to be inactive
 
-	InlineRule { uf_tmpl = unf_template, uf_arity = arity, uf_is_top = is_top
-		   , uf_is_value = is_value, uf_worker = mb_worker }
-	    -> let yes_or_no | not active_inline   = False
-			     | n_val_args <  arity = yes_unsat	-- Not enough value args
-			     | n_val_args == arity = yes_exact	-- Exactly saturated
-			     | otherwise	   = True	-- Over-saturated
-	           result | yes_or_no = Just unf_template
-	       	 	  | otherwise = Nothing
-		   
-		   -- See Note [Inlining an InlineRule]
-		   is_wrapper = isJust mb_worker 
-		   yes_unsat | is_wrapper  = or arg_infos
-		   	     | otherwise   = False
-
-		   yes_exact = or arg_infos || interesting_saturated_call
-		   interesting_saturated_call 
-			= case cont_info of
-			    BoringCtxt -> not is_top				-- Note [Nested functions]
-			    CaseCtxt   -> not lone_variable || not is_value	-- Note [Lone variables]
-			    ArgCtxt {} -> arity > 0 	    			-- Note [Inlining in ArgCtxt]
-			    ValAppCtxt -> True					-- Note [Cast then apply]
-	       in
-	       if dopt Opt_D_dump_inlinings dflags then
-		pprTrace ("Considering InlineRule for: " ++ showSDoc (ppr id))
-			 (vcat [text "active:" <+> ppr active_inline,
-				text "arg infos" <+> ppr arg_infos,
-				text "interesting call" <+> ppr interesting_saturated_call,
-				text "is value:" <+> ppr is_value,
-				text "ANSWER =" <+> if yes_or_no then text "YES" else text "NO"])
-			  result
-		else result ;
-
-	CoreUnfolding { uf_tmpl = unf_template, uf_is_top = is_top, uf_is_value = is_value,
-		        uf_is_cheap = is_cheap, uf_guidance = guidance } ->
+	CoreUnfolding unf_template is_top is_value is_cheap guidance ->
 
     let
 	result | yes_or_no = Just unf_template
 	       | otherwise = Nothing
+
+	n_val_args  = length arg_infos
 
  	yes_or_no = active_inline && is_cheap && consider_safe
 		-- We consider even the once-in-one-branch
@@ -567,8 +584,7 @@ callSiteInline dflags active_inline id lone_variable arg_infos cont_info
 		-- work-duplication issue (the caller checks that).
 	  = case guidance of
 	      UnfoldNever  -> False
-	      UnfoldIfGoodArgs { ug_arity = n_vals_wanted, ug_args = arg_discounts
-                               , ug_res = res_discount, ug_size = size }
+	      UnfoldIfGoodArgs n_vals_wanted arg_discounts size res_discount
 		  | enough_args && size <= (n_vals_wanted + 1)
 			-- Inline unconditionally if there no size increase
 			-- Size of call is n_vals_wanted (+1 for the function)
@@ -618,34 +634,19 @@ callSiteInline dflags active_inline id lone_variable arg_infos cont_info
 		
     in    
     if dopt Opt_D_dump_inlinings dflags then
-	pprTrace ("Considering inlining: " ++ showSDoc (ppr id))
-		 (vcat [text "active:" <+> ppr active_inline,
-			text "arg infos" <+> ppr arg_infos,
-			text "interesting continuation" <+> ppr cont_info,
-			text "is value:" <+> ppr is_value,
-			text "is cheap:" <+> ppr is_cheap,
-			text "guidance" <+> ppr guidance,
-			text "ANSWER =" <+> if yes_or_no then text "YES" else text "NO"])
+	pprTrace "Considering inlining"
+		 (ppr id <+> vcat [text "active:" <+> ppr active_inline,
+			  	   text "arg infos" <+> ppr arg_infos,
+				   text "interesting continuation" <+> ppr cont_info,
+				   text "is value:" <+> ppr is_value,
+				   text "is cheap:" <+> ppr is_cheap,
+				   text "guidance" <+> ppr guidance,
+				   text "ANSWER =" <+> if yes_or_no then text "YES" else text "NO"])
 		  result
     else
     result
     }
 \end{code}
-
-Note [Inlining an InlineRule]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-An InlineRules is used for
-  (a) pogrammer INLINE pragmas
-  (b) inlinings from worker/wrapper
-
-For (a) the RHS may be large, and our contract is that we *only* inline
-when the function is applied to all the arguments on the LHS of the
-source-code defn.  (The uf_arity in the rule.)
-
-However for worker/wrapper it may be worth inlining even if the 
-arity is not satisfied (as we do in the CoreUnfolding case) so we don't
-require saturation.
-
 
 Note [Nested functions]
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -763,3 +764,74 @@ computeDiscount n_vals_wanted arg_discounts result_discount arg_infos
 				      | otherwise = 0
 \end{code}
 
+%************************************************************************
+%*									*
+	The Very Simple Optimiser
+%*									*
+%************************************************************************
+
+
+\begin{code}
+simpleOptExpr :: Subst -> CoreExpr -> CoreExpr
+-- Return an occur-analysed and slightly optimised expression
+-- The optimisation is very straightforward: just
+-- inline non-recursive bindings that are used only once, 
+-- or wheere the RHS is trivial
+
+simpleOptExpr subst expr
+  = go subst (occurAnalyseExpr expr)
+  where
+    go subst (Var v)          = lookupIdSubst subst v
+    go subst (App e1 e2)      = App (go subst e1) (go subst e2)
+    go subst (Type ty)        = Type (substTy subst ty)
+    go _     (Lit lit)        = Lit lit
+    go subst (Note note e)    = Note note (go subst e)
+    go subst (Cast e co)      = Cast (go subst e) (substTy subst co)
+    go subst (Let bind body)  = go_bind subst bind body
+    go subst (Lam bndr body)  = Lam bndr' (go subst' body)
+		              where
+			        (subst', bndr') = substBndr subst bndr
+
+    go subst (Case e b ty as) = Case (go subst e) b' 
+				     (substTy subst ty)
+				     (map (go_alt subst') as)
+			      where
+			  	 (subst', b') = substBndr subst b
+
+
+    ----------------------
+    go_alt subst (con, bndrs, rhs) = (con, bndrs', go subst' rhs)
+				 where
+				   (subst', bndrs') = substBndrs subst bndrs
+
+    ----------------------
+    go_bind subst (Rec prs) body = Let (Rec (bndrs' `zip` rhss'))
+				       (go subst' body)
+			    where
+			      (bndrs, rhss)    = unzip prs
+			      (subst', bndrs') = substRecBndrs subst bndrs
+			      rhss'	       = map (go subst') rhss
+
+    go_bind subst (NonRec b r) body = go_nonrec subst b (go subst r) body
+
+    ----------------------
+    go_nonrec subst b (Type ty') body
+      | isTyVar b = go (extendTvSubst subst b ty') body
+	-- let a::* = TYPE ty in <body>
+    go_nonrec subst b r' body
+      | isId b	-- let x = e in <body>
+      , exprIsTrivial r' || safe_to_inline (idOccInfo b)
+      = go (extendIdSubst subst b r') body
+    go_nonrec subst b r' body
+      = Let (NonRec b' r') (go subst' body)
+      where
+	(subst', b') = substBndr subst b
+
+    ----------------------
+	-- Unconditionally safe to inline
+    safe_to_inline :: OccInfo -> Bool
+    safe_to_inline IAmDead                  = True
+    safe_to_inline (OneOcc in_lam one_br _) = not in_lam && one_br
+    safe_to_inline (IAmALoopBreaker {})     = False
+    safe_to_inline NoOccInfo                = False
+\end{code}

@@ -16,7 +16,7 @@ Utility functions on @Core@ syntax
 -- | Commonly useful utilites for manipulating the Core language
 module CoreUtils (
 	-- * Constructing expressions
-	mkSCC, mkCoerce, mkCoerceI,
+	mkInlineMe, mkSCC, mkCoerce, mkCoerceI,
 	bindNonRec, needsCaseBinding,
 	mkAltExpr, mkPiType, mkPiTypes,
 
@@ -27,12 +27,10 @@ module CoreUtils (
 	exprType, coreAltType, coreAltsType,
 	exprIsDupable, exprIsTrivial, exprIsCheap, 
 	exprIsHNF,exprOkForSpeculation, exprIsBig, 
-	exprIsConApp_maybe, 
-	exprBotStrictness_maybe,
+	exprIsConApp_maybe, exprIsBottom,
 	rhsIsStatic,
 
 	-- * Arity and eta expansion
-	-- exprIsBottom, 	Not used
 	manifestArity, exprArity, 
 	exprEtaExpandArity, etaExpand, 
 
@@ -52,7 +50,6 @@ module CoreUtils (
 
 #include "HsVersions.h"
 
-import StaticFlags	( opt_NoStateHack )
 import CoreSyn
 import CoreFVs
 import PprCore
@@ -174,6 +171,46 @@ panic_msg e op_ty = pprCoreExpr e $$ ppr op_ty
 \subsection{Attaching notes}
 %*									*
 %************************************************************************
+
+mkNote removes redundant coercions, and SCCs where possible
+
+\begin{code}
+#ifdef UNUSED
+mkNote :: Note -> CoreExpr -> CoreExpr
+mkNote (SCC cc)	expr		   = mkSCC cc expr
+mkNote InlineMe expr		   = mkInlineMe expr
+mkNote note     expr		   = Note note expr
+#endif
+\end{code}
+
+Drop trivial InlineMe's.  This is somewhat important, because if we have an unfolding
+that looks like	(Note InlineMe (Var v)), the InlineMe doesn't go away because it may
+not be *applied* to anything.
+
+We don't use exprIsTrivial here, though, because we sometimes generate worker/wrapper
+bindings like
+	fw = ...
+	f  = inline_me (coerce t fw)
+As usual, the inline_me prevents the worker from getting inlined back into the wrapper.
+We want the split, so that the coerces can cancel at the call site.  
+
+However, we can get left with tiresome type applications.  Notably, consider
+	f = /\ a -> let t = e in (t, w)
+Then lifting the let out of the big lambda gives
+	t' = /\a -> e
+	f = /\ a -> let t = inline_me (t' a) in (t, w)
+The inline_me is to stop the simplifier inlining t' right back
+into t's RHS.  In the next phase we'll substitute for t (since
+its rhs is trivial) and *then* we could get rid of the inline_me.
+But it hardly seems worth it, so I don't bother.
+
+\begin{code}
+-- | Wraps the given expression in an inlining hint unless the expression
+-- is trivial in some sense, so that doing so would usually hurt us
+mkInlineMe :: CoreExpr -> CoreExpr
+mkInlineMe (Var v) = Var v
+mkInlineMe e	   = Note InlineMe e
+\end{code}
 
 \begin{code}
 -- | Wrap the given expression in the coercion, dropping identity coercions and coalescing nested coercions
@@ -383,11 +420,12 @@ exprIsTrivial _                = False
 
 \begin{code}
 exprIsDupable :: CoreExpr -> Bool
-exprIsDupable (Type _)   = True
-exprIsDupable (Var _)    = True
-exprIsDupable (Lit lit)  = litIsDupable lit
-exprIsDupable (Note _ e) = exprIsDupable e
-exprIsDupable (Cast e _) = exprIsDupable e
+exprIsDupable (Type _)          = True
+exprIsDupable (Var _)           = True
+exprIsDupable (Lit lit)         = litIsDupable lit
+exprIsDupable (Note InlineMe _) = True
+exprIsDupable (Note _ e)        = exprIsDupable e
+exprIsDupable (Cast e _)        = exprIsDupable e
 exprIsDupable expr
   = go expr 0
   where
@@ -434,6 +472,7 @@ exprIsCheap :: CoreExpr -> Bool
 exprIsCheap (Lit _)           = True
 exprIsCheap (Type _)          = True
 exprIsCheap (Var _)           = True
+exprIsCheap (Note InlineMe _) = True
 exprIsCheap (Note _ e)        = exprIsCheap e
 exprIsCheap (Cast e _)        = exprIsCheap e
 exprIsCheap (Lam x e)         = isRuntimeVar x || exprIsCheap e
@@ -580,9 +619,8 @@ isDivOp _                = False
 \end{code}
 
 \begin{code}
-{-	Never used -- omitting
 -- | True of expressions that are guaranteed to diverge upon execution
-exprIsBottom :: CoreExpr -> Bool	-- True => definitely bottom
+exprIsBottom :: CoreExpr -> Bool
 exprIsBottom e = go 0 e
                where
                 -- n is the number of args
@@ -598,7 +636,6 @@ exprIsBottom e = go 0 e
 
 idAppIsBottom :: Id -> Int -> Bool
 idAppIsBottom id n_val_args = appIsBottom (idNewStrictness id) n_val_args
--}
 \end{code}
 
 \begin{code}
@@ -845,7 +882,12 @@ exprIsConApp_maybe (Note (BinaryTickBox {}) expr)
 
 exprIsConApp_maybe (Note _ expr)
   = exprIsConApp_maybe expr
-    -- We ignore all notes.  For example,
+    -- We ignore InlineMe notes in case we have
+    --	x = __inline_me__ (a,b)
+    -- All part of making sure that INLINE pragmas never hurt
+    -- Marcin tripped on this one when making dictionaries more inlinable
+    --
+    -- In fact, we ignore all notes.  For example,
     --  	case _scc_ "foo" (C a b) of
     --			C a b -> e
     -- should be optimised away, but it will be only if we look
@@ -881,55 +923,50 @@ exprIsConApp_maybe expr = analyse (collectArgs expr)
 -- ^ The Arity returned is the number of value args the 
 -- expression can be applied to without doing much work
 exprEtaExpandArity :: DynFlags -> CoreExpr -> Arity
--- exprEtaExpandArity is used when eta expanding
--- 	e  ==>  \xy -> e x y
-exprEtaExpandArity dflags e
-    = applyStateHack e (arityType dicts_cheap e)
-  where
-    dicts_cheap = dopt Opt_DictsCheap dflags
+{- 
+exprEtaExpandArity is used when eta expanding
+	e  ==>  \xy -> e x y
 
-exprBotStrictness_maybe :: CoreExpr -> Maybe (Arity, StrictSig)
--- A cheap and cheerful function that identifies bottoming functions
--- and gives them a suitable strictness signatures.  It's used during
--- float-out
-exprBotStrictness_maybe e
-  = case arityType False e of
-	AT _ ATop -> Nothing
-	AT a ABot -> Just (a, mkStrictSig (mkTopDmdType (replicate a topDmd) BotRes))
-\end{code}	
-
-Note [Definition of arity]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-The "arity" of an expression 'e' is n if
-   applying 'e' to *fewer* than n *value* arguments
-   converges rapidly
-
-Or, to put it another way
-
-   there is no work lost in duplicating the partial
-   application (e x1 .. x(n-1))
-
-In the divegent case, no work is lost by duplicating because if the thing
-is evaluated once, that's the end of the program.
-
-Or, to put it another way, in any context C
-
-   C[ (\x1 .. xn. e x1 .. xn) ]
-         is as efficient as
-   C[ e ]
-
+It returns 1 (or more) to:
+	case x of p -> \s -> ...
+because for I/O ish things we really want to get that \s to the top.
+We are prepared to evaluate x each time round the loop in order to get that
 
 It's all a bit more subtle than it looks:
 
-Note [Arity of case expressions]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We treat the arity of 
-	case x of p -> \s -> ...
-as 1 (or more) because for I/O ish things we really want to get that
-\s to the top.  We are prepared to evaluate x each time round the loop
-in order to get that.
+1.  One-shot lambdas
 
-This isn't really right in the presence of seq.  Consider
+Consider one-shot lambdas
+		let x = expensive in \y z -> E
+We want this to have arity 2 if the \y-abstraction is a 1-shot lambda
+Hence the ArityType returned by arityType
+
+2.  The state-transformer hack
+
+The one-shot lambda special cause is particularly important/useful for
+IO state transformers, where we often get
+	let x = E in \ s -> ...
+
+and the \s is a real-world state token abstraction.  Such abstractions
+are almost invariably 1-shot, so we want to pull the \s out, past the
+let x=E, even if E is expensive.  So we treat state-token lambdas as 
+one-shot even if they aren't really.  The hack is in Id.isOneShotBndr.
+
+3.  Dealing with bottom
+
+Consider also 
+	f = \x -> error "foo"
+Here, arity 1 is fine.  But if it is
+	f = \x -> case x of 
+			True  -> error "foo"
+			False -> \y -> x+y
+then we want to get arity 2.  Tecnically, this isn't quite right, because
+	(f True) `seq` 1
+should diverge, but it'll converge if we eta-expand f.  Nevertheless, we
+do so; it improves some programs significantly, and increasing convergence
+isn't a bad thing.  Hence the ABot/ATop in ArityType.
+
+Actually, the situation is worse.  Consider
 	f = \x -> case x of
 			True  -> \y -> x+y
 			False -> \y -> x-y
@@ -941,29 +978,8 @@ This should diverge!  But if we eta-expand, it won't.   Again, we ignore this
 many programs.
 
 
-1.  Note [One-shot lambdas]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider one-shot lambdas
-		let x = expensive in \y z -> E
-We want this to have arity 1 if the \y-abstraction is a 1-shot lambda.
+4. Newtypes
 
-3.  Note [Dealing with bottom]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider
-	f = \x -> error "foo"
-Here, arity 1 is fine.  But if it is
-	f = \x -> case x of 
-			True  -> error "foo"
-			False -> \y -> x+y
-then we want to get arity 2.  Technically, this isn't quite right, because
-	(f True) `seq` 1
-should diverge, but it'll converge if we eta-expand f.  Nevertheless, we
-do so; it improves some programs significantly, and increasing convergence
-isn't a bad thing.  Hence the ABot/ATop in ArityType.
-
-
-4. Note [Newtype arity]
-~~~~~~~~~~~~~~~~~~~~~~~~
 Non-recursive newtypes are transparent, and should not get in the way.
 We do (currently) eta-expand recursive newtypes too.  So if we have, say
 
@@ -981,154 +997,75 @@ HOWEVER, note that if you use coerce bogusly you can ge
 	coerce Int negate
 And since negate has arity 2, you might try to eta expand.  But you can't
 decopose Int to a function type.   Hence the final case in eta_expand.
+-}
 
 
-Note [The state-transformer hack]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Suppose we have 
-	f = e
-where e has arity n.  Then, if we know from the context that f has
-a usage type like
-	t1 -> ... -> tn -1-> t(n+1) -1-> ... -1-> tm -> ...
-then we can expand the arity to m.  This usage type says that
-any application (x e1 .. en) will be applied to uniquely to (m-n) more args
-Consider f = \x. let y = <expensive> 
-		 in case x of
-		      True  -> foo
-		      False -> \(s:RealWorld) -> e
-where foo has arity 1.  Then we want the state hack to
-apply to foo too, so we can eta expand the case.
+exprEtaExpandArity dflags e = arityDepth (arityType dflags e)
 
-Then we expect that if f is applied to one arg, it'll be applied to two
-(that's the hack -- we don't really know, and sometimes it's false)
-See also Id.isOneShotBndr.
-
-\begin{code}
-applyStateHack :: CoreExpr -> ArityType -> Arity
-applyStateHack e (AT orig_arity is_bot)
-  | opt_NoStateHack = orig_arity
-  | ABot <- is_bot  = orig_arity   -- Note [State hack and bottoming functions]
-  | otherwise       = go orig_ty orig_arity
-  where			-- Note [The state-transformer hack]
-    orig_ty = exprType e
-    go :: Type -> Arity -> Arity
-    go ty arity		-- This case analysis should match that in eta_expand
-	| Just (_, ty') <- splitForAllTy_maybe ty   = go ty' arity
-
-	| Just (tc,tys) <- splitTyConApp_maybe ty 
-	, Just (ty', _) <- instNewTyCon_maybe tc tys
-	, not (isRecursiveTyCon tc)	            = go ty' arity
-		-- Important to look through non-recursive newtypes, so that, eg 
-		--	(f x)   where f has arity 2, f :: Int -> IO ()
-		-- Here we want to get arity 1 for the result!
-
-	| Just (arg,res) <- splitFunTy_maybe ty
-	, arity > 0 || isStateHackType arg = 1 + go res (arity-1)
-{-
-	= if arity > 0 then 1 + go res (arity-1)
-	  else if isStateHackType arg then
-		pprTrace "applystatehack" (vcat [ppr orig_arity, ppr orig_ty,
-						ppr ty, ppr res, ppr e]) $
-	        1 + go res (arity-1)
-          else WARN( arity > 0, ppr arity ) 0
--}						 
-	| otherwise = WARN( arity > 0, ppr arity ) 0
-\end{code}
-
-Note [State hack and bottoming functions]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-It's a terrible idea to use the state hack on a bottoming function.
-Here's what happens (Trac #2861):
-
-  f :: String -> IO T
-  f = \p. error "..."
-
-Eta-expand, using the state hack:
-
-  f = \p. (\s. ((error "...") |> g1) s) |> g2
-  g1 :: IO T ~ (S -> (S,T))
-  g2 :: (S -> (S,T)) ~ IO T
-
-Extrude the g2
-
-  f' = \p. \s. ((error "...") |> g1) s
-  f = f' |> (String -> g2)
-
-Discard args for bottomming function
-
-  f' = \p. \s. ((error "...") |> g1 |> g3
-  g3 :: (S -> (S,T)) ~ (S,T)
-
-Extrude g1.g3
-
-  f'' = \p. \s. (error "...")
-  f' = f'' |> (String -> S -> g1.g3)
-
-And now we can repeat the whole loop.  Aargh!  The bug is in applying the
-state hack to a function which then swallows the argument.
-
-
--------------------- Main arity code ----------------------------
-\begin{code}
--- If e has ArityType (AT n r), then the term 'e'
---  * Must be applied to at least n *value* args 
---	before doing any significant work
---  * It will not diverge before being applied to n
---	value arguments
---  * If 'r' is ABot, then it guarantees to diverge if 
---	applied to n arguments (or more)
-
-data ArityType = AT Arity ArityRes
-data ArityRes  = ATop			-- Know nothing
+-- A limited sort of function type
+data ArityType = AFun Bool ArityType	-- True <=> one-shot
+	       | ATop			-- Know nothing
 	       | ABot			-- Diverges
 
-vanillaArityType :: ArityType
-vanillaArityType = AT 0 ATop	-- Totally uninformative
+arityDepth :: ArityType -> Arity
+arityDepth (AFun _ ty) = 1 + arityDepth ty
+arityDepth _           = 0
 
-incArity :: ArityType -> ArityType
-incArity (AT a r) = AT (a+1) r
+andArityType :: ArityType -> ArityType -> ArityType
+andArityType ABot           at2           = at2
+andArityType ATop           _             = ATop
+andArityType (AFun t1 at1)  (AFun t2 at2) = AFun (t1 && t2) (andArityType at1 at2)
+andArityType at1            at2           = andArityType at2 at1
 
-decArity :: ArityType -> ArityType
-decArity (AT 0 r) = AT 0     r
-decArity (AT a r) = AT (a-1) r
+arityType :: DynFlags -> CoreExpr -> ArityType
+	-- (go1 e) = [b1,..,bn]
+	-- means expression can be rewritten \x_b1 -> ... \x_bn -> body
+	-- where bi is True <=> the lambda is one-shot
 
-andArityType :: ArityType -> ArityType -> ArityType   -- Used for branches of a 'case'
-andArityType (AT a1 ATop) (AT a2 ATop) = AT (a1 `min` a2) ATop
-andArityType (AT _  ABot) (AT a2 ATop) = AT a2		  ATop
-andArityType (AT a1 ATop) (AT _  ABot) = AT a1		  ATop
-andArityType (AT a1 ABot) (AT a2 ABot) = AT (a1 `max` a2) ABot
+arityType dflags (Note _ e) = arityType dflags e
+--	Not needed any more: etaExpand is cleverer
+-- removed: | ok_note n = arityType dflags e
+-- removed: | otherwise = ATop
 
-trimArity :: Bool -> ArityType -> ArityType
--- We have something like (let x = E in b), where b has the given
--- arity type.  Then
---	* If E is cheap we can push it inside as far as we like
---	* If b eventually diverges, we allow ourselves to push inside
---	  arbitrarily, even though that is not quite right
-trimArity _cheap (AT a ABot) = AT a ABot
-trimArity True   (AT a ATop) = AT a ATop
-trimArity False  (AT _ ATop) = AT 0 ATop	-- Bale out
+arityType dflags (Cast e _) = arityType dflags e
 
----------------------------
-arityType :: Bool -> CoreExpr -> ArityType
 arityType _ (Var v)
-  | Just strict_sig <- idNewStrictness_maybe v
-  , (ds, res) <- splitStrictSig strict_sig
-  , isBotRes res
-  = AT (length ds) ABot	-- Function diverges
-  | otherwise
-  = AT (idArity v) ATop
+  = mk (idArity v) (arg_tys (idType v))
+  where
+    mk :: Arity -> [Type] -> ArityType
+	-- The argument types are only to steer the "state hack"
+	-- Consider case x of
+	--		True  -> foo
+	--		False -> \(s:RealWorld) -> e
+	-- where foo has arity 1.  Then we want the state hack to
+	-- apply to foo too, so we can eta expand the case.
+    mk 0 tys | isBottomingId v                   = ABot
+             | (ty:_) <- tys, isStateHackType ty = AFun True ATop
+             | otherwise                         = ATop
+    mk n (ty:tys) = AFun (isStateHackType ty) (mk (n-1) tys)
+    mk n []       = AFun False		      (mk (n-1) [])
+
+    arg_tys :: Type -> [Type]	-- Ignore for-alls
+    arg_tys ty 
+	| Just (_, ty')  <- splitForAllTy_maybe ty = arg_tys ty'
+	| Just (arg,res) <- splitFunTy_maybe ty    = arg : arg_tys res
+	| otherwise				   = []
 
 	-- Lambdas; increase arity
-arityType dicts_cheap (Lam x e)
-  | isId x    = incArity (arityType dicts_cheap e)
-  | otherwise = arityType dicts_cheap e
+arityType dflags (Lam x e)
+  | isId x    = AFun (isOneShotBndr x) (arityType dflags e)
+  | otherwise = arityType dflags e
 
 	-- Applications; decrease arity
-arityType dicts_cheap (App fun (Type _))
-   = arityType dicts_cheap fun
-arityType dicts_cheap (App fun arg )
-   = trimArity (exprIsCheap arg) (decArity (arityType dicts_cheap fun))
-
+arityType dflags (App f (Type _)) = arityType dflags f
+arityType dflags (App f a)
+   = case arityType dflags f of
+	ABot -> ABot	-- If function diverges, ignore argument
+	ATop -> ATop	-- No no info about function
+	AFun _ xs
+		| exprIsCheap a -> xs
+		| otherwise	-> ATop
+							   
 	-- Case/Let; keep arity if either the expression is cheap
 	-- or it's a 1-shot lambda
 	-- The former is not really right for Haskell
@@ -1136,16 +1073,22 @@ arityType dicts_cheap (App fun arg )
 	--  ===>
 	--	f x y = case x of { (a,b) -> e }
 	-- The difference is observable using 'seq'
-arityType dicts_cheap (Case scrut _ _ alts)
-  = trimArity (exprIsCheap scrut)
-	      (foldr1 andArityType [arityType dicts_cheap rhs | (_,_,rhs) <- alts])
+arityType dflags (Case scrut _ _ alts)
+  = case foldr1 andArityType [arityType dflags rhs | (_,_,rhs) <- alts] of
+        xs | exprIsCheap scrut     -> xs
+        AFun one_shot _ | one_shot -> AFun True ATop
+        _                          -> ATop
 
-arityType dicts_cheap (Let b e) 
-  = trimArity (cheap_bind b) (arityType dicts_cheap e)
+arityType dflags (Let b e) 
+  = case arityType dflags e of
+        xs              | cheap_bind b -> xs
+        AFun one_shot _ | one_shot     -> AFun True ATop
+        _                              -> ATop
   where
     cheap_bind (NonRec b e) = is_cheap (b,e)
     cheap_bind (Rec prs)    = all is_cheap prs
-    is_cheap (b,e) = (dicts_cheap && isDictId b) || exprIsCheap e
+    is_cheap (b,e) = (dopt Opt_DictsCheap dflags && isDictId b)
+		   || exprIsCheap e
 	-- If the experimental -fdicts-cheap flag is on, we eta-expand through
 	-- dictionary bindings.  This improves arities. Thereby, it also
 	-- means that full laziness is less prone to floating out the
@@ -1163,9 +1106,21 @@ arityType dicts_cheap (Let b e)
 	-- One could go further and make exprIsCheap reply True to any
 	-- dictionary-typed expression, but that's more work.
 
-arityType dicts_cheap (Note _ e) = arityType dicts_cheap e
-arityType dicts_cheap (Cast e _) = arityType dicts_cheap e
-arityType _           _          = vanillaArityType
+arityType _ _ = ATop
+
+{- NOT NEEDED ANY MORE: etaExpand is cleverer
+ok_note InlineMe = False
+ok_note other    = True
+    -- Notice that we do not look through __inline_me__
+    -- This may seem surprising, but consider
+    --		f = _inline_me (\x -> e)
+    -- We DO NOT want to eta expand this to
+    --		f = \x -> (_inline_me (\x -> e)) x
+    -- because the _inline_me gets dropped now it is applied, 
+    -- giving just
+    --		f = \x -> e
+    -- A Bad Idea
+-}
 \end{code}
 
 
@@ -1192,7 +1147,8 @@ etaExpand :: Arity	  	-- ^ Result should have this number of value args
 
 etaExpand n us expr ty
   | manifestArity expr >= n = expr		-- The no-op case
-  | otherwise 		    = eta_expand n us expr ty
+  | otherwise 		    
+  = eta_expand n us expr ty
 
 -- manifestArity sees how many leading value lambdas there are
 manifestArity :: CoreExpr -> Arity
@@ -1212,8 +1168,16 @@ manifestArity _                     = 0
 -- so perhaps the extra code isn't worth it
 eta_expand :: Int -> [Unique] -> CoreExpr -> Type -> CoreExpr
 
-eta_expand n _ expr _
-  | n == 0    -- Saturated, so nothing to do
+eta_expand n _ expr ty
+  | n == 0 && 
+    -- The ILX code generator requires eta expansion for type arguments
+    -- too, but alas the 'n' doesn't tell us how many of them there 
+    -- may be.  So we eagerly eta expand any big lambdas, and just
+    -- cross our fingers about possible loss of sharing in the ILX case. 
+    -- The Right Thing is probably to make 'arity' include
+    -- type variables throughout the compiler.  (ToDo.)
+    not (isForAllTy ty)	
+    -- Saturated, so nothing to do
   = expr
 
 	-- Short cut for the case where there already
@@ -1382,7 +1346,6 @@ exprIsBig :: Expr b -> Bool
 exprIsBig (Lit _)      = False
 exprIsBig (Var _)      = False
 exprIsBig (Type _)     = False
-exprIsBig (Lam _ e)    = exprIsBig e
 exprIsBig (App f a)    = exprIsBig f || exprIsBig a
 exprIsBig (Cast e _)   = exprIsBig e	-- Hopefully coercions are not too big!
 exprIsBig _            = True
@@ -1462,6 +1425,7 @@ exprSize (Type t)        = seqType t `seq` 1
 
 noteSize :: Note -> Int
 noteSize (SCC cc)       = cc `seq` 1
+noteSize InlineMe       = 1
 noteSize (CoreNote s)   = s `seq` 1  -- hdaume: core annotations
  
 varSize :: Var -> Int
@@ -1617,7 +1581,7 @@ rhsIsStatic :: PackageId -> CoreExpr -> Bool
 -- This is a bit like CoreUtils.exprIsHNF, with the following differences:
 --    a) scc "foo" (\x -> ...) is updatable (so we catch the right SCC)
 --
---    b) (C x xs), where C is a contructor is updatable if the application is
+--    b) (C x xs), where C is a contructors is updatable if the application is
 --	   dynamic
 -- 
 --    c) don't look through unfolding of f in (f x).

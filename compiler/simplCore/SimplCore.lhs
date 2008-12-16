@@ -28,7 +28,7 @@ import Rules		( RuleBase, emptyRuleBase, mkRuleBase, unionRuleBase,
 import PprCore		( pprCoreBindings, pprCoreExpr, pprRules )
 import OccurAnal	( occurAnalysePgm, occurAnalyseExpr )
 import IdInfo		( setNewStrictnessInfo, newStrictnessInfo, 
-			  setUnfoldingInfo, unfoldingInfo, setSpecInfoHead,
+			  setWorkerInfo, workerInfo, setSpecInfoHead,
 			  setInlinePragInfo, inlinePragInfo,
 			  setSpecInfo, specInfo, specInfoRules )
 import CoreUtils	( coreBindsSize )
@@ -322,34 +322,45 @@ prepareRules :: HscEnv
 
 		    ModGuts)		-- Modified fields are 
 					--	(a) Bindings have rules attached,
-					--		and INLINE rules simplified
 					-- 	(b) Rules are now just orphan rules
 
 prepareRules hsc_env@(HscEnv { hsc_dflags = dflags, hsc_HPT = hpt })
 	     guts@(ModGuts { mg_binds = binds, mg_deps = deps 
 	     		   , mg_rules = local_rules, mg_rdr_env = rdr_env })
 	     us 
-  = do	{ us <- mkSplitUniqSupply 'w'
-
-	; let 	-- Simplify the local rules; boringly, we need to make an in-scope set
+  = do	{ let 	-- Simplify the local rules; boringly, we need to make an in-scope set
 		-- from the local binders, to avoid warnings from Simplify.simplVar
 	      local_ids        = mkInScopeSet (mkVarSet (bindersOfBinds binds))
 	      env	       = setInScopeSet gentleSimplEnv local_ids 
-	      (simpl_rules, _) = initSmpl dflags emptyRuleBase emptyFamInstEnvs us $
-				 mapM (simplRule env) local_rules
+	      (better_rules,_) = initSmpl dflags emptyRuleBase emptyFamInstEnvs us $
+				 (mapM (simplRule env) local_rules)
+	      home_pkg_rules   = hptRules hsc_env (dep_mods deps)
 
-	; let (rules_for_locals, rules_for_imps) = partition isLocalRule simpl_rules
+		-- Find the rules for locally-defined Ids; then we can attach them
+		-- to the binders in the top-level bindings
+		-- 
+		-- Reason
+		-- 	- It makes the rules easier to look up
+		--	- It means that transformation rules and specialisations for
+		--	  locally defined Ids are handled uniformly
+		--	- It keeps alive things that are referred to only from a rule
+		--	  (the occurrence analyser knows about rules attached to Ids)
+		--	- It makes sure that, when we apply a rule, the free vars
+		--	  of the RHS are more likely to be in scope
+		--	- The imported rules are carried in the in-scope set
+		--	  which is extended on each iteration by the new wave of
+		--	  local binders; any rules which aren't on the binding will
+		--	  thereby get dropped
+	      (rules_for_locals, rules_for_imps) = partition isLocalRule better_rules
+	      local_rule_base = extendRuleBaseList emptyRuleBase rules_for_locals
+	      binds_w_rules   = updateBinders local_rule_base binds
 
-	      home_pkg_rules = hptRules hsc_env (dep_mods deps)
-	      hpt_rule_base  = mkRuleBase home_pkg_rules
-	      imp_rule_base  = extendRuleBaseList hpt_rule_base rules_for_imps
-
-	      binds_w_rules = updateBinders rules_for_locals binds
-
+	      hpt_rule_base = mkRuleBase home_pkg_rules
+	      imp_rule_base = extendRuleBaseList hpt_rule_base rules_for_imps
 
 	; Err.dumpIfSet_dyn dflags Opt_D_dump_rules "Transformation rules"
 		(withPprStyle (mkUserStyle (mkPrintUnqualified dflags rdr_env) AllTheWay) $
-		 vcat [text "Local rules", pprRules simpl_rules,
+		 vcat [text "Local rules", pprRules better_rules,
 		       text "",
 		       text "Imported rules", pprRuleBase imp_rule_base])
 
@@ -357,41 +368,18 @@ prepareRules hsc_env@(HscEnv { hsc_dflags = dflags, hsc_HPT = hpt })
 					mg_rules = rules_for_imps })
     }
 
--- Note [Attach rules to local ids]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- Find the rules for locally-defined Ids; then we can attach them
--- to the binders in the top-level bindings
--- 
--- Reason
--- 	- It makes the rules easier to look up
---	- It means that transformation rules and specialisations for
---	  locally defined Ids are handled uniformly
---	- It keeps alive things that are referred to only from a rule
---	  (the occurrence analyser knows about rules attached to Ids)
---	- It makes sure that, when we apply a rule, the free vars
---	  of the RHS are more likely to be in scope
---	- The imported rules are carried in the in-scope set
---	  which is extended on each iteration by the new wave of
---	  local binders; any rules which aren't on the binding will
---	  thereby get dropped
-
-updateBinders :: [CoreRule] -> [CoreBind] -> [CoreBind]
-updateBinders rules_for_locals binds
-  = map update_bind binds
+updateBinders :: RuleBase -> [CoreBind] -> [CoreBind]
+updateBinders local_rules binds
+  = map update_bndrs binds
   where
-    local_rules = extendRuleBaseList emptyRuleBase rules_for_locals
+    update_bndrs (NonRec b r) = NonRec (update_bndr b) r
+    update_bndrs (Rec prs)    = Rec [(update_bndr b, r) | (b,r) <- prs]
 
-    update_bind (NonRec b r) = NonRec (add_rules b) r
-    update_bind (Rec prs)    = Rec (mapFst add_rules prs)
-
-	-- See Note [Attach rules to local ids]
-	-- NB: the binder might have some existing rules,
-	-- arising from specialisation pragmas
-    add_rules bndr
-	| Just rules <- lookupNameEnv local_rules (idName bndr)
-	= bndr `addIdSpecialisations` rules
-	| otherwise
-	= bndr
+    update_bndr bndr = case lookupNameEnv local_rules (idName bndr) of
+			  Nothing    -> bndr
+			  Just rules -> bndr `addIdSpecialisations` rules
+				-- The binder might have some existing rules,
+				-- arising from specialisation pragmas
 \end{code}
 
 Note [Simplifying the left-hand side of a RULE]
@@ -408,9 +396,6 @@ we do not want to get
 otherwise we don't match when given an argument like
 	augment (\a. h a a) (build h)
 
-The simplifier does indeed do eta reduction (it's in
-Simplify.completeLam) but only if -O is on.
-
 \begin{code}
 simplRule env rule@(BuiltinRule {})
   = return rule
@@ -419,6 +404,17 @@ simplRule env rule@(Rule { ru_bndrs = bndrs, ru_args = args, ru_rhs = rhs })
        args' <- mapM (simplExprGently env) args
        rhs' <- simplExprGently env rhs
        return (rule { ru_bndrs = bndrs', ru_args = args', ru_rhs = rhs' })
+
+-- It's important that simplExprGently does eta reduction.
+-- For example, in a rule like:
+--	augment g (build h) 
+-- we do not want to get
+--	augment (\a. g a) (build h)
+-- otherwise we don't match when given an argument like
+--	(\a. h a a)
+--
+-- The simplifier does indeed do eta reduction (it's in
+-- Simplify.completeLam) but only if -O is on.
 \end{code}
 
 \begin{code}
@@ -811,7 +807,7 @@ transferIdInfo exported_id local_id
   where
     local_info = idInfo local_id
     transfer exp_info = exp_info `setNewStrictnessInfo` newStrictnessInfo local_info
-				 `setUnfoldingInfo`     unfoldingInfo local_info
+				 `setWorkerInfo`        workerInfo local_info
 				 `setInlinePragInfo`	inlinePragInfo local_info
 				 `setSpecInfo`	        addSpecInfo (specInfo exp_info) new_info
     new_info = setSpecInfoHead (idName exported_id) 

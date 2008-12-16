@@ -13,7 +13,7 @@
 -- a Royal Pain (triggers other recompilation).
 -----------------------------------------------------------------------------
 
-{-# OPTIONS -fwarn-unused-imports #-}
+{-# OPTIONS -fno-warn-unused-imports #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and fix
 -- any warnings in the module. See
@@ -33,6 +33,7 @@ module DsMeta( dsBracket,
 import {-# SOURCE #-}	DsExpr ( dsExpr )
 
 import MatchLit
+import DsUtils
 import DsMonad
 
 import qualified Language.Haskell.TH as TH
@@ -44,11 +45,11 @@ import PrelNames
 -- OccName.varName we do this by removing varName from the import of
 -- OccName above, making a qualified instance of OccName and using
 -- OccNameAlias.varName where varName ws previously used in this file.
-import qualified OccName( isDataOcc, isVarOcc, isTcOcc, varName, tcName ) 
+import qualified OccName
 
 import Module
 import Id
-import Name hiding( isVarOcc, isTcOcc, varName, tcName ) 
+import Name
 import NameEnv
 import TcType
 import TyCon

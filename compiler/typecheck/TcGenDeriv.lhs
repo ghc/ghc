@@ -558,8 +558,8 @@ gen_Bounded_binds loc tycon
     data_cons = tyConDataCons tycon
 
     ----- enum-flavored: ---------------------------
-    min_bound_enum = mkHsVarBind loc minBound_RDR (nlHsVar data_con_1_RDR)
-    max_bound_enum = mkHsVarBind loc maxBound_RDR (nlHsVar data_con_N_RDR)
+    min_bound_enum = mkVarBind loc minBound_RDR (nlHsVar data_con_1_RDR)
+    max_bound_enum = mkVarBind loc maxBound_RDR (nlHsVar data_con_N_RDR)
 
     data_con_1	  = head data_cons
     data_con_N	  = last data_cons
@@ -569,9 +569,9 @@ gen_Bounded_binds loc tycon
     ----- single-constructor-flavored: -------------
     arity	   = dataConSourceArity data_con_1
 
-    min_bound_1con = mkHsVarBind loc minBound_RDR $
+    min_bound_1con = mkVarBind loc minBound_RDR $
 		     nlHsVarApps data_con_1_RDR (nOfThem arity minBound_RDR)
-    max_bound_1con = mkHsVarBind loc maxBound_RDR $
+    max_bound_1con = mkVarBind loc maxBound_RDR $
 		     nlHsVarApps data_con_1_RDR (nOfThem arity maxBound_RDR)
 \end{code}
 
@@ -801,16 +801,16 @@ gen_Read_binds get_fixity loc tycon
   where
     -----------------------------------------------------------------------
     default_readlist 
-	= mkHsVarBind loc readList_RDR     (nlHsVar readListDefault_RDR)
+	= mkVarBind loc readList_RDR     (nlHsVar readListDefault_RDR)
 
     default_readlistprec
-	= mkHsVarBind loc readListPrec_RDR (nlHsVar readListPrecDefault_RDR)
+	= mkVarBind loc readListPrec_RDR (nlHsVar readListPrecDefault_RDR)
     -----------------------------------------------------------------------
 
     data_cons = tyConDataCons tycon
     (nullary_cons, non_nullary_cons) = partition isNullarySrcDataCon data_cons
     
-    read_prec = mkHsVarBind loc readPrec_RDR
+    read_prec = mkVarBind loc readPrec_RDR
 	 		      (nlHsApp (nlHsVar parens_RDR) read_cons)
 
     read_cons 	          = foldr1 mk_alt (read_nullary_cons ++ read_non_nullary_cons)
@@ -955,7 +955,7 @@ gen_Show_binds get_fixity loc tycon
   = (listToBag [shows_prec, show_list], [])
   where
     -----------------------------------------------------------------------
-    show_list = mkHsVarBind loc showList_RDR
+    show_list = mkVarBind loc showList_RDR
 		  (nlHsApp (nlHsVar showList___RDR) (nlHsPar (nlHsApp (nlHsVar showsPrec_RDR) (nlHsIntLit 0))))
     -----------------------------------------------------------------------
     shows_prec = mk_FunBind loc showsPrec_RDR (map pats_etc (tyConDataCons tycon))
@@ -1189,6 +1189,7 @@ gen_Data_binds loc tycon
 			[nlWildPat]
                         (nlHsVar (mk_data_type_name tycon))
 
+
 gfoldl_RDR, gunfold_RDR, toConstr_RDR, dataTypeOf_RDR, mkConstr_RDR,
     mkDataType_RDR, conIndex_RDR, prefix_RDR, infix_RDR :: RdrName
 gfoldl_RDR     = varQual_RDR gENERICS (fsLit "gfoldl")
@@ -1264,7 +1265,7 @@ genAuxBind loc (GenTag2Con tycon)
     rdr_name = tag2con_RDR tycon
 
 genAuxBind loc (GenMaxTag tycon)
-  = mkHsVarBind loc rdr_name 
+  = mkVarBind loc rdr_name 
 		  (nlHsApp (nlHsVar intDataCon_RDR) (nlHsLit (HsIntPrim max_tag)))
   where
     rdr_name = maxtag_RDR tycon
@@ -1272,16 +1273,16 @@ genAuxBind loc (GenMaxTag tycon)
 		 data_cons -> toInteger ((length data_cons) - fIRST_TAG)
 
 genAuxBind loc (MkTyCon tycon)	--  $dT
-  = mkHsVarBind loc (mk_data_type_name tycon)
-		    ( nlHsVar mkDataType_RDR 
+  = mkVarBind loc (mk_data_type_name tycon)
+		  ( nlHsVar mkDataType_RDR 
                     `nlHsApp` nlHsLit (mkHsString (showSDoc (ppr tycon)))
                     `nlHsApp` nlList constrs )
   where
     constrs = [nlHsVar (mk_constr_name con) | con <- tyConDataCons tycon]
 
 genAuxBind loc (MkDataCon dc)	--  $cT1 etc
-  = mkHsVarBind loc (mk_constr_name dc) 
-	  	    (nlHsApps mkConstr_RDR constr_args)
+  = mkVarBind loc (mk_constr_name dc) 
+		  (nlHsApps mkConstr_RDR constr_args)
   where
     constr_args 
        = [ -- nlHsIntLit (toInteger (dataConTag dc)),	  -- Tag

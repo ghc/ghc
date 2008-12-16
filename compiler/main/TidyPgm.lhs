@@ -209,7 +209,7 @@ unit.  These are
 This exercise takes a sweep of the bindings bottom to top.  Actually,
 in Step 2 we're also going to need to know which Ids should be
 exported with their unfoldings, so we produce not an IdSet but an
-ExtIdEnv = IdEnv Bool
+IdEnv Bool
 
 
 Step 2: Tidy the program
@@ -504,12 +504,10 @@ getImplicitBinds type_env
 %************************************************************************
 
 \begin{code}
-type ExtIdEnv = IdEnv Bool	
-	-- In domain => Id is external
-	-- Range = True <=> show unfolding, 
-		-- Always True for InlineRule 
-
-findExternalIds :: Bool -> [CoreBind] -> ExtIdEnv
+findExternalIds :: Bool
+		-> [CoreBind]
+		-> IdEnv Bool	-- In domain => external
+				-- Range = True <=> show unfolding
 	-- Step 1 from the notes above
 findExternalIds omit_prags binds
   | omit_prags
@@ -549,7 +547,8 @@ addExternal (id,rhs) needed
 	-- "False" because we don't know we need the Id's unfolding
 	-- Don't override existing bindings; we might have already set it to True
 
-    new_needed_ids = (mb_unfold_ids `orElse` emptyVarSet) `unionVarSet`
+    new_needed_ids = worker_ids	`unionVarSet`
+		     unfold_ids	`unionVarSet`
 		     spec_ids
 
     idinfo	   = idInfo id
@@ -557,25 +556,29 @@ addExternal (id,rhs) needed
     loop_breaker   = isNonRuleLoopBreaker (occInfo idinfo)
     bottoming_fn   = isBottomingSig (newStrictnessInfo idinfo `orElse` topSig)
     spec_ids	   = specInfoFreeVars (specInfo idinfo)
+    worker_info	   = workerInfo idinfo
 
 	-- Stuff to do with the Id's unfolding
+	-- The simplifier has put an up-to-date unfolding
+	-- in the IdInfo, but the RHS will do just as well
+    unfolding	 = unfoldingInfo idinfo
+    rhs_is_small = not (neverUnfold unfolding)
+
 	-- We leave the unfolding there even if there is a worker
 	-- In GHCI the unfolding is used by importers
-    show_unfold = isJust mb_unfold_ids
+	-- When writing an interface file, we omit the unfolding 
+	-- if there is a worker
+    show_unfold = not bottoming_fn	 &&	-- Not necessary
+		  not dont_inline	 &&
+		  not loop_breaker	 &&
+		  rhs_is_small		 	-- Small enough
 
-    mb_unfold_ids :: Maybe IdSet	-- Nothing => don't unfold
-    mb_unfold_ids = case unfoldingInfo idinfo of
-		      InlineRule { uf_worker = Just wkr_id } -> Just (unitVarSet wkr_id)
-		      InlineRule { uf_tmpl = rhs } 	     -> Just (exprFreeIds rhs)
-		      CoreUnfolding { uf_guidance = guide } 
-			| not bottoming_fn	 	-- Not necessary
-			, not dont_inline	 
-			, not loop_breaker	 
-			, not (neverUnfoldGuidance guide)
-			-> Just (exprFreeIds rhs)	-- The simplifier has put an up-to-date unfolding
-							-- in the IdInfo, but the RHS will do just as well
-		    
-		      _ -> Nothing
+    unfold_ids | show_unfold = exprSomeFreeVars isLocalId rhs
+	       | otherwise   = emptyVarSet
+
+    worker_ids = case worker_info of
+		   HasWorker work_id _ -> unitVarSet work_id
+		   _otherwise          -> emptyVarSet
 \end{code}
 
 
@@ -632,7 +635,8 @@ findExternalRules binds non_local_rules ext_ids
 tidyTopBinds :: HscEnv
 	     -> Module
 	     -> TypeEnv
-	     -> ExtIdEnv
+	     -> IdEnv Bool	-- Domain = Ids that should be external
+				-- True <=> their unfolding is external too
 	     -> [CoreBind]
 	     -> IO (TidyEnv, [CoreBind])
 
@@ -671,7 +675,8 @@ tidyTopBinds hsc_env mod type_env ext_ids binds
 tidyTopBind  :: PackageId
 	     -> Module
 	     -> IORef NameCache	-- For allocating new unique names
-	     -> ExtIdEnv
+	     -> IdEnv Bool	-- Domain = Ids that should be external
+				-- True <=> their unfolding is external too
 	     -> TidyEnv -> CoreBind
 	     -> IO (TidyEnv, CoreBind)
 
@@ -794,7 +799,7 @@ tidyTopPair ext_ids rhs_tidy_env caf_info name' (bndr, rhs)
     rhs'    = tidyExpr rhs_tidy_env rhs
     idinfo  = idInfo bndr
     idinfo' = tidyTopIdInfo (isJust maybe_external)
-			    idinfo unfold_info
+			    idinfo unfold_info worker_info
 			    arity caf_info
 
     -- Expose an unfolding if ext_ids tells us to
@@ -802,21 +807,9 @@ tidyTopPair ext_ids rhs_tidy_env caf_info name' (bndr, rhs)
     --	True to show the unfolding, False to hide it
     maybe_external = lookupVarEnv ext_ids bndr
     show_unfold = maybe_external `orElse` False
-    unfold_info | show_unfold = tidyUnfolding rhs_tidy_env rhs' (unfoldingInfo idinfo)
+    unfold_info | show_unfold = mkTopUnfolding rhs'
 		| otherwise   = noUnfolding
-    -- NB: do *not* expose the worker if show_unfold is off,
-    --     because that means this thing is a loop breaker or
-    --     marked NOINLINE or something like that
-    -- This is important: if you expose the worker for a loop-breaker
-    -- then you can make the simplifier go into an infinite loop, because
-    -- in effect the unfolding is exposed.  See Trac #1709
-    -- 
-    -- You might think that if show_unfold is False, then the thing should
-    -- not be w/w'd in the first place.  But a legitimate reason is this:
-    -- 	  the function returns bottom
-    -- In this case, show_unfold will be false (we don't expose unfoldings
-    -- for bottoming functions), but we might still have a worker/wrapper
-    -- split (see Note [Worker-wrapper for bottoming functions] in WorkWrap.lhs
+    worker_info = tidyWorker rhs_tidy_env show_unfold (workerInfo idinfo)
 
     -- Usually the Id will have an accurate arity on it, because
     -- the simplifier has just run, but not always. 
@@ -840,9 +833,9 @@ tidyTopPair ext_ids rhs_tidy_env caf_info name' (bndr, rhs)
 -- 	unfoldings, which are inside Ids imported by GHCi. Ditto RULES.
 --	CoreToStg makes use of this when constructing SRTs.
 tidyTopIdInfo :: Bool -> IdInfo -> Unfolding
-              -> ArityInfo -> CafInfo
+              -> WorkerInfo -> ArityInfo -> CafInfo
               -> IdInfo
-tidyTopIdInfo is_external idinfo unfold_info arity caf_info
+tidyTopIdInfo is_external idinfo unfold_info worker_info arity caf_info
   | not is_external	-- For internal Ids (not externally visible)
   = vanillaIdInfo	-- we only need enough info for code generation
 			-- Arity and strictness info are enough;
@@ -858,19 +851,32 @@ tidyTopIdInfo is_external idinfo unfold_info arity caf_info
 	`setAllStrictnessInfo` newStrictnessInfo idinfo
 	`setInlinePragInfo`    inlinePragInfo idinfo
 	`setUnfoldingInfo`     unfold_info
+	`setWorkerInfo`	       worker_info
 		-- NB: we throw away the Rules
 		-- They have already been extracted by findExternalRules
 
 
 
------------- Unfolding  --------------
-tidyUnfolding :: TidyEnv -> CoreExpr -> Unfolding -> Unfolding
-tidyUnfolding tidy_env _ unf@(InlineRule { uf_tmpl = rhs, uf_worker = mb_wkr })
-  = unf { uf_tmpl = tidyExpr tidy_env rhs, 
-	  uf_worker = fmap (tidyVarOcc tidy_env) mb_wkr }
-tidyUnfolding _ tidy_rhs (CoreUnfolding {})
-  = mkTopUnfolding tidy_rhs
-tidyUnfolding _ _ unf = unf
+------------  Worker  --------------
+tidyWorker :: TidyEnv -> Bool -> WorkerInfo -> WorkerInfo
+tidyWorker _tidy_env _show_unfold NoWorker
+  = NoWorker
+tidyWorker tidy_env show_unfold (HasWorker work_id wrap_arity) 
+  | show_unfold = HasWorker (tidyVarOcc tidy_env work_id) wrap_arity
+  | otherwise   = NoWorker
+    -- NB: do *not* expose the worker if show_unfold is off,
+    --     because that means this thing is a loop breaker or
+    --     marked NOINLINE or something like that
+    -- This is important: if you expose the worker for a loop-breaker
+    -- then you can make the simplifier go into an infinite loop, because
+    -- in effect the unfolding is exposed.  See Trac #1709
+    -- 
+    -- You might think that if show_unfold is False, then the thing should
+    -- not be w/w'd in the first place.  But a legitimate reason is this:
+    -- 	  the function returns bottom
+    -- In this case, show_unfold will be false (we don't expose unfoldings
+    -- for bottoming functions), but we might still have a worker/wrapper
+    -- split (see Note [Worker-wrapper for bottoming functions] in WorkWrap.lhs
 \end{code}
 
 %************************************************************************

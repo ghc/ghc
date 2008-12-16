@@ -710,13 +710,6 @@ tcSimplifyInfer doc tau_tvs wanted
 		-- irreds2 will be empty.  But we don't want to generalise over b!
 	; let preds2 = fdPredsOfInsts irreds2	-- irreds2 is zonked
 	      qtvs   = grow preds2 tau_tvs2 `minusVarSet` oclose preds2 gbl_tvs2
-		---------------------------------------------------
-		-- BUG WARNING: there's a nasty bug lurking here
-		-- fdPredsOfInsts may return preds that mention variables quantified in
-		-- one of the implication constraints in irreds2; and that is clearly wrong:
-		-- we might quantify over too many variables through accidental capture
-		---------------------------------------------------
-
 	; let (free, irreds3) = partition (isFreeWhenInferring qtvs) irreds2
 	; extendLIEs free
 
@@ -1023,17 +1016,16 @@ makeImplicationBind loc all_tvs
 		     <.> mkWpTyApps eq_cotvs
 		     <.> mkWpTyApps (mkTyVarTys all_tvs)
 	      bind | [dict_irred_id] <- dict_irred_ids  
-                   = mkVarBind dict_irred_id rhs
+                   = VarBind dict_irred_id rhs
 		   | otherwise        
-                   = L span $ 
-                     PatBind { pat_lhs = lpat
+                   = PatBind { pat_lhs = lpat
 			     , pat_rhs = unguardedGRHSs rhs 
 			     , pat_rhs_ty = hsLPatType lpat
 			     , bind_fvs = placeHolderNames 
                              }
 
 	; traceTc $ text "makeImplicationBind" <+> ppr implic_inst
-	; return ([implic_inst], unitBag bind) 
+	; return ([implic_inst], unitBag (L span bind)) 
         }
 
 -----------------------------------------------------------
@@ -2361,7 +2353,11 @@ reduceImplication env
               eq_cotvs = map instToVar extra_eq_givens
 	      dict_ids = map instToId  extra_dict_givens 
 
-              co         = mkWpTyLams tvs
+                        -- Note [Always inline implication constraints]
+              wrap_inline | null dict_ids = idHsWrapper
+                          | otherwise	  = WpInline
+              co         = wrap_inline
+                           <.> mkWpTyLams tvs
                            <.> mkWpTyLams eq_cotvs
                            <.> mkWpLams dict_ids
                            <.> WpLet (binds `unionBags` bind)
@@ -2373,15 +2369,12 @@ reduceImplication env
                            . filter (not . isEqInst) 
                            $ wanteds
               payload    = mkBigLHsTup dict_bndrs
+
 	
 	; traceTc (vcat [text "reduceImplication" <+> ppr name,
 			 ppr simpler_implic_insts,
 			 text "->" <+> ppr rhs])
-	; return (unitBag (L loc (VarBind { var_id= instToId orig_implic
-					  , var_rhs = rhs
-					  , var_inline = not (null dict_ids) }
-				-- See Note [Always inline implication constraints]
-			  )),
+	; return (unitBag (L loc (VarBind (instToId orig_implic) rhs)),
 		  simpler_implic_insts)
   	} 
     }

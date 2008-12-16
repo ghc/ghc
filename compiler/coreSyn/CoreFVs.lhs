@@ -16,7 +16,6 @@ Taken quite directly from the Peyton Jones/Lester paper.
 module CoreFVs (
         -- * Free variables of expressions and binding groups
 	exprFreeVars,	-- CoreExpr   -> VarSet	-- Find all locally-defined free Ids or tyvars
-	exprFreeIds,	-- CoreExpr   -> IdSet	-- Find all locally-defined free Ids
 	exprsFreeVars,	-- [CoreExpr] -> VarSet
 	bindFreeVars, 	-- CoreBind   -> VarSet
 
@@ -26,8 +25,7 @@ module CoreFVs (
 	exprFreeNames, exprsFreeNames,
 
         -- * Free variables of Rules, Vars and Ids
-	idRuleVars, idRuleRhsVars, idFreeVars, idInlineFreeVars,
-	varTypeTyVars, 
+	idRuleVars, idFreeVars, varTypeTyVars, 
 	ruleRhsFreeVars, rulesFreeVars,
 	ruleLhsFreeNames, ruleLhsFreeIds, 
 
@@ -72,10 +70,6 @@ but not those that are free in the type of variable occurrence.
 -- | Find all locally-defined free Ids or type variables in an expression
 exprFreeVars :: CoreExpr -> VarSet
 exprFreeVars = exprSomeFreeVars isLocalVar
-
--- | Find all locally-defined free Ids in an expression
-exprFreeIds :: CoreExpr -> IdSet	-- Find all locally-defined free Ids
-exprFreeIds = exprSomeFreeVars isLocalId
 
 -- | Find all locally-defined free Ids or type variables in several expressions
 exprsFreeVars :: [CoreExpr] -> VarSet
@@ -384,24 +378,7 @@ bndrRuleVars v | isTyVar v = emptyVarSet
 	       | otherwise = idRuleVars v
 
 idRuleVars ::Id -> VarSet
-idRuleVars id = ASSERT( isId id) 
-		specInfoFreeVars (idSpecialisation id) `unionVarSet` 
-		idInlineFreeVars id	-- And the variables in an INLINE rule
-
-idRuleRhsVars :: Id -> VarSet
--- Just the variables free on the *rhs* of a rule
--- See Note [Choosing loop breakers] in Simplify.lhs
-idRuleRhsVars id = foldr (unionVarSet . ruleRhsFreeVars) 
-			 (idInlineFreeVars id)
-			 (idCoreRules id)
-
-idInlineFreeVars :: Id -> VarSet
--- Produce free vars for an InlineRule, BUT NOT for an ordinary unfolding
--- An InlineRule behaves *very like* a RULE, and that is what we are after here
-idInlineFreeVars id
-  = case idUnfolding id of
-	InlineRule { uf_tmpl = tmpl } -> exprFreeVars tmpl
-	_				   -> emptyVarSet
+idRuleVars id = ASSERT( isId id) specInfoFreeVars (idSpecialisation id)
 \end{code}
 
 

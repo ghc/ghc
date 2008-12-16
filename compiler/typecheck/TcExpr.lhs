@@ -809,20 +809,18 @@ tcId :: InstOrigin
      -> BoxyRhoType				-- Result type
      -> TcM (HsExpr TcId)
 tcId orig fun_name res_ty
-  = do	{ (fun, fun_ty) <- lookupFun orig fun_name
-        ; traceTc (text "tcId" <+> ppr fun_name <+> (ppr fun_ty $$ ppr res_ty))
-	
+  = do	{ traceTc (text "tcId" <+> ppr fun_name <+> ppr res_ty)
+	; (fun, fun_ty) <- lookupFun orig fun_name
+
 	-- Split up the function type
 	; let (tv_theta_prs, fun_tau) = tcMultiSplitSigmaTy fun_ty
-	      qtvs = concatMap fst tv_theta_prs  	-- Quantified tyvars
+	      qtvs = concatMap fst tv_theta_prs	-- Quantified tyvars
 	      tau_qtvs = exactTyVarsOfType fun_tau	-- Mentioned in the tau part
 	; qtv_tys <- preSubType qtvs tau_qtvs fun_tau res_ty
 
 	-- Do the subsumption check wrt the result type
 	; let res_subst = zipTopTvSubst qtvs qtv_tys
 	      fun_tau'  = substTy res_subst fun_tau
-
-        ; traceTc (text "tcId2" <+> ppr fun_name <+> (ppr qtvs $$ ppr qtv_tys))
 
 	; co_fn <- tcSubExp orig fun_tau' res_ty
 

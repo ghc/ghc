@@ -213,6 +213,10 @@ fiExpr to_drop (_, AnnNote note@(SCC _) expr)
   = 	-- Wimp out for now
     mkCoLets' to_drop (Note note (fiExpr [] expr))
 
+fiExpr to_drop (_, AnnNote InlineMe expr)
+  = 	-- Ditto... don't float anything into an INLINE expression
+    mkCoLets' to_drop (Note InlineMe (fiExpr [] expr))
+
 fiExpr to_drop (_, AnnNote note@(CoreNote _) expr)
   = Note note (fiExpr to_drop expr)
 \end{code}
@@ -355,7 +359,8 @@ fiExpr to_drop (_, AnnCase scrut case_bndr ty alts)
     fi_alt to_drop (con, args, rhs) = (con, args, fiExpr to_drop rhs)
 
 noFloatIntoRhs :: AnnExpr' Var (UniqFM Var) -> Bool
-noFloatIntoRhs (AnnLam b _) = not (is_one_shot b)
+noFloatIntoRhs (AnnNote InlineMe _) = True
+noFloatIntoRhs (AnnLam b _)   	    = not (is_one_shot b)
 	-- IMPORTANT: don't say 'True' for a RHS with a one-shot lambda at the top.
 	-- This makes a big difference for things like
 	--	f x# = let x = I# x#

@@ -352,7 +352,7 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
                      do { tick LetFloatFromLet
                         ; (poly_binds, body3) <- abstractFloats tvs' body_env2 body2
                         ; rhs' <- mkLam tvs' body3
-                        ; env' <- foldlM (addPolyBind top_lvl) env poly_binds
+                        ; let env' = foldl (addPolyBind top_lvl) env poly_binds
                         ; return (env', rhs') }
 
         ; completeBind env' top_lvl bndr bndr1 rhs' }
@@ -567,23 +567,29 @@ completeBind :: SimplEnv
 --      * or by adding to the floats in the envt
 
 completeBind env top_lvl old_bndr new_bndr new_rhs
-  = do	{ let old_info = idInfo old_bndr
-	      old_unf  = unfoldingInfo old_info
-	      occ_info = occInfo old_info
+  | postInlineUnconditionally env top_lvl new_bndr occ_info new_rhs unfolding
+                -- Inline and discard the binding
+  = do  { tick (PostInlineUnconditionally old_bndr)
+        ; -- pprTrace "postInlineUnconditionally" (ppr old_bndr <+> ppr new_bndr <+> ppr new_rhs) $
+          return (extendIdSubst env old_bndr (DoneEx new_rhs)) }
+        -- Use the substitution to make quite, quite sure that the
+        -- substitution will happen, since we are going to discard the binding
 
-	; new_unfolding <- simplUnfolding env top_lvl old_bndr occ_info old_unf new_rhs
+  | otherwise
+  = return (addNonRecWithUnf env new_bndr new_rhs unfolding wkr)
+  where
+    unfolding | omit_unfolding = NoUnfolding
+	      | otherwise      = mkUnfolding  (isTopLevel top_lvl) new_rhs
+    old_info    = idInfo old_bndr
+    occ_info    = occInfo old_info
+    wkr		= substWorker env (workerInfo old_info)
+    omit_unfolding = isNonRuleLoopBreaker occ_info 
+		   --       or not (activeInline env old_bndr)
+    		   -- Do *not* trim the unfolding in SimplGently, else
+		   -- the specialiser can't see it!
 
-	; if postInlineUnconditionally env top_lvl new_bndr occ_info new_rhs new_unfolding
-	                -- Inline and discard the binding
-	  then do  { tick (PostInlineUnconditionally old_bndr)
-	            ; return (extendIdSubst env old_bndr (DoneEx new_rhs)) }
-	        -- Use the substitution to make quite, quite sure that the
-	        -- substitution will happen, since we are going to discard the binding
-
-	  else return (addNonRecWithUnf env new_bndr new_rhs new_unfolding) }
-
-------------------------------
-addPolyBind :: TopLevelFlag -> SimplEnv -> OutBind -> SimplM SimplEnv
+-----------------
+addPolyBind :: TopLevelFlag -> SimplEnv -> OutBind -> SimplEnv
 -- Add a new binding to the environment, complete with its unfolding
 -- but *do not* do postInlineUnconditionally, because we have already
 -- processed some of the scope of the binding
@@ -596,92 +602,71 @@ addPolyBind :: TopLevelFlag -> SimplEnv -> OutBind -> SimplM SimplEnv
 -- opportunity to inline 'y' too.
 
 addPolyBind top_lvl env (NonRec poly_id rhs)
-  = do	{ unfolding <- simplUnfolding env top_lvl poly_id NoOccInfo noUnfolding rhs
-    	  		-- Assumes that poly_id did not have an INLINE prag
-			-- which is perhaps wrong.  ToDo: think about this
-        ; return (addNonRecWithUnf env poly_id rhs unfolding) }
+  = addNonRecWithUnf env poly_id rhs unfolding NoWorker
+  where
+    unfolding | not (activeInline env poly_id) = NoUnfolding
+	      | otherwise		       = mkUnfolding (isTopLevel top_lvl) rhs
+		-- addNonRecWithInfo adds the new binding in the
+		-- proper way (ie complete with unfolding etc),
+		-- and extends the in-scope set
 
-addPolyBind _ env bind@(Rec _) = return (extendFloats env bind)
+addPolyBind _ env bind@(Rec _) = extendFloats env bind
 		-- Hack: letrecs are more awkward, so we extend "by steam"
 		-- without adding unfoldings etc.  At worst this leads to
 		-- more simplifier iterations
 
-------------------------------
+-----------------
 addNonRecWithUnf :: SimplEnv
-             	 -> OutId -> OutExpr    -- New binder and RHS
-	     	 -> Unfolding		-- New unfolding
-             	 -> SimplEnv
-addNonRecWithUnf env new_bndr new_rhs new_unfolding
-  = let new_arity = exprArity new_rhs
-	old_arity = idArity new_bndr
-        info1 = idInfo new_bndr `setArityInfo` new_arity
-	
-              -- Unfolding info: Note [Setting the new unfolding]
-	info2 = info1 `setUnfoldingInfo` new_unfolding
-
-        -- Demand info: Note [Setting the demand info]
-        info3 | isEvaldUnfolding new_unfolding = zapDemandInfo info2 `orElse` info2
-              | otherwise                      = info2
-
-        final_id = new_bndr `setIdInfo` info3
-	dmd_arity = length $ fst $ splitStrictSig $ idNewStrictness new_bndr
-    in
-    ASSERT( isId new_bndr )
+             	  -> OutId -> OutExpr        -- New binder and RHS
+		  -> Unfolding -> WorkerInfo -- and unfolding
+             	  -> SimplEnv
+-- Add suitable IdInfo to the Id, add the binding to the floats, and extend the in-scope set
+addNonRecWithUnf env new_bndr rhs unfolding wkr
+  = ASSERT( isId new_bndr )
     WARN( new_arity < old_arity || new_arity < dmd_arity, 
-          (ppr final_id <+> ppr old_arity <+> ppr new_arity <+> ppr dmd_arity) $$ ppr new_rhs )
-
-    final_id `seq`   -- This seq forces the Id, and hence its IdInfo,
-	             -- and hence any inner substitutions
-	    -- pprTrace "Binding" (ppr final_id <+> ppr unfolding) $
-    addNonRec env final_id new_rhs
-		-- The addNonRec adds it to the in-scope set too
-
-------------------------------
-simplUnfolding :: SimplEnv-> TopLevelFlag
-	       -> Id	-- Debug output only
-	       -> OccInfo -> Unfolding -> OutExpr
-	       -> SimplM Unfolding
-simplUnfolding env top_lvl bndr occ_info old_unf new_rhs	-- Note [Setting the new unfolding]
-  | omit_unfolding = WARN( is_inline_rule, ppr bndr ) return NoUnfolding	
-  | is_inline_rule = return (substUnfolding env is_top_lvl old_unf)
-  | otherwise	   = return (mkUnfolding is_top_lvl new_rhs)
+          (ppr final_id <+> ppr old_arity <+> ppr new_arity <+> ppr dmd_arity) $$ ppr rhs )
+    final_id `seq`      -- This seq forces the Id, and hence its IdInfo,
+	                -- and hence any inner substitutions
+    addNonRec env final_id rhs
+	-- The addNonRec adds it to the in-scope set too
   where
-    is_top_lvl     = isTopLevel top_lvl
-    is_inline_rule = isInlineRule old_unf
-    omit_unfolding = isNonRuleLoopBreaker occ_info
+	dmd_arity = length $ fst $ splitStrictSig $ idNewStrictness new_bndr
+	old_arity = idArity new_bndr
+
+        --      Arity info
+	new_arity = exprArity rhs
+        new_bndr_info = idInfo new_bndr `setArityInfo` new_arity
+
+        --      Unfolding info
+        -- Add the unfolding *only* for non-loop-breakers
+        -- Making loop breakers not have an unfolding at all
+        -- means that we can avoid tests in exprIsConApp, for example.
+        -- This is important: if exprIsConApp says 'yes' for a recursive
+        -- thing, then we can get into an infinite loop
+
+        --      Demand info
+        -- If the unfolding is a value, the demand info may
+        -- go pear-shaped, so we nuke it.  Example:
+        --      let x = (a,b) in
+        --      case x of (p,q) -> h p q x
+        -- Here x is certainly demanded. But after we've nuked
+        -- the case, we'll get just
+        --      let x = (a,b) in h a b x
+        -- and now x is not demanded (I'm assuming h is lazy)
+        -- This really happens.  Similarly
+        --      let f = \x -> e in ...f..f...
+        -- After inlining f at some of its call sites the original binding may
+        -- (for example) be no longer strictly demanded.
+        -- The solution here is a bit ad hoc...
+        info_w_unf = new_bndr_info `setUnfoldingInfo` unfolding
+				   `setWorkerInfo`    wkr
+
+        final_info | isEvaldUnfolding unfolding = zapDemandInfo info_w_unf `orElse` info_w_unf
+                   | otherwise                  = info_w_unf
+	
+        final_id = new_bndr `setIdInfo` final_info
 \end{code}
 
-Note [Setting the new unfolding]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-* If there's an INLINE pragma, we use substUnfolding to retain the 
-  supplied inlining
-
-* If not, we make an unfolding from the new RHS.  But *only* for
-  non-loop-breakers. Making loop breakers not have an unfolding at all
-  means that we can avoid tests in exprIsConApp, for example.  This is
-  important: if exprIsConApp says 'yes' for a recursive thing, then we
-  can get into an infinite loop
-
-If there's an INLINE pragma on a loop breaker, we simply discard it 
-(with a DEBUG warning).  The desugarer complains about binding groups
-that look likely to trigger this behaviour.
-
-
-Note [Setting the demand info]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If the unfolding is a value, the demand info may
-go pear-shaped, so we nuke it.  Example:
-     let x = (a,b) in
-     case x of (p,q) -> h p q x
-Here x is certainly demanded. But after we've nuked
-the case, we'll get just
-     let x = (a,b) in h a b x
-and now x is not demanded (I'm assuming h is lazy)
-This really happens.  Similarly
-     let f = \x -> e in ...f..f...
-After inlining f at some of its call sites the original binding may
-(for example) be no longer strictly demanded.
-The solution here is a bit ad hoc...
 
 
 %************************************************************************
@@ -940,7 +925,7 @@ simplLam env bndrs body cont
 
 ------------------
 simplNonRecE :: SimplEnv
-             -> InBndr                  -- The binder
+             -> InId                    -- The binder
              -> (InExpr, SimplEnv)      -- Rhs of binding (or arg of lambda)
              -> ([InBndr], InExpr)      -- Body of the let/lambda
                                         --      \xs.e
@@ -999,9 +984,21 @@ simplNote env (SCC cc) e cont
   = do  { e' <- simplExpr (setEnclosingCC env currentCCS) e
         ; rebuild env (mkSCC cc e') cont }
 
-simplNote env (CoreNote s) e cont
-  = do { e' <- simplExpr env e
-       ; rebuild env (Note (CoreNote s) e') cont }
+-- See notes with SimplMonad.inlineMode
+simplNote env InlineMe e cont
+  | Just (inside, outside) <- splitInlineCont cont  -- Boring boring continuation; see notes above
+  = do  {                       -- Don't inline inside an INLINE expression
+          e' <- simplExprC (setMode inlineMode env) e inside
+        ; rebuild env (mkInlineMe e') outside }
+
+  | otherwise   -- Dissolve the InlineMe note if there's
+                -- an interesting context of any kind to combine with
+                -- (even a type application -- anything except Stop)
+  = simplExprF env e cont
+
+simplNote env (CoreNote s) e cont = do
+    e' <- simplExpr env e
+    rebuild env (Note (CoreNote s) e') cont
 \end{code}
 
 
@@ -1098,7 +1095,7 @@ completeCall env var cont
             Just unfolding      -- There is an inlining!
               ->  do { tick (UnfoldingDone var)
                      ; (if dopt Opt_D_dump_inlinings dflags then
-                           pprTrace ("Inlining done: " ++ showSDoc (ppr var)) (vcat [
+                           pprTrace ("Inlining done" ++ showSDoc (ppr var)) (vcat [
                                 text "Before:" <+> ppr var <+> sep (map pprParendExpr args),
                                 text "Inlined fn: " <+> nest 2 (ppr unfolding),
                                 text "Cont:  " <+> ppr call_cont])
@@ -1410,19 +1407,6 @@ The point is that we bring into the envt a binding
         let x = (a,b)
 after the outer case, and that makes (a,b) alive.  At least we do unless
 the case binder is guaranteed dead.
-
-In practice, the scrutinee is almost always a variable, so we pretty
-much always zap the OccInfo of the binders.  It doesn't matter much though.
-
-
-Note [Case of cast]
-~~~~~~~~~~~~~~~~~~~
-Consider        case (v `cast` co) of x { I# ->
-                ... (case (v `cast` co) of {...}) ...
-We'd like to eliminate the inner case.  We can get this neatly by
-arranging that inside the outer case we add the unfolding
-        v |-> x `cast` (sym co)
-to v.  Then we should inline v at the inner case, cancel the casts, and away we go
 
 Note [Improving seq]
 ~~~~~~~~~~~~~~~~~~~

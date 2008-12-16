@@ -1,4 +1,3 @@
-
 %
 % (c) The University of Glasgow, 1992-2006
 %
@@ -300,12 +299,8 @@ mkFunBind fn ms = FunBind { fun_id = fn, fun_infix = False, fun_matches = mkMatc
 			    fun_tick = Nothing }
 
 
-mkHsVarBind :: SrcSpan -> id -> LHsExpr id -> LHsBind id
-mkHsVarBind loc var rhs = mk_easy_FunBind loc var [] rhs
-
-mkVarBind :: id -> LHsExpr id -> LHsBind id
-mkVarBind var rhs = L (getLoc rhs) $
-		    VarBind { var_id = var, var_rhs = rhs, var_inline = False }
+mkVarBind :: SrcSpan -> id -> LHsExpr id -> LHsBind id
+mkVarBind loc var rhs = mk_easy_FunBind loc var [] rhs
 
 ------------
 mk_easy_FunBind :: SrcSpan -> id -> [LPat id]
