@@ -38,7 +38,6 @@ module StaticFlags (
 	opt_Parallel,
 
 	-- optimisation opts
-        opt_PassCaseBndrToJoinPoints,
 	opt_DsMultiTyVar,
 	opt_NoStateHack,
         opt_SimpleListLiterals,
@@ -216,9 +215,6 @@ opt_Parallel			= lookUp  (fsLit "-fparallel")
 opt_DsMultiTyVar :: Bool
 opt_DsMultiTyVar		= not (lookUp (fsLit "-fno-ds-multi-tyvar"))
 	-- On by default
-
-opt_PassCaseBndrToJoinPoints :: Bool
-opt_PassCaseBndrToJoinPoints	= lookUp  (fsLit "-fpass-case-bndr-to-join-points")
 
 opt_SpecInlineJoinPoints :: Bool
 opt_SpecInlineJoinPoints	= lookUp  (fsLit "-fspec-inline-join-points")
