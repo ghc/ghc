@@ -1,10 +1,3 @@
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 -----------------------------------------------------------------------------
 --
 -- Code generation for PrimOps.
@@ -58,7 +51,7 @@ emitPrimOp :: CmmFormals	-- where to put the results
 --  First we handle various awkward cases specially.  The remaining
 -- easy cases are then handled by translateOp, defined below.
 
-emitPrimOp [res_r,res_c] IntAddCOp [aa,bb] live
+emitPrimOp [res_r,res_c] IntAddCOp [aa,bb] _
 {- 
    With some bit-twiddling, we can define int{Add,Sub}Czh portably in
    C, and without needing any comparisons.  This may not be the
@@ -92,7 +85,7 @@ emitPrimOp [res_r,res_c] IntAddCOp [aa,bb] live
      ]
 
 
-emitPrimOp [res_r,res_c] IntSubCOp [aa,bb] live
+emitPrimOp [res_r,res_c] IntSubCOp [aa,bb] _
 {- Similarly:
    #define subIntCzh(r,c,a,b)					\
    { r = ((I_)(a)) - ((I_)(b));					\
@@ -131,7 +124,7 @@ emitPrimOp [res] ParOp [arg] live
   where
 	newspark = CmmLit (CmmLabel (mkRtsCodeLabel (sLit "newSpark")))
 
-emitPrimOp [res] ReadMutVarOp [mutv] live
+emitPrimOp [res] ReadMutVarOp [mutv] _
    = stmtC (CmmAssign (CmmLocal res) (cmmLoadIndexW mutv fixedHdrSize gcWord))
 
 emitPrimOp [] WriteMutVarOp [mutv,var] live
@@ -150,7 +143,7 @@ emitPrimOp [] WriteMutVarOp [mutv,var] live
 
 --  #define sizzeofByteArrayzh(r,a) \
 --     r = (((StgArrWords *)(a))->words * sizeof(W_))
-emitPrimOp [res] SizeofByteArrayOp [arg] live
+emitPrimOp [res] SizeofByteArrayOp [arg] _
    = stmtC $
 	CmmAssign (CmmLocal res) (CmmMachOp mo_wordMul [
 			  cmmLoadIndexW arg fixedHdrSize bWord,
@@ -164,36 +157,36 @@ emitPrimOp [res] SizeofMutableByteArrayOp [arg] live
 
 
 --  #define touchzh(o)                  /* nothing */
-emitPrimOp [] TouchOp [arg] live
+emitPrimOp [] TouchOp [_] _
    = nopC
 
 --  #define byteArrayContentszh(r,a) r = BYTE_ARR_CTS(a)
-emitPrimOp [res] ByteArrayContents_Char [arg] live
+emitPrimOp [res] ByteArrayContents_Char [arg] _
    = stmtC (CmmAssign (CmmLocal res) (cmmOffsetB arg arrWordsHdrSize))
 
 --  #define stableNameToIntzh(r,s)   (r = ((StgStableName *)s)->sn)
-emitPrimOp [res] StableNameToIntOp [arg] live
+emitPrimOp [res] StableNameToIntOp [arg] _
    = stmtC (CmmAssign (CmmLocal res) (cmmLoadIndexW arg fixedHdrSize bWord))
 
 --  #define eqStableNamezh(r,sn1,sn2)					\
 --    (r = (((StgStableName *)sn1)->sn == ((StgStableName *)sn2)->sn))
-emitPrimOp [res] EqStableNameOp [arg1,arg2] live
+emitPrimOp [res] EqStableNameOp [arg1,arg2] _
    = stmtC (CmmAssign (CmmLocal res) (CmmMachOp mo_wordEq [
 				cmmLoadIndexW arg1 fixedHdrSize bWord,
 				cmmLoadIndexW arg2 fixedHdrSize bWord
 			 ]))
 
 
-emitPrimOp [res] ReallyUnsafePtrEqualityOp [arg1,arg2] live
+emitPrimOp [res] ReallyUnsafePtrEqualityOp [arg1,arg2] _
    = stmtC (CmmAssign (CmmLocal res) (CmmMachOp mo_wordEq [arg1,arg2]))
 
 --  #define addrToHValuezh(r,a) r=(P_)a
-emitPrimOp [res] AddrToHValueOp [arg] live
+emitPrimOp [res] AddrToHValueOp [arg] _
    = stmtC (CmmAssign (CmmLocal res) arg)
 
 --  #define dataToTagzh(r,a)  r=(GET_TAG(((StgClosure *)a)->header.info))
 --  Note: argument may be tagged!
-emitPrimOp [res] DataToTagOp [arg] live
+emitPrimOp [res] DataToTagOp [arg] _
    = stmtC (CmmAssign (CmmLocal res) (getConstrTag (cmmUntag arg)))
 
 {- Freezing arrays-of-ptrs requires changing an info table, for the
@@ -206,137 +199,137 @@ emitPrimOp [res] DataToTagOp [arg] live
 --        SET_INFO((StgClosure *)a,&stg_MUT_ARR_PTRS_FROZEN0_info);
 --	  r = a;
 --	}
-emitPrimOp [res] UnsafeFreezeArrayOp [arg] live
+emitPrimOp [res] UnsafeFreezeArrayOp [arg] _
    = stmtsC [ setInfo arg (CmmLit (CmmLabel mkMAP_FROZEN_infoLabel)),
 	     CmmAssign (CmmLocal res) arg ]
 
 --  #define unsafeFreezzeByteArrayzh(r,a)	r=(a)
-emitPrimOp [res] UnsafeFreezeByteArrayOp [arg] live
+emitPrimOp [res] UnsafeFreezeByteArrayOp [arg] _
    = stmtC (CmmAssign (CmmLocal res) arg)
 
 -- Reading/writing pointer arrays
 
-emitPrimOp [r] ReadArrayOp  [obj,ix]   live  = doReadPtrArrayOp r obj ix
-emitPrimOp [r] IndexArrayOp [obj,ix]   live  = doReadPtrArrayOp r obj ix
-emitPrimOp []  WriteArrayOp [obj,ix,v] live  = doWritePtrArrayOp obj ix v
+emitPrimOp [r] ReadArrayOp  [obj,ix]   _  = doReadPtrArrayOp r obj ix
+emitPrimOp [r] IndexArrayOp [obj,ix]   _  = doReadPtrArrayOp r obj ix
+emitPrimOp []  WriteArrayOp [obj,ix,v] _  = doWritePtrArrayOp obj ix v
 
 -- IndexXXXoffAddr
 
-emitPrimOp res IndexOffAddrOp_Char      args live = doIndexOffAddrOp (Just mo_u_8ToWord) b8 res args
-emitPrimOp res IndexOffAddrOp_WideChar  args live = doIndexOffAddrOp (Just mo_u_32ToWord) b32 res args
-emitPrimOp res IndexOffAddrOp_Int       args live = doIndexOffAddrOp Nothing bWord res args
-emitPrimOp res IndexOffAddrOp_Word      args live = doIndexOffAddrOp Nothing bWord res args
-emitPrimOp res IndexOffAddrOp_Addr      args live = doIndexOffAddrOp Nothing bWord res args
-emitPrimOp res IndexOffAddrOp_Float     args live = doIndexOffAddrOp Nothing f32 res args
-emitPrimOp res IndexOffAddrOp_Double    args live = doIndexOffAddrOp Nothing f64 res args
-emitPrimOp res IndexOffAddrOp_StablePtr args live = doIndexOffAddrOp Nothing bWord res args
-emitPrimOp res IndexOffAddrOp_Int8      args live = doIndexOffAddrOp (Just mo_s_8ToWord)  b8  res args
-emitPrimOp res IndexOffAddrOp_Int16     args live = doIndexOffAddrOp (Just mo_s_16ToWord) b16 res args
-emitPrimOp res IndexOffAddrOp_Int32     args live = doIndexOffAddrOp (Just mo_s_32ToWord) b32 res args
-emitPrimOp res IndexOffAddrOp_Int64     args live = doIndexOffAddrOp Nothing b64 res args
-emitPrimOp res IndexOffAddrOp_Word8     args live = doIndexOffAddrOp (Just mo_u_8ToWord) b8   res args
-emitPrimOp res IndexOffAddrOp_Word16    args live = doIndexOffAddrOp (Just mo_u_16ToWord) b16 res args
-emitPrimOp res IndexOffAddrOp_Word32    args live = doIndexOffAddrOp (Just mo_u_32ToWord) b32 res args
-emitPrimOp res IndexOffAddrOp_Word64    args live = doIndexOffAddrOp Nothing b64 res args
+emitPrimOp res IndexOffAddrOp_Char      args _ = doIndexOffAddrOp (Just mo_u_8ToWord) b8 res args
+emitPrimOp res IndexOffAddrOp_WideChar  args _ = doIndexOffAddrOp (Just mo_u_32ToWord) b32 res args
+emitPrimOp res IndexOffAddrOp_Int       args _ = doIndexOffAddrOp Nothing bWord res args
+emitPrimOp res IndexOffAddrOp_Word      args _ = doIndexOffAddrOp Nothing bWord res args
+emitPrimOp res IndexOffAddrOp_Addr      args _ = doIndexOffAddrOp Nothing bWord res args
+emitPrimOp res IndexOffAddrOp_Float     args _ = doIndexOffAddrOp Nothing f32 res args
+emitPrimOp res IndexOffAddrOp_Double    args _ = doIndexOffAddrOp Nothing f64 res args
+emitPrimOp res IndexOffAddrOp_StablePtr args _ = doIndexOffAddrOp Nothing bWord res args
+emitPrimOp res IndexOffAddrOp_Int8      args _ = doIndexOffAddrOp (Just mo_s_8ToWord)  b8  res args
+emitPrimOp res IndexOffAddrOp_Int16     args _ = doIndexOffAddrOp (Just mo_s_16ToWord) b16 res args
+emitPrimOp res IndexOffAddrOp_Int32     args _ = doIndexOffAddrOp (Just mo_s_32ToWord) b32 res args
+emitPrimOp res IndexOffAddrOp_Int64     args _ = doIndexOffAddrOp Nothing b64 res args
+emitPrimOp res IndexOffAddrOp_Word8     args _ = doIndexOffAddrOp (Just mo_u_8ToWord) b8   res args
+emitPrimOp res IndexOffAddrOp_Word16    args _ = doIndexOffAddrOp (Just mo_u_16ToWord) b16 res args
+emitPrimOp res IndexOffAddrOp_Word32    args _ = doIndexOffAddrOp (Just mo_u_32ToWord) b32 res args
+emitPrimOp res IndexOffAddrOp_Word64    args _ = doIndexOffAddrOp Nothing b64 res args
 
 -- ReadXXXoffAddr, which are identical, for our purposes, to IndexXXXoffAddr.
 
-emitPrimOp res ReadOffAddrOp_Char      args live = doIndexOffAddrOp (Just mo_u_8ToWord) b8 res args
-emitPrimOp res ReadOffAddrOp_WideChar  args live = doIndexOffAddrOp (Just mo_u_32ToWord) b32 res args
-emitPrimOp res ReadOffAddrOp_Int       args live = doIndexOffAddrOp Nothing bWord res args
-emitPrimOp res ReadOffAddrOp_Word      args live = doIndexOffAddrOp Nothing bWord res args
-emitPrimOp res ReadOffAddrOp_Addr      args live = doIndexOffAddrOp Nothing bWord res args
-emitPrimOp res ReadOffAddrOp_Float     args live = doIndexOffAddrOp Nothing f32 res args
-emitPrimOp res ReadOffAddrOp_Double    args live = doIndexOffAddrOp Nothing f64 res args
-emitPrimOp res ReadOffAddrOp_StablePtr args live = doIndexOffAddrOp Nothing bWord res args
-emitPrimOp res ReadOffAddrOp_Int8      args live = doIndexOffAddrOp (Just mo_s_8ToWord) b8  res args
-emitPrimOp res ReadOffAddrOp_Int16     args live = doIndexOffAddrOp (Just mo_s_16ToWord) b16 res args
-emitPrimOp res ReadOffAddrOp_Int32     args live = doIndexOffAddrOp (Just mo_s_32ToWord) b32 res args
-emitPrimOp res ReadOffAddrOp_Int64     args live = doIndexOffAddrOp Nothing b64 res args
-emitPrimOp res ReadOffAddrOp_Word8     args live = doIndexOffAddrOp (Just mo_u_8ToWord) b8  res args
-emitPrimOp res ReadOffAddrOp_Word16    args live = doIndexOffAddrOp (Just mo_u_16ToWord) b16 res args
-emitPrimOp res ReadOffAddrOp_Word32    args live = doIndexOffAddrOp (Just mo_u_32ToWord) b32 res args
-emitPrimOp res ReadOffAddrOp_Word64    args live = doIndexOffAddrOp Nothing b64 res args
+emitPrimOp res ReadOffAddrOp_Char      args _ = doIndexOffAddrOp (Just mo_u_8ToWord) b8 res args
+emitPrimOp res ReadOffAddrOp_WideChar  args _ = doIndexOffAddrOp (Just mo_u_32ToWord) b32 res args
+emitPrimOp res ReadOffAddrOp_Int       args _ = doIndexOffAddrOp Nothing bWord res args
+emitPrimOp res ReadOffAddrOp_Word      args _ = doIndexOffAddrOp Nothing bWord res args
+emitPrimOp res ReadOffAddrOp_Addr      args _ = doIndexOffAddrOp Nothing bWord res args
+emitPrimOp res ReadOffAddrOp_Float     args _ = doIndexOffAddrOp Nothing f32 res args
+emitPrimOp res ReadOffAddrOp_Double    args _ = doIndexOffAddrOp Nothing f64 res args
+emitPrimOp res ReadOffAddrOp_StablePtr args _ = doIndexOffAddrOp Nothing bWord res args
+emitPrimOp res ReadOffAddrOp_Int8      args _ = doIndexOffAddrOp (Just mo_s_8ToWord) b8  res args
+emitPrimOp res ReadOffAddrOp_Int16     args _ = doIndexOffAddrOp (Just mo_s_16ToWord) b16 res args
+emitPrimOp res ReadOffAddrOp_Int32     args _ = doIndexOffAddrOp (Just mo_s_32ToWord) b32 res args
+emitPrimOp res ReadOffAddrOp_Int64     args _ = doIndexOffAddrOp Nothing b64 res args
+emitPrimOp res ReadOffAddrOp_Word8     args _ = doIndexOffAddrOp (Just mo_u_8ToWord) b8  res args
+emitPrimOp res ReadOffAddrOp_Word16    args _ = doIndexOffAddrOp (Just mo_u_16ToWord) b16 res args
+emitPrimOp res ReadOffAddrOp_Word32    args _ = doIndexOffAddrOp (Just mo_u_32ToWord) b32 res args
+emitPrimOp res ReadOffAddrOp_Word64    args _ = doIndexOffAddrOp Nothing b64 res args
 
 -- IndexXXXArray
 
-emitPrimOp res IndexByteArrayOp_Char      args live = doIndexByteArrayOp (Just mo_u_8ToWord) b8 res args
-emitPrimOp res IndexByteArrayOp_WideChar  args live = doIndexByteArrayOp (Just mo_u_32ToWord) b32 res args
-emitPrimOp res IndexByteArrayOp_Int       args live = doIndexByteArrayOp Nothing bWord res args
-emitPrimOp res IndexByteArrayOp_Word      args live = doIndexByteArrayOp Nothing bWord res args
-emitPrimOp res IndexByteArrayOp_Addr      args live = doIndexByteArrayOp Nothing bWord res args
-emitPrimOp res IndexByteArrayOp_Float     args live = doIndexByteArrayOp Nothing f32 res args
-emitPrimOp res IndexByteArrayOp_Double    args live = doIndexByteArrayOp Nothing f64 res args
-emitPrimOp res IndexByteArrayOp_StablePtr args live = doIndexByteArrayOp Nothing bWord res args
-emitPrimOp res IndexByteArrayOp_Int8      args live = doIndexByteArrayOp (Just mo_s_8ToWord) b8  res args
-emitPrimOp res IndexByteArrayOp_Int16     args live = doIndexByteArrayOp (Just mo_s_16ToWord) b16  res args
-emitPrimOp res IndexByteArrayOp_Int32     args live = doIndexByteArrayOp (Just mo_s_32ToWord) b32  res args
-emitPrimOp res IndexByteArrayOp_Int64     args live = doIndexByteArrayOp Nothing b64  res args
-emitPrimOp res IndexByteArrayOp_Word8     args live = doIndexByteArrayOp (Just mo_u_8ToWord) b8  res args
-emitPrimOp res IndexByteArrayOp_Word16    args live = doIndexByteArrayOp (Just mo_u_16ToWord) b16  res args
-emitPrimOp res IndexByteArrayOp_Word32    args live = doIndexByteArrayOp (Just mo_u_32ToWord) b32  res args
-emitPrimOp res IndexByteArrayOp_Word64    args live = doIndexByteArrayOp Nothing b64  res args
+emitPrimOp res IndexByteArrayOp_Char      args _ = doIndexByteArrayOp (Just mo_u_8ToWord) b8 res args
+emitPrimOp res IndexByteArrayOp_WideChar  args _ = doIndexByteArrayOp (Just mo_u_32ToWord) b32 res args
+emitPrimOp res IndexByteArrayOp_Int       args _ = doIndexByteArrayOp Nothing bWord res args
+emitPrimOp res IndexByteArrayOp_Word      args _ = doIndexByteArrayOp Nothing bWord res args
+emitPrimOp res IndexByteArrayOp_Addr      args _ = doIndexByteArrayOp Nothing bWord res args
+emitPrimOp res IndexByteArrayOp_Float     args _ = doIndexByteArrayOp Nothing f32 res args
+emitPrimOp res IndexByteArrayOp_Double    args _ = doIndexByteArrayOp Nothing f64 res args
+emitPrimOp res IndexByteArrayOp_StablePtr args _ = doIndexByteArrayOp Nothing bWord res args
+emitPrimOp res IndexByteArrayOp_Int8      args _ = doIndexByteArrayOp (Just mo_s_8ToWord) b8  res args
+emitPrimOp res IndexByteArrayOp_Int16     args _ = doIndexByteArrayOp (Just mo_s_16ToWord) b16  res args
+emitPrimOp res IndexByteArrayOp_Int32     args _ = doIndexByteArrayOp (Just mo_s_32ToWord) b32  res args
+emitPrimOp res IndexByteArrayOp_Int64     args _ = doIndexByteArrayOp Nothing b64  res args
+emitPrimOp res IndexByteArrayOp_Word8     args _ = doIndexByteArrayOp (Just mo_u_8ToWord) b8  res args
+emitPrimOp res IndexByteArrayOp_Word16    args _ = doIndexByteArrayOp (Just mo_u_16ToWord) b16  res args
+emitPrimOp res IndexByteArrayOp_Word32    args _ = doIndexByteArrayOp (Just mo_u_32ToWord) b32  res args
+emitPrimOp res IndexByteArrayOp_Word64    args _ = doIndexByteArrayOp Nothing b64  res args
 
 -- ReadXXXArray, identical to IndexXXXArray.
 
-emitPrimOp res ReadByteArrayOp_Char       args live = doIndexByteArrayOp (Just mo_u_8ToWord) b8 res args
-emitPrimOp res ReadByteArrayOp_WideChar   args live = doIndexByteArrayOp (Just mo_u_32ToWord) b32 res args
-emitPrimOp res ReadByteArrayOp_Int        args live = doIndexByteArrayOp Nothing bWord res args
-emitPrimOp res ReadByteArrayOp_Word       args live = doIndexByteArrayOp Nothing bWord res args
-emitPrimOp res ReadByteArrayOp_Addr       args live = doIndexByteArrayOp Nothing bWord res args
-emitPrimOp res ReadByteArrayOp_Float      args live = doIndexByteArrayOp Nothing f32 res args
-emitPrimOp res ReadByteArrayOp_Double     args live = doIndexByteArrayOp Nothing f64 res args
-emitPrimOp res ReadByteArrayOp_StablePtr  args live = doIndexByteArrayOp Nothing bWord res args
-emitPrimOp res ReadByteArrayOp_Int8       args live = doIndexByteArrayOp (Just mo_s_8ToWord) b8  res args
-emitPrimOp res ReadByteArrayOp_Int16      args live = doIndexByteArrayOp (Just mo_s_16ToWord) b16  res args
-emitPrimOp res ReadByteArrayOp_Int32      args live = doIndexByteArrayOp (Just mo_s_32ToWord) b32  res args
-emitPrimOp res ReadByteArrayOp_Int64      args live = doIndexByteArrayOp Nothing b64  res args
-emitPrimOp res ReadByteArrayOp_Word8      args live = doIndexByteArrayOp (Just mo_u_8ToWord) b8  res args
-emitPrimOp res ReadByteArrayOp_Word16     args live = doIndexByteArrayOp (Just mo_u_16ToWord) b16  res args
-emitPrimOp res ReadByteArrayOp_Word32     args live = doIndexByteArrayOp (Just mo_u_32ToWord) b32  res args
-emitPrimOp res ReadByteArrayOp_Word64     args live = doIndexByteArrayOp Nothing b64  res args
+emitPrimOp res ReadByteArrayOp_Char       args _ = doIndexByteArrayOp (Just mo_u_8ToWord) b8 res args
+emitPrimOp res ReadByteArrayOp_WideChar   args _ = doIndexByteArrayOp (Just mo_u_32ToWord) b32 res args
+emitPrimOp res ReadByteArrayOp_Int        args _ = doIndexByteArrayOp Nothing bWord res args
+emitPrimOp res ReadByteArrayOp_Word       args _ = doIndexByteArrayOp Nothing bWord res args
+emitPrimOp res ReadByteArrayOp_Addr       args _ = doIndexByteArrayOp Nothing bWord res args
+emitPrimOp res ReadByteArrayOp_Float      args _ = doIndexByteArrayOp Nothing f32 res args
+emitPrimOp res ReadByteArrayOp_Double     args _ = doIndexByteArrayOp Nothing f64 res args
+emitPrimOp res ReadByteArrayOp_StablePtr  args _ = doIndexByteArrayOp Nothing bWord res args
+emitPrimOp res ReadByteArrayOp_Int8       args _ = doIndexByteArrayOp (Just mo_s_8ToWord) b8  res args
+emitPrimOp res ReadByteArrayOp_Int16      args _ = doIndexByteArrayOp (Just mo_s_16ToWord) b16  res args
+emitPrimOp res ReadByteArrayOp_Int32      args _ = doIndexByteArrayOp (Just mo_s_32ToWord) b32  res args
+emitPrimOp res ReadByteArrayOp_Int64      args _ = doIndexByteArrayOp Nothing b64  res args
+emitPrimOp res ReadByteArrayOp_Word8      args _ = doIndexByteArrayOp (Just mo_u_8ToWord) b8  res args
+emitPrimOp res ReadByteArrayOp_Word16     args _ = doIndexByteArrayOp (Just mo_u_16ToWord) b16  res args
+emitPrimOp res ReadByteArrayOp_Word32     args _ = doIndexByteArrayOp (Just mo_u_32ToWord) b32  res args
+emitPrimOp res ReadByteArrayOp_Word64     args _ = doIndexByteArrayOp Nothing b64  res args
 
 -- WriteXXXoffAddr
 
-emitPrimOp res WriteOffAddrOp_Char       args live = doWriteOffAddrOp (Just mo_WordTo8) b8 res args
-emitPrimOp res WriteOffAddrOp_WideChar   args live = doWriteOffAddrOp (Just mo_WordTo32) b32 res args
-emitPrimOp res WriteOffAddrOp_Int        args live = doWriteOffAddrOp Nothing bWord res args
-emitPrimOp res WriteOffAddrOp_Word       args live = doWriteOffAddrOp Nothing bWord res args
-emitPrimOp res WriteOffAddrOp_Addr       args live = doWriteOffAddrOp Nothing bWord res args
-emitPrimOp res WriteOffAddrOp_Float      args live = doWriteOffAddrOp Nothing f32 res args
-emitPrimOp res WriteOffAddrOp_Double     args live = doWriteOffAddrOp Nothing f64 res args
-emitPrimOp res WriteOffAddrOp_StablePtr  args live = doWriteOffAddrOp Nothing bWord res args
-emitPrimOp res WriteOffAddrOp_Int8       args live = doWriteOffAddrOp (Just mo_WordTo8) b8  res args
-emitPrimOp res WriteOffAddrOp_Int16      args live = doWriteOffAddrOp (Just mo_WordTo16) b16 res args
-emitPrimOp res WriteOffAddrOp_Int32      args live = doWriteOffAddrOp (Just mo_WordTo32) b32 res args
-emitPrimOp res WriteOffAddrOp_Int64      args live = doWriteOffAddrOp Nothing b64 res args
-emitPrimOp res WriteOffAddrOp_Word8      args live = doWriteOffAddrOp (Just mo_WordTo8) b8  res args
-emitPrimOp res WriteOffAddrOp_Word16     args live = doWriteOffAddrOp (Just mo_WordTo16) b16 res args
-emitPrimOp res WriteOffAddrOp_Word32     args live = doWriteOffAddrOp (Just mo_WordTo32) b32 res args
-emitPrimOp res WriteOffAddrOp_Word64     args live = doWriteOffAddrOp Nothing b64 res args
+emitPrimOp res WriteOffAddrOp_Char       args _ = doWriteOffAddrOp (Just mo_WordTo8) b8 res args
+emitPrimOp res WriteOffAddrOp_WideChar   args _ = doWriteOffAddrOp (Just mo_WordTo32) b32 res args
+emitPrimOp res WriteOffAddrOp_Int        args _ = doWriteOffAddrOp Nothing bWord res args
+emitPrimOp res WriteOffAddrOp_Word       args _ = doWriteOffAddrOp Nothing bWord res args
+emitPrimOp res WriteOffAddrOp_Addr       args _ = doWriteOffAddrOp Nothing bWord res args
+emitPrimOp res WriteOffAddrOp_Float      args _ = doWriteOffAddrOp Nothing f32 res args
+emitPrimOp res WriteOffAddrOp_Double     args _ = doWriteOffAddrOp Nothing f64 res args
+emitPrimOp res WriteOffAddrOp_StablePtr  args _ = doWriteOffAddrOp Nothing bWord res args
+emitPrimOp res WriteOffAddrOp_Int8       args _ = doWriteOffAddrOp (Just mo_WordTo8) b8  res args
+emitPrimOp res WriteOffAddrOp_Int16      args _ = doWriteOffAddrOp (Just mo_WordTo16) b16 res args
+emitPrimOp res WriteOffAddrOp_Int32      args _ = doWriteOffAddrOp (Just mo_WordTo32) b32 res args
+emitPrimOp res WriteOffAddrOp_Int64      args _ = doWriteOffAddrOp Nothing b64 res args
+emitPrimOp res WriteOffAddrOp_Word8      args _ = doWriteOffAddrOp (Just mo_WordTo8) b8  res args
+emitPrimOp res WriteOffAddrOp_Word16     args _ = doWriteOffAddrOp (Just mo_WordTo16) b16 res args
+emitPrimOp res WriteOffAddrOp_Word32     args _ = doWriteOffAddrOp (Just mo_WordTo32) b32 res args
+emitPrimOp res WriteOffAddrOp_Word64     args _ = doWriteOffAddrOp Nothing b64 res args
 
 -- WriteXXXArray
 
-emitPrimOp res WriteByteArrayOp_Char      args live = doWriteByteArrayOp (Just mo_WordTo8) b8 res args
-emitPrimOp res WriteByteArrayOp_WideChar  args live = doWriteByteArrayOp (Just mo_WordTo32) b32 res args
-emitPrimOp res WriteByteArrayOp_Int       args live = doWriteByteArrayOp Nothing bWord res args
-emitPrimOp res WriteByteArrayOp_Word      args live = doWriteByteArrayOp Nothing bWord res args
-emitPrimOp res WriteByteArrayOp_Addr      args live = doWriteByteArrayOp Nothing bWord res args
-emitPrimOp res WriteByteArrayOp_Float     args live = doWriteByteArrayOp Nothing f32 res args
-emitPrimOp res WriteByteArrayOp_Double    args live = doWriteByteArrayOp Nothing f64 res args
-emitPrimOp res WriteByteArrayOp_StablePtr args live = doWriteByteArrayOp Nothing bWord res args
-emitPrimOp res WriteByteArrayOp_Int8      args live = doWriteByteArrayOp (Just mo_WordTo8) b8  res args
-emitPrimOp res WriteByteArrayOp_Int16     args live = doWriteByteArrayOp (Just mo_WordTo16) b16  res args
-emitPrimOp res WriteByteArrayOp_Int32     args live = doWriteByteArrayOp (Just mo_WordTo32) b32  res args
-emitPrimOp res WriteByteArrayOp_Int64     args live = doWriteByteArrayOp Nothing b64  res args
-emitPrimOp res WriteByteArrayOp_Word8     args live = doWriteByteArrayOp (Just mo_WordTo8) b8  res args
-emitPrimOp res WriteByteArrayOp_Word16    args live = doWriteByteArrayOp (Just mo_WordTo16) b16  res args
-emitPrimOp res WriteByteArrayOp_Word32    args live = doWriteByteArrayOp (Just mo_WordTo32) b32  res args
-emitPrimOp res WriteByteArrayOp_Word64    args live = doWriteByteArrayOp Nothing b64  res args
+emitPrimOp res WriteByteArrayOp_Char      args _ = doWriteByteArrayOp (Just mo_WordTo8) b8 res args
+emitPrimOp res WriteByteArrayOp_WideChar  args _ = doWriteByteArrayOp (Just mo_WordTo32) b32 res args
+emitPrimOp res WriteByteArrayOp_Int       args _ = doWriteByteArrayOp Nothing bWord res args
+emitPrimOp res WriteByteArrayOp_Word      args _ = doWriteByteArrayOp Nothing bWord res args
+emitPrimOp res WriteByteArrayOp_Addr      args _ = doWriteByteArrayOp Nothing bWord res args
+emitPrimOp res WriteByteArrayOp_Float     args _ = doWriteByteArrayOp Nothing f32 res args
+emitPrimOp res WriteByteArrayOp_Double    args _ = doWriteByteArrayOp Nothing f64 res args
+emitPrimOp res WriteByteArrayOp_StablePtr args _ = doWriteByteArrayOp Nothing bWord res args
+emitPrimOp res WriteByteArrayOp_Int8      args _ = doWriteByteArrayOp (Just mo_WordTo8) b8  res args
+emitPrimOp res WriteByteArrayOp_Int16     args _ = doWriteByteArrayOp (Just mo_WordTo16) b16  res args
+emitPrimOp res WriteByteArrayOp_Int32     args _ = doWriteByteArrayOp (Just mo_WordTo32) b32  res args
+emitPrimOp res WriteByteArrayOp_Int64     args _ = doWriteByteArrayOp Nothing b64  res args
+emitPrimOp res WriteByteArrayOp_Word8     args _ = doWriteByteArrayOp (Just mo_WordTo8) b8  res args
+emitPrimOp res WriteByteArrayOp_Word16    args _ = doWriteByteArrayOp (Just mo_WordTo16) b16  res args
+emitPrimOp res WriteByteArrayOp_Word32    args _ = doWriteByteArrayOp (Just mo_WordTo32) b32  res args
+emitPrimOp res WriteByteArrayOp_Word64    args _ = doWriteByteArrayOp Nothing b64  res args
 
 
 -- The rest just translate straightforwardly
-emitPrimOp [res] op [arg] live
+emitPrimOp [res] op [arg] _
    | nopOp op
    = stmtC (CmmAssign (CmmLocal res) arg)
 
@@ -365,6 +358,7 @@ emitPrimOp _ op _ _
 
 -- These PrimOps are NOPs in Cmm
 
+nopOp :: PrimOp -> Bool
 nopOp Int2WordOp     = True
 nopOp Word2IntOp     = True
 nopOp Int2AddrOp     = True
@@ -386,6 +380,7 @@ narrowOp _ 		= Nothing
 
 -- Native word signless ops
 
+translateOp :: PrimOp -> Maybe MachOp
 translateOp IntAddOp       = Just mo_wordAdd
 translateOp IntSubOp       = Just mo_wordSub
 translateOp WordAddOp      = Just mo_wordAdd
@@ -507,6 +502,7 @@ translateOp _ = Nothing
 -- These primops are implemented by CallishMachOps, because they sometimes
 -- turn into foreign calls depending on the backend.
 
+callishOp :: PrimOp -> Maybe CallishMachOp
 callishOp DoublePowerOp  = Just MO_F64_Pwr
 callishOp DoubleSinOp    = Just MO_F64_Sin
 callishOp DoubleCosOp    = Just MO_F64_Cos
