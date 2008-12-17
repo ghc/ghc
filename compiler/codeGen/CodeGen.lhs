@@ -11,13 +11,6 @@ This module says how things get going at the top level.
 functions drive the mangling of top-level bindings.
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module CodeGen ( codeGen ) where
 
 #include "HsVersions.h"
@@ -44,13 +37,11 @@ import PrelNames
 import DynFlags
 import StaticFlags
 
-import PackageConfig
 import HscTypes
 import CostCentre
 import Id
 import Name
 import OccName
-import Outputable
 import TyCon
 import Module
 import ErrUtils
@@ -299,7 +290,7 @@ cgTopBinding dflags (StgRec pairs, srts)
 	; nopC }
 
 mkSRT :: [Id] -> (Id,[Id]) -> Code
-mkSRT these (id,[])  = nopC
+mkSRT _ (_,[])  = nopC
 mkSRT these (id,ids)
   = do	{ ids <- mapFCs remap ids
 	; id  <- remap id
@@ -321,7 +312,7 @@ cgTopRhs :: Id -> StgRhs -> FCode (Id, CgIdInfo)
 	-- The Id is passed along for setting up a binding...
 	-- It's already been externalised if necessary
 
-cgTopRhs bndr (StgRhsCon cc con args)
+cgTopRhs bndr (StgRhsCon _cc con args)
   = forkStatics (cgTopRhsCon bndr con args)
 
 cgTopRhs bndr (StgRhsClosure cc bi fvs upd_flag srt args body)
