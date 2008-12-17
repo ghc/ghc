@@ -1,6 +1,3 @@
-{-# OPTIONS -w #-}
--- Lots of missing type sigs etc
-
 -----------------------------------------------------------------------------
 --
 -- Code generation for profiling
@@ -37,14 +34,12 @@ module StgCmmProf (
 	-- For REP_xxx constants, which are MachReps
 
 import StgCmmClosure
-import StgCmmEnv
 import StgCmmUtils
 import StgCmmMonad
 import SMRep
 
 import MkZipCfgCmm
 import Cmm
-import TyCon	( PrimRep(..) )
 import CmmUtils
 import CLabel
 
@@ -229,8 +224,8 @@ isBox :: StgExpr -> Bool
 -- one introduced by boxHigherOrderArgs for profiling,
 -- so we charge it to "OVERHEAD".
 -- This looks like a GROSS HACK to me --SDM
-isBox (StgApp fun []) = True
-isBox other	      = False
+isBox (StgApp _ []) = True
+isBox _             = False
 
 
 -- -----------------------------------------------------------------------
@@ -261,6 +256,7 @@ enterCostCentre closure_info ccs body
     ASSERT2(not (noCCSAttached ccs), ppr (closureName closure_info) <+> ppr ccs)
     enter_cost_centre closure_info ccs body
 
+enter_cost_centre :: ClosureInfo -> CostCentreStack -> StgExpr -> FCode ()
 enter_cost_centre closure_info ccs body
   | isSubsumedCCS ccs
   = ASSERT(isToplevClosure closure_info)
@@ -319,9 +315,11 @@ enterCostCentreThunk closure =
   ifProfiling $ do 
     emit $ mkStore curCCSAddr (costCentreFrom closure)
 
+enter_ccs_fun :: CmmExpr -> FCode ()
 enter_ccs_fun stack = emitRtsCall (sLit "EnterFunCCS") [(stack,AddrHint)] False
 			-- ToDo: vols
 
+enter_ccs_fsub :: FCode ()
 enter_ccs_fsub = enteringPAP 0
 
 -- When entering a PAP, EnterFunCCS is called by both the PAP entry
@@ -396,7 +394,9 @@ emitCostCentreStackDecl ccs
 	-- pad out the struct with zero words until we hit the
 	-- size of the overall struct (which we get via DerivedConstants.h)
 
+zero :: CmmLit
 zero = mkIntCLit 0
+zero64 :: CmmLit
 zero64 = CmmInt 0 W64
 
 sizeof_ccs_words :: Int
@@ -447,9 +447,11 @@ mkRegisterCCS ccs
     ccs_lit = CmmLit (CmmLabel (mkCCSLabel ccs))
 
 
+cC_LIST, cC_ID :: CmmExpr
 cC_LIST = CmmLit (CmmLabel (mkRtsDataLabel (sLit "CC_LIST")))
 cC_ID   = CmmLit (CmmLabel (mkRtsDataLabel (sLit "CC_ID")))
 
+cCS_LIST, cCS_ID :: CmmExpr
 cCS_LIST = CmmLit (CmmLabel (mkRtsDataLabel (sLit "CCS_LIST")))
 cCS_ID   = CmmLit (CmmLabel (mkRtsDataLabel (sLit "CCS_ID")))
 
@@ -545,10 +547,16 @@ ldvWord :: CmmExpr -> CmmExpr
 ldvWord closure_ptr = cmmOffsetB closure_ptr oFFSET_StgHeader_ldvw
 
 -- LDV constants, from ghc/includes/Constants.h
-lDV_SHIFT	 = (LDV_SHIFT :: Int)
---lDV_STATE_MASK   = (LDV_STATE_MASK :: StgWord)
-lDV_CREATE_MASK  = (LDV_CREATE_MASK :: StgWord)
---lDV_LAST_MASK    = (LDV_LAST_MASK :: StgWord)
-lDV_STATE_CREATE = (LDV_STATE_CREATE :: StgWord)
-lDV_STATE_USE    = (LDV_STATE_USE :: StgWord)
+lDV_SHIFT :: Int
+lDV_SHIFT = LDV_SHIFT
+--lDV_STATE_MASK :: StgWord
+--lDV_STATE_MASK   = LDV_STATE_MASK
+lDV_CREATE_MASK :: StgWord
+lDV_CREATE_MASK  = LDV_CREATE_MASK
+--lDV_LAST_MASK :: StgWord
+--lDV_LAST_MASK    = LDV_LAST_MASK
+lDV_STATE_CREATE :: StgWord
+lDV_STATE_CREATE = LDV_STATE_CREATE
+lDV_STATE_USE :: StgWord
+lDV_STATE_USE    = LDV_STATE_USE
 
