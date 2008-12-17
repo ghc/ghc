@@ -5,13 +5,6 @@
 \section[CgHeapery]{Heap management functions}
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module CgHeapery (
 	initHeapUsage, getVirtHp, setVirtHp, setRealHp, 
 	getHpRelOffset,	hpRel,
@@ -44,13 +37,11 @@ import SMRep
 import Cmm
 import CmmUtils
 import Id
-import IdInfo
 import DataCon
 import TyCon
 import CostCentre
 import Util
 import Constants
-import PackageConfig
 import Outputable
 import FastString
 
@@ -130,6 +121,8 @@ layOutDynConstr, layOutStaticConstr
 layOutDynConstr    = layOutConstr False
 layOutStaticConstr = layOutConstr True
 
+layOutConstr :: Bool -> DataCon -> [(CgRep, a)]
+             -> (ClosureInfo, [(a, VirtualHpOffset)])
 layOutConstr is_static data_con args
    = (mkConInfo is_static data_con tot_wds ptr_wds,
       things_w_offsets)
@@ -361,7 +354,7 @@ altHeapCheck alt_type code
 	--
 	-- However R1 is guaranteed to be a pointer
 
-    rts_label (AlgAlt tc) = stg_gc_enter1
+    rts_label (AlgAlt _) = stg_gc_enter1
 	-- Enter R1 after the heap check; it's a pointer
  	
     rts_label (PrimAlt tc)
@@ -445,6 +438,7 @@ do_checks stk hp reg_save_code rts_lbl
 	 (stk /= 0) (hp /= 0) reg_save_code rts_lbl
 
 -- The offsets are now in *bytes*
+do_checks' :: CmmExpr -> CmmExpr -> Bool -> Bool -> CmmStmts -> CmmExpr -> Code
 do_checks' stk_expr hp_expr stk_nonzero hp_nonzero reg_save_code rts_lbl
   = do	{ doGranAllocate hp_expr
 
@@ -519,7 +513,9 @@ stkChkNodePoints :: CmmExpr -> Code
 stkChkNodePoints bytes
   = do_checks' bytes (CmmLit (mkIntCLit 0)) True False noStmts stg_gc_enter1
 
+stg_gc_gen :: CmmExpr
 stg_gc_gen = CmmLit (CmmLabel (mkRtsCodeLabel (sLit "stg_gc_gen")))
+stg_gc_enter1 :: CmmExpr
 stg_gc_enter1 = CmmReg (CmmGlobal GCEnter1)
 \end{code}
 
@@ -543,7 +539,7 @@ allocDynClosure
 					-- ie Info ptr has offset zero.
 	-> FCode VirtualHpOffset	-- Returns virt offset of object
 
-allocDynClosure cl_info use_cc blame_cc amodes_with_offsets
+allocDynClosure cl_info use_cc _blame_cc amodes_with_offsets
   = do	{ virt_hp <- getVirtHp
 
 	-- FIND THE OFFSET OF THE INFO-PTR WORD
