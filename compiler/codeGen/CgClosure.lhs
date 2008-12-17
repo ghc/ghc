@@ -9,13 +9,6 @@ with {\em closures} on the RHSs of let(rec)s.  See also
 @CgCon@, which deals with constructors.
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module CgClosure ( cgTopRhsClosure, 
 		   cgStdRhsClosure, 
 		   cgRhsClosure,
@@ -116,7 +109,7 @@ cgStdRhsClosure
 	-> [StgArg]		-- payload
 	-> FCode (Id, CgIdInfo)
 
-cgStdRhsClosure bndr cc bndr_info fvs args body lf_info payload 
+cgStdRhsClosure bndr cc _bndr_info _fvs args body lf_info payload 
   = do	-- AHA!  A STANDARD-FORM THUNK
   {	-- LAY OUT THE OBJECT
     amodes <- getArgAmodes payload
@@ -248,7 +241,7 @@ So it should set up an update frame (if it is shared).
 NB: Thunks cannot have a primitive type!
 
 \begin{code}
-closureCodeBody binder_info cl_info cc [{- No args i.e. thunk -}] body = do
+closureCodeBody _binder_info cl_info cc [{- No args i.e. thunk -}] body = do
   { body_absC <- getCgStmts $ do
 	{ tickyEnterThunk cl_info
 	; ldvEnterClosure cl_info  -- NB: Node always points when profiling
@@ -273,7 +266,7 @@ argSatisfactionCheck (by calling fetchAndReschedule).  There info if
 Node points to closure is available. -- HWL
 
 \begin{code}
-closureCodeBody binder_info cl_info cc args body 
+closureCodeBody _binder_info cl_info cc args body 
   = ASSERT( length args > 0 )
   do { 	-- Get the current virtual Sp (it might not be zero, 
 	-- eg. if we're compiling a let-no-escape).
@@ -555,7 +548,7 @@ link_caf :: ClosureInfo
 -- updated with the new value when available.  The reason for all of this
 -- is that we only want to update dynamic heap objects, not static ones,
 -- so that generational GC is easier.
-link_caf cl_info is_upd = do
+link_caf cl_info _is_upd = do
   { 	-- Alloc black hole specifying CC_HDR(Node) as the cost centre
   ; let	use_cc   = costCentreFrom (CmmReg nodeReg)
         blame_cc = use_cc
