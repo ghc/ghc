@@ -5,13 +5,6 @@
 \section[CgBindery]{Utility functions related to doing @CgBindings@}
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module CgBindery (
 	CgBindings, CgIdInfo,
 	StableLoc, VolatileLoc,
@@ -94,6 +87,7 @@ data CgIdInfo
         , cg_tag :: {-# UNPACK #-} !Int  -- tag to be added in idInfoToAmode
          }
 
+mkCgIdInfo :: Id -> VolatileLoc -> StableLoc -> LambdaFormInfo -> CgIdInfo
 mkCgIdInfo id vol stb lf
   = CgIdInfo { cg_id = id, cg_vol = vol, cg_stb = stb, 
 	       cg_lf = lf, cg_rep = idCgRep id, cg_tag = tag }
@@ -111,6 +105,7 @@ mkCgIdInfo id vol stb lf
       | otherwise
       = funTagLFInfo lf
 
+voidIdInfo :: Id -> CgIdInfo
 voidIdInfo id = CgIdInfo { cg_id = id, cg_vol = NoVolatileLoc
 			 , cg_stb = VoidLoc, cg_lf = mkLFArgument id
 			 , cg_rep = VoidArg, cg_tag = 0 }
@@ -125,6 +120,8 @@ data VolatileLoc	-- These locations die across a call
                                    -- NB. Byte offset, because we subtract R1's
                                    -- tag from the offset.
 
+mkTaggedCgIdInfo :: Id -> VolatileLoc -> StableLoc -> LambdaFormInfo -> DataCon
+                 -> CgIdInfo
 mkTaggedCgIdInfo id vol stb lf con
   = CgIdInfo { cg_id = id, cg_vol = vol, cg_stb = stb, 
 	       cg_lf = lf, cg_rep = idCgRep id, cg_tag = tagForCon con }
@@ -152,7 +149,7 @@ data StableLoc
 
 \begin{code}
 instance Outputable CgIdInfo where
-  ppr (CgIdInfo id rep vol stb lf _) -- TODO, pretty pring the tag info
+  ppr (CgIdInfo id _ vol stb _ _) -- TODO, pretty pring the tag info
     = ppr id <+> ptext (sLit "-->") <+> vcat [ppr vol, ppr stb]
 
 instance Outputable VolatileLoc where
@@ -176,17 +173,34 @@ instance Outputable StableLoc where
 %************************************************************************
 
 \begin{code}
+stableIdInfo :: Id -> CmmExpr -> LambdaFormInfo -> CgIdInfo
 stableIdInfo id amode   lf_info = mkCgIdInfo id NoVolatileLoc (StableLoc amode) lf_info
+
+heapIdInfo :: Id -> VirtualHpOffset -> LambdaFormInfo -> CgIdInfo
 heapIdInfo id offset    lf_info = mkCgIdInfo id (VirHpLoc offset) NoStableLoc lf_info
+
+letNoEscapeIdInfo :: Id -> VirtualSpOffset -> LambdaFormInfo -> CgIdInfo
 letNoEscapeIdInfo id sp lf_info = mkCgIdInfo id NoVolatileLoc (VirStkLNE sp) lf_info
+
+stackIdInfo :: Id -> VirtualSpOffset -> LambdaFormInfo -> CgIdInfo
 stackIdInfo id sp	lf_info = mkCgIdInfo id NoVolatileLoc (VirStkLoc sp) lf_info
+
+nodeIdInfo :: Id -> Int -> LambdaFormInfo -> CgIdInfo
 nodeIdInfo id offset    lf_info = mkCgIdInfo id (VirNodeLoc (wORD_SIZE*offset)) NoStableLoc lf_info
+
+regIdInfo :: Id -> CmmReg -> LambdaFormInfo -> CgIdInfo
 regIdInfo id reg        lf_info = mkCgIdInfo id (RegLoc reg) NoStableLoc lf_info
 
+taggedStableIdInfo :: Id -> CmmExpr -> LambdaFormInfo -> DataCon -> CgIdInfo
 taggedStableIdInfo id amode lf_info con
   = mkTaggedCgIdInfo id NoVolatileLoc (StableLoc amode) lf_info con
+
+taggedHeapIdInfo :: Id -> VirtualHpOffset -> LambdaFormInfo -> DataCon
+                 -> CgIdInfo
 taggedHeapIdInfo id offset lf_info con
   = mkTaggedCgIdInfo id (VirHpLoc offset) NoStableLoc lf_info con
+
+untagNodeIdInfo :: Id -> Int -> LambdaFormInfo -> Int -> CgIdInfo
 untagNodeIdInfo id offset    lf_info tag
   = mkCgIdInfo id (VirNodeLoc (wORD_SIZE*offset - tag)) NoStableLoc lf_info
 
@@ -232,8 +246,9 @@ cgIdInfoLF = cg_lf
 cgIdInfoArgRep :: CgIdInfo -> CgRep
 cgIdInfoArgRep = cg_rep
 
+maybeLetNoEscape :: CgIdInfo -> Maybe VirtualSpOffset
 maybeLetNoEscape (CgIdInfo { cg_stb = VirStkLNE sp_off }) = Just sp_off
-maybeLetNoEscape other   				  = Nothing
+maybeLetNoEscape _       				  = Nothing
 \end{code}
 
 %************************************************************************
@@ -347,7 +362,7 @@ getCAddrModeIfVolatile id
 		NoStableLoc -> do -- Aha!  So it is volatile!
 			amode <- idInfoToAmode info
 			return $ Just amode
-		a_stable_loc -> return Nothing }
+		_ -> return Nothing }
 \end{code}
 
 @getVolatileRegs@ gets a set of live variables, and returns a list of
@@ -374,7 +389,7 @@ getVolatileRegs vars = do
 			-- regs *really* need to be saved.
 		  case cg_stb info of
 			NoStableLoc     -> returnFC (Just reg) -- got one!
-			is_a_stable_loc -> do
+			_ -> do
 				{ -- has both volatile & stable locations;
 				  -- force it to rely on the stable location
 				  modifyBindC var nuke_vol_bind 
@@ -383,7 +398,7 @@ getVolatileRegs vars = do
 	; case cg_vol info of
 	    RegLoc (CmmGlobal reg) -> consider_reg reg
 	    VirNodeLoc _ 	   -> consider_reg node
-	    other_loc 	 	   -> returnFC Nothing	-- Local registers
+	    _         	 	   -> returnFC Nothing	-- Local registers
 	}
 
     nuke_vol_bind info = info { cg_vol = NoVolatileLoc }
@@ -511,7 +526,7 @@ dead_slots :: StgLiveVars
 
 -- dead_slots carries accumulating parameters for
 --	filtered bindings, dead slots
-dead_slots live_vars fbs ds []
+dead_slots _ fbs ds []
   = (ds, reverse fbs) -- Finished; rm the dups, if any
 
 dead_slots live_vars fbs ds ((v,i):bs)
