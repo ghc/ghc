@@ -115,7 +115,6 @@ performTailCall fun_info arg_amodes pending_assts
 	      opt_node_asst | nodeMustPointToIt lf_info = node_asst
 			    | otherwise		        = noStmts
 	; EndOfBlockInfo sp _ <- getEndOfBlockInfo
-	; this_pkg <- getThisPackage
 
 	; case (getCallMethod fun_name fun_has_cafs lf_info (length arg_amodes)) of
 
