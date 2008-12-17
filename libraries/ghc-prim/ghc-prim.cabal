@@ -9,6 +9,11 @@ description:
 cabal-version:  >=1.2
 build-type: Custom
 
+flag include-ghc-prim {
+    Description: Include GHC.Prim in exposed-modules
+    default: False
+}
+
 Library {
     build-depends: rts
     exposed-modules:
@@ -21,6 +26,11 @@ Library {
         GHC.Tuple
         GHC.Types
         GHC.Unit
+
+    if flag(include-ghc-prim) {
+        exposed-modules: GHC.Prim
+    }
+
     c-sources:
         cbits/longlong.c
     extensions: CPP, MagicHash, ForeignFunctionInterface, UnliftedFFITypes,
