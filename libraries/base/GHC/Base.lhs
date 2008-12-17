@@ -103,6 +103,12 @@ import GHC.Ordering
 import GHC.Prim
 import {-# SOURCE #-} GHC.Err
 
+-- These two are not strictly speaking required by this module, but they are
+-- implicit dependencies whenever () or tuples are mentioned, so adding them
+-- as imports here helps to get the dependencies right in the new build system.
+import GHC.Tuple ()
+import GHC.Unit ()
+
 infixr 9  .
 infixr 5  ++
 infixl 1  >>, >>=
