@@ -38,14 +38,22 @@ COMPILER     = ghc
 CONFIGDIR    = $(TOP)/config
 CONFIG       = $(CONFIGDIR)/$(COMPILER)
 
+ifeq "$(NEWBUILD)" "YES"
 # can be overriden from the command line
+ifneq "$(stage)" ""
+TEST_HC = $(GHC_STAGE$(stage)_ABS)
+else
+TEST_HC = $(GHC_STAGE2_ABS)
+endif
+GHC_PKG = $(FPTOOLS_TOP_ABS)/$(GHC_PKG_INPLACE)
+else
 ifneq "$(stage)" ""
 TEST_HC = $(GHC_STAGE$(stage))
 else
 TEST_HC = $(GHC_STAGE2)
 endif
-
 GHC_PKG = $(GHC_PKG_INPLACE)
+endif
 
 RUNTEST_OPTS =
 
@@ -130,9 +138,23 @@ WAY =
 
 all :: test
 
-TIMEOUT_PROGRAM = $(TOP)/timeout/install-inplace/bin/timeout$(exeext)
+ifeq "$(NEWBUILD)" "YES"
 
-timeout : $(TIMEOUT_PROGRAM)
+TIMEOUT_PROGRAM = $(FPTOOLS_TOP)/inplace/bin/timeout$(exeext)
+
+$(TIMEOUT_PROGRAM) :
+	@echo "Looks like you don't have timeout, building it first..."
+	cd $(FPTOOLS_TOP) && $(MAKE) $(MFLAGS) inplace/bin/timeout$(exeext)
+
+pwd : $(FPTOOLS_TOP)/utils/pwd$(exeext)
+
+$(FPTOOLS_TOP)/utils/pwd$(exeext) :
+	@echo "Looks like you don't have pwd, building utils first..."
+	cd $(FPTOOLS_TOP) && $(MAKE) $(MFLAGS) utils/pwd$(exeext)
+
+else
+
+TIMEOUT_PROGRAM = $(TOP)/timeout/install-inplace/bin/timeout$(exeext)
 
 $(TIMEOUT_PROGRAM) :
 	@echo "Looks like you don't have timeout, building it first..."
@@ -140,11 +162,12 @@ $(TIMEOUT_PROGRAM) :
 
 pwd : $(TOP)/utils/pwd$(exeext)
 
-$(TOP)/utils/pwd$(exeext) :
+-$(TOP)/utils/pwd$(exeext) :
 	@echo "Looks like you don't have pwd, building utils first..."
 	cd $(TOP)/utils && $(MAKE) $(MFLAGS) all
+endif
 
-test: timeout pwd
+test: $(TIMEOUT_PROGRAM) pwd
 	$(PYTHON) $(RUNTESTS) $(RUNTEST_OPTS) \
 		$(patsubst %, --only=%, $(TEST)) \
 		$(patsubst %, --only=%, $(TESTS)) \
@@ -160,4 +183,3 @@ accept:
 
 fast:
 	$(MAKE) fast=YES
-
