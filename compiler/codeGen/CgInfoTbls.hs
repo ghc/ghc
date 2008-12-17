@@ -1,10 +1,3 @@
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 -----------------------------------------------------------------------------
 --
 -- Building info tables.
@@ -41,7 +34,6 @@ import CgMonad
 import CmmUtils
 import Cmm
 import CLabel
-import StgSyn
 import Name
 import DataCon
 import Unique
@@ -49,7 +41,6 @@ import StaticFlags
 
 import Maybes
 import Constants
-import Panic
 import Util
 import Outputable
 
@@ -237,7 +228,7 @@ stack_layout ((off, bind):binds) sizeW | off == sizeW - 1 =
     stack_bind = LocalReg unique machRep
     unique = getUnique (cgIdInfoId bind)
     machRep = argMachRep (cgIdInfoArgRep bind)
-stack_layout binds@((off, _):_) sizeW | otherwise =
+stack_layout binds@(_:_) sizeW | otherwise =
   Nothing : (stack_layout binds (sizeW - 1))
 
 {- Another way to write the function that might be less error prone (untested)
@@ -291,8 +282,6 @@ emitAlgReturnTarget name branches mb_deflt fam_sz
 	; return (lbl, Nothing) }
 		-- Nothing: the internal branches in the switch don't have
 		-- global labels, so we can't use them at the 'call site'
-  where
-    uniq = getUnique name 
 
 --------------------------------
 emitReturnInstr :: Code
@@ -317,7 +306,8 @@ stdInfoTableSizeW
     size_prof | opt_SccProfilingOn = 2
 	      | otherwise	   = 0
 
-stdInfoTableSizeB = stdInfoTableSizeW * wORD_SIZE :: ByteOff
+stdInfoTableSizeB :: ByteOff
+stdInfoTableSizeB = stdInfoTableSizeW * wORD_SIZE
 
 stdSrtBitmapOffset :: ByteOff
 -- Byte offset of the SRT bitmap half-word which is 
