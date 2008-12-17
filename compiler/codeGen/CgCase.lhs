@@ -317,7 +317,6 @@ cgInlinePrimOp primop args bndr (AlgAlt tycon) live_in_alts alts
 	 	-- Bind the default binder if necessary
 		-- (avoiding it avoids the assignment)
 		-- The deadness info is set by StgVarInfo
-	; this_pkg <- getThisPackage
 	; whenC (not (isDeadBinder bndr))
 		(do { tmp_reg <- bindNewToTemp bndr
 		    ; stmtC (CmmAssign
