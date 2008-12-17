@@ -432,18 +432,6 @@ emitInfoTableAndCode entry_ret_lbl info args blocks
 
 -------------------------------------------------------------------------
 --
---	Static reference tables
---
--------------------------------------------------------------------------
-
-srtLabelAndLength :: C_SRT -> CLabel -> (CmmLit, StgHalfWord)
-srtLabelAndLength NoC_SRT _		
-  = (zeroCLit, 0)
-srtLabelAndLength (C_SRT lbl off bitmap) info_lbl
-  = (makeRelativeRefTo info_lbl $ cmmLabelOffW lbl off, bitmap)
-
--------------------------------------------------------------------------
---
 --	Position independent code
 --
 -------------------------------------------------------------------------
