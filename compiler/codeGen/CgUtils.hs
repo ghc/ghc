@@ -322,7 +322,6 @@ emitIfThenElse :: CmmExpr 	-- Boolean
 -- Emit (if e then x else y)
 emitIfThenElse cond then_part else_part
   = do { then_id <- newLabelC
-       ; else_id <- newLabelC
        ; join_id <- newLabelC
        ; stmtC (CmmCondBranch cond then_id)
        ; else_part
