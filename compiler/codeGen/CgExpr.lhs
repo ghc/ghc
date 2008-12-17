@@ -4,13 +4,6 @@
 %
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module CgExpr ( cgExpr ) where
 
 #include "HsVersions.h"
@@ -19,6 +12,7 @@ import Constants
 import StgSyn
 import CgMonad
 
+import CostCentre
 import SMRep
 import CoreSyn
 import CgProf
@@ -28,7 +22,6 @@ import CgCase
 import CgClosure
 import CgCon
 import CgLetNoEscape
-import CgCallConv
 import CgTailCall
 import CgInfoTbls
 import CgForeignCall
@@ -48,7 +41,6 @@ import Maybes
 import ListSetOps
 import BasicTypes
 import Util
-import FastString
 import Outputable
 \end{code}
 
@@ -130,7 +122,7 @@ cgExpr (StgOpApp (StgFCallOp fcall _) stg_args res_ty) = do
 		      nonVoidArg rep]
 
     arg_tmps <- sequence [ assignTemp arg
-                         | (arg, stg_arg) <- arg_exprs]
+                         | (arg, _) <- arg_exprs]
     let	arg_hints = zipWith CmmHinted arg_tmps (map (typeForeignHint.stgArgType) stg_args)
     {-
 	Now, allocate some result regs.
@@ -145,7 +137,7 @@ cgExpr (StgOpApp (StgFCallOp fcall _) stg_args res_ty) = do
 
 cgExpr (StgOpApp (StgPrimOp TagToEnumOp) [arg] res_ty) 
   = ASSERT(isEnumerationTyCon tycon)
-    do	{ (rep,amode) <- getArgAmode arg
+    do	{ (_rep,amode) <- getArgAmode arg
 	; amode' <- assignTemp amode	-- We're going to use it twice,
 					-- so save in a temp if non-trivial
 	; stmtC (CmmAssign nodeReg (tagToClosure tycon amode'))
@@ -159,7 +151,7 @@ cgExpr (StgOpApp (StgPrimOp TagToEnumOp) [arg] res_ty)
 	tycon = tyConAppTyCon res_ty
 
 
-cgExpr x@(StgOpApp op@(StgPrimOp primop) args res_ty)
+cgExpr (StgOpApp (StgPrimOp primop) args res_ty)
   | primOpOutOfLine primop
 	= tailCallPrimOp primop args
 
@@ -269,6 +261,16 @@ cgExpr (StgTick m n expr) = do cgTickBox m n; cgExpr expr
 \end{code}
 
 %********************************************************
+%*                                                     *
+%*             Anything else                           *
+%*                                                     *
+%********************************************************
+
+\begin{code}
+cgExpr _ = panic "cgExpr"
+\end{code}
+
+%********************************************************
 %*							*
 %*		Non-top-level bindings			*
 %*							*
@@ -311,14 +313,17 @@ form:
 
 
 \begin{code}
+mkRhsClosure :: Id -> CostCentreStack -> StgBinderInfo
+             -> [Id] -> UpdateFlag -> [Id] -> GenStgExpr Id Id
+             -> FCode (Id, CgIdInfo)
 mkRhsClosure	bndr cc bi
 		[the_fv]   		-- Just one free var
 		upd_flag		-- Updatable thunk
 		[]			-- A thunk
 		body@(StgCase (StgApp scrutinee [{-no args-}])
 		      _ _ _ srt   -- ignore uniq, etc.
-		      (AlgAlt tycon)
-		      [(DataAlt con, params, use_mask,
+		      (AlgAlt _)
+		      [(DataAlt con, params, _use_mask,
 			    (StgApp selectee [{-no args-}]))])
   |  the_fv == scrutinee		-- Scrutinee is the only free variable
   && maybeToBool maybe_offset		-- Selectee is a component of the tuple
@@ -393,6 +398,9 @@ mkRhsClosure bndr cc bi fvs upd_flag args body
 %*							*
 %********************************************************
 \begin{code}
+cgLetNoEscapeBindings :: StgLiveVars -> EndOfBlockInfo
+                      -> Maybe VirtualSpOffset -> GenStgBinding Id Id
+                      -> Code
 cgLetNoEscapeBindings live_in_rhss rhs_eob_info maybe_cc_slot 
 	(StgNonRec binder rhs)
   = do	{ (binder,info) <- cgLetNoEscapeRhs live_in_rhss rhs_eob_info 
@@ -411,7 +419,7 @@ cgLetNoEscapeBindings live_in_rhss rhs_eob_info maybe_cc_slot (StgRec pairs)
   where
     -- We add the binders to the live-in-rhss set so that we don't
     -- delete the bindings for the binder from the environment!
-    full_live_in_rhss = live_in_rhss `unionVarSet` (mkVarSet [b | (b,r) <- pairs])
+    full_live_in_rhss = live_in_rhss `unionVarSet` (mkVarSet [b | (b,_) <- pairs])
 
 cgLetNoEscapeRhs
     :: StgLiveVars	-- Live in rhss
@@ -423,7 +431,7 @@ cgLetNoEscapeRhs
     -> FCode (Id, CgIdInfo)
 
 cgLetNoEscapeRhs full_live_in_rhss rhs_eob_info maybe_cc_slot rec binder
-		 (StgRhsClosure cc bi _ upd_flag srt args body)
+		 (StgRhsClosure cc bi _ _upd_flag srt args body)
   = -- We could check the update flag, but currently we don't switch it off
     -- for let-no-escaped things, so we omit the check too!
     -- case upd_flag of
