@@ -61,8 +61,12 @@ Library {
                     ScopedTypeVariables, UnboxedTuples,
                     ForeignFunctionInterface, UnliftedFFITypes,
                     DeriveDataTypeable, GeneralizedNewtypeDeriving,
-                    FlexibleInstances, PatternSignatures, StandaloneDeriving,
+                    FlexibleInstances, StandaloneDeriving,
                     PatternGuards, EmptyDataDecls
+
+        if impl(ghc < 6.10) 
+           -- PatternSignatures was deprecated in 6.10
+           extensions: PatternSignatures
     }
     exposed-modules:
         Control.Applicative,
