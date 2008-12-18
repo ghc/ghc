@@ -301,7 +301,8 @@ render flags ifaces installedIfaces = do
     copyHtmlBits odir libdir css_file
 
   when (Flag_Hoogle `elem` flags) $ do
-    ppHoogle pkgName pkgVer title prologue visibleIfaces odir
+    let pkgName2 = if pkgName == "main" && title /= [] then title else pkgName
+    ppHoogle pkgName2 pkgVer title prologue visibleIfaces odir
 
 
 -------------------------------------------------------------------------------
