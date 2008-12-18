@@ -162,7 +162,7 @@ $(TIMEOUT_PROGRAM) :
 
 pwd : $(TOP)/utils/pwd$(exeext)
 
--$(TOP)/utils/pwd$(exeext) :
+$(TOP)/utils/pwd$(exeext) :
 	@echo "Looks like you don't have pwd, building utils first..."
 	cd $(TOP)/utils && $(MAKE) $(MFLAGS) all
 endif
