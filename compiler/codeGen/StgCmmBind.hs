@@ -462,7 +462,8 @@ thunkCode cl_info fv_details cc node arity body
 	; entryHeapCheck node arity [] $ do
       	{	-- Overwrite with black hole if necessary
 		-- but *after* the heap-overflow check
-	  whenC (blackHoleOnEntry cl_info && node_points)
+	  dflags <- getDynFlags
+	; whenC (blackHoleOnEntry dflags cl_info && node_points)
  	        (blackHoleIt cl_info)
 
 		-- Push update frame

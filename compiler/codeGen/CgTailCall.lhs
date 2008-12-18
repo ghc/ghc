@@ -108,7 +108,8 @@ performTailCall fun_info arg_amodes pending_assts
 			    | otherwise		        = noStmts
 	; EndOfBlockInfo sp _ <- getEndOfBlockInfo
 
-	; case (getCallMethod fun_name fun_has_cafs lf_info (length arg_amodes)) of
+	; dflags <- getDynFlags
+	; case (getCallMethod dflags fun_name fun_has_cafs lf_info (length arg_amodes)) of
 
 	    -- Node must always point to things we enter
 	    EnterIt -> do

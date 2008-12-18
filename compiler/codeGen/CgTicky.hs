@@ -69,6 +69,8 @@ import PrelNames
 import TcType
 import TyCon
 
+import DynFlags
+
 import Data.Maybe
 
 -----------------------------------------------------------------------------
@@ -298,9 +300,9 @@ tickyAllocHeap hp
 -- Ticky utils
 
 ifTicky :: Code -> Code
-ifTicky code
-  | opt_DoTickyProfiling = code
-  | otherwise		 = nopC
+ifTicky code = do dflags <- getDynFlags
+                  if doingTickyProfiling dflags then code
+                                                else nopC
 
 addToMemLbl :: Width -> CLabel -> Int -> CmmStmt
 addToMemLbl rep lbl n = addToMem rep (CmmLit (CmmLabel lbl)) n

@@ -395,8 +395,10 @@ thunkWrapper closure_info thunk_code = do
 
         -- Stack and/or heap checks
   ; thunkEntryChecks closure_info $ do
-      	{	-- Overwrite with black hole if necessary
-	  whenC (blackHoleOnEntry closure_info && node_points)
+      	{
+          dflags <- getDynFlags
+          -- Overwrite with black hole if necessary
+	; whenC (blackHoleOnEntry dflags closure_info && node_points)
  	        (blackHoleIt closure_info)
 	; setupUpdate closure_info thunk_code }
 		-- setupUpdate *encloses* the thunk_code

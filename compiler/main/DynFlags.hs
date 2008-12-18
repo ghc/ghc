@@ -35,6 +35,7 @@ module DynFlags (
         updOptLevel,
         setTmpDir,
         setPackageName,
+        doingTickyProfiling,
 
         -- ** Parsing DynFlags
         parseDynamicFlags,
@@ -516,6 +517,11 @@ data GhcLink
 isNoLink :: GhcLink -> Bool
 isNoLink NoLink = True
 isNoLink _      = False
+
+-- Is it worth evaluating this Bool and caching it in the DynFlags value
+-- during initDynFlags?
+doingTickyProfiling :: DynFlags -> Bool
+doingTickyProfiling dflags = WayTicky `elem` wayNames dflags
 
 data PackageFlag
   = ExposePackage  String

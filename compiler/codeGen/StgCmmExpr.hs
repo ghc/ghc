@@ -442,8 +442,9 @@ cgLneJump blk_id lne_regs args	-- Join point; discard sequel
 		<*> mkBranch blk_id) }
     
 cgTailCall :: Id -> CgIdInfo -> [StgArg] -> FCode ()
-cgTailCall fun_id fun_info args
-  = case (getCallMethod fun_name (idCafInfo fun_id) lf_info (length args)) of
+cgTailCall fun_id fun_info args = do
+    dflags <- getDynFlags
+    case (getCallMethod dflags fun_name (idCafInfo fun_id) lf_info (length args)) of
 
 	    -- A value in WHNF, so we can just return it.
       	ReturnIt -> emitReturn [fun]	-- ToDo: does ReturnIt guarantee tagged?

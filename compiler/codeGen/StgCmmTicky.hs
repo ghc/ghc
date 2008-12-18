@@ -56,11 +56,12 @@ import CLabel
 import Module
 import Name
 import Id
-import StaticFlags
 import BasicTypes
 import FastString
 import Constants
 import Outputable
+
+import DynFlags
 
 -- Turgid imports for showTypeCategory
 import PrelNames
@@ -321,9 +322,9 @@ tickyAllocHeap hp
 -- Ticky utils
 
 ifTicky :: FCode () -> FCode ()
-ifTicky code
-  | opt_DoTickyProfiling = code
-  | otherwise		 = nopC
+ifTicky code = do dflags <- getDynFlags
+                  if doingTickyProfiling dflags then code
+                                                else nopC
 
 -- All the ticky-ticky counters are declared "unsigned long" in C
 bumpTickyCounter :: LitString -> FCode ()

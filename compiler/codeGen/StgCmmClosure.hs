@@ -90,7 +90,7 @@ import TyCon
 import BasicTypes
 import Outputable
 import Constants
-
+import DynFlags
 
 -----------------------------------------------------------------------------
 --		Representations
@@ -491,38 +491,39 @@ data CallMethod
 	CLabel 		--   The code label
 	Int 		--   Its arity
 
-getCallMethod :: Name		-- Function being applied
+getCallMethod :: DynFlags
+              -> Name           -- Function being applied
               -> CafInfo        -- Can it refer to CAF's?
 	      -> LambdaFormInfo	-- Its info
 	      -> Int		-- Number of available arguments
 	      -> CallMethod
 
-getCallMethod _name _ lf_info _n_args
+getCallMethod _ _name _ lf_info _n_args
   | nodeMustPointToIt lf_info && opt_Parallel
   =	-- If we're parallel, then we must always enter via node.  
 	-- The reason is that the closure may have been 	
 	-- fetched since we allocated it.
     EnterIt
 
-getCallMethod name caf (LFReEntrant _ arity _ _) n_args
+getCallMethod _ name caf (LFReEntrant _ arity _ _) n_args
   | n_args == 0    = ASSERT( arity /= 0 )
 		     ReturnIt	-- No args at all
   | n_args < arity = SlowCall	-- Not enough args
   | otherwise      = DirectEntry (enterIdLabel name caf) arity
 
-getCallMethod _name _ LFUnLifted n_args
+getCallMethod _ _name _ LFUnLifted n_args
   = ASSERT( n_args == 0 ) ReturnIt
 
-getCallMethod _name _ (LFCon _) n_args
+getCallMethod _ _name _ (LFCon _) n_args
   = ASSERT( n_args == 0 ) ReturnIt
 
-getCallMethod name caf (LFThunk _ _ updatable std_form_info is_fun) n_args
+getCallMethod dflags name caf (LFThunk _ _ updatable std_form_info is_fun) n_args
   | is_fun 	-- it *might* be a function, so we must "call" it (which is always safe)
   = SlowCall	-- We cannot just enter it [in eval/apply, the entry code
 		-- is the fast-entry code]
 
   -- Since is_fun is False, we are *definitely* looking at a data value
-  | updatable || opt_DoTickyProfiling  -- to catch double entry
+  | updatable || doingTickyProfiling dflags -- to catch double entry
       {- OLD: || opt_SMP
 	 I decided to remove this, because in SMP mode it doesn't matter
 	 if we enter the same thunk multiple times, so the optimisation
@@ -540,19 +541,19 @@ getCallMethod name caf (LFThunk _ _ updatable std_form_info is_fun) n_args
   = ASSERT( n_args == 0 )
     DirectEntry (thunkEntryLabel name caf std_form_info updatable) 0
 
-getCallMethod _name _ (LFUnknown True) _n_args
+getCallMethod _ _name _ (LFUnknown True) _n_args
   = SlowCall -- might be a function
 
-getCallMethod name _ (LFUnknown False) n_args
+getCallMethod _ name _ (LFUnknown False) n_args
   = ASSERT2 ( n_args == 0, ppr name <+> ppr n_args ) 
     EnterIt -- Not a function
 
-getCallMethod _name _ (LFBlackHole _) _n_args
+getCallMethod _ _name _ (LFBlackHole _) _n_args
   = SlowCall	-- Presumably the black hole has by now
 		-- been updated, but we don't know with
 		-- what, so we slow call it
 
-getCallMethod _name _ LFLetNoEscape _n_args
+getCallMethod _ _name _ LFLetNoEscape _n_args
   = JumpToIt
 
 isStandardFormThunk :: LambdaFormInfo -> Bool
@@ -887,15 +888,15 @@ minPayloadSize smrep updatable
 --   Other functions over ClosureInfo
 --------------------------------------
 
-blackHoleOnEntry :: ClosureInfo -> Bool
+blackHoleOnEntry :: DynFlags -> ClosureInfo -> Bool
 -- Static closures are never themselves black-holed.
 -- Updatable ones will be overwritten with a CAFList cell, which points to a 
 -- black hole;
 -- Single-entry ones have no fvs to plug, and we trust they don't form part 
 -- of a loop.
 
-blackHoleOnEntry ConInfo{} = False
-blackHoleOnEntry (ClosureInfo { closureLFInfo = lf_info, closureSMRep = rep })
+blackHoleOnEntry _ ConInfo{} = False
+blackHoleOnEntry dflags (ClosureInfo { closureLFInfo = lf_info, closureSMRep = rep })
   | isStaticRep rep
   = False	-- Never black-hole a static closure
 
@@ -906,7 +907,7 @@ blackHoleOnEntry (ClosureInfo { closureLFInfo = lf_info, closureSMRep = rep })
 	LFThunk _ no_fvs updatable _ _
 	  -> if updatable
 	     then not opt_OmitBlackHoling
-	     else opt_DoTickyProfiling || not no_fvs
+	     else doingTickyProfiling dflags || not no_fvs
                   -- the former to catch double entry,
                   -- and the latter to plug space-leaks.  KSW/SDM 1999-04.
 

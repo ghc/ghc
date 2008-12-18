@@ -27,7 +27,6 @@ module StaticFlags (
 
 	-- profiling opts
 	opt_SccProfilingOn,
-	opt_DoTickyProfiling,
 
         -- Hpc opts
 	opt_Hpc,
@@ -196,8 +195,6 @@ opt_NoDebugOutput               = lookUp  (fsLit "-dno-debug-output")
 -- profiling opts
 opt_SccProfilingOn :: Bool
 opt_SccProfilingOn		= lookUp  (fsLit "-fscc-profiling")
-opt_DoTickyProfiling :: Bool
-opt_DoTickyProfiling            = WayTicky `elem` (unsafePerformIO $ readIORef v_Ways)
 
 -- Hpc opts
 opt_Hpc :: Bool
