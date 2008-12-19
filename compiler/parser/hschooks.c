@@ -19,7 +19,7 @@ void
 defaultsHook (void)
 {
     RtsFlags.GcFlags.heapSizeSuggestion = 6*1024*1024 / BLOCK_SIZE;
-    RtsFlags.GcFlags.maxStkSize         = 64*1024*1024 / sizeof(W_);
+    RtsFlags.GcFlags.maxStkSize         = 512*1024*1024 / sizeof(W_);
     RtsFlags.GcFlags.giveStats = COLLECT_GC_STATS;
     RtsFlags.GcFlags.statsFile = stderr;
 }
