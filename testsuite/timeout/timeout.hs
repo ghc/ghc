@@ -4,23 +4,20 @@ import Prelude hiding (catch)
 
 import Control.Concurrent (forkIO, threadDelay)
 import Control.Concurrent.MVar (putMVar, takeMVar, newEmptyMVar)
-import Control.Exception (throw, catch, try, IOException)
+import Control.Exception
 import Data.Maybe (isNothing)
-import System.Cmd (system)
 import System.Environment (getArgs)
 import System.Exit
 import System.IO (hPutStrLn, stderr)
-import System.Process
 import Control.Monad
 
 #if !defined(mingw32_HOST_OS)
-import System.Process.Internals (mkProcessHandle)
-import System.Posix.Process (forkProcess, createSession, executeFile)
-import System.Posix.Signals (installHandler, Handler(Catch),
-                             signalProcessGroup, sigINT, sigTERM, sigKILL )
+import System.Posix hiding (killProcess)
+import System.IO.Error hiding (try,catch)
 #endif
 
 #if defined(mingw32_HOST_OS)
+import System.Process
 import WinCBindings
 import Foreign
 import System.Win32.DebugApi
@@ -44,32 +41,31 @@ run secs cmd = do
         m <- newEmptyMVar
         mp <- newEmptyMVar
         installHandler sigINT (Catch (putMVar m Nothing)) Nothing
-        forkIO (do threadDelay (secs * 1000000)
-                   putMVar m Nothing
-               )
-        forkIO (do ei <- try $ do pid <- systemSession cmd
-                                  ph <- mkProcessHandle pid
-                                  return (pid, ph)
-                   putMVar mp ei
-                   case ei of
+        forkIO $ do threadDelay (secs * 1000000)
+                    putMVar m Nothing
+        forkIO $ do ei <- try $ do pid <- systemSession cmd
+                                   return pid
+                    putMVar mp ei
+                    case ei of
                        Left _ -> return ()
-                       Right (_, ph) -> do
-                           r <- waitForProcess ph
-                           putMVar m (Just r))
+                       Right pid -> do
+                           r <- getProcessStatus True False pid
+                           putMVar m r
         ei_pid_ph <- takeMVar mp
         case ei_pid_ph of
             Left e -> do hPutStrLn stderr
                                    ("Timeout:\n" ++ show (e :: IOException))
                          exitWith (ExitFailure 98)
-            Right (pid,ph) -> do
+            Right pid -> do
                 r <- takeMVar m
                 case r of
                   Nothing -> do
                         hPutStrLn stderr timeoutMsg
-                        killProcess pid ph
+                        killProcess pid
                         exitWith (ExitFailure 99)
-                  Just r -> do
-                        exitWith r
+                  Just (Exited r) -> exitWith r
+                  Just (Terminated s) -> raiseSignal s
+                  Just _ -> exitWith (ExitFailure 1)
 
 systemSession cmd =
  forkProcess $ do
@@ -81,17 +77,21 @@ systemSession cmd =
    -- things in a forked child of a pthread process, such as forking
    -- more threads.
 
-killProcess pid ph = do
+killProcess pid = do
   ignoreIOExceptions (signalProcessGroup sigTERM pid)
   checkReallyDead 10
   where
     checkReallyDead 0 = hPutStrLn stderr "checkReallyDead: Giving up"
     checkReallyDead (n+1) =
       do threadDelay (3*100000) -- 3/10 sec
-         m <- getProcessExitCode ph
-         when (isNothing m) $ do
-             ignoreIOExceptions (signalProcessGroup sigKILL pid)
-             checkReallyDead n
+         m <- tryJust (guard . isDoesNotExistError) $
+                 getProcessStatus False False pid
+         case m of
+            Right Nothing -> return ()
+            Left _ -> return ()
+            _ -> do
+              ignoreIOExceptions (signalProcessGroup sigKILL pid)
+              checkReallyDead n
 
 ignoreIOExceptions :: IO () -> IO ()
 ignoreIOExceptions io = io `catch` ((\_ -> return ()) :: IOException -> IO ())
