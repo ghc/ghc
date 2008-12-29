@@ -1,9 +1,3 @@
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
 
 module HaddockUtils where
 
@@ -33,11 +27,11 @@ parseModuleHeader str0 =
          Nothing -> (Nothing,str)                                                               
          Just (value,rest) -> (Just value,rest)                                                 
                                                                                                 
-      (moduleOpt,str1) = getKey "Module" str0                                                   
+      (_moduleOpt,str1) = getKey "Module" str0                                                   
       (descriptionOpt,str2) = getKey "Description" str1                                         
-      (copyrightOpt,str3) = getKey "Copyright" str2                                             
-      (licenseOpt,str4) = getKey "License" str3                                                 
-      (licenceOpt,str5) = getKey "Licence" str4                                                 
+      (_copyrightOpt,str3) = getKey "Copyright" str2                                             
+      (_licenseOpt,str4) = getKey "License" str3                                                 
+      (_licenceOpt,str5) = getKey "Licence" str4                                                 
       (maintainerOpt,str6) = getKey "Maintainer" str5                                           
       (stabilityOpt,str7) = getKey "Stability" str6                                             
       (portabilityOpt,str8) = getKey "Portability" str7                                         
@@ -97,7 +91,7 @@ parseKey key toParse0 =
       return (scanKey True indentation afterColon1)
    where
       scanKey :: Bool -> String -> String -> (String,String)
-      scanKey isFirst indentation [] = ([],[])
+      scanKey _       _           [] = ([],[])
       scanKey isFirst indentation str =
          let
             (nextLine,rest1) = extractNextLine str
@@ -149,7 +143,7 @@ parseKey key toParse0 =
       -- comparison is case-insensitive.
       extractPrefix :: String -> String -> Maybe String
       extractPrefix [] s = Just s
-      extractPrefix s [] = Nothing
+      extractPrefix _ [] = Nothing
       extractPrefix (c1:cs1) (c2:cs2)
          | toUpper c1 == toUpper c2 = extractPrefix cs1 cs2
          | True = Nothing
