@@ -4,13 +4,6 @@
 \section[CoreRules]{Transformation rules}
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 -- | Functions for collecting together and applying rewrite rules to a module.
 -- The 'CoreRule' datatype itself is declared elsewhere.
 module Rules (
@@ -42,7 +35,6 @@ import CoreFVs		( exprFreeVars, exprsFreeVars, bindFreeVars, rulesFreeVars )
 import CoreUtils	( tcEqExprX, exprType )
 import PprCore		( pprRules )
 import Type		( Type, TvSubstEnv )
-import Coercion         ( coercionKind )
 import TcType		( tcSplitTyConApp_maybe )
 import CoreTidy		( tidyRules )
 import Id
@@ -128,10 +120,10 @@ roughTopName :: CoreExpr -> Maybe Name
 roughTopName (Type ty) = case tcSplitTyConApp_maybe ty of
 			  Just (tc,_) -> Just (getName tc)
 			  Nothing     -> Nothing
-roughTopName (App f a) = roughTopName f
+roughTopName (App f _) = roughTopName f
 roughTopName (Var f) | isGlobalId f = Just (idName f)
 		     | otherwise    = Nothing
-roughTopName other = Nothing
+roughTopName _ = Nothing
 
 ruleCantMatch :: [Maybe Name] -> [Maybe Name] -> Bool
 -- ^ @ruleCantMatch tpl actual@ returns True only if @actual@
@@ -147,8 +139,8 @@ ruleCantMatch :: [Maybe Name] -> [Maybe Name] -> Bool
 --      Reason: a local variable @v@ in the actuals might [_$_]
 
 ruleCantMatch (Just n1 : ts) (Just n2 : as) = n1 /= n2 || ruleCantMatch ts as
-ruleCantMatch (t       : ts) (a       : as) = ruleCantMatch ts as
-ruleCantMatch ts	     as		    = False
+ruleCantMatch (_       : ts) (_       : as) = ruleCantMatch ts as
+ruleCantMatch _ 	     _ 		    = False
 \end{code}
 
 \begin{code}
@@ -225,6 +217,7 @@ type RuleBase = NameEnv [CoreRule]
 	-- The rules are are unordered; 
 	-- we sort out any overlaps on lookup
 
+emptyRuleBase :: RuleBase
 emptyRuleBase = emptyNameEnv
 
 mkRuleBase :: [CoreRule] -> RuleBase
@@ -302,7 +295,7 @@ findBest :: (Id, [CoreExpr])
 -- Return the pair the the most specific rule
 -- The (fn,args) is just for overlap reporting
 
-findBest target (rule,ans)   [] = (rule,ans)
+findBest _      (rule,ans)   [] = (rule,ans)
 findBest target (rule1,ans1) ((rule2,ans2):prs)
   | rule1 `isMoreSpecific` rule2 = findBest target (rule1,ans1) prs
   | rule2 `isMoreSpecific` rule1 = findBest target (rule2,ans2) prs
@@ -321,8 +314,8 @@ findBest target (rule1,ans1) ((rule2,ans2):prs)
     (fn,args) = target
 
 isMoreSpecific :: CoreRule -> CoreRule -> Bool
-isMoreSpecific (BuiltinRule {}) r2 = True
-isMoreSpecific r1 (BuiltinRule {}) = False
+isMoreSpecific (BuiltinRule {}) _ = True
+isMoreSpecific _ (BuiltinRule {}) = False
 isMoreSpecific (Rule { ru_bndrs = bndrs1, ru_args = args1 })
 	       (Rule { ru_bndrs = bndrs2, ru_args = args2 })
   = isJust (matchN in_scope bndrs2 args2 args1)
@@ -332,7 +325,7 @@ isMoreSpecific (Rule { ru_bndrs = bndrs1, ru_args = args1 })
 	-- of rule1's args, but I can't be bothered
 
 noBlackList :: Activation -> Bool
-noBlackList act = False		-- Nothing is black listed
+noBlackList _ = False		-- Nothing is black listed
 
 matchRule :: (Activation -> Bool) -> InScopeSet
 	  -> [CoreExpr] -> [Maybe Name]
@@ -360,14 +353,14 @@ matchRule :: (Activation -> Bool) -> InScopeSet
 -- Any 'surplus' arguments in the input are simply put on the end
 -- of the output.
 
-matchRule is_active in_scope args rough_args
-	  (BuiltinRule { ru_name = name, ru_try = match_fn })
+matchRule _is_active _in_scope args _rough_args
+	  (BuiltinRule { ru_try = match_fn })
   = case match_fn args of
 	Just expr -> Just expr
 	Nothing   -> Nothing
 
 matchRule is_active in_scope args rough_args
-          (Rule { ru_name = rn, ru_act = act, ru_rough = tpl_tops,
+          (Rule { ru_act = act, ru_rough = tpl_tops,
 		  ru_bndrs = tpl_vars, ru_args = tpl_args,
 		  ru_rhs = rhs })
   | not (is_active act)		      = Nothing
@@ -404,8 +397,8 @@ matchN in_scope tmpl_vars tmpl_es target_es
 
     init_menv = ME { me_tmpls = mkVarSet tmpl_vars', me_env = init_rn_env }
 		
-    go menv subst []     es 	= Just subst
-    go menv subst ts     [] 	= Nothing	-- Fail if too few actual args
+    go _    subst []     _  	= Just subst
+    go _    _     _      [] 	= Nothing	-- Fail if too few actual args
     go menv subst (t:ts) (e:es) = do { subst1 <- match menv subst t e 
 				     ; go menv subst1 ts es }
 
@@ -416,7 +409,7 @@ matchN in_scope tmpl_vars tmpl_es target_es
 				Nothing 	-> unbound tmpl_var'
 	| otherwise	    = case lookupVarEnv id_subst tmpl_var' of
 				Just e -> e
-				other  -> unbound tmpl_var'
+				_      -> unbound tmpl_var'
  
     unbound var = pprPanic "Template variable unbound in rewrite rule" 
 			(ppr var $$ ppr tmpl_vars $$ ppr tmpl_vars' $$ ppr tmpl_es $$ ppr target_es)
@@ -495,7 +488,7 @@ match menv subst (Var v1) e2
   | Just subst <- match_var menv subst v1 e2
   = Just subst
 
-match menv subst e1 (Note n e2)
+match menv subst e1 (Note _ e2)
   = match menv subst e1 e2
 	-- Note [Notes in RULE matching]
 	-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -567,7 +560,7 @@ Watch out!
 I'm removing the cloning because that makes the above case
 fail, because the inner let looks as if it has locally-bound vars -}
 
-match menv subst@(tv_subst, id_subst, binds) e1 (Let bind e2)
+match menv (tv_subst, id_subst, binds) e1 (Let bind e2)
   | all freshly_bound bndrs,
     not (any locally_bound bind_fvs)
   = match (menv { me_env = rn_env' }) 
@@ -593,7 +586,7 @@ match menv subst@(tv_subst, id_subst, binds) e1 (Let bind e2)
 		Rec {}    -> Rec (bndrs' `zip` map (substExpr subst) rhss)
 -}
 
-match menv subst (Lit lit1) (Lit lit2)
+match _ subst (Lit lit1) (Lit lit2)
   | lit1 == lit2
   = Just subst
 
@@ -666,7 +659,7 @@ match menv subst e1 (Let bind e2)
 -}
 
 -- Everything else fails
-match menv subst e1 e2 = -- pprTrace "Failing at" ((text "e1:" <+> ppr e1) $$ (text "e2:" <+> ppr e2)) $ 
+match _ _ _e1 _e2 = -- pprTrace "Failing at" ((text "e1:" <+> ppr e1) $$ (text "e2:" <+> ppr e2)) $ 
 			 Nothing
 
 ------------------------------------------
@@ -707,7 +700,7 @@ match_var menv subst@(tv_subst, id_subst, binds) v1 e2
   | otherwise	-- v1 is not a template variable; check for an exact match with e2
   = case e2 of
        Var v2 | v1' == rnOccR rn_env v2 -> Just subst
-       other				-> Nothing
+       _    				-> Nothing
 
   where
     rn_env = me_env menv
@@ -724,7 +717,7 @@ match_alts :: MatchEnv
       -> [CoreAlt]		-- Template
       -> [CoreAlt]		-- Target
       -> Maybe SubstEnv
-match_alts menv subst [] []
+match_alts _ subst [] []
   = return subst
 match_alts menv subst ((c1,vs1,r1):alts1) ((c2,vs2,r2):alts2)
   | c1 == c2
@@ -734,7 +727,7 @@ match_alts menv subst ((c1,vs1,r1):alts1) ((c2,vs2,r2):alts2)
     menv' :: MatchEnv
     menv' = menv { me_env = rnBndrs2 (me_env menv) vs1 vs2 }
 
-match_alts menv subst alts1 alts2 
+match_alts _ _ _ _
   = Nothing
 \end{code}
 
@@ -834,24 +827,25 @@ data RuleCheckEnv = RuleCheckEnv {
 
 ruleCheckBind :: RuleCheckEnv -> CoreBind -> Bag SDoc
    -- The Bag returned has one SDoc for each call site found
-ruleCheckBind env (NonRec b r) = ruleCheck env r
-ruleCheckBind env (Rec prs)    = unionManyBags [ruleCheck env r | (b,r) <- prs]
+ruleCheckBind env (NonRec _ r) = ruleCheck env r
+ruleCheckBind env (Rec prs)    = unionManyBags [ruleCheck env r | (_,r) <- prs]
 
 ruleCheck :: RuleCheckEnv -> CoreExpr -> Bag SDoc
-ruleCheck env (Var v) 	    = emptyBag
-ruleCheck env (Lit l) 	    = emptyBag
-ruleCheck env (Type ty)     = emptyBag
+ruleCheck _   (Var _) 	    = emptyBag
+ruleCheck _   (Lit _) 	    = emptyBag
+ruleCheck _   (Type _)      = emptyBag
 ruleCheck env (App f a)     = ruleCheckApp env (App f a) []
-ruleCheck env (Note n e)    = ruleCheck env e
-ruleCheck env (Cast e co)   = ruleCheck env e
+ruleCheck env (Note _ e)    = ruleCheck env e
+ruleCheck env (Cast e _)    = ruleCheck env e
 ruleCheck env (Let bd e)    = ruleCheckBind env bd `unionBags` ruleCheck env e
-ruleCheck env (Lam b e)     = ruleCheck env e
+ruleCheck env (Lam _ e)     = ruleCheck env e
 ruleCheck env (Case e _ _ as) = ruleCheck env e `unionBags` 
 			        unionManyBags [ruleCheck env r | (_,_,r) <- as]
 
+ruleCheckApp :: RuleCheckEnv -> Expr CoreBndr -> [Arg CoreBndr] -> Bag SDoc
 ruleCheckApp env (App f a) as = ruleCheck env a `unionBags` ruleCheckApp env f (a:as)
 ruleCheckApp env (Var f) as   = ruleCheckFun env f as
-ruleCheckApp env other as     = ruleCheck env other
+ruleCheckApp env other _      = ruleCheck env other
 \end{code}
 
 \begin{code}
@@ -889,7 +883,7 @@ ruleAppCheck_help is_active fn args rules
 
     rule_info (BuiltinRule {}) = text "does not match"
 
-    rule_info (Rule { ru_name = name, ru_act = act, 
+    rule_info (Rule { ru_act = act, 
 		      ru_bndrs = rule_bndrs, ru_args = rule_args})
 	| not (is_active act)    = text "active only in later phase"
 	| n_args < n_rule_args	      = text "too few arguments"
