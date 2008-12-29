@@ -1,10 +1,3 @@
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module CmmProcPoint (
   calculateProcPoints
   ) where
@@ -12,12 +5,10 @@ module CmmProcPoint (
 #include "HsVersions.h"
 
 import BlockId
-import Cmm
 import CmmBrokenBlock
 import Dataflow
 
 import UniqSet
-import UniqFM
 import Panic
 
 -- Determine the proc points for a set of basic blocks.
@@ -115,7 +106,7 @@ calculateOwnership blocks_ufm proc_points blocks =
             (Nothing, True) ->
                 Just $ extendBlockEnv owners ident (unitUniqSet ident)
             (Nothing, False) -> Nothing
-            (Just cause', True) -> Nothing
+            (Just _,      True) -> Nothing
             (Just cause', False) ->
                 if (sizeUniqSet old) == (sizeUniqSet new)
                    then Nothing
