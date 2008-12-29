@@ -4,30 +4,21 @@
 \section[WorkWrap]{Worker/wrapper-generating back-end of strictness analyser}
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module WorkWrap ( wwTopBinds, mkWrapper ) where
 
 #include "HsVersions.h"
 
 import CoreSyn
 import CoreUnfold	( certainlyWillInline )
-import CoreLint		( showPass, endPass )
 import CoreUtils	( exprType, exprIsHNF, exprArity )
+import Var
 import Id		( Id, idType, isOneShotLambda, 
 			  setIdNewStrictness, mkWorkerId,
 			  setIdWorkerInfo, setInlinePragma,
 			  setIdArity, idInfo )
 import MkId		( lazyIdKey, lazyIdUnfolding )
 import Type		( Type )
-import IdInfo		( WorkerInfo(..), arityInfo,
-			  newDemandInfo, newStrictnessInfo, unfoldingInfo, inlinePragInfo
-			)
+import IdInfo
 import NewDemand        ( Demand(..), StrictSig(..), DmdType(..), DmdResult(..), 
 			  Demands(..), mkTopDmdType, isBotRes, returnsCPR, topSig, isAbsent
 			)
@@ -114,9 +105,9 @@ matching by looking for strict arguments of the correct type.
 \begin{code}
 wwExpr :: CoreExpr -> UniqSM CoreExpr
 
-wwExpr e@(Type _)             = return e
-wwExpr e@(Lit _)              = return e
-wwExpr e@(Note InlineMe expr) = return e
+wwExpr e@(Type _)          = return e
+wwExpr e@(Lit _)           = return e
+wwExpr e@(Note InlineMe _) = return e
 	-- Don't w/w inside InlineMe's
 
 wwExpr e@(Var v)
@@ -244,6 +235,8 @@ tryWW is_rec fn_id rhs
     is_thunk  = not is_fun && not (exprIsHNF rhs)
 
 ---------------------
+splitFun :: Id -> IdInfo -> [Demand] -> DmdResult -> InlinePragInfo -> Expr Var
+         -> UniqSM [(Id, CoreExpr)]
 splitFun fn_id fn_info wrap_dmds res_info inline_prag rhs
   = WARN( not (wrap_dmds `lengthIs` arity), ppr fn_id <+> (ppr arity $$ ppr wrap_dmds $$ ppr res_info) ) 
     (do {
@@ -288,11 +281,12 @@ splitFun fn_id fn_info wrap_dmds res_info inline_prag rhs
 -- make the wrapper and worker have corresponding one-shot arguments too.
 -- Otherwise we spuriously float stuff out of case-expression join points,
 -- which is very annoying.
+get_one_shots :: Expr Var -> [Bool]
 get_one_shots (Lam b e)
   | isIdVar b = isOneShotLambda b : get_one_shots e
   | otherwise = get_one_shots e
 get_one_shots (Note _ e) = get_one_shots e
-get_one_shots other	 = noOneShotInfo
+get_one_shots _    	 = noOneShotInfo
 \end{code}
 
 Thunk splitting
@@ -338,6 +332,7 @@ then the splitting will go deeper too.
 --		 I# y -> let x = I# y in x }
 -- See comments above. Is it not beautifully short?
 
+splitThunk :: Var -> Expr Var -> UniqSM [(Var, Expr Var)]
 splitThunk fn_id rhs = do
     (_, wrap_fn, work_fn) <- mkWWstr [fn_id]
     return [ (fn_id, Let (NonRec fn_id rhs) (wrap_fn (work_fn (Var fn_id)))) ]
@@ -360,8 +355,8 @@ worthSplittingFun ds res
   -- See Note [Worker-wrapper for bottoming functions]
   where
     worth_it Abs	      = True	-- Absent arg
-    worth_it (Eval (Prod ds)) = True	-- Product arg to evaluate
-    worth_it other	      = False
+    worth_it (Eval (Prod _)) = True	-- Product arg to evaluate
+    worth_it _    	      = False
 
 worthSplittingThunk :: Maybe Demand	-- Demand on the thunk
 		    -> DmdResult	-- CPR info for the thunk
@@ -371,7 +366,7 @@ worthSplittingThunk maybe_dmd res
   where
 	-- Split if the thing is unpacked
     worth_it (Just (Eval (Prod ds))) = not (all isAbsent ds)
-    worth_it other	   	     = False
+    worth_it _    	   	     = False
 \end{code}
 
 Note [Worker-wrapper for bottoming functions]
@@ -407,5 +402,6 @@ mkWrapper fun_ty (StrictSig (DmdType _ demands res_info)) = do
     (_, wrap_fn, _) <- mkWwBodies fun_ty demands res_info noOneShotInfo
     return wrap_fn
 
+noOneShotInfo :: [Bool]
 noOneShotInfo = repeat False
 \end{code}
