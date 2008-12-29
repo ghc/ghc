@@ -1,9 +1,3 @@
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
 
 module CmmBrokenBlock (
   BrokenBlock(..),
@@ -31,9 +25,7 @@ import ClosureInfo
 import Maybes
 import List
 import Panic
-import UniqSupply
 import Unique
-import UniqFM
 
 -- This module takes a 'CmmBasicBlock' which might have 'CmmCall'
 -- statements in it with 'CmmSafe' set and breaks it up at each such call.
@@ -347,8 +339,10 @@ selectContinuations needed_continuations = formats
               -- sort so the most votes goes *first*
               -- (thus the order of x and y is reversed)
 
+makeContinuationEntries :: [(BlockId, ContFormat)]
+                        -> BrokenBlock -> BrokenBlock
 makeContinuationEntries formats
-                        block@(BrokenBlock ident entry stmts targets exit) =
+                        block@(BrokenBlock ident _entry stmts targets exit) =
     case lookup ident formats of
       Nothing -> block
       Just (ContFormat formals srt is_gc) ->
@@ -361,8 +355,8 @@ adaptBlockToFormat :: [(BlockId, ContFormat)]
                    -> [BrokenBlock]
 adaptBlockToFormat formats unique
                    block@(BrokenBlock ident entry stmts targets
-                                      exit@(FinalCall next target formals
-                                                      actuals srt ret is_gc)) =
+                                      (FinalCall next target formals
+                                                 actuals srt ret is_gc)) =
     if format_formals == formals &&
        format_srt == srt &&
        format_is_gc == is_gc
