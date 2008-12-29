@@ -1,10 +1,3 @@
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module CmmInfo (
   emptyContInfoTable,
   cmmToRawCmm,
@@ -28,7 +21,6 @@ import SMRep
 import ZipCfgCmmRep
 
 import Constants
-import Outputable
 import StaticFlags
 import Unique
 import UniqSupply
@@ -85,7 +77,7 @@ cmmToRawCmm cmm = do
 --  * The SRT slot is only there if there is SRT info to record
 
 mkInfoTable :: Unique -> CmmTop -> [RawCmmTop]
-mkInfoTable uniq (CmmData sec dat) = [CmmData sec dat]
+mkInfoTable _    (CmmData sec dat) = [CmmData sec dat]
 mkInfoTable uniq (CmmProc (CmmInfo _ _ info) entry_label arguments blocks) =
     case info of
       -- Code without an info table.  Easy.
@@ -133,7 +125,7 @@ mkInfoTable uniq (CmmProc (CmmInfo _ _ info) entry_label arguments blocks) =
                 layout = packHalfWordsCLit ptrs nptrs
 
           -- A selector thunk.
-          ThunkSelectorInfo offset srt ->
+          ThunkSelectorInfo offset _srt ->
               mkInfoTableAndCode info_label std_info [{- no SRT -}] entry_label
                                  arguments blocks
               where
@@ -193,7 +185,7 @@ mkSRTLit :: CLabel
          -> C_SRT
          -> ([CmmLit],    -- srt_label
              StgHalfWord) -- srt_bitmap
-mkSRTLit info_label NoC_SRT = ([], 0)
+mkSRTLit _          NoC_SRT = ([], 0)
 mkSRTLit info_label (C_SRT lbl off bitmap) =
     ([makeRelativeRefTo info_label (cmmLabelOffW lbl off)], bitmap)
 
