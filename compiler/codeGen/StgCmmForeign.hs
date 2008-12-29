@@ -1,6 +1,3 @@
-{-# OPTIONS -w #-}
--- Lots of missing type sigs etc
-
 -----------------------------------------------------------------------------
 --
 -- Code generation for foreign calls.
@@ -29,17 +26,14 @@ import StgCmmClosure
 import BlockId
 import Cmm
 import CmmUtils
-import MkZipCfg
 import MkZipCfgCmm hiding (CmmAGraph)
 import Type
 import TysPrim
-import UniqSupply
 import CLabel
 import SMRep
 import ForeignCall
 import Constants
 import StaticFlags
-import FastString
 import Maybes
 import Outputable
 import ZipCfgCmmRep
@@ -65,7 +59,9 @@ cgForeignCall results result_hints (CCall (CCallSpec target cconv safety)) stg_a
 		= case target of
 		   StaticTarget lbl -> (args, CmmLit (CmmLabel 
 						(mkForeignLabel lbl (call_size args) False)))
-		   DynamicTarget    ->  case args of fn:rest -> (rest, fn)
+		   DynamicTarget    ->  case args of
+                                        fn:rest -> (rest, fn)
+                                        [] -> panic "cgForeignCall []"
 	      call_target = ForeignTarget cmm_target fc
 	
 	; srt <- getSRTInfo NoSRT	-- SLPJ: Not sure what SRT 
@@ -92,7 +88,7 @@ emitCCall :: [(CmmFormal,ForeignHint)]
 	  -> [(CmmActual,ForeignHint)]
 	  -> FCode ()
 emitCCall hinted_results fn hinted_args
-  = emitForeignCall PlayRisky results (ForeignTarget fn fc) args 
+  = emitForeignCall PlayRisky results target args
 	            NoC_SRT -- No SRT b/c we PlayRisky
               	    CmmMayReturn
   where
@@ -116,10 +112,9 @@ emitForeignCall
         -> CmmReturnInfo	-- This can say "never returns"
 				--   only RTS procedures do this
 	-> FCode ()
-emitForeignCall safety results target args _srt ret
+emitForeignCall safety results target args _srt _ret
   | not (playSafe safety) = do
     let (caller_save, caller_load) = callerSaveVolatileRegs
-    updfr_off <- getUpdFrameOff
     emit caller_save
     emit $ mkUnsafeCall target results args
     emit caller_load
@@ -145,12 +140,14 @@ load_args_into_temps = mapM arg_assign_temp
 	   return (tmp,hint)
 -}
 	
+load_target_into_temp :: MidCallTarget -> FCode MidCallTarget
 load_target_into_temp (ForeignTarget expr conv) = do 
   tmp <- maybe_assign_temp expr
   return (ForeignTarget tmp conv)
 load_target_into_temp other_target@(PrimTarget _) =
   return other_target
 
+maybe_assign_temp :: CmmExpr -> FCode CmmExpr
 maybe_assign_temp e
   | hasNoGlobalRegs e = return e
   | otherwise         = do 
@@ -235,10 +232,12 @@ openNursery = catAGraphs [
 emitOpenNursery :: FCode ()
 emitOpenNursery = emit openNursery
 
+nursery_bdescr_free, nursery_bdescr_start, nursery_bdescr_blocks :: CmmExpr
 nursery_bdescr_free   = cmmOffset stgCurrentNursery oFFSET_bdescr_free
 nursery_bdescr_start  = cmmOffset stgCurrentNursery oFFSET_bdescr_start
 nursery_bdescr_blocks = cmmOffset stgCurrentNursery oFFSET_bdescr_blocks
 
+tso_SP, tso_STACK, tso_CCCS :: ByteOff
 tso_SP    = tsoFieldB     oFFSET_StgTSO_sp
 tso_STACK = tsoFieldB     oFFSET_StgTSO_stack
 tso_CCCS  = tsoProfFieldB oFFSET_StgTSO_CCCS
@@ -253,11 +252,13 @@ tsoFieldB off
 tsoProfFieldB :: ByteOff -> ByteOff
 tsoProfFieldB off = off + fixedHdrSize * wORD_SIZE
 
+stgSp, stgHp, stgCurrentTSO, stgCurrentNursery :: CmmExpr
 stgSp		  = CmmReg sp
 stgHp		  = CmmReg hp
 stgCurrentTSO	  = CmmReg currentTSO
 stgCurrentNursery = CmmReg currentNursery
 
+sp, spLim, hp, hpLim, currentTSO, currentNursery :: CmmReg
 sp		  = CmmGlobal Sp
 spLim		  = CmmGlobal SpLim
 hp		  = CmmGlobal Hp
