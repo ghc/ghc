@@ -1,10 +1,3 @@
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 -- -----------------------------------------------------------------------------
 --
 -- (c) The University of Glasgow 1993-2004
@@ -42,6 +35,7 @@ data NatM_State = NatM_State {
 
 newtype NatM result = NatM (NatM_State -> (result, NatM_State))
 
+unNat :: NatM a -> NatM_State -> (a, NatM_State)
 unNat (NatM a) = a
 
 mkNatM_State :: UniqSupply -> Int -> DynFlags -> NatM_State
@@ -67,7 +61,7 @@ mapAccumLNat :: (acc -> x -> NatM (acc, y))
 	        -> [x]
 	        -> NatM (acc, [y])
 
-mapAccumLNat f b []
+mapAccumLNat _ b []
   = return (b, [])
 mapAccumLNat f b (x:xs)
   = do (b__2, x__2)  <- f b x
