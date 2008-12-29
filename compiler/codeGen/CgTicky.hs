@@ -1,10 +1,3 @@
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 -----------------------------------------------------------------------------
 --
 -- Code generation for ticky-ticky profiling
@@ -58,11 +51,11 @@ import CLabel
 import Name
 import Id
 import IdInfo
-import StaticFlags
 import BasicTypes
 import FastString
 import Constants
 import Outputable
+import Module
 
 -- Turgid imports for showTypeCategory
 import PrelNames
@@ -115,6 +108,7 @@ emitTickyCounter cl_info args on_stk
 -- When printing the name of a thing in a ticky file, we want to
 -- give the module name even for *local* things.   We print
 -- just "x (M)" rather that "M.x" to distinguish them from the global kind.
+ppr_for_ticky_name :: Module -> Name -> String
 ppr_for_ticky_name mod_name name
   | isInternalName name = showSDocDebug (ppr name <+> (parens (ppr mod_name)))
   | otherwise	        = showSDocDebug (ppr name)
@@ -122,12 +116,15 @@ ppr_for_ticky_name mod_name name
 -- -----------------------------------------------------------------------------
 -- Ticky stack frames
 
+tickyPushUpdateFrame, tickyUpdateFrameOmitted :: Code
 tickyPushUpdateFrame    = ifTicky $ bumpTickyCounter (sLit "UPDF_PUSHED_ctr")
 tickyUpdateFrameOmitted = ifTicky $ bumpTickyCounter (sLit "UPDF_OMITTED_ctr")
 
 -- -----------------------------------------------------------------------------
 -- Ticky entries
 
+tickyEnterDynCon, tickyEnterDynThunk, tickyEnterStaticCon,
+    tickyEnterStaticThunk, tickyEnterViaNode :: Code
 tickyEnterDynCon      = ifTicky $ bumpTickyCounter (sLit "ENT_DYN_CON_ctr")
 tickyEnterDynThunk    = ifTicky $ bumpTickyCounter (sLit "ENT_DYN_THK_ctr")
 tickyEnterStaticCon   = ifTicky $ bumpTickyCounter (sLit "ENT_STATIC_CON_ctr")
@@ -146,6 +143,7 @@ tickyBlackHole updatable
     ctr | updatable = sLit "UPD_BH_SINGLE_ENTRY_ctr"
 	| otherwise = sLit "UPD_BH_UPDATABLE_ctr"
 
+tickyUpdateBhCaf :: ClosureInfo -> Code
 tickyUpdateBhCaf cl_info
   = ifTicky (bumpTickyCounter ctr)
   where
@@ -209,6 +207,8 @@ tickyVectoredReturn family_size
 -- Ticky calls
 
 -- Ticks at a *call site*:
+tickyKnownCallTooFewArgs, tickyKnownCallExact,
+    tickyKnownCallExtraArgs, tickyUnknownCall :: Code
 tickyKnownCallTooFewArgs = ifTicky $ bumpTickyCounter (sLit "KNOWN_CALL_TOO_FEW_ARGS_ctr")
 tickyKnownCallExact = ifTicky $ bumpTickyCounter (sLit "KNOWN_CALL_ctr")
 tickyKnownCallExtraArgs = ifTicky $ bumpTickyCounter (sLit "KNOWN_CALL_EXTRA_ARGS_ctr")
@@ -217,7 +217,7 @@ tickyUnknownCall = ifTicky $ bumpTickyCounter (sLit "UNKNOWN_CALL_ctr")
 -- Tick for the call pattern at slow call site (i.e. in addition to
 -- tickyUnknownCall, tickyKnownCallExtraArgs, etc.)
 tickySlowCallPat :: [CgRep] -> Code
-tickySlowCallPat args = return ()
+tickySlowCallPat _args = return ()
 {- LATER: (introduces recursive module dependency now).
   case callPattern args of
     (str, True)  -> bumpTickyCounter' (mkRtsSlowTickyCtrLabel pat)
@@ -255,8 +255,8 @@ tickyDynAlloc cl_info
         Nothing               -> return ()
   where
 	-- will be needed when we fill in stubs
-    cl_size   =	closureSize cl_info
-    slop_size = slopSize cl_info
+    _cl_size   =	closureSize cl_info
+    _slop_size = slopSize cl_info
 
     tick_alloc_thk 
 	| closureUpdReqd cl_info = tick_alloc_up_thk
@@ -271,13 +271,13 @@ tickyDynAlloc cl_info
 
 
 tickyAllocPrim :: CmmExpr -> CmmExpr -> CmmExpr -> Code
-tickyAllocPrim hdr goods slop = ifTicky $ pprTrace "ToDo: tickyAllocPrim" empty (return ())
+tickyAllocPrim _hdr _goods _slop = ifTicky $ pprTrace "ToDo: tickyAllocPrim" empty (return ())
 
 tickyAllocThunk :: CmmExpr -> CmmExpr -> Code
-tickyAllocThunk goods slop = ifTicky $ pprTrace "ToDo: tickyAllocThunk" empty (return ())
+tickyAllocThunk _goods _slop = ifTicky $ pprTrace "ToDo: tickyAllocThunk" empty (return ())
 
 tickyAllocPAP :: CmmExpr -> CmmExpr -> Code
-tickyAllocPAP goods slop = ifTicky $ pprTrace "ToDo: tickyAllocPAP" empty (return ())
+tickyAllocPAP _goods _slop = ifTicky $ pprTrace "ToDo: tickyAllocPAP" empty (return ())
 
 tickyAllocHeap :: VirtualHpOffset -> Code
 -- Called when doing a heap check [TICK_ALLOC_HEAP]
@@ -316,10 +316,11 @@ bumpTickyCounter' :: CmmLit -> Code
 bumpTickyCounter' lhs = stmtC (addToMemLong (CmmLit lhs) 1)
 
 bumpHistogram :: LitString -> Int -> Code
-bumpHistogram lbl n 
+bumpHistogram _lbl _n
 --  = bumpHistogramE lbl (CmmLit (CmmInt (fromIntegral n) cLong))
     = return ()	   -- TEMP SPJ Apr 07
 
+{-
 bumpHistogramE :: LitString -> CmmExpr -> Code
 bumpHistogramE lbl n 
   = do  t <- newTemp cLong
@@ -332,8 +333,10 @@ bumpHistogramE lbl n
 			    1)
   where 
    eight = CmmLit (CmmInt 8 cLongWidth)
+-}
 
 ------------------------------------------------------------------
+addToMemLong :: CmmExpr -> Int -> CmmStmt
 addToMemLong = addToMem cLongWidth
 
 ------------------------------------------------------------------
