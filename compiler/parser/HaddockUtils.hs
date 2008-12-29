@@ -146,18 +146,6 @@ parseKey key toParse0 =
             in
                (c:line,rest)
          
-
-      -- indentation returns characters after last newline.
-      indentation :: String -> String
-      indentation s = fromMaybe s (indentation0 s)
-         where
-            indentation0 :: String -> Maybe String
-            indentation0 [] = Nothing
-            indentation0 (c:cs) =
-               case indentation0 cs of
-                  Nothing -> if c == '\n' then Just cs else Nothing
-                  in0 -> in0
-               
       -- comparison is case-insensitive.
       extractPrefix :: String -> String -> Maybe String
       extractPrefix [] s = Just s
