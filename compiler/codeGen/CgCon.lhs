@@ -9,13 +9,6 @@ with {\em constructors} on the RHSs of let(rec)s.  See also
 @CgClosure@, which deals with closures.
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module CgCon (
 	cgTopRhsCon, buildDynCon,
 	bindConArgs, bindUnboxedTupleComponents,
@@ -141,7 +134,7 @@ which have exclusively size-zero (VoidRep) args, we generate no code
 at all.
 
 \begin{code}
-buildDynCon binder cc con []
+buildDynCon binder _ con []
   = returnFC (taggedStableIdInfo binder
 			   (mkLblExpr (mkClosureLabel (dataConName con)
                                       (idCafInfo binder)))
@@ -171,7 +164,7 @@ which is guaranteed in range.
 Because of this, we use can safely return an addressing mode.
 
 \begin{code}
-buildDynCon binder cc con [arg_amode]
+buildDynCon binder _ con [arg_amode]
   | maybeIntLikeCon con 
   , (_, CmmLit (CmmInt val _)) <- arg_amode
   , let val_int = (fromIntegral val) :: Int
@@ -182,7 +175,7 @@ buildDynCon binder cc con [arg_amode]
 	      intlike_amode = CmmLit (cmmLabelOffW intlike_lbl offsetW)
 	; returnFC (taggedStableIdInfo binder intlike_amode (mkConLFInfo con) con) }
 
-buildDynCon binder cc con [arg_amode]
+buildDynCon binder _ con [arg_amode]
   | maybeCharLikeCon con 
   , (_, CmmLit (CmmInt val _)) <- arg_amode
   , let val_int = (fromIntegral val) :: Int
@@ -326,7 +319,7 @@ cgReturnDataCon con amodes
 			| isDeadBinder bndr -> performReturn (jump_to deflt_lbl)
 			| otherwise	    -> build_it_then (jump_to deflt_lbl) }
     
-	    other_sequel	-- The usual case
+	    _	-- The usual case
 	      | isUnboxedTupleCon con -> returnUnboxedTuple amodes
               | otherwise -> build_it_then emitReturnInstr
 	}
