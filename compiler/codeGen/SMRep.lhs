@@ -9,13 +9,6 @@ This is here, rather than in ClosureInfo, just to keep nhc happy.
 Other modules should access this info through ClosureInfo.
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module SMRep (
 	-- Words and bytes
 	StgWord, StgHalfWord, 
@@ -76,13 +69,17 @@ StgWord is a type representing an StgWord on the target platform.
 #if SIZEOF_HSWORD == 4
 type StgWord     = Word32
 type StgHalfWord = Word16
-hALF_WORD_SIZE = 2 :: ByteOff
-hALF_WORD_SIZE_IN_BITS = 16 :: Int
+hALF_WORD_SIZE :: ByteOff
+hALF_WORD_SIZE = 2
+hALF_WORD_SIZE_IN_BITS :: Int
+hALF_WORD_SIZE_IN_BITS = 16
 #elif SIZEOF_HSWORD == 8
 type StgWord     = Word64
 type StgHalfWord = Word32
-hALF_WORD_SIZE = 4 :: ByteOff
-hALF_WORD_SIZE_IN_BITS = 32 :: Int
+hALF_WORD_SIZE :: ByteOff
+hALF_WORD_SIZE = 4
+hALF_WORD_SIZE_IN_BITS :: Int
+hALF_WORD_SIZE_IN_BITS = 32
 #else
 #error unknown SIZEOF_HSWORD
 #endif
@@ -177,15 +174,15 @@ computation of GC liveness info.
 \begin{code}
 isFollowableArg :: CgRep -> Bool  -- True <=> points to a heap object
 isFollowableArg PtrArg  = True
-isFollowableArg other = False
+isFollowableArg _       = False
 
 isVoidArg :: CgRep -> Bool
 isVoidArg VoidArg = True
-isVoidArg other   = False
+isVoidArg _       = False
 
 nonVoidArg :: CgRep -> Bool
 nonVoidArg VoidArg = False
-nonVoidArg other   = True
+nonVoidArg _       = True
 
 -- isFloatingArg is used to distinguish @Double@ and @Float@ which
 -- cause inadvertent numeric conversions if you aren't jolly careful.
@@ -331,11 +328,12 @@ smRepClosureTypeInt (GenericRep True _ _ Thunk)       = THUNK_STATIC
 
 smRepClosureTypeInt BlackHoleRep = BLACKHOLE
 
-smRepClosureTypeInt rep = panic "smRepClosuretypeint"
+smRepClosureTypeInt _ = panic "smRepClosuretypeint"
 
 
 -- We export these ones
-rET_SMALL     = (RET_SMALL     :: StgHalfWord)
-rET_BIG       = (RET_BIG       :: StgHalfWord)
+rET_SMALL, rET_BIG :: StgHalfWord
+rET_SMALL     = RET_SMALL
+rET_BIG       = RET_BIG
 \end{code}
 
