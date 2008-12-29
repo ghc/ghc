@@ -1,10 +1,3 @@
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 -----------------------------------------------------------------------------
 --
 -- Cmm utilities.
@@ -114,18 +107,18 @@ isNopStmt :: CmmStmt -> Bool
 isNopStmt CmmNop 		       = True
 isNopStmt (CmmAssign r e) 	       = cheapEqReg r e
 isNopStmt (CmmStore e1 (CmmLoad e2 _)) = cheapEqExpr e1 e2
-isNopStmt s 			       = False
+isNopStmt _ 			       = False
 
 cheapEqExpr :: CmmExpr -> CmmExpr -> Bool
 cheapEqExpr (CmmReg r)      e 		      = cheapEqReg r e
 cheapEqExpr (CmmRegOff r 0) e 		      = cheapEqReg r e
 cheapEqExpr (CmmRegOff r n) (CmmRegOff r' n') = r==r' && n==n'
-cheapEqExpr e1 		    e2		      = False
+cheapEqExpr _  		    _ 		      = False
 
 cheapEqReg :: CmmReg -> CmmExpr -> Bool
 cheapEqReg r (CmmReg r')      = r==r'
 cheapEqReg r (CmmRegOff r' 0) = r==r'
-cheapEqReg r e		      = False
+cheapEqReg _ _		      = False
 
 ---------------------------------------------------
 --
@@ -139,6 +132,7 @@ isTrivialCmmExpr (CmmMachOp _ _) = False
 isTrivialCmmExpr (CmmLit _)      = True
 isTrivialCmmExpr (CmmReg _)      = True
 isTrivialCmmExpr (CmmRegOff _ _) = True
+isTrivialCmmExpr (CmmStackSlot _ _) = panic "isTrivialCmmExpr CmmStackSlot"
 
 hasNoGlobalRegs :: CmmExpr -> Bool
 hasNoGlobalRegs (CmmLoad e _)   	   = hasNoGlobalRegs e
@@ -187,7 +181,7 @@ cmmOffsetLit :: CmmLit -> Int -> CmmLit
 cmmOffsetLit (CmmLabel l)      byte_off = cmmLabelOff	l byte_off
 cmmOffsetLit (CmmLabelOff l m) byte_off = cmmLabelOff	l (m+byte_off)
 cmmOffsetLit (CmmInt m rep)    byte_off = CmmInt (m + fromIntegral byte_off) rep
-cmmOffsetLit other	       byte_off = pprPanic "cmmOffsetLit" (ppr byte_off)
+cmmOffsetLit _    	       byte_off = pprPanic "cmmOffsetLit" (ppr byte_off)
 
 cmmLabelOff :: CLabel -> Int -> CmmLit
 -- Smart constructor for CmmLabelOff
