@@ -1,10 +1,3 @@
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module CmmLive (
         CmmLive,
         BlockEntryLiveness,
@@ -20,7 +13,6 @@ import Dataflow
 
 import Maybes
 import Panic
-import UniqFM
 import UniqSet
 
 -----------------------------------------------------------------------------
@@ -213,6 +205,7 @@ cmmExprLive expr = addLive (mkUniqSet $ expr_liveness expr) where
     expr_liveness (CmmReg reg) = reg_liveness reg
     expr_liveness (CmmMachOp _ exprs) = concatMap expr_liveness exprs
     expr_liveness (CmmRegOff reg _) = reg_liveness reg
+    expr_liveness (CmmStackSlot _ _) = panic "cmmExprLive CmmStackSlot"
 
     reg_liveness :: CmmReg -> [LocalReg]
     reg_liveness (CmmLocal reg) = [reg]
