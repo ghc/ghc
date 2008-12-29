@@ -7,13 +7,6 @@ ByteCodeLink: Bytecode assembler and linker
 \begin{code}
 {-# OPTIONS -optc-DNON_POSIX_SOURCE #-}
 
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module ByteCodeAsm (  
 	assembleBCOs, assembleBCO,
 
@@ -43,12 +36,11 @@ import Outputable
 import Control.Monad	( foldM )
 import Control.Monad.ST	( runST )
 
-import GHC.Word		( Word(..) )
 import Data.Array.MArray
 import Data.Array.Unboxed ( listArray )
 import Data.Array.Base	( UArray(..) )
 import Data.Array.ST	( castSTUArray )
-import Foreign		( Word16, free )
+import Foreign
 import Data.Bits
 import Data.Int		( Int64 )
 import Data.Char	( ord )
@@ -107,7 +99,7 @@ bcoFreeNames bco
 	  )
 
 instance Outputable UnlinkedBCO where
-   ppr (UnlinkedBCO nm arity insns bitmap lits ptrs)
+   ppr (UnlinkedBCO nm _arity _insns _bitmap lits ptrs)
       = sep [text "BCO", ppr nm, text "with", 
              int (sizeSS lits), text "lits",
              int (sizeSS ptrs), text "ptrs" ]
@@ -130,14 +122,14 @@ assembleBCOs proto_bcos tycons
         return (ByteCode bcos itblenv)
 
 assembleBCO :: ProtoBCO Name -> IO UnlinkedBCO
-assembleBCO (ProtoBCO nm instrs bitmap bsize arity origin malloced)
+assembleBCO (ProtoBCO nm instrs bitmap bsize arity _origin _malloced)
    = let
          -- pass 1: collect up the offsets of the local labels.
          -- Remember that the first insn starts at offset 1 since offset 0
          -- (eventually) will hold the total # of insns.
          label_env = mkLabelEnv emptyFM 1 instrs
 
-         mkLabelEnv env i_offset [] = env
+         mkLabelEnv env _ [] = env
          mkLabelEnv env i_offset (i:is)
             = let new_env 
                      = case i of LABEL n -> addToFM env n i_offset ; _ -> env
@@ -193,18 +185,21 @@ type AsmState = (SizedSeq Word16,
                  SizedSeq BCOPtr)
 
 data SizedSeq a = SizedSeq !Int [a]
+emptySS :: SizedSeq a
 emptySS = SizedSeq 0 []
 
 -- Why are these two monadic???
+addToSS :: SizedSeq a -> a -> IO (SizedSeq a)
 addToSS (SizedSeq n r_xs) x = return (SizedSeq (n+1) (x:r_xs))
+addListToSS :: SizedSeq a -> [a] -> IO (SizedSeq a)
 addListToSS (SizedSeq n r_xs) xs 
    = return (SizedSeq (n + length xs) (reverse xs ++ r_xs))
 
 ssElts :: SizedSeq a -> [a]
-ssElts (SizedSeq n r_xs) = reverse r_xs
+ssElts (SizedSeq _ r_xs) = reverse r_xs
 
 sizeSS :: SizedSeq a -> Int
-sizeSS (SizedSeq n r_xs) = n
+sizeSS (SizedSeq n _) = n
 
 -- Bring in all the bci_ bytecode constants.
 #include "Bytecodes.h"
@@ -285,7 +280,7 @@ mkBits findLabel st proto_insns
                UNPACK    n        -> instr2 st bci_UNPACK n
                PACK      dcon sz  -> do (itbl_no,st2) <- itbl st dcon
                                         instr3 st2 bci_PACK itbl_no sz
-               LABEL     lab      -> return st
+               LABEL     _        -> return st
                TESTLT_I  i l      -> do (np, st2) <- int st i
                                         instr3 st2 bci_TESTLT_I np (findLabel l)
                TESTEQ_I  i l      -> do (np, st2) <- int st i
@@ -396,9 +391,10 @@ mkBits findLabel st proto_insns
        literal st (MachChar c)     = int st (ord c)
        literal st (MachInt64 ii)   = int64 st (fromIntegral ii)
        literal st (MachWord64 ii)  = int64 st (fromIntegral ii)
-       literal st other            = pprPanic "ByteCodeAsm.literal" (ppr other)
+       literal _  other            = pprPanic "ByteCodeAsm.literal" (ppr other)
 
 
+push_alts :: CgRep -> Int
 push_alts NonPtrArg = bci_PUSH_ALTS_N
 push_alts FloatArg  = bci_PUSH_ALTS_F
 push_alts DoubleArg = bci_PUSH_ALTS_D
@@ -406,6 +402,7 @@ push_alts VoidArg   = bci_PUSH_ALTS_V
 push_alts LongArg   = bci_PUSH_ALTS_L
 push_alts PtrArg    = bci_PUSH_ALTS_P
 
+return_ubx :: CgRep -> Word16
 return_ubx NonPtrArg = bci_RETURN_N
 return_ubx FloatArg  = bci_RETURN_F
 return_ubx DoubleArg = bci_RETURN_D
@@ -501,6 +498,8 @@ mkLitD d
         w0 <- readArray d_arr 0
         return [w0 :: Word]
      )
+   | otherwise
+   = panic "mkLitD: Bad wORD_SIZE"
 
 mkLitI64 ii
    | wORD_SIZE == 4
@@ -520,6 +519,8 @@ mkLitI64 ii
         w0 <- readArray d_arr 0
         return [w0 :: Word]
      )
+   | otherwise
+   = panic "mkLitI64: Bad wORD_SIZE"
 
 mkLitI i
    = runST (do
@@ -539,5 +540,6 @@ mkLitPtr a
         return [w0 :: Word]
      )
 
-iNTERP_STACK_CHECK_THRESH = (INTERP_STACK_CHECK_THRESH :: Int)
+iNTERP_STACK_CHECK_THRESH :: Int
+iNTERP_STACK_CHECK_THRESH = INTERP_STACK_CHECK_THRESH
 \end{code}
