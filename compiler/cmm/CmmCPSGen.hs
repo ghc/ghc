@@ -1,10 +1,3 @@
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module CmmCPSGen (
   -- | Converts continuations into full proceedures.
   -- The main work of the CPS transform that everything else is setting-up.
@@ -19,6 +12,7 @@ import CLabel
 import CmmBrokenBlock -- Data types only
 import CmmUtils
 import CmmCallConv
+import ClosureInfo
 
 import CgProf
 import CgUtils
@@ -50,6 +44,7 @@ import Panic
 -- and heap memory (not sure if that's usefull at all though, but it may
 -- be worth exploring the design space).
 
+continuationLabel :: Continuation (Either C_SRT CmmInfo) -> CLabel
 continuationLabel (Continuation _ l _ _ _) = l
 data Continuation info =
   Continuation
@@ -202,7 +197,7 @@ continuationToProc (max_stack, update_frame_size, formats) stack_use uniques
 
                         -- A regular Cmm function call
                         FinalCall next (CmmCallee target CmmCallConv)
-                            results arguments _ _ _ ->
+                            _ arguments _ _ _ ->
                                 pack_continuation curr_format cont_format ++
                                 tail_call (curr_stack - cont_stack)
                                               target arguments
@@ -212,7 +207,7 @@ continuationToProc (max_stack, update_frame_size, formats) stack_use uniques
                               cont_stack = continuation_frame_size cont_format
 
                         -- A safe foreign call
-                        FinalCall next (CmmCallee target conv)
+                        FinalCall _ (CmmCallee target conv)
                             results arguments _ _ _ ->
                                 target_stmts ++
                                 foreignCall call_uniques' (CmmCallee new_target conv)
@@ -222,11 +217,12 @@ continuationToProc (max_stack, update_frame_size, formats) stack_use uniques
                                   maybeAssignTemp call_uniques target
 
                         -- A safe prim call
-                        FinalCall next (CmmPrim target)
+                        FinalCall _ (CmmPrim target)
                             results arguments _ _ _ ->
                                 foreignCall call_uniques (CmmPrim target)
                                             results arguments
 
+formal_to_actual :: LocalReg -> CmmHinted CmmExpr
 formal_to_actual reg = CmmHinted (CmmReg (CmmLocal reg)) NoHint
 
 foreignCall :: [Unique] -> CmmCallTarget -> HintedCmmFormals -> HintedCmmActuals -> [CmmStmt]
@@ -263,12 +259,14 @@ foreignCall uniques call results arguments =
 -- -----------------------------------------------------------------------------
 -- Save/restore the thread state in the TSO
 
+suspendThread, resumeThread :: CmmExpr
 suspendThread = CmmLit (CmmLabel (mkRtsCodeLabel (sLit "suspendThread")))
 resumeThread  = CmmLit (CmmLabel (mkRtsCodeLabel (sLit "resumeThread")))
 
 -- This stuff can't be done in suspendThread/resumeThread, because it
 -- refers to global registers which aren't available in the C world.
 
+saveThreadState :: [CmmStmt]
 saveThreadState =
   -- CurrentTSO->sp = Sp;
   [CmmStore (cmmOffset stgCurrentTSO tso_SP) stgSp,
@@ -279,8 +277,10 @@ saveThreadState =
   else []
 
    -- CurrentNursery->free = Hp+1;
+closeNursery :: CmmStmt
 closeNursery = CmmStore nursery_bdescr_free (cmmOffsetW stgHp 1)
 
+loadThreadState :: Unique -> [CmmStmt]
 loadThreadState tso_unique =
   [
 	-- tso = CurrentTSO;
@@ -301,6 +301,7 @@ loadThreadState tso_unique =
   where tso = LocalReg tso_unique bWord -- TODO FIXME NOW
 
 
+openNursery :: [CmmStmt]
 openNursery = [
         -- Hp = CurrentNursery->free - 1;
 	CmmAssign hp (cmmOffsetW (CmmLoad nursery_bdescr_free bWord) (-1)),
@@ -322,10 +323,12 @@ openNursery = [
    ]
 
 
+nursery_bdescr_free, nursery_bdescr_start, nursery_bdescr_blocks :: CmmExpr
 nursery_bdescr_free   = cmmOffset stgCurrentNursery oFFSET_bdescr_free
 nursery_bdescr_start  = cmmOffset stgCurrentNursery oFFSET_bdescr_start
 nursery_bdescr_blocks = cmmOffset stgCurrentNursery oFFSET_bdescr_blocks
 
+tso_SP, tso_STACK, tso_CCCS :: ByteOff
 tso_SP    = tsoFieldB     oFFSET_StgTSO_sp
 tso_STACK = tsoFieldB     oFFSET_StgTSO_stack
 tso_CCCS  = tsoProfFieldB oFFSET_StgTSO_CCCS
@@ -340,11 +343,13 @@ tsoFieldB off
 tsoProfFieldB :: ByteOff -> ByteOff
 tsoProfFieldB off = off + fixedHdrSize * wORD_SIZE
 
+stgSp, stgHp, stgCurrentTSO, stgCurrentNursery :: CmmExpr
 stgSp		  = CmmReg sp
 stgHp		  = CmmReg hp
 stgCurrentTSO	  = CmmReg currentTSO
 stgCurrentNursery = CmmReg currentNursery
 
+sp, spLim, hp, hpLim, currentTSO, currentNursery :: CmmReg
 sp		  = CmmGlobal Sp
 spLim		  = CmmGlobal SpLim
 hp		  = CmmGlobal Hp
@@ -369,17 +374,22 @@ tail_call spRel target arguments
 
     argument_formats = assignArguments (cmmExprType . hintlessCmm) arguments
 
+adjust_sp_reg :: Int -> [CmmStmt]
 adjust_sp_reg spRel =
     if spRel == 0
     then []
     else [CmmAssign spReg (CmmRegOff spReg (spRel*wORD_SIZE))]
 
+assign_gc_stack_use :: CmmReg -> Int -> Int -> [CmmStmt]
 assign_gc_stack_use stack_use arg_stack max_frame_size =
     if max_frame_size > arg_stack
     then [CmmAssign stack_use (CmmRegOff spReg (-max_frame_size*wORD_SIZE))]
     else [CmmAssign stack_use (CmmReg spLimReg)]
          -- Trick the optimizer into eliminating the branch for us
   
+{-
+UNUSED 2008-12-29
+
 gc_stack_check :: BlockId -> WordOff -> [CmmStmt]
 gc_stack_check gc_block max_frame_size
   = check_stack_limit where
@@ -389,7 +399,7 @@ gc_stack_check gc_block max_frame_size
                 [CmmRegOff spReg (-max_frame_size*wORD_SIZE),
                      CmmReg spLimReg])
      gc_block]
-
+-}
 
 pack_continuation :: ContinuationFormat -- ^ The current format
                   -> ContinuationFormat -- ^ The return point format
@@ -432,7 +442,7 @@ pack_frame curr_frame_size next_frame_size next_frame_header frame_args =
 
     label_size = 1 :: WordOff
 
-    mkOffsets size [] = []
+    mkOffsets _    [] = []
     mkOffsets size (Nothing:exprs) = mkOffsets (size+1) exprs
     mkOffsets size (Just expr:exprs) = (expr, size):mkOffsets (size + width) exprs
         where
@@ -467,7 +477,7 @@ function_entry (ContinuationFormat formals _ _ live_regs)
 
     label_size = 1 :: WordOff
 
-    mkOffsets size [] = []
+    mkOffsets _    [] = []
     mkOffsets size (Nothing:regs) = mkOffsets (size+1) regs
     mkOffsets size (Just reg:regs) = (reg, size):mkOffsets (size + width) regs
         where
