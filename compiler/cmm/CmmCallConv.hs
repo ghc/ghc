@@ -1,10 +1,3 @@
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/CodingStyle#Warnings
--- for details
-
 module CmmCallConv (
   ParamLocation(..),
   ArgumentFormat,
@@ -43,7 +36,7 @@ assignArguments f reps = assignments
     where
       availRegs = getRegs False
       (sizes, assignments) = unzip $ assignArguments' reps (negate (sum sizes)) availRegs
-      assignArguments' [] offset availRegs = []
+      assignArguments' [] _ _ = []
       assignArguments' (r:rs) offset availRegs =
           (size,(r,assignment)):assignArguments' rs new_offset remaining
           where 
@@ -80,7 +73,7 @@ argumentsSize :: (a -> CmmType) -> [a] -> WordOff
 argumentsSize f reps = maximum (0 : map arg_top args)
     where
       args = assignArguments f reps
-      arg_top (a, StackParam offset) = -offset
+      arg_top (_, StackParam offset) = -offset
       arg_top (_, RegisterParam _) = 0
 
 -----------------------------------------------------------------------------
@@ -98,6 +91,7 @@ type AvailRegs = ( [VGcPtr -> GlobalReg]   -- available vanilla regs.
 -- We take these register supplies from the *real* registers, i.e. those
 -- that are guaranteed to map to machine registers.
 
+useVanillaRegs, useFloatRegs, useDoubleRegs, useLongRegs :: Int
 useVanillaRegs | opt_Unregisterised = 0
 	       | otherwise          = mAX_Real_Vanilla_REG
 useFloatRegs   | opt_Unregisterised = 0
@@ -107,6 +101,7 @@ useDoubleRegs  | opt_Unregisterised = 0
 useLongRegs    | opt_Unregisterised = 0
 	       | otherwise          = mAX_Real_Long_REG
 
+getRegs :: Bool -> AvailRegs
 getRegs reserveNode =
   (if reserveNode then filter (\r -> r VGcPtr /= node) intRegs else intRegs,
    regList FloatReg  useFloatRegs,
@@ -116,13 +111,20 @@ getRegs reserveNode =
       regList f max = map f [1 .. max]
       intRegs = regList VanillaReg useVanillaRegs
 
+noStack :: AvailRegs
 noStack = (map VanillaReg any, map FloatReg any, map DoubleReg any, map LongReg any)
   where any = [1 .. ]
+
+noRegs :: AvailRegs
 noRegs    = ([], [], [], [])
 
 -- Round the size of a local register up to the nearest word.
+{-
+UNUSED 2008-12-29
+
 slot_size :: LocalReg -> Int
 slot_size reg = slot_size' (typeWidth (localRegType reg))
+-}
 
 slot_size' :: Width -> Int
 slot_size' reg = ((widthInBytes reg - 1) `div` wORD_SIZE) + 1
@@ -143,26 +145,29 @@ assign_reg slot ty off avails
 -- JD: I don't know why this convention stops using all the registers
 --     after running out of one class of registers.
 assign_slot_neg :: SlotAssigner
-assign_slot_neg width off regs =
+assign_slot_neg width off _regs =
   (StackParam $ off, off + size, size, ([], [], [], [])) where size = slot_size' width
 
 -- Assigning a slot using positive offsets into a CallArea.
 assign_slot_pos :: SlotAssigner
-assign_slot_pos width off regs =
+assign_slot_pos width off _regs =
   (StackParam $ off, off - size, size, ([], [], [], []))
   where size = slot_size' width
 
 -- On calls in the native convention, `node` is used to hold the environment
 -- for the closure, so we can't pass arguments in that register.
+assign_bits_reg :: SlotAssigner -> Width -> WordOff -> VGcPtr -> AvailRegs
+                -> Assignment
 assign_bits_reg _ W128 _ _ _ = panic "W128 is not a supported register type"
 assign_bits_reg assign_slot w off gcp regs@(v:vs, fs, ds, ls) =
   if widthInBits w <= widthInBits wordWidth then
     (RegisterParam (v gcp), off, 0, (vs, fs, ds, ls))
   else assign_slot w off regs
-assign_bits_reg assign_slot w off gcp regs@([], _, _, _) =
+assign_bits_reg assign_slot w off _ regs@([], _, _, _) =
   assign_slot w off regs
 
+assign_float_reg :: SlotAssigner -> Width -> WordOff -> AvailRegs -> Assignment
 assign_float_reg _ W32 off (vs, f:fs, ds, ls) = (RegisterParam $ f, off, 0, (vs, fs, ds, ls))
 assign_float_reg _ W64 off (vs, fs, d:ds, ls) = (RegisterParam $ d, off, 0, (vs, fs, ds, ls))
-assign_float_reg _ W80 off _                  = panic "F80 is not a supported register type"
+assign_float_reg _ W80 _   _                  = panic "F80 is not a supported register type"
 assign_float_reg assign_slot width off r = assign_slot width off r
