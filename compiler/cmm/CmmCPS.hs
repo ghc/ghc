@@ -1,10 +1,3 @@
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module CmmCPS (
   -- | Converts C-- with full proceedures and parameters
   -- to a CPS transformed C-- with the stack made manifest.
@@ -35,7 +28,6 @@ import ErrUtils
 import Maybes
 import Outputable
 import UniqSupply
-import UniqFM
 import UniqSet
 import Unique
 
@@ -89,11 +81,11 @@ cpsProc :: UniqSupply
 		      --   multiple output procedures
 
 -- Data blocks don't need to be CPS transformed
-cpsProc uniqSupply proc@(CmmData _ _) = [proc]
+cpsProc _ proc@(CmmData _ _) = [proc]
 
 -- Empty functions just don't work with the CPS algorithm, but
 -- they don't need the transformation anyway so just output them directly
-cpsProc uniqSupply proc@(CmmProc _ _ _ (ListGraph []))
+cpsProc _ proc@(CmmProc _ _ _ (ListGraph []))
   = pprTrace "cpsProc: unexpected empty proc" (ppr proc) [proc]
 
 -- CPS transform for those procs that actually need it
@@ -189,6 +181,8 @@ cpsProc uniqSupply (CmmProc info ident params (ListGraph blocks)) = cps_procs
       cps_procs :: [CmmTop]
       cps_procs = zipWith (continuationToProc formats' stack_use) proc_uniques continuations'
 
+make_stack_check :: BlockId -> CmmInfo -> CmmReg -> BlockId
+                 -> GenBasicBlock CmmStmt
 make_stack_check stack_check_block_id info stack_use next_block_id =
     BasicBlock stack_check_block_id $
                    check_stmts ++ [CmmBranch next_block_id]
@@ -282,7 +276,7 @@ selectContinuationFormat live continuations =
     where
       -- User written continuations
       selectContinuationFormat' (Continuation
-                          (Right (CmmInfo _ _ (CmmInfoTable _ _ _ (ContInfo format srt))))
+                          (Right (CmmInfo _ _ (CmmInfoTable _ _ _ (ContInfo format _))))
                           label formals _ _) =
           (formals, Just label, format)
       -- Either user written non-continuation code
@@ -290,7 +284,7 @@ selectContinuationFormat live continuations =
       selectContinuationFormat' (Continuation (Right _) _ formals _ _) =
           (formals, Nothing, [])
       -- CPS generated continuations
-      selectContinuationFormat' (Continuation (Left srt) label formals _ blocks) =
+      selectContinuationFormat' (Continuation (Left _) label formals _ blocks) =
           -- TODO: assumes the first block is the entry block
           let ident = brokenBlockId $ head blocks -- TODO: CLabel isn't a uniquable, but we need a better way than this
           in (formals,
@@ -362,7 +356,7 @@ continuationMaxStack formats (Continuation _ label _ False blocks) =
           argumentsSize (cmmExprType . hintlessCmm) args
       final_arg_size (FinalJump _ args) =
           argumentsSize (cmmExprType . hintlessCmm) args
-      final_arg_size (FinalCall next _ _ args _ _ True) = 0
+      final_arg_size (FinalCall _    _ _ _    _ _ True) = 0
       final_arg_size (FinalCall next _ _ args _ _ False) =
           -- We have to account for the stack used when we build a frame
           -- for the *next* continuation from *this* continuation
@@ -399,7 +393,7 @@ applyContinuationFormat formats
       unknown_block = panic "unknown BlockId in applyContinuationFormat"
 
 -- Either user written non-continuation code or CPS generated proc-point
-applyContinuationFormat formats (Continuation
+applyContinuationFormat _ (Continuation
                           (Right info) label formals is_gc blocks) =
     Continuation info label formals is_gc blocks
 
