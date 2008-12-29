@@ -180,6 +180,9 @@ data FinalStmt
 -- the 'adaptBlockToFormat' function.
 -- could be 
 
+{-
+UNUSED: 2008-12-29
+
 breakProc ::
     [BlockId]                   -- ^ Any GC blocks that should be special
     -> [[Unique]]               -- ^ An infinite list of uniques
@@ -212,6 +215,7 @@ breakProc gc_block_idents uniques info ident params blocks =
        zipWith (adaptBlockToFormat selected)
                adaptor_uniques
                (snd broken_blocks)
+-}
 
 -----------------------------------------------------------------------------
 -- | Takes a 'CmmBasicBlock' and breaks it up into a list of 'BrokenBlock'
