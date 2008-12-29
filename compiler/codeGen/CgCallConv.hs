@@ -1,10 +1,3 @@
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 -----------------------------------------------------------------------------
 --
 -- (c) The University of Glasgow 2004-2006
@@ -127,7 +120,7 @@ stdPattern [PtrArg,PtrArg,PtrArg]	   = Just ARG_PPP
 stdPattern [PtrArg,PtrArg,PtrArg,PtrArg]	       = Just ARG_PPPP
 stdPattern [PtrArg,PtrArg,PtrArg,PtrArg,PtrArg]        = Just ARG_PPPPP
 stdPattern [PtrArg,PtrArg,PtrArg,PtrArg,PtrArg,PtrArg] = Just ARG_PPPPPP
-stdPattern other = Nothing
+stdPattern _ = Nothing
 
 
 -------------------------------------------------------------------------
@@ -240,6 +233,7 @@ matchSlowPattern amodes = (arg_pat, these, rest)
 	(these, rest) = splitAt n amodes
 
 -- These cases were found to cover about 99% of all slow calls:
+slowCallPattern :: [CgRep] -> (LitString, Int)
 slowCallPattern (PtrArg: PtrArg: PtrArg: PtrArg: PtrArg: PtrArg: _) = (sLit "stg_ap_pppppp", 6)
 slowCallPattern (PtrArg: PtrArg: PtrArg: PtrArg: PtrArg: _) 	= (sLit "stg_ap_ppppp", 5)
 slowCallPattern (PtrArg: PtrArg: PtrArg: PtrArg: _) 	= (sLit "stg_ap_pppp", 4)
@@ -358,7 +352,7 @@ assign_regs :: [(CgRep,a)]     	-- Arg or result values to assign
 assign_regs args supply
   = go args [] supply
   where
-    go [] acc supply = (acc, [])	-- Return the results reversed (doesn't matter)
+    go [] acc _ = (acc, [])	-- Return the results reversed (doesn't matter)
     go ((VoidArg,_) : args) acc supply 	-- Skip void arguments; they aren't passed, and
 	= go args acc supply		-- there's nothing to bind them to
     go ((rep,arg) : args) acc supply 
@@ -373,7 +367,7 @@ assign_reg LongArg   (vs, fs, ds, l:ls) = Just (LongReg l,    (vs, fs, ds, ls))
 assign_reg PtrArg    (v:vs, fs, ds, ls) = Just (VanillaReg v VGcPtr, (vs, fs, ds, ls))
 assign_reg NonPtrArg (v:vs, fs, ds, ls) = Just (VanillaReg v VNonGcPtr, (vs, fs, ds, ls))
     -- PtrArg and NonPtrArg both go in a vanilla register
-assign_reg other     not_enough_regs    = Nothing
+assign_reg _         _                  = Nothing
 
 
 -------------------------------------------------------------------------
@@ -388,12 +382,16 @@ assign_reg other     not_enough_regs    = Nothing
 -- We take these register supplies from the *real* registers, i.e. those
 -- that are guaranteed to map to machine registers.
 
+useVanillaRegs :: Int
 useVanillaRegs | opt_Unregisterised = 0
 	       | otherwise          = mAX_Real_Vanilla_REG
+useFloatRegs :: Int
 useFloatRegs   | opt_Unregisterised = 0
 	       | otherwise          = mAX_Real_Float_REG
+useDoubleRegs :: Int
 useDoubleRegs  | opt_Unregisterised = 0
 	       | otherwise          = mAX_Real_Double_REG
+useLongRegs :: Int
 useLongRegs    | opt_Unregisterised = 0
 	       | otherwise          = mAX_Real_Long_REG
 
@@ -409,6 +407,7 @@ allFloatRegNos	 = regList mAX_Float_REG
 allDoubleRegNos	 = regList mAX_Double_REG
 allLongRegNos	 = regList mAX_Long_REG
 
+regList :: Int -> [Int]
 regList 0 = []
 regList n = [1 .. n]
 
@@ -426,6 +425,8 @@ mkRegTbl_allRegs :: [GlobalReg] -> AvailRegs
 mkRegTbl_allRegs regs_in_use
   = mkRegTbl' regs_in_use allVanillaRegNos allFloatRegNos allDoubleRegNos allLongRegNos
 
+mkRegTbl' :: [GlobalReg] -> [Int] -> [Int] -> [Int] -> [Int]
+          -> ([Int], [Int], [Int], [Int])
 mkRegTbl' regs_in_use vanillas floats doubles longs
   = (ok_vanilla, ok_float, ok_double, ok_long)
   where
