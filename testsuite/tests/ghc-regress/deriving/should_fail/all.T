@@ -21,3 +21,4 @@ test('drvfail016',
 test('T2394', normal, compile_fail, [''])
 test('T2604', normal, compile_fail, [''])
 test('T2701', normal, compile_fail, [''])
+test('T2851', normal, compile_fail, [''])

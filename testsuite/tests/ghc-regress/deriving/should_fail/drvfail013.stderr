@@ -4,6 +4,8 @@ drvfail013.hs:4:69:
       arising from the 'deriving' clause of a data type declaration
                    at drvfail013.hs:4:69-70
     Possible fix: add an instance declaration for (Eq (m (Maybe a)))
+    Alternative fix: use a standalone 'deriving instance' declaration
+      instead, so you can specify the instance context yourself
     When deriving the instance for (Eq (MaybeT m a))
 
 drvfail013.hs:6:69:
@@ -11,4 +13,6 @@ drvfail013.hs:6:69:
       arising from the 'deriving' clause of a data type declaration
                    at drvfail013.hs:6:69-70
     Possible fix: add an instance declaration for (Eq (m (Maybe a)))
+    Alternative fix: use a standalone 'deriving instance' declaration
+      instead, so you can specify the instance context yourself
     When deriving the instance for (Eq (MaybeT' m a))

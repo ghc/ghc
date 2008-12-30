@@ -4,4 +4,6 @@ drvfail007.hs:4:37:
       arising from the 'deriving' clause of a data type declaration
                    at drvfail007.hs:4:37-38
     Possible fix: add an instance declaration for (Eq (Int -> Int))
+    Alternative fix: use a standalone 'deriving instance' declaration
+      instead, so you can specify the instance context yourself
     When deriving the instance for (Eq Foo)

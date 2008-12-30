@@ -1,0 +1,9 @@
+
+T2851.hs:9:14:
+    No instance for (Show (F a))
+      arising from the 'deriving' clause of a data type declaration
+                   at T2851.hs:9:14-17
+    Possible fix: add an instance declaration for (Show (F a))
+    Alternative fix: use a standalone 'deriving instance' declaration instead,
+      so you can specify the instance context yourself
+    When deriving the instance for (Show (D a))

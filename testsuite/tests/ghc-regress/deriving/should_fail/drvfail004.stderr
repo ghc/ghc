@@ -4,4 +4,6 @@ drvfail004.hs:8:11:
       arising from the 'deriving' clause of a data type declaration
                    at drvfail004.hs:8:11-13
     Possible fix: add an instance declaration for (Eq (Foo a b))
+    Alternative fix: use a standalone 'deriving instance' declaration
+      instead, so you can specify the instance context yourself
     When deriving the instance for (Ord (Foo a b))
