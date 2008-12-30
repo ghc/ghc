@@ -1314,7 +1314,9 @@ standaloneCtxt ty = hang (ptext (sLit "In the stand-alone deriving instance for"
 
 derivInstCtxt :: Class -> [Type] -> Message
 derivInstCtxt clas inst_tys
-  = ptext (sLit "When deriving the instance for") <+> parens (pprClassPred clas inst_tys)
+  = vcat [ptext (sLit "Alternative fix: use a standalone 'deriving instance' declaration"),
+          nest 2 (ptext (sLit "instead, so you can specify the instance context yourself")),
+	  ptext (sLit "When deriving the instance for") <+> parens (pprClassPred clas inst_tys)]
 
 badDerivedPred :: PredType -> Message
 badDerivedPred pred
