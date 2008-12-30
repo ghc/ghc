@@ -677,15 +677,17 @@ tcDataKindSig (Just kind)
 	; us   <- newUniqueSupply 
 	; let uniqs = uniqsFromSupply us
 	; return [ mk_tv span uniq str kind 
-		 | ((kind, str), uniq) <- arg_kinds `zip` names `zip` uniqs ] }
+		 | ((kind, str), uniq) <- arg_kinds `zip` dnames `zip` uniqs ] }
   where
     (arg_kinds, res_kind) = splitKindFunTys kind
     mk_tv loc uniq str kind = mkTyVar name kind
 	where
 	   name = mkInternalName uniq occ loc
 	   occ  = mkOccName tvName str
+	  
+    dnames = map ('$' :) names	-- Note [Avoid name clashes for associated data types]
 
-    names :: [String]	-- a,b,c...aa,ab,ac etc
+    names :: [String]
     names = [ c:cs | cs <- "" : names, c <- ['a'..'z'] ] 
 
 badKindSig :: Kind -> SDoc
@@ -693,6 +695,24 @@ badKindSig kind
  = hang (ptext (sLit "Kind signature on data type declaration has non-* return kind"))
 	2 (ppr kind)
 \end{code}
+
+Note [Avoid name clashes for associated data types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider    class C a b where
+               data D b :: * -> *
+When typechecking the decl for D, we'll invent an extra type variable for D,
+to fill out its kind.  We *don't* want this type variable to be 'a', because
+in an .hi file we'd get
+            class C a b where
+               data D b a 
+which makes it look as if there are *two* type indices.  But there aren't!
+So we use $a instead, which cannot clash with a user-written type variable.
+Remember that type variable binders in interface files are just FastStrings,
+not proper Names.
+
+(The tidying phase can't help here because we don't tidy TyCons.  Another
+alternative would be to record the number of indexing parameters in the 
+interface file.)
 
 
 %************************************************************************

@@ -461,11 +461,11 @@ tcLocalInstDecl1 (L loc (InstDecl poly_ty binds uprags ats))
            ; mapM_ (checkIndexes clas inst_tys) ats
            }
 
-    checkIndexes clas inst_tys (hsAT, ATyCon tycon) =
+    checkIndexes clas inst_tys (hsAT, ATyCon tycon)
 -- !!!TODO: check that this does the Right Thing for indexed synonyms, too!
-      checkIndexes' clas inst_tys hsAT
-                    (tyConTyVars tycon,
-                     snd . fromJust . tyConFamInst_maybe $ tycon)
+      = checkIndexes' clas inst_tys hsAT
+                      (tyConTyVars tycon,
+                       snd . fromJust . tyConFamInst_maybe $ tycon)
     checkIndexes _ _ _ = panic "checkIndexes"
 
     checkIndexes' clas (instTvs, instTys) hsAT (atTvs, atTys)
@@ -475,8 +475,8 @@ tcLocalInstDecl1 (L loc (InstDecl poly_ty binds uprags ats))
         addErrCtxt (atInstCtxt atName) $
         case find ((atName ==) . tyConName) (classATs clas) of
           Nothing     -> addErrTc $ badATErr clas atName  -- not in this class
-          Just atDecl ->
-            case assocTyConArgPoss_maybe atDecl of
+          Just atycon ->
+            case assocTyConArgPoss_maybe atycon of
               Nothing   -> panic "checkIndexes': AT has no args poss?!?"
               Just poss ->
 
@@ -487,6 +487,13 @@ tcLocalInstDecl1 (L loc (InstDecl poly_ty binds uprags ats))
                 -- which must be type variables; and (3) variables in AT and
                 -- instance head will be different `Name's even if their
                 -- source lexemes are identical.
+		--
+		-- e.g.    class C a b c where 
+		-- 	     data D b a :: * -> *           -- NB (1) b a, omits c
+		-- 	   instance C [x] Bool Char where 
+		--	     data D Bool [x] v = MkD x [v]  -- NB (2) v
+		--	     	  -- NB (3) the x in 'instance C...' have differnt
+		--		  --        Names to x's in 'data D...'
                 --
                 -- Re (1), `poss' contains a permutation vector to extract the
                 -- class parameters in the right order.

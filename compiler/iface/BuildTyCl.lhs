@@ -8,7 +8,7 @@ module BuildTyCl (
 	buildSynTyCon, buildAlgTyCon, buildDataCon,
 	buildClass,
 	mkAbstractTyConRhs, mkOpenDataTyConRhs, 
-	mkNewTyConRhs, mkDataTyConRhs 
+	mkNewTyConRhs, mkDataTyConRhs, setAssocFamilyPermutation
     ) where
 
 #include "HsVersions.h"
@@ -174,6 +174,13 @@ mkNewTyConRhs tycon_name tycon con
 			 = eta_reduce as fun
     eta_reduce tvs ty = (reverse tvs, ty)
 				
+
+setAssocFamilyPermutation :: [TyVar] -> TyThing -> TyThing
+setAssocFamilyPermutation clas_tvs (ATyCon tc) 
+  = ATyCon (setTyConArgPoss clas_tvs tc)
+setAssocFamilyPermutation _clas_tvs other
+  = pprPanic "setAssocFamilyPermutation" (ppr other)
+
 
 ------------------------------------------------------
 buildDataCon :: Name -> Bool

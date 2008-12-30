@@ -13,6 +13,7 @@ module TyCon(
 	AlgTyConRhs(..), visibleDataCons, 
         TyConParent(..), 
 	SynTyConRhs(..),
+	AssocFamilyPermutation,
 
         -- ** Constructing TyCons
 	mkAlgTyCon,
@@ -92,6 +93,7 @@ import Maybes
 import Outputable
 import FastString
 import Constants
+import Data.List( elemIndex )
 \end{code}
 
 %************************************************************************
@@ -260,17 +262,7 @@ data AlgTyConRhs
   -- >   data T b :: *
 
   | OpenTyCon {
-
-      otArgPoss   :: Maybe [Int]
-	-- ^ @Nothing@ iff this is a top-level indexed type family.
-	-- @Just ns@ iff this is an associated (not top-level) family
-	--
-	-- In the latter case, for each 'TyVar' in the associated type declaration, 
-	-- @ns@ gives the position of that tyvar in the class argument list (starting 
-	-- from 0).
-	--
-	-- NB: The length of this list is less than the accompanying 'tyConArity' iff 
-	-- we have a higher kind signature.
+      otArgPoss :: AssocFamilyPermutation
     }
 
   -- | Information about those 'TyCon's derived from a @data@ declaration. This includes 
@@ -315,6 +307,18 @@ data AlgTyConRhs
 				-- Watch out!  If any newtypes become transparent
 				-- again check Trac #1072.
     }
+
+type AssocFamilyPermutation
+  = Maybe [Int]  -- Nothing for *top-level* type families
+                 -- For *associated* type families, gives the position
+	         -- of that 'TyVar' in the class argument list (0-indexed)
+		 -- e.g.  class C a b c where { type F c a :: *->* }
+                 --       Then we get Just [2,0]
+	 -- For *synonyms*, the length of the list is identical to
+	 -- 		    the TyCon's arity
+	 -- For *data types*, the length may be smaller than the
+	 -- 	TyCon's arity; e.g. class C a where { data D a :: *->* }
+	 -- 		       here D gets arity 2
 
 -- | Extract those 'DataCon's that we are able to learn about. Note that visibility in this sense does not
 -- correspond to visibility in the context of any particular user program!
@@ -369,16 +373,10 @@ okParent _       (FamilyTyCon fam_tc tys _co_tc) = tyConArity fam_tc == length t
 
 -- | Information pertaining to the expansion of a type synonym (@type@)
 data SynTyConRhs
-  = OpenSynTyCon Kind	        
-		 (Maybe [Int])  -- ^ A Type family synonym. The /result/ 'Kind' is
-		                -- given for associated families, and in this case the
-		                -- list of @Int@s is not empty, and for each 'TyVar' in
-				-- the associated type declaration, it gives the position
-				-- of that 'TyVar' in the class argument list (starting
-				-- from 0). 
-				--
-				-- NB: The length of this list will be less than 'tyConArity' iff
-				-- the family has a higher kind signature.
+  = OpenSynTyCon      -- e.g. type family F x y :: * -> *
+       Kind	      -- Kind of the "rhs"; ie *excluding type indices*
+       		      --     In the example, the kind is (*->*)
+       AssocFamilyPermutation
 
   | SynonymTyCon Type   -- ^ The synonym mentions head type variables. It acts as a
 			-- template for the expansion when the 'TyCon' is applied to some
@@ -836,14 +834,22 @@ assocTyConArgPoss_maybe _ = Nothing
 isTyConAssoc :: TyCon -> Bool
 isTyConAssoc = isJust . assocTyConArgPoss_maybe
 
--- | Sets up a 'TyVar' to family argument-list mapping in the given 'TyCon' if it is
--- an open 'TyCon'. Panics otherwise
-setTyConArgPoss :: TyCon -> [Int] -> TyCon
-setTyConArgPoss tc@(AlgTyCon { algTcRhs = rhs })               poss = 
-  tc { algTcRhs = rhs {otArgPoss = Just poss} }
-setTyConArgPoss tc@(SynTyCon { synTcRhs = OpenSynTyCon ki _ }) poss = 
-  tc { synTcRhs = OpenSynTyCon ki (Just poss) }
-setTyConArgPoss tc _ = pprPanic "setTyConArgPoss" (ppr tc)
+-- | Set the AssocFamilyPermutation structure in an 
+-- associated data or type synonym.  The [TyVar] are the
+-- class type variables.  Remember, the tyvars of an associated
+-- data/type are a subset of the class tyvars; except that an
+-- associated data type can have extra type variables at the
+-- end (see Note [Avoid name clashes for associated data types] in TcHsType)
+setTyConArgPoss :: [TyVar] -> TyCon -> TyCon
+setTyConArgPoss clas_tvs tc
+  = case tc of
+      AlgTyCon { algTcRhs = rhs }               -> tc { algTcRhs = rhs {otArgPoss = Just ps} }
+      SynTyCon { synTcRhs = OpenSynTyCon ki _ } -> tc { synTcRhs = OpenSynTyCon ki (Just ps) }
+      _                                         -> pprPanic "setTyConArgPoss" (ppr tc)
+  where
+    ps = catMaybes [tv `elemIndex` clas_tvs | tv <- tyConTyVars tc]
+       -- We will get Nothings for the "extra" type variables in an
+       -- associated data type
 
 -- The unit tycon didn't used to be classed as a tuple tycon
 -- but I thought that was silly so I've undone it

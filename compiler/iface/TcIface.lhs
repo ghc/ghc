@@ -427,7 +427,7 @@ tcIfaceDecl ignore_prags
     ; sigs <- mapM tc_sig rdr_sigs
     ; fds  <- mapM tc_fd rdr_fds
     ; ats' <- mapM (tcIfaceDecl ignore_prags) rdr_ats
-    ; let ats = zipWith setTyThingPoss ats' (map ifTyVars rdr_ats)
+    ; let ats = map (setAssocFamilyPermutation tyvars) ats'
     ; cls  <- buildClass ignore_prags cls_name tyvars ctxt fds ats sigs tc_isrec
     ; return (AClass cls) }
   where
@@ -444,19 +444,6 @@ tcIfaceDecl ignore_prags
    tc_fd (tvs1, tvs2) = do { tvs1' <- mapM tcIfaceTyVar tvs1
 			   ; tvs2' <- mapM tcIfaceTyVar tvs2
 			   ; return (tvs1', tvs2') }
-
-   -- For each AT argument compute the position of the corresponding class
-   -- parameter in the class head.  This will later serve as a permutation
-   -- vector when checking the validity of instance declarations.
-   setTyThingPoss (ATyCon tycon) atTyVars = 
-     let classTyVars = map fst tv_bndrs
-	 poss        =   catMaybes 
-		       . map ((`elemIndex` classTyVars) . fst) 
-		       $ atTyVars
-		    -- There will be no Nothing, as we already passed renaming
-     in 
-     ATyCon (setTyConArgPoss tycon poss)
-   setTyThingPoss _		  _ = panic "TcIface.setTyThingPoss"
 
 tcIfaceDecl _ (IfaceForeign {ifName = rdr_name, ifExtName = ext_name})
   = do	{ name <- lookupIfaceTop rdr_name

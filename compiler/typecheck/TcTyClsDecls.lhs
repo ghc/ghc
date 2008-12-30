@@ -667,16 +667,17 @@ tcTyClDecl calc_isrec decl
 tcTyClDecl1 :: (Name -> RecFlag) -> TyClDecl Name -> TcM [TyThing]
 tcTyClDecl1 _calc_isrec 
   (TyFamily {tcdFlavour = TypeFamily, 
-	     tcdLName = L _ tc_name, tcdTyVars = tvs, tcdKind = Just kind})
-						      -- NB: kind at latest
-						      --     added during
-						      --     kind checking
+	     tcdLName = L _ tc_name, tcdTyVars = tvs,
+             tcdKind = Just kind}) -- NB: kind at latest added during kind checking
   = tcTyVarBndrs tvs  $ \ tvs' -> do 
   { traceTc (text "type family: " <+> ppr tc_name) 
-  ; idx_tys <- doptM Opt_TypeFamilies
 
 	-- Check that we don't use families without -XTypeFamilies
+  ; idx_tys <- doptM Opt_TypeFamilies
   ; checkTc idx_tys $ badFamInstDecl tc_name
+
+        -- Check for no type indices
+  ; checkTc (not (null tvs)) (noIndexTypes tc_name)
 
   ; tycon <- buildSynTyCon tc_name tvs' (OpenSynTyCon kind Nothing) kind Nothing
   ; return [ATyCon tycon]
@@ -691,10 +692,13 @@ tcTyClDecl1 _calc_isrec
   ; extra_tvs <- tcDataKindSig mb_kind
   ; let final_tvs = tvs' ++ extra_tvs    -- we may not need these
 
-  ; idx_tys <- doptM Opt_TypeFamilies
 
 	-- Check that we don't use families without -XTypeFamilies
+  ; idx_tys <- doptM Opt_TypeFamilies
   ; checkTc idx_tys $ badFamInstDecl tc_name
+
+        -- Check for no type indices
+  ; checkTc (not (null tvs)) (noIndexTypes tc_name)
 
   ; tycon <- buildAlgTyCon tc_name final_tvs [] 
 	       mkOpenDataTyConRhs Recursive False True Nothing
@@ -771,7 +775,7 @@ tcTyClDecl1 calc_isrec
   ; atss <- mapM (addLocM (tcTyClDecl1 (const Recursive))) ats
             -- NB: 'ats' only contains "type family" and "data family"
             --     declarations as well as type family defaults
-  ; let ats' = zipWith setTyThingPoss atss (map (tcdTyVars . unLoc) ats)
+  ; let ats' = map (setAssocFamilyPermutation tvs') (concat atss)
   ; sig_stuff <- tcClassSigs class_name sigs meths
   ; clas <- fixM (\ clas ->
 		let 	-- This little knot is just so we can get
@@ -791,20 +795,6 @@ tcTyClDecl1 calc_isrec
     tc_fundep (tvs1, tvs2) = do { tvs1' <- mapM tcLookupTyVar tvs1 ;
 				; tvs2' <- mapM tcLookupTyVar tvs2 ;
 				; return (tvs1', tvs2') }
-
-    -- For each AT argument compute the position of the corresponding class
-    -- parameter in the class head.  This will later serve as a permutation
-    -- vector when checking the validity of instance declarations.
-    setTyThingPoss [ATyCon tycon] atTyVars = 
-      let classTyVars = hsLTyVarNames tvs
-	  poss        =   catMaybes 
-			. map (`elemIndex` classTyVars) 
-			. hsLTyVarNames 
-			$ atTyVars
-		     -- There will be no Nothing, as we already passed renaming
-      in 
-      ATyCon (setTyConArgPoss tycon poss)
-    setTyThingPoss _		  _ = panic "TcTyClsDecls.setTyThingPoss"
 
 tcTyClDecl1 _
   (ForeignType {tcdLName = L _ tc_name, tcdExtName = tc_ext_name})
@@ -1311,6 +1301,11 @@ badSigTyDecl tc_name
   = vcat [ ptext (sLit "Illegal kind signature") <+>
 	   quotes (ppr tc_name)
 	 , nest 2 (parens $ ptext (sLit "Use -XKindSignatures to allow kind signatures")) ]
+
+noIndexTypes :: Name -> SDoc
+noIndexTypes tc_name
+  = ptext (sLit "Type family constructor") <+> quotes (ppr tc_name)
+    <+> ptext (sLit "must have at least one type index parameter")
 
 badFamInstDecl :: Outputable a => a -> SDoc
 badFamInstDecl tc_name
