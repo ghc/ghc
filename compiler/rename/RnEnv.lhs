@@ -1,4 +1,4 @@
-\%
+%
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-2006
 %
 \section[RnEnv]{Environment manipulation for the renamer monad}
@@ -8,12 +8,12 @@ module RnEnv (
 	newTopSrcBinder, lookupFamInstDeclBndr,
 	lookupLocatedTopBndrRn, lookupTopBndrRn,
 	lookupLocatedOccRn, lookupOccRn, 
-	lookupLocatedGlobalOccRn, lookupGlobalOccRn,
-	lookupLocalDataTcNames, lookupSrcOcc_maybe,
-	lookupSigOccRn,
+	lookupLocatedGlobalOccRn, 
+	lookupGlobalOccRn, lookupGlobalOccRn_maybe,
+	lookupLocalDataTcNames, lookupSigOccRn,
 	lookupFixityRn, lookupTyFixityRn, 
 	lookupInstDeclBndr, lookupRecordBndr, lookupConstructorFields,
-	lookupSyntaxName, lookupSyntaxTable, lookupImportedName,
+	lookupSyntaxName, lookupSyntaxTable, 
 	lookupGreRn, lookupGreLocalRn, lookupGreRn_maybe,
 	getLookupOccRn,
 
@@ -300,10 +300,9 @@ lookup_sub_bndr is_good doc rdr_name
 	}
 
   | otherwise	-- Occurs in derived instances, where we just
-		-- refer directly to the right method
-  = ASSERT2( not (isQual rdr_name), ppr rdr_name )
-	  -- NB: qualified names are rejected by the parser
-    lookupImportedName rdr_name
+		-- refer directly to the right method with an Orig
+		-- And record fields can be Quals: C { F.f = x }
+  = lookupGlobalOccRn rdr_name
 
 newIPNameRn :: IPName RdrName -> TcRnIf m n (IPName Name)
 newIPNameRn ip_rdr = newIPName (mapIPName rdrNameOcc ip_rdr)
@@ -350,54 +349,43 @@ lookupLocatedGlobalOccRn = wrapLocM lookupGlobalOccRn
 
 lookupGlobalOccRn :: RdrName -> RnM Name
 -- lookupGlobalOccRn is like lookupOccRn, except that it looks in the global 
--- environment.  It's called directly only for
---	record field names
---	class op names in class and instance decls
--- 	names in export lists
+-- environment.  Adds an error message if the RdrName is not in scope.
+-- Also has a special case for GHCi.
 
 lookupGlobalOccRn rdr_name
-  | not (isSrcRdrName rdr_name)
-  = lookupImportedName rdr_name	
+  = do { -- First look up the name in the normal environment.
+         mb_name <- lookupGlobalOccRn_maybe rdr_name
+       ; case mb_name of {
+		Just n  -> return n ;
+		Nothing -> do
 
-  | otherwise
-  = do
-  	-- First look up the name in the normal environment.
-   mb_gre <- lookupGreRn_maybe rdr_name
-   case mb_gre of {
-	Just gre -> returnM (gre_name gre) ;
-	Nothing   -> do
-
-	-- We allow qualified names on the command line to refer to 
-	--  *any* name exported by any module in scope, just as if 
-	-- there was an "import qualified M" declaration for every 
-	-- module.
-   allow_qual <- doptM Opt_ImplicitImportQualified
-   mod <- getModule
+       { -- We allow qualified names on the command line to refer to 
+	 --  *any* name exported by any module in scope, just as if there
+	 -- was an "import qualified M" declaration for every module.
+	 allow_qual <- doptM Opt_ImplicitImportQualified
+       ; mod <- getModule
                -- This test is not expensive,
                -- and only happens for failed lookups
-   if isQual rdr_name && allow_qual && mod == iNTERACTIVE
-      then lookupQualifiedName rdr_name
-      else unboundName rdr_name
-  }
+       ; if isQual rdr_name && allow_qual && mod == iNTERACTIVE
+         then lookupQualifiedName rdr_name
+         else unboundName rdr_name } } }
 
-lookupImportedName :: RdrName -> TcRnIf m n Name
--- Lookup the occurrence of an imported name
--- The RdrName is *always* qualified or Exact
--- Treat it as an original name, and conjure up the Name
--- Usually it's Exact or Orig, but it can be Qual if it
---	comes from an hi-boot file.  (This minor infelicity is 
---	just to reduce duplication in the parser.)
-lookupImportedName rdr_name
-  | Just n <- isExact_maybe rdr_name 
-	-- This happens in derived code
-  = returnM n
+lookupGlobalOccRn_maybe :: RdrName -> RnM (Maybe Name)
+-- No filter function; does not report an error on failure
 
-	-- Always Orig, even when reading a .hi-boot file
+lookupGlobalOccRn_maybe rdr_name
+  | Just n <- isExact_maybe rdr_name   -- This happens in derived code
+  = return (Just n)
+
   | Just (rdr_mod, rdr_occ) <- isOrig_maybe rdr_name
-  = lookupOrig rdr_mod rdr_occ
+  = do { n <- lookupOrig rdr_mod rdr_occ; return (Just n) }
 
   | otherwise
-  = pprPanic "RnEnv.lookupImportedName" (ppr rdr_name)
+  = do	{ mb_gre <- lookupGreRn_maybe rdr_name
+	; case mb_gre of
+		Nothing  -> return Nothing
+		Just gre -> return (Just (gre_name gre)) }
+
 
 unboundName :: RdrName -> RnM Name
 unboundName rdr_name 
@@ -412,15 +400,6 @@ unboundName rdr_name
 --	Lookup in the Global RdrEnv of the module
 --------------------------------------------------
 
-lookupSrcOcc_maybe :: RdrName -> RnM (Maybe Name)
--- No filter function; does not report an error on failure
-lookupSrcOcc_maybe rdr_name
-  = do	{ mb_gre <- lookupGreRn_maybe rdr_name
-	; case mb_gre of
-		Nothing  -> returnM Nothing
-		Just gre -> returnM (Just (gre_name gre)) }
-	
--------------------------
 lookupGreRn_maybe :: RdrName -> RnM (Maybe GlobalRdrElt)
 -- Just look up the RdrName in the GlobalRdrEnv
 lookupGreRn_maybe rdr_name 

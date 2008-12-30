@@ -825,11 +825,7 @@ lookupThName_maybe th_name
 	     ; rdr_env <- getLocalRdrEnv
   	     ; case lookupLocalRdrEnv rdr_env rdr_name of
 		 Just name -> return (Just name)
-	         Nothing | not (isSrcRdrName rdr_name)	-- Exact, Orig
-		         -> do { name <- lookupImportedName rdr_name
-			       ; return (Just name) }
-		    	 | otherwise			-- Unqual, Qual
-		    	 -> lookupSrcOcc_maybe rdr_name }
+	         Nothing   -> lookupGlobalOccRn_maybe rdr_name }
 
 tcLookupTh :: Name -> TcM TcTyThing
 -- This is a specialised version of TcEnv.tcLookup; specialised mainly in that

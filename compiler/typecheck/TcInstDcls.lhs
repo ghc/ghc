@@ -21,7 +21,7 @@ import FamInst
 import FamInstEnv
 import TcDeriv
 import TcEnv
-import RnEnv	( lookupImportedName )
+import RnEnv	( lookupGlobalOccRn )
 import TcHsType
 import TcUnify
 import TcSimplify
@@ -863,7 +863,7 @@ tcInstanceMethod loc clas tyvars dfun_dicts theta inst_tys
 			{   -- Build the typechecked version directly, 
 			    -- without calling typecheck_method; 
 			    -- see Note [Default methods in instances]
-			  dm_name <- lookupImportedName (mkDefMethRdrName sel_name)
+			  dm_name <- lookupGlobalOccRn (mkDefMethRdrName sel_name)
 					-- Might not be imported, but will be an OrigName
 			; dm_id   <- tcLookupId dm_name
 			; return (wrapId dm_wrapper dm_id, emptyBag) } }

@@ -877,7 +877,7 @@ check_main dflags tcg_env
    return tcg_env
 
  | otherwise
- = do	{ mb_main <- lookupSrcOcc_maybe main_fn
+ = do	{ mb_main <- lookupGlobalOccRn_maybe main_fn
 		-- Check that 'main' is in scope
 		-- It might be imported from another module!
 	; case mb_main of {
