@@ -256,13 +256,14 @@ schemeR fvs (nm, rhs)
    = undefined
    | otherwise
 -}
-   = schemeR_wrk fvs nm rhs (collect [] rhs)
+   = schemeR_wrk fvs nm rhs (collect rhs)
 
-collect :: [Var] -> AnnExpr Id VarSet -> ([Var], AnnExpr' Id VarSet)
-collect xs (_, AnnNote _ e) = collect xs e
-collect xs (_, AnnCast e _) = collect xs e
-collect xs (_, AnnLam x e)  = collect (if isTyVar x then xs else (x:xs)) e
-collect xs (_, not_lambda)  = (reverse xs, not_lambda)
+collect :: AnnExpr Id VarSet -> ([Var], AnnExpr' Id VarSet)
+collect (_, e) = go [] e
+  where
+    go xs e | Just e' <- bcView e = go xs e'
+    go xs (AnnLam x (_,e))        = go (x:xs) e
+    go xs not_lambda              = (reverse xs, not_lambda)
 
 schemeR_wrk :: [Id] -> Id -> AnnExpr Id VarSet -> ([Var], AnnExpr' Var VarSet) -> BcM (ProtoBCO Name) 
 schemeR_wrk fvs nm original_body (args, body)
@@ -346,6 +347,10 @@ instance Outputable TickInfo where
 -- on the stack, returning a HNF.
 schemeE :: Int -> Sequel -> BCEnv -> AnnExpr' Id VarSet -> BcM BCInstrList
 
+schemeE d s p e
+   | Just e' <- bcView e
+   = schemeE d s p e'
+
 -- Delegate tail-calls to schemeT.
 schemeE d s p e@(AnnApp _ _) 
    = schemeT d s p e
@@ -397,7 +402,7 @@ schemeE d s p (AnnLet binds (_,body))
          sizes = map (\rhs_fvs -> sum (map idSizeW rhs_fvs)) fvss
 
 	 -- the arity of each rhs
-	 arities = map (length . fst . collect []) rhss
+	 arities = map (length . fst . collect) rhss
 
          -- This p', d' defn is safe because all the items being pushed
          -- are ptrs, so all have size 1.  d' and p' reflect the stack
@@ -490,12 +495,6 @@ schemeE d s p (AnnCase scrut _ _ [(DataAlt dc, [bind1], rhs)])
 
 schemeE d s p (AnnCase scrut bndr _ alts)
    = doCase d s p scrut bndr alts False{-not an unboxed tuple-} 
-
-schemeE d s p (AnnNote _ (_, body))
-   = schemeE d s p body
-
-schemeE d s p (AnnCast (_, body) _)
-   = schemeE d s p body
 
 schemeE _ _ _ expr
    = pprPanic "ByteCodeGen.schemeE: unhandled case" 
@@ -1169,18 +1168,11 @@ implement_tagToId names
 
 pushAtom :: Int -> BCEnv -> AnnExpr' Id VarSet -> BcM (BCInstrList, Int)
 
-pushAtom d p (AnnApp f (_, AnnType _))
-   = pushAtom d p (snd f)
-
-pushAtom d p (AnnNote _ e)
-   = pushAtom d p (snd e)
-
-pushAtom d p (AnnLam x e) 
-   | isTyVar x 
-   = pushAtom d p (snd e)
+pushAtom d p e 
+   | Just e' <- bcView e 
+   = pushAtom d p e'
 
 pushAtom d p (AnnVar v)
-
    | idCgRep v == VoidArg
    = return (nilOL, 0)
 
@@ -1411,34 +1403,37 @@ unboxedTupleException
 mkSLIDE :: Int -> Int -> OrdList BCInstr
 mkSLIDE n d = if d == 0 then nilOL else unitOL (SLIDE n d)
 
-splitApp :: AnnExpr' id ann -> (AnnExpr' id ann, [AnnExpr' id ann])
+splitApp :: AnnExpr' Var ann -> (AnnExpr' Var ann, [AnnExpr' Var ann])
 	-- The arguments are returned in *right-to-left* order
-splitApp (AnnApp (_,f) (_,a))
-	       | isTypeAtom a = splitApp f
-	       | otherwise    = case splitApp f of 
-				     (f', as) -> (f', a:as)
-splitApp (AnnNote _ (_,e))    = splitApp e
-splitApp (AnnCast (_,e) _)    = splitApp e
-splitApp e		      = (e, [])
+splitApp e | Just e' <- bcView e = splitApp e'
+splitApp (AnnApp (_,f) (_,a)) 	 = case splitApp f of 
+			      	      (f', as) -> (f', a:as)
+splitApp e		      	 = (e, [])
 
 
-isTypeAtom :: AnnExpr' id ann -> Bool
-isTypeAtom (AnnType _) = True
-isTypeAtom _           = False
+bcView :: AnnExpr' Var ann -> Maybe (AnnExpr' Var ann)
+-- The "bytecode view" of a term discards
+--  a) type abstractions
+--  b) type applications
+--  c) casts
+--  d) notes
+-- Type lambdas *can* occur in random expressions, 
+-- whereas value lambdas cannot; that is why they are nuked here
+bcView (AnnNote _ (_,e)) 	     = Just e
+bcView (AnnCast (_,e) _) 	     = Just e
+bcView (AnnLam v (_,e)) | isTyVar v  = Just e
+bcView (AnnApp (_,e) (_, AnnType _)) = Just e
+bcView _                             = Nothing
 
-isVoidArgAtom :: AnnExpr' id ann -> Bool
-isVoidArgAtom (AnnVar v)        = typePrimRep (idType v) == VoidRep
-isVoidArgAtom (AnnNote _ (_,e)) = isVoidArgAtom e
-isVoidArgAtom (AnnCast (_,e) _) = isVoidArgAtom e
-isVoidArgAtom _ 	        = False
+isVoidArgAtom :: AnnExpr' Var ann -> Bool
+isVoidArgAtom e | Just e' <- bcView e = isVoidArgAtom e'
+isVoidArgAtom (AnnVar v)              = typePrimRep (idType v) == VoidRep
+isVoidArgAtom _ 	              = False
 
 atomPrimRep :: AnnExpr' Id ann -> PrimRep
-atomPrimRep (AnnVar v)    = typePrimRep (idType v)
-atomPrimRep (AnnLit l)    = typePrimRep (literalType l)
-atomPrimRep (AnnNote _ b) = atomPrimRep (snd b)
-atomPrimRep (AnnApp f (_, AnnType _)) = atomPrimRep (snd f)
-atomPrimRep (AnnLam x e) | isTyVar x = atomPrimRep (snd e)
-atomPrimRep (AnnCast b _) = atomPrimRep (snd b)
+atomPrimRep e | Just e' <- bcView e = atomPrimRep e'
+atomPrimRep (AnnVar v)    	    = typePrimRep (idType v)
+atomPrimRep (AnnLit l)    	    = typePrimRep (literalType l)
 atomPrimRep other = pprPanic "atomPrimRep" (ppr (deAnnotate (undefined,other)))
 
 atomRep :: AnnExpr' Id ann -> CgRep
