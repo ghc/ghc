@@ -963,7 +963,7 @@ mustBeVarArgErr ty =
 wrongATArgErr :: Type -> Type -> SDoc
 wrongATArgErr ty instTy =
   sep [ ptext (sLit "Type indexes must match class instance head")
-      , ptext (sLit "Found") <+> ppr ty <+> ptext (sLit "but expected") <+>
-         ppr instTy
+      , ptext (sLit "Found") <+> quotes (ppr ty)
+        <+> ptext (sLit "but expected") <+> quotes (ppr instTy)
       ]
 \end{code}
