@@ -564,11 +564,21 @@ tcInstDecls2 tycl_decls inst_decls
                       unionManyBags inst_binds_s
         ; tcl_env <- getLclEnv -- Default method Ids in here
         ; return (binds, tcl_env) }
+
+tcInstDecl2 :: InstInfo Name -> TcM (LHsBinds Id)
+tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
+  = recoverM (return emptyLHsBinds)             $
+    setSrcSpan loc                              $
+    addErrCtxt (instDeclCtxt2 (idType dfun_id)) $ 
+    tc_inst_decl2 dfun_id ibinds
+ where
+        dfun_id    = instanceDFunId ispec
+        loc        = getSrcSpan dfun_id
 \end{code}
 
 
 \begin{code}
-tcInstDecl2 :: InstInfo Name -> TcM (LHsBinds Id)
+tc_inst_decl2 :: Id -> InstBindings Name -> TcM (LHsBinds Id)
 -- Returns a binding for the dfun
 
 ------------------------
@@ -590,9 +600,8 @@ tcInstDecl2 :: InstInfo Name -> TcM (LHsBinds Id)
 -- If there are no superclasses, matters are simpler, because we don't need the case
 -- see Note [Newtype deriving superclasses] in TcDeriv.lhs
 
-tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = NewTypeDerived })
-  = do  { let dfun_id      = instanceDFunId ispec
-              rigid_info   = InstSkol
+tc_inst_decl2 dfun_id (NewTypeDerived coi)
+  = do  { let rigid_info   = InstSkol
               origin       = SigOrigin rigid_info
               inst_ty      = idType dfun_id
         ; (inst_tvs', theta, inst_head_ty) <- tcSkolSigType rigid_info inst_ty
@@ -693,103 +702,95 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = NewTypeDerived })
 ------------------------
 -- Ordinary instances
 
-tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = VanillaInst monobinds uprags })
-  = let
-        dfun_id    = instanceDFunId ispec
-        rigid_info = InstSkol
-        inst_ty    = idType dfun_id
-        loc        = getSrcSpan dfun_id
-    in
-         -- Prime error recovery
-    recoverM (return emptyLHsBinds)             $
-    setSrcSpan loc                              $
-    addErrCtxt (instDeclCtxt2 (idType dfun_id)) $ do
+tc_inst_decl2 dfun_id (VanillaInst monobinds uprags)
+  = do { let rigid_info = InstSkol
+             inst_ty    = idType dfun_id
 
         -- Instantiate the instance decl with skolem constants
-    (inst_tyvars', dfun_theta', inst_head') <- tcSkolSigType rigid_info inst_ty
+       ; (inst_tyvars', dfun_theta', inst_head') <- tcSkolSigType rigid_info inst_ty
                 -- These inst_tyvars' scope over the 'where' part
                 -- Those tyvars are inside the dfun_id's type, which is a bit
                 -- bizarre, but OK so long as you realise it!
-    let
-        (clas, inst_tys') = tcSplitDFunHead inst_head'
-        (class_tyvars, sc_theta, _, op_items) = classBigSig clas
+       ; let
+            (clas, inst_tys') = tcSplitDFunHead inst_head'
+            (class_tyvars, sc_theta, _, op_items) = classBigSig clas
 
-        -- Instantiate the super-class context with inst_tys
-        sc_theta' = substTheta (zipOpenTvSubst class_tyvars inst_tys') sc_theta
-        origin    = SigOrigin rigid_info
+             -- Instantiate the super-class context with inst_tys
+            sc_theta' = substTheta (zipOpenTvSubst class_tyvars inst_tys') sc_theta
+            origin    = SigOrigin rigid_info
 
          -- Create dictionary Ids from the specified instance contexts.
-    sc_loc      <- getInstLoc InstScOrigin
-    sc_dicts    <- newDictOccs sc_loc sc_theta'		-- These are wanted
-    inst_loc    <- getInstLoc origin
-    dfun_dicts  <- newDictBndrs inst_loc dfun_theta'	-- Includes equalities
-    this_dict   <- newDictBndr inst_loc (mkClassPred clas inst_tys')
+       ; sc_loc      <- getInstLoc InstScOrigin
+       ; sc_dicts    <- newDictOccs sc_loc sc_theta'		-- These are wanted
+       ; inst_loc    <- getInstLoc origin
+       ; dfun_dicts  <- newDictBndrs inst_loc dfun_theta'	-- Includes equalities
+       ; this_dict   <- newDictBndr inst_loc (mkClassPred clas inst_tys')
                 -- Default-method Ids may be mentioned in synthesised RHSs,
                 -- but they'll already be in the environment.
 
         -- Typecheck the methods
-    let this_dict_id  	= instToId this_dict
-	dfun_lam_vars   = map instToVar dfun_dicts	-- Includes equalities
-	prag_fn	= mkPragFun uprags 
-	tc_meth = tcInstanceMethod loc clas inst_tyvars'
-			  	   dfun_dicts
-                   	  	   dfun_theta' inst_tys'
-				   this_dict dfun_id
-                        	   prag_fn monobinds
-    (meth_exprs, meth_binds) <- tcExtendTyVarEnv inst_tyvars'  $
+       ; let this_dict_id  = instToId this_dict
+	     dfun_lam_vars = map instToVar dfun_dicts	-- Includes equalities
+	     prag_fn	= mkPragFun uprags 
+             loc        = getSrcSpan dfun_id
+	     tc_meth    = tcInstanceMethod loc clas inst_tyvars'
+	     		  	 dfun_dicts
+                        	 dfun_theta' inst_tys'
+	     			 this_dict dfun_id
+                             	 prag_fn monobinds
+       ; (meth_exprs, meth_binds) <- tcExtendTyVarEnv inst_tyvars'  $
 				mapAndUnzipM tc_meth op_items 
 
-    -- Figure out bindings for the superclass context
-    -- Don't include this_dict in the 'givens', else
-    -- sc_dicts get bound by just selecting  from this_dict!!
-    sc_binds <- addErrCtxt superClassCtxt $
-                tcSimplifySuperClasses inst_loc this_dict dfun_dicts sc_dicts
+         -- Figure out bindings for the superclass context
+         -- Don't include this_dict in the 'givens', else
+         -- sc_dicts get bound by just selecting  from this_dict!!
+       ; sc_binds <- addErrCtxt superClassCtxt $
+                     tcSimplifySuperClasses inst_loc this_dict dfun_dicts sc_dicts
 		-- Note [Recursive superclasses]
 
 	-- It's possible that the superclass stuff might unified something
 	-- in the envt with one of the inst_tyvars'
-    checkSigTyVars inst_tyvars'
+       ; checkSigTyVars inst_tyvars'
 
-    -- Deal with 'SPECIALISE instance' pragmas
-    prags <- tcPrags dfun_id (filter isSpecInstLSig uprags)
+       -- Deal with 'SPECIALISE instance' pragmas
+       ;  prags <- tcPrags dfun_id (filter isSpecInstLSig uprags)
 
-    -- Create the result bindings
-    let
-        dict_constr   = classDataCon clas
-        inline_prag | null dfun_dicts  = []
-                    | otherwise        = [L loc (InlinePrag (Inline AlwaysActive True))]
-                -- Always inline the dfun; this is an experimental decision
-                -- because it makes a big performance difference sometimes.
-                -- Often it means we can do the method selection, and then
-                -- inline the method as well.  Marcin's idea; see comments below.
-                --
-                -- BUT: don't inline it if it's a constant dictionary;
-                -- we'll get all the benefit without inlining, and we get
-                -- a **lot** of code duplication if we inline it
-                --
-                --      See Note [Inline dfuns] below
+       -- Create the result bindings
+       ; let dict_constr   = classDataCon clas
+             inline_prag | null dfun_dicts  = []
+                         | otherwise        = [L loc (InlinePrag (Inline AlwaysActive True))]
+                     -- Always inline the dfun; this is an experimental decision
+                     -- because it makes a big performance difference sometimes.
+                     -- Often it means we can do the method selection, and then
+                     -- inline the method as well.  Marcin's idea; see comments below.
+                     --
+                     -- BUT: don't inline it if it's a constant dictionary;
+                     -- we'll get all the benefit without inlining, and we get
+                     -- a **lot** of code duplication if we inline it
+                     --
+                     --      See Note [Inline dfuns] below
 
-        sc_dict_vars  = map instToVar sc_dicts
-        dict_bind     = L loc (VarBind this_dict_id dict_rhs)
-        dict_rhs      = foldl (\ f a -> L loc (HsApp f (L loc a))) inst_constr meth_exprs
- 	inst_constr   = L loc $ wrapId (mkWpApps sc_dict_vars <.> mkWpTyApps inst_tys')
-				       (dataConWrapId dict_constr)
-                -- We don't produce a binding for the dict_constr; instead we
-                -- rely on the simplifier to unfold this saturated application
-                -- We do this rather than generate an HsCon directly, because
-                -- it means that the special cases (e.g. dictionary with only one
-                -- member) are dealt with by the common MkId.mkDataConWrapId code rather
-                -- than needing to be repeated here.
+             sc_dict_vars  = map instToVar sc_dicts
+             dict_bind     = L loc (VarBind this_dict_id dict_rhs)
+             dict_rhs      = foldl (\ f a -> L loc (HsApp f (L loc a))) inst_constr meth_exprs
+ 	     inst_constr   = L loc $ wrapId (mkWpApps sc_dict_vars <.> mkWpTyApps inst_tys')
+	     			       (dataConWrapId dict_constr)
+                     -- We don't produce a binding for the dict_constr; instead we
+                     -- rely on the simplifier to unfold this saturated application
+                     -- We do this rather than generate an HsCon directly, because
+                     -- it means that the special cases (e.g. dictionary with only one
+                     -- member) are dealt with by the common MkId.mkDataConWrapId code rather
+                     -- than needing to be repeated here.
 
 
-        main_bind = noLoc $ AbsBinds
-                            inst_tyvars'
-                            dfun_lam_vars
-                            [(inst_tyvars', dfun_id, this_dict_id, inline_prag ++ prags)]
-                            (dict_bind `consBag` sc_binds)
+             main_bind = noLoc $ AbsBinds
+                                 inst_tyvars'
+                                 dfun_lam_vars
+                                 [(inst_tyvars', dfun_id, this_dict_id, inline_prag ++ prags)]
+                                 (dict_bind `consBag` sc_binds)
 
-    showLIE (text "instance")
-    return (main_bind `consBag` unionManyBags meth_binds)
+       ; showLIE (text "instance")
+       ; return (main_bind `consBag` unionManyBags meth_binds) }
 \end{code}
 
 Note [Recursive superclasses]

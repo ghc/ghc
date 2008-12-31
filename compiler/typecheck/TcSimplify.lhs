@@ -1281,7 +1281,7 @@ tcSimplifySuperClasses loc this givens sc_wanteds
   = do	{ traceTc (text "tcSimplifySuperClasses")
 	; (irreds,binds1) <- checkLoop env sc_wanteds
 	; let (tidy_env, tidy_irreds) = tidyInsts irreds
-	; reportNoInstances tidy_env (Just (loc, givens)) tidy_irreds
+	; reportNoInstances tidy_env (Just (loc, givens)) [] tidy_irreds
 	; return binds1 }
   where
     env =  RedEnv { red_doc = pprInstLoc loc, 
@@ -2980,7 +2980,8 @@ tcSimplifyDeriv orig tyvars theta
 	; (irreds, _) <- tryHardCheckLoop doc wanteds
 
 	; let (tv_dicts, others) = partition ok irreds
-	; addNoInstanceErrs others
+	      (tidy_env, tidy_insts) = tidyInsts others
+        ; reportNoInstances tidy_env Nothing [alt_fix] tidy_insts
 	-- See Note [Exotic derived instance contexts] in TcMType
 
 	; let rev_env = zipTopTvSubst tvs (mkTyVarTys tyvars)
@@ -2994,6 +2995,8 @@ tcSimplifyDeriv orig tyvars theta
 
     ok dict | isDict dict = validDerivPred (dictPred dict)
 	    | otherwise	  = False
+    alt_fix = vcat [ptext (sLit "use a standalone 'deriving instance' declaration instead,"),
+                    ptext (sLit "so you can specify the instance context yourself")]
 \end{code}
 
 
@@ -3008,7 +3011,7 @@ tcSimplifyDefault :: ThetaType	-- Wanted; has no type variables in it
 tcSimplifyDefault theta = do
     wanteds <- newDictBndrsO DefaultOrigin theta
     (irreds, _) <- tryHardCheckLoop doc wanteds
-    addNoInstanceErrs  irreds
+    addNoInstanceErrs irreds
     if null irreds then
 	return ()
      else
@@ -3104,7 +3107,7 @@ addNoInstanceErrs :: [Inst]	-- Wanted (can include implications)
 		  -> TcM ()	
 addNoInstanceErrs insts
   = do	{ let (tidy_env, tidy_insts) = tidyInsts insts
-	; reportNoInstances tidy_env Nothing tidy_insts }
+	; reportNoInstances tidy_env Nothing [] tidy_insts }
 
 reportNoInstances 
 	:: TidyEnv
@@ -3112,14 +3115,15 @@ reportNoInstances
 			-- Nothing => top level
 			-- Just (d,g) => d describes the construct
 			--		 with givens g
+        -> [SDoc]	-- Alternative fix for no-such-instance
 	-> [Inst]	-- What is wanted (can include implications)
 	-> TcM ()	
 
-reportNoInstances tidy_env mb_what insts 
-  = groupErrs (report_no_instances tidy_env mb_what) insts
+reportNoInstances tidy_env mb_what alt_fix insts 
+  = groupErrs (report_no_instances tidy_env mb_what alt_fix) insts
 
-report_no_instances :: TidyEnv -> Maybe (InstLoc, [Inst]) -> [Inst] -> TcM ()
-report_no_instances tidy_env mb_what insts
+report_no_instances :: TidyEnv -> Maybe (InstLoc, [Inst]) -> [SDoc] -> [Inst] -> TcM ()
+report_no_instances tidy_env mb_what alt_fixes insts
   = do { inst_envs <- tcGetInstEnvs
        ; let (implics, insts1)  = partition isImplicInst insts
 	     (insts2, overlaps) = partitionWith (check_overlap inst_envs) insts1
@@ -3137,7 +3141,7 @@ report_no_instances tidy_env mb_what insts
     complain_implic inst	-- Recurse!
       = reportNoInstances tidy_env 
 			  (Just (tci_loc inst, tci_given inst)) 
-			  (tci_wanted inst)
+			  alt_fixes (tci_wanted inst)
 
     check_overlap :: (InstEnv,InstEnv) -> Inst -> Either Inst SDoc
 	-- Right msg  => overlap message
@@ -3185,13 +3189,13 @@ report_no_instances tidy_env mb_what insts
       = vcat [ addInstLoc insts $
 	       sep [ ptext (sLit "Could not deduce") <+> pprDictsTheta insts
 	           , nest 2 $ ptext (sLit "from the context") <+> pprDictsTheta givens]
-	     , show_fixes (fix1 loc : fixes2) ]
+	     , show_fixes (fix1 loc : fixes2 ++ alt_fixes) ]
 
       | otherwise	-- Top level 
       = vcat [ addInstLoc insts $
 	       ptext (sLit "No instance") <> plural insts
 		    <+> ptext (sLit "for") <+> pprDictsTheta insts
-	     , show_fixes fixes2 ]
+	     , show_fixes (fixes2 ++ alt_fixes) ]
 
       where
     	fix1 loc = sep [ ptext (sLit "add") <+> pprDictsTheta insts
