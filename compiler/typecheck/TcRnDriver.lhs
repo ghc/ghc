@@ -823,7 +823,7 @@ tcTopSrcDecls boot_details
 
 	     	-- Second pass over class and instance declarations, 
         traceTc (text "Tc6") ;
-	(inst_binds, tcl_env)     <- setLclTypeEnv tcl_env $ tcInstDecls2 tycl_decls inst_infos ;
+	(inst_binds, tcl_env) <- setLclTypeEnv tcl_env $ tcInstDecls2 tycl_decls inst_infos ;
 	showLIE (text "after instDecls2") ;
 
 		-- Foreign exports

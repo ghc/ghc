@@ -534,7 +534,7 @@ splitTyConApp_maybe (FunTy arg res)   = Just (funTyCon, [arg,res])
 splitTyConApp_maybe _                 = Nothing
 
 newTyConInstRhs :: TyCon -> [Type] -> Type
--- ^ Unwrap one 'layer' of newtype on a type constructor and it's arguments, using an 
+-- ^ Unwrap one 'layer' of newtype on a type constructor and its arguments, using an 
 -- eta-reduced version of the @newtype@ if possible
 newTyConInstRhs tycon tys 
     = ASSERT2( equalLength tvs tys1, ppr tycon $$ ppr tys $$ ppr tvs )
