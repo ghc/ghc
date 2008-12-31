@@ -1819,7 +1819,6 @@ glasgowExtsFlags = [
            , Opt_PatternGuards
            , Opt_LiberalTypeSynonyms
            , Opt_RankNTypes
-           , Opt_ImpredicativeTypes
            , Opt_TypeOperators
            , Opt_RecursiveDo
            , Opt_ParallelListComp
