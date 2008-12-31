@@ -1000,18 +1000,20 @@ mkNewTypeEqn orig mayDeriveDataTypeable newtype_deriving tvs
 	-------------------------------------------------------------------
 	--  Figuring out whether we can only do this newtype-deriving thing
 
-	right_arity = length cls_tys + 1 == classArity cls
-
-		-- Never derive Read,Show,Typeable,Data this way 
-	non_iso_class cls = className cls `elem` ([readClassName, showClassName, dataClassName] ++
-					  	  typeableClassNames)
 	can_derive_via_isomorphism
 	   =  not (non_iso_class cls)
-	   && right_arity 			-- Well kinded;
-						-- eg not: newtype T ... deriving( ST )
-						--	because ST needs *2* type params
-	   && eta_ok				-- Eta reduction works
+	   && arity_ok
+	   && eta_ok
+	   && ats_ok
 --	   && not (isRecursiveTyCon tycon)	-- Note [Recursive newtypes]
+
+		-- Never derive Read,Show,Typeable,Data by isomorphism
+	non_iso_class cls = className cls `elem` ([readClassName, showClassName, dataClassName] ++
+					  	  typeableClassNames)
+
+	arity_ok = length cls_tys + 1 == classArity cls
+ 		-- Well kinded; eg not: newtype T ... deriving( ST )
+		--			because ST needs *2* type params
 
 	-- Check that eta reduction is OK
 	eta_ok = nt_eta_arity <= length rep_tc_args
@@ -1022,17 +1024,19 @@ mkNewTypeEqn orig mayDeriveDataTypeable newtype_deriving tvs
 		--     And the [a] must not mention 'b'.  That's all handled
 		--     by nt_eta_rity.
 
-	cant_derive_err = vcat [ptext (sLit "even with cunning newtype deriving:"),
-				if isRecursiveTyCon tycon then
-				  ptext (sLit "the newtype may be recursive")
-				else empty,
-				if not right_arity then 
-				  quotes (ppr (mkClassPred cls cls_tys)) <+> ptext (sLit "does not have arity 1")
-				else empty,
-				if not eta_ok then 
-				  ptext (sLit "cannot eta-reduce the representation type enough")
-				else empty
-				]
+	ats_ok = null (classATs cls)	
+	       -- No associated types for the class, because we don't 
+	       -- currently generate type 'instance' decls; and cannot do
+	       -- so for 'data' instance decls
+					 
+	cant_derive_err
+	   = vcat [ ptext (sLit "even with cunning newtype deriving:")
+		  , if arity_ok then empty else arity_msg
+		  , if eta_ok then empty else eta_msg
+		  , if ats_ok then empty else ats_msg ]
+        arity_msg = quotes (ppr (mkClassPred cls cls_tys)) <+> ptext (sLit "does not have arity 1")
+	eta_msg   = ptext (sLit "cannot eta-reduce the representation type enough")
+	ats_msg   = ptext (sLit "the class has associated types")
 \end{code}
 
 Note [Recursive newtypes]
