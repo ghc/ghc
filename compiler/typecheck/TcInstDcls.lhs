@@ -611,15 +611,28 @@ tc_inst_decl2 dfun_id (NewTypeDerived coi)
               (class_tyvars, sc_theta, _, _) = classBigSig cls
               cls_tycon = classTyCon cls
               sc_theta' = substTheta (zipOpenTvSubst class_tyvars cls_inst_tys) sc_theta
-
               Just (initial_cls_inst_tys, last_ty) = snocView cls_inst_tys
-              (nt_tycon, tc_args) = tcSplitTyConApp last_ty     -- Can't fail
-              rep_ty              = newTyConInstRhs nt_tycon tc_args
 
-              rep_pred     = mkClassPred cls (initial_cls_inst_tys ++ [rep_ty])
-                                -- In our example, rep_pred is (Foo Int (Tree [a]))
-              the_coercion = make_coercion cls_tycon initial_cls_inst_tys nt_tycon tc_args
-                                -- Coercion of kind (Foo Int (Tree [a]) ~ Foo Int (N a)
+              (rep_ty, wrapper) 
+	         = case coi of
+	      	     IdCo   -> (last_ty, idHsWrapper)
+		     ACo co -> (snd (coercionKind co), WpCast (mk_full_coercion co))
+
+		 -----------------------
+		 --        mk_full_coercion
+		 -- The inst_head looks like (C s1 .. sm (T a1 .. ak))
+		 -- But we want the coercion (C s1 .. sm (sym (CoT a1 .. ak)))
+		 --        with kind (C s1 .. sm (T a1 .. ak)  ~  C s1 .. sm <rep_ty>)
+		 --        where rep_ty is the (eta-reduced) type rep of T
+		 -- So we just replace T with CoT, and insert a 'sym'
+		 -- NB: we know that k will be >= arity of CoT, because the latter fully eta-reduced
+
+	      mk_full_coercion co = mkTyConApp cls_tycon 
+	      		       	         (initial_cls_inst_tys ++ [mkSymCoercion co])
+                 -- Full coercion : (Foo Int (Tree [a]) ~ Foo Int (N a)
+
+              rep_pred = mkClassPred cls (initial_cls_inst_tys ++ [rep_ty])
+                 -- In our example, rep_pred is (Foo Int (Tree [a]))
 
         ; sc_loc     <- getInstLoc InstScOrigin
         ; sc_dicts   <- newDictBndrs sc_loc sc_theta'
@@ -639,7 +652,7 @@ tc_inst_decl2 dfun_id (NewTypeDerived coi)
 	-- in the envt with one of the clas_tyvars
 	; checkSigTyVars inst_tvs'
 
-        ; let coerced_rep_dict = wrapId the_coercion (instToId rep_dict)
+        ; let coerced_rep_dict = wrapId wrapper (instToId rep_dict)
 
         ; body <- make_body cls_tycon cls_inst_tys sc_dicts coerced_rep_dict
         ; let dict_bind = noLoc $ VarBind (instToId this_dict) (noLoc body)
@@ -649,22 +662,6 @@ tc_inst_decl2 dfun_id (NewTypeDerived coi)
                             [(inst_tvs', dfun_id, instToId this_dict, [])]
                             (dict_bind `consBag` sc_binds)) }
   where
-      -----------------------
-      --        make_coercion
-      -- The inst_head looks like (C s1 .. sm (T a1 .. ak))
-      -- But we want the coercion (C s1 .. sm (sym (CoT a1 .. ak)))
-      --        with kind (C s1 .. sm (T a1 .. ak)  ~  C s1 .. sm <rep_ty>)
-      --        where rep_ty is the (eta-reduced) type rep of T
-      -- So we just replace T with CoT, and insert a 'sym'
-      -- NB: we know that k will be >= arity of CoT, because the latter fully eta-reduced
-
-    make_coercion cls_tycon initial_cls_inst_tys nt_tycon tc_args
-        | Just co_con <- newTyConCo_maybe nt_tycon
-        , let co = mkSymCoercion (mkTyConApp co_con tc_args)
-        = WpCast (mkTyConApp cls_tycon (initial_cls_inst_tys ++ [co]))
-        | otherwise     -- The newtype is transparent; no need for a cast
-        = idHsWrapper
-
       -----------------------
       --     (make_body C tys scs coreced_rep_dict)
       --                returns
