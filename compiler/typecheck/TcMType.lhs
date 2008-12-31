@@ -1066,6 +1066,7 @@ checkValidMonoType ty = check_mono_type MustBeMonoType ty
 data Rank = ArbitraryRank	  -- Any rank ok
           | MustBeMonoType  	  -- Monotype regardless of flags
 	  | TyConArgMonoType	  -- Monotype but could be poly if -XImpredicativeTypes
+	  | SynArgMonoType	  -- Monotype but could be poly if -XLiberalTypeSynonyms
           | Rank Int		  -- Rank n, but could be more with -XRankNTypes
 
 decRank :: Rank -> Rank		  -- Function arguments
@@ -1139,7 +1140,7 @@ check_type rank ubx_tup ty@(TyConApp tc tys)
 	; liberal <- doptM Opt_LiberalTypeSynonyms
 	; if not liberal || isOpenSynTyCon tc then
 		-- For H98 and synonym families, do check the type args
-		mapM_ (check_mono_type TyConArgMonoType) tys
+		mapM_ (check_mono_type SynArgMonoType) tys
 
 	  else	-- In the liberal case (only for closed syns), expand then check
 	  case tcView ty of   
@@ -1216,6 +1217,7 @@ forAllTyErr rank ty
     suggestion = case rank of
     	       	   Rank _ -> ptext (sLit "Perhaps you intended to use -XRankNTypes or -XRank2Types")
     	       	   TyConArgMonoType -> ptext (sLit "Perhaps you intended to use -XImpredicativeTypes")
+    	       	   SynArgMonoType -> ptext (sLit "Perhaps you intended to use -XLiberalTypeSynonyms")
 		   _ -> empty      -- Polytype is always illegal
 
 unliftedArgErr, ubxArgTyErr :: Type -> SDoc

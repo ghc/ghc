@@ -1792,6 +1792,7 @@ impliedFlags
 
     , (Opt_ScopedTypeVariables, Opt_RelaxedPolyRec)  -- Ditto for scoped type variables; see
                                                      --      Note [Scoped tyvars] in TcBinds
+    , (Opt_ImpredicativeTypes,  Opt_RankNTypes)
   ]
 
 glasgowExtsFlags :: [DynFlag]
