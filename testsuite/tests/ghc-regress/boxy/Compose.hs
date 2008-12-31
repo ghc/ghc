@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fglasgow-exts #-}
+{-# OPTIONS_GHC -XImpredicativeTypes -XEmptyDataDecls -XGADTs #-}
 
 -- Trac #1118
 

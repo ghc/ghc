@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fglasgow-exts #-}
+{-# OPTIONS_GHC -XImpredicativeTypes -XScopedTypeVariables #-}
 
 module ShouldCompile where
 

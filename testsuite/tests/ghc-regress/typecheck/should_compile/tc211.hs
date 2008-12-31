@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# OPTIONS_GHC -XImpredicativeTypes -XScopedTypeVariables -XGADTs #-}
 
 -- Here are a bunch of tests for impredicative polymorphism
 -- mainly written by Dimitrios

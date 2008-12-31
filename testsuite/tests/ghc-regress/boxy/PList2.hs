@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fglasgow-exts #-}
+{-# OPTIONS_GHC -XImpredicativeTypes #-}
 
 module PList2 where 
 -- Polymorphic lists 2: require smart-app-arg & smart-app-res: Should fail w/o smart-app-arg

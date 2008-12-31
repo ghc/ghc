@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# OPTIONS -XImpredicativeTypes #-}
 
 module ShouldFail where
 

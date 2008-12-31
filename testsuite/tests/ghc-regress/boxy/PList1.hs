@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fglasgow-exts #-}
+{-# OPTIONS_GHC -XImpredicativeTypes #-}
 
 module PList1 where 
 -- Polymorphic lists 1: requires smart-app-res  

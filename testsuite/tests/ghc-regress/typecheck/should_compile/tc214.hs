@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fglasgow-exts #-}
+{-# OPTIONS_GHC -XImpredicativeTypes -XGADTs #-}
 
 -- This program sent GHC 6.6 into a loop, because the fixpointing
 -- of the substitution in type refinement got its in-scope-set

@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fglasgow-exts #-}
+{-# OPTIONS_GHC -XImpredicativeTypes #-}
 
 module Base1 where 
 -- basic examples of impredicative instantiation of variables 
