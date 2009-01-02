@@ -24,6 +24,7 @@ import Haddock.GHC.Utils
 import Haddock.GHC.Typecheck
 import Haddock.Exception
 import Haddock.Utils
+import Haddock.InterfaceFile
 
 import qualified Data.Map as Map
 import Data.Map (Map)
@@ -42,19 +43,28 @@ import SrcLoc
 -- | Turn a topologically sorted list of module names/filenames into interfaces. Also
 -- return the home link environment created in the process.
 #if __GLASGOW_HASKELL__ >= 609
-createInterfaces :: [String] -> LinkEnv -> [Flag] -> Ghc ([Interface], LinkEnv)
-createInterfaces modules externalLinks flags = do
+createInterfaces :: [String] -> [Flag] -> [InterfaceFile]
+                 -> Ghc ([Interface], LinkEnv)
+createInterfaces modules flags extIfaces = do
   -- part 1, create interfaces
-  interfaces <- createInterfaces' modules flags
+  let instIfaceMap =  Map.fromList [ (instMod iface, iface) | ext <- extIfaces
+                                   , iface <- ifInstalledIfaces ext ]
+  interfaces <- createInterfaces' modules flags instIfaceMap
 #else
-createInterfaces :: Session -> [String] -> LinkEnv -> [Flag] -> IO ([Interface], LinkEnv)
-createInterfaces session modules externalLinks flags = do
+createInterfaces :: Session -> [String] -> [Flag]
+                 -> [InterfaceFile] -> IO ([Interface], LinkEnv)
+createInterfaces session modules flags extIfaces = do
   -- part 1, create interfaces
-  interfaces <- createInterfaces' session modules flags
+  let instIfaceMap =  Map.fromList [ (instMod iface, iface) | ext <- extIfaces
+                                   , iface <- ifInstalledIfaces ext ]
+  interfaces <- createInterfaces' session modules flags instIfaceMap
 #endif
   -- part 2, build link environment
-  let homeLinks = buildHomeLinks interfaces
-      links     = homeLinks `Map.union` externalLinks
+      -- combine the link envs of the external packages into one
+  let extLinks  = Map.unions (map ifLinkEnv extIfaces)
+      homeLinks = buildHomeLinks interfaces -- build the environment for the home
+                                            -- package
+      links     = homeLinks `Map.union` extLinks
       allNames  = Map.keys links
 
   -- part 3, attach instances
@@ -70,17 +80,17 @@ createInterfaces session modules externalLinks flags = do
 
 
 #if __GLASGOW_HASKELL__ >= 609
-createInterfaces' :: [String] -> [Flag] -> Ghc [Interface]
-createInterfaces' modules flags = do
+createInterfaces' :: [String] -> [Flag] -> InstIfaceMap -> Ghc [Interface]
+createInterfaces' modules flags instIfaceMap = do
   targets <- mapM (\f -> guessTarget f Nothing) modules
   setTargets targets
   modgraph <- depanal [] False
   let orderedMods = flattenSCCs $ topSortModuleGraph False modgraph Nothing
   (ifaces, _) <- foldM (\(ifaces, modMap) modsum -> do
-    interface <- processModule modsum flags modMap
+    interface <- processModule modsum flags modMap instIfaceMap
 #else
-createInterfaces' :: Session -> [String] -> [Flag] -> IO [Interface]
-createInterfaces' session modules flags = do
+createInterfaces' :: Session -> [String] -> [Flag] -> InstIfaceMap -> IO [Interface]
+createInterfaces' session modules flags instIfaceMap = do
   targets <- mapM (\f -> guessTarget f Nothing) modules
   setTargets session targets
   mbGraph <- depanal session [] False
@@ -89,7 +99,7 @@ createInterfaces' session modules flags = do
     Nothing -> throwE "Failed to create dependecy graph"
   let orderedMods = flattenSCCs $ topSortModuleGraph False modgraph Nothing
   (ifaces, _) <- foldM (\(ifaces, modMap) modsum -> do
-    interface <- processModule session modsum flags modMap
+    interface <- processModule session modsum flags modMap instIfaceMap
 #endif
     return $ (interface : ifaces , Map.insert (ifaceMod interface) interface modMap)
     ) ([], Map.empty) orderedMods
@@ -128,8 +138,8 @@ ppModInfo (HaddockModInfo a b c d) = show (fmap pretty a) ++ show b ++ show c ++
 -}
 
 #if __GLASGOW_HASKELL__ >= 609
-processModule :: ModSummary -> [Flag] -> ModuleMap -> Ghc Interface
-processModule modsum flags modMap = 
+processModule :: ModSummary -> [Flag] -> ModuleMap -> InstIfaceMap -> Ghc Interface
+processModule modsum flags modMap instIfaceMap = 
 
   let handleSrcErrors action = flip handleSourceError action $ \err -> do 
         printExceptionAndWarnings err
@@ -147,20 +157,20 @@ processModule modsum flags modMap =
                               typecheckedSource tc_mod,
                               moduleInfo tc_mod))
                              dynflags
-       let (interface, msg) = runWriter $ createInterface ghcMod flags modMap
+       let (interface, msg) = runWriter $ createInterface ghcMod flags modMap instIfaceMap
        liftIO $ mapM_ putStrLn msg
        liftIO $ evaluate interface
        return interface
 #else
-processModule :: Session -> ModSummary -> [Flag] -> ModuleMap -> IO Interface
-processModule session modsum flags modMap = do
+processModule :: Session -> ModSummary -> [Flag] -> ModuleMap -> InstIfaceMap -> IO Interface
+processModule session modsum flags modMap instIfaceMap = do
   let filename = msHsFilePath modsum
   mbMod <- checkAndLoadModule session modsum False
   ghcMod <- case mbMod of
     Just (CheckedModule a (Just b) (Just c) (Just d) _)
       -> return $ mkGhcModule (ms_mod modsum, filename, (a,b,c,d)) (ms_hspp_opts modsum)
     _ -> throwE ("Failed to check module: " ++ (moduleString $ ms_mod modsum))
-  let (interface, msg) = runWriter $ createInterface ghcMod flags modMap
+  let (interface, msg) = runWriter $ createInterface ghcMod flags modMap instIfaceMap
   mapM_ putStrLn msg
   return interface
 #endif

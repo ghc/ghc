@@ -353,13 +353,14 @@ instance Binary InterfaceFile where
 
 
 instance Binary InstalledInterface where
-  put_ bh (InstalledInterface modu info docMap exps visExps opts) = do
+  put_ bh (InstalledInterface modu info docMap exps visExps opts subMap) = do
     put_ bh modu
     put_ bh info
     put_ bh (Map.toList docMap)
     put_ bh exps
     put_ bh visExps
     put_ bh opts
+    put_ bh (Map.toList subMap)
 
   get bh = do
     modu    <- get bh
@@ -368,7 +369,10 @@ instance Binary InstalledInterface where
     exps    <- get bh
     visExps <- get bh
     opts    <- get bh
-    return (InstalledInterface modu info (Map.fromList docMap) exps visExps opts)
+    subMap  <- get bh
+    
+    return (InstalledInterface modu info (Map.fromList docMap)
+            exps visExps opts (Map.fromList subMap))
 
 
 instance Binary DocOption where

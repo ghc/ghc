@@ -609,7 +609,7 @@ ifaceToHtml maybe_source_url maybe_wiki_url iface
     exports = numberSectionHeadings (ifaceRnExportItems iface)
 
     has_doc (ExportDecl _ doc _ _) = isJust doc
-    has_doc (ExportNoDecl _ _ _) = False
+    has_doc (ExportNoDecl _ _) = False
     has_doc (ExportModule _) = False
     has_doc _ = True
 
@@ -733,9 +733,9 @@ processExport _ _ _ (ExportGroup lev id0 doc)
   = ppDocGroup lev (namedAnchor id0 << docToHtml doc)
 processExport summary links docMap (ExportDecl decl doc subdocs insts)
   = ppDecl summary links decl doc insts docMap subdocs
-processExport summmary _ _ (ExportNoDecl _ y [])
+processExport summmary _ _ (ExportNoDecl y [])
   = declBox (ppDocName y)
-processExport summmary _ _ (ExportNoDecl _ y subs)
+processExport summmary _ _ (ExportNoDecl y subs)
   = declBox (ppDocName y <+> parenList (map ppDocName subs))
 processExport _ _ _ (ExportDoc doc)
   = docBox (docToHtml doc)

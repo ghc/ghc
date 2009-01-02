@@ -56,11 +56,7 @@ data ExportItem name
 	  }	-- ^ An exported declaration 
 		    
   | ExportNoDecl {
-	  -- | The original name
-      expItemName :: Name,
-
-      -- | Where to link to
-      expItemLinkTarget :: name,
+      expItemName :: name,
 
       -- | Subordinate names
       expItemSubs :: [name]
@@ -89,6 +85,7 @@ data ExportItem name
 
 type InstHead name = ([HsPred name], name, [HsType name])
 type ModuleMap     = Map Module Interface
+type InstIfaceMap  = Map Module InstalledInterface
 type DocMap        = Map Name (HsDoc DocName)
 type LinkEnv       = Map Name Module
 
@@ -136,6 +133,7 @@ data Interface = Interface {
 
   ifaceDeclMap         :: Map Name DeclInfo,
   ifaceRnDocMap        :: Map Name (HsDoc DocName),
+  ifaceSubMap          :: Map Name [Name],
 
   ifaceExportItems     :: ![ExportItem Name],
   ifaceRnExportItems   :: [ExportItem DocName],
@@ -168,7 +166,8 @@ data InstalledInterface = InstalledInterface {
   instDocMap         :: Map Name (HsDoc DocName),
   instExports        :: [Name],
   instVisibleExports :: [Name],
-  instOptions        :: [DocOption]
+  instOptions        :: [DocOption],
+  instSubMap         :: Map Name [Name]
 }
 
 
@@ -180,7 +179,8 @@ toInstalledIface interface = InstalledInterface {
   instDocMap         = ifaceRnDocMap       interface,
   instExports        = ifaceExports        interface,
   instVisibleExports = ifaceVisibleExports interface,
-  instOptions        = ifaceOptions        interface
+  instOptions        = ifaceOptions        interface,
+  instSubMap         = ifaceSubMap         interface
 }
 
 

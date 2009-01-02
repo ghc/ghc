@@ -166,11 +166,10 @@ main = handleTopExceptions $ do
         -- get packages supplied with --read-interface
         packages <- readInterfaceFiles nameCacheFromGhc (ifacePairs flags)
 
-        -- combine the link envs of the external packages into one
-        let extLinks = Map.unions (map (ifLinkEnv . fst) packages)
 
         -- create the interfaces -- this is the core part of Haddock
-        (interfaces, homeLinks) <- createInterfaces fileArgs extLinks flags
+        (interfaces, homeLinks) <- createInterfaces fileArgs flags
+                                                    (map fst packages)
 
         liftIO $ do
           -- render the interfaces
@@ -185,11 +184,9 @@ main = handleTopExceptions $ do
       -- get packages supplied with --read-interface
       packages <- readInterfaceFiles (nameCacheFromGhc session) (ifacePairs flags)
 
-      -- combine the link envs of the external packages into one
-      let extLinks = Map.unions (map (ifLinkEnv . fst) packages)
-
       -- create the interfaces -- this is the core part of Haddock
-      (interfaces, homeLinks) <- createInterfaces session fileArgs extLinks flags
+      (interfaces, homeLinks) <- createInterfaces session fileArgs flags
+                                                  (map fst packages)
 
       -- render the interfaces
       renderStep packages interfaces

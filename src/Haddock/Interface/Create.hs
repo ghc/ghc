@@ -40,8 +40,9 @@ import HscTypes
 -- | Process the data in the GhcModule to produce an interface.
 -- To do this, we need access to already processed modules in the topological
 -- sort. That's what's in the module map.
-createInterface :: GhcModule -> [Flag] -> ModuleMap -> ErrMsgM Interface
-createInterface ghcMod flags modMap = do
+createInterface :: GhcModule -> [Flag] -> ModuleMap -> InstIfaceMap
+                -> ErrMsgM Interface
+createInterface ghcMod flags modMap instIfaceMap = do
 
   let mod = ghcModule ghcMod
 
@@ -63,9 +64,9 @@ createInterface ghcMod flags modMap = do
   warnAboutFilteredDecls mod decls0
 
   exportItems <- mkExportItems modMap mod (ghcExportedNames ghcMod) decls declMap
-                               opts exports ignoreExps instances
+                               opts exports ignoreExps instances instIfaceMap
 
-  let visibleNames = mkVisibleNames exportItems
+  let visibleNames = mkVisibleNames exportItems opts
   
   -- prune the export list to just those declarations that have
   -- documentation, if the 'prune' option is on.
@@ -88,6 +89,7 @@ createInterface ghcMod flags modMap = do
     ifaceExports         = exportedNames,
     ifaceVisibleExports  = visibleNames, 
     ifaceDeclMap         = declMap,
+    ifaceSubMap          = mkSubMap declMap exportedNames,
     ifaceInstances       = ghcInstances ghcMod
   }
 
@@ -122,6 +124,14 @@ parseOption other = tell ["Unrecognised option: " ++ other] >> return Nothing
 --------------------------------------------------------------------------------
 -- Declarations
 --------------------------------------------------------------------------------
+
+-- | Make a sub map from a declaration map. Make sure we only include exported
+-- names.
+mkSubMap :: Map Name DeclInfo -> [Name] -> Map Name [Name]
+mkSubMap declMap exports =
+  Map.filterWithKey (\k _ -> k `elem` exports) (Map.map filterSubs declMap)
+  where
+    filterSubs (_, _, subs) = [ sub  | (sub, _) <- subs, sub `elem` exports ]
 
 
 -- Make a map from names to 'DeclInfo's. Exclude declarations that don't
@@ -322,6 +332,9 @@ attachATs exports =
 -- | Build the list of items that will become the documentation, from the
 -- export list.  At this point, the list of ExportItems is in terms of
 -- original names.
+--
+-- We create the export items even if the module is hidden, since they
+-- might be useful when creating the export items for other modules.
 mkExportItems
   :: ModuleMap
   -> Module			-- this module
@@ -332,10 +345,11 @@ mkExportItems
   -> Maybe [IE Name]
   -> Bool				-- --ignore-all-exports flag
   -> [Instance]
+  -> InstIfaceMap
   -> ErrMsgM [ExportItem Name]
 
 mkExportItems modMap this_mod exported_names decls declMap
-              opts maybe_exps ignore_all_exports instances
+              opts maybe_exps ignore_all_exports instances instIfaceMap
   | isNothing maybe_exps || ignore_all_exports || OptIgnoreExports `elem` opts
     = everything_local_exported
   | Just specs <- maybe_exps = liftM concat $ mapM lookupExport specs
@@ -373,7 +387,17 @@ mkExportItems modMap this_mod exported_names decls declMap
       -- name out in mkVisibleNames...
       | Just x@(decl,_,_) <- findDecl t,
         t `notElem` declATs (unL decl) = return [ mkExportDecl t x ]
-      | otherwise = return []
+      | otherwise =
+        -- If we can't find the declaration, it must belong to another package.
+        -- We return an 'ExportNoDecl', and we try to get the subs from the
+        -- installed interface of that package.
+        case Map.lookup (nameModule t) instIfaceMap of
+          Nothing -> return [ ExportNoDecl t [] ]
+          Just iface ->
+            let subs = case Map.lookup t (instSubMap iface) of
+                         Nothing -> []
+                         Just x -> x
+            in return [ ExportNoDecl t subs ]
 
     mkExportDecl :: Name -> DeclInfo -> ExportItem Name
     mkExportDecl n (decl, doc, subs) = decl'
@@ -481,15 +505,18 @@ pruneExportItems items = filter hasDoc items
 	hasDoc _ = True
 
 
-mkVisibleNames :: [ExportItem Name] -> [Name]
-mkVisibleNames exports = concatMap exportName exports
+mkVisibleNames :: [ExportItem Name] -> [DocOption] -> [Name]
+mkVisibleNames exports opts
+  | OptHide `elem` opts = []
+  | otherwise = concatMap exportName exports
   where
     exportName e@ExportDecl {} =
       case getMainDeclBinder $ unL $ expItemDecl e of
         Just n -> n : subs
         Nothing -> subs
       where subs = map fst (expItemSubDocs e) 
-    exportName e@ExportNoDecl {} = expItemName e : expItemSubs e
+    exportName e@ExportNoDecl {} = [] -- we don't count these as visible, since
+                                      -- we don't want links to go to them.
     exportName _ = []
 
       
