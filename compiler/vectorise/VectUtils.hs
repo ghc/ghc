@@ -56,8 +56,8 @@ collectAnnTypeBinders expr = go [] expr
 collectAnnValBinders :: AnnExpr Var ann -> ([Var], AnnExpr Var ann)
 collectAnnValBinders expr = go [] expr
   where
-    go bs (_, AnnLam b e) | isIdVar b = go (b:bs) e
-    go bs e                           = (reverse bs, e)
+    go bs (_, AnnLam b e) | isId b = go (b:bs) e
+    go bs e                        = (reverse bs, e)
 
 isAnnTypeArg :: AnnExpr b ann -> Bool
 isAnnTypeArg (_, AnnType _) = True

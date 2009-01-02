@@ -309,7 +309,7 @@ sizeExpr bOMB_OUT_SIZE top_args expr
       | fun `hasKey` buildIdKey   = buildSize
       | fun `hasKey` augmentIdKey = augmentSize
       | otherwise 
-      = case globalIdDetails fun of
+      = case idDetails fun of
 	  DataConWorkId dc -> conSizeN dc (valArgCount args)
 
 	  FCallId _    -> sizeN opt_UF_DearOp
@@ -684,7 +684,7 @@ slow-down).  The motivation was test eyeball/inline1.hs; but that seems
 to work ok now.
 
 Note [Lone variables]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
 The "lone-variable" case is important.  I spent ages messing about
 with unsatisfactory varaints, but this is nice.  The idea is that if a
 variable appears all alone

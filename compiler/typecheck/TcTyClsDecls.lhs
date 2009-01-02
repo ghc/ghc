@@ -7,7 +7,7 @@ TcTyClsDecls: Typecheck type and class declarations
 
 \begin{code}
 module TcTyClsDecls (
-	tcTyAndClassDecls, tcFamInstDecl
+	tcTyAndClassDecls, tcFamInstDecl, mkAuxBinds
     ) where
 
 #include "HsVersions.h"
@@ -25,6 +25,7 @@ import TcClassDcl
 import TcHsType
 import TcMType
 import TcType
+import TysWiredIn	( unitTy )
 import FunDeps
 import Type
 import Generics
@@ -32,6 +33,8 @@ import Class
 import TyCon
 import DataCon
 import Id
+import MkId		( rEC_SEL_ERROR_ID )
+import IdInfo
 import Var
 import VarSet
 import Name
@@ -46,7 +49,10 @@ import ListSetOps
 import Digraph
 import DynFlags
 import FastString
+import Unique		( mkBuiltinUnique )
+import BasicTypes
 
+import Bag
 import Data.List
 import Control.Monad    ( mplus )
 \end{code}
@@ -133,8 +139,9 @@ indeed type families).  I think.
 
 \begin{code}
 tcTyAndClassDecls :: ModDetails -> [LTyClDecl Name]
-   	           -> TcM TcGblEnv 	-- Input env extended by types and classes 
-					-- and their implicit Ids,DataCons
+   	           -> TcM (TcGblEnv,   	     -- Input env extended by types and classes 
+					     -- and their implicit Ids,DataCons
+		           HsValBinds Name)  -- Renamed bindings for record selectors
 -- Fails if there are any errors
 
 tcTyAndClassDecls boot_details allDecls
@@ -199,11 +206,13 @@ tcTyAndClassDecls boot_details allDecls
 	-- NB: All associated types and their implicit things will be added a
 	--     second time here.  This doesn't matter as the definitions are
 	--     the same.
-	; let {	implicit_things = concatMap implicitTyThings alg_tyclss }
+	; let {	implicit_things = concatMap implicitTyThings alg_tyclss
+	      ; aux_binds       = mkAuxBinds alg_tyclss }
 	; traceTc ((text "Adding" <+> ppr alg_tyclss) 
 		   $$ (text "and" <+> ppr implicit_things))
-  	; tcExtendGlobalEnv implicit_things getGblEnv
-    }}
+  	; env <- tcExtendGlobalEnv implicit_things getGblEnv
+	; return (env, aux_binds) }
+    }
   where
     -- Pull associated types out of class declarations, to tie them into the
     -- knot above.  
@@ -230,7 +239,7 @@ mkGlobalThings decls things
 
 %************************************************************************
 %*									*
-\subsection{Type checking family instances}
+               Type checking family instances
 %*									*
 %************************************************************************
 
@@ -360,7 +369,7 @@ tcFamInstDecl1 d = pprPanic "tcFamInstDecl1" (ppr d)
 -- * Here we check that a type instance matches its kind signature, but we do
 --   not check whether there is a pattern for each type index; the latter
 --   check is only required for type synonym instances.
---
+
 kcIdxTyPats :: TyClDecl Name
 	    -> ([LHsTyVarBndr Name] -> [LHsType Name] -> Kind -> TyCon -> TcM a)
 	       -- ^^kinded tvs         ^^kinded ty pats  ^^res kind
@@ -853,8 +862,9 @@ tcConDecl unbox_strict existential_ok rep_tycon res_tmpl 	-- Data types
 -- In this case orig_res_ty = T (e,e)
 
 tcResultType :: ([TyVar], Type)	-- Template for result type; e.g.
-				-- data T a b c = ...  gives ([a,b,c], T a b)
-	     -> [TyVar] 	-- where MkT :: forall a b c. ...
+				-- data instance T [a] b c = ...  
+				--      gives template ([a,b,c], T [a] b c)
+	     -> [TyVar] 	-- where MkT :: forall x y z. ...
 	     -> ResType Name
 	     -> TcM ([TyVar],	 	-- Universal
 		     [TyVar],		-- Existential (distinct OccNames from univs)
@@ -879,6 +889,7 @@ tcResultType (tmpl_tvs, res_tmpl) dc_tvs (ResTyGADT res_ty)
 	--	    b		   b~z
 	--	    z		   
 	-- Existentials are the leftover type vars: [x,y]
+	-- So we return ([a,b,z], [x,y], [a~(x,y),b~z], T [(x,y)] z z)
   = do	{ res_ty' <- tcHsKindedType res_ty
 	; let Just subst = tcMatchTy (mkVarSet tmpl_tvs) res_tmpl res_ty'
 
@@ -952,9 +963,10 @@ But it's the *argument* type that matters. This is fine:
 	data S = MkS S !Int
 because Int is non-recursive.
 
+
 %************************************************************************
 %*									*
-\subsection{Dependency analysis}
+		Validity checking
 %*									*
 %************************************************************************
 
@@ -1175,9 +1187,175 @@ checkValidClass cls
 		-- forall has an (Eq a) constraint.  Whereas in general, each constraint 
 		-- in the context of a for-all must mention at least one quantified
 		-- type variable.  What a mess!
+\end{code}
 
 
----------------------------------------------------------------------
+%************************************************************************
+%*									*
+		Building record selectors
+%*									*
+%************************************************************************
+
+\begin{code}
+mkAuxBinds :: [TyThing] -> HsValBinds Name
+mkAuxBinds ty_things
+  = ValBindsOut [(NonRecursive, b) | b <- binds] sigs
+  where
+    (sigs, binds) = unzip rec_sels
+    rec_sels = map mkRecSelBind [ (tc,fld) 
+       	 	     	        | ATyCon tc <- ty_things 
+				, fld <- tyConFields tc ]
+
+
+mkRecSelBind :: (TyCon, FieldLabel) -> (LSig Name, LHsBinds Name)
+mkRecSelBind (tycon, sel_name)
+  = (L loc (IdSig sel_id), unitBag (L loc sel_bind))
+  where
+    loc = getSrcSpan tycon    
+    sel_id = Var.mkLocalVar rec_details sel_name sel_ty vanillaIdInfo
+    rec_details = RecSelId { sel_tycon = tycon, sel_naughty = is_naughty }
+
+    -- Find a representative constructor, con1
+    all_cons = tyConDataCons tycon 
+    cons_w_field = [ con | con <- all_cons
+                   , sel_name `elem` dataConFieldLabels con ] 
+    con1 = ASSERT( not (null cons_w_field) ) head cons_w_field
+
+    -- Selector type; Note [Polymorphic selectors]
+    field_ty = dataConFieldType con1 sel_name
+    (field_tvs, field_theta, field_tau) 
+       | is_naughty = ([], [], unitTy)
+       | otherwise  = tcSplitSigmaTy field_ty
+    data_ty    = dataConOrigResTy con1
+    data_tvs   = tyVarsOfType data_ty
+    is_naughty = not (tyVarsOfType field_ty `subVarSet` data_tvs)  
+    sel_ty = mkForAllTys (varSetElems data_tvs ++ field_tvs) $ 
+    	     mkPhiTy (dataConStupidTheta con1)  $	-- Urgh!
+    	     mkPhiTy field_theta  	 	$	-- Urgh!
+             mkFunTy data_ty field_tau
+
+    -- Make the binding: sel (C2 { fld = x }) = x
+    --                   sel (C7 { fld = x }) = x
+    --    where cons_w_field = [C2,C7]
+    sel_bind  	 = mkFunBind sel_lname (map mk_match cons_w_field ++ deflt)
+    mk_match con = mkSimpleMatch [L loc (mk_sel_pat con)] 
+                                 (L loc match_body)
+    mk_sel_pat con = ConPatIn (L loc (getName con)) (RecCon rec_fields)
+    rec_fields = HsRecFields { rec_flds = [rec_field], rec_dotdot = Nothing }
+    rec_field  = HsRecField { hsRecFieldId = sel_lname
+                            , hsRecFieldArg = nlVarPat field_var
+                            , hsRecPun = False }
+    match_body | is_naughty = ExplicitTuple [] Boxed
+    	       | otherwise  = HsVar field_var
+    sel_lname = L loc sel_name
+    field_var = mkInternalName (mkBuiltinUnique 1) (getOccName sel_name) loc
+
+    -- Add catch-all default case unless the case is exhaustive
+    -- We do this explicitly so that we get a nice error message that
+    -- mentions this particular record selector
+    deflt | length cons_w_field == length all_cons = []
+	  | otherwise = [mkSimpleMatch [nlWildPat] 
+	    	      	    (nlHsApp (nlHsVar (getName rEC_SEL_ERROR_ID))
+    	      		    	     (nlHsLit msg_lit))]
+    msg_lit = HsStringPrim $ mkFastString $ 
+              occNameString (getOccName sel_name)
+
+---------------
+tyConFields :: TyCon -> [FieldLabel]
+tyConFields tc 
+  | isAlgTyCon tc = nub (concatMap dataConFieldLabels (tyConDataCons tc))
+  | otherwise     = []
+\end{code}
+
+Note [Polymorphic selectors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When a record has a polymorphic field, we pull the foralls out to the front.
+   data T = MkT { f :: forall a. [a] -> a }
+Then f :: forall a. T -> [a] -> a
+NOT  f :: T -> forall a. [a] -> a
+
+This is horrid.  It's only needed in deeply obscure cases, which I hate.
+The only case I know is test tc163, which is worth looking at.  It's far
+from clear that this test should succeed at all!
+
+Note [Naughty record selectors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A "naughty" field is one for which we can't define a record 
+selector, because an existential type variable would escape.  For example:
+        data T = forall a. MkT { x,y::a }
+We obviously can't define       
+        x (MkT v _) = v
+Nevertheless we *do* put a RecSelId into the type environment
+so that if the user tries to use 'x' as a selector we can bleat
+helpfully, rather than saying unhelpfully that 'x' is not in scope.
+Hence the sel_naughty flag, to identify record selectors that don't really exist.
+
+In general, a field is naughty if its type mentions a type variable that
+isn't in the result type of the constructor.
+
+We make a dummy binding for naughty selectors, so that they can be treated
+uniformly, apart from their sel_naughty field.  The function is never called.
+
+Note [GADT record selectors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For GADTs, we require that all constructors with a common field 'f' have the same
+result type (modulo alpha conversion).  [Checked in TcTyClsDecls.checkValidTyCon]
+E.g. 
+        data T where
+          T1 { f :: Maybe a } :: T [a]
+          T2 { f :: Maybe a, y :: b  } :: T [a]
+
+and now the selector takes that result type as its argument:
+   f :: forall a. T [a] -> Maybe a
+
+Details: the "real" types of T1,T2 are:
+   T1 :: forall r a.   (r~[a]) => a -> T r
+   T2 :: forall r a b. (r~[a]) => a -> b -> T r
+
+So the selector loooks like this:
+   f :: forall a. T [a] -> Maybe a
+   f (a:*) (t:T [a])
+     = case t of
+	 T1 c   (g:[a]~[c]) (v:Maybe c)       -> v `cast` Maybe (right (sym g))
+         T2 c d (g:[a]~[c]) (v:Maybe c) (w:d) -> v `cast` Maybe (right (sym g))
+
+Note the forall'd tyvars of the selector are just the free tyvars
+of the result type; there may be other tyvars in the constructor's
+type (e.g. 'b' in T2).
+
+Note the need for casts in the result!
+
+Note [Selector running example]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+It's OK to combine GADTs and type families.  Here's a running example:
+
+        data instance T [a] where 
+          T1 { fld :: b } :: T [Maybe b]
+
+The representation type looks like this
+        data :R7T a where
+          T1 { fld :: b } :: :R7T (Maybe b)
+
+and there's coercion from the family type to the representation type
+        :CoR7T a :: T [a] ~ :R7T a
+
+The selector we want for fld looks like this:
+
+        fld :: forall b. T [Maybe b] -> b
+        fld = /\b. \(d::T [Maybe b]).
+              case d `cast` :CoR7T (Maybe b) of 
+                T1 (x::b) -> x
+
+The scrutinee of the case has type :R7T (Maybe b), which can be
+gotten by appying the eq_spec to the univ_tvs of the data con.
+
+%************************************************************************
+%*									*
+		Error messages
+%*									*
+%************************************************************************
+
+\begin{code}
 resultTypeMisMatch :: Name -> DataCon -> DataCon -> SDoc
 resultTypeMisMatch field_name con1 con2
   = vcat [sep [ptext (sLit "Constructors") <+> ppr con1 <+> ptext (sLit "and") <+> ppr con2, 
@@ -1313,13 +1491,6 @@ badFamInstDecl tc_name
 	   quotes (ppr tc_name)
 	 , nest 2 (parens $ ptext (sLit "Use -XTypeFamilies to allow indexed type families")) ]
 
-{-
-badGadtIdxTyDecl :: Name -> SDoc
-badGadtIdxTyDecl tc_name
-  = vcat [ ptext (sLit "Illegal generalised algebraic data declaration for") <+>
-	   quotes (ppr tc_name)
-	 , nest 2 (parens $ ptext (sLit "Family instances can not yet use GADT declarations")) ]
--}
 tooManyParmsErr :: Located Name -> SDoc
 tooManyParmsErr tc_name
   = ptext (sLit "Family instance has too many parameters:") <+> 

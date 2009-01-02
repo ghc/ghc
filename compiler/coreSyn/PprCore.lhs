@@ -250,7 +250,7 @@ pprCoreBinder :: BindingSite -> Var -> SDoc
 pprCoreBinder LetBind binder
   | isTyVar binder = pprKindedTyVarBndr binder
   | otherwise
-  = vcat [sig, pprIdDetails binder, pragmas]
+  = vcat [sig, pprIdExtras binder, pragmas]
   where
     sig     = pprTypedBinder binder
     pragmas = ppIdInfo binder (idInfo binder)
@@ -326,10 +326,12 @@ pprIdBndrInfo info
 
 
 \begin{code}
-pprIdDetails :: Id -> SDoc
-pprIdDetails id | isGlobalId id     = ppr (globalIdDetails id)
-		| isExportedId id   = ptext (sLit "[Exported]")
-		| otherwise	    = empty
+pprIdExtras :: Id -> SDoc
+pprIdExtras id = pp_scope <> ppr (idDetails id)
+  where
+    pp_scope | isGlobalId id   = ptext (sLit "GblId")
+    	     | isExportedId id = ptext (sLit "LclIdX")
+    	     | otherwise       = ptext (sLit "LclId")
 
 ppIdInfo :: Id -> IdInfo -> SDoc
 ppIdInfo _ info

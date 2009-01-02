@@ -321,14 +321,15 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
 
        ; let { (local_info,
                 at_tycons_s)   = unzip local_info_tycons
-             ; at_idx_tycon    = concat at_tycons_s ++ idx_tycons
+             ; at_idx_tycons   = concat at_tycons_s ++ idx_tycons
              ; clas_decls      = filter (isClassDecl.unLoc) tycl_decls
-             ; implicit_things = concatMap implicitTyThings at_idx_tycon
+             ; implicit_things = concatMap implicitTyThings at_idx_tycons
+	     ; aux_binds       = mkAuxBinds at_idx_tycons
              }
 
                 -- (2) Add the tycons of indexed types and their implicit
                 --     tythings to the global environment
-       ; tcExtendGlobalEnv (at_idx_tycon ++ implicit_things) $ do {
+       ; tcExtendGlobalEnv (at_idx_tycons ++ implicit_things) $ do {
 
                 -- (3) Instances from generic class declarations
        ; generic_inst_info <- getGenericInstances clas_decls
@@ -340,7 +341,7 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
                 --   c) local family instance decls
        ; addInsts local_info         $ do {
        ; addInsts generic_inst_info  $ do {
-       ; addFamInsts at_idx_tycon    $ do {
+       ; addFamInsts at_idx_tycons   $ do {
 
                 -- (4) Compute instances from "deriving" clauses;
                 -- This stuff computes a context for the derived instance
@@ -352,13 +353,11 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
 				-- more errors still
        ; (deriv_inst_info, deriv_binds) <- tcDeriving tycl_decls inst_decls
                                                       deriv_decls
-       ; addInsts deriv_inst_info   $ do {
-
-       ; gbl_env <- getGblEnv
+       ; gbl_env <- addInsts deriv_inst_info getGblEnv
        ; return (gbl_env,
                   generic_inst_info ++ deriv_inst_info ++ local_info,
-                  deriv_binds)
-    }}}}}}
+                  aux_binds `plusHsValBinds` deriv_binds)
+    }}}}}
   where
     -- Make sure that toplevel type instance are not for associated types.
     -- !!!TODO: Need to perform this check for the TyThing of type functions,

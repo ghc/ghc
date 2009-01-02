@@ -55,7 +55,6 @@ module TyCon(
 	tyConTyVars,
 	tyConDataCons, tyConDataCons_maybe, tyConSingleDataCon_maybe,
 	tyConFamilySize,
-	tyConSelIds,
 	tyConStupidTheta,
 	tyConArity,
 	tyConClass_maybe,
@@ -145,8 +144,6 @@ data TyCon
 					-- 3. The family instance types if present
 					--
 					-- Note that it does /not/ scope over the data constructors.
-
-	algTcSelIds :: [Id],  		-- ^ The record selectors of this type (possibly emptys)
 
 	algTcGadtSyntax  :: Bool,	-- ^ Was the data type declared with GADT syntax? If so,
 					-- that doesn't mean it's a true GADT; only that the "where"
@@ -574,13 +571,12 @@ mkAlgTyCon :: Name
            -> [TyVar]           -- ^ 'TyVar's scoped over: see 'tyConTyVars'. Arity is inferred from the length of this list
            -> [PredType]        -- ^ Stupid theta: see 'algTcStupidTheta'
            -> AlgTyConRhs       -- ^ Information about dat aconstructors
-           -> [Id]              -- ^ Selector 'Id's
            -> TyConParent
            -> RecFlag           -- ^ Is the 'TyCon' recursive?
            -> Bool              -- ^ Does it have generic functions? See 'hasGenerics'
            -> Bool              -- ^ Was the 'TyCon' declared with GADT syntax?
            -> TyCon
-mkAlgTyCon name kind tyvars stupid rhs sel_ids parent is_rec gen_info gadt_syn
+mkAlgTyCon name kind tyvars stupid rhs parent is_rec gen_info gadt_syn
   = AlgTyCon {	
 	tyConName 	 = name,
 	tyConUnique	 = nameUnique name,
@@ -589,7 +585,6 @@ mkAlgTyCon name kind tyvars stupid rhs sel_ids parent is_rec gen_info gadt_syn
 	tyConTyVars	 = tyvars,
 	algTcStupidTheta = stupid,
 	algTcRhs         = rhs,
-	algTcSelIds	 = sel_ids,
 	algTcParent	 = ASSERT( okParent name parent ) parent,
 	algTcRec	 = is_rec,
 	algTcGadtSyntax  = gadt_syn,
@@ -599,7 +594,7 @@ mkAlgTyCon name kind tyvars stupid rhs sel_ids parent is_rec gen_info gadt_syn
 -- | Simpler specialization of 'mkAlgTyCon' for classes
 mkClassTyCon :: Name -> Kind -> [TyVar] -> AlgTyConRhs -> Class -> RecFlag -> TyCon
 mkClassTyCon name kind tyvars rhs clas is_rec =
-  mkAlgTyCon name kind tyvars [] rhs [] (ClassTyCon clas) is_rec False False
+  mkAlgTyCon name kind tyvars [] rhs (ClassTyCon clas) is_rec False False
 
 mkTupleTyCon :: Name 
              -> Kind    -- ^ Kind of the resulting 'TyCon'
@@ -1012,11 +1007,6 @@ tyConFamilySize (AlgTyCon   {algTcRhs = NewTyCon {}})                  = 1
 tyConFamilySize (AlgTyCon   {algTcRhs = OpenTyCon {}})                 = 0
 tyConFamilySize (TupleTyCon {})	 		                       = 1
 tyConFamilySize other = pprPanic "tyConFamilySize:" (ppr other)
-
--- | Extract the record selector 'Id's from an algebraic 'TyCon' and returns the empty list otherwise
-tyConSelIds :: TyCon -> [Id]
-tyConSelIds (AlgTyCon {algTcSelIds = fs}) = fs
-tyConSelIds _                             = []
 
 -- | Extract an 'AlgTyConRhs' with information about data constructors from an algebraic or tuple
 -- 'TyCon'. Panics for any other sort of 'TyCon'

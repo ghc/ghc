@@ -872,7 +872,7 @@ reifyThing (AGlobal (AnId id))
   = do	{ ty <- reifyType (idType id)
 	; fix <- reifyFixity (idName id)
 	; let v = reifyName id
-	; case globalIdDetails id of
+	; case idDetails id of
 	    ClassOpId cls    -> return (TH.ClassOpI v ty (reifyName cls) fix)
 	    _                -> return (TH.VarI     v ty Nothing fix)
     }

@@ -223,7 +223,6 @@ pcTyCon is_enum is_rec name tyvars cons
                 tyvars
                 []		-- No stupid theta
 		(DataTyCon cons is_enum)
-		[] 		-- No record selectors
 		NoParentTyCon
                 is_rec
 		True		-- All the wired-in tycons have generics

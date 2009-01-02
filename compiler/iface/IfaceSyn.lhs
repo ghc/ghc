@@ -9,7 +9,7 @@ module IfaceSyn (
 
 	IfaceDecl(..), IfaceClassOp(..), IfaceConDecl(..), IfaceConDecls(..),
 	IfaceExpr(..), IfaceAlt, IfaceNote(..), IfaceLetBndr(..),
-	IfaceBinding(..), IfaceConAlt(..), IfaceIdInfo(..),
+	IfaceBinding(..), IfaceConAlt(..), IfaceIdInfo(..), IfaceIdDetails(..),
 	IfaceInfoItem(..), IfaceRule(..), IfaceAnnotation(..), IfaceAnnTarget,
 	IfaceInst(..), IfaceFamInst(..),
 
@@ -56,9 +56,10 @@ infixl 3 &&&
 
 \begin{code}
 data IfaceDecl 
-  = IfaceId { ifName   :: OccName,
-	      ifType   :: IfaceType, 
-	      ifIdInfo :: IfaceIdInfo }
+  = IfaceId { ifName   	  :: OccName,
+	      ifType   	  :: IfaceType, 
+	      ifIdDetails :: IfaceIdDetails,
+	      ifIdInfo    :: IfaceIdInfo }
 
   | IfaceData { ifName       :: OccName,	-- Type constructor
 		ifTyVars     :: [IfaceTvBndr],	-- Type variables
@@ -126,6 +127,7 @@ visibleIfConDecls (IfNewTyCon c)   = [c]
 data IfaceConDecl 
   = IfCon {
 	ifConOcc     :: OccName,   		-- Constructor name
+	ifConWrapper :: Bool,			-- True <=> has a wrapper
 	ifConInfix   :: Bool,			-- True <=> declared infix
 	ifConUnivTvs :: [IfaceTvBndr],		-- Universal tyvars
 	ifConExTvs   :: [IfaceTvBndr],		-- Existential tyvars
@@ -173,6 +175,16 @@ data IfaceAnnotation
   }
 
 type IfaceAnnTarget = AnnTarget OccName
+
+-- We only serialise the IdDetails of top-level Ids, and even then
+-- we only need a very limited selection.  Notably, none of the
+-- implicit ones are needed here, becuase they are not put it
+-- interface files
+
+data IfaceIdDetails
+  = IfVanillaId
+  | IfRecSelId Bool
+  | IfDFunId
 
 data IfaceIdInfo
   = NoInfo			-- When writing interface file without -O
@@ -347,28 +359,22 @@ ifaceDeclSubBndrs IfaceData {ifCons = IfAbstractTyCon}  = []
 -- Newtype
 ifaceDeclSubBndrs (IfaceData {ifName = tc_occ,
                               ifCons = IfNewTyCon (
-                                        IfCon { ifConOcc = con_occ, 
-                                                ifConFields = fields
-					          }),
+                                        IfCon { ifConOcc = con_occ }),
                               ifFamInst = famInst}) 
-  = -- fields (names of selectors)
-    fields ++ 
-    -- implicit coerion and (possibly) family instance coercion
+  =   -- implicit coerion and (possibly) family instance coercion
     (mkNewTyCoOcc tc_occ) : (famInstCo famInst tc_occ) ++
-    -- data constructor and worker (newtypes don't have a wrapper)
+      -- data constructor and worker (newtypes don't have a wrapper)
     [con_occ, mkDataConWorkerOcc con_occ]
 
 
 ifaceDeclSubBndrs (IfaceData {ifName = tc_occ,
 			      ifCons = IfDataTyCon cons, 
 			      ifFamInst = famInst})
-  = -- fields (names of selectors) 
-    nub (concatMap ifConFields cons) 	-- Eliminate duplicate fields
-    -- (possibly) family instance coercion;
-    -- there is no implicit coercion for non-newtypes
-    ++ famInstCo famInst tc_occ
-    -- for each data constructor in order,
-    --    data constructor, worker, and (possibly) wrapper
+  =   -- (possibly) family instance coercion;
+      -- there is no implicit coercion for non-newtypes
+    famInstCo famInst tc_occ
+      -- for each data constructor in order,
+      --    data constructor, worker, and (possibly) wrapper
     ++ concatMap dc_occs cons
   where
     dc_occs con_decl
@@ -379,10 +385,8 @@ ifaceDeclSubBndrs (IfaceData {ifName = tc_occ,
 	  wrap_occ = mkDataConWrapperOcc con_occ	-- Id namespace
 	  work_occ = mkDataConWorkerOcc con_occ		-- Id namespace
 	  strs     = ifConStricts con_decl
-	  has_wrapper = any isMarkedStrict strs	-- See MkId.mkDataConIds (sigh)
-			|| not (null . ifConEqSpec $ con_decl)
-			|| isJust famInst
-		-- ToDo: may miss strictness in existential dicts
+	  has_wrapper = ifConWrapper con_decl		-- This is the reason for
+	  	      		     			-- having the ifConWrapper field!
 
 ifaceDeclSubBndrs (IfaceClass {ifCtxt = sc_ctxt, ifName = cls_occ, 
 			       ifSigs = sigs, ifATs = ats })
@@ -428,8 +432,10 @@ instance Outputable IfaceDecl where
   ppr = pprIfaceDecl
 
 pprIfaceDecl :: IfaceDecl -> SDoc
-pprIfaceDecl (IfaceId {ifName = var, ifType = ty, ifIdInfo = info})
+pprIfaceDecl (IfaceId {ifName = var, ifType = ty, 
+                       ifIdDetails = details, ifIdInfo = info})
   = sep [ ppr var <+> dcolon <+> ppr ty, 
+    	  nest 2 (ppr details),
 	  nest 2 (ppr info) ]
 
 pprIfaceDecl (IfaceForeign {ifName = tycon})
@@ -495,12 +501,13 @@ pp_condecls tc (IfDataTyCon cs) = equals <+> sep (punctuate (ptext (sLit " |"))
 
 pprIfaceConDecl :: OccName -> IfaceConDecl -> SDoc
 pprIfaceConDecl tc
-	(IfCon { ifConOcc = name, ifConInfix = is_infix, 
+	(IfCon { ifConOcc = name, ifConInfix = is_infix, ifConWrapper = has_wrap,
 		 ifConUnivTvs = univ_tvs, ifConExTvs = ex_tvs, 
 		 ifConEqSpec = eq_spec, ifConCtxt = ctxt, ifConArgTys = arg_tys, 
 		 ifConStricts = strs, ifConFields = fields })
   = sep [main_payload,
 	 if is_infix then ptext (sLit "Infix") else empty,
+	 if has_wrap then ptext (sLit "HasWrapper") else empty,
 	 if null strs then empty 
 	      else nest 4 (ptext (sLit "Stricts:") <+> hsep (map ppr strs)),
 	 if null fields then empty
@@ -641,6 +648,12 @@ instance Outputable IfaceConAlt where
     -- IfaceTupleAlt is handled by the case-alternative printer
 
 ------------------
+instance Outputable IfaceIdDetails where
+  ppr IfVanillaId    = empty
+  ppr (IfRecSelId b) = ptext (sLit "RecSel")
+      		       <> if b then ptext (sLit "<naughty>") else empty
+  ppr IfDFunId       = ptext (sLit "DFunId")
+
 instance Outputable IfaceIdInfo where
   ppr NoInfo       = empty
   ppr (HasInfo is) = ptext (sLit "{-") <+> fsep (map ppr is) <+> ptext (sLit "-}")
@@ -666,7 +679,7 @@ instance Outputable IfaceInfoItem where
 -- fingerprinting the instance, so DFuns are not dependencies.
 
 freeNamesIfDecl :: IfaceDecl -> NameSet
-freeNamesIfDecl (IfaceId _s t i) = 
+freeNamesIfDecl (IfaceId _s t _d i) = 
   freeNamesIfType t &&&
   freeNamesIfIdInfo i
 freeNamesIfDecl IfaceForeign{} = 

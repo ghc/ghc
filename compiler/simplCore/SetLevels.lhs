@@ -525,7 +525,7 @@ lvlBind top_lvl ctxt_lvl env (AnnRec pairs)
        new_rhss <- mapM (lvlExpr ctxt_lvl new_env) rhss
        return (Rec ([TB b dest_lvl | b <- new_bndrs] `zip` new_rhss), new_env)
 
-  | isSingleton pairs && count isIdVar abs_vars > 1
+  | isSingleton pairs && count isId abs_vars > 1
   = do	-- Special case for self recursion where there are
 	-- several variables carried around: build a local loop:	
 	--	poly_f = \abs_vars. \lam_vars . letrec f = \lam_vars. rhs in f lam_vars
@@ -605,7 +605,7 @@ lvlLamBndrs lvl bndrs
 	[] bndrs
   where
     go old_lvl bumped_major rev_lvld_bndrs (bndr:bndrs)
-	| isIdVar bndr &&		-- Go to the next major level if this is a value binder,
+	| isId bndr &&	    		-- Go to the next major level if this is a value binder,
 	  not bumped_major && 		-- and we havn't already gone to the next level (one jump per group)
 	  not (isOneShotLambda bndr)	-- and it isn't a one-shot lambda
 	= go new_lvl True (TB bndr new_lvl : rev_lvld_bndrs) bndrs
@@ -647,7 +647,7 @@ isFunction :: CoreExprWithFVs -> Bool
 -- We may only want to do this if there are sufficiently few free 
 -- variables.  We certainly only want to do it for values, and not for
 -- constructors.  So the simple thing is just to look for lambdas
-isFunction (_, AnnLam b e) | isIdVar b = True
+isFunction (_, AnnLam b e) | isId b    = True
                            | otherwise = isFunction e
 isFunction (_, AnnNote _ e)            = isFunction e
 isFunction _                           = False
@@ -765,10 +765,10 @@ maxIdLevel (_, lvl_env,_,id_env) var_set
 						Nothing		   -> [in_var])
 
     max_out out_var lvl 
-	| isIdVar out_var = case lookupVarEnv lvl_env out_var of
+	| isId out_var = case lookupVarEnv lvl_env out_var of
 				Just lvl' -> maxLvl lvl' lvl
 				Nothing   -> lvl 
-	| otherwise       = lvl	-- Ignore tyvars in *maxIdLevel*
+	| otherwise    = lvl	-- Ignore tyvars in *maxIdLevel*
 
 lookupVar :: LevelEnv -> Id -> LevelledExpr
 lookupVar (_, _, _, id_env) v = case lookupVarEnv id_env v of
@@ -808,7 +808,7 @@ abstractVars dest_lvl (_, lvl_env, _, id_env) fvs
 
 	-- We are going to lambda-abstract, so nuke any IdInfo,
 	-- and add the tyvars of the Id (if necessary)
-    zap v | isIdVar v = WARN( workerExists (idWorkerInfo v) ||
+    zap v | isId v = WARN( workerExists (idWorkerInfo v) ||
 		           not (isEmptySpecInfo (idSpecialisation v)),
 		           text "absVarsOf: discarding info on" <+> ppr v )
 		     setIdInfo v vanillaIdInfo
@@ -823,7 +823,7 @@ absVarsOf :: IdEnv ([Var], LevelledExpr) -> Var -> [Var]
 	--	we must look in x's type
 	-- And similarly if x is a coercion variable.
 absVarsOf id_env v 
-  | isIdVar v = [av2 | av1 <- lookup_avs v
+  | isId v    = [av2 | av1 <- lookup_avs v
 		     , av2 <- add_tyvars av1]
   | isCoVar v = add_tyvars v
   | otherwise = [v]
@@ -871,7 +871,7 @@ cloneVar :: TopLevelFlag -> LevelEnv -> Id -> Level -> Level -> LvlM (LevelEnv, 
 cloneVar TopLevel env v _ _
   = return (env, v)	-- Don't clone top level things
 cloneVar NotTopLevel env@(_,_,subst,_) v ctxt_lvl dest_lvl
-  = ASSERT( isIdVar v ) do
+  = ASSERT( isId v ) do
     us <- getUniqueSupplyM
     let
       (subst', v1) = cloneIdBndr subst us v
@@ -883,7 +883,7 @@ cloneRecVars :: TopLevelFlag -> LevelEnv -> [Id] -> Level -> Level -> LvlM (Leve
 cloneRecVars TopLevel env vs _ _
   = return (env, vs)	-- Don't clone top level things
 cloneRecVars NotTopLevel env@(_,_,subst,_) vs ctxt_lvl dest_lvl
-  = ASSERT( all isIdVar vs ) do
+  = ASSERT( all isId vs ) do
     us <- getUniqueSupplyM
     let
       (subst', vs1) = cloneRecIdBndrs subst us vs

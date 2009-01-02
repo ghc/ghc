@@ -718,6 +718,8 @@ renameSigs mb_names ok_sig sigs
 
 renameSig :: Maybe NameSet -> Sig RdrName -> RnM (Sig Name)
 -- FixitySig is renamed elsewhere.
+renameSig _ (IdSig x)
+  = return (IdSig x)	  -- Actually this never occurs
 renameSig mb_names sig@(TypeSig v ty)
   = do	{ new_v <- lookupSigOccRn mb_names sig v
 	; new_ty <- rnHsSigType (quotes (ppr v)) ty

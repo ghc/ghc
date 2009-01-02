@@ -16,7 +16,6 @@ import Linker
 import RtClosureInspect
 
 import HscTypes
-import IdInfo
 import Id
 import Name
 import Var hiding ( varName )
@@ -117,7 +116,7 @@ bindSuspensions t = do
       (t', stuff)     <- liftIO $ foldTerm (nameSuspensionsAndGetInfos availNames_var) t
       let (names, tys, hvals) = unzip3 stuff
           (tys', skol_vars)   = unzip $ map skolemiseTy tys
-      let ids = [ mkGlobalId VanillaGlobal name ty vanillaIdInfo
+      let ids = [ mkVanillaGlobal name ty 
                 | (name,ty) <- zip names tys']
           new_ic = extendInteractiveContext ictxt ids (unionVarSets skol_vars)
       liftIO $ extendLinkEnv (zip names hvals)
@@ -199,7 +198,7 @@ showTerm term = do
     name <- newGrimName userName
     let ictxt    = hsc_IC hsc_env
         tmp_ids  = ic_tmp_ids ictxt
-        id       = mkGlobalId VanillaGlobal name ty vanillaIdInfo
+        id       = mkVanillaGlobal name ty 
         new_ic   = ictxt { ic_tmp_ids = id : tmp_ids }
     return (hsc_env {hsc_IC = new_ic }, name)
 

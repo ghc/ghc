@@ -498,10 +498,10 @@ exprIsCheap other_expr 	-- Applications and variables
     go (Var _) [] = True	-- Just a type application of a variable
 				-- (f t1 t2 t3) counts as WHNF
     go (Var f) args
- 	= case globalIdDetails f of
-		RecordSelId {} -> go_sel args
-		ClassOpId _    -> go_sel args
-		PrimOpId op    -> go_primop op args
+ 	= case idDetails f of
+		RecSelId {}  -> go_sel args
+		ClassOpId _  -> go_sel args
+		PrimOpId op  -> go_primop op args
 
 		DataConWorkId _ -> go_pap args
 		_ | length args < idArity f -> go_pap args
@@ -578,7 +578,7 @@ exprOkForSpeculation (Note _ e)  = exprOkForSpeculation e
 exprOkForSpeculation (Cast e _)  = exprOkForSpeculation e
 exprOkForSpeculation other_expr
   = case collectArgs other_expr of
-	(Var f, args) -> spec_ok (globalIdDetails f) args
+	(Var f, args) -> spec_ok (idDetails f) args
         _             -> False
  
   where

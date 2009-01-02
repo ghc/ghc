@@ -19,6 +19,7 @@ import LoadIface
 import IfaceEnv
 import BuildTyCl
 import TcRnMonad
+import TcType		( tcSplitSigmaTy )
 import Type
 import TypeRep
 import HscTypes
@@ -108,8 +109,9 @@ tcImportDecl :: Name -> TcM TyThing
 -- Entry point for *source-code* uses of importDecl
 tcImportDecl name 
   | Just thing <- wiredInNameTyThing_maybe name
-  = do	{ initIfaceTcRn (loadWiredInHomeIface name) 
-		-- See Note [Loading instances] in LoadIface
+  = do	{ when (needWiredInHomeIface thing)
+    	       (initIfaceTcRn (loadWiredInHomeIface name))
+		-- See Note [Loading instances for wired-in things]
 	; return thing }
   | otherwise
   = do 	{ traceIf (text "tcImportDecl" <+> ppr name)
@@ -117,26 +119,6 @@ tcImportDecl name
 	; case mb_thing of
 	    Succeeded thing -> return thing
 	    Failed err      -> failWithTc err }
-
-checkWiredInTyCon :: TyCon -> TcM ()
--- Ensure that the home module of the TyCon (and hence its instances)
--- are loaded. See See Note [Loading instances] in LoadIface
--- It might not be a wired-in tycon (see the calls in TcUnify),
--- in which case this is a no-op.
-checkWiredInTyCon tc	
-  | not (isWiredInName tc_name) 
-  = return ()
-  | otherwise
-  = do	{ mod <- getModule
-	; ASSERT( isExternalName tc_name ) 
-	  unless (mod == nameModule tc_name)
-		 (initIfaceTcRn (loadWiredInHomeIface tc_name))
-		-- Don't look for (non-existent) Float.hi when
-		-- compiling Float.lhs, which mentions Float of course
-	  	-- A bit yukky to call initIfaceTcRn here
-	}
-  where
-    tc_name = tyConName tc
 
 importDecl :: Name -> IfM lcl (MaybeErr Message TyThing)
 -- Get the TyThing for this Name from an interface file
@@ -164,6 +146,83 @@ importDecl name
 				pprNameSpace (occNameSpace (nameOccName name)) <+> ppr name)
 	  	       2 (vcat [ptext (sLit "Probable cause: bug in .hi-boot file, or inconsistent .hi file"),
 		                ptext (sLit "Use -ddump-if-trace to get an idea of which file caused the error")])
+\end{code}
+
+%************************************************************************
+%*									*
+           Checks for wired-in things
+%*									*
+%************************************************************************
+
+Note [Loading instances for wired-in things]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We need to make sure that we have at least *read* the interface files
+for any module with an instance decl or RULE that we might want.  
+
+* If the instance decl is an orphan, we have a whole separate mechanism
+  (loadOprhanModules)
+
+* If the instance decl not an orphan, then the act of looking at the
+  TyCon or Class will force in the defining module for the
+  TyCon/Class, and hence the instance decl
+
+* BUT, if the TyCon is a wired-in TyCon, we don't really need its interface;
+  but we must make sure we read its interface in case it has instances or
+  rules.  That is what LoadIface.loadWiredInHomeInterface does.  It's called
+  from TcIface.{tcImportDecl, checkWiredInTyCon, ifCheckWiredInThing}
+
+* HOWEVER, only do this for TyCons.  There are no wired-in Classes.  There
+  are some wired-in Ids, but we don't want to load their interfaces. For
+  example, Control.Exception.Base.recSelError is wired in, but that module
+  is compiled late in the base library, and we don't want to force it to
+  load before it's been compiled!
+
+All of this is done by the type checker. The renamer plays no role.
+(It used to, but no longer.)
+
+
+\begin{code}
+checkWiredInTyCon :: TyCon -> TcM ()
+-- Ensure that the home module of the TyCon (and hence its instances)
+-- are loaded. See Note [Loading instances for wired-in things]
+-- It might not be a wired-in tycon (see the calls in TcUnify),
+-- in which case this is a no-op.
+checkWiredInTyCon tc	
+  | not (isWiredInName tc_name) 
+  = return ()
+  | otherwise
+  = do	{ mod <- getModule
+	; ASSERT( isExternalName tc_name ) 
+	  when (mod /= nameModule tc_name)
+	       (initIfaceTcRn (loadWiredInHomeIface tc_name))
+		-- Don't look for (non-existent) Float.hi when
+		-- compiling Float.lhs, which mentions Float of course
+	  	-- A bit yukky to call initIfaceTcRn here
+	}
+  where
+    tc_name = tyConName tc
+
+ifCheckWiredInThing :: TyThing -> IfL ()
+-- Even though we are in an interface file, we want to make
+-- sure the instances of a wired-in thing are loaded (imagine f :: Double -> Double)
+-- Ditto want to ensure that RULES are loaded too
+-- See Note [Loading instances for wired-in things]
+ifCheckWiredInThing thing
+  = do	{ mod <- getIfModule
+		-- Check whether we are typechecking the interface for this
+		-- very module.  E.g when compiling the base library in --make mode
+		-- we may typecheck GHC.Base.hi. At that point, GHC.Base is not in
+		-- the HPT, so without the test we'll demand-load it into the PIT!
+		-- C.f. the same test in checkWiredInTyCon above
+        ; let name = getName thing
+	; ASSERT2( isExternalName name, ppr name ) 
+	  when (needWiredInHomeIface thing && mod /= nameModule name)
+	       (loadWiredInHomeIface name) }
+
+needWiredInHomeIface :: TyThing -> Bool
+-- Only for TyCons; see Note [Loading instances for wired-in things]
+needWiredInHomeIface (ATyCon {}) = True
+needWiredInHomeIface _           = False
 \end{code}
 
 %************************************************************************
@@ -355,11 +414,13 @@ tcIfaceDecl :: Bool	-- True <=> discard IdInfo on IfaceId bindings
 	    -> IfaceDecl
 	    -> IfL TyThing
 
-tcIfaceDecl ignore_prags (IfaceId {ifName = occ_name, ifType = iface_type, ifIdInfo = info})
+tcIfaceDecl ignore_prags (IfaceId {ifName = occ_name, ifType = iface_type, 
+ 	    		 	   ifIdDetails = details, ifIdInfo = info})
   = do	{ name <- lookupIfaceTop occ_name
 	; ty <- tcIfaceType iface_type
+	; details <- tcIdDetails ty details
 	; info <- tcIdInfo ignore_prags name ty info
-	; return (AnId (mkVanillaGlobalWithInfo name ty info)) }
+	; return (AnId (mkGlobalId details name ty info)) }
 
 tcIfaceDecl _ (IfaceData {ifName = occ_name, 
 			  ifTyVars = tv_bndrs, 
@@ -914,6 +975,17 @@ do_one (IfaceRec pairs) thing_inside
 %************************************************************************
 
 \begin{code}
+tcIdDetails :: Type -> IfaceIdDetails -> IfL IdDetails
+tcIdDetails _  IfVanillaId = return VanillaId
+tcIdDetails _  IfDFunId    = return DFunId
+tcIdDetails ty (IfRecSelId naughty)
+  = return (RecSelId { sel_tycon = tc, sel_naughty = naughty })
+  where
+    (_, _, tau) = tcSplitSigmaTy ty
+    tc = tyConAppTyCon (funArgTy tau)
+    -- A bit fragile. Relies on the selector type looking like
+    --    forall abc. (stupid-context) => T a b c -> blah
+
 tcIdInfo :: Bool -> Name -> Type -> IfaceIdInfo -> IfL IdInfo
 tcIdInfo ignore_prags name ty info 
   | ignore_prags = return vanillaIdInfo
@@ -1016,7 +1088,7 @@ tcIfaceGlobal :: Name -> IfL TyThing
 tcIfaceGlobal name
   | Just thing <- wiredInNameTyThing_maybe name
 	-- Wired-in things include TyCons, DataCons, and Ids
-  = do { ifCheckWiredInThing name; return thing }
+  = do { ifCheckWiredInThing thing; return thing }
   | otherwise
   = do	{ env <- getGblEnv
 	; case if_rec_types env of {	-- Note [Tying the knot]
@@ -1059,22 +1131,6 @@ tcIfaceGlobal name
 -- Because if M.hs also has M.hs-boot, M.T will *already be* in the HPT, but in its
 -- emasculated form (e.g. lacking data constructors).
 
-ifCheckWiredInThing :: Name -> IfL ()
--- Even though we are in an interface file, we want to make
--- sure the instances of a wired-in thing are loaded (imagine f :: Double -> Double)
--- Ditto want to ensure that RULES are loaded too
--- See Note [Loading instances] in LoadIface
-ifCheckWiredInThing name 
-  = do	{ mod <- getIfModule
-		-- Check whether we are typechecking the interface for this
-		-- very module.  E.g when compiling the base library in --make mode
-		-- we may typecheck GHC.Base.hi. At that point, GHC.Base is not in
-		-- the HPT, so without the test we'll demand-load it into the PIT!
-		-- C.f. the same test in checkWiredInTyCon above
-	; ASSERT2( isExternalName name, ppr name ) 
-	  unless (mod == nameModule name)
-		 (loadWiredInHomeIface name) }
-
 tcIfaceTyCon :: IfaceTyCon -> IfL TyCon
 tcIfaceTyCon IfaceIntTc       	= tcWiredInTyCon intTyCon
 tcIfaceTyCon IfaceBoolTc      	= tcWiredInTyCon boolTyCon
@@ -1101,7 +1157,7 @@ tcIfaceTyCon IfaceUbxTupleKindTc     = return ubxTupleKindTyCon
 -- sure the instances and RULES of this tycon are loaded 
 -- Imagine: f :: Double -> Double
 tcWiredInTyCon :: TyCon -> IfL TyCon
-tcWiredInTyCon tc = do { ifCheckWiredInThing (tyConName tc)
+tcWiredInTyCon tc = do { ifCheckWiredInThing (ATyCon tc)
 		       ; return tc }
 
 tcIfaceClass :: Name -> IfL Class

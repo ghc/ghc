@@ -373,7 +373,7 @@ noFloatIntoRhs (AnnLam b _)   	    = not (is_one_shot b)
 noFloatIntoRhs rhs = exprIsHNF (deAnnotate' rhs)	-- We'd just float right back out again...
 
 is_one_shot :: Var -> Bool
-is_one_shot b = isIdVar b && isOneShotBndr b
+is_one_shot b = isId b && isOneShotBndr b
 \end{code}
 
 

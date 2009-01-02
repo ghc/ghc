@@ -1293,14 +1293,13 @@ mkPrintUnqualified dflags env = (qual_name, qual_mod)
 implicitTyThings :: TyThing -> [TyThing]
 
 -- For data and newtype declarations:
-implicitTyThings (ATyCon tc) = 
-    -- fields (names of selectors)
-    map AnId (tyConSelIds tc) ++ 
-    -- (possibly) implicit coercion and family coercion
-    --   depending on whether it's a newtype or a family instance or both
+implicitTyThings (ATyCon tc)
+  =   -- fields (names of selectors)
+      -- (possibly) implicit coercion and family coercion
+      --   depending on whether it's a newtype or a family instance or both
     implicitCoTyCon tc ++
-    -- for each data constructor in order,
-    --   the contructor, worker, and (possibly) wrapper
+      -- for each data constructor in order,
+      --   the contructor, worker, and (possibly) wrapper
     concatMap (extras_plus . ADataCon) (tyConDataCons tc)
 		     
 implicitTyThings (AClass cl) 

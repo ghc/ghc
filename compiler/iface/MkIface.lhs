@@ -1271,9 +1271,10 @@ tyThingToIfaceDecl :: TyThing -> IfaceDecl
 -- Reason: Iface stuff uses OccNames, and the conversion here does
 --	   not do tidying on the way
 tyThingToIfaceDecl (AnId id)
-  = IfaceId { ifName   = getOccName id,
-	      ifType   = toIfaceType (idType id),
-	      ifIdInfo = info }
+  = IfaceId { ifName      = getOccName id,
+	      ifType      = toIfaceType (idType id),
+	      ifIdDetails = toIfaceIdDetails (idDetails id),
+	      ifIdInfo    = info }
   where
     info = case toIfaceIdInfo (idInfo id) of
 		[]    -> NoInfo
@@ -1351,6 +1352,7 @@ tyThingToIfaceDecl (ATyCon tycon)
     ifaceConDecl data_con 
 	= IfCon   { ifConOcc   	 = getOccName (dataConName data_con),
 		    ifConInfix 	 = dataConIsInfix data_con,
+		    ifConWrapper = isJust (dataConWrapId_maybe data_con),
 		    ifConUnivTvs = toIfaceTvBndrs (dataConUnivTyVars data_con),
 		    ifConExTvs   = toIfaceTvBndrs (dataConExTyVars data_con),
 		    ifConEqSpec  = to_eq_spec (dataConEqSpec data_con),
@@ -1442,6 +1444,13 @@ toIfaceLetBndr id  = IfLetBndr (occNameFS (getOccName id))
 	      | otherwise		   = HasInfo [HsInline inline_prag]
 
 --------------------------
+toIfaceIdDetails :: IdDetails -> IfaceIdDetails
+toIfaceIdDetails VanillaId 		        = IfVanillaId
+toIfaceIdDetails DFunId    		        = IfVanillaId	            
+toIfaceIdDetails (RecSelId { sel_naughty = n }) = IfRecSelId n
+toIfaceIdDetails other	     		        = pprTrace "toIfaceIdDetails" (ppr other) 
+                                                  IfVanillaId   -- Unexpected
+
 toIfaceIdInfo :: IdInfo -> [IfaceInfoItem]
 toIfaceIdInfo id_info
   = catMaybes [arity_hsinfo, caf_hsinfo, strict_hsinfo, 

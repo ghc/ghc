@@ -318,7 +318,6 @@ data DataCon
 	dcOrigArgTys :: [Type],		-- Original argument types
 					-- (before unboxing and flattening of strict fields)
 	dcOrigResTy :: Type,		-- Original result type, as seen by the user
-		-- INVARIANT: mentions only dcUnivTyVars
 		-- NB: for a data instance, the original user result type may 
 		-- differ from the DataCon's representation TyCon.  Example
 		--	data instance T [a] where MkT :: a -> T [a]
@@ -636,8 +635,10 @@ dataConFieldLabels = dcFields
 
 -- | Extract the type for any given labelled field of the 'DataCon'
 dataConFieldType :: DataCon -> FieldLabel -> Type
-dataConFieldType con label = expectJust "unexpected label" $
-    lookup label (dcFields con `zip` dcOrigArgTys con)
+dataConFieldType con label
+  = case lookup label (dcFields con `zip` dcOrigArgTys con) of
+      Just ty -> ty
+      Nothing -> pprPanic "dataConFieldType" (ppr con <+> ppr label)
 
 -- | The strictness markings decided on by the compiler.  Does not include those for
 -- existential dictionaries.  The list is in one-to-one correspondence with the arity of the 'DataCon'
@@ -726,7 +727,7 @@ dataConUserType :: DataCon -> Type
 --
 -- rather than:
 --
--- > T :: forall a c. forall b. (c=[a]) => a -> b -> T c
+-- > T :: forall a c. forall b. (c~[a]) => a -> b -> T c
 --
 -- NB: If the constructor is part of a data instance, the result type
 -- mentions the family tycon, not the internal one.

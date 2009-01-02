@@ -79,9 +79,8 @@ buildAlgTyCon tc_name tvs stupid_theta rhs is_rec want_generics gadt_syn
        ; tycon <- fixM (\ tycon_rec -> do 
 	 { parent <- mkParentInfo mb_family tc_name tvs tycon_rec
 	 ; let { tycon = mkAlgTyCon tc_name kind tvs stupid_theta rhs
-				    fields parent is_rec want_generics gadt_syn
-	       ; kind    = mkArrowKinds (map tyVarKind tvs) liftedTypeKind
-	       ; fields  = mkTyConSelIds tycon rhs
+				    parent is_rec want_generics gadt_syn
+	       ; kind  = mkArrowKinds (map tyVarKind tvs) liftedTypeKind
 	       }
          ; return tycon
          })
@@ -234,14 +233,6 @@ mkDataConStupidTheta tycon arg_tys univ_tvs
     arg_tyvars      = tyVarsOfTypes arg_tys
     in_arg_tys pred = not $ isEmptyVarSet $ 
 		      tyVarsOfPred pred `intersectVarSet` arg_tyvars
-
-------------------------------------------------------
-mkTyConSelIds :: TyCon -> AlgTyConRhs -> [Id]
-mkTyConSelIds tycon rhs
-  =  [ mkRecordSelId tycon fld 
-     | fld <- nub (concatMap dataConFieldLabels (visibleDataCons rhs)) ]
-	-- We'll check later that fields with the same name 
-	-- from different constructors have the same type.
 \end{code}
 
 
@@ -269,19 +260,10 @@ buildClass no_unf class_name tvs sc_theta fds ats sig_stuff tc_isrec
 
 	  let { rec_tycon  = classTyCon rec_clas
 	      ; op_tys	   = [ty | (_,_,ty) <- sig_stuff]
+	      ; op_names   = [op | (op,_,_) <- sig_stuff]
 	      ; op_items   = [ (mkDictSelId no_unf op_name rec_clas, dm_info)
 			     | (op_name, dm_info, _) <- sig_stuff ] }
 	  		-- Build the selector id and default method id
-
-	; dict_con <- buildDataCon datacon_name
-				   False 	-- Not declared infix
-				   (map (const NotMarkedStrict) op_tys)
-				   [{- No labelled fields -}]
-				   tvs [{- no existentials -}]
-                                   [{- No GADT equalities -}] sc_theta 
-                                   op_tys 
-				   (mkTyConApp rec_tycon (mkTyVarTys tvs))
-				   rec_tycon
 
 	; let n_value_preds   = count (not . isEqPred) sc_theta
 	      all_value_preds = n_value_preds == length sc_theta
@@ -306,6 +288,23 @@ buildClass no_unf class_name tvs sc_theta fds ats sig_stuff tc_isrec
 		--	(b) no existential or equality-predicate fields
 		-- i.e. exactly one operation or superclass taken together
 		-- See note [Class newtypes and equality predicates]
+
+		-- We play a bit fast and loose by treating the superclasses
+		-- as ordinary arguments.  That means that in the case of
+		--     class C a => D a
+		-- we don't get a newtype with no arguments!
+	      args    = sc_sel_names ++ op_names
+	      arg_tys = map mkPredTy sc_theta ++ op_tys
+
+	; dict_con <- buildDataCon datacon_name
+				   False 	-- Not declared infix
+				   (map (const NotMarkedStrict) args)
+				   [{- No fields -}]
+				   tvs [{- no existentials -}]
+                                   [{- No GADT equalities -}] [{- No theta -}]
+                                   arg_tys
+				   (mkTyConApp rec_tycon (mkTyVarTys tvs))
+				   rec_tycon
 
 	; rhs <- if use_newtype
 		 then mkNewTyConRhs tycon_name rec_tycon dict_con

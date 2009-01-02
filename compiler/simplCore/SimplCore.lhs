@@ -43,7 +43,7 @@ import FloatOut		( floatOutwards )
 import FamInstEnv
 import Id
 import DataCon
-import TyCon		( tyConSelIds, tyConDataCons )
+import TyCon		( tyConDataCons )
 import Class		( classSelIds )
 import BasicTypes       ( CompilerPhase, isActive )
 import VarSet

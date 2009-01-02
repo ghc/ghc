@@ -523,8 +523,7 @@ bindLocalsAtBreakpoint hsc_env apStack Nothing = do
        e_fs      = fsLit "e"
        e_name    = mkInternalName (getUnique e_fs) (mkTyVarOccFS e_fs) span
        e_tyvar   = mkTcTyVar e_name liftedTypeKind (SkolemTv RuntimeUnkSkol)
-       exn_id    = Id.mkGlobalId VanillaGlobal exn_name (mkTyVarTy e_tyvar)
-                                vanillaIdInfo
+       exn_id    = Id.mkVanillaGlobal exn_name (mkTyVarTy e_tyvar)
        new_tyvars = unitVarSet e_tyvar
 
        ictxt0 = hsc_IC hsc_env
@@ -575,8 +574,7 @@ bindLocalsAtBreakpoint hsc_env apStack (Just info) = do
    -- _result in scope at any time.
    let result_name = mkInternalName (getUnique result_fs)
                           (mkVarOccFS result_fs) span
-       result_id   = Id.mkGlobalId VanillaGlobal result_name result_ty 
-                                   vanillaIdInfo
+       result_id   = Id.mkVanillaGlobal result_name result_ty 
 
    -- for each Id we're about to bind in the local envt:
    --    - skolemise the type variables in its type, so they can't
@@ -610,7 +608,7 @@ bindLocalsAtBreakpoint hsc_env apStack (Just info) = do
          loc = nameSrcSpan (idName id)
          name = mkInternalName uniq occ loc
          ty = idType id
-         new_id = Id.mkGlobalId VanillaGlobal name ty (idInfo id)
+         new_id = Id.mkVanillaGlobalWithInfo name ty (idInfo id)
      return new_id
 
 rttiEnvironment :: HscEnv -> IO HscEnv 

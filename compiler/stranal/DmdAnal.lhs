@@ -267,7 +267,7 @@ dmdAnal sigs dmd (Case scrut case_bndr ty [alt@(DataAlt dc,bndrs,rhs)])
 	-- The insight is, of course, that a demand on y is a demand on the
 	-- scrutinee, so we need to `both` it with the scrut demand
 
-	alt_dmd 	   = Eval (Prod [idNewDemandInfo b | b <- bndrs', isIdVar b])
+	alt_dmd 	   = Eval (Prod [idNewDemandInfo b | b <- bndrs', isId b])
         scrut_dmd 	   = alt_dmd `both`
 			     idNewDemandInfo case_bndr'
 
@@ -747,7 +747,7 @@ annotateLamIdBndr :: DmdType 	-- Demand type of body
 annotateLamIdBndr dmd_ty@(DmdType fv ds res) id
 -- For lambdas we add the demand to the argument demands
 -- Only called for Ids
-  = ASSERT( isIdVar id )
+  = ASSERT( isId id )
     (DmdType fv' (hacked_dmd:ds) res, setIdNewDemandInfo id hacked_dmd)
   where
     (fv', dmd) = removeFV fv id res

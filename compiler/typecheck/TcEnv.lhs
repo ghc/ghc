@@ -126,11 +126,8 @@ tcLookupGlobal name
 	}}}}}
 
 tcLookupField :: Name -> TcM Id		-- Returns the selector Id
-tcLookupField name = do
-    thing <- tcLookup name	-- Note [Record field lookup]
-    case thing of
-	AGlobal (AnId id) -> return id
-	thing -> wrongThingErr "field name" thing name
+tcLookupField name 
+  = tcLookupId name	-- Note [Record field lookup]
 
 {- Note [Record field lookup]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~

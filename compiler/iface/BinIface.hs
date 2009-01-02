@@ -579,12 +579,9 @@ instance Binary Activation where
 		      return (ActiveAfter ab)
 
 instance Binary StrictnessMark where
-    put_ bh MarkedStrict = do
-	    putByte bh 0
-    put_ bh MarkedUnboxed = do
-	    putByte bh 1
-    put_ bh NotMarkedStrict = do
-	    putByte bh 2
+    put_ bh MarkedStrict    = putByte bh 0
+    put_ bh MarkedUnboxed   = putByte bh 1
+    put_ bh NotMarkedStrict = putByte bh 2
     get bh = do
 	    h <- getByte bh
 	    case h of
@@ -593,10 +590,8 @@ instance Binary StrictnessMark where
 	      _ -> do return NotMarkedStrict
 
 instance Binary Boxity where
-    put_ bh Boxed = do
-	    putByte bh 0
-    put_ bh Unboxed = do
-	    putByte bh 1
+    put_ bh Boxed   = putByte bh 0
+    put_ bh Unboxed = putByte bh 1
     get bh = do
 	    h <- getByte bh
 	    case h of
@@ -1096,6 +1091,18 @@ instance Binary IfaceBinding where
 	      _ -> do ac <- get bh
 		      return (IfaceRec ac)
 
+instance Binary IfaceIdDetails where
+    put_ bh IfVanillaId    = putByte bh 0
+    put_ bh (IfRecSelId b) = do { putByte bh 1; put_ bh b }
+    put_ bh IfDFunId       = putByte bh 2
+    get bh = do
+	    h <- getByte bh
+	    case h of
+	      0 -> return IfVanillaId
+	      1 -> do a <- get bh
+		      return (IfRecSelId a)
+	      _ -> return IfDFunId
+
 instance Binary IfaceIdInfo where
     put_ bh NoInfo = putByte bh 0
     put_ bh (HasInfo i) = do
@@ -1174,10 +1181,11 @@ instance Binary IfaceNote where
 -- when de-serialising.
 
 instance Binary IfaceDecl where
-    put_ bh (IfaceId name ty idinfo) = do
+    put_ bh (IfaceId name ty details idinfo) = do
 	    putByte bh 0
 	    put_ bh (occNameFS name)
 	    put_ bh ty
+	    put_ bh details
 	    put_ bh idinfo
     put_ _ (IfaceForeign _ _) = 
 	error "Binary.put_(IfaceDecl): IfaceForeign"
@@ -1210,11 +1218,12 @@ instance Binary IfaceDecl where
     get bh = do
 	    h <- getByte bh
 	    case h of
-	      0 -> do name   <- get bh
-		      ty     <- get bh
-		      idinfo <- get bh
+	      0 -> do name    <- get bh
+		      ty      <- get bh
+		      details <- get bh
+		      idinfo  <- get bh
                       occ <- return $! mkOccNameFS varName name
-		      return (IfaceId occ ty idinfo)
+		      return (IfaceId occ ty details idinfo)
 	      1 -> error "Binary.get(TyClDecl): ForeignType"
 	      2 -> do
 		    a1 <- get bh
@@ -1299,7 +1308,7 @@ instance Binary IfaceConDecls where
 		      return (IfNewTyCon aa)
 
 instance Binary IfaceConDecl where
-    put_ bh (IfCon a1 a2 a3 a4 a5 a6 a7 a8 a9) = do
+    put_ bh (IfCon a1 a2 a3 a4 a5 a6 a7 a8 a9 a10) = do
 	    put_ bh a1
 	    put_ bh a2
 	    put_ bh a3
@@ -1309,6 +1318,7 @@ instance Binary IfaceConDecl where
 	    put_ bh a7
 	    put_ bh a8
 	    put_ bh a9
+	    put_ bh a10
     get bh = do a1 <- get bh
 		a2 <- get bh
 		a3 <- get bh	      
@@ -1318,7 +1328,8 @@ instance Binary IfaceConDecl where
 		a7 <- get bh
 		a8 <- get bh
 		a9 <- get bh
-	        return (IfCon a1 a2 a3 a4 a5 a6 a7 a8 a9)
+		a10 <- get bh
+	        return (IfCon a1 a2 a3 a4 a5 a6 a7 a8 a9 a10)
 
 instance Binary IfaceClassOp where
    put_ bh (IfaceClassOp n def ty) = do	

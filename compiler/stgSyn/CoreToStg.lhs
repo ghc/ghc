@@ -523,7 +523,7 @@ coreToStgApp _ f args = do
 	--	   two regardless.
 
 	res_ty = exprType (mkApps (Var f) args)
-	app = case globalIdDetails f of
+	app = case idDetails f of
       		DataConWorkId dc | saturated -> StgConApp dc args'
 	        PrimOpId op  	 -> ASSERT( saturated )
 				    StgOpApp (StgPrimOp op) args' res_ty

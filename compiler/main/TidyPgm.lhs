@@ -4,7 +4,8 @@
 \section{Tidying up Core}
 
 \begin{code}
-module TidyPgm( mkBootModDetailsDs, mkBootModDetailsTc, tidyProgram ) where
+module TidyPgm( mkBootModDetailsDs, mkBootModDetailsTc, 
+       		tidyProgram, globaliseAndTidyId ) where
 
 #include "HsVersions.h"
 
@@ -18,11 +19,11 @@ import CoreTidy
 import PprCore
 import CoreLint
 import CoreUtils
+import Class	( classSelIds )
 import VarEnv
 import VarSet
 import Var
 import Id
-import Class
 import IdInfo
 import InstEnv
 import NewDemand
@@ -134,7 +135,7 @@ mkBootModDetails hsc_env exports type_env insts fam_insts
   = do	{ let dflags = hsc_dflags hsc_env 
 	; showPass dflags "Tidy [hoot] type env"
 
-	; let { insts'     = tidyInstances tidyExternalId insts
+	; let { insts'     = tidyInstances globaliseAndTidyId insts
 	      ; dfun_ids   = map instanceDFunId insts'
 	      ; type_env1  = tidyBootTypeEnv (availsToNameSet exports) type_env
 	      ; type_env'  = extendTypeEnvWithIds type_env1 dfun_ids
@@ -161,7 +162,7 @@ tidyBootTypeEnv exports type_env
 	-- because we don't tidy the OccNames, and if we don't remove
 	-- the non-exported ones we'll get many things with the
 	-- same name in the interface file, giving chaos.
-    final_ids = [ tidyExternalId id
+    final_ids = [ globaliseAndTidyId id
 		| id <- typeEnvIds type_env
 		, isLocalId id
 		, keep_it id ]
@@ -172,13 +173,17 @@ tidyBootTypeEnv exports type_env
     keep_it id = isExportedId id || idName id `elemNameSet` exports
 
 
-tidyExternalId :: Id -> Id
+
+globaliseAndTidyId :: Id -> Id
 -- Takes an LocalId with an External Name, 
--- makes it into a GlobalId with VanillaIdInfo, and tidies its type
--- (NB: vanillaIdInfo makes a conservative assumption about Caf-hood.)
-tidyExternalId id 
-  = ASSERT2( isLocalId id && isExternalName (idName id), ppr id )
-    mkVanillaGlobal (idName id) (tidyTopType (idType id))
+-- makes it into a GlobalId 
+--     * unchanged Name (might be Internal or External)
+--     * unchanged details
+--     * VanillaIdInfo (makes a conservative assumption about Caf-hood)
+globaliseAndTidyId id	
+  = Id.setIdType (globaliseId id) tidy_type
+  where
+    tidy_type = tidyTopType (idType id)
 \end{code}
 
 
@@ -476,21 +481,11 @@ It's much safer just to inject them right at the end, after tidying.
 \begin{code}
 getImplicitBinds :: TypeEnv -> [CoreBind]
 getImplicitBinds type_env
-  = map get_defn (concatMap implicit_con_ids (typeEnvTyCons type_env)
-		  ++ concatMap other_implicit_ids (typeEnvElts type_env))
-	-- Put the constructor wrappers first, because
-	-- other implicit bindings (notably the fromT functions arising 
-	-- from generics) use the constructor wrappers.  At least that's
-	-- what External Core likes
+  = map get_defn (concatMap implicit_ids (typeEnvElts type_env))
   where
-    implicit_con_ids tc = mapCatMaybes dataConWrapId_maybe (tyConDataCons tc)
-    
-    other_implicit_ids (ATyCon tc) = filter (not . isNaughtyRecordSelector) (tyConSelIds tc)
-	-- The "naughty" ones are not real functions at all
-	-- They are there just so we can get decent error messages
-	-- See Note  [Naughty record selectors] in MkId.lhs
-    other_implicit_ids (AClass cl) = classSelIds cl
-    other_implicit_ids _other      = []
+    implicit_ids (ATyCon tc)  = mapCatMaybes dataConWrapId_maybe (tyConDataCons tc)
+    implicit_ids (AClass cls) = classSelIds cls
+    implicit_ids _            = []
     
     get_defn :: Id -> CoreBind
     get_defn id = NonRec id (unfoldingTemplate (idUnfolding id))
@@ -791,10 +786,7 @@ tidyTopPair ext_ids rhs_tidy_env caf_info name' (bndr, rhs)
   = (bndr', rhs')
   where
     bndr' = mkGlobalId details name' ty' idinfo'
-	-- Preserve the GlobalIdDetails of existing global-ids
-    details = case globalIdDetails bndr of	
-		NotGlobalId -> VanillaGlobal
-		old_details -> old_details
+    details = idDetails bndr	-- Preserve the IdDetails
     ty'	    = tidyTopType (idType bndr)
     rhs'    = tidyExpr rhs_tidy_env rhs
     idinfo  = idInfo bndr

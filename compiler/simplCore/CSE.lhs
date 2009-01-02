@@ -342,7 +342,7 @@ extendSubst (CS cs in_scope sub) x y = CS cs in_scope (extendVarEnv sub x y)
 addBinder :: CSEnv -> Id -> (CSEnv, Id)
 addBinder (CS cs in_scope sub) v
   | not (v `elemInScopeSet` in_scope) = (CS cs (extendInScopeSet in_scope v)  sub,		       v)
-  | isIdVar v			      = (CS cs (extendInScopeSet in_scope v') (extendVarEnv sub v v'), v')
+  | isId v			      = (CS cs (extendInScopeSet in_scope v') (extendVarEnv sub v v'), v')
   | otherwise			      = WARN( True, ppr v )
 				        (CS emptyUFM in_scope		      sub,		       v)
 	-- This last case is the unusual situation where we have shadowing of

@@ -127,7 +127,7 @@ loadInterfaceForName doc name
 
 -- | An 'IfM' function to load the home interface for a wired-in thing,
 -- so that we're sure that we see its instance declarations and rules
--- See Note [Loading instances]
+-- See Note [Loading instances for wired-in things] in TcIface
 loadWiredInHomeIface :: Name -> IfM lcl ()
 loadWiredInHomeIface name
   = ASSERT( isWiredInName name )
@@ -152,27 +152,6 @@ loadInterfaceWithException doc mod_name where_from
 	    Failed err      -> ghcError (ProgramError (showSDoc err))
 	    Succeeded iface -> return iface }
 \end{code}
-
-Note [Loading instances]
-~~~~~~~~~~~~~~~~~~~~~~~~
-We need to make sure that we have at least *read* the interface files
-for any module with an instance decl or RULE that we might want.  
-
-* If the instance decl is an orphan, we have a whole separate mechanism
-  (loadOprhanModules)
-
-* If the instance decl not an orphan, then the act of looking at the
-  TyCon or Class will force in the defining module for the
-  TyCon/Class, and hence the instance decl
-
-* BUT, if the TyCon is a wired-in TyCon, we don't really need its interface;
-  but we must make sure we read its interface in case it has instances or
-  rules.  That is what LoadIface.loadWiredInHomeInterface does.  It's called
-  from TcIface.{tcImportDecl, checkWiredInTyCon, ifCHeckWiredInThing}
-
-All of this is done by the type checker. The renamer plays no role.
-(It used to, but no longer.)
-
 
 
 %*********************************************************

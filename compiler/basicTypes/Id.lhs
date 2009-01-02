@@ -27,14 +27,14 @@ module Id (
 
 	-- ** Simple construction
 	mkGlobalId, mkVanillaGlobal, mkVanillaGlobalWithInfo,
-	mkLocalId, mkLocalIdWithInfo,
+	mkLocalId, mkLocalIdWithInfo, mkExportedLocalId,
 	mkSysLocal, mkSysLocalM, mkUserLocal, mkUserLocalM,
 	mkTemplateLocals, mkTemplateLocalsNum, mkTemplateLocal,
-	mkWorkerId, mkExportedLocalId,
+	mkWorkerId, 
 
 	-- ** Taking an Id apart
-	idName, idType, idUnique, idInfo,
-	isId, globalIdDetails, idPrimRep,
+	idName, idType, idUnique, idInfo, idDetails,
+	isId, idPrimRep,
 	recordSelectorFieldLabel,
 
 	-- ** Modifying an Id
@@ -104,8 +104,13 @@ import CoreSyn ( CoreRule, Unfolding )
 
 import IdInfo
 import BasicTypes
+
+-- Imported and re-exported 
+import Var( Id, DictId,
+            idInfo, idDetails, globaliseId,
+            isId, isLocalId, isGlobalId, isExportedId )
 import qualified Var
-import Var
+
 import TyCon
 import Type
 import TcType
@@ -156,26 +161,19 @@ idName   :: Id -> Name
 idName    = Var.varName
 
 idUnique :: Id -> Unique
-idUnique  = varUnique
+idUnique  = Var.varUnique
 
 idType   :: Id -> Kind
-idType    = varType
-
-idInfo :: Id -> IdInfo
-idInfo = varIdInfo
+idType    = Var.varType
 
 idPrimRep :: Id -> PrimRep
 idPrimRep id = typePrimRep (idType id)
 
-globalIdDetails :: Id -> GlobalIdDetails
-globalIdDetails = globalIdVarDetails
-
-
 setIdName :: Id -> Name -> Id
-setIdName = setVarName
+setIdName = Var.setVarName
 
 setIdUnique :: Id -> Unique -> Id
-setIdUnique = setVarUnique
+setIdUnique = Var.setVarUnique
 
 -- | Not only does this set the 'Id' 'Type', it also evaluates the type to try and
 -- reduce space usage
@@ -183,10 +181,10 @@ setIdType :: Id -> Type -> Id
 setIdType id ty = seqType ty `seq` Var.setVarType id ty
 
 setIdExported :: Id -> Id
-setIdExported = setIdVarExported
+setIdExported = Var.setIdExported
 
 setIdNotExported :: Id -> Id
-setIdNotExported = setIdVarNotExported
+setIdNotExported = Var.setIdNotExported
 
 localiseId :: Id -> Id
 -- Make an with the same unique and type as the 
@@ -199,11 +197,8 @@ localiseId id
   where
     name = idName id
 
-globaliseId :: GlobalIdDetails -> Id -> Id
-globaliseId = globaliseIdVar
-
 lazySetIdInfo :: Id -> IdInfo -> Id
-lazySetIdInfo = lazySetVarIdInfo
+lazySetIdInfo = Var.lazySetIdInfo
 
 setIdInfo :: Id -> IdInfo -> Id
 setIdInfo id info = seqIdInfo info `seq` (lazySetIdInfo id info)
@@ -240,8 +235,8 @@ Anyway, we removed it in March 2008.
 
 \begin{code}
 -- | For an explanation of global vs. local 'Id's, see "Var#globalvslocal"
-mkGlobalId :: GlobalIdDetails -> Name -> Type -> IdInfo -> Id
-mkGlobalId = mkGlobalIdVar
+mkGlobalId :: IdDetails -> Name -> Type -> IdInfo -> Id
+mkGlobalId = Var.mkGlobalVar
 
 -- | Make a global 'Id' without any extra information at all
 mkVanillaGlobal :: Name -> Type -> Id
@@ -249,7 +244,7 @@ mkVanillaGlobal name ty = mkVanillaGlobalWithInfo name ty vanillaIdInfo
 
 -- | Make a global 'Id' with no global information but some generic 'IdInfo'
 mkVanillaGlobalWithInfo :: Name -> Type -> IdInfo -> Id
-mkVanillaGlobalWithInfo = mkGlobalId VanillaGlobal
+mkVanillaGlobalWithInfo = mkGlobalId VanillaId
 
 
 -- | For an explanation of global vs. local 'Id's, see "Var#globalvslocal"
@@ -257,16 +252,18 @@ mkLocalId :: Name -> Type -> Id
 mkLocalId name ty = mkLocalIdWithInfo name ty vanillaIdInfo
 
 mkLocalIdWithInfo :: Name -> Type -> IdInfo -> Id
-mkLocalIdWithInfo = mkLocalIdVar
+mkLocalIdWithInfo name ty info = Var.mkLocalVar VanillaId name ty info
 	-- Note [Free type variables]
 
--- | Create a local 'Id' that is marked as exported. This prevents things attached to it from being removed as dead code.
+-- | Create a local 'Id' that is marked as exported. 
+-- This prevents things attached to it from being removed as dead code.
 mkExportedLocalId :: Name -> Type -> Id
-mkExportedLocalId name ty = mkExportedLocalIdVar name ty vanillaIdInfo
+mkExportedLocalId name ty = Var.mkExportedLocalVar VanillaId name ty vanillaIdInfo
 	-- Note [Free type variables]
 
 
--- | Create a system local 'Id'. These are local 'Id's (see "Var#globalvslocal") that are created by the compiler out of thin air
+-- | Create a system local 'Id'. These are local 'Id's (see "Var#globalvslocal") 
+-- that are created by the compiler out of thin air
 mkSysLocal :: FastString -> Unique -> Type -> Id
 mkSysLocal fs uniq ty = mkLocalId (mkSystemVarName uniq fs) ty
 
@@ -311,29 +308,6 @@ mkTemplateLocalsNum n tys = zipWith mkTemplateLocal [n..] tys
 
 %************************************************************************
 %*									*
-\subsection{Basic predicates on @Id@s}
-%*									*
-%************************************************************************
-
-\begin{code}
-isId :: Id -> Bool
-isId = isIdVar
-
--- | For an explanation of global vs. local 'Id's, see "Var#globalvslocal"
-isLocalId :: Id -> Bool
-isLocalId = isLocalIdVar
-
--- | For an explanation of global vs. local 'Id's, see "Var#globalvslocal"
-isGlobalId :: Id -> Bool
-isGlobalId = isGlobalIdVar
-
--- | Determines whether an 'Id' is marked as exported and hence will not be considered dead code
-isExportedId :: Id -> Bool
-isExportedId = isExportedIdVar
-\end{code}
-
-%************************************************************************
-%*									*
 \subsection{Special Ids}
 %*									*
 %************************************************************************
@@ -342,8 +316,8 @@ isExportedId = isExportedIdVar
 -- | If the 'Id' is that for a record selector, extract the 'sel_tycon' and label. Panic otherwise
 recordSelectorFieldLabel :: Id -> (TyCon, FieldLabel)
 recordSelectorFieldLabel id
-  = case globalIdDetails id of
-        RecordSelId { sel_tycon = tycon, sel_label = lbl } -> (tycon,lbl)
+  = case Var.idDetails id of
+        RecSelId { sel_tycon = tycon } -> (tycon, idName id)
         _ -> panic "recordSelectorFieldLabel"
 
 isRecordSelector        :: Id -> Bool
@@ -357,44 +331,44 @@ isPrimOpId_maybe        :: Id -> Maybe PrimOp
 isFCallId_maybe         :: Id -> Maybe ForeignCall
 isDataConWorkId_maybe   :: Id -> Maybe DataCon
 
-isRecordSelector id = case globalIdDetails id of
-                        RecordSelId {}  -> True
+isRecordSelector id = case Var.idDetails id of
+                        RecSelId {}  -> True
                         _               -> False
 
-isNaughtyRecordSelector id = case globalIdDetails id of
-                        RecordSelId { sel_naughty = n } -> n
+isNaughtyRecordSelector id = case Var.idDetails id of
+                        RecSelId { sel_naughty = n } -> n
                         _                               -> False
 
-isClassOpId_maybe id = case globalIdDetails id of
+isClassOpId_maybe id = case Var.idDetails id of
 			ClassOpId cls -> Just cls
 			_other        -> Nothing
 
-isPrimOpId id = case globalIdDetails id of
+isPrimOpId id = case Var.idDetails id of
                         PrimOpId _ -> True
                         _          -> False
 
-isPrimOpId_maybe id = case globalIdDetails id of
+isPrimOpId_maybe id = case Var.idDetails id of
                         PrimOpId op -> Just op
                         _           -> Nothing
 
-isFCallId id = case globalIdDetails id of
+isFCallId id = case Var.idDetails id of
                         FCallId _ -> True
                         _         -> False
 
-isFCallId_maybe id = case globalIdDetails id of
+isFCallId_maybe id = case Var.idDetails id of
                         FCallId call -> Just call
                         _            -> Nothing
 
-isDataConWorkId id = case globalIdDetails id of
+isDataConWorkId id = case Var.idDetails id of
                         DataConWorkId _ -> True
                         _               -> False
 
-isDataConWorkId_maybe id = case globalIdDetails id of
+isDataConWorkId_maybe id = case Var.idDetails id of
                         DataConWorkId con -> Just con
                         _                 -> Nothing
 
 isDataConId_maybe :: Id -> Maybe DataCon
-isDataConId_maybe id = case globalIdDetails id of
+isDataConId_maybe id = case Var.idDetails id of
                          DataConWorkId con -> Just con
                          DataConWrapId con -> Just con
                          _                 -> Nothing
@@ -417,7 +391,7 @@ hasNoBinding :: Id -> Bool
 -- they aren't any more.  Instead, we inject a binding for 
 -- them at the CorePrep stage. 
 -- EXCEPT: unboxed tuples, which definitely have no binding
-hasNoBinding id = case globalIdDetails id of
+hasNoBinding id = case Var.idDetails id of
 			PrimOpId _  	 -> True	-- See Note [Primop wrappers]
 			FCallId _   	 -> True
 			DataConWorkId dc -> isUnboxedTupleCon dc
@@ -428,11 +402,10 @@ isImplicitId :: Id -> Bool
 -- declarations, so we don't need to put its signature in an interface
 -- file, even if it's mentioned in some other interface unfolding.
 isImplicitId id
-  = case globalIdDetails id of
-	RecordSelId {}  -> True
+  = case Var.idDetails id of
         FCallId _       -> True
+	ClassOpId _     -> True
         PrimOpId _      -> True
-	ClassOpId _	-> True
         DataConWorkId _ -> True
 	DataConWrapId _ -> True
 		-- These are are implied by their type or class decl;
@@ -469,13 +442,13 @@ isDeadBinder bndr | isId bndr = isDeadOcc (idOccInfo bndr)
 \begin{code}
 isTickBoxOp :: Id -> Bool
 isTickBoxOp id = 
-  case globalIdDetails id of
+  case Var.idDetails id of
     TickBoxOpId _    -> True
     _                -> False
 
 isTickBoxOp_maybe :: Id -> Maybe TickBoxOp
 isTickBoxOp_maybe id = 
-  case globalIdDetails id of
+  case Var.idDetails id of
     TickBoxOpId tick -> Just tick
     _                -> Nothing
 \end{code}

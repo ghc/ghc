@@ -1,9 +1,8 @@
 \begin{code}
 module IdInfo where
-
+import Outputable
 data IdInfo
-data GlobalIdDetails
+data IdDetails
 
-notGlobalId :: GlobalIdDetails
-seqIdInfo   :: IdInfo -> ()
+pprIdDetails :: IdDetails -> SDoc
 \end{code}

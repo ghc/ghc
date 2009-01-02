@@ -98,7 +98,7 @@ tcHsBootSigs :: HsValBinds Name -> TcM [Id]
 -- signatures in it.  The renamer checked all this
 tcHsBootSigs (ValBindsOut binds sigs)
   = do  { checkTc (null binds) badBootDeclErr
-        ; mapM (addLocM tc_boot_sig) (filter isVanillaLSig sigs) }
+        ; mapM (addLocM tc_boot_sig) (filter isTypeLSig sigs) }
   where
     tc_boot_sig (TypeSig (L _ name) ty)
       = do { sigma_ty <- tcHsSigType (FunSigCtxt name) ty
@@ -151,7 +151,7 @@ tcValBinds _ (ValBindsIn binds _) _
 tcValBinds top_lvl (ValBindsOut binds sigs) thing_inside
   = do  {       -- Typecheck the signature
         ; let { prag_fn = mkPragFun sigs
-              ; ty_sigs = filter isVanillaLSig sigs
+              ; ty_sigs = filter isTypeLSig sigs
               ; sig_fn  = mkTcSigFun ty_sigs }
 
         ; poly_ids <- checkNoErrs (mapAndRecoverM tcTySig ty_sigs)
@@ -428,8 +428,7 @@ tcPrag :: TcId -> Sig Name -> TcM Prag
 tcPrag poly_id (SpecSig _ hs_ty inl) = tcSpecPrag poly_id hs_ty inl
 tcPrag poly_id (SpecInstSig hs_ty)   = tcSpecPrag poly_id hs_ty defaultInlineSpec
 tcPrag _       (InlineSig _ inl)     = return (InlinePrag inl)
-tcPrag _       (FixSig {})           = panic "tcPrag FixSig"
-tcPrag _       (TypeSig {})          = panic "tcPrag TypeSig"
+tcPrag _       sig	             = pprPanic "tcPrag" (ppr sig)
 
 
 tcSpecPrag :: TcId -> LHsType Name -> InlineSpec -> TcM Prag
@@ -1045,8 +1044,10 @@ mkTcSigFun :: [LSig Name] -> TcSigFun
 -- Precondition: no duplicates
 mkTcSigFun sigs = lookupNameEnv env
   where
-    env = mkNameEnv [(name, hsExplicitTvs lhs_ty)
-                    | L _ (TypeSig (L _ name) lhs_ty) <- sigs]
+    env = mkNameEnv (mapCatMaybes mk_pair sigs)
+    mk_pair (L _ (TypeSig (L _ name) lhs_ty)) = Just (name, hsExplicitTvs lhs_ty)
+    mk_pair (L _ (IdSig id))                  = Just (idName id, [])
+    mk_pair _                                 = Nothing    
         -- The scoped names are the ones explicitly mentioned
         -- in the HsForAll.  (There may be more in sigma_ty, because
         -- of nested type synonyms.  See Note [More instantiated than scoped].)
@@ -1100,6 +1101,8 @@ tcTySig (L span (TypeSig (L _ name) ty))
   = setSrcSpan span             $
     do  { sigma_ty <- tcHsSigType (FunSigCtxt name) ty
         ; return (mkLocalId name sigma_ty) }
+tcTySig (L _ (IdSig id))
+  = return id
 tcTySig s = pprPanic "tcTySig" (ppr s)
 
 -------------------

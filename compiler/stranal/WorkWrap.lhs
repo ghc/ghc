@@ -283,7 +283,7 @@ splitFun fn_id fn_info wrap_dmds res_info inline_prag rhs
 -- which is very annoying.
 get_one_shots :: Expr Var -> [Bool]
 get_one_shots (Lam b e)
-  | isIdVar b = isOneShotLambda b : get_one_shots e
+  | isId b    = isOneShotLambda b : get_one_shots e
   | otherwise = get_one_shots e
 get_one_shots (Note _ e) = get_one_shots e
 get_one_shots _    	 = noOneShotInfo

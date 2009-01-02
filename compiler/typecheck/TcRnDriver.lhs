@@ -98,6 +98,7 @@ import IdInfo
 import {- Kind parts of -} Type
 import BasicTypes
 import Foreign.Ptr( Ptr )
+import TidyPgm	( globaliseAndTidyId )
 #endif
 
 import FastString
@@ -306,10 +307,12 @@ tcRnExtCore hsc_env (HsExtCore this_mod decls src_binds)
 
 	-- Typecheck them all together so that
 	-- any mutually recursive types are done right
-   tcg_env <- tcTyAndClassDecls emptyModDetails rn_decls ;
-	-- Make the new type env available to stuff slurped from interface files
+	-- Just discard the auxiliary bindings; they are generated 
+	-- only for Haskell source code, and should already be in Core
+   (tcg_env, _aux_binds) <- tcTyAndClassDecls emptyModDetails rn_decls ;
 
    setGblEnv tcg_env $ do {
+	-- Make the new type env available to stuff slurped from interface files
    
 	-- Now the core bindings
    core_binds <- initIfaceExtCore (tcExtCoreBindings src_binds) ;
@@ -486,7 +489,7 @@ tcRnHsBootDecls decls
 
 		-- Typecheck type/class decls
 	; traceTc (text "Tc2")
-	; tcg_env <- tcTyAndClassDecls emptyModDetails tycl_decls
+	; (tcg_env, aux_binds) <- tcTyAndClassDecls emptyModDetails tycl_decls
 	; setGblEnv tcg_env	$ do {
 
 		-- Typecheck instance decls
@@ -506,11 +509,18 @@ tcRnHsBootDecls decls
 	
 		-- Make the final type-env
 		-- Include the dfun_ids so that their type sigs
-		-- are written into the interface file
+		-- are written into the interface file. 
+		-- And similarly the aux_ids from aux_binds
 	; let { type_env0 = tcg_type_env gbl_env
 	      ; type_env1 = extendTypeEnvWithIds type_env0 val_ids
 	      ; type_env2 = extendTypeEnvWithIds type_env1 dfun_ids 
-	      ; dfun_ids = map iDFunId inst_infos }
+	      ; type_env3 = extendTypeEnvWithIds type_env1 aux_ids 
+	      ; dfun_ids = map iDFunId inst_infos
+	      ; aux_ids  = case aux_binds of
+	      		     ValBindsOut _ sigs -> [id | L _ (IdSig id) <- sigs]
+			     _		   	-> panic "tcRnHsBoodDecls"
+	      }
+
 	; setGlobalTypeEnv gbl_env type_env2  
    }}}}
 
@@ -787,7 +797,7 @@ tcTopSrcDecls boot_details
 		-- The latter come in via tycl_decls
         traceTc (text "Tc2") ;
 
-	tcg_env <- tcTyAndClassDecls boot_details tycl_decls ;
+	(tcg_env, aux_binds) <- tcTyAndClassDecls boot_details tycl_decls ;
 		-- If there are any errors, tcTyAndClassDecls fails here
 	
 	setGblEnv tcg_env	$ do {
@@ -798,8 +808,7 @@ tcTopSrcDecls boot_details
             <- tcInstDecls1 tycl_decls inst_decls deriv_decls;
 	setGblEnv tcg_env	$ do {
 
-	        -- Foreign import declarations next.  No zonking necessary
-		-- here; we can tuck them straight into the global environment.
+	        -- Foreign import declarations next. 
         traceTc (text "Tc4") ;
 	(fi_ids, fi_decls) <- tcForeignImports foreign_decls ;
 	tcExtendGlobalValEnv fi_ids	$ do {
@@ -809,25 +818,27 @@ tcTopSrcDecls boot_details
 	default_tys <- tcDefaults default_decls ;
 	updGblEnv (\gbl -> gbl { tcg_default = default_tys }) $ do {
 	
-		-- Value declarations next
-		-- We also typecheck any extra binds that came out 
-		-- of the "deriving" process (deriv_binds)
-        traceTc (text "Tc5") ;
-	(tc_val_binds,   tcl_env) <- tcTopBinds val_binds ;
-	setLclTypeEnv tcl_env 	$ do {
+		-- Now GHC-generated derived bindings, generics, and selectors
+		-- Do not generate warnings from compiler-generated code;
+		-- hence the use of discardWarnings
+	(tc_aux_binds,   tcl_env) <- discardWarnings (tcTopBinds aux_binds) ;
+	(tc_deriv_binds, tcl_env) <- setLclTypeEnv tcl_env $ 
+			 	     discardWarnings (tcTopBinds deriv_binds) ;
 
-		-- Now GHC-generated derived bindings and generics.
-		-- Do not generate warnings from compiler-generated code.
-	(tc_deriv_binds, tcl_env) <- discardWarnings $
-                                 tcTopBinds deriv_binds ;
+		-- Value declarations next
+        traceTc (text "Tc5") ;
+	(tc_val_binds, tcl_env) <- setLclTypeEnv tcl_env $
+			 	   tcTopBinds val_binds;
 
 	     	-- Second pass over class and instance declarations, 
         traceTc (text "Tc6") ;
-	(inst_binds, tcl_env) <- setLclTypeEnv tcl_env $ tcInstDecls2 tycl_decls inst_infos ;
-	showLIE (text "after instDecls2") ;
+	(inst_binds, tcl_env) <- setLclTypeEnv tcl_env $ 
+                                 tcInstDecls2 tycl_decls inst_infos ;
+                                 	showLIE (text "after instDecls2") ;
+
+        setLclTypeEnv tcl_env $ do {	-- Environment doesn't change now
 
 		-- Foreign exports
-		-- They need to be zonked, so we return them
         traceTc (text "Tc7") ;
 	(foe_binds, foe_decls) <- tcForeignExports foreign_decls ;
 
@@ -842,6 +853,7 @@ tcTopSrcDecls boot_details
 	tcg_env <- getGblEnv ;
 	let { all_binds = tc_val_binds	 `unionBags`
 			  tc_deriv_binds `unionBags`
+			  tc_aux_binds   `unionBags`
 			  inst_binds	 `unionBags`
 			  foe_binds;
 
@@ -1016,8 +1028,9 @@ tcRnStmt hsc_env ictxt rdr_stmt
     mapM bad_unboxed (filter (isUnLiftedType . idType) zonked_ids) ;
 
     traceTc (text "tcs 1") ;
-    let { global_ids = map globaliseAndTidy zonked_ids } ;
-    
+    let { global_ids = map globaliseAndTidyId zonked_ids } ;
+        -- Note [Interactively-bound Ids in GHCi]
+
 {- ---------------------------------------------
    At one stage I removed any shadowed bindings from the type_env;
    they are inaccessible but might, I suppose, cause a space leak if we leave them there.
@@ -1046,12 +1059,6 @@ tcRnStmt hsc_env ictxt rdr_stmt
   where
     bad_unboxed id = addErr (sep [ptext (sLit "GHCi can't bind a variable of unlifted type:"),
 				  nest 2 (ppr id <+> dcolon <+> ppr (idType id))])
-
-globaliseAndTidy :: Id -> Id
-globaliseAndTidy id	-- Note [Interactively-bound Ids in GHCi]
-  = Id.setIdType (globaliseId VanillaGlobal id) tidy_type
-  where
-    tidy_type = tidyTopType (idType id)
 \end{code}
 
 Note [Interactively-bound Ids in GHCi]

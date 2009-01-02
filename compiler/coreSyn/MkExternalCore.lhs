@@ -136,7 +136,7 @@ make_exp (Var v) = do
   let vName = Var.varName v
   isLocal <- isALocal vName
   return $
-     case globalIdVarDetails v of
+     case idDetails v of
        FCallId (CCall (CCallSpec (StaticTarget nm) callconv _)) 
            -> C.External (unpackFS nm) (showSDoc (ppr callconv)) (make_ty (varType v))
        FCallId (CCall (CCallSpec DynamicTarget     callconv _)) 
