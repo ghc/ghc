@@ -669,8 +669,9 @@ recSelError, recConError, irrefutPatError, runtimeError,
              nonExhaustiveGuardsError, patError, noMethodBindingError
         :: Addr# -> a   -- All take a UTF8-encoded C string
 
-recSelError              s = throw (RecSelError (unpackCStringUtf8# s)) -- No location info unfortunately
-runtimeError             s = error (unpackCStringUtf8# s)               -- No location info unfortunately
+recSelError              s = throw (RecSelError ("No match in record selector "
+			                         ++ unpackCStringUtf8# s))  -- No location info unfortunately
+runtimeError             s = error (unpackCStringUtf8# s)                   -- No location info unfortunately
 
 nonExhaustiveGuardsError s = throw (PatternMatchFail (untangle s "Non-exhaustive guards in"))
 irrefutPatError          s = throw (PatternMatchFail (untangle s "Irrefutable pattern failed for pattern"))
