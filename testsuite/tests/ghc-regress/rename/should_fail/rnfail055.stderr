@@ -77,7 +77,7 @@ RnFail055.hs-boot:23:5:
     Boot file:   data T6
                      RecFlag NonRecursive
                      Generics: no
-                     = T6 :: Int -> T6 Stricts: !
+                     = T6 :: Int -> T6 HasWrapper Stricts: !
                      FamilyInstance: none
 
 RnFail055.hs-boot:25:5:
