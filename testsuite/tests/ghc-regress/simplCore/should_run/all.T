@@ -26,3 +26,4 @@ test('simplrun010', composes([extra_run_opts('24 16 8'),
 # runtime has not gone up, but here I just compile it so that
 # the output of -ddump-rules can be compared
 test('T2486', normal, compile, [''])
+test('T2756', normal, compile_and_run, [''])
