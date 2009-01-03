@@ -47,7 +47,6 @@ import TcType           hiding (typeKind)
 import InstEnv
 import Var
 import Id
-import IdInfo
 import Name             hiding ( varName )
 import NameSet
 import RdrName
