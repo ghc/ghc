@@ -384,7 +384,6 @@ ifaceDeclSubBndrs (IfaceData {ifName = tc_occ,
 	  con_occ  = ifConOcc con_decl			-- DataCon namespace
 	  wrap_occ = mkDataConWrapperOcc con_occ	-- Id namespace
 	  work_occ = mkDataConWorkerOcc con_occ		-- Id namespace
-	  strs     = ifConStricts con_decl
 	  has_wrapper = ifConWrapper con_decl		-- This is the reason for
 	  	      		     			-- having the ifConWrapper field!
 
