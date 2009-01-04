@@ -199,14 +199,14 @@ sub main {
         elsif ($arg eq "--ignore-failure") {
             $ignore_failure = 1;
         }
+        elsif ($arg eq "--complete" || $arg eq "--partial") {
+            $get_mode = $arg;
+        }
         # --<tag> says we grab the libs tagged 'tag' with
         # 'get'. It has no effect on the other commands.
         elsif ($arg =~ m/^--/) {
             $arg =~ s/^--//;
             $tags{$arg} = 1;
-        }
-        elsif ($arg eq "--complete" || $arg eq "--partial") {
-            $get_mode = $arg;
         }
         else {
             unshift @_, $arg;
