@@ -525,7 +525,7 @@ foreign import ccall safe "fdReady"
       The "System.IO" library manages multiplexing in its own way.  On
       Windows systems it uses @safe@ foreign calls to ensure that
       threads doing I\/O operations don't block the whole runtime,
-      whereas on Unix systems all the currently blocked I\/O reqwests
+      whereas on Unix systems all the currently blocked I\/O requests
       are managed by a single thread (the /IO manager thread/) using
       @select@.
 
