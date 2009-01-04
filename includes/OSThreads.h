@@ -23,6 +23,7 @@
 #else
 
 #include <pthread.h>
+#include <errno.h>
 
 typedef pthread_cond_t  Condition;
 typedef pthread_mutex_t Mutex;
@@ -34,47 +35,26 @@ typedef pthread_key_t   ThreadLocalKey;
 #define INIT_COND_VAR       PTHREAD_COND_INITIALIZER
 
 #ifdef LOCK_DEBUG
+#define LOCK_DEBUG_BELCH(what, mutex) \
+  debugBelch("%s(0x%p) %s %d\n", what, mutex, __FILE__, __LINE__)
+#else
+#define LOCK_DEBUG_BELCH(what, mutex) /* nothing */
+#endif
 
+/* Always check the result of lock and unlock. */
 #define ACQUIRE_LOCK(mutex) \
-  debugBelch("ACQUIRE_LOCK(0x%p) %s %d\n", mutex,__FILE__,__LINE__); \
-  pthread_mutex_lock(mutex)
-#define RELEASE_LOCK(mutex) \
-  debugBelch("RELEASE_LOCK(0x%p) %s %d\n", mutex,__FILE__,__LINE__); \
-  pthread_mutex_unlock(mutex)
-#define ASSERT_LOCK_HELD(mutex) /* nothing */
-
-#elif defined(DEBUG) && defined(linux_HOST_OS)
-#include <errno.h>
-/* 
- * On Linux, we can use extensions to determine whether we already
- * hold a lock or not, which is useful for debugging.
- */
-#define ACQUIRE_LOCK(mutex) \
+  LOCK_DEBUG_BELCH("ACQUIRE_LOCK", mutex); \
   if (pthread_mutex_lock(mutex) == EDEADLK) { \
     barf("multiple ACQUIRE_LOCK: %s %d", __FILE__,__LINE__); \
   }
+
 #define RELEASE_LOCK(mutex) \
+  LOCK_DEBUG_BELCH("RELEASE_LOCK", mutex); \
   if (pthread_mutex_unlock(mutex) != 0) { \
     barf("RELEASE_LOCK: I do not own this lock: %s %d", __FILE__,__LINE__); \
   }
 
 #define ASSERT_LOCK_HELD(mutex) ASSERT(pthread_mutex_lock(mutex) == EDEADLK)
-
-#define ASSERT_LOCK_NOTHELD(mutex)		\
-  if (pthread_mutex_lock(mutex) != EDEADLK) {	\
-     pthread_mutex_unlock(mutex);		\
-  } else {					\
-    ASSERT(0);					\
-  }
-
-
-#else
-
-#define ACQUIRE_LOCK(mutex) pthread_mutex_lock(mutex)
-#define RELEASE_LOCK(mutex) pthread_mutex_unlock(mutex)
-#define ASSERT_LOCK_HELD(mutex) /* nothing */
-
-#endif
 
 #endif // CMINUSMINUS
 
