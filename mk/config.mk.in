@@ -187,6 +187,8 @@ XMLDocWays=
 
 # Should we build haddock docs?
 HADDOCK_DOCS = YES
+# And HsColour the sources?
+HSCOLOUR_SRCS = YES
 
 # Should we build latex docs?
 LATEX_DOCS = NO

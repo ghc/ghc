@@ -74,7 +74,7 @@ endif
 
 SUBDIRS = gmp libffi includes utils docs rts compiler ghc driver libraries libraries/Cabal/doc
 
-check-all: check-packages
+check-all: check-packages check-tools
 
 # Sanity check that all the boot libraries are in the tree, to catch
 # failure to run darcs-all.
@@ -92,6 +92,14 @@ check-packages :
 	    echo "Did you run 'sh boot' at the top level?"; \
 	    exit 1; \
 	fi
+
+check-tools:
+ifeq "$(HSCOLOUR_SRCS) $(HSCOLOUR)" "YES "
+	@echo "HsColour needed but wasn't found."
+	@echo "Set HSCOLOUR_SRCS=NO if you don't want to use it"
+	exit 1
+endif
+	@:
 
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 ifneq "$(WhatGccIsCalled)" ""
