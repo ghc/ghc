@@ -187,8 +187,8 @@ withHandle__' fun h m act =
    return ()
 
 augmentIOError :: IOException -> String -> Handle -> IOException
-augmentIOError (IOError _ iot _ str fp) fun h
-  = IOError (Just h) iot fun str filepath
+augmentIOError ioe@IOError{ ioe_filename = fp } fun h
+  = ioe { ioe_handle = Just h, ioe_location = fun, ioe_filename = filepath }
   where filepath
           | Just _ <- fp = fp
           | otherwise = case h of
@@ -267,7 +267,7 @@ checkReadableHandle act handle_ =
 wantSeekableHandle :: String -> Handle -> (Handle__ -> IO a) -> IO a
 wantSeekableHandle fun h@(DuplexHandle _ _ _) _act =
   ioException (IOError (Just h) IllegalOperation fun
-                   "handle is not seekable" Nothing)
+                   "handle is not seekable" Nothing Nothing)
 wantSeekableHandle fun h@(FileHandle _ m) act =
   withHandle_' fun h m (checkSeekableHandle act)
 
@@ -289,32 +289,32 @@ ioe_closedHandle, ioe_EOF,
 
 ioe_closedHandle = ioException
    (IOError Nothing IllegalOperation ""
-        "handle is closed" Nothing)
+        "handle is closed" Nothing Nothing)
 ioe_EOF = ioException
-   (IOError Nothing EOF "" "" Nothing)
+   (IOError Nothing EOF "" "" Nothing Nothing)
 ioe_notReadable = ioException
    (IOError Nothing IllegalOperation ""
-        "handle is not open for reading" Nothing)
+        "handle is not open for reading" Nothing Nothing)
 ioe_notWritable = ioException
    (IOError Nothing IllegalOperation ""
-        "handle is not open for writing" Nothing)
+        "handle is not open for writing" Nothing Nothing)
 ioe_notSeekable = ioException
    (IOError Nothing IllegalOperation ""
-        "handle is not seekable" Nothing)
+        "handle is not seekable" Nothing Nothing)
 ioe_notSeekable_notBin = ioException
    (IOError Nothing IllegalOperation ""
       "seek operations on text-mode handles are not allowed on this platform"
-        Nothing)
+        Nothing Nothing)
 
 ioe_finalizedHandle :: FilePath -> Handle__
 ioe_finalizedHandle fp = throw
    (IOError Nothing IllegalOperation ""
-        "handle is finalized" (Just fp))
+        "handle is finalized" Nothing (Just fp))
 
 ioe_bufsiz :: Int -> IO a
 ioe_bufsiz n = ioException
    (IOError Nothing InvalidArgument "hSetBuffering"
-        ("illegal buffer size " ++ showsPrec 9 n []) Nothing)
+        ("illegal buffer size " ++ showsPrec 9 n []) Nothing Nothing)
                                 -- 9 => should be parens'ified.
 
 -- -----------------------------------------------------------------------------
@@ -843,8 +843,8 @@ stderr = unsafePerformIO $ do
 -- Opening and Closing Files
 
 addFilePathToIOError :: String -> FilePath -> IOException -> IOException
-addFilePathToIOError fun fp (IOError h iot _ str _)
-  = IOError h iot fun str (Just fp)
+addFilePathToIOError fun fp ioe
+  = ioe{ ioe_location = fun, ioe_filename = Just fp }
 
 -- | Computation 'openFile' @file mode@ allocates and returns a new, open
 -- handle to manage the file @file@.  It manages input if @mode@
@@ -994,7 +994,7 @@ fdToHandle_stat fd mb_stat is_socket filepath mode binary = do
     case fd_type of
         Directory -> 
            ioException (IOError Nothing InappropriateType "openFile"
-                           "is a directory" Nothing) 
+                           "is a directory" Nothing Nothing) 
 
         -- regular files need to be locked
         RegularFile -> do
@@ -1005,7 +1005,7 @@ fdToHandle_stat fd mb_stat is_socket filepath mode binary = do
            r <- lockFile fd dev ino (fromBool write)
            when (r == -1)  $
                 ioException (IOError Nothing ResourceBusy "openFile"
-                                   "file is locked" Nothing)
+                                   "file is locked" Nothing Nothing)
 #endif
            mkFileHandle fd is_socket filepath ha_type binary
 
@@ -1232,7 +1232,7 @@ hFileSize handle =
               if r /= -1
                  then return r
                  else ioException (IOError Nothing InappropriateType "hFileSize"
-                                   "not a regular file" Nothing)
+                                   "not a regular file" Nothing Nothing)
 
 
 -- | 'hSetFileSize' @hdl@ @size@ truncates the physical file with handle @hdl@ to @size@ bytes.
@@ -1746,7 +1746,7 @@ hDuplicateTo h1@(DuplexHandle _ r1 w1) h2@(DuplexHandle _ r2 w2)  = do
    withHandle' "hDuplicateTo" h1 r1 (dupHandleTo (Just w1) r2_)
 hDuplicateTo h1 _ =
    ioException (IOError (Just h1) IllegalOperation "hDuplicateTo" 
-                "handles are incompatible" Nothing)
+                "handles are incompatible" Nothing Nothing)
 
 -- ---------------------------------------------------------------------------
 -- showing Handles.

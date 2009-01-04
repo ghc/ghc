@@ -178,7 +178,10 @@ failWhenNULL :: String -> IO (Ptr a) -> IO (Ptr a)
 failWhenNULL name f = do
    addr <- f
    if addr == nullPtr
-#if __GLASGOW_HASKELL__ || __HUGS__
+#if __GLASGOW_HASKELL__
+      then ioError (IOError Nothing ResourceExhausted name 
+                                        "out of memory" Nothing Nothing)
+#elif __HUGS__
       then ioError (IOError Nothing ResourceExhausted name 
                                         "out of memory" Nothing)
 #else

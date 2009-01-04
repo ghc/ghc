@@ -341,7 +341,7 @@ lazyRead handle =
           SemiClosedHandle -> lazyRead' handle handle_
           _ -> ioException 
                   (IOError (Just handle) IllegalOperation "lazyRead"
-                        "illegal handle type" Nothing)
+                        "illegal handle type" Nothing Nothing)
 
 lazyRead' :: Handle -> Handle__ -> IO (Handle__, [Char])
 lazyRead' h handle_ = do
@@ -971,4 +971,4 @@ illegalBufferSize handle fn sz =
         ioException (IOError (Just handle)
                             InvalidArgument  fn
                             ("illegal buffer size " ++ showsPrec 9 sz [])
-                            Nothing)
+                            Nothing Nothing)

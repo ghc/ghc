@@ -787,6 +787,7 @@ data IOException
      ioe_type     :: IOErrorType,    -- what it was.
      ioe_location :: String,         -- location.
      ioe_description :: String,      -- error type specific information.
+     ioe_errno    :: Maybe CInt,     -- errno leading to this error, if any.
      ioe_filename :: Maybe FilePath  -- filename the error is related to.
    }
     deriving Typeable
@@ -794,8 +795,8 @@ data IOException
 instance Exception IOException
 
 instance Eq IOException where
-  (IOError h1 e1 loc1 str1 fn1) == (IOError h2 e2 loc2 str2 fn2) = 
-    e1==e2 && str1==str2 && h1==h2 && loc1==loc2 && fn1==fn2
+  (IOError h1 e1 loc1 str1 en1 fn1) == (IOError h2 e2 loc2 str2 en2 fn2) = 
+    e1==e2 && str1==str2 && h1==h2 && loc1==loc2 && en1==en2 && fn1==fn2
 
 -- | An abstract type that contains a value for each variant of 'IOError'.
 data IOErrorType
@@ -857,13 +858,13 @@ instance Show IOErrorType where
 -- >   fail s = ioError (userError s)
 --
 userError       :: String  -> IOError
-userError str   =  IOError Nothing UserError "" str Nothing
+userError str   =  IOError Nothing UserError "" str Nothing Nothing
 
 -- ---------------------------------------------------------------------------
 -- Showing IOErrors
 
 instance Show IOException where
-    showsPrec p (IOError hdl iot loc s fn) =
+    showsPrec p (IOError hdl iot loc s _ fn) =
       (case fn of
          Nothing -> case hdl of
                         Nothing -> id

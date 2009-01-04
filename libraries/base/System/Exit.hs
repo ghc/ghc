@@ -64,7 +64,7 @@ exitWith ExitSuccess = throwIO ExitSuccess
 exitWith code@(ExitFailure n)
   | n /= 0 = throwIO code
 #ifdef __GLASGOW_HASKELL__
-  | otherwise = ioError (IOError Nothing InvalidArgument "exitWith" "ExitFailure 0" Nothing)
+  | otherwise = ioError (IOError Nothing InvalidArgument "exitWith" "ExitFailure 0" Nothing Nothing)
 #endif
 #endif  /* ! __NHC__ */
 

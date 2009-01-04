@@ -155,6 +155,9 @@ mkIOError t location maybe_hdl maybe_filename =
                IOError{ ioe_type = t, 
                         ioe_location = location,
                         ioe_description = "",
+#if defined(__GLASGOW_HASKELL__)
+                        ioe_errno = Nothing,
+#endif
                         ioe_handle = maybe_hdl, 
                         ioe_filename = maybe_filename
                         }
@@ -370,8 +373,9 @@ annotateIOError :: IOError
               -> Maybe Handle 
               -> Maybe FilePath 
               -> IOError 
-annotateIOError (IOError ohdl errTy _ str opath) loc hdl path = 
-  IOError (hdl `mplus` ohdl) errTy loc str (path `mplus` opath)
+annotateIOError ioe loc hdl path = 
+  ioe{ ioe_handle = hdl `mplus` ioe_handle ioe,
+       ioe_location = loc, ioe_filename = path `mplus` ioe_filename ioe }
   where
     Nothing `mplus` ys = ys
     xs      `mplus` _  = xs

@@ -123,7 +123,7 @@ getEnv name =
       if litstring /= nullPtr
         then peekCString litstring
         else ioException (IOError Nothing NoSuchThing "getEnv"
-                          "no environment variable" (Just name))
+                          "no environment variable" Nothing (Just name))
 
 foreign import ccall unsafe "getenv"
    c_getenv :: CString -> IO (Ptr CChar)

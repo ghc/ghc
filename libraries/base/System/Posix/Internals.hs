@@ -129,7 +129,11 @@ statGetType p_stat = do
     
 ioe_unknownfiletype :: IOException
 ioe_unknownfiletype = IOError Nothing UnsupportedOperation "fdType"
-                        "unknown file type" Nothing
+                        "unknown file type"
+#if __GLASGOW_HASKELL__
+                        Nothing
+#endif
+                        Nothing
 
 #if __GLASGOW_HASKELL__ && (defined(mingw32_HOST_OS) || defined(__MINGW32__))
 closeFd :: Bool -> CInt -> IO CInt

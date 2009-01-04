@@ -498,8 +498,9 @@ errnoToIOError  :: String       -- ^ the location where the error occurred
 errnoToIOError loc errno maybeHdl maybeName = unsafePerformIO $ do
     str <- strerror errno >>= peekCString
 #if __GLASGOW_HASKELL__
-    return (IOError maybeHdl errType loc str maybeName)
+    return (IOError maybeHdl errType loc str (Just errno') maybeName)
     where
+    Errno errno' = errno
     errType
         | errno == eOK             = OtherError
         | errno == e2BIG           = ResourceExhausted
