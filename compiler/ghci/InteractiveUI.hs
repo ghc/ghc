@@ -1674,8 +1674,8 @@ completeNone :: String -> IO [String]
 completeNone _w = return []
 
 completeMacro, completeIdentifier, completeModule,
-    completeHomeModule, completeSetOptions, completeFilename,
-    completeHomeModuleOrFile 
+    completeHomeModule, completeSetOptions, completeShowOptions,
+    completeFilename, completeHomeModuleOrFile
     :: String -> IO [String]
 
 #ifdef USE_EDITLINE
@@ -1754,9 +1754,9 @@ completeSetOptions w = do
 
 completeShowOptions w = do
   return (filter (w `isPrefixOf`) options)
-    where options =
-        ["args", "prog", "prompt", "editor", "stop", "modules", "bindings",
-         "linker", "breaks", "context", "packages", "languages"]
+    where options = ["args", "prog", "prompt", "editor", "stop",
+                     "modules", "bindings", "linker", "breaks",
+                     "context", "packages", "languages"]
 
 completeFilename w = do
     ws <- Readline.filenameCompletionFunction w
