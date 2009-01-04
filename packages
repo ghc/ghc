@@ -55,7 +55,6 @@ libraries/regex-base        extralibs   packages/regex-base             darcs
 libraries/regex-compat      extralibs   packages/regex-compat           darcs
 libraries/regex-posix       extralibs   packages/regex-posix            darcs
 libraries/stm               extralibs   packages/stm                    darcs
-libraries/time              extralibs   packages/time                   darcs
 libraries/xhtml             extralibs   packages/xhtml                  darcs
 libraries/dph               dph         packages/dph                    darcs
 testsuite                   testsuite   testsuite                       darcs
