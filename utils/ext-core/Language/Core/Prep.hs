@@ -13,6 +13,7 @@ After these preprocessing steps, Core can be interpreted (or given an operationa
 
 module Language.Core.Prep where
 
+import Control.Monad.State
 import Data.Either
 import Data.List
 import Data.Generics
@@ -22,70 +23,96 @@ import Language.Core.Core
 import Language.Core.Env
 import Language.Core.Check
 import Language.Core.Environments
-import Language.Core.Encoding
 import Language.Core.Utils
 
 prepModule :: Menv -> Module -> Module
 prepModule globalEnv (Module mn tdefs vdefgs) = 
-    Module mn tdefs vdefgs' 
+    Module mn tdefs (snd (evalState 
+      (foldM prepTopVdefg (eempty,[]) vdefgs) initCounter))
   where
-
     (tcenv, cenv) = mkTypeEnvsNoChecking tdefs
-    (_,vdefgs') = foldl' prepTopVdefg (eempty,[]) vdefgs
 
-    prepTopVdefg (venv,vdefgs) vdefg = (venv',vdefgs ++ [vdefg'])
-       where (venv',vdefg') = prepVdefg (venv,eempty) vdefg
+    prepTopVdefg :: (Venv, [Vdefg]) -> Vdefg -> PrepM (Venv, [Vdefg])
+    prepTopVdefg (venv,vdefgs) vdefg = do
+         (venv',vdefg') <- prepVdefg (venv,eempty) vdefg
+         return (venv',vdefgs ++ [vdefg'])
  
-    prepVdefg (env@(venv,_)) (Nonrec(Vdef((Nothing,x),t,e))) = 
-	(eextend venv (x,t), Nonrec(Vdef((Nothing,x),t,prepExp env e)))
-    prepVdefg (env@(venv,_))  (Nonrec(Vdef(qx,t,e))) =
-     	(venv, Nonrec(Vdef(qx,t,prepExp env e)))
-    prepVdefg (venv,tvenv) (Rec vdefs) = 
-	(venv',Rec [ Vdef(qx,t,prepExp (venv',tvenv) e) | Vdef(qx,t,e) <- vdefs])
+    prepVdefg (env@(venv,_)) (Nonrec(Vdef((Nothing,x),t,e))) = do
+        e' <- prepExp env e
+	return (eextend venv (x,t), Nonrec(Vdef((Nothing,x),t,e')))
+    prepVdefg (env@(venv,_))  (Nonrec(Vdef(qx,t,e))) = do
+        e' <- prepExp env e
+     	return (venv, Nonrec(Vdef(qx,t,e')))
+    prepVdefg (venv,tvenv) (Rec vdefs) = do
+        vds' <- mapM (\ (Vdef (qx,t,e)) -> do
+                         e' <- prepExp (venv',tvenv) e
+                         return (Vdef (qx,t,e'))) vdefs
+	return (venv', Rec vds')
 	where venv' = foldl' eextend venv [(x,t) | Vdef((Nothing,x),t,_) <- vdefs]
 
-    prepExp _ (Var qv) = Var qv
-    prepExp _ (Dcon qdc) = Dcon qdc
-    prepExp _ (Lit l) = Lit l
+    prepExp :: (Venv, Tvenv) -> Exp -> PrepM Exp
+    prepExp _ (Var qv) = return $ Var qv
+    prepExp _ (Dcon qdc) = return $ Dcon qdc
+    prepExp _ (Lit l) = return $ Lit l
     prepExp env e@(App _ _) = unwindApp env e []
     prepExp env e@(Appt _ _) = unwindApp env e []
-    prepExp (venv,tvenv) (Lam (Vb vb) e) = Lam (Vb vb) (prepExp (eextend venv vb,tvenv) e)
-    prepExp (venv,tvenv) (Lam (Tb tb) e) = Lam (Tb tb) (prepExp (venv,eextend tvenv tb) e)
+    prepExp (venv,tvenv) (Lam (Vb vb) e) = do
+       e' <- prepExp (eextend venv vb,tvenv) e             
+       return $ Lam (Vb vb) e' 
+    prepExp (venv,tvenv) (Lam (Tb tb) e) = do
+       e' <- prepExp (venv,eextend tvenv tb) e
+       return $ Lam (Tb tb) e' 
     prepExp env@(venv,tvenv) (Let (Nonrec(Vdef((Nothing,x),t,b))) e) 
-        | (kindOfTy tvenv t `eqKind` Kunlifted && suspends b) = 
+        | (kindOfTy tvenv t `eqKind` Kunlifted && suspends b) = do 
             -- There are two places where we call the typechecker, one of them
             -- here.
             -- We need to know the type of the let body in order to construct
             -- a case expression. 
                                 -- need to extend the env with the let-bound var too!
-            let eTy = typeOfExp (eextend venv (x, t)) tvenv e in
-               Case (prepExp env b) (x,t) 
-                  eTy
-                  [Adefault (prepExp (eextend venv (x,t),tvenv) e)] 
-    prepExp (venv,tvenv) (Let vdefg e) =  Let vdefg' (prepExp (venv',tvenv) e)
-		where (venv',vdefg') = prepVdefg (venv,tvenv) vdefg
-    prepExp env@(venv,tvenv) (Case e vb t alts) = Case (prepExp env e) vb t (map (prepAlt (eextend venv vb,tvenv)) alts)
-    prepExp env (Cast e t) = Cast (prepExp env e) t
-    prepExp env (Note s e) = Note s (prepExp env e)
-    prepExp _ (External s t) = External s t
+            scrut' <- prepExp env b
+            rhs' <- prepExp (eextend venv (x,t),tvenv) e
+            return $
+              let eTy = typeOfExp (eextend venv (x, t)) tvenv e in
+                Case scrut' (x,t) eTy [Adefault rhs'] 
+    prepExp (venv,tvenv) (Let vdefg e) =  do
+      (venv',vdefg') <- prepVdefg (venv,tvenv) vdefg
+      rhs' <- prepExp (venv',tvenv) e
+      return $ Let vdefg' rhs'
+    prepExp env@(venv,tvenv) (Case e vb t alts) = do
+      e' <- prepExp env e
+      alts' <- mapM (prepAlt (eextend venv vb,tvenv)) alts
+      return $ Case e' vb t alts'
+    prepExp env (Cast e t) = do
+      e' <- prepExp env e
+      return $ Cast e' t
+    prepExp env (Note s e) = do
+      e' <- prepExp env e
+      return $ Note s e'
+    prepExp _ (External s t) = return $ External s t
 
-    prepAlt (venv,tvenv) (Acon qdc tbs vbs e) = Acon qdc tbs vbs (prepExp (foldl' eextend venv vbs,foldl' eextend tvenv tbs) e)
-    prepAlt env (Alit l e) = Alit l (prepExp env e)
-    prepAlt env (Adefault e) = Adefault (prepExp env e)
+    prepAlt :: (Venv,Tvenv) -> Alt -> PrepM Alt
+    prepAlt (venv,tvenv) (Acon qdc tbs vbs e) = do
+      rhs' <- prepExp (foldl' eextend venv vbs,foldl' eextend tvenv tbs) e
+      return $ Acon qdc tbs vbs rhs'
+    prepAlt env (Alit l e) = (liftM (Alit l)) (prepExp env e)
+    prepAlt env (Adefault e) = (liftM Adefault) (prepExp env e)
 
     ntEnv = mkNtEnv globalEnv
 
+    unwindApp :: (Venv, Tvenv) -> Exp -> [Either Exp Ty] -> PrepM Exp
     unwindApp env (App e1 e2) as = unwindApp env e1 (Left e2:as)
     unwindApp env (Appt e t) as  = unwindApp env e (Right t:as)
-    unwindApp env (op@(Dcon qdc)) as = 
+    unwindApp env (op@(Dcon qdc)) as = do
+        e' <- rewindApp env op as
         -- possibly dubious to assume no type args
-        etaExpand [] (drop n atys) (rewindApp env op as)
+        etaExpand [] (drop n atys) e'
         where (tbs,atys0,_) = splitTy (qlookup cenv_ eempty qdc)
 	      atys = map (substl (map fst tbs) ts) atys0
 	      ts = [t | Right t <- as]
               n = length [e | Left e <- as]
-    unwindApp env (op@(Var(qv@(_,p)))) as | isPrimVar qv =
-	k $ etaExpand (snd (unzip extraTbs)) (drop n atys) (k1 (rewindApp env op as))
+    unwindApp env (op@(Var(qv@(_,p)))) as | isPrimVar qv = do
+        e' <- rewindApp env op as
+	(liftM k) $ etaExpand (snd (unzip extraTbs)) (drop n atys) (k1 e')
         where -- TODO: avoid copying code. these two cases are the same
 
               -- etaExpand needs to add the type arguments too! Bah!
@@ -106,6 +133,8 @@ prepModule globalEnv (Module mn tdefs vdefgs) =
               -- (\ (s::State# RealWorld#) -> foo# 5 s)
               -- (This code may be a very good case against introducing such
               -- primops.)
+                  -- tim 10/29/2008: I think this is no longer necessary.
+                  -- hPutChar now has a (#wub,blub#) return type.
               (k,k1) = case newtypeCoercion_maybe ntEnv resTy' of
                          Just co -> case splitTyConApp_maybe resTy' of
                                       Just (_, args) -> ((\ e -> Cast e (SymCoercion (mkTapp co args))), (\ e1 -> Cast e1 (mkTapp co args)))
@@ -116,18 +145,22 @@ prepModule globalEnv (Module mn tdefs vdefgs) =
               atys = map (substl (map fst appliedTbs) ts) atys0
               ts = [t | Right t <- as]
               n = length [e | Left e <- as]
-    unwindApp env (op@(External _ t)) as =
-        etaExpand [] (drop n atys) (rewindApp env op as)
+    unwindApp env (op@(External _ t)) as = do
+        e' <- rewindApp env op as
+        etaExpand [] (drop n atys) e'
           where (_,atys,_) = splitTy t
                 n = length as -- assumes all args are term args
     unwindApp env op as = rewindApp env op as
 
 
-    etaExpand :: [Kind] -> [Ty] -> Exp -> Exp
-    etaExpand ks ts e = 
+    etaExpand :: [Kind] -> [Ty] -> Exp -> PrepM Exp
+    etaExpand ks ts e = do
          -- what a pain
-         let tyArgs = [(zEncodeString $ "$t_"++(show i),k) | (i, k) <- zip [(1::Integer)..] ks]   
-             termArgs = [ (zEncodeString $ '$':(show i),t) | (i,t) <- zip [(1::Integer)..] ts] in
+         tyvs <- replicateM (length ks) freshVar
+         termvs <- replicateM (length ts) freshVar
+         let tyArgs   = zip tyvs ks
+         let termArgs = zip termvs ts
+         return $
           foldr (\ (t1,k1) e -> Lam (Tb (t1,k1)) e)
 	   (foldr (\ (v,t) e -> Lam (Vb (v,t)) e)
               (foldl' (\ e (v,_) -> App e (Var (unqual v)))
@@ -136,27 +169,21 @@ prepModule globalEnv (Module mn tdefs vdefgs) =
               termArgs) termArgs)
            tyArgs
 
-    rewindApp _ e [] = e
-    rewindApp env@(venv,tvenv) e1 (Left e2:as) | kindOfTy tvenv t `eqKind` Kunlifted && suspends e2 =
+    rewindApp :: (Venv, Tvenv) -> Exp -> [Either Exp Ty] -> PrepM Exp
+    rewindApp _ e [] = return e
+    rewindApp env@(venv,tvenv) e1 (Left e2:as) | kindOfTy tvenv t `eqKind` Kunlifted && suspends e2 = do
+        v <- freshVar
+        let venv' = eextend venv (v,t)
+        rhs <- rewindApp (venv', tvenv) (App e1 (Var (unqual v))) as
+        newScrut <- prepExp env e2
        -- This is the other place where we call the typechecker.
-        Case newScrut (v,t) (typeOfExp venv' tvenv rhs) [Adefault rhs]
-        where newScrut = prepExp env e2
-              rhs = (rewindApp (venv', tvenv) (App e1 (Var (unqual v))) as)
-                 -- note:
-                 -- e1 gets moved inside rhs. so if we pick a case
-                 -- var name (outside e1) equal to a name bound *inside*
-                 -- e1, the binding *inside* e1 will shadow "v"
-                 -- Which would be name capture!
-                 -- So, we pass the bound vars of e1 to freshVar along with
-                 -- the domain of the current env.
-              v = freshVar (edomain venv `union` (boundVars e1))
-              t = typeOfExp venv tvenv e2
-              venv' = eextend venv (v,t)
-    rewindApp env e1 (Left e2:as) = rewindApp env (App e1 (prepExp env e2)) as
+        return $ Case newScrut (v,t) (typeOfExp venv' tvenv rhs) [Adefault rhs]
+        where t = typeOfExp venv tvenv e2
+    rewindApp env e1 (Left e2:as) = do
+      e2' <- prepExp env e2
+      rewindApp env (App e1 e2') as
     rewindApp env e (Right t:as) = rewindApp env (Appt e t) as
 
-    freshVar vs = maximum ("":vs) ++ "x" -- one simple way!
-    
     typeOfExp :: Venv -> Tvenv -> Exp -> Ty
     typeOfExp = checkExpr mn globalEnv tcenv cenv
 
@@ -247,3 +274,14 @@ type NtEnv  = M.Map Tcon (Ty, Ty)
 
 mkTapp :: Ty -> [Ty] -> Ty
 mkTapp = foldl Tapp
+
+initCounter :: Int
+initCounter = 0
+
+type PrepM = State Int
+
+freshVar :: PrepM String
+freshVar = do
+  i <- get
+  put (i+1)
+  return $ ("zd" ++ show i)
