@@ -82,3 +82,14 @@ tdefNames = concatMap doOne
         doOne (Newtype qtc qtc1 _ _) = [qtc, qtc1]
         doCdef (Constr qdc _ _) = [qdc]
 
+tdefDcons :: [Tdef] -> [Qual Var]
+tdefDcons = concatMap doOne
+  where doOne (Data _ _ cds) = concatMap doCdef cds
+        doOne _ = []
+        doCdef (Constr qdc _ _) = [qdc]
+
+tdefTcons :: [Tdef] -> [Qual Var]
+tdefTcons = concatMap doOne
+  where doOne (Data qtc _ _) = [qtc]
+        doOne (Newtype qtc qtc1 _ _) = [qtc, qtc1]
+

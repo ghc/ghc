@@ -2,7 +2,7 @@
    This module combines multiple External Core modules into
    a single module, including both datatype and value definitions. 
 -}
-module Language.Core.Merge(merge) where
+module Language.Core.Merge(merge,uniqueNamesIn,nonUniqueNamesIn) where
 
 import Language.Core.Core
 import Language.Core.CoreUtils
@@ -63,10 +63,18 @@ merge subst ms =
 -}
 uniqueNamesIn :: [Vdef] -> [Tdef] -> [Qual Var]
 uniqueNamesIn topBinds allTdefs = res
-  where allNames = vdefNamesQ topBinds ++ tdefNames allTdefs
-        dups     = dupsUnqual allNames
-        res      = allNames \\ dups
+  where vars  = vdefNamesQ topBinds
+        dcons = tdefDcons allTdefs
+        tcons = tdefTcons allTdefs
+        uniqueVars  = vars \\ dupsUnqual vars
+        uniqueDcons = dcons \\ dupsUnqual dcons
+        uniqueTcons = tcons \\ dupsUnqual tcons
+        res = uniqueVars ++ uniqueDcons ++ uniqueTcons
 
+nonUniqueNamesIn :: [Vdef] -> [Tdef] -> [Qual Var]
+nonUniqueNamesIn topBinds allTdefs = dupsUnqual allNames
+  where allNames = vdefNamesQ topBinds ++ tdefNames allTdefs
+        
 -- This takes each top-level name of the form Foo.Bar.blah and
 -- renames it to FoozuBarzublah (note we *don't* make it exported!
 -- This is so we know which names were in the original program and
