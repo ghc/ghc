@@ -35,6 +35,7 @@ import Foreign.C
 
 import Data.Bits
 import Data.Maybe
+import System.IO.Error
 
 #if __GLASGOW_HASKELL__
 import GHC.Base
@@ -270,7 +271,7 @@ setCooked fd cooked = do
 
 ioe_unk_error :: String -> String -> IOException
 ioe_unk_error loc msg 
- = IOError Nothing OtherError loc msg Nothing
+ = ioeSetErrorString (mkIOError OtherError loc Nothing Nothing) msg
 
 -- Note: echoing goes hand in hand with enabling 'line input' / raw-ness
 -- for Win32 consoles, hence setEcho ends up being the inverse of setCooked.
