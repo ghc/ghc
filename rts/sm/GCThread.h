@@ -195,7 +195,14 @@ extern gc_thread **gc_threads;
 
 #define GLOBAL_REG_DECL(type,name,reg) register type name REG(reg);
 
-#if defined(REG_Base) && !defined(i386_HOST_ARCH)
+#if defined(sparc_HOST_ARCH)
+// Don't use REG_base or R1 for gct on SPARC because they're getting clobbered 
+//	by something else. Not sure what yet. -- BL 2009/01/03
+
+extern __thread gc_thread* gct;
+#define DECLARE_GCT __thread gc_thread* gct;
+
+#elif defined(REG_Base) && !defined(i386_HOST_ARCH)
 // on i386, REG_Base is %ebx which is also used for PIC, so we don't
 // want to steal it
 
