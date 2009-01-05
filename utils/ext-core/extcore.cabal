@@ -8,12 +8,21 @@ license-file:        LICENSE
 author:              Andrew Tolmach, Tim Chevalier, The GHC Team
 maintainer:          chevalier@alum.wellesley.edu
 stability:           alpha
-build-depends:       base, containers, directory, filepath, mtl, parsec, pretty, syb
-exposed-modules:     Language.Core.Check, Language.Core.Dependencies, Language.Core.Core, Language.Core.Interp, Language.Core.Overrides, Language.Core.ParsecParser, Language.Core.Prep, Language.Core.Prims, Language.Core.Printer, Language.Core.Merge, Language.Core.ElimDeadCode, Language.Core.Encoding, Language.Core.Env
-other-modules:       Language.Core.PrimCoercions, Language.Core.PrimEnv, Language.Core.Utils, Language.Core.CoreUtils, Language.Core.Environments
-extensions:          DeriveDataTypeable PatternGuards RankNTypes ScopedTypeVariables
-ghc-options:         -Wall -O2
-tested-with:         GHC ==6.8.2
+tested-with:         GHC ==6.8.2, GHC==6.10.1
 data-files:          README
 build-type:          Simple
+cabal-version:       >=1.2
+Library {
+  exposed-modules:     Language.Core.Check, Language.Core.Dependencies, Language.Core.Core, Language.Core.Interp, Language.Core.Overrides, Language.Core.ParsecParser, Language.Core.Prep, Language.Core.Prims, Language.Core.Printer, Language.Core.Merge, Language.Core.ElimDeadCode, Language.Core.Encoding, Language.Core.Env
+  other-modules:       Language.Core.PrimCoercions, Language.Core.PrimEnv, Language.Core.Utils, Language.Core.CoreUtils, Language.Core.Environments
+  extensions:          DeriveDataTypeable PatternGuards RankNTypes ScopedTypeVariables
+  ghc-options:         -Wall -O2
+  build-depends:       base, containers, directory, filepath, mtl, parsec, pretty
+  if impl(ghc > 6.8.2) {
+     build-depends:syb
+  }
+  else {
+     extensions: PatternSignatures
+  }
+}
 

@@ -1,8 +1,7 @@
 #!/usr/bin/env runhaskell
 \begin{code}
-{-# OPTIONS -Wall #-}
+{-# OPTIONS -Wall -cpp #-}
 
-import Control.Exception
 import Control.Monad
 import Distribution.PackageDescription
 import Distribution.Simple
@@ -12,7 +11,7 @@ import System.Cmd
 import System.FilePath
 import System.Exit
 import System.Directory
-import Control.Exception (try)
+import Control.Exception
 
 main :: IO ()
 main = do
@@ -58,7 +57,12 @@ maybeUpdateFile source target = do
   r <- rawSystem "cmp" ["-s" {-quiet-}, source, target]
   case r of
     ExitSuccess   -> removeFile source
-    ExitFailure _ -> do (try :: IO () -> IO (Either IOException ())) (removeFile target); renameFile source target
-
-
+    ExitFailure _ -> do 
+#if __GLASGOW_HASKELL__ >= 610
+      (try :: IO () -> IO (Either IOException ()))
+#else
+      try
+#endif 
+       (removeFile target)
+      renameFile source target
 \end{code}
