@@ -35,7 +35,10 @@ import Foreign.C
 
 import Data.Bits
 import Data.Maybe
+
+#if !defined(HTYPE_TCFLAG_T)
 import System.IO.Error
+#endif
 
 #if __GLASGOW_HASKELL__
 import GHC.Base
