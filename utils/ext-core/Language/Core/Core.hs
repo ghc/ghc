@@ -210,7 +210,7 @@ mainPkg = P "main"
 primPkg = P $ zEncodeString "ghc-prim"
 ghcPrefix = ["GHC"]
 mainPrefix = []
-baseMname = mkBaseMname "Base"
+baseMname = error "Somebody called baseMname!" -- mkBaseMname "Base"
 boolMname = mkPrimMname "Bool"
 mainVar = qual mainMname "main"
 wrapperMainVar = qual wrapperMainMname "main"
@@ -287,3 +287,6 @@ flattenBinds :: [Vdefg] -> [Vdef]	-- Get all the lhs/rhs pairs
 flattenBinds (Nonrec vd : binds) = vd : flattenBinds binds
 flattenBinds (Rec prs1   : binds) = prs1 ++ flattenBinds binds
 flattenBinds []			  = []
+
+unitMname :: AnMname
+unitMname = mkPrimMname "Unit"

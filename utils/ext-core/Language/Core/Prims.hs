@@ -99,12 +99,15 @@ tStatezh t = Tapp (Tcon tcStatezh) t
 
 {- Properly defined in PrelError, but needed in many modules before that. -}
 errorVals :: [(Var, Ty)]
-errorVals = [
+errorVals = []
+{-
+ [
  ("error", Tforall ("a",Kopen) (tArrow tString (Tvar "a"))),
  ("irrefutPatError", str2A),
  ("patError", str2A),
  ("divZZeroError", forallAA),
  ("overflowError", forallAA)]
+-}
 
 {- Non-primitive, but mentioned in the types of primitives. -}
 
