@@ -35,19 +35,13 @@
 #ifdef CMINUSMINUS
 #define BLOCK_BEGIN
 #define BLOCK_END
-#define DECLARE_IPTR(info)  W_ info
-#define FCALL               foreign "C"
 #define INFO_PTR(info)      info
-#define ARG_PTR             "ptr"
 #else
 #define BLOCK_BEGIN         {
 #define BLOCK_END           }
-#define DECLARE_IPTR(info)  const StgInfoTable *(info)
-#define FCALL               /* nothing */
 #define INFO_PTR(info)      &info
 #define StgBlockingQueue_blocking_queue(closure) \
     (((StgBlockingQueue *)closure)->blocking_queue)
-#define ARG_PTR             /* nothing */
 #endif
 
 /* krc: there used to be an UPD_REAL_IND and an
@@ -56,26 +50,11 @@
    for now, we just have UPD_REAL_IND. */
 #define UPD_REAL_IND(updclosure, ind_info, heapptr, and_then)	\
         BLOCK_BEGIN						\
-	DECLARE_IPTR(info);					\
-	info = GET_INFO(updclosure);				\
 	updateWithIndirection(ind_info,				\
 			      updclosure,			\
 			      heapptr,				\
 			      and_then);			\
 	BLOCK_END
-
-#if defined(RTS_SUPPORTS_THREADS)
-
-#  define UPD_IND_NOLOCK(updclosure, heapptr)			\
-        BLOCK_BEGIN						\
-	updateWithIndirection(INFO_PTR(stg_IND_info),		\
-			      updclosure,			\
-			      heapptr,); 			\
-	BLOCK_END
-
-#else
-#define UPD_IND_NOLOCK(updclosure,heapptr) UPD_IND(updclosure,heapptr)
-#endif /* RTS_SUPPORTS_THREADS */
 
 /* -----------------------------------------------------------------------------
    Awaken any threads waiting on a blocking queue (BLACKHOLE_BQ).

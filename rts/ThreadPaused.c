@@ -74,7 +74,7 @@ stackSqueeze(StgTSO *tso, StgPtr bottom)
 		 * screw us up if we don't check.
 		 */
 		if (upd->updatee != updatee && !closure_IND(upd->updatee)) {
-		    UPD_IND_NOLOCK(upd->updatee, updatee);
+		    UPD_IND(upd->updatee, updatee);
 		}
 
 		// now mark this update frame as a stack gap.  The gap
