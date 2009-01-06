@@ -1402,6 +1402,13 @@ scheduleHandleThreadFinished (Capability *cap STG_UNUSED, Task *task, StgTSO *t)
     debugTrace(DEBUG_sched, "--++ thread %lu (%s) finished", 
 	       (unsigned long)t->id, whatNext_strs[t->what_next]);
 
+    // blocked exceptions can now complete, even if the thread was in
+    // blocked mode (see #2910).  The thread is already marked
+    // ThreadComplete, so any further throwTos will complete
+    // immediately and we don't need to worry about synchronising with
+    // those.
+    awakenBlockedExceptionQueue (cap, t);
+
       //
       // Check whether the thread that just completed was a bound
       // thread, and if so return with the result.  
