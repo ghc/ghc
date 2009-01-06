@@ -38,6 +38,7 @@ import HscTypes ( msHsFilePath )
 import Digraph
 import BasicTypes
 import SrcLoc
+import HscTypes
 
 
 -- | Turn a topologically sorted list of module names/filenames into interfaces. Also
@@ -87,7 +88,7 @@ createInterfaces' modules flags instIfaceMap = do
   modgraph <- depanal [] False
   let orderedMods = flattenSCCs $ topSortModuleGraph False modgraph Nothing
   (ifaces, _) <- foldM (\(ifaces, modMap) modsum -> do
-    interface <- processModule modsum flags modMap instIfaceMap
+    x <- processModule modsum flags modMap instIfaceMap
 #else
 createInterfaces' :: Session -> [String] -> [Flag] -> InstIfaceMap -> IO [Interface]
 createInterfaces' session modules flags instIfaceMap = do
@@ -99,9 +100,12 @@ createInterfaces' session modules flags instIfaceMap = do
     Nothing -> throwE "Failed to create dependecy graph"
   let orderedMods = flattenSCCs $ topSortModuleGraph False modgraph Nothing
   (ifaces, _) <- foldM (\(ifaces, modMap) modsum -> do
-    interface <- processModule session modsum flags modMap instIfaceMap
+    x <- processModule session modsum flags modMap instIfaceMap
 #endif
-    return $ (interface : ifaces , Map.insert (ifaceMod interface) interface modMap)
+    case x of
+      Just interface ->
+        return $ (interface : ifaces , Map.insert (ifaceMod interface) interface modMap)
+      Nothing -> return (ifaces, modMap)
     ) ([], Map.empty) orderedMods
   return (reverse ifaces)
 
@@ -138,7 +142,7 @@ ppModInfo (HaddockModInfo a b c d) = show (fmap pretty a) ++ show b ++ show c ++
 -}
 
 #if __GLASGOW_HASKELL__ >= 609
-processModule :: ModSummary -> [Flag] -> ModuleMap -> InstIfaceMap -> Ghc Interface
+processModule :: ModSummary -> [Flag] -> ModuleMap -> InstIfaceMap -> Ghc (Maybe Interface)
 processModule modsum flags modMap instIfaceMap = 
 
   let handleSrcErrors action = flip handleSourceError action $ \err -> do 
@@ -146,33 +150,41 @@ processModule modsum flags modMap instIfaceMap =
         throwE ("Failed to check module: " ++ moduleString (ms_mod modsum))
 
   in handleSrcErrors $ do
-       let filename = msHsFilePath modsum
-       let dynflags = ms_hspp_opts modsum
        tc_mod <- loadModule =<< typecheckModule =<< parseModule modsum
-       let Just renamed_src = renamedSource tc_mod
-       let ghcMod = mkGhcModule (ms_mod modsum,
-                             filename,
-                             (parsedSource tc_mod,
-                              renamed_src,
-                              typecheckedSource tc_mod,
-                              moduleInfo tc_mod))
-                             dynflags
-       let (interface, msg) = runWriter $ createInterface ghcMod flags modMap instIfaceMap
-       liftIO $ mapM_ putStrLn msg
-       liftIO $ evaluate interface
-       return interface
+       if not $ isBootSummary modsum
+         then do
+           let filename = msHsFilePath modsum
+           let dynflags = ms_hspp_opts modsum
+           let Just renamed_src = renamedSource tc_mod
+           let ghcMod = mkGhcModule (ms_mod modsum,
+                                 filename,
+                                 (parsedSource tc_mod,
+                                  renamed_src,
+                                  typecheckedSource tc_mod,
+                                  moduleInfo tc_mod))
+                                 dynflags
+           let (interface, msg) = runWriter $ createInterface ghcMod flags modMap instIfaceMap
+           liftIO $ mapM_ putStrLn msg
+           liftIO $ evaluate interface
+           return (Just interface)
+         else
+           return Nothing
 #else
-processModule :: Session -> ModSummary -> [Flag] -> ModuleMap -> InstIfaceMap -> IO Interface
+processModule :: Session -> ModSummary -> [Flag] -> ModuleMap -> InstIfaceMap -> IO (Maybe Interface)
 processModule session modsum flags modMap instIfaceMap = do
   let filename = msHsFilePath modsum
   mbMod <- checkAndLoadModule session modsum False
-  ghcMod <- case mbMod of
-    Just (CheckedModule a (Just b) (Just c) (Just d) _)
-      -> return $ mkGhcModule (ms_mod modsum, filename, (a,b,c,d)) (ms_hspp_opts modsum)
-    _ -> throwE ("Failed to check module: " ++ (moduleString $ ms_mod modsum))
-  let (interface, msg) = runWriter $ createInterface ghcMod flags modMap instIfaceMap
-  mapM_ putStrLn msg
-  return interface
+  if not $ isBootSummary modsum
+    then do
+      ghcMod <- case mbMod of
+        Just (CheckedModule a (Just b) (Just c) (Just d) _)
+          -> return $ mkGhcModule (ms_mod modsum, filename, (a,b,c,d)) (ms_hspp_opts modsum)
+        _ -> throwE ("Failed to check module: " ++ (moduleString $ ms_mod modsum))
+      let (interface, msg) = runWriter $ createInterface ghcMod flags modMap instIfaceMap
+      mapM_ putStrLn msg
+      return (Just interface)
+    else
+      return Nothing
 #endif
 
 -- | Build a mapping which for each original name, points to the "best"
