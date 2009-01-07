@@ -1651,8 +1651,11 @@ takeMVarzh_fast
                                    CurrentTSO) [];
 	}
 	StgTSO__link(CurrentTSO)       = stg_END_TSO_QUEUE_closure;
-	StgTSO_why_blocked(CurrentTSO) = BlockedOnMVar::I16;
 	StgTSO_block_info(CurrentTSO)  = mvar;
+        // write barrier for throwTo(), which looks at block_info
+        // if why_blocked==BlockedOnMVar.
+        prim %write_barrier() [];
+	StgTSO_why_blocked(CurrentTSO) = BlockedOnMVar::I16;
 	StgMVar_tail(mvar) = CurrentTSO;
 	
         R1 = mvar;
@@ -1808,8 +1811,11 @@ putMVarzh_fast
                                    CurrentTSO) [];
 	}
 	StgTSO__link(CurrentTSO)       = stg_END_TSO_QUEUE_closure;
-	StgTSO_why_blocked(CurrentTSO) = BlockedOnMVar::I16;
 	StgTSO_block_info(CurrentTSO)  = mvar;
+        // write barrier for throwTo(), which looks at block_info
+        // if why_blocked==BlockedOnMVar.
+        prim %write_barrier() [];
+	StgTSO_why_blocked(CurrentTSO) = BlockedOnMVar::I16;
 	StgMVar_tail(mvar) = CurrentTSO;
 	
         R1 = mvar;
