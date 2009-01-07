@@ -558,6 +558,9 @@ maybePerformBlockedException (Capability *cap, StgTSO *tso)
     return 0;
 }
 
+// awakenBlockedExceptionQueue(): Just wake up the whole queue of
+// blocked exceptions and let them try again.
+
 void
 awakenBlockedExceptionQueue (Capability *cap, StgTSO *tso)
 {
