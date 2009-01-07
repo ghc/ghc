@@ -512,6 +512,15 @@ maybePerformBlockedException (Capability *cap, StgTSO *tso)
 {
     StgTSO *source;
     
+    if (tso->what_next == ThreadComplete || tso->what_next == ThreadFinished) {
+        if (tso->blocked_exceptions != END_TSO_QUEUE) {
+            awakenBlockedExceptionQueue(cap,tso);
+            return 1;
+        } else {
+            return 0;
+        }
+    }
+
     if (tso->blocked_exceptions != END_TSO_QUEUE && 
         (tso->flags & TSO_BLOCKEX) != 0) {
         debugTrace(DEBUG_sched, "throwTo: thread %lu has blocked exceptions but is inside block", (unsigned long)tso->id);
