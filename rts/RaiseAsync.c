@@ -415,6 +415,7 @@ check_target:
 	// Unblocking BlockedOnSTM threads requires the TSO to be
 	// locked; see STM.c:unpark_tso().
 	if (target->why_blocked != BlockedOnSTM) {
+	    unlockTSO(target);
 	    goto retry;
 	}
 	if ((target->flags & TSO_BLOCKEX) &&
@@ -436,6 +437,11 @@ check_target:
 	// thread is blocking exceptions, and block on its
 	// blocked_exception queue.
 	lockTSO(target);
+	if (target->why_blocked != BlockedOnCCall &&
+ 	    target->why_blocked != BlockedOnCCall_NoUnblockExc) {
+	    unlockTSO(target);
+            goto retry;
+	}
 	blockedThrowTo(cap,source,target);
 	*out = target;
 	return THROWTO_BLOCKED;
