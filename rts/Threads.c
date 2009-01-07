@@ -763,6 +763,11 @@ printThreadStatus(StgTSO *t)
 	default:
 	    printThreadBlockage(t);
 	}
+        if (t->flags & TSO_DIRTY) {
+            debugBelch(" (TSO_DIRTY)");
+        } else if (t->flags & TSO_LINK_DIRTY) {
+            debugBelch(" (TSO_LINK_DIRTY)");
+        }
 	debugBelch("\n");
     }
 }
