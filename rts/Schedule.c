@@ -1599,6 +1599,21 @@ delete_threads_and_gc:
     
     heap_census = scheduleNeedHeapProfile(rtsTrue);
 
+    if (recent_activity == ACTIVITY_INACTIVE && force_major)
+    {
+        // We are doing a GC because the system has been idle for a
+        // timeslice and we need to check for deadlock.  Record the
+        // fact that we've done a GC and turn off the timer signal;
+        // it will get re-enabled if we run any threads after the GC.
+        //
+        // Note: this is done before GC, because after GC there might
+        // be threads already running (GarbageCollect() releases the
+        // GC threads when it completes), so we risk turning off the
+        // timer signal when it should really be on.
+        recent_activity = ACTIVITY_DONE_GC;
+        stopTimer();
+    }
+
 #if defined(THREADED_RTS)
     debugTrace(DEBUG_sched, "doing GC");
     // reset waiting_for_gc *before* GC, so that when the GC threads
@@ -1639,16 +1654,6 @@ delete_threads_and_gc:
        occur. Should be defined in Sparks.c. */
     balanceSparkPoolsCaps(n_capabilities, capabilities);
 #endif
-
-    if (force_major)
-    {
-        // We've just done a major GC and we don't need the timer
-        // signal turned on any more (#1623).
-        // NB. do this *before* releasing the Capabilities, to avoid
-        // deadlocks!
-        recent_activity = ACTIVITY_DONE_GC;
-        stopTimer();
-    }
 
 #if defined(THREADED_RTS)
     if (gc_type == PENDING_GC_SEQ) {
