@@ -1403,10 +1403,9 @@ scheduleHandleThreadFinished (Capability *cap STG_UNUSED, Task *task, StgTSO *t)
 	       (unsigned long)t->id, whatNext_strs[t->what_next]);
 
     // blocked exceptions can now complete, even if the thread was in
-    // blocked mode (see #2910).  The thread is already marked
-    // ThreadComplete, so any further throwTos will complete
-    // immediately and we don't need to worry about synchronising with
-    // those.
+    // blocked mode (see #2910).  This unconditionally calls
+    // lockTSO(), which ensures that we don't miss any threads that
+    // are engaged in throwTo() with this thread as a target.
     awakenBlockedExceptionQueue (cap, t);
 
       //
@@ -1988,7 +1987,10 @@ resumeThread (void *task_)
     debugTrace(DEBUG_sched, "thread %lu: re-entering RTS", (unsigned long)tso->id);
     
     if (tso->why_blocked == BlockedOnCCall) {
-	awakenBlockedExceptionQueue(cap,tso);
+        // avoid locking the TSO if we don't have to
+        if (tso->blocked_exceptions != END_TSO_QUEUE) {
+            awakenBlockedExceptionQueue(cap,tso);
+        }
 	tso->flags &= ~(TSO_BLOCKEX | TSO_INTERRUPTIBLE);
     }
     

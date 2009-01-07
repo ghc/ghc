@@ -264,6 +264,15 @@ check_target:
 		target = target->_link;
 		goto retry;
 	    }
+            // check again for ThreadComplete and ThreadKilled.  This
+            // cooperates with scheduleHandleThreadFinished to ensure
+            // that we never miss any threads that are throwing an
+            // exception to a thread in the process of terminating.
+            if (target->what_next == ThreadComplete
+                || target->what_next == ThreadKilled) {
+		unlockTSO(target);
+                return THROWTO_SUCCESS;
+            }
 	    blockedThrowTo(cap,source,target);
 	    *out = target;
 	    return THROWTO_BLOCKED;
@@ -564,12 +573,10 @@ maybePerformBlockedException (Capability *cap, StgTSO *tso)
 void
 awakenBlockedExceptionQueue (Capability *cap, StgTSO *tso)
 {
-    if (tso->blocked_exceptions != END_TSO_QUEUE) {
-	lockTSO(tso);
-	awakenBlockedQueue(cap, tso->blocked_exceptions);
-	tso->blocked_exceptions = END_TSO_QUEUE;
-	unlockTSO(tso);
-    }
+    lockTSO(tso);
+    awakenBlockedQueue(cap, tso->blocked_exceptions);
+    tso->blocked_exceptions = END_TSO_QUEUE;
+    unlockTSO(tso);
 }    
 
 static void
