@@ -58,6 +58,16 @@ NEW_BUILD_SYSTEM_STAGE2_GHC := $(abspath $(TOP)/../inplace/bin/ghc-stage2)
 NEW_BUILD_SYSTEM_STAGE3_GHC := $(abspath $(TOP)/../inplace/bin/ghc-stage3)
 ifneq "$(wildcard $(NEW_BUILD_SYSTEM_STAGE1_GHC))" ""
 
+ifeq "$(stage)" "1"
+TEST_HC := $(NEW_BUILD_SYSTEM_STAGE1_GHC)
+else
+ifeq "$(stage)" "3"
+TEST_HC := $(NEW_BUILD_SYSTEM_STAGE3_GHC)
+else
+# use stage2 by default
+TEST_HC := $(NEW_BUILD_SYSTEM_STAGE2_GHC)
+endif
+
 else
 TEST_HC := $(shell which ghc)
 endif
