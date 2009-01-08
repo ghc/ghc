@@ -74,15 +74,15 @@ HP2PS_ABS := $(dir $(TEST_HC))/hp2ps
 endif
 
 ifeq "$(wildcard $(TEST_HC))" ""
-$(error Cannot find ghc)
+$(error Cannot find ghc: $(TEST_HC))
 endif
 
 ifeq "$(wildcard $(GHC_PKG))" ""
-$(error Cannot find ghc-pkg)
+$(error Cannot find ghc-pkg: $(GHC_PKG))
 endif
 
 ifeq "$(wildcard $(HP2PS_ABS))" ""
-$(error Cannot find hp2ps)
+$(error Cannot find hp2ps: $(HP2PS_ABS))
 endif
 
 $(eval $(call get-ghc-field,GhcRTSWays,RTS ways))
