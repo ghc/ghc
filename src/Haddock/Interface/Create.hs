@@ -359,7 +359,6 @@ mkExportItems modMap this_mod exported_names decls declMap
     everything_local_exported =  -- everything exported
       return (fullContentsOfThisModule this_mod decls)
    
-    packageId = modulePackageId this_mod
 
     lookupExport (IEVar x) = declWith x
     lookupExport (IEThingAbs t) = declWith t
@@ -371,7 +370,7 @@ mkExportItems modMap this_mod exported_names decls declMap
 
     lookupExport (IEThingAll t)        = declWith t
     lookupExport (IEThingWith t cs)    = declWith t
-    lookupExport (IEModuleContents m)  = fullContentsOf (mkModule packageId m)
+    lookupExport (IEModuleContents m)  = fullContentsOf m
     lookupExport (IEGroup lev doc)     = return [ ExportGroup lev "" doc ]
     lookupExport (IEDoc doc)           = return [ ExportDoc doc ] 
     lookupExport (IEDocNamed str) = do
@@ -407,7 +406,7 @@ mkExportItems modMap this_mod exported_names decls declMap
         subs' = filter ((`elem` exported_names) . fst) subs
         sub_names = map fst subs'
 
-    fullContentsOf m  
+    fullContentsOf modname
 	| m == this_mod = return (fullContentsOfThisModule this_mod decls)
 	| otherwise = 
 	   case Map.lookup m modMap of
@@ -415,8 +414,20 @@ mkExportItems modMap this_mod exported_names decls declMap
 		| OptHide `elem` ifaceOptions iface
 			-> return (ifaceExportItems iface)
 		| otherwise -> return [ ExportModule m ]
-	     Nothing -> return [] -- already emitted a warning in visibleNames
+               
+	     Nothing -> -- we have to try to find it in the installed interfaces
+                        -- (external packages)
+               case Map.lookup modname (Map.mapKeys moduleName instIfaceMap) of
+                 Just iface -> return [ ExportModule (instMod iface) ]
+                 Nothing -> do
+                   tell ["Warning: " ++ pretty this_mod ++ ": Could not find " ++
+                         "documentation for exported module: " ++ pretty modname]
+                   return []
+      where
+        m = mkModule packageId modname
+        packageId = modulePackageId this_mod
 
+    
     findDecl :: Name -> Maybe DeclInfo
     findDecl n 
       | m == this_mod = Map.lookup n declMap
