@@ -475,20 +475,23 @@ getPkgDatabases modify my_flags = do
              in
                 return (flag_stack, to_modify)
 
-  db_stack <- mapM readParseDatabase final_stack
+  db_stack <- mapM (readParseDatabase mb_user_conf) final_stack
   return (db_stack, to_modify)
 
-readParseDatabase :: PackageDBName -> IO (PackageDBName,PackageDB)
-readParseDatabase filename = do
-  str <- readFile filename `catchIO` \_ -> return emptyPackageConfig
-  let packages = map convertPackageInfoIn $ read str
-  Exception.evaluate packages
-    `catchError` \e->
-        die ("error while parsing " ++ filename ++ ": " ++ show e)
-  return (filename,packages)
-
-emptyPackageConfig :: String
-emptyPackageConfig = "[]"
+readParseDatabase :: Maybe (PackageDBName,Bool)
+                  -> PackageDBName
+                  -> IO (PackageDBName,PackageDB)
+readParseDatabase mb_user_conf filename
+  -- the user database (only) is allowed to be non-existent
+  | Just (user_conf,False) <- mb_user_conf, filename == user_conf
+  = return (filename, [])
+  | otherwise
+  = do str <- readFile filename
+       let packages = map convertPackageInfoIn $ read str
+       Exception.evaluate packages
+         `catchError` \e->
+            die ("error while parsing " ++ filename ++ ": " ++ show e)
+       return (filename,packages)
 
 -- -----------------------------------------------------------------------------
 -- Registering
@@ -1144,9 +1147,6 @@ installSignalHandlers = do
 isInfixOf               :: (Eq a) => [a] -> [a] -> Bool
 isInfixOf needle haystack = any (isPrefixOf needle) (tails haystack)
 #endif
-
-catchIO :: IO a -> (Exception.IOException -> IO a) -> IO a
-catchIO = Exception.catch
 
 #if mingw32_HOST_OS || mingw32_TARGET_OS
 throwIOIO :: Exception.IOException -> IO a
