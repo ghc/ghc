@@ -1,5 +1,0 @@
-
-#include "../../includes/MachDeps.h"
-
-WORDSIZE = WORD_SIZE_IN_BITS
-

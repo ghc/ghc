@@ -1,22 +1,23 @@
-TOP = ../..
+TOP = ..
 include $(TOP)/mk/boilerplate.mk
-include $(TOP)/mk/cabal-flags.mk
 
 TIMEOUT_PROGRAM = install-inplace/bin/timeout$(exeext)
 
-ifeq "$(findstring thr,$(GhcRTSWays))" ""
+ifeq "$(filter thr, $(GhcRTSWays))" ""
 $(TIMEOUT_PROGRAM): timeout.py
-	$(MKDIRHIER) `dirname $@`
+	rm -rf install-inplace
+	mkdir install-inplace
+	mkdir install-inplace/bin
 	cp $< $@
 	chmod +x $@
 else
 $(TIMEOUT_PROGRAM): timeout.hs
-	$(CABAL) configure $(USE_STAGE1_CONFIGURE_FLAGS)   \
-	                   $(INPLACE_DIRS_CONFIGURE_FLAGS) \
-	                   $(COMMON_CONFIGURE_FLAGS)       \
-					   --ghc-option=-threaded
-	$(CABAL) build
-	$(CABAL) install
+	rm -rf install-inplace
+	$(TEST_HC) --make Setup
+	./Setup configure --with-compiler=$(TEST_HC) --with-hc-pkg=$(GHC_PKG) \
+	                  --ghc-option=-threaded --prefix=$(abspath install-inplace)
+	./Setup build
+	./Setup install
 endif
 
 boot all :: calibrate.out $(TIMEOUT_PROGRAM)
