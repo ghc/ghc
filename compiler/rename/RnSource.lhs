@@ -127,7 +127,7 @@ rnSrcDecls group@(HsGroup {hs_valds  = val_decls,
    --     extend the record field env.
    --     This depends on the data constructors and field names being in
    --     scope from (B) above
-   inNewEnv (extendRecordFieldEnv tycl_decls) $ \ _ -> do {
+   inNewEnv (extendRecordFieldEnv tycl_decls inst_decls) $ \ _ -> do {
 
    -- (D) Rename the left-hand sides of the value bindings.
    --     This depends on everything from (B) being in scope,
@@ -1053,10 +1053,10 @@ badDataCon name
 Get the mapping from constructors to fields for this module.
 It's convenient to do this after the data type decls have been renamed
 \begin{code}
-extendRecordFieldEnv :: [LTyClDecl RdrName] -> TcM TcGblEnv
-extendRecordFieldEnv decls 
+extendRecordFieldEnv :: [LTyClDecl RdrName] -> [LInstDecl RdrName] -> TcM TcGblEnv
+extendRecordFieldEnv tycl_decls inst_decls
   = do	{ tcg_env <- getGblEnv
-	; field_env' <- foldrM get (tcg_field_env tcg_env) decls
+	; field_env' <- foldrM get_con (tcg_field_env tcg_env) all_data_cons
 	; return (tcg_env { tcg_field_env = field_env' }) }
   where
     -- we want to lookup:
@@ -1068,10 +1068,14 @@ extendRecordFieldEnv decls
     lookup x = do { x' <- lookupLocatedTopBndrRn x
                     ; return $ unLoc x'}
 
-    get (L _ (TyData { tcdCons = cons })) env = foldrM get_con env cons
-    get _     		                  env = return env
+    all_data_cons :: [ConDecl RdrName]
+    all_data_cons = [con | L _ (TyData { tcdCons = cons }) <- all_tycl_decls
+    		         , L _ con <- cons ]
+    all_tycl_decls = at_tycl_decls ++ tycl_decls
+    at_tycl_decls = [at | L _ (InstDecl _ _ _ ats) <- inst_decls, at <- ats]
+    		      -- Do not forget associated types!
 
-    get_con (L _ (ConDecl { con_name = con, con_details = RecCon flds }))
+    get_con (ConDecl { con_name = con, con_details = RecCon flds })
 	    (RecFields env fld_set)
 	= do { con' <- lookup con
              ; flds' <- mappM lookup (map cd_fld_name flds)
