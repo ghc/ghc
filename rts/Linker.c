@@ -1744,7 +1744,7 @@ static int ocAllocateSymbolExtras( ObjectCode* oc, int count, int first )
     if( m > n ) // we need to allocate more pages
     {
         oc->symbol_extras = mmapForLinker(sizeof(SymbolExtra) * count, 
-                                          MAP_ANONYMOUS, 0);
+                                          MAP_ANONYMOUS, -1);
     }
     else
     {
