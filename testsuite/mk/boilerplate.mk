@@ -48,9 +48,9 @@ else
 # use stage2 by default
 TEST_HC := $(OLD_BUILD_SYSTEM_STAGE2_GHC)
 endif
+endif
 GHC_PKG := $(OLD_BUILD_SYSTEM_GHC_PKG)
 HP2PS_ABS := $(OLD_BUILD_SYSTEM_HP2PS)
-endif
 
 else
 NEW_BUILD_SYSTEM_STAGE1_GHC := $(abspath $(TOP)/../inplace/bin/ghc-stage1)
@@ -66,6 +66,7 @@ TEST_HC := $(NEW_BUILD_SYSTEM_STAGE3_GHC)
 else
 # use stage2 by default
 TEST_HC := $(NEW_BUILD_SYSTEM_STAGE2_GHC)
+endif
 endif
 
 else
