@@ -10,7 +10,7 @@ clean:
 	rm -rf v1/dist v2/dist
 	rm -f *.o *.hi
 	rm -f clean.out prep.out
-	-$(GHC_PKG_INPLACE) unregister $(PKG)
+	-$(GHC_PKG) unregister $(PKG)
 
 # We aren't interested in the output from the cabal & compilation
 # stages, so redirect it to a file.
@@ -24,7 +24,7 @@ prep:
 	for i in v1 v2; do \
 	   (cd $$i && \
 		$(TEST_HC) --make -o setup Setup.hs && \
-		./setup configure -v0 --with-compiler=$(TEST_HC) --with-hc-pkg=$(GHC_PKG_INPLACE) && \
+		./setup configure -v0 --with-compiler=$(TEST_HC) --with-hc-pkg=$(GHC_PKG) && \
 		./setup build && \
 		./setup register --inplace ); done
 

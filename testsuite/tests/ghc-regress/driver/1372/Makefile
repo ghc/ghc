@@ -9,8 +9,8 @@ clean:
 	rm -f *.o *.hi
 	rm -f clean.out prep.out
 	rm -f p1/A.hs
-	-$(GHC_PKG_INPLACE) unregister p1
-	-$(GHC_PKG_INPLACE) unregister p2
+	-$(GHC_PKG) unregister p1
+	-$(GHC_PKG) unregister p2
 
 # We aren't interested in the output from the cabal & compilation
 # stages, so redirect it to a file.
@@ -27,7 +27,7 @@ prep:
 	for i in p1 p2; do \
 	   (cd $$i && \
 		$(TEST_HC) --make -o setup Setup.hs && \
-		./setup configure -v0 --with-compiler=$(TEST_HC) --with-hc-pkg=$(GHC_PKG_INPLACE) && \
+		./setup configure -v0 --with-compiler=$(TEST_HC) --with-hc-pkg=$(GHC_PKG) && \
 		./setup build && \
 		./setup register --inplace ); done
 	cp p1/A2.hs p1/A.hs
