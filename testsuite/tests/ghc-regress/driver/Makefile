@@ -42,7 +42,7 @@ test013:
 test014:
 	$(RM) -f A014.hi
 	$(RM) -rf obj014
-	$(MKDIRHIER) -q obj014
+	mkdir obj014
 	$(TEST_HC) -c A014.hs -odir obj014
 	test -f obj014/A014$(OBJSUFFIX)
 	test -f A014.hi
@@ -51,7 +51,7 @@ test014:
 test015:
 	$(RM) -f A015$(OBJSUFFIX)
 	$(RM) -rf hi015
-	$(MKDIRHIER) -q hi015
+	mkdir hi015
 	$(TEST_HC) -c A015.hs -hidir hi015
 	test -f A015$(OBJSUFFIX)
 	test -f hi015/A015.hi
@@ -76,7 +76,7 @@ test017:
 test018:
 	$(RM) -f F018.hi F018$(OBJSUFFIX) F018_stub.c F018_stub.h
 	$(RM) -rf obj018
-	$(MKDIRHIER) -q obj018
+	mkdir obj018
 	$(TEST_HC) -c F018.hs -odir obj018
 	test -f obj018/TestStub018_stub$(OBJSUFFIX)
 
@@ -118,7 +118,7 @@ test023:
 test024:
 	$(RM) -f B/C024.hi
 	$(RM) -rf obj024
-	$(MKDIRHIER) -q obj024
+	mkdir obj024
 	$(TEST_HC) -c B/C024.hs -odir obj024
 	test -f obj024/B/C024$(OBJSUFFIX)
 
@@ -126,15 +126,15 @@ test024:
 test024a:
 	$(RM) -f B/stub.c
 	$(RM) -rf obj
-	$(MKDIRHIER) -q obj
+	mkdir obj
 	echo >B/stub.c
 	$(TEST_HC) -c B/stub.c -odir obj
 	test -f obj/B/stub$(OBJSUFFIX)
 
 # test -hidir
 test025:
-	$(MKDIRHIER) -q hi
-	$(RM) hi/B/C.hi
+	$(RM) -rf hi
+	mkdir hi
 	$(RM) B/C$(OBJSUFFIX)
 	$(TEST_HC) -c B/C.hs -hidir hi
 	test -f hi/B/C.hi
@@ -176,16 +176,16 @@ test031:
 # test -odir
 test032:
 	$(RM) A.hi
-	$(RM) obj/A$(OBJSUFFIX)
-	$(MKDIRHIER) -q obj
+	$(RM) -rf obj
+	mkdir obj
 	$(TEST_HC) -v0 --make A.hs -odir obj
 	test -f obj/A$(OBJSUFFIX)
 
 # test -hidir
 test033:
-	$(RM) hi/A.hi
+	$(RM) -rf hi
 	$(RM) A$(OBJSUFFIX)
-	$(MKDIRHIER) -q hi
+	mkdir hi
 	$(TEST_HC) -v0 --make A.hs -hidir hi
 	test -f hi/A.hi
 
@@ -215,9 +215,9 @@ test041:
 
 # test -odir
 test042:
-	$(MKDIRHIER) -q obj
+	$(RM) -rf obj
+	mkdir obj
 	$(RM) B/C.hi
-	$(RM) obj/B/C$(OBJSUFFIX)
 	$(TEST_HC) -v0 --make B/C.hs -odir obj
 	test -f obj/B/C$(OBJSUFFIX)
 
@@ -225,7 +225,7 @@ test042:
 test043:
 	$(RM) -f B/C$(OBJSUFFIX)
 	$(RM) -rf hi
-	$(MKDIRHIER) -q hi
+	mkdir hi
 	$(TEST_HC) -v0 --make B/C.hs -hidir hi
 	test -f hi/B/C.hi
 
@@ -260,10 +260,9 @@ test051:
 # test -odir
 test052:
 	$(RM) d2/R/S.hi
-	$(RM) obj/R/S$(OBJSUFFIX)
 	$(RM) d1/P/Q.hi
-	$(RM) obj/P/Q$(OBJSUFFIX)
-	$(MKDIRHIER) -q obj
+	$(RM) -rf obj
+	mkdir obj
 	$(TEST_HC) -v0 --make -id1 -id2 -odir obj R.S 
 	test -f d2/R/S.hi
 	test -f obj/R/S$(OBJSUFFIX)
