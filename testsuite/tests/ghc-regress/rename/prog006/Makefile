@@ -17,7 +17,7 @@ include $(TOP)/mk/test.mk
 
 rn.prog006:
 	$(TEST_HC) --make -package-name test-1.0 B.C -fforce-recomp -v0
-	sed "s@__IMPORT__@`$(TOP)/utils/pwd quadruple-backslash`@" <pkg.conf.in >pkg.conf
+	sed "s@__IMPORT__@$(abspath .)@" <pkg.conf.in >pkg.conf
 	$(TEST_HC) -c -package-conf pkg.conf -package test -fforce-recomp A.hs -i
 # The -i clears the search path, so A.hs will find B.C from package test
 #

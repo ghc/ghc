@@ -23,7 +23,7 @@ cabal01:
 	$(MAKE) clean
 	$(TEST_HC) --make -o setup Setup.lhs -v0
 
-	./setup configure -v0 --prefix=$(shell $(TOP)/utils/pwd forwardslash)/install --with-compiler=$(TEST_HC) --with-hc-pkg=$(GHC_PKG) $(PROF)
+	./setup configure -v0 --prefix=$(abspath install) --with-compiler=$(TEST_HC) --with-hc-pkg=$(GHC_PKG) $(PROF)
 	./setup build -v0
 	./setup copy -v0
 	echo install1:

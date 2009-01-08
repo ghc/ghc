@@ -12,4 +12,4 @@ config :
 	@echo "Creating $(CONFIG_HS) ... "
 	@echo "module Config where" >>$(CONFIG_HS)
 	@echo "cTop          :: String" >> $(CONFIG_HS)
-	@echo "cTop          = \""`cd $(TOP) && cd .. && pwd`"\"" >> $(CONFIG_HS)
+	@echo "cTop          = \""`$(TEST_HC) --print-libdir`"\"" >> $(CONFIG_HS)
