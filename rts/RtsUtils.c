@@ -480,8 +480,17 @@ void printRtsInfo(void) {
     mkRtsInfoPair("GHC version",             ProjectVersion);
     mkRtsInfoPair("RTS way",                 RtsWay);
     mkRtsInfoPair("Host platform",           HostPlatform);
+    mkRtsInfoPair("Host architecture",       HostArch);
+    mkRtsInfoPair("Host OS",                 HostOS);
+    mkRtsInfoPair("Host vendor",             HostVendor);
     mkRtsInfoPair("Build platform",          BuildPlatform);
+    mkRtsInfoPair("Build architecture",      BuildArch);
+    mkRtsInfoPair("Build OS",                BuildOS);
+    mkRtsInfoPair("Build vendor",            BuildVendor);
     mkRtsInfoPair("Target platform",         TargetPlatform);
+    mkRtsInfoPair("Target architecture",     TargetArch);
+    mkRtsInfoPair("Target OS",               TargetOS);
+    mkRtsInfoPair("Target vendor",           TargetVendor);
     mkRtsInfoPair("Compiler unregisterised", GhcUnregisterised);
     mkRtsInfoPair("Tables next to code",     GhcEnableTablesNextToCode);
     printf(" ]\n");

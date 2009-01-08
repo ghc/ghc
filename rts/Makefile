@@ -198,9 +198,22 @@ Main_HC_OPTS += -optc-O0
 RtsMessages_CC_OPTS += -DProjectVersion=$(DQ)$(ProjectVersion)$(DQ)
 RtsUtils_CC_OPTS += -DProjectVersion=$(DQ)$(ProjectVersion)$(DQ)
 RtsUtils_CC_OPTS += -DRtsWay=$(DQ)rts$(_way)$(DQ)
+#
 RtsUtils_CC_OPTS += -DHostPlatform=$(DQ)$(HOSTPLATFORM)$(DQ)
+RtsUtils_CC_OPTS += -DHostArch=$(DQ)$(HostArch_CPP)$(DQ)
+RtsUtils_CC_OPTS += -DHostOS=$(DQ)$(HostOS_CPP)$(DQ)
+RtsUtils_CC_OPTS += -DHostVendor=$(DQ)$(HostVendor_CPP)$(DQ)
+#
 RtsUtils_CC_OPTS += -DBuildPlatform=$(DQ)$(BUILDPLATFORM)$(DQ)
+RtsUtils_CC_OPTS += -DBuildArch=$(DQ)$(BuildArch_CPP)$(DQ)
+RtsUtils_CC_OPTS += -DBuildOS=$(DQ)$(BuildOS_CPP)$(DQ)
+RtsUtils_CC_OPTS += -DBuildVendor=$(DQ)$(BuildVendor_CPP)$(DQ)
+#
 RtsUtils_CC_OPTS += -DTargetPlatform=$(DQ)$(TARGETPLATFORM)$(DQ)
+RtsUtils_CC_OPTS += -DTargetArch=$(DQ)$(TargetArch_CPP)$(DQ)
+RtsUtils_CC_OPTS += -DTargetOS=$(DQ)$(TargetOS_CPP)$(DQ)
+RtsUtils_CC_OPTS += -DTargetVendor=$(DQ)$(TargetVendor_CPP)$(DQ)
+#
 RtsUtils_CC_OPTS += -DGhcUnregisterised=$(DQ)$(GhcUnregisterised)$(DQ)
 RtsUtils_CC_OPTS += -DGhcEnableTablesNextToCode=$(DQ)$(GhcEnableTablesNextToCode)$(DQ)
 
