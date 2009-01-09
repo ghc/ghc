@@ -2,10 +2,10 @@ TOP=../../../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
-# Test that we can load an object compiled with $(CC) -g into GHCi.
+# Test that we can load a C object compiled with -g into GHCi.
 # (sourceforge bug #1073501).
 ghciprog004:
-	@rm -f ctest.o
+	rm -f ctest.o
 	echo "int foo(){}" >ctest.c
-	$(CC) -g -c ctest.c
+	$(TEST_HC) -optc-g -c ctest.c
 	echo ":q" | $(TEST_HC) -v0 --interactive -ignore-dot-ghci ctest.o
