@@ -9,4 +9,3 @@ all ::
 clean distclean:
 	$(MAKE) -C timeout $@
 
-include $(TOP)/mk/target.mk
