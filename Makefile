@@ -93,10 +93,17 @@ check-packages :
 	    exit 1; \
 	fi
 
+HAVE_EVAL := NO
+$(eval HAVE_EVAL := YES)
+
 check-tools:
 ifeq "$(HSCOLOUR_SRCS) $(HSCOLOUR)" "YES "
 	@echo "HsColour needed but wasn't found."
 	@echo "Set HSCOLOUR_SRCS=NO if you don't want to use it"
+	exit 1
+endif
+ifeq "$(HAVE_EVAL)" "NO"
+	@echo "Your make doesn't support eval. You need GNU make >= 3.80"
 	exit 1
 endif
 	@:
