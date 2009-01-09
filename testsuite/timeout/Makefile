@@ -31,7 +31,8 @@ calibrate.out:
 # interested in
 
 clean distclean:
-	-$(CABAL) clean
+	-./Setup clean
 	$(RM) -rf install-inplace
 	$(RM) -f calibrate.out
+	$(RM) -f Setup Setup.exe Setup.hi Setup.o
 
