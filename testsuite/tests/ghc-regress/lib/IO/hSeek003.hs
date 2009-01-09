@@ -4,7 +4,7 @@ module Main(main) where
 
 import IO
 import Monad ( sequence )
-#ifdef i386_unknown_mingw32
+#ifdef mingw32_HOST_OS
 import GHC.Handle(hSetBinaryMode)
 #endif
 
@@ -19,7 +19,7 @@ bmo_ls = [NoBuffering, LineBuffering, BlockBuffering Nothing,
 
 main = do
   hdl  <- openFile "hSeek003.hs" ReadMode
-#ifdef i386_unknown_mingw32
+#ifdef mingw32_HOST_OS
   hSetBinaryMode hdl True
 #endif
   sequence (zipWith testPosns (repeat hdl) bmo_ls)
