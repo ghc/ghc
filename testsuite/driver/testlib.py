@@ -330,6 +330,12 @@ def _cmd_prefix( opts, prefix ):
 def normalise_slashes( opts ):
     opts.extra_normaliser = normalise_slashes_
 
+def normalise_fun( fun ):
+    return lambda opts, f=fun: _normalise_fun(opts, f)
+
+def _normalise_fun( opts, f ):
+    opts.extra_normaliser = f
+
 # ----
 # Function for composing two opt-fns together
 
@@ -1181,6 +1187,9 @@ def normalise_errmsg( str ):
     #    hacky solution is used in place of more sophisticated filename
     #    mangling
     str = re.sub('([^\\s])\\.exe', '\\1', str)
+    # The inplace ghc's are called ghc-bin-stage[123] to avoid filename
+    # collisions, so we need to normalise that to just "ghc"
+    str = re.sub('ghc-bin-stage[123]', 'ghc', str)
     return str
 
 def normalise_slashes_( str ):

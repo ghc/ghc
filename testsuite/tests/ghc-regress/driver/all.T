@@ -192,7 +192,9 @@ test('driver200', normal, run_command,
      ['$MAKE -s --no-print-directory test200'])
 cleanall()
 
-test('2566', normal, run_command,
+test('2566',
+     normalise_fun(normalise_errmsg),
+     run_command,
      ['$MAKE -s --no-print-directory 2566'])
 cleanall()
 
