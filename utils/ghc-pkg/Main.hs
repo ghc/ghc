@@ -1151,6 +1151,9 @@ isInfixOf needle haystack = any (isPrefixOf needle) (tails haystack)
 #if mingw32_HOST_OS || mingw32_TARGET_OS
 throwIOIO :: Exception.IOException -> IO a
 throwIOIO = Exception.throwIO
+
+catchIO :: IO a -> (Exception.IOException -> IO a) -> IO a
+catchIO = Exception.catch
 #endif
 
 catchError :: IO a -> (String -> IO a) -> IO a
