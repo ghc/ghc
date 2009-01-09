@@ -376,8 +376,11 @@ ppr_mono_ty _         (HsParTy ty)
   -- But we still use the precedence stuff to add parens because
   --	toHsType doesn't put in any HsParTys, so we may still need them
 
-ppr_mono_ty _         (HsDocTy ty doc)
-  = ppr ty <+> ppr (unLoc doc)
+ppr_mono_ty ctxt_prec (HsDocTy ty doc) 
+  = maybeParen ctxt_prec pREC_OP $
+    ppr_mono_lty pREC_OP ty <+> ppr (unLoc doc)
+  -- we pretty print Haddock comments on types as if they were
+  -- postfix operators
 
 --------------------------
 ppr_fun_ty :: (OutputableBndr name) => Int -> LHsType name -> LHsType name -> SDoc
