@@ -3,7 +3,7 @@
 import IO
 import Directory (removeFile, doesFileExist)
 import Monad
-#ifdef i386_unknown_mingw32
+#ifdef mingw32_HOST_OS
 import GHC.Handle(hSetBinaryMode)
 #endif
 
@@ -15,7 +15,7 @@ main = do
    f <- doesFileExist username
    when f (removeFile username)
    cd <- openFile username ReadWriteMode
-#ifdef i386_unknown_mingw32
+#ifdef mingw32_HOST_OS
    hSetBinaryMode cd True
 #endif
    hSetBuffering stdin NoBuffering
