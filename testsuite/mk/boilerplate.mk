@@ -1,13 +1,4 @@
 
-# XXX This whole file should disappear
-
-# New build system:
-# 	  include mk/newconfig.mk
-#     default : all
-
-# Old build system:
-#     include mk/boilerplate.mk
-
 default: all
 
 HAVE_EVAL := NO
