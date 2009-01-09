@@ -47,7 +47,7 @@ OLD_BUILD_SYSTEM_STAGE2_GHC := $(abspath $(TOP)/../ghc/stage2-inplace/ghc)
 OLD_BUILD_SYSTEM_STAGE3_GHC := $(abspath $(TOP)/../ghc/stage3-inplace/ghc)
 OLD_BUILD_SYSTEM_GHC_PKG    := $(abspath $(TOP)/../utils/ghc-pkg/install-inplace/bin/ghc-pkg)
 OLD_BUILD_SYSTEM_HP2PS      := $(abspath $(TOP)/../utils/hp2ps/hp2ps)
-ifneq "$(wildcard $(OLD_BUILD_SYSTEM_STAGE1_GHC))" ""
+ifneq "$(wildcard $(OLD_BUILD_SYSTEM_STAGE1_GHC) $(OLD_BUILD_SYSTEM_STAGE1_GHC).exe)" ""
 
 ifeq "$(stage)" "1"
 TEST_HC := $(OLD_BUILD_SYSTEM_STAGE1_GHC)
@@ -66,7 +66,7 @@ else
 NEW_BUILD_SYSTEM_STAGE1_GHC := $(abspath $(TOP)/../inplace/bin/ghc-stage1)
 NEW_BUILD_SYSTEM_STAGE2_GHC := $(abspath $(TOP)/../inplace/bin/ghc-stage2)
 NEW_BUILD_SYSTEM_STAGE3_GHC := $(abspath $(TOP)/../inplace/bin/ghc-stage3)
-ifneq "$(wildcard $(NEW_BUILD_SYSTEM_STAGE1_GHC))" ""
+ifneq "$(wildcard $(NEW_BUILD_SYSTEM_STAGE1_GHC) $(NEW_BUILD_SYSTEM_STAGE1_GHC).exe)" ""
 
 ifeq "$(stage)" "1"
 TEST_HC := $(NEW_BUILD_SYSTEM_STAGE1_GHC)
