@@ -91,15 +91,15 @@ ifeq "$(HP2PS_ABS)" ""
 HP2PS_ABS := $(dir $(TEST_HC))/hp2ps
 endif
 
-ifeq "$(wildcard $(TEST_HC))" ""
+ifeq "$(wildcard $(TEST_HC) $(TEST_HC).exe)" ""
 $(error Cannot find ghc: $(TEST_HC))
 endif
 
-ifeq "$(wildcard $(GHC_PKG))" ""
+ifeq "$(wildcard $(GHC_PKG) $(GHC_PKG).exe)" ""
 $(error Cannot find ghc-pkg: $(GHC_PKG))
 endif
 
-ifeq "$(wildcard $(HP2PS_ABS))" ""
+ifeq "$(wildcard $(HP2PS_ABS) $(HP2PS_ABS).exe)" ""
 $(error Cannot find hp2ps: $(HP2PS_ABS))
 endif
 
