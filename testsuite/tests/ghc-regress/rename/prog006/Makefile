@@ -16,8 +16,9 @@ include $(TOP)/mk/test.mk
 # using the supplied Cabal configuration.
 
 rn.prog006:
+	$(TEST_HC) --make pwd -v0
 	$(TEST_HC) --make -package-name test-1.0 B.C -fforce-recomp -v0
-	sed "s@__IMPORT__@$(abspath .)@" <pkg.conf.in >pkg.conf
+	sed "s@__IMPORT__@`./pwd`@" <pkg.conf.in >pkg.conf
 	$(TEST_HC) -c -package-conf pkg.conf -package test -fforce-recomp A.hs -i
 # The -i clears the search path, so A.hs will find B.C from package test
 #
