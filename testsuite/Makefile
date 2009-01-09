@@ -1,9 +1,7 @@
 TOP = .
 include $(TOP)/mk/boilerplate.mk
 
-SUBDIRS = timeout utils
-
-all ::
+all:
 	cd tests/ghc-regress && $(MAKE) $(MFLAGS)
 
 clean distclean:
