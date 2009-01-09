@@ -14,7 +14,7 @@ HAVE_EVAL := NO
 $(eval HAVE_EVAL := YES)
 
 ifeq "$(HAVE_EVAL)" "NO"
-$(error Your make doesn't support eval. You need GNU make >= 3.80)
+$(error Your make does not support eval. You need GNU make >= 3.80)
 endif
 
 define get-ghc-rts-field # $1 = rseult variable, $2 = field name
