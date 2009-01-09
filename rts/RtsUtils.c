@@ -473,6 +473,11 @@ static void mkRtsInfoPair(char *key, char *val) {
     printf(" ,(\"%s\", \"%s\")\n", key, val);
 }
 
+/* This little bit of magic allows us to say TOSTRING(SYM) and get
+ * "5" if SYM is 5 */
+#define TOSTRING2(x) #x
+#define TOSTRING(x)  TOSTRING2(x)
+
 void printRtsInfo(void) {
     /* The first entry is just a hack to make it easy to get the
      * commas right */
@@ -491,6 +496,7 @@ void printRtsInfo(void) {
     mkRtsInfoPair("Target architecture",     TargetArch);
     mkRtsInfoPair("Target OS",               TargetOS);
     mkRtsInfoPair("Target vendor",           TargetVendor);
+    mkRtsInfoPair("Word size",               TOSTRING(WORD_SIZE_IN_BITS));
     mkRtsInfoPair("Compiler unregisterised", GhcUnregisterised);
     mkRtsInfoPair("Tables next to code",     GhcEnableTablesNextToCode);
     printf(" ]\n");
