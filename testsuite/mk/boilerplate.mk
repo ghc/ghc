@@ -101,5 +101,5 @@ $(eval $(call get-ghc-field,GhcRTSWays,RTS ways))
 GS = gs
 CP = cp
 RM = rm -f
-PYTHON = /usr/bin/python
+PYTHON = python
 
