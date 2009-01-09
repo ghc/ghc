@@ -2,13 +2,13 @@
 
 import IO
 import Maybe
-#ifdef i386_unknown_mingw32
+#ifdef mingw32_HOST_OS
 import GHC.Handle(hSetBinaryMode)
 #endif
 
 main = do
   h <- openFile "ioeGetErrorString001.hs" ReadMode
-#ifdef i386_unknown_mingw32
+#ifdef mingw32_HOST_OS
   hSetBinaryMode h True
 #endif
   hSeek h SeekFromEnd 0
