@@ -4,14 +4,14 @@ module Main(main) where
 
 import IO
 import Directory ( removeFile )
-#ifdef i386_unknown_mingw32
+#ifdef mingw32_HOST_OS
 import GHC.Handle(hSetBinaryMode)
 #endif
 
 main :: IO ()
 main = do
    hdl <- openFile "hSeek002.hs" ReadMode
-#ifdef i386_unknown_mingw32
+#ifdef mingw32_HOST_OS
    hSetBinaryMode hdl True
 #endif
    flg <- hIsEOF hdl
