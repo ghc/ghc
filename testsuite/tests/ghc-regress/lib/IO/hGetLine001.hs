@@ -1,7 +1,7 @@
 -- !!! testing hGetLine
 
 import IO
-#ifdef i386_unknown_mingw32
+#ifdef mingw32_HOST_OS
 import GHC.Handle(hSetBinaryMode)
 #endif
 
@@ -14,7 +14,7 @@ main = do
 
   h <- openFile "hGetLine001.hs" ReadMode
 
-#ifdef i386_unknown_mingw32
+#ifdef mingw32_HOST_OS
   hSetBinaryMode stdout True
   hSetBinaryMode h True
 #endif
