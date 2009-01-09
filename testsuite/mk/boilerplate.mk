@@ -17,6 +17,9 @@ ifeq "$(HAVE_EVAL)" "NO"
 $(error Your make does not support eval. You need GNU make >= 3.80)
 endif
 
+show:
+	@echo '$(VALUE)="$($(VALUE))"'
+
 define get-ghc-rts-field # $1 = rseult variable, $2 = field name
 $1 := $$(shell $$(TEST_HC) +RTS --info | grep '^ .("$2",' | sed -e 's/.*", *"//' -e 's/")$$$$//')
 endef
