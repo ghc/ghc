@@ -1,13 +1,13 @@
 -- !!! test hIsEOF in various buffering situations
 
 import IO
-#ifdef i386_unknown_mingw32
+#ifdef mingw32_HOST_OS
 import GHC.Handle(hSetBinaryMode)
 #endif
 
 main = do
   h <- openFile "hIsEOF002.hs" ReadMode
-#ifdef i386_unknown_mingw32
+#ifdef mingw32_HOST_OS
   hSetBinaryMode h True
 #endif
   hSetBuffering h NoBuffering
@@ -44,7 +44,7 @@ main = do
   hClose h
 
   h <- openFile "hIsEOF002.out" ReadWriteMode
-#ifdef i386_unknown_mingw32
+#ifdef mingw32_HOST_OS
   hSetBinaryMode h True
 #endif
   hSetBuffering h NoBuffering
