@@ -86,7 +86,20 @@ createInterfaces' modules flags instIfaceMap = do
   targets <- mapM (\f -> guessTarget f Nothing) modules
   setTargets targets
   modgraph <- depanal [] False
-  let orderedMods = flattenSCCs $ topSortModuleGraph False modgraph Nothing
+
+  -- If template haskell is used by the package, we can not use
+  -- HscNothing as target since we might need to run code generated from
+  -- one or more of the modules during typechecking.
+  modgraph' <- if needsTemplateHaskell modgraph
+       then do
+         dflags <- getSessionDynFlags
+         setSessionDynFlags dflags { hscTarget = HscC } 
+         -- we need to set HscC on all the ModSummaries as well
+         let addHscC m = m { ms_hspp_opts = (ms_hspp_opts m) { hscTarget = HscC } }  
+         return (map addHscC modgraph)
+       else return modgraph
+
+  let orderedMods = flattenSCCs $ topSortModuleGraph False modgraph' Nothing
   (ifaces, _) <- foldM (\(ifaces, modMap) modsum -> do
     x <- processModule modsum flags modMap instIfaceMap
 #else
