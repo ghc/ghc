@@ -115,7 +115,11 @@ TESTS	     =
 TEST	     = 
 WAY =
 
-all :: test
+.PHONY: all boot test verbose accept fast
+
+all: test
+
+boot: $(TIMEOUT_PROGRAM)
 
 TIMEOUT_PROGRAM = $(TOP)/timeout/install-inplace/bin/timeout$(exeext)
 
