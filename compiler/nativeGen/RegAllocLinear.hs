@@ -699,8 +699,11 @@ allocateRegsAndSpill reading keep spills alloc (r:rs) = do
 	        -- to spill.  We just pick the first one that isn't used in 
 	        -- the current instruction for now.
 
-	        let (temp_to_push_out, my_reg) = myHead "regalloc" candidates2
-
+	        let (temp_to_push_out, my_reg) 
+			= case candidates2 of
+				[]	-> panic "RegAllocLinear.allocRegsAndSpill: no spill candidates"
+				(x:_)	-> x
+				
     	        (spill_insn, slot) <- spillR (RealReg my_reg) temp_to_push_out
 		let spill_store	 = (if reading then id else reverse)
 					[ COMMENT (fsLit "spill alloc") 
@@ -740,9 +743,6 @@ loadTemp True vreg (Just (InMem slot)) hreg spills
 loadTemp _ _ _ _ spills =
    return spills
 
-
-myHead s [] = panic s
-myHead _ (x:_) = x
 
 -- -----------------------------------------------------------------------------
 -- Joining a jump instruction to its targets
