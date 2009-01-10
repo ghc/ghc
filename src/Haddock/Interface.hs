@@ -87,6 +87,7 @@ createInterfaces' modules flags instIfaceMap = do
   setTargets targets
   modgraph <- depanal [] False
 
+#if (__GLASGOW_HASKELL__ == 610 && __GHC_PATCHLEVEL__ >= 2) || __GLASGOW_HASKELL__ >= 611
   -- If template haskell is used by the package, we can not use
   -- HscNothing as target since we might need to run code generated from
   -- one or more of the modules during typechecking.
@@ -98,6 +99,9 @@ createInterfaces' modules flags instIfaceMap = do
          let addHscC m = m { ms_hspp_opts = (ms_hspp_opts m) { hscTarget = HscC } }  
          return (map addHscC modgraph)
        else return modgraph
+#else
+  let modgraph' = modgraph
+#endif
 
   let orderedMods = flattenSCCs $ topSortModuleGraph False modgraph' Nothing
   (ifaces, _) <- foldM (\(ifaces, modMap) modsum -> do
