@@ -74,7 +74,7 @@ module MachRegs (
 	addrModeRegs, allFPArgRegs,
 #endif
 #if sparc_TARGET_ARCH
-	fits13Bits,
+	fits13Bits, 
 	fpRel, gReg, iReg, lReg, oReg, largeOffsetError,
 	fp, sp, g0, g1, g2, o0, o1, f0, f6, f8, f26, f27,
 #endif
@@ -194,14 +194,53 @@ data Size
 
 #if sparc_TARGET_ARCH /* || powerpc_TARGET_ARCH */
 data Size
-    = B     -- byte (signed)
-    | Bu    -- byte (unsigned)
-    | H     -- halfword (signed, 2 bytes)
-    | Hu    -- halfword (unsigned, 2 bytes)
-    | W	    -- word (4 bytes)
-    | F	    -- IEEE single-precision floating pt
-    | DF    -- IEEE single-precision floating pt
+    = II8     -- byte (signed)
+    | II8u    -- byte (unsigned)
+    | II16    -- halfword (signed, 2 bytes)
+    | II16u   -- halfword (unsigned, 2 bytes)
+    | II32    -- word (4 bytes)
+    | II64    -- word (8 bytes)
+    | FF32    -- IEEE single-precision floating pt
+    | FF64    -- IEEE single-precision floating pt
   deriving Eq
+
+
+intSize, floatSize :: Width -> Size
+intSize W8  = II8
+intSize W16 = II16u
+intSize W32 = II32
+intSize W64 = II64
+intSize other = pprPanic "MachInstrs.intSize" (ppr other)
+
+floatSize W32 = FF32
+floatSize W64 = FF64
+floatSize other = pprPanic "MachInstrs.intSize" (ppr other)
+
+wordSize :: Size
+wordSize = intSize wordWidth
+
+isFloatSize :: Size -> Bool
+isFloatSize FF32	= True
+isFloatSize FF64	= True
+isFloatSize _		= False
+
+cmmTypeSize :: CmmType -> Size
+cmmTypeSize ty | isFloatType ty = floatSize (typeWidth ty)
+	       | otherwise	= intSize (typeWidth ty)
+
+sizeToWidth :: Size -> Width
+sizeToWidth size
+ = case size of
+ 	II8		-> W8
+	II8u		-> W8
+	II16		-> W16
+	II16u		-> W16
+	II32		-> W32
+	II64		-> W64
+	FF32		-> W32
+	FF64		-> W64
+
+
 #endif
 
 -- -----------------------------------------------------------------------------
@@ -494,10 +533,11 @@ mkVReg u size
    = case size of
 #if sparc_TARGET_ARCH
         FF32    -> VirtualRegF u
+	FF64	-> VirtualRegD u
 #else
         FF32    -> VirtualRegD u
-#endif
         FF64    -> VirtualRegD u
+#endif
 	_other -> panic "mkVReg"
 
 isVirtualReg :: Reg -> Bool
@@ -609,6 +649,10 @@ worst n classN classC
 #elif powerpc_TARGET_ARCH
 #define ALLOCATABLE_REGS_INTEGER (_ILIT(16))
 #define ALLOCATABLE_REGS_DOUBLE  (_ILIT(26))
+
+#elif sparc_TARGET_ARCH
+#define ALLOCATABLE_REGS_INTEGER (_ILIT(3))
+#define ALLOCATABLE_REGS_DOUBLE  (_ILIT(6))
 
 #else
 #error ToDo: define ALLOCATABLE_REGS_INTEGER and ALLOCATABLE_REGS_DOUBLE

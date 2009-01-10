@@ -768,15 +768,25 @@ patchRegs instr env = case instr of
 -- by assigning the src and dest temporaries to the same real register.
 
 isRegRegMove :: Instr -> Maybe (Reg,Reg)
+
 #if i386_TARGET_ARCH || x86_64_TARGET_ARCH
 -- TMP:
 isRegRegMove (MOV _ (OpReg r1) (OpReg r2)) = Just (r1,r2)
+
 #elif powerpc_TARGET_ARCH
 isRegRegMove (MR dst src) = Just (src,dst)
-#else
-#error ToDo: isRegRegMove
+
+#elif sparc_TARGET_ARCH
+isRegRegMove instr
+ = case instr of
+ 	ADD False False src (RIReg src2) dst
+	 | g0 == src2		-> Just (src, dst)
+
+	FMOV FF64 src dst	-> Just (src, dst)
+	FMOV FF32  src dst	-> Just (src, dst)
+	_			-> Nothing
 #endif
-isRegRegMove _ = Nothing
+isRegRegMove _  = Nothing
 
 -- -----------------------------------------------------------------------------
 -- Generating spill instructions
@@ -811,9 +821,9 @@ mkSpillInstr reg delta slot
 	{-SPARC: spill below frame pointer leaving 2 words/spill-}
                         let{off_w = 1 + (off `div` 4);
                             sz = case regClass reg of {
-                                    RcInteger -> I32;
-				    RcFloat   -> F32;
-                                    RcDouble  -> F64}}
+                                    RcInteger -> II32;
+				    RcFloat   -> FF32;
+                                    RcDouble  -> FF64;}}
                         in ST sz reg (fpRel (negate off_w))
 #endif
 #ifdef powerpc_TARGET_ARCH
@@ -852,7 +862,7 @@ mkLoadInstr reg delta slot
             sz = case regClass reg of {
                    RcInteger -> II32;
 		   RcFloat   -> FF32;
-                   RcDouble  -> F64}}
+                   RcDouble  -> FF64}}
         in LD sz (fpRel (- off_w)) reg
 #endif
 #if powerpc_TARGET_ARCH
@@ -877,6 +887,11 @@ mkRegRegMoveInstr src dst
 #endif
 #elif powerpc_TARGET_ARCH
     = MR dst src
+#elif sparc_TARGET_ARCH
+    = case regClass src of
+    	RcInteger -> ADD  False False src (RIReg g0) dst
+	RcDouble  -> FMOV FF64 src dst
+	RcFloat   -> FMOV FF32  src dst
 #else
 #error ToDo: mkRegRegMoveInstr
 #endif

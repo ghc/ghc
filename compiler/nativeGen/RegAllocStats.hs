@@ -327,6 +327,13 @@ regDotColor reg
 	RcFloat		-> text "red"
 	RcDouble	-> text "green"
 
+#elif sparc_TARGET_ARCH
+regDotColor :: Reg -> SDoc
+regDotColor reg
+ = case regClass reg of
+ 	RcInteger	-> text "blue"
+	RcFloat		-> text "red"
+	RcDouble	-> text "green"
 #else
 #error ToDo: regDotColor
 #endif

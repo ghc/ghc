@@ -306,10 +306,10 @@ assignMem_I64Code addrTree valueTree = do
          mov_lo = ST II32 rlo (AddrRegImm src (ImmInt 4))
      return (vcode `appOL` code `snocOL` mov_hi `snocOL` mov_lo)
 
-assignReg_I64Code (CmmLocal (LocalReg u_dst pk _)) valueTree = do
+assignReg_I64Code (CmmLocal (LocalReg u_dst pk)) valueTree = do
      ChildCode64 vcode r_src_lo <- iselExpr64 valueTree    
      let 
-         r_dst_lo = mkVReg u_dst pk
+         r_dst_lo = mkVReg u_dst (cmmTypeSize pk)
          r_dst_hi = getHiVRegFromLo r_dst_lo
          r_src_hi = getHiVRegFromLo r_src_lo
          mov_lo = mkMOV r_src_lo r_dst_lo
@@ -336,10 +336,10 @@ iselExpr64 (CmmLoad addrTree ty) | isWord64 ty = do
                          rlo
           )
 
-iselExpr64 (CmmReg (CmmLocal (LocalReg uq ty))) isWord64 ty = do
-     r_dst_lo <-  getNewRegNat b32
+iselExpr64 (CmmReg (CmmLocal (LocalReg uq ty))) | isWord64 ty = do
+     r_dst_lo <-  getNewRegNat II32
      let r_dst_hi = getHiVRegFromLo r_dst_lo
-         r_src_lo = mkVReg uq b32
+         r_src_lo = mkVReg uq II32
          r_src_hi = getHiVRegFromLo r_src_lo
          mov_lo = mkMOV r_src_lo r_dst_lo
          mov_hi = mkMOV r_src_hi r_dst_hi
@@ -1429,10 +1429,10 @@ getRegister (CmmMachOp mop [x]) -- unary MachOps
 
       -- Conversions which are a nop on sparc
       MO_UU_Conv from to
-	| from == to    -> conversionNop to  x
-      MO_UU_Conv W32 W8 -> trivialCode I8 (AND False) x (CmmLit (CmmInt 255 I8))
-      MO_UU_Conv W32 to -> conversionNop to x
-      MO_SS_Conv W32 to -> conversionNop to x
+	| from == to    -> conversionNop (intSize to)  x
+      MO_UU_Conv W32 W8 -> trivialCode W8 (AND False) x (CmmLit (CmmInt 255 W8))
+      MO_UU_Conv W32 to -> conversionNop (intSize to) x
+      MO_SS_Conv W32 to -> conversionNop (intSize to) x
 
       -- widenings
       MO_UU_Conv W8 W32  -> integerExtend False W8 W32  x
@@ -1526,8 +1526,8 @@ getRegister (CmmMachOp mop [x, y]) -- dyadic PrimOps
     imulMayOflo rep a b = do
          (a_reg, a_code) <- getSomeReg a
 	 (b_reg, b_code) <- getSomeReg b
-	 res_lo <- getNewRegNat b32
-	 res_hi <- getNewRegNat b32
+	 res_lo <- getNewRegNat II32
+	 res_hi <- getNewRegNat II32
 	 let
 	    shift_amt  = case rep of
 			  W32 -> 31
@@ -1545,8 +1545,8 @@ getRegister (CmmMachOp mop [x, y]) -- dyadic PrimOps
 getRegister (CmmLoad mem pk) = do
     Amode src code <- getAmode mem
     let
-    	code__2 dst = code `snocOL` LD pk src dst
-    return (Any pk code__2)
+	code__2 dst 	= code `snocOL` LD (cmmTypeSize pk) src dst
+    return (Any (cmmTypeSize pk) code__2)
 
 getRegister (CmmLit (CmmInt i _))
   | fits13Bits i
@@ -1916,7 +1916,7 @@ getAmode (CmmMachOp (MO_Add rep) [x, y])
 -- XXX Is this same as "leaf" in Stix?
 getAmode (CmmLit lit)
   = do
-      tmp <- getNewRegNat b32
+      tmp <- getNewRegNat II32
       let
     	code = unitOL (SETHI (HI imm__2) tmp)
       return (Amode (AddrRegImm tmp (LO imm__2)) code)
@@ -2306,9 +2306,9 @@ condFltCode cond x y = do
     	pk2   = cmmExprType y
 
     	code__2 =
-		if pk1 == pk2 then
+		if pk1 `cmmEqType` pk2 then
     	            code1 `appOL` code2 `snocOL`
-    	    	    FCMP True pk1 src1 src2
+    	    	    FCMP True (cmmTypeSize pk1) src1 src2
     	    	else if typeWidth pk1 == W32 then
     	    	    code1 `snocOL` promote src1 `appOL` code2 `snocOL`
     	    	    FCMP True FF64 tmp src2
@@ -2570,9 +2570,10 @@ assignMem_FltCode pk addr src = do
     let
     	pk__2   = cmmExprType src
     	code__2 = code1 `appOL` code2 `appOL`
-	    if   pk == pk__2 
+	    if   sizeToWidth pk == typeWidth pk__2 
             then unitOL (ST pk src__2 dst__2)
-	    else toOL [FxTOy pk__2 pk src__2 tmp1, ST pk tmp1 dst__2]
+	    else toOL 	[ FxTOy (cmmTypeSize pk__2) pk src__2 tmp1
+	    		, ST    pk tmp1 dst__2]
     return code__2
 
 -- Floating point assignment to a register/temporary
@@ -3503,10 +3504,10 @@ genCCall target dest_regs argsAndHints = do
         | otherwise
         = do
 	  (src, code) <- getSomeReg arg
-          tmp <- getNewRegNat (cmmExprType arg)
+          tmp <- getNewRegNat (cmmTypeSize $ cmmExprType arg)
           let
               pk   = cmmExprType arg
-          case pk of
+          case cmmTypeSize pk of
              FF64 -> do
                       v1 <- getNewRegNat II32
                       v2 <- getNewRegNat II32
@@ -3967,6 +3968,13 @@ genSwitch expr ids
                             BCTR [ id | Just id <- ids ]
                     ]
         return code
+#elif sparc_TARGET_ARCH
+genSwitch expr ids
+  | opt_PIC
+  = error "MachCodeGen: sparc genSwitch PIC not finished\n"
+  
+  | otherwise
+  = error "MachCodeGen: sparc genSwitch non-PIC not finished\n"
 #else
 #error "ToDo: genSwitch"
 #endif
@@ -4500,8 +4508,8 @@ trivialCode pk instr x y = do
 trivialFCode pk instr x y = do
     (src1, code1) <- getSomeReg x
     (src2, code2) <- getSomeReg y
-    tmp1 <- getNewRegNat (cmmExprType x)
-    tmp2 <- getNewRegNat (cmmExprType y)
+    tmp1 <- getNewRegNat (cmmTypeSize $ cmmExprType x)
+    tmp2 <- getNewRegNat (cmmTypeSize $ cmmExprType y)
     tmp <- getNewRegNat FF64
     let
     	promote x = FxTOy FF32 FF64 x tmp
@@ -4510,7 +4518,7 @@ trivialFCode pk instr x y = do
     	pk2   = cmmExprType y
 
     	code__2 dst =
-    	    	if pk1 == pk2 then
+    	    	if pk1 `cmmEqType` pk2 then
     	            code1 `appOL` code2 `snocOL`
     	    	    instr (floatSize pk) src1 src2 dst
     	    	else if typeWidth pk1 == W32 then
@@ -4519,7 +4527,8 @@ trivialFCode pk instr x y = do
     	    	else
     	    	    code1 `appOL` code2 `snocOL` promote src2 `snocOL`
     	    	    instr FF64 src1 tmp dst
-    return (Any (if pk1 == pk2 then pk1 else cmmFloat W64) code__2)
+    return (Any (cmmTypeSize $ if pk1 `cmmEqType` pk2 then pk1 else cmmFloat W64) 
+    		code__2)
 
 ------------
 trivialUCode size instr x = do
@@ -4733,17 +4742,20 @@ coerceFP2FP to x = do
 
 #if sparc_TARGET_ARCH
 
-coerceInt2FP pk1 pk2 x = do
+coerceInt2FP width1 width2 x = do
     (src, code) <- getSomeReg x
     let
     	code__2 dst = code `appOL` toOL [
-    	    ST pk1 src (spRel (-2)),
-    	    LD pk1 (spRel (-2)) dst,
-    	    FxTOy pk1 pk2 dst dst]
-    return (Any pk2 code__2)
+    	    ST (intSize width1) src (spRel (-2)),
+    	    LD (intSize width1) (spRel (-2)) dst,
+    	    FxTOy (intSize width1) (floatSize width1) dst dst]
+    return (Any (floatSize $ width2) code__2)
 
 ------------
-coerceFP2Int pk fprep x = do
+coerceFP2Int width1 width2 x = do
+    let pk	= intSize width1
+        fprep	= floatSize width2
+
     (src, code) <- getSomeReg x
     reg <- getNewRegNat fprep
     tmp <- getNewRegNat pk
