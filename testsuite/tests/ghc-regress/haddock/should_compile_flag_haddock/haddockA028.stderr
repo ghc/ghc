@@ -1,7 +1,8 @@
 
 ==================== Parser ====================
 module ShouldCompile where
-test :: [a] <document comment> -> a <--> (b -> [a]) <document comment>
+test ::
+  [a] <document comment> -> (a <--> (b -> [a])) <document comment>
 test xs ys = xs
 
 

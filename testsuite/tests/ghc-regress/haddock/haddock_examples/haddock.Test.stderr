@@ -19,14 +19,16 @@ hidden a = a
 ==================== Parser ====================
 <document comment>
 module Test (
-        <IEGroup: 1>, <IEGroup: 2>, T(..), T2, T3(..), T4(..), T5(..), T6(..), N1(..),
-        N2(..), N3(..), N4, N5(..), N6(..), N7(..), <IEGroup: 2>, R(..), R1(..),
-        <document comment>, p, q, u, <IEGroup: 1>, C(a, b), D(..), E, F(..),
-        <document comment>, a, <IEGroup: 1>, f, g, <IEGroup: 1>, <IEDocNamed: aux1>,
-        <IEDocNamed: aux2>, <IEDocNamed: aux3>, <IEDocNamed: aux4>, <IEDocNamed: aux5>,
-        <IEDocNamed: aux6>, <IEDocNamed: aux7>, <IEDocNamed: aux8>, <IEDocNamed: aux9>,
-        <IEDocNamed: aux10>, <IEDocNamed: aux11>, <IEDocNamed: aux12>,
-        <document comment>, <IEGroup: 1>, module Hidden, <IEGroup: 1>, module Visible,
+        <IEGroup: 1>, <IEGroup: 2>, T(..), T2, T3(..), T4(..), T5(..),
+        T6(..), N1(..), N2(..), N3(..), N4, N5(..), N6(..), N7(..),
+        <IEGroup: 2>, R(..), R1(..), <document comment>, p, q, u,
+        <IEGroup: 1>, C(a, b), D(..), E, F(..), <document comment>, a,
+        <IEGroup: 1>, f, g, <IEGroup: 1>, <IEDocNamed: aux1>,
+        <IEDocNamed: aux2>, <IEDocNamed: aux3>, <IEDocNamed: aux4>,
+        <IEDocNamed: aux5>, <IEDocNamed: aux6>, <IEDocNamed: aux7>,
+        <IEDocNamed: aux8>, <IEDocNamed: aux9>, <IEDocNamed: aux10>,
+        <IEDocNamed: aux11>, <IEDocNamed: aux12>, <document comment>,
+        <IEGroup: 1>, module Hidden, <IEGroup: 1>, module Visible,
         <document comment>, <IEGroup: 1>, Ex(..), <IEGroup: 1>, k, l, m, o,
         <IEGroup: 1>, <IEGroup: 2>, <document comment>, f'
     ) where
@@ -43,7 +45,10 @@ data T3 a b = A1 a | B1 b
 data T4 a b = A2 a | B2 b
 data T5 a b = <document comment> A3 a | <document comment> B3 b
 <document comment>
-data T6 = <document comment> A4 | <document comment> B4 | <document comment> C4
+data T6
+    = <document comment> A4 |
+      <document comment> B4 |
+      <document comment> C4
 <document comment>
 newtype N1 a = N1 a
 <document comment>
@@ -77,7 +82,8 @@ data R
           r :: Int <document comment>,
           s :: Int <document comment>} |
       <document comment>
-      C2 {t :: T1 -> (T2 Int Int) -> (T3 Bool Bool) -> (T4 Float Float) -> T5 () (),
+      C2 {t :: T1
+               -> (T2 Int Int) -> (T3 Bool Bool) -> (T4 Float Float) -> T5 () (),
           u :: Int,
           v :: Int}
 <document comment>
@@ -117,8 +123,8 @@ data Ex a
 <document comment>
 k ::
   T () () <document comment>
-  -> T2 Int Int <document comment>
-     -> T3 Bool Bool -> T4 Float Float <document comment>
+  -> (T2 Int Int) <document comment>
+     -> (T3 Bool Bool -> T4 Float Float) <document comment>
         -> T5 () () <document comment> -> IO () <document comment>
 l :: (Int, Int, Float) <document comment> -> Int <document comment>
 <document comment>
