@@ -33,7 +33,7 @@ SRC_HC_OPTS += -w
 
 .PHONY: install-inplace
 
-INPLACE_PKG_CONF = $(FPTOOLS_TOP_ABS)/ghc/inplace-datadir/package.conf
+INPLACE_PKG_CONF = $(INPLACE_DATA_DIR)/package.conf
 
 ifneq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 INSTALL_INPLACE_FLAGS += --enable-shell-wrappers
