@@ -354,7 +354,10 @@ pprReg IF_ARCH_i386(s,) IF_ARCH_x86_64(s,) r
 
 
 -- -----------------------------------------------------------------------------
--- pprSize: print a 'Size'
+-- | print a 'Size'
+--	Used for instruction suffixes.
+--	eg LD is 32bit on sparc, but LDD is 64 bit.
+--
 
 #if powerpc_TARGET_ARCH || i386_TARGET_ARCH || x86_64_TARGET_ARCH || sparc_TARGET_ARCH
 pprSize :: Size -> Doc
@@ -395,6 +398,7 @@ pprSize x = ptext (case x of
 	II8   -> sLit "sb"
         II16  -> sLit "sh"
 	II32  -> sLit ""
+	II64  -> sLit "d"
 	FF32  -> sLit ""
 	FF64  -> sLit "d"
     )
@@ -806,17 +810,18 @@ instance Outputable Instr where
 
 pprInstr :: Instr -> Doc
 
---pprInstr (COMMENT s) = empty -- nuke 'em
+pprInstr (COMMENT s) = empty -- nuke 'em
+{-
 pprInstr (COMMENT s)
    =  IF_ARCH_alpha( ((<>) (ptext (sLit "\t# ")) (ftext s))
-     ,IF_ARCH_sparc( ((<>) (ptext (sLit "! "))   (ftext s))
+     ,IF_ARCH_sparc( ((<>) (ptext (sLit "# "))   (ftext s))
      ,IF_ARCH_i386( ((<>) (ptext (sLit "# "))   (ftext s))
      ,IF_ARCH_x86_64( ((<>) (ptext (sLit "# "))   (ftext s))
      ,IF_ARCH_powerpc( IF_OS_linux(
         ((<>) (ptext (sLit "# ")) (ftext s)),
         ((<>) (ptext (sLit "; ")) (ftext s)))
      ,)))))
-
+-}
 pprInstr (DELTA d)
    = pprInstr (COMMENT (mkFastString ("\tdelta = " ++ show d)))
 
@@ -1959,8 +1964,9 @@ pprInstr (ST size reg addr)
     ]
 
 pprInstr (ADD x cc reg1 ri reg2)
-  | not x && not cc && riZero ri
-  = hcat [ ptext (sLit "\tmov\t"), pprReg reg1, comma, pprReg reg2 ]
+--  | not x && not cc && riZero ri
+--  = hcat [ ptext (sLit "\tmov\t"), pprReg reg1, comma, pprReg reg2 ]
+
   | otherwise
   = pprRegRIReg (if x then sLit "addx" else sLit "add") cc reg1 ri reg2
 
@@ -1976,11 +1982,12 @@ pprInstr (AND  b reg1 ri reg2) = pprRegRIReg (sLit "and")  b reg1 ri reg2
 pprInstr (ANDN b reg1 ri reg2) = pprRegRIReg (sLit "andn") b reg1 ri reg2
 
 pprInstr (OR b reg1 ri reg2)
-  | not b && reg1 == g0
+{-  | not b && reg1 == g0
   = let doit = hcat [ ptext (sLit "\tmov\t"), pprRI ri, comma, pprReg reg2 ]
     in  case ri of
            RIReg rrr | rrr == reg2 -> empty
            other                   -> doit
+-}
   | otherwise
   = pprRegRIReg (sLit "or") b reg1 ri reg2
 

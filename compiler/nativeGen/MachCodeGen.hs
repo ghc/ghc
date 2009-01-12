@@ -1393,24 +1393,38 @@ reg2reg size src dst
 
 #if sparc_TARGET_ARCH
 
+-- getRegister :: CmmExpr -> NatM Register
+
+-- Load a literal float into a float register.
+--	The actual literal is stored in a new data area, and we load it 
+--	at runtime.
 getRegister (CmmLit (CmmFloat f W32)) = do
+
+    -- a label for the new data area
     lbl <- getNewLabelNat
+    tmp <- getNewRegNat II32
+
     let code dst = toOL [
+            -- the data area         
 	    LDATA ReadOnlyData
 	                [CmmDataLabel lbl,
 			 CmmStaticLit (CmmFloat f W32)],
-	    SETHI (HI (ImmCLbl lbl)) dst,
-	    LD FF32 (AddrRegImm dst (LO (ImmCLbl lbl))) dst] 
+
+            -- load the literal
+	    SETHI (HI (ImmCLbl lbl)) tmp,
+	    LD II32 (AddrRegImm tmp (LO (ImmCLbl lbl))) dst] 
+
     return (Any FF32 code)
 
 getRegister (CmmLit (CmmFloat d W64)) = do
     lbl <- getNewLabelNat
+    tmp <- getNewRegNat II32
     let code dst = toOL [
 	    LDATA ReadOnlyData
 	                [CmmDataLabel lbl,
 			 CmmStaticLit (CmmFloat d W64)],
-	    SETHI (HI (ImmCLbl lbl)) dst,
-	    LD FF64 (AddrRegImm dst (LO (ImmCLbl lbl))) dst] 
+	    SETHI (HI (ImmCLbl lbl)) tmp,
+	    LD II64 (AddrRegImm tmp (LO (ImmCLbl lbl))) dst] 
     return (Any FF64 code)
 
 getRegister (CmmMachOp mop [x]) -- unary MachOps
@@ -2475,7 +2489,7 @@ assignReg_IntCode pk reg src = do
     r <- getRegister src
     return $ case r of
 	Any _ code         -> code dst
-	Fixed _ freg fcode -> fcode `snocOL` OR False g0 (RIReg dst) freg
+	Fixed _ freg fcode -> fcode `snocOL` OR False g0 (RIReg freg) dst
     where
       dst = getRegisterReg reg
 

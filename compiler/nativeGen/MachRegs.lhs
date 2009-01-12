@@ -195,9 +195,9 @@ data Size
 #if sparc_TARGET_ARCH /* || powerpc_TARGET_ARCH */
 data Size
     = II8     -- byte (signed)
-    | II8u    -- byte (unsigned)
+--    | II8u    -- byte (unsigned)
     | II16    -- halfword (signed, 2 bytes)
-    | II16u   -- halfword (unsigned, 2 bytes)
+--   | II16u   -- halfword (unsigned, 2 bytes)
     | II32    -- word (4 bytes)
     | II64    -- word (8 bytes)
     | FF32    -- IEEE single-precision floating pt
@@ -207,7 +207,8 @@ data Size
 
 intSize, floatSize :: Width -> Size
 intSize W8  = II8
-intSize W16 = II16u
+--intSize W16 = II16u
+intSize W16 = II16
 intSize W32 = II32
 intSize W64 = II64
 intSize other = pprPanic "MachInstrs.intSize" (ppr other)
@@ -232,9 +233,9 @@ sizeToWidth :: Size -> Width
 sizeToWidth size
  = case size of
  	II8		-> W8
-	II8u		-> W8
+--	II8u		-> W8
 	II16		-> W16
-	II16u		-> W16
+--	II16u		-> W16
 	II32		-> W32
 	II64		-> W64
 	FF32		-> W32
@@ -1405,6 +1406,7 @@ freeReg rsp = fastBool False  --	%rsp is the C stack pointer
 
 #if sparc_TARGET_ARCH
 freeReg g0 = fastBool False  --	%g0 is always 0.
+
 freeReg g5 = fastBool False  --	%g5 is reserved (ABI).
 freeReg g6 = fastBool False  --	%g6 is reserved (ABI).
 freeReg g7 = fastBool False  --	%g7 is reserved (ABI).
@@ -1414,6 +1416,19 @@ freeReg o6 = fastBool False  --	%o6 is our stack pointer.
 freeReg o7 = fastBool False  --	%o7 holds ret addrs (???)
 freeReg f0 = fastBool False  --  %f0/%f1 are the C fp return registers.
 freeReg f1 = fastBool False
+
+-- TODO: Not sure about these BL 2009/01/10
+--	Used for NCG spill tmps? what is this?
+
+{-
+freeReg g1  = fastBool False  -- %g1 is used for NCG spill tmp
+freeReg g2  = fastBool False 
+freeReg f6  = fastBool False
+freeReg f8  = fastBool False
+freeReg f26 = fastBool False
+freeReg f27 = fastBool False
+-}
+
 #endif
 
 #if powerpc_TARGET_ARCH
