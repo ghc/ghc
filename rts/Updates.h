@@ -268,7 +268,7 @@ no_slop:
     write_barrier();						\
     bd = Bdescr((P_)p1);					\
     if (bd->gen_no != 0) {					\
-      recordMutableGenLock(p1, &generations[bd->gen_no]);	\
+      recordMutableGenLock(p1, bd->gen_no);			\
       SET_INFO(p1, &stg_IND_OLDGEN_info);			\
       TICK_UPD_OLD_IND();					\
       and_then;							\

@@ -125,10 +125,6 @@ nat n_gc_threads;
 // For stats:
 long copied;        // *words* copied & scavenged during this GC
 
-#ifdef THREADED_RTS
-SpinLock recordMutableGen_sync;
-#endif
-
 DECLARE_GCT
 
 /* -----------------------------------------------------------------------------
@@ -314,17 +310,7 @@ GarbageCollect (rtsBool force_major_gc,
 
   /* -----------------------------------------------------------------------
    * follow all the roots that we know about:
-   *   - mutable lists from each generation > N
-   * we want to *scavenge* these roots, not evacuate them: they're not
-   * going to move in this GC.
-   * Also do them in reverse generation order, for the usual reason:
-   * namely to reduce the likelihood of spurious old->new pointers.
    */
-  for (g = RtsFlags.GcFlags.generations-1; g > N; g--) {
-      generations[g].saved_mut_list = generations[g].mut_list;
-      generations[g].mut_list = allocBlock(); 
-      // mut_list always has at least one block.
-  }
 
   // the main thread is running: this prevents any other threads from
   // exiting prematurely, so we can start them now.
@@ -333,8 +319,29 @@ GarbageCollect (rtsBool force_major_gc,
   inc_running();
   wakeup_gc_threads(n_gc_threads, gct->thread_index);
 
+  // Mutable lists from each generation > N
+  // we want to *scavenge* these roots, not evacuate them: they're not
+  // going to move in this GC.
+  // Also do them in reverse generation order, for the usual reason:
+  // namely to reduce the likelihood of spurious old->new pointers.
+  //
   for (g = RtsFlags.GcFlags.generations-1; g > N; g--) {
-      scavenge_mutable_list(&generations[g]);
+      scavenge_mutable_list(generations[g].saved_mut_list, &generations[g]);
+      freeChain_sync(generations[g].saved_mut_list);
+      generations[g].saved_mut_list = NULL;
+
+  }
+
+  // scavenge the capability-private mutable lists.  This isn't part
+  // of markSomeCapabilities() because markSomeCapabilities() can only
+  // call back into the GC via mark_root() (due to the gct register
+  // variable).
+  if (n_gc_threads == 1) {
+      for (n = 0; n < n_capabilities; n++) {
+          scavenge_capability_mut_lists(&capabilities[n]);
+      }
+  } else {
+      scavenge_capability_mut_lists(&capabilities[gct->thread_index]);
   }
 
   // follow roots from the CAF list (used by GHCi)
@@ -545,6 +552,12 @@ GarbageCollect (rtsBool force_major_gc,
 	for (bd = generations[g].mut_list; bd != NULL; bd = bd->link) {
 	    mut_list_size += bd->free - bd->start;
 	}
+        for (n = 0; n < n_capabilities; n++) {
+            for (bd = capabilities[n].mut_lists[g]; 
+                 bd != NULL; bd = bd->link) {
+                mut_list_size += bd->free - bd->start;
+            }
+        }
 	copied +=  mut_list_size;
 
 	debugTrace(DEBUG_gc,
@@ -1037,6 +1050,7 @@ gcWorkerThread (Capability *cap)
     gct->evac_step = 0;
     markSomeCapabilities(mark_root, gct, gct->thread_index, n_gc_threads,
                          rtsTrue/*prune sparks*/);
+    scavenge_capability_mut_lists(&capabilities[gct->thread_index]);
 
     scavenge_until_all_done();
     
@@ -1287,10 +1301,20 @@ init_collected_gen (nat g, nat n_threads)
 static void
 init_uncollected_gen (nat g, nat threads)
 {
-    nat s, t, i;
+    nat s, t, n;
     step_workspace *ws;
     step *stp;
     bdescr *bd;
+
+    // save the current mutable lists for this generation, and
+    // allocate a fresh block for each one.  We'll traverse these
+    // mutable lists as roots early on in the GC.
+    generations[g].saved_mut_list = generations[g].mut_list;
+    generations[g].mut_list = allocBlock(); 
+    for (n = 0; n < n_capabilities; n++) {
+        capabilities[n].saved_mut_lists[g] = capabilities[n].mut_lists[g];
+        capabilities[n].mut_lists[g] = allocBlock();
+    }
 
     for (s = 0; s < generations[g].n_steps; s++) {
 	stp = &generations[g].steps[s];
@@ -1352,19 +1376,6 @@ init_uncollected_gen (nat g, nat threads)
             if (t == n_gc_threads) t = 0;
         }
     }
-
-
-    // Move the private mutable lists from each capability onto the
-    // main mutable list for the generation.
-    for (i = 0; i < n_capabilities; i++) {
-	for (bd = capabilities[i].mut_lists[g]; 
-	     bd->link != NULL; bd = bd->link) {
-	    /* nothing */
-	}
-	bd->link = generations[g].mut_list;
-	generations[g].mut_list = capabilities[i].mut_lists[g];
-	capabilities[i].mut_lists[g] = allocBlock();
-    }
 }
 
 /* -----------------------------------------------------------------------------
@@ -1377,6 +1388,7 @@ init_gc_thread (gc_thread *t)
     t->static_objects = END_OF_STATIC_LIST;
     t->scavenged_static_objects = END_OF_STATIC_LIST;
     t->scan_bd = NULL;
+    t->mut_lists = capabilities[t->thread_index].mut_lists;
     t->evac_step = 0;
     t->failed_to_evac = rtsFalse;
     t->eager_promotion = rtsTrue;

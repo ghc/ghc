@@ -34,3 +34,22 @@ isPartiallyFull(bdescr *bd)
 #if DEBUG
 void printMutableList (generation *gen);
 #endif
+
+// Version of recordMutableGen for use during GC.  This uses the
+// mutable lists attached to the current gc_thread structure, which
+// are the same as the mutable lists on the Capability.
+INLINE_HEADER void
+recordMutableGen_GC (StgClosure *p, nat gen_no)
+{
+    bdescr *bd;
+
+    bd = gct->mut_lists[gen_no];
+    if (bd->free >= bd->start + BLOCK_SIZE_W) {
+	bdescr *new_bd;
+	new_bd = allocBlock_sync();
+	new_bd->link = bd;
+	bd = new_bd;
+	gct->mut_lists[gen_no] = bd;
+    }
+    *bd->free++ = (StgWord)p;
+}

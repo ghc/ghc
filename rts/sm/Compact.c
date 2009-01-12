@@ -976,11 +976,20 @@ compact(StgClosure *static_objects)
     for (g = 1; g < RtsFlags.GcFlags.generations; g++) {
 	bdescr *bd;
 	StgPtr p;
+        nat n;
 	for (bd = generations[g].mut_list; bd != NULL; bd = bd->link) {
 	    for (p = bd->start; p < bd->free; p++) {
 		thread((StgClosure **)p);
 	    }
 	}
+        for (n = 0; n < n_capabilities; n++) {
+            for (bd = capabilities[n].mut_lists[g]; 
+                 bd != NULL; bd = bd->link) {
+                for (p = bd->start; p < bd->free; p++) {
+                    thread((StgClosure **)p);
+                }
+            }
+        }
     }
 
     // the global thread list

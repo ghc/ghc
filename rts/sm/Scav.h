@@ -12,9 +12,11 @@
  * ---------------------------------------------------------------------------*/
 
 void    scavenge_loop (void);
-void    scavenge_mutable_list (generation *g);
+void    scavenge_mutable_list (bdescr *bd, generation *gen);
+void    scavenge_capability_mut_lists (Capability *cap);
 
 #ifdef THREADED_RTS
 void    scavenge_loop1 (void);
-void    scavenge_mutable_list1 (generation *g);
+void    scavenge_mutable_list1 (bdescr *bd, generation *gen);
+void    scavenge_capability_mut_Lists1 (Capability *cap);
 #endif

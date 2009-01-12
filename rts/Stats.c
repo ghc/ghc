@@ -712,7 +712,6 @@ stat_exit(int alloc)
             {
                 nat g, s;
                 
-                statsPrintf("recordMutableGen_sync: %"FMT_Word64"\n", recordMutableGen_sync.spin);
                 statsPrintf("gc_alloc_block_sync: %"FMT_Word64"\n", gc_alloc_block_sync.spin);
                 statsPrintf("whitehole_spin: %"FMT_Word64"\n", whitehole_spin);
                 for (g = 0; g < RtsFlags.GcFlags.generations; g++) {

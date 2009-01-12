@@ -131,6 +131,14 @@ typedef struct gc_thread_ {
     // block that is currently being scanned
     bdescr *     scan_bd;
 
+    // Remembered sets on this CPU.  Each GC thread has its own
+    // private per-generation remembered sets, so it can add an item
+    // to the remembered set without taking a lock.  The mut_lists
+    // array on a gc_thread is the same as the one on the
+    // corresponding Capability; we stash it here too for easy access
+    // during GC; see recordMutableGen_GC().
+    bdescr **    mut_lists;
+
     // --------------------
     // evacuate flags
 

@@ -65,10 +65,12 @@ struct Capability_ {
     Task *suspended_ccalling_tasks;
 
     // One mutable list per generation, so we don't need to take any
-    // locks when updating an old-generation thunk.  These
-    // mini-mut-lists are moved onto the respective gen->mut_list at
-    // each GC.
+    // locks when updating an old-generation thunk.  This also lets us
+    // keep track of which closures this CPU has been mutating, so we
+    // can traverse them using the right thread during GC and avoid
+    // unnecessarily moving the data from one cache to another.
     bdescr **mut_lists;
+    bdescr **saved_mut_lists; // tmp use during GC
 
     // Context switch flag. We used to have one global flag, now one 
     // per capability. Locks required  : none (conflicts are harmless)

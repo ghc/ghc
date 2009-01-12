@@ -25,6 +25,7 @@
 #include "Trace.h"
 #include "LdvProfile.h"
 #include "Sanity.h"
+#include "Capability.h"
 
 static void scavenge_stack (StgPtr p, StgPtr stack_end);
 
@@ -36,7 +37,8 @@ static void scavenge_large_bitmap (StgPtr p,
 # define evacuate(a) evacuate1(a)
 # define recordMutableGen_GC(a,b) recordMutableGen(a,b)
 # define scavenge_loop(a) scavenge_loop1(a)
-# define scavenge_mutable_list(g) scavenge_mutable_list1(g)
+# define scavenge_mutable_list(bd,g) scavenge_mutable_list1(bd,g)
+# define scavenge_capability_mut_lists(cap) scavenge_capability_mut_Lists1(cap)
 #endif
 
 /* -----------------------------------------------------------------------------
@@ -66,6 +68,8 @@ scavengeTSO (StgTSO *tso)
         evacuate((StgClosure**)&tso->_link);
         return;
     }
+
+    debugTrace(DEBUG_gc,"scavenging thread %d",tso->id);
 
     saved_eager = gct->eager_promotion;
     gct->eager_promotion = rtsFalse;
@@ -692,7 +696,7 @@ scavenge_block (bdescr *bd)
     if (gct->failed_to_evac) {
 	gct->failed_to_evac = rtsFalse;
 	if (bd->gen_no > 0) {
-	    recordMutableGen_GC((StgClosure *)q, &generations[bd->gen_no]);
+	    recordMutableGen_GC((StgClosure *)q, bd->gen_no);
 	}
     }
   }
@@ -1047,7 +1051,7 @@ linear_scan:
 	if (gct->failed_to_evac) {
 	    gct->failed_to_evac = rtsFalse;
 	    if (gct->evac_step) {
-		recordMutableGen_GC((StgClosure *)q, gct->evac_step->gen);
+		recordMutableGen_GC((StgClosure *)q, gct->evac_step->gen_no);
 	    }
 	}
 	
@@ -1419,12 +1423,9 @@ scavenge_one(StgPtr p)
    -------------------------------------------------------------------------- */
 
 void
-scavenge_mutable_list(generation *gen)
+scavenge_mutable_list(bdescr *bd, generation *gen)
 {
-    bdescr *bd;
     StgPtr p, q;
-
-    bd = gen->saved_mut_list;
 
     gct->evac_step = &gen->steps[0];
     for (; bd != NULL; bd = bd->link) {
@@ -1456,12 +1457,12 @@ scavenge_mutable_list(generation *gen)
 	    // definitely doesn't point into a young generation.
 	    // Clean objects don't need to be scavenged.  Some clean
 	    // objects (MUT_VAR_CLEAN) are not kept on the mutable
-	    // list at all; others, such as MUT_ARR_PTRS_CLEAN and
-	    // TSO, are always on the mutable list.
+	    // list at all; others, such as MUT_ARR_PTRS_CLEAN
+	    // are always on the mutable list.
 	    //
 	    switch (get_itbl((StgClosure *)p)->type) {
 	    case MUT_ARR_PTRS_CLEAN:
-		recordMutableGen_GC((StgClosure *)p,gen);
+		recordMutableGen_GC((StgClosure *)p,gen->no);
 		continue;
 	    case TSO: {
 		StgTSO *tso = (StgTSO *)p;
@@ -1472,7 +1473,7 @@ scavenge_mutable_list(generation *gen)
 
                     scavenge_TSO_link(tso);
                     if (gct->failed_to_evac) {
-                        recordMutableGen_GC((StgClosure *)p,gen);
+                        recordMutableGen_GC((StgClosure *)p,gen->no);
                         gct->failed_to_evac = rtsFalse;
                     } else {
                         tso->flags &= ~TSO_LINK_DIRTY;
@@ -1487,14 +1488,28 @@ scavenge_mutable_list(generation *gen)
 	    if (scavenge_one(p)) {
 		// didn't manage to promote everything, so put the
 		// object back on the list.
-		recordMutableGen_GC((StgClosure *)p,gen);
+		recordMutableGen_GC((StgClosure *)p,gen->no);
 	    }
 	}
     }
+}
 
-    // free the old mut_list
-    freeChain_sync(gen->saved_mut_list);
-    gen->saved_mut_list = NULL;
+void
+scavenge_capability_mut_lists (Capability *cap)
+{
+    nat g;
+
+    /* Mutable lists from each generation > N
+     * we want to *scavenge* these roots, not evacuate them: they're not
+     * going to move in this GC.
+     * Also do them in reverse generation order, for the usual reason:
+     * namely to reduce the likelihood of spurious old->new pointers.
+     */
+    for (g = RtsFlags.GcFlags.generations-1; g > N; g--) {
+        scavenge_mutable_list(cap->saved_mut_lists[g], &generations[g]);
+        freeChain_sync(cap->saved_mut_lists[g]);
+        cap->saved_mut_lists[g] = NULL;
+    }
 }
 
 /* -----------------------------------------------------------------------------
@@ -1560,7 +1575,7 @@ scavenge_static(void)
 	 */
 	if (gct->failed_to_evac) {
 	  gct->failed_to_evac = rtsFalse;
-	  recordMutableGen_GC((StgClosure *)p,oldest_gen);
+	  recordMutableGen_GC((StgClosure *)p,oldest_gen->no);
 	}
 	break;
       }
@@ -1834,7 +1849,7 @@ scavenge_large (step_workspace *ws)
 	p = bd->start;
 	if (scavenge_one(p)) {
 	    if (ws->step->gen_no > 0) {
-		recordMutableGen_GC((StgClosure *)p, ws->step->gen);
+		recordMutableGen_GC((StgClosure *)p, ws->step->gen_no);
 	    }
 	}
 

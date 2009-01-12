@@ -272,7 +272,6 @@ initStorage( void )
 
 #ifdef THREADED_RTS
   initSpinLock(&gc_alloc_block_sync);
-  initSpinLock(&recordMutableGen_sync);
   whitehole_spin = 0;
 #endif
 
@@ -376,7 +375,7 @@ newCAF(StgClosure* caf)
     * any more and can use it as a STATIC_LINK.
     */
     ((StgIndStatic *)caf)->saved_info = NULL;
-    recordMutableGen(caf, oldest_gen);
+    recordMutableGen(caf, oldest_gen->no);
   }
   
   RELEASE_SM_LOCK;

@@ -245,7 +245,6 @@ extern void GarbageCollect(rtsBool force_major_gc, nat gc_type, Capability *cap)
 #if defined(THREADED_RTS)
 extern Mutex sm_mutex;
 extern Mutex atomic_modify_mutvar_mutex;
-extern SpinLock recordMutableGen_sync;
 #endif
 
 #if defined(THREADED_RTS)
@@ -258,54 +257,31 @@ extern SpinLock recordMutableGen_sync;
 #define ASSERT_SM_LOCK()
 #endif
 
+#if !IN_STG_CODE
+
 INLINE_HEADER void
-recordMutableGen(StgClosure *p, generation *gen)
+recordMutableGen(StgClosure *p, nat gen_no)
 {
     bdescr *bd;
 
-    bd = gen->mut_list;
+    bd = generations[gen_no].mut_list;
     if (bd->free >= bd->start + BLOCK_SIZE_W) {
 	bdescr *new_bd;
 	new_bd = allocBlock();
 	new_bd->link = bd;
 	bd = new_bd;
-	gen->mut_list = bd;
+	generations[gen_no].mut_list = bd;
     }
     *bd->free++ = (StgWord)p;
 
 }
 
 INLINE_HEADER void
-recordMutableGenLock(StgClosure *p, generation *gen)
+recordMutableGenLock(StgClosure *p, nat gen_no)
 {
     ACQUIRE_SM_LOCK;
-    recordMutableGen(p,gen);
+    recordMutableGen(p,gen_no);
     RELEASE_SM_LOCK;
-}
-
-extern bdescr *allocBlock_sync(void);
-
-// Version of recordMutableGen() for use in parallel GC.  The same as
-// recordMutableGen(), except that we surround it with a spinlock and
-// call the spinlock version of allocBlock().
-INLINE_HEADER void
-recordMutableGen_GC(StgClosure *p, generation *gen)
-{
-    bdescr *bd;
-
-    ACQUIRE_SPIN_LOCK(&recordMutableGen_sync);
-
-    bd = gen->mut_list;
-    if (bd->free >= bd->start + BLOCK_SIZE_W) {
-	bdescr *new_bd;
-	new_bd = allocBlock_sync();
-	new_bd->link = bd;
-	bd = new_bd;
-	gen->mut_list = bd;
-    }
-    *bd->free++ = (StgWord)p;
-
-    RELEASE_SPIN_LOCK(&recordMutableGen_sync);
 }
 
 INLINE_HEADER void
@@ -314,7 +290,7 @@ recordMutable(StgClosure *p)
     bdescr *bd;
     ASSERT(closure_MUTABLE(p));
     bd = Bdescr((P_)p);
-    if (bd->gen_no > 0) recordMutableGen(p, &RTS_DEREF(generations)[bd->gen_no]);
+    if (bd->gen_no > 0) recordMutableGen(p, bd->gen_no);
 }
 
 INLINE_HEADER void
@@ -324,6 +300,8 @@ recordMutableLock(StgClosure *p)
     recordMutable(p);
     RELEASE_SM_LOCK;
 }
+
+#endif // !IN_STG_CODE
 
 /* -----------------------------------------------------------------------------
    The CAF table - used to let us revert CAFs in GHCi

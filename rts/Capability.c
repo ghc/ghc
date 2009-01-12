@@ -217,6 +217,9 @@ initCapability( Capability *cap, nat i )
     cap->mut_lists  = stgMallocBytes(sizeof(bdescr *) *
 				     RtsFlags.GcFlags.generations,
 				     "initCapability");
+    cap->saved_mut_lists = stgMallocBytes(sizeof(bdescr *) *
+                                          RtsFlags.GcFlags.generations,
+                                          "initCapability");
 
     for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
 	cap->mut_lists[g] = NULL;
