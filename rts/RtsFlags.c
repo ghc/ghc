@@ -178,6 +178,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.DebugFlags.prof		= rtsFalse;
     RtsFlags.DebugFlags.gran		= rtsFalse;
     RtsFlags.DebugFlags.par		= rtsFalse;
+    RtsFlags.DebugFlags.apply		= rtsFalse;
     RtsFlags.DebugFlags.linker		= rtsFalse;
     RtsFlags.DebugFlags.squeeze		= rtsFalse;
     RtsFlags.DebugFlags.hpc		= rtsFalse;
@@ -445,6 +446,7 @@ usage_text[] = {
 "  -Dp  DEBUG: prof",
 "  -Dr  DEBUG: gran",
 "  -DP  DEBUG: par",
+"  -Da  DEBUG: apply",
 "  -Dl  DEBUG: linker",
 "  -Dm  DEBUG: stm",
 "  -Dz  DEBUG: stack squezing",
