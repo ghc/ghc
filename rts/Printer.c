@@ -121,8 +121,9 @@ printThunkObject( StgThunk *obj, char* tag )
 void
 printClosure( StgClosure *obj )
 {
+    obj = UNTAG_CLOSURE(obj);
+
     StgInfoTable *info;
-    
     info = get_itbl(obj);
 
     switch ( info->type ) {
