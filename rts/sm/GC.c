@@ -266,7 +266,7 @@ GarbageCollect (rtsBool force_major_gc,
 
   // check stack sanity *before* GC
   IF_DEBUG(sanity, checkFreeListSanity());
-  IF_DEBUG(sanity, checkMutableLists());
+  IF_DEBUG(sanity, checkMutableLists(rtsTrue));
 
   // Initialise all our gc_thread structures
   for (t = 0; t < n_gc_threads; t++) {

@@ -29,7 +29,7 @@ extern StgOffset checkStackFrame ( StgPtr sp );
 extern StgOffset checkClosure  ( StgClosure* p );
 
 extern void checkMutableList   ( bdescr *bd, nat gen );
-extern void checkMutableLists (void);
+extern void checkMutableLists ( rtsBool checkTSOs );
 
 #if defined(GRAN)
 extern void checkTSOsSanity(void);

@@ -1483,9 +1483,6 @@ checkSanity( void )
 		       == generations[g].steps[s].n_large_blocks);
 		checkHeap(generations[g].steps[s].blocks);
 		checkChain(generations[g].steps[s].large_objects);
-		if (g > 0) {
-		    checkMutableList(generations[g].mut_list, g);
-		}
 	    }
 	}
 
@@ -1502,9 +1499,9 @@ checkSanity( void )
 #if defined(THREADED_RTS)
     // check the stacks too in threaded mode, because we don't do a
     // full heap sanity check in this case (see checkHeap())
-    checkGlobalTSOList(rtsTrue);
+    checkMutableLists(rtsTrue);
 #else
-    checkGlobalTSOList(rtsFalse);
+    checkMutableLists(rtsFalse);
 #endif
 }
 
