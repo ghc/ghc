@@ -121,6 +121,7 @@ test('T2700', normal, compile, ['-v0'])
 test('T2817', normal, compile, ['-v0'])
 test('T2713', normal, compile_fail, ['-v0'])
 test('T2674', normal, compile_fail, ['-v0'])
+test('T2931', normal, compile, ['-v0'])
 test('TH_emptycase', normal, compile_fail, ['-v0'])
 
 test('T2386', extra_clean(['T2386_Lib.hi', 'T2386_Lib.o']),
