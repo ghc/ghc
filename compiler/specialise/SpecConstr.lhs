@@ -365,6 +365,19 @@ specialising the loops arising from stream fusion, for example in NDP where
 we were getting literally hundreds of (mostly unused) specialisations of
 a local function.
 
+Note [Do not specialise diverging functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Specialising a function that just diverges is a waste of code.
+Furthermore, it broke GHC (simpl014) thus:
+   {-# STR Sb #-}
+   f = \x. case x of (a,b) -> f x
+If we specialise f we get
+   f = \x. case x of (a,b) -> fspec a b
+But fspec doesn't have decent strictnes info.  As it happened,
+(f x) :: IO t, so the state hack applied and we eta expanded fspec,
+and hence f.  But now f's strictness is less than its arity, which
+breaks an invariant.
+
 -----------------------------------------------------
 		Stuff not yet handled
 -----------------------------------------------------
@@ -1006,8 +1019,9 @@ specialise
 
 specialise env bind_calls (fn, arg_bndrs, body, arg_occs) 
 			  spec_info@(SI specs spec_count mb_unspec)
-  | notNull arg_bndrs,	-- Only specialise functions
-    Just all_calls <- lookupVarEnv bind_calls fn
+  | not (isBottomingId fn)      -- Note [Do not specialise diverging functions]
+  , notNull arg_bndrs		-- Only specialise functions
+  , Just all_calls <- lookupVarEnv bind_calls fn
   = do	{ (boring_call, pats) <- callsToPats env specs arg_occs all_calls
 --	; pprTrace "specialise" (vcat [ppr fn <+> ppr arg_occs,
 --	  				text "calls" <+> ppr all_calls,
