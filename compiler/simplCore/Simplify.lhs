@@ -26,6 +26,7 @@ import NewDemand        ( isStrictDmd, splitStrictSig )
 import PprCore          ( pprParendExpr, pprCoreExpr )
 import CoreUnfold       ( mkUnfolding, callSiteInline, CallCtxt(..) )
 import CoreUtils
+import CoreArity	( exprArity )
 import Rules            ( lookupRule, getRules )
 import BasicTypes       ( isMarkedStrict )
 import CostCentre       ( currentCCS )
@@ -339,7 +340,7 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
         ; (env', rhs')
             <-  if not (doFloatFromRhs top_lvl is_rec False body2 body_env2)
                 then                            -- No floating, just wrap up!
-                     do { rhs' <- mkLam tvs' (wrapFloats body_env2 body2)
+                     do { rhs' <- mkLam env tvs' (wrapFloats body_env2 body2)
                         ; return (env, rhs') }
 
                 else if null tvs then           -- Simple floating
@@ -349,7 +350,7 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
                 else                            -- Do type-abstraction first
                      do { tick LetFloatFromLet
                         ; (poly_binds, body3) <- abstractFloats tvs' body_env2 body2
-                        ; rhs' <- mkLam tvs' body3
+                        ; rhs' <- mkLam env tvs' body3
                         ; let env' = foldl (addPolyBind top_lvl) env poly_binds
                         ; return (env', rhs') }
 
@@ -918,7 +919,7 @@ simplLam env (bndr:bndrs) body (ApplyTo _ arg arg_se cont)
 simplLam env bndrs body cont
   = do  { (env', bndrs') <- simplLamBndrs env bndrs
         ; body' <- simplExpr env' body
-        ; new_lam <- mkLam bndrs' body'
+        ; new_lam <- mkLam env' bndrs' body'
         ; rebuild env' new_lam cont }
 
 ------------------
@@ -1093,7 +1094,7 @@ completeCall env var cont
             Just unfolding      -- There is an inlining!
               ->  do { tick (UnfoldingDone var)
                      ; (if dopt Opt_D_dump_inlinings dflags then
-                           pprTrace ("Inlining done" ++ showSDoc (ppr var)) (vcat [
+                           pprTrace ("Inlining done: " ++ showSDoc (ppr var)) (vcat [
                                 text "Before:" <+> ppr var <+> sep (map pprParendExpr args),
                                 text "Inlined fn: " <+> nest 2 (ppr unfolding),
                                 text "Cont:  " <+> ppr call_cont])
@@ -1437,59 +1438,6 @@ At one point I did transformation in LiberateCase, but it's more robust here.
 LiberateCase gets to see it.)
 
 
-Historical note [no-case-of-case]
-~~~~~~~~~~~~~~~~~~~~~~
-We *used* to suppress the binder-swap in case expressoins when 
--fno-case-of-case is on.  Old remarks:
-    "This happens in the first simplifier pass,
-    and enhances full laziness.  Here's the bad case:
-            f = \ y -> ...(case x of I# v -> ...(case x of ...) ... )
-    If we eliminate the inner case, we trap it inside the I# v -> arm,
-    which might prevent some full laziness happening.  I've seen this
-    in action in spectral/cichelli/Prog.hs:
-             [(m,n) | m <- [1..max], n <- [1..max]]
-    Hence the check for NoCaseOfCase."
-However, now the full-laziness pass itself reverses the binder-swap, so this
-check is no longer necessary.
-
-Historical note [Suppressing the case binder-swap]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-There is another situation when it might make sense to suppress the
-case-expression binde-swap. If we have
-
-    case x of w1 { DEFAULT -> case x of w2 { A -> e1; B -> e2 }
-                   ...other cases .... }
-
-We'll perform the binder-swap for the outer case, giving
-
-    case x of w1 { DEFAULT -> case w1 of w2 { A -> e1; B -> e2 }
-                   ...other cases .... }
-
-But there is no point in doing it for the inner case, because w1 can't
-be inlined anyway.  Furthermore, doing the case-swapping involves
-zapping w2's occurrence info (see paragraphs that follow), and that
-forces us to bind w2 when doing case merging.  So we get
-
-    case x of w1 { A -> let w2 = w1 in e1
-                   B -> let w2 = w1 in e2
-                   ...other cases .... }
-
-This is plain silly in the common case where w2 is dead.
-
-Even so, I can't see a good way to implement this idea.  I tried
-not doing the binder-swap if the scrutinee was already evaluated
-but that failed big-time:
-
-        data T = MkT !Int
-
-        case v of w  { MkT x ->
-        case x of x1 { I# y1 ->
-        case x of x2 { I# y2 -> ...
-
-Notice that because MkT is strict, x is marked "evaluated".  But to
-eliminate the last case, we must either make sure that x (as well as
-x1) has unfolding MkT y1.  THe straightforward thing to do is to do
-the binder-swap.  So this whole note is a no-op.
 
 
 \begin{code}

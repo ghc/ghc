@@ -14,7 +14,7 @@ module CoreTidy (
 #include "HsVersions.h"
 
 import CoreSyn
-import CoreUtils
+import CoreArity
 import Id
 import IdInfo
 import Type

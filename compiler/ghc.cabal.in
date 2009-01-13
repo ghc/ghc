@@ -241,6 +241,7 @@ Library
         ClosureInfo
         CodeGen
         SMRep
+        CoreArity
         CoreFVs
         CoreLint
         CorePrep

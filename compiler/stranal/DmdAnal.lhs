@@ -25,7 +25,8 @@ import StaticFlags	( opt_MaxWorkerArgs )
 import NewDemand	-- All of it
 import CoreSyn
 import PprCore	
-import CoreUtils	( exprIsHNF, exprIsTrivial, exprArity )
+import CoreUtils	( exprIsHNF, exprIsTrivial )
+import CoreArity	( exprArity )
 import DataCon		( dataConTyCon )
 import TyCon		( isProductTyCon, isRecursiveTyCon )
 import Id		( Id, idType, idInlinePragma,

@@ -34,6 +34,7 @@ import qualified CoreSubst
 import PprCore
 import CoreFVs
 import CoreUtils
+import CoreArity	( etaExpand, exprEtaExpandArity )
 import CoreUnfold
 import Name
 import Id
@@ -230,8 +231,18 @@ splitInlineCont (ApplyTo dup (Type ty) se c)
   | Just (c1, c2) <- splitInlineCont c = Just (ApplyTo dup (Type ty) se c1, c2)
 splitInlineCont cont@(Stop {})         = Just (mkBoringStop, cont)
 splitInlineCont cont@(StrictBind {})   = Just (mkBoringStop, cont)
-splitInlineCont cont@(StrictArg  {})   = Just (mkBoringStop, cont)
 splitInlineCont _                      = Nothing
+	-- NB: we dissolve an InlineMe in any strict context, 
+	--     not just function aplication.  
+	-- E.g.  foldr k z (__inline_me (case x of p -> build ...))
+	--     Here we want to get rid of the __inline_me__ so we
+	--     can float the case, and see foldr/build
+	--
+	-- However *not* in a strict RHS, else we get
+	-- 	   let f = __inline_me__ (\x. e) in ...f...
+	-- Now if f is guaranteed to be called, hence a strict binding
+	-- we don't thereby want to dissolve the __inline_me__; for
+	-- example, 'f' might be a  wrapper, so we'd inline the worker
 \end{code}
 
 
@@ -818,14 +829,14 @@ activeRule dflags env
 %************************************************************************
 
 \begin{code}
-mkLam :: [OutBndr] -> OutExpr -> SimplM OutExpr
+mkLam :: SimplEnv -> [OutBndr] -> OutExpr -> SimplM OutExpr
 -- mkLam tries three things
 --	a) eta reduction, if that gives a trivial expression
 --	b) eta expansion [only if there are some value lambdas]
 
-mkLam [] body 
+mkLam _b [] body 
   = return body
-mkLam bndrs body
+mkLam _env bndrs body
   = do	{ dflags <- getDOptsSmpl
 	; mkLam' dflags bndrs body }
   where
@@ -847,7 +858,7 @@ mkLam bndrs body
 
       | dopt Opt_DoLambdaEtaExpansion dflags,
    	any isRuntimeVar bndrs
-      = do { body' <- tryEtaExpansion dflags body
+      = do { let body' = tryEtaExpansion dflags body
  	   ; return (mkLams bndrs body') }
    
       | otherwise 
@@ -1032,11 +1043,10 @@ when computing arity; and etaExpand adds the coerces as necessary when
 actually computing the expansion.
 
 \begin{code}
-tryEtaExpansion :: DynFlags -> OutExpr -> SimplM OutExpr
+tryEtaExpansion :: DynFlags -> OutExpr -> OutExpr
 -- There is at least one runtime binder in the binders
-tryEtaExpansion dflags body = do
-    us <- getUniquesM
-    return (etaExpand fun_arity us body (exprType body))
+tryEtaExpansion dflags body
+  = etaExpand fun_arity body
   where
     fun_arity = exprEtaExpandArity dflags body
 \end{code}

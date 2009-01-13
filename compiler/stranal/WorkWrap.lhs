@@ -10,7 +10,8 @@ module WorkWrap ( wwTopBinds, mkWrapper ) where
 
 import CoreSyn
 import CoreUnfold	( certainlyWillInline )
-import CoreUtils	( exprType, exprIsHNF, exprArity )
+import CoreUtils	( exprType, exprIsHNF )
+import CoreArity	( exprArity )
 import Var
 import Id		( Id, idType, isOneShotLambda, 
 			  setIdNewStrictness, mkWorkerId,

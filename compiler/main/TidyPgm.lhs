@@ -19,7 +19,8 @@ import CoreTidy
 import PprCore
 import CoreLint
 import CoreUtils
-import Class	( classSelIds )
+import CoreArity	( exprArity )
+import Class		( classSelIds )
 import VarEnv
 import VarSet
 import Var

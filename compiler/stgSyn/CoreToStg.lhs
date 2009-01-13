@@ -12,7 +12,8 @@ module CoreToStg ( coreToStg, coreExprToStg ) where
 #include "HsVersions.h"
 
 import CoreSyn
-import CoreUtils	( rhsIsStatic, manifestArity, exprType, findDefault )
+import CoreUtils	( rhsIsStatic, exprType, findDefault )
+import CoreArity	( manifestArity )
 import StgSyn
 
 import Type

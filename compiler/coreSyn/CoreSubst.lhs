@@ -12,7 +12,7 @@ module CoreSubst (
 
         -- ** Substituting into expressions and related types
 	deShadowBinds,
-	substTy, substExpr, substSpec, substWorker,
+	substTy, substExpr, substBind, substSpec, substWorker,
 	lookupIdSubst, lookupTvSubst, 
 
         -- ** Operations on substitutions

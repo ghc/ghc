@@ -980,6 +980,16 @@ us to adjust the OccInfo for 'x' and 'b' as we go.
 The Maybe (Id,CoreExpr) passed to occAnalAlt is the extra let-binding
 {x=b}; it's Nothing if the binder-swap doesn't happen.
 
+There is a danger though.  Consider
+      let v = x +# y
+      in case (f v) of w -> ...v...v...
+And suppose that (f v) expands to just v.  Then we'd like to
+use 'w' instead of 'v' in the alternative.  But it may be too
+late; we may have substituted the (cheap) x+#y for v in the 
+same simplifier pass that reduced (f v) to v.
+
+I think this is just too bad.  CSE will recover some of it.
+
 Note [Binder swap on GlobalId scrutinees]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When the scrutinee is a GlobalId we must take care in two ways
@@ -992,6 +1002,67 @@ When the scrutinee is a GlobalId we must take care in two ways
  ii) We must call localiseId on 'x' first, in case it's a GlobalId, or
      has an External Name. See, for example, SimplEnv Note [Global Ids in
      the substitution].
+
+Historical note [no-case-of-case]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We *used* to suppress the binder-swap in case expressoins when 
+-fno-case-of-case is on.  Old remarks:
+    "This happens in the first simplifier pass,
+    and enhances full laziness.  Here's the bad case:
+            f = \ y -> ...(case x of I# v -> ...(case x of ...) ... )
+    If we eliminate the inner case, we trap it inside the I# v -> arm,
+    which might prevent some full laziness happening.  I've seen this
+    in action in spectral/cichelli/Prog.hs:
+             [(m,n) | m <- [1..max], n <- [1..max]]
+    Hence the check for NoCaseOfCase."
+However, now the full-laziness pass itself reverses the binder-swap, so this
+check is no longer necessary.
+
+Historical note [Suppressing the case binder-swap]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This old note describes a problem that is also fixed by doing the
+binder-swap in OccAnal:
+
+    There is another situation when it might make sense to suppress the
+    case-expression binde-swap. If we have
+
+        case x of w1 { DEFAULT -> case x of w2 { A -> e1; B -> e2 }
+                       ...other cases .... }
+
+    We'll perform the binder-swap for the outer case, giving
+
+        case x of w1 { DEFAULT -> case w1 of w2 { A -> e1; B -> e2 }
+                       ...other cases .... }
+
+    But there is no point in doing it for the inner case, because w1 can't
+    be inlined anyway.  Furthermore, doing the case-swapping involves
+    zapping w2's occurrence info (see paragraphs that follow), and that
+    forces us to bind w2 when doing case merging.  So we get
+
+        case x of w1 { A -> let w2 = w1 in e1
+                       B -> let w2 = w1 in e2
+                       ...other cases .... }
+
+    This is plain silly in the common case where w2 is dead.
+
+    Even so, I can't see a good way to implement this idea.  I tried
+    not doing the binder-swap if the scrutinee was already evaluated
+    but that failed big-time:
+
+            data T = MkT !Int
+
+            case v of w  { MkT x ->
+            case x of x1 { I# y1 ->
+            case x of x2 { I# y2 -> ...
+
+    Notice that because MkT is strict, x is marked "evaluated".  But to
+    eliminate the last case, we must either make sure that x (as well as
+    x1) has unfolding MkT y1.  THe straightforward thing to do is to do
+    the binder-swap.  So this whole note is a no-op.
+
+It's fixed by doing the binder-swap in OccAnal because we can do the
+binder-swap unconditionally and still get occurrence analysis
+information right.
 
 Note [Case of cast]
 ~~~~~~~~~~~~~~~~~~~
