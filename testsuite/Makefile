@@ -7,3 +7,5 @@ all:
 clean distclean:
 	$(MAKE) -C timeout $@
 
+boot:
+	cd $(TOP)/timeout && $(MAKE) $(MFLAGS) all

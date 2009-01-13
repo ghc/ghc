@@ -119,9 +119,9 @@ WAY =
 
 all: test
 
-boot: $(TIMEOUT_PROGRAM)
-
 TIMEOUT_PROGRAM = $(TOP)/timeout/install-inplace/bin/timeout$(exeext)
+
+boot: $(TIMEOUT_PROGRAM)
 
 $(TIMEOUT_PROGRAM) :
 	@echo "Looks like you don't have timeout, building it first..."
