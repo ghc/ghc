@@ -1,11 +1,12 @@
 TOP = .
 include $(TOP)/mk/boilerplate.mk
 
+boot:
+	$(MAKE) -C $(TOP)/timeout all
+
 all:
-	cd tests/ghc-regress && $(MAKE) $(MFLAGS)
+	$(MAKE) -C $(TOP)/tests/ghc-regress all
 
 clean distclean:
-	$(MAKE) -C timeout $@
+	$(MAKE) -C $(TOP)/timeout $@
 
-boot:
-	cd $(TOP)/timeout && $(MAKE) $(MFLAGS) all
