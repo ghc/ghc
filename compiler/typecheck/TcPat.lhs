@@ -978,7 +978,7 @@ patCtxt pat 	    = Just (hang (ptext (sLit "In the pattern:"))
 existentialExplode :: LPat Name -> SDoc
 existentialExplode pat
   = hang (vcat [text "My brain just exploded.",
-	        text "I can't handle pattern bindings for existentially-quantified constructors.",
+	        text "I can't handle pattern bindings for existential or GADT data constructors.",
 	        text "Instead, use a case-expression, or do-notation, to unpack the constructor.",
 		text "In the binding group for"])
 	4 (ppr pat)
@@ -1030,7 +1030,7 @@ existentialProcPat con
 lazyPatErr :: Pat name -> [TcTyVar] -> TcM ()
 lazyPatErr _ tvs
   = failWithTc $
-    hang (ptext (sLit "A lazy (~) pattern cannot bind existential type variables"))
+    hang (ptext (sLit "A lazy (~) pattern cannot match existential or GADT data constructors"))
        2 (vcat (map pprSkolTvBinding tvs))
 
 nonRigidMatch :: PatCtxt -> DataCon -> SDoc
