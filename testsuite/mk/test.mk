@@ -125,7 +125,7 @@ boot: $(TIMEOUT_PROGRAM)
 
 $(TIMEOUT_PROGRAM) :
 	@echo "Looks like you don't have timeout, building it first..."
-	cd $(TOP)/timeout && $(MAKE) $(MFLAGS) all
+	$(MAKE) -C $(TOP)/timeout all
 
 test: $(TIMEOUT_PROGRAM)
 	$(PYTHON) $(RUNTESTS) $(RUNTEST_OPTS) \
