@@ -427,7 +427,7 @@ tc_pat pstate (orig@(ViewPat expr pat _)) overall_pat_ty thing_inside
 tc_pat pstate (SigPatIn pat sig_ty) pat_ty thing_inside
   = do	{ (inner_ty, tv_binds, coi) <- tcPatSig (patSigCtxt pstate) sig_ty 
                                                                     pat_ty
-        ; unless (isIdentityCoercion coi) $ 
+        ; unless (isIdentityCoI coi) $ 
             failWithTc (badSigPat pat_ty)
 	; (pat', tvs, res) <- tcExtendTyVarEnv2 tv_binds $
 			      tc_lpat pat inner_ty pstate thing_inside
@@ -702,7 +702,7 @@ tcConPat pstate con_span data_con tycon pat_ty arg_pats thing_inside
 	     ; (_, freshTvs, subst) <- tcInstTyVars (tyConTyVars tycon)
              ; let instTys' = substTys subst instTys
 	     ; cois <- boxyUnifyList instTys' scrutinee_arg_tys
-             ; let coi = if isIdentityCoercion coi1
+             ; let coi = if isIdentityCoI coi1
                          then  -- pat_ty was splittable
                                -- => boxyUnifyList had real work to do
                            mkTyConAppCoI fam_tycon instTys' cois

@@ -22,7 +22,7 @@ module Coercion (
         Coercion,
  
         mkCoKind, mkReflCoKind, splitCoercionKind_maybe, splitCoercionKind,
-        coercionKind, coercionKinds, coercionKindPredTy,
+        coercionKind, coercionKinds, coercionKindPredTy, isIdentityCoercion,
 
 	-- ** Equality predicates
 	isEqPred, mkEqPred, getEqPredTys, isEqPredTy,  
@@ -46,7 +46,7 @@ module Coercion (
 
 	-- * CoercionI
 	CoercionI(..),
-	isIdentityCoercion,
+	isIdentityCoI,
 	mkSymCoI, mkTransCoI, 
 	mkTyConAppCoI, mkAppTyCoI, mkFunTyCoI,
 	mkForAllTyCoI,
@@ -182,6 +182,12 @@ coercionKindPredTy c = let (t1, t2) = coercionKind c in mkCoKind t1 t2
 -- | Apply 'coercionKind' to multiple 'Coercion's
 coercionKinds :: [Coercion] -> ([Type], [Type])
 coercionKinds tys = unzip $ map coercionKind tys
+
+-------------------------------------
+isIdentityCoercion :: Coercion -> Bool
+isIdentityCoercion co  
+  = case coercionKind co of
+       (t1,t2) -> t1 `coreEqType` t2
 
 -------------------------------------
 -- Coercion kind and type mk's
@@ -580,13 +586,13 @@ instance Outputable CoercionI where
   ppr IdCo     = ptext (sLit "IdCo")
   ppr (ACo co) = ppr co
 
-isIdentityCoercion :: CoercionI -> Bool
-isIdentityCoercion IdCo = True
-isIdentityCoercion _    = False
+isIdentityCoI :: CoercionI -> Bool
+isIdentityCoI IdCo = True
+isIdentityCoI _    = False
 
 -- | Tests whether all the given 'CoercionI's represent the identity coercion
-allIdCos :: [CoercionI] -> Bool
-allIdCos = all isIdentityCoercion
+allIdCoIs :: [CoercionI] -> Bool
+allIdCoIs = all isIdentityCoI
 
 -- | For each 'CoercionI' in the input list, return either the 'Coercion' it
 -- contains or the corresponding 'Type' from the other list
@@ -615,8 +621,8 @@ mkTransCoI (ACo co1) (ACo co2) = ACo $ mkTransCoercion co1 co2
 -- | Smart constructor for type constructor application on 'CoercionI', see also 'mkAppCoercion'
 mkTyConAppCoI :: TyCon -> [Type] -> [CoercionI] -> CoercionI
 mkTyConAppCoI tyCon tys cois
-  | allIdCos cois = IdCo
-  | otherwise	  = ACo (TyConApp tyCon (zipCoArgs cois tys))
+  | allIdCoIs cois = IdCo
+  | otherwise	   = ACo (TyConApp tyCon (zipCoArgs cois tys))
 
 -- | Smart constructor for honest-to-god 'Coercion' application on 'CoercionI', see also 'mkAppCoercion'
 mkAppTyCoI :: Type -> CoercionI -> Type -> CoercionI -> CoercionI
@@ -645,8 +651,8 @@ fromACo (ACo co) = co
 -- > mkClassPPredCoI cls tys cois :: PredTy (cls tys) ~ PredTy (cls (tys `cast` cois))
 mkClassPPredCoI :: Class -> [Type] -> [CoercionI] -> CoercionI
 mkClassPPredCoI cls tys cois 
-  | allIdCos cois = IdCo
-  | otherwise     = ACo $ PredTy $ ClassP cls (zipCoArgs cois tys)
+  | allIdCoIs cois = IdCo
+  | otherwise      = ACo $ PredTy $ ClassP cls (zipCoArgs cois tys)
 
 -- | Smart constructor for implicit parameter 'Coercion's on 'CoercionI'. Similar to 'mkClassPPredCoI'
 mkIParamPredCoI :: (IPName Name) -> CoercionI -> CoercionI 

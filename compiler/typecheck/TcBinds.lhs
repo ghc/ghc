@@ -812,7 +812,7 @@ unifyCtxts (sig1 : sigs)        -- Argument is always non-empty
                -- where F is a type function and (F a ~ [a])
                -- Then unification might succeed with a coercion.  But it's much
                -- much simpler to require that such signatures have identical contexts
-               checkTc (all isIdentityCoercion cois)
+               checkTc (all isIdentityCoI cois)
                        (ptext (sLit "Mutually dependent functions have syntactically distinct contexts"))
              }
 
