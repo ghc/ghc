@@ -260,7 +260,7 @@ mkLFReEntrant top fvs args arg_descr
 
 mkLFThunk :: Type -> TopLevelFlag -> [Var] -> UpdateFlag -> LambdaFormInfo
 mkLFThunk thunk_ty top fvs upd_flag
-  = ASSERT( not (isUpdatable upd_flag) || not (isUnLiftedType thunk_ty) )
+  = ASSERT2( not (isUpdatable upd_flag) || not (isUnLiftedType thunk_ty), ppr thunk_ty $$ ppr fvs )
     LFThunk top (null fvs) 
 	    (isUpdatable upd_flag)
 	    NonStandardThunk 
