@@ -1243,11 +1243,11 @@ lex_char_tok span _buf _len = do	-- We've seen '
 		-- We've seen 'x, where x is a valid character
 		--  (i.e. not newline etc) but not a quote or backslash
 	   case alexGetChar' i2 of	-- Look ahead one more character
-		Nothing -> lit_error
 		Just ('\'', i3) -> do 	-- We've seen 'x'
 			setInput i3 
 			finish_char_tok loc c
 		_other -> do 		-- We've seen 'x not followed by quote
+		       	  		-- (including the possibility of EOF)
 					-- If TH is on, just parse the quote only
 			th_exts <- extension thEnabled	
 			let (AI end _ _) = i1
