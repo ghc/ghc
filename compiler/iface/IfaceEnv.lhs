@@ -7,7 +7,7 @@ module IfaceEnv (
 	lookupOrig, lookupOrigNameCache, extendNameCache,
 	newIfaceName, newIfaceNames,
 	extendIfaceIdEnv, extendIfaceTyVarEnv, 
-	tcIfaceLclId,     tcIfaceTyVar, 
+	tcIfaceLclId, tcIfaceTyVar, lookupIfaceTyVar,
 	tcIfaceTick,
 
 	ifaceExportNames,
@@ -281,6 +281,11 @@ tcIfaceTyVar occ
             Just ty_var -> return ty_var
             Nothing     -> failIfM (text "Iface type variable out of scope: " <+> ppr occ)
         }
+
+lookupIfaceTyVar :: FastString -> IfL (Maybe TyVar)
+lookupIfaceTyVar occ
+  = do	{ lcl <- getLclEnv
+	; return (lookupUFM (if_tv_env lcl) occ) }
 
 extendIfaceTyVarEnv :: [TyVar] -> IfL a -> IfL a
 extendIfaceTyVarEnv tyvars thing_inside
