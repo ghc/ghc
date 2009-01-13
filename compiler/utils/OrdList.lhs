@@ -12,7 +12,7 @@ can be appended in linear time.
 module OrdList (
 	OrdList, 
         nilOL, isNilOL, unitOL, appOL, consOL, snocOL, concatOL,
-        fromOL, toOL, foldrOL, foldlOL
+        mapOL, fromOL, toOL, foldrOL, foldlOL
 ) where
 
 infixl 5  `appOL`
