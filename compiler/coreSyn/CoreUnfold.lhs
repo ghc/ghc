@@ -634,14 +634,14 @@ callSiteInline dflags active_inline id lone_variable arg_infos cont_info
 		
     in    
     if dopt Opt_D_dump_inlinings dflags then
-	pprTrace "Considering inlining"
-		 (ppr id <+> vcat [text "active:" <+> ppr active_inline,
-			  	   text "arg infos" <+> ppr arg_infos,
-				   text "interesting continuation" <+> ppr cont_info,
-				   text "is value:" <+> ppr is_value,
-				   text "is cheap:" <+> ppr is_cheap,
-				   text "guidance" <+> ppr guidance,
-				   text "ANSWER =" <+> if yes_or_no then text "YES" else text "NO"])
+	pprTrace ("Considering inlining: " ++ showSDoc (ppr id))
+		 (vcat [text "active:" <+> ppr active_inline,
+			text "arg infos" <+> ppr arg_infos,
+			text "interesting continuation" <+> ppr cont_info,
+			text "is value:" <+> ppr is_value,
+			text "is cheap:" <+> ppr is_cheap,
+			text "guidance" <+> ppr guidance,
+			text "ANSWER =" <+> if yes_or_no then text "YES" else text "NO"])
 		  result
     else
     result
