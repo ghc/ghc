@@ -138,7 +138,7 @@ Running example:
   inline df_i in it, and that in turn means that (since it'll be a
   loop-breaker because df_i isn't), op1_i will ironically never be 
   inlined.  We need to fix this somehow -- perhaps allowing inlining
-  of INLINE funcitons inside other INLINE functions.
+  of INLINE functions inside other INLINE functions.
 
 Note [Subtle interaction of recursion and overlap]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
