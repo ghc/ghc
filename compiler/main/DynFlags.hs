@@ -1790,6 +1790,8 @@ impliedFlags
   = [ (Opt_GADTs,               Opt_RelaxedPolyRec)  -- We want type-sig variables to
                                                      --      be completely rigid for GADTs
 
+    , (Opt_TypeFamilies,        Opt_RelaxedPolyRec)  -- Trac #2944 gives a nice example
+
     , (Opt_ScopedTypeVariables, Opt_RelaxedPolyRec)  -- Ditto for scoped type variables; see
                                                      --      Note [Scoped tyvars] in TcBinds
     , (Opt_ImpredicativeTypes,  Opt_RankNTypes)
