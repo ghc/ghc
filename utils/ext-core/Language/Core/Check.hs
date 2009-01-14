@@ -7,7 +7,10 @@ module Language.Core.Check(
   CheckRes(..), splitTy, substl,
   mkTypeEnvsNoChecking) where
 
+--import Debug.Trace
+
 import Language.Core.Core
+import Language.Core.CoreUtils
 import Language.Core.Printer()
 import Language.Core.PrimEnv
 import Language.Core.Env
@@ -43,25 +46,22 @@ require False s = fail s
 require True  _ = return ()
 
 
-extendM :: (Ord a, Show a) => EnvType -> Env a b -> (a,b) -> CheckResult (Env a b)
-extendM envType env (k,d) = 
+extendM :: (Ord a, Show a) => Bool -> EnvType -> Env a b -> (a,b) -> CheckResult (Env a b)
+extendM checkNameShadowing envType env (k,d) = 
    case elookup env k of
-     Just _ | envType == NotTv -> fail ("multiply-defined identifier: " 
+     Just _ | envType == NotTv && checkNameShadowing -> fail ("multiply-defined identifier: " 
                                       ++ show k)
      _ -> return (eextend env (k,d))
 
-extendVenv :: (Ord a, Show a) => Env a b -> (a,b) -> CheckResult (Env a b)
-extendVenv = extendM NotTv
+extendVenv :: (Ord a, Show a) => Bool -> Env a b -> (a,b) -> CheckResult (Env a b)
+extendVenv check = extendM check NotTv
 
 extendTvenv :: (Ord a, Show a) => Env a b -> (a,b) -> CheckResult (Env a b)
-extendTvenv = extendM Tv
+extendTvenv = extendM True Tv
 
-lookupM :: (Ord a, Show a) => Env a b -> a -> CheckResult b
-lookupM env k =   
-   case elookup env k of
-     Just v -> return v
-     Nothing -> fail ("undefined identifier: " ++ show k ++ " e = " ++ show (edomain env))
-            
+lookupM :: (Ord a, Show a) => Env a b -> a -> CheckResult (Maybe b)
+lookupM env k = return $ elookup env k
+          
 {- Main entry point. -}
 checkModule :: Menv -> Module -> CheckRes Menv
 checkModule globalEnv (Module mn tdefs vdefgs) = 
@@ -72,8 +72,7 @@ checkModule globalEnv (Module mn tdefs vdefgs) =
                               vdefgs
         return (eextend globalEnv 
             (mn,Envs{tcenv_=tcenv,cenv_=cenv,venv_=e_venv})))
-         -- avoid name shadowing
-    (mn, eremove globalEnv mn)
+    (mn, globalEnv)
 
 -- Like checkModule, but doesn't typecheck the code, instead just
 -- returning declared types for top-level defns.
@@ -93,8 +92,7 @@ envsModule globalEnv (Module mn tdefs vdefgs) =
               add :: [(Qual Var,Ty)] -> Venv -> Venv
               add pairs e = foldr addOne e pairs
               addOne :: (Qual Var, Ty) -> Venv -> Venv
-              addOne ((Nothing,_),_) e = e
-              addOne ((Just _,v),t) e  = eextend e (v,t)
+              addOne ((_,v),t) e  = eextend e (v,t)
 
 checkTdef0 :: Tcenv -> Tdef -> CheckResult Tcenv
 checkTdef0 tcenv tdef = ch tdef
@@ -102,12 +100,12 @@ checkTdef0 tcenv tdef = ch tdef
 	ch (Data (m,c) tbs _) = 
 	    do mn <- getMname
                requireModulesEq m mn "data type declaration" tdef False
-	       extendM NotTv tcenv (c, Kind k)
+	       extendM True NotTv tcenv (c, Kind k)
 	    where k = foldr Karrow Klifted (map snd tbs)
 	ch (Newtype (m,c) coVar tbs rhs) = 
 	    do mn <- getMname
                requireModulesEq m mn "newtype declaration" tdef False
-	       tcenv' <- extendM NotTv tcenv (c, Kind k)
+	       tcenv' <- extendM True NotTv tcenv (c, Kind k)
                -- add newtype axiom to env
                tcenv'' <- envPlusNewtype tcenv' (m,c) coVar tbs rhs
 	       return tcenv''
@@ -128,7 +126,7 @@ processTdef0NoChecking tcenv tdef = ch tdef
 
 envPlusNewtype :: Tcenv -> Qual Tcon -> Qual Tcon -> [Tbind] -> Ty
   -> CheckResult Tcenv
-envPlusNewtype tcenv tyCon coVar tbs rep = extendM NotTv tcenv
+envPlusNewtype tcenv tyCon coVar tbs rep = extendM True NotTv tcenv
                   (snd coVar, Coercion $ DefinedCoercion tbs
                             (foldl Tapp (Tcon tyCon) 
                                        (map Tvar (fst (unzip tbs))),
@@ -139,12 +137,12 @@ checkTdef tcenv cenv = ch
        where 
 	 ch (Data (_,c) utbs cdefs) = 
 	    do cbinds <- mapM checkCdef cdefs
-	       foldM (extendM NotTv) cenv cbinds
+	       foldM (extendM True NotTv) cenv cbinds
 	    where checkCdef (cdef@(Constr (m,dcon) etbs ts)) =
 		    do mn <- getMname
                        requireModulesEq m mn "constructor declaration" cdef 
                          False 
-		       tvenv <- foldM (extendM Tv) eempty tbs 
+		       tvenv <- foldM (extendM True Tv) eempty tbs 
 		       ks <- mapM (checkTy (tcenv,tvenv)) ts
 		       mapM_ (\k -> require (baseKind k)
 					    ("higher-order kind in:\n" ++ show cdef ++ "\n" ++
@@ -156,7 +154,7 @@ checkTdef tcenv cenv = ch
 					  (foldl Tapp (Tcon (Just mn,c))
 						 (map (Tvar . fst) utbs)) ts) tbs
          ch (tdef@(Newtype tc _ tbs t)) =  
-	    do tvenv <- foldM (extendM Tv) eempty tbs
+	    do tvenv <- foldM (extendM True Tv) eempty tbs
 	       kRhs <- checkTy (tcenv,tvenv) t
                require (kRhs `eqKind` Klifted) ("bad kind:\n" ++ show tdef)
                kLhs <- checkTy (tcenv,tvenv) 
@@ -209,7 +207,7 @@ checkVdefg top_level (tcenv,tvenv,cenv) (e_venv,l_venv) vdefg = do
       case vdefg of
 	Rec vdefs ->
 	    do (e_venv', l_venv') <- makeEnv mn vdefs
-	       let env' = (tcenv,tvenv,cenv,e_venv',l_venv')
+               let env' = (tcenv,tvenv,cenv,e_venv',l_venv')
                mapM_ (checkVdef (\ vdef k -> require (k `eqKind` Klifted) 
                         ("unlifted kind in:\n" ++ show vdef)) env') 
                      vdefs
@@ -223,8 +221,8 @@ checkVdefg top_level (tcenv,tvenv,cenv) (e_venv,l_venv) vdefg = do
                makeEnv mn [vdef]
 
   where makeEnv mn vdefs = do
-             ev <- foldM extendVenv e_venv e_vts
-             lv <- foldM extendVenv l_venv l_vts
+             ev <- foldM (extendVenv False) e_venv e_vts
+             lv <- foldM (extendVenv False) l_venv l_vts
              return (ev, lv)
            where e_vts = [ (v,t) | Vdef ((Just m,v),t,_) <- vdefs,
                                      not (vdefIsMainWrapper mn (Just m))]
@@ -311,7 +309,7 @@ checkExp (tcenv,tvenv,cenv,e_venv,l_venv) = ch
 		 require (baseKind k) 	
 			 ("higher-order kind in:\n" ++ show e0 ++ "\n" ++
 			  "kind: " ++ show k) 
-		 l_venv' <- extendVenv l_venv vb
+		 l_venv' <- extendVenv True l_venv vb
 		 t <- checkExp (tcenv,tvenv,cenv,e_venv,l_venv') e
 		 require (not (isUtupleTy vt)) ("lambda-bound unboxed tuple in:\n" ++ show e0) 
 		 return (tArrow vt t)
@@ -347,7 +345,7 @@ checkExp (tcenv,tvenv,cenv,e_venv,l_venv) = ch
 		      in ok as [l] 
 		   [Adefault _] -> return ()
 		   _ -> fail ("no alternatives in case:\n" ++ show e0) 
-		 l_venv' <- extendVenv l_venv (v,t)
+		 l_venv' <- extendVenv True l_venv (v,t)
 		 t:ts <- mapM (checkAlt (tcenv,tvenv,cenv,e_venv,l_venv') t) alts
 		 require (all (== t) ts)
 			 ("alternative types don't match in:\n" ++ show e0 ++ "\n" ++
@@ -413,7 +411,7 @@ checkAlt (env@(tcenv,tvenv,cenv,e_venv,l_venv)) t0 = ch
 			  ("pattern constructor type doesn't match scrutinee type in:\n" ++ show a0 ++ "\n" ++
 			   "pattern constructor type: " ++ show ct_res ++ "\n" ++
 			   "scrutinee type: " ++ show t0) 
-		 l_venv' <- foldM extendVenv l_venv vbs
+		 l_venv' <- foldM (extendVenv True) l_venv vbs
 		 t <- checkExp (tcenv,tvenv',cenv,e_venv,l_venv') e
 		 checkTy (tcenv,tvenv) t  {- check that existentials don't escape in result type -}
 		 return t
@@ -430,7 +428,11 @@ checkAlt (env@(tcenv,tvenv,cenv,e_venv,l_venv)) t0 = ch
 checkTy :: (Tcenv,Tvenv) -> Ty -> CheckResult Kind
 checkTy es@(tcenv,tvenv) = ch
      where
-       ch (Tvar tv) = lookupM tvenv tv
+       ch (Tvar tv) = do
+          res <- lookupM tvenv tv
+          case res of
+            Just k  -> return k
+            Nothing -> fail ("Undefined tvar: " ++ show tv)
        ch (Tcon qtc) = do
          kOrC <- qlookupM tcenv_ tcenv eempty qtc
          case kOrC of
@@ -443,11 +445,11 @@ checkTy es@(tcenv,tvenv) = ch
                  tcK <- qlookupM tcenv_ tcenv eempty tc 
                  case tcK of
                    Kind _ -> checkTapp t1 t2
-                   Coercion (DefinedCoercion tbs (from,to)) -> do
+                   Coercion co@(DefinedCoercion tbs _) -> do
                      -- makes sure coercion is fully applied
                      require (length tys == length tbs) $
                         ("Arity mismatch in coercion app: " ++ show t)
-                     let (tvs, tks) = unzip tbs
+                     let (_, tks) = unzip tbs
                      argKs <- mapM (checkTy es) tys
                      let kPairs = zip argKs tks
                          -- Simon says it's okay for these to be
@@ -456,7 +458,7 @@ checkTy es@(tcenv,tvenv) = ch
                      require kindsOk
                         ("Kind mismatch in coercion app: " ++ show tks 
                          ++ " and " ++ show argKs ++ " t = " ++ show t)
-                     return $ Keq (substl tvs tys from) (substl tvs tys to)
+                     return $ (uncurry Keq) (applyNewtype co tys)
                Nothing -> checkTapp t1 t2
             where checkTapp t1 t2 = do 
                     k1 <- ch t1
@@ -521,17 +523,17 @@ checkTyCo es@(tcenv,_) t@(Tapp t1 t2) =
  -- todo: avoid duplicating this code
  -- blah, this almost calls for a different syntactic form
  -- (for a defined-coercion app): (TCoercionApp Tcon [Ty])
-         Coercion (DefinedCoercion tbs (from, to)) -> do
+         Coercion co@(DefinedCoercion tbs _) -> do
            require (length tys == length tbs) $ 
             ("Arity mismatch in coercion app: " ++ show t)
-           let (tvs, tks) = unzip tbs
+           let (_, tks) = unzip tbs
            argKs <- mapM (checkTy es) tys
            let kPairs = zip argKs tks
            let kindsOk = all (uncurry subKindOf) kPairs
            require kindsOk
               ("Kind mismatch in coercion app: " ++ show tks 
                  ++ " and " ++ show argKs ++ " t = " ++ show t)
-           return (substl tvs tys from, substl tvs tys to)
+           return (applyNewtype co tys)
          _ -> checkTapp t1 t2
     _ -> checkTapp t1 t2)
        where checkTapp t1 t2 = do
@@ -552,15 +554,17 @@ checkTyCo es t = do
     -- otherwise, expand by the "refl" rule
     _          -> return (t, t)
 
-mlookupM :: (Eq a, Show a) => (Envs -> Env a b) -> Env a b -> Env a b -> Mname
+mlookupM :: (Eq a, Show a, Show b) => (Envs -> Env a b) -> Env a b -> Env a b -> Mname
           -> CheckResult (Env a b)
-mlookupM _ _ local_env    Nothing            = return local_env
+mlookupM _ _ local_env    Nothing            = -- (trace ("mlookupM_: returning " ++ show local_env)) $
+  return local_env
 mlookupM selector external_env local_env (Just m) = do
   mn <- getMname
+  globalEnv <- getGlobalEnv
   if m == mn
-     then return external_env
-     else do
-       globalEnv <- getGlobalEnv
+     then -- trace ("global env would b e " ++ show (elookup globalEnv m)) $
+            return external_env
+     else
        case elookup globalEnv m of
          Just env' -> return (selector env')
          Nothing -> fail ("Check: undefined module name: "
@@ -568,9 +572,27 @@ mlookupM selector external_env local_env (Just m) = do
 
 qlookupM :: (Ord a, Show a,Show b) => (Envs -> Env a b) -> Env a b -> Env a b
                   -> Qual a -> CheckResult b
-qlookupM selector external_env local_env (m,k) =
-      do env <- mlookupM selector external_env local_env m
-         lookupM env k
+qlookupM selector external_env local_env v@(m,k) =
+      do env <- -- trace ("qlookupM: " ++ show v) $
+                  mlookupM selector external_env local_env m
+         -- argh, hack for unqualified top-level names
+         maybeRes <- lookupM env k
+         case maybeRes of
+           Just r -> return r
+           Nothing -> do mn <- getMname
+                         currentMenv <- --  trace ("qlookupM: trying module for " ++ show mn) $
+                                         mlookupM selector external_env local_env (Just mn)
+                         maybeRes1 <- -- trace ("qlookupM: trying in " ++ show currentMenv) $
+                                        lookupM currentMenv k
+                         case maybeRes1 of
+                           Just r1 -> return r1
+                           Nothing -> do
+                             globalEnv <- getGlobalEnv
+                             case elookup globalEnv mn of
+                               Just e1 -> case elookup (selector e1) k of
+                                            Just r2 -> return r2
+                                            Nothing -> fail ("Undefined id " ++ show v)
+                               Nothing -> fail ("Undefined id " ++ show v) 
 
 checkLit :: Lit -> CheckResult Ty
 checkLit (Literal lit t) =
@@ -602,50 +624,6 @@ splitTy (Tapp(Tapp(Tcon tc) t0) t) | tc == tcArrow = (tbs,t0:ts,tr)
 		where (tbs,ts,tr) = splitTy t
 splitTy t = ([],[],t)
 
-
-{- Simultaneous substitution on types for type variables,
-   renaming as neceessary to avoid capture.
-   No checks for correct kindedness. -}
-substl :: [Tvar] -> [Ty] -> Ty -> Ty
-substl tvs ts t = f (zip tvs ts) t
-  where 
-    f env t0 =
-     case t0 of
-       Tcon _ -> t0
-       Tvar v -> case lookup v env of
-                   Just t1 -> t1
-                   Nothing -> t0
-       Tapp t1 t2 -> Tapp (f env t1) (f env t2)
-       Tforall (t,k) t1 -> 
-         if t `elem` free then
-           Tforall (t',k) (f ((t,Tvar t'):env) t1)
-         else 
-	   Tforall (t,k) (f (filter ((/=t).fst) env) t1)
-       TransCoercion t1 t2 -> TransCoercion (f env t1) (f env t2)
-       SymCoercion t1 -> SymCoercion (f env t1)
-       UnsafeCoercion t1 t2 -> UnsafeCoercion (f env t1) (f env t2)
-       LeftCoercion t1 -> LeftCoercion (f env t1)
-       RightCoercion t1 -> RightCoercion (f env t1)
-       InstCoercion t1 t2 -> InstCoercion (f env t1) (f env t2)
-     where free = foldr union [] (map (freeTvars.snd) env)
-           t' = freshTvar free 
-   
-{- Return free tvars in a type -}
-freeTvars :: Ty -> [Tvar]
-freeTvars (Tcon _) = []
-freeTvars (Tvar v) = [v]
-freeTvars (Tapp t1 t2) = freeTvars t1 `union` freeTvars t2
-freeTvars (Tforall (t,_) t1) = delete t (freeTvars t1) 
-freeTvars (TransCoercion t1 t2) = freeTvars t1 `union` freeTvars t2
-freeTvars (SymCoercion t) = freeTvars t
-freeTvars (UnsafeCoercion t1 t2) = freeTvars t1 `union` freeTvars t2
-freeTvars (LeftCoercion t) = freeTvars t
-freeTvars (RightCoercion t) = freeTvars t
-freeTvars (InstCoercion t1 t2) = freeTvars t1 `union` freeTvars t2
-
-{- Return any tvar *not* in the argument list. -}
-freshTvar :: [Tvar] -> Tvar
-freshTvar tvs = maximum ("":tvs) ++ "x" -- one simple way!
 
 primCoercionError :: Show a => a -> b
 primCoercionError s = error $ "Bad coercion application: " ++ show s

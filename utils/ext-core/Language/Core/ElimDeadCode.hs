@@ -7,6 +7,7 @@ module Language.Core.ElimDeadCode(elimDeadCode) where
 
 import Language.Core.Core
 import Language.Core.Printer()
+import Language.Core.CoreUtils
 import Language.Core.Utils
 
 import Control.Monad.Reader
@@ -16,12 +17,15 @@ import Data.Maybe
 import qualified Data.Map as M
 import qualified Data.Set as S
 
-elimDeadCode :: Module -> Module
-elimDeadCode (Module mn tdefs vdefgs) = runReader (do
+elimDeadCode :: Bool -> Module -> Module
+-- exports = true <=> it's assumed we want to keep exported functions;
+-- otherwise, we assume the module is "closed" and eliminate everything
+-- not reachable from Main
+elimDeadCode exports (Module mn tdefs vdefgs) = runReader (do
   (usedVars, usedDcons, usedTcons) <- findUsed emptySet 
-     (mkStartSet mn vdefgs) 
+     (mkStartSet exports mn vdefgs) 
   let isUsed (Vdef (v,_,_)) = v `S.member` usedVars
-  let newVdefgs = [Rec $ filter isUsed (flattenBinds vdefgs)]
+  let newVdefgs = filterVdefgs isUsed vdefgs
   let newTdefs  = filter (tdefIsUsed usedTcons usedDcons) tdefs in
     return $ Module mn newTdefs newVdefgs) ((mkVarEnv vdefgs), mkTyEnv tdefs)
 
@@ -82,20 +86,19 @@ varsAndConsInOne' tc = do
 
 emptySet :: DeadSet
 emptySet = (S.empty, S.empty, S.empty)
-mkStartSet :: AnMname -> [Vdefg] -> DeadSet
+mkStartSet :: Bool -> AnMname -> [Vdefg] -> DeadSet
 -- Initially, we assume the definitions of any exported functions are not
 -- dead, and work backwards from there.
-mkStartSet mn vds = 
-  (S.fromList (filter ((== Just mn) . getModule) (exportedNames vds)), 
+mkStartSet exports mn vds = 
+  (S.fromList (filter ((== Just mn) . getModule) (if exports then exportedNames vds else [mainVar])), 
    S.empty, S.empty)
 
 exportedNames :: [Vdefg] -> [Qual Var]
 exportedNames vdefgs = 
   let vds = flattenBinds vdefgs in
-    filter isQual (vdefNames vds)
+    filter isQual (ns vds)
       where isQual    = isJust . fst
-            vdefNames = map (\ (Vdef (n,_,_)) -> n)
-
+            ns = map (\ (Vdef (n,_,_)) -> n)
 
 type DeadSet = (S.Set (Qual Var), S.Set (Qual Dcon), S.Set (Qual Tcon))
 type DeadM = Reader (M.Map (Qual Var) Exp, M.Map (Qual Tcon) [Ty])

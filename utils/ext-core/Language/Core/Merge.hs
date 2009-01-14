@@ -11,6 +11,7 @@ import Language.Core.Utils
 import Data.Char
 import Data.Generics
 import Data.List
+import Data.Maybe
 
 {-
    merge turns a group of (possibly mutually recursive) modules
@@ -38,7 +39,7 @@ import Data.List
 
 merge    :: [(Qual Var, Qual Var)] -> [Module] -> Module
 merge subst ms = 
-   zapNames subst topNames (Module mainMname newTdefs [Rec topBinds])
+   zapNames subst topNames (Module mainMname newTdefs topBinds)
      where -- note: dead code elimination will later remove any names
            -- that were in the domain of the substitution
            newTdefs = finishTdefs deadIds $ concat allTdefs
@@ -46,7 +47,7 @@ merge subst ms =
                                              -> (tds, vdefgs)) ms
            (deadIds,_) = unzip subst
            topNames    = uniqueNamesIn topBinds (concat allTdefs)
-           topBinds    = finishVdefs deadIds $ flattenBinds (concat allVdefgs)
+           (topBinds::[Vdefg])    = finishVdefs deadIds $ concat allVdefgs
 
 {-
    This function finds all of the names in the given group of vdefs and
@@ -61,9 +62,9 @@ merge subst ms =
    (Both of those would allow for more names to be shortened, but aren't
    strictly necessary.)
 -}
-uniqueNamesIn :: [Vdef] -> [Tdef] -> [Qual Var]
+uniqueNamesIn :: [Vdefg] -> [Tdef] -> [Qual Var]
 uniqueNamesIn topBinds allTdefs = res
-  where vars  = vdefNamesQ topBinds
+  where vars  = vdefNamesQ (flattenBinds topBinds)
         dcons = tdefDcons allTdefs
         tcons = tdefTcons allTdefs
         uniqueVars  = vars \\ dupsUnqual vars
@@ -149,5 +150,6 @@ finishTdefs namesToDrop = filter isOkay
             && cdefsOkay cdefs
         cdefsOkay = all cdefOkay
         cdefOkay (Constr qdc _ _) = qdc `notElem` namesToDrop
-finishVdefs :: [Qual Var] -> [Vdef] -> [Vdef]
-finishVdefs namesToDrop = filter (\ (Vdef (qv,_,_)) -> qv `notElem` namesToDrop)
+finishVdefs :: [Qual Var] -> [Vdefg] -> [Vdefg]
+finishVdefs namesToDrop = filterVdefgs
+  (\ (Vdef (qv,_,_)) -> qv `notElem` namesToDrop)

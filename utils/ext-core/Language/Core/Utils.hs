@@ -33,7 +33,7 @@ everywhere'But :: GenericQ Bool -> GenericT -> GenericT
 -- Guarded to let traversal cease if predicate q holds for x
 everywhere'But q f x
     | q x       = x
-    | otherwise = let top = gmapT f x in
+    | otherwise = let top = f x in
                     top `seq` (gmapT (everywhere'But q f) top)
 
 everywhereButM :: Monad m => GenericQ Bool -> GenericM m -> GenericM m

@@ -13,8 +13,8 @@ data-files:          README
 build-type:          Simple
 cabal-version:       >=1.2
 Library {
-  exposed-modules:     Language.Core.Check, Language.Core.Dependencies, Language.Core.Core, Language.Core.Interp, Language.Core.Overrides, Language.Core.ParsecParser, Language.Core.Prep, Language.Core.Prims, Language.Core.Printer, Language.Core.Merge, Language.Core.ElimDeadCode, Language.Core.Encoding, Language.Core.Env
-  other-modules:       Language.Core.PrimCoercions, Language.Core.PrimEnv, Language.Core.Utils, Language.Core.CoreUtils, Language.Core.Environments
+  exposed-modules:     Language.Core.Check, Language.Core.Dependencies, Language.Core.Core, Language.Core.Interp, Language.Core.Overrides, Language.Core.ParsecParser, Language.Core.Prep, Language.Core.Prims, Language.Core.Printer, Language.Core.Merge, Language.Core.ElimDeadCode, Language.Core.Encoding, Language.Core.Env, Language.Core.CoreUtils
+  other-modules:       Language.Core.PrimCoercions, Language.Core.PrimEnv, Language.Core.Utils, Language.Core.Environments
   extensions:          DeriveDataTypeable PatternGuards RankNTypes ScopedTypeVariables
   ghc-options:         -Wall -O2
   build-depends:       base, containers, directory, filepath, mtl, parsec, pretty

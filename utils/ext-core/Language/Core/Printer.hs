@@ -35,6 +35,11 @@ instance Show Ty where
 instance Show Kind where
   showsPrec _ k = shows (pkind k)
 
+instance Show CoercionKind where
+  showsPrec _ (DefinedCoercion tbs (from,to)) =
+    shows $ parens (text "defined coercion:" <+> (hsep (map ptbind tbs))
+            <+> text ":" <+> brackets (pty from)
+            <+> text "->" <+> brackets (pty to))
 instance Show Lit where
   showsPrec _ l = shows (plit l)
 
