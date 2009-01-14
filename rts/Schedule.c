@@ -32,6 +32,7 @@
 #include "Proftimer.h"
 #include "ProfHeap.h"
 #include "GC.h"
+#include "Weak.h"
 
 /* PARALLEL_HASKELL includes go here */
 
@@ -280,6 +281,12 @@ schedule (Capability *initialCapability, Task *task)
   debugTrace (DEBUG_sched, 
 	      "### NEW SCHEDULER LOOP (task: %p, cap: %p)",
 	      task, initialCapability);
+
+  if (running_finalizers) {
+      errorBelch("error: a C finalizer called back into Haskell.\n"
+                 "   use Foreign.Concurrent.newForeignPtr for Haskell finalizers.");
+      stg_exit(EXIT_FAILURE);
+  }
 
   schedulePreLoop();
 
