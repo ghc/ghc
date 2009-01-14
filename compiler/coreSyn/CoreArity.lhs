@@ -22,9 +22,6 @@ import CoreSubst ( Subst, substBndr, substBndrs, substExpr
        		 , mkEmptySubst, isEmptySubst )
 import Var
 import VarEnv
-#if mingw32_TARGET_OS
-import Packages
-#endif
 import Id
 import Type
 import Coercion
