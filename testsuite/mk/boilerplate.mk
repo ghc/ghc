@@ -1,11 +1,6 @@
 
 default: all
 
-# If we're cleaning then we don't want to do all the GHC detection hardwork,
-# and we certainly don't want to fail if GHC etc can't be found!
-ifneq "$(MAKECMDGOALS)" "clean"
-ifneq "$(MAKECMDGOALS)" "distclean"
-
 HAVE_EVAL := NO
 $(eval HAVE_EVAL := YES)
 
@@ -108,7 +103,4 @@ GS = gs
 CP = cp
 RM = rm -f
 PYTHON = python
-
-endif
-endif
 
