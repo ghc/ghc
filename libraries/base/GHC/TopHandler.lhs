@@ -168,8 +168,14 @@ real_handler exit se@(SomeException exn) =
            Just ExitSuccess     -> exit 0
            Just (ExitFailure n) -> exit n
 
-           _ -> do reportError se
-                   exit 1
+           -- EPIPE errors received for stdout are ignored (#2699)
+           _ -> case cast exn of
+                Just IOError{ ioe_type = ResourceVanished,
+                              ioe_errno = Just ioe,
+                              ioe_handle = Just hdl }
+                   | Errno ioe == ePIPE, hdl == stdout -> exit 0
+                _ -> do reportError se
+                        exit 1
            
 
 -- try to flush stdout/stderr, but don't worry if we fail
