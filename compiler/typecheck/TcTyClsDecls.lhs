@@ -14,7 +14,6 @@ module TcTyClsDecls (
 
 import HsSyn
 import HsTypes
-import BasicTypes
 import HscTypes
 import BuildTyCl
 import TcUnify
