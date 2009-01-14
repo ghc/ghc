@@ -27,6 +27,7 @@ import Control.Concurrent  (forkIO, threadDelay, myThreadId, killThread)
 import Control.Exception   (Exception, handleJust, throwTo, bracket)
 import Data.Typeable
 import Data.Unique         (Unique, newUnique)
+import GHC.Num
 
 -- An internal type that is thrown as a dynamic exception to
 -- interrupt the running IO computation when the timeout has
