@@ -73,7 +73,7 @@ import {-# SOURCE #-} Foreign.Storable
 import Data.Bits        ( Bits(..) )
 import Data.Int         ( Int8,  Int16,  Int32,  Int64  )
 import Data.Word        ( Word8, Word16, Word32, Word64 )
-import {-# SOURCE #-} Data.Typeable
+import {-# SOURCE #-} Data.Typeable (Typeable(typeOf), TyCon, mkTyCon, mkTyConApp)
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base

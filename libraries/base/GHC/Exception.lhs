@@ -19,7 +19,7 @@
 module GHC.Exception where
 
 import Data.Maybe
-import {-# SOURCE #-} Data.Typeable
+import {-# SOURCE #-} Data.Typeable (Typeable, cast)
 import GHC.Base
 import GHC.Show
 \end{code}
