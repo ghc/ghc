@@ -17,7 +17,6 @@ module StgCmmBind (
 
 import StgCmmExpr
 import StgCmmMonad
-import StgCmmExpr
 import StgCmmEnv
 import StgCmmCon
 import StgCmmHeap
