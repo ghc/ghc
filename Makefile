@@ -209,6 +209,8 @@ install-strip:
 
 # Same as default rule, but we pass $(INSTALL_STAGE) to $(MAKE) too
 install :: check-packages
+	$(MKDIRHIER) $(DESTDIR)$(datadir)
+	echo "[]" > $(DESTDIR)$(datadir)/package.conf
 	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
 	for i in $(SUBDIRS); do \
 	  echo "------------------------------------------------------------------------"; \
