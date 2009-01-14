@@ -29,7 +29,8 @@ import MachInstrs
 import MachRegs
 import NCGMonad
 import PositionIndependentCode
-import RegAllocInfo ( mkBranchInstr )
+import RegAllocInfo 	( mkBranchInstr, mkRegRegMoveInstr )
+import MachRegs
 
 -- Our intermediate code:
 import BlockId
@@ -2921,14 +2922,14 @@ genCondJump id bool = do
 
 #if sparc_TARGET_ARCH
 
-genCondJump (BlockId id) bool = do
+genCondJump bid bool = do
   CondCode is_float cond code <- getCondCode bool
   return (
        code `appOL` 
        toOL (
          if   is_float
-         then [NOP, BF cond False (ImmCLbl (mkAsmTempLabel id)), NOP]
-         else [BI cond False (ImmCLbl (mkAsmTempLabel id)), NOP]
+         then [NOP, BF cond False bid, NOP]
+         else [BI cond False bid, NOP]
        )
     )
 
@@ -3481,14 +3482,40 @@ genCCall target dest_regs argsAndHints = do
              in  if   nn <= 0
                  then (nilOL, nilOL)
                  else (unitOL (moveSp (-1*nn)), unitOL (moveSp (1*nn)))
+
         transfer_code
            = toOL (move_final vregs allArgRegs eXTRA_STK_ARGS_HERE)
+
+	-- assign the results, if necessary
+	assign_code []	= nilOL
+	
+	assign_code [CmmHinted dest _hint]	
+	 = let	rep	= localRegType dest
+		width	= typeWidth rep
+		r_dest 	= getRegisterReg (CmmLocal dest)
+
+	 	result
+		 	| isFloatType rep 
+			, W32	<- width
+			= unitOL $ FMOV FF32 (RealReg $ fReg 0) r_dest
+			
+			| isFloatType rep
+			, W64	<- width
+			= unitOL $ FMOV FF64 (RealReg $ fReg 0) r_dest
+			
+			| not $ isFloatType rep
+			, W32	<- width
+			= unitOL $ mkRegRegMoveInstr (RealReg $ oReg 0) r_dest
+			
+	   in	result
+				
     return (argcode       `appOL`
             move_sp_down  `appOL`
             transfer_code `appOL`
             callinsns     `appOL`
             unitOL NOP    `appOL`
-            move_sp_up)
+            move_sp_up	  `appOL`
+	    assign_code dest_regs)
   where
      -- move args from the integer vregs into which they have been 
      -- marshalled, into %o0 .. %o5, and the rest onto the stack.
@@ -3520,7 +3547,8 @@ genCCall target dest_regs argsAndHints = do
 	  (src, code) <- getSomeReg arg
           tmp <- getNewRegNat (cmmTypeSize $ cmmExprType arg)
           let
-              pk   = cmmExprType arg
+              pk   	= cmmExprType arg
+              Just f0_high = fPair f0
           case cmmTypeSize pk of
              FF64 -> do
                       v1 <- getNewRegNat II32
@@ -3530,7 +3558,7 @@ genCCall target dest_regs argsAndHints = do
                         FMOV FF64 src f0                `snocOL`
                         ST   FF32  f0 (spRel 16)         `snocOL`
                         LD   II32  (spRel 16) v1         `snocOL`
-                        ST   FF32  (fPair f0) (spRel 16) `snocOL`
+                        ST   FF32  f0_high (spRel 16) `snocOL`
                         LD   II32  (spRel 16) v2
                         ,
                         [v1,v2]
@@ -4149,32 +4177,32 @@ condIntReg NE x y = do
     return (Any II32 code__2)
 
 condIntReg cond x y = do
-    BlockId lbl1 <- getBlockIdNat
-    BlockId lbl2 <- getBlockIdNat
+    bid1@(BlockId lbl1) <- getBlockIdNat
+    bid2@(BlockId lbl2) <- getBlockIdNat
     CondCode _ cond cond_code <- condIntCode cond x y
     let
 	code__2 dst = cond_code `appOL` toOL [
-	    BI cond False (ImmCLbl (mkAsmTempLabel lbl1)), NOP,
+	    BI cond False bid1, NOP,
 	    OR False g0 (RIImm (ImmInt 0)) dst,
-	    BI ALWAYS False (ImmCLbl (mkAsmTempLabel lbl2)), NOP,
-	    NEWBLOCK (BlockId lbl1),
+	    BI ALWAYS False bid2, NOP,
+	    NEWBLOCK bid1,
 	    OR False g0 (RIImm (ImmInt 1)) dst,
-	    NEWBLOCK (BlockId lbl2)]
+	    NEWBLOCK bid2]
     return (Any II32 code__2)
 
 condFltReg cond x y = do
-    BlockId lbl1 <- getBlockIdNat
-    BlockId lbl2 <- getBlockIdNat
+    bid1@(BlockId lbl1) <- getBlockIdNat
+    bid2@(BlockId lbl2) <- getBlockIdNat
     CondCode _ cond cond_code <- condFltCode cond x y
     let
     	code__2 dst = cond_code `appOL` toOL [ 
     	    NOP,
-	    BF cond False (ImmCLbl (mkAsmTempLabel lbl1)), NOP,
+	    BF cond False bid1, NOP,
 	    OR False g0 (RIImm (ImmInt 0)) dst,
-	    BI ALWAYS False (ImmCLbl (mkAsmTempLabel lbl2)), NOP,
-	    NEWBLOCK (BlockId lbl1),
+	    BI ALWAYS False bid2, NOP,
+	    NEWBLOCK bid1,
 	    OR False g0 (RIImm (ImmInt 1)) dst,
-	    NEWBLOCK (BlockId lbl2)]
+	    NEWBLOCK bid2]
     return (Any II32 code__2)
 
 #endif /* sparc_TARGET_ARCH */
@@ -4762,7 +4790,7 @@ coerceInt2FP width1 width2 x = do
     	code__2 dst = code `appOL` toOL [
     	    ST (intSize width1) src (spRel (-2)),
     	    LD (intSize width1) (spRel (-2)) dst,
-    	    FxTOy (intSize width1) (floatSize width1) dst dst]
+    	    FxTOy (intSize width1) (floatSize width2) dst dst]
     return (Any (floatSize $ width2) code__2)
 
 ------------

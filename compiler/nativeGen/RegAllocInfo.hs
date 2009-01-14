@@ -421,6 +421,11 @@ jumpDests insn acc
         BCC _ id        -> id : acc
         BCCFAR _ id     -> id : acc
         BCTR targets    -> targets ++ acc
+#elif sparc_TARGET_ARCH
+	BI   _ _ id	-> id : acc
+	BF   _ _ id	-> id : acc
+#else
+#error "RegAllocInfo.jumpDests not finished"
 #endif
 	_other		-> acc
 
@@ -908,7 +913,7 @@ mkBranchInstr id = [JXX ALWAYS id]
 #endif
 
 #if sparc_TARGET_ARCH
-mkBranchInstr (BlockId id) = [BI ALWAYS False (ImmCLbl (mkAsmTempLabel id)), NOP]
+mkBranchInstr id = [BI ALWAYS False id, NOP]
 #endif
 
 #if powerpc_TARGET_ARCH

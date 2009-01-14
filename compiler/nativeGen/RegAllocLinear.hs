@@ -94,6 +94,7 @@ import MachInstrs
 import RegAllocInfo
 import RegLiveness
 import Cmm hiding (RegSet)
+import PprMach
 
 import Digraph
 import Unique		( Uniquable(getUnique), Unique )
@@ -103,6 +104,7 @@ import UniqSupply
 import Outputable
 import State
 import FastString
+import MonadUtils
 
 import Data.Maybe
 import Data.List
@@ -110,6 +112,9 @@ import Control.Monad
 import Data.Word
 import Data.Bits
 
+import Debug.Trace
+
+#include "../includes/MachRegs.h"
 
 -- -----------------------------------------------------------------------------
 -- The free register set
@@ -126,7 +131,7 @@ getFreeRegs cls f = filter ( (==cls) . regClass . RealReg ) f
 allocateReg f r = filter (/= r) f
 -}
 
-#if defined(powerpc_TARGET_ARCH)
+#if defined(powerpc_TARGET_ARCH) 
 
 -- The PowerPC has 32 integer and 32 floating point registers.
 -- This is 32bit PowerPC, so Word64 is inefficient - two Word32s are much
@@ -157,7 +162,7 @@ getFreeRegs :: RegClass -> FreeRegs -> [RegNo]	-- lazilly
 getFreeRegs cls (FreeRegs g f)
     | RcDouble <- cls = go f (0x80000000) 63
     | RcInteger <- cls = go g (0x80000000) 31
-    | otherwise = pprPanic "RegAllocLinear.getFreeRegs: Bad cls" (ppr cls)
+    | otherwise = pprPanic "RegAllocLinear.getFreeRegs: Bad register class" (ppr cls)
     where
         go _ 0 _ = []
         go x m i | x .&. m /= 0 = i : (go x (m `shiftR` 1) $! i-1)
@@ -168,16 +173,176 @@ allocateReg r (FreeRegs g f)
     | r > 31    = FreeRegs g (f .&. complement (1 `shiftL` (fromIntegral r - 32)))
     | otherwise = FreeRegs (g .&. complement (1 `shiftL` fromIntegral r)) f
 
-#else
+
+#elif defined(sparc_TARGET_ARCH)
+--------------------------------------------------------------------------------
+-- SPARC is like PPC, except for twinning of floating point regs.
+--	When we allocate a double reg we must take an even numbered
+--	float reg, as well as the one after it.
+
+
+-- Holds bitmaps showing what registers are currently allocated.
+--	The float and double reg bitmaps overlap, but we only alloc
+--	float regs into the float map, and double regs into the double map.
+--
+--	Free regs have a bit set in the corresponding bitmap.
+--
+data FreeRegs 
+	= FreeRegs 
+		!Word32 	-- int    reg bitmap	regs  0..31
+		!Word32 	-- float  reg bitmap	regs 32..63
+		!Word32		-- double reg bitmap	regs 32..63
+	deriving( Show )
+
+
+-- | A reg map where no regs are free to be allocated.
+noFreeRegs :: FreeRegs
+noFreeRegs = FreeRegs 0 0 0
+
+
+-- | The initial set of free regs.
+--	Don't treat the top half of reg pairs we're using as doubles as being free.
+initFreeRegs :: FreeRegs
+initFreeRegs 
+-- = 	trace (show allocable ++ "\n" ++ show freeDouble) 
+-- $ 	regs
+ = 	regs
+ where	
+	freeDouble	= getFreeRegs RcDouble regs
+	regs		= foldr releaseReg noFreeRegs allocable
+	allocable	= allocatableRegs \\ doublePairs
+	doublePairs	= [43, 45, 47, 49, 51, 53]
+
+			
+-- | Get all the free registers of this class.
+getFreeRegs :: RegClass -> FreeRegs -> [RegNo]	-- lazilly
+getFreeRegs cls (FreeRegs g f d)
+	| RcInteger <- cls = go g 1 0
+	| RcFloat   <- cls = go f 1 32
+	| RcDouble  <- cls = go d 1 32
+	| otherwise = pprPanic "RegAllocLinear.getFreeRegs: Bad register class " (ppr cls)
+	where
+		go _ 0 _ = []
+	        go x m i | x .&. m /= 0 = i : (go x (m `shiftL` 1) $! i+1)
+        	         | otherwise    = go x (m `shiftL` 1) $! i+1
+
+showFreeRegs :: FreeRegs -> String
+showFreeRegs regs
+ 	=  "FreeRegs\n"
+	++ "    integer: " ++ (show $ getFreeRegs RcInteger regs)	++ "\n"
+	++ "      float: " ++ (show $ getFreeRegs RcFloat   regs)	++ "\n"
+	++ "     double: " ++ (show $ getFreeRegs RcDouble  regs)	++ "\n"
+
+
+-- | Check whether a reg is free
+regIsFree :: RegNo -> FreeRegs -> Bool
+regIsFree r (FreeRegs g f d)
+
+	-- a general purpose reg
+	| r <= 31	
+	, mask	<- 1 `shiftL` fromIntegral r
+	= g .&. mask /= 0
+
+	-- use the first 22 float regs as double precision
+	| r >= 32
+	, r <= 53
+	, mask	<- 1 `shiftL` (fromIntegral r - 32)
+	= d .&. mask /= 0
+
+	-- use the last 10 float regs as single precision
+	| otherwise 
+	, mask	<- 1 `shiftL` (fromIntegral r - 32)
+	= f .&. mask /= 0
+	
+
+-- | Grab a register.
+grabReg :: RegNo -> FreeRegs -> FreeRegs
+grabReg r (FreeRegs g f d)
+
+	-- a general purpose reg
+	| r <= 31
+	, mask	<- complement (1 `shiftL` fromIntegral r)
+	= FreeRegs (g .&. mask) f d
+    
+	-- use the first 22 float regs as double precision
+	| r >= 32
+	, r <= 53
+	, mask	<- complement (1 `shiftL` (fromIntegral r - 32))
+	= FreeRegs g f (d .&. mask)
+
+	-- use the last 10 float regs as single precision
+	| otherwise
+	, mask	<- complement (1 `shiftL` (fromIntegral r - 32))
+	= FreeRegs g (f .&. mask) d
+
+
+
+-- | Release a register from allocation.
+--	The register liveness information says that most regs die after a C call, 
+--	but we still don't want to allocate to some of them.
+--
+releaseReg :: RegNo -> FreeRegs -> FreeRegs
+releaseReg r regs@(FreeRegs g f d)
+
+	-- used by STG machine, or otherwise unavailable
+	| r >= 0  && r <= 15	= regs
+	| r >= 17 && r <= 21	= regs
+	| r >= 24 && r <= 31	= regs
+	| r >= 32 && r <= 41	= regs
+	| r >= 54 && r <= 59	= regs
+
+	-- never release the high part of double regs.
+	| r == 43		= regs
+	| r == 45		= regs
+	| r == 47		= regs
+	| r == 49		= regs
+	| r == 51		= regs
+	| r == 53		= regs
+	
+	-- a general purpose reg
+	| r <= 31	
+	, mask	<- 1 `shiftL` fromIntegral r
+	= FreeRegs (g .|. mask) f d
+
+	-- use the first 22 float regs as double precision
+	| r >= 32
+	, r <= 53
+	, mask	<- 1 `shiftL` (fromIntegral r - 32)
+	= FreeRegs g f (d .|. mask)
+
+	-- use the last 10 float regs as single precision
+	| otherwise 
+	, mask	<- 1 `shiftL` (fromIntegral r - 32)
+	= FreeRegs g (f .|. mask) d
+
+
+-- | Allocate a register in the map.
+allocateReg :: RegNo -> FreeRegs -> FreeRegs
+allocateReg r regs@(FreeRegs g f d) 
+
+	-- if the reg isn't actually free then we're in trouble
+{-	| not $ regIsFree r regs
+	= pprPanic 
+		"RegAllocLinear.allocateReg"
+		(text "reg " <> ppr r <> text " is not free")
+-}  
+	| otherwise
+	= grabReg r regs
+
+
+     
+--------------------------------------------------------------------------------
 
 -- If we have less than 32 registers, or if we have efficient 64-bit words,
 -- we will just use a single bitfield.
 
-#if defined(alpha_TARGET_ARCH)
-type FreeRegs = Word64
 #else
+
+#  if defined(alpha_TARGET_ARCH)
+type FreeRegs = Word64
+#  else
 type FreeRegs = Word32
-#endif
+#  endif
 
 noFreeRegs :: FreeRegs
 noFreeRegs = 0
@@ -465,11 +630,14 @@ genRaInsn block_live new_instrs instr r_dying w_dying =
     -- (a) save any temporaries which will be clobbered by this instruction
     clobber_saves <- saveClobberedTemps real_written r_dying
 
-    {-
-    freeregs <- getFreeRegsR
+
+{-  freeregs <- getFreeRegsR
     assig <- getAssigR
-    pprTrace "raInsn" (docToSDoc (pprInstr instr) $$ ppr r_dying <+> ppr w_dying $$ ppr virt_read <+> ppr virt_written $$ text (show freeregs) $$ ppr assig) $ do
-    -}
+    pprTrace "raInsn" 
+    	(docToSDoc (pprInstr instr) $$ ppr r_dying <+> ppr w_dying $$ ppr virt_read <+> ppr virt_written 
+		$$ text (show freeregs) $$ ppr assig) 
+		$ do
+-}
 
     -- (b), (c) allocate real regs for all regs read by this instruction.
     (r_spills, r_allocd) <- 
@@ -592,7 +760,9 @@ clobberRegs :: [RegNo] -> RegM ()
 clobberRegs [] = return () -- common case
 clobberRegs clobbered = do
   freeregs <- getFreeRegsR
+--  setFreeRegsR $! foldr grabReg freeregs clobbered
   setFreeRegsR $! foldr allocateReg freeregs clobbered
+
   assig <- getAssigR
   setAssigR $! clobber assig (ufmToList assig)
  where
@@ -652,13 +822,14 @@ allocateRegsAndSpill reading keep spills alloc (r:rs) = do
         case getFreeRegs (regClass r) freeregs of
 
       	-- case (2): we have a free register
-      	  my_reg:_ -> do
+      	  freeClass@(my_reg:_) -> {- pprTrace "alloc" (ppr r <+> ppr my_reg <+> ppr freeClass) $ -}
+	    do
     	    spills'   <- loadTemp reading r loc my_reg spills
 	    let new_loc 
 		 | Just (InMem slot) <- loc, reading = InBoth my_reg slot
 		 | otherwise		             = InReg my_reg
 	    setAssigR (addToUFM assig r $! new_loc)
-	    setFreeRegsR (allocateReg my_reg freeregs)
+	    setFreeRegsR $ allocateReg my_reg freeregs
     	    allocateRegsAndSpill reading keep spills' (my_reg:alloc) rs
 
         -- case (3): we need to push something out to free up a register
@@ -701,7 +872,8 @@ allocateRegsAndSpill reading keep spills alloc (r:rs) = do
 
 	        let (temp_to_push_out, my_reg) 
 			= case candidates2 of
-				[]	-> panic "RegAllocLinear.allocRegsAndSpill: no spill candidates"
+				[]	-> panic $ "RegAllocLinear.allocRegsAndSpill: no spill candidates"
+					++ "assignment: " ++ show (ufmToList assig) ++ "\n"
 				(x:_)	-> x
 				
     	        (spill_insn, slot) <- spillR (RealReg my_reg) temp_to_push_out

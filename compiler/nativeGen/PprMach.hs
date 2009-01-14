@@ -42,7 +42,7 @@ import Unique		( pprUnique )
 import Pretty
 import FastString
 import qualified Outputable
-import Outputable	( Outputable )
+import Outputable	( Outputable, pprPanic, ppr, docToSDoc)
 
 import Data.Array.ST
 import Data.Word	( Word8 )
@@ -1886,25 +1886,25 @@ pprInstr (RELOAD slot reg)
 --    sub g1,g2,g1           -- to restore g1
 
 pprInstr (LD FF64 (AddrRegReg g1 g2) reg)
-  = vcat [
+ = let Just regH	= fPair reg
+   in vcat [
        hcat [ptext (sLit "\tadd\t"), pprReg g1,comma,pprReg g2,comma,pprReg g1],
        hcat [pp_ld_lbracket, pprReg g1, pp_rbracket_comma, pprReg reg],
-       hcat [pp_ld_lbracket, pprReg g1, ptext (sLit "+4]"), comma, pprReg (fPair reg)],
+       hcat [pp_ld_lbracket, pprReg g1, ptext (sLit "+4]"), comma, pprReg regH],
        hcat [ptext (sLit "\tsub\t"), pprReg g1,comma,pprReg g2,comma,pprReg g1]
     ]
 
 -- Translate to
 --    ld  [addr],%fn
 --    ld  [addr+4],%f(n+1)
-pprInstr (LD FF64 addr reg) | isJust off_addr
-  = vcat [
-       hcat [pp_ld_lbracket, pprAddr addr, pp_rbracket_comma, pprReg reg],
-       hcat [pp_ld_lbracket, pprAddr addr2, pp_rbracket_comma,pprReg (fPair reg)]
-    ]
-  where
-    off_addr = addrOffset addr 4
-    addr2 = case off_addr of Just x -> x
-
+pprInstr (LD FF64 addr reg)
+ = let	Just addr2	= addrOffset addr 4
+ 	Just regH	= fPair reg
+   in	vcat [
+	       hcat [pp_ld_lbracket, pprAddr addr, pp_rbracket_comma, pprReg reg],
+	       hcat [pp_ld_lbracket, pprAddr addr2, pp_rbracket_comma,pprReg regH]
+	    ]
+       
 
 pprInstr (LD size addr reg)
   = hcat [
@@ -1925,11 +1925,12 @@ pprInstr (LD size addr reg)
 --    st  %f(n+1),[g1+4]
 --    sub g1,g2,g1           -- to restore g1
 pprInstr (ST FF64 reg (AddrRegReg g1 g2))
- = vcat [
+ = let	Just regH	= fPair reg
+   in vcat [
        hcat [ptext (sLit "\tadd\t"), pprReg g1,comma,pprReg g2,comma,pprReg g1],
        hcat [ptext (sLit "\tst\t"), pprReg reg, pp_comma_lbracket, 
              pprReg g1,	rbrack],
-       hcat [ptext (sLit "\tst\t"), pprReg (fPair reg), pp_comma_lbracket,
+       hcat [ptext (sLit "\tst\t"), pprReg regH, pp_comma_lbracket,
              pprReg g1, ptext (sLit "+4]")],
        hcat [ptext (sLit "\tsub\t"), pprReg g1,comma,pprReg g2,comma,pprReg g1]
     ]
@@ -1937,16 +1938,17 @@ pprInstr (ST FF64 reg (AddrRegReg g1 g2))
 -- Translate to
 --    st  %fn,[addr]
 --    st  %f(n+1),[addr+4]
-pprInstr (ST FF64 reg addr) | isJust off_addr 
- = vcat [
-      hcat [ptext (sLit "\tst\t"), pprReg reg, pp_comma_lbracket, 
-            pprAddr addr, rbrack],
-      hcat [ptext (sLit "\tst\t"), pprReg (fPair reg), pp_comma_lbracket,
-            pprAddr addr2, rbrack]
-    ]
-  where
-    off_addr = addrOffset addr 4
-    addr2 = case off_addr of Just x -> x
+pprInstr instr@(ST FF64 reg addr)
+ = let	Just addr2	= addrOffset addr 4
+	Just regH	= fPair reg
+   in	vcat [
+	      hcat [ptext (sLit "\tst\t"), pprReg reg, pp_comma_lbracket, 
+	            pprAddr addr, rbrack],
+	      hcat [ptext (sLit "\tst\t"), pprReg regH, pp_comma_lbracket,
+	            pprAddr addr2, rbrack]
+	    ]
+    
+    
 
 -- no distinction is made between signed and unsigned bytes on stores for the
 -- Sparc opcodes (at least I cannot see any, and gas is nagging me --SOF),
@@ -1964,8 +1966,8 @@ pprInstr (ST size reg addr)
     ]
 
 pprInstr (ADD x cc reg1 ri reg2)
---  | not x && not cc && riZero ri
---  = hcat [ ptext (sLit "\tmov\t"), pprReg reg1, comma, pprReg reg2 ]
+  | not x && not cc && riZero ri
+  = hcat [ ptext (sLit "\tmov\t"), pprReg reg1, comma, pprReg reg2 ]
 
   | otherwise
   = pprRegRIReg (if x then sLit "addx" else sLit "add") cc reg1 ri reg2
@@ -1982,12 +1984,12 @@ pprInstr (AND  b reg1 ri reg2) = pprRegRIReg (sLit "and")  b reg1 ri reg2
 pprInstr (ANDN b reg1 ri reg2) = pprRegRIReg (sLit "andn") b reg1 ri reg2
 
 pprInstr (OR b reg1 ri reg2)
-{-  | not b && reg1 == g0
+  | not b && reg1 == g0
   = let doit = hcat [ ptext (sLit "\tmov\t"), pprRI ri, comma, pprReg reg2 ]
     in  case ri of
            RIReg rrr | rrr == reg2 -> empty
            other                   -> doit
--}
+
   | otherwise
   = pprRegRIReg (sLit "or") b reg1 ri reg2
 
@@ -2016,10 +2018,13 @@ pprInstr NOP = ptext (sLit "\tnop")
 
 pprInstr (FABS FF32 reg1 reg2) = pprSizeRegReg (sLit "fabs") FF32 reg1 reg2
 pprInstr (FABS FF64 reg1 reg2)
-  = (<>) (pprSizeRegReg (sLit "fabs") FF32 reg1 reg2)
+ = let	Just reg1H	= fPair reg1
+ 	Just reg2H	= fPair reg2
+   in
+    (<>) (pprSizeRegReg (sLit "fabs") FF32 reg1 reg2)
     (if (reg1 == reg2) then empty
      else (<>) (char '\n')
-    	  (pprSizeRegReg (sLit "fmov") FF32 (fPair reg1) (fPair reg2)))
+    	  (pprSizeRegReg (sLit "fmov") FF32 reg1H reg2H))
 
 pprInstr (FADD size reg1 reg2 reg3)
   = pprSizeRegRegReg (sLit "fadd") size reg1 reg2 reg3
@@ -2030,20 +2035,26 @@ pprInstr (FDIV size reg1 reg2 reg3)
 
 pprInstr (FMOV FF32 reg1 reg2) = pprSizeRegReg (sLit "fmov") FF32 reg1 reg2
 pprInstr (FMOV FF64 reg1 reg2)
-  = (<>) (pprSizeRegReg (sLit "fmov") FF32 reg1 reg2)
+ = let	Just reg1H	= fPair reg1
+ 	Just reg2H	= fPair reg2
+   in
+    (<>) (pprSizeRegReg (sLit "fmov") FF32 reg1 reg2)
     (if (reg1 == reg2) then empty
      else (<>) (char '\n')
-    	  (pprSizeRegReg (sLit "fmov") FF32 (fPair reg1) (fPair reg2)))
+    	  (pprSizeRegReg (sLit "fmov") FF32 reg1H reg2H))
 
 pprInstr (FMUL size reg1 reg2 reg3)
   = pprSizeRegRegReg (sLit "fmul") size reg1 reg2 reg3
 
 pprInstr (FNEG FF32 reg1 reg2) = pprSizeRegReg (sLit "fneg") FF32 reg1 reg2
 pprInstr (FNEG FF64 reg1 reg2)
-  = (<>) (pprSizeRegReg (sLit "fneg") FF32 reg1 reg2)
+ = let	Just reg1H	= fPair reg1
+ 	Just reg2H	= fPair reg2
+   in
+    (<>) (pprSizeRegReg (sLit "fneg") FF32 reg1 reg2)
     (if (reg1 == reg2) then empty
      else (<>) (char '\n')
-    	  (pprSizeRegReg (sLit "fmov") FF32 (fPair reg1) (fPair reg2)))
+    	  (pprSizeRegReg (sLit "fmov") FF32 reg1H reg2H))
 
 pprInstr (FSQRT size reg1 reg2)     = pprSizeRegReg (sLit "fsqrt") size reg1 reg2
 pprInstr (FSUB size reg1 reg2 reg3) = pprSizeRegRegReg (sLit "fsub") size reg1 reg2 reg3
@@ -2064,20 +2075,20 @@ pprInstr (FxTOy size1 size2 reg1 reg2)
     ]
 
 
-pprInstr (BI cond b lab)
+pprInstr (BI cond b (BlockId id))
   = hcat [
 	ptext (sLit "\tb"), pprCond cond,
 	if b then pp_comma_a else empty,
 	char '\t',
-	pprImm lab
+	pprCLabel_asm (mkAsmTempLabel id)
     ]
 
-pprInstr (BF cond b lab)
+pprInstr (BF cond b (BlockId id))
   = hcat [
 	ptext (sLit "\tfb"), pprCond cond,
 	if b then pp_comma_a else empty,
 	char '\t',
-	pprImm lab
+	pprCLabel_asm (mkAsmTempLabel id)
     ]
 
 pprInstr (JMP addr) = (<>) (ptext (sLit "\tjmp\t")) (pprAddr addr)

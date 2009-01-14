@@ -591,8 +591,8 @@ is_G_instr instr
     	      | FxTOy	      Size Size Reg Reg -- src, dst
 
 -- Jumping around.
-	      | BI	      Cond Bool Imm -- cond, annul?, target
-    	      | BF  	      Cond Bool Imm -- cond, annul?, target
+	      | BI	      Cond Bool BlockId -- cond, annul?, target
+    	      | BF  	      Cond Bool BlockId -- cond, annul?, target
 
 	      | JMP	      AddrMode     -- target
 	      | CALL	      (Either Imm Reg) Int Bool -- target, args, terminal
@@ -617,9 +617,17 @@ moveSp n
    = ADD False False sp (RIImm (ImmInt (n * wORD_SIZE))) sp
 
 -- Produce the second-half-of-a-double register given the first half.
-fPair :: Reg -> Reg
-fPair (RealReg n) | n >= 32 && n `mod` 2 == 0  = RealReg (n+1)
-fPair other = pprPanic "fPair(sparc NCG)" (ppr other)
+fPair :: Reg -> Maybe Reg
+fPair (RealReg n) 
+	| n >= 32 && n `mod` 2 == 0  = Just (RealReg (n+1))
+
+fPair (VirtualRegD u)
+	= Just (VirtualRegHi u)
+
+fPair other 
+	= trace ("MachInstrs.fPair: can't get high half of supposed double reg " ++ show other) 
+		Nothing
+		
 #endif /* sparc_TARGET_ARCH */
 
 

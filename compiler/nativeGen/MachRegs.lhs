@@ -75,7 +75,7 @@ module MachRegs (
 #endif
 #if sparc_TARGET_ARCH
 	fits13Bits, 
-	fpRel, gReg, iReg, lReg, oReg, largeOffsetError,
+	fpRel, gReg, iReg, lReg, oReg, fReg, largeOffsetError,
 	fp, sp, g0, g1, g2, o0, o1, f0, f6, f8, f26, f27,
 #endif
 #if powerpc_TARGET_ARCH
