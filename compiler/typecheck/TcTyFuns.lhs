@@ -69,21 +69,16 @@ tcUnfoldSynFamInst (TyConApp tycon tys)
   | not (isOpenSynTyCon tycon)     -- unfold *only* _synonym_ family instances
   = return Nothing
   | otherwise
-  = do { -- we only use the indexing arguments for matching, 
-         -- not the additional ones
-       ; maybeFamInst <- tcLookupFamInst tycon idxTys
+  = do { -- The TyCon might be over-saturated, but that's ok for tcLookupFamInst
+       ; maybeFamInst <- tcLookupFamInst tycon tys
        ; case maybeFamInst of
            Nothing                -> return Nothing
-           Just (rep_tc, rep_tys) -> return $ Just (mkTyConApp rep_tc tys',
-		                                    mkTyConApp coe_tc tys')
+           Just (rep_tc, rep_tys) -> return $ Just (mkTyConApp rep_tc rep_tys,
+		                                    mkTyConApp coe_tc rep_tys)
              where
-               tys'   = rep_tys ++ restTys
                coe_tc = expectJust "TcTyFuns.tcUnfoldSynFamInst" 
                                    (tyConFamilyCoercion_maybe rep_tc)
        }
-    where
-        n                = tyConArity tycon
-        (idxTys, restTys) = splitAt n tys
 tcUnfoldSynFamInst _other = return Nothing
 \end{code}
 

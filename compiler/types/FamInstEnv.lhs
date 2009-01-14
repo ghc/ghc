@@ -218,8 +218,25 @@ desugared to
 
 we return the matching instance '(FamInst{.., fi_tycon = :R42T}, Int)'.
 
+Note [Over-saturated matches]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+It's ok to look up an over-saturated type constructor.  E.g.
+     type family F a :: * -> *
+     type instance F (a,b) = Either (a->b)
+
+The type instance gives rise to a newtype TyCon (at a higher kind
+which you can't do in Haskell!):
+     newtype FPair a b = FP (Either (a->b))
+
+Then looking up (F (Int,Bool) Char) will return a FamInstMatch 
+     (FPair, [Int,Bool,Char])
+
+The "extra" type argument [Char] just stays on the end.
+
+
 \begin{code}
 type FamInstMatch = (FamInst, [Type])           -- Matching type instance
+  -- See Note [Over-saturated matches]
 
 lookupFamInstEnv :: FamInstEnvs
 	         -> TyCon -> [Type]		-- What we are looking for
@@ -228,12 +245,22 @@ lookupFamInstEnv (pkg_ie, home_ie) fam tys
   | not (isOpenTyCon fam) 
   = []
   | otherwise
-  = home_matches ++ pkg_matches
+  = ASSERT( n_tys >= arity )	-- Family type applications must be saturated
+    home_matches ++ pkg_matches
   where
     rough_tcs    = roughMatchTcs tys
     all_tvs      = all isNothing rough_tcs
     home_matches = lookup home_ie 
     pkg_matches  = lookup pkg_ie  
+
+    -- See Note [Over-saturated matches]
+    arity = tyConArity fam
+    n_tys = length tys
+    extra_tys = drop arity tys
+    (match_tys, add_extra_tys) 
+       | arity > n_tys = (take arity tys, \res_tys -> res_tys ++ extra_tys)
+       | otherwise     = (tys,            \res_tys -> res_tys)
+       	 -- The second case is the common one, hence functional representation
 
     --------------
     lookup env = case lookupUFM env fam of
@@ -255,8 +282,8 @@ lookupFamInstEnv (pkg_ie, home_ie) fam tys
       = find rest
 
         -- Proper check
-      | Just subst <- tcMatchTys tpl_tvs tpl_tys tys
-      = (item, substTyVars subst (tyConTyVars tycon)) : find rest
+      | Just subst <- tcMatchTys tpl_tvs tpl_tys match_tys
+      = (item, add_extra_tys $ substTyVars subst (tyConTyVars tycon)) : find rest
 
         -- No match => try next
       | otherwise
