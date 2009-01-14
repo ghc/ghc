@@ -69,7 +69,7 @@ scavengeTSO (StgTSO *tso)
         return;
     }
 
-    debugTrace(DEBUG_gc,"scavenging thread %d",tso->id);
+    debugTrace(DEBUG_gc,"scavenging thread %d",(int)tso->id);
 
     saved_eager = gct->eager_promotion;
     gct->eager_promotion = rtsFalse;
