@@ -65,16 +65,9 @@ mkExternalCore :: CgGuts -> C.Module
 -- implicit in the data type declaration itself
 mkExternalCore (CgGuts {cg_module=this_mod, cg_tycons = tycons, 
                         cg_binds = binds})
- -- Note that we flatten binds at the top level:
- -- every module is just a single recursive bag of declarations.
- -- Rationale: since modules can be mutually recursive, 
- -- there's not much reason to preserve dependency info within a module.
-  = C.Module mname tdefs (case flattenBinds binds of
-                          -- check for empty list so we don't create an
-                          -- empty Rec group
-                            [] -> []
-                            bs  -> [(runCoreM (make_vdef True
-                                      (Rec bs)) this_mod)])
+{- Note that modules can be mutually recursive, but even so, we
+   print out dependency information within each module. -}
+  = C.Module mname tdefs (runCoreM (mapM (make_vdef True) binds) this_mod)
   where
     mname  = make_mid this_mod
     tdefs  = foldr collect_tdefs [] tycons
