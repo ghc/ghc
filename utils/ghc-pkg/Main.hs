@@ -16,6 +16,7 @@
 module Main (main) where
 
 import Version ( version, targetOS, targetARCH )
+import Distribution.ModuleName hiding (main)
 import Distribution.InstalledPackageInfo hiding (depends)
 import Distribution.Compat.ReadP
 import Distribution.ParseUtils
@@ -223,7 +224,8 @@ substProg prog (c:xs) = c : substProg prog xs
 -- -----------------------------------------------------------------------------
 -- Do the business
 
-data Force = ForceAll | ForceFiles | NoForce
+data Force = NoForce | ForceFiles | ForceAll | CannotForce
+  deriving (Eq,Ord)
 
 data PackageArg = Id PackageIdentifier | Substring String (String->Bool)
 
@@ -635,13 +637,15 @@ listPackages my_flags mPackageName mModuleName = do
                    | otherwise = parens doc
                    where doc = text (display (package p))
 
-        show_simple db_stack = do
-          let showPkg = if FlagNamesOnly `elem` my_flags then display . pkgName
-                                                         else display
-              pkgs = map showPkg $ sortBy compPkgIdVer $
-                          map package (allPackagesInStack db_stack)
-          when (not (null pkgs)) $ 
-             hPutStrLn stdout $ concat $ intersperse " " pkgs
+        show_simple = simplePackageList my_flags . allPackagesInStack
+
+simplePackageList :: [Flag] -> [InstalledPackageInfo] -> IO ()
+simplePackageList my_flags pkgs = do
+   let showPkg = if FlagNamesOnly `elem` my_flags then display . pkgName
+                                                  else display
+       strs = map showPkg $ sortBy compPkgIdVer $ map package pkgs
+   when (not (null pkgs)) $
+      hPutStrLn stdout $ concat $ intersperse " " strs
 
 -- -----------------------------------------------------------------------------
 -- Prints the highest (hidden or exposed) version of a package
@@ -776,29 +780,50 @@ checkConsistency my_flags = do
   (db_stack, _) <- getPkgDatabases True my_flags
          -- check behaves like modify for the purposes of deciding which
          -- databases to use, because ordering is important.
+
+  let simple_output = FlagSimpleOutput `elem` my_flags
+
   let pkgs = allPackagesInStack db_stack
-      broken_pkgs = brokenPackages pkgs
-      broken_ids = map package broken_pkgs
-      broken_why = [ (package p, filter (`elem` broken_ids) (depends p))
-                   | p <- broken_pkgs ]
-  mapM_ (putStrLn . render . show_func) broken_why
-  where
-  show_func | FlagSimpleOutput `elem` my_flags = show_simple
-            | otherwise = show_normal
-  show_simple (pid,deps) =
-    text (display pid) <> colon
-      <+> fsep (punctuate comma (map (text . display) deps))
-  show_normal (pid,deps) =
-    text "package" <+> text (display pid) <+> text "has missing dependencies:"
-      $$ nest 4 (fsep (punctuate comma (map (text . display) deps)))
+
+      checkPackage p = do
+         (_,es) <- runValidate $ checkPackageConfig p db_stack False True
+         if null es
+            then return []
+            else do
+              when (not simple_output) $ do
+                  reportError ("There are problems in package " ++ display (package p) ++ ":")
+                  reportValidateErrors es "  " Nothing
+                  return ()
+              return [p]
+
+  broken_pkgs <- concat `fmap` mapM checkPackage pkgs
+
+  let filterOut pkgs1 pkgs2 = filter not_in pkgs2
+        where not_in p = package p `notElem` all_ps
+              all_ps = map package pkgs1
+
+  let not_broken_pkgs = filterOut broken_pkgs pkgs
+      (_, trans_broken_pkgs) = closure [] not_broken_pkgs
+      all_broken_pkgs = broken_pkgs ++ trans_broken_pkgs
+
+  when (not (null all_broken_pkgs)) $ do
+    if simple_output
+      then simplePackageList my_flags all_broken_pkgs
+      else do
+       reportError ("\nThe following packages are broken, either because they have a problem\n"++
+                "listed above, or because they depend on a broken package.")
+       mapM_ (hPutStrLn stderr . display . package) all_broken_pkgs
+
+  when (not (null all_broken_pkgs)) $ exitWith (ExitFailure 1)
 
 
-brokenPackages :: [InstalledPackageInfo] -> [InstalledPackageInfo]
-brokenPackages pkgs = go [] pkgs
+closure :: [InstalledPackageInfo] -> [InstalledPackageInfo]
+        -> ([InstalledPackageInfo], [InstalledPackageInfo])
+closure pkgs db_stack = go pkgs db_stack
  where
    go avail not_avail =
      case partition (depsAvailable avail) not_avail of
-        ([],        not_avail') -> not_avail'
+        ([],        not_avail') -> (avail, not_avail')
         (new_avail, not_avail') -> go (new_avail ++ avail) not_avail'
 
    depsAvailable :: [InstalledPackageInfo] -> InstalledPackageInfo
@@ -809,6 +834,9 @@ brokenPackages pkgs = go [] pkgs
 
         -- we want mutually recursive groups of package to show up
         -- as broken. (#1750)
+
+brokenPackages :: [InstalledPackageInfo] -> [InstalledPackageInfo]
+brokenPackages pkgs = snd (closure [] pkgs)
 
 -- -----------------------------------------------------------------------------
 -- Manipulating package.conf files
@@ -848,21 +876,70 @@ writeNewConfig filename packages = do
 -- Sanity-check a new package config, and automatically build GHCi libs
 -- if requested.
 
+type ValidateError = (Force,String)
+
+newtype Validate a = V { runValidate :: IO (a, [ValidateError]) }
+
+instance Monad Validate where
+   return a = V $ return (a, [])
+   m >>= k = V $ do
+      (a, es) <- runValidate m
+      (b, es') <- runValidate (k a)
+      return (b,es++es')
+
+verror :: Force -> String -> Validate ()
+verror f s = V (return ((),[(f,s)]))
+
+liftIO :: IO a -> Validate a
+liftIO k = V (k >>= \a -> return (a,[]))
+
+-- returns False if we should die
+reportValidateErrors :: [ValidateError] -> String -> Maybe Force -> IO Bool
+reportValidateErrors es prefix mb_force = do
+  oks <- mapM report es
+  return (and oks)
+  where
+    report (f,s)
+      | Just force <- mb_force
+      = if (force >= f)
+           then do reportError (prefix ++ s ++ " (ignoring)")
+                   return True
+           else if f < CannotForce
+                   then do reportError (prefix ++ s ++ " (use --force to override)")
+                           return False
+                   else do reportError err
+                           return False
+      | otherwise = do reportError err
+                       return False
+      where
+             err = prefix ++ s
+
 validatePackageConfig :: InstalledPackageInfo
                       -> PackageDBStack
                       -> Bool   -- auto-ghc-libs
-                      -> Bool   -- update
+                      -> Bool   -- update, or check
                       -> Force
                       -> IO ()
 validatePackageConfig pkg db_stack auto_ghci_libs update force = do
+  (_,es) <- runValidate $ checkPackageConfig pkg db_stack auto_ghci_libs update
+  ok <- reportValidateErrors es (display (package pkg) ++ ": ") (Just force)
+  when (not ok) $ exitWith (ExitFailure 1)
+
+checkPackageConfig :: InstalledPackageInfo
+                      -> PackageDBStack
+                      -> Bool   -- auto-ghc-libs
+                      -> Bool   -- update, or check
+                      -> Validate ()
+checkPackageConfig pkg db_stack auto_ghci_libs update = do
   checkPackageId pkg
-  checkDuplicates db_stack pkg update force
-  mapM_ (checkDep db_stack force) (depends pkg)
-  checkDuplicateDepends force (depends pkg)
-  mapM_ (checkDir force) (importDirs pkg)
-  mapM_ (checkDir force) (libraryDirs pkg)
-  mapM_ (checkDir force) (includeDirs pkg)
-  mapM_ (checkHSLib (libraryDirs pkg) auto_ghci_libs force) (hsLibraries pkg)
+  checkDuplicates db_stack pkg update
+  mapM_ (checkDep db_stack) (depends pkg)
+  checkDuplicateDepends (depends pkg)
+  mapM_ (checkDir "import-dirs") (importDirs pkg)
+  mapM_ (checkDir "library-dirs") (libraryDirs pkg)
+  mapM_ (checkDir "include-dirs") (includeDirs pkg)
+  checkModules pkg
+  mapM_ (checkHSLib (libraryDirs pkg) auto_ghci_libs) (hsLibraries pkg)
   -- ToDo: check these somehow?
   --    extra_libraries :: [String],
   --    c_includes      :: [String],
@@ -871,16 +948,16 @@ validatePackageConfig pkg db_stack auto_ghci_libs update force = do
 -- end up with a package id that cannot be parsed.  This will lead to
 -- difficulties when the user wants to refer to the package later, so
 -- we check that the package id can be parsed properly here.
-checkPackageId :: InstalledPackageInfo -> IO ()
+checkPackageId :: InstalledPackageInfo -> Validate ()
 checkPackageId ipi =
   let str = display (package ipi) in
   case [ x :: PackageIdentifier | (x,ys) <- readP_to_S parse str, all isSpace ys ] of
     [_] -> return ()
-    []  -> die ("invalid package identifier: " ++ str)
-    _   -> die ("ambiguous package identifier: " ++ str)
+    []  -> verror CannotForce ("invalid package identifier: " ++ str)
+    _   -> verror CannotForce ("ambiguous package identifier: " ++ str)
 
-checkDuplicates :: PackageDBStack -> InstalledPackageInfo -> Bool -> Force -> IO ()
-checkDuplicates db_stack pkg update force = do
+checkDuplicates :: PackageDBStack -> InstalledPackageInfo -> Bool -> Validate ()
+checkDuplicates db_stack pkg update = do
   let
         pkgid = package pkg
         (_top_db_name, pkgs) : _  = db_stack
@@ -888,33 +965,34 @@ checkDuplicates db_stack pkg update force = do
   -- Check whether this package id already exists in this DB
   --
   when (not update && (pkgid `elem` map package pkgs)) $
-       die ("package " ++ display pkgid ++ " is already installed")
+       verror CannotForce $
+          "package " ++ display pkgid ++ " is already installed"
 
   let
         uncasep = map toLower . display
         dups = filter ((== uncasep pkgid) . uncasep) (map package pkgs)
 
-  when (not update && not (null dups)) $ dieOrForceAll force $
+  when (not update && not (null dups)) $ verror ForceAll $
         "Package names may be treated case-insensitively in the future.\n"++
         "Package " ++ display pkgid ++
         " overlaps with: " ++ unwords (map display dups)
 
 
-checkDir :: Force -> String -> IO ()
-checkDir force d
+checkDir :: String -> String -> Validate ()
+checkDir thisfield d
  | "$topdir"     `isPrefixOf` d = return ()
  | "$httptopdir" `isPrefixOf` d = return ()
         -- can't check these, because we don't know what $(http)topdir is
  | otherwise = do
-   there <- doesDirectoryExist d
-   when (not there)
-       (dieOrForceFile force (d ++ " doesn't exist or isn't a directory"))
+   there <- liftIO $ doesDirectoryExist d
+   when (not there) $
+       verror ForceFiles (thisfield ++ ": " ++ d ++ " doesn't exist or isn't a directory")
 
-checkDep :: PackageDBStack -> Force -> PackageIdentifier -> IO ()
-checkDep db_stack force pkgid
+checkDep :: PackageDBStack -> PackageIdentifier -> Validate ()
+checkDep db_stack pkgid
   | pkgid `elem` pkgids || (not real_version && name_exists) = return ()
-  | otherwise = dieOrForceAll force ("dependency " ++ display pkgid
-                                        ++ " doesn't exist")
+  | otherwise = verror ForceAll ("dependency " ++ display pkgid
+                                 ++ " doesn't exist")
   where
         -- for backwards compat, we treat 0.0 as a special version,
         -- and don't check that it actually exists.
@@ -926,10 +1004,10 @@ checkDep db_stack force pkgid
         all_pkgs = allPackagesInStack db_stack
         pkgids = map package all_pkgs
 
-checkDuplicateDepends :: Force -> [PackageIdentifier] -> IO ()
-checkDuplicateDepends force deps
+checkDuplicateDepends :: [PackageIdentifier] -> Validate ()
+checkDuplicateDepends deps
   | null dups = return ()
-  | otherwise = dieOrForceAll force ("package has duplicate dependencies: " ++
+  | otherwise = verror ForceAll ("package has duplicate dependencies: " ++
                                      unwords (map display dups))
   where
        dups = [ p | (p:_:_) <- group (sort deps) ]
@@ -937,31 +1015,48 @@ checkDuplicateDepends force deps
 realVersion :: PackageIdentifier -> Bool
 realVersion pkgid = versionBranch (pkgVersion pkgid) /= []
 
-checkHSLib :: [String] -> Bool -> Force -> String -> IO ()
-checkHSLib dirs auto_ghci_libs force lib = do
+checkHSLib :: [String] -> Bool -> String -> Validate ()
+checkHSLib dirs auto_ghci_libs lib = do
   let batch_lib_file = "lib" ++ lib ++ ".a"
-  bs <- mapM (doesLibExistIn batch_lib_file) dirs
-  case [ dir | (exists,dir) <- zip bs dirs, exists ] of
-        [] -> dieOrForceFile force ("cannot find " ++ batch_lib_file ++
-                                    " on library path")
-        (dir:_) -> checkGHCiLib dirs dir batch_lib_file lib auto_ghci_libs
+  m <- liftIO $ doesFileExistOnPath batch_lib_file dirs
+  case m of
+    Nothing -> verror ForceFiles ("cannot find " ++ batch_lib_file ++
+                                   " on library path")
+    Just dir -> liftIO $ checkGHCiLib dirs dir batch_lib_file lib auto_ghci_libs
 
-doesLibExistIn :: String -> String -> IO Bool
-doesLibExistIn lib d
+doesFileExistOnPath :: String -> [FilePath] -> IO (Maybe FilePath)
+doesFileExistOnPath file path = go path
+  where go []     = return Nothing
+        go (p:ps) = do b <- doesFileExistIn file p
+                       if b then return (Just p) else go ps
+
+doesFileExistIn :: String -> String -> IO Bool
+doesFileExistIn lib d
  | "$topdir"     `isPrefixOf` d = return True
  | "$httptopdir" `isPrefixOf` d = return True
- | otherwise                = doesFileExist (d ++ '/':lib)
+ | otherwise                = doesFileExist (d </> lib)
+
+checkModules :: InstalledPackageInfo -> Validate ()
+checkModules pkg = do
+  mapM_ findModule (exposedModules pkg ++ hiddenModules pkg)
+  where
+    findModule modl = do
+      -- there's no .hi file for GHC.Prim
+      if modl == fromString "GHC.Prim" then return () else do
+      let file = toFilePath modl <.> "hi"
+      m <- liftIO $ doesFileExistOnPath file (importDirs pkg)
+      when (isNothing m) $
+         verror ForceFiles ("file " ++ file ++ " is missing")
 
 checkGHCiLib :: [String] -> String -> String -> String -> Bool -> IO ()
 checkGHCiLib dirs batch_lib_dir batch_lib_file lib auto_build
   | auto_build = autoBuildGHCiLib batch_lib_dir batch_lib_file ghci_lib_file
   | otherwise  = do
-      bs <- mapM (doesLibExistIn ghci_lib_file) dirs
-      case [dir | (exists,dir) <- zip bs dirs, exists] of
-        []    -> hPutStrLn stderr ("warning: can't find GHCi lib " ++ ghci_lib_file)
-        (_:_) -> return ()
-  where
-    ghci_lib_file = lib ++ ".o"
+      m <- doesFileExistOnPath ghci_lib_file dirs
+      when (isNothing m) $
+        hPutStrLn stderr ("warning: can't find GHCi lib " ++ ghci_lib_file)
+ where
+    ghci_lib_file = lib <.> "o"
 
 -- automatically build the GHCi version of a batch lib,
 -- using ld --whole-archive.
@@ -1066,13 +1161,11 @@ dieOrForceAll :: Force -> String -> IO ()
 dieOrForceAll ForceAll s = ignoreError s
 dieOrForceAll _other s   = dieForcible s
 
-dieOrForceFile :: Force -> String -> IO ()
-dieOrForceFile ForceAll   s = ignoreError s
-dieOrForceFile ForceFiles s = ignoreError s
-dieOrForceFile _other     s = dieForcible s
-
 ignoreError :: String -> IO ()
-ignoreError s = do hFlush stdout; hPutStrLn stderr (s ++ " (ignoring)")
+ignoreError s = reportError (s ++ " (ignoring)")
+
+reportError :: String -> IO ()
+reportError s = do hFlush stdout; hPutStrLn stderr s
 
 dieForcible :: String -> IO ()
 dieForcible s = die (s ++ " (use --force to override)")
