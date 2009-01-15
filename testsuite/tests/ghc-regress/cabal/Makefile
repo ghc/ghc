@@ -89,7 +89,7 @@ ghcpkg05 :
 	echo "[]" >$(PKGCONF05b)
 	$(LOCAL_GHC_PKG05a) register --force test2.pkg >/dev/null 2>&1 
 	$(LOCAL_GHC_PKG05b) register --force test3.pkg >/dev/null 2>&1 
-	$(LOCAL_GHC_PKG05b) check
+	$(LOCAL_GHC_PKG05b) check || true
 	$(LOCAL_GHC_PKG05b) list
 	$(LOCAL_GHC_PKG05b) expose testpkg-2.0
 	$(LOCAL_GHC_PKG05b) hide   testpkg-2.0
