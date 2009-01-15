@@ -1451,23 +1451,46 @@ getRegister (CmmMachOp mop [x]) -- unary MachOps
       MO_UU_Conv W32 to -> conversionNop (intSize to) x
       MO_SS_Conv W32 to -> conversionNop (intSize to) x
 
-      -- widenings
-      MO_UU_Conv W8 W32  -> integerExtend False W8 W32  x
-      MO_UU_Conv W16 W32 -> integerExtend False W16 W32 x
-      MO_UU_Conv W8 W16  -> integerExtend False W8 W16  x
-      MO_SS_Conv W16 W32 -> integerExtend True  W16 W32 x
+      MO_UU_Conv W8  to@W32  -> conversionNop (intSize to)  x
+      MO_UU_Conv W16 to@W32  -> conversionNop (intSize to)  x
+      MO_UU_Conv W8  to@W16  -> conversionNop (intSize to)  x
 
-      other_op -> panic "Unknown unary mach op"
+      -- sign extension
+      MO_SS_Conv W8  W32  -> integerExtend W8  W32 x
+      MO_SS_Conv W16 W32  -> integerExtend W16 W32 x
+      MO_SS_Conv W8  W16  -> integerExtend W8  W16 x
+
+      other_op -> panic ("Unknown unary mach op: " ++ show mop)
     where
-        -- XXX SLL/SRL?
-        integerExtend signed from to expr = do
-           (reg, e_code) <- getSomeReg expr
-	   let
-	       code dst =
-		   e_code `snocOL` 
-		   ((if signed then SRA else SRL)
-		          reg (RIImm (ImmInt 0)) dst)
-	   return (Any (intSize to) code)
+
+	-- | sign extend and widen
+	integerExtend 
+		:: Width 		-- ^ width of source expression
+		-> Width 		-- ^ width of result
+		-> CmmExpr 		-- ^ source expression
+		-> NatM Register	
+
+	integerExtend from to expr
+	 = do	-- load the expr into some register
+	 	(reg, e_code) 	<- getSomeReg expr
+		tmp		<- getNewRegNat II32
+		let bitCount
+			= case (from, to) of
+				(W8,  W32)	-> 24
+				(W16, W32)	-> 16
+				(W8,  W16)	-> 24
+	 	let code dst
+			= e_code 	
+
+			-- local shift word left to load the sign bit
+			`snocOL`  SLL reg (RIImm (ImmInt bitCount)) tmp
+			
+			-- arithmetic shift right to sign extend
+			`snocOL`  SRA tmp (RIImm (ImmInt bitCount)) dst
+			
+		return (Any (intSize to) code)
+				
+
         conversionNop new_rep expr
             = do e_code <- getRegister expr
                  return (swizzleRegisterRep e_code new_rep)
