@@ -570,14 +570,8 @@ cantFindErr cannot_find dflags mod_name find_result
 	    NotFound files mb_pkg
 		| null files
 		-> ptext (sLit "it is not a module in the current program, or in any known package.")
-		| Just pkg <- mb_pkg, pkg /= thisPackage dflags, build_tag /= ""
-		-> let 
-		     build = if build_tag == "p" then "profiling" 
-						 else "\"" ++ build_tag ++ "\""
-		   in
-		   ptext (sLit "Perhaps you haven't installed the ") <> text build <>
-		   ptext (sLit " libraries for package ") <> ppr pkg <> char '?' $$
-		   not_found files
+		| Just pkg <- mb_pkg, pkg /= thisPackage dflags
+		-> not_found_in_package pkg files
 
 		| otherwise
 		-> not_found files
@@ -588,6 +582,22 @@ cantFindErr cannot_find dflags mod_name find_result
 	    _ -> panic "cantFindErr"
 
     build_tag = buildTag dflags
+
+    not_found_in_package pkg files
+       | build_tag /= ""
+       = let
+            build = if build_tag == "p" then "profiling"
+                                        else "\"" ++ build_tag ++ "\""
+         in
+         ptext (sLit "Perhaps you haven't installed the ") <> text build <>
+         ptext (sLit " libraries for package ") <> ppr pkg <> char '?' $$
+         not_found files
+
+       | otherwise
+       = ptext (sLit "There are files missing in the ") <> ppr pkg <>
+         ptext (sLit " package,") $$
+         ptext (sLit "try running 'ghc-pkg check'.") $$
+         not_found files
 
     not_found files
 	| verbosity dflags < 3
