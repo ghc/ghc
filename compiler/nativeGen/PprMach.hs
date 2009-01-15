@@ -482,14 +482,14 @@ pprImm (ImmFloat _)  = ptext (sLit "naughty float immediate")
 pprImm (ImmDouble _) = ptext (sLit "naughty double immediate")
 
 pprImm (ImmConstantSum a b) = pprImm a <> char '+' <> pprImm b
-#if sparc_TARGET_ARCH
+-- #if sparc_TARGET_ARCH
 -- ToDo: This should really be fixed in the PIC support, but only
 -- print a for now.
-pprImm (ImmConstantDiff a b) = pprImm a 
-#else
+-- pprImm (ImmConstantDiff a b) = pprImm a 
+-- #else
 pprImm (ImmConstantDiff a b) = pprImm a <> char '-'
                             <> lparen <> pprImm b <> rparen
-#endif
+-- #endif
 
 #if sparc_TARGET_ARCH
 pprImm (LO i)
@@ -640,7 +640,7 @@ pprSectionHeader Data
 pprSectionHeader ReadOnlyData
     = ptext
 	 (IF_ARCH_alpha(sLit "\t.data\n\t.align 3"
-	,IF_ARCH_sparc(sLit ".data\n\t.align 8" {-<8 will break double constants -}
+	,IF_ARCH_sparc(sLit ".text\n\t.align 8" {-<8 will break double constants -}
 	,IF_ARCH_i386(IF_OS_darwin(sLit ".const\n.align 2",
                                    sLit ".section .rodata\n\t.align 4")
 	,IF_ARCH_x86_64(IF_OS_darwin(sLit ".const\n.align 3",
@@ -651,7 +651,7 @@ pprSectionHeader ReadOnlyData
 pprSectionHeader RelocatableReadOnlyData
     = ptext
 	 (IF_ARCH_alpha(sLit "\t.data\n\t.align 3"
-	,IF_ARCH_sparc(sLit ".data\n\t.align 8" {-<8 will break double constants -}
+	,IF_ARCH_sparc(sLit ".text\n\t.align 8" {-<8 will break double constants -}
 	,IF_ARCH_i386(IF_OS_darwin(sLit ".const_data\n.align 2",
                                    sLit ".section .data\n\t.align 4")
 	,IF_ARCH_x86_64(IF_OS_darwin(sLit ".const_data\n.align 3",
@@ -2034,6 +2034,9 @@ pprInstr (FDIV size reg1 reg2 reg3)
   = pprSizeRegRegReg (sLit "fdiv") size reg1 reg2 reg3
 
 pprInstr (FMOV FF32 reg1 reg2) = pprSizeRegReg (sLit "fmov") FF32 reg1 reg2
+pprInstr (FMOV FF64 reg1 reg2) = pprSizeRegReg (sLit "fmov") FF64 reg1 reg2
+
+{-
 pprInstr (FMOV FF64 reg1 reg2)
  = let	Just reg1H	= fPair reg1
  	Just reg2H	= fPair reg2
@@ -2042,6 +2045,7 @@ pprInstr (FMOV FF64 reg1 reg2)
     (if (reg1 == reg2) then empty
      else (<>) (char '\n')
     	  (pprSizeRegReg (sLit "fmov") FF32 reg1H reg2H))
+-}
 
 pprInstr (FMUL size reg1 reg2 reg3)
   = pprSizeRegRegReg (sLit "fmul") size reg1 reg2 reg3

@@ -31,6 +31,7 @@ import NCGMonad
 import PositionIndependentCode
 import RegAllocInfo 	( mkBranchInstr, mkRegRegMoveInstr )
 import MachRegs
+import PprMach
 
 -- Our intermediate code:
 import BlockId
@@ -57,6 +58,7 @@ import Data.Maybe	( fromJust )
 import Data.Bits
 import Data.Word
 import Data.Int
+
 
 -- -----------------------------------------------------------------------------
 -- Top-level of the instruction selector
@@ -2592,15 +2594,13 @@ assignMem_FltCode pk addr src = do
     return code__2
 
 -- Floating point assignment to a register/temporary
--- ToDo: Verify correctness
-assignReg_FltCode pk reg src = do
-    r <- getRegister src
-    v1 <- getNewRegNat pk
-    return $ case r of
-        Any _ code         -> code dst
-	Fixed _ freg fcode -> fcode `snocOL` FMOV pk freg v1
-    where
-      dst = getRegisterReg reg
+assignReg_FltCode pk dstCmmReg srcCmmExpr = do
+    srcRegister <- getRegister srcCmmExpr
+    let dstReg	= getRegisterReg dstCmmReg
+
+    return $ case srcRegister of
+        Any _ code         	    -> code dstReg
+	Fixed _ srcFixedReg srcCode -> srcCode `snocOL` FMOV pk srcFixedReg dstReg
 
 #endif /* sparc_TARGET_ARCH */
 
