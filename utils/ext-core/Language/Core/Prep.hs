@@ -224,8 +224,6 @@ newtypeCoercion_maybe ntEnv t | Just ((_,tc),_) <- splitTyConApp_maybe t =
   M.lookup tc ntEnv
 newtypeCoercion_maybe _ _ = Nothing
 
-type NtEnv  = M.Map Tcon CoercionKind
-
 mkTapp :: Ty -> [Ty] -> Ty
 mkTapp = foldl Tapp
 

@@ -5,7 +5,7 @@ module Language.Core.Check(
   primCoercionError, 
   Menv, Venv, Tvenv, Envs(..),
   CheckRes(..), splitTy, substl,
-  mkTypeEnvsNoChecking) where
+  mkTypeEnvsNoChecking, NtEnv, mkNtEnv) where
 
 --import Debug.Trace
 
@@ -18,6 +18,7 @@ import Language.Core.Environments
 
 import Control.Monad.Reader
 import Data.List
+import qualified Data.Map as M
 import Data.Maybe
 
 {- Checking is done in a simple error monad.  In addition to
@@ -632,3 +633,17 @@ primCoercionError s = error $ "Bad coercion application: " ++ show s
 reportError :: Show a => a -> String -> b
 reportError e s = error $ ("Core type error: checkExpr failed with "
                    ++ s ++ " and " ++ show e)
+
+type NtEnv  = M.Map Tcon CoercionKind
+
+mkNtEnv :: Menv -> NtEnv
+mkNtEnv menv = 
+  foldl M.union M.empty $
+        map (\ (_,e) ->
+                 foldr (\ (_,thing) rest ->
+                            case thing of
+                              Kind _ -> rest
+                              Coercion d@(DefinedCoercion _ (lhs,_)) -> 
+                                  case splitTyConApp_maybe lhs of
+                                    Just ((_,tc1),_) -> M.insert tc1 d rest
+                                    _ -> rest) M.empty (etolist (tcenv_ e))) (etolist menv)
