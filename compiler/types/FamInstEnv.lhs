@@ -14,7 +14,7 @@ module FamInstEnv (
 	extendFamInstEnv, extendFamInstEnvList, 
 	famInstEnvElts, familyInstances,
 
-	lookupFamInstEnv, lookupFamInstEnvUnify,
+	lookupFamInstEnv, lookupFamInstEnvConflicts,
 	
 	-- Normalisation
 	topNormaliseType
@@ -218,38 +218,97 @@ desugared to
 
 we return the matching instance '(FamInst{.., fi_tycon = :R42T}, Int)'.
 
-Note [Over-saturated matches]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-It's ok to look up an over-saturated type constructor.  E.g.
-     type family F a :: * -> *
-     type instance F (a,b) = Either (a->b)
-
-The type instance gives rise to a newtype TyCon (at a higher kind
-which you can't do in Haskell!):
-     newtype FPair a b = FP (Either (a->b))
-
-Then looking up (F (Int,Bool) Char) will return a FamInstMatch 
-     (FPair, [Int,Bool,Char])
-
-The "extra" type argument [Char] just stays on the end.
-
-
 \begin{code}
 type FamInstMatch = (FamInst, [Type])           -- Matching type instance
   -- See Note [Over-saturated matches]
 
-lookupFamInstEnv :: FamInstEnvs
-	         -> TyCon -> [Type]		-- What we are looking for
-	         -> [FamInstMatch] 	        -- Successful matches
-lookupFamInstEnv (pkg_ie, home_ie) fam tys
+lookupFamInstEnv
+    :: FamInstEnvs
+    -> TyCon -> [Type]		-- What we are looking for
+    -> [FamInstMatch] 	        -- Successful matches
+
+lookupFamInstEnv
+   = lookup_fam_inst_env match
+   where
+     match _ tpl_tvs tpl_tys tys = tcMatchTys tpl_tvs tpl_tys tys
+
+lookupFamInstEnvConflicts
+    :: FamInstEnvs
+    -> FamInst		-- Putative new instance
+    -> [TyVar]		-- Unique tyvars, matching arity of FamInst
+    -> [FamInstMatch] 	-- Conflicting matches
+-- E.g. when we are about to add
+--    f : type instance F [a] = a->a
+-- we do (lookupFamInstConflicts f [b])
+-- to find conflicting matches
+-- The skolem tyvars are needed because we don't have a 
+-- unique supply to hand
+
+lookupFamInstEnvConflicts envs fam_inst skol_tvs
+  = lookup_fam_inst_env my_unify envs fam tys'
+  where
+    inst_tycon = famInstTyCon fam_inst
+    (fam, tys) = expectJust "FamInstEnv.lookuFamInstEnvConflicts"
+    	       	            (tyConFamInst_maybe inst_tycon)
+    skol_tys = mkTyVarTys skol_tvs
+    tys'     = substTys (zipTopTvSubst (tyConTyVars inst_tycon) skol_tys) tys
+        -- In example above,   fam tys' = F [b]   
+
+    my_unify old_fam_inst tpl_tvs tpl_tys match_tys
+       = ASSERT2( tyVarsOfTypes tys `disjointVarSet` tpl_tvs,
+		  (ppr fam <+> ppr tys) $$
+		  (ppr tpl_tvs <+> ppr tpl_tys) )
+		-- Unification will break badly if the variables overlap
+		-- They shouldn't because we allocate separate uniques for them
+         case tcUnifyTys instanceBindFun tpl_tys match_tys of
+	      Just subst | conflicting old_fam_inst subst -> Just subst
+	      _other	   	              	          -> Nothing
+
+      -- - In the case of data family instances, any overlap is fundamentally a
+      --   conflict (as these instances imply injective type mappings).
+      -- - In the case of type family instances, overlap is admitted as long as
+      --   the right-hand sides of the overlapping rules coincide under the
+      --   overlap substitution.  We require that they are syntactically equal;
+      --   anything else would be difficult to test for at this stage.
+    conflicting old_fam_inst subst 
+      | isAlgTyCon fam = True
+      | otherwise      = not (old_rhs `tcEqType` new_rhs)
+      where
+        old_tycon = famInstTyCon old_fam_inst
+        old_rhs   = mkTyConApp old_tycon (substTyVars subst (tyConTyVars old_tycon))
+        new_rhs   = mkTyConApp inst_tycon (substTyVars subst skol_tvs)
+\end{code}
+
+While @lookupFamInstEnv@ uses a one-way match, the next function
+@lookupFamInstEnvUnify@ uses two-way matching (ie, unification).  This is
+needed to check for overlapping instances.
+
+For class instances, these two variants of lookup are combined into one
+function (cf, @InstEnv@).  We don't do that for family instances as the
+results of matching and unification are used in two different contexts.
+Moreover, matching is the wildly more frequently used operation in the case of
+indexed synonyms and we don't want to slow that down by needless unification.
+
+\begin{code}
+------------------------------------------------------------
+-- Might be a one-way match or a unifier
+type MatchFun =  FamInst		-- The FamInst template
+     	      -> TyVarSet -> [Type]	--   fi_tvs, fi_tys of that FamInst
+	      -> [Type]			-- Target to match against
+	      -> Maybe TvSubst
+
+lookup_fam_inst_env 	      -- The worker, local to this module
+    :: MatchFun
+    -> FamInstEnvs
+    -> TyCon -> [Type]		-- What we are looking for
+    -> [FamInstMatch] 	        -- Successful matches
+lookup_fam_inst_env match_fun (pkg_ie, home_ie) fam tys
   | not (isOpenTyCon fam) 
   = []
   | otherwise
   = ASSERT( n_tys >= arity )	-- Family type applications must be saturated
     home_matches ++ pkg_matches
   where
-    rough_tcs    = roughMatchTcs tys
-    all_tvs      = all isNothing rough_tcs
     home_matches = lookup home_ie 
     pkg_matches  = lookup pkg_ie  
 
@@ -261,6 +320,10 @@ lookupFamInstEnv (pkg_ie, home_ie) fam tys
        | arity > n_tys = (take arity tys, \res_tys -> res_tys ++ extra_tys)
        | otherwise     = (tys,            \res_tys -> res_tys)
        	 -- The second case is the common one, hence functional representation
+
+    --------------
+    rough_tcs = roughMatchTcs match_tys
+    all_tvs   = all isNothing rough_tcs
 
     --------------
     lookup env = case lookupUFM env fam of
@@ -282,7 +345,7 @@ lookupFamInstEnv (pkg_ie, home_ie) fam tys
       = find rest
 
         -- Proper check
-      | Just subst <- tcMatchTys tpl_tvs tpl_tys match_tys
+      | Just subst <- match_fun item tpl_tvs tpl_tys match_tys
       = (item, add_extra_tys $ substTyVars subst (tyConTyVars tycon)) : find rest
 
         -- No match => try next
@@ -290,62 +353,23 @@ lookupFamInstEnv (pkg_ie, home_ie) fam tys
       = find rest
 \end{code}
 
-While @lookupFamInstEnv@ uses a one-way match, the next function
-@lookupFamInstEnvUnify@ uses two-way matching (ie, unification).  This is
-needed to check for overlapping instances.
+Note [Over-saturated matches]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+It's ok to look up an over-saturated type constructor.  E.g.
+     type family F a :: * -> *
+     type instance F (a,b) = Either (a->b)
 
-For class instances, these two variants of lookup are combined into one
-function (cf, @InstEnv@).  We don't do that for family instances as the
-results of matching and unification are used in two different contexts.
-Moreover, matching is the wildly more frequently used operation in the case of
-indexed synonyms and we don't want to slow that down by needless unification.
+The type instance gives rise to a newtype TyCon (at a higher kind
+which you can't do in Haskell!):
+     newtype FPair a b = FP (Either (a->b))
 
-\begin{code}
-lookupFamInstEnvUnify :: (FamInstEnv, FamInstEnv) -> TyCon -> [Type]
-	              -> [(FamInstMatch, TvSubst)]
-lookupFamInstEnvUnify (pkg_ie, home_ie) fam tys
-  | not (isOpenTyCon fam) 
-  = []
-  | otherwise
-  = home_matches ++ pkg_matches
-  where
-    rough_tcs    = roughMatchTcs tys
-    all_tvs      = all isNothing rough_tcs
-    home_matches = lookup home_ie 
-    pkg_matches  = lookup pkg_ie  
+Then looking up (F (Int,Bool) Char) will return a FamInstMatch 
+     (FPair, [Int,Bool,Char])
 
-    --------------
-    lookup env = case lookupUFM env fam of
-		   Nothing -> []	-- No instances for this class
-		   Just (FamIE insts has_tv_insts)
-		       -- Short cut for common case:
-		       --   The thing we are looking up is of form (C a
-		       --   b c), and the FamIE has no instances of
-		       --   that form, so don't bother to search 
-		     | all_tvs && not has_tv_insts -> []
-		     | otherwise                   -> find insts
+The "extra" type argument [Char] just stays on the end.
 
-    --------------
-    find [] = []
-    find (item@(FamInst { fi_tcs = mb_tcs, fi_tvs = tpl_tvs, 
-			  fi_tys = tpl_tys, fi_tycon = tycon }) : rest)
-	-- Fast check for no match, uses the "rough match" fields
-      | instanceCantMatch rough_tcs mb_tcs
-      = find rest
 
-      | otherwise
-      = ASSERT2( tyVarsOfTypes tys `disjointVarSet` tpl_tvs,
-		 (ppr fam <+> ppr tys <+> ppr all_tvs) $$
-		 (ppr tycon <+> ppr tpl_tvs <+> ppr tpl_tys)
-		)
-		-- Unification will break badly if the variables overlap
-		-- They shouldn't because we allocate separate uniques for them
-        case tcUnifyTys instanceBindFun tpl_tys tys of
-	    Just subst -> let rep_tys = substTyVars subst (tyConTyVars tycon)
-                          in
-                          ((item, rep_tys), subst) : find rest
-	    Nothing    -> find rest
-\end{code}
+
 
 %************************************************************************
 %*									*
