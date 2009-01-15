@@ -9,13 +9,8 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- The Monoid class with various general-purpose instances.
---
---    Inspired by the paper
---    /Functional Programming with Overloading and
---        Higher-Order Polymorphism/,
---      Mark P Jones (<http://citeseer.ist.psu.edu/jones95functional.html>)
---        Advanced School of Functional Programming, 1995.
+-- A class for monoids (types with an associative binary operation that
+-- has an identity) with various general-purpose instances.
 -----------------------------------------------------------------------------
 
 module Data.Monoid (
@@ -44,9 +39,16 @@ import Test.QuickCheck
 -- -}
 
 -- ---------------------------------------------------------------------------
--- | The monoid class.
--- A minimal complete definition must supply 'mempty' and 'mappend',
--- and these should satisfy the monoid laws.
+-- | The class of monoids (types with an associative binary operation that
+-- has an identity).  The method names refer to the monoid of lists,
+-- but there are many other instances.
+--
+-- Minimal complete definition: 'mempty' and 'mappend'.
+--
+-- Some types can be viewed as a monoid in more than one way,
+-- e.g. both addition and multiplication on numbers.
+-- In such cases we often define @newtype@s and make those instances
+-- of 'Monoid', e.g. 'Sum' and 'Product'.
 
 class Monoid a where
         mempty  :: a
