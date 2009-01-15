@@ -395,8 +395,8 @@ pprSize x = ptext (case x of
 	FF64  -> sLit "sd"	-- "scalar double-precision float" (SSE2)
 #endif
 #if sparc_TARGET_ARCH
-	II8   -> sLit "sb"
-        II16  -> sLit "sh"
+	II8   -> sLit "ub"
+        II16  -> sLit "uh"
 	II32  -> sLit ""
 	II64  -> sLit "d"
 	FF32  -> sLit ""
