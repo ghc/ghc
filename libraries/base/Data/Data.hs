@@ -76,7 +76,9 @@ module Data.Data (
         -- ** Constructors
         mkConstr,       -- :: DataType -> String -> Fixity -> Constr
         mkIntConstr,    -- :: DataType -> Integer -> Constr
-        mkFloatConstr,  -- :: DataType -> Double  -> Constr
+        mkFloatConstr,  -- :: DataType -> Double -> Constr
+        mkIntegralConstr,-- :: (Integral a) => DataType -> a -> Constr
+        mkRealConstr,   -- :: (Real a) => DataType -> a -> Constr
         mkStringConstr, -- :: DataType -> String  -> Constr
         mkCharConstr,   -- :: DataType -> Char -> Constr
         -- ** Observers
@@ -515,7 +517,7 @@ data DataRep = AlgRep [Constr]
 {-# DEPRECATED StringConstr "Use CharConstr instead" #-}
 data ConstrRep = AlgConstr    ConIndex
                | IntConstr    Integer
-               | FloatConstr  Double
+               | FloatConstr  Rational
                | StringConstr String -- ^ Deprecated. Please use 'CharConstr' instead.
                | CharConstr   Char
 
@@ -568,7 +570,7 @@ repConstr dt cr =
       case (dataTypeRep dt, cr) of
         (AlgRep cs, AlgConstr i)      -> cs !! (i-1)
         (IntRep,    IntConstr i)      -> mkIntConstr dt i
-        (FloatRep,  FloatConstr f)    -> mkFloatConstr dt f
+        (FloatRep,  FloatConstr f)    -> mkRealConstr dt f
         (StringRep, StringConstr str) -> mkStringConstr dt str
         (CharRep,   CharConstr c)     -> mkCharConstr dt c
         _ -> error "repConstr"
@@ -744,17 +746,25 @@ mkPrimCon dt str cr = Constr
                         , confixity = error "constrFixity"
                         }
 
-
+-- | This function is now deprecated. Please use 'mkIntegralConstr' instead.
+{-# DEPRECATED mkIntConstr "Use mkIntegralConstr instead" #-}
 mkIntConstr :: DataType -> Integer -> Constr
-mkIntConstr dt i = case datarep dt of
-                  IntRep -> mkPrimCon dt (show i) (IntConstr i)
-                  _ -> error "mkIntConstr"
+mkIntConstr = mkIntegralConstr
 
+mkIntegralConstr :: (Integral a) => DataType -> a -> Constr
+mkIntegralConstr dt i = case datarep dt of
+                  IntRep -> mkPrimCon dt (show i) (IntConstr (toInteger  i))
+                  _ -> error "mkIntegralConstr"
 
+-- | This function is now deprecated. Please use 'mkRealConstr' instead.
+{-# DEPRECATED mkFloatConstr "Use mkRealConstr instead" #-}
 mkFloatConstr :: DataType -> Double -> Constr
-mkFloatConstr dt f = case datarep dt of
-                    FloatRep -> mkPrimCon dt (show f) (FloatConstr f)
-                    _ -> error "mkFloatConstr"
+mkFloatConstr dt = mkRealConstr dt . toRational
+
+mkRealConstr :: (Real a) => DataType -> a -> Constr
+mkRealConstr dt f = case datarep dt of
+                    FloatRep -> mkPrimCon dt (show f) (FloatConstr (toRational f))
+                    _ -> error "mkRealConstr"
 
 -- | This function is now deprecated. Please use 'mkCharConstr' instead.
 {-# DEPRECATED mkStringConstr "Use mkCharConstr instead" #-}
@@ -875,7 +885,7 @@ floatType :: DataType
 floatType = mkFloatType "Prelude.Float"
 
 instance Data Float where
-  toConstr x = mkFloatConstr floatType (realToFrac x)
+  toConstr = mkRealConstr floatType
   gunfold _ z c = case constrRep c of
                     (FloatConstr x) -> z (realToFrac x)
                     _ -> error "gunfold"
@@ -888,9 +898,9 @@ doubleType :: DataType
 doubleType = mkFloatType "Prelude.Double"
 
 instance Data Double where
-  toConstr = mkFloatConstr floatType
+  toConstr = mkRealConstr doubleType
   gunfold _ z c = case constrRep c of
-                    (FloatConstr x) -> z x
+                    (FloatConstr x) -> z (realToFrac x)
                     _ -> error "gunfold"
   dataTypeOf _ = doubleType
 
