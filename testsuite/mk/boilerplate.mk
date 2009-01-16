@@ -11,6 +11,17 @@ endif
 show:
 	@echo '$(VALUE)="$($(VALUE))"'
 
+define canonicalise
+# $1 = program path variable
+ifneq "$$(wildcard $$($1).exe)" ""
+$1 := $$($1).exe
+endif
+$1_CYGPATH := $$(shell cygpath -m $$($1) 2> /dev/null)
+ifneq "$$($1_CYGPATH)" ""
+$1 := $$($1_CYGPATH)
+endif
+endef
+
 define get-ghc-rts-field # $1 = rseult variable, $2 = field name
 $1 := $$(shell $$(TEST_HC) +RTS --info | grep '^ .("$2",' | sed -e 's/.*", *"//' -e 's/")$$$$//')
 endef
@@ -85,15 +96,18 @@ ifeq "$(HP2PS_ABS)" ""
 HP2PS_ABS := $(dir $(TEST_HC))/hp2ps
 endif
 
-ifeq "$(wildcard $(TEST_HC) $(TEST_HC).exe)" ""
+$(eval $(call canonicalise,TEST_HC))
+ifeq "$(wildcard $(TEST_HC))" ""
 $(error Cannot find ghc: $(TEST_HC))
 endif
 
-ifeq "$(wildcard $(GHC_PKG) $(GHC_PKG).exe)" ""
+$(eval $(call canonicalise,GHC_PKG))
+ifeq "$(wildcard $(GHC_PKG))" ""
 $(error Cannot find ghc-pkg: $(GHC_PKG))
 endif
 
-ifeq "$(wildcard $(HP2PS_ABS) $(HP2PS_ABS).exe)" ""
+$(eval $(call canonicalise,HP2PS_ABS))
+ifeq "$(wildcard $(HP2PS_ABS))" ""
 $(error Cannot find hp2ps: $(HP2PS_ABS))
 endif
 
