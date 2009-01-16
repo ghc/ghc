@@ -12,14 +12,19 @@ show:
 	@echo '$(VALUE)="$($(VALUE))"'
 
 define canonicalise
-# $1 = program path variable
-ifneq "$$(wildcard $$($1).exe)" ""
-$1 := $$($1).exe
-endif
+# $1 = path variable
 $1_CYGPATH := $$(shell cygpath -m $$($1) 2> /dev/null)
 ifneq "$$($1_CYGPATH)" ""
 $1 := $$($1_CYGPATH)
 endif
+endef
+
+define canonicaliseExecutable
+# $1 = program path variable
+ifneq "$$(wildcard $$($1).exe)" ""
+$1 := $$($1).exe
+endif
+$(call canonicalise,$1)
 endef
 
 define get-ghc-rts-field # $1 = rseult variable, $2 = field name
@@ -96,17 +101,17 @@ ifeq "$(HP2PS_ABS)" ""
 HP2PS_ABS := $(dir $(TEST_HC))/hp2ps
 endif
 
-$(eval $(call canonicalise,TEST_HC))
+$(eval $(call canonicaliseExecutable,TEST_HC))
 ifeq "$(wildcard $(TEST_HC))" ""
 $(error Cannot find ghc: $(TEST_HC))
 endif
 
-$(eval $(call canonicalise,GHC_PKG))
+$(eval $(call canonicaliseExecutable,GHC_PKG))
 ifeq "$(wildcard $(GHC_PKG))" ""
 $(error Cannot find ghc-pkg: $(GHC_PKG))
 endif
 
-$(eval $(call canonicalise,HP2PS_ABS))
+$(eval $(call canonicaliseExecutable,HP2PS_ABS))
 ifeq "$(wildcard $(HP2PS_ABS))" ""
 $(error Cannot find hp2ps: $(HP2PS_ABS))
 endif

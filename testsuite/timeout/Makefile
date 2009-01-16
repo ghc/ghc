@@ -12,6 +12,9 @@ include $(TOP)/mk/boilerplate.mk
 
 TIMEOUT_PROGRAM = install-inplace/bin/timeout$(exeext)
 
+PREFIX := $(abspath install-inplace)
+$(eval $(call canonicalise,PREFIX))
+
 ifeq "$(filter thr, $(GhcRTSWays))" ""
 $(TIMEOUT_PROGRAM): timeout.py
 	rm -rf install-inplace
@@ -24,7 +27,7 @@ $(TIMEOUT_PROGRAM): timeout.hs
 	rm -rf install-inplace
 	$(TEST_HC) --make Setup
 	./Setup configure --with-compiler=$(TEST_HC) --with-hc-pkg=$(GHC_PKG) \
-	                  --ghc-option=-threaded --prefix=$(abspath install-inplace)
+	                  --ghc-option=-threaded --prefix=$(PREFIX)
 	./Setup build
 	./Setup install
 endif
