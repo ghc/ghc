@@ -88,6 +88,10 @@ else
 # use stage2 by default
 TEST_HC := $(NEW_BUILD_SYSTEM_STAGE2_GHC)
 endif
+# XXX This GCC definition is a hack. Once the in-tree GHC has a gcc in the
+# right place we won't need to do this, as Cabal will be able to find
+# gcc relative to ghc's location.
+GCC := $(shell cd $(TOP)/.. && $(MAKE) --no-print-directory -s show VALUE=WhatGccIsCalled 2> /dev/null | sed 's/.*"\(.*\)"/\1/')
 endif
 
 else
