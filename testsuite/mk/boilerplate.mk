@@ -68,6 +68,10 @@ endif
 endif
 GHC_PKG := $(OLD_BUILD_SYSTEM_GHC_PKG)
 HP2PS_ABS := $(OLD_BUILD_SYSTEM_HP2PS)
+# XXX This GCC definition is a hack. Once the in-tree GHC has a gcc in the
+# right place we won't need to do this, as Cabal will be able to find
+# gcc relative to ghc's location.
+GCC := $(shell cd $(TOP)/.. && $(MAKE) --no-print-directory show VALUE=WhatGccIsCalled | sed 's/.*"\(.*\)"/\1/')
 
 else
 NEW_BUILD_SYSTEM_STAGE1_GHC := $(abspath $(TOP)/../inplace/bin/ghc-stage1)
