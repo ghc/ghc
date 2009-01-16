@@ -128,9 +128,8 @@ import Data.Either
 import Data.Maybe
 
 #ifdef __NHC__
-import qualified System.IO.Error as H'98 (catch)
-import System.IO.Error (ioError)
-import IO              (bracket)
+import qualified IO as H'98 (catch)
+import IO              (bracket,ioError)
 import DIOError         -- defn of IOError type
 import System          (ExitCode())
 import System.IO.Unsafe (unsafePerformIO)
