@@ -204,8 +204,6 @@ noFreeRegs = FreeRegs 0 0 0
 --	Don't treat the top half of reg pairs we're using as doubles as being free.
 initFreeRegs :: FreeRegs
 initFreeRegs 
--- = 	trace (show allocable ++ "\n" ++ show freeDouble) 
--- $ 	regs
  = 	regs
  where	
 	freeDouble	= getFreeRegs RcDouble regs
