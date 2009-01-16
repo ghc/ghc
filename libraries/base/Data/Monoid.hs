@@ -40,7 +40,17 @@ import Test.QuickCheck
 
 -- ---------------------------------------------------------------------------
 -- | The class of monoids (types with an associative binary operation that
--- has an identity).  The method names refer to the monoid of lists,
+-- has an identity).  Instances should satisfy the following laws:
+--
+--  * @mempty `mappend` x = x@
+--
+--  * @x `mappend` mempty = x@
+--
+--  * @x `mappend` (y `mappend` z) = (x `mappend` y) `mappend` z@
+--
+--  * @mconcat = 'foldr' mappend mempty@
+--
+-- The method names refer to the monoid of lists under concatenation,
 -- but there are many other instances.
 --
 -- Minimal complete definition: 'mempty' and 'mappend'.
