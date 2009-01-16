@@ -19,11 +19,14 @@ clean:
 # ghc-pkg (via Cabal) to use one in ., and the global one at least
 # won't affect the installed GHC and is more likely to work
 
+PREFIX := $(abspath install)
+$(eval $(call canonicalise,PREFIX))
+
 cabal01:
 	$(MAKE) clean
 	$(TEST_HC) --make -o setup Setup.lhs -v0
 
-	./setup configure -v0 --prefix=$(abspath install) --with-compiler=$(TEST_HC) --with-hc-pkg=$(GHC_PKG) $(PROF)
+	./setup configure -v0 --prefix=$(PREFIX) --with-compiler=$(TEST_HC) --with-hc-pkg=$(GHC_PKG) $(PROF)
 	./setup build -v0
 	./setup copy -v0
 	echo install1:
