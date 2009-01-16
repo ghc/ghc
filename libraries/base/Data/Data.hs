@@ -501,11 +501,9 @@ instance Eq Constr where
 
 
 -- | Public representation of datatypes
-{-# DEPRECATED StringRep "Use CharRep instead" #-}
 data DataRep = AlgRep [Constr]
              | IntRep
              | FloatRep
-             | StringRep -- ^ Deprecated. Please use 'CharRep' instead.
              | CharRep
              | NoRep
 
@@ -514,11 +512,9 @@ data DataRep = AlgRep [Constr]
 
 
 -- | Public representation of constructors
-{-# DEPRECATED StringConstr "Use CharConstr instead" #-}
 data ConstrRep = AlgConstr    ConIndex
                | IntConstr    Integer
                | FloatConstr  Rational
-               | StringConstr String -- ^ Deprecated. Please use 'CharConstr' instead.
                | CharConstr   Char
 
                deriving (Eq,Show)
@@ -571,7 +567,6 @@ repConstr dt cr =
         (AlgRep cs, AlgConstr i)      -> cs !! (i-1)
         (IntRep,    IntConstr i)      -> mkIntConstr dt i
         (FloatRep,  FloatConstr f)    -> mkRealConstr dt f
-        (StringRep, StringConstr str) -> mkStringConstr dt str
         (CharRep,   CharConstr c)     -> mkCharConstr dt c
         _ -> error "repConstr"
 
@@ -646,7 +641,6 @@ readConstr dt str =
         AlgRep cons -> idx cons
         IntRep      -> mkReadCon (\i -> (mkPrimCon dt str (IntConstr i)))
         FloatRep    -> mkReadCon (\f -> (mkPrimCon dt str (FloatConstr f)))
-        StringRep   -> Just (mkStringConstr dt str)
         CharRep     -> mkReadCon (\c -> (mkPrimCon dt str (CharConstr c)))
         NoRep       -> Nothing
   where
@@ -721,7 +715,7 @@ mkFloatType = mkPrimType FloatRep
 -- | This function is now deprecated. Please use 'mkCharType' instead.
 {-# DEPRECATED mkStringType "Use mkCharType instead" #-}
 mkStringType :: String -> DataType
-mkStringType = mkPrimType StringRep
+mkStringType = mkCharType
 
 -- | Constructs the 'Char' type
 mkCharType :: String -> DataType
@@ -769,9 +763,12 @@ mkRealConstr dt f = case datarep dt of
 -- | This function is now deprecated. Please use 'mkCharConstr' instead.
 {-# DEPRECATED mkStringConstr "Use mkCharConstr instead" #-}
 mkStringConstr :: DataType -> String -> Constr
-mkStringConstr dt str = case datarep dt of
-                       StringRep -> mkPrimCon dt str (StringConstr str)
-                       _ -> error "mkStringConstr"
+mkStringConstr dt str =
+  case datarep dt of
+    CharRep -> case str of
+      [c] -> mkPrimCon dt (show c) (CharConstr c)
+      _ -> error "mkStringConstr: input String must contain a single character"
+    _ -> error "mkStringConstr"
 
 -- | Makes a constructor for 'Char'.
 mkCharConstr :: DataType -> Char -> Constr
