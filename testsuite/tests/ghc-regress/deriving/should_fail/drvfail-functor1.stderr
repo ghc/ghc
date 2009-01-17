@@ -1,0 +1,5 @@
+
+drvfail-functor1.hs:6:13:
+    Can't make a derived instance of `Functor List'
+      (You need -XDeriveFunctor to derive an instance for this class)
+    In the data type declaration for `List'
