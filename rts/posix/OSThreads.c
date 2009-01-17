@@ -104,10 +104,14 @@ osThreadIsAlive(OSThreadId id STG_UNUSED)
 void
 initMutex(Mutex* pMut)
 {
-#if defined(DEBUG) && defined(linux_HOST_OS)
+#if defined(DEBUG)
     pthread_mutexattr_t attr;
     pthread_mutexattr_init(&attr);
+#if defined(linux_HOST_OS)
     pthread_mutexattr_settype(&attr,PTHREAD_MUTEX_ERRORCHECK_NP);
+#else
+    pthread_mutexattr_settype(&attr,PTHREAD_MUTEX_ERRORCHECK);
+#endif
     pthread_mutex_init(pMut,&attr);
 #else
     pthread_mutex_init(pMut,NULL);
