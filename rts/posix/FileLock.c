@@ -52,6 +52,9 @@ initFileLocking(void)
 {
     obj_hash = allocHashTable_(hashLock, cmpLocks);
     fd_hash  = allocHashTable(); /* ordinary word-based table */
+#ifdef THREADED_RTS
+    initMutex(&file_lock_mutex);
+#endif
 }
 
 static void
@@ -65,6 +68,9 @@ freeFileLocking(void)
 {
     freeHashTable(obj_hash, freeLock);
     freeHashTable(fd_hash,  NULL);
+#ifdef THREADED_RTS
+    closeMutex(&file_lock_mutex);
+#endif
 }
 
 int
