@@ -126,6 +126,9 @@ endif
 
 $(eval $(call get-ghc-field,GhcRTSWays,RTS ways))
 
+TOP_ABS := $(abspath $(TOP))
+$(eval $(call canonicalise,TOP_ABS))
+
 GS = gs
 CP = cp
 RM = rm -f

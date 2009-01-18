@@ -96,7 +96,7 @@ RUNTEST_OPTS +=  \
 	-e config.timeout="int($(TIMEOUT)) or config.timeout" \
 	-e config.timeout_prog=\"$(TIMEOUT_PROGRAM)\" \
 	-e config.exeext=\"$(exeext)\" \
-	-e config.top=\"$(FPTOOLS_TOP_ABS)/testsuite\" \
+	-e config.top=\"$(TOP_ABS)\" \
 	$(EXTRA_RUNTEST_OPTS)
 
 ifeq "$(fast)" "YES"
