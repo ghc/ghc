@@ -19,6 +19,8 @@ install-strip:
 
 install ::
 	$(INSTALL_DIR) $(bindir)
+	$(INSTALL_DIR) $(datadir)
+	echo "[]" > $(datadir)/package.conf
 
 install::
 	$(MAKE) -C includes  install      DOING_BIN_DIST=YES
