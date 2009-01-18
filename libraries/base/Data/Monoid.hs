@@ -42,11 +42,11 @@ import Test.QuickCheck
 -- | The class of monoids (types with an associative binary operation that
 -- has an identity).  Instances should satisfy the following laws:
 --
---  * @mempty `mappend` x = x@
+--  * @mappend mempty x = x@
 --
---  * @x `mappend` mempty = x@
+--  * @mappend x mempty = x@
 --
---  * @x `mappend` (y `mappend` z) = (x `mappend` y) `mappend` z@
+--  * @mappend x (mappend y z) = mappend (mappend x y) z@
 --
 --  * @mconcat = 'foldr' mappend mempty@
 --
