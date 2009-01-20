@@ -1519,14 +1519,13 @@ getRegister (CmmMachOp mop [x, y]) -- dyadic PrimOps
       MO_Sub W32 -> trivialCode W32 (SUB False False) x y
 
       MO_S_MulMayOflo rep -> imulMayOflo rep x y
-{-
-      -- ToDo: teach about V8+ SPARC div instructions
-      MO_S_Quot W32 -> idiv FSLIT(".div")   x y
-      MO_S_Rem W32  -> idiv FSLIT(".rem")   x y
-      MO_U_Quot W32 -> idiv FSLIT(".udiv")  x y
-      MO_U_Rem W32  -> idiv FSLIT(".urem")  x y
--}
 
+      MO_S_Quot W32 	-> idiv True  False x y
+      MO_U_Quot W32 	-> idiv False False x y
+       
+      MO_S_Rem  W32	-> irem True  x y
+      MO_U_Rem	W32	-> irem False x y
+       
       MO_F_Eq w -> condFltReg EQQ x y
       MO_F_Ne w -> condFltReg NE x y
 
@@ -1559,9 +1558,115 @@ getRegister (CmmMachOp mop [x, y]) -- dyadic PrimOps
 -}
       other -> pprPanic "getRegister(sparc) - binary CmmMachOp (1)" (pprMachOp mop)
   where
-    --idiv fn x y = getRegister (StCall (Left fn) CCallConv II32 [x, y])
+    -- idiv fn x y = getRegister (StCall (Left fn) CCallConv II32 [x, y])
 
-    --------------------
+
+    -- | Generate an integer division instruction.
+    idiv :: Bool -> Bool -> CmmExpr -> CmmExpr -> NatM Register
+	
+    -- For unsigned division with a 32 bit numerator, 
+    --		we can just clear the Y register.
+    idiv False cc x y = do
+	(a_reg, a_code)		<- getSomeReg x
+       	(b_reg, b_code)		<- getSomeReg y
+	
+	let code dst
+		= 	a_code 
+		`appOL`	b_code  
+		`appOL`	toOL
+			[ WRY  g0 g0
+			, UDIV cc a_reg (RIReg b_reg) dst]
+			
+	return (Any II32 code)
+    	
+
+    -- For _signed_ division with a 32 bit numerator,
+    --		we have to sign extend the numerator into the Y register.
+    idiv True cc x y = do
+	(a_reg, a_code)		<- getSomeReg x
+       	(b_reg, b_code)		<- getSomeReg y
+	
+	tmp			<- getNewRegNat II32
+	
+	let code dst
+		= 	a_code 
+		`appOL`	b_code  
+		`appOL`	toOL
+			[ SRA  a_reg (RIImm (ImmInt 16)) tmp		-- sign extend
+			, SRA  tmp   (RIImm (ImmInt 16)) tmp
+
+			, WRY  tmp g0				
+			, SDIV cc a_reg (RIReg b_reg) dst]
+			
+	return (Any II32 code)
+
+
+    -- | Do an integer remainder.
+    --
+    --	 NOTE:	The SPARC v8 architecture manual says that integer division
+    --		instructions _may_ generate a remainder, depending on the implementation.
+    --		If so it is _recommended_ that the remainder is placed in the Y register.
+    --
+    --          The UltraSparc 2007 manual says Y is _undefined_ after division.
+    --
+    --		The SPARC T2 doesn't store the remainder, not sure about the others. 
+    --		It's probably best not to worry about it, and just generate our own
+    --		remainders. 
+    --
+    irem :: Bool -> CmmExpr -> CmmExpr -> NatM Register
+
+    -- For unsigned operands: 
+    --		Division is between a 64 bit numerator and a 32 bit denominator, 
+    --		so we still have to clear the Y register.
+    irem False x y = do
+    	(a_reg, a_code)	<- getSomeReg x
+	(b_reg, b_code)	<- getSomeReg y
+
+	tmp_reg		<- getNewRegNat II32
+
+	let code dst
+		= 	a_code
+		`appOL`	b_code
+		`appOL`	toOL
+			[ WRY	g0 g0
+			, UDIV  False         a_reg (RIReg b_reg) tmp_reg
+			, UMUL  False       tmp_reg (RIReg b_reg) tmp_reg
+			, SUB   False False   a_reg (RIReg tmp_reg) dst]
+    
+    	return	(Any II32 code)
+
+    
+    -- For signed operands:
+    --		Make sure to sign extend into the Y register, or the remainder
+    --		will have the wrong sign when the numerator is negative.
+    --
+    --	TODO:	When sign extending, GCC only shifts the a_reg right by 17 bits,
+    --		not the full 32. Not sure why this is, something to do with overflow?
+    --		If anyone cares enough about the speed of signed remainder they
+    --		can work it out themselves (then tell me). -- BL 2009/01/20
+    
+    irem True x y = do
+    	(a_reg, a_code)	<- getSomeReg x
+	(b_reg, b_code)	<- getSomeReg y
+	
+	tmp1_reg	<- getNewRegNat II32
+	tmp2_reg	<- getNewRegNat II32
+		
+	let code dst
+		=	a_code
+		`appOL`	b_code
+		`appOL`	toOL
+			[ SRA	a_reg      (RIImm (ImmInt 16)) tmp1_reg	-- sign extend
+			, SRA	tmp1_reg   (RIImm (ImmInt 16)) tmp1_reg	-- sign extend
+			, WRY	tmp1_reg g0
+
+			, SDIV  False          a_reg (RIReg b_reg)    tmp2_reg	
+			, SMUL  False       tmp2_reg (RIReg b_reg)    tmp2_reg
+			, SUB   False False    a_reg (RIReg tmp2_reg) dst]
+			
+	return (Any II32 code)
+   
+
     imulMayOflo :: Width -> CmmExpr -> CmmExpr -> NatM Register
     imulMayOflo rep a b = do
          (a_reg, a_code) <- getSomeReg a

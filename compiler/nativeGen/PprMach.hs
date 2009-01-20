@@ -2002,9 +2002,19 @@ pprInstr (SLL reg1 ri reg2) = pprRegRIReg (sLit "sll") False reg1 ri reg2
 pprInstr (SRL reg1 ri reg2) = pprRegRIReg (sLit "srl") False reg1 ri reg2
 pprInstr (SRA reg1 ri reg2) = pprRegRIReg (sLit "sra") False reg1 ri reg2
 
-pprInstr (RDY rd) = ptext (sLit "\trd\t%y,") <> pprReg rd
-pprInstr (SMUL b reg1 ri reg2) = pprRegRIReg (sLit "smul")  b reg1 ri reg2
-pprInstr (UMUL b reg1 ri reg2) = pprRegRIReg (sLit "umul")  b reg1 ri reg2
+pprInstr (RDY rd) 		= ptext (sLit "\trd\t%y,") <> pprReg rd
+pprInstr (WRY reg1 reg2) 	
+	= ptext (sLit "\twr\t") 
+		<> pprReg reg1 
+		<> char ','
+		<> pprReg reg2
+		<> char ','
+		<> ptext (sLit "%y") 
+
+pprInstr (SMUL b reg1 ri reg2)	= pprRegRIReg (sLit "smul")  b reg1 ri reg2
+pprInstr (UMUL b reg1 ri reg2)	= pprRegRIReg (sLit "umul")  b reg1 ri reg2
+pprInstr (SDIV b reg1 ri reg2)	= pprRegRIReg (sLit "sdiv")  b reg1 ri reg2
+pprInstr (UDIV b reg1 ri reg2)	= pprRegRIReg (sLit "udiv")  b reg1 ri reg2
 
 pprInstr (SETHI imm reg)
   = hcat [

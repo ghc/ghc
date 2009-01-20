@@ -558,9 +558,23 @@ is_G_instr instr
 -- Int Arithmetic.
 	      | ADD	      Bool Bool Reg RI Reg -- x?, cc?, src1, src2, dst
 	      | SUB	      Bool Bool Reg RI Reg -- x?, cc?, src1, src2, dst
+
 	      | UMUL	           Bool Reg RI Reg --     cc?, src1, src2, dst
 	      | SMUL	           Bool Reg RI Reg --     cc?, src1, src2, dst
-              | RDY           Reg	-- move contents of Y register to reg
+
+
+              -- The SPARC divide instructions perform 64bit by 32bit division
+	      --   The Y register is xored into the first operand.
+
+	      --   On _some implementations_ the Y register is overwritten by
+              --   the remainder, so we have to make sure it is 0 each time.
+
+              --   dst <- ((Y `shiftL` 32) `or` src1) `div` src2
+              | UDIV               Bool Reg RI Reg --     cc?, src1, src2, dst
+	      | SDIV               Bool Reg RI Reg --     cc?, src1, src2, dst
+
+              | RDY           Reg                  -- move contents of Y register to reg
+              | WRY           Reg  Reg             -- Y <- src1 `xor` src2
 
 -- Simple bit-twiddling.
 	      | AND	      Bool Reg RI Reg -- cc?, src1, src2, dst
