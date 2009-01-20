@@ -289,7 +289,6 @@ filterClasses decls = [ if isClassD d then (L loc (filterClass d), doc) else x
 collectDocs :: [Decl] -> [(Decl, (Maybe Doc))]
 collectDocs decls = collect Nothing DocEmpty decls
 
-
 collect :: Maybe Decl -> Doc -> [Decl] -> [(Decl, (Maybe Doc))]
 collect d doc_so_far [] =
    case d of
@@ -307,9 +306,7 @@ collect d doc_so_far (e:es) =
 
     _ -> case d of
       Nothing -> collect (Just e) doc_so_far es
-      Just d0
-        | sameDecl d0 e -> collect d doc_so_far es  
-        | otherwise -> finishedDoc d0 doc_so_far (collect (Just e) DocEmpty es)
+      Just d0 -> finishedDoc d0 doc_so_far (collect (Just e) DocEmpty es)
 
 
 finishedDoc :: Decl -> Doc -> [(Decl, (Maybe Doc))] -> [(Decl, (Maybe Doc))]
@@ -319,9 +316,6 @@ finishedDoc d doc rest | notDocDecl d = (d, Just doc) : rest
     notDocDecl (L _ (DocD _)) = False
     notDocDecl _              = True
 finishedDoc _ _ rest = rest
-
-
-sameDecl d1 d2 = getLoc d1 == getLoc d2
 
 
 {-
