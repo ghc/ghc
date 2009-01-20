@@ -21,7 +21,7 @@
 
 module PprMach ( 
 	pprNatCmmTop, pprBasicBlock, pprSectionHeader, pprData,
-	pprInstr, pprSize, pprUserReg
+	pprInstr, pprSize, pprUserReg, pprImm
   ) where
 
 #include "HsVersions.h"
@@ -2083,6 +2083,7 @@ pprInstr (FxTOy size1 size2 reg1 reg2)
 	ptext
     	(case size2 of
     	    II32  -> sLit "i\t"
+	    II64  -> sLit "x\t"
     	    FF32  -> sLit "s\t"
     	    FF64  -> sLit "d\t"),
 	pprReg reg1, comma, pprReg reg2

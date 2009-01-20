@@ -323,21 +323,53 @@ assignReg_I64Code lvalue valueTree
    = panic "assignReg_I64Code(sparc): invalid lvalue"
 
 
--- Don't delete this -- it's very handy for debugging.
---iselExpr64 expr 
---   | trace ("iselExpr64: " ++ showSDoc (ppr expr)) False
---   = panic "iselExpr64(???)"
+-- Load a 64 bit word
+iselExpr64 (CmmLoad addrTree ty) 
+ | isWord64 ty
+ = do	Amode amode addr_code	<- getAmode addrTree
+ 	let result
 
-iselExpr64 (CmmLoad addrTree ty) | isWord64 ty = do
-     Amode (AddrRegReg r1 r2) addr_code <- getAmode addrTree
-     rlo <- getNewRegNat II32
-     let rhi = getHiVRegFromLo rlo
-         mov_hi = LD II32 (AddrRegImm r1 (ImmInt 0)) rhi
-         mov_lo = LD II32 (AddrRegImm r1 (ImmInt 4)) rlo
-     return (
-            ChildCode64 (addr_code `snocOL` mov_hi `snocOL` mov_lo) 
-                         rlo
-          )
+		| AddrRegReg r1 r2	<- amode
+		= do	rlo 	<- getNewRegNat II32
+			tmp	<- getNewRegNat II32
+			let rhi = getHiVRegFromLo rlo
+
+			return	$ ChildCode64 
+				(	 addr_code 
+				`appOL`	 toOL
+					 [ ADD False False r1 (RIReg r2) tmp
+					 , LD II32 (AddrRegImm tmp (ImmInt 0)) rhi
+					 , LD II32 (AddrRegImm tmp (ImmInt 4)) rlo ])
+				rlo
+
+		| AddrRegImm r1 (ImmInt i) <- amode
+		= do	rlo	<- getNewRegNat II32
+			let rhi = getHiVRegFromLo rlo
+			
+			return	$ ChildCode64 
+				(	 addr_code 
+				`appOL`	 toOL
+					 [ LD II32 (AddrRegImm r1 (ImmInt $ 0 + i)) rhi
+					 , LD II32 (AddrRegImm r1 (ImmInt $ 4 + i)) rlo ])
+				rlo
+		
+	result
+
+
+-- Add a literal to a 64 bit integer
+iselExpr64 (CmmMachOp (MO_Add _) [e1, CmmLit (CmmInt i _)]) 
+ = do	ChildCode64 code1 r1_lo <- iselExpr64 e1
+ 	let r1_hi	= getHiVRegFromLo r1_lo
+	
+	r_dst_lo	<- getNewRegNat II32
+	let r_dst_hi	=  getHiVRegFromLo r_dst_lo 
+	
+	return	$ ChildCode64
+			( toOL
+			[ ADD False False r1_lo (RIImm (ImmInteger i)) r_dst_lo
+			, ADD True  False r1_hi (RIReg g0)	   r_dst_hi ])
+			r_dst_lo
+
 
 iselExpr64 (CmmReg (CmmLocal (LocalReg uq ty))) | isWord64 ty = do
      r_dst_lo <-  getNewRegNat II32
@@ -2058,15 +2090,16 @@ getAmode (CmmMachOp (MO_Add rep) [x, y])
     	code = codeX `appOL` codeY
     return (Amode (AddrRegReg regX regY) code)
 
--- XXX Is this same as "leaf" in Stix?
 getAmode (CmmLit lit)
   = do
-      tmp <- getNewRegNat II32
-      let
-    	code = unitOL (SETHI (HI imm__2) tmp)
-      return (Amode (AddrRegImm tmp (LO imm__2)) code)
-      where
-         imm__2 = litToImm lit
+	let imm__2	= litToImm lit
+	tmp1 	<- getNewRegNat II32
+	tmp2	<- getNewRegNat II32
+
+	let code = toOL	[ SETHI (HI imm__2) tmp1
+			, OR    False tmp1 (RIImm (LO imm__2)) tmp2]
+		
+	return (Amode (AddrRegReg tmp2 g0) code)
 
 getAmode other
   = do

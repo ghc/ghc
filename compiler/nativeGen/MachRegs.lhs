@@ -887,9 +887,10 @@ fReg x = (32 + x)
 nCG_FirstFloatReg :: RegNo
 nCG_FirstFloatReg = unRealReg NCG_FirstFloatReg
 
-regClass (VirtualRegI u) = RcInteger
-regClass (VirtualRegF u) = RcFloat
-regClass (VirtualRegD u) = RcDouble
+regClass (VirtualRegI  u) = RcInteger
+regClass (VirtualRegHi u) = RcInteger
+regClass (VirtualRegF  u) = RcFloat
+regClass (VirtualRegD  u) = RcDouble
 regClass (RealReg i) | i < 32                = RcInteger 
                      | i < nCG_FirstFloatReg = RcDouble
                      | otherwise             = RcFloat
