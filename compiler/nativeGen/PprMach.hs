@@ -402,11 +402,14 @@ pprSize x = ptext (case x of
 	FF32  -> sLit ""
 	FF64  -> sLit "d"
     )
+
+-- suffix to store/ ST instruction
 pprStSize :: Size -> Doc
 pprStSize x = ptext (case x of
 	II8   -> sLit "b"
 	II16  -> sLit "h"
 	II32  -> sLit ""
+	II64  -> sLit "x"
 	FF32  -> sLit ""
 	FF64  -> sLit "d"
 #endif
