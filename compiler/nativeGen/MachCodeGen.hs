@@ -3667,6 +3667,10 @@ genCCall target dest_regs argsAndHints = do
 			| not $ isFloatType rep
 			, W32	<- width
 			= unitOL $ mkRegRegMoveInstr (RealReg $ oReg 0) r_dest
+
+			| not $ isFloatType rep
+			, W64	<- width
+			= unitOL $ mkRegRegMoveInstr (RealReg $ oReg 0) r_dest
 			
 	   in	result
 				

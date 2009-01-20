@@ -94,7 +94,6 @@ import MachInstrs
 import RegAllocInfo
 import RegLiveness
 import Cmm hiding (RegSet)
-import PprMach
 
 import Digraph
 import Unique		( Uniquable(getUnique), Unique )
@@ -104,15 +103,12 @@ import UniqSupply
 import Outputable
 import State
 import FastString
-import MonadUtils
 
 import Data.Maybe
 import Data.List
 import Control.Monad
 import Data.Word
 import Data.Bits
-
-import Debug.Trace
 
 #include "../includes/MachRegs.h"
 
@@ -206,7 +202,7 @@ initFreeRegs :: FreeRegs
 initFreeRegs 
  = 	regs
  where	
-	freeDouble	= getFreeRegs RcDouble regs
+--	freeDouble	= getFreeRegs RcDouble regs
 	regs		= foldr releaseReg noFreeRegs allocable
 	allocable	= allocatableRegs \\ doublePairs
 	doublePairs	= [43, 45, 47, 49, 51, 53]
@@ -223,15 +219,16 @@ getFreeRegs cls (FreeRegs g f d)
 		go _ 0 _ = []
 	        go x m i | x .&. m /= 0 = i : (go x (m `shiftL` 1) $! i+1)
         	         | otherwise    = go x (m `shiftL` 1) $! i+1
-
+{-
 showFreeRegs :: FreeRegs -> String
 showFreeRegs regs
  	=  "FreeRegs\n"
 	++ "    integer: " ++ (show $ getFreeRegs RcInteger regs)	++ "\n"
 	++ "      float: " ++ (show $ getFreeRegs RcFloat   regs)	++ "\n"
 	++ "     double: " ++ (show $ getFreeRegs RcDouble  regs)	++ "\n"
+-}
 
-
+{-
 -- | Check whether a reg is free
 regIsFree :: RegNo -> FreeRegs -> Bool
 regIsFree r (FreeRegs g f d)
@@ -251,7 +248,7 @@ regIsFree r (FreeRegs g f d)
 	| otherwise 
 	, mask	<- 1 `shiftL` (fromIntegral r - 32)
 	= f .&. mask /= 0
-	
+-}
 
 -- | Grab a register.
 grabReg :: RegNo -> FreeRegs -> FreeRegs
@@ -316,7 +313,7 @@ releaseReg r regs@(FreeRegs g f d)
 
 -- | Allocate a register in the map.
 allocateReg :: RegNo -> FreeRegs -> FreeRegs
-allocateReg r regs@(FreeRegs g f d) 
+allocateReg r regs -- (FreeRegs g f d) 
 
 	-- if the reg isn't actually free then we're in trouble
 {-	| not $ regIsFree r regs
@@ -820,7 +817,7 @@ allocateRegsAndSpill reading keep spills alloc (r:rs) = do
         case getFreeRegs (regClass r) freeregs of
 
       	-- case (2): we have a free register
-      	  freeClass@(my_reg:_) -> {- pprTrace "alloc" (ppr r <+> ppr my_reg <+> ppr freeClass) $ -}
+      	  my_reg:_ -> {- pprTrace "alloc" (ppr r <+> ppr my_reg <+> ppr freeClass) $ -}
 	    do
     	    spills'   <- loadTemp reading r loc my_reg spills
 	    let new_loc 
