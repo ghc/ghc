@@ -282,7 +282,10 @@ filterClasses decls = [ if isClassD d then (L loc (filterClass d), doc) else x
 --------------------------------------------------------------------------------
 
 
--- | Collect the docs and attach them to the right declaration
+-- | Collect the docs and attach them to the right declaration.
+-- Ideally, input should contain all kinds of declarations, so that we don't
+-- attach docs to the wrong declaration. An exception to this is function and
+-- value declarations - we assume (for now) that they are not part of the input.
 collectDocs :: [Decl] -> [(Decl, (Maybe Doc))]
 collectDocs decls = collect Nothing DocEmpty decls
 
