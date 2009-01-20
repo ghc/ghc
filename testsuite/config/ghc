@@ -103,7 +103,7 @@ def get_compiler_info():
     config.compiler_tags = v[1:]
 
     # remove profthreaded for GHC <6.9, it didn't work
-    if version_lt(config.compiler_version, '6.9'):
+    if ('profthreaded' in config.run_ways) and version_lt(config.compiler_version, '6.9'):
         config.run_ways.remove('profthreaded')
 
     if version_ge(config.compiler_version, '6.9'):
