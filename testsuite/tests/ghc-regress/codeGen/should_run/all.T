@@ -70,6 +70,7 @@ test('cg060',
      compile_and_run, [''])
 test('cg061', normal, compile_and_run, [''])
 test('cg062', normal, compile_and_run, [''])
+test('cg063', normal, compile_and_run, [''])
 
 test('1861', extra_run_opts('0'), compile_and_run, [''])
 
