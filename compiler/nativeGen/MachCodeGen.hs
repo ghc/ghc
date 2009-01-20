@@ -4179,15 +4179,42 @@ genSwitch expr ids
         return code
 #elif sparc_TARGET_ARCH
 genSwitch expr ids
-  | opt_PIC
-  = error "MachCodeGen: sparc genSwitch PIC not finished\n"
+	| opt_PIC
+	= error "MachCodeGen: sparc genSwitch PIC not finished\n"
   
-  | otherwise
-  = error "MachCodeGen: sparc genSwitch non-PIC not finished\n"
+	| otherwise
+	= do	(e_reg, e_code) <- getSomeReg expr
+
+		base_reg	<- getNewRegNat II32
+		offset_reg	<- getNewRegNat II32
+		dst		<- getNewRegNat II32
+
+		label 		<- getNewLabelNat
+		let jumpTable	= map jumpTableEntry ids
+
+		return $ e_code `appOL`
+		 toOL	
+		 	-- the jump table
+			[ LDATA ReadOnlyData (CmmDataLabel label : jumpTable)
+
+			-- load base of jump table
+			, SETHI (HI (ImmCLbl label)) base_reg
+			, OR    False base_reg (RIImm $ LO $ ImmCLbl label) base_reg
+			
+			-- the addrs in the table are 32 bits wide..
+			, SLL   e_reg (RIImm $ ImmInt 2) offset_reg
+
+			-- load and jump to the destination
+			, LD 	II32 (AddrRegReg base_reg offset_reg) dst
+			, JMP   (AddrRegImm dst (ImmInt 0)) ]
+
 #else
 #error "ToDo: genSwitch"
 #endif
 
+
+-- | Convert a BlockId to some CmmStatic data
+jumpTableEntry :: Maybe BlockId -> CmmStatic
 jumpTableEntry Nothing = CmmStaticLit (CmmInt 0 wordWidth)
 jumpTableEntry (Just (BlockId id)) = CmmStaticLit (CmmLabel blockLabel)
     where blockLabel = mkAsmTempLabel id
