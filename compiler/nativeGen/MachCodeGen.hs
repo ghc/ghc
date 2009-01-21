@@ -3641,7 +3641,7 @@ genCCall target dest_regs argsAndHints
 			return (dyn_c `snocOL` CALL (Right dyn_r) n_argRegs_used False)
 
 		CmmPrim mop 
-		 -> do	(res, reduce) <- outOfLineFloatOp mop
+		 -> do	res	<- outOfLineFloatOp mop
 			lblOrMopExpr <- case res of
 				Left lbl -> do
 					return (unitOL (CALL (Left (litToImm (CmmLabel lbl))) n_argRegs_used False))
@@ -3649,9 +3649,8 @@ genCCall target dest_regs argsAndHints
 		       		Right mopExpr -> do
 					(dyn_c, [dyn_r]) <- arg_to_int_vregs mopExpr
 					return (dyn_c `snocOL` CALL (Right dyn_r) n_argRegs_used False)
-			if reduce 
-			  	then panic ("genCCall(sparc): can not reduce mach op " ++ show mop)
-				else return lblOrMopExpr
+
+			return lblOrMopExpr
 
 	let argcode = concatOL argcodes
 
@@ -3787,11 +3786,10 @@ assign_code [CmmHinted dest _hint]
 -- | Generate a call to implement an out-of-line floating point operation
 outOfLineFloatOp 
 	:: CallishMachOp 
-	-> NatM ( Either CLabel CmmExpr
-		, Bool)
+	-> NatM (Either CLabel CmmExpr)
 
 outOfLineFloatOp mop 
- = do	let (reduce, functionName)
+ = do	let functionName
  		= outOfLineFloatOp_table mop
 	
  	dflags	<- getDynFlagsNat
@@ -3803,46 +3801,48 @@ outOfLineFloatOp mop
 			CmmLit (CmmLabel lbl) 	-> Left lbl
                         _ 			-> Right mopExpr
 
-	return (mopLabelOrExpr, reduce)
+	return mopLabelOrExpr
 
 
+-- | Decide what C function to use to implement a CallishMachOp
+--
 outOfLineFloatOp_table 
 	:: CallishMachOp
-	-> (Bool, FastString)
+	-> FastString
 	
 outOfLineFloatOp_table mop
  = case mop of
-	MO_F32_Exp    -> (True,  fsLit "exp")
-	MO_F32_Log    -> (True,  fsLit "log")
-	MO_F32_Sqrt   -> (True,  fsLit "sqrt")
+	MO_F32_Exp    -> fsLit "expf"
+	MO_F32_Log    -> fsLit "logf"
+	MO_F32_Sqrt   -> fsLit "sqrtf"
 
-	MO_F32_Sin    -> (True,  fsLit "sin")
-	MO_F32_Cos    -> (True,  fsLit "cos")
-	MO_F32_Tan    -> (True,  fsLit "tan")
+	MO_F32_Sin    -> fsLit "sinf"
+	MO_F32_Cos    -> fsLit "cosf"
+	MO_F32_Tan    -> fsLit "tanf"
 
-	MO_F32_Asin   -> (True,  fsLit "asin")
-	MO_F32_Acos   -> (True,  fsLit "acos")
-	MO_F32_Atan   -> (True,  fsLit "atan")
+	MO_F32_Asin   -> fsLit "asinf"
+	MO_F32_Acos   -> fsLit "acosf"
+	MO_F32_Atan   -> fsLit "atanf"
 
-	MO_F32_Sinh   -> (True,  fsLit "sinh")
-	MO_F32_Cosh   -> (True,  fsLit "cosh")
-	MO_F32_Tanh   -> (True,  fsLit "tanh")
+	MO_F32_Sinh   -> fsLit "sinhf"
+	MO_F32_Cosh   -> fsLit "coshf"
+	MO_F32_Tanh   -> fsLit "tanhf"
 
-	MO_F64_Exp    -> (False, fsLit "exp")
-	MO_F64_Log    -> (False, fsLit "log")
-	MO_F64_Sqrt   -> (False, fsLit "sqrt")
+	MO_F64_Exp    -> fsLit "exp"
+	MO_F64_Log    -> fsLit "log"
+	MO_F64_Sqrt   -> fsLit "sqrt"
 
-	MO_F64_Sin    -> (False, fsLit "sin")
-	MO_F64_Cos    -> (False, fsLit "cos")
-	MO_F64_Tan    -> (False, fsLit "tan")
+	MO_F64_Sin    -> fsLit "sin"
+	MO_F64_Cos    -> fsLit "cos"
+	MO_F64_Tan    -> fsLit "tan"
 
-	MO_F64_Asin   -> (False, fsLit "asin")
-	MO_F64_Acos   -> (False, fsLit "acos")
-	MO_F64_Atan   -> (False, fsLit "atan")
+	MO_F64_Asin   -> fsLit "asin"
+	MO_F64_Acos   -> fsLit "acos"
+	MO_F64_Atan   -> fsLit "atan"
 
-	MO_F64_Sinh   -> (False, fsLit "sinh")
-	MO_F64_Cosh   -> (False, fsLit "cosh")
-	MO_F64_Tanh   -> (False, fsLit "tanh")
+	MO_F64_Sinh   -> fsLit "sinh"
+	MO_F64_Cosh   -> fsLit "cosh"
+	MO_F64_Tanh   -> fsLit "tanh"
 
 	other -> pprPanic "outOfLineFloatOp(sparc): Unknown callish mach op "
               		(pprCallishMachOp mop)
