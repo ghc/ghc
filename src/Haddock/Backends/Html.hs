@@ -1415,7 +1415,8 @@ ppForAll Explicit ltvs lctxt =
 -}
 
 ppBang HsStrict = toHtml "!"
-ppBang HsUnbox  = toHtml "!!"
+ppBang HsUnbox  = toHtml "!" -- unboxed args is an implementation detail,
+                             -- so we just show the strictness annotation
 
 tupleParens Boxed   = parenList
 tupleParens Unboxed = ubxParenList 
