@@ -54,7 +54,7 @@ import GHC.Base		( Int(..), Int#, (<#), (==#) )
 import Data.Data (Data(..), Typeable, mkConstr, mkDataType, constrIndex)
 import qualified Data.Data as Data
 import Data.IORef
-import GHC.IOBase	( unsafePerformIO )
+import System.IO.Unsafe	( unsafePerformIO )
 import Control.Monad (liftM)
 import System.IO	( hPutStrLn, stderr )
 import Data.Char        ( isAlpha )
