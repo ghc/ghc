@@ -4206,7 +4206,8 @@ genSwitch expr ids
 
 			-- load and jump to the destination
 			, LD 	II32 (AddrRegReg base_reg offset_reg) dst
-			, JMP   (AddrRegImm dst (ImmInt 0)) ]
+			, JMP   (AddrRegImm dst (ImmInt 0)) 
+			, NOP ]
 
 #else
 #error "ToDo: genSwitch"
