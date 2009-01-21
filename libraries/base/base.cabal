@@ -3,6 +3,7 @@ version:        4.0.0.0
 license:        BSD3
 license-file:   LICENSE
 maintainer:     libraries@haskell.org
+bug-reports: http://hackage.haskell.org/trac/ghc/newticket?component=libraries/base
 synopsis:       Basic libraries
 description:
     This package contains the Prelude and its support libraries,
@@ -17,6 +18,10 @@ extra-source-files:
                 config.guess config.sub install-sh
                 aclocal.m4 configure.ac configure
                 include/CTypes.h
+
+source-repository head
+    type:     darcs
+    location: http://darcs.haskell.org/packages/base/
 
 Library {
     if impl(ghc) {
