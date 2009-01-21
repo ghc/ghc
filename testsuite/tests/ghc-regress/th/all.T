@@ -130,3 +130,6 @@ test('T2386', extra_clean(['T2386_Lib.hi', 'T2386_Lib.o']),
 
 test('T2685', extra_clean(['T2685a.hi','T2685a.o']), 
               multimod_compile, ['T2685','-v0'])
+
+test('TH_sections', normal, compile, ['-v0'])
+
