@@ -4988,21 +4988,33 @@ coerceInt2FP width1 width2 x = do
     	    FxTOy (intSize width1) (floatSize width2) dst dst]
     return (Any (floatSize $ width2) code__2)
 
-------------
-coerceFP2Int width1 width2 x = do
-    let pk	= intSize width1
-        fprep	= floatSize width2
 
-    (src, code) <- getSomeReg x
-    reg <- getNewRegNat fprep
-    tmp <- getNewRegNat pk
-    let
-    	code__2 dst = ASSERT(fprep == FF64 || fprep == FF32)
-	    code `appOL` toOL [
-    	    FxTOy fprep pk src tmp,
-    	    ST pk tmp (spRel (-2)),
-    	    LD pk (spRel (-2)) dst]
-    return (Any pk code__2)
+-- | Coerce a floating point value to integer
+--
+--   NOTE: On sparc v9 there are no instructions to move a value from an
+--	   FP register directly to an int register, so we have to use a load/store.
+--
+coerceFP2Int width1 width2 x 
+ = do	let fsize1	= floatSize width1
+	    fsize2	= floatSize width2
+	
+            isize2	= intSize   width2
+
+	(fsrc, code)	<- getSomeReg x
+	fdst		<- getNewRegNat fsize2
+    
+	let code2 dst	
+		= 	code
+		`appOL` toOL
+			-- convert float to int format, leaving it in a float reg.
+			[ FxTOy fsize1 isize2 fsrc fdst
+
+			-- store the int into mem, then load it back to move
+			--	it into an actual int reg.
+			, ST    fsize2 fdst (spRel (-2))
+			, LD	isize2 (spRel (-2)) dst]
+
+	return (Any isize2 code2)
 
 ------------
 coerceDbl2Flt x = do
