@@ -3,11 +3,16 @@ version:        0.1.0.0
 license:        BSD3
 license-file:   LICENSE
 maintainer:     libraries@haskell.org
+bug-reports: http://hackage.haskell.org/trac/ghc/newticket?component=libraries%20%28other%29
 synopsis:       Integer library based on GMP
 description:
     This package contains an Integer library based on GMP.
 cabal-version:  >=1.2
 build-type: Simple
+
+source-repository head
+    type:     darcs
+    location: http://darcs.haskell.org/packages/integer-gmp/
 
 Library {
     build-depends: ghc-prim
