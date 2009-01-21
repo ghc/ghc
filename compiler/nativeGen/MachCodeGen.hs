@@ -3606,191 +3606,247 @@ genCCall target dest_regs args = do
    in preparation for the outer call.  Upshot: we need to calculate the
    args into temporary regs, and move those to arg regs or onto the
    stack only immediately prior to the call proper.  Sigh.
+
+genCCall
+    :: CmmCallTarget		-- function to call
+    -> HintedCmmFormals		-- where to put the result
+    -> HintedCmmActuals		-- arguments (of mixed type)
+    -> NatM InstrBlock
+
 -}
 
-genCCall target dest_regs argsAndHints = do
-    let
-        args = map hintlessCmm argsAndHints
-    argcode_and_vregs <- mapM arg_to_int_vregs args
-    let 
-        (argcodes, vregss) = unzip argcode_and_vregs
-        n_argRegs          = length allArgRegs
-        n_argRegs_used     = min (length vregs) n_argRegs
-        vregs              = concat vregss
-    -- deal with static vs dynamic call targets
-    callinsns <- (case target of
-        CmmCallee (CmmLit (CmmLabel lbl)) conv -> do
-		return (unitOL (CALL (Left (litToImm (CmmLabel lbl))) n_argRegs_used False))
-        CmmCallee expr conv -> do
-                (dyn_c, [dyn_r]) <- arg_to_int_vregs expr
-                return (dyn_c `snocOL` CALL (Right dyn_r) n_argRegs_used False)
-	CmmPrim mop -> do
-		  (res, reduce) <- outOfLineFloatOp mop
-		  lblOrMopExpr <- case res of
-		       Left lbl -> do
-		            return (unitOL (CALL (Left (litToImm (CmmLabel lbl))) n_argRegs_used False))
-		       Right mopExpr -> do
-			    (dyn_c, [dyn_r]) <- arg_to_int_vregs mopExpr
-			    return (dyn_c `snocOL` CALL (Right dyn_r) n_argRegs_used False)
-		  if reduce then panic "genCCall(sparc): can not reduce" else return lblOrMopExpr
+genCCall target dest_regs argsAndHints 
+ = do	 	
+	-- strip hints from the arg regs
+	let args :: [CmmExpr]
+	    args  = map hintlessCmm argsAndHints
 
-      )
-    let
-        argcode = concatOL argcodes
-        (move_sp_down, move_sp_up)
-           = let diff = length vregs - n_argRegs
-                 nn   = if odd diff then diff + 1 else diff -- keep 8-byte alignment
-             in  if   nn <= 0
-                 then (nilOL, nilOL)
-                 else (unitOL (moveSp (-1*nn)), unitOL (moveSp (1*nn)))
 
-        transfer_code
-           = toOL (move_final vregs allArgRegs eXTRA_STK_ARGS_HERE)
+	-- work out the arguments, and assign them to integer regs
+	argcode_and_vregs	<- mapM arg_to_int_vregs args
+	let (argcodes, vregss)	= unzip argcode_and_vregs
+	let vregs		= concat vregss
 
-	-- assign the results, if necessary
-	assign_code []	= nilOL
-	
-	assign_code [CmmHinted dest _hint]	
-	 = let	rep	= localRegType dest
-		width	= typeWidth rep
-		r_dest 	= getRegisterReg (CmmLocal dest)
+	let n_argRegs		= length allArgRegs
+	let n_argRegs_used 	= min (length vregs) n_argRegs
 
-	 	result
-		 	| isFloatType rep 
-			, W32	<- width
-			= unitOL $ FMOV FF32 (RealReg $ fReg 0) r_dest
-			
-			| isFloatType rep
-			, W64	<- width
-			= unitOL $ FMOV FF64 (RealReg $ fReg 0) r_dest
-			
-			| not $ isFloatType rep
-			, W32	<- width
-			= unitOL $ mkRegRegMoveInstr (RealReg $ oReg 0) r_dest
 
-			| not $ isFloatType rep
-			, W64		<- width
-			, r_dest_hi	<- getHiVRegFromLo r_dest
-			= toOL 	[ mkRegRegMoveInstr (RealReg $ oReg 0) r_dest_hi
-				, mkRegRegMoveInstr (RealReg $ oReg 1) r_dest]
-			
-	   in	result
+	-- deal with static vs dynamic call targets
+	callinsns <- case target of
+		CmmCallee (CmmLit (CmmLabel lbl)) conv -> 
+			return (unitOL (CALL (Left (litToImm (CmmLabel lbl))) n_argRegs_used False))
+
+		CmmCallee expr conv 
+		 -> do	(dyn_c, [dyn_r]) <- arg_to_int_vregs expr
+			return (dyn_c `snocOL` CALL (Right dyn_r) n_argRegs_used False)
+
+		CmmPrim mop 
+		 -> do	(res, reduce) <- outOfLineFloatOp mop
+			lblOrMopExpr <- case res of
+				Left lbl -> do
+					return (unitOL (CALL (Left (litToImm (CmmLabel lbl))) n_argRegs_used False))
+
+		       		Right mopExpr -> do
+					(dyn_c, [dyn_r]) <- arg_to_int_vregs mopExpr
+					return (dyn_c `snocOL` CALL (Right dyn_r) n_argRegs_used False)
+			if reduce 
+			  	then panic ("genCCall(sparc): can not reduce mach op " ++ show mop)
+				else return lblOrMopExpr
+
+	let argcode = concatOL argcodes
+
+	let (move_sp_down, move_sp_up)
+	           = let diff = length vregs - n_argRegs
+	                 nn   = if odd diff then diff + 1 else diff -- keep 8-byte alignment
+	             in  if   nn <= 0
+	                 then (nilOL, nilOL)
+	                 else (unitOL (moveSp (-1*nn)), unitOL (moveSp (1*nn)))
+
+        let transfer_code
+           	= toOL (move_final vregs allArgRegs eXTRA_STK_ARGS_HERE)
 				
-    return (argcode       `appOL`
-            move_sp_down  `appOL`
-            transfer_code `appOL`
-            callinsns     `appOL`
-            unitOL NOP    `appOL`
-            move_sp_up	  `appOL`
-	    assign_code dest_regs)
-  where
-     -- move args from the integer vregs into which they have been 
-     -- marshalled, into %o0 .. %o5, and the rest onto the stack.
-     move_final :: [Reg] -> [Reg] -> Int -> [Instr]
+	return 
+	 $ 	argcode			`appOL`
+		move_sp_down		`appOL`
+		transfer_code		`appOL`
+		callinsns		`appOL`
+		unitOL NOP		`appOL`
+		move_sp_up		`appOL`
+		assign_code dest_regs
 
-     move_final [] _ offset          -- all args done
-        = []
 
-     move_final (v:vs) [] offset     -- out of aregs; move to stack
-        = ST II32 v (spRel offset)
-          : move_final vs [] (offset+1)
+-- | Generate code to calculate an argument, and move it into one
+-- 	or two integer vregs.
+arg_to_int_vregs :: CmmExpr -> NatM (OrdList Instr, [Reg])
+arg_to_int_vregs arg
 
-     move_final (v:vs) (a:az) offset -- move into an arg (%o[0..5]) reg
-        = OR False g0 (RIReg v) a
-          : move_final vs az offset
+	-- If the expr produces a 64 bit int, then we can just use iselExpr64
+	| isWord64 (cmmExprType arg)
+	= do	(ChildCode64 code r_lo) <- iselExpr64 arg
+	  	let r_hi 		= getHiVRegFromLo r_lo
+		return (code, [r_hi, r_lo])
 
-     -- generate code to calculate an argument, and move it into one
-     -- or two integer vregs.
-     arg_to_int_vregs :: CmmExpr -> NatM (OrdList Instr, [Reg])
-     arg_to_int_vregs arg
-        | isWord64 (cmmExprType arg)
-        = do
-	  (ChildCode64 code r_lo) <- iselExpr64 arg
-          let 
-              r_hi = getHiVRegFromLo r_lo
-          return (code, [r_hi, r_lo])
-        | otherwise
-        = do
-	  (src, code) <- getSomeReg arg
-          tmp <- getNewRegNat (cmmTypeSize $ cmmExprType arg)
-          let
-              pk   	= cmmExprType arg
-              Just f0_high = fPair f0
-          case cmmTypeSize pk of
-             FF64 -> do
-                      v1 <- getNewRegNat II32
-                      v2 <- getNewRegNat II32
-                      return (
-                        code                          `snocOL`
-                        FMOV FF64 src f0                `snocOL`
-                        ST   FF32  f0 (spRel 16)         `snocOL`
-                        LD   II32  (spRel 16) v1         `snocOL`
-                        ST   FF32  f0_high (spRel 16) `snocOL`
-                        LD   II32  (spRel 16) v2
-                        ,
-                        [v1,v2]
-                       )
-             FF32 -> do
-                      v1 <- getNewRegNat II32
-                      return (
-                        code                    `snocOL`
-                        ST   FF32  src (spRel 16)  `snocOL`
-                        LD   II32  (spRel 16) v1
-                        ,
-                        [v1]
-                       )
-             other -> do
-                        v1 <- getNewRegNat II32
-                        return (
-                          code `snocOL` OR False g0 (RIReg src) v1
-                          , 
-                          [v1]
-                         )
-outOfLineFloatOp mop =
-    do
-      dflags <- getDynFlagsNat
-      mopExpr <- cmmMakeDynamicReference dflags addImportNat CallReference $
-		  mkForeignLabel functionName Nothing True
-      let mopLabelOrExpr = case mopExpr of
-			CmmLit (CmmLabel lbl) -> Left lbl
-                        _ -> Right mopExpr
-      return (mopLabelOrExpr, reduce)
-            where
-                (reduce, functionName) = case mop of
-	          MO_F32_Exp    -> (True,  fsLit "exp")
-	          MO_F32_Log    -> (True,  fsLit "log")
-	          MO_F32_Sqrt   -> (True,  fsLit "sqrt")
+	| otherwise
+	= do	(src, code) 	<- getSomeReg arg
+		tmp 		<- getNewRegNat (cmmTypeSize $ cmmExprType arg)
+		let pk   	= cmmExprType arg
 
-	          MO_F32_Sin    -> (True,  fsLit "sin")
-	          MO_F32_Cos    -> (True,  fsLit "cos")
-	          MO_F32_Tan    -> (True,  fsLit "tan")
+		case cmmTypeSize pk of
 
-	          MO_F32_Asin   -> (True,  fsLit "asin")
-	          MO_F32_Acos   -> (True,  fsLit "acos")
-	          MO_F32_Atan   -> (True,  fsLit "atan")
+		 -- Load a 64 bit float return value into two integer regs.
+		 FF64 -> do
+			v1 <- getNewRegNat II32
+			v2 <- getNewRegNat II32
 
-	          MO_F32_Sinh   -> (True,  fsLit "sinh")
-	          MO_F32_Cosh   -> (True,  fsLit "cosh")
-	          MO_F32_Tanh   -> (True,  fsLit "tanh")
+			let Just f0_high = fPair f0
+			
+			let code2 = 
+				code				`snocOL`
+		                FMOV FF64 src f0		`snocOL`
+		                ST   FF32  f0 (spRel 16)	`snocOL`
+		                LD   II32  (spRel 16) v1	`snocOL`
+		                ST   FF32  f0_high (spRel 16)	`snocOL`
+		                LD   II32  (spRel 16) v2
 
-	          MO_F64_Exp    -> (False, fsLit "exp")
-	          MO_F64_Log    -> (False, fsLit "log")
-	          MO_F64_Sqrt   -> (False, fsLit "sqrt")
+			return	(code2, [v1,v2])
 
-	          MO_F64_Sin    -> (False, fsLit "sin")
-	          MO_F64_Cos    -> (False, fsLit "cos")
-	          MO_F64_Tan    -> (False, fsLit "tan")
+		 -- Load a 32 bit float return value into an integer reg
+		 FF32 -> do
+			v1 <- getNewRegNat II32
+			
+			let code2 =
+				code                    	`snocOL`
+				ST   FF32  src (spRel 16)  	`snocOL`
+				LD   II32  (spRel 16) v1
+				
+			return (code2, [v1])
 
-	          MO_F64_Asin   -> (False, fsLit "asin")
-	          MO_F64_Acos   -> (False, fsLit "acos")
-	          MO_F64_Atan   -> (False, fsLit "atan")
+		 -- Move an integer return value into its destination reg.
+		 other -> do
+			v1 <- getNewRegNat II32
+	                
+			let code2 = 
+				code				`snocOL`
+				OR False g0 (RIReg src) v1
+			
+			return (code2, [v1])
 
-	          MO_F64_Sinh   -> (False, fsLit "sinh")
-	          MO_F64_Cosh   -> (False, fsLit "cosh")
-	          MO_F64_Tanh   -> (False, fsLit "tanh")
 
-                  other -> pprPanic "outOfLineFloatOp(sparc) "
-                                (pprCallishMachOp mop)
+-- | Move args from the integer vregs into which they have been 
+-- 	marshalled, into %o0 .. %o5, and the rest onto the stack.
+--
+move_final :: [Reg] -> [Reg] -> Int -> [Instr]
+
+-- all args done
+move_final [] _ offset          
+	= []
+
+-- out of aregs; move to stack
+move_final (v:vs) [] offset     
+	= ST II32 v (spRel offset)
+	: move_final vs [] (offset+1)
+
+-- move into an arg (%o[0..5]) reg
+move_final (v:vs) (a:az) offset 
+	= OR False g0 (RIReg v) a
+	: move_final vs az offset
+
+
+-- | Assign results returned from the call into their 
+--	desination regs.
+--
+assign_code :: [CmmHinted LocalReg] -> OrdList Instr
+assign_code []	= nilOL
+
+assign_code [CmmHinted dest _hint]	
+ = let	rep	= localRegType dest
+	width	= typeWidth rep
+	r_dest 	= getRegisterReg (CmmLocal dest)
+
+	result
+		| isFloatType rep 
+		, W32	<- width
+		= unitOL $ FMOV FF32 (RealReg $ fReg 0) r_dest
+
+		| isFloatType rep
+		, W64	<- width
+		= unitOL $ FMOV FF64 (RealReg $ fReg 0) r_dest
+
+		| not $ isFloatType rep
+		, W32	<- width
+		= unitOL $ mkRegRegMoveInstr (RealReg $ oReg 0) r_dest
+
+		| not $ isFloatType rep
+		, W64		<- width
+		, r_dest_hi	<- getHiVRegFromLo r_dest
+		= toOL 	[ mkRegRegMoveInstr (RealReg $ oReg 0) r_dest_hi
+			, mkRegRegMoveInstr (RealReg $ oReg 1) r_dest]
+   in	result
+
+
+-- | Generate a call to implement an out-of-line floating point operation
+outOfLineFloatOp 
+	:: CallishMachOp 
+	-> NatM ( Either CLabel CmmExpr
+		, Bool)
+
+outOfLineFloatOp mop 
+ = do	let (reduce, functionName)
+ 		= outOfLineFloatOp_table mop
+	
+ 	dflags	<- getDynFlagsNat
+	mopExpr <- cmmMakeDynamicReference dflags addImportNat CallReference 
+		$  mkForeignLabel functionName Nothing True
+
+	let mopLabelOrExpr 
+		= case mopExpr of
+			CmmLit (CmmLabel lbl) 	-> Left lbl
+                        _ 			-> Right mopExpr
+
+	return (mopLabelOrExpr, reduce)
+
+
+outOfLineFloatOp_table 
+	:: CallishMachOp
+	-> (Bool, FastString)
+	
+outOfLineFloatOp_table mop
+ = case mop of
+	MO_F32_Exp    -> (True,  fsLit "exp")
+	MO_F32_Log    -> (True,  fsLit "log")
+	MO_F32_Sqrt   -> (True,  fsLit "sqrt")
+
+	MO_F32_Sin    -> (True,  fsLit "sin")
+	MO_F32_Cos    -> (True,  fsLit "cos")
+	MO_F32_Tan    -> (True,  fsLit "tan")
+
+	MO_F32_Asin   -> (True,  fsLit "asin")
+	MO_F32_Acos   -> (True,  fsLit "acos")
+	MO_F32_Atan   -> (True,  fsLit "atan")
+
+	MO_F32_Sinh   -> (True,  fsLit "sinh")
+	MO_F32_Cosh   -> (True,  fsLit "cosh")
+	MO_F32_Tanh   -> (True,  fsLit "tanh")
+
+	MO_F64_Exp    -> (False, fsLit "exp")
+	MO_F64_Log    -> (False, fsLit "log")
+	MO_F64_Sqrt   -> (False, fsLit "sqrt")
+
+	MO_F64_Sin    -> (False, fsLit "sin")
+	MO_F64_Cos    -> (False, fsLit "cos")
+	MO_F64_Tan    -> (False, fsLit "tan")
+
+	MO_F64_Asin   -> (False, fsLit "asin")
+	MO_F64_Acos   -> (False, fsLit "acos")
+	MO_F64_Atan   -> (False, fsLit "atan")
+
+	MO_F64_Sinh   -> (False, fsLit "sinh")
+	MO_F64_Cosh   -> (False, fsLit "cosh")
+	MO_F64_Tanh   -> (False, fsLit "tanh")
+
+	other -> pprPanic "outOfLineFloatOp(sparc): Unknown callish mach op "
+              		(pprCallishMachOp mop)
+
 
 #endif /* sparc_TARGET_ARCH */
 
