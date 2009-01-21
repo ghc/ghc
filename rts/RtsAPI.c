@@ -74,6 +74,31 @@ rts_mkInt32 (Capability *cap, HsInt32 i)
   return p;
 }
 
+
+#ifdef sparc_HOST_ARCH
+/* The closures returned by allocateLocal are only guaranteed to be 32 bit
+   aligned, because that's the size of pointers. SPARC v9 can't do
+   misaligned loads/stores, so we have to write the 64bit word in chunks         */
+
+HaskellObj
+rts_mkInt64 (Capability *cap, HsInt64 i_)
+{
+  StgInt64 i   = (StgInt64)i_;
+  StgInt32 *tmp;
+
+  StgClosure *p = (StgClosure *)allocateLocal(cap,CONSTR_sizeW(0,2));
+  SET_HDR(p, I64zh_con_info, CCS_SYSTEM);
+
+  tmp    = (StgInt32*)&(p->payload[0]);
+
+  tmp[0] = (StgInt32)((StgInt64)i >> 32);
+  tmp[1] = (StgInt32)i;		/* truncate high 32 bits */
+
+  return p;
+}
+
+#else
+
 HaskellObj
 rts_mkInt64 (Capability *cap, HsInt64 i)
 {
@@ -84,6 +109,9 @@ rts_mkInt64 (Capability *cap, HsInt64 i)
   *tmp = (StgInt64)i;
   return p;
 }
+
+#endif /* sparc_HOST_ARCH */
+
 
 HaskellObj
 rts_mkWord (Capability *cap, HsWord i)
