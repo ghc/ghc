@@ -388,9 +388,11 @@ cvtl e = wrapL (cvt e)
 					  ; e' <- returnL $ OpApp x' s' undefined y'
 					  ; return $ HsPar e' }
     cvt (InfixE Nothing  s (Just y)) = do { s' <- cvtl s; y' <- cvtl y
-					  ; return $ SectionR s' y' }
+					  ; sec <- returnL $ SectionR s' y'
+					  ; return $ HsPar sec }
     cvt (InfixE (Just x) s Nothing ) = do { x' <- cvtl x; s' <- cvtl s
-					  ; return $ SectionL x' s' }
+					  ; sec <- returnL $ SectionL x' s'
+					  ; return $ HsPar sec }
     cvt (InfixE Nothing  s Nothing ) = cvt s	-- Can I indicate this is an infix thing?
 
     cvt (SigE e t)	 = do { e' <- cvtl e; t' <- cvtType t
