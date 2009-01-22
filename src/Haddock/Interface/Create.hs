@@ -198,18 +198,19 @@ topDecls = filterClasses . filterDecls . collectDocs . sortByLoc . declsFromGrou
 filterOutInstances = filter (\(L _ d, _, _) -> not (isInstD d))
 
 
--- | Take all declarations in an 'HsGroup' and convert them into a list of
--- 'Decl's
+-- | Take all declarations except pragmas, infix decls, rules and value
+-- bindings from an 'HsGroup'.
 declsFromGroup :: HsGroup Name -> [Decl]
--- TODO: actually take all declarations
 declsFromGroup group = 
-  decls hs_tyclds TyClD group ++
-  decls hs_fords  ForD  group ++
-  decls hs_docs   DocD  group ++
-  decls hs_instds InstD group ++
-  decls (sigs . hs_valds) SigD group
+  decls hs_tyclds  TyClD    group ++
+  decls hs_derivds DerivD   group ++
+  decls hs_defds   DefD     group ++
+  decls hs_fords   ForD     group ++
+  decls hs_docs    DocD     group ++
+  decls hs_instds  InstD    group ++
+  decls (typesigs . hs_valds) SigD group
   where
-    sigs (ValBindsOut _ x) = x
+    typesigs (ValBindsOut _ sigs) = filter isVanillaLSig sigs
 
 
 -- | Take a field of declarations from a data structure and create HsDecls
@@ -283,9 +284,6 @@ filterClasses decls = [ if isClassD d then (L loc (filterClass d), doc) else x
 
 
 -- | Collect the docs and attach them to the right declaration.
--- Ideally, input should contain all kinds of declarations, so that we don't
--- attach docs to the wrong declaration. An exception to this is function and
--- value declarations - we assume (for now) that they are not part of the input.
 collectDocs :: [Decl] -> [(Decl, (Maybe Doc))]
 collectDocs decls = collect Nothing DocEmpty decls
 
