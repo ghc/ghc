@@ -7,7 +7,7 @@ bug-reports: http://hackage.haskell.org/trac/ghc/newticket?component=libraries%2
 synopsis:       GHC primitives
 description:
     GHC primitives.
-cabal-version:  >=1.2
+cabal-version:  >=1.6
 build-type: Custom
 
 source-repository head
