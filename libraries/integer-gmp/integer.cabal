@@ -7,7 +7,7 @@ bug-reports: http://hackage.haskell.org/trac/ghc/newticket?component=libraries%2
 synopsis:       Integer library based on GMP
 description:
     This package contains an Integer library based on GMP.
-cabal-version:  >=1.2
+cabal-version:  >=1.6
 build-type: Simple
 
 source-repository head
