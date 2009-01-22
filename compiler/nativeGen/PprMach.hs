@@ -692,7 +692,7 @@ pprData :: CmmStatic -> Doc
 pprData (CmmAlign bytes)         = pprAlign bytes
 pprData (CmmDataLabel lbl)       = pprLabel lbl
 pprData (CmmString str)          = pprASCII str
-pprData (CmmUninitialised bytes) = ptext (sLit ".space ") <> int bytes
+pprData (CmmUninitialised bytes) = ptext (sLit ".skip ") <> int bytes
 pprData (CmmStaticLit lit)       = pprDataItem lit
 
 pprGloblDecl :: CLabel -> Doc
