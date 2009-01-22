@@ -9,7 +9,7 @@ description:
     This package contains the Prelude and its support libraries,
     and a large collection of useful libraries ranging from data
     structures to parsing combinators and debugging utilities.
-cabal-version:  >=1.2
+cabal-version:  >=1.6
 build-type: Configure
 extra-tmp-files:
                 config.log config.status autom4te.cache
