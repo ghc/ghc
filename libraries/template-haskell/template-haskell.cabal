@@ -7,7 +7,7 @@ bug-reports: http://hackage.haskell.org/trac/ghc/newticket?component=Template%20
 description:
     Facilities for manipulating Haskell source code using Template Haskell.
 build-type: Simple
-Cabal-Version: >= 1.2
+Cabal-Version: >= 1.6
 
 Library
     build-depends: base, pretty, packedstring, containers
