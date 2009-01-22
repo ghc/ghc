@@ -301,19 +301,6 @@ rts_getInt32 (HaskellObj p)
 HsInt64
 rts_getInt64 (HaskellObj p)
 {
-    HsInt64* tmp;
-    // See comment above:
-    // ASSERT(p->header.info == I64zh_con_info ||
-    //        p->header.info == I64zh_static_info);
-    tmp = (HsInt64*)&(UNTAG_CLOSURE(p)->payload[0]);
-    return *tmp;
-}
-
-#else
-
-HsInt64
-rts_getInt64 (HaskellObj p)
-{
     HsInt32* tmp;
     // See comment above:
     // ASSERT(p->header.info == I64zh_con_info ||
@@ -321,7 +308,20 @@ rts_getInt64 (HaskellObj p)
     tmp = (HsInt32*)&(UNTAG_CLOSURE(p)->payload[0]);
 
     HsInt64 i	= (HsInt64)(tmp[0] << 32) | (HsInt64)tmp[1];
-    return i
+    return i;
+}
+
+#else
+
+HsInt64
+rts_getInt64 (HaskellObj p)
+{
+    HsInt64* tmp;
+    // See comment above:
+    // ASSERT(p->header.info == I64zh_con_info ||
+    //        p->header.info == I64zh_static_info);
+    tmp = (HsInt64*)&(UNTAG_CLOSURE(p)->payload[0]);
+    return *tmp;
 }
 
 #endif /* sparc_HOST_ARCH */
