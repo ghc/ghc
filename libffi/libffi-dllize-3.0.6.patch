@@ -1,5 +1,42 @@
---- libffi-3.0.6/include/ffi.h.in	2008-04-03 20:57:34.000000000 +0200
-+++ build/include/ffi.h.in	2008-10-14 09:51:55.000000000 +0200
+diff -Nur libffi-3.0.6/Makefile.am build/Makefile.am
+--- libffi-3.0.6/Makefile.am	2008-02-21 13:36:18.000000000 +0000
++++ build/Makefile.am	2009-01-23 17:56:09.000000000 +0000
+@@ -165,7 +165,7 @@
+ 
+ AM_CFLAGS = -Wall -g -fexceptions
+ 
+-libffi_la_LDFLAGS = -version-info `grep -v '^\#' $(srcdir)/libtool-version`
++libffi_la_LDFLAGS = $(LIBFFI_LDFLAGS) -version-info `grep -v '^\#' $(srcdir)/libtool-version`
+ 
+ AM_CPPFLAGS = -I. -I$(top_srcdir)/include -Iinclude -I$(top_srcdir)/src
+ AM_CCASFLAGS = $(AM_CPPFLAGS)
+diff -Nur libffi-3.0.6/configure.ac build/configure.ac
+--- libffi-3.0.6/configure.ac	2008-07-17 13:57:33.000000000 +0100
++++ build/configure.ac	2009-01-23 17:56:09.000000000 +0000
+@@ -26,6 +26,20 @@
+ 
+ AM_PROG_AS
+ AM_PROG_CC_C_O
++
++AC_LIBTOOL_WIN32_DLL
++AC_SUBST(LIBFFI_DLL,0)
++
++case $host in
++  *-*-cygwin* | *-*-mingw* | *-*-pw32* | *-*-os2*)
++    if test "$enable_shared" = yes; then
++      LIBFFI_LDFLAGS="-no-undefined -Wl,--export-all-symbols"
++      LIBFFI_DLL=1
++    fi
++    ;;
++esac
++AC_SUBST(LIBFFI_LDFLAGS)
++
+ AC_PROG_LIBTOOL
+ 
+ AM_MAINTAINER_MODE
+diff -Nur libffi-3.0.6/include/ffi.h.in build/include/ffi.h.in
+--- libffi-3.0.6/include/ffi.h.in	2008-04-03 19:57:34.000000000 +0100
++++ build/include/ffi.h.in	2009-01-23 17:56:09.000000000 +0000
 @@ -61,6 +61,17 @@
  #define @TARGET@
  #endif
@@ -141,31 +178,9 @@
  
  /* Useful for eliminating compiler warnings */
  #define FFI_FN(f) ((void (*)(void))f)
---- build/Makefile.am	2008-02-21 14:21:24.000000000 +0100
-+++ build-shared/Makefile.am	2008-10-11 20:44:15.000000000 +0200
-@@ -165,7 +165,7 @@
- 
- AM_CFLAGS = -Wall -g -fexceptions
- 
--libffi_la_LDFLAGS = -version-info `grep -v '^\#' $(srcdir)/libtool-version`
-+libffi_la_LDFLAGS = $(LIBFFI_LDFLAGS) -version-info `grep -v '^\#' $(srcdir)/libtool-version`
- 
- AM_CPPFLAGS = -I. -I$(top_srcdir)/include -Iinclude -I$(top_srcdir)/src
- AM_CCASFLAGS = $(AM_CPPFLAGS)
---- build/src/x86/win32.S	2008-02-15 02:17:20.000000000 +0100
-+++ build-shared/src/x86/win32.S	2008-10-11 19:19:03.000000000 +0200
-@@ -33,8 +33,6 @@
-  
- .text
-  
--.globl ffi_prep_args
-- 
-         # This assumes we are using gas.
-         .balign 16
- .globl _ffi_call_SYSV
-
---- build/include/ffi_common.h	2008-01-29 16:15:17.000000000 +0100
-+++ build-shared/include/ffi_common.h	2008-10-13 00:35:02.000000000 +0200
+diff -Nur libffi-3.0.6/include/ffi_common.h build/include/ffi_common.h
+--- libffi-3.0.6/include/ffi_common.h	2008-07-12 06:43:00.000000000 +0100
++++ build/include/ffi_common.h	2009-01-23 17:56:09.000000000 +0000
 @@ -49,9 +49,9 @@
  #endif
  
@@ -188,26 +203,15 @@
  
  /* Extended cif, used in callback from assembly routine */
  typedef struct
---- build/configure.ac	2008-02-24 18:20:21.000000000 +0100
-+++ build-shared/configure.ac	2008-10-13 19:20:04.000000000 +0200
-@@ -26,6 +26,20 @@
- 
- AM_PROG_AS
- AM_PROG_CC_C_O
-+
-+AC_LIBTOOL_WIN32_DLL
-+AC_SUBST(LIBFFI_DLL,0)
-+
-+case $host in
-+  *-*-cygwin* | *-*-mingw* | *-*-pw32* | *-*-os2*)
-+    if test "$enable_shared" = yes; then
-+      LIBFFI_LDFLAGS="-no-undefined -Wl,--export-all-symbols"
-+      LIBFFI_DLL=1
-+    fi
-+    ;;
-+esac
-+AC_SUBST(LIBFFI_LDFLAGS)
-+
- AC_PROG_LIBTOOL
- 
- AM_MAINTAINER_MODE
+diff -Nur libffi-3.0.6/src/x86/win32.S build/src/x86/win32.S
+--- libffi-3.0.6/src/x86/win32.S	2008-02-15 01:24:06.000000000 +0000
++++ build/src/x86/win32.S	2009-01-23 17:56:09.000000000 +0000
+@@ -33,8 +33,6 @@
+  
+ .text
+  
+-.globl ffi_prep_args
+- 
+         # This assumes we are using gas.
+         .balign 16
+ .globl _ffi_call_SYSV
