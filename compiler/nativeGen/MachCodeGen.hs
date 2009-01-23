@@ -3616,6 +3616,16 @@ genCCall
 
 -}
 
+
+-- On SPARC under TSO (Total Store Ordering), writes earlier in the instruction stream
+-- are guaranteed to take place before writes afterwards (unlike on PowerPC). 
+-- Ref: Section 8.4 of the SPARC V9 Architecture manual.
+--
+-- In the SPARC case we don't need a barrier.
+--
+genCCall (CmmPrim (MO_WriteBarrier)) _ _
+ = do	return nilOL
+
 genCCall target dest_regs argsAndHints 
  = do	 	
 	-- strip hints from the arg regs
