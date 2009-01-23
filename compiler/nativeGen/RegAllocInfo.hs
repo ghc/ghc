@@ -320,8 +320,8 @@ regUsage instr = case instr of
     FSUB  s r1 r2 r3 	-> usage ([r1, r2], [r3])
     FxTOy s1 s2 r1 r2 	-> usage ([r1], [r2])
 
-    -- We assume that all local jumps will be BI/BF.  JMP must be out-of-line.
-    JMP   addr 	        -> usage (regAddr addr, [])
+    JMP     addr 	-> usage (regAddr addr, [])
+    JMP_TBL addr ids    -> usage (regAddr addr, [])
 
     CALL  (Left imm)  n True  -> noUsage
     CALL  (Left imm)  n False -> usage (argRegs n, callClobberedRegs)
@@ -427,6 +427,7 @@ jumpDests insn acc
 #elif sparc_TARGET_ARCH
 	BI   _ _ id	-> id : acc
 	BF   _ _ id	-> id : acc
+	JMP_TBL _ ids	-> ids ++ acc
 #else
 #error "RegAllocInfo.jumpDests not finished"
 #endif
@@ -696,7 +697,10 @@ patchRegs instr env = case instr of
     FSQRT s r1 r2       -> FSQRT s (env r1) (env r2)
     FSUB  s r1 r2 r3    -> FSUB s (env r1) (env r2) (env r3)
     FxTOy s1 s2 r1 r2   -> FxTOy s1 s2 (env r1) (env r2)
-    JMP   addr          -> JMP (fixAddr addr)
+
+    JMP     addr        -> JMP     (fixAddr addr)
+    JMP_TBL addr ids    -> JMP_TBL (fixAddr addr) ids
+
     CALL  (Left i) n t  -> CALL (Left i) n t
     CALL  (Right r) n t -> CALL (Right (env r)) n t
     _ -> instr

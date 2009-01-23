@@ -4309,8 +4309,8 @@ genSwitch expr ids
 			, SLL   e_reg (RIImm $ ImmInt 2) offset_reg
 
 			-- load and jump to the destination
-			, LD 	II32 (AddrRegReg base_reg offset_reg) dst
-			, JMP   (AddrRegImm dst (ImmInt 0)) 
+			, LD 	  II32 (AddrRegReg base_reg offset_reg) dst
+			, JMP_TBL (AddrRegImm dst (ImmInt 0)) [i | Just i <- ids]
 			, NOP ]
 
 #else

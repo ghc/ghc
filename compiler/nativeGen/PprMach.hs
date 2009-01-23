@@ -2110,6 +2110,7 @@ pprInstr (BF cond b (BlockId id))
     ]
 
 pprInstr (JMP addr) = (<>) (ptext (sLit "\tjmp\t")) (pprAddr addr)
+pprInstr (JMP_TBL op ids)  = pprInstr (JMP op)
 
 pprInstr (CALL (Left imm) n _)
   = hcat [ ptext (sLit "\tcall\t"), pprImm imm, comma, int n ]

@@ -609,6 +609,13 @@ is_G_instr instr
     	      | BF  	      Cond Bool BlockId -- cond, annul?, target
 
 	      | JMP	      AddrMode     -- target
+
+	      -- With a tabled jump we know all the possible destinations. Tabled
+	      -- jump includes its list of destinations so we can work out what regs
+	      -- are live across the jump.
+	      -- 
+	      | JMP_TBL	      AddrMode [BlockId]
+
 	      | CALL	      (Either Imm Reg) Int Bool -- target, args, terminal
 
 riZero :: RI -> Bool
