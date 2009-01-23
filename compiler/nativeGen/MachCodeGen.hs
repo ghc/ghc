@@ -371,6 +371,26 @@ iselExpr64 (CmmMachOp (MO_Add _) [e1, CmmLit (CmmInt i _)])
 			r_dst_lo
 
 
+-- Addition of II64
+iselExpr64 (CmmMachOp (MO_Add width) [e1, e2])
+ = do	ChildCode64 code1 r1_lo	<- iselExpr64 e1
+	let r1_hi	= getHiVRegFromLo r1_lo
+
+ 	ChildCode64 code2 r2_lo	<- iselExpr64 e2
+	let r2_hi	= getHiVRegFromLo r2_lo
+	
+	r_dst_lo	<- getNewRegNat II32
+	let r_dst_hi	= getHiVRegFromLo r_dst_lo
+	
+	let code =	code1
+		`appOL`	code2
+		`appOL`	toOL
+			[ ADD False False r1_lo (RIReg r2_lo) r_dst_lo
+			, ADD True  False r1_hi (RIReg r2_hi) r_dst_hi ]
+	
+	return	$ ChildCode64 code r_dst_lo
+
+
 iselExpr64 (CmmReg (CmmLocal (LocalReg uq ty))) | isWord64 ty = do
      r_dst_lo <-  getNewRegNat II32
      let r_dst_hi = getHiVRegFromLo r_dst_lo
@@ -382,6 +402,23 @@ iselExpr64 (CmmReg (CmmLocal (LocalReg uq ty))) | isWord64 ty = do
      return (
             ChildCode64 (toOL [mov_hi, mov_lo]) r_dst_lo
          )
+
+-- Convert something into II64
+iselExpr64 (CmmMachOp (MO_UU_Conv _ W64) [expr]) 
+ = do
+	r_dst_lo 	<- getNewRegNat II32
+	let r_dst_hi	= getHiVRegFromLo r_dst_lo
+
+	-- compute expr and load it into r_dst_lo
+	(a_reg, a_code)	<- getSomeReg expr
+
+	let code	= a_code
+		`appOL`	toOL
+			[ mkRegRegMoveInstr g0    r_dst_hi 	-- clear high 32 bits
+			, mkRegRegMoveInstr a_reg r_dst_lo ]
+			
+	return	$ ChildCode64 code r_dst_lo
+
 
 iselExpr64 expr
    = pprPanic "iselExpr64(sparc)" (ppr expr)
