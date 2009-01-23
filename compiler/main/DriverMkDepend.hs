@@ -21,12 +21,12 @@ import HsSyn            ( ImportDecl(..) )
 import PrelNames
 import DynFlags
 import Util
-import HscTypes         ( HscEnv, IsBootInterface, msObjFilePath, msHsFilePath, getSession )
+import HscTypes
 import SysTools         ( newTempName )
 import qualified SysTools
 import Module
 import Digraph          ( SCC(..) )
-import Finder           ( findImportedModule, FindResult(..) )
+import Finder
 import Outputable
 import Panic
 import SrcLoc
@@ -34,7 +34,7 @@ import Data.List
 import FastString
 
 import Exception
-import ErrUtils         ( debugTraceMsg, putMsg )
+import ErrUtils
 import MonadUtils       ( liftIO )
 
 import System.Directory
@@ -187,8 +187,8 @@ processDeps dflags hsc_env excl_mods hdl (AcyclicSCC node)
               obj_file  = msObjFilePath node
               obj_files = insertSuffixes obj_file extra_suffixes
 
-              do_imp is_boot pkg_qual imp_mod
-                = do { mb_hi <- findDependency hsc_env pkg_qual imp_mod
+              do_imp loc is_boot pkg_qual imp_mod
+                = do { mb_hi <- findDependency hsc_env loc pkg_qual imp_mod
                                                is_boot include_pkg_deps
                      ; case mb_hi of {
                            Nothing      -> return () ;
@@ -209,8 +209,8 @@ processDeps dflags hsc_env excl_mods hdl (AcyclicSCC node)
                 -- Emit a dependency for each import
 
         ; let do_imps is_boot idecls = sequence_
-                    [ do_imp is_boot (ideclPkgQual i) mod
-                    | L _ i <- idecls,
+                    [ do_imp loc is_boot (ideclPkgQual i) mod
+                    | L loc i <- idecls,
                       let mod = unLoc (ideclName i),
                       mod `notElem` excl_mods ]
 
@@ -218,17 +218,18 @@ processDeps dflags hsc_env excl_mods hdl (AcyclicSCC node)
         ; do_imps False (ms_imps node)
 
         ; when (dopt Opt_ImplicitPrelude (ms_hspp_opts node)) $
-            do_imp False Nothing pRELUDE_NAME
+            do_imp noSrcSpan False Nothing pRELUDE_NAME
         }
 
 
 findDependency  :: HscEnv
+                -> SrcSpan
                 -> Maybe FastString     -- package qualifier, if any
                 -> ModuleName           -- Imported module
                 -> IsBootInterface      -- Source import
                 -> Bool                 -- Record dependency on package modules
                 -> IO (Maybe FilePath)  -- Interface file file
-findDependency hsc_env pkg imp is_boot include_pkg_deps
+findDependency hsc_env srcloc pkg imp is_boot include_pkg_deps
   = do  {       -- Find the module; this will be fast because
                 -- we've done it once during downsweep
           r <- findImportedModule hsc_env imp pkg
@@ -242,7 +243,8 @@ findDependency hsc_env pkg imp is_boot include_pkg_deps
                 | otherwise
                 -> return Nothing
 
-            _ -> panic "findDependency"
+            fail -> throwOneError $ mkPlainErrMsg srcloc $
+                        cannotFindModule (hsc_dflags hsc_env) imp fail
         }
 
 -----------------------------
