@@ -375,23 +375,25 @@ mkExportItems modMap this_mod exported_names decls declMap
         Just found -> return [ ExportDoc found ]
 
     declWith :: Name -> ErrMsgM [ ExportItem Name ]
-    declWith t
-      -- temp hack: we filter out separately declared ATs, since we haven't decided how
-      -- to handle them yet. We should really give an warning message also, and filter the
-      -- name out in mkVisibleNames...
-      | Just x@(decl,_,_) <- findDecl t,
-        t `notElem` declATs (unL decl) = return [ mkExportDecl t x ]
-      | otherwise =
-        -- If we can't find the declaration, it must belong to another package.
-        -- We return an 'ExportNoDecl', and we try to get the subs from the
-        -- installed interface of that package.
-        case Map.lookup (nameModule t) instIfaceMap of
-          Nothing -> return [ ExportNoDecl t [] ]
-          Just iface ->
-            let subs = case Map.lookup t (instSubMap iface) of
-                         Nothing -> []
-                         Just x -> x
-            in return [ ExportNoDecl t subs ]
+    declWith t =
+      case findDecl t of
+        Just x@(decl,_,_)
+          -- temp hack: we filter out separately exported ATs, since we haven't decided how
+          -- to handle them yet. We should really give an warning message also, and filter the
+          -- name out in mkVisibleNames...
+          | t `elem` declATs (unL decl) -> return []
+          | otherwise                   -> return [ mkExportDecl t x ]
+        Nothing ->
+          -- If we can't find the declaration, it must belong to another package.
+          -- We return an 'ExportNoDecl', and we try to get the subs from the
+          -- installed interface of that package.
+          case Map.lookup (nameModule t) instIfaceMap of
+            Nothing -> return [ ExportNoDecl t [] ]
+            Just iface ->
+              let subs = case Map.lookup t (instSubMap iface) of
+                           Nothing -> []
+                           Just x -> x
+              in return [ ExportNoDecl t subs ]
 
     mkExportDecl :: Name -> DeclInfo -> ExportItem Name
     mkExportDecl n (decl, doc, subs) = decl'
