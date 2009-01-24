@@ -385,8 +385,8 @@ mkExportItems modMap this_mod exported_names decls declMap
           | otherwise                   -> return [ mkExportDecl t x ]
         Nothing ->
           -- If we can't find the declaration, it must belong to another package.
-          -- We return an 'ExportNoDecl', and we try to get the subs from the
-          -- installed interface of that package.
+          -- We return just the name of the declaration and try to get the subs
+          -- from the installed interface of that package.
           case Map.lookup (nameModule t) instIfaceMap of
             Nothing -> return [ ExportNoDecl t [] ]
             Just iface ->
