@@ -114,7 +114,7 @@ createInterfaces' session modules flags instIfaceMap = do
   mbGraph <- depanal session [] False
   modgraph <- case mbGraph of
     Just graph -> return graph
-    Nothing -> throwE "Failed to create dependecy graph"
+    Nothing -> throwE "Failed to create dependency graph"
   let orderedMods = flattenSCCs $ topSortModuleGraph False modgraph Nothing
   (ifaces, _) <- foldM (\(ifaces, modMap) modsum -> do
     x <- processModule session modsum flags modMap instIfaceMap
