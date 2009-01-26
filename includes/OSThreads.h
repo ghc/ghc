@@ -54,6 +54,11 @@ typedef pthread_key_t   ThreadLocalKey;
     barf("RELEASE_LOCK: I do not own this lock: %s %d", __FILE__,__LINE__); \
   }
 
+// Note: this assertion calls pthread_mutex_lock() on a mutex that
+// is already held by the calling thread.  The mutex should therefore
+// have been created with PTHREAD_MUTEX_ERRORCHECK, otherwise this
+// assertion will hang.  We always initialise mutexes with
+// PTHREAD_MUTEX_ERRORCHECK when DEBUG is on (see rts/posix/OSThreads.h).
 #define ASSERT_LOCK_HELD(mutex) ASSERT(pthread_mutex_lock(mutex) == EDEADLK)
 
 #endif // CMINUSMINUS
