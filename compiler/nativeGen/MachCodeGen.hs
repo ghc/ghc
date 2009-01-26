@@ -3567,8 +3567,9 @@ genCCall target dest_regs args = do
 	 (arg_op, arg_code) <- getOperand arg
          delta <- getDeltaNat
          setDeltaNat (delta-arg_size)
-	 let code' = code `appOL` toOL [PUSH II64 arg_op, 
-	 			        DELTA (delta-arg_size)]
+	 let code' = code `appOL` arg_code `appOL` toOL [
+                        PUSH II64 arg_op, 
+	 		DELTA (delta-arg_size)]
 	 push_args rest code'
 	where
 	  arg_rep = cmmExprType arg
