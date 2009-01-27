@@ -2362,6 +2362,26 @@ getApStackValzh_fast
    RET_NP(ok,val);
 }
 
+/* -----------------------------------------------------------------------------
+   Misc. primitives
+   -------------------------------------------------------------------------- */
+
+// Write the cost center stack of the first argument on stderr; return
+// the second.  Possibly only makes sense for already evaluated
+// things?
+traceCcszh_fast
+{
+    W_ ccs;
+
+#ifdef PROFILING
+    ccs = StgHeader_ccs(UNTAG(R1));
+    foreign "C" fprintCCS_stderr(ccs "ptr") [R2];
+#endif
+
+    R1 = R2;
+    ENTER();
+}
+
 getSparkzh_fast
 {
    W_ spark;

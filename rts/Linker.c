@@ -856,6 +856,7 @@ typedef struct _RtsSymbolVal {
       SymI_NeedsProto(rts_stop_on_exception)		\
       SymI_HasProto(stopTimer)				\
       SymI_HasProto(n_capabilities)			\
+      SymI_HasProto(traceCcszh_fast)                    \
       RTS_USER_SIGNALS_SYMBOLS
 
 #ifdef SUPPORT_LONG_LONGS

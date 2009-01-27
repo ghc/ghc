@@ -1743,6 +1743,17 @@ primop  GetApStackValOp "getApStackVal#" GenPrimOp
    out_of_line = True
 
 ------------------------------------------------------------------------
+section "Misc"
+        {These aren't nearly as wired in as Etc...}
+------------------------------------------------------------------------
+
+primop  TraceCcsOp "traceCcs#" GenPrimOp
+   a -> b -> b
+   with
+   has_side_effects = True
+   out_of_line = True
+
+------------------------------------------------------------------------
 section "Etc" 
 	{Miscellaneous built-ins}
 ------------------------------------------------------------------------

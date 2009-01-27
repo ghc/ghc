@@ -606,6 +606,8 @@ RTS_FUN(getSparkzh_fast);
 
 RTS_FUN(noDuplicatezh_fast);
 
+RTS_FUN(traceCcszh_fast);
+
 /* Other misc stuff */
 // See wiki:Commentary/Compiler/Backends/PprC#Prototypes
 
