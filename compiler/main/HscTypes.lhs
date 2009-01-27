@@ -1149,6 +1149,8 @@ data InteractiveContext
 #ifdef GHCI
         , ic_resume :: [Resume]         -- ^ The stack of breakpoint contexts
 #endif
+
+        , ic_cwd :: Maybe FilePath      -- virtual CWD of the program
     }
 
 
@@ -1162,6 +1164,7 @@ emptyInteractiveContext
 #ifdef GHCI
                          , ic_resume = []
 #endif
+                         , ic_cwd = Nothing
                        }
 
 icPrintUnqual :: DynFlags -> InteractiveContext -> PrintUnqualified

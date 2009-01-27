@@ -340,8 +340,6 @@ interactiveUI srcs maybe_exprs = withTerminalReset $ do
 
    default_editor <- liftIO $ findEditor
 
-   cwd <- liftIO $ getCurrentDirectory
-
    startGHCi (runGHCi srcs maybe_exprs)
         GHCiState{ progname = "<interactive>",
                    args = [],
@@ -357,7 +355,6 @@ interactiveUI srcs maybe_exprs = withTerminalReset $ do
                    last_command = Nothing,
                    cmdqueue = [],
                    remembered_ctx = [],
-                   virtual_path   = cwd,
                    ghc_e = isJust maybe_exprs
                  }
 

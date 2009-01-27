@@ -36,7 +36,6 @@ import Data.Int         ( Int64 )
 import Data.IORef
 import Data.List
 import System.CPUTime
-import System.Directory
 import System.Environment
 import System.IO
 import Control.Monad as Monad
@@ -73,7 +72,6 @@ data GHCiState = GHCiState
              -- were supposed to be in the context but currently had errors,
              -- but this was complicated.  Just replaying the :module commands
              -- seems to be the right thing.
-        virtual_path   :: FilePath,
         ghc_e :: Bool -- True if this is 'ghc -e' (or runghc)
      }
 
@@ -239,19 +237,8 @@ printForUserPartWay doc = do
   unqual <- GHC.getPrintUnqual
   io $ Outputable.printForUserPartWay stdout opt_PprUserLength unqual doc
 
-withVirtualPath :: GHCi a -> GHCi a
-withVirtualPath m = do
-  ghci_wd <- io getCurrentDirectory                -- Store the cwd of GHCi
-  st  <- getGHCiState
-  io$ setCurrentDirectory (virtual_path st)
-  result <- m                                  -- Evaluate in the virtual wd..
-  vwd <- io getCurrentDirectory
-  setGHCiState (st{ virtual_path = vwd})       -- Update the virtual path
-  io$ setCurrentDirectory ghci_wd                  -- ..and restore GHCi wd
-  return result
-
 runStmt :: String -> GHC.SingleStep -> GHCi GHC.RunResult
-runStmt expr step = withVirtualPath$ do
+runStmt expr step = do
   st <- getGHCiState
   reifyGHCi $ \x ->
     withProgName (progname st) $
@@ -262,9 +249,7 @@ runStmt expr step = withVirtualPath$ do
           GHC.runStmt expr step
 
 resume :: GHC.SingleStep -> GHCi GHC.RunResult
-resume step = withVirtualPath$ do
-  GHC.resume step
-
+resume step = GHC.resume step
 
 -- --------------------------------------------------------------------------
 -- timing & statistics
