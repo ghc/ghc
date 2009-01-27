@@ -337,7 +337,17 @@ case "${UNAME_MACHINE}:${UNAME_SYSTEM}:${UNAME_RELEASE}:${UNAME_VERSION}" in
 	# Note that the Sun cc does not turn __LP64__ into 1 like gcc does.
 	# This test works for both compilers.
 	if [ "$CC_FOR_BUILD" != 'no_compiler_found' ]; then
-	    if echo '\n#ifdef __amd64\nIS_64BIT_ARCH\n#endif' | \
+            # bash is not able to generate correct code here
+            # i.e. it leaves \ns there
+            # so we need to use /usr/bin/echo to get what we want
+            # note that if config.guess is run by /bin/sh then
+            # this works as expected even without /usr/bin/echo
+            # but the problem is that configure is clever enough
+            # to find bash installed and then runs config.guess
+            # by bash instead of by /bin/sh
+            # It seems that using /usr/bin/echo here is the most
+            # portable Solaris fix
+	    if /usr/bin/echo '\n#ifdef __amd64\nIS_64BIT_ARCH\n#endif' | \
 		(CCOPTS= $CC_FOR_BUILD -E - 2>/dev/null) | \
 		grep IS_64BIT_ARCH >/dev/null
 	    then
