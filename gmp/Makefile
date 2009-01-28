@@ -34,8 +34,13 @@ PLATFORM := $(shell echo $(HOSTPLATFORM) | sed 's/i[567]86/i486/g')
 # follow, as it isn't used consistently. Instead we put an ln.bat in
 # path that always fails.
 
+# We use a tarball like gmp-4.2.1-nodoc.tar.gz, which is
+# gmp-4.2.1.tar.gz repacked without the doc/ directory contents.
+# That's because the doc/ directory contents are under the GFDL,
+# which causes problems for Debian.
+
 GMP_TARBALL := $(firstword $(wildcard gmp*.tar.gz))
-GMP_DIR := $(subst .tar.gz,,$(GMP_TARBALL))
+GMP_DIR := $(subst -nodoc.tar.gz,,$(GMP_TARBALL))
 
 ifeq "$(findstring dyn, $(GhcRTSWays))" "dyn"
 BUILD_SHARED=yes
