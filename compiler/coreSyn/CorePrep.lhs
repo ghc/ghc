@@ -277,34 +277,58 @@ cpePair :: TopLevelFlag -> RecFlag -> RhsDemand
 	-> UniqSM (Floats, Id, CoreExpr)
 -- Used for all bindings
 cpePair top_lvl is_rec is_strict_or_unlifted env bndr rhs
-  = do { (floats, rhs') <- cpeRhs want_float (idArity bndr) env rhs
+  = do { (floats1, rhs1) <- cpeRhsE env rhs
+       ; let (rhs1_bndrs, _) = collectBinders rhs1
+       ; (floats2, rhs2)
+       	    <- if want_float floats1 rhs1 
+       	       then return (floats1, rhs1)
+       	       else -- Non-empty floats will wrap rhs1
+                    -- But: rhs1 might have lambdas, and we can't
+		    --      put them inside a wrapBinds
+	       if valBndrCount rhs1_bndrs <= arity 
+	       then    -- Lambdas in rhs1 will be nuked by eta expansion
+	       	    return (emptyFloats, wrapBinds floats1 rhs1)
+	   
+	       else do { body1 <- rhsToBodyNF rhs1
+  	               ; return (emptyFloats, wrapBinds floats1 body1) } 
+
+       ; (floats3, rhs')   -- Note [Silly extra arguments]
+            <- if manifestArity rhs2 <= arity 
+	       then return (floats2, cpeEtaExpand arity rhs2)
+	       else WARN(True, text "CorePrep: silly extra arguments:" <+> ppr bndr)
+	       	    (do { v <- newVar (idType bndr)
+		        ; let float = mkFloat False False v rhs2
+		        ; return (addFloat floats2 float, cpeEtaExpand arity (Var v)) })
 
 	     	-- Record if the binder is evaluated
        ; let bndr' | exprIsHNF rhs' = bndr `setIdUnfolding` evaldUnfolding
        	     	   | otherwise      = bndr
 
-       ; return (floats, bndr', rhs') }
+       ; return (floats3, bndr', rhs') }
   where
+    arity = idArity bndr	-- We must match this arity
     want_float floats rhs 
      | isTopLevel top_lvl = wantFloatTop bndr floats
      | otherwise          = wantFloatNested is_rec is_strict_or_unlifted floats rhs
 
+{- Note [Silly extra arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we had this
+	f{arity=1} = \x\y. e
+We *must* match the arity on the Id, so we have to generate
+        f' = \x\y. e
+ 	f  = \x. f' x
 
+It's a bizarre case: why is the arity on the Id wrong?  Reason
+(in the days of __inline_me__): 
+        f{arity=0} = __inline_me__ (let v = expensive in \xy. e)
+When InlineMe notes go away this won't happen any more.  But
+it seems good for CorePrep to be robust.
+-}
 
 -- ---------------------------------------------------------------------------
 --		CpeRhs: produces a result satisfying CpeRhs
 -- ---------------------------------------------------------------------------
-
-cpeRhs :: (Floats -> CpeRhs -> Bool)	-- Float the floats out
-       -> Arity		-- Guarantees an Rhs with this manifest arity
-       -> CorePrepEnv
-       -> CoreExpr 	-- Expression and its type
-       -> UniqSM (Floats, CpeRhs)
-cpeRhs want_float arity env expr
-  = do { (floats, rhs) <- cpeRhsE env expr
-       ; if want_float floats rhs
-       	 then return (floats,      cpeEtaExpand arity rhs)
-       	 else return (emptyFloats, cpeEtaExpand arity (wrapBinds floats rhs)) }
 
 cpeRhsE :: CorePrepEnv -> CoreExpr -> UniqSM (Floats, CpeRhs)
 -- If
@@ -375,6 +399,11 @@ cpeBody env expr
   = do { (floats1, rhs) <- cpeRhsE env expr
        ; (floats2, body) <- rhsToBody rhs
        ; return (floats1 `appendFloats` floats2, body) }
+
+--------
+rhsToBodyNF :: CpeRhs -> UniqSM CpeBody
+rhsToBodyNF rhs = do { (floats,body) <- rhsToBody rhs
+	    	     ; return (wrapBinds floats body) }
 
 --------
 rhsToBody :: CpeRhs -> UniqSM (Floats, CpeBody)
@@ -498,14 +527,21 @@ cpeApp env expr
 cpeArg :: CorePrepEnv -> RhsDemand -> CoreArg -> Type
        -> UniqSM (Floats, CpeTriv)
 cpeArg env is_strict arg arg_ty
-  | cpe_ExprIsTrivial arg	-- Do not eta expand etc a trivial argument
-  = cpeBody env arg	-- Must still do substitution though
+  | cpe_ExprIsTrivial arg   -- Do not eta expand etc a trivial argument
+  = cpeBody env arg	    -- Must still do substitution though
   | otherwise
-  = do { (floats, arg') <- cpeRhs want_float
-       	 	  	   	  (exprArity arg) env arg
+  = do { (floats1, arg1) <- cpeRhsE env arg	-- arg1 can be a lambda
+       ; (floats2, arg2) <- if want_float floats1 arg1 
+       	 	   	    then return (floats1, arg1)
+       	 	   	    else do { body1 <- rhsToBodyNF arg1
+  			            ; return (emptyFloats, wrapBinds floats1 body1) } 
+	 	-- Else case: arg1 might have lambdas, and we can't
+		--            put them inside a wrapBinds
+
        ; v <- newVar arg_ty
-       ; let arg_float = mkFloat is_strict is_unlifted v arg'
-       ; return (addFloat floats arg_float, Var v) }
+       ; let arg3      = cpeEtaExpand (exprArity arg2) arg2
+       	     arg_float = mkFloat is_strict is_unlifted v arg3
+       ; return (addFloat floats2 arg_float, Var v) }
   where
     is_unlifted = isUnLiftedType arg_ty
     want_float = wantFloatNested NonRecursive (is_strict || is_unlifted)
@@ -748,6 +784,9 @@ mkFloat is_strict is_unlifted bndr rhs
 emptyFloats :: Floats
 emptyFloats = Floats OkToSpec nilOL
 
+isEmptyFloats :: Floats -> Bool
+isEmptyFloats (Floats _ bs) = isNilOL bs
+
 wrapBinds :: Floats -> CoreExpr -> CoreExpr
 wrapBinds (Floats _ binds) body
   = foldrOL mk_bind body binds
@@ -800,12 +839,14 @@ deFloatTop (Floats _ floats)
 -------------------------------------------
 wantFloatTop :: Id -> Floats -> Bool
        -- Note [CafInfo and floating]
-wantFloatTop bndr floats = mayHaveCafRefs (idCafInfo bndr)
-      			   && allLazyTop floats
+wantFloatTop bndr floats = isEmptyFloats floats
+	     	  	 || (mayHaveCafRefs (idCafInfo bndr)
+      			     && allLazyTop floats)
 
 wantFloatNested :: RecFlag -> Bool -> Floats -> CpeRhs -> Bool
 wantFloatNested is_rec strict_or_unlifted floats rhs
-  = strict_or_unlifted
+  =  isEmptyFloats floats
+  || strict_or_unlifted
   || (allLazyNested is_rec floats && exprIsHNF rhs)
    	-- Why the test for allLazyNested? 
 	--	v = f (x `divInt#` y)
