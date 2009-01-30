@@ -1030,6 +1030,9 @@ defineMacro overwrite s = do
 runMacro :: GHC.HValue{-String -> IO String-} -> String -> GHCi Bool
 runMacro fun s = do
   str <- io ((unsafeCoerce# fun :: String -> IO String) s)
+  -- make sure we force any exceptions in the result, while we are still
+  -- inside the exception handler for commands:
+  seqList str (return ())
   enqueueCommands (lines str)
   return False
 
