@@ -18,3 +18,9 @@ T2412:
 	$(TEST_HC) -c T2412A.hs
 	$(TEST_HC) -c T2412.hs
 
+tc245:
+	$(RM) -f Tc245_A.hi Tc245_A.o tc245.hi tc245.o
+	$(TEST_HC) --make tc245
+	$(RM) -f tc245.hi tc245.o
+	$(TEST_HC) --make tc245
+
