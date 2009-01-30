@@ -478,6 +478,19 @@ got the wrong arity -- ie the simplifier gave it arity 2, whereas
 importing modules were expecting it to have arity 1 (Trac #2844).
 It's much safer just to inject them right at the end, after tidying.
 
+Oh: two other reasons for injecting them late:
+  - If implicit Ids are already in the bindings when we start TidyPgm,
+    we'd have to be careful not to treat them as external Ids (in
+    the sense of findExternalIds); else the Ids mentioned in *their*
+    RHSs will be treated as external and you get an interface file 
+    saying      a18 = <blah>
+    but nothing refererring to a18 (because the implicit Id is the 
+    one that does).
+
+  - More seriously, the tidied type-envt will include the implicit
+    Id replete with a18 in its unfolding; but we won't take account
+    of a18 when computing a fingerprint for the class; result chaos.
+    
 
 \begin{code}
 getImplicitBinds :: TypeEnv -> [CoreBind]
