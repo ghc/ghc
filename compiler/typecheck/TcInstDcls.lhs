@@ -637,8 +637,8 @@ tc_inst_decl2 dfun_id (NewTypeDerived coi)
         ; sc_dicts   <- newDictBndrs sc_loc sc_theta'
         ; inst_loc   <- getInstLoc origin
         ; dfun_dicts <- newDictBndrs inst_loc theta
-        ; this_dict  <- newDictBndr inst_loc (mkClassPred cls cls_inst_tys)
         ; rep_dict   <- newDictBndr inst_loc rep_pred
+        ; this_dict  <- newDictBndr inst_loc (mkClassPred cls cls_inst_tys)
 
         -- Figure out bindings for the superclass context from dfun_dicts
         -- Don't include this_dict in the 'givens', else
@@ -716,11 +716,12 @@ tc_inst_decl2 dfun_id (VanillaInst monobinds uprags)
             origin    = SigOrigin rigid_info
 
          -- Create dictionary Ids from the specified instance contexts.
-       ; sc_loc      <- getInstLoc InstScOrigin
-       ; sc_dicts    <- newDictOccs sc_loc sc_theta'		-- These are wanted
-       ; inst_loc    <- getInstLoc origin
-       ; dfun_dicts  <- newDictBndrs inst_loc dfun_theta'	-- Includes equalities
-       ; this_dict   <- newDictBndr inst_loc (mkClassPred clas inst_tys')
+       ; sc_loc     <- getInstLoc InstScOrigin
+       ; sc_dicts   <- newDictOccs sc_loc sc_theta'		-- These are wanted
+       ; inst_loc   <- getInstLoc origin
+       ; dfun_dicts <- newDictBndrs inst_loc dfun_theta'	-- Includes equalities
+       ; this_dict  <- newDictBndr inst_loc (mkClassPred clas inst_tys')
+
                 -- Default-method Ids may be mentioned in synthesised RHSs,
                 -- but they'll already be in the environment.
 
