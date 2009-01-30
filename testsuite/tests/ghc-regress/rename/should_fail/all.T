@@ -70,7 +70,5 @@ test('rn_dup', normal, compile_fail, [''])
 test('T2310', normal, compile_fail, [''])
 test('T2490', normal, compile_fail, [''])
 test('T2901', normal, compile_fail, [''])
-test('T2723',
-     if_compiler_lt('ghc', '6.11', expect_fail),
-     compile, [''])  # Warnings only
+test('T2723', normal, compile, [''])  # Warnings only
 
