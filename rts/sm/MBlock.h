@@ -4,6 +4,9 @@
  *
  * MegaBlock Allocator interface.
  *
+ * See wiki commentary at
+ *  http://hackage.haskell.org/trac/ghc/wiki/Commentary/HeapAlloced
+ *
  * ---------------------------------------------------------------------------*/
 
 #ifndef MBLOCK_H
@@ -26,6 +29,9 @@ extern void *getNextMBlock(void *mblock);
 
    HEAP_ALLOCED is called FOR EVERY SINGLE CLOSURE during GC.
    It needs to be FAST.
+
+   See wiki commentary at
+     http://hackage.haskell.org/trac/ghc/wiki/Commentary/HeapAlloced
 
    Implementation of HEAP_ALLOCED
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
