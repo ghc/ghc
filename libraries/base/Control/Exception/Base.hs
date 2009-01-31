@@ -332,31 +332,35 @@ blocked  = return False
 -- the \"handler\" is executed, with the value of the exception passed as an
 -- argument.  Otherwise, the result is returned as normal.  For example:
 --
--- >   catch (openFile f ReadMode)
--- >       (\e -> hPutStr stderr ("Couldn't open "++f++": " ++ show e))
+-- >   catch (readFile f)
+-- >         (\e -> do let err = show (e :: IOException)
+-- >                   hPutStr stderr ("Warning: Couldn't open " ++ f ++ ": " ++ err)
+-- >                   return "")
+--
+-- Note that we have to give a type signature to @e@, or the program
+-- will not typecheck as the type is ambiguous. While it is possible
+-- to catch exceptions of any type, see $catchall for an explanation
+-- of the problems with doing so.
 --
 -- For catching exceptions in pure (non-'IO') expressions, see the
 -- function 'evaluate'.
 --
 -- Note that due to Haskell\'s unspecified evaluation order, an
--- expression may return one of several possible exceptions: consider
--- the expression @error \"urk\" + 1 \`div\` 0@.  Does
--- 'catch' execute the handler passing
--- @ErrorCall \"urk\"@, or @ArithError DivideByZero@?
+-- expression may throw one of several possible exceptions: consider
+-- the expression @(error \"urk\") + (1 \`div\` 0)@.  Does
+-- the expression throw
+-- @ErrorCall \"urk\"@, or @DivideByZero@?
 --
--- The answer is \"either\": 'catch' makes a
--- non-deterministic choice about which exception to catch.  If you
--- call it again, you might get a different exception back.  This is
--- ok, because 'catch' is an 'IO' computation.
+-- The answer is \"it might throw either\"; the choice is
+-- non-deterministic. If you are catching any type of exception then you
+-- might catch either. If you are calling @catch@ with type
+-- @IO Int -> (ArithException -> IO Int) -> IO Int@ then the handler may
+-- get run with @DivideByZero@ as an argument, or an @ErrorCall \"urk\"@
+-- exception may be propogated further up. If you call it again, you
+-- might get a the opposite behaviour. This is ok, because 'catch' is an
+-- 'IO' computation.
 --
--- Note that 'catch' catches all types of exceptions, and is generally
--- used for \"cleaning up\" before passing on the exception using
--- 'throwIO'.  It is not good practice to discard the exception and
--- continue, without first checking the type of the exception (it
--- might be a 'ThreadKilled', for example).  In this case it is usually better
--- to use 'catchJust' and select the kinds of exceptions to catch.
---
--- Also note that the "Prelude" also exports a function called
+-- Note that the "Prelude" also exports a function called
 -- 'Prelude.catch' with a similar type to 'Control.Exception.catch',
 -- except that the "Prelude" version only catches the IO and user
 -- families of exceptions (as required by Haskell 98).
@@ -391,11 +395,14 @@ catch m h = Hugs.Exception.catchException m h'
 -- argument which is an /exception predicate/, a function which
 -- selects which type of exceptions we\'re interested in.
 --
--- >   result <- catchJust errorCalls thing_to_try handler
+-- > catchJust (\e -> if isDoesNotExistErrorType (ioeGetErrorType e) then Just () else Nothing)
+-- >           (readFile f)
+-- >           (\_ -> do hPutStrLn stderr ("No such file: " ++ show f)
+-- >                     return "")
 --
 -- Any other exceptions which are not matched by the predicate
 -- are re-raised, and may be caught by an enclosing
--- 'catch' or 'catchJust'.
+-- 'catch', 'catchJust', etc.
 catchJust
         :: Exception e
         => (e -> Maybe b)         -- ^ Predicate to select exceptions
@@ -410,7 +417,7 @@ catchJust p a handler = catch a handler'
 -- | A version of 'catch' with the arguments swapped around; useful in
 -- situations where the code for the handler is shorter.  For example:
 --
--- >   do handle (\e -> exitWith (ExitFailure 1)) $
+-- >   do handle (\NonTermination -> exitWith (ExitFailure 1)) $
 -- >      ...
 handle     :: Exception e => (e -> IO a) -> IO a -> IO a
 handle     =  flip catch
@@ -436,16 +443,14 @@ mapException f v = unsafePerformIO (catch (evaluate v)
 -- 'try' and variations.
 
 -- | Similar to 'catch', but returns an 'Either' result which is
--- @('Right' a)@ if no exception was raised, or @('Left' e)@ if an
--- exception was raised and its value is @e@.
+-- @('Right' a)@ if no exception of type @e@ was raised, or @('Left' ex)@
+-- if an exception of type @e@ was raised and its value is @ex@.
+-- If any other type of exception is raised than it will be propogated
+-- up to the next enclosing exception handler.
 --
 -- >  try a = catch (Right `liftM` a) (return . Left)
 --
--- Note: as with 'catch', it is only polite to use this variant if you intend
--- to re-throw the exception after performing whatever cleanup is needed.
--- Otherwise, 'tryJust' is generally considered to be better.
---
--- Also note that "System.IO.Error" also exports a function called
+-- Note that "System.IO.Error" also exports a function called
 -- 'System.IO.Error.try' with a similar type to 'Control.Exception.try',
 -- except that it catches only the IO and user families of exceptions
 -- (as required by the Haskell 98 @IO@ module).
@@ -465,6 +470,8 @@ tryJust p a = do
                         Nothing -> throw e
                         Just b  -> return (Left b)
 
+-- | Like 'finally', but only performs the final action if there was an
+-- exception raised by the computation.
 onException :: IO a -> IO b -> IO a
 onException io what = io `catch` \e -> do what
                                           throw (e :: SomeException)
@@ -484,7 +491,7 @@ onException io what = io `catch` \e -> do what
 -- > bracket
 -- >   (openFile "filename" ReadMode)
 -- >   (hClose)
--- >   (\handle -> do { ... })
+-- >   (\fileHandle -> do { ... })
 --
 -- The arguments to 'bracket' are in this order so that we can partially apply
 -- it, e.g.:
@@ -525,7 +532,7 @@ a `finally` sequel =
 bracket_ :: IO a -> IO b -> IO c -> IO c
 bracket_ before after thing = bracket before (const after) (const thing)
 
--- | Like bracket, but only performs the final action if there was an
+-- | Like 'bracket', but only performs the final action if there was an
 -- exception raised by the in-between computation.
 bracketOnError
         :: IO a         -- ^ computation to run first (\"acquire resource\")
@@ -547,6 +554,8 @@ assert False _ = throw (AssertionFailed "")
 -----
 
 #if __GLASGOW_HASKELL__ || __HUGS__
+-- |A pattern match failed. The @String@ gives information about the
+-- source location of the pattern.
 data PatternMatchFail = PatternMatchFail String
 INSTANCE_TYPEABLE0(PatternMatchFail,patternMatchFailTc,"PatternMatchFail")
 
@@ -564,6 +573,11 @@ instance Exception PatternMatchFail
 
 -----
 
+-- |A record selector was applied to a constructor without the
+-- appropriate field. This can only happen with a datatype with
+-- multiple constructors, where some fields are in one constructor
+-- but not another. The @String@ gives information about the source
+-- location of the record selector.
 data RecSelError = RecSelError String
 INSTANCE_TYPEABLE0(RecSelError,recSelErrorTc,"RecSelError")
 
@@ -581,6 +595,9 @@ instance Exception RecSelError
 
 -----
 
+-- |An uninitialised record field was used. The @String@ gives
+-- information about the source location where the record was
+-- constructed.
 data RecConError = RecConError String
 INSTANCE_TYPEABLE0(RecConError,recConErrorTc,"RecConError")
 
@@ -598,6 +615,11 @@ instance Exception RecConError
 
 -----
 
+-- |A record update was performed on a constructor without the
+-- appropriate field. This can only happen with a datatype with
+-- multiple constructors, where some fields are in one constructor
+-- but not another. The @String@ gives information about the source
+-- location of the record update.
 data RecUpdError = RecUpdError String
 INSTANCE_TYPEABLE0(RecUpdError,recUpdErrorTc,"RecUpdError")
 
@@ -615,6 +637,9 @@ instance Exception RecUpdError
 
 -----
 
+-- |A class method without a definition (neither a default definition,
+-- nor a definition in the appropriate instance) was called. The
+-- @String@ gives information about which method it was.
 data NoMethodError = NoMethodError String
 INSTANCE_TYPEABLE0(NoMethodError,noMethodErrorTc,"NoMethodError")
 
@@ -632,6 +657,10 @@ instance Exception NoMethodError
 
 -----
 
+-- |Thrown when the runtime system detects that the computation is
+-- guaranteed not to terminate. Note that there is no guarantee that
+-- the runtime system will notice whether any given computation is
+-- guaranteed to terminate or not.
 data NonTermination = NonTermination
 INSTANCE_TYPEABLE0(NonTermination,nonTerminationTc,"NonTermination")
 
@@ -649,6 +678,8 @@ instance Exception NonTermination
 
 -----
 
+-- |Thrown when the program attempts to call @atomically@, from the @stm@
+-- package, inside another call to @atomically@.
 data NestedAtomically = NestedAtomically
 INSTANCE_TYPEABLE0(NestedAtomically,nestedAtomicallyTc,"NestedAtomically")
 

@@ -31,12 +31,105 @@ import GHC.Show
 %*********************************************************
 
 \begin{code}
+{- |
+The @SomeException@ type is the root of the exception type hierarchy.
+When an exception of type @e@ is thrown, behind the scenes it is
+encapsulated in a @SomeException@.
+-}
 data SomeException = forall e . Exception e => SomeException e
     deriving Typeable
 
 instance Show SomeException where
     showsPrec p (SomeException e) = showsPrec p e
 
+{- |
+Any type that you wish to throw or catch as an exception must be an
+instance of the @Exception@ class. The simplest case is a new exception
+type directly below the root:
+
+> data MyException = ThisException | ThatException
+>     deriving (Show, Typeable)
+>
+> instance Exception MyException
+
+The default method definitions in the @Exception@ class do what we need
+in this case. You can now throw and catch @ThisException@ and
+@ThatException@ as exceptions:
+
+@
+*Main> throw ThisException `catch` \e -> putStrLn (\"Caught \" ++ show (e :: MyException))
+Caught ThisException
+@
+
+In more complicated examples, you may wish to define a whole hierarchy
+of exceptions:
+
+> ---------------------------------------------------------------------
+> -- Make the root exception type for all the exceptions in a compiler
+>
+> data SomeCompilerException = forall e . Exception e => SomeCompilerException e
+>     deriving Typeable
+>
+> instance Show SomeCompilerException where
+>     show (SomeCompilerException e) = show e
+>
+> instance Exception SomeCompilerException
+>
+> compilerExceptionToException :: Exception e => e -> SomeException
+> compilerExceptionToException = toException . SomeCompilerException
+>
+> compilerExceptionFromException :: Exception e => SomeException -> Maybe e
+> compilerExceptionFromException x = do
+>     SomeCompilerException a <- fromException x
+>     cast a
+>
+> ---------------------------------------------------------------------
+> -- Make a subhierarchy for exceptions in the frontend of the compiler
+>
+> data SomeFrontendException = forall e . Exception e => SomeFrontendException e
+>     deriving Typeable
+>
+> instance Show SomeFrontendException where
+>     show (SomeFrontendException e) = show e
+>
+> instance Exception SomeFrontendException where
+>     toException = compilerExceptionToException
+>     fromException = compilerExceptionFromException
+>
+> frontendExceptionToException :: Exception e => e -> SomeException
+> frontendExceptionToException = toException . SomeFrontendException
+>
+> frontendExceptionFromException :: Exception e => SomeException -> Maybe e
+> frontendExceptionFromException x = do
+>     SomeFrontendException a <- fromException x
+>     cast a
+>
+> ---------------------------------------------------------------------
+> -- Make an exception type for a particular frontend compiler exception
+>
+> data MismatchedParentheses = MismatchedParentheses
+>     deriving (Typeable, Show)
+>
+> instance Exception MismatchedParentheses where
+>     toException   = frontendExceptionToException
+>     fromException = frontendExceptionFromException
+
+We can now catch a @MismatchedParentheses@ exception as
+@MismatchedParentheses@, @SomeFrontendException@ or
+@SomeCompilerException@, but not other types, e.g. @IOException@:
+
+@
+*Main> throw MismatchedParentheses `catch` \e -> putStrLn (\"Caught \" ++ show (e :: MismatchedParentheses))
+Caught MismatchedParentheses
+*Main> throw MismatchedParentheses `catch` \e -> putStrLn (\"Caught \" ++ show (e :: SomeFrontendException))
+Caught MismatchedParentheses
+*Main> throw MismatchedParentheses `catch` \e -> putStrLn (\"Caught \" ++ show (e :: SomeCompilerException))
+Caught MismatchedParentheses
+*Main> throw MismatchedParentheses `catch` \e -> putStrLn (\"Caught \" ++ show (e :: IOException))
+*** Exception: MismatchedParentheses
+@
+
+-}
 class (Typeable e, Show e) => Exception e where
     toException   :: e -> SomeException
     fromException :: SomeException -> Maybe e
@@ -63,6 +156,8 @@ throw e = raise# (toException e)
 \end{code}
 
 \begin{code}
+-- |This is thrown when the user calls 'error'. The @String@ is the
+-- argument given to 'error'.
 data ErrorCall = ErrorCall String
     deriving Typeable
 
@@ -73,7 +168,7 @@ instance Show ErrorCall where
 
 -----
 
--- |The type of arithmetic exceptions
+-- |Arithmetic exceptions.
 data ArithException
   = Overflow
   | Underflow

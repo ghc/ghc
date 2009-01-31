@@ -306,7 +306,7 @@ Like any blocking operation, 'throwTo' is therefore interruptible (see Section 5
 the paper).
 
 There is currently no guarantee that the exception delivered by 'throwTo' will be
-delivered at the first possible opportunity.  In particular, if a thread may 
+delivered at the first possible opportunity.  In particular, a thread may 
 unblock and then re-block exceptions (using 'unblock' and 'block') without receiving
 a pending 'throwTo'.  This is arguably undesirable behaviour.
 
