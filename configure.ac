@@ -1280,3 +1280,22 @@ AC_SUBST(HavePapi)
 AC_CONFIG_FILES([mk/config.mk compiler/ghc.cabal ghc/ghc-bin.cabal ghc.spec extra-gcc-opts docs/users_guide/ug-book.xml])
 AC_CONFIG_COMMANDS([mk/stamp-h],[echo timestamp > mk/stamp-h])
 AC_OUTPUT
+
+# We get caught by
+#     http://savannah.gnu.org/bugs/index.php?1516
+#     $(eval ...) inside conditionals causes errors
+# with make 3.80, so warn the user if it looks like they're about to
+# try to use it.
+checkMake380() {
+    if $1 --version 2>&1 | head -1 | grep -q 'GNU Make 3\.80'
+    then
+        echo
+        echo "WARNING: It looks like \"$1\" is GNU make 3.80."
+        echo "This version cannot be used to build GHC."
+        echo "Please use GNU make >= 3.81."
+    fi
+}
+
+checkMake380 make
+checkMake380 gmake
+
