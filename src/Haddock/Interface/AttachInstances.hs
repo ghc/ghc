@@ -23,7 +23,7 @@ import Name
 import SrcLoc
 import InstEnv
 import Class
-import TypeRep
+import TypeRep hiding (funTyConName)
 import Var hiding (varName)
 import TyCon
 import PrelNames
