@@ -23,7 +23,7 @@ import RnEnv
 import TcRnMonad
 import RdrName
 import PrelNames
-import TypeRep		( funTyCon )
+import TypeRep		( funTyConName )
 import Name
 import SrcLoc
 import NameSet
@@ -32,6 +32,7 @@ import BasicTypes	( compareFixity, funTyFixity, negateFixity,
 			  Fixity(..), FixityDirection(..) )
 import Outputable
 import FastString
+import Control.Monad	( unless )
 
 #include "HsVersions.h"
 \end{code}
@@ -116,7 +117,7 @@ rnHsType doc ty@(HsOpTy ty1 (L loc op) ty2)
 	; fix <- lookupTyFixityRn l_op'
 	; ty1' <- rnLHsType doc ty1
 	; ty2' <- rnLHsType doc ty2
-	; mkHsOpTyRn (\t1 t2 -> HsOpTy t1 l_op' t2) (ppr op') fix ty1' ty2' }
+	; mkHsOpTyRn (\t1 t2 -> HsOpTy t1 l_op' t2) op' fix ty1' ty2' }
 
 rnHsType doc (HsParTy ty) = do
     ty' <- rnLHsType doc ty
@@ -141,7 +142,7 @@ rnHsType doc (HsFunTy ty1 ty2) = do
 	-- when we find return :: forall m. Monad m -> forall a. a -> m a
 
 	-- Check for fixity rearrangements
-    mkHsOpTyRn HsFunTy (ppr funTyCon) funTyFixity ty1' ty2'
+    mkHsOpTyRn HsFunTy funTyConName funTyFixity ty1' ty2'
 
 rnHsType doc (HsListTy ty) = do
     ty' <- rnLHsType doc ty
@@ -270,36 +271,35 @@ by the presence of ->, which is a separate syntactic construct.
 ---------------
 -- Building (ty1 `op1` (ty21 `op2` ty22))
 mkHsOpTyRn :: (LHsType Name -> LHsType Name -> HsType Name)
-	   -> SDoc -> Fixity -> LHsType Name -> LHsType Name 
+	   -> Name -> Fixity -> LHsType Name -> LHsType Name 
 	   -> RnM (HsType Name)
 
 mkHsOpTyRn mk1 pp_op1 fix1 ty1 (L loc2 (HsOpTy ty21 op2 ty22))
   = do  { fix2 <- lookupTyFixityRn op2
 	; mk_hs_op_ty mk1 pp_op1 fix1 ty1 
 		      (\t1 t2 -> HsOpTy t1 op2 t2)
-		      (ppr op2) fix2 ty21 ty22 loc2 }
+		      (unLoc op2) fix2 ty21 ty22 loc2 }
 
 mkHsOpTyRn mk1 pp_op1 fix1 ty1 (L loc2 (HsFunTy ty21 ty22))
   = mk_hs_op_ty mk1 pp_op1 fix1 ty1 
-		HsFunTy (ppr funTyCon) funTyFixity ty21 ty22 loc2
+		HsFunTy funTyConName funTyFixity ty21 ty22 loc2
 
 mkHsOpTyRn mk1 _ _ ty1 ty2 		-- Default case, no rearrangment
   = return (mk1 ty1 ty2)
 
 ---------------
 mk_hs_op_ty :: (LHsType Name -> LHsType Name -> HsType Name)
-	    -> SDoc -> Fixity -> LHsType Name
+	    -> Name -> Fixity -> LHsType Name
 	    -> (LHsType Name -> LHsType Name -> HsType Name)
-	    -> SDoc -> Fixity -> LHsType Name -> LHsType Name -> SrcSpan
+	    -> Name -> Fixity -> LHsType Name -> LHsType Name -> SrcSpan
 	    -> RnM (HsType Name)
-mk_hs_op_ty mk1 pp_op1 fix1 ty1 
-	    mk2 pp_op2 fix2 ty21 ty22 loc2
-  | nofix_error     = do { addErr (precParseErr (quotes pp_op1,fix1) 
-			 		        (quotes pp_op2,fix2))
+mk_hs_op_ty mk1 op1 fix1 ty1 
+	    mk2 op2 fix2 ty21 ty22 loc2
+  | nofix_error     = do { precParseErr (op1,fix1) (op2,fix2)
 		         ; return (mk1 ty1 (L loc2 (mk2 ty21 ty22))) }
   | associate_right = return (mk1 ty1 (L loc2 (mk2 ty21 ty22)))
   | otherwise	    = do { -- Rearrange to ((ty1 `op1` ty21) `op2` ty22)
-			   new_ty <- mkHsOpTyRn mk1 pp_op1 fix1 ty1 ty21
+			   new_ty <- mkHsOpTyRn mk1 op1 fix1 ty1 ty21
 			 ; return (mk2 (noLoc new_ty) ty22) }
   where
     (nofix_error, associate_right) = compareFixity fix1 fix2
@@ -314,9 +314,9 @@ mkOpAppRn :: LHsExpr Name			-- Left operand; already rearranged
 
 -- (e11 `op1` e12) `op2` e2
 mkOpAppRn e1@(L _ (OpApp e11 op1 fix1 e12)) op2 fix2 e2
-  | nofix_error = do
-    addErr (precParseErr (ppr_op op1,fix1) (ppr_op op2,fix2))
-    return (OpApp e1 op2 fix2 e2)
+  | nofix_error
+  = do precParseErr (get_op op1,fix1) (get_op op2,fix2)
+       return (OpApp e1 op2 fix2 e2)
 
   | associate_right = do
     new_e <- mkOpAppRn e12 op2 fix2 e2
@@ -328,13 +328,13 @@ mkOpAppRn e1@(L _ (OpApp e11 op1 fix1 e12)) op2 fix2 e2
 ---------------------------
 --	(- neg_arg) `op` e2
 mkOpAppRn e1@(L _ (NegApp neg_arg neg_name)) op2 fix2 e2
-  | nofix_error = do
-    addErr (precParseErr (pp_prefix_minus,negateFixity) (ppr_op op2,fix2))
-    return (OpApp e1 op2 fix2 e2)
+  | nofix_error
+  = do precParseErr (negateName,negateFixity) (get_op op2,fix2)
+       return (OpApp e1 op2 fix2 e2)
 
-  | associate_right = do
-    new_e <- mkOpAppRn neg_arg op2 fix2 e2
-    return (NegApp (L loc' new_e) neg_name)
+  | associate_right 
+  = do new_e <- mkOpAppRn neg_arg op2 fix2 e2
+       return (NegApp (L loc' new_e) neg_name)
   where
     loc' = combineLocs neg_arg e2
     (nofix_error, associate_right) = compareFixity negateFixity fix2
@@ -342,9 +342,9 @@ mkOpAppRn e1@(L _ (NegApp neg_arg neg_name)) op2 fix2 e2
 ---------------------------
 --	e1 `op` - neg_arg
 mkOpAppRn e1 op1 fix1 e2@(L _ (NegApp _ _))	-- NegApp can occur on the right
-  | not associate_right= do			-- We *want* right association
-    addErr (precParseErr (ppr_op op1, fix1) (pp_prefix_minus, negateFixity))
-    return (OpApp e1 op1 fix1 e2)
+  | not associate_right			-- We *want* right association
+  = do precParseErr (get_op op1, fix1) (negateName, negateFixity)
+       return (OpApp e1 op1 fix1 e2)
   where
     (_, associate_right) = compareFixity fix1 negateFixity
 
@@ -355,6 +355,11 @@ mkOpAppRn e1 op fix e2 			-- Default case, no rearrangment
 	     ppr e1 $$ text "---" $$ ppr op $$ text "---" $$ ppr fix $$ text "---" $$ ppr e2
     )
     return (OpApp e1 op fix e2)
+
+----------------------------
+get_op :: LHsExpr Name -> Name
+get_op (L _ (HsVar n)) = n
+get_op other           = pprPanic "get_op" (ppr other)
 
 -- Parser left-associates everything, but 
 -- derived instances may have correctly-associated things to
@@ -387,14 +392,14 @@ mkOpFormRn :: LHsCmdTop Name		-- Left operand; already rearranged
 -- (e11 `op1` e12) `op2` e2
 mkOpFormRn a1@(L loc (HsCmdTop (L _ (HsArrForm op1 (Just fix1) [a11,a12])) _ _ _))
 	op2 fix2 a2
-  | nofix_error = do
-    addErr (precParseErr (ppr_op op1,fix1) (ppr_op op2,fix2))
-    return (HsArrForm op2 (Just fix2) [a1, a2])
+  | nofix_error
+  = do precParseErr (get_op op1,fix1) (get_op op2,fix2)
+       return (HsArrForm op2 (Just fix2) [a1, a2])
 
-  | associate_right = do
-    new_c <- mkOpFormRn a12 op2 fix2 a2
-    return (HsArrForm op1 (Just fix1)
-	[a11, L loc (HsCmdTop (L loc new_c) [] placeHolderType [])])
+  | associate_right
+  = do new_c <- mkOpFormRn a12 op2 fix2 a2
+       return (HsArrForm op1 (Just fix1)
+	          [a11, L loc (HsCmdTop (L loc new_c) [] placeHolderType [])])
 	-- TODO: locs are wrong
   where
     (nofix_error, associate_right) = compareFixity fix1 fix2
@@ -413,7 +418,7 @@ mkConOpPatRn op2 fix2 p1@(L loc (ConPatIn op1 (InfixCon p11 p12))) p2
 	; let (nofix_error, associate_right) = compareFixity fix1 fix2
 
 	; if nofix_error then do
-		{ addErr (precParseErr (ppr_op op1,fix1) (ppr_op op2,fix2))
+		{ precParseErr (unLoc op1,fix1) (unLoc op2,fix2)
 		; return (ConPatIn op2 (InfixCon p1 p2)) }
 
 	  else if associate_right then do
@@ -462,11 +467,10 @@ checkPrec op (ConPatIn op1 (InfixCon _ _)) right = do
 		  (op1_dir == InfixR && op_dir == InfixR && right ||
 		   op1_dir == InfixL && op_dir == InfixL && not right))
 
-	info  = (ppr_op op,  op_fix)
-	info1 = (ppr_op op1, op1_fix)
+	info  = (op,        op_fix)
+	info1 = (unLoc op1, op1_fix)
 	(infol, infor) = if right then (info, info1) else (info1, info)
-
-    checkErr inf_ok (precParseErr infol infor)
+    unless inf_ok (precParseErr infol infor)
 
 checkPrec _ _ _
   = return ()
@@ -479,41 +483,47 @@ checkSectionPrec :: FixityDirection -> HsExpr RdrName
 	-> LHsExpr Name -> LHsExpr Name -> RnM ()
 checkSectionPrec direction section op arg
   = case unLoc arg of
-	OpApp _ op fix _ -> go_for_it (ppr_op op)     fix
-	NegApp _ _	 -> go_for_it pp_prefix_minus negateFixity
+	OpApp _ op fix _ -> go_for_it (get_op op) fix
+	NegApp _ _	 -> go_for_it negateName  negateFixity
 	_    		 -> return ()
   where
-    L _ (HsVar op_name) = op
-    go_for_it pp_arg_op arg_fix@(Fixity arg_prec assoc) = do
+    op_name = get_op op
+    go_for_it arg_op arg_fix@(Fixity arg_prec assoc) = do
           op_fix@(Fixity op_prec _) <- lookupFixityRn op_name
-	  checkErr (op_prec < arg_prec
-		     || op_prec == arg_prec && direction == assoc)
-		  (sectionPrecErr (ppr_op op_name, op_fix) 	
-				  (pp_arg_op, arg_fix) section)
+	  unless (op_prec < arg_prec
+	          || (op_prec == arg_prec && direction == assoc))
+		 (sectionPrecErr (op_name, op_fix) 	
+				 (arg_op, arg_fix) section)
 \end{code}
 
 Precedence-related error messages
 
 \begin{code}
-precParseErr :: (SDoc, Fixity) -> (SDoc, Fixity) -> SDoc
-precParseErr op1 op2 
-  = hang (ptext (sLit "precedence parsing error"))
+precParseErr :: (Name, Fixity) -> (Name, Fixity) -> RnM ()
+precParseErr op1@(n1,_) op2@(n2,_) 
+  | isUnboundName n1 || isUnboundName n2
+  = return ()	  -- Avoid error cascade
+  | otherwise
+  = addErr $ hang (ptext (sLit "Precedence parsing error"))
       4 (hsep [ptext (sLit "cannot mix"), ppr_opfix op1, ptext (sLit "and"), 
 	       ppr_opfix op2,
 	       ptext (sLit "in the same infix expression")])
 
-sectionPrecErr :: (SDoc, Fixity) -> (SDoc, Fixity) -> HsExpr RdrName -> SDoc
-sectionPrecErr op arg_op section
- = vcat [ptext (sLit "The operator") <+> ppr_opfix op <+> ptext (sLit "of a section"),
-	 nest 4 (ptext (sLit "must have lower precedence than the operand") <+> ppr_opfix arg_op),
+sectionPrecErr :: (Name, Fixity) -> (Name, Fixity) -> HsExpr RdrName -> RnM ()
+sectionPrecErr op@(n1,_) arg_op@(n2,_) section
+  | isUnboundName n1 || isUnboundName n2
+  = return ()	  -- Avoid error cascade
+  | otherwise
+  = addErr $ vcat [ptext (sLit "The operator") <+> ppr_opfix op <+> ptext (sLit "of a section"),
+	 nest 4 (sep [ptext (sLit "must have lower precedence than that of the operand,"),
+	      	      nest 2 (ptext (sLit "namely") <+> ppr_opfix arg_op)]),
 	 nest 4 (ptext (sLit "in the section:") <+> quotes (ppr section))]
 
-pp_prefix_minus :: SDoc
-pp_prefix_minus = ptext (sLit "prefix `-'")
-ppr_op :: Outputable a => a -> SDoc
-ppr_op op = quotes (ppr op)	-- Here, op can be a Name or a (Var n), where n is a Name
-ppr_opfix :: (SDoc, Fixity) -> SDoc
-ppr_opfix (pp_op, fixity) = pp_op <+> brackets (ppr fixity)
+ppr_opfix :: (Name, Fixity) -> SDoc
+ppr_opfix (op, fixity) = pp_op <+> brackets (ppr fixity)
+   where
+     pp_op | op == negateName = ptext (sLit "prefix `-'")
+     	   | otherwise        = quotes (ppr op)
 \end{code}
 
 %*********************************************************

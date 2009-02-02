@@ -15,7 +15,7 @@ module TypeRep (
 	
  	Kind, ThetaType,		-- Synonyms
 
-	funTyCon,
+	funTyCon, funTyConName,
 
 	-- Pretty-printing
 	pprType, pprParendType, pprTypeApp,
