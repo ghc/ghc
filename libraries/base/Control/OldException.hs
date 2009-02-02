@@ -727,7 +727,12 @@ instance New.Exception Exception where
        Caster (\(New.PatternMatchFail err) -> PatternMatchFail err),
        Caster (\(New.RecConError err) -> RecConError err),
        Caster (\(New.RecSelError err) -> RecSelError err),
-       Caster (\(New.RecUpdError err) -> RecUpdError err)]
+       Caster (\(New.RecUpdError err) -> RecUpdError err),
+       -- Anything else gets taken as a Dynamic exception. It's
+       -- important that we put all exceptions into the old Exception
+       -- type somehow, or throwing a new exception wouldn't cause
+       -- the cleanup code for bracket, finally etc to happen.
+       Caster (\exc -> DynException (toDyn (exc :: New.SomeException)))]
 
   -- Unbundle exceptions.
   toException (ArithException exc)   = toException exc
@@ -738,7 +743,13 @@ instance New.Exception Exception where
   toException BlockedIndefinitely    = toException New.BlockedIndefinitely
   toException NestedAtomically       = toException New.NestedAtomically
   toException Deadlock               = toException New.Deadlock
-  toException (DynException exc)     = toException exc
+  -- If a dynamic exception is a SomeException then resurrect it, so
+  -- that bracket, catch+throw etc rethrow the same exception even
+  -- when the exception is in the new style.
+  -- If it's not a SomeException, then just throw the Dynamic.
+  toException (DynException exc)     = case fromDynamic exc of
+                                       Just exc' -> exc'
+                                       Nothing -> toException exc
   toException (ErrorCall err)        = toException (New.ErrorCall err)
   toException (ExitException exc)    = toException exc
   toException (IOException exc)      = toException exc
