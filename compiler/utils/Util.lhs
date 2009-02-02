@@ -32,6 +32,7 @@ module Util (
 
         -- * List operations controlled by another list
         takeList, dropList, splitAtList, split,
+        dropTail,
 
         -- * For loop
         nTimes,
@@ -607,6 +608,10 @@ splitAtList _ xs@[]   = (xs, xs)
 splitAtList (_:xs) (y:ys) = (y:ys', ys'')
     where
       (ys', ys'') = splitAtList xs ys
+
+-- drop from the end of a list
+dropTail :: Int -> [a] -> [a]
+dropTail n = reverse . drop n . reverse
 
 snocView :: [a] -> Maybe ([a],a)
         -- Split off the last element

@@ -220,6 +220,7 @@ data DynFlag
    | Opt_RelaxedPolyRec
    | Opt_StandaloneDeriving
    | Opt_DeriveDataTypeable
+   | Opt_DeriveFunctor
    | Opt_TypeSynonymInstances
    | Opt_FlexibleContexts
    | Opt_FlexibleInstances
@@ -1771,6 +1772,7 @@ xFlags = [
   ( "UnboxedTuples",                    Opt_UnboxedTuples, const Supported ),
   ( "StandaloneDeriving",               Opt_StandaloneDeriving, const Supported ),
   ( "DeriveDataTypeable",               Opt_DeriveDataTypeable, const Supported ),
+  ( "DeriveFunctor",                    Opt_DeriveFunctor, const Supported ),
   ( "TypeSynonymInstances",             Opt_TypeSynonymInstances, const Supported ),
   ( "FlexibleContexts",                 Opt_FlexibleContexts, const Supported ),
   ( "FlexibleInstances",                Opt_FlexibleInstances, const Supported ),
@@ -1809,6 +1811,7 @@ glasgowExtsFlags = [
            , Opt_TypeSynonymInstances
            , Opt_StandaloneDeriving
            , Opt_DeriveDataTypeable
+           , Opt_DeriveFunctor
            , Opt_FlexibleContexts
            , Opt_FlexibleInstances
            , Opt_ConstrainedClassMethods

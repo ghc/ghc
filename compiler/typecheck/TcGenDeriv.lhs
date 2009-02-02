@@ -23,6 +23,9 @@ module TcGenDeriv (
 	gen_Show_binds,
 	gen_Data_binds,
 	gen_Typeable_binds,
+	gen_Functor_binds, functorLikeTraverse, deepSubtypesContaining,
+	gen_Foldable_binds,
+	gen_Traversable_binds,
 	genAuxBind
     ) where
 
@@ -44,7 +47,12 @@ import TyCon
 import TcType
 import TysPrim
 import TysWiredIn
+import Type
+import TypeRep
+import VarSet
+import State
 import Util
+import MonadUtils
 import Outputable
 import FastString
 import OccName
@@ -1203,6 +1211,302 @@ prefix_RDR     = dataQual_RDR gENERICS (fsLit "Prefix")
 infix_RDR      = dataQual_RDR gENERICS (fsLit "Infix")
 \end{code}
 
+
+
+%************************************************************************
+%*									*
+	Functor instances
+%*									*
+%************************************************************************
+
+For the data type:
+
+  data T a = T1 Int a | T2 (T a)
+
+We generate the instance:
+
+  instance Functor T where
+      fmap f (T1 b1 a) = T1 b1 (f a)
+      fmap f (T2 ta)   = T2 (fmap f ta)
+
+Notice that we don't simply apply 'fmap' to the constructor arguments.
+Rather 
+  - Do nothing to an argument whose type doesn't mention 'a'
+  - Apply 'f' to an argument of type 'a'
+  - Apply 'fmap f' to other arguments 
+That's why we have to recurse deeply into the constructor argument types,
+rather than just one level, as we typically do.
+
+What about types with more than one type parameter?  In general, we only 
+derive Functor for the last position:
+
+  data S a b = S1 [b] | S2 a
+  instance Functor (S a) where
+    fmap f (S1 bs) = S1 (fmap f bs)
+    fmap f (S2 a)  = S2 a
+
+However, we have special cases for
+	 - tuples
+	 - functions
+
+More formally, we write the derivation of fmap code over type variable
+'a for type 'b as ($fmap 'a 'b).  In this general notation the derived
+instance for T is:
+
+  instance Functor T where
+      fmap f (T1 x1 x2) = T1 ($(fmap 'a 'b1) x1) ($(fmap 'a 'a) x2)
+      fmap f (T2 x1)    = T2 ($(fmap 'a '(T a)) x1)
+
+  $(fmap 'a 'b)         x  =  x     -- when b does not contain a
+  $(fmap 'a 'a)         x  =  f x
+  $(fmap 'a '(b1,b2))   x  =  case x of (x1,x2) -> ($(fmap 'a 'b1) x1, $(fmap 'a 'b2) x2)
+  $(fmap 'a '(T b1 b2)) x  =  fmap $(fmap 'a 'b2) x   -- when a only occurs in the last parameter, b2
+  $(fmap 'a '(b -> c))  x  =  \b -> $(fmap 'a' 'c) (x ($(cofmap 'a 'b) b))
+
+For functions, the type parameter 'a can occur in a contravariant position,
+which means we need to derive a function like:
+
+  cofmap :: (a -> b) -> (f b -> f a)
+
+This is pretty much the same as $fmap, only without the $(cofmap 'a 'a) case:
+
+  $(cofmap 'a 'b)         x  =  x     -- when b does not contain a
+  $(cofmap 'a 'a)         x  =  error "type variable in contravariant position"
+  $(cofmap 'a '(b1,b2))   x  =  case x of (x1,x2) -> ($(cofmap 'a 'b1) x1, $(cofmap 'a 'b2) x2)
+  $(cofmap 'a '[b])       x  =  map $(cofmap 'a 'b) x
+  $(cofmap 'a '(T b1 b2)) x  =  fmap $(cofmap 'a 'b2) x   -- when a only occurs in the last parameter, b2
+  $(cofmap 'a '(b -> c))  x  =  \b -> $(cofmap 'a' 'c) (x ($(fmap 'a 'c) b))
+
+\begin{code}
+gen_Functor_binds :: SrcSpan -> TyCon -> (LHsBinds RdrName, DerivAuxBinds)
+gen_Functor_binds loc tycon
+  = (listToBag [fmap_bind], [])
+  where
+    data_cons = tyConDataCons tycon
+    arg = last (tyConTyVars tycon) -- argument to derive for, 'a in the above description
+
+    fmap_bind = L loc $ mkFunBind (L loc fmap_RDR) (map fmap_eqn data_cons)
+    fmap_eqn con = evalState (match_for_con [f_Pat] con parts) bs_RDRs
+      where parts = map derive_fmap_type (dataConOrigArgTys con)
+
+    derive_fmap_type :: Type -> LHsExpr RdrName -> State [RdrName] (LHsExpr RdrName)
+    derive_fmap_type = functorLikeTraverse
+        (\     x -> return x)                                         -- fmap f x = x
+        (\     x -> return (nlHsApp f_Expr x))                        -- fmap f x = f x
+        (panic "contravariant")
+        (\g h  x -> mkSimpleLam (\b -> h =<< (nlHsApp x `fmap` g b))) -- fmap f x = \b -> h (x (g b))
+        (mkSimpleTupleCase match_for_con)                             -- fmap f x = case x of (a1,a2,..) -> (g1 a1,g2 a2,..)
+        (\_ g  x -> do gg <- mkSimpleLam g
+                       return $ nlHsApps fmap_RDR [gg,x])             -- fmap f x = fmap g x
+        (panic "in other argument")
+        (\_ g  x -> g x)
+        arg
+
+    match_for_con = mkSimpleConMatch $
+        \con_name xsM -> do xs <- sequence xsM
+                            return (nlHsApps con_name xs)  -- Con (g1 v1) (g2 v2) ..
+\end{code}
+
+Utility functions related to Functor deriving.
+
+Since several things use the same pattern of traversal, this is abstracted into functorLikeTraverse.
+This function works like a fold: it makes a value of type 'a' in a bottom up way.
+
+\begin{code}
+-- Generic traversal for Functor deriving
+functorLikeTraverse :: a                    -- ^ Case: does not contain variable
+                    -> a                    -- ^ Case: the variable itself
+                    -> a                    -- ^ Case: the variable itself, contravariantly
+                    -> (a -> a -> a)        -- ^ Case: function type
+                    -> (Boxity -> [a] -> a) -- ^ Case: tuple type
+                    -> (Type -> a -> a)     -- ^ Case: other tycon, variable only in last argument
+                    -> a                    -- ^ Case: other tycon, variable only in last argument
+                    -> (TcTyVar -> a -> a)  -- ^ Case: forall type
+                    -> TcTyVar              -- ^ Variable to look for
+                    -> Type                 -- ^ Type to process
+                    -> a
+functorLikeTraverse caseTrivial caseVar caseCoVar caseFun caseTuple caseTyApp caseWrongArg caseForAll var ty
+    = fst (go False ty)
+  where -- go returns (result of type a, does type contain var)
+        go co ty | Just ty' <- coreView ty = go co ty'
+        go co (TyVarTy    v) | v == var = (if co then caseCoVar else caseVar,True)
+        go co (FunTy (PredTy _) b)      = go co b
+        go co (FunTy x y)    | xc || yc = (caseFun xr yr,True)
+            where (xr,xc) = go (not co) x
+                  (yr,yc) = go co       y
+        go co (AppTy    x y) | xc       = (caseWrongArg,True)
+                             | yc       = (caseTyApp x yr,True)
+            where (_, xc) = go co x
+                  (yr,yc) = go co y
+        go co ty@(TyConApp con args)
+               | isTupleTyCon con       = (caseTuple (tupleTyConBoxity con) xrs,True)
+               | null args              = (caseTrivial,False)
+               | or (init xcs)          = (caseWrongArg,True)
+               | (last xcs)             = (caseTyApp (fst (splitAppTy ty)) (last xrs),True)
+            where (xrs,xcs) = unzip (map (go co) args)
+        go co (ForAllTy v x) | v /= var && xc = (caseForAll v xr,True)
+            where (xr,xc) = go co x
+        go _  _                         = (caseTrivial,False)
+
+-- return all subtypes of ty that contain var somewhere
+-- these are the things that should appear in instance constraints
+deepSubtypesContaining :: TcTyVar -> TcType -> [TcType]
+deepSubtypesContaining = functorLikeTraverse
+      []
+      []
+      (panic "contravariant")
+      (\x y   -> x ++ y)      -- function
+      (\_  xs -> concat xs)   -- tuple
+      (\ty x  -> ty : x)      -- tyapp
+      (panic "in other argument")
+      (\v x   -> filter (not . (v `elemVarSet`) . tyVarsOfType) x) -- forall v
+
+
+-- Make a HsLam using a fresh variable from a State monad
+mkSimpleLam :: (LHsExpr id -> State [id] (LHsExpr id)) -> State [id] (LHsExpr id)
+mkSimpleLam lam = do
+    (n:names) <- get
+    put names
+    body <- lam (nlHsVar n)
+    return (mkHsLam [nlVarPat n] body)
+
+mkSimpleLam2 :: (LHsExpr id -> LHsExpr id -> State [id] (LHsExpr id)) -> State [id] (LHsExpr id)
+mkSimpleLam2 lam = do
+    (n1:n2:names) <- get
+    put names
+    body <- lam (nlHsVar n1) (nlHsVar n2)
+    return (mkHsLam [nlVarPat n1,nlVarPat n2] body)
+
+-- "Con a1 a2 a3 -> fold [x1 a1, x2 a2, x3 a3]"
+mkSimpleConMatch :: Monad m => (RdrName -> [a] -> m (LHsExpr RdrName)) -> [LPat RdrName] -> DataCon -> [LHsExpr RdrName -> a] -> m (LMatch RdrName)
+mkSimpleConMatch fold extra_pats con insides = do
+    let con_name = getRdrName con
+    let vars_needed = takeList insides as_RDRs
+    let pat = nlConVarPat con_name vars_needed
+    rhs <- fold con_name (zipWith ($) insides (map nlHsVar vars_needed))
+    return $ mkMatch (extra_pats ++ [pat]) rhs emptyLocalBinds
+
+-- "case x of (a1,a2,a3) -> fold [x1 a1, x2 a2, x3 a3]"
+mkSimpleTupleCase :: Monad m => ([LPat RdrName] -> DataCon -> [LHsExpr RdrName -> a] -> m (LMatch RdrName))
+                  -> Boxity -> [LHsExpr RdrName -> a] -> LHsExpr RdrName -> m (LHsExpr RdrName)
+mkSimpleTupleCase match_for_con boxity insides x = do
+    let con = tupleCon boxity (length insides)
+    match <- match_for_con [] con insides
+    return $ nlHsCase x [match]
+\end{code}
+
+
+%************************************************************************
+%*									*
+	Foldable instances
+%*									*
+%************************************************************************
+
+Deriving Foldable instances works the same way as Functor instances,
+only Foldable instances are not possible for function types at all.
+Here the derived instance for the type T above is:
+
+  instance Foldable T where
+      foldr f z (T1 x1 x2 x3) = $(foldr 'a 'b1) x1 ( $(foldr 'a 'a) x2 ( $(foldr 'a 'b2) x3 z ) )
+
+The cases are:
+
+  $(foldr 'a 'b)         x z  =  z     -- when b does not contain a
+  $(foldr 'a 'a)         x z  =  f x z
+  $(foldr 'a '(b1,b2))   x z  =  case x of (x1,x2) -> $(foldr 'a 'b1) x1 ( $(foldr 'a 'b2) x2 z )
+  $(foldr 'a '(T b1 b2)) x z  =  foldr $(foldr 'a 'b2) x z  -- when a only occurs in the last parameter, b2
+
+Note that the arguments to the real foldr function are the wrong way around,
+since (f :: a -> b -> b), while (foldr f :: b -> t a -> b).
+
+\begin{code}
+gen_Foldable_binds :: SrcSpan -> TyCon -> (LHsBinds RdrName, DerivAuxBinds)
+gen_Foldable_binds loc tycon
+  = (listToBag [foldr_bind], [])
+  where
+    data_cons = tyConDataCons tycon
+    arg = last (tyConTyVars tycon) -- argument to derive for, 'a in the above description
+
+    foldr_bind = L loc $ mkFunBind (L loc foldr_RDR) (map foldr_eqn data_cons)
+    foldr_eqn con = evalState (match_for_con z_Expr [f_Pat,z_Pat] con parts) bs_RDRs
+      where parts = map derive_foldr_type (dataConOrigArgTys con)
+
+    derive_foldr_type :: Type -> LHsExpr RdrName -> LHsExpr RdrName -> State [RdrName] (LHsExpr RdrName)
+    derive_foldr_type = functorLikeTraverse
+        (\     _ z -> return z)                            -- foldr f z x = z
+        (\     x z -> return (nlHsApps f_RDR [x,z]))       -- foldr f z x = f x z
+        (panic "function")
+        (panic "function")
+        (\b gs x z -> mkSimpleTupleCase (match_for_con z) b gs x)
+        (\_ g  x z -> do gg <- mkSimpleLam2 g              -- foldr f z x = foldr (\xx zz -> g xx zz) z x
+                         return $ nlHsApps foldable_foldr_RDR [gg,z,x])
+        (panic "in other argument")
+        (\_ g  x z -> g x z)
+        arg
+
+    match_for_con z = mkSimpleConMatch (\_con_name -> foldrM ($) z) -- g1 v1 (g2 v2 (.. z))
+\end{code}
+
+
+%************************************************************************
+%*									*
+	Traversable instances
+%*									*
+%************************************************************************
+
+Again, Traversable is much like Functor and Foldable.
+
+The cases are:
+
+  $(traverse 'a 'b)         x  =  pure x     -- when b does not contain a
+  $(traverse 'a 'a)         x  =  f x
+  $(traverse 'a '(b1,b2))   x  =  case x of (x1,x2) -> (,) <$> $(traverse 'a 'b1) x1 <*> $(traverse 'a 'b2) x2
+  $(traverse 'a '(T b1 b2)) x  =  traverse $(traverse 'a 'b2) x  -- when a only occurs in the last parameter, b2
+
+Note that the generated code is not as efficient as it could be. For instance:
+
+  data T a = T Int a  deriving Traversable
+
+gives the function: traverse f (T x y) = T <$> pure x <*> f y
+instead of:         traverse f (T x y) = T x <$> f y
+
+\begin{code}
+gen_Traversable_binds :: SrcSpan -> TyCon -> (LHsBinds RdrName, DerivAuxBinds)
+gen_Traversable_binds loc tycon
+  = (listToBag [traverse_bind], [])
+  where
+    data_cons = tyConDataCons tycon
+    arg = last (tyConTyVars tycon) -- argument to derive for, 'a in the above description
+
+    traverse_bind = L loc $ mkFunBind (L loc traverse_RDR) (map traverse_eqn data_cons)
+    traverse_eqn con = evalState (match_for_con [f_Pat] con parts) bs_RDRs
+      where parts = map derive_travese_type (dataConOrigArgTys con)
+
+    derive_travese_type :: Type -> LHsExpr RdrName -> State [RdrName] (LHsExpr RdrName)
+    derive_travese_type = functorLikeTraverse
+        (\     x -> return (nlHsApps pure_RDR [x]))    -- traverse f x = pure x
+        (\     x -> return (nlHsApps f_RDR [x]))       -- travese f x = f x
+        (panic "function")
+        (panic "function")
+        (mkSimpleTupleCase match_for_con)              -- travese f x z = case x of (a1,a2,..) -> (,,) <$> g1 a1 <*> g2 a2 <*> ..
+        (\_ g  x -> do gg <- mkSimpleLam g             -- travese f x = travese (\xx -> g xx) x
+                       return $ nlHsApps traverse_RDR [gg,x])
+        (panic "in other argument")
+        (\_ g  x -> g x)
+        arg
+
+    match_for_con = mkSimpleConMatch $
+        \con_name xsM -> do xs <- sequence xsM
+                            return (mkApCon (nlHsVar con_name) xs)
+
+    -- ((Con <$> x1) <*> x2) <*> ..
+    mkApCon con []     = nlHsApps pure_RDR [con]
+    mkApCon con (x:xs) = foldl appAp (nlHsApps fmap_RDR [con,x]) xs
+       where appAp x y = nlHsApps ap_RDR [x,y]
+\end{code}
+
+
+
 %************************************************************************
 %*									*
 \subsection{Generating extra binds (@con2tag@ and @tag2con@)}
@@ -1500,12 +1804,13 @@ genOpApp e1 op e2 = nlHsPar (nlHsOpApp e1 op e2)
 \end{code}
 
 \begin{code}
-a_RDR, b_RDR, c_RDR, d_RDR, k_RDR, z_RDR, ah_RDR, bh_RDR, ch_RDR, dh_RDR,
+a_RDR, b_RDR, c_RDR, d_RDR, f_RDR, k_RDR, z_RDR, ah_RDR, bh_RDR, ch_RDR, dh_RDR,
     cmp_eq_RDR :: RdrName
 a_RDR		= mkVarUnqual (fsLit "a")
 b_RDR		= mkVarUnqual (fsLit "b")
 c_RDR		= mkVarUnqual (fsLit "c")
 d_RDR		= mkVarUnqual (fsLit "d")
+f_RDR		= mkVarUnqual (fsLit "f")
 k_RDR		= mkVarUnqual (fsLit "k")
 z_RDR		= mkVarUnqual (fsLit "z")
 ah_RDR		= mkVarUnqual (fsLit "a#")
@@ -1519,22 +1824,25 @@ as_RDRs		= [ mkVarUnqual (mkFastString ("a"++show i)) | i <- [(1::Int) .. ] ]
 bs_RDRs		= [ mkVarUnqual (mkFastString ("b"++show i)) | i <- [(1::Int) .. ] ]
 cs_RDRs		= [ mkVarUnqual (mkFastString ("c"++show i)) | i <- [(1::Int) .. ] ]
 
-a_Expr, b_Expr, c_Expr, ltTag_Expr, eqTag_Expr, gtTag_Expr,
+a_Expr, b_Expr, c_Expr, f_Expr, z_Expr, ltTag_Expr, eqTag_Expr, gtTag_Expr,
     false_Expr, true_Expr :: LHsExpr RdrName
 a_Expr		= nlHsVar a_RDR
 b_Expr		= nlHsVar b_RDR
 c_Expr		= nlHsVar c_RDR
+f_Expr		= nlHsVar f_RDR
+z_Expr		= nlHsVar z_RDR
 ltTag_Expr	= nlHsVar ltTag_RDR
 eqTag_Expr	= nlHsVar eqTag_RDR
 gtTag_Expr	= nlHsVar gtTag_RDR
 false_Expr	= nlHsVar false_RDR
 true_Expr	= nlHsVar true_RDR
 
-a_Pat, b_Pat, c_Pat, d_Pat, k_Pat, z_Pat :: LPat RdrName
+a_Pat, b_Pat, c_Pat, d_Pat, f_Pat, k_Pat, z_Pat :: LPat RdrName
 a_Pat		= nlVarPat a_RDR
 b_Pat		= nlVarPat b_RDR
 c_Pat		= nlVarPat c_RDR
 d_Pat		= nlVarPat d_RDR
+f_Pat		= nlVarPat f_RDR
 k_Pat		= nlVarPat k_RDR
 z_Pat		= nlVarPat z_RDR
 
