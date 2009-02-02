@@ -53,6 +53,7 @@ import Module
 
 import Digraph
 import qualified Pretty
+import BufWrite
 import Outputable
 import FastString
 import UniqSet
@@ -127,8 +128,12 @@ nativeCodeGen dflags h us cmms
  = do
 	let split_cmms	= concat $ map add_split cmms
 
- 	(imports, prof)
-		<- cmmNativeGens dflags h us split_cmms [] [] 0
+        -- BufHandle is a performance hack.  We could hide it inside
+        -- Pretty if it weren't for the fact that we do lots of little
+        -- printDocs here (in order to do codegen in constant space).
+        bufh <- newBufHandle h
+ 	(imports, prof) <- cmmNativeGens dflags bufh us split_cmms [] [] 0
+        bFlush bufh
 
 	let (native, colorStats, linearStats)
 		= unzip3 prof
@@ -186,7 +191,7 @@ cmmNativeGens dflags h us (cmm : cmms) impAcc profAcc count
  	(us', native, imports, colorStats, linearStats)
 		<- cmmNativeGen dflags us cmm count
 
-	Pretty.printDoc Pretty.LeftMode h
+	Pretty.bufLeftRender h
 		$ {-# SCC "pprNativeCode" #-} Pretty.vcat $ map pprNatCmmTop native
 
 	let lsPprNative =

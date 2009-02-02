@@ -176,7 +176,8 @@ module Pretty (
         hang, punctuate,
 
 --      renderStyle,            -- Haskell 1.3 only
-        render, fullRender, printDoc, showDocWith
+        render, fullRender, printDoc, showDocWith,
+        bufLeftRender -- performance hack
   ) where
 
 import BufWrite
@@ -1042,8 +1043,11 @@ hPutLitString handle a l = if l ==# _ILIT(0)
 printLeftRender :: Handle -> Doc -> IO ()
 printLeftRender hdl doc = do
   b <- newBufHandle hdl
-  layLeft b (reduceDoc doc)
+  bufLeftRender b doc
   bFlush b
+
+bufLeftRender :: BufHandle -> Doc -> IO ()
+bufLeftRender b doc = layLeft b (reduceDoc doc)
 
 -- HACK ALERT!  the "return () >>" below convinces GHC to eta-expand
 -- this function with the IO state lambda.  Otherwise we end up with
