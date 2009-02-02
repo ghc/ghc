@@ -28,7 +28,9 @@ import NCGMonad
 import PositionIndependentCode
 import RegLiveness
 import RegCoalesce
-import qualified RegAllocLinear	as Linear
+
+import qualified RegAlloc.Linear.Main	as Linear
+
 import qualified RegAllocColor	as Color
 import qualified RegAllocStats	as Color
 import qualified GraphColor	as Color

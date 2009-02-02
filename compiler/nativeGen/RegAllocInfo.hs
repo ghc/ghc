@@ -433,8 +433,11 @@ jumpDests insn acc
 #endif
 	_other		-> acc
 
-patchJump :: Instr -> BlockId -> BlockId -> Instr
 
+-- | Change the destination of this jump instruction
+--	Used in joinToTargets in the linear allocator, when emitting fixup code
+--	for join points.
+patchJump :: Instr -> BlockId -> BlockId -> Instr
 patchJump insn old new
   = case insn of
 #if i386_TARGET_ARCH || x86_64_TARGET_ARCH
@@ -444,6 +447,14 @@ patchJump insn old new
         BCC cc id | id == old -> BCC cc new
         BCCFAR cc id | id == old -> BCCFAR cc new
         BCTR targets -> error "Cannot patch BCTR"
+#elif sparc_TARGET_ARCH
+	BI cc annul id
+	 | id == old	-> BI cc annul new
+	 
+	BF cc annul id
+	 | id == old	-> BF cc annul new
+#else
+#error	"RegAllocInfo.patchJump not finished"
 #endif
 	_other		-> insn
 
