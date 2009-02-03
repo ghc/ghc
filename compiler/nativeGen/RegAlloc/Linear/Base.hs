@@ -3,7 +3,9 @@
 
 module RegAlloc.Linear.Base (
 	BlockAssignment,
+
 	Loc(..),
+	regsOfLoc,
 
 	-- for stats
 	SpillReason(..),
@@ -63,6 +65,13 @@ data Loc
 
 instance Outputable Loc where
 	ppr l = text (show l)
+
+
+-- | Get the reg numbers stored in this Loc.
+regsOfLoc :: Loc -> [RegNo]
+regsOfLoc (InReg r)    = [r]
+regsOfLoc (InBoth r _) = [r]
+regsOfLoc (InMem _)    = []
 
 
 -- | Reasons why instructions might be inserted by the spiller.

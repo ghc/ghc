@@ -95,6 +95,7 @@ import RegAlloc.Linear.Base
 import RegAlloc.Linear.StackMap
 import RegAlloc.Linear.FreeRegs
 import RegAlloc.Linear.Stats
+import RegAlloc.Linear.JoinToTargets
 
 import BlockId
 import MachRegs
@@ -104,7 +105,7 @@ import RegLiveness
 import Cmm hiding (RegSet)
 
 import Digraph
-import Unique		( Uniquable(getUnique), Unique )
+import Unique
 import UniqSet
 import UniqFM
 import UniqSupply
@@ -215,7 +216,7 @@ processBlock
 processBlock block_live (BasicBlock id instrs)
  = do 	initBlock id
  	(instrs', fixups)
-		<- linearRA block_live [] [] instrs
+		<- linearRA block_live [] [] id instrs
 
 	return	$ BasicBlock id instrs' : fixups
 
@@ -238,38 +239,51 @@ initBlock id
 			setAssigR	assig
 
 
+-- | Do allocation for a sequence of instructions.
 linearRA
-	:: BlockMap RegSet
-	-> [Instr] -> [NatBasicBlock] -> [LiveInstr]
-	-> RegM ([Instr], [NatBasicBlock])
+	:: BlockMap RegSet		-- ^ map of what vregs are live on entry to each block.
+	-> [Instr] 			-- ^ accumulator for instructions already processed.
+	-> [NatBasicBlock] 		-- ^ accumulator for blocks of fixup code.
+	-> BlockId			-- ^ id of the current block, for debugging.
+	-> [LiveInstr]			-- ^ liveness annotated instructions in this block.
 
-linearRA _          instr_acc fixups []
-	= return (reverse instr_acc, fixups)
+	-> RegM ( [Instr]		-- ^ instructions after register allocation
+		, [NatBasicBlock])	-- ^ fresh blocks of fixup code.
 
-linearRA block_live instr_acc fixups (instr:instrs)
- = do	(instr_acc', new_fixups) <- raInsn block_live instr_acc instr
-	linearRA block_live instr_acc' (new_fixups++fixups) instrs
 
--- -----------------------------------------------------------------------------
--- Register allocation for a single instruction
+linearRA _          accInstr accFixup _ []
+	= return 
+		( reverse accInstr	-- instrs need to be returned in the correct order.
+		, accFixup)		-- it doesn't matter what order the fixup blocks are returned in.
 
-raInsn  :: BlockMap RegSet		-- Live temporaries at each basic block
-	-> [Instr]			-- new instructions (accum.)
-	-> LiveInstr 			-- the instruction (with "deaths")
-	-> RegM (
-	     [Instr],			-- new instructions
-	     [NatBasicBlock]		-- extra fixup blocks
-	   )
 
-raInsn _     new_instrs (Instr (COMMENT _) Nothing)
+linearRA block_live accInstr accFixups id (instr:instrs)
+ = do
+ 	(accInstr', new_fixups) 
+		<- raInsn block_live accInstr id instr
+
+	linearRA block_live accInstr' (new_fixups ++ accFixups) id instrs
+
+
+-- | Do allocation for a single instruction.
+raInsn  
+	:: BlockMap RegSet		-- ^ map of what vregs are love on entry to each block.
+	-> [Instr]			-- ^ accumulator for instructions already processed.
+	-> BlockId			-- ^ the id of the current block, for debugging
+	-> LiveInstr 			-- ^ the instr to have its regs allocated, with liveness info.
+	-> RegM 
+		( [Instr]		-- new instructions
+		, [NatBasicBlock])	-- extra fixup blocks
+
+raInsn _     new_instrs _ (Instr (COMMENT _) Nothing)
  = return (new_instrs, [])
 
-raInsn _     new_instrs (Instr (DELTA n) Nothing)  
+raInsn _     new_instrs _ (Instr (DELTA n) Nothing)  
  = do
     setDeltaR n
     return (new_instrs, [])
 
-raInsn block_live new_instrs (Instr instr (Just live))
+raInsn block_live new_instrs id (Instr instr (Just live))
  = do
     assig    <- getAssigR
 
@@ -299,20 +313,23 @@ raInsn block_live new_instrs (Instr instr (Just live))
           {-
 	  freeregs <- getFreeRegsR
     	  assig <- getAssigR
-          pprTrace "raInsn" (text "ELIMINATED: " <> docToSDoc (pprInstr instr) $$ ppr r_dying <+> ppr w_dying $$ text (show freeregs) $$ ppr assig) $ do
+          pprTrace "raInsn" (text "ELIMINATED: " <> docToSDoc (pprInstr instr) 
+	  		$$ ppr r_dying <+> ppr w_dying $$ text (show freeregs) $$ ppr assig) $ do
           -}
 	   return (new_instrs, [])
 
-	_ -> genRaInsn block_live new_instrs instr 
+	_ -> genRaInsn block_live new_instrs id instr 
 			(uniqSetToList $ liveDieRead live) 
 			(uniqSetToList $ liveDieWrite live)
 
 
-raInsn _ _ li
-	= pprPanic "raInsn" (text "no match for:" <> ppr li)
+raInsn _ _ id instr
+	= pprPanic "raInsn" (text "no match for:" <> ppr instr)
 
 
-genRaInsn block_live new_instrs instr r_dying w_dying =
+
+
+genRaInsn block_live new_instrs block_id instr r_dying w_dying =
     case regUsage instr              of { RU read written ->
     case partition isRealReg written of { (real_written1,virt_written) ->
     do
@@ -346,7 +363,7 @@ genRaInsn block_live new_instrs instr r_dying w_dying =
     -- these dead regs might in fact be live in the jump targets (they're
     -- only dead in the code that follows in the current basic block).
     (fixup_blocks, adjusted_instr)
-	<- joinToTargets block_live [] instr (jumpDests instr [])
+	<- joinToTargets block_live block_id instr
 
     -- (e) Delete all register assignments for temps which are read
     --     (only) and die here.  Update the free register list.
@@ -613,203 +630,3 @@ loadTemp True vreg (Just (InMem slot)) hreg spills
 loadTemp _ _ _ _ spills =
    return spills
 
-
--- -----------------------------------------------------------------------------
--- Joining a jump instruction to its targets
-
--- The first time we encounter a jump to a particular basic block, we
--- record the assignment of temporaries.  The next time we encounter a
--- jump to the same block, we compare our current assignment to the
--- stored one.  They might be different if spilling has occrred in one
--- branch; so some fixup code will be required to match up the
--- assignments.
-
-joinToTargets
-	:: BlockMap RegSet
-	-> [NatBasicBlock]
-	-> Instr
-	-> [BlockId]
-	-> RegM ([NatBasicBlock], Instr)
-
-joinToTargets _          new_blocks instr []
-  = return (new_blocks, instr)
-
-joinToTargets block_live new_blocks instr (dest:dests) = do
-  block_assig <- getBlockAssigR
-  assig <- getAssigR
-  let
-	-- adjust the assignment to remove any registers which are not
-	-- live on entry to the destination block.
-	adjusted_assig = filterUFM_Directly still_live assig
-
-	live_set = lookItUp "joinToTargets" block_live dest
-	still_live uniq _ = uniq `elemUniqSet_Directly` live_set
-
-	-- and free up those registers which are now free.
-	to_free =
-	  [ r | (reg, loc) <- ufmToList assig, 
-		not (elemUniqSet_Directly reg live_set), 
-		r <- regsOfLoc loc ]
-
-	regsOfLoc (InReg r)    = [r]
-	regsOfLoc (InBoth r _) = [r]
-	regsOfLoc (InMem _)    = []
-  -- in
-  case lookupBlockEnv block_assig dest of
-	-- Nothing <=> this is the first time we jumped to this
-	-- block.
-	Nothing -> do
-	  freeregs <- getFreeRegsR
-	  let freeregs' = foldr releaseReg freeregs to_free 
-	  setBlockAssigR (extendBlockEnv block_assig dest 
-				(freeregs',adjusted_assig))
-	  joinToTargets block_live new_blocks instr dests
-
-	Just (_, dest_assig)
-
-	   -- the assignments match
-	   | ufmToList dest_assig == ufmToList adjusted_assig
-	   -> joinToTargets block_live new_blocks instr dests
-
-	   -- need fixup code
-	   | otherwise
-	   -> do
-	       delta <- getDeltaR
-	       
-               let graph = makeRegMovementGraph adjusted_assig dest_assig
-	       let sccs  = stronglyConnCompFromEdgedVerticesR graph
-	       fixUpInstrs <- mapM (handleComponent delta instr) sccs
-
-	       block_id <- getUniqueR
-	       let block = BasicBlock (BlockId block_id) $
-	               concat fixUpInstrs ++ mkBranchInstr dest
-
-	       let instr' = patchJump instr dest (BlockId block_id)
-
-	       joinToTargets block_live (block : new_blocks) instr' dests
-
-
--- | Construct a graph of register\/spill movements.
---
--- 	We cut some corners by
--- 	a) not handling cyclic components
--- 	b) not handling memory-to-memory moves.
---
--- 	Cyclic components seem to occur only very rarely,
--- 	and we don't need memory-to-memory moves because we
--- 	make sure that every temporary always gets its own
--- 	stack slot.
-
-makeRegMovementGraph :: RegMap Loc -> RegMap Loc -> [(Unique, Loc, [Loc])]
-makeRegMovementGraph adjusted_assig dest_assig
- = let
- 	mkNodes src vreg
-	 = expandNode vreg src
-	 $ lookupWithDefaultUFM_Directly
-           	dest_assig
-                (panic "RegAllocLinear.makeRegMovementGraph")
-		vreg
-
-   in	[ node 	| (vreg, src) <- ufmToList adjusted_assig
- 		, node <- mkNodes src vreg ]
-
--- The InBoth handling is a little tricky here.  If
--- the destination is InBoth, then we must ensure that
--- the value ends up in both locations.  An InBoth
--- destination must conflict with an InReg or InMem
--- source, so we expand an InBoth destination as
--- necessary.  An InBoth source is slightly different:
--- we only care about the register that the source value
--- is in, so that we can move it to the destinations.
-
-expandNode vreg loc@(InReg src) (InBoth dst mem)
-	| src == dst = [(vreg, loc, [InMem mem])]
-	| otherwise  = [(vreg, loc, [InReg dst, InMem mem])]
-
-expandNode vreg loc@(InMem src) (InBoth dst mem)
-	| src == mem = [(vreg, loc, [InReg dst])]
-	| otherwise  = [(vreg, loc, [InReg dst, InMem mem])]
-
-expandNode _        (InBoth _ src) (InMem dst)
-	| src == dst = [] -- guaranteed to be true
-
-expandNode _        (InBoth src _) (InReg dst)
-	| src == dst = []
-
-expandNode vreg     (InBoth src _) dst
-	= expandNode vreg (InReg src) dst
-
-expandNode vreg src dst
-	| src == dst = []
-	| otherwise  = [(vreg, src, [dst])]
-
-
--- | Make a move instruction between these two locations so we
---	can join together allocations for different basic blocks.
---
-makeMove :: Int -> Unique -> Loc -> Loc -> RegM Instr
-makeMove _     vreg (InReg src) (InReg dst)
- = do	recordSpill (SpillJoinRR vreg)
- 	return	$ mkRegRegMoveInstr (RealReg src) (RealReg dst)
-
-makeMove delta vreg (InMem src) (InReg dst)
- = do	recordSpill (SpillJoinRM vreg)
- 	return	$ mkLoadInstr (RealReg dst) delta src
-
-makeMove delta vreg (InReg src) (InMem dst)
- = do	recordSpill (SpillJoinRM vreg)
-	return	$ mkSpillInstr (RealReg src) delta dst
-
-makeMove _     vreg src dst
-	= panic $ "makeMove " ++ show vreg ++ " (" ++ show src ++ ") ("
-		++ show dst ++ ")"
-		++ " (workaround: use -fviaC)"
-
-
--- we have eliminated any possibility of single-node cylces
--- in expandNode above.
-handleComponent :: Int -> Instr -> SCC (Unique, Loc, [Loc]) -> RegM [Instr]
-handleComponent delta _  (AcyclicSCC (vreg,src,dsts))
-	 = mapM (makeMove delta vreg src) dsts
-
--- we can not have cycles that involve memory
--- locations as source nor as single destination
--- because memory locations (stack slots) are
--- allocated exclusively for a virtual register and
--- therefore can not require a fixup
-handleComponent delta instr (CyclicSCC ((vreg, (InReg sreg),dsts):rest))
- = do
-	spill_id <- getUniqueR
-	(_, slot) 		<- spillR (RealReg sreg) spill_id
-	remainingFixUps 	<- mapM (handleComponent delta instr) (stronglyConnCompFromEdgedVerticesR rest)
-	restoreAndFixInstr 	<- getRestoreMoves dsts slot
-	return ([instr] ++ concat remainingFixUps ++ restoreAndFixInstr)
-
-	where
-	getRestoreMoves [r@(InReg reg), mem@(InMem _)] slot
-	 = do
-		restoreToReg 	<- loadR (RealReg reg) slot
-		moveInstr	<- makeMove delta vreg r mem
-		return $ [COMMENT (fsLit "spill join move"), restoreToReg, moveInstr]
-
-	getRestoreMoves [InReg reg] slot
-		= loadR (RealReg reg) slot >>= return . (:[])
-
-	getRestoreMoves [InMem _] _ 	= panic "getRestoreMoves can not handle memory only restores"
-	getRestoreMoves _ _ 		= panic "getRestoreMoves unknown case"
-
-
-handleComponent _ _ (CyclicSCC _)
- = panic "Register Allocator: handleComponent cyclic"
-
-
-
--- -----------------------------------------------------------------------------
--- Utils
-
-my_fromJust :: String -> SDoc -> Maybe a -> a
-my_fromJust _ _ (Just x) = x
-my_fromJust s p Nothing = pprPanic ("fromJust: " ++ s) p
-
-lookItUp :: String -> BlockMap a -> BlockId -> a
-lookItUp str fm x = my_fromJust str (ppr x) (lookupBlockEnv fm x)

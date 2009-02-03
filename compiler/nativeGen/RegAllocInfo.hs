@@ -21,6 +21,7 @@ module RegAllocInfo (
 	regUsage,
 	patchRegs,
 	jumpDests,
+	isJumpish,
 	patchJump,
 	isRegRegMove,
 
@@ -433,6 +434,37 @@ jumpDests insn acc
 #endif
 	_other		-> acc
 
+
+-- | Check whether a particular instruction is a jump, branch or call instruction (jumpish)
+--	We can't just use jumpDests above because the jump might take its arg,
+--	so the instr won't contain a blockid.
+--
+isJumpish :: Instr -> Bool
+isJumpish instr
+ = case instr of
+#if i386_TARGET_ARCH || x86_64_TARGET_ARCH
+	JMP{}		-> True
+	JXX{}		-> True
+	JXX_GBL{}	-> True
+	JMP_TBL{}	-> True
+	CALL{}		-> True
+
+#elif powerpc_TARGET_ARCH
+	BCC{}		-> True
+	BCCFAR{}	-> True
+	JMP{}		-> True
+	
+#elif sparc_TARGET_ARCH
+	BI{}		-> True
+	BF{}		-> True
+	JMP{}		-> True
+	JMP_TBL{}	-> True
+	CALL{}		-> True
+#else
+#error	"RegAllocInfo.isJumpish: not implemented for this architecture"
+#endif
+	_		-> False
+	
 
 -- | Change the destination of this jump instruction
 --	Used in joinToTargets in the linear allocator, when emitting fixup code
