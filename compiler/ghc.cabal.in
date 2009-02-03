@@ -456,6 +456,10 @@ Library
             AsmCodeGen
             MachCodeGen
             MachInstrs
+            Alpha.Instr
+            X86.Instr
+            PPC.Instr
+            SPARC.Instr
             MachRegs
             NCGMonad
             PositionIndependentCode
