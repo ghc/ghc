@@ -462,7 +462,16 @@ Library
             PprMach
             RegAllocColor
             RegAllocInfo
-            RegAllocLinear
+            RegAlloc.Linear.Main
+            RegAlloc.Linear.JoinToTargets
+            RegAlloc.Linear.State
+            RegAlloc.Linear.Stats
+            RegAlloc.Linear.FreeRegs
+            RegAlloc.Linear.StackMap
+            RegAlloc.Linear.Base
+            RegAlloc.Linear.X86.FreeRegs
+            RegAlloc.Linear.PPC.FreeRegs
+            RegAlloc.Linear.SPARC.FreeRegs
             RegAllocStats
             RegArchBase
             RegArchX86
