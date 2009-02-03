@@ -460,8 +460,16 @@ Library
             NCGMonad
             PositionIndependentCode
             PprMach
-            RegAllocColor
+            RegLiveness
             RegAllocInfo
+            RegAlloc.Graph.Main
+            RegAlloc.Graph.Stats
+            RegAlloc.Graph.ArchBase
+            RegAlloc.Graph.ArchX86
+            RegAlloc.Graph.Coalesce
+            RegAlloc.Graph.Spill
+            RegAlloc.Graph.SpillClean
+            RegAlloc.Graph.SpillCost
             RegAlloc.Linear.Main
             RegAlloc.Linear.JoinToTargets
             RegAlloc.Linear.State
@@ -472,14 +480,6 @@ Library
             RegAlloc.Linear.X86.FreeRegs
             RegAlloc.Linear.PPC.FreeRegs
             RegAlloc.Linear.SPARC.FreeRegs
-            RegAllocStats
-            RegArchBase
-            RegArchX86
-            RegCoalesce
-            RegLiveness
-            RegSpill
-            RegSpillClean
-            RegSpillCost
 
     if flag(ghci)
         Exposed-Modules:

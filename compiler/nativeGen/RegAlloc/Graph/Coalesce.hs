@@ -1,7 +1,7 @@
 -- | Register coalescing.
 --
 
-module RegCoalesce (
+module RegAlloc.Graph.Coalesce (
 	regCoalesce,
 	slurpJoinMovs
 )

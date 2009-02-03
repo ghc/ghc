@@ -4,7 +4,7 @@
 -- TODO: The colors in graphviz graphs for x86_64 and ppc could be nicer.
 --
 
-module RegAllocColor ( 
+module RegAlloc.Graph.Main ( 
 	regAlloc,
 	regDotColor
 ) 
@@ -13,11 +13,10 @@ where
 
 import qualified GraphColor	as Color
 import RegLiveness
-import RegSpill
-import RegSpillClean
-import RegSpillCost
-import RegAllocStats
--- import RegCoalesce
+import RegAlloc.Graph.Spill
+import RegAlloc.Graph.SpillClean
+import RegAlloc.Graph.SpillCost
+import RegAlloc.Graph.Stats
 import MachRegs
 import MachInstrs
 import PprMach

@@ -1,5 +1,5 @@
 
-module RegSpillCost (
+module RegAlloc.Graph.SpillCost (
 	SpillCostRecord,
 	plusSpillCostRecord,
 	pprSpillCostRecord,

@@ -27,13 +27,13 @@ import RegAllocInfo
 import NCGMonad
 import PositionIndependentCode
 import RegLiveness
-import RegCoalesce
 
 import qualified RegAlloc.Linear.Main	as Linear
 
-import qualified RegAllocColor	as Color
-import qualified RegAllocStats	as Color
-import qualified GraphColor	as Color
+import qualified GraphColor			as Color
+import qualified RegAlloc.Graph.Main		as Color
+import qualified RegAlloc.Graph.Stats		as Color
+import qualified RegAlloc.Graph.Coalesce	as Color
 
 import Cmm
 import CmmOpt		( cmmMiniInline, cmmMachOpFold )

@@ -1,7 +1,7 @@
 
 {-# OPTIONS -fno-warn-missing-signatures #-}
 
-module RegSpill (
+module RegAlloc.Graph.Spill (
 	regSpill,
 	SpillStats(..),
 	accSpillSL

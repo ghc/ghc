@@ -24,7 +24,7 @@
 --	spilling %r1 to a slot makes that slot have the same value as %r1.
 --
 
-module RegSpillClean (
+module RegAlloc.Graph.SpillClean (
 	cleanSpills
 )
 where

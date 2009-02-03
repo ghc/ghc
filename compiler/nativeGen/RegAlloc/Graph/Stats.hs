@@ -3,7 +3,7 @@
 --	graph coloring register allocator.
 --
 
-module RegAllocStats (
+module RegAlloc.Graph.Stats (
 	RegAllocStats (..),
 	regDotColor,
 
@@ -23,8 +23,8 @@ where
 import qualified GraphColor as Color
 import RegLiveness
 import RegAllocInfo
-import RegSpill
-import RegSpillCost
+import RegAlloc.Graph.Spill
+import RegAlloc.Graph.SpillCost
 import MachRegs
 import MachInstrs
 import Cmm
