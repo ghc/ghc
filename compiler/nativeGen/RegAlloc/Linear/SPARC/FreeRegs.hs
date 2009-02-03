@@ -120,15 +120,53 @@ releaseReg :: RegNo -> FreeRegs -> FreeRegs
 releaseReg r regs@(FreeRegs g f d)
 
 	-- used by STG machine, or otherwise unavailable
-	| r >= 0  && r <= 15	= regs
---	| r >= 3  && r <= 15	= regs
+	--	see includes/MachRegs.h for more info
 
-	| r >= 17 && r <= 21	= regs
+	-- Global Regs g0-g7
+	--         r0: always zero
+	--      r1-r4: allocable
+	--      r5-r7: reserved for OS
+	| r == 0 		= regs
+	| r >= 5 && r <= 7	= regs
+	
+	-- Output Regs o0-o7
+	--   caller saves
+	--   r8 - r13: allocable
+	--        r14: C stack ptr
+	--        r15: C ret addr
+	| r >= 14 && r <= 15	= regs
+	
+	-- Local Regs 
+	--        r16: allocable
+	--  r17 - r21: R1-R5
+	--  r22 - r23: allocable
+	| r >= 17 && r <= 21	= regs		
+
+	-- Input Regs
+	--  r24 - r29: Sp, Base, SpLim, Hp, HpLim, R6
+	--        r30: C frame ptr
+	--        r31: C ret addr
 	| r >= 24 && r <= 31	= regs
+	
+	-- Float regs
+	--  r32 & r33: floating point return from C fun
+	--  r34 & r35: D1
+	--  r36 & r37: D2
+	--  r38 & r39: NCG spill tmp
+	--  r40 & r41: NCG spill tmp
 	| r >= 32 && r <= 41	= regs
+
+	--  r42 - r53: allocatable as double prec float regs
+
+	--  r54 - r57: F1-F4
+	--  r58 - r59: NCG spill tmps
 	| r >= 54 && r <= 59	= regs
 
+	--  r60-r64: allocatable as single prec float regs.
+
+
 	-- never release the high part of double regs.
+	--	this prevents them from being allocated as single precison regs.
 	| r == 43		= regs
 	| r == 45		= regs
 	| r == 47		= regs

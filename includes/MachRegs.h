@@ -559,17 +559,49 @@
    output registers visible in one register window.  The 8 %g (global)
    registers are visible all the time.
    
-   %o0..%o7 	       	not available; can be zapped by callee
-   			  (%o6 is C-stack ptr; %o7 hold ret addrs)
-   %i0..%i7            	available (except %i6 is used as frame ptr)
-   			  (and %i7 tends to have ret-addr-ish things)
-   %l0..%l7	       	available
-   %g0..%g4 		not available; prone to stomping by division, etc.
-   %g5..%g7 		not available; reserved for the OS
+      zero: always zero
+   scratch: volatile across C-fn calls. used by linker.
+       app: usable by application
+    system: reserved for system
+ 
+     alloc: allocated to in the register allocator, intra-closure only
+   
+                GHC usage     v8 ABI        v9 ABI
+   Global
+     %g0	zero        zero          zero
+     %g1	alloc       scratch       scrach
+     %g2	alloc       app           app
+     %g3	alloc       app           app
+     %g4	alloc       app           scratch
+     %g5                    system        scratch    
+     %g6                    system        system
+     %g7                    system        system
 
-   Note: %g3 is *definitely* clobbered in the builtin divide code (and
-   our save/restore machinery is NOT GOOD ENOUGH for that); discretion
-   being the better part of valor, we also don't take %g4.
+   Output: can be zapped by callee
+     %o0-o5	alloc       caller saves
+     %o6                    C stack ptr
+     %o7                    C ret addr
+   
+   Local: maintained by register windowing mechanism
+     %l0	alloc        
+     %l1	R1
+     %l2	R2
+     %l3	R3
+     %l4	R4
+     %l5	R5
+     %l6	alloc
+     %l7	alloc
+
+   Input
+     %i0	Sp
+     %i1        Base
+     %i2        SpLim
+     %i3        Hp
+     %i4        HpLim
+     %i5        R6
+     %i6                    C frame ptr
+     %i7                    C ret addr
+     
 
    The paired nature of the floating point registers causes complications for
    the native code generator.  For convenience, we pretend that the first 22
@@ -638,12 +670,14 @@
 
 #define REG_Base	i1
 
+/*
 #define NCG_SpillTmp_I1	g1
 #define NCG_SpillTmp_I2	g2
 #define NCG_SpillTmp_F1	f26
 #define NCG_SpillTmp_F2 f27
 #define NCG_SpillTmp_D1	f6
 #define NCG_SpillTmp_D2	f8
+*/
 
 #define NCG_FirstFloatReg f22
 
