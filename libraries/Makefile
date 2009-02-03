@@ -36,9 +36,16 @@ TOP=..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/cabal-flags.mk
 
+ifeq "$(stage)" ""
+stage := 1
+endif
+
 # Any libraries listed here should also be in ../packages
 
-SUBDIRS  = ghc-prim $(INTEGER_LIBRARY) base syb base3-compat array packedstring
+SUBDIRS :=
+
+ifeq "$(stage)" "1"
+SUBDIRS += ghc-prim $(INTEGER_LIBRARY) base syb base3-compat array packedstring
 SUBDIRS += containers bytestring old-locale old-time filepath 
 ifeq "$(GhcLibsWithUnix)" "YES"
 SUBDIRS += unix
@@ -65,6 +72,11 @@ SUBDIRS += $(wildcard time)
 SUBDIRS += $(wildcard stm)
 SUBDIRS += $(wildcard xhtml)
 SUBDIRS += $(wildcard parallel)
+endif
+endif
+
+ifeq "$(stage)" "2"
+ifneq "$(GhcBootLibs)" "YES"
 ifneq "$(wildcard dph)" ""
 SUBDIRS += dph/dph-base
 SUBDIRS += dph/dph-prim-interface
@@ -72,6 +84,7 @@ SUBDIRS += dph/dph-prim-seq
 SUBDIRS += dph/dph-prim-par
 SUBDIRS += dph/dph-seq
 SUBDIRS += dph/dph-par
+endif
 endif
 endif
 
@@ -189,7 +202,7 @@ configure: $(foreach SUBDIR,$(SUBDIRS), \
 
 ALL_CONFIGURE_FLAGS = \
                $(INSTALL_DIRS_CONFIGURE_FLAGS) \
-               $(USE_STAGE1_CONFIGURE_FLAGS) \
+               $(USE_STAGE$(stage)_CONFIGURE_FLAGS) \
                $(COMMON_CONFIGURE_FLAGS) \
 	           --haddock-options="--use-contents=../index.html \
 	                              --use-index=../doc-index.html" \

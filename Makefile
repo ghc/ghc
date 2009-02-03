@@ -152,6 +152,7 @@ stage2 : check-all
 	$(MAKE) -C compiler stage=2 boot
 	$(MAKE) -C compiler stage=2
 	$(MAKE) -C utils with-stage-2
+	$(MAKE) -C libraries stage=2 all
 ifeq "$(HADDOCK_DOCS)" "YES"
 	$(MAKE) -C libraries doc
 	$(MAKE) -C compiler  doc stage=2
