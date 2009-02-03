@@ -269,9 +269,7 @@ newCAString str = do
 --
 newCAStringLen     :: String -> IO CStringLen
 #ifndef __GLASGOW_HASKELL__
-newCAStringLen str  = do
-  a <- newArray (charsToCChars str)
-  return (pairLength str a)
+newCAStringLen str  = newArrayLen (charsToCChars str)
 #else
 newCAStringLen str = do
   ptr <- mallocArray0 len
@@ -315,10 +313,10 @@ withCAString str f =
 --   storage must /not/ be used after this.
 --
 withCAStringLen         :: String -> (CStringLen -> IO a) -> IO a
+withCAStringLen str f    =
 #ifndef __GLASGOW_HASKELL__
-withCAStringLen str act  = withArray (charsToCChars str) $ act . pairLength str
+  withArrayLen (charsToCChars str) $ \ len ptr -> f (ptr, len)
 #else
-withCAStringLen str f =
   allocaArray len $ \ptr ->
       let
         go [] n     = n `seq` return () -- make it strict in n
@@ -338,10 +336,11 @@ withCAStringLen str f =
 nUL :: CChar
 nUL  = 0
 
--- pair a C string with the length of the given Haskell string
---
-pairLength :: String -> a -> (a, Int)
-pairLength  = flip (,) . length
+-- allocate an array to hold the list and pair it with the number of elements
+newArrayLen        :: Storable a => [a] -> IO (Ptr a, Int)
+newArrayLen xs      = do
+  a <- newArray xs
+  return (a, length xs)
 
 #ifndef __GLASGOW_HASKELL__
 -- cast [CChar] to [Char]
@@ -403,9 +402,7 @@ newCWString  = newArray0 wNUL . charsToCWchars
 --   'Foreign.Marshal.Alloc.finalizerFree'.
 --
 newCWStringLen     :: String -> IO CWStringLen
-newCWStringLen str  = do
-  a <- newArray (charsToCWchars str)
-  return (pairLength str a)
+newCWStringLen str  = newArrayLen (charsToCWchars str)
 
 -- | Marshal a Haskell string into a NUL terminated C wide string using
 -- temporary storage.
@@ -429,7 +426,8 @@ withCWString  = withArray0 wNUL . charsToCWchars
 --   storage must /not/ be used after this.
 --
 withCWStringLen         :: String -> (CWStringLen -> IO a) -> IO a
-withCWStringLen str act  = withArray (charsToCWchars str) $ act . pairLength str
+withCWStringLen str f    =
+  withArrayLen (charsToCWchars str) $ \ len ptr -> f (ptr, len)
 
 -- auxiliary definitions
 -- ----------------------
