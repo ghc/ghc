@@ -461,6 +461,11 @@ Library
             PPC.Instr
             SPARC.Instr
             MachRegs
+            RegsBase
+            X86.Regs
+            PPC.Regs
+            SPARC.Regs
+            Alpha.Regs
             NCGMonad
             PositionIndependentCode
             PprMach
