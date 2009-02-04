@@ -247,8 +247,8 @@ linearRA
 	-> BlockId			-- ^ id of the current block, for debugging.
 	-> [LiveInstr]			-- ^ liveness annotated instructions in this block.
 
-	-> RegM ( [Instr]		-- ^ instructions after register allocation
-		, [NatBasicBlock])	-- ^ fresh blocks of fixup code.
+	-> RegM ( [Instr]		--   instructions after register allocation
+		, [NatBasicBlock])	--   fresh blocks of fixup code.
 
 
 linearRA _          accInstr accFixup _ []

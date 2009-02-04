@@ -105,9 +105,10 @@ data RegAllocStats
 data RA_State 
 	= RA_State 
 
+	{ 
 	-- | the current mapping from basic blocks to 
 	-- 	the register assignments at the beginning of that block.
-	{ ra_blockassig	:: BlockAssignment
+	  ra_blockassig	:: BlockAssignment
 	
 	-- | free machine registers
 	, ra_freeregs   :: {-#UNPACK#-}!FreeRegs

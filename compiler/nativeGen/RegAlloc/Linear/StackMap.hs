@@ -31,11 +31,10 @@ type StackSlot = Int
 
 data StackMap 
 	= StackMap 
+	{ -- | The slots that are still available to be allocated.
+	  stackMapFreeSlots	:: [StackSlot]
 
-	-- | The slots that are still available to be allocated.
-	{ stackMapFreeSlots	:: [StackSlot]
-
-	-- | Assignment of vregs to stack slots.
+	  -- | Assignment of vregs to stack slots.
 	, stackMapAssignment	:: UniqFM StackSlot }
 
 
