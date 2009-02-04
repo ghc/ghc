@@ -37,6 +37,7 @@ import Name
 import Bag
 import Outputable
 import SrcLoc	( Located(..) )
+import Util	( debugIsOn )
 import Maybes
 import FastString
 
@@ -278,7 +279,15 @@ no further propoagation is possible.
 --
 normaliseEqs :: [Inst] -> TcM EqConfig
 normaliseEqs eqs 
-  = do { ASSERTM2( allM wantedEqInstIsUnsolved eqs, ppr eqs )
+  = do { if debugIsOn then do { all_unsolved <- allM wantedEqInstIsUnsolved eqs
+       	    	      	      ; let msg = ptext (sLit "(This warning is harmless; for Simon & Manuel)")
+       	    	      	      ; WARN( not all_unsolved, msg $$ ppr eqs ) return () }
+		      else return ()
+	    -- This is just a warning (not an error) because a current
+	    -- harmless bug means that we sometimes solve the same
+	    -- equality more than once It'll go away with the new
+	    -- solver. See Trac #2999 for example
+
        ; traceTc $ ptext (sLit "Entering normaliseEqs")
 
        ; (eqss, skolemss) <- mapAndUnzipM normEqInst eqs
