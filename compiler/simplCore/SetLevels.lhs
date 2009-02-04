@@ -851,7 +851,7 @@ newPolyBndrs dest_lvl env abs_vars bndrs = do
     let new_bndrs = zipWith mk_poly_bndr bndrs uniqs
     return (extendPolyLvlEnv dest_lvl env abs_vars (bndrs `zip` new_bndrs), new_bndrs)
   where
-    mk_poly_bndr bndr uniq = transferPolyIdInfo bndr $ 	-- Note [transferPolyIdInfo] in Id.lhs
+    mk_poly_bndr bndr uniq = transferPolyIdInfo bndr abs_vars $ 	-- Note [transferPolyIdInfo] in Id.lhs
 			     mkSysLocal (mkFastString str) uniq poly_ty
 			   where
 			     str     = "poly_" ++ occNameString (getOccName bndr)

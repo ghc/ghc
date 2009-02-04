@@ -106,7 +106,7 @@ import IdInfo
 import BasicTypes
 
 -- Imported and re-exported 
-import Var( Id, DictId,
+import Var( Var, Id, DictId,
             idInfo, idDetails, globaliseId,
             isId, isLocalId, isGlobalId, isExportedId )
 import qualified Var
@@ -132,6 +132,7 @@ import Outputable
 import Unique
 import UniqSupply
 import FastString
+import Util( count )
 import StaticFlags
 
 -- infixl so you can say (id `set` a `set` b)
@@ -697,23 +698,47 @@ where g has interesting strictness information.  Then if we float thus
    g' = /\a. rhs
    f = /\a. ...[g' a/g]
 
-we *do not* want to lose the strictness information on g.  Nor arity.
+we *do not* want to lose g's
+  * strictness information
+  * arity 
+  * inline pragma (though that is bit more debatable)
 
 It's simple to retain strictness and arity, but not so simple to retain
-	worker info
-	rules
+  * worker info
+  * rules
 so we simply discard those.  Sooner or later this may bite us.
 
 This transfer is used in two places: 
 	FloatOut (long-distance let-floating)
 	SimplUtils.abstractFloats (short-distance let-floating)
 
+If we abstract wrt one or more *value* binders, we must modify the 
+arity and strictness info before transferring it.  E.g. 
+      f = \x. e
+-->
+      g' = \y. \x. e
+      + substitute (g' y) for g
+Notice that g' has an arity one more than the original g
+
 \begin{code}
-transferPolyIdInfo :: Id -> Id -> Id
-transferPolyIdInfo old_id new_id
+transferPolyIdInfo :: Id	-- Original Id
+		   -> [Var]	-- Abstract wrt these variables
+		   -> Id	-- New Id
+		   -> Id
+transferPolyIdInfo old_id abstract_wrt new_id
   = modifyIdInfo transfer new_id
   where
-    old_info = idInfo old_id
-    transfer new_info = new_info `setNewStrictnessInfo` (newStrictnessInfo old_info)
-			         `setArityInfo` (arityInfo old_info)
+    arity_increase = count isId abstract_wrt	-- Arity increases by the
+    		     	   			-- number of value binders
+
+    old_info 	    = idInfo old_id
+    old_arity       = arityInfo old_info
+    old_inline_prag = inlinePragInfo old_info
+    new_arity       = old_arity + arity_increase
+    old_strictness  = newStrictnessInfo old_info
+    new_strictness  = fmap (increaseStrictSigArity arity_increase) old_strictness
+
+    transfer new_info = new_info `setNewStrictnessInfo` new_strictness
+			         `setArityInfo` new_arity
+ 			         `setInlinePragInfo` old_inline_prag
 \end{code}

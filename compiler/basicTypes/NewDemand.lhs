@@ -19,7 +19,7 @@ module NewDemand(
 
 	StrictSig(..), mkStrictSig, topSig, botSig, cprSig,
         isTopSig,
-	splitStrictSig,
+	splitStrictSig, increaseStrictSigArity,
 	pprIfaceStrictSig, appIsBottom, isBottomingSig, seqStrictSig,
      ) where
 
@@ -306,6 +306,11 @@ mkStrictSig dmd_ty = StrictSig dmd_ty
 
 splitStrictSig :: StrictSig -> ([Demand], DmdResult)
 splitStrictSig (StrictSig (DmdType _ dmds res)) = (dmds, res)
+
+increaseStrictSigArity :: Int -> StrictSig -> StrictSig
+-- Add extra arguments to a strictness signature
+increaseStrictSigArity arity_increase (StrictSig (DmdType env dmds res))
+  = StrictSig (DmdType env (replicate arity_increase topDmd ++ dmds) res)
 
 isTopSig :: StrictSig -> Bool
 isTopSig (StrictSig ty) = isTopDmdType ty
