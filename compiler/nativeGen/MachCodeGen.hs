@@ -3863,6 +3863,7 @@ outOfLineFloatOp_table mop
 	MO_F32_Exp    -> fsLit "expf"
 	MO_F32_Log    -> fsLit "logf"
 	MO_F32_Sqrt   -> fsLit "sqrtf"
+	MO_F32_Pwr    -> fsLit "powf"
 
 	MO_F32_Sin    -> fsLit "sinf"
 	MO_F32_Cos    -> fsLit "cosf"
@@ -3879,6 +3880,7 @@ outOfLineFloatOp_table mop
 	MO_F64_Exp    -> fsLit "exp"
 	MO_F64_Log    -> fsLit "log"
 	MO_F64_Sqrt   -> fsLit "sqrt"
+	MO_F64_Pwr    -> fsLit "pow"
 
 	MO_F64_Sin    -> fsLit "sin"
 	MO_F64_Cos    -> fsLit "cos"
