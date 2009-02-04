@@ -61,7 +61,6 @@ extra-libraries:		"m"		/* for ldexp() */
 include-dirs:		INCLUDE_DIR GMP_INCLUDE_DIRS PAPI_INCLUDE_DIR
 #else /* !INSTALLING */
 include-dirs:		FPTOOLS_TOP_ABS"/includes"
-             		FPTOOLS_TOP_ABS"/rts"
 # if !defined(HAVE_LIB_GMP) && !defined(HAVE_FRAMEWORK_GMP)
              		FPTOOLS_TOP_ABS"/gmp/gmpbuild"
 # endif
