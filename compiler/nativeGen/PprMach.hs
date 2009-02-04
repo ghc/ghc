@@ -28,8 +28,8 @@ module PprMach (
 
 import BlockId
 import Cmm
-import MachRegs		-- may differ per-platform
-import MachInstrs
+import Regs		-- may differ per-platform
+import Instrs
 
 import CLabel		( CLabel, pprCLabel, externallyVisibleCLabel,
 			  labelDynamic, mkAsmTempLabel, entryLblToInfoLbl )

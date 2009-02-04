@@ -17,8 +17,8 @@ import RegAlloc.Graph.Spill
 import RegAlloc.Graph.SpillClean
 import RegAlloc.Graph.SpillCost
 import RegAlloc.Graph.Stats
-import MachRegs
-import MachInstrs
+import Regs
+import Instrs
 import PprMach
 
 import UniqSupply

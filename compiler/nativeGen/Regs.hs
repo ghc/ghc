@@ -11,7 +11,7 @@
 
 #include "nativeGen/NCG.h"
 
-module MachRegs (
+module Regs (
 	--------------------------------
 	-- Generic things, shared by all architectures.
 	module RegsBase,	
@@ -121,7 +121,7 @@ import X86.Regs
 #elif sparc_TARGET_ARCH
 import SPARC.Regs
 #else
-#error "MachRegs: not defined for this architecture"
+#error "Regs: not defined for this architecture"
 #endif
 
 
@@ -181,7 +181,7 @@ allocatableRegsInClass cls
  = case cls of
  	RcInteger	-> allocatableRegsInteger
 	RcDouble	-> allocatableRegsDouble
-	RcFloat		-> panic "MachRegs.allocatableRegsInClass: no match\n"
+	RcFloat		-> panic "Regs.allocatableRegsInClass: no match\n"
 
 allocatableRegsInteger :: Int
 allocatableRegsInteger	
@@ -218,7 +218,7 @@ trivColorable classN conflicts exclusions
 	 = case regClass r of
 		RcInteger	-> (cd+1, cf)
 		RcDouble	-> (cd,   cf+1)
-		_		-> panic "MachRegs.trivColorable: reg class not handled"
+		_		-> panic "Regs.trivColorable: reg class not handled"
 
 	tmp			= foldUniqSet acc (0, 0) conflicts
 	(countInt,  countFloat)	= foldUniqSet acc tmp    exclusions
@@ -256,7 +256,7 @@ worst n classN classC
 -- There is an allocatableRegsInClass :: RegClass -> Int, but doing the unboxing
 -- is too slow for us here.
 --
--- Compare MachRegs.freeRegs  and MachRegs.h to get these numbers.
+-- Compare Regs.freeRegs  and MachRegs.h to get these numbers.
 --
 #if i386_TARGET_ARCH
 #define ALLOCATABLE_REGS_INTEGER (_ILIT(3))

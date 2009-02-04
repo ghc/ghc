@@ -65,8 +65,8 @@ import CLabel           ( CLabel, pprCLabel,
 import CLabel           ( mkForeignLabel )
 #endif
 
-import MachRegs
-import MachInstrs
+import Regs
+import Instrs
 import NCGMonad         ( NatM, getNewRegNat, getNewLabelNat )
 
 import StaticFlags	( opt_PIC, opt_Static )

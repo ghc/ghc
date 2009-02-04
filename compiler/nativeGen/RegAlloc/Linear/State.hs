@@ -35,8 +35,8 @@ import RegAlloc.Linear.Base
 import RegAlloc.Linear.FreeRegs
 
 
-import MachInstrs
-import MachRegs
+import Instrs
+import Regs
 import RegAllocInfo
 import RegLiveness
 

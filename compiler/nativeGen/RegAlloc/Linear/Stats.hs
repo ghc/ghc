@@ -9,7 +9,7 @@ where
 import RegAlloc.Linear.Base
 import RegLiveness
 import RegAllocInfo
-import MachInstrs
+import Instrs
 import Cmm		(GenBasicBlock(..))
 
 import UniqFM

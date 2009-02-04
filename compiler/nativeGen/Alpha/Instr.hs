@@ -18,7 +18,7 @@ module Alpha.Instr (
 where
 
 import BlockId
-import MachRegs
+import Regs
 import Cmm
 import FastString
 import CLabel

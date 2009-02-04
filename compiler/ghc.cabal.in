@@ -455,17 +455,17 @@ Library
         Exposed-Modules:
             AsmCodeGen
             MachCodeGen
-            MachInstrs
-            Alpha.Instr
-            X86.Instr
-            PPC.Instr
-            SPARC.Instr
-            MachRegs
+            Regs
             RegsBase
-            X86.Regs
-            PPC.Regs
-            SPARC.Regs
+            Instrs
             Alpha.Regs
+            Alpha.Instr
+            X86.Regs
+            X86.Instr
+            PPC.Regs
+            PPC.Instr
+            SPARC.Regs
+            SPARC.Instr
             NCGMonad
             PositionIndependentCode
             PprMach

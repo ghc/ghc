@@ -13,7 +13,7 @@ module X86.Instr
 where
 
 import BlockId
-import MachRegs
+import Regs
 import Cmm
 import FastString
 

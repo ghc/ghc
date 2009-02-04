@@ -25,8 +25,8 @@ import RegLiveness
 import RegAllocInfo
 import RegAlloc.Graph.Spill
 import RegAlloc.Graph.SpillCost
-import MachRegs
-import MachInstrs
+import Regs
+import Instrs
 import Cmm
 
 import Outputable

@@ -3,7 +3,7 @@
 module RegAlloc.Linear.X86.FreeRegs
 where
 
-import MachRegs
+import Regs
 
 import Data.Word
 import Data.Bits

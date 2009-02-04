@@ -11,8 +11,8 @@ where
 
 import RegLiveness
 import RegAllocInfo
-import MachRegs
-import MachInstrs
+import Regs
+import Instrs
 import Cmm
 
 import State

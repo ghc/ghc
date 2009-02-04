@@ -16,7 +16,7 @@
 #include "nativeGen/NCG.h"
 
 
-module MachInstrs (
+module Instrs (
 	NatCmm,
 	NatCmmTop,
 	NatBasicBlock,
@@ -33,7 +33,7 @@ module MachInstrs (
 #elif sparc_TARGET_ARCH
 	module SPARC.Instr
 #else
-#error "MachInstrs: not defined for this architecture"
+#error "Instrs: not defined for this architecture"
 #endif
 )
 
@@ -42,7 +42,7 @@ where
 #include "HsVersions.h"
 
 import BlockId
-import MachRegs
+import Regs
 import Cmm
 import CLabel           ( CLabel, pprCLabel )
 import Panic		( panic )
@@ -61,7 +61,7 @@ import X86.Instr
 #elif sparc_TARGET_ARCH
 import SPARC.Instr
 #else
-#error "MachInstrs: not defined for this architecture"
+#error "Instrs: not defined for this architecture"
 #endif
 
 

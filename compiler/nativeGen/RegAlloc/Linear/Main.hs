@@ -98,8 +98,8 @@ import RegAlloc.Linear.Stats
 import RegAlloc.Linear.JoinToTargets
 
 import BlockId
-import MachRegs
-import MachInstrs
+import Regs
+import Instrs
 import RegAllocInfo
 import RegLiveness
 import Cmm hiding (RegSet)

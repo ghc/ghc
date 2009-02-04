@@ -19,7 +19,7 @@ module PPC.Instr (
 where
 
 import BlockId
-import MachRegs
+import Regs
 import Cmm
 import Outputable
 import FastString

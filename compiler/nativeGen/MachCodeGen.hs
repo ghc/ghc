@@ -25,12 +25,11 @@ module MachCodeGen ( cmmTopCodeGen, InstrBlock ) where
 #include "MachDeps.h"
 
 -- NCG stuff:
-import MachInstrs
-import MachRegs
+import Instrs
+import Regs
 import NCGMonad
 import PositionIndependentCode
 import RegAllocInfo 	( mkBranchInstr, mkRegRegMoveInstr )
-import MachRegs
 import PprMach
 
 -- Our intermediate code:
@@ -5190,7 +5189,7 @@ coerceFP2Int fromRep toRep x = do
 -- We (allegedly) put the first six C-call arguments in registers;
 -- where do we start putting the rest of them?
 
--- Moved from MachInstrs (SDM):
+-- Moved from Instrs (SDM):
 
 #if alpha_TARGET_ARCH || sparc_TARGET_ARCH
 eXTRA_STK_ARGS_HERE :: Int

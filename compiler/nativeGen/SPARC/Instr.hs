@@ -22,7 +22,7 @@ module SPARC.Instr (
 where
 
 import BlockId
-import MachRegs
+import Regs
 import Cmm
 import Outputable
 import Constants	( wORD_SIZE )

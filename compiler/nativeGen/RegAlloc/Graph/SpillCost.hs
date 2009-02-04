@@ -19,8 +19,8 @@ where
 import GraphBase
 import RegLiveness
 import RegAllocInfo
-import MachInstrs
-import MachRegs
+import Instrs
+import Regs
 import BlockId
 import Cmm
 

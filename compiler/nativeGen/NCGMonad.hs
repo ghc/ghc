@@ -20,7 +20,7 @@ module NCGMonad (
 
 import BlockId
 import CLabel		( CLabel, mkAsmTempLabel )
-import MachRegs
+import Regs
 import UniqSupply
 import Unique		( Unique )
 import DynFlags

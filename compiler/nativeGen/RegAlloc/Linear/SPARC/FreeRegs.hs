@@ -3,7 +3,7 @@
 module RegAlloc.Linear.SPARC.FreeRegs
 where
 
-import MachRegs
+import Regs
 
 import Outputable
 

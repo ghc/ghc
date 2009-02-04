@@ -22,7 +22,7 @@ import RegAlloc.Linear.FreeRegs
 import RegAlloc.Linear.StackMap
 
 import RegLiveness
-import MachRegs
+import Regs
 
 import Outputable
 import Unique

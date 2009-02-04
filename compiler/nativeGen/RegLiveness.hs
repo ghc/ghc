@@ -31,8 +31,8 @@ module RegLiveness (
   ) where
 
 import BlockId
-import MachRegs
-import MachInstrs
+import Regs
+import Instrs
 import PprMach
 import RegAllocInfo
 import Cmm hiding (RegSet)

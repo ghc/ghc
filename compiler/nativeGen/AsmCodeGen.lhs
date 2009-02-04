@@ -19,8 +19,8 @@ module AsmCodeGen ( nativeCodeGen ) where
 #include "HsVersions.h"
 #include "nativeGen/NCG.h"
 
-import MachInstrs
-import MachRegs
+import Instrs
+import Regs
 import MachCodeGen
 import PprMach
 import RegAllocInfo

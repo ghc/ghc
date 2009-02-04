@@ -9,7 +9,7 @@ module RegAlloc.Graph.Coalesce (
 where
 
 import Cmm
-import MachRegs
+import Regs
 import RegLiveness
 import RegAllocInfo
 

@@ -39,8 +39,8 @@ module RegAllocInfo (
 import BlockId
 import Cmm
 import CLabel
-import MachInstrs
-import MachRegs
+import Instrs
+import Regs
 import Outputable
 import Constants	( rESERVED_C_STACK_BYTES )
 import FastBool
