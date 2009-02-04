@@ -1,4 +1,5 @@
 
 tcfail094.hs:7:9:
-    Kind error: `Int' is applied to too many type arguments
+    `Int' is applied to too many type arguments
+    In the type `Int 1'
     In the type synonym declaration for `A'

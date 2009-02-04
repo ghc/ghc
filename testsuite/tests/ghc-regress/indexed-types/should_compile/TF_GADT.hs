@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE GADTs, TypeFamilies #-}
 
 module TF_GADT where
 

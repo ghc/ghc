@@ -6,5 +6,4 @@ tcfail036.hs:6:9:
 
 tcfail036.hs:9:12:
     Class `Num' used as a type
-    In the type `Num'
     In the instance declaration for `Eq Num'

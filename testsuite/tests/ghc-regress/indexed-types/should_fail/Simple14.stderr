@@ -2,4 +2,5 @@
 Simple14.hs:5:14:
     Equality predicate used as a type
     In the type `a ~ a'
+    In the definition of data constructor `T'
     In the data type declaration for `T'

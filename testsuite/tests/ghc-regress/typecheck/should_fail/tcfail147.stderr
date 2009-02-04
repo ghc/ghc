@@ -2,4 +2,6 @@
 tcfail147.hs:7:18:
     `XClass' is not applied to enough type arguments
     Expected kind `?', but `XClass' has kind `k -> *'
+    In the type `XClass'
+    In the definition of data constructor `XCon'
     In the data type declaration for `XData'

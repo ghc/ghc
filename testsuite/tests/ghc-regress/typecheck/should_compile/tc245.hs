@@ -1,6 +1,6 @@
 -- Test for trac #2937
 
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE GADTs, TypeFamilies #-}
 
 module Tc245 where
 
