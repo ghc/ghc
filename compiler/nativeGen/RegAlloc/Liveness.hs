@@ -7,7 +7,7 @@
 -----------------------------------------------------------------------------
 {-# OPTIONS -Wall -fno-warn-name-shadowing #-}
 
-module RegLiveness (
+module RegAlloc.Liveness (
 	RegSet,
 	RegMap, emptyRegMap,
 	BlockMap, emptyBlockMap,

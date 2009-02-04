@@ -469,8 +469,8 @@ Library
             NCGMonad
             PositionIndependentCode
             PprMach
-            RegLiveness
             RegAllocInfo
+            RegAlloc.Liveness
             RegAlloc.Graph.Main
             RegAlloc.Graph.Stats
             RegAlloc.Graph.ArchBase

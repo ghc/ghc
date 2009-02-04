@@ -33,12 +33,12 @@ import RegAlloc.Linear.Stats
 import RegAlloc.Linear.StackMap
 import RegAlloc.Linear.Base
 import RegAlloc.Linear.FreeRegs
+import RegAlloc.Liveness
 
 
 import Instrs
 import Regs
 import RegAllocInfo
-import RegLiveness
 
 import Unique
 import UniqSupply

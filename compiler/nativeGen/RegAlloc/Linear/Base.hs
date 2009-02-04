@@ -20,8 +20,7 @@ where
 
 import RegAlloc.Linear.FreeRegs
 import RegAlloc.Linear.StackMap
-
-import RegLiveness
+import RegAlloc.Liveness
 import Regs
 
 import Outputable

@@ -9,7 +9,7 @@ module RegAlloc.Graph.Spill (
 
 where
 
-import RegLiveness
+import RegAlloc.Liveness
 import RegAllocInfo
 import Regs
 import Instrs

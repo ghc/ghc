@@ -7,7 +7,8 @@ module RegAlloc.Linear.Stats (
 where
 
 import RegAlloc.Linear.Base
-import RegLiveness
+import RegAlloc.Liveness
+
 import RegAllocInfo
 import Instrs
 import Cmm		(GenBasicBlock(..))

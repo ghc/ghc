@@ -12,7 +12,7 @@ module RegAlloc.Graph.Main (
 where
 
 import qualified GraphColor	as Color
-import RegLiveness
+import RegAlloc.Liveness
 import RegAlloc.Graph.Spill
 import RegAlloc.Graph.SpillClean
 import RegAlloc.Graph.SpillCost

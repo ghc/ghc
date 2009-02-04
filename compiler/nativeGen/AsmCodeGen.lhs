@@ -26,7 +26,7 @@ import PprMach
 import RegAllocInfo
 import NCGMonad
 import PositionIndependentCode
-import RegLiveness
+import RegAlloc.Liveness
 
 import qualified RegAlloc.Linear.Main	as Linear
 

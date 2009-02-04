@@ -10,7 +10,7 @@ where
 
 import Cmm
 import Regs
-import RegLiveness
+import RegAlloc.Liveness
 import RegAllocInfo
 
 import Bag

@@ -17,7 +17,7 @@ module RegAlloc.Graph.SpillCost (
 where
 
 import GraphBase
-import RegLiveness
+import RegAlloc.Liveness
 import RegAllocInfo
 import Instrs
 import Regs
@@ -83,7 +83,7 @@ slurpSpillCostInfo cmm
 		= countLIs rsLiveEntry instrs
 
 		| otherwise
-		= error "RegLiveness.slurpSpillCostInfo: bad block"
+		= error "RegAlloc.SpillCost.slurpSpillCostInfo: bad block"
 
 	countLIs _      []
 		= return ()

@@ -21,7 +21,7 @@ where
 #include "nativeGen/NCG.h"
 
 import qualified GraphColor as Color
-import RegLiveness
+import RegAlloc.Liveness
 import RegAllocInfo
 import RegAlloc.Graph.Spill
 import RegAlloc.Graph.SpillCost

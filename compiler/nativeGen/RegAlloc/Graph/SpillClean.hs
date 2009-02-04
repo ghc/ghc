@@ -30,7 +30,7 @@ module RegAlloc.Graph.SpillClean (
 where
 
 import BlockId
-import RegLiveness
+import RegAlloc.Liveness
 import RegAllocInfo
 import Regs
 import Instrs

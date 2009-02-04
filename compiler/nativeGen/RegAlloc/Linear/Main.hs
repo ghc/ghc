@@ -96,12 +96,12 @@ import RegAlloc.Linear.StackMap
 import RegAlloc.Linear.FreeRegs
 import RegAlloc.Linear.Stats
 import RegAlloc.Linear.JoinToTargets
+import RegAlloc.Liveness
 
 import BlockId
 import Regs
 import Instrs
 import RegAllocInfo
-import RegLiveness
 import Cmm hiding (RegSet)
 
 import Digraph
