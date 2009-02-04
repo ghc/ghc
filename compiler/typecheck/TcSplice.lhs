@@ -565,7 +565,7 @@ kcTopSpliceType expr
 	; let doc = ptext (sLit "In the spliced type") <+> ppr hs_ty2
 	; hs_ty3 <- checkNoErrs (rnLHsType doc hs_ty2)
 
-	; kcHsType hs_ty3 }
+	; kcLHsType hs_ty3 }
 \end{code}
 
 %************************************************************************

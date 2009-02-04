@@ -1266,7 +1266,7 @@ tcRnType hsc_env ictxt rdr_type
     failIfErrsM ;
 
 	-- Now kind-check the type
-    (ty', kind) <- kcHsType rn_type ;
+    (ty', kind) <- kcLHsType rn_type ;
     return kind
     }
   where

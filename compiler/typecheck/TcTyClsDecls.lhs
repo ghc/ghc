@@ -276,7 +276,7 @@ tcFamInstDecl1 (decl@TySynonym {tcdLName = L loc tc_name})
 	   addErr (wrongKindOfFamily family)
 
        ; -- (1) kind check the right-hand side of the type equation
-       ; k_rhs <- kcCheckHsType (tcdSynRhs decl) resKind
+       ; k_rhs <- kcCheckLHsType (tcdSynRhs decl) resKind
 
          -- we need the exact same number of type parameters as the family
          -- declaration 
@@ -385,7 +385,7 @@ kcIdxTyPats decl thing_inside
 
          -- type functions can have a higher-kinded result
        ; let resultKind = mkArrowKinds (drop (length hs_typats) kinds) resKind
-       ; typats <- zipWithM kcCheckHsType hs_typats kinds
+       ; typats <- zipWithM kcCheckLHsType hs_typats kinds
        ; thing_inside tvs typats resultKind fam_tycon
        }
   where
@@ -508,7 +508,7 @@ kcSynDecl (AcyclicSCC (L loc decl))
     kcHsTyVars (tcdTyVars decl) (\ k_tvs ->
     do { traceTc (text "kcd1" <+> ppr (unLoc (tcdLName decl)) <+> brackets (ppr (tcdTyVars decl)) 
 			<+> brackets (ppr k_tvs))
-       ; (k_rhs, rhs_kind) <- kcHsType (tcdSynRhs decl)
+       ; (k_rhs, rhs_kind) <- kcLHsType (tcdSynRhs decl)
        ; traceTc (text "kcd2" <+> ppr (unLoc (tcdLName decl)))
        ; let tc_kind = foldr (mkArrowKind . kindedTyVarKind) rhs_kind k_tvs
        ; return (L loc (decl { tcdTyVars = k_tvs, tcdSynRhs = k_rhs }),
@@ -584,14 +584,15 @@ kcDataDecl decl@(TyData {tcdND = new_or_data, tcdCtxt = ctxt, tcdCons = cons})
 	; return (decl {tcdTyVars = tvs, tcdCtxt = ctxt', tcdCons = cons'}) }
   where
     -- doc comments are typechecked to Nothing here
-    kc_con_decl (ConDecl name expl ex_tvs ex_ctxt details res _) = do
-      kcHsTyVars ex_tvs $ \ex_tvs' -> do
-        ex_ctxt' <- kcHsContext ex_ctxt
-        details' <- kc_con_details details 
-        res'     <- case res of
-          ResTyH98 -> return ResTyH98
-          ResTyGADT ty -> do { ty' <- kcHsSigType ty; return (ResTyGADT ty') }
-        return (ConDecl name expl ex_tvs' ex_ctxt' details' res' Nothing)
+    kc_con_decl (ConDecl name expl ex_tvs ex_ctxt details res _) 
+      = addErrCtxt (dataConCtxt name)	$ 
+        kcHsTyVars ex_tvs $ \ex_tvs' -> do
+        do { ex_ctxt' <- kcHsContext ex_ctxt
+           ; details' <- kc_con_details details 
+           ; res'     <- case res of
+                ResTyH98 -> return ResTyH98
+                ResTyGADT ty -> do { ty' <- kcHsSigType ty; return (ResTyGADT ty') }
+           ; return (ConDecl name expl ex_tvs' ex_ctxt' details' res' Nothing) }
 
     kc_con_details (PrefixCon btys) 
 	= do { btys' <- mapM kc_larg_ty btys 

@@ -12,7 +12,7 @@ module TcHsType (
 
 		-- Kind checking
 	kcHsTyVars, kcHsSigType, kcHsLiftedSigType, 
-	kcCheckHsType, kcHsContext, kcHsType, 
+	kcLHsType, kcCheckLHsType, kcHsContext, 
 	
 		-- Typechecking kinded types
 	tcHsKindedContext, tcHsKindedType, tcHsBangType,
@@ -175,7 +175,7 @@ tc_hs_deriv :: [LHsTyVarBndr Name] -> HsType Name
 tc_hs_deriv tv_names (HsPredTy (HsClassP cls_name hs_tys))
   = kcHsTyVars tv_names 		$ \ tv_names' ->
     do	{ cls_kind <- kcClass cls_name
-	; (tys, _res_kind) <- kcApps cls_kind (ppr cls_name) hs_tys
+	; (tys, _res_kind) <- kcApps cls_name cls_kind hs_tys
 	; tcTyVarBndrs tv_names'	$ \ tyvars ->
     do	{ arg_tys <- dsHsTypes tys
 	; cls <- tcLookupClass cls_name
@@ -198,8 +198,8 @@ tc_hs_deriv _ other
 \begin{code}
 kcHsSigType, kcHsLiftedSigType :: LHsType Name -> TcM (LHsType Name)
 	-- Used for type signatures
-kcHsSigType ty 	     = kcTypeType ty
-kcHsLiftedSigType ty = kcLiftedType ty
+kcHsSigType ty 	     = addKcTypeCtxt ty $ kcTypeType ty
+kcHsLiftedSigType ty = addKcTypeCtxt ty $ kcLiftedType ty
 
 tcHsKindedType :: LHsType Name -> TcM Type
   -- Don't do kind checking, nor validity checking.
@@ -232,39 +232,64 @@ tcHsKindedContext hs_theta = addLocM (mapM dsHsLPred) hs_theta
 ---------------------------
 kcLiftedType :: LHsType Name -> TcM (LHsType Name)
 -- The type ty must be a *lifted* *type*
-kcLiftedType ty = kcCheckHsType ty liftedTypeKind
+kcLiftedType ty = kc_check_lhs_type ty liftedTypeKind
     
 ---------------------------
 kcTypeType :: LHsType Name -> TcM (LHsType Name)
 -- The type ty must be a *type*, but it can be lifted or 
 -- unlifted or an unboxed tuple.
-kcTypeType ty = kcCheckHsType ty openTypeKind
+kcTypeType ty = kc_check_lhs_type ty openTypeKind
 
 ---------------------------
-kcCheckHsType :: LHsType Name -> TcKind -> TcM (LHsType Name)
+kcCheckLHsType :: LHsType Name -> TcKind -> TcM (LHsType Name)
+kcCheckLHsType ty kind = addKcTypeCtxt ty $ kc_check_lhs_type ty kind
+
+
+kc_check_lhs_type :: LHsType Name -> TcKind -> TcM (LHsType Name)
 -- Check that the type has the specified kind
 -- Be sure to use checkExpectedKind, rather than simply unifying 
 -- with OpenTypeKind, because it gives better error messages
-kcCheckHsType (L span ty) exp_kind 
-  = setSrcSpan span				$
-    do	{ (ty', act_kind) <- add_ctxt ty (kc_hs_type ty)
+kc_check_lhs_type (L span ty) exp_kind 
+  = setSrcSpan span $
+    do { ty' <- kc_check_hs_type ty exp_kind
+       ; return (L span ty') }
+
+kc_check_lhs_types :: [(LHsType Name,TcKind)] -> TcM [LHsType Name]
+kc_check_lhs_types tys_w_kinds
+  = mapM kc_arg tys_w_kinds
+  where
+    kc_arg (arg, arg_kind) = kc_check_lhs_type arg arg_kind
+
+
+---------------------------
+kc_check_hs_type :: HsType Name -> TcKind -> TcM (HsType Name)
+
+-- First some special cases for better error messages 
+-- when we know the expected kind
+kc_check_hs_type (HsParTy ty) exp_kind
+  = do { ty' <- kc_check_lhs_type ty exp_kind; return (HsParTy ty') }
+
+kc_check_hs_type ty@(HsAppTy ty1 ty2) exp_kind
+  = do { let (fun_ty, arg_tys) = splitHsAppTys ty1 ty2
+       ; (fun_ty', fun_kind) <- kc_lhs_type fun_ty
+       ; arg_tys' <- kcCheckApps fun_ty fun_kind arg_tys ty exp_kind
+       ; return (mkHsAppTys fun_ty' arg_tys') }
+
+kc_check_hs_type ty@(HsPredTy (HsClassP cls tys)) exp_kind
+  = do { cls_kind <- kcClass cls
+       ; tys' <- kcCheckApps cls cls_kind tys ty exp_kind
+       ; return (HsPredTy (HsClassP cls tys')) }
+
+-- This is the general case: infer the kind and compare
+kc_check_hs_type ty exp_kind
+  = do	{ (ty', act_kind) <- kc_hs_type ty
 		-- Add the context round the inner check only
 		-- because checkExpectedKind already mentions
 		-- 'ty' by name in any error message
 
 	; checkExpectedKind (strip ty) act_kind exp_kind
-	; return (L span ty') }
+	; return ty' }
   where
-	-- Wrap a context around only if we want to show that contexts.  
-    add_ctxt (HsPredTy _) thing = thing
-	-- Omit invisble ones and ones user's won't grok (HsPred p).
-    add_ctxt (HsForAllTy _ _ (L _ []) _) thing = thing
-	-- Omit wrapping if the theta-part is empty
-	-- Reason: the recursive call to kcLiftedType, in the ForAllTy
-	--	   case of kc_hs_type, will do the wrapping instead
-	--	   and we don't want to duplicate
-    add_ctxt other_ty thing = addErrCtxt (typeCtxt other_ty) thing
-
 	-- We infer the kind of the type, and then complain if it's
 	-- not right.  But we don't want to complain about
 	--	(ty) or !(ty) or forall a. ty
@@ -273,14 +298,23 @@ kcCheckHsType (L span ty) exp_kind
     strip (HsBangTy _ (L _ ty))       = strip ty
     strip (HsForAllTy _ _ _ (L _ ty)) = strip ty
     strip ty			      = ty
+
 \end{code}
 
 	Here comes the main function
 
 \begin{code}
-kcHsType :: LHsType Name -> TcM (LHsType Name, TcKind)
-kcHsType ty = wrapLocFstM kc_hs_type ty
--- kcHsType *returns* the kind of the type, rather than taking an expected
+kcLHsType :: LHsType Name -> TcM (LHsType Name, TcKind)
+-- Called from outside: set the context
+kcLHsType ty = addKcTypeCtxt ty (kc_lhs_type ty)
+
+kc_lhs_type :: LHsType Name -> TcM (LHsType Name, TcKind)
+kc_lhs_type (L span ty)
+  = setSrcSpan span $
+    do { (ty', kind) <- kc_hs_type ty
+       ; return (L span ty', kind) }
+
+-- kc_hs_type *returns* the kind of the type, rather than taking an expected
 -- kind as argument as tcExpr does.  
 -- Reasons: 
 --	(a) the kind of (->) is
@@ -292,7 +326,7 @@ kcHsType ty = wrapLocFstM kc_hs_type ty
 
 kc_hs_type :: HsType Name -> TcM (HsType Name, TcKind)
 kc_hs_type (HsParTy ty) = do
-   (ty', kind) <- kcHsType ty
+   (ty', kind) <- kc_lhs_type ty
    return (HsParTy ty', kind)
 
 kc_hs_type (HsTyVar name) = do
@@ -311,7 +345,7 @@ kc_hs_type (HsNumTy n)
    = return (HsNumTy n, liftedTypeKind)
 
 kc_hs_type (HsKindSig ty k) = do
-    ty' <- kcCheckHsType ty k
+    ty' <- kc_check_lhs_type ty k
     return (HsKindSig ty' k, k)
 
 kc_hs_type (HsTupleTy Boxed tys) = do
@@ -323,26 +357,21 @@ kc_hs_type (HsTupleTy Unboxed tys) = do
     return (HsTupleTy Unboxed tys', ubxTupleKind)
 
 kc_hs_type (HsFunTy ty1 ty2) = do
-    ty1' <- kcCheckHsType ty1 argTypeKind
+    ty1' <- kc_check_lhs_type ty1 argTypeKind
     ty2' <- kcTypeType ty2
     return (HsFunTy ty1' ty2', liftedTypeKind)
 
 kc_hs_type (HsOpTy ty1 op ty2) = do
     op_kind <- addLocM kcTyVar op
-    ([ty1',ty2'], res_kind) <- kcApps op_kind (ppr op) [ty1,ty2]
+    ([ty1',ty2'], res_kind) <- kcApps op op_kind [ty1,ty2]
     return (HsOpTy ty1' op ty2', res_kind)
 
 kc_hs_type (HsAppTy ty1 ty2) = do
-    (fun_ty', fun_kind) <- kcHsType fun_ty
-    ((arg_ty':arg_tys'), res_kind) <- kcApps fun_kind (ppr fun_ty) arg_tys
-    return (foldl mk_app (HsAppTy fun_ty' arg_ty') arg_tys', res_kind)
+    (fun_ty', fun_kind) <- kc_lhs_type fun_ty
+    (arg_tys', res_kind) <- kcApps fun_ty fun_kind arg_tys
+    return (mkHsAppTys fun_ty' arg_tys', res_kind)
   where
-    (fun_ty, arg_tys) = split ty1 [ty2]
-    split (L _ (HsAppTy f a)) as = split f (a:as)
-    split f       	      as = (f,as)
-    mk_app fun arg = HsAppTy (noLoc fun) arg	-- Add noLocs for inner nodes of
-						-- the application; they are
-						-- never used 
+    (fun_ty, arg_tys) = splitHsAppTys ty1 ty2
 
 kc_hs_type (HsPredTy (HsEqualP _ _))
   = wrongEqualityErr
@@ -367,7 +396,7 @@ kc_hs_type (HsForAllTy exp tv_names context ty)
   	; return (HsForAllTy exp tv_names' ctxt' ty', liftedTypeKind) }
 
 kc_hs_type (HsBangTy b ty) = do
-    (ty', kind) <- kcHsType ty
+    (ty', kind) <- kc_lhs_type ty
     return (HsBangTy b ty', kind)
 
 kc_hs_type ty@(HsSpliceTy _)
@@ -379,25 +408,53 @@ kc_hs_type (HsDocTy ty _)
   = kc_hs_type (unLoc ty) 
 
 ---------------------------
-kcApps :: TcKind			-- Function kind
-       -> SDoc				-- Function 
+kcApps :: Outputable a
+       => a 
+       -> TcKind			-- Function kind
        -> [LHsType Name]		-- Arg types
        -> TcM ([LHsType Name], TcKind)	-- Kind-checked args
-kcApps fun_kind ppr_fun args = do
-    (arg_kinds, res_kind) <- split_fk fun_kind (length args)
-    args' <- zipWithM kc_arg args arg_kinds
-    return (args', res_kind)
+kcApps the_fun fun_kind args
+  = do { (args_w_kinds, res_kind) <- splitFunKind the_fun fun_kind args
+       ; args' <- kc_check_lhs_types args_w_kinds
+       ; return (args', res_kind) }
+
+kcCheckApps :: Outputable a => a -> TcKind -> [LHsType Name]
+	    -> HsType Name     -- The type being checked (for err messages only)
+	    -> TcKind 	       -- Expected kind
+	    -> TcM [LHsType Name]
+kcCheckApps the_fun fun_kind args ty exp_kind
+  = do { (args_w_kinds, res_kind) <- splitFunKind the_fun fun_kind args
+       ; checkExpectedKind ty res_kind exp_kind
+       	     -- Check the result kind *before* checking argument kinds
+	     -- This improves error message; Trac #2994
+       ; kc_check_lhs_types args_w_kinds }
+
+splitHsAppTys :: LHsType Name -> LHsType Name -> (LHsType Name, [LHsType Name])
+splitHsAppTys fun_ty arg_ty = split fun_ty [arg_ty]
   where
-    split_fk fk 0 = return ([], fk)
-    split_fk fk n = do mb_fk <- unifyFunKind fk
-                       case mb_fk of
-                          Nothing       -> failWithTc too_many_args 
-                          Just (ak,fk') -> do (aks, rk) <- split_fk fk' (n-1)
-                                              return (ak:aks, rk)
+    split (L _ (HsAppTy f a)) as = split f (a:as)
+    split f       	      as = (f,as)
 
-    kc_arg arg arg_kind = kcCheckHsType arg arg_kind
+mkHsAppTys :: LHsType Name -> [LHsType Name] -> HsType Name
+mkHsAppTys fun_ty [] = pprPanic "mkHsAppTys" (ppr fun_ty)
+mkHsAppTys fun_ty (arg_ty:arg_tys)
+  = foldl mk_app (HsAppTy fun_ty arg_ty) arg_tys
+  where
+    mk_app fun arg = HsAppTy (noLoc fun) arg	-- Add noLocs for inner nodes of
+					 	-- the application; they are
+						-- never used 
 
-    too_many_args = ptext (sLit "Kind error:") <+> quotes ppr_fun <+>
+---------------------------
+splitFunKind :: Outputable a => a -> TcKind -> [b] -> TcM ([(b,TcKind)], TcKind)
+splitFunKind _       fk [] = return ([], fk)
+splitFunKind the_fun fk (arg:args)
+  = do { mb_fk <- unifyFunKind fk
+       ; case mb_fk of
+            Nothing       -> failWithTc too_many_args 
+            Just (ak,fk') -> do { (aks, rk) <- splitFunKind the_fun fk' args
+                                ; return ((arg,ak):aks, rk) } }
+  where
+    too_many_args = quotes (ppr the_fun) <+>
 		    ptext (sLit "is applied to too many type arguments")
 
 ---------------------------
@@ -418,18 +475,18 @@ kc_pred :: HsPred Name -> TcM (HsPred Name, TcKind)
 	-- Does *not* check for a saturated
 	-- application (reason: used from TcDeriv)
 kc_pred (HsIParam name ty)
-  = do { (ty', kind) <- kcHsType ty
+  = do { (ty', kind) <- kc_lhs_type ty
        ; return (HsIParam name ty', kind)
        }
 kc_pred (HsClassP cls tys)
   = do { kind <- kcClass cls
-       ; (tys', res_kind) <- kcApps kind (ppr cls) tys
+       ; (tys', res_kind) <- kcApps cls kind tys
        ; return (HsClassP cls tys', res_kind)
        }
 kc_pred (HsEqualP ty1 ty2)
-  = do { (ty1', kind1) <- kcHsType ty1
+  = do { (ty1', kind1) <- kc_lhs_type ty1
 --       ; checkExpectedKind ty1 kind1 liftedTypeKind
-       ; (ty2', kind2) <- kcHsType ty2
+       ; (ty2', kind2) <- kc_lhs_type ty2
 --       ; checkExpectedKind ty2 kind2 liftedTypeKind
        ; checkExpectedKind ty2 kind2 kind1
        ; return (HsEqualP ty1' ty2', liftedTypeKind)
@@ -622,6 +679,12 @@ badGadtDecl :: HsType Name -> SDoc
 badGadtDecl ty
   = hang (ptext (sLit "Malformed constructor result type:"))
        2 (ppr ty)
+
+addKcTypeCtxt :: LHsType Name -> TcM a -> TcM a
+	-- Wrap a context around only if we want to show that contexts.  
+addKcTypeCtxt (L _ (HsPredTy _)) thing = thing
+	-- Omit invisble ones and ones user's won't grok (HsPred p).
+addKcTypeCtxt (L _ other_ty) thing = addErrCtxt (typeCtxt other_ty) thing
 
 typeCtxt :: HsType Name -> SDoc
 typeCtxt ty = ptext (sLit "In the type") <+> quotes (ppr ty)
