@@ -328,6 +328,10 @@ tcFamInstDecl1 (decl@TyData {tcdND = new_or_data, tcdLName = L loc tc_name,
          --         foralls earlier)
        ; mapM_ checkTyFamFreeness t_typats
 
+	 -- Check that we don't use GADT syntax in H98 world
+       ; gadt_ok <- doptM Opt_GADTs
+       ; checkTc (gadt_ok || consUseH98Syntax cons) (badGadtDecl tc_name)
+
 	 --     (b) a newtype has exactly one constructor
        ; checkTc (new_or_data == DataType || isSingleton k_cons) $
 	         newtypeConError tc_name (length k_cons)
@@ -770,9 +774,7 @@ tcTyClDecl1 calc_isrec
   }
   where
     is_rec   = calc_isrec tc_name
-    h98_syntax = case cons of 	-- All constructors have same shape
-			L _ (ConDecl { con_res = ResTyGADT _ }) : _ -> False
-			_ -> True
+    h98_syntax = consUseH98Syntax cons
 
 tcTyClDecl1 calc_isrec 
   (ClassDecl {tcdLName = L _ class_name, tcdTyVars = tvs, 
@@ -918,6 +920,11 @@ tcResultType (tmpl_tvs, res_tmpl) dc_tvs (ResTyGADT res_ty)
 	      where
 		 name = tyVarName tv
 		 (env', occ') = tidyOccName env (getOccName name) 
+
+consUseH98Syntax :: [LConDecl a] -> Bool
+consUseH98Syntax (L _ (ConDecl { con_res = ResTyGADT _ }) : _) = False
+consUseH98Syntax _                                             = True
+		 -- All constructors have same shape
 
 -------------------
 tcConArg :: Bool		-- True <=> -funbox-strict_fields

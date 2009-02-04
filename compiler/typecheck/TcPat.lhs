@@ -37,6 +37,7 @@ import TyCon
 import DataCon
 import PrelNames
 import BasicTypes hiding (SuccessFlag(..))
+import DynFlags	( DynFlag( Opt_GADTs ) )
 import SrcLoc
 import ErrUtils
 import Util
@@ -669,6 +670,12 @@ tcConPat pstate con_span data_con tycon pat_ty arg_pats thing_inside
 	      no_equalities = not (any isEqPred theta')
 	      pstate' | no_equalities = pstate
 		      | otherwise     = pstate { pat_eqs = True }
+
+        ; gadts_on <- doptM Opt_GADTs
+	; checkTc (no_equalities || gadts_on)
+	  	  (ptext (sLit "A pattern match on a GADT requires -XGADTs"))
+		  -- Trac #2905 decided that a *pattern-match* of a GADT
+		  -- should require the GADT language flag
 
 	; unless no_equalities $ checkTc (isRigidTy pat_ty) $
                                  nonRigidMatch (pat_ctxt pstate) data_con
