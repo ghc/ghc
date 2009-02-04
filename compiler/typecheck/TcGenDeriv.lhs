@@ -1240,10 +1240,10 @@ rather than just one level, as we typically do.
 What about types with more than one type parameter?  In general, we only 
 derive Functor for the last position:
 
-  data S a b = S1 [b] | S2 a
+  data S a b = S1 [b] | S2 (a, T a b)
   instance Functor (S a) where
-    fmap f (S1 bs) = S1 (fmap f bs)
-    fmap f (S2 a)  = S2 a
+    fmap f (S1 bs)    = S1 (fmap f bs)
+    fmap f (S2 (p,q)) = S2 (a, fmap f q)
 
 However, we have special cases for
 	 - tuples
@@ -1319,8 +1319,8 @@ functorLikeTraverse :: a                    -- ^ Case: does not contain variable
                     -> a                    -- ^ Case: the variable itself, contravariantly
                     -> (a -> a -> a)        -- ^ Case: function type
                     -> (Boxity -> [a] -> a) -- ^ Case: tuple type
-                    -> (Type -> a -> a)     -- ^ Case: other tycon, variable only in last argument
-                    -> a                    -- ^ Case: other tycon, variable only in last argument
+                    -> (Type -> a -> a)     -- ^ Case: type app, variable only in last argument
+                    -> a                    -- ^ Case: type app, variable other than in last argument
                     -> (TcTyVar -> a -> a)  -- ^ Case: forall type
                     -> TcTyVar              -- ^ Variable to look for
                     -> Type                 -- ^ Type to process
@@ -1334,22 +1334,23 @@ functorLikeTraverse caseTrivial caseVar caseCoVar caseFun caseTuple caseTyApp ca
         go co (FunTy x y)    | xc || yc = (caseFun xr yr,True)
             where (xr,xc) = go (not co) x
                   (yr,yc) = go co       y
-        go co (AppTy    x y) | xc       = (caseWrongArg,True)
-                             | yc       = (caseTyApp x yr,True)
+        go co (AppTy    x y) | xc = (caseWrongArg,   True)
+                             | yc = (caseTyApp x yr, True)
             where (_, xc) = go co x
                   (yr,yc) = go co y
         go co ty@(TyConApp con args)
-               | isTupleTyCon con       = (caseTuple (tupleTyConBoxity con) xrs,True)
-               | null args              = (caseTrivial,False)
-               | or (init xcs)          = (caseWrongArg,True)
-               | (last xcs)             = (caseTyApp (fst (splitAppTy ty)) (last xrs),True)
+               | isTupleTyCon con = (caseTuple (tupleTyConBoxity con) xrs,True)
+               | null args        = (caseTrivial,False)	 -- T
+               | or (init xcs)    = (caseWrongArg,True)	 -- T (..var..)    ty
+               | last xcs         = 			 -- T (..no var..) ty
+	       	      		    (caseTyApp (fst (splitAppTy ty)) (last xrs),True)
             where (xrs,xcs) = unzip (map (go co) args)
         go co (ForAllTy v x) | v /= var && xc = (caseForAll v xr,True)
             where (xr,xc) = go co x
-        go _  _                         = (caseTrivial,False)
+        go _ _ = (caseTrivial,False)
 
--- return all subtypes of ty that contain var somewhere
--- these are the things that should appear in instance constraints
+-- Return all syntactic subterms of ty that contain var somewhere
+-- These are the things that should appear in instance constraints
 deepSubtypesContaining :: TcTyVar -> TcType -> [TcType]
 deepSubtypesContaining = functorLikeTraverse
       []

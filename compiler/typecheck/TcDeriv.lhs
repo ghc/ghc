@@ -663,39 +663,40 @@ mk_data_eqn orig tvs cls tycon tc_args rep_tc rep_tc_args mtheta
   | otherwise
   = do	{ dfun_name <- new_dfun_name cls tycon
   	; loc <- getSrcSpanM
-	; let ordinary_constraints_simple
+	; let ordinary_constraints
 	        = [ mkClassPred cls [arg_ty] 
 	          | data_con <- tyConDataCons rep_tc,
 	            arg_ty   <- ASSERT( isVanillaDataCon data_con )
-				dataConInstOrigArgTys data_con rep_tc_args,
+				get_constrained_tys $
+				substTys subst $
+			 	dataConInstOrigArgTys data_con all_rep_tc_args,
 	            not (isUnLiftedType arg_ty) ]
 			-- No constraints for unlifted types
 			-- Where they are legal we generate specilised function calls
 
-              -- constraints on all subtypes for classes like Functor
-              ordinary_constraints_deep
-                = [ mkClassPred cls [deept_ty]
-                  | data_con <- tyConDataCons rep_tc,
-                    arg_ty   <- ASSERT( isVanillaDataCon data_con )
-                                dataConInstOrigArgTys data_con (rep_tc_args++[mkTyVarTy dummy_ty]),
-                    deept_ty <- deepSubtypesContaining dummy_ty arg_ty,
-                    not (isUnLiftedType deept_ty) ]
-               where dummy_ty = last (tyConTyVars tycon) -- don't substitute the last var, this might not be a good idea
+			-- For functor-like classes, two things are different
+			-- (a) We recurse over argument types to generate constraints
+			--     See Functor examples in TcGenDeriv
+			-- (b) The rep_tc_args will be one short
+              is_functor_like = getUnique cls `elem` functorLikeClassKeys
 
-              ordinary_constraints
-               | getUnique cls == functorClassKey     = ordinary_constraints_deep
-               | getUnique cls == foldableClassKey    = ordinary_constraints_deep
-               | getUnique cls == traversableClassKey = ordinary_constraints_deep
-               | otherwise                            = ordinary_constraints_simple
+              get_constrained_tys :: [Type] -> [Type]
+	      get_constrained_tys tys 
+	      	| is_functor_like = concatMap (deepSubtypesContaining last_tv) tys
+		| otherwise	  = tys
+
+	      rep_tc_tvs = tyConTyVars rep_tc
+	      last_tv = last rep_tc_tvs
+	      all_rep_tc_args | is_functor_like = rep_tc_args ++ [mkTyVarTy last_tv]
+	      		      | otherwise	= rep_tc_args
+
 
 			-- See Note [Superclasses of derived instance]
 	      sc_constraints = substTheta (zipOpenTvSubst (classTyVars cls) inst_tys)
 					  (classSCTheta cls)
 	      inst_tys = [mkTyConApp tycon tc_args]
-
-	      nonfree_tycon_vars = dropTail (classArity cls) (tyConTyVars rep_tc)
-	      stupid_subst = zipTopTvSubst nonfree_tycon_vars rep_tc_args
-	      stupid_constraints = substTheta stupid_subst (tyConStupidTheta rep_tc)
+	      subst = zipTopTvSubst rep_tc_tvs all_rep_tc_args
+	      stupid_constraints = substTheta subst (tyConStupidTheta rep_tc)
 
 	      all_constraints = stupid_constraints ++ sc_constraints ++ ordinary_constraints
 
@@ -706,7 +707,8 @@ mk_data_eqn orig tvs cls tycon tc_args rep_tc rep_tc_args mtheta
 			, ds_theta =  mtheta `orElse` all_constraints
 			, ds_newtype = False }
 
-  	; return (if isJust mtheta then Right spec	-- Specified context
+  	; ASSERT2( equalLength rep_tc_tvs all_rep_tc_args, ppr cls <+> ppr tycon )
+          return (if isJust mtheta then Right spec	-- Specified context
 				   else Left spec) }	-- Infer context
 
 mk_typeable_eqn orig tvs cls tycon tc_args rep_tc rep_tc_args mtheta
@@ -766,17 +768,17 @@ nonStdErr cls = quotes (ppr cls) <+> ptext (sLit "is not a derivable class")
 
 sideConditions :: Class -> Maybe Condition
 sideConditions cls
-  | cls_key == eqClassKey      = Just cond_std
-  | cls_key == ordClassKey     = Just cond_std
-  | cls_key == showClassKey    = Just cond_std
-  | cls_key == readClassKey    = Just (cond_std `andCond` cond_noUnliftedArgs)
-  | cls_key == enumClassKey    = Just (cond_std `andCond` cond_isEnumeration)
-  | cls_key == ixClassKey      = Just (cond_std `andCond` cond_enumOrProduct)
-  | cls_key == boundedClassKey = Just (cond_std `andCond` cond_enumOrProduct)
-  | cls_key == dataClassKey    = Just (cond_mayDeriveDataTypeable `andCond` cond_std `andCond` cond_noUnliftedArgs)
-  | cls_key == functorClassKey = Just (cond_mayDeriveFunctor `andCond` cond_std `andCond` cond_functorOK True)
-  | cls_key == foldableClassKey = Just (cond_mayDeriveFunctor `andCond` cond_std `andCond` cond_functorOK False)
-  | cls_key == traversableClassKey = Just (cond_mayDeriveFunctor `andCond` cond_std `andCond` cond_functorOK False)
+  | cls_key == eqClassKey      	   = Just cond_std
+  | cls_key == ordClassKey     	   = Just cond_std
+  | cls_key == showClassKey    	   = Just cond_std
+  | cls_key == readClassKey    	   = Just (cond_std `andCond` cond_noUnliftedArgs)
+  | cls_key == enumClassKey    	   = Just (cond_std `andCond` cond_isEnumeration)
+  | cls_key == ixClassKey      	   = Just (cond_std `andCond` cond_enumOrProduct)
+  | cls_key == boundedClassKey 	   = Just (cond_std `andCond` cond_enumOrProduct)
+  | cls_key == dataClassKey    	   = Just (cond_mayDeriveDataTypeable `andCond` cond_std `andCond` cond_noUnliftedArgs)
+  | cls_key == functorClassKey 	   = Just (cond_std `andCond` cond_functorOK True)
+  | cls_key == foldableClassKey	   = Just (cond_std `andCond` cond_functorOK False)
+  | cls_key == traversableClassKey = Just (cond_std `andCond` cond_functorOK False)
   | getName cls `elem` typeableClassNames = Just (cond_mayDeriveDataTypeable `andCond` cond_typeableOK)
   | otherwise = Nothing
   where
@@ -865,13 +867,21 @@ cond_typeableOK (_, rep_tc)
     fam_inst = quotes (pprSourceTyCon rep_tc) <+> 
 	       ptext (sLit "is a type family")
 
+
+functorLikeClassKeys :: [Unique]
+functorLikeClassKeys = [functorClassKey, foldableClassKey, traversableClassKey]
+
 cond_functorOK :: Bool -> Condition
 -- OK for Functor class
 -- Currently: (a) at least one argument
 --            (b) don't use argument contravariantly
 --            (c) don't use argument in the wrong place, e.g. data T a = T (X a a)
 --            (d) optionally: don't use function types
-cond_functorOK allowFunctions (_, rep_tc) = msum (map check con_types)
+cond_functorOK allowFunctions (dflags, rep_tc) 
+  | not (dopt Opt_DeriveFunctor dflags)
+  = Just (ptext (sLit "You need -XDeriveFunctor to derive an instance for this class"))
+  | otherwise
+  = msum (map check con_types)
   where
     data_cons = tyConDataCons rep_tc
     con_types = concatMap dataConOrigArgTys data_cons
@@ -899,17 +909,10 @@ cond_mayDeriveDataTypeable (dflags, _)
   where
     why  = ptext (sLit "You need -XDeriveDataTypeable to derive an instance for this class")
 
-cond_mayDeriveFunctor :: Condition
-cond_mayDeriveFunctor (dflags, _)
- | dopt Opt_DeriveFunctor dflags = Nothing
- | otherwise = Just why
-  where
-    why  = ptext (sLit "You need -XDeriveFunctor to derive an instance for this class")
-
 std_class_via_iso :: Class -> Bool
 std_class_via_iso clas	-- These standard classes can be derived for a newtype
 			-- using the isomorphism trick *even if no -fglasgow-exts*
-  = classKey clas `elem`  [eqClassKey, ordClassKey, ixClassKey, boundedClassKey]
+  = classKey clas `elem` [eqClassKey, ordClassKey, ixClassKey, boundedClassKey]
 	-- Not Read/Show because they respect the type
 	-- Not Enum, because newtypes are never in Enum
 
