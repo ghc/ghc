@@ -61,24 +61,20 @@ module Regs (
 	freg,
 	sp, r3, r4, r27, r28, f1, f20, f21,
 
-#elif i386_TARGET_ARCH
+#elif i386_TARGET_ARCH || i386_64_TARGET_ARCH
 	EABase(..), EAIndex(..), addrModeRegs,
 	
 	eax, ebx, ecx, edx, esi, edi, ebp, esp,
 	fake0, fake1, fake2, fake3, fake4, fake5,
-
-#elif i386_64_TARGET_ARCH
-	EABase(..), EAIndex(..), addrModeRegs, 
-
-	ripRel,
-	allFPArgRegs,
-	
 	rax, rbx, rcx, rdx, rsi, rdi, rbp, rsp,
 	eax, ebx, ecx, edx, esi, edi, ebp, esp,
 	r8, r9, r10, r11, r12, r13, r14, r15,
   	xmm0, xmm1, xmm2, xmm3, xmm4, xmm5, xmm6, xmm7,
   	xmm8, xmm9, xmm10, xmm11, xmm12, xmm13, xmm14, xmm15,
 	xmm,
+
+	ripRel,
+	allFPArgRegs,
 
 #elif sparc_TARGET_ARCH
 	fpRel,

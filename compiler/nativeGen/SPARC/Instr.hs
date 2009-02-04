@@ -22,7 +22,8 @@ module SPARC.Instr (
 where
 
 import BlockId
-import Regs
+import RegsBase
+import SPARC.Regs
 import Cmm
 import Outputable
 import Constants	( wORD_SIZE )
@@ -183,6 +184,6 @@ fPair (RealReg n)
 fPair (VirtualRegD u)
 	= Just (VirtualRegHi u)
 
-fPair other 
-	= trace ("MachInstrs.fPair: can't get high half of supposed double reg " ++ show other) 
+fPair _
+	= trace ("MachInstrs.fPair: can't get high half of supposed double reg ") 
 		Nothing

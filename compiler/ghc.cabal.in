@@ -458,18 +458,22 @@ Library
             Regs
             RegsBase
             Instrs
+            RegAllocInfo
             Alpha.Regs
+            Alpha.RegInfo
             Alpha.Instr
             X86.Regs
+            X86.RegInfo
             X86.Instr
             PPC.Regs
+            PPC.RegInfo
             PPC.Instr
             SPARC.Regs
+            SPARC.RegInfo
             SPARC.Instr
             NCGMonad
             PositionIndependentCode
             PprMach
-            RegAllocInfo
             RegAlloc.Liveness
             RegAlloc.Graph.Main
             RegAlloc.Graph.Stats

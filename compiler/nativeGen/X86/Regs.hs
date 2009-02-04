@@ -31,23 +31,17 @@ module X86.Regs (
 	-- machine specific
 	EABase(..), EAIndex(..), addrModeRegs,
 
-#if i386_TARGET_ARCH
-	-- part of address mode. shared for both arches.
 	eax, ebx, ecx, edx, esi, edi, ebp, esp,
 	fake0, fake1, fake2, fake3, fake4, fake5,
-#endif
-#if x86_64_TARGET_ARCH
-	-- part of address mode. shared for both arches.
-	ripRel,
-	allFPArgRegs,
-	
+
 	rax, rbx, rcx, rdx, rsi, rdi, rbp, rsp,
-	eax, ebx, ecx, edx, esi, edi, ebp, esp,
-	r8, r9, r10, r11, r12, r13, r14, r15,
+	r8,  r9,  r10, r11, r12, r13, r14, r15,
   	xmm0, xmm1, xmm2, xmm3, xmm4, xmm5, xmm6, xmm7,
   	xmm8, xmm9, xmm10, xmm11, xmm12, xmm13, xmm14, xmm15,
 	xmm,
-#endif
+
+	ripRel,
+	allFPArgRegs,
 
 	-- horror show
 	freeReg,
@@ -384,9 +378,9 @@ regs.  @regClass@ barfs if you give it a VirtualRegF, and mkVReg above should
 never generate them.
 -}
 
-#if   i386_TARGET_ARCH
 fake0, fake1, fake2, fake3, fake4, fake5, 
        eax, ebx, ecx, edx, esp, ebp, esi, edi :: Reg
+
 eax   = RealReg 0
 ebx   = RealReg 1
 ecx   = RealReg 2
@@ -402,7 +396,6 @@ fake3 = RealReg 11
 fake4 = RealReg 12
 fake5 = RealReg 13
 
-#endif
 
 
 {-
@@ -412,13 +405,6 @@ AMD x86_64 architecture:
 - Registers 0-3 have 8 bit counterparts (ah, bh etc.)
 
 -}
-
-#if   x86_64_TARGET_ARCH
-allFPArgRegs :: [Reg]
-allFPArgRegs	= map RealReg [xmm0 .. xmm7]
-
-ripRel imm	= AddrBaseIndex EABaseRip EAIndexNone imm
-
 
 rax, rbx, rcx, rdx, rsp, rbp, rsi, rdi, 
   r8, r9, r10, r11, r12, r13, r14, r15,
@@ -458,7 +444,15 @@ xmm13 = RealReg 29
 xmm14 = RealReg 30
 xmm15 = RealReg 31
 
+allFPArgRegs :: [Reg]
+allFPArgRegs	= map RealReg [16 .. 23]
+
+ripRel :: Displacement -> AddrMode
+ripRel imm	= AddrBaseIndex EABaseRip EAIndexNone imm
+
+
  -- so we can re-use some x86 code:
+{-
 eax = rax
 ebx = rbx
 ecx = rcx
@@ -467,10 +461,11 @@ esi = rsi
 edi = rdi
 ebp = rbp
 esp = rsp
+-}
 
+xmm :: RegNo -> Reg
 xmm n = RealReg (16+n)
 
-#endif
 
 
 

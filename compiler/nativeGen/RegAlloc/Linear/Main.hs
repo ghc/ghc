@@ -323,7 +323,7 @@ raInsn block_live new_instrs id (Instr instr (Just live))
 			(uniqSetToList $ liveDieWrite live)
 
 
-raInsn _ _ id instr
+raInsn _ _ _ instr
 	= pprPanic "raInsn" (text "no match for:" <> ppr instr)
 
 
