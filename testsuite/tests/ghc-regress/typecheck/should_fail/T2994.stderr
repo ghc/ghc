@@ -1,0 +1,11 @@
+
+T2994.hs:11:9:
+    `MonadReader (Reader' r)' is not applied to enough type arguments
+    Expected kind `*', but `MonadReader (Reader' r)' has kind `* -> *'
+    In the type `MonadReader (Reader' r)'
+    In the instance declaration for `MonadReader (Reader' r)'
+
+T2994.hs:13:9:
+    `MonadReader' is applied to too many type arguments
+    In the type `MonadReader r r (Reader' r)'
+    In the instance declaration for `MonadReader r r (Reader' r)'
