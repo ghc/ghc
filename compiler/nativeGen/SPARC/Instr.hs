@@ -32,6 +32,7 @@ import FastString
 import GHC.Exts
 
 
+-- | Branch condition codes.
 data Cond
 	= ALWAYS
 	| EQQ
@@ -51,34 +52,30 @@ data Cond
 	| VS
 	deriving Eq
 
--- -----------------------------------------------------------------------------
--- Machine's assembly language
 
--- We have a few common "instructions" (nearly all the pseudo-ops) but
--- mostly all of 'Instr' is machine-specific.
-
--- Register or immediate
+-- | Register or immediate
 data RI 
 	= RIReg Reg
 	| RIImm Imm
 
+
+-- | SPARC isntruction set.
 data Instr
+
+	-- meta ops --------------------------------------------------
 	-- comment pseudo-op
 	= COMMENT FastString		
 
-	-- some static data spat out during code
-	-- generation.  Will be extracted before
-	-- pretty-printing.
+	-- some static data spat out during code generation.
+	-- Will be extracted before pretty-printing.
 	| LDATA   Section [CmmStatic]	
 
-	-- start a new basic block.  Useful during
-	-- codegen, removed later.  Preceding 
-	-- instruction should be a jump, as per the
-	-- invariants for a BasicBlock (see Cmm).
+	-- Start a new basic block.  Useful during codegen, removed later.
+	-- Preceding instruction should be a jump, as per the invariants
+	-- for a BasicBlock (see Cmm).
 	| NEWBLOCK BlockId		
 
-	-- specify current stack offset for
-        -- benefit of subsequent passes
+	-- specify current stack offset for benefit of subsequent passes.
 	| DELTA   Int
 
 	-- | spill this reg to a stack slot
@@ -87,7 +84,7 @@ data Instr
 	-- | reload this reg from a stack slot
 	| RELOAD  Int Reg
 
-
+	-- real instrs -----------------------------------------------
 	-- Loads and stores.
 	| LD		Size AddrMode Reg 		-- size, src, dst
 	| ST		Size Reg AddrMode 		-- size, src, dst
@@ -113,7 +110,7 @@ data Instr
  	| RDY           Reg                  		-- move contents of Y register to reg
 	| WRY           Reg  Reg             		-- Y <- src1 `xor` src2
 	
-	-- Simple bit-twiddling.
+	-- Logic operations.
 	| AND		Bool Reg RI Reg 		-- cc?, src1, src2, dst
 	| ANDN		Bool Reg RI Reg 		-- cc?, src1, src2, dst
 	| OR		Bool Reg RI Reg 		-- cc?, src1, src2, dst
@@ -123,12 +120,18 @@ data Instr
 	| SLL		Reg RI Reg 			-- src1, src2, dst
 	| SRL		Reg RI Reg 			-- src1, src2, dst
 	| SRA		Reg RI Reg 			-- src1, src2, dst
+
+	-- Load immediates.
 	| SETHI		Imm Reg 			-- src, dst
-	| NOP						-- Really SETHI 0, %g0, but worth an alias
+
+	-- Do nothing.
+	-- Implemented by the assembler as SETHI 0, %g0, but worth an alias
+	| NOP						
 
 	-- Float Arithmetic.
 	-- Note that we cheat by treating F{ABS,MOV,NEG} of doubles as single
 	-- instructions right up until we spit them out.
+	--
 	| FABS		Size Reg Reg	   		-- src dst
 	| FADD		Size Reg Reg Reg  		-- src1, src2, dst
 	| FCMP		Bool Size Reg Reg 		-- exception?, src1, src2, dst
@@ -146,15 +149,18 @@ data Instr
 
 	| JMP		AddrMode     			-- target
 
-	-- With a tabled jump we know all the possible destinations. Tabled
-	-- jump includes its list of destinations so we can work out what regs
-	-- are live across the jump.
+	-- With a tabled jump we know all the possible destinations.
+	-- We also need this info so we can work out what regs are live across the jump.
 	-- 
 	| JMP_TBL	AddrMode [BlockId]
 
 	| CALL		(Either Imm Reg) Int Bool 	-- target, args, terminal
 
 
+-- | Check if a RI represents a zero value.
+--  	- a literal zero
+--	- register %g0, which is always zero.
+--
 riZero :: RI -> Bool
 riZero (RIImm (ImmInt 0))	    = True
 riZero (RIImm (ImmInteger 0))	    = True

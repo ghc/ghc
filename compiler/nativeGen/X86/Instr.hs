@@ -18,10 +18,8 @@ import RegsBase
 import Cmm
 import FastString
 
-#if i386_TARGET_ARCH
 import CLabel
 import Panic
-#endif
 
 data Cond
 	= ALWAYS	-- What's really used? ToDo
@@ -201,9 +199,7 @@ data Instr
         | BT          Size Imm Operand
 	| NOP
 
-#if i386_TARGET_ARCH
-	-- Float Arithmetic.
-
+	-- x86 Float Arithmetic.
 	-- Note that we cheat by treating G{ABS,MOV,NEG} of doubles 
 	-- as single instructions right up until we spit them out.
         -- all the 3-operand fake fp insns are src1 src2 dst
@@ -241,14 +237,11 @@ data Instr
     	| GTAN	      Size CLabel CLabel Reg Reg -- src, dst
 	
         | GFREE         -- do ffree on all x86 regs; an ugly hack
-#endif
 
-#if x86_64_TARGET_ARCH
--- SSE2 floating point: we use a restricted set of the available SSE2
--- instructions for floating-point.
 
+	-- SSE2 floating point: we use a restricted set of the available SSE2
+	-- instructions for floating-point.
 	-- use MOV for moving (either movss or movsd (movlpd better?))
-
 	| CVTSS2SD	Reg Reg		-- F32 to F64
 	| CVTSD2SS	Reg Reg		-- F64 to F32
 	| CVTTSS2SIQ	Operand Reg	-- F32 to I32/I64 (with truncation)
@@ -266,7 +259,7 @@ data Instr
 	-- compare single/double prec floating point respectively.
 
 	| SQRT		Size Operand Reg	-- src, dst
-#endif
+
 
 	-- Comparison
 	| TEST          Size Operand Operand
@@ -307,7 +300,7 @@ data Operand
 	| OpAddr AddrMode	-- memory reference
 
 
-#if i386_TARGET_ARCH
+
 i386_insert_ffrees :: [GenBasicBlock Instr] -> [GenBasicBlock Instr]
 i386_insert_ffrees blocks
    | or (map (any is_G_instr) [ instrs | BasicBlock _ instrs <- blocks ])
@@ -350,4 +343,3 @@ is_G_instr instr
 	GTAN{}	 	-> True
         GFREE 		-> panic "is_G_instr: GFREE (!)"
         _     		-> False
-#endif /* i386_TARGET_ARCH */
