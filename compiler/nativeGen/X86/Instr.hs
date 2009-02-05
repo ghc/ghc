@@ -17,6 +17,11 @@ import MachRegs
 import Cmm
 import FastString
 
+#if i386_TARGET_ARCH
+import CLabel
+import Panic
+#endif
+
 data Cond
 	= ALWAYS	-- What's really used? ToDo
 	| EQQ
@@ -304,8 +309,9 @@ data Operand
 #if i386_TARGET_ARCH
 i386_insert_ffrees :: [GenBasicBlock Instr] -> [GenBasicBlock Instr]
 i386_insert_ffrees blocks
-   | or (map (any is_G_instr) [ instrs | BasicBlock id instrs <- blocks ])
+   | or (map (any is_G_instr) [ instrs | BasicBlock _ instrs <- blocks ])
    = map ffree_before_nonlocal_transfers blocks
+
    | otherwise
    = blocks
   where
@@ -314,22 +320,33 @@ i386_insert_ffrees blocks
      where p insn r = case insn of
                         CALL _ _ -> GFREE : insn : r
                         JMP _    -> GFREE : insn : r
-                        other    -> insn : r
+                        _        -> insn : r
 
 -- if you ever add a new FP insn to the fake x86 FP insn set,
 -- you must update this too
 is_G_instr :: Instr -> Bool
 is_G_instr instr
    = case instr of
-        GMOV _ _ -> True; GLD _ _ _ -> True; GST _ _ _ -> True
-        GLDZ _ -> True; GLD1 _ -> True
-        GFTOI _ _ -> True; GDTOI _ _ -> True
-        GITOF _ _ -> True; GITOD _ _ -> True
-	GADD _ _ _ _ -> True; GDIV _ _ _ _ -> True
-	GSUB _ _ _ _ -> True; GMUL _ _ _ _ -> True
-    	GCMP _ _ _ -> True; GABS _ _ _ -> True
-    	GNEG _ _ _ -> True; GSQRT _ _ _ -> True
-        GSIN _ _ _ _ _ -> True; GCOS _ _ _ _ _ -> True; GTAN _ _ _ _ _ -> True
-        GFREE -> panic "is_G_instr: GFREE (!)"
-        other -> False
+        GMOV{} 		-> True
+	GLD{}	 	-> True
+	GST{}	 	-> True
+        GLDZ{}		-> True
+	GLD1{}		-> True
+        GFTOI{}		-> True
+	GDTOI{}	 	-> True
+        GITOF{} 	-> True
+	GITOD{} 	-> True
+	GADD{}	 	-> True
+	GDIV{}	 	-> True
+	GSUB{} 		-> True
+	GMUL{} 		-> True
+    	GCMP{} 		-> True
+	GABS{} 		-> True
+    	GNEG{} 		-> True
+	GSQRT{} 	-> True
+        GSIN{} 		-> True
+	GCOS{}	 	-> True
+	GTAN{}	 	-> True
+        GFREE 		-> panic "is_G_instr: GFREE (!)"
+        _     		-> False
 #endif /* i386_TARGET_ARCH */
