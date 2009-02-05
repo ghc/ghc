@@ -73,9 +73,11 @@ module Control.Exception (
 
         -- * Catching Exceptions
 
-        -- |There are several functions for catching and examining
-        -- exceptions; all of them may only be used from within the
-        -- 'IO' monad.
+        -- $catching
+
+        -- ** Catching all exceptions
+
+        -- $catchall
 
         -- ** The @catch@ functions
         catch,
@@ -130,9 +132,6 @@ module Control.Exception (
         finally,
         onException,
 
-        -- * Catching all exceptions
-
-        -- $catchall
   ) where
 
 import Control.Exception.Base
@@ -181,6 +180,45 @@ catchesHandler handlers e = foldr tryHandler (throw e) handlers
                 Nothing -> res
 
 -- -----------------------------------------------------------------------------
+-- Catching exceptions
+
+{- $catching
+
+There are several functions for catching and examining
+exceptions; all of them may only be used from within the
+'IO' monad.
+
+Here's a rule of thumb for deciding which catch-style function to
+use:
+
+ * If you want to do some cleanup in the event that an exception
+   is raised, use 'finally', 'bracket' or 'onException'.
+
+ * To recover after an exception and do something else, the best
+   choice is to use one of the 'try' family.
+
+ * ... unless you are recovering from an asynchronous exception, in which
+   case use 'catch' or 'catchJust'.
+
+The difference between using 'try' and 'catch' for recovery is that in
+'catch' the handler is inside an implicit 'block' (see \"Asynchronous
+Exceptions\") which is important when catching asynchronous
+exceptions, but when catching other kinds of exception it is
+unnecessary.  Furthermore it is possible to accidentally stay inside
+the implicit 'block' by tail-calling rather than returning from the
+handler, which is why we recommend using 'try' rather than 'catch' for
+ordinary exception recovery.
+
+A typical use of 'tryJust' for recovery looks like this:
+
+>  do r <- tryJust (guard . isDoesNotExistError) $ getEnv "HOME"
+>     case r of
+>       Left  e    -> ...
+>       Right home -> ...
+
+-}
+
+-- -----------------------------------------------------------------------------
 -- Asynchronous exceptions
 
 {- $async
@@ -224,9 +262,8 @@ If you need to unblock asynchronous exceptions again in the exception
 handler, just use 'unblock' as normal.
 
 Note that 'try' and friends /do not/ have a similar default, because
-there is no exception handler in this case.  If you want to use 'try'
-in an asynchronous-exception-safe way, you will need to use
-'block'.
+there is no exception handler in this case.  Don't use 'try' for
+recovering from an asynchronous exception.
 -}
 
 {- $interruptible
@@ -266,23 +303,22 @@ It is possible to catch all exceptions, by using the type 'SomeException':
 HOWEVER, this is normally not what you want to do!
 
 For example, suppose you want to read a file, but if it doesn't exist
-then continue as if it contained \"\". In the old exceptions library,
-the easy thing to do was just to catch all exceptions and return \"\" in
-the handler. However, this has all sorts of undesirable consequences.
-For example, if the user presses control-C at just the right moment then
-the 'UserInterrupt' exception will be caught, and the program will
-continue running under the belief that the file contains \"\".
-Similarly, if another thread tries to kill the thread reading the file
-then the 'ThreadKilled' exception will be ignored.
+then continue as if it contained \"\".  You might be tempted to just
+catch all exceptions and return \"\" in the handler. However, this has
+all sorts of undesirable consequences.  For example, if the user
+presses control-C at just the right moment then the 'UserInterrupt'
+exception will be caught, and the program will continue running under
+the belief that the file contains \"\".  Similarly, if another thread
+tries to kill the thread reading the file then the 'ThreadKilled'
+exception will be ignored.
 
 Instead, you should only catch exactly the exceptions that you really
 want. In this case, this would likely be more specific than even
 \"any IO exception\"; a permissions error would likely also want to be
 handled differently. Instead, you would probably want something like:
 
-> catchJust (\e -> if isDoesNotExistErrorType (ioeGetErrorType e) then Just () else Nothing)
->           (readFile f)
->           (\_ -> return "")
+> e <- tryJust (guard . isDoesNotExistError) (readFile f)
+> let str = either (const "") id e
 
 There are occassions when you really do need to catch any sort of
 exception. However, in most cases this is just so you can do some
