@@ -324,12 +324,18 @@ o1  = RealReg (oReg 1)
 f0  = RealReg (fReg 0)
 
 
+#if sparc_TARGET_ARCH
 nCG_FirstFloatReg :: RegNo
 nCG_FirstFloatReg = unRealReg NCG_FirstFloatReg
+#else
+nCG_FirstFloatReg :: RegNo
+nCG_FirstFloatReg = unRealReg f22
+#endif
 
 
 -- horror show -----------------------------------------------------------------
 #if sparc_TARGET_ARCH
+
 #define g0 0
 #define g1 1
 #define g2 2
@@ -399,6 +405,10 @@ nCG_FirstFloatReg = unRealReg NCG_FirstFloatReg
 
 
 freeReg :: RegNo -> FastBool
+globalRegMaybe :: GlobalReg -> Maybe Reg
+
+#if defined(sparc_TARGET_ARCH)
+
 
 freeReg g0 = fastBool False  --	%g0 is always 0.
 
@@ -492,7 +502,6 @@ freeReg _         = fastBool True
 -- in a real machine register, otherwise returns @'Just' reg@, where
 -- reg is the machine register it is stored in.
 
-globalRegMaybe :: GlobalReg -> Maybe Reg
 
 #ifdef REG_Base
 globalRegMaybe BaseReg			= Just (RealReg REG_Base)
@@ -570,3 +579,13 @@ globalRegMaybe CurrentTSO	   	= Just (RealReg REG_CurrentTSO)
 globalRegMaybe CurrentNursery	   	= Just (RealReg REG_CurrentNursery)
 #endif	    				
 globalRegMaybe _		   	= Nothing
+
+
+#else
+
+freeReg	_	= 0#
+globalRegMaybe	= panic "SPARC.Regs.globalRegMaybe: not defined"
+
+#endif
+
+

@@ -9,7 +9,7 @@ module X86.RegInfo (
 	patchJump,
 	isRegRegMove,
 
-        JumpDest, 
+        JumpDest(..), 
 	canShortcut, 
 	shortcutJump, 
 
@@ -457,6 +457,7 @@ mkRegRegMoveInstr src dst
         RcInteger -> MOV wordSize (OpReg src) (OpReg dst)
 #if   i386_TARGET_ARCH
         RcDouble  -> GMOV src dst
+	RcFloat   -> panic "X86.RegInfo.mkRegRegMoveInstr: no match"
 #else
         RcDouble  -> MOV FF64 (OpReg src) (OpReg dst)
 	RcFloat   -> panic "X86.RegInfo.mkRegRegMoveInstr: no match"

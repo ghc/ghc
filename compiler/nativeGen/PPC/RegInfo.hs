@@ -16,7 +16,7 @@ module PPC.RegInfo (
 	patchJump,
 	isRegRegMove,
 
-        JumpDest, 
+        JumpDest(..), 
 	canShortcut, 
 	shortcutJump, 
 
@@ -36,8 +36,6 @@ where
 #include "HsVersions.h"
 
 import BlockId
-import Cmm
-import CLabel
 import RegsBase
 import PPC.Regs
 import PPC.Instr
@@ -52,28 +50,28 @@ noUsage  = RU [] []
 
 regUsage :: Instr -> RegUsage
 regUsage instr = case instr of
-    SPILL  reg slot	-> usage ([reg], [])
-    RELOAD slot reg	-> usage ([], [reg])
+    SPILL  reg _	-> usage ([reg], [])
+    RELOAD _ reg	-> usage ([], [reg])
 
-    LD    sz reg addr  	-> usage (regAddr addr, [reg])
-    LA    sz reg addr  	-> usage (regAddr addr, [reg])
-    ST    sz reg addr  	-> usage (reg : regAddr addr, [])
-    STU    sz reg addr  -> usage (reg : regAddr addr, [])
-    LIS   reg imm	-> usage ([], [reg])
-    LI    reg imm	-> usage ([], [reg])
+    LD    _ reg addr  	-> usage (regAddr addr, [reg])
+    LA    _ reg addr  	-> usage (regAddr addr, [reg])
+    ST    _ reg addr  	-> usage (reg : regAddr addr, [])
+    STU    _ reg addr  -> usage (reg : regAddr addr, [])
+    LIS   reg _		-> usage ([], [reg])
+    LI    reg _		-> usage ([], [reg])
     MR	  reg1 reg2     -> usage ([reg2], [reg1])
-    CMP   sz reg ri	-> usage (reg : regRI ri,[])
-    CMPL  sz reg ri	-> usage (reg : regRI ri,[])
-    BCC	  cond lbl	-> noUsage
-    BCCFAR cond lbl	-> noUsage
+    CMP   _ reg ri	-> usage (reg : regRI ri,[])
+    CMPL  _ reg ri	-> usage (reg : regRI ri,[])
+    BCC	   _ _		-> noUsage
+    BCCFAR _ _		-> noUsage
     MTCTR reg		-> usage ([reg],[])
-    BCTR  targets	-> noUsage
-    BL    imm params	-> usage (params, callClobberedRegs)
+    BCTR  _		-> noUsage
+    BL    _  params	-> usage (params, callClobberedRegs)
     BCTRL params	-> usage (params, callClobberedRegs)
     ADD	  reg1 reg2 ri  -> usage (reg2 : regRI ri, [reg1])
     ADDC  reg1 reg2 reg3-> usage ([reg2,reg3], [reg1])
     ADDE  reg1 reg2 reg3-> usage ([reg2,reg3], [reg1])
-    ADDIS reg1 reg2 imm -> usage ([reg2], [reg1])
+    ADDIS reg1 reg2 _   -> usage ([reg2], [reg1])
     SUBF  reg1 reg2 reg3-> usage ([reg2,reg3], [reg1])
     MULLW reg1 reg2 ri  -> usage (reg2 : regRI ri, [reg1])
     DIVW  reg1 reg2 reg3-> usage ([reg2,reg3], [reg1])
@@ -83,19 +81,19 @@ regUsage instr = case instr of
     AND	  reg1 reg2 ri  -> usage (reg2 : regRI ri, [reg1])
     OR	  reg1 reg2 ri  -> usage (reg2 : regRI ri, [reg1])
     XOR	  reg1 reg2 ri  -> usage (reg2 : regRI ri, [reg1])
-    XORIS reg1 reg2 imm -> usage ([reg2], [reg1])
-    EXTS  siz reg1 reg2 -> usage ([reg2], [reg1])
+    XORIS reg1 reg2 _   -> usage ([reg2], [reg1])
+    EXTS  _   reg1 reg2 -> usage ([reg2], [reg1])
     NEG	  reg1 reg2	-> usage ([reg2], [reg1])
     NOT	  reg1 reg2	-> usage ([reg2], [reg1])
     SLW	  reg1 reg2 ri  -> usage (reg2 : regRI ri, [reg1])
     SRW	  reg1 reg2 ri  -> usage (reg2 : regRI ri, [reg1])
     SRAW  reg1 reg2 ri  -> usage (reg2 : regRI ri, [reg1])
-    RLWINM reg1 reg2 sh mb me
+    RLWINM reg1 reg2 _ _ _
                         -> usage ([reg2], [reg1])
-    FADD  sz r1 r2 r3   -> usage ([r2,r3], [r1])
-    FSUB  sz r1 r2 r3   -> usage ([r2,r3], [r1])
-    FMUL  sz r1 r2 r3   -> usage ([r2,r3], [r1])
-    FDIV  sz r1 r2 r3   -> usage ([r2,r3], [r1])
+    FADD  _ r1 r2 r3   -> usage ([r2,r3], [r1])
+    FSUB  _ r1 r2 r3   -> usage ([r2,r3], [r1])
+    FMUL  _ r1 r2 r3   -> usage ([r2,r3], [r1])
+    FDIV  _ r1 r2 r3   -> usage ([r2,r3], [r1])
     FNEG  r1 r2		-> usage ([r2], [r1])
     FCMP  r1 r2		-> usage ([r1,r2], [])
     FCTIWZ r1 r2	-> usage ([r2], [r1])
@@ -209,7 +207,7 @@ isJumpish instr
 	BCC{}		-> True
 	BCCFAR{}	-> True
 	JMP{}		-> True
-
+	_		-> False
 
 -- | Change the destination of this jump instruction
 --	Used in joinToTargets in the linear allocator, when emitting fixup code
@@ -223,7 +221,7 @@ patchJump insn old new
         BCCFAR cc id 
 	 | id == old 	-> BCCFAR cc new
 
-        BCTR targets 	-> error "Cannot patch BCTR"
+        BCTR _	 	-> error "Cannot patch BCTR"
 
 	_		-> insn
 
@@ -239,7 +237,7 @@ canShortcut :: Instr -> Maybe JumpDest
 canShortcut _ = Nothing
 
 shortcutJump :: (BlockId -> Maybe JumpDest) -> Instr -> Instr
-shortcutJump fn other = other
+shortcutJump _ other = other
 
 
 
@@ -258,6 +256,7 @@ mkSpillInstr reg delta slot
     let sz = case regClass reg of
                 RcInteger -> II32
                 RcDouble  -> FF64
+		RcFloat	  -> panic "PPC.RegInfo.mkSpillInstr: no match"
     in ST sz reg (AddrRegImm sp (ImmInt (off-delta)))
 
 
@@ -272,6 +271,7 @@ mkLoadInstr reg delta slot
     let sz = case regClass reg of
                 RcInteger -> II32
                 RcDouble  -> FF64
+		RcFloat	  -> panic "PPC.RegInfo.mkSpillInstr: no match"
     in LD sz reg (AddrRegImm sp (ImmInt (off-delta)))
 
 

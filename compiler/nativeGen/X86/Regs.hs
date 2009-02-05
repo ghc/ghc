@@ -70,6 +70,7 @@ import Outputable	( Outputable(..), pprPanic, panic )
 import qualified Outputable
 import Unique
 import FastBool
+import Constants
 
 -- -----------------------------------------------------------------------------
 -- Sizes on this architecture
@@ -247,38 +248,6 @@ argRegs _	= panic "MachRegs.argRegs(x86): should not be used!"
 
 
 
--- 
-allArgRegs :: [Reg]
-
-#if   i386_TARGET_ARCH
-allArgRegs = panic "X86.Regs.allArgRegs: should not be used!"
-
-#elif x86_64_TARGET_ARCH
-allArgRegs = map RealReg [rdi,rsi,rdx,rcx,r8,r9]
-
-#else
-allArgRegs  = panic "X86.Regs.allArgRegs: not defined for this architecture"
-#endif
-
-
--- | these are the regs which we cannot assume stay alive over a C call.  
-callClobberedRegs :: [Reg]
-
-#if   i386_TARGET_ARCH
--- caller-saves registers
-callClobberedRegs
-  = map RealReg [eax,ecx,edx,fake0,fake1,fake2,fake3,fake4,fake5]
-
-#elif x86_64_TARGET_ARCH
--- all xmm regs are caller-saves
--- caller-saves registers
-callClobberedRegs    
-  = map RealReg ([rax,rcx,rdx,rsi,rdi,r8,r9,r10,r11] ++ [16..31])
-
-#else
-callClobberedRegs
-  = panic "X86.Regs.callClobberedRegs: not defined for this architecture"
-#endif
 
 
 -- | The complete set of machine registers.
@@ -306,11 +275,10 @@ regClass :: Reg -> RegClass
 -- However, we can get away without this at the moment because the
 -- only allocatable integer regs are also 8-bit compatible (1, 3, 4).
 regClass (RealReg i)     = if i < 8 then RcInteger else RcDouble
-regClass (VirtualRegI  u) = RcInteger
-regClass (VirtualRegHi u) = RcInteger
-regClass (VirtualRegD  u) = RcDouble
-regClass (VirtualRegF  u) = pprPanic "regClass(x86):VirtualRegF" 
-                                    (ppr (VirtualRegF u))
+regClass (VirtualRegI  _) = RcInteger
+regClass (VirtualRegHi _) = RcInteger
+regClass (VirtualRegD  _) = RcDouble
+regClass (VirtualRegF  u) = pprPanic ("regClass(x86):VirtualRegF") (ppr u)
 
 #elif x86_64_TARGET_ARCH
 -- On x86, we might want to have an 8-bit RegClass, which would
@@ -318,11 +286,10 @@ regClass (VirtualRegF  u) = pprPanic "regClass(x86):VirtualRegF"
 -- However, we can get away without this at the moment because the
 -- only allocatable integer regs are also 8-bit compatible (1, 3, 4).
 regClass (RealReg i)     = if i < 16 then RcInteger else RcDouble
-regClass (VirtualRegI  u) = RcInteger
-regClass (VirtualRegHi u) = RcInteger
-regClass (VirtualRegD  u) = RcDouble
-regClass (VirtualRegF  u) = pprPanic "regClass(x86_64):VirtualRegF" 
-                                    (ppr (VirtualRegF u))
+regClass (VirtualRegI  _) = RcInteger
+regClass (VirtualRegHi _) = RcInteger
+regClass (VirtualRegD  _) = RcDouble
+regClass (VirtualRegF  u) = pprPanic "regClass(x86_64):VirtualRegF" (ppr u)
 
 #else
 regClass _	= panic "X86.Regs.regClass: not defined for this architecture"
@@ -339,6 +306,7 @@ showReg n
      then regNames !! n
      else "%unknown_x86_real_reg_" ++ show n
 
+regNames :: [String]
 regNames 
    = ["%eax", "%ebx", "%ecx", "%edx", "%esi", "%edi", "%ebp", "%esp", 
       "%fake0", "%fake1", "%fake2", "%fake3", "%fake4", "%fake5", "%fake6"]
@@ -349,6 +317,7 @@ showReg n
 	| n >= 8	= "%r" ++ show n
 	| otherwise	= regNames !! n
 
+regNames :: [String]
 regNames 
  = ["%rax", "%rbx", "%rcx", "%rdx", "%rsi", "%rdi", "%rbp", "%rsp" ]
 
@@ -597,7 +566,7 @@ freeReg REG_Hp   = fastBool False
 #ifdef REG_HpLim
 freeReg REG_HpLim = fastBool False
 #endif
-freeReg n               = fastBool True
+freeReg _               = fastBool True
 
 
 --  | Returns 'Nothing' if this global register is not stored
@@ -681,9 +650,50 @@ globalRegMaybe CurrentNursery	   	= Just (RealReg REG_CurrentNursery)
 #endif	    				
 globalRegMaybe _		   	= Nothing
 
+-- 
+allArgRegs :: [Reg]
+
+#if   i386_TARGET_ARCH
+allArgRegs = panic "X86.Regs.allArgRegs: should not be used!"
+
+#elif x86_64_TARGET_ARCH
+allArgRegs = map RealReg [rdi,rsi,rdx,rcx,r8,r9]
+
+#else
+allArgRegs  = panic "X86.Regs.allArgRegs: not defined for this architecture"
+#endif
+
+
+-- | these are the regs which we cannot assume stay alive over a C call.  
+callClobberedRegs :: [Reg]
+
+#if   i386_TARGET_ARCH
+-- caller-saves registers
+callClobberedRegs
+  = map RealReg [eax,ecx,edx,fake0,fake1,fake2,fake3,fake4,fake5]
+
+#elif x86_64_TARGET_ARCH
+-- all xmm regs are caller-saves
+-- caller-saves registers
+callClobberedRegs    
+  = map RealReg ([rax,rcx,rdx,rsi,rdi,r8,r9,r10,r11] ++ [16..31])
+
+#else
+callClobberedRegs
+  = panic "X86.Regs.callClobberedRegs: not defined for this architecture"
+#endif
+
 #else /* i386_TARGET_ARCH || x86_64_TARGET_ARCH */
+
+
 
 freeReg	_		= 0#
 globalRegMaybe _	= panic "X86.Regs.globalRegMaybe: not defined"
 
+allArgRegs		= panic "X86.Regs.globalRegMaybe: not defined"
+callClobberedRegs	= panic "X86.Regs.globalRegMaybe: not defined"
+
+
 #endif
+
+

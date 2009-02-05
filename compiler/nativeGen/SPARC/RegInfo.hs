@@ -38,9 +38,11 @@ where
 #include "nativeGen/NCG.h"
 #include "HsVersions.h"
 
+import SPARC.Instr
+import SPARC.Regs
+import RegsBase
+
 import BlockId
-import Instrs
-import Regs
 import Outputable
 import Constants	( rESERVED_C_STACK_BYTES )
 import FastBool
