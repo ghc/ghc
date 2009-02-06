@@ -253,7 +253,8 @@ pprStmt stmt = case stmt of
                                  )
                     in (fun_proto lbl, myCall)
 	      _ -> 
-                   (empty {- no proto -}, cast_fn)
+                   (empty {- no proto -},
+                    pprCall cast_fn cconv results args safety <> semi)
 			-- for a dynamic call, no declaration is necessary.
 
     CmmCall (CmmPrim op) results args safety _ret ->
