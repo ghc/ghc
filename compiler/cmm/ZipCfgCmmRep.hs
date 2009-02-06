@@ -35,6 +35,7 @@ import ZipCfg
 import MkZipCfg
 import Util
 
+import BasicTypes
 import Maybes
 import Monad
 import Outputable
@@ -460,7 +461,7 @@ ppr_safety Unsafe         = text "unsafe"
 
 ppr_call_target :: MidCallTarget -> SDoc
 ppr_call_target (ForeignTarget fn c) = ppr_fc c <+> ppr_target fn
-ppr_call_target (PrimTarget op)      = ppr (CmmLabel (mkForeignLabel (mkFastString (show op)) Nothing False))
+ppr_call_target (PrimTarget op)      = ppr (CmmLabel (mkForeignLabel (mkFastString (show op)) Nothing False IsFunction))
 
 ppr_target :: CmmExpr -> SDoc
 ppr_target t@(CmmLit _) = ppr t

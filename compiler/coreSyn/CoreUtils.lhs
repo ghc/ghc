@@ -1191,7 +1191,7 @@ rhsIsStatic _this_pkg rhs = is_static False rhs
   
   is_static _      (Lit lit)
     = case lit of
-  	MachLabel _ _ -> False
+  	MachLabel _ _ _ -> False
         _             -> True
   	-- A MachLabel (foreign import "&foo") in an argument
   	-- prevents a constructor application from being static.  The

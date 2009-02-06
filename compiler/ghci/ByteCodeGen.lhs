@@ -1205,7 +1205,7 @@ pushAtom d p (AnnVar v)
 
 pushAtom _ _ (AnnLit lit)
    = case lit of
-        MachLabel _ _ -> code NonPtrArg
+        MachLabel _ _ _ -> code NonPtrArg
         MachWord _    -> code NonPtrArg
         MachInt _     -> code PtrArg
         MachFloat _   -> code FloatArg

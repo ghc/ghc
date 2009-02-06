@@ -377,12 +377,12 @@ mkBits findLabel st proto_insns
                return (sizeSS st_l0, (st_i0,st_l1,st_p0))
 
 #ifdef mingw32_TARGET_OS
-       literal st (MachLabel fs (Just sz)) 
+       literal st (MachLabel fs (Just sz) _)
             = litlabel st (appendFS fs (mkFastString ('@':show sz)))
         -- On Windows, stdcall labels have a suffix indicating the no. of 
         -- arg words, e.g. foo@8.  testcase: ffi012(ghci)
 #endif
-       literal st (MachLabel fs _) = litlabel st fs
+       literal st (MachLabel fs _ _) = litlabel st fs
        literal st (MachWord w)     = int st (fromIntegral w)
        literal st (MachInt j)      = int st (fromIntegral j)
        literal st MachNullAddr     = int st (fromIntegral 0)

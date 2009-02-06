@@ -99,7 +99,7 @@ mkSimpleLit (MachWord i)      = CmmInt i wordWidth
 mkSimpleLit (MachWord64 i)    = CmmInt i W64
 mkSimpleLit (MachFloat r)     = CmmFloat r W32
 mkSimpleLit (MachDouble r)    = CmmFloat r W64
-mkSimpleLit (MachLabel fs ms) = CmmLabel (mkForeignLabel fs ms is_dyn)
+mkSimpleLit (MachLabel fs ms fod) = CmmLabel (mkForeignLabel fs ms is_dyn fod)
 			      where
 				is_dyn = False	-- ToDo: fix me
 mkSimpleLit other	      = pprPanic "mkSimpleLit" (ppr other)

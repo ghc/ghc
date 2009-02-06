@@ -119,6 +119,8 @@ module CLabel (
 
 import IdInfo
 import StaticFlags
+import BasicTypes
+import Literal
 import Packages
 import DataCon
 import PackageConfig
@@ -193,11 +195,12 @@ data CLabel
 
   | RtsLabel RtsLabelInfo
 
-  | ForeignLabel FastString	-- a 'C' (or otherwise foreign) label
-	(Maybe Int) 		-- possible '@n' suffix for stdcall functions
-		-- When generating C, the '@n' suffix is omitted, but when
-		-- generating assembler we must add it to the label.
-	Bool			-- True <=> is dynamic
+  | ForeignLabel FastString     -- a 'C' (or otherwise foreign) label
+        (Maybe Int)             -- possible '@n' suffix for stdcall functions
+                -- When generating C, the '@n' suffix is omitted, but when
+                -- generating assembler we must add it to the label.
+        Bool                    -- True <=> is dynamic
+        FunctionOrData
 
   | CC_Label  CostCentre
   | CCS_Label CostCentreStack
@@ -373,17 +376,18 @@ mkApEntryLabel upd off		= RtsLabel (RtsApEntry   upd off)
 
 	-- Foreign labels
 
-mkForeignLabel :: FastString -> Maybe Int -> Bool -> CLabel
-mkForeignLabel str mb_sz  is_dynamic = ForeignLabel str mb_sz is_dynamic
+mkForeignLabel :: FastString -> Maybe Int -> Bool -> FunctionOrData -> CLabel
+mkForeignLabel str mb_sz is_dynamic fod
+    = ForeignLabel str mb_sz is_dynamic fod
 
 addLabelSize :: CLabel -> Int -> CLabel
-addLabelSize (ForeignLabel str _ is_dynamic) sz
-  = ForeignLabel str (Just sz) is_dynamic
+addLabelSize (ForeignLabel str _ is_dynamic fod) sz
+  = ForeignLabel str (Just sz) is_dynamic fod
 addLabelSize label _
   = label
 
 foreignLabelStdcallInfo :: CLabel -> Maybe Int
-foreignLabelStdcallInfo (ForeignLabel _ info _) = info
+foreignLabelStdcallInfo (ForeignLabel _ info _ _) = info
 foreignLabelStdcallInfo _lbl = Nothing
 
 	-- Cost centres etc.
@@ -498,7 +502,7 @@ needsCDecl ModuleRegdLabel		= False
 needsCDecl (StringLitLabel _)		= False
 needsCDecl (AsmTempLabel _)		= False
 needsCDecl (RtsLabel _)			= False
-needsCDecl l@(ForeignLabel _ _ _)	= not (isMathFun l)
+needsCDecl l@(ForeignLabel _ _ _ _)	= not (isMathFun l)
 needsCDecl (CC_Label _)			= True
 needsCDecl (CCS_Label _)		= True
 needsCDecl (HpcTicksLabel _)            = True
@@ -518,7 +522,7 @@ maybeAsmTemp _ 	    	       = Nothing
 -- they are builtin to the C compiler.  For these labels we avoid
 -- generating our own C prototypes.
 isMathFun :: CLabel -> Bool
-isMathFun (ForeignLabel fs _ _) = fs `elem` math_funs
+isMathFun (ForeignLabel fs _ _ _) = fs `elem` math_funs
   where
   math_funs = [
         (fsLit "pow"),    (fsLit "sin"),   (fsLit "cos"),
@@ -557,7 +561,7 @@ externallyVisibleCLabel (PlainModuleInitLabel _)= True
 externallyVisibleCLabel (ModuleInitTableLabel _)= False
 externallyVisibleCLabel ModuleRegdLabel    = False
 externallyVisibleCLabel (RtsLabel _)	   = True
-externallyVisibleCLabel (ForeignLabel _ _ _) = True
+externallyVisibleCLabel (ForeignLabel _ _ _ _) = True
 externallyVisibleCLabel (IdLabel name _ _)     = isExternalName name
 externallyVisibleCLabel (CC_Label _)	   = True
 externallyVisibleCLabel (CCS_Label _)	   = True
@@ -611,6 +615,7 @@ labelType (PlainModuleInitLabel _)            = CodeLabel
 labelType (ModuleInitTableLabel _)            = DataLabel
 labelType (LargeSRTLabel _)                   = DataLabel
 labelType (LargeBitmapLabel _)                = DataLabel
+labelType (ForeignLabel _ _ _ IsFunction) = CodeLabel
 labelType (IdLabel _ _ info) = idInfoLabelType info
 labelType _                = DataLabel
 
@@ -639,11 +644,11 @@ labelDynamic this_pkg lbl =
    RtsLabel _  	     -> not opt_Static && (this_pkg /= rtsPackageId) -- i.e., is the RTS in a DLL or not?
    IdLabel n _ k       -> isDllName this_pkg n
 #if mingw32_TARGET_OS
-   ForeignLabel _ _ d  -> d
+   ForeignLabel _ _ d _ -> d
 #else
    -- On Mac OS X and on ELF platforms, false positives are OK,
    -- so we claim that all foreign imports come from dynamic libraries
-   ForeignLabel _ _ _ -> True
+   ForeignLabel _ _ _ _ -> True
 #endif
    ModuleInitLabel m _    -> not opt_Static && this_pkg /= (modulePackageId m)
    PlainModuleInitLabel m -> not opt_Static && this_pkg /= (modulePackageId m)
@@ -738,7 +743,7 @@ maybe_underscore doc
 #ifdef mingw32_TARGET_OS
 -- In asm mode, we need to put the suffix on a stdcall ForeignLabel.
 -- (The C compiler does this itself).
-pprAsmCLbl (ForeignLabel fs (Just sz) _)
+pprAsmCLbl (ForeignLabel fs (Just sz) _ _)
    = ftext fs <> char '@' <> int sz
 #endif
 pprAsmCLbl lbl
@@ -832,7 +837,7 @@ pprCLbl (RtsLabel (RtsSlowTickyCtr pat))
 pprCLbl ModuleRegdLabel
   = ptext (sLit "_module_registered")
 
-pprCLbl (ForeignLabel str _ _)
+pprCLbl (ForeignLabel str _ _ _)
   = ftext str
 
 pprCLbl (IdLabel name cafs flavor) = ppr name <> ppIdFlavor flavor

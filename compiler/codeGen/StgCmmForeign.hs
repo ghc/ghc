@@ -58,7 +58,7 @@ cgForeignCall results result_hints (CCall (CCallSpec target cconv safety)) stg_a
 	      (call_args, cmm_target)
 		= case target of
 		   StaticTarget lbl -> (args, CmmLit (CmmLabel 
-						(mkForeignLabel lbl (call_size args) False)))
+						(mkForeignLabel lbl (call_size args) False IsFunction)))
 		   DynamicTarget    ->  case args of
                                         fn:rest -> (rest, fn)
                                         [] -> panic "cgForeignCall []"

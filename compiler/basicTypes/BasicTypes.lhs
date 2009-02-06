@@ -18,6 +18,8 @@ module BasicTypes(
 	Version, bumpVersion, initialVersion,
 
 	Arity, 
+
+    FunctionOrData(..),
 	
 	WarningTxt(..),
 
@@ -70,6 +72,21 @@ import Outputable
 
 \begin{code}
 type Arity = Int
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[FunctionOrData]{FunctionOrData}
+%*									*
+%************************************************************************
+
+\begin{code}
+data FunctionOrData = IsFunction | IsData
+    deriving (Eq, Ord)
+
+instance Outputable FunctionOrData where
+    ppr IsFunction = text "(function)"
+    ppr IsData     = text "(data)"
 \end{code}
 
 

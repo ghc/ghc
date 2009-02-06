@@ -48,6 +48,7 @@ import Type
 import Outputable
 import FastTypes
 import FastString
+import BasicTypes
 import Binary
 import Ratio
 
@@ -121,11 +122,13 @@ data Literal
   | MachDouble	Rational        -- ^ @Double#@. Create with 'mkMachDouble'
 
   | MachLabel   FastString
-  		(Maybe Int)     -- ^ A label literal. Parameters:
-  		                --
-  		                -- 1) The name of the symbol mentioned in the declaration
-  		                --
-  		                -- 2) The size (in bytes) of the arguments
+  		(Maybe Int)
+        FunctionOrData
+                -- ^ A label literal. Parameters:
+  		        --
+  		        -- 1) The name of the symbol mentioned in the declaration
+  		        --
+  		        -- 2) The size (in bytes) of the arguments
 				--    the label expects. Only applicable with
 				--    @stdcall@ labels. @Just x@ => @\<x\>@ will
 				--    be appended to label name when emitting assembly.
@@ -144,7 +147,11 @@ instance Binary Literal where
     put_ bh (MachWord64 ag)   = do putByte bh 6; put_ bh ag
     put_ bh (MachFloat ah)    = do putByte bh 7; put_ bh ah
     put_ bh (MachDouble ai)   = do putByte bh 8; put_ bh ai
-    put_ bh (MachLabel aj mb) = do putByte bh 9; put_ bh aj ; put_ bh mb
+    put_ bh (MachLabel aj mb fod)
+        = do putByte bh 9
+             put_ bh aj
+             put_ bh mb
+             put_ bh fod
     get bh = do
 	    h <- getByte bh
 	    case h of
@@ -177,7 +184,8 @@ instance Binary Literal where
 	      9 -> do
 		    aj <- get bh
 		    mb <- get bh
-		    return (MachLabel aj mb)
+		    fod <- get bh
+		    return (MachLabel aj mb fod)
 \end{code}
 
 \begin{code}
@@ -349,7 +357,7 @@ literalType (MachInt64  _)  = int64PrimTy
 literalType (MachWord64  _) = word64PrimTy
 literalType (MachFloat _)   = floatPrimTy
 literalType (MachDouble _)  = doublePrimTy
-literalType (MachLabel _ _) = addrPrimTy
+literalType (MachLabel _ _ _) = addrPrimTy
 \end{code}
 
 
@@ -366,7 +374,7 @@ cmpLit (MachInt64     a)   (MachInt64	   b)   = a `compare` b
 cmpLit (MachWord64    a)   (MachWord64	   b)   = a `compare` b
 cmpLit (MachFloat     a)   (MachFloat	   b)   = a `compare` b
 cmpLit (MachDouble    a)   (MachDouble	   b)   = a `compare` b
-cmpLit (MachLabel     a _) (MachLabel      b _) = a `compare` b
+cmpLit (MachLabel     a _ _) (MachLabel      b _ _) = a `compare` b
 cmpLit lit1		   lit2		        | litTag lit1 <# litTag lit2 = LT
 					        | otherwise  		     = GT
 
@@ -380,7 +388,7 @@ litTag (MachInt64     _)   = _ILIT(6)
 litTag (MachWord64    _)   = _ILIT(7)
 litTag (MachFloat     _)   = _ILIT(8)
 litTag (MachDouble    _)   = _ILIT(9)
-litTag (MachLabel   _ _)   = _ILIT(10)
+litTag (MachLabel _ _ _)   = _ILIT(10)
 \end{code}
 
 	Printing
@@ -399,10 +407,10 @@ pprLit (MachWord64 w) 	= ptext (sLit "__word64") <+> integer w
 pprLit (MachFloat f)  	= ptext (sLit "__float") <+> rational f
 pprLit (MachDouble d) 	= rational d
 pprLit (MachNullAddr) 	= ptext (sLit "__NULL")
-pprLit (MachLabel l mb) = ptext (sLit "__label") <+> 
-			     case mb of
-			       Nothing -> pprHsString l
-			       Just x  -> doubleQuotes (text (unpackFS l ++ '@':show x))
+pprLit (MachLabel l mb fod) = ptext (sLit "__label") <+> b <+> ppr fod
+    where b = case mb of
+              Nothing -> pprHsString l
+              Just x  -> doubleQuotes (text (unpackFS l ++ '@':show x))
 
 pprIntVal :: Integer -> SDoc
 -- ^ Print negative integers with parens to be sure it's unambiguous
@@ -431,7 +439,7 @@ hashLiteral (MachWord i)   	= hashInteger i
 hashLiteral (MachWord64 i) 	= hashInteger i
 hashLiteral (MachFloat r)   	= hashRational r
 hashLiteral (MachDouble r)  	= hashRational r
-hashLiteral (MachLabel s _)     = hashFS s
+hashLiteral (MachLabel s _ _)     = hashFS s
 
 hashRational :: Rational -> Int
 hashRational r = hashInteger (numerator r)

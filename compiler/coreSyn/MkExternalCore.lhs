@@ -142,7 +142,7 @@ make_exp (Var v) = do
        DataConWorkId _ -> C.Var (make_var_qid False vName)
        DataConWrapId _ -> C.Var (make_var_qid False vName)
        _ -> C.Var (make_var_qid isLocal vName)
-make_exp (Lit (MachLabel s _)) = return $ C.Label (unpackFS s)
+make_exp (Lit (MachLabel s _ _)) = return $ C.Label (unpackFS s)
 make_exp (Lit l) = return $ C.Lit (make_lit l)
 make_exp (App e (Type t)) = make_exp e >>= (\ b -> return $ C.Appt b (make_ty t))
 make_exp (App e1 e2) = do

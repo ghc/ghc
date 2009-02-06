@@ -525,7 +525,7 @@ needImportedSymbols = not opt_Static && not opt_PIC
 -- The label used to refer to our "fake GOT" from
 -- position-independent code.
 gotLabel = mkForeignLabel -- HACK: it's not really foreign
-                           (fsLit ".LCTOC1") Nothing False
+                           (fsLit ".LCTOC1") Nothing False IsData
 
 -- pprGotDeclaration
 -- Output whatever needs to be output once per .s file.

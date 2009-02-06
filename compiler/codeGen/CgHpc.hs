@@ -21,6 +21,9 @@ import FastString
 import HscTypes
 import Panic
 import Char
+import StaticFlags
+import BasicTypes
+import PackageConfig
 
 import Data.Word
 
@@ -66,7 +69,7 @@ initHpc this_mod (HpcInfo tickCount hashNo)
                PlayRisky
                [CmmHinted id NoHint]
                (CmmCallee
-                 (CmmLit $ CmmLabel $ mkForeignLabel mod_alloc Nothing False)
+                 (CmmLit $ CmmLabel $ mkForeignLabel mod_alloc Nothing False IsFunction)
                   CCallConv
                )
                [ CmmHinted (mkLblExpr mkHpcModuleNameLabel) AddrHint

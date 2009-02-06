@@ -67,6 +67,7 @@ import Panic
 import UniqFM
 import FastMutInt
 import Fingerprint
+import BasicTypes
 
 import Foreign
 import Data.Array
@@ -725,4 +726,14 @@ instance Binary FastString where
 instance Binary Fingerprint where
   put_ h (Fingerprint w1 w2) = do put_ h w1; put_ h w2
   get  h = do w1 <- get h; w2 <- get h; return (Fingerprint w1 w2)
+
+instance Binary FunctionOrData where
+    put_ bh IsFunction = putByte bh 0
+    put_ bh IsData     = putByte bh 1
+    get bh = do
+        h <- getByte bh
+        case h of
+          0 -> return IsFunction
+          1 -> return IsData
+          _ -> panic "Binary FunctionOrData"
 

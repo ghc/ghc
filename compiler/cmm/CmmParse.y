@@ -52,6 +52,7 @@ import FastString
 import Panic
 import Constants
 import Outputable
+import BasicTypes
 import Bag              ( emptyBag, unitBag )
 
 import Control.Monad
@@ -202,7 +203,7 @@ static 	:: { ExtFCode [CmmStatic] }
 	| 'CLOSURE' '(' NAME lits ')'
 		{ do lits <- sequence $4;
 		     return $ map CmmStaticLit $
-                       mkStaticClosure (mkForeignLabel $3 Nothing True)
+                       mkStaticClosure (mkForeignLabel $3 Nothing True IsFunction)
                          -- mkForeignLabel because these are only used
                          -- for CHARLIKE and INTLIKE closures in the RTS.
 			 dontCareCCS (map getLit lits) [] [] [] }
@@ -824,7 +825,7 @@ newLocal ty name = do
 -- PIC code for them.
 newImport :: FastString -> ExtFCode ()
 newImport name
-   = addVarDecl name (CmmLit (CmmLabel (mkForeignLabel name Nothing True)))
+   = addVarDecl name (CmmLit (CmmLabel (mkForeignLabel name Nothing True IsFunction)))
 
 newLabel :: FastString -> ExtFCode BlockId
 newLabel name = do

@@ -142,10 +142,15 @@ dsCImport :: Id
 	  -> DsM ([Binding], SDoc, SDoc)
 dsCImport id (CLabel cid) cconv _ = do
    let ty = idType id
+       fod = case splitTyConApp_maybe (repType ty) of
+             Just (tycon, _)
+              | tyConUnique tycon == funPtrTyConKey ->
+                 IsFunction
+             _ -> IsData
    (resTy, foRhs) <- resultWrapper ty
    ASSERT(fromJust resTy `coreEqType` addrPrimTy)    -- typechecker ensures this
     let
-        rhs = foRhs (Lit (MachLabel cid stdcall_info))
+        rhs = foRhs (Lit (MachLabel cid stdcall_info fod))
         stdcall_info = fun_type_arg_stdcall_info cconv ty
     in
     return ([(id, rhs)], empty, empty)
@@ -355,7 +360,7 @@ dsFExportDynamic id cconv = do
          -}
         adj_args      = [ mkIntLitInt (ccallConvToInt cconv)
                         , Var stbl_value
-                        , Lit (MachLabel fe_nm mb_sz_args)
+                        , Lit (MachLabel fe_nm mb_sz_args IsFunction)
                         , Lit (mkMachString typestring)
                         ]
           -- name of external entry point providing these services.
