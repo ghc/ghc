@@ -23,7 +23,9 @@
 -- #hide
 module System.Posix.Internals where
 
-#include "HsBaseConfig.h"
+#ifndef __NHC__
+# include "HsBaseConfig.h"
+#endif
 
 #if ! (defined(mingw32_HOST_OS) || defined(__MINGW32__))
 import Control.Monad
@@ -48,8 +50,10 @@ import GHC.IOBase
 #elif __HUGS__
 import Hugs.Prelude (IOException(..), IOErrorType(..))
 import Hugs.IO (IOMode(..))
-#else
+#elif __NHC__
 import System.IO
+import Control.Exception
+import DIOError
 #endif
 
 #ifdef __HUGS__
@@ -90,8 +94,8 @@ fdFileSize fd =
     if not (s_isreg c_mode)
         then return (-1)
         else do
-    c_size <- st_size p_stat
-    return (fromIntegral c_size)
+      c_size <- st_size p_stat
+      return (fromIntegral c_size)
 
 data FDType  = Directory | Stream | RegularFile | RawDevice
                deriving (Eq)
@@ -132,12 +136,16 @@ statGetType p_stat = do
         | otherwise             -> ioError ioe_unknownfiletype
     
 ioe_unknownfiletype :: IOException
+#ifndef __NHC__
 ioe_unknownfiletype = IOError Nothing UnsupportedOperation "fdType"
                         "unknown file type"
-#if __GLASGOW_HASKELL__
+#  if __GLASGOW_HASKELL__
                         Nothing
+#  endif
+                        Nothing
+#else
+ioe_unknownfiletype = UserError "fdType" "unknown file type"
 #endif
-                        Nothing
 
 #if __GLASGOW_HASKELL__ && (defined(mingw32_HOST_OS) || defined(__MINGW32__))
 closeFd :: Bool -> CInt -> IO CInt
@@ -274,7 +282,11 @@ setCooked fd cooked = do
 
 ioe_unk_error :: String -> String -> IOException
 ioe_unk_error loc msg 
+#ifndef __NHC__
  = ioeSetErrorString (mkIOError OtherError loc Nothing Nothing) msg
+#else
+ = UserError loc msg
+#endif
 
 -- Note: echoing goes hand in hand with enabling 'line input' / raw-ness
 -- for Win32 consoles, hence setEcho ends up being the inverse of setCooked.

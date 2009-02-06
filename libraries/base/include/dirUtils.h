@@ -5,6 +5,8 @@
  */
 #ifndef __DIRUTILS_H__
 #define __DIRUTILS_H__
+#include <sys/types.h>
+#include <dirent.h>
 
 extern int __hscore_readdir(DIR *dirPtr, struct dirent **pDirEnt);
 

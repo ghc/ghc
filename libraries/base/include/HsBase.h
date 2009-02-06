@@ -9,7 +9,11 @@
 #ifndef __HSBASE_H__
 #define __HSBASE_H__
 
+#ifdef __NHC__
+# include "Nhc98BaseConfig.h"
+#else
 #include "HsBaseConfig.h"
+#endif
 
 /* ultra-evil... */
 #undef PACKAGE_BUGREPORT

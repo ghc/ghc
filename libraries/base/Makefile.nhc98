@@ -40,7 +40,7 @@ SRCS	= \
 	Text/ParserCombinators/ReadP.hs Data/Version.hs \
 	Unsafe/Coerce.hs \
 	WCsubst.c \
-	System/Posix/Types.hs \
+	System/Posix/Types.hs System/Posix/Internals.hs \
 
 #	Data/String.hs
 #	Text/ParserCombinators/ReadPrec.hs
