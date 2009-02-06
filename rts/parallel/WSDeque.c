@@ -30,7 +30,11 @@
  * are synchronised without a lock, based on a cas of the top
  * position. One reader wins, the others return NULL for a failure.
  * 
- * Both popBottom and steal also return NULL when the queue is empty.
+ * Both popWSDeque and stealWSDeque also return NULL when the queue is empty.
+ *
+ * Testing: see testsuite/tests/ghc-regress/rts/testwsdeque.c.  If
+ * there's anything wrong with the deque implementation, this test
+ * will probably catch it.
  * 
  * ---------------------------------------------------------------------------*/
 
@@ -140,6 +144,7 @@ popWSDeque (WSDeque *q)
     }
     removed = *pos;
     if (currSize > 0) { /* no danger, still elements in buffer after b-- */
+        // debugBelch("popWSDeque: t=%ld b=%ld = %ld\n", t, b, removed);
         return removed;
     } 
     /* otherwise, has someone meanwhile stolen the same (last) element?
@@ -153,6 +158,8 @@ popWSDeque (WSDeque *q)
     ASSERT_WSDEQUE_INVARIANTS(q); 
     ASSERT(q->bottom >= q->top);
     
+    // debugBelch("popWSDeque: t=%ld b=%ld = %ld\n", t, b, removed);
+
     return removed;
 }
 
@@ -176,7 +183,8 @@ stealWSDeque_ (WSDeque *q)
     t = q->top;
     
     // NB. b and t are unsigned; we need a signed value for the test
-    // below.
+    // below, because it is possible that t > b during a
+    // concurrent popWSQueue() operation.
     if ((long)b - (long)t <= 0 ) { 
         return NULL; /* already looks empty, abort */
   }
@@ -192,6 +200,8 @@ stealWSDeque_ (WSDeque *q)
         /* lost the race, someon else has changed top in the meantime */
         return NULL;
     }  /* else: OK, top has been incremented by the cas call */
+
+    // debugBelch("stealWSDeque_: t=%d b=%d\n", t, b);
 
 // Can't do this on someone else's spark pool:
 // ASSERT_WSDEQUE_INVARIANTS(q); 
@@ -211,6 +221,9 @@ stealWSDeque (WSDeque *q)
     return stolen;
 }
 
+/* -----------------------------------------------------------------------------
+ * pushWSQueue
+ * -------------------------------------------------------------------------- */
 
 #define DISCARD_NEW
 
