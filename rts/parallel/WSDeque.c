@@ -136,7 +136,7 @@ popWSDeque (WSDeque *q)
                    need a lower bound. We use the real top here, but
                    can update the topBound value */
     q->topBound = t;
-    currSize = b - t;
+    currSize = (long)b - (long)t;
     if (currSize < 0) { /* was empty before decrementing b, set b
                            consistently and abort */
         q->bottom = t;
