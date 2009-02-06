@@ -151,6 +151,7 @@ popWSDeque (WSDeque *q)
     q->topBound = t+1; /* ...and cached top value as well */
     
     ASSERT_WSDEQUE_INVARIANTS(q); 
+    ASSERT(q->bottom >= q->top);
     
     return removed;
 }
