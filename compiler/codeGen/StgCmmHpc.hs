@@ -21,6 +21,7 @@ import FastString
 import HscTypes
 import Char
 import StaticFlags
+import BasicTypes
 
 mkTickBox :: Module -> Int -> CmmAGraph
 mkTickBox mod n 

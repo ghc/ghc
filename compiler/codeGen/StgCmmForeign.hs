@@ -37,6 +37,7 @@ import StaticFlags
 import Maybes
 import Outputable
 import ZipCfgCmmRep
+import BasicTypes
 
 import Control.Monad
 

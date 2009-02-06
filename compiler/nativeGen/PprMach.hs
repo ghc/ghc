@@ -30,6 +30,7 @@ import BlockId
 import Cmm
 import Regs		-- may differ per-platform
 import Instrs
+import Regs
 
 import CLabel		( CLabel, pprCLabel, externallyVisibleCLabel,
 			  labelDynamic, mkAsmTempLabel, entryLblToInfoLbl )

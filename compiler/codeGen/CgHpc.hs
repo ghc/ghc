@@ -21,9 +21,7 @@ import FastString
 import HscTypes
 import Panic
 import Char
-import StaticFlags
 import BasicTypes
-import PackageConfig
 
 import Data.Word
 

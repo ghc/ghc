@@ -61,7 +61,7 @@ module Regs (
 	freg,
 	sp, r3, r4, r27, r28, f1, f20, f21,
 
-#elif i386_TARGET_ARCH || i386_64_TARGET_ARCH
+#elif i386_TARGET_ARCH || x86_64_TARGET_ARCH
 	EABase(..), EAIndex(..), addrModeRegs,
 	
 	eax, ebx, ecx, edx, esi, edi, ebp, esp,
