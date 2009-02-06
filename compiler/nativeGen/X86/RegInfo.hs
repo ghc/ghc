@@ -412,6 +412,7 @@ mkSpillInstr reg delta slot
     in case regClass reg of
 	   RcInteger -> MOV II64 (OpReg reg) (OpAddr (spRel off_w))
 	   RcDouble  -> MOV FF64 (OpReg reg) (OpAddr (spRel off_w))
+	   RcFloat   -> panic "mkSpillInstr/RcFloat"
 		-- ToDo: will it work to always spill as a double?
 		-- does that cause a stall if the data was a float?
 #else
