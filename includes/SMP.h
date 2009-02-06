@@ -218,6 +218,17 @@ xchg(StgPtr p, StgWord w)
     return old;
 }
 
+STATIC_INLINE StgWord
+cas(StgVolatilePtr p, StgWord o, StgWord n)
+{
+    StgWord result;
+    result = *p;
+    if (result == o) {
+        *p = n;
+    }
+    return result;
+}
+
 #endif /* !THREADED_RTS */
 
 #endif /* SMP_H */
