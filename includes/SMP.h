@@ -60,6 +60,11 @@ EXTERN_INLINE StgWord cas(StgVolatilePtr p, StgWord o, StgWord n);
  */ 
 EXTERN_INLINE void write_barrier(void);
 
+/*
+ * Prevents loads from moving before earlier stores.
+ */
+EXTERN_INLINE void store_load_barrier(void);
+
 /* ----------------------------------------------------------------------------
    Implementations
    ------------------------------------------------------------------------- */
@@ -180,10 +185,30 @@ write_barrier(void) {
 #endif
 }
 
+EXTERN_INLINE void
+store_load_barrier(void) {
+#if i386_HOST_ARCH
+    __asm__ __volatile__ ("lock; addl $0,0(%%esp)" : : : "memory");
+#elif x86_64_HOST_ARCH
+    __asm__ __volatile__ ("lock; addq $0,0(%%rsp)" : : : "memory");
+#elif powerpc_HOST_ARCH
+    __asm__ __volatile__ ("msync" : : : "memory");
+#elif sparc_HOST_ARCH
+    /* Sparc in TSO mode does not require write/write barriers. */
+    __asm__ __volatile__ ("membar" : : : "memory");
+#elif !defined(WITHSMP)
+    return;
+#else
+#error memory barriers unimplemented on this architecture
+#endif
+}
+
 /* ---------------------------------------------------------------------- */
 #else /* !THREADED_RTS */
 
 #define write_barrier() /* nothing */
+
+#define store_load_barrier() /* nothing */
 
 INLINE_HEADER StgWord
 xchg(StgPtr p, StgWord w)
