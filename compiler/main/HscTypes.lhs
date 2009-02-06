@@ -800,14 +800,12 @@ data FindResult
 	-- ^ The requested package was not found
   | FoundMultiple [PackageId]
 	-- ^ _Error_: both in multiple packages
-  | PackageHidden PackageId
-	-- ^ For an explicit source import, the package containing the module is
-	-- not exposed.
-  | ModuleHidden  PackageId
-	-- ^ For an explicit source import, the package containing the module is
-	-- exposed, but the module itself is hidden.
-  | NotFound [FilePath] (Maybe PackageId)
-	-- ^ The module was not found, the specified places were searched
+  | NotFound [FilePath] (Maybe PackageId) [PackageId] [PackageId]
+	-- ^ The module was not found, including either
+        --    * the specified places were searched
+        --    * the package that this module should have been in
+        --    * list of packages in which the module was hidden,
+        --    * list of hidden packages containing this module
   | NotFoundInPackage PackageId
 	-- ^ The module was not found in this package
 

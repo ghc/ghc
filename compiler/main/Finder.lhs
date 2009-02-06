@@ -149,10 +149,14 @@ orIfNotFound :: IO FindResult -> IO FindResult -> IO FindResult
 this `orIfNotFound` or_this = do
   res <- this
   case res of
-    NotFound here _ -> do
+    NotFound places1 _mb_pkg1 mod_hiddens1 pkg_hiddens1 -> do
 	res2 <- or_this
 	case res2 of
-	   NotFound or_here pkg -> return (NotFound (here ++ or_here) pkg)
+	   NotFound places2 mb_pkg2 mod_hiddens2 pkg_hiddens2 -> 
+              return (NotFound (places1 ++ places2)
+                               mb_pkg2 -- snd arg is the package search
+                               (mod_hiddens1 ++ mod_hiddens2)
+                               (pkg_hiddens1 ++ pkg_hiddens2))
 	   _other -> return res2
     _other -> return res
 
@@ -174,29 +178,30 @@ findExposedPackageModule :: HscEnv -> ModuleName -> Maybe FastString
                          -> IO FindResult
 findExposedPackageModule hsc_env mod_name mb_pkg
         -- not found in any package:
-  | null found = return (NotFound [] Nothing)
+  | null found_exposed = return (NotFound [] Nothing mod_hiddens pkg_hiddens)
         -- found in just one exposed package:
   | [(pkg_conf, _)] <- found_exposed
         = let pkgid = mkPackageId (package pkg_conf) in      
           findPackageModule_ hsc_env (mkModule pkgid mod_name) pkg_conf
-        -- not found in any exposed package, report how it was hidden:
-  | null found_exposed, ((pkg_conf, exposed_mod):_) <- found
-        = let pkgid = mkPackageId (package pkg_conf) in
-          if not (exposed_mod)
-                then return (ModuleHidden pkgid)
-                else return (PackageHidden pkgid)
   | otherwise
         = return (FoundMultiple (map (mkPackageId.package.fst) found_exposed))
   where
 	dflags = hsc_dflags hsc_env
         found = lookupModuleInAllPackages dflags mod_name
 
+        for_this_pkg = filter ((`matches` mb_pkg) . fst) found
+
         found_exposed = [ (pkg_conf,exposed_mod) 
-                        | x@(pkg_conf,exposed_mod) <- found,
-                          is_exposed x,
-                          pkg_conf `matches` mb_pkg ]
+                        | x@(pkg_conf,exposed_mod) <- for_this_pkg,
+                          is_exposed x ]
 
         is_exposed (pkg_conf,exposed_mod) = exposed pkg_conf && exposed_mod
+
+        mod_hiddens = [ mkPackageId (package pkg_conf)
+                      | (pkg_conf,False) <- found ]
+
+        pkg_hiddens = [ mkPackageId (package pkg_conf)
+                      | (pkg_conf,_) <- found, not (exposed pkg_conf) ]
 
         _pkg_conf `matches` Nothing  = True
         pkg_conf  `matches` Just pkg =
@@ -298,24 +303,22 @@ findPackageModule_ hsc_env mod pkg_conf =
 	   -- hi-suffix for packages depends on the build tag.
      package_hisuf | null tag  = "hi"
 		   | otherwise = tag ++ "_hi"
-     hi_exts =
-        [ (package_hisuf, mkHiOnlyModLocation dflags package_hisuf) ]
 
-     source_exts = 
-       [ ("hs",   mkHiOnlyModLocation dflags package_hisuf)
-       , ("lhs",  mkHiOnlyModLocation dflags package_hisuf)
-       ]
+     mk_hi_loc = mkHiOnlyModLocation dflags package_hisuf
 
-     -- mkdependHS needs to look for source files in packages too, so
-     -- that we can make dependencies between package before they have
-     -- been built.
-     exts 
-      | MkDepend <- ghcMode dflags = hi_exts ++ source_exts
-      | otherwise	 	   = hi_exts
+     import_dirs = importDirs pkg_conf
       -- we never look for a .hi-boot file in an external package;
       -- .hi-boot files only make sense for the home package.
   in
-  searchPathExts (importDirs pkg_conf) mod exts
+  case import_dirs of
+    [one] | MkDepend <- ghcMode dflags -> do
+          -- there's only one place that this .hi file can be, so
+          -- don't bother looking for it.
+          let basename = moduleNameSlashes (moduleName mod)
+          loc <- mk_hi_loc one basename
+          return (Found loc mod)
+    _otherwise ->
+          searchPathExts import_dirs mod [(package_hisuf, mk_hi_loc)]
 
 -- -----------------------------------------------------------------------------
 -- General path searching
@@ -354,7 +357,8 @@ searchPathExts paths mod exts
 	              file = base <.> ext
 		]
 
-    search [] = return (NotFound (map fst to_search) (Just (modulePackageId mod)))
+    search [] = return (NotFound (map fst to_search) (Just (modulePackageId mod))
+                        [] [])
     search ((file, mk_result) : rest) = do
       b <- doesFileExist file
       if b 
@@ -555,29 +559,24 @@ cantFindErr cannot_find dflags mod_name find_result
   where
     more_info
       = case find_result of
-	    PackageHidden pkg 
-		-> ptext (sLit "it is a member of package") <+> ppr pkg <> comma
-		   <+> ptext (sLit "which is hidden")
-
-	    ModuleHidden pkg
-		-> ptext (sLit "it is hidden") <+> parens (ptext (sLit "in package")
-		   <+> ppr pkg)
-
 	    NoPackage pkg
-		-> ptext (sLit "no package matching") <+> ppr pkg <+>
+		-> ptext (sLit "no package matching") <+> quotes (ppr pkg) <+>
 		   ptext (sLit "was found")
 
-	    NotFound files mb_pkg
-		| null files
-		-> ptext (sLit "it is not a module in the current program, or in any known package.")
+	    NotFound files mb_pkg mod_hiddens pkg_hiddens
 		| Just pkg <- mb_pkg, pkg /= thisPackage dflags
 		-> not_found_in_package pkg files
 
+                | null files && null mod_hiddens && null pkg_hiddens
+		-> ptext (sLit "it is not a module in the current program, or in any known package.")
+
 		| otherwise
-		-> not_found files
+		-> vcat (map pkg_hidden pkg_hiddens) $$
+                   vcat (map mod_hidden mod_hiddens) $$ 
+                   tried_these files
 
 	    NotFoundInPackage pkg
-		-> ptext (sLit "it is not in package") <+> ppr pkg
+		-> ptext (sLit "it is not in package") <+> quotes (ppr pkg)
 
 	    _ -> panic "cantFindErr"
 
@@ -590,18 +589,25 @@ cantFindErr cannot_find dflags mod_name find_result
                                         else "\"" ++ build_tag ++ "\""
          in
          ptext (sLit "Perhaps you haven't installed the ") <> text build <>
-         ptext (sLit " libraries for package ") <> ppr pkg <> char '?' $$
-         not_found files
+         ptext (sLit " libraries for package ") <> quotes (ppr pkg) <> char '?' $$
+         tried_these files
 
        | otherwise
-       = ptext (sLit "There are files missing in the ") <> ppr pkg <>
+       = ptext (sLit "There are files missing in the ") <> quotes (ppr pkg) <>
          ptext (sLit " package,") $$
          ptext (sLit "try running 'ghc-pkg check'.") $$
-         not_found files
+         tried_these files
 
-    not_found files
-	| verbosity dflags < 3
-	= ptext (sLit "Use -v to see a list of the files searched for.")
-	| otherwise 
-	= hang (ptext (sLit "locations searched:")) 2 (vcat (map text files))
+    tried_these files
+        | null files = empty
+        | verbosity dflags < 3 =
+   	      ptext (sLit "Use -v to see a list of the files searched for.")
+        | otherwise =
+               hang (ptext (sLit "locations searched:")) 2 $ vcat (map text files)
+        
+    pkg_hidden pkg =
+        ptext (sLit "it is a member of the hidden package") <+> quotes (ppr pkg)
+
+    mod_hidden pkg =
+        ptext (sLit "it is a hidden module in the package") <+> quotes (ppr pkg)
 \end{code}
