@@ -925,7 +925,11 @@ openFile' filepath mode binary =
 
     stat@(fd_type,_,_) <- fdStat fd
 
-    h <- fdToHandle_stat fd (Just stat) False filepath mode binary
+    h <- fdToHandle_stat fd (Just stat) 
+              False  -- set_non_blocking
+              True   -- is_non_blocking
+              False  -- is_socket
+              filepath mode binary
             `catchAny` \e -> do c_close fd; throw e
         -- NB. don't forget to close the FD if fdToHandle' fails, otherwise
         -- this FD leaks.
@@ -959,22 +963,26 @@ append_flags = write_flags  .|. o_APPEND
 
 fdToHandle_stat :: FD
             -> Maybe (FDType, CDev, CIno)
-            -> Bool
+            -> Bool                     -- set_non_blocking
+            -> Bool                     -- is_non_blocking
+            -> Bool                     -- is_socket
             -> FilePath
             -> IOMode
             -> Bool
             -> IO Handle
 
-fdToHandle_stat fd mb_stat is_socket filepath mode binary = do
+fdToHandle_stat fd mb_stat set_non_blocking is_non_blocking is_socket 
+                filepath mode binary = do
 
 #ifdef mingw32_HOST_OS
-    -- On Windows, the is_socket flag indicates that the Handle is a socket
+    -- On Windows, the is_stream flag indicates that the Handle is a socket
+    let is_stream = is_socket
 #else
-    -- On Unix, the is_socket flag indicates that the FD can be made non-blocking
-    let non_blocking = is_socket
-
-    when non_blocking $ setNonBlockingFD fd
+    when set_non_blocking $ setNonBlockingFD fd
     -- turn on non-blocking mode
+
+    -- On Unix, the is_stream flag indicates that the FD is in non-blocking mode
+    let is_stream = is_non_blocking || set_non_blocking
 #endif
 
     let (ha_type, write) =
@@ -1007,18 +1015,18 @@ fdToHandle_stat fd mb_stat is_socket filepath mode binary = do
                 ioException (IOError Nothing ResourceBusy "openFile"
                                    "file is locked" Nothing Nothing)
 #endif
-           mkFileHandle fd is_socket filepath ha_type binary
+           mkFileHandle fd is_stream filepath ha_type binary
 
         Stream
            -- only *Streams* can be DuplexHandles.  Other read/write
            -- Handles must share a buffer.
            | ReadWriteHandle <- ha_type -> 
-                mkDuplexHandle fd is_socket filepath binary
+                mkDuplexHandle fd is_stream filepath binary
            | otherwise ->
-                mkFileHandle   fd is_socket filepath ha_type binary
+                mkFileHandle   fd is_stream filepath ha_type binary
 
         RawDevice -> 
-                mkFileHandle fd is_socket filepath ha_type binary
+                mkFileHandle fd is_stream filepath ha_type binary
 
 -- | Old API kept to avoid breaking clients
 fdToHandle' :: FD -> Maybe FDType -> Bool -> FilePath  -> IOMode -> Bool
@@ -1031,16 +1039,21 @@ fdToHandle' fd mb_type is_socket filepath mode binary
                         Just RegularFile -> Nothing
                           -- no stat required for streams etc.:
                         Just other       -> Just (other,0,0)
-       fdToHandle_stat fd mb_stat is_socket filepath mode binary
+       fdToHandle_stat fd mb_stat
+              is_socket -- set_non_blocking
+              False     -- is_non_blocking
+              is_socket -- is_socket
+              filepath mode binary
 
 fdToHandle :: FD -> IO Handle
 fdToHandle fd = do
    mode <- fdGetMode fd
    let fd_str = "<file descriptor: " ++ show fd ++ ">"
-   fdToHandle_stat fd Nothing False fd_str mode True{-bin mode-}
-        -- NB. the is_socket flag is False, meaning that:
-        --  on Unix the file descriptor will *not* be put in non-blocking mode
-        --  on Windows we're guessing this is not a socket (XXX)
+   fdToHandle_stat fd Nothing
+              False -- set_non_blocking
+              False -- is_non_blocking
+              False -- is_socket (guess XXX)
+              fd_str mode True{-bin mode-}
 
 #ifndef mingw32_HOST_OS
 foreign import ccall unsafe "lockFile"
