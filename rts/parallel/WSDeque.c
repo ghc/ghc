@@ -275,7 +275,7 @@ pushWSDeque (WSDeque* q, void * elem)
     }
     pos = (q->elements) + (b & sz);
     *pos = elem;
-    (q->bottom)++;
+    q->bottom = b + 1;
     
     ASSERT_WSDEQUE_INVARIANTS(q); 
     return rtsTrue;
