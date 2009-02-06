@@ -130,7 +130,14 @@ popWSDeque (WSDeque *q)
     
     b = q->bottom;
     /* "decrement b as a test, see what happens" */
-    q->bottom = --b; 
+
+    b--;
+    q->bottom = b;
+
+    // very important that the following read of q->top does not occur
+    // before the earlier write to q->bottom.
+    store_load_barrier();
+
     pos = (q->elements) + (b & (q->moduloSize));
     t = q->top; /* using topBound would give an *upper* bound, we
                    need a lower bound. We use the real top here, but
