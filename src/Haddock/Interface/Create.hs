@@ -377,12 +377,32 @@ mkExportItems modMap this_mod exported_names decls declMap
     declWith :: Name -> ErrMsgM [ ExportItem Name ]
     declWith t =
       case findDecl t of
-        Just x@(decl,_,_)
-          -- temp hack: we filter out separately exported ATs, since we haven't decided how
-          -- to handle them yet. We should really give an warning message also, and filter the
-          -- name out in mkVisibleNames...
-          | t `elem` declATs (unL decl) -> return []
-          | otherwise                   -> return [ mkExportDecl t x ]
+        Just x@(decl,_,_) ->
+          let declName =
+                case getMainDeclBinder (unL decl) of
+                  Just declName -> declName
+                  Nothing -> error "declWith: should not happen"
+          in case () of
+            _
+              -- temp hack: we filter out separately exported ATs, since we haven't decided how
+              -- to handle them yet. We should really give an warning message also, and filter the
+              -- name out in mkVisibleNames...
+              | t `elem` declATs (unL decl)        -> return []
+
+              -- We should not show a subordinate at the top level if its
+              -- parent is also exported. See note [1].
+              | declName /= t, isExported declName ->
+                do tell [ 
+                     "Warning: " ++ moduleString this_mod ++ ": " ++
+                     pretty (nameOccName t) ++ " is listed separately in " ++
+                     "the export list, but " ++
+                     "will be documented under its parent. " ++
+                     "Consider exporting it through the parent "++
+                     "export item only, for code clarity." ]
+                   return []
+
+              -- normal case
+              | otherwise                          -> return [ mkExportDecl t x ]
         Nothing ->
           -- If we can't find the declaration, it must belong to another package.
           -- We return just the name of the declaration and try to get the subs
@@ -402,6 +422,8 @@ mkExportItems modMap this_mod exported_names decls declMap
         mdl = nameModule n
         subs' = filter ((`elem` exported_names) . fst) subs
         sub_names = map fst subs'
+
+    isExported n = n `elem` exported_names
 
     fullContentsOf modname
 	| m == this_mod = return (fullContentsOfThisModule this_mod decls)
@@ -433,6 +455,22 @@ mkExportItems modMap this_mod exported_names decls declMap
                       Nothing -> Nothing
       where
         m = nameModule n
+
+
+-- Note [1]:
+------------
+-- We should not show a subordinate at the top level if its parent is also
+-- exported. We should show it under the parent to indicate its special
+-- status as a class method or record field. Showing it again makes no sense.
+--
+-- A user might expect that it should show up separately, so we issue a
+-- warning. It's a fine opportunity to also tell the user she might want to
+-- export the subordinate through the same export item for clarity.
+--
+-- The code removes top-level subordinates also when the parent is exported
+-- through a 'module' export. I think that is fine.
+--
+-- (For more information, see Trac #69)
 
 
 fullContentsOfThisModule :: Module -> [DeclInfo] -> [ExportItem Name]
