@@ -203,7 +203,7 @@ static 	:: { ExtFCode [CmmStatic] }
 	| 'CLOSURE' '(' NAME lits ')'
 		{ do lits <- sequence $4;
 		     return $ map CmmStaticLit $
-                       mkStaticClosure (mkForeignLabel $3 Nothing True IsFunction)
+                       mkStaticClosure (mkForeignLabel $3 Nothing True IsData)
                          -- mkForeignLabel because these are only used
                          -- for CHARLIKE and INTLIKE closures in the RTS.
 			 dontCareCCS (map getLit lits) [] [] [] }
