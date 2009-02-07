@@ -7,7 +7,7 @@ data A = A { a :: Int }
 
 -- |
 -- .. with its field, but the field is named separately in the export list
--- (should still be visible as a field name)
+-- (the field isn't documented separately since it is already documented here)
 data B = B { b :: Int }
 
 -- |

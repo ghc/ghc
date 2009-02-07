@@ -112,18 +112,6 @@
 ></TR
 ><TR
 ><TD CLASS="decl"
-><A HREF="#v%3Ab"
->b</A
-> :: <A HREF="Bug6.html#t%3AB"
->B</A
-> -&gt; Int</TD
-></TR
-><TR
-><TD CLASS="s8"
-></TD
-></TR
-><TR
-><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >data</SPAN
 >  <A HREF="#t%3AC"
@@ -256,7 +244,7 @@
 ><TR
 ><TD CLASS="ndoc"
 >.. with its field, but the field is named separately in the export list
- (should still be visible as a field name)
+ (the field isn't documented separately since it is already documented here)
 </TD
 ></TR
 ><TR
@@ -301,22 +289,6 @@
 ></TR
 ></TABLE
 ></TD
-></TR
-><TR
-><TD CLASS="s15"
-></TD
-></TR
-><TR
-><TD CLASS="decl"
-><A NAME="v:b"
-><A NAME="v%3Ab"
-></A
-></A
-><B
->b</B
-> :: <A HREF="Bug6.html#t%3AB"
->B</A
-> -&gt; Int</TD
 ></TR
 ><TR
 ><TD CLASS="s15"

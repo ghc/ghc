@@ -669,44 +669,6 @@
 ></TR
 ><TR
 ><TD CLASS="decl"
-><A HREF="#v%3Ap"
->p</A
-> :: <A HREF="Test.html#t%3AR"
->R</A
-> -&gt; Int</TD
-></TR
-><TR
-><TD CLASS="s8"
-></TD
-></TR
-><TR
-><TD CLASS="decl"
-><A HREF="#v%3Aq"
->q</A
-> :: <A HREF="Test.html#t%3AR"
->R</A
-> -&gt; <SPAN CLASS="keyword"
->forall</SPAN
-> a.  a -&gt; a</TD
-></TR
-><TR
-><TD CLASS="s8"
-></TD
-></TR
-><TR
-><TD CLASS="decl"
-><A HREF="#v%3Au"
->u</A
-> :: <A HREF="Test.html#t%3AR"
->R</A
-> -&gt; Int</TD
-></TR
-><TR
-><TD CLASS="s8"
-></TD
-></TR
-><TR
-><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >class</SPAN
 > <A HREF="Test.html#t%3AD"
@@ -806,18 +768,6 @@
 ></TR
 ></TABLE
 ></TD
-></TR
-><TR
-><TD CLASS="s8"
-></TD
-></TR
-><TR
-><TD CLASS="decl"
-><A HREF="#v%3Aa"
->a</A
-> :: <A HREF="Test.html#t%3AC"
->C</A
-> a =&gt; IO a</TD
 ></TR
 ><TR
 ><TD CLASS="s8"
@@ -2172,74 +2122,6 @@
 ></TD
 ></TR
 ><TR
-><TD CLASS="decl"
-><A NAME="v:p"
-><A NAME="v%3Ap"
-></A
-></A
-><B
->p</B
-> :: <A HREF="Test.html#t%3AR"
->R</A
-> -&gt; Int</TD
-></TR
-><TR
-><TD CLASS="doc"
->This comment applies to the <TT
-><A HREF="Test.html#v%3Ap"
->p</A
-></TT
-> field
-</TD
-></TR
-><TR
-><TD CLASS="s15"
-></TD
-></TR
-><TR
-><TD CLASS="decl"
-><A NAME="v:q"
-><A NAME="v%3Aq"
-></A
-></A
-><B
->q</B
-> :: <A HREF="Test.html#t%3AR"
->R</A
-> -&gt; <SPAN CLASS="keyword"
->forall</SPAN
-> a.  a -&gt; a</TD
-></TR
-><TR
-><TD CLASS="doc"
->This comment applies to the <TT
-><A HREF="Test.html#v%3Aq"
->q</A
-></TT
-> field
-</TD
-></TR
-><TR
-><TD CLASS="s15"
-></TD
-></TR
-><TR
-><TD CLASS="decl"
-><A NAME="v:u"
-><A NAME="v%3Au"
-></A
-></A
-><B
->u</B
-> :: <A HREF="Test.html#t%3AR"
->R</A
-> -&gt; Int</TD
-></TR
-><TR
-><TD CLASS="s15"
-></TD
-></TR
-><TR
 ><TD CLASS="section1"
 ><A NAME="4"
 ><A NAME="4"
@@ -2521,31 +2403,6 @@
 ><TR
 ><TD CLASS="doc"
 >Test that we can export a class method on its own:
-</TD
-></TR
-><TR
-><TD CLASS="s15"
-></TD
-></TR
-><TR
-><TD CLASS="decl"
-><A NAME="v:a"
-><A NAME="v%3Aa"
-></A
-></A
-><B
->a</B
-> :: <A HREF="Test.html#t%3AC"
->C</A
-> a =&gt; IO a</TD
-></TR
-><TR
-><TD CLASS="doc"
->this is a description of the <TT
-><A HREF="Test.html#v%3Aa"
->a</A
-></TT
-> method
 </TD
 ></TR
 ><TR
