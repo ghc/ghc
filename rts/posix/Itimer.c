@@ -80,9 +80,10 @@
 
 #elif defined(HAVE_SETITIMER)
 
-#  ifdef THREADED_RTS
+#  if defined(THREADED_RTS) || !defined(HAVE_SETITIMER_VIRTUAL)
 //   Oh dear, we have to use SIGALRM if there's no timer_create and
 //   we're using the THREADED_RTS.  This leads to problems, see bug #850.
+//   We also use it if we don't have a virtual timer (trac #2883).
 #    define ITIMER_SIGNAL  SIGALRM
 #    define ITIMER_FLAVOUR ITIMER_REAL
 #  else

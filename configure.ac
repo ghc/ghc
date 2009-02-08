@@ -1108,6 +1108,19 @@ fi
 dnl ** check for more functions
 dnl ** The following have been verified to be used in ghc/, but might be used somewhere else, too.
 AC_CHECK_FUNCS([getclock getrusage gettimeofday setitimer siginterrupt sysconf times ctime_r])
+
+AC_TRY_RUN([
+#include <sys/types.h>
+#include <sys/time.h>
+int main(void) {
+  struct itimerval tval;
+  tval.it_value.tv_sec = 1;
+  tval.it_value.tv_usec = 0;
+  tval.it_interval = tval.it_value;
+  return setitimer(ITIMER_VIRTUAL, &tval, (void*)0) != 0;
+}
+],[AC_DEFINE([HAVE_SETITIMER_VIRTUAL], [1], [Define to 1 if setitimer accepts ITIMER_VIRTUAL, 0 else.])])
+
 dnl ** On OS X 10.4 (at least), time.h doesn't declare ctime_r if
 dnl ** _POSIX_C_SOURCE is defined
 AC_CHECK_DECLS([ctime_r], , ,
