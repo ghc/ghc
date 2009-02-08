@@ -222,10 +222,10 @@ test('tc207', normal, compile, [''])
 test('tc208', normal, compile, [''])
 test('tc209', normal, compile, [''])
 test('tc210', normal, compile, [''])
-test('tc211', normal, compile, [''])
+test('tc211', if_compiler_lt('ghc', '6.11', expect_fail), compile, [''])
 test('tc212', normal, compile, [''])
 test('tc213', normal, compile, [''])
-test('tc214', normal, compile, [''])
+test('tc214', if_compiler_lt('ghc', '6.11', expect_fail), compile, [''])
 test('tc215', expect_broken(366), compile, [''])
 test('tc216', normal, compile, [''])
 test('tc217', reqlib('mtl'), compile, [''])
@@ -260,7 +260,8 @@ test('tc242', normal, compile, [''])
 test('tc243', normal, compile, [''])
 test('tc244', if_compiler_lt('ghc', '6.11', expect_fail), compile, [''])
 test('tc245',
-     extra_clean(['Tc245_A.hi', 'Tc245_A.o', 'tc245.hi', 'tc245.o']),
+     [extra_clean(['Tc245_A.hi', 'Tc245_A.o', 'tc245.hi', 'tc245.o']),
+      if_compiler_lt('ghc', '6.11', expect_fail)],
      run_command,
      ['$MAKE -s --no-print-directory tc245'])
 

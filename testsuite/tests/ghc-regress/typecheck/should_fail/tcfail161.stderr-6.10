@@ -1,0 +1,7 @@
+
+tcfail161.hs:5:6:
+    `Maybe' is not applied to enough type arguments
+    Expected kind `*', but `Maybe' has kind `* -> *'
+    In the type `[Maybe]'
+    In the type signature for `f':
+      f :: [Maybe]

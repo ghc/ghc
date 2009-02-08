@@ -18,6 +18,12 @@ test('drv021', normal, compile, [''])
 test('deriving-1935', normal, compile, [''])
 test('T2378', normal, compile, [''])
 test('T2856', normal, compile, [''])
-test('drv-functor1', normal, compile, [''])
+test('drv-functor1',
+     if_compiler_lt('ghc', '6.11', expect_fail),
+     compile,
+     [''])
 test('drv-functor2', normal, compile, [''])
-test('drv-foldable-traversable1', normal, compile, [''])
+test('drv-foldable-traversable1',
+     if_compiler_lt('ghc', '6.11', expect_fail),
+     compile,
+     [''])

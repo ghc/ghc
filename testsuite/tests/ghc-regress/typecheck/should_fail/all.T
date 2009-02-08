@@ -152,7 +152,10 @@ test('tcfail161', normal, compile_fail, [''])
 test('tcfail162', normal, compile_fail, [''])
 test('tcfail163', normal, compile_fail, [''])
 test('tcfail164', normal, compile_fail, [''])
-test('tcfail165', normal, compile, [''])	  # Succeeds now!
+test('tcfail165',
+     if_compiler_lt('ghc', '6.11', expect_fail),
+     compile,
+     [''])	  # Succeeds now!
 test('tcfail166', normal, compile_fail, [''])
 test('tcfail167', normal, compile_fail, [''])
 test('tcfail168', normal, compile_fail, [''])
@@ -161,7 +164,10 @@ test('tcfail170', normal, compile_fail, [''])
 test('tcfail171', normal, compile_fail, [''])
 test('tcfail172', normal, compile_fail, [''])
 test('tcfail173', normal, compile_fail, [''])
-test('tcfail174', normal, compile_fail, [''])
+test('tcfail174',
+     if_compiler_lt('ghc', '6.11', expect_fail),
+     compile_fail,
+     [''])
 test('tcfail175', normal, compile_fail, [''])
 test('tcfail176', normal, compile_fail, [''])
 test('tcfail177', expect_broken(1176), compile_fail, [''])
