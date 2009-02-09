@@ -6,13 +6,9 @@ import GHC.Conc
 -- exception.
 
 main = do
-  m <- newEmptyMVar
-  t <- forkIO (
 	    Control.Exception.catch (do
-		m <- newMVar ()
-		putMVar m ()
+		m2 <- newMVar ()
+		putMVar m2 ()
 	     )
-	     (\e -> putMVar m (e::SomeException))
-	   )
-  takeMVar m >>= print
+	     (\e -> print (e::SomeException))
   -- should print "thread blocked indefinitely"
