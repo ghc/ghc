@@ -744,6 +744,7 @@ scheduleYield (Capability **pcap, Task *task)
     // if we have work, and we don't need to give up the Capability, continue.
     if (!shouldYieldCapability(cap,task) && 
         (!emptyRunQueue(cap) ||
+         !emptyWakeupQueue(cap) ||
          blackholes_need_checking ||
          sched_state >= SCHED_INTERRUPTING))
         return;
