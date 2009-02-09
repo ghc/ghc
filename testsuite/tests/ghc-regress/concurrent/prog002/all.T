@@ -12,4 +12,4 @@ test('concprog002',
                    'Server.hi',    'Server.o',
                    'Thread.hi',    'Thread.o'])],
      multimod_compile_and_run,
-     ['Server','-debug -O0'])
+     ['Server','-O0'])
