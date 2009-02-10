@@ -13,7 +13,7 @@ all:
 	$(RM) -rf ghc*
 	$(RM) HelloWorld HelloWorld.o HelloWorld.hi output
 	# --force-local makes tar not think that c:/foo refers to a remote file
-	$(TAR) --force-local -jxf $(BIN_DIST_TAR_BZ2)
+	$(TAR) --force-local -jxf $(FPTOOLS_TOP_ABS)/$(BIN_DIST_TAR_BZ2)
 ifeq "$(Windows)" "YES"
 	mv $(BIN_DIST_NAME) $(BIN_DIST_INST_DIR)
 else

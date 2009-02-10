@@ -314,8 +314,8 @@ binary-dist :: tar-binary-dist
 
 .PHONY: tar-binary-dist
 tar-binary-dist:
-	( cd $(BIN_DIST_TOPDIR_ABS); $(TAR) cf - $(BIN_DIST_NAME) | bzip2 > $(BIN_DIST_TAR_BZ2) )
-	( cd $(BIN_DIST_TOPDIR_ABS); bunzip2 -c $(BIN_DIST_TAR_BZ2) | $(TAR) tf - | sed "s/^ghc-$(ProjectVersion)/fptools/" | sort >$(FPTOOLS_TOP_ABS)/bin-manifest-$(ProjectVersion) )
+	( cd $(BIN_DIST_TOPDIR_ABS); $(TAR) cf - $(BIN_DIST_NAME) | bzip2 > $(FPTOOLS_TOP_ABS)/$(BIN_DIST_TAR_BZ2) )
+	( cd $(BIN_DIST_TOPDIR_ABS); bunzip2 -c $(FPTOOLS_TOP_ABS)/$(BIN_DIST_TAR_BZ2) | $(TAR) tf - | sed "s/^ghc-$(ProjectVersion)/fptools/" | sort >$(FPTOOLS_TOP_ABS)/bin-manifest-$(ProjectVersion) )
 
 else
 
@@ -412,7 +412,7 @@ endif
 # h means "follow symlinks", e.g. if aclocal.m4 is a symlink to a source
 # tree then we want to include the real file, not a symlink to it
 	$(TAR) hcf $(BIN_DIST_TAR) -T $(BIN_DIST_LIST)
-	cd $(BIN_DIST_PREP_DIR) && $(TAR) rf $(BIN_DIST_TAR) $(BIN_DIST_NAME)
+	cd $(BIN_DIST_PREP_DIR) && $(TAR) rf ../$(BIN_DIST_TAR) $(BIN_DIST_NAME)
 	bzip2 < $(BIN_DIST_TAR) > $(BIN_DIST_TAR_BZ2)
 	$(TAR) tf $(BIN_DIST_TAR) | sort > bin-manifest-$(ProjectVersion)
 endif
