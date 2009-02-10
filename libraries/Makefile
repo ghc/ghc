@@ -40,11 +40,24 @@ ifeq "$(stage)" ""
 stage := 1
 endif
 
+DO_STAGE_1_LIBS := NO
+DO_STAGE_2_LIBS := NO
+ifeq "$(stage)" "1"
+DO_STAGE_1_LIBS := YES
+endif
+ifeq "$(stage)" "2"
+DO_STAGE_2_LIBS := YES
+endif
+ifneq "$(filter install clean,$(MAKECMDGOALS))" ""
+DO_STAGE_1_LIBS := YES
+DO_STAGE_2_LIBS := YES
+endif
+
 # Any libraries listed here should also be in ../packages
 
 SUBDIRS :=
 
-ifeq "$(stage)" "1"
+ifeq "$(DO_STAGE_1_LIBS)" "YES"
 SUBDIRS += ghc-prim $(INTEGER_LIBRARY) base syb base3-compat array packedstring
 SUBDIRS += containers bytestring old-locale old-time filepath 
 ifeq "$(GhcLibsWithUnix)" "YES"
@@ -75,7 +88,7 @@ SUBDIRS += $(wildcard parallel)
 endif
 endif
 
-ifeq "$(stage)" "2"
+ifeq "$(DO_STAGE_2_LIBS)" "YES"
 ifneq "$(GhcBootLibs)" "YES"
 ifneq "$(wildcard dph)" ""
 SUBDIRS += dph/dph-base
