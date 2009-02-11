@@ -122,15 +122,14 @@ popWSDeque (WSDeque *q)
     /* also a bit tricky, has to avoid concurrent steal() calls by
        accessing top with cas, when there is only one element left */
     StgWord t, b;
-    void ** pos;
     long  currSize;
     void * removed;
     
     ASSERT_WSDEQUE_INVARIANTS(q); 
     
     b = q->bottom;
-    /* "decrement b as a test, see what happens" */
 
+    // "decrement b as a test, see what happens"
     b--;
     q->bottom = b;
 
@@ -138,7 +137,6 @@ popWSDeque (WSDeque *q)
     // before the earlier write to q->bottom.
     store_load_barrier();
 
-    pos = (q->elements) + (b & (q->moduloSize));
     t = q->top; /* using topBound would give an *upper* bound, we
                    need a lower bound. We use the real top here, but
                    can update the topBound value */
@@ -149,7 +147,10 @@ popWSDeque (WSDeque *q)
         q->bottom = t;
         return NULL;
     }
-    removed = *pos;
+
+    // read the element at b
+    removed = q->elements[b & q->moduloSize];
+
     if (currSize > 0) { /* no danger, still elements in buffer after b-- */
         // debugBelch("popWSDeque: t=%ld b=%ld = %ld\n", t, b, removed);
         return removed;
@@ -177,9 +178,6 @@ popWSDeque (WSDeque *q)
 void *
 stealWSDeque_ (WSDeque *q)
 {
-    void ** pos;
-    void ** arraybase;
-    StgWord sz;
     void * stolen;
     StgWord b,t; 
     
@@ -200,10 +198,7 @@ stealWSDeque_ (WSDeque *q)
   }
     
     /* now access array, see pushBottom() */
-    arraybase = q->elements;
-    sz = q->moduloSize;
-    pos = arraybase + (t & sz);  
-    stolen = *pos;
+    stolen = q->elements[t & q->moduloSize];
     
     /* now decide whether we have won */
     if ( !(CASTOP(&(q->top),t,t+1)) ) {
@@ -243,9 +238,8 @@ rtsBool
 pushWSDeque (WSDeque* q, void * elem)
 {
     StgWord t;
-    void ** pos;
+    StgWord b;
     StgWord sz = q->moduloSize; 
-    StgWord b = q->bottom;
     
     ASSERT_WSDEQUE_INVARIANTS(q); 
     
@@ -253,6 +247,7 @@ pushWSDeque (WSDeque* q, void * elem)
        q->topBound (accessed only by writer) instead. 
        This is why we do not just call empty(q) here.
     */
+    b = q->bottom;
     t = q->topBound;
     if ( (StgInt)b - (StgInt)t >= (StgInt)sz ) { 
         /* NB. 1. sz == q->size - 1, thus ">="
@@ -283,8 +278,8 @@ pushWSDeque (WSDeque* q, void * elem)
 #endif
         }
     }
-    pos = (q->elements) + (b & sz);
-    *pos = elem;
+
+    q->elements[b & sz] = elem;
     q->bottom = b + 1;
     
     ASSERT_WSDEQUE_INVARIANTS(q); 
