@@ -15,7 +15,7 @@ module VarSet (
 	unionVarSet, unionVarSets,
 	intersectVarSet, intersectsVarSet, disjointVarSet,
 	isEmptyVarSet, delVarSet, delVarSetList, delVarSetByKey,
-	minusVarSet, foldVarSet, filterVarSet,
+	minusVarSet, foldVarSet, filterVarSet, fixVarSet,
 	lookupVarSet, mapVarSet, sizeVarSet, seqVarSet,
 	elemVarSetByKey
     ) where
@@ -63,6 +63,7 @@ extendVarSet_C  :: (Var->Var->Var) -> VarSet -> Var -> VarSet
 
 delVarSetByKey	:: VarSet -> Unique -> VarSet
 elemVarSetByKey :: Unique -> VarSet -> Bool
+fixVarSet       :: (VarSet -> VarSet) -> VarSet -> VarSet
 
 emptyVarSet	= emptyUniqSet
 unitVarSet	= unitUniqSet
@@ -100,6 +101,12 @@ elemVarSetByKey	= elemUniqSet_Directly
 intersectsVarSet s1 s2 = not (s1 `disjointVarSet` s2)
 disjointVarSet   s1 s2 = isEmptyVarSet (s1 `intersectVarSet` s2)
 subVarSet        s1 s2 = isEmptyVarSet (s1 `minusVarSet` s2)
+
+-- Iterate f to a fixpoint
+fixVarSet f s | new_s `subVarSet` s = s
+	      | otherwise	    = fixVarSet f new_s 
+	      where
+		new_s = f s
 \end{code}
 
 \begin{code}

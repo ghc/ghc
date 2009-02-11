@@ -24,7 +24,7 @@ module Inst (
 
 	tyVarsOfInst, tyVarsOfInsts, tyVarsOfLIE, 
 	ipNamesOfInst, ipNamesOfInsts, fdPredsOfInst, fdPredsOfInsts,
-	getDictClassTys, dictPred,
+	growInstsTyVars, getDictClassTys, dictPred,
 
 	lookupSimpleInst, LookupInstResult(..), 
 	tcExtendLocalInstEnv, tcGetInstEnvs, getOverlapFlag,
@@ -152,6 +152,7 @@ getDictClassTys :: Inst -> (Class, [Type])
 getDictClassTys (Dict {tci_pred = pred}) = getClassPredTys pred
 getDictClassTys inst		         = pprPanic "getDictClassTys" (ppr inst)
 
+--------------------------------
 -- fdPredsOfInst is used to get predicates that contain functional 
 -- dependencies *or* might do so.  The "might do" part is because
 -- a constraint (C a b) might have a superclass with FDs
@@ -161,14 +162,16 @@ getDictClassTys inst		         = pprPanic "getDictClassTys" (ppr inst)
 fdPredsOfInst :: Inst -> [TcPredType]
 fdPredsOfInst (Dict {tci_pred = pred}) 	     = [pred]
 fdPredsOfInst (Method {tci_theta = theta})   = theta
-fdPredsOfInst (ImplicInst {tci_given = gs, 
-			   tci_wanted = ws}) = fdPredsOfInsts (gs ++ ws)
+fdPredsOfInst (ImplicInst {tci_wanted = ws}) = fdPredsOfInsts ws
+   -- The ImplicInst case doesn't look right;
+   -- what if ws mentions skolem variables?
 fdPredsOfInst (LitInst {})		     = []
 fdPredsOfInst (EqInst {})		     = []
 
 fdPredsOfInsts :: [Inst] -> [PredType]
 fdPredsOfInsts insts = concatMap fdPredsOfInst insts
 
+---------------------------------
 isInheritableInst :: Inst -> Bool
 isInheritableInst (Dict {tci_pred = pred})     = isInheritablePred pred
 isInheritableInst (Method {tci_theta = theta}) = all isInheritablePred theta
@@ -216,8 +219,45 @@ addInstToDictBind :: TcDictBinds -> Inst -> LHsExpr TcId -> TcDictBinds
 addInstToDictBind binds inst rhs = binds `unionBags` instToDictBind inst rhs
 \end{code}
 
-Predicates
-~~~~~~~~~~
+Note [Growing the tau-tvs using constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+(growInstsTyVars insts tvs) is the result of extending the set 
+    of tyvars tvs using all conceivable links from pred
+
+E.g. tvs = {a}, preds = {H [a] b, K (b,Int) c, Eq e}
+Then grow precs tvs = {a,b,c}
+
+All the type variables from an implicit parameter are added, whether or
+not they are mentioned in tvs; see Note [Implicit parameters and ambiguity] 
+in TcSimplify.
+
+See also Note [Ambiguity] in TcSimplify
+
+\begin{code}
+growInstsTyVars :: [Inst] -> TyVarSet -> TyVarSet
+growInstsTyVars insts tvs
+  | null insts = tvs
+  | otherwise  = fixVarSet mk_next tvs
+  where
+    mk_next tvs = foldr grow_inst_tvs tvs insts
+
+grow_inst_tvs :: Inst -> TyVarSet -> TyVarSet
+grow_inst_tvs (Dict {tci_pred = pred})     tvs = growPredTyVars pred tvs
+grow_inst_tvs (Method {tci_theta = theta}) tvs = foldr growPredTyVars tvs theta
+grow_inst_tvs (ImplicInst {tci_tyvars = tvs1, tci_wanted = ws}) tvs
+  = tvs `unionVarSet` (foldr grow_inst_tvs (tvs `delVarSetList` tvs1) ws
+    		          `delVarSetList` tvs1)
+grow_inst_tvs inst tvs   -- EqInst, LitInst
+  = growTyVars (tyVarsOfInst inst) tvs
+\end{code}
+
+
+%************************************************************************
+%*									*
+		Predicates
+%*									*
+%************************************************************************
+
 \begin{code}
 
 isAbstractableInst :: Inst -> Bool

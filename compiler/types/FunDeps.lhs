@@ -10,7 +10,7 @@ It's better to read it as: "if we know these, then we're going to know these"
 \begin{code}
 module FunDeps (
  	Equation, pprEquation,
-	oclose, grow, improveOne,
+	oclose, improveOne,
 	checkInstCoverage, checkFunDeps,
 	pprFundeps
     ) where
@@ -132,44 +132,6 @@ oclose preds fixed_tvs
 	      ]
 \end{code}
 
-Note [Growing the tau-tvs using constraints]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-(grow preds tvs) is the result of extend the set of tyvars tvs
-		 using all conceivable links from pred
-
-E.g. tvs = {a}, preds = {H [a] b, K (b,Int) c, Eq e}
-Then grow precs tvs = {a,b,c}
-
-All the type variables from an implicit parameter are added, whether or
-not they are mentioned in tvs; see Note [Implicit parameters and ambiguity] 
-in TcSimplify.
-
-See also Note [Ambiguity] in TcSimplify
-
-\begin{code}
-grow :: [PredType] -> TyVarSet -> TyVarSet
-grow preds fixed_tvs 
-  | null preds = fixed_tvs
-  | otherwise  = loop real_fixed_tvs
-  where
-	-- Add the implicit parameters; 
-	-- see Note [Implicit parameters and ambiguity] in TcSimplify
-    real_fixed_tvs = foldr unionVarSet fixed_tvs ip_tvs
- 
-    loop fixed_tvs
-	| new_fixed_tvs `subVarSet` fixed_tvs = fixed_tvs
-	| otherwise		  	      = loop new_fixed_tvs
-	where
-	  new_fixed_tvs = foldl extend fixed_tvs non_ip_tvs
-
-    extend fixed_tvs pred_tvs 
-	| fixed_tvs `intersectsVarSet` pred_tvs = fixed_tvs `unionVarSet` pred_tvs
-	| otherwise			        = fixed_tvs
-
-    (ip_tvs, non_ip_tvs) = partitionWith get_ip preds
-    get_ip (IParam _ ty) = Left (tyVarsOfType ty)
-    get_ip other         = Right (tyVarsOfPred other)
-\end{code}
     
 %************************************************************************
 %*									*

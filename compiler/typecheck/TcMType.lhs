@@ -45,6 +45,7 @@ module TcMType (
   checkInstTermination, checkValidTypeInst, checkTyFamFreeness,
   checkUpdateMeta, updateMeta, checkTauTvUpdate, fillBoxWithTau, unifyKindCtxt,
   unifyKindMisMatch, validDerivPred, arityErr, notMonoType, notMonoArgs,
+  growPredTyVars, growTyVars, growThetaTyVars,
 
   --------------------------------
   -- Zonking
@@ -1421,7 +1422,7 @@ checkAmbiguity forall_tyvars theta tau_tyvars
   = mapM_ complain (filter is_ambig theta)
   where
     complain pred     = addErrTc (ambigErr pred)
-    extended_tau_vars = grow theta tau_tyvars
+    extended_tau_vars = growThetaTyVars theta tau_tyvars
 
 	-- See Note [Implicit parameters and ambiguity] in TcSimplify
     is_ambig pred     = isClassPred  pred &&
@@ -1435,6 +1436,28 @@ ambigErr pred
   = sep [ptext (sLit "Ambiguous constraint") <+> quotes (pprPred pred),
 	 nest 4 (ptext (sLit "At least one of the forall'd type variables mentioned by the constraint") $$
 		 ptext (sLit "must be reachable from the type after the '=>'"))]
+
+--------------------------
+-- For this 'grow' stuff see Note [Growing the tau-tvs using constraints] in Inst
+
+growThetaTyVars :: TcThetaType -> TyVarSet -> TyVarSet
+-- Finds a fixpoint
+growThetaTyVars theta tvs
+  | null theta = tvs
+  | otherwise  = fixVarSet mk_next tvs
+  where
+    mk_next tvs = foldr growPredTyVars tvs theta
+
+
+growPredTyVars :: TcPredType -> TyVarSet -> TyVarSet
+-- Here is where the special case for inplicit parameters happens
+growPredTyVars (IParam _ ty) tvs = tvs `unionVarSet` tyVarsOfType ty
+growPredTyVars pred          tvs = growTyVars (tyVarsOfPred pred) tvs
+
+growTyVars :: TyVarSet -> TyVarSet -> TyVarSet
+growTyVars new_tvs tvs 
+  | new_tvs `intersectsVarSet` tvs = tvs `unionVarSet` new_tvs
+  | otherwise			   = tvs
 \end{code}
     
 In addition, GHC insists that at least one type variable

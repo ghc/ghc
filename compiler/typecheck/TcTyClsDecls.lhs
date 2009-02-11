@@ -25,7 +25,6 @@ import TcHsType
 import TcMType
 import TcType
 import TysWiredIn	( unitTy )
-import FunDeps
 import Type
 import Generics
 import Class
@@ -1172,7 +1171,7 @@ checkValidClass cls
 		--   class Error e => Game b mv e | b -> mv e where
 		--      newBoard :: MonadState b m => m ()
 		-- Here, MonadState has a fundep m->b, so newBoard is fine
-	; let grown_tyvars = grow theta (mkVarSet tyvars)
+	; let grown_tyvars = growThetaTyVars theta (mkVarSet tyvars)
 	; checkTc (tyVarsOfType tau `intersectsVarSet` grown_tyvars)
 	          (noClassTyVarErr cls sel_id)
 
