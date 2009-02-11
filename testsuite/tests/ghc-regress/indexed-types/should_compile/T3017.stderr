@@ -1,0 +1,18 @@
+TYPE SIGNATURES
+    emptyL :: forall a. ListColl a
+    test2 :: forall t t1 c.
+             ((t, t1) ~ Elem c, Num t, Num t1, Coll c) =>
+             c -> c
+TYPE CONSTRUCTORS
+    data ListColl a
+        RecFlag NonRecursive
+        Generics: no
+        = L :: forall a. [a] -> ListColl a Stricts: _
+        FamilyInstance: none
+INSTANCES
+  instance Coll (ListColl a) -- Defined at T3017.hs:12:10-26
+FAMILY INSTANCES
+  type instance Elem (ListColl a) -- Defined at T3017.hs:13:8-11
+Tycons with generics:
+Dependent modules: []
+Dependent packages: [base, ghc-prim, integer]
