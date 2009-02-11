@@ -46,26 +46,25 @@ ghc [argument...]
 
       <para>Sometimes it is useful to make the connection between a
       source file and the command-line options it requires quite
-      tight. For instance, if a Haskell source file uses GHC
-      extensions, it will always need to be compiled with the
-      <option>-fglasgow-exts</option> option.  Rather than maintaining
+      tight. For instance, if a Haskell source file deliberately
+	uses name shadowing, it should be compiled with  the
+      <option>-fno-warn-name-shadowing</option> option.  Rather than maintaining
       the list of per-file options in a <filename>Makefile</filename>,
       it is possible to do this directly in the source file using the
       <literal>OPTIONS_GHC</literal> pragma <indexterm><primary>OPTIONS_GHC
       pragma</primary></indexterm>:</para>
 
 <programlisting>
-{-# OPTIONS_GHC -fglasgow-exts #-}
+{-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 module X where
 ...
 </programlisting>
       
-      <para><literal>OPTIONS_GHC</literal> pragmas are only looked for at
-      the top of your source files, upto the first
-      (non-literate,non-empty) line not containing
-      <literal>OPTIONS_GHC</literal>. Multiple <literal>OPTIONS_GHC</literal>
-      pragmas are recognised.  Do not put comments before, or on the same line
-	as, the <literal>OPTIONS_GHC</literal> pragma.</para>
+      <para><literal>OPTIONS_GHC</literal> is a <emphasis>file-header pragma</emphasis>
+      (see <xref linkend="pragmas"/>).</para>
+
+      <para>Only <emphasis>dynamic</emphasis> flags can be used in an <literal>OPTIONS_GHC</literal> pragma
+      (see <xref linkend="static-dynamic-flags"/>).</para>
 
       <para>Note that your command shell does not
       get to the source file options, they are just included literally

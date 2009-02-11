@@ -607,7 +607,9 @@
     <sect2>
       <title>Language options</title>
 
-      <para><xref linkend="options-language"/></para>
+      <para>Language options can be enabled either by a command-line option 
+      <option>-Xblah</option>, or by a <literal>{-# LANGUAGE blah #-}</literal>
+      pragma in the file itself.  See <xref linkend="options-language"/></para>
 
       <informaltable>
 	<tgroup cols="4" align="left" colsep="1" rowsep="1">
@@ -932,7 +934,7 @@
 	    </row>
 	    <row>
 	      <entry><option>-XTypeSynonymInstances</option></entry>
-	      <entry>Enable <link linkend="type-synonym-instances">type synonyms</link>.</entry>
+	      <entry>Enable <link linkend="flexible-instance-head">type synonyms in instance heads</link>.</entry>
 	      <entry>dynamic</entry>
 	      <entry><option>-XNoTypeSynonymInstances</option></entry>
 	    </row>

@@ -38,19 +38,20 @@ documentation</ulink> describes all the libraries that come with GHC.
     <indexterm><primary>extensions</primary><secondary>options controlling</secondary>
     </indexterm>
 
-    <para>The language option flag control what variation of the language are
+    <para>The language option flags control what variation of the language are
     permitted.  Leaving out all of them gives you standard Haskell
     98.</para>
 
-    <para>Generally speaking, all the language options are introduced by "<option>-X</option>", 
-    e.g. <option>-XTemplateHaskell</option>.
-    </para>
-
-   <para> All the language options can be turned off by using the prefix "<option>No</option>"; 
-      e.g. "<option>-XNoTemplateHaskell</option>".</para>
-
-   <para> Language options recognised by Cabal can also be enabled using the <literal>LANGUAGE</literal> pragma,
-   thus <literal>{-# LANGUAGE TemplateHaskell #-}</literal> (see <xref linkend="language-pragma"/>>). </para>
+    <para>Language options can be controlled in two ways:
+    <itemizedlist>
+      <listitem><para>Every language option can switched on by a command-line flag "<option>-X...</option>" 
+        (e.g. <option>-XTemplateHaskell</option>), and switched off by the flag "<option>-XNo...</option>"; 
+        (e.g. <option>-XNoTemplateHaskell</option>).</para></listitem>
+      <listitem><para>
+          Language options recognised by Cabal can also be enabled using the <literal>LANGUAGE</literal> pragma,
+          thus <literal>{-# LANGUAGE TemplateHaskell #-}</literal> (see <xref linkend="language-pragma"/>). </para>
+          </listitem>
+      </itemizedlist></para>
 
     <para>The flag <option>-fglasgow-exts</option>
           <indexterm><primary><option>-fglasgow-exts</option></primary></indexterm>
@@ -6862,10 +6863,27 @@ Assertion failures can be caught, see the documentation for the
     ignored. The layout rule applies in pragmas, so the closing <literal>#-}</literal>
     should start in a column to the right of the opening <literal>{-#</literal>. </para> 
 
-    <para>Certain pragmas are <emphasis>file-header pragmas</emphasis>.  A file-header
-      pragma must precede the <literal>module</literal> keyword in the file.  
+    <para>Certain pragmas are <emphasis>file-header pragmas</emphasis>:
+      <itemizedlist>
+      <listitem><para>
+	  A file-header
+	  pragma must precede the <literal>module</literal> keyword in the file.
+	  </para></listitem>
+      <listitem><para>
       There can be as many file-header pragmas as you please, and they can be
-      preceded or followed by comments.</para>
+      preceded or followed by comments.  
+	  </para></listitem>
+      <listitem><para>
+      File-header pragmas are read once only, before
+      pre-processing the file (e.g. with cpp).
+	  </para></listitem>
+      <listitem><para>
+         The file-header pragmas are: <literal>{-# LANGUAGE #-}</literal>,
+	<literal>{-# OPTIONS_GHC #-}</literal>, and
+	<literal>{-# INCLUDE #-}</literal>.
+	  </para></listitem>
+      </itemizedlist>
+      </para>
 
     <sect2 id="language-pragma">
       <title>LANGUAGE pragma</title>
