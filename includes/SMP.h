@@ -55,15 +55,22 @@ EXTERN_INLINE StgWord cas(StgVolatilePtr p, StgWord o, StgWord n);
 #endif // !IN_STG_CODE
 
 /*
- * Prevents write operations from moving across this call in either
- * direction.
+ * Various kinds of memory barrier.
+ *  write_barrier: prevents future stores occurring before prededing stores.
+ *  store_load_barrier: prevents future loads occurring before preceding stores.
+ *  load_load_barrier: prevents future loads occurring before earlier stores.
+ *
+ * Reference for these: "The JSR-133 Cookbook for Compiler Writers"
+ * http://gee.cs.oswego.edu/dl/jmm/cookbook.html
+ *
+ * To check whether you got these right, try the test in 
+ *   testsuite/tests/ghc-regress/rts/testwsdeque.c
+ * This tests the work-stealing deque implementation, which relies on
+ * properly working store_load and load_load memory barriers.
  */ 
 EXTERN_INLINE void write_barrier(void);
-
-/*
- * Prevents loads from moving before earlier stores.
- */
 EXTERN_INLINE void store_load_barrier(void);
+EXTERN_INLINE void load_load_barrier(void);
 
 /* ----------------------------------------------------------------------------
    Implementations
@@ -160,14 +167,10 @@ cas(StgVolatilePtr p, StgWord o, StgWord n)
 #endif // !IN_STG_CODE
 
 /*
- * Write barrier - ensure that all preceding writes have happened
- * before all following writes.  
- *
- * We need to tell both the compiler AND the CPU about the barrier.
- * This is a brute force solution; better results might be obtained by
- * using volatile type declarations to get fine-grained ordering
- * control in C, and optionally a memory barrier instruction on CPUs
- * that require it (not x86 or x86_64).
+ * We need to tell both the compiler AND the CPU about the barriers.
+ * It's no good preventing the CPU from reordering the operations if
+ * the compiler has already done so - hence the "memory" restriction
+ * on each of the barriers below.
  */
 EXTERN_INLINE void
 write_barrier(void) {
@@ -203,12 +206,30 @@ store_load_barrier(void) {
 #endif
 }
 
+EXTERN_INLINE void
+load_load_barrier(void) {
+#if i386_HOST_ARCH
+    __asm__ __volatile__ ("" : : : "memory");
+#elif x86_64_HOST_ARCH
+    __asm__ __volatile__ ("" : : : "memory");
+#elif powerpc_HOST_ARCH
+    __asm__ __volatile__ ("lwsync" : : : "memory");
+#elif sparc_HOST_ARCH
+    /* Sparc in TSO mode does not require write/write barriers. */
+    __asm__ __volatile__ ("" : : : "memory");
+#elif !defined(WITHSMP)
+    return;
+#else
+#error memory barriers unimplemented on this architecture
+#endif
+}
+
 /* ---------------------------------------------------------------------- */
 #else /* !THREADED_RTS */
 
-#define write_barrier() /* nothing */
-
+#define write_barrier()      /* nothing */
 #define store_load_barrier() /* nothing */
+#define load_load_barrier()  /* nothing */
 
 INLINE_HEADER StgWord
 xchg(StgPtr p, StgWord w)

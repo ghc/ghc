@@ -186,8 +186,11 @@ stealWSDeque_ (WSDeque *q)
 // Can't do this on someone else's spark pool:
 // ASSERT_WSDEQUE_INVARIANTS(q); 
     
-    b = q->bottom;
+    // NB. these loads must be ordered, otherwise there is a race
+    // between steal and pop.
     t = q->top;
+    load_load_barrier();
+    b = q->bottom;
     
     // NB. b and t are unsigned; we need a signed value for the test
     // below, because it is possible that t > b during a
