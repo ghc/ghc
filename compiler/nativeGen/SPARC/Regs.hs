@@ -65,12 +65,14 @@ import Unique
 import Constants
 import FastBool
 
+-- sizes -----------------------------------------------------------------------
 
+-- | A 'Size' also includes format information, such as whether
+--	the word is signed or unsigned.
+--
 data Size
 	= II8     -- byte (signed)
---	| II8u    -- byte (unsigned)
 	| II16    -- halfword (signed, 2 bytes)
---	| II16u   -- halfword (unsigned, 2 bytes)
 	| II32    -- word (4 bytes)
 	| II64    -- word (8 bytes)
 	| FF32    -- IEEE single-precision floating pt
@@ -78,48 +80,61 @@ data Size
 	deriving Eq
 
 
-intSize, floatSize :: Width -> Size
-intSize W8  	= II8
---intSize W16 = II16u
-intSize W16 	= II16
-intSize W32 	= II32
-intSize W64 	= II64
-intSize other	= pprPanic "MachInstrs.intSize" (ppr other)
-
-floatSize W32	= FF32
-floatSize W64	= FF64
-floatSize other	= pprPanic "MachInstrs.intSize" (ppr other)
+-- | Get the integer size of this width.
+intSize :: Width -> Size
+intSize width
+ = case width of
+ 	W8 	-> II8
+	W16	-> II16
+	W32	-> II32
+	W64 	-> II64
+	other	-> pprPanic "SPARC.Regs.intSize" (ppr other)
 
 
+-- | Get the float size of this width.
+floatSize :: Width -> Size
+floatSize width
+ = case width of
+ 	W32	-> FF32
+	W64	-> FF64
+	other 	-> pprPanic "SPARC.Regs.intSize" (ppr other)
+
+
+-- | Check if a size represents a floating point value.
 isFloatSize :: Size -> Bool
-isFloatSize FF32	= True
-isFloatSize FF64	= True
-isFloatSize _		= False
+isFloatSize size
+ = case size of
+ 	FF32	-> True
+	FF64	-> True
+	_	-> False
 
 
+-- | Size of a machine word. 
+--	This is big enough to hold a pointer.
 wordSize :: Size
 wordSize = intSize wordWidth
 
 
+-- | Convert a Cmm type to a Size.
 cmmTypeSize :: CmmType -> Size
 cmmTypeSize ty 
 	| isFloatType ty	= floatSize (typeWidth ty)
 	| otherwise		= intSize (typeWidth ty)
 
 
+-- | Get the Width of a Size.
 sizeToWidth :: Size -> Width
 sizeToWidth size
  = case size of
  	II8		-> W8
---	II8u		-> W8
 	II16		-> W16
---	II16u		-> W16
 	II32		-> W32
 	II64		-> W64
 	FF32		-> W32
 	FF64		-> W64
 
 
+-- | Make a virtual reg with this size.
 mkVReg :: Unique -> Size -> Reg
 mkVReg u size
 	| not (isFloatSize size) 
@@ -133,48 +148,74 @@ mkVReg u size
 
 
 -- immediates ------------------------------------------------------------------
+
+-- | An immediate value.
+--	Not all of these are directly representable by the machine. 
+--	Things like ImmLit are slurped out and put in a data segment instead.
+--
 data Imm
 	= ImmInt	Int
-	| ImmInteger	Integer	    -- Sigh.
-	| ImmCLbl	CLabel	    -- AbstractC Label (with baggage)
-	| ImmLit	Doc	    -- Simple string
-	| ImmIndex    CLabel Int
+
+	-- Sigh.
+	| ImmInteger	Integer	    
+
+	-- AbstractC Label (with baggage)
+	| ImmCLbl	CLabel	    
+
+	-- Simple string
+	| ImmLit	Doc	    
+	| ImmIndex	CLabel Int
 	| ImmFloat	Rational
 	| ImmDouble	Rational
-	| ImmConstantSum Imm Imm
+
+	| ImmConstantSum  Imm Imm
 	| ImmConstantDiff Imm Imm
-	| LO Imm		    {- Possible restrictions... -}
-	| HI Imm
+
+	| LO 	Imm		   
+	| HI 	Imm
 
 
+-- | Create a ImmLit containing this string.
 strImmLit :: String -> Imm
 strImmLit s = ImmLit (text s)
 
 
--- narrow to the width: a CmmInt might be out of
--- range, but we assume that ImmInteger only contains
--- in-range values.  A signed value should be fine here.
+-- | Convert a CmmLit to an Imm.
+-- 	Narrow to the width: a CmmInt might be out of
+-- 	range, but we assume that ImmInteger only contains
+-- 	in-range values.  A signed value should be fine here.
+--
 litToImm :: CmmLit -> Imm
-litToImm (CmmInt i w)        = ImmInteger (narrowS w i)
-litToImm (CmmFloat f W32)    = ImmFloat f
-litToImm (CmmFloat f W64)    = ImmDouble f
-litToImm (CmmLabel l)        = ImmCLbl l
-litToImm (CmmLabelOff l off) = ImmIndex l off
+litToImm lit
+ = case lit of
+ 	CmmInt i w		-> ImmInteger (narrowS w i)
+	CmmFloat f W32		-> ImmFloat f
+	CmmFloat f W64		-> ImmDouble f
+	CmmLabel l		-> ImmCLbl l
+	CmmLabelOff l off	-> ImmIndex l off
 
-litToImm (CmmLabelDiffOff l1 l2 off)
-                             = ImmConstantSum
-                               (ImmConstantDiff (ImmCLbl l1) (ImmCLbl l2))
-                               (ImmInt off)
-litToImm (CmmBlock id)		= ImmCLbl (infoTblLbl id)
-litToImm _
-	= panic "SPARC.Regs.litToImm: no match"
+	CmmLabelDiffOff l1 l2 off
+	 -> ImmConstantSum
+		(ImmConstantDiff (ImmCLbl l1) (ImmCLbl l2))
+		(ImmInt off)
+
+	CmmBlock id	-> ImmCLbl (infoTblLbl id)
+	_		-> panic "SPARC.Regs.litToImm: no match"
+
+
 
 -- addressing modes ------------------------------------------------------------
+
+-- | Represents a memory address in an instruction.
+--	Being a RISC machine, the SPARC addressing modes are very regular.
+--
 data AddrMode
-	= AddrRegReg	Reg Reg
-	| AddrRegImm	Reg Imm
+	= AddrRegReg	Reg Reg		-- addr = r1 + r2
+	| AddrRegImm	Reg Imm		-- addr = r1 + imm
 
 
+-- | Add an integer offset to the address in an AddrMode.
+--
 addrOffset :: AddrMode -> Int -> Maybe AddrMode
 addrOffset addr off
   = case addr of
@@ -198,42 +239,57 @@ addrOffset addr off
 
 -- registers -------------------------------------------------------------------
 
--- @spRel@ gives us a stack relative addressing mode for volatile
--- temporaries and for excess call arguments.  @fpRel@, where
--- applicable, is the same but for the frame pointer.
-spRel :: Int	-- desired stack offset in words, positive or negative
+-- | Get an AddrMode relative to the address in sp.
+--	This gives us a stack relative addressing mode for volatile
+-- 	temporaries and for excess call arguments.  
+--
+spRel :: Int		-- ^ stack offset in words, positive or negative
       -> AddrMode
 
 spRel n	= AddrRegImm sp (ImmInt (n * wORD_SIZE))
 
 
+-- | The registers to place arguments for function calls, 
+--	for some number of arguments.
+--
 argRegs :: RegNo -> [Reg]
-argRegs 0 = []
-argRegs 1 = map (RealReg . oReg) [0]
-argRegs 2 = map (RealReg . oReg) [0,1]
-argRegs 3 = map (RealReg . oReg) [0,1,2]
-argRegs 4 = map (RealReg . oReg) [0,1,2,3]
-argRegs 5 = map (RealReg . oReg) [0,1,2,3,4]
-argRegs 6 = map (RealReg . oReg) [0,1,2,3,4,5]
-argRegs _ = panic "MachRegs.argRegs(sparc): don't know about >6 arguments!"
+argRegs r
+ = case r of
+ 	0	-> []
+	1	-> map (RealReg . oReg) [0]
+	2	-> map (RealReg . oReg) [0,1]
+	3	-> map (RealReg . oReg) [0,1,2]
+	4	-> map (RealReg . oReg) [0,1,2,3]
+	5	-> map (RealReg . oReg) [0,1,2,3,4]
+	6	-> map (RealReg . oReg) [0,1,2,3,4,5]
+	_	-> panic "MachRegs.argRegs(sparc): don't know about >6 arguments!"
 
 
+-- | All all the regs that could possibly be returned by argRegs
+--
 allArgRegs :: [Reg]
-allArgRegs = map RealReg [oReg i | i <- [0..5]]
+allArgRegs 
+	= map RealReg [oReg i | i <- [0..5]]
 
 
--- These are the regs which we cannot assume stay alive over a C call.  
+-- These are the regs that we cannot assume stay alive over a C call.  
+--	TODO: Why can we assume that o6 isn't clobbered? -- BL 2009/02
+--
 callClobberedRegs :: [Reg]
 callClobberedRegs
 	= map RealReg 
-	        ( oReg 7 :
+	        (  oReg 7 :
 	          [oReg i | i <- [0..5]] ++
 	          [gReg i | i <- [1..7]] ++
 	          [fReg i | i <- [0..31]] )
 
 
+-- | The RegNos corresponding to all the registers in the machine.
+--	For SPARC we use f0-f22 as doubles, so pretend that the high halves
+--	of these, ie f23, f25 .. don't exist.
+--
 allMachRegNos :: [RegNo]
-allMachRegNos
+allMachRegNos	
 	= ([0..31]
                ++ [32,34 .. nCG_FirstFloatReg-1]
                ++ [nCG_FirstFloatReg .. 63])	
@@ -242,79 +298,89 @@ allMachRegNos
 -- | Get the class of a register.
 {-# INLINE regClass      #-}
 regClass :: Reg -> RegClass
-regClass (VirtualRegI  _)	= RcInteger
-regClass (VirtualRegHi _)	= RcInteger
-regClass (VirtualRegF  _)	= RcFloat
-regClass (VirtualRegD  _)	= RcDouble
-regClass (RealReg i) 
-	| i < 32		= RcInteger 
-	| i < nCG_FirstFloatReg	= RcDouble
-	| otherwise		= RcFloat
+regClass reg
+ = case reg of
+ 	VirtualRegI  _	-> RcInteger
+	VirtualRegHi _	-> RcInteger
+	VirtualRegF  _	-> RcFloat
+	VirtualRegD  _	-> RcDouble
+	RealReg i
+	  | i < 32			-> RcInteger 
+	  | i < nCG_FirstFloatReg	-> RcDouble
+	  | otherwise			-> RcFloat
 
 
+-- | Get the standard name for the register with this number.
 showReg :: RegNo -> String
 showReg n
-   | n >= 0  && n < 8   = "%g" ++ show n
-   | n >= 8  && n < 16  = "%o" ++ show (n-8)
-   | n >= 16 && n < 24  = "%l" ++ show (n-16)
-   | n >= 24 && n < 32  = "%i" ++ show (n-24)
-   | n >= 32 && n < 64  = "%f" ++ show (n-32)
-   | otherwise          = "%unknown_sparc_real_reg_" ++ show n
+	| n >= 0  && n < 8   = "%g" ++ show n
+	| n >= 8  && n < 16  = "%o" ++ show (n-8)
+	| n >= 16 && n < 24  = "%l" ++ show (n-16)
+	| n >= 24 && n < 32  = "%i" ++ show (n-24)
+	| n >= 32 && n < 64  = "%f" ++ show (n-32)
+	| otherwise          = panic "SPARC.Regs.showReg: unknown sparc register"
 
 
 -- machine specific ------------------------------------------------------------
 
--- Duznae work for offsets greater than 13 bits; we just hope for the best
+-- | Get an address relative to the frame pointer.
+--	This doesn't work work for offsets greater than 13 bits; we just hope for the best
+--
 fpRel :: Int -> AddrMode
 fpRel n
-  = AddrRegImm fp (ImmInt (n * wORD_SIZE))
+	= AddrRegImm fp (ImmInt (n * wORD_SIZE))
 
 
-{-# SPECIALIZE fits13Bits :: Int -> Bool, Integer -> Bool #-}
+-- | Check whether an offset is representable with 13 bits.
 fits13Bits :: Integral a => a -> Bool
 fits13Bits x = x >= -4096 && x < 4096
 
+{-# SPECIALIZE fits13Bits :: Int -> Bool, Integer -> Bool #-}
 
+
+-- | Sadness.
 largeOffsetError :: Integral a => a -> b
 largeOffsetError i
-  = error ("ERROR: SPARC native-code generator cannot handle large offset ("
-           ++ show i ++ ");\nprobably because of large constant data structures;" ++ 
-           "\nworkaround: use -fvia-C on this module.\n")
+  = panic ("ERROR: SPARC native-code generator cannot handle large offset ("
+		++ show i ++ ");\nprobably because of large constant data structures;" ++ 
+		"\nworkaround: use -fvia-C on this module.\n")
+
 
 
 {-
-The SPARC has 64 registers of interest; 32 integer registers and 32
-floating point registers.  The mapping of STG registers to SPARC
-machine registers is defined in StgRegs.h.  We are, of course,
-prepared for any eventuality.
+	The SPARC has 64 registers of interest; 32 integer registers and 32
+	floating point registers.  The mapping of STG registers to SPARC
+	machine registers is defined in StgRegs.h.  We are, of course,
+	prepared for any eventuality.
 
-The whole fp-register pairing thing on sparcs is a huge nuisance.  See
-fptools/ghc/includes/MachRegs.h for a description of what's going on
-here.
+	The whole fp-register pairing thing on sparcs is a huge nuisance.  See
+	fptools/ghc/includes/MachRegs.h for a description of what's going on
+	here.
 -}
 
 
-gReg,lReg,iReg,oReg,fReg :: Int -> RegNo
-gReg x = x
-oReg x = (8 + x)
-lReg x = (16 + x)
-iReg x = (24 + x)
-fReg x = (32 + x)
+-- | Get the regno for this sort of reg
+gReg, lReg, iReg, oReg, fReg :: Int -> RegNo
+
+gReg x	= x		-- global regs
+oReg x	= (8 + x)	-- output regs
+lReg x	= (16 + x)	-- local regs
+iReg x	= (24 + x)	-- input regs
+fReg x	= (32 + x)	-- float regs
 
 
+-- | Some specific regs used by the code generator.
 g0, g1, g2, fp, sp, o0, o1, f0, f6, f8, f22, f26, f27 :: Reg
+
 f6  = RealReg (fReg 6)
 f8  = RealReg (fReg 8)
 f22 = RealReg (fReg 22)
 f26 = RealReg (fReg 26)
 f27 = RealReg (fReg 27)
 
-
--- g0 is useful for codegen; is always zero, and writes to it vanish.
-g0  = RealReg (gReg 0)
+g0  = RealReg (gReg 0)	-- g0 is always zero, and writes to it vanish.
 g1  = RealReg (gReg 1)
 g2  = RealReg (gReg 2)
-
 
 -- FP, SP, int and float return (from C) regs.
 fp  = RealReg (iReg 6)
@@ -324,7 +390,6 @@ o1  = RealReg (oReg 1)
 f0  = RealReg (fReg 0)
 
 
-#if sparc_TARGET_ARCH
 nCG_FirstFloatReg :: RegNo
 nCG_FirstFloatReg = unRealReg NCG_FirstFloatReg
 #else
@@ -335,7 +400,6 @@ nCG_FirstFloatReg = unRealReg f22
 
 -- horror show -----------------------------------------------------------------
 #if sparc_TARGET_ARCH
-
 #define g0 0
 #define g1 1
 #define g2 2
@@ -369,216 +433,114 @@ nCG_FirstFloatReg = unRealReg f22
 #define i6 30
 #define i7 31
 
-#define f0  32
-#define f1  33
-#define f2  34
-#define f3  35
-#define f4  36
-#define f5  37
-#define f6  38
-#define f7  39
-#define f8  40
-#define f9  41
-#define f10 42
-#define f11 43
-#define f12 44
-#define f13 45
-#define f14 46
-#define f15 47
-#define f16 48
-#define f17 49
-#define f18 50
-#define f19 51
-#define f20 52
-#define f21 53
-#define f22 54
-#define f23 55
-#define f24 56
-#define f25 57
-#define f26 58
-#define f27 59
-#define f28 60
-#define f29 61
-#define f30 62
-#define f31 63
-#endif
+-- | Check whether a machine register is free for allocation.
+--	This needs to match the info in includes/MachRegs.h otherwise modules
+--	compiled with the NCG won't be compatible with via-C ones.
+--
+freeReg :: RegNo -> FastBool
+freeReg regno
+ = case regno of
+	-- %g0(r0) is always 0.
+ 	0	-> fastBool False	
 
+ 	-- %g1(r1) - %g4(r4) are allocable -----------------
 
 freeReg :: RegNo -> FastBool
+
+	-- %o0(r8) - %o5(r13) are allocable ----------------
+
+	-- %o6(r14) 
+	--	is the C stack pointer
+	14	-> fastBool False
+
+	-- %o7(r15) 
+	--	holds C return addresses (???)
+	15	-> fastBool False
+
+	-- %l0(r16) is allocable ---------------------------
+
+	-- %l1(r17) - %l5(r21) 
+	--	are STG regs R1 - R5
+	17	-> fastBool False
+	18	-> fastBool False
+	19	-> fastBool False
+	20	-> fastBool False
+	21	-> fastBool False
+	
+	-- %l6(r22) - %l7(r23) are allocable --------------
+	
+	-- %i0(r24) - %i5(r29)
+	--	are STG regs Sp, Base, SpLim, Hp, HpLim, R6
+	24	-> fastBool False
+	25	-> fastBool False
+	26	-> fastBool False
+	27	-> fastBool False
+	28	-> fastBool False
+	29	-> fastBool False
+	
+	-- %i6(r30) 
+	--	is the C frame pointer
+	30	-> fastBool False
+
+	-- %i7(r31) 
+	--	is used for C return addresses
+	31	-> fastBool False
+	
+	-- %f0(r32) - %f1(r33)
+	--	are C fp return registers
+	32	-> fastBool False
+	33	-> fastBool False
+
+	-- %f2(r34) - %f5(r37)
+	--	are STG regs D1 - D2
+	34	-> fastBool False
+	35	-> fastBool False
+	36	-> fastBool False
+	37	-> fastBool False
+
+	-- %f22(r54) - %f25(r57)
+	--	are STG regs F1 - F4
+	54	-> fastBool False
+	55	-> fastBool False
+	56	-> fastBool False
+	57	-> fastBool False
+
+	-- regs not matched above are allocable.
+	_	-> fastBool True
+	
+
+
+-- | Returns Just the real register that a global register is stored in.
+--	Returns Nothing if the global has no real register, and is stored
+--	in the in-memory register table instead.
+--
+globalRegMaybe  :: GlobalReg -> Maybe Reg
+globalRegMaybe gg
+ = case gg of
+	-- Argument and return regs
+	VanillaReg 1 _	-> Just (RealReg 17)	-- %l1
+	VanillaReg 2 _	-> Just (RealReg 18)	-- %l2
+	VanillaReg 3 _	-> Just (RealReg 19)	-- %l3
+	VanillaReg 4 _	-> Just (RealReg 20)	-- %l4
+	VanillaReg 5 _	-> Just (RealReg 21)	-- %l5
+	VanillaReg 6 _	-> Just (RealReg 29)	-- %i5
+
+	FloatReg 1	-> Just (RealReg 54)	-- %f22
+	FloatReg 2	-> Just (RealReg 55)	-- %f23
+	FloatReg 3	-> Just (RealReg 56)	-- %f24
+	FloatReg 4	-> Just (RealReg 57)	-- %f25
+
+	DoubleReg 1	-> Just (RealReg 34)	-- %f2
+	DoubleReg 2	-> Just (RealReg 36)	-- %f4
+
+	-- STG Regs
+	Sp		-> Just (RealReg 24)	-- %i0
+	SpLim		-> Just (RealReg 26)	-- %i2
+	Hp		-> Just (RealReg 27)	-- %i3
+	HpLim		-> Just (RealReg 28)	-- %i4
+
 globalRegMaybe :: GlobalReg -> Maybe Reg
 
-#if defined(sparc_TARGET_ARCH)
-
-
-freeReg g0 = fastBool False  --	%g0 is always 0.
-
-freeReg g5 = fastBool False  --	%g5 is reserved (ABI).
-freeReg g6 = fastBool False  --	%g6 is reserved (ABI).
-freeReg g7 = fastBool False  --	%g7 is reserved (ABI).
-freeReg i6 = fastBool False  --	%i6 is our frame pointer.
-freeReg i7 = fastBool False  --	%i7 tends to have ret-addr-ish things
-freeReg o6 = fastBool False  --	%o6 is our stack pointer.
-freeReg o7 = fastBool False  --	%o7 holds ret addrs (???)
-freeReg f0 = fastBool False  --  %f0/%f1 are the C fp return registers.
-freeReg f1 = fastBool False
-
--- TODO: Not sure about these BL 2009/01/10
---	Used for NCG spill tmps? what is this?
-
-{-
-freeReg g1  = fastBool False  -- %g1 is used for NCG spill tmp
-freeReg g2  = fastBool False 
-freeReg f6  = fastBool False
-freeReg f8  = fastBool False
-freeReg f26 = fastBool False
-freeReg f27 = fastBool False
--}
-
-#ifdef REG_Base
-freeReg REG_Base = fastBool False
-#endif
-#ifdef REG_R1
-freeReg REG_R1   = fastBool False
-#endif	
-#ifdef REG_R2  
-freeReg REG_R2   = fastBool False
-#endif	
-#ifdef REG_R3  
-freeReg REG_R3   = fastBool False
-#endif	
-#ifdef REG_R4  
-freeReg REG_R4   = fastBool False
-#endif	
-#ifdef REG_R5  
-freeReg REG_R5   = fastBool False
-#endif	
-#ifdef REG_R6  
-freeReg REG_R6   = fastBool False
-#endif	
-#ifdef REG_R7  
-freeReg REG_R7   = fastBool False
-#endif	
-#ifdef REG_R8  
-freeReg REG_R8   = fastBool False
-#endif
-#ifdef REG_F1
-freeReg REG_F1 = fastBool False
-#endif
-#ifdef REG_F2
-freeReg REG_F2 = fastBool False
-#endif
-#ifdef REG_F3
-freeReg REG_F3 = fastBool False
-#endif
-#ifdef REG_F4
-freeReg REG_F4 = fastBool False
-#endif
-#ifdef REG_D1
-freeReg REG_D1 = fastBool False
-#endif
-#ifdef REG_D2
-freeReg REG_D2 = fastBool False
-#endif
-#ifdef REG_Sp 
-freeReg REG_Sp   = fastBool False
-#endif 
-#ifdef REG_Su
-freeReg REG_Su   = fastBool False
-#endif 
-#ifdef REG_SpLim 
-freeReg REG_SpLim = fastBool False
-#endif 
-#ifdef REG_Hp 
-freeReg REG_Hp   = fastBool False
-#endif
-#ifdef REG_HpLim
-freeReg REG_HpLim = fastBool False
-#endif
-freeReg _         = fastBool True
-
-
-
---  | Returns 'Nothing' if this global register is not stored
--- in a real machine register, otherwise returns @'Just' reg@, where
--- reg is the machine register it is stored in.
-
-
-#ifdef REG_Base
-globalRegMaybe BaseReg			= Just (RealReg REG_Base)
-#endif
-#ifdef REG_R1
-globalRegMaybe (VanillaReg 1 _)		= Just (RealReg REG_R1)
-#endif 
-#ifdef REG_R2 
-globalRegMaybe (VanillaReg 2 _)		= Just (RealReg REG_R2)
-#endif 
-#ifdef REG_R3 
-globalRegMaybe (VanillaReg 3 _) 	= Just (RealReg REG_R3)
-#endif 
-#ifdef REG_R4 
-globalRegMaybe (VanillaReg 4 _)		= Just (RealReg REG_R4)
-#endif 
-#ifdef REG_R5 
-globalRegMaybe (VanillaReg 5 _)		= Just (RealReg REG_R5)
-#endif 
-#ifdef REG_R6 
-globalRegMaybe (VanillaReg 6 _)		= Just (RealReg REG_R6)
-#endif 
-#ifdef REG_R7 
-globalRegMaybe (VanillaReg 7 _)		= Just (RealReg REG_R7)
-#endif 
-#ifdef REG_R8 
-globalRegMaybe (VanillaReg 8 _)		= Just (RealReg REG_R8)
-#endif
-#ifdef REG_R9 
-globalRegMaybe (VanillaReg 9 _)		= Just (RealReg REG_R9)
-#endif
-#ifdef REG_R10 
-globalRegMaybe (VanillaReg 10 _)	= Just (RealReg REG_R10)
-#endif
-#ifdef REG_F1
-globalRegMaybe (FloatReg 1)		= Just (RealReg REG_F1)
-#endif				 	
-#ifdef REG_F2			 	
-globalRegMaybe (FloatReg 2)		= Just (RealReg REG_F2)
-#endif				 	
-#ifdef REG_F3			 	
-globalRegMaybe (FloatReg 3)		= Just (RealReg REG_F3)
-#endif				 	
-#ifdef REG_F4			 	
-globalRegMaybe (FloatReg 4)		= Just (RealReg REG_F4)
-#endif				 	
-#ifdef REG_D1			 	
-globalRegMaybe (DoubleReg 1)		= Just (RealReg REG_D1)
-#endif				 	
-#ifdef REG_D2			 	
-globalRegMaybe (DoubleReg 2)		= Just (RealReg REG_D2)
-#endif
-#ifdef REG_Sp	    
-globalRegMaybe Sp		   	= Just (RealReg REG_Sp)
-#endif
-#ifdef REG_Lng1			 	
-globalRegMaybe (LongReg 1)		= Just (RealReg REG_Lng1)
-#endif				 	
-#ifdef REG_Lng2			 	
-globalRegMaybe (LongReg 2)		= Just (RealReg REG_Lng2)
-#endif
-#ifdef REG_SpLim	    			
-globalRegMaybe SpLim		   	= Just (RealReg REG_SpLim)
-#endif	    				
-#ifdef REG_Hp	   			
-globalRegMaybe Hp		   	= Just (RealReg REG_Hp)
-#endif	    				
-#ifdef REG_HpLim      			
-globalRegMaybe HpLim		   	= Just (RealReg REG_HpLim)
-#endif	    				
-#ifdef REG_CurrentTSO      			
-globalRegMaybe CurrentTSO	   	= Just (RealReg REG_CurrentTSO)
-#endif	    				
-#ifdef REG_CurrentNursery      			
-globalRegMaybe CurrentNursery	   	= Just (RealReg REG_CurrentNursery)
-#endif	    				
-globalRegMaybe _		   	= Nothing
 
 
 #else
