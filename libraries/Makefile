@@ -48,7 +48,7 @@ endif
 ifeq "$(stage)" "2"
 DO_STAGE_2_LIBS := YES
 endif
-ifneq "$(filter install clean,$(MAKECMDGOALS))" ""
+ifneq "$(filter install clean maintainer-clean distclean binary-dist,$(MAKECMDGOALS))" ""
 DO_STAGE_1_LIBS := YES
 DO_STAGE_2_LIBS := YES
 endif
