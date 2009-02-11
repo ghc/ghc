@@ -523,7 +523,12 @@ writeMetaTyVar tyvar ty
   = ASSERT( isMetaTyVar tyvar )
     -- TOM: It should also work for coercions
     -- ASSERT2( k2 `isSubKind` k1, (ppr tyvar <+> ppr k1) $$ (ppr ty <+> ppr k2) )
-    do	{ ASSERTM2( do { details <- readMetaTyVar tyvar; return (isFlexi details) }, ppr tyvar )
+    do	{ if debugIsOn then do { details <- readMetaTyVar tyvar; 
+    	     	       	       ; WARN( not (isFlexi details), ppr tyvar )
+			       	 return () }
+			else return () 
+		-- Temporarily make this a warning, until we fix Trac #2999
+
 	; traceTc (text "writeMetaTyVar" <+> ppr tyvar <+> text ":=" <+> ppr ty)
 	; writeMutVar (metaTvRef tyvar) (Indirect ty) }
   where
