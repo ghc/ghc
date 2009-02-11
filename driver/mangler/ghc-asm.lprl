@@ -580,7 +580,7 @@ sub mangle_asm {
 	next if /${T_PRE_APP}(NO_)?APP/om; 
     	next if /^;/m && $TargetPlatform =~ /^hppa/m;
 
-	next if /(^$|^\t\.file\t|^ # )/m && $TargetPlatform =~ /^(mips|ia64)-/m;
+	next if /(^$|^\t\.file\t|^ # )/m && $TargetPlatform =~ /(^mips-|^ia64-|-mingw32$)/m;
 
 	if ( $TargetPlatform =~ /^mips-/m 
 	  && /^\t\.(globl\S+\.text|comm\t)/m ) {
