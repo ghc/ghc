@@ -1143,6 +1143,16 @@ runPhase SplitAs _stop hsc_env _basename _suff _input_fn get_output_fn maybe_loc
         let assemble_file n
               = SysTools.runAs dflags
                          (map SysTools.Option as_opts ++
+#ifdef sparc_TARGET_ARCH
+        -- We only support SparcV9 and better because V8 lacks an atomic CAS
+        -- instruction so we have to make sure that the assembler accepts the
+        -- instruction set. Note that the user can still override this
+        -- (e.g., -mcpu=ultrasparc). GCC picks the "best" -mcpu flag
+        -- regardless of the ordering.
+        --
+        -- This is a temporary hack.
+                          [ SysTools.Option "-mcpu=v9" ] ++
+#endif
                           [ SysTools.Option "-c"
                           , SysTools.Option "-o"
                           , SysTools.FileOption "" (split_obj n)
