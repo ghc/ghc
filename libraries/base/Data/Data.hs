@@ -640,7 +640,7 @@ readConstr dt str =
       case dataTypeRep dt of
         AlgRep cons -> idx cons
         IntRep      -> mkReadCon (\i -> (mkPrimCon dt str (IntConstr i)))
-        FloatRep    -> mkReadCon (\f -> (mkPrimCon dt str (FloatConstr f)))
+        FloatRep    -> mkReadCon ffloat
         CharRep     -> mkReadCon (\c -> (mkPrimCon dt str (CharConstr c)))
         NoRep       -> Nothing
   where
@@ -658,6 +658,8 @@ readConstr dt str =
                      then Nothing
                      else Just (head fit)
 
+    ffloat :: Double -> Constr
+    ffloat =  mkPrimCon dt str . FloatConstr . toRational
 
 ------------------------------------------------------------------------------
 --
