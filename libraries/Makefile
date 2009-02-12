@@ -134,10 +134,6 @@ CONFIGURE_OPTS += --enable-split-objs
 CONFIGURE_STAMP_EXTRAS := $(CONFIGURE_STAMP_EXTRAS)-splitting
 endif
 
-ifeq "$(HSCOLOUR_SRCS)" "YES"
-CONFIGURE_OPTS += --with-hscolour="$(HSCOLOUR)"
-endif
-
 .PHONY: subdirs
 
 subdirs:

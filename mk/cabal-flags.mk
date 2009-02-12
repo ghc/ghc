@@ -29,8 +29,8 @@ COMMON_CONFIGURE_FLAGS =          \
     --with-ld=$(LD)               \
     $(addprefix --hsc2hs-option=,$(SRC_HSC2HS_OPTS))
 
-ifneq "$(HSCOLOUR)" ""
-COMMON_CONFIGURE_FLAGS += --with-hscolour=$(HSCOLOUR)
+ifeq "$(HSCOLOUR_SRCS)" "YES"
+CONFIGURE_OPTS += --with-hscolour="$(HSCOLOUR)"
 endif
 
 ifneq "$(ALEX)" ""
