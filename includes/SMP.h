@@ -179,7 +179,7 @@ write_barrier(void) {
 #elif powerpc_HOST_ARCH
     __asm__ __volatile__ ("lwsync" : : : "memory");
 #elif sparc_HOST_ARCH
-    /* Sparc in TSO mode does not require write/write barriers. */
+    /* Sparc in TSO mode does not require store/store barriers. */
     __asm__ __volatile__ ("" : : : "memory");
 #elif !defined(WITHSMP)
     return;
@@ -197,8 +197,7 @@ store_load_barrier(void) {
 #elif powerpc_HOST_ARCH
     __asm__ __volatile__ ("sync" : : : "memory");
 #elif sparc_HOST_ARCH
-    /* Sparc in TSO mode does not require store/load barriers. */
-    __asm__ __volatile__ ("membar" : : : "memory");
+    __asm__ __volatile__ ("membar #StoreLoad" : : : "memory");
 #elif !defined(WITHSMP)
     return;
 #else
