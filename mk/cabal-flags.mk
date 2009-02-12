@@ -34,15 +34,15 @@ COMMON_CONFIGURE_FLAGS += --with-hscolour=$(HSCOLOUR)
 endif
 
 ifneq "$(ALEX)" ""
-COMMON_CONFIGURE_FLAGS += --with-alex=$(ALEX)
+COMMON_CONFIGURE_FLAGS += --with-alex="$(ALEX)"
 endif
 
 ifneq "$(HAPPY)" ""
-COMMON_CONFIGURE_FLAGS += --with-happy=$(HAPPY)
+COMMON_CONFIGURE_FLAGS += --with-happy="$(HAPPY)"
 endif
 
 COMMON_CONFIGURE_FLAGS += $(FLAGGED_CONFIGURE_ARGS) \
-                          --configure-option=--with-cc=$(CC)
+                          --configure-option=--with-cc="$(CC)"
 
 COMMON_CONFIGURE_FLAGS += $(shell [ -f $(HSC2HS_INPLACE) ] && \
                                   echo --with-hsc2hs=$(HSC2HS_INPLACE) )
