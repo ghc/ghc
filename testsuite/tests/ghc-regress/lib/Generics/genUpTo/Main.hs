@@ -37,7 +37,7 @@ genUpTo d = result
               AlgRep cons -> cons
               IntRep      -> [mkIntConstr ty 0]
               FloatRep    -> [mkIntConstr ty 0]
-              StringRep   -> [mkStringConstr ty "foo"]
+              CharRep     -> [mkCharConstr ty 'x']
       where
         ty = dataTypeOf (head result)     
 
