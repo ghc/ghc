@@ -195,7 +195,7 @@ store_load_barrier(void) {
 #elif x86_64_HOST_ARCH
     __asm__ __volatile__ ("lock; addq $0,0(%%rsp)" : : : "memory");
 #elif powerpc_HOST_ARCH
-    __asm__ __volatile__ ("msync" : : : "memory");
+    __asm__ __volatile__ ("sync" : : : "memory");
 #elif sparc_HOST_ARCH
     /* Sparc in TSO mode does not require write/write barriers. */
     __asm__ __volatile__ ("membar" : : : "memory");
