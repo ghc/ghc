@@ -5,8 +5,6 @@
 \section[TcMonoType]{Typechecking user-specified @MonoTypes@}
 
 \begin{code}
-{-# LANGUAGE RelaxedPolyRec #-}
-
 module TcHsType (
 	tcHsSigType, tcHsDeriv, 
 	tcHsInstHead, tcHsQuantifiedType,
