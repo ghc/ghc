@@ -194,19 +194,42 @@ linearRA_SCCs first_id block_live blocksAcc (AcyclicSCC block : sccs)
 		sccs
 
 linearRA_SCCs first_id block_live blocksAcc (CyclicSCC blocks : sccs) 
- = do	let process [] []         accum = return $ reverse accum
-            process [] next_round accum = process next_round [] accum
-            process (b@(BasicBlock id _) : blocks) next_round accum =
-              do block_assig <- getBlockAssigR
-                 if isJust (lookupBlockEnv block_assig id) || id == first_id
-                  then do b'  <- processBlock block_live b
-                          process blocks next_round (b' : accum)
-                  else process blocks (b : next_round) accum
-        blockss' <- process blocks [] (return [])
+ = do
+        blockss' <- process first_id block_live blocks [] (return [])
 	linearRA_SCCs first_id block_live
 		(reverse (concat blockss') ++ blocksAcc)
 		sccs
+
+{- from John Dias's patch 2008/10/16:
+   The linear-scan allocator sometimes allocates a block
+   before allocating one of its predecessors, which could lead to 
+   inconsistent allocations. Make it so a block is only allocated
+   if a predecessor has set the "incoming" assignments for the block, or
+   if it's the procedure's entry block.
+
+   BL 2009/02: Careful. If the assignment for a block doesn't get set for
+   some reason then this function will loop. We should probably do some 
+   more sanity checking to guard against this eventuality.
+-}
 		
+process _ _ [] []         accum 
+	= return $ reverse accum
+
+process first_id block_live [] next_round accum 
+	= process first_id block_live next_round [] accum
+
+process first_id block_live (b@(BasicBlock id _) : blocks) next_round accum 
+ = do 	
+	block_assig <- getBlockAssigR
+
+    	if isJust (lookupBlockEnv block_assig id) 
+             || id == first_id
+         then do 
+		b'  <- processBlock block_live b
+                process first_id block_live blocks next_round (b' : accum)
+
+         else 	process first_id block_live blocks (b : next_round) accum
+
 
 -- | Do register allocation on this basic block
 --
@@ -219,7 +242,6 @@ processBlock block_live (BasicBlock id instrs)
  = do 	initBlock id
  	(instrs', fixups)
 		<- linearRA block_live [] [] id instrs
-
 	return	$ BasicBlock id instrs' : fixups
 
 
@@ -348,9 +370,9 @@ genRaInsn block_live new_instrs block_id instr r_dying w_dying =
     clobber_saves <- saveClobberedTemps real_written r_dying
 
 
-{-  freeregs <- getFreeRegsR
-    assig <- getAssigR
-    pprTrace "raInsn" 
+{-    freeregs <- getFreeRegsR
+    assig    <- getAssigR
+    pprTrace "genRaInsn" 
     	(docToSDoc (pprInstr instr) $$ ppr r_dying <+> ppr w_dying $$ ppr virt_read <+> ppr virt_written 
 		$$ text (show freeregs) $$ ppr assig) 
 		$ do
@@ -394,7 +416,7 @@ genRaInsn block_live new_instrs block_id instr r_dying w_dying =
 				Just y  -> y
     -- in
 
-    -- pprTrace "patched" (docToSDoc (pprInstr patched_instr)) $ do
+--    pprTrace "patched" (docToSDoc (pprInstr patched_instr)) $ do
 
     -- (j) free up stack slots for dead spilled regs
     -- TODO (can't be bothered right now)
@@ -402,14 +424,19 @@ genRaInsn block_live new_instrs block_id instr r_dying w_dying =
     -- erase reg->reg moves where the source and destination are the same.
     --	If the src temp didn't die in this instr but happened to be allocated
     --	to the same real reg as the destination, then we can erase the move anyway.
-	squashed_instr	= case isRegRegMove patched_instr of
+    let	squashed_instr	= case isRegRegMove patched_instr of
 				Just (src, dst)
 				 | src == dst	-> []
 				_		-> [patched_instr]
 
-    return (squashed_instr ++ w_spills ++ reverse r_spills
-		 ++ clobber_saves ++ new_instrs,
-	    fixup_blocks)
+    let code = squashed_instr ++ w_spills ++ reverse r_spills
+		++ clobber_saves ++ new_instrs
+
+--    pprTrace "patched-code" ((vcat $ map (docToSDoc . pprInstr) code)) $ do
+--    pprTrace "pached-fixup" ((ppr fixup_blocks)) $ do
+
+    return (code, fixup_blocks)
+
   }}
 
 -- -----------------------------------------------------------------------------

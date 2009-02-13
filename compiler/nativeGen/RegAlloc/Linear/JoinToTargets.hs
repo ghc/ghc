@@ -152,8 +152,8 @@ joinToTargets_again
 		--		
 		let sccs  = stronglyConnCompFromEdgedVerticesR graph
 
-		-- debugging
-{-		pprTrace 
+{-		-- debugging
+		pprTrace 
 			("joinToTargets: making fixup code")
 			(vcat	[ text "        in block: "	<> ppr block_id
 				, text " jmp instruction: "	<> ppr instr
