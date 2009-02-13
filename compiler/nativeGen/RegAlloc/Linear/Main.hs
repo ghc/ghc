@@ -98,6 +98,8 @@ import RegAlloc.Linear.Stats
 import RegAlloc.Linear.JoinToTargets
 import RegAlloc.Liveness
 
+-- import PprMach
+
 import BlockId
 import Regs
 import Instrs

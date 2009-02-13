@@ -58,7 +58,7 @@ module Regs (
 	allFPArgRegs,
 	fits16Bits,
 	makeImmediate,
-	freg,
+	fReg,
 	sp, r3, r4, r27, r28, f1, f20, f21,
 
 #elif i386_TARGET_ARCH || x86_64_TARGET_ARCH

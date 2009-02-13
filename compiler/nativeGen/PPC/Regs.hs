@@ -490,7 +490,7 @@ freeReg REG_Hp   = fastBool False
 #ifdef REG_HpLim
 freeReg REG_HpLim = fastBool False
 #endif
-freeReg n               = fastBool True
+freeReg _               = fastBool True
 
 
 --  | Returns 'Nothing' if this global register is not stored

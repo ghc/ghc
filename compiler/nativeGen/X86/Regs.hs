@@ -70,7 +70,10 @@ import Outputable	( Outputable(..), pprPanic, panic )
 import qualified Outputable
 import Unique
 import FastBool
+
+#if  defined(i386_TARGET_ARCH) || defined(x86_64_TARGET_ARCH)
 import Constants
+#endif
 
 -- -----------------------------------------------------------------------------
 -- Sizes on this architecture
@@ -439,8 +442,10 @@ xmm n = RealReg (16+n)
 
 
 -- horror show -----------------------------------------------------------------
-freeReg :: RegNo -> FastBool
-globalRegMaybe :: GlobalReg -> Maybe Reg
+freeReg 		:: RegNo -> FastBool
+globalRegMaybe 		:: GlobalReg -> Maybe Reg
+allArgRegs 		:: [Reg]
+callClobberedRegs 	:: [Reg]
 
 #if defined(i386_TARGET_ARCH) || defined(x86_64_TARGET_ARCH)
 
@@ -651,7 +656,6 @@ globalRegMaybe CurrentNursery	   	= Just (RealReg REG_CurrentNursery)
 globalRegMaybe _		   	= Nothing
 
 -- 
-allArgRegs :: [Reg]
 
 #if   i386_TARGET_ARCH
 allArgRegs = panic "X86.Regs.allArgRegs: should not be used!"
@@ -665,7 +669,6 @@ allArgRegs  = panic "X86.Regs.allArgRegs: not defined for this architecture"
 
 
 -- | these are the regs which we cannot assume stay alive over a C call.  
-callClobberedRegs :: [Reg]
 
 #if   i386_TARGET_ARCH
 -- caller-saves registers
