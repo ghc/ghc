@@ -206,6 +206,9 @@ isJumpish instr
  = case instr of
 	BCC{}		-> True
 	BCCFAR{}	-> True
+        BCTR{}		-> True
+        BCTRL{}		-> True
+	BL{}		-> True
 	JMP{}		-> True
 	_		-> False
 
