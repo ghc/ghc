@@ -1031,7 +1031,90 @@ $ ./a.out +RTS --info
  ]
 </screen>
     <para>The information is formatted such that it can be read as a
-    of type <literal>[(String, String)]</literal>.</para>
+    of type <literal>[(String, String)]</literal>. Currently the following
+    fields are present:</para>
+
+    <variablelist>
+
+      <varlistentry>
+        <term><literal>GHC RTS</literal></term>
+        <listitem>
+          <para>Is this program linked against the GHC RTS? (Currently
+          the answer is always yes.)</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><literal>GHC version</literal></term>
+        <listitem>
+          <para>The version of GHC used to compile this program.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><literal>RTS way</literal></term>
+        <listitem>
+          <para>The variant (&ldquo;way&rdquo;) of the runtime. Possible
+          values are <literal>rts</literal> (vanilla), 
+          <literal>rts_thr</literal> (threaded runtime, i.e. linked using the
+          <literal>-threaded</literal> option) and <literal>rts_p</literal>
+          (profiling runtime, i.e. linked using the <literal>-prof</literal>
+          option). Other variants include <literal>t</literal>
+          (ticky-ticky profiling) and <literal>dyn</literal> (the RTS is
+          linked in dynamically, i.e. a shared library, rather than statically
+          linked into the executable itself).</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><literal>Target platform</literal></term>
+        <listitem>
+          <para>This is the platform the program is compiled to run on.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><literal>Build platform</literal></term>
+        <listitem>
+          <para>This is the platform where the program was compiled
+          from. (That is, the target platform of GHC itself.) Ordinarily
+          this is identical to the target platform. (It could potentially
+          be different if cross-compiling.)</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><literal>Host platform</literal></term>
+        <listitem>
+          <para>This is the platform where GHC itself was compiled.
+          Again, this would normally be identical to the build and
+          target platforms.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><literal>Compiler unregistered</literal></term>
+        <listitem>
+          <para>Was this program compiled with an &ldquo;unregistered&rdquo;
+          version of GHC? (I.e., a version of GHC that has no platform-specific
+          optimisations compiled in, usually because this is a currently
+          unsupported platform.) This value will usually be no, unless you're
+          using an experimental build of GHC.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><literal>Tables next to code</literal></term>
+        <listitem>
+          <para>Putting info tables directly next to entry code is a useful
+          performance optimisation that is not available on all platforms.
+          This field tells you whether the program has been compiled with
+          this optimisation. (Usually yes, except on unusual platforms.)</para>
+        </listitem>
+      </varlistentry>
+
+    </variablelist>
+
   </sect2>
 </sect1>
 
