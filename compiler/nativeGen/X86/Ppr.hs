@@ -379,7 +379,7 @@ pprSectionHeader seg
 	RelocatableReadOnlyData	-> ptext (sLit ".const_data\n.align 2")
 	UninitialisedData	-> ptext (sLit ".data\n\t.align 2")
 	ReadOnlyData16		-> ptext (sLit ".const\n.align 4")
-	OtherSection sec	-> panic "X86.Ppr.pprSectionHeader: unknown section"
+	OtherSection _		-> panic "X86.Ppr.pprSectionHeader: unknown section"
 
 #    else
 pprSectionHeader seg
@@ -390,7 +390,7 @@ pprSectionHeader seg
 	RelocatableReadOnlyData	-> ptext (sLit ".section .data\n\t.align 4")
 	UninitialisedData	-> ptext (sLit ".section .bss\n\t.align 4")
 	ReadOnlyData16		-> ptext (sLit ".section .rodata\n\t.align 16")
-	OtherSection sec	-> panic "X86.Ppr.pprSectionHeader: unknown section"
+	OtherSection _		-> panic "X86.Ppr.pprSectionHeader: unknown section"
 
 #    endif
 
@@ -404,7 +404,7 @@ pprSectionHeader seg
 	RelocatableReadOnlyData	-> ptext (sLit ".const_data\n.align 3")
 	UninitialisedData	-> ptext (sLit ".data\n\t.align 3")
 	ReadOnlyData16		-> ptext (sLit ".const\n.align 4")
-	OtherSection sec	-> panic "PprMach.pprSectionHeader: unknown section"
+	OtherSection _		-> panic "PprMach.pprSectionHeader: unknown section"
 
 #    else
 pprSectionHeader seg
@@ -415,7 +415,7 @@ pprSectionHeader seg
 	RelocatableReadOnlyData	-> ptext (sLit ".section .data\n\t.align 8")
 	UninitialisedData	-> ptext (sLit ".section .bss\n\t.align 8")
 	ReadOnlyData16		-> ptext (sLit ".section .rodata.cst16\n\t.align 16")
-	OtherSection sec	-> panic "PprMach.pprSectionHeader: unknown section"
+	OtherSection _		-> panic "PprMach.pprSectionHeader: unknown section"
 
 #    endif
 

@@ -401,7 +401,7 @@ cmmNativeGen dflags us cmm count
 
 
 #if i386_TARGET_ARCH
-x86fp_kludge :: NatCmmTop -> NatCmmTop
+x86fp_kludge :: NatCmmTop Instr -> NatCmmTop Instr
 x86fp_kludge top@(CmmData _ _) = top
 x86fp_kludge top@(CmmProc info lbl params (ListGraph code)) = 
 	CmmProc info lbl params (ListGraph $ i386_insert_ffrees code)

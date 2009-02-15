@@ -23,6 +23,8 @@ import BlockId
 import Cmm
 import FastString
 import FastBool
+import Outputable
+import Constants	(rESERVED_C_STACK_BYTES)
 
 import CLabel
 import Panic
@@ -655,6 +657,23 @@ x86_mkLoadInstr _ _ _
  	= panic "X86.RegInfo.mkLoadInstr: not defined for this architecture."
 #endif
 
+spillSlotSize :: Int
+spillSlotSize = IF_ARCH_i386(12, 8)
+
+maxSpillSlots :: Int
+maxSpillSlots = ((rESERVED_C_STACK_BYTES - 64) `div` spillSlotSize) - 1
+
+-- convert a spill slot number to a *byte* offset, with no sign:
+-- decide on a per arch basis whether you are spilling above or below
+-- the C stack pointer.
+spillSlotToOffset :: Int -> Int
+spillSlotToOffset slot
+   | slot >= 0 && slot < maxSpillSlots
+   = 64 + spillSlotSize * slot
+   | otherwise
+   = pprPanic "spillSlotToOffset:" 
+              (   text "invalid spill location: " <> int slot
+	      $$  text "maxSpillSlots:          " <> int maxSpillSlots)
 
 --------------------------------------------------------------------------------
 

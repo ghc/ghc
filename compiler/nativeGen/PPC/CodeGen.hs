@@ -55,6 +55,11 @@ import Data.Bits
 import Data.Int
 import Data.Word
 
+#if darwin_TARGET_OS || linux_TARGET_OS
+import BasicTypes
+import FastString
+#endif
+
 -- -----------------------------------------------------------------------------
 -- Top-level of the instruction selector
 
@@ -1053,7 +1058,7 @@ genCCall target dest_regs argsAndHints
             do
                 dflags <- getDynFlagsNat
                 mopExpr <- cmmMakeDynamicReference dflags addImportNat CallReference $
-                              mkForeignLabel functionName Nothing True
+                              mkForeignLabel functionName Nothing True IsFunction
                 let mopLabelOrExpr = case mopExpr of
                         CmmLit (CmmLabel lbl) -> Left lbl
                         _ -> Right mopExpr

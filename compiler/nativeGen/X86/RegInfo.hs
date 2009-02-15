@@ -5,10 +5,6 @@ module X86.RegInfo (
         JumpDest, 
 	canShortcut, 
 	shortcutJump, 
-
-	spillSlotSize,
-	maxSpillSlots,
-	spillSlotToOffset,
 	
 	shortcutStatic,
 	regDotColor
@@ -29,8 +25,12 @@ import Cmm
 import CLabel
 import BlockId
 import Outputable
-import Constants	( rESERVED_C_STACK_BYTES )
 import Unique
+
+#if i386_TARGET_ARCH || x86_64_TARGET_ARCH
+import UniqFM
+#endif
+
 
 mkVReg :: Unique -> Size -> Reg
 mkVReg u size
@@ -59,26 +59,6 @@ shortcutJump fn insn@(JXX cc id) =
     Just (DestImm imm)     -> shortcutJump fn (JXX_GBL cc imm)
 
 shortcutJump _ other = other
-
-
-
-spillSlotSize :: Int
-spillSlotSize = IF_ARCH_i386(12, 8)
-
-maxSpillSlots :: Int
-maxSpillSlots = ((rESERVED_C_STACK_BYTES - 64) `div` spillSlotSize) - 1
-
--- convert a spill slot number to a *byte* offset, with no sign:
--- decide on a per arch basis whether you are spilling above or below
--- the C stack pointer.
-spillSlotToOffset :: Int -> Int
-spillSlotToOffset slot
-   | slot >= 0 && slot < maxSpillSlots
-   = 64 + spillSlotSize * slot
-   | otherwise
-   = pprPanic "spillSlotToOffset:" 
-              (   text "invalid spill location: " <> int slot
-	      $$  text "maxSpillSlots:          " <> int maxSpillSlots)
 
 
 -- Here because it knows about JumpDest
@@ -116,6 +96,7 @@ regDotColor reg
  = let	Just	str	= lookupUFM regColors reg
    in	text str
 
+regColors :: UniqFM [Char]
 regColors
  = listToUFM
  $  	[ (eax,	"#00ff00")
@@ -138,6 +119,7 @@ regDotColor reg
  = let	Just	str	= lookupUFM regColors reg
    in	text str
 
+regColors :: UniqFM [Char]
 regColors
  = listToUFM
  $	[ (rax, "#00ff00"), (eax, "#00ff00")
