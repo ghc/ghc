@@ -445,9 +445,8 @@ pprGotDeclaration ArchX86 OSDarwin
 		ptext (sLit "\tmovl (%esp), %eax"),
 		ptext (sLit "\tret") ]
 
-	| otherwise
-	= empty
-	
+pprGotDeclaration _ OSDarwin
+	= Pretty.empty
 		
 -- pprGotDeclaration
 -- Output whatever needs to be output once per .s file.

@@ -98,7 +98,13 @@ pprData :: CmmStatic -> Doc
 pprData (CmmAlign bytes)         = pprAlign bytes
 pprData (CmmDataLabel lbl)       = pprLabel lbl
 pprData (CmmString str)          = pprASCII str
+
+#if darwin_TARGET_OS
+pprData (CmmUninitialised bytes) = ptext (sLit ".space ") <> int bytes
+#else
 pprData (CmmUninitialised bytes) = ptext (sLit ".skip ") <> int bytes
+#endif
+
 pprData (CmmStaticLit lit)       = pprDataItem lit
 
 pprGloblDecl :: CLabel -> Doc

@@ -43,6 +43,7 @@ import SPARC.Ppr
 
 #elif powerpc_TARGET_ARCH
 import PPC.CodeGen
+import PPC.Cond
 import PPC.Regs
 import PPC.RegInfo
 import PPC.Instr
@@ -476,9 +477,8 @@ makeImportsDoc dflags imports
 -- fallthroughs.
 
 sequenceTop 
-	:: Instruction instr
-	=> NatCmmTop instr
-	-> NatCmmTop instr
+	:: NatCmmTop Instr
+	-> NatCmmTop Instr
 
 sequenceTop top@(CmmData _ _) = top
 sequenceTop (CmmProc info lbl params (ListGraph blocks)) = 
@@ -552,9 +552,8 @@ reorder id accum (b@(block,id',out) : rest)
 -- big, we have to work around this limitation.
 
 makeFarBranches 
-	:: Instruction instr
-	=> [NatBasicBlock instr] 
-	-> [NatBasicBlock instr]
+	:: [NatBasicBlock Instr] 
+	-> [NatBasicBlock Instr]
 
 #if powerpc_TARGET_ARCH
 makeFarBranches blocks
