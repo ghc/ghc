@@ -466,7 +466,6 @@ Library
             Alpha.Regs
             Alpha.RegInfo
             Alpha.Instr
-            Alpha.Ppr
             Alpha.CodeGen
             X86.Regs
             X86.RegInfo
