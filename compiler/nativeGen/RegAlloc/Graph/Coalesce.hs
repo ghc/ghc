@@ -8,11 +8,11 @@ module RegAlloc.Graph.Coalesce (
 
 where
 
-import Cmm
-import Regs
 import RegAlloc.Liveness
-import RegAllocInfo
+import Instruction
+import Reg
 
+import Cmm
 import Bag
 import UniqFM
 import UniqSet
@@ -26,7 +26,11 @@ import Data.List
 --	then the mov only serves to join live ranges. The two regs can be renamed to be 
 --	the same and the move instruction safely erased.
 
-regCoalesce :: [LiveCmmTop] -> UniqSM [LiveCmmTop]
+regCoalesce 
+	:: Instruction instr
+	=> [LiveCmmTop instr] 
+	-> UniqSM [LiveCmmTop instr]
+
 regCoalesce code
  = do	
  	let joins	= foldl' unionBags emptyBag
@@ -57,7 +61,11 @@ sinkReg fm r
 --	During a mov, if the source reg dies and the destiation reg is born
 --	then we can rename the two regs to the same thing and eliminate the move.
 --
-slurpJoinMovs :: LiveCmmTop -> Bag (Reg, Reg)
+slurpJoinMovs 
+	:: Instruction instr
+	=> LiveCmmTop instr 
+	-> Bag (Reg, Reg)
+
 slurpJoinMovs live
 	= slurpCmm emptyBag live
  where	
@@ -68,7 +76,7 @@ slurpJoinMovs live
                 
         slurpLI    rs (Instr _	Nothing)	         = rs
 	slurpLI    rs (Instr instr (Just live))
-	 	| Just (r1, r2)	<- isRegRegMove instr
+	 	| Just (r1, r2)	<- takeRegRegMoveInstr instr
 		, elementOfUniqSet r1 $ liveDieRead live
 		, elementOfUniqSet r2 $ liveBorn live
 
@@ -80,4 +88,7 @@ slurpJoinMovs live
 		| otherwise
 		= rs
 	
+	slurpLI	   rs SPILL{} 	= rs
+	slurpLI    rs RELOAD{}	= rs
+		
 	

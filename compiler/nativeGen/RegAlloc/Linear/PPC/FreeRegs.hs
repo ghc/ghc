@@ -3,7 +3,9 @@
 module RegAlloc.Linear.PPC.FreeRegs
 where
 
-import Regs
+import PPC.Regs
+import RegClass
+import Reg
 
 import Outputable
 

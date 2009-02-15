@@ -96,14 +96,14 @@ import RegAlloc.Linear.StackMap
 import RegAlloc.Linear.FreeRegs
 import RegAlloc.Linear.Stats
 import RegAlloc.Linear.JoinToTargets
+import TargetReg
 import RegAlloc.Liveness
+import Instruction
+import Reg
 
 -- import PprMach
 
 import BlockId
-import Regs
-import Instrs
-import RegAllocInfo
 import Cmm hiding (RegSet)
 
 import Digraph
@@ -112,7 +112,6 @@ import UniqSet
 import UniqFM
 import UniqSupply
 import Outputable
-import FastString
 
 import Data.Maybe
 import Data.List
@@ -126,8 +125,9 @@ import Control.Monad
 
 -- Allocate registers
 regAlloc 
-	:: LiveCmmTop
-	-> UniqSM (NatCmmTop, Maybe RegAllocStats)
+	:: (Outputable instr, Instruction instr)
+	=> LiveCmmTop instr
+	-> UniqSM (NatCmmTop instr, Maybe RegAllocStats)
 
 regAlloc (CmmData sec d) 
  	= return
@@ -171,10 +171,11 @@ regAlloc (CmmProc _ _ _ _)
 --   an entry in the block map or it is the first block.
 --
 linearRegAlloc
-	:: BlockId                      -- ^ the first block
+	:: (Outputable instr, Instruction instr)
+	=> BlockId                      -- ^ the first block
         -> BlockMap RegSet		-- ^ live regs on entry to each basic block
-	-> [SCC LiveBasicBlock]		-- ^ instructions annotated with "deaths"
-	-> UniqSM ([NatBasicBlock], RegAllocStats)
+	-> [SCC (LiveBasicBlock instr)]	-- ^ instructions annotated with "deaths"
+	-> UniqSM ([NatBasicBlock instr], RegAllocStats)
 
 linearRegAlloc first_id block_live sccs
  = do	us	<- getUs
@@ -234,9 +235,10 @@ process first_id block_live (b@(BasicBlock id _) : blocks) next_round accum
 -- | Do register allocation on this basic block
 --
 processBlock
-	:: BlockMap RegSet 		-- ^ live regs on entry to each basic block
-	-> LiveBasicBlock 		-- ^ block to do register allocation on
-	-> RegM [NatBasicBlock]		-- ^ block with registers allocated
+	:: (Outputable instr, Instruction instr)
+	=> BlockMap RegSet 		-- ^ live regs on entry to each basic block
+	-> LiveBasicBlock instr 	-- ^ block to do register allocation on
+	-> RegM [NatBasicBlock instr]	-- ^ block with registers allocated
 
 processBlock block_live (BasicBlock id instrs)
  = do 	initBlock id
@@ -265,20 +267,21 @@ initBlock id
 
 -- | Do allocation for a sequence of instructions.
 linearRA
-	:: BlockMap RegSet		-- ^ map of what vregs are live on entry to each block.
-	-> [Instr] 			-- ^ accumulator for instructions already processed.
-	-> [NatBasicBlock] 		-- ^ accumulator for blocks of fixup code.
-	-> BlockId			-- ^ id of the current block, for debugging.
-	-> [LiveInstr]			-- ^ liveness annotated instructions in this block.
+	:: (Outputable instr, Instruction instr)
+	=> BlockMap RegSet			-- ^ map of what vregs are live on entry to each block.
+	-> [instr] 				-- ^ accumulator for instructions already processed.
+	-> [NatBasicBlock instr]		-- ^ accumulator for blocks of fixup code.
+	-> BlockId				-- ^ id of the current block, for debugging.
+	-> [LiveInstr instr]			-- ^ liveness annotated instructions in this block.
 
-	-> RegM ( [Instr]		--   instructions after register allocation
-		, [NatBasicBlock])	--   fresh blocks of fixup code.
+	-> RegM ( [instr]			--   instructions after register allocation
+		, [NatBasicBlock instr])	--   fresh blocks of fixup code.
 
 
 linearRA _          accInstr accFixup _ []
 	= return 
-		( reverse accInstr	-- instrs need to be returned in the correct order.
-		, accFixup)		-- it doesn't matter what order the fixup blocks are returned in.
+		( reverse accInstr		-- instrs need to be returned in the correct order.
+		, accFixup)			-- it doesn't matter what order the fixup blocks are returned in.
 
 
 linearRA block_live accInstr accFixups id (instr:instrs)
@@ -291,21 +294,24 @@ linearRA block_live accInstr accFixups id (instr:instrs)
 
 -- | Do allocation for a single instruction.
 raInsn  
-	:: BlockMap RegSet		-- ^ map of what vregs are love on entry to each block.
-	-> [Instr]			-- ^ accumulator for instructions already processed.
-	-> BlockId			-- ^ the id of the current block, for debugging
-	-> LiveInstr 			-- ^ the instr to have its regs allocated, with liveness info.
+	:: (Outputable instr, Instruction instr)
+	=> BlockMap RegSet			-- ^ map of what vregs are love on entry to each block.
+	-> [instr]				-- ^ accumulator for instructions already processed.
+	-> BlockId				-- ^ the id of the current block, for debugging
+	-> LiveInstr instr 			-- ^ the instr to have its regs allocated, with liveness info.
 	-> RegM 
-		( [Instr]		-- new instructions
-		, [NatBasicBlock])	-- extra fixup blocks
+		( [instr]			-- new instructions
+		, [NatBasicBlock instr])	-- extra fixup blocks
 
-raInsn _     new_instrs _ (Instr (COMMENT _) Nothing)
- = return (new_instrs, [])
+raInsn _     new_instrs _ (Instr ii Nothing)  
+	| Just n	<- takeDeltaInstr ii
+ 	= do	setDeltaR n
+		return (new_instrs, [])
 
-raInsn _     new_instrs _ (Instr (DELTA n) Nothing)  
- = do
-    setDeltaR n
-    return (new_instrs, [])
+raInsn _     new_instrs _ (Instr ii Nothing)
+	| isMetaInstr ii
+	= return (new_instrs, [])
+
 
 raInsn block_live new_instrs id (Instr instr (Just live))
  = do
@@ -318,7 +324,7 @@ raInsn block_live new_instrs id (Instr instr (Just live))
     -- then we can eliminate the instruction.
     -- (we can't eliminitate it if the source register is on the stack, because
     --  we do not want to use one spill slot for different virtual registers)
-    case isRegRegMove instr of
+    case takeRegRegMoveInstr instr of
 	Just (src,dst)	| src `elementOfUniqSet` (liveDieRead live), 
 		  	  isVirtualReg dst,
 		 	  not (dst `elemUFM` assig),
@@ -354,7 +360,7 @@ raInsn _ _ _ instr
 
 
 genRaInsn block_live new_instrs block_id instr r_dying w_dying =
-    case regUsage instr              of { RU read written ->
+    case regUsageOfInstr instr              of { RU read written ->
     case partition isRealReg written of { (real_written1,virt_written) ->
     do
     let 
@@ -410,7 +416,7 @@ genRaInsn block_live new_instrs block_id instr r_dying w_dying =
 				  (t,r) <- zip virt_read r_allocd
 					  ++ zip virt_written w_allocd ]
 
-	patched_instr = patchRegs adjusted_instr patchLookup
+	patched_instr = patchRegsOfInstr adjusted_instr patchLookup
 	patchLookup x = case lookupUFM patch_map x of
 				Nothing -> x
 				Just y  -> y
@@ -424,7 +430,7 @@ genRaInsn block_live new_instrs block_id instr r_dying w_dying =
     -- erase reg->reg moves where the source and destination are the same.
     --	If the src temp didn't die in this instr but happened to be allocated
     --	to the same real reg as the destination, then we can erase the move anyway.
-    let	squashed_instr	= case isRegRegMove patched_instr of
+    let	squashed_instr	= case takeRegRegMoveInstr patched_instr of
 				Just (src, dst)
 				 | src == dst	-> []
 				_		-> [patched_instr]
@@ -473,10 +479,11 @@ for allocateRegs on the temps *written*,
 -}
 
 saveClobberedTemps
-   :: [RegNo]		   -- real registers clobbered by this instruction
-   -> [Reg]		   -- registers which are no longer live after this insn
-   -> RegM [Instr] 	   -- return: instructions to spill any temps that will
-		 	   -- be clobbered.
+	:: Instruction instr
+	=> [RegNo]		-- real registers clobbered by this instruction
+	-> [Reg]		-- registers which are no longer live after this insn
+	-> RegM [instr]		-- return: instructions to spill any temps that will
+				-- be clobbered.
 
 saveClobberedTemps [] _ = return [] -- common case
 saveClobberedTemps clobbered dying =  do
@@ -498,7 +505,7 @@ saveClobberedTemps clobbered dying =  do
 	recordSpill (SpillClobber temp)
 
 	let new_assign	= addToUFM assig temp (InBoth reg slot)
-	clobber new_assign (spill : COMMENT (fsLit "spill clobber") : instrs) rest
+	clobber new_assign (spill : {- COMMENT (fsLit "spill clobber") : -} instrs) rest
 
 clobberRegs :: [RegNo] -> RegM ()
 clobberRegs [] = return () -- common case
@@ -533,12 +540,13 @@ clobberRegs clobbered = do
 --   the list of free registers and free stack slots.
 
 allocateRegsAndSpill
-	:: Bool			-- True <=> reading (load up spilled regs)
+	:: Instruction instr
+	=> Bool			-- True <=> reading (load up spilled regs)
 	-> [Reg]		-- don't push these out
-	-> [Instr]		-- spill insns
+	-> [instr]		-- spill insns
 	-> [RegNo]		-- real registers allocated (accum.)
 	-> [Reg]		-- temps to allocate
-	-> RegM ([Instr], [RegNo])
+	-> RegM ([instr], [RegNo])
 
 allocateRegsAndSpill _       _    spills alloc []
   = return (spills,reverse alloc)
@@ -563,7 +571,7 @@ allocateRegsAndSpill reading keep spills alloc (r:rs) = do
      loc -> do
 	freeregs <- getFreeRegsR
 
-        case getFreeRegs (regClass r) freeregs of
+        case getFreeRegs (targetRegClass r) freeregs of
 
       	-- case (2): we have a free register
       	  my_reg:_ -> {- pprTrace "alloc" (ppr r <+> ppr my_reg <+> ppr freeClass) $ -}
@@ -582,10 +590,10 @@ allocateRegsAndSpill reading keep spills alloc (r:rs) = do
 	      keep' = map getUnique keep
 	      candidates1 = [ (temp,reg,mem)
 			    | (temp, InBoth reg mem) <- ufmToList assig,
-			      temp `notElem` keep', regClass (RealReg reg) == regClass r ]
+			      temp `notElem` keep', targetRegClass (RealReg reg) == targetRegClass r ]
 	      candidates2 = [ (temp,reg)
 			    | (temp, InReg reg) <- ufmToList assig,
-			      temp `notElem` keep', regClass (RealReg reg) == regClass r  ]
+			      temp `notElem` keep', targetRegClass (RealReg reg) == targetRegClass r  ]
 	    -- in
 	    ASSERT2(not (null candidates1 && null candidates2), 
 		    text (show freeregs) <+> ppr r <+> ppr assig) do
@@ -622,8 +630,8 @@ allocateRegsAndSpill reading keep spills alloc (r:rs) = do
 				
     	        (spill_insn, slot) <- spillR (RealReg my_reg) temp_to_push_out
 		let spill_store	 = (if reading then id else reverse)
-					[ COMMENT (fsLit "spill alloc") 
-					, spill_insn ]
+					[ -- COMMENT (fsLit "spill alloc") 
+					   spill_insn ]
 
 		-- record that this temp was spilled
 		recordSpill (SpillAlloc temp_to_push_out)
@@ -643,18 +651,19 @@ allocateRegsAndSpill reading keep spills alloc (r:rs) = do
 
 -- | Load up a spilled temporary if we need to.
 loadTemp
-	:: Bool
+	:: Instruction instr
+	=> Bool
 	-> Reg 		-- the temp being loaded
 	-> Maybe Loc	-- the current location of this temp
 	-> RegNo	-- the hreg to load the temp into
-	-> [Instr]
-	-> RegM [Instr]
+	-> [instr]
+	-> RegM [instr]
 
 loadTemp True vreg (Just (InMem slot)) hreg spills
  = do
  	insn <- loadR (RealReg hreg) slot
 	recordSpill (SpillLoad $ getUnique vreg)
-	return	$  COMMENT (fsLit "spill load") : insn : spills
+	return	$  {- COMMENT (fsLit "spill load") : -} insn : spills
 
 loadTemp _ _ _ _ spills =
    return spills

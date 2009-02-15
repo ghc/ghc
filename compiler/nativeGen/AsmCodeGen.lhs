@@ -19,21 +19,56 @@ module AsmCodeGen ( nativeCodeGen ) where
 #include "HsVersions.h"
 #include "nativeGen/NCG.h"
 
-import Instrs
-import Regs
-import MachCodeGen
-import PprMach
-import RegAllocInfo
-import NCGMonad
-import PositionIndependentCode
-import RegAlloc.Liveness
 
-import qualified RegAlloc.Linear.Main	as Linear
+#if   alpha_TARGET_ARCH
+import Alpha.CodeGen
+import Alpha.Regs
+import Alpha.RegInfo
+import Alpha.Instr
+import Alpha.Ppr
+
+#elif i386_TARGET_ARCH || x86_64_TARGET_ARCH
+import X86.CodeGen
+import X86.Regs
+import X86.RegInfo
+import X86.Instr
+import X86.Ppr
+
+#elif sparc_TARGET_ARCH
+import SPARC.CodeGen
+import SPARC.Regs
+import SPARC.RegInfo
+import SPARC.Instr
+import SPARC.Ppr
+
+#elif powerpc_TARGET_ARCH
+import PPC.CodeGen
+import PPC.Regs
+import PPC.RegInfo
+import PPC.Instr
+import PPC.Ppr
+
+#else
+#error "AsmCodeGen: unknown architecture"
+
+#endif
+
+import RegAlloc.Liveness
+import qualified RegAlloc.Linear.Main		as Linear
 
 import qualified GraphColor			as Color
 import qualified RegAlloc.Graph.Main		as Color
 import qualified RegAlloc.Graph.Stats		as Color
 import qualified RegAlloc.Graph.Coalesce	as Color
+import qualified RegAlloc.Graph.TrivColorable	as Color
+
+import qualified TargetReg			as Target
+
+import Platform
+import Instruction
+import PIC
+import Reg
+import NCGMonad
 
 import Cmm
 import CmmOpt		( cmmMiniInline, cmmMachOpFold )
@@ -160,7 +195,7 @@ nativeCodeGen dflags h us cmms
 
 		dumpIfSet_dyn dflags
 			Opt_D_dump_asm_conflicts "Register conflict graph"
-			$ Color.dotGraph Color.regDotColor trivColorable
+			$ Color.dotGraph Target.targetRegDotColor (Color.trivColorable Target.targetRegClass)
 			$ graphGlobal)
 
 
@@ -172,7 +207,7 @@ nativeCodeGen dflags h us cmms
 
 	-- write out the imports
 	Pretty.printDoc Pretty.LeftMode h
-		$ makeImportsDoc (concat imports)
+		$ makeImportsDoc dflags (concat imports)
 
 	return	()
 
@@ -225,13 +260,13 @@ cmmNativeGens dflags h us (cmm : cmms) impAcc profAcc count
 cmmNativeGen 
 	:: DynFlags
 	-> UniqSupply
-	-> RawCmmTop				-- ^ the cmm to generate code for
-	-> Int					-- ^ sequence number of this top thing
+	-> RawCmmTop					-- ^ the cmm to generate code for
+	-> Int						-- ^ sequence number of this top thing
 	-> IO	( UniqSupply
-		, [NatCmmTop]			-- native code
-		, [CLabel]			-- things imported by this cmm
-		, Maybe [Color.RegAllocStats]	-- stats for the coloring register allocator
-		, Maybe [Linear.RegAllocStats])	-- stats for the linear register allocators
+		, [NatCmmTop Instr]			-- native code
+		, [CLabel]				-- things imported by this cmm
+		, Maybe [Color.RegAllocStats Instr]	-- stats for the coloring register allocator
+		, Maybe [Linear.RegAllocStats])		-- stats for the linear register allocators
 
 cmmNativeGen dflags us cmm count
  = do
@@ -375,8 +410,8 @@ x86fp_kludge top@(CmmProc info lbl params (ListGraph code)) =
 
 -- | Build a doc for all the imports.
 --
-makeImportsDoc :: [CLabel] -> Pretty.Doc
-makeImportsDoc imports
+makeImportsDoc :: DynFlags -> [CLabel] -> Pretty.Doc
+makeImportsDoc dflags imports
  = dyld_stubs imports
 
 #if HAVE_SUBSECTIONS_VIA_SYMBOLS
@@ -410,13 +445,16 @@ makeImportsDoc imports
 {-      dyld_stubs imps = Pretty.vcat $ map pprDyldSymbolStub $
 				    map head $ group $ sort imps-}
 
+	arch	= platformArch	$ targetPlatform dflags
+	os	= platformOS	$ targetPlatform dflags
+	
 	-- (Hack) sometimes two Labels pretty-print the same, but have
 	-- different uniques; so we compare their text versions...
 	dyld_stubs imps
-		| needImportedSymbols
+		| needImportedSymbols arch os
 		= Pretty.vcat $
-			(pprGotDeclaration :) $
-			map (pprImportedSymbol . fst . head) $
+			(pprGotDeclaration arch os :) $
+			map ( pprImportedSymbol arch os . fst . head) $
 			groupBy (\(_,a) (_,b) -> a == b) $
 			sortBy (\(_,a) (_,b) -> compare a b) $
 			map doPpr $
@@ -437,7 +475,11 @@ makeImportsDoc imports
 -- such that as many of the local jumps as possible turn into
 -- fallthroughs.
 
-sequenceTop :: NatCmmTop -> NatCmmTop
+sequenceTop 
+	:: Instruction instr
+	=> NatCmmTop instr
+	-> NatCmmTop instr
+
 sequenceTop top@(CmmData _ _) = top
 sequenceTop (CmmProc info lbl params (ListGraph blocks)) = 
   CmmProc info lbl params (ListGraph $ makeFarBranches $ sequenceBlocks blocks)
@@ -452,21 +494,36 @@ sequenceTop (CmmProc info lbl params (ListGraph blocks)) =
 -- FYI, the classic layout for basic blocks uses postorder DFS; this
 -- algorithm is implemented in cmm/ZipCfg.hs (NR 6 Sep 2007).
 
-sequenceBlocks :: [NatBasicBlock] -> [NatBasicBlock]
+sequenceBlocks 
+	:: Instruction instr
+	=> [NatBasicBlock instr] 
+	-> [NatBasicBlock instr]
+
 sequenceBlocks [] = []
 sequenceBlocks (entry:blocks) = 
   seqBlocks (mkNode entry : reverse (flattenSCCs (sccBlocks blocks)))
   -- the first block is the entry point ==> it must remain at the start.
 
-sccBlocks :: [NatBasicBlock] -> [SCC (NatBasicBlock,Unique,[Unique])]
+
+sccBlocks 
+	:: Instruction instr
+	=> [NatBasicBlock instr] 
+	-> [SCC ( NatBasicBlock instr
+		, Unique
+		, [Unique])]
+
 sccBlocks blocks = stronglyConnCompFromEdgedVerticesR (map mkNode blocks)
 
-getOutEdges :: [Instr] -> [Unique]
-getOutEdges instrs = case jumpDests (last instrs) [] of
-			[one] -> [getUnique one]
-			_many -> []
-		-- we're only interested in the last instruction of
-		-- the block, and only if it has a single destination.
+-- we're only interested in the last instruction of
+-- the block, and only if it has a single destination.
+getOutEdges 
+	:: Instruction instr
+	=> [instr] -> [Unique]
+
+getOutEdges instrs 
+	= case jumpDestsOfInstr (last instrs) of
+		[one] -> [getUnique one]
+		_many -> []
 
 mkNode block@(BasicBlock id instrs) = (block, getUnique id, getOutEdges instrs)
 
@@ -494,7 +551,10 @@ reorder id accum (b@(block,id',out) : rest)
 -- Conditional branches on PowerPC are limited to +-32KB; if our Procs get too
 -- big, we have to work around this limitation.
 
-makeFarBranches :: [NatBasicBlock] -> [NatBasicBlock]
+makeFarBranches 
+	:: Instruction instr
+	=> [NatBasicBlock instr] 
+	-> [NatBasicBlock instr]
 
 #if powerpc_TARGET_ARCH
 makeFarBranches blocks
@@ -530,7 +590,11 @@ makeFarBranches = id
 -- -----------------------------------------------------------------------------
 -- Shortcut branches
 
-shortcutBranches :: DynFlags -> [NatCmmTop] -> [NatCmmTop]
+shortcutBranches 
+	:: DynFlags 
+	-> [NatCmmTop Instr] 
+	-> [NatCmmTop Instr]
+
 shortcutBranches dflags tops
   | optLevel dflags < 1 = tops    -- only with -O or higher
   | otherwise           = map (apply_mapping mapping) tops'
@@ -589,12 +653,17 @@ apply_mapping ufm (CmmProc info lbl params (ListGraph blocks))
 -- Switching between the two monads whilst carrying along the same
 -- Unique supply breaks abstraction.  Is that bad?
 
-genMachCode :: DynFlags -> RawCmmTop -> UniqSM ([NatCmmTop], [CLabel])
+genMachCode 
+	:: DynFlags 
+	-> RawCmmTop 
+	-> UniqSM 
+		( [NatCmmTop Instr]
+		, [CLabel])
 
 genMachCode dflags cmm_top
   = do	{ initial_us <- getUs
 	; let initial_st           = mkNatM_State initial_us 0 dflags
-	      (new_tops, final_st) = initNat initial_st (cmmTopCodeGen cmm_top)
+	      (new_tops, final_st) = initNat initial_st (cmmTopCodeGen dflags cmm_top)
 	      final_delta          = natm_delta final_st
 	      final_imports        = natm_imports final_st
 	; if   final_delta == 0

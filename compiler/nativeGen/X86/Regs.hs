@@ -1,15 +1,4 @@
 module X86.Regs (
-
-	-- sizes
-	Size(..),
-	intSize, 
-	floatSize, 
-	isFloatSize, 
-	wordSize,
-	cmmTypeSize,
-	sizeToWidth,
-	mkVReg,
-
 	-- immediates
 	Imm(..),
 	strImmLit,
@@ -45,7 +34,10 @@ module X86.Regs (
 
 	-- horror show
 	freeReg,
-	globalRegMaybe
+	globalRegMaybe,
+	
+	get_GlobalReg_reg_or_addr,
+	allocatableRegs
 )
 
 where
@@ -60,92 +52,21 @@ where
 
 #include "../includes/MachRegs.h"
 
-import RegsBase
+import Reg
+import RegClass
 
+import CgUtils          ( get_GlobalReg_addr )
 import BlockId
 import Cmm
 import CLabel           ( CLabel )
 import Pretty
-import Outputable	( Outputable(..), pprPanic, panic )
+import Outputable	( panic )
 import qualified Outputable
-import Unique
 import FastBool
 
 #if  defined(i386_TARGET_ARCH) || defined(x86_64_TARGET_ARCH)
 import Constants
 #endif
-
--- -----------------------------------------------------------------------------
--- Sizes on this architecture
--- 
--- A Size is usually a combination of width and class
-
--- It looks very like the old MachRep, but it's now of purely local
--- significance, here in the native code generator.  You can change it
--- without global consequences.
---
--- A major use is as an opcode qualifier; thus the opcode 
---	mov.l a b
--- might be encoded 
--- 	MOV II32 a b
--- where the Size field encodes the ".l" part.
-
--- ToDo: it's not clear to me that we need separate signed-vs-unsigned sizes
--- here.  I've removed them from the x86 version, we'll see what happens --SDM
-
--- ToDo: quite a few occurrences of Size could usefully be replaced by Width
-
-data Size
-	= II8 | II16 | II32 | II64 | FF32 | FF64 | FF80
-	deriving Eq
-
-intSize, floatSize :: Width -> Size
-intSize W8 = II8
-intSize W16 = II16
-intSize W32 = II32
-intSize W64 = II64
-intSize other = pprPanic "MachInstrs.intSize" (ppr other)
-
-
-floatSize W32 = FF32
-floatSize W64 = FF64
-floatSize other = pprPanic "MachInstrs.intSize" (ppr other)
-
-
-isFloatSize :: Size -> Bool
-isFloatSize FF32 = True
-isFloatSize FF64 = True
-isFloatSize FF80 = True
-isFloatSize _    = False
-
-
-wordSize :: Size
-wordSize = intSize wordWidth
-
-
-cmmTypeSize :: CmmType -> Size
-cmmTypeSize ty | isFloatType ty = floatSize (typeWidth ty)
-	       | otherwise	= intSize (typeWidth ty)
-
-
-sizeToWidth :: Size -> Width
-sizeToWidth II8  = W8
-sizeToWidth II16 = W16
-sizeToWidth II32 = W32
-sizeToWidth II64 = W64
-sizeToWidth FF32 = W32
-sizeToWidth FF64 = W64
-sizeToWidth _ = panic "MachInstrs.sizeToWidth"
-
-
-mkVReg :: Unique -> Size -> Reg
-mkVReg u size
-   | not (isFloatSize size) = VirtualRegI u
-   | otherwise
-   = case size of
-        FF32	-> VirtualRegD u
-        FF64	-> VirtualRegD u
-	_	-> panic "mkVReg"
 
 
 -- -----------------------------------------------------------------------------
@@ -698,5 +619,27 @@ callClobberedRegs	= panic "X86.Regs.globalRegMaybe: not defined"
 
 
 #endif
+
+-- We map STG registers onto appropriate CmmExprs.  Either they map
+-- to real machine registers or stored as offsets from BaseReg.  Given
+-- a GlobalReg, get_GlobalReg_reg_or_addr produces either the real
+-- register it is in, on this platform, or a CmmExpr denoting the
+-- address in the register table holding it.
+-- (See also get_GlobalReg_addr in CgUtils.)
+
+get_GlobalReg_reg_or_addr :: GlobalReg -> Either Reg CmmExpr
+get_GlobalReg_reg_or_addr mid
+   = case globalRegMaybe mid of
+        Just rr -> Left rr
+        Nothing -> Right (get_GlobalReg_addr mid)
+
+
+-- allocatableRegs is allMachRegNos with the fixed-use regs removed.
+-- i.e., these are the regs for which we are prepared to allow the
+-- register allocator to attempt to map VRegs to.
+allocatableRegs :: [RegNo]
+allocatableRegs
+   = let isFree i = isFastTrue (freeReg i)
+     in  filter isFree allMachRegNos
 
 

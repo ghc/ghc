@@ -454,31 +454,38 @@ Library
 
         Exposed-Modules:
             AsmCodeGen
-            MachCodeGen
-            Regs
-            RegsBase
-            Instrs
-            RegAllocInfo
-            PprMach
+            TargetReg
+            NCGMonad
+            Instruction
+            Size
+            Reg
+            RegClass
             PprBase
+            PIC
+            Platform
             Alpha.Regs
             Alpha.RegInfo
             Alpha.Instr
             Alpha.Ppr
+            Alpha.CodeGen
             X86.Regs
             X86.RegInfo
             X86.Instr
+            X86.Cond
             X86.Ppr
+            X86.CodeGen
             PPC.Regs
             PPC.RegInfo
             PPC.Instr
+            PPC.Cond
             PPC.Ppr
+            PPC.CodeGen
             SPARC.Regs
             SPARC.RegInfo
             SPARC.Instr
+            SPARC.Cond
             SPARC.Ppr
-            NCGMonad
-            PositionIndependentCode
+            SPARC.CodeGen
             RegAlloc.Liveness
             RegAlloc.Graph.Main
             RegAlloc.Graph.Stats
@@ -488,6 +495,7 @@ Library
             RegAlloc.Graph.Spill
             RegAlloc.Graph.SpillClean
             RegAlloc.Graph.SpillCost
+            RegAlloc.Graph.TrivColorable
             RegAlloc.Linear.Main
             RegAlloc.Linear.JoinToTargets
             RegAlloc.Linear.State

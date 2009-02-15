@@ -64,6 +64,7 @@ module DynFlags (
 
 #include "HsVersions.h"
 
+import Platform
 import Module
 import PackageConfig
 import PrelNames        ( mAIN, main_RDR_Unqual )
@@ -339,6 +340,7 @@ data DynFlags = DynFlags {
   specConstrCount       :: Maybe Int,   -- ^ Max number of specialisations for any one function
   liberateCaseThreshold :: Maybe Int,   -- ^ Threshold for LiberateCase
 
+  targetPlatform	:: Platform,	-- ^ The platform we're compiling for. Used by the NCG.
   stolen_x86_regs       :: Int,
   cmdlineHcIncludes     :: [String],    -- ^ @\-\#includes@
   importPaths           :: [FilePath],
@@ -584,6 +586,7 @@ defaultDynFlags =
         specConstrThreshold     = Just 200,
         specConstrCount         = Just 3,
         liberateCaseThreshold   = Just 200,
+        targetPlatform          = defaultTargetPlatform,
         stolen_x86_regs         = 4,
         cmdlineHcIncludes       = [],
         importPaths             = ["."],

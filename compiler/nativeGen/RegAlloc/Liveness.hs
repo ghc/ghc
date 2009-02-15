@@ -20,7 +20,7 @@ module RegAlloc.Liveness (
 	mapBlockTop, 	mapBlockTopM,
 	mapGenBlockTop,	mapGenBlockTopM,
 	stripLive,
-	spillNatBlock,
+	stripLiveBlock,
 	slurpConflicts,
 	slurpReloadCoalesce,
 	eraseDeltasLive,
@@ -30,12 +30,13 @@ module RegAlloc.Liveness (
 
   ) where
 
+
+import Reg
+import Instruction
+
 import BlockId
-import Regs
-import Instrs
-import PprMach
-import RegAllocInfo
 import Cmm hiding (RegSet)
+import PprCmm()
 
 import Digraph
 import Outputable
@@ -65,18 +66,25 @@ emptyBlockMap = emptyBlockEnv
 
 
 -- | A top level thing which carries liveness information.
-type LiveCmmTop
+type LiveCmmTop instr
 	= GenCmmTop
 		CmmStatic
 		LiveInfo
-		(ListGraph (GenBasicBlock LiveInstr))
+		(ListGraph (GenBasicBlock (LiveInstr instr)))
 			-- the "instructions" here are actually more blocks,
 			--	single blocks are acyclic
 			--	multiple blocks are taken to be cyclic.
 
 -- | An instruction with liveness information.
-data LiveInstr
-	= Instr Instr (Maybe Liveness)
+data LiveInstr instr
+	= Instr instr (Maybe Liveness)
+
+	-- | spill this reg to a stack slot
+	| SPILL Reg Int
+
+	-- | reload this reg from a stack slot
+	| RELOAD Int Reg
+	
 
 -- | Liveness information.
 -- 	The regs which die are ones which are no longer live in the *next* instruction
@@ -100,11 +108,28 @@ data LiveInfo
 		(BlockMap RegSet)	-- argument locals live on entry to this block
 
 -- | A basic block with liveness information.
-type LiveBasicBlock
-	= GenBasicBlock LiveInstr
+type LiveBasicBlock instr
+	= GenBasicBlock (LiveInstr instr)
 
 
-instance Outputable LiveInstr where
+instance Outputable instr 
+      => Outputable (LiveInstr instr) where
+	ppr (SPILL reg slot)
+	   = hcat [
+	   	ptext (sLit "\tSPILL"),
+		char ' ',
+		ppr reg,
+		comma,
+		ptext (sLit "SLOT") <> parens (int slot)]
+
+	ppr (RELOAD slot reg)
+	   = hcat [
+	   	ptext (sLit "\tRELOAD"),
+		char ' ',
+		ptext (sLit "SLOT") <> parens (int slot),
+		comma,
+		ppr reg]
+
 	ppr (Instr instr Nothing)
 	 = ppr instr
 
@@ -120,8 +145,7 @@ instance Outputable LiveInstr where
 	 where 	pprRegs :: SDoc -> RegSet -> SDoc
 	 	pprRegs name regs
 		 | isEmptyUniqSet regs	= empty
-		 | otherwise		= name <> (hcat $ punctuate space $ map (docToSDoc . pprUserReg) $ uniqSetToList regs)
-
+		 | otherwise		= name <> (hcat $ punctuate space $ map ppr $ uniqSetToList regs)
 
 instance Outputable LiveInfo where
 	ppr (LiveInfo static firstId liveOnEntry)
@@ -130,11 +154,12 @@ instance Outputable LiveInfo where
 		$$ text "# liveOnEntry = " <> ppr liveOnEntry
 
 
+
 -- | map a function across all the basic blocks in this code
 --
 mapBlockTop
-	:: (LiveBasicBlock -> LiveBasicBlock)
-	-> LiveCmmTop -> LiveCmmTop
+	:: (LiveBasicBlock instr -> LiveBasicBlock instr)
+	-> LiveCmmTop instr -> LiveCmmTop instr
 
 mapBlockTop f cmm
 	= evalState (mapBlockTopM (\x -> return $ f x) cmm) ()
@@ -144,8 +169,8 @@ mapBlockTop f cmm
 --
 mapBlockTopM
 	:: Monad m
-	=> (LiveBasicBlock -> m LiveBasicBlock)
-	-> LiveCmmTop -> m LiveCmmTop
+	=> (LiveBasicBlock instr -> m (LiveBasicBlock instr))
+	-> LiveCmmTop instr -> m (LiveCmmTop instr)
 
 mapBlockTopM _ cmm@(CmmData{})
 	= return cmm
@@ -187,7 +212,11 @@ mapGenBlockTopM f (CmmProc header label params (ListGraph blocks))
 --	Slurping of conflicts and moves is wrapped up together so we don't have
 --	to make two passes over the same code when we want to build the graph.
 --
-slurpConflicts :: LiveCmmTop -> (Bag (UniqSet Reg), Bag (Reg, Reg))
+slurpConflicts 
+	:: Instruction instr
+	=> LiveCmmTop instr 
+	-> (Bag (UniqSet Reg), Bag (Reg, Reg))
+
 slurpConflicts live
 	= slurpCmm (emptyBag, emptyBag) live
 
@@ -205,12 +234,20 @@ slurpConflicts live
 		= (consBag rsLiveEntry conflicts, moves)
 
 		| otherwise
-		= panic "RegLiveness.slurpBlock: bad block"
+		= panic "Liveness.slurpConflicts: bad block"
 
 	slurpLIs rsLive (conflicts, moves) []
 		= (consBag rsLive conflicts, moves)
 
-	slurpLIs rsLive rs (Instr _ Nothing     : lis)	= slurpLIs rsLive rs lis
+	slurpLIs rsLive rs (Instr _ Nothing     : lis)	
+		= slurpLIs rsLive rs lis
+
+	-- we're not expecting to be slurping conflicts from spilled code
+	slurpLIs _ _ (SPILL _ _ : _)
+		= panic "Liveness.slurpConflicts: unexpected SPILL"
+
+	slurpLIs _ _ (RELOAD _ _ : _)
+		= panic "Liveness.slurpConflicts: unexpected RELOAD"
 		
 	slurpLIs rsLiveEntry (conflicts, moves) (Instr instr (Just live) : lis)
 	 = let
@@ -234,7 +271,7 @@ slurpConflicts live
 		--
 		rsConflicts	= unionUniqSets rsLiveNext rsOrphans
 
-	  in	case isRegRegMove instr of
+	  in	case takeRegRegMoveInstr instr of
 	  	 Just rr	-> slurpLIs rsLiveNext
 		 			( consBag rsConflicts conflicts
 					, consBag rr moves) lis
@@ -254,7 +291,11 @@ slurpConflicts live
 --	the spill\/reload instrs can be cleaned and replaced by a nop reg-reg move.
 --
 --
-slurpReloadCoalesce :: LiveCmmTop -> Bag (Reg, Reg)
+slurpReloadCoalesce 
+	:: Instruction instr
+	=> LiveCmmTop instr
+	-> Bag (Reg, Reg)
+
 slurpReloadCoalesce live
 	= slurpCmm emptyBag live
 
@@ -285,23 +326,24 @@ slurpReloadCoalesce live
 	 	(_, mMoves)	<- mapAccumLM slurpLI slotMap instrs
 	   	return $ listToBag $ catMaybes mMoves
 
-	slurpLI :: UniqFM Reg 				-- current slotMap
-		-> LiveInstr
+	slurpLI :: Instruction instr
+		=> UniqFM Reg 				-- current slotMap
+		-> LiveInstr instr
 		-> State (UniqFM [UniqFM Reg]) 		-- blockId -> [slot -> reg]
 							-- 	for tracking slotMaps across jumps
 
 			 ( UniqFM Reg			-- new slotMap
 			 , Maybe (Reg, Reg))		-- maybe a new coalesce edge
 
-	slurpLI slotMap (Instr instr _)
+	slurpLI slotMap li
 
 		-- remember what reg was stored into the slot
-		| SPILL reg slot	<- instr
+		| SPILL reg slot	<- li
 		, slotMap'		<- addToUFM slotMap slot reg
 		= return (slotMap', Nothing)
 
 		-- add an edge betwen the this reg and the last one stored into the slot
-		| RELOAD slot reg	<- instr
+		| RELOAD slot reg	<- li
 		= case lookupUFM slotMap slot of
 			Just reg2
 			 | reg /= reg2	-> return (slotMap, Just (reg, reg2))
@@ -310,7 +352,8 @@ slurpReloadCoalesce live
 			Nothing		-> return (slotMap, Nothing)
 
 		-- if we hit a jump, remember the current slotMap
-		| targets	<- jumpDests instr []
+		| Instr instr _		<- li
+		, targets		<- jumpDestsOfInstr instr
 		, not $ null targets
 		= do	mapM_	(accSlotMap slotMap) targets
 			return	(slotMap, Nothing)
@@ -340,7 +383,11 @@ slurpReloadCoalesce live
 
 -- | Strip away liveness information, yielding NatCmmTop
 
-stripLive :: LiveCmmTop -> NatCmmTop
+stripLive 
+	:: Instruction instr
+	=> LiveCmmTop instr 
+	-> NatCmmTop instr
+
 stripLive live
 	= stripCmm live
 
@@ -349,25 +396,25 @@ stripLive live
 		= CmmProc info label params
                           (ListGraph $ concatMap stripComp comps)
 
-	stripComp  (BasicBlock _ blocks)	= map stripBlock blocks
-	stripBlock (BasicBlock i instrs)	= BasicBlock i (map stripLI instrs)
-	stripLI    (Instr instr _)		= instr
+	stripComp  (BasicBlock _ blocks)	= map stripLiveBlock blocks
 
 
--- | Make real spill instructions out of SPILL, RELOAD pseudos
+-- | Strip away liveness information from a basic block,
+--	and make real spill instructions out of SPILL, RELOAD pseudos along the way.
 
-spillNatBlock :: NatBasicBlock -> NatBasicBlock
-spillNatBlock (BasicBlock i is)
+stripLiveBlock
+	:: Instruction instr
+	=> LiveBasicBlock instr
+	-> NatBasicBlock instr
+
+stripLiveBlock (BasicBlock i lis)
  = 	BasicBlock i instrs'
+
  where 	(instrs', _)
- 		= runState (spillNat [] is) 0
+ 		= runState (spillNat [] lis) 0
 
 	spillNat acc []
 	 = 	return (reverse acc)
-
-	spillNat acc (DELTA i : instrs)
-	 = do	put i
-	 	spillNat acc instrs
 
 	spillNat acc (SPILL reg slot : instrs)
 	 = do	delta	<- get
@@ -377,22 +424,28 @@ spillNatBlock (BasicBlock i is)
 	 = do	delta	<- get
 	 	spillNat (mkLoadInstr reg delta slot : acc) instrs
 
-	spillNat acc (instr : instrs)
+	spillNat acc (Instr instr _ : instrs)
+	 | Just i <- takeDeltaInstr instr
+	 = do	put i
+	 	spillNat acc instrs
+
+	spillNat acc (Instr instr _ : instrs)
 	 =	spillNat (instr : acc) instrs
 
 
 -- | Erase Delta instructions.
 
-eraseDeltasLive :: LiveCmmTop -> LiveCmmTop
+eraseDeltasLive 
+	:: Instruction instr
+	=> LiveCmmTop instr
+	-> LiveCmmTop instr
+
 eraseDeltasLive cmm
 	= mapBlockTop eraseBlock cmm
  where
-	isDelta (DELTA _)	= True
-	isDelta _		= False
-
  	eraseBlock (BasicBlock id lis)
 		= BasicBlock id
-		$ filter (\(Instr i _) -> not $ isDelta i)
+		$ filter (\(Instr i _) -> not $ isJust $ takeDeltaInstr i)
 		$ lis
 
 
@@ -401,8 +454,9 @@ eraseDeltasLive cmm
 --	also erase reg -> reg moves when the destination dies in this instr.
 
 patchEraseLive
-	:: (Reg -> Reg)
-	-> LiveCmmTop -> LiveCmmTop
+	:: Instruction instr
+	=> (Reg -> Reg)
+	-> LiveCmmTop instr -> LiveCmmTop instr
 
 patchEraseLive patchF cmm
 	= patchCmm cmm
@@ -427,7 +481,7 @@ patchEraseLive patchF cmm
 	patchInstrs (li : lis)
 
 		| Instr i (Just live)	<- li'
-		, Just (r1, r2)	<- isRegRegMove i
+		, Just (r1, r2)	<- takeRegRegMoveInstr i
 		, eatMe r1 r2 live
 		= patchInstrs lis
 
@@ -451,30 +505,38 @@ patchEraseLive patchF cmm
 -- | Patch registers in this LiveInstr, including the liveness information.
 --
 patchRegsLiveInstr
-	:: (Reg -> Reg)
-	-> LiveInstr -> LiveInstr
+	:: Instruction instr
+	=> (Reg -> Reg)
+	-> LiveInstr instr -> LiveInstr instr
 
 patchRegsLiveInstr patchF li
  = case li of
 	Instr instr Nothing
-	 -> Instr (patchRegs instr patchF) Nothing
+	 -> Instr (patchRegsOfInstr instr patchF) Nothing
 
 	Instr instr (Just live)
 	 -> Instr
-	 	(patchRegs instr patchF)
+	 	(patchRegsOfInstr instr patchF)
 		(Just live
 			{ -- WARNING: have to go via lists here because patchF changes the uniq in the Reg
 			  liveBorn	= mkUniqSet $ map patchF $ uniqSetToList $ liveBorn live
 			, liveDieRead	= mkUniqSet $ map patchF $ uniqSetToList $ liveDieRead live
 			, liveDieWrite	= mkUniqSet $ map patchF $ uniqSetToList $ liveDieWrite live })
 
+	SPILL reg slot
+	 -> SPILL (patchF reg) slot
+		
+	RELOAD slot reg
+	 -> RELOAD slot (patchF reg)
+
 
 ---------------------------------------------------------------------------------
 -- Annotate code with register liveness information
 --
 regLiveness
-	:: NatCmmTop
-	-> UniqSM LiveCmmTop
+	:: Instruction instr
+	=> NatCmmTop instr
+	-> UniqSM (LiveCmmTop instr)
 
 regLiveness (CmmData i d)
 	= returnUs $ CmmData i d
@@ -501,11 +563,15 @@ regLiveness (CmmProc info lbl params (ListGraph blocks@(first : _)))
 			   lbl params (ListGraph liveBlocks)
 
 
-sccBlocks :: [NatBasicBlock] -> [SCC NatBasicBlock]
+sccBlocks 
+	:: Instruction instr
+	=> [NatBasicBlock instr] 
+	-> [SCC (NatBasicBlock instr)]
+
 sccBlocks blocks = stronglyConnCompFromEdgedVertices graph
   where
-	getOutEdges :: [Instr] -> [BlockId]
-	getOutEdges instrs = foldl' (\a x -> jumpDests x a) [] instrs
+	getOutEdges :: Instruction instr => [instr] -> [BlockId]
+	getOutEdges instrs = concat $ map jumpDestsOfInstr instrs
 
 	graph = [ (block, getUnique id, map getUnique (getOutEdges instrs))
 		| block@(BasicBlock id instrs) <- blocks ]
@@ -515,12 +581,13 @@ sccBlocks blocks = stronglyConnCompFromEdgedVertices graph
 -- Computing liveness
 
 computeLiveness
-   :: [SCC NatBasicBlock]
-   -> ([SCC LiveBasicBlock],		-- instructions annotated with list of registers
-					-- which are "dead after this instruction".
-       BlockMap RegSet)			-- blocks annontated with set of live registers
-					-- on entry to the block.
-
+	:: Instruction instr
+	=> [SCC (NatBasicBlock instr)]
+	-> ([SCC (LiveBasicBlock instr)],	-- instructions annotated with list of registers
+						-- which are "dead after this instruction".
+	       BlockMap RegSet)			-- blocks annontated with set of live registers
+						-- on entry to the block.
+	
   -- NOTE: on entry, the SCCs are in "reverse" order: later blocks may transfer
   -- control to earlier ones only.  The SCCs returned are in the *opposite* 
   -- order, which is exactly what we want for the next pass.
@@ -530,10 +597,12 @@ computeLiveness sccs
 
 
 livenessSCCs
-       :: BlockMap RegSet
-       -> [SCC LiveBasicBlock]		-- accum
-       -> [SCC NatBasicBlock]
-       -> ([SCC LiveBasicBlock], BlockMap RegSet)
+       :: Instruction instr
+       => BlockMap RegSet
+       -> [SCC (LiveBasicBlock instr)]		-- accum
+       -> [SCC (NatBasicBlock instr)]
+       -> ( [SCC (LiveBasicBlock instr)]
+       	  , BlockMap RegSet)
 
 livenessSCCs blockmap done [] = (done, blockmap)
 
@@ -561,8 +630,11 @@ livenessSCCs blockmap done
 	          (a, panic "RegLiveness.livenessSCCs")
 
 
-            linearLiveness :: BlockMap RegSet -> [NatBasicBlock]
-                           -> (BlockMap RegSet, [LiveBasicBlock])
+            linearLiveness 
+	    	:: Instruction instr
+		=> BlockMap RegSet -> [NatBasicBlock instr]
+            	-> (BlockMap RegSet, [LiveBasicBlock instr])
+
             linearLiveness = mapAccumL livenessBlock
 
                 -- probably the least efficient way to compare two
@@ -578,9 +650,10 @@ livenessSCCs blockmap done
 -- | Annotate a basic block with register liveness information.
 --
 livenessBlock
-	:: BlockMap RegSet
-	-> NatBasicBlock
-	-> (BlockMap RegSet, LiveBasicBlock)
+	:: Instruction instr
+	=> BlockMap RegSet
+	-> NatBasicBlock instr
+	-> (BlockMap RegSet, LiveBasicBlock instr)
 
 livenessBlock blockmap (BasicBlock block_id instrs)
  = let
@@ -598,8 +671,9 @@ livenessBlock blockmap (BasicBlock block_id instrs)
 --	filling in when regs are born
 
 livenessForward
-	:: RegSet			-- regs live on this instr
-	-> [LiveInstr] -> [LiveInstr]
+	:: Instruction instr
+	=> RegSet			-- regs live on this instr
+	-> [LiveInstr instr] -> [LiveInstr instr]
 
 livenessForward _           []	= []
 livenessForward rsLiveEntry (li@(Instr instr mLive) : lis)
@@ -607,7 +681,7 @@ livenessForward rsLiveEntry (li@(Instr instr mLive) : lis)
 	= li : livenessForward rsLiveEntry lis
 
 	| Just live	<- mLive
-	, RU _ written	<- regUsage instr
+	, RU _ written	<- regUsageOfInstr instr
 	= let
 		-- Regs that are written to but weren't live on entry to this instruction
 		--	are recorded as being born here.
@@ -628,11 +702,12 @@ livenessForward _ _ 		= panic "RegLiveness.livenessForward: no match"
 --	filling in when regs die, and what regs are live across each instruction
 
 livenessBack
-	:: RegSet			-- regs live on this instr
+	:: Instruction instr 
+	=> RegSet			-- regs live on this instr
 	-> BlockMap RegSet   		-- regs live on entry to other BBs
-	-> [LiveInstr]   		-- instructions (accum)
-	-> [Instr]			-- instructions
-	-> (RegSet, [LiveInstr])
+	-> [LiveInstr instr]   		-- instructions (accum)
+	-> [instr]			-- instructions
+	-> (RegSet, [LiveInstr instr])
 
 livenessBack liveregs _        done []  = (liveregs, done)
 
@@ -640,32 +715,37 @@ livenessBack liveregs blockmap acc (instr : instrs)
  = let	(liveregs', instr')	= liveness1 liveregs blockmap instr
    in	livenessBack liveregs' blockmap (instr' : acc) instrs
 
--- don't bother tagging comments or deltas with liveness
-liveness1 :: RegSet -> BlockMap RegSet -> Instr -> (RegSet, LiveInstr)
-liveness1 liveregs _   (instr@COMMENT{})
-	= (liveregs, Instr instr Nothing)
 
-liveness1 liveregs _   (instr@DELTA{})
+-- don't bother tagging comments or deltas with liveness
+liveness1 
+	:: Instruction instr
+	=> RegSet 
+	-> BlockMap RegSet 
+	-> instr
+	-> (RegSet, LiveInstr instr)
+
+liveness1 liveregs _ instr
+	| isMetaInstr instr
 	= (liveregs, Instr instr Nothing)
 
 liveness1 liveregs blockmap instr
 
-      | not_a_branch
-      = (liveregs1, Instr instr
+	| not_a_branch
+	= (liveregs1, Instr instr
 			(Just $ Liveness
 			{ liveBorn	= emptyUniqSet
 			, liveDieRead	= mkUniqSet r_dying
 			, liveDieWrite	= mkUniqSet w_dying }))
 
-      | otherwise
-      = (liveregs_br, Instr instr
+	| otherwise
+	= (liveregs_br, Instr instr
 			(Just $ Liveness
 			{ liveBorn	= emptyUniqSet
 			, liveDieRead	= mkUniqSet r_dying_br
 			, liveDieWrite	= mkUniqSet w_dying }))
 
-      where
-	    RU read written = regUsage instr
+	where
+	    RU read written = regUsageOfInstr instr
 
 	    -- registers that were written here are dead going backwards.
 	    -- registers that were read here are live going backwards.
@@ -682,7 +762,7 @@ liveness1 liveregs blockmap instr
 
 	    -- union in the live regs from all the jump destinations of this
 	    -- instruction.
-	    targets      = jumpDests instr [] -- where we go from here
+	    targets      = jumpDestsOfInstr instr -- where we go from here
 	    not_a_branch = null targets
 
 	    targetLiveRegs target

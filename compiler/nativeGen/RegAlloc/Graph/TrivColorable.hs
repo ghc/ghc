@@ -1,164 +1,21 @@
--- -----------------------------------------------------------------------------
---
--- (c) The University of Glasgow 1994-2004
--- 
--- Machine-specific info about registers.
--- 
--- Also includes stuff about immediate operands, which are
--- often/usually quite entangled with registers.
--- 
--- -----------------------------------------------------------------------------
 
-#include "nativeGen/NCG.h"
-
-module Regs (
-	--------------------------------
-	-- Generic things, shared by all architectures.
-	module RegsBase,	
-	getHiVRegFromLo,
-	get_GlobalReg_reg_or_addr,
-	allocatableRegs,
-	allocatableRegsInClass,
+module RegAlloc.Graph.TrivColorable (
 	trivColorable,
-
-	--------------------------------
-	-- Things that are defined by the arch specific module.
-	--
-
-	-- sizes
-	Size(..),
-	intSize, 
-	floatSize, 
-	isFloatSize, 
-	wordSize, 
-	cmmTypeSize, 
-	sizeToWidth,
-	mkVReg,
-
-	-- immediates
-	Imm(..), 
-	strImmLit, 
-	litToImm,
-
-	-- addressing modes
-	AddrMode(..),
-	addrOffset,
-
-	-- registers
-	spRel,
-	argRegs, 
-	allArgRegs, 
-	callClobberedRegs,
-	allMachRegNos,
-	regClass,
-	showReg,
-
-	-- machine specific things
-#if   powerpc_TARGET_ARCH
-	allFPArgRegs,
-	fits16Bits,
-	makeImmediate,
-	fReg,
-	sp, r3, r4, r27, r28, f1, f20, f21,
-
-#elif i386_TARGET_ARCH || x86_64_TARGET_ARCH
-	EABase(..), EAIndex(..), addrModeRegs,
-	
-	eax, ebx, ecx, edx, esi, edi, ebp, esp,
-	fake0, fake1, fake2, fake3, fake4, fake5,
-	rax, rbx, rcx, rdx, rsi, rdi, rbp, rsp,
-	r8, r9, r10, r11, r12, r13, r14, r15,
-  	xmm0, xmm1, xmm2, xmm3, xmm4, xmm5, xmm6, xmm7,
-  	xmm8, xmm9, xmm10, xmm11, xmm12, xmm13, xmm14, xmm15,
-	xmm,
-
-	ripRel,
-	allFPArgRegs,
-
-#elif sparc_TARGET_ARCH
-	fpRel,
-	fits13Bits, 
-	largeOffsetError,
-	gReg, iReg, lReg, oReg, fReg,
-	fp, sp, g0, g1, g2, o0, o1, f0, f6, f8, f26, f27,
-	nCG_FirstFloatReg,
-#endif
-	-- horror show
-	freeReg,
-	globalRegMaybe	
-) 
+)
 
 where
 
 #include "HsVersions.h"
-#include "../includes/MachRegs.h"
 
-import Cmm
-import CgUtils          ( get_GlobalReg_addr )
-import Outputable	( Outputable(..), pprPanic )
-import qualified Outputable
-import Panic
-import Unique
-import UniqSet
-import FastTypes
-import FastBool
+import RegClass
+import Reg
+
+import GraphBase
+
 import UniqFM
+import FastTypes
 
-
-import RegsBase
-
-#if   alpha_TARGET_ARCH
-import Alpha.Regs
-#elif powerpc_TARGET_ARCH
-import PPC.Regs
-#elif i386_TARGET_ARCH || x86_64_TARGET_ARCH
-import X86.Regs
-#elif sparc_TARGET_ARCH
-import SPARC.Regs
-#else
-#error "Regs: not defined for this architecture"
-#endif
-
-
-
-instance Show Reg where
-	show (RealReg i)      = showReg i
-	show (VirtualRegI u)  = "%vI_" ++ show u
-	show (VirtualRegHi u) = "%vHi_" ++ show u
-	show (VirtualRegF u)  = "%vF_" ++ show u
-	show (VirtualRegD u)  = "%vD_" ++ show u
-
-instance Outputable Reg where
-	ppr r = Outputable.text (show r)
-
-
--- Determine the upper-half vreg for a 64-bit quantity on a 32-bit platform
--- when supplied with the vreg for the lower-half of the quantity.
--- (NB. Not reversible).
-getHiVRegFromLo :: Reg -> Reg
-getHiVRegFromLo (VirtualRegI u) 
-   = VirtualRegHi (newTagUnique u 'H') -- makes a pseudo-unique with tag 'H'
-
-getHiVRegFromLo other 
-   = pprPanic "getHiVRegFromLo" (ppr other)
-
--- -----------------------------------------------------------------------------
--- Global registers
-
--- We map STG registers onto appropriate CmmExprs.  Either they map
--- to real machine registers or stored as offsets from BaseReg.  Given
--- a GlobalReg, get_GlobalReg_reg_or_addr produces either the real
--- register it is in, on this platform, or a CmmExpr denoting the
--- address in the register table holding it.
--- (See also get_GlobalReg_addr in CgUtils.)
-
-get_GlobalReg_reg_or_addr       :: GlobalReg -> Either Reg CmmExpr
-get_GlobalReg_reg_or_addr mid
-   = case globalRegMaybe mid of
-        Just rr -> Left rr
-        Nothing -> Right (get_GlobalReg_addr mid)
-
-
+{-
 -- allocatableRegs is allMachRegNos with the fixed-use regs removed.
 -- i.e., these are the regs for which we are prepared to allow the
 -- register allocator to attempt to map VRegs to.
@@ -187,7 +44,7 @@ allocatableRegsDouble :: Int
 allocatableRegsDouble
 	= length $ filter (\r -> regClass r == RcDouble) 
 		 $ map RealReg allocatableRegs
-
+-}
 
 
 -- trivColorable ---------------------------------------------------------------
@@ -277,8 +134,11 @@ worst n classN classC
 #error ToDo: define ALLOCATABLE_REGS_INTEGER and ALLOCATABLE_REGS_DOUBLE
 #endif
 
-trivColorable :: RegClass -> UniqSet Reg -> UniqSet Reg -> Bool
-trivColorable _ conflicts exclusions
+trivColorable 
+	:: (Reg -> RegClass) 
+	-> Triv Reg RegClass Reg
+	
+trivColorable regClass _ conflicts exclusions
  = {-# SCC "trivColorable" #-}
    let
 	isSqueesed cI cF ufm
@@ -314,5 +174,3 @@ trivColorable _ conflicts exclusions
 
 	(# True, _, _ #)
 	 -> False
-
-

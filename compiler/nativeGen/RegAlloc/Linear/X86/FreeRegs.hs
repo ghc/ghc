@@ -3,7 +3,9 @@
 module RegAlloc.Linear.X86.FreeRegs
 where
 
-import Regs
+import X86.Regs
+import RegClass
+import Reg
 
 import Data.Word
 import Data.Bits

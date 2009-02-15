@@ -3,7 +3,9 @@
 module RegAlloc.Linear.SPARC.FreeRegs
 where
 
-import Regs
+import SPARC.Regs
+import RegClass
+import Reg
 
 import Outputable
 import FastBool

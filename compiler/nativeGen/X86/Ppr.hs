@@ -7,12 +7,15 @@
 -----------------------------------------------------------------------------
 
 module X86.Ppr (
+	pprNatCmmTop,
+	pprBasicBlock,
+	pprSectionHeader,
+	pprData,
+	pprInstr,
 	pprUserReg,
 	pprSize,
 	pprImm,
-	pprSectionHeader,
 	pprDataItem,
-	pprInstr
 )
 
 where
@@ -20,24 +23,145 @@ where
 #include "HsVersions.h"
 #include "nativeGen/NCG.h"
 
-import PprBase
-import RegsBase
 import X86.Regs
 import X86.Instr
+import X86.Cond
+import Instruction
+import Size
+import Reg
+import PprBase
+
 
 import BlockId
 import Cmm
-
-import CLabel		( CLabel, mkAsmTempLabel )
-#if HAVE_SUBSECTIONS_VIA_SYMBOLS
-import CLabel       ( mkDeadStripPreventer )
-#endif
-
+import CLabel
 import Unique		( pprUnique )
 import Pretty
 import FastString
 import qualified Outputable
-import Outputable	(panic)
+import Outputable	(panic, Outputable)
+
+import Data.Word
+
+
+
+-- -----------------------------------------------------------------------------
+-- Printing this stuff out
+
+pprNatCmmTop :: NatCmmTop Instr -> Doc
+pprNatCmmTop (CmmData section dats) = 
+  pprSectionHeader section $$ vcat (map pprData dats)
+
+ -- special case for split markers:
+pprNatCmmTop (CmmProc [] lbl _ (ListGraph [])) = pprLabel lbl
+
+pprNatCmmTop (CmmProc info lbl _ (ListGraph blocks)) = 
+  pprSectionHeader Text $$
+  (if null info then -- blocks guaranteed not null, so label needed
+       pprLabel lbl
+   else
+#if HAVE_SUBSECTIONS_VIA_SYMBOLS
+            pprCLabel_asm (mkDeadStripPreventer $ entryLblToInfoLbl lbl)
+                <> char ':' $$
+#endif
+       vcat (map pprData info) $$
+       pprLabel (entryLblToInfoLbl lbl)
+  ) $$
+  vcat (map pprBasicBlock blocks)
+     -- above: Even the first block gets a label, because with branch-chain
+     -- elimination, it might be the target of a goto.
+#if HAVE_SUBSECTIONS_VIA_SYMBOLS
+        -- If we are using the .subsections_via_symbols directive
+        -- (available on recent versions of Darwin),
+        -- we have to make sure that there is some kind of reference
+        -- from the entry code to a label on the _top_ of of the info table,
+        -- so that the linker will not think it is unreferenced and dead-strip
+        -- it. That's why the label is called a DeadStripPreventer (_dsp).
+  $$ if not (null info)
+		    then text "\t.long "
+		      <+> pprCLabel_asm (entryLblToInfoLbl lbl)
+		      <+> char '-'
+		      <+> pprCLabel_asm (mkDeadStripPreventer $ entryLblToInfoLbl lbl)
+		    else empty
+#endif
+
+
+pprBasicBlock :: NatBasicBlock Instr -> Doc
+pprBasicBlock (BasicBlock (BlockId id) instrs) =
+  pprLabel (mkAsmTempLabel id) $$
+  vcat (map pprInstr instrs)
+
+
+pprData :: CmmStatic -> Doc
+pprData (CmmAlign bytes)         = pprAlign bytes
+pprData (CmmDataLabel lbl)       = pprLabel lbl
+pprData (CmmString str)          = pprASCII str
+pprData (CmmUninitialised bytes) = ptext (sLit ".skip ") <> int bytes
+pprData (CmmStaticLit lit)       = pprDataItem lit
+
+pprGloblDecl :: CLabel -> Doc
+pprGloblDecl lbl
+  | not (externallyVisibleCLabel lbl) = empty
+  | otherwise = ptext IF_ARCH_sparc((sLit ".global "), 
+				    (sLit ".globl ")) <>
+		pprCLabel_asm lbl
+
+pprTypeAndSizeDecl :: CLabel -> Doc
+#if linux_TARGET_OS
+pprTypeAndSizeDecl lbl
+  | not (externallyVisibleCLabel lbl) = empty
+  | otherwise = ptext (sLit ".type ") <>
+		pprCLabel_asm lbl <> ptext (sLit ", @object")
+#else
+pprTypeAndSizeDecl _
+  = empty
+#endif
+
+pprLabel :: CLabel -> Doc
+pprLabel lbl = pprGloblDecl lbl $$ pprTypeAndSizeDecl lbl $$ (pprCLabel_asm lbl <> char ':')
+
+
+pprASCII :: [Word8] -> Doc
+pprASCII str
+  = vcat (map do1 str) $$ do1 0
+    where
+       do1 :: Word8 -> Doc
+       do1 w = ptext (sLit "\t.byte\t") <> int (fromIntegral w)
+
+pprAlign :: Int -> Doc
+
+
+pprAlign bytes
+	= ptext (sLit ".align ") <> int IF_OS_darwin(pow2, bytes)
+  where
+
+#if darwin_TARGET_OS
+	pow2 = log2 bytes
+
+	log2 :: Int -> Int  -- cache the common ones
+	log2 1 = 0 
+	log2 2 = 1
+	log2 4 = 2
+	log2 8 = 3
+	log2 n = 1 + log2 (n `quot` 2)
+#endif
+
+-- -----------------------------------------------------------------------------
+-- pprInstr: print an 'Instr'
+
+instance Outputable Instr where
+    ppr	 instr	= Outputable.docToSDoc $ pprInstr instr
+
+
+
+
+
+
+
+
+
+
+
 
 #if  i386_TARGET_ARCH || x86_64_TARGET_ARCH
 pprUserReg :: Reg -> Doc
@@ -48,7 +172,6 @@ pprUserReg :: Reg -> Doc
 pprUserReg = panic "X86.Ppr.pprUserReg: not defined"
 
 #endif
-
 
 pprReg :: Size -> Reg -> Doc
 
@@ -228,7 +351,7 @@ pprAddr (AddrBaseIndex base index displacement)
   = let
 	pp_disp  = ppr_disp displacement
 	pp_off p = pp_disp <> char '(' <> p <> char ')'
-	pp_reg r = pprReg wordSize r
+	pp_reg r = pprReg archWordSize r
     in
     case (base, index) of
       (EABaseNone,  EAIndexNone) -> pp_disp
@@ -384,6 +507,7 @@ pprInstr (NEWBLOCK _)
 pprInstr (LDATA _ _)
    = panic "PprMach.pprInstr: LDATA"
 
+{-
 pprInstr (SPILL reg slot)
    = hcat [
    	ptext (sLit "\tSPILL"),
@@ -399,6 +523,7 @@ pprInstr (RELOAD slot reg)
 	ptext (sLit "SLOT") <> parens (int slot),
 	comma,
 	pprUserReg reg]
+-}
 
 pprInstr (MOV size src dst)
   = pprSizeOpOp (sLit "mov") size src dst
@@ -414,7 +539,7 @@ pprInstr (MOVZxL sizes src dst) = pprSizeOpOpCoerce (sLit "movz") sizes II32 src
 	-- the remaining zero-extension to 64 bits is automatic, and the 32-bit
 	-- instruction is shorter.
 
-pprInstr (MOVSxL sizes src dst) = pprSizeOpOpCoerce (sLit "movs") sizes wordSize src dst
+pprInstr (MOVSxL sizes src dst) = pprSizeOpOpCoerce (sLit "movs") sizes archWordSize src dst
 
 -- here we do some patching, since the physical registers are only set late
 -- in the code generation.
@@ -497,10 +622,10 @@ pprInstr (JXX cond (BlockId id))
 pprInstr (JXX_GBL cond imm) = pprCondInstr (sLit "j") cond (pprImm imm)
 
 pprInstr (JMP (OpImm imm)) = (<>) (ptext (sLit "\tjmp ")) (pprImm imm)
-pprInstr (JMP op)          = (<>) (ptext (sLit "\tjmp *")) (pprOperand wordSize op)
+pprInstr (JMP op)          = (<>) (ptext (sLit "\tjmp *")) (pprOperand archWordSize op)
 pprInstr (JMP_TBL op _)  = pprInstr (JMP op)
 pprInstr (CALL (Left imm) _)    = (<>) (ptext (sLit "\tcall ")) (pprImm imm)
-pprInstr (CALL (Right reg) _)   = (<>) (ptext (sLit "\tcall *")) (pprReg wordSize reg)
+pprInstr (CALL (Right reg) _)   = (<>) (ptext (sLit "\tcall *")) (pprReg archWordSize reg)
 
 pprInstr (IDIV sz op)	= pprSizeOp (sLit "idiv") sz op
 pprInstr (DIV sz op)    = pprSizeOp (sLit "div")  sz op
@@ -941,9 +1066,9 @@ pprRegReg :: LitString -> Reg -> Reg -> Doc
 pprRegReg name reg1 reg2
   = hcat [
 	pprMnemonic_ name,
-	pprReg wordSize reg1,
+	pprReg archWordSize reg1,
         comma,
-        pprReg wordSize reg2
+        pprReg archWordSize reg2
     ]
 
 
@@ -951,9 +1076,9 @@ pprOpReg :: LitString -> Operand -> Reg -> Doc
 pprOpReg name op1 reg2
   = hcat [
 	pprMnemonic_ name,
-	pprOperand wordSize op1,
+	pprOperand archWordSize op1,
         comma,
-        pprReg wordSize reg2
+        pprReg archWordSize reg2
     ]
 
 

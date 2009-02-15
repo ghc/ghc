@@ -5,16 +5,6 @@
 -- -----------------------------------------------------------------------------
 
 module PPC.Regs (
-	-- sizes
-	Size(..),
-	intSize, 
-	floatSize, 
-	isFloatSize, 
-	wordSize,
-	cmmTypeSize,
-	sizeToWidth,
-	mkVReg,
-
 	-- immediates
 	Imm(..),
 	strImmLit,
@@ -42,7 +32,10 @@ module PPC.Regs (
 
 	-- horrow show
 	freeReg,
-	globalRegMaybe
+	globalRegMaybe,
+	get_GlobalReg_reg_or_addr,
+	allocatableRegs
+
 )
 
 where
@@ -51,77 +44,21 @@ where
 #include "HsVersions.h"
 #include "../includes/MachRegs.h"
 
-import RegsBase
+import Reg
+import RegClass
 
+import CgUtils          ( get_GlobalReg_addr )
 import BlockId
 import Cmm
 import CLabel           ( CLabel )
 import Pretty
 import Outputable	( Outputable(..), pprPanic, panic )
 import qualified Outputable
-import Unique
 import Constants
 import FastBool
 
 import Data.Word	( Word8, Word16, Word32 )
 import Data.Int 	( Int8, Int16, Int32 )
-
--- sizes -----------------------------------------------------------------------
--- For these three, the "size" also gives the int/float
--- distinction, because the instructions for int/float
--- differ only in their suffices
-data Size	
-	= II8 | II16 | II32 | II64 | FF32 | FF64 | FF80
-	deriving Eq
-
-intSize, floatSize :: Width -> Size
-intSize W8 = II8
-intSize W16 = II16
-intSize W32 = II32
-intSize W64 = II64
-intSize other = pprPanic "MachInstrs.intSize" (ppr other)
-
-floatSize W32 = FF32
-floatSize W64 = FF64
-floatSize other = pprPanic "MachInstrs.intSize" (ppr other)
-
-
-isFloatSize :: Size -> Bool
-isFloatSize FF32 = True
-isFloatSize FF64 = True
-isFloatSize FF80 = True
-isFloatSize _    = False
-
-
-wordSize :: Size
-wordSize = intSize wordWidth
-
-
-cmmTypeSize :: CmmType -> Size
-cmmTypeSize ty 
-	| isFloatType ty	= floatSize (typeWidth ty)
-	| otherwise		= intSize (typeWidth ty)
-
-
-sizeToWidth :: Size -> Width
-sizeToWidth II8  = W8
-sizeToWidth II16 = W16
-sizeToWidth II32 = W32
-sizeToWidth II64 = W64
-sizeToWidth FF32 = W32
-sizeToWidth FF64 = W64
-sizeToWidth _ = panic "MachInstrs.sizeToWidth"
-
-
-mkVReg :: Unique -> Size -> Reg
-mkVReg u size
-   | not (isFloatSize size) = VirtualRegI u
-   | otherwise
-   = case size of
-        FF32	-> VirtualRegD u
-        FF64	-> VirtualRegD u
-	_	-> panic "mkVReg"
-
 
 
 -- immediates ------------------------------------------------------------------
@@ -490,7 +427,7 @@ freeReg REG_Hp   = fastBool False
 #ifdef REG_HpLim
 freeReg REG_HpLim = fastBool False
 #endif
-freeReg n               = fastBool True
+freeReg _               = fastBool True
 
 
 --  | Returns 'Nothing' if this global register is not stored
@@ -582,3 +519,26 @@ freeReg _		= 0#
 globalRegMaybe _	= panic "PPC.Regs.globalRegMaybe: not defined"
 
 #endif /* powerpc_TARGET_ARCH */
+
+
+-- We map STG registers onto appropriate CmmExprs.  Either they map
+-- to real machine registers or stored as offsets from BaseReg.  Given
+-- a GlobalReg, get_GlobalReg_reg_or_addr produces either the real
+-- register it is in, on this platform, or a CmmExpr denoting the
+-- address in the register table holding it.
+-- (See also get_GlobalReg_addr in CgUtils.)
+
+get_GlobalReg_reg_or_addr :: GlobalReg -> Either Reg CmmExpr
+get_GlobalReg_reg_or_addr mid
+   = case globalRegMaybe mid of
+        Just rr -> Left rr
+        Nothing -> Right (get_GlobalReg_addr mid)
+
+
+-- allocatableRegs is allMachRegNos with the fixed-use regs removed.
+-- i.e., these are the regs for which we are prepared to allow the
+-- register allocator to attempt to map VRegs to.
+allocatableRegs :: [RegNo]
+allocatableRegs
+   = let isFree i = isFastTrue (freeReg i)
+     in  filter isFree allMachRegNos

@@ -5,7 +5,6 @@
 
 module RegAlloc.Graph.Stats (
 	RegAllocStats (..),
-	regDotColor,
 
 	pprStats,
 	pprStatsSpills,
@@ -22,13 +21,13 @@ where
 
 import qualified GraphColor as Color
 import RegAlloc.Liveness
-import RegAllocInfo
 import RegAlloc.Graph.Spill
 import RegAlloc.Graph.SpillCost
-import Regs
-import Instrs
-import Cmm
+import Instruction
+import RegClass
+import Reg
 
+import Cmm
 import Outputable
 import UniqFM
 import UniqSet
@@ -36,11 +35,11 @@ import State
 
 import Data.List
 
-data RegAllocStats
+data RegAllocStats instr
 
 	-- initial graph
 	= RegAllocStatsStart
-	{ raLiveCmm	:: [LiveCmmTop]			  -- ^ initial code, with liveness
+	{ raLiveCmm	:: [LiveCmmTop instr]		  -- ^ initial code, with liveness
 	, raGraph	:: Color.Graph Reg RegClass Reg   -- ^ the initial, uncolored graph
 	, raSpillCosts	:: SpillCostInfo } 		  -- ^ information to help choose which regs to spill
 
@@ -50,35 +49,35 @@ data RegAllocStats
 	, raCoalesced	:: UniqFM Reg			-- ^ the regs that were coaleced
 	, raSpillStats	:: SpillStats 			-- ^ spiller stats
 	, raSpillCosts	:: SpillCostInfo 		-- ^ number of instrs each reg lives for
-	, raSpilled	:: [LiveCmmTop] }		-- ^ code with spill instructions added
+	, raSpilled	:: [LiveCmmTop instr] }		-- ^ code with spill instructions added
 
 	-- a successful coloring
 	| RegAllocStatsColored
 	{ raGraph	 :: Color.Graph Reg RegClass Reg -- ^ the uncolored graph
 	, raGraphColored :: Color.Graph Reg RegClass Reg -- ^ the coalesced and colored graph
 	, raCoalesced	:: UniqFM Reg			-- ^ the regs that were coaleced
-	, raPatched	:: [LiveCmmTop] 		-- ^ code with vregs replaced by hregs
-	, raSpillClean  :: [LiveCmmTop]			-- ^ code with unneeded spill\/reloads cleaned out
-	, raFinal	:: [NatCmmTop] 			-- ^ final code
+	, raPatched	:: [LiveCmmTop instr] 		-- ^ code with vregs replaced by hregs
+	, raSpillClean  :: [LiveCmmTop instr]		-- ^ code with unneeded spill\/reloads cleaned out
+	, raFinal	:: [NatCmmTop instr] 		-- ^ final code
 	, raSRMs	:: (Int, Int, Int) }		-- ^ spill\/reload\/reg-reg moves present in this code
 
-instance Outputable RegAllocStats where
+instance Outputable instr => Outputable (RegAllocStats instr) where
 
  ppr (s@RegAllocStatsStart{})
  	=  text "#  Start"
 	$$ text "#  Native code with liveness information."
 	$$ ppr (raLiveCmm s)
 	$$ text ""
-	$$ text "#  Initial register conflict graph."
-	$$ Color.dotGraph regDotColor trivColorable (raGraph s)
+--	$$ text "#  Initial register conflict graph."
+--	$$ Color.dotGraph regDotColor trivColorable (raGraph s)
 
 
  ppr (s@RegAllocStatsSpill{})
  	=  text "#  Spill"
 
-	$$ text "#  Register conflict graph."
-	$$ Color.dotGraph regDotColor trivColorable (raGraph s)
-	$$ text ""
+--	$$ text "#  Register conflict graph."
+--	$$ Color.dotGraph regDotColor trivColorable (raGraph s)
+--	$$ text ""
 
 	$$ (if (not $ isNullUFM $ raCoalesced s)
 		then 	text "#  Registers coalesced."
@@ -86,9 +85,9 @@ instance Outputable RegAllocStats where
 			$$ text ""
 		else empty)
 
-	$$ text "#  Spill costs.  reg uses defs lifetime degree cost"
-	$$ vcat (map (pprSpillCostRecord (raGraph s)) $ eltsUFM $ raSpillCosts s)
-	$$ text ""
+--	$$ text "#  Spill costs.  reg uses defs lifetime degree cost"
+--	$$ vcat (map (pprSpillCostRecord (raGraph s)) $ eltsUFM $ raSpillCosts s)
+--	$$ text ""
 
 	$$ text "#  Spills inserted."
 	$$ ppr (raSpillStats s)
@@ -101,13 +100,13 @@ instance Outputable RegAllocStats where
  ppr (s@RegAllocStatsColored { raSRMs = (spills, reloads, moves) })
  	=  text "#  Colored"
 
-	$$ text "#  Register conflict graph (initial)."
-	$$ Color.dotGraph regDotColor trivColorable (raGraph s)
-	$$ text ""
+--	$$ text "#  Register conflict graph (initial)."
+--	$$ Color.dotGraph regDotColor trivColorable (raGraph s)
+--	$$ text ""
 
-	$$ text "#  Register conflict graph (colored)."
-	$$ Color.dotGraph regDotColor trivColorable (raGraphColored s)
-	$$ text ""
+--	$$ text "#  Register conflict graph (colored)."
+--	$$ Color.dotGraph regDotColor trivColorable (raGraphColored s)
+--	$$ text ""
 
 	$$ (if (not $ isNullUFM $ raCoalesced s)
 		then 	text "#  Registers coalesced."
@@ -133,7 +132,7 @@ instance Outputable RegAllocStats where
 	$$ text ""
 
 -- | Do all the different analysis on this list of RegAllocStats
-pprStats :: [RegAllocStats] -> Color.Graph Reg RegClass Reg -> SDoc
+pprStats :: [RegAllocStats instr] -> Color.Graph Reg RegClass Reg -> SDoc
 pprStats stats graph
  = let 	outSpills	= pprStatsSpills    stats
 	outLife		= pprStatsLifetimes stats
@@ -145,7 +144,7 @@ pprStats stats graph
 
 -- | Dump a table of how many spill loads \/ stores were inserted for each vreg.
 pprStatsSpills
-	:: [RegAllocStats] -> SDoc
+	:: [RegAllocStats instr] -> SDoc
 
 pprStatsSpills stats
  = let
@@ -163,7 +162,7 @@ pprStatsSpills stats
 
 -- | Dump a table of how long vregs tend to live for in the initial code.
 pprStatsLifetimes
-	:: [RegAllocStats] -> SDoc
+	:: [RegAllocStats instr] -> SDoc
 
 pprStatsLifetimes stats
  = let	info		= foldl' plusSpillCostInfo zeroSpillCostInfo
@@ -191,7 +190,7 @@ binLifetimeCount fm
 
 -- | Dump a table of how many conflicts vregs tend to have in the initial code.
 pprStatsConflict
-	:: [RegAllocStats] -> SDoc
+	:: [RegAllocStats instr] -> SDoc
 
 pprStatsConflict stats
  = let	confMap	= foldl' (plusUFM_C (\(c1, n1) (_, n2) -> (c1, n1 + n2)))
@@ -208,7 +207,7 @@ pprStatsConflict stats
 -- | For every vreg, dump it's how many conflicts it has and its lifetime
 --	good for making a scatter plot.
 pprStatsLifeConflict
-	:: [RegAllocStats]
+	:: [RegAllocStats instr]
 	-> Color.Graph Reg RegClass Reg 	-- ^ global register conflict graph
 	-> SDoc
 
@@ -238,7 +237,10 @@ pprStatsLifeConflict stats graph
 -- | Count spill/reload/reg-reg moves.
 --	Lets us see how well the register allocator has done.
 --
-countSRMs :: LiveCmmTop -> (Int, Int, Int)
+countSRMs 
+	:: Instruction instr
+	=> LiveCmmTop instr -> (Int, Int, Int)
+
 countSRMs cmm
 	= execState (mapBlockTopM countSRM_block cmm) (0, 0, 0)
 
@@ -246,16 +248,17 @@ countSRM_block (BasicBlock i instrs)
  = do	instrs'	<- mapM countSRM_instr instrs
  	return	$ BasicBlock i instrs'
 
-countSRM_instr li@(Instr instr _)
-	| SPILL _ _	<- instr
+countSRM_instr li
+	| SPILL _ _	<- li
 	= do	modify 	$ \(s, r, m)	-> (s + 1, r, m)
 		return li
 
-	| RELOAD _ _	<- instr
+	| RELOAD _ _	<- li
 	= do	modify	$ \(s, r, m)	-> (s, r + 1, m)
 		return li
 
-	| Just _		<- isRegRegMove instr
+	| Instr instr _	<- li
+	, Just _	<- takeRegRegMoveInstr instr
 	= do	modify	$ \(s, r, m)	-> (s, r, m + 1)
 		return li
 
@@ -266,77 +269,9 @@ countSRM_instr li@(Instr instr _)
 addSRM (s1, r1, m1) (s2, r2, m2)
 	= (s1+s2, r1+r2, m1+m2)
 
------
--- Register colors for drawing conflict graphs
---	Keep this out of MachRegs.hs because it's specific to the graph coloring allocator.
 
 
--- reg colors for x86
-#if i386_TARGET_ARCH
-regDotColor :: Reg -> SDoc
-regDotColor reg
- = let	Just	str	= lookupUFM regColors reg
-   in	text str
 
-regColors
- = listToUFM
- $  	[ (eax,	"#00ff00")
-	, (ebx,	"#0000ff")
-	, (ecx,	"#00ffff")
-	, (edx,	"#0080ff")
-
-	, (fake0, "#ff00ff")
-	, (fake1, "#ff00aa")
-	, (fake2, "#aa00ff")
-	, (fake3, "#aa00aa")
-	, (fake4, "#ff0055")
-	, (fake5, "#5500ff") ]
-
-
--- reg colors for x86_64
-#elif x86_64_TARGET_ARCH
-regDotColor :: Reg -> SDoc
-regDotColor reg
- = let	Just	str	= lookupUFM regColors reg
-   in	text str
-
-regColors
- = listToUFM
- $	[ (rax, "#00ff00"), (eax, "#00ff00")
-	, (rbx,	"#0000ff"), (ebx, "#0000ff")
-	, (rcx,	"#00ffff"), (ecx, "#00ffff")
-	, (rdx,	"#0080ff"), (edx, "#00ffff")
-	, (r8,  "#00ff80")
-	, (r9,  "#008080")
-	, (r10, "#0040ff")
-	, (r11, "#00ff40")
-	, (r12, "#008040")
-	, (r13, "#004080")
-	, (r14, "#004040")
-	, (r15, "#002080") ]
-
-	++ zip (map RealReg [16..31]) (repeat "red")
-
-
--- reg colors for ppc
-#elif powerpc_TARGET_ARCH
-regDotColor :: Reg -> SDoc
-regDotColor reg
- = case regClass reg of
- 	RcInteger	-> text "blue"
-	RcFloat		-> text "red"
-	RcDouble	-> text "green"
-
-#elif sparc_TARGET_ARCH
-regDotColor :: Reg -> SDoc
-regDotColor reg
- = case regClass reg of
- 	RcInteger	-> text "blue"
-	RcFloat		-> text "red"
-	RcDouble	-> text "green"
-#else
-#error ToDo: regDotColor
-#endif
 
 
 {-

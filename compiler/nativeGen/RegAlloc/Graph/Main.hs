@@ -5,8 +5,7 @@
 --
 
 module RegAlloc.Graph.Main ( 
-	regAlloc,
-	regDotColor
+	regAlloc
 ) 
 
 where
@@ -17,9 +16,12 @@ import RegAlloc.Graph.Spill
 import RegAlloc.Graph.SpillClean
 import RegAlloc.Graph.SpillCost
 import RegAlloc.Graph.Stats
-import Regs
-import Instrs
-import PprMach
+import RegAlloc.Graph.TrivColorable
+import Instruction
+import TargetReg
+import RegClass
+import Reg
+
 
 import UniqSupply
 import UniqSet
@@ -43,18 +45,26 @@ maxSpinCount	= 10
 -- | The top level of the graph coloring register allocator.
 --	
 regAlloc
-	:: DynFlags
+	:: (Outputable instr, Instruction instr)
+	=> DynFlags
 	-> UniqFM (UniqSet Reg)		-- ^ the registers we can use for allocation
 	-> UniqSet Int			-- ^ the set of available spill slots.
-	-> [LiveCmmTop]			-- ^ code annotated with liveness information.
-	-> UniqSM ( [NatCmmTop], [RegAllocStats] )
+	-> [LiveCmmTop instr]		-- ^ code annotated with liveness information.
+	-> UniqSM ( [NatCmmTop instr], [RegAllocStats instr] )
            -- ^ code with registers allocated and stats for each stage of
            -- allocation
 		
 regAlloc dflags regsFree slotsFree code
  = do
+	-- TODO: the regClass function is currently hard coded to the default target
+	--	 architecture. Would prefer to determine this from dflags.
+	--	 There are other uses of targetRegClass later in this module.
+	let triv = trivColorable targetRegClass
+
  	(code_final, debug_codeGraphs, _)
-		<- regAlloc_spin dflags 0 trivColorable regsFree slotsFree [] code
+		<- regAlloc_spin dflags 0 
+			triv
+			regsFree slotsFree [] code
 	
 	return	( code_final
 		, reverse debug_codeGraphs )
@@ -74,7 +84,7 @@ regAlloc_spin dflags spinCount triv regsFree slotsFree debug_codeGraphs code
 	 $ pprPanic "regAlloc_spin: max build/spill cycle count exceeded."
 	 	(  text "It looks like the register allocator is stuck in an infinite loop."
 		$$ text "max cycles  = " <> int maxSpinCount
-	 	$$ text "regsFree    = " <> (hcat	$ punctuate space $ map (docToSDoc . pprUserReg)
+	 	$$ text "regsFree    = " <> (hcat	$ punctuate space $ map ppr
 						$ uniqSetToList $ unionManyUniqSets $ eltsUFM regsFree)
 		$$ text "slotsFree   = " <> ppr (sizeUniqSet slotsFree))
 
@@ -139,12 +149,12 @@ regAlloc_spin dflags spinCount triv regsFree slotsFree debug_codeGraphs code
 		-- clean out unneeded SPILL/RELOADs
 		let code_spillclean	= map cleanSpills code_patched
 
-		-- strip off liveness information
-		let code_nat		= map stripLive code_spillclean
+		-- strip off liveness information, 
+		--	and rewrite SPILL/RELOAD pseudos into real instructions along the way
+		let code_final		= map stripLive code_spillclean
 
-		-- rewrite SPILL/RELOAD pseudos into real instructions
-		let spillNatTop		= mapGenBlockTop spillNatBlock
-		let code_final		= map spillNatTop code_nat
+--		let spillNatTop		= mapGenBlockTop spillNatBlock
+--		let code_final		= map spillNatTop code_nat
 		
 		-- record what happened in this stage for debugging
 		let stat		=
@@ -213,7 +223,8 @@ regAlloc_spin dflags spinCount triv regsFree slotsFree debug_codeGraphs code
 -- | Build a graph from the liveness and coalesce information in this code.
 
 buildGraph 
-	:: [LiveCmmTop]
+	:: Instruction instr
+	=> [LiveCmmTop instr]
 	-> UniqSM (Color.Graph Reg RegClass Reg)
 	
 buildGraph code
@@ -248,8 +259,8 @@ graphAddConflictSet set graph
  = let	reals		= filterUFM isRealReg set
  	virtuals	= filterUFM (not . isRealReg) set
  
-	graph1	= Color.addConflicts virtuals regClass graph
-	graph2	= foldr (\(r1, r2) -> Color.addExclusion r1 regClass r2)
+	graph1	= Color.addConflicts virtuals targetRegClass graph
+	graph2	= foldr (\(r1, r2) -> Color.addExclusion r1 targetRegClass r2)
 			graph1
 			[ (a, b) 
 				| a <- uniqSetToList virtuals
@@ -276,13 +287,14 @@ graphAddCoalesce (r1, r2) graph
 	| otherwise
 	= Color.addCoalesce (regWithClass r1) (regWithClass r2) graph
 
-	where 	regWithClass r	= (r, regClass r)
+	where 	regWithClass r	= (r, targetRegClass r)
 
 
 -- | Patch registers in code using the reg -> reg mapping in this graph.
 patchRegsFromGraph 
-	:: Color.Graph Reg RegClass Reg
-	-> LiveCmmTop -> LiveCmmTop
+	:: (Outputable instr, Instruction instr)
+	=> Color.Graph Reg RegClass Reg
+	-> LiveCmmTop instr -> LiveCmmTop instr
 
 patchRegsFromGraph graph code
  = let
@@ -303,7 +315,7 @@ patchRegsFromGraph graph code
 		= pprPanic "patchRegsFromGraph: register mapping failed." 
 			(  text "There is no node in the graph for register " <> ppr reg
 			$$ ppr code
-			$$ Color.dotGraph (\_ -> text "white") trivColorable graph)
+			$$ Color.dotGraph (\_ -> text "white") (trivColorable targetRegClass) graph)
 
    in	patchEraseLive patchF code
    

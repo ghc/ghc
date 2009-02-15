@@ -10,9 +10,8 @@ module RegAlloc.Graph.Spill (
 where
 
 import RegAlloc.Liveness
-import RegAllocInfo
-import Regs
-import Instrs
+import Instruction
+import Reg
 import Cmm
 
 import State
@@ -35,11 +34,12 @@ import Data.Maybe
 --		address the spill slot directly.
 --
 regSpill
-	:: [LiveCmmTop]			-- ^ the code
+	:: Instruction instr
+	=> [LiveCmmTop instr]		-- ^ the code
 	-> UniqSet Int			-- ^ available stack slots
 	-> UniqSet Reg			-- ^ the regs to spill
 	-> UniqSM
-		([LiveCmmTop]		-- code will spill instructions
+		([LiveCmmTop instr]	-- code will spill instructions
 		, UniqSet Int		-- left over slots
 		, SpillStats )		-- stats about what happened during spilling
 
@@ -75,6 +75,20 @@ regSpill_block regSlotMap (BasicBlock i instrs)
  = do	instrss'	<- mapM (regSpill_instr regSlotMap) instrs
  	return	$ BasicBlock i (concat instrss')
 
+
+regSpill_instr
+	:: Instruction instr
+	=> UniqFM Int 
+	-> LiveInstr instr -> SpillM [LiveInstr instr]
+
+-- | The thing we're spilling shouldn't already have spill or reloads in it
+regSpill_instr	_ SPILL{}
+	= panic "regSpill_instr: unexpected SPILL"
+
+regSpill_instr	_ RELOAD{}
+	= panic "regSpill_instr: unexpected RELOAD"
+
+
 regSpill_instr _	li@(Instr _ Nothing)
  = do	return [li]
 
@@ -82,7 +96,7 @@ regSpill_instr regSlotMap
 	(Instr instr (Just _))
  = do
 	-- work out which regs are read and written in this instr
-	let RU rlRead rlWritten	= regUsage instr
+	let RU rlRead rlWritten	= regUsageOfInstr instr
 
 	-- sometimes a register is listed as being read more than once,
 	--	nub this so we don't end up inserting two lots of spill code.
@@ -109,9 +123,9 @@ regSpill_instr regSlotMap
 	let postfixes			= concat mPostfixes
 
 	-- final code
-	let instrs'	=  map (\i -> Instr i Nothing) prefixes
-			++ [ Instr instr3 Nothing ]
-			++ map (\i -> Instr i Nothing) postfixes
+	let instrs'	=  prefixes
+			++ [Instr instr3 Nothing]
+			++ postfixes
 
 	return
 {-		$ pprTrace "* regSpill_instr spill"
@@ -139,6 +153,7 @@ spillRead regSlotMap instr reg
 
 	| otherwise	= panic "RegSpill.spillRead: no slot defined for spilled reg"
 
+
 spillWrite regSlotMap instr reg
 	| Just slot	<- lookupUFM regSlotMap reg
 	= do 	(instr', nReg)	<- patchInstr reg instr
@@ -151,6 +166,7 @@ spillWrite regSlotMap instr reg
 			  , [SPILL nReg slot]))
 
 	| otherwise	= panic "RegSpill.spillWrite: no slot defined for spilled reg"
+
 
 spillModify regSlotMap instr reg
 	| Just slot	<- lookupUFM regSlotMap reg
@@ -168,19 +184,25 @@ spillModify regSlotMap instr reg
 
 
 -- | rewrite uses of this virtual reg in an instr to use a different virtual reg
-patchInstr :: Reg -> Instr -> SpillM (Instr, Reg)
+patchInstr 
+	:: Instruction instr
+	=> Reg -> instr -> SpillM (instr, Reg)
+
 patchInstr reg instr
  = do	nUnique		<- newUnique
  	let nReg	= renameVirtualReg nUnique reg
 	let instr'	= patchReg1 reg nReg instr
 	return		(instr', nReg)
 
-patchReg1 :: Reg -> Reg -> Instr -> Instr
+patchReg1 
+	:: Instruction instr
+	=> Reg -> Reg -> instr -> instr
+
 patchReg1 old new instr
  = let	patchF r
 		| r == old	= new
 		| otherwise	= r
-   in	patchRegs instr patchF
+   in	patchRegsOfInstr instr patchF
 
 
 ------------------------------------------------------

@@ -21,7 +21,7 @@ where
 import RegAlloc.Linear.FreeRegs
 import RegAlloc.Linear.StackMap
 import RegAlloc.Liveness
-import Regs
+import Reg
 
 import Outputable
 import Unique

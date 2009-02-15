@@ -5,7 +5,8 @@ module RegAlloc.Linear.FreeRegs (
 	releaseReg,
 	initFreeRegs,
 	getFreeRegs,
-	allocateReg
+	allocateReg,
+	maxSpillSlots
 )
 
 #include "HsVersions.h"
@@ -27,12 +28,15 @@ where
 
 #if   defined(powerpc_TARGET_ARCH) 
 import RegAlloc.Linear.PPC.FreeRegs
+import PPC.Instr	(maxSpillSlots)
 
 #elif defined(sparc_TARGET_ARCH)
 import RegAlloc.Linear.SPARC.FreeRegs
+import SPARC.Instr	(maxSpillSlots)
 
 #elif defined(i386_TARGET_ARCH) || defined(x86_64_TARGET_ARCH)
 import RegAlloc.Linear.X86.FreeRegs
+import X86.Instr	(maxSpillSlots)
 
 #else
 #error "RegAlloc.Linear.FreeRegs not defined for this architecture."

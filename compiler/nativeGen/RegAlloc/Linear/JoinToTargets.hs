@@ -19,13 +19,11 @@ import RegAlloc.Linear.State
 import RegAlloc.Linear.Base
 import RegAlloc.Linear.FreeRegs
 import RegAlloc.Liveness
+import Instruction
+import Reg
 
 import BlockId
-import Instrs
-import Regs
-import RegAllocInfo
 import Cmm	hiding (RegSet)
-
 import Digraph
 import Outputable
 import Unique
@@ -37,39 +35,41 @@ import UniqSet
 --	vregs are in the correct regs for its destination.
 --
 joinToTargets
-	:: BlockMap RegSet		-- ^ maps the unique of the blockid to the set of vregs 
+	:: Instruction instr
+	=> BlockMap RegSet		-- ^ maps the unique of the blockid to the set of vregs 
 					--	that are known to be live on the entry to each block.
 
 	-> BlockId			-- ^ id of the current block
-	-> Instr			-- ^ branch instr on the end of the source block.
+	-> instr			-- ^ branch instr on the end of the source block.
 
-	-> RegM ([NatBasicBlock]	--   fresh blocks of fixup code.
-		, Instr)		--   the original branch instruction, but maybe patched to jump
+	-> RegM ([NatBasicBlock instr]	--   fresh blocks of fixup code.
+		, instr)		--   the original branch instruction, but maybe patched to jump
 					--	to a fixup block first.
 
 joinToTargets block_live id instr
 
 	-- we only need to worry about jump instructions.
-	| not $ isJumpish instr
+	| not $ isJumpishInstr instr
 	= return ([], instr)
 
 	| otherwise
-	= joinToTargets' block_live [] id instr (jumpDests instr [])
+	= joinToTargets' block_live [] id instr (jumpDestsOfInstr instr)
 
 -----
 joinToTargets'
-	:: BlockMap RegSet		-- ^ maps the unique of the blockid to the set of vregs 
+	:: Instruction instr
+	=> BlockMap RegSet		-- ^ maps the unique of the blockid to the set of vregs 
 					--	that are known to be live on the entry to each block.
 
-	-> [NatBasicBlock]		-- ^ acc blocks of fixup code.
+	-> [NatBasicBlock instr]	-- ^ acc blocks of fixup code.
 
 	-> BlockId			-- ^ id of the current block
-	-> Instr			-- ^ branch instr on the end of the source block.
+	-> instr			-- ^ branch instr on the end of the source block.
 
 	-> [BlockId]			-- ^ branch destinations still to consider.
 
-	-> RegM ( [NatBasicBlock]
-		, Instr)
+	-> RegM ( [NatBasicBlock instr]
+		, instr)
 
 -- no more targets to consider. all done.
 joinToTargets' _          new_blocks _ instr []
@@ -173,7 +173,7 @@ joinToTargets_again
 		--	then that will jump to our original destination.
 		fixup_block_id <- getUniqueR
 		let block = BasicBlock (BlockId fixup_block_id) 
-				$ fixUpInstrs ++ mkBranchInstr dest
+				$ fixUpInstrs ++ mkJumpInstr dest
 		
 {-		pprTrace
 			("joinToTargets: fixup code is:")
@@ -187,7 +187,11 @@ joinToTargets_again
 
 		 -- patch the original branch instruction so it goes to our
 		 --	fixup block instead.
-		 _	-> let	instr'	=  patchJump instr dest (BlockId fixup_block_id)
+		 _	-> let	instr'	=  patchJumpInstr instr 
+		 				(\bid -> if bid == dest 
+								then BlockId fixup_block_id 
+								else dest)
+						
 		 	   in	joinToTargets' block_live (block : new_blocks) block_id instr' dests
 
 
@@ -256,7 +260,9 @@ expandNode vreg src dst
 --	destinations. We have eliminated any possibility of single-node
 --	cycles in expandNode above.
 --
-handleComponent :: Int -> Instr -> SCC (Unique, Loc, [Loc]) -> RegM [Instr]
+handleComponent 
+	:: Instruction instr
+	=> Int -> instr -> SCC (Unique, Loc, [Loc]) -> RegM [instr]
 
 -- If the graph is acyclic then we won't get the swapping problem below.
 --	In this case we can just do the moves directly, and avoid having to
@@ -305,11 +311,12 @@ handleComponent _ _ (CyclicSCC _)
 -- | Move a vreg between these two locations.
 --
 makeMove 
-	:: Int 		-- ^ current C stack delta.
+	:: Instruction instr
+	=> Int 		-- ^ current C stack delta.
 	-> Unique 	-- ^ unique of the vreg that we're moving.
 	-> Loc 		-- ^ source location.
 	-> Loc 		-- ^ destination location.
-	-> RegM Instr	-- ^ move instruction.
+	-> RegM instr	-- ^ move instruction.
 
 makeMove _     vreg (InReg src) (InReg dst)
  = do	recordSpill (SpillJoinRR vreg)

@@ -19,7 +19,7 @@ module RegAlloc.Linear.StackMap (
 
 where
 
-import RegAllocInfo	(maxSpillSlots)
+import RegAlloc.Linear.FreeRegs
 
 import Outputable
 import UniqFM

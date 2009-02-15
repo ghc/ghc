@@ -10,13 +10,14 @@
 #include "nativeGen/NCG.h"
 
 module Alpha.Instr (
-	Cond(..),
-	Instr(..),
-	RI(..)
+--	Cond(..),
+--	Instr(..),
+--	RI(..)
 )
 
 where
 
+{-
 import BlockId
 import Regs
 import Cmm
@@ -138,3 +139,4 @@ data Instr
 	| FUNEND CLabel
 
 
+-}

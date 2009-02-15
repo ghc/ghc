@@ -7,12 +7,15 @@
 -----------------------------------------------------------------------------
 
 module SPARC.Ppr (
+	pprNatCmmTop,
+	pprBasicBlock,
+	pprSectionHeader,
+	pprData,
+	pprInstr,
 	pprUserReg,
 	pprSize,
 	pprImm,
-	pprSectionHeader,
-	pprDataItem,
-	pprInstr
+	pprDataItem
 )
 
 where
@@ -20,20 +23,119 @@ where
 #include "HsVersions.h"
 #include "nativeGen/NCG.h"
 
-import PprBase
-import RegsBase
 import SPARC.Regs
+import SPARC.RegInfo
 import SPARC.Instr
+import SPARC.Cond
+import Instruction
+import Reg
+import Size
+import PprBase
 
 import BlockId
 import Cmm
-
 import CLabel
 
-import Panic		( panic )
 import Unique		( pprUnique )
+import qualified Outputable
+import Outputable	(Outputable, panic)
 import Pretty
 import FastString
+import Data.Word
+
+-- -----------------------------------------------------------------------------
+-- Printing this stuff out
+
+pprNatCmmTop :: NatCmmTop Instr -> Doc
+pprNatCmmTop (CmmData section dats) = 
+  pprSectionHeader section $$ vcat (map pprData dats)
+
+ -- special case for split markers:
+pprNatCmmTop (CmmProc [] lbl _ (ListGraph [])) = pprLabel lbl
+
+pprNatCmmTop (CmmProc info lbl _ (ListGraph blocks)) = 
+  pprSectionHeader Text $$
+  (if null info then -- blocks guaranteed not null, so label needed
+       pprLabel lbl
+   else
+#if HAVE_SUBSECTIONS_VIA_SYMBOLS
+            pprCLabel_asm (mkDeadStripPreventer $ entryLblToInfoLbl lbl)
+                <> char ':' $$
+#endif
+       vcat (map pprData info) $$
+       pprLabel (entryLblToInfoLbl lbl)
+  ) $$
+  vcat (map pprBasicBlock blocks)
+     -- above: Even the first block gets a label, because with branch-chain
+     -- elimination, it might be the target of a goto.
+#if HAVE_SUBSECTIONS_VIA_SYMBOLS
+        -- If we are using the .subsections_via_symbols directive
+        -- (available on recent versions of Darwin),
+        -- we have to make sure that there is some kind of reference
+        -- from the entry code to a label on the _top_ of of the info table,
+        -- so that the linker will not think it is unreferenced and dead-strip
+        -- it. That's why the label is called a DeadStripPreventer (_dsp).
+  $$ if not (null info)
+		    then text "\t.long "
+		      <+> pprCLabel_asm (entryLblToInfoLbl lbl)
+		      <+> char '-'
+		      <+> pprCLabel_asm (mkDeadStripPreventer $ entryLblToInfoLbl lbl)
+		    else empty
+#endif
+
+
+pprBasicBlock :: NatBasicBlock Instr -> Doc
+pprBasicBlock (BasicBlock (BlockId id) instrs) =
+  pprLabel (mkAsmTempLabel id) $$
+  vcat (map pprInstr instrs)
+
+
+pprData :: CmmStatic -> Doc
+pprData (CmmAlign bytes)         = pprAlign bytes
+pprData (CmmDataLabel lbl)       = pprLabel lbl
+pprData (CmmString str)          = pprASCII str
+pprData (CmmUninitialised bytes) = ptext (sLit ".skip ") <> int bytes
+pprData (CmmStaticLit lit)       = pprDataItem lit
+
+pprGloblDecl :: CLabel -> Doc
+pprGloblDecl lbl
+  | not (externallyVisibleCLabel lbl) = empty
+  | otherwise = ptext IF_ARCH_sparc((sLit ".global "), 
+				    (sLit ".globl ")) <>
+		pprCLabel_asm lbl
+
+pprTypeAndSizeDecl :: CLabel -> Doc
+#if linux_TARGET_OS
+pprTypeAndSizeDecl lbl
+  | not (externallyVisibleCLabel lbl) = empty
+  | otherwise = ptext (sLit ".type ") <>
+		pprCLabel_asm lbl <> ptext (sLit ", @object")
+#else
+pprTypeAndSizeDecl _
+  = empty
+#endif
+
+pprLabel :: CLabel -> Doc
+pprLabel lbl = pprGloblDecl lbl $$ pprTypeAndSizeDecl lbl $$ (pprCLabel_asm lbl <> char ':')
+
+
+pprASCII :: [Word8] -> Doc
+pprASCII str
+  = vcat (map do1 str) $$ do1 0
+    where
+       do1 :: Word8 -> Doc
+       do1 w = ptext (sLit "\t.byte\t") <> int (fromIntegral w)
+
+pprAlign :: Int -> Doc
+pprAlign bytes =
+	ptext (sLit ".align ") <> int bytes
+
+
+-- -----------------------------------------------------------------------------
+-- pprInstr: print an 'Instr'
+
+instance Outputable Instr where
+    ppr	 instr	= Outputable.docToSDoc $ pprInstr instr
 
 
 -- | Pretty print a register.
@@ -101,12 +203,13 @@ pprSize :: Size -> Doc
 pprSize x 
  = ptext 
     (case x of
-	II8   -> sLit "ub"
-	II16  -> sLit "uh"
-	II32  -> sLit ""
-	II64  -> sLit "d"
-	FF32  -> sLit ""
-	FF64  -> sLit "d")
+	II8	-> sLit "ub"
+	II16	-> sLit "uh"
+	II32	-> sLit ""
+	II64	-> sLit "d"
+	FF32	-> sLit ""
+	FF64	-> sLit "d"
+	_	-> panic "SPARC.Ppr.pprSize: no match")
 
 
 -- | Pretty print a size for an instruction suffix.
@@ -120,7 +223,8 @@ pprStSize x
 	II32  -> sLit ""
 	II64  -> sLit "x"
 	FF32  -> sLit ""
-	FF64  -> sLit "d")
+	FF64  -> sLit "d"
+	_	-> panic "SPARC.Ppr.pprSize: no match")
 
 		
 -- | Pretty print a condition code.
@@ -258,6 +362,7 @@ pprInstr (NEWBLOCK _)
 pprInstr (LDATA _ _)
 	= panic "PprMach.pprInstr: LDATA"
 
+{-
 pprInstr (SPILL reg slot)
  = hcat [
  	ptext (sLit "\tSPILL"),
@@ -273,7 +378,7 @@ pprInstr (RELOAD slot reg)
 	ptext (sLit "SLOT") <> parens (int slot),
 	comma,
 	pprReg reg]
-
+-}
 
 -- a clumsy hack for now, to handle possible double alignment problems
 -- even clumsier, to allow for RegReg regs that show when doing indexed

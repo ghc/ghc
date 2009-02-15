@@ -16,14 +16,16 @@ module RegAlloc.Graph.SpillCost (
 
 where
 
-import GraphBase
 import RegAlloc.Liveness
-import RegAllocInfo
-import Instrs
-import Regs
+import Instruction
+import RegClass
+import Reg
+
+import GraphBase
+
+
 import BlockId
 import Cmm
-
 import UniqFM
 import UniqSet
 import Outputable
@@ -62,7 +64,8 @@ plusSpillCostRecord (r1, a1, b1, c1) (r2, a2, b2, c2)
 --	and the number of instructions it was live on entry to (lifetime)
 --
 slurpSpillCostInfo
-	:: LiveCmmTop
+	:: (Outputable instr, Instruction instr)
+	=> LiveCmmTop instr
 	-> SpillCostInfo
 
 slurpSpillCostInfo cmm
@@ -89,11 +92,14 @@ slurpSpillCostInfo cmm
 		= return ()
 
 	-- skip over comment and delta pseudo instrs
-	countLIs rsLive (Instr instr Nothing : lis)
-		| COMMENT{}	<- instr
+	countLIs rsLive (SPILL{} : lis)
+		= countLIs rsLive lis
+		
+	countLIs rsLive (RELOAD{} : lis)
 		= countLIs rsLive lis
 
-		| DELTA{}	<- instr
+	countLIs rsLive (Instr instr Nothing : lis)
+		| isMetaInstr instr
 		= countLIs rsLive lis
 
 		| otherwise
@@ -106,7 +112,7 @@ slurpSpillCostInfo cmm
 		mapM_ incLifetime $ uniqSetToList rsLiveEntry
 
 		-- increment counts for what regs were read/written from
-		let (RU read written)	= regUsage instr
+		let (RU read written)	= regUsageOfInstr instr
 		mapM_ incUses	$ filter (not . isRealReg) $ nub read
 		mapM_ incDefs 	$ filter (not . isRealReg) $ nub written
 
@@ -226,8 +232,11 @@ lifeMapFromSpillCostInfo info
 
 
 -- | Work out the degree (number of neighbors) of this node which have the same class.
-nodeDegree :: Graph Reg RegClass Reg -> Reg -> Int
-nodeDegree graph reg
+nodeDegree 
+	:: (Reg -> RegClass)
+	-> Graph Reg RegClass Reg -> Reg -> Int
+
+nodeDegree regClass graph reg
 	| Just node	<- lookupUFM (graphMap graph) reg
 	, virtConflicts	<- length 	$ filter (\r -> regClass r == regClass reg)
 					$ uniqSetToList $ nodeConflicts node
@@ -238,12 +247,17 @@ nodeDegree graph reg
 
 
 -- | Show a spill cost record, including the degree from the graph and final calulated spill cos
-pprSpillCostRecord :: Graph Reg RegClass Reg -> SpillCostRecord -> SDoc
-pprSpillCostRecord graph (reg, uses, defs, life)
+pprSpillCostRecord 
+	:: (Reg -> RegClass)
+	-> (Reg -> SDoc)
+	-> Graph Reg RegClass Reg -> SpillCostRecord -> SDoc
+
+pprSpillCostRecord regClass pprReg graph (reg, uses, defs, life)
  	=  hsep
-	[ ppr reg
+	[ pprReg reg
 	, ppr uses
 	, ppr defs
 	, ppr life
-	, ppr $ nodeDegree graph reg
-	, text $ show $ (fromIntegral (uses + defs) / fromIntegral (nodeDegree graph reg) :: Float) ]
+	, ppr $ nodeDegree regClass graph reg
+	, text $ show $ (fromIntegral (uses + defs) 
+			/ fromIntegral (nodeDegree regClass graph reg) :: Float) ]

@@ -7,12 +7,15 @@
 -----------------------------------------------------------------------------
 
 module PPC.Ppr (
+	pprNatCmmTop,
+	pprBasicBlock,
+	pprSectionHeader,
+	pprData,
+	pprInstr,
 	pprUserReg,
 	pprSize,
 	pprImm,
-	pprSectionHeader,
 	pprDataItem,
-	pprInstr
 )
 
 where
@@ -20,24 +23,132 @@ where
 #include "nativeGen/NCG.h"
 #include "HsVersions.h"
 
-import RegsBase
-import PprBase
 import PPC.Regs
 import PPC.Instr
+import PPC.Cond
+import PprBase
+import Instruction
+import Size
+import Reg
+import RegClass
 
 import BlockId
 import Cmm
 
-import CLabel		( mkAsmTempLabel )
+import CLabel
 
 import Unique		( pprUnique )
 import Pretty
 import FastString
 import qualified Outputable
-import Outputable	( panic )
+import Outputable	( Outputable, panic )
 
-import Data.Word(Word32)
+import Data.Word
 import Data.Bits
+
+
+-- -----------------------------------------------------------------------------
+-- Printing this stuff out
+
+pprNatCmmTop :: NatCmmTop Instr -> Doc
+pprNatCmmTop (CmmData section dats) = 
+  pprSectionHeader section $$ vcat (map pprData dats)
+
+ -- special case for split markers:
+pprNatCmmTop (CmmProc [] lbl _ (ListGraph [])) = pprLabel lbl
+
+pprNatCmmTop (CmmProc info lbl _ (ListGraph blocks)) = 
+  pprSectionHeader Text $$
+  (if null info then -- blocks guaranteed not null, so label needed
+       pprLabel lbl
+   else
+#if HAVE_SUBSECTIONS_VIA_SYMBOLS
+            pprCLabel_asm (mkDeadStripPreventer $ entryLblToInfoLbl lbl)
+                <> char ':' $$
+#endif
+       vcat (map pprData info) $$
+       pprLabel (entryLblToInfoLbl lbl)
+  ) $$
+  vcat (map pprBasicBlock blocks)
+     -- above: Even the first block gets a label, because with branch-chain
+     -- elimination, it might be the target of a goto.
+#if HAVE_SUBSECTIONS_VIA_SYMBOLS
+        -- If we are using the .subsections_via_symbols directive
+        -- (available on recent versions of Darwin),
+        -- we have to make sure that there is some kind of reference
+        -- from the entry code to a label on the _top_ of of the info table,
+        -- so that the linker will not think it is unreferenced and dead-strip
+        -- it. That's why the label is called a DeadStripPreventer (_dsp).
+  $$ if not (null info)
+		    then text "\t.long "
+		      <+> pprCLabel_asm (entryLblToInfoLbl lbl)
+		      <+> char '-'
+		      <+> pprCLabel_asm (mkDeadStripPreventer $ entryLblToInfoLbl lbl)
+		    else empty
+#endif
+
+
+pprBasicBlock :: NatBasicBlock Instr -> Doc
+pprBasicBlock (BasicBlock (BlockId id) instrs) =
+  pprLabel (mkAsmTempLabel id) $$
+  vcat (map pprInstr instrs)
+
+
+pprData :: CmmStatic -> Doc
+pprData (CmmAlign bytes)         = pprAlign bytes
+pprData (CmmDataLabel lbl)       = pprLabel lbl
+pprData (CmmString str)          = pprASCII str
+pprData (CmmUninitialised bytes) = ptext (sLit ".skip ") <> int bytes
+pprData (CmmStaticLit lit)       = pprDataItem lit
+
+pprGloblDecl :: CLabel -> Doc
+pprGloblDecl lbl
+  | not (externallyVisibleCLabel lbl) = empty
+  | otherwise = ptext IF_ARCH_sparc((sLit ".global "), 
+				    (sLit ".globl ")) <>
+		pprCLabel_asm lbl
+
+pprTypeAndSizeDecl :: CLabel -> Doc
+#if linux_TARGET_OS
+pprTypeAndSizeDecl lbl
+  | not (externallyVisibleCLabel lbl) = empty
+  | otherwise = ptext (sLit ".type ") <>
+		pprCLabel_asm lbl <> ptext (sLit ", @object")
+#else
+pprTypeAndSizeDecl _
+  = empty
+#endif
+
+pprLabel :: CLabel -> Doc
+pprLabel lbl = pprGloblDecl lbl $$ pprTypeAndSizeDecl lbl $$ (pprCLabel_asm lbl <> char ':')
+
+
+pprASCII :: [Word8] -> Doc
+pprASCII str
+  = vcat (map do1 str) $$ do1 0
+    where
+       do1 :: Word8 -> Doc
+       do1 w = ptext (sLit "\t.byte\t") <> int (fromIntegral w)
+
+pprAlign :: Int -> Doc
+pprAlign bytes =
+	ptext (sLit ".align ") <> int pow2
+  where
+	pow2 = log2 bytes
+	
+	log2 :: Int -> Int  -- cache the common ones
+	log2 1 = 0 
+	log2 2 = 1
+	log2 4 = 2
+	log2 8 = 3
+	log2 n = 1 + log2 (n `quot` 2)
+
+
+-- -----------------------------------------------------------------------------
+-- pprInstr: print an 'Instr'
+
+instance Outputable Instr where
+    ppr	 instr	= Outputable.docToSDoc $ pprInstr instr
 
 
 pprUserReg :: Reg -> Doc
@@ -255,7 +366,7 @@ pprInstr (NEWBLOCK _)
 pprInstr (LDATA _ _)
    = panic "PprMach.pprInstr: LDATA"
 
-
+{-
 pprInstr (SPILL reg slot)
    = hcat [
    	ptext (sLit "\tSPILL"),
@@ -271,6 +382,7 @@ pprInstr (RELOAD slot reg)
 	ptext (sLit "SLOT") <> parens (int slot),
 	comma,
 	pprReg reg]
+-}
 
 pprInstr (LD sz reg addr) = hcat [
 	char '\t',

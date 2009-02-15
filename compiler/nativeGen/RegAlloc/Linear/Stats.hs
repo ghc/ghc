@@ -8,9 +8,8 @@ where
 
 import RegAlloc.Linear.Base
 import RegAlloc.Liveness
+import Instruction
 
-import RegAllocInfo
-import Instrs
 import Cmm		(GenBasicBlock(..))
 
 import UniqFM
@@ -36,7 +35,10 @@ binSpillReasons reasons
 
 
 -- | Count reg-reg moves remaining in this code.
-countRegRegMovesNat :: NatCmmTop -> Int
+countRegRegMovesNat 
+	:: Instruction instr
+	=> NatCmmTop instr -> Int
+
 countRegRegMovesNat cmm
 	= execState (mapGenBlockTopM countBlock cmm) 0
  where
@@ -45,7 +47,7 @@ countRegRegMovesNat cmm
 	 	return	b
 
 	countInstr instr
-		| Just _	<- isRegRegMove instr
+		| Just _	<- takeRegRegMoveInstr instr
 		= do	modify (+ 1)
 			return instr
 
@@ -54,7 +56,10 @@ countRegRegMovesNat cmm
 
 
 -- | Pretty print some RegAllocStats
-pprStats :: [NatCmmTop] -> [RegAllocStats] -> SDoc
+pprStats 
+	:: Instruction instr 
+	=> [NatCmmTop instr] -> [RegAllocStats] -> SDoc
+
 pprStats code statss
  = let	-- sum up all the instrs inserted by the spiller
  	spills		= foldl' (plusUFM_C (zipWith (+)))

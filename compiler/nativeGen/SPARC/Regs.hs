@@ -5,17 +5,6 @@
 -- -----------------------------------------------------------------------------
 
 module SPARC.Regs (
-
-	-- sizes
-	Size(..),
-	intSize, 
-	floatSize, 
-	isFloatSize, 
-	wordSize,
-	cmmTypeSize,
-	sizeToWidth,
-	mkVReg,
-
 	-- immediate values
 	Imm(..),
 	strImmLit,
@@ -39,112 +28,32 @@ module SPARC.Regs (
 	fits13Bits, 
 	largeOffsetError,
 	gReg, iReg, lReg, oReg, fReg,
-	fp, sp, g0, g1, g2, o0, o1, f0, f6, f8, f26, f27,
+	fp, sp, g0, g1, g2, o0, o1, f0, f6, f8, f22, f26, f27,
 	nCG_FirstFloatReg,
 
-	-- horror show
+	-- allocatable
 	freeReg,
-	globalRegMaybe
+	allocatableRegs,
+	globalRegMaybe,
+
+	get_GlobalReg_reg_or_addr
 )
 
 where
 
-#include "nativeGen/NCG.h"
-#include "HsVersions.h"
-#include "../includes/MachRegs.h"
 
-import RegsBase
+import Reg
+import RegClass
 
+import CgUtils          ( get_GlobalReg_addr )
 import BlockId
 import Cmm
 import CLabel           ( CLabel )
 import Pretty
-import Outputable	( Outputable(..), pprPanic, panic )
+import Outputable	( panic )
 import qualified Outputable
-import Unique
 import Constants
 import FastBool
-
--- sizes -----------------------------------------------------------------------
-
--- | A 'Size' also includes format information, such as whether
---	the word is signed or unsigned.
---
-data Size
-	= II8     -- byte (signed)
-	| II16    -- halfword (signed, 2 bytes)
-	| II32    -- word (4 bytes)
-	| II64    -- word (8 bytes)
-	| FF32    -- IEEE single-precision floating pt
-	| FF64    -- IEEE single-precision floating pt
-	deriving Eq
-
-
--- | Get the integer size of this width.
-intSize :: Width -> Size
-intSize width
- = case width of
- 	W8 	-> II8
-	W16	-> II16
-	W32	-> II32
-	W64 	-> II64
-	other	-> pprPanic "SPARC.Regs.intSize" (ppr other)
-
-
--- | Get the float size of this width.
-floatSize :: Width -> Size
-floatSize width
- = case width of
- 	W32	-> FF32
-	W64	-> FF64
-	other 	-> pprPanic "SPARC.Regs.intSize" (ppr other)
-
-
--- | Check if a size represents a floating point value.
-isFloatSize :: Size -> Bool
-isFloatSize size
- = case size of
- 	FF32	-> True
-	FF64	-> True
-	_	-> False
-
-
--- | Size of a machine word. 
---	This is big enough to hold a pointer.
-wordSize :: Size
-wordSize = intSize wordWidth
-
-
--- | Convert a Cmm type to a Size.
-cmmTypeSize :: CmmType -> Size
-cmmTypeSize ty 
-	| isFloatType ty	= floatSize (typeWidth ty)
-	| otherwise		= intSize (typeWidth ty)
-
-
--- | Get the Width of a Size.
-sizeToWidth :: Size -> Width
-sizeToWidth size
- = case size of
- 	II8		-> W8
-	II16		-> W16
-	II32		-> W32
-	II64		-> W64
-	FF32		-> W32
-	FF64		-> W64
-
-
--- | Make a virtual reg with this size.
-mkVReg :: Unique -> Size -> Reg
-mkVReg u size
-	| not (isFloatSize size) 
-	= VirtualRegI u
-
-	| otherwise
-	= case size of
-		FF32    -> VirtualRegF u
-		FF64	-> VirtualRegD u
-		_ 	-> panic "mkVReg"
 
 
 -- immediates ------------------------------------------------------------------
@@ -390,48 +299,13 @@ o1  = RealReg (oReg 1)
 f0  = RealReg (fReg 0)
 
 
+-- | We use he first few float regs as double precision. 
+--	This is the RegNo of the first float regs we use as single precision.
+--
 nCG_FirstFloatReg :: RegNo
-nCG_FirstFloatReg = unRealReg NCG_FirstFloatReg
-#else
-nCG_FirstFloatReg :: RegNo
-nCG_FirstFloatReg = unRealReg f22
-#endif
+nCG_FirstFloatReg = 54
 
 
--- horror show -----------------------------------------------------------------
-#if sparc_TARGET_ARCH
-#define g0 0
-#define g1 1
-#define g2 2
-#define g3 3
-#define g4 4
-#define g5 5
-#define g6 6
-#define g7 7
-#define o0 8
-#define o1 9
-#define o2 10
-#define o3 11
-#define o4 12
-#define o5 13
-#define o6 14
-#define o7 15
-#define l0 16
-#define l1 17
-#define l2 18
-#define l3 19
-#define l4 20
-#define l5 21
-#define l6 22
-#define l7 23
-#define i0 24
-#define i1 25
-#define i2 26
-#define i3 27
-#define i4 28
-#define i5 29
-#define i6 30
-#define i7 31
 
 -- | Check whether a machine register is free for allocation.
 --	This needs to match the info in includes/MachRegs.h otherwise modules
@@ -445,7 +319,11 @@ freeReg regno
 
  	-- %g1(r1) - %g4(r4) are allocable -----------------
 
-freeReg :: RegNo -> FastBool
+	-- %g5(r5) - %g7(r7) 
+	--	are reserved for the OS
+	5	-> fastBool False
+	6	-> fastBool False
+	7	-> fastBool False
 
 	-- %o0(r8) - %o5(r13) are allocable ----------------
 
@@ -507,7 +385,15 @@ freeReg :: RegNo -> FastBool
 
 	-- regs not matched above are allocable.
 	_	-> fastBool True
-	
+
+
+-- allocatableRegs is allMachRegNos with the fixed-use regs removed.
+-- i.e., these are the regs for which we are prepared to allow the
+-- register allocator to attempt to map VRegs to.
+allocatableRegs :: [RegNo]
+allocatableRegs
+   = let isFree i = isFastTrue (freeReg i)
+     in  filter isFree allMachRegNos
 
 
 -- | Returns Just the real register that a global register is stored in.
@@ -539,15 +425,20 @@ globalRegMaybe gg
 	Hp		-> Just (RealReg 27)	-- %i3
 	HpLim		-> Just (RealReg 28)	-- %i4
 
-globalRegMaybe :: GlobalReg -> Maybe Reg
+	BaseReg		-> Just (RealReg 25)	-- %i1
+		
+	_		-> Nothing 	
 
 
+-- We map STG registers onto appropriate CmmExprs.  Either they map
+-- to real machine registers or stored as offsets from BaseReg.  Given
+-- a GlobalReg, get_GlobalReg_reg_or_addr produces either the real
+-- register it is in, on this platform, or a CmmExpr denoting the
+-- address in the register table holding it.
+-- (See also get_GlobalReg_addr in CgUtils.)
 
-#else
-
-freeReg	_	= 0#
-globalRegMaybe	= panic "SPARC.Regs.globalRegMaybe: not defined"
-
-#endif
-
-
+get_GlobalReg_reg_or_addr :: GlobalReg -> Either Reg CmmExpr
+get_GlobalReg_reg_or_addr mid
+   = case globalRegMaybe mid of
+        Just rr -> Left rr
+        Nothing -> Right (get_GlobalReg_addr mid)
