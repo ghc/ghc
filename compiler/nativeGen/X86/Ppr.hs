@@ -301,6 +301,7 @@ pprSize x
 #elif x86_64_TARGET_ARCH
 		FF32  -> sLit "ss"	-- "scalar single-precision float" (SSE2)
 		FF64  -> sLit "sd"	-- "scalar double-precision float" (SSE2)
+                _     -> panic "X86.Ppr.pprSize: no match"
 #else
 		_     -> panic "X86.Ppr.pprSize: no match"
 #endif

@@ -2038,8 +2038,8 @@ condFltReg cond x y = do
 #elif x86_64_TARGET_ARCH
 condFltReg cond x y = do
   CondCode _ cond cond_code <- condFltCode cond x y
-  tmp1 <- getNewRegNat wordSize
-  tmp2 <- getNewRegNat wordSize
+  tmp1 <- getNewRegNat archWordSize
+  tmp2 <- getNewRegNat archWordSize
   let 
 	-- We have to worry about unordered operands (eg. comparisons
 	-- against NaN).  If the operands are unordered, the comparison
