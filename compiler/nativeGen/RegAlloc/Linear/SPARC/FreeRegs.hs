@@ -128,12 +128,14 @@ releaseReg r regs@(FreeRegs g f d)
 	
 	-- don't release the high part of double regs
 	--	this prevents them from being allocated as single precison regs.
-	| r == 43		= regs
-	| r == 45		= regs
-	| r == 47		= regs
-	| r == 49		= regs
-	| r == 51		= regs
-	| r == 53		= regs
+	| r == 39	= regs
+	| r == 41	= regs
+	| r == 43	= regs
+	| r == 45	= regs
+	| r == 47	= regs
+	| r == 49	= regs
+	| r == 51	= regs
+	| r == 53	= regs
 	
 	-- a general purpose reg
 	| r <= 31	
