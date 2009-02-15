@@ -300,9 +300,9 @@ howToAccessLabel dflags arch OSLinux DataReference lbl
 
 
 	-- In most cases, we have to avoid symbol stubs on ELF, for the following reasons:
-	-- * on i386, the position-independent symbol stubs in the Procedure Linkage Table
+	--   on i386, the position-independent symbol stubs in the Procedure Linkage Table
 	--   require the address of the GOT to be loaded into register %ebx on entry.
-	-- * The linker will take any reference to the symbol stub as a hint that
+	--   The linker will take any reference to the symbol stub as a hint that
 	--   the label in question is a code label. When linking executables, this
 	--   will cause the linker to replace even data references to the label with
 	--   references to the symbol stub.
