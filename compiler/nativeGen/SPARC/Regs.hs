@@ -5,38 +5,31 @@
 -- -----------------------------------------------------------------------------
 
 module SPARC.Regs (
-	-- immediate values
-	Imm(..),
-	strImmLit,
-	litToImm,
-
-	-- addressing modes
-	AddrMode(..),
-	addrOffset,
-
 	-- registers
-	spRel,
-	argRegs, 
-	allArgRegs, 
-	callClobberedRegs,
-	allMachRegNos,
-	regClass,
 	showReg,
+	regClass,
+	allMachRegNos,
 
 	-- machine specific info
-	fpRel,
-	fits13Bits, 
-	largeOffsetError,
 	gReg, iReg, lReg, oReg, fReg,
 	fp, sp, g0, g1, g2, o0, o1, f0, f6, f8, f22, f26, f27,
 	nCG_FirstFloatReg,
+	fPair,
 
 	-- allocatable
 	freeReg,
 	allocatableRegs,
 	globalRegMaybe,
+	get_GlobalReg_reg_or_addr,
 
-	get_GlobalReg_reg_or_addr
+	-- args
+	argRegs, 
+	allArgRegs, 
+	callClobberedRegs,
+
+	-- 
+	mkVReg,
+	regDotColor
 )
 
 where
@@ -44,164 +37,40 @@ where
 
 import Reg
 import RegClass
+import Size
 
+import Cmm
 import CgUtils          ( get_GlobalReg_addr )
 import BlockId
-import Cmm
-import CLabel           ( CLabel )
-import Pretty
-import Outputable	( panic )
-import qualified Outputable
+import CLabel
 import Constants
+
+import Unique
+import Outputable
 import FastBool
 
 
--- immediates ------------------------------------------------------------------
+{-
+	The SPARC has 64 registers of interest; 32 integer registers and 32
+	floating point registers.  The mapping of STG registers to SPARC
+	machine registers is defined in StgRegs.h.  We are, of course,
+	prepared for any eventuality.
 
--- | An immediate value.
---	Not all of these are directly representable by the machine. 
---	Things like ImmLit are slurped out and put in a data segment instead.
---
-data Imm
-	= ImmInt	Int
-
-	-- Sigh.
-	| ImmInteger	Integer	    
-
-	-- AbstractC Label (with baggage)
-	| ImmCLbl	CLabel	    
-
-	-- Simple string
-	| ImmLit	Doc	    
-	| ImmIndex	CLabel Int
-	| ImmFloat	Rational
-	| ImmDouble	Rational
-
-	| ImmConstantSum  Imm Imm
-	| ImmConstantDiff Imm Imm
-
-	| LO 	Imm		   
-	| HI 	Imm
+	The whole fp-register pairing thing on sparcs is a huge nuisance.  See
+	fptools/ghc/includes/MachRegs.h for a description of what's going on
+	here.
+-}
 
 
--- | Create a ImmLit containing this string.
-strImmLit :: String -> Imm
-strImmLit s = ImmLit (text s)
-
-
--- | Convert a CmmLit to an Imm.
--- 	Narrow to the width: a CmmInt might be out of
--- 	range, but we assume that ImmInteger only contains
--- 	in-range values.  A signed value should be fine here.
---
-litToImm :: CmmLit -> Imm
-litToImm lit
- = case lit of
- 	CmmInt i w		-> ImmInteger (narrowS w i)
-	CmmFloat f W32		-> ImmFloat f
-	CmmFloat f W64		-> ImmDouble f
-	CmmLabel l		-> ImmCLbl l
-	CmmLabelOff l off	-> ImmIndex l off
-
-	CmmLabelDiffOff l1 l2 off
-	 -> ImmConstantSum
-		(ImmConstantDiff (ImmCLbl l1) (ImmCLbl l2))
-		(ImmInt off)
-
-	CmmBlock id	-> ImmCLbl (infoTblLbl id)
-	_		-> panic "SPARC.Regs.litToImm: no match"
-
-
-
--- addressing modes ------------------------------------------------------------
-
--- | Represents a memory address in an instruction.
---	Being a RISC machine, the SPARC addressing modes are very regular.
---
-data AddrMode
-	= AddrRegReg	Reg Reg		-- addr = r1 + r2
-	| AddrRegImm	Reg Imm		-- addr = r1 + imm
-
-
--- | Add an integer offset to the address in an AddrMode.
---
-addrOffset :: AddrMode -> Int -> Maybe AddrMode
-addrOffset addr off
-  = case addr of
-      AddrRegImm r (ImmInt n)
-       | fits13Bits n2 -> Just (AddrRegImm r (ImmInt n2))
-       | otherwise     -> Nothing
-       where n2 = n + off
-
-      AddrRegImm r (ImmInteger n)
-       | fits13Bits n2 -> Just (AddrRegImm r (ImmInt (fromInteger n2)))
-       | otherwise     -> Nothing
-       where n2 = n + toInteger off
-
-      AddrRegReg r (RealReg 0)
-       | fits13Bits off -> Just (AddrRegImm r (ImmInt off))
-       | otherwise     -> Nothing
-       
-      _ -> Nothing
-
-
-
--- registers -------------------------------------------------------------------
-
--- | Get an AddrMode relative to the address in sp.
---	This gives us a stack relative addressing mode for volatile
--- 	temporaries and for excess call arguments.  
---
-spRel :: Int		-- ^ stack offset in words, positive or negative
-      -> AddrMode
-
-spRel n	= AddrRegImm sp (ImmInt (n * wORD_SIZE))
-
-
--- | The registers to place arguments for function calls, 
---	for some number of arguments.
---
-argRegs :: RegNo -> [Reg]
-argRegs r
- = case r of
- 	0	-> []
-	1	-> map (RealReg . oReg) [0]
-	2	-> map (RealReg . oReg) [0,1]
-	3	-> map (RealReg . oReg) [0,1,2]
-	4	-> map (RealReg . oReg) [0,1,2,3]
-	5	-> map (RealReg . oReg) [0,1,2,3,4]
-	6	-> map (RealReg . oReg) [0,1,2,3,4,5]
-	_	-> panic "MachRegs.argRegs(sparc): don't know about >6 arguments!"
-
-
--- | All all the regs that could possibly be returned by argRegs
---
-allArgRegs :: [Reg]
-allArgRegs 
-	= map RealReg [oReg i | i <- [0..5]]
-
-
--- These are the regs that we cannot assume stay alive over a C call.  
---	TODO: Why can we assume that o6 isn't clobbered? -- BL 2009/02
---
-callClobberedRegs :: [Reg]
-callClobberedRegs
-	= map RealReg 
-	        (  oReg 7 :
-	          [oReg i | i <- [0..5]] ++
-	          [gReg i | i <- [1..7]] ++
-	          [fReg i | i <- [0..31]] )
-
-
--- | The RegNos corresponding to all the registers in the machine.
---	For SPARC we use f0-f22 as doubles, so pretend that the high halves
---	of these, ie f23, f25 .. don't exist.
---
-allMachRegNos :: [RegNo]
-allMachRegNos	
-	= ([0..31]
-               ++ [32,34 .. nCG_FirstFloatReg-1]
-               ++ [nCG_FirstFloatReg .. 63])	
+-- | Get the standard name for the register with this number.
+showReg :: RegNo -> String
+showReg n
+	| n >= 0  && n < 8   = "%g" ++ show n
+	| n >= 8  && n < 16  = "%o" ++ show (n-8)
+	| n >= 16 && n < 24  = "%l" ++ show (n-16)
+	| n >= 24 && n < 32  = "%i" ++ show (n-24)
+	| n >= 32 && n < 64  = "%f" ++ show (n-32)
+	| otherwise          = panic "SPARC.Regs.showReg: unknown sparc register"
 
 
 -- | Get the class of a register.
@@ -219,53 +88,15 @@ regClass reg
 	  | otherwise			-> RcFloat
 
 
--- | Get the standard name for the register with this number.
-showReg :: RegNo -> String
-showReg n
-	| n >= 0  && n < 8   = "%g" ++ show n
-	| n >= 8  && n < 16  = "%o" ++ show (n-8)
-	| n >= 16 && n < 24  = "%l" ++ show (n-16)
-	| n >= 24 && n < 32  = "%i" ++ show (n-24)
-	| n >= 32 && n < 64  = "%f" ++ show (n-32)
-	| otherwise          = panic "SPARC.Regs.showReg: unknown sparc register"
-
-
--- machine specific ------------------------------------------------------------
-
--- | Get an address relative to the frame pointer.
---	This doesn't work work for offsets greater than 13 bits; we just hope for the best
+-- | The RegNos corresponding to all the registers in the machine.
+--	For SPARC we use f0-f22 as doubles, so pretend that the high halves
+--	of these, ie f23, f25 .. don't exist.
 --
-fpRel :: Int -> AddrMode
-fpRel n
-	= AddrRegImm fp (ImmInt (n * wORD_SIZE))
-
-
--- | Check whether an offset is representable with 13 bits.
-fits13Bits :: Integral a => a -> Bool
-fits13Bits x = x >= -4096 && x < 4096
-
-{-# SPECIALIZE fits13Bits :: Int -> Bool, Integer -> Bool #-}
-
-
--- | Sadness.
-largeOffsetError :: Integral a => a -> b
-largeOffsetError i
-  = panic ("ERROR: SPARC native-code generator cannot handle large offset ("
-		++ show i ++ ");\nprobably because of large constant data structures;" ++ 
-		"\nworkaround: use -fvia-C on this module.\n")
-
-
-
-{-
-	The SPARC has 64 registers of interest; 32 integer registers and 32
-	floating point registers.  The mapping of STG registers to SPARC
-	machine registers is defined in StgRegs.h.  We are, of course,
-	prepared for any eventuality.
-
-	The whole fp-register pairing thing on sparcs is a huge nuisance.  See
-	fptools/ghc/includes/MachRegs.h for a description of what's going on
-	here.
--}
+allMachRegNos :: [RegNo]
+allMachRegNos	
+	= ([0..31]
+               ++ [32,34 .. nCG_FirstFloatReg-1]
+               ++ [nCG_FirstFloatReg .. 63])	
 
 
 -- | Get the regno for this sort of reg
@@ -305,6 +136,18 @@ f0  = RealReg (fReg 0)
 nCG_FirstFloatReg :: RegNo
 nCG_FirstFloatReg = 54
 
+
+-- | Produce the second-half-of-a-double register given the first half.
+fPair :: Reg -> Maybe Reg
+fPair (RealReg n) 
+	| n >= 32 && n `mod` 2 == 0  = Just (RealReg (n+1))
+
+fPair (VirtualRegD u)
+	= Just (VirtualRegHi u)
+
+fPair _
+	= trace ("MachInstrs.fPair: can't get high half of supposed double reg ") 
+		Nothing
 
 
 -- | Check whether a machine register is free for allocation.
@@ -442,3 +285,60 @@ get_GlobalReg_reg_or_addr mid
    = case globalRegMaybe mid of
         Just rr -> Left rr
         Nothing -> Right (get_GlobalReg_addr mid)
+
+
+-- | The registers to place arguments for function calls, 
+--	for some number of arguments.
+--
+argRegs :: RegNo -> [Reg]
+argRegs r
+ = case r of
+ 	0	-> []
+	1	-> map (RealReg . oReg) [0]
+	2	-> map (RealReg . oReg) [0,1]
+	3	-> map (RealReg . oReg) [0,1,2]
+	4	-> map (RealReg . oReg) [0,1,2,3]
+	5	-> map (RealReg . oReg) [0,1,2,3,4]
+	6	-> map (RealReg . oReg) [0,1,2,3,4,5]
+	_	-> panic "MachRegs.argRegs(sparc): don't know about >6 arguments!"
+
+
+-- | All all the regs that could possibly be returned by argRegs
+--
+allArgRegs :: [Reg]
+allArgRegs 
+	= map RealReg [oReg i | i <- [0..5]]
+
+
+-- These are the regs that we cannot assume stay alive over a C call.  
+--	TODO: Why can we assume that o6 isn't clobbered? -- BL 2009/02
+--
+callClobberedRegs :: [Reg]
+callClobberedRegs
+	= map RealReg 
+	        (  oReg 7 :
+	          [oReg i | i <- [0..5]] ++
+	          [gReg i | i <- [1..7]] ++
+	          [fReg i | i <- [0..31]] )
+
+
+
+-- | Make a virtual reg with this size.
+mkVReg :: Unique -> Size -> Reg
+mkVReg u size
+	| not (isFloatSize size) 
+	= VirtualRegI u
+
+	| otherwise
+	= case size of
+		FF32    -> VirtualRegF u
+		FF64	-> VirtualRegD u
+		_ 	-> panic "mkVReg"
+
+
+regDotColor :: Reg -> SDoc
+regDotColor reg
+ = case regClass reg of
+ 	RcInteger	-> text "blue"
+	RcFloat		-> text "red"
+	RcDouble	-> text "green"

@@ -24,9 +24,11 @@ where
 #include "nativeGen/NCG.h"
 
 import SPARC.Regs
-import SPARC.RegInfo
 import SPARC.Instr
 import SPARC.Cond
+import SPARC.Imm
+import SPARC.AddrMode
+import SPARC.Base
 import Instruction
 import Reg
 import Size

@@ -37,9 +37,9 @@ import X86.Ppr
 #elif sparc_TARGET_ARCH
 import SPARC.CodeGen
 import SPARC.Regs
-import SPARC.RegInfo
 import SPARC.Instr
 import SPARC.Ppr
+import SPARC.ShortcutJump
 
 #elif powerpc_TARGET_ARCH
 import PPC.CodeGen

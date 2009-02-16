@@ -20,9 +20,12 @@ where
 
 -- NCG stuff:
 import SPARC.Instr
+import SPARC.Stack
 import SPARC.Cond
+import SPARC.Imm
+import SPARC.AddrMode
 import SPARC.Regs
-import SPARC.RegInfo
+import SPARC.Base
 import Instruction
 import Size
 import Reg

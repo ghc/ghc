@@ -479,10 +479,14 @@ Library
             PPC.Cond
             PPC.Ppr
             PPC.CodeGen
+            SPARC.Base
             SPARC.Regs
-            SPARC.RegInfo
-            SPARC.Instr
+            SPARC.Imm
+            SPARC.AddrMode	    
             SPARC.Cond
+            SPARC.Instr
+            SPARC.Stack	   
+            SPARC.ShortcutJump
             SPARC.Ppr
             SPARC.CodeGen
             RegAlloc.Liveness

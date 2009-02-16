@@ -39,8 +39,6 @@ import qualified PPC.RegInfo	as PPC
 
 #elif sparc_TARGET_ARCH	
 import qualified SPARC.Regs	as SPARC
-import qualified SPARC.RegInfo	as SPARC
-
 
 #else
 #error "RegAlloc.Graph.TargetReg: not defined"

@@ -11,14 +11,23 @@
 
 module SPARC.Instr (
 	RI(..),
+	riZero,
+
+	fpRelEA,
+	moveSp,
+	
 	Instr(..),
 	maxSpillSlots
 )
 
 where
 
-import SPARC.Regs
+import SPARC.Stack
+import SPARC.Imm
+import SPARC.AddrMode
 import SPARC.Cond
+import SPARC.Regs
+import SPARC.Base
 import Instruction
 import RegClass
 import Reg
@@ -26,8 +35,6 @@ import Size
 
 import BlockId
 import Cmm
-import Outputable
-import Constants	(rESERVED_C_STACK_BYTES )
 import FastString
 import FastBool
 
@@ -38,6 +45,29 @@ import GHC.Exts
 data RI 
 	= RIReg Reg
 	| RIImm Imm
+
+-- | Check if a RI represents a zero value.
+--  	- a literal zero
+--	- register %g0, which is always zero.
+--
+riZero :: RI -> Bool
+riZero (RIImm (ImmInt 0))	    = True
+riZero (RIImm (ImmInteger 0))	    = True
+riZero (RIReg (RealReg 0))          = True
+riZero _			    = False
+
+
+-- | Calculate the effective address which would be used by the
+-- 	corresponding fpRel sequence. 
+fpRelEA :: Int -> Reg -> Instr
+fpRelEA n dst
+   = ADD False False fp (RIImm (ImmInt (n * wordLength))) dst
+
+
+-- | Code to shift the stack pointer by n words.
+moveSp :: Int -> Instr
+moveSp n
+   = ADD False False sp (RIImm (ImmInt (n * wordLength))) sp
 
 
 -- | instance for sparc instruction set
@@ -346,29 +376,6 @@ sparc_mkLoadInstr reg _ slot
 			RcDouble  -> FF64
 
         in LD sz (fpRel (- off_w)) reg
-
--- | Convert a spill slot number to a *byte* offset, with no sign.
---
-spillSlotToOffset :: Int -> Int
-spillSlotToOffset slot
-	| slot >= 0 && slot < maxSpillSlots
-	= 64 + spillSlotSize * slot
-
-	| otherwise
-	= pprPanic "spillSlotToOffset:" 
-	              (   text "invalid spill location: " <> int slot
-		      $$  text "maxSpillSlots:          " <> int maxSpillSlots)
-
-
--- | We need 8 bytes because our largest registers are 64 bit.
-spillSlotSize :: Int
-spillSlotSize = 8
-
-
--- | The maximum number of spill slots available on the C stack.
---	If we use up all of the slots, then we're screwed.
-maxSpillSlots :: Int
-maxSpillSlots = ((rESERVED_C_STACK_BYTES - 64) `div` spillSlotSize) - 1
 
 
 --------------------------------------------------------------------------------
