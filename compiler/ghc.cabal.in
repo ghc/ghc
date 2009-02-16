@@ -489,6 +489,12 @@ Library
             SPARC.ShortcutJump
             SPARC.Ppr
             SPARC.CodeGen
+            SPARC.CodeGen.Amode
+            SPARC.CodeGen.Base
+            SPARC.CodeGen.CCall
+            SPARC.CodeGen.CondCode
+            SPARC.CodeGen.Gen32
+            SPARC.CodeGen.Gen64
             RegAlloc.Liveness
             RegAlloc.Graph.Main
             RegAlloc.Graph.Stats

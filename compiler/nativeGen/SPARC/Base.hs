@@ -10,7 +10,9 @@ module SPARC.Base (
 	wordLengthInBits,
 	spillAreaLength,
 	spillSlotSize,
+	extraStackArgsHere,
 	fits13Bits,
+	is32BitInteger,
 	largeOffsetError
 )
 
@@ -18,6 +20,9 @@ where
 
 import qualified Constants
 import Panic
+
+import Data.Int
+
 
 -- On 32 bit SPARC, pointers are 32 bits.
 wordLength :: Int
@@ -37,10 +42,27 @@ spillSlotSize :: Int
 spillSlotSize = 8
 
 
+-- | We (allegedly) put the first six C-call arguments in registers;
+-- 	where do we start putting the rest of them?
+extraStackArgsHere :: Int
+extraStackArgsHere = 23
+
+
 {-# SPECIALIZE fits13Bits :: Int -> Bool, Integer -> Bool #-}
 -- | Check whether an offset is representable with 13 bits.
 fits13Bits :: Integral a => a -> Bool
 fits13Bits x = x >= -4096 && x < 4096
+
+-- | Check whether an integer will fit in 32 bits.
+--	A CmmInt is intended to be truncated to the appropriate 
+-- 	number of bits, so here we truncate it to Int64.  This is
+-- 	important because e.g. -1 as a CmmInt might be either
+-- 	-1 or 18446744073709551615.
+--
+is32BitInteger :: Integer -> Bool
+is32BitInteger i 
+	= i64 <= 0x7fffffff && i64 >= -0x80000000
+  	where i64 = fromIntegral i :: Int64
 
 
 -- | Sadness.
@@ -49,3 +71,5 @@ largeOffsetError i
   = panic ("ERROR: SPARC native-code generator cannot handle large offset ("
 		++ show i ++ ");\nprobably because of large constant data structures;" ++ 
 		"\nworkaround: use -fvia-C on this module.\n")
+
+

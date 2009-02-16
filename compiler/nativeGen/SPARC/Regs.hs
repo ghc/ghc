@@ -41,9 +41,6 @@ import Size
 
 import Cmm
 import CgUtils          ( get_GlobalReg_addr )
-import BlockId
-import CLabel
-import Constants
 
 import Unique
 import Outputable
