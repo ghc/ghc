@@ -60,9 +60,15 @@ wakeUpSleepingThreads(lnat ticks)
     StgTSO *tso;
     rtsBool flag = rtsFalse;
 
-    while (sleeping_queue != END_TSO_QUEUE &&
-	   (int)(ticks - sleeping_queue->block_info.target) >= 0) {
+    while (sleeping_queue != END_TSO_QUEUE) {
 	tso = sleeping_queue;
+        if (tso->what_next == ThreadRelocated) {
+            sleeping_queue = tso->_link;
+            continue;
+        }
+        if (((long)ticks - (long)tso->block_info.target) < 0) {
+            break;
+        }
 	sleeping_queue = tso->_link;
 	tso->why_blocked = NotBlocked;
 	tso->_link = END_TSO_QUEUE;
