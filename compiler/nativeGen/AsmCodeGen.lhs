@@ -25,7 +25,6 @@ import Alpha.CodeGen
 import Alpha.Regs
 import Alpha.RegInfo
 import Alpha.Instr
-import Alpha.Ppr
 
 #elif i386_TARGET_ARCH || x86_64_TARGET_ARCH
 import X86.CodeGen

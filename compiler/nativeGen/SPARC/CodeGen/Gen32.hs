@@ -104,40 +104,81 @@ getRegister (CmmLit (CmmFloat d W64)) = do
 	    LD II64 (AddrRegImm tmp (LO (ImmCLbl lbl))) dst] 
     return (Any FF64 code)
 
-getRegister (CmmMachOp mop [x]) -- unary MachOps
+
+-- Unary machine ops
+getRegister (CmmMachOp mop [x])
   = case mop of
-      MO_F_Neg W32     -> trivialUFCode FF32 (FNEG FF32) x
-      MO_F_Neg W64     -> trivialUFCode FF64 (FNEG FF64) x
-
-      MO_S_Neg rep     -> trivialUCode (intSize rep) (SUB False False g0) x
-      MO_Not rep       -> trivialUCode (intSize rep) (XNOR False g0) x
-
-      MO_FF_Conv W64 W32-> coerceDbl2Flt x
-      MO_FF_Conv W32 W64-> coerceFlt2Dbl x
-
-      MO_FS_Conv from to -> coerceFP2Int from to x
-      MO_SF_Conv from to -> coerceInt2FP from to x
-
-      -- Conversions which are a nop on sparc
-      MO_UU_Conv from to
-	| from == to    -> conversionNop (intSize to)  x
-      MO_UU_Conv W32 W8 -> trivialCode W8 (AND False) x (CmmLit (CmmInt 255 W8))
-      MO_UU_Conv W32 to -> conversionNop (intSize to) x
-      MO_SS_Conv W32 to -> conversionNop (intSize to) x
-
-      MO_UU_Conv W8  to@W32  -> conversionNop (intSize to)  x
-      MO_UU_Conv W16 to@W32  -> conversionNop (intSize to)  x
-      MO_UU_Conv W8  to@W16  -> conversionNop (intSize to)  x
-
-      -- sign extension
-      MO_SS_Conv W8  W32  -> integerExtend W8  W32 x
-      MO_SS_Conv W16 W32  -> integerExtend W16 W32 x
-      MO_SS_Conv W8  W16  -> integerExtend W8  W16 x
-
-      _ 		  -> panic ("Unknown unary mach op: " ++ show mop)
+	-- Floating point negation -------------------------
+	MO_F_Neg W32		-> trivialUFCode FF32 (FNEG FF32) x
+	MO_F_Neg W64		-> trivialUFCode FF64 (FNEG FF64) x
 
 
-getRegister (CmmMachOp mop [x, y]) -- dyadic PrimOps
+	-- Integer negation --------------------------------
+	MO_S_Neg rep		-> trivialUCode (intSize rep) (SUB False False g0) x
+	MO_Not rep		-> trivialUCode (intSize rep) (XNOR False g0) x
+
+
+	-- Float word size conversion ----------------------
+	MO_FF_Conv W64 W32	-> coerceDbl2Flt x
+	MO_FF_Conv W32 W64	-> coerceFlt2Dbl x
+
+
+	-- Float <-> Signed Int conversion -----------------
+	MO_FS_Conv from to 	-> coerceFP2Int from to x
+	MO_SF_Conv from to 	-> coerceInt2FP from to x
+
+
+	-- Unsigned integer word size conversions ----------
+
+	-- If it's the same size, then nothing needs to be done.
+	MO_UU_Conv from to
+	 | from == to    	-> conversionNop (intSize to)  x
+
+	-- To narrow an unsigned word, mask out the high bits to simulate what would 
+	--	happen if we copied the value into a smaller register.
+	MO_UU_Conv W16 W8	-> trivialCode W8  (AND False) x (CmmLit (CmmInt 255 W8))
+	MO_UU_Conv W32 W8	-> trivialCode W8  (AND False) x (CmmLit (CmmInt 255 W8))
+
+	-- for narrowing 32 bit to 16 bit, don't use a literal mask value like the W16->W8
+	--	case because the only way we can load it is via SETHI, which needs 2 ops.
+	--	Do some shifts to chop out the high bits instead.
+	MO_UU_Conv W32 W16	
+	 -> do	tmpReg		<- getNewRegNat II32
+		(xReg, xCode)	<- getSomeReg x
+	 	let code dst
+			=  	xCode
+			`appOL` toOL
+				[ SLL xReg   (RIImm $ ImmInt 16) tmpReg
+				, SRL tmpReg (RIImm $ ImmInt 16) dst]
+				
+		return	$ Any II32 code
+			
+		--	 trivialCode W16 (AND False) x (CmmLit (CmmInt 65535 W16))
+
+	-- To widen an unsigned word we don't have to do anything.
+	--	Just leave it in the same register and mark the result as the new size.
+	MO_UU_Conv W8  W16	-> conversionNop (intSize W16)  x
+	MO_UU_Conv W8  W32	-> conversionNop (intSize W32)  x
+	MO_UU_Conv W16 W32	-> conversionNop (intSize W32)  x
+
+
+	-- Signed integer word size conversions ------------
+
+	-- Mask out high bits when narrowing them
+	MO_SS_Conv W16 W8	-> trivialCode W8  (AND False) x (CmmLit (CmmInt 255 W8))
+	MO_SS_Conv W32 W8	-> trivialCode W8  (AND False) x (CmmLit (CmmInt 255 W8))
+	MO_SS_Conv W32 W16	-> trivialCode W16 (AND False) x (CmmLit (CmmInt 65535 W16))
+
+	-- Sign extend signed words when widening them.
+	MO_SS_Conv W8  W16	-> integerExtend W8  W16 x
+	MO_SS_Conv W8  W32	-> integerExtend W8  W32 x
+	MO_SS_Conv W16 W32	-> integerExtend W16 W32 x
+
+	_ 		  	-> panic ("Unknown unary mach op: " ++ show mop)
+
+
+-- Binary machine ops
+getRegister (CmmMachOp mop [x, y]) 
   = case mop of
       MO_Eq _ 		-> condIntReg EQQ x y
       MO_Ne _ 		-> condIntReg NE x y
@@ -250,8 +291,12 @@ integerExtend from to expr
 	return (Any (intSize to) code)
 				
 
+-- | For nop word format conversions we set the resulting value to have the
+--	required size, but don't need to generate any actual code.
+--
 conversionNop
 	:: Size -> CmmExpr -> NatM Register
+
 conversionNop new_rep expr
  = do	e_code <- getRegister expr
 	return (setSizeOfRegister e_code new_rep)
