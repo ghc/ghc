@@ -188,10 +188,10 @@ getRegister (CmmMachOp mop [x, y])
       MO_S_Lt _		-> condIntReg LTT x y
       MO_S_Le _		-> condIntReg LE x y
 	      
-      MO_U_Gt W32  	-> condIntReg GTT x y
-      MO_U_Ge W32  	-> condIntReg GE x y
-      MO_U_Lt W32  	-> condIntReg LTT x y
-      MO_U_Le W32  	-> condIntReg LE x y
+      MO_U_Gt W32  	-> condIntReg GU  x y
+      MO_U_Ge W32  	-> condIntReg GEU x y
+      MO_U_Lt W32  	-> condIntReg LU  x y
+      MO_U_Le W32  	-> condIntReg LEU x y
 
       MO_U_Gt W16 	-> condIntReg GU  x y
       MO_U_Ge W16	-> condIntReg GEU x y
