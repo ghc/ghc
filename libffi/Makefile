@@ -68,7 +68,7 @@ endif
 
 INSTALL_HEADERS += ffi.h
 STATIC_LIB = libffi.a
-INSTALL_LIBS += libHSffi.a HSffi.o
+INSTALL_LIBS += libHSffi.a libHSffi_p.a HSffi.o
 
 # We have to add the GHC version to the name of our dynamic libs, because
 # they will be residing in the system location along with dynamic libs from
