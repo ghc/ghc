@@ -145,7 +145,12 @@ ifneq "$(strip $(INSTALL_PROGS))" ""
 # entry in the INSTALL_PROGS list. If there's no suffix, use
 # $(exeext).
 # 
-INSTALL_PROGS := $(foreach p, $(INSTALL_PROGS), $(addsuffix $(if $(suffix $(p)),,$(exeext)), $(basename $(p))))
+INSTALL_PROGS := $(foreach p, $(INSTALL_PROGS),\
+                   $(if $(filter $(exeext),$(suffix $p)),\
+                        $p,\
+                        $(addsuffix $(exeext),$p)\
+                    )\
+                  )
 
 install:: $(INSTALL_PROGS)
 	$(INSTALL_DIR) $(DESTDIR)$(bindir)

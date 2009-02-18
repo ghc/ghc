@@ -2,7 +2,7 @@ TOP=../..
 include $(TOP)/mk/boilerplate.mk
 
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
-C_PROG = ghc-$(ProjectVersion)
+C_PROG = ghc-$(ProjectVersion)$(exeext)
 INSTALL_PROGS += $(C_PROG)
 else
 SCRIPT_DIR = $(DESTDIR)$(bindir)
