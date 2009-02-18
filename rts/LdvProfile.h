@@ -27,7 +27,7 @@ extern void LdvCensusKillAll ( void );
 #define LDV_FILL_SLOP(from, howManyBackwards)	\
   if (era > 0) {				\
     int i;					\
-    for (i = 0;i < (howManyBackwards); i++)	\
+    for (i = 1;i <= (howManyBackwards); i++)	\
       ((StgWord *)(from))[-i] = 0;		\
   }
 
