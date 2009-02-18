@@ -13,3 +13,7 @@ test('2592',
      [only_ways(['profasm','profc']), req_profiling,
       extra_run_opts('+RTS -M1m -RTS'), exit_code(251)],
      compile_and_run, [''])
+
+test('T3001',
+     [only_ways(['prof_hb']), extra_ways(['prof_hb']), req_profiling],
+     compile_and_run, [''])
