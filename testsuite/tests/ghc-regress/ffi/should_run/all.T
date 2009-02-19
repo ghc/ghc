@@ -134,3 +134,6 @@ test('fptr01', [ omit_ways(['ghci']), extra_clean(['fptr01_c.o']) ],
 test('fptrfail01', [ compose(omit_ways(['ghci']), exit_code(1)),
                      extra_clean(['fptrfail01_c.o']) ],
                    compile_and_run, ['fptrfail01_c.c'])
+
+test('2917a', normal, compile_and_run, [''])
+
