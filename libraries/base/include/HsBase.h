@@ -632,6 +632,13 @@ INLINE int __hscore_sig_setmask( void )
 #endif
 }
 
+#ifndef __MINGW32__
+INLINE size_t __hscore_sizeof_siginfo_t (void)
+{
+    return sizeof(siginfo_t);
+}
+#endif
+
 INLINE int
 __hscore_f_getfl( void )
 {

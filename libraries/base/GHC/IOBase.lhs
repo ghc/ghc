@@ -27,7 +27,8 @@ module GHC.IOBase(
 
         -- References
     IORef(..), newIORef, readIORef, writeIORef, 
-    IOArray(..), newIOArray, readIOArray, writeIOArray, unsafeReadIOArray, unsafeWriteIOArray,
+    IOArray(..), newIOArray, readIOArray, writeIOArray, unsafeReadIOArray, 
+    unsafeWriteIOArray, boundsIOArray,
     MVar(..),
 
         -- Handles, file descriptors,
@@ -606,6 +607,9 @@ readIOArray (IOArray marr) i = stToIO (readSTArray marr i)
 writeIOArray :: Ix i => IOArray i e -> i -> e -> IO ()
 writeIOArray (IOArray marr) i e = stToIO (writeSTArray marr i e)
 
+{-# INLINE boundsIOArray #-}
+boundsIOArray :: IOArray i e -> (i,i)  
+boundsIOArray (IOArray marr) = boundsSTArray marr
 
 -- ---------------------------------------------------------------------------
 -- Show instance for Handles
