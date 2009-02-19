@@ -91,24 +91,17 @@ newPinnedByteArrayzh_fast
     n = R1;
     payload_words = ROUNDUP_BYTES_TO_WDS(n);
 
-    // We want an 8-byte aligned array.  allocatePinned() gives us
+    // We want a 16-byte aligned array.  allocatePinned() gives us
     // 8-byte aligned memory by default, but we want to align the
     // *goods* inside the ArrWords object, so we have to check the
     // size of the ArrWords header and adjust our size accordingly.
-    words = BYTES_TO_WDS(SIZEOF_StgArrWords) + payload_words;
-    if ((SIZEOF_StgArrWords & 7) != 0) {
-	words = words + 1;
-    }
+    words = payload_words + ((SIZEOF_StgArrWords + 15) & ~15);
 
     ("ptr" p) = foreign "C" allocatePinned(words) [];
     TICK_ALLOC_PRIM(SIZEOF_StgArrWords,WDS(payload_words),0);
 
-    // Again, if the ArrWords header isn't a multiple of 8 bytes, we
-    // have to push the object forward one word so that the goods
-    // fall on an 8-byte boundary.
-    if ((SIZEOF_StgArrWords & 7) != 0) {
-	p = p + WDS(1);
-    }
+    // Push the pointer forward so that the goods fall on a 16-byte boundary.
+    p = p + ((p + SIZEOF_StgArrWords) & 15);
 
     SET_HDR(p, stg_ARR_WORDS_info, W_[CCCS]);
     StgArrWords_words(p) = payload_words;
