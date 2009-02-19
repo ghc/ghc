@@ -94,7 +94,7 @@ extern HpcModuleInfo *hs_hpc_rootModule(void);
 extern int  rts_InstallConsoleEvent ( int action, StgStablePtr *handler );
 extern void rts_ConsoleHandlerDone  ( int ev );
 #else
-extern int stg_sig_install (int, int, StgStablePtr *, void *);
+extern int stg_sig_install (int, int, void *);
 #endif
 
 #if defined(mingw32_HOST_OS)

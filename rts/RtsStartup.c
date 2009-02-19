@@ -402,12 +402,6 @@ hs_exit_(rtsBool wait_foreign)
     
     OnExitHook();
 
-#if defined(RTS_USER_SIGNALS)
-    if (RtsFlags.MiscFlags.install_signal_handlers) {
-        freeSignalHandlers();
-    }
-#endif
-
 #if defined(THREADED_RTS)
     ioManagerDie();
 #endif
@@ -418,6 +412,12 @@ hs_exit_(rtsBool wait_foreign)
     /* run C finalizers for all active weak pointers */
     runAllCFinalizers(weak_ptr_list);
     
+#if defined(RTS_USER_SIGNALS)
+    if (RtsFlags.MiscFlags.install_signal_handlers) {
+        freeSignalHandlers();
+    }
+#endif
+
 #if defined(GRAN)
     /* end_gr_simulation prints global stats if requested -- HWL */
     if (!RtsFlags.GranFlags.GranSimStats.Suppressed)

@@ -35,7 +35,12 @@
 # include <signal.h>
 #endif
 
+#ifdef HAVE_ERRNO_H
+# include <errno.h>
+#endif
+
 #include <stdlib.h>
+#include <string.h>
 
 /* This curious flag is provided for the benefit of the Haskell binding
  * to POSIX.1 to control whether or not to include SA_NOCLDSTOP when
@@ -60,7 +65,7 @@ static nat n_haskell_handlers = 0;
  * -------------------------------------------------------------------------- */
 
 static void
-more_handlers(I_ sig)
+more_handlers(int sig)
 {
     StgInt i;
 
@@ -78,33 +83,6 @@ more_handlers(I_ sig)
 
     nHandlers = sig + 1;
 }
-
-/* -----------------------------------------------------------------------------
- * Pending Handlers
- *
- * The mechanism for starting handlers differs between the threaded
- * (THREADED_RTS) and non-threaded versions of the RTS.
- *
- * When the RTS is single-threaded, we just write the pending signal
- * handlers into a buffer, and start a thread for each one in the
- * scheduler loop.
- *
- * When THREADED_RTS, the problem is that signals might be
- * delivered to multiple threads, so we would need to synchronise
- * access to pending_handler_buf somehow.  Using thread
- * synchronisation from a signal handler isn't possible in general
- * (some OSs support it, eg. MacOS X, but not all).  So instead:
- *
- *   - the signal handler writes the signal number into the pipe
- *     managed by the IO manager thread (see GHC.Conc).
- *   - the IO manager picks up the signal number and calls
- *     startSignalHandler() to start the thread.
- *
- * This also has the nice property that we don't need to arrange to
- * wake up a worker task to start the signal handler: the IO manager
- * wakes up when we write into the pipe.
- *
- * -------------------------------------------------------------------------- */
 
 // Here's the pipe into which we will send our signals
 static int io_manager_pipe = -1;
@@ -138,6 +116,8 @@ ioManagerDie (void)
     if (io_manager_pipe >= 0) {
 	StgWord8 byte = (StgWord8)IO_MANAGER_DIE;
 	write(io_manager_pipe, &byte, 1);
+        close(io_manager_pipe);
+        io_manager_pipe = -1;
     }
 }
 
@@ -158,8 +138,8 @@ ioManagerStart (void)
 
 #define N_PENDING_HANDLERS 16
 
-StgPtr pending_handler_buf[N_PENDING_HANDLERS];
-StgPtr *next_pending_handler = pending_handler_buf;
+siginfo_t pending_handler_buf[N_PENDING_HANDLERS];
+siginfo_t *next_pending_handler = pending_handler_buf;
 
 #endif /* THREADED_RTS */
 
@@ -171,7 +151,9 @@ StgPtr *next_pending_handler = pending_handler_buf;
  * -------------------------------------------------------------------------- */
 
 static void
-generic_handler(int sig)
+generic_handler(int sig USED_IF_THREADS,
+                siginfo_t *info,
+                void *p STG_UNUSED)
 {
     sigset_t signals;
 
@@ -179,10 +161,16 @@ generic_handler(int sig)
 
     if (io_manager_pipe != -1)
     {
-	// Write the signal number into the pipe as a single byte.  We
-	// hope that signals fit into a byte...
-	StgWord8 csig = (StgWord8)sig;
-	write(io_manager_pipe, &csig, 1);
+        StgWord8 buf[sizeof(siginfo_t) + 1];
+        int r;
+
+        buf[0] = sig;
+        memcpy(buf+1, info, sizeof(siginfo_t));
+	r = write(io_manager_pipe, buf, sizeof(siginfo_t)+1);
+        if (r == -1 && errno == EAGAIN)
+        {
+            errorBelch("lost signal due to full pipe: %d\n", sig);
+        }
     }
     // If the IO manager hasn't told us what the FD of the write end
     // of its pipe is, there's not much we can do here, so just ignore
@@ -218,7 +206,9 @@ generic_handler(int sig)
        circumstances, depending on the signal.  
     */
 
-    *next_pending_handler++ = deRefStablePtr((StgStablePtr)signal_handlers[sig]);
+    memcpy(next_pending_handler, info, sizeof(siginfo_t));
+
+    next_pending_handler++;
 
     // stack full?
     if (next_pending_handler == &pending_handler_buf[N_PENDING_HANDLERS]) {
@@ -247,6 +237,10 @@ void
 initUserSignals(void)
 {
     sigemptyset(&userSignals);
+#ifndef THREADED_RTS
+    getStablePtr((StgPtr)&base_GHCziConc_runHandlers_closure); 
+    // needed to keep runHandler alive
+#endif
 }
 
 void
@@ -279,10 +273,14 @@ awaitUserSignals(void)
 
 /* -----------------------------------------------------------------------------
  * Install a Haskell signal handler.
+ *
+ * We should really do this in Haskell in GHC.Conc, and share the
+ * signal_handlers array with the one there.
+ *
  * -------------------------------------------------------------------------- */
 
 int
-stg_sig_install(int sig, int spi, StgStablePtr *handler, void *mask)
+stg_sig_install(int sig, int spi, void *mask)
 {
     sigset_t signals, osignals;
     struct sigaction action;
@@ -303,26 +301,19 @@ stg_sig_install(int sig, int spi, StgStablePtr *handler, void *mask)
     
     switch(spi) {
     case STG_SIG_IGN:
-    	signal_handlers[sig] = STG_SIG_IGN;
-	sigdelset(&userSignals, sig);
         action.sa_handler = SIG_IGN;
     	break;
-    	
+
     case STG_SIG_DFL:
-    	signal_handlers[sig] = STG_SIG_DFL;
-	sigdelset(&userSignals, sig);
         action.sa_handler = SIG_DFL;
     	break;
 
-    case STG_SIG_HAN:
     case STG_SIG_RST:
-    	signal_handlers[sig] = (StgInt)*handler;
-	sigaddset(&userSignals, sig);
-    	action.sa_handler = generic_handler;
-	if (spi == STG_SIG_RST) {
-	    action.sa_flags = SA_RESETHAND;
-	}
-	n_haskell_handlers++;
+        action.sa_flags |= SA_RESETHAND;
+        /* fall through */
+    case STG_SIG_HAN:
+    	action.sa_sigaction = generic_handler;
+        action.sa_flags |= SA_SIGINFO;
     	break;
 
     default:
@@ -336,25 +327,38 @@ stg_sig_install(int sig, int spi, StgStablePtr *handler, void *mask)
 
     action.sa_flags |= sig == SIGCHLD && nocldstop ? SA_NOCLDSTOP : 0;
 
-    if (sigaction(sig, &action, NULL) || 
-	sigprocmask(SIG_SETMASK, &osignals, NULL)) 
+    if (sigaction(sig, &action, NULL))
     {
-	// need to return an error code, so avoid a stable pointer leak
-	// by freeing the previous handler if there was one.
-	if (previous_spi >= 0) {
-	    freeStablePtr(stgCast(StgStablePtr,signal_handlers[sig]));
-	    n_haskell_handlers--;
-	}
+        errorBelch("sigaction");
 	return STG_SIG_ERR;
     }
 
-    if (previous_spi == STG_SIG_DFL || previous_spi == STG_SIG_IGN
-	|| previous_spi == STG_SIG_ERR) {
-	return previous_spi;
-    } else {
-	*handler = (StgStablePtr)previous_spi;
-	return STG_SIG_HAN;
+    signal_handlers[sig] = spi;
+
+    switch(spi) {
+    case STG_SIG_RST:
+    case STG_SIG_HAN:
+	sigaddset(&userSignals, sig);
+        if (previous_spi != STG_SIG_HAN && previous_spi != STG_SIG_RST) {
+            n_haskell_handlers++;
+        }
+    	break;
+
+    default:
+	sigdelset(&userSignals, sig);
+        if (previous_spi == STG_SIG_HAN || previous_spi == STG_SIG_RST) {
+            n_haskell_handlers--;
+        }
+        break;
     }
+
+    if (sigprocmask(SIG_SETMASK, &osignals, NULL))
+    {
+        errorBelch("sigprocmask");
+	return STG_SIG_ERR;
+    }
+
+    return previous_spi;
 }
 
 /* -----------------------------------------------------------------------------
@@ -365,16 +369,32 @@ stg_sig_install(int sig, int spi, StgStablePtr *handler, void *mask)
 void
 startSignalHandlers(Capability *cap)
 {
+  siginfo_t *info;
+  int sig;
+
   blockUserSignals();
   
   while (next_pending_handler != pending_handler_buf) {
 
     next_pending_handler--;
 
+    sig = next_pending_handler->si_signo;
+    if (signal_handlers[sig] == STG_SIG_DFL) {
+        continue; // handler has been changed.
+    }
+
+    info = stgMallocBytes(sizeof(siginfo_t), "startSignalHandlers"); 
+           // freed by runHandler
+    memcpy(info, next_pending_handler, sizeof(siginfo_t));
+
     scheduleThread (cap,
 	createIOThread(cap,
 		       RtsFlags.GcFlags.initialStkSize, 
-		       (StgClosure *) *next_pending_handler));
+                       rts_apply(cap,
+                                 rts_apply(cap,
+                                           &base_GHCziConc_runHandlers_closure,
+                                           rts_mkPtr(cap, info)),
+                                 rts_mkInt(cap, info->si_signo))));
   }
 
   unblockUserSignals();
@@ -383,37 +403,18 @@ startSignalHandlers(Capability *cap)
 
 /* ----------------------------------------------------------------------------
  * Mark signal handlers during GC.
- *
- * We do this rather than trying to start all the signal handlers
- * prior to GC, because that requires extra heap for the new threads.
- * Signals must be blocked (see blockUserSignals() above) during GC to
- * avoid race conditions.
  * -------------------------------------------------------------------------- */
 
-#if !defined(THREADED_RTS)
-void
-markSignalHandlers (evac_fn evac, void *user)
-{
-    StgPtr *p;
-
-    p = next_pending_handler;
-    while (p != pending_handler_buf) {
-	p--;
-	evac(user, (StgClosure **)p);
-    }
-}
-#else
 void
 markSignalHandlers (evac_fn evac STG_UNUSED, void *user STG_UNUSED)
 {
+    // nothing to do
 }
-#endif
 
 #else /* !RTS_USER_SIGNALS */
 StgInt 
 stg_sig_install(StgInt sig STG_UNUSED,
 		StgInt spi STG_UNUSED,
-		StgStablePtr* handler STG_UNUSED,
 		void* mask STG_UNUSED)
 {
   //barf("User signals not supported");

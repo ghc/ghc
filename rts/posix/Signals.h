@@ -9,11 +9,15 @@
 #ifndef POSIX_SIGNALS_H
 #define POSIX_SIGNALS_H
 
+#ifdef HAVE_SIGNAL_H
+# include <signal.h>
+#endif
+
 extern rtsBool anyUserHandlers(void);
 
 #if !defined(THREADED_RTS)
-extern StgPtr pending_handler_buf[];
-extern StgPtr *next_pending_handler;
+extern siginfo_t pending_handler_buf[];
+extern siginfo_t *next_pending_handler;
 #define signals_pending() (next_pending_handler != pending_handler_buf)
 void startSignalHandlers(Capability *cap);
 #endif
