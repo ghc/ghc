@@ -1052,6 +1052,8 @@ startIOManagerThread = do
         wr_end <- peekElemOff fds 1
         setNonBlockingFD wr_end -- writes happen in a signal handler, we
                                 -- don't want them to block.
+        setCloseOnExec rd_end
+        setCloseOnExec wr_end
         writeIORef stick (fromIntegral wr_end)
         c_setIOManagerPipe wr_end
         forkIO $ do

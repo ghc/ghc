@@ -337,6 +337,15 @@ setNonBlockingFD _ = return ()
 #endif
 
 -- -----------------------------------------------------------------------------
+-- Set close-on-exec for a file descriptor
+
+setCloseOnExec :: FD -> IO ()
+setCloseOnExec fd = do
+  throwErrnoIfMinus1 "setCloseOnExec" $
+    c_fcntl_write fd const_f_setfd const_fd_cloexec
+  return ()
+
+-- -----------------------------------------------------------------------------
 -- foreign imports
 
 foreign import ccall unsafe "HsBase.h access"
@@ -519,6 +528,8 @@ foreign import ccall unsafe "HsBase.h __hscore_sig_block"    const_sig_block :: 
 foreign import ccall unsafe "HsBase.h __hscore_sig_setmask"  const_sig_setmask :: CInt
 foreign import ccall unsafe "HsBase.h __hscore_f_getfl"      const_f_getfl :: CInt
 foreign import ccall unsafe "HsBase.h __hscore_f_setfl"      const_f_setfl :: CInt
+foreign import ccall unsafe "HsBase.h __hscore_f_setfd"      const_f_setfd :: CInt
+foreign import ccall unsafe "HsBase.h __hscore_fd_cloexec"   const_fd_cloexec :: CLong
 
 #if defined(HTYPE_TCFLAG_T)
 foreign import ccall unsafe "HsBase.h __hscore_sizeof_termios"  sizeof_termios :: Int

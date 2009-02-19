@@ -659,6 +659,26 @@ __hscore_f_setfl( void )
 #endif
 }
 
+INLINE int
+__hscore_f_setfd( void )
+{
+#ifdef F_SETFD
+  return F_SETFD;
+#else
+  return 0;
+#endif
+}
+
+INLINE long
+__hscore_fd_cloexec( void )
+{
+#ifdef FD_CLOEXEC
+  return FD_CLOEXEC;
+#else
+  return 0;
+#endif
+}
+
 // defined in rts/RtsStartup.c.
 extern void* __hscore_get_saved_termios(int fd);
 extern void __hscore_set_saved_termios(int fd, void* ts);
