@@ -339,11 +339,13 @@ setNonBlockingFD _ = return ()
 -- -----------------------------------------------------------------------------
 -- Set close-on-exec for a file descriptor
 
+#if !defined(mingw32_HOST_OS) && !defined(__MINGW32__)
 setCloseOnExec :: FD -> IO ()
 setCloseOnExec fd = do
   throwErrnoIfMinus1 "setCloseOnExec" $
     c_fcntl_write fd const_f_setfd const_fd_cloexec
   return ()
+#endif
 
 -- -----------------------------------------------------------------------------
 -- foreign imports
