@@ -114,16 +114,20 @@ import System.Posix.Internals
 import Foreign
 import Foreign.C
 
+#ifndef mingw32_HOST_OS
 import Data.Dynamic
-import Data.Maybe
 import Control.Monad
+#endif
+import Data.Maybe
 
 import GHC.Base
 import {-# SOURCE #-} GHC.Handle
 import GHC.IOBase
 import GHC.Num          ( Num(..) )
 import GHC.Real         ( fromIntegral )
+#ifndef mingw32_HOST_OS
 import GHC.Arr          ( inRange )
+#endif
 #ifdef mingw32_HOST_OS
 import GHC.Real         ( div )
 import GHC.Ptr          ( plusPtr, FunPtr(..) )
