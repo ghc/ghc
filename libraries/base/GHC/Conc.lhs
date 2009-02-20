@@ -92,7 +92,9 @@ module GHC.Conc
 #endif
 
         , ensureIOManagerIsRunning
+#ifndef mingw32_HOST_OS
         , syncIOManager
+#endif
 
 #ifdef mingw32_HOST_OS
         , ConsoleEvent(..)
