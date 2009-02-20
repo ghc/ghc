@@ -111,7 +111,7 @@ writeInterfaceFile filename iface = do
   bh <- return $ setUserData bh0 ud
   put_ bh iface
 
-  -- write the symtab pointer at the fornt of the file
+  -- write the symtab pointer at the front of the file
   symtab_p <- tellBin bh
   putAt bh symtab_p_p symtab_p
   seekBin bh symtab_p		
