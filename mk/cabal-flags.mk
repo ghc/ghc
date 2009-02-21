@@ -89,8 +89,7 @@ USE_STAGE1_CONFIGURE_FLAGS = \
 
 USE_STAGE2_CONFIGURE_FLAGS =            \
     --with-compiler=$(GHC_STAGE2)       \
-    $(USE_STAGE_CONFIGURE_FLAGS)        \
-	--package-db $(STAGE3_PACKAGE_CONF)
+    $(USE_STAGE_CONFIGURE_FLAGS)
 
 BUILD_FLAGS = $(addprefix --ghc-option=,$(SRC_HC_OPTS))
 
