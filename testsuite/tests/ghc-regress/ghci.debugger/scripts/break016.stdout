@@ -1,9 +1,3 @@
 Breakpoint 0 activated at break016.hs:1:6-13
-Stopped at break016.hs:1:6-13
-_result :: Int = _
-i :: Int = 4
 macro '__cond' is not defined
 4
-Stopped at break016.hs:1:6-13
-_result :: Int = _
-i :: Int = 1
