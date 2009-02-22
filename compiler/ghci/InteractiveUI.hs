@@ -742,7 +742,7 @@ afterRunStmt step_here run_result = do
                st <- getGHCiState
                enqueueCommands [stop st]
                return ()
-         | otherwise -> resume GHC.SingleStep >>=
+         | otherwise -> resume step_here GHC.SingleStep >>=
                         afterRunStmt step_here >> return ()
      _ -> return ()
 
@@ -1978,7 +1978,7 @@ continueCmd = noArgs $ doContinue (const True) GHC.RunToCompletion
 -- doContinue :: SingleStep -> GHCi ()
 doContinue :: (SrcSpan -> Bool) -> SingleStep -> GHCi ()
 doContinue pred step = do 
-  runResult <- resume step
+  runResult <- resume pred step
   afterRunStmt pred runResult
   return ()
 

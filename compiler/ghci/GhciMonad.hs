@@ -248,8 +248,8 @@ runStmt expr step = do
                                         return GHC.RunFailed) $ do
           GHC.runStmt expr step
 
-resume :: GHC.SingleStep -> GHCi GHC.RunResult
-resume step = GHC.resume step
+resume :: (SrcSpan -> Bool) -> GHC.SingleStep -> GHCi GHC.RunResult
+resume canLogSpan step = GHC.resume canLogSpan step
 
 -- --------------------------------------------------------------------------
 -- timing & statistics

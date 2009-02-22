@@ -431,8 +431,8 @@ noBreakAction :: Bool -> BreakInfo -> HValue -> IO ()
 noBreakAction False _ _ = putStrLn "*** Ignoring breakpoint"
 noBreakAction True  _ _ = return () -- exception: just continue
 
-resume :: GhcMonad m => SingleStep -> m RunResult
-resume step
+resume :: GhcMonad m => (SrcSpan->Bool) -> SingleStep -> m RunResult
+resume canLogSpan step
  = do
    hsc_env <- getSession
    let ic = hsc_IC hsc_env
@@ -459,7 +459,7 @@ resume step
         when (isStep step) $ liftIO setStepFlag
         case r of 
           Resume expr tid breakMVar statusMVar bindings 
-              final_ids apStack info _ hist _ -> do
+              final_ids apStack info span hist _ -> do
                withVirtualCWD $ do
                 withBreakAction (isStep step) (hsc_dflags hsc_env) 
                                         breakMVar statusMVar $ do
@@ -468,10 +468,12 @@ resume step
                                       -- this awakens the stopped thread...
                              takeMVar statusMVar
                                       -- and wait for the result 
-                let hist' = 
-                     case info of 
-                       Nothing -> fromListBL 50 hist
-                       Just i -> mkHistory hsc_env apStack i `consBL` 
+                let prevHistoryLst = fromListBL 50 hist
+                    hist' = case info of
+                       Nothing -> prevHistoryLst
+                       Just i
+                         | not $canLogSpan span -> prevHistoryLst
+                         | otherwise -> mkHistory hsc_env apStack i `consBL`
                                                         fromListBL 50 hist
                 case step of
                   RunAndLogSteps -> 
