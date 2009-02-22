@@ -730,18 +730,14 @@ afterRunStmt step_here run_result = do
      GHC.RunOk names -> do
         show_types <- isOptionSet ShowType
         when show_types $ printTypeOfNames names
-     GHC.RunBreak _ names mb_info 
-         | isNothing  mb_info || 
+     GHC.RunBreak _ names mb_info
+         | isNothing  mb_info ||
            step_here (GHC.resumeSpan $ head resumes) -> do
-               printForUser $ ptext (sLit "Stopped at") <+> 
-                       ppr (GHC.resumeSpan $ head resumes)
---               printTypeOfNames session names
-               let namesSorted = sortBy compareNames names
-               tythings <- catMaybes `liftM` 
-                              mapM GHC.lookupName namesSorted
-               docs <- pprTypeAndContents [id | AnId id <- tythings]
-               printForUserPartWay docs
-               maybe (return ()) runBreakCmd mb_info
+               mb_id_loc <- toBreakIdAndLocation mb_info
+               let breakCmd = maybe "" ( \(_,l) -> onBreakCmd l ) mb_id_loc
+               if (null breakCmd)
+                 then printStoppedAtBreakInfo (head resumes) names
+                 else enqueueCommands [breakCmd]
                -- run the command set with ":set stop <cmd>"
                st <- getGHCiState
                enqueueCommands [stop st]
@@ -757,17 +753,26 @@ afterRunStmt step_here run_result = do
 
   return (case run_result of GHC.RunOk _ -> True; _ -> False)
 
-runBreakCmd :: GHC.BreakInfo -> GHCi ()
-runBreakCmd info = do
+toBreakIdAndLocation ::
+  Maybe GHC.BreakInfo -> GHCi (Maybe (Int, BreakLocation))
+toBreakIdAndLocation Nothing = return Nothing
+toBreakIdAndLocation (Just info) = do
   let mod = GHC.breakInfo_module info
       nm  = GHC.breakInfo_number info
   st <- getGHCiState
-  case  [ loc | (_,loc) <- breaks st,
-                breakModule loc == mod, breakTick loc == nm ] of
-        []  -> return ()
-        loc:_ | null cmd  -> return ()
-              | otherwise -> do enqueueCommands [cmd]; return ()
-              where cmd = onBreakCmd loc
+  return $ listToMaybe [ id_loc | id_loc@(_,loc) <- breaks st,
+                                  breakModule loc == mod,
+                                  breakTick loc == nm ]
+
+printStoppedAtBreakInfo :: Resume -> [Name] -> GHCi ()
+printStoppedAtBreakInfo resume names = do
+  printForUser $ ptext (sLit "Stopped at") <+>
+    ppr (GHC.resumeSpan resume)
+  --  printTypeOfNames session names
+  let namesSorted = sortBy compareNames names
+  tythings <- catMaybes `liftM` mapM GHC.lookupName namesSorted
+  docs <- pprTypeAndContents [id | AnId id <- tythings]
+  printForUserPartWay docs
 
 printTypeOfNames :: [Name] -> GHCi ()
 printTypeOfNames names
