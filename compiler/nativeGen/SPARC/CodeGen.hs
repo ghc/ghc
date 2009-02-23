@@ -18,6 +18,7 @@ where
 #include "MachDeps.h"
 
 -- NCG stuff:
+import SPARC.CodeGen.Sanity
 import SPARC.CodeGen.Amode
 import SPARC.CodeGen.CondCode
 import SPARC.CodeGen.Gen64
@@ -77,7 +78,7 @@ basicBlockCodeGen
 	-> NatM ( [NatBasicBlock Instr]
 		, [NatCmmTop Instr])
 
-basicBlockCodeGen (BasicBlock id stmts) = do
+basicBlockCodeGen cmm@(BasicBlock id stmts) = do
   instrs <- stmtsToInstrs stmts
   let
 	(top,other_blocks,statics) 
@@ -92,44 +93,12 @@ basicBlockCodeGen (BasicBlock id stmts) = do
 	mkBlocks instr (instrs,blocks,statics)
 	  = (instr:instrs, blocks, statics)
 
+	-- do intra-block sanity checking
 	blocksChecked
-	  	= map checkBlockEnd
+	  	= map (checkBlock cmm)
 	  	$ BasicBlock id top : other_blocks
 
   return (blocksChecked, statics)
-
-
--- | Enforce the invariant that all basic blocks must end with a jump.
---	For SPARC this is a jump, then a nop for the branch delay slot.
---
---	If the branch isn't there then the register liveness determinator
---	will get the liveness information wrong. This will cause a bad
---	allocation, which is seriously difficult to debug.
---
---	If there is an instr in the branch delay slot, then the allocator
---	will also get confused and give a bad allocation.
---
-checkBlockEnd 
-	:: NatBasicBlock Instr -> NatBasicBlock Instr
-
-checkBlockEnd block@(BasicBlock _ instrs)
-	| Just (i1, i2)	<- takeLast2 instrs
-	, isJumpishInstr i1
-	, NOP		<- i2
-	= block
-	
-	| otherwise
-	= pprPanic 
-		("SPARC.CodeGen: bad instrs at end of block\n")
-		(text "block:\n" <> ppr block)
-
-takeLast2 :: [a] -> Maybe (a, a)
-takeLast2 xx
- = case xx of
- 	[]		-> Nothing
-	_:[]		-> Nothing
-	x1:x2:[]	-> Just (x1, x2)
-	_:xs		-> takeLast2 xs
 
 
 -- | Convert some Cmm statements to SPARC instructions.

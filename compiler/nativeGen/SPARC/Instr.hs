@@ -16,6 +16,8 @@ module SPARC.Instr (
 	fpRelEA,
 	moveSp,
 	
+	isUnconditionalJump,
+	
 	Instr(..),
 	maxSpillSlots
 )
@@ -68,6 +70,17 @@ fpRelEA n dst
 moveSp :: Int -> Instr
 moveSp n
    = ADD False False sp (RIImm (ImmInt (n * wordLength))) sp
+
+-- | An instruction that will cause the one after it never to be exectuted
+isUnconditionalJump :: Instr -> Bool
+isUnconditionalJump ii
+ = case ii of
+ 	CALL{}		-> True
+	JMP{}		-> True
+	JMP_TBL{}	-> True
+	BI ALWAYS _ _	-> True
+	BF ALWAYS _ _ 	-> True
+	_		-> False
 
 
 -- | instance for sparc instruction set
