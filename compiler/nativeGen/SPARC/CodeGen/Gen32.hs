@@ -642,13 +642,23 @@ condIntReg cond x y = do
     bid2@(BlockId _) <- getBlockIdNat
     CondCode _ cond cond_code <- condIntCode cond x y
     let
-	code__2 dst = cond_code `appOL` toOL [
-	    BI cond False bid1, NOP,
-	    OR False g0 (RIImm (ImmInt 0)) dst,
-	    BI ALWAYS False bid2, NOP,
-	    NEWBLOCK bid1,
-	    OR False g0 (RIImm (ImmInt 1)) dst,
-	    NEWBLOCK bid2]
+	code__2 dst 
+	 =	cond_code 
+	  `appOL` toOL 
+		[ BI cond False bid1
+		, NOP
+
+		, OR False g0 (RIImm (ImmInt 0)) dst
+		, BI ALWAYS False bid2
+		, NOP
+
+		, NEWBLOCK bid1
+		, OR False g0 (RIImm (ImmInt 1)) dst
+		, BI ALWAYS False bid2
+		, NOP
+
+		, NEWBLOCK bid2]
+
     return (Any II32 code__2)
 
 
@@ -659,12 +669,26 @@ condFltReg cond x y = do
 
     CondCode _ cond cond_code <- condFltCode cond x y
     let
-    	code__2 dst = cond_code `appOL` toOL [ 
-    	    NOP,
-	    BF cond False bid1, NOP,
-	    OR False g0 (RIImm (ImmInt 0)) dst,
-	    BI ALWAYS False bid2, NOP,
-	    NEWBLOCK bid1,
-	    OR False g0 (RIImm (ImmInt 1)) dst,
-	    NEWBLOCK bid2]
+    	code__2 dst 
+	 = 	cond_code 
+	  `appOL` toOL 
+	  	[ NOP
+		, BF cond False bid1
+		, NOP
+
+		, OR False g0 (RIImm (ImmInt 0)) dst
+		, BI ALWAYS False bid2
+		, NOP
+
+		, NEWBLOCK bid1
+		, OR False g0 (RIImm (ImmInt 1)) dst
+		, BI ALWAYS False bid2
+		, NOP
+
+		, NEWBLOCK bid2 ]
+
     return (Any II32 code__2)
+
+
+
+
