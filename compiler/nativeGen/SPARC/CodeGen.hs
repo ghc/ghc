@@ -24,6 +24,7 @@ import SPARC.CodeGen.Gen64
 import SPARC.CodeGen.Gen32
 import SPARC.CodeGen.CCall
 import SPARC.CodeGen.Base
+import SPARC.Ppr	()
 import SPARC.Instr
 import SPARC.Imm
 import SPARC.AddrMode
@@ -57,22 +58,20 @@ cmmTopCodeGen _
  = do	
  	(nat_blocks,statics) <- mapAndUnzipM basicBlockCodeGen blocks
 
---	picBaseMb 	<- getPicBaseMaybeNat
 	let proc 	= CmmProc info lab params (ListGraph $ concat nat_blocks)
 	let tops 	= proc : concat statics
 
---	case picBaseMb of
---	 Just picBase -> initializePicBase picBase tops
---	 Nothing -> return tops
-  
   	return tops
-  
   
 cmmTopCodeGen _ (CmmData sec dat) = do
   return [CmmData sec dat]  -- no translation, we just use CmmStatic
 
 
-
+-- | Do code generation on a single block of CMM code.
+--	code generation may introduce new basic block boundaries, which
+-- 	are indicated by the NEWBLOCK instruction.  We must split up the
+-- 	instruction stream into basic blocks again.  Also, we extract
+-- 	LDATAs here too.
 basicBlockCodeGen 
 	:: CmmBasicBlock
 	-> NatM ( [NatBasicBlock Instr]
@@ -80,23 +79,60 @@ basicBlockCodeGen
 
 basicBlockCodeGen (BasicBlock id stmts) = do
   instrs <- stmtsToInstrs stmts
-  -- code generation may introduce new basic block boundaries, which
-  -- are indicated by the NEWBLOCK instruction.  We must split up the
-  -- instruction stream into basic blocks again.  Also, we extract
-  -- LDATAs here too.
   let
-	(top,other_blocks,statics) = foldrOL mkBlocks ([],[],[]) instrs
+	(top,other_blocks,statics) 
+		= foldrOL mkBlocks ([],[],[]) instrs
 	
 	mkBlocks (NEWBLOCK id) (instrs,blocks,statics) 
 	  = ([], BasicBlock id instrs : blocks, statics)
+
 	mkBlocks (LDATA sec dat) (instrs,blocks,statics) 
 	  = (instrs, blocks, CmmData sec dat:statics)
+
 	mkBlocks instr (instrs,blocks,statics)
 	  = (instr:instrs, blocks, statics)
-  -- in
-  return (BasicBlock id top : other_blocks, statics)
+
+	blocksChecked
+	  	= map checkBlockEnd
+	  	$ BasicBlock id top : other_blocks
+
+  return (blocksChecked, statics)
 
 
+-- | Enforce the invariant that all basic blocks must end with a jump.
+--	For SPARC this is a jump, then a nop for the branch delay slot.
+--
+--	If the branch isn't there then the register liveness determinator
+--	will get the liveness information wrong. This will cause a bad
+--	allocation, which is seriously difficult to debug.
+--
+--	If there is an instr in the branch delay slot, then the allocator
+--	will also get confused and give a bad allocation.
+--
+checkBlockEnd 
+	:: NatBasicBlock Instr -> NatBasicBlock Instr
+
+checkBlockEnd block@(BasicBlock _ instrs)
+	| Just (i1, i2)	<- takeLast2 instrs
+	, isJumpishInstr i1
+	, NOP		<- i2
+	= block
+	
+	| otherwise
+	= pprPanic 
+		("SPARC.CodeGen: bad instrs at end of block\n")
+		(text "block:\n" <> ppr block)
+
+takeLast2 :: [a] -> Maybe (a, a)
+takeLast2 xx
+ = case xx of
+ 	[]		-> Nothing
+	_:[]		-> Nothing
+	x1:x2:[]	-> Just (x1, x2)
+	_:xs		-> takeLast2 xs
+
+
+-- | Convert some Cmm statements to SPARC instructions.
 stmtsToInstrs :: [CmmStmt] -> NatM InstrBlock
 stmtsToInstrs stmts
    = do instrss <- mapM stmtToInstrs stmts
