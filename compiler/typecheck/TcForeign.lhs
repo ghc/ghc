@@ -96,7 +96,7 @@ tcCheckFIType _ arg_tys res_ty (DNImport spec) = do
     checkCg checkDotnet
     dflags <- getDOpts
     checkForeignArgs (isFFIDotnetTy dflags) arg_tys
-    checkForeignRes True{-non IO ok-} (isFFIDotnetTy dflags) res_ty
+    checkForeignRes nonIOok (isFFIDotnetTy dflags) res_ty
     let (DNCallSpec isStatic kind _ _ _ _) = spec
     case kind of
        DNMethod | not isStatic ->
