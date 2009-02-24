@@ -120,10 +120,8 @@ executable haddock
   -- Cabal doesn't define __GHC_PATCHLEVEL__
   if impl(ghc == 6.8.3)
     cpp-options: -D__GHC_PATCHLEVEL__=3
-  if impl(ghc == 6.8.2)
+  if impl(ghc == 6.8.2) || impl(ghc >= 6.10.1.20090223)
     cpp-options: -D__GHC_PATCHLEVEL__=2
-
-
 
 library
   hs-source-dirs:       src
@@ -141,7 +139,7 @@ library
   -- Cabal doesn't define __GHC_PATCHLEVEL__
   if impl(ghc == 6.8.3)
     cpp-options: -D__GHC_PATCHLEVEL__=3
-  if impl(ghc == 6.8.2)
+  if impl(ghc == 6.8.2) || impl(ghc >= 6.10.1.20090223)
     cpp-options: -D__GHC_PATCHLEVEL__=2
 
   if flag(in-ghc-tree)
