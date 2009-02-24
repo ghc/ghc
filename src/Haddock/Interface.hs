@@ -91,6 +91,9 @@ createInterfaces' modules flags instIfaceMap = do
   -- If template haskell is used by the package, we can not use
   -- HscNothing as target since we might need to run code generated from
   -- one or more of the modules during typechecking.
+#if __GLASGOW_HASKELL__ < 611
+  let needsTemplateHaskell = any (dopt Opt_TemplateHaskell . ms_hspp_opts)
+#endif
   modgraph' <- if needsTemplateHaskell modgraph
        then do
          dflags <- getSessionDynFlags
