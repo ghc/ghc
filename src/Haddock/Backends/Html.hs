@@ -1586,13 +1586,13 @@ ppModule mod ref = anchor ! [href ((moduleHtmlFile mod) ++ ref)]
 -- -----------------------------------------------------------------------------
 -- * Doc Markup
 
-parHtmlMarkup :: (a -> Html) -> DocMarkup a Html
-parHtmlMarkup ppId = Markup {
+parHtmlMarkup :: (a -> Html) -> (a -> Bool) -> DocMarkup a Html
+parHtmlMarkup ppId isTyCon = Markup {
   markupParagraph     = paragraph,
   markupEmpty	      = toHtml "",
   markupString        = toHtml,
   markupAppend        = (+++),
-  markupIdentifier    = tt . ppId . head,
+  markupIdentifier    = tt . ppId . choose,
   markupModule        = \m -> let (mod,ref) = break (=='#') m in ppModule (mkModuleNoPackage mod) ref,
   markupEmphasis      = emphasize . toHtml,
   markupMonospaced    = tt . toHtml,
@@ -1604,12 +1604,23 @@ parHtmlMarkup ppId = Markup {
   markupURL	      = \url -> anchor ! [href url] << toHtml url,
   markupAName	      = \aname -> namedAnchor aname << toHtml ""
   }
+  where
+    -- If an id can refer to multiple things, we give precedence to type
+    -- constructors.  This should ideally be done during renaming from RdrName
+    -- to Name, but since we will move this process from GHC into Haddock in
+    -- the future, we fix it here in the meantime.
+    -- TODO: mention this rule in the documentation.
+    choose [x] = x
+    choose (x:y:_)
+      | isTyCon x = x
+      | otherwise = y
+
 
 markupDef (a,b) = dterm << a +++ ddef << b
 
-htmlMarkup = parHtmlMarkup ppDocName
-htmlOrigMarkup = parHtmlMarkup ppName
-htmlRdrMarkup = parHtmlMarkup ppRdrName
+htmlMarkup = parHtmlMarkup ppDocName (isTyConName . getName)
+htmlOrigMarkup = parHtmlMarkup ppName isTyConName
+htmlRdrMarkup = parHtmlMarkup ppRdrName isRdrTc
 
 -- If the doc is a single paragraph, don't surround it with <P> (this causes
 -- ugly extra whitespace with some browsers).
