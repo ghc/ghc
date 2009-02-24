@@ -306,7 +306,7 @@ static StgClosure *lock_tvar(StgTRecHeader *trec,
   do {
     do {
       result = s -> current_value;
-    } while (GET_INFO(result) == &stg_TREC_HEADER_info);
+    } while (GET_INFO(UNTAG_CLOSURE(result)) == &stg_TREC_HEADER_info);
   } while (cas((void *)&(s -> current_value),
 	       (StgWord)result, (StgWord)trec) != (StgWord)result);
   return result;
@@ -1573,7 +1573,7 @@ static StgClosure *read_current_value(StgTRecHeader *trec STG_UNUSED, StgTVar *t
   result = tvar -> current_value;
 
 #if defined(STM_FG_LOCKS)
-  while (GET_INFO(result) == &stg_TREC_HEADER_info) {
+  while (GET_INFO(UNTAG_CLOSURE(result)) == &stg_TREC_HEADER_info) {
     TRACE("%p : read_current_value(%p) saw %p", trec, tvar, result);
     result = tvar -> current_value;
   }
