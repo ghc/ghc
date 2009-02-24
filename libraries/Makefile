@@ -196,6 +196,22 @@ rebuild.library.%: clean.library.% build.library.%
 $(foreach SUBDIR,$(SUBDIRS),remake.library.$(SUBDIR)):\
 remake.library.%: clean.library.% make.library.%
 
+# The meta package dph is a special case
+ifeq "$(stage)" "1"
+remake.library.dph:
+	@echo "*** Package dph needs to be made in stage=2"
+endif
+ifeq "$(stage)" "2"
+# NB. we're depending on make chasing dependencies from left to right here.
+# This bit goes wrong with 'make -j'.
+remake.library.dph: remake.library.dph/dph-base \
+		remake.library.dph/dph-prim-interface \
+		remake.library.dph/dph-prim-seq \
+		remake.library.dph/dph-prim-par \
+		remake.library.dph/dph-seq \
+		remake.library.dph/dph-par
+endif
+
 # NB. we're depending on make chasing dependencies from left to right here.
 # This bit goes wrong with 'make -j'.
 build: $(foreach SUBDIR,$(SUBDIRS),make.library.$(SUBDIR))
@@ -256,6 +272,11 @@ make.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
 	  $(CABAL) register --inplace; \
 	fi
 
+# Special case for meta package dph: we can only remake it as we don't have
+# any dependency info between the sub-packages
+make.library.dph:
+	@echo "*** Please use the target 'remake.library.dph' instead"
+
 MAKEFILE_LOCAL = $(FPTOOLS_TOP_ABS)/libraries/Makefile.local
 
 # Build the library using 'setup build' (not the default)
@@ -305,7 +326,11 @@ endif
 maintainer-clean: clean
 distclean: clean
 
+ifeq "$(wildcard dph)" ""
 clean: $(foreach SUBDIR,$(SUBDIRS),clean.library.$(SUBDIR))
+else
+clean: $(foreach SUBDIR,$(SUBDIRS),clean.library.$(SUBDIR)) clean.library.dph
+endif
 	-cd extensible-exceptions && $(CABAL) clean --distpref=dist-bootstrapping
 	-cd filepath              && $(CABAL) clean --distpref=dist-bootstrapping
 	-cd Cabal                 && $(CABAL) clean --distpref=dist-bootstrapping
@@ -318,9 +343,6 @@ clean: $(foreach SUBDIR,$(SUBDIRS),clean.library.$(SUBDIR))
 	$(RM) -f libraries.txt index.html doc-index.html doc-index*.html
 	$(RM) -f haddock* *.gif
 	$(RM) -rf stamp/*
-ifneq "$(wildcard dph)" ""
-	$(MAKE) -C dph clean
-endif
 
 maintainer-clean distclean:
 	$(RM) $(foreach lib, $(SUBDIRS), $(lib)/.depend $(lib)/.depend.bak)
@@ -331,6 +353,19 @@ clean.library.%:
 	-cd $* && $(CABAL) clean
 	$(RM) -f $*/Setup $*/Setup.exe $*/Setup.hi $*/Setup.o
 	$(RM) $*/GNUmakefile $*/Makefile.local
+endif
+
+# Extra target to clean all the sub-packages of dph
+ifeq "$(stage)" "1"
+clean.library.dph:
+	@echo "*** Package dph needs to be made in stage=2"
+endif
+ifeq "$(stage)" "2"
+clean.library.dph: clean.library.dph/dph-prim-par \
+		clean.library.dph/dph-prim-seq \
+		clean.library.dph/dph-prim-interface \
+		clean.library.dph/dph-base
+	$(MAKE) -C dph clean
 endif
 
 # -----------------------------------------------------------------------------
