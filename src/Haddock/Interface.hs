@@ -160,32 +160,26 @@ ppModInfo (HaddockModInfo a b c d) = show (fmap pretty a) ++ show b ++ show c ++
 
 #if __GLASGOW_HASKELL__ >= 609
 processModule :: ModSummary -> [Flag] -> ModuleMap -> InstIfaceMap -> Ghc (Maybe Interface)
-processModule modsum flags modMap instIfaceMap = 
-
-  let handleSrcErrors action = flip handleSourceError action $ \err -> do 
-        printExceptionAndWarnings err
-        throwE ("Failed to check module: " ++ moduleString (ms_mod modsum))
-
-  in handleSrcErrors $ do
-       tc_mod <- loadModule =<< typecheckModule =<< parseModule modsum
-       if not $ isBootSummary modsum
-         then do
-           let filename = msHsFilePath modsum
-           let dynflags = ms_hspp_opts modsum
-           let Just renamed_src = renamedSource tc_mod
-           let ghcMod = mkGhcModule (ms_mod modsum,
-                                 filename,
-                                 (parsedSource tc_mod,
-                                  renamed_src,
-                                  typecheckedSource tc_mod,
-                                  moduleInfo tc_mod))
-                                 dynflags
-           let (interface, msg) = runWriter $ createInterface ghcMod flags modMap instIfaceMap
-           liftIO $ mapM_ putStrLn msg
-           liftIO $ evaluate interface
-           return (Just interface)
-         else
-           return Nothing
+processModule modsum flags modMap instIfaceMap = do
+  tc_mod <- loadModule =<< typecheckModule =<< parseModule modsum
+  if not $ isBootSummary modsum
+    then do
+      let filename = msHsFilePath modsum
+      let dynflags = ms_hspp_opts modsum
+      let Just renamed_src = renamedSource tc_mod
+      let ghcMod = mkGhcModule (ms_mod modsum,
+                            filename,
+                            (parsedSource tc_mod,
+                             renamed_src,
+                             typecheckedSource tc_mod,
+                             moduleInfo tc_mod))
+                            dynflags
+      let (interface, msg) = runWriter $ createInterface ghcMod flags modMap instIfaceMap
+      liftIO $ mapM_ putStrLn msg
+      liftIO $ evaluate interface
+      return (Just interface)
+    else
+      return Nothing
 #else
 processModule :: Session -> ModSummary -> [Flag] -> ModuleMap -> InstIfaceMap -> IO (Maybe Interface)
 processModule session modsum flags modMap instIfaceMap = do

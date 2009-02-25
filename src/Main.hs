@@ -160,8 +160,14 @@ main = handleTopExceptions $ do
 #endif
 
 #if __GLASGOW_HASKELL__ >= 609
+      -- We have one global error handler for all GHC source errors.  Other kinds
+      -- of exceptions will be propagated to the top-level error handler. 
+      let handleSrcErrors action = flip handleSourceError action $ \err -> do
+            printExceptionAndWarnings err
+            liftIO exitFailure
+
       -- initialize GHC
-      startGhc libDir (ghcFlags flags) $ \dynflags -> do
+      startGhc libDir (ghcFlags flags) $ \dynflags -> handleSrcErrors $ do
 
         -- get packages supplied with --read-interface
         packages <- readInterfaceFiles nameCacheFromGhc (ifacePairs flags)
