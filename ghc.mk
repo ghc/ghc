@@ -19,6 +19,12 @@ $(INPLACE_BIN)/haddock: $(INPLACE_BIN)/haddock-real
 	$(EXECUTABLE_FILE) $@
 endif
 
+$(INPLACE_BIN)/$(utils/haddock_dist_PROG): inplace/lib/html
+
+inplace/lib/html:
+	$(RM) -rf $@
+	cp -a utils/haddock/html $@
+
 $(eval $(call build-prog,utils/haddock,dist,2))
 
 utils/haddock_dist_MODULES += Paths_haddock
