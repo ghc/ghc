@@ -23,7 +23,13 @@ import Name
 import SrcLoc
 import InstEnv
 import Class
+
+#if __GLASGOW_HASKELL__ >= 610 && __GHC_PATCHLEVEL__ >= 2
 import TypeRep hiding (funTyConName)
+#else
+import TypeRep
+#endif
+
 import Var hiding (varName)
 import TyCon
 import PrelNames
