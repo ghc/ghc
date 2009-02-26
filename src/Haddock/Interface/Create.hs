@@ -395,7 +395,7 @@ mkExportItems modMap this_mod exported_names decls declMap
                 do tell [ 
                      "Warning: " ++ moduleString this_mod ++ ": " ++
                      pretty (nameOccName t) ++ " is listed separately in " ++
-                     "the export list, but " ++
+                     "the export list of " ++ pretty this_mod ++ ", but " ++
                      "will be documented under its parent. " ++
                      "Consider exporting it through the parent "++
                      "export item only, for code clarity." ]
