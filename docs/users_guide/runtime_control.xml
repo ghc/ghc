@@ -1020,12 +1020,22 @@ char *ghc_rts_opts = "-H128m -K1m";
     itself. To do this, use the <option>--info</option> flag, e.g.</para>
 <screen>
 $ ./a.out +RTS --info
- [("GHC RTS", "Yes")
+ [("GHC RTS", "YES")
  ,("GHC version", "6.7")
  ,("RTS way", "rts_p")
  ,("Host platform", "x86_64-unknown-linux")
+ ,("Host architecture", "x86_64")
+ ,("Host OS", "linux")
+ ,("Host vendor", "unknown")
  ,("Build platform", "x86_64-unknown-linux")
+ ,("Build architecture", "x86_64")
+ ,("Build OS", "linux")
+ ,("Build vendor", "unknown")
  ,("Target platform", "x86_64-unknown-linux")
+ ,("Target architecture", "x86_64")
+ ,("Target OS", "linux")
+ ,("Target vendor", "unknown")
+ ,("Word size", "64")
  ,("Compiler unregisterised", "NO")
  ,("Tables next to code", "YES")
  ]
@@ -1039,8 +1049,8 @@ $ ./a.out +RTS --info
       <varlistentry>
         <term><literal>GHC RTS</literal></term>
         <listitem>
-          <para>Is this program linked against the GHC RTS? (Currently
-          the answer is always yes.)</para>
+          <para>Is this program linked against the GHC RTS? (always
+          "YES").</para>
         </listitem>
       </varlistentry>
 
@@ -1054,41 +1064,67 @@ $ ./a.out +RTS --info
       <varlistentry>
         <term><literal>RTS way</literal></term>
         <listitem>
-          <para>The variant (&ldquo;way&rdquo;) of the runtime. Possible
-          values are <literal>rts</literal> (vanilla), 
+          <para>The variant (&ldquo;way&rdquo;) of the runtime. The
+          most common values are <literal>rts</literal> (vanilla),
           <literal>rts_thr</literal> (threaded runtime, i.e. linked using the
           <literal>-threaded</literal> option) and <literal>rts_p</literal>
           (profiling runtime, i.e. linked using the <literal>-prof</literal>
-          option). Other variants include <literal>t</literal>
-          (ticky-ticky profiling) and <literal>dyn</literal> (the RTS is
+          option). Other variants include <literal>debug</literal>
+          (linked using <literal>-debug</literal>),
+          <literal>t</literal> (ticky-ticky profiling) and
+          <literal>dyn</literal> (the RTS is
           linked in dynamically, i.e. a shared library, rather than statically
-          linked into the executable itself).</para>
+          linked into the executable itself). These can be combined,
+          e.g. you might have <literal>rts_thr_debug_p</literal>.</para>
         </listitem>
       </varlistentry>
 
       <varlistentry>
-        <term><literal>Target platform</literal></term>
+        <term>
+            <literal>Target platform</literal>,
+            <literal>Target architecture</literal>,
+            <literal>Target OS</literal>,
+            <literal>Target vendor</literal>
+        </term>
         <listitem>
-          <para>This is the platform the program is compiled to run on.</para>
+          <para>These are the platform the program is compiled to run on.</para>
         </listitem>
       </varlistentry>
 
       <varlistentry>
-        <term><literal>Build platform</literal></term>
+        <term>
+            <literal>Build platform</literal>,
+            <literal>Build architecture</literal>,
+            <literal>Build OS</literal>,
+            <literal>Build vendor</literal>
+        </term>
         <listitem>
-          <para>This is the platform where the program was compiled
-          from. (That is, the target platform of GHC itself.) Ordinarily
+          <para>These are the platform where the program was built
+          on. (That is, the target platform of GHC itself.) Ordinarily
           this is identical to the target platform. (It could potentially
           be different if cross-compiling.)</para>
         </listitem>
       </varlistentry>
 
       <varlistentry>
-        <term><literal>Host platform</literal></term>
+        <term>
+            <literal>Host platform</literal>,
+            <literal>Host architecture</literal>
+            <literal>Host OS</literal>
+            <literal>Host vendor</literal>
+        </term>
         <listitem>
-          <para>This is the platform where GHC itself was compiled.
+          <para>These are the platform where GHC itself was compiled.
           Again, this would normally be identical to the build and
           target platforms.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><literal>Word size</literal></term>
+        <listitem>
+          <para>Either <literal>"32"</literal> or <literal>"64"</literal>,
+          reflecting the word size of the target platform.</para>
         </listitem>
       </varlistentry>
 
