@@ -240,9 +240,8 @@ warnAboutFilteredDecls mod decls = do
   when (not $ null instances) $
 
     tell $ nub $ [
-      "Warning: " ++ modStr ++ ": Rendering of associated types for instances has "
-      ++ "not yet been implemented. Associated types will not be shown for the "
-      ++ "following instances:\n" ++ (concat $ intersperse ", " instances) ]
+      "Warning: " ++ modStr ++ ": We do not support associated types in instances yet. "
+      ++ "These instances are affected:\n" ++ (concat $ intersperse ", " instances) ]
 
 
 --------------------------------------------------------------------------------
