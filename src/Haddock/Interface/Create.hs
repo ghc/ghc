@@ -395,11 +395,10 @@ mkExportItems modMap this_mod exported_names decls declMap
                 Just p <- find isExported (parents t $ unL decl) ->
                 do tell [ 
                      "Warning: " ++ moduleString this_mod ++ ": " ++
-                     pretty (nameOccName t) ++ " is listed separately in " ++
-                     "the export list, but " ++
-                     "will be documented under its parent. " ++
-                     "Consider exporting it through the parent "++
-                     "export item only, for code clarity." ]
+                     pretty (nameOccName t) ++ " is exported separately but " ++
+                     "will be documented under " ++ pretty (nameOccName p) ++
+                     ". Consider exporting it together with its parent(s)" ++
+                     " for code clarity." ]
                    return []
 
               -- normal case
