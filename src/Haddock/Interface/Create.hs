@@ -389,13 +389,14 @@ mkExportItems modMap this_mod exported_names decls declMap
               -- name out in mkVisibleNames...
               | t `elem` declATs (unL decl)        -> return []
 
-              -- We should not show a subordinate at the top level if its
-              -- parent is also exported. See note [1].
-              | declName /= t, isExported declName ->
+              -- We should not show a subordinate by itself if any of its
+              -- parents is also exported. See note [1].
+              | t /= declName,
+                Just p <- find isExported (parents t $ unL decl) ->
                 do tell [ 
                      "Warning: " ++ moduleString this_mod ++ ": " ++
                      pretty (nameOccName t) ++ " is listed separately in " ++
-                     "the export list of " ++ pretty this_mod ++ ", but " ++
+                     "the export list, but " ++
                      "will be documented under its parent. " ++
                      "Consider exporting it through the parent "++
                      "export item only, for code clarity." ]
@@ -459,13 +460,14 @@ mkExportItems modMap this_mod exported_names decls declMap
 
 -- Note [1]:
 ------------
--- We should not show a subordinate at the top level if its parent is also
--- exported. We should show it under the parent to indicate its special
--- status as a class method or record field. Showing it again makes no sense.
+-- It is unnecessary to document a subordinate by itself at the top level if
+-- any of its parents is also documented. Furthermore, if the subordinate is a
+-- record field or a class method, documenting it under its parent
+-- indicates its special status.
 --
 -- A user might expect that it should show up separately, so we issue a
 -- warning. It's a fine opportunity to also tell the user she might want to
--- export the subordinate through the same export item for clarity.
+-- export the subordinate through the parent export item for clarity.
 --
 -- The code removes top-level subordinates also when the parent is exported
 -- through a 'module' export. I think that is fine.

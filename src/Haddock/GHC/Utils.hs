@@ -5,6 +5,7 @@
 --
 
 
+{-# LANGUAGE FlexibleInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_HADDOCK hide #-}
 
@@ -15,6 +16,7 @@ module Haddock.GHC.Utils where
 import Data.Char
 import Data.Version
 import qualified Data.Map as Map
+import Control.Arrow
 
 import HsSyn
 import SrcLoc
@@ -113,3 +115,66 @@ pretty x = showSDoc (ppr x)
 
 trace_ppr :: Outputable a => a -> b -> b
 trace_ppr x y = trace (pretty x) y
+
+
+-------------------------------------------------------------------------------
+-- NamedThing instances
+-------------------------------------------------------------------------------
+
+
+instance NamedThing (TyClDecl Name) where
+  getName = tcdName
+
+
+instance NamedThing (ConDecl Name) where
+  getName = unL . con_name
+
+
+-------------------------------------------------------------------------------
+-- Subordinates
+-------------------------------------------------------------------------------
+
+
+class Parent a where
+  children :: a -> [Name]
+
+
+instance Parent (ConDecl Name) where
+  children con =
+    case con_details con of
+      RecCon fields -> map (unL . cd_fld_name) fields
+      _             -> []
+
+
+instance Parent (TyClDecl Name) where
+  children d
+    | isDataDecl  d = map (unL . con_name . unL) . tcdCons $ d
+    | isClassDecl d =
+        map (tcdName . unL) (tcdATs d) ++
+        [ unL n | L _ (TypeSig n _) <- tcdSigs d ]
+    | otherwise = []
+
+
+-- | A parent and its children
+family :: (NamedThing a, Parent a) => a -> (Name, [Name])
+family = getName &&& children
+
+
+-- | A mapping from the parent (main-binder) to its children and from each
+-- child to its grand-children, recursively.
+families :: TyClDecl Name -> [(Name, [Name])]
+families d
+  | isDataDecl  d = family d : map (family . unL) (tcdCons d)
+  | isClassDecl d = family d : concatMap (families . unL) (tcdATs d)
+  | otherwise     = []
+
+
+-- | A mapping from child to parent
+parentMap :: TyClDecl Name -> [(Name, Name)]
+parentMap d = [ (c, p) | (p, cs) <- families d, c <- cs ]
+
+
+-- | The parents of a subordinate in a declaration
+parents :: Name -> HsDecl Name -> [Name]
+parents n (TyClD d) = [ p | (c, p) <- parentMap d, c == n ]
+parents _ _ = []
