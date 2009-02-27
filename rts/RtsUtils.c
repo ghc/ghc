@@ -481,7 +481,7 @@ static void mkRtsInfoPair(char *key, char *val) {
 void printRtsInfo(void) {
     /* The first entry is just a hack to make it easy to get the
      * commas right */
-    printf(" [(\"GHC RTS\", \"Yes\")\n");
+    printf(" [(\"GHC RTS\", \"YES\")\n");
     mkRtsInfoPair("GHC version",             ProjectVersion);
     mkRtsInfoPair("RTS way",                 RtsWay);
     mkRtsInfoPair("Host platform",           HostPlatform);
