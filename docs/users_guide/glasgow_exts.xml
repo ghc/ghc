@@ -6613,11 +6613,22 @@ Because the preprocessor targets Haskell (rather than Core),
 <indexterm><primary>Bang patterns</primary></indexterm>
 </title>
 <para>GHC supports an extension of pattern matching called <emphasis>bang
-patterns</emphasis>.   Bang patterns are under consideration for Haskell Prime.
+patterns</emphasis>, written <literal>!<replaceable>pat</replaceable></literal>.   
+Bang patterns are under consideration for Haskell Prime.
 The <ulink
 url="http://hackage.haskell.org/trac/haskell-prime/wiki/BangPatterns">Haskell
 prime feature description</ulink> contains more discussion and examples
 than the material below.
+</para>
+<para>
+The key change is the addition of a new rule to the 
+<ulink url="http://haskell.org/onlinereport/exps.html#sect3.17.2">semantics of pattern matching in the Haskell 98 report</ulink>.
+Add new bullet 10, saying: Matching the pattern <literal>!</literal><replaceable>pat</replaceable> 
+against a value <replaceable>v</replaceable> behaves as follows:
+<itemizedlist>
+<listitem><para>if <replaceable>v</replaceable> is bottom, the match diverges</para></listitem>
+<listitem><para>otherwise, <replaceable>pat</replaceable> is matched against <replaceable>v</replaceable>  </para></listitem>
+</itemizedlist>
 </para>
 <para>
 Bang patterns are enabled by the flag <option>-XBangPatterns</option>.
@@ -6650,9 +6661,40 @@ A bang only really has an effect if it precedes a variable or wild-card pattern:
 f3 !(x,y) = [x,y]
 f4 (x,y)  = [x,y]
 </programlisting>
-Here, <literal>f3</literal> and <literal>f4</literal> are identical; putting a bang before a pattern that
+Here, <literal>f3</literal> and <literal>f4</literal> are identical; 
+putting a bang before a pattern that
 forces evaluation anyway does nothing.
-</para><para>
+</para>
+<para>
+There is one (apparent) exception to this general rule that a bang only
+makes a difference when it precedes a variable or wild-card: a bang at the
+top level of a <literal>let</literal> or <literal>where</literal>
+binding makes the binding strict, regardless of the pattern. For example:
+<programlisting>
+let ![x,y] = e in b
+</programlisting>
+is a strict binding: operationally, it evaluates <literal>e</literal>, matches
+it against the pattern <literal>[x,y]</literal>, and then evaluates <literal>b</literal>.
+(We say "apparent" exception because the Right Way to think of it is that the bang
+at the top of a binding is not part of the <emphasis>pattern</emphasis>; rather it
+is part of the syntax of the <emphasis>binding</emphasis>.)
+Nested bangs in a pattern binding behave uniformly with all other forms of 
+pattern matching.  For example
+<programlisting>
+let (!x,[y]) = e in b
+</programlisting>
+is equivalent to this:
+<programlisting>
+let { t = case e of (x,[y]) -> x `seq` (x,y)
+      x = fst t
+      y = snd t }
+in b
+</programlisting>
+The binding is lazy, but when either <literal>x</literal> or <literal>y</literal> is
+evaluated by <literal>b</literal> the entire pattern is matched, including forcing the
+evaluation of <literal>x</literal>.
+</para>
+<para>
 Bang patterns work in <literal>case</literal> expressions too, of course:
 <programlisting>
 g5 x = let y = f x in body
@@ -6662,18 +6704,6 @@ g7 x = case f x of { !y -&gt; body }
 The functions <literal>g5</literal> and <literal>g6</literal> mean exactly the same thing.  
 But <literal>g7</literal> evaluates <literal>(f x)</literal>, binds <literal>y</literal> to the
 result, and then evaluates <literal>body</literal>.
-</para><para>
-Bang patterns work in <literal>let</literal> and <literal>where</literal>
-definitions too. For example:
-<programlisting>
-let ![x,y] = e in b
-</programlisting>
-is a strict pattern: operationally, it evaluates <literal>e</literal>, matches
-it against the pattern <literal>[x,y]</literal>, and then evaluates <literal>b</literal>
-The "<literal>!</literal>" should not be regarded as part of the pattern; after all,
-in a function argument <literal>![x,y]</literal> means the 
-same as <literal>[x,y]</literal>.  Rather, the "<literal>!</literal>" 
-is part of the syntax of <literal>let</literal> bindings.
 </para>
 </sect2>
 
