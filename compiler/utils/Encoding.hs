@@ -29,9 +29,8 @@ module Encoding (
 
 #include "HsVersions.h"
 import Foreign
-import Data.Char        ( ord, chr, isDigit, digitToInt, intToDigit,
-                          isHexDigit )
-import Numeric          ( showIntAtBase )
+import Data.Char
+import Numeric
 import Data.Bits
 import GHC.Ptr          ( Ptr(..) )
 import GHC.Base
@@ -239,7 +238,9 @@ zEncodeString cs = case maybe_tuple cs of
                 Nothing -> go cs
           where
                 go []     = []
-                go (c:cs) = encode_ch c ++ go cs
+                go (c:cs) = encode_digit_ch c ++ go' cs
+                go' []     = []
+                go' (c:cs) = encode_ch c ++ go' cs
 
 unencodedChar :: Char -> Bool   -- True for chars that don't need encoding
 unencodedChar 'Z' = False
@@ -247,6 +248,12 @@ unencodedChar 'z' = False
 unencodedChar c   =  c >= 'a' && c <= 'z'
                   || c >= 'A' && c <= 'Z'
                   || c >= '0' && c <= '9'
+
+-- If a digit is at the start of a symbol then we need to encode it.
+-- Otherwise package names like 9pH-0.1 give linker errors.
+encode_digit_ch :: Char -> EncodedString
+encode_digit_ch c | c >= '0' && c <= '9' = encode_as_unicode_char c
+encode_digit_ch c | otherwise            = encode_ch c
 
 encode_ch :: Char -> EncodedString
 encode_ch c | unencodedChar c = [c]     -- Common case first
@@ -279,15 +286,15 @@ encode_ch '/'  = "zs"
 encode_ch '*'  = "zt"
 encode_ch '_'  = "zu"
 encode_ch '%'  = "zv"
-encode_ch c    = 'z' : if isDigit (head hex_str) then hex_str
-                                                 else '0':hex_str
+encode_ch c    = encode_as_unicode_char c
+
+encode_as_unicode_char :: Char -> EncodedString
+encode_as_unicode_char c = 'z' : if isDigit (head hex_str) then hex_str
+                                                           else '0':hex_str
   where hex_str = showHex (ord c) "U"
   -- ToDo: we could improve the encoding here in various ways.
   -- eg. strings of unicode characters come out as 'z1234Uz5678U', we
   -- could remove the 'U' in the middle (the 'z' works as a separator).
-
-        showHex = showIntAtBase 16 intToDigit
-        -- needed because prior to GHC 6.2, Numeric.showHex added a "0x" prefix
 
 zDecodeString :: EncodedString -> UserString
 zDecodeString [] = []
