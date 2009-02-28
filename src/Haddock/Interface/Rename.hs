@@ -68,7 +68,7 @@ renameInterface renamingEnv warnings mod =
     -- report things that we couldn't link to. Only do this for non-hidden
     -- modules.
     unless (OptHide `elem` ifaceOptions mod || null strings || not warnings) $
-      tell ["Warning: " ++ show (ppr (ifaceMod mod) defaultUserStyle) ++
+      tell ["Warning: " ++ moduleString (ifaceMod mod) ++
             ": could not find link destinations for:\n"++
             "   " ++ concat (map (' ':) strings) ]
 
