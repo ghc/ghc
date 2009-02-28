@@ -63,7 +63,7 @@ $ident    = [$alphanum \'\_\.\!\#\$\%\&\*\+\/\<\=\>\?\@\\\\\^\|\-\~]
   () 			{ begin string }
 }
 
-<birdtrack> .*	\n?	{ strtoken TokBirdTrack `andBegin` line }
+<birdtrack> .*	\n?	{ strtokenNL TokBirdTrack `andBegin` line }
 
 <string,def> {
   $special			{ strtoken $ \s -> TokSpecial (head s) }
@@ -78,7 +78,7 @@ $ident    = [$alphanum \'\_\.\!\#\$\%\&\*\+\/\<\=\>\?\@\\\\\^\|\-\~]
   -- allow special characters through if they don't fit one of the previous
   -- patterns.
   [\/\'\`\<\#\&\\]			{ strtoken TokString }
-  [^ $special \/ \< \# \n \'\` \& \\ \]]* \n { strtoken TokString `andBegin` line }
+  [^ $special \/ \< \# \n \'\` \& \\ \]]* \n { strtokenNL TokString `andBegin` line }
   [^ $special \/ \< \# \n \'\` \& \\ \]]+    { strtoken TokString }
 }
 
@@ -141,8 +141,11 @@ andBegin act new_sc = \str _ cont -> act str new_sc cont
 token :: Token -> Action
 token t = \_ sc cont -> t : cont sc
 
-strtoken :: (String -> Token) -> Action
+strtoken, strtokenNL :: (String -> Token) -> Action
 strtoken t = \str sc cont -> t str : cont sc
+strtokenNL t = \str sc cont -> t (filter (/= '\r') str) : cont sc
+-- ^ We only want LF line endings in our internal doc string format, so we
+-- filter out all CRs.
 
 begin :: StartCode -> Action
 begin sc = \_ _ cont -> cont sc
