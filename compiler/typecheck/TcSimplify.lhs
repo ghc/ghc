@@ -710,6 +710,12 @@ tcSimplifyInfer doc tau_tvs wanted
 		-- irreds2 will be empty.  But we don't want to generalise over b!
 	; let preds2 = fdPredsOfInsts irreds2	-- irreds2 is zonked
 	      qtvs   = growInstsTyVars irreds2 tau_tvs2 `minusVarSet` oclose preds2 gbl_tvs2
+		---------------------------------------------------
+		-- BUG WARNING: there's a nasty bug lurking here
+		-- fdPredsOfInsts may return preds that mention variables quantified in
+		-- one of the implication constraints in irreds2; and that is clearly wrong:
+		-- we might quantify over too many variables through accidental capture
+		---------------------------------------------------
 	; let (free, irreds3) = partition (isFreeWhenInferring qtvs) irreds2
 	; extendLIEs free
 
