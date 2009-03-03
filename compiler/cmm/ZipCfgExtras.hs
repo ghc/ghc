@@ -43,10 +43,10 @@ _unused = all `seq` ()
 
 --unfocus (FGraph e bz bs) = LGraph e (insertBlock (zip bz) bs)
 
-focusp p (LGraph entry _ blocks) =
+focusp p (LGraph entry blocks) =
     fmap (\(b, bs) -> FGraph entry (unzip b) bs) (splitp_blocks p blocks)
 
-exit g@(LGraph eid _ _) = FGraph eid (ZBlock h (ZLast l)) others
+exit g@(LGraph eid _) = FGraph eid (ZBlock h (ZLast l)) others
     where FGraph _ b others = focusp is_exit g `orElse` panic "no exit in flow graph"
           (h, l) = goto_end b
 
@@ -65,7 +65,7 @@ splice_focus_exit (FGraph eid (ZBlock head tail) blocks) g =
 foldM_fwd_block ::
   Monad m => (BlockId -> a -> m a) -> (mid -> a -> m a) -> (ZLast l -> a -> m a) ->
              Block mid l -> a -> m a
-foldM_fwd_block first middle last (Block id _ t) z = do { z <- first id z; tail t z }
+foldM_fwd_block first middle last (Block id t) z = do { z <- first id z; tail t z }
     where tail (ZTail m t) z = do { z <- middle m z; tail t z }
           tail (ZLast l)   z = last l z
 

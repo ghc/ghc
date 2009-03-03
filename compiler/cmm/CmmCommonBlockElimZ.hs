@@ -73,8 +73,8 @@ upd_graph g subst = map_nodes id middle last g
         last l = last' (mapExpDeepLast exp l)
         last' (LastBranch bid)            = LastBranch $ sub bid
         last' (LastCondBranch p t f)      = cond p (sub t) (sub f)
-        last' (LastCall t (Just bid) s u) = LastCall t (Just $ sub bid) s u
-        last' l@(LastCall _ Nothing _ _)  = l
+        last' (LastCall t (Just bid) args res u) = LastCall t (Just $ sub bid) args res u
+        last' l@(LastCall _ Nothing _ _ _)  = l
         last' (LastSwitch e bs)           = LastSwitch e $ map (liftM sub) bs
         cond p t f = if t == f then LastBranch t else LastCondBranch p t f
         exp (CmmStackSlot (CallArea (Young id))       off) =
@@ -87,7 +87,7 @@ upd_graph g subst = map_nodes id middle last g
 -- The hashing is a bit arbitrary (the numbers are completely arbitrary),
 -- but it should be fast and good enough.
 hash_block :: CmmBlock -> Int
-hash_block (Block _ _ t) =
+hash_block (Block _ t) =
   fromIntegral (hash_tail t (0 :: Word32) .&. (0x7fffffff :: Word32))
   -- UniqFM doesn't like negative Ints
   where hash_mid   (MidComment (FastString u _ _ _ _)) = cvt u
@@ -118,7 +118,7 @@ hash_block (Block _ _ t) =
         hash_lst f = foldl (\z x -> f x + z) (0::Word32)
         hash_last (LastBranch _) = 23 -- would be great to hash these properly
         hash_last (LastCondBranch p _ _) = hash_e p 
-        hash_last (LastCall e _ _ _) = hash_e e
+        hash_last (LastCall e _ _ _ _) = hash_e e
         hash_last (LastSwitch e _) = hash_e e
         hash_tail (ZLast LastExit) v = 29 + v `shiftL` 1
         hash_tail (ZLast (LastOther l)) v = hash_last l + (v `shiftL` 1)
@@ -136,8 +136,7 @@ lookupBid subst bid = case lookupBlockEnv subst bid of
 
 -- Equality on the body of a block, modulo a function mapping block IDs to block IDs.
 eqBlockBodyWith :: (BlockId -> BlockId -> Bool) -> CmmBlock -> CmmBlock -> Bool
-eqBlockBodyWith eqBid (Block _ sinfo t) (Block _ sinfo' t') =
-  sinfo == sinfo' && eqTailWith eqBid t t'
+eqBlockBodyWith eqBid (Block _ t) (Block _ t') = eqTailWith eqBid t t'
 
 type CmmTail = ZTail Middle Last
 eqTailWith :: (BlockId -> BlockId -> Bool) -> CmmTail -> CmmTail -> Bool
@@ -150,8 +149,8 @@ eqLastWith :: (BlockId -> BlockId -> Bool) -> Last -> Last -> Bool
 eqLastWith eqBid (LastBranch bid1) (LastBranch bid2) = eqBid bid1 bid2
 eqLastWith eqBid (LastCondBranch c1 t1 f1) (LastCondBranch c2 t2 f2) =
   c1 == c2 && eqBid t1 t2 && eqBid f1 f2
-eqLastWith eqBid (LastCall t1 c1 s1 u1) (LastCall t2 c2 s2 u2) =
-  t1 == t2 && eqMaybeWith eqBid c1 c2 && s1 == s2 && u1 == u2
+eqLastWith eqBid (LastCall t1 c1 a1 r1 u1) (LastCall t2 c2 a2 r2 u2) =
+  t1 == t2 && eqMaybeWith eqBid c1 c2 && a1 == a2 && r1 == r2 && u1 == u2
 eqLastWith eqBid (LastSwitch e1 bs1) (LastSwitch e2 bs2) =
   e1 == e2 && eqLstWith (eqMaybeWith eqBid) bs1 bs2
 eqLastWith _ _ _ = False

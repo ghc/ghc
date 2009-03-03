@@ -213,6 +213,9 @@ data Sequel
                         -- space that's unused on this path?
                         -- We need to do this only if the expression may
                         -- allocate (e.g. it's a foreign call or allocating primOp)
+instance Show Sequel where
+  show (Return _) = "Sequel: Return"
+  show (AssignTo _ _) = "Sequel: Assign"
 
 initCgInfoDown :: DynFlags -> Module -> CgInfoDownwards
 initCgInfoDown dflags mod
@@ -504,7 +507,7 @@ forkProc body_code
   = do	{ info_down <- getInfoDown
 	; us    <- newUniqSupply
 	; state <- getState
-   	; let	info_down' = info_down { cgd_sequel = initSequel }
+   	; let	info_down' = info_down -- { cgd_sequel = initSequel }
                 fork_state_in = (initCgState us) { cgs_binds = cgs_binds state }
 		(result, fork_state_out) = doFCode body_code info_down' fork_state_in
   	; setState $ state `addCodeBlocksFrom` fork_state_out
@@ -598,8 +601,8 @@ emitProcWithConvention :: Convention -> CmmInfo -> CLabel -> CmmFormals ->
 emitProcWithConvention conv info lbl args blocks
   = do  { us <- newUniqSupply
         ; let (offset, entry) = mkEntry (mkBlockId $ uniqFromSupply us) conv args
-              blks = initUs_ us $ lgraphOfAGraph offset $ entry <*> blocks
-        ; let proc_block = CmmProc info lbl args blks
+              blks = initUs_ us $ lgraphOfAGraph $ entry <*> blocks
+        ; let proc_block = CmmProc info lbl args ((offset, Just initUpdFrameOff), blks)
         ; state <- getState
         ; setState $ state { cgs_tops = cgs_tops state `snocOL` proc_block } }
 
@@ -630,5 +633,5 @@ getCmm code
 cgStmtsToBlocks :: CmmAGraph -> FCode CmmGraph
 cgStmtsToBlocks stmts
   = do  { us <- newUniqSupply
-	; return (initUs_ us (lgraphOfAGraph 0 stmts)) }	
+	; return (initUs_ us (lgraphOfAGraph stmts)) }	
 

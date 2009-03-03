@@ -51,14 +51,17 @@ canShortcut (JMP (OpImm imm)) 	= Just (DestImm imm)
 canShortcut _ 			= Nothing
 
 
+-- The helper ensures that we don't follow cycles.
 shortcutJump :: (BlockId -> Maybe JumpDest) -> Instr -> Instr
-shortcutJump fn insn@(JXX cc id) = 
-  case fn id of
-    Nothing                -> insn
-    Just (DestBlockId id') -> shortcutJump fn (JXX cc id')
-    Just (DestImm imm)     -> shortcutJump fn (JXX_GBL cc imm)
-
-shortcutJump _ other = other
+shortcutJump fn insn = shortcutJump' fn emptyBlockSet insn
+  where shortcutJump' fn seen insn@(JXX cc id) =
+          if elemBlockSet id seen then insn
+          else case fn id of
+                 Nothing                -> insn
+                 Just (DestBlockId id') -> shortcutJump' fn seen' (JXX cc id')
+                 Just (DestImm imm)     -> shortcutJump' fn seen' (JXX_GBL cc imm)
+               where seen' = extendBlockSet seen id
+        shortcutJump' _ _ other = other
 
 
 -- Here because it knows about JumpDest

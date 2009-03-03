@@ -22,24 +22,27 @@ import UniqSupply
 
 import Maybe
 
-cmmToZgraph :: GenCmm d h (ListGraph CmmStmt) -> UniqSM (GenCmm d h CmmGraph)
-cmmOfZgraph :: GenCmm d h (CmmGraph)          ->         GenCmm d h (ListGraph CmmStmt)
+cmmToZgraph :: GenCmm d h (ListGraph CmmStmt) -> UniqSM (GenCmm d h (CmmStackInfo, CmmGraph))
+cmmOfZgraph :: GenCmm d h (CmmStackInfo, CmmGraph)          ->         GenCmm d h (ListGraph CmmStmt)
 
 cmmToZgraph (Cmm tops) = liftM Cmm $ mapM mapTop tops
   where mapTop (CmmProc h l args g) =
           toZgraph (showSDoc $ ppr l) args g >>= return . CmmProc h l args
         mapTop (CmmData s ds) = return $ CmmData s ds
-cmmOfZgraph = cmmMapGraph ofZgraph
+cmmOfZgraph = cmmMapGraph (ofZgraph . snd)
 
-toZgraph :: String -> CmmFormals -> ListGraph CmmStmt -> UniqSM CmmGraph
-toZgraph _ _ (ListGraph []) = lgraphOfAGraph 0 emptyAGraph
+toZgraph :: String -> CmmFormals -> ListGraph CmmStmt -> UniqSM (CmmStackInfo, CmmGraph)
+toZgraph _ _ (ListGraph []) =
+  do g <- lgraphOfAGraph emptyAGraph
+     return ((0, Nothing), g)
 toZgraph fun_name args g@(ListGraph (BasicBlock id ss : other_blocks)) = 
            let (offset, entry) = mkEntry id Native args in
-           labelAGraph id offset $
-              entry <*> mkStmts ss <*> foldr addBlock emptyAGraph other_blocks
+           do g <- labelAGraph id $
+                     entry <*> mkStmts ss <*> foldr addBlock emptyAGraph other_blocks
+              return ((offset, Nothing), g)
   where addBlock (BasicBlock id ss) g =
-          mkLabel id emptyStackInfo <*> mkStmts ss <*> g
-        updfr_sz = panic "upd frame size lost in cmm conversion"
+          mkLabel id <*> mkStmts ss <*> g
+        updfr_sz = 0 -- panic "upd frame size lost in cmm conversion"
         mkStmts (CmmNop        : ss)  = mkNop        <*> mkStmts ss 
         mkStmts (CmmComment s  : ss)  = mkComment s  <*> mkStmts ss
         mkStmts (CmmAssign l r : ss)  = mkAssign l r <*> mkStmts ss
@@ -106,11 +109,11 @@ ofZgraph g = ListGraph $ swallow blocks
           extend_block _id stmts = stmts
           _extend_entry stmts = scomment showblocks : scomment cscomm : stmts
           showblocks = "LGraph has " ++ show (length blocks) ++ " blocks:" ++
-                       concat (map (\(G.Block id _ _) -> " " ++ show id) blocks)
+                       concat (map (\(G.Block id _) -> " " ++ show id) blocks)
           cscomm = "Call successors are" ++
                    (concat $ map (\id -> " " ++ show id) $ blockSetToList call_succs)
           swallow [] = []
-          swallow (G.Block id _ t : rest) = tail id [] t rest
+          swallow (G.Block id t : rest) = tail id [] t rest
           tail id prev' (G.ZTail m t)             rest = tail id (mid m : prev') t rest
           tail id prev' (G.ZLast G.LastExit)      rest = exit id prev' rest
           tail id prev' (G.ZLast (G.LastOther l)) rest = last id prev' l rest
@@ -139,7 +142,7 @@ ofZgraph g = ListGraph $ swallow blocks
                     _ -> endblock (CmmBranch tgt)
               LastCondBranch expr tid fid ->
                   case n of
-                    G.Block id' _ t : bs
+                    G.Block id' t : bs
                       -- It would be better to handle earlier, but we still must
                       -- generate correct code here.
                       | id' == fid, tid == fid, unique_pred id' ->
@@ -152,11 +155,11 @@ ofZgraph g = ListGraph $ swallow blocks
                     _ -> let instrs' = CmmBranch fid : CmmCondBranch expr tid : prev'
                          in block' id instrs' : swallow n
               LastSwitch arg ids   -> endblock $ CmmSwitch arg $ ids
-              LastCall e _ _ _ -> endblock $ CmmJump e []
+              LastCall e _ _ _ _ -> endblock $ CmmJump e []
           exit id prev' n = -- highly irregular (assertion violation?)
               let endblock stmt = block' id (stmt : prev') : swallow n in
               case n of [] -> endblock (scomment "procedure falls off end")
-                        G.Block id' _ t : bs -> 
+                        G.Block id' t : bs -> 
                             if unique_pred id' then
                                 tail id (scomment "went thru exit" : prev') t bs 
                             else
@@ -175,7 +178,7 @@ ofZgraph g = ListGraph $ swallow blocks
           call_succs = 
               let add b succs =
                       case G.last (G.unzip b) of
-                        G.LastOther (LastCall _ (Just id) _ _) ->
+                        G.LastOther (LastCall _ (Just id) _ _ _) ->
                           extendBlockSet succs id
                         _ -> succs
               in  G.fold_blocks add emptyBlockSet g

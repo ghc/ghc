@@ -8,14 +8,14 @@
 module MkZipCfgCmm
   ( mkNop, mkAssign, mkStore, mkCall, mkCmmCall, mkSafeCall, mkUnsafeCall, mkFinalCall
          , mkJump, mkForeignJump, mkJumpGC, mkCbranch, mkSwitch, mkReturn
-         , mkReturnSimple, mkComment, copyIn, copyOut
+         , mkReturnSimple, mkComment, copyInOflow, copyInSlot, copyOutOflow, copyOutSlot
          , mkEntry, mkCmmIfThenElse, mkCmmIfThen, mkCmmWhileDo
   , (<*>), catAGraphs, mkLabel, mkBranch
   , emptyAGraph, withFreshLabel, withUnique, outOfLine
   , lgraphOfAGraph, graphOfAGraph, labelAGraph
-  , CmmZ, CmmTopZ, CmmGraph, CmmBlock, CmmAGraph
+  , CmmZ, CmmTopZ, CmmGraph, CmmBlock, CmmAGraph, CmmStackInfo
   , Middle, Last, Convention(..), ForeignConvention(..), MidCallTarget(..), Transfer(..)
-  , emptyStackInfo, stackStubExpr, pprAGraph
+  , stackStubExpr, pprAGraph
   )
 where
 
@@ -36,14 +36,17 @@ import FastString
 import ForeignCall
 import MkZipCfg
 import Panic 
+import SMRep (ByteOff) 
 import StaticFlags 
 import ZipCfg 
 
 type CmmGraph  = LGraph Middle Last
 type CmmAGraph = AGraph Middle Last
 type CmmBlock  = Block  Middle Last
-type CmmZ      = GenCmm    CmmStatic CmmInfo CmmGraph
-type CmmTopZ   = GenCmmTop CmmStatic CmmInfo CmmGraph
+type CmmStackInfo            = (ByteOff, Maybe ByteOff)
+  -- probably want a record; (SP offset on entry, update frame space)
+type CmmZ                    = GenCmm    CmmStatic CmmInfo (CmmStackInfo, CmmGraph)
+type CmmTopZ                 = GenCmmTop CmmStatic CmmInfo (CmmStackInfo, CmmGraph)
 
 data Transfer = Call | Jump | Ret deriving Eq
 
@@ -95,8 +98,8 @@ mkCmmIfThen e tbranch
   = withFreshLabel "end of if"     $ \endif ->
     withFreshLabel "start of then" $ \tid ->
     mkCbranch e tid endif <*>
-    mkLabel tid   emptyStackInfo <*> tbranch <*> mkBranch endif <*>
-    mkLabel endif emptyStackInfo
+    mkLabel tid   <*> tbranch <*> mkBranch endif <*>
+    mkLabel endif
 
 
 
@@ -137,74 +140,123 @@ mkUnsafeCall t fs as = mkMiddle $ MidForeignCall Unsafe t fs as
 stackStubExpr :: Width -> CmmExpr
 stackStubExpr w = CmmLit (CmmInt 0 w)
 
+-- When we copy in parameters, we usually want to put overflow
+-- parameters on the stack, but sometimes we want to pass
+-- the variables in their spill slots.
+-- Therefore, for copying arguments and results, we provide different
+-- functions to pass the arguments in an overflow area and to pass them in spill slots.
+copyInOflow  :: Convention -> Bool -> Area -> CmmFormals -> (Int, CmmAGraph)
+copyInSlot   :: Convention -> Bool -> CmmFormals -> CmmAGraph
+copyOutOflow :: Convention -> Transfer -> Area -> CmmActuals -> UpdFrameOffset ->
+                              (Int, [Middle])
+copyOutSlot  :: Convention -> Transfer -> [LocalReg] -> [Middle]
+  -- why a list of middles here instead of an AGraph?
+
+copyInOflow      = copyIn oneCopyOflowI
+copyInSlot c i f = snd $ copyIn oneCopySlotI c i (panic "no area for copying to slots") f
+
+type SlotCopier = Area -> (LocalReg, ByteOff) -> (ByteOff, CmmAGraph) ->
+                          (ByteOff, CmmAGraph)
+type CopyIn  = SlotCopier -> Convention -> Bool -> Area -> CmmFormals ->
+                          (ByteOff, CmmAGraph)
+
 -- Return the number of bytes used for copying arguments, as well as the
 -- instructions to copy the arguments.
-copyIn :: Convention -> Bool -> Area -> CmmFormals -> (Int, AGraph Middle Last)
-copyIn conv isCall area formals =
-  foldr ci (init_offset, mkNop) $ assignArgumentsPos conv isCall localRegType formals
+copyIn :: CopyIn
+copyIn oflow conv isCall area formals =
+  foldr ci (init_offset, mkNop) args'
   where ci (reg, RegisterParam r) (n, ms) =
           (n, mkAssign (CmmLocal reg) (CmmReg $ CmmGlobal r) <*> ms)
-        ci (reg, StackParam off) (n, ms) =
-          let ty = localRegType reg
-              off' = off + init_offset
-          in (max n off',
-              mkAssign (CmmLocal reg) (CmmLoad (CmmStackSlot area off') ty) <*> ms)
-        init_offset = widthInBytes wordWidth
+        ci (r, StackParam off) (n, ms) = oflow area (r, off) (n, ms)
+        init_offset = widthInBytes wordWidth -- infotable
+        args  = assignArgumentsPos conv isCall localRegType formals
+        args' = foldl adjust [] args
+          where adjust rst (v, StackParam off) = (v, StackParam (off + init_offset)) : rst
+                adjust rst x@(_, RegisterParam _) = x : rst
+
+-- Copy-in one arg, using overflow space if needed.
+oneCopyOflowI, oneCopySlotI :: SlotCopier
+oneCopyOflowI area (reg, off) (n, ms) =
+  (max n off, mkAssign (CmmLocal reg) (CmmLoad (CmmStackSlot area off) ty) <*> ms)
+  where ty = localRegType reg
+
+-- Copy-in one arg, using spill slots if needed -- used for calling conventions at
+-- a procpoint that is not a return point. The offset is irrelevant here...
+oneCopySlotI _ (reg, _) (n, ms) =
+  (n, mkAssign (CmmLocal reg) (CmmLoad (CmmStackSlot (RegSlot reg) w) ty) <*> ms)
+  where ty = localRegType reg
+        w  = widthInBytes (typeWidth ty)
+
+
+-- Factoring out the common parts of the copyout functions yielded something
+-- more complicated:
 
 -- The argument layout function ignores the pointer to the info table, so we slot that
 -- in here. When copying-out to a young area, we set the info table for return
 -- and adjust the offsets of the other parameters.
 -- If this is a call instruction, we adjust the offsets of the other parameters.
-copyOut :: Convention -> Transfer -> Area -> CmmActuals -> UpdFrameOffset -> (Int, [Middle])
-copyOut conv transfer area@(CallArea a) actuals updfr_off =
+copyOutOflow conv transfer area@(CallArea a) actuals updfr_off =
   foldr co (init_offset, []) args'
-  where args = assignArgumentsPos conv skip_node cmmExprType actuals
-        skip_node = transfer /= Ret
+  where co (v, RegisterParam r) (n, ms) = (n, MidAssign (CmmGlobal r) v : ms)
+        co (v, StackParam off)  (n, ms) = 
+          (max n off, MidStore (CmmStackSlot area off) v : ms)
         (setRA, init_offset) =
           case a of Young id@(BlockId _) -> -- set RA if making a call
                       if transfer == Call then
-                        ([(CmmLit (CmmBlock id), StackParam init_offset)], ra_width)
+                        ([(CmmLit (CmmBlock id), StackParam init_offset)],
+                         widthInBytes wordWidth)
                       else ([], 0)
                     Old -> ([], updfr_off)
-        ra_width = widthInBytes wordWidth
+        args = assignArgumentsPos conv (transfer /= Ret) cmmExprType actuals
         args' = foldl adjust setRA args
           where adjust rst (v, StackParam off) = (v, StackParam (off + init_offset)) : rst
                 adjust rst x@(_, RegisterParam _) = x : rst
-        co (v, RegisterParam r) (n, ms) = (n, MidAssign (CmmGlobal r) v : ms)
-        co (v, StackParam off)  (n, ms) =
-          (max n off, MidStore (CmmStackSlot area off) v : ms)
-copyOut _ _ (RegSlot _) _ _ = panic "cannot copy arguments into a register slot"
+copyOutOflow _ _ (RegSlot _) _ _ = panic "cannot copy arguments into a register slot"
+
+-- Args passed only in registers and stack slots; no overflow space.
+-- No return address may apply!
+copyOutSlot conv transfer actuals = foldr co [] args
+  where co (v, RegisterParam r) ms = MidAssign (CmmGlobal r) (toExp v) : ms
+        co (v, StackParam off)  ms =
+          MidStore (CmmStackSlot (RegSlot v) off) (toExp v) : ms
+        toExp r = CmmReg (CmmLocal r)
+        args = assignArgumentsPos conv (transfer /= Ret) localRegType actuals
+
+-- oneCopySlotO _ (reg, _) (n, ms) =
+--   (n, MidStore (CmmStackSlot (RegSlot reg) w) reg : ms)
+--   where w = widthInBytes (typeWidth (localRegType reg))
 
 mkEntry :: BlockId -> Convention -> CmmFormals -> (Int, CmmAGraph)
-mkEntry _ conv formals = copyIn conv False (CallArea Old) formals
+mkEntry _ conv formals = copyInOflow conv False (CallArea Old) formals
 
 lastWithArgs :: Transfer -> Area -> Convention -> CmmActuals -> UpdFrameOffset ->
-                (Int -> Last) -> CmmAGraph
+                (ByteOff -> Last) -> CmmAGraph
 lastWithArgs transfer area conv actuals updfr_off last =
-  let (outArgs, copies) = copyOut conv transfer area actuals updfr_off in
+  let (outArgs, copies) = copyOutOflow conv transfer area actuals updfr_off in
   mkMiddles copies <*> mkLast (last outArgs)
 
 -- The area created for the jump and return arguments is the same area as the
 -- procedure entry.
 old :: Area
 old = CallArea Old
-toCall :: CmmExpr -> Maybe BlockId -> UpdFrameOffset -> Int -> Last
-toCall e cont updfr_off arg_space = LastCall e cont arg_space (Just updfr_off)
+toCall :: CmmExpr -> Maybe BlockId -> UpdFrameOffset -> ByteOff -> ByteOff -> Last
+toCall e cont updfr_off res_space arg_space =
+  LastCall e cont arg_space res_space (Just updfr_off)
 mkJump e actuals updfr_off =
-  lastWithArgs Jump old Native actuals updfr_off $ toCall e Nothing updfr_off
+  lastWithArgs Jump old Native actuals updfr_off $ toCall e Nothing updfr_off 0
 mkJumpGC e actuals updfr_off =
-  lastWithArgs Jump old GC actuals updfr_off $ toCall e Nothing updfr_off
+  lastWithArgs Jump old GC actuals updfr_off $ toCall e Nothing updfr_off 0
 mkForeignJump conv e actuals updfr_off =
-  lastWithArgs Jump old conv actuals updfr_off $ toCall e Nothing updfr_off
+  lastWithArgs Jump old conv actuals updfr_off $ toCall e Nothing updfr_off 0
 mkReturn e actuals updfr_off =
-  lastWithArgs Ret  old Native actuals updfr_off $ toCall e Nothing updfr_off
+  lastWithArgs Ret  old Native actuals updfr_off $ toCall e Nothing updfr_off 0
     -- where e = CmmLoad (CmmStackSlot (CallArea Old) updfr_off) gcWord
 mkReturnSimple actuals updfr_off =
-  lastWithArgs Ret  old Native actuals updfr_off $ toCall e Nothing updfr_off
+  lastWithArgs Ret  old Native actuals updfr_off $ toCall e Nothing updfr_off 0
     where e = CmmLoad (CmmStackSlot (CallArea Old) updfr_off) gcWord
 
 mkFinalCall f _ actuals updfr_off =
-  lastWithArgs Call old Native actuals updfr_off $ toCall f Nothing updfr_off
+  lastWithArgs Call old Native actuals updfr_off $ toCall f Nothing updfr_off 0
 
 mkCmmCall f results actuals = mkCall f Native results actuals
 
@@ -212,8 +264,7 @@ mkCmmCall f results actuals = mkCall f Native results actuals
 mkCall f conv results actuals updfr_off =
   withFreshLabel "call successor" $ \k ->
     let area = CallArea $ Young k
-        (off, copyin) = copyIn conv False area results
+        (off, copyin) = copyInOflow conv False area results
         copyout = lastWithArgs Call area conv actuals updfr_off 
-                               (toCall f (Just k) updfr_off)
-    in (copyout <*> mkLabel k (StackInfo (Just off) (Just updfr_off))
-                <*> copyin)
+                               (toCall f (Just k) updfr_off off)
+    in (copyout <*> mkLabel k <*> copyin)

@@ -52,7 +52,6 @@ import BlockId
 import Cmm
 import CmmExpr
 import MkZipCfgCmm
-import ZipCfg hiding (last, unzip, zip)
 import CLabel
 import CmmUtils
 import PprCmm		( {- instances -} )
@@ -636,7 +635,7 @@ mkCmmSwitch via_C tag_expr branches mb_deflt lo_tag hi_tag
     mk_switch tag_expr' (sortLe le branches) mb_deflt 
 	      lo_tag hi_tag via_C
 	  -- Sort the branches before calling mk_switch
-    <*> mkLabel join_lbl emptyStackInfo
+    <*> mkLabel join_lbl
 
   where
     (t1,_) `le` (t2,_) = t1 <= t2
@@ -791,7 +790,7 @@ mkCmmLitSwitch scrut  branches deflt
     label_code join_lbl deflt		$ \ deflt ->
     label_branches join_lbl branches	$ \ branches ->
     mk_lit_switch scrut' deflt (sortLe le branches)
-    <*> mkLabel join_lbl emptyStackInfo
+    <*> mkLabel join_lbl
   where
     le (t1,_) (t2,_) = t1 <= t2
 
@@ -850,7 +849,7 @@ label_code :: BlockId -> CmmAGraph -> (BlockId -> CmmAGraph) -> CmmAGraph
 --  [L: code; goto J] fun L
 label_code join_lbl code thing_inside
   = withFreshLabel "switch" 	$ \lbl -> 
-    outOfLine (mkLabel lbl emptyStackInfo <*> code <*> mkBranch join_lbl)
+    outOfLine (mkLabel lbl <*> code <*> mkBranch join_lbl)
     <*> thing_inside lbl
  
 

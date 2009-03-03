@@ -165,8 +165,7 @@ catAGraphs :: [AGraph m l] -> AGraph m l
 -- splicing operation <*>, are constant-time operations.
 
 emptyAGraph :: AGraph m l
-mkLabel     :: (LastNode l) =>
-               BlockId -> StackInfo -> AGraph m l -- graph contains the label
+mkLabel     :: (LastNode l) => BlockId -> AGraph m l -- graph contains the label
 mkMiddle    :: m -> AGraph m l   -- graph contains the node
 mkLast      :: (Outputable m, Outputable l, LastNode l) =>
                l       -> AGraph m l              -- graph contains the node
@@ -230,9 +229,9 @@ mkWhileDo    :: (Outputable m, Outputable l, LastNode l)
 -- because it may require the allocation of fresh, unique labels.
 
 graphOfAGraph  :: AGraph m l -> UniqSM (Graph  m l)
-lgraphOfAGraph :: Int -> AGraph m l -> UniqSM (LGraph m l)
+lgraphOfAGraph :: AGraph m l -> UniqSM (LGraph m l)
   -- ^ allocate a fresh label for the entry point
-labelAGraph    :: BlockId -> Int -> AGraph m l -> UniqSM (LGraph m l)
+labelAGraph    :: BlockId -> AGraph m l -> UniqSM (LGraph m l)
   -- ^ use the given BlockId as the label of the entry point
 
 
@@ -261,21 +260,20 @@ emptyAGraph = AGraph return
 graphOfAGraph (AGraph f) = f emptyGraph
 emptyGraph = Graph (ZLast LastExit) emptyBlockEnv
 
-labelAGraph id args g =
+labelAGraph id g =
     do Graph tail blocks <- graphOfAGraph g
-       return $ LGraph id args $ insertBlock (Block id stackInfo tail) blocks
-    where stackInfo = StackInfo Nothing Nothing
+       return $ LGraph id $ insertBlock (Block id tail) blocks
 
-lgraphOfAGraph args g = do id <- freshBlockId "graph entry"
-                           labelAGraph id args g
+lgraphOfAGraph g = do id <- freshBlockId "graph entry"
+                      labelAGraph id g
 
 -------------------------------------
 -- constructors
 
-mkLabel id args = AGraph f
+mkLabel id = AGraph f
     where f (Graph tail blocks) =
             return $ Graph (ZLast (mkBranchNode id))
-                           (insertBlock (Block id args tail) blocks)
+                           (insertBlock (Block id tail) blocks)
 
 mkBranch target = mkLast $ mkBranchNode target
 
@@ -320,18 +318,18 @@ mkIfThenElse cbranch tbranch fbranch =
     withFreshLabel "start of then" $ \tid ->
     withFreshLabel "start of else" $ \fid ->
         cbranch tid fid <*>
-        mkLabel tid emptyStackInfo <*> tbranch <*> mkBranch endif <*>
-        mkLabel fid emptyStackInfo <*> fbranch <*>
-        mkLabel endif emptyStackInfo 
+        mkLabel tid <*> tbranch <*> mkBranch endif <*>
+        mkLabel fid <*> fbranch <*>
+        mkLabel endif
 
 mkWhileDo cbranch body = 
   withFreshLabel "loop test" $ \test ->
   withFreshLabel "loop head" $ \head ->
   withFreshLabel "end while" $ \endwhile ->
      -- Forrest Baskett's while-loop layout
-     mkBranch test <*> mkLabel head emptyStackInfo <*> body
-                   <*> mkLabel test emptyStackInfo <*> cbranch head endwhile
-                   <*> mkLabel endwhile emptyStackInfo 
+     mkBranch test <*> mkLabel head <*> body
+                   <*> mkLabel test <*> cbranch head endwhile
+                   <*> mkLabel endwhile
 
 -- | Bleat if the insertion of a last node will create unreachable code
 note_this_code_becomes_unreachable ::

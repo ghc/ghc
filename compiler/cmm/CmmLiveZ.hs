@@ -3,7 +3,7 @@ module CmmLiveZ
     ( CmmLive
     , cmmLivenessZ
     , liveLattice
-    , middleLiveness, lastLiveness, noLiveOnEntry
+    , middleLiveness, noLiveOnEntry
     ) 
 where
 
@@ -43,16 +43,21 @@ type BlockEntryLiveness = BlockEnv CmmLive
 -- | Calculated liveness info for a CmmGraph
 -----------------------------------------------------------------------------
 cmmLivenessZ :: CmmGraph -> FuelMonad BlockEntryLiveness
-cmmLivenessZ g@(LGraph entry _ _) =
+cmmLivenessZ g@(LGraph entry _) =
   liftM (check . zdfFpFacts) (res :: FuelMonad (CmmBackwardFixedPoint CmmLive))
   where res = zdfSolveFrom emptyBlockEnv "liveness analysis" liveLattice transfers
                            emptyUniqSet (graphOfLGraph g)
-        transfers = BackwardTransfers first middle last
-        first live _ = live
-        middle       = flip middleLiveness
-        last         = flip lastLiveness
-        check facts  =
+        transfers = BackwardTransfers (flip const) mid last
+        mid  m = gen_kill m . midLive  m
+        last l = gen_kill l . lastLive l 
+        check facts   =
           noLiveOnEntry entry (expectJust "check" $ lookupBlockEnv facts entry) facts
+
+gen_kill :: (DefinerOfLocalRegs a, UserOfLocalRegs a) => a -> CmmLive -> CmmLive
+gen_kill a = gen a . kill a
+
+middleLiveness :: Middle -> CmmLive -> CmmLive
+middleLiveness = gen_kill
 
 -- | On entry to the procedure, there had better not be any LocalReg's live-in.
 noLiveOnEntry :: BlockId -> CmmLive -> a -> a
@@ -62,22 +67,18 @@ noLiveOnEntry bid in_fact x =
 
 -- | The transfer equations use the traditional 'gen' and 'kill'
 -- notations, which should be familiar from the dragon book.
-gen, kill :: UserOfLocalRegs a => a -> RegSet -> RegSet
-gen  a live = foldRegsUsed extendRegSet      live a
-kill a live = foldRegsUsed delOneFromUniqSet live a
+gen  :: UserOfLocalRegs    a => a -> RegSet -> RegSet
+gen  a live = foldRegsUsed    extendRegSet      live a
+kill :: DefinerOfLocalRegs a => a -> RegSet -> RegSet
+kill a live = foldRegsDefd delOneFromUniqSet live a
 
--- Why aren't these function using the typeclasses on Middle and Last?
-middleLiveness :: Middle -> CmmLive -> CmmLive
-middleLiveness (MidComment {})            live = live
-middleLiveness (MidAssign lhs expr)       live = gen expr $ kill lhs live
-middleLiveness (MidStore addr rval)       live = gen addr $ gen rval live
-middleLiveness (MidForeignCall _ tgt _ args) _ = gen tgt $ gen args emptyUniqSet
+midLive :: Middle -> CmmLive -> CmmLive
+midLive (MidForeignCall {}) _ = emptyUniqSet
+midLive _                live = live
 
-lastLiveness :: Last -> (BlockId -> CmmLive) -> CmmLive
-lastLiveness l env = last l
-  where last (LastBranch id)             = env id
-        last (LastCall tgt Nothing  _ _) = gen tgt $ emptyUniqSet
-        last (LastCall tgt (Just k) _ _) = gen tgt $ env k
-        last (LastCondBranch e t f)      = gen e $ unionUniqSets (env t) (env f)
-        last (LastSwitch e tbl)          =
-          gen e $ unionManyUniqSets $ map env (catMaybes tbl)
+lastLive :: Last -> (BlockId -> CmmLive) -> CmmLive
+lastLive l env = last l
+  where last (LastBranch id)        = env id
+        last (LastCall _ _  _ _ _)  = emptyUniqSet
+        last (LastCondBranch _ t f) = unionUniqSets (env t) (env f)
+        last (LastSwitch _ tbl)     = unionManyUniqSets $ map env (catMaybes tbl)

@@ -80,7 +80,7 @@ emitReturn :: [CmmExpr] -> FCode ()
 emitReturn results
   = do { sequel    <- getSequel;
        ; updfr_off <- getUpdFrameOff
-       ; emit $ mkComment $ mkFastString "emitReturn"
+       ; emit $ mkComment $ mkFastString ("emitReturn: " ++ show sequel)
        ; case sequel of
            Return _ ->
              do { adjustHpBackwards
@@ -97,7 +97,7 @@ emitCall conv fun args
   = do	{ adjustHpBackwards
 	; sequel <- getSequel
 	; updfr_off <- getUpdFrameOff
-        ; emit $ mkComment $ mkFastString "emitCall"
+        ; emit $ mkComment $ mkFastString ("emitCall: " ++ show sequel)
 	; case sequel of
 	    Return _            -> emit (mkForeignJump conv fun args updfr_off)
 	    AssignTo res_regs _ -> emit (mkCall fun conv res_regs args updfr_off)

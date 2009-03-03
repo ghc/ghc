@@ -20,7 +20,9 @@ import MkZipCfgCmm hiding (CmmBlock, CmmGraph)
 import Monad
 import Outputable
 import Panic
+import SMRep (ByteOff)
 import ZipCfg
+import ZipCfg as Z
 import ZipCfgCmmRep
 import ZipDataflow
 
@@ -114,7 +116,7 @@ liveKill (a, hi, w) set = -- pprTrace "killing slots in area" (ppr a) $
 liveSlotTransfers :: BackwardTransfers Middle Last SubAreaSet
 liveSlotTransfers =
   BackwardTransfers first liveInSlots liveLastIn
-    where first live id = delFromFM live (CallArea (Young id))
+    where first id live = delFromFM live (CallArea (Young id))
 
 -- Slot sets: adding slots, removing slots, and checking for membership.
 liftToArea :: Area -> ([SubArea] -> [SubArea]) -> SubAreaSet -> SubAreaSet 
@@ -129,11 +131,11 @@ elemSlot   live (a, i, w) =
 removeLiveSlotDefs :: (DefinerOfSlots s, UserOfSlots s) => SubAreaSet -> s -> SubAreaSet
 removeLiveSlotDefs = foldSlotsDefd removeSlot
 
-liveInSlots :: (DefinerOfSlots s, UserOfSlots s) => SubAreaSet -> s -> SubAreaSet
-liveInSlots live x = foldSlotsUsed addSlot (removeLiveSlotDefs live x) x
+liveInSlots :: (DefinerOfSlots s, UserOfSlots s) => s -> SubAreaSet -> SubAreaSet
+liveInSlots x live = foldSlotsUsed addSlot (removeLiveSlotDefs live x) x
 
-liveLastIn :: (BlockId -> SubAreaSet) -> Last -> SubAreaSet
-liveLastIn env l = liveInSlots (liveLastOut env l) l
+liveLastIn :: Last -> (BlockId -> SubAreaSet) -> SubAreaSet
+liveLastIn l env = liveInSlots l (liveLastOut env l)
 
 -- Don't forget to keep the outgoing parameters in the CallArea live,
 -- as well as the update frame.
@@ -145,11 +147,11 @@ liveLastIn env l = liveInSlots (liveLastOut env l) l
 liveLastOut :: (BlockId -> SubAreaSet) -> Last -> SubAreaSet
 liveLastOut env l =
   case l of
-    LastCall _ Nothing n _ -> 
+    LastCall _ Nothing n _ _ -> 
       add_area (CallArea Old) n out -- add outgoing args (includes upd frame)
-    LastCall _ (Just k) n (Just _) ->
+    LastCall _ (Just k) n _ (Just _) ->
       add_area (CallArea Old) n (add_area (CallArea (Young k)) n out)
-    LastCall _ (Just k) n Nothing ->
+    LastCall _ (Just k) n _ Nothing ->
       add_area (CallArea (Young k)) n out
     _ -> out
   where out = joinOuts slotLattice env l
@@ -195,9 +197,9 @@ igraph builder env g = foldr interfere emptyFM (postorder_dfs g)
         interfere block igraph =
           let (h, l) = goto_end (unzip block)
               --heads :: ZHead Middle -> (IGraph x, SubAreaSet) -> IGraph x
-              heads (ZFirst _ _) (igraph, _)       = igraph
+              heads (ZFirst _) (igraph, _)       = igraph
               heads (ZHead h m)    (igraph, liveOut) =
-                heads h (addEdges igraph m liveOut, liveInSlots liveOut m)
+                heads h (addEdges igraph m liveOut, liveInSlots m liveOut)
               -- add edges between a def and the other defs and liveouts
               addEdges igraph i out = fst $ foldSlotsDefd addDef (igraph, out) i
               addDef (igraph, out) def@(a, _, _) =
@@ -212,24 +214,26 @@ igraph builder env g = foldr interfere emptyFM (postorder_dfs g)
               env' bid = lookupBlockEnv env bid `orElse` panic "unknown blockId in igraph"
           in heads h $ case l of LastExit    -> (igraph, emptyFM)
                                  LastOther l -> (addEdges igraph l $ liveLastOut env' l,
-                                                 liveLastIn env' l)
+                                                 liveLastIn l env')
 
 -- Before allocating stack slots, we need to collect one more piece of information:
 -- what's the highest offset (in bytes) used in each Area?
 -- We'll need to allocate that much space for each Area.
-getAreaSize :: LGraph Middle Last -> AreaMap
-getAreaSize g@(LGraph _ off _) =
+getAreaSize :: ByteOff -> LGraph Middle Last -> AreaMap
+getAreaSize entry_off g@(LGraph _ _) =
   fold_blocks (fold_fwd_block first add_regslots last)
-              (unitFM (CallArea Old) off) g
-  where first id (StackInfo {argBytes = Just off}) z = add z (CallArea (Young id)) off
-        first _  _          z = z
-        add_regslots i z = foldSlotsUsed addSlot (foldSlotsDefd addSlot z i) i
-        last l@(LastOther (LastCall _ Nothing off _)) z =
-          add_regslots l (add z (CallArea Old) off)
-        last l@(LastOther (LastCall _ (Just k) off _)) z =
-          add_regslots l (add z (CallArea (Young k)) off)
+              (unitFM (CallArea Old) entry_off) g
+  where first _  z = z
+        last l@(LastOther (LastCall _ Nothing args res _)) z =
+          add_regslots l (add (add z area args) area res)
+          where area = CallArea Old
+        last l@(LastOther (LastCall _ (Just k) args res _)) z =
+          add_regslots l (add (add z area args) area res)
+          where area = CallArea (Young k)
         last l z = add_regslots l z
-        addSlot z (a@(RegSlot _), off, _) = add z a off
+        add_regslots i z = foldSlotsUsed addSlot (foldSlotsDefd addSlot z i) i
+        addSlot z (a@(RegSlot (LocalReg _ ty)), _, _) =
+          add z a $ widthInBytes $ typeWidth ty
         addSlot z _ = z
         add z a off = addToFM z a (max off (lookupWithDefaultFM z 0 a))
 
@@ -285,35 +289,41 @@ allocSlotFrom ig areaSize from areaMap area =
 
 -- Note: The stack pointer only has to be younger than the youngest live stack slot
 -- at proc points. Otherwise, the stack pointer can point anywhere.
-layout :: ProcPointSet -> SlotEnv -> LGraph Middle Last -> AreaMap
-layout procPoints env g =
-  let builder = areaBuilder
-      ig = (igraph builder env g, builder)
+layout :: ProcPointSet -> SlotEnv -> ByteOff -> LGraph Middle Last -> AreaMap
+layout procPoints env entry_off g =
+  let ig = (igraph areaBuilder env g, areaBuilder)
       env' bid = lookupBlockEnv env bid `orElse` panic "unknown blockId in igraph"
-      areaSize = getAreaSize g
-      -- Find the slots that are live-in to the block
-      live_in (ZTail m l) = liveInSlots (live_in l) m
-      live_in (ZLast (LastOther l)) = liveLastIn env' l
+      areaSize = getAreaSize entry_off g
+      -- Find the slots that are live-in to a block tail
+      live_in (ZTail m l) = liveInSlots m (live_in l)
+      live_in (ZLast (LastOther l)) = liveLastIn l env'
       live_in (ZLast LastExit) = emptyFM 
       -- Find the youngest live stack slot
       youngest_live areaMap live = fold_subareas young_slot live 0
         where young_slot (a, o, _) z = case lookupFM areaMap a of
                                          Just top -> max z $ top + o
                                          Nothing  -> z
-      fold_subareas :: (SubArea -> z -> z) -> SubAreaSet -> z -> z
-      fold_subareas f m z = foldFM (\_ s z -> foldr f z s) z m
+              fold_subareas f m z = foldFM (\_ s z -> foldr f z s) z m
       -- Allocate space for spill slots and call areas
       allocVarSlot = allocSlotFrom ig areaSize 0
-      allocCallSlot areaMap (Block id stackInfo t)
-        | elemBlockSet id procPoints =
-        let young  = youngest_live areaMap $ live_in t
-            start = case returnOff stackInfo of Just b  -> max b young
-                                                Nothing -> young
-            z = allocSlotFrom ig areaSize start areaMap (CallArea (Young id))
-        in -- pprTrace "allocCallSlot for" (ppr id <+> ppr young <+> ppr (live_in t) <+> ppr z) 
-           z
-      allocCallSlot areaMap _ = areaMap
-      -- mid foreign calls need to have info tables placed on the stack
+      -- Update the successor's incoming SP.
+      setSuccSPs inSp bid areaMap =
+        case (lookupFM areaMap area, lookupBlockEnv (lg_blocks g) bid) of
+          (Just _, _) -> areaMap -- succ already knows incoming SP
+          (Nothing, Just (Block _ _)) ->
+            if elemBlockSet bid procPoints then
+              let young = youngest_live areaMap $ env' bid
+                  -- start = case returnOff stackInfo of Just b  -> max b young
+                  --                                     Nothing -> young
+                  start = young -- maybe wrong, but I don't understand
+                                -- why the preceding is necessary...
+              in  allocSlotFrom ig areaSize start areaMap area
+            else addToFM areaMap area inSp
+          (_, Nothing) -> panic "Block not found in cfg"
+        where area = CallArea (Young bid)
+      allocLast (Block id _) areaMap l =
+        fold_succs (setSuccSPs inSp) l areaMap
+        where inSp = expectJust "sp in" $ lookupFM areaMap (CallArea (Young id))
       allocMidCall m@(MidForeignCall (Safe bid _) _ _ _) t areaMap =
         let young     = youngest_live areaMap $ removeLiveSlotDefs (live_in t) m
             area      = CallArea (Young bid)
@@ -324,12 +334,14 @@ layout procPoints env g =
           foldSlotsDefd alloc' (foldSlotsUsed alloc' (allocMidCall m t areaMap) m) m
         where alloc' areaMap (a@(RegSlot _), _, _) = allocVarSlot areaMap a
               alloc' areaMap _ = areaMap
-      layoutAreas areaMap b@(Block _ _ t) = layout areaMap t
+      layoutAreas areaMap b@(Block _ t) = layout areaMap t
         where layout areaMap (ZTail m t) = layout (alloc m t areaMap) t
-              layout areaMap (ZLast _)   = allocCallSlot areaMap b
-      areaMap = foldl layoutAreas (addToFM emptyFM (CallArea Old) 0) (postorder_dfs g)
+              layout areaMap (ZLast l)   = allocLast b areaMap l
+      initMap = addToFM (addToFM emptyFM (CallArea Old) 0)
+                        (CallArea (Young (lg_entry g))) 0
+      areaMap = foldl layoutAreas initMap (postorder_dfs g)
   in -- pprTrace "ProcPoints" (ppr procPoints) $
-       -- pprTrace "Area SizeMap" (ppr areaSize) $
+        -- pprTrace "Area SizeMap" (ppr areaSize) $
          -- pprTrace "Entry SP" (ppr entrySp) $
            -- pprTrace "Area Map" (ppr areaMap) $
      areaMap
@@ -343,35 +355,32 @@ layout procPoints env g =
 --    stack pointer to be younger than the live values on the stack at proc points.
 -- 3. Compute the maximum stack offset used in the procedure and replace
 --    the stack high-water mark with that offset.
-manifestSP :: ProcPointSet -> BlockEnv Status -> AreaMap ->
-                LGraph Middle Last -> FuelMonad (LGraph Middle Last)
-manifestSP procPoints procMap areaMap g@(LGraph entry args blocks) =
-  liftM (LGraph entry args) blocks'
-  where blocks' = foldl replB (return emptyBlockEnv) (postorder_dfs g)
-        slot a = -- pprTrace "slot" (ppr a) $
+manifestSP :: AreaMap -> ByteOff -> LGraph Middle Last -> FuelMonad (LGraph Middle Last)
+manifestSP areaMap entry_off g@(LGraph entry _blocks) =
+  liftM (LGraph entry) $ foldl replB (return emptyBlockEnv) (postorder_dfs g)
+  where slot a = -- pprTrace "slot" (ppr a) $
                    lookupFM areaMap a `orElse` panic "unallocated Area"
         slot' (Just id) = slot $ CallArea (Young id)
         slot' Nothing   = slot $ CallArea Old
         sp_high = maxSlot slot g
-        proc_entry_sp = slot (CallArea Old) + args
+        proc_entry_sp = slot (CallArea Old) + entry_off
+
+        add_sp_off b env =
+          case Z.last (unzip b) of
+            LastOther (LastCall {cml_cont = Just succ, cml_ret_args = off}) ->
+              extendBlockEnv env succ off
+            _ -> env
+        spEntryMap = fold_blocks add_sp_off (mkBlockEnv [(entry, entry_off)]) g
+        spOffset id = lookupBlockEnv spEntryMap id `orElse` 0
+
         sp_on_entry id | id == entry = proc_entry_sp
-        sp_on_entry id =
-          case lookupBlockEnv blocks id of
-            Just (Block _ (StackInfo {argBytes = Just o}) _) -> slot' (Just id) + o
-            _ -> 
-             case expectJust "sp_on_entry" (lookupBlockEnv procMap id) of
-               ReachedBy pp ->
-                 case blockSetToList pp of
-                   [id] -> sp_on_entry id
-                   _    -> panic "block not reached by one proc point"
-               ProcPoint -> pprPanic "procpoint doesn't take any arguments?"
-                               (ppr id <+> ppr g <+> ppr procPoints <+> ppr procMap)
+        sp_on_entry id = slot' (Just id) + spOffset id
 
         -- On entry to procpoints, the stack pointer is conventional;
         -- otherwise, we check the SP set by predecessors.
         replB :: FuelMonad (BlockEnv CmmBlock) -> CmmBlock -> FuelMonad (BlockEnv CmmBlock)
-        replB blocks (Block id o t) =
-          do bs <- replTail (Block id o) spIn t
+        replB blocks (Block id t) =
+          do bs <- replTail (Block id) spIn t
              -- pprTrace "spIn" (ppr id <+> ppr spIn) $ do
              liftM (flip (foldr insertBlock) bs) blocks
           where spIn = sp_on_entry id
@@ -391,7 +400,7 @@ manifestSP procPoints procMap areaMap g@(LGraph entry args blocks) =
         replSlot _ e = e
         -- The block must establish the SP expected at each successsor.
         fixSp :: (ZTail Middle Last -> CmmBlock) -> Int -> Last -> FuelMonad ([CmmBlock])
-        fixSp h spOff l@(LastCall _ k n _) = updSp h spOff (slot' k + n) l
+        fixSp h spOff l@(LastCall _ k n _ _) = updSp h spOff (slot' k + n) l
         fixSp h spOff l@(LastBranch k) =
           let succSp = sp_on_entry k in
           if succSp /= spOff then
@@ -417,7 +426,7 @@ manifestSP procPoints procMap areaMap g@(LGraph entry args blocks) =
 -- To compute the stack high-water mark, we fold over the graph and
 -- compute the highest slot offset.
 maxSlot :: (Area -> Int) -> CmmGraph -> Int
-maxSlot slotOff g = fold_blocks (fold_fwd_block (\ _ _ x -> x) highSlot highSlot) 0 g
+maxSlot slotOff g = fold_blocks (fold_fwd_block (\ _ x -> x) highSlot highSlot) 0 g
   where highSlot i z = foldSlotsUsed add (foldSlotsDefd add z i) i
         add z (a, i, _) = max z (slotOff a + i)
 
@@ -436,7 +445,7 @@ stubSlotsOnDeath g = liftM zdfFpContents $ (res :: StubPtrFix)
           rewrites = BackwardRewrites first middle last Nothing
           first _ _ = Nothing
           last  _ _ = Nothing
-          middle liveSlots m = foldSlotsUsed (stub liveSlots m) Nothing m
+          middle m liveSlots = foldSlotsUsed (stub liveSlots m) Nothing m
           stub liveSlots m rst subarea@(a, off, w) =
             if elemSlot liveSlots subarea then rst
             else let store = mkStore (CmmStackSlot a off)

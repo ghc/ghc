@@ -56,9 +56,10 @@ assignArgumentsPos conv isCall arg_ty reps = map cvt assignments
     where
       regs = case conv of Native -> getRegs isCall
                           GC     -> getRegs False
-                          PrimOp -> noStack
+                          PrimOp -> if isCall then noStack else getRegs isCall
                           Slow   -> noRegs
-                          _      -> panic "unrecognized calling convention"
+                          _   -> getRegs isCall
+                          -- _      -> panic "unrecognized calling convention"
       (sizes, assignments) = unzip $ assignArguments' reps (sum sizes) regs
       assignArguments' [] _ _ = []
       assignArguments' (r:rs) offset avails =

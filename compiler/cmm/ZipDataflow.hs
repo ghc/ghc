@@ -88,10 +88,10 @@ N.B. 'A set of facts' is shorthand for 'A finite map from CFG label to fact'.
 
 The types of transfer equations, rewrites, and fixed points are
 different for forward and backward problems.  To avoid cluttering the
-name space with two versions of every names, other names such as
+name space with two versions of every name, other names such as
 zdfSolveFrom are overloaded to work in both forward or backward
 directions.  This design decision is based on experience with the
-predecessor module, now called ZipDataflow0 and destined for the bit bucket.
+predecessor module, which has been mercifully deleted.
 
 
 This module is deliberately very abstract.  It is a completely general
@@ -122,9 +122,9 @@ the time being.
 -- block, so instead of a fact it is given a mapping from BlockId to fact.
 
 data BackwardTransfers middle last a = BackwardTransfers
-    { bt_first_in  :: a              -> BlockId -> a
-    , bt_middle_in :: a              -> middle  -> a
-    , bt_last_in   :: (BlockId -> a) -> last    -> a
+    { bt_first_in  :: BlockId -> a              -> a
+    , bt_middle_in :: middle  -> a              -> a
+    , bt_last_in   :: last    -> (BlockId -> a) -> a
     } 
 
 -- | For a forward transfer, you're given the fact on a node's 
@@ -133,10 +133,10 @@ data BackwardTransfers middle last a = BackwardTransfers
 -- block, so instead of a fact it produces a list of (BlockId, fact) pairs.
 
 data ForwardTransfers middle last a = ForwardTransfers
-    { ft_first_out  :: a -> BlockId -> a
-    , ft_middle_out :: a -> middle  -> a
-    , ft_last_outs  :: a -> last    -> LastOutFacts a
-    , ft_exit_out   :: a            -> a
+    { ft_first_out  :: BlockId -> a -> a
+    , ft_middle_out :: middle  -> a -> a
+    , ft_last_outs  :: last    -> a -> LastOutFacts a
+    , ft_exit_out   ::            a -> a
     } 
 
 newtype LastOutFacts a = LastOutFacts [(BlockId, a)] 
@@ -149,9 +149,9 @@ newtype LastOutFacts a = LastOutFacts [(BlockId, a)]
 -- but instead of producing a fact, it produces a replacement graph or Nothing.
 
 data BackwardRewrites middle last a = BackwardRewrites
-    { br_first  :: a              -> BlockId -> Maybe (AGraph middle last)
-    , br_middle :: a              -> middle  -> Maybe (AGraph middle last)
-    , br_last   :: (BlockId -> a) -> last    -> Maybe (AGraph middle last)
+    { br_first  :: BlockId -> a              -> Maybe (AGraph middle last)
+    , br_middle :: middle  -> a              -> Maybe (AGraph middle last)
+    , br_last   :: last    -> (BlockId -> a) -> Maybe (AGraph middle last)
     , br_exit   ::                              Maybe (AGraph middle last)
     } 
 
@@ -159,10 +159,10 @@ data BackwardRewrites middle last a = BackwardRewrites
 -- but instead of producing a fact, it produces a replacement graph or Nothing.
 
 data ForwardRewrites middle last a = ForwardRewrites
-    { fr_first  :: a -> BlockId -> Maybe (AGraph middle last)
-    , fr_middle :: a -> middle  -> Maybe (AGraph middle last)
-    , fr_last   :: a -> last    -> Maybe (AGraph middle last)
-    , fr_exit   :: a            -> Maybe (AGraph middle last)
+    { fr_first  :: BlockId -> a -> Maybe (AGraph middle last)
+    , fr_middle :: middle  -> a -> Maybe (AGraph middle last)
+    , fr_last   :: last    -> a -> Maybe (AGraph middle last)
+    , fr_exit   ::            a -> Maybe (AGraph middle last)
     } 
 
 {- ===================== FIXED POINTS =================== -}
@@ -284,28 +284,17 @@ instance DataflowSolverDirection BackwardTransfers BackwardFixedPoint
 -- forward and backward directions.
 -- 
 -- The type parameters of the class include not only transfer
--- functions and the fixed point but also rewrites and the type
--- constructor (here called 'graph') for making rewritten graphs.  As
--- above, in the definitoins of the rewrites, it might simplify
--- matters if 'graph' were replaced with 'AGraph'.
+-- functions and the fixed point but also rewrites.
 --
 -- The type signature of 'zdfRewriteFrom' is that of 'zdfSolveFrom'
--- with additional parameters and a different result.  Of course the
--- rewrites are an additional parameter, but there are further
--- parameters which reflect the fact that rewriting consumes both
--- OptimizationFuel and Uniqs.
---
--- The result type is changed to reflect fuel consumption, and also
--- the resulting fixed point containts a rewritten graph.
---
--- John Dias is going to improve the management of Uniqs and Fuel so
--- that it doesn't make us sick to look at the types.
+-- with the rewrites and a rewriting depth as additional parameters,
+-- as well as a different result, which contains a rewritten graph.
 
 class DataflowSolverDirection transfers fixedpt =>
       DataflowDirection transfers fixedpt rewrites where
   zdfRewriteFrom :: (DebugNodes m l, Outputable a)
                  => RewritingDepth      -- whether to rewrite a rewritten graph
-                 -> BlockEnv a          -- initial facts (unbound == botton)
+                 -> BlockEnv a          -- initial facts (unbound == bottom)
                  -> PassName
                  -> DataflowLattice a
                  -> transfers m l a
@@ -321,26 +310,26 @@ class DataflowSolverDirection transfers fixedpt =>
 quickGraph :: LastNode l => LGraph m l -> Graph m l
 quickGraph g = Graph (ZLast $ mkBranchNode $ lg_entry g) $ lg_blocks g
 
-quickLGraph :: LastNode l => Int -> Graph m l -> FuelMonad (LGraph m l)
-quickLGraph args (Graph (ZLast (LastOther l)) blockenv)
-    | isBranchNode l = return $ LGraph (branchNodeTarget l) args blockenv
-quickLGraph args g = F.lGraphOfGraph g args
+quickLGraph :: LastNode l => Graph m l -> FuelMonad (LGraph m l)
+quickLGraph (Graph (ZLast (LastOther l)) blockenv)
+    | isBranchNode l = return $ LGraph (branchNodeTarget l) blockenv
+quickLGraph g = F.lGraphOfGraph g
 
-fixptWithLGraph :: LastNode l => Int -> CommonFixedPoint m l fact (Graph m l) ->
+fixptWithLGraph :: LastNode l => CommonFixedPoint m l fact (Graph m l) ->
                                  FuelMonad (CommonFixedPoint m l fact (LGraph m l))
-fixptWithLGraph args cfp =
-  do fp_c <- quickLGraph args $ fp_contents cfp
+fixptWithLGraph cfp =
+  do fp_c <- quickLGraph $ fp_contents cfp
      return $ cfp {fp_contents = fp_c}
 
-ffixptWithLGraph :: LastNode l => Int -> ForwardFixedPoint m l fact (Graph m l) ->
+ffixptWithLGraph :: LastNode l => ForwardFixedPoint m l fact (Graph m l) ->
                                   FuelMonad (ForwardFixedPoint m l fact (LGraph m l))
-ffixptWithLGraph args fp =
-  do common <- fixptWithLGraph args $ ffp_common fp
+ffixptWithLGraph fp =
+  do common <- fixptWithLGraph $ ffp_common fp
      return $ fp {ffp_common = common}
 
 zdfFRewriteFromL :: (DebugNodes m l, Outputable a)
                => RewritingDepth      -- whether to rewrite a rewritten graph
-               -> BlockEnv a          -- initial facts (unbound == botton)
+               -> BlockEnv a          -- initial facts (unbound == bottom)
                -> PassName
                -> DataflowLattice a
                -> ForwardTransfers m l a
@@ -348,13 +337,13 @@ zdfFRewriteFromL :: (DebugNodes m l, Outputable a)
                -> a                   -- fact flowing in (at entry or exit)
                -> LGraph m l
                -> FuelMonad (ForwardFixedPoint m l a (LGraph m l))
-zdfFRewriteFromL d b p l t r a g@(LGraph _ args _) =
+zdfFRewriteFromL d b p l t r a g@(LGraph _ _) =
   do fp <- zdfRewriteFrom d b p l t r a $ quickGraph g
-     ffixptWithLGraph args fp
+     ffixptWithLGraph fp
 
 zdfBRewriteFromL :: (DebugNodes m l, Outputable a)
                => RewritingDepth      -- whether to rewrite a rewritten graph
-               -> BlockEnv a          -- initial facts (unbound == botton)
+               -> BlockEnv a          -- initial facts (unbound == bottom)
                -> PassName
                -> DataflowLattice a
                -> BackwardTransfers m l a
@@ -362,9 +351,9 @@ zdfBRewriteFromL :: (DebugNodes m l, Outputable a)
                -> a                   -- fact flowing in (at entry or exit)
                -> LGraph m l
                -> FuelMonad (BackwardFixedPoint m l a (LGraph m l))
-zdfBRewriteFromL d b p l t r a g@(LGraph _ args _) =
+zdfBRewriteFromL d b p l t r a g@(LGraph _ _) =
   do fp <- zdfRewriteFrom d b p l t r a $ quickGraph g
-     fixptWithLGraph args fp
+     fixptWithLGraph fp
 
 
 data RewritingDepth = RewriteShallow | RewriteDeep
@@ -427,11 +416,11 @@ areturn g = liftToDFM $ liftUniq $ graphOfAGraph g
 -- introduces an unnecessary basic block at each rewrite, and we don't
 -- want to stress out the finite map more than necessary
 lgraphToGraph :: LastNode l => LGraph m l -> Graph m l
-lgraphToGraph (LGraph eid _ blocks) =
+lgraphToGraph (LGraph eid blocks) =
     if flip any (eltsBlockEnv blocks) $ \block -> any (== eid) (succs block) then
         Graph (ZLast (mkBranchNode eid)) blocks
     else -- common case: entry is not a branch target
-        let Block _ _ entry = lookupBlockEnv blocks eid `orElse` panic "missing entry!"
+        let Block _ entry = lookupBlockEnv blocks eid `orElse` panic "missing entry!"
         in  Graph entry (delFromBlockEnv blocks eid)
     
 
@@ -522,11 +511,11 @@ forward_sol check_maybe = forw
        solve finish in_fact (Graph entry blockenv) fuel =
          let blocks = G.postorder_dfs_from blockenv entry
              set_or_save = mk_set_or_save (isJust . lookupBlockEnv blockenv)
-             set_successor_facts (Block id _ tail) fuel =
+             set_successor_facts (Block id tail) fuel =
                do { idfact <- getFact id
                   ; (last_outs, fuel) <-
-                      case check_maybe fuel $ fr_first rewrites idfact id of
-                        Nothing -> solve_tail (ft_first_out transfers idfact id) tail fuel
+                      case check_maybe fuel $ fr_first rewrites id idfact of
+                        Nothing -> solve_tail (ft_first_out transfers id idfact) tail fuel
                         Just g ->
                           do g <- areturn g
                              (a, fuel) <- subAnalysis' $
@@ -547,8 +536,8 @@ forward_sol check_maybe = forw
                }
 
        solve_tail in' (G.ZTail m t) fuel =
-         case check_maybe fuel $ fr_middle rewrites in' m of
-           Nothing -> solve_tail (ft_middle_out transfers in' m) t fuel
+         case check_maybe fuel $ fr_middle rewrites m in' of
+           Nothing -> solve_tail (ft_middle_out transfers m in') t fuel
            Just g ->
              do { g <- areturn g
                 ; (a, fuel) <- subAnalysis' $
@@ -561,7 +550,7 @@ forward_sol check_maybe = forw
        solve_tail in' (G.ZLast l) fuel = 
          case check_maybe fuel $ either_last rewrites in' l of
            Nothing ->
-               case l of LastOther l -> return (ft_last_outs transfers in' l, fuel)
+               case l of LastOther l -> return (ft_last_outs transfers l in', fuel)
                          LastExit -> do { setExitFact (ft_exit_out transfers in')
                                         ; return (LastOutFacts [], fuel) }
            Just g ->
@@ -584,8 +573,8 @@ forward_sol check_maybe = forw
             ; return (fp, fuel)
             }
 
-       either_last rewrites in' (LastExit) = fr_exit rewrites in'
-       either_last rewrites in' (LastOther l) = fr_last rewrites in' l
+       either_last rewrites in' (LastExit)    = fr_exit rewrites in'
+       either_last rewrites in' (LastOther l) = fr_last rewrites l in'
 
    in fixed_point
 
@@ -635,11 +624,10 @@ forward_rew check_maybe = forw
             in do { solve depth name start transfers rewrites in_fact g fuel
                   ; eid <- freshBlockId "temporary entry id"
                   ; (rewritten, fuel) <-
-                      rew_tail (ZFirst eid emptyStackInfo)
-                               in_fact entry emptyBlockEnv fuel
+                      rew_tail (ZFirst eid) in_fact entry emptyBlockEnv fuel
                   ; (rewritten, fuel) <- rewrite_blocks blocks rewritten fuel
                   ; a <- finish
-                  ; return (a, lgraphToGraph (LGraph eid 0 rewritten), fuel)
+                  ; return (a, lgraphToGraph (LGraph eid rewritten), fuel)
                   }
           don't_rewrite facts finish in_fact g fuel =
               do  { solve depth name facts transfers rewrites in_fact g fuel
@@ -662,12 +650,12 @@ forward_rew check_maybe = forw
           rewrite_blocks :: [Block m l] -> (BlockEnv (Block m l))
                          -> Fuel -> DFM a (BlockEnv (Block m l), Fuel)
           rewrite_blocks [] rewritten fuel = return (rewritten, fuel)
-          rewrite_blocks (G.Block id off t : bs) rewritten fuel =
-            do let h = ZFirst id off
+          rewrite_blocks (G.Block id t : bs) rewritten fuel =
+            do let h = ZFirst id
                a <- getFact id
-               case check_maybe fuel $ fr_first rewrites a id of
+               case check_maybe fuel $ fr_first rewrites id a of
                  Nothing -> do { (rewritten, fuel) <-
-                                    rew_tail h (ft_first_out transfers a id)
+                                    rew_tail h (ft_first_out transfers id a)
                                              t rewritten fuel
                                ; rewrite_blocks bs rewritten fuel }
                  Just g  -> do { markGraphRewritten
@@ -680,8 +668,8 @@ forward_rew check_maybe = forw
 
           rew_tail head in' (G.ZTail m t) rewritten fuel =
             my_trace "Rewriting middle node" (ppr m) $
-            case check_maybe fuel $ fr_middle rewrites in' m of
-              Nothing -> rew_tail (G.ZHead head m) (ft_middle_out transfers in' m) t
+            case check_maybe fuel $ fr_middle rewrites m in' of
+              Nothing -> rew_tail (G.ZHead head m) (ft_middle_out transfers m in') t
                          rewritten fuel
               Just g -> do { markGraphRewritten
                            ; g <- areturn g
@@ -701,9 +689,9 @@ forward_rew check_maybe = forw
                            ; return (G.lg_blocks g' `plusBlockEnv` rewritten, fuel)
                            }
           either_last rewrites in' (LastExit) = fr_exit rewrites in'
-          either_last rewrites in' (LastOther l) = fr_last rewrites in' l
+          either_last rewrites in' (LastOther l) = fr_last rewrites l in'
           check_facts in' (LastOther l) =
-            let LastOutFacts last_outs = ft_last_outs transfers in' l
+            let LastOutFacts last_outs = ft_last_outs transfers l in'
             in mapM (uncurry checkFactMatch) last_outs
           check_facts _ LastExit = return []
       in  fixed_pt_and_fuel
@@ -788,9 +776,9 @@ backward_sol check_maybe = back
        solve (Graph entry blockenv) exit_fact fuel =
          let blocks = reverse $ G.postorder_dfs_from blockenv entry
              last_in  _env (LastExit)    = exit_fact
-             last_in   env (LastOther l) = bt_last_in transfers env l
+             last_in   env (LastOther l) = bt_last_in transfers l env
              last_rew _env (LastExit)    = br_exit rewrites 
-             last_rew  env (LastOther l) = br_last rewrites env l
+             last_rew  env (LastOther l) = br_last rewrites l env
              set_block_fact block fuel =
                  let (h, l) = G.goto_end (G.unzip block) in
                  do { env <- factsEnv
@@ -806,28 +794,28 @@ backward_sol check_maybe = back
 
          in do { fuel <- run "backward" name set_block_fact blocks fuel
                ; eid <- freshBlockId "temporary entry id"
-               ; fuel <- set_block_fact (Block eid emptyStackInfo entry) fuel
+               ; fuel <- set_block_fact (Block eid entry) fuel
                ; a <- getFact eid
                ; forgetFact eid
                ; return (a, fuel)
                }
 
-       set_head_fact (G.ZFirst id _) a fuel =
-         case check_maybe fuel $ br_first rewrites a id of
+       set_head_fact (G.ZFirst id) a fuel =
+         case check_maybe fuel $ br_first rewrites id a of
            Nothing -> do { my_trace "set_head_fact" (ppr id <+> text "=" <+>
-                                                     ppr (bt_first_in transfers a id)) $
-                           setFact id $ bt_first_in transfers a id
+                                                     ppr (bt_first_in transfers id a)) $
+                           setFact id $ bt_first_in transfers id a
                          ; return fuel }
            Just g  -> do { g' <- areturn g
                          ; (a, fuel) <- my_trace "analysis rewrites first node"
                                       (ppr id <+> pprGraph g') $
                                       subsolve g a fuel
-                         ; setFact id $ bt_first_in transfers a id
+                         ; setFact id $ bt_first_in transfers id a
                          ; return fuel
                          }
        set_head_fact (G.ZHead h m) a fuel =
-         case check_maybe fuel $ br_middle rewrites a m of
-           Nothing -> set_head_fact h (bt_middle_in transfers a m) fuel
+         case check_maybe fuel $ br_middle rewrites m a of
+           Nothing -> set_head_fact h (bt_middle_in transfers m a) fuel
            Just g -> do { g' <- areturn g
                         ; (a, fuel) <- my_trace "analysis rewrites middle node"
                                       (ppr m <+> pprGraph g') $
@@ -903,12 +891,11 @@ backward_rew check_maybe = back
                  ; (rewritten, fuel) <- rewrite_blocks True blocks emptyBlockEnv fuel
                  -- We can't have the fact check fail on the bogus entry, which _may_ change
                  ; (rewritten, fuel) <-
-                     rewrite_blocks False [Block eid emptyStackInfo entry]
-                                    rewritten fuel
+                     rewrite_blocks False [Block eid entry] rewritten fuel
                  ; my_trace "eid" (ppr eid) $ return ()
                  ; my_trace "exit_fact" (ppr exit_fact) $ return ()
                  ; my_trace "in_fact" (ppr in_fact) $ return ()
-                 ; return (in_fact, lgraphToGraph (LGraph eid 0 rewritten), fuel)
+                 ; return (in_fact, lgraphToGraph (LGraph eid rewritten), fuel)
                  } -- Remember: the entry fact computed by @solve@ accounts for rewriting
           don't_rewrite facts g exit_fact fuel =
             do { (fp, _) <-
@@ -946,13 +933,13 @@ backward_rew check_maybe = back
                    ; propagate check fuel h a t rewritten' -- continue at entry of g
                    } 
           either_last _env (LastExit)    = br_exit rewrites 
-          either_last  env (LastOther l) = br_last rewrites env l
+          either_last  env (LastOther l) = br_last rewrites l env
           last_in _env (LastExit)    = exit_fact
-          last_in  env (LastOther l) = bt_last_in transfers env l
+          last_in  env (LastOther l) = bt_last_in transfers l env
           propagate check fuel (ZHead h m) a tail rewritten =
-            case maybeRewriteWithFuel fuel $ br_middle rewrites a m of
+            case maybeRewriteWithFuel fuel $ br_middle rewrites m a of
               Nothing ->
-                propagate check fuel h (bt_middle_in transfers a m) (ZTail m tail) rewritten
+                propagate check fuel h (bt_middle_in transfers m a) (ZTail m tail) rewritten
               Just g  ->
                 do { markGraphRewritten
                    ; g <- areturn g
@@ -964,22 +951,22 @@ backward_rew check_maybe = back
                    ; let Graph t newblocks = G.splice_tail g tail
                    ; my_trace "propagating facts" (ppr a) $
                      propagate check fuel h a t (newblocks `plusBlockEnv` rewritten) }
-          propagate check fuel (ZFirst id off) a tail rewritten =
-            case maybeRewriteWithFuel fuel $ br_first rewrites a id of
+          propagate check fuel (ZFirst id) a tail rewritten =
+            case maybeRewriteWithFuel fuel $ br_first rewrites id a of
               Nothing -> do { if check then
-                                checkFactMatch id $ bt_first_in transfers a id
+                                checkFactMatch id $ bt_first_in transfers id a
                               else return ()
-                            ; return (insertBlock (Block id off tail) rewritten, fuel) }
+                            ; return (insertBlock (Block id tail) rewritten, fuel) }
               Just g ->
                 do { markGraphRewritten
                    ; g <- areturn g
                    ; my_trace "Rewrote first node"
                      (f4sep [ppr id <> colon, text "to", pprGraph g]) $ return ()
                    ; (a, g, fuel) <- inner_rew g a fuel
-                   ; if check then checkFactMatch id (bt_first_in transfers a id)
+                   ; if check then checkFactMatch id (bt_first_in transfers id a)
                      else return ()
                    ; let Graph t newblocks = G.splice_tail g tail
-                   ; let r = insertBlock (Block id off t) (newblocks `plusBlockEnv` rewritten)
+                   ; let r = insertBlock (Block id t) (newblocks `plusBlockEnv` rewritten)
                    ; return (r, fuel) }
       in  fixed_pt_and_fuel
 
@@ -1003,7 +990,7 @@ instance FixedPoint ForwardFixedPoint where
 
 
 dump_things :: Bool
-dump_things = False
+dump_things = True
 
 my_trace :: String -> SDoc -> a -> a
 my_trace = if dump_things then pprTrace else \_ _ a -> a
@@ -1046,14 +1033,13 @@ run dir name do_block blocks b =
      unchanged depth =
        my_nest depth (text "facts for" <+> graphId <+> text "are unchanged")
 
-     graphId = case blocks of { Block id _ _ : _ -> ppr id ; [] -> text "<empty>" }
+     graphId = case blocks of { Block id _ : _ -> ppr id ; [] -> text "<empty>" }
      show_blocks = my_trace "Blocks:" (vcat (map pprBlock blocks))
-     pprBlock (Block id off t) = nest 2 (pprFact' (id, off, t))
+     pprBlock (Block id t) = nest 2 (pprFact (id, t))
      pprFacts depth n env =
          my_nest depth (text "facts for iteration" <+> pp_i n <+> text "are:" $$
                         (nest 2 $ vcat $ map pprFact $ blockEnvToList env))
      pprFact  (id, a) = hang (ppr id <> colon) 4 (ppr a)
-     pprFact' (id, off, a) = hang (ppr id <> parens (ppr off) <> colon) 4 (ppr a)
 
 
 f4sep :: [SDoc] -> SDoc

@@ -21,10 +21,10 @@ import SMRep
 import ZipCfgCmmRep
 
 import Constants
+import Panic
 import StaticFlags
 import Unique
 import UniqSupply
-import Panic
 
 import Data.Bits
 

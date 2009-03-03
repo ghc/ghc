@@ -22,7 +22,7 @@ module CmmExpr
     , DefinerOfSlots, UserOfSlots, foldSlotsDefd, foldSlotsUsed
     , RegSet, emptyRegSet, elemRegSet, extendRegSet, deleteFromRegSet, mkRegSet
             , plusRegSet, minusRegSet, timesRegSet
-    , Area(..), AreaId(..), SubArea, SubAreaSet, AreaMap, StackSlotMap, getSlot
+    , Area(..), AreaId(..), SubArea, SubAreaSet, AreaMap, isStackSlotOf
  
    -- MachOp
     , MachOp(..) 
@@ -263,22 +263,13 @@ instance DefinerOfLocalRegs a => DefinerOfLocalRegs (Maybe a) where
 --    Stack slots
 -----------------------------------------------------------------------------
 
-mkVarSlot :: LocalReg -> CmmExpr
-mkVarSlot r = CmmStackSlot (RegSlot r) 0
-
--- Usually, we either want to lookup a variable's spill slot in an environment
--- or else allocate it and add it to the environment.
--- For a variable, we just need a single area of the appropriate size.
-type StackSlotMap = FiniteMap LocalReg CmmExpr
-getSlot :: StackSlotMap -> LocalReg -> (StackSlotMap, CmmExpr)
-getSlot map r = case lookupFM map r of
-                  Just s  -> (map, s)
-                  Nothing -> (addToFM map r s, s) where s = mkVarSlot r
+isStackSlotOf :: CmmExpr -> LocalReg -> Bool
+isStackSlotOf (CmmStackSlot (RegSlot r) _) r' = r == r'
+isStackSlotOf _ _ = False
 
 -----------------------------------------------------------------------------
 --    Stack slot use information for expressions and other types [_$_]
 -----------------------------------------------------------------------------
-
 
 -- Fold over the area, the offset into the area, and the width of the subarea.
 class UserOfSlots a where

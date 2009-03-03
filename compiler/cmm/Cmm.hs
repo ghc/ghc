@@ -135,7 +135,7 @@ cmmTopMapGraphM :: Monad m => (String -> g -> m g') -> GenCmmTop d h g -> m (Gen
 
 cmmMapGraph f (Cmm tops) = Cmm $ map (cmmTopMapGraph f) tops
 cmmTopMapGraph f (CmmProc h l args g) = CmmProc h l args (f g)
-cmmTopMapGraph _ (CmmData s ds)       = CmmData s ds
+cmmTopMapGraph _ (CmmData s ds)             = CmmData s ds
 
 cmmMapGraphM f (Cmm tops) = mapM (cmmTopMapGraphM f) tops >>= return . Cmm
 cmmTopMapGraphM f (CmmProc h l args g) =

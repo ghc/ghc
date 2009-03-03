@@ -42,6 +42,7 @@ import Maybes
 import Util
 import FastString
 import Outputable
+import UniqSupply
 
 ------------------------------------------------------------------------
 --		cgExpr: the main function
@@ -57,8 +58,13 @@ cgExpr (StgTick m n expr) = do { emit (mkTickBox m n); cgExpr expr }
 cgExpr (StgLit lit)       = do cmm_lit <- cgLit lit
                                emitReturn [CmmLit cmm_lit]
 
-cgExpr (StgLet binds expr)  	       = do { cgBind binds; cgExpr expr }
-cgExpr (StgLetNoEscape _ _ binds expr) = do { cgLneBinds binds; cgExpr expr }
+cgExpr (StgLet binds expr)             = do { cgBind binds;     cgExpr expr }
+cgExpr (StgLetNoEscape _ _ binds expr) =
+  do { us <- newUniqSupply
+     ; let join_id = mkBlockId (uniqFromSupply us)
+     ; cgLneBinds join_id binds
+     ; cgExpr expr 
+     ; emit $ mkLabel join_id}
 
 cgExpr (StgCase expr _live_vars _save_vars bndr srt alt_type alts) =
   cgCase expr bndr srt alt_type alts
@@ -84,37 +90,42 @@ bound only to stable things like stack locations..  The 'e' part will
 execute *next*, just like the scrutinee of a case. -}
 
 -------------------------
-cgLneBinds :: StgBinding -> FCode ()
-cgLneBinds (StgNonRec bndr rhs)
-  = do	{ local_cc <- saveCurrentCostCentre
-		-- See Note [Saving the current cost centre]
-	; info <- cgLetNoEscapeRhs local_cc bndr rhs 
-	; addBindC (cg_id info) info }
+cgLneBinds :: BlockId -> StgBinding -> FCode ()
+cgLneBinds join_id (StgNonRec bndr rhs)
+  = do  { local_cc <- saveCurrentCostCentre
+                -- See Note [Saving the current cost centre]
+        ; info <- cgLetNoEscapeRhs join_id local_cc bndr rhs 
+        ; addBindC (cg_id info) info }
 
-cgLneBinds (StgRec pairs)
-  = do	{ local_cc <- saveCurrentCostCentre
-	; new_bindings <- fixC (\ new_bindings -> do
-		{ addBindsC new_bindings
-		; listFCs [ cgLetNoEscapeRhs local_cc b e 
-			  | (b,e) <- pairs ] })
-
-	; addBindsC new_bindings }
+cgLneBinds join_id (StgRec pairs)
+  = do  { local_cc <- saveCurrentCostCentre
+        ; new_bindings <- fixC (\ new_bindings -> do
+                { addBindsC new_bindings
+                ; listFCs [ cgLetNoEscapeRhs join_id local_cc b e 
+                          | (b,e) <- pairs ] })
+        ; addBindsC new_bindings }
 
 
 -------------------------
-cgLetNoEscapeRhs, cgLetNoEscapeRhsBody
-    :: Maybe LocalReg	-- Saved cost centre
+cgLetNoEscapeRhs
+    :: BlockId          -- join point for successor of let-no-escape
+    -> Maybe LocalReg	-- Saved cost centre
     -> Id
     -> StgRhs
     -> FCode CgIdInfo
 
-cgLetNoEscapeRhs local_cc bndr rhs =
+cgLetNoEscapeRhs join_id local_cc bndr rhs =
   do { (info, rhs_body) <- getCodeR $ cgLetNoEscapeRhsBody local_cc bndr rhs 
      ; let (bid, _) = expectJust "cgLetNoEscapeRhs" $ maybeLetNoEscape info
-     ; emit (outOfLine $ mkLabel bid emptyStackInfo <*> rhs_body)
+     ; emit (outOfLine $ mkLabel bid <*> rhs_body <*> mkBranch join_id)
      ; return info
      }
 
+cgLetNoEscapeRhsBody
+    :: Maybe LocalReg	-- Saved cost centre
+    -> Id
+    -> StgRhs
+    -> FCode CgIdInfo
 cgLetNoEscapeRhsBody local_cc bndr (StgRhsClosure cc _bi _ _upd _ args body)
   = cgLetNoEscapeClosure bndr local_cc cc (nonVoidIds args) body
 cgLetNoEscapeRhsBody local_cc bndr (StgRhsCon cc con args)

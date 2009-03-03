@@ -239,8 +239,7 @@ mkModuleInit way cost_centre_info this_mod main_mod imported_mods hpc_info
     mod_reg_val = CmmLoad (mkLblExpr moduleRegdLabel) bWord
     check_already_done retId updfr_sz
      = mkCmmIfThenElse (cmmNeWord (CmmLit zeroCLit) mod_reg_val)
-		       (mkLabel retId emptyStackInfo
-                    <*> mkReturn (ret_e updfr_sz) [] (pop_ret_loc updfr_sz)) mkNop
+		       (mkLabel retId <*> mkReturn (ret_e updfr_sz) [] (pop_ret_loc updfr_sz)) mkNop
 	<*>  	-- Set mod_reg to 1 to record that we've been here
 	    mkStore (mkLblExpr moduleRegdLabel) (CmmLit (mkIntCLit 1))
 

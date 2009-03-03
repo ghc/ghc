@@ -437,7 +437,7 @@ do_checks :: Bool       -- Should we check the stack?
 do_checks checkStack alloc do_gc
   = withFreshLabel "gc" $ \ loop_id ->
     withFreshLabel "gc" $ \ gc_id   ->
-      mkLabel loop_id emptyStackInfo
+      mkLabel loop_id 
       <*> (let hpCheck = if alloc == 0 then mkNop
                          else mkAssign hpReg bump_hp <*>
                               mkCmmIfThen hp_oflo (save_alloc <*> mkBranch gc_id)
@@ -445,7 +445,7 @@ do_checks checkStack alloc do_gc
                 mkCmmIfThenElse sp_oflo (mkBranch gc_id) hpCheck
               else hpCheck)
       <*> mkComment (mkFastString "outOfLine should follow:")
-      <*> outOfLine (mkLabel gc_id emptyStackInfo
+      <*> outOfLine (mkLabel gc_id 
                      <*> mkComment (mkFastString "outOfLine here")
                      <*> do_gc
                      <*> mkBranch loop_id)

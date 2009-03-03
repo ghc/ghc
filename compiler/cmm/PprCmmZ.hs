@@ -26,35 +26,35 @@ pprCmmGraphLikeCmm g = vcat (swallow blocks)
     where blocks = Z.postorder_dfs g
           swallow :: [G.CmmBlock] -> [SDoc]
           swallow [] = []
-          swallow (Z.Block id off t : rest) = tail (id, off) [] Nothing t rest
+          swallow (Z.Block id t : rest) = tail id [] Nothing t rest
           tail id prev' out (Z.ZTail m t) rest = tail id (mid m : prev') out t rest
           tail id prev' out (Z.ZLast (Z.LastOther l)) rest = last id prev' out l rest
           tail id prev' _   (Z.ZLast Z.LastExit)      rest = exit id prev' rest
           mid m = ppr m
-          block' (id, off) prev'
+          block' id prev'
               | id == Z.lg_entry g, entry_has_no_pred =
-                            vcat (text "<entry>" <> parens (ppr off) : reverse prev')
-              | otherwise = hang (ppr id <> parens (ppr off) <> colon) 4 (vcat (reverse prev'))
+                            vcat (text "<entry>" : reverse prev')
+              | otherwise = hang (ppr id <> colon) 4 (vcat (reverse prev'))
           last id prev' out l n =
               let endblock stmt = block' id (stmt : prev') : swallow n in
               case l of
                 G.LastBranch tgt ->
                     case n of
-                      Z.Block id' _ t : bs
+                      Z.Block id' t : bs
                           | tgt == id', unique_pred id' 
                           -> tail id prev' out t bs  -- optimize out redundant labels
                       _ -> endblock (ppr $ CmmBranch tgt)
                 l@(G.LastCondBranch expr tid fid) ->
                   let ft id = text "// fall through to " <> ppr id in
                   case n of
-                    Z.Block id' _ t : bs
+                    Z.Block id' t : bs
                       | id' == fid, isNothing out ->
                           tail id (ft fid : ppr (CmmCondBranch expr tid) : prev') Nothing t bs
                       | id' == tid, Just e' <- maybeInvertCmmExpr expr, isNothing out->
                           tail id (ft tid : ppr (CmmCondBranch e'   fid) : prev') Nothing t bs
                     _ -> endblock $ with_out out l
-                l@(G.LastSwitch {})   -> endblock $ with_out out l
-                l@(G.LastCall _ _ _ _)-> endblock $ with_out out l
+                l@(G.LastSwitch {})      -> endblock $ with_out out l
+                l@(G.LastCall _ _ _ _ _) -> endblock $ with_out out l
           exit id prev' n = -- highly irregular (assertion violation?)
               let endblock stmt = block' id (stmt : prev') : swallow n in
               endblock (text "// <exit>")
@@ -76,7 +76,7 @@ pprCmmGraphLikeCmm g = vcat (swallow blocks)
 with_out :: Maybe (G.Convention, CmmActuals) -> G.Last -> SDoc
 with_out Nothing l = ptext (sLit "??no-arguments??") <+> ppr l
 with_out (Just (conv, args)) l = last l
-    where last (G.LastCall e k _ _) =
+    where last (G.LastCall e k _ _ _) =
               hcat [ptext (sLit "... = foreign "),
                     doubleQuotes(ppr conv), space,
                     ppr_target e, parens ( commafy $ map ppr args ),

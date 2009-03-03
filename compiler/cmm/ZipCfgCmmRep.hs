@@ -50,8 +50,10 @@ import UniqSupply
 type CmmGraph                = LGraph Middle Last
 type CmmAGraph               = AGraph Middle Last
 type CmmBlock                = Block  Middle Last
-type CmmZ                    = GenCmm    CmmStatic CmmInfo CmmGraph
-type CmmTopZ                 = GenCmmTop CmmStatic CmmInfo CmmGraph
+type CmmStackInfo            = (ByteOff, Maybe ByteOff)
+  -- probably want a record; (SP offset on entry, update frame space)
+type CmmZ                    = GenCmm    CmmStatic CmmInfo (CmmStackInfo, CmmGraph)
+type CmmTopZ                 = GenCmmTop CmmStatic CmmInfo (CmmStackInfo, CmmGraph)
 type CmmBackwardFixedPoint a = DF.BackwardFixedPoint Middle Last a ()
 type CmmForwardFixedPoint  a = DF.ForwardFixedPoint  Middle Last a ()
 
@@ -90,6 +92,7 @@ data Last
             -- BlockId of continuation (Nothing for return or tail call)
         cml_args    :: ByteOff,  -- byte offset for youngest outgoing arg
                                  -- (includes update frame, which must be younger)
+        cml_ret_args:: ByteOff,  -- byte offset for youngest incoming arg
         cml_ret_off :: Maybe UpdFrameOffset}
           -- stack offset for return (update frames);
           -- The return offset should be Nothing only if we have to create
@@ -203,7 +206,7 @@ insertBetween b ms succId = insert $ goto_end $ unzip b
           panic "unimp: insertBetween after a call -- probably not a good idea"
         insert (_, LastExit) = panic "cannot insert after exit"
         newBlocks = do id <- liftM BlockId $ getUniqueM
-                       return $ (id, [Block id emptyStackInfo $
+                       return $ (id, [Block id $
                                    foldr ZTail (ZLast (LastOther (LastBranch succId))) ms])
         mbNewBlocks (Just k) = if k == succId then liftM lift newBlocks
                                else return (Just k, [])
@@ -225,18 +228,18 @@ instance LastNode Last where
     branchNodeTarget _ = panic "asked for target of non-branch"
 
 cmmSuccs :: Last -> [BlockId]
-cmmSuccs (LastBranch id)            = [id]
-cmmSuccs (LastCall _ Nothing _ _)   = []
-cmmSuccs (LastCall _ (Just id) _ _) = [id]
-cmmSuccs (LastCondBranch _ t f)     = [f, t]  -- meets layout constraint
-cmmSuccs (LastSwitch _ edges)       = catMaybes edges
+cmmSuccs (LastBranch id)              = [id]
+cmmSuccs (LastCall _ Nothing   _ _ _) = []
+cmmSuccs (LastCall _ (Just id) _ _ _) = [id]
+cmmSuccs (LastCondBranch _ t f)       = [f, t]  -- meets layout constraint
+cmmSuccs (LastSwitch _ edges)         = catMaybes edges
 
 fold_cmm_succs :: (BlockId -> a -> a) -> Last -> a -> a
-fold_cmm_succs  f (LastBranch id)            z = f id z
-fold_cmm_succs  _ (LastCall _ Nothing _ _)   z = z
-fold_cmm_succs  f (LastCall _ (Just id) _ _) z = f id z
-fold_cmm_succs  f (LastCondBranch _ te fe)   z = f te (f fe z)
-fold_cmm_succs  f (LastSwitch _ edges)       z = foldl (flip f) z $ catMaybes edges
+fold_cmm_succs  f (LastBranch id)              z = f id z
+fold_cmm_succs  _ (LastCall _ Nothing _ _ _)   z = z
+fold_cmm_succs  f (LastCall _ (Just id) _ _ _) z = f id z
+fold_cmm_succs  f (LastCondBranch _ te fe)     z = f te (f fe z)
+fold_cmm_succs  f (LastSwitch _ edges)         z = foldl (flip f) z $ catMaybes edges
 
 ----------------------------------------------------------------------
 ----- Instance declarations for register use
@@ -268,16 +271,16 @@ instance (UserOfSlots a) => UserOfSlots (Maybe a) where
 instance UserOfLocalRegs Last where
     foldRegsUsed f z l = last l
       where last (LastBranch _id)       = z
-            last (LastCall tgt _ _ _)   = foldRegsUsed f z tgt
+            last (LastCall tgt _ _ _ _) = foldRegsUsed f z tgt
             last (LastCondBranch e _ _) = foldRegsUsed f z e
             last (LastSwitch e _tbl)    = foldRegsUsed f z e
 
 instance DefinerOfLocalRegs Middle where
     foldRegsDefd f z m = middle m
-      where middle (MidComment {})            = z
-            middle (MidAssign _lhs _)         = fold f z _lhs
-            middle (MidStore _ _)             = z
-            middle (MidForeignCall _ _ fs _)  = fold f z fs
+      where middle (MidComment {})           = z
+            middle (MidAssign lhs _)         = fold f z lhs
+            middle (MidStore _ _)            = z
+            middle (MidForeignCall _ _ fs _) = fold f z fs
             fold f z m = foldRegsDefd f z m  -- avoid monomorphism restriction
 
 instance DefinerOfLocalRegs Last where
@@ -298,7 +301,7 @@ instance UserOfSlots Middle where
 instance UserOfSlots Last where
     foldSlotsUsed f z l = last l
       where last (LastBranch _id)       = z
-            last (LastCall tgt _ _ _)   = foldSlotsUsed f z tgt
+            last (LastCall tgt _ _ _ _) = foldSlotsUsed f z tgt
             last (LastCondBranch e _ _) = foldSlotsUsed f z e
             last (LastSwitch e _tbl)    = foldSlotsUsed f z e
 
@@ -342,13 +345,13 @@ mapExpLast :: (CmmExpr -> CmmExpr) -> Last -> Last
 mapExpLast _   l@(LastBranch _)           = l
 mapExpLast exp (LastCondBranch e ti fi)   = LastCondBranch (exp e) ti fi
 mapExpLast exp (LastSwitch e tbl)         = LastSwitch (exp e) tbl
-mapExpLast exp (LastCall tgt mb_id u s) = LastCall (exp tgt) mb_id u s
+mapExpLast exp (LastCall tgt mb_id o i s) = LastCall (exp tgt) mb_id o i s
 
 foldExpLast :: (CmmExpr -> z -> z) -> Last -> z -> z
 foldExpLast _   (LastBranch _)         z = z
 foldExpLast exp (LastCondBranch e _ _) z = exp e z
 foldExpLast exp (LastSwitch e _)       z = exp e z
-foldExpLast exp (LastCall tgt _ _ _)   z = exp tgt z
+foldExpLast exp (LastCall tgt _ _ _ _) z = exp tgt z
 
 mapExpMidcall :: (CmmExpr -> CmmExpr) -> MidCallTarget -> MidCallTarget 
 mapExpMidcall exp   (ForeignTarget e c) = ForeignTarget (exp e) c
@@ -388,11 +391,11 @@ joinOuts lattice env l =
   let bot  = fact_bot lattice
       join x y = txVal $ fact_add_to lattice x y
   in case l of
-       (LastBranch id)           -> env id
-       (LastCall _ Nothing _ _)  -> bot
-       (LastCall _ (Just k) _ _) -> env k
-       (LastCondBranch _ t f)    -> join (env t) (env f)
-       (LastSwitch _ tbl)        -> foldr join bot (map env $ catMaybes tbl)
+       (LastBranch id)             -> env id
+       (LastCall _ Nothing _ _ _)  -> bot
+       (LastCall _ (Just k) _ _ _) -> env k
+       (LastCondBranch _ t f)      -> join (env t) (env f)
+       (LastSwitch _ tbl)          -> foldr join bot (map env $ catMaybes tbl)
 
 ----------------------------------------------------------------------
 ----- Instance declarations for prettyprinting (avoids recursive imports)
@@ -476,10 +479,10 @@ pprLast :: Last -> SDoc
 pprLast stmt = pp_stmt <+> pp_debug
   where
     pp_stmt = case stmt of
-       LastBranch ident             -> ptext (sLit "goto") <+> ppr ident <> semi
-       LastCondBranch expr t f      -> genFullCondBranch expr t f
-       LastSwitch arg ids           -> ppr $ CmmSwitch arg ids
-       LastCall tgt k off updfr_off -> genBareCall tgt k off updfr_off
+       LastBranch ident                -> ptext (sLit "goto") <+> ppr ident <> semi
+       LastCondBranch expr t f         -> genFullCondBranch expr t f
+       LastSwitch arg ids              -> ppr $ CmmSwitch arg ids
+       LastCall tgt k out res updfr_off -> genBareCall tgt k out res updfr_off
 
     pp_debug = text " //" <+> case stmt of
            LastBranch {} -> text "LastBranch"
@@ -487,11 +490,13 @@ pprLast stmt = pp_stmt <+> pp_debug
            LastSwitch {} -> text "LastSwitch"
            LastCall {} -> text "LastCall"
 
-genBareCall :: CmmExpr -> Maybe BlockId -> Int -> Maybe UpdFrameOffset -> SDoc
-genBareCall fn k off updfr_off =
+genBareCall :: CmmExpr -> Maybe BlockId -> ByteOff -> ByteOff ->
+                          Maybe UpdFrameOffset -> SDoc
+genBareCall fn k out res updfr_off =
         hcat [ ptext (sLit "call"), space
              , pprFun fn, ptext (sLit "(...)"), space
-             , ptext (sLit "returns to") <+> ppr k <+> parens (ppr off)
+             , ptext (sLit "returns to") <+> ppr k <+> parens (ppr out)
+                                                   <+> parens (ppr res)
              , ptext (sLit " with update frame") <+> ppr updfr_off
              , semi ]
 

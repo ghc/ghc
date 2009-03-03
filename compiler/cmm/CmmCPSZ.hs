@@ -71,14 +71,16 @@ cpsTop :: HscEnv -> CmmTopZ ->
           IO ([(CLabel, CAFSet)],
               [(CAFSet, CmmTopForInfoTables)])
 cpsTop _ p@(CmmData {}) = return ([], [(emptyFM, NoInfoTable p)])
-cpsTop hsc_env (CmmProc h l args g) =
+cpsTop hsc_env (CmmProc h l args (stackInfo@(entry_off, _), g)) =
     do 
        dump Opt_D_dump_cmmz "Pre Proc Points Added"  g
        let callPPs = callProcPoints g
-       g <- dual_rewrite Opt_D_dump_cmmz "spills and reloads"
-                             (dualLivenessWithInsertion callPPs) g
-       g <- dual_rewrite Opt_D_dump_cmmz "Dead Assignment Elimination"
-                         (removeDeadAssignmentsAndReloads callPPs) g
+       -- Why bother doing it this early?
+       -- g <- dual_rewrite Opt_D_dump_cmmz "spills and reloads"
+       --                       (dualLivenessWithInsertion callPPs) g
+       -- g <- run $ insertLateReloads g -- Duplicate reloads just before uses
+       -- g <- dual_rewrite Opt_D_dump_cmmz "Dead Assignment Elimination"
+       --                   (removeDeadAssignmentsAndReloads callPPs) g
        dump Opt_D_dump_cmmz "Pre common block elimination" g
        g <- return $ elimCommonBlocks g
        dump Opt_D_dump_cmmz "Post common block elimination" g
@@ -96,23 +98,21 @@ cpsTop hsc_env (CmmProc h l args g) =
                     -- Remove redundant reloads (and any other redundant asst)
        -- Debugging: stubbing slots on death can cause crashes early
        g <-  if opt_StubDeadValues then run $ stubSlotsOnDeath g else return g
-       mbpprTrace "graph before procPointMap: " (ppr g) $ return ()
-       procPointMap <- run $ procPointAnalysis procPoints g
        slotEnv <- run $ liveSlotAnal g
        mbpprTrace "live slot analysis results: " (ppr slotEnv) $ return ()
        cafEnv <- run $ cafAnal g
        (cafEnv, slotEnv) <- return $ extendEnvsForSafeForeignCalls cafEnv slotEnv g
        mbpprTrace "slotEnv extended for safe foreign calls: " (ppr slotEnv) $ return ()
-       let areaMap = layout procPoints slotEnv g
+       let areaMap = layout procPoints slotEnv entry_off g
        mbpprTrace "areaMap" (ppr areaMap) $ return ()
-       g  <- run $ manifestSP procPoints procPointMap areaMap g
+       g  <- run $ manifestSP areaMap entry_off g
        dump Opt_D_dump_cmmz "after manifestSP" g
        -- UGH... manifestSP can require updates to the procPointMap.
        -- We can probably do something quicker here for the update...
        procPointMap  <- run $ procPointAnalysis procPoints g
        dump Opt_D_dump_cmmz "procpoint map" procPointMap
-       gs <- run $ splitAtProcPoints l callPPs procPoints procPointMap areaMap
-                                       (CmmProc h l args g)
+       gs <- run $ splitAtProcPoints l callPPs procPoints procPointMap
+                                       (CmmProc h l args (stackInfo, g))
        mapM (dump Opt_D_dump_cmmz "after splitting") gs
        let localCAFs = catMaybes $ map (localCAFInfo cafEnv) gs
        mbpprTrace "localCAFs" (ppr localCAFs) $ return ()
@@ -125,18 +125,6 @@ cpsTop hsc_env (CmmProc h l args g) =
        let gs'' = map (bundleCAFs cafEnv) gs'
        mapM (dump Opt_D_dump_cmmz "after bundleCAFs") gs''
        return (localCAFs, gs'')
-{-
-       -- Return: (a) CAFs used by this proc (b) a closure that will compute
-       --  a new SRT for the procedure.
-       let toTops topCAFEnv (topSRT, tops) =
-             do let setSRT (topSRT, rst) g =
-                      do (topSRT, gs) <- setInfoTableSRT cafEnv topCAFEnv topSRT g
-                         return (topSRT, gs : rst)
-                (topSRT, gs') <- run $ foldM setSRT (topSRT, []) gs'
-                gs' <- mapM finishInfoTables (concat gs')
-                return (topSRT, concat gs' : tops)
-       return (localCAFs, toTops)
--}
   where dflags = hsc_dflags hsc_env
         mbpprTrace x y z = if dopt Opt_D_dump_cmmz dflags then pprTrace x y z else z
         dump f txt g = dumpIfSet_dyn dflags f txt (ppr g)
@@ -157,7 +145,6 @@ toTops hsc_env topCAFEnv (topSRT, tops) gs =
   do let setSRT (topSRT, rst) g =
            do (topSRT, gs) <- setInfoTableSRT topCAFEnv topSRT g
               return (topSRT, gs : rst)
-     (topSRT, gs') <- run $ foldM setSRT (topSRT, []) gs
+     (topSRT, gs') <- runFuelIO (hsc_OptFuel hsc_env) $ foldM setSRT (topSRT, []) gs
      gs' <- mapM finishInfoTables (concat gs')
      return (topSRT, concat gs' : tops)
-  where run = runFuelIO (hsc_OptFuel hsc_env)

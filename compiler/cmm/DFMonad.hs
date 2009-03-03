@@ -45,11 +45,11 @@ conjunction with the join, so we have [[fact_add_to]]:
 -}
 
 data DataflowLattice a = DataflowLattice  { 
-  fact_name    :: String,                 -- documentation
-  fact_bot     :: a,                      -- lattice bottom element
-  fact_add_to  :: a -> a -> TxRes a,      -- lattice join and compare
+  fact_name       :: String,                 -- documentation
+  fact_bot        :: a,                      -- lattice bottom element
+  fact_add_to     :: a -> a -> TxRes a,      -- lattice join and compare
     -- ^ compute join of two args; something changed iff join is greater than 2nd arg
-  fact_do_logging :: Bool  -- log changes
+  fact_do_logging :: Bool                    -- log changes
 }
 
 
@@ -136,15 +136,11 @@ instance Monad m => DataflowAnalysis (DFM' m) where
   getExitFact = DFM' get
     where get _ s = return (df_exit_fact s, s)
   setExitFact a =
-    do old <- getExitFact
-       DataflowLattice { fact_add_to = add_fact
-                       , fact_name = name, fact_do_logging = log } <- lattice
-       case add_fact a old of
-         TxRes NoChange _ -> return ()
-         TxRes SomeChange join -> DFM' $ \_ s ->
-             let debug = if log then pprTrace else \_ _ a -> a
-             in  debug name (pprSetFact "exit" old a join) $
-                 return ((), s { df_exit_fact = join, df_facts_change = SomeChange })
+    do DataflowLattice { fact_name = name, fact_do_logging = log} <- lattice
+       DFM' $ \_ s ->
+                let debug = if log then pprTrace else \_ _ a -> a
+                in  debug name (pprSetFact "exit" a a a) $
+                    return ((), s { df_exit_fact = a })
   getAllFacts = DFM' f
     where f _ s = return (df_facts s, s)
   setAllFacts env = DFM' f

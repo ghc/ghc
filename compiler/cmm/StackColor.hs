@@ -27,13 +27,13 @@ fold_edge_facts_b f comp graph env z =
     fold_block_facts z b =              
       let (h, l) = goto_end (ZipCfg.unzip b) 
           last_in _ LastExit = fact_bot dualLiveLattice
-          last_in env (LastOther l) = bt_last_in comp env l
+          last_in env (LastOther l) = bt_last_in comp l env
       in head_fold h (last_in env l) z
-    head_fold (ZHead h m)   out z = head_fold h (bt_middle_in comp out m) (f out z)
-    head_fold (ZFirst id _) out z = f (bt_first_in comp out id) (f out z)
+    head_fold (ZHead h m)   out z = head_fold h (bt_middle_in comp m out) (f out z)
+    head_fold (ZFirst id) out z = f (bt_first_in comp id out) (f out z)
 
 foldConflicts :: (RegSet -> a -> a) -> a -> LGraph Middle Last -> FuelMonad a
-foldConflicts f z g@(LGraph entry _ _) =
+foldConflicts f z g@(LGraph entry _) =
   do env <- dualLiveness emptyBlockSet g
      let lookup id = lookupBlockEnv env id `orElse` fact_bot dualLiveLattice
          f' dual z = f (on_stack dual) z

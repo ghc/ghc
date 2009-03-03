@@ -717,10 +717,11 @@ hscGenHardCode cgguts mod_summary
                                stg_binds hpc_info
 
          --- Optionally run experimental Cmm transformations ---
-         cmms <- optionallyConvertAndOrCPS hsc_env cmms
+         -- cmms <- optionallyConvertAndOrCPS hsc_env cmms
                  -- unless certain dflags are on, the identity function
          ------------------  Code output -----------------------
          rawcmms <- cmmToRawCmm cmms
+         dumpIfSet_dyn dflags Opt_D_dump_cmmz "Raw Cmm" (ppr rawcmms)
          (_stub_h_exists, stub_c_exists)
              <- codeOutput dflags this_mod location foreign_stubs 
                 dependencies rawcmms
@@ -811,10 +812,8 @@ tryNewCodeGen hsc_env this_mod data_tycons imported_mods
 	; prog <- return $ map (runTx $ runCmmOpts cmmCfgOptsZ) (srtToData topSRT : prog)
 		-- Control flow optimisation, again
 
-	; dumpIfSet_dyn dflags Opt_D_dump_cmmz "Output Cmm" (pprCmms prog)
-
 	; let prog' = map cmmOfZgraph prog
-	; dumpIfSet_dyn dflags Opt_D_dump_cmmz "Raw Cmm" (ppr prog')
+	; dumpIfSet_dyn dflags Opt_D_dump_cmmz "Output Cmm" (ppr prog')
 	; return prog' }
 
 
@@ -853,7 +852,6 @@ testCmmConversion hsc_env cmm =
        let cvt = cmmOfZgraph $ cfopts $ chosen_graph
        dumpIfSet_dyn dflags Opt_D_dump_cvt_cmm "C-- post-conversion" (ppr cvt)
        return cvt
-       -- return cmm -- don't use the conversion
 
 myCoreToStg :: DynFlags -> Module -> [CoreBind]
             -> IO ( [(StgBinding,[(Id,[Id])])]  -- output program
