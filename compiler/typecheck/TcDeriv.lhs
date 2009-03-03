@@ -881,20 +881,19 @@ cond_functorOK allowFunctions (dflags, rep_tc)
   | not (dopt Opt_DeriveFunctor dflags)
   = Just (ptext (sLit "You need -XDeriveFunctor to derive an instance for this class"))
   | otherwise
-  = msum (map check con_types)
+  = msum (map check_con data_cons)	-- msum picks the first 'Just', if any
   where
     data_cons = tyConDataCons rep_tc
-    con_types = concatMap dataConOrigArgTys data_cons
-    check = functorLikeTraverse
-                    Nothing
-                    Nothing
-                    (Just covariant)
-                    (\x y   -> if allowFunctions then x `mplus` y else Just functions)
-                    (\_ xs  -> msum xs)
-                    (\_ x   -> x)
-                    (Just wrong_arg)
-                    (\_ x   -> x)
-                    (last (tyConTyVars rep_tc))
+    check_con con = msum (foldDataConArgs ft_check con)
+
+    ft_check :: FFoldType (Maybe SDoc)
+    ft_check = FT { ft_triv = Nothing, ft_var = Nothing, ft_co_var = Just covariant
+	      	  , ft_fun = \x y -> if allowFunctions then x `mplus` y else Just functions
+                  , ft_tup = \_ xs  -> msum xs
+                  , ft_ty_app = \_ x   -> x
+                  , ft_bad_app = Just wrong_arg
+                  , ft_forall = \_ x   -> x }
+                    
     covariant = quotes (pprSourceTyCon rep_tc) <+> 
                 ptext (sLit "uses the type variable in a function argument")
     functions = quotes (pprSourceTyCon rep_tc) <+> 
