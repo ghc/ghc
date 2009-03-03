@@ -61,6 +61,7 @@ test('break024', normal, ghci_script, ['break024.script'])
 test('break025', normal, ghci_script, ['break025.script'])
 test('break026', normal, ghci_script, ['break026.script'])
 test('break027', normal, ghci_script, ['break027.script'])
+test('break028', normal, ghci_script, ['break028.script'])
 
 test('dynbrk001', normal, ghci_script, ['dynbrk001.script'])
 test('dynbrk002', normal, ghci_script, ['dynbrk002.script'])

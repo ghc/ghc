@@ -1,0 +1,5 @@
+Stopped at break028.hs:15:0-23
+_result :: Id a = _
+Stopped at break028.hs:15:22-23
+_result :: Id a = _
+x' :: Id a = _
