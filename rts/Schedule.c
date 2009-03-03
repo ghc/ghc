@@ -2203,22 +2203,16 @@ exitScheduler(
 {
     Task *task = NULL;
 
-#if defined(THREADED_RTS)
     ACQUIRE_LOCK(&sched_mutex);
     task = newBoundTask();
     RELEASE_LOCK(&sched_mutex);
-#endif
 
     // If we haven't killed all the threads yet, do it now.
     if (sched_state < SCHED_SHUTTING_DOWN) {
 	sched_state = SCHED_INTERRUPTING;
-#if defined(THREADED_RTS)
         waitForReturnCapability(&task->cap,task);
 	scheduleDoGC(task->cap,task,rtsFalse);    
         releaseCapability(task->cap);
-#else
-	scheduleDoGC(&MainCapability,task,rtsFalse);    
-#endif
     }
     sched_state = SCHED_SHUTTING_DOWN;
 
