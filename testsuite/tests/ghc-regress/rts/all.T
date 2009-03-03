@@ -43,6 +43,6 @@ test('2783', [ omit_ways(['ghci']), exit_code(1) ], compile_and_run, [''])
 
 # Test the work-stealing deque implementation.  We run this test in
 # both threaded1 (-threaded -debug) and threaded2 (-threaded) ways.
-test('testwsdeque', [if_compiler_lt(ghc, "6.11", skip),
+test('testwsdeque', [if_compiler_lt('ghc', '6.11', skip),
                     c_src, only_ways(['threaded1', 'threaded2'])],
                     compile_and_run, ['-I../../../../rts/parallel'])
