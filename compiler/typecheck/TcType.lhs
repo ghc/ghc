@@ -1268,8 +1268,9 @@ checkRepTyCon :: (TyCon -> Bool) -> Type -> Bool
 	--	newtype T = MkT (Ptr T)
 	-- and wanted it to work...
 checkRepTyCon check_tc ty 
-  | Just (tc,_) <- splitTyConApp_maybe (repType ty) = check_tc tc
-  | otherwise				  	    = False
+  | Just (ty', _) <- splitNewTypeRepCo_maybe ty = checkRepTyCon check_tc ty'
+  | Just (tc,_)   <- splitTyConApp_maybe ty     = check_tc tc
+  | otherwise				  	= False
 
 checkRepTyConKey :: [Unique] -> Type -> Bool
 -- Like checkRepTyCon, but just looks at the TyCon key
