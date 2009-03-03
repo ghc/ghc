@@ -32,17 +32,25 @@ import Data.List
 die :: String -> IO a
 die s = hPutStr stderr s >> exitWith (ExitFailure 1)
 
+data Normalise = NormalisePercent | NormaliseRatio | NormaliseNone
+
 main :: IO ()
 main = do
 
  when (not (null cmdline_errors) || OptHelp `elem` flags) $
       die (concat cmdline_errors ++ usage)
 
+ norm <- case [ n | OptNormalise n <- flags ] of
+                 []          -> return NormalisePercent
+                 ["percent"] -> return NormalisePercent
+                 ["ratio"]   -> return NormaliseRatio
+                 ["none"]    -> return NormaliseNone
+                 _           -> die ("unrecognised value for --normalise\n" ++ usage)
+
  let { html  = OptHTMLOutput  `elem` flags;
-       latex = OptLaTeXOutput `elem` flags;
+       latex = [ t | OptLaTeXOutput t <- flags ];
        ascii = OptASCIIOutput `elem` flags;
-       csv   = [ table | OptCSV table <- flags ];
-       no_norm = OptNoNormalise `elem` flags;
+       csv   = [ t | OptCSV t <- flags ];
      }
 
  when (ascii && html)  $ die "Can't produce both ASCII and HTML"
@@ -66,13 +74,13 @@ main = do
 
  case () of
    _ | not (null csv) ->
-        putStr (csvTable results (head csv) (not no_norm))
+        putStr (csvTable results (head csv) norm)
    _ | html      ->
         putStr (renderHtml (htmlPage results column_headings))
-   _ | latex     ->
-        putStr (latexOutput results column_headings summary_spec summary_rows)
+   _ | not (null latex) ->
+        putStr (latexOutput results (head latex) column_headings summary_spec summary_rows norm)
    _ | otherwise ->
-        putStr (asciiPage results column_headings summary_spec summary_rows)
+        putStr (asciiPage results column_headings summary_spec summary_rows norm)
 
 
 parse_logs :: [String] -> IO [ResultTable]
@@ -397,37 +405,87 @@ calcColor percentage | percentage >= 0 = printf "#%02x0000" val
 -----------------------------------------------------------------------------
 -- LaTeX table generation (just the summary for now)
 
-latexOutput :: [ResultTable] -> [String] -> [PerProgTableSpec]
-            -> Maybe [String] -> String
-latexOutput results _ summary_spec summary_rows =
+latexOutput :: [ResultTable] -> Maybe String -> [String] -> [PerProgTableSpec]
+            -> Maybe [String] -> Normalise ->  String
+
+latexOutput results (Just table_name) _ _ _ norm
+  = let
+        table_spec = [ spec | spec@(SpecP _ n _ _ _ _) <- per_prog_result_tab, 
+                       n == table_name ]
+    in
+    case table_spec of
+        [] -> error ("can't find table named: " ++ table_name)
+        (spec:_) -> latexProgTable results spec norm "\n"
+
+latexOutput results Nothing _ summary_spec summary_rows _ =
    (if (length results == 2)
         then ascii_summary_table True results summary_spec summary_rows
             . str "\n\n"
         else id) ""
 
 
+latexProgTable :: [ResultTable] -> PerProgTableSpec -> Normalise -> ShowS
+latexProgTable results (SpecP _long_name _ _ get_result get_status result_ok) norm
+  = latex_show_results results get_result get_status result_ok norm
+
+latex_show_results
+   :: Result a
+        => [ResultTable]
+        -> (Results -> Maybe a)
+        -> (Results -> Status)
+        -> (a -> Bool)
+        -> Normalise
+        -> ShowS
+
+latex_show_results []      _ _    _ _
+ = error "latex_show_results: Can't happen?"
+latex_show_results (r:rs) f stat _result_ok norm
+        = makeLatexTable $
+             [ TableRow (BoxString prog : boxes) | 
+               (prog,boxes) <- results_per_prog ] ++
+             if nodevs then [] else
+             [ TableLine,
+               TableRow (BoxString "Min" : mins),
+               TableRow (BoxString "Max" : maxs),
+               TableRow (BoxString "Geometric Mean" : gms) ]
+ where
+        -- results_per_prog :: [ (String,[BoxValue a]) ]
+        results_per_prog = [ (prog,tail xs) | (prog,xs) <- map calc (Map.toList r) ]
+        calc = calc_result rs f stat (const True) (normalise norm)
+
+        results_per_run    = transpose (map snd results_per_prog)
+        (_lows,gms,_highs) = unzip3 (map calc_gmsd results_per_run)
+        (mins, maxs)       = unzip  (map calc_minmax results_per_run)
+
+normalise :: Result a => Normalise -> a -> a -> BoxValue 
+normalise norm = case norm of
+             NormalisePercent -> convert_to_percentage
+             NormaliseRatio   -> normalise_to_base
+             NormaliseNone    -> \_base res -> toBox res
+
 -----------------------------------------------------------------------------
 -- ASCII page generation
 
 asciiPage :: [ResultTable] -> [String] -> [PerProgTableSpec] -> Maybe [String]
+          -> Normalise
           -> String
-asciiPage results args summary_spec summary_rows =
+asciiPage results args summary_spec summary_rows norm =
   ( str reportTitle
   . str "\n\n"
      -- only show the summary table if we're comparing two runs
   . (if (length results == 2)
         then ascii_summary_table False results summary_spec summary_rows . str "\n\n"
         else id)
-  . interleave "\n\n" (map (asciiGenProgTable results args) per_prog_result_tab)
+  . interleave "\n\n" (map (asciiGenProgTable results args norm) per_prog_result_tab)
   . str "\n"
   . interleave "\n\n" (map (asciiGenModTable results args)  per_module_result_tab)
   ) "\n"
 
-asciiGenProgTable :: [ResultTable] -> [String] -> PerProgTableSpec -> ShowS
-asciiGenProgTable results args (SpecP long_name _ _ get_result get_status result_ok)
+asciiGenProgTable :: [ResultTable] -> [String] -> Normalise -> PerProgTableSpec -> ShowS
+asciiGenProgTable results args norm (SpecP long_name _ _ get_result get_status result_ok)
   = str long_name
   . str "\n"
-  . ascii_show_results results args get_result get_status result_ok
+  . ascii_show_results results args get_result get_status result_ok norm
 
 asciiGenModTable :: [ResultTable] -> [String] -> PerModuleTableSpec -> ShowS
 asciiGenModTable results args (SpecM long_name _ get_result result_ok)
@@ -450,11 +508,12 @@ ascii_show_results
         -> (Results -> Maybe a)
         -> (Results -> Status)
         -> (a -> Bool)
+        -> Normalise
         -> ShowS
 
-ascii_show_results []     _  _ _    _
+ascii_show_results []     _  _ _    _ _
  = error "ascii_show_results: Can't happen?"
-ascii_show_results (r:rs) ss f stat result_ok
+ascii_show_results (r:rs) ss f stat result_ok norm
         = ascii_header fIELD_WIDTH ss
         . interleave "\n" (map show_per_prog_results results_per_prog)
         . if nodevs then id
@@ -466,7 +525,7 @@ ascii_show_results (r:rs) ss f stat result_ok
         . show_per_prog_results ("Average",gms)
  where
         -- results_per_prog :: [ (String,[BoxValue a]) ]
-        results_per_prog = map (calc_result rs f stat result_ok convert_to_percentage) (Map.toList r)
+        results_per_prog = map (calc_result rs f stat result_ok (normalise norm)) (Map.toList r)
 
         results_per_run  = transpose (map snd results_per_prog)
         (lows,gms,highs) = unzip3 (map calc_gmsd results_per_run)
@@ -536,10 +595,10 @@ mungeForLaTeX = map transrow
         transchar c s = c:s
 
 table_layout :: Int -> Int -> Layout
-table_layout n w =
-  (str . rjustify 15) :
-  (\s -> str (space 5) . str (rjustify w s)) :
-  replicate (n-1) (str . rjustify w)
+table_layout n w boxes = foldr (.) id $ zipWith ($) fns boxes
+ where fns = (str . rjustify 15 . show ) :
+             (\s -> str (space 5) . str (rjustify w (show s))) :
+             replicate (n-1) (str . rjustify w . show)
 
 ascii_show_multi_results
    :: Result a
@@ -605,7 +664,7 @@ show_per_prog_results_width w (prog,results)
 -- -----------------------------------------------------------------------------
 -- CSV output
 
-csvTable :: [ResultTable] -> String -> Bool -> String
+csvTable :: [ResultTable] -> String -> Normalise -> String
 csvTable results table_name norm
   = let
         table_spec = [ spec | spec@(SpecP _ n _ _ _ _) <- per_prog_result_tab, 
@@ -615,8 +674,8 @@ csvTable results table_name norm
         [] -> error ("can't find table named: " ++ table_name)
         (spec:_) -> csvProgTable results spec norm "\n"
 
-csvProgTable :: [ResultTable] -> PerProgTableSpec -> Bool -> ShowS
-csvProgTable results (SpecP long_name _ _ get_result get_status result_ok) norm
+csvProgTable :: [ResultTable] -> PerProgTableSpec -> Normalise -> ShowS
+csvProgTable results (SpecP _long_name _ _ get_result get_status result_ok) norm
   = csv_show_results results get_result get_status result_ok norm
 
 csv_show_results
@@ -625,20 +684,17 @@ csv_show_results
         -> (Results -> Maybe a)
         -> (Results -> Status)
         -> (a -> Bool)
-        -> Bool
+        -> Normalise
         -> ShowS
 
 csv_show_results []      _ _    _ _
  = error "csv_show_results: Can't happen?"
-csv_show_results (r:rs) f stat result_ok norm
+csv_show_results (r:rs) f stat _result_ok norm
         = interleave "\n" results_per_prog
  where
         -- results_per_prog :: [ (String,[BoxValue a]) ]
         results_per_prog = map (result_line . calc) (Map.toList r)
-        calc = calc_result rs f stat (const True) do_norm
-
-        do_norm | norm      = normalise_to_base
-                | otherwise = \base res -> toBox res
+        calc = calc_result rs f stat (const True) (normalise norm)
 
         result_line (prog,boxes) = interleave "," (str prog : map (str.showBox) boxes)
 
@@ -656,7 +712,7 @@ calc_result
         -> (String,b)                   -- the baseline result
         -> (String,[BoxValue])
 
-calc_result rts get_maybe_a get_stat base_ok normalise (prog,base_r) =
+calc_result rts get_maybe_a get_stat base_ok norm_fn (prog,base_r) =
         (prog, (just_result m_baseline base_stat :
 
           let
@@ -680,7 +736,7 @@ calc_result rts get_maybe_a get_stat base_ok normalise (prog,base_r) =
         just_result (Just a) _ = toBox a
 
         do_norm Nothing   s _        = RunFailed s
-        do_norm (Just a)  _ baseline = normalise baseline a
+        do_norm (Just a)  _ baseline = norm_fn baseline a
 
 -----------------------------------------------------------------------------
 -- Calculating geometric means and standard deviations
@@ -747,11 +803,11 @@ calc_minmax xs
 -- Show the Results
 
 convert_to_percentage :: Result a => a -> a -> BoxValue
-convert_to_percentage 0 val = Percentage 100
+convert_to_percentage 0 _val = Percentage 100
 convert_to_percentage baseline val = Percentage  ((realToFrac val / realToFrac baseline) * 100)
 
 normalise_to_base :: Result a => a -> a -> BoxValue
-normalise_to_base 0 val        = BoxFloat 1
+normalise_to_base 0 _val       = BoxFloat 1
 normalise_to_base baseline val = BoxFloat (realToFrac baseline / realToFrac val)
 
 class Real a => Result a where
@@ -809,30 +865,29 @@ data TableRow
   = TableRow [BoxValue]
   | TableLine
 
-type Layout = [String -> ShowS]
+type Layout = [BoxValue] -> ShowS
 
 makeTable :: Layout -> [TableRow] -> ShowS
 makeTable layout = interleave "\n" . map do_row
-  where do_row (TableRow boxes) = applyLayout layout boxes
+  where do_row (TableRow boxes) = layout boxes
         do_row TableLine = str (take 80 (repeat '-'))
 
 makeLatexTable :: [TableRow] -> ShowS
 makeLatexTable = foldr (.) id . map do_row
   where do_row (TableRow boxes)
-           = applyLayout latexTableLayout boxes . str "\\\\\n"
+           = latexTableLayout boxes . str "\\\\\n"
         do_row TableLine
            = str "\\hline\n"
 
 latexTableLayout :: Layout
-latexTableLayout = box : repeat (box . (" & "++))
-  where box s = str (foldr transchar "" s)
+latexTableLayout boxes = 
+  foldr (.) id . intersperse (str " & ") . map abox $ boxes
+  where 
+        abox (RunFailed NotDone) = id
+        abox s = str (foldr transchar "" (show s))
 
         transchar '%' s = s  -- leave out the percentage signs
         transchar c   s = c : s
-
-applyLayout :: Layout -> [BoxValue] -> ShowS
-applyLayout layout values =
- foldr (.) id [ f (show val) | (val,f) <- zip values layout ]
 
 -- -----------------------------------------------------------------------------
 -- General Utils

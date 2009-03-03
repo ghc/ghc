@@ -46,7 +46,7 @@ reportTitle = case [ t | OptTitle t <- flags ] of
 
 data CLIFlags
   = OptASCIIOutput
-  | OptLaTeXOutput
+  | OptLaTeXOutput (Maybe String)
   | OptHTMLOutput
   | OptIgnoreSmallTimes Float
   | OptDeviations
@@ -55,7 +55,7 @@ data CLIFlags
   | OptColumns String
   | OptRows String
   | OptCSV String
-  | OptNoNormalise
+  | OptNormalise String
   | OptHelp
   deriving Eq
 
@@ -77,7 +77,7 @@ argInfo =
 	"Ignore runtimes smaller than <secs>"
   , Option ['d'] ["deviations"] (NoArg OptDeviations)
 	"Display deviations (default)"
-  , Option ['l'] ["latex"]    (NoArg OptLaTeXOutput)  
+  , Option ['l'] ["latex"]    (OptArg OptLaTeXOutput "TABLE")
 	"Produce LaTeX output"
   , Option [] ["columns"] (ReqArg OptColumns "COLUMNS")
 	"Specify columns for summary table (comma separates)"
@@ -85,8 +85,8 @@ argInfo =
 	"Specify rows for summary table (comma separates)"
   , Option [] ["csv"] (ReqArg OptCSV "TABLE")
 	"Output a single table in CSV format"
-  , Option [] ["no-normalise"] (NoArg OptNoNormalise)
-	"Do not normalise to the baseline"
+  , Option [] ["normalise"] (ReqArg OptNormalise "percent|ratio|none")
+	"normalise to the baseline"
   , Option ['n'] ["nodeviations"] (NoArg OptNoDeviations)
 	"Hide deviations"
   , Option ['t'] ["title"] (ReqArg OptTitle "title")
