@@ -108,10 +108,12 @@ tcCheckFIType _ arg_tys res_ty (DNImport spec) = do
        _ -> return ()
     return (DNImport (withDNTypes spec (map toDNType arg_tys) (toDNType res_ty)))
 
-tcCheckFIType sig_ty _ _ idecl@(CImport _ _ _ _ (CLabel _)) = do
-    checkCg checkCOrAsm
-    check (isFFILabelTy sig_ty) (illegalForeignTyErr empty sig_ty)
-    return idecl
+tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport _ _ _ _ (CLabel _)) 
+  = ASSERT( null arg_tys )
+    do { checkCg checkCOrAsm
+       ; check (isFFILabelTy res_ty) (illegalForeignTyErr empty sig_ty)
+       ; return idecl }	     -- NB check res_ty not sig_ty!
+       	 	      	     --    In case sig_ty is (forall a. ForeignPtr a)
 
 tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv _ _ _ CWrapper) = do
    	-- Foreign wrapper (former f.e.d.)
