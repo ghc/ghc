@@ -391,7 +391,7 @@ Indeed, the bindings can even be recursive.
         the syntax by eliminating odd cases
         like <literal>Prelude..</literal>.  For example,
         when <literal>NewQualifiedOperators</literal> is on, it is possible to
-        write the enerated sequence <literal>[Monday..]</literal>
+        write the enumerated sequence <literal>[Monday..]</literal>
         without spaces, whereas in Haskell 98 this would be a
         reference to the operator &lsquo;<literal>.</literal>&lsquo;
         from module <literal>Monday</literal>.</para>
