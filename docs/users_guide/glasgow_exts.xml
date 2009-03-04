@@ -8202,7 +8202,7 @@ r) ->
 <title>Special built-in functions</title>
 <para>GHC has a few built-in functions with special behaviour.  These
 are now described in the module <ulink
-url="../libraries/base/GHC-Prim.html"><literal>GHC.Prim</literal></ulink>
+url="../libraries/ghc-prim/GHC-Prim.html"><literal>GHC.Prim</literal></ulink>
 in the library documentation.</para>
 </sect1>
 
