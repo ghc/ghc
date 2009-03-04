@@ -1,6 +1,12 @@
 test('char001', 	normal, compile_and_run, [''])
 test('char002', 	normal, compile_and_run, [''])
 
+test('length001',
+     # This fails without -O, as it relies on a RULE being applied
+     expect_fail_for(['normal', 'ghci', 'threaded1']),
+     compile_and_run,
+     [''])
+
 test('ratio001', 	normal, compile_and_run, [''])
 
 test('rand001',		normal, compile_and_run, [''])
