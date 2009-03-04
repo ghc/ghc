@@ -69,22 +69,22 @@ tcForeignImports decls
 
 tcFImport :: ForeignDecl Name -> TcM (Id, ForeignDecl Id)
 tcFImport fo@(ForeignImport (L loc nm) hs_ty imp_decl)
- = addErrCtxt (foreignDeclCtxt fo)  $ do
-   sig_ty <- tcHsSigType (ForSigCtxt nm) hs_ty
-   let 
-      -- drop the foralls before inspecting the structure
-      -- of the foreign type.
-	(_, t_ty)	  = tcSplitForAllTys sig_ty
-	(arg_tys, res_ty) = tcSplitFunTys t_ty
-	id		  = mkLocalId nm sig_ty
+ = addErrCtxt (foreignDeclCtxt fo)  $ 
+   do { sig_ty <- tcHsSigType (ForSigCtxt nm) hs_ty
+      ; let 
+          -- Drop the foralls before inspecting the
+          -- structure of the foreign type.
+	    (_, t_ty)	      = tcSplitForAllTys sig_ty
+	    (arg_tys, res_ty) = tcSplitFunTys t_ty
+	    id  	      = mkLocalId nm sig_ty
  		-- Use a LocalId to obey the invariant that locally-defined 
 		-- things are LocalIds.  However, it does not need zonking,
 		-- (so TcHsSyn.zonkForeignExports ignores it).
    
-   imp_decl' <- tcCheckFIType sig_ty arg_tys res_ty imp_decl
-   -- can't use sig_ty here because it :: Type and we need HsType Id
-   -- hence the undefined
-   return (id, ForeignImport (L loc id) undefined imp_decl')
+      ; imp_decl' <- tcCheckFIType sig_ty arg_tys res_ty imp_decl
+         -- Can't use sig_ty here because sig_ty :: Type and 
+	 -- we need HsType Id hence the undefined
+      ; return (id, ForeignImport (L loc id) undefined imp_decl') }
 tcFImport d = pprPanic "tcFImport" (ppr d)
 \end{code}
 
