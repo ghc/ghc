@@ -264,6 +264,7 @@ test('tc245',
       if_compiler_lt('ghc', '6.11', expect_fail)],
      run_command,
      ['$MAKE -s --no-print-directory tc245'])
+test('tc246', normal, compile, [''])
 
 test('FD1', normal, compile_fail, [''])
 test('FD2', normal, compile_fail, [''])
