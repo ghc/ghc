@@ -1262,15 +1262,19 @@ toDNType ty
 		 ]
 
 checkRepTyCon :: (TyCon -> Bool) -> Type -> Bool
-	-- Look through newtypes
-	-- Non-recursive ones are transparent to splitTyConApp,
-	-- but recursive ones aren't.  Manuel had:
-	--	newtype T = MkT (Ptr T)
-	-- and wanted it to work...
-checkRepTyCon check_tc ty 
-  | Just (ty', _) <- splitNewTypeRepCo_maybe ty = checkRepTyCon check_tc ty'
-  | Just (tc,_)   <- splitTyConApp_maybe ty     = check_tc tc
-  | otherwise				  	= False
+-- Look through newtypes, but *not* foralls
+-- Should work even for recursive newtypes
+-- eg Manuel had:	newtype T = MkT (Ptr T)
+checkRepTyCon check_tc ty
+  = go [] ty
+  where
+    go rec_nts ty
+      | Just (tc,tys) <- splitTyConApp_maybe ty
+      = case carefullySplitNewType_maybe rec_nts tc tys of
+      	   Just (rec_nts', ty') -> go rec_nts' ty'
+	   Nothing	   	-> check_tc tc
+      | otherwise
+      = False
 
 checkRepTyConKey :: [Unique] -> Type -> Bool
 -- Like checkRepTyCon, but just looks at the TyCon key

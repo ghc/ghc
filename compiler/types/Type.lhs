@@ -41,7 +41,7 @@ module Type (
 	applyTy, applyTys, applyTysD, isForAllTy, dropForAlls,
 	
 	-- (Newtypes)
-	newTyConInstRhs,
+	newTyConInstRhs, carefullySplitNewType_maybe,
 	
 	-- (Type families)
         tyFamInsts, predFamInsts,
@@ -596,14 +596,9 @@ newtype at outermost level; and bale out if we see it again.
 -- | Looks through:
 --
 --	1. For-alls
---
 --	2. Synonyms
---
 --	3. Predicates
---
---	4. Usage annotations
---
---	5. All newtypes, including recursive ones, but not newtype families
+--	4. All newtypes, including recursive ones, but not newtype families
 --
 -- It's useful in the back end of the compiler.
 repType :: Type -> Type
@@ -618,17 +613,23 @@ repType ty
     go rec_nts (ForAllTy _ ty)			-- Look through foralls
 	= go rec_nts ty
 
-    go rec_nts ty@(TyConApp tc tys)		-- Expand newtypes
-	| Just _co_con <- newTyConCo_maybe tc	-- See Note [Expanding newtypes]
-	= if tc `elem` rec_nts 			--  in Type.lhs
-	  then ty
-	  else go rec_nts' nt_rhs
-	where
-	  nt_rhs = newTyConInstRhs tc tys
-	  rec_nts' | isRecursiveTyCon tc = tc:rec_nts
-		   | otherwise		 = rec_nts
+    go rec_nts (TyConApp tc tys)		-- Expand newtypes
+      | Just (rec_nts', ty') <- carefullySplitNewType_maybe rec_nts tc tys
+      = go rec_nts' ty'
 
     go _ ty = ty
+
+
+carefullySplitNewType_maybe :: [TyCon] -> TyCon -> [Type] -> Maybe ([TyCon],Type)
+-- Return the representation of a newtype, unless 
+-- we've seen it already: see Note [Expanding newtypes]
+carefullySplitNewType_maybe rec_nts tc tys
+  | isNewTyCon tc
+  , not (tc `elem` rec_nts)  = Just (rec_nts', newTyConInstRhs tc tys)
+  | otherwise	   	     = Nothing
+  where
+    rec_nts' | isRecursiveTyCon tc = tc:rec_nts
+	     | otherwise	   = rec_nts
 
 
 -- ToDo: this could be moved to the code generator, using splitTyConApp instead
