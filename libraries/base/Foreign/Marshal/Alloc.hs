@@ -32,7 +32,7 @@ module Foreign.Marshal.Alloc (
 
 import Data.Maybe
 import Foreign.C.Types          ( CSize )
-import Foreign.Storable         ( Storable(sizeOf) )
+import Foreign.Storable         ( Storable(sizeOf,alignment) )
 
 #ifndef __GLASGOW_HASKELL__
 import Foreign.Ptr              ( Ptr, nullPtr, FunPtr )
@@ -97,7 +97,7 @@ alloca :: Storable a => (Ptr a -> IO b) -> IO b
 alloca  = doAlloca undefined
   where
     doAlloca       :: Storable a' => a' -> (Ptr a' -> IO b') -> IO b'
-    doAlloca dummy  = allocaBytes (sizeOf dummy)
+    doAlloca dummy  = allocaBytesAligned (sizeOf dummy) (alignment dummy)
 
 -- |@'allocaBytes' n f@ executes the computation @f@, passing as argument
 -- a pointer to a temporarily allocated block of memory of @n@ bytes.
@@ -118,9 +118,23 @@ allocaBytes (I# size) action = IO $ \ s0 ->
      case touch# barr# s3 of { s4 ->
      (# s4, r #)
   }}}}}
+
+allocaBytesAligned :: Int -> Int -> (Ptr a -> IO b) -> IO b
+allocaBytesAligned (I# size) (I# align) action = IO $ \ s0 ->
+     case newAlignedPinnedByteArray# size align s0 of { (# s1, mbarr# #) ->
+     case unsafeFreezeByteArray# mbarr# s1 of { (# s2, barr#  #) ->
+     let addr = Ptr (byteArrayContents# barr#) in
+     case action addr     of { IO action' ->
+     case action' s2      of { (# s3, r #) ->
+     case touch# barr# s3 of { s4 ->
+     (# s4, r #)
+  }}}}}
 #else
 allocaBytes      :: Int -> (Ptr a -> IO b) -> IO b
 allocaBytes size  = bracket (mallocBytes size) free
+
+allocaBytesAligned :: Int -> Int -> (Ptr a -> IO b) -> IO b
+allocaBytesAligned size align = allocaBytes size -- wrong
 #endif
 
 -- |Resize a memory area that was allocated with 'malloc' or 'mallocBytes'

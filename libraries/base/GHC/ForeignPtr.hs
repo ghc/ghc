@@ -152,11 +152,12 @@ mallocForeignPtr = doMalloc undefined
         doMalloc a = do
           r <- newIORef (NoFinalizers, [])
           IO $ \s ->
-            case newPinnedByteArray# size s of { (# s', mbarr# #) ->
+            case newAlignedPinnedByteArray# size align s of { (# s', mbarr# #) ->
              (# s', ForeignPtr (byteArrayContents# (unsafeCoerce# mbarr#))
                                (MallocPtr mbarr# r) #)
             }
-            where (I# size) = sizeOf a
+            where (I# size)  = sizeOf a
+                  (I# align) = alignment a
 
 -- | This function is similar to 'mallocForeignPtr', except that the
 -- size of the memory required is given explicitly as a number of bytes.
@@ -186,11 +187,12 @@ mallocPlainForeignPtr :: Storable a => IO (ForeignPtr a)
 mallocPlainForeignPtr = doMalloc undefined
   where doMalloc :: Storable b => b -> IO (ForeignPtr b)
         doMalloc a = IO $ \s ->
-            case newPinnedByteArray# size s of { (# s', mbarr# #) ->
+            case newAlignedPinnedByteArray# size align s of { (# s', mbarr# #) ->
              (# s', ForeignPtr (byteArrayContents# (unsafeCoerce# mbarr#))
                                (PlainPtr mbarr#) #)
             }
-            where (I# size) = sizeOf a
+            where (I# size)  = sizeOf a
+                  (I# align) = alignment a
 
 -- | This function is similar to 'mallocForeignPtrBytes', except that
 -- the internally an optimised ForeignPtr representation with no
