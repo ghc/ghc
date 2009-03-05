@@ -1520,6 +1520,8 @@ maybeCreateManifest dflags exe_filename = do
         -- no FileOptions here: windres doesn't like seeing
         -- backslashes, apparently
 
+  removeFile manifest_filename
+
   return [rc_obj_filename]
 #endif
 
