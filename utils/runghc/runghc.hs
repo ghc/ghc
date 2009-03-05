@@ -22,10 +22,13 @@
 
 module Main (main) where
 
+import Paths_runghc
+
 import Control.Exception
 import Data.Char
 import Data.List
 import Data.Monoid
+import Data.Version
 import System.Cmd
 import System.Directory
 import System.Environment
@@ -44,6 +47,7 @@ main = do
     args <- getArgs
     case parseRunGhcFlags args of
         (Help, _) -> printUsage
+        (ShowVersion, _) -> printVersion
         (RunGhcFlags (Just ghc), args') -> doIt ghc args'
         (RunGhcFlags Nothing, args') -> do
             mbPath <- getExecPath
@@ -55,11 +59,14 @@ main = do
 
 data RunGhcFlags = RunGhcFlags (Maybe FilePath) -- GHC location
                  | Help -- Print help text
+                 | ShowVersion -- Print version info
 
 instance Monoid RunGhcFlags where
     mempty = RunGhcFlags Nothing
     Help `mappend` _ = Help
     _ `mappend` Help = Help
+    ShowVersion `mappend` _ = ShowVersion
+    _ `mappend` ShowVersion = ShowVersion
     RunGhcFlags _ `mappend` right@(RunGhcFlags (Just _)) = right
     left@(RunGhcFlags _) `mappend` RunGhcFlags Nothing = left
 
@@ -70,10 +77,15 @@ parseRunGhcFlags = f mempty
           f flags (('-' : 'f' : ghc) : args)
               = f (flags `mappend` RunGhcFlags (Just ghc)) args
           f flags ("--help" : args) = f (flags `mappend` Help) args
+          f flags ("--version" : args) = f (flags `mappend` ShowVersion) args
           -- If you need the first GHC flag to be a -f flag then
           -- you can pass -- first
           f flags ("--" : args) = (flags, args)
           f flags         args  = (flags, args)
+
+printVersion :: IO ()
+printVersion = do
+    putStrLn ("runghc " ++ showVersion version)
 
 printUsage :: IO ()
 printUsage = do
@@ -82,6 +94,7 @@ printUsage = do
     putStrLn "The runghc flags are"
     putStrLn "    -f /path/to/ghc       Tell runghc where GHC is"
     putStrLn "    --help                Print this usage information"
+    putStrLn "    --version             Print version number"
 
 doIt :: String -> [String] -> IO ()
 doIt ghc args = do

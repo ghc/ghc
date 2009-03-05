@@ -1,6 +1,5 @@
 Name: runghc
--- XXX version number:
-Version: 0.67
+Version: @ProjectVersion@
 Copyright: XXX
 License: BSD3
 -- XXX License-File: LICENSE
