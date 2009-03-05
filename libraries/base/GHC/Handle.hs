@@ -1374,13 +1374,10 @@ hSetBuffering handle mode =
           is_tty <- fdIsTTY (haFD handle_)
           when (is_tty && isReadableHandleType (haType handle_)) $
                 case mode of
-#ifndef mingw32_HOST_OS
-        -- 'raw' mode under win32 is a bit too specialised (and troublesome
-        -- for most common uses), so simply disable its use here.
+                   -- Note: we used to disable 'cooked' mode setting
+                   -- for mingw / win32 here, but it is now back on (and well
+                   -- behaved for Console-connected Handles.)
                   NoBuffering -> setCooked (haFD handle_) False
-#else
-                  NoBuffering -> return ()
-#endif
                   _           -> setCooked (haFD handle_) True
 
           -- throw away spare buffers, they might be the wrong size

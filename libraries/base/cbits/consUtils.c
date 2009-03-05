@@ -25,10 +25,13 @@ set_console_buffering__(int fd, int cooked)
     DWORD flgs = ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT;
     
     if ( (h = (HANDLE)_get_osfhandle(fd)) != INVALID_HANDLE_VALUE ) {
+        /* Only for console-connected Handles */
+      if ( GetFileType(h) == FILE_TYPE_CHAR ) {
 	if ( GetConsoleMode(h,&st) &&
-	     SetConsoleMode(h, cooked ? (st | ENABLE_LINE_INPUT) : st & ~flgs)  ) {
+             SetConsoleMode(h, cooked ? (st | flgs) : st & ~flgs)  ) {
 	    return 0;
-	}
+        }
+      }
     }
     return -1;
 }
