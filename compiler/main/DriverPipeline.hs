@@ -993,6 +993,13 @@ runPhase cc_phase _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
         -- This is a temporary hack.
                        ++ ["-mcpu=v9"]
 #endif
+#if defined(darwin_TARGET_OS) && defined(i386_TARGET_ARCH)
+                          -- By default, gcc on OS X will generate SSE
+                          -- instructions, which need things 16-byte aligned,
+                          -- but we don't 16-byte align things. Thus drop
+                          -- back to generic i686 compatibility. Trac #2983.
+                       ++ ["-march=i686"]
+#endif
 		       ++ (if hcc && mangle
 		  	     then md_regd_c_flags
 		  	     else [])
