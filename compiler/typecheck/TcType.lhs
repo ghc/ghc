@@ -71,7 +71,8 @@ module TcType (
   getClassPredTys_maybe, getClassPredTys, 
   isClassPred, isTyVarClassPred, isEqPred, 
   mkDictTy, tcSplitPredTy_maybe, 
-  isPredTy, isDictTy, tcSplitDFunTy, tcSplitDFunHead, predTyUnique, 
+  isPredTy, isDictTy, isDictLikeTy,
+  tcSplitDFunTy, tcSplitDFunHead, predTyUnique, 
   mkClassPred, isInheritablePred, isIPPred, 
   dataConsStupidTheta, isRefineableTy, isRefineablePred,
 
@@ -894,7 +895,44 @@ isDictTy :: Type -> Bool
 isDictTy ty | Just ty' <- tcView ty = isDictTy ty'
 isDictTy (PredTy p) = isClassPred p
 isDictTy _          = False
+
+isDictLikeTy :: Type -> Bool
+-- Note [Dictionary-like types]
+isDictLikeTy ty | Just ty' <- tcView ty = isDictTy ty'
+isDictLikeTy (PredTy p) = isClassPred p
+isDictLikeTy (TyConApp tc tys) 
+  | isTupleTyCon tc     = all isDictLikeTy tys
+isDictLikeTy _          = False
 \end{code}
+
+Note [Dictionary-like types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Being "dictionary-like" means either a dictionary type or a tuple thereof.
+In GHC 6.10 we build implication constraints which construct such tuples,
+and if we land up with a binding
+    t :: (C [a], Eq [a])
+    t = blah
+then we want to treat t as cheap under "-fdicts-cheap" for example.
+(Implication constraints are normally inlined, but sadly not if the
+occurrence is itself inside an INLINE function!  Until we revise the 
+handling of implication constraints, that is.)  This turned out to
+be important in getting good arities in DPH code.  Example:
+
+    class C a
+    class D a where { foo :: a -> a }
+    instance C a => D (Maybe a) where { foo x = x }
+
+    bar :: (C a, C b) => a -> b -> (Maybe a, Maybe b)
+    {-# INLINE bar #-}
+    bar x y = (foo (Just x), foo (Just y))
+
+Then 'bar' should jolly well have arity 4 (two dicts, two args), but
+we ended up with something like
+   bar = __inline_me__ (\d1,d2. let t :: (D (Maybe a), D (Maybe b)) = ...
+                                in \x,y. <blah>)
+
+This is all a bit ad-hoc; eg it relies on knowing that implication
+constraints build tuples.
 
 --------------------- Implicit parameters ---------------------------------
 

@@ -24,6 +24,7 @@ import Var
 import VarEnv
 import Id
 import Type
+import TcType	( isDictLikeTy )
 import Coercion
 import BasicTypes
 import Unique
@@ -293,7 +294,7 @@ arityType dflags (Let b e)
   where
     cheap_bind (NonRec b e) = is_cheap (b,e)
     cheap_bind (Rec prs)    = all is_cheap prs
-    is_cheap (b,e) = (dopt Opt_DictsCheap dflags && isDictId b)
+    is_cheap (b,e) = (dopt Opt_DictsCheap dflags && isDictLikeTy (idType b))
 		   || exprIsCheap e
 	-- If the experimental -fdicts-cheap flag is on, we eta-expand through
 	-- dictionary bindings.  This improves arities. Thereby, it also
@@ -311,6 +312,9 @@ arityType dflags (Let b e)
 	--
 	-- One could go further and make exprIsCheap reply True to any
 	-- dictionary-typed expression, but that's more work.
+	-- 
+	-- See Note [Dictionary-like types] in TcType.lhs for why we use
+	-- isDictLikeTy here rather than isDictTy
 
 arityType _ _ = ATop
 \end{code}
