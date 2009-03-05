@@ -185,11 +185,6 @@ BootingFromUnregisterisedHc = @BootingFromUnregisterisedHc@
 #
 XMLDocWays=
 
-# Should we build haddock docs?
-HADDOCK_DOCS = YES
-# And HsColour the sources?
-HSCOLOUR_SRCS = YES
-
 # Should we build latex docs?
 LATEX_DOCS = NO
 
@@ -1191,6 +1186,15 @@ ALEX_VERSION		= @AlexVersion@
 # Options to pass to Happy when we're going to compile the output with GHC
 #
 GHC_ALEX_OPTS		= -g
+
+# Should we build haddock docs?
+HADDOCK_DOCS = YES
+# And HsColour the sources?
+ifeq "$(HSCOLOUR)" ""
+HSCOLOUR_SRCS = NO
+else
+HSCOLOUR_SRCS = YES
+endif
 
 #
 # Options for compiling in different `ways'. 
