@@ -6889,7 +6889,7 @@ Assertion failures can be caught, see the documentation for the
     <replaceable>word</replaceable>.  The various values for
     <replaceable>word</replaceable> that GHC understands are described
     in the following sections; any pragma encountered with an
-    unrecognised <replaceable>word</replaceable> is (silently)
+    unrecognised <replaceable>word</replaceable> is
     ignored. The layout rule applies in pragmas, so the closing <literal>#-}</literal>
     should start in a column to the right of the opening <literal>{-#</literal>. </para> 
 

@@ -918,6 +918,23 @@ ghc -c Foo.hs</screen>
     <variablelist>
 
       <varlistentry>
+	<term><option>-fwarn-unrecognised-pragmas</option>:</term>
+	<listitem>
+	  <indexterm><primary><option>-fwarn-unrecognised-pragmas</option></primary>
+	  </indexterm>
+	  <indexterm><primary>warnings</primary></indexterm>
+	  <indexterm><primary>pragmas</primary></indexterm>
+	  <para>Causes a warning to be emitted when a
+	  pragma that GHC doesn't recognise is used. As well as pragmas
+      that GHC itself uses, GHC also recognises pragmas known to be used
+      by other tools, e.g. <literal>OPTIONS_HUGS</literal> and
+      <literal>DERIVE</literal>.</para>
+
+	  <para>This option is on by default.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
 	<term><option>-fwarn-warnings-deprecations</option>:</term>
 	<listitem>
 	  <indexterm><primary><option>-fwarn-warnings-deprecations</option></primary>

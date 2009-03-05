@@ -1027,6 +1027,13 @@
 	  </row>
 
 	  <row>
+	    <entry><option>-fwarn-unrecognised-pragmas</option></entry>
+	    <entry>warn about uses of pragmas that GHC doesn't recognise</entry>
+	    <entry>dynamic</entry>
+	    <entry><option>-fno-warn-unrecognised-pragmas</option></entry>
+	  </row>
+
+	  <row>
 	    <entry><option>-fwarn-warnings-deprecations</option></entry>
 	    <entry>warn about uses of functions &amp; types that have warnings or deprecated pragmas</entry>
 	    <entry>dynamic</entry>
