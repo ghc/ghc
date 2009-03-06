@@ -252,7 +252,7 @@ onlyIfV b p = ensureV b >> p
 
 traceEnsureV :: String -> SDoc -> Bool -> VM ()
 traceEnsureV s d False = traceNoV s d
-traceEnsureV s d True  = return ()
+traceEnsureV _ _ True  = return ()
 
 tryV :: VM a -> VM (Maybe a)
 tryV (VM p) = VM $ \bi genv lenv ->

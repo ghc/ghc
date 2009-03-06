@@ -298,7 +298,7 @@ vectScalarLam args body
                     | otherwise = False
 
     is_scalar vs (Var v)     = v `elemVarSet` vs
-    is_scalar _ e@(Lit l)    = is_scalar_ty $ exprType e
+    is_scalar _ e@(Lit _)    = is_scalar_ty $ exprType e
     is_scalar vs (App e1 e2) = is_scalar vs e1 && is_scalar vs e2
     is_scalar _ _            = False
 
