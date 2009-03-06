@@ -88,17 +88,25 @@ SUBDIRS += $(wildcard parallel)
 endif
 endif
 
-ifeq "$(DO_STAGE_2_LIBS)" "YES"
+DPH_SUBDIRS :=
 ifneq "$(GhcBootLibs)" "YES"
 ifneq "$(wildcard dph)" ""
-SUBDIRS += dph/dph-base
-SUBDIRS += dph/dph-prim-interface
-SUBDIRS += dph/dph-prim-seq
-SUBDIRS += dph/dph-prim-par
-SUBDIRS += dph/dph-seq
-SUBDIRS += dph/dph-par
+DPH_SUBDIRS += dph/dph-base
+DPH_SUBDIRS += dph/dph-prim-interface
+DPH_SUBDIRS += dph/dph-prim-seq
+DPH_SUBDIRS += dph/dph-prim-par
+DPH_SUBDIRS += dph/dph-seq
+DPH_SUBDIRS += dph/dph-par
 endif
 endif
+
+# We have a separate variable for cleaning as this happens in stage=1 and
+# we want to clean the dph subdirectories, too.
+ifeq "$(DO_STAGE_2_LIBS)" "YES"
+SUBDIRS       += $(DPH_SUBDIRS)
+CLEAN_SUBDIRS  = $(SUBDIRS)
+else
+CLEAN_SUBDIRS  = $(SUBDIRS) $(DPH_SUBDIRS)
 endif
 
 # -----------------------------------------------------------------------------
@@ -326,7 +334,7 @@ endif
 maintainer-clean: clean
 distclean: clean
 
-ifeq "$(wildcard dph)" ""
+ifeq "$(DPH_SUBDIRS)" ""
 clean: $(foreach SUBDIR,$(SUBDIRS),clean.library.$(SUBDIR))
 else
 clean: $(foreach SUBDIR,$(SUBDIRS),clean.library.$(SUBDIR)) clean.library.dph
@@ -347,7 +355,7 @@ endif
 maintainer-clean distclean:
 	$(RM) $(foreach lib, $(SUBDIRS), $(lib)/.depend $(lib)/.depend.bak)
 
-$(foreach SUBDIR,$(SUBDIRS),clean.library.$(SUBDIR)): \
+$(foreach SUBDIR,$(CLEAN_SUBDIRS),clean.library.$(SUBDIR)): \
 clean.library.%:
 	$(RM) -f stamp/configure.library.*.$* $*/unbuildable
 	-cd $* && $(CABAL) clean
@@ -356,17 +364,11 @@ clean.library.%:
 endif
 
 # Extra target to clean all the sub-packages of dph
-ifeq "$(stage)" "1"
-clean.library.dph:
-	@echo "*** Package dph needs to be made in stage=2"
-endif
-ifeq "$(stage)" "2"
 clean.library.dph: clean.library.dph/dph-prim-par \
 		clean.library.dph/dph-prim-seq \
 		clean.library.dph/dph-prim-interface \
 		clean.library.dph/dph-base
 	$(MAKE) -C dph clean
-endif
 
 # -----------------------------------------------------------------------------
 
