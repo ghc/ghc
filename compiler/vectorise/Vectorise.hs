@@ -264,11 +264,43 @@ vectExpr (_, AnnLet (AnnRec bs) body)
                       $ vectExpr rhs
 
 vectExpr e@(fvs, AnnLam bndr _)
-  | isId bndr = vectLam fvs bs body
+  | isId bndr = onlyIfV (isEmptyVarSet fvs) (vectScalarLam bs $ deAnnotate body)
+                `orElseV` vectLam fvs bs body
   where
     (bs,body) = collectAnnValBinders e
 
 vectExpr e = cantVectorise "Can't vectorise expression" (ppr $ deAnnotate e)
+
+vectScalarLam :: [Var] -> CoreExpr -> VM VExpr
+vectScalarLam args body
+  = do
+      scalars <- globalScalars
+      onlyIfV (all is_scalar_ty arg_tys
+               && is_scalar_ty res_ty
+               && is_scalar (extendVarSetList scalars args) body)
+        $ do
+            fn_var <- hoistExpr (fsLit "fn") (mkLams args body)
+            zipf <- zipScalars arg_tys res_ty
+            clo <- scalarClosure arg_tys res_ty (Var fn_var)
+                                                (zipf `App` Var fn_var)
+            clo_var <- hoistExpr (fsLit "clo") clo
+            lclo <- liftPA (Var clo_var)
+            return (Var clo_var, lclo)
+  where
+    arg_tys = map idType args
+    res_ty  = exprType body
+
+    is_scalar_ty ty | Just (tycon, []) <- splitTyConApp_maybe ty
+                    = tycon == intTyCon
+                      || tycon == floatTyCon
+                      || tycon == doubleTyCon
+
+                    | otherwise = False
+
+    is_scalar vs (Var v)     = v `elemVarSet` vs
+    is_scalar _ e@(Lit l)    = is_scalar_ty $ exprType e
+    is_scalar vs (App e1 e2) = is_scalar vs e1 && is_scalar vs e2
+    is_scalar _ _            = False
 
 vectLam :: VarSet -> [Var] -> CoreExprWithFVs -> VM VExpr
 vectLam fvs bs body

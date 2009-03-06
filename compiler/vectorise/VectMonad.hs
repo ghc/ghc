@@ -2,14 +2,15 @@ module VectMonad (
   Scope(..),
   VM,
 
-  noV, traceNoV, tryV, maybeV, traceMaybeV, orElseV, fixV, localV, closedV,
+  noV, traceNoV, ensureV, traceEnsureV, tryV, maybeV, traceMaybeV, orElseV,
+  onlyIfV, fixV, localV, closedV,
   initV, cantVectorise, maybeCantVectorise, maybeCantVectoriseM,
   liftDs,
   cloneName, cloneId, cloneVar,
   newExportedVar, newLocalVar, newDummyVar, newTyVar,
   
   Builtins(..), sumTyCon, prodTyCon,
-  combinePAVar,
+  combinePAVar, scalarZip, closureCtrFun,
   builtin, builtins,
 
   GlobalEnv(..),
@@ -21,7 +22,7 @@ module VectMonad (
 
   getBindName, inBind,
 
-  lookupVar, defGlobalVar,
+  lookupVar, defGlobalVar, globalScalars,
   lookupTyCon, defTyCon,
   lookupDataCon, defDataCon,
   lookupTyConPA, defTyConPA, defTyConPAs,
@@ -30,7 +31,7 @@ module VectMonad (
   lookupPrimMethod, lookupPrimPArray,
   lookupTyVarPA, defLocalTyVar, defLocalTyVarWithPA, localTyVars,
 
-  {-lookupInst,-} lookupFamInst
+  lookupInst, lookupFamInst
 ) where
 
 #include "HsVersions.h"
@@ -40,10 +41,12 @@ import VectBuiltIn
 import HscTypes hiding  ( MonadThings(..) )
 import Module           ( PackageId )
 import CoreSyn
+import Class
 import TyCon
 import DataCon
 import Type
 import Var
+import VarSet
 import VarEnv
 import Id
 import Name
@@ -70,6 +73,10 @@ data GlobalEnv = GlobalEnv {
                   -- Mapping from global variables to their vectorised versions.
                   -- 
                   global_vars :: VarEnv Var
+
+                  -- Purely scalar variables. Code which mentions only these
+                  -- variables doesn't have to be lifted.
+                , global_scalars :: VarSet
 
                   -- Exported variables which have a vectorised version
                   --
@@ -130,6 +137,7 @@ initGlobalEnv :: VectInfo -> (InstEnv, InstEnv) -> FamInstEnvs -> GlobalEnv
 initGlobalEnv info instEnvs famInstEnvs
   = GlobalEnv {
       global_vars          = mapVarEnv snd $ vectInfoVar info
+    , global_scalars   = emptyVarSet
     , global_exported_vars = emptyVarEnv
     , global_tycons        = mapNameEnv snd $ vectInfoTyCon info
     , global_datacons      = mapNameEnv snd $ vectInfoDataCon info
@@ -144,6 +152,10 @@ initGlobalEnv info instEnvs famInstEnvs
 extendImportedVarsEnv :: [(Var, Var)] -> GlobalEnv -> GlobalEnv
 extendImportedVarsEnv ps genv
   = genv { global_vars = extendVarEnvList (global_vars genv) ps }
+
+extendScalars :: [Var] -> GlobalEnv -> GlobalEnv
+extendScalars vs genv
+  = genv { global_scalars = extendVarSetList (global_scalars genv) vs }
 
 setFamInstEnv :: FamInstEnv -> GlobalEnv -> GlobalEnv
 setFamInstEnv l_fam_inst genv
@@ -231,6 +243,17 @@ noV = VM $ \_ _ _ -> return No
 traceNoV :: String -> SDoc -> VM a
 traceNoV s d = pprTrace s d noV
 
+ensureV :: Bool -> VM ()
+ensureV False = noV
+ensureV True  = return ()
+
+onlyIfV :: Bool -> VM a -> VM a
+onlyIfV b p = ensureV b >> p
+
+traceEnsureV :: String -> SDoc -> Bool -> VM ()
+traceEnsureV s d False = traceNoV s d
+traceEnsureV s d True  = return ()
+
 tryV :: VM a -> VM (Maybe a)
 tryV (VM p) = VM $ \bi genv lenv ->
   do
@@ -301,10 +324,8 @@ setLEnv lenv = VM $ \_ genv _ -> return (Yes genv lenv ())
 updLEnv :: (LocalEnv -> LocalEnv) -> VM ()
 updLEnv f = VM $ \_ genv lenv -> return (Yes genv (f lenv) ())
 
-{-
 getInstEnv :: VM (InstEnv, InstEnv)
 getInstEnv = readGEnv global_inst_env
--}
 
 getFamInstEnv :: VM FamInstEnvs
 getFamInstEnv = readGEnv global_fam_inst_env
@@ -382,6 +403,9 @@ lookupVar v
                 . maybeCantVectoriseM "Variable not vectorised:" (ppr v)
                 . readGEnv $ \env -> lookupVarEnv (global_vars env) v
 
+globalScalars :: VM VarSet
+globalScalars = readGEnv global_scalars
+
 lookupTyCon :: TyCon -> VM (Maybe TyCon)
 lookupTyCon tc
   | isUnLiftedTyCon tc || isTupleTyCon tc = return (Just tc)
@@ -453,7 +477,6 @@ localTyVars = readLEnv (reverse . local_tyvars)
 -- instances head (i.e., no flexi vars); for details for what this means,
 -- see the docs at InstEnv.lookupInstEnv.
 --
-{-
 lookupInst :: Class -> [Type] -> VM (DFunId, [Type])
 lookupInst cls tys
   = do { instEnv <- getInstEnv
@@ -465,12 +488,12 @@ lookupInst cls tys
              where
                inst_tys'  = [ty | Right ty <- inst_tys]
                noFlexiVar = all isRight inst_tys
-	   _other         -> traceNoV "lookupInst" (ppr cls <+> ppr tys)
+	   _other         ->
+             pprPanic "VectMonad.lookupInst: not found " (ppr cls <+> ppr tys)
        }
   where
     isRight (Left  _) = False
     isRight (Right _) = True
--}
 
 -- Look up the representation tycon of a family instance.
 --
@@ -520,12 +543,14 @@ initV pkg hsc_env guts info p
         builtin_pas    <- initBuiltinPAs builtins
         builtin_prs    <- initBuiltinPRs builtins
         builtin_boxed  <- initBuiltinBoxedTyCons builtins
+        builtin_scalars <- initBuiltinScalars builtins
 
         eps <- liftIO $ hscEPS hsc_env
         let famInstEnvs = (eps_fam_inst_env eps, mg_fam_inst_env guts)
             instEnvs    = (eps_inst_env     eps, mg_inst_env     guts)
 
         let genv = extendImportedVarsEnv builtin_vars
+                 . extendScalars builtin_scalars
                  . extendTyConsEnv builtin_tycons
                  . extendDataConsEnv builtin_datacons
                  . extendPAFunsEnv builtin_pas

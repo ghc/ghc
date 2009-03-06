@@ -12,6 +12,7 @@ module VectUtils (
   prDFunOfTyCon,
   paDictArgType, paDictOfType, paDFunType,
   paMethod, mkPR, lengthPA, replicatePA, emptyPA, packPA, combinePA, liftPA,
+  zipScalars, scalarClosure,
   polyAbstract, polyApply, polyVApply,
   hoistBinding, hoistExpr, hoistPolyVExpr, takeHoisted,
   buildClosure, buildClosures,
@@ -269,6 +270,24 @@ liftPA x
   = do
       lc <- builtin liftingContext
       replicatePA (Var lc) x
+
+zipScalars :: [Type] -> Type -> VM CoreExpr
+zipScalars arg_tys res_ty
+  = do
+      scalar <- builtin scalarClass
+      (dfuns, _) <- mapAndUnzipM (\ty -> lookupInst scalar [ty]) ty_args
+      zipf <- builtin (scalarZip $ length arg_tys)
+      return $ Var zipf `mkTyApps` ty_args `mkApps` map Var dfuns
+    where
+      ty_args = arg_tys ++ [res_ty]
+
+scalarClosure :: [Type] -> Type -> CoreExpr -> CoreExpr -> VM CoreExpr
+scalarClosure arg_tys res_ty scalar_fun array_fun
+  = do
+      ctr <- builtin (closureCtrFun $ length arg_tys)
+      pas <- mapM paDictOfType (init arg_tys)
+      return $ Var ctr `mkTyApps` (arg_tys ++ [res_ty])
+                       `mkApps`   (pas ++ [scalar_fun, array_fun])
 
 newLocalVVar :: FastString -> Type -> VM VVar
 newLocalVVar fs vty
