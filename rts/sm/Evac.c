@@ -212,7 +212,7 @@ spin:
     SET_EVACUAEE_FOR_LDV(from, size_to_reserve);
     // fill the slop
     if (size_to_reserve - size_to_copy > 0)
-	LDV_FILL_SLOP(to + size_to_reserve, (int)(size_to_reserve - size_to_copy));
+	LDV_FILL_SLOP(to + size_to_copy, (int)(size_to_reserve - size_to_copy));
 #endif
 
     return rtsTrue;
