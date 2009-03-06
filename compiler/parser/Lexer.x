@@ -271,7 +271,7 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
 
   -- We ignore all these pragmas, but don't generate a warning for them
   -- CFILES is a hugs-only thing.
-  "{-#" $whitechar* (OPTIONS_(HUGS|hugs|NHC98|nhc98|JHC|jhc|YHC|yhc|CATCH|catch|DERIVE|derive)|CFILES|cfiles) / { notFollowedByPragmaChar }
+  "{-#" $whitechar* (OPTIONS_(HUGS|hugs|NHC98|nhc98|JHC|jhc|YHC|yhc|CATCH|catch|DERIVE|derive)|CFILES|cfiles|CONTRACT|contract) / { notFollowedByPragmaChar }
                     { nested_comment lexToken }
 
   -- ToDo: should only be valid inside a pragma:
