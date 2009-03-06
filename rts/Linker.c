@@ -692,6 +692,7 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(noDuplicatezh_fast)			\
       SymI_HasProto(atomicModifyMutVarzh_fast)		\
       SymI_HasProto(newPinnedByteArrayzh_fast)		\
+      SymI_HasProto(newAlignedPinnedByteArrayzh_fast)	\
       SymI_HasProto(newSpark)				\
       SymI_HasProto(orIntegerzh_fast)			\
       SymI_HasProto(performGC)				\

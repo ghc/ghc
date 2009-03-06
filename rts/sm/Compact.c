@@ -490,6 +490,10 @@ update_fwd_large( bdescr *bd )
 
   for (; bd != NULL; bd = bd->link) {
 
+    // nothing to do in a pinned block; it might not even have an object
+    // at the beginning.
+    if (bd->flags & BF_PINNED) continue;
+
     p = bd->start;
     info  = get_itbl((StgClosure *)p);
 

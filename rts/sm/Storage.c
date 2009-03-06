@@ -808,20 +808,15 @@ allocatePinned( lnat n )
     // If the request is for a large object, then allocate()
     // will give us a pinned object anyway.
     if (n >= LARGE_OBJECT_THRESHOLD/sizeof(W_)) {
-	return allocate(n);
+	p = allocate(n);
+        Bdescr(p)->flags |= BF_PINNED;
+        return p;
     }
 
     ACQUIRE_SM_LOCK;
     
     TICK_ALLOC_HEAP_NOCTR(n);
     CCS_ALLOC(CCCS,n);
-
-    // we always return 8-byte aligned memory.  bd->free must be
-    // 8-byte aligned to begin with, so we just round up n to
-    // the nearest multiple of 8 bytes.
-    if (sizeof(StgWord) == 4) {
-	n = (n+1) & ~1;
-    }
 
     // If we don't have a block of pinned objects yet, or the current
     // one isn't large enough to hold the new object, allocate a new one.

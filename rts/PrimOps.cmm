@@ -83,6 +83,9 @@ newByteArrayzh_fast
     RET_P(p);
 }
 
+#define BA_ALIGN 16
+#define BA_MASK  (BA_ALIGN-1)
+
 newPinnedByteArrayzh_fast
 {
     W_ words, payload_words, n, p;
@@ -91,24 +94,45 @@ newPinnedByteArrayzh_fast
     n = R1;
     payload_words = ROUNDUP_BYTES_TO_WDS(n);
 
-    // We want an 8-byte aligned array.  allocatePinned() gives us
-    // 8-byte aligned memory by default, but we want to align the
-    // *goods* inside the ArrWords object, so we have to check the
-    // size of the ArrWords header and adjust our size accordingly.
-    words = BYTES_TO_WDS(SIZEOF_StgArrWords) + payload_words;
-    if ((SIZEOF_StgArrWords & 7) != 0) {
-	words = words + 1;
-    }
+    words = payload_words + ((SIZEOF_StgArrWords + BA_MASK) & ~BA_MASK);
 
     ("ptr" p) = foreign "C" allocatePinned(words) [];
     TICK_ALLOC_PRIM(SIZEOF_StgArrWords,WDS(payload_words),0);
 
-    // Again, if the ArrWords header isn't a multiple of 8 bytes, we
-    // have to push the object forward one word so that the goods
-    // fall on an 8-byte boundary.
-    if ((SIZEOF_StgArrWords & 7) != 0) {
-	p = p + WDS(1);
+    // This bumps p forwards so that the payload falls on an R2-byte boundary.
+    p = p + ((-p - SIZEOF_StgArrWords) & BA_MASK);
+
+    SET_HDR(p, stg_ARR_WORDS_info, W_[CCCS]);
+    StgArrWords_words(p) = payload_words;
+    RET_P(p);
+}
+
+newAlignedPinnedByteArrayzh_fast
+{
+    W_ words, payload_words, n, p, mask;
+
+    MAYBE_GC(NO_PTRS,newAlignedPinnedByteArrayzh_fast);
+    n = R1;
+
+    if (R2 > SIZEOF_W) {
+        mask = R2 - 1;
+    } else {
+        mask = 0;
     }
+
+    payload_words = ROUNDUP_BYTES_TO_WDS(n);
+
+    // We want an <align>-byte aligned array.  allocatePinned() gives us
+    // 8-byte aligned memory by default, but we want to align the
+    // *goods* inside the ArrWords object, so we have to check the
+    // size of the ArrWords header and adjust our size accordingly.
+    words = payload_words + ((SIZEOF_StgArrWords + mask) & ~mask);
+
+    ("ptr" p) = foreign "C" allocatePinned(words) [];
+    TICK_ALLOC_PRIM(SIZEOF_StgArrWords,WDS(payload_words),0);
+
+    // This bumps p forwards so that the payload falls on an R2-byte boundary.
+    p = p + ((-p - SIZEOF_StgArrWords) & mask);
 
     SET_HDR(p, stg_ARR_WORDS_info, W_[CCCS]);
     StgArrWords_words(p) = payload_words;

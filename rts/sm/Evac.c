@@ -248,10 +248,6 @@ evacuate_large(StgPtr p)
   stp = bd->step;
   ACQUIRE_SPIN_LOCK(&stp->sync_large_objects);
 
-  // object must be at the beginning of the block (or be a ByteArray)
-  ASSERT(get_itbl((StgClosure *)p)->type == ARR_WORDS ||
-	 (((W_)p & BLOCK_MASK) == 0));
-
   // already evacuated? 
   if (bd->flags & BF_EVACUATED) { 
     /* Don't forget to set the gct->failed_to_evac flag if we didn't get
@@ -287,11 +283,23 @@ evacuate_large(StgPtr p)
   }
 
   ws = &gct->steps[new_stp->abs_no];
+
   bd->flags |= BF_EVACUATED;
   bd->step = new_stp;
   bd->gen_no = new_stp->gen_no;
-  bd->link = ws->todo_large_objects;
-  ws->todo_large_objects = bd;
+
+  // If this is a block of pinned objects, we don't have to scan
+  // these objects, because they aren't allowed to contain any
+  // pointers.  For these blocks, we skip the scavenge stage and put
+  // them straight on the scavenged_large_objects list.
+  if (bd->flags & BF_PINNED) {
+      ASSERT(get_itbl((StgClosure *)p)->type == ARR_WORDS);
+      dbl_link_onto(bd, &ws->step->scavenged_large_objects);
+      ws->step->n_scavenged_large_blocks += bd->blocks;
+  } else {
+      bd->link = ws->todo_large_objects;
+      ws->todo_large_objects = bd;
+  }
 
   RELEASE_SPIN_LOCK(&stp->sync_large_objects);
 }

@@ -814,6 +814,11 @@ primop  NewPinnedByteArrayOp_Char "newPinnedByteArray#" GenPrimOp
    {Create a mutable byte array that the GC guarantees not to move.}
    with out_of_line = True
 
+primop  NewAlignedPinnedByteArrayOp_Char "newAlignedPinnedByteArray#" GenPrimOp
+   Int# -> Int# -> State# s -> (# State# s, MutableByteArray# s #)
+   {Create a mutable byte array, aligned by the specified amount, that the GC guarantees not to move.}
+   with out_of_line = True
+
 primop  ByteArrayContents_Char "byteArrayContents#" GenPrimOp
    ByteArray# -> Addr#
    {Intended for use with pinned arrays; otherwise very unsafe!}
