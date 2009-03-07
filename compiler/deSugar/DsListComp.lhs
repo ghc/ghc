@@ -510,10 +510,32 @@ dsPArrComp :: [Stmt Id]
             -> DsM CoreExpr
 dsPArrComp [ParStmt qss] body _  =  -- parallel comprehension
   dePArrParComp qss body
+
+-- Special case for simple generators:
+--
+--  <<[:e' | p <- e, qs:]>> = <<[: e' | qs :]>> p e
+--
+-- if matching again p cannot fail, or else
+--
+--  <<[:e' | p <- e, qs:]>> = 
+--    <<[:e' | qs:]>> p (filterP (\x -> case x of {p -> True; _ -> False}) e)
+--
+dsPArrComp (BindStmt p e _ _ : qs) body _ = do
+    filterP <- dsLookupGlobalId filterPName
+    ce <- dsLExpr e
+    let ety'ce  = parrElemType ce
+        false   = Var falseDataConId
+        true    = Var trueDataConId
+    v <- newSysLocalDs ety'ce
+    pred <- matchSimply (Var v) (StmtCtxt PArrComp) p true false
+    let gen | isIrrefutableHsPat p = ce
+            | otherwise            = mkApps (Var filterP) [Type ety'ce, mkLams [v] pred, ce]
+    dePArrComp qs body p gen
+
 dsPArrComp qs            body _  = do -- no ParStmt in `qs'
     sglP <- dsLookupGlobalId singletonPName
     let unitArray = mkApps (Var sglP) [Type unitTy, mkCoreTup []]
-    dePArrComp qs body (mkLHsPatTup []) unitArray
+    dePArrComp qs body (noLoc $ WildPat unitTy) unitArray
 
 
 
