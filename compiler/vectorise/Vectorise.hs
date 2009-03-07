@@ -193,7 +193,7 @@ vectPolyExpr (_, AnnNote note expr)
 vectPolyExpr expr
   = polyAbstract tvs $ \abstract ->
     do
-      mono' <- vectExpr mono
+      mono' <- vectFnExpr False mono
       return $ mapVect abstract mono'
   where
     (tvs, mono) = collectAnnTypeBinders expr
@@ -263,13 +263,25 @@ vectExpr (_, AnnLet (AnnRec bs) body)
                       . inBind bndr
                       $ vectExpr rhs
 
-vectExpr e@(fvs, AnnLam bndr _)
-  | isId bndr = onlyIfV (isEmptyVarSet fvs) (vectScalarLam bs $ deAnnotate body)
-                `orElseV` vectLam fvs bs body
+vectExpr e@(_, AnnLam bndr _)
+  | isId bndr = vectFnExpr True e
+{-
+onlyIfV (isEmptyVarSet fvs) (vectScalarLam bs $ deAnnotate body)
+                `orElseV` vectLam True fvs bs body
   where
     (bs,body) = collectAnnValBinders e
+-}
 
 vectExpr e = cantVectorise "Can't vectorise expression" (ppr $ deAnnotate e)
+
+vectFnExpr :: Bool -> CoreExprWithFVs -> VM VExpr
+vectFnExpr inline e@(fvs, AnnLam bndr _)
+  | isId bndr = onlyIfV (isEmptyVarSet fvs) (vectScalarLam bs $ deAnnotate body)
+                `orElseV` vectLam inline fvs bs body
+  where
+    (bs,body) = collectAnnValBinders e
+vectFnExpr _ e = vectExpr e
+
 
 vectScalarLam :: [Var] -> CoreExpr -> VM VExpr
 vectScalarLam args body
@@ -302,8 +314,8 @@ vectScalarLam args body
     is_scalar vs (App e1 e2) = is_scalar vs e1 && is_scalar vs e2
     is_scalar _ _            = False
 
-vectLam :: VarSet -> [Var] -> CoreExprWithFVs -> VM VExpr
-vectLam fvs bs body
+vectLam :: Bool -> VarSet -> [Var] -> CoreExprWithFVs -> VM VExpr
+vectLam inline fvs bs body
   = do
       tyvars <- localTyVars
       (vs, vvs) <- readLEnv $ \env ->
@@ -319,7 +331,9 @@ vectLam fvs bs body
             lc <- builtin liftingContext
             (vbndrs, vbody) <- vectBndrsIn (vs ++ bs)
                                            (vectExpr body)
-            return $ vLams lc vbndrs vbody
+            return . maybe_inline $ vLams lc vbndrs vbody
+  where
+    maybe_inline = if inline then vInlineMe else id
 
 vectTyAppExpr :: CoreExprWithFVs -> [Type] -> VM VExpr
 vectTyAppExpr (_, AnnVar v) tys = vectPolyVar v tys

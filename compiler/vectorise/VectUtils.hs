@@ -394,12 +394,13 @@ buildClosures :: [TyVar] -> [VVar] -> [Type] -> Type -> VM VExpr -> VM VExpr
 buildClosures _   _    [] _ mk_body
   = mk_body
 buildClosures tvs vars [arg_ty] res_ty mk_body
-  = buildClosure tvs vars arg_ty res_ty mk_body
+  = liftM vInlineMe (buildClosure tvs vars arg_ty res_ty mk_body)
 buildClosures tvs vars (arg_ty : arg_tys) res_ty mk_body
   = do
       res_ty' <- mkClosureTypes arg_tys res_ty
       arg <- newLocalVVar (fsLit "x") arg_ty
-      buildClosure tvs vars arg_ty res_ty'
+      liftM vInlineMe
+        . buildClosure tvs vars arg_ty res_ty'
         . hoistPolyVExpr tvs
         $ do
             lc <- builtin liftingContext
@@ -424,7 +425,7 @@ buildClosure tvs vars arg_ty res_ty mk_body
               body  <- mk_body
               body' <- bind (vVar env_bndr)
                             (vVarApps lc body (vars ++ [arg_bndr]))
-              return (vLamsWithoutLC [env_bndr, arg_bndr] body')
+              return . vInlineMe $ vLamsWithoutLC [env_bndr, arg_bndr] body'
 
       mkClosure arg_ty res_ty env_ty fn env
 

@@ -8,12 +8,13 @@ module VectCore (
 
   vVar, vType, vNote, vLet,
   vLams, vLamsWithoutLC, vVarApps,
-  vCaseDEFAULT, vCaseProd
+  vCaseDEFAULT, vCaseProd, vInlineMe
 ) where
 
 #include "HsVersions.h"
 
 import CoreSyn
+import CoreUtils      ( mkInlineMe )
 import MkCore	      ( mkWildCase )
 import CoreUtils      ( exprType )
 import DataCon        ( DataCon )
@@ -90,3 +91,7 @@ vCaseProd (vscrut, lscrut) vty lty vdc ldc sh_bndrs bndrs
           [(DataAlt ldc, sh_bndrs ++ lbndrs, lbody)])
   where
     (vbndrs, lbndrs) = unzip bndrs
+
+vInlineMe :: VExpr -> VExpr
+vInlineMe (vexpr, lexpr) = (mkInlineMe vexpr, mkInlineMe lexpr)
+
