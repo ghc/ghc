@@ -2,7 +2,6 @@
 WERROR          = -Werror
 
 HADDOCK_DOCS    = YES
-HSCOLOUR_SRCS   = YES
 SRC_CC_OPTS     = $(WERROR)
 SRC_HC_OPTS     = $(WERROR) -H64m -O0 -fasm
 GhcStage1HcOpts = -O -fasm
