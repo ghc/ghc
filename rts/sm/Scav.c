@@ -1372,7 +1372,7 @@ scavenge_one(StgPtr p)
 	 * evacuated, so we perform that check here.
 	 */
 	StgClosure *q = ((StgInd *)p)->indirectee;
-	if (HEAP_ALLOCED(q) && Bdescr((StgPtr)q)->flags & BF_EVACUATED) {
+	if (HEAP_ALLOCED_GC(q) && Bdescr((StgPtr)q)->flags & BF_EVACUATED) {
 	    break;
 	}
 	evacuate(&((StgInd *)p)->indirectee);

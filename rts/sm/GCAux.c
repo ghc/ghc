@@ -48,7 +48,7 @@ isAlive(StgClosure *p)
     // Problem here is that we sometimes don't set the link field, eg.
     // for static closures with an empty SRT or CONSTR_STATIC_NOCAFs.
     //
-    if (!HEAP_ALLOCED(q)) {
+    if (!HEAP_ALLOCED_GC(q)) {
 	return p;
     }
 

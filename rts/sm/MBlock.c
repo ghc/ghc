@@ -17,13 +17,10 @@
 #include "Trace.h"
 #include "OSMem.h"
 
-lnat mblocks_allocated = 0;
+#include <string.h>
 
-void
-initMBlocks(void)
-{
-    osMemInit();
-}
+lnat mblocks_allocated = 0;
+lnat mpc_misses = 0;
 
 /* -----------------------------------------------------------------------------
    The MBlock Map: provides our implementation of HEAP_ALLOCED()
@@ -31,11 +28,20 @@ initMBlocks(void)
 
 #if SIZEOF_VOID_P == 4
 StgWord8 mblock_map[MBLOCK_MAP_SIZE]; // initially all zeros
+
+static void
+markHeapAlloced(void *p)
+{
+    mblock_map[MBLOCK_MAP_ENTRY(p)] = 1;
+}
+
 #elif SIZEOF_VOID_P == 8
-static MBlockMap dummy_mblock_map;
-MBlockMap *mblock_cache = &dummy_mblock_map;
-nat mblock_map_count = 0;
+
 MBlockMap **mblock_maps = NULL;
+
+nat mblock_map_count = 0;
+
+MbcCacheLine mblock_cache[MBC_ENTRIES];
 
 static MBlockMap *
 findMBlockMap(void *p)
@@ -52,39 +58,56 @@ findMBlockMap(void *p)
     return NULL;
 }
 
-StgBool
-slowIsHeapAlloced(void *p)
+StgBool HEAP_ALLOCED_miss(StgWord mblock, void *p)
 {
-    MBlockMap *map = findMBlockMap(p);
-    if(map)
+    MBlockMap *map;
+    MBlockMapLine value;
+    nat entry_no;
+    
+    entry_no = mblock & (MBC_ENTRIES-1);
+
+    map = findMBlockMap(p);
+    if (map)
     {
-    	mblock_cache = map;
-	return map->mblocks[MBLOCK_MAP_ENTRY(p)];
+        mpc_misses++;
+        value = map->lines[MBLOCK_MAP_LINE(p)];
+        mblock_cache[entry_no] = (mblock<<1) | value;
+        return value;
     }
     else
-    	return 0;
+    {
+        mblock_cache[entry_no] = (mblock<<1);
+        return 0;
+    }
 }
-#endif
 
 static void
 markHeapAlloced(void *p)
 {
-#if SIZEOF_VOID_P == 4
-    mblock_map[MBLOCK_MAP_ENTRY(p)] = 1;
-#elif SIZEOF_VOID_P == 8
     MBlockMap *map = findMBlockMap(p);
     if(map == NULL)
     {
     	mblock_map_count++;
     	mblock_maps = realloc(mblock_maps,
 			      sizeof(MBlockMap*) * mblock_map_count);
-	map = mblock_maps[mblock_map_count-1] = calloc(1,sizeof(MBlockMap));
+	map = mblock_maps[mblock_map_count-1] = 
+            stgMallocBytes(sizeof(MBlockMap),"markHeapAlloced");
+        memset(map,0,sizeof(MBlockMap));
 	map->addrHigh32 = (StgWord32) (((StgWord)p) >> 32);
     }
-    map->mblocks[MBLOCK_MAP_ENTRY(p)] = 1;
-    mblock_cache = map;
-#endif
+
+    map->lines[MBLOCK_MAP_LINE(p)] = 1;
+
+    {
+        StgWord mblock;
+        nat entry_no;
+        
+        mblock   = (StgWord)p >> MBLOCK_SHIFT;
+        entry_no = mblock & (MBC_ENTRIES-1);
+        mblock_cache[entry_no] = (mblock << 1) + 1;
+    }
 }
+#endif
 
 /* ----------------------------------------------------------------------------
    Debugging code for traversing the allocated MBlocks
@@ -125,47 +148,59 @@ void * getNextMBlock(void *mblock)
 
 #elif SIZEOF_VOID_P == 8
 
-STATIC_INLINE
-void * mapEntryToMBlock(MBlockMap *map, nat i)
-{
-    return (void *)(((StgWord)map->addrHigh32) << 32) + 
-        ((StgWord)i << MBLOCK_SHIFT);
-}
-
-void * getFirstMBlock(void)
+void * getNextMBlock(void *p)
 {
     MBlockMap *map;
-    nat i, j;
+    nat off, j;
+    nat line_no;
+    MBlockMapLine line;
 
     for (j = 0; j < mblock_map_count; j++)  {
         map = mblock_maps[j];
-        for (i = 0; i < MBLOCK_MAP_SIZE; i++) {
-            if (map->mblocks[i]) return mapEntryToMBlock(map,i);
-        }
-    }
-    return NULL;
-}
-
-void * getNextMBlock(void *mblock)
-{
-    MBlockMap *map;
-    nat i, j;
-
-    for (j = 0; j < mblock_map_count; j++)  {
-        map = mblock_maps[j];
-        if (map->addrHigh32 == (StgWord)mblock >> 32) break;
+        if (map->addrHigh32 == (StgWord)p >> 32) break;
     }
     if (j == mblock_map_count) return NULL;
 
     for (; j < mblock_map_count; j++) {
         map = mblock_maps[j];
-        if (map->addrHigh32 == (StgWord)mblock >> 32) {
-            i = MBLOCK_MAP_ENTRY(mblock) + 1;
+        if (map->addrHigh32 == (StgWord)p >> 32) {
+            line_no = MBLOCK_MAP_LINE(p);
+            off  = (((StgWord)p >> MBLOCK_SHIFT) & (MBC_LINE_SIZE-1)) + 1;
+            // + 1 because we want the *next* mblock
         } else {
-            i = 0;
+            line_no = 0; off = 0;
         }
-        for (; i < MBLOCK_MAP_SIZE; i++) {
-            if (map->mblocks[i]) return mapEntryToMBlock(map,i);
+        for (; line_no < MBLOCK_MAP_ENTRIES; line_no++) {
+            line = map->lines[line_no];
+            for (; off < MBC_LINE_SIZE; off++) {
+                if (line & (1<<off)) {
+                    return (void*)(((StgWord)map->addrHigh32 << 32) + 
+                                   line_no * MBC_LINE_SIZE * MBLOCK_SIZE +
+                                   off * MBLOCK_SIZE);
+                }
+            }
+            off = 0;
+        }
+    }
+    return NULL;
+}
+
+void * getFirstMBlock(void)
+{
+    MBlockMap *map = mblock_maps[0];
+    nat line_no, off;
+    MbcCacheLine line;
+
+    for (line_no = 0; line_no < MBLOCK_MAP_ENTRIES; line_no++) {
+        line = map->lines[line_no];
+        if (line) {
+            for (off = 0; off < MBC_LINE_SIZE; off++) {
+                if (line & (1<<off)) {
+                    return (void*)(((StgWord)map->addrHigh32 << 32) + 
+                                   line_no * MBC_LINE_SIZE * MBLOCK_SIZE +
+                                   off * MBLOCK_SIZE);
+                }
+            }
         }
     }
     return NULL;
@@ -212,4 +247,13 @@ void
 freeAllMBlocks(void)
 {
     osFreeAllMBlocks();
+}
+
+void
+initMBlocks(void)
+{
+    osMemInit();
+#if SIZEOF_VOID_P == 8
+    memset(mblock_cache,0xff,sizeof(mblock_cache));
+#endif
 }

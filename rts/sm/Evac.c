@@ -29,6 +29,7 @@ StgWord64 whitehole_spin = 0;
 
 #if defined(THREADED_RTS) && !defined(PARALLEL_GC)
 #define evacuate(p) evacuate1(p)
+#define HEAP_ALLOCED_GC(p) HEAP_ALLOCED(p)
 #endif
 
 #if !defined(PARALLEL_GC)
@@ -364,7 +365,7 @@ loop:
 
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(q));
 
-  if (!HEAP_ALLOCED(q)) {
+  if (!HEAP_ALLOCED_GC(q)) {
 
       if (!major_gc) return;
 
@@ -780,7 +781,7 @@ unchain_thunk_selectors(StgSelector *p, StgClosure *val)
         // invoke eval_thunk_selector(), the recursive calls will not 
         // evacuate the value (because we want to select on the value,
         // not evacuate it), so in this case val is in from-space.
-        // ASSERT(!HEAP_ALLOCED(val) || Bdescr((P_)val)->gen_no > N || (Bdescr((P_)val)->flags & BF_EVACUATED));
+        // ASSERT(!HEAP_ALLOCED_GC(val) || Bdescr((P_)val)->gen_no > N || (Bdescr((P_)val)->flags & BF_EVACUATED));
 
         prev = (StgSelector*)((StgClosure *)p)->payload[0];
 
@@ -834,7 +835,7 @@ eval_thunk_selector (StgClosure **q, StgSelector * p, rtsBool evac)
 selector_chain:
 
     bd = Bdescr((StgPtr)p);
-    if (HEAP_ALLOCED(p)) {
+    if (HEAP_ALLOCED_GC(p)) {
         // If the THUNK_SELECTOR is in to-space or in a generation that we
         // are not collecting, then bale out early.  We won't be able to
         // save any space in any case, and updating with an indirection is
