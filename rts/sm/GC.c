@@ -146,7 +146,6 @@ static nat  inc_running             (void);
 static nat  dec_running             (void);
 static void wakeup_gc_threads       (nat n_threads, nat me);
 static void shutdown_gc_threads     (nat n_threads, nat me);
-static void continue_gc_threads     (nat n_threads, nat me);
 
 #if 0 && defined(DEBUG)
 static void gcCAFs                  (void);
@@ -787,8 +786,6 @@ GarbageCollect (rtsBool force_major_gc,
   }
 #endif
 
-  continue_gc_threads(n_gc_threads, gct->thread_index);
-
   RELEASE_SM_LOCK;
 
   gct = saved_gct;
@@ -1144,14 +1141,17 @@ shutdown_gc_threads (nat n_threads USED_IF_THREADS, nat me USED_IF_THREADS)
 #endif
 }
 
-static void
-continue_gc_threads (nat n_threads USED_IF_THREADS, nat me USED_IF_THREADS)
+void
+releaseGCThreads (Capability *cap USED_IF_THREADS)
 {
 #if defined(THREADED_RTS)
+    nat n_threads = RtsFlags.ParFlags.nNodes;
+    nat me = cap->no;
     nat i;
     for (i=0; i < n_threads; i++) {
         if (i == me) continue;
-        if (gc_threads[i]->wakeup != GC_THREAD_WAITING_TO_CONTINUE) barf("continue_gc_threads");
+        if (gc_threads[i]->wakeup != GC_THREAD_WAITING_TO_CONTINUE) 
+            barf("releaseGCThreads");
         
         gc_threads[i]->wakeup = GC_THREAD_INACTIVE;
         ACQUIRE_SPIN_LOCK(&gc_threads[i]->gc_spin);

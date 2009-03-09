@@ -43,6 +43,7 @@ extern StgWord64 whitehole_spin;
 void gcWorkerThread (Capability *cap);
 void initGcThreads (void);
 void waitForGcThreads (Capability *cap);
+void releaseGCThreads (Capability *cap);
 
 #define WORK_UNIT_WORDS 128
 

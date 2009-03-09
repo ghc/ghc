@@ -1606,21 +1606,6 @@ delete_threads_and_gc:
     
     heap_census = scheduleNeedHeapProfile(rtsTrue);
 
-    if (recent_activity == ACTIVITY_INACTIVE && force_major)
-    {
-        // We are doing a GC because the system has been idle for a
-        // timeslice and we need to check for deadlock.  Record the
-        // fact that we've done a GC and turn off the timer signal;
-        // it will get re-enabled if we run any threads after the GC.
-        //
-        // Note: this is done before GC, because after GC there might
-        // be threads already running (GarbageCollect() releases the
-        // GC threads when it completes), so we risk turning off the
-        // timer signal when it should really be on.
-        recent_activity = ACTIVITY_DONE_GC;
-        stopTimer();
-    }
-
 #if defined(THREADED_RTS)
     debugTrace(DEBUG_sched, "doing GC");
     // reset waiting_for_gc *before* GC, so that when the GC threads
@@ -1629,6 +1614,30 @@ delete_threads_and_gc:
     GarbageCollect(force_major || heap_census, gc_type, cap);
 #else
     GarbageCollect(force_major || heap_census, 0, cap);
+#endif
+
+    if (recent_activity == ACTIVITY_INACTIVE && force_major)
+    {
+        // We are doing a GC because the system has been idle for a
+        // timeslice and we need to check for deadlock.  Record the
+        // fact that we've done a GC and turn off the timer signal;
+        // it will get re-enabled if we run any threads after the GC.
+        recent_activity = ACTIVITY_DONE_GC;
+        stopTimer();
+    }
+    else
+    {
+        // the GC might have taken long enough for the timer to set
+        // recent_activity = ACTIVITY_INACTIVE, but we aren't
+        // necessarily deadlocked:
+        recent_activity = ACTIVITY_YES;
+    }
+
+#if defined(THREADED_RTS)
+    if (gc_type == PENDING_GC_PAR)
+    {
+        releaseGCThreads(cap);
+    }
 #endif
 
     if (heap_census) {
