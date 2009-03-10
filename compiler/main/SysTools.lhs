@@ -222,7 +222,7 @@ initSysTools mbMinusB dflags0
               -- gcc can cope
               --      (see comments with declarations of global variables)
               gcc_b_arg = Option ("-B" ++ installed "gcc-lib/")
-              gcc_mingw_include_arg = Option ("-I" ++ installed "include/mingw/")
+              gcc_mingw_include_arg = Option ("-I" ++ installed "include/mingw")
               (gcc_prog,gcc_args)
                 | isWindowsHost && am_installed
                     -- We tell gcc where its specs file + exes are (-B)
