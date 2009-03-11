@@ -57,3 +57,4 @@ test('1914',
      ['1914.script'])
 
 test('2976', normal, ghci_script, ['2976.script'])
+test('2816', normal, ghci_script, ['2816.script'])
