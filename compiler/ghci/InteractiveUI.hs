@@ -1215,14 +1215,20 @@ typeOfExpr str
        ty <- GHC.exprType str
        dflags <- getDynFlags
        let pefas = dopt Opt_PrintExplicitForalls dflags
-       printForUser $ sep [text str, nest 2 (dcolon <+> pprTypeForUser pefas ty)]
+       printForUser $ sep [utext str, nest 2 (dcolon <+> pprTypeForUser pefas ty)]
 
 kindOfType :: String -> GHCi ()
 kindOfType str 
   = handleSourceError (\e -> GHC.printExceptionAndWarnings e) $ do
        ty <- GHC.typeKind str
-       printForUser $ text str <+> dcolon <+> ppr ty
+       printForUser $ utext str <+> dcolon <+> ppr ty
           
+-- HACK for printing unicode text.  We assume the output device
+-- understands UTF-8, and go via FastString which converts to UTF-8.
+-- ToDo: fix properly when we have encoding support in Handles.
+utext :: String -> SDoc
+utext str = ftext (mkFastString str)
+
 quit :: String -> GHCi Bool
 quit _ = return True
 
