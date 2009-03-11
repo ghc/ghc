@@ -45,14 +45,11 @@ awaitEvent(rtsBool wait)
         return;
     }
 
-    if (!ret) { 
-      return; /* still hold the lock */
-    }
-
-    // Return to the scheduler if:
+    // The return value from awaitRequests() is a red herring: ignore
+    // it.  Return to the scheduler if !wait, or
     //
     //  - we were interrupted
-    //  - new threads have arrived
+    //  - the run-queue is now non- empty
 
   } while (wait
 	   && sched_state == SCHED_RUNNING
