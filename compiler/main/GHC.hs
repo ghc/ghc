@@ -289,8 +289,6 @@ import Annotations
 import Module
 import LazyUniqFM
 import qualified UniqFM as UFM
-import UniqSet
-import Unique
 import FiniteMap
 import Panic
 import Digraph
@@ -2376,14 +2374,10 @@ getBindings = withSession $ \hsc_env ->
    -- we have to implement the shadowing behaviour of ic_tmp_ids here
    -- (see InteractiveContext) and the quickest way is to use an OccEnv.
    let 
-       tmp_ids = ic_tmp_ids (hsc_IC hsc_env)
-       filtered = foldr f (const []) tmp_ids emptyUniqSet
-       f id rest set 
-           | uniq `elementOfUniqSet` set = rest set
-           | otherwise  = AnId id : rest (addOneToUniqSet set uniq)
-           where uniq = getUnique (nameOccName (idName id))
+       occ_env = mkOccEnv [ (nameOccName (idName id), AnId id) 
+                          | id <- ic_tmp_ids (hsc_IC hsc_env) ]
    in
-   return filtered
+   return (occEnvElts occ_env)
 
 getPrintUnqual :: GhcMonad m => m PrintUnqualified
 getPrintUnqual = withSession $ \hsc_env ->
