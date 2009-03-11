@@ -88,18 +88,26 @@ newByteArrayzh_fast
 
 newPinnedByteArrayzh_fast
 {
-    W_ words, payload_words, n, p;
+    W_ words, bytes, payload_words, p;
 
     MAYBE_GC(NO_PTRS,newPinnedByteArrayzh_fast);
-    n = R1;
-    payload_words = ROUNDUP_BYTES_TO_WDS(n);
-
-    words = payload_words + ((SIZEOF_StgArrWords + BA_MASK) & ~BA_MASK);
+    bytes = R1;
+    /* payload_words is what we will tell the profiler we had to allocate */
+    payload_words = ROUNDUP_BYTES_TO_WDS(bytes);
+    /* When we actually allocate memory, we need to allow space for the
+       header: */
+    bytes = bytes + SIZEOF_StgArrWords;
+    /* And we want to align to BA_ALIGN bytes, so we need to allow space
+       to shift up to BA_ALIGN - 1 bytes: */
+    bytes = bytes + BA_ALIGN - 1;
+    /* Now we convert to a number of words: */
+    words = ROUNDUP_BYTES_TO_WDS(bytes);
 
     ("ptr" p) = foreign "C" allocatePinned(words) [];
     TICK_ALLOC_PRIM(SIZEOF_StgArrWords,WDS(payload_words),0);
 
-    // This bumps p forwards so that the payload falls on an R2-byte boundary.
+    /* Now we need to move p forward so that the payload is aligned
+       to BA_ALIGN bytes: */
     p = p + ((-p - SIZEOF_StgArrWords) & BA_MASK);
 
     SET_HDR(p, stg_ARR_WORDS_info, W_[CCCS]);
@@ -109,30 +117,31 @@ newPinnedByteArrayzh_fast
 
 newAlignedPinnedByteArrayzh_fast
 {
-    W_ words, payload_words, n, p, mask;
+    W_ words, bytes, payload_words, p, alignment;
 
     MAYBE_GC(NO_PTRS,newAlignedPinnedByteArrayzh_fast);
-    n = R1;
+    bytes = R1;
+    alignment = R2;
 
-    if (R2 > SIZEOF_W) {
-        mask = R2 - 1;
-    } else {
-        mask = 0;
-    }
+    /* payload_words is what we will tell the profiler we had to allocate */
+    payload_words = ROUNDUP_BYTES_TO_WDS(bytes);
 
-    payload_words = ROUNDUP_BYTES_TO_WDS(n);
-
-    // We want an <align>-byte aligned array.  allocatePinned() gives us
-    // 8-byte aligned memory by default, but we want to align the
-    // *goods* inside the ArrWords object, so we have to check the
-    // size of the ArrWords header and adjust our size accordingly.
-    words = payload_words + ((SIZEOF_StgArrWords + mask) & ~mask);
+    /* When we actually allocate memory, we need to allow space for the
+       header: */
+    bytes = bytes + SIZEOF_StgArrWords;
+    /* And we want to align to <alignment> bytes, so we need to allow space
+       to shift up to <alignment - 1> bytes: */
+    bytes = bytes + alignment - 1;
+    /* Now we convert to a number of words: */
+    words = ROUNDUP_BYTES_TO_WDS(bytes);
 
     ("ptr" p) = foreign "C" allocatePinned(words) [];
     TICK_ALLOC_PRIM(SIZEOF_StgArrWords,WDS(payload_words),0);
 
-    // This bumps p forwards so that the payload falls on an R2-byte boundary.
-    p = p + ((-p - SIZEOF_StgArrWords) & mask);
+    /* Now we need to move p forward so that the payload is aligned
+       to <alignment> bytes. Note that we are assuming that
+       <alignment> is a power of 2, which is technically not guaranteed */
+    p = p + ((-p - SIZEOF_StgArrWords) & (alignment - 1));
 
     SET_HDR(p, stg_ARR_WORDS_info, W_[CCCS]);
     StgArrWords_words(p) = payload_words;
