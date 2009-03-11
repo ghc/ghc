@@ -955,7 +955,8 @@ service_loop wakeup old_delays = do
 
 service_cont :: HANDLE -> [DelayReq] -> IO ()
 service_cont wakeup delays = do
-  atomicModifyIORef prodding (\_ -> (False,False))
+  r <- atomicModifyIORef prodding (\_ -> (False,False))
+  r `seq` return () -- avoid space leak
   service_loop wakeup delays
 
 -- must agree with rts/win32/ThrIOManager.c
