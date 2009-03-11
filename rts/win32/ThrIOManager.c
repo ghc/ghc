@@ -34,7 +34,7 @@ getIOManagerEvent (void)
         hRes = CreateEvent ( NULL, // no security attrs
                              TRUE, // manual reset
                              FALSE, // initial state,
-                             "IO Manager Event" );
+                             NULL ); // event name: NULL for private events
         if (hRes == NULL) {
             sysErrorBelch("getIOManagerEvent");
             stg_exit(EXIT_FAILURE);
