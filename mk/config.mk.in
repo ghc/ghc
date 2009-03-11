@@ -441,14 +441,19 @@ PackageSourceURL = http://darcs.haskell.org/packages/$(PACKAGE)/%{FILE}
 #		system needs to do other special magic if you are
 #		doing object-file splitting
 
+ArchSupportsSplitObjs=$(strip $(if $(filter $(TargetArch_CPP),i386 x86_64 powerpc sparc),YES,NO))
+
 # lazy test, so that $(GhcUnregisterised) can be set in build.mk
-SplitObjs=$(strip $(if $(filter $(TargetArch_CPP),i386 x86_64 powerpc sparc),\
-	            $(if $(filter YES,$(BootingFromHC)),\
-		      NO,\
-	              $(if $(filter NO,$(GhcUnregisterised)),\
-			YES,\
-			NO)),\
-		    NO))
+SupportsSplitObjs=$(strip $(if $(filter YES,$(ArchSupportsSplitObjs)),\
+	            $(if $(filter NO,$(BootingFromHc)),\
+		      $(if $(filter NO,$(GhcUnregisterised)),\
+	                YES,\
+			NO),\
+                      NO),\
+                    NO))
+
+# By default, enable SplitObjs for the libraries if this build supports it
+SplitObjs=$(SupportsSplitObjs)
 
 # Math library
 LIBM=@LIBM@

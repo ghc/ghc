@@ -246,7 +246,7 @@ $(CONFIG_HS) : $(FPTOOLS_TOP)/mk/config.mk
 	@echo "cHscIfaceFileVersion  :: String" >> $(CONFIG_HS)
 	@echo "cHscIfaceFileVersion  = \"$(HscIfaceFileVersion)\"" >> $(CONFIG_HS)
 	@echo "cSplitObjs            :: String" >> $(CONFIG_HS)
-	@echo "cSplitObjs            = \"$(SplitObjs)\"" >> $(CONFIG_HS)
+	@echo "cSplitObjs            = \"$(SupportsSplitObjs)\"" >> $(CONFIG_HS)
 	@echo "cGhcWithInterpreter   :: String" >> $(CONFIG_HS)
 	@echo "cGhcWithInterpreter   = \"$(GhcWithInterpreter)\"" >> $(CONFIG_HS)
 	@echo "cGhcWithNativeCodeGen :: String" >> $(CONFIG_HS)
