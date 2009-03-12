@@ -23,8 +23,7 @@ import FastString
 import HsSyn		( ImportDecl(..), HsModule(..) )
 import Module		( ModuleName, moduleName )
 import PrelNames        ( gHC_PRIM, mAIN_NAME )
-import StringBuffer	( StringBuffer(..), hGetStringBufferBlock
-                        , appendStringBuffers )
+import StringBuffer
 import SrcLoc
 import DynFlags
 import ErrUtils
@@ -38,6 +37,7 @@ import MonadUtils       ( MonadIO )
 import Exception
 import Control.Monad
 import System.IO
+import System.IO.Unsafe
 import Data.List
 
 ------------------------------------------------------------------------------
@@ -93,21 +93,57 @@ getOptionsFromFile dflags filename
     = Exception.bracket
 	      (openBinaryFile filename ReadMode)
               (hClose)
-              (\handle ->
-                   do buf <- hGetStringBufferBlock handle blockSize
-                      loop handle buf)
-    where blockSize = 1024
-          loop handle buf
-              | len buf == 0 = return []
-              | otherwise
-              = case getOptions' dflags buf filename of
-                  (Nothing, opts) -> return opts
-                  (Just buf', opts) -> do nextBlock <- hGetStringBufferBlock handle blockSize
-                                          newBuf <- appendStringBuffers buf' nextBlock
-                                          if len newBuf == len buf
-                                             then return opts
-                                             else do opts' <- loop handle newBuf
-                                                     return (opts++opts')
+              (\handle -> do
+                  opts <- fmap getOptions' $ lazyGetToks dflags filename handle
+                  seqList opts $ return opts)
+
+blockSize :: Int
+-- blockSize = 17 -- for testing :-)
+blockSize = 1024
+
+lazyGetToks :: DynFlags -> FilePath -> Handle -> IO [Located Token]
+lazyGetToks dflags filename handle = do
+  buf <- hGetStringBufferBlock handle blockSize
+  unsafeInterleaveIO $ lazyLexBuf handle (pragState dflags buf loc) False
+ where
+  loc  = mkSrcLoc (mkFastString filename) 1 0
+
+  lazyLexBuf :: Handle -> PState -> Bool -> IO [Located Token]
+  lazyLexBuf handle state eof = do
+    case unP (lexer return) state of
+      POk state' t -> do
+        -- pprTrace "lazyLexBuf" (text (show (buffer state'))) (return ())
+        if atEnd (buffer state') && not eof
+           -- if this token reached the end of the buffer, and we haven't
+           -- necessarily read up to the end of the file, then the token might
+           -- be truncated, so read some more of the file and lex it again.
+           then getMore handle state
+           else case t of
+                  L _ ITeof -> return [t]
+                  _other    -> do rest <- lazyLexBuf handle state' eof
+                                  return (t : rest)
+      _ | not eof   -> getMore handle state
+        | otherwise -> return []
+  
+  getMore :: Handle -> PState -> IO [Located Token]
+  getMore handle state = do
+     -- pprTrace "getMore" (text (show (buffer state))) (return ())
+     nextbuf <- hGetStringBufferBlock handle blockSize
+     if (len nextbuf == 0) then lazyLexBuf handle state True else do
+     newbuf <- appendStringBuffers (buffer state) nextbuf
+     unsafeInterleaveIO $ lazyLexBuf handle state{buffer=newbuf} False
+
+
+getToks :: DynFlags -> FilePath -> StringBuffer -> [Located Token]
+getToks dflags filename buf = lexAll (pragState dflags buf loc)
+ where
+  loc  = mkSrcLoc (mkFastString filename) 1 0
+
+  lexAll state = case unP (lexer return) state of
+                   POk _      t@(L _ ITeof) -> [t]
+                   POk state' t -> t : lexAll state'
+                   _ -> [L (last_loc state) ITeof]
+
 
 -- | Parse OPTIONS and LANGUAGE pragmas of the source file.
 --
@@ -117,76 +153,54 @@ getOptions :: DynFlags
            -> FilePath     -- ^ Source filename.  Used for location info.
            -> [Located String] -- ^ Parsed options.
 getOptions dflags buf filename
-    = case getOptions' dflags buf filename of
-        (_,opts) -> opts
+    = getOptions' (getToks dflags filename buf)
 
 -- The token parser is written manually because Happy can't
 -- return a partial result when it encounters a lexer error.
 -- We want to extract options before the buffer is passed through
 -- CPP, so we can't use the same trick as 'getImports'.
-getOptions' :: DynFlags
-            -> StringBuffer         -- Input buffer
-            -> FilePath             -- Source file. Used for msgs only.
-            -> ( Maybe StringBuffer -- Just => we can use more input
-               , [Located String]   -- Options.
-               )
-getOptions' dflags buf filename
-    = parseToks (lexAll (pragState dflags buf loc))
-    where loc  = mkSrcLoc (mkFastString filename) 1 0
-
-          getToken (_buf,L _loc tok) = tok
-          getLoc (_buf,L loc _tok) = loc
-          getBuf (buf,_tok) = buf
-          combine opts (flag, opts') = (flag, opts++opts')
-          add opt (flag, opts) = (flag, opt:opts)
+getOptions' :: [Located Token]      -- Input buffer
+            -> [Located String]     -- Options.
+getOptions' toks
+    = parseToks toks
+    where 
+          getToken (L _loc tok) = tok
+          getLoc (L loc _tok) = loc
 
           parseToks (open:close:xs)
               | IToptions_prag str <- getToken open
               , ITclose_prag       <- getToken close
-              = map (L (getLoc open)) (words str) `combine`
+              = map (L (getLoc open)) (words str) ++
                 parseToks xs
           parseToks (open:close:xs)
               | ITinclude_prag str <- getToken open
               , ITclose_prag       <- getToken close
-              = map (L (getLoc open)) ["-#include",removeSpaces str] `combine`
+              = map (L (getLoc open)) ["-#include",removeSpaces str] ++
                 parseToks xs
           parseToks (open:close:xs)
               | ITdocOptions str <- getToken open
               , ITclose_prag     <- getToken close
               = map (L (getLoc open)) ["-haddock-opts", removeSpaces str]
-                `combine` parseToks xs
+                ++ parseToks xs
           parseToks (open:xs)
               | ITdocOptionsOld str <- getToken open
               = map (L (getLoc open)) ["-haddock-opts", removeSpaces str]
-                `combine` parseToks xs
+                ++ parseToks xs
           parseToks (open:xs)
               | ITlanguage_prag <- getToken open
               = parseLanguage xs
-          -- The last token before EOF could have been truncated.
-          -- We ignore it to be on the safe side.
-          parseToks [tok,eof]
-              | ITeof <- getToken eof
-              = (Just (getBuf tok),[])
-          parseToks (eof:_)
-              | ITeof <- getToken eof
-              = (Just (getBuf eof),[])
-          parseToks _ = (Nothing,[])
-          parseLanguage ((_buf,L loc (ITconid fs)):rest)
-              = checkExtension (L loc fs) `add`
+          parseToks _ = []
+          parseLanguage (L loc (ITconid fs):rest)
+              = checkExtension (L loc fs) :
                 case rest of
-                  (_,L _loc ITcomma):more -> parseLanguage more
-                  (_,L _loc ITclose_prag):more -> parseToks more
-                  (_,L loc _):_ -> languagePragParseError loc
+                  (L _loc ITcomma):more -> parseLanguage more
+                  (L _loc ITclose_prag):more -> parseToks more
+                  (L loc _):_ -> languagePragParseError loc
                   [] -> panic "getOptions'.parseLanguage(1) went past eof token"
           parseLanguage (tok:_)
               = languagePragParseError (getLoc tok)
           parseLanguage []
               = panic "getOptions'.parseLanguage(2) went past eof token"
-          lexToken t = return t
-          lexAll state = case unP (lexer lexToken) state of
-                           POk _      t@(L _ ITeof) -> [(buffer state,t)]
-                           POk state' t -> (buffer state,t):lexAll state'
-                           _ -> [(buffer state,L (last_loc state) ITeof)]
 
 -----------------------------------------------------------------------------
 
