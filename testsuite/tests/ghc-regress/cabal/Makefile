@@ -131,6 +131,10 @@ LOCAL_GHC_PKG1750 = $(GHC_PKG) -f $(PKGCONF1750)
 COPY_PACKAGE_CONF = package.conf.copy
 GHC_PKG_COPY = $(GHC_PKG) --global-conf=$(COPY_PACKAGE_CONF)
 
+# Hack: the testsuite is separate from the build tree now, we don't
+# have a good way to do this.
+INPLACE_DATA_DIR = $(TOP)/../inplace-datadir
+
 ghcpkg02:
 	cp $(INPLACE_DATA_DIR)/package.conf $(COPY_PACKAGE_CONF)
 	set -e; \
