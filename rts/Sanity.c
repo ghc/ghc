@@ -633,10 +633,12 @@ checkHeapChunk(StgPtr start, StgPtr end)
 #endif
 
 void
-checkChain(bdescr *bd)
+checkLargeObjects(bdescr *bd)
 {
   while (bd != NULL) {
-    checkClosure((StgClosure *)bd->start);
+    if (!(bd->flags & BF_PINNED)) {
+      checkClosure((StgClosure *)bd->start);
+    }
     bd = bd->link;
   }
 }

@@ -20,7 +20,7 @@
 /* debugging routines */
 extern void checkHeap      ( bdescr *bd );
 extern void checkHeapChunk ( StgPtr start, StgPtr end );
-extern void checkChain     ( bdescr *bd );
+extern void checkLargeObjects ( bdescr *bd );
 extern void checkTSO       ( StgTSO* tso );
 extern void checkGlobalTSOList ( rtsBool checkTSOs );
 extern void checkStaticObjects ( StgClosure* static_objects );

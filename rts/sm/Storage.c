@@ -1466,7 +1466,7 @@ checkSanity( void )
 
     if (RtsFlags.GcFlags.generations == 1) {
 	checkHeap(g0s0->blocks);
-	checkChain(g0s0->large_objects);
+	checkLargeObjects(g0s0->large_objects);
     } else {
 	
 	for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
@@ -1477,7 +1477,7 @@ checkSanity( void )
 		ASSERT(countBlocks(generations[g].steps[s].large_objects)
 		       == generations[g].steps[s].n_large_blocks);
 		checkHeap(generations[g].steps[s].blocks);
-		checkChain(generations[g].steps[s].large_objects);
+		checkLargeObjects(generations[g].steps[s].large_objects);
 	    }
 	}
 
