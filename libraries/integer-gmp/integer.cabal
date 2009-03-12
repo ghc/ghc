@@ -22,5 +22,5 @@ Library {
                 ForeignFunctionInterface, UnliftedFFITypes
     -- We need to set the package name to integer (without a version number)
     -- as it's magic.
-    ghc-options: -package-name integer -Wall -Werror
+    ghc-options: -package-name integer
 }
