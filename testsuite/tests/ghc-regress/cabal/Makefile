@@ -133,6 +133,7 @@ GHC_PKG_COPY = $(GHC_PKG) --global-conf=$(COPY_PACKAGE_CONF)
 
 ghcpkg02:
 	cp $(INPLACE_DATA_DIR)/package.conf $(COPY_PACKAGE_CONF)
+	set -e; \
 	for i in `$(GHC_PKG_COPY) list --global --simple-output`; do \
 		echo Updating $$i; \
 		$(GHC_PKG_COPY) describe --global $$i | $(GHC_PKG_COPY) update --global --force -; \
