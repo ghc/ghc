@@ -1389,8 +1389,9 @@ dodgyExportWarn item = dodgyMsg (ptext (sLit "export")) item
 
 dodgyMsg :: OutputableBndr n => SDoc -> n -> SDoc
 dodgyMsg kind tc
-  = sep [ ptext (sLit "The") <+> kind <+> ptext (sLit "item") <+> quotes (ppr (IEThingAll tc)),
-	  ptext (sLit "suggests that") <+> quotes (ppr tc) <+> ptext (sLit "has constructors or class methods,"),
+  = sep [ ptext (sLit "The") <+> kind <+> ptext (sLit "item") <+> quotes (ppr (IEThingAll tc))
+    	  	<+> ptext (sLit "suggests that"),
+	  quotes (ppr tc) <+> ptext (sLit "has (in-scope) constructors or class methods,"),
 	  ptext (sLit "but it has none") ]
 
 exportItemErr :: IE RdrName -> SDoc
