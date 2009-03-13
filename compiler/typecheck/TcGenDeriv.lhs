@@ -1142,13 +1142,18 @@ we generate
     
     dataTypeOf _ = $dT
 
+    dataCast1 = gcast1   -- If T :: * -> *
+    dataCast2 = gcast2   -- if T :: * -> * -> *
+
+    
 \begin{code}
 gen_Data_binds :: SrcSpan
 	       -> TyCon 
 	       -> (LHsBinds RdrName,	-- The method bindings
 		   DerivAuxBinds)	-- Auxiliary bindings
 gen_Data_binds loc tycon
-  = (listToBag [gfoldl_bind, gunfold_bind, toCon_bind, dataTypeOf_bind],
+  = (listToBag [gfoldl_bind, gunfold_bind, toCon_bind, dataTypeOf_bind]
+     `unionBags` gcast_binds,
 		-- Auxiliary definitions: the data type and constructors
      MkTyCon tycon : map MkDataCon data_cons)
   where
@@ -1200,13 +1205,31 @@ gen_Data_binds loc tycon
 			[nlWildPat]
                         (nlHsVar (mk_data_type_name tycon))
 
+	------------ gcast1/2
+    tycon_kind = tyConKind tycon
+    gcast_binds | tycon_kind `eqKind` kind1 = mk_gcast dataCast1_RDR gcast1_RDR
+    		| tycon_kind `eqKind` kind2 = mk_gcast dataCast2_RDR gcast2_RDR
+		| otherwise  	      = emptyBag
+    mk_gcast dataCast_RDR gcast_RDR 
+      = unitBag (mk_easy_FunBind loc dataCast_RDR [nlVarPat f_RDR] 
+                                 (nlHsVar gcast_RDR `nlHsApp` nlHsVar f_RDR))
+
+
+kind1, kind2 :: Kind
+kind1 = liftedTypeKind `mkArrowKind` liftedTypeKind
+kind2 = liftedTypeKind `mkArrowKind` kind1
 
 gfoldl_RDR, gunfold_RDR, toConstr_RDR, dataTypeOf_RDR, mkConstr_RDR,
-    mkDataType_RDR, conIndex_RDR, prefix_RDR, infix_RDR :: RdrName
+    mkDataType_RDR, conIndex_RDR, prefix_RDR, infix_RDR,
+    dataCast1_RDR, dataCast2_RDR, gcast1_RDR, gcast2_RDR :: RdrName
 gfoldl_RDR     = varQual_RDR gENERICS (fsLit "gfoldl")
 gunfold_RDR    = varQual_RDR gENERICS (fsLit "gunfold")
 toConstr_RDR   = varQual_RDR gENERICS (fsLit "toConstr")
 dataTypeOf_RDR = varQual_RDR gENERICS (fsLit "dataTypeOf")
+dataCast1_RDR  = varQual_RDR gENERICS (fsLit "dataCast1")
+dataCast2_RDR  = varQual_RDR gENERICS (fsLit "dataCast2")
+gcast1_RDR     = varQual_RDR tYPEABLE (fsLit "gcast1")
+gcast2_RDR     = varQual_RDR tYPEABLE (fsLit "gcast2")
 mkConstr_RDR   = varQual_RDR gENERICS (fsLit "mkConstr")
 mkDataType_RDR = varQual_RDR gENERICS (fsLit "mkDataType")
 conIndex_RDR   = varQual_RDR gENERICS (fsLit "constrIndex")

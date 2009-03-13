@@ -663,52 +663,16 @@ mk_data_eqn orig tvs cls tycon tc_args rep_tc rep_tc_args mtheta
   | otherwise
   = do	{ dfun_name <- new_dfun_name cls tycon
   	; loc <- getSrcSpanM
-	; let ordinary_constraints
-	        = [ mkClassPred cls [arg_ty] 
-	          | data_con <- tyConDataCons rep_tc,
-	            arg_ty   <- ASSERT( isVanillaDataCon data_con )
-				get_constrained_tys $
-				substTys subst $
-			 	dataConInstOrigArgTys data_con all_rep_tc_args,
-	            not (isUnLiftedType arg_ty) ]
-			-- No constraints for unlifted types
-			-- Where they are legal we generate specilised function calls
-
-			-- For functor-like classes, two things are different
-			-- (a) We recurse over argument types to generate constraints
-			--     See Functor examples in TcGenDeriv
-			-- (b) The rep_tc_args will be one short
-              is_functor_like = getUnique cls `elem` functorLikeClassKeys
-
-              get_constrained_tys :: [Type] -> [Type]
-	      get_constrained_tys tys 
-	      	| is_functor_like = concatMap (deepSubtypesContaining last_tv) tys
-		| otherwise	  = tys
-
-	      rep_tc_tvs = tyConTyVars rep_tc
-	      last_tv = last rep_tc_tvs
-	      all_rep_tc_args | is_functor_like = rep_tc_args ++ [mkTyVarTy last_tv]
-	      		      | otherwise	= rep_tc_args
-
-
-			-- See Note [Superclasses of derived instance]
-	      sc_constraints = substTheta (zipOpenTvSubst (classTyVars cls) inst_tys)
-					  (classSCTheta cls)
-	      inst_tys = [mkTyConApp tycon tc_args]
-	      subst = zipTopTvSubst rep_tc_tvs all_rep_tc_args
-	      stupid_constraints = substTheta subst (tyConStupidTheta rep_tc)
-
-	      all_constraints = stupid_constraints ++ sc_constraints ++ ordinary_constraints
-
+	; let inst_tys = [mkTyConApp tycon tc_args]
+	      inferred_constraints = inferConstraints tvs cls inst_tys rep_tc rep_tc_args
 	      spec = DS { ds_loc = loc, ds_orig = orig
 			, ds_name = dfun_name, ds_tvs = tvs 
 			, ds_cls = cls, ds_tys = inst_tys
 			, ds_tc = rep_tc, ds_tc_args = rep_tc_args
-			, ds_theta =  mtheta `orElse` all_constraints
+			, ds_theta =  mtheta `orElse` inferred_constraints
 			, ds_newtype = False }
 
-  	; ASSERT2( equalLength rep_tc_tvs all_rep_tc_args, ppr cls <+> ppr tycon )
-          return (if isJust mtheta then Right spec	-- Specified context
+  	; return (if isJust mtheta then Right spec	-- Specified context
 				   else Left spec) }	-- Infer context
 
 mk_typeable_eqn orig tvs cls tycon tc_args rep_tc rep_tc_args mtheta
@@ -739,6 +703,61 @@ mk_typeable_eqn orig tvs cls tycon tc_args rep_tc rep_tc_args mtheta
 		     , ds_tc = rep_tc, ds_tc_args = rep_tc_args
 		     , ds_theta = mtheta `orElse` [], ds_newtype = False })  }
 
+
+inferConstraints :: [TyVar] -> Class -> [TcType] -> TyCon -> [TcType] -> ThetaType
+-- Generate a sufficiently large set of constraints that typechecking the
+-- generated method definitions should succeed.   This set will be simplified
+-- before being used in the instance declaration
+inferConstraints tvs cls inst_tys rep_tc rep_tc_args
+  = ASSERT2( equalLength rep_tc_tvs all_rep_tc_args, ppr cls <+> ppr rep_tc )
+    stupid_constraints ++ extra_constraints
+    ++ sc_constraints ++ con_arg_constraints
+  where
+       -- Constraints arising from the arguments of each constructor
+    con_arg_constraints
+      = [ mkClassPred cls [arg_ty] 
+        | data_con <- tyConDataCons rep_tc,
+          arg_ty   <- ASSERT( isVanillaDataCon data_con )
+    			get_constrained_tys $
+    		 	dataConInstOrigArgTys data_con all_rep_tc_args,
+          not (isUnLiftedType arg_ty) ]
+    		-- No constraints for unlifted types
+    		-- Where they are legal we generate specilised function calls
+
+    		-- For functor-like classes, two things are different
+    		-- (a) We recurse over argument types to generate constraints
+    		--     See Functor examples in TcGenDeriv
+    		-- (b) The rep_tc_args will be one short
+    is_functor_like = getUnique cls `elem` functorLikeClassKeys
+
+    get_constrained_tys :: [Type] -> [Type]
+    get_constrained_tys tys 
+    	| is_functor_like = concatMap (deepSubtypesContaining last_tv) tys
+    	| otherwise	  = tys
+
+    rep_tc_tvs = tyConTyVars rep_tc
+    last_tv = last rep_tc_tvs
+    all_rep_tc_args | is_functor_like = rep_tc_args ++ [mkTyVarTy last_tv]
+    		    | otherwise       = rep_tc_args
+
+    	-- Constraints arising from superclasses
+    	-- See Note [Superclasses of derived instance]
+    sc_constraints = substTheta (zipOpenTvSubst (classTyVars cls) inst_tys)
+    				(classSCTheta cls)
+
+    	-- Stupid constraints
+    stupid_constraints = substTheta subst (tyConStupidTheta rep_tc)
+    subst = zipTopTvSubst rep_tc_tvs all_rep_tc_args
+	      
+	-- Extra constraints
+	-- The Data class (only) requires that for 
+	--    instance (...) => Data (T a b) 
+	-- then (Data a, Data b) are among the (...) constraints
+	-- Reason: that's what you need to typecheck the method
+	-- 	       dataCast1 f = gcast1 f
+    extra_constraints 
+      | cls `hasKey` dataClassKey = [mkClassPred cls [mkTyVarTy tv] | tv <- tvs]
+      | otherwise    		  = []
 
 ------------------------------------------------------------------
 -- Check side conditions that dis-allow derivability for particular classes
