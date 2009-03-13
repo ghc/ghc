@@ -672,16 +672,7 @@ removeFromQueues(Capability *cap, StgTSO *tso)
   }
 
  done:
-  tso->_link = END_TSO_QUEUE; // no write barrier reqd
-  tso->why_blocked = NotBlocked;
-  tso->block_info.closure = NULL;
-  appendToRunQueue(cap,tso);
-
-  // We might have just migrated this TSO to our Capability:
-  if (tso->bound) {
-      tso->bound->cap = cap;
-  }
-  tso->cap = cap;
+  unblockOne(cap, tso);
 }
 
 /* -----------------------------------------------------------------------------
