@@ -335,6 +335,7 @@ scavenge_block (bdescr *bd)
   // time around the loop.
   while (p < bd->free || (bd == ws->todo_bd && p < ws->todo_free)) {
 
+      ASSERT(bd->link == NULL);
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
     info = get_itbl((StgClosure *)p);
     
@@ -1915,7 +1916,7 @@ loop:
             break;
         }
 
-        if ((bd = grab_todo_block(ws)) != NULL) {
+        if ((bd = grab_local_todo_block(ws)) != NULL) {
             scavenge_block(bd);
             did_something = rtsTrue;
             break;
@@ -1926,6 +1927,28 @@ loop:
         did_anything = rtsTrue;
         goto loop;
     }
+
+#if defined(THREADED_RTS)
+    if (work_stealing) {
+        // look for work to steal
+        for (s = total_steps-1; s >= 0; s--) {
+            if (s == 0 && RtsFlags.GcFlags.generations > 1) { 
+                continue; 
+            }
+            if ((bd = steal_todo_block(s)) != NULL) {
+                scavenge_block(bd);
+                did_something = rtsTrue;
+                break;
+            }
+        }
+
+        if (did_something) {
+            did_anything = rtsTrue;
+            goto loop;
+        }
+    }
+#endif
+
     // only return when there is no more work to do
 
     return did_anything;

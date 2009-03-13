@@ -43,8 +43,6 @@
 #include "WSDeque.h"
 #include "SMP.h" // for cas
 
-#if defined(THREADED_RTS)
-
 #define CASTOP(addr,old,new) ((old) == cas(((StgPtr)addr),(old),(new)))
 
 /* -----------------------------------------------------------------------------
@@ -285,5 +283,3 @@ pushWSDeque (WSDeque* q, void * elem)
     ASSERT_WSDEQUE_INVARIANTS(q); 
     return rtsTrue;
 }
-
-#endif

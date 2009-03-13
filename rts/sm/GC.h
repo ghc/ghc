@@ -28,6 +28,8 @@ extern StgPtr  oldgen_scan;
 
 extern long copied;
 
+extern rtsBool work_stealing;
+
 #ifdef DEBUG
 extern nat mutlist_MUTVARS, mutlist_MUTARRS, mutlist_MVARS, mutlist_OTHERS;
 #endif

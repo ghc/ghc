@@ -226,6 +226,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.ParFlags.wakeupMigrate     = rtsFalse;
     RtsFlags.ParFlags.parGcEnabled      = 1;
     RtsFlags.ParFlags.parGcGen          = 1;
+    RtsFlags.ParFlags.parGcLoadBalancing = 1;
 #endif
 
 #ifdef PAR
@@ -1211,6 +1212,9 @@ error = rtsTrue;
                             error = rtsTrue;
                         }
                         break;
+		    case 'b':
+			RtsFlags.ParFlags.parGcLoadBalancing = rtsFalse;
+			break;
 		    case 'm':
 			RtsFlags.ParFlags.migrate = rtsFalse;
 			break;

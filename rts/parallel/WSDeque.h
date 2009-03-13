@@ -9,8 +9,6 @@
 #ifndef WSDEQUE_H
 #define WSDEQUE_H
 
-#if defined(THREADED_RTS)
-
 typedef struct WSDeque_ {
     // Size of elements array. Used for modulo calculation: we round up
     // to powers of 2 and use the dyadic log (modulo == bitwise &) 
@@ -124,7 +122,5 @@ discardElements (WSDeque *q)
     q->top = q->bottom;
 //    pool->topBound = pool->top;
 }
-
-#endif // THREADED_RTS
 
 #endif // WSDEQUE_H

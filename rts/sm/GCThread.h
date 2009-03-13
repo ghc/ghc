@@ -15,6 +15,7 @@
 #define GCTHREAD_H
 
 #include "OSThreads.h"
+#include "WSDeque.h"
 
 /* -----------------------------------------------------------------------------
    General scheme
@@ -81,13 +82,14 @@ typedef struct step_workspace_ {
     StgPtr       todo_free;            // free ptr for todo_bd
     StgPtr       todo_lim;             // lim for todo_bd
 
-    bdescr *     buffer_todo_bd;     // buffer to reduce contention
-                                     // on the step's todos list
+    WSDeque *    todo_q;
+    bdescr *     todo_overflow;
+    nat          n_todo_overflow;
 
     // where large objects to be scavenged go
     bdescr *     todo_large_objects;
 
-    // Objects that have already been, scavenged.
+    // Objects that have already been scavenged.
     bdescr *     scavd_list;
     nat          n_scavd_blocks;     // count of blocks in this list
 
@@ -95,7 +97,7 @@ typedef struct step_workspace_ {
     bdescr *     part_list;
     unsigned int n_part_blocks;      // count of above
 
-    StgWord pad[5];
+    StgWord pad[3];
 
 } step_workspace ATTRIBUTE_ALIGNED(64);
 // align so that computing gct->steps[n] is a shift, not a multiply

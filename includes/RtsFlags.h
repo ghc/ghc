@@ -183,6 +183,7 @@ struct PAR_FLAGS {
   rtsBool        parGcEnabled;   /* enable parallel GC */
   rtsBool        parGcGen;       /* do parallel GC in this generation
                                   * and higher only */
+  rtsBool        parGcLoadBalancing; /* do load-balancing in parallel GC */
 };
 #endif /* THREADED_RTS */
 

@@ -17,9 +17,11 @@ bdescr *allocBlock_sync(void);
 void    freeChain_sync(bdescr *bd);
 
 void    push_scanned_block   (bdescr *bd, step_workspace *ws);
-bdescr *grab_todo_block      (step_workspace *ws);
 StgPtr  todo_block_full      (nat size, step_workspace *ws);
 StgPtr  alloc_todo_block     (step_workspace *ws, nat size);
+
+bdescr *grab_local_todo_block  (step_workspace *ws);
+bdescr *steal_todo_block       (nat s);
 
 // Returns true if a block is partially full.  This predicate is used to try
 // to re-use partial blocks wherever possible, and to reduce wastage.

@@ -104,7 +104,6 @@ initStep (step *stp, int g, int s)
     stp->compact = 0;
     stp->bitmap = NULL;
 #ifdef THREADED_RTS
-    initSpinLock(&stp->sync_todo);
     initSpinLock(&stp->sync_large_objects);
 #endif
     stp->threads = END_TSO_QUEUE;

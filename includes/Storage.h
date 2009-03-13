@@ -81,7 +81,6 @@ typedef struct step_ {
 #if defined(THREADED_RTS)
     char pad[128];                      // make sure the following is
                                         // on a separate cache line.
-    SpinLock     sync_todo;             // lock for todos
     SpinLock     sync_large_objects;    // lock for large_objects
                                         //    and scavenged_large_objects
 #endif
@@ -93,10 +92,6 @@ typedef struct step_ {
     unsigned int n_old_blocks;		// number of blocks in from-space
     unsigned int live_estimate;         // for sweeping: estimate of live data
     
-    bdescr *     todos;		        // blocks waiting to be scavenged
-    bdescr *     todos_last;
-    unsigned int n_todos;               // count of above
-
     bdescr *     part_blocks;           // partially-full scanned blocks
     unsigned int n_part_blocks;         // count of above
 
