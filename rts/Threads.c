@@ -505,8 +505,10 @@ unblockOne_ (Capability *cap, StgTSO *tso,
       }
       tso->cap = cap;
       appendToRunQueue(cap,tso);
-      // we're holding a newly woken thread, make sure we context switch
-      // quickly so we can migrate it if necessary.
+
+      // context-switch soonish so we can migrate the new thread if
+      // necessary.  NB. not contextSwitchCapability(cap), which would
+      // force a context switch immediately.
       cap->context_switch = 1;
   } else {
       // we'll try to wake it up on the Capability it was last on.
@@ -514,6 +516,10 @@ unblockOne_ (Capability *cap, StgTSO *tso,
   }
 #else
   appendToRunQueue(cap,tso);
+
+  // context-switch soonish so we can migrate the new thread if
+  // necessary.  NB. not contextSwitchCapability(cap), which would
+  // force a context switch immediately.
   cap->context_switch = 1;
 #endif
 

@@ -196,6 +196,9 @@ interpretBCO (Capability* cap)
 
     LOAD_STACK_POINTERS;
 
+    cap->r.rHpLim = (P_)1; // HpLim is the context-switch flag; when it
+                           // goes to zero we must return to the scheduler.
+
     // ------------------------------------------------------------------------
     // Case 1:
     // 
@@ -1281,7 +1284,7 @@ run_BCO:
 	    // context switching: sometimes the scheduler can invoke
 	    // the interpreter with context_switch == 1, particularly
 	    // if the -C0 flag has been given on the cmd line.
-	    if (cap->context_switch) {
+	    if (cap->r.rHpLim == NULL) {
 		Sp--; Sp[0] = (W_)&stg_enter_info;
 		RETURN_TO_SCHEDULER(ThreadInterpret, ThreadYielding);
 	    }

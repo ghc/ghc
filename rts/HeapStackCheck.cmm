@@ -23,8 +23,11 @@ import LeaveCriticalSection;
  *
  * On discovering that a stack or heap check has failed, we do the following:
  *
- *    - If the context_switch flag is set, indicating that there are more
- *      threads waiting to run, we yield to the scheduler 
+ *    - If HpLim==0, indicating that we should context-switch, we yield
+ *      to the scheduler (return ThreadYielding).
+ *
+ *    - If the context_switch flag is set (the backup plan if setting HpLim
+ *      to 0 didn't trigger a context switch), we yield to the scheduler
  *	(return ThreadYielding).
  *
  *    - If Hp > HpLim, we've had a heap check failure.  This means we've
@@ -60,6 +63,10 @@ import LeaveCriticalSection;
 #define GC_GENERIC						\
     DEBUG_ONLY(foreign "C" heapCheckFail());			\
     if (Hp > HpLim) {						\
+        if (HpLim == 0) { \
+                R1 = ThreadYielding;				\
+                goto sched;					\
+        }						\
         Hp = Hp - HpAlloc/*in bytes*/;				\
         if (HpAlloc <= BLOCK_SIZE				\
             && bdescr_link(CurrentNursery) != NULL) {		\

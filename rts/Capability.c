@@ -294,10 +294,10 @@ initCapabilities( void )
 
 void setContextSwitches(void)
 {
-  nat i;
-  for (i=0; i < n_capabilities; i++) {
-    capabilities[i].context_switch = 1;
-  }
+    nat i;
+    for (i=0; i < n_capabilities; i++) {
+        contextSwitchCapability(&capabilities[i]);
+    }
 }
 
 /* ----------------------------------------------------------------------------
@@ -482,14 +482,17 @@ waitForReturnCapability (Capability **pCap, Task *task)
 	if (!cap->running_task) {
 	    nat i;
 	    // otherwise, search for a free capability
+            cap = NULL;
 	    for (i = 0; i < n_capabilities; i++) {
-		cap = &capabilities[i];
-		if (!cap->running_task) {
+		if (!capabilities[i].running_task) {
+                    cap = &capabilities[i];
 		    break;
 		}
 	    }
-	    // Can't find a free one, use last_free_capability.
-	    cap = last_free_capability;
+            if (cap == NULL) {
+                // Can't find a free one, use last_free_capability.
+                cap = last_free_capability;
+            }
 	}
 
 	// record the Capability as the one this Task is now assocated with.

@@ -276,6 +276,7 @@ extern void grabCapability (Capability **pCap);
 
 // cause all capabilities to context switch as soon as possible.
 void setContextSwitches(void);
+INLINE_HEADER void contextSwitchCapability(Capability *cap);
 
 // Free all capabilities
 void freeCapabilities (void);
@@ -321,5 +322,17 @@ INLINE_HEADER void
 discardSparksCap (Capability *cap) 
 { return discardSparks(cap->sparks); }
 #endif
+
+INLINE_HEADER void
+contextSwitchCapability (Capability *cap)
+{
+    // setting HpLim to NULL ensures that the next heap check will
+    // fail, and the thread will return to the scheduler.
+    cap->r.rHpLim = NULL;
+    // But just in case it didn't work (the target thread might be
+    // modifying HpLim at the same time), we set the end-of-block
+    // context-switch flag too:
+    cap->context_switch = 1;
+}
 
 #endif /* CAPABILITY_H */

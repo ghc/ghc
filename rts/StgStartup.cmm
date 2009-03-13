@@ -28,9 +28,7 @@
     ASSERT(Hp != 0);			\
     ASSERT(Sp != 0);			\
     ASSERT(SpLim != 0);			\
-    ASSERT(HpLim != 0);			\
-    ASSERT(SpLim - WDS(RESERVED_STACK_WORDS) <= Sp); \
-    ASSERT(HpLim >= Hp);
+    ASSERT(SpLim - WDS(RESERVED_STACK_WORDS) <= Sp);
 
 /* -----------------------------------------------------------------------------
    Returning from the STG world.

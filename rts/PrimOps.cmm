@@ -1073,7 +1073,8 @@ forkzh_fast
 
   foreign "C" scheduleThread(MyCapability() "ptr", threadid "ptr") [];
 
-  // switch at the earliest opportunity
+  // context switch soon, but not immediately: we don't want every
+  // forkIO to force a context-switch.
   Capability_context_switch(MyCapability()) = 1 :: CInt;
   
   RET_P(threadid);
@@ -1102,7 +1103,8 @@ forkOnzh_fast
 
   foreign "C" scheduleThreadOn(MyCapability() "ptr", cpu, threadid "ptr") [];
 
-  // switch at the earliest opportunity
+  // context switch soon, but not immediately: we don't want every
+  // forkIO to force a context-switch.
   Capability_context_switch(MyCapability()) = 1 :: CInt;
   
   RET_P(threadid);

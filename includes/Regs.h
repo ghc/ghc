@@ -133,7 +133,6 @@ typedef struct StgRegTable_ {
 #define SAVE_SpLim    	    (CurrentTSO->splim)
 
 #define SAVE_Hp	    	    (BaseReg->rHp)
-#define SAVE_HpLim	    (BaseReg->rHpLim)
 
 #define SAVE_CurrentTSO     (BaseReg->rCurrentTSO)
 #define SAVE_CurrentNursery (BaseReg->rCurrentNursery)
@@ -349,7 +348,7 @@ GLOBAL_REG_DECL(P_,Hp,REG_Hp)
 #endif
 
 #if defined(REG_HpLim) && !defined(NO_GLOBAL_REG_DECLS)
-GLOBAL_REG_DECL(P_,HpLim,REG_HpLim)
+#error HpLim cannot be in a register
 #else
 #define HpLim (BaseReg->rHpLim)
 #endif
@@ -570,14 +569,6 @@ GLOBAL_REG_DECL(bdescr *,HpAlloc,REG_HpAlloc)
 #define CALLER_RESTORE_Hp	/* nothing */
 #endif
 
-#ifdef CALLER_SAVES_HpLim
-#define CALLER_SAVE_HpLim   	SAVE_HpLim = HpLim;
-#define CALLER_RESTORE_HpLim	HpLim = SAVE_HpLim;
-#else
-#define CALLER_SAVE_HpLim   	/* nothing */
-#define CALLER_RESTORE_HpLim   	/* nothing */
-#endif
-
 #ifdef CALLER_SAVES_Base
 #ifdef THREADED_RTS
 #error "Can't have caller-saved BaseReg with THREADED_RTS"
@@ -644,7 +635,6 @@ GLOBAL_REG_DECL(bdescr *,HpAlloc,REG_HpAlloc)
   CALLER_SAVE_Sp				\
   CALLER_SAVE_SpLim				\
   CALLER_SAVE_Hp				\
-  CALLER_SAVE_HpLim				\
   CALLER_SAVE_CurrentTSO			\
   CALLER_SAVE_CurrentNursery			\
   CALLER_SAVE_Base
@@ -673,7 +663,6 @@ GLOBAL_REG_DECL(bdescr *,HpAlloc,REG_HpAlloc)
   CALLER_RESTORE_Sp				\
   CALLER_RESTORE_SpLim				\
   CALLER_RESTORE_Hp				\
-  CALLER_RESTORE_HpLim				\
   CALLER_RESTORE_CurrentTSO			\
   CALLER_RESTORE_CurrentNursery
 

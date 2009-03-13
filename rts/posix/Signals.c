@@ -214,7 +214,7 @@ generic_handler(int sig USED_IF_THREADS,
 	stg_exit(EXIT_FAILURE);
     }
     
-    MainCapability.context_switch = 1;
+    contextSwitchCapability(&MainCapability);
 
 #endif /* THREADED_RTS */
 }

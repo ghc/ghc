@@ -95,7 +95,6 @@
    s0	$9	Sp
    s2	$11	SpLim
    s3	$12	Hp   
-   s4	$13	HpLim
    t8	$22	NCG_reserved
    t12	$27	NCG_reserved
    -------------------------------------------------------------------------- */
@@ -134,7 +133,6 @@
 #  define REG_SpLim     11
 
 #  define REG_Hp	12
-#  define REG_HpLim	13
   
 #  define NCG_Reserved_I1 22
 #  define NCG_Reserved_I2 27
@@ -189,7 +187,6 @@
 #define REG_SpLim    	r6
 
 #define REG_Hp	    	r7
-#define REG_HpLim	r8
 
 #define NCG_Reserved_I1 r28
 #define NCG_Reserved_I2	r29
@@ -215,7 +212,7 @@
    esi     R1
    edi     Hp
 
-   Leaving SpLim, and HpLim out of the picture.
+   Leaving SpLim out of the picture.
    -------------------------------------------------------------------------- */
 
 
@@ -284,12 +281,12 @@
 #define REG_Sp    rbp
 #define REG_Hp    r12
 #define REG_R1    rbx
-#define REG_R2    rsi
-#define REG_R3    rdi
-#define REG_R4    r8
-#define REG_R5    r9
-#define REG_SpLim r14
-#define REG_HpLim r15
+#define REG_R2    r14
+#define REG_R3    rsi
+#define REG_R4    rdi
+#define REG_R5    r8
+#define REG_R6    r9
+#define REG_SpLim r15
 
 #define REG_F1    xmm1
 #define REG_F2    xmm2
@@ -299,10 +296,10 @@
 #define REG_D1    xmm5
 #define REG_D2    xmm6
 
-#define CALLER_SAVES_R2
 #define CALLER_SAVES_R3
 #define CALLER_SAVES_R4
 #define CALLER_SAVES_R5
+#define CALLER_SAVES_R6
 
 #define CALLER_SAVES_F1
 #define CALLER_SAVES_F2
@@ -312,7 +309,7 @@
 #define CALLER_SAVES_D1
 #define CALLER_SAVES_D2
 
-#define MAX_REAL_VANILLA_REG 5
+#define MAX_REAL_VANILLA_REG 6
 #define MAX_REAL_FLOAT_REG   4
 #define MAX_REAL_DOUBLE_REG  2
 #define MAX_REAL_LONG_REG    0
@@ -361,7 +358,6 @@
 #define REG_SpLim	d3
 
 #define REG_Hp	    	d4
-#define REG_HpLim       d5
 
 #define REG_R1    	a5
 #define REG_R2    	d6
@@ -425,7 +421,6 @@
 #define REG_SpLim    	21
 
 #define REG_Hp	    	22
-#define REG_HpLim	23
 
 #define REG_Base	30
 
@@ -500,7 +495,6 @@
 #define REG_SpLim    	r24
 
 #define REG_Hp	    	r25
-#define REG_HpLim	r26
 
 #define REG_Base        r27
 
@@ -543,7 +537,6 @@
 #define REG_SpLim	loc26
 
 #define REG_Hp		loc27
-#define REG_HpLim	loc28
 
 #endif /* ia64 */
 
@@ -597,7 +590,6 @@
      %i1        Base
      %i2        SpLim
      %i3        Hp
-     %i4        HpLim
      %i5        R6
      %i6                    C frame ptr
      %i7                    C ret addr
@@ -666,7 +658,6 @@
 #define REG_SpLim    	i2
 
 #define REG_Hp	    	i3
-#define REG_HpLim	i4
 
 #define REG_Base	i1
 
