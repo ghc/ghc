@@ -842,11 +842,10 @@ data ModIface
 	mi_boot	    :: !IsBootInterface,    -- ^ Read from an hi-boot file?
 
 	mi_deps	    :: Dependencies,
-	        -- ^ The dependencies of the module, consulted for directly
-	        -- imported modules only
-	
-		-- This is consulted for directly-imported modules,
-		-- but not for anything else (hence lazy)
+	        -- ^ The dependencies of the module.  This is
+		-- consulted for directly-imported modules, but not
+		-- for anything else (hence lazy)
+
         mi_usages   :: [Usage],
                 -- ^ Usages; kept sorted so that it's easy to decide
 		-- whether to write a new iface file (changing usages
