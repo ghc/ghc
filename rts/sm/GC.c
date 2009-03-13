@@ -179,7 +179,7 @@ StgPtr  oldgen_scan;
 void
 GarbageCollect (rtsBool force_major_gc, 
                 nat gc_type USED_IF_THREADS,
-                Capability *cap USED_IF_THREADS)
+                Capability *cap)
 {
   bdescr *bd;
   step *stp;
@@ -748,7 +748,7 @@ GarbageCollect (rtsBool force_major_gc,
 
   // start any pending finalizers 
   RELEASE_SM_LOCK;
-  scheduleFinalizers(last_free_capability, old_weak_ptr_list);
+  scheduleFinalizers(cap, old_weak_ptr_list);
   ACQUIRE_SM_LOCK;
   
   // send exceptions to any threads which were about to die 
