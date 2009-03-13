@@ -17,6 +17,14 @@
 #include <ctype.h>
 #endif
 
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+
+#ifdef HAVE_WINDOWS_H
+#include <windows.h>
+#endif
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -454,7 +462,8 @@ usage_text[] = {
 "",
 #endif /* DEBUG */
 #if defined(THREADED_RTS) && !defined(NOSMP)
-"  -N<n>     Use <n> OS threads (default: 1)",
+"  -N<n>     Use <n> processors (default: 1)",
+"  -N        Determine the number of processors to use automatically",
 "  -q1       Use one OS thread for GC (turns off parallel GC)",
 "  -qg<n>    Use parallel GC only for generations >= <n> (default: 1)",
 "  -qm       Don't automatically migrate threads between CPUs",
@@ -1138,7 +1147,23 @@ error = rtsTrue;
 #if defined(THREADED_RTS) && !defined(NOSMP)
 	      case 'N':
 		THREADED_BUILD_ONLY(
-		if (rts_argv[arg][2] != '\0') {
+		if (rts_argv[arg][2] == '\0') {
+#if defined(PROFILING)
+		    RtsFlags.ParFlags.nNodes = 1;
+#else
+#if defined(mingw32_HOST_OS)
+                    {
+                        SYSTEM_INFO si;
+                        GetSystemInfo(&si);
+                        RtsFlags.ParFlags.nNodes = si.dwNumberOfProcessors;
+                    }
+#elif defined(HAVE_SYSCONF)
+                    RtsFlags.ParFlags.nNodes = sysconf(_SC_NPROCESSORS_CONF);
+#else
+                    RtsFlags.ParFlags.nNodes = 1;
+#endif
+#endif
+		} else {
 		    RtsFlags.ParFlags.nNodes
 		      = strtol(rts_argv[arg]+2, (char **) NULL, 10);
 		    if (RtsFlags.ParFlags.nNodes <= 0) {

@@ -1834,7 +1834,7 @@ f "2"    = 2
 
       <variablelist>
 	<varlistentry>
-	  <term><option>-N<replaceable>x</replaceable></option></term>
+	  <term><option>-N<optional><replaceable>x</replaceable></optional></option></term>
 	  <listitem>
 	    <para><indexterm><primary><option>-N<replaceable>x</replaceable></option></primary><secondary>RTS option</secondary></indexterm>
 	      Use <replaceable>x</replaceable> simultaneous threads when
@@ -1846,9 +1846,19 @@ f "2"    = 2
 	      on a dual-core machine we would probably use
 	      <literal>+RTS -N2 -RTS</literal>.</para>
 	    
+            <para>Omitting <replaceable>x</replaceable>,
+              i.e. <literal>+RTS -N -RTS</literal>, lets the runtime
+              choose the value of <replaceable>x</replaceable> itself
+              based on how many processors are in your machine.</para>
+
+            <para>Be careful when using all the processors in your
+              machine: if some of your processors are in use by other
+              programs, this can actually harm performance rather than
+              improve it.</para>
+
             <para>Setting <option>-N</option> also has the effect of
-	      setting <option>-g</option> (the number of OS threads to
-	      use for garbage collection) to the same value.</para>
+              enabling the parallel garbage collector (see
+              <xref linkend="rts-options-gc" />).</para>
 
             <para>There is no means (currently) by which this value
 	      may vary after the program has started.</para>
