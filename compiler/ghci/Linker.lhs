@@ -413,7 +413,7 @@ reallyInitDynLinker dflags
 	; ok <- resolveObjs
 
 	; if succeeded ok then maybePutStrLn dflags "done"
-	  else ghcError (InstallationError "linking extra libraries/objects failed")
+	  else ghcError (ProgramError "linking extra libraries/objects failed")
 	}}
 
 classifyLdInput :: FilePath -> IO (Maybe LibrarySpec)

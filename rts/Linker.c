@@ -2655,8 +2655,7 @@ ocResolve_PEi386 ( ObjectCode* oc )
             copyName ( sym->Name, strtab, symbol, 1000-1 );
             S = (UInt32) lookupSymbol( symbol );
             if ((void*)S != NULL) goto foundit;
-	    /* Newline first because the interactive linker has printed "linking..." */
-            errorBelch("\n%s: unknown symbol `%s'", oc->fileName, symbol);
+            errorBelch("%s: unknown symbol `%s'", oc->fileName, symbol);
             return 0;
            foundit:;
          }
