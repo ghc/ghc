@@ -10,7 +10,8 @@ module MonadUtils
         , MonadIO(..)
         
         , liftIO1, liftIO2, liftIO3, liftIO4
-        
+
+        , zipWith3M        
         , mapAndUnzipM, mapAndUnzip3M, mapAndUnzip4M
         , mapAccumLM
         , mapSndM
@@ -77,6 +78,16 @@ liftIO4 = (((.).(.)).((.).(.))) liftIO
 -- Common functions
 --  These are used throughout the compiler
 ----------------------------------------------------------------------------------------
+
+zipWith3M :: Monad m => (a -> b -> c -> m d) -> [a] -> [b] -> [c] -> m [d]
+zipWith3M _ []     _      _      = return []
+zipWith3M _ _      []     _      = return []
+zipWith3M _ _      _      []     = return []
+zipWith3M f (x:xs) (y:ys) (z:zs) 
+  = do { r  <- f x y z
+       ; rs <- zipWith3M f xs ys zs
+       ; return $ r:rs
+       }
 
 -- | mapAndUnzipM for triples
 mapAndUnzip3M :: Monad m => (a -> m (b,c,d)) -> [a] -> m ([b],[c],[d])

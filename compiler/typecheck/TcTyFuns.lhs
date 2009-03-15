@@ -39,6 +39,7 @@ import Outputable
 import SrcLoc	( Located(..) )
 import Util	( debugIsOn )
 import Maybes
+import MonadUtils
 import FastString
 
 -- standard
@@ -369,7 +370,7 @@ finaliseEqsAndDicts (EqConfig { eqs     = eqs
 
 A normal equality is a properly oriented equality with associated coercion
 that contains at most one family equality (in its left-hand side) is oriented
-such that it may be used as a reqrite rule.  It has one of the following two 
+such that it may be used as a rewrite rule.  It has one of the following two 
 forms:
 
 (1) co :: F t1..tn ~ t  (family equalities)
@@ -382,8 +383,10 @@ Variable equalities fall again in two classes:
 
 The types t, t1, ..., tn may not contain any occurrences of synonym
 families.  Moreover, in Forms (2) & (3), the left-hand side may not occur in
-the right-hand side, and the relation x > y is an arbitrary, but total order
-on type variables
+the right-hand side, and the relation x > y is an (nearly) arbitrary, but
+total order on type variables.  The only restriction that we impose on that
+order is that for x > y, we are happy to instantiate x with y taking into
+account kinds, signature skolems etc (cf, TcUnify.uUnfilledVars).
 
 \begin{code}
 data RewriteInst
@@ -596,15 +599,14 @@ checkOrientation ty1 ty2 co inst
            ; return []
            }
 
-      -- two tvs, left greater => unchanged
+      -- two tvs (distinct tvs, due to previous equation)
     go ty1@(TyVarTy tv1) ty2@(TyVarTy tv2)
-      | tv1 > tv2
-      = mkRewriteVar False tv1 ty2 co
-
-      -- two tvs, right greater => swap
-      | otherwise
-      = do { co' <- mkSymEqInstCo co (ty2, ty1)
-           ; mkRewriteVar True tv2 ty1 co'
+      = do { isBigger <- tv1 `tvIsBigger` tv2
+           ; if isBigger                                      -- left greater
+               then mkRewriteVar False tv1 ty2 co             --   => unchanged
+               else do { co' <- mkSymEqInstCo co (ty2, ty1)   -- right greater
+                       ; mkRewriteVar True tv2 ty1 co'        --   => swap
+                       }
            }
 
       -- only lhs is a tv => unchanged
@@ -623,6 +625,26 @@ checkOrientation ty1 ty2 co inst
            ; mkRewriteVar True tv2 ty1 co'
            }
 
+      -- data type constructor application => decompose
+      -- NB: Special cased for efficiency - could be handled as type application
+    go (TyConApp con1 args1) (TyConApp con2 args2)
+      |  con1 == con2
+      && not (isOpenSynTyCon con1)   -- don't match family synonym apps
+      = do { co_args <- mkTyConEqInstCo co con1 (zip args1 args2)
+           ; eqss <- zipWith3M (\ty1 ty2 co -> checkOrientation ty1 ty2 co inst)
+                     args1 args2 co_args
+           ; return $ concat eqss
+           }
+
+      -- function type => decompose
+      -- NB: Special cased for efficiency - could be handled as type application
+    go (FunTy ty1_l ty1_r) (FunTy ty2_l ty2_r)
+      = do { (co_l, co_r) <- mkFunEqInstCo co (ty1_l, ty2_l) (ty1_r, ty2_r)
+           ; eqs_l <- checkOrientation ty1_l ty2_l co_l inst
+           ; eqs_r <- checkOrientation ty1_r ty2_r co_r inst
+           ; return $ eqs_l ++ eqs_r
+           }
+
       -- type applications => decompose
     go ty1 ty2 
       | Just (ty1_l, ty1_r) <- repSplitAppTy_maybe ty1   -- won't split fam apps
@@ -632,8 +654,6 @@ checkOrientation ty1 ty2 co inst
            ; eqs_r <- checkOrientation ty1_r ty2_r co_r inst
            ; return $ eqs_l ++ eqs_r
            }
--- !!!TODO: would be more efficient to handle the FunApp and the data
--- constructor application explicitly.
 
       -- inconsistency => type error
     go ty1 ty2
@@ -648,6 +668,55 @@ checkOrientation ty1 ty2 co inst
                                             , rwi_name    = tci_name inst
                                             , rwi_swapped = swapped
                                             }]
+
+    -- if tv1 `tvIsBigger` tv2, we make a rewrite rule tv1 ~> tv2
+    tvIsBigger :: TcTyVar -> TcTyVar -> TcM Bool
+    tvIsBigger tv1 tv2 
+      = isBigger tv1 (tcTyVarDetails tv1) tv2 (tcTyVarDetails tv2)
+      where
+        isBigger tv1 (SkolemTv _)     tv2 (SkolemTv _)
+          = return $ tv1 > tv2
+        isBigger _   (MetaTv _ _)     _   (SkolemTv _)
+          = return True
+        isBigger _   (SkolemTv _)     _   (MetaTv _ _)
+          = return False
+        isBigger tv1 (MetaTv info1 _) tv2 (MetaTv info2 _)
+          -- meta variable meets meta variable 
+          -- => be clever about which of the two to update 
+          --   (from TcUnify.uUnfilledVars minus boxy stuff)
+          = case (info1, info2) of
+              -- Avoid SigTvs if poss
+              (SigTv _, SigTv _)             -> return $ tv1 > tv2
+              (SigTv _, _      ) | k1_sub_k2 -> return False
+              (_,       SigTv _) | k2_sub_k1 -> return True
+
+              (_, _) 
+                | k1_sub_k2 &&
+                  k2_sub_k1    
+                  -> case (nicer_to_update tv1, nicer_to_update tv2) of
+                       (True, False) -> return True
+                       (False, True) -> return False
+                       _             -> return $ tv1 > tv2
+                | k1_sub_k2    -> return False
+                | k2_sub_k1    -> return True
+                | otherwise    -> kind_err >> return True
+              -- Update the variable with least kind info
+              -- See notes on type inference in Kind.lhs
+              -- The "nicer to" part only applies if the two kinds are the same,
+              -- so we can choose which to do.
+          where
+            kind_err = addErrCtxtM (unifyKindCtxt False tv1 (mkTyVarTy tv2)) $
+                       unifyKindMisMatch k1 k2
+
+            k1 = tyVarKind tv1
+            k2 = tyVarKind tv2
+            k1_sub_k2 = k1 `isSubKind` k2
+            k2_sub_k1 = k2 `isSubKind` k1
+
+            nicer_to_update tv = isSystemName (Var.varName tv)
+                -- Try to update sys-y type variables in preference to ones
+                -- gotten (say) by instantiating a polymorphic function with
+                -- a user-written type sig 
 
 flattenType :: Inst     -- context to get location  & name
             -> Type     -- the type to flatten
@@ -1263,6 +1332,20 @@ instantiateAndExtract eqs localsEmpty skolems
            ; uMeta swapped tv lookupTV ty cotv
            }
       where
+        -- Try to fill in a meta variable.  There is *no* need to consider
+        -- reorienting the underlying equality; `checkOrientation' makes sure
+        -- that we get variable-variable equalities only in the appropriate
+        -- orientation.
+        --
+        uMeta :: Bool                    -- is this a swapped equality?
+              -> TcTyVar                 -- tyvar to instantiate
+              -> LookupTyVarResult       -- lookup result of that tyvar
+              -> TcType                  -- to to instantiate tyvar with
+              -> TcTyVar                 -- coercion tyvar of current equality
+              -> TcM (Maybe RewriteInst) -- returns the original equality if
+                                         -- the tyvar could not be instantiated,
+                                         -- and hence, the equality must be kept
+
         -- meta variable has been filled already
         -- => keep the equality
         uMeta _swapped tv (IndirectTv fill_ty) ty _cotv
@@ -1273,33 +1356,40 @@ instantiateAndExtract eqs localsEmpty skolems
                ; return $ Just eq
                }
 
-        -- type variable meets type variable
-        -- => check that tv2 hasn't been updated yet and choose which to update
-        uMeta swapped tv1 (DoneTv details1) (TyVarTy tv2) cotv
-          | tv1 == tv2
-          = panic "TcTyFuns.uMeta: normalisation shouldn't allow x ~ x"
-
-          | otherwise
-          = do { lookupTV2 <- lookupTcTyVar tv2
-               ; case lookupTV2 of
-                   IndirectTv ty   -> 
-                     uMeta swapped tv1 (DoneTv details1) ty cotv
-                   DoneTv details2 -> 
-                     uMetaVar swapped tv1 details1 tv2 details2 cotv
-               }
-
-        ------ Beyond this point we know that ty2 is not a type variable
-
-        -- signature skolem meets non-variable type
+        -- signature skolem
         -- => cannot update (retain the equality)!
         uMeta _swapped _tv (DoneTv (MetaTv (SigTv _) _)) _non_tv_ty _cotv
           = return $ Just eq
 
+        -- type variable meets type variable
+        -- => `checkOrientation' already ensures that it is fine to instantiate
+        --    tv1 with tv2, but chase tv2's instantiations if necessary
+        -- NB: tv's instantiations won't alter the orientation in which we
+        --     want to instantiate as they either constitute a family 
+        --     application or are themselves due to a properly oriented
+        --     instantiation
+        uMeta swapped tv1 details1@(DoneTv (MetaTv _ ref)) ty@(TyVarTy tv2) cotv
+          = do { lookupTV2 <- lookupTcTyVar tv2
+               ; case lookupTV2 of
+                   IndirectTv ty' -> 
+                     uMeta swapped tv1 details1 ty' cotv
+                   DoneTv _       -> 
+                     uMetaInst swapped tv1 ref ty cotv
+               }
+
         -- updatable meta variable meets non-variable type
         -- => occurs check, monotype check, and kinds match check, then update
         uMeta swapped tv (DoneTv (MetaTv _ ref)) non_tv_ty cotv
+          = uMetaInst swapped tv ref non_tv_ty cotv
+
+        uMeta _ _ _ _ _ = panic "TcTyFuns.uMeta"
+
+        -- We know `tv' can be instantiated; check that `ty' is alright for
+        -- instantiating `tv' with and then do it; otherwise, return the original
+        -- equality.
+        uMetaInst swapped tv ref ty cotv
           = do {   -- occurs + monotype check
-               ; mb_ty' <- checkTauTvUpdate tv non_tv_ty    
+               ; mb_ty' <- checkTauTvUpdate tv ty    
                              
                ; case mb_ty' of
                    Nothing  -> 
@@ -1312,60 +1402,6 @@ instantiateAndExtract eqs localsEmpty skolems
                         ; return Nothing
                         }
                }
-
-        uMeta _ _ _ _ _ = panic "TcTyFuns.uMeta"
-
-        -- uMetaVar: unify two type variables
-        -- meta variable meets skolem 
-        -- => just update
-        uMetaVar swapped tv1 (MetaTv _ ref) tv2 (SkolemTv _) cotv
-          = do { checkUpdateMeta swapped tv1 ref (mkTyVarTy tv2)
-               ; writeMetaTyVar cotv (mkTyVarTy tv2)
-               ; return Nothing
-               }
-
-        -- meta variable meets meta variable 
-        -- => be clever about which of the two to update 
-        --   (from TcUnify.uUnfilledVars minus boxy stuff)
-        uMetaVar swapped tv1 (MetaTv info1 ref1) tv2 (MetaTv info2 ref2) cotv
-          = do { case (info1, info2) of
-                   -- Avoid SigTvs if poss
-                   (SigTv _, _      ) | k1_sub_k2 -> update_tv2
-                   (_,       SigTv _) | k2_sub_k1 -> update_tv1
-
-                   (_,   _) | k1_sub_k2 -> if k2_sub_k1 && 
-                                              nicer_to_update_tv1
-                                           then update_tv1  -- Same kinds
-                                           else update_tv2
-                            | k2_sub_k1 -> update_tv1
-                            | otherwise -> kind_err
-              -- Update the variable with least kind info
-              -- See notes on type inference in Kind.lhs
-              -- The "nicer to" part only applies if the two kinds are the same,
-              -- so we can choose which to do.
-
-               ; writeMetaTyVar cotv (mkTyVarTy tv2)
-               ; return Nothing
-               }
-          where
-                -- Kinds should be guaranteed ok at this point
-            update_tv1 = updateMeta tv1 ref1 (mkTyVarTy tv2)
-            update_tv2 = updateMeta tv2 ref2 (mkTyVarTy tv1)
-
-            kind_err = addErrCtxtM (unifyKindCtxt swapped tv1 (mkTyVarTy tv2)) $
-                       unifyKindMisMatch k1 k2
-
-            k1 = tyVarKind tv1
-            k2 = tyVarKind tv2
-            k1_sub_k2 = k1 `isSubKind` k2
-            k2_sub_k1 = k2 `isSubKind` k1
-
-            nicer_to_update_tv1 = isSystemName (Var.varName tv1)
-                -- Try to update sys-y type variables in preference to ones
-                -- gotten (say) by instantiating a polymorphic function with
-                -- a user-written type sig 
-
-        uMetaVar _ _ _ _ _ _ = panic "uMetaVar"
 \end{code}
 
 

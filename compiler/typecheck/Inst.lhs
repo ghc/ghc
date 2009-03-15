@@ -42,6 +42,7 @@ module Inst (
 
 	mkWantedCo, mkGivenCo, isWantedCo, eqInstCoType, mkIdEqInstCo, 
         mkSymEqInstCo, mkLeftTransEqInstCo, mkRightTransEqInstCo, mkAppEqInstCo,
+        mkTyConEqInstCo, mkFunEqInstCo,
         wantedEqInstIsUnsolved, eitherEqInst, mkEqInst, mkWantedEqInst,
         wantedToLocalEqInst, finalizeEqInst, eqInstType, eqInstCoercion,
         eqInstTys
@@ -62,6 +63,7 @@ import FunDeps
 import TcMType
 import TcType
 import MkCore
+import TyCon
 import Type
 import TypeRep
 import Class
@@ -1076,6 +1078,36 @@ mkAppEqInstCo (Left cotv) (ty1_l, ty2_l) (ty1_r, ty2_r)
        }
 mkAppEqInstCo (Right co) _ _
   = return (Right $ mkLeftCoercion co, Right $ mkRightCoercion co)
+
+-- Coercion transformation: co = con col -> cor
+--
+mkTyConEqInstCo :: EqInstCo -> TyCon -> [(Type, Type)] -> TcM ([EqInstCo])
+mkTyConEqInstCo (Left cotv) con ty12s
+  = do { cotvs <- mapM (uncurry newMetaCoVar) ty12s
+       ; writeMetaTyVar cotv (mkTyConCoercion con (mkTyVarTys cotvs))
+       ; return (map Left cotvs)
+       }
+mkTyConEqInstCo (Right co) _ args
+  = return $ map (\mkCoes -> Right $ foldl (.) id mkCoes co) mkCoes
+    -- make cascades of the form 
+    --   mkRightCoercion (mkLeftCoercion .. (mkLeftCoercion co)..)
+  where
+    n      = length args
+    mkCoes = [mkRightCoercion : replicate i mkLeftCoercion | i <- [n-1, n-2..0]]
+
+-- Coercion transformation: co = col -> cor
+--
+mkFunEqInstCo :: EqInstCo -> (Type, Type) -> (Type, Type)
+              -> TcM (EqInstCo, EqInstCo)
+mkFunEqInstCo (Left cotv) (ty1_l, ty2_l) (ty1_r, ty2_r)
+  = do { cotv_l <- newMetaCoVar ty1_l ty2_l
+       ; cotv_r <- newMetaCoVar ty1_r ty2_r
+       ; writeMetaTyVar cotv (mkFunCoercion (TyVarTy cotv_l) (TyVarTy cotv_r))
+       ; return (Left cotv_l, Left cotv_r)
+       }
+mkFunEqInstCo (Right co) _ _
+  = return (Right $ mkRightCoercion (mkLeftCoercion co), 
+            Right $ mkRightCoercion co)
 \end{code}
 
 Operations on entire EqInst.
