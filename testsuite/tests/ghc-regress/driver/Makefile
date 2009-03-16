@@ -80,6 +80,12 @@ test018:
 	$(TEST_HC) -c F018.hs -odir obj018
 	test -f obj018/TestStub018_stub$(OBJSUFFIX)
 
+# test for bug #3093
+test018a:
+	$(RM) -f F018a.hi F018a_stub.c F018a_stub.h *.obj.018
+	$(TEST_HC) -c F018a.hs -osuf obj.018
+	test -f F018a_stub.obj.018
+
 # test -outputdir
 test019:
 	$(RM) -rf out019
