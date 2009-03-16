@@ -271,8 +271,8 @@ tcFamInstDecl1 :: TyClDecl Name -> TcM TyCon
 tcFamInstDecl1 (decl@TySynonym {tcdLName = L loc tc_name})
   = kcIdxTyPats decl $ \k_tvs k_typats resKind family ->
     do { -- check that the family declaration is for a synonym
-	 unless (isSynTyCon family) $
-	   addErr (wrongKindOfFamily family)
+         checkTc (isOpenTyCon family) (notFamily family)
+       ; checkTc (isSynTyCon family) (wrongKindOfFamily family)
 
        ; -- (1) kind check the right-hand side of the type equation
        ; k_rhs <- kcCheckLHsType (tcdSynRhs decl) resKind
@@ -302,8 +302,8 @@ tcFamInstDecl1 (decl@TyData {tcdND = new_or_data, tcdLName = L loc tc_name,
 			     tcdCons = cons})
   = kcIdxTyPats decl $ \k_tvs k_typats resKind fam_tycon ->
     do { -- check that the family declaration is for the right kind
-	 unless (isAlgTyCon fam_tycon) $
-	   addErr (wrongKindOfFamily fam_tycon)
+         checkTc (isOpenTyCon fam_tycon) (notFamily fam_tycon)
+       ; checkTc (isAlgTyCon fam_tycon) (wrongKindOfFamily fam_tycon)
 
        ; -- (1) kind check the data declaration as usual
        ; k_decl <- kcDataDecl decl k_tvs
@@ -1513,13 +1513,18 @@ wrongNumberOfParmsErr exp_arity
     <+> ppr exp_arity
 
 badBootFamInstDeclErr :: SDoc
-badBootFamInstDeclErr = 
-  ptext (sLit "Illegal family instance in hs-boot file")
+badBootFamInstDeclErr
+  = ptext (sLit "Illegal family instance in hs-boot file")
 
+notFamily :: TyCon -> SDoc
+notFamily tycon
+  = vcat [ ptext (sLit "Illegal family instance for") <+> quotes (ppr tycon)
+         , nest 2 $ parens (ppr tycon <+> ptext (sLit "is not an indexed type family"))]
+  
 wrongKindOfFamily :: TyCon -> SDoc
-wrongKindOfFamily family =
-  ptext (sLit "Wrong category of family instance; declaration was for a") <+>
-  kindOfFamily
+wrongKindOfFamily family
+  = ptext (sLit "Wrong category of family instance; declaration was for a")
+    <+> kindOfFamily
   where
     kindOfFamily | isSynTyCon family = ptext (sLit "type synonym")
 		 | isAlgTyCon family = ptext (sLit "data type")
