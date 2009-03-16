@@ -811,9 +811,9 @@ isEnumerationTyCon _                                                   = False
 
 -- | Is this a 'TyCon', synonym or otherwise, that may have further instances appear?
 isOpenTyCon :: TyCon -> Bool
-isOpenTyCon (SynTyCon {synTcRhs = OpenSynTyCon _ _}) = True
-isOpenTyCon (AlgTyCon {algTcRhs = OpenTyCon {}    }) = True
-isOpenTyCon _					     = False
+isOpenTyCon (SynTyCon {synTcRhs = OpenSynTyCon {}}) = True
+isOpenTyCon (AlgTyCon {algTcRhs = OpenTyCon {}})    = True
+isOpenTyCon _					    = False
 
 -- | Extract the mapping from 'TyVar' indexes to indexes in the corresponding family
 -- argument lists form an open 'TyCon' of any sort, if the given 'TyCon' is indeed
