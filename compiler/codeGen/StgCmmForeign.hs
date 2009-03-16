@@ -54,21 +54,21 @@ cgForeignCall :: [LocalReg]		-- r1,r2  where to put the results
 
 cgForeignCall results result_hints (CCall (CCallSpec target cconv safety)) stg_args
   = do	{ cmm_args <- getFCallArgs stg_args
-	; let (args, arg_hints) = unzip cmm_args
-	      fc = ForeignConvention cconv arg_hints result_hints
-	      (call_args, cmm_target)
-		= case target of
-		   StaticTarget lbl -> (args, CmmLit (CmmLabel 
-						(mkForeignLabel lbl (call_size args) False IsFunction)))
-		   DynamicTarget    ->  case args of
-                                        fn:rest -> (rest, fn)
-                                        [] -> panic "cgForeignCall []"
-	      call_target = ForeignTarget cmm_target fc
-	
-	; srt <- getSRTInfo NoSRT	-- SLPJ: Not sure what SRT 
-					-- is right here
+        ; let ((call_args, arg_hints), cmm_target)
+                = case target of
+                    StaticTarget lbl ->
+                      (unzip cmm_args,
+                       CmmLit (CmmLabel (mkForeignLabel lbl (call_size cmm_args) False IsFunction)))
+                    DynamicTarget    ->  case cmm_args of
+                                           (fn,_):rest -> (unzip rest, fn)
+                                           [] -> panic "cgForeignCall []"
+              fc = ForeignConvention cconv arg_hints result_hints
+              call_target = ForeignTarget cmm_target fc
+        
+        ; srt <- getSRTInfo NoSRT        -- SLPJ: Not sure what SRT 
+                                        -- is right here
                                         -- JD: Does it matter in the new codegen?
-	; emitForeignCall safety results call_target call_args srt CmmMayReturn }
+        ; emitForeignCall safety results call_target call_args srt CmmMayReturn }
   where
 	-- in the stdcall calling convention, the symbol needs @size appended
 	-- to it, where size is the total number of bytes of arguments.  We
@@ -79,7 +79,7 @@ cgForeignCall results result_hints (CCall (CCallSpec target cconv safety)) stg_a
 	| otherwise            = Nothing
 
 	-- ToDo: this might not be correct for 64-bit API
-      arg_size arg = max (widthInBytes $ typeWidth $ cmmExprType arg) wORD_SIZE
+      arg_size (arg, _) = max (widthInBytes $ typeWidth $ cmmExprType arg) wORD_SIZE
 
 cgForeignCall _ _ (DNCall _) _
   = panic "cgForeignCall: DNCall"
