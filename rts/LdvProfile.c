@@ -266,7 +266,9 @@ processChainForDead( bdescr *bd )
 {
     // Any object still in the chain is dead!
     while (bd != NULL) {
-	processHeapClosureForDead((StgClosure *)bd->start);
+        if (!(bd->flags & BF_PINNED)) {
+            processHeapClosureForDead((StgClosure *)bd->start);
+        }
 	bd = bd->link;
     }
 }
