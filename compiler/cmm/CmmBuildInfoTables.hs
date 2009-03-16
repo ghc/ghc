@@ -165,15 +165,15 @@ cafLattice = DataflowLattice "live cafs" emptyFM add False
 
 cafTransfers :: BackwardTransfers Middle Last CAFSet
 cafTransfers = BackwardTransfers first middle last
-    where first  _ live = live
-          middle m live = foldExpDeepMiddle addCaf m live
-          last   l env  = foldExpDeepLast   addCaf l (joinOuts cafLattice env l)
-          addCaf e set = case e of
-                 CmmLit (CmmLabel c)              -> add c set
-                 CmmLit (CmmLabelOff c _)         -> add c set
-                 CmmLit (CmmLabelDiffOff c1 c2 _) -> add c1 $ add c2 set
-                 _ -> set
-          add l s = if hasCAF l then addToFM s (cvtToClosureLbl l) () else s
+  where first  _ live = live
+        middle m live = foldExpDeepMiddle addCaf m live
+        last   l env  = foldExpDeepLast   addCaf l (joinOuts cafLattice env l)
+        addCaf e set = case e of
+               CmmLit (CmmLabel c)              -> add c set
+               CmmLit (CmmLabelOff c _)         -> add c set
+               CmmLit (CmmLabelDiffOff c1 c2 _) -> add c1 $ add c2 set
+               _ -> set
+        add l s = if hasCAF l then addToFM s (cvtToClosureLbl l) () else s
 
 type CafFix a = FuelMonad (BackwardFixedPoint Middle Last CAFSet a)
 cafAnal :: LGraph Middle Last -> FuelMonad CAFEnv

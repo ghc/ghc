@@ -456,7 +456,8 @@ pprMiddle stmt = pp_stmt <+> pp_debug
              MidForeignCall {} -> text "MidForeignCall"
 
 ppr_fc :: ForeignConvention -> SDoc
-ppr_fc (ForeignConvention c _ _) = doubleQuotes (ppr c)
+ppr_fc (ForeignConvention c args res) =
+  doubleQuotes (ppr c) <+> text "args: " <+> ppr args <+> text " results: " <+> ppr res
 
 ppr_safety :: ForeignSafety -> SDoc
 ppr_safety (Safe bid upd) = text "safe<" <> ppr bid <> text ", " <> ppr upd <> text ">"

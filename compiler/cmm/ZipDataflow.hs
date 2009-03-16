@@ -513,55 +513,46 @@ forward_sol check_maybe = forw
              set_or_save = mk_set_or_save (isJust . lookupBlockEnv blockenv)
              set_successor_facts (Block id tail) fuel =
                do { idfact <- getFact id
-                  ; (last_outs, fuel) <-
-                      case check_maybe fuel $ fr_first rewrites id idfact of
-                        Nothing -> solve_tail (ft_first_out transfers id idfact) tail fuel
-                        Just g ->
-                          do g <- areturn g
-                             (a, fuel) <- subAnalysis' $
-                               case rewrite of
-                                 RewriteDeep -> solve getExitFact idfact g (oneLessFuel fuel)
-                                 RewriteShallow ->
-                                     do { a <- anal_f getExitFact idfact g
-                                        ; return (a, oneLessFuel fuel) }
-                             solve_tail a tail fuel
+                  ; (last_outs, fuel) <- rec_rewrite (fr_first rewrites id idfact)
+                                                (ft_first_out transfers id idfact)
+                                                getExitFact (solve_tail tail)
+                                                (solve_tail tail) idfact fuel
                   ; set_or_save last_outs
                   ; return fuel }
-
-         in do { (last_outs, fuel) <- solve_tail in_fact entry fuel
-               ; set_or_save last_outs                                    
+         in do { (last_outs, fuel) <- solve_tail entry in_fact fuel
+                   -- last_outs contains a mix of internal facts, which
+                   -- are inputs to 'run', and external facts, which
+                   -- are going to be forgotten by 'run'
+               ; set_or_save last_outs
                ; fuel <- run "forward" name set_successor_facts blocks fuel
-               ; b <- finish
+               ; set_or_save last_outs
+                   -- Re-set facts that may have been forgotten by run
+               ; b <-  finish
                ; return (b, fuel)
                }
-
-       solve_tail in' (G.ZTail m t) fuel =
-         case check_maybe fuel $ fr_middle rewrites m in' of
-           Nothing -> solve_tail (ft_middle_out transfers m in') t fuel
-           Just g ->
-             do { g <- areturn g
-                ; (a, fuel) <- subAnalysis' $
-                     case rewrite of
-                       RewriteDeep -> solve getExitFact in' g (oneLessFuel fuel)
-                       RewriteShallow -> do { a <- anal_f getExitFact in' g
-                                            ; return (a, oneLessFuel fuel) }
-                ; solve_tail a t fuel
-                }
-       solve_tail in' (G.ZLast l) fuel = 
-         case check_maybe fuel $ either_last rewrites in' l of
-           Nothing ->
-               case l of LastOther l -> return (ft_last_outs transfers l in', fuel)
-                         LastExit -> do { setExitFact (ft_exit_out transfers in')
-                                        ; return (LastOutFacts [], fuel) }
-           Just g ->
-             do { g <- areturn g
-                ; (last_outs :: LastOutFacts a, fuel) <- subAnalysis' $
-                    case rewrite of
-                      RewriteDeep -> solve lastOutFacts in' g (oneLessFuel fuel)
-                      RewriteShallow -> do { los <- anal_f lastOutFacts in' g
-                                           ; return (los, fuel) }
-                ; return (last_outs, fuel)
-                } 
+       -- The need for both k1 and k2 suggests that maybe there's an opportunity
+       -- for improvement here -- in most cases, they're the same...
+       rec_rewrite rewritten analyzed finish k1 k2 in' fuel =
+         case check_maybe fuel rewritten of -- fr_first rewrites id idfact of
+           Nothing -> k1 analyzed fuel
+           Just g -> do g <- areturn g
+                        (a, fuel) <- subAnalysis' $
+                          case rewrite of
+                            RewriteDeep -> solve finish in' g (oneLessFuel fuel)
+                            RewriteShallow -> do { a <- anal_f finish in' g
+                                                 ; return (a, oneLessFuel fuel) }
+                        k2 a fuel
+       solve_tail (G.ZTail m t) in' fuel =
+         rec_rewrite (fr_middle rewrites m in') (ft_middle_out transfers m in')
+                     getExitFact (solve_tail t) (solve_tail t) in' fuel
+       solve_tail (G.ZLast (LastOther l)) in' fuel = 
+         rec_rewrite (fr_last rewrites l in') (ft_last_outs transfers l in')
+                     lastOutFacts k k in' fuel
+           where k a b = return (a, b)
+       solve_tail (G.ZLast LastExit) in' fuel =
+         rec_rewrite (fr_exit rewrites in') (ft_exit_out transfers in')
+                     lastOutFacts k (\a b -> return (a, b)) in' fuel
+           where k a fuel = do { setExitFact a ; return (LastOutFacts [], fuel) }
 
        fixed_point in_fact g fuel =
          do { setAllFacts start_facts
@@ -572,10 +563,6 @@ forward_sol check_maybe = forw
             ; let fp = FFP cfp last_outs
             ; return (fp, fuel)
             }
-
-       either_last rewrites in' (LastExit)    = fr_exit rewrites in'
-       either_last rewrites in' (LastOther l) = fr_last rewrites l in'
-
    in fixed_point
 
 
@@ -585,7 +572,7 @@ mk_set_or_save :: (DataflowAnalysis df, Monad (df a), Outputable a) =>
                   (BlockId -> Bool) -> LastOutFacts a -> df a ()
 mk_set_or_save is_local (LastOutFacts l) = mapM_ set_or_save_one l
     where set_or_save_one (id, a) =
-              if is_local id then setFact id a else addLastOutFact (id, a)
+              if is_local id then setFact id a else pprTrace "addLastOutFact" (ppr $ length l) $ addLastOutFact (id, a)
 
 
 
@@ -619,6 +606,7 @@ forward_rew check_maybe = forw
                   -> a -> Graph m l -> Fuel
                   -> DFM a (b, Graph m l, Fuel)
           rewrite start finish in_fact g fuel =
+           in_fact `seq` g `seq`
             let Graph entry blockenv = g
                 blocks = G.postorder_dfs_from blockenv entry
             in do { solve depth name start transfers rewrites in_fact g fuel
@@ -647,6 +635,7 @@ forward_rew check_maybe = forw
                  ; let fp = FFP cfp last_outs
                  ; return (fp, fuel)
                  }
+-- JD: WHY AREN'T WE TAKING ANY FUEL HERE?
           rewrite_blocks :: [Block m l] -> (BlockEnv (Block m l))
                          -> Fuel -> DFM a (BlockEnv (Block m l), Fuel)
           rewrite_blocks [] rewritten fuel = return (rewritten, fuel)
@@ -667,10 +656,11 @@ forward_rew check_maybe = forw
                                ; rewrite_blocks bs rewritten fuel }
 
           rew_tail head in' (G.ZTail m t) rewritten fuel =
+           in' `seq` rewritten `seq`
             my_trace "Rewriting middle node" (ppr m) $
             case check_maybe fuel $ fr_middle rewrites m in' of
               Nothing -> rew_tail (G.ZHead head m) (ft_middle_out transfers m in') t
-                         rewritten fuel
+                                  rewritten fuel
               Just g -> do { markGraphRewritten
                            ; g <- areturn g
                            ; (a, g, fuel) <- inner_rew getExitFact in' g fuel
@@ -678,13 +668,15 @@ forward_rew check_maybe = forw
                            ; rew_tail h a t (blocks `plusBlockEnv` rewritten) fuel
                            }
           rew_tail h in' (G.ZLast l) rewritten fuel = 
+           in' `seq` rewritten `seq`
             my_trace "Rewriting last node" (ppr l) $
             case check_maybe fuel $ either_last rewrites in' l of
               Nothing -> do check_facts in' l
                             return (insertBlock (zipht h (G.ZLast l)) rewritten, fuel)
-              Just g -> do { markGraphRewritten
+              Just g ->  do { markGraphRewritten
                            ; g <- areturn g
-                           ; ((), g, fuel) <- inner_rew (return ()) in' g fuel
+                           ; ((), g, fuel) <-
+                               my_trace "Just" (ppr g) $ inner_rew (return ()) in' g fuel
                            ; let g' = G.splice_head_only' h g
                            ; return (G.lg_blocks g' `plusBlockEnv` rewritten, fuel)
                            }
@@ -1010,10 +1002,9 @@ run dir name do_block blocks b =
                     do_block block b
             return (b', cnt + 1)
      iterate n = 
-         do { markFactsUnchanged
-            ; (b, _) <-
-                 my_trace "block count:" (ppr (length blocks)) $
-                   foldM trace_block (b, 0 :: Int) blocks
+         do { forgetLastOutFacts
+            ; markFactsUnchanged
+            ; (b, _) <- foldM trace_block (b, 0 :: Int) blocks
             ; changed <- factsStatus
             ; facts <- getAllFacts
             ; let depth = 0 -- was nesting depth

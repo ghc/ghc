@@ -85,23 +85,34 @@ cpsTop hsc_env (CmmProc h l args (stackInfo@(entry_off, _), g)) =
        g <- return $ elimCommonBlocks g
        dump Opt_D_dump_cmmz "Post common block elimination" g
        procPoints <- run $ minimalProcPointSet callPPs g
-       -- print $ "call procPoints: " ++ (showSDoc $ ppr procPoints)
        g <- run $ addProcPointProtocols callPPs procPoints g
        dump Opt_D_dump_cmmz "Post Proc Points Added" g
-       g     <- dual_rewrite Opt_D_dump_cmmz "spills and reloads"
+       g     <- 
+              -- pprTrace "pre Spills" (ppr g) $
+                dual_rewrite Opt_D_dump_cmmz "spills and reloads"
                              (dualLivenessWithInsertion procPoints) g
                     -- Insert spills at defns; reloads at return points
-       g     <- run $ insertLateReloads g -- Duplicate reloads just before uses
+       g     <-
+              -- pprTrace "pre insertLateReloads" (ppr g) $
+                run $ insertLateReloads g -- Duplicate reloads just before uses
        dump Opt_D_dump_cmmz "Post late reloads" g
-       g     <- dual_rewrite Opt_D_dump_cmmz "Dead Assignment Elimination"
+       g     <-
+               -- pprTrace "post insertLateReloads" (ppr g) $
+                dual_rewrite Opt_D_dump_cmmz "Dead Assignment Elimination"
                                         (removeDeadAssignmentsAndReloads procPoints) g
                     -- Remove redundant reloads (and any other redundant asst)
        -- Debugging: stubbing slots on death can cause crashes early
-       g <-  if opt_StubDeadValues then run $ stubSlotsOnDeath g else return g
+       g <-  
+           -- trace "post dead-assign elim" $
+            if opt_StubDeadValues then run $ stubSlotsOnDeath g else return g
        slotEnv <- run $ liveSlotAnal g
        mbpprTrace "live slot analysis results: " (ppr slotEnv) $ return ()
-       cafEnv <- run $ cafAnal g
-       (cafEnv, slotEnv) <- return $ extendEnvsForSafeForeignCalls cafEnv slotEnv g
+       cafEnv <- 
+                -- trace "post liveSlotAnal" $
+                 run $ cafAnal g
+       (cafEnv, slotEnv) <-
+        -- trace "post print cafAnal" $
+          return $ extendEnvsForSafeForeignCalls cafEnv slotEnv g
        mbpprTrace "slotEnv extended for safe foreign calls: " (ppr slotEnv) $ return ()
        let areaMap = layout procPoints slotEnv entry_off g
        mbpprTrace "areaMap" (ppr areaMap) $ return ()

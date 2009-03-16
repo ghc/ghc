@@ -59,14 +59,14 @@ data DataflowLattice a = DataflowLattice  {
 -- case of DFM, parameterized over any monad.
 -- In practice, we apply DFM' to the FuelMonad, which provides optimization fuel and
 -- the unique supply.
-data DFState f = DFState { df_rewritten    :: ChangeFlag
-                         , df_facts        :: BlockEnv f
-                         , df_exit_fact    :: f
-                         , df_last_outs    :: [(BlockId, f)]
-                         , df_facts_change :: ChangeFlag
+data DFState f = DFState { df_rewritten    :: !ChangeFlag
+                         , df_facts        :: !(BlockEnv f)
+                         , df_exit_fact    :: !f
+                         , df_last_outs    :: ![(BlockId, f)]
+                         , df_facts_change :: !ChangeFlag
                          }
 
-newtype DFM' m fact a = DFM' (DataflowLattice fact -> DFState  fact
+newtype DFM' m fact a = DFM' (DataflowLattice fact -> DFState fact
                                                    -> m (a, DFState  fact))
 type DFM fact a = DFM' FuelMonad fact a
 
@@ -190,7 +190,7 @@ graphWasRewritten = DFM' f
                     
 instance Monad m => Monad (DFM' m f) where
   DFM' f >>= k = DFM' (\l s -> do (a, s') <- f l s
-                                  let DFM' f' = k a in f' l s')
+                                  s' `seq` case k a of DFM' f' -> f' l s')
   return a = DFM' (\_ s -> return (a, s))
 
 instance FuelUsingMonad (DFM' FuelMonad f) where

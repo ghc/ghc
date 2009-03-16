@@ -66,7 +66,7 @@ changeRegs  f live = live { in_regs  = f (in_regs  live) }
 
 dualLiveLattice :: DataflowLattice DualLive
 dualLiveLattice =
-      DataflowLattice "variables live in registers and on stack" empty add False
+      DataflowLattice "variables live in registers and on stack" empty add True
     where empty = DualLive emptyRegSet emptyRegSet
           -- | compute in the Tx monad to track whether anything has changed
           add new old = do stack <- add1 (on_stack new) (on_stack old)

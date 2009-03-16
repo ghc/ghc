@@ -1,4 +1,3 @@
-
 module CmmTx where
 
 data ChangeFlag = NoChange | SomeChange
