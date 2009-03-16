@@ -4,13 +4,6 @@
 Functions over HsSyn specialised to RdrName.
 
 \begin{code}
-{-# OPTIONS -fno-warn-incomplete-patterns #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module RdrHsSyn (
 	extractHsTyRdrTyVars, 
 	extractHsRhoRdrTyVars, extractGenericPatTyVars,
@@ -42,7 +35,8 @@ module RdrHsSyn (
 	checkPrecP, 	      -- Int -> P Int
 	checkContext,	      -- HsType -> P HsContext
 	checkPred,	      -- HsType -> P HsPred
-	checkTyClHdr,         -- LHsContext RdrName -> LHsType RdrName -> P (LHsContext RdrName, Located RdrName, [LHsTyVarBndr RdrName], [LHsType RdrName])
+	checkTyClHdr,         -- LHsContext RdrName -> LHsType RdrName
+                              -- -> P (LHsContext RdrName, Located RdrName, [LHsTyVarBndr RdrName], [LHsType RdrName])
 	checkTyVars,          -- [LHsType RdrName] -> P ()
 	checkSynHdr,	      -- LHsType RdrName -> P (Located RdrName, [LHsTyVarBndr RdrName], [LHsType RdrName])
 	checkKindSigs,	      -- [LTyClDecl RdrName] -> P ()
@@ -80,6 +74,8 @@ import FastString
 
 import List		( isSuffixOf, nubBy )
 import Monad		( unless )
+
+#include "HsVersions.h"
 \end{code}
 
 
@@ -225,8 +221,8 @@ cvTopDecls decls = go (fromOL decls)
 cvBindGroup :: OrdList (LHsDecl RdrName) -> HsValBinds RdrName
 cvBindGroup binding
   = case cvBindsAndSigs binding of
-      (mbs, sigs, [], _) ->                 -- list of type decls *always* empty
-        ValBindsIn mbs sigs
+      (mbs, sigs, tydecls, _) -> ASSERT( null tydecls )
+      	    	  	         ValBindsIn mbs sigs
 
 cvBindsAndSigs :: OrdList (LHsDecl RdrName)
   -> (Bag (LHsBind RdrName), [LSig RdrName], [LTyClDecl RdrName], [LDocDecl RdrName])
@@ -237,14 +233,15 @@ cvBindsAndSigs  fb = go (fromOL fb)
   where
     go [] 		   = (emptyBag, [], [], [])
     go (L l (SigD s) : ds) = (bs, L l s : ss, ts, docs)
-			    where (bs, ss, ts, docs) = go ds
+			   where (bs, ss, ts, docs) = go ds
     go (L l (ValD b) : ds) = (b' `consBag` bs, ss, ts, docs)
-			    where (b', ds')    = getMonoBind (L l b) ds
-				  (bs, ss, ts, docs) = go ds'
+			   where (b', ds')    = getMonoBind (L l b) ds
+				 (bs, ss, ts, docs) = go ds'
     go (L l (TyClD t): ds) = (bs, ss, L l t : ts, docs)
-			    where (bs, ss, ts, docs) = go ds
-    go (L l (DocD d) : ds)     =  (bs, ss, ts, (L l d) : docs)
-			    where (bs, ss, ts, docs) = go ds
+			   where (bs, ss, ts, docs) = go ds
+    go (L l (DocD d) : ds) =  (bs, ss, ts, (L l d) : docs)
+			   where (bs, ss, ts, docs) = go ds
+    go (L _ d : _)        = pprPanic "cvBindsAndSigs" (ppr d)
 
 -----------------------------------------------------------------------------
 -- Group function bindings into equation groups
@@ -285,6 +282,7 @@ getMonoBind (L loc1 (FunBind { fun_id = fun_id1@(L _ f1), fun_infix = is_infix1,
 getMonoBind bind binds = (bind, binds)
 
 has_args :: [LMatch RdrName] -> Bool
+has_args [] 	    	     	      = panic "RdrHsSyn:has_args"
 has_args ((L _ (Match args _ _)) : _) = not (null args)
 	-- Don't group together FunBinds if they have
 	-- no arguments.  This is necessary now that variable bindings
@@ -359,9 +357,11 @@ add gp l (DocD d) ds
 
 add_bind :: LHsBind a -> HsValBinds a -> HsValBinds a
 add_bind b (ValBindsIn bs sigs) = ValBindsIn (bs `snocBag` b) sigs
+add_bind _ (ValBindsOut {})     = panic "RdrHsSyn:add_bind"
 
 add_sig :: LSig a -> HsValBinds a -> HsValBinds a
-add_sig  s (ValBindsIn bs sigs) = ValBindsIn bs	              (s:sigs) 
+add_sig s (ValBindsIn bs sigs) = ValBindsIn bs (s:sigs) 
+add_sig _ (ValBindsOut {})     = panic "RdrHsSyn:add_sig"
 \end{code}
 
 %************************************************************************
@@ -541,13 +541,14 @@ extractTyVars tvs = collects tvs []
     collect (L _ (HsNumTy _         )) = return
     collect (L l (HsPredTy _        )) = 
       const $ parseError l "Predicate not allowed as type parameter"
-    collect (L l (HsKindSig (L _ (HsTyVar tv)) k))
-	| isRdrTyVar tv                = 
-	  return . (L l (KindedTyVar tv k) :)
-	| otherwise                    =
-	  const $ parseError l "Kind signature only allowed for type variables"
+    collect (L l (HsKindSig (L _ ty) k))
+	| HsTyVar tv <- ty, isRdrTyVar tv
+	= return . (L l (KindedTyVar tv k) :)
+	| otherwise
+	= const $ parseError l "Kind signature only allowed for type variables"
     collect (L l (HsSpliceTy _      )) = 
       const $ parseError l "Splice not allowed as type parameter"
+    collect (L _ (HsDocTy t _       )) = collect t
 
         -- Collect all variables of a list of types
     collects []     = return
@@ -634,6 +635,7 @@ checkDoMDo _   nm loc []   = parseError loc ("Empty " ++ nm ++ " construct")
 checkDoMDo pre nm _   ss   = do
   check ss
   where 
+	check  []                     = panic "RdrHsSyn:checkDoMDo"
 	check  [L _ (ExprStmt e _ _)] = return ([], e)
 	check  [L l _] = parseError l ("The last statement in " ++ pre ++ nm ++
 					 " construct must be an expression")
