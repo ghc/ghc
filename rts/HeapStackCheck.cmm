@@ -63,11 +63,11 @@ import LeaveCriticalSection;
 #define GC_GENERIC						\
     DEBUG_ONLY(foreign "C" heapCheckFail());			\
     if (Hp > HpLim) {						\
+        Hp = Hp - HpAlloc/*in bytes*/;				\
         if (HpLim == 0) { \
                 R1 = ThreadYielding;				\
                 goto sched;					\
         }						\
-        Hp = Hp - HpAlloc/*in bytes*/;				\
         if (HpAlloc <= BLOCK_SIZE				\
             && bdescr_link(CurrentNursery) != NULL) {		\
             CLOSE_NURSERY();					\
