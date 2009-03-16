@@ -1,12 +1,12 @@
 
 drvfail-functor2.hs:7:13:
     Can't make a derived instance of `Functor InFunctionArgument'
-      (`InFunctionArgument' uses the type variable in a function argument)
+      (Constructor `InFunctionArgument' uses the type variable in a function argument)
     In the newtype declaration for `InFunctionArgument'
 
 drvfail-functor2.hs:10:13:
     Can't make a derived instance of `Functor OnSecondArg'
-      (`OnSecondArg' uses the type variable in an argument other than the last)
+      (Constructor `OnSecondArg' uses the type variable in an argument other than the last)
     In the newtype declaration for `OnSecondArg'
 
 drvfail-functor2.hs:15:13:

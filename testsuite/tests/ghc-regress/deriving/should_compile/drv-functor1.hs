@@ -55,7 +55,7 @@ data Existential b
     = forall a. ExistentialList [a]
     | forall f. Functor f => ExistentialFunctor (f b)
     | forall b. SneakyUseSameName (b -> Bool)
---  deriving (Functor)
+  -- deriving (Functor)
 
 -- Don't get confused by synonyms
 type IntFun a = Int -> a

@@ -21,20 +21,20 @@ drvfail-foldable-traversable1.hs:13:21:
 
 drvfail-foldable-traversable1.hs:17:21:
     Can't make a derived instance of `Foldable Infinite'
-      (`Infinite' contains function types)
+      (Constructor `Infinite' contains function types)
     In the data type declaration for `Infinite'
 
 drvfail-foldable-traversable1.hs:17:30:
     Can't make a derived instance of `Traversable Infinite'
-      (`Infinite' contains function types)
+      (Constructor `Infinite' contains function types)
     In the data type declaration for `Infinite'
 
 drvfail-foldable-traversable1.hs:21:21:
     Can't make a derived instance of `Foldable (Cont r)'
-      (`Cont' contains function types)
+      (Constructor `Cont' contains function types)
     In the data type declaration for `Cont'
 
 drvfail-foldable-traversable1.hs:21:30:
     Can't make a derived instance of `Traversable (Cont r)'
-      (`Cont' contains function types)
+      (Constructor `Cont' contains function types)
     In the data type declaration for `Cont'
