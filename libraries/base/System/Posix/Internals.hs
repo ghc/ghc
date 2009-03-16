@@ -23,7 +23,9 @@
 -- #hide
 module System.Posix.Internals where
 
-#ifndef __NHC__
+#ifdef __NHC__
+#define HTYPE_TCFLAG_T
+#else
 # include "HsBaseConfig.h"
 #endif
 
@@ -245,7 +247,7 @@ tcSetAttr fd fun = do
         -- wrapper which temporarily blocks SIGTTOU around the call, making it
         -- transparent.
         allocaBytes sizeof_sigset_t $ \ p_sigset -> do
-        allocaBytes sizeof_sigset_t $ \ p_old_sigset -> do
+          allocaBytes sizeof_sigset_t $ \ p_old_sigset -> do
              c_sigemptyset p_sigset
              c_sigaddset   p_sigset const_sigttou
              c_sigprocmask const_sig_block p_sigset p_old_sigset
