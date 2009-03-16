@@ -795,9 +795,9 @@ sideConditions cls
   | cls_key == ixClassKey      	   = Just (cond_std `andCond` cond_enumOrProduct)
   | cls_key == boundedClassKey 	   = Just (cond_std `andCond` cond_enumOrProduct)
   | cls_key == dataClassKey    	   = Just (cond_mayDeriveDataTypeable `andCond` cond_std `andCond` cond_noUnliftedArgs)
-  | cls_key == functorClassKey 	   = Just (cond_std `andCond` cond_functorOK True)
-  | cls_key == foldableClassKey	   = Just (cond_std `andCond` cond_functorOK False)
-  | cls_key == traversableClassKey = Just (cond_std `andCond` cond_functorOK False)
+  | cls_key == functorClassKey 	   = Just (cond_functorOK True)	 -- NB: no cond_std!
+  | cls_key == foldableClassKey	   = Just (cond_functorOK False) -- Functor/Fold/Trav works ok for rank-n types
+  | cls_key == traversableClassKey = Just (cond_functorOK False)
   | getName cls `elem` typeableClassNames = Just (cond_mayDeriveDataTypeable `andCond` cond_typeableOK)
   | otherwise = Nothing
   where
@@ -826,15 +826,21 @@ andCond c1 c2 tc = case c1 tc of
 
 cond_std :: Condition
 cond_std (_, rep_tc)
-  | any (not . isVanillaDataCon) data_cons = Just existential_why     
-  | null data_cons		    	   = Just no_cons_why
-  | otherwise      			   = Nothing
+  | null data_cons      = Just no_cons_why
+  | not (null con_whys) = Just (vcat con_whys)
+  | otherwise      	= Nothing
   where
     data_cons       = tyConDataCons rep_tc
     no_cons_why	    = quotes (pprSourceTyCon rep_tc) <+> 
 		      ptext (sLit "has no data constructors")
-    existential_why = quotes (pprSourceTyCon rep_tc) <+> 
-		      ptext (sLit "has non-Haskell-98 constructor(s)")
+
+    con_whys = mapCatMaybes check_con data_cons
+
+    check_con :: DataCon -> Maybe SDoc
+    check_con con 
+      | isVanillaDataCon con
+      , all isTauTy (dataConOrigArgTys con) = Nothing
+      | otherwise = Just (badCon con (ptext (sLit "does not have a Haskell-98 type")))
   
 cond_enumOrProduct :: Condition
 cond_enumOrProduct = cond_isEnumeration `orCond` 
@@ -849,8 +855,7 @@ cond_noUnliftedArgs (_, tc)
   where
     bad_cons = [ con | con <- tyConDataCons tc
 		     , any isUnLiftedType (dataConOrigArgTys con) ]
-    why = ptext (sLit "Constructor") <+> quotes (ppr (head bad_cons))
-	  <+> ptext (sLit "has arguments of unlifted type")
+    why = badCon (head bad_cons) (ptext (sLit "has arguments of unlifted type"))
 
 cond_isEnumeration :: Condition
 cond_isEnumeration (_, rep_tc)
@@ -903,22 +908,26 @@ cond_functorOK allowFunctions (dflags, rep_tc)
   = msum (map check_con data_cons)	-- msum picks the first 'Just', if any
   where
     data_cons = tyConDataCons rep_tc
-    check_con con = msum (foldDataConArgs ft_check con)
+    check_con con = msum (check_vanilla con : foldDataConArgs (ft_check con) con)
 
-    ft_check :: FFoldType (Maybe SDoc)
-    ft_check = FT { ft_triv = Nothing, ft_var = Nothing, ft_co_var = Just covariant
-	      	  , ft_fun = \x y -> if allowFunctions then x `mplus` y else Just functions
-                  , ft_tup = \_ xs  -> msum xs
-                  , ft_ty_app = \_ x   -> x
-                  , ft_bad_app = Just wrong_arg
-                  , ft_forall = \_ x   -> x }
+    check_vanilla :: DataCon -> Maybe SDoc
+    check_vanilla con | isVanillaDataCon con = Nothing
+    		      | otherwise	     = Just (badCon con existential)
+
+    ft_check :: DataCon -> FFoldType (Maybe SDoc)
+    ft_check con = FT { ft_triv = Nothing, ft_var = Nothing
+                      , ft_co_var = Just (badCon con covariant)
+	      	      , ft_fun = \x y -> if allowFunctions then x `mplus` y 
+                                                           else Just (badCon con functions)
+                      , ft_tup = \_ xs  -> msum xs
+                      , ft_ty_app = \_ x   -> x
+                      , ft_bad_app = Just (badCon con wrong_arg)
+                      , ft_forall = \_ x   -> x }
                     
-    covariant = quotes (pprSourceTyCon rep_tc) <+> 
-                ptext (sLit "uses the type variable in a function argument")
-    functions = quotes (pprSourceTyCon rep_tc) <+> 
-                ptext (sLit "contains function types")
-    wrong_arg = quotes (pprSourceTyCon rep_tc) <+> 
-                ptext (sLit "uses the type variable in an argument other than the last")
+    existential = ptext (sLit "has existential arguments")
+    covariant 	= ptext (sLit "uses the type variable in a function argument")
+    functions 	= ptext (sLit "contains function types")
+    wrong_arg 	= ptext (sLit "uses the type variable in an argument other than the last")
 
 cond_mayDeriveDataTypeable :: Condition
 cond_mayDeriveDataTypeable (dflags, _)
@@ -941,6 +950,9 @@ new_dfun_name clas tycon 	-- Just a simple wrapper
 	; newDFunName clas [mkTyConApp tycon []] loc }
 	-- The type passed to newDFunName is only used to generate
 	-- a suitable string; hence the empty type arg list
+
+badCon :: DataCon -> SDoc -> SDoc
+badCon con msg = ptext (sLit "Constructor") <+> quotes (ppr con) <+> msg
 \end{code}
 
 Note [Superclasses of derived instance] 
