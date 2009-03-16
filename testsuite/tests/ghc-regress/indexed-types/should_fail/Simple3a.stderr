@@ -1,3 +1,5 @@
 
 Simple3a.hs:10:2:
     Wrong category of family instance; declaration was for a data type
+    In the type synonym instance declaration for `S1'
+    In the instance declaration for `C1 Int'
