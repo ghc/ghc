@@ -498,23 +498,14 @@ mkStubPaths dflags mod location
 
         stub_basename = stub_basename0 ++ "_stub"
 
-        -- this is the filename we're going to use when
-        -- \#including the stub_h file from the .hc file.
-        -- Without -stubdir, we just #include the basename
-        -- (eg. for a module A.B, we #include "B_stub.h"),
-        -- relying on the fact that we add an implicit -I flag
-        -- for the directory in which the source file resides
-        -- (see DriverPipeline.hs).  With -stubdir, we
-        -- \#include "A/B.h", assuming that the user has added
-        -- -I<dir> along with -stubdir <dir>.
-        include_basename
-                | Just _ <- stubdir = mod_basename 
-                | otherwise         = takeFileName src_basename
+        obj  = ml_obj_file location
+        osuf = objectSuf dflags
+        stub_obj_base = dropTail (length osuf + 1) obj ++ "_stub"
+                        -- NB. not takeFileName, see #3093
      in
         (stub_basename <.> "c",
          stub_basename <.> "h",
-         (include_basename ++ "_stub") <.> "h")
-        -- the _stub.o filename is derived from the ml_obj_file.
+         stub_obj_base <.> objectSuf dflags)
 
 -- -----------------------------------------------------------------------------
 -- findLinkable isn't related to the other stuff in here, 

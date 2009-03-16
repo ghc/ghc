@@ -260,11 +260,10 @@ compile' (nothingCompiler, interactiveCompiler, batchCompiler)
 compileStub :: GhcMonad m => HscEnv -> Module -> ModLocation
             -> m FilePath
 compileStub hsc_env mod location = do
-	let (o_base, o_ext) = splitExtension (ml_obj_file location)
-	    stub_o = (o_base ++ "_stub") <.> o_ext
-
 	-- compile the _stub.c file w/ gcc
-	let (stub_c,_,_) = mkStubPaths (hsc_dflags hsc_env) (moduleName mod) location
+	let (stub_c,_,stub_o) = mkStubPaths (hsc_dflags hsc_env) 
+                                   (moduleName mod) location
+
 	runPipeline StopLn hsc_env (stub_c,Nothing)  Nothing
 		(SpecificFile stub_o) Nothing{-no ModLocation-}
 
