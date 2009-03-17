@@ -320,10 +320,9 @@ giveCapabilityToTask (Capability *cap USED_IF_DEBUG, Task *task)
 {
     ASSERT_LOCK_HELD(&cap->lock);
     ASSERT(task->cap == cap);
-    trace(TRACE_sched | DEBUG_sched,
-	  "passing capability %d to %s %p",
-	  cap->no, task->tso ? "bound task" : "worker",
-	  (void *)task->id);
+    debugTrace(DEBUG_sched, "passing capability %d to %s %p",
+               cap->no, task->tso ? "bound task" : "worker",
+               (void *)task->id);
     ACQUIRE_LOCK(&task->lock);
     task->wakeup = rtsTrue;
     // the wakeup flag is needed because signalCondition() doesn't
@@ -365,8 +364,7 @@ releaseCapability_ (Capability* cap,
 
     if (waiting_for_gc == PENDING_GC_SEQ) {
       last_free_capability = cap; // needed?
-      trace(TRACE_sched | DEBUG_sched, 
-	    "GC pending, set capability %d free", cap->no);
+      debugTrace(DEBUG_sched, "GC pending, set capability %d free", cap->no);
       return;
     } 
 
@@ -407,7 +405,7 @@ releaseCapability_ (Capability* cap,
     }
 
     last_free_capability = cap;
-    trace(TRACE_sched | DEBUG_sched, "freeing capability %d", cap->no);
+    debugTrace(DEBUG_sched, "freeing capability %d", cap->no);
 }
 
 void
@@ -542,7 +540,7 @@ waitForReturnCapability (Capability **pCap, Task *task)
 
     ASSERT_FULL_CAPABILITY_INVARIANTS(cap,task);
 
-    trace(TRACE_sched | DEBUG_sched, "resuming capability %d", cap->no);
+    debugTrace(DEBUG_sched, "resuming capability %d", cap->no);
 
     *pCap = cap;
 #endif
@@ -560,7 +558,9 @@ yieldCapability (Capability** pCap, Task *task)
 
     if (waiting_for_gc == PENDING_GC_PAR) {
 	debugTrace(DEBUG_sched, "capability %d: becoming a GC thread", cap->no);
+        postEvent(cap, EVENT_GC_START, 0, 0);
         gcWorkerThread(cap);
+        postEvent(cap, EVENT_GC_END, 0, 0);
         return;
     }
 
@@ -606,7 +606,7 @@ yieldCapability (Capability** pCap, Task *task)
 	    break;
 	}
 
-	trace(TRACE_sched | DEBUG_sched, "resuming capability %d", cap->no);
+	debugTrace(DEBUG_sched, "resuming capability %d", cap->no);
 	ASSERT(cap->running_task == task);
 
     *pCap = cap;
@@ -648,7 +648,6 @@ wakeupThreadOnCapability (Capability *my_cap,
 
 	appendToRunQueue(other_cap,tso);
 
-	trace(TRACE_sched, "resuming capability %d", other_cap->no);
 	releaseCapability_(other_cap,rtsFalse);
     } else {
 	appendToWakeupQueue(my_cap,other_cap,tso);
@@ -768,6 +767,7 @@ shutdownCapability (Capability *cap, Task *task, rtsBool safe)
             continue;
         }
             
+        postEvent(cap, EVENT_SHUTDOWN, 0, 0);
 	debugTrace(DEBUG_sched, "capability %d is stopped.", cap->no);
 	RELEASE_LOCK(&cap->lock);
 	break;

@@ -194,7 +194,7 @@ todo_block_full (nat size, step_workspace *ws)
         {
             step *stp;
             stp = ws->step;
-            trace(TRACE_gc|DEBUG_gc, "push todo block %p (%ld words), step %d, todo_q: %ld", 
+            debugTrace(DEBUG_gc, "push todo block %p (%ld words), step %d, todo_q: %ld", 
                   bd->start, (unsigned long)(bd->free - bd->u.scan),
                   stp->abs_no, dequeElements(ws->todo_q));
 

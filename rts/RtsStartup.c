@@ -34,6 +34,7 @@
 #include "Stable.h"
 #include "Hpc.h"
 #include "FileLock.h"
+#include "EventLog.h"
 
 #if defined(RTS_GTK_FRONTPANEL)
 #include "FrontPanel.h"
@@ -195,7 +196,9 @@ hs_init(int *argc, char **argv[])
 #endif
 
     /* initTracing must be after setupRtsFlags() */
+#ifdef DEBUG
     initTracing();
+#endif
 
 #if defined(PAR)
     /* NB: this really must be done after processing the RTS flags */
@@ -253,6 +256,12 @@ hs_init(int *argc, char **argv[])
 #endif
 
     initProfiling1();
+
+#ifdef EVENTLOG
+    if (RtsFlags.EventLogFlags.doEventLogging) {
+        initEventLogging();
+    }
+#endif
 
     /* start the virtual timer 'subsystem'. */
     initTimer();
@@ -512,6 +521,13 @@ hs_exit_(rtsBool wait_foreign)
     // profiling might tack some extra stuff on to the end of this file
     // during endProfiling().
     if (prof_file != NULL) fclose(prof_file);
+#endif
+
+#ifdef EVENTLOG
+    if (RtsFlags.EventLogFlags.doEventLogging) {
+        endEventLogging();
+        freeEventLogging();
+    }
 #endif
 
 #if defined(TICKY_TICKY)

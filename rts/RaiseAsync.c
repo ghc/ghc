@@ -18,6 +18,7 @@
 #include "STM.h"
 #include "Sanity.h"
 #include "Profiling.h"
+#include "EventLog.h"
 #if defined(mingw32_HOST_OS)
 #include "win32/IOManager.h"
 #endif

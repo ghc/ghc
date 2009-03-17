@@ -12,6 +12,7 @@
 
 #include "OSThreads.h"
 #include "Capability.h"
+#include "EventLog.h"
 
 /* initScheduler(), exitScheduler()
  * Called from STG :  no
@@ -188,10 +189,10 @@ appendToRunQueue (Capability *cap, StgTSO *tso)
 	setTSOLink(cap, cap->run_queue_tl, tso);
     }
     cap->run_queue_tl = tso;
+    postEvent (cap, EVENT_THREAD_RUNNABLE, tso->id, 0);
 }
 
-/* Push a thread on the beginning of the run queue.  Used for
- * newly awakened threads, so they get run as soon as possible.
+/* Push a thread on the beginning of the run queue.
  * ASSUMES: cap->running_task is the current task.
  */
 INLINE_HEADER void

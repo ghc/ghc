@@ -320,6 +320,7 @@ data WayName
   = WayThreaded
   | WayDebug
   | WayProf
+  | WayEventLog
   | WayTicky
   | WayPar
   | WayGran
@@ -359,6 +360,7 @@ allowed_combination way = and [ x `allowedWith` y
 
 	WayProf `allowedWith` WayNDP		= True
 	WayThreaded `allowedWith` WayProf	= True
+	WayThreaded `allowedWith` WayEventLog	= True
 	_ `allowedWith` _ 			= False
 
 
@@ -424,6 +426,10 @@ way_details =
 	[ "-fscc-profiling"
 	, "-DPROFILING"
 	, "-optc-DPROFILING" ]),
+
+    (WayEventLog, Way  "l" True "RTS Event Logging"
+	[ "-DEVENTLOG"
+	, "-optc-DEVENTLOG" ]),
 
     (WayTicky, Way  "t" True "Ticky-ticky Profiling"  
 	[ "-DTICKY_TICKY"

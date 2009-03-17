@@ -2,16 +2,14 @@
  *
  * (c) The GHC Team 2006
  *
- * Debug and performance tracing.  
+ * Debug tracing.  
  *
  * This is a layer over RtsMessages, which provides for generating
- * trace messages with timestamps and thread Ids attached
+ * trace messages with timestamps and task IDs attached
  * automatically.  Also, multiple classes of messages are supported,
  * which can be enabled separately via RTS flags.
  *
- * All debug trace messages go through here.  Additionally, we
- * generate timestamped trace messages for consumption by profiling
- * tools using this API.
+ * All debug trace messages go through here.
  *
  * ---------------------------------------------------------------------------*/
 
@@ -21,6 +19,8 @@
 // -----------------------------------------------------------------------------
 // Tracing functions
 // -----------------------------------------------------------------------------
+
+#ifdef DEBUG
 
 void initTracing (void);
 
@@ -42,17 +42,18 @@ void traceBegin (const char *str, ...)
 
 void traceEnd (void);
 
-#ifdef DEBUG
 #define debugTrace(class, str, ...) trace(class,str, ## __VA_ARGS__)
 // variable arg macros are C99, and supported by gcc.
 #define debugTraceBegin(str, ...) traceBegin(str, ## __VA_ARGS__)
 #define debugTraceEnd() traceEnd()
-#else
+
+#else /* !DEBUG */
+
 #define debugTrace(class, str, ...) /* nothing */
 #define debugTraceBegin(str, ...) /* nothing */
 #define debugTraceEnd() /* nothing */
-#endif
 
+#endif
 
 // -----------------------------------------------------------------------------
 // Message classes, these may be OR-ed together
@@ -74,10 +75,7 @@ void traceEnd (void);
 #define DEBUG_linker		   (1<<12)
 #define DEBUG_squeeze              (1<<13)
 #define DEBUG_hpc                  (1<<14)
-
-// Tracing flags
-#define TRACE_sched                (1<<20)
-#define TRACE_gc                   (1<<21)
+#define DEBUG_eventlog		   (1<<15)
 
 // -----------------------------------------------------------------------------
 // PRIVATE below here

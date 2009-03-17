@@ -60,6 +60,7 @@ struct DEBUG_FLAGS {
     rtsBool sanity;         /* 'S'   warning: might be expensive! */
     rtsBool stable;         /* 't' */
     rtsBool prof;           /* 'p' */
+    rtsBool eventlog;       /* 'e' */
     rtsBool gran;           /* 'r' */
     rtsBool par;            /* 'P' */
     rtsBool linker;         /* 'l'   the object linker */
@@ -67,6 +68,7 @@ struct DEBUG_FLAGS {
     rtsBool stm;            /* 'm' */
     rtsBool squeeze;        /* 'z'  stack squeezing & lazy blackholing */
     rtsBool hpc; 	    /* 'c' coverage */
+    rtsBool timestamp;          /* add timestamps to traces */
 };
 
 struct COST_CENTRE_FLAGS {
@@ -112,6 +114,12 @@ struct PROFILING_FLAGS {
     char*               bioSelector;
 
 };
+
+#ifdef EVENTLOG
+struct EVENTLOG_FLAGS {
+  rtsBool doEventLogging;
+};
+#endif
 
 struct CONCURRENT_FLAGS {
     int ctxtSwitchTime;		/* in milliseconds */
@@ -307,12 +315,6 @@ struct TICKY_FLAGS {
     FILE   *tickyFile;
 };
 
-struct TRACE_FLAGS {
-    rtsBool sched;		/* trace scheduler events for profiling */
-    rtsBool gc;                 /* trace GC events */
-    rtsBool timestamp;          /* add timestamps to traces */
-};
-
 #ifdef USE_PAPI
 #define MAX_PAPI_USER_EVENTS 8
 
@@ -341,8 +343,10 @@ typedef struct _RTS_FLAGS {
     struct DEBUG_FLAGS	     DebugFlags;
     struct COST_CENTRE_FLAGS CcFlags;
     struct PROFILING_FLAGS   ProfFlags;
+#ifdef EVENTLOG
+    struct EVENTLOG_FLAGS    EventLogFlags;
+#endif
     struct TICKY_FLAGS	     TickyFlags;
-    struct TRACE_FLAGS       TraceFlags;
 
 #if defined(THREADED_RTS) || defined(PAR)
     struct PAR_FLAGS	ParFlags;

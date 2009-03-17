@@ -33,6 +33,7 @@
 #include "ProfHeap.h"
 #include "GC.h"
 #include "Weak.h"
+#include "EventLog.h"
 
 /* PARALLEL_HASKELL includes go here */
 
@@ -539,6 +540,8 @@ run_thread:
     }
 #endif
 
+    postEvent(cap, EVENT_RUN_THREAD, t->id, 0);
+
     switch (prev_what_next) {
 	
     case ThreadKilled:
@@ -586,6 +589,8 @@ run_thread:
     // Similarly for Windows error code
     t->saved_winerror = GetLastError();
 #endif
+
+    postEvent (cap, EVENT_STOP_THREAD, t->id, ret);
 
 #if defined(THREADED_RTS)
     // If ret is ThreadBlocked, and this Task is bound to the TSO that
@@ -852,6 +857,9 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
 		} else {
 		    debugTrace(DEBUG_sched, "pushing thread %lu to capability %d", (unsigned long)t->id, free_caps[i]->no);
 		    appendToRunQueue(free_caps[i],t);
+
+                    postEvent (cap, EVENT_MIGRATE_THREAD, t->id, free_caps[i]->no);
+
 		    if (t->bound) { t->bound->cap = free_caps[i]; }
 		    t->cap = free_caps[i];
 		    i++;
@@ -1560,6 +1568,7 @@ scheduleDoGC (Capability *cap, Task *task USED_IF_THREADS, rtsBool force_major)
     
     if (gc_type == PENDING_GC_SEQ)
     {
+        postEvent(cap, EVENT_REQUEST_SEQ_GC, 0, 0);
         // single-threaded GC: grab all the capabilities
         for (i=0; i < n_capabilities; i++) {
             debugTrace(DEBUG_sched, "ready_to_gc, grabbing all the capabilies (%d/%d)", i, n_capabilities);
@@ -1582,6 +1591,7 @@ scheduleDoGC (Capability *cap, Task *task USED_IF_THREADS, rtsBool force_major)
     {
         // multi-threaded GC: make sure all the Capabilities donate one
         // GC thread each.
+        postEvent(cap, EVENT_REQUEST_PAR_GC, 0, 0);
         debugTrace(DEBUG_sched, "ready_to_gc, grabbing GC threads");
 
         waitForGcThreads(cap);
@@ -1607,6 +1617,7 @@ delete_threads_and_gc:
     heap_census = scheduleNeedHeapProfile(rtsTrue);
 
 #if defined(THREADED_RTS)
+    postEvent(cap, EVENT_GC_START, 0, 0);
     debugTrace(DEBUG_sched, "doing GC");
     // reset waiting_for_gc *before* GC, so that when the GC threads
     // emerge they don't immediately re-enter the GC.
@@ -1615,6 +1626,7 @@ delete_threads_and_gc:
 #else
     GarbageCollect(force_major || heap_census, 0, cap);
 #endif
+    postEvent(cap, EVENT_GC_END, 0, 0);
 
     if (recent_activity == ACTIVITY_INACTIVE && force_major)
     {
@@ -1930,6 +1942,7 @@ suspendThread (StgRegTable *reg)
   task = cap->running_task;
   tso = cap->r.rCurrentTSO;
 
+  postEvent(cap, EVENT_STOP_THREAD, tso->id, THREAD_SUSPENDED_FOREIGN_CALL);
   debugTrace(DEBUG_sched, 
 	     "thread %lu did a safe foreign call", 
 	     (unsigned long)cap->r.rCurrentTSO->id);
@@ -2001,6 +2014,8 @@ resumeThread (void *task_)
     tso = task->suspended_tso;
     task->suspended_tso = NULL;
     tso->_link = END_TSO_QUEUE; // no write barrier reqd
+
+    postEvent(cap, EVENT_RUN_THREAD, tso->id, 0);
     debugTrace(DEBUG_sched, "thread %lu: re-entering RTS", (unsigned long)tso->id);
     
     if (tso->why_blocked == BlockedOnCCall) {
@@ -2057,6 +2072,7 @@ scheduleThreadOn(Capability *cap, StgWord cpu USED_IF_THREADS, StgTSO *tso)
     if (cpu == cap->no) {
 	appendToRunQueue(cap,tso);
     } else {
+        postEvent (cap, EVENT_MIGRATE_THREAD, tso->id, capabilities[cpu].no);
 	wakeupThreadOnCapability(cap, &capabilities[cpu], tso);
     }
 #else
@@ -2195,8 +2211,6 @@ initScheduler(void)
       }
   }
 #endif
-
-  trace(TRACE_sched, "start: %d capabilities", n_capabilities);
 
   RELEASE_LOCK(&sched_mutex);
 }

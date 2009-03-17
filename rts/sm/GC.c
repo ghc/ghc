@@ -264,7 +264,7 @@ GarbageCollect (rtsBool force_major_gc,
   n_gc_threads = 1;
 #endif
 
-  trace(TRACE_gc|DEBUG_gc, "GC (gen %d): %d KB to collect, %ld MB in use, using %d thread(s)",
+  debugTrace(DEBUG_gc, "GC (gen %d): %d KB to collect, %ld MB in use, using %d thread(s)",
         N, n * (BLOCK_SIZE / 1024), mblocks_allocated, n_gc_threads);
 
 #ifdef RTS_GTK_FRONTPANEL
@@ -534,12 +534,12 @@ GarbageCollect (rtsBool force_major_gc,
       nat i;
       for (i=0; i < n_gc_threads; i++) {
           if (n_gc_threads > 1) {
-              trace(TRACE_gc,"thread %d:", i);
-              trace(TRACE_gc,"   copied           %ld", gc_threads[i]->copied * sizeof(W_));
-              trace(TRACE_gc,"   scanned          %ld", gc_threads[i]->scanned * sizeof(W_));
-              trace(TRACE_gc,"   any_work         %ld", gc_threads[i]->any_work);
-              trace(TRACE_gc,"   no_work          %ld", gc_threads[i]->no_work);
-              trace(TRACE_gc,"   scav_find_work %ld",   gc_threads[i]->scav_find_work);
+              debugTrace(DEBUG_gc,"thread %d:", i);
+              debugTrace(DEBUG_gc,"   copied           %ld", gc_threads[i]->copied * sizeof(W_));
+              debugTrace(DEBUG_gc,"   scanned          %ld", gc_threads[i]->scanned * sizeof(W_));
+              debugTrace(DEBUG_gc,"   any_work         %ld", gc_threads[i]->any_work);
+              debugTrace(DEBUG_gc,"   no_work          %ld", gc_threads[i]->no_work);
+              debugTrace(DEBUG_gc,"   scav_find_work %ld",   gc_threads[i]->scav_find_work);
           }
           copied += gc_threads[i]->copied;
           max_copied = stg_max(gc_threads[i]->copied, max_copied);
@@ -764,7 +764,7 @@ GarbageCollect (rtsBool force_major_gc,
   IF_DEBUG(sanity, checkSanity());
 
   // extra GC trace info 
-  if (traceClass(TRACE_gc|DEBUG_gc)) statDescribeGens();
+  IF_DEBUG(gc, statDescribeGens());
 
 #ifdef DEBUG
   // symbol-table based profiling 

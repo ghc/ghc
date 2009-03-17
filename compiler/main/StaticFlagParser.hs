@@ -106,6 +106,7 @@ static_flags = [
 
         ------- ways --------------------------------------------------------
   , Flag "prof"           (NoArg (addWay WayProf)) Supported
+  , Flag "eventlog"       (NoArg (addWay WayEventLog)) Supported
   , Flag "ticky"          (NoArg (addWay WayTicky)) Supported
   , Flag "parallel"       (NoArg (addWay WayPar)) Supported
   , Flag "gransim"        (NoArg (addWay WayGran)) Supported

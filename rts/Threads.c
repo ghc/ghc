@@ -210,6 +210,8 @@ createThread(Capability *cap, nat size)
     }
 #endif 
     
+    postEvent (cap, EVENT_CREATE_THREAD, tso->id, 0);
+
 #if defined(GRAN)
     debugTrace(GRAN_DEBUG_pri,
 	       "==__ schedule: Created TSO %d (%p);",
@@ -503,6 +505,7 @@ unblockOne_ (Capability *cap, StgTSO *tso,
 	  ASSERT(tso->bound->cap == tso->cap);
 	  tso->bound->cap = cap;
       }
+
       tso->cap = cap;
       appendToRunQueue(cap,tso);
 
@@ -523,8 +526,9 @@ unblockOne_ (Capability *cap, StgTSO *tso,
   cap->context_switch = 1;
 #endif
 
-  debugTrace(DEBUG_sched,
-	     "waking up thread %ld on cap %d",
+  postEvent (cap, EVENT_THREAD_WAKEUP, tso->id, tso->cap->no);
+
+  debugTrace(DEBUG_sched, "waking up thread %ld on cap %d",
 	     (long)tso->id, tso->cap->no);
 
   return next;

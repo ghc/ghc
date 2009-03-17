@@ -57,7 +57,7 @@ override HADDOCK_DOCS = NO
 NON_HS_PACKAGE = YES
 
 # grab sources from these subdirectories
-ALL_DIRS = hooks parallel sm
+ALL_DIRS = hooks parallel sm eventlog
 
 ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 ALL_DIRS += win32
@@ -137,7 +137,8 @@ WARNING_OPTS += -Waggregate-return
 #WARNING_OPTS += -Wredundant-decls 
 #WARNING_OPTS += -Wconversion
 
-STANDARD_OPTS += -I../includes -I. -Iparallel -Ism
+STANDARD_OPTS += -I../includes -I. -Iparallel -Ism -Ieventlog
+
 # COMPILING_RTS is only used when building Win32 DLL support.
 STANDARD_OPTS += -DCOMPILING_RTS
 
@@ -322,7 +323,7 @@ SRC_MKDEPENDC_OPTS += -I. -I../includes
 # a superset of the dependencies.  To do this properly, we should generate
 # a different set of dependencies for each way.  Further hack: PROFILING and
 # TICKY_TICKY can't be used together, so we omit TICKY_TICKY for now.
-SRC_MKDEPENDC_OPTS += -DPROFILING -DTHREADED_RTS -DDEBUG
+SRC_MKDEPENDC_OPTS += -DPROFILING -DTHREADED_RTS -DDEBUG -DEVENTLOG
 
 # -----------------------------------------------------------------------------
 # The auto-generated apply code

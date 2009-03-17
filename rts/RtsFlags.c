@@ -184,12 +184,14 @@ void initRtsFlagsDefaults(void)
     RtsFlags.DebugFlags.stable		= rtsFalse;
     RtsFlags.DebugFlags.stm             = rtsFalse;
     RtsFlags.DebugFlags.prof		= rtsFalse;
+    RtsFlags.DebugFlags.eventlog        = rtsFalse;
     RtsFlags.DebugFlags.gran		= rtsFalse;
     RtsFlags.DebugFlags.par		= rtsFalse;
     RtsFlags.DebugFlags.apply		= rtsFalse;
     RtsFlags.DebugFlags.linker		= rtsFalse;
     RtsFlags.DebugFlags.squeeze		= rtsFalse;
     RtsFlags.DebugFlags.hpc		= rtsFalse;
+    RtsFlags.DebugFlags.timestamp	= rtsFalse;
 #endif
 
 #if defined(PROFILING) || defined(PAR)
@@ -211,6 +213,10 @@ void initRtsFlagsDefaults(void)
     RtsFlags.ProfFlags.ccsSelector        = NULL;
     RtsFlags.ProfFlags.retainerSelector   = NULL;
     RtsFlags.ProfFlags.bioSelector        = NULL;
+#endif
+
+#ifdef EVENTLOG
+    RtsFlags.EventLogFlags.doEventLogging = rtsFalse;
 #endif
 
     RtsFlags.MiscFlags.tickInterval	= 20;  /* In milliseconds */
@@ -329,10 +335,6 @@ void initRtsFlagsDefaults(void)
     RtsFlags.TickyFlags.tickyFile	 = NULL;
 #endif
 
-    RtsFlags.TraceFlags.timestamp	= rtsFalse;
-    RtsFlags.TraceFlags.sched 		= rtsFalse;
-    RtsFlags.TraceFlags.gc 		= rtsFalse;
-
 #ifdef USE_PAPI
     /* By default no special measurements taken */
     RtsFlags.PapiFlags.eventType        = 0;
@@ -419,6 +421,13 @@ usage_text[] = {
 "",
 # endif
 #endif /* PROFILING or PAR */
+
+#ifdef EVENTLOG
+"",
+"  -l       Log runtime events (generates binary trace file <program>.eventlog)",
+"",
+#endif
+
 #if !defined(PROFILING)
 "",
 "  -hT      Heap residency profile (output file <program>.hp)",
@@ -440,8 +449,7 @@ usage_text[] = {
 "            This sets the resolution for -C and the profile timer -i.",
 "            Default: 0.02 sec.",
 "",
-"  -vs       Trace scheduler events (see also -Ds with -debug)",
-"  -vt       Time-stamp trace messages",
+"  -vt       Time-stamp debug messages",
 "",
 #if defined(DEBUG)
 "  -Ds  DEBUG: scheduler",
@@ -453,6 +461,7 @@ usage_text[] = {
 "  -DS  DEBUG: sanity",
 "  -Dt  DEBUG: stable",
 "  -Dp  DEBUG: prof",
+"  -De  DEBUG: event logging",
 "  -Dr  DEBUG: gran",
 "  -DP  DEBUG: par",
 "  -Da  DEBUG: apply",
@@ -660,6 +669,14 @@ errorBelch("not built for: -prof"); \
 error = rtsTrue;
 #endif
 
+#ifdef EVENTLOG
+# define EVENTLOG_BUILD_ONLY(x)   x
+#else
+# define EVENTLOG_BUILD_ONLY(x) \
+errorBelch("not built for: -par-prof"); \
+error = rtsTrue;
+#endif
+
 #ifdef PAR
 # define PAR_BUILD_ONLY(x)      x
 #else
@@ -821,6 +838,9 @@ error = rtsTrue;
 		      case 'p':
 			  RtsFlags.DebugFlags.prof = rtsTrue;
 			  break;
+		      case 'e':
+			  RtsFlags.DebugFlags.eventlog = rtsTrue;
+                          break;
 		      case 'r':
 			  RtsFlags.DebugFlags.gran = rtsTrue;
 			  break;
@@ -954,6 +974,14 @@ error = rtsTrue;
 		break;
 
 	      /* =========== PROFILING ========================== */
+
+              case 'l':
+#ifdef EVENTLOG
+                  RtsFlags.EventLogFlags.doEventLogging = rtsTrue;
+#else
+                  errorBelch("not built for: -eventlog");
+#endif
+                  break;
 
 	      case 'P': /* detailed cost centre profiling (time/alloc) */
 	      case 'p': /* cost centre profiling (time/alloc) */
@@ -1270,13 +1298,11 @@ error = rtsTrue;
 		    error = rtsTrue;
 		    break;
 		case 't':
-		    RtsFlags.TraceFlags.timestamp = rtsTrue;
+		    RtsFlags.DebugFlags.timestamp = rtsTrue;
 		    break;
 		case 's':
-		    RtsFlags.TraceFlags.sched = rtsTrue;
-		    break;
 		case 'g':
-		    RtsFlags.TraceFlags.gc = rtsTrue;
+                    // ignored for backwards-compat
 		    break;
 		default:
 		    errorBelch("unknown RTS option: %s",rts_argv[arg]);

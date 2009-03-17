@@ -70,7 +70,7 @@ sweep(step *step)
 
     step->live_estimate = live;
 
-    trace(DEBUG_gc|TRACE_gc, "sweeping: %d blocks, %d were copied, %d freed (%d%%), %d are fragmented, live estimate: %ld%%",
+    debugTrace(DEBUG_gc, "sweeping: %d blocks, %d were copied, %d freed (%d%%), %d are fragmented, live estimate: %ld%%",
           step->n_old_blocks + freed,
           step->n_old_blocks - blocks + freed,
           freed,
