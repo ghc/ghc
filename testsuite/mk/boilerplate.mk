@@ -13,7 +13,7 @@ show:
 
 define canonicalise
 # $1 = path variable
-$1_CYGPATH := $$(shell cygpath -m $$($1) 2> /dev/null)
+$1_CYGPATH := $$(shell sh -c "cygpath -m $$($1)" 2> /dev/null)
 ifneq "$$($1_CYGPATH)" ""
 $1 := $$($1_CYGPATH)
 endif
