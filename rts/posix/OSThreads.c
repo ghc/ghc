@@ -179,6 +179,24 @@ forkOS_createThread ( HsStablePtr entry )
     return result;
 }
 
+nat
+getNumberOfProcessors (void)
+{
+    static nat nproc = 0;
+
+    if (nproc == 0) {
+#if defined(HAVE_SYSCONF) && defined(_SC_NPROCESSORS_ONLN)
+        nproc = sysconf(_SC_NPROCESSORS_ONLN);
+#elif defined(HAVE_SYSCONF) && defined(_SC_NPROCESSORS_CONF)
+        nproc = sysconf(_SC_NPROCESSORS_CONF);
+#else
+        nproc = 1;
+#endif
+    }
+
+    return nproc;
+}
+
 #else /* !defined(THREADED_RTS) */
 
 int

@@ -1152,17 +1152,7 @@ error = rtsTrue;
 #if defined(PROFILING)
 		    RtsFlags.ParFlags.nNodes = 1;
 #else
-#if defined(mingw32_HOST_OS)
-                    {
-                        SYSTEM_INFO si;
-                        GetSystemInfo(&si);
-                        RtsFlags.ParFlags.nNodes = si.dwNumberOfProcessors;
-                    }
-#elif defined(HAVE_SYSCONF)
-                    RtsFlags.ParFlags.nNodes = sysconf(_SC_NPROCESSORS_CONF);
-#else
-                    RtsFlags.ParFlags.nNodes = 1;
-#endif
+                    RtsFlags.ParFlags.nNodes = getNumberOfProcessors();
 #endif
 		} else {
 		    RtsFlags.ParFlags.nNodes

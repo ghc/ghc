@@ -232,6 +232,20 @@ forkOS_createThread ( HsStablePtr entry )
 			   (unsigned*)&pId) == 0);
 }
 
+nat
+getNumberOfProcessors (void)
+{
+    static nat nproc = 0;
+
+    if (nproc == 0) {
+        SYSTEM_INFO si;
+        GetSystemInfo(&si);
+        nproc = si.dwNumberOfProcessors;
+    }
+
+    return nproc;
+}
+
 #else /* !defined(THREADED_RTS) */
 
 int

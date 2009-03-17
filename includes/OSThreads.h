@@ -185,6 +185,9 @@ void *getThreadLocalVar (ThreadLocalKey *key);
 void  setThreadLocalVar (ThreadLocalKey *key, void *value);
 void  freeThreadLocalKey (ThreadLocalKey *key);
 
+// Processors and affinity
+nat getNumberOfProcessors (void);
+
 #endif // !CMINUSMINUS
 
 #else
