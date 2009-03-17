@@ -408,7 +408,6 @@ allDoubleRegNos	 = regList mAX_Double_REG
 allLongRegNos	 = regList mAX_Long_REG
 
 regList :: Int -> [Int]
-regList 0 = []
 regList n = [1 .. n]
 
 type AvailRegs = ( [Int]   -- available vanilla regs.

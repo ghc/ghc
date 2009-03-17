@@ -35,6 +35,7 @@ import PprCmm()
 import FastString
 import ForeignCall
 import MkZipCfg
+import Outputable
 import Panic 
 import SMRep (ByteOff) 
 import StaticFlags 
@@ -262,6 +263,7 @@ mkCmmCall f results actuals = mkCall f Native results actuals
 
 -- I'm dropping the SRT, but that should be okay: we plan to reconstruct it later.
 mkCall f conv results actuals updfr_off =
+ pprTrace "mkCall" (ppr f <+> ppr actuals <+> ppr results <+> ppr conv) $
   withFreshLabel "call successor" $ \k ->
     let area = CallArea $ Young k
         (off, copyin) = copyInOflow conv False area results

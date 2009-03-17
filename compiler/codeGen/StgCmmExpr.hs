@@ -480,8 +480,6 @@ cgTailCall fun_id fun_info args = do
                     do emit $ mkComment $ mkFastString "directEntry"
                        emit (mkAssign nodeReg fun)
                        directCall lbl arity args
-                    -- directCall lbl (arity+1) (StgVarArg fun_id : args))
-                    -- >>= (emit . (mkComment (mkFastString "DirectEntry") <*>))
 		  else do emit $ mkComment $ mkFastString "directEntry else"
                           directCall lbl arity args }
 

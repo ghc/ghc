@@ -387,7 +387,7 @@ tailCallPrimOp op args
 		-- except that *all* the arguments will be in registers.
 		-- Hence the ASSERT( null leftovers )
 	  arg_amodes <- getArgAmodes args
-	; let (arg_regs, leftovers) = assignPrimOpCallRegs arg_amodes
+	; let (arg_regs, leftovers) = pprTrace "prim op" (ppr op) $ assignPrimOpCallRegs arg_amodes
 	      jump_to_primop = jumpToLbl (mkRtsPrimOpLabel op)
 
 	; ASSERT(null leftovers) -- no stack-resident args

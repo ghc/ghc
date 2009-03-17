@@ -34,7 +34,7 @@ type ArgumentFormat a b = [(a, ParamLocation b)]
 assignArguments :: (a -> CmmType) -> [a] -> ArgumentFormat a WordOff
 assignArguments f reps = assignments
     where
-      availRegs = getRegs False
+      availRegs = getRegsWithNode
       (sizes, assignments) = unzip $ assignArguments' reps (negate (sum sizes)) availRegs
       assignArguments' [] _ _ = []
       assignArguments' (r:rs) offset availRegs =
@@ -53,13 +53,22 @@ assignArguments f reps = assignments
 assignArgumentsPos :: (Outputable a) => Convention -> Bool -> (a -> CmmType) -> [a] ->
                       ArgumentFormat a ByteOff
 assignArgumentsPos conv isCall arg_ty reps = map cvt assignments
-    where
-      regs = case conv of Native -> getRegs isCall
-                          GC     -> getRegs False
-                          PrimOp -> if isCall then noStack else getRegs isCall
-                          Slow   -> noRegs
-                          _   -> getRegs isCall
-                          -- _      -> panic "unrecognized calling convention"
+    where -- The calling conventions (CgCallConv.hs) are complicated, to say the least
+      regs = if isCall then
+               case (reps, conv) of
+                 (_, Native) -> getRegsWithoutNode
+                 (_, GC    ) -> getRegsWithNode
+                 (_, PrimOp) -> allRegs
+                 (_, Slow  ) -> noRegs
+                 (_, _     ) -> getRegsWithoutNode
+             else
+               case (reps, conv) of
+                 ([_], _)    -> allRegs
+                 (_, Native) -> getRegsWithNode
+                 (_, GC    ) -> getRegsWithNode
+                 (_, PrimOp) -> getRegsWithNode
+                 (_, Slow  ) -> noRegs
+                 (_, _     ) -> getRegsWithNode
       (sizes, assignments) = unzip $ assignArguments' reps (sum sizes) regs
       assignArguments' [] _ _ = []
       assignArguments' (r:rs) offset avails =
@@ -92,29 +101,38 @@ type AvailRegs = ( [VGcPtr -> GlobalReg]   -- available vanilla regs.
 -- We take these register supplies from the *real* registers, i.e. those
 -- that are guaranteed to map to machine registers.
 
-useVanillaRegs, useFloatRegs, useDoubleRegs, useLongRegs :: Int
-useVanillaRegs | opt_Unregisterised = 0
-	       | otherwise          = mAX_Real_Vanilla_REG
-useFloatRegs   | opt_Unregisterised = 0
-	       | otherwise          = mAX_Real_Float_REG
-useDoubleRegs  | opt_Unregisterised = 0
-	       | otherwise          = mAX_Real_Double_REG
-useLongRegs    | opt_Unregisterised = 0
-	       | otherwise          = mAX_Real_Long_REG
+vanillaRegNos, floatRegNos, doubleRegNos, longRegNos :: [Int]
+vanillaRegNos | opt_Unregisterised = []
+              | otherwise          = regList mAX_Real_Vanilla_REG
+floatRegNos	  | opt_Unregisterised = []
+              | otherwise          = regList mAX_Real_Float_REG
+doubleRegNos  | opt_Unregisterised = []
+              | otherwise          = regList mAX_Real_Double_REG
+longRegNos	  | opt_Unregisterised = []
+              | otherwise          = regList mAX_Real_Long_REG
 
-getRegs :: Bool -> AvailRegs
-getRegs reserveNode =
-  (if reserveNode then filter (\r -> r VGcPtr /= node) intRegs else intRegs,
-   regList FloatReg  useFloatRegs,
-   regList DoubleReg useDoubleRegs,
-   regList LongReg   useLongRegs)
-    where
-      regList f max = map f [1 .. max]
-      intRegs = regList VanillaReg useVanillaRegs
+-- 
+getRegsWithoutNode, getRegsWithNode :: AvailRegs
+getRegsWithoutNode =
+  (filter (\r -> r VGcPtr /= node) intRegs,
+   map FloatReg  floatRegNos, map DoubleReg doubleRegNos, map LongReg longRegNos)
+    where intRegs = map VanillaReg vanillaRegNos
+getRegsWithNode =
+  (intRegs, map FloatReg  floatRegNos, map DoubleReg doubleRegNos, map LongReg longRegNos)
+    where intRegs = map VanillaReg vanillaRegNos
 
-noStack :: AvailRegs
-noStack = (map VanillaReg any, map FloatReg any, map DoubleReg any, map LongReg any)
-  where any = [1 .. ]
+allVanillaRegNos, allFloatRegNos, allDoubleRegNos, allLongRegNos :: [Int]
+allVanillaRegNos = regList mAX_Vanilla_REG
+allFloatRegNos	 = regList mAX_Float_REG
+allDoubleRegNos	 = regList mAX_Double_REG
+allLongRegNos	   = regList mAX_Long_REG
+
+regList :: Int -> [Int]
+regList n = [1 .. n]
+
+allRegs :: AvailRegs
+allRegs = (map VanillaReg allVanillaRegNos, map FloatReg allFloatRegNos,
+           map DoubleReg  allDoubleRegNos,  map LongReg  allLongRegNos)
 
 noRegs :: AvailRegs
 noRegs    = ([], [], [], [])
@@ -157,15 +175,16 @@ assign_slot_pos width off _regs =
 
 -- On calls in the native convention, `node` is used to hold the environment
 -- for the closure, so we can't pass arguments in that register.
-assign_bits_reg :: SlotAssigner -> Width -> WordOff -> VGcPtr -> AvailRegs
-                -> Assignment
+assign_bits_reg :: SlotAssigner -> Width -> WordOff -> VGcPtr -> AvailRegs -> Assignment
 assign_bits_reg _ W128 _ _ _ = panic "W128 is not a supported register type"
-assign_bits_reg assign_slot w off gcp regs@(v:vs, fs, ds, ls) =
-  if widthInBits w <= widthInBits wordWidth then
-    (RegisterParam (v gcp), off, 0, (vs, fs, ds, ls))
-  else assign_slot w off regs
-assign_bits_reg assign_slot w off _ regs@([], _, _, _) =
-  assign_slot w off regs
+assign_bits_reg _ w off gcp (v:vs, fs, ds, ls)
+  | widthInBits w <= widthInBits wordWidth =
+        pprTrace "long regs" (ppr ls <+> ppr wordWidth <+> ppr mAX_Real_Long_REG) $ (RegisterParam (v gcp), off, 0, (vs, fs, ds, ls))
+assign_bits_reg _ w off _ (vs, fs, ds, l:ls)
+  | widthInBits w > widthInBits wordWidth =
+        pprTrace "long regs" (ppr ls <+> ppr wordWidth <+> ppr mAX_Real_Long_REG) $ (RegisterParam l, off, 0, (vs, fs, ds, ls))
+assign_bits_reg assign_slot w off _ regs@(_, _, _, ls) =
+  pprTrace "long regs" (ppr w <+> ppr ls <+> ppr wordWidth <+> ppr mAX_Real_Long_REG <+> ppr mAX_Long_REG) $ assign_slot w off regs
 
 assign_float_reg :: SlotAssigner -> Width -> WordOff -> AvailRegs -> Assignment
 assign_float_reg _ W32 off (vs, f:fs, ds, ls) = (RegisterParam $ f, off, 0, (vs, fs, ds, ls))
