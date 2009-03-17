@@ -52,7 +52,22 @@
  * so we untag it before accessing the field.
  *
  */
-#define SELECTOR_CODE_UPD(offset) \
+#ifdef PROFILING
+// When profiling, we cannot shortcut by checking the tag,
+// because LDV profiling relies on entering closures to mark them as
+// "used".
+#define SEL_ENTER(offset)                       \
+      R1 = UNTAG(R1);                           \
+      jump %GET_ENTRY(R1);
+#else
+#define SEL_ENTER(offset)                               \
+      if (GETTAG(R1) != 0) {                            \
+          jump RET_LBL(stg_sel_ret_##offset##_upd);     \
+      }                                                 \
+      jump %GET_ENTRY(R1);
+#endif
+
+#define SELECTOR_CODE_UPD(offset)                                       \
   INFO_TABLE_RET(stg_sel_ret_##offset##_upd, RET_SMALL, RET_PARAMS)	\
   {									\
       R1 = StgClosure_payload(UNTAG(R1),offset);			\
@@ -73,10 +88,7 @@
       W_[Sp-WITHUPD_FRAME_SIZE] = stg_sel_ret_##offset##_upd_info;	\
       Sp = Sp - WITHUPD_FRAME_SIZE;					\
       R1 = StgThunk_payload(R1,0);				        \
-      if (GETTAG(R1) != 0) {                                            \
-          jump RET_LBL(stg_sel_ret_##offset##_upd);		        \
-      }                                                                 \
-      jump %GET_ENTRY(R1);						\
+      SEL_ENTER(offset);                                                \
   }
   /* NOTE: no need to ENTER() here, we know the closure cannot evaluate to a function,
      because we're going to do a field selection on the result. */

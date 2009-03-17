@@ -35,6 +35,7 @@ import Id
 import StgSyn
 import PrimOp
 import Outputable
+import StaticFlags
 
 import Control.Monad
 
@@ -183,7 +184,10 @@ performTailCall fun_info arg_amodes pending_assts
     untag_node = CmmAssign nodeReg (cmmUntag (CmmReg nodeReg))
     -- Test if closure is a constructor
     maybeSwitchOnCons enterClosure eob
-              | EndOfBlockInfo _ (CaseAlts lbl _ _) <- eob
+              | EndOfBlockInfo _ (CaseAlts lbl _ _) <- eob,
+                not opt_SccProfilingOn
+                -- we can't shortcut when profiling is on, because we have
+                -- to enter a closure to mark it as "used" for LDV profiling
               = do { is_constr <- newLabelC
                    -- Is the pointer tagged?
                    -- Yes, jump to switch statement

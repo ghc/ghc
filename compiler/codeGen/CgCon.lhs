@@ -47,6 +47,9 @@ import Outputable
 import ListSetOps
 import Util
 import FastString
+import StaticFlags
+
+import Control.Monad
 \end{code}
 
 
@@ -296,6 +299,11 @@ sure the @amodes@ passed don't conflict with each other.
 cgReturnDataCon :: DataCon -> [(CgRep, CmmExpr)] -> Code
 
 cgReturnDataCon con amodes
+  | isUnboxedTupleCon con = returnUnboxedTuple amodes
+      -- when profiling we can't shortcut here, we have to enter the closure
+      -- for it to be marked as "used" for LDV profiling.
+  | opt_SccProfilingOn    = build_it_then enter_it
+  | otherwise
   = ASSERT( amodes `lengthIs` dataConRepArity con )
     do	{ EndOfBlockInfo _ sequel <- getEndOfBlockInfo
 	; case sequel of
@@ -319,11 +327,12 @@ cgReturnDataCon con amodes
 			| isDeadBinder bndr -> performReturn (jump_to deflt_lbl)
 			| otherwise	    -> build_it_then (jump_to deflt_lbl) }
     
-	    _	-- The usual case
-	      | isUnboxedTupleCon con -> returnUnboxedTuple amodes
-              | otherwise -> build_it_then emitReturnInstr
+	    _otherwise	-- The usual case
+              -> build_it_then emitReturnInstr
 	}
   where
+    enter_it    = stmtsC [ CmmAssign nodeReg (cmmUntag (CmmReg nodeReg)),
+                           CmmJump (entryCode (closureInfoPtr (CmmReg nodeReg))) [] ]
     jump_to lbl = stmtC (CmmJump (CmmLit lbl) [])
     build_it_then return_code
       = do { 	-- BUILD THE OBJECT IN THE HEAP
