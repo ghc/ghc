@@ -23,6 +23,11 @@
 #include <string.h>
 #endif
 
+#if defined(darwin_HOST_OS)
+#include <sys/types.h>
+#include <sys/sysctl.h>
+#endif
+
 #if !defined(HAVE_PTHREAD_H)
 #error pthreads.h is required for the threaded RTS on Posix platforms
 #endif
@@ -196,12 +201,16 @@ nat
 getNumberOfProcessors (void)
 {
     static nat nproc = 0;
+    size_t size = sizeof(nat);
 
     if (nproc == 0) {
 #if defined(HAVE_SYSCONF) && defined(_SC_NPROCESSORS_ONLN)
         nproc = sysconf(_SC_NPROCESSORS_ONLN);
 #elif defined(HAVE_SYSCONF) && defined(_SC_NPROCESSORS_CONF)
         nproc = sysconf(_SC_NPROCESSORS_CONF);
+#elif defined(darwin_HOST_OS)
+        if(0 != sysctlbyname("hw.ncpu",&nproc,&size,NULL,0))
+            nproc = 1;
 #else
         nproc = 1;
 #endif
