@@ -387,7 +387,7 @@ dsFExportDynamic id cconv = do
                         , Lam stbl_value ccall_adj
                         ]
 
-        fed = (id `setInlinePragma` NeverActive, io_app)
+        fed = (id `setInlineActivation` NeverActive, io_app)
                -- Never inline the f.e.d. function, because the litlit
                -- might not be in scope in other modules.
 

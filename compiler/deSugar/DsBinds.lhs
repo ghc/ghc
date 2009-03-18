@@ -516,12 +516,12 @@ addInlinePrags prags bndr rhs
 	(inl:_) -> addInlineInfo inl bndr rhs
 
 addInlineInfo :: InlineSpec -> Id -> CoreExpr -> (Id,CoreExpr)
-addInlineInfo (Inline phase is_inline) bndr rhs
-  = (attach_phase bndr phase, wrap_inline is_inline rhs)
+addInlineInfo (Inline prag is_inline) bndr rhs
+  = (attach_pragma bndr prag, wrap_inline is_inline rhs)
   where
-    attach_phase bndr phase 
-	| isAlwaysActive phase = bndr	-- Default phase
-	| otherwise  	       = bndr `setInlinePragma` phase
+    attach_pragma bndr prag
+        | isDefaultInlinePragma prag = bndr
+        | otherwise                  = bndr `setInlinePragma` prag
 
     wrap_inline True  body = mkInlineMe body
     wrap_inline False body = body

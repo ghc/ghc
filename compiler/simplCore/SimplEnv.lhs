@@ -356,7 +356,7 @@ doFloatFromRhs :: TopLevelFlag -> RecFlag -> Bool -> OutExpr -> SimplEnv -> Bool
 doFloatFromRhs lvl rec str rhs (SimplEnv {seFloats = Floats fs ff}) 
   =  not (isNilOL fs) && want_to_float && can_float
   where
-     want_to_float = isTopLevel lvl || exprIsCheap rhs
+     want_to_float = isTopLevel lvl || exprIsExpandable rhs
      can_float = case ff of
 		   FltLifted  -> True
 	 	   FltOkSpec  -> isNotTopLevel lvl && isNonRec rec
@@ -677,7 +677,7 @@ substUnfolding :: SimplEnv -> Unfolding -> Unfolding
 substUnfolding _   NoUnfolding     	       = NoUnfolding
 substUnfolding _   (OtherCon cons) 	       = OtherCon cons
 substUnfolding env (CompulsoryUnfolding rhs)   = CompulsoryUnfolding (substExpr env rhs)
-substUnfolding env (CoreUnfolding rhs t v w g) = CoreUnfolding (substExpr env rhs) t v w g
+substUnfolding env (CoreUnfolding rhs t u v w g) = CoreUnfolding (substExpr env rhs) t u v w g
 
 ------------------
 substWorker :: SimplEnv -> WorkerInfo -> WorkerInfo

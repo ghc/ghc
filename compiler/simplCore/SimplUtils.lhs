@@ -370,7 +370,7 @@ mkArgInfo fun n_val_args call_cont
     vanilla_discounts, arg_discounts :: [Int]
     vanilla_discounts = repeat 0
     arg_discounts = case idUnfolding fun of
-			CoreUnfolding _ _ _ _ (UnfoldIfGoodArgs _ discounts _ _)
+			CoreUnfolding _ _ _ _ _ (UnfoldIfGoodArgs _ discounts _ _)
 			      -> discounts ++ vanilla_discounts
 			_     -> vanilla_discounts
 
@@ -622,9 +622,9 @@ preInlineUnconditionally env top_lvl bndr rhs
   where
     phase = getMode env
     active = case phase of
-		   SimplGently    -> isAlwaysActive prag
-		   SimplPhase n _ -> isActive n prag
-    prag = idInlinePragma bndr
+		   SimplGently    -> isAlwaysActive act
+		   SimplPhase n _ -> isActive n act
+    act = idInlineActivation bndr
 
     try_once in_lam int_cxt	-- There's one textual occurrence
 	| not in_lam = isNotTopLevel top_lvl || early_phase
@@ -778,9 +778,9 @@ postInlineUnconditionally env top_lvl bndr occ_info rhs unfolding
 
   where
     active = case getMode env of
-		   SimplGently    -> isAlwaysActive prag
-		   SimplPhase n _ -> isActive n prag
-    prag = idInlinePragma bndr
+		   SimplGently    -> isAlwaysActive act
+		   SimplPhase n _ -> isActive n act
+    act = idInlineActivation bndr
 
 activeInline :: SimplEnv -> OutId -> Bool
 activeInline env id
@@ -801,9 +801,9 @@ activeInline env id
 	-- and they are now constructed as Compulsory unfoldings (in MkId)
 	-- so they'll happen anyway.
 
-      SimplPhase n _ -> isActive n prag
+      SimplPhase n _ -> isActive n act
   where
-    prag = idInlinePragma id
+    act = idInlineActivation id
 
 activeRule :: DynFlags -> SimplEnv -> Maybe (Activation -> Bool)
 -- Nothing => No rules at all

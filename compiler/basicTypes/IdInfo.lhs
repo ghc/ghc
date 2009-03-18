@@ -329,7 +329,7 @@ data IdInfo
 	unfoldingInfo	:: Unfolding,		-- ^ The 'Id's unfolding
 	cafInfo		:: CafInfo,		-- ^ 'Id' CAF info
         lbvarInfo	:: LBVarInfo,		-- ^ Info about a lambda-bound variable, if the 'Id' is one
-	inlinePragInfo	:: InlinePragInfo,	-- ^ Any inline pragma atached to the 'Id'
+	inlinePragInfo	:: InlinePragma,	-- ^ Any inline pragma atached to the 'Id'
 	occInfo		:: OccInfo,		-- ^ How the 'Id' occurs in the program
 
 	newStrictnessInfo :: Maybe StrictSig,	-- ^ Id strictness information. Reason for Maybe: 
@@ -378,7 +378,7 @@ setWorkerInfo :: IdInfo -> WorkerInfo -> IdInfo
 setWorkerInfo     info wk = wk `seq` info { workerInfo = wk }
 setSpecInfo :: IdInfo -> SpecInfo -> IdInfo
 setSpecInfo 	  info sp = sp `seq` info { specInfo = sp }
-setInlinePragInfo :: IdInfo -> InlinePragInfo -> IdInfo
+setInlinePragInfo :: IdInfo -> InlinePragma -> IdInfo
 setInlinePragInfo info pr = pr `seq` info { inlinePragInfo = pr }
 setOccInfo :: IdInfo -> OccInfo -> IdInfo
 setOccInfo	  info oc = oc `seq` info { occInfo = oc }
@@ -434,7 +434,7 @@ vanillaIdInfo
 	    workerInfo		= NoWorker,
 	    unfoldingInfo	= noUnfolding,
 	    lbvarInfo		= NoLBVarInfo,
-	    inlinePragInfo 	= AlwaysActive,
+	    inlinePragInfo 	= defaultInlinePragma,
 	    occInfo		= NoOccInfo,
 	    newDemandInfo	= Nothing,
 	    newStrictnessInfo   = Nothing
@@ -493,7 +493,7 @@ ppArityInfo n = hsep [ptext (sLit "Arity"), int n]
 --
 -- The default 'InlinePragInfo' is 'AlwaysActive', so the info serves
 -- entirely as a way to inhibit inlining until we want it
-type InlinePragInfo = Activation
+type InlinePragInfo = InlinePragma
 \end{code}
 
 

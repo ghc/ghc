@@ -53,12 +53,13 @@ module Id (
 	isPrimOpId, isPrimOpId_maybe, 
 	isFCallId, isFCallId_maybe,
 	isDataConWorkId, isDataConWorkId_maybe, isDataConId_maybe, idDataCon,
-	isBottomingId, idIsFrom,
+        isConLikeId, isBottomingId, idIsFrom,
         isTickBoxOp, isTickBoxOp_maybe,
 	hasNoBinding, 
 
 	-- ** Inline pragma stuff
-	idInlinePragma, setInlinePragma, modifyInlinePragma, 
+	idInlinePragma, setInlinePragma, modifyInlinePragma,
+        idInlineActivation, setInlineActivation, idRuleMatchInfo,
 
 	-- ** One-shot lambdas
 	isOneShotBndr, isOneShotLambda, isStateHackType,
@@ -599,14 +600,26 @@ The inline pragma tells us to be very keen to inline this Id, but it's still
 OK not to if optimisation is switched off.
 
 \begin{code}
-idInlinePragma :: Id -> InlinePragInfo
+idInlinePragma :: Id -> InlinePragma
 idInlinePragma id = inlinePragInfo (idInfo id)
 
-setInlinePragma :: Id -> InlinePragInfo -> Id
+setInlinePragma :: Id -> InlinePragma -> Id
 setInlinePragma id prag = modifyIdInfo (`setInlinePragInfo` prag) id
 
-modifyInlinePragma :: Id -> (InlinePragInfo -> InlinePragInfo) -> Id
+modifyInlinePragma :: Id -> (InlinePragma -> InlinePragma) -> Id
 modifyInlinePragma id fn = modifyIdInfo (\info -> info `setInlinePragInfo` (fn (inlinePragInfo info))) id
+
+idInlineActivation :: Id -> Activation
+idInlineActivation id = inlinePragmaActivation (idInlinePragma id)
+
+setInlineActivation :: Id -> Activation -> Id
+setInlineActivation id act = modifyInlinePragma id (\(InlinePragma _ match_info) -> InlinePragma act match_info)
+
+idRuleMatchInfo :: Id -> RuleMatchInfo
+idRuleMatchInfo id = inlinePragmaRuleMatchInfo (idInlinePragma id)
+
+isConLikeId :: Id -> Bool
+isConLikeId id = isDataConWorkId id || isConLike (idRuleMatchInfo id)
 \end{code}
 
 

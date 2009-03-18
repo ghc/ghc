@@ -32,9 +32,9 @@ module Rules (
 import CoreSyn		-- All of it
 import OccurAnal	( occurAnalyseExpr )
 import CoreFVs		( exprFreeVars, exprsFreeVars, bindFreeVars, rulesFreeVars )
-import CoreUtils	( tcEqExprX, exprType )
+import CoreUtils	( exprType )
 import PprCore		( pprRules )
-import Type		( Type, TvSubstEnv )
+import Type		( Type, TvSubstEnv, tcEqTypeX )
 import TcType		( tcSplitTyConApp_maybe )
 import CoreTidy		( tidyRules )
 import Id
@@ -490,79 +490,23 @@ match menv subst (Var v1) e2
 
 match menv subst e1 (Note _ e2)
   = match menv subst e1 e2
-	-- Note [Notes in RULE matching]
-	-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-	-- Look through Notes.  In particular, we don't want to
-	-- be confused by InlineMe notes.  Maybe we should be more
-	-- careful about profiling notes, but for now I'm just
-	-- riding roughshod over them.  
-	--- See Note [Notes in call patterns] in SpecConstr
+	-- See Note [Notes in RULE matching]
 
--- Here is another important rule: if the term being matched is a
--- variable, we expand it so long as its unfolding is a WHNF
--- (Its occurrence information is not necessarily up to date,
---  so we don't use it.)
-match menv subst e1 (Var v2)
-  | isCheapUnfolding unfolding
-  = match menv subst e1 (unfoldingTemplate unfolding)
+match menv subst e1 (Var v2)      -- Note [Expanding variables]
+  | not (locallyBoundR rn_env v2) -- Note [Do not expand locally-bound variables]
+  , Just e2' <- expandId v2'
+  = match (menv { me_env = nukeRnEnvR rn_env }) subst e1 e2'
   where
-    rn_env    = me_env menv
-    unfolding = idUnfolding (lookupRnInScope rn_env (rnOccR rn_env v2))
+    v2'    = lookupRnInScope rn_env v2
+    rn_env = me_env menv
 	-- Notice that we look up v2 in the in-scope set
 	-- See Note [Lookup in-scope]
-	-- Remember to apply any renaming first (hence rnOccR)
-
--- Note [Matching lets]
--- ~~~~~~~~~~~~~~~~~~~~
--- Matching a let-expression.  Consider
---	RULE forall x.  f (g x) = <rhs>
--- and target expression
---	f (let { w=R } in g E))
--- Then we'd like the rule to match, to generate
---	let { w=R } in (\x. <rhs>) E
--- In effect, we want to float the let-binding outward, to enable
--- the match to happen.  This is the WHOLE REASON for accumulating
--- bindings in the SubstEnv
---
--- We can only do this if
---	(a) Widening the scope of w does not capture any variables
---	    We use a conservative test: w is not already in scope
---	    If not, we clone the binders, and substitute
---	(b) The free variables of R are not bound by the part of the
---	    target expression outside the let binding; e.g.
---		f (\v. let w = v+1 in g E)
---	    Here we obviously cannot float the let-binding for w.
---
--- You may think rule (a) would never apply, because rule matching is
--- mostly invoked from the simplifier, when we have just run substExpr 
--- over the argument, so there will be no shadowing anyway.
--- The fly in the ointment is that the forall'd variables of the
--- RULE itself are considered in scope.
---
--- I though of various cheapo ways to solve this tiresome problem,
--- but ended up doing the straightforward thing, which is to 
--- clone the binders if they are in scope.  It's tiresome, and
--- potentially inefficient, because of the calls to substExpr,
--- but I don't think it'll happen much in pracice.
-
-{-  Cases to think about
-	(let x=y+1 in \x. (x,x))
-		--> let x=y+1 in (\x1. (x1,x1))
-	(\x. let x = y+1 in (x,x))
-		--> let x1 = y+1 in (\x. (x1,x1)
-	(let x=y+1 in (x,x), let x=y-1 in (x,x))
-		--> let x=y+1 in let x1=y-1 in ((x,x),(x1,x1))
-
-Watch out!
-	(let x=y+1 in let z=x+1 in (z,z)
-		--> matches (p,p) but watch out that the use of 
-			x on z's rhs is OK!
-I'm removing the cloning because that makes the above case
-fail, because the inner let looks as if it has locally-bound vars -}
+	-- No need to apply any renaming first (hence no rnOccR)
+	-- becuase of the not-locallyBoundR
 
 match menv (tv_subst, id_subst, binds) e1 (Let bind e2)
-  | all freshly_bound bndrs,
-    not (any locally_bound bind_fvs)
+  | all freshly_bound bndrs	-- See Note [Matching lets]
+  , not (any (locallyBoundR rn_env) bind_fvs)
   = match (menv { me_env = rn_env' }) 
 	  (tv_subst, id_subst, binds `snocOL` bind')
 	  e1 e2'
@@ -570,21 +514,10 @@ match menv (tv_subst, id_subst, binds) e1 (Let bind e2)
     rn_env   = me_env menv
     bndrs    = bindersOf  bind
     bind_fvs = varSetElems (bindFreeVars bind)
-    locally_bound x   = inRnEnvR rn_env x
     freshly_bound x = not (x `rnInScope` rn_env)
-    bind' = bind
-    e2'   = e2
+    bind'   = bind
+    e2'     = e2
     rn_env' = extendRnInScopeList rn_env bndrs
-{-
-    (rn_env', bndrs') = mapAccumL rnBndrR rn_env bndrs
-    s_prs = [(bndr, Var bndr') | (bndr,bndr') <- zip bndrs bndrs', bndr /= bndr']
-    subst = mkSubst (rnInScopeSet rn_env) emptyVarEnv (mkVarEnv s_prs)
-    (bind', e2') | null s_prs = (bind,   e2)
-		 | otherwise  = (s_bind, substExpr subst e2)
-    s_bind = case bind of
-		NonRec {} -> NonRec (head bndrs') (head rhss)
-		Rec {}    -> Rec (bndrs' `zip` map (substExpr subst) rhss)
--}
 
 match _ subst (Lit lit1) (Lit lit2)
   | lit1 == lit2
@@ -632,32 +565,6 @@ match menv subst (Cast e1 co1) (Cast e2 co2)
   = do	{ subst1 <- match_ty menv subst co1 co2
 	; match menv subst1 e1 e2 }
 
-{-	REMOVING OLD CODE: I think that the above handling for let is 
-			   better than the stuff here, which looks 
-			   pretty suspicious to me.  SLPJ Sept 06
--- This is an interesting rule: we simply ignore lets in the 
--- term being matched against!  The unfolding inside it is (by assumption)
--- already inside any occurrences of the bound variables, so we'll expand
--- them when we encounter them.  This gives a chance of matching
---	forall x,y.  f (g (x,y))
--- against
---	f (let v = (a,b) in g v)
-
-match menv subst e1 (Let bind e2)
-  = match (menv { me_env = rn_env' }) subst e1 e2
-  where
-    (rn_env', _bndrs') = mapAccumL rnBndrR (me_env menv) (bindersOf bind)
-	-- It's important to do this renaming, so that the bndrs
-	-- are brought into the local scope. For example:
-	-- Matching
-	--	forall f,x,xs. f (x:xs)
-	--   against
-	--	f (let y = e in (y:[]))
-	-- We must not get success with x->y!  So we record that y is
-	-- locally bound (with rnBndrR), and proceed.  The Var case
-	-- will fail when trying to bind x->y
--}
-
 -- Everything else fails
 match _ _ _e1 _e2 = -- pprTrace "Failing at" ((text "e1:" <+> ppr e1) $$ (text "e2:" <+> ppr e2)) $ 
 			 Nothing
@@ -691,7 +598,7 @@ match_var menv subst@(tv_subst, id_subst, binds) v1 e2
 						-- c.f. match_ty below
 			; return (tv_subst', extendVarEnv id_subst v1' e2, binds) }
 
-	Just e1' | tcEqExprX (nukeRnEnvL rn_env) e1' e2 
+	Just e1' | eqExpr (nukeRnEnvL rn_env) e1' e2 
 		 -> Just subst
 
 		 | otherwise
@@ -749,6 +656,85 @@ match_ty menv (tv_subst, id_subst, binds) ty1 ty2
 	; return (tv_subst', id_subst, binds) }
 \end{code}
 
+Note [Expanding variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Here is another Very Important rule: if the term being matched is a
+variable, we expand it so long as its unfolding is "expandable". (Its
+occurrence information is not necessarily up to date, so we don't use
+it.)  By "expandable" we mean a WHNF or a "constructor-like" application.
+This is the key reason for "constructor-like" Ids.  If we have
+     {-# NOINLINE [1] CONLIKE g #-}
+     {-# RULE f (g x) = h x #-}
+then in the term
+   let v = g 3 in ....(f v)....
+we want to make the rule fire, to replace (f v) with (h 3). 
+
+Note [Do not expand locally-bound variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Do *not* expand locally-bound variables, else there's a worry that the
+unfolding might mention variables that are themselves renamed.
+Example
+	  case x of y { (p,q) -> ...y... }
+Don't expand 'y' to (p,q) because p,q might themselves have been 
+renamed.  Essentially we only expand unfoldings that are "outside" 
+the entire match.
+
+Hence, (a) the guard (not (isLocallyBoundR v2))
+       (b) when we expand we nuke the renaming envt (nukeRnEnvR).
+
+Note [Notes in RULE matching]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Look through Notes.  In particular, we don't want to
+be confused by InlineMe notes.  Maybe we should be more
+careful about profiling notes, but for now I'm just
+riding roughshod over them.  
+See Note [Notes in call patterns] in SpecConstr
+
+Note [Matching lets]
+~~~~~~~~~~~~~~~~~~~~
+Matching a let-expression.  Consider
+	RULE forall x.  f (g x) = <rhs>
+and target expression
+	f (let { w=R } in g E))
+Then we'd like the rule to match, to generate
+	let { w=R } in (\x. <rhs>) E
+In effect, we want to float the let-binding outward, to enable
+the match to happen.  This is the WHOLE REASON for accumulating
+bindings in the SubstEnv
+
+We can only do this if
+	(a) Widening the scope of w does not capture any variables
+	    We use a conservative test: w is not already in scope
+	    If not, we clone the binders, and substitute
+	(b) The free variables of R are not bound by the part of the
+	    target expression outside the let binding; e.g.
+		f (\v. let w = v+1 in g E)
+	    Here we obviously cannot float the let-binding for w.
+
+You may think rule (a) would never apply, because rule matching is
+mostly invoked from the simplifier, when we have just run substExpr 
+over the argument, so there will be no shadowing anyway.
+The fly in the ointment is that the forall'd variables of the
+RULE itself are considered in scope.
+
+I though of various ways to solve (a).  One plan was to 
+clone the binders if they are in scope.  But watch out!
+	(let x=y+1 in let z=x+1 in (z,z)
+		--> should match (p,p) but watch out that 
+		    the use of x on z's rhs is OK!
+If we clone x, then the let-binding for 'z' is then caught by (b), 
+at least unless we elaborate the RnEnv stuff a bit.
+
+So for we simply fail to match unless both (a) and (b) hold.
+
+Other cases to think about
+	(let x=y+1 in \x. (x,x))
+		--> let x=y+1 in (\x1. (x1,x1))
+	(\x. let x = y+1 in (x,x))
+		--> let x1 = y+1 in (\x. (x1,x1)
+	(let x=y+1 in (x,x), let x=y-1 in (x,x))
+		--> let x=y+1 in let x1=y-1 in ((x,x),(x1,x1))
+
 
 Note [Lookup in-scope]
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -785,19 +771,89 @@ at all.
 That is why the 'lookupRnInScope' call in the (Var v2) case of 'match'
 is so important.
 
+\begin{code}
+eqExpr :: RnEnv2 -> CoreExpr -> CoreExpr -> Bool
+-- ^ A kind of shallow equality used in rule matching, so does 
+-- /not/ look through newtypes or predicate types
+
+eqExpr env (Var v1) (Var v2)
+  | rnOccL env v1 == rnOccR env v2
+  = True
+
+-- The next two rules expand non-local variables
+-- C.f. Note [Expanding variables]
+-- and  Note [Do not expand locally-bound variables]
+eqExpr env (Var v1) e2
+  | not (locallyBoundL env v1)
+  , Just e1' <- expandId (lookupRnInScope env v1)
+  = eqExpr (nukeRnEnvL env) e1' e2
+
+eqExpr env e1 (Var v2)
+  | not (locallyBoundR env v2)
+  , Just e2' <- expandId (lookupRnInScope env v2)
+  = eqExpr (nukeRnEnvR env) e1 e2'
+
+eqExpr _   (Lit lit1)    (Lit lit2)    = lit1 == lit2
+eqExpr env (App f1 a1)   (App f2 a2)   = eqExpr env f1 f2 && eqExpr env a1 a2
+eqExpr env (Lam v1 e1)   (Lam v2 e2)   = eqExpr (rnBndr2 env v1 v2) e1 e2
+eqExpr env (Note n1 e1)  (Note n2 e2)  = eq_note env n1 n2 && eqExpr env e1 e2
+eqExpr env (Cast e1 co1) (Cast e2 co2) = tcEqTypeX env co1 co2 && eqExpr env e1 e2
+eqExpr env (Type t1)     (Type t2)     = tcEqTypeX env t1 t2
+
+eqExpr env (Let (NonRec v1 r1) e1)
+	   (Let (NonRec v2 r2) e2) =  eqExpr env r1 r2 
+				   && eqExpr (rnBndr2 env v1 v2) e1 e2
+eqExpr env (Let (Rec ps1) e1)
+	   (Let (Rec ps2) e2)      =  equalLength ps1 ps2
+				   && and (zipWith eq_rhs ps1 ps2)
+				   && eqExpr env' e1 e2
+				   where
+				      env' = foldl2 rn_bndr2 env ps2 ps2
+				      rn_bndr2 env (b1,_) (b2,_) = rnBndr2 env b1 b2
+				      eq_rhs       (_,r1) (_,r2) = eqExpr env' r1 r2
+eqExpr env (Case e1 v1 t1 a1)
+	   (Case e2 v2 t2 a2) =  eqExpr env e1 e2
+                              && tcEqTypeX env t1 t2                      
+			      && equalLength a1 a2
+			      && and (zipWith (eq_alt env') a1 a2)
+			      where
+				env' = rnBndr2 env v1 v2
+
+eqExpr _   _             _             = False
+
+eq_alt :: RnEnv2 -> CoreAlt -> CoreAlt -> Bool
+eq_alt env (c1,vs1,r1) (c2,vs2,r2) = c1==c2 && eqExpr (rnBndrs2 env vs1  vs2) r1 r2
+
+eq_note :: RnEnv2 -> Note -> Note -> Bool
+eq_note _ (SCC cc1)     (SCC cc2)      = cc1 == cc2
+eq_note _ (CoreNote s1) (CoreNote s2)  = s1 == s2
+eq_note _ _             _              = False
+\end{code}
+
+Auxiliary functions
+
+\begin{code}
+locallyBoundL, locallyBoundR :: RnEnv2 -> Var -> Bool
+locallyBoundL rn_env v = inRnEnvL rn_env v
+locallyBoundR rn_env v = inRnEnvR rn_env v
+
+
+expandId :: Id -> Maybe CoreExpr
+expandId id
+  | isExpandableUnfolding unfolding = Just (unfoldingTemplate unfolding)
+  | otherwise		  	    = Nothing
+  where
+    unfolding = idUnfolding id
+\end{code}
 
 %************************************************************************
 %*									*
-\subsection{Checking a program for failing rule applications}
+                   Rule-check the program										
 %*									*
 %************************************************************************
 
------------------------------------------------------
-			Game plan
------------------------------------------------------
-
-We want to know what sites have rules that could have fired but didn't.
-This pass runs over the tree (without changing it) and reports such.
+   We want to know what sites have rules that could have fired but didn't.
+   This pass runs over the tree (without changing it) and reports such.
 
 \begin{code}
 -- | Report partial matches for rules beginning with the specified

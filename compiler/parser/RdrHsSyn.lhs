@@ -58,7 +58,9 @@ import TypeRep          ( Kind )
 import RdrName		( RdrName, isRdrTyVar, isRdrTc, mkUnqual, rdrNameOcc, 
 			  isRdrDataCon, isUnqual, getRdrName, isQual,
 			  setRdrNameSpace, showRdrName )
-import BasicTypes	( maxPrecedence, Activation, InlineSpec(..), alwaysInlineSpec, neverInlineSpec )
+import BasicTypes	( maxPrecedence, Activation, RuleMatchInfo,
+                          InlinePragma(..),  InlineSpec(..),
+                          alwaysInlineSpec, neverInlineSpec )
 import Lexer		( P, failSpanMsgP, extension, standaloneDerivingEnabled, bangPatEnabled )
 import TysWiredIn	( unitTyCon ) 
 import ForeignCall	( CCallConv, Safety, CCallTarget(..), CExportSpec(..),
@@ -923,11 +925,13 @@ mk_rec_fields :: [HsRecField id arg] -> Bool -> HsRecFields id arg
 mk_rec_fields fs False = HsRecFields { rec_flds = fs, rec_dotdot = Nothing }
 mk_rec_fields fs True  = HsRecFields { rec_flds = fs, rec_dotdot = Just (length fs) }
 
-mkInlineSpec :: Maybe Activation -> Bool -> InlineSpec
+mkInlineSpec :: Maybe Activation -> RuleMatchInfo -> Bool -> InlineSpec
 -- The Maybe is becuase the user can omit the activation spec (and usually does)
-mkInlineSpec Nothing 	True  = alwaysInlineSpec	-- INLINE
-mkInlineSpec Nothing 	False = neverInlineSpec		-- NOINLINE
-mkInlineSpec (Just act) inl   = Inline act inl
+mkInlineSpec Nothing    match_info True  = alwaysInlineSpec match_info
+                                                                -- INLINE
+mkInlineSpec Nothing 	match_info False = neverInlineSpec  match_info
+                                                                -- NOINLINE
+mkInlineSpec (Just act) match_info inl   = Inline (InlinePragma act match_info) inl
 
 
 -----------------------------------------------------------------------------

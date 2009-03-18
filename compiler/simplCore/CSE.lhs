@@ -10,7 +10,7 @@ module CSE (
 
 #include "HsVersions.h"
 
-import Id		( Id, idType, idInlinePragma, zapIdOccInfo )
+import Id		( Id, idType, idInlineActivation, zapIdOccInfo )
 import CoreUtils	( hashExpr, cheapEqExpr, exprIsBig, mkAltExpr, exprIsCheap )
 import DataCon		( isUnboxedTupleCon )
 import Type		( tyConAppArgs )
@@ -201,8 +201,8 @@ do_one env (id, rhs)
 	Nothing             -> (addCSEnvItem env' rhs' (Var id'), (id', rhs'))
   where
     (env', id') = addBinder env id
-    rhs' | isAlwaysActive (idInlinePragma id) = cseExpr env' rhs
-	 | otherwise			      = rhs
+    rhs' | isAlwaysActive (idInlineActivation id) = cseExpr env' rhs
+	 | otherwise			          = rhs
 		-- See Note [CSE for INLINE and NOINLINE]
 
 tryForCSE :: CSEnv -> CoreExpr -> CoreExpr

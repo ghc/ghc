@@ -864,7 +864,7 @@ occAnalApp env (Var fun, args)
   where
     fun_uniq = idUnique fun
     fun_uds  = mkOneOcc env fun (valArgCount args > 0)
-    is_pap = isDataConWorkId fun || valArgCount args < idArity fun
+    is_pap = isConLikeId fun || valArgCount args < idArity fun
 
                 -- Hack for build, fold, runST
     args_stuff  | fun_uniq == buildIdKey    = appSpecial env 2 [True,True]  args

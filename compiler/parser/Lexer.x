@@ -244,6 +244,12 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
                     { token (ITinline_prag True) }
   "{-#" $whitechar* (NO(T?)INLINE|no(t?)inline) / { notFollowedByPragmaChar }
   					{ token (ITinline_prag False) }
+  "{-#" $whitechar* (INLINE|inline)
+        $whitechar+ (CONLIKE|conlike) / { notFollowedByPragmaChar }
+                                        { token (ITinline_conlike_prag True) }
+  "{-#" $whitechar* (NO(T)?INLINE|no(t?)inline)
+        $whitechar+ (CONLIKE|constructorlike) / { notFollowedByPragmaChar }
+                                        { token (ITinline_conlike_prag False) }
   "{-#" $whitechar* (SPECIALI[SZ]E|speciali[sz]e) / { notFollowedByPragmaChar }
   					{ token ITspec_prag }
   "{-#" $whitechar* (SPECIALI[SZ]E|speciali[sz]e)
@@ -490,6 +496,7 @@ data Token
 
 	-- Pragmas
   | ITinline_prag Bool		-- True <=> INLINE, False <=> NOINLINE
+  | ITinline_conlike_prag Bool  -- same
   | ITspec_prag			-- SPECIALISE	
   | ITspec_inline_prag Bool	-- SPECIALISE INLINE (or NOINLINE)
   | ITsource_prag

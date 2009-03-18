@@ -1440,8 +1440,8 @@ toIfaceLetBndr id  = IfLetBndr (occNameFS (getOccName id))
 	-- See Note [IdInfo on nested let-bindings] in IfaceSyn
     id_info = idInfo id
     inline_prag = inlinePragInfo id_info
-    prag_info | isAlwaysActive inline_prag = NoInfo
-	      | otherwise		   = HasInfo [HsInline inline_prag]
+    prag_info | isDefaultInlinePragma inline_prag = NoInfo
+	      | otherwise		          = HasInfo [HsInline inline_prag]
 
 --------------------------
 toIfaceIdDetails :: IdDetails -> IfaceIdDetails
@@ -1495,11 +1495,13 @@ toIfaceIdInfo id_info
 					
     ------------  Inline prag  --------------
     inline_prag = inlinePragInfo id_info
-    inline_hsinfo | isAlwaysActive inline_prag     = Nothing
-		  | no_unfolding && not has_worker = Nothing
+    inline_hsinfo | isDefaultInlinePragma inline_prag = Nothing
+		  | no_unfolding && not has_worker 
+                      && isFunLike (inlinePragmaRuleMatchInfo inline_prag)
+                                                      = Nothing
 			-- If the iface file give no unfolding info, we 
 			-- don't need to say when inlining is OK!
-		  | otherwise			   = Just (HsInline inline_prag)
+		  | otherwise			      = Just (HsInline inline_prag)
 
 --------------------------
 coreRuleToIfaceRule :: Module -> CoreRule -> IfaceRule

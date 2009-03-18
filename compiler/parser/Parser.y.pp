@@ -47,7 +47,7 @@ import Module
 import StaticFlags	( opt_SccProfilingOn, opt_Hpc )
 import Type		( Kind, mkArrowKind, liftedTypeKind, unliftedTypeKind )
 import BasicTypes	( Boxity(..), Fixity(..), FixityDirection(..), IPName(..),
-			  Activation(..), defaultInlineSpec )
+			  Activation(..), RuleMatchInfo(..), defaultInlineSpec )
 import DynFlags
 import OrdList
 import HaddockParse
@@ -254,6 +254,7 @@ incorrect.
  'using'    { L _ ITusing }     -- for list transform extension
 
  '{-# INLINE'      	  { L _ (ITinline_prag _) }
+ '{-# INLINE_CONLIKE'     { L _ (ITinline_conlike_prag _) }
  '{-# SPECIALISE'  	  { L _ ITspec_prag }
  '{-# SPECIALISE_INLINE'  { L _ (ITspec_inline_prag _) }
  '{-# SOURCE'	   { L _ ITsource_prag }
@@ -1287,12 +1288,14 @@ sigdecl :: { Located (OrdList (LHsDecl RdrName)) }
 	| infix prec ops	{ LL $ toOL [ LL $ SigD (FixSig (FixitySig n (Fixity $2 (unLoc $1))))
 					     | n <- unLoc $3 ] }
 	| '{-# INLINE'   activation qvar '#-}'	      
-				{ LL $ unitOL (LL $ SigD (InlineSig $3 (mkInlineSpec $2 (getINLINE $1)))) }
+				{ LL $ unitOL (LL $ SigD (InlineSig $3 (mkInlineSpec $2 FunLike (getINLINE $1)))) }
+        | '{-# INLINE_CONLIKE' activation qvar '#-}'
+                                { LL $ unitOL (LL $ SigD (InlineSig $3 (mkInlineSpec $2 ConLike (getINLINE_CONLIKE $1)))) }
 	| '{-# SPECIALISE' qvar '::' sigtypes1 '#-}'
 			 	{ LL $ toOL [ LL $ SigD (SpecSig $2 t defaultInlineSpec) 
 					    | t <- $4] }
 	| '{-# SPECIALISE_INLINE' activation qvar '::' sigtypes1 '#-}'
-			 	{ LL $ toOL [ LL $ SigD (SpecSig $3 t (mkInlineSpec $2 (getSPEC_INLINE $1)))
+			 	{ LL $ toOL [ LL $ SigD (SpecSig $3 t (mkInlineSpec $2 FunLike (getSPEC_INLINE $1)))
 					    | t <- $5] }
 	| '{-# SPECIALISE' 'instance' inst_type '#-}'
 				{ LL $ unitOL (LL $ SigD (SpecInstSig $3)) }
@@ -2013,6 +2016,7 @@ getPRIMFLOAT	(L _ (ITprimfloat  x)) = x
 getPRIMDOUBLE	(L _ (ITprimdouble x)) = x
 getTH_ID_SPLICE (L _ (ITidEscape x)) = x
 getINLINE	(L _ (ITinline_prag b)) = b
+getINLINE_CONLIKE (L _ (ITinline_conlike_prag b)) = b
 getSPEC_INLINE	(L _ (ITspec_inline_prag b)) = b
 
 getDOCNEXT (L _ (ITdocCommentNext x)) = x

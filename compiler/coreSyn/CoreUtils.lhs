@@ -25,7 +25,7 @@ module CoreUtils (
 
 	-- * Properties of expressions
 	exprType, coreAltType, coreAltsType,
-	exprIsDupable, exprIsTrivial, exprIsCheap, 
+	exprIsDupable, exprIsTrivial, exprIsCheap, exprIsExpandable,
 	exprIsHNF,exprOkForSpeculation, exprIsBig, 
 	exprIsConApp_maybe, exprIsBottom,
 	rhsIsStatic,
@@ -37,7 +37,7 @@ module CoreUtils (
 	hashExpr,
 
 	-- * Equality
-	cheapEqExpr, tcEqExpr, tcEqExprX,
+	cheapEqExpr, 
 
 	-- * Manipulating data constructors and types
 	applyTypeToArgs, applyTypeToArg,
@@ -47,11 +47,9 @@ module CoreUtils (
 #include "HsVersions.h"
 
 import CoreSyn
-import CoreFVs
 import PprCore
 import Var
 import SrcLoc
-import VarSet
 import VarEnv
 import Name
 import Module
@@ -462,27 +460,28 @@ Notice that a variable is considered 'cheap': we can push it inside a lambda,
 because sharing will make sure it is only evaluated once.
 
 \begin{code}
-exprIsCheap :: CoreExpr -> Bool
-exprIsCheap (Lit _)           = True
-exprIsCheap (Type _)          = True
-exprIsCheap (Var _)           = True
-exprIsCheap (Note InlineMe _) = True
-exprIsCheap (Note _ e)        = exprIsCheap e
-exprIsCheap (Cast e _)        = exprIsCheap e
-exprIsCheap (Lam x e)         = isRuntimeVar x || exprIsCheap e
-exprIsCheap (Case e _ _ alts) = exprIsCheap e && 
-				and [exprIsCheap rhs | (_,_,rhs) <- alts]
+exprIsCheap' :: (Id -> Bool) -> CoreExpr -> Bool
+exprIsCheap' _          (Lit _)           = True
+exprIsCheap' _          (Type _)          = True
+exprIsCheap' _          (Var _)           = True
+exprIsCheap' _          (Note InlineMe _) = True
+exprIsCheap' is_conlike (Note _ e)        = exprIsCheap' is_conlike e
+exprIsCheap' is_conlike (Cast e _)        = exprIsCheap' is_conlike e
+exprIsCheap' is_conlike (Lam x e)         = isRuntimeVar x
+                                            || exprIsCheap' is_conlike e
+exprIsCheap' is_conlike (Case e _ _ alts) = exprIsCheap' is_conlike e && 
+				and [exprIsCheap' is_conlike rhs | (_,_,rhs) <- alts]
 	-- Experimentally, treat (case x of ...) as cheap
 	-- (and case __coerce x etc.)
 	-- This improves arities of overloaded functions where
 	-- there is only dictionary selection (no construction) involved
-exprIsCheap (Let (NonRec x _) e)  
-      | isUnLiftedType (idType x) = exprIsCheap e
+exprIsCheap' is_conlike (Let (NonRec x _) e)  
+      | isUnLiftedType (idType x) = exprIsCheap' is_conlike e
       | otherwise		  = False
 	-- strict lets always have cheap right hand sides,
 	-- and do no allocation.
 
-exprIsCheap other_expr 	-- Applications and variables
+exprIsCheap' is_conlike other_expr 	-- Applications and variables
   = go other_expr []
   where
 	-- Accumulate value arguments, then decide
@@ -497,8 +496,8 @@ exprIsCheap other_expr 	-- Applications and variables
 		ClassOpId _  -> go_sel args
 		PrimOpId op  -> go_primop op args
 
-		DataConWorkId _ -> go_pap args
-		_ | length args < idArity f -> go_pap args
+		_ | is_conlike f -> go_pap args
+                  | length args < idArity f -> go_pap args
 
 	        _ -> isBottomingId f
 			-- Application of a function which
@@ -515,18 +514,24 @@ exprIsCheap other_expr 	-- Applications and variables
  	-- We'll put up with one constructor application, but not dozens
  	
     --------------
-    go_primop op args = primOpIsCheap op && all exprIsCheap args
+    go_primop op args = primOpIsCheap op && all (exprIsCheap' is_conlike) args
  	-- In principle we should worry about primops
  	-- that return a type variable, since the result
  	-- might be applied to something, but I'm not going
  	-- to bother to check the number of args
  
     --------------
-    go_sel [arg] = exprIsCheap arg	-- I'm experimenting with making record selection
+    go_sel [arg] = exprIsCheap' is_conlike arg	-- I'm experimenting with making record selection
     go_sel _     = False		-- look cheap, so we will substitute it inside a
  					-- lambda.  Particularly for dictionary field selection.
   		-- BUT: Take care with (sel d x)!  The (sel d) might be cheap, but
   		--	there's no guarantee that (sel d x) will be too.  Hence (n_val_args == 1)
+
+exprIsCheap :: CoreExpr -> Bool
+exprIsCheap = exprIsCheap' isDataConWorkId
+
+exprIsExpandable :: CoreExpr -> Bool
+exprIsExpandable = exprIsCheap' isConLikeId
 \end{code}
 
 \begin{code}
@@ -899,7 +904,7 @@ exprIsConApp_maybe expr = analyse (collectArgs expr)
 	-- we are effectively duplicating the unfolding
     analyse (Var fun, [])
 	| let unf = idUnfolding fun,
-	  isCheapUnfolding unf
+	  isExpandableUnfolding unf
 	= exprIsConApp_maybe (unfoldingTemplate unf)
 
     analyse _ = Nothing
@@ -943,53 +948,6 @@ exprIsBig (Cast e _)   = exprIsBig e	-- Hopefully coercions are not too big!
 exprIsBig _            = True
 \end{code}
 
-
-\begin{code}
-tcEqExpr :: CoreExpr -> CoreExpr -> Bool
--- ^ A kind of shallow equality used in rule matching, so does 
--- /not/ look through newtypes or predicate types
-
-tcEqExpr e1 e2 = tcEqExprX rn_env e1 e2
-  where
-    rn_env = mkRnEnv2 (mkInScopeSet (exprFreeVars e1 `unionVarSet` exprFreeVars e2))
-
-tcEqExprX :: RnEnv2 -> CoreExpr -> CoreExpr -> Bool
-tcEqExprX env (Var v1)	   (Var v2)	= rnOccL env v1 == rnOccR env v2
-tcEqExprX _   (Lit lit1)   (Lit lit2)   = lit1 == lit2
-tcEqExprX env (App f1 a1)  (App f2 a2)  = tcEqExprX env f1 f2 && tcEqExprX env a1 a2
-tcEqExprX env (Lam v1 e1)  (Lam v2 e2)  = tcEqExprX (rnBndr2 env v1 v2) e1 e2
-tcEqExprX env (Let (NonRec v1 r1) e1)
-	      (Let (NonRec v2 r2) e2)   = tcEqExprX env r1 r2 
-				       && tcEqExprX (rnBndr2 env v1 v2) e1 e2
-tcEqExprX env (Let (Rec ps1) e1)
-	      (Let (Rec ps2) e2)        =  equalLength ps1 ps2
-				        && and (zipWith eq_rhs ps1 ps2)
-				        && tcEqExprX env' e1 e2
-				     where
-				       env' = foldl2 rn_bndr2 env ps2 ps2
-				       rn_bndr2 env (b1,_) (b2,_) = rnBndr2 env b1 b2
-				       eq_rhs       (_,r1) (_,r2) = tcEqExprX env' r1 r2
-tcEqExprX env (Case e1 v1 t1 a1)
-	      (Case e2 v2 t2 a2)     =  tcEqExprX env e1 e2
-                                     && tcEqTypeX env t1 t2                      
-				     && equalLength a1 a2
-				     && and (zipWith (eq_alt env') a1 a2)
-				     where
-				       env' = rnBndr2 env v1 v2
-
-tcEqExprX env (Note n1 e1)  (Note n2 e2)  = eq_note env n1 n2 && tcEqExprX env e1 e2
-tcEqExprX env (Cast e1 co1) (Cast e2 co2) = tcEqTypeX env co1 co2 && tcEqExprX env e1 e2
-tcEqExprX env (Type t1)     (Type t2)     = tcEqTypeX env t1 t2
-tcEqExprX _   _             _             = False
-
-eq_alt :: RnEnv2 -> CoreAlt -> CoreAlt -> Bool
-eq_alt env (c1,vs1,r1) (c2,vs2,r2) = c1==c2 && tcEqExprX (rnBndrs2 env vs1  vs2) r1 r2
-
-eq_note :: RnEnv2 -> Note -> Note -> Bool
-eq_note _ (SCC cc1)     (SCC cc2)      = cc1 == cc2
-eq_note _ (CoreNote s1) (CoreNote s2)  = s1 == s2
-eq_note _ _             _              = False
-\end{code}
 
 
 %************************************************************************

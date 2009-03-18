@@ -561,7 +561,7 @@ addExternal (id,rhs) needed
 		     spec_ids
 
     idinfo	   = idInfo id
-    dont_inline	   = isNeverActive (inlinePragInfo idinfo)
+    dont_inline	   = isNeverActive (inlinePragmaActivation (inlinePragInfo idinfo))
     loop_breaker   = isNonRuleLoopBreaker (occInfo idinfo)
     bottoming_fn   = isBottomingSig (newStrictnessInfo idinfo `orElse` topSig)
     spec_ids	   = specInfoFreeVars (specInfo idinfo)

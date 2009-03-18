@@ -22,7 +22,7 @@ module CoreUnfold (
 	mkCompulsoryUnfolding, seqUnfolding,
 	evaldUnfolding, mkOtherCon, otherCons,
 	unfoldingTemplate, maybeUnfoldingTemplate,
-	isEvaldUnfolding, isValueUnfolding, isCheapUnfolding, isCompulsoryUnfolding,
+	isEvaldUnfolding, isValueUnfolding, isExpandableUnfolding, isCompulsoryUnfolding,
 	hasUnfolding, hasSomeUnfolding, neverUnfold,
 
 	couldBeSmallEnoughToInline, 
@@ -71,7 +71,8 @@ mkImplicitUnfolding expr
   = CoreUnfolding (simpleOptExpr emptySubst expr)
 		  True
 		  (exprIsHNF expr)
-		  (exprIsCheap expr)
+                  (exprIsCheap expr)
+                  (exprIsExpandable expr)
 		  (calcUnfoldingGuidance opt_UF_CreationThreshold expr)
 
 mkUnfolding :: Bool -> CoreExpr -> Unfolding
@@ -84,6 +85,8 @@ mkUnfolding top_lvl expr
 
 		  (exprIsCheap expr)
 			-- OK to inline inside a lambda
+
+                  (exprIsExpandable expr)
 
 		  (calcUnfoldingGuidance opt_UF_CreationThreshold expr)
 	-- Sometimes during simplification, there's a large let-bound thing	
@@ -99,8 +102,8 @@ instance Outputable Unfolding where
   ppr NoUnfolding = ptext (sLit "No unfolding")
   ppr (OtherCon cs) = ptext (sLit "OtherCon") <+> ppr cs
   ppr (CompulsoryUnfolding e) = ptext (sLit "Compulsory") <+> ppr e
-  ppr (CoreUnfolding e top hnf cheap g) 
-	= ptext (sLit "Unf") <+> sep [ppr top <+> ppr hnf <+> ppr cheap <+> ppr g, 
+  ppr (CoreUnfolding e top hnf cheap expable g) 
+	= ptext (sLit "Unf") <+> sep [ppr top <+> ppr hnf <+> ppr cheap <+> ppr expable <+> ppr g, 
 				     ppr e]
 
 mkCompulsoryUnfolding :: CoreExpr -> Unfolding
@@ -484,13 +487,13 @@ couldBeSmallEnoughToInline threshold rhs = case calcUnfoldingGuidance threshold 
 
 certainlyWillInline :: Unfolding -> Bool
   -- Sees if the unfolding is pretty certain to inline	
-certainlyWillInline (CoreUnfolding _ _ _ is_cheap (UnfoldIfGoodArgs n_vals _ size _))
+certainlyWillInline (CoreUnfolding _ _ _ is_cheap _ (UnfoldIfGoodArgs n_vals _ size _))
   = is_cheap && size - (n_vals +1) <= opt_UF_UseThreshold
 certainlyWillInline _
   = False
 
 smallEnoughToInline :: Unfolding -> Bool
-smallEnoughToInline (CoreUnfolding _ _ _ _ (UnfoldIfGoodArgs _ _ size _))
+smallEnoughToInline (CoreUnfolding _ _ _ _ _ (UnfoldIfGoodArgs _ _ size _))
   = size <= opt_UF_UseThreshold
 smallEnoughToInline _
   = False
@@ -561,7 +564,7 @@ callSiteInline dflags active_inline id lone_variable arg_infos cont_info
 		-- compulsory unfoldings (see MkId.lhs).
 		-- We don't allow them to be inactive
 
-	CoreUnfolding unf_template is_top is_value is_cheap guidance ->
+	CoreUnfolding unf_template is_top is_value is_cheap is_expable guidance ->
 
     let
 	result | yes_or_no = Just unf_template
@@ -639,7 +642,8 @@ callSiteInline dflags active_inline id lone_variable arg_infos cont_info
 			text "arg infos" <+> ppr arg_infos,
 			text "interesting continuation" <+> ppr cont_info,
 			text "is value:" <+> ppr is_value,
-			text "is cheap:" <+> ppr is_cheap,
+                        text "is cheap:" <+> ppr is_cheap,
+			text "is expandable:" <+> ppr is_expable,
 			text "guidance" <+> ppr guidance,
 			text "ANSWER =" <+> if yes_or_no then text "YES" else text "NO"])
 		  result

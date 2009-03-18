@@ -461,7 +461,7 @@ prepareRhs env0 rhs0
         where
           is_val = n_val_args > 0       -- There is at least one arg
                                         -- ...and the fun a constructor or PAP
-                 && (isDataConWorkId fun || n_val_args < idArity fun)
+                 && (isConLikeId fun || n_val_args < idArity fun)
     go _ env other
         = return (False, env, other)
 \end{code}
@@ -578,7 +578,7 @@ completeBind env top_lvl old_bndr new_bndr new_rhs
   = return (addNonRecWithUnf env new_bndr new_rhs unfolding wkr)
   where
     unfolding | omit_unfolding = NoUnfolding
-	      | otherwise      = mkUnfolding  (isTopLevel top_lvl) new_rhs
+	      | otherwise      = mkUnfolding (isTopLevel top_lvl) new_rhs
     old_info    = idInfo old_bndr
     occ_info    = occInfo old_info
     wkr		= substWorker env (workerInfo old_info)

@@ -15,8 +15,8 @@ module Specialise ( specProgram ) where
 #include "HsVersions.h"
 
 import Id		( Id, idName, idType, mkUserLocal, idCoreRules,
-			  idInlinePragma, setInlinePragma, setIdUnfolding,
-			  isLocalId ) 
+			  idInlineActivation, setInlineActivation, setIdUnfolding,
+                          isLocalId ) 
 import TcType		( Type, mkTyVarTy, tcSplitSigmaTy, 
 			  tyVarsOfTypes, tyVarsOfTheta, isClassPred,
 			  tcCmpType, isUnLiftedType
@@ -829,7 +829,7 @@ specDefn subst calls fn rhs
     (tyvars, theta, _) = tcSplitSigmaTy fn_type
     n_tyvars	       = length tyvars
     n_dicts	       = length theta
-    inline_prag        = idInlinePragma fn
+    inline_act         = idInlineActivation fn
 
 	-- It's important that we "see past" any INLINE pragma
 	-- else we'll fail to specialise an INLINE thing
@@ -913,7 +913,7 @@ specDefn subst calls fn rhs
 	        rule_name = mkFastString ("SPEC " ++ showSDoc (ppr fn <+> ppr spec_ty_args))
   		spec_env_rule = mkLocalRule
 			          rule_name
-				  inline_prag 	-- Note [Auto-specialisation and RULES]
+				  inline_act 	-- Note [Auto-specialisation and RULES]
 			 	  (idName fn)
 			          (poly_tyvars ++ inst_dict_ids)
 				  inst_args 
@@ -922,7 +922,7 @@ specDefn subst calls fn rhs
 		-- Add the { d1' = dx1; d2' = dx2 } usage stuff
 	   	final_uds = foldr addDictBind rhs_uds dx_binds
 
-	   	spec_pr | inline_rhs = (spec_f `setInlinePragma` inline_prag, Note InlineMe spec_rhs)
+	   	spec_pr | inline_rhs = (spec_f `setInlineActivation` inline_act, Note InlineMe spec_rhs)
 		        | otherwise  = (spec_f, 		 	      spec_rhs)
 
 	   ; return (Just (spec_pr, final_uds, spec_env_rule)) } }
@@ -1068,7 +1068,8 @@ Note [Inline specialisations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We transfer to the specialised function any INLINE stuff from the
 original.  This means (a) the Activation in the IdInfo, and (b) any
-InlineMe on the RHS.  
+InlineMe on the RHS.  We do not, however, transfer the RuleMatchInfo
+since we do not expect the specialisation to occur in rewrite rules.
 
 This is a change (Jun06).  Previously the idea is that the point of
 inlining was precisely to specialise the function at its call site,

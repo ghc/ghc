@@ -755,7 +755,7 @@ tc_inst_decl2 dfun_id (VanillaInst monobinds uprags)
        -- Create the result bindings
        ; let dict_constr   = classDataCon clas
              inline_prag | null dfun_dicts  = []
-                         | otherwise        = [L loc (InlinePrag (Inline AlwaysActive True))]
+                         | otherwise        = [L loc (InlinePrag (alwaysInlineSpec FunLike))]
                      -- Always inline the dfun; this is an experimental decision
                      -- because it makes a big performance difference sometimes.
                      -- Often it means we can do the method selection, and then

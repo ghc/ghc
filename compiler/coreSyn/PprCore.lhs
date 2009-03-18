@@ -310,7 +310,7 @@ pprIdBndrInfo info
     dmd_info  = newDemandInfo info
     lbv_info  = lbvarInfo info
 
-    no_info = isAlwaysActive prag_info && isNoOcc occ_info && 
+    no_info = isDefaultInlinePragma prag_info && isNoOcc occ_info && 
 	      (case dmd_info of { Nothing -> True; Just d -> isTop d }) &&
 	      hasNoLBVarInfo lbv_info
 

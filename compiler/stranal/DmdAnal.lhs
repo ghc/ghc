@@ -29,7 +29,7 @@ import CoreUtils	( exprIsHNF, exprIsTrivial )
 import CoreArity	( exprArity )
 import DataCon		( dataConTyCon )
 import TyCon		( isProductTyCon, isRecursiveTyCon )
-import Id		( Id, idType, idInlinePragma,
+import Id		( Id, idType, idInlineActivation,
 			  isDataConWorkId, isGlobalId, idArity,
 #ifdef OLD_STRICTNESS
 			  idDemandInfo,  idStrictness, idCprInfo, idName,
@@ -463,7 +463,7 @@ mkSigTy :: TopLevelFlag -> RecFlag -> Id -> CoreExpr -> DmdType -> (DmdEnv, Stri
 mkSigTy top_lvl rec_flag id rhs dmd_ty 
   = mk_sig_ty never_inline thunk_cpr_ok rhs dmd_ty
   where
-    never_inline = isNeverActive (idInlinePragma id)
+    never_inline = isNeverActive (idInlineActivation id)
     maybe_id_dmd = idNewDemandInfo_maybe id
 	-- Is Nothing the first time round
 

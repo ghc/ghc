@@ -15,7 +15,7 @@ import CoreArity	( exprArity )
 import Var
 import Id		( Id, idType, isOneShotLambda, 
 			  setIdNewStrictness, mkWorkerId,
-			  setIdWorkerInfo, setInlinePragma,
+			  setIdWorkerInfo, setInlineActivation,
 			  setIdArity, idInfo )
 import MkId		( lazyIdKey, lazyIdUnfolding )
 import Type		( Type )
@@ -25,7 +25,8 @@ import NewDemand        ( Demand(..), StrictSig(..), DmdType(..), DmdResult(..),
 			)
 import UniqSupply
 import Unique		( hasKey )
-import BasicTypes	( RecFlag(..), isNonRec, isNeverActive )
+import BasicTypes	( RecFlag(..), isNonRec, isNeverActive,
+                          Activation, inlinePragmaActivation )
 import VarEnv		( isEmptyVarEnv )
 import Maybes		( orElse )
 import WwLib
@@ -196,7 +197,7 @@ tryWW is_rec fn_id rhs
   |  -- isNonRec is_rec && 	-- Now omitted: see Note [Don't w/w inline things]
      certainlyWillInline unfolding
 
-  || isNeverActive inline_prag
+  || isNeverActive inline_act
 	-- No point in worker/wrappering if the thing is never inlined!
 	-- Because the no-inline prag will prevent the wrapper ever
 	-- being inlined at a call site. 
@@ -207,7 +208,7 @@ tryWW is_rec fn_id rhs
     splitThunk new_fn_id rhs
 
   | is_fun && worthSplittingFun wrap_dmds res_info
-  = splitFun new_fn_id fn_info wrap_dmds res_info inline_prag rhs
+  = splitFun new_fn_id fn_info wrap_dmds res_info inline_act rhs
 
   | otherwise
   = return [ (new_fn_id, rhs) ]
@@ -216,7 +217,7 @@ tryWW is_rec fn_id rhs
     fn_info   	 = idInfo fn_id
     maybe_fn_dmd = newDemandInfo fn_info
     unfolding 	 = unfoldingInfo fn_info
-    inline_prag  = inlinePragInfo fn_info
+    inline_act   = inlinePragmaActivation (inlinePragInfo fn_info)
 
 	-- In practice it always will have a strictness 
 	-- signature, even if it's a uninformative one
@@ -236,9 +237,9 @@ tryWW is_rec fn_id rhs
     is_thunk  = not is_fun && not (exprIsHNF rhs)
 
 ---------------------
-splitFun :: Id -> IdInfo -> [Demand] -> DmdResult -> InlinePragInfo -> Expr Var
+splitFun :: Id -> IdInfo -> [Demand] -> DmdResult -> Activation -> Expr Var
          -> UniqSM [(Id, CoreExpr)]
-splitFun fn_id fn_info wrap_dmds res_info inline_prag rhs
+splitFun fn_id fn_info wrap_dmds res_info inline_act rhs
   = WARN( not (wrap_dmds `lengthIs` arity), ppr fn_id <+> (ppr arity $$ ppr wrap_dmds $$ ppr res_info) ) 
     (do {
 	-- The arity should match the signature
@@ -247,13 +248,14 @@ splitFun fn_id fn_info wrap_dmds res_info inline_prag rhs
     ; let
 	work_rhs = work_fn rhs
 	work_id  = mkWorkerId work_uniq fn_id (exprType work_rhs) 
-			`setInlinePragma` inline_prag
-				-- Any inline pragma (which sets when inlining is active) 
+			`setInlineActivation` inline_act
+				-- Any inline activation (which sets when inlining is active) 
 				-- on the original function is duplicated on the worker and wrapper
 				-- It *matters* that the pragma stays on the wrapper
 				-- It seems sensible to have it on the worker too, although we
 				-- can't think of a compelling reason. (In ptic, INLINE things are 
-				-- not w/wd)
+				-- not w/wd). However, the RuleMatchInfo is not transferred since
+                                -- it does not make sense for workers to be constructorlike.
 			`setIdNewStrictness` StrictSig (mkTopDmdType work_demands work_res_info)
 				-- Even though we may not be at top level, 
 				-- it's ok to give it an empty DmdEnv

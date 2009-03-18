@@ -578,6 +578,24 @@ instance Binary Activation where
 	      _ -> do ab <- get bh
 		      return (ActiveAfter ab)
 
+instance Binary RuleMatchInfo where
+    put_ bh FunLike = putByte bh 0
+    put_ bh ConLike = putByte bh 1
+    get bh = do
+            h <- getByte bh
+            if h == 1 then return ConLike
+                      else return FunLike
+
+instance Binary InlinePragma where
+    put_ bh (InlinePragma activation match_info) = do
+            put_ bh activation
+            put_ bh match_info
+
+    get bh = do
+           act  <- get bh
+           info <- get bh
+           return (InlinePragma act info)
+
 instance Binary StrictnessMark where
     put_ bh MarkedStrict    = putByte bh 0
     put_ bh MarkedUnboxed   = putByte bh 1

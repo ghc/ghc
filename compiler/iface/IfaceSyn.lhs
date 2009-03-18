@@ -203,7 +203,7 @@ data IfaceIdInfo
 data IfaceInfoItem
   = HsArity	 Arity
   | HsStrictness StrictSig
-  | HsInline     Activation
+  | HsInline     InlinePragma
   | HsUnfold	 IfaceExpr
   | HsNoCafRefs
   | HsWorker	 Name Arity	-- Worker, if any see IdInfo.WorkerInfo
@@ -660,7 +660,7 @@ instance Outputable IfaceIdInfo where
 instance Outputable IfaceInfoItem where
   ppr (HsUnfold unf)  	 = ptext (sLit "Unfolding:") <+>
 				  	parens (pprIfaceExpr noParens unf)
-  ppr (HsInline act)     = ptext (sLit "Inline:") <+> ppr act
+  ppr (HsInline prag)    = ptext (sLit "Inline:") <+> ppr prag
   ppr (HsArity arity)    = ptext (sLit "Arity:") <+> int arity
   ppr (HsStrictness str) = ptext (sLit "Strictness:") <+> pprIfaceStrictSig str
   ppr HsNoCafRefs	 = ptext (sLit "HasNoCafRefs")
