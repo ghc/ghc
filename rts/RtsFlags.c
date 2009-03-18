@@ -233,6 +233,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.ParFlags.parGcEnabled      = 1;
     RtsFlags.ParFlags.parGcGen          = 1;
     RtsFlags.ParFlags.parGcLoadBalancing = 1;
+    RtsFlags.ParFlags.setAffinity       = 0;
 #endif
 
 #ifdef PAR
@@ -476,6 +477,8 @@ usage_text[] = {
 "  -N        Determine the number of processors to use automatically",
 "  -q1       Use one OS thread for GC (turns off parallel GC)",
 "  -qg<n>    Use parallel GC only for generations >= <n> (default: 1)",
+"  -qb       Disable load-balancing in the parallel GC",
+"  -qa       Use the OS to set thread affinity",
 "  -qm       Don't automatically migrate threads between CPUs",
 "  -qw       Migrate a thread to the current CPU when it is woken up",
 #endif
@@ -1232,6 +1235,9 @@ error = rtsTrue;
                         break;
 		    case 'b':
 			RtsFlags.ParFlags.parGcLoadBalancing = rtsFalse;
+			break;
+		    case 'a':
+			RtsFlags.ParFlags.setAffinity = rtsTrue;
 			break;
 		    case 'm':
 			RtsFlags.ParFlags.migrate = rtsFalse;

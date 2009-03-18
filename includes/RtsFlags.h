@@ -192,6 +192,7 @@ struct PAR_FLAGS {
   rtsBool        parGcGen;       /* do parallel GC in this generation
                                   * and higher only */
   rtsBool        parGcLoadBalancing; /* do load-balancing in parallel GC */
+  rtsBool        setAffinity;    /* force thread affinity with CPUs */
 };
 #endif /* THREADED_RTS */
 

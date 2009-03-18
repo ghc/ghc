@@ -2125,6 +2125,10 @@ workerStart(Task *task)
     cap = task->cap;
     RELEASE_LOCK(&task->lock);
 
+    if (RtsFlags.ParFlags.setAffinity) {
+        setThreadAffinity(cap->no, n_capabilities);
+    }
+
     // set the thread-local pointer to the Task:
     taskEnter(task);
 

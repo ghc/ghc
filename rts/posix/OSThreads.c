@@ -7,8 +7,9 @@
  *
  * --------------------------------------------------------------------------*/
 
-#if defined(DEBUG) && defined(__linux__)
+#if defined(__linux__)
 /* We want GNU extensions in DEBUG mode for mutex error checking */
+/* We also want the affinity API, which requires _GNU_SOURCE */
 #define _GNU_SOURCE
 #endif
 
@@ -24,6 +25,10 @@
 
 #if !defined(HAVE_PTHREAD_H)
 #error pthreads.h is required for the threaded RTS on Posix platforms
+#endif
+
+#if defined(HAVE_SCHED_H)
+#include <sched.h>
 #endif
 
 /*
@@ -195,6 +200,26 @@ getNumberOfProcessors (void)
     }
 
     return nproc;
+}
+
+// Schedules the thread to run on CPU n of m.  m may be less than the
+// number of physical CPUs, in which case, the thread will be allowed
+// to run on CPU n, n+m, n+2m etc.
+void
+setThreadAffinity (nat n, nat m)
+{
+#if defined(HAVE_SCHED_H) && defined(HAVE_SCHED_SETAFFINITY)
+    nat nproc;
+    cpu_set_t cs;
+    nat i;
+
+    nproc = getNumberOfProcessors();
+    CPU_ZERO(&cs);
+    for (i = n; i < nproc; i+=m) {
+        CPU_SET(n, &cs);
+    }
+    sched_setaffinity(0, sizeof(cpu_set_t), &cs);
+#endif
 }
 
 #else /* !defined(THREADED_RTS) */

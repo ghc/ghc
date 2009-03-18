@@ -246,6 +246,12 @@ getNumberOfProcessors (void)
     return nproc;
 }
 
+void
+setThreadAffinity (nat n STG_UNUSED, nat m STG_UNUSED)
+{
+    /* ToDo */
+}
+
 #else /* !defined(THREADED_RTS) */
 
 int
