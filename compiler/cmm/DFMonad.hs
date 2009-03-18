@@ -192,6 +192,10 @@ instance Monad m => Monad (DFM' m f) where
   DFM' f >>= k = DFM' (\l s -> do (a, s') <- f l s
                                   s' `seq` case k a of DFM' f' -> f' l s')
   return a = DFM' (\_ s -> return (a, s))
+ -- The `seq` is essential to ensure that entire passes of the dataflow engine 
+ -- aren't postponed in a thunk. By making the sequence strict in the state,
+ -- we ensure that each action in the monad is executed immediately, preventing
+ -- stack overflows that previously occurred when finally forcing the old state thunks.
 
 instance FuelUsingMonad (DFM' FuelMonad f) where
   fuelRemaining = liftToDFM' fuelRemaining
