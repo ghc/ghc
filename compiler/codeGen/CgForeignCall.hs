@@ -212,7 +212,11 @@ emitLoadThreadState = do
 	                      bWord),
 	-- SpLim = tso->stack + RESERVED_STACK_WORDS;
 	CmmAssign spLim (cmmOffsetW (cmmOffset (CmmReg (CmmLocal tso)) tso_STACK)
-			            rESERVED_STACK_WORDS)
+			            rESERVED_STACK_WORDS),
+        -- HpAlloc = 0;
+        --   HpAlloc is assumed to be set to non-zero only by a failed
+        --   a heap check, see HeapStackCheck.cmm:GC_GENERIC
+        CmmAssign hpAlloc (CmmLit zeroCLit)
     ]
   emitOpenNursery
   -- and load the current cost centre stack from the TSO when profiling:
@@ -267,13 +271,14 @@ stgHp		  = CmmReg hp
 stgCurrentTSO	  = CmmReg currentTSO
 stgCurrentNursery = CmmReg currentNursery
 
-sp, spLim, hp, hpLim, currentTSO, currentNursery :: CmmReg
+sp, spLim, hp, hpLim, currentTSO, currentNursery, hpAlloc :: CmmReg
 sp		  = CmmGlobal Sp
 spLim		  = CmmGlobal SpLim
 hp		  = CmmGlobal Hp
 hpLim		  = CmmGlobal HpLim
 currentTSO	  = CmmGlobal CurrentTSO
 currentNursery 	  = CmmGlobal CurrentNursery
+hpAlloc 	  = CmmGlobal HpAlloc
 
 -- -----------------------------------------------------------------------------
 -- For certain types passed to foreign calls, we adjust the actual

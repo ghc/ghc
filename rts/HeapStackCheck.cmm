@@ -26,6 +26,17 @@ import LeaveCriticalSection;
  *    - If HpLim==0, indicating that we should context-switch, we yield
  *      to the scheduler (return ThreadYielding).
  *
+ * Note that we must leave no slop in the heap (this is a requirement
+ * for LDV profiling, at least), so if we just had a heap-check
+ * failure, then we must retract Hp by HpAlloc.  How do we know
+ * whether there was a heap-check failure?  HpLim might be zero, and
+ * yet we got here as a result of a stack-check failure.  Hence, we
+ * require that HpAlloc is only non-zero if there was a heap-check
+ * failure, otherwise it is zero, so we can always safely subtract
+ * HpAlloc from Hp.
+ *
+ * Hence, HpAlloc is zeroed in LOAD_THREAD_STATE().
+ *
  *    - If the context_switch flag is set (the backup plan if setting HpLim
  *      to 0 didn't trigger a context switch), we yield to the scheduler
  *	(return ThreadYielding).
@@ -70,6 +81,7 @@ import LeaveCriticalSection;
         }						\
         if (HpAlloc <= BLOCK_SIZE				\
             && bdescr_link(CurrentNursery) != NULL) {		\
+            HpAlloc = 0;                                        \
             CLOSE_NURSERY();					\
             CurrentNursery = bdescr_link(CurrentNursery);	\
             OPEN_NURSERY();					\
