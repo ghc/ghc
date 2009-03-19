@@ -1299,8 +1299,9 @@ AC_OUTPUT
 #     $(eval ...) inside conditionals causes errors
 # with make 3.80, so warn the user if it looks like they're about to
 # try to use it.
+# We would use "grep -q" here, but Solaris's grep doesn't support it.
 checkMake380() {
-    if $1 --version 2>&1 | head -1 | grep -q 'GNU Make 3\.80'
+    if $1 --version 2>&1 | head -1 | grep 'GNU Make 3\.80' > /dev/null
     then
         echo
         echo "WARNING: It looks like \"$1\" is GNU make 3.80."
