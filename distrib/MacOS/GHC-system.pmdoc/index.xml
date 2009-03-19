@@ -5,7 +5,7 @@
 
 \f0\fs26 \cf0 The installer will guide you through the process of installing the Glasgow Haskell Compiler (GHC) framework.\
 \
-This package must be installed on the system volume and is not relocatable.  An admin password is required during installation.\
+This package will be installed on the system volume and is not relocatable.  An admin password is required during installation.\
 \
 *** IMPORTANT NOTE ***\
 \
@@ -18,11 +18,11 @@ Xcode can be installed off your Mac OS X installation DVD or be downloaded from 
 
 \f0\fs26 \cf0 To start the Glasgow Haskell Compiler interactively, invoke the command 'ghci' in a Terminal window.\
 \
-A user's guide and detailed library documentation is at\
+A user's guide and detailed library documentation is available by opening\
 \
   /usr/share/doc/ghc/index.html\
 \
-More documentation is available online at\
+in a web browser. More documentation is available online at\
 \
   http://haskell.org/haskellwiki/GHC\
 \
