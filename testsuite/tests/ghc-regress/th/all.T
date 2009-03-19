@@ -135,3 +135,4 @@ test('TH_sections', normal, compile, ['-v0'])
 
 test('TH_tf1', normal, compile, ['-v0'])
 test('TH_tf2', normal, compile, ['-v0'])
+test('TH_tf3', normal, compile, ['-v0'])

@@ -1,7 +1,6 @@
-{-# OPTIONS -fglasgow-exts #-}
-module TH_tf2 where
+{-# LANGUAGE TypeFamilies #-}
 
-import Language.Haskell.TH
+module TH_tf2 where
 
 $( [d| class C a where
          data T a

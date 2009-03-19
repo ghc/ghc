@@ -1,4 +1,5 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE TypeFamilies #-}
+
 module TH_tf1 where
 
 $( [d| data family T a |] )
