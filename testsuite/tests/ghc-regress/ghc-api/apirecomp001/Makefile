@@ -7,4 +7,4 @@ clean:
 
 apirecomp001: clean
 	@$(TEST_HC) --make -v0 -package ghc myghc.hs
-	@myghc $(TOP)/..
+	@./myghc $(TOP)/..
