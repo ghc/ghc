@@ -133,3 +133,5 @@ test('T2685', extra_clean(['T2685a.hi','T2685a.o']),
 
 test('TH_sections', normal, compile, ['-v0'])
 
+test('TH_tf1', normal, compile, ['-v0'])
+test('TH_tf2', normal, compile, ['-v0'])
