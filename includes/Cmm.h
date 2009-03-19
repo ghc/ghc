@@ -298,6 +298,7 @@
     FUN_0_1,						\
     FUN_2_0,						\
     FUN_1_1,						\
+    FUN_0_2,						\
     FUN_STATIC,                                         \
     BCO,						\
     PAP:						\
