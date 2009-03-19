@@ -30,7 +30,7 @@ module Language.Haskell.TH.Syntax(
         showName, showName', NameIs(..),
 
 	-- The algebraic data types
-	Dec(..), Exp(..), Con(..), Type(..), Cxt, Match(..), 
+	Dec(..), Exp(..), Con(..), Type(..), Cxt, Pred(..), Match(..), 
 	Clause(..), Body(..), Guard(..), Stmt(..), Range(..),
 	Lit(..), Pat(..), FieldExp, FieldPat, 
 	Strict(..), Foreign(..), Callconv(..), Safety(..),
@@ -757,7 +757,11 @@ data Callconv = CCall | StdCall
 data Safety = Unsafe | Safe | Threadsafe
         deriving( Show, Eq, Data, Typeable )
 
-type Cxt = [Type]    -- (Eq a, Ord b)
+type Cxt = [Pred]                 -- (Eq a, Ord b)
+
+data Pred = ClassP Name [Type]    -- Eq (Int, a)
+          | EqualP Type Type      -- F a ~ Bool
+          deriving( Show, Eq, Data, Typeable )
 
 data Strict = IsStrict | NotStrict
          deriving( Show, Eq, Data, Typeable )

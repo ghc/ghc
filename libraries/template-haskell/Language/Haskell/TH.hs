@@ -18,7 +18,7 @@ module Language.Haskell.TH(
 	tupleTypeName, tupleDataName,	-- Int -> Name
 	
 	-- The algebraic data types
-	Dec(..), Exp(..), Con(..), Type(..), Cxt, Match(..), 
+	Dec(..), Exp(..), Con(..), Type(..), Cxt, Pred(..), Match(..), 
 	Clause(..), Body(..), Guard(..), Stmt(..), Range(..),
 	Lit(..), Pat(..), FieldExp, FieldPat, 
 	Strict(..), Foreign(..), Callconv(..), Safety(..), FunDep(..), 
@@ -26,8 +26,8 @@ module Language.Haskell.TH(
 	Fixity(..), FixityDirection(..), defaultFixity, maxPrecedence,
 
 	-- Library functions
-	InfoQ, ExpQ, DecQ, ConQ, TypeQ, CxtQ, MatchQ, ClauseQ, BodyQ, GuardQ,
-	StmtQ, RangeQ, StrictTypeQ, VarStrictTypeQ, PatQ, FieldPatQ,
+	InfoQ, ExpQ, DecQ, ConQ, TypeQ, CxtQ, PredQ, MatchQ, ClauseQ, BodyQ,
+	GuardQ, StmtQ, RangeQ, StrictTypeQ, VarStrictTypeQ, PatQ, FieldPatQ,
 	intPrimL, wordPrimL, floatPrimL, doublePrimL, integerL, rationalL,
 	charL, stringL,
 	litP, varP, tupP, conP, infixP, tildeP, asP, wildP, recP, listP, sigP,
@@ -41,7 +41,7 @@ module Language.Haskell.TH(
 	listE, sigE, recConE, recUpdE, stringE, fieldExp,
 	valD, funD, tySynD, dataD, newtypeD, classD, instanceD, sigD, forImpD,
         familyD, dataInstD, newtypeInstD, tySynInstD,
-	cxt, normalC, recC, infixC,
+	cxt, classP, equalP, normalC, recC, infixC,
 	forallT, varT, conT, appT, arrowT, listT, tupleT,
 	isStrict, notStrict, strictType, varStrictType,
 	cCall, stdCall, unsafe, safe, threadsafe, typeFam, dataFam,

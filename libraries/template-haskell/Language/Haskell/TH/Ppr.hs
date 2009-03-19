@@ -362,6 +362,11 @@ pprCxt [t] = ppr t <+> text "=>"
 pprCxt ts = parens (hsep $ punctuate comma $ map ppr ts) <+> text "=>"
 
 ------------------------------
+instance Ppr Pred where
+  ppr (ClassP cla tys) = ppr cla <+> sep (map pprParendType tys)
+  ppr (EqualP ty1 ty2) = pprFunArgType ty1 <+> char '~' <+> pprFunArgType ty2
+
+------------------------------
 instance Ppr Range where
     ppr = brackets . pprRange
         where pprRange :: Range -> Doc

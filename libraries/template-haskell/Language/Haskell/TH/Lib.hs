@@ -21,6 +21,7 @@ type DecQ           = Q Dec
 type ConQ           = Q Con
 type TypeQ          = Q Type
 type CxtQ           = Q Cxt
+type PredQ          = Q Pred
 type MatchQ         = Q Match
 type ClauseQ        = Q Clause
 type BodyQ          = Q Body
@@ -343,8 +344,21 @@ tySynInstD tc tys rhs =
     rhs1 <- rhs
     return (TySynInstD tc tys1 rhs1)
 
-cxt :: [TypeQ] -> CxtQ
+cxt :: [PredQ] -> CxtQ
 cxt = sequence
+
+classP :: Name -> [TypeQ] -> PredQ
+classP cla tys
+  = do
+      tys1 <- sequence tys
+      return (ClassP cla tys1)
+
+equalP :: TypeQ -> TypeQ -> PredQ
+equalP tleft tright
+  = do
+      tleft1  <- tleft
+      tright1 <- tright
+      return (EqualP tleft1 tright1)
 
 normalC :: Name -> [StrictTypeQ] -> ConQ
 normalC con strtys = liftM (NormalC con) $ sequence strtys
