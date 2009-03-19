@@ -918,7 +918,7 @@ reifyTyCon tc
 	      r_tvs  = reifyTyVars tvs
 	      deriv = []	-- Don't know about deriving
 	      decl | isNewTyCon tc = TH.NewtypeD cxt name r_tvs (head cons) deriv
-		   | otherwise	   = TH.DataD    cxt name r_tvs cons 	  deriv
+		   | otherwise	   = TH.DataD    cxt name r_tvs cons 	    deriv
 	; return (TH.TyConI decl) }
 
 reifyDataCon :: [Type] -> DataCon -> TcM TH.Con
@@ -970,7 +970,8 @@ reifyType (PredTy {}) = panic "reifyType PredTy"
 
 reifyTypes :: [Type] -> TcM [TH.Type]
 reifyTypes = mapM reifyType
-reifyCxt :: [PredType] -> TcM [TH.Type]
+
+reifyCxt :: [PredType] -> TcM [TH.Pred]
 reifyCxt   = mapM reifyPred
 
 reifyFunDep :: ([TyVar], [TyVar]) -> TH.FunDep
@@ -983,10 +984,17 @@ reify_tc_app :: TH.Name -> [TypeRep.Type] -> TcM TH.Type
 reify_tc_app tc tys = do { tys' <- reifyTypes tys 
 			 ; return (foldl TH.AppT (TH.ConT tc) tys') }
 
-reifyPred :: TypeRep.PredType -> TcM TH.Type
-reifyPred (ClassP cls tys) = reify_tc_app (reifyName cls) tys
+reifyPred :: TypeRep.PredType -> TcM TH.Pred
+reifyPred (ClassP cls tys) 
+  = do { tys' <- reifyTypes tys 
+       ; return $ TH.ClassP (reifyName cls) tys'
+       }
 reifyPred p@(IParam _ _)   = noTH (sLit "implicit parameters") (ppr p)
-reifyPred (EqPred {})      = panic "reifyPred EqPred"
+reifyPred (EqPred ty1 ty2) 
+  = do { ty1' <- reifyType ty1
+       ; ty2' <- reifyType ty2
+       ; return $ TH.EqualP ty1' ty2'
+       }
 
 
 ------------------------------

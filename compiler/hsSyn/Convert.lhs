@@ -146,13 +146,13 @@ cvtTop (ClassD ctxt cl tvs fds decs)
     isFamilyD (FamilyD _ _ _) = True
     isFamilyD _               = False
 
-cvtTop (InstanceD tys ty decs)
+cvtTop (InstanceD ctxt ty decs)
   = do 	{ let (ats, bind_sig_decs) = partition isFamInstD decs
         ; (binds', sigs') <- cvtBindsAndSigs bind_sig_decs
         ; ats' <- mapM cvtTop ats
         ; let ats'' = map unTyClD ats'
-	; ctxt' <- cvtContext tys
-	; L loc pred' <- cvtPred ty
+	; ctxt' <- cvtContext ctxt
+	; L loc pred' <- cvtPredTy ty
 	; inst_ty' <- returnL $ 
                         mkImplicitHsForAllTy ctxt' (L loc (HsPredTy pred'))
 	; returnL $ InstD (InstDecl inst_ty' binds' sigs' ats'')
@@ -603,16 +603,29 @@ cvtTvs tvs = mapM cvt_tv tvs
 cvt_tv :: TH.Name -> CvtM (LHsTyVarBndr RdrName)
 cvt_tv tv = do { tv' <- tName tv; returnL $ UserTyVar tv' }
 
-cvtContext :: Cxt -> CvtM (LHsContext RdrName)
+cvtContext :: TH.Cxt -> CvtM (LHsContext RdrName)
 cvtContext tys = do { preds' <- mapM cvtPred tys; returnL preds' }
 
-cvtPred :: TH.Type -> CvtM (LHsPred RdrName)
-cvtPred ty 
+cvtPred :: TH.Pred -> CvtM (LHsPred RdrName)
+cvtPred (TH.ClassP cla tys)
+  = do { cla' <- if isVarName cla then tName cla else tconName cla
+       ; tys' <- mapM cvtType tys
+       ; returnL $ HsClassP cla' tys'
+       }
+cvtPred (TH.EqualP ty1 ty2)
+  = do { ty1' <- cvtType ty1
+       ; ty2' <- cvtType ty2
+       ; returnL $ HsEqualP ty1' ty2'
+       }
+
+cvtPredTy :: TH.Type -> CvtM (LHsPred RdrName)
+cvtPredTy ty 
   = do	{ (head, tys') <- split_ty_app ty
 	; case head of
 	    ConT tc -> do { tc' <- tconName tc; returnL $ HsClassP tc' tys' }
 	    VarT tv -> do { tv' <- tName tv;    returnL $ HsClassP tv' tys' }
-	    _       -> failWith (ptext (sLit "Malformed predicate") <+> text (TH.pprint ty)) }
+	    _       -> failWith (ptext (sLit "Malformed predicate") <+> 
+                       text (TH.pprint ty)) }
 
 cvtType :: TH.Type -> CvtM (LHsType RdrName)
 cvtType ty = do { (head_ty, tys') <- split_ty_app ty
@@ -696,6 +709,14 @@ okOcc _  []      = False
 okOcc ns str@(c:_) 
   | OccName.isVarNameSpace ns = startsVarId c || startsVarSym c
   | otherwise 	 	      = startsConId c || startsConSym c || str == "[]"
+
+-- Determine the name space of a name in a type
+--
+isVarName :: TH.Name -> Bool
+isVarName (TH.Name occ _)
+  = case TH.occString occ of
+      ""    -> False
+      (c:_) -> startsVarId c || startsVarSym c
 
 badOcc :: OccName.NameSpace -> String -> SDoc
 badOcc ctxt_ns occ 

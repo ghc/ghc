@@ -314,7 +314,7 @@ repInstD' (L loc (InstDecl ty binds _ ats))	-- Ignore user pragmas for now
 		-- occurrences don't fail, even though the binders don't 
                 -- appear in the resulting data structure
 		do { cxt1 <- repContext cxt
-		   ; inst_ty1 <- repPred (HsClassP cls tys)
+		   ; inst_ty1 <- repPredTy (HsClassP cls tys)
 		   ; ss <- mkGenSyms (collectHsBindBinders binds)
 		   ; binds1 <- addBinds ss (rep_binds binds)
                    ; ats1   <- repLAssocFamInst ats
@@ -481,21 +481,35 @@ repLContext (L _ ctxt) = repContext ctxt
 repContext :: HsContext Name -> DsM (Core TH.CxtQ)
 repContext ctxt = do 
 	            preds    <- mapM repLPred ctxt
-		    predList <- coreList typeQTyConName preds
+		    predList <- coreList predQTyConName preds
 		    repCtxt predList
 
 -- represent a type predicate
 --
-repLPred :: LHsPred Name -> DsM (Core TH.TypeQ)
+repLPred :: LHsPred Name -> DsM (Core TH.PredQ)
 repLPred (L _ p) = repPred p
 
-repPred :: HsPred Name -> DsM (Core TH.TypeQ)
-repPred (HsClassP cls tys) = do
-			       tcon <- repTy (HsTyVar cls)
-			       tys1 <- repLTys tys
-			       repTapps tcon tys1
-repPred p@(HsEqualP _ _) = notHandled "Equational constraint" (ppr p)
+repPred :: HsPred Name -> DsM (Core TH.PredQ)
+repPred (HsClassP cls tys) 
+  = do
+      cls1 <- lookupOcc cls
+      tys1 <- repLTys tys
+      tys2 <- coreList typeQTyConName tys1
+      repClassP cls1 tys2
+repPred (HsEqualP tyleft tyright) 
+  = do
+      tyleft1  <- repLTy tyleft
+      tyright1 <- repLTy tyright
+      repEqualP tyleft1 tyright1
 repPred p@(HsIParam _ _) = notHandled "Implicit parameter constraint" (ppr p)
+
+repPredTy :: HsPred Name -> DsM (Core TH.TypeQ)
+repPredTy (HsClassP cls tys) 
+  = do
+      tcon <- repTy (HsTyVar cls)
+      tys1 <- repLTys tys
+      repTapps tcon tys1
+repPredTy _ = panic "DsMeta.repPredTy: unexpected equality: internal error"
 
 -- yield the representation of a list of types
 --
@@ -546,7 +560,7 @@ repTy (HsTupleTy _ tys)	  = do
 repTy (HsOpTy ty1 n ty2) 	  = repLTy ((nlHsTyVar (unLoc n) `nlHsAppTy` ty1) 
 					   `nlHsAppTy` ty2)
 repTy (HsParTy t)  	       	  = repLTy t
-repTy (HsPredTy pred)             = repPred pred
+repTy (HsPredTy pred)             = repPredTy pred
 repTy ty@(HsNumTy _)              = notHandled "Number types (for generics)" (ppr ty)
 repTy ty			  = notHandled "Exotic form of type" (ppr ty)
 
@@ -1313,8 +1327,14 @@ repFunDep (MkC xs) (MkC ys) = rep2 funDepName [xs, ys]
 repProto :: Core TH.Name -> Core TH.TypeQ -> DsM (Core TH.DecQ)
 repProto (MkC s) (MkC ty) = rep2 sigDName [s, ty]
 
-repCtxt :: Core [TH.TypeQ] -> DsM (Core TH.CxtQ)
+repCtxt :: Core [TH.PredQ] -> DsM (Core TH.CxtQ)
 repCtxt (MkC tys) = rep2 cxtName [tys]
+
+repClassP :: Core TH.Name -> Core [TH.TypeQ] -> DsM (Core TH.PredQ)
+repClassP (MkC cla) (MkC tys) = rep2 classPName [cla, tys]
+
+repEqualP :: Core TH.TypeQ -> Core TH.TypeQ -> DsM (Core TH.PredQ)
+repEqualP (MkC ty1) (MkC ty2) = rep2 equalPName [ty1, ty2]
 
 repConstr :: Core TH.Name -> HsConDeclDetails Name
           -> DsM (Core TH.ConQ)
@@ -1517,6 +1537,8 @@ templateHaskellNames = [
     newtypeInstDName, tySynInstDName,
     -- Cxt
     cxtName,
+    -- Pred
+    classPName, equalPName,
     -- Strict
     isStrictName, notStrictName,
     -- Con
@@ -1541,11 +1563,11 @@ templateHaskellNames = [
 
     -- And the tycons
     qTyConName, nameTyConName, patTyConName, fieldPatTyConName, matchQTyConName,
-    clauseQTyConName, expQTyConName, fieldExpTyConName, stmtQTyConName,
-    decQTyConName, conQTyConName, strictTypeQTyConName,
+    clauseQTyConName, expQTyConName, fieldExpTyConName, predTyConName,
+    stmtQTyConName, decQTyConName, conQTyConName, strictTypeQTyConName,
     varStrictTypeQTyConName, typeQTyConName, expTyConName, decTyConName,
     typeTyConName, matchTyConName, clauseTyConName, patQTyConName,
-    fieldPatQTyConName, fieldExpQTyConName, funDepTyConName,
+    fieldPatQTyConName, fieldExpQTyConName, funDepTyConName, predQTyConName,
 
     -- Quasiquoting
     quoteExpName, quotePatName]
@@ -1568,7 +1590,7 @@ qqFun  = mk_known_key_name OccName.varName qqLib
 -------------------- TH.Syntax -----------------------
 qTyConName, nameTyConName, fieldExpTyConName, patTyConName,
     fieldPatTyConName, expTyConName, decTyConName, typeTyConName,
-    matchTyConName, clauseTyConName, funDepTyConName :: Name
+    matchTyConName, clauseTyConName, funDepTyConName, predTyConName :: Name
 qTyConName        = thTc (fsLit "Q")            qTyConKey
 nameTyConName     = thTc (fsLit "Name")         nameTyConKey
 fieldExpTyConName = thTc (fsLit "FieldExp")     fieldExpTyConKey
@@ -1580,6 +1602,7 @@ typeTyConName     = thTc (fsLit "Type")         typeTyConKey
 matchTyConName    = thTc (fsLit "Match")        matchTyConKey
 clauseTyConName   = thTc (fsLit "Clause")       clauseTyConKey
 funDepTyConName   = thTc (fsLit "FunDep")       funDepTyConKey
+predTyConName     = thTc (fsLit "Pred")         predTyConKey
 
 returnQName, bindQName, sequenceQName, newNameName, liftName,
     mkNameName, mkNameG_vName, mkNameG_dName, mkNameG_tcName,
@@ -1711,6 +1734,11 @@ tySynInstDName   = libFun (fsLit "tySynInstD")   tySynInstDIdKey
 cxtName :: Name
 cxtName = libFun (fsLit "cxt") cxtIdKey
 
+-- data Pred = ...
+classPName, equalPName :: Name
+classPName = libFun (fsLit "classP") classPIdKey
+equalPName = libFun (fsLit "equalP") equalPIdKey
+
 -- data Strict = ...
 isStrictName, notStrictName :: Name
 isStrictName      = libFun  (fsLit "isStrict")      isStrictKey
@@ -1765,7 +1793,7 @@ dataFamName = libFun (fsLit "dataFam") dataFamIdKey
 matchQTyConName, clauseQTyConName, expQTyConName, stmtQTyConName,
     decQTyConName, conQTyConName, strictTypeQTyConName,
     varStrictTypeQTyConName, typeQTyConName, fieldExpQTyConName,
-    patQTyConName, fieldPatQTyConName :: Name
+    patQTyConName, fieldPatQTyConName, predQTyConName :: Name
 matchQTyConName         = libTc (fsLit "MatchQ")        matchQTyConKey
 clauseQTyConName        = libTc (fsLit "ClauseQ")       clauseQTyConKey
 expQTyConName           = libTc (fsLit "ExpQ")          expQTyConKey
@@ -1778,6 +1806,7 @@ typeQTyConName          = libTc (fsLit "TypeQ")          typeQTyConKey
 fieldExpQTyConName      = libTc (fsLit "FieldExpQ")      fieldExpQTyConKey
 patQTyConName           = libTc (fsLit "PatQ")           patQTyConKey
 fieldPatQTyConName      = libTc (fsLit "FieldPatQ")      fieldPatQTyConKey
+predQTyConName          = libTc (fsLit "PredQ")          predQTyConKey
 
 -- quasiquoting
 quoteExpName, quotePatName :: Name
@@ -1792,7 +1821,8 @@ expTyConKey, matchTyConKey, clauseTyConKey, qTyConKey, expQTyConKey,
     stmtQTyConKey, conQTyConKey, typeQTyConKey, typeTyConKey,
     decTyConKey, varStrictTypeQTyConKey, strictTypeQTyConKey,
     fieldExpTyConKey, fieldPatTyConKey, nameTyConKey, patQTyConKey,
-    fieldPatQTyConKey, fieldExpQTyConKey, funDepTyConKey :: Unique
+    fieldPatQTyConKey, fieldExpQTyConKey, funDepTyConKey, predTyConKey,
+    predQTyConKey :: Unique
 expTyConKey             = mkPreludeTyConUnique 100
 matchTyConKey           = mkPreludeTyConUnique 101
 clauseTyConKey          = mkPreludeTyConUnique 102
@@ -1816,6 +1846,8 @@ patQTyConKey            = mkPreludeTyConUnique 119
 fieldPatQTyConKey       = mkPreludeTyConUnique 120
 fieldExpQTyConKey       = mkPreludeTyConUnique 121
 funDepTyConKey          = mkPreludeTyConUnique 122
+predTyConKey            = mkPreludeTyConUnique 123
+predQTyConKey           = mkPreludeTyConUnique 124
 
 -- IdUniques available: 200-399
 -- If you want to change this, make sure you check in PrelNames
@@ -1885,9 +1917,9 @@ conEIdKey         = mkPreludeMiscIdUnique 241
 litEIdKey         = mkPreludeMiscIdUnique 242
 appEIdKey         = mkPreludeMiscIdUnique 243
 infixEIdKey       = mkPreludeMiscIdUnique 244
-infixAppIdKey       = mkPreludeMiscIdUnique 245
-sectionLIdKey       = mkPreludeMiscIdUnique 246
-sectionRIdKey       = mkPreludeMiscIdUnique 247
+infixAppIdKey     = mkPreludeMiscIdUnique 245
+sectionLIdKey     = mkPreludeMiscIdUnique 246
+sectionRIdKey     = mkPreludeMiscIdUnique 247
 lamEIdKey         = mkPreludeMiscIdUnique 248
 tupEIdKey         = mkPreludeMiscIdUnique 249
 condEIdKey        = mkPreludeMiscIdUnique 250
@@ -1946,6 +1978,11 @@ tySynInstDIdKey   = mkPreludeMiscIdUnique 343
 -- type Cxt = ...
 cxtIdKey :: Unique
 cxtIdKey            = mkPreludeMiscIdUnique 280
+
+-- data Pred = ...
+classPIdKey, equalPIdKey :: Unique
+classPIdKey         = mkPreludeMiscIdUnique 346
+equalPIdKey         = mkPreludeMiscIdUnique 347
 
 -- data Strict = ...
 isStrictKey, notStrictKey :: Unique
