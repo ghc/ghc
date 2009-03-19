@@ -78,17 +78,50 @@ static void postEventType(EventsBuf *eb, EventType *et);
 
 static StgBool hasRoomForEvent(EventsBuf *eb, EventTypeNum eNum);
 
-static inline void postInt8(EventsBuf *eb, StgInt8 i);
-static inline void postInt16(EventsBuf *eb, StgInt16 i);
-static inline void postInt32(EventsBuf *eb, StgInt32 i);
-static inline void postInt64(EventsBuf *eb, StgInt64 i);
-static inline void postWord8(EventsBuf *eb, StgWord8 i);
-static inline void postWord16(EventsBuf *eb, StgWord16 i);
-static inline void postWord32(EventsBuf *eb, StgWord32 i);
-static inline void postWord64(EventsBuf *eb, StgWord64 i);
+static inline void postWord8(EventsBuf *eb, StgWord8 i)
+{
+    *(eb->pos++) = i; 
+}
 
-static inline void postEventTypeNum(EventsBuf *eb, EventTypeNum etNum);
-static inline void postTimestamp(EventsBuf *eb, Timestamp t);
+static inline void postWord16(EventsBuf *eb, StgWord16 i)
+{
+    postWord8(eb, (StgWord8)(i >> 8));
+    postWord8(eb, (StgWord8)i);
+}
+
+static inline void postWord32(EventsBuf *eb, StgWord32 i)
+{
+    postWord16(eb, (StgWord16)(i >> 16));
+    postWord16(eb, (StgWord16)i);
+}
+
+static inline void postWord64(EventsBuf *eb, StgWord64 i)
+{
+    postWord32(eb, (StgWord32)(i >> 32));
+    postWord32(eb, (StgWord32)i);
+}
+
+static inline void postEventTypeNum(EventsBuf *eb, EventTypeNum etNum)
+{ postWord16(eb, etNum); }
+
+static inline void postEventTypeID(EventsBuf *eb, StgWord16 etID)
+{ postWord16(eb, etID); }
+
+static inline void postTimestamp(EventsBuf *eb, Timestamp t)
+{ postWord64(eb,t); }
+
+static inline void postInt8(EventsBuf *eb, StgInt8 i)
+{ postWord8(eb, (StgWord8)i); }
+
+static inline void postInt16(EventsBuf *eb, StgInt16 i)
+{ postWord16(eb, (StgWord16)i); }
+
+static inline void postInt32(EventsBuf *eb, StgInt32 i)
+{ postWord32(eb, (StgWord32)i); }
+
+static inline void postInt64(EventsBuf *eb, StgInt64 i)
+{ postWord64(eb, (StgWord64)i); }
+
 
 void
 initEventLogging(void)
@@ -418,50 +451,6 @@ static void postEventType(EventsBuf *eb, EventType *et)
     }
     postWord32(eb, 0); // no extensions yet
     postInt32(eb, EVENT_ET_END);
-}
-
-static inline void postEventTypeNum(EventsBuf *eb, EventTypeNum etNum)
-{ postWord16(eb, etNum); }
-
-static inline void postEventTypeID(EventsBuf *eb, StgWord16 etID)
-{ postWord16(eb, etID); }
-
-static inline void postTimestamp(EventsBuf *eb, Timestamp t)
-{ postWord64(eb,t); }
-
-static inline void postInt8(EventsBuf *eb, StgInt8 i)
-{ postWord8(eb, (StgWord8)i); }
-
-static inline void postInt16(EventsBuf *eb, StgInt16 i)
-{ postWord16(eb, (StgWord16)i); }
-
-static inline void postInt32(EventsBuf *eb, StgInt32 i)
-{ postWord32(eb, (StgWord32)i); }
-
-static inline void postInt64(EventsBuf *eb, StgInt64 i)
-{ postWord64(eb, (StgWord64)i); }
-
-static inline void postWord8(EventsBuf *eb, StgWord8 i)
-{
-    *(eb->pos++) = i; 
-}
-
-static inline void postWord16(EventsBuf *eb, StgWord16 i)
-{
-    postWord8(eb, (StgWord8)(i >> 8));
-    postWord8(eb, (StgWord8)i);
-}
-
-static inline void postWord32(EventsBuf *eb, StgWord32 i)
-{
-    postWord16(eb, (StgWord16)(i >> 16));
-    postWord16(eb, (StgWord16)i);
-}
-
-static inline void postWord64(EventsBuf *eb, StgWord64 i)
-{
-    postWord32(eb, (StgWord32)(i >> 32));
-    postWord32(eb, (StgWord32)i);
 }
 
 #endif /* EVENTLOG */
