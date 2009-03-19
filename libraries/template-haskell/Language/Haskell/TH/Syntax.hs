@@ -34,7 +34,7 @@ module Language.Haskell.TH.Syntax(
 	Clause(..), Body(..), Guard(..), Stmt(..), Range(..),
 	Lit(..), Pat(..), FieldExp, FieldPat, 
 	Strict(..), Foreign(..), Callconv(..), Safety(..),
-	StrictType, VarStrictType, FunDep(..),
+	StrictType, VarStrictType, FunDep(..), FamFlavour(..),
 	Info(..), Loc(..), CharPos,
 	Fixity(..), FixityDirection(..), defaultFixity, maxPrecedence,
 
@@ -728,9 +728,23 @@ data Dec
                                   --       where ds }
   | SigD Name Type                -- { length :: [a] -> Int }
   | ForeignD Foreign
+  -- type families (may appear in [Dec] of 'ClassD' and 'InstanceD')
+  | FamilyD FamFlavour Name [Name] {- (Maybe Kind) -}
+                                  -- { type family T a b c }
+  | DataInstD Cxt Name [Type]
+         [Con] [Name]             -- { data instance Cxt x => T [x] = A x 
+                                  --                                | B (T x)
+                                  --       deriving (Z,W)}
+  | NewtypeInstD Cxt Name [Type]
+         Con [Name]               -- { newtype instance Cxt x => T [x] = A (B x)
+                                  --       deriving (Z,W)}
+  | TySynInstD Name [Type] Type   -- { type instance T (Maybe x) = (x,x) }
   deriving( Show, Eq, Data, Typeable )
 
 data FunDep = FunDep [Name] [Name]
+  deriving( Show, Eq, Data, Typeable )
+
+data FamFlavour = TypeFam | DataFam
   deriving( Show, Eq, Data, Typeable )
 
 data Foreign = ImportF Callconv Safety String Name Type
@@ -757,8 +771,6 @@ data Con = NormalC Name [StrictType]
 type StrictType = (Strict, Type)
 type VarStrictType = (Name, Strict, Type)
 
--- FIXME: Why this special status for "List" (even tuples might be handled
---      differently)? -=chak
 data Type = ForallT [Name] Cxt Type   -- forall <vars>. <ctxt> -> <type>
           | VarT Name                 -- a
           | ConT Name                 -- T

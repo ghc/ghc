@@ -317,6 +317,32 @@ forImpD cc s str n ty
  = do ty' <- ty
       return $ ForeignD (ImportF cc s str n ty')
 
+familyD :: FamFlavour -> Name -> [Name] -> DecQ
+familyD flav tc tvs = return $ FamilyD flav tc tvs
+
+dataInstD :: CxtQ -> Name -> [TypeQ] -> [ConQ] -> [Name] -> DecQ
+dataInstD ctxt tc tys cons derivs =
+  do
+    ctxt1 <- ctxt
+    tys1  <- sequence tys
+    cons1 <- sequence cons
+    return (DataInstD ctxt1 tc tys1 cons1 derivs)
+
+newtypeInstD :: CxtQ -> Name -> [TypeQ] -> ConQ -> [Name] -> DecQ
+newtypeInstD ctxt tc tys con derivs =
+  do
+    ctxt1 <- ctxt
+    tys1  <- sequence tys
+    con1  <- con
+    return (NewtypeInstD ctxt1 tc tys1 con1 derivs)
+
+tySynInstD :: Name -> [TypeQ] -> TypeQ -> DecQ
+tySynInstD tc tys rhs = 
+  do 
+    tys1 <- sequence tys
+    rhs1 <- rhs
+    return (TySynInstD tc tys1 rhs1)
+
 cxt :: [TypeQ] -> CxtQ
 cxt = sequence
 
@@ -396,6 +422,13 @@ threadsafe = Threadsafe
 
 funDep :: [Name] -> [Name] -> FunDep
 funDep = FunDep
+
+-------------------------------------------------------------------------------
+--     FamFlavour
+
+typeFam, dataFam :: FamFlavour
+typeFam = TypeFam
+dataFam = DataFam
 
 --------------------------------------------------------------
 -- Useful helper functions

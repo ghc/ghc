@@ -21,8 +21,8 @@ module Language.Haskell.TH(
 	Dec(..), Exp(..), Con(..), Type(..), Cxt, Match(..), 
 	Clause(..), Body(..), Guard(..), Stmt(..), Range(..),
 	Lit(..), Pat(..), FieldExp, FieldPat, 
-	Strict(..), Foreign(..), Callconv(..), Safety(..), FunDep(..),
-	Info(..), Loc(..),
+	Strict(..), Foreign(..), Callconv(..), Safety(..), FunDep(..), 
+	FamFlavour(..), Info(..), Loc(..),
 	Fixity(..), FixityDirection(..), defaultFixity, maxPrecedence,
 
 	-- Library functions
@@ -40,10 +40,11 @@ module Language.Haskell.TH(
 	fromE, fromThenE, fromToE, fromThenToE,
 	listE, sigE, recConE, recUpdE, stringE, fieldExp,
 	valD, funD, tySynD, dataD, newtypeD, classD, instanceD, sigD, forImpD,
+        familyD, dataInstD, newtypeInstD, tySynInstD,
 	cxt, normalC, recC, infixC,
 	forallT, varT, conT, appT, arrowT, listT, tupleT,
 	isStrict, notStrict, strictType, varStrictType,
-	cCall, stdCall, unsafe, safe, threadsafe,
+	cCall, stdCall, unsafe, safe, threadsafe, typeFam, dataFam,
 
 	-- Pretty-printer
 	Ppr(..), pprint, pprExp, pprLit, pprPat, pprParendType
