@@ -404,7 +404,7 @@ endif
 # Defer the check until later by using $(if..), because GhcUnregisterised might
 # be set in build.mk, which hasn't been read yet.
 GhcRTSWays += $(if $(findstring NO, $(GhcUnregisterised)),thr thr_debug thr_l,)
-GhcRTSWays += $(if $(findstring p, $(GhcLibWays)),thr_p,)
+GhcRTSWays += $(if $(findstring p, $(GhcLibWays)),$(if $(findstring NO, $(GhcUnregisterised)),thr_p,),)
 
 # We can only build GHCi threaded if we have a threaded RTS:
 GhcThreaded = $(if $(findstring thr,$(GhcRTSWays)),YES,NO)
