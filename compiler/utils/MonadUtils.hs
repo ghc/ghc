@@ -19,6 +19,7 @@ module MonadUtils
         , mapMaybeM
         , anyM, allM
         , foldlM, foldrM
+        , maybeMapM
         ) where
 
 ----------------------------------------------------------------------------------------
@@ -149,3 +150,8 @@ foldlM = foldM
 foldrM        :: (Monad m) => (b -> a -> m a) -> a -> [b] -> m a
 foldrM _ z []     = return z
 foldrM k z (x:xs) = do { r <- foldrM k z xs; k x r }
+
+-- | Monadic version of fmap specialised for Maybe
+maybeMapM :: Monad m => (a -> m b) -> (Maybe a -> m (Maybe b))
+maybeMapM _ Nothing  = return Nothing
+maybeMapM m (Just x) = liftM Just $ m x

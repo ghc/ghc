@@ -6,13 +6,6 @@
 This module converts Template Haskell syntax into HsSyn
 
 \begin{code}
-{-# OPTIONS -fno-warn-incomplete-patterns #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module Convert( convertToHsExpr, convertToPat, convertToHsDecls,
                 convertToHsType, thRdrNameGuesses ) where
 
@@ -32,6 +25,7 @@ import ForeignCall
 import Char
 import List
 import Unique
+import MonadUtils
 import ErrUtils
 import Bag
 import FastString
@@ -107,15 +101,21 @@ wrapL (CvtM m) = CvtM (\loc -> case m loc of
 
 -------------------------------------------------------------------
 cvtTop :: TH.Dec -> CvtM (LHsDecl RdrName)
-cvtTop d@(TH.ValD _ _ _) = do { L loc d' <- cvtBind d; return (L loc $ Hs.ValD d') }
-cvtTop d@(TH.FunD _ _)   = do { L loc d' <- cvtBind d; return (L loc $ Hs.ValD d') }
-cvtTop (TH.SigD nm typ)  = do  { nm' <- vNameL nm
-				; ty' <- cvtType typ
-				; returnL $ Hs.SigD (TypeSig nm' ty') }
+cvtTop d@(TH.ValD _ _ _) 
+  = do { L loc d' <- cvtBind d
+       ; return (L loc $ Hs.ValD d') }
+
+cvtTop d@(TH.FunD _ _)   
+  = do { L loc d' <- cvtBind d
+       ; return (L loc $ Hs.ValD d') }
+
+cvtTop (TH.SigD nm typ)  
+  = do  { nm' <- vNameL nm
+	; ty' <- cvtType typ
+	; returnL $ Hs.SigD (TypeSig nm' ty') }
 
 cvtTop (TySynD tc tvs rhs)
-  = do	{ tc' <- tconNameL tc
-	; tvs' <- cvtTvs tvs
+  = do	{ (_, tc', tvs', _) <- cvt_tycl_hdr [] tc tvs
 	; rhs' <- cvtType rhs
 	; returnL $ TyClD (TySynonym tc' tvs' Nothing rhs') }
 
@@ -124,7 +124,6 @@ cvtTop (DataD ctxt tc tvs constrs derivs)
 	; cons' <- mapM cvtConstr constrs
 	; derivs' <- cvtDerivs derivs
 	; returnL $ TyClD (mkTyData DataType stuff Nothing cons' derivs') }
-
 
 cvtTop (NewtypeD ctxt tc tvs constr derivs)
   = do	{ stuff <- cvt_tycl_hdr ctxt tc tvs
@@ -135,32 +134,109 @@ cvtTop (NewtypeD ctxt tc tvs constr derivs)
 cvtTop (ClassD ctxt cl tvs fds decs)
   = do	{ (cxt', tc', tvs', _) <- cvt_tycl_hdr ctxt cl tvs
 	; fds'  <- mapM cvt_fundep fds
-	; (binds', sigs') <- cvtBindsAndSigs decs
-	; returnL $ TyClD $ mkClassDecl (cxt', tc', tvs') fds' sigs' binds' [] []
-						    -- no ATs or docs in TH ^^ ^^
+        ; let (ats, bind_sig_decs) = partition isFamilyD decs
+	; (binds', sigs') <- cvtBindsAndSigs bind_sig_decs
+        ; ats' <- mapM cvtTop ats
+        ; let ats'' = map unTyClD ats'
+	; returnL $ 
+            TyClD $ mkClassDecl (cxt', tc', tvs') fds' sigs' binds' ats'' []
+						        -- no docs in TH ^^
 	}
+  where
+    isFamilyD (FamilyD _ _ _) = True
+    isFamilyD _               = False
 
 cvtTop (InstanceD tys ty decs)
-  = do 	{ (binds', sigs') <- cvtBindsAndSigs decs
+  = do 	{ let (ats, bind_sig_decs) = partition isFamInstD decs
+        ; (binds', sigs') <- cvtBindsAndSigs bind_sig_decs
+        ; ats' <- mapM cvtTop ats
+        ; let ats'' = map unTyClD ats'
 	; ctxt' <- cvtContext tys
 	; L loc pred' <- cvtPred ty
-	; inst_ty' <- returnL $ mkImplicitHsForAllTy ctxt' (L loc (HsPredTy pred'))
-	; returnL $ InstD (InstDecl inst_ty' binds' sigs' [])
-					-- no ATs in TH   ^^
+	; inst_ty' <- returnL $ 
+                        mkImplicitHsForAllTy ctxt' (L loc (HsPredTy pred'))
+	; returnL $ InstD (InstDecl inst_ty' binds' sigs' ats'')
 	}
+  where
+    isFamInstD (DataInstD _ _ _ _ _)    = True
+    isFamInstD (NewtypeInstD _ _ _ _ _) = True
+    isFamInstD (TySynInstD _ _ _)       = True
+    isFamInstD _                        = False
 
 cvtTop (ForeignD ford) = do { ford' <- cvtForD ford; returnL $ ForD ford' }
 
+cvtTop (FamilyD flav tc tvs)
+  = do { (_, tc', tvs', _) <- cvt_tycl_hdr [] tc tvs
+       ; returnL $ TyClD (TyFamily (cvtFamFlavour flav) tc' tvs' Nothing)
+                                                                 -- FIXME: kinds
+       }
+  where
+    cvtFamFlavour TypeFam = TypeFamily
+    cvtFamFlavour DataFam = DataFamily
+
+cvtTop (DataInstD ctxt tc tys constrs derivs)
+  = do { stuff <- cvt_tyinst_hdr ctxt tc tys
+       ; cons' <- mapM cvtConstr constrs
+       ; derivs' <- cvtDerivs derivs
+       ; returnL $ TyClD (mkTyData DataType stuff Nothing cons' derivs') 
+       }
+
+cvtTop (NewtypeInstD ctxt tc tys constr derivs)
+  = do { stuff <- cvt_tyinst_hdr ctxt tc tys
+       ; con' <- cvtConstr constr
+       ; derivs' <- cvtDerivs derivs
+       ; returnL $ TyClD (mkTyData NewType stuff Nothing [con'] derivs') 
+       }
+
+cvtTop (TySynInstD tc tys rhs)
+  = do	{ (_, tc', tvs', tys') <- cvt_tyinst_hdr [] tc tys
+	; rhs' <- cvtType rhs
+	; returnL $ TyClD (TySynonym tc' tvs' tys' rhs') }
+
+-- FIXME: This projection is not nice, but to remove it, cvtTop should be 
+--        refactored.
+unTyClD :: LHsDecl a -> LTyClDecl a
+unTyClD (L l (TyClD d)) = L l d
+unTyClD _               = panic "Convert.unTyClD: internal error"
+
 cvt_tycl_hdr :: TH.Cxt -> TH.Name -> [TH.Name]
-             -> CvtM (LHsContext RdrName
-                     ,Located RdrName
-                     ,[LHsTyVarBndr RdrName]
-                     ,Maybe [LHsType RdrName])
+             -> CvtM ( LHsContext RdrName
+                     , Located RdrName
+                     , [LHsTyVarBndr RdrName]
+                     , Maybe [LHsType RdrName])
 cvt_tycl_hdr cxt tc tvs
-  = do	{ cxt' <- cvtContext cxt
-	; tc'  <- tconNameL tc
-	; tvs' <- cvtTvs tvs
-	; return (cxt', tc', tvs', Nothing) }
+  = do { cxt' <- cvtContext cxt
+       ; tc'  <- tconNameL tc
+       ; tvs' <- cvtTvs tvs
+       ; return (cxt', tc', tvs', Nothing) 
+       }
+
+cvt_tyinst_hdr :: TH.Cxt -> TH.Name -> [TH.Type]
+               -> CvtM ( LHsContext RdrName
+                       , Located RdrName
+                       , [LHsTyVarBndr RdrName]
+                       , Maybe [LHsType RdrName])
+cvt_tyinst_hdr cxt tc tys
+  = do { cxt' <- cvtContext cxt
+       ; tc'  <- tconNameL tc
+       ; tvs  <- concatMapM collect tys
+       ; tvs' <- cvtTvs tvs
+       ; tys' <- mapM cvtType tys
+       ; return (cxt', tc', tvs', Just tys') 
+       }
+  where
+    collect (ForallT _ _ _) 
+      = failWith $ text "Forall type not allowed as type parameter"
+    collect (VarT tv)    = return [tv]
+    collect (ConT _)     = return []
+    collect (TupleT _)   = return []
+    collect ArrowT       = return []
+    collect ListT        = return []
+    collect (AppT t1 t2)
+      = do { tvs1 <- collect t1
+           ; tvs2 <- collect t2
+           ; return $ tvs1 ++ tvs2
+           }
 
 ---------------------------------------------------
 -- 	Data types
@@ -317,6 +393,7 @@ cvtBindsAndSigs ds
 cvtSig :: TH.Dec -> CvtM (LSig RdrName)
 cvtSig (TH.SigD nm ty)
   = do { nm' <- vNameL nm; ty' <- cvtType ty; returnL (Hs.TypeSig nm' ty') }
+cvtSig _ = panic "Convert.cvtSig: Signature expected"
 
 cvtBind :: TH.Dec -> CvtM (LHsBind RdrName)
 -- Used only for declarations in a 'let/where' clause,
@@ -426,6 +503,7 @@ cvtHsDo do_or_lc stmts
   = do	{ stmts' <- cvtStmts stmts
 	; let body = case last stmts' of
 			L _ (ExprStmt body _ _) -> body
+                        _                       -> panic "Malformed body"
 	; return $ HsDo do_or_lc (init stmts') body void }
 
 cvtStmts :: [TH.Stmt] -> CvtM [Hs.LStmt RdrName]
@@ -458,10 +536,17 @@ cvtpair (PatG gs,rhs)    = do { gs' <- cvtStmts gs; rhs' <- cvtl rhs
 			      ; returnL $ GRHS gs' rhs' }
 
 cvtOverLit :: Lit -> CvtM (HsOverLit RdrName)
-cvtOverLit (IntegerL i)  = do { force i; return $ mkHsIntegral i placeHolderType}
-cvtOverLit (RationalL r) = do { force r; return $ mkHsFractional r placeHolderType}
-cvtOverLit (StringL s)   = do { let { s' = mkFastString s }; force s'; return $ mkHsIsString s' placeHolderType }
--- An Integer is like an an (overloaded) '3' in a Haskell source program
+cvtOverLit (IntegerL i)  
+  = do { force i; return $ mkHsIntegral i placeHolderType}
+cvtOverLit (RationalL r) 
+  = do { force r; return $ mkHsFractional r placeHolderType}
+cvtOverLit (StringL s)   
+  = do { let { s' = mkFastString s }
+       ; force s'
+       ; return $ mkHsIsString s' placeHolderType 
+       }
+cvtOverLit _ = panic "Convert.cvtOverLit: Unexpected overloaded literal"
+-- An Integer is like an (overloaded) '3' in a Haskell source program
 -- Similarly 3.5 for fractionals
 
 cvtLit :: Lit -> CvtM HsLit
@@ -470,7 +555,12 @@ cvtLit (WordPrimL w)   = do { force w; return $ HsWordPrim w }
 cvtLit (FloatPrimL f)  = do { force f; return $ HsFloatPrim f }
 cvtLit (DoublePrimL f) = do { force f; return $ HsDoublePrim f }
 cvtLit (CharL c)       = do { force c; return $ HsChar c }
-cvtLit (StringL s)     = do { let { s' = mkFastString s }; force s'; return $ HsString s' }
+cvtLit (StringL s)     
+  = do { let { s' = mkFastString s }
+       ; force s'
+       ; return $ HsString s' 
+       }
+cvtLit _ = panic "Convert.cvtLit: Unexpected literal"
 
 cvtPats :: [TH.Pat] -> CvtM [Hs.LPat RdrName]
 cvtPats pats = mapM cvtPat pats

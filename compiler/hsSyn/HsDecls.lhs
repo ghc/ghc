@@ -406,8 +406,8 @@ data TyClDecl name
     }
 
 
-  | -- | @type/data/newtype family T :: *->*@
-    TyFamily {  tcdFlavour:: FamilyFlavour,	        -- type, new, or data
+  | -- | @type/data family T :: *->*@
+    TyFamily {  tcdFlavour:: FamilyFlavour,	        -- type or data
 		tcdLName  :: Located name,	        -- type constructor
 		tcdTyVars :: [LHsTyVarBndr name],	-- type variables
 		tcdKind   :: Maybe Kind			-- result kind
