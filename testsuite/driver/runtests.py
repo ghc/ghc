@@ -12,6 +12,7 @@ import string
 import getopt
 import platform
 import time
+import re
 
 from testutil import *
 from testglobals import *
@@ -83,10 +84,13 @@ for opt,arg in opts:
         # Trac #1558 says threads don't work in python 2.4.4, but do
         # in 2.5.2. Probably >= 2.5 is sufficient, but let's be
         # conservative here.
+        # Some versions of python have things like '1c1' for some of
+        # these components (see trac #3091), but int() chokes on the
+        # 'c1', so we drop it.
         (maj, min, pat) = platform.python_version_tuple()
-        maj = int(maj)
-        min = int(min)
-        pat = int(pat)
+        maj = int(re.sub('[^0-9].*', '', maj))
+        min = int(re.sub('[^0-9].*', '', min))
+        pat = int(re.sub('[^0-9].*', '', pat))
         if (maj, min, pat) >= (2, 5, 2):
             config.threads = int(arg)
             config.use_threads = 1
