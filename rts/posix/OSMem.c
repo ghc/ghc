@@ -237,6 +237,6 @@ void setExecutable (void *p, lnat len, rtsBool exec)
     StgWord size             = startOfLastPage - startOfFirstPage + pageSize;
     if (mprotect((void*)startOfFirstPage, (size_t)size, 
 		 (exec ? PROT_EXEC : 0) | PROT_READ | PROT_WRITE) != 0) {
-	barf("makeExecutable: failed to protect 0x%p\n", p);
+	barf("setExecutable: failed to protect 0x%p\n", p);
     }
 }
