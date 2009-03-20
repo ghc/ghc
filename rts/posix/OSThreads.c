@@ -201,7 +201,6 @@ nat
 getNumberOfProcessors (void)
 {
     static nat nproc = 0;
-    size_t size = sizeof(nat);
 
     if (nproc == 0) {
 #if defined(HAVE_SYSCONF) && defined(_SC_NPROCESSORS_ONLN)
@@ -209,6 +208,7 @@ getNumberOfProcessors (void)
 #elif defined(HAVE_SYSCONF) && defined(_SC_NPROCESSORS_CONF)
         nproc = sysconf(_SC_NPROCESSORS_CONF);
 #elif defined(darwin_HOST_OS)
+        size_t size = sizeof(nat);
         if(0 != sysctlbyname("hw.ncpu",&nproc,&size,NULL,0))
             nproc = 1;
 #else
