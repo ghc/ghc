@@ -224,7 +224,7 @@ setThreadAffinity (nat n, nat m)
     nproc = getNumberOfProcessors();
     CPU_ZERO(&cs);
     for (i = n; i < nproc; i+=m) {
-        CPU_SET(n, &cs);
+        CPU_SET(i, &cs);
     }
     sched_setaffinity(0, sizeof(cpu_set_t), &cs);
 }
