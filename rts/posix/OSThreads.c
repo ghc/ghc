@@ -35,6 +35,10 @@
 #include <unistd.h>
 #endif
 
+#if defined(darwin_HOST_OS)
+#include <mach/mach.h>
+#endif
+
 /*
  * This (allegedly) OS threads independent layer was initially
  * abstracted away from code that used Pthreads, so the functions
@@ -206,13 +210,13 @@ getNumberOfProcessors (void)
     return nproc;
 }
 
+#if defined(HAVE_SCHED_H) && defined(HAVE_SCHED_SETAFFINITY)
 // Schedules the thread to run on CPU n of m.  m may be less than the
 // number of physical CPUs, in which case, the thread will be allowed
 // to run on CPU n, n+m, n+2m etc.
 void
 setThreadAffinity (nat n, nat m)
 {
-#if defined(HAVE_SCHED_H) && defined(HAVE_SCHED_SETAFFINITY)
     nat nproc;
     cpu_set_t cs;
     nat i;
@@ -223,8 +227,29 @@ setThreadAffinity (nat n, nat m)
         CPU_SET(n, &cs);
     }
     sched_setaffinity(0, sizeof(cpu_set_t), &cs);
-#endif
 }
+
+#elif defined(darwin_HOST_OS) && defined(THREAD_AFFINITY_POLICY)
+// Schedules the current thread in the affinity set identified by tag n.
+void
+setThreadAffinity (nat n, nat m GNUC3_ATTRIBUTE(__unused__))
+{
+    thread_affinity_policy_data_t policy;
+
+    policy.affinity_tag = n;
+    thread_policy_set(mach_thread_self(), 
+		      THREAD_AFFINITY_POLICY,
+		      (thread_policy_t) &policy,
+		      THREAD_AFFINITY_POLICY_COUNT);
+}
+
+#else
+void
+setThreadAffinity (nat n GNUC3_ATTRIBUTE(__unused__), 
+		   nat m GNUC3_ATTRIBUTE(__unused__))
+{
+}
+#endif
 
 #else /* !defined(THREADED_RTS) */
 
