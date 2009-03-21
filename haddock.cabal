@@ -118,6 +118,8 @@ executable haddock
     Haddock.GHC
    
   -- Cabal doesn't define __GHC_PATCHLEVEL__
+  if impl(ghc == 6.10.1)
+    cpp-options: -D__GHC_PATCHLEVEL__=1
   if impl(ghc == 6.8.3)
     cpp-options: -D__GHC_PATCHLEVEL__=3
   if impl(ghc == 6.8.2) || impl(ghc >= 6.10.1.20090223)
@@ -137,6 +139,8 @@ library
     Haddock.GHC.Utils
   
   -- Cabal doesn't define __GHC_PATCHLEVEL__
+  if impl(ghc == 6.10.1)
+    cpp-options: -D__GHC_PATCHLEVEL__=1
   if impl(ghc == 6.8.3)
     cpp-options: -D__GHC_PATCHLEVEL__=3
   if impl(ghc == 6.8.2) || impl(ghc >= 6.10.1.20090223)
