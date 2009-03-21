@@ -1,6 +1,6 @@
 name:                 haddock
 version:              2.4.2
-cabal-version:        >= 1.2
+cabal-version:        >= 1.2.3
 license:              BSD3
 build-type:           Simple
 license-file:         LICENSE
