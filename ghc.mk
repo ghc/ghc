@@ -6,6 +6,8 @@ utils/haddock_CONFIGURE_OPTS = --flag in-ghc-tree
 utils/haddock_HC_OPTS += -Wwarn
 utils/haddock_dist_SHELL_WRAPPER = YES
 utils/haddock_dist_PROG = haddock
+# XXX Is this a hack? Should it be needed? Done another way?
+utils/haddock_dist_DATADIR = lib
 
 $(INPLACE_BIN)/$(utils/haddock_dist_PROG): inplace/lib/html
 
