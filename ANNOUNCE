@@ -1,45 +1,62 @@
 --------------------------------------------
--- Haddock 2.4.0
+-- Haddock 2.4.2
 --------------------------------------------
 
 A new version of Haddock, the Haskell documentation tool, is out.
 
-This is a later version than the one shipped with GHC 6.10.1, which is version
-2.3.0. That version will not be released on Hackage since it only builds with
-GHC 6.10.1 (by accident, actually).
-
-Besides adding back support for earlier GHC versions, this release contains
-some more fixes and support for HTML frames.
+This is a bug fix release only, and it's the same version that will ship with
+GHC 6.10.2, unless any important problems are discovered before the GHC
+release.
 
 Please use the bug tracker to submit bug reports or feature requests.
 
 --------------------------------------------
--- Changes in version 2.4.0
+-- Changes in version 2.4.2
 --------------------------------------------
 
-  * Add framed view of the HTML documentation
+  * Support GHC 6.10.2
 
-  * Build with GHC 6.8.2 and 6.8.3 again
+  * Haddock no longer crashes on Template Haskell modules (#68)
+    (only with GHC 6.10.2 or above)
 
-  * Support images in documentation comments again
+  * Fix problem with Template Haskell-generated declarations disappearing (#59)
 
-  * Small improvements to the Hoogle output
+  * Generate two anchors for each link for compatibility between IE and Opera
+    (#45)
 
-  * A few bugs has been fixed
+  * Improved error messages
 
---------------------------------------------
--- Changes in version 2.3.0
---------------------------------------------
+  * Show re-exports from external packages again (GHC ticket #2746)
 
-  * Support for GHC 6.10.1
+  * Fix problem with exporting modules from external packages
 
-  * Slightly improved space usage
+  * Store hidden modules in .haddock files again (needed by the haddock
+    library)
 
-  * Fix a bug that made hidden modules show up in the contents & index pages
+  * Avoid processing boot modules
 
-  * Fix a bug that made Haddock load modules twice
+  * Do not show a subordinate by itself if its parent is also exported (#69)
 
-  * Improvements to the Hoogle output
+  * Pragmas may exist between document comments and declarations
+
+  * Do not indicate that a constructor argument is unboxed
+
+  * Fix problem with with non-working links to ghc-prim
+
+  * Improvements to the haddock library
+
+  * Allow referring to a specific section within a module in a module link
+    (#65)
+
+  * Fix problem with --source-entity (#58)
+
+  * Do not double ^Ms in Windows (#57) (only with GHC >= 6.10.2)
+
+  * Fix bug in pretty-printing of documented types (only with GHC >= 6.10.2)
+
+  * Fixes to the Hoogle backend
+
+  * Other fixes (including #67)
 
 --------------------------------------------
 -- Links
@@ -49,13 +66,13 @@ Homepage:
  http://www.haskell.org/haddock
 
 Hackage page:
- http://hackage.haskell.org/cgi-bin/hackage-scripts/package/haddock-2.4.0
+ http://hackage.haskell.org/cgi-bin/hackage-scripts/package/haddock-2.4.2
 
 Bugtracker and wiki:
  http://trac.haskell.org/haddock
 
 Mailing list:
- haskelldoc@haskell.org
+ haddock@projects.haskell.org
 
 Code repository:
  http://code.haskell.org/haddock
@@ -64,13 +81,13 @@ Code repository:
 -- Contributors
 --------------------------------------------
 
-The persons who contributed to the 2.3.0 and 2.4.0 releases are:
+The following people contributed with patches to this release.
 
- Clemens Fruhwirth
- Peter Gavin
+ Joachim Breitner
+ Roman Cheplyaka
  Ian Lynagh
  Neil Mitchell
- Luke Plant
+ Simon Peyton-Jones
  Thomas Schilling
  David Waern
 
