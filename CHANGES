@@ -14,14 +14,10 @@ Changed in version 2.4.2:
 
   * Show re-exports from external packages again (GHC ticket #2746)
 
-  * Fix problem with exporting modules from external packages
-
   * Store hidden modules in .haddock files again (needed by the haddock
     library)
 
   * Avoid processing boot modules
-
-  * Do not show a subordinate by itself if its parent is also exported (#69)
 
   * Pragmas may exist between document comments and declarations
 
@@ -29,20 +25,14 @@ Changed in version 2.4.2:
 
   * Fix problem with with non-working links to ghc-prim
 
-  * Improvements to the haddock library
-
   * Allow referring to a specific section within a module in a module link
     (#65)
 
-  * Fix problem with --source-entity (#58)
-
-  * Do not double ^Ms in Windows (#57) (only with GHC >= 6.10.2)
-
-  * Fix bug in pretty-printing of documented types (only with GHC >= 6.10.2)
-
   * Fixes to the Hoogle backend
+  
+  * Improvements to the haddock library
 
-  * Other fixes (including #67)
+  * Many other fixes (including #67, #69, #58, #57)
 
 -----------------------------------------------------------------------------
 
