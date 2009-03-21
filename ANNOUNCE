@@ -2,11 +2,14 @@
 -- Haddock 2.4.2
 --------------------------------------------
 
-A new version of Haddock, the Haskell documentation tool, is out.
+A new version of Haddock, the Haskell documentation tool, is out!
 
 This is a bug fix release only, and it's the same version that will ship with
 GHC 6.10.2, unless any important problems are discovered before the GHC
 release.
+
+Because the .haddock file format has changed, links to previously installed
+documentation will not work when generating documentation using this version.
 
 Please use the bug tracker to submit bug reports or feature requests.
 
@@ -81,7 +84,7 @@ Code repository:
 -- Contributors
 --------------------------------------------
 
-The following people contributed with patches to this release.
+The following people contributed patches to this release:
 
  Joachim Breitner
  Roman Cheplyaka
