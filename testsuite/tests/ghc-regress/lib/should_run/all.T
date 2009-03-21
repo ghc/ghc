@@ -4,7 +4,7 @@ test('char002', 	normal, compile_and_run, [''])
 test('length001',
      # This fails without -O, as it relies on a RULE being applied
      [expect_fail_for(['normal', 'ghci', 'threaded1']),
-      if_compiler_lt('ghc', '6.11', expect_fail)]
+      if_compiler_lt('ghc', '6.11', expect_fail)],
      compile_and_run,
      [''])
 
