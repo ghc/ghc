@@ -345,7 +345,7 @@ printRetainerSetShort(FILE *f, RetainerSet *rs)
 	    // size = strlen(tmp);
 	}
     }
-    fprintf(f, tmp);
+    fputs(tmp, f);
 }
 #elif defined(RETAINER_SCHEME_CC)
 // Retainer scheme 3: retainer = cost centre
