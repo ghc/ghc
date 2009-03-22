@@ -102,20 +102,24 @@ setIOManagerPipe (int fd)
 void
 ioManagerWakeup (void)
 {
+    int r;
     // Wake up the IO Manager thread by sending a byte down its pipe
     if (io_manager_pipe >= 0) {
 	StgWord8 byte = (StgWord8)IO_MANAGER_WAKEUP;
-	write(io_manager_pipe, &byte, 1);
+	r = write(io_manager_pipe, &byte, 1);
+        if (r == -1) { sysErrorBelch("ioManagerWakeup: write"); }
     }
 }
 
 void
 ioManagerDie (void)
 {
+    int r;
     // Ask the IO Manager thread to exit
     if (io_manager_pipe >= 0) {
 	StgWord8 byte = (StgWord8)IO_MANAGER_DIE;
-	write(io_manager_pipe, &byte, 1);
+	r = write(io_manager_pipe, &byte, 1);
+        if (r == -1) { sysErrorBelch("ioManagerDie: write"); }
         close(io_manager_pipe);
         io_manager_pipe = -1;
     }
