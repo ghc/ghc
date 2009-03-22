@@ -75,6 +75,10 @@ import Prelude
   )
 #endif
 
+#ifdef __GLASGOW_HASKELL__
+import GHC.Unit ()
+#endif
+
 default ()              -- Double isn't available yet
 
 #ifdef __GLASGOW_HASKELL__
