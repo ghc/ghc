@@ -366,8 +366,9 @@ occAnalRec (CyclicSCC nodes) (body_usage, binds)
 
 	----------------------------
 	-- Now reconstruct the cycle
-    pairs | no_rules  = reOrderCycle tagged_nodes
- 	  | otherwise = concatMap reOrderRec (stronglyConnCompFromEdgedVerticesR loop_breaker_edges)
+    pairs | no_rules  = reOrderCycle 0 tagged_nodes []
+ 	  | otherwise = foldr (reOrderRec 0) [] $
+			stronglyConnCompFromEdgedVerticesR loop_breaker_edges
 
 	-- See Note [Choosing loop breakers] for looop_breaker_edges
     loop_breaker_edges = map mk_node tagged_nodes
@@ -458,42 +459,55 @@ data Details = ND Id 		-- Binder
 		  IdSet		-- Other binders from this Rec group mentioned on RHS
 				-- (derivable from UsageDetails but cached here)
 
-reOrderRec :: SCC (Node Details)
-           -> [(Id,CoreExpr)]
+reOrderRec :: Int -> SCC (Node Details)
+           -> [(Id,CoreExpr)] -> [(Id,CoreExpr)]
 -- Sorted into a plausible order.  Enough of the Ids have
 --      IAmALoopBreaker pragmas that there are no loops left.
-reOrderRec (AcyclicSCC (ND bndr rhs _ _, _, _)) = [(bndr, rhs)]
-reOrderRec (CyclicSCC cycle)  		        = reOrderCycle cycle
+reOrderRec _ (AcyclicSCC (ND bndr rhs _ _, _, _)) pairs = (bndr, rhs) : pairs
+reOrderRec depth (CyclicSCC cycle)  		  pairs = reOrderCycle depth cycle pairs
 
-reOrderCycle :: [Node Details] -> [(Id,CoreExpr)]
-reOrderCycle []
+reOrderCycle :: Int -> [Node Details] -> [(Id,CoreExpr)] -> [(Id,CoreExpr)]
+reOrderCycle _ [] _
   = panic "reOrderCycle"
-reOrderCycle [bind]     -- Common case of simple self-recursion
-  = [(makeLoopBreaker False bndr, rhs)]
+reOrderCycle _ [bind] pairs    -- Common case of simple self-recursion
+  = (makeLoopBreaker False bndr, rhs) : pairs
   where
     (ND bndr rhs _ _, _, _) = bind
 
-reOrderCycle (bind : binds)
+reOrderCycle depth (bind : binds) pairs
   =     -- Choose a loop breaker, mark it no-inline,
         -- do SCC analysis on the rest, and recursively sort them out
-    concatMap reOrderRec (stronglyConnCompFromEdgedVerticesR unchosen) ++
-    [(makeLoopBreaker False bndr, rhs)]
-
+--    pprTrace "reOrderCycle" (ppr [b | (ND b _ _ _, _, _) <- bind:binds]) $
+    foldr (reOrderRec new_depth)
+          ([ (makeLoopBreaker False bndr, rhs) 
+           | (ND bndr rhs _ _, _, _) <- chosen_binds] ++ pairs)
+	  (stronglyConnCompFromEdgedVerticesR unchosen) 
   where
-    (chosen_bind, unchosen) = choose_loop_breaker bind (score bind) [] binds
-    ND bndr rhs _ _ = chosen_bind
+    (chosen_binds, unchosen) = choose_loop_breaker [bind] (score bind) [] binds
+
+    approximate_loop_breaker = depth >= 2
+    new_depth | approximate_loop_breaker = 0
+	      | otherwise		 = depth+1
+	-- After two iterations (d=0, d=1) give up
+	-- and approximate, returning to d=0
 
         -- This loop looks for the bind with the lowest score
         -- to pick as the loop  breaker.  The rest accumulate in
-    choose_loop_breaker (details,_,_) _loop_sc acc []
-        = (details, acc)        -- Done
+    choose_loop_breaker loop_binds _loop_sc acc []
+        = (loop_binds, acc)        -- Done
 
-    choose_loop_breaker loop_bind loop_sc acc (bind : binds)
+	-- If approximate_loop_breaker is True, we pick *all*
+	-- nodes with lowest score, else just one
+	-- See Note [Complexity of loop breaking]
+    choose_loop_breaker loop_binds loop_sc acc (bind : binds)
         | sc < loop_sc  -- Lower score so pick this new one
-        = choose_loop_breaker bind sc (loop_bind : acc) binds
+        = choose_loop_breaker [bind] sc (loop_binds ++ acc) binds
 
-        | otherwise     -- No lower so don't pick it
-        = choose_loop_breaker loop_bind loop_sc (bind : acc) binds
+	| approximate_loop_breaker && sc == loop_sc
+	= choose_loop_breaker (bind : loop_binds) loop_sc acc binds
+	
+        | otherwise     -- Higher score so don't pick it
+        = choose_loop_breaker loop_binds loop_sc (bind : acc) binds
         where
           sc = score bind
 
@@ -564,6 +578,41 @@ makeLoopBreaker :: Bool -> Id -> Id
 -- Set the loop-breaker flag: see Note [Weak loop breakers]
 makeLoopBreaker weak bndr = setIdOccInfo bndr (IAmALoopBreaker weak)
 \end{code}
+
+Note [Complexity of loop breaking]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The loop-breaking algorithm knocks out one binder at a time, and 
+performs a new SCC analysis on the remaining binders.  That can
+behave very badly in tightly-coupled groups of bindings; in the
+worst case it can be (N**2)*log N, because it does a full SCC
+on N, then N-1, then N-2 and so on.
+
+To avoid this, we switch plans after 2 (or whatever) attempts:
+  Plan A: pick one binder with the lowest score, make it
+	  a loop breaker, and try again
+  Plan B: pick *all* binders with the lowest score, make them
+	  all loop breakers, and try again 
+Since there are only a small finite number of scores, this will
+terminate in a constant number of iterations, rather than O(N)
+iterations.
+
+You might thing that it's very unlikely, but RULES make it much
+more likely.  Here's a real example from Trac #1969:
+  Rec { $dm = \d.\x. op d
+	{-# RULES forall d. $dm Int d  = $s$dm1
+		  forall d. $dm Bool d = $s$dm2 #-}
+	
+	dInt = MkD .... opInt ...
+	dInt = MkD .... opBool ...
+	opInt  = $dm dInt
+	opBool = $dm dBool
+
+	$s$dm1 = \x. op dInt
+	$s$dm2 = \x. op dBool }
+The RULES stuff means that we can't choose $dm as a loop breaker
+(Note [Choosing loop breakers]), so we must choose at least (say)
+opInt *and* opBool, and so on.  The number of loop breakders is
+linear in the number of instance declarations.
 
 Note [INLINE pragmas]
 ~~~~~~~~~~~~~~~~~~~~~
