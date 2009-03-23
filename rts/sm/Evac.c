@@ -295,8 +295,10 @@ evacuate_large(StgPtr p)
   // them straight on the scavenged_large_objects list.
   if (bd->flags & BF_PINNED) {
       ASSERT(get_itbl((StgClosure *)p)->type == ARR_WORDS);
-      dbl_link_onto(bd, &ws->step->scavenged_large_objects);
-      ws->step->n_scavenged_large_blocks += bd->blocks;
+      if (new_stp != stp) { ACQUIRE_SPIN_LOCK(&new_stp->sync_large_objects); }
+      dbl_link_onto(bd, &new_stp->scavenged_large_objects);
+      new_stp->n_scavenged_large_blocks += bd->blocks;
+      if (new_stp != stp) { RELEASE_SPIN_LOCK(&new_stp->sync_large_objects); }
   } else {
       bd->link = ws->todo_large_objects;
       ws->todo_large_objects = bd;
