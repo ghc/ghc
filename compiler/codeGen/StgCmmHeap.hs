@@ -344,15 +344,14 @@ entryHeapCheck fun arity args code
   = do updfr_sz <- getUpdFrameOff
        heapCheck True (gc_call updfr_sz) code   -- The 'fun' keeps relevant CAFs alive
   where
-    fun_expr = CmmReg (CmmLocal fun)
-    -- JD: ugh... we should only do the following for dynamic closures
-    args' = fun_expr : map (CmmReg . CmmLocal) args
+    args'     = fun : args
+    arg_exprs = map (CmmReg . CmmLocal) args'
     gc_call updfr_sz
-	| arity == 0 = mkJumpGC (CmmReg (CmmGlobal GCEnter1)) args' updfr_sz
-	| otherwise  = case gc_lbl (fun : args) of
-		 	 Just lbl -> mkJumpGC (CmmLit (CmmLabel (mkRtsCodeLabel lbl)))
-					      args' updfr_sz
-			 Nothing  -> mkCall generic_gc (GC, GC) [] [] updfr_sz
+        | arity == 0 = mkJumpGC (CmmReg (CmmGlobal GCEnter1)) arg_exprs updfr_sz
+        | otherwise  = case gc_lbl args' of
+                         Just lbl -> mkJumpGC (CmmLit (CmmLabel (mkRtsCodeLabel lbl)))
+                                              arg_exprs updfr_sz
+                         Nothing  -> mkCall generic_gc (GC, GC) [] [] updfr_sz
 
     gc_lbl :: [LocalReg] -> Maybe LitString
 {-

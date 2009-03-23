@@ -393,21 +393,22 @@ closureCodeBody top_lvl bndr cl_info cc args arity body fv_details
 
 	-- Emit the main entry code
         ; emitClosureProcAndInfoTable top_lvl bndr cl_info args $ \(node, arg_regs) -> do
-    	        -- Emit the slow-entry code (for entering a closure through a PAP)
-	        { mkSlowEntryCode cl_info arg_regs
+                    -- Emit the slow-entry code (for entering a closure through a PAP)
+                { mkSlowEntryCode cl_info arg_regs
 
-		; let lf_info = closureLFInfo cl_info
-		      node_points = nodeMustPointToIt lf_info
-		; tickyEnterFun cl_info
-		; whenC node_points (ldvEnterClosure cl_info)
-		; granYield arg_regs node_points
+                ; let lf_info = closureLFInfo cl_info
+                      node_points = nodeMustPointToIt lf_info
+                ; tickyEnterFun cl_info
+                ; whenC node_points (ldvEnterClosure cl_info)
+                ; granYield arg_regs node_points
 
-			-- Main payload
-		; entryHeapCheck node arity arg_regs $ do
-		{ enterCostCentre cl_info cc body
+                        -- Main payload
+                ; entryHeapCheck node arity arg_regs $ do
+                { enterCostCentre cl_info cc body
                 ; fv_bindings <- mapM bind_fv fv_details
-		; load_fvs node lf_info fv_bindings -- Load free vars out of closure *after*
-		; cgExpr body }}	    -- heap check, to reduce live vars over check
+                -- Load free vars out of closure *after*
+                ; if node_points then load_fvs node lf_info fv_bindings else return ()
+                ; cgExpr body }}	    -- heap check, to reduce live vars over check
 
   }
 

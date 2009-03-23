@@ -46,13 +46,9 @@ assignArguments f reps = assignments
 -- | JD: For the new stack story, I want arguments passed on the stack to manifest as
 -- positive offsets in a CallArea, not negative offsets from the stack pointer.
 -- Also, I want byte offsets, not word offsets.
--- The first argument tells us whether we are assigning positions for call arguments
--- or return results. The distinction matters because some conventions use different
--- global registers in each case. In particular, the native calling convention
--- uses the `node' register to pass the closure environment.
-assignArgumentsPos :: (Outputable a) => Convention -> Bool -> (a -> CmmType) -> [a] ->
+assignArgumentsPos :: (Outputable a) => Convention -> (a -> CmmType) -> [a] ->
                       ArgumentFormat a ByteOff
-assignArgumentsPos conv isCall arg_ty reps = map cvt assignments
+assignArgumentsPos conv arg_ty reps = map cvt assignments
     where -- The calling conventions (CgCallConv.hs) are complicated, to say the least
       regs = case (reps, conv) of
                (_,   NativeNodeCall)   -> getRegsWithNode
@@ -65,34 +61,6 @@ assignArgumentsPos conv isCall arg_ty reps = map cvt assignments
                (_,   PrimOpReturn)     -> getRegsWithNode
                (_,   Slow)             -> noRegs
                _ -> pprPanic "Unknown calling convention" (ppr conv)
-      -- regs = if isCall then
-      --          case (reps, conv) of
-      --            (_, NativeNodeCall)   -> getRegsWithNode
-      --            (_, NativeDirectCall) -> getRegsWithoutNode
-      --            (_, GC    ) -> getRegsWithNode
-      --            (_, PrimOpCall) -> allRegs
-      --            (_, Slow  ) -> noRegs
-      --            _ -> pprPanic "Unknown calling convention" (ppr conv)
-      --        else
-      --          case (reps, conv) of
-      --            (_,   NativeNodeCall)   -> getRegsWithNode
-      --            (_,   NativeDirectCall) -> getRegsWithoutNode
-      --            ([_], NativeReturn)     -> allRegs
-      --            (_,   NativeReturn)     -> getRegsWithNode
-      --            (_,   GC)               -> getRegsWithNode
-      --            ([_], PrimOpReturn)     -> allRegs
-      --            (_,   PrimOpReturn)     -> getRegsWithNode
-      --            (_,   Slow)             -> noRegs
-      --            _ -> pprPanic "Unknown calling convention" (ppr conv)
-           --       (_, NativeCall) -> getRegsWithoutNode
-           --       (_, GC    ) -> getRegsWithNode
-           --       (_, PrimOpCall) -> allRegs
-           --       (_, Slow  ) -> noRegs
-           --       _ -> panic "Unknown calling convention"
-           --   else
-           --     case (reps, conv) of
-           --       ([_], _)    -> allRegs
-           --       (_, NativeCall)   -> getRegsWithNode
       (sizes, assignments) = unzip $ assignArguments' reps (sum sizes) regs
       assignArguments' [] _ _ = []
       assignArguments' (r:rs) offset avails =

@@ -329,7 +329,7 @@ add_CopyIns callPPs protos blocks =
            = case lookupBlockEnv protos id of
                Just (Protocol c fs _area) ->
                  do LGraph _ blocks <-
-                      lgraphOfAGraph (mkLabel id <*> copyInSlot c False fs <*> mkZTail t)
+                      lgraphOfAGraph (mkLabel id <*> copyInSlot c fs <*> mkZTail t)
                     return (map snd $ blockEnvToList blocks)
                Nothing -> return [b]
            | otherwise = return [b]
@@ -356,8 +356,7 @@ add_CopyOuts protos procPoints g = fold_blocks mb_copy_out (return emptyBlockEnv
                     if elemBlockSet succId procPoints then
                       case lookupBlockEnv protos succId of
                         Nothing -> z
-                        Just (Protocol c fs _area) ->
-                          insert z succId $ copyOutSlot c Jump fs
+                        Just (Protocol c fs _area) -> insert z succId $ copyOutSlot c fs
                     else z
                   insert z succId m =
                     do (b, bmap) <- z

@@ -146,15 +146,15 @@ stackStubExpr w = CmmLit (CmmInt 0 w)
 -- the variables in their spill slots.
 -- Therefore, for copying arguments and results, we provide different
 -- functions to pass the arguments in an overflow area and to pass them in spill slots.
-copyInOflow  :: Convention -> Bool -> Area -> CmmFormals -> (Int, CmmAGraph)
-copyInSlot   :: Convention -> Bool -> CmmFormals -> CmmAGraph
+copyInOflow  :: Convention -> Area -> CmmFormals -> (Int, CmmAGraph)
+copyInSlot   :: Convention -> CmmFormals -> CmmAGraph
 copyOutOflow :: Convention -> Transfer -> Area -> CmmActuals -> UpdFrameOffset ->
                               (Int, [Middle])
-copyOutSlot  :: Convention -> Transfer -> [LocalReg] -> [Middle]
+copyOutSlot  :: Convention -> [LocalReg] -> [Middle]
   -- why a list of middles here instead of an AGraph?
 
 copyInOflow      = copyIn oneCopyOflowI
-copyInSlot c i f = snd $ copyIn oneCopySlotI c i (panic "no area for copying to slots") f
+copyInSlot c f = snd $ copyIn oneCopySlotI c (panic "no area for copying to slots") f
 
 type SlotCopier = Area -> (LocalReg, ByteOff) -> (ByteOff, CmmAGraph) ->
                           (ByteOff, CmmAGraph)
@@ -207,7 +207,7 @@ copyOutOflow conv transfer area@(CallArea a) actuals updfr_off =
                          widthInBytes wordWidth)
                       else ([], 0)
                     Old -> ([], updfr_off)
-        args = assignArgumentsPos conv (transfer /= Ret) cmmExprType actuals
+        args = assignArgumentsPos conv cmmExprType actuals
         args' = foldl adjust setRA args
           where adjust rst (v, StackParam off) = (v, StackParam (off + init_offset)) : rst
                 adjust rst x@(_, RegisterParam _) = x : rst
@@ -215,19 +215,19 @@ copyOutOflow _ _ (RegSlot _) _ _ = panic "cannot copy arguments into a register 
 
 -- Args passed only in registers and stack slots; no overflow space.
 -- No return address may apply!
-copyOutSlot conv transfer actuals = foldr co [] args
+copyOutSlot conv actuals = foldr co [] args
   where co (v, RegisterParam r) ms = MidAssign (CmmGlobal r) (toExp v) : ms
         co (v, StackParam off)  ms =
           MidStore (CmmStackSlot (RegSlot v) off) (toExp v) : ms
         toExp r = CmmReg (CmmLocal r)
-        args = assignArgumentsPos conv (transfer /= Ret) localRegType actuals
+        args = assignArgumentsPos conv localRegType actuals
 
 -- oneCopySlotO _ (reg, _) (n, ms) =
 --   (n, MidStore (CmmStackSlot (RegSlot reg) w) reg : ms)
 --   where w = widthInBytes (typeWidth (localRegType reg))
 
 mkEntry :: BlockId -> Convention -> CmmFormals -> (Int, CmmAGraph)
-mkEntry _ conv formals = copyInOflow conv False (CallArea Old) formals
+mkEntry _ conv formals = copyInOflow conv (CallArea Old) formals
 
 lastWithArgs :: Transfer -> Area -> Convention -> CmmActuals -> UpdFrameOffset ->
                 (ByteOff -> Last) -> CmmAGraph
@@ -266,7 +266,7 @@ mkCall f (callConv, retConv) results actuals updfr_off =
                     ppr retConv) $
   withFreshLabel "call successor" $ \k ->
     let area = CallArea $ Young k
-        (off, copyin) = copyInOflow retConv False area results
+        (off, copyin) = copyInOflow retConv area results
         copyout = lastWithArgs Call area callConv actuals updfr_off 
                                (toCall f (Just k) updfr_off off)
     in (copyout <*> mkLabel k <*> copyin)
