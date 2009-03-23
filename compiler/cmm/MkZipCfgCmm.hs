@@ -60,7 +60,7 @@ mkAssign     :: CmmReg  -> CmmExpr -> CmmAGraph
 mkStore      :: CmmExpr -> CmmExpr -> CmmAGraph
 
 ---------- Calls
-mkCall       :: CmmExpr -> Convention -> CmmFormals -> CmmActuals ->
+mkCall       :: CmmExpr -> (Convention, Convention) -> CmmFormals -> CmmActuals ->
                   UpdFrameOffset -> CmmAGraph
 mkCmmCall    :: CmmExpr ->              CmmFormals -> CmmActuals ->
                   UpdFrameOffset -> CmmAGraph
@@ -259,14 +259,15 @@ mkReturnSimple actuals updfr_off =
 mkFinalCall f _ actuals updfr_off =
   lastWithArgs Call old NativeCall actuals updfr_off $ toCall f Nothing updfr_off 0
 
-mkCmmCall f results actuals = mkCall f NativeCall results actuals
+mkCmmCall f results actuals = mkCall f (NativeCall, NativeReturn) results actuals
 
 -- I'm dropping the SRT, but that should be okay: we plan to reconstruct it later.
-mkCall f conv results actuals updfr_off =
- pprTrace "mkCall" (ppr f <+> ppr actuals <+> ppr results <+> ppr conv) $
+mkCall f (callConv, retConv) results actuals updfr_off =
+ pprTrace "mkCall" (ppr f <+> ppr actuals <+> ppr results <+> ppr callConv <+>
+                    ppr retConv) $
   withFreshLabel "call successor" $ \k ->
     let area = CallArea $ Young k
-        (off, copyin) = copyInOflow conv False area results
-        copyout = lastWithArgs Call area conv actuals updfr_off 
+        (off, copyin) = copyInOflow retConv False area results
+        copyout = lastWithArgs Call area callConv actuals updfr_off 
                                (toCall f (Just k) updfr_off off)
     in (copyout <*> mkLabel k <*> copyin)

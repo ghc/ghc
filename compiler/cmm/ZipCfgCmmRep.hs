@@ -114,16 +114,16 @@ data Convention
 
   | NativeReturn -- Native C-- return
 
-  | Slow 		-- Slow entry points: all args pushed on the stack
+  | Slow         -- Slow entry points: all args pushed on the stack
 
-  | GC 		        -- Entry to the garbage collector: uses the node reg!
+  | GC           -- Entry to the garbage collector: uses the node reg!
 
   | PrimOpCall   -- Calling prim ops
 
   | PrimOpReturn -- Returning from prim ops
 
-  | Foreign		-- Foreign call/return
-	ForeignConvention
+  | Foreign      -- Foreign call/return
+        ForeignConvention
 
   | Private
         -- Used for control transfers within a (pre-CPS) procedure All

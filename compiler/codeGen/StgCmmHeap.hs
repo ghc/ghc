@@ -352,7 +352,7 @@ entryHeapCheck fun arity args code
 	| otherwise  = case gc_lbl (fun : args) of
 		 	 Just lbl -> mkJumpGC (CmmLit (CmmLabel (mkRtsCodeLabel lbl)))
 					      args' updfr_sz
-			 Nothing  -> mkCall generic_gc GC [] [] updfr_sz
+			 Nothing  -> mkCall generic_gc (GC, GC) [] [] updfr_sz
 
     gc_lbl :: [LocalReg] -> Maybe LitString
 {-
@@ -386,13 +386,13 @@ altHeapCheck regs code
        heapCheck False (gc_call updfr_sz) code
   where
     gc_call updfr_sz
-	| null regs = mkCall generic_gc GC [] [] updfr_sz
+	| null regs = mkCall generic_gc (GC, GC) [] [] updfr_sz
 
 	| Just gc_lbl <- rts_label regs	-- Canned call
-	= mkCall    (CmmLit (CmmLabel (mkRtsCodeLabel gc_lbl))) GC
+	= mkCall    (CmmLit (CmmLabel (mkRtsCodeLabel gc_lbl))) (GC, GC)
 		    regs (map (CmmReg . CmmLocal) regs) updfr_sz
 	| otherwise		-- No canned call, and non-empty live vars
-	= mkCall generic_gc GC [] [] updfr_sz
+	= mkCall generic_gc (GC, GC) [] [] updfr_sz
 
 {-
     rts_label [reg] 

@@ -60,14 +60,13 @@ assignArgumentsPos conv isCall arg_ty reps = map cvt assignments
                  (_, GC    ) -> getRegsWithNode
                  (_, PrimOpCall) -> allRegs
                  (_, Slow  ) -> noRegs
-                 _ -> panic "Unknown calling convention"
+                 _ -> pprPanic "Unknown calling convention" (ppr conv)
              else
                case (reps, conv) of
                  ([_], _)    -> allRegs
                  (_, NativeCall)   -> getRegsWithNode
                  (_, NativeReturn) -> getRegsWithNode
                  (_, GC    ) -> getRegsWithNode
-                 (_, PrimOpCall) -> getRegsWithNode
                  (_, PrimOpReturn) -> getRegsWithNode
                  (_, Slow  ) -> noRegs
                  _ -> pprPanic "Unknown calling convention" (ppr conv)

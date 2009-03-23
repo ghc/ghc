@@ -465,7 +465,8 @@ cgTailCall fun_id fun_info args = do
                    ; [ret,call] <- forkAlts [
       			getCode $ emitReturn [fun],	-- Is tagged; no need to untag
       			getCode $ do emit (mkAssign nodeReg fun)
-                                     emitCall NativeCall (entryCode fun') []]  -- Not tagged
+                                     emitCall (NativeCall, NativeReturn)
+                                              (entryCode fun') []]  -- Not tagged
       		   ; emit (mkCmmIfThenElse (cmmIsTagged fun) ret call) }
 
       	SlowCall -> do 	    -- A slow function call via the RTS apply routines

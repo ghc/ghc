@@ -90,17 +90,17 @@ emitReturn results
                 ; emit (mkMultiAssign  regs results) }
        }
 
-emitCall :: Convention -> CmmExpr -> [CmmExpr] -> FCode ()
+emitCall :: (Convention, Convention) -> CmmExpr -> [CmmExpr] -> FCode ()
 -- (cgCall fun args) makes a call to the entry-code of 'fun', 
 -- passing 'args', and returning the results to the current sequel
-emitCall conv fun args
+emitCall convs@(callConv, _) fun args
   = do	{ adjustHpBackwards
 	; sequel <- getSequel
 	; updfr_off <- getUpdFrameOff
         ; emit $ mkComment $ mkFastString ("emitCall: " ++ show sequel)
 	; case sequel of
-	    Return _            -> emit (mkForeignJump conv fun args updfr_off)
-	    AssignTo res_regs _ -> emit (mkCall fun conv res_regs args updfr_off)
+	    Return _            -> emit (mkForeignJump callConv fun args updfr_off)
+	    AssignTo res_regs _ -> emit (mkCall fun convs res_regs args updfr_off)
     }
 
 adjustHpBackwards :: FCode ()
@@ -161,13 +161,13 @@ direct_call caller lbl arity args reps
 	     	  	    <+> ppr args <+> ppr reps )
 
   | null rest_reps     -- Precisely the right number of arguments
-  = emitCall NativeCall target args
+  = emitCall (NativeCall, NativeReturn) target args
 
   | otherwise		-- Over-saturated call
   = ASSERT( arity == length initial_reps )
     do	{ pap_id <- newTemp gcWord
 	; withSequel (AssignTo [pap_id] True)
-		     (emitCall NativeCall target fast_args)
+		     (emitCall (NativeCall, NativeReturn) target fast_args)
 	; slow_call (CmmReg (CmmLocal pap_id)) 
 		    rest_args rest_reps }
   where
