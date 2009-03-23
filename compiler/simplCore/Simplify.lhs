@@ -623,7 +623,9 @@ addNonRecWithUnf :: SimplEnv
 addNonRecWithUnf env new_bndr rhs unfolding wkr
   = ASSERT( isId new_bndr )
     WARN( new_arity < old_arity || new_arity < dmd_arity, 
-          (ppr final_id <+> ppr old_arity <+> ppr new_arity <+> ppr dmd_arity) $$ ppr rhs )
+          (ptext (sLit "Arity decrease:") <+> ppr final_id <+> ppr old_arity
+		<+> ppr new_arity <+> ppr dmd_arity) $$ ppr rhs )
+	-- Note [Arity decrease]
     final_id `seq`      -- This seq forces the Id, and hence its IdInfo,
 	                -- and hence any inner substitutions
     addNonRec env final_id rhs
@@ -666,6 +668,28 @@ addNonRecWithUnf env new_bndr rhs unfolding wkr
         final_id = new_bndr `setIdInfo` final_info
 \end{code}
 
+Note [Arity decrease]
+~~~~~~~~~~~~~~~~~~~~~
+Generally speaking the arity of a binding should not decrease.  But it *can* 
+legitimately happen becuase of RULES.  Eg
+	f = g Int
+where g has arity 2, will have arity 2.  But if there's a rewrite rule
+	g Int --> h
+where h has arity 1, then f's arity will decrease.  Here's a real-life example,
+which is in the output of Specialise:
+
+     Rec {
+	$dm {Arity 2} = \d.\x. op d
+	{-# RULES forall d. $dm Int d = $s$dm #-}
+	
+	dInt = MkD .... opInt ...
+	opInt {Arity 1} = $dm dInt
+
+	$s$dm {Arity 0} = \x. op dInt }
+
+Here opInt has arity 1; but when we apply the rule its arity drops to 0.
+That's why Specialise goes to a little trouble to pin the right arity
+on specialised functions too.
 
 
 %************************************************************************

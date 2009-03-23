@@ -16,7 +16,7 @@ module Specialise ( specProgram ) where
 
 import Id		( Id, idName, idType, mkUserLocal, idCoreRules,
 			  idInlineActivation, setInlineActivation, setIdUnfolding,
-                          isLocalId ) 
+                          isLocalId, idArity, setIdArity ) 
 import TcType		( Type, mkTyVarTy, tcSplitSigmaTy, 
 			  tyVarsOfTypes, tyVarsOfTheta, isClassPred,
 			  tcCmpType, isUnLiftedType
@@ -826,6 +826,7 @@ specDefn subst calls fn rhs
   
   where
     fn_type	       = idType fn
+    fn_arity	       = idArity fn
     (tyvars, theta, _) = tcSplitSigmaTy fn_type
     n_tyvars	       = length tyvars
     n_dicts	       = length theta
@@ -906,6 +907,10 @@ specDefn subst calls fn rhs
 	         spec_id_ty = mkPiTypes lam_args body_ty
 	
            ; spec_f <- newSpecIdSM fn spec_id_ty
+  	   ; let spec_f_w_arity = setIdArity spec_f (max 0 (fn_arity - n_dicts))
+		-- Adding arity information just propagates it a bit faster
+		-- See Note [Arity decrease] in Simplify
+
            ; (spec_rhs, rhs_uds) <- specExpr rhs_subst2 (mkLams lam_args body)
 	   ; let
 		-- The rule to put in the function's specialisation is:
@@ -917,13 +922,13 @@ specDefn subst calls fn rhs
 			 	  (idName fn)
 			          (poly_tyvars ++ inst_dict_ids)
 				  inst_args 
-				  (mkVarApps (Var spec_f) app_args)
+				  (mkVarApps (Var spec_f_w_arity) app_args)
 
 		-- Add the { d1' = dx1; d2' = dx2 } usage stuff
 	   	final_uds = foldr addDictBind rhs_uds dx_binds
 
-	   	spec_pr | inline_rhs = (spec_f `setInlineActivation` inline_act, Note InlineMe spec_rhs)
-		        | otherwise  = (spec_f, 		 	      spec_rhs)
+	   	spec_pr | inline_rhs = (spec_f_w_arity `setInlineActivation` inline_act, Note InlineMe spec_rhs)
+		        | otherwise  = (spec_f_w_arity, 	 	                 spec_rhs)
 
 	   ; return (Just (spec_pr, final_uds, spec_env_rule)) } }
       where
