@@ -110,7 +110,9 @@ data MidCallTarget	-- The target of a MidUnsafeCall
   deriving Eq
 
 data Convention
-  = NativeCall   -- Native C-- call
+  = NativeDirectCall -- Native C-- call skipping the node (closure) argument
+  
+  | NativeNodeCall   -- Native C-- call including the node argument
 
   | NativeReturn -- Native C-- return
 
@@ -520,14 +522,15 @@ genFullCondBranch expr t f =
          ]
 
 pprConvention :: Convention -> SDoc
-pprConvention (NativeCall   {}) = text "<native-call-convention>"
-pprConvention (NativeReturn {}) = text "<native-ret-convention>"
-pprConvention  Slow             = text "<slow-convention>"
-pprConvention  GC               = text "<gc-convention>"
-pprConvention  PrimOpCall       = text "<primop-call-convention>"
-pprConvention  PrimOpReturn     = text "<primop-ret-convention>"
-pprConvention (Foreign c)       = ppr c
-pprConvention (Private {})      = text "<private-convention>"
+pprConvention (NativeNodeCall   {}) = text "<native-node-call-convention>"
+pprConvention (NativeDirectCall {}) = text "<native-direct-call-convention>"
+pprConvention (NativeReturn {})     = text "<native-ret-convention>"
+pprConvention  Slow                 = text "<slow-convention>"
+pprConvention  GC                   = text "<gc-convention>"
+pprConvention  PrimOpCall           = text "<primop-call-convention>"
+pprConvention  PrimOpReturn         = text "<primop-ret-convention>"
+pprConvention (Foreign c)           = ppr c
+pprConvention (Private {})          = text "<private-convention>"
 
 pprForeignConvention :: ForeignConvention -> SDoc
 pprForeignConvention (ForeignConvention c as rs) = ppr c <> ppr as <> ppr rs

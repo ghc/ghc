@@ -36,7 +36,7 @@ toZgraph _ _ (ListGraph []) =
   do g <- lgraphOfAGraph emptyAGraph
      return ((0, Nothing), g)
 toZgraph fun_name args g@(ListGraph (BasicBlock id ss : other_blocks)) = 
-           let (offset, entry) = mkEntry id NativeCall args in
+           let (offset, entry) = mkEntry id NativeNodeCall args in
            do g <- labelAGraph id $
                      entry <*> mkStmts ss <*> foldr addBlock emptyAGraph other_blocks
               return ((offset, Nothing), g)
@@ -94,7 +94,7 @@ get_hints (Foreign (ForeignConvention _ _ hints)) Results   = hints
 get_hints _other_conv		  		  _vd       = repeat NoHint
 
 get_conv :: MidCallTarget -> Convention
-get_conv (PrimTarget _)       = NativeCall
+get_conv (PrimTarget _)       = NativeNodeCall -- JD: SUSPICIOUS
 get_conv (ForeignTarget _ fc) = Foreign fc
 
 cmm_target :: MidCallTarget -> CmmCallTarget

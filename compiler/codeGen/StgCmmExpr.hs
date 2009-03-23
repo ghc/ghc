@@ -464,9 +464,9 @@ cgTailCall fun_id fun_info args = do
       		do { let fun' = CmmLoad fun (cmmExprType fun)
                    ; [ret,call] <- forkAlts [
       			getCode $ emitReturn [fun],	-- Is tagged; no need to untag
-      			getCode $ do emit (mkAssign nodeReg fun)
-                                     emitCall (NativeCall, NativeReturn)
-                                              (entryCode fun') []]  -- Not tagged
+      			getCode $ do -- emit (mkAssign nodeReg fun)
+                         emitCall (NativeNodeCall, NativeReturn)
+                                  (entryCode fun') [fun]]  -- Not tagged
       		   ; emit (mkCmmIfThenElse (cmmIsTagged fun) ret call) }
 
       	SlowCall -> do 	    -- A slow function call via the RTS apply routines

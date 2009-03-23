@@ -607,7 +607,7 @@ emitProcWithConvention conv info lbl args blocks
         ; setState $ state { cgs_tops = cgs_tops state `snocOL` proc_block } }
 
 emitProc :: CmmInfo -> CLabel -> CmmFormals -> CmmAGraph -> FCode ()
-emitProc = emitProcWithConvention NativeCall
+emitProc = emitProcWithConvention NativeNodeCall
 
 emitSimpleProc :: CLabel -> CmmAGraph -> FCode ()
 emitSimpleProc lbl code = 
