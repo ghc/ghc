@@ -334,7 +334,7 @@ These are used in the following circumstances
 --------------------------------------------------------------
 -- A heap/stack check at a function or thunk entry point.
 
-entryHeapCheck :: LocalReg	-- Function (closure environment)
+entryHeapCheck :: Maybe LocalReg -- Function (closure environment)
 	       -> Int           -- Arity -- not same as length args b/c of voids
 	       -> [LocalReg]	-- Non-void args (empty for thunk)
 	       -> FCode ()
@@ -344,7 +344,8 @@ entryHeapCheck fun arity args code
   = do updfr_sz <- getUpdFrameOff
        heapCheck True (gc_call updfr_sz) code   -- The 'fun' keeps relevant CAFs alive
   where
-    args'     = fun : args
+    args'     = case fun of Just f  -> f : args
+                            Nothing -> args
     arg_exprs = map (CmmReg . CmmLocal) args'
     gc_call updfr_sz
         | arity == 0 = mkJumpGC (CmmReg (CmmGlobal GCEnter1)) arg_exprs updfr_sz

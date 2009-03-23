@@ -403,7 +403,7 @@ closureCodeBody top_lvl bndr cl_info cc args arity body fv_details
                 ; granYield arg_regs node_points
 
                         -- Main payload
-                ; entryHeapCheck node arity arg_regs $ do
+                ; entryHeapCheck (if node_points then Just node else Nothing) arity arg_regs $ do
                 { enterCostCentre cl_info cc body
                 ; fv_bindings <- mapM bind_fv fv_details
                 -- Load free vars out of closure *after*
@@ -459,7 +459,7 @@ thunkCode cl_info fv_details cc node arity body
 	; granThunk node_points
 
         -- Heap overflow check
-	; entryHeapCheck node arity [] $ do
+	; entryHeapCheck (if node_points then Just node else Nothing) arity [] $ do
       	{	-- Overwrite with black hole if necessary
 		-- but *after* the heap-overflow check
 	  dflags <- getDynFlags
