@@ -5,17 +5,14 @@ utils/haddock_CONFIGURE_OPTS = --flag in-ghc-tree
 # XXX This is a temporary hack:
 utils/haddock_HC_OPTS += -Wwarn
 utils/haddock_dist_SHELL_WRAPPER = YES
+utils/haddock_dist_INSTALL_SHELL_WRAPPER = YES
 utils/haddock_dist_PROG = haddock
-# XXX Is this a hack? Should it be needed? Done another way?
-utils/haddock_dist_DATADIR = lib
 
-$(INPLACE_BIN)/$(utils/haddock_dist_PROG): inplace/lib/html
+$(INPLACE_BIN)/$(utils/haddock_dist_PROG): $(INPLACE_LIB)/html
 
-inplace/lib/html:
+$(INPLACE_LIB)/html:
 	$(RM) -rf $@
-	cp -a utils/haddock/html $@
-
-INSTALL_LIBEXECS += utils/haddock/dist/build/$(utils/haddock_dist_PROG)
+	$(CP) -R utils/haddock/html $@
 
 install: install_utils/haddock_html
 .PHONY: install_utils/haddock_html
