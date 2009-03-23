@@ -54,24 +54,36 @@ assignArgumentsPos :: (Outputable a) => Convention -> Bool -> (a -> CmmType) -> 
                       ArgumentFormat a ByteOff
 assignArgumentsPos conv isCall arg_ty reps = map cvt assignments
     where -- The calling conventions (CgCallConv.hs) are complicated, to say the least
-      regs = if isCall then
-               case (reps, conv) of
-                 (_, NativeNodeCall)   -> getRegsWithNode
-                 (_, NativeDirectCall) -> getRegsWithoutNode
-                 (_, GC    ) -> getRegsWithNode
-                 (_, PrimOpCall) -> allRegs
-                 (_, Slow  ) -> noRegs
-                 _ -> pprPanic "Unknown calling convention" (ppr conv)
-             else
-               case (reps, conv) of
-                 ([_], _)    -> allRegs
-                 (_, NativeNodeCall)   -> getRegsWithNode
-                 (_, NativeDirectCall) -> getRegsWithoutNode
-                 (_, NativeReturn) -> getRegsWithNode
-                 (_, GC    ) -> getRegsWithNode
-                 (_, PrimOpReturn) -> getRegsWithNode
-                 (_, Slow  ) -> noRegs
-                 _ -> pprPanic "Unknown calling convention" (ppr conv)
+      regs = case (reps, conv) of
+               (_,   NativeNodeCall)   -> getRegsWithNode
+               (_,   NativeDirectCall) -> getRegsWithoutNode
+               ([_], NativeReturn)     -> allRegs
+               (_,   NativeReturn)     -> getRegsWithNode
+               (_,   GC)               -> getRegsWithNode
+               (_,   PrimOpCall)       -> allRegs
+               ([_], PrimOpReturn)     -> allRegs
+               (_,   PrimOpReturn)     -> getRegsWithNode
+               (_,   Slow)             -> noRegs
+               _ -> pprPanic "Unknown calling convention" (ppr conv)
+      -- regs = if isCall then
+      --          case (reps, conv) of
+      --            (_, NativeNodeCall)   -> getRegsWithNode
+      --            (_, NativeDirectCall) -> getRegsWithoutNode
+      --            (_, GC    ) -> getRegsWithNode
+      --            (_, PrimOpCall) -> allRegs
+      --            (_, Slow  ) -> noRegs
+      --            _ -> pprPanic "Unknown calling convention" (ppr conv)
+      --        else
+      --          case (reps, conv) of
+      --            (_,   NativeNodeCall)   -> getRegsWithNode
+      --            (_,   NativeDirectCall) -> getRegsWithoutNode
+      --            ([_], NativeReturn)     -> allRegs
+      --            (_,   NativeReturn)     -> getRegsWithNode
+      --            (_,   GC)               -> getRegsWithNode
+      --            ([_], PrimOpReturn)     -> allRegs
+      --            (_,   PrimOpReturn)     -> getRegsWithNode
+      --            (_,   Slow)             -> noRegs
+      --            _ -> pprPanic "Unknown calling convention" (ppr conv)
            --       (_, NativeCall) -> getRegsWithoutNode
            --       (_, GC    ) -> getRegsWithNode
            --       (_, PrimOpCall) -> allRegs

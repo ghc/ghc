@@ -64,11 +64,11 @@ mkCall       :: CmmExpr -> (Convention, Convention) -> CmmFormals -> CmmActuals 
                   UpdFrameOffset -> CmmAGraph
 mkCmmCall    :: CmmExpr ->              CmmFormals -> CmmActuals ->
                   UpdFrameOffset -> CmmAGraph
-			-- Native C-- calling convention
+  -- Native C-- calling convention
 mkSafeCall    :: MidCallTarget -> CmmFormals -> CmmActuals -> UpdFrameOffset -> CmmAGraph
 mkUnsafeCall  :: MidCallTarget -> CmmFormals -> CmmActuals -> CmmAGraph
 mkFinalCall   :: CmmExpr -> CCallConv -> CmmActuals -> UpdFrameOffset -> CmmAGraph
-		 -- Never returns; like exit() or barf()
+  -- Never returns; like exit() or barf()
 
 ---------- Control transfer
 mkJump       	::               CmmExpr -> CmmActuals -> UpdFrameOffset -> CmmAGraph
@@ -158,19 +158,18 @@ copyInSlot c i f = snd $ copyIn oneCopySlotI c i (panic "no area for copying to 
 
 type SlotCopier = Area -> (LocalReg, ByteOff) -> (ByteOff, CmmAGraph) ->
                           (ByteOff, CmmAGraph)
-type CopyIn  = SlotCopier -> Convention -> Bool -> Area -> CmmFormals ->
-                          (ByteOff, CmmAGraph)
+type CopyIn  = SlotCopier -> Convention -> Area -> CmmFormals -> (ByteOff, CmmAGraph)
 
 -- Return the number of bytes used for copying arguments, as well as the
 -- instructions to copy the arguments.
 copyIn :: CopyIn
-copyIn oflow conv isCall area formals =
+copyIn oflow conv area formals =
   foldr ci (init_offset, mkNop) args'
   where ci (reg, RegisterParam r) (n, ms) =
           (n, mkAssign (CmmLocal reg) (CmmReg $ CmmGlobal r) <*> ms)
         ci (r, StackParam off) (n, ms) = oflow area (r, off) (n, ms)
         init_offset = widthInBytes wordWidth -- infotable
-        args  = assignArgumentsPos conv isCall localRegType formals
+        args  = assignArgumentsPos conv localRegType formals
         args' = foldl adjust [] args
           where adjust rst (v, StackParam off) = (v, StackParam (off + init_offset)) : rst
                 adjust rst x@(_, RegisterParam _) = x : rst
