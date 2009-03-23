@@ -161,13 +161,13 @@ direct_call caller lbl arity args reps
 	     	  	    <+> ppr args <+> ppr reps )
 
   | null rest_reps     -- Precisely the right number of arguments
-  = emitCall Native target args
+  = emitCall NativeCall target args
 
   | otherwise		-- Over-saturated call
   = ASSERT( arity == length initial_reps )
     do	{ pap_id <- newTemp gcWord
 	; withSequel (AssignTo [pap_id] True)
-		     (emitCall Native target fast_args)
+		     (emitCall NativeCall target fast_args)
 	; slow_call (CmmReg (CmmLocal pap_id)) 
 		    rest_args rest_reps }
   where

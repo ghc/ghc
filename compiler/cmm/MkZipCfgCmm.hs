@@ -244,22 +244,22 @@ toCall :: CmmExpr -> Maybe BlockId -> UpdFrameOffset -> ByteOff -> ByteOff -> La
 toCall e cont updfr_off res_space arg_space =
   LastCall e cont arg_space res_space (Just updfr_off)
 mkJump e actuals updfr_off =
-  lastWithArgs Jump old Native actuals updfr_off $ toCall e Nothing updfr_off 0
+  lastWithArgs Jump old NativeCall actuals updfr_off $ toCall e Nothing updfr_off 0
 mkJumpGC e actuals updfr_off =
   lastWithArgs Jump old GC actuals updfr_off $ toCall e Nothing updfr_off 0
 mkForeignJump conv e actuals updfr_off =
   lastWithArgs Jump old conv actuals updfr_off $ toCall e Nothing updfr_off 0
 mkReturn e actuals updfr_off =
-  lastWithArgs Ret  old Native actuals updfr_off $ toCall e Nothing updfr_off 0
+  lastWithArgs Ret  old NativeReturn actuals updfr_off $ toCall e Nothing updfr_off 0
     -- where e = CmmLoad (CmmStackSlot (CallArea Old) updfr_off) gcWord
 mkReturnSimple actuals updfr_off =
-  lastWithArgs Ret  old Native actuals updfr_off $ toCall e Nothing updfr_off 0
+  lastWithArgs Ret  old NativeReturn actuals updfr_off $ toCall e Nothing updfr_off 0
     where e = CmmLoad (CmmStackSlot (CallArea Old) updfr_off) gcWord
 
 mkFinalCall f _ actuals updfr_off =
-  lastWithArgs Call old Native actuals updfr_off $ toCall f Nothing updfr_off 0
+  lastWithArgs Call old NativeCall actuals updfr_off $ toCall f Nothing updfr_off 0
 
-mkCmmCall f results actuals = mkCall f Native results actuals
+mkCmmCall f results actuals = mkCall f NativeCall results actuals
 
 -- I'm dropping the SRT, but that should be okay: we plan to reconstruct it later.
 mkCall f conv results actuals updfr_off =

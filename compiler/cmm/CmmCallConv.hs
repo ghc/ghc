@@ -56,19 +56,21 @@ assignArgumentsPos conv isCall arg_ty reps = map cvt assignments
     where -- The calling conventions (CgCallConv.hs) are complicated, to say the least
       regs = if isCall then
                case (reps, conv) of
-                 (_, Native) -> getRegsWithoutNode
+                 (_, NativeCall) -> getRegsWithoutNode
                  (_, GC    ) -> getRegsWithNode
-                 (_, PrimOp) -> allRegs
+                 (_, PrimOpCall) -> allRegs
                  (_, Slow  ) -> noRegs
-                 (_, _     ) -> getRegsWithoutNode
+                 _ -> panic "Unknown calling convention"
              else
                case (reps, conv) of
                  ([_], _)    -> allRegs
-                 (_, Native) -> getRegsWithNode
+                 (_, NativeCall)   -> getRegsWithNode
+                 (_, NativeReturn) -> getRegsWithNode
                  (_, GC    ) -> getRegsWithNode
-                 (_, PrimOp) -> getRegsWithNode
+                 (_, PrimOpCall) -> getRegsWithNode
+                 (_, PrimOpReturn) -> getRegsWithNode
                  (_, Slow  ) -> noRegs
-                 (_, _     ) -> getRegsWithNode
+                 _ -> pprPanic "Unknown calling convention" (ppr conv)
       (sizes, assignments) = unzip $ assignArguments' reps (sum sizes) regs
       assignArguments' [] _ _ = []
       assignArguments' (r:rs) offset avails =

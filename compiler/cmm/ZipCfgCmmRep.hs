@@ -110,13 +110,17 @@ data MidCallTarget	-- The target of a MidUnsafeCall
   deriving Eq
 
 data Convention
-  = Native 		-- Native C-- call/return
+  = NativeCall   -- Native C-- call
+
+  | NativeReturn -- Native C-- return
 
   | Slow 		-- Slow entry points: all args pushed on the stack
 
   | GC 		        -- Entry to the garbage collector: uses the node reg!
 
-  | PrimOp 		-- Calling prim ops
+  | PrimOpCall   -- Calling prim ops
+
+  | PrimOpReturn -- Returning from prim ops
 
   | Foreign		-- Foreign call/return
 	ForeignConvention
@@ -516,12 +520,14 @@ genFullCondBranch expr t f =
          ]
 
 pprConvention :: Convention -> SDoc
-pprConvention (Native {})  = text "<native-convention>"
-pprConvention  Slow        = text "<slow-convention>"
-pprConvention  GC          = text "<gc-convention>"
-pprConvention  PrimOp      = text "<primop-convention>"
-pprConvention (Foreign c)  = ppr c
-pprConvention (Private {}) = text "<private-convention>"
+pprConvention (NativeCall   {}) = text "<native-call-convention>"
+pprConvention (NativeReturn {}) = text "<native-ret-convention>"
+pprConvention  Slow             = text "<slow-convention>"
+pprConvention  GC               = text "<gc-convention>"
+pprConvention  PrimOpCall       = text "<primop-call-convention>"
+pprConvention  PrimOpReturn     = text "<primop-ret-convention>"
+pprConvention (Foreign c)       = ppr c
+pprConvention (Private {})      = text "<private-convention>"
 
 pprForeignConvention :: ForeignConvention -> SDoc
 pprForeignConvention (ForeignConvention c as rs) = ppr c <> ppr as <> ppr rs

@@ -314,7 +314,7 @@ emitRtsCall' res fun args _vols safe
   where
     call updfr_off =
       if safe then
-        mkCall fun_expr Native res' args' updfr_off
+        mkCall fun_expr NativeCall res' args' updfr_off
       else
         mkUnsafeCall (ForeignTarget fun_expr
                          (ForeignConvention CCallConv arg_hints res_hints)) res' args'
