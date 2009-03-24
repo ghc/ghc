@@ -6,7 +6,7 @@ utils/haddock_CONFIGURE_OPTS = --flag in-ghc-tree
 utils/haddock_HC_OPTS += -Wwarn
 utils/haddock_dist_SHELL_WRAPPER = YES
 utils/haddock_dist_INSTALL_SHELL_WRAPPER = YES
-utils/haddock_dist_PROG = haddock
+utils/haddock_dist_PROG = haddock$(exeext)
 
 $(INPLACE_BIN)/$(utils/haddock_dist_PROG): $(INPLACE_LIB)/html
 
