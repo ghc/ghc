@@ -180,8 +180,8 @@ integerToString n0 cs0
     jsplith p (n:ns) =
         case n `quotRemInteger` p of
         (# q, r #) ->
-            if q > 0 then fromInteger q : fromInteger r : jsplitb p ns
-                     else fromInteger r : jsplitb p ns
+            if q > 0 then q : r : jsplitb p ns
+                     else     r : jsplitb p ns
     jsplith _ [] = error "jsplith: []"
 
     jsplitb :: Integer -> [Integer] -> [Integer]
