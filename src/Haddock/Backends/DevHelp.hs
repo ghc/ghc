@@ -21,9 +21,9 @@ import qualified Data.Map as Map
 import Text.PrettyPrint
 
 ppDevHelpFile :: FilePath -> String -> Maybe String -> [Interface] -> IO ()
-ppDevHelpFile odir doctitle maybe_package modules = do
+ppDevHelpFile odir doctitle maybe_package ifaces = do
   let devHelpFile = package++".devhelp"
-      tree = mkModuleTree True [ (ifaceMod mod, toDescription mod) | mod <- modules ]
+      tree = mkModuleTree True [ (ifaceMod iface, toDescription iface) | iface <- ifaces ]
       doc =
         text "<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"no\"?>" $$
         (text "<book xmlns=\"http://www.devhelp.net/book\" title=\""<>text doctitle<>
@@ -48,7 +48,7 @@ ppDevHelpFile odir doctitle maybe_package modules = do
     ppNode ss (Node s leaf _ _short ts) =
         case ts of
           [] -> text "<sub"<+>ppAttribs<>text "/>"
-          ts -> 
+          _  -> 
             text "<sub"<+>ppAttribs<>text ">" $$
             nest 4 (ppModuleTree (s:ss) ts) $+$
             text "</sub>"
@@ -64,11 +64,11 @@ ppDevHelpFile odir doctitle maybe_package modules = do
 		-- reconstruct the module name
 
     index :: [(Name, [Module])]
-    index = Map.toAscList (foldr getModuleIndex Map.empty modules)
+    index = Map.toAscList (foldr getModuleIndex Map.empty ifaces)
 
     getModuleIndex iface fm =
-	Map.unionWith (++) (Map.fromListWith (flip (++)) [(name, [mod]) | name <- ifaceExports iface, nameModule name == mod]) fm
-	where mod = ifaceMod iface
+	Map.unionWith (++) (Map.fromListWith (flip (++)) [(name, [mdl]) | name <- ifaceExports iface, nameModule name == mdl]) fm
+	where mdl = ifaceMod iface
 
     ppList :: [(Name, [Module])] -> Doc
     ppList [] = empty
@@ -77,7 +77,7 @@ ppDevHelpFile odir doctitle maybe_package modules = do
       ppList mdls
 
     ppReference :: Name -> [Module] -> Doc
-    ppReference name [] = empty
-    ppReference name (mod:refs) =  
-      text "<function name=\""<>text (escapeStr (getOccString name))<>text"\" link=\""<>text (nameHtmlRef mod (nameOccName name))<>text"\"/>" $$
+    ppReference _ [] = empty
+    ppReference name (mdl:refs) =  
+      text "<function name=\""<>text (escapeStr (getOccString name))<>text"\" link=\""<>text (nameHtmlRef mdl (nameOccName name))<>text"\"/>" $$
       ppReference name refs
