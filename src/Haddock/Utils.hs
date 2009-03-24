@@ -1,5 +1,3 @@
-{-# LANGUAGE PatternSignatures #-}
-
 --
 -- Haddock - A Haskell Documentation Tool
 --
