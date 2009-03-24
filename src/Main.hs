@@ -156,7 +156,11 @@ main = handleTopExceptions $ do
                     do m <- getExecDir
                        case m of
                            Nothing -> error "No GhcLibDir found"
+#ifdef NEW_GHC_LAYOUT
+                           Just d -> return (d </> ".." </> "lib")
+#else
                            Just d -> return (d </> "..")
+#endif
 #else
                     return libdir -- from GHC.Paths
 #endif
@@ -237,7 +241,11 @@ render flags ifaces installedIfaces = do
                       do m <- getExecDir
                          case m of
                              Nothing -> error "No libdir found"
+#ifdef NEW_GHC_LAYOUT
+                             Just d -> return (d </> ".." </> "lib")
+#else
                              Just d -> return (d </> "..")
+#endif
 #else
                       getDataDir -- provided by Cabal
 #endif
