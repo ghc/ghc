@@ -21,13 +21,14 @@ module Language.Haskell.TH(
 	Dec(..), Exp(..), Con(..), Type(..), Cxt, Pred(..), Match(..), 
 	Clause(..), Body(..), Guard(..), Stmt(..), Range(..),
 	Lit(..), Pat(..), FieldExp, FieldPat, 
-	Strict(..), Foreign(..), Callconv(..), Safety(..), FunDep(..), 
-	FamFlavour(..), Info(..), Loc(..),
+	Strict(..), Foreign(..), Callconv(..), Safety(..), Pragma(..),
+	InlineSpec(..), FunDep(..), FamFlavour(..), Info(..), Loc(..),
 	Fixity(..), FixityDirection(..), defaultFixity, maxPrecedence,
 
 	-- Library functions
 	InfoQ, ExpQ, DecQ, ConQ, TypeQ, CxtQ, PredQ, MatchQ, ClauseQ, BodyQ,
 	GuardQ, StmtQ, RangeQ, StrictTypeQ, VarStrictTypeQ, PatQ, FieldPatQ,
+        InlineSpecQ,
 	intPrimL, wordPrimL, floatPrimL, doublePrimL, integerL, rationalL,
 	charL, stringL,
 	litP, varP, tupP, conP, infixP, tildeP, asP, wildP, recP, listP, sigP,
@@ -40,11 +41,12 @@ module Language.Haskell.TH(
 	fromE, fromThenE, fromToE, fromThenToE,
 	listE, sigE, recConE, recUpdE, stringE, fieldExp,
 	valD, funD, tySynD, dataD, newtypeD, classD, instanceD, sigD, forImpD,
-        familyD, dataInstD, newtypeInstD, tySynInstD,
+        pragInlD, pragSpecD, familyD, dataInstD, newtypeInstD, tySynInstD,
 	cxt, classP, equalP, normalC, recC, infixC,
 	forallT, varT, conT, appT, arrowT, listT, tupleT,
 	isStrict, notStrict, strictType, varStrictType,
-	cCall, stdCall, unsafe, safe, threadsafe, typeFam, dataFam,
+	cCall, stdCall, unsafe, safe, threadsafe, 
+        inlineSpecNoPhase, inlineSpecPhase, typeFam, dataFam,
 
 	-- Pretty-printer
 	Ppr(..), pprint, pprExp, pprLit, pprPat, pprParendType

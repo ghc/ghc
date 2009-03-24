@@ -31,6 +31,7 @@ type RangeQ         = Q Range
 type StrictTypeQ    = Q StrictType
 type VarStrictTypeQ = Q VarStrictType
 type FieldExpQ      = Q FieldExp
+type InlineSpecQ    = Q InlineSpec
 
 ----------------------------------------------------------
 -- Lowercase pattern syntax functions
@@ -318,6 +319,25 @@ forImpD cc s str n ty
  = do ty' <- ty
       return $ ForeignD (ImportF cc s str n ty')
 
+pragInlD :: Name -> InlineSpecQ -> DecQ
+pragInlD n ispec 
+  = do
+      ispec1 <- ispec 
+      return $ PragmaD (InlineP n ispec1)
+
+pragSpecD :: Name -> TypeQ -> DecQ
+pragSpecD n ty
+  = do
+      ty1    <- ty
+      return $ PragmaD (SpecialiseP n ty1 Nothing)
+
+pragSpecInlD :: Name -> TypeQ -> InlineSpecQ -> DecQ
+pragSpecInlD n ty ispec 
+  = do
+      ty1    <- ty
+      ispec1 <- ispec
+      return $ PragmaD (SpecialiseP n ty1 (Just ispec1))
+
 familyD :: FamFlavour -> Name -> [Name] -> DecQ
 familyD flav tc tvs = return $ FamilyD flav tc tvs
 
@@ -430,6 +450,17 @@ unsafe, safe, threadsafe :: Safety
 unsafe = Unsafe
 safe = Safe
 threadsafe = Threadsafe
+
+-------------------------------------------------------------------------------
+--     InlineSpec
+
+inlineSpecNoPhase :: Bool -> Bool -> InlineSpecQ
+inlineSpecNoPhase inline conlike
+  = return $ InlineSpec inline conlike Nothing
+
+inlineSpecPhase :: Bool -> Bool -> Bool -> Int -> InlineSpecQ
+inlineSpecPhase inline conlike beforeFrom phase
+  = return $ InlineSpec inline conlike (Just (beforeFrom, phase))
 
 -------------------------------------------------------------------------------
 --     FunDep

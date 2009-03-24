@@ -214,6 +214,7 @@ ppr_dec _ (InstanceD ctxt i ds) = text "instance" <+> pprCxt ctxt <+> ppr i
                                   $$ where_clause ds
 ppr_dec _ (SigD f t) = ppr f <+> text "::" <+> ppr t
 ppr_dec _ (ForeignD f) = ppr f
+ppr_dec _ (PragmaD p) = ppr p
 ppr_dec isTop (FamilyD flav tc tvs) 
   = ppr flav <+> maybeFamily <+> ppr tc <+> hsep (map ppr tvs)
   where
@@ -293,6 +294,36 @@ instance Ppr Foreign where
       <+> text (show expent)
       <+> ppr as
       <+> text "::" <+> ppr typ
+
+------------------------------
+instance Ppr Pragma where
+    ppr (InlineP n (InlineSpec inline conlike activation))
+       = text "{-#"
+     <+> if inline then text "INLINE" else text "NOINLINE"
+     <+> if conlike then text "CONLIKE" else empty
+     <+> ppr_activation activation 
+     <+> ppr n
+     <+> text "#-}"
+    ppr (SpecialiseP n ty Nothing)
+       = sep [ text "{-# SPECIALISE" 
+             , ppr n <+> text "::"
+             , ppr ty
+             , text "#-}"
+             ]
+    ppr (SpecialiseP n ty (Just (InlineSpec inline _conlike activation)))
+       = sep [ text "{-# SPECIALISE" <+> 
+               (if inline then text "INLINE" else text "NOINLINE") <+>
+               ppr_activation activation
+             , ppr n <+> text "::"
+             , ppr ty
+             , text "#-}"
+             ]
+      where
+
+ppr_activation :: Maybe (Bool, Int) -> Doc
+ppr_activation (Just (beforeFrom, i))
+  = brackets $ (if beforeFrom then empty else char '~') <+> int i
+ppr_activation Nothing = empty
 
 ------------------------------
 instance Ppr Clause where

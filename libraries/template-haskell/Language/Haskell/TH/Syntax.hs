@@ -33,8 +33,8 @@ module Language.Haskell.TH.Syntax(
 	Dec(..), Exp(..), Con(..), Type(..), Cxt, Pred(..), Match(..), 
 	Clause(..), Body(..), Guard(..), Stmt(..), Range(..),
 	Lit(..), Pat(..), FieldExp, FieldPat, 
-	Strict(..), Foreign(..), Callconv(..), Safety(..),
-	StrictType, VarStrictType, FunDep(..), FamFlavour(..),
+	Strict(..), Foreign(..), Callconv(..), Safety(..), Pragma(..),
+	InlineSpec(..),	StrictType, VarStrictType, FunDep(..), FamFlavour(..),
 	Info(..), Loc(..), CharPos,
 	Fixity(..), FixityDirection(..), defaultFixity, maxPrecedence,
 
@@ -728,6 +728,8 @@ data Dec
                                   --       where ds }
   | SigD Name Type                -- { length :: [a] -> Int }
   | ForeignD Foreign
+  -- pragmas
+  | PragmaD Pragma                -- { {-# INLINE [1] foo #-} }
   -- type families (may appear in [Dec] of 'ClassD' and 'InstanceD')
   | FamilyD FamFlavour Name [Name] {- (Maybe Kind) -}
                                   -- { type family T a b c }
@@ -756,6 +758,16 @@ data Callconv = CCall | StdCall
 
 data Safety = Unsafe | Safe | Threadsafe
         deriving( Show, Eq, Data, Typeable )
+
+data Pragma = InlineP     Name InlineSpec
+            | SpecialiseP Name Type (Maybe InlineSpec)
+        deriving( Show, Eq, Data, Typeable )
+
+data InlineSpec 
+  = InlineSpec Bool                 -- False: no inline; True: inline 
+               Bool                 -- False: fun-like; True: constructor-like
+               (Maybe (Bool, Int))  -- False: before phase; True: from phase
+  deriving( Show, Eq, Data, Typeable )
 
 type Cxt = [Pred]                 -- (Eq a, Ord b)
 
