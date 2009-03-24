@@ -426,14 +426,64 @@ rep_sigs' sigs = do { sigs1 <- mapM rep_sig sigs ;
 rep_sig :: LSig Name -> DsM [(SrcSpan, Core TH.DecQ)]
 	-- Singleton => Ok
 	-- Empty     => Too hard, signature ignored
-rep_sig (L loc (TypeSig nm ty)) = rep_proto nm ty loc
-rep_sig _                       = return []
+rep_sig (L loc (TypeSig nm ty))       = rep_proto nm ty loc
+rep_sig (L loc (InlineSig nm ispec))  = rep_inline nm ispec loc
+rep_sig (L loc (SpecSig nm ty ispec)) = rep_specialise nm ty ispec loc
+rep_sig _                             = return []
 
-rep_proto :: Located Name -> LHsType Name -> SrcSpan -> DsM [(SrcSpan, Core TH.DecQ)]
-rep_proto nm ty loc = do { nm1 <- lookupLOcc nm ; 
-		       ty1 <- repLTy ty ; 
-		       sig <- repProto nm1 ty1 ;
-		       return [(loc, sig)] }
+rep_proto :: Located Name -> LHsType Name -> SrcSpan 
+          -> DsM [(SrcSpan, Core TH.DecQ)]
+rep_proto nm ty loc 
+  = do { nm1 <- lookupLOcc nm
+       ; ty1 <- repLTy ty
+       ; sig <- repProto nm1 ty1
+       ; return [(loc, sig)]
+       }
+
+rep_inline :: Located Name -> InlineSpec -> SrcSpan 
+           -> DsM [(SrcSpan, Core TH.DecQ)]
+rep_inline nm ispec loc
+  = do { nm1 <- lookupLOcc nm
+       ; (_, ispec1) <- rep_InlineSpec ispec
+       ; pragma <- repPragInl nm1 ispec1
+       ; return [(loc, pragma)]
+       }
+
+rep_specialise :: Located Name -> LHsType Name -> InlineSpec -> SrcSpan 
+               -> DsM [(SrcSpan, Core TH.DecQ)]
+rep_specialise nm ty ispec loc
+  = do { nm1 <- lookupLOcc nm
+       ; ty1 <- repLTy ty
+       ; (hasSpec, ispec1) <- rep_InlineSpec ispec
+       ; pragma <- if hasSpec
+                   then repPragSpecInl nm1 ty1 ispec1
+                   else repPragSpec    nm1 ty1 
+       ; return [(loc, pragma)]
+       }
+
+-- extract all the information needed to build a TH.InlineSpec
+--
+rep_InlineSpec :: InlineSpec -> DsM (Bool, Core TH.InlineSpecQ)
+rep_InlineSpec (Inline (InlinePragma activation match) inline)
+  | Nothing            <- activation1 
+    = liftM ((,) False) $ repInlineSpecNoPhase inline1 match1
+  | Just (flag, phase) <- activation1 
+    = liftM ((,) True)  $ repInlineSpecPhase inline1 match1 flag phase
+  | otherwise = {- unreachable, but shuts up -W -} panic "rep_InlineSpec"
+    where
+      match1      = coreBool (rep_RuleMatchInfo match)
+      activation1 = rep_Activation activation
+      inline1     = coreBool inline
+
+      rep_RuleMatchInfo FunLike = False
+      rep_RuleMatchInfo ConLike = True
+
+      rep_Activation NeverActive          = Nothing
+      rep_Activation AlwaysActive         = Nothing
+      rep_Activation (ActiveBefore phase) = Just (coreBool False, 
+                                                  MkC $ mkIntExprInt phase)
+      rep_Activation (ActiveAfter phase)  = Just (coreBool True, 
+                                                  MkC $ mkIntExprInt phase)
 
 
 -------------------------------------------------------
@@ -1313,13 +1363,36 @@ repTySyn (MkC nm) (MkC _) (Just (MkC tys)) (MkC rhs)
 repInst :: Core TH.CxtQ -> Core TH.TypeQ -> Core [TH.DecQ] -> DsM (Core TH.DecQ)
 repInst (MkC cxt) (MkC ty) (MkC ds) = rep2 instanceDName [cxt, ty, ds]
 
-repClass :: Core TH.CxtQ -> Core TH.Name -> Core [TH.Name] -> Core [TH.FunDep] -> Core [TH.DecQ] -> DsM (Core TH.DecQ)
-repClass (MkC cxt) (MkC cls) (MkC tvs) (MkC fds) (MkC ds) = rep2 classDName [cxt, cls, tvs, fds, ds]
+repClass :: Core TH.CxtQ -> Core TH.Name -> Core [TH.Name] 
+         -> Core [TH.FunDep] -> Core [TH.DecQ] 
+         -> DsM (Core TH.DecQ)
+repClass (MkC cxt) (MkC cls) (MkC tvs) (MkC fds) (MkC ds) 
+  = rep2 classDName [cxt, cls, tvs, fds, ds]
+
+repPragInl :: Core TH.Name -> Core TH.InlineSpecQ -> DsM (Core TH.DecQ)
+repPragInl (MkC nm) (MkC ispec) = rep2 pragInlDName [nm, ispec]
+
+repPragSpec :: Core TH.Name -> Core TH.TypeQ -> DsM (Core TH.DecQ)
+repPragSpec (MkC nm) (MkC ty) = rep2 pragSpecDName [nm, ty]
+
+repPragSpecInl :: Core TH.Name -> Core TH.TypeQ -> Core TH.InlineSpecQ 
+               -> DsM (Core TH.DecQ)
+repPragSpecInl (MkC nm) (MkC ty) (MkC ispec) 
+  = rep2 pragSpecInlDName [nm, ty, ispec]
 
 repFamily :: Core TH.FamFlavour -> Core TH.Name -> Core [TH.Name] 
           -> DsM (Core TH.DecQ)
 repFamily (MkC flav) (MkC nm) (MkC tvs)
     = rep2 familyDName [flav, nm, tvs]
+
+repInlineSpecNoPhase :: Core Bool -> Core Bool -> DsM (Core TH.InlineSpecQ)
+repInlineSpecNoPhase (MkC inline) (MkC conlike) 
+  = rep2 inlineSpecNoPhaseName [inline, conlike]
+
+repInlineSpecPhase :: Core Bool -> Core Bool -> Core Bool -> Core Int
+                   -> DsM (Core TH.InlineSpecQ)
+repInlineSpecPhase (MkC inline) (MkC conlike) (MkC beforeFrom) (MkC phase)
+  = rep2 inlineSpecPhaseName [inline, conlike, beforeFrom, phase]
 
 repFunDep :: Core [TH.Name] -> Core [TH.Name] -> DsM (Core TH.FunDep)
 repFunDep (MkC xs) (MkC ys) = rep2 funDepName [xs, ys]
@@ -1471,6 +1544,12 @@ nonEmptyCoreList xs@(MkC x:_) = MkC (mkListExpr (exprType x) (map unC xs))
 coreStringLit :: String -> DsM (Core String)
 coreStringLit s = do { z <- mkStringExpr s; return(MkC z) }
 
+------------ Bool, Literals & Variables -------------------
+
+coreBool :: Bool -> Core Bool
+coreBool False = MkC $ mkConApp falseDataCon []
+coreBool True  = MkC $ mkConApp trueDataCon  []
+
 coreIntLit :: Int -> DsM (Core Int)
 coreIntLit i = return (MkC (mkIntExprInt i))
 
@@ -1533,8 +1612,9 @@ templateHaskellNames = [
     bindSName, letSName, noBindSName, parSName,
     -- Dec
     funDName, valDName, dataDName, newtypeDName, tySynDName,
-    classDName, instanceDName, sigDName, forImpDName, familyDName, dataInstDName,
-    newtypeInstDName, tySynInstDName,
+    classDName, instanceDName, sigDName, forImpDName, 
+    pragInlDName, pragSpecDName, pragSpecInlDName,
+    familyDName, dataInstDName, newtypeInstDName, tySynInstDName,
     -- Cxt
     cxtName,
     -- Pred
@@ -1556,6 +1636,8 @@ templateHaskellNames = [
     unsafeName,
     safeName,
     threadsafeName,
+    -- InlineSpec
+    inlineSpecNoPhaseName, inlineSpecPhaseName,
     -- FunDep
     funDepName,
     -- FamFlavour
@@ -1714,8 +1796,9 @@ parSName    = libFun (fsLit "parS")    parSIdKey
 
 -- data Dec = ...
 funDName, valDName, dataDName, newtypeDName, tySynDName, classDName,
-    instanceDName, sigDName, forImpDName, familyDName, dataInstDName, 
-    newtypeInstDName, tySynInstDName :: Name
+    instanceDName, sigDName, forImpDName, pragInlDName, pragSpecDName,
+    pragSpecInlDName, familyDName, dataInstDName, newtypeInstDName, 
+    tySynInstDName :: Name
 funDName         = libFun (fsLit "funD")         funDIdKey
 valDName         = libFun (fsLit "valD")         valDIdKey
 dataDName        = libFun (fsLit "dataD")        dataDIdKey
@@ -1725,6 +1808,9 @@ classDName       = libFun (fsLit "classD")       classDIdKey
 instanceDName    = libFun (fsLit "instanceD")    instanceDIdKey
 sigDName         = libFun (fsLit "sigD")         sigDIdKey
 forImpDName      = libFun (fsLit "forImpD")      forImpDIdKey
+pragInlDName     = libFun (fsLit "pragInlD")     pragInlDIdKey
+pragSpecDName    = libFun (fsLit "pragSpecD")    pragSpecDIdKey
+pragSpecInlDName = libFun (fsLit "pragSpecInlD") pragSpecInlDIdKey
 familyDName      = libFun (fsLit "familyD")      familyDIdKey
 dataInstDName    = libFun (fsLit "dataInstD")    dataInstDIdKey
 newtypeInstDName = libFun (fsLit "newtypeInstD") newtypeInstDIdKey
@@ -1780,6 +1866,11 @@ unsafeName, safeName, threadsafeName :: Name
 unsafeName     = libFun (fsLit "unsafe") unsafeIdKey
 safeName       = libFun (fsLit "safe") safeIdKey
 threadsafeName = libFun (fsLit "threadsafe") threadsafeIdKey
+
+-- data InlineSpec = ...
+inlineSpecNoPhaseName, inlineSpecPhaseName :: Name
+inlineSpecNoPhaseName = libFun (fsLit "inlineSpecNoPhase") inlineSpecNoPhaseIdKey
+inlineSpecPhaseName   = libFun (fsLit "inlineSpecPhase")   inlineSpecPhaseIdKey
 
 -- data FunDep = ...
 funDepName :: Name
@@ -1959,8 +2050,9 @@ parSIdKey        = mkPreludeMiscIdUnique 271
 
 -- data Dec = ...
 funDIdKey, valDIdKey, dataDIdKey, newtypeDIdKey, tySynDIdKey,
-    classDIdKey, instanceDIdKey, sigDIdKey, forImpDIdKey, familyDIdKey,
-    dataInstDIdKey, newtypeInstDIdKey, tySynInstDIdKey :: Unique
+    classDIdKey, instanceDIdKey, sigDIdKey, forImpDIdKey, pragInlDIdKey,
+    pragSpecDIdKey, pragSpecInlDIdKey, familyDIdKey, dataInstDIdKey,
+    newtypeInstDIdKey, tySynInstDIdKey :: Unique 
 funDIdKey         = mkPreludeMiscIdUnique 272
 valDIdKey         = mkPreludeMiscIdUnique 273
 dataDIdKey        = mkPreludeMiscIdUnique 274
@@ -1970,6 +2062,9 @@ classDIdKey       = mkPreludeMiscIdUnique 277
 instanceDIdKey    = mkPreludeMiscIdUnique 278
 sigDIdKey         = mkPreludeMiscIdUnique 279
 forImpDIdKey      = mkPreludeMiscIdUnique 297
+pragInlDIdKey     = mkPreludeMiscIdUnique 348
+pragSpecDIdKey    = mkPreludeMiscIdUnique 349
+pragSpecInlDIdKey = mkPreludeMiscIdUnique 352
 familyDIdKey      = mkPreludeMiscIdUnique 340
 dataInstDIdKey    = mkPreludeMiscIdUnique 341
 newtypeInstDIdKey = mkPreludeMiscIdUnique 342
@@ -2026,6 +2121,11 @@ unsafeIdKey     = mkPreludeMiscIdUnique 305
 safeIdKey       = mkPreludeMiscIdUnique 306
 threadsafeIdKey = mkPreludeMiscIdUnique 307
 
+-- data InlineSpec =
+inlineSpecNoPhaseIdKey, inlineSpecPhaseIdKey :: Unique
+inlineSpecNoPhaseIdKey = mkPreludeMiscIdUnique 350
+inlineSpecPhaseIdKey   = mkPreludeMiscIdUnique 351
+
 -- data FunDep = ...
 funDepIdKey :: Unique
 funDepIdKey = mkPreludeMiscIdUnique 320
@@ -2039,4 +2139,3 @@ dataFamIdKey = mkPreludeMiscIdUnique 345
 quoteExpKey, quotePatKey :: Unique
 quoteExpKey = mkPreludeMiscIdUnique 321
 quotePatKey = mkPreludeMiscIdUnique 322
-

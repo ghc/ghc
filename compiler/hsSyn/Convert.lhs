@@ -20,7 +20,7 @@ import OccName
 import SrcLoc
 import Type
 import TysWiredIn
-import BasicTypes
+import BasicTypes as Hs
 import ForeignCall
 import Char
 import List
@@ -163,7 +163,15 @@ cvtTop (InstanceD ctxt ty decs)
     isFamInstD (TySynInstD _ _ _)       = True
     isFamInstD _                        = False
 
-cvtTop (ForeignD ford) = do { ford' <- cvtForD ford; returnL $ ForD ford' }
+cvtTop (ForeignD ford) 
+  = do { ford' <- cvtForD ford
+       ; returnL $ ForD ford' 
+       }
+
+cvtTop (PragmaD prag)
+  = do { prag' <- cvtPragmaD prag
+       ; returnL $ Hs.SigD prag'
+       }
 
 cvtTop (FamilyD flav tc tvs)
   = do { (_, tc', tvs', _) <- cvt_tycl_hdr [] tc tvs
@@ -370,6 +378,35 @@ lex_ccall_impent xs = case span is_valid xs of
     where is_valid :: Char -> Bool
           is_valid c = isAscii c && (isAlphaNum c || c `elem` "._")
 
+------------------------------------------
+--              Pragmas
+------------------------------------------
+
+cvtPragmaD :: Pragma -> CvtM (Sig RdrName)
+cvtPragmaD (InlineP nm ispec)
+  = do { nm'    <- vNameL nm
+       ; return $ InlineSig nm' (cvtInlineSpec (Just ispec))
+       }
+cvtPragmaD (SpecialiseP nm ty opt_ispec)
+  = do { nm'    <- vNameL nm
+       ; ty'    <- cvtType ty
+       ; return $ SpecSig nm' ty' (cvtInlineSpec opt_ispec)
+       }
+
+cvtInlineSpec :: Maybe TH.InlineSpec -> Hs.InlineSpec
+cvtInlineSpec Nothing 
+  = defaultInlineSpec
+cvtInlineSpec (Just (TH.InlineSpec inline conlike opt_activation)) 
+  = mkInlineSpec opt_activation' matchinfo inline
+  where
+    matchinfo       = cvtRuleMatchInfo conlike
+    opt_activation' = fmap cvtActivation opt_activation
+
+    cvtRuleMatchInfo False = FunLike
+    cvtRuleMatchInfo True  = ConLike
+
+    cvtActivation (False, phase) = ActiveBefore phase
+    cvtActivation (True , phase) = ActiveAfter  phase
 
 ---------------------------------------------------
 --		Declarations
@@ -377,22 +414,31 @@ lex_ccall_impent xs = case span is_valid xs of
 
 cvtDecs :: [TH.Dec] -> CvtM (HsLocalBinds RdrName)
 cvtDecs [] = return EmptyLocalBinds
-cvtDecs ds = do { (binds,sigs) <- cvtBindsAndSigs ds
+cvtDecs ds = do { (binds, sigs) <- cvtBindsAndSigs ds
 		; return (HsValBinds (ValBindsIn binds sigs)) }
 
 cvtBindsAndSigs :: [TH.Dec] -> CvtM (Bag (LHsBind RdrName), [LSig RdrName])
 cvtBindsAndSigs ds 
-  = do { binds' <- mapM cvtBind binds; sigs' <- mapM cvtSig sigs
+  = do { binds' <- mapM cvtBind binds
+       ; sigs' <- mapM cvtSig sigs
        ; return (listToBag binds', sigs') }
   where 
     (sigs, binds) = partition is_sig ds
 
-    is_sig (TH.SigD _ _) = True
-    is_sig _             = False
+    is_sig (TH.SigD _ _)  = True
+    is_sig (TH.PragmaD _) = True
+    is_sig _              = False
 
 cvtSig :: TH.Dec -> CvtM (LSig RdrName)
 cvtSig (TH.SigD nm ty)
-  = do { nm' <- vNameL nm; ty' <- cvtType ty; returnL (Hs.TypeSig nm' ty') }
+  = do { nm' <- vNameL nm
+       ; ty' <- cvtType ty
+       ; returnL (Hs.TypeSig nm' ty') 
+       }
+cvtSig (TH.PragmaD prag)
+  = do { prag' <- cvtPragmaD prag
+       ; returnL prag'
+       }
 cvtSig _ = panic "Convert.cvtSig: Signature expected"
 
 cvtBind :: TH.Dec -> CvtM (LHsBind RdrName)
