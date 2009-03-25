@@ -453,13 +453,20 @@ splitAtProcPoints entry_label callPPs procPoints procMap
      graphEnv <- foldM add_jumps emptyBlockEnv $ blockEnvToList graphEnv
      let to_proc (bid, g) | elemBlockSet bid callPPs =
            if bid == entry then 
-             CmmProc (CmmInfo gc upd_fr info_tbl) top_l top_args g
+             CmmProc (CmmInfo gc upd_fr info_tbl) top_l top_args (replacePPIds g)
            else
-             CmmProc emptyContInfoTable lbl [] g
+             CmmProc emptyContInfoTable lbl [] (replacePPIds g)
            where lbl = expectJust "pp label" $ lookupFM procLabels bid
          to_proc (bid, g) =
-           CmmProc (CmmInfo Nothing Nothing CmmNonInfoTable) lbl [] g
+           CmmProc (CmmInfo Nothing Nothing CmmNonInfoTable) lbl [] (replacePPIds g)
              where lbl = expectJust "pp label" $ lookupFM procLabels bid
+         -- References to procpoint IDs can now be replaced with the infotable's label
+         replacePPIds (x, g) = (x, map_nodes id (mapExpMiddle repl) (mapExpLast repl) g)
+           where repl e@(CmmLit (CmmBlock bid)) =
+                   case lookupFM procLabels bid of
+                     Just l  -> CmmLit (CmmLabel (entryLblToInfoLbl l))
+                     Nothing -> e
+                 repl e = e
      -- The C back end expects to see return continuations before the call sites.
      -- Here, we sort them in reverse order -- it gets reversed later.
      let (_, block_order) = foldl add_block_num (0::Int, emptyBlockEnv) (postorder_dfs g)

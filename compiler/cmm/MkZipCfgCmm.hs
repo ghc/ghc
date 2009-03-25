@@ -262,8 +262,6 @@ mkCmmCall f results actuals = mkCall f (NativeDirectCall, NativeReturn) results 
 
 -- I'm dropping the SRT, but that should be okay: we plan to reconstruct it later.
 mkCall f (callConv, retConv) results actuals updfr_off =
- pprTrace "mkCall" (ppr f <+> ppr actuals <+> ppr results <+> ppr callConv <+>
-                    ppr retConv) $
   withFreshLabel "call successor" $ \k ->
     let area = CallArea $ Young k
         (off, copyin) = copyInOflow retConv area results

@@ -467,13 +467,15 @@ emitClosureProcAndInfoTable :: Bool                    -- top-level?
                             -> FCode ()
 emitClosureProcAndInfoTable top_lvl bndr cl_info args body
  = do	{ let lf_info = closureLFInfo cl_info
-	-- Bind the binder itself, but only if it's not a top-level
+        -- Bind the binder itself, but only if it's not a top-level
         -- binding. We need non-top let-bindings to refer to the
         -- top-level binding, which this binding would incorrectly shadow.
         ; node <- if top_lvl then return $ idToReg (NonVoid bndr)
                   else bindToReg (NonVoid bndr) lf_info
+        ; let node_points = nodeMustPointToIt lf_info
         ; arg_regs <- bindArgsToRegs args
-        ; emitClosureAndInfoTable cl_info (node : arg_regs) $ body (node, arg_regs)
+        ; let args' = if node_points then (node : arg_regs) else arg_regs
+        ; emitClosureAndInfoTable cl_info args' $ body (node, arg_regs)
         }
 
 -- Data constructors need closures, but not with all the argument handling
@@ -482,7 +484,9 @@ emitClosureAndInfoTable :: ClosureInfo -> [LocalReg] -> FCode () -> FCode ()
 emitClosureAndInfoTable cl_info args body
   = do { info <- mkCmmInfo cl_info
        ; blks <- getCode body
-       ; emitProc info (infoLblToEntryLbl info_lbl) args blks
+       ; let conv = if nodeMustPointToIt (closureLFInfo cl_info) then NativeNodeCall
+                    else NativeDirectCall
+       ; emitProcWithConvention conv info (infoLblToEntryLbl info_lbl) args blks
        }
   where
     info_lbl = infoTableLabelFromCI cl_info

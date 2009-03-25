@@ -171,12 +171,11 @@ assign_bits_reg :: SlotAssigner -> Width -> WordOff -> VGcPtr -> AvailRegs -> As
 assign_bits_reg _ W128 _ _ _ = panic "W128 is not a supported register type"
 assign_bits_reg _ w off gcp (v:vs, fs, ds, ls)
   | widthInBits w <= widthInBits wordWidth =
-        pprTrace "long regs" (ppr ls <+> ppr wordWidth <+> ppr mAX_Real_Long_REG) $ (RegisterParam (v gcp), off, 0, (vs, fs, ds, ls))
+        (RegisterParam (v gcp), off, 0, (vs, fs, ds, ls))
 assign_bits_reg _ w off _ (vs, fs, ds, l:ls)
   | widthInBits w > widthInBits wordWidth =
-        pprTrace "long regs" (ppr ls <+> ppr wordWidth <+> ppr mAX_Real_Long_REG) $ (RegisterParam l, off, 0, (vs, fs, ds, ls))
-assign_bits_reg assign_slot w off _ regs@(_, _, _, ls) =
-  pprTrace "long regs" (ppr w <+> ppr ls <+> ppr wordWidth <+> ppr mAX_Real_Long_REG <+> ppr mAX_Long_REG) $ assign_slot w off regs
+        (RegisterParam l, off, 0, (vs, fs, ds, ls))
+assign_bits_reg assign_slot w off _ regs@(_, _, _, ls) = assign_slot w off regs
 
 assign_float_reg :: SlotAssigner -> Width -> WordOff -> AvailRegs -> Assignment
 assign_float_reg _ W32 off (vs, f:fs, ds, ls) = (RegisterParam $ f, off, 0, (vs, fs, ds, ls))
