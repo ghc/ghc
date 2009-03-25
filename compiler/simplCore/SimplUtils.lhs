@@ -113,7 +113,7 @@ data SimplCont
 	SimplCont	
 
   | StrictArg 		-- e C
-	OutExpr			-- e 
+	OutExpr			-- e; *always* of form (Var v `App1` e1 .. `App` en)
 	CallCtxt		-- Whether *this* argument position is interesting
  	ArgInfo			-- Whether the function at the head of e has rules, etc
 	SimplCont		--     plus strictness flags for *further* args

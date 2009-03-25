@@ -1787,11 +1787,20 @@ mkDupableCont env (CoerceIt ty cont)
 
 mkDupableCont env cont@(StrictBind {})
   =  return (env, mkBoringStop, cont)
-        -- See Note [Duplicating strict continuations]
+        -- See Note [Duplicating StrictBind]
 
-mkDupableCont env cont@(StrictArg {})
-  =  return (env, mkBoringStop, cont)
-        -- See Note [Duplicating strict continuations]
+mkDupableCont env (StrictArg fun cci ai cont)
+        -- See Note [Duplicating StrictArg]
+  = do { (env', dup, nodup) <- mkDupableCont env cont
+       ; (env'', fun') <- mk_dupable_call env' fun
+       ; return (env'', StrictArg fun' cci ai dup, nodup) }
+  where
+    mk_dupable_call env (Var v)       = return (env, Var v)
+    mk_dupable_call env (App fun arg) = do { (env', fun') <- mk_dupable_call env fun
+                                           ; (env'', arg') <- makeTrivial env' arg
+                                           ; return (env'', fun' `App` arg') }
+    mk_dupable_call _ other = pprPanic "mk_dupable_call" (ppr other)
+	-- The invariant of StrictArg is that the first arg is always an App chain
 
 mkDupableCont env (ApplyTo _ arg se cont)
   =     -- e.g.         [...hole...] (...arg...)
@@ -1972,32 +1981,71 @@ It's a bit silly to add the realWorld dummy arg in this case, making
            True -> $j s
 (the \v alone is enough to make CPR happy) but I think it's rare
 
-Note [Duplicating strict continuations]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Do *not* duplicate StrictBind and StritArg continuations.  We gain
-nothing by propagating them into the expressions, and we do lose a
-lot.  Here's an example:
-        && (case x of { T -> F; F -> T }) E
+Note [Duplicating StrictArg]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The original plan had (where E is a big argument)
+e.g.    f E [..hole..]
+        ==>     let $j = \a -> f E a
+                in $j [..hole..]
+
+But this is terrible! Here's an example:
+        && E (case x of { T -> F; F -> T })
 Now, && is strict so we end up simplifying the case with
 an ArgOf continuation.  If we let-bind it, we get
-
-        let $j = \v -> && v E
+        let $j = \v -> && E v
         in simplExpr (case x of { T -> F; F -> T })
                      (ArgOf (\r -> $j r)
 And after simplifying more we get
-
-        let $j = \v -> && v E
+        let $j = \v -> && E v
         in case x of { T -> $j F; F -> $j T }
 Which is a Very Bad Thing
+
+What we do now is this
+	f E [..hole..]
+ 	==> 	let a = E
+		in f a [..hole..]
+Now if the thing in the hole is a case expression (which is when
+we'll call mkDupableCont), we'll push the function call into the
+branches, which is what we want.  Now RULES for f may fire, and
+call-pattern specialisation.  Here's an example from Trac #3116
+     go (n+1) (case l of
+           	 1  -> bs'
+           	 _  -> Chunk p fpc (o+1) (l-1) bs')
+If we can push the call for 'go' inside the case, we get
+call-pattern specialisation for 'go', which is *crucial* for 
+this program.
+
+Here is the (&&) example: 
+        && E (case x of { T -> F; F -> T })
+  ==>   let a = E in 
+        case x of { T -> && a F; F -> && a T }
+Much better!
+
+Notice that 
+  * Arguments to f *after* the strict one are handled by 
+    the ApplyTo case of mkDupableCont.  Eg
+	f [..hole..] E
+
+  * We can only do the let-binding of E because the function
+    part of a StrictArg continuation is an explicit syntax
+    tree.  In earlier versions we represented it as a function
+    (CoreExpr -> CoreEpxr) which we couldn't take apart.
+
+Do *not* duplicate StrictBind and StritArg continuations.  We gain
+nothing by propagating them into the expressions, and we do lose a
+lot.  
 
 The desire not to duplicate is the entire reason that
 mkDupableCont returns a pair of continuations.
 
-The original plan had:
-e.g.    (...strict-fn...) [...hole...]
-        ==>
-                let $j = \a -> ...strict-fn...
-                in $j [...hole...]
+Note [Duplicating StrictBind]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Unlike StrictArg, there doesn't seem anything to gain from
+duplicating a StrictBind continuation, so we don't.
+
+The desire not to duplicate is the entire reason that
+mkDupableCont returns a pair of continuations.
+
 
 Note [Single-alternative cases]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
