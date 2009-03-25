@@ -15,9 +15,11 @@ module DataCon (
 	
 	-- ** Type deconstruction
 	dataConRepType, dataConSig, dataConFullSig,
-	dataConName, dataConIdentity, dataConTag, dataConTyCon, dataConUserType,
+	dataConName, dataConIdentity, dataConTag, dataConTyCon, 
+        dataConOrigTyCon, dataConUserType,
 	dataConUnivTyVars, dataConExTyVars, dataConAllTyVars, 
-	dataConEqSpec, eqSpecPreds, dataConEqTheta, dataConDictTheta, dataConStupidTheta, 
+	dataConEqSpec, eqSpecPreds, dataConEqTheta, dataConDictTheta,
+	dataConStupidTheta,  
 	dataConInstArgTys, dataConOrigArgTys, dataConOrigResTy,
 	dataConInstOrigArgTys, dataConRepArgTys, 
 	dataConFieldLabels, dataConFieldType,
@@ -562,6 +564,14 @@ dataConTag  = dcTag
 -- | The type constructor that we are building via this data constructor
 dataConTyCon :: DataCon -> TyCon
 dataConTyCon = dcRepTyCon
+
+-- | The original type constructor used in the definition of this data
+-- constructor.  In case of a data family instance, that will be the family
+-- type constructor.
+dataConOrigTyCon :: DataCon -> TyCon
+dataConOrigTyCon dc 
+  | Just (tc, _) <- tyConFamInst_maybe (dcRepTyCon dc) = tc
+  | otherwise                                          = dcRepTyCon dc
 
 -- | The representation type of the data constructor, i.e. the sort
 -- type that will represent values of this type at runtime

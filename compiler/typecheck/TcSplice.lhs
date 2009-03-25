@@ -883,7 +883,9 @@ reifyThing (AGlobal (ADataCon dc))
   = do	{ let name = dataConName dc
 	; ty <- reifyType (idType (dataConWrapId dc))
 	; fix <- reifyFixity name
-	; return (TH.DataConI (reifyName name) ty (reifyName (dataConTyCon dc)) fix) }
+	; return (TH.DataConI (reifyName name) ty 
+                              (reifyName (dataConOrigTyCon dc)) fix) 
+        }
 
 reifyThing (ATcId {tct_id = id, tct_type = ty}) 
   = do	{ ty1 <- zonkTcType ty	-- Make use of all the info we have, even
@@ -902,13 +904,22 @@ reifyThing (AThing {}) = panic "reifyThing AThing"
 ------------------------------
 reifyTyCon :: TyCon -> TcM TH.Info
 reifyTyCon tc
-  | isFunTyCon tc  = return (TH.PrimTyConI (reifyName tc) 2 		  False)
-  | isPrimTyCon tc = return (TH.PrimTyConI (reifyName tc) (tyConArity tc) (isUnLiftedTyCon tc))
+  | isFunTyCon tc  
+  = return (TH.PrimTyConI (reifyName tc) 2 		  False)
+  | isPrimTyCon tc 
+  = return (TH.PrimTyConI (reifyName tc) (tyConArity tc) (isUnLiftedTyCon tc))
+  | isOpenTyCon tc
+  = let flavour = reifyFamFlavour tc
+        tvs     = tyConTyVars tc
+    in
+    return (TH.TyConI $
+              TH.FamilyD flavour (reifyName tc) (reifyTyVars tvs))
   | isSynTyCon tc
   = do { let (tvs, rhs) = synTyConDefn tc 
        ; rhs' <- reifyType rhs
        ; return (TH.TyConI $ 
-		   TH.TySynD (reifyName tc) (reifyTyVars tvs) rhs') }
+		   TH.TySynD (reifyName tc) (reifyTyVars tvs) rhs') 
+       }
 
 reifyTyCon tc
   = do 	{ cxt <- reifyCxt (tyConStupidTheta tc)
@@ -940,7 +951,7 @@ reifyDataCon tys dc
 	  else
 	     return (TH.NormalC name (stricts `zip` arg_tys)) }
   | otherwise
-  = failWithTc (ptext (sLit "Can't reify a non-Haskell-98 data constructor:") 
+  = failWithTc (ptext (sLit "Can't reify a GADT data constructor:") 
 		<+> quotes (ppr dc))
 
 ------------------------------
@@ -976,6 +987,12 @@ reifyCxt   = mapM reifyPred
 
 reifyFunDep :: ([TyVar], [TyVar]) -> TH.FunDep
 reifyFunDep (xs, ys) = TH.FunDep (map reifyName xs) (map reifyName ys)
+
+reifyFamFlavour :: TyCon -> TH.FamFlavour
+reifyFamFlavour tc | isOpenSynTyCon tc = TH.TypeFam
+                   | isOpenTyCon    tc = TH.DataFam
+                   | otherwise         
+                   = panic "TcSplice.reifyFamFlavour: not a type family"
 
 reifyTyVars :: [TyVar] -> [TH.Name]
 reifyTyVars = map reifyName
