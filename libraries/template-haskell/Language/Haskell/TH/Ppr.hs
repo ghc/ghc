@@ -215,11 +215,14 @@ ppr_dec _ (InstanceD ctxt i ds) = text "instance" <+> pprCxt ctxt <+> ppr i
 ppr_dec _ (SigD f t) = ppr f <+> text "::" <+> ppr t
 ppr_dec _ (ForeignD f) = ppr f
 ppr_dec _ (PragmaD p) = ppr p
-ppr_dec isTop (FamilyD flav tc tvs) 
-  = ppr flav <+> maybeFamily <+> ppr tc <+> hsep (map ppr tvs)
+ppr_dec isTop (FamilyD flav tc tvs k) 
+  = ppr flav <+> maybeFamily <+> ppr tc <+> hsep (map ppr tvs) <+> maybeKind
   where
     maybeFamily | isTop     = text "family"
                 | otherwise = empty
+
+    maybeKind | (Just k') <- k = text "::" <+> ppr k'
+              | otherwise      = empty
 ppr_dec isTop (DataInstD ctxt tc tys cs decs) 
   = ppr_data maybeInst ctxt tc (sep (map pprParendType tys)) cs decs
   where
@@ -363,10 +366,11 @@ pprParendType ListT      = text "[]"
 pprParendType other      = parens (ppr other)
 
 instance Ppr Type where
-    ppr (ForallT tvars ctxt ty) = 
-        text "forall" <+> hsep (map ppr tvars) <+> text "."
+    ppr (ForallT tvars ctxt ty)
+      = text "forall" <+> hsep (map ppr tvars) <+> text "."
                       <+> pprCxt ctxt <+> ppr ty
-    ppr ty = pprTyApp (split ty)
+    ppr (SigT ty k) = ppr ty <+> text "::" <+> ppr k
+    ppr ty          = pprTyApp (split ty)
 
 pprTyApp :: (Type, [Type]) -> Doc
 pprTyApp (ArrowT, [arg1,arg2]) = sep [pprFunArgType arg1 <+> text "->", ppr arg2]
@@ -379,12 +383,26 @@ pprFunArgType :: Type -> Doc	-- Should really use a precedence argument
 -- Everything except forall and (->) binds more tightly than (->)
 pprFunArgType ty@(ForallT {})                 = parens (ppr ty)
 pprFunArgType ty@((ArrowT `AppT` _) `AppT` _) = parens (ppr ty)
+pprFunArgType ty@(SigT _ _)                   = parens (ppr ty)
 pprFunArgType ty                              = ppr ty
 
 split :: Type -> (Type, [Type])    -- Split into function and args
 split t = go t []
     where go (AppT t1 t2) args = go t1 (t2:args)
           go ty           args = (ty, args)
+
+------------------------------
+instance Ppr TyVarBndr where
+    ppr (PlainTV nm)    = ppr nm
+    ppr (KindedTV nm k) = parens (ppr nm <+> text "::" <+> ppr k)
+
+instance Ppr Kind where
+    ppr StarK          = char '*'
+    ppr (ArrowK k1 k2) = pprArrowArgKind k1 <+> text "->" <+> ppr k2
+
+pprArrowArgKind :: Kind -> Doc
+pprArrowArgKind k@(ArrowK _ _) = parens (ppr k)
+pprArrowArgKind k              = ppr k
 
 ------------------------------
 pprCxt :: Cxt -> Doc

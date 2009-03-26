@@ -18,9 +18,9 @@ module Language.Haskell.TH(
 	tupleTypeName, tupleDataName,	-- Int -> Name
 	
 	-- The algebraic data types
-	Dec(..), Exp(..), Con(..), Type(..), Cxt, Pred(..), Match(..), 
-	Clause(..), Body(..), Guard(..), Stmt(..), Range(..),
-	Lit(..), Pat(..), FieldExp, FieldPat, 
+	Dec(..), Exp(..), Con(..), Type(..), TyVarBndr(..), Kind(..), Cxt,
+	Pred(..), Match(..), Clause(..), Body(..), Guard(..), Stmt(..),
+	Range(..), Lit(..), Pat(..), FieldExp, FieldPat, 
 	Strict(..), Foreign(..), Callconv(..), Safety(..), Pragma(..),
 	InlineSpec(..), FunDep(..), FamFlavour(..), Info(..), Loc(..),
 	Fixity(..), FixityDirection(..), defaultFixity, maxPrecedence,
@@ -41,9 +41,10 @@ module Language.Haskell.TH(
 	fromE, fromThenE, fromToE, fromThenToE,
 	listE, sigE, recConE, recUpdE, stringE, fieldExp,
 	valD, funD, tySynD, dataD, newtypeD, classD, instanceD, sigD, forImpD,
-        pragInlD, pragSpecD, familyD, dataInstD, newtypeInstD, tySynInstD,
+        pragInlD, pragSpecD, familyNoKindD, familyKindD, dataInstD,
+        newtypeInstD, tySynInstD, 
 	cxt, classP, equalP, normalC, recC, infixC,
-	forallT, varT, conT, appT, arrowT, listT, tupleT,
+	forallT, varT, conT, appT, arrowT, listT, tupleT, sigT,
 	isStrict, notStrict, strictType, varStrictType,
 	cCall, stdCall, unsafe, safe, threadsafe, 
         inlineSpecNoPhase, inlineSpecPhase, typeFam, dataFam,

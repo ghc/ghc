@@ -30,9 +30,9 @@ module Language.Haskell.TH.Syntax(
         showName, showName', NameIs(..),
 
 	-- The algebraic data types
-	Dec(..), Exp(..), Con(..), Type(..), Cxt, Pred(..), Match(..), 
-	Clause(..), Body(..), Guard(..), Stmt(..), Range(..),
-	Lit(..), Pat(..), FieldExp, FieldPat, 
+	Dec(..), Exp(..), Con(..), Type(..), TyVarBndr(..), Kind(..),Cxt,
+	Pred(..), Match(..),  Clause(..), Body(..), Guard(..), Stmt(..),
+	Range(..), Lit(..), Pat(..), FieldExp, FieldPat, 
 	Strict(..), Foreign(..), Callconv(..), Safety(..), Pragma(..),
 	InlineSpec(..),	StrictType, VarStrictType, FunDep(..), FamFlavour(..),
 	Info(..), Loc(..), CharPos,
@@ -639,16 +639,16 @@ data Lit = CharL Char
 
 data Pat 
   = LitP Lit                      -- { 5 or 'c' }
-  | VarP Name                   -- { x }
+  | VarP Name                     -- { x }
   | TupP [Pat]                    -- { (p1,p2) }
-  | ConP Name [Pat]             -- data T1 = C1 t1 t2; {C1 p1 p1} = e 
+  | ConP Name [Pat]               -- data T1 = C1 t1 t2; {C1 p1 p1} = e 
   | InfixP Pat Name Pat           -- foo ({x :+ y}) = e 
   | TildeP Pat                    -- { ~p }
-  | AsP Name Pat                -- { x @ p }
+  | AsP Name Pat                  -- { x @ p }
   | WildP                         -- { _ }
-  | RecP Name [FieldPat]        -- f (Pt { pointx = x }) = g x
+  | RecP Name [FieldPat]          -- f (Pt { pointx = x }) = g x
   | ListP [ Pat ]                 -- { [1,2,3] }
-  | SigP Pat Type                 -- p :: t
+  | SigP Pat Type                 -- { p :: t }
   deriving( Show, Eq, Data, Typeable )
 
 type FieldPat = (Name,Pat)
@@ -661,8 +661,8 @@ data Clause = Clause [Pat] Body [Dec]
     deriving( Show, Eq, Data, Typeable )
  
 data Exp 
-  = VarE Name                        -- { x }
-  | ConE Name                        -- data T1 = C1 t1 t2; p = {C1} e1 e2  
+  = VarE Name                          -- { x }
+  | ConE Name                          -- data T1 = C1 t1 t2; p = {C1} e1 e2  
   | LitE Lit                           -- { 5 or 'c'}
   | AppE Exp Exp                       -- { f x }
 
@@ -682,7 +682,7 @@ data Exp
   | CompE [Stmt]                       -- { [ (x,y) | x <- xs, y <- ys ] }
   | ArithSeqE Range                    -- { [ 1 ,2 .. 10 ] }
   | ListE [ Exp ]                      -- { [1,2,3] }
-  | SigE Exp Type                      -- e :: t
+  | SigE Exp Type                      -- { e :: t }
   | RecConE Name [FieldExp]            -- { T { x = y, z = w } }
   | RecUpdE Exp [FieldExp]             -- { (f x) { z = w } }
   deriving( Show, Eq, Data, Typeable )
@@ -715,24 +715,25 @@ data Range = FromR Exp | FromThenR Exp Exp
 data Dec 
   = FunD Name [Clause]            -- { f p1 p2 = b where decs }
   | ValD Pat Body [Dec]           -- { p = b where decs }
-  | DataD Cxt Name [Name] 
+  | DataD Cxt Name [TyVarBndr] 
          [Con] [Name]             -- { data Cxt x => T x = A x | B (T x)
                                   --       deriving (Z,W)}
-  | NewtypeD Cxt Name [Name] 
+  | NewtypeD Cxt Name [TyVarBndr] 
          Con [Name]               -- { newtype Cxt x => T x = A (B x)
                                   --       deriving (Z,W)}
-  | TySynD Name [Name] Type       -- { type T x = (x,x) }
-  | ClassD Cxt Name [Name] [FunDep] [Dec]
-                                  -- { class Eq a => Ord a where ds }
+  | TySynD Name [TyVarBndr] Type  -- { type T x = (x,x) }
+  | ClassD Cxt Name [TyVarBndr] 
+         [FunDep] [Dec]           -- { class Eq a => Ord a where ds }
   | InstanceD Cxt Type [Dec]      -- { instance Show w => Show [w]
                                   --       where ds }
   | SigD Name Type                -- { length :: [a] -> Int }
   | ForeignD Foreign
   -- pragmas
   | PragmaD Pragma                -- { {-# INLINE [1] foo #-} }
-  -- type families (may appear in [Dec] of 'ClassD' and 'InstanceD')
-  | FamilyD FamFlavour Name [Name] {- (Maybe Kind) -}
-                                  -- { type family T a b c }
+  -- type families (may also appear in [Dec] of 'ClassD' and 'InstanceD')
+  | FamilyD FamFlavour Name 
+         [TyVarBndr] (Maybe Kind) -- { type family T a b c :: * }
+                                 
   | DataInstD Cxt Name [Type]
          [Con] [Name]             -- { data instance Cxt x => T [x] = A x 
                                   --                                | B (T x)
@@ -778,22 +779,31 @@ data Pred = ClassP Name [Type]    -- Eq (Int, a)
 data Strict = IsStrict | NotStrict
          deriving( Show, Eq, Data, Typeable )
 
-data Con = NormalC Name [StrictType]
-         | RecC Name [VarStrictType]
-         | InfixC StrictType Name StrictType
-         | ForallC [Name] Cxt Con
+data Con = NormalC Name [StrictType]          -- C Int a
+         | RecC Name [VarStrictType]          -- C { v :: Int, w :: a }
+         | InfixC StrictType Name StrictType  -- Int :+ a
+         | ForallC [TyVarBndr] Cxt Con        -- forall a. Eq a => C [a]
          deriving( Show, Eq, Data, Typeable )
 
 type StrictType = (Strict, Type)
 type VarStrictType = (Name, Strict, Type)
 
-data Type = ForallT [Name] Cxt Type   -- forall <vars>. <ctxt> -> <type>
-          | VarT Name                 -- a
-          | ConT Name                 -- T
-          | TupleT Int                -- (,), (,,), etc.
-          | ArrowT                    -- ->
-          | ListT                     -- []
-          | AppT Type Type            -- T a b
+data Type = ForallT [TyVarBndr] Cxt Type  -- forall <vars>. <ctxt> -> <type>
+          | VarT Name                     -- a
+          | ConT Name                     -- T
+          | TupleT Int                    -- (,), (,,), etc.
+          | ArrowT                        -- ->
+          | ListT                         -- []
+          | AppT Type Type                -- T a b
+          | SigT Type Kind                -- t :: k
+      deriving( Show, Eq, Data, Typeable )
+
+data TyVarBndr = PlainTV  Name            -- a
+               | KindedTV Name Kind       -- (a :: k)
+      deriving( Show, Eq, Data, Typeable )
+
+data Kind = StarK                         -- '*'
+          | ArrowK Kind Kind              -- k1 -> k2
       deriving( Show, Eq, Data, Typeable )
 
 -----------------------------------------------------

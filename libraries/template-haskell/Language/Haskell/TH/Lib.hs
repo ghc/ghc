@@ -279,24 +279,24 @@ funD nm cs =
     ; return (FunD nm cs1)
     }
 
-tySynD :: Name -> [Name] -> TypeQ -> DecQ
+tySynD :: Name -> [TyVarBndr] -> TypeQ -> DecQ
 tySynD tc tvs rhs = do { rhs1 <- rhs; return (TySynD tc tvs rhs1) }
 
-dataD :: CxtQ -> Name -> [Name] -> [ConQ] -> [Name] -> DecQ
+dataD :: CxtQ -> Name -> [TyVarBndr] -> [ConQ] -> [Name] -> DecQ
 dataD ctxt tc tvs cons derivs =
   do
     ctxt1 <- ctxt
     cons1 <- sequence cons
     return (DataD ctxt1 tc tvs cons1 derivs)
 
-newtypeD :: CxtQ -> Name -> [Name] -> ConQ -> [Name] -> DecQ
+newtypeD :: CxtQ -> Name -> [TyVarBndr] -> ConQ -> [Name] -> DecQ
 newtypeD ctxt tc tvs con derivs =
   do
     ctxt1 <- ctxt
     con1 <- con
     return (NewtypeD ctxt1 tc tvs con1 derivs)
 
-classD :: CxtQ -> Name -> [Name] -> [FunDep] -> [DecQ] -> DecQ
+classD :: CxtQ -> Name -> [TyVarBndr] -> [FunDep] -> [DecQ] -> DecQ
 classD ctxt cls tvs fds decs =
   do 
     decs1 <- sequence decs
@@ -338,8 +338,11 @@ pragSpecInlD n ty ispec
       ispec1 <- ispec
       return $ PragmaD (SpecialiseP n ty1 (Just ispec1))
 
-familyD :: FamFlavour -> Name -> [Name] -> DecQ
-familyD flav tc tvs = return $ FamilyD flav tc tvs
+familyNoKindD :: FamFlavour -> Name -> [TyVarBndr] -> DecQ
+familyNoKindD flav tc tvs = return $ FamilyD flav tc tvs Nothing
+
+familyKindD :: FamFlavour -> Name -> [TyVarBndr] -> Kind -> DecQ
+familyKindD flav tc tvs k = return $ FamilyD flav tc tvs (Just k)
 
 dataInstD :: CxtQ -> Name -> [TypeQ] -> [ConQ] -> [Name] -> DecQ
 dataInstD ctxt tc tys cons derivs =
@@ -391,14 +394,14 @@ infixC st1 con st2 = do st1' <- st1
                         st2' <- st2
                         return $ InfixC st1' con st2'
 
-forallC :: [Name] -> CxtQ -> ConQ -> ConQ
+forallC :: [TyVarBndr] -> CxtQ -> ConQ -> ConQ
 forallC ns ctxt con = liftM2 (ForallC ns) ctxt con
 
 
 -------------------------------------------------------------------------------
 --     Type
 
-forallT :: [Name] -> CxtQ -> TypeQ -> TypeQ
+forallT :: [TyVarBndr] -> CxtQ -> TypeQ -> TypeQ
 forallT tvars ctxt ty = do
     ctxt1 <- ctxt
     ty1   <- ty
@@ -425,6 +428,12 @@ listT = return ListT
 tupleT :: Int -> TypeQ
 tupleT i = return (TupleT i)
 
+sigT :: TypeQ -> Kind -> TypeQ
+sigT t k
+  = do
+      t' <- t
+      return $ SigT t' k
+
 isStrict, notStrict :: Q Strict
 isStrict = return $ IsStrict
 notStrict = return $ NotStrict
@@ -435,6 +444,21 @@ strictType = liftM2 (,)
 varStrictType :: Name -> StrictTypeQ -> VarStrictTypeQ
 varStrictType v st = do (s, t) <- st
                         return (v, s, t)
+
+-------------------------------------------------------------------------------
+--     Kind
+
+plainTV :: Name -> TyVarBndr
+plainTV = PlainTV
+
+kindedTV :: Name -> Kind -> TyVarBndr
+kindedTV = KindedTV
+
+starK :: Kind
+starK = StarK
+
+arrowK :: Kind -> Kind -> Kind
+arrowK = ArrowK
 
 -------------------------------------------------------------------------------
 --     Callconv
