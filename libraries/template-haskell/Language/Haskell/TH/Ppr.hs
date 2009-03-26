@@ -181,6 +181,7 @@ pprPat i (InfixP p1 n p2)
                                                pprName' Infix n <+>
                                                pprPat opPrec p2)
 pprPat i (TildeP p)   = parensIf (i > noPrec) $ char '~' <> pprPat appPrec p
+pprPat i (BangP p)    = parensIf (i > noPrec) $ char '!' <> pprPat appPrec p
 pprPat i (AsP v p)    = parensIf (i > noPrec) $ ppr v <> text "@"
                                                       <> pprPat appPrec p
 pprPat _ WildP        = text "_"

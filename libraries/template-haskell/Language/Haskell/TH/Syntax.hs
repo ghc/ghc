@@ -644,6 +644,7 @@ data Pat
   | ConP Name [Pat]               -- data T1 = C1 t1 t2; {C1 p1 p1} = e 
   | InfixP Pat Name Pat           -- foo ({x :+ y}) = e 
   | TildeP Pat                    -- { ~p }
+  | BangP Pat                     -- { !p }
   | AsP Name Pat                  -- { x @ p }
   | WildP                         -- { _ }
   | RecP Name [FieldPat]          -- f (Pt { pointx = x }) = g x

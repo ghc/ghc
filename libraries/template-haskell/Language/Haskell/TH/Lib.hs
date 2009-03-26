@@ -70,6 +70,9 @@ infixP p1 n p2 = do p1' <- p1
 tildeP :: PatQ -> PatQ
 tildeP p = do p' <- p
               return (TildeP p')
+bangP :: PatQ -> PatQ
+bangP p = do p' <- p
+             return (BangP p')
 asP :: Name -> PatQ -> PatQ
 asP n p = do p' <- p
              return (AsP n p')
@@ -518,6 +521,7 @@ rename (InfixP p1 n p2) = do { r1 <- rename p1;
                                let {(env, [p1', p2']) = combine [r1, r2]};
                                return (env, InfixP p1' n p2') }
 rename (TildeP p) = do { (env,p2) <- rename p; return(env,TildeP p2) }   
+rename (BangP p) = do { (env,p2) <- rename p; return(env,BangP p2) }   
 rename (AsP s p) = 
    do { s1 <- newName (nameBase s); (env,p2) <- rename p; return((s,s1):env,AsP s1 p2) }
 rename WildP = return([],WildP)
