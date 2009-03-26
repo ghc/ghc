@@ -2544,6 +2544,10 @@ checkBlackHoles (Capability *cap)
     prev = &blackhole_queue;
     t = blackhole_queue;
     while (t != END_TSO_QUEUE) {
+        if (t->what_next == ThreadRelocated) {
+            t = t->_link;
+            continue;
+        }
 	ASSERT(t->why_blocked == BlockedOnBlackHole);
 	type = get_itbl(UNTAG_CLOSURE(t->block_info.closure))->type;
 	if (type != BLACKHOLE && type != CAF_BLACKHOLE) {
