@@ -630,6 +630,7 @@ cvtp (ConP s ps)      = do { s' <- cNameL s; ps' <- cvtPats ps; return $ ConPatI
 cvtp (InfixP p1 s p2) = do { s' <- cNameL s; p1' <- cvtPat p1; p2' <- cvtPat p2
 			   ; return $ ConPatIn s' (InfixCon p1' p2') }
 cvtp (TildeP p)       = do { p' <- cvtPat p; return $ LazyPat p' }
+cvtp (BangP p)        = do { p' <- cvtPat p; return $ BangPat p' }
 cvtp (TH.AsP s p)     = do { s' <- vNameL s; p' <- cvtPat p; return $ AsPat s' p' }
 cvtp TH.WildP         = return $ WildPat void
 cvtp (RecP c fs)      = do { c' <- cNameL c; fs' <- mapM cvtPatFld fs 

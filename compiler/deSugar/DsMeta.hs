@@ -1004,6 +1004,7 @@ repP (WildPat _)       = repPwild
 repP (LitPat l)        = do { l2 <- repLiteral l; repPlit l2 }
 repP (VarPat x)        = do { x' <- lookupBinder x; repPvar x' }
 repP (LazyPat p)       = do { p1 <- repLP p; repPtilde p1 }
+repP (BangPat p)       = do { p1 <- repLP p; repPbang p1 }
 repP (AsPat x p)       = do { x' <- lookupLBinder x; p1 <- repLP p; repPaspat x' p1 }
 repP (ParPat p)        = repLP p 
 repP (ListPat ps _)    = do { qs <- repLPs ps; repPlist qs }
@@ -1242,6 +1243,9 @@ repPinfix (MkC p1) (MkC n) (MkC p2) = rep2 infixPName [p1, n, p2]
 
 repPtilde :: Core TH.PatQ -> DsM (Core TH.PatQ)
 repPtilde (MkC p) = rep2 tildePName [p]
+
+repPbang :: Core TH.PatQ -> DsM (Core TH.PatQ)
+repPbang (MkC p) = rep2 bangPName [p]
 
 repPaspat :: Core TH.Name -> Core TH.PatQ -> DsM (Core TH.PatQ)
 repPaspat (MkC s) (MkC p) = rep2 asPName [s, p]
@@ -1645,7 +1649,7 @@ templateHaskellNames = [
     charLName, stringLName, integerLName, intPrimLName, wordPrimLName,
     floatPrimLName, doublePrimLName, rationalLName,
     -- Pat
-    litPName, varPName, tupPName, conPName, tildePName, infixPName,
+    litPName, varPName, tupPName, conPName, tildePName, bangPName, infixPName,
     asPName, wildPName, recPName, listPName, sigPName,
     -- FieldPat
     fieldPatName,
@@ -1780,7 +1784,7 @@ doublePrimLName = libFun (fsLit "doublePrimL") doublePrimLIdKey
 rationalLName   = libFun (fsLit "rationalL")     rationalLIdKey
 
 -- data Pat = ...
-litPName, varPName, tupPName, conPName, infixPName, tildePName,
+litPName, varPName, tupPName, conPName, infixPName, tildePName, bangPName,
     asPName, wildPName, recPName, listPName, sigPName :: Name
 litPName   = libFun (fsLit "litP")   litPIdKey
 varPName   = libFun (fsLit "varP")   varPIdKey
@@ -1788,6 +1792,7 @@ tupPName   = libFun (fsLit "tupP")   tupPIdKey
 conPName   = libFun (fsLit "conP")   conPIdKey
 infixPName = libFun (fsLit "infixP") infixPIdKey
 tildePName = libFun (fsLit "tildeP") tildePIdKey
+bangPName  = libFun (fsLit "bangP")  bangPIdKey
 asPName    = libFun (fsLit "asP")    asPIdKey
 wildPName  = libFun (fsLit "wildP")  wildPIdKey
 recPName   = libFun (fsLit "recP")   recPIdKey
@@ -2049,7 +2054,7 @@ doublePrimLIdKey  = mkPreludeMiscIdUnique 216
 rationalLIdKey    = mkPreludeMiscIdUnique 217
 
 -- data Pat = ...
-litPIdKey, varPIdKey, tupPIdKey, conPIdKey, infixPIdKey, tildePIdKey,
+litPIdKey, varPIdKey, tupPIdKey, conPIdKey, infixPIdKey, tildePIdKey, bangPIdKey,
     asPIdKey, wildPIdKey, recPIdKey, listPIdKey, sigPIdKey :: Unique
 litPIdKey         = mkPreludeMiscIdUnique 220
 varPIdKey         = mkPreludeMiscIdUnique 221
@@ -2057,6 +2062,7 @@ tupPIdKey         = mkPreludeMiscIdUnique 222
 conPIdKey         = mkPreludeMiscIdUnique 223
 infixPIdKey       = mkPreludeMiscIdUnique 312
 tildePIdKey       = mkPreludeMiscIdUnique 224
+bangPIdKey        = mkPreludeMiscIdUnique 359
 asPIdKey          = mkPreludeMiscIdUnique 225
 wildPIdKey        = mkPreludeMiscIdUnique 226
 recPIdKey         = mkPreludeMiscIdUnique 227
