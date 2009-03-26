@@ -143,8 +143,8 @@ cvtTop (ClassD ctxt cl tvs fds decs)
 						        -- no docs in TH ^^
 	}
   where
-    isFamilyD (FamilyD _ _ _) = True
-    isFamilyD _               = False
+    isFamilyD (FamilyD _ _ _ _) = True
+    isFamilyD _                 = False
 
 cvtTop (InstanceD ctxt ty decs)
   = do 	{ let (ats, bind_sig_decs) = partition isFamInstD decs
@@ -173,10 +173,10 @@ cvtTop (PragmaD prag)
        ; returnL $ Hs.SigD prag'
        }
 
-cvtTop (FamilyD flav tc tvs)
+cvtTop (FamilyD flav tc tvs kind)
   = do { (_, tc', tvs', _) <- cvt_tycl_hdr [] tc tvs
-       ; returnL $ TyClD (TyFamily (cvtFamFlavour flav) tc' tvs' Nothing)
-                                                                 -- FIXME: kinds
+       ; let kind' = fmap cvtKind kind
+       ; returnL $ TyClD (TyFamily (cvtFamFlavour flav) tc' tvs' kind')
        }
   where
     cvtFamFlavour TypeFam = TypeFamily
@@ -207,7 +207,7 @@ unTyClD :: LHsDecl a -> LTyClDecl a
 unTyClD (L l (TyClD d)) = L l d
 unTyClD _               = panic "Convert.unTyClD: internal error"
 
-cvt_tycl_hdr :: TH.Cxt -> TH.Name -> [TH.Name]
+cvt_tycl_hdr :: TH.Cxt -> TH.Name -> [TH.TyVarBndr]
              -> CvtM ( LHsContext RdrName
                      , Located RdrName
                      , [LHsTyVarBndr RdrName]
@@ -235,7 +235,7 @@ cvt_tyinst_hdr cxt tc tys
   where
     collect (ForallT _ _ _) 
       = failWith $ text "Forall type not allowed as type parameter"
-    collect (VarT tv)    = return [tv]
+    collect (VarT tv)    = return [PlainTV tv]
     collect (ConT _)     = return []
     collect (TupleT _)   = return []
     collect ArrowT       = return []
@@ -245,6 +245,8 @@ cvt_tyinst_hdr cxt tc tys
            ; tvs2 <- collect t2
            ; return $ tvs1 ++ tvs2
            }
+    collect (SigT (VarT tv) ki) = return [KindedTV tv ki]
+    collect (SigT ty _)         = collect ty
 
 ---------------------------------------------------
 -- 	Data types
@@ -643,11 +645,18 @@ cvtPatFld (s,p)
 -----------------------------------------------------------
 --	Types and type variables
 
-cvtTvs :: [TH.Name] -> CvtM [LHsTyVarBndr RdrName]
+cvtTvs :: [TH.TyVarBndr] -> CvtM [LHsTyVarBndr RdrName]
 cvtTvs tvs = mapM cvt_tv tvs
 
-cvt_tv :: TH.Name -> CvtM (LHsTyVarBndr RdrName)
-cvt_tv tv = do { tv' <- tName tv; returnL $ UserTyVar tv' }
+cvt_tv :: TH.TyVarBndr -> CvtM (LHsTyVarBndr RdrName)
+cvt_tv (TH.PlainTV nm) 
+  = do { nm' <- tName nm
+       ; returnL $ UserTyVar nm' 
+       }
+cvt_tv (TH.KindedTV nm ki) 
+  = do { nm' <- tName nm
+       ; returnL $ KindedTyVar nm' (cvtKind ki)
+       }
 
 cvtContext :: TH.Cxt -> CvtM (LHsContext RdrName)
 cvtContext tys = do { preds' <- mapM cvtPred tys; returnL preds' }
@@ -674,27 +683,42 @@ cvtPredTy ty
                        text (TH.pprint ty)) }
 
 cvtType :: TH.Type -> CvtM (LHsType RdrName)
-cvtType ty = do { (head_ty, tys') <- split_ty_app ty
-		; case head_ty of
-		    TupleT n | length tys' == n 	-- Saturated
-			     -> if n==1 then return (head tys')	-- Singleton tuples treated 
-								-- like nothing (ie just parens)
-					else returnL (HsTupleTy Boxed tys')
-		             | n == 1    -> failWith (ptext (sLit "Illegal 1-tuple type constructor"))
-		             | otherwise -> mk_apps (HsTyVar (getRdrName (tupleTyCon Boxed n))) tys'
-		    ArrowT | [x',y'] <- tys' -> returnL (HsFunTy x' y')
-		    	   | otherwise       -> mk_apps (HsTyVar (getRdrName funTyCon)) tys'
-		    ListT  | [x']    <- tys' -> returnL (HsListTy x')
-		    	   | otherwise       -> mk_apps (HsTyVar (getRdrName listTyCon)) tys'
-		    VarT nm -> do { nm' <- tName nm;    mk_apps (HsTyVar nm') tys' }
-		    ConT nm -> do { nm' <- tconName nm; mk_apps (HsTyVar nm') tys' }
+cvtType ty 
+  = do { (head_ty, tys') <- split_ty_app ty
+       ; case head_ty of
+           TupleT n 
+             | length tys' == n 	-- Saturated
+             -> if n==1 then return (head tys')	-- Singleton tuples treated 
+                                                -- like nothing (ie just parens)
+                        else returnL (HsTupleTy Boxed tys')
+             | n == 1    
+             -> failWith (ptext (sLit "Illegal 1-tuple type constructor"))
+             | otherwise 
+             -> mk_apps (HsTyVar (getRdrName (tupleTyCon Boxed n))) tys'
+           ArrowT 
+             | [x',y'] <- tys' -> returnL (HsFunTy x' y')
+             | otherwise       -> mk_apps (HsTyVar (getRdrName funTyCon)) tys'
+           ListT  
+             | [x']    <- tys' -> returnL (HsListTy x')
+             | otherwise       -> mk_apps (HsTyVar (getRdrName listTyCon)) tys'
+           VarT nm -> do { nm' <- tName nm;    mk_apps (HsTyVar nm') tys' }
+           ConT nm -> do { nm' <- tconName nm; mk_apps (HsTyVar nm') tys' }
 
-		    ForallT tvs cxt ty | null tys' -> do { tvs' <- cvtTvs tvs
-							 ; cxt' <- cvtContext cxt
-							 ; ty'  <- cvtType ty
-							 ; returnL $ mkExplicitHsForAllTy tvs' cxt' ty' }
-		    _       -> failWith (ptext (sLit "Malformed type") <+> text (show ty))
-	     }
+           ForallT tvs cxt ty 
+             | null tys' 
+             -> do { tvs' <- cvtTvs tvs
+                   ; cxt' <- cvtContext cxt
+                   ; ty'  <- cvtType ty
+                   ; returnL $ mkExplicitHsForAllTy tvs' cxt' ty' 
+                   }
+
+           SigT ty ki
+             -> do { ty' <- cvtType ty
+                   ; mk_apps (HsKindSig ty' (cvtKind ki)) tys'
+                   }
+
+           _ -> failWith (ptext (sLit "Malformed type") <+> text (show ty))
+    }
   where
     mk_apps head_ty []       = returnL head_ty
     mk_apps head_ty (ty:tys) = do { head_ty' <- returnL head_ty
@@ -705,6 +729,10 @@ split_ty_app ty = go ty []
   where
     go (AppT f a) as' = do { a' <- cvtType a; go f (a':as') }
     go f as 	      = return (f,as)
+
+cvtKind :: TH.Kind -> Type.Kind
+cvtKind StarK          = liftedTypeKind
+cvtKind (ArrowK k1 k2) = mkArrowKind (cvtKind k1) (cvtKind k2)
 
 -----------------------------------------------------------
 

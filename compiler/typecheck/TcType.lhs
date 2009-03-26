@@ -98,7 +98,7 @@ module TcType (
   unliftedTypeKind, liftedTypeKind, argTypeKind,
   openTypeKind, mkArrowKind, mkArrowKinds, 
   isLiftedTypeKind, isUnliftedTypeKind, isSubOpenTypeKind, 
-  isSubArgTypeKind, isSubKind, defaultKind,
+  isSubArgTypeKind, isSubKind, splitKindFunTys, defaultKind,
   kindVarRef, mkKindVar,  
 
   Type, PredType(..), ThetaType, 

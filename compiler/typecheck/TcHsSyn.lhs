@@ -35,7 +35,6 @@ import Id
 
 import TcRnMonad
 import PrelNames
-import Type
 import TcType
 import TcMType
 import TysPrim

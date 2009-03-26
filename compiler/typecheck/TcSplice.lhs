@@ -911,9 +911,13 @@ reifyTyCon tc
   | isOpenTyCon tc
   = let flavour = reifyFamFlavour tc
         tvs     = tyConTyVars tc
+        kind    = tyConKind tc
+        kind'
+          | isLiftedTypeKind kind = Nothing
+          | otherwise             = Just $ reifyKind kind
     in
     return (TH.TyConI $
-              TH.FamilyD flavour (reifyName tc) (reifyTyVars tvs))
+              TH.FamilyD flavour (reifyName tc) (reifyTyVars tvs) kind')
   | isSynTyCon tc
   = do { let (tvs, rhs) = synTyConDefn tc 
        ; rhs' <- reifyType rhs
@@ -982,6 +986,18 @@ reifyType (PredTy {}) = panic "reifyType PredTy"
 reifyTypes :: [Type] -> TcM [TH.Type]
 reifyTypes = mapM reifyType
 
+reifyKind :: Kind -> TH.Kind
+reifyKind  ki
+  = let (kis, ki') = splitKindFunTys ki
+        kis_rep    = map reifyKind kis
+        ki'_rep    = reifyNonArrowKind ki'
+    in
+    foldl TH.ArrowK ki'_rep kis_rep
+  where
+    reifyNonArrowKind k | isLiftedTypeKind k = TH.StarK
+                        | otherwise          = pprPanic "Exotic form of kind" 
+                                                        (ppr k)
+
 reifyCxt :: [PredType] -> TcM [TH.Pred]
 reifyCxt   = mapM reifyPred
 
@@ -994,8 +1010,14 @@ reifyFamFlavour tc | isOpenSynTyCon tc = TH.TypeFam
                    | otherwise         
                    = panic "TcSplice.reifyFamFlavour: not a type family"
 
-reifyTyVars :: [TyVar] -> [TH.Name]
-reifyTyVars = map reifyName
+reifyTyVars :: [TyVar] -> [TH.TyVarBndr]
+reifyTyVars = map reifyTyVar
+  where
+    reifyTyVar tv | isLiftedTypeKind kind = TH.PlainTV  name
+                  | otherwise             = TH.KindedTV name (reifyKind kind)
+      where
+        kind = tyVarKind tv
+        name = reifyName tv
 
 reify_tc_app :: TH.Name -> [TypeRep.Type] -> TcM TH.Type
 reify_tc_app tc tys = do { tys' <- reifyTypes tys 
