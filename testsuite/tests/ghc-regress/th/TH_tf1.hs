@@ -13,3 +13,9 @@ $( [d| type instance S Int = Bool |] )
 
 bar :: S Int -> Int
 bar c = if c then 1 else 2
+
+$( [d| type family R (a :: * -> *) :: * -> * |] )
+$( [d| type instance R Maybe = [] |] )
+
+baz :: R Maybe Int -> Int
+baz = head

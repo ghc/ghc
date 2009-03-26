@@ -16,6 +16,6 @@ genAnyClass name decls
   = DataD [] anyName [] [constructor] []
   where
     anyName = mkName ("Any" ++ nameBase name ++ "1111")
-    constructor = ForallC [var_a] [ClassP name [VarT var_a]] $
+    constructor = ForallC [PlainTV var_a] [ClassP name [VarT var_a]] $
 		  NormalC anyName [(NotStrict, VarT var_a)]
     var_a = mkName "a"
