@@ -36,7 +36,6 @@ module Module
 	basePackageId,
 	rtsPackageId,
 	haskell98PackageId,
-	sybPackageId,
 	thPackageId,
         dphSeqPackageId,
         dphParPackageId,
@@ -316,7 +315,7 @@ packageIdString = unpackFS . packageIdFS
 -- Make sure you change 'Packages.findWiredInPackages' if you add an entry here
 
 integerPackageId, primPackageId,
-  basePackageId, rtsPackageId, haskell98PackageId, sybPackageId,
+  basePackageId, rtsPackageId, haskell98PackageId,
   thPackageId, dphSeqPackageId, dphParPackageId,
   mainPackageId  :: PackageId
 primPackageId      = fsToPackageId (fsLit "ghc-prim")
@@ -324,7 +323,6 @@ integerPackageId   = fsToPackageId (fsLit "integer")
 basePackageId      = fsToPackageId (fsLit "base")
 rtsPackageId	   = fsToPackageId (fsLit "rts")
 haskell98PackageId = fsToPackageId (fsLit "haskell98")
-sybPackageId       = fsToPackageId (fsLit "syb")
 thPackageId        = fsToPackageId (fsLit "template-haskell")
 dphSeqPackageId    = fsToPackageId (fsLit "dph-seq")
 dphParPackageId    = fsToPackageId (fsLit "dph-par")

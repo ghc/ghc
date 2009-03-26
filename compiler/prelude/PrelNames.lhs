@@ -321,9 +321,6 @@ mkBaseModule m = mkModule basePackageId (mkModuleNameFS m)
 mkBaseModule_ :: ModuleName -> Module
 mkBaseModule_ m = mkModule basePackageId m
 
-mkSybModule :: FastString -> Module
-mkSybModule m = mkModule sybPackageId (mkModuleNameFS m)
-
 mkMainModule :: FastString -> Module
 mkMainModule m = mkModule mainPackageId (mkModuleNameFS m)
 
