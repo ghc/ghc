@@ -26,6 +26,8 @@ type Doc  = HsDoc Name
 type DeclInfo = (Decl, Maybe Doc, [(Name, Maybe Doc)])
 
 
+-- | A 'DocName' is an identifier that may be documented. The 'Module'
+-- component specifies the place which we want to link to in the documentation.
 data DocName = Documented Name Module | Undocumented Name
   deriving Eq
 
