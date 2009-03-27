@@ -21,7 +21,6 @@ import Haddock.Interface.Rename
 import Haddock.Types
 import Haddock.Options
 import Haddock.GHC.Utils
-import Haddock.GHC.Typecheck
 import Haddock.Exception
 import Haddock.Utils
 import Haddock.InterfaceFile
@@ -29,6 +28,7 @@ import Haddock.InterfaceFile
 import qualified Data.Map as Map
 import Data.Map (Map)
 import Data.List
+import Data.Maybe
 import Control.Monad
 import Control.Exception ( evaluate )
 import Distribution.Verbosity
@@ -209,6 +209,41 @@ processModule verbosity session modsum flags modMap instIfaceMap = do
     else
       return Nothing
 #endif
+
+
+type CheckedMod = (Module, FilePath, FullyCheckedMod)
+
+
+type FullyCheckedMod = (ParsedSource, 
+                        RenamedSource, 
+                        TypecheckedSource, 
+                        ModuleInfo)
+
+
+-- | Dig out what we want from the typechecker output
+mkGhcModule :: CheckedMod -> DynFlags -> GhcModule 
+mkGhcModule (mdl, file, checkedMod) dynflags = GhcModule {
+  ghcModule         = mdl,
+  ghcFilename       = file,
+  ghcMbDocOpts      = mbOpts,
+  ghcHaddockModInfo = info,
+  ghcMbDoc          = mbDoc,
+  ghcGroup          = group_,
+  ghcMbExports      = mbExports,
+  ghcExportedNames  = modInfoExports modInfo,
+  ghcDefinedNames   = map getName $ modInfoTyThings modInfo,
+  ghcNamesInScope   = fromJust $ modInfoTopLevelScope modInfo, 
+  ghcInstances      = modInfoInstances modInfo
+}
+  where
+#if __GLASGOW_HASKELL__ == 608 && __GHC_PATCHLEVEL__ == 2
+    HsModule _ _ _ _ _ mbOpts _ _ = unLoc parsed
+#else
+    mbOpts = haddockOptions dynflags
+#endif
+    (group_, _, mbExports, mbDoc, info) = renamed
+    (parsed, renamed, _, modInfo) = checkedMod
+
 
 -- | Build a mapping which for each original name, points to the "best"
 -- place to link to in the documentation.  For the definition of

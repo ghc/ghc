@@ -7,12 +7,10 @@
 
 module Haddock.GHC (
   startGhc,
-  module Haddock.GHC.Typecheck,
   module Haddock.GHC.Utils
 ) where
 
 
-import Haddock.GHC.Typecheck
 import Haddock.GHC.Utils
 import Haddock.Exception
 import Haddock.Options
