@@ -13,16 +13,12 @@ module Haddock.GHC (
 
 import Haddock.GHC.Utils
 import Haddock.Exception
-import Haddock.Options
 
-import Data.Foldable (foldlM)
 import Data.Maybe
 import Control.Monad
 
-import GHC
-import DynFlags hiding (Option)
-import Packages hiding (package)
-import StaticFlags
+import GHC hiding (flags)
+import DynFlags hiding (Option, flags)
 import SrcLoc
 
 
@@ -105,6 +101,8 @@ loadPackages session pkgStrs = do
 -}
 
 -- | Try to parse dynamic GHC flags
+parseGhcFlags :: Monad m => DynFlags -> [Located String]
+              -> [String] -> m DynFlags
 parseGhcFlags dynflags flags origFlags = do
   -- TODO: handle warnings?
 #if __GLASGOW_HASKELL__ >= 609

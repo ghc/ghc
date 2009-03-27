@@ -15,7 +15,7 @@ module Haddock.InterfaceFile (
 
 
 import Haddock.Types
-import Haddock.Utils
+import Haddock.Utils hiding (out)
 
 import Data.List
 import Data.Word
