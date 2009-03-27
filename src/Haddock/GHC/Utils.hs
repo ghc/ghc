@@ -17,6 +17,8 @@ import Data.Char
 import Data.Version
 import qualified Data.Map as Map
 import Control.Arrow
+import Data.Foldable hiding (concatMap)
+import Data.Traversable
 
 import HsSyn
 import SrcLoc
@@ -24,14 +26,6 @@ import Outputable
 import Name
 import Packages
 import Module
-
-
-unL :: Located a -> a
-unL (L _ x) = x
-
-
-reL :: a -> Located a
-reL = L undefined
 
 
 moduleString :: Module -> String
@@ -115,6 +109,27 @@ pretty x = showSDoc (ppr x)
 
 trace_ppr :: Outputable a => a -> b -> b
 trace_ppr x y = trace (pretty x) y
+
+
+-------------------------------------------------------------------------------
+-- Located
+-------------------------------------------------------------------------------
+
+
+unL :: Located a -> a
+unL (L _ x) = x
+
+
+reL :: a -> Located a
+reL = L undefined
+
+
+instance Foldable Located where
+  foldMap f (L _ x) = f x
+
+
+instance Traversable Located where
+  mapM f (L l x) = (return . L l) =<< f x  
 
 
 -------------------------------------------------------------------------------

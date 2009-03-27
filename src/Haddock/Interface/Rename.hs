@@ -129,8 +129,12 @@ runRnFM env rn = unRn rn lkp
 --------------------------------------------------------------------------------
 
 
-rename = lookupRn id 
-renameL (L loc name) = return . L loc =<< rename name
+rename :: Name -> RnM DocName
+rename = lookupRn id
+
+
+renameL :: Located Name -> RnM (Located DocName)
+renameL = mapM rename
 
 
 renameExportItems :: [ExportItem Name] -> RnM [ExportItem DocName]
