@@ -176,7 +176,8 @@ main = handleTopExceptions $ do
 
 
         -- create the interfaces -- this is the core part of Haddock
-        (interfaces, homeLinks) <- createInterfaces fileArgs extLinks flags
+        (interfaces, homeLinks) <- createInterfaces verbosity fileArgs flags
+                                                    (map fst packages)
 
         liftIO $ do
           -- render the interfaces
@@ -192,7 +193,8 @@ main = handleTopExceptions $ do
       packages <- readInterfaceFiles (nameCacheFromGhc session) (ifacePairs flags)
 
       -- create the interfaces -- this is the core part of Haddock
-      (interfaces, homeLinks) <- createInterfaces session fileArgs extLinks flags
+      (interfaces, homeLinks) <- createInterfaces verbosity session fileArgs flags
+                                                  (map fst packages)
 
       -- render the interfaces
       renderStep packages interfaces
