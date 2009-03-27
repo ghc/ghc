@@ -787,7 +787,7 @@ ppFunSig summary links loc mbDoc docname typ =
   ppTypeOrFunSig summary links loc docname typ mbDoc 
     (ppTypeSig summary occname typ, ppBinder False occname, dcolon)
   where
-    occname = nameOccName . getName $ docname
+    occname = docNameOcc docname
 
 ppTypeOrFunSig :: Bool -> LinksInfo -> SrcSpan -> DocName -> HsType DocName ->
                   Maybe (HsDoc DocName) -> (Html, Html, Html) -> HtmlTable
