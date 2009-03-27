@@ -14,7 +14,6 @@ module Haddock.InterfaceFile (
 ) where
 
 
-import Haddock.DocName ()
 import Haddock.Types
 import Haddock.Utils
 
@@ -515,3 +514,26 @@ instance Binary name => Binary (HaddockModInfo name) where
     stabi <- get bh
     maint <- get bh
     return (HaddockModInfo descr porta stabi maint)
+
+
+instance Binary DocName where
+  put_ bh (Documented name modu) = do
+    putByte bh 0
+    put_ bh name
+    put_ bh modu
+  put_ bh (Undocumented name) = do
+    putByte bh 1
+    put_ bh name
+
+  get bh = do
+    h <- getByte bh
+    case h of
+      0 -> do
+        name <- get bh
+        modu <- get bh
+        return (Documented name modu)
+      1 -> do
+        name <- get bh
+        return (Undocumented name)
+      _ -> error "get DocName: Bad h"
+

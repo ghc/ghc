@@ -10,7 +10,6 @@
 module Haddock.Types where
 
 
-import Haddock.DocName
 import Data.Map (Map)
 import qualified Data.Map as Map
 import GHC hiding (NoLink)
@@ -25,6 +24,20 @@ type Doc  = HsDoc Name
 -- | A declaration that may have documentation, including its subordinates,
 -- which may also have documentation
 type DeclInfo = (Decl, Maybe Doc, [(Name, Maybe Doc)])
+
+
+data DocName = Documented Name Module | Undocumented Name
+  deriving Eq
+
+
+-- | The 'OccName' belonging to this name
+docNameOcc :: DocName -> OccName
+docNameOcc = nameOccName . getName
+
+
+instance NamedThing DocName where
+  getName (Documented name _) = name
+  getName (Undocumented name) = name
 
 
 {-! for DocOption derive: Binary !-}

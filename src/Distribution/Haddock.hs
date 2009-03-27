@@ -13,10 +13,11 @@ module Distribution.Haddock (
   InterfaceFile(..),
   LinkEnv,
   InstalledInterface(..),
-  module Haddock.DocName
+  DocName(..),
+  docNameOcc
 ) where
 
 
 import Haddock.InterfaceFile
 import Haddock.Types
-import Haddock.DocName
+

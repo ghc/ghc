@@ -108,7 +108,6 @@ executable haddock
     Haddock.Backends.Hoogle
     Haddock.ModuleTree
     Haddock.Types
-    Haddock.DocName
     Haddock.Version
     Haddock.InterfaceFile        
     Haddock.Exception
@@ -130,7 +129,6 @@ library
                         ScopedTypeVariables, MagicHash
   exposed-modules:      Distribution.Haddock
   other-modules:
-    Haddock.DocName
     Haddock.Types
     Haddock.InterfaceFile
     Haddock.Exception

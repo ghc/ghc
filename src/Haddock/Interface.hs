@@ -14,7 +14,6 @@ module Haddock.Interface (
 ) where
 
 
-import Haddock.DocName
 import Haddock.Interface.Create
 import Haddock.Interface.AttachInstances
 import Haddock.Interface.Rename

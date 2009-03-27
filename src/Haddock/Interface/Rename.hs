@@ -8,7 +8,6 @@
 module Haddock.Interface.Rename (renameInterface) where
 
 
-import Haddock.DocName
 import Haddock.Types
 import Haddock.GHC.Utils
 

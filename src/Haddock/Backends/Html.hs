@@ -14,7 +14,6 @@ module Haddock.Backends.Html (
 
 import Prelude hiding (div)
 
-import Haddock.DocName
 import Haddock.Backends.DevHelp
 import Haddock.Backends.HH
 import Haddock.Backends.HH2
