@@ -399,6 +399,9 @@ unionBy eq xs ys        =  xs ++ foldl (flip (deleteBy eq)) (nubBy eq ys) xs
 -- > [1,2,3,4] `intersect` [2,4,6,8] == [2,4]
 --
 -- If the first list contains duplicates, so will the result.
+--
+-- > [1,2,2,3,4] `intersect` [6,4,4,2] == [2,2,4]
+--
 -- It is a special case of 'intersectBy', which allows the programmer to
 -- supply their own equality test.
 
