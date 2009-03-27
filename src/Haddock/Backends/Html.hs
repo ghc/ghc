@@ -831,11 +831,11 @@ ppTypeOrFunSig summary links loc docname typ doc (pref1, pref2, sep)
       = argBox (leader <+> ppType t) <-> rdocBox (noHtml)
 
 
-ppTyVars :: [Located (HsTyVarBndr DocName)] -> [Html]
+ppTyVars :: [LHsTyVarBndr DocName] -> [Html]
 ppTyVars tvs = map ppTyName (tyvarNames tvs)
 
 
-tyvarNames :: [Located (HsTyVarBndr DocName)] -> [Name]
+tyvarNames :: [LHsTyVarBndr DocName] -> [Name]
 tyvarNames = map (getName . hsTyVarName . unLoc)
   
 
