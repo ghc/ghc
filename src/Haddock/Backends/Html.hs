@@ -787,7 +787,7 @@ ppFunSig summary links loc mbDoc docname typ =
   ppTypeOrFunSig summary links loc docname typ mbDoc 
     (ppTypeSig summary occname typ, ppBinder False occname, dcolon)
   where
-    occname = nameOccName . docNameOrig $ docname
+    occname = nameOccName . getName $ docname
 
 ppTypeOrFunSig :: Bool -> LinksInfo -> SrcSpan -> DocName -> HsType DocName ->
                   Maybe (HsDoc DocName) -> (Html, Html, Html) -> HtmlTable
@@ -837,7 +837,7 @@ ppTyVars tvs = map ppTyName (tyvarNames tvs)
 
 
 tyvarNames :: [Located (HsTyVarBndr DocName)] -> [Name]
-tyvarNames = map (docNameOrig . hsTyVarName . unLoc)
+tyvarNames = map (getName . hsTyVarName . unLoc)
   
 
 ppFor :: Bool -> LinksInfo -> SrcSpan -> Maybe Doc -> ForeignDecl DocName -> HtmlTable
@@ -913,7 +913,7 @@ ppTyFam summary associated links loc mbDoc decl
 
     doc = ndocBox . docToHtml . fromJust $ mbDoc 
 
-    instId = collapseId (docNameOrig docname)
+    instId = collapseId (getName docname)
 
     instancesBit = instHdr instId </>
   	  tda [theclass "body"] << 
@@ -1025,7 +1025,7 @@ ppTypeApp n (t1:t2:rest) ppDN ppT
   | operator, not . null $ rest = parens opApp <+> hsep (map ppT rest)
   | operator                    = opApp
   where
-    operator = isNameSym . docNameOrig $ n
+    operator = isNameSym . getName $ n
     opApp = ppT t1 <+> ppDN n <+> ppT t2
 
 ppTypeApp n ts ppDN ppT = ppDN n <+> hsep (map ppT ts)
@@ -1151,7 +1151,7 @@ ppClassDecl summary links instances loc mbDoc _ subdocs
     atTable = abovesSep s8 $ [ ppAssocType summary links doc at | at <- ats
                              , let doc = join $ lookup (tcdName $ unL at) subdocs ]
 
-    instId = collapseId (docNameOrig nm)
+    instId = collapseId (getName nm)
     instancesBit
       | null instances = Html.emptyTable
       | otherwise 
@@ -1253,7 +1253,7 @@ ppDataDecl summary links instances loc mbDoc dataDecl
 	  aboves (map ppSideBySideConstr cons)
         )
 
-    instId = collapseId (docNameOrig docname)
+    instId = collapseId (getName docname)
 
     instancesBit
       | null instances = Html.emptyTable

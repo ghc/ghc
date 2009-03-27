@@ -19,22 +19,14 @@ data DocName = Documented Name Module | Undocumented Name
   deriving Eq
 
 
--- TODO: remove docNameOrig in favour of the NamedThing instance
+-- | The 'OccName' belonging to this name
+docNameOcc :: DocName -> OccName
+docNameOcc = nameOccName . getName
+
 
 instance NamedThing DocName where
   getName (Documented name _) = name
   getName (Undocumented name) = name
-
-
--- | The 'OccName' belonging to this name
-docNameOcc :: DocName -> OccName
-docNameOcc = nameOccName . docNameOrig
-
-
--- | The original definition site of this name
-docNameOrig :: DocName -> Name
-docNameOrig (Documented name _) = name
-docNameOrig (Undocumented name) = name
 
 
 instance Binary DocName where
