@@ -20,24 +20,19 @@ import Haddock.Interface.Rename
 import Haddock.Types
 import Haddock.Options
 import Haddock.GHC.Utils
-import Haddock.Exception
 import Haddock.Utils
 import Haddock.InterfaceFile
 
 import qualified Data.Map as Map
-import Data.Map (Map)
 import Data.List
 import Data.Maybe
 import Control.Monad
 import Control.Exception ( evaluate )
 import Distribution.Verbosity
 
-import GHC
+import GHC hiding (verbosity, flags)
 import Name
-import HscTypes ( msHsFilePath )
 import Digraph
-import BasicTypes
-import SrcLoc
 import HscTypes
 
 
@@ -241,7 +236,7 @@ mkGhcModule (mdl, file, checkedMod) dynflags = GhcModule {
     mbOpts = haddockOptions dynflags
 #endif
     (group_, _, mbExports, mbDoc, info) = renamed
-    (parsed, renamed, _, modInfo) = checkedMod
+    (_, renamed, _, modInfo) = checkedMod
 
 
 -- | Build a mapping which for each original name, points to the "best"
@@ -262,6 +257,6 @@ buildHomeLinks ifaces = foldl upd Map.empty (reverse ifaces)
       | otherwise = foldl' keep_new old_env exported_names
       where
         exported_names = ifaceVisibleExports iface
-        mod            = ifaceMod iface
-        keep_old env n = Map.insertWith (\new old -> old) n mod env
-        keep_new env n = Map.insert n mod env
+        mdl            = ifaceMod iface
+        keep_old env n = Map.insertWith (\_ old -> old) n mdl env
+        keep_new env n = Map.insert n mdl env
