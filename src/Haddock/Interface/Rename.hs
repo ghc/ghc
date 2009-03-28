@@ -16,41 +16,37 @@ import Name
 import BasicTypes
 import SrcLoc 
 import Bag (emptyBag)
-import Outputable
-import Util (thenCmp)
 
 import Data.List
-import Data.Map (Map)
 import qualified Data.Map as Map hiding ( Map )
 import Prelude hiding (mapM)
 import Data.Traversable (mapM)
-import Control.Arrow
 import Control.Monad hiding (mapM)
 
 
 renameInterface :: LinkEnv -> Bool -> Interface -> ErrMsgM Interface
-renameInterface renamingEnv warnings mod =
+renameInterface renamingEnv warnings iface =
 
   -- first create the local env, where every name exported by this module
   -- is mapped to itself, and everything else comes from the global renaming
   -- env
-  let localEnv = foldl fn renamingEnv (ifaceVisibleExports mod)
-        where fn env name = Map.insert name (ifaceMod mod) env
+  let localEnv = foldl fn renamingEnv (ifaceVisibleExports iface)
+        where fn env name = Map.insert name (ifaceMod iface) env
       
-      docMap = Map.map (\(_,x,_) -> x) (ifaceDeclMap mod)
+      docMap = Map.map (\(_,x,_) -> x) (ifaceDeclMap iface)
       docs   = [ (n, doc) | (n, Just doc) <- Map.toList docMap ]
       renameMapElem (k,d) = do d' <- renameDoc d; return (k, d') 
 
       -- rename names in the exported declarations to point to things that
       -- are closer to, or maybe even exported by, the current module.
       (renamedExportItems, missingNames1)
-        = runRnFM localEnv (renameExportItems (ifaceExportItems mod))
+        = runRnFM localEnv (renameExportItems (ifaceExportItems iface))
 
       (rnDocMap, missingNames2) 
         = runRnFM localEnv (liftM Map.fromList (mapM renameMapElem docs))
 
       (finalModuleDoc, missingNames3)
-        = runRnFM localEnv (renameMaybeDoc (ifaceDoc mod))
+        = runRnFM localEnv (renameMaybeDoc (ifaceDoc iface))
 
       -- combine the missing names and filter out the built-ins, which would
       -- otherwise allways be missing. 
@@ -66,14 +62,14 @@ renameInterface renamingEnv warnings mod =
   in do
     -- report things that we couldn't link to. Only do this for non-hidden
     -- modules.
-    unless (OptHide `elem` ifaceOptions mod || null strings || not warnings) $
-      tell ["Warning: " ++ moduleString (ifaceMod mod) ++
+    unless (OptHide `elem` ifaceOptions iface || null strings || not warnings) $
+      tell ["Warning: " ++ moduleString (ifaceMod iface) ++
             ": could not find link destinations for:\n"++
             "   " ++ concat (map (' ':) strings) ]
 
-    return $ mod { ifaceRnDoc = finalModuleDoc,
-                   ifaceRnDocMap = rnDocMap,
-                   ifaceRnExportItems = renamedExportItems }
+    return $ iface { ifaceRnDoc         = finalModuleDoc,
+                     ifaceRnDocMap      = rnDocMap,
+                     ifaceRnExportItems = renamedExportItems }
 
 
 --------------------------------------------------------------------------------
@@ -121,7 +117,7 @@ runRnFM env rn = unRn rn lkp
   where 
     lkp n = case Map.lookup n env of
       Nothing  -> (False, Undocumented n) 
-      Just mod -> (True,  Documented n mod)
+      Just mdl -> (True,  Documented n mdl)
 
 
 --------------------------------------------------------------------------------
@@ -145,11 +141,12 @@ renameMaybeDoc :: Maybe (HsDoc Name) -> RnM (Maybe (HsDoc DocName))
 renameMaybeDoc mbDoc = mapM renameDoc mbDoc
 
 
-renameLDoc (L loc doc) = return . L loc =<< renameDoc doc
+renameLDoc :: LHsDoc Name -> RnM (LHsDoc DocName)
+renameLDoc = mapM renameDoc
 
 
 renameDoc :: HsDoc Name -> RnM (HsDoc DocName)
-renameDoc doc = case doc of
+renameDoc d = case d of
   DocEmpty -> return DocEmpty
   DocAppend a b -> do
     a' <- renameDoc a
@@ -191,7 +188,8 @@ renameDoc doc = case doc of
   DocAName str -> return (DocAName str)
 
 
-renameLPred (L loc p) = return . L loc =<< renamePred p
+renameLPred :: LHsPred Name -> RnM (LHsPred DocName)
+renameLPred = mapM renamePred
 
 
 renamePred :: HsPred Name -> RnM (HsPred DocName)
@@ -209,9 +207,11 @@ renamePred (HsIParam (IPName name) t) = do
   return (HsIParam (IPName name') t')
 
 
-renameLType (L loc t) = return . L loc =<< renameType t
+renameLType :: LHsType Name -> RnM (LHsType DocName) 
+renameLType = mapM renameType
 
 
+renameType :: HsType Name -> RnM (HsType DocName)
 renameType t = case t of 
   HsForAllTy expl tyvars lcontext ltype -> do
     tyvars'   <- mapM renameLTyVarBndr tyvars
@@ -232,8 +232,8 @@ renameType t = case t of
     b' <- renameLType b
     return (HsFunTy a' b')
 
-  HsListTy t -> return . HsListTy =<< renameLType t
-  HsPArrTy t -> return . HsPArrTy =<< renameLType t
+  HsListTy ty -> return . HsListTy =<< renameLType ty
+  HsPArrTy ty -> return . HsPArrTy =<< renameLType ty
 
   HsTupleTy b ts -> return . HsTupleTy b =<< mapM renameLType ts
 
@@ -243,29 +243,31 @@ renameType t = case t of
     b'  <- renameLType b
     return (HsOpTy a' (L loc op') b')
 
-  HsParTy t -> return . HsParTy =<< renameLType t
+  HsParTy ty -> return . HsParTy =<< renameLType ty
 
   HsNumTy n -> return (HsNumTy n)
 
   HsPredTy p -> return . HsPredTy =<< renamePred p
 
-  HsKindSig t k -> do
-    t' <- renameLType t
-    return (HsKindSig t' k)
+  HsKindSig ty k -> do
+    ty' <- renameLType ty
+    return (HsKindSig ty' k)
 
-  HsDocTy t doc -> do
-    t' <- renameLType t
+  HsDocTy ty doc -> do
+    ty' <- renameLType ty
     doc' <- renameLDoc doc
-    return (HsDocTy t' doc')
+    return (HsDocTy ty' doc')
 
   _ -> error "renameType"
 
 
+renameLTyVarBndr :: LHsTyVarBndr Name -> RnM (LHsTyVarBndr DocName)
 renameLTyVarBndr (L loc tv) = do
   name' <- rename (hsTyVarName tv)
   return $ L loc (replaceTyVarName tv name')
 
-    
+
+renameLContext :: Located [LHsPred Name] -> RnM (Located [LHsPred DocName])
 renameLContext (L loc context) = do
   context' <- mapM renameLPred context
   return (L loc context')
@@ -279,10 +281,12 @@ renameInstHead (preds, className, types) = do
   return (preds', className', types')
 
 
+renameLDecl :: LHsDecl Name -> RnM (LHsDecl DocName)
 renameLDecl (L loc d) = return . L loc =<< renameDecl d
 
 
-renameDecl d = case d of
+renameDecl :: HsDecl Name -> RnM (HsDecl DocName)
+renameDecl decl = case decl of
   TyClD d -> do
     d' <- renameTyClD d
     return (TyClD d')
@@ -298,9 +302,11 @@ renameDecl d = case d of
   _ -> error "renameDecl"
 
 
+renameLTyClD :: LTyClDecl Name -> RnM (LTyClDecl DocName)
 renameLTyClD (L loc d) = return . L loc =<< renameTyClD d 
 
 
+renameTyClD :: TyClDecl Name -> RnM (TyClDecl DocName)
 renameTyClD d = case d of
   ForeignType lname a b -> do
     lname' <- renameL lname
@@ -371,15 +377,18 @@ renameTyClD d = case d of
    
     renameLSig (L loc sig) = return . L loc =<< renameSig sig
 
-      
+ 
+renameSig :: Sig Name -> RnM (Sig DocName)    
 renameSig sig = case sig of 
   TypeSig lname ltype -> do 
     lname' <- renameL lname
     ltype' <- renameLType ltype
-    return (TypeSig lname' ltype')
+    return (TypeSig lname' ltype')  
   -- we have filtered out all other kinds of signatures in Interface.Create
+  _ -> error "expected TypeSig"
 
 
+renameForD :: ForeignDecl Name -> RnM (ForeignDecl DocName)
 renameForD (ForeignImport lname ltype x) = do
   lname' <- renameL lname
   ltype' <- renameLType ltype
@@ -390,18 +399,19 @@ renameForD (ForeignExport lname ltype x) = do
   return (ForeignExport lname' ltype' x)
 
 
+renameInstD :: InstDecl Name -> RnM (InstDecl DocName)
 renameInstD (InstDecl ltype _ _ lATs) = do
-  ltype <- renameLType ltype
+  ltype' <- renameLType ltype
   lATs' <- mapM renameLTyClD lATs
-  return (InstDecl ltype emptyBag [] lATs') 
+  return (InstDecl ltype' emptyBag [] lATs') 
 
 
 renameExportItem :: ExportItem Name -> RnM (ExportItem DocName)
 renameExportItem item = case item of 
-  ExportModule mod -> return (ExportModule mod)
-  ExportGroup lev id doc -> do
+  ExportModule mdl -> return (ExportModule mdl)
+  ExportGroup lev id_ doc -> do
     doc' <- renameDoc doc
-    return (ExportGroup lev id doc')
+    return (ExportGroup lev id_ doc')
   ExportDecl decl doc subs instances -> do
     decl' <- renameLDecl decl
     doc'  <- mapM renameDoc doc
@@ -417,6 +427,7 @@ renameExportItem item = case item of
     return (ExportDoc doc')
 
 
+renameSub :: (Name, Maybe (HsDoc Name)) -> RnM (DocName, Maybe (HsDoc DocName))
 renameSub (n,doc) = do
   n' <- rename n
   doc' <- mapM renameDoc doc
