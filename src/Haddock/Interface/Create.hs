@@ -20,21 +20,13 @@ import Data.Maybe
 import Data.Char
 import Data.Ord
 import Control.Monad
-import Control.Arrow
 
-import GHC
-import Outputable
+import GHC hiding (flags)
 import SrcLoc
 import Name
 import Module
 import InstEnv
-import Class
-import TypeRep
-import Var hiding (varName)
-import TyCon
-import PrelNames
 import Bag
-import HscTypes
 
 
 -- | Process the data in the GhcModule to produce an interface.
@@ -44,26 +36,26 @@ createInterface :: GhcModule -> [Flag] -> ModuleMap -> InstIfaceMap
                 -> ErrMsgM Interface
 createInterface ghcMod flags modMap instIfaceMap = do
 
-  let mod = ghcModule ghcMod
+  let mdl = ghcModule ghcMod
 
-  opts0 <- mkDocOpts (ghcMbDocOpts ghcMod) flags mod
+  opts0 <- mkDocOpts (ghcMbDocOpts ghcMod) flags mdl
   let opts
         | Flag_IgnoreAllExports `elem` flags = OptIgnoreExports : opts0
         | otherwise = opts0
 
-  let group         = ghcGroup ghcMod
+  let group_        = ghcGroup ghcMod
       exports       = fmap (reverse . map unLoc) (ghcMbExports ghcMod)
       localNames    = ghcDefinedNames ghcMod
-      decls0        = declInfos . topDecls $ group
+      decls0        = declInfos . topDecls $ group_
       decls         = filterOutInstances decls0
       declMap       = mkDeclMap decls
       ignoreExps    = Flag_IgnoreAllExports `elem` flags
       exportedNames = ghcExportedNames ghcMod
       instances     = ghcInstances ghcMod
 
-  warnAboutFilteredDecls mod decls0
+  warnAboutFilteredDecls mdl decls0
 
-  exportItems <- mkExportItems modMap mod (ghcExportedNames ghcMod) decls declMap
+  exportItems <- mkExportItems modMap mdl (ghcExportedNames ghcMod) decls declMap
                                opts exports ignoreExps instances instIfaceMap
 
   let visibleNames = mkVisibleNames exportItems opts
@@ -76,7 +68,7 @@ createInterface ghcMod flags modMap instIfaceMap = do
       | otherwise = exportItems
  
   return Interface {
-    ifaceMod             = mod,
+    ifaceMod             = mdl,
     ifaceOrigFilename    = ghcFilename ghcMod,
     ifaceInfo            = ghcHaddockModInfo ghcMod,
     ifaceDoc             = ghcMbDoc ghcMod,
@@ -102,13 +94,13 @@ createInterface ghcMod flags modMap instIfaceMap = do
 
 
 mkDocOpts :: Maybe String -> [Flag] -> Module -> ErrMsgM [DocOption]
-mkDocOpts mbOpts flags mod = do
+mkDocOpts mbOpts flags mdl = do
   opts <- case mbOpts of 
     Just opts -> case words $ replace ',' ' ' opts of
       [] -> tell ["No option supplied to DOC_OPTION/doc_option"] >> return []
       xs -> liftM catMaybes (mapM parseOption xs)
     Nothing -> return []
-  if Flag_HideModule (moduleString mod) `elem` flags 
+  if Flag_HideModule (moduleString mdl) `elem` flags 
     then return $ OptHide : opts
     else return opts
 
@@ -150,6 +142,7 @@ declInfos decls = [ (parent, doc, subordinates d)
                   | (parent@(L _ d), doc) <- decls]
 
 
+subordinates :: HsDecl Name -> [(Name, Maybe Doc)]
 subordinates (TyClD d) = classDataSubs d
 subordinates _ = []
 
@@ -172,21 +165,25 @@ classDataSubs decl
 
 -- All the sub declarations of a class (that we handle), ordered by
 -- source location, with documentation attached if it exists. 
+classDecls :: TyClDecl Name -> [(Decl, Maybe Doc)]
 classDecls = filterDecls . collectDocs . sortByLoc . declsFromClass
 
 
+declsFromClass :: TyClDecl a -> [Located (HsDecl a)]
 declsFromClass class_ = docs ++ defs ++ sigs ++ ats
   where 
-    docs = decls tcdDocs DocD class_
-    defs = decls (bagToList . tcdMeths) ValD class_
-    sigs = decls tcdSigs SigD class_
-    ats  = decls tcdATs TyClD class_
+    docs = mkDecls tcdDocs DocD class_
+    defs = mkDecls (bagToList . tcdMeths) ValD class_
+    sigs = mkDecls tcdSigs SigD class_
+    ats  = mkDecls tcdATs TyClD class_
 
 
+declName :: HsDecl a -> a
 declName (TyClD d) = tcdName d
 declName (ForD (ForeignImport n _ _)) = unLoc n
 -- we have normal sigs only (since they are taken from ValBindsOut)
 declName (SigD sig) = fromJust $ sigNameNoLoc sig
+declName _ = error "unexpected argument to declName"
 
 
 -- | The top-level declarations of a module that we care about, 
@@ -195,35 +192,40 @@ topDecls :: HsGroup Name -> [(Decl, Maybe Doc)]
 topDecls = filterClasses . filterDecls . collectDocs . sortByLoc . declsFromGroup
 
 
+filterOutInstances :: [(Located (HsDecl a), b, c)] -> [(Located (HsDecl a), b, c)]
 filterOutInstances = filter (\(L _ d, _, _) -> not (isInstD d))
 
 
 -- | Take all declarations except pragmas, infix decls, rules and value
 -- bindings from an 'HsGroup'.
 declsFromGroup :: HsGroup Name -> [Decl]
-declsFromGroup group = 
-  decls hs_tyclds  TyClD    group ++
-  decls hs_derivds DerivD   group ++
-  decls hs_defds   DefD     group ++
-  decls hs_fords   ForD     group ++
-  decls hs_docs    DocD     group ++
-  decls hs_instds  InstD    group ++
-  decls (typesigs . hs_valds) SigD group
+declsFromGroup group_ = 
+  mkDecls hs_tyclds  TyClD    group_ ++
+  mkDecls hs_derivds DerivD   group_ ++
+  mkDecls hs_defds   DefD     group_ ++
+  mkDecls hs_fords   ForD     group_ ++
+  mkDecls hs_docs    DocD     group_ ++
+  mkDecls hs_instds  InstD    group_ ++
+  mkDecls (typesigs . hs_valds) SigD group_
   where
     typesigs (ValBindsOut _ sigs) = filter isVanillaLSig sigs
+    typesigs _ = error "expected ValBindsOut"
 
 
 -- | Take a field of declarations from a data structure and create HsDecls
 -- using the given constructor
-decls field con struct = [ L loc (con decl) | L loc decl <- field struct ]
+mkDecls :: (a -> [Located b]) -> (b -> c) -> a -> [Located c]
+mkDecls field con struct = [ L loc (con decl) | L loc decl <- field struct ]
 
 
 -- | Sort by source location
+sortByLoc :: [Located a] -> [Located a]
 sortByLoc = sortBy (comparing getLoc)
 
 
-warnAboutFilteredDecls mod decls = do
-  let modStr = moduleString mod
+warnAboutFilteredDecls :: Module -> [(LHsDecl Name, b, c)] -> ErrMsgM ()
+warnAboutFilteredDecls mdl decls = do
+  let modStr = moduleString mdl
   let typeInstances =
         nub [ tcdName d | (L _ (TyClD d), _, _) <- decls, isFamInstDecl d ]
 
@@ -271,6 +273,7 @@ filterClasses decls = [ if isClassD d then (L loc (filterClass d), doc) else x
   where
     filterClass (TyClD c) =
       TyClD $ c { tcdSigs = filter isVanillaLSig $ tcdSigs c }  
+    filterClass _ = error "expected TyClD"
 
 
 --------------------------------------------------------------------------------
@@ -343,15 +346,17 @@ mkExportItems
   -> ErrMsgM [ExportItem Name]
 
 mkExportItems modMap this_mod exported_names decls declMap
-              opts maybe_exps ignore_all_exports instances instIfaceMap
+              opts maybe_exps ignore_all_exports _ instIfaceMap
   | isNothing maybe_exps || ignore_all_exports || OptIgnoreExports `elem` opts
     = everything_local_exported
-  | Just specs <- maybe_exps = liftM concat $ mapM lookupExport specs
+  | otherwise = liftM concat $ mapM lookupExport (fromJust maybe_exps)
   where
-    instances = [ d | d@(L _ decl, _, _) <- decls, isInstD decl ]
+
+-- creating export items for intsances (unfinished experiment)
+--    instances = [ d | d@(L _ decl, _, _) <- decls, isInstD decl ]
 
     everything_local_exported =  -- everything exported
-      return (fullContentsOfThisModule this_mod decls)
+      return (fullContentsOfThisModule decls)
    
 
     lookupExport (IEVar x) = declWith x
@@ -363,7 +368,7 @@ mkExportItems modMap this_mod exported_names decls declMap
      --   absFam (Nothing, instances) =
 
     lookupExport (IEThingAll t)        = declWith t
-    lookupExport (IEThingWith t cs)    = declWith t
+    lookupExport (IEThingWith t _)     = declWith t
     lookupExport (IEModuleContents m)  = fullContentsOf m
     lookupExport (IEGroup lev doc)     = return [ ExportGroup lev "" doc ]
     lookupExport (IEDoc doc)           = return [ ExportDoc doc ] 
@@ -377,9 +382,9 @@ mkExportItems modMap this_mod exported_names decls declMap
     declWith t =
       case findDecl t of
         Just x@(decl,_,_) ->
-          let declName =
+          let declName_ =
                 case getMainDeclBinder (unL decl) of
-                  Just declName -> declName
+                  Just n -> n
                   Nothing -> error "declWith: should not happen"
           in case () of
             _
@@ -390,7 +395,7 @@ mkExportItems modMap this_mod exported_names decls declMap
 
               -- We should not show a subordinate by itself if any of its
               -- parents is also exported. See note [1].
-              | t /= declName,
+              | t /= declName_,
                 Just p <- find isExported (parents t $ unL decl) ->
                 do tell [ 
                      "Warning: " ++ moduleString this_mod ++ ": " ++
@@ -425,7 +430,7 @@ mkExportItems modMap this_mod exported_names decls declMap
     isExported n = n `elem` exported_names
 
     fullContentsOf modname
-	| m == this_mod = return (fullContentsOfThisModule this_mod decls)
+	| m == this_mod = return (fullContentsOfThisModule decls)
 	| otherwise = 
 	   case Map.lookup m modMap of
 	     Just iface
@@ -473,8 +478,8 @@ mkExportItems modMap this_mod exported_names decls declMap
 -- (For more information, see Trac #69)
 
 
-fullContentsOfThisModule :: Module -> [DeclInfo] -> [ExportItem Name]
-fullContentsOfThisModule module_ decls = catMaybes (map mkExportItem decls)
+fullContentsOfThisModule :: [DeclInfo] -> [ExportItem Name]
+fullContentsOfThisModule decls = catMaybes (map mkExportItem decls)
   where
     mkExportItem (L _ (DocD (DocGroup lev doc)), _, _) = Just $ ExportGroup lev "" doc
     mkExportItem (L _ (DocD (DocCommentNamed _ doc)), _, _)   = Just $ ExportDoc doc
@@ -498,7 +503,7 @@ extractDecl name mdl decl
 --        let assocMathes = [ tyDecl | at <- tcdATs d,  ] 
         in case matches of 
           [s0] -> let (n, tyvar_names) = name_and_tyvars d
-                      L pos sig = extractClassDecl n mdl tyvar_names s0
+                      L pos sig = extractClassDecl n tyvar_names s0
                   in L pos (SigD sig)
           _ -> error "internal: extractDecl" 
       TyClD d | isDataDecl d -> 
@@ -514,20 +519,15 @@ toTypeNoLoc :: Located Name -> LHsType Name
 toTypeNoLoc lname = noLoc (HsTyVar (unLoc lname))
 
 
-rmLoc :: Located a -> Located a
-rmLoc a = noLoc (unLoc a)
-
-
-extractClassDecl :: Name -> Module -> [Located Name] -> LSig Name -> LSig Name
-extractClassDecl c mdl tvs0 (L pos (TypeSig lname ltype)) = case ltype of
-  L _ (HsForAllTy exp tvs (L _ preds) ty) -> 
-    L pos (TypeSig lname (noLoc (HsForAllTy exp tvs (lctxt preds) ty)))
+extractClassDecl :: Name -> [Located Name] -> LSig Name -> LSig Name
+extractClassDecl c tvs0 (L pos (TypeSig lname ltype)) = case ltype of
+  L _ (HsForAllTy expl tvs (L _ preds) ty) -> 
+    L pos (TypeSig lname (noLoc (HsForAllTy expl tvs (lctxt preds) ty)))
   _ -> L pos (TypeSig lname (noLoc (mkImplicitHsForAllTy (lctxt []) ltype)))
   where
     lctxt preds = noLoc (ctxt preds)
     ctxt preds = [noLoc (HsClassP c (map toTypeNoLoc tvs0))] ++ preds  
-
-extractClassDecl _ _ _ d = error $ "extractClassDecl: unexpected decl"
+extractClassDecl _ _ _ = error $ "extractClassDecl: unexpected decl"
 
 
 extractRecSel :: Name -> Module -> Name -> [Located Name] -> [LConDecl Name]
@@ -561,31 +561,9 @@ mkVisibleNames exports opts
         Just n -> n : subs
         Nothing -> subs
       where subs = map fst (expItemSubDocs e) 
-    exportName e@ExportNoDecl {} = [] -- we don't count these as visible, since
-                                      -- we don't want links to go to them.
+    exportName ExportNoDecl {} = [] -- we don't count these as visible, since
+                                    -- we don't want links to go to them.
     exportName _ = []
-
-      
-exportModuleMissingErr this mdl 
-  = ["Warning: in export list of " ++ show (moduleString this)
-	 ++ ": module not found: " ++ show (moduleString mdl)]
-
-
--- | For a given entity, find all the names it "owns" (ie. all the
--- constructors and field names of a tycon, or all the methods of a
--- class).
-allSubsOfName :: Map Module Interface -> Name -> [Name]
-allSubsOfName ifaces name =
-  case Map.lookup (nameModule name) ifaces of
-    Just iface -> subsOfName name (ifaceDeclMap iface)
-    Nothing -> []
-
-
-subsOfName :: Name -> Map Name DeclInfo -> [Name]
-subsOfName n declMap =
-  case Map.lookup n declMap of
-    Just (_, _, subs) -> map fst subs
-    Nothing -> []
 
 
 -- | Find a stand-alone documentation comment by its name
