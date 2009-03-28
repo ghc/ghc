@@ -50,13 +50,13 @@ extra-source-files:
   src/haddock.sh
 
 data-files:
-	html/haddock-DEBUG.css
-	html/haddock.css
-	html/haddock-util.js
-	html/haskell_icon.gif
-	html/minus.gif
-	html/plus.gif
-	html/frames.html
+  html/haddock-DEBUG.css
+  html/haddock.css
+  html/haddock-util.js
+  html/haskell_icon.gif
+  html/minus.gif
+  html/plus.gif
+  html/frames.html
 
 flag in-ghc-tree
   description: Are we in a GHC tree?
