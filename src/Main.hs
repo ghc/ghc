@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wwarn #-}
 {-# LANGUAGE ForeignFunctionInterface, PatternSignatures #-}
 
 --
@@ -31,11 +32,9 @@ import qualified Control.Exception as NewException
 #else
 import Control.Exception
 #endif
-import Data.Dynamic
 import Data.Maybe
 import Data.IORef
 import qualified Data.Map as Map
-import Data.Version
 import System.IO
 import System.Exit
 import System.Environment
@@ -52,13 +51,10 @@ import Data.Int
 import GHC.Paths
 #endif
 
-import GHC
-import DynFlags
-import Bag
-import ErrUtils
+import GHC hiding (flags, verbosity)
+import DynFlags hiding (flags, verbosity)
 #if __GLASGOW_HASKELL__ >= 609
 import Panic (handleGhcException)
-import Util
 import MonadUtils ( MonadIO(..) )
 #else
 import Util hiding (handle)
@@ -70,10 +66,12 @@ import Util hiding (handle)
 --------------------------------------------------------------------------------
 
 
+handleTopExceptions :: IO a -> IO a
 handleTopExceptions = 
   handleNormalExceptions . handleHaddockExceptions . handleGhcExceptions
 
 
+handleNormalExceptions :: IO a -> IO a
 handleNormalExceptions inner =
   handle (\exception -> do
     hFlush stdout    
@@ -88,6 +86,7 @@ handleNormalExceptions inner =
   ) inner
 
 
+handleHaddockExceptions :: IO a -> IO a
 handleHaddockExceptions inner = 
 #if __GLASGOW_HASKELL__ >= 609
   NewException.catches inner [NewException.Handler handler]
@@ -100,6 +99,7 @@ handleHaddockExceptions inner =
       exitFailure
 
 
+handleGhcExceptions :: IO a -> IO a
 handleGhcExceptions inner = 
   -- compilation errors: messages with locations attached
 #if __GLASGOW_HASKELL__ < 609
@@ -137,7 +137,7 @@ main = handleTopExceptions $ do
   -- parse command-line flags and handle some of them initially
   args <- getArgs
   (flags, fileArgs) <- parseHaddockOpts args
-  handleEasyFlags flags fileArgs
+  handleEasyFlags flags
   verbosity <- getVerbosity flags
 
   let renderStep packages interfaces = do 
@@ -169,7 +169,7 @@ main = handleTopExceptions $ do
             liftIO exitFailure
 
       -- initialize GHC
-      startGhc libDir (ghcFlags flags) $ \dynflags -> handleSrcErrors $ do
+      startGhc libDir (ghcFlags flags) $ \_ -> handleSrcErrors $ do
 
         -- get packages supplied with --read-interface
         packages <- readInterfaceFiles nameCacheFromGhc (ifacePairs flags)
@@ -231,7 +231,7 @@ render flags ifaces installedIfaces = do
                       ,listToMaybe [str | Flag_WikiModuleURL str <- flags]
                       ,listToMaybe [str | Flag_WikiEntityURL str <- flags])
 
-  libdir <- case [str | Flag_Lib str <- flags] of
+  libDir <- case [str | Flag_Lib str <- flags] of
 		[] ->
 #ifdef IN_GHC_TREE
                       do m <- getExecDir
@@ -285,7 +285,7 @@ render flags ifaces installedIfaces = do
     ppHtmlIndex odir title packageStr maybe_html_help_format
                 maybe_contents_url maybe_source_urls maybe_wiki_urls
                 allVisibleIfaces
-    copyHtmlBits odir libdir css_file
+    copyHtmlBits odir libDir css_file
         
   when (Flag_GenContents `elem` flags && Flag_GenIndex `elem` flags) $ do
     ppHtmlHelpFiles title packageStr visibleIfaces odir maybe_html_help_format []
@@ -294,14 +294,14 @@ render flags ifaces installedIfaces = do
     ppHtmlContents odir title packageStr maybe_html_help_format
 	                 maybe_index_url maybe_source_urls maybe_wiki_urls
 	                 allVisibleIfaces True prologue
-    copyHtmlBits odir libdir css_file
+    copyHtmlBits odir libDir css_file
 
   when (Flag_Html `elem` flags) $ do
     ppHtml title packageStr visibleIfaces odir
                 prologue maybe_html_help_format
                 maybe_source_urls maybe_wiki_urls
                 maybe_contents_url maybe_index_url
-    copyHtmlBits odir libdir css_file
+    copyHtmlBits odir libDir css_file
 
   when (Flag_Hoogle `elem` flags) $ do
     let pkgName2 = if pkgName == "main" && title /= [] then title else pkgName
@@ -330,7 +330,7 @@ readInterfaceFiles name_cache_accessor pairs = do
           putStrLn ("   " ++ show err)
           putStrLn "Skipping this interface."
           return Nothing
-        Right iface -> return $ Just (iface, html)
+        Right f -> return $ Just (f, html)
 
 
 dumpInterfaceFile :: [InstalledInterface] -> LinkEnv -> [Flag] -> IO ()
@@ -350,12 +350,14 @@ dumpInterfaceFile ifaces homeLinks flags =
 -------------------------------------------------------------------------------
 
 
+getGhcLibDir :: [Flag] -> Maybe String
 getGhcLibDir flags =
   case [ dir | Flag_GhcLibDir dir <- flags ] of
     [] -> Nothing
     xs -> Just $ last xs
 
 
+getVerbosity :: Monad m => [Flag] -> m Verbosity
 getVerbosity flags =
   case [ str | Flag_Verbosity str <- flags ] of
     [] -> return normal
@@ -364,7 +366,8 @@ getVerbosity flags =
       Right v -> return v
 
 
-handleEasyFlags flags fileArgs = do
+handleEasyFlags :: [Flag] -> IO ()
+handleEasyFlags flags = do
   usage <- getUsage
 
   when (Flag_Help       `elem` flags) (bye usage)
