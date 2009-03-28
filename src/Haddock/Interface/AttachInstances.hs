@@ -12,7 +12,6 @@ module Haddock.Interface.AttachInstances (attachInstances) where
 
 
 import Haddock.Types
-import Haddock.GHC.Utils
 
 import qualified Data.Map as Map
 import Data.Map (Map)
@@ -39,15 +38,15 @@ import FastString
 
 
 attachInstances :: [Interface] -> [Name] -> [Interface]
-attachInstances modules filterNames = map attach modules
+attachInstances ifaces filterNames = map attach ifaces
   where
     instMap =
       fmap (map toHsInstHead . sortImage instHead) $
-      collectInstances modules filterNames
+      collectInstances ifaces filterNames
 
-    attach mod = mod { ifaceExportItems = newItems }
+    attach iface = iface { ifaceExportItems = newItems }
       where
-        newItems = map attachExport (ifaceExportItems mod)
+        newItems = map attachExport (ifaceExportItems iface)
 
         attachExport (ExportDecl decl@(L _ (TyClD d)) doc subs _)
           | isClassDecl d || isDataDecl d || isFamilyDecl d =
@@ -72,13 +71,15 @@ collectInstances
    -> [Name]
    -> Map Name [([TyVar], [PredType], Class, [Type])]  -- maps class/type names to instances
 
-collectInstances modules filterNames
+collectInstances ifaces _ -- filterNames
   = Map.fromListWith (flip (++)) tyInstPairs `Map.union`
     Map.fromListWith (flip (++)) classInstPairs
   where
-    allInstances = concat (map ifaceInstances modules)
+    allInstances = concat (map ifaceInstances ifaces)
     classInstPairs = [ (is_cls inst, [instanceHead inst]) | 
-                       inst <- allInstances, Just n <- nub (is_tcs inst) ]
+                       inst <- allInstances ]
+                    -- unfinished filtering of internal instances
+                    -- Just n <- nub (is_tcs inst) ]
                     --   n `elem` filterNames ]
     tyInstPairs = [ (tycon, [instanceHead inst]) | inst <- allInstances, 
                     Just tycon <- nub (is_tcs inst) ]    
@@ -98,8 +99,8 @@ instHead (_, _, cls, args)
     simplify (ForAllTy _ t) = simplify t
     simplify (FunTy t1 t2) = 
       SimpleType funTyConName [simplify t1, simplify t2]
-    simplify (AppTy t1 t2) = SimpleType s (args ++ [simplify t2])
-      where (SimpleType s args) = simplify t1
+    simplify (AppTy t1 t2) = SimpleType s (ts ++ [simplify t2])
+      where (SimpleType s ts) = simplify t1
     simplify (TyVarTy v) = SimpleType (tyVarName v) []
     simplify (TyConApp tc ts) = SimpleType (tyConName tc) (map simplify ts)
     simplify _ = error "simplify"
@@ -111,6 +112,7 @@ sortImage f xs = map snd $ sortBy cmp_fst [(f x, x) | x <- xs]
  where cmp_fst (x,_) (y,_) = compare x y
 
 
+funTyConName :: Name
 funTyConName = mkWiredInName gHC_PRIM
                         (mkOccNameFS tcName FSLIT("(->)"))
                         funTyConKey
@@ -133,6 +135,7 @@ toHsPred (IParam n t) = HsIParam n (toLHsType t)
 toHsPred (EqPred t1 t2) = HsEqualP (toLHsType t1) (toLHsType t2)
 
 
+toLHsType :: Type -> Located (HsType Name)
 toLHsType = noLoc . toHsType
 
  
@@ -148,11 +151,11 @@ toHsType t = case t of
     _ -> app (tycon tc) ts
 
   FunTy a b -> HsFunTy (toLHsType a) (toLHsType b)
-  ForAllTy v t -> cvForAll [v] t 
+  ForAllTy v ty -> cvForAll [v] ty 
   PredTy p -> HsPredTy (toHsPred p) 
   where
     tycon tc = HsTyVar (tyConName tc)
     app tc ts = foldl (\a b -> HsAppTy (noLoc a) (noLoc b)) tc (map toHsType ts)
-    cvForAll vs (ForAllTy v t) = cvForAll (v:vs) t
-    cvForAll vs t = mkExplicitHsForAllTy (tyvarbinders vs) (noLoc []) (toLHsType t)
+    cvForAll vs (ForAllTy v ty) = cvForAll (v:vs) ty
+    cvForAll vs ty = mkExplicitHsForAllTy (tyvarbinders vs) (noLoc []) (toLHsType ty)
     tyvarbinders vs = map (noLoc . UserTyVar . tyVarName) vs
