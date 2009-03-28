@@ -53,5 +53,5 @@ test = do
   code <- waitForProcess handle
 
 --  code <- system $ printf "haddock -w -o %s -h --optghc=-fglasgow-exts --optghc=-w %s" outdir (unwords mods')
-  unless (code == ExitSuccess) $ error "Haddock run failed! Exiting."
+  when (code /= ExitSuccess) $ error "Haddock run failed! Exiting."
   check mods (if not (null args) && args !! 0 == "all" then False else True)
