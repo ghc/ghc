@@ -609,6 +609,7 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(barf)				\
       SymI_HasProto(debugBelch)				\
       SymI_HasProto(errorBelch)				\
+      SymI_HasProto(sysErrorBelch)                      \
       SymI_HasProto(asyncExceptionsBlockedzh_fast)	\
       SymI_HasProto(blockAsyncExceptionszh_fast)	\
       SymI_HasProto(catchzh_fast)			\
