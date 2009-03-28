@@ -120,7 +120,7 @@ module X where
 	<listitem>
 	  <para>Most non-mode flags fall into this category.  A dynamic flag
 	    may be used on the command line, in a
-	    <literal>GHC_OPTIONS</literal> pragma in a source file, or set
+	    <literal>OPTIONS_GHC</literal> pragma in a source file, or set
 	    using <literal>:set</literal> in GHCi.</para>
 	</listitem>
       </varlistentry>
