@@ -74,7 +74,7 @@ module TcType (
   isPredTy, isDictTy, isDictLikeTy,
   tcSplitDFunTy, tcSplitDFunHead, predTyUnique, 
   mkClassPred, isInheritablePred, isIPPred, 
-  dataConsStupidTheta, isRefineableTy, isRefineablePred,
+  isRefineableTy, isRefineablePred,
 
   ---------------------------------
   -- Foreign import and export
@@ -140,7 +140,6 @@ import DataCon
 import Class
 import Var
 import ForeignCall
-import Unify
 import VarSet
 import Type
 import Coercion
@@ -960,28 +959,6 @@ isInheritablePred _            = False
 substEqSpec :: TvSubst -> [(TyVar,Type)] -> [(TcType,TcType)]
 substEqSpec subst eq_spec = [ (substTyVar subst tv, substTy subst ty)
 			    | (tv,ty) <- eq_spec]
-\end{code}
-
---------------------- The stupid theta (sigh) ---------------------------------
-
-\begin{code}
-dataConsStupidTheta :: [DataCon] -> ThetaType
--- Union the stupid thetas from all the specified constructors (non-empty)
--- All the constructors should have the same result type, modulo alpha conversion
--- The resulting ThetaType uses type variables from the *first* constructor in the list
---
--- It's here because it's used in MkId.mkRecordSelId, and in TcExpr
-dataConsStupidTheta (con1:cons)
-  = nubBy tcEqPred all_preds
-  where
-    all_preds 	  = dataConStupidTheta con1 ++ other_stupids
-    res_ty1       = dataConOrigResTy con1
-    other_stupids = [ substPred subst pred
-		    | con <- cons
-		    , let (tvs, _, _, res_ty) = dataConSig con
-			  Just subst = tcMatchTy (mkVarSet tvs) res_ty res_ty1
-		    , pred <- dataConStupidTheta con ]
-dataConsStupidTheta [] = panic "dataConsStupidTheta"
 \end{code}
 
 
