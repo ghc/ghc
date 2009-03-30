@@ -48,7 +48,7 @@ done
 if [ "$CPUS" = "" ]; then
     threads=2
 else
-    threads=$((($CPUS + 1) * 2)) # `expr $CPUS + 1`
+    threads=$(($CPUS + 1)) # `expr $CPUS + 1`
 fi
 
 if [ $testsuite_only -eq 0 ]; then
