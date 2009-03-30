@@ -465,7 +465,7 @@ def test_common_work (name, opts, func, args):
                '.interp.stderr.normalised', '.interp.stdout.normalised',
                '.stats',
                '.hi', '.o', '.prof', '.exe.prof', '.hc', '_stub.h', '_stub.c',
-               '_stub.o', '.hp', '.exe.hp', '.ps', '.aux', '.hcr']))
+               '_stub.o', '.hp', '.exe.hp', '.ps', '.aux', '.hcr', '.eventlog']))
 
     clean(getTestOpts().clean_files)
 
