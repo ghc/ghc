@@ -655,6 +655,7 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(hs_free_stable_ptr)			\
       SymI_HasProto(hs_free_fun_ptr)			\
       SymI_HasProto(hs_hpc_rootModule)		        \
+      SymI_HasProto(hs_hpc_module)		        \
       SymI_HasProto(initLinker)				\
       SymI_HasProto(unpackClosurezh_fast)               \
       SymI_HasProto(getApStackValzh_fast)               \
