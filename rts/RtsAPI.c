@@ -307,7 +307,7 @@ rts_getInt64 (HaskellObj p)
     //        p->header.info == I64zh_static_info);
     tmp = (HsInt32*)&(UNTAG_CLOSURE(p)->payload[0]);
 
-    HsInt64 i	= (HsInt64)(tmp[0] << 32) | (HsInt64)tmp[1];
+    HsInt64 i	= (HsInt64)((HsInt64)(tmp[0]) << 32) | (HsInt64)tmp[1];
     return i;
 }
 
