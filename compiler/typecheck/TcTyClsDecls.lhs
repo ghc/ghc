@@ -1095,7 +1095,8 @@ checkValidDataCon :: TyCon -> DataCon -> TcM ()
 checkValidDataCon tc con
   = setSrcSpan (srcLocSpan (getSrcLoc con))	$
     addErrCtxt (dataConCtxt con)		$ 
-    do	{ let tc_tvs = tyConTyVars tc
+    do	{ traceTc (ptext (sLit "Validity of data con") <+> ppr con)
+        ; let tc_tvs = tyConTyVars tc
 	      res_ty_tmpl = mkFamilyTyConApp tc (mkTyVarTys tc_tvs)
 	      actual_res_ty = dataConOrigResTy con
 	; checkTc (isJust (tcMatchTy (mkVarSet tc_tvs)
