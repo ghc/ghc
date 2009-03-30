@@ -43,6 +43,7 @@ import SrcLoc
 import Maybes
 import Util
 import Name
+import FiniteMap
 import Outputable
 import FastString
 \end{code}
@@ -289,8 +290,7 @@ match vars@(v:_) ty eqns
 	  (aux_binds, tidy_eqns) <- mapAndUnzipM (tidyEqnInfo v) eqns
 
 		-- Group the equations and match each group in turn
-
-       ; let grouped = (groupEquations tidy_eqns)
+       ; let grouped = groupEquations tidy_eqns
 
          -- print the view patterns that are commoned up to help debug
        ; ifOptM Opt_D_dump_view_pattern_commoning (debug grouped)
@@ -305,10 +305,11 @@ match vars@(v:_) ty eqns
     match_group :: [(PatGroup,EquationInfo)] -> DsM MatchResult
     match_group eqns@((group,_) : _)
         = case group of
+            PgCon _    -> matchConFamily  vars ty (subGroup [(c,e) | (PgCon c, e) <- eqns])
+            PgLit _    -> matchLiterals   vars ty (subGroup [(l,e) | (PgLit l, e) <- eqns])
+
             PgAny      -> matchVariables  vars ty (dropGroup eqns)
-            PgCon _    -> matchConFamily  vars ty (subGroups eqns)
-            PgLit _    -> matchLiterals   vars ty (subGroups eqns)
-            PgN _      -> matchNPats      vars ty (subGroups eqns)
+            PgN _      -> matchNPats      vars ty (dropGroup eqns)
             PgNpK _    -> matchNPlusKPats vars ty (dropGroup eqns)
             PgBang     -> matchBangs      vars ty (dropGroup eqns)
             PgCo _     -> matchCoercion   vars ty (dropGroup eqns)
@@ -772,24 +773,39 @@ groupEquations :: [EquationInfo] -> [[(PatGroup, EquationInfo)]]
 -- If the result is of form [g1, g2, g3], 
 -- (a) all the (pg,eq) pairs in g1 have the same pg
 -- (b) none of the gi are empty
+-- The ordering of equations is unchanged
 groupEquations eqns
   = runs same_gp [(patGroup (firstPat eqn), eqn) | eqn <- eqns]
   where
     same_gp :: (PatGroup,EquationInfo) -> (PatGroup,EquationInfo) -> Bool
     (pg1,_) `same_gp` (pg2,_) = pg1 `sameGroup` pg2
 
-subGroups :: [(PatGroup, EquationInfo)] -> [[EquationInfo]]
+subGroup :: Ord a => [(a, EquationInfo)] -> [[EquationInfo]]
 -- Input is a particular group.  The result sub-groups the 
 -- equations by with particular constructor, literal etc they match.
--- The order may be swizzled, so the matching should be order-independent
-subGroups groups = map (map snd) (equivClasses cmp groups)
+-- Each sub-list in the result has the same PatGroup
+-- See Note [Take care with pattern order]
+subGroup group 
+    = map reverse $ eltsFM $ foldl accumulate emptyFM group
   where
-    (pg1, _) `cmp` (pg2, _) = pg1 `cmp_pg` pg2
-    (PgCon c1) `cmp_pg` (PgCon c2) = c1 `compare` c2
-    (PgLit l1) `cmp_pg` (PgLit l2) = l1 `compare` l2
-    (PgN   l1) `cmp_pg` (PgN   l2) = l1 `compare` l2
-	-- These are the only cases that are every sub-grouped
+    accumulate pg_map (pg, eqn)
+      = case lookupFM pg_map pg of
+          Just eqns -> addToFM pg_map pg (eqn:eqns)
+          Nothing   -> addToFM pg_map pg [eqn]
 
+    -- pg_map :: FiniteMap a [EquationInfo]
+    -- Equations seen so far in reverse order of appearance
+\end{code}
+
+Note [Take care with pattern order]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In the subGroup function we must be very careful about pattern re-ordering,
+Consider the patterns [ (True, Nothing), (False, x), (True, y) ]
+Then in bringing together the patterns for True, we must not 
+swap the Nothing and y!
+
+
+\begin{code}
 sameGroup :: PatGroup -> PatGroup -> Bool
 -- Same group means that a single case expression 
 -- or test will suffice to match both, *and* the order
@@ -798,9 +814,8 @@ sameGroup PgAny      PgAny      = True
 sameGroup PgBang     PgBang     = True
 sameGroup (PgCon _)  (PgCon _)  = True		-- One case expression
 sameGroup (PgLit _)  (PgLit _)  = True		-- One case expression
-sameGroup (PgN _)    (PgN _)    = True		-- Needs conditionals
-sameGroup (PgNpK l1) (PgNpK l2) = l1==l2	-- Order is significant
-						-- See Note [Order of n+k]
+sameGroup (PgN l1)   (PgN l2)   = l1==l2	-- Order is significant
+sameGroup (PgNpK l1) (PgNpK l2) = l1==l2	-- See Note [Grouping overloaded literal patterns]
 sameGroup (PgCo	t1)  (PgCo t2)  = t1 `coreEqType` t2
 	-- CoPats are in the same goup only if the type of the
 	-- enclosed pattern is the same. The patterns outside the CoPat
@@ -905,8 +920,8 @@ patGroup (ViewPat expr p _)               = PgView expr (hsPatType (unLoc p))
 patGroup pat = pprPanic "patGroup" (ppr pat)
 \end{code}
 
-Note [Order of n+k]
-~~~~~~~~~~~~~~~~~~~
+Note [Grouping overloaded literal patterns]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 WATCH OUT!  Consider
 
 	f (n+1) = ...
@@ -914,9 +929,11 @@ WATCH OUT!  Consider
 	f (n+1) = ...
 
 We can't group the first and third together, because the second may match 
-the same thing as the first.  Contrast
-	f 1 = ...
-	f 2 = ...
-	f 1 = ...
-where we can group the first and third.  Hence we don't regard (n+1) and
-(n+2) as part of the same group.
+the same thing as the first.  Same goes for *overloaded* literal patterns
+	f 1 True = ...
+	f 2 False = ...
+	f 1 False = ...
+If the first arg matches '1' but the second does not match 'True', we
+cannot jump to the third equation!  Because the same argument might
+match '2'!
+Hence we don't regard 1 and 2, or (n+1) and (n+2), as part of the same group.

@@ -248,14 +248,8 @@ matchLiterals [] _ _ = panic "matchLiterals []"
 %************************************************************************
 
 \begin{code}
-matchNPats :: [Id] -> Type -> [[EquationInfo]] -> DsM MatchResult
-	-- All NPats, but perhaps for different literals
-matchNPats vars ty groups
-  = do {  match_results <- mapM (matchOneNPat vars ty) groups
-	; return (foldr1 combineMatchResults match_results) }
-
-matchOneNPat :: [Id] -> Type -> [EquationInfo] -> DsM MatchResult
-matchOneNPat (var:vars) ty (eqn1:eqns)	-- All for the same literal
+matchNPats :: [Id] -> Type -> [EquationInfo] -> DsM MatchResult
+matchNPats (var:vars) ty (eqn1:eqns)	-- All for the same literal
   = do	{ let NPat lit mb_neg eq_chk = firstPat eqn1
 	; lit_expr <- dsOverLit lit
 	; neg_lit <- case mb_neg of
@@ -266,7 +260,7 @@ matchOneNPat (var:vars) ty (eqn1:eqns)	-- All for the same literal
 	; let pred_expr = mkApps eq_expr [Var var, neg_lit]
 	; match_result <- match vars ty (shiftEqns (eqn1:eqns))
 	; return (mkGuardedMatchResult pred_expr match_result) }
-matchOneNPat vars _ eqns = pprPanic "matchOneNPat" (ppr (vars, eqns))
+matchNPats vars _ eqns = pprPanic "matchOneNPat" (ppr (vars, eqns))
 \end{code}
 
 
