@@ -133,6 +133,7 @@ import CostCentre
 import Outputable
 import FastString
 import DynFlags
+import UniqSet
 
 -- -----------------------------------------------------------------------------
 -- The CLabel type
@@ -522,9 +523,10 @@ maybeAsmTemp _ 	    	       = Nothing
 -- they are builtin to the C compiler.  For these labels we avoid
 -- generating our own C prototypes.
 isMathFun :: CLabel -> Bool
-isMathFun (ForeignLabel fs _ _ _) = fs `elem` math_funs
-  where
-  math_funs = [
+isMathFun (ForeignLabel fs _ _ _) = fs `elementOfUniqSet` math_funs
+isMathFun _ = False
+
+math_funs = mkUniqSet [
         -- _ISOC99_SOURCE
         (fsLit "acos"),         (fsLit "acosf"),        (fsLit "acosh"),
         (fsLit "acoshf"),       (fsLit "acoshl"),       (fsLit "acosl"),
@@ -603,7 +605,6 @@ isMathFun (ForeignLabel fs _ _ _) = fs `elem` math_funs
         (fsLit "y1"),           (fsLit "y1f"),          (fsLit "y1l"),
         (fsLit "yn"),           (fsLit "ynf"),          (fsLit "ynl")
     ]
-isMathFun _ = False
 
 -- -----------------------------------------------------------------------------
 -- Is a CLabel visible outside this object file or not?
