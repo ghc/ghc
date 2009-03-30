@@ -126,6 +126,11 @@ data Instr
 	| ST		Size Reg AddrMode 		-- size, src, dst
 
 	-- Int Arithmetic.
+	--	x:   add/sub with carry bit. 
+	--		In SPARC V9 addx and friends were renamed addc. 
+	--
+	--	cc:  modify condition codes
+	-- 
 	| ADD		Bool Bool Reg RI Reg 		-- x?, cc?, src1, src2, dst
 	| SUB		Bool Bool Reg RI Reg 		-- x?, cc?, src1, src2, dst
 

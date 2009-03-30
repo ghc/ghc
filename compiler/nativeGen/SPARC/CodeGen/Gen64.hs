@@ -15,6 +15,7 @@ import SPARC.Regs
 import SPARC.AddrMode
 import SPARC.Imm
 import SPARC.Instr
+import SPARC.Ppr()
 import NCGMonad
 import Instruction
 import Size
@@ -35,15 +36,26 @@ assignMem_I64Code addrTree valueTree
  = do
      ChildCode64 vcode rlo 	<- iselExpr64 valueTree  
 
-     (src, code) <- getSomeReg addrTree
+     (src, acode) <- getSomeReg addrTree
      let 
          rhi = getHiVRegFromLo rlo
  
          -- Big-endian store
          mov_hi = ST II32 rhi (AddrRegImm src (ImmInt 0))
          mov_lo = ST II32 rlo (AddrRegImm src (ImmInt 4))
+         
+	 code   = vcode `appOL` acode `snocOL` mov_hi `snocOL` mov_lo
 
-     return (vcode `appOL` code `snocOL` mov_hi `snocOL` mov_lo)
+{-     pprTrace "assignMem_I64Code" 
+     	(vcat	[ text "addrTree:  " <+> ppr addrTree
+		, text "valueTree: " <+> ppr valueTree
+		, text "vcode:"
+		, vcat $ map ppr $ fromOL vcode 
+		, text ""
+		, text "acode:"
+		, vcat $ map ppr $ fromOL acode ])
+       $ -}
+     return code
 
 
 -- | Code to assign a 64 bit value to a register.
@@ -113,17 +125,18 @@ iselExpr64 (CmmLoad addrTree ty)
 
 -- Add a literal to a 64 bit integer
 iselExpr64 (CmmMachOp (MO_Add _) [e1, CmmLit (CmmInt i _)]) 
- = do	ChildCode64 _ r1_lo <- iselExpr64 e1
+ = do	ChildCode64 code1 r1_lo <- iselExpr64 e1
  	let r1_hi	= getHiVRegFromLo r1_lo
 	
 	r_dst_lo	<- getNewRegNat II32
 	let r_dst_hi	=  getHiVRegFromLo r_dst_lo 
 	
-	return	$ ChildCode64
-			( toOL
-			[ ADD False False r1_lo (RIImm (ImmInteger i)) r_dst_lo
-			, ADD True  False r1_hi (RIReg g0)	   r_dst_hi ])
-			r_dst_lo
+	let code =	code1
+		`appOL`	toOL
+			[ ADD False True  r1_lo (RIImm (ImmInteger i)) r_dst_lo
+			, ADD True  False r1_hi (RIReg g0)	   r_dst_hi ]
+			
+	return	$ ChildCode64 code r_dst_lo
 
 
 -- Addition of II64
@@ -140,7 +153,7 @@ iselExpr64 (CmmMachOp (MO_Add _) [e1, e2])
 	let code =	code1
 		`appOL`	code2
 		`appOL`	toOL
-			[ ADD False False r1_lo (RIReg r2_lo) r_dst_lo
+			[ ADD False True  r1_lo (RIReg r2_lo) r_dst_lo
 			, ADD True  False r1_hi (RIReg r2_hi) r_dst_hi ]
 	
 	return	$ ChildCode64 code r_dst_lo
