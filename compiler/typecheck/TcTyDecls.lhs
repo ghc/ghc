@@ -31,6 +31,8 @@ import Digraph
 import BasicTypes
 import SrcLoc
 import Outputable
+import Util ( isSingleton )
+import List ( partition )
 \end{code}
 
 
@@ -232,9 +234,18 @@ calcRecFlags boot_details tyclss
         -- loop.  We could program round this, but it'd make the code
         -- rather less nice, so I'm not going to do that yet.
 
+    single_con_tycons = filter (isSingleton . tyConDataCons) all_tycons
+        -- Both newtypes and data types, with exactly one data constructor
+    (new_tycons, prod_tycons) = partition isNewTyCon single_con_tycons
+        -- NB: we do *not* call isProductTyCon because that checks
+	--     for vanilla-ness of data constructors; and that depends
+	--     on empty existential type variables; and that is figured
+	--     out by tcResultType; which uses tcMatchTy; which uses
+	--     coreView; which calls coreExpandTyCon_maybe; which uses
+	--     the recursiveness of the TyCon.  Result... a black hole.
+	-- YUK YUK YUK
+
         --------------- Newtypes ----------------------
-    new_tycons = filter isNewTyConAndNotOpen all_tycons
-    isNewTyConAndNotOpen tycon = isNewTyCon tycon && not (isOpenTyCon tycon)
     nt_loop_breakers = mkNameSet (findLoopBreakers nt_edges)
     is_rec_nt tc = tyConName tc  `elemNameSet` nt_loop_breakers
         -- is_rec_nt is a locally-used helper function
@@ -252,9 +263,6 @@ calcRecFlags boot_details tyclss
         | otherwise = []
 
         --------------- Product types ----------------------
-        -- The "prod_tycons" are the non-newtype products
-    prod_tycons = [tc | tc <- all_tycons,
-                        not (isNewTyCon tc), isProductTyCon tc]
     prod_loop_breakers = mkNameSet (findLoopBreakers prod_edges)
 
     prod_edges = [(tc, mk_prod_edges tc) | tc <- prod_tycons]

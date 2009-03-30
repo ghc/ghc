@@ -954,7 +954,7 @@ tcExpandTyCon_maybe _ _ = Nothing
 
 -- ^ Used to create the view /Core/ has on 'TyCon's. We expand not only closed synonyms like 'tcExpandTyCon_maybe',
 -- but also non-recursive @newtype@s
-coreExpandTyCon_maybe (AlgTyCon {algTcRec = NonRecursive,	-- Not recursive
+coreExpandTyCon_maybe (AlgTyCon {
          algTcRhs = NewTyCon { nt_etad_rhs = etad_rhs, nt_co = Nothing }}) tys
    = case etad_rhs of	-- Don't do this in the pattern match, lest we accidentally
 			-- match the etad_rhs of a *recursive* newtype
