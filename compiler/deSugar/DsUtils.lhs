@@ -144,12 +144,12 @@ selectMatchVars :: [Pat Id] -> DsM [Id]
 selectMatchVars ps = mapM selectMatchVar ps
 
 selectMatchVar :: Pat Id -> DsM Id
-selectMatchVar (BangPat pat)   = selectMatchVar (unLoc pat)
-selectMatchVar (LazyPat pat)   = selectMatchVar (unLoc pat)
-selectMatchVar (ParPat pat)    = selectMatchVar (unLoc pat)
-selectMatchVar (VarPat var)    = return var
+selectMatchVar (BangPat pat) = selectMatchVar (unLoc pat)
+selectMatchVar (LazyPat pat) = selectMatchVar (unLoc pat)
+selectMatchVar (ParPat pat)  = selectMatchVar (unLoc pat)
+selectMatchVar (VarPat var)  = return var
 selectMatchVar (AsPat var _) = return (unLoc var)
-selectMatchVar other_pat       = newSysLocalDs (hsPatType other_pat)
+selectMatchVar other_pat     = newSysLocalDs (hsPatType other_pat)
 				  -- OK, better make up one...
 \end{code}
 
