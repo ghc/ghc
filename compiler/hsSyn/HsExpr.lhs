@@ -1105,20 +1105,20 @@ pprStmtResultContext other           = ptext (sLit "the result of") <+> pprStmtC
 -}
 
 -- Used to generate the string for a *runtime* error message
-matchContextErrString :: Outputable id => HsMatchContext id -> String
-matchContextErrString (FunRhs fun _)             = "function " ++ showSDoc (ppr fun)
-matchContextErrString CaseAlt                    = "case"
-matchContextErrString PatBindRhs                 = "pattern binding"
-matchContextErrString RecUpd                     = "record update"
-matchContextErrString LambdaExpr                 = "lambda"
-matchContextErrString ProcExpr                   = "proc"
+matchContextErrString :: Outputable id => HsMatchContext id -> SDoc
+matchContextErrString (FunRhs fun _)             = ptext (sLit "function") <+> ppr fun
+matchContextErrString CaseAlt                    = ptext (sLit "case")
+matchContextErrString PatBindRhs                 = ptext (sLit "pattern binding")
+matchContextErrString RecUpd                     = ptext (sLit "record update")
+matchContextErrString LambdaExpr                 = ptext (sLit "lambda")
+matchContextErrString ProcExpr                   = ptext (sLit "proc")
 matchContextErrString (StmtCtxt (ParStmtCtxt c)) = matchContextErrString (StmtCtxt c)
 matchContextErrString (StmtCtxt (TransformStmtCtxt c)) = matchContextErrString (StmtCtxt c)
-matchContextErrString (StmtCtxt (PatGuard _))    = "pattern guard"
-matchContextErrString (StmtCtxt DoExpr)          = "'do' expression"
-matchContextErrString (StmtCtxt (MDoExpr _))     = "'mdo' expression"
-matchContextErrString (StmtCtxt ListComp)        = "list comprehension"
-matchContextErrString (StmtCtxt PArrComp)        = "array comprehension"
+matchContextErrString (StmtCtxt (PatGuard _))    = ptext (sLit "pattern guard")
+matchContextErrString (StmtCtxt DoExpr)          = ptext (sLit "'do' expression")
+matchContextErrString (StmtCtxt (MDoExpr _))     = ptext (sLit "'mdo' expression")
+matchContextErrString (StmtCtxt ListComp)        = ptext (sLit "list comprehension")
+matchContextErrString (StmtCtxt PArrComp)        = ptext (sLit "array comprehension")
 \end{code}
 
 \begin{code}

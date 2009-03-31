@@ -273,7 +273,7 @@ dsExpr (HsCoreAnn fs expr)
 dsExpr (HsCase discrim matches@(MatchGroup _ rhs_ty)) 
   | isEmptyMatchGroup matches	-- A Core 'case' is always non-empty
   = 		      		-- So desugar empty HsCase to error call
-    mkErrorAppDs pAT_ERROR_ID (funResultTy rhs_ty) "case"
+    mkErrorAppDs pAT_ERROR_ID (funResultTy rhs_ty) (ptext (sLit "case"))
 
   | otherwise
   = do { core_discrim <- dsLExpr discrim
@@ -396,8 +396,8 @@ dsExpr (RecordCon (L _ data_con_id) con_expr rbinds) = do
           = case findField (rec_flds rbinds) lbl of
               (rhs:rhss) -> ASSERT( null rhss )
                             dsLExpr rhs
-              []         -> mkErrorAppDs rEC_CON_ERROR_ID arg_ty (showSDoc (ppr lbl))
-        unlabelled_bottom arg_ty = mkErrorAppDs rEC_CON_ERROR_ID arg_ty ""
+              []         -> mkErrorAppDs rEC_CON_ERROR_ID arg_ty (ppr lbl)
+        unlabelled_bottom arg_ty = mkErrorAppDs rEC_CON_ERROR_ID arg_ty empty
 
         labels = dataConFieldLabels (idDataCon data_con_id)
         -- The data_con_id is guaranteed to be the wrapper id of the constructor

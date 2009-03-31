@@ -37,6 +37,7 @@ import PrelNames
 import PrelInfo
 import SrcLoc
 import Outputable
+import FastString
 
 import Control.Monad ( liftM2 )
 \end{code}
@@ -611,7 +612,7 @@ dePArrComp (LetStmt ds : qs) body pa cea = do
     let projBody = mkCoreLet (NonRec let'v clet) $ 
                    mkCoreTup [Var v, Var let'v]
         errTy    = exprType projBody
-        errMsg   = "DsListComp.dePArrComp: internal error!"
+        errMsg   = ptext (sLit "DsListComp.dePArrComp: internal error!")
     cerr <- mkErrorAppDs pAT_ERROR_ID errTy errMsg
     ccase <- matchSimply (Var v) (StmtCtxt PArrComp) pa projBody cerr
     let pa'    = mkLHsPatTup [pa, mkLHsPatTup (map nlVarPat xs)]
@@ -673,7 +674,7 @@ mkLambda :: Type			-- type of the argument
 	 -> DsM (CoreExpr, Type)
 mkLambda ty p ce = do
     v <- newSysLocalDs ty
-    let errMsg = do "DsListComp.deLambda: internal error!"
+    let errMsg = ptext (sLit "DsListComp.deLambda: internal error!")
         ce'ty  = exprType ce
     cerr <- mkErrorAppDs pAT_ERROR_ID ce'ty errMsg
     res <- matchSimply (Var v) (StmtCtxt PArrComp) p ce cerr

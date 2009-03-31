@@ -73,8 +73,6 @@ import Util
 import ListSetOps
 import FastString
 import StaticFlags
-
-import Data.Char
 \end{code}
 
 
@@ -392,13 +390,13 @@ mkCoAlgCaseMatchResult var ty match_alts
 \begin{code}
 mkErrorAppDs :: Id 		-- The error function
 	     -> Type		-- Type to which it should be applied
-	     -> String		-- The error message string to pass
+	     -> SDoc		-- The error message string to pass
 	     -> DsM CoreExpr
 
 mkErrorAppDs err_id ty msg = do
     src_loc <- getSrcSpanDs
     let
-        full_msg = showSDoc (hcat [ppr src_loc, text "|", text msg])
+        full_msg = showSDoc (hcat [ppr src_loc, text "|", msg])
         core_msg = Lit (mkMachString full_msg)
         -- mkMachString returns a result of type String#
     return (mkApps (Var err_id) [Type ty, core_msg])
@@ -458,7 +456,7 @@ mkSelectorBinds pat val_expr
 
         -- For the error message we make one error-app, to avoid duplication.
         -- But we need it at different types... so we use coerce for that
-      err_expr <- mkErrorAppDs iRREFUT_PAT_ERROR_ID  unitTy (showSDoc (ppr pat))
+      err_expr <- mkErrorAppDs iRREFUT_PAT_ERROR_ID  unitTy (ppr pat)
       err_var <- newSysLocalDs unitTy
       binds <- mapM (mk_bind val_var err_var) binders
       return ( (val_var, val_expr) : 
@@ -467,7 +465,7 @@ mkSelectorBinds pat val_expr
 
 
   | otherwise = do
-      error_expr <- mkErrorAppDs iRREFUT_PAT_ERROR_ID   tuple_ty (showSDoc (ppr pat))
+      error_expr <- mkErrorAppDs iRREFUT_PAT_ERROR_ID   tuple_ty (ppr pat)
       tuple_expr <- matchSimply val_expr PatBindRhs pat local_tuple error_expr
       tuple_var <- newSysLocalDs tuple_ty
       let

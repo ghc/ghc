@@ -32,7 +32,7 @@ import TysWiredIn
 import PrelNames
 import Name
 import SrcLoc
-
+import Outputable
 \end{code}
 
 @dsGuarded@ is used for both @case@ expressions and pattern bindings.
@@ -51,7 +51,7 @@ dsGuarded :: GRHSs Id -> Type -> DsM CoreExpr
 
 dsGuarded grhss rhs_ty = do
     match_result <- dsGRHSs PatBindRhs [] grhss rhs_ty
-    error_expr <- mkErrorAppDs nON_EXHAUSTIVE_GUARDS_ERROR_ID rhs_ty ""
+    error_expr <- mkErrorAppDs nON_EXHAUSTIVE_GUARDS_ERROR_ID rhs_ty empty
     extractMatchResult match_result error_expr
 \end{code}
 
