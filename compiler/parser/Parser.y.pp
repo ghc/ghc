@@ -589,7 +589,7 @@ cl_decl :: { LTyClDecl RdrName }
 --
 ty_decl :: { LTyClDecl RdrName }
            -- ordinary type synonyms
-        : 'type' type '=' ctype
+        : 'type' type '=' ctypedoc
 		-- Note ctype, not sigtype, on the right of '='
 		-- We allow an explicit for-all but we don't insert one
 		-- in 	type Foo a = (b,b)
@@ -1000,23 +1000,6 @@ infixtype :: { LHsType RdrName }
 	: btype qtyconop gentype         { LL $ HsOpTy $1 $2 $3 }
         | btype tyvarop  gentype  	 { LL $ HsOpTy $1 $2 $3 }
 
-infixtypedoc :: { LHsType RdrName }
-        : infixtype                      { $1 }
-	| infixtype docprev              { LL $ HsDocTy $1 $2 }
-
-gentypedoc :: { LHsType RdrName }
-        : btype                          { $1 }
-        | btypedoc                       { $1 }
-        | infixtypedoc                   { $1 }
-        | btype '->' ctypedoc            { LL $ HsFunTy $1 $3 }
-        | btypedoc '->' ctypedoc         { LL $ HsFunTy $1 $3 }
-
-ctypedoc  :: { LHsType RdrName }
-        : 'forall' tv_bndrs '.' ctypedoc { LL $ mkExplicitHsForAllTy $2 (noLoc []) $4 }
-        | context '=>' ctypedoc          { LL $ mkImplicitHsForAllTy   $1 $3 }
-	-- A type of form (context => type) is an *implicit* HsForAllTy
-	| gentypedoc			 { $1 }
-	
 strict_mark :: { Located HsBang }
 	: '!'				{ L1 HsStrict }
 	| '{-# UNPACK' '#-}' '!'	{ LL HsUnbox }
@@ -1027,6 +1010,12 @@ ctype	:: { LHsType RdrName }
 	| context '=>' type		{ LL $ mkImplicitHsForAllTy   $1 $3 }
 	-- A type of form (context => type) is an *implicit* HsForAllTy
 	| type				{ $1 }
+
+ctypedoc :: { LHsType RdrName }
+	: 'forall' tv_bndrs '.' ctypedoc	{ LL $ mkExplicitHsForAllTy $2 (noLoc []) $4 }
+	| context '=>' ctypedoc		{ LL $ mkImplicitHsForAllTy   $1 $3 }
+	-- A type of form (context => type) is an *implicit* HsForAllTy
+	| typedoc				{ $1 }
 
 -- We parse a context as a btype so that we don't get reduce/reduce
 -- errors in ctype.  The basic problem is that
@@ -1044,6 +1033,10 @@ type :: { LHsType RdrName }
 	: ipvar '::' gentype		{ LL (HsPredTy (HsIParam (unLoc $1) $3)) }
 	| gentype			{ $1 }
 
+typedoc :: { LHsType RdrName }
+	: ipvar '::' gentype		{ LL (HsPredTy (HsIParam (unLoc $1) $3)) }
+	| gentypedoc			{ $1 }
+
 gentype :: { LHsType RdrName }
         : btype                         { $1 }
         | btype qtyconop gentype        { LL $ HsOpTy $1 $2 $3 }
@@ -1051,13 +1044,20 @@ gentype :: { LHsType RdrName }
  	| btype '->'     ctype		{ LL $ HsFunTy $1 $3 }
         | btype '~'      btype  	{ LL $ HsPredTy (HsEqualP $1 $3) }
 
+gentypedoc :: { LHsType RdrName }
+        : btype                          { $1 }
+        | btype docprev                  { LL $ HsDocTy $1 $2 }
+        | btype qtyconop gentype         { LL $ HsOpTy $1 $2 $3 }
+        | btype qtyconop gentype docprev { LL $ HsDocTy (L (comb3 $1 $2 $3) (HsOpTy $1 $2 $3)) $4 }
+        | btype tyvarop  gentype         { LL $ HsOpTy $1 $2 $3 }
+        | btype tyvarop  gentype docprev { LL $ HsDocTy (L (comb3 $1 $2 $3) (HsOpTy $1 $2 $3)) $4 }
+        | btype '->'     ctypedoc        { LL $ HsFunTy $1 $3 }
+        | btype docprev '->' ctypedoc    { LL $ HsFunTy (L (comb2 $1 $2) (HsDocTy $1 $2)) $4 }
+        | btype '~'      btype           { LL $ HsPredTy (HsEqualP $1 $3) }
+
 btype :: { LHsType RdrName }
 	: btype atype			{ LL $ HsAppTy $1 $2 }
 	| atype				{ $1 }
-
-btypedoc :: { LHsType RdrName }
-	: btype atype docprev		{ LL $ HsDocTy (L (comb2 $1 $2) (HsAppTy $1 $2)) $3 }
-        | atype docprev                 { LL $ HsDocTy $1 $2 }
 
 atype :: { LHsType RdrName }
 	: gtycon			{ L1 (HsTyVar (unLoc $1)) }
