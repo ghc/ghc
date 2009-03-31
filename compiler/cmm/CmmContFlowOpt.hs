@@ -83,14 +83,24 @@ replaceLabels env (BasicBlock id stmts)
 ----------------------------------------------------------------
 branchChainElimZ :: Tx CmmGraph
 -- Remove any basic block of the form L: goto L',
--- and replace L with L' everywhere else
+-- and replace L with L' everywhere else,
+-- unless L is the successor of a call instruction and L'
+-- is the entry block. You don't want to set the successor
+-- of a function call to the entry block because there is no good way
+-- to store both the infotables for the call and from the callee,
+-- while putting the stack pointer in a consistent place.
+--
+-- JD isn't quite sure when it's safe to share continuations for different
+-- function calls -- have to think about where the SP will be,
+-- so we'll table that problem for now by leaving all call successors alone.
 branchChainElimZ g@(G.LGraph eid _)
   | null lone_branch_blocks     -- No blocks to remove
   = noTx g
   | otherwise
   = aTx $ replaceLabelsZ env $ G.of_block_list eid (self_branches ++ others)
   where
-    (lone_branch_blocks, others) = partitionWith isLoneBranchZ (G.to_block_list g)
+    blocks = G.to_block_list g
+    (lone_branch_blocks, others) = partitionWith isLoneBranchZ blocks
     env = mkClosureBlockEnvZ lone_branch_blocks
     self_branches =
       let loop_to (id, _) =
@@ -101,27 +111,41 @@ branchChainElimZ g@(G.LGraph eid _)
       in  mapMaybe loop_to lone_branch_blocks
     lookup id = lookupBlockEnv env id `orElse` id 
 
-isLoneBranchZ :: CmmBlock -> Either (BlockId, BlockId) CmmBlock
-isLoneBranchZ (G.Block id (G.ZLast (G.LastOther (LastBranch target))))
-    | id /= target  = Left (id,target)
-isLoneBranchZ other = Right other
-   -- An infinite loop is not a link in a branch chain!
+    call_succs = foldl add emptyBlockSet blocks
+      where add succs b =
+              case G.last (G.unzip b) of
+                LastOther (LastCall _ (Just k) _ _ _) -> extendBlockSet succs k
+                _ -> succs
+    isLoneBranchZ :: CmmBlock -> Either (BlockId, BlockId) CmmBlock
+    isLoneBranchZ (G.Block id (G.ZLast (G.LastOther (LastBranch target))))
+        | id /= target && not (elemBlockSet id call_succs) = Left (id,target)
+    isLoneBranchZ other = Right other
+       -- An infinite loop is not a link in a branch chain!
+
+maybeReplaceLabels :: (Last -> Bool) -> BlockEnv BlockId -> CmmGraph -> CmmGraph
+maybeReplaceLabels lpred env =
+  replace_eid . G.map_nodes id middle last
+   where
+     replace_eid (G.LGraph eid blocks) = G.LGraph (lookup eid) blocks
+     middle = mapExpDeepMiddle exp
+     last l = if lpred l then mapExpDeepLast exp (last' l) else l
+     last' (LastBranch bid) = LastBranch (lookup bid)
+     last' (LastCondBranch p t f) = LastCondBranch p (lookup t) (lookup f)
+     last' (LastSwitch e arms) = LastSwitch e (map (liftM lookup) arms)
+     last' (LastCall t k a res r) = LastCall t (liftM lookup k) a res r
+     exp (CmmLit (CmmBlock bid)) = CmmLit (CmmBlock (lookup bid))
+     exp   (CmmStackSlot (CallArea (Young id)) i) =
+       CmmStackSlot (CallArea (Young (lookup id))) i
+     exp e = e
+     lookup id = fmap lookup (lookupBlockEnv env id) `orElse` id 
 
 replaceLabelsZ :: BlockEnv BlockId -> CmmGraph -> CmmGraph
-replaceLabelsZ env = replace_eid . G.map_nodes id middle last
-  where
-    replace_eid (G.LGraph eid blocks) = G.LGraph (lookup eid) blocks
-    middle = mapExpDeepMiddle exp
-    last l = mapExpDeepLast   exp (last' l)
-    last' (LastBranch bid) = LastBranch (lookup bid)
-    last' (LastCondBranch p t f) = LastCondBranch p (lookup t) (lookup f)
-    last' (LastSwitch e arms) = LastSwitch e (map (liftM lookup) arms)
-    last' (LastCall t k a res r) = LastCall t (liftM lookup k) a res r
-    exp (CmmLit (CmmBlock bid)) = CmmLit (CmmBlock (lookup bid))
-    exp   (CmmStackSlot (CallArea (Young id)) i) =
-      CmmStackSlot (CallArea (Young (lookup id))) i
-    exp e = e
-    lookup id = fmap lookup (lookupBlockEnv env id) `orElse` id 
+replaceLabelsZ = maybeReplaceLabels (const True)
+
+-- replaceBranchLabels :: BlockEnv BlockId -> CmmGraph -> CmmGraph
+-- replaceBranchLabels env g@(LGraph _ _) = maybeReplaceLabels lpred env g
+--   where lpred (LastBranch _) = True
+--         lpred _ = False
 
 replaceBranches :: BlockEnv BlockId -> CmmGraph -> CmmGraph
 replaceBranches env g = map_nodes id id last g
@@ -141,9 +165,10 @@ predMap g = G.fold_blocks add_preds emptyBlockEnv g -- find the back edges
           extendBlockEnv env b' $
                 extendBlockSet (lookupBlockEnv env b' `orElse` emptyBlockSet) bid
 ----------------------------------------------------------------
--- If a block B branches to a label L, and L has no other predecessors,
+-- If a block B branches to a label L, L is not the entry block,
+-- and L has no other predecessors,
 -- then we can splice the block starting with L onto the end of B.
--- Because this optmization can be inhibited by unreachable blocks,
+-- Because this optimization can be inhibited by unreachable blocks,
 -- we first take a pass to drops unreachable blocks.
 -- Order matters, so we work bottom up (reverse postorder DFS).
 --
@@ -168,12 +193,12 @@ blockConcatZ' g@(G.LGraph eid blocks) =
                   else unchanged
                _ -> unchanged
         num_preds bid = liftM sizeBlockSet (lookupBlockEnv backEdges bid) `orElse` 0
-        canConcatWith b' = num_preds b' == 1
+        canConcatWith b' = b' /= eid && num_preds b' == 1
         backEdges = predMap g
         splice blocks' h bid' =
           case lookupBlockEnv blocks' bid' of
             Just (G.Block _ t) -> G.zip $ G.ZBlock h t
-            Nothing -> pprPanic "unknown successor block" (ppr bid' <+> ppr blocks' <+> ppr blocks)
+            Nothing -> panic "unknown successor block"
         tx = if changed then aTx else noTx
 ----------------------------------------------------------------
 mkClosureBlockEnv :: [(BlockId, BlockId)] -> BlockEnv BlockId
