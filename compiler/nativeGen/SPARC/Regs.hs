@@ -188,12 +188,14 @@ freeReg regno
 	-- %l6(r22) - %l7(r23) are allocable --------------
 	
 	-- %i0(r24) - %i5(r29)
-	--	are STG regs Sp, Base, SpLim, Hp, HpLim, R6
+	--	are STG regs Sp, Base, SpLim, Hp, R6
 	24	-> fastBool False
 	25	-> fastBool False
 	26	-> fastBool False
 	27	-> fastBool False
-	28	-> fastBool False
+
+	-- %i5(r28) is allocable --------------------------
+
 	29	-> fastBool False
 	
 	-- %i6(r30) 
@@ -263,7 +265,6 @@ globalRegMaybe gg
 	Sp		-> Just (RealReg 24)	-- %i0
 	SpLim		-> Just (RealReg 26)	-- %i2
 	Hp		-> Just (RealReg 27)	-- %i3
-	HpLim		-> Just (RealReg 28)	-- %i4
 
 	BaseReg		-> Just (RealReg 25)	-- %i1
 		

@@ -543,6 +543,10 @@
 /* -----------------------------------------------------------------------------
    The Sun SPARC register mapping
 
+   !! IMPORTANT: if you change this register mapping you must also update
+                 compiler/nativeGen/SPARC/Regs.hs. That file handles the
+                 mapping for the NCG. This one only affects via-c code.
+
    The SPARC register (window) story: Remember, within the Haskell
    Threaded World, we essentially ``shut down'' the register-window
    mechanism---the window doesn't move at all while in this World.  It
@@ -590,11 +594,11 @@
      %i1        Base
      %i2        SpLim
      %i3        Hp
+     %i4        alloc
      %i5        R6
      %i6                    C frame ptr
      %i7                    C ret addr
      
-
    The paired nature of the floating point registers causes complications for
    the native code generator.  For convenience, we pretend that the first 22
    fp regs %f0 .. %f21 are actually 11 double regs, and the remaining 10 are
