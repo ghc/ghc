@@ -316,7 +316,7 @@ mkCodeStyle = PprCode
 -- However, Doc *is* an instance of Show
 -- showSDoc just blasts it out as a string
 showSDoc :: SDoc -> String
-showSDoc d = show (d defaultUserStyle)
+showSDoc d = Pretty.showDocWith PageMode (d defaultUserStyle)
 
 showSDocForUser :: PrintUnqualified -> SDoc -> String
 showSDocForUser unqual doc = show (doc (mkUserStyle unqual AllTheWay))
