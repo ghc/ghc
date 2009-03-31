@@ -1,7 +1,11 @@
 # Annotations were implemented in GHC 6.11 and not supported in other compilers
 setTestOpts(if_compiler_lt('ghc', '6.11', skip));
 
-test('ann01', normal, compile, ['-v0'])
+# Annotations, like Template Haskell, require runtime evaluation.  In
+# order for this to work with profiling, we would have to build the
+# program twice and use -osuf p_o (see the TH_splitE5_prof test).  For
+# now, just disable the profiling ways.
+test('ann01', omit_ways(['profc','profasm','profthreaded']), compile, ['-v0'])
 
 """"
 Helpful things to C+P:
