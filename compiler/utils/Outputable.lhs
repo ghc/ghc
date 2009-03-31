@@ -36,7 +36,9 @@ module Outputable (
 	printSDoc, printErrs, hPrintDump, printDump,
 	printForC, printForAsm, printForUser, printForUserPartWay,
 	pprCode, mkCodeStyle,
-	showSDoc, showSDocForUser, showSDocDebug, showSDocDump, showPpr,
+	showSDoc, showSDocOneLine,
+    showSDocForUser, showSDocDebug, showSDocDump, showSDocDumpOneLine,
+    showPpr,
 	showSDocUnqual, showsPrecSDoc,
 
 	pprInfixVar, pprPrefixVar,
@@ -318,6 +320,12 @@ mkCodeStyle = PprCode
 showSDoc :: SDoc -> String
 showSDoc d = Pretty.showDocWith PageMode (d defaultUserStyle)
 
+-- This shows an SDoc, but on one line only. It's cheaper than a full
+-- showSDoc, designed for when we're getting results like "Foo.bar"
+-- and "foo{uniq strictness}" so we don't want fancy layout anyway.
+showSDocOneLine :: SDoc -> String
+showSDocOneLine d = Pretty.showDocWith PageMode (d defaultUserStyle)
+
 showSDocForUser :: PrintUnqualified -> SDoc -> String
 showSDocForUser unqual doc = show (doc (mkUserStyle unqual AllTheWay))
 
@@ -329,7 +337,10 @@ showsPrecSDoc :: Int -> SDoc -> ShowS
 showsPrecSDoc p d = showsPrec p (d defaultUserStyle)
 
 showSDocDump :: SDoc -> String
-showSDocDump d = show (d PprDump)
+showSDocDump d = Pretty.showDocWith PageMode (d PprDump)
+
+showSDocDumpOneLine :: SDoc -> String
+showSDocDumpOneLine d = Pretty.showDocWith OneLineMode (d PprDump)
 
 showSDocDebug :: SDoc -> String
 showSDocDebug d = show (d PprDebug)

@@ -1135,7 +1135,7 @@ segsToStmts ((defs, uses, fwds, ss) : segs) fvs_later
 
 \begin{code}
 srcSpanPrimLit :: SrcSpan -> HsExpr Name
-srcSpanPrimLit span = HsLit (HsStringPrim (mkFastString (showSDoc (ppr span))))
+srcSpanPrimLit span = HsLit (HsStringPrim (mkFastString (showSDocOneLine (ppr span))))
 
 mkAssertErrorExpr :: RnM (HsExpr Name)
 -- Return an expression for (assertError "Foo.hs:27")

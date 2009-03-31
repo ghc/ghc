@@ -599,11 +599,11 @@ closureDescription :: Module		-- Module
 	-- Not called for StgRhsCon which have global info tables built in
 	-- CgConTbls.lhs with a description generated from the data constructor
 closureDescription mod_name name
-  = showSDocDump (char '<' <>
+  = showSDocDumpOneLine (char '<' <>
 		    (if isExternalName name
 		      then ppr name -- ppr will include the module name prefix
 		      else pprModule mod_name <> char '.' <> ppr name) <>
 		    char '>')
-   -- showSDocDump, because we want to see the unique on the Name.
+   -- showSDocDumpOneLine, because we want to see the unique on the Name.
 \end{code}
   

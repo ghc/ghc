@@ -1098,7 +1098,7 @@ gen_Typeable_binds loc tycon
 		[nlWildPat] 
 		(nlHsApps mkTypeRep_RDR [tycon_rep, nlList []])
   where
-    tycon_rep = nlHsVar mkTyConRep_RDR `nlHsApp` nlHsLit (mkHsString (showSDoc (ppr tycon)))
+    tycon_rep = nlHsVar mkTyConRep_RDR `nlHsApp` nlHsLit (mkHsString (showSDocOneLine (ppr tycon)))
 
 mk_typeOf_RDR :: TyCon -> RdrName
 -- Use the arity of the TyCon to make the right typeOfn function
@@ -1623,7 +1623,7 @@ genAuxBind loc (GenMaxTag tycon)
 genAuxBind loc (MkTyCon tycon)	--  $dT
   = mkVarBind loc (mk_data_type_name tycon)
 		  ( nlHsVar mkDataType_RDR 
-                    `nlHsApp` nlHsLit (mkHsString (showSDoc (ppr tycon)))
+                    `nlHsApp` nlHsLit (mkHsString (showSDocOneLine (ppr tycon)))
                     `nlHsApp` nlList constrs )
   where
     constrs = [nlHsVar (mk_constr_name con) | con <- tyConDataCons tycon]
