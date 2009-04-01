@@ -44,6 +44,22 @@
   <para>GHC comes with a number of libraries. These are
   described in separate documentation.</para>
 
+  <sect1 id="getting">
+    <title>Obtaining GHC</title>
+
+    <para>Go to the <ulink url="http://www.haskell.org/ghc/">GHC home
+	page</ulink> and follow the "download" link to download GHC
+	for your platform.</para>
+
+    <para>Alternatively, if you want to build GHC yourself, head on
+      over to the
+      <ulink url="http://hackage.haskell.org/trac/ghc/wiki/Building">GHC
+        Building Guide</ulink> to find out how to get the sources, and
+        build it on your system.  Note that GHC itself is written in
+        Haskell, so you will still need to install GHC in order to
+        build it.</para>
+  </sect1>
+
   <sect1 id="mailing-lists-GHC">
     <title>Meta-information: Web sites, mailing lists, etc.</title>
 
@@ -55,24 +71,18 @@
 
     <itemizedlist>
       <listitem>
-	<para><ulink url="http://www.haskell.org/" >Haskell home
-	page</ulink></para>
-      </listitem>
-
-      <listitem>
 	<para><ulink url="http://www.haskell.org/ghc/">GHC home
 	page</ulink></para>
       </listitem>
 
       <listitem>
-	<para><ulink
-	url="http://www.cs.nott.ac.uk/~gmh/faq.html">comp.lang.functional
-	FAQ</ulink></para>
+	<para><ulink url="http://hackage.haskell.org/trac/ghc/">GHC
+	Developers Home</ulink> (developer documentation, wiki, and
+	bug tracker)</para>
       </listitem>
-
     </itemizedlist>
 
-    <para>We run the following mailing lists about Glasgow Haskell.
+    <para>We run the following mailing lists about GHC.
     We encourage you to join, as you feel is appropriate.</para>
 
     <variablelist>
@@ -119,6 +129,47 @@
 	</listitem>
       </varlistentry>
 
+      <varlistentry>
+	<term>glasgow-haskell-bugs:</term>
+	<listitem>
+	  <para>This list is for reporting and discussing GHC bugs.
+	    However, please see <xref linkend="bug-reporting" /> before
+	    posting here.</para>
+
+	  <variablelist>
+	    <varlistentry>
+	      <term>list email address:</term>
+	      <listitem>
+		<para><email>glasgow-haskell-bugs@haskell.org</email></para>
+	      </listitem>
+	    </varlistentry>
+
+	    <varlistentry>
+	      <term>subscribe at:</term> 
+	      <listitem>
+		<para><ulink
+	      url="http://www.haskell.org/mailman/listinfo/glasgow-haskell-bugs"><literal>http://www.haskell.org/mailman/listinfo/glasgow-haskell-bugs</literal></ulink>.</para>
+	      </listitem>
+	    </varlistentry>
+
+	    <varlistentry>
+	      <term>admin email address:</term>
+	      <listitem>
+		<para><email>glasgow-haskell-bugs-admin@haskell.org</email></para>
+	      </listitem>
+	    </varlistentry>
+
+	    <varlistentry>
+	      <term>list archives:</term>
+	      <listitem>
+		<para><ulink
+                         url="http://www.haskell.org/pipermail/glasgow-haskell-bugs/"><literal>http://www.haskell.org/pipermail/glasgow-haskell-bugs/</literal></ulink></para>
+	      </listitem>
+	    </varlistentry>
+	  </variablelist>
+	</listitem>
+      </varlistentry>
+      
       <varlistentry>
 	<term>cvs-ghc:</term>
 	<listitem>
