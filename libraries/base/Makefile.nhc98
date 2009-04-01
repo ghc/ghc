@@ -70,9 +70,12 @@ extra:
 	if [ -f Prelude.hs ]; then mv Prelude.hs Prelude.hs.unused; fi
 	if [ -f Numeric.hs ]; then mv Numeric.hs Numeric.hs.unused; fi
 	$(INSTALL) include/Typeable.h $(INCDIR)/packages/$(THISPKG)
+	$(INSTALL) include/Nhc98BaseConfig.h $(INCDIR)/packages/$(THISPKG)
 extracfiles:
 	if [ -f Prelude.hs ]; then mv Prelude.hs Prelude.hs.unused; fi
 	if [ -f Numeric.hs ]; then mv Numeric.hs Numeric.hs.unused; fi
+	$(INSTALL) include/Typeable.h $(INCDIR)/packages/$(THISPKG)
+	$(INSTALL) include/Nhc98BaseConfig.h $(INCDIR)/packages/$(THISPKG)
 
 # Here are any extra dependencies.
 
