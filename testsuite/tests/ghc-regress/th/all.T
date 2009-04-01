@@ -138,4 +138,8 @@ test('TH_tf1', if_compiler_lt('ghc', '6.11', expect_fail), compile, ['-v0'])
 test('TH_tf2', if_compiler_lt('ghc', '6.11', expect_fail), compile, ['-v0'])
 test('TH_tf3', if_compiler_lt('ghc', '6.11', expect_fail), compile, ['-v0'])
 
-test('TH_pragma', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques -S'])
+test('TH_pragma',
+     if_compiler_lt('ghc', '6.11', expect_fail),
+     compile,
+     ['-v0 -ddump-splices -dsuppress-uniques -S'])
+
