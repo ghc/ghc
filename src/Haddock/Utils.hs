@@ -87,7 +87,7 @@ instance MonadIO IO where liftIO = id
 
 
 parseVerbosity :: String -> Either String Verbosity
-parseVerbosity str = runReadE flagToVerbosity str
+parseVerbosity = runReadE flagToVerbosity
 
 
 -- | Print a message to stdout, if it is not too verbose
@@ -145,7 +145,7 @@ restrictCons names decls = [ L p d | L p (Just d) <- map (fmap keep) decls ]
           -- it's the best we can do.
         InfixCon _ _ -> Just d
       where
-        field_avail (ConDeclField n _ _) = (unLoc n) `elem` names
+        field_avail (ConDeclField n _ _) = unLoc n `elem` names
         field_types flds = [ t | ConDeclField _ t _ <- flds ] 
       
     keep _ | otherwise = Nothing
@@ -288,7 +288,7 @@ mapSnd f ((x,y):xs) = (x,f y) : mapSnd f xs
 
 mapMaybeM :: Monad m => (a -> m b) -> Maybe a -> m (Maybe b)
 mapMaybeM _ Nothing = return Nothing
-mapMaybeM f (Just a) = f a >>= return . Just
+mapMaybeM f (Just a) = liftM Just (f a)
 
 escapeStr :: String -> String
 escapeStr = escapeURIString isUnreserved
@@ -304,7 +304,7 @@ escapeURIChar p c
     | otherwise = '%' : myShowHex (ord c) ""
     where
         myShowHex :: Int -> ShowS
-        myShowHex n r =  case showIntAtBase 16 (toChrHex) n r of
+        myShowHex n r =  case showIntAtBase 16 toChrHex n r of
             []  -> "00"
             [a] -> ['0',a]
             cs  -> cs
@@ -313,7 +313,7 @@ escapeURIChar p c
             | otherwise = chr (ord 'A' + fromIntegral (d - 10))
 
 escapeURIString :: (Char -> Bool) -> String -> String
-escapeURIString p s = concatMap (escapeURIChar p) s
+escapeURIString = concatMap . escapeURIChar
 
 isUnreserved :: Char -> Bool
 isUnreserved c = isAlphaNumChar c || (c `elem` "-_.~")
@@ -321,7 +321,7 @@ isUnreserved c = isAlphaNumChar c || (c `elem` "-_.~")
 
 isAlphaChar, isDigitChar, isAlphaNumChar :: Char -> Bool
 isAlphaChar c    = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
-isDigitChar c    = (c >= '0' && c <= '9')
+isDigitChar c    = c >= '0' && c <= '9'
 isAlphaNumChar c = isAlphaChar c || isDigitChar c
 
 
@@ -350,7 +350,7 @@ html_xrefs = unsafePerformIO (readIORef html_xrefs_ref)
 
 
 replace :: Eq a => a -> a -> [a] -> [a]
-replace a b xs = map (\x -> if x == a then b else x) xs 
+replace a b = map (\x -> if x == a then b else x) 
 
 
 -----------------------------------------------------------------------------
@@ -406,7 +406,7 @@ nullFormatVersion :: FormatVersion
 nullFormatVersion = mkFormatVersion 0
 
 mkFormatVersion :: Int -> FormatVersion
-mkFormatVersion i = FormatVersion i
+mkFormatVersion = FormatVersion
 
 instance Binary FormatVersion where
    put_ bh (FormatVersion i) =

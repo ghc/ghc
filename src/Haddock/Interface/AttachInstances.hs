@@ -75,7 +75,7 @@ collectInstances ifaces _ -- filterNames
   = Map.fromListWith (flip (++)) tyInstPairs `Map.union`
     Map.fromListWith (flip (++)) classInstPairs
   where
-    allInstances = concat (map ifaceInstances ifaces)
+    allInstances = concatMap ifaceInstances ifaces
     classInstPairs = [ (is_cls inst, [instanceHead inst]) | 
                        inst <- allInstances ]
                     -- unfinished filtering of internal instances
@@ -154,8 +154,8 @@ toHsType t = case t of
   ForAllTy v ty -> cvForAll [v] ty 
   PredTy p -> HsPredTy (toHsPred p) 
   where
-    tycon tc = HsTyVar (tyConName tc)
-    app tc ts = foldl (\a b -> HsAppTy (noLoc a) (noLoc b)) tc (map toHsType ts)
+    tycon = HsTyVar . tyConName
+    app tc = foldl (\a b -> HsAppTy (noLoc a) (noLoc b)) tc . map toHsType
     cvForAll vs (ForAllTy v ty) = cvForAll (v:vs) ty
     cvForAll vs ty = mkExplicitHsForAllTy (tyvarbinders vs) (noLoc []) (toLHsType ty)
     tyvarbinders = map (noLoc . UserTyVar . tyVarName)
