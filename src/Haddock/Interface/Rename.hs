@@ -65,7 +65,7 @@ renameInterface renamingEnv warnings iface =
     unless (OptHide `elem` ifaceOptions iface || null strings || not warnings) $
       tell ["Warning: " ++ moduleString (ifaceMod iface) ++
             ": could not find link destinations for:\n"++
-            "   " ++ concat (map (' ':) strings) ]
+            unwords ("   " : strings) ]
 
     return $ iface { ifaceRnDoc         = finalModuleDoc,
                      ifaceRnDocMap      = rnDocMap,
@@ -93,7 +93,7 @@ instance Monad (GenRnM n) where
   return = returnRn   
 
 returnRn :: a -> GenRnM n a
-returnRn a   = RnM (\_ -> (a,[]))
+returnRn a   = RnM (const (a,[]))
 thenRn :: GenRnM n a -> (a -> GenRnM n b) -> GenRnM n b
 m `thenRn` k = RnM (\lkp -> case unRn m lkp of 
 				(a,out1) -> case unRn (k a) lkp of
@@ -102,7 +102,7 @@ m `thenRn` k = RnM (\lkp -> case unRn m lkp of
 getLookupRn :: RnM (Name -> (Bool, DocName))
 getLookupRn = RnM (\lkp -> (lkp,[]))
 outRn :: Name -> RnM ()
-outRn name = RnM (\_ -> ((),[name]))
+outRn name = RnM (const ((),[name]))
 
 lookupRn :: (DocName -> a) -> Name -> RnM a
 lookupRn and_then name = do
@@ -134,11 +134,11 @@ renameL = mapM rename
 
 
 renameExportItems :: [ExportItem Name] -> RnM [ExportItem DocName]
-renameExportItems items = mapM renameExportItem items
+renameExportItems = mapM renameExportItem
 
 
 renameMaybeDoc :: Maybe (HsDoc Name) -> RnM (Maybe (HsDoc DocName))
-renameMaybeDoc mbDoc = mapM renameDoc mbDoc
+renameMaybeDoc = mapM renameDoc
 
 
 renameLDoc :: LHsDoc Name -> RnM (LHsDoc DocName)

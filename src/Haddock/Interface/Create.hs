@@ -239,9 +239,8 @@ warnAboutFilteredDecls mdl decls = do
   let instances = nub [ pretty i | (L _ (InstD (InstDecl i _ _ ats)), _, _) <- decls
                                  , not (null ats) ]
 
-  when (not $ null instances) $
-
-    tell $ nub $ [
+  unless (null instances) $
+    tell $ nub [
       "Warning: " ++ modStr ++ ": We do not support associated types in instances yet. "
       ++ "These instances are affected:\n" ++ (concat $ intersperse ", " instances) ]
 
