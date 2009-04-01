@@ -9,7 +9,6 @@
 
 &license;
 &intro;
-&installing;
 &ghci;
 &runghc;
 &using;
