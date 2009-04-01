@@ -158,4 +158,4 @@ toHsType t = case t of
     app tc ts = foldl (\a b -> HsAppTy (noLoc a) (noLoc b)) tc (map toHsType ts)
     cvForAll vs (ForAllTy v ty) = cvForAll (v:vs) ty
     cvForAll vs ty = mkExplicitHsForAllTy (tyvarbinders vs) (noLoc []) (toLHsType ty)
-    tyvarbinders vs = map (noLoc . UserTyVar . tyVarName) vs
+    tyvarbinders = map (noLoc . UserTyVar . tyVarName)

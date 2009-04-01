@@ -229,7 +229,7 @@ warnAboutFilteredDecls mdl decls = do
   let typeInstances =
         nub [ tcdName d | (L _ (TyClD d), _, _) <- decls, isFamInstDecl d ]
 
-  when (not $null typeInstances) $
+  unless (null typeInstances) $
     tell $ nub [
       "Warning: " ++ modStr ++ ": Instances of type and data "
       ++ "families are not yet supported. Instances of the following families "
@@ -287,7 +287,7 @@ filterClasses decls = [ if isClassD d then (L loc (filterClass d), doc) else x
 
 -- | Collect the docs and attach them to the right declaration.
 collectDocs :: [Decl] -> [(Decl, (Maybe Doc))]
-collectDocs decls = collect Nothing DocEmpty decls
+collectDocs = collect Nothing DocEmpty
 
 collect :: Maybe Decl -> Doc -> [Decl] -> [(Decl, (Maybe Doc))]
 collect d doc_so_far [] =
@@ -516,7 +516,7 @@ extractDecl name mdl decl
 
 
 toTypeNoLoc :: Located Name -> LHsType Name
-toTypeNoLoc lname = noLoc (HsTyVar (unLoc lname))
+toTypeNoLoc = noLoc . HsTyVar . unLoc
 
 
 extractClassDecl :: Name -> [Located Name] -> LSig Name -> LSig Name
@@ -525,9 +525,9 @@ extractClassDecl c tvs0 (L pos (TypeSig lname ltype)) = case ltype of
     L pos (TypeSig lname (noLoc (HsForAllTy expl tvs (lctxt preds) ty)))
   _ -> L pos (TypeSig lname (noLoc (mkImplicitHsForAllTy (lctxt []) ltype)))
   where
-    lctxt preds = noLoc (ctxt preds)
-    ctxt preds = [noLoc (HsClassP c (map toTypeNoLoc tvs0))] ++ preds  
-extractClassDecl _ _ _ = error $ "extractClassDecl: unexpected decl"
+    lctxt = noLoc . ctxt
+    ctxt preds = noLoc (HsClassP c (map toTypeNoLoc tvs0)) : preds  
+extractClassDecl _ _ _ = error "extractClassDecl: unexpected decl"
 
 
 extractRecSel :: Name -> Module -> Name -> [Located Name] -> [LConDecl Name]
@@ -540,7 +540,7 @@ extractRecSel nm mdl t tvs (L _ con : rest) =
       L (getLoc n) (TypeSig (noLoc nm) (noLoc (HsFunTy data_ty (getBangType ty))))
     _ -> extractRecSel nm mdl t tvs rest
  where 
-  matching_fields flds = [ f | f@(ConDeclField n _ _) <- flds, (unLoc n) == nm ]   
+  matching_fields flds = [ f | f@(ConDeclField n _ _) <- flds, unLoc n == nm ]   
   data_ty = foldl (\x y -> noLoc (HsAppTy x y)) (noLoc (HsTyVar t)) (map toTypeNoLoc tvs)
 
 
