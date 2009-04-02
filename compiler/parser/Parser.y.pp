@@ -1004,6 +1004,17 @@ strict_mark :: { Located HsBang }
 	: '!'				{ L1 HsStrict }
 	| '{-# UNPACK' '#-}' '!'	{ LL HsUnbox }
 
+----------------------
+-- Notes for 'ctype'
+-- We should probably use 'gentype' rather than 'type' in the LHS of type declarations
+-- That would leave the only use of 'type' in 'ctype'; and only one of its occurrences 
+-- makes sense there too! So it might make sense to inline type there:
+--    ctype : 'forall' tv_bndrs '.' ctype
+--          | context '=>' ctype           
+--          | ipvar '::' gentype
+--          | gentype
+-- Which in turn would let us rename gentype to type 
+
 -- A ctype is a for-all type
 ctype	:: { LHsType RdrName }
 	: 'forall' tv_bndrs '.' ctype	{ LL $ mkExplicitHsForAllTy $2 (noLoc []) $4 }
@@ -1011,31 +1022,46 @@ ctype	:: { LHsType RdrName }
 	-- A type of form (context => type) is an *implicit* HsForAllTy
 	| type				{ $1 }
 
+type :: { LHsType RdrName }
+	: ipvar '::' gentype		{ LL (HsPredTy (HsIParam (unLoc $1) $3)) }
+	| gentype			{ $1 }
+
+----------------------
+-- Notes for 'ctypedoc'
+-- It would have been nice to simplify the grammar by unifying `ctype` and 
+-- ctypedoc` into one production, allowing comments on types everywhere (and
+-- rejecting them after parsing, where necessary).  This is however not possible
+-- since it leads to ambiguity. The reason is the support for comments on record
+-- fields: 
+--         data R = R { field :: Int -- ^ comment on the field }
+-- If we allow comments on types here, it's not clear if the comment applies
+-- to 'field' or to 'Int'. So we must use `ctype` to describe the type.
+
 ctypedoc :: { LHsType RdrName }
 	: 'forall' tv_bndrs '.' ctypedoc	{ LL $ mkExplicitHsForAllTy $2 (noLoc []) $4 }
 	| context '=>' ctypedoc		{ LL $ mkImplicitHsForAllTy   $1 $3 }
 	-- A type of form (context => type) is an *implicit* HsForAllTy
 	| typedoc				{ $1 }
 
+typedoc :: { LHsType RdrName }
+	: ipvar '::' gentype		{ LL (HsPredTy (HsIParam (unLoc $1) $3)) }
+	| gentypedoc			{ $1 }
+
+----------------------
+-- Notes for 'context'
 -- We parse a context as a btype so that we don't get reduce/reduce
 -- errors in ctype.  The basic problem is that
 --	(Eq a, Ord a)
 -- looks so much like a tuple type.  We can't tell until we find the =>
---
--- We have the t1 ~ t2 form here and in gentype, to permit an individual
--- equational constraint without parenthesis.
+
+-- We have the t1 ~ t2 form both in 'context' and in gentype, 
+-- to permit an individual equational constraint without parenthesis.
+-- Thus for some reason we allow    f :: a~b => blah
+-- but not 	                    f :: ?x::Int => blah
 context :: { LHsContext RdrName }
         : btype '~'      btype  	{% checkContext
 					     (LL $ HsPredTy (HsEqualP $1 $3)) }
 	| btype 			{% checkContext $1 }
-
-type :: { LHsType RdrName }
-	: ipvar '::' gentype		{ LL (HsPredTy (HsIParam (unLoc $1) $3)) }
-	| gentype			{ $1 }
-
-typedoc :: { LHsType RdrName }
-	: ipvar '::' gentype		{ LL (HsPredTy (HsIParam (unLoc $1) $3)) }
-	| gentypedoc			{ $1 }
 
 gentype :: { LHsType RdrName }
         : btype                         { $1 }
