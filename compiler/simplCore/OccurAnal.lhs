@@ -22,6 +22,7 @@ import CoreFVs
 import CoreUtils        ( exprIsTrivial, isDefaultAlt )
 import Coercion		( mkSymCoercion )
 import Id
+import Name		( localiseName )
 import IdInfo
 import BasicTypes
 
@@ -1153,12 +1154,15 @@ occAnalAlt env case_bndr mb_scrut_var (con, bndrs, rhs)
 	  , not (any shadowing bndrs)		-- (b) 
 	  -> (addOneOcc usg_wo_scrut case_bndr NoOccInfo,
 			-- See Note [Case binder usage] for the NoOccInfo
-	      (con, bndrs', Let (NonRec scrut_var' scrut_rhs) rhs'))
+	      (con, bndrs', Let (NonRec scrut_var2 scrut_rhs) rhs'))
 	  where
-	   (usg_wo_scrut, scrut_var') = tagBinder alt_usg (localiseId scrut_var)
-			-- Note the localiseId; we're making a new binding
-			-- for it, and it might have an External Name, or
+	   scrut_var1 = mkLocalId (localiseName (idName scrut_var)) (idType scrut_var)
+			-- Localise the scrut_var before shadowing it; we're making a 
+			-- new binding for it, and it might have an External Name, or
 			-- even be a GlobalId; Note [Binder swap on GlobalId scrutinees]
+	   	      	-- Also we don't want any INLILNE or NOINLINE pragmas!
+
+	   (usg_wo_scrut, scrut_var2) = tagBinder alt_usg scrut_var1
 	   shadowing bndr = bndr `elemVarSet` rhs_fvs
 	   rhs_fvs = exprFreeVars scrut_rhs
 
