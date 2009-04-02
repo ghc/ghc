@@ -14,9 +14,9 @@ module Specialise ( specProgram ) where
 
 #include "HsVersions.h"
 
-import Id		( Id, idName, idType, mkUserLocal, idCoreRules,
+import Id		( Id, idName, idType, mkUserLocal, idCoreRules, idUnfolding,
 			  idInlineActivation, setInlineActivation, setIdUnfolding,
-                          isLocalId, idArity, setIdArity ) 
+                          isLocalId, isDataConWorkId, idArity, setIdArity ) 
 import TcType		( Type, mkTyVarTy, tcSplitSigmaTy, 
 			  tyVarsOfTypes, tyVarsOfTheta, isClassPred,
 			  tcCmpType, isUnLiftedType
@@ -27,7 +27,6 @@ import CoreSubst	( Subst, mkEmptySubst, extendTvSubstList, lookupIdSubst,
 			  extendIdSubst
 			) 
 import CoreUnfold	( mkUnfolding )
-import SimplUtils	( interestingArg )
 import Var		( DictId )
 import VarSet
 import VarEnv
@@ -1200,13 +1199,13 @@ mkCallUDs f args
 	--  *don't* say what the value of the implicit param is!
   || not (spec_tys `lengthIs` n_tyvars)
   || not ( dicts   `lengthIs` n_dicts)
-  || not (any interestingArg dicts)	-- Note [Interesting dictionary arguments]
+  || not (any interestingDict dicts)	-- Note [Interesting dictionary arguments]
   -- See also Note [Specialisations already covered]
-  = -- pprTrace "mkCallUDs: discarding" (vcat [ppr f, ppr args, ppr n_tyvars, ppr n_dicts, ppr (map interestingArg dicts)]) 
+  = -- pprTrace "mkCallUDs: discarding" (vcat [ppr f, ppr args, ppr n_tyvars, ppr n_dicts, ppr (map interestingDict dicts)]) 
     emptyUDs	-- Not overloaded, or no specialisation wanted
 
   | otherwise
-  = -- pprTrace "mkCallUDs: keeping" (vcat [ppr f, ppr args, ppr n_tyvars, ppr n_dicts, ppr (map interestingArg dicts)]) 
+  = -- pprTrace "mkCallUDs: keeping" (vcat [ppr f, ppr args, ppr n_tyvars, ppr n_dicts, ppr (map interestingDict dicts)]) 
     singleCall f spec_tys dicts
   where
     (tyvars, theta, _) = tcSplitSigmaTy (idType f)
@@ -1230,9 +1229,19 @@ There really is not much point in specialising f wrt the dictionary d,
 because the code for the specialised f is not improved at all, because
 d is lambda-bound.  We simply get junk specialisations.
 
-We re-use the function SimplUtils.interestingArg function to determine
-what sort of dictionary arguments have *some* information in them.
+What is "interesting"?  Just that it has *some* structure.
 
+\begin{code}
+interestingDict :: CoreExpr -> Bool
+-- A dictionary argument is interesting if it has *some* structure
+interestingDict (Var v) =  hasSomeUnfolding (idUnfolding v)
+			|| isDataConWorkId v
+interestingDict (Type _)	  = False
+interestingDict (App fn (Type _)) = interestingDict fn
+interestingDict (Note _ a)	  = interestingDict a
+interestingDict (Cast e _)	  = interestingDict e
+interestingDict _                 = True
+\end{code}
 
 \begin{code}
 plusUDs :: UsageDetails -> UsageDetails -> UsageDetails
