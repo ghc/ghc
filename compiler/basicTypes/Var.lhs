@@ -127,8 +127,8 @@ data Var
 	realUnique :: FastInt,
    	varType    :: Type,
 	idScope    :: IdScope,
-	idDetails  :: IdDetails,	-- Stable, doesn't change
-	idInfo     :: IdInfo }		-- Unstable, updated by simplifier
+	id_details :: IdDetails,	-- Stable, doesn't change
+	id_info    :: IdInfo }		-- Unstable, updated by simplifier
 
 data IdScope	-- See Note [GlobalId/LocalId]
   = GlobalId 
@@ -137,7 +137,6 @@ data IdScope	-- See Note [GlobalId/LocalId]
 data ExportFlag 
   = NotExported	-- ^ Not exported: may be discarded as dead code.
   | Exported	-- ^ Exported: kept alive
-
 \end{code}
 
 Note [GlobalId/LocalId]
@@ -164,7 +163,7 @@ instance Outputable Var where
 ppr_debug :: Var -> SDoc
 ppr_debug (TyVar {})                          = ptext (sLit "tv")
 ppr_debug (TcTyVar {tcTyVarDetails = d})      = pprTcTyVarDetails d
-ppr_debug (Id { idScope = s, idDetails = d }) = ppr_id_scope s <> pprIdDetails d
+ppr_debug (Id { idScope = s, id_details = d }) = ppr_id_scope s <> pprIdDetails d
 
 ppr_id_scope :: IdScope -> SDoc
 ppr_id_scope GlobalId              = ptext (sLit "gid")
@@ -301,6 +300,14 @@ mkWildCoVar = mkCoVar (mkSysTvName (mkBuiltinUnique 1) (fsLit "co_wild"))
 type Id = Var
 type DictId = Var
 
+idInfo :: Id -> IdInfo
+idInfo (Id { id_info = info }) = info
+idInfo other 	       	       = pprPanic "idInfo" (ppr other)
+
+idDetails :: Id -> IdDetails
+idDetails (Id { id_details = details }) = details
+idDetails other 	       	        = pprPanic "idDetails" (ppr other)
+
 -- The next three have a 'Var' suffix even though they always build
 -- Ids, becuase Id.lhs uses 'mkGlobalId' etc with different types
 mkGlobalVar :: IdDetails -> Name -> Type -> IdInfo -> Id
@@ -322,15 +329,15 @@ mk_id name ty scope details info
 	 realUnique = getKeyFastInt (nameUnique name),
 	 varType    = ty,	
 	 idScope    = scope,
-	 idDetails  = details,
-	 idInfo     = info }
+	 id_details = details,
+	 id_info    = info }
 
 -------------------
 lazySetIdInfo :: Id -> IdInfo -> Var
-lazySetIdInfo id info = id { idInfo = info }
+lazySetIdInfo id info = id { id_info = info }
 
 setIdDetails :: Id -> IdDetails -> Id
-setIdDetails id details = id { idDetails = details }
+setIdDetails id details = id { id_details = details }
 
 globaliseId :: Id -> Id
 -- ^ If it's a local, make it global
