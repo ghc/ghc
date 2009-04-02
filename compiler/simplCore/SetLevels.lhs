@@ -366,6 +366,14 @@ For example:
 where h :: Int -> Int# is expensive. We'd like to float the (h y) outside
 the \x, but we don't because it's unboxed.  Possible solution: box it.
 
+Note [Case MFEs]
+~~~~~~~~~~~~~~~~
+We don't float a case expression as an MFE from a strict context.  Why not?
+Because in doing so we share a tiny bit of computation (the switch) but
+in exchange we build a thunk, which is bad.  This case reduces allocation 
+by 7% in spectral/puzzle (a rather strange benchmark) and 1.2% in real/fem.
+Doesn't change any other allocation at all.
+
 \begin{code}
 lvlMFE ::  Bool			-- True <=> strict context [body of case or let]
 	-> Level		-- Level of innermost enclosing lambda/tylam
@@ -383,6 +391,10 @@ lvlMFE _ _ _ (_, AnnType ty)
 lvlMFE strict_ctxt ctxt_lvl env (_, AnnCast e co)
   = do	{ expr' <- lvlMFE strict_ctxt ctxt_lvl env e
 	; return (Cast expr' co) }
+
+-- Note [Case MFEs]
+lvlMFE True ctxt_lvl env e@(_, AnnCase {})
+  = lvlExpr ctxt_lvl env e     -- Don't share cases
 
 lvlMFE strict_ctxt ctxt_lvl env ann_expr@(fvs, _)
   |  isUnLiftedType ty			-- Can't let-bind it; see Note [Unlifted MFEs]
