@@ -428,6 +428,8 @@ sm/Scav_thr.c : sm/Scav.c
 
 sm/Evac_thr_HC_OPTS += -optc-DPARALLEL_GC
 sm/Scav_thr_HC_OPTS += -optc-DPARALLEL_GC
+
+sm/Evac_thr_HC_OPTS += -optc-funroll-loops
 else
 EXCLUDED_SRCS += sm/Evac_thr.c sm/Scav_thr.c
 endif
