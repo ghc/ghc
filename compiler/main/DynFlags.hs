@@ -1000,8 +1000,8 @@ pprFloatOutSwitches sw = pp_not (floatOutLambdas sw) <+> text "lambdas" <> comma
     pp_not False = text "not"
 
 -- | Switches that specify the minimum amount of floating out
-gentleFloatOutSwitches :: FloatOutSwitches
-gentleFloatOutSwitches = FloatOutSwitches False False
+-- gentleFloatOutSwitches :: FloatOutSwitches
+-- gentleFloatOutSwitches = FloatOutSwitches False False
 
 -- | Switches that do not specify floating out of lambdas, just of constants
 constantsOnlyFloatOutSwitches :: FloatOutSwitches
@@ -1103,7 +1103,14 @@ getCoreToDo dflags
         -- so that overloaded functions have all their dictionary lambdas manifest
         CoreDoSpecialising,
 
-        runWhen full_laziness (CoreDoFloatOutwards gentleFloatOutSwitches),
+        runWhen full_laziness (CoreDoFloatOutwards constantsOnlyFloatOutSwitches),
+      		-- Was: gentleFloatOutSwitches	
+		-- I have no idea why, but not floating constants to top level is
+		-- very bad in some cases. 
+		-- Notably: p_ident in spectral/rewrite
+		-- 	    Changing from "gentle" to "constantsOnly" improved
+		-- 	    rewrite's allocation by 19%, and made  0.0% difference
+		-- 	    to any other nofib benchmark
 
         CoreDoFloatInwards,
 
