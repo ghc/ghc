@@ -310,6 +310,7 @@ endif
 
 else # GhcRtsWithPapi==YES
 
+PACKAGE_CPP_OPTS += -DPAPI_INCLUDE_DIR=""
 PACKAGE_CPP_OPTS += -DPAPI_LIB_DIR=""
 
 endif
