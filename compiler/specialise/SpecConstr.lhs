@@ -27,6 +27,7 @@ import Coercion
 import Rules
 import Type		hiding( substTy )
 import Id
+import MkId		( mkImpossibleExpr )
 import Var
 import VarEnv
 import VarSet
@@ -778,7 +779,8 @@ scExpr' env (Case scrut b ty alts)
   where
     sc_con_app con args scrut' 	-- Known constructor; simplify
 	= do { let (_, bs, rhs) = findAlt con alts
-		   alt_env' = extendScSubstList env ((b,scrut') : bs `zip` trimConArgs con args)
+	       	   	          `orElse` (DEFAULT, [], mkImpossibleExpr (coreAltsType alts))
+		   alt_env'  = extendScSubstList env ((b,scrut') : bs `zip` trimConArgs con args)
 	     ; scExpr alt_env' rhs }
 				
     sc_vanilla scrut_usg scrut'	-- Normal case

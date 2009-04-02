@@ -35,7 +35,7 @@ module MkId (
         unsafeCoerceId, realWorldPrimId, voidArgId, nullAddrId, seqId,
         lazyId, lazyIdUnfolding, lazyIdKey,
 
-        mkRuntimeErrorApp,
+        mkRuntimeErrorApp, mkImpossibleExpr,
         rEC_CON_ERROR_ID, iRREFUT_PAT_ERROR_ID, rUNTIME_ERROR_ID,
         nON_EXHAUSTIVE_GUARDS_ERROR_ID, nO_METHOD_BINDING_ERROR_ID,
         pAT_ERROR_ID, eRROR_ID, rEC_SEL_ERROR_ID,
@@ -53,7 +53,7 @@ import Type
 import TypeRep
 import Coercion
 import TcType
-import CoreUtils
+import CoreUtils	( exprType, mkCoerce )
 import CoreUnfold
 import Literal
 import TyCon
@@ -976,6 +976,10 @@ mkRuntimeErrorApp err_id res_ty err_msg
   = mkApps (Var err_id) [Type res_ty, err_string]
   where
     err_string = Lit (mkMachString err_msg)
+
+mkImpossibleExpr :: Type -> CoreExpr
+mkImpossibleExpr res_ty
+  = mkRuntimeErrorApp rUNTIME_ERROR_ID res_ty "Impossible case alternative"
 
 rEC_SEL_ERROR_ID                = mkRuntimeErrorId recSelErrorName
 rUNTIME_ERROR_ID                = mkRuntimeErrorId runtimeErrorName

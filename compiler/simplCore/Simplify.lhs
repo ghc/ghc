@@ -13,9 +13,9 @@ import SimplMonad
 import Type hiding      ( substTy, extendTvSubst )
 import SimplEnv
 import SimplUtils
-import MkId		( rUNTIME_ERROR_ID )
 import FamInstEnv	( FamInstEnv )
 import Id
+import MkId		( mkImpossibleExpr )
 import Var
 import IdInfo
 import Coercion
@@ -1390,17 +1390,7 @@ rebuildCase env scrut case_bndr alts cont
         ; (scrut', case_bndr', alts') <- simplAlts env' scrut case_bndr alts dup_cont
 
 	-- Check for empty alternatives
-	; if null alts' then
-		-- This isn't strictly an error, although it is unusual. 
-		-- It's possible that the simplifer might "see" that 
-		-- an inner case has no accessible alternatives before 
-		-- it "sees" that the entire branch of an outer case is 
-		-- inaccessible.  So we simply put an error case here instead.
-	    pprTrace "mkCase: null alts" (ppr case_bndr <+> ppr scrut) $
-	    let res_ty' = contResultType env' (substTy env' (coreAltsType alts)) dup_cont
-		lit = mkStringLit "Impossible alternative"
-	    in return (env', mkApps (Var rUNTIME_ERROR_ID) [Type res_ty', lit])
-
+	; if null alts' then missingAlt env case_bndr alts cont
 	  else do
 	{ case_expr <- mkCase scrut' case_bndr' alts'
 
@@ -1687,23 +1677,15 @@ knownCon :: SimplEnv -> OutExpr -> AltCon
 
 knownCon env scrut con args bndr alts cont
   = do  { tick (KnownBranch bndr)
-        ; knownAlt env scrut args bndr (findAlt con alts) cont }
+        ; case findAlt con alts of
+	    Nothing  -> missingAlt env bndr alts cont
+	    Just alt -> knownAlt env scrut args bndr alt cont
+	}
 
+-------------------
 knownAlt :: SimplEnv -> OutExpr -> [OutExpr]
-         -> InId -> (AltCon, [CoreBndr], InExpr) -> SimplCont
+         -> InId -> InAlt -> SimplCont
          -> SimplM (SimplEnv, OutExpr)
-knownAlt env scrut _ bndr (DEFAULT, bs, rhs) cont
-  = ASSERT( null bs )
-    do  { env' <- simplNonRecX env bndr scrut
-                -- This might give rise to a binding with non-atomic args
-                -- like x = Node (f x) (g x)
-                -- but simplNonRecX will atomic-ify it
-        ; simplExprF env' rhs cont }
-
-knownAlt env scrut _ bndr (LitAlt _, bs, rhs) cont
-  = ASSERT( null bs )
-    do  { env' <- simplNonRecX env bndr scrut
-        ; simplExprF env' rhs cont }
 
 knownAlt env scrut the_args bndr (DataAlt dc, bs, rhs) cont
   = do  { let n_drop_tys = length (dataConUnivTyVars dc)
@@ -1749,6 +1731,25 @@ knownAlt env scrut the_args bndr (DataAlt dc, bs, rhs) cont
     bind_args _ _ _ =
       pprPanic "bind_args" $ ppr dc $$ ppr bs $$ ppr the_args $$
                              text "scrut:" <+> ppr scrut
+
+knownAlt env scrut _ bndr (_, bs, rhs) cont
+  = ASSERT( null bs )	  -- Works for LitAlt and DEFAULT
+    do  { env' <- simplNonRecX env bndr scrut
+        ; simplExprF env' rhs cont }
+
+
+-------------------
+missingAlt :: SimplEnv -> Id -> [InAlt] -> SimplCont -> SimplM (SimplEnv, OutExpr)
+   		-- This isn't strictly an error, although it is unusual. 
+		-- It's possible that the simplifer might "see" that 
+		-- an inner case has no accessible alternatives before 
+		-- it "sees" that the entire branch of an outer case is 
+		-- inaccessible.  So we simply put an error case here instead.
+missingAlt env case_bndr alts cont
+  = WARN( True, ptext (sLit "missingAlt") <+> ppr case_bndr )
+    return (env, mkImpossibleExpr res_ty)
+  where
+    res_ty = contResultType env (substTy env (coreAltsType alts)) cont
 \end{code}
 
 
@@ -1912,7 +1913,7 @@ we'd lose that when zapping the subst-env.  We could have a per-alt subst-env,
 but zapping it (as we do in mkDupableCont, the Select case) is safe, and
 at worst delays the join-point inlining.
 
-Note [Small alterantive rhs]
+Note [Small alternative rhs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 It is worth checking for a small RHS because otherwise we
 get extra let bindings that may cause an extra iteration of the simplifier to

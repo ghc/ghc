@@ -308,26 +308,27 @@ findDefault :: [CoreAlt] -> ([CoreAlt], Maybe CoreExpr)
 findDefault ((DEFAULT,args,rhs) : alts) = ASSERT( null args ) (alts, Just rhs)
 findDefault alts			= 		      (alts, Nothing)
 
--- | Find the case alternative corresponding to a particular 
--- constructor: panics if no such constructor exists
-findAlt :: AltCon -> [CoreAlt] -> CoreAlt
-findAlt con alts
-  = case alts of
-	(deflt@(DEFAULT,_,_):alts) -> go alts deflt
-        _                          -> go alts panic_deflt
-  where
-    panic_deflt = pprPanic "Missing alternative" (ppr con $$ vcat (map ppr alts))
-
-    go []	 	       deflt = deflt
-    go (alt@(con1,_,_) : alts) deflt
-      =	case con `cmpAltCon` con1 of
-	  LT -> deflt	-- Missed it already; the alts are in increasing order
-	  EQ -> alt
-	  GT -> ASSERT( not (con1 == DEFAULT) ) go alts deflt
-
 isDefaultAlt :: CoreAlt -> Bool
 isDefaultAlt (DEFAULT, _, _) = True
 isDefaultAlt _               = False
+
+
+-- | Find the case alternative corresponding to a particular 
+-- constructor: panics if no such constructor exists
+findAlt :: AltCon -> [CoreAlt] -> Maybe CoreAlt
+    -- A "Nothing" result *is* legitmiate
+    -- See Note [Unreachable code]
+findAlt con alts
+  = case alts of
+	(deflt@(DEFAULT,_,_):alts) -> go alts (Just deflt)
+        _                          -> go alts Nothing
+  where
+    go []	 	      deflt = deflt
+    go (alt@(con1,_,_) : alts) deflt
+      =	case con `cmpAltCon` con1 of
+	  LT -> deflt	-- Missed it already; the alts are in increasing order
+	  EQ -> Just alt
+	  GT -> ASSERT( not (con1 == DEFAULT) ) go alts deflt
 
 ---------------------------------
 mergeAlts :: [CoreAlt] -> [CoreAlt] -> [CoreAlt]
@@ -356,6 +357,36 @@ trimConArgs DEFAULT      args = ASSERT( null args ) []
 trimConArgs (LitAlt _)   args = ASSERT( null args ) []
 trimConArgs (DataAlt dc) args = dropList (dataConUnivTyVars dc) args
 \end{code}
+
+Note [Unreachable code]
+~~~~~~~~~~~~~~~~~~~~~~~
+It is possible (although unusual) for GHC to find a case expression
+that cannot match.  For example: 
+
+     data Col = Red | Green | Blue
+     x = Red
+     f v = case x of 
+              Red -> ...
+	      _ -> ...(case x of { Green -> e1; Blue -> e2 })...
+
+Suppose that for some silly reason, x isn't substituted in the case
+expression.  (Perhaps there's a NOINLINE on it, or profiling SCC stuff
+gets in the way; cf Trac #3118.)  Then the full-lazines pass might produce
+this
+
+     x = Red
+     lvl = case x of { Green -> e1; Blue -> e2 })
+     f v = case x of 
+             Red -> ...
+	     _ -> ...lvl...
+
+Now if x gets inlined, we won't be able to find a matching alternative
+for 'Red'.  That's because 'lvl' is unreachable.  So rather than crashing
+we generate (error "Inaccessible alternative").
+
+Similar things can happen (augmented by GADTs) when the Simplifier
+filters down the matching alternatives in Simplify.rebuildCase.
+
 
 
 %************************************************************************
