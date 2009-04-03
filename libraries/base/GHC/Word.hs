@@ -41,6 +41,7 @@ import GHC.Real
 import GHC.Read
 import GHC.Arr
 import GHC.Show
+import GHC.Err
 
 ------------------------------------------------------------------------
 -- Helper functions

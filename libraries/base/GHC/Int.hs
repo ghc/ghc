@@ -37,6 +37,7 @@ import GHC.Num
 import GHC.Real
 import GHC.Read
 import GHC.Arr
+import GHC.Err
 import GHC.Word hiding (uncheckedShiftL64#, uncheckedShiftRL64#)
 import GHC.Show
 

@@ -24,6 +24,7 @@ import GHC.Num
 import GHC.List
 import GHC.Enum
 import GHC.Show
+import GHC.Err
 
 infixr 8  ^, ^^
 infixl 7  /, `quot`, `rem`, `div`, `mod`
