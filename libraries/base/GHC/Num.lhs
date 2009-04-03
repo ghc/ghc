@@ -293,6 +293,8 @@ enumDeltaInteger x d = x `seq` (x : enumDeltaInteger (x+d) d)
 --     head (drop 1000000 [1 .. ]
 -- works
 
+{-# NOINLINE [0] enumDeltaToIntegerFB #-}
+-- Don't inline this until RULE "enumDeltaToInteger" has had a chance to fire
 enumDeltaToIntegerFB :: (Integer -> a -> a) -> a
                      -> Integer -> Integer -> Integer -> a
 enumDeltaToIntegerFB c n x delta lim
