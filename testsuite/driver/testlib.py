@@ -216,13 +216,11 @@ def _extra_clean( opts, v ):
 
 # -----
 
-def space( field, min, max ):
-    return lambda opts, f=field, n=min, x=max: _space(opts, f, n, x);
+def stats_num_field( field, min, max ):
+    return lambda opts, f=field, x=min, y=max: _stats_num_field(opts, f, x, y);
 
-def _space( opts, f, n, x ):
-    opts.space_field = f
-    opts.space_min = n
-    opts.space_max = x
+def _stats_num_field( opts, f, x, y ):
+    opts.stats_num_fields = opts.stats_num_fields + [(f, x, y)]
 
 # -----
 
@@ -671,37 +669,6 @@ def compile_and_run__( name, way, extra_hc_opts, top_mod ):
 def compile_and_run( name, way, extra_hc_opts ):
     return compile_and_run__( name, way, extra_hc_opts, '')
 
-def compile_and_run_space( name, way, extra_hc_opts ):
-    stats_file = name + '.stats'
-    opts = getTestOpts()
-    opts.extra_run_opts += ' +RTS -t' + stats_file + " --machine-readable -RTS"
-    setLocalTestOpts(opts)
-
-    result = compile_and_run__( name, way, extra_hc_opts, '')
-    if result != 'pass':
-        return 'fail'
-
-    f = open(in_testdir(stats_file))
-    contents = f.read()
-    f.close()
-
-    m = re.search('\("' + opts.space_field + '", "([0-9]+)"\)', contents)
-    if m == None:
-        print "Failed to find space field: ", opts.space_field
-        return 'fail'
-    val = int(m.group(1))
-
-    if val < opts.space_min:
-        print 'Space usage ', val, \
-              ' less than minimum allowed ', opts.space_min
-        return 'fail'
-    if val > opts.space_max:
-        print 'Space usage ', val, \
-              ' more than maximum allowed ', opts.space_max
-        return 'fail'
-    else:
-        return 'pass';
-
 def multimod_compile_and_run( name, way, top_mod, extra_hc_opts ):
     return compile_and_run__( name, way, extra_hc_opts, top_mod)
 
@@ -780,6 +747,10 @@ def simple_run( name, way, prog, args ):
    
     my_rts_flags = rts_flags(way)
 
+    if opts.stats_num_fields != []:
+        stats_file = name + '.stats'
+        args += ' +RTS -t' + stats_file + ' --machine-readable -RTS'
+
     if opts.no_stdin:
         stdin_comes_from = ''
     else:
@@ -816,6 +787,31 @@ def simple_run( name, way, prog, args ):
         if check_hp and (exit_code <= 127 or exit_code == 251) and not check_hp_ok(name):
             return 'fail'
         if check_prof and not check_prof_ok(name):
+            return 'fail'
+
+    if opts.stats_num_fields != []:
+        num_field_fail = False
+        f = open(in_testdir(stats_file))
+        contents = f.read()
+        f.close()
+
+        for (field, min, max) in opts.stats_num_fields:
+            m = re.search('\("' + field + '", "([0-9]+)"\)', contents)
+            if m == None:
+                print 'Failed to find field: ', field
+                return 'fail'
+            val = int(m.group(1))
+
+            if val < min:
+                print field, val, 'is less than minimum allowed', min
+                print 'If this is because you have improved GHC, please'
+                print 'update the test so that GHC doesn\'t regress again'
+                num_field_fail = True
+            if val > max:
+                print field, val, 'is more than maximum allowed', max
+                num_field_fail = True
+
+        if num_field_fail:
             return 'fail'
 
     return 'pass'

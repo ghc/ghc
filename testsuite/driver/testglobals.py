@@ -176,11 +176,13 @@ class TestOptions:
        # extra files to clean afterward
        self.clean_files = []
 
-       # which space field do we want to look at, and what bounds must
-       # it fall within?
-       self.space_field = None
-       self.space_min = None
-       self.space_max = None
+       # which -t numeric fields do we want to look at, and what bounds must
+       # they fall within?
+       # Elements of this list should be things like
+       # ('bytes allocated',
+       #   9300000000,
+       #   9400000000)
+       self.stats_num_fields = []
 
        # should we run this test alone, i.e. not run it in parallel with
        # any other threads
