@@ -350,7 +350,7 @@ stdPattern reps
   = case reps of
 	[]  -> Just ARG_NONE	-- just void args, probably
 	[N] -> Just ARG_N
-	[P] -> Just ARG_N
+	[P] -> Just ARG_P
 	[F] -> Just ARG_F
 	[D] -> Just ARG_D
 	[L] -> Just ARG_L
