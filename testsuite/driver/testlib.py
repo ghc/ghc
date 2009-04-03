@@ -242,6 +242,12 @@ def if_platform( plat, f ):
     else:
         return normal
 
+def if_not_platform( plat, f ):
+    if config.platform != plat:
+        return f
+    else:
+        return normal
+
 def if_os( os, f ):
     if config.os == os:
         return f
