@@ -757,9 +757,11 @@ def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link ):
 # testname.run.stderr.  Returns the exit code of the run.
 
 def simple_run( name, way, prog, args ):
+   opts = getTestOpts()
+
    # figure out what to use for stdin
-   if getTestOpts().stdin != '':
-       use_stdin = getTestOpts().stdin
+   if opts.stdin != '':
+       use_stdin = opts.stdin
    else:
        stdin_file = add_suffix(name, 'stdin')
        if os.path.exists(in_testdir(stdin_file)):
@@ -778,7 +780,7 @@ def simple_run( name, way, prog, args ):
    
    my_rts_flags = rts_flags(way)
 
-   if getTestOpts().no_stdin:
+   if opts.no_stdin:
      stdin_comes_from = ''
    else:
      stdin_comes_from = ' <' + use_stdin
@@ -796,8 +798,8 @@ def simple_run( name, way, prog, args ):
    signal    = result & 0xff
 
    # check the exit code
-   if exit_code != getTestOpts().exit_code:
-       print 'Wrong exit code (expected', getTestOpts().exit_code, ', actual', exit_code, ')'
+   if exit_code != opts.exit_code:
+       print 'Wrong exit code (expected', opts.exit_code, ', actual', exit_code, ')'
        dump_stdout(name)
        dump_stderr(name)
        return 'fail'
@@ -805,7 +807,7 @@ def simple_run( name, way, prog, args ):
    check_hp = my_rts_flags.find("-h") != -1
    check_prof = my_rts_flags.find("-p") != -1
 
-   if getTestOpts().ignore_output or \
+   if opts.ignore_output or \
       (check_stderr_ok(name) and
        check_stdout_ok(name) and
        (not check_hp or (exit_code > 127 and exit_code != 251) or check_hp_ok(name)) and
