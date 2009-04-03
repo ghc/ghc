@@ -807,15 +807,18 @@ def simple_run( name, way, prog, args ):
     check_hp = my_rts_flags.find("-h") != -1
     check_prof = my_rts_flags.find("-p") != -1
 
-    if opts.ignore_output or \
-       (check_stderr_ok(name) and
-        check_stdout_ok(name) and
-        (not check_hp or (exit_code > 127 and exit_code != 251) or check_hp_ok(name)) and
-        (not check_prof or check_prof_ok(name))):
+    if not opts.ignore_output:
+        if not check_stderr_ok(name):
+            return 'fail'
+        if not check_stdout_ok(name):
+            return 'fail'
         # exit_code > 127 probably indicates a crash, so don't try to run hp2ps.
-        return 'pass'
-    else:
-        return 'fail'
+        if check_hp and (exit_code <= 127 or exit_code == 251) and not check_hp_ok(name):
+            return 'fail'
+        if check_prof and not check_prof_ok(name):
+            return 'fail'
+
+    return 'pass'
 
 def rts_flags(way):
     if (way == ''):
