@@ -757,65 +757,65 @@ def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link ):
 # testname.run.stderr.  Returns the exit code of the run.
 
 def simple_run( name, way, prog, args ):
-   opts = getTestOpts()
+    opts = getTestOpts()
 
-   # figure out what to use for stdin
-   if opts.stdin != '':
-       use_stdin = opts.stdin
-   else:
-       stdin_file = add_suffix(name, 'stdin')
-       if os.path.exists(in_testdir(stdin_file)):
-           use_stdin = stdin_file
-       else:
-           use_stdin = '/dev/null'
+    # figure out what to use for stdin
+    if opts.stdin != '':
+        use_stdin = opts.stdin
+    else:
+        stdin_file = add_suffix(name, 'stdin')
+        if os.path.exists(in_testdir(stdin_file)):
+            use_stdin = stdin_file
+        else:
+            use_stdin = '/dev/null'
 
-   run_stdout = add_suffix(name,'run.stdout')
-   run_stderr = add_suffix(name,'run.stderr')
+    run_stdout = add_suffix(name,'run.stdout')
+    run_stderr = add_suffix(name,'run.stderr')
 
-   rm_no_fail(qualify(name,'run.stdout'))
-   rm_no_fail(qualify(name,'run.stderr'))
-   rm_no_fail(qualify(name, 'hp'))
-   rm_no_fail(qualify(name,'ps'))
-   rm_no_fail(qualify(name, 'prof'))
+    rm_no_fail(qualify(name,'run.stdout'))
+    rm_no_fail(qualify(name,'run.stderr'))
+    rm_no_fail(qualify(name, 'hp'))
+    rm_no_fail(qualify(name,'ps'))
+    rm_no_fail(qualify(name, 'prof'))
    
-   my_rts_flags = rts_flags(way)
+    my_rts_flags = rts_flags(way)
 
-   if opts.no_stdin:
-     stdin_comes_from = ''
-   else:
-     stdin_comes_from = ' <' + use_stdin
-   cmd = 'cd ' + testdir + ' && ' \
-	  + prog + ' ' + args + ' ' \
-          + my_rts_flags + ' ' \
-          + stdin_comes_from \
-          + ' >' + run_stdout \
-          + ' 2>' + run_stderr
+    if opts.no_stdin:
+        stdin_comes_from = ''
+    else:
+        stdin_comes_from = ' <' + use_stdin
+    cmd = 'cd ' + testdir + ' && ' \
+	    + prog + ' ' + args + ' '  \
+        + my_rts_flags + ' '       \
+        + stdin_comes_from         \
+        + ' >' + run_stdout        \
+        + ' 2>' + run_stderr
 
-   # run the command
-   result = runCmd(cmd)
+    # run the command
+    result = runCmd(cmd)
 
-   exit_code = result >> 8
-   signal    = result & 0xff
+    exit_code = result >> 8
+    signal    = result & 0xff
 
-   # check the exit code
-   if exit_code != opts.exit_code:
-       print 'Wrong exit code (expected', opts.exit_code, ', actual', exit_code, ')'
-       dump_stdout(name)
-       dump_stderr(name)
-       return 'fail'
+    # check the exit code
+    if exit_code != opts.exit_code:
+        print 'Wrong exit code (expected', opts.exit_code, ', actual', exit_code, ')'
+        dump_stdout(name)
+        dump_stderr(name)
+        return 'fail'
 
-   check_hp = my_rts_flags.find("-h") != -1
-   check_prof = my_rts_flags.find("-p") != -1
+    check_hp = my_rts_flags.find("-h") != -1
+    check_prof = my_rts_flags.find("-p") != -1
 
-   if opts.ignore_output or \
-      (check_stderr_ok(name) and
-       check_stdout_ok(name) and
-       (not check_hp or (exit_code > 127 and exit_code != 251) or check_hp_ok(name)) and
-       (not check_prof or check_prof_ok(name))):
-       # exit_code > 127 probably indicates a crash, so don't try to run hp2ps.
-       return 'pass'
-   else:
-       return 'fail'
+    if opts.ignore_output or \
+       (check_stderr_ok(name) and
+        check_stdout_ok(name) and
+        (not check_hp or (exit_code > 127 and exit_code != 251) or check_hp_ok(name)) and
+        (not check_prof or check_prof_ok(name))):
+        # exit_code > 127 probably indicates a crash, so don't try to run hp2ps.
+        return 'pass'
+    else:
+        return 'fail'
 
 def rts_flags(way):
     if (way == ''):
