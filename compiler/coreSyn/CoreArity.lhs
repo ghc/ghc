@@ -9,7 +9,7 @@
 -- | Arit and eta expansion
 module CoreArity (
 	manifestArity, exprArity, 
-	exprEtaExpandArity, etaExpand 
+	exprEtaExpandArity, etaExpand
     ) where
 
 #include "HsVersions.h"
@@ -17,6 +17,8 @@ module CoreArity (
 import CoreSyn
 import CoreFVs
 import CoreUtils
+import NewDemand
+import TyCon	( isRecursiveTyCon )
 import qualified CoreSubst
 import CoreSubst ( Subst, substBndr, substBndrs, substExpr
        		 , mkEmptySubst, isEmptySubst )
@@ -30,6 +32,7 @@ import BasicTypes
 import Unique
 import Outputable
 import DynFlags
+import StaticFlags	( opt_NoStateHack )
 import FastString
 import Maybes
 
@@ -124,53 +127,54 @@ exprArity e = go e
 
 %************************************************************************
 %*									*
-\subsection{Eta reduction and expansion}
+	   Eta expansion
 %*									*
 %************************************************************************
 
-exprEtaExpandArity is used when eta expanding
-	e  ==>  \xy -> e x y
+\begin{code}
+-- ^ The Arity returned is the number of value args the 
+-- expression can be applied to without doing much work
+exprEtaExpandArity :: DynFlags -> CoreExpr -> Arity
+-- exprEtaExpandArity is used when eta expanding
+-- 	e  ==>  \xy -> e x y
+exprEtaExpandArity dflags e
+    = applyStateHack e (arityType dicts_cheap e)
+  where
+    dicts_cheap = dopt Opt_DictsCheap dflags
+\end{code}	
 
-It returns 1 (or more) to:
-	case x of p -> \s -> ...
-because for I/O ish things we really want to get that \s to the top.
-We are prepared to evaluate x each time round the loop in order to get that
+Note [Definition of arity]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+The "arity" of an expression 'e' is n if
+   applying 'e' to *fewer* than n *value* arguments
+   converges rapidly
+
+Or, to put it another way
+
+   there is no work lost in duplicating the partial
+   application (e x1 .. x(n-1))
+
+In the divegent case, no work is lost by duplicating because if the thing
+is evaluated once, that's the end of the program.
+
+Or, to put it another way, in any context C
+
+   C[ (\x1 .. xn. e x1 .. xn) ]
+         is as efficient as
+   C[ e ]
+
 
 It's all a bit more subtle than it looks:
 
-1.  One-shot lambdas
+Note [Arity of case expressions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We treat the arity of 
+	case x of p -> \s -> ...
+as 1 (or more) because for I/O ish things we really want to get that
+\s to the top.  We are prepared to evaluate x each time round the loop
+in order to get that.
 
-Consider one-shot lambdas
-		let x = expensive in \y z -> E
-We want this to have arity 2 if the \y-abstraction is a 1-shot lambda
-Hence the ArityType returned by arityType
-
-2.  The state-transformer hack
-
-The one-shot lambda special cause is particularly important/useful for
-IO state transformers, where we often get
-	let x = E in \ s -> ...
-
-and the \s is a real-world state token abstraction.  Such abstractions
-are almost invariably 1-shot, so we want to pull the \s out, past the
-let x=E, even if E is expensive.  So we treat state-token lambdas as 
-one-shot even if they aren't really.  The hack is in Id.isOneShotBndr.
-
-3.  Dealing with bottom
-
-Consider also 
-	f = \x -> error "foo"
-Here, arity 1 is fine.  But if it is
-	f = \x -> case x of 
-			True  -> error "foo"
-			False -> \y -> x+y
-then we want to get arity 2.  Tecnically, this isn't quite right, because
-	(f True) `seq` 1
-should diverge, but it'll converge if we eta-expand f.  Nevertheless, we
-do so; it improves some programs significantly, and increasing convergence
-isn't a bad thing.  Hence the ABot/ATop in ArityType.
-
-Actually, the situation is worse.  Consider
+This isn't really right in the presence of seq.  Consider
 	f = \x -> case x of
 			True  -> \y -> x+y
 			False -> \y -> x-y
@@ -182,8 +186,29 @@ This should diverge!  But if we eta-expand, it won't.   Again, we ignore this
 many programs.
 
 
-4. Newtypes
+1.  Note [One-shot lambdas]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider one-shot lambdas
+		let x = expensive in \y z -> E
+We want this to have arity 1 if the \y-abstraction is a 1-shot lambda.
 
+3.  Note [Dealing with bottom]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+	f = \x -> error "foo"
+Here, arity 1 is fine.  But if it is
+	f = \x -> case x of 
+			True  -> error "foo"
+			False -> \y -> x+y
+then we want to get arity 2.  Technically, this isn't quite right, because
+	(f True) `seq` 1
+should diverge, but it'll converge if we eta-expand f.  Nevertheless, we
+do so; it improves some programs significantly, and increasing convergence
+isn't a bad thing.  Hence the ABot/ATop in ArityType.
+
+
+4. Note [Newtype arity]
+~~~~~~~~~~~~~~~~~~~~~~~~
 Non-recursive newtypes are transparent, and should not get in the way.
 We do (currently) eta-expand recursive newtypes too.  So if we have, say
 
@@ -197,82 +222,157 @@ that is, etaExpandArity looks through the coerce.
 When we eta-expand e to arity 1: eta_expand 1 e T
 we want to get: 		 coerce T (\x::[T] -> (coerce ([T]->Int) e) x)
 
-HOWEVER, note that if you use coerce bogusly you can ge
-	coerce Int negate
-And since negate has arity 2, you might try to eta expand.  But you can't
-decopose Int to a function type.   Hence the final case in eta_expand.
+  HOWEVER, note that if you use coerce bogusly you can ge
+  	coerce Int negate
+  And since negate has arity 2, you might try to eta expand.  But you can't
+  decopose Int to a function type.   Hence the final case in eta_expand.
+  
+Note [The state-transformer hack]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have 
+	f = e
+where e has arity n.  Then, if we know from the context that f has
+a usage type like
+	t1 -> ... -> tn -1-> t(n+1) -1-> ... -1-> tm -> ...
+then we can expand the arity to m.  This usage type says that
+any application (x e1 .. en) will be applied to uniquely to (m-n) more args
+Consider f = \x. let y = <expensive> 
+		 in case x of
+		      True  -> foo
+		      False -> \(s:RealWorld) -> e
+where foo has arity 1.  Then we want the state hack to
+apply to foo too, so we can eta expand the case.
 
+Then we expect that if f is applied to one arg, it'll be applied to two
+(that's the hack -- we don't really know, and sometimes it's false)
+See also Id.isOneShotBndr.
 
 \begin{code}
--- ^ The Arity returned is the number of value args the 
--- expression can be applied to without doing much work
-exprEtaExpandArity :: DynFlags -> CoreExpr -> Arity
-exprEtaExpandArity dflags e = arityDepth (arityType dflags e)
+applyStateHack :: CoreExpr -> ArityType -> Arity
+applyStateHack e (AT orig_arity is_bot)
+  | opt_NoStateHack = orig_arity
+  | ABot <- is_bot  = orig_arity   -- Note [State hack and bottoming functions]
+  | otherwise       = go orig_ty orig_arity
+  where			-- Note [The state-transformer hack]
+    orig_ty = exprType e
+    go :: Type -> Arity -> Arity
+    go ty arity		-- This case analysis should match that in eta_expand
+	| Just (_, ty') <- splitForAllTy_maybe ty   = go ty' arity
 
--- A limited sort of function type
-data ArityType = AFun Bool ArityType	-- True <=> one-shot
-	       | ATop			-- Know nothing
+	| Just (tc,tys) <- splitTyConApp_maybe ty 
+	, Just (ty', _) <- instNewTyCon_maybe tc tys
+	, not (isRecursiveTyCon tc)	            = go ty' arity
+		-- Important to look through non-recursive newtypes, so that, eg 
+		--	(f x)   where f has arity 2, f :: Int -> IO ()
+		-- Here we want to get arity 1 for the result!
+
+	| Just (arg,res) <- splitFunTy_maybe ty
+	, arity > 0 || isStateHackType arg = 1 + go res (arity-1)
+{-
+	= if arity > 0 then 1 + go res (arity-1)
+	  else if isStateHackType arg then
+		pprTrace "applystatehack" (vcat [ppr orig_arity, ppr orig_ty,
+						ppr ty, ppr res, ppr e]) $
+	        1 + go res (arity-1)
+          else WARN( arity > 0, ppr arity ) 0
+-}						 
+	| otherwise = WARN( arity > 0, ppr arity ) 0
+\end{code}
+
+Note [State hack and bottoming functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+It's a terrible idea to use the state hack on a bottoming function.
+Here's what happens (Trac #2861):
+
+  f :: String -> IO T
+  f = \p. error "..."
+
+Eta-expand, using the state hack:
+
+  f = \p. (\s. ((error "...") |> g1) s) |> g2
+  g1 :: IO T ~ (S -> (S,T))
+  g2 :: (S -> (S,T)) ~ IO T
+
+Extrude the g2
+
+  f' = \p. \s. ((error "...") |> g1) s
+  f = f' |> (String -> g2)
+
+Discard args for bottomming function
+
+  f' = \p. \s. ((error "...") |> g1 |> g3
+  g3 :: (S -> (S,T)) ~ (S,T)
+
+Extrude g1.g3
+
+  f'' = \p. \s. (error "...")
+  f' = f'' |> (String -> S -> g1.g3)
+
+And now we can repeat the whole loop.  Aargh!  The bug is in applying the
+state hack to a function which then swallows the argument.
+
+
+-------------------- Main arity code ----------------------------
+\begin{code}
+-- If e has ArityType (AT n r), then the term 'e'
+--  * Must be applied to at least n *value* args 
+--	before doing any significant work
+--  * It will not diverge before being applied to n
+--	value arguments
+--  * If 'r' is ABot, then it guarantees to diverge if 
+--	applied to n arguments (or more)
+
+data ArityType = AT Arity ArityRes
+data ArityRes  = ATop			-- Know nothing
 	       | ABot			-- Diverges
 
-arityDepth :: ArityType -> Arity
-arityDepth (AFun _ ty) = 1 + arityDepth ty
-arityDepth _           = 0
+vanillaArityType :: ArityType
+vanillaArityType = AT 0 ATop	-- Totally uninformative
 
-andArityType :: ArityType -> ArityType -> ArityType
-andArityType ABot           at2           = at2
-andArityType ATop           _             = ATop
-andArityType (AFun t1 at1)  (AFun t2 at2) = AFun (t1 && t2) (andArityType at1 at2)
-andArityType at1            at2           = andArityType at2 at1
+incArity :: ArityType -> ArityType
+incArity (AT a r) = AT (a+1) r
 
-arityType :: DynFlags -> CoreExpr -> ArityType
-	-- (go1 e) = [b1,..,bn]
-	-- means expression can be rewritten \x_b1 -> ... \x_bn -> body
-	-- where bi is True <=> the lambda is one-shot
+decArity :: ArityType -> ArityType
+decArity (AT 0 r) = AT 0     r
+decArity (AT a r) = AT (a-1) r
 
-arityType dflags (Note _ e) = arityType dflags e
---	Not needed any more: etaExpand is cleverer
--- removed: | ok_note n = arityType dflags e
--- removed: | otherwise = ATop
+andArityType :: ArityType -> ArityType -> ArityType   -- Used for branches of a 'case'
+andArityType (AT a1 ATop) (AT a2 ATop) = AT (a1 `min` a2) ATop
+andArityType (AT _  ABot) (AT a2 ATop) = AT a2		  ATop
+andArityType (AT a1 ATop) (AT _  ABot) = AT a1		  ATop
+andArityType (AT a1 ABot) (AT a2 ABot) = AT (a1 `max` a2) ABot
 
-arityType dflags (Cast e _) = arityType dflags e
+trimArity :: Bool -> ArityType -> ArityType
+-- We have something like (let x = E in b), where b has the given
+-- arity type.  Then
+--	* If E is cheap we can push it inside as far as we like
+--	* If b eventually diverges, we allow ourselves to push inside
+--	  arbitrarily, even though that is not quite right
+trimArity _cheap (AT a ABot) = AT a ABot
+trimArity True   (AT a ATop) = AT a ATop
+trimArity False  (AT _ ATop) = AT 0 ATop	-- Bale out
 
+---------------------------
+arityType :: Bool -> CoreExpr -> ArityType
 arityType _ (Var v)
-  = mk (idArity v) (arg_tys (idType v))
-  where
-    mk :: Arity -> [Type] -> ArityType
-	-- The argument types are only to steer the "state hack"
-	-- Consider case x of
-	--		True  -> foo
-	--		False -> \(s:RealWorld) -> e
-	-- where foo has arity 1.  Then we want the state hack to
-	-- apply to foo too, so we can eta expand the case.
-    mk 0 tys | isBottomingId v                   = ABot
-             | (ty:_) <- tys, isStateHackType ty = AFun True ATop
-             | otherwise                         = ATop
-    mk n (ty:tys) = AFun (isStateHackType ty) (mk (n-1) tys)
-    mk n []       = AFun False		      (mk (n-1) [])
-
-    arg_tys :: Type -> [Type]	-- Ignore for-alls
-    arg_tys ty 
-	| Just (_, ty')  <- splitForAllTy_maybe ty = arg_tys ty'
-	| Just (arg,res) <- splitFunTy_maybe ty    = arg : arg_tys res
-	| otherwise				   = []
+  | Just strict_sig <- idNewStrictness_maybe v
+  , (ds, res) <- splitStrictSig strict_sig
+  , isBotRes res
+  = AT (length ds) ABot	-- Function diverges
+  | otherwise
+  = AT (idArity v) ATop
 
 	-- Lambdas; increase arity
-arityType dflags (Lam x e)
-  | isId x    = AFun (isOneShotBndr x) (arityType dflags e)
-  | otherwise = arityType dflags e
+arityType dicts_cheap (Lam x e)
+  | isId x    = incArity (arityType dicts_cheap e)
+  | otherwise = arityType dicts_cheap e
 
 	-- Applications; decrease arity
-arityType dflags (App f (Type _)) = arityType dflags f
-arityType dflags (App f a)
-   = case arityType dflags f of
-	ABot -> ABot	-- If function diverges, ignore argument
-	ATop -> ATop	-- No no info about function
-	AFun _ xs
-		| exprIsCheap a -> xs
-		| otherwise	-> ATop
-							   
+arityType dicts_cheap (App fun (Type _))
+   = arityType dicts_cheap fun
+arityType dicts_cheap (App fun arg )
+   = trimArity (exprIsCheap arg) (decArity (arityType dicts_cheap fun))
+
 	-- Case/Let; keep arity if either the expression is cheap
 	-- or it's a 1-shot lambda
 	-- The former is not really right for Haskell
@@ -280,26 +380,21 @@ arityType dflags (App f a)
 	--  ===>
 	--	f x y = case x of { (a,b) -> e }
 	-- The difference is observable using 'seq'
-arityType dflags (Case scrut _ _ alts)
-  = case foldr1 andArityType [arityType dflags rhs | (_,_,rhs) <- alts] of
-        xs | exprIsCheap scrut     -> xs
-        AFun one_shot _ | one_shot -> AFun True ATop
-        _                          -> ATop
+arityType dicts_cheap (Case scrut _ _ alts)
+  = trimArity (exprIsCheap scrut)
+	      (foldr1 andArityType [arityType dicts_cheap rhs | (_,_,rhs) <- alts])
 
-arityType dflags (Let b e) 
-  = case arityType dflags e of
-        xs              | cheap_bind b -> xs
-        AFun one_shot _ | one_shot     -> AFun True ATop
-        _                              -> ATop
+arityType dicts_cheap (Let b e) 
+  = trimArity (cheap_bind b) (arityType dicts_cheap e)
   where
     cheap_bind (NonRec b e) = is_cheap (b,e)
     cheap_bind (Rec prs)    = all is_cheap prs
-    is_cheap (b,e) = (dopt Opt_DictsCheap dflags && isDictLikeTy (idType b))
+    is_cheap (b,e) = (dicts_cheap && isDictLikeTy (idType b))
 		   || exprIsCheap e
 	-- If the experimental -fdicts-cheap flag is on, we eta-expand through
 	-- dictionary bindings.  This improves arities. Thereby, it also
 	-- means that full laziness is less prone to floating out the
-	-- application of a function to its dictionary arguments, which
+  	-- application of a function to its dictionary arguments, which
 	-- can thereby lose opportunities for fusion.  Example:
 	-- 	foo :: Ord a => a -> ...
 	--	foo = /\a \(d:Ord a). let d' = ...d... in \(x:a). ....
@@ -309,17 +404,19 @@ arityType dflags (Let b e)
 	--
 	-- The (foo DInt) is floated out, and makes ineffective a RULE 
 	--	foo (bar x) = ...
-	--
+  	--
 	-- One could go further and make exprIsCheap reply True to any
 	-- dictionary-typed expression, but that's more work.
 	-- 
 	-- See Note [Dictionary-like types] in TcType.lhs for why we use
 	-- isDictLikeTy here rather than isDictTy
 
-arityType _ _ = ATop
+arityType dicts_cheap (Note _ e) = arityType dicts_cheap e
+arityType dicts_cheap (Cast e _) = arityType dicts_cheap e
+arityType _           _          = vanillaArityType
 \end{code}
-
-
+  
+  
 %************************************************************************
 %*									*
               The main eta-expander								
@@ -370,11 +467,11 @@ etaExpand n orig_expr
   = go n orig_expr
   where
       -- Strip off existing lambdas
+      -- Note [Eta expansion and SCCs]
     go 0 expr = expr
     go n (Lam v body) | isTyVar v = Lam v (go n     body)
        	              | otherwise = Lam v (go (n-1) body)
     go n (Note InlineMe expr) = Note InlineMe (go n expr)
-        -- Note [Eta expansion and SCCs]
     go n (Cast expr co) = Cast (go n expr) co
     go n expr           = -- pprTrace "ee" (vcat [ppr orig_expr, ppr expr, ppr etas]) $
        	 		  etaInfoAbs etas (etaInfoApp subst' expr etas)
