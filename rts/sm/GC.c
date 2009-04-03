@@ -116,7 +116,10 @@ nat mutlist_MUTVARS,
 /* Thread-local data for each GC thread
  */
 gc_thread **gc_threads = NULL;
-// gc_thread *gct = NULL;  // this thread's gct TODO: make thread-local
+
+#if !defined(THREADED_RTS)
+StgWord8 the_gc_thread[sizeof(gc_thread) + 64 * sizeof(step_workspace)];
+#endif
 
 // Number of threads running in *this* GC.  Affects how many
 // step->todos[] lists we have to look in to find work.
@@ -314,12 +317,12 @@ GarbageCollect (rtsBool force_major_gc,
   // this is the main thread
 #ifdef THREADED_RTS
   if (n_gc_threads == 1) {
-      gct = gc_threads[0];
+      SET_GCT(gc_threads[0]);
   } else {
-      gct = gc_threads[cap->no];
+      SET_GCT(gc_threads[cap->no]);
   }
 #else
-  gct = gc_threads[0];
+SET_GCT(gc_threads[0]);
 #endif
 
   /* -----------------------------------------------------------------------
@@ -803,7 +806,7 @@ GarbageCollect (rtsBool force_major_gc,
 
   RELEASE_SM_LOCK;
 
-  gct = saved_gct;
+  SET_GCT(saved_gct);
 }
 
 /* -----------------------------------------------------------------------------
@@ -857,15 +860,11 @@ initialise_N (rtsBool force_major_gc)
 #define GC_THREAD_RUNNING              2
 #define GC_THREAD_WAITING_TO_CONTINUE  3
 
-static gc_thread *
-alloc_gc_thread (int n)
+static void
+new_gc_thread (nat n, gc_thread *t)
 {
     nat s;
     step_workspace *ws;
-    gc_thread *t;
-
-    t = stgMallocBytes(sizeof(gc_thread) + total_steps * sizeof(step_workspace),
-                       "alloc_gc_thread");
 
 #ifdef THREADED_RTS
     t->id = 0;
@@ -891,7 +890,7 @@ alloc_gc_thread (int n)
         ws = &t->steps[s];
         ws->step = &all_steps[s];
         ASSERT(s == ws->step->abs_no);
-        ws->gct = t;
+        ws->my_gct = t;
         
         ws->todo_bd = NULL;
         ws->todo_q = newWSDeque(128);
@@ -904,8 +903,6 @@ alloc_gc_thread (int n)
         ws->scavd_list = NULL;
         ws->n_scavd_blocks = 0;
     }
-
-    return t;
 }
 
 
@@ -920,13 +917,16 @@ initGcThreads (void)
 				     "alloc_gc_threads");
 
 	for (i = 0; i < RtsFlags.ParFlags.nNodes; i++) {
-	    gc_threads[i] = alloc_gc_thread(i);
+            gc_threads[i] = 
+                stgMallocBytes(sizeof(gc_thread) + total_steps * sizeof(step_workspace),
+                               "alloc_gc_threads");
+
+            new_gc_thread(i, gc_threads[i]);
 	}
 #else
-	gc_threads = stgMallocBytes (sizeof(gc_thread*), 
-				     "alloc_gc_threads");
-
-	gc_threads[0] = alloc_gc_thread(0);
+        gc_threads = stgMallocBytes (sizeof(gc_thread*),"alloc_gc_threads");
+	gc_threads[0] = gct;
+        new_gc_thread(0,gc_threads[0]);
 #endif
     }
 }
@@ -1435,7 +1435,7 @@ init_gc_thread (gc_thread *t)
    -------------------------------------------------------------------------- */
 
 static void
-mark_root(void *user, StgClosure **root)
+mark_root(void *user USED_IF_THREADS, StgClosure **root)
 {
     // we stole a register for gct, but this function is called from
     // *outside* the GC where the register variable is not in effect,
@@ -1444,11 +1444,11 @@ mark_root(void *user, StgClosure **root)
     // incorrect.
     gc_thread *saved_gct;
     saved_gct = gct;
-    gct = user;
+    SET_GCT(user);
     
     evacuate(root);
     
-    gct = saved_gct;
+    SET_GCT(saved_gct);
 }
 
 /* -----------------------------------------------------------------------------

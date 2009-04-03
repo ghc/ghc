@@ -75,7 +75,7 @@
 
 typedef struct step_workspace_ {
     step * step;		// the step for this workspace 
-    struct gc_thread_ * gct;    // the gc_thread that contains this workspace
+    struct gc_thread_ * my_gct; // the gc_thread that contains this workspace
 
     // where objects to be scavenged go
     bdescr *     todo_bd;
@@ -189,8 +189,6 @@ typedef struct gc_thread_ {
 
 extern nat n_gc_threads;
 
-extern gc_thread **gc_threads;
-
 /* -----------------------------------------------------------------------------
    The gct variable is thread-local and points to the current thread's
    gc_thread structure.  It is heavily accessed, so we try to put gct
@@ -203,7 +201,13 @@ extern gc_thread **gc_threads;
    __thread version.
    -------------------------------------------------------------------------- */
 
+extern gc_thread **gc_threads;
+
+#if defined(THREADED_RTS)
+
 #define GLOBAL_REG_DECL(type,name,reg) register type name REG(reg);
+
+#define SET_GCT(to) gct = (to)
 
 #if defined(sparc_HOST_ARCH)
 // Don't use REG_base or R1 for gct on SPARC because they're getting clobbered 
@@ -232,6 +236,16 @@ extern __thread gc_thread* gct;
 #else
 
 #error Cannot find a way to declare the thread-local gct
+
+#endif
+
+#else  // not the threaded RTS
+
+extern StgWord8 the_gc_thread[];
+
+#define gct ((gc_thread*)&the_gc_thread)
+#define SET_GCT(to) /*nothing*/
+#define DECLARE_GCT /*nothing*/
 
 #endif
 
