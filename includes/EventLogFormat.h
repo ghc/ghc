@@ -109,8 +109,9 @@
 #define EVENT_GC_END         10 /* (cap) */
 #define EVENT_REQUEST_SEQ_GC 11 /* (cap) */
 #define EVENT_REQUEST_PAR_GC 12 /* (cap) */
+#define EVENT_CREATE_SPARK   13 /* (cap, thread)              */
 
-#define NUM_EVENT_TAGS       13 
+#define NUM_EVENT_TAGS       14 
 
 /*
  * Status values for EVENT_STOP_THREAD

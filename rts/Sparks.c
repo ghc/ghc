@@ -57,6 +57,7 @@ createSparkThread (Capability *cap)
 
     tso = createIOThread (cap, RtsFlags.GcFlags.initialStkSize, 
                           &base_GHCziConc_runSparks_closure);
+
     appendToRunQueue(cap,tso);
 }
 
@@ -82,6 +83,8 @@ newSpark (StgRegTable *reg, StgClosure *p)
     }	
 
     cap->sparks_created++;
+
+    postEvent(cap, EVENT_CREATE_SPARK, reg->rCurrentTSO->id, 0);
 
     return 1;
 }

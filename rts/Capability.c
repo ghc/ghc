@@ -79,6 +79,10 @@ findSpark (Capability *cap)
   spark = tryStealSpark(cap);
   if (spark != NULL) {
       cap->sparks_converted++;
+
+      // Post event for running a spark from capability's own pool.
+      postEvent(cap, EVENT_RUN_SPARK, cap->r.rCurrentTSO->id, 0);
+
       return spark;
   }
 
@@ -113,6 +117,11 @@ findSpark (Capability *cap)
 		 "cap %d: Stole a spark from capability %d",
                          cap->no, robbed->no);
               cap->sparks_converted++;
+
+              postEvent(cap, EVENT_STEAL_SPARK, 
+                        cap->r.rCurrentTSO->id, robbed->no);
+                        
+              
               return spark;
           }
           // otherwise: no success, try next one

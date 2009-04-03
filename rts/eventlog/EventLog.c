@@ -48,7 +48,8 @@ char *EventDesc[] = {
   "Request sequential GC",
   "Request parallel GC",
   "Starting GC",
-  "Finished GC"
+  "Finished GC",
+  "Create spark"
 };
 
 // Event type. 
@@ -176,6 +177,7 @@ initEventLogging(void)
         case EVENT_CREATE_THREAD:   // (cap, thread)
         case EVENT_RUN_THREAD:      // (cap, thread)
         case EVENT_THREAD_RUNNABLE: // (cap, thread)
+        case EVENT_CREATE_SPARK:    // (cap, thread)
         case EVENT_RUN_SPARK:       // (cap, thread)
             eventTypes[t].size = sizeof(CapabilityNum) + sizeof(ThreadID);
             break;
@@ -298,6 +300,7 @@ postEvent_(Capability *cap, EventTypeNum tag, StgThreadID thread, nat other_cap)
     case EVENT_CREATE_THREAD:   // (cap, thread)
     case EVENT_RUN_THREAD:      // (cap, thread)
     case EVENT_THREAD_RUNNABLE: // (cap, thread)
+    case EVENT_CREATE_SPARK:    // (cap, thread)
     case EVENT_RUN_SPARK:       // (cap, thread)
     {
         postWord64(eb,thread);

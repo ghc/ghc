@@ -858,7 +858,7 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
 		    debugTrace(DEBUG_sched, "pushing thread %lu to capability %d", (unsigned long)t->id, free_caps[i]->no);
 		    appendToRunQueue(free_caps[i],t);
 
-                    postEvent (cap, EVENT_MIGRATE_THREAD, t->id, free_caps[i]->no);
+        postEvent (cap, EVENT_MIGRATE_THREAD, t->id, free_caps[i]->no);
 
 		    if (t->bound) { t->bound->cap = free_caps[i]; }
 		    t->cap = free_caps[i];
@@ -881,6 +881,9 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
 		    spark = tryStealSpark(cap->sparks);
 		    if (spark != NULL) {
 			debugTrace(DEBUG_sched, "pushing spark %p to capability %d", spark, free_caps[i]->no);
+
+      postEvent(free_caps[i], EVENT_STEAL_SPARK, t->id, cap->no);
+
 			newSpark(&(free_caps[i]->r), spark);
 		    }
 		}
