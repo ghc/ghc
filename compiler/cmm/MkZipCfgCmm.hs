@@ -35,7 +35,6 @@ import PprCmm()
 import FastString
 import ForeignCall
 import MkZipCfg
-import Outputable
 import Panic 
 import SMRep (ByteOff) 
 import StaticFlags 

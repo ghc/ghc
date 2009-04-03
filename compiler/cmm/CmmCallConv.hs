@@ -175,7 +175,7 @@ assign_bits_reg _ w off gcp (v:vs, fs, ds, ls)
 assign_bits_reg _ w off _ (vs, fs, ds, l:ls)
   | widthInBits w > widthInBits wordWidth =
         (RegisterParam l, off, 0, (vs, fs, ds, ls))
-assign_bits_reg assign_slot w off _ regs@(_, _, _, ls) = assign_slot w off regs
+assign_bits_reg assign_slot w off _ regs@(_, _, _, _) = assign_slot w off regs
 
 assign_float_reg :: SlotAssigner -> Width -> WordOff -> AvailRegs -> Assignment
 assign_float_reg _ W32 off (vs, f:fs, ds, ls) = (RegisterParam $ f, off, 0, (vs, fs, ds, ls))
