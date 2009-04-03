@@ -251,7 +251,7 @@ opt_SimplExcessPrecision	= lookUp  (fsLit "-fexcess-precision")
 opt_UF_CreationThreshold :: Int
 opt_UF_CreationThreshold	= lookup_def_int "-funfolding-creation-threshold"  (45::Int)
 opt_UF_UseThreshold :: Int
-opt_UF_UseThreshold		= lookup_def_int "-funfolding-use-threshold"	   (8::Int)	-- Discounts can be big
+opt_UF_UseThreshold		= lookup_def_int "-funfolding-use-threshold"	   (6::Int)	-- Discounts can be big
 opt_UF_FunAppDiscount :: Int
 opt_UF_FunAppDiscount		= lookup_def_int "-funfolding-fun-discount"	   (6::Int)	-- It's great to inline a fn
 opt_UF_KeenessFactor :: Float

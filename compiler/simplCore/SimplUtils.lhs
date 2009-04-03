@@ -246,42 +246,8 @@ splitInlineCont _                      = Nothing
 \end{code}
 
 
-\begin{code}
-interestingArg :: OutExpr -> Bool
-	-- An argument is interesting if it has *some* structure
-	-- We are here trying to avoid unfolding a function that
-	-- is applied only to variables that have no unfolding
-	-- (i.e. they are probably lambda bound): f x y z
-	-- There is little point in inlining f here.
-interestingArg (Var v)	         = hasSomeUnfolding (idUnfolding v)
-					-- Was: isValueUnfolding (idUnfolding v')
-					-- But that seems over-pessimistic
-				 || isDataConWorkId v
-					-- This accounts for an argument like
-					-- () or [], which is definitely interesting
-interestingArg (Type _)	         = False
-interestingArg (App fn (Type _)) = interestingArg fn
-interestingArg (Note _ a)	 = interestingArg a
-
--- Idea (from Sam B); I'm not sure if it's a good idea, so commented out for now
--- interestingArg expr | isUnLiftedType (exprType expr)
---        -- Unlifted args are only ever interesting if we know what they are
---  =                  case expr of
---                        Lit lit -> True
---                        _       -> False
-
-interestingArg _                 = True
-	-- Consider 	let x = 3 in f x
-	-- The substitution will contain (x -> ContEx 3), and we want to
-	-- to say that x is an interesting argument.
-	-- But consider also (\x. f x y) y
-	-- The substitution will contain (x -> ContEx y), and we want to say
-	-- that x is not interesting (assuming y has no unfolding)
-\end{code}
-
-
-Comment about interestingCallContext
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Interesting call context]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We want to avoid inlining an expression where there can't possibly be
 any gain, such as in an argument position.  Hence, if the continuation
 is interesting (eg. a case scrutinee, application etc.) then we
@@ -316,6 +282,7 @@ default case.
 
 \begin{code}
 interestingCallContext :: SimplCont -> CallCtxt
+-- See Note [Interesting call context]
 interestingCallContext cont
   = interesting cont
   where
@@ -354,7 +321,7 @@ interestingCallContext cont
 -------------------
 mkArgInfo :: Id
 	  -> Int	-- Number of value args
-	  -> SimplCont	-- Context of the cal
+	  -> SimplCont	-- Context of the call
 	  -> ArgInfo
 
 mkArgInfo fun n_val_args call_cont

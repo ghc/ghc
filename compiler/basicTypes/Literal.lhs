@@ -24,7 +24,6 @@ module Literal
 	, mkMachChar, mkMachString
 	
 	-- ** Operations on Literals
-	, litSize
 	, literalType
 	, hashLiteral
 
@@ -332,15 +331,6 @@ litFitsInChar (MachInt i)
     		         = fromInteger i <= ord minBound 
                         && fromInteger i >= ord maxBound 
 litFitsInChar _         = False
-
--- | Finds a nominal size of a string literal. Every literal has size at least 1
-litSize :: Literal -> Int
--- Used by CoreUnfold.sizeExpr
-litSize (MachStr str) = 1 + ((lengthFS str + 3) `div` 4)
-	-- If size could be 0 then @f "x"@ might be too small
-	-- [Sept03: make literal strings a bit bigger to avoid fruitless 
-	--  duplication of little strings]
-litSize _other	      = 1
 \end{code}
 
 	Types

@@ -25,10 +25,12 @@ module CoreUnfold (
 	isEvaldUnfolding, isValueUnfolding, isExpandableUnfolding, isCompulsoryUnfolding,
 	hasUnfolding, hasSomeUnfolding, neverUnfold,
 
+	interestingArg, ArgSummary(..),
+
 	couldBeSmallEnoughToInline, 
 	certainlyWillInline, smallEnoughToInline,
 
-	callSiteInline, CallCtxt(..)
+	callSiteInline, CallCtxt(..), 
 
     ) where
 
@@ -190,6 +192,50 @@ calcUnfoldingGuidance bOMB_OUT_SIZE expr
     go inline rev_vbs e			    = (inline, reverse rev_vbs, e)
 \end{code}
 
+Note [Computing the size of an expression]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The basic idea of sizeExpr is obvious enough: count nodes.  But getting the
+heuristics right has taken a long time.  Here's the basic strategy:
+
+    * Variables, literals: 0
+      (Exception for string literals, see litSize.)
+
+    * Function applications (f e1 .. en): 1 + #value args
+
+    * Constructor applications: 1, regardless of #args
+
+    * Let(rec): 1 + size of components
+
+    * Note, cast: 0
+
+Examples
+
+  Size	Term
+  --------------
+    0	  42#
+    0	  x
+    2	  f x
+    1	  Just x
+    4 	  f (g x)
+
+Notice that 'x' counts 0, while (f x) counts 2.  That's deliberate: there's
+a function call to account for.  Notice also that constructor applications 
+are very cheap, because exposing them to a caller is so valuable.
+
+Thing to watch out for
+
+* We inline *unconditionally* if inlined thing is smaller (using sizeExpr)
+  than the thing it's replacing.  Notice that
+      (f x) --> (g 3) 		  -- YES, unconditionally
+      (f x) --> x : []		  -- YES, *even though* there are two
+      	    	    		  --      arguments to the cons
+      x     --> g 3		  -- NO
+      x	    --> Just v		  -- NO
+
+  It's very important not to unconditionally replace a variable by
+  a non-atomic term.
+
+
 \begin{code}
 sizeExpr :: FastInt 	    -- Bomb out if it gets bigger than this
 	 -> [Id]	    -- Arguments; we're interested in which of these
@@ -197,11 +243,16 @@ sizeExpr :: FastInt 	    -- Bomb out if it gets bigger than this
 	 -> CoreExpr
 	 -> ExprSize
 
+-- Note [Computing the size of an expression]
+
 sizeExpr bOMB_OUT_SIZE top_args expr
   = size_up expr
   where
-    size_up (Type _)           = sizeZero        -- Types cost nothing
-    size_up (Var _)            = sizeOne
+    size_up (Type _)   = sizeZero           -- Types cost nothing
+    size_up (Lit lit)  = sizeN (litSize lit)
+    size_up (Var f)    = size_up_call f 0   -- Make sure we get constructor
+    	    	       	 	      	    -- discounts even on nullary constructors
+    size_up (Cast e _) = size_up e
 
     size_up (Note InlineMe _)  = sizeOne         -- Inline notes make it look very small
 	-- This can be important.  If you have an instance decl like this:
@@ -210,15 +261,11 @@ sizeExpr bOMB_OUT_SIZE top_args expr
 	--	   op1 = ...
 	--	   op2 = ...
 	-- then we'll get a dfun which is a pair of two INLINE lambdas
-
     size_up (Note _      body) = size_up body  -- Other notes cost nothing
-    
-    size_up (Cast e _)         = size_up e
 
     size_up (App fun (Type _)) = size_up fun
     size_up (App fun arg)      = size_up_app fun [arg]
-
-    size_up (Lit lit) 	       = sizeN (litSize lit)
+    	     	      		  `addSize` nukeScrutDiscount (size_up arg)
 
     size_up (Lam b e) | isId b    = lamScrutDiscount (size_up e `addSizeN` 1)
 		      | otherwise = size_up e
@@ -239,54 +286,32 @@ sizeExpr bOMB_OUT_SIZE top_args expr
 
     size_up (Case (Var v) _ _ alts) 
 	| v `elem` top_args		-- We are scrutinising an argument variable
-	= 
-{-	I'm nuking this special case; BUT see the comment with case alternatives.
-
-	(a) It's too eager.  We don't want to inline a wrapper into a
-	    context with no benefit.  
-	    E.g.  \ x. f (x+x)   	no point in inlining (+) here!
-
-	(b) It's ineffective. Once g's wrapper is inlined, its case-expressions 
-	    aren't scrutinising arguments any more
-
-	    case alts of
-
-		[alt] -> size_up_alt alt `addSize` SizeIs (_ILIT(0)) (unitBag (v, 1)) (_ILIT(0))
-		-- We want to make wrapper-style evaluation look cheap, so that
-		-- when we inline a wrapper it doesn't make call site (much) bigger
-		-- Otherwise we get nasty phase ordering stuff: 
-		--	f x = g x x
-		--	h y = ...(f e)...
-		-- If we inline g's wrapper, f looks big, and doesn't get inlined
-		-- into h; if we inline f first, while it looks small, then g's 
-		-- wrapper will get inlined later anyway.  To avoid this nasty
-		-- ordering difference, we make (case a of (x,y) -> ...), 
-		--  *where a is one of the arguments* look free.
-
-		other -> 
--}
-			 alts_size (foldr addSize sizeOne alt_sizes)	-- The 1 is for the scrutinee
-				   (foldr1 maxSize alt_sizes)
-
+	= alts_size (foldr addSize sizeOne alt_sizes)	-- The 1 is for the case itself
+		    (foldr1 maxSize alt_sizes)
 		-- Good to inline if an arg is scrutinised, because
 		-- that may eliminate allocation in the caller
 		-- And it eliminates the case itself
-
 	where
 	  alt_sizes = map size_up_alt alts
 
 		-- alts_size tries to compute a good discount for
 		-- the case when we are scrutinising an argument variable
-	  alts_size (SizeIs tot _tot_disc _tot_scrut)           -- Size of all alternatives
-		    (SizeIs max  max_disc  max_scrut)           -- Size of biggest alternative
-	 	= SizeIs tot (unitBag (v, iBox (_ILIT(1) +# tot -# max)) `unionBags` max_disc) max_scrut
+	  alts_size (SizeIs tot tot_disc _tot_scrut)           -- Size of all alternatives
+		    (SizeIs max _max_disc  max_scrut)           -- Size of biggest alternative
+	 	= SizeIs tot (unitBag (v, iBox (_ILIT(1) +# tot -# max)) `unionBags` tot_disc) max_scrut
 			-- If the variable is known, we produce a discount that
-			-- will take us back to 'max', the size of rh largest alternative
+			-- will take us back to 'max', the size of the largest alternative
 			-- The 1+ is a little discount for reduced allocation in the caller
+			--
+			-- Notice though, that we return tot_disc, the total discount from 
+			-- all branches.  I think that's right.
+
 	  alts_size tot_size _ = tot_size
 
-    size_up (Case e _ _ alts) = nukeScrutDiscount (size_up e) `addSize` 
-			         foldr (addSize . size_up_alt) sizeZero alts
+    size_up (Case e _ _ alts) = foldr (addSize . size_up_alt) 
+				      (nukeScrutDiscount (size_up e))
+				      alts
+			 	`addSizeN` 1	-- Add 1 for the case itself
 	  	-- We don't charge for the case itself
 		-- It's a strict thing, and the price of the call
 		-- is paid by scrut.  Also consider
@@ -294,48 +319,22 @@ sizeExpr bOMB_OUT_SIZE top_args expr
 		-- This is just ';'!  Don't charge for it.
 
     ------------ 
-    size_up_app (App fun arg) args   
-	| isTypeArg arg		     = size_up_app fun args
-	| otherwise		     = size_up_app fun (arg:args)
-    size_up_app fun 	      args   = foldr (addSize . nukeScrutDiscount . size_up) 
-					     (size_up_fun fun args)
-					     args
+    -- size_up_app is used when there's ONE OR MORE value args
+    size_up_app (App fun arg) args 
+	| isTypeArg arg		   = size_up_app fun args
+	| otherwise		   = size_up_app fun (arg:args)
+	  			     `addSize` nukeScrutDiscount (size_up arg)
+    size_up_app (Var fun)     args = size_up_call fun (length args)
+    size_up_app other         args = size_up other `addSizeN` length args
 
-	-- A function application with at least one value argument
-	-- so if the function is an argument give it an arg-discount
-	--
-	-- Also behave specially if the function is a build
-	--
-	-- Also if the function is a constant Id (constr or primop)
-	-- compute discounts specially
-    size_up_fun (Var fun) args
-      | fun `hasKey` buildIdKey   = buildSize
-      | fun `hasKey` augmentIdKey = augmentSize
-      | otherwise 
-      = case idDetails fun of
-	  DataConWorkId dc -> conSizeN dc (valArgCount args)
-
-	  FCallId _    -> sizeN opt_UF_DearOp
-	  PrimOpId op  -> primOpSize op (valArgCount args)
-			  -- foldr addSize (primOpSize op) (map arg_discount args)
-			  -- At one time I tried giving an arg-discount if a primop 
-			  -- is applied to one of the function's arguments, but it's
-			  -- not good.  At the moment, any unlifted-type arg gets a
-			  -- 'True' for 'yes I'm evald', so we collect the discount even
-			  -- if we know nothing about it.  And just having it in a primop
-			  -- doesn't help at all if we don't know something more.
-
-	  _            -> fun_discount fun `addSizeN`
-			  (1 + length (filter (not . exprIsTrivial) args))
-				-- The 1+ is for the function itself
-				-- Add 1 for each non-trivial arg;
-				-- the allocation cost, as in let(rec)
-				-- Slight hack here: for constructors the args are almost always
-				--	trivial; and for primops they are almost always prim typed
-				-- 	We should really only count for non-prim-typed args in the
-				--	general case, but that seems too much like hard work
-
-    size_up_fun other _ = size_up other
+    ------------ 
+    size_up_call :: Id -> Int -> ExprSize
+    size_up_call fun n_val_args
+       = case idDetails fun of
+           FCallId _        -> sizeN opt_UF_DearOp
+           DataConWorkId dc -> conSize    dc n_val_args
+           PrimOpId op      -> primOpSize op n_val_args
+	   _     	    -> funSize top_args fun n_val_args
 
     ------------ 
     size_up_alt (_con, _bndrs, rhs) = size_up rhs
@@ -343,14 +342,8 @@ sizeExpr bOMB_OUT_SIZE top_args expr
 	-- (See comments about wrappers with Case)
 
     ------------
-	-- We want to record if we're case'ing, or applying, an argument
-    fun_discount v | v `elem` top_args = SizeIs (_ILIT(0)) (unitBag (v, opt_UF_FunAppDiscount)) (_ILIT(0))
-    fun_discount _                     = sizeZero
-
-    ------------
 	-- These addSize things have to be here because
 	-- I don't want to give them bOMB_OUT_SIZE as an argument
-
     addSizeN TooBig          _  = TooBig
     addSizeN (SizeIs n xs d) m 	= mkSizeIs bOMB_OUT_SIZE (n +# iUnbox m) xs d
     
@@ -360,6 +353,116 @@ sizeExpr bOMB_OUT_SIZE top_args expr
 	= mkSizeIs bOMB_OUT_SIZE (n1 +# n2) (xs `unionBags` ys) (d1 +# d2)
 \end{code}
 
+\begin{code}
+-- | Finds a nominal size of a string literal.
+litSize :: Literal -> Int
+-- Used by CoreUnfold.sizeExpr
+litSize (MachStr str) = 1 + ((lengthFS str + 3) `div` 4)
+	-- If size could be 0 then @f "x"@ might be too small
+	-- [Sept03: make literal strings a bit bigger to avoid fruitless 
+	--  duplication of little strings]
+litSize _other = 0    -- Must match size of nullary constructors
+	       	      -- Key point: if  x |-> 4, then x must inline unconditionally
+		      --     	    (eg via case binding)
+
+funSize :: [Id] -> Id -> Int -> ExprSize
+-- Size for functions that are not constructors or primops
+-- Note [Function applications]
+funSize top_args fun n_val_args
+  | fun `hasKey` buildIdKey   = buildSize
+  | fun `hasKey` augmentIdKey = augmentSize
+  | otherwise = SizeIs (iUnbox size) arg_discount (iUnbox res_discount)
+  where
+    some_val_args = n_val_args > 0
+
+    arg_discount | some_val_args && fun `elem` top_args
+    		 = unitBag (fun, opt_UF_FunAppDiscount)
+		 | otherwise = emptyBag
+	-- If the function is an argument and is applied
+	-- to some values, give it an arg-discount
+
+    res_discount | idArity fun > n_val_args = opt_UF_FunAppDiscount
+    		 | otherwise   	 	    = 0
+        -- If the function is partially applied, show a result discount
+
+    size | some_val_args = 1 + n_val_args
+         | otherwise     = 0
+	-- The 1+ is for the function itself
+	-- Add 1 for each non-trivial arg;
+	-- the allocation cost, as in let(rec)
+  
+
+conSize :: DataCon -> Int -> ExprSize
+conSize dc n_val_args
+  | n_val_args == 0      = SizeIs (_ILIT(0)) emptyBag (_ILIT(1))
+  | isUnboxedTupleCon dc = SizeIs (_ILIT(0)) emptyBag (iUnbox n_val_args +# _ILIT(1))
+  | otherwise		 = SizeIs (_ILIT(1)) emptyBag (iUnbox n_val_args +# _ILIT(1))
+	-- Treat a constructors application as size 1, regardless of how
+	-- many arguments it has; we are keen to expose them
+	-- (and we charge separately for their args).  We can't treat
+	-- them as size zero, else we find that (Just x) has size 0,
+	-- which is the same as a lone variable; and hence 'v' will 
+	-- always be replaced by (Just x), where v is bound to Just x.
+	--
+	-- However, unboxed tuples count as size zero
+	-- I found occasions where we had 
+	--	f x y z = case op# x y z of { s -> (# s, () #) }
+	-- and f wasn't getting inlined
+
+primOpSize :: PrimOp -> Int -> ExprSize
+primOpSize op n_val_args
+ | not (primOpIsDupable op) = sizeN opt_UF_DearOp
+ | not (primOpOutOfLine op) = sizeN 1
+	-- Be very keen to inline simple primops.
+	-- We give a discount of 1 for each arg so that (op# x y z) costs 2.
+	-- We can't make it cost 1, else we'll inline let v = (op# x y z) 
+	-- at every use of v, which is excessive.
+	--
+	-- A good example is:
+	--	let x = +# p q in C {x}
+	-- Even though x get's an occurrence of 'many', its RHS looks cheap,
+	-- and there's a good chance it'll get inlined back into C's RHS. Urgh!
+
+ | otherwise = sizeN n_val_args
+
+
+buildSize :: ExprSize
+buildSize = SizeIs (_ILIT(0)) emptyBag (_ILIT(4))
+	-- We really want to inline applications of build
+	-- build t (\cn -> e) should cost only the cost of e (because build will be inlined later)
+	-- Indeed, we should add a result_discount becuause build is 
+	-- very like a constructor.  We don't bother to check that the
+	-- build is saturated (it usually is).  The "-2" discounts for the \c n, 
+	-- The "4" is rather arbitrary.
+
+augmentSize :: ExprSize
+augmentSize = SizeIs (_ILIT(0)) emptyBag (_ILIT(4))
+	-- Ditto (augment t (\cn -> e) ys) should cost only the cost of
+	-- e plus ys. The -2 accounts for the \cn 
+
+nukeScrutDiscount :: ExprSize -> ExprSize
+nukeScrutDiscount (SizeIs n vs _) = SizeIs n vs (_ILIT(0))
+nukeScrutDiscount TooBig          = TooBig
+
+-- When we return a lambda, give a discount if it's used (applied)
+lamScrutDiscount :: ExprSize -> ExprSize
+lamScrutDiscount (SizeIs n vs _) = SizeIs n vs (iUnbox opt_UF_FunAppDiscount)
+lamScrutDiscount TooBig          = TooBig
+\end{code}
+
+
+Note [Function applications]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In a function application (f a b)
+
+  - If 'f' is an argument to the function being analysed, 
+    and there's at least one value arg, record a FunAppDiscount for f
+
+  - If the application if a PAP (arity > 2 in this example)
+    record a *result* discount (because inlining
+    with "extra" args in the call may mean that we now 
+    get a saturated application)
+
 Code for manipulating sizes
 
 \begin{code}
@@ -368,6 +471,10 @@ data ExprSize = TooBig
 		       (Bag (Id,Int))	-- Arguments cased herein, and discount for each such
 		       FastInt		-- Size to subtract if result is scrutinised 
 					-- by a case expression
+
+instance Outputable ExprSize where
+  ppr TooBig         = ptext (sLit "TooBig")
+  ppr (SizeIs a _ c) = brackets (int (iBox a) <+> int (iBox c))
 
 -- subtract the discount before deciding whether to bale out. eg. we
 -- want to inline a large constructor application into a selector:
@@ -386,63 +493,13 @@ maxSize s1@(SizeIs n1 _ _) s2@(SizeIs n2 _ _) | n1 ># n2  = s1
 
 sizeZero, sizeOne :: ExprSize
 sizeN :: Int -> ExprSize
-conSizeN :: DataCon ->Int -> ExprSize
 
-sizeZero     	= SizeIs (_ILIT(0))  emptyBag (_ILIT(0))
-sizeOne      	= SizeIs (_ILIT(1))  emptyBag (_ILIT(0))
-sizeN n 	= SizeIs (iUnbox n) emptyBag (_ILIT(0))
-conSizeN dc n   
-  | isUnboxedTupleCon dc = SizeIs (_ILIT(0)) emptyBag (iUnbox n +# _ILIT(1))
-  | otherwise		 = SizeIs (_ILIT(1)) emptyBag (iUnbox n +# _ILIT(1))
-	-- Treat constructors as size 1; we are keen to expose them
-	-- (and we charge separately for their args).  We can't treat
-	-- them as size zero, else we find that (iBox x) has size 1,
-	-- which is the same as a lone variable; and hence 'v' will 
-	-- always be replaced by (iBox x), where v is bound to iBox x.
-	--
-	-- However, unboxed tuples count as size zero
-	-- I found occasions where we had 
-	--	f x y z = case op# x y z of { s -> (# s, () #) }
-	-- and f wasn't getting inlined
-
-primOpSize :: PrimOp -> Int -> ExprSize
-primOpSize op n_args
- | not (primOpIsDupable op) = sizeN opt_UF_DearOp
- | not (primOpOutOfLine op) = sizeN (2 - n_args)
-	-- Be very keen to inline simple primops.
-	-- We give a discount of 1 for each arg so that (op# x y z) costs 2.
-	-- We can't make it cost 1, else we'll inline let v = (op# x y z) 
-	-- at every use of v, which is excessive.
-	--
-	-- A good example is:
-	--	let x = +# p q in C {x}
-	-- Even though x get's an occurrence of 'many', its RHS looks cheap,
-	-- and there's a good chance it'll get inlined back into C's RHS. Urgh!
- | otherwise	      	    = sizeOne
-
-buildSize :: ExprSize
-buildSize = SizeIs (_ILIT(-2)) emptyBag (_ILIT(4))
-	-- We really want to inline applications of build
-	-- build t (\cn -> e) should cost only the cost of e (because build will be inlined later)
-	-- Indeed, we should add a result_discount becuause build is 
-	-- very like a constructor.  We don't bother to check that the
-	-- build is saturated (it usually is).  The "-2" discounts for the \c n, 
-	-- The "4" is rather arbitrary.
-
-augmentSize :: ExprSize
-augmentSize = SizeIs (_ILIT(-2)) emptyBag (_ILIT(4))
-	-- Ditto (augment t (\cn -> e) ys) should cost only the cost of
-	-- e plus ys. The -2 accounts for the \cn 
-
-nukeScrutDiscount :: ExprSize -> ExprSize
-nukeScrutDiscount (SizeIs n vs _) = SizeIs n vs (_ILIT(0))
-nukeScrutDiscount TooBig          = TooBig
-
--- When we return a lambda, give a discount if it's used (applied)
-lamScrutDiscount :: ExprSize -> ExprSize
-lamScrutDiscount (SizeIs n vs _) = case opt_UF_FunAppDiscount of { d -> SizeIs n vs (iUnbox d) }
-lamScrutDiscount TooBig          = TooBig
+sizeZero = SizeIs (_ILIT(0))  emptyBag (_ILIT(0))
+sizeOne  = SizeIs (_ILIT(1))  emptyBag (_ILIT(0))
+sizeN n  = SizeIs (iUnbox n) emptyBag (_ILIT(0))
 \end{code}
+
+
 
 
 %************************************************************************
@@ -488,7 +545,7 @@ couldBeSmallEnoughToInline threshold rhs = case calcUnfoldingGuidance threshold 
 certainlyWillInline :: Unfolding -> Bool
   -- Sees if the unfolding is pretty certain to inline	
 certainlyWillInline (CoreUnfolding _ _ _ is_cheap _ (UnfoldIfGoodArgs n_vals _ size _))
-  = is_cheap && size - (n_vals +1) <= opt_UF_UseThreshold
+  = is_cheap && size - (n_vals+1) <= opt_UF_UseThreshold
 certainlyWillInline _
   = False
 
@@ -526,10 +583,15 @@ callSiteInline :: DynFlags
 	       -> Bool			-- True <=> the Id can be inlined
 	       -> Id			-- The Id
 	       -> Bool			-- True if there are are no arguments at all (incl type args)
-	       -> [Bool]		-- One for each value arg; True if it is interesting
+	       -> [ArgSummary]		-- One for each value arg; True if it is interesting
 	       -> CallCtxt		-- True <=> continuation is interesting
 	       -> Maybe CoreExpr	-- Unfolding, if any
 
+
+instance Outputable ArgSummary where
+  ppr TrivArg    = ptext (sLit "TrivArg")
+  ppr NonTrivArg = ptext (sLit "NonTrivArg")
+  ppr ValueArg   = ptext (sLit "ValueArg")
 
 data CallCtxt = BoringCtxt
 
@@ -588,24 +650,29 @@ callSiteInline dflags active_inline id lone_variable arg_infos cont_info
 	  = case guidance of
 	      UnfoldNever  -> False
 	      UnfoldIfGoodArgs n_vals_wanted arg_discounts size res_discount
-		  | enough_args && size <= (n_vals_wanted + 1)
-			-- Inline unconditionally if there no size increase
-			-- Size of call is n_vals_wanted (+1 for the function)
-		  -> True
-
-	  	  | otherwise
-		  -> some_benefit && small_enough && inline_enough_args
+		  | uncond_inline -> True
+	  	  | otherwise	  -> some_benefit && small_enough && inline_enough_args
 
 		  where
+			-- Inline unconditionally if there no size increase
+			-- Size of call is n_vals_wanted (+1 for the function)
+		    uncond_inline 
+		       | n_vals_wanted == 0 = size == 0
+		       | otherwise          = enough_args && (size <= n_vals_wanted + 1)
+
 		    enough_args	= n_val_args >= n_vals_wanted
                     inline_enough_args =
                       not (dopt Opt_InlineIfEnoughArgs dflags) || enough_args
 
 
-		    some_benefit = or arg_infos || really_interesting_cont
+		    some_benefit = any nonTriv arg_infos || really_interesting_cont
 				-- There must be something interesting
 				-- about some argument, or the result
 				-- context, to make it worth inlining
+ 
+ 				-- NB: (any nonTriv arg_infos) looks at the over-saturated
+ 				-- args too which is wrong; but if over-saturated
+ 				-- we'll probably inline anyway.
 
 		    really_interesting_cont 
 			| n_val_args <  n_vals_wanted = False	-- Too few args
@@ -623,17 +690,7 @@ callSiteInline dflags active_inline id lone_variable arg_infos cont_info
 
 		    small_enough = (size - discount) <= opt_UF_UseThreshold
 		    discount = computeDiscount n_vals_wanted arg_discounts 
-					       res_discount' arg_infos
-		    res_discount' = case cont_info of
-					BoringCtxt  -> 0
-					CaseCtxt    -> res_discount
-					_other      -> 4 `min` res_discount
-			-- res_discount can be very large when a function returns
-			-- construtors; but we only want to invoke that large discount
-			-- when there's a case continuation.
-			-- Otherwise we, rather arbitrarily, threshold it.  Yuk.
-			-- But we want to aovid inlining large functions that return 
-			-- constructors into contexts that are simply "interesting"
+					       res_discount arg_infos cont_info
 		
     in    
     if dopt Opt_D_dump_inlinings dflags then
@@ -651,6 +708,17 @@ callSiteInline dflags active_inline id lone_variable arg_infos cont_info
     result
     }
 \end{code}
+
+Note [Things to watch]
+~~~~~~~~~~~~~~~~~~~~~~
+*   { y = I# 3; x = y `cast` co; ...case (x `cast` co) of ... }
+    Assume x is exported, so not inlined unconditionally.
+    Then we want x to inline unconditionally; no reason for it 
+    not to, and doing so avoids an indirection.
+
+*   { x = I# 3; ....f x.... }
+    Make sure that x does not inline unconditionally!  
+    Lest we get extra allocation.
 
 Note [Nested functions]
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -743,30 +811,105 @@ However, watch out:
    a significant disadvantage.  Hence some_val_args in the Stop case
 
 \begin{code}
-computeDiscount :: Int -> [Int] -> Int -> [Bool] -> Int
-computeDiscount n_vals_wanted arg_discounts result_discount arg_infos
+computeDiscount :: Int -> [Int] -> Int -> [ArgSummary] -> CallCtxt -> Int
+computeDiscount n_vals_wanted arg_discounts res_discount arg_infos cont_info
  	-- We multiple the raw discounts (args_discount and result_discount)
 	-- ty opt_UnfoldingKeenessFactor because the former have to do with
 	--  *size* whereas the discounts imply that there's some extra 
 	--  *efficiency* to be gained (e.g. beta reductions, case reductions) 
 	-- by inlining.
 
-	-- we also discount 1 for each argument passed, because these will
-	-- reduce with the lambdas in the function (we count 1 for a lambda
- 	-- in size_up).
-  = 1 +			-- Discount of 1 because the result replaces the call
-			-- so we count 1 for the function itself
-    length (take n_vals_wanted arg_infos) +
-			-- Discount of 1 for each arg supplied, because the 
-			-- result replaces the call
-    round (opt_UF_KeenessFactor * 
-	   fromIntegral (arg_discount + result_discount))
+  = 1 		-- Discount of 1 because the result replaces the call
+		-- so we count 1 for the function itself
+
+    + length (take n_vals_wanted arg_infos)
+      	       -- Discount of (un-scaled) 1 for each arg supplied, 
+   	       -- because the result replaces the call
+
+    + round (opt_UF_KeenessFactor * 
+	     fromIntegral (arg_discount + res_discount'))
   where
     arg_discount = sum (zipWith mk_arg_discount arg_discounts arg_infos)
 
-    mk_arg_discount discount is_evald | is_evald  = discount
-				      | otherwise = 0
+    mk_arg_discount _ 	     TrivArg    = 0 
+    mk_arg_discount _ 	     NonTrivArg = 1   
+    mk_arg_discount discount ValueArg   = discount 
+
+    res_discount' = case cont_info of
+			BoringCtxt  -> 0
+			CaseCtxt    -> res_discount
+			_other      -> 4 `min` res_discount
+		-- res_discount can be very large when a function returns
+		-- construtors; but we only want to invoke that large discount
+		-- when there's a case continuation.
+		-- Otherwise we, rather arbitrarily, threshold it.  Yuk.
+		-- But we want to aovid inlining large functions that return 
+		-- constructors into contexts that are simply "interesting"
 \end{code}
+
+%************************************************************************
+%*									*
+	Interesting arguments
+%*									*
+%************************************************************************
+
+Note [Interesting arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An argument is interesting if it deserves a discount for unfoldings
+with a discount in that argument position.  The idea is to avoid
+unfolding a function that is applied only to variables that have no
+unfolding (i.e. they are probably lambda bound): f x y z There is
+little point in inlining f here.
+
+Generally, *values* (like (C a b) and (\x.e)) deserve discounts.  But
+we must look through lets, eg (let x = e in C a b), because the let will
+float, exposing the value, if we inline.  That makes it different to
+exprIsHNF.
+
+Before 2009 we said it was interesting if the argument had *any* structure
+at all; i.e. (hasSomeUnfolding v).  But does too much inlining; see Trac #3016.
+
+But we don't regard (f x y) as interesting, unless f is unsaturated.
+If it's saturated and f hasn't inlined, then it's probably not going
+to now!
+
+\begin{code}
+data ArgSummary = TrivArg	-- Nothing interesting
+     		| NonTrivArg	-- Arg has structure
+		| ValueArg	-- Arg is a con-app or PAP
+
+interestingArg :: CoreExpr -> ArgSummary
+-- See Note [Interesting arguments]
+interestingArg e = go e 0
+  where
+    -- n is # value args to which the expression is applied
+    go (Lit {}) _   	   = ValueArg
+    go (Var v)  n
+       | isDataConWorkId v = ValueArg
+       | idArity v > n	   = ValueArg	-- Catches (eg) primops with arity but no unfolding
+       | n > 0	           = NonTrivArg	-- Saturated or unknown call
+       | evald_unfolding   = ValueArg	-- n==0; look for a value
+       | otherwise	   = TrivArg	-- n==0, no useful unfolding
+       where
+         evald_unfolding = isEvaldUnfolding (idUnfolding v)
+
+    go (Type _)          _ = TrivArg
+    go (App fn (Type _)) n = go fn n    
+    go (App fn _)        n = go fn (n+1)
+    go (Note _ a) 	 n = go a n
+    go (Cast e _) 	 n = go e n
+    go (Lam v e)  	 n 
+       | isTyVar v	   = go e n
+       | n>0	 	   = go e (n-1)
+       | otherwise	   = ValueArg
+    go (Let _ e)  	 n = case go e n of { ValueArg -> ValueArg; _ -> NonTrivArg }
+    go (Case {})  	 _ = NonTrivArg
+
+nonTriv ::  ArgSummary -> Bool
+nonTriv TrivArg = False
+nonTriv _       = True
+\end{code}
+
 
 %************************************************************************
 %*									*
