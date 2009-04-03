@@ -45,10 +45,10 @@ char *EventDesc[] = {
   "Steal spark",
   "Shutdown",
   "Wakeup thread",
-  "Request sequential GC",
-  "Request parallel GC",
   "Starting GC",
   "Finished GC",
+  "Request sequential GC",
+  "Request parallel GC",
   "Create spark"
 };
 
