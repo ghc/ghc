@@ -248,6 +248,12 @@ def if_os( os, f ):
     else:
         return normal
 
+def if_wordsize( ws, f ):
+    if config.wordsize == ws:
+        return f
+    else:
+        return normal
+
 # ---
 
 def if_compiler_type( compiler, f ):
