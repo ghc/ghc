@@ -923,7 +923,11 @@ unpacking the strings of error messages.
 
 \begin{code}
 unpackCString# :: Addr# -> [Char]
-{-# NOINLINE [1] unpackCString# #-}
+{-# NOINLINE unpackCString# #-}
+    -- There's really no point in inlining this, ever, cos
+    -- the loop doesn't specialise in an interesting
+    -- But it's pretty small, so there's a danger that
+    -- it'll be inlined at every literal, which is a waste
 unpackCString# addr 
   = unpack 0#
   where
@@ -934,6 +938,8 @@ unpackCString# addr
         ch = indexCharOffAddr# addr nh
 
 unpackAppendCString# :: Addr# -> [Char] -> [Char]
+{-# NOINLINE unpackAppendCString# #-}
+     -- See the NOINLINE note on unpackCString# 
 unpackAppendCString# addr rest
   = unpack 0#
   where
@@ -945,7 +951,9 @@ unpackAppendCString# addr rest
 
 unpackFoldrCString# :: Addr# -> (Char  -> a -> a) -> a -> a 
 {-# NOINLINE [0] unpackFoldrCString# #-}
--- Don't inline till right at the end;
+-- Unlike unpackCString#, there *is* some point in inlining unpackFoldrCString#, 
+-- because we get better code for the function call.
+-- However, don't inline till right at the end;
 -- usually the unpack-list rule turns it into unpackCStringList
 -- It also has a BuiltInRule in PrelRules.lhs:
 --      unpackFoldrCString# "foo" c (unpackFoldrCString# "baz" c n)
@@ -995,7 +1003,7 @@ unpackNBytes#  addr len# = unpack [] (len# -# 1#)
             ch -> unpack (C# ch : acc) (i# -# 1#)
 
 {-# RULES
-"unpack"       [~1] forall a   . unpackCString# a                  = build (unpackFoldrCString# a)
+"unpack"       [~1] forall a   . unpackCString# a             = build (unpackFoldrCString# a)
 "unpack-list"  [1]  forall a   . unpackFoldrCString# a (:) [] = unpackCString# a
 "unpack-append"     forall a n . unpackFoldrCString# a (:) n  = unpackAppendCString# a n
 
