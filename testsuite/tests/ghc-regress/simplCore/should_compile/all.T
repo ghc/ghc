@@ -36,4 +36,5 @@ test('spec003', normal, compile, [''])
 test('rule1', normal, compile, [''])
 
 test('strict-float', normal, compile, [''])
+test('T3118', normal, compile, [''])
 
