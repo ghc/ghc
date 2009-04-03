@@ -149,7 +149,12 @@ push_scanned_block (bdescr *bd, step_workspace *ws)
 StgPtr
 todo_block_full (nat size, step_workspace *ws)
 {
+    StgPtr p;
     bdescr *bd;
+
+    // todo_free has been pre-incremented by Evac.c:alloc_for_copy().  We
+    // are expected to leave it bumped when we've finished here.
+    ws->todo_free -= size;
 
     bd = ws->todo_bd;
 
@@ -167,7 +172,9 @@ todo_block_full (nat size, step_workspace *ws)
             ws->todo_lim = stg_min(bd->start + BLOCK_SIZE_W,
                                    ws->todo_lim + stg_max(WORK_UNIT_WORDS,size));
             debugTrace(DEBUG_gc, "increasing limit for %p to %p", bd->start, ws->todo_lim);
-            return ws->todo_free;
+            p = ws->todo_free;
+            ws->todo_free += size;
+            return p;
         }
     }
     
@@ -212,7 +219,9 @@ todo_block_full (nat size, step_workspace *ws)
 
     alloc_todo_block(ws, size);
 
-    return ws->todo_free;
+    p = ws->todo_free;
+    ws->todo_free += size;
+    return p;
 }
 
 StgPtr
