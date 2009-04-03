@@ -69,10 +69,6 @@ step *nurseries         = NULL; /* array of nurseries, >1 only if THREADED_RTS *
  * simultaneous access by two STG threads.
  */
 Mutex sm_mutex;
-/*
- * This mutex is used by atomicModifyMutVar# only
- */
-Mutex atomic_modify_mutvar_mutex;
 #endif
 
 
@@ -148,7 +144,6 @@ initStorage( void )
   
 #if defined(THREADED_RTS)
   initMutex(&sm_mutex);
-  initMutex(&atomic_modify_mutvar_mutex);
 #endif
 
   ACQUIRE_SM_LOCK;
@@ -297,7 +292,6 @@ freeStorage (void)
     freeAllMBlocks();
 #if defined(THREADED_RTS)
     closeMutex(&sm_mutex);
-    closeMutex(&atomic_modify_mutvar_mutex);
 #endif
     stgFree(nurseries);
 }
