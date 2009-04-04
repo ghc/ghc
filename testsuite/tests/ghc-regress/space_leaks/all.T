@@ -23,3 +23,37 @@ test('space_leak_001',
       ],
      compile_and_run,
      [''])
+
+test('T1969',
+     [if_wordsize(32,
+          compiler_stats_num_field('peak_megabytes_allocated', 15,
+                                                               15)),
+                                             # expected value: 15 (x86/Windows)
+                                             #                 15 (x86/OS X)
+      if_wordsize(64,
+          compiler_stats_num_field('peak_megabytes_allocated', 28,
+                                                               32)),
+                                             # expected value: 28 (amd64/Linux)
+                                             # expected value: 32 (amd64/Linux)
+      if_wordsize(32,
+          compiler_stats_num_field('max_bytes_used', 6600000,
+                                                     6800000)),
+                                   # expected value: 6707308 (x86/OS X)
+                                   #                 6694144 (x86/Windows)
+      if_wordsize(64,
+          compiler_stats_num_field('max_bytes_used', 12000000,
+                                                     15000000)),
+                                   # expected value: 12918232 (amd64/Linux)
+      if_wordsize(32,
+          compiler_stats_num_field('bytes allocated', 210000000,
+                                                      230000000)),
+                                    # expected value: 215582916 (x86/Windows)
+                                    #                 221667908 (x86/OS X)
+      if_wordsize(64,
+          compiler_stats_num_field('bytes allocated', 440000000,
+                                                      460000000))
+                                    # expected value: 451976088 (amd64/Linux)
+      ],
+     compile,
+     [''])
+
