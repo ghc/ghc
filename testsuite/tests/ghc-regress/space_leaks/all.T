@@ -27,9 +27,10 @@ test('space_leak_001',
 test('T1969',
      [if_wordsize(32,
           compiler_stats_num_field('peak_megabytes_allocated', 15,
-                                                               15)),
+                                                               19)),
                                              # expected value: 15 (x86/Windows)
                                              #                 15 (x86/OS X)
+                                             #                 19 (x86/OS X)
       if_wordsize(64,
           compiler_stats_num_field('peak_megabytes_allocated', 28,
                                                                32)),
