@@ -28,5 +28,5 @@ install_utils/haddock_html:
 	$(RM) -rf $(DESTDIR)$(datadir)/html
 	$(CP) -R utils/haddock/html $(DESTDIR)$(datadir)/html
 
-$(eval $(call bindist,utils/haddock,ghc.mk html/*))
+BINDIST_EXTRAS += $(addprefix utils/haddock/,html/*)
 
