@@ -209,11 +209,11 @@ extern gc_thread **gc_threads;
 
 #define SET_GCT(to) gct = (to)
 
-#if defined(sparc_HOST_ARCH) || defined(i386_HOST_ARCH)
+#if defined(sparc_HOST_ARCH) || (defined(i386_HOST_ARCH) && defined(linux_HOST_OS))
 // Don't use REG_base or R1 for gct on SPARC because they're getting clobbered 
 //	by something else. Not sure what yet. -- BL 2009/01/03
 
-// Using __thread is better than stealing a register on x86, because
+// Using __thread is better than stealing a register on x86/Linux, because
 // we have too few registers available.  In my tests it was worth
 // about 5% in GC performance, but of course that might change as gcc
 // improves. -- SDM 2009/04/03
