@@ -47,7 +47,7 @@ module Haddock.Utils (
  ) where
 
 import Haddock.Types
-import Haddock.GHC.Utils
+import Haddock.GhcUtils
 
 import GHC
 import SrcLoc

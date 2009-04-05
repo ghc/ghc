@@ -12,7 +12,7 @@ module Haddock.Backends.Hoogle (
   ) where
 
 
-import Haddock.GHC.Utils
+import Haddock.GhcUtils
 import Haddock.Types
 import Haddock.Utils hiding (out)
 import GHC

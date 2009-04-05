@@ -7,11 +7,11 @@
 
 module Haddock.GHC (
   startGhc,
-  module Haddock.GHC.Utils
+  module Haddock.GhcUtils
 ) where
 
 
-import Haddock.GHC.Utils
+import Haddock.GhcUtils
 import Haddock.Exception
 
 import Data.Maybe

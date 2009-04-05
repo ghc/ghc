@@ -19,7 +19,7 @@ import Haddock.Interface.AttachInstances
 import Haddock.Interface.Rename
 import Haddock.Types
 import Haddock.Options
-import Haddock.GHC.Utils
+import Haddock.GhcUtils
 import Haddock.Utils
 import Haddock.InterfaceFile
 

@@ -23,7 +23,7 @@ import Haddock.Version
 import Haddock.Utils
 import Haddock.Utils.Html hiding ( name, title, p )
 import qualified Haddock.Utils.Html as Html
-import Haddock.GHC.Utils
+import Haddock.GhcUtils
 import qualified Haddock.Utils.Html as Html
 
 import Control.Exception     ( bracket )

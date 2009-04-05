@@ -9,7 +9,7 @@ module Haddock.Interface.Rename (renameInterface) where
 
 
 import Haddock.Types
-import Haddock.GHC.Utils
+import Haddock.GhcUtils
 
 import GHC hiding (NoLink)
 import Name

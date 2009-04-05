@@ -10,7 +10,7 @@
 {-# OPTIONS_HADDOCK hide #-}
 
 
-module Haddock.GHC.Utils where
+module Haddock.GhcUtils where
 
 
 import Data.Char

@@ -10,7 +10,7 @@ module Haddock.Interface.Create (createInterface) where
 
 import Haddock.Types
 import Haddock.Options
-import Haddock.GHC.Utils
+import Haddock.GhcUtils
 import Haddock.Utils
 
 import qualified Data.Map as Map

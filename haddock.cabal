@@ -112,8 +112,7 @@ executable haddock
     Haddock.InterfaceFile        
     Haddock.Exception
     Haddock.Options
-    Haddock.GHC.Utils
-    Haddock.GHC
+    Haddock.GhcUtils
    
   -- Cabal doesn't define __GHC_PATCHLEVEL__
   if impl(ghc == 6.10.1)
@@ -133,7 +132,7 @@ library
     Haddock.InterfaceFile
     Haddock.Exception
     Haddock.Utils
-    Haddock.GHC.Utils
+    Haddock.GhcUtils
   
   -- Cabal doesn't define __GHC_PATCHLEVEL__
   if impl(ghc == 6.10.1)
