@@ -21,8 +21,8 @@ import Haddock.Version
 import Haddock.InterfaceFile
 import Haddock.Exception
 import Haddock.Options
-import Haddock.GHC
 import Haddock.Utils
+import Haddock.GhcUtils
 import Paths_haddock
 
 import Control.Monad
@@ -343,6 +343,57 @@ dumpInterfaceFile ifaces homeLinks flags =
         ifInstalledIfaces = ifaces,
         ifLinkEnv         = homeLinks
       }
+
+
+-------------------------------------------------------------------------------
+-- Creating a GHC session
+-------------------------------------------------------------------------------
+
+-- | Start a GHC session with the -haddock flag set. Also turn off 
+-- compilation and linking.  
+#if __GLASGOW_HASKELL__ >= 609 
+startGhc :: String -> [String] -> (DynFlags -> Ghc a) -> IO a
+startGhc libDir flags ghcActs = do
+  -- TODO: handle warnings?
+  (restFlags, _) <- parseStaticFlags (map noLoc flags)
+  runGhc (Just libDir) $ do
+    dynflags  <- getSessionDynFlags
+#else
+startGhc :: String -> [String] -> IO (Session, DynFlags)
+startGhc libDir flags = do
+  restFlags <- parseStaticFlags flags
+  session <- newSession (Just libDir)
+  dynflags <- getSessionDynFlags session
+  do
+#endif
+    let dynflags' = dopt_set dynflags Opt_Haddock
+    let dynflags'' = dynflags' {
+        hscTarget = HscNothing,
+        ghcMode   = CompManager,
+        ghcLink   = NoLink
+      }
+    dynflags''' <- parseGhcFlags dynflags'' restFlags flags
+    defaultCleanupHandler dynflags''' $ do
+#if __GLASGOW_HASKELL__ >= 609
+        setSessionDynFlags dynflags'''
+        ghcActs dynflags'''
+#else
+        setSessionDynFlags session dynflags'''
+        return (session, dynflags''')
+#endif
+  where
+    parseGhcFlags :: Monad m => DynFlags -> [Located String]
+                  -> [String] -> m DynFlags
+    parseGhcFlags dynflags flags_ origFlags = do
+      -- TODO: handle warnings?
+#if __GLASGOW_HASKELL__ >= 609
+      (dynflags', rest, _) <- parseDynamicFlags dynflags flags_
+#else
+      (dynflags', rest) <- parseDynamicFlags dynflags flags_
+#endif
+      if not (null rest)
+        then throwE ("Couldn't parse GHC options: " ++ (unwords origFlags))
+        else return dynflags'
 
 
 -------------------------------------------------------------------------------
