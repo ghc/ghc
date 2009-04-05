@@ -5,7 +5,7 @@
 -- Haddock - A Haskell Documentation Tool
 --
 -- (c) Simon Marlow 2003
--- 
+--
 -- Ported to use the GHC API by David Waern during "Summer of Code" 2006
 --
 
@@ -67,14 +67,14 @@ import Util hiding (handle)
 
 
 handleTopExceptions :: IO a -> IO a
-handleTopExceptions = 
+handleTopExceptions =
   handleNormalExceptions . handleHaddockExceptions . handleGhcExceptions
 
 
 handleNormalExceptions :: IO a -> IO a
 handleNormalExceptions inner =
   handle (\exception -> do
-    hFlush stdout    
+    hFlush stdout
     case exception of
       AsyncException StackOverflow -> do
         putStrLn "stack overflow: use -g +RTS -K<size> to increase it"
@@ -87,7 +87,7 @@ handleNormalExceptions inner =
 
 
 handleHaddockExceptions :: IO a -> IO a
-handleHaddockExceptions inner = 
+handleHaddockExceptions inner =
 #if __GLASGOW_HASKELL__ >= 609
   NewException.catches inner [NewException.Handler handler]
 #else
@@ -100,7 +100,7 @@ handleHaddockExceptions inner =
 
 
 handleGhcExceptions :: IO a -> IO a
-handleGhcExceptions inner = 
+handleGhcExceptions inner =
   -- compilation errors: messages with locations attached
 #if __GLASGOW_HASKELL__ < 609
  handleDyn (\e -> do
@@ -120,7 +120,7 @@ handleGhcExceptions inner =
     case e of
       PhaseFailed _ code -> exitWith code
       Interrupted -> exitFailure
-      _ -> do 
+      _ -> do
         print (e :: GhcException)
         exitFailure
   ) inner
@@ -140,7 +140,7 @@ main = handleTopExceptions $ do
   handleEasyFlags flags
   verbosity <- getVerbosity flags
 
-  let renderStep packages interfaces = do 
+  let renderStep packages interfaces = do
         updateHTMLXRefs packages
         let ifaceFiles = map fst packages
             installedIfaces = concatMap ifInstalledIfaces ifaceFiles
@@ -163,7 +163,7 @@ main = handleTopExceptions $ do
 
 #if __GLASGOW_HASKELL__ >= 609
       -- We have one global error handler for all GHC source errors.  Other kinds
-      -- of exceptions will be propagated to the top-level error handler. 
+      -- of exceptions will be propagated to the top-level error handler.
       let handleSrcErrors action = flip handleSourceError action $ \err -> do
             printExceptionAndWarnings err
             liftIO exitFailure
@@ -182,7 +182,7 @@ main = handleTopExceptions $ do
         liftIO $ do
           -- render the interfaces
           renderStep packages interfaces
- 
+
           -- last but not least, dump the interface file
           dumpInterfaceFile (map toInstalledIface interfaces) homeLinks flags
 #else
@@ -198,7 +198,7 @@ main = handleTopExceptions $ do
 
       -- render the interfaces
       renderStep packages interfaces
- 
+
       -- last but not least, dump the interface file
       dumpInterfaceFile (map toInstalledIface interfaces) homeLinks flags
 #endif
@@ -215,13 +215,13 @@ main = handleTopExceptions $ do
 -------------------------------------------------------------------------------
 
 
--- | Render the interfaces with whatever backend is specified in the flags 
+-- | Render the interfaces with whatever backend is specified in the flags
 render :: [Flag] -> [Interface] -> [InstalledInterface] -> IO ()
 render flags ifaces installedIfaces = do
   let
     title = case [str | Flag_Heading str <- flags] of
-		[] -> ""
-		(t:_) -> t
+              [] -> ""
+              (t:_) -> t
 
     maybe_source_urls = (listToMaybe [str | Flag_SourceBaseURL   str <- flags]
                         ,listToMaybe [str | Flag_SourceModuleURL str <- flags]
@@ -232,7 +232,7 @@ render flags ifaces installedIfaces = do
                       ,listToMaybe [str | Flag_WikiEntityURL str <- flags])
 
   libDir <- case [str | Flag_Lib str <- flags] of
-		[] ->
+    [] ->
 #ifdef IN_GHC_TREE
                       do m <- getExecDir
                          case m of
@@ -241,23 +241,23 @@ render flags ifaces installedIfaces = do
 #else
                       getDataDir -- provided by Cabal
 #endif
-		fs -> return (last fs)
+    fs -> return (last fs)
 
   let css_file = case [str | Flag_CSS str <- flags] of
-			[] -> Nothing
-			fs -> Just (last fs)
+                   [] -> Nothing
+                   fs -> Just (last fs)
 
   odir <- case [str | Flag_OutputDir str <- flags] of
-		[] -> return "."
-		fs -> return (last fs)
+            [] -> return "."
+            fs -> return (last fs)
 
-  let 
-    maybe_contents_url = 
+  let
+    maybe_contents_url =
       case [url | Flag_UseContents url <- flags] of
         [] -> Nothing
         us -> Just (last us)
 
-    maybe_index_url = 
+    maybe_index_url =
       case [url | Flag_UseIndex url <- flags] of
         [] -> Nothing
         us -> Just (last us)
@@ -269,7 +269,7 @@ render flags ifaces installedIfaces = do
 
   prologue <- getPrologue flags
 
-  let 
+  let
     visibleIfaces    = [ i | i <- ifaces, OptHide `notElem` ifaceOptions i ]
 
     -- *all* visible interfaces including external package modules
@@ -280,20 +280,20 @@ render flags ifaces installedIfaces = do
     packageStr       = Just (modulePackageString packageMod)
     (pkgName,pkgVer) = modulePackageInfo packageMod
 
- 
+
   when (Flag_GenIndex `elem` flags) $ do
     ppHtmlIndex odir title packageStr maybe_html_help_format
                 maybe_contents_url maybe_source_urls maybe_wiki_urls
                 allVisibleIfaces
     copyHtmlBits odir libDir css_file
-        
+
   when (Flag_GenContents `elem` flags && Flag_GenIndex `elem` flags) $ do
     ppHtmlHelpFiles title packageStr visibleIfaces odir maybe_html_help_format []
 
   when (Flag_GenContents `elem` flags) $ do
     ppHtmlContents odir title packageStr maybe_html_help_format
-	                 maybe_index_url maybe_source_urls maybe_wiki_urls
-	                 allVisibleIfaces True prologue
+                   maybe_index_url maybe_source_urls maybe_wiki_urls
+                   allVisibleIfaces True prologue
     copyHtmlBits odir libDir css_file
 
   when (Flag_Html `elem` flags) $ do
@@ -334,11 +334,11 @@ readInterfaceFiles name_cache_accessor pairs = do
 
 
 dumpInterfaceFile :: [InstalledInterface] -> LinkEnv -> [Flag] -> IO ()
-dumpInterfaceFile ifaces homeLinks flags = 
+dumpInterfaceFile ifaces homeLinks flags =
   case [str | Flag_DumpInterface str <- flags] of
     [] -> return ()
     fs -> let filename = last fs in writeInterfaceFile filename ifaceFile
-  where 
+  where
     ifaceFile = InterfaceFile {
         ifInstalledIfaces = ifaces,
         ifLinkEnv         = homeLinks
@@ -349,9 +349,9 @@ dumpInterfaceFile ifaces homeLinks flags =
 -- Creating a GHC session
 -------------------------------------------------------------------------------
 
--- | Start a GHC session with the -haddock flag set. Also turn off 
--- compilation and linking.  
-#if __GLASGOW_HASKELL__ >= 609 
+-- | Start a GHC session with the -haddock flag set. Also turn off
+-- compilation and linking.
+#if __GLASGOW_HASKELL__ >= 609
 startGhc :: String -> [String] -> (DynFlags -> Ghc a) -> IO a
 startGhc libDir flags ghcActs = do
   -- TODO: handle warnings?
@@ -433,7 +433,7 @@ handleEasyFlags flags = do
       "Haddock version " ++ projectVersion ++ ", (c) Simon Marlow 2006\n"
       ++ "Ported to use the GHC API by David Waern 2006-2008\n"
 
-    byeGhcVersion = bye $ 
+    byeGhcVersion = bye $
       (fromJust $ lookup "Project version" $ compilerInfo) ++ "\n"
 
 
@@ -441,20 +441,21 @@ updateHTMLXRefs :: [(InterfaceFile, FilePath)] -> IO ()
 updateHTMLXRefs packages = do
   writeIORef html_xrefs_ref (Map.fromList mapping)
   where
-    mapping = [ (instMod iface, html) | (ifaces, html) <- packages,
-                iface <- ifInstalledIfaces ifaces ]
+    mapping = [ (instMod iface, html) | (ifaces, html) <- packages
+              , iface <- ifInstalledIfaces ifaces ]
 
 
 getPrologue :: [Flag] -> IO (Maybe (HsDoc RdrName))
-getPrologue flags
-  = case [filename | Flag_Prologue filename <- flags ] of
-	[] -> return Nothing 
-	[filename] -> do
-	   str <- readFile filename
-	   case parseHaddockComment str of
-		Left err -> throwE err
-		Right doc -> return (Just doc)
-	_otherwise -> throwE "multiple -p/--prologue options"
+getPrologue flags =
+  case [filename | Flag_Prologue filename <- flags ] of
+    [] -> return Nothing
+    [filename] -> do
+      str <- readFile filename
+      case parseHaddockComment str of
+        Left err -> throwE err
+        Right doc -> return (Just doc)
+    _otherwise -> throwE "multiple -p/--prologue options"
+
 
 getExecDir :: IO (Maybe String)
 #if defined(mingw32_HOST_OS)
@@ -466,10 +467,9 @@ getExecDir = allocaArray len $ \buf -> do
                 return (Just (dropFileName s))
   where len = 2048 -- Plenty, PATH_MAX is 512 under Win32.
 
-foreign import stdcall unsafe  "GetModuleFileNameA"
+foreign import stdcall unsafe "GetModuleFileNameA"
   getModuleFileName :: Ptr () -> CString -> Int -> IO Int32
 #else
 getExecDir = return Nothing
 #endif
-
 
