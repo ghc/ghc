@@ -79,7 +79,7 @@ data StringBuffer
 instance Show StringBuffer where
         showsPrec _ s = showString "<stringbuffer("
                       . shows (len s) . showString "," . shows (cur s)
-                      . showString ">"
+                      . showString ")>"
 
 -- -----------------------------------------------------------------------------
 -- Creation / Destruction
