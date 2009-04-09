@@ -1,26 +1,5 @@
 
 rnfail052.hs:6:13:
-    Illegal operator `.' in type `forall a . (a -> a)'
-      Perhaps you intended to use -XRankNTypes or similar flag
-      to enable explicit-forall syntax: forall <tvs>. <type>
-
-rnfail052.hs:9:21:
-    Illegal operator `.' in type `forall a . (a -> a)'
-      Perhaps you intended to use -XRankNTypes or similar flag
-      to enable explicit-forall syntax: forall <tvs>. <type>
-
-rnfail052.hs:12:14:
-    Not in scope: type variable `forall'
-    Perhaps you intended to use -XRankNTypes or similar flag
+    Illegal symbol '.' in type
+    Perhaps you intended -XRankNTypes or similar flag
     to enable explicit-forall syntax: forall <tvs>. <type>
-
-rnfail052.hs:12:21: Not in scope: type variable `a'
-
-rnfail052.hs:12:22:
-    Illegal operator `.' in type `forall a . (a -> a)'
-      Perhaps you intended to use -XRankNTypes or similar flag
-      to enable explicit-forall syntax: forall <tvs>. <type>
-
-rnfail052.hs:12:24: Not in scope: type variable `a'
-
-rnfail052.hs:12:27: Not in scope: type variable `a'

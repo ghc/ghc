@@ -1,2 +1,4 @@
 
-read036.hs:4:15: parse error on input `*'
+read036.hs:4:0:
+    Illegal kind signature for `a'
+      Perhaps you intended to use -XKindSignatures

@@ -1,2 +1,5 @@
 
-T3095.hs:5:10: Kind signature only allowed for type variables
+T3095.hs:5:20:
+    Illegal symbol '.' in type
+    Perhaps you intended -XRankNTypes or similar flag
+    to enable explicit-forall syntax: forall <tvs>. <type>

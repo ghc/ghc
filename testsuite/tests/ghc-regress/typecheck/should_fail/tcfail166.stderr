@@ -1,6 +1,5 @@
 
 tcfail166.hs:5:20:
-    Illegal operator `.' in type `forall a . ((a -> Maybe (b, a))
-                                              -> a -> c)'
-      Perhaps you intended to use -XRankNTypes or similar flag
-      to enable explicit-forall syntax: forall <tvs>. <type>
+    Illegal symbol '.' in type
+    Perhaps you intended -XRankNTypes or similar flag
+    to enable explicit-forall syntax: forall <tvs>. <type>

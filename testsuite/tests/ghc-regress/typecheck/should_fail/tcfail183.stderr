@@ -1,2 +1,5 @@
 
-tcfail183.hs:4:45: parse error on input `=>'
+tcfail183.hs:4:37:
+    Illegal symbol '.' in type
+    Perhaps you intended -XRankNTypes or similar flag
+    to enable explicit-forall syntax: forall <tvs>. <type>
