@@ -28,6 +28,7 @@ import RnEnv		( lookupLocalDataTcNames, lookupLocatedOccRn,
 			  bindLocatedLocalsFV, bindPatSigTyVarsFV,
 			  bindTyVarsRn, extendTyVarEnvFVRn,
 			  bindLocalNames, checkDupRdrNames, mapFvRn,
+			  checkM
 			)
 import RnNames       	( getLocalNonValBinders, extendGlobalRdrEnvRn )
 import HscTypes      	( GenAvailInfo(..), availsToNameSet )
@@ -61,18 +62,6 @@ thenM = (>>=)
 
 thenM_ :: Monad a => a b -> a c -> a c
 thenM_ = (>>)
-
-returnM :: Monad m => a -> m a
-returnM = return
-
-mappM :: (Monad m) => (a -> m b) -> [a] -> m [b]
-mappM = mapM
-
-mappM_ :: (Monad m) => (a -> m b) -> [a] -> m ()
-mappM_ = mapM_
-
-checkM :: Monad m => Bool -> m () -> m ()
-checkM = unless
 \end{code}
 
 @rnSourceDecl@ `renames' declarations.
@@ -310,18 +299,18 @@ gather them together.
 -- checks that the deprecations are defined locally, and that there are no duplicates
 rnSrcWarnDecls :: NameSet -> [LWarnDecl RdrName] -> RnM Warnings
 rnSrcWarnDecls _bound_names [] 
-  = returnM NoWarnings
+  = return NoWarnings
 
 rnSrcWarnDecls bound_names decls 
   = do { -- check for duplicates
-       ; mappM_ (\ (lrdr:lrdr':_) -> addLocErr lrdr (dupWarnDecl lrdr')) warn_rdr_dups
-       ; mappM (addLocM rn_deprec) decls	`thenM` \ pairs_s ->
-         returnM (WarnSome ((concat pairs_s))) }
+       ; mapM_ (\ (lrdr:lrdr':_) -> addLocErr lrdr (dupWarnDecl lrdr')) warn_rdr_dups
+       ; mapM (addLocM rn_deprec) decls	`thenM` \ pairs_s ->
+         return (WarnSome ((concat pairs_s))) }
  where
    rn_deprec (Warning rdr_name txt)
        -- ensures that the names are defined locally
      = lookupLocalDataTcNames bound_names what rdr_name	`thenM` \ names ->
-       returnM [(nameOccName name, txt) | name <- names]
+       return [(nameOccName name, txt) | name <- names]
    
    what = ptext (sLit "deprecation")
 
@@ -368,7 +357,7 @@ rnAnnProvenance provenance = do
 rnDefaultDecl :: DefaultDecl RdrName -> RnM (DefaultDecl Name, FreeVars)
 rnDefaultDecl (DefaultDecl tys)
   = mapFvRn (rnHsTypeFVs doc_str) tys	`thenM` \ (tys', fvs) ->
-    returnM (DefaultDecl tys', fvs)
+    return (DefaultDecl tys', fvs)
   where
     doc_str = text "In a `default' declaration"
 \end{code}
@@ -384,12 +373,12 @@ rnHsForeignDecl :: ForeignDecl RdrName -> RnM (ForeignDecl Name, FreeVars)
 rnHsForeignDecl (ForeignImport name ty spec)
   = lookupLocatedTopBndrRn name	        `thenM` \ name' ->
     rnHsTypeFVs (fo_decl_msg name) ty	`thenM` \ (ty', fvs) ->
-    returnM (ForeignImport name' ty' spec, fvs)
+    return (ForeignImport name' ty' spec, fvs)
 
 rnHsForeignDecl (ForeignExport name ty spec)
   = lookupLocatedOccRn name	        `thenM` \ name' ->
     rnHsTypeFVs (fo_decl_msg name) ty  	`thenM` \ (ty', fvs) ->
-    returnM (ForeignExport name' ty' spec, fvs `addOneFV` unLoc name')
+    return (ForeignExport name' ty' spec, fvs `addOneFV` unLoc name')
 	-- NB: a foreign export is an *occurrence site* for name, so 
 	--     we add it to the free-variable list.  It might, for example,
 	--     be imported from another module
@@ -461,7 +450,7 @@ rnSrcInstDecl (InstDecl inst_ty mbinds uprags ats)
     bindLocalNames binders 
 	(renameSigs (Just bndr_set) okInstDclSig uprags)	`thenM` \ uprags' ->
 
-    returnM (InstDecl inst_ty' mbinds' uprags' ats',
+    return (InstDecl inst_ty' mbinds' uprags' ats',
 	     meth_fvs `plusFV` at_fvs
 		      `plusFV` hsSigsFVs uprags'
 		      `plusFV` extractHsTyNames inst_ty')
@@ -548,10 +537,10 @@ rnHsRuleDecl (HsRule rule_name act vars lhs _fv_lhs rhs _fv_rhs)
     get_var (RuleBndrSig v _) = v
 
     rn_var (RuleBndr (L loc _), id)
-	= returnM (RuleBndr (L loc id), emptyFVs)
+	= return (RuleBndr (L loc id), emptyFVs)
     rn_var (RuleBndrSig (L loc _) t, id)
 	= rnHsTypeFVs doc t	`thenM` \ (t', fvs) ->
-	  returnM (RuleBndrSig (L loc id) t', fvs)
+	  return (RuleBndrSig (L loc id) t', fvs)
 
 badRuleVar :: FastString -> Name -> SDoc
 badRuleVar name var
@@ -651,7 +640,7 @@ However, we can also do some scoping checks at the same time.
 rnTyClDecl :: TyClDecl RdrName -> RnM (TyClDecl Name, FreeVars)
 rnTyClDecl (ForeignType {tcdLName = name, tcdFoType = fo_type, tcdExtName = ext_name})
   = lookupLocatedTopBndrRn name		`thenM` \ name' ->
-    returnM (ForeignType {tcdLName = name', tcdFoType = fo_type, tcdExtName = ext_name},
+    return (ForeignType {tcdLName = name', tcdFoType = fo_type, tcdExtName = ext_name},
 	     emptyFVs)
 
 -- all flavours of type family declarations ("type family", "newtype fanily",
@@ -678,7 +667,7 @@ rnTyClDecl (tydecl@TyData {tcdND = new_or_data, tcdCtxt = context,
 	; condecls' <- rnConDecls (unLoc tycon') condecls
 		-- No need to check for duplicate constructor decls
 		-- since that is done by RnNames.extendGlobalRdrEnvRn
-	; returnM (TyData {tcdND = new_or_data, tcdCtxt = context', 
+	; return (TyData {tcdND = new_or_data, tcdCtxt = context', 
 			   tcdLName = tycon', tcdTyVars = tyvars', 
 			   tcdTyPats = typats', tcdKindSig = Nothing, 
 			   tcdCons = condecls', tcdDerivs = derivs'}, 
@@ -709,7 +698,7 @@ rnTyClDecl (tydecl@TyData {tcdND = new_or_data, tcdCtxt = context,
 		-- No need to check for duplicate constructor decls
 		-- since that is done by RnNames.extendGlobalRdrEnvRn
 
-	; returnM (TyData {tcdND = new_or_data, tcdCtxt = noLoc [], 
+	; return (TyData {tcdND = new_or_data, tcdCtxt = noLoc [], 
 			   tcdLName = tycon', tcdTyVars = tyvars', 
 			   tcdTyPats = typats', tcdKindSig = sig,
 			   tcdCons = condecls', tcdDerivs = derivs'}, 
@@ -727,9 +716,9 @@ rnTyClDecl (tydecl@TyData {tcdND = new_or_data, tcdCtxt = context,
 
     data_doc = text "In the data type declaration for" <+> quotes (ppr tycon)
 
-    rn_derivs Nothing   = returnM (Nothing, emptyFVs)
+    rn_derivs Nothing   = return (Nothing, emptyFVs)
     rn_derivs (Just ds) = rnLHsTypes data_doc ds	`thenM` \ ds' -> 
-			  returnM (Just ds', extractHsTyNames_s ds')
+			  return (Just ds', extractHsTyNames_s ds')
 
 -- "type" and "type instance" declarations
 rnTyClDecl tydecl@(TySynonym {tcdLName = name,
@@ -741,7 +730,7 @@ rnTyClDecl tydecl@(TySynonym {tcdLName = name,
 		  else lookupLocatedTopBndrRn name
        ; typats' <- rnTyPats syn_doc typatsMaybe
        ; (ty', fvs) <- rnHsTypeFVs syn_doc ty
-       ; returnM (TySynonym {tcdLName = name', tcdTyVars = tyvars', 
+       ; return (TySynonym {tcdLName = name', tcdTyVars = tyvars', 
 			     tcdTyPats = typats', tcdSynRhs = ty'},
 	          delFVs (map hsLTyVarName tyvars') $
 		  fvs			      `plusFV`
@@ -868,7 +857,7 @@ rnTyPats doc (Just typats) = liftM Just $ rnLHsTypes doc typats
 
 rnConDecls :: Name -> [LConDecl RdrName] -> RnM [LConDecl Name]
 rnConDecls _tycon condecls
-  = mappM (wrapLocM rnConDecl) condecls
+  = mapM (wrapLocM rnConDecl) condecls
 
 rnConDecl :: ConDecl RdrName -> RnM (ConDecl Name)
 rnConDecl (ConDecl name expl tvs cxt details res_ty mb_doc)
@@ -921,16 +910,16 @@ rnConDeclDetails :: SDoc
                  -> HsConDetails (LHsType RdrName) [ConDeclField RdrName]
                  -> RnM (HsConDetails (LHsType Name) [ConDeclField Name])
 rnConDeclDetails doc (PrefixCon tys)
-  = mappM (rnLHsType doc) tys	`thenM` \ new_tys  ->
-    returnM (PrefixCon new_tys)
+  = mapM (rnLHsType doc) tys	`thenM` \ new_tys  ->
+    return (PrefixCon new_tys)
 
 rnConDeclDetails doc (InfixCon ty1 ty2)
   = rnLHsType doc ty1  		`thenM` \ new_ty1 ->
     rnLHsType doc ty2  		`thenM` \ new_ty2 ->
-    returnM (InfixCon new_ty1 new_ty2)
+    return (InfixCon new_ty1 new_ty2)
 
 rnConDeclDetails doc (RecCon fields)
-  = do	{ new_fields <- mappM (rnField doc) fields
+  = do	{ new_fields <- mapM (rnField doc) fields
 		-- No need to check for duplicate fields
 		-- since that is done by RnNames.extendGlobalRdrEnvRn
 	; return (RecCon new_fields) }
@@ -940,7 +929,7 @@ rnField doc (ConDeclField name ty haddock_doc)
   = lookupLocatedTopBndrRn name	`thenM` \ new_name ->
     rnLHsType doc ty		`thenM` \ new_ty ->
     rnMbLHsDoc haddock_doc      `thenM` \ new_haddock_doc ->
-    returnM (ConDeclField new_name new_ty new_haddock_doc) 
+    return (ConDeclField new_name new_ty new_haddock_doc) 
 
 -- Rename family declarations
 --
@@ -961,7 +950,7 @@ rnFamily (tydecl@TyFamily {tcdFlavour = flavour,
 		   || not (null tyvars)) $ addErr needOneIdx  -- no. of indexes >= 1
 	 ; bindIdxVars (family_doc tycon) tyvars $ \tyvars' -> do {
 	 ; tycon' <- lookupLocatedTopBndrRn tycon
-	 ; returnM (TyFamily {tcdFlavour = flavour, tcdLName = tycon', 
+	 ; return (TyFamily {tcdFlavour = flavour, tcdLName = tycon', 
 			      tcdTyVars = tyvars', tcdKind = tcdKind tydecl}, 
 		    emptyFVs) 
          } }
@@ -992,7 +981,7 @@ rnATs ats = mapFvRn (wrapLocFstM rn_at) ats
 
     lookupIdxVars _ tyvars cont = 
       do { checkForDups tyvars;
-	 ; tyvars' <- mappM lookupIdxVar tyvars
+	 ; tyvars' <- mapM lookupIdxVar tyvars
 	 ; cont tyvars'
 	 }
     -- Type index variables must be class parameters, which are the only
@@ -1078,7 +1067,7 @@ extendRecordFieldEnv tycl_decls inst_decls
     get_con (ConDecl { con_name = con, con_details = RecCon flds })
 	    (RecFields env fld_set)
 	= do { con' <- lookup con
-             ; flds' <- mappM lookup (map cd_fld_name flds)
+             ; flds' <- mapM lookup (map cd_fld_name flds)
 	     ; let env'    = extendNameEnv env con' flds'
 	           fld_set' = addListToNameSet fld_set flds'
              ; return $ (RecFields env' fld_set') }
@@ -1095,15 +1084,15 @@ extendRecordFieldEnv tycl_decls inst_decls
 rnFds :: SDoc -> [Located (FunDep RdrName)] -> RnM [Located (FunDep Name)]
 
 rnFds doc fds
-  = mappM (wrapLocM rn_fds) fds
+  = mapM (wrapLocM rn_fds) fds
   where
     rn_fds (tys1, tys2)
       =	rnHsTyVars doc tys1		`thenM` \ tys1' ->
 	rnHsTyVars doc tys2		`thenM` \ tys2' ->
-	returnM (tys1', tys2')
+	return (tys1', tys2')
 
 rnHsTyVars :: SDoc -> [RdrName] -> RnM [Name]
-rnHsTyVars doc tvs  = mappM (rnHsTyVar doc) tvs
+rnHsTyVars doc tvs  = mapM (rnHsTyVar doc) tvs
 
 rnHsTyVar :: SDoc -> RdrName -> RnM Name
 rnHsTyVar _doc tyvar = lookupOccRn tyvar
@@ -1154,7 +1143,7 @@ rnSplice (HsSplice n expr)
 
 checkTH :: Outputable a => a -> String -> RnM ()
 #ifdef GHCI 
-checkTH _ _ = returnM ()	-- OK
+checkTH _ _ = return ()	-- OK
 #else
 checkTH e what 	-- Raise an error in a stage-1 compiler
   = addErr (vcat [ptext (sLit "Template Haskell") <+> text what <+>  

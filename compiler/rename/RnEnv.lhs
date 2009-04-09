@@ -30,7 +30,9 @@ module RnEnv (
 	mapFvRn, mapFvRnCPS,
 	warnUnusedMatches, warnUnusedModules, warnUnusedImports, 
 	warnUnusedTopBinds, warnUnusedLocalBinds,
-	dataTcOccs, unknownNameErr, perhapsForallMsg
+	dataTcOccs, unknownNameErr, perhapsForallMsg,
+
+	checkM
     ) where
 
 #include "HsVersions.h"

@@ -61,15 +61,6 @@ thenM = (>>=)
 
 thenM_ :: Monad a => a b -> a c -> a c
 thenM_ = (>>)
-
-returnM :: Monad m => a -> m a
-returnM = return
-
-mappM :: (Monad m) => (a -> m b) -> [a] -> m [b]
-mappM = mapM
-
-checkM :: Monad m => Bool -> m () -> m ()
-checkM = unless
 \end{code}
 
 %************************************************************************
@@ -82,7 +73,7 @@ checkM = unless
 rnExprs :: [LHsExpr RdrName] -> RnM ([LHsExpr Name], FreeVars)
 rnExprs ls = rnExprs' ls emptyUniqSet
  where
-  rnExprs' [] acc = returnM ([], acc)
+  rnExprs' [] acc = return ([], acc)
   rnExprs' (expr:exprs) acc
    = rnLExpr expr 	        `thenM` \ (expr', fvExpr) ->
 
@@ -92,7 +83,7 @@ rnExprs ls = rnExprs' ls emptyUniqSet
 	acc' = acc `plusFV` fvExpr
     in
     acc' `seq` rnExprs' exprs acc' `thenM` \ (exprs', fvExprs) ->
-    returnM (expr':exprs', fvExprs)
+    return (expr':exprs', fvExprs)
 \end{code}
 
 Variables. We look up the variable and return the resulting name. 
@@ -120,7 +111,7 @@ rnExpr (HsVar v)
 
 rnExpr (HsIPVar v)
   = newIPNameRn v		`thenM` \ name ->
-    returnM (HsIPVar name, emptyFVs)
+    return (HsIPVar name, emptyFVs)
 
 rnExpr (HsLit lit@(HsString s))
   = do {
@@ -129,21 +120,21 @@ rnExpr (HsLit lit@(HsString s))
             rnExpr (HsOverLit (mkHsIsString s placeHolderType))
 	 else -- Same as below
 	    rnLit lit		`thenM_`
-            returnM (HsLit lit, emptyFVs)
+            return (HsLit lit, emptyFVs)
        }
 
 rnExpr (HsLit lit) 
   = rnLit lit		`thenM_`
-    returnM (HsLit lit, emptyFVs)
+    return (HsLit lit, emptyFVs)
 
 rnExpr (HsOverLit lit) 
   = rnOverLit lit		`thenM` \ (lit', fvs) ->
-    returnM (HsOverLit lit', fvs)
+    return (HsOverLit lit', fvs)
 
 rnExpr (HsApp fun arg)
   = rnLExpr fun		`thenM` \ (fun',fvFun) ->
     rnLExpr arg		`thenM` \ (arg',fvArg) ->
-    returnM (HsApp fun' arg', fvFun `plusFV` fvArg)
+    return (HsApp fun' arg', fvFun `plusFV` fvArg)
 
 rnExpr (OpApp e1 (L op_loc (HsVar op_rdr)) _ e2) 
   = do	{ (e1', fv_e1) <- rnLExpr e1
@@ -165,7 +156,7 @@ rnExpr (NegApp e _)
   = rnLExpr e			`thenM` \ (e', fv_e) ->
     lookupSyntaxName negateName	`thenM` \ (neg_name, fv_neg) ->
     mkNegAppRn e' neg_name	`thenM` \ final_e ->
-    returnM (final_e, fv_e `plusFV` fv_neg)
+    return (final_e, fv_e `plusFV` fv_neg)
 
 ------------------------------------------
 -- Template Haskell extensions
@@ -174,11 +165,11 @@ rnExpr (NegApp e _)
 rnExpr e@(HsBracket br_body)
   = checkTH e "bracket"		`thenM_`
     rnBracket br_body		`thenM` \ (body', fvs_e) ->
-    returnM (HsBracket body', fvs_e)
+    return (HsBracket body', fvs_e)
 
 rnExpr (HsSpliceE splice)
   = rnSplice splice 		`thenM` \ (splice', fvs) ->
-    returnM (HsSpliceE splice', fvs)
+    return (HsSpliceE splice', fvs)
 
 #ifndef GHCI
 rnExpr e@(HsQuasiQuoteE _) = pprPanic "Cant do quasiquotation without GHCi" (ppr e)
@@ -187,7 +178,7 @@ rnExpr (HsQuasiQuoteE qq)
   = rnQuasiQuote qq 		`thenM` \ (qq', fvs_qq) ->
     runQuasiQuoteExpr qq'	`thenM` \ (L _ expr') ->
     rnExpr expr'		`thenM` \ (expr'', fvs_expr) ->
-    returnM (expr'', fvs_qq `plusFV` fvs_expr)
+    return (expr'', fvs_qq `plusFV` fvs_expr)
 #endif 	/* GHCI */
 
 ---------------------------------------------
@@ -213,28 +204,28 @@ rnExpr expr@(SectionR {})
 ---------------------------------------------
 rnExpr (HsCoreAnn ann expr)
   = rnLExpr expr `thenM` \ (expr', fvs_expr) ->
-    returnM (HsCoreAnn ann expr', fvs_expr)
+    return (HsCoreAnn ann expr', fvs_expr)
 
 rnExpr (HsSCC lbl expr)
   = rnLExpr expr	 	`thenM` \ (expr', fvs_expr) ->
-    returnM (HsSCC lbl expr', fvs_expr)
+    return (HsSCC lbl expr', fvs_expr)
 rnExpr (HsTickPragma info expr)
   = rnLExpr expr	 	`thenM` \ (expr', fvs_expr) ->
-    returnM (HsTickPragma info expr', fvs_expr)
+    return (HsTickPragma info expr', fvs_expr)
 
 rnExpr (HsLam matches)
   = rnMatchGroup LambdaExpr matches	`thenM` \ (matches', fvMatch) ->
-    returnM (HsLam matches', fvMatch)
+    return (HsLam matches', fvMatch)
 
 rnExpr (HsCase expr matches)
   = rnLExpr expr		 	`thenM` \ (new_expr, e_fvs) ->
     rnMatchGroup CaseAlt matches	`thenM` \ (new_matches, ms_fvs) ->
-    returnM (HsCase new_expr new_matches, e_fvs `plusFV` ms_fvs)
+    return (HsCase new_expr new_matches, e_fvs `plusFV` ms_fvs)
 
 rnExpr (HsLet binds expr)
   = rnLocalBindsAndThen binds		$ \ binds' ->
     rnLExpr expr			 `thenM` \ (expr',fvExpr) ->
-    returnM (HsLet binds' expr', fvExpr)
+    return (HsLet binds' expr', fvExpr)
 
 rnExpr (HsDo do_or_lc stmts body _)
   = do 	{ ((stmts', body'), fvs) <- rnStmts do_or_lc stmts $
@@ -243,16 +234,16 @@ rnExpr (HsDo do_or_lc stmts body _)
 
 rnExpr (ExplicitList _ exps)
   = rnExprs exps		 	`thenM` \ (exps', fvs) ->
-    returnM  (ExplicitList placeHolderType exps', fvs)
+    return  (ExplicitList placeHolderType exps', fvs)
 
 rnExpr (ExplicitPArr _ exps)
   = rnExprs exps		 	`thenM` \ (exps', fvs) ->
-    returnM  (ExplicitPArr placeHolderType exps', fvs)
+    return  (ExplicitPArr placeHolderType exps', fvs)
 
 rnExpr (ExplicitTuple exps boxity)
   = checkTupSize (length exps)			`thenM_`
     rnExprs exps	 			`thenM` \ (exps', fvs) ->
-    returnM (ExplicitTuple exps' boxity, fvs)
+    return (ExplicitTuple exps' boxity, fvs)
 
 rnExpr (RecordCon con_id _ rbinds)
   = do	{ conname <- lookupLocatedOccRn con_id
@@ -278,21 +269,21 @@ rnExpr (HsIf p b1 b2)
   = rnLExpr p		`thenM` \ (p', fvP) ->
     rnLExpr b1		`thenM` \ (b1', fvB1) ->
     rnLExpr b2		`thenM` \ (b2', fvB2) ->
-    returnM (HsIf p' b1' b2', plusFVs [fvP, fvB1, fvB2])
+    return (HsIf p' b1' b2', plusFVs [fvP, fvB1, fvB2])
 
 rnExpr (HsType a)
   = rnHsTypeFVs doc a	`thenM` \ (t, fvT) -> 
-    returnM (HsType t, fvT)
+    return (HsType t, fvT)
   where 
     doc = text "In a type argument"
 
 rnExpr (ArithSeq _ seq)
   = rnArithSeq seq	 `thenM` \ (new_seq, fvs) ->
-    returnM (ArithSeq noPostTcExpr new_seq, fvs)
+    return (ArithSeq noPostTcExpr new_seq, fvs)
 
 rnExpr (PArrSeq _ seq)
   = rnArithSeq seq	 `thenM` \ (new_seq, fvs) ->
-    returnM (PArrSeq noPostTcExpr new_seq, fvs)
+    return (PArrSeq noPostTcExpr new_seq, fvs)
 \end{code}
 
 These three are pattern syntax appearing in expressions.
@@ -317,12 +308,12 @@ rnExpr (HsProc pat body)
   = newArrowScope $
     rnPatsAndThen_LocalRightwards ProcExpr [pat] $ \ [pat'] ->
     rnCmdTop body	         `thenM` \ (body',fvBody) ->
-    returnM (HsProc pat' body', fvBody)
+    return (HsProc pat' body', fvBody)
 
 rnExpr (HsArrApp arrow arg _ ho rtl)
   = select_arrow_scope (rnLExpr arrow)	`thenM` \ (arrow',fvArrow) ->
     rnLExpr arg				`thenM` \ (arg',fvArg) ->
-    returnM (HsArrApp arrow' arg' placeHolderType ho rtl,
+    return (HsArrApp arrow' arg' placeHolderType ho rtl,
 	     fvArrow `plusFV` fvArg)
   where
     select_arrow_scope tc = case ho of
@@ -341,13 +332,13 @@ rnExpr (HsArrForm op (Just _) [arg1, arg2])
     lookupFixityRn op_name		`thenM` \ fixity ->
     mkOpFormRn arg1' op' fixity arg2'	`thenM` \ final_e -> 
 
-    returnM (final_e,
+    return (final_e,
 	      fv_arg1 `plusFV` fv_op `plusFV` fv_arg2)
 
 rnExpr (HsArrForm op fixity cmds)
   = escapeArrowScope (rnLExpr op)	`thenM` \ (op',fvOp) ->
     rnCmdArgs cmds			`thenM` \ (cmds',fvCmds) ->
-    returnM (HsArrForm op' fixity cmds', fvOp `plusFV` fvCmds)
+    return (HsArrForm op' fixity cmds', fvOp `plusFV` fvCmds)
 
 rnExpr other = pprPanic "rnExpr: unexpected expression" (ppr other)
 	-- HsWrap
@@ -378,11 +369,11 @@ rnSection other = pprPanic "rnSection" (ppr other)
 
 \begin{code}
 rnCmdArgs :: [LHsCmdTop RdrName] -> RnM ([LHsCmdTop Name], FreeVars)
-rnCmdArgs [] = returnM ([], emptyFVs)
+rnCmdArgs [] = return ([], emptyFVs)
 rnCmdArgs (arg:args)
   = rnCmdTop arg	`thenM` \ (arg',fvArg) ->
     rnCmdArgs args	`thenM` \ (args',fvArgs) ->
-    returnM (arg':args', fvArg `plusFV` fvArgs)
+    return (arg':args', fvArg `plusFV` fvArgs)
 
 rnCmdTop :: LHsCmdTop RdrName -> RnM (LHsCmdTop Name, FreeVars)
 rnCmdTop = wrapLocFstM rnCmdTop'
@@ -396,7 +387,7 @@ rnCmdTop = wrapLocFstM rnCmdTop'
 	-- Generate the rebindable syntax for the monad
      lookupSyntaxTable cmd_names	`thenM` \ (cmd_names', cmd_fvs) ->
 
-     returnM (HsCmdTop cmd' [] placeHolderType cmd_names', 
+     return (HsCmdTop cmd' [] placeHolderType cmd_names', 
 	     fvCmd `plusFV` cmd_fvs)
 
 ---------------------------------------------------
@@ -547,23 +538,23 @@ methodNamesStmt (GroupStmt _ _) = emptyFVs
 rnArithSeq :: ArithSeqInfo RdrName -> RnM (ArithSeqInfo Name, FreeVars)
 rnArithSeq (From expr)
  = rnLExpr expr 	`thenM` \ (expr', fvExpr) ->
-   returnM (From expr', fvExpr)
+   return (From expr', fvExpr)
 
 rnArithSeq (FromThen expr1 expr2)
  = rnLExpr expr1 	`thenM` \ (expr1', fvExpr1) ->
    rnLExpr expr2	`thenM` \ (expr2', fvExpr2) ->
-   returnM (FromThen expr1' expr2', fvExpr1 `plusFV` fvExpr2)
+   return (FromThen expr1' expr2', fvExpr1 `plusFV` fvExpr2)
 
 rnArithSeq (FromTo expr1 expr2)
  = rnLExpr expr1	`thenM` \ (expr1', fvExpr1) ->
    rnLExpr expr2	`thenM` \ (expr2', fvExpr2) ->
-   returnM (FromTo expr1' expr2', fvExpr1 `plusFV` fvExpr2)
+   return (FromTo expr1' expr2', fvExpr1 `plusFV` fvExpr2)
 
 rnArithSeq (FromThenTo expr1 expr2 expr3)
  = rnLExpr expr1	`thenM` \ (expr1', fvExpr1) ->
    rnLExpr expr2	`thenM` \ (expr2', fvExpr2) ->
    rnLExpr expr3	`thenM` \ (expr3', fvExpr3) ->
-   returnM (FromThenTo expr1' expr2' expr3',
+   return (FromThenTo expr1' expr2' expr3',
 	    plusFVs [fvExpr1, fvExpr2, fvExpr3])
 \end{code}
 
@@ -580,7 +571,7 @@ rnBracket (VarBr n) = do { name <- lookupOccRn n
 			 ; checkM (nameIsLocalOrFrom this_mod name) $	-- Reason: deprecation checking asumes the
 			   do { loadInterfaceForName msg name		-- home interface is loaded, and this is the
 			      ; return () }				-- only way that is going to happen
-			 ; returnM (VarBr name, unitFV name) }
+			 ; return (VarBr name, unitFV name) }
 		    where
 		      msg = ptext (sLit "Need interface for Template Haskell quoted Name")
 
@@ -803,7 +794,7 @@ rnParallelStmts ctxt segs thing_inside = do
             let (bndrs', dups) = removeDups cmpByOcc bndrs
                 inner_env = extendLocalRdrEnv orig_lcl_env bndrs'
             
-            mappM dupErr dups
+            mapM dupErr dups
             (thing, fvs) <- setLocalRdrEnv inner_env thing_inside
             return (([], thing), fvs)
 
@@ -970,7 +961,7 @@ rn_rec_stmts_lhs fix_env stmts =
      -- don't bind all of the variables from the Stmt at once
      -- with bindLocatedLocals.
      checkDupRdrNames doc boundNames
-     mappM (rn_rec_stmt_lhs fix_env) stmts `thenM` \ ls -> returnM (concat ls)
+     mapM (rn_rec_stmt_lhs fix_env) stmts `thenM` \ ls -> return (concat ls)
 
 
 -- right-hand-sides
@@ -982,7 +973,7 @@ rn_rec_stmt :: [Name] -> LStmtLR Name RdrName -> FreeVars -> RnM [Segment (LStmt
 rn_rec_stmt _ (L loc (ExprStmt expr _ _)) _
   = rnLExpr expr `thenM` \ (expr', fvs) ->
     lookupSyntaxName thenMName	`thenM` \ (then_op, fvs1) ->
-    returnM [(emptyNameSet, fvs `plusFV` fvs1, emptyNameSet,
+    return [(emptyNameSet, fvs `plusFV` fvs1, emptyNameSet,
 	      L loc (ExprStmt expr' then_op placeHolderType))]
 
 rn_rec_stmt _ (L loc (BindStmt pat' expr _ _)) fv_pat
@@ -993,7 +984,7 @@ rn_rec_stmt _ (L loc (BindStmt pat' expr _ _)) fv_pat
 	bndrs = mkNameSet (collectPatBinders pat')
 	fvs   = fv_expr `plusFV` fv_pat `plusFV` fvs1 `plusFV` fvs2
     in
-    returnM [(bndrs, fvs, bndrs `intersectNameSet` fvs,
+    return [(bndrs, fvs, bndrs `intersectNameSet` fvs,
 	      L loc (BindStmt pat' expr' bind_op fail_op))]
 
 rn_rec_stmt _ (L _ (LetStmt binds@(HsIPBinds _))) _
@@ -1003,7 +994,7 @@ rn_rec_stmt all_bndrs (L loc (LetStmt (HsValBinds binds'))) _ = do
   (binds', du_binds) <- 
       -- fixities and unused are handled above in rn_rec_stmts_and_then
       rnValBindsRHS (mkNameSet all_bndrs) binds'
-  returnM [(duDefs du_binds, duUses du_binds, 
+  return [(duDefs du_binds, duUses du_binds, 
 	    emptyNameSet, L loc (LetStmt (HsValBinds binds')))]
 
 -- no RecStmt case becuase they get flattened above when doing the LHSes
@@ -1023,8 +1014,8 @@ rn_rec_stmt _ (L _ (LetStmt EmptyLocalBinds)) _
   = panic "rn_rec_stmt: LetStmt EmptyLocalBinds"
 
 rn_rec_stmts :: [Name] -> [(LStmtLR Name RdrName, FreeVars)] -> RnM [Segment (LStmt Name)]
-rn_rec_stmts bndrs stmts = mappM (uncurry (rn_rec_stmt bndrs)) stmts	`thenM` \ segs_s ->
-		   	   returnM (concat segs_s)
+rn_rec_stmts bndrs stmts = mapM (uncurry (rn_rec_stmt bndrs)) stmts	`thenM` \ segs_s ->
+		   	   return (concat segs_s)
 
 ---------------------------------------------
 addFwdRefs :: [Segment a] -> [Segment a]
