@@ -1829,6 +1829,11 @@ tyvar   : tyvarid		{ $1 }
 tyvarop :: { Located RdrName }
 tyvarop : '`' tyvarid '`'	{ LL (unLoc $2) }
 	| tyvarsym		{ $1 }
+	| '.'			{% parseErrorSDoc (getLoc $1) 
+	  			      (vcat [ptext (sLit "Illegal symbol '.' in type"), 
+				             ptext (sLit "Perhaps you intended -XRankNTypes or similar flag"),
+					     ptext (sLit "to enable explicit-forall syntax: forall <tvs>. <type>")])
+	                        }
 
 tyvarid	:: { Located RdrName }
 	: VARID			{ L1 $! mkUnqual tvName (getVARID $1) }

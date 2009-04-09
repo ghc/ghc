@@ -719,9 +719,9 @@ reservedSymsFM = listToUFM $
        ,("!",   ITbang,     always)
 
         -- For data T (a::*) = MkT
-       ,("*", ITstar, \i -> kindSigsEnabled i || tyFamEnabled i)
+       ,("*", ITstar, always) -- \i -> kindSigsEnabled i || tyFamEnabled i)
         -- For 'forall a . t'
-       ,(".", ITdot, \i -> explicitForallEnabled i || inRulePrag i)
+       ,(".", ITdot,  always) -- \i -> explicitForallEnabled i || inRulePrag i)
 
        ,("-<",  ITlarrowtail, arrowsEnabled)
        ,(">-",  ITrarrowtail, arrowsEnabled)

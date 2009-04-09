@@ -49,7 +49,8 @@ module RdrHsSyn (
 	checkMDo,	      -- [Stmt] -> P [Stmt]
 	checkValDef,	      -- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
 	checkValSig,	      -- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
-	parseError,	      -- String -> Pa
+	parseError,	    
+	parseErrorSDoc,	    
     ) where
 
 import HsSyn		-- Lots of it

@@ -30,7 +30,7 @@ module RnEnv (
 	mapFvRn, mapFvRnCPS,
 	warnUnusedMatches, warnUnusedModules, warnUnusedImports, 
 	warnUnusedTopBinds, warnUnusedLocalBinds,
-	dataTcOccs, unknownNameErr, perhapsForallMsg,
+	dataTcOccs, unknownNameErr, kindSigErr, perhapsForallMsg,
 
 	checkM
     ) where
@@ -824,13 +824,15 @@ bindTyVarsRn :: SDoc -> [LHsTyVarBndr RdrName]
 	      -> RnM a
 -- Haskell-98 binding of type variables; e.g. within a data type decl
 bindTyVarsRn doc_str tyvar_names enclosed_scope
-  = let
-	located_tyvars = hsLTyVarLocNames tyvar_names
-    in
-    bindLocatedLocalsRn doc_str located_tyvars	$ \ names ->
-    enclosed_scope (zipWith replace tyvar_names names)
-    where 
-	replace (L loc n1) n2 = L loc (replaceTyVarName n1 n2)
+  = bindLocatedLocalsRn doc_str located_tyvars	$ \ names ->
+    do { kind_sigs_ok <- doptM Opt_KindSignatures
+       ; checkM (null kinded_tyvars || kind_sigs_ok) 
+       	 	(mapM_ (addErr . kindSigErr) kinded_tyvars)
+       ; enclosed_scope (zipWith replace tyvar_names names) }
+  where 
+    replace (L loc n1) n2 = L loc (replaceTyVarName n1 n2)
+    located_tyvars = hsLTyVarLocNames tyvar_names
+    kinded_tyvars  = [n | L _ (KindedTyVar n _) <- tyvar_names]
 
 bindPatSigTyVars :: [LHsType RdrName] -> ([Name] -> RnM a) -> RnM a
   -- Find the type variables in the pattern type 
@@ -1086,6 +1088,12 @@ dupNamesErr get_loc descriptor names
     locations | one_line  = empty 
 	      | otherwise = ptext (sLit "Bound at:") <+> 
 			    vcat (map ppr (sortLe (<=) locs))
+
+kindSigErr :: Outputable a => a -> SDoc
+kindSigErr thing
+  = hang (ptext (sLit "Illegal kind signature for") <+> quotes (ppr thing))
+       2 (ptext (sLit "Perhaps you intended to use -XKindSignatures"))
+
 
 badQualBndrErr :: RdrName -> SDoc
 badQualBndrErr rdr_name

@@ -148,9 +148,11 @@ rnHsType doc (HsListTy ty) = do
     ty' <- rnLHsType doc ty
     return (HsListTy ty')
 
-rnHsType doc (HsKindSig ty k) = do
-    ty' <- rnLHsType doc ty
-    return (HsKindSig ty' k)
+rnHsType doc (HsKindSig ty k)
+  = do { kind_sigs_ok <- doptM Opt_KindSignatures
+       ; checkM kind_sigs_ok (addErr (kindSigErr ty))
+       ; ty' <- rnLHsType doc ty
+       ; return (HsKindSig ty' k) }
 
 rnHsType doc (HsPArrTy ty) = do
     ty' <- rnLHsType doc ty

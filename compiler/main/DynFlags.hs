@@ -1809,6 +1809,8 @@ impliedFlags
                                                      --      be completely rigid for GADTs
 
     , (Opt_TypeFamilies,        Opt_RelaxedPolyRec)  -- Trac #2944 gives a nice example
+    , (Opt_TypeFamilies,        Opt_KindSignatures)  -- Type families use kind signatures
+      						     -- all over the place
 
     , (Opt_ScopedTypeVariables, Opt_RelaxedPolyRec)  -- Ditto for scoped type variables; see
                                                      --      Note [Scoped tyvars] in TcBinds
