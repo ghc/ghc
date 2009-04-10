@@ -32,6 +32,7 @@ $(TIMEOUT_PROGRAM): timeout.hs
 	$(TEST_HC) --make Setup
 	./Setup configure --with-compiler=$(TEST_HC) \
 	                  --with-hc-pkg=$(GHC_PKG) \
+	                  --with-hsc2hs=$(HSC2HS) \
 	                  $(WITH_GCC) \
 	                  --ghc-option=-threaded --prefix=$(PREFIX)
 	./Setup build

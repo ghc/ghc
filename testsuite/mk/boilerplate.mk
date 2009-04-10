@@ -53,6 +53,7 @@ OLD_BUILD_SYSTEM_STAGE1_GHC := $(abspath $(TOP)/../ghc/stage1-inplace/ghc)
 OLD_BUILD_SYSTEM_STAGE2_GHC := $(abspath $(TOP)/../ghc/stage2-inplace/ghc)
 OLD_BUILD_SYSTEM_STAGE3_GHC := $(abspath $(TOP)/../ghc/stage3-inplace/ghc)
 OLD_BUILD_SYSTEM_GHC_PKG    := $(abspath $(TOP)/../utils/ghc-pkg/install-inplace/bin/ghc-pkg)
+OLD_BUILD_SYSTEM_HSC2HS     := $(abspath $(TOP)/../utils/hsc2hs/install-inplace/bin/hsc2hs)
 OLD_BUILD_SYSTEM_HP2PS      := $(abspath $(TOP)/../utils/hp2ps/hp2ps)
 ifneq "$(wildcard $(OLD_BUILD_SYSTEM_STAGE1_GHC) $(OLD_BUILD_SYSTEM_STAGE1_GHC).exe)" ""
 
@@ -67,6 +68,7 @@ TEST_HC := $(OLD_BUILD_SYSTEM_STAGE2_GHC)
 endif
 endif
 GHC_PKG := $(OLD_BUILD_SYSTEM_GHC_PKG)
+HSC2HS := $(OLD_BUILD_SYSTEM_HSC2HS)
 HP2PS_ABS := $(OLD_BUILD_SYSTEM_HP2PS)
 # XXX This GCC definition is a hack. Once the in-tree GHC has a gcc in the
 # right place we won't need to do this, as Cabal will be able to find
@@ -105,6 +107,10 @@ ifeq "$(GHC_PKG)" ""
 GHC_PKG := $(dir $(TEST_HC))/ghc-pkg
 endif
 
+ifeq "$(HSC2HS)" ""
+HSC2HS := $(dir $(TEST_HC))/hsc2hs
+endif
+
 ifeq "$(HP2PS_ABS)" ""
 HP2PS_ABS := $(dir $(TEST_HC))/hp2ps
 endif
@@ -117,6 +123,11 @@ endif
 $(eval $(call canonicaliseExecutable,GHC_PKG))
 ifeq "$(wildcard $(GHC_PKG))" ""
 $(error Cannot find ghc-pkg: $(GHC_PKG))
+endif
+
+$(eval $(call canonicaliseExecutable,HSC2HS))
+ifeq "$(wildcard $(HSC2HS))" ""
+$(error Cannot find ghc-pkg: $(HSC2HS))
 endif
 
 $(eval $(call canonicaliseExecutable,HP2PS_ABS))
