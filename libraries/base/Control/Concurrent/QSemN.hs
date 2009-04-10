@@ -35,10 +35,12 @@ newtype QSemN = QSemN (MVar (Int,[(Int,MVar ())]))
 INSTANCE_TYPEABLE0(QSemN,qSemNTc,"QSemN")
 
 -- |Build a new 'QSemN' with a supplied initial quantity.
-newQSemN :: Int -> IO QSemN 
-newQSemN initial = do
-   sem <- newMVar (initial, [])
-   return (QSemN sem)
+newQSemN :: Int -> IO QSemN
+newQSemN initial =
+    if initial < 0
+    then fail "newQSemN: Initial quantity must be non-negative"
+    else do sem <- newMVar (initial, [])
+            return (QSemN sem)
 
 -- |Wait for the specified quantity to become available
 waitQSemN :: QSemN -> Int -> IO ()

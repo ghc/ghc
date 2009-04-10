@@ -41,9 +41,11 @@ INSTANCE_TYPEABLE0(QSem,qSemTc,"QSem")
 
 -- |Build a new 'QSem'
 newQSem :: Int -> IO QSem
-newQSem initial = do
-   sem <- newMVar (initial, [])
-   return (QSem sem)
+newQSem initial =
+    if initial < 0
+    then fail "newQSem: Initial quantity must be non-negative"
+    else do sem <- newMVar (initial, [])
+            return (QSem sem)
 
 -- |Wait for a unit to become available
 waitQSem :: QSem -> IO ()
