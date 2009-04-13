@@ -91,7 +91,7 @@ newSpark (StgRegTable *reg, StgClosure *p)
 
     cap->sparks_created++;
 
-    postEvent(cap, EVENT_CREATE_SPARK, reg->rCurrentTSO->id, 0);
+    postEvent(cap, EVENT_CREATE_SPARK, cap->r.rCurrentTSO->id, 0);
 
     return 1;
 }
