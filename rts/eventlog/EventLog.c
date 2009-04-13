@@ -106,9 +106,6 @@ static inline void postWord64(EventsBuf *eb, StgWord64 i)
 static inline void postEventTypeNum(EventsBuf *eb, EventTypeNum etNum)
 { postWord16(eb, etNum); }
 
-static inline void postEventTypeID(EventsBuf *eb, StgWord16 etID)
-{ postWord16(eb, etID); }
-
 static inline void postTimestamp(EventsBuf *eb, Timestamp t)
 { postWord64(eb,t); }
 
