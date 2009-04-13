@@ -58,6 +58,13 @@ createSparkThread (Capability *cap)
     tso = createIOThread (cap, RtsFlags.GcFlags.initialStkSize, 
                           &base_GHCziConc_runSparks_closure);
 
+    if (cap->r.rCurrentTSO != NULL)
+      // Capability in a bound thread?
+      postEvent(cap, EVENT_SPARK_TO_THREAD, cap->r.rCurrentTSO->id, tso->id);
+    else
+      // Capability in a worker thread?
+      postEvent(cap, EVENT_SPARK_TO_THREAD, 0, tso->id);
+
     appendToRunQueue(cap,tso);
 }
 
