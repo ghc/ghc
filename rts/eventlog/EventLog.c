@@ -284,7 +284,7 @@ freeEventLogging(void)
  * If the buffer is full, prints out the buffer and clears it.
  */
 void
-postEvent_(Capability *cap, EventTypeNum tag, StgThreadID thread, nat other_cap)
+postEvent_(Capability *cap, EventTypeNum tag, StgThreadID thread, StgWord64 other)
 {
     EventsBuf *eb;
 

@@ -23,15 +23,15 @@ void initEventLogging(void);
 void endEventLogging(void);
 void freeEventLogging(void);
 
-void postEvent_(Capability *cap, EventTypeNum tag, StgThreadID id, nat from);
+void postEvent_(Capability *cap, EventTypeNum tag, StgThreadID id, StgWord64 other);
 
 /* 
  * Post an event to the capability's event buffer.
  */
-INLINE_HEADER void postEvent(Capability *cap, EventTypeNum tag, StgThreadID id, nat from)
+INLINE_HEADER void postEvent(Capability *cap, EventTypeNum tag, StgThreadID id, StgWord64 other)
 {
     if (RtsFlags.EventLogFlags.doEventLogging) {
-        postEvent_(cap, tag, id, from);
+        postEvent_(cap, tag, id, other);
     }
 }
 
@@ -42,7 +42,7 @@ void printAndClearEventLog(Capability *cap);
 INLINE_HEADER void postEvent(Capability *cap  STG_UNUSED,
                              EventTypeNum tag STG_UNUSED,
                              StgThreadID id   STG_UNUSED,
-                             nat from         STG_UNUSED)
+                             StgWord64 other  STG_UNUSED)
 {
     /* nothing */
 }
