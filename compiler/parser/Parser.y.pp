@@ -774,7 +774,7 @@ tycl_hdr :: { Located (LHsContext RdrName,
 		       [LHsTyVarBndr RdrName],
 		       [LHsType RdrName]) }
 	: context '=>' type		{% checkTyClHdr $1         $3 >>= return.LL }
-	| type				{% checkTyClHdr (noLoc []) $1 >>= return.L1 }
+	| type                          {% checkTyClHdr (noLoc []) $1 >>= return.L1 }
 
 -----------------------------------------------------------------------------
 -- Stand-alone deriving
@@ -997,8 +997,8 @@ sig_vars :: { Located [Located RdrName] }
 -- Types
 
 infixtype :: { LHsType RdrName }
-	: btype qtyconop gentype         { LL $ HsOpTy $1 $2 $3 }
-        | btype tyvarop  gentype  	 { LL $ HsOpTy $1 $2 $3 }
+	: btype qtyconop type         { LL $ HsOpTy $1 $2 $3 }
+        | btype tyvarop  type  	 { LL $ HsOpTy $1 $2 $3 }
 
 strict_mark :: { Located HsBang }
 	: '!'				{ L1 HsStrict }
@@ -1018,9 +1018,10 @@ strict_mark :: { Located HsBang }
 -- A ctype is a for-all type
 ctype	:: { LHsType RdrName }
 	: 'forall' tv_bndrs '.' ctype	{ LL $ mkExplicitHsForAllTy $2 (noLoc []) $4 }
-	| context '=>' type		{ LL $ mkImplicitHsForAllTy   $1 $3 }
+	| context '=>' ctype		{ LL $ mkImplicitHsForAllTy   $1 $3 }
 	-- A type of form (context => type) is an *implicit* HsForAllTy
-	| type				{ $1 }
+	| ipvar '::' type		{ LL (HsPredTy (HsIParam (unLoc $1) $3)) }
+	| type  			{ $1 }
 
 type :: { LHsType RdrName }
 	: ipvar '::' gentype		{ LL (HsPredTy (HsIParam (unLoc $1) $3)) }
@@ -1041,7 +1042,8 @@ ctypedoc :: { LHsType RdrName }
 	: 'forall' tv_bndrs '.' ctypedoc	{ LL $ mkExplicitHsForAllTy $2 (noLoc []) $4 }
 	| context '=>' ctypedoc		{ LL $ mkImplicitHsForAllTy   $1 $3 }
 	-- A type of form (context => type) is an *implicit* HsForAllTy
-	| typedoc				{ $1 }
+	| ipvar '::' type		{ LL (HsPredTy (HsIParam (unLoc $1) $3)) }
+	| typedoc			{ $1 }
 
 typedoc :: { LHsType RdrName }
 	: ipvar '::' gentype		{ LL (HsPredTy (HsIParam (unLoc $1) $3)) }
@@ -1054,7 +1056,7 @@ typedoc :: { LHsType RdrName }
 --	(Eq a, Ord a)
 -- looks so much like a tuple type.  We can't tell until we find the =>
 
--- We have the t1 ~ t2 form both in 'context' and in gentype, 
+-- We have the t1 ~ t2 form both in 'context' and in type, 
 -- to permit an individual equational constraint without parenthesis.
 -- Thus for some reason we allow    f :: a~b => blah
 -- but not 	                    f :: ?x::Int => blah
@@ -1063,20 +1065,20 @@ context :: { LHsContext RdrName }
 					     (LL $ HsPredTy (HsEqualP $1 $3)) }
 	| btype 			{% checkContext $1 }
 
-gentype :: { LHsType RdrName }
+type :: { LHsType RdrName }
         : btype                         { $1 }
-        | btype qtyconop gentype        { LL $ HsOpTy $1 $2 $3 }
-        | btype tyvarop  gentype  	{ LL $ HsOpTy $1 $2 $3 }
+        | btype qtyconop type        { LL $ HsOpTy $1 $2 $3 }
+        | btype tyvarop  type     	{ LL $ HsOpTy $1 $2 $3 }
  	| btype '->'     ctype		{ LL $ HsFunTy $1 $3 }
         | btype '~'      btype  	{ LL $ HsPredTy (HsEqualP $1 $3) }
 
-gentypedoc :: { LHsType RdrName }
+typedoc :: { LHsType RdrName }
         : btype                          { $1 }
         | btype docprev                  { LL $ HsDocTy $1 $2 }
-        | btype qtyconop gentype         { LL $ HsOpTy $1 $2 $3 }
-        | btype qtyconop gentype docprev { LL $ HsDocTy (L (comb3 $1 $2 $3) (HsOpTy $1 $2 $3)) $4 }
-        | btype tyvarop  gentype         { LL $ HsOpTy $1 $2 $3 }
-        | btype tyvarop  gentype docprev { LL $ HsDocTy (L (comb3 $1 $2 $3) (HsOpTy $1 $2 $3)) $4 }
+        | btype qtyconop type            { LL $ HsOpTy $1 $2 $3 }
+        | btype qtyconop type docprev    { LL $ HsDocTy (L (comb3 $1 $2 $3) (HsOpTy $1 $2 $3)) $4 }
+        | btype tyvarop  type            { LL $ HsOpTy $1 $2 $3 }
+        | btype tyvarop  type docprev    { LL $ HsDocTy (L (comb3 $1 $2 $3) (HsOpTy $1 $2 $3)) $4 }
         | btype '->'     ctypedoc        { LL $ HsFunTy $1 $3 }
         | btype docprev '->' ctypedoc    { LL $ HsFunTy (L (comb2 $1 $2) (HsDocTy $1 $2)) $4 }
         | btype '~'      btype           { LL $ HsPredTy (HsEqualP $1 $3) }
@@ -1410,7 +1412,7 @@ aexp1	:: { LHsExpr RdrName }
 -- so it's not enabled yet.
 -- But this case *is* used for the left hand side of a generic definition,
 -- which is parsed as an expression before being munged into a pattern
- 	| qcname '{|' gentype '|}'      { LL $ HsApp (sL (getLoc $1) (HsVar (unLoc $1)))
+ 	| qcname '{|' type '|}'         { LL $ HsApp (sL (getLoc $1) (HsVar (unLoc $1)))
 						     (sL (getLoc $3) (HsType $3)) }
 
 aexp2	:: { LHsExpr RdrName }
