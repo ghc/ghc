@@ -335,6 +335,9 @@ coalesceNodes aggressive triv graph (k1, k2)
 	, not $ elementOfUniqSet kMin (nodeConflicts nMax)
 	, not $ elementOfUniqSet kMax (nodeConflicts nMin)
 
+	-- can't coalesce the same node
+	, nodeId nMin /= nodeId nMax
+
 	= coalesceNodes_merge aggressive triv graph kMin kMax nMin nMax
 
 	-- don't do the coalescing after all
@@ -349,9 +352,6 @@ coalesceNodes_merge aggressive triv graph kMin kMax nMin nMax
 
 	| not (isNothing (nodeColor nMin) && isNothing (nodeColor nMax))
 	= error "GraphOps.coalesceNodes: can't coalesce colored nodes."
-
-	| nodeId nMin == nodeId nMax
-	= error "GraphOps.coalesceNodes: can't coalesce the same node."
 
 	---
 	| otherwise
