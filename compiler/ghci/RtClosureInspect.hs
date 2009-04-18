@@ -581,7 +581,7 @@ instScheme ty = liftTcM$ do
 -- do its magic.
 addConstraint :: TcType -> TcType -> TR ()
 addConstraint actual expected = do
-    traceTR $ fsep [text "add constraint:", ppr actual, equals, ppr expected]
+    traceTR (text "add constraint:" <+> fsep [ppr actual, equals, ppr expected])
     recoverTR (traceTR $ fsep [text "Failed to unify", ppr actual,
                                     text "with", ppr expected])
               (congruenceNewtypes actual expected >>=
@@ -630,15 +630,19 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
                                            _   -> return ty)
                                  zterm
                       zonkTerm zterm'
-   traceTR (text "Term reconstruction completed. Term obtained: " <> ppr term)
+   traceTR (text "Term reconstruction completed." $$
+            text "Term obtained: " <> ppr term $$
+            text "Type obtained: " <> ppr (termType term))
    return term
     where 
   go :: Int -> Type -> Type -> HValue -> TcM Term
   go max_depth _ _ _ | seq max_depth False = undefined
   go 0 my_ty _old_ty a = do
+    traceTR (text "Gave up reconstructing a term after" <>
+                  int max_depth <> text " steps")
     clos <- trIO $ getClosureData a
     return (Suspension (tipe clos) my_ty a Nothing)
-  go max_depth my_ty old_ty a = do 
+  go max_depth my_ty old_ty a = do
     let monomorphic = not(isTyVarTy my_ty)   
     -- This ^^^ is a convention. The ancestor tests for
     -- monomorphism and passes a type instead of a tv
@@ -672,7 +676,10 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
 
  -- The interesting case
       Constr -> do
-        traceTR (text "entering a constructor")
+        traceTR (text "entering a constructor " <>
+                      if monomorphic
+                        then parens (text "already monomorphic: " <> ppr my_ty)
+                        else Outputable.empty)
         Right dcname <- dataConInfoPtrToName (infoPtr clos)
         (_,mb_dc)    <- tryTcErrs (tcLookupDataCon dcname)
         case mb_dc of
@@ -689,25 +696,29 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
                        return (Term my_ty (Left ('<' : tag ++ ">")) a subTerms)
           Just dc -> do
             let subTtypes  = matchSubTypes dc old_ty
-                (subTtypesP, subTtypesNP) = partition (isLifted |.| isRefType) subTtypes
             subTermTvs    <- mapMif (not . isMonomorphic)
                                     (\t -> newVar (typeKind t))
                                     subTtypes
-            -- It is vital for newtype reconstruction that the unification step
-            -- is done right here, _before_ the subterms are RTTI reconstructed
-            when (not monomorphic) $ do
+            let (subTermsP, subTermsNP) = partition (\(ty,_) -> isLifted ty
+                                                             || isRefType ty)
+                                                    (zip subTtypes subTermTvs)
+                (subTtypesP,   subTermTvsP ) = unzip subTermsP
+                (subTtypesNP, _subTermTvsNP) = unzip subTermsNP
 
-                       -- When we already have all the information, avoid solving
-                       -- unnecessary constraints. Propagation of type information
-                       -- to subterms is already being done via matching.
+            -- When we already have all the information, avoid solving
+            -- unnecessary constraints. Propagation of type information
+            -- to subterms is already being done via matching.
+            when (not monomorphic) $ do
                let myType = mkFunTys subTermTvs my_ty
                (signatureType,_) <- instScheme (rttiView $ dataConUserType dc)
+            -- It is vital for newtype reconstruction that the unification step
+            -- is done right here, _before_ the subterms are RTTI reconstructed
                addConstraint myType signatureType
             subTermsP <- sequence
                   [ appArr (go (pred max_depth) tv t) (ptrs clos) i
-                   | (i,tv,t) <- zip3 [0..] subTermTvs subTtypesP]
+                   | (i,tv,t) <- zip3 [0..] subTermTvsP subTtypesP]
             let unboxeds   = extractUnboxed subTtypesNP clos
-                subTermsNP = map (uncurry Prim) (zip subTtypesNP unboxeds)      
+                subTermsNP = map (uncurry Prim) (zip subTtypesNP unboxeds)
                 subTerms   = reOrderTerms subTermsP subTermsNP subTtypes
             return (Term my_ty (Right dc) a subTerms)
 -- The otherwise case: can be a Thunk,AP,PAP,etc.
@@ -734,7 +745,7 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
                                         (ppr pointed $$ ppr unpointed))
                     let (t:tt) = pointed in t : reOrderTerms tt unpointed tys
    | otherwise    = ASSERT2(not(null unpointed)
-                           , ptext (sLit "Reorderterms") $$ 
+                           , ptext (sLit "reOrderTerms") $$ 
                                        (ppr pointed $$ ppr unpointed))
                     let (t:tt) = unpointed in t : reOrderTerms pointed tt tys
 
@@ -965,7 +976,7 @@ If that is not the case, then we consider two conditions.
 2. To prevent the class of unsoundness shown by row 6,
    the rtti type should be structurally more
    defined than the old type we are comparing it to.
-  check2 :: OldType -> NewTy            pe -> Bool
+  check2 :: NewType -> OldType -> Bool
   check2 a  _        = True
   check2 [a] a       = True
   check2 [a] (t Int) = False
