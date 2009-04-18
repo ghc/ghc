@@ -1004,17 +1004,6 @@ strict_mark :: { Located HsBang }
 	: '!'				{ L1 HsStrict }
 	| '{-# UNPACK' '#-}' '!'	{ LL HsUnbox }
 
-----------------------
--- Notes for 'ctype'
--- We should probably use 'gentype' rather than 'type' in the LHS of type declarations
--- That would leave the only use of 'type' in 'ctype'; and only one of its occurrences 
--- makes sense there too! So it might make sense to inline type there:
---    ctype : 'forall' tv_bndrs '.' ctype
---          | context '=>' ctype           
---          | ipvar '::' gentype
---          | gentype
--- Which in turn would let us rename gentype to type 
-
 -- A ctype is a for-all type
 ctype	:: { LHsType RdrName }
 	: 'forall' tv_bndrs '.' ctype	{ LL $ mkExplicitHsForAllTy $2 (noLoc []) $4 }
@@ -1022,10 +1011,6 @@ ctype	:: { LHsType RdrName }
 	-- A type of form (context => type) is an *implicit* HsForAllTy
 	| ipvar '::' type		{ LL (HsPredTy (HsIParam (unLoc $1) $3)) }
 	| type  			{ $1 }
-
-type :: { LHsType RdrName }
-	: ipvar '::' gentype		{ LL (HsPredTy (HsIParam (unLoc $1) $3)) }
-	| gentype			{ $1 }
 
 ----------------------
 -- Notes for 'ctypedoc'
@@ -1044,10 +1029,6 @@ ctypedoc :: { LHsType RdrName }
 	-- A type of form (context => type) is an *implicit* HsForAllTy
 	| ipvar '::' type		{ LL (HsPredTy (HsIParam (unLoc $1) $3)) }
 	| typedoc			{ $1 }
-
-typedoc :: { LHsType RdrName }
-	: ipvar '::' gentype		{ LL (HsPredTy (HsIParam (unLoc $1) $3)) }
-	| gentypedoc			{ $1 }
 
 ----------------------
 -- Notes for 'context'
