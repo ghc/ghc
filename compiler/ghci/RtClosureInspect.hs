@@ -46,6 +46,7 @@ import TyCon
 import Name
 import VarEnv
 import Util
+import ListSetOps
 import VarSet
 import TysPrim
 import PrelNames
@@ -710,7 +711,7 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
             -- to subterms is already being done via matching.
             when (not monomorphic) $ do
                let myType = mkFunTys subTermTvs my_ty
-               (signatureType,_) <- instScheme (rttiView $ dataConUserType dc)
+               (signatureType,_) <- instScheme (mydataConType dc)
             -- It is vital for newtype reconstruction that the unification step
             -- is done right here, _before_ the subterms are RTTI reconstructed
                addConstraint myType signatureType
@@ -837,7 +838,7 @@ cvReconstructType hsc_env max_depth old_ty hval = runTR_maybe hsc_env $ do
             -- It is vital for newtype reconstruction that the unification step
             -- is done right here, _before_ the subterms are RTTI reconstructed
             let myType         = mkFunTys subTtypes my_ty
-            (signatureType,_) <- instScheme(rttiView $ dataConUserType dc)
+            (signatureType,_) <- instScheme(mydataConType dc)
             addConstraint myType signatureType
             return $ [ appArr (\e->(t,e)) (ptrs clos) i
                        | (i,t) <- zip [0..] (filter (isLifted |.| isRefType) subTtypes)]
@@ -849,7 +850,7 @@ cvReconstructType hsc_env max_depth old_ty hval = runTR_maybe hsc_env $ do
 -- In particular, we want them to unify with things.
 improveRTTIType :: HscEnv -> RttiType -> RttiType -> IO (Maybe TvSubst)
 improveRTTIType hsc_env _ty rtti_ty = runTR_maybe hsc_env $ do
-    traceTR $ fsep [text "improveRttiType", ppr _ty, ppr rtti_ty]
+    traceTR (text "improveRttiType" <+> fsep [ppr _ty, ppr rtti_ty])
     (ty_tvs,  _, _)   <- tcInstType return ty
     (ty_tvs', _, ty') <- tcInstType (mapM tcInstTyVar) ty
     (_, _, rtti_ty')  <- tcInstType (mapM tcInstTyVar) (sigmaType rtti_ty)
@@ -867,6 +868,24 @@ myDataConInstArgTys :: DataCon -> [Type] -> [Type]
 myDataConInstArgTys dc args
     | null (dataConExTyVars dc) && null (dataConEqTheta dc) = dataConInstArgTys dc args
     | otherwise = dataConRepArgTys dc
+
+mydataConType :: DataCon -> Type
+-- ^ Custom version of DataCon.dataConUserType where we
+--    - remove the equality constraints
+--    - use the representation types for arguments, including dictionaries
+--    - keep the original result type
+mydataConType  dc
+  = mkForAllTys ((univ_tvs `minusList` map fst eq_spec) ++ ex_tvs) $
+    mkFunTys arg_tys $
+    res_ty
+  where univ_tvs   = dataConUnivTyVars dc
+        ex_tvs     = dataConExTyVars dc
+        eq_spec    = dataConEqSpec dc
+        arg_tys    = [case a of
+                        PredTy p -> predTypeRep p
+                        _        -> a
+                     | a <- dataConRepArgTys dc]
+        res_ty     = dataConOrigResTy dc
 
 isRefType :: Type -> Bool
 isRefType ty
@@ -1094,13 +1113,6 @@ zonkTerm = foldTermM TermFoldM{
              }
 
 --------------------------------------------------------------------------------
--- representation types for thetas
-rttiView :: Type -> Type
-rttiView ty | Just ty' <- coreView ty  = rttiView ty'
-rttiView ty
-  | (tvs, theta, tau) <- tcSplitSigmaTy ty
-  =  mkForAllTys tvs (mkFunTys [predTypeRep p | p <- theta, isClassPred p] tau)
-
 -- Restore Class predicates out of a representation type
 dictsView :: Type -> Type
 -- dictsView ty = ty
