@@ -1,2 +1,10 @@
 ()
 test = C 1 32 1.2 1.23 'x' 1 1.2 1.23
+Breakpoint 0 activated at print022.hs:11:0-6
+Stopped at print022.hs:11:0-6
+_result :: t = _
+Stopped at print022.hs:11:6
+_result :: t = _
+x :: t = _
+x = C2 1 32 'a' 3
+x :: T2
