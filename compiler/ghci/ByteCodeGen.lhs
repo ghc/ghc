@@ -17,6 +17,7 @@ import LibFFI
 
 import Outputable
 import Name
+import MkId
 import Id
 import FiniteMap
 import ForeignCall
@@ -454,9 +455,21 @@ schemeE d s p (AnnLet binds (_,body))
 -- best way to calculate the free vars but it seemed like the least
 -- intrusive thing to do
 schemeE d s p exp@(AnnCase {})
-   | Just (_tickInfo, rhs) <- isTickedExp' exp
+   | Just (_tickInfo, _rhs) <- isTickedExp' exp
    = if isUnLiftedType ty
-        then schemeE d s p (snd rhs)
+        then do
+          -- If the result type is unlifted, then we must generate
+          --   let f = \s . case tick# of _ -> e 
+          --   in  f realWorld#
+          -- When we stop at the breakpoint, _result will have an unlifted
+          -- type and hence won't be bound in the environment, but the
+          -- breakpoint will otherwise work fine.
+          id <- newId (mkFunTy realWorldStatePrimTy ty)
+          st <- newId realWorldStatePrimTy
+          let letExp = AnnLet (AnnNonRec id (fvs, AnnLam st (emptyVarSet, exp)))
+                              (emptyVarSet, (AnnApp (emptyVarSet, AnnVar id) 
+                                                    (emptyVarSet, AnnVar realWorldPrimId)))
+          schemeE d s p letExp
         else do
           id <- newId ty
           -- Todo: is emptyVarSet correct on the next line?

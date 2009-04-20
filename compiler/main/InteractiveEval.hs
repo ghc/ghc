@@ -609,18 +609,22 @@ bindLocalsAtBreakpoint hsc_env apStack (Just info) = do
    --    - tidy the type variables
    --    - globalise the Id (Ids are supposed to be Global, apparently).
    --
-   let all_ids | isPointer result_id = result_id : new_ids
-               | otherwise           = new_ids
+   let result_ok = isPointer result_id
+                    && not (isUnboxedTupleType (idType result_id))
+
+       all_ids | result_ok = result_id : new_ids
+               | otherwise = new_ids
        (id_tys, tyvarss) = mapAndUnzip (skolemiseTy.idType) all_ids
        (_,tidy_tys) = tidyOpenTypes emptyTidyEnv id_tys
        new_tyvars = unionVarSets tyvarss             
-   let final_ids = zipWith setIdType all_ids tidy_tys
+       final_ids = zipWith setIdType all_ids tidy_tys
        ictxt0 = hsc_IC hsc_env
        ictxt1 = extendInteractiveContext ictxt0 final_ids new_tyvars
+
    Linker.extendLinkEnv [ (name,hval) | (name, Just hval) <- zip names mb_hValues ]
-   Linker.extendLinkEnv [(result_name, unsafeCoerce# apStack)]
+   when result_ok $ Linker.extendLinkEnv [(result_name, unsafeCoerce# apStack)]
    hsc_env1 <- rttiEnvironment hsc_env{ hsc_IC = ictxt1 }
-   return (hsc_env1, result_name:names, span)
+   return (hsc_env1, if result_ok then result_name:names else names, span)
   where
    mkNewId :: OccName -> Id -> IO Id
    mkNewId occ id = do
