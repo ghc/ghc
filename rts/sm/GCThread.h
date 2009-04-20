@@ -209,10 +209,9 @@ extern gc_thread **gc_threads;
 
 #define SET_GCT(to) gct = (to)
 
-#if defined(sparc_HOST_ARCH) || (defined(i386_HOST_ARCH) && defined(linux_HOST_OS))
-// Don't use REG_base or R1 for gct on SPARC because they're getting clobbered 
-//	by something else. Not sure what yet. -- BL 2009/01/03
 
+
+#if (defined(i386_HOST_ARCH) && defined(linux_HOST_OS))
 // Using __thread is better than stealing a register on x86/Linux, because
 // we have too few registers available.  In my tests it was worth
 // about 5% in GC performance, but of course that might change as gcc
@@ -221,6 +220,22 @@ extern gc_thread **gc_threads;
 extern __thread gc_thread* gct;
 #define DECLARE_GCT __thread gc_thread* gct;
 
+
+#elif defined(sparc_TARGET_ARCH)
+// On SPARC we can't pin gct to a register. Names like %l1 are just offsets
+//	into the register window, which change on each function call.
+//	
+//	There are eight global (non-window) registers, but they're used for other purposes.
+//	%g0     -- always zero
+//	%g1     -- volatile over function calls, used by the linker
+//	%g2-%g3 -- used as scratch regs by the C compiler (caller saves)
+//	%g4	-- volatile over function calls, used by the linker
+//	%g5-%g7	-- reserved by the OS
+
+extern __thread gc_thread* gct;
+#define DECLARE_GCT __thread gc_thread* gct;
+
+
 #elif defined(REG_Base) && !defined(i386_HOST_ARCH)
 // on i386, REG_Base is %ebx which is also used for PIC, so we don't
 // want to steal it
@@ -228,10 +243,12 @@ extern __thread gc_thread* gct;
 GLOBAL_REG_DECL(gc_thread*, gct, REG_Base)
 #define DECLARE_GCT /* nothing */
 
+
 #elif defined(REG_R1)
 
 GLOBAL_REG_DECL(gc_thread*, gct, REG_R1)
 #define DECLARE_GCT /* nothing */
+
 
 #elif defined(__GNUC__)
 
