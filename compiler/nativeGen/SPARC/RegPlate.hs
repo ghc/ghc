@@ -19,6 +19,7 @@ import FastBool
 --	These names are the same as the ones in Regs.hs, but those have
 --	type Reg and not RegNo.
 --
+#ifdef sparc_TARGET_ARCH
 
 #define g0	0
 #define g1	1
@@ -96,7 +97,6 @@ import FastBool
 freeReg :: RegNo -> FastBool
 
 
-#ifdef sparc_REGS
 -- SPARC regs used by the OS / ABI
 -- %g0(r0) is always zero
 freeReg g0	= fastBool False
@@ -135,8 +135,6 @@ freeReg regNo
 	, regNo `mod` 2 /= 0
 	= fastBool False
 --------------------------------------
-#endif
-
 
 
 #ifdef REG_Base
@@ -285,3 +283,13 @@ globalRegMaybe CurrentTSO	   	= Just (RealReg REG_CurrentTSO)
 globalRegMaybe CurrentNursery	   	= Just (RealReg REG_CurrentNursery)
 #endif	    				
 globalRegMaybe _		   	= Nothing
+
+
+#else
+freeReg :: RegNo -> FastBool
+freeReg		= error "SPARC.RegPlate.freeReg: not defined"
+
+globalRegMaybe :: GlobalReg -> Maybe Reg
+globalRegMaybe	= error "SPARC.RegPlate.globalRegMaybe: not defined"
+
+#endif

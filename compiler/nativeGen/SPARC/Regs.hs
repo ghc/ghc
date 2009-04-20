@@ -39,7 +39,7 @@ import RegClass
 import Size
 
 import Cmm
-import PprCmm
+import PprCmm		()
 import CgUtils          ( get_GlobalReg_addr )
 
 import Unique
