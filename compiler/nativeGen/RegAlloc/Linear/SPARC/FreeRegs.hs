@@ -4,6 +4,7 @@ module RegAlloc.Linear.SPARC.FreeRegs
 where
 
 import SPARC.Regs
+import SPARC.RegPlate
 import RegClass
 import Reg
 

@@ -29,6 +29,7 @@ import SPARC.Imm
 import SPARC.AddrMode
 import SPARC.Cond
 import SPARC.Regs
+import SPARC.RegPlate
 import SPARC.Base
 import Instruction
 import RegClass

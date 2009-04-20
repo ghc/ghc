@@ -17,9 +17,7 @@ module SPARC.Regs (
 	fPair,
 
 	-- allocatable
-	freeReg,
 	allocatableRegs,
-	globalRegMaybe,
 	get_GlobalReg_reg_or_addr,
 
 	-- args
@@ -35,11 +33,13 @@ module SPARC.Regs (
 where
 
 
+import SPARC.RegPlate
 import Reg
 import RegClass
 import Size
 
 import Cmm
+import PprCmm
 import CgUtils          ( get_GlobalReg_addr )
 
 import Unique
@@ -142,15 +142,105 @@ fPair (RealReg n)
 fPair (VirtualRegD u)
 	= Just (VirtualRegHi u)
 
-fPair _
-	= trace ("MachInstrs.fPair: can't get high half of supposed double reg ") 
+fPair reg
+	= trace ("MachInstrs.fPair: can't get high half of supposed double reg " ++ showPpr reg)
 		Nothing
 
 
+
+-- allocatableRegs is allMachRegNos with the fixed-use regs removed.
+-- i.e., these are the regs for which we are prepared to allow the
+-- register allocator to attempt to map VRegs to.
+allocatableRegs :: [RegNo]
+allocatableRegs
+   = let isFree i = isFastTrue (freeReg i)
+     in  filter isFree allMachRegNos
+
+
+
+-- We map STG registers onto appropriate CmmExprs.  Either they map
+-- to real machine registers or stored as offsets from BaseReg.  Given
+-- a GlobalReg, get_GlobalReg_reg_or_addr produces either the real
+-- register it is in, on this platform, or a CmmExpr denoting the
+-- address in the register table holding it.
+-- (See also get_GlobalReg_addr in CgUtils.)
+
+get_GlobalReg_reg_or_addr :: GlobalReg -> Either Reg CmmExpr
+get_GlobalReg_reg_or_addr mid
+   = case globalRegMaybe mid of
+        Just rr -> Left rr
+        Nothing -> Right (get_GlobalReg_addr mid)
+
+
+-- | The registers to place arguments for function calls, 
+--	for some number of arguments.
+--
+argRegs :: RegNo -> [Reg]
+argRegs r
+ = case r of
+ 	0	-> []
+	1	-> map (RealReg . oReg) [0]
+	2	-> map (RealReg . oReg) [0,1]
+	3	-> map (RealReg . oReg) [0,1,2]
+	4	-> map (RealReg . oReg) [0,1,2,3]
+	5	-> map (RealReg . oReg) [0,1,2,3,4]
+	6	-> map (RealReg . oReg) [0,1,2,3,4,5]
+	_	-> panic "MachRegs.argRegs(sparc): don't know about >6 arguments!"
+
+
+-- | All all the regs that could possibly be returned by argRegs
+--
+allArgRegs :: [Reg]
+allArgRegs 
+	= map RealReg [oReg i | i <- [0..5]]
+
+
+-- These are the regs that we cannot assume stay alive over a C call.  
+--	TODO: Why can we assume that o6 isn't clobbered? -- BL 2009/02
+--
+callClobberedRegs :: [Reg]
+callClobberedRegs
+	= map RealReg 
+	        (  oReg 7 :
+	          [oReg i | i <- [0..5]] ++
+	          [gReg i | i <- [1..7]] ++
+	          [fReg i | i <- [0..31]] )
+
+
+
+-- | Make a virtual reg with this size.
+mkVReg :: Unique -> Size -> Reg
+mkVReg u size
+	| not (isFloatSize size) 
+	= VirtualRegI u
+
+	| otherwise
+	= case size of
+		FF32    -> VirtualRegF u
+		FF64	-> VirtualRegD u
+		_ 	-> panic "mkVReg"
+
+
+regDotColor :: Reg -> SDoc
+regDotColor reg
+ = case regClass reg of
+ 	RcInteger	-> text "blue"
+	RcFloat		-> text "red"
+	RcDouble	-> text "green"
+
+
+
+
+
+-- Hard coded freeReg / globalRegMaybe -----------------------------------------
+-- This isn't being used at the moment because we're generating
+--	these functions from the information in includes/MachRegs.hs via RegPlate.hs
+	
 -- | Check whether a machine register is free for allocation.
 --	This needs to match the info in includes/MachRegs.h otherwise modules
 --	compiled with the NCG won't be compatible with via-C ones.
 --
+{-
 freeReg :: RegNo -> FastBool
 freeReg regno
  = case regno of
@@ -228,20 +318,13 @@ freeReg regno
 	-- regs not matched above are allocable.
 	_	-> fastBool True
 
-
--- allocatableRegs is allMachRegNos with the fixed-use regs removed.
--- i.e., these are the regs for which we are prepared to allow the
--- register allocator to attempt to map VRegs to.
-allocatableRegs :: [RegNo]
-allocatableRegs
-   = let isFree i = isFastTrue (freeReg i)
-     in  filter isFree allMachRegNos
-
+-}
 
 -- | Returns Just the real register that a global register is stored in.
 --	Returns Nothing if the global has no real register, and is stored
 --	in the in-memory register table instead.
 --
+{-
 globalRegMaybe  :: GlobalReg -> Maybe Reg
 globalRegMaybe gg
  = case gg of
@@ -269,74 +352,4 @@ globalRegMaybe gg
 	BaseReg		-> Just (RealReg 25)	-- %i1
 		
 	_		-> Nothing 	
-
-
--- We map STG registers onto appropriate CmmExprs.  Either they map
--- to real machine registers or stored as offsets from BaseReg.  Given
--- a GlobalReg, get_GlobalReg_reg_or_addr produces either the real
--- register it is in, on this platform, or a CmmExpr denoting the
--- address in the register table holding it.
--- (See also get_GlobalReg_addr in CgUtils.)
-
-get_GlobalReg_reg_or_addr :: GlobalReg -> Either Reg CmmExpr
-get_GlobalReg_reg_or_addr mid
-   = case globalRegMaybe mid of
-        Just rr -> Left rr
-        Nothing -> Right (get_GlobalReg_addr mid)
-
-
--- | The registers to place arguments for function calls, 
---	for some number of arguments.
---
-argRegs :: RegNo -> [Reg]
-argRegs r
- = case r of
- 	0	-> []
-	1	-> map (RealReg . oReg) [0]
-	2	-> map (RealReg . oReg) [0,1]
-	3	-> map (RealReg . oReg) [0,1,2]
-	4	-> map (RealReg . oReg) [0,1,2,3]
-	5	-> map (RealReg . oReg) [0,1,2,3,4]
-	6	-> map (RealReg . oReg) [0,1,2,3,4,5]
-	_	-> panic "MachRegs.argRegs(sparc): don't know about >6 arguments!"
-
-
--- | All all the regs that could possibly be returned by argRegs
---
-allArgRegs :: [Reg]
-allArgRegs 
-	= map RealReg [oReg i | i <- [0..5]]
-
-
--- These are the regs that we cannot assume stay alive over a C call.  
---	TODO: Why can we assume that o6 isn't clobbered? -- BL 2009/02
---
-callClobberedRegs :: [Reg]
-callClobberedRegs
-	= map RealReg 
-	        (  oReg 7 :
-	          [oReg i | i <- [0..5]] ++
-	          [gReg i | i <- [1..7]] ++
-	          [fReg i | i <- [0..31]] )
-
-
-
--- | Make a virtual reg with this size.
-mkVReg :: Unique -> Size -> Reg
-mkVReg u size
-	| not (isFloatSize size) 
-	= VirtualRegI u
-
-	| otherwise
-	= case size of
-		FF32    -> VirtualRegF u
-		FF64	-> VirtualRegD u
-		_ 	-> panic "mkVReg"
-
-
-regDotColor :: Reg -> SDoc
-regDotColor reg
- = case regClass reg of
- 	RcInteger	-> text "blue"
-	RcFloat		-> text "red"
-	RcDouble	-> text "green"
+-}
