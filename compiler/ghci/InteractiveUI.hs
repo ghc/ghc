@@ -335,7 +335,7 @@ interactiveUI srcs maybe_exprs = withTerminalReset $ do
 #endif
 
    -- initial context is just the Prelude
-   prel_mod <- GHC.findModule (GHC.mkModuleName "Prelude") Nothing
+   prel_mod <- GHC.lookupModule (GHC.mkModuleName "Prelude") Nothing
    GHC.setContext [] [prel_mod]
 
    default_editor <- liftIO $ findEditor
@@ -2356,7 +2356,7 @@ mkTickArray ticks
 
 lookupModule :: String -> GHCi Module
 lookupModule modName
-   = GHC.findModule (GHC.mkModuleName modName) Nothing
+   = GHC.lookupModule (GHC.mkModuleName modName) Nothing
 
 -- don't reset the counter back to zero?
 discardActiveBreakPoints :: GHCi ()

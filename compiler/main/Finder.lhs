@@ -10,6 +10,7 @@ module Finder (
     findImportedModule,
     findExactModule,
     findHomeModule,
+    findExposedPackageModule,
     mkHomeModLocation,
     mkHomeModLocation2,
     mkHiOnlyModLocation,

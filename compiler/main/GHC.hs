@@ -89,6 +89,7 @@ module GHC (
 	-- * Interactive evaluation
 	getBindings, getPrintUnqual,
         findModule,
+        lookupModule,
 #ifdef GHCI
 	setContext, getContext,	
 	getNamesInScope,
@@ -2648,23 +2649,58 @@ showRichTokenStream ts = go startLoc ts ""
 -- filesystem and package database to find the corresponding 'Module', 
 -- using the algorithm that is used for an @import@ declaration.
 findModule :: GhcMonad m => ModuleName -> Maybe FastString -> m Module
-findModule mod_name maybe_pkg = withSession $ \hsc_env -> liftIO $ -- XXX
-  let
-        dflags = hsc_dflags hsc_env
-        hpt    = hsc_HPT hsc_env
-        this_pkg = thisPackage dflags
-  in
-  case lookupUFM hpt mod_name of
-    Just mod_info -> return (mi_module (hm_iface mod_info))
-    _not_a_home_module -> do
-	  res <- findImportedModule hsc_env mod_name maybe_pkg
-	  case res of
-	    Found _ m | modulePackageId m /= this_pkg -> return m
-		      | otherwise -> ghcError (CmdLineError (showSDoc $
-					text "module" <+> quotes (ppr (moduleName m)) <+>
-					text "is not loaded"))
-	    err -> let msg = cannotFindModule dflags mod_name err in
-		   ghcError (CmdLineError (showSDoc msg))
+findModule mod_name maybe_pkg = withSession $ \hsc_env -> do
+  let 
+    dflags   = hsc_dflags hsc_env
+    this_pkg = thisPackage dflags
+  --
+  case maybe_pkg of
+    Just pkg | fsToPackageId pkg /= this_pkg && pkg /= fsLit "this" -> liftIO $ do
+      res <- findImportedModule hsc_env mod_name maybe_pkg
+      case res of
+        Found _ m -> return m
+        err       -> noModError dflags noSrcSpan mod_name err
+    _otherwise -> do
+      home <- lookupLoadedHomeModule mod_name
+      case home of
+        Just m  -> return m
+        Nothing -> liftIO $ do
+           res <- findImportedModule hsc_env mod_name maybe_pkg
+           case res of
+             Found loc m | modulePackageId m /= this_pkg -> return m
+                         | otherwise -> modNotLoadedError m loc
+             err -> noModError dflags noSrcSpan mod_name err
+
+modNotLoadedError :: Module -> ModLocation -> IO a
+modNotLoadedError m loc = ghcError $ CmdLineError $ showSDoc $
+   text "module is not loaded:" <+> 
+   quotes (ppr (moduleName m)) <+>
+   parens (text (expectJust "modNotLoadedError" (ml_hs_file loc)))
+
+-- | Like 'findModule', but differs slightly when the module refers to
+-- a source file, and the file has not been loaded via 'load'.  In
+-- this case, 'findModule' will throw an error (module not loaded),
+-- but 'lookupModule' will check to see whether the module can also be
+-- found in a package, and if so, that package 'Module' will be
+-- returned.  If not, the usual module-not-found error will be thrown.
+--
+lookupModule :: GhcMonad m => ModuleName -> Maybe FastString -> m Module
+lookupModule mod_name (Just pkg) = findModule mod_name (Just pkg)
+lookupModule mod_name Nothing = withSession $ \hsc_env -> do
+  home <- lookupLoadedHomeModule mod_name
+  case home of
+    Just m  -> return m
+    Nothing -> liftIO $ do
+      res <- findExposedPackageModule hsc_env mod_name Nothing
+      case res of
+        Found _ m -> return m
+	err       -> noModError (hsc_dflags hsc_env) noSrcSpan mod_name err
+
+lookupLoadedHomeModule  :: GhcMonad m => ModuleName -> m (Maybe Module)
+lookupLoadedHomeModule mod_name = withSession $ \hsc_env ->
+  case lookupUFM (hsc_HPT hsc_env) mod_name of
+    Just mod_info      -> return (Just (mi_module (hm_iface mod_info)))
+    _not_a_home_module -> return Nothing
 
 #ifdef GHCI
 getHistorySpan :: GhcMonad m => History -> m SrcSpan
