@@ -1,3 +1,5 @@
+# DO NOT EDIT!  Instead, create a file mk/validate.mk, whose settings will
+# override these.  See also mk/custom-settings.mk.
 
 WERROR          = -Werror
 
