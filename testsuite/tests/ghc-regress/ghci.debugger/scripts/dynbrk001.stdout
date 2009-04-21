@@ -1,6 +1,4 @@
 Breakpoint 1 does not exist
-Could not find module `NonModule':
-  Use -v to see a list of the files searched for.
 No breakpoints found at that location.
 No active breakpoints.
 [4,8,15,16,23,42]
