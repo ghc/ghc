@@ -123,8 +123,9 @@ lazyGetToks dflags filename handle = do
                   _other    -> do rest <- lazyLexBuf handle state' eof
                                   return (t : rest)
       _ | not eof   -> getMore handle state
-        | otherwise -> return []
-  
+        | otherwise -> return [L (last_loc state) ITeof]
+                         -- parser assumes an ITeof sentinel at the end
+
   getMore :: Handle -> PState -> IO [Located Token]
   getMore handle state = do
      -- pprTrace "getMore" (text (show (buffer state))) (return ())
