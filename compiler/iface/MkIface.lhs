@@ -631,7 +631,8 @@ freeNamesDeclABI (_mod, decl, extras) =
 data IfaceDeclExtras 
   = IfaceIdExtras    Fixity [IfaceRule]
   | IfaceDataExtras  Fixity [IfaceInstABI] [(Fixity,[IfaceRule])]
-  | IfaceClassExtras [IfaceInstABI] [(Fixity,[IfaceRule])]
+  | IfaceClassExtras Fixity [IfaceInstABI] [(Fixity,[IfaceRule])]
+  | IfaceSynExtras   Fixity
   | IfaceOtherDeclExtras
 
 freeNamesDeclExtras :: IfaceDeclExtras -> NameSet
@@ -639,8 +640,10 @@ freeNamesDeclExtras (IfaceIdExtras    _ rules)
   = unionManyNameSets (map freeNamesIfRule rules)
 freeNamesDeclExtras (IfaceDataExtras  _ _insts subs)
   = unionManyNameSets (map freeNamesSub subs)
-freeNamesDeclExtras (IfaceClassExtras _insts subs)
+freeNamesDeclExtras (IfaceClassExtras _ _insts subs)
   = unionManyNameSets (map freeNamesSub subs)
+freeNamesDeclExtras (IfaceSynExtras _)
+  = emptyNameSet
 freeNamesDeclExtras IfaceOtherDeclExtras
   = emptyNameSet
 
@@ -653,10 +656,12 @@ instance Binary IfaceDeclExtras where
    putByte bh 1; put_ bh fix; put_ bh rules
   put_ bh (IfaceDataExtras fix insts cons) = do
    putByte bh 2; put_ bh fix; put_ bh insts; put_ bh cons
-  put_ bh (IfaceClassExtras insts methods) = do
-   putByte bh 3; put_ bh insts; put_ bh methods
+  put_ bh (IfaceClassExtras fix insts methods) = do
+   putByte bh 3; put_ bh fix; put_ bh insts; put_ bh methods
+  put_ bh (IfaceSynExtras fix) = do
+   putByte bh 4; put_ bh fix
   put_ bh IfaceOtherDeclExtras = do
-   putByte bh 4
+   putByte bh 5
 
 declExtras :: (OccName -> Fixity)
            -> OccEnv [IfaceRule]
@@ -673,9 +678,10 @@ declExtras fix_fn rule_env inst_env decl
                         (map IfaceInstABI $ lookupOccEnvL inst_env n)
                         (map (id_extras . ifConOcc) (visibleIfConDecls cons))
       IfaceClass{ifSigs=sigs} -> 
-                     IfaceClassExtras 
+                     IfaceClassExtras (fix_fn n)
                         (map IfaceInstABI $ lookupOccEnvL inst_env n)
                         [id_extras op | IfaceClassOp op _ _ <- sigs]
+      IfaceSyn{} -> IfaceSynExtras (fix_fn n)
       _other -> IfaceOtherDeclExtras
   where
         n = ifName decl
