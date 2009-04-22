@@ -296,6 +296,24 @@ link NoLink _ _ _
    = return Succeeded
 
 link LinkBinary dflags batch_attempt_linking hpt
+   = link' dflags batch_attempt_linking hpt
+
+link LinkDynLib dflags batch_attempt_linking hpt
+   = link' dflags batch_attempt_linking hpt
+
+-- warning suppression
+link other _ _ _ = panicBadLink other
+
+panicBadLink :: GhcLink -> a
+panicBadLink other = panic ("link: GHC not built to link this way: " ++
+                            show other)
+
+link' :: DynFlags                -- dynamic flags
+      -> Bool                    -- attempt linking in batch mode?
+      -> HomePackageTable        -- what to link
+      -> IO SuccessFlag
+
+link' dflags batch_attempt_linking hpt
    | batch_attempt_linking
    = do
         let
@@ -346,13 +364,6 @@ link LinkBinary dflags batch_attempt_linking hpt
    = do debugTraceMsg dflags 3 (text "link(batch): upsweep (partially) failed OR" $$
                                 text "   Main.main not exported; not linking.")
         return Succeeded
-
--- warning suppression
-link other _ _ _ = panicBadLink other
-
-panicBadLink :: GhcLink -> a
-panicBadLink other = panic ("link: GHC not built to link this way: " ++
-                            show other)
 
 
 linkingNeeded :: DynFlags -> [Linkable] -> [PackageId] -> IO Bool
