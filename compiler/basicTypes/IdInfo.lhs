@@ -277,7 +277,6 @@ instance Outputable IdDetails where
 
 pprIdDetails :: IdDetails -> SDoc
 pprIdDetails VanillaId         = empty
-pprIdDetails (RecSelId {})  = ptext (sLit "[RecSel]")
 pprIdDetails (DataConWorkId _) = ptext (sLit "[DataCon]")
 pprIdDetails (DataConWrapId _) = ptext (sLit "[DataConWrapper]")
 pprIdDetails (ClassOpId _)     = ptext (sLit "[ClassOp]")
@@ -285,9 +284,12 @@ pprIdDetails (PrimOpId _)      = ptext (sLit "[PrimOp]")
 pprIdDetails (FCallId _)       = ptext (sLit "[ForeignCall]")
 pprIdDetails (TickBoxOpId _)   = ptext (sLit "[TickBoxOp]")
 pprIdDetails DFunId            = ptext (sLit "[DFunId]")
+pprIdDetails (RecSelId { sel_naughty = is_naughty })
+  = brackets $ ptext (sLit "RecSel") <> pp_naughty
+  where
+    pp_naughty | is_naughty = ptext (sLit "(naughty)")
+	       | otherwise  = empty
 \end{code}
-
-
 
 
 %************************************************************************
