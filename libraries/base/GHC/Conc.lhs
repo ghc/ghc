@@ -1225,7 +1225,18 @@ type HandlerFun = ForeignPtr Word8 -> IO ()
 signal_handlers :: MVar (IOArray Int (Maybe (HandlerFun,Dynamic)))
 signal_handlers = unsafePerformIO $ do
    arr <- newIOArray (0,maxSig) Nothing
-   newMVar arr
+   m <- newMVar arr
+   block $ do
+     stable_ref <- newStablePtr m
+     let ref = castStablePtrToPtr stable_ref
+     ref2 <- getOrSetSignalHandlerStore ref
+     if ref==ref2
+        then return m
+        else do freeStablePtr stable_ref
+                deRefStablePtr (castPtrToStablePtr ref2)
+
+foreign import ccall unsafe "getOrSetSignalHandlerStore"
+    getOrSetSignalHandlerStore :: Ptr a -> IO (Ptr a)
 
 setHandler :: Signal -> Maybe (HandlerFun,Dynamic) -> IO (Maybe (HandlerFun,Dynamic))
 setHandler sig handler = do
