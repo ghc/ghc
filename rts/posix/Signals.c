@@ -95,7 +95,9 @@ setIOManagerPipe (int fd)
 {
     // only called when THREADED_RTS, but unconditionally
     // compiled here because GHC.Conc depends on it.
-    io_manager_pipe = fd;
+    if (io_manager_pipe < 0) {
+        io_manager_pipe = fd;
+    }
 }
 
 #if defined(THREADED_RTS)
