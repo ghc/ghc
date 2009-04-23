@@ -1205,6 +1205,9 @@ checkValidClass cls
 
 \begin{code}
 mkAuxBinds :: [TyThing] -> HsValBinds Name
+-- NB We produce *un-typechecked* bindings, rather like 'deriving'
+--    This makes life easier, because the later type checking will add
+--    all necessary type abstractions and applications
 mkAuxBinds ty_things
   = ValBindsOut [(NonRecursive, b) | b <- binds] sigs
   where
@@ -1213,47 +1216,44 @@ mkAuxBinds ty_things
        	 	     	        | ATyCon tc <- ty_things 
 				, fld <- tyConFields tc ]
 
-
 mkRecSelBind :: (TyCon, FieldLabel) -> (LSig Name, LHsBinds Name)
 mkRecSelBind (tycon, sel_name)
   = (L loc (IdSig sel_id), unitBag (L loc sel_bind))
   where
-    loc = getSrcSpan tycon    
-    sel_id = Var.mkLocalVar rec_details sel_name sel_ty vanillaIdInfo
+    loc    	= getSrcSpan tycon    
+    sel_id 	= Var.mkLocalVar rec_details sel_name sel_ty vanillaIdInfo
     rec_details = RecSelId { sel_tycon = tycon, sel_naughty = is_naughty }
 
     -- Find a representative constructor, con1
-    all_cons = tyConDataCons tycon 
+    all_cons     = tyConDataCons tycon 
     cons_w_field = [ con | con <- all_cons
                    , sel_name `elem` dataConFieldLabels con ] 
     con1 = ASSERT( not (null cons_w_field) ) head cons_w_field
 
     -- Selector type; Note [Polymorphic selectors]
-    field_ty = dataConFieldType con1 sel_name
-    (field_tvs, field_theta, field_tau) 
-       | is_naughty = ([], [], unitTy)
-       | otherwise  = tcSplitSigmaTy field_ty
+    field_ty   = dataConFieldType con1 sel_name
     data_ty    = dataConOrigResTy con1
     data_tvs   = tyVarsOfType data_ty
     is_naughty = not (tyVarsOfType field_ty `subVarSet` data_tvs)  
-    sel_ty = mkForAllTys (varSetElems data_tvs ++ field_tvs) $ 
-    	     mkPhiTy (dataConStupidTheta con1)  $	-- Urgh!
-    	     mkPhiTy field_theta  	 	$	-- Urgh!
-             mkFunTy data_ty field_tau
+    (field_tvs, field_theta, field_tau) = tcSplitSigmaTy field_ty
+    sel_ty | is_naughty = unitTy
+           | otherwise  = mkForAllTys (varSetElems data_tvs ++ field_tvs) $ 
+    	     	          mkPhiTy (dataConStupidTheta con1) $	-- Urgh!
+    	     	          mkPhiTy field_theta               $	-- Urgh!
+             	          mkFunTy data_ty field_tau
 
     -- Make the binding: sel (C2 { fld = x }) = x
     --                   sel (C7 { fld = x }) = x
     --    where cons_w_field = [C2,C7]
-    sel_bind  	 = mkFunBind sel_lname (map mk_match cons_w_field ++ deflt)
+    sel_bind | is_naughty = mkFunBind sel_lname [mkSimpleMatch [] unit_rhs]
+             | otherwise  = mkFunBind sel_lname (map mk_match cons_w_field ++ deflt)
     mk_match con = mkSimpleMatch [L loc (mk_sel_pat con)] 
-                                 (L loc match_body)
+                                 (L loc (HsVar field_var))
     mk_sel_pat con = ConPatIn (L loc (getName con)) (RecCon rec_fields)
     rec_fields = HsRecFields { rec_flds = [rec_field], rec_dotdot = Nothing }
     rec_field  = HsRecField { hsRecFieldId = sel_lname
                             , hsRecFieldArg = nlVarPat field_var
                             , hsRecPun = False }
-    match_body | is_naughty = ExplicitTuple [] Boxed
-    	       | otherwise  = HsVar field_var
     sel_lname = L loc sel_name
     field_var = mkInternalName (mkBuiltinUnique 1) (getOccName sel_name) loc
 
@@ -1264,6 +1264,8 @@ mkRecSelBind (tycon, sel_name)
 	  | otherwise = [mkSimpleMatch [nlWildPat] 
 	    	      	    (nlHsApp (nlHsVar (getName rEC_SEL_ERROR_ID))
     	      		    	     (nlHsLit msg_lit))]
+
+    unit_rhs = L loc $ ExplicitTuple [] Boxed
     msg_lit = HsStringPrim $ mkFastString $ 
               occNameString (getOccName sel_name)
 
@@ -1300,8 +1302,11 @@ Hence the sel_naughty flag, to identify record selectors that don't really exist
 In general, a field is naughty if its type mentions a type variable that
 isn't in the result type of the constructor.
 
-We make a dummy binding for naughty selectors, so that they can be treated
-uniformly, apart from their sel_naughty field.  The function is never called.
+We make a dummy binding 
+   sel = ()
+for naughty selectors, so that the later type-check will add them to the
+environment, and they'll be exported.  The function is never called, because
+the tyepchecker spots the sel_naughty field.
 
 Note [GADT record selectors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
