@@ -50,7 +50,8 @@ char *EventDesc[] = {
   "Request sequential GC",
   "Request parallel GC",
   "Create spark",
-  "Spark to thread"
+  "Spark to thread", /* DEPRECATED! */
+  "Create spark thread"
 };
 
 // Event type. 
@@ -106,13 +107,13 @@ static inline void postWord64(EventsBuf *eb, StgWord64 i)
 static inline void postEventTypeNum(EventsBuf *eb, EventTypeNum etNum)
 { postWord16(eb, etNum); }
 
-static inline void postTimestamp(EventsBuf *eb, Timestamp t)
+static inline void postTimestamp(EventsBuf *eb, EventTimestamp t)
 { postWord64(eb,t); }
 
-static inline void postThreadID(EventsBuf *eb, ThreadID id)
+static inline void postThreadID(EventsBuf *eb, EventThreadID id)
 { postWord32(eb,id); }
 
-static inline void postCapNo(EventsBuf *eb, CapNo no)
+static inline void postCapNo(EventsBuf *eb, EventCapNo no)
 { postWord16(eb,no); }
 
 static inline void postInt8(EventsBuf *eb, StgInt8 i)
@@ -183,24 +184,20 @@ initEventLogging(void)
         case EVENT_THREAD_RUNNABLE: // (cap, thread)
         case EVENT_CREATE_SPARK:    // (cap, thread)
         case EVENT_RUN_SPARK:       // (cap, thread)
-            eventTypes[t].size = sizeof(CapNo) + sizeof(ThreadID);
-            break;
-
-        case EVENT_SPARK_TO_THREAD: // (cap, thread, spark_thread)
-            eventTypes[t].size = 
-                sizeof(CapNo) + sizeof(ThreadID) + sizeof(ThreadID);
+        case EVENT_CREATE_SPARK_THREAD: // (cap, spark_thread)
+            eventTypes[t].size = sizeof(EventCapNo) + sizeof(EventThreadID);
             break;
 
         case EVENT_MIGRATE_THREAD:  // (cap, thread, new_cap)
         case EVENT_STEAL_SPARK:     // (cap, thread, victim_cap)
         case EVENT_THREAD_WAKEUP:   // (cap, thread, other_cap)
             eventTypes[t].size =
-                sizeof(CapNo) + sizeof(ThreadID) + sizeof(CapNo);
+                sizeof(EventCapNo) + sizeof(EventThreadID) + sizeof(EventCapNo);
             break;
 
         case EVENT_STOP_THREAD:     // (cap, thread, status)
             eventTypes[t].size =
-                sizeof(CapNo) + sizeof(ThreadID) + sizeof(StgWord16);
+                sizeof(EventCapNo) + sizeof(EventThreadID) + sizeof(StgWord16);
             break;
 
         case EVENT_SHUTDOWN:        // (cap)
@@ -208,7 +205,7 @@ initEventLogging(void)
         case EVENT_REQUEST_PAR_GC:  // (cap)
         case EVENT_GC_START:        // (cap)
         case EVENT_GC_END:          // (cap)
-            eventTypes[t].size = sizeof(CapNo);
+            eventTypes[t].size = sizeof(EventCapNo);
             break;
         }
 
@@ -315,9 +312,8 @@ postEvent_(Capability *cap, EventTypeNum tag, StgThreadID thread, StgWord64 othe
         break;
     }
 
-    case EVENT_SPARK_TO_THREAD: // (cap, thread, spark_thread)
+    case EVENT_CREATE_SPARK_THREAD: // (cap, spark_thread)
     {
-        postThreadID(eb,thread);
         postThreadID(eb,other /* spark_thread */);
         break;
     }
@@ -445,7 +441,7 @@ StgBool hasRoomForEvent(EventsBuf *eb, EventTypeNum eNum)
 {
   nat size = 0;
 
-  size += sizeof(EventTypeNum) + sizeof(Timestamp) + eventTypes[eNum].size;
+  size += sizeof(EventTypeNum) + sizeof(EventTimestamp) + eventTypes[eNum].size;
 
   if (eb->pos + size > eb->begin + eb->size) {
       return 0; // Not enough space.

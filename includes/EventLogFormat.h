@@ -96,23 +96,24 @@
 /*
  * Types of event
  */
-#define EVENT_CREATE_THREAD    0 /* (cap, thread)               */
-#define EVENT_RUN_THREAD       1 /* (cap, thread)               */
-#define EVENT_STOP_THREAD      2 /* (cap, thread, status)       */
-#define EVENT_THREAD_RUNNABLE  3 /* (cap, thread)               */
-#define EVENT_MIGRATE_THREAD   4 /* (cap, thread, new_cap)      */
-#define EVENT_RUN_SPARK        5 /* (cap, thread)               */
-#define EVENT_STEAL_SPARK      6 /* (cap, thread, victim_cap)   */
-#define EVENT_SHUTDOWN         7 /* (cap)                       */
-#define EVENT_THREAD_WAKEUP    8 /* (cap, thread, other_cap)    */
-#define EVENT_GC_START         9 /* (cap)                       */
-#define EVENT_GC_END          10 /* (cap)                       */
-#define EVENT_REQUEST_SEQ_GC  11 /* (cap)                       */
-#define EVENT_REQUEST_PAR_GC  12 /* (cap)                       */
-#define EVENT_CREATE_SPARK    13 /* (cap, thread)               */
-#define EVENT_SPARK_TO_THREAD 14 /* (cap, thread, spark_thread) */
+#define EVENT_CREATE_THREAD        0 /* (cap, thread)               */
+#define EVENT_RUN_THREAD           1 /* (cap, thread)               */
+#define EVENT_STOP_THREAD          2 /* (cap, thread, status)       */
+#define EVENT_THREAD_RUNNABLE      3 /* (cap, thread)               */
+#define EVENT_MIGRATE_THREAD       4 /* (cap, thread, new_cap)      */
+#define EVENT_RUN_SPARK            5 /* (cap, thread)               */
+#define EVENT_STEAL_SPARK          6 /* (cap, thread, victim_cap)   */
+#define EVENT_SHUTDOWN             7 /* (cap)                       */
+#define EVENT_THREAD_WAKEUP        8 /* (cap, thread, other_cap)    */
+#define EVENT_GC_START             9 /* (cap)                       */
+#define EVENT_GC_END              10 /* (cap)                       */
+#define EVENT_REQUEST_SEQ_GC      11 /* (cap)                       */
+#define EVENT_REQUEST_PAR_GC      12 /* (cap)                       */
+#define EVENT_CREATE_SPARK        13 /* (cap, thread)               */
+#define EVENT_SPARK_TO_THREAD     14 /* DEPRECATED! (cap, thread, spark_thread) */
+#define EVENT_CREATE_SPARK_THREAD 15 /* (cap, thread, spark_thread) */
 
-#define NUM_EVENT_TAGS        15 
+#define NUM_EVENT_TAGS        16 
 
 /*
  * Status values for EVENT_STOP_THREAD
@@ -130,8 +131,8 @@
 #ifndef EVENTLOG_CONSTANTS_ONLY
 
 typedef StgWord16 EventTypeNum;
-typedef StgWord64 Timestamp; // in nanoseconds
-typedef StgThreadID ThreadID;
-typedef StgWord16 CapNo;
+typedef StgWord64 EventTimestamp; // in nanoseconds
+typedef StgWord64 EventThreadID;
+typedef StgWord16 EventCapNo;
 
 #endif
