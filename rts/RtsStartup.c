@@ -30,7 +30,7 @@
 #include "ThreadLabels.h"
 #include "BlockAlloc.h"
 #include "Trace.h"
-#include "RtsTypeable.h"
+#include "RtsGlobals.h"
 #include "Stable.h"
 #include "Hpc.h"
 #include "FileLock.h"
@@ -243,7 +243,7 @@ hs_init(int *argc, char **argv[])
     getStablePtr((StgPtr)blockedIndefinitely_closure);
 
     /* initialise the shared Typeable store */
-    initTypeableStore();
+    initGlobalStore();
 
     /* initialise file locking, if necessary */
 #if !defined(mingw32_HOST_OS)    
@@ -488,7 +488,7 @@ hs_exit_(rtsBool wait_foreign)
     freeScheduler();
 
     /* free shared Typeable store */
-    exitTypeableStore();
+    exitGlobalStore();
 
     /* free file locking tables, if necessary */
 #if !defined(mingw32_HOST_OS)    

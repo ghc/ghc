@@ -26,7 +26,7 @@
 #include "RtsUtils.h"
 #include "Schedule.h"
 #include "Sparks.h"
-#include "RtsTypeable.h"
+#include "RtsGlobals.h"
 #include "Timer.h"
 #include "Trace.h"
 
@@ -639,6 +639,7 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(freeHaskellFunctionPtr)		\
       SymI_HasProto(freeStablePtr)		        \
       SymI_HasProto(getOrSetTypeableStore)		\
+      SymI_HasProto(getOrSetSignalHandlerStore)		\
       SymI_HasProto(gcdIntegerzh_fast)			\
       SymI_HasProto(gcdIntegerIntzh_fast)		\
       SymI_HasProto(gcdIntzh_fast)			\
