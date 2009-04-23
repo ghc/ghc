@@ -1069,6 +1069,9 @@ lookupFun orig id_name
 	    	-- nor does it need the 'lifting' treatment
 
     	    ATcId { tct_id = id, tct_type = ty, tct_co = mb_co, tct_level = lvl }
+	    	| isNaughtyRecordSelector id -> failWithTc (naughtyRecordSel id)
+		  			  -- Note [Local record selectors]
+		| otherwise
 		-> do { thLocalId orig id ty lvl
 		      ; case mb_co of
 			  Unrefineable    -> return (HsVar id, ty)
@@ -1146,6 +1149,12 @@ thBrackId orig id ps_var lie_var
 	; return id } }
 #endif /* GHCI */
 \end{code}
+
+Local record selectors
+~~~~~~~~~~~~~~~~~~~~~~
+Record selectors for TyCons in this module are ordinary local bindings,
+which show up as ATcIds rather than AGlobals.  So we need to check for
+naughtiness in both branches.  c.f. TcTyClsBindings.mkAuxBinds.
 
 
 %************************************************************************
