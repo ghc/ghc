@@ -19,5 +19,5 @@ main = putStr (case len4_twice of
 	    _  -> "oops\n")
   where
     list4	= mk 4#
-    len4	= clen list4
-    len4_twice	= len4 +# len4
+    !len4	= clen list4
+    !len4_twice	= len4 +# len4

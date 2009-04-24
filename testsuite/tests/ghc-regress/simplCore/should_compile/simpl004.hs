@@ -8,7 +8,7 @@ import GHC.Exts
 
 f ixs@(_, ix_end) frozen# =
  let
-  n# = 
+  !n# =
    case (
 	 if null (range ixs)
 	  then 0

@@ -5,4 +5,4 @@
 module Bug where
 import GHC.Base
 
-foo v = let I# x# = 7 * 7 in "Forty-Two"
+foo v = let !(I# x#) = 7 * 7 in "Forty-Two"

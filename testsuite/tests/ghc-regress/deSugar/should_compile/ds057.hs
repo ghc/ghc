@@ -10,4 +10,4 @@ f# a# = (# '\0'#, a#  #)
 
 g :: Int -> (Char, Int)
 g (I# a#) = ( C# c#, I# b# )
-  where (# c#, b# #) = f# a#
+  where !(# c#, b# #) = f# a#
