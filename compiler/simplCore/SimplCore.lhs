@@ -27,10 +27,7 @@ import Rules		( RuleBase, emptyRuleBase, mkRuleBase, unionRuleBase,
 			  addSpecInfo, addIdSpecialisations )
 import PprCore		( pprCoreBindings, pprCoreExpr, pprRules )
 import OccurAnal	( occurAnalysePgm, occurAnalyseExpr )
-import IdInfo		( setNewStrictnessInfo, newStrictnessInfo, 
-			  setWorkerInfo, workerInfo, setSpecInfoHead,
-			  setInlinePragInfo, inlinePragInfo,
-			  setSpecInfo, specInfo, specInfoRules )
+import IdInfo
 import CoreUtils	( coreBindsSize )
 import Simplify		( simplTopBinds, simplExpr )
 import SimplEnv		( SimplEnv, simplBinders, mkSimplEnv, setInScopeSet )
@@ -45,7 +42,7 @@ import Id
 import DataCon
 import TyCon		( tyConDataCons )
 import Class		( classSelIds )
-import BasicTypes       ( CompilerPhase, isActive )
+import BasicTypes       ( CompilerPhase, isActive, isDefaultInlinePragma )
 import VarSet
 import VarEnv
 import NameEnv		( lookupNameEnv )
@@ -639,22 +636,20 @@ save a gratuitous jump (from \tr{x_exported} to \tr{x_local}), and
 makes strictness information propagate better.  This used to happen in
 the final phase, but it's tidier to do it here.
 
+Note [Transferring IdInfo]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+We want to propagage any useful IdInfo on x_local to x_exported.
+
 STRICTNESS: if we have done strictness analysis, we want the strictness info on
 x_local to transfer to x_exported.  Hence the copyIdInfo call.
 
 RULES: we want to *add* any RULES for x_local to x_exported.
 
-Note [Rules and indirection-zapping]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Problem: what if x_exported has a RULE that mentions something in ...bindings...?
-Then the things mentioned can be out of scope!  Solution
- a) Make sure that in this pass the usage-info from x_exported is 
-	available for ...bindings...
- b) If there are any such RULES, rec-ify the entire top-level. 
-    It'll get sorted out next time round
 
-Messing up the rules
-~~~~~~~~~~~~~~~~~~~~
+Note [Messing up the exported Id's IdInfo]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We must be careful about discarding the IdInfo on the old Id
+
 The example that went bad on me at one stage was this one:
 	
     iterate :: (a -> a) -> a -> [a]
@@ -688,13 +683,28 @@ And now we get an infinite loop in the rule system
 		    -> iterateFB (:) f x
 		    -> iterate f x
 
-Tiresome old solution: 
-	don't do shorting out if f has rewrite rules (see shortableIdInfo)
-
-New solution (I think): 
+Old "solution": 
 	use rule switching-off pragmas to get rid 
 	of iterateList in the first place
 
+But in principle the user *might* want rules that only apply to the Id
+he says.  And inline pragmas are similar
+   {-# NOINLINE f #-}
+   f = local
+   local = <stuff>
+Then we do not want to get rid of the NOINLINE.
+
+Hence hasShortableIdinfo.
+
+
+Note [Rules and indirection-zapping]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Problem: what if x_exported has a RULE that mentions something in ...bindings...?
+Then the things mentioned can be out of scope!  Solution
+ a) Make sure that in this pass the usage-info from x_exported is 
+	available for ...bindings...
+ b) If there are any such RULES, rec-ify the entire top-level. 
+    It'll get sorted out next time round
 
 Other remarks
 ~~~~~~~~~~~~~
@@ -765,6 +775,7 @@ makeIndEnv binds
     add_pair (exported_id, rhs) env
 	= env
 			
+-----------------
 shortMeOut ind_env exported_id local_id
 -- The if-then-else stuff is just so I can get a pprTrace to see
 -- how often I don't get shorting out becuase of IdInfo stuff
@@ -779,23 +790,27 @@ shortMeOut ind_env exported_id local_id
    
        not (local_id `elemVarEnv` ind_env)	-- Only if not already substituted for
     then
-	True
-
-{- No longer needed
-	if isEmptySpecInfo (specInfo (idInfo exported_id)) 	-- Only if no rules
-	then True	-- See note on "Messing up rules"
-	else 
-#ifdef DEBUG 
-          pprTrace "shortMeOut:" (ppr exported_id)
-#endif
-                                                False
--}
+	if hasShortableIdInfo exported_id
+	then True	-- See Note [Messing up the exported Id's IdInfo]
+	else WARN( True, ptext (sLit "Not shorting out:") <+> ppr exported_id )
+             False
     else
-	False
+        False
 
+-----------------
+hasShortableIdInfo :: Id -> Bool
+-- True if there is no user-attached IdInfo on exported_id,
+-- so we can safely discard it
+-- See Note [Messing up the exported Id's IdInfo]
+hasShortableIdInfo id
+  =  isEmptySpecInfo (specInfo info)
+  && isDefaultInlinePragma (inlinePragInfo info)
+  where
+     info = idInfo id
 
 -----------------
 transferIdInfo :: Id -> Id -> Id
+-- See Note [Transferring IdInfo]
 -- If we have
 --	lcl_id = e; exp_id = lcl_id
 -- and lcl_id has useful IdInfo, we don't want to discard it by going
