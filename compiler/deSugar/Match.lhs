@@ -519,6 +519,21 @@ tidy1 _ (LitPat lit)
 tidy1 _ (NPat lit mb_neg eq)
   = return (idDsWrapper, tidyNPat lit mb_neg eq)
 
+-- BangPatterns: Pattern matching is already strict in constructors,
+-- tuples etc, so the last case strips off the bang for thoses patterns.
+tidy1 v (BangPat (L _ (LazyPat p)))       = tidy1 v (BangPat p)
+tidy1 v (BangPat (L _ (ParPat p)))        = tidy1 v (BangPat p)
+tidy1 _ p@(BangPat (L _(VarPat _)))       = return (idDsWrapper, p)
+tidy1 _ p@(BangPat (L _(VarPatOut _ _)))  = return (idDsWrapper, p)
+tidy1 _ p@(BangPat (L _ (WildPat _)))     = return (idDsWrapper, p)
+tidy1 _ p@(BangPat (L _ (CoPat _ _ _)))   = return (idDsWrapper, p)
+tidy1 _ p@(BangPat (L _ (SigPatIn _ _)))  = return (idDsWrapper, p)
+tidy1 _ p@(BangPat (L _ (SigPatOut _ _))) = return (idDsWrapper, p)
+tidy1 v (BangPat (L _ (AsPat (L _ var) pat)))
+  = do	{ (wrap, pat') <- tidy1 v (BangPat pat)
+        ; return (wrapBind var v . wrap, pat') }
+tidy1 v (BangPat (L _ p))                   = tidy1 v p
+
 -- Everything else goes through unchanged...
 
 tidy1 _ non_interesting_pat
