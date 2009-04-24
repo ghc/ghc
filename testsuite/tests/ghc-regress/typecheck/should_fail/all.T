@@ -198,6 +198,9 @@ test('tcfail199', normal, compile_fail, [''])
 test('tcfail200', normal, compile_fail, [''])
 test('tcfail201', normal, compile_fail, [''])
 test('tcfail202', normal, compile_fail, [''])
+# -Werror is a temporary hack. Once GHC makes this an error, rather
+# than a warning, we won't need it.
+test('tcfail203', normal, compile_fail, ['-Werror'])
 
 test('T1899', normal, compile_fail, [''])
 test('T2126', normal, compile_fail, [''])
