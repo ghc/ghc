@@ -48,3 +48,6 @@ fail8 = 'a'
 fail9 = 'a'
     where (# b, !x #) = (# True, 5# #)
 
+fail10 = 'a'
+    where !(b, ~(c, (I# x))) = (True, (False, 5))
+

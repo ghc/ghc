@@ -71,6 +71,9 @@ tcfail203.hs:49:10:
               where
                   (# b, !x #) = (# True, 5# #)
 
-<no location info>: 
-Failing due to -Werror.
+tcfail203.hs:52:15:
+    A lazy (~) pattern cannot contain unlifted types ~(c, (I# x))
+    In the pattern: ~(c, (I# x))
+    In the pattern: (b, ~(c, (I# x)))
+    In the pattern: !(b, ~(c, (I# x)))
 
