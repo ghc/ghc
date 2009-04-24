@@ -200,8 +200,9 @@ But it hardly seems worth it, so I don't bother.
 -- | Wraps the given expression in an inlining hint unless the expression
 -- is trivial in some sense, so that doing so would usually hurt us
 mkInlineMe :: CoreExpr -> CoreExpr
-mkInlineMe (Var v) = Var v
-mkInlineMe e	   = Note InlineMe e
+mkInlineMe e@(Var _)           = e
+mkInlineMe e@(Note InlineMe _) = e
+mkInlineMe e	               = Note InlineMe e
 \end{code}
 
 \begin{code}
