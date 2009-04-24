@@ -579,7 +579,7 @@ instance Integral Word32 where
         | i# >=# 0#                 = smallInteger i#
         | otherwise                 = wordToInteger x#
         where
-        i# = word2Int# x#
+        !i# = word2Int# x#
 #else
                                     = smallInteger (word2Int# x#)
 #endif
@@ -730,7 +730,7 @@ instance Bits Word64 where
         | otherwise  = W64# ((x# `uncheckedShiftL64#` i'#) `or64#`
                              (x# `uncheckedShiftRL64#` (64# -# i'#)))
         where
-        i'# = word2Int# (int2Word# i# `and#` int2Word# 63#)
+        !i'# = word2Int# (int2Word# i# `and#` int2Word# 63#)
     bitSize  _                = 64
     isSigned _                = False
 
