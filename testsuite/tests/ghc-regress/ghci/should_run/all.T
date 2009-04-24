@@ -1,9 +1,11 @@
 # We only want to run these tests with GHCi
-def f( opts ):
+def just_ghci( opts ):
   opts.only_ways = ['ghci']
-setTestOpts(f)
 
-test('ghci001', normal, compile_and_run, [''])
-test('ghci002', normal, compile_and_run, [''])
-test('ghci003', normal, compile_and_run, [''])
-test('2589', normal, compile_and_run, [''])
+test('ghci001', just_ghci, compile_and_run, [''])
+test('ghci002', just_ghci, compile_and_run, [''])
+test('ghci003', just_ghci, compile_and_run, [''])
+test('2589',    just_ghci, compile_and_run, [''])
+
+test('3171', if_platform('i386_unknown_mingw32',skip), run_command,
+     ['$MAKE -s --no-print-directory 3171'])
