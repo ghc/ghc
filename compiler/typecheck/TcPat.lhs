@@ -367,6 +367,10 @@ tc_pat pstate lpat@(LazyPat pat) pat_ty thing_inside
 	-- Check no existentials
 	; unless (null pat_tvs) $ lazyPatErr lpat pat_tvs
 
+	-- Check there are no unlifted types under the lazy pattern
+	; when (any (isUnLiftedType . idType) $ collectPatBinders pat') $
+               lazyUnliftedPatErr lpat
+
 	-- Check that the pattern has a lifted type
 	; pat_tv <- newBoxyTyVar liftedTypeKind
 	; boxyUnify pat_ty (mkTyVarTy pat_tv)
@@ -1038,6 +1042,12 @@ lazyPatErr _ tvs
   = failWithTc $
     hang (ptext (sLit "A lazy (~) pattern cannot match existential or GADT data constructors"))
        2 (vcat (map pprSkolTvBinding tvs))
+
+lazyUnliftedPatErr :: OutputableBndr name => Pat name -> TcM ()
+lazyUnliftedPatErr pat
+  = failWithTc $
+    hang (ptext (sLit "A lazy (~) pattern cannot contain unlifted types"))
+       2 (ppr pat)
 
 nonRigidMatch :: PatCtxt -> DataCon -> SDoc
 nonRigidMatch ctxt con
