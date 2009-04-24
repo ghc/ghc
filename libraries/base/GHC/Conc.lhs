@@ -351,8 +351,8 @@ Other applications like the graphical Concurrent Haskell Debugger
 
 labelThread :: ThreadId -> String -> IO ()
 labelThread (ThreadId t) str = IO $ \ s ->
-   let ps  = packCString# str
-       adr = byteArrayContents# ps in
+   let !ps  = packCString# str
+       !adr = byteArrayContents# ps in
      case (labelThread# t adr s) of s1 -> (# s1, () #)
 
 --      Nota Bene: 'pseq' used to be 'seq'

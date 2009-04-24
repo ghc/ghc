@@ -138,7 +138,7 @@ hGetChar handle =
         hGetcBuffered fd ref new_buf
     NoBuffering -> do
         -- make use of the minimal buffer we already have
-        let raw = bufBuf buf
+        let !raw = bufBuf buf
         r <- readRawBuffer "hGetChar" fd (haIsStream handle_) raw 0 1
         if r == 0
            then ioe_EOF
@@ -358,7 +358,7 @@ lazyRead' h handle_ = do
   case haBufferMode handle_ of
      NoBuffering      -> do
         -- make use of the minimal buffer we already have
-        let raw = bufBuf buf
+        let !raw = bufBuf buf
         r <- readRawBuffer "lazyRead" fd (haIsStream handle_) raw 0 1
         if r == 0
            then do (handle_', _) <- hClose_help handle_ 

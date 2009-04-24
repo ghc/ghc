@@ -753,7 +753,7 @@ x# `modInt#` y#
       (x# <# 0#) && (y# ># 0#)    = if r# /=# 0# then r# +# y# else 0#
     | otherwise                   = r#
     where
-    r# = x# `remInt#` y#
+    !r# = x# `remInt#` y#
 \end{code}
 
 Definitions of the boxed PrimOps; these will be
@@ -801,8 +801,8 @@ gcdInt (I# a) (I# b) = g a b
 
          absInt x = if x <# 0# then negateInt# x else x
 
-         absA     = absInt a
-         absB     = absInt b
+         !absA     = absInt a
+         !absB     = absInt b
 
 negateInt :: Int -> Int
 negateInt (I# x) = I# (negateInt# x)
@@ -935,7 +935,7 @@ unpackCString# addr
       | ch `eqChar#` '\0'# = []
       | otherwise          = C# ch : unpack (nh +# 1#)
       where
-        ch = indexCharOffAddr# addr nh
+        !ch = indexCharOffAddr# addr nh
 
 unpackAppendCString# :: Addr# -> [Char] -> [Char]
 {-# NOINLINE unpackAppendCString# #-}
@@ -947,7 +947,7 @@ unpackAppendCString# addr rest
       | ch `eqChar#` '\0'# = rest
       | otherwise          = C# ch : unpack (nh +# 1#)
       where
-        ch = indexCharOffAddr# addr nh
+        !ch = indexCharOffAddr# addr nh
 
 unpackFoldrCString# :: Addr# -> (Char  -> a -> a) -> a -> a 
 {-# NOINLINE [0] unpackFoldrCString# #-}
@@ -965,7 +965,7 @@ unpackFoldrCString# addr f z
       | ch `eqChar#` '\0'# = z
       | otherwise          = C# ch `f` unpack (nh +# 1#)
       where
-        ch = indexCharOffAddr# addr nh
+        !ch = indexCharOffAddr# addr nh
 
 unpackCStringUtf8# :: Addr# -> [Char]
 unpackCStringUtf8# addr 
@@ -990,7 +990,7 @@ unpackCStringUtf8# addr
                      (ord# (indexCharOffAddr# addr (nh +# 3#)) -# 0x80#))) :
           unpack (nh +# 4#)
       where
-        ch = indexCharOffAddr# addr nh
+        !ch = indexCharOffAddr# addr nh
 
 unpackNBytes# :: Addr# -> Int# -> [Char]
 unpackNBytes# _addr 0#   = []

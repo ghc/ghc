@@ -138,7 +138,7 @@ instance Integral Word where
         | i# >=# 0#             = smallInteger i#
         | otherwise             = wordToInteger x#
         where
-        i# = word2Int# x#
+        !i# = word2Int# x#
 
 instance Bounded Word where
     minBound = 0
@@ -167,7 +167,8 @@ instance Bits Word where
     (W# x#) .&.   (W# y#)    = W# (x# `and#` y#)
     (W# x#) .|.   (W# y#)    = W# (x# `or#`  y#)
     (W# x#) `xor` (W# y#)    = W# (x# `xor#` y#)
-    complement (W# x#)       = W# (x# `xor#` mb#) where W# mb# = maxBound
+    complement (W# x#)       = W# (x# `xor#` mb#)
+        where !(W# mb#) = maxBound
     (W# x#) `shift` (I# i#)
         | i# >=# 0#          = W# (x# `shiftL#` i#)
         | otherwise          = W# (x# `shiftRL#` negateInt# i#)
@@ -175,8 +176,8 @@ instance Bits Word where
         | i'# ==# 0# = W# x#
         | otherwise  = W# ((x# `uncheckedShiftL#` i'#) `or#` (x# `uncheckedShiftRL#` (wsib -# i'#)))
         where
-        i'# = word2Int# (int2Word# i# `and#` int2Word# (wsib -# 1#))
-        wsib = WORD_SIZE_IN_BITS#  {- work around preprocessor problem (??) -}
+        !i'# = word2Int# (int2Word# i# `and#` int2Word# (wsib -# 1#))
+        !wsib = WORD_SIZE_IN_BITS#  {- work around preprocessor problem (??) -}
     bitSize  _               = WORD_SIZE_IN_BITS
     isSigned _               = False
 
@@ -270,7 +271,8 @@ instance Bits Word8 where
     (W8# x#) .&.   (W8# y#)   = W8# (x# `and#` y#)
     (W8# x#) .|.   (W8# y#)   = W8# (x# `or#`  y#)
     (W8# x#) `xor` (W8# y#)   = W8# (x# `xor#` y#)
-    complement (W8# x#)       = W8# (x# `xor#` mb#) where W8# mb# = maxBound
+    complement (W8# x#)       = W8# (x# `xor#` mb#)
+        where !(W8# mb#) = maxBound
     (W8# x#) `shift` (I# i#)
         | i# >=# 0#           = W8# (narrow8Word# (x# `shiftL#` i#))
         | otherwise           = W8# (x# `shiftRL#` negateInt# i#)
@@ -279,7 +281,7 @@ instance Bits Word8 where
         | otherwise  = W8# (narrow8Word# ((x# `uncheckedShiftL#` i'#) `or#`
                                           (x# `uncheckedShiftRL#` (8# -# i'#))))
         where
-        i'# = word2Int# (int2Word# i# `and#` int2Word# 7#)
+        !i'# = word2Int# (int2Word# i# `and#` int2Word# 7#)
     bitSize  _                = 8
     isSigned _                = False
 
@@ -374,7 +376,8 @@ instance Bits Word16 where
     (W16# x#) .&.   (W16# y#)  = W16# (x# `and#` y#)
     (W16# x#) .|.   (W16# y#)  = W16# (x# `or#`  y#)
     (W16# x#) `xor` (W16# y#)  = W16# (x# `xor#` y#)
-    complement (W16# x#)       = W16# (x# `xor#` mb#) where W16# mb# = maxBound
+    complement (W16# x#)       = W16# (x# `xor#` mb#)
+        where !(W16# mb#) = maxBound
     (W16# x#) `shift` (I# i#)
         | i# >=# 0#            = W16# (narrow16Word# (x# `shiftL#` i#))
         | otherwise            = W16# (x# `shiftRL#` negateInt# i#)
@@ -383,7 +386,7 @@ instance Bits Word16 where
         | otherwise  = W16# (narrow16Word# ((x# `uncheckedShiftL#` i'#) `or#`
                                             (x# `uncheckedShiftRL#` (16# -# i'#))))
         where
-        i'# = word2Int# (int2Word# i# `and#` int2Word# 15#)
+        !i'# = word2Int# (int2Word# i# `and#` int2Word# 15#)
     bitSize  _                = 16
     isSigned _                = False
 
@@ -587,7 +590,8 @@ instance Bits Word32 where
     (W32# x#) .&.   (W32# y#)  = W32# (x# `and#` y#)
     (W32# x#) .|.   (W32# y#)  = W32# (x# `or#`  y#)
     (W32# x#) `xor` (W32# y#)  = W32# (x# `xor#` y#)
-    complement (W32# x#)       = W32# (x# `xor#` mb#) where W32# mb# = maxBound
+    complement (W32# x#)       = W32# (x# `xor#` mb#)
+        where !(W32# mb#) = maxBound
     (W32# x#) `shift` (I# i#)
         | i# >=# 0#            = W32# (narrow32Word# (x# `shiftL#` i#))
         | otherwise            = W32# (x# `shiftRL#` negateInt# i#)
@@ -596,7 +600,7 @@ instance Bits Word32 where
         | otherwise  = W32# (narrow32Word# ((x# `uncheckedShiftL#` i'#) `or#`
                                             (x# `uncheckedShiftRL#` (32# -# i'#))))
         where
-        i'# = word2Int# (int2Word# i# `and#` int2Word# 31#)
+        !i'# = word2Int# (int2Word# i# `and#` int2Word# 31#)
     bitSize  _                = 32
     isSigned _                = False
 
@@ -816,7 +820,7 @@ instance Integral Word64 where
         | i# >=# 0#                 = smallInteger i#
         | otherwise                 = wordToInteger x#
         where
-        i# = word2Int# x#
+        !i# = word2Int# x#
 
 instance Bits Word64 where
     {-# INLINE shift #-}
@@ -824,7 +828,8 @@ instance Bits Word64 where
     (W64# x#) .&.   (W64# y#)  = W64# (x# `and#` y#)
     (W64# x#) .|.   (W64# y#)  = W64# (x# `or#`  y#)
     (W64# x#) `xor` (W64# y#)  = W64# (x# `xor#` y#)
-    complement (W64# x#)       = W64# (x# `xor#` mb#) where W64# mb# = maxBound
+    complement (W64# x#)       = W64# (x# `xor#` mb#)
+        where !(W64# mb#) = maxBound
     (W64# x#) `shift` (I# i#)
         | i# >=# 0#            = W64# (x# `shiftL#` i#)
         | otherwise            = W64# (x# `shiftRL#` negateInt# i#)
@@ -833,7 +838,7 @@ instance Bits Word64 where
         | otherwise  = W64# ((x# `uncheckedShiftL#` i'#) `or#`
                              (x# `uncheckedShiftRL#` (64# -# i'#)))
         where
-        i'# = word2Int# (int2Word# i# `and#` int2Word# 63#)
+        !i'# = word2Int# (int2Word# i# `and#` int2Word# 63#)
     bitSize  _                = 64
     isSigned _                = False
 

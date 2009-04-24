@@ -218,9 +218,9 @@ instance Bits Int where
         I# (word2Int# ((x'# `uncheckedShiftL#` i'#) `or#`
                        (x'# `uncheckedShiftRL#` (wsib -# i'#))))
       where
-        x'# = int2Word# x#
-        i'# = word2Int# (int2Word# i# `and#` int2Word# (wsib -# 1#))
-        wsib = WORD_SIZE_IN_BITS#   {- work around preprocessor problem (??) -}
+        !x'# = int2Word# x#
+        !i'# = word2Int# (int2Word# i# `and#` int2Word# (wsib -# 1#))
+        !wsib = WORD_SIZE_IN_BITS#   {- work around preprocessor problem (??) -}
     bitSize  _             = WORD_SIZE_IN_BITS
 
     {-# INLINE shiftR #-}

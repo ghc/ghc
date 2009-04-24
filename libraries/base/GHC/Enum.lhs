@@ -368,14 +368,14 @@ efdCharFB c n x1 x2
   | delta >=# 0# = go_up_char_fb c n x1 delta 0x10FFFF#
   | otherwise    = go_dn_char_fb c n x1 delta 0#
   where
-    delta = x2 -# x1
+    !delta = x2 -# x1
 
 efdChar :: Int# -> Int# -> String
 efdChar x1 x2
   | delta >=# 0# = go_up_char_list x1 delta 0x10FFFF#
   | otherwise    = go_dn_char_list x1 delta 0#
   where
-    delta = x2 -# x1
+    !delta = x2 -# x1
 
 {-# NOINLINE [0] efdtCharFB #-}
 efdtCharFB :: (Char -> a -> a) -> a -> Int# -> Int# -> Int# -> a
@@ -383,14 +383,14 @@ efdtCharFB c n x1 x2 lim
   | delta >=# 0# = go_up_char_fb c n x1 delta lim
   | otherwise    = go_dn_char_fb c n x1 delta lim
   where
-    delta = x2 -# x1
+    !delta = x2 -# x1
 
 efdtChar :: Int# -> Int# -> Int# -> String
 efdtChar x1 x2 lim
   | delta >=# 0# = go_up_char_list x1 delta lim
   | otherwise    = go_dn_char_list x1 delta lim
   where
-    delta = x2 -# x1
+    !delta = x2 -# x1
 
 go_up_char_fb :: (Char -> a -> a) -> a -> Int# -> Int# -> Int# -> a
 go_up_char_fb c n x0 delta lim
@@ -453,7 +453,7 @@ instance  Enum Int  where
 
     {-# INLINE enumFrom #-}
     enumFrom (I# x) = eftInt x maxInt#
-        where I# maxInt# = maxInt
+        where !(I# maxInt#) = maxInt
         -- Blarg: technically I guess enumFrom isn't strict!
 
     {-# INLINE enumFromTo #-}
@@ -528,8 +528,8 @@ efdtIntUp :: Int# -> Int# -> Int# -> [Int]
 efdtIntUp x1 x2 y    -- Be careful about overflow!
  | y <# x2   = if y <# x1 then [] else [I# x1]
  | otherwise = -- Common case: x1 <= x2 <= y
-               let delta = x2 -# x1 -- >= 0
-                   y' = y -# delta  -- x1 <= y' <= y; hence y' is representable
+               let !delta = x2 -# x1 -- >= 0
+                   !y' = y -# delta  -- x1 <= y' <= y; hence y' is representable
 
                    -- Invariant: x <= y
                    -- Note that: z <= y' => z + delta won't overflow
@@ -543,8 +543,8 @@ efdtIntUpFB :: (Int -> r -> r) -> r -> Int# -> Int# -> Int# -> r
 efdtIntUpFB c n x1 x2 y    -- Be careful about overflow!
  | y <# x2   = if y <# x1 then n else I# x1 `c` n
  | otherwise = -- Common case: x1 <= x2 <= y
-               let delta = x2 -# x1 -- >= 0
-                   y' = y -# delta  -- x1 <= y' <= y; hence y' is representable
+               let !delta = x2 -# x1 -- >= 0
+                   !y' = y -# delta  -- x1 <= y' <= y; hence y' is representable
 
                    -- Invariant: x <= y
                    -- Note that: z <= y' => z + delta won't overflow
@@ -558,8 +558,8 @@ efdtIntDn :: Int# -> Int# -> Int# -> [Int]
 efdtIntDn x1 x2 y    -- Be careful about underflow!
  | y ># x2   = if y ># x1 then [] else [I# x1]
  | otherwise = -- Common case: x1 >= x2 >= y
-               let delta = x2 -# x1 -- <= 0
-                   y' = y -# delta  -- y <= y' <= x1; hence y' is representable
+               let !delta = x2 -# x1 -- <= 0
+                   !y' = y -# delta  -- y <= y' <= x1; hence y' is representable
 
                    -- Invariant: x >= y
                    -- Note that: z >= y' => z + delta won't underflow
@@ -573,8 +573,8 @@ efdtIntDnFB :: (Int -> r -> r) -> r -> Int# -> Int# -> Int# -> r
 efdtIntDnFB c n x1 x2 y    -- Be careful about underflow!
  | y ># x2 = if y ># x1 then n else I# x1 `c` n
  | otherwise = -- Common case: x1 >= x2 >= y
-               let delta = x2 -# x1 -- <= 0
-                   y' = y -# delta  -- y <= y' <= x1; hence y' is representable
+               let !delta = x2 -# x1 -- <= 0
+                   !y' = y -# delta  -- y <= y' <= x1; hence y' is representable
 
                    -- Invariant: x >= y
                    -- Note that: z >= y' => z + delta won't underflow

@@ -123,7 +123,7 @@ runFinalizerBatch (I# n) arr =
    let  go m  = IO $ \s ->
                   case m of 
                   0# -> (# s, () #)
-                  _  -> let m' = m -# 1# in
+                  _  -> let !m' = m -# 1# in
                         case indexArray# arr m' of { (# io #) -> 
                         case unIO io s of          { (# s', _ #) -> 
                         unIO (go m') s'
