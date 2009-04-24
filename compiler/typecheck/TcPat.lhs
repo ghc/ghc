@@ -365,8 +365,7 @@ tc_pat pstate lpat@(LazyPat pat) pat_ty thing_inside
 	-- getLIE/extendLIEs: see Note [Hopping the LIE in lazy patterns]
 
 	-- Check no existentials
-	; if (null pat_tvs) then return ()
-	  else lazyPatErr lpat pat_tvs
+	; unless (null pat_tvs) $ lazyPatErr lpat pat_tvs
 
 	-- Check that the pattern has a lifted type
 	; pat_tv <- newBoxyTyVar liftedTypeKind
