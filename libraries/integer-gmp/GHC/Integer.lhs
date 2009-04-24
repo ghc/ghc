@@ -166,8 +166,8 @@ quotRemInteger (S# i) (S# j) = (# S# q, S# r #)
       -- (# let q = i `quotInt#` j in S# q, ... #) which builds a
       -- useless thunk.  Placing the bindings here means they'll be
       -- evaluated strictly.
-      q = i `quotInt#` j
-      r = i `remInt#`  j
+      !q = i `quotInt#` j
+      !r = i `remInt#`  j
 quotRemInteger i1@(J# _ _) i2@(S# _) = quotRemInteger i1 (toBig i2)
 quotRemInteger i1@(S# _) i2@(J# _ _) = quotRemInteger (toBig i1) i2
 quotRemInteger (J# s1 d1) (J# s2 d2)
@@ -180,8 +180,8 @@ divModInteger a@(S# INT_MINBOUND) b = divModInteger (toBig a) b
 divModInteger (S# i) (S# j) = (# S# d, S# m #)
     where
       -- NB. don't inline these.  See quotRemInteger above.
-      d = i `divInt#` j
-      m = i `modInt#` j
+      !d = i `divInt#` j
+      !m = i `modInt#` j
 
       -- XXX Copied from GHC.Base
       divInt# :: Int# -> Int# -> Int#
@@ -196,7 +196,7 @@ divModInteger (S# i) (S# j) = (# S# d, S# m #)
             ((x# <# 0#) && (y# ># 0#))
          then if r# /=# 0# then r# +# y# else 0#
          else r#
-          where r# = x# `remInt#` y#
+          where !r# = x# `remInt#` y#
 
       (&&) :: Bool -> Bool -> Bool
       True  && x = x
@@ -269,8 +269,8 @@ gcdInteger ia@(S# a)  ib@(J# sb b)
  =      if a  ==# 0# then absInteger ib
    else if sb ==# 0# then absInteger ia
    else                   S# (gcdIntegerInt# absSb b absA)
-       where absA  = if a  <# 0# then negateInt# a  else a
-             absSb = if sb <# 0# then negateInt# sb else sb
+       where !absA  = if a  <# 0# then negateInt# a  else a
+             !absSb = if sb <# 0# then negateInt# sb else sb
 gcdInteger ia@(J# _ _) ib@(S# _) = gcdInteger ib ia
 gcdInteger (J# sa a) (J# sb b)
   = case gcdInteger# sa a sb b of (# sg, g #) -> J# sg g
@@ -383,7 +383,7 @@ signumInteger (S# i) = if i <# 0# then S# -1#
                        else S# 1#
 signumInteger (J# s d)
   = let
-        cmp = cmpIntegerInt# s d 0#
+        !cmp = cmpIntegerInt# s d 0#
     in
     if      cmp >#  0# then S# 1#
     else if cmp ==# 0# then S# 0#
