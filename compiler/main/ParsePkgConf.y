@@ -1,5 +1,5 @@
 {
-{-# OPTIONS -fno-warn-unused-binds -fno-warn-unused-matches -fno-warn-missing-signatures -fno-warn-incomplete-patterns #-}
+{-# OPTIONS -fno-warn-unused-binds -fno-warn-unused-matches -fno-warn-missing-signatures -fno-warn-incomplete-patterns -Wwarn #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and fix
 -- any warnings in the module. See

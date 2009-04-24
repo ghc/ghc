@@ -475,6 +475,11 @@ checkStrictBinds top_lvl rec_group mbind mono_tys infos
                   (strictBindErr "Recursive" unlifted mbind)
         ; checkTc (isSingletonBag mbind)
                   (strictBindErr "Multiple" unlifted mbind) 
+        -- This should be a checkTc, not a warnTc, but as of GHC 6.11
+        -- the versions of alex and happy available have non-conforming
+        -- templates, so the GHC build fails if it's an error:
+        ; warnTc (not bang_pat)
+                 (unliftedMustBeBang mbind)
         ; mapM_ check_sig infos
         ; return True }
   | otherwise
@@ -485,6 +490,11 @@ checkStrictBinds top_lvl rec_group mbind mono_tys infos
     check_sig (_, Just sig, _) = checkTc (null (sig_tvs sig) && null (sig_theta sig))
                                          (badStrictSig unlifted sig)
     check_sig _                = return ()
+
+unliftedMustBeBang :: LHsBindsLR Var Var -> SDoc
+unliftedMustBeBang mbind
+  = hang (text "Bindings containing unlifted types must use an outermost bang pattern:")
+         4 (pprLHsBinds mbind)
 
 strictBindErr :: String -> Bool -> LHsBindsLR Var Var -> SDoc
 strictBindErr flavour unlifted mbind

@@ -120,13 +120,13 @@ linkBCO' ie ce (UnlinkedBCO nm arity insns_barr bitmap literalsSS ptrsSS)
 	ptrs_arr <- mkPtrsArray ie ce n_ptrs ptrs
 
         let 
-            ptrs_parr = case ptrs_arr of Array _lo _hi _n parr -> parr
+            !ptrs_parr = case ptrs_arr of Array _lo _hi _n parr -> parr
 
             literals_arr = listArray (0, n_literals-1) linked_literals
                            :: UArray Int Word
-            literals_barr = case literals_arr of UArray _lo _hi _n barr -> barr
+            !literals_barr = case literals_arr of UArray _lo _hi _n barr -> barr
 
-	    (I# arity#)  = arity
+	    !(I# arity#)  = arity
 
         newBCO insns_barr literals_barr ptrs_parr arity# bitmap
 

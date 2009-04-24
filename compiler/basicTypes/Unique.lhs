@@ -134,8 +134,8 @@ newTagUnique u c = mkUnique c i where (_,i) = unpkUnique u
 mkUnique c i
   = MkUnique (tag `bitOrFastInt` bits)
   where
-    tag  = fastOrd (cUnbox c) `shiftLFastInt` _ILIT(24)
-    bits = iUnbox i `bitAndFastInt` _ILIT(16777215){-``0x00ffffff''-}
+    !tag  = fastOrd (cUnbox c) `shiftLFastInt` _ILIT(24)
+    !bits = iUnbox i `bitAndFastInt` _ILIT(16777215){-``0x00ffffff''-}
 
 unpkUnique (MkUnique u)
   = let
@@ -266,7 +266,7 @@ iToBase62 n_
 #if defined(__GLASGOW_HASKELL__)
     --then FastInt == Int#
     chooseChar62 n = C# (indexCharOffAddr# chars62 n)
-    chars62 = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"#
+    !chars62 = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"#
 #else
     --Haskell98 arrays are portable
     chooseChar62 n = (!) chars62 n

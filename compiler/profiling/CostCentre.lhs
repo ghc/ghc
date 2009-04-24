@@ -300,8 +300,8 @@ cmpCostCentre (NormalCC {cc_name = n1, cc_mod =  m1, cc_is_caf = c1})
 
 cmpCostCentre other_1 other_2
   = let
-	tag1 = tag_CC other_1
-	tag2 = tag_CC other_2
+	!tag1 = tag_CC other_1
+	!tag2 = tag_CC other_2
     in
     if tag1 <# tag2 then LT else GT
   where

@@ -50,21 +50,21 @@ import GHC.Base
 {-# INLINE utf8DecodeChar# #-}
 utf8DecodeChar# :: Addr# -> (# Char#, Addr# #)
 utf8DecodeChar# a# =
-  let ch0 = word2Int# (indexWord8OffAddr# a# 0#) in
+  let !ch0 = word2Int# (indexWord8OffAddr# a# 0#) in
   case () of
     _ | ch0 <=# 0x7F# -> (# chr# ch0, a# `plusAddr#` 1# #)
 
       | ch0 >=# 0xC0# && ch0 <=# 0xDF# ->
-        let ch1 = word2Int# (indexWord8OffAddr# a# 1#) in
+        let !ch1 = word2Int# (indexWord8OffAddr# a# 1#) in
         if ch1 <# 0x80# || ch1 >=# 0xC0# then fail 1# else
         (# chr# (((ch0 -# 0xC0#) `uncheckedIShiftL#` 6#) +#
                   (ch1 -# 0x80#)),
            a# `plusAddr#` 2# #)
 
       | ch0 >=# 0xE0# && ch0 <=# 0xEF# ->
-        let ch1 = word2Int# (indexWord8OffAddr# a# 1#) in
+        let !ch1 = word2Int# (indexWord8OffAddr# a# 1#) in
         if ch1 <# 0x80# || ch1 >=# 0xC0# then fail 1# else
-        let ch2 = word2Int# (indexWord8OffAddr# a# 2#) in
+        let !ch2 = word2Int# (indexWord8OffAddr# a# 2#) in
         if ch2 <# 0x80# || ch2 >=# 0xC0# then fail 2# else
         (# chr# (((ch0 -# 0xE0#) `uncheckedIShiftL#` 12#) +#
                  ((ch1 -# 0x80#) `uncheckedIShiftL#` 6#)  +#
@@ -72,11 +72,11 @@ utf8DecodeChar# a# =
            a# `plusAddr#` 3# #)
 
      | ch0 >=# 0xF0# && ch0 <=# 0xF8# ->
-        let ch1 = word2Int# (indexWord8OffAddr# a# 1#) in
+        let !ch1 = word2Int# (indexWord8OffAddr# a# 1#) in
         if ch1 <# 0x80# || ch1 >=# 0xC0# then fail 1# else
-        let ch2 = word2Int# (indexWord8OffAddr# a# 2#) in
+        let !ch2 = word2Int# (indexWord8OffAddr# a# 2#) in
         if ch2 <# 0x80# || ch2 >=# 0xC0# then fail 2# else
-        let ch3 = word2Int# (indexWord8OffAddr# a# 3#) in
+        let !ch3 = word2Int# (indexWord8OffAddr# a# 3#) in
         if ch3 <# 0x80# || ch3 >=# 0xC0# then fail 3# else
         (# chr# (((ch0 -# 0xF0#) `uncheckedIShiftL#` 18#) +#
                  ((ch1 -# 0x80#) `uncheckedIShiftL#` 12#) +#
@@ -116,7 +116,7 @@ STRICT2(utf8DecodeString)
 utf8DecodeString (Ptr a#) (I# len#)
   = unpack a#
   where
-    end# = addr2Int# (a# `plusAddr#` len#)
+    !end# = addr2Int# (a# `plusAddr#` len#)
 
     unpack p#
         | addr2Int# p# >=# end# = return []

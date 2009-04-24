@@ -50,7 +50,7 @@ data FastMutInt = FastMutInt (MutableByteArray# RealWorld)
 newFastMutInt = IO $ \s ->
   case newByteArray# size s of { (# s, arr #) ->
   (# s, FastMutInt arr #) }
-  where I# size = SIZEOF_HSINT
+  where !(I# size) = SIZEOF_HSINT
 
 readFastMutInt (FastMutInt arr) = IO $ \s ->
   case readIntArray# arr 0# s of { (# s, i #) ->
@@ -65,7 +65,7 @@ data FastMutPtr = FastMutPtr (MutableByteArray# RealWorld)
 newFastMutPtr = IO $ \s ->
   case newByteArray# size s of { (# s, arr #) ->
   (# s, FastMutPtr arr #) }
-  where I# size = SIZEOF_VOID_P
+  where !(I# size) = SIZEOF_VOID_P
 
 readFastMutPtr (FastMutPtr arr) = IO $ \s ->
   case readAddrArray# arr 0# s of { (# s, i #) ->

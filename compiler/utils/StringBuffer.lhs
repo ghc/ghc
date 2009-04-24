@@ -224,7 +224,7 @@ parseUnsignedInteger (StringBuffer buf _ cur) len radix char_to_int
     --LOL, in implementations where the indexing needs slow unsafePerformIO,
     --this is less (not more) efficient than using the IO monad explicitly
     --here.
-    ptr' = pUnbox ptr
+    !ptr' = pUnbox ptr
     byteOff i = cBox (indexWord8OffFastPtrAsFastChar ptr' (iUnbox (cur + i)))
     go i x | i == len  = x
            | otherwise = case byteOff i of

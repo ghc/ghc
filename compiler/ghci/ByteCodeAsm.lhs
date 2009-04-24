@@ -154,10 +154,10 @@ assembleBCO (ProtoBCO nm instrs bitmap bsize arity _origin _malloced)
              insns_arr
 		 | n_insns > 65535 = panic "linkBCO: >= 64k insns in BCO"
                  | otherwise = mkInstrArray n_insns asm_insns
-             insns_barr = case insns_arr of UArray _lo _hi _n barr -> barr
+             !insns_barr = case insns_arr of UArray _lo _hi _n barr -> barr
 
 	     bitmap_arr = mkBitmapArray bsize bitmap
-             bitmap_barr = case bitmap_arr of UArray _lo _hi _n barr -> barr
+             !bitmap_barr = case bitmap_arr of UArray _lo _hi _n barr -> barr
 
          let ul_bco = UnlinkedBCO nm arity insns_barr bitmap_barr final_lits final_ptrs 
 

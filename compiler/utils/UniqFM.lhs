@@ -803,8 +803,8 @@ getCommonNodeUFMData (NodeUFMData i p) (NodeUFMData i2 p2)
   | p <# p2	= getCommonNodeUFMData_ p2 (j `quotFastInt` (p2 `quotFastInt` p)) j2
   | otherwise	= getCommonNodeUFMData_ p j (j2 `quotFastInt` (p `quotFastInt` p2))
   where
-    j  = i  `quotFastInt` (shiftL1 p)
-    j2 = i2 `quotFastInt` (shiftL1 p2)
+    !j  = i  `quotFastInt` (shiftL1 p)
+    !j2 = i2 `quotFastInt` (shiftL1 p2)
 
     getCommonNodeUFMData_ :: FastInt -> FastInt -> FastInt -> NodeUFMData
 

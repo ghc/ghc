@@ -615,7 +615,7 @@ aboveNest (Nest k1 p)         g k q = nest_ k1 (aboveNest p g (k -# k1) q)
 aboveNest (NilAbove p)        g k q = nilAbove_ (aboveNest p g k q)
 aboveNest (TextBeside s sl p) g k q = textBeside_ s sl rest
                                     where
-                                      k1   = k -# sl
+                                      !k1  = k -# sl
                                       rest = case p of
                                                 Empty -> nilAboveNest g k1 q
                                                 _     -> aboveNest  p g k1 q
@@ -775,8 +775,8 @@ fillNB g Empty k (y:ys)    = nilBeside g (fill1 g (oneLiner (reduceDoc y)) k1 ys
                              `mkUnion`
                              nilAboveNest False k (fill g (y:ys))
                            where
-                             k1 | g         = k -# _ILIT(1)
-                                | otherwise = k
+                             !k1 | g         = k -# _ILIT(1)
+                                 | otherwise = k
 
 fillNB g p k ys            = fill1 g p k ys
 \end{code}
@@ -797,7 +797,7 @@ best :: Int             -- Line length
 best w_ r_ p
   = get (iUnbox w_) p
   where
-    r = iUnbox r_
+    !r = iUnbox r_
     get :: FastInt          -- (Remaining) width of line
         -> Doc -> Doc
     get _ Empty               = Empty
