@@ -11,6 +11,8 @@ module SPARC.RegPlate (
 
 where
 
+#include "HsVersions.h"
+
 import Reg
 import CmmExpr
 import FastBool
