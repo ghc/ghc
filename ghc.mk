@@ -33,7 +33,6 @@
 #
 # Tickets we can now close, or fix and close:
 #
-#   * 912  build system doesn't have enough dependencies (it does now!)
 #   * 2744 check for presence of hsc2hs in ./configure
 #   * 2966 make sure --with-gcc does the right thing (#2966)
 #   * 3115 make ghc.cabal read-only
