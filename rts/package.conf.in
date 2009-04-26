@@ -3,7 +3,7 @@
 #include "ghcconfig.h"
 #include "RtsConfig.h"
 
-name:		PACKAGE
+name:		rts
 version:	1.0
 license:	BSD3
 maintainer:	glasgow-haskell-users@haskell.org
@@ -21,9 +21,9 @@ library-dirs:		LIB_DIR GMP_LIB_DIRS PAPI_LIB_DIR
 			/* force the dist-provided gcc-lib/ into scope. */
 # endif
 #else /* !INSTALLING */
-library-dirs:		FPTOOLS_TOP_ABS"/rts" GMP_LIB_DIRS PAPI_LIB_DIR
+library-dirs:		TOP"/rts/dist/build" GMP_LIB_DIRS PAPI_LIB_DIR
 # if !defined(HAVE_LIB_GMP) && !defined(HAVE_FRAMEWORK_GMP)
-			, FPTOOLS_TOP_ABS"/gmp"
+			, TOP"/gmp"
 # endif
 #endif
 
@@ -60,9 +60,9 @@ extra-libraries:		"m"		/* for ldexp() */
 #ifdef INSTALLING
 include-dirs:		INCLUDE_DIR GMP_INCLUDE_DIRS PAPI_INCLUDE_DIR
 #else /* !INSTALLING */
-include-dirs:		FPTOOLS_TOP_ABS"/includes"
+include-dirs:		TOP"/includes"
 # if !defined(HAVE_LIB_GMP) && !defined(HAVE_FRAMEWORK_GMP)
-             		FPTOOLS_TOP_ABS"/gmp/gmpbuild"
+             		TOP"/gmp/gmpbuild"
 # endif
              		GMP_INCLUDE_DIRS
 #endif

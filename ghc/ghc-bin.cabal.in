@@ -1,3 +1,6 @@
+-- WARNING: ghc-bin.cabal is automatically generated from ghc-bin.cabal.in by
+-- ./configure.  Make sure you are editing ghc-bin.cabal.in, not ghc-bin.cabal.
+
 Name: ghc-bin
 Version: @ProjectVersion@
 Copyright: XXX

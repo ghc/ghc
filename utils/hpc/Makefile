@@ -1,5 +1,3 @@
-
-TOP=../..
-include $(TOP)/mk/boilerplate.mk
-include $(TOP)/mk/cabal.mk
-
+dir = utils/hpc
+TOP = ../..
+include $(TOP)/mk/sub-makefile.mk

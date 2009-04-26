@@ -50,9 +50,6 @@ distclean: clean
 
 maintainer-clean: distclean
 
-ifeq "$(LATEX_DOCS)" "YES"
-BINDIST_EXTRAS += core.pdf
-endif
 include $(TOP)/mk/bindist.mk
 
 # dummy targets

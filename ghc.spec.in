@@ -1,3 +1,6 @@
+# WARNING: ghc.spec is automatically generated from ghc.spec.in by
+# ./configure.  Make sure you are editing ghc.spec.in, not ghc.spec.
+#
 # RPM spec file for GHC					         -*-rpm-spec-*-
 #
 # Copyright [1998..2007] The GHC Team

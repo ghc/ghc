@@ -72,7 +72,8 @@ doMkDependHS srcs = do
     -- Prcess them one by one, dumping results into makefile
     -- and complaining about cycles
     hsc_env <- getSession
-    mapM (liftIO . processDeps dflags hsc_env excl_mods (mkd_tmp_hdl files)) sorted
+    root <- liftIO getCurrentDirectory
+    mapM (liftIO . processDeps dflags hsc_env excl_mods root (mkd_tmp_hdl files)) sorted
 
     -- If -ddump-mod-cycles, show cycles in the module graph
     liftIO $ dumpModCycles dflags mod_summaries
@@ -158,6 +159,7 @@ beginMkDependHS dflags = do
 processDeps :: DynFlags
             -> HscEnv
             -> [ModuleName]
+            -> FilePath
             -> Handle           -- Write dependencies to here
             -> SCC ModSummary
             -> IO ()
@@ -176,11 +178,11 @@ processDeps :: DynFlags
 --
 -- For {-# SOURCE #-} imports the "hi" will be "hi-boot".
 
-processDeps _ _ _ _ (CyclicSCC nodes)
+processDeps _ _ _ _ _ (CyclicSCC nodes)
   =     -- There shouldn't be any cycles; report them
     ghcError (ProgramError (showSDoc $ GHC.cyclicModuleErr nodes))
 
-processDeps dflags hsc_env excl_mods hdl (AcyclicSCC node)
+processDeps dflags hsc_env excl_mods root hdl (AcyclicSCC node)
   = do  { let extra_suffixes = depSuffixes dflags
               include_pkg_deps = depIncludePkgDeps dflags
               src_file  = msHsFilePath node
@@ -194,7 +196,7 @@ processDeps dflags hsc_env excl_mods hdl (AcyclicSCC node)
                            Nothing      -> return () ;
                            Just hi_file -> do
                      { let hi_files = insertSuffixes hi_file extra_suffixes
-                           write_dep (obj,hi) = writeDependency hdl [obj] hi
+                           write_dep (obj,hi) = writeDependency root hdl [obj] hi
 
                         -- Add one dependency for each suffix;
                         -- e.g.         A.o   : B.hi
@@ -204,7 +206,7 @@ processDeps dflags hsc_env excl_mods hdl (AcyclicSCC node)
 
                 -- Emit std dependency of the object(s) on the source file
                 -- Something like       A.o : A.hs
-        ; writeDependency hdl obj_files src_file
+        ; writeDependency root hdl obj_files src_file
 
                 -- Emit a dependency for each import
 
@@ -248,12 +250,18 @@ findDependency hsc_env srcloc pkg imp is_boot include_pkg_deps
         }
 
 -----------------------------
-writeDependency :: Handle -> [FilePath] -> FilePath -> IO ()
--- (writeDependency h [t1,t2] dep) writes to handle h the dependency
+writeDependency :: FilePath -> Handle -> [FilePath] -> FilePath -> IO ()
+-- (writeDependency r h [t1,t2] dep) writes to handle h the dependency
 --      t1 t2 : dep
-writeDependency hdl targets dep
-  = hPutStrLn hdl (unwords (map forOutput targets) ++ " : " ++ forOutput dep)
-    where forOutput = escapeSpaces . reslash Forwards . normalise
+writeDependency root hdl targets dep
+  = do let -- We need to avoid making deps on
+           --     c:/foo/...
+           -- on cygwin as make gets confused by the :
+           -- Making relative deps avoids some instances of this.
+           dep' = makeRelative root dep
+           forOutput = escapeSpaces . reslash Forwards . normalise
+           output = unwords (map forOutput targets) ++ " : " ++ forOutput dep'
+       hPutStrLn hdl output
 
 -----------------------------
 insertSuffixes

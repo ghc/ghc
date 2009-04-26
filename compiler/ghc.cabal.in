@@ -1,3 +1,6 @@
+-- WARNING: ghc.cabal is automatically generated from ghc.cabal.in by
+-- ./configure.  Make sure you are editing ghc.cabal.in, not ghc.cabal.
+
 Name: ghc
 Version: @ProjectVersion@
 License: BSD3
@@ -45,6 +48,15 @@ Flag ncg
 
 Flag stage1
     Description: Is this stage 1?
+    Default: False
+
+Flag stage2
+    Description: Is this stage 2?
+    Default: False
+
+Flag stage3
+    Description: Is this stage 3?
+    Default: False
 
 Library
     Exposed: False
@@ -103,7 +115,12 @@ Library
             Build-Depends: extensible-exceptions
             Extensions: PatternSignatures
     else
-        Include-Dirs: stage2plus
+        if flag(stage2)
+            Include-Dirs: stage2
+        else
+            if flag(stage3)
+                Include-Dirs: stage2
+
     Install-Includes: HsVersions.h, ghc_boot_platform.h
 
     c-sources:

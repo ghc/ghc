@@ -14,14 +14,14 @@ GhcStage2HcOpts = -O -fasm
 # running of the tests, and faster building of the utils to be installed
 
 GhcLibHcOpts    = -O -fasm -dcore-lint
-GhcLibWays      =
+GhcLibWays      = v
 SplitObjs       = NO
 NoFibWays       =
 STRIP           = :
 GhcBootLibs     = YES
 
 ifeq "$(ValidateHpc)" "YES"
-GhcStage2HcOpts += -fhpc -hpcdir $(FPTOOLS_TOP_ABS)/testsuite/hpc_output/
+GhcStage2HcOpts += -fhpc -hpcdir $(TOP)/testsuite/hpc_output/
 endif
 ifeq "$(ValidateSlow)" "YES"
 GhcStage2HcOpts += -XGenerics -DDEBUG

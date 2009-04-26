@@ -77,27 +77,20 @@ How GHC finds its files
 [Note topdir]
 
 GHC needs various support files (library packages, RTS etc), plus
-various auxiliary programs (cp, gcc, etc).  It starts by finding topdir:
-
-     for "installed" topdir is the root of GHC's support files ($libdir)
-     for "in-place"  topdir is the root of the build tree
+various auxiliary programs (cp, gcc, etc).  It starts by finding topdir,
+the root of GHC's support files
 
 On Unix:
   - ghc always has a shell wrapper that passes a -B<dir> option
-  - in an installation, <dir> is $libdir
-  - in a build tree, <dir> is $TOP/inplace-datadir
-  - so we detect the build-tree case and add ".." to get us back to $TOP
 
 On Windows:
   - ghc never has a shell wrapper.
   - we can find the location of the ghc binary, which is
-        $topdir/bin/ghc.exe                   in an installation, or
-        $topdir/ghc/stage1-inplace/ghc.exe    in a build tree.
-  - we detect which one of these we have, and calculate $topdir.
+        $topdir/bin/<something>.exe
+    where <something> may be "ghc", "ghc-stage2", or similar
+  - we strip off the "bin/<something>.exe" to leave $topdir.
 
-
-from topdir we can find package.conf, which contains the locations of
-almost everything else, whether we're in a build tree or installed.
+from topdir we can find package.conf, ghc-asm, etc.
 
 
 SysTools.initSysProgs figures out exactly where all the auxiliary programs
@@ -113,8 +106,8 @@ Config.hs contains two sorts of things
   etc           They do *not* include paths
 
 
-  cUNLIT_DIR_REL   The *path* to the directory containing unlit, split etc
-  cSPLIT_DIR_REL   *relative* to the root of the build tree,
+  cUNLIT_DIR   The *path* to the directory containing unlit, split etc
+  cSPLIT_DIR   *relative* to the root of the build tree,
                    for use when running *in-place* in a build tree (only)
 
 
@@ -159,46 +152,28 @@ initSysTools :: Maybe String    -- Maybe TopDir path (without the '-B' prefix)
 
 
 initSysTools mbMinusB dflags0
-  = do  { (am_installed, top_dir) <- findTopDir mbMinusB
+  = do  { top_dir <- findTopDir mbMinusB
                 -- see [Note topdir]
                 -- NB: top_dir is assumed to be in standard Unix
                 -- format, '/' separated
 
-        ; let installed, installed_bin :: FilePath -> FilePath
-              installed_bin pgm  = top_dir </> pgm
-              installed     file = top_dir </> file
-              inplace dir   pgm  = top_dir </> dir </> pgm
+        ; let installed :: FilePath -> FilePath
+              installed file = top_dir </> file
+              installed_mingw_bin file = top_dir </> ".." </> "mingw" </> "bin" </> file
 
-        ; let pkgconfig_path
-                | am_installed = installed "package.conf"
-                | otherwise    = inplace "inplace-datadir" "package.conf"
-
-              ghc_usage_msg_path
-                | am_installed = installed "ghc-usage.txt"
-                | otherwise    = inplace cGHC_DRIVER_DIR_REL "ghc-usage.txt"
-
-              ghci_usage_msg_path
-                | am_installed = installed "ghci-usage.txt"
-                | otherwise    = inplace cGHC_DRIVER_DIR_REL "ghci-usage.txt"
+        ; let pkgconfig_path      = installed "package.conf"
+              ghc_usage_msg_path  = installed "ghc-usage.txt"
+              ghci_usage_msg_path = installed "ghci-usage.txt"
 
                 -- For all systems, unlit, split, mangle are GHC utilities
                 -- architecture-specific stuff is done when building Config.hs
-              unlit_path
-                | am_installed = installed_bin cGHC_UNLIT_PGM
-                | otherwise    = inplace cGHC_UNLIT_DIR_REL cGHC_UNLIT_PGM
+              unlit_path = installed cGHC_UNLIT_PGM
 
                 -- split and mangle are Perl scripts
-              split_script
-                | am_installed = installed_bin cGHC_SPLIT_PGM
-                | otherwise    = inplace cGHC_SPLIT_DIR_REL cGHC_SPLIT_PGM
+              split_script  = installed cGHC_SPLIT_PGM
+              mangle_script = installed cGHC_MANGLER_PGM
 
-              mangle_script
-                | am_installed = installed_bin cGHC_MANGLER_PGM
-                | otherwise    = inplace cGHC_MANGLER_DIR_REL cGHC_MANGLER_PGM
-
-              windres_path
-                | am_installed = installed_bin "bin/windres"
-                | otherwise    = "windres"
+              windres_path  = installed_mingw_bin "windres"
 
         ; tmpdir <- getTemporaryDirectory
         ; let dflags1 = setTmpDir tmpdir dflags0
@@ -209,43 +184,19 @@ initSysTools mbMinusB dflags0
              ghcError (InstallationError
                          ("Can't find package.conf as " ++ pkgconfig_path))
 
-        -- On Windows, gcc and friends are distributed with GHC,
-        --      so when "installed" we look in TopDir/bin
-        -- When "in-place", or when not on Windows, we look wherever
-        --      the build-time configure script found them
+        -- On Windows, mingw is distributed with GHC,
+        --      so we look in TopDir/../mingw/bin
         ; let
-              -- The trailing "/" is absolutely essential; gcc seems
-              -- to construct file names simply by concatenating to
-              -- this -B path with no extra slash We use "/" rather
-              -- than "\\" because otherwise "\\\" is mangled
-              -- later on; although gcc_args are in NATIVE format,
-              -- gcc can cope
-              --      (see comments with declarations of global variables)
-              gcc_b_arg = Option ("-B" ++ installed "gcc-lib/")
-              gcc_mingw_include_arg = Option ("-I" ++ installed "include/mingw")
-              (gcc_prog,gcc_args)
-                | isWindowsHost && am_installed
-                    -- We tell gcc where its specs file + exes are (-B)
-                    -- and also some places to pick up include files.  We need
-                    -- to be careful to put all necessary exes in the -B place
-                    -- (as, ld, cc1, etc) since if they don't get found there,
-                    -- gcc then tries to run unadorned "as", "ld", etc, and
-                    -- will pick up whatever happens to be lying around in
-                    -- the path, possibly including those from a cygwin
-                    -- install on the target, which is exactly what we're
-                    -- trying to avoid.
-                    = (installed_bin "gcc", [gcc_b_arg, gcc_mingw_include_arg])
-                | otherwise = (cGCC, [])
+              gcc_prog
+                | isWindowsHost = installed_mingw_bin "gcc"
+                | otherwise     = cGCC
               perl_path
-                | isWindowsHost && am_installed = installed_bin cGHC_PERL
-                | otherwise = cGHC_PERL
+                | isWindowsHost = installed cGHC_PERL
+                | otherwise     = cGHC_PERL
               -- 'touch' is a GHC util for Windows
               touch_path
-                | isWindowsHost
-                    = if am_installed
-                      then installed_bin cGHC_TOUCHY_PGM
-                      else inplace cGHC_TOUCHY_DIR_REL cGHC_TOUCHY_PGM
-                | otherwise = "touch"
+                | isWindowsHost = installed cGHC_TOUCHY_PGM
+                | otherwise     = "touch"
               -- On Win32 we don't want to rely on #!/bin/perl, so we prepend
               -- a call to Perl to get the invocation of split and mangle.
               -- On Unix, scripts are invoked using the '#!' method.  Binary
@@ -261,23 +212,18 @@ initSysTools mbMinusB dflags0
               (mkdll_prog, mkdll_args)
                 | not isWindowsHost
                     = panic "Can't build DLLs on a non-Win32 system"
-                | am_installed =
-                    (installed "gcc-lib/" </> cMKDLL,
-                     [ Option "--dlltool-name",
-                       Option (installed "gcc-lib/" </> "dlltool"),
-                       Option "--driver-name",
-                       Option gcc_prog, gcc_b_arg, gcc_mingw_include_arg ])
-                | otherwise    = (cMKDLL, [])
+                | otherwise =
+                    (installed_mingw_bin cMKDLL, [])
 
         -- cpp is derived from gcc on all platforms
         -- HACK, see setPgmP below. We keep 'words' here to remember to fix
         -- Config.hs one day.
-        ; let cpp_path  = (gcc_prog, gcc_args ++
+        ; let cpp_path  = (gcc_prog,
                            (Option "-E"):(map Option (words cRAWCPP_FLAGS)))
 
         -- Other things being equal, as and ld are simply gcc
-        ; let   (as_prog,as_args)  = (gcc_prog,gcc_args)
-                (ld_prog,ld_args)  = (gcc_prog,gcc_args)
+        ; let   as_prog  = gcc_prog
+                ld_prog  = gcc_prog
 
         ; return dflags1{
                         ghcUsagePath = ghc_usage_msg_path,
@@ -287,11 +233,11 @@ initSysTools mbMinusB dflags0
                         pgm_L   = unlit_path,
                         pgm_P   = cpp_path,
                         pgm_F   = "",
-                        pgm_c   = (gcc_prog,gcc_args),
+                        pgm_c   = (gcc_prog,[]),
                         pgm_m   = (mangle_prog,mangle_args),
                         pgm_s   = (split_prog,split_args),
-                        pgm_a   = (as_prog,as_args),
-                        pgm_l   = (ld_prog,ld_args),
+                        pgm_a   = (as_prog,[]),
+                        pgm_l   = (ld_prog,[]),
                         pgm_dll = (mkdll_prog,mkdll_args),
                         pgm_T   = touch_path,
                         pgm_sysman = top_dir ++ "/ghc/rts/parallel/SysMan",
@@ -303,33 +249,17 @@ initSysTools mbMinusB dflags0
 \end{code}
 
 \begin{code}
-findTopDir :: Maybe String   -- Maybe TopDir path (without the '-B' prefix).
-           -> IO (Bool,      -- True <=> am installed, False <=> in-place
-                  String)    -- TopDir (in Unix format '/' separated)
-
-findTopDir mbMinusB
-  = do { top_dir <- get_proto
-       ; exists1 <- doesFileExist (top_dir </> "package.conf")
-       ; exists2 <- doesFileExist (top_dir </> "inplace")
-       ; let amInplace = not exists1 -- On Windows, package.conf doesn't exist
-                                     -- when we are inplace
-                      || exists2 -- On Linux, the presence of inplace signals
-                                 -- that we are inplace
-
-       ; let real_top = if exists2 then top_dir </> ".." else top_dir
-
-       ; return (not amInplace, real_top)
-       }
-  where
-    -- get_proto returns a Unix-format path (relying on getBaseDir to do so too)
-    get_proto = case mbMinusB of
-                  Just minusb -> return (normalise minusb)
-                  Nothing
-                      -> do maybe_exec_dir <- getBaseDir -- Get directory of executable
-                            case maybe_exec_dir of       -- (only works on Windows;
-                                                         --  returns Nothing on Unix)
-                              Nothing  -> ghcError (InstallationError "missing -B<dir> option")
-                              Just dir -> return dir
+-- returns a Unix-format path (relying on getBaseDir to do so too)
+findTopDir :: Maybe String -- Maybe TopDir path (without the '-B' prefix).
+           -> IO String    -- TopDir (in Unix format '/' separated)
+findTopDir (Just minusb) = return (normalise minusb)
+findTopDir Nothing
+    = do -- Get directory of executable
+         maybe_exec_dir <- getBaseDir
+         case maybe_exec_dir of
+             -- "Just" on Windows, "Nothing" on unix
+             Nothing  -> ghcError (InstallationError "missing -B<dir> option")
+             Just dir -> return dir
 \end{code}
 
 
@@ -473,25 +403,10 @@ runMkDLL dflags args = do
 
 runWindres :: DynFlags -> [Option] -> IO ()
 runWindres dflags args = do
-  let (gcc,gcc_args) = pgm_c dflags
+  let (_gcc,gcc_args) = pgm_c dflags
       windres        = pgm_windres dflags
   mb_env <- getGccEnv gcc_args
-  runSomethingFiltered dflags id "Windres" windres
-        -- we must tell windres where to find gcc: it might not be on PATH
-        (Option ("--preprocessor=" ++
-                 unwords (map quote (gcc : map showOpt gcc_args ++
-                                     ["-E", "-xc", "-DRC_INVOKED"])))
-        -- -- use-temp-file is required for windres to interpret the
-        -- quoting in the preprocessor arg above correctly.  Without
-        -- this, windres calls the preprocessor with popen, which gets
-        -- the quoting wrong (discovered by experimentation and
-        -- reading the windres sources).  See #1828.
-        : Option "--use-temp-file"
-        : args)
-        -- we must use the PATH workaround here too, since windres invokes gcc
-        mb_env
-  where
-        quote x = '\"' : x ++ "\""
+  runSomethingFiltered dflags id "Windres" windres args mb_env
 
 touch :: DynFlags -> String -> String -> IO ()
 touch dflags purpose arg =
@@ -833,8 +748,8 @@ traceCmd dflags phase_name cmd_line action
 
 getBaseDir :: IO (Maybe String)
 #if defined(mingw32_HOST_OS)
--- Assuming we are running ghc, accessed by path  $()/bin/ghc.exe,
--- return the path $(stuff).  Note that we drop the "bin/" directory too.
+-- Assuming we are running ghc, accessed by path  $(stuff)/bin/ghc.exe,
+-- return the path $(stuff)/lib.
 getBaseDir = do let len = (2048::Int) -- plenty, PATH_MAX is 512 under Win32.
                 buf <- mallocArray len
                 ret <- getModuleFileName nullPtr buf len
@@ -844,13 +759,14 @@ getBaseDir = do let len = (2048::Int) -- plenty, PATH_MAX is 512 under Win32.
                                     return (Just (rootDir s))
   where
     rootDir s = case splitFileName $ normalise s of
-                (d, ghc_exe) | lower ghc_exe == "ghc.exe" ->
+                (d, ghc_exe)
+                 | lower ghc_exe `elem` ["ghc.exe",
+                                         "ghc-stage1.exe",
+                                         "ghc-stage2.exe",
+                                         "ghc-stage3.exe"] ->
                     case splitFileName $ takeDirectory d of
-                    -- installed ghc.exe is in $topdir/bin/ghc.exe
-                    (d', bin) | lower bin == "bin" -> takeDirectory d'
-                    -- inplace ghc.exe is in $topdir/ghc/stage1-inplace/ghc.exe
-                    (d', x) | "-inplace" `isSuffixOf` lower x -> 
-                        takeDirectory d' </> ".."
+                    -- ghc is in $topdir/bin/ghc.exe
+                    (d', bin) | lower bin == "bin" -> takeDirectory d' </> "lib"
                     _ -> fail
                 _ -> fail
         where fail = panic ("can't decompose ghc.exe path: " ++ show s)

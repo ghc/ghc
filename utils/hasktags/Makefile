@@ -1,5 +1,3 @@
-
-TOP=../..
-include $(TOP)/mk/boilerplate.mk
-include $(TOP)/mk/cabal.mk
-
+dir = utils/hasktags
+TOP = ../..
+include $(TOP)/mk/sub-makefile.mk

@@ -6,14 +6,14 @@ default_target: all
 # Ideally we'd just include something to give us variables
 # for paths and arguments to tools etc, and those set in mk/build.mk.
 TOP=..
-include $(TOP)/mk/boilerplate.mk
+include $(TOP)/mk/config.mk
 
 all:
 	$(RM) -rf $(BIN_DIST_INST_SUBDIR)
 	$(RM) -rf ghc*
 	$(RM) HelloWorld HelloWorld.o HelloWorld.hi output
 	# --force-local makes tar not think that c:/foo refers to a remote file
-	$(TAR) --force-local -jxf $(FPTOOLS_TOP_ABS)/$(BIN_DIST_TAR_BZ2)
+	$(TAR) --force-local -jxf $(BIN_DIST_TAR_BZ2)
 ifeq "$(Windows)" "YES"
 	mv $(BIN_DIST_NAME) $(BIN_DIST_INST_DIR)
 else

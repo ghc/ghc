@@ -143,8 +143,14 @@ rnImportDecl this_mod (L loc (ImportDecl loc_imp_mod_name mb_pkg want_boot
 
 	-- Issue a user warning for a redundant {- SOURCE -} import
 	-- NB that we arrange to read all the ordinary imports before 
-	-- any of the {- SOURCE -} imports
-    warnIf (want_boot && not (mi_boot iface))
+	-- any of the {- SOURCE -} imports.
+        --
+        -- in --make and GHCi, the compilation manager checks for this,
+        -- and indeed we shouldn't do it here because the existence of
+        -- the non-boot module depends on the compilation order, which
+        -- is not deterministic.  The hs-boot test can show this up.
+    dflags <- getDOpts
+    warnIf (want_boot && not (mi_boot iface) && isOneShot (ghcMode dflags))
 	   (warnRedundantSourceImport imp_mod_name)
 
     let

@@ -48,8 +48,6 @@ $(BASH_INSTALLERS): install.bash.%:
 	cat $*.bash      >> $(bindir)/$*
 	$(EXECUTABLE_FILE)  $(bindir)/$*
 
-BINDIST_EXTRAS += $(addsuffix .pl,$(PERL_PROGS))
-BINDIST_EXTRAS += $(addsuffix .bash,$(BASH_PROGS))
 include $(TOP)/mk/bindist.mk
 
 include $(TOP)/mk/target.mk

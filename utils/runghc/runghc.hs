@@ -22,8 +22,6 @@
 
 module Main (main) where
 
-import Paths_runghc
-
 import Control.Exception
 import Data.Char
 import Data.List
@@ -85,7 +83,7 @@ parseRunGhcFlags = f mempty
 
 printVersion :: IO ()
 printVersion = do
-    putStrLn ("runghc " ++ showVersion version)
+    putStrLn ("runghc " ++ VERSION)
 
 printUsage :: IO ()
 printUsage = do

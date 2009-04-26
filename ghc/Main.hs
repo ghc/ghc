@@ -10,8 +10,6 @@
 
 module Main (main) where
 
-#include "HsVersions.h"
-
 -- The official GHC API
 import qualified GHC
 import GHC		( DynFlags(..), HscTarget(..),

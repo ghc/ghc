@@ -4,9 +4,9 @@ set -e
 # Check that we have all boot packages.
 for dir in `grep "^[^# ][^ ]*  *[^ ][^ ]*  *[^ ][^ ]*$" packages | sed "s/ .*//"`
 do
-    if test ! -d $dir
+    if test ! -f $dir/LICENSE
     then
-        echo "Looks like you're missing $dir." >&2
+        echo "Error: $dir/LICENSE doesn't exist." >&2
         echo "Maybe you haven't done './darcs-all get'?" >&2
         exit 1
     fi
@@ -31,3 +31,19 @@ do
     fi
 done
 
+for f in libraries/*; do
+   dir=`basename $f`
+   cabals=`echo $f/*.cabal`
+   if test -f $cabals; then
+       echo "Creating $f/ghc.mk"
+       rm -f $f/ghc.mk
+       pkg=`basename ${cabals%.cabal}`
+       echo "${f}_PACKAGE = ${pkg}" >> $f/ghc.mk
+       echo "\$(eval \$(call build-package,${f},dist-install,1))" >> $f/ghc.mk
+       rm -f $f/GNUmakefile
+       echo "Creating $f/GNUmakefile"
+       echo "dir = ${f}" >> $f/GNUmakefile
+       echo "TOP = ../.." >> $f/GNUmakefile
+       echo "include \$(TOP)/mk/sub-makefile.mk" >> $f/GNUmakefile
+   fi
+done

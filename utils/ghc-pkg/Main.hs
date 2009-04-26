@@ -378,19 +378,14 @@ getPkgDatabases modify my_flags = do
   let err_msg = "missing --global-conf option, location of global package.conf unknown\n"
   global_conf <-
      case [ f | FlagGlobalConfig f <- my_flags ] of
-        [] -> do mb_dir <- getExecDir "/bin/ghc-pkg.exe"
+        [] -> do mb_dir <- getLibDir
                  case mb_dir of
                         Nothing  -> die err_msg
                         Just dir ->
-                            do let path1 = dir </> "package.conf"
-                                   path2 = dir </> ".." </> ".." </> ".."
-                                               </> "inplace-datadir"
-                                               </> "package.conf"
-                               exists1 <- doesFileExist path1
-                               exists2 <- doesFileExist path2
-                               if exists1 then return path1
-                                   else if exists2 then return path2
-                                   else die "Can't find package.conf"
+                            do let path = dir </> "package.conf"
+                               exists <- doesFileExist path
+                               unless exists $ die "Can't find package.conf"
+                               return path
         fs -> return (last fs)
 
   let global_conf_dir = global_conf ++ ".d"
@@ -1053,7 +1048,7 @@ checkGHCiLib dirs batch_lib_dir batch_lib_file lib auto_build
   | auto_build = autoBuildGHCiLib batch_lib_dir batch_lib_file ghci_lib_file
   | otherwise  = do
       m <- doesFileExistOnPath ghci_lib_file dirs
-      when (isNothing m) $
+      when (isNothing m && ghci_lib_file /= "HSrts.o") $
         hPutStrLn stderr ("warning: can't find GHCi lib " ++ ghci_lib_file)
  where
     ghci_lib_file = lib <.> "o"
@@ -1069,7 +1064,7 @@ autoBuildGHCiLib dir batch_file ghci_file = do
 #if defined(darwin_HOST_OS)
   r <- rawSystem "ld" ["-r","-x","-o",ghci_lib_file,"-all_load",batch_lib_file]
 #elif defined(mingw32_HOST_OS)
-  execDir <- getExecDir "/bin/ghc-pkg.exe"
+  execDir <- getLibDir
   r <- rawSystem (maybe "" (++"/gcc-lib/") execDir++"ld") ["-r","-x","-o",ghci_lib_file,"--whole-archive",batch_lib_file]
 #else
   r <- rawSystem "ld" ["-r","-x","-o",ghci_lib_file,"--whole-archive",batch_lib_file]
@@ -1184,26 +1179,34 @@ subst a b ls = map (\ x -> if x == a then b else x) ls
 unDosifyPath :: FilePath -> FilePath
 unDosifyPath xs = subst '\\' '/' xs
 
-getExecDir :: String -> IO (Maybe String)
+getLibDir :: IO (Maybe String)
+getLibDir = fmap (fmap (</> "lib")) $ getExecDir "/bin/ghc-pkg.exe"
+
 -- (getExecDir cmd) returns the directory in which the current
 --                  executable, which should be called 'cmd', is running
 -- So if the full path is /a/b/c/d/e, and you pass "d/e" as cmd,
 -- you'll get "/a/b/c" back as the result
-getExecDir cmd
-  = allocaArray len $ \buf -> do
-        ret <- getModuleFileName nullPtr buf len
-        if ret == 0 then return Nothing
-                    else do s <- peekCString buf
-                            return (Just (reverse (drop (length cmd)
-                                                        (reverse (unDosifyPath s)))))
-  where
-    len = 2048::Int -- Plenty, PATH_MAX is 512 under Win32.
-
-foreign import stdcall unsafe  "GetModuleFileNameA"
-  getModuleFileName :: Ptr () -> CString -> Int -> IO Int32
-#else
 getExecDir :: String -> IO (Maybe String)
-getExecDir _ = return Nothing
+getExecDir cmd =
+    getExecPath >>= maybe (return Nothing) removeCmdSuffix
+    where unDosifyPath = subst '\\' '/'
+          initN n = reverse . drop n . reverse
+          removeCmdSuffix = return . Just . initN (length cmd) . unDosifyPath
+
+getExecPath :: IO (Maybe String)
+getExecPath =
+     allocaArray len $ \buf -> do
+         ret <- getModuleFileName nullPtr buf len
+         if ret == 0 then return Nothing
+	             else liftM Just $ peekCString buf
+    where len = 2048 -- Plenty, PATH_MAX is 512 under Win32.
+
+foreign import stdcall unsafe "GetModuleFileNameA"
+    getModuleFileName :: Ptr () -> CString -> Int -> IO Int32
+
+#else
+getLibDir :: IO (Maybe String)
+getLibDir = return Nothing
 #endif
 
 -----------------------------------------

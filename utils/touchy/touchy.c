@@ -11,6 +11,7 @@
 #include <sys/types.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <utime.h>
 
 int
 main(int argc, char** argv)

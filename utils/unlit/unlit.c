@@ -90,10 +90,8 @@ static char *ofilename = NULL;
  * if noisy is not set.
  */
 
-complain(file, lin, what)
-char *file;
-char *what;
-int lin; {
+void complain(char *file, int lin, char *what)
+{
     if (noisy) {
         if (file)
             fprintf(stderr, "%s ", file);
@@ -102,7 +100,7 @@ int lin; {
     }
 }
 
-writeerror()
+void writeerror(void)
 {
     if (!strcmp(ofilename,"-")) {
 	fprintf(stderr, CANNOTWRITESTDOUT);
@@ -112,9 +110,8 @@ writeerror()
     exit(1);
 }
 
-myputc(c, ostream)
-char c;
-FILE *ostream; {
+void myputc(char c, FILE *ostream)
+{
     if (putc(c,ostream) == EOF) {
 	writeerror();
     }	
@@ -247,10 +244,8 @@ FILE *istream, *ostream; {
  *  - there should be at least one DEFN line in a script.
  */
 
-unlit(file, istream, ostream)
-char *file;
-FILE *istream;
-FILE *ostream; {
+void unlit(char *file, FILE *istream, FILE *ostream)
+{
     line last, this=START;
     int  linesread=0;
     int  defnsread=0;
@@ -317,9 +312,8 @@ FILE *ostream; {
  * position to specify the standard input or the standard output respectively.
  */
 
-main(argc,argv)
-int argc;
-char **argv; {
+int main(int argc,char **argv)
+{
     FILE *istream, *ostream;
     char *file;
 

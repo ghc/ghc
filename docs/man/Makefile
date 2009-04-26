@@ -45,7 +45,6 @@ install-docs:: $(MAN_PAGE).$(MAN_SECTION)
 
 endif
 
-BINDIST_EXTRAS += $(MAN_PAGE).$(MAN_SECTION)
 include $(TOP)/mk/bindist.mk
 
 include $(TOP)/mk/target.mk

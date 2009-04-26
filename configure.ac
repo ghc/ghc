@@ -95,9 +95,17 @@ HostPlatform=`/bin/sh $srcdir/config.sub $host` || exit 1
 TargetPlatform=`/bin/sh $srcdir/config.sub $target` || exit 1
 
 if test x"$TargetPlatform" != x"$HostPlatform" ; then
-    echo "GHC configuration does not support differing host/target (i.e., cross-compiling)"
-    exit 1
+    AC_MSG_ERROR([
+      GHC configuration does not support differing host/target (i.e., cross-compiling)])
 fi
+
+case $HostPlatform in
+*-cygwin*)
+    AC_MSG_WARN([GHC does not support the Cygwin target at the moment])
+    AC_MSG_WARN([I'm assuming you wanted to build for i386-unknown-mingw32])
+    HostPlatform=i386-unknown-mingw32  
+    ;;
+esac
 
 exeext=''
 soext='.so'
@@ -645,12 +653,16 @@ AC_ARG_WITH([ghc],
   fi
   WithGhc="$GHC"])
 # GHC is passed to Cabal, so we need a native path
-if test "x$HostPlatform"  = "xi386-unknown-mingw32" && \
-   test "${OSTYPE}"      != "msys"                  && \
-   test "${WithGhc}"     != ""
+if test "${WithGhc}" != "" && test "$HostPlatform" = "i386-unknown-mingw32"
 then
-    # Canonicalise to <drive>:/path/to/ghc
-    WithGhc=`cygpath -m ${WithGhc}`
+    if test "${OSTYPE}" = "msys"
+    then
+        WithGhc=`echo "${WithGhc}" | sed "s#^/\([a-zA-Z]\)/#\1:/#"`
+    else
+        # Canonicalise to <drive>:/path/to/ghc
+        WithGhc=`cygpath -m ${WithGhc}`
+    fi
+    echo "Canonicalised to: ${WithGhc}"
 fi
 AC_SUBST([WithGhc])
 
@@ -663,8 +675,27 @@ AC_ARG_WITH(hc,
 )
 AC_SUBST(WithHc)
 
+AC_ARG_ENABLE(bootstrap-with-devel-snapshot,
+[AC_HELP_STRING([--enable-bootstrap-with-devel-snapshot],
+                [Allow bootstrapping using a development snapshot of GHC.  This is not guaranteed to work.])],
+        EnableBootstrapWithDevelSnaphost=YES,
+        EnableBootstrapWithDevelSnaphost=NO
+)
+
 if test "$WithGhc" != ""; then
   FPTOOLS_GHC_VERSION([GhcVersion], [GhcMajVersion], [GhcMinVersion], [GhcPatchLevel])dnl
+
+  if test `expr $GhcMinVersion % 2` = "1"; then
+     echo $EnableBootstrapWithDevelSnaphost
+     if test "$EnableBootstrapWithDevelSnaphost" = "NO"; then
+        AC_MSG_ERROR([
+     $WithGhc is a development snapshot of GHC, version $GhcVersion.
+     Bootstrapping using this version of GHC is not supported, and may not
+     work.  Use --enable-bootstrap-with-devel-snapshot to try it anyway,
+     or --with-ghc to specify a different GHC to use.])
+     fi
+  fi
+
   AC_SUBST(GhcVersion)dnl
   AC_SUBST(GhcMajVersion)dnl
   AC_SUBST(GhcMinVersion)dnl
@@ -971,6 +1002,10 @@ dnl ** check for tar
 dnl   if GNU tar is named gtar, look for it first.
 AC_PATH_PROGS(TarCmd,gtar tar,tar)
 
+dnl ** check for patch
+dnl if GNU patch is named gpatch, look for it first
+AC_PATH_PROGS(PatchCmd,gpatch patch, patch)
+
 AC_PATH_PROG(HSCOLOUR,HsColour)
 # HsColour is passed to Cabal, so we need a native path
 if test "x$HostPlatform"  = "xi386-unknown-mingw32" && \
@@ -988,15 +1023,6 @@ FP_PROG_FO_PROCESSOR
 
 dnl ** check for ghc-pkg command
 FP_PROG_GHC_PKG
-
-AC_ARG_WITH(greencard,
-[AC_HELP_STRING([--with-greencard=ARG],
-        [Use ARG as the path to greencard  [default=autodetct]])],
-[
-GreenCardCmd=$withval;
-FPTOOLS_GREENCARD(3.00)
-]
-)
 
 dnl ** check for installed happy binary + version
 dnl    (don't do it if we're booting from .hc files though.)
@@ -1290,7 +1316,7 @@ else
 fi
 AC_SUBST(HavePapi)
 
-AC_CONFIG_FILES([mk/config.mk compiler/ghc.cabal ghc/ghc-bin.cabal utils/runghc/runghc.cabal ghc.spec extra-gcc-opts docs/users_guide/ug-book.xml])
+AC_CONFIG_FILES([mk/config.mk mk/project.mk compiler/ghc.cabal ghc/ghc-bin.cabal ghc.spec extra-gcc-opts docs/users_guide/ug-book.xml])
 AC_CONFIG_COMMANDS([mk/stamp-h],[echo timestamp > mk/stamp-h])
 AC_OUTPUT
 
@@ -1313,3 +1339,69 @@ checkMake380() {
 checkMake380 make
 checkMake380 gmake
 
+echo ["
+----------------------------------------------------------------------
+Configure completed successfully.
+
+   Building GHC version  : $ProjectVersion
+
+   Build platform        : $BuildPlatform
+   Host platform         : $HostPlatform
+   Target platform       : $TargetPlatform
+"]
+
+if test "$BootingFromHc" = "YES"; then
+echo ["\
+   Bootstrapping from HC files.
+"]
+else
+echo ["\
+   Bootstrapping using   : $WithGhc
+      which is version   : $GhcVersion
+"]
+fi
+
+echo ["\
+   Using GCC             : $WhatGccIsCalled
+      which is version   : $GccVersion
+
+   ld       : $LdCmd
+   Happy    : $HappyCmd
+   Alex     : $AlexCmd
+   Python   : $PythonCmd
+   Perl     : $PerlCmd"]
+
+if test "$HSCOLOUR" = ""; then
+echo ["
+   HsColour was not found; documentation will not contain source links
+"]
+else
+echo ["\
+   HsColour : $HSCOLOUR
+"]
+fi
+
+if test "$DIR_DOCBOOK_XSL" = ""; then
+echo ["\
+   Building DocBook documentation : no"]
+else
+echo ["\
+   Building DocBook documentation : yes"]
+fi
+
+
+echo ["\
+   Building shared libraries      : $BuildSharedLibs"]
+
+echo ["----------------------------------------------------------------------
+"]
+
+echo "\
+For a standard build of GHC (fully optimised with profiling), type (g)make.
+
+To make changes to the default build configuration, copy the file
+mk/build.mk.sample to mk/build.mk, and edit the settings in there.
+
+For more information on how to configure your GHC build, see
+   http://hackage.haskell.org/trac/ghc/wiki/Building
+"

@@ -1425,7 +1425,7 @@ run_BCO:
             ffi_call(cif, fn, ret, argptrs);
 
 	    // And restart the thread again, popping the RET_DYN frame.
-	    cap = (Capability *)((void *)((unsigned char*)resumeThread(tok) - FIELD_OFFSET(Capability,r)));
+	    cap = (Capability *)((void *)((unsigned char*)resumeThread(tok) - STG_FIELD_OFFSET(Capability,r)));
 	    LOAD_STACK_POINTERS;
 
             // Re-load the pointer to the BCO from the RET_DYN frame,

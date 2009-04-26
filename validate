@@ -58,6 +58,11 @@ if [ $no_clean -eq 0 ]; then
         make distclean
     fi
 
+    INSTDIR=`pwd`/inst
+    if [ "$OSTYPE" = "cygwin" ]
+    then
+        INSTDIR=`cygpath -m "$INSTDIR"`
+    fi
     case $OSTYPE in
         cygwin|msys) config_args=--build=i386-unknown-mingw32
             if [ -f c:/mingw/bin/gcc.exe ]
@@ -72,7 +77,7 @@ if [ $no_clean -eq 0 ]; then
     esac
 
     sh boot
-    ./configure "--prefix=`pwd`/inst" $config_args
+    ./configure --prefix="$INSTDIR" $config_args
 fi
 
 thisdir=`utils/pwd/pwd forwardslash`

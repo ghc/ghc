@@ -122,6 +122,8 @@ sub mangle_command_line_args {
 	    push(@Defines, $2);
 	} elsif ( /^(-optc)?(-I.*)/ ) {
 	    $Include_dirs .= " $2";
+	} elsif ( /^(-optc)?(-isystem.*)/ ) {
+	    $Include_dirs .= " $2";
 
 	} elsif ($Dashdashes_seen != 1) { # not between -- ... --
 	    if ( /^-v$/ ) {

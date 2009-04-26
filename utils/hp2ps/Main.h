@@ -1,7 +1,7 @@
 #ifndef MAIN_H
 #define MAIN_H
 
-#include "../includes/ghcconfig.h"
+#include "ghcconfig.h"
 #include <stdio.h>
 
 #ifdef __STDC__

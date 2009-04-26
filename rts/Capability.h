@@ -148,7 +148,7 @@ struct Capability_ {
 INLINE_HEADER Capability *
 regTableToCapability (StgRegTable *reg)
 {
-    return (Capability *)((void *)((unsigned char*)reg - FIELD_OFFSET(Capability,r)));
+    return (Capability *)((void *)((unsigned char*)reg - STG_FIELD_OFFSET(Capability,r)));
 }
 
 // Initialise the available capabilities.

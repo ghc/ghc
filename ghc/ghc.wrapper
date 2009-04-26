@@ -1,3 +1,1 @@
-#!/bin/sh
-
 exec $executablename -B$datadir -dynload wrapped ${1+"$@"}
