@@ -535,17 +535,20 @@ findObjectLinkable mod obj_fn obj_time = do
 
 cannotFindModule :: DynFlags -> ModuleName -> FindResult -> SDoc
 cannotFindModule = cantFindErr (sLit "Could not find module")
+                               (sLit "Ambiguous module name")
 
 cannotFindInterface  :: DynFlags -> ModuleName -> FindResult -> SDoc
 cannotFindInterface = cantFindErr (sLit "Failed to load interface for")
+                                  (sLit "Ambiguous interface for")
 
-cantFindErr :: LitString -> DynFlags -> ModuleName -> FindResult -> SDoc
-cantFindErr cannot_find _dflags mod_name (FoundMultiple pkgs)
-  = hang (ptext cannot_find <+> quotes (ppr mod_name) <> colon) 2 (
+cantFindErr :: LitString -> LitString -> DynFlags -> ModuleName -> FindResult
+            -> SDoc
+cantFindErr _ multiple_found _ mod_name (FoundMultiple pkgs)
+  = hang (ptext multiple_found <+> quotes (ppr mod_name) <> colon) 2 (
        sep [ptext (sLit "it was found in multiple packages:"),
 		hsep (map (text.packageIdString) pkgs)]
     )
-cantFindErr cannot_find dflags mod_name find_result
+cantFindErr cannot_find _ dflags mod_name find_result
   = hang (ptext cannot_find <+> quotes (ppr mod_name) <> colon)
        2 more_info
   where
