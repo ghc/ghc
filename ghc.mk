@@ -67,27 +67,31 @@
 #   make show VALUE=VAR       prints the value of VAR
 #   $(warning stuff)          prints stuff when reading the makefile
 
-# BUILD ORDER
+# Approximate build order.
+#
+# The actual build order is defined by dependencies, and the phase
+# ordering used to ensure correct ordering of makefile-generation; see
+#    http://hackage.haskell.org/trac/ghc/wiki/Building/Architecture/Idiom/PhaseOrdering
 #
 #     * With bootstrapping compiler:
-#           o Build libraries/{hpc,extensible-exceptions,Cabal}
-#           o Build utils/ghc-pkg
 #           o Build utils/ghc-cabal
-#     * With bootstrapping compiler and ghc-cabal:
+#           o Build utils/ghc-pkg
 #           o Build utils/hsc2hs
-#           o Build libraries/hpc
-#           o Build compiler (stage 1)
 #     * For each package:
-#	    o generate package-data.mk and inplace-pkg-info
+#	    o configure, generate package-data.mk and inplace-pkg-info
 #           o register each package into inplace/lib/package.conf
-#           o generate .depend for each package
+#     * build libffi
+#     * With bootstrapping compiler:
+#	    o Build libraries/{filepath,hpc,extensible-exceptions,Cabal}
+#           o Build compiler (stage 1)
 #     * With stage 1:
 #           o Build libraries/*
+#	    o Build rts
 #           o Build utils/* (except haddock)
 #           o Build compiler (stage 2)
 #     * With stage 2:
 #           o Build utils/haddock
-#           o Build compiler (stage 3)
+#           o Build compiler (stage 3) (optional)
 #     * With haddock:
 #           o libraries/*
 #           o compiler
