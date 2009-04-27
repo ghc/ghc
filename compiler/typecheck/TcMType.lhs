@@ -35,14 +35,14 @@ module TcMType (
   tcInstTyVar, tcInstType, tcInstTyVars, tcInstBoxyTyVar,
   tcInstSigType,
   tcInstSkolTyVars, tcInstSkolType, 
-  tcSkolSigType, tcSkolSigTyVars, occurCheckErr,
+  tcSkolSigType, tcSkolSigTyVars, occurCheckErr, execTcTyVarBinds,
 
   --------------------------------
   -- Checking type validity
   Rank, UserTypeCtxt(..), checkValidType, checkValidMonoType,
   SourceTyCtxt(..), checkValidTheta, checkFreeness,
   checkValidInstHead, checkValidInstance, 
-  checkInstTermination, checkValidTypeInst, checkTyFamFreeness,
+  checkInstTermination, checkValidTypeInst, checkTyFamFreeness, checkKinds,
   checkUpdateMeta, updateMeta, checkTauTvUpdate, fillBoxWithTau, unifyKindCtxt,
   unifyKindMisMatch, validDerivPred, arityErr, notMonoType, notMonoArgs,
   growPredTyVars, growTyVars, growThetaTyVars,
@@ -78,6 +78,7 @@ import VarSet
 import ErrUtils
 import DynFlags
 import Util
+import Bag
 import Maybes
 import ListSetOps
 import UniqSupply
@@ -337,6 +338,27 @@ Rather, we should bind t to () (= non_var_ty2).
 
 --------------
 
+Execute a bag of type variable bindings.
+
+\begin{code}
+execTcTyVarBinds :: TcTyVarBinds -> TcM ()
+execTcTyVarBinds = mapM_ execTcTyVarBind . bagToList
+  where
+    execTcTyVarBind (TcTyVarBind tv ty)
+      = do { ASSERTM2( do { details <- readMetaTyVar tv
+                          ; return (isFlexi details) }, ppr tv )
+           ; ty' <- if isCoVar tv 
+                    then return ty 
+                    else do { maybe_ty <- checkTauTvUpdate tv ty
+                            ; case maybe_ty of
+                                Nothing -> pprPanic "TcRnMonad.execTcTyBind"
+                                             (ppr tv <+> text ":=" <+> ppr ty)
+                                Just ty' -> return ty'
+                            }
+           ; writeMetaTyVar tv ty'
+           }
+\end{code}
+
 Error mesages in case of kind mismatch.
 
 \begin{code}
@@ -522,19 +544,17 @@ writeMetaTyVar tyvar ty
     return ()
   | otherwise
   = ASSERT( isMetaTyVar tyvar )
-    -- TOM: It should also work for coercions
-    -- ASSERT2( k2 `isSubKind` k1, (ppr tyvar <+> ppr k1) $$ (ppr ty <+> ppr k2) )
+    ASSERT2( isCoVar tyvar || typeKind ty `isSubKind` tyVarKind tyvar, 
+             (ppr tyvar <+> ppr (tyVarKind tyvar)) 
+             $$ (ppr ty <+> ppr (typeKind ty)) )
     do	{ if debugIsOn then do { details <- readMetaTyVar tyvar; 
+-- FIXME   	     	       	       ; ASSERT2( not (isFlexi details), ppr tyvar )
     	     	       	       ; WARN( not (isFlexi details), ppr tyvar )
 			       	 return () }
 			else return () 
-		-- Temporarily make this a warning, until we fix Trac #2999
 
 	; traceTc (text "writeMetaTyVar" <+> ppr tyvar <+> text ":=" <+> ppr ty)
 	; writeMutVar (metaTvRef tyvar) (Indirect ty) }
-  where
-    _k1 = tyVarKind tyvar
-    _k2 = typeKind ty
 \end{code}
 
 

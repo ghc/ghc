@@ -25,7 +25,7 @@ module CoreFVs (
 	exprFreeNames, exprsFreeNames,
 
         -- * Free variables of Rules, Vars and Ids
-	idRuleVars, idFreeVars, varTypeTyVars, 
+	idRuleVars, idFreeVars, varTypeTyVars, varTypeTcTyVars, 
 	ruleRhsFreeVars, rulesFreeVars,
 	ruleLhsFreeNames, ruleLhsFreeIds, 
 
@@ -368,6 +368,13 @@ varTypeTyVars :: Var -> TyVarSet
 -- Remember, coercion variables can mention type variables...
 varTypeTyVars var
   | isLocalId var || isCoVar var = tyVarsOfType (idType var)
+  | otherwise = emptyVarSet	-- Global Ids and non-coercion TyVars
+
+varTypeTcTyVars :: Var -> TyVarSet
+-- Find the type variables free in the type of the variable
+-- Remember, coercion variables can mention type variables...
+varTypeTcTyVars var
+  | isLocalId var || isCoVar var = tcTyVarsOfType (idType var)
   | otherwise = emptyVarSet	-- Global Ids and non-coercion TyVars
 
 idFreeVars :: Id -> VarSet

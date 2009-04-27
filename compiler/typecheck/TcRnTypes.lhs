@@ -34,7 +34,7 @@ module TcRnTypes(
 	plusLIEs, mkLIE, isEmptyLIE, lieToList, listToLIE,
 
 	-- Misc other types
-	TcId, TcIdSet, TcDictBinds,
+	TcId, TcIdSet, TcDictBinds, TcTyVarBind(..), TcTyVarBinds
 	
   ) where
 
@@ -96,6 +96,18 @@ type IfL a  = IfM IfLclEnv a			-- Nested
 type TcRn a = TcRnIf TcGblEnv TcLclEnv a
 type RnM  a = TcRn a		-- Historical
 type TcM  a = TcRn a		-- Historical
+\end{code}
+
+Representation of type bindings to uninstantiated meta variables used during
+constraint solving.
+
+\begin{code}
+data TcTyVarBind = TcTyVarBind TcTyVar TcType
+
+type TcTyVarBinds = Bag TcTyVarBind
+
+instance Outputable TcTyVarBind where
+  ppr (TcTyVarBind tv ty) = ppr tv <+> text ":=" <+> ppr ty
 \end{code}
 
 
@@ -343,15 +355,20 @@ data TcLclEnv		-- Changes as we move inside an expression
 		-- We still need the unsullied global name env so that
     		--   we can look up record field names
 
-	tcl_env  :: NameEnv TcTyThing,  -- The local type environment: Ids and TyVars
-					-- defined in this module
+	tcl_env  :: NameEnv TcTyThing,  -- The local type environment: Ids and
+					-- TyVars defined in this module
 					
 	tcl_tyvars :: TcRef TcTyVarSet,	-- The "global tyvars"
 			-- Namely, the in-scope TyVars bound in tcl_env, 
-			-- plus the tyvars mentioned in the types of Ids bound in tcl_lenv
-			-- Why mutable? see notes with tcGetGlobalTyVars
+			-- plus the tyvars mentioned in the types of Ids bound
+			-- in tcl_lenv. 
+                        -- Why mutable? see notes with tcGetGlobalTyVars
 
-	tcl_lie   :: TcRef LIE		-- Place to accumulate type constraints
+	tcl_lie   :: TcRef LIE,		-- Place to accumulate type constraints
+
+        tcl_tybinds :: TcRef TcTyVarBinds -- Meta and coercion type variable
+                                          -- bindings accumulated during
+                                          -- constraint solving
     }
 
 

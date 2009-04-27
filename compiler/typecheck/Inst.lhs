@@ -22,9 +22,9 @@ module Inst (
 	tcInstClassOp, 
 	tcSyntaxName, isHsVar,
 
-	tyVarsOfInst, tyVarsOfInsts, tyVarsOfLIE, 
-	ipNamesOfInst, ipNamesOfInsts, fdPredsOfInst, fdPredsOfInsts,
-	growInstsTyVars, getDictClassTys, dictPred,
+	tyVarsOfInst, tyVarsOfInsts, tyVarsOfLIE, tcTyVarsOfInst,
+	tcTyVarsOfInsts, ipNamesOfInst, ipNamesOfInsts, fdPredsOfInst,
+	fdPredsOfInsts, growInstsTyVars, getDictClassTys, dictPred,
 
 	lookupSimpleInst, LookupInstResult(..), 
 	tcExtendLocalInstEnv, tcGetInstEnvs, getOverlapFlag,
@@ -193,22 +193,53 @@ ipNamesOfInst (Method {tci_theta = theta})   = [ipNameName n | IParam n _ <- the
 ipNamesOfInst _                              = []
 
 ---------------------------------
-tyVarsOfInst :: Inst -> TcTyVarSet
+
+-- |All free type variables (not including the coercion variables of
+-- equalities)
+--
+tyVarsOfInst :: Inst -> TyVarSet
 tyVarsOfInst (LitInst {tci_ty = ty})  = tyVarsOfType  ty
 tyVarsOfInst (Dict {tci_pred = pred}) = tyVarsOfPred pred
-tyVarsOfInst (Method {tci_oid = id, tci_tys = tys}) = tyVarsOfTypes tys `unionVarSet` varTypeTyVars id
-				 -- The id might have free type variables; in the case of
-				 -- locally-overloaded class methods, for example
-tyVarsOfInst (ImplicInst {tci_tyvars = tvs, tci_given = givens, tci_wanted = wanteds})
+tyVarsOfInst (Method {tci_oid = id, tci_tys = tys}) 
+  = tyVarsOfTypes tys `unionVarSet` varTypeTyVars id
+    -- The id might have free type variables; in the case of
+    -- locally-overloaded class methods, for example
+tyVarsOfInst (ImplicInst {tci_tyvars = tvs, tci_given = givens, 
+                          tci_wanted = wanteds})
   = (tyVarsOfInsts givens `unionVarSet` tyVarsOfInsts wanteds) 
     `minusVarSet` mkVarSet tvs
     `unionVarSet` unionVarSets (map varTypeTyVars tvs)
 		-- Remember the free tyvars of a coercion
-tyVarsOfInst (EqInst {tci_left = ty1, tci_right = ty2}) = tyVarsOfType ty1 `unionVarSet` tyVarsOfType ty2
+tyVarsOfInst (EqInst {tci_left = ty1, tci_right = ty2}) 
+  = tyVarsOfType ty1 `unionVarSet` tyVarsOfType ty2
 
-tyVarsOfInsts :: [Inst] -> VarSet
+-- |All free meta type variables *including* the coercion variables of
+-- equalities
+--
+tcTyVarsOfInst :: Inst -> TyVarSet
+tcTyVarsOfInst (LitInst {tci_ty = ty})  = tcTyVarsOfType  ty
+tcTyVarsOfInst (Dict {tci_pred = pred}) = tcTyVarsOfPred pred
+tcTyVarsOfInst (Method {tci_oid = id, tci_tys = tys}) 
+  = tcTyVarsOfTypes tys `unionVarSet` varTypeTcTyVars id
+    -- The id might have free type variables; in the case of
+    -- locally-overloaded class methods, for example
+tcTyVarsOfInst (ImplicInst {tci_tyvars = tvs, tci_given = givens, 
+                            tci_wanted = wanteds})
+  = (tcTyVarsOfInsts givens `unionVarSet` tcTyVarsOfInsts wanteds) 
+    `minusVarSet` mkVarSet tvs
+    `unionVarSet` unionVarSets (map varTypeTcTyVars tvs)
+		-- Remember the free tyvars of a coercion
+tcTyVarsOfInst (EqInst {tci_co = co, tci_left = ty1, tci_right = ty2}) 
+  = either unitVarSet tcTyVarsOfType co `unionVarSet`   -- include covars
+    tcTyVarsOfType ty1 `unionVarSet` tcTyVarsOfType ty2
+
+tyVarsOfInsts :: [Inst] -> TyVarSet
 tyVarsOfInsts insts = foldr (unionVarSet . tyVarsOfInst) emptyVarSet insts
-tyVarsOfLIE :: Bag Inst -> VarSet
+
+tcTyVarsOfInsts :: [Inst] -> TcTyVarSet
+tcTyVarsOfInsts insts = foldr (unionVarSet . tcTyVarsOfInst) emptyVarSet insts
+
+tyVarsOfLIE :: Bag Inst -> TyVarSet
 tyVarsOfLIE   lie   = tyVarsOfInsts (lieToList lie)
 
 
@@ -1029,7 +1060,7 @@ depending on whether a EqInstCo is for a wanted or local equality:
 --
 mkIdEqInstCo :: EqInstCo -> Type -> TcM ()
 mkIdEqInstCo (Left cotv) t
-  = writeMetaTyVar cotv t
+  = bindMetaTyVar cotv t
 mkIdEqInstCo (Right _) _
   = return ()
 
@@ -1038,7 +1069,7 @@ mkIdEqInstCo (Right _) _
 mkSymEqInstCo :: EqInstCo -> (Type, Type) -> TcM EqInstCo
 mkSymEqInstCo (Left cotv) (ty1, ty2)
   = do { cotv' <- newMetaCoVar ty1 ty2
-       ; writeMetaTyVar cotv (mkSymCoercion (TyVarTy cotv'))
+       ; bindMetaTyVar cotv (mkSymCoercion (TyVarTy cotv'))
        ; return $ Left cotv'
        }
 mkSymEqInstCo (Right co) _ 
@@ -1049,7 +1080,7 @@ mkSymEqInstCo (Right co) _
 mkLeftTransEqInstCo :: EqInstCo -> Coercion -> (Type, Type) -> TcM EqInstCo
 mkLeftTransEqInstCo (Left cotv) given_co (ty1, ty2)
   = do { cotv' <- newMetaCoVar ty1 ty2
-       ; writeMetaTyVar cotv (TyVarTy cotv' `mkTransCoercion` given_co)
+       ; bindMetaTyVar cotv (TyVarTy cotv' `mkTransCoercion` given_co)
        ; return $ Left cotv'
        }
 mkLeftTransEqInstCo (Right co) given_co _ 
@@ -1060,7 +1091,7 @@ mkLeftTransEqInstCo (Right co) given_co _
 mkRightTransEqInstCo :: EqInstCo -> Coercion -> (Type, Type) -> TcM EqInstCo
 mkRightTransEqInstCo (Left cotv) given_co (ty1, ty2)
   = do { cotv' <- newMetaCoVar ty1 ty2
-       ; writeMetaTyVar cotv (given_co `mkTransCoercion` TyVarTy cotv')
+       ; bindMetaTyVar cotv (given_co `mkTransCoercion` TyVarTy cotv')
        ; return $ Left cotv'
        }
 mkRightTransEqInstCo (Right co) given_co _ 
@@ -1073,7 +1104,7 @@ mkAppEqInstCo :: EqInstCo -> (Type, Type) -> (Type, Type)
 mkAppEqInstCo (Left cotv) (ty1_l, ty2_l) (ty1_r, ty2_r)
   = do { cotv_l <- newMetaCoVar ty1_l ty2_l
        ; cotv_r <- newMetaCoVar ty1_r ty2_r
-       ; writeMetaTyVar cotv (mkAppCoercion (TyVarTy cotv_l) (TyVarTy cotv_r))
+       ; bindMetaTyVar cotv (mkAppCoercion (TyVarTy cotv_l) (TyVarTy cotv_r))
        ; return (Left cotv_l, Left cotv_r)
        }
 mkAppEqInstCo (Right co) _ _
@@ -1084,7 +1115,7 @@ mkAppEqInstCo (Right co) _ _
 mkTyConEqInstCo :: EqInstCo -> TyCon -> [(Type, Type)] -> TcM ([EqInstCo])
 mkTyConEqInstCo (Left cotv) con ty12s
   = do { cotvs <- mapM (uncurry newMetaCoVar) ty12s
-       ; writeMetaTyVar cotv (mkTyConCoercion con (mkTyVarTys cotvs))
+       ; bindMetaTyVar cotv (mkTyConCoercion con (mkTyVarTys cotvs))
        ; return (map Left cotvs)
        }
 mkTyConEqInstCo (Right co) _ args
@@ -1102,7 +1133,7 @@ mkFunEqInstCo :: EqInstCo -> (Type, Type) -> (Type, Type)
 mkFunEqInstCo (Left cotv) (ty1_l, ty2_l) (ty1_r, ty2_r)
   = do { cotv_l <- newMetaCoVar ty1_l ty2_l
        ; cotv_r <- newMetaCoVar ty1_r ty2_r
-       ; writeMetaTyVar cotv (mkFunCoercion (TyVarTy cotv_l) (TyVarTy cotv_r))
+       ; bindMetaTyVar cotv (mkFunCoercion (TyVarTy cotv_l) (TyVarTy cotv_r))
        ; return (Left cotv_l, Left cotv_r)
        }
 mkFunEqInstCo (Right co) _ _

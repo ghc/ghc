@@ -37,7 +37,6 @@ import Name
 import Bag
 import Outputable
 import SrcLoc	( Located(..) )
-import Util	( debugIsOn )
 import Maybes
 import MonadUtils
 import FastString
@@ -199,23 +198,67 @@ tcGenericNormaliseFamInstPred fun (EqPred ty1 ty2)
 %*									*
 %************************************************************************
 
+Given a set of given, local constraints and a set of wanted constraints,
+simplify the wanted equalities as far as possible and normalise both local and
+wanted dictionaries with respect to the equalities.
+
+In addition to the normalised local dictionaries and simplified wanteds, the
+function yields bindings for instantiated meta variables (due to solving
+equality constraints) and dictionary bindings (due to simplifying class
+constraints).  The bag of type variable bindings only contains bindings for
+non-local variables - i.e., type variables other than those newly created by
+the present function.  Consequently, type improvement took place iff the bag
+of bindings contains any bindings for proper type variables (not just covars).
+The solver does not instantiate any non-local variables; i.e., the bindings
+must be executed by the caller.
+
+All incoming constraints are assumed to be zonked already.  All outgoing
+constraints will be zonked again.
+
+NB: The solver only has local effects that cannot be observed from outside.
+    In particular, it can be executed twice on the same constraint set with
+    the same result (modulo generated variables names).
+
 \begin{code}
 tcReduceEqs :: [Inst]             -- locals
             -> [Inst]             -- wanteds
             -> TcM ([Inst],       -- normalised locals (w/o equalities)
                     [Inst],       -- normalised wanteds (including equalities)
-                    TcDictBinds,  -- bindings for all simplified dictionaries
-                    Bool)         -- whether any flexibles where instantiated
+                    TcTyVarBinds, -- bindings for meta type variables
+                    TcDictBinds)  -- bindings for all simplified dictionaries
 tcReduceEqs locals wanteds
-  = do { let (local_eqs  , local_dicts)   = partition isEqInst locals
-             (wanteds_eqs, wanteds_dicts) = partition isEqInst wanteds
-       ; eqCfg1 <- normaliseEqs (local_eqs ++ wanteds_eqs)
-       ; eqCfg2 <- normaliseDicts False local_dicts
-       ; eqCfg3 <- normaliseDicts True  wanteds_dicts
-       ; eqCfg <- propagateEqs (eqCfg1 `unionEqConfig` eqCfg2 
-                                       `unionEqConfig` eqCfg3)
-       ; finaliseEqsAndDicts eqCfg
+  = do { ((locals, wanteds, dictBinds), tyBinds) <- getTcTyVarBinds $
+           do { let (local_eqs  , local_dicts)   = partition isEqInst locals
+                    (wanteds_eqs, wanteds_dicts) = partition isEqInst wanteds
+              ; eqCfg1 <- normaliseEqs (local_eqs ++ wanteds_eqs)
+              ; eqCfg2 <- normaliseDicts False local_dicts
+              ; eqCfg3 <- normaliseDicts True  wanteds_dicts
+              ; eqCfg <- propagateEqs (eqCfg1 `unionEqConfig` 
+                                       eqCfg2 `unionEqConfig`
+                                       eqCfg3) 
+              ; finaliseEqsAndDicts freeFlexibles eqCfg
+              }
+         -- execute type bindings of skolem flexibles...
+       ; tyBinds_pruned <- pruneTyBinds tyBinds freeFlexibles
+         -- ...and zonk the constraints to propagate the bindings
+       ; locals_z  <- zonkInsts locals
+       ; wanteds_z <- zonkInsts wanteds
+       ; return (locals_z, wanteds_z, tyBinds_pruned, dictBinds)
        }
+   where
+     -- unification variables that appear in the environment and may not be
+     -- instantiated - this includes coercion variables
+     freeFlexibles = tcTyVarsOfInsts locals `unionVarSet` 
+                     tcTyVarsOfInsts wanteds
+
+     pruneTyBinds tybinds freeFlexibles
+       = do { let tybinds'                      = bagToList tybinds
+                  (skolem_tybinds, env_tybinds) = partition isSkolem tybinds'
+            ; execTcTyVarBinds (listToBag skolem_tybinds)
+            ; return $ listToBag env_tybinds
+            }
+       where
+         isSkolem (TcTyVarBind tv _ ) = not (tv `elemVarSet` freeFlexibles)
 \end{code}
 
 
@@ -235,12 +278,7 @@ data EqConfig = EqConfig { eqs     :: [RewriteInst]     -- all equalities
                          , locals  :: [Inst]            -- given dicts
                          , wanteds :: [Inst]            -- wanted dicts
                          , binds   :: TcDictBinds       -- bindings
-                         , skolems :: TyVarSet          -- flattening skolems
                          }
-
-addSkolems :: EqConfig -> TyVarSet -> EqConfig
-addSkolems eqCfg newSkolems 
-  = eqCfg {skolems = skolems eqCfg `unionVarSet` newSkolems}
 
 addEq :: EqConfig -> RewriteInst -> EqConfig
 addEq eqCfg eq = eqCfg {eqs = eq : eqs eqCfg}
@@ -251,7 +289,6 @@ unionEqConfig eqc1 eqc2 = EqConfig
                           , locals  = locals eqc1 ++ locals eqc2
                           , wanteds = wanteds eqc1 ++ wanteds eqc2
                           , binds   = binds eqc1 `unionBags` binds eqc2
-                          , skolems = skolems eqc1 `unionVarSet` skolems eqc2
                           }
 
 emptyEqConfig :: EqConfig
@@ -260,7 +297,6 @@ emptyEqConfig = EqConfig
                 , locals  = []
                 , wanteds = []
                 , binds   = emptyBag
-                , skolems = emptyVarSet
                 }
 
 instance Outputable EqConfig where
@@ -280,21 +316,11 @@ no further propoagation is possible.
 --
 normaliseEqs :: [Inst] -> TcM EqConfig
 normaliseEqs eqs 
-  = do { if debugIsOn then do { all_unsolved <- allM wantedEqInstIsUnsolved eqs
-       	    	      	      ; let msg = ptext (sLit "(This warning is harmless; for Simon & Manuel)")
-       	    	      	      ; WARN( not all_unsolved, msg $$ ppr eqs ) return () }
-		      else return ()
-	    -- This is just a warning (not an error) because a current
-	    -- harmless bug means that we sometimes solve the same
-	    -- equality more than once It'll go away with the new
-	    -- solver. See Trac #2999 for example
-
+  = do { ASSERTM2( allM wantedEqInstIsUnsolved eqs, ppr eqs )
        ; traceTc $ ptext (sLit "Entering normaliseEqs")
 
-       ; (eqss, skolemss) <- mapAndUnzipM normEqInst eqs
-       ; return $ emptyEqConfig { eqs = concat eqss
-                                , skolems = unionVarSets skolemss 
-                                }
+       ; eqss <- mapM normEqInst eqs
+       ; return $ emptyEqConfig { eqs = concat eqss }
        }
 
 -- |Flatten the type arguments of all dictionaries, returning the result as a 
@@ -309,8 +335,8 @@ normaliseDicts isWanted insts
                          ptext (if isWanted then sLit "[Wanted] for" 
                                             else sLit "[Local] for"))
                      4 (ppr insts)
-       ; (insts', eqss, bindss, skolemss) <- mapAndUnzip4M (normDict isWanted) 
-                                                           insts
+
+       ; (insts', eqss, bindss) <- mapAndUnzip3M (normDict isWanted) insts
 
        ; traceTc $ hang (ptext (sLit "normaliseDicts returns"))
                      4 (ppr insts' $$ ppr eqss)
@@ -318,7 +344,6 @@ normaliseDicts isWanted insts
                                 , locals  = if isWanted then [] else insts'
                                 , wanteds = if isWanted then insts' else []
                                 , binds   = unionManyBags bindss
-                                , skolems = unionVarSets skolemss
                                 }
        }
 
@@ -333,23 +358,22 @@ propagateEqs eqCfg@(EqConfig {eqs = todoEqs})
        }
 
 -- |Finalise a set of equalities and associated dictionaries after
--- propagation.  The returned Boolean value is `True' iff any flexible
--- variables, except those introduced by flattening (i.e., those in the
--- `skolems' component of the argument) where instantiated. The first returned
--- set of instances are the locals (without equalities) and the second set are
--- all residual wanteds, including equalities. 
+-- propagation.  The first returned set of instances are the locals (without
+-- equalities) and the second set are all residual wanteds, including
+-- equalities.  In addition, we return all generated dictionary bindings.
 --
-finaliseEqsAndDicts :: EqConfig 
-                    -> TcM ([Inst], [Inst], TcDictBinds, Bool)
-finaliseEqsAndDicts (EqConfig { eqs     = eqs
-                              , locals  = locals
-                              , wanteds = wanteds
-                              , binds   = binds
-                              , skolems = skolems
-                              })
+finaliseEqsAndDicts :: TcTyVarSet -> EqConfig 
+                    -> TcM ([Inst], [Inst], TcDictBinds)
+finaliseEqsAndDicts freeFlexibles (EqConfig { eqs     = eqs
+                                            , locals  = locals
+                                            , wanteds = wanteds
+                                            , binds   = binds
+                                            })
   = do { traceTc $ ptext (sLit "finaliseEqsAndDicts")
-       ; (eqs', subst_binds, locals', wanteds') <- substitute eqs locals wanteds
-       ; (eqs'', improved) <- instantiateAndExtract eqs' (null locals) skolems
+
+       ; (eqs', subst_binds, locals', wanteds') 
+           <- substitute eqs locals wanteds checkingMode freeFlexibles
+       ; eqs'' <- bindAndExtract eqs' checkingMode freeFlexibles
        ; let final_binds = subst_binds `unionBags` binds
 
          -- Assert that all cotvs of wanted equalities are still unfilled, and
@@ -357,8 +381,11 @@ finaliseEqsAndDicts (EqConfig { eqs     = eqs
        ; ASSERTM2( allM wantedEqInstIsUnsolved eqs'', ppr eqs'' )
        ; zonked_locals  <- zonkInsts locals'
        ; zonked_wanteds <- zonkInsts (eqs'' ++ wanteds')
-       ; return (zonked_locals, zonked_wanteds, final_binds, improved)
+       ; return (zonked_locals, zonked_wanteds, final_binds)
        }
+  where
+    checkingMode = length eqs > length wanteds || not (null locals)
+                     -- no local equalities or dicts => checking mode
 \end{code}
 
 
@@ -410,6 +437,16 @@ data RewriteInst
 
 isWantedRewriteInst :: RewriteInst -> Bool
 isWantedRewriteInst = isWantedCo . rwi_co
+
+isRewriteVar :: RewriteInst -> Bool
+isRewriteVar (RewriteVar {}) = True
+isRewriteVar _               = False
+
+tyVarsOfRewriteInst :: RewriteInst -> TyVarSet
+tyVarsOfRewriteInst (RewriteVar {rwi_var = tv, rwi_right = ty})
+  = unitVarSet tv `unionVarSet` tyVarsOfType ty
+tyVarsOfRewriteInst (RewriteFam {rwi_args = args, rwi_right = ty})
+  = tyVarsOfTypes args `unionVarSet` tyVarsOfType ty
 
 rewriteInstToInst :: RewriteInst -> TcM Inst
 rewriteInstToInst eq@(RewriteVar {rwi_var = tv})
@@ -472,7 +509,7 @@ we drop that equality and raise an error if it is a wanted or a warning if it
 is a local.
 
 \begin{code}
-normEqInst :: Inst -> TcM ([RewriteInst], TyVarSet)
+normEqInst :: Inst -> TcM [RewriteInst]
 -- Normalise one equality.
 normEqInst inst
   = ASSERT( isEqInst inst )
@@ -480,6 +517,7 @@ normEqInst inst
                    pprEqInstCo co <+> text "::" <+> 
                    ppr ty1 <+> text "~" <+> ppr ty2
        ; res <- go ty1 ty2 co
+
        ; traceTc $ ptext (sLit "normEqInst returns") <+> ppr res
        ; return res
        }
@@ -505,8 +543,8 @@ normEqInst inst
 
       -- no outermost family
     go ty1 ty2 co
-      = do { (ty1', co1, ty1_eqs, ty1_skolems) <- flattenType inst ty1
-           ; (ty2', co2, ty2_eqs, ty2_skolems) <- flattenType inst ty2
+      = do { (ty1', co1, ty1_eqs) <- flattenType inst ty1
+           ; (ty2', co2, ty2_eqs) <- flattenType inst ty2
            ; let ty12_eqs  = ty1_eqs ++ ty2_eqs
                  sym_co2   = mkSymCoercion co2
                  eqTys     = (ty1', ty2')
@@ -519,17 +557,15 @@ normEqInst inst
                             eqInstMisMatch inst
                        else
                          warnDroppingLoopyEquality ty1 ty2
-                     ; return ([], emptyVarSet)         -- drop the equality
+                     ; return ([])                 -- drop the equality
                      }
              else
-               return (eqs ++ ty12_eqs',
-                      ty1_skolems `unionVarSet` ty2_skolems)
+               return (eqs ++ ty12_eqs')
            }
 
     mkRewriteFam swapped con args ty2 co
-      = do { (args', cargs, args_eqss, args_skolemss) 
-               <- mapAndUnzip4M (flattenType inst) args
-           ; (ty2', co2, ty2_eqs, ty2_skolems) <- flattenType inst ty2
+      = do { (args', cargs, args_eqss) <- mapAndUnzip3M (flattenType inst) args
+           ; (ty2', co2, ty2_eqs) <- flattenType inst ty2
            ; let co1       = mkTyConApp con cargs
                  sym_co2   = mkSymCoercion co2
                  all_eqs   = concat args_eqss ++ ty2_eqs
@@ -544,40 +580,37 @@ normEqInst inst
                                   , rwi_name    = tci_name inst
                                   , rwi_swapped = swapped
                                   }
-           ; return $ (thisRewriteFam : all_eqs',
-                       unionVarSets (ty2_skolems:args_skolemss))
+           ; return $ thisRewriteFam : all_eqs'
            }
 
     -- If the original equality has the form a ~ T .. (F ...a...) ..., we will
     -- have a variable equality with 'a' on the lhs as the first equality.
     -- Then, check whether 'a' occurs in the lhs of any family equality
     -- generated by flattening.
-    isLoopyEquality (RewriteVar {rwi_var = tv}:_) eqs
-      = any inRewriteFam eqs
+    isLoopyEquality (RewriteVar {rwi_var = tv}:_) eqs = any inRewriteFam eqs
       where
         inRewriteFam (RewriteFam {rwi_args = args}) 
           = tv `elemVarSet` tyVarsOfTypes args
         inRewriteFam _ = False
     isLoopyEquality _ _ = False
 
-normDict :: Bool -> Inst -> TcM (Inst, [RewriteInst], TcDictBinds, TyVarSet)
+normDict :: Bool -> Inst -> TcM (Inst, [RewriteInst], TcDictBinds)
 -- Normalise one dictionary or IP constraint.
 normDict isWanted inst@(Dict {tci_pred = ClassP clas args})
-  = do { (args', cargs, args_eqss, args_skolemss) 
-           <- mapAndUnzip4M (flattenType inst) args
+  = do { (args', cargs, args_eqss) <- mapAndUnzip3M (flattenType inst) args
        ; let rewriteCo = PredTy $ ClassP clas cargs
              eqs       = concat args_eqss
              pred'     = ClassP clas args'
        ; if null eqs
          then  -- don't generate a binding if there is nothing to flatten
-           return (inst, [], emptyBag, emptyVarSet)
+           return (inst, [], emptyBag)
          else do {
        ; (inst', bind) <- mkDictBind inst isWanted rewriteCo pred'
        ; eqs' <- if isWanted then return eqs else mapM wantedToLocal eqs
-       ; return (inst', eqs', bind, unionVarSets args_skolemss)
+       ; return (inst', eqs', bind)
        }}
 normDict _isWanted inst
-  = return (inst, [], emptyBag, emptyVarSet)
+  = return (inst, [], emptyBag)
 -- !!!TODO: Still need to normalise IP constraints.
 
 checkOrientation :: Type -> Type -> EqInstCo -> Inst -> TcM [RewriteInst]
@@ -722,31 +755,29 @@ flattenType :: Inst     -- context to get location  & name
             -> Type     -- the type to flatten
             -> TcM (Type,           -- the flattened type
                     Coercion,       -- coercion witness of flattening wanteds
-                    [RewriteInst],  -- extra equalities
-                    TyVarSet)       -- new intermediate skolems
+                    [RewriteInst])  -- extra equalities
 -- Removes all family synonyms from a type by moving them into extra equalities
-flattenType inst ty
-  = go ty
+flattenType inst ty = go ty
   where
       -- look through synonyms
     go ty | Just ty' <- tcView ty 
-      = do { (ty_flat, co, eqs, skolems) <- go ty'
+      = do { (ty_flat, co, eqs) <- go ty'
            ; if null eqs
              then     -- unchanged, keep the old type with folded synonyms
-               return (ty, ty, [], emptyVarSet)
+               return (ty, ty, [])
              else 
-               return (ty_flat, co, eqs, skolems)
+               return (ty_flat, co, eqs)
            }
 
       -- type variable => nothing to do
     go ty@(TyVarTy _)
-      = return (ty, ty, [] , emptyVarSet)
+      = return (ty, ty, [])
 
       -- type family application & family arity matches number of args
       -- => flatten to "gamma :: F t1'..tn' ~ alpha" (alpha & gamma fresh)
     go ty@(TyConApp con args)
       | isOpenSynTyConApp ty   -- only if not oversaturated
-      = do { (args', cargs, args_eqss, args_skolemss) <- mapAndUnzip4M go args
+      = do { (args', cargs, args_eqss) <- mapAndUnzip3M go args
            ; alpha <- newFlexiTyVar (typeKind ty)
            ; let alphaTy = mkTyVarTy alpha
            ; cotv <- newMetaCoVar (mkTyConApp con args') alphaTy
@@ -761,38 +792,35 @@ flattenType inst ty
                                   }
            ; return (alphaTy,
                      mkTyConApp con cargs `mkTransCoercion` mkTyVarTy cotv,
-                     thisRewriteFam : concat args_eqss,
-                     unionVarSets args_skolemss `extendVarSet` alpha)
-           }           -- adding new unflatten var inst
+                     thisRewriteFam : concat args_eqss)
+           }
 
       -- data constructor application => flatten subtypes
       -- NB: Special cased for efficiency - could be handled as type application
     go ty@(TyConApp con args)
       | not (isOpenSynTyCon con)   -- don't match oversaturated family apps
-      = do { (args', cargs, args_eqss, args_skolemss) <- mapAndUnzip4M go args
+      = do { (args', cargs, args_eqss) <- mapAndUnzip3M go args
            ; if null args_eqss
              then     -- unchanged, keep the old type with folded synonyms
-               return (ty, ty, [], emptyVarSet)
+               return (ty, ty, [])
              else 
                return (mkTyConApp con args', 
                        mkTyConApp con cargs,
-                       concat args_eqss,
-                       unionVarSets args_skolemss)
+                       concat args_eqss)
            }
 
       -- function type => flatten subtypes
       -- NB: Special cased for efficiency - could be handled as type application
     go ty@(FunTy ty_l ty_r)
-      = do { (ty_l', co_l, eqs_l, skolems_l) <- go ty_l
-           ; (ty_r', co_r, eqs_r, skolems_r) <- go ty_r
+      = do { (ty_l', co_l, eqs_l) <- go ty_l
+           ; (ty_r', co_r, eqs_r) <- go ty_r
            ; if null eqs_l && null eqs_r
              then     -- unchanged, keep the old type with folded synonyms
-               return (ty, ty, [], emptyVarSet)
+               return (ty, ty, [])
              else 
                return (mkFunTy ty_l' ty_r', 
                        mkFunTy co_l co_r,
-                       eqs_l ++ eqs_r, 
-                       skolems_l `unionVarSet` skolems_r)
+                       eqs_l ++ eqs_r)
            }
 
       -- type application => flatten subtypes
@@ -800,16 +828,15 @@ flattenType inst ty
       | Just (ty_l, ty_r) <- repSplitAppTy_maybe ty
                              -- need to use the smart split as ty may be an
                              -- oversaturated family application
-      = do { (ty_l', co_l, eqs_l, skolems_l) <- go ty_l
-           ; (ty_r', co_r, eqs_r, skolems_r) <- go ty_r
+      = do { (ty_l', co_l, eqs_l) <- go ty_l
+           ; (ty_r', co_r, eqs_r) <- go ty_r
            ; if null eqs_l && null eqs_r
              then     -- unchanged, keep the old type with folded synonyms
-               return (ty, ty, [], emptyVarSet)
+               return (ty, ty, [])
              else 
                return (mkAppTy ty_l' ty_r', 
                        mkAppTy co_l co_r, 
-                       eqs_l ++ eqs_r, 
-                       skolems_l `unionVarSet` skolems_r)
+                       eqs_l ++ eqs_r)
            }
 
       -- forall type => panic if the body contains a type family
@@ -818,7 +845,7 @@ flattenType inst ty
       --          variable???
     go ty@(ForAllTy _ body)
       | null (tyFamInsts body)
-      = return (ty, ty, [] , emptyVarSet)
+      = return (ty, ty, [])
       | otherwise
       = panic "TcTyFuns.flattenType: synonym family in a rank-n type"
 
@@ -841,7 +868,7 @@ adjustCoercions :: EqInstCo            -- coercion of original equality
 adjustCoercions (Left cotv) co1 co2 (ty_l, ty_r) all_eqs
     -- wanted => generate a fresh coercion variable for the flattened equality
   = do { cotv' <- newMetaCoVar ty_l ty_r
-       ; writeMetaTyVar cotv $ 
+       ; bindMetaTyVar cotv $ 
            (co1 `mkTransCoercion` TyVarTy cotv' `mkTransCoercion` co2)
        ; return (Left cotv', all_eqs)
        }
@@ -890,6 +917,12 @@ mkDictBind dict isWanted rewriteCo pred
 --  NB: It's crucial to update *both* alpha and gamma, as gamma may already
 --      have escaped into some other coercions during normalisation.
 --
+--      We do actually update alpha and gamma by side effect (instead of
+--      only remembering the binding with `bindMetaTyVar', as we do for all
+--      other tyvars).  We can do this as the side effects are strictly
+--      *local*; we know that both alpha and gamma were just a moment ago
+--      introduced by normalisation. 
+--
 wantedToLocal :: RewriteInst -> TcM RewriteInst
 wantedToLocal eq@(RewriteFam {rwi_fam   = fam, 
                               rwi_args  = args, 
@@ -919,35 +952,32 @@ propagate (eq:eqs) eqCfg
        ; case optEqs of
 
               -- Top applied to 'eq' => retry with new equalities
-           Just (eqs2, skolems2) 
-             -> propagate (eqs2 ++ eqs) (eqCfg `addSkolems` skolems2)
+           Just eqs2 -> propagate (eqs2 ++ eqs) eqCfg
 
               -- Top doesn't apply => try subst rules with all other
               --   equalities, after that 'eq' can go into the residual list
-           Nothing
-             -> do { (eqs', eqCfg') <- applySubstRules eq eqs eqCfg
-                   ; propagate eqs' (eqCfg' `addEq` eq)
-                   }
-   }
+           Nothing   -> do { (eqs', eqCfg') <- applySubstRules eq eqs eqCfg
+                           ; propagate eqs' (eqCfg' `addEq` eq)
+                           }
+       }
 
 applySubstRules :: RewriteInst                    -- currently considered eq
                 -> [RewriteInst]                  -- todo eqs list
                 -> EqConfig                       -- residual
                 -> TcM ([RewriteInst], EqConfig)  -- new todo & residual
 applySubstRules eq todoEqs (eqConfig@EqConfig {eqs = resEqs})
-  = do { (newEqs_t, unchangedEqs_t, skolems_t) <- mapSubstRules eq todoEqs
-       ; (newEqs_r, unchangedEqs_r, skolems_r) <- mapSubstRules eq resEqs
+  = do { (newEqs_t, unchangedEqs_t) <- mapSubstRules eq todoEqs
+       ; (newEqs_r, unchangedEqs_r) <- mapSubstRules eq resEqs
        ; return (newEqs_t ++ newEqs_r ++ unchangedEqs_t,
-                 eqConfig {eqs = unchangedEqs_r} 
-                   `addSkolems` (skolems_t `unionVarSet` skolems_r))
+                 eqConfig {eqs = unchangedEqs_r})
        }
 
 mapSubstRules :: RewriteInst     -- try substituting this equality
               -> [RewriteInst]   -- into these equalities
-              -> TcM ([RewriteInst], [RewriteInst], TyVarSet)
+              -> TcM ([RewriteInst], [RewriteInst])
 mapSubstRules eq eqs
-  = do { (newEqss, unchangedEqss, skolemss) <- mapAndUnzip3M (substRules eq) eqs
-       ; return (concat newEqss, concat unchangedEqss, unionVarSets skolemss)
+  = do { (newEqss, unchangedEqss) <- mapAndUnzipM (substRules eq) eqs
+       ; return (concat newEqss, concat unchangedEqss)
        }
   where
     substRules eq1 eq2
@@ -957,18 +987,18 @@ mapSubstRules eq eqs
                -- try the SubstFam rule
            ; optEqs <- applySubstFam eq1 eq2
            ; case optEqs of
-               Just (eqs, skolems) -> return (eqs, [], skolems)
-               Nothing             -> do 
+               Just eqs -> return (eqs, [])
+               Nothing  -> do 
            {   -- try the SubstVarVar rule
              optEqs <- applySubstVarVar eq1 eq2
            ; case optEqs of
-               Just (eqs, skolems) -> return (eqs, [], skolems)
-               Nothing             -> do 
+               Just eqs -> return (eqs, [])
+               Nothing  -> do 
            {   -- try the SubstVarFam rule
              optEqs <- applySubstVarFam eq1 eq2
            ; case optEqs of
-               Just eq -> return ([eq], [], emptyVarSet)
-               Nothing -> return ([], [eq2], emptyVarSet)
+               Just eq -> return ([eq], [])
+               Nothing -> return ([], [eq2])
                  -- if no rule matches, we return the equlity we tried to
                  -- substitute into unchanged
            }}}
@@ -986,7 +1016,7 @@ Returns Nothing if the rule could not be applied.  Otherwise, the resulting
 equality is normalised and a list of the normal equalities is returned.
 
 \begin{code}
-applyTop :: RewriteInst -> TcM (Maybe ([RewriteInst], TyVarSet))
+applyTop :: RewriteInst -> TcM (Maybe [RewriteInst])
 
 applyTop eq@(RewriteFam {rwi_fam = fam, rwi_args = args})
   = do { optTyCo <- tcUnfoldSynFamInst (TyConApp fam args)
@@ -1020,7 +1050,7 @@ equality co1 is not returned as it remain unaltered.)
 \begin{code}
 applySubstFam :: RewriteInst 
               -> RewriteInst 
-              -> TcM (Maybe ([RewriteInst], TyVarSet))
+              -> TcM (Maybe ([RewriteInst]))
 applySubstFam eq1@(RewriteFam {rwi_fam = fam1, rwi_args = args1})
               eq2@(RewriteFam {rwi_fam = fam2, rwi_args = args2})
 
@@ -1035,7 +1065,7 @@ applySubstFam eq1@(RewriteFam {rwi_fam = fam1, rwi_args = args1})
     -- rule would match with eq1 and eq2 swapped => put eq2 into todo list
   | fam1 == fam2 && tcEqTypes args1 args2 &&
     (isWantedRewriteInst eq1 || not (isWantedRewriteInst eq2))
-  = return $ Just ([eq2], emptyVarSet)
+  = return $ Just [eq2]
 
   where
     lhs = rwi_right eq1
@@ -1059,9 +1089,7 @@ co2' is normalised and a list of the normal equalities is returned.  (The
 equality co1 is not returned as it remain unaltered.)
 
 \begin{code}
-applySubstVarVar :: RewriteInst 
-                 -> RewriteInst 
-                 -> TcM (Maybe ([RewriteInst], TyVarSet))
+applySubstVarVar :: RewriteInst -> RewriteInst -> TcM (Maybe [RewriteInst])
 applySubstVarVar eq1@(RewriteVar {rwi_var = tv1})
                  eq2@(RewriteVar {rwi_var = tv2})
 
@@ -1076,7 +1104,7 @@ applySubstVarVar eq1@(RewriteVar {rwi_var = tv1})
     -- rule would match with eq1 and eq2 swapped => put eq2 into todo list
   | tv1 == tv2 &&
     (isWantedRewriteInst eq1 || not (isWantedRewriteInst eq2))
-  = return $ Just ([eq2], emptyVarSet)
+  = return $ Just [eq2]
 
   where
     lhs = rwi_right eq1
@@ -1135,28 +1163,54 @@ applySubstVarFam _ _ = return Nothing
 %************************************************************************
 
 Exhaustive substitution of all variable equalities of the form co :: x ~ t
-(both local and wanted) into the left-hand sides of all other equalities.  This
-may lead to recursive equalities; i.e., (1) we need to apply the substitution
-implied by one variable equality exhaustively before turning to the next and
-(2) we need an occurs check.
+(both local and wanted) into the right-hand sides of all other equalities and
+of family equalities of the form co :: F t1..tn ~ alpha into both sides of all
+other *family* equalities.  This may lead to recursive equalities; i.e., (1)
+we need to apply the substitution implied by one equality exhaustively before
+turning to the next and (2) we need an occurs check.
 
 We also apply the same substitutions to the local and wanted class and IP
-dictionaries.
+dictionaries.  
+
+We perform the substitutions in two steps:
+
+  Step A: Substitute variable equalities into the right-hand sides of all
+          other equalities (but wanted only into wanteds) and into class and IP 
+          constraints (again wanteds only into wanteds).
+
+  Step B: Substitute wanted family equalities `co :: F t1..tn ~ alpha', where
+          'alpha' is a skolem flexible (i.e., not free in the environment),
+          into the right-hand sides of all wanted variable equalities and into
+          both sides of all wanted family equalities.
+
+  Step C: Substitute the remaining wanted family equalities `co :: F t1..tn ~
+          alpha' into the right-hand sides of all wanted variable equalities
+          and into both sides of all wanted family equalities.
+
+In inference mode, we do not substitute into variable equalities in Steps B & C.
 
 The treatment of flexibles in wanteds is quite subtle.  We absolutely want to
-substitute them into right-hand sides of equalities, to avoid getting two
-competing instantiations for a type variables; e.g., consider
+substitute variable equalities first; e.g., consider
 
   F s ~ alpha, alpha ~ t
 
-If we don't substitute `alpha ~ t', we may instantiate t with `F s' instead.
+If we don't substitute `alpha ~ t', we may instantiate `t' with `F s' instead.
 This would be bad as `F s' is less useful, eg, as an argument to a class
-constraint.
+constraint.  
 
-However, there is no reason why we would want to *substitute* `alpha ~ t' into a
-class constraint.  We rather wait until `alpha' is instantiated to `t` and
-save the extra dictionary binding that substitution would introduce.
-Moreover, we may substitute wanted equalities only into wanted dictionaries.
+The restriction on substituting locals is necessary due to examples, such as
+
+  F delta ~ alpha, F alpha ~ delta,
+
+where `alpha' is a skolem flexible and `delta' a environment flexible. We need
+to produce `F (F delta) ~ delta' (and not `F (F alpha) ~ alpha'). Otherwise,
+we may wrongly claim to having performed an improvement, which can lead to
+non-termination of the combined class-family solver.
+
+We do also substitute flexibles, as in `alpha ~ t' into class constraints.
+When `alpha' is later instantiated, we'd get the same effect, but in the
+meantime the class constraint would miss some information, which would be a
+problem in an integrated equality-class solver.
 
 NB: 
 * Given that we apply the substitution corresponding to a single equality
@@ -1168,25 +1222,43 @@ NB:
 substitute :: [RewriteInst]       -- equalities
            -> [Inst]              -- local class dictionaries
            -> [Inst]              -- wanted class dictionaries
+           -> Bool                -- True ~ checking mode; False ~ inference
+           -> TyVarSet            -- flexibles free in the environment
            -> TcM ([RewriteInst], -- equalities after substitution
                    TcDictBinds,   -- all newly generated dictionary bindings
                    [Inst],        -- local dictionaries after substitution
                    [Inst])        -- wanted dictionaries after substitution
-substitute eqs locals wanteds = subst eqs [] emptyBag locals wanteds
+substitute eqs locals wanteds checkingMode freeFlexibles
+  = -- We achieve the sequencing of "Step A", "Step B", and "Step C" above by
+    -- sorting the equalities appropriately: first all variable, then all
+    -- family/skolem, and then the remaining family equalities. 
+    let (var_eqs, fam_eqs)             = partition isRewriteVar eqs
+        (fam_skolem_eqs, fam_eqs_rest) = partition isFamSkolemEq fam_eqs
+    in 
+    subst (var_eqs ++ fam_skolem_eqs ++ fam_eqs_rest) [] emptyBag locals wanteds
   where
+    isFamSkolemEq (RewriteFam {rwi_right = ty})
+      | Just tv <- tcGetTyVar_maybe ty = not (tv `elemVarSet` freeFlexibles)
+    isFamSkolemEq _ = False
+
     subst [] res binds locals wanteds 
       = return (res, binds, locals, wanteds)
 
+    -- co :: x ~ t
     subst (eq@(RewriteVar {rwi_var = tv, rwi_right = ty, rwi_co = co}):eqs) 
           res binds locals wanteds
-      = do { traceTc $ ptext (sLit "TcTyFuns.substitute:") <+> ppr eq
+      = do { traceTc $ ptext (sLit "TcTyFuns.substitute[RewriteVar]:") <+> 
+                       ppr eq
 
+             -- create the substitution
            ; let coSubst = zipOpenTvSubst [tv] [eqInstCoType co]
                  tySubst = zipOpenTvSubst [tv] [ty]
+
+             -- substitute into all other equalities
            ; eqs' <- mapM (substEq eq coSubst tySubst) eqs
            ; res' <- mapM (substEq eq coSubst tySubst) res
 
-             -- only susbtitute local equalities into local dictionaries
+             -- only substitute local equalities into local dictionaries
            ; (lbinds, locals')  <- if not (isWantedCo co)
                                    then 
                                      mapAndUnzipM 
@@ -1195,28 +1267,48 @@ substitute eqs locals wanteds = subst eqs [] emptyBag locals wanteds
                                    else
                                      return ([], locals)
 
-              -- flexible tvs in wanteds will be instantiated anyway, there is
-              -- no need to substitute them into dictionaries
-           ; (wbinds, wanteds') <- if not (isMetaTyVar tv && isWantedCo co)
-                                   then
-                                     mapAndUnzipM 
-                                       (substDict eq coSubst tySubst True) 
-                                       wanteds
-                                   else
-                                     return ([], wanteds)
+              -- substitute all equalities into wanteds dictionaries
+           ; (wbinds, wanteds') <- mapAndUnzipM 
+                                     (substDict eq coSubst tySubst True) 
+                                     wanteds
 
            ; let binds' = unionManyBags $ binds : lbinds ++ wbinds
            ; subst eqs' (eq:res') binds' locals' wanteds'
            }
+
+    -- co ::^w F t1..tn ~ alpha
+    subst (eq@(RewriteFam {rwi_fam = fam, rwi_args = args, rwi_right = ty, 
+                           rwi_co = co}):eqs) 
+          res binds locals wanteds
+      | Just tv <- tcGetTyVar_maybe ty
+      , isMetaTyVar tv
+      , isWantedCo co
+      = do { traceTc $ ptext (sLit "TcTyFuns.substitute[RewriteFam]:") <+> 
+                       ppr eq
+
+             -- create the substitution
+           ; let coSubst = zipOpenTvSubst [tv] [mkSymCoercion $ eqInstCoType co]
+                 tySubst = zipOpenTvSubst [tv] [mkTyConApp fam args]
+
+             -- substitute into other wanted equalities (`substEq' makes sure
+             -- that we only substitute into wanteds)
+           ; eqs' <- mapM (substEq eq coSubst tySubst) eqs
+           ; res' <- mapM (substEq eq coSubst tySubst) res
+
+           ; subst eqs' (eq:res') binds locals wanteds
+           }
+
     subst (eq:eqs) res binds locals wanteds
       = subst eqs (eq:res) binds locals wanteds
 
       -- We have, co :: tv ~ ty 
       -- => apply [ty/tv] to right-hand side of eq2
-      --    (but only if tv actually occurs in the right-hand side of eq2)
-    substEq (RewriteVar {rwi_var = tv, rwi_right = ty}) 
+      --    (but only if tv actually occurs in the right-hand side of eq2
+      --    and if eq2 is a local, co :: tv ~ ty needs to be a local, too)
+    substEq (RewriteVar {rwi_var = tv, rwi_right = ty, rwi_co = co}) 
             coSubst tySubst eq2
-      | tv `elemVarSet` tyVarsOfType (rwi_right eq2)
+      |  tv `elemVarSet` tyVarsOfType (rwi_right eq2)
+      && (isWantedRewriteInst eq2 || not (isWantedCo co))
       = do { let co1Subst = mkSymCoercion $ substTy coSubst (rwi_right eq2)
                  right2'  = substTy tySubst (rwi_right eq2)
                  left2    = case eq2 of
@@ -1228,6 +1320,44 @@ substitute eqs locals wanteds = subst eqs [] emptyBag locals wanteds
                RewriteVar {rwi_var = tv2} | tv2 `elemVarSet` tyVarsOfType ty
                  -> occurCheckErr left2 right2'
                _ -> return $ eq2 {rwi_right = right2', rwi_co = co2'}
+           }
+
+      -- We have, co ::^w F t1..tn ~ tv
+      -- => apply [F t1..tn/tv] to eq2
+      --    (but only if tv actually occurs in eq2
+      --    and eq2 is a wanted equality
+      --    and we are either in checking mode or eq2 is a family equality)
+    substEq (RewriteFam {rwi_args = args, rwi_right = ty}) 
+            coSubst tySubst eq2
+      | Just tv <- tcGetTyVar_maybe ty
+      , tv `elemVarSet` tyVarsOfRewriteInst eq2
+      , isWantedRewriteInst eq2
+      , checkingMode || not (isRewriteVar eq2)
+      = do { -- substitute into the right-hand side
+           ; let co1Subst = mkSymCoercion $ substTy coSubst (rwi_right eq2)
+                 right2'  = substTy tySubst (rwi_right eq2)
+                 left2    = case eq2 of
+                              RewriteVar {rwi_var = tv2}   -> mkTyVarTy tv2
+                              RewriteFam {rwi_fam = fam,
+                                          rwi_args = args} -> mkTyConApp fam args
+           ; co2' <- mkLeftTransEqInstCo (rwi_co eq2) co1Subst (left2, right2')
+           ; case eq2 of
+               RewriteVar {rwi_var = tv2} 
+                 -- variable equality: perform an occurs check
+                 | tv2 `elemVarSet` tyVarsOfTypes args
+                 -> occurCheckErr left2 right2'
+                 | otherwise
+                 -> return $ eq2 {rwi_right = right2', rwi_co = co2'}
+               RewriteFam {rwi_fam = fam}
+                 -- family equality: substitute also into the left-hand side
+                 -> do { let co1Subst = substTy coSubst left2
+                             args2'   = substTys tySubst (rwi_args  eq2)
+                             left2'   = mkTyConApp fam args2'
+                       ; co2'' <- mkRightTransEqInstCo co2' co1Subst 
+                                                       (left2', right2')
+                       ; return $ eq2 {rwi_args = args2', rwi_right = right2', 
+                                       rwi_co = co2''}
+                       }
            }
 
       -- unchanged
@@ -1253,73 +1383,107 @@ substitute eqs locals wanteds = subst eqs [] emptyBag locals wanteds
 \end{code}
 
 For any *wanted* variable equality of the form co :: alpha ~ t or co :: a ~
-alpha, we instantiate alpha with t or a, respectively, and set co := id.
-Return all remaining wanted equalities.  The Boolean result component is True
-if at least one instantiation of a flexible that is *not* a skolem from
-flattening was performed.
+alpha, we record a binding of alpha with t or a, respectively, and for co :=
+id.  We do the same for equalities of the form co :: F t1..tn ~ alpha unless
+we are in inference mode and alpha appears in the environment - i.e., it is
+not a flexible introduced by flattening locals or it is local, but was
+propagated into the environment by the instantiation of a variable equality.
 
-We need to instantiate all flexibles that arose as skolems during flattening
-of wanteds before we instantiate any other flexibles. Consider F delta ~
-alpha, F alpha ~ delta, where alpha is a skolem and delta a free flexible. We
-need to produce F (F delta) ~ delta (and not F (F alpha) ~ alpha). Otherwise,
-we may wrongly claim to having performed an improvement, which can lead to
-non-termination of the combined class-family solver.
+We proceed in two phases: (1) first we consider all variable equalities and then
+(2) we consider all family equalities.  The two phase structure is required as
+the recorded variable equalities determine which skolems flexibles escape, and
+hence, which family equalities may be recorded as bindings.
+
+We return all wanted equalities for which we did not generate a binding.
+(These can be skolem variable equalities, cyclic variable equalities, and
+family equalities.)
+
+We don't update any meta variables.  Instead, instantiation simply implies
+putting a type variable binding into the binding pool of TcM.
+
+NB:
+ * We may encounter filled flexibles due to the instant filling of local
+   skolems in local-given constraints during flattening.
+ * Be careful with SigTVs.  They can only be instantiated with other SigTVs or
+   rigid skolems.
 
 \begin{code}
-instantiateAndExtract :: [RewriteInst] -> Bool -> TyVarSet -> TcM ([Inst], Bool)
-instantiateAndExtract eqs localsEmpty skolems
-  = do { traceTc $ hang (ptext (sLit "instantiateAndExtract:"))
-                     4 (ppr eqs $$ ppr skolems)
-           -- start by *only* instantiating skolem flexibles from flattening
-       ; unflat_wanteds <- liftM catMaybes $ 
-                             mapM (inst (`elemVarSet` skolems)) wanteds
-           -- only afterwards instantiate free flexibles
-       ; residuals <- liftM catMaybes $ mapM (inst (const True)) unflat_wanteds
-       ; let improvement = length residuals < length unflat_wanteds
-       ; residuals' <- mapM rewriteInstToInst residuals
-       ; return (residuals', improvement)
+bindAndExtract :: [RewriteInst] -> Bool -> TyVarSet -> TcM [Inst]
+bindAndExtract eqs checkingMode freeFlexibles
+  = do { traceTc $ hang (ptext (sLit "bindAndExtract:"))
+                     4 (ppr eqs $$ ppr freeFlexibles)
+       ; residuals1 <- mapMaybeM instVarEq (filter isWantedRewriteInst eqs)
+       ; escapingSkolems <- getEscapingSkolems
+       ; let newFreeFlexibles = freeFlexibles `unionVarSet` escapingSkolems
+       ; residuals2 <- mapMaybeM (instFamEq newFreeFlexibles) residuals1
+       ; mapM rewriteInstToInst residuals2
        }
   where
-    wanteds      = filter (isWantedCo . rwi_co) eqs
-    checkingMode = length eqs > length wanteds || not localsEmpty
-                     -- no local equalities or dicts => checking mode
+    -- NB: we don't have to transitively chase the relation as the substitution
+    --     process applied before generating the bindings was exhaustive
+    getEscapingSkolems
+      = do { tybinds_rel <- getTcTyVarBindsRelation
+           ; return (unionVarSets . map snd . filter isFree $ tybinds_rel)
+           }
+      where
+        isFree (tv, _) = tv `elemVarSet` freeFlexibles
 
         -- co :: alpha ~ t or co :: a ~ alpha
-    inst mayInst eq@(RewriteVar {rwi_var = tv1, rwi_right = ty2, rwi_co = co})
-      = do { flexi_tv1       <- isFlexible mayInst tv1
-           ; maybe_flexi_tv2 <- isFlexibleTy mayInst ty2
+    instVarEq eq@(RewriteVar {rwi_var = tv1, rwi_right = ty2, rwi_co = co})
+      = do { flexi_tv1       <- isFlexible   tv1
+           ; maybe_flexi_tv2 <- isFlexibleTy ty2
            ; case (flexi_tv1, maybe_flexi_tv2) of
+               (True, Just tv2)
+                 | isSigTyVar tv1 && isSigTyVar tv2
+                 -> -- co :: alpha ~ beta, where both a SigTvs
+                    doInst (rwi_swapped eq) tv1 ty2 co eq
+               (True, Nothing) 
+                 | Just tv2 <- tcGetTyVar_maybe ty2
+                 , isSigTyVar tv1
+                 , isSkolemTyVar tv2
+                 -> -- co :: alpha ~ a, where alpha is a SigTv
+                    doInst (rwi_swapped eq) tv1 ty2 co eq
                (True, _) 
-                 -> -- co :: alpha ~ t
+                 | not (isSigTyVar tv1)
+                 -> -- co :: alpha ~ t, where alpha is not a SigTv
                     doInst (rwi_swapped eq) tv1 ty2 co eq
                (False, Just tv2) 
-                 -> -- co :: a ~ alpha                  
+                 | isSigTyVar tv2
+                 , isSkolemTyVar tv1
+                 -> -- co :: a ~ alpha, where alpha is a SigTv
+                    doInst (not $ rwi_swapped eq) tv2 (mkTyVarTy tv1) co eq
+                 | not (isSigTyVar tv2)
+                 -> -- co :: a ~ alpha, where alpha is not a SigTv 
+                    --                        ('a' may be filled)
                     doInst (not $ rwi_swapped eq) tv2 (mkTyVarTy tv1) co eq
                _ -> return $ Just eq
            }
+    instVarEq eq = return $ Just eq
 
-        -- co :: F args ~ alpha, and we are in checking mode (ie, no locals)
-    inst mayInst eq@(RewriteFam {rwi_fam = fam, rwi_args = args, 
-                                 rwi_right = ty2, rwi_co = co})
+        -- co :: F args ~ alpha, 
+        -- and we are either in checking mode or alpha is a skolem flexible that
+        --     doesn't escape
+    instFamEq newFreeFlexibles eq@(RewriteFam {rwi_fam = fam, rwi_args = args, 
+                                               rwi_right = ty2, rwi_co = co})
       | Just tv2 <- tcGetTyVar_maybe ty2
-      , isMetaTyVar tv2
-      , mayInst tv2 && (checkingMode || tv2 `elemVarSet` skolems)
-                        -- !!!FIXME: this is too liberal, even if tv2 is in 
-                        -- skolems we shouldn't instantiate if tvs occurs 
-                        -- in other equalities that may propagate it into the
-                        -- environment
-      = doInst (not $ rwi_swapped eq) tv2 (mkTyConApp fam args) co eq
+      , checkingMode || not (tv2 `elemVarSet` newFreeFlexibles)
+      = do { flexi_tv2 <- isFlexible tv2
+           ; if flexi_tv2
+             then
+               doInst (not $ rwi_swapped eq) tv2 (mkTyConApp fam args) co eq
+             else
+               return $ Just eq
+           }
+    instFamEq _ eq = return $ Just eq
 
-    inst _mayInst eq = return $ Just eq
+    -- tv is a meta var, but not a SigTV and not filled
+    isFlexible tv
+      | isMetaTyVar tv = liftM isFlexi $ readMetaTyVar tv
+      | otherwise      = return False
 
-    -- tv is a meta var and not filled
-    isFlexible mayInst tv
-      | isMetaTyVar tv && mayInst tv = liftM isFlexi $ readMetaTyVar tv
-      | otherwise                    = return False
-
-    -- type is a tv that is a meta var and not filled
-    isFlexibleTy mayInst ty
-      | Just tv <- tcGetTyVar_maybe ty = do {flexi <- isFlexible mayInst tv
+    -- type is a tv that is a meta var, but not a SigTV and not filled
+    isFlexibleTy ty
+      | Just tv <- tcGetTyVar_maybe ty = do {flexi <- isFlexible tv
                                             ; if flexi then return $ Just tv 
                                                        else return Nothing
                                             }
@@ -1329,15 +1493,15 @@ instantiateAndExtract eqs localsEmpty skolems
       = pprPanic "TcTyFuns.doInst: local eq: " (ppr ty)
     doInst swapped tv ty (Left cotv) eq
       = do { lookupTV <- lookupTcTyVar tv
-           ; uMeta swapped tv lookupTV ty cotv
+           ; bMeta swapped tv lookupTV ty cotv
            }
       where
-        -- Try to fill in a meta variable.  There is *no* need to consider
-        -- reorienting the underlying equality; `checkOrientation' makes sure
-        -- that we get variable-variable equalities only in the appropriate
-        -- orientation.
+        -- Try to create a binding for a meta variable.  There is *no* need to
+        -- consider reorienting the underlying equality; `checkOrientation'
+        -- makes sure that we get variable-variable equalities only in the
+        -- appropriate orientation.
         --
-        uMeta :: Bool                    -- is this a swapped equality?
+        bMeta :: Bool                    -- is this a swapped equality?
               -> TcTyVar                 -- tyvar to instantiate
               -> LookupTyVarResult       -- lookup result of that tyvar
               -> TcType                  -- to to instantiate tyvar with
@@ -1347,58 +1511,52 @@ instantiateAndExtract eqs localsEmpty skolems
                                          -- and hence, the equality must be kept
 
         -- meta variable has been filled already
-        -- => keep the equality
-        uMeta _swapped tv (IndirectTv fill_ty) ty _cotv
-          = do { traceTc $ 
-                   ptext (sLit "flexible") <+> ppr tv <+>
-                   ptext (sLit "already filled with") <+> ppr fill_ty <+>
-                   ptext (sLit "meant to fill with") <+> ppr ty
-               ; return $ Just eq
-               }
-
-        -- signature skolem
-        -- => cannot update (retain the equality)!
-        uMeta _swapped _tv (DoneTv (MetaTv (SigTv _) _)) _non_tv_ty _cotv
-          = return $ Just eq
+        -- => this should never happen due to the use of `isFlexible' above
+        bMeta _swapped tv (IndirectTv fill_ty) ty _cotv
+          = pprPanic "TcTyFuns.bMeta" $ 
+              ptext (sLit "flexible") <+> ppr tv <+>
+              ptext (sLit "already filled with") <+> ppr fill_ty <+>
+              ptext (sLit "meant to fill with") <+> ppr ty
 
         -- type variable meets type variable
         -- => `checkOrientation' already ensures that it is fine to instantiate
-        --    tv1 with tv2, but chase tv2's instantiations if necessary
+        --    tv1 with tv2, but chase tv2's instantiations if necessary, so that
+        --    we eventually can perform a kinds check in bMetaInst
         -- NB: tv's instantiations won't alter the orientation in which we
         --     want to instantiate as they either constitute a family 
         --     application or are themselves due to a properly oriented
         --     instantiation
-        uMeta swapped tv1 details1@(DoneTv (MetaTv _ ref)) ty@(TyVarTy tv2) cotv
+        bMeta swapped tv1 details1@(DoneTv (MetaTv _ _)) ty@(TyVarTy tv2) cotv
           = do { lookupTV2 <- lookupTcTyVar tv2
                ; case lookupTV2 of
-                   IndirectTv ty' -> 
-                     uMeta swapped tv1 details1 ty' cotv
-                   DoneTv _       -> 
-                     uMetaInst swapped tv1 ref ty cotv
+                   IndirectTv ty' -> bMeta swapped tv1 details1 ty' cotv
+                   DoneTv _       -> bMetaInst swapped tv1 ty cotv
                }
 
         -- updatable meta variable meets non-variable type
-        -- => occurs check, monotype check, and kinds match check, then update
-        uMeta swapped tv (DoneTv (MetaTv _ ref)) non_tv_ty cotv
-          = uMetaInst swapped tv ref non_tv_ty cotv
+        -- => occurs check, monotype check, and kinds match check, then bind
+        bMeta swapped tv (DoneTv (MetaTv _ _ref)) non_tv_ty cotv
+          = bMetaInst swapped tv non_tv_ty cotv
 
-        uMeta _ _ _ _ _ = panic "TcTyFuns.uMeta"
+        bMeta _ _ _ _ _ = panic "TcTyFuns.bMeta"
 
         -- We know `tv' can be instantiated; check that `ty' is alright for
-        -- instantiating `tv' with and then do it; otherwise, return the original
-        -- equality.
-        uMetaInst swapped tv ref ty cotv
+        -- instantiating `tv' with and then record a binding; we return the
+        -- original equality if it is cyclic through a synonym family
+        bMetaInst swapped tv ty cotv
           = do {   -- occurs + monotype check
                ; mb_ty' <- checkTauTvUpdate tv ty    
                              
                ; case mb_ty' of
                    Nothing  -> 
                      -- there may be a family in non_tv_ty due to an unzonked,
-                     -- but updated skolem for a local equality
+                     -- but updated skolem for a local equality 
+                     -- (cf `wantedToLocal')
                      return $ Just eq
                    Just ty' ->
-                     do { checkUpdateMeta swapped tv ref ty'  -- update meta var
-                        ; writeMetaTyVar cotv ty'             -- update co var
+                     do { checkKinds swapped tv ty'
+                        ; bindMetaTyVar tv ty'          -- bind meta var
+                        ; bindMetaTyVar cotv ty'        -- bind co var
                         ; return Nothing
                         }
                }

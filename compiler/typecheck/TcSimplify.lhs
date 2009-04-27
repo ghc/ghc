@@ -1115,7 +1115,9 @@ checkLoop env wanteds
                 ; env'     <- zonkRedEnv env
 		; wanteds' <- zonkInsts  wanteds
 	
-		; (improved, binds, irreds) <- reduceContext env' wanteds'
+		; (improved, tybinds, binds, irreds) 
+                    <- reduceContext env' wanteds'
+                ; execTcTyVarBinds tybinds
 
 		; if null irreds || not improved then
 	 	    return (irreds, binds)
@@ -1450,7 +1452,8 @@ tcSimplifyRestricted doc top_lvl bndrs tau_tvs wanteds
 	-- HOWEVER, some unification may take place, if we instantiate
 	-- 	    a method Inst with an equality constraint
 	; let env = mkNoImproveRedEnv doc (\_ -> ReduceMe)
-	; (_imp, _binds, constrained_dicts) <- reduceContext env wanteds_z
+	; (_imp, _tybinds, _binds, constrained_dicts) 
+            <- reduceContext env wanteds_z
 
 	-- Next, figure out the tyvars we will quantify over
 	; tau_tvs' <- zonkTcTyVarsAndFV (varSetElems tau_tvs)
@@ -1478,13 +1481,6 @@ tcSimplifyRestricted doc top_lvl bndrs tau_tvs wanteds
 		ppr _binds,
 		ppr constrained_tvs', ppr tau_tvs', ppr qtvs ])
 
-          -- Zonk wanteds again!  The first call to reduceContext may have
-          -- instantiated some variables. 
-          -- FIXME: If red_improve would work, we could propagate that into
-          --        the equality solver, too, to prevent instantating any
-          --        variables.
-	; wanteds_zz <- zonkInsts wanteds_z
-
 	-- The first step may have squashed more methods than
 	-- necessary, so try again, this time more gently, knowing the exact
 	-- set of type variables to quantify over.
@@ -1506,7 +1502,8 @@ tcSimplifyRestricted doc top_lvl bndrs tau_tvs wanteds
 			   (is_nested_group || isDict inst) = Stop
 		          | otherwise  	                    = ReduceMe 
 	      env = mkNoImproveRedEnv doc try_me
-	; (_imp, binds, irreds) <- reduceContext env wanteds_zz
+	; (_imp, tybinds, binds, irreds) <- reduceContext env wanteds_z
+        ; execTcTyVarBinds tybinds
 
 	-- See "Notes on implicit parameters, Question 4: top level"
 	; ASSERT( all (isFreeWrtTyVars qtvs) irreds )	-- None should be captured
@@ -1683,7 +1680,8 @@ tcSimplifyIPs given_ips wanteds
 		-- Unusually for checking, we *must* zonk the given_ips
 
 	; let env = mkRedEnv doc try_me given_ips'
-	; (improved, binds, irreds) <- reduceContext env wanteds'
+	; (improved, tybinds, binds, irreds) <- reduceContext env wanteds'
+        ; execTcTyVarBinds tybinds
 
 	; if null irreds || not improved then 
 		ASSERT( all is_free irreds )
@@ -1872,6 +1870,7 @@ discharge with the explicit instance.
 reduceContext :: RedEnv
 	      -> [Inst]			-- Wanted
 	      -> TcM (ImprovementDone,
+                      TcTyVarBinds,     -- Type variable bindings
 		      TcDictBinds,	-- Dictionary bindings
 		      [Inst])		-- Irreducible
 
@@ -1898,10 +1897,11 @@ reduceContext env wanteds0
               givens  = red_givens env
         ; (givens', 
            wanteds', 
-           normalise_binds,
-           eq_improved)     <- tcReduceEqs givens wanteds
+           tybinds,
+           normalise_binds) <- tcReduceEqs givens wanteds
 	; traceTc $ text "reduceContext: tcReduceEqs result" <+> vcat
-		      [ppr givens', ppr wanteds', ppr normalise_binds]
+		      [ppr givens', ppr wanteds', ppr tybinds, 
+                       ppr normalise_binds]
 
           -- Build the Avail mapping from "given_dicts"
 	; (init_state, _) <- getLIE $ do 
@@ -1941,7 +1941,7 @@ reduceContext env wanteds0
           -- Collect all irreducible instances, and determine whether we should
           -- go round again.  We do so in either of two cases:
           -- (1) If dictionary reduction or equality solving led to
-          --     improvement (i.e., instantiated type variables).
+          --     improvement (i.e., bindings for type variables).
           -- (2) If we reduced dictionaries (i.e., got dictionary bindings),
           --     they may have exposed further opportunities to normalise
           --     family applications.  See Note [Dictionary Improvement]
@@ -1954,6 +1954,7 @@ reduceContext env wanteds0
 
 	; let all_irreds       = dict_irreds ++ implic_irreds ++ extra_eqs
       	      avails_improved  = availsImproved avails
+              eq_improved      = anyBag (not . isCoVarBind) tybinds
               improvedFlexible = avails_improved || eq_improved
               reduced_dicts    = not (isEmptyBag dict_binds)
               improved         = improvedFlexible || reduced_dicts
@@ -1967,6 +1968,7 @@ reduceContext env wanteds0
 	     text "given" <+> ppr givens,
 	     text "wanted" <+> ppr wanteds0,
 	     text "----",
+	     text "tybinds" <+> ppr tybinds,
 	     text "avails" <+> pprAvails avails,
 	     text "improved =" <+> ppr improved <+> text improvedHint,
 	     text "(all) irreds = " <+> ppr all_irreds,
@@ -1976,10 +1978,13 @@ reduceContext env wanteds0
 	     ]))
 
 	; return (improved, 
+                  tybinds,
                   normalise_binds `unionBags` dict_binds 
                                   `unionBags` implic_binds, 
                   all_irreds) 
         }
+  where
+    isCoVarBind (TcTyVarBind tv _) = isCoVar tv
 
 tcImproveOne :: Avails -> Inst -> TcM ImprovementDone
 tcImproveOne avails inst

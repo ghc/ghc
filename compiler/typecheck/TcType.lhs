@@ -124,7 +124,8 @@ module TcType (
   typeKind, tidyKind,
 
   tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, tyVarsOfTheta,
-  tcTyVarsOfType, tcTyVarsOfTypes, exactTyVarsOfType, exactTyVarsOfTypes,
+  tcTyVarsOfType, tcTyVarsOfTypes, tcTyVarsOfPred, exactTyVarsOfType,
+  exactTyVarsOfTypes, 
 
   pprKind, pprParendKind,
   pprType, pprParendType, pprTypeApp, pprTyThingCategory,

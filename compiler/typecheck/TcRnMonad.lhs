@@ -9,6 +9,8 @@ module TcRnMonad(
 	module IOEnv
   ) where
 
+#include "HsVersions.h"
+
 import TcRnTypes	-- Re-export all
 import IOEnv		-- Re-export all
 
@@ -123,7 +125,9 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
 		tcl_arrow_ctxt = NoArrowCtxt,
 		tcl_env        = emptyNameEnv,
 		tcl_tyvars     = tvs_var,
-		tcl_lie	       = panic "initTc:LIE"	-- LIE only valid inside a getLIE
+		tcl_lie	       = panic "initTc:LIE", -- only valid inside getLIE
+		tcl_tybinds    = panic "initTc:tybinds"	
+                                               -- only valid inside a getTyBinds
 	     } ;
 	} ;
    
@@ -823,7 +827,7 @@ debugTc thing
  | otherwise = return ()
 \end{code}
 
- %************************************************************************
+%************************************************************************
 %*									*
 	     Type constraints (the so-called LIE)
 %*									*
@@ -878,6 +882,44 @@ setLclTypeEnv lcl_env thing_inside
 		    tcl_tyvars = tcl_tyvars lcl_env }
 \end{code}
 
+
+%************************************************************************
+%*									*
+	     Meta type variable bindings
+%*									*
+%************************************************************************
+
+\begin{code}
+getTcTyVarBindsVar :: TcM (TcRef TcTyVarBinds)
+getTcTyVarBindsVar = do { env <- getLclEnv; return (tcl_tybinds env) }
+
+getTcTyVarBinds :: TcM a -> TcM (a, TcTyVarBinds)
+getTcTyVarBinds thing_inside
+  = do { tybinds_var <- newMutVar emptyBag
+       ; res <- updLclEnv (\ env -> env { tcl_tybinds = tybinds_var }) 
+			  thing_inside
+       ; tybinds <- readMutVar tybinds_var
+       ; return (res, tybinds) 
+       }
+
+bindMetaTyVar :: TcTyVar -> TcType -> TcM ()
+bindMetaTyVar tv ty
+  = do { ASSERTM2( do { details <- readMutVar (metaTvRef tv)
+                      ; return (isFlexi details) }, ppr tv )
+       ; tybinds_var <- getTcTyVarBindsVar
+       ; tybinds <- readMutVar tybinds_var
+       ; writeMutVar tybinds_var (tybinds `snocBag` TcTyVarBind tv ty) 
+       }
+
+getTcTyVarBindsRelation :: TcM [(TcTyVar, TcTyVarSet)]
+getTcTyVarBindsRelation
+  = do { tybinds_var <- getTcTyVarBindsVar
+       ; tybinds <- readMutVar tybinds_var
+       ; return $ map freeTvs (bagToList tybinds)
+       }
+  where
+    freeTvs (TcTyVarBind tv ty) = (tv, tyVarsOfType ty)
+\end{code}
 
 %************************************************************************
 %*									*
