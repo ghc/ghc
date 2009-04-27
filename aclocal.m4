@@ -561,8 +561,11 @@ fi
 AC_CACHE_CHECK([version of gcc], [fp_gcc_version],
 [if test "$fp_have_gcc" = "YES"; then
    fp_gcc_version="`$CC -v 2>&1 | grep 'version ' | sed -e 's/.*version [[^0-9]]*\([[0-9.]]*\).*/\1/g'`"
-   FP_COMPARE_VERSIONS([$fp_gcc_version], [-lt], [2.0],
-     [AC_MSG_ERROR([Need at least gcc version 2.0 (3.4+ recommended)])])
+   FP_COMPARE_VERSIONS([$fp_gcc_version], [-lt], [3.0],
+     [AC_MSG_ERROR([Need at least gcc version 3.0 (3.4+ recommended)])])
+   # See #2770: gcc 2.95 doesn't work any more, apparently.  There probably
+   # isn't a very good reason for that, but for now just make configure
+   # fail.
  else
    fp_gcc_version="not-installed"
  fi
