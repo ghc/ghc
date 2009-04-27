@@ -12,21 +12,28 @@
 #   * need to fix Cabal for new Windows layout, see
 #     Distribution/Simple/GHC.configureToolchain.
 #
-# As we merge the new build system into HEAD:
+# Once the new build system is in HEAD, and before 6.12:
 #
 #   * remove old Makefiles, add new stubs for building in subdirs
 #     * utils/hsc2hs/Makefile
 #     * utils/haddock/Makefile
 #     * mk/oldconfig.mk.in
-#
-# Once the new build system is in HEAD, and before 6.12:
-#
+#     * docs/Makefile
+#     * docs/docbook-cheat-sheet/Makefile
+#     * docs/ext-core/Makefile
+#     * docs/man/Makefile
+#     * docs/storage-mgmt/Makefile
+#     * docs/users_guide/Makefile
+#     * docs/vh/Makefile
+#     * driver/Makefile
+#     * driver/ghc/Makefile
+#     * libraries/Makefile
+#     * rts/dotnet/Makefile
+#     * utils/Makefile
 #   * docbook PDFs, e.g. "dblatex -T db2latex users_guide.xml"
 #   * GhcProfiled
 #   * optionally install stage3?
-#   * why does so much stuff get rebuilt after re-configuring?
 #   * shared libraries, way dyn
-#   * add pointers to wiki docs from the build system source
 #   * get HC bootstrapping working
 #   * add Makefiles for the rest of the utils/ programs that aren't built
 #     by default (need to exclude them from 'make all' too)
@@ -54,12 +61,6 @@
 #     dependencies more accurately.  Otherwise it's possible to get into
 #     a state where the package database is out of date, and the build
 #     system doesn't know.
-
-# NOTES on how to debug:
-#   make --debug=b --debug=m  shows dependencies
-#   make -p                   prints all generated makefile rules and variables
-#   make show VALUE=VAR       prints the value of VAR
-#   $(warning stuff)          prints stuff when reading the makefile
 
 # Approximate build order.
 #
@@ -372,8 +373,8 @@ libraries/ghc-prim/GHC/Prim.hs : $(GENPRIMOP_INPLACE) $(PRIMOPS_TXT)
 # -----------------------------------------------------------------------------
 # Include build instructions from all subdirs
 
-# See commentary in the top-level Makefile for why we divide the build
-# into phases.
+# For the rationale behind the build phases, see
+#   http://hackage.haskell.org/trac/ghc/wiki/Building/Architecture/Idiom/PhaseOrdering
 
 # Setting foo_dist_DISABLE=YES means "in directory foo, for build
 # "dist", just read the package-data.mk file, do not build anything".
