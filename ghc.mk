@@ -33,15 +33,9 @@
 #
 # Tickets we can now close, or fix and close:
 #
-#   * 2744 check for presence of hsc2hs in ./configure
 #   * 2966 make sure --with-gcc does the right thing (#2966)
-#   * 3115 make ghc.cabal read-only
-#   * 2107 install the docs by default
 #   * 1693 make distclean
 #   * 2689 make maintainer-clean
-#   * 2619  bootstrapping using a newer GHC shouldn't fail
-#     for bogus reasons (picking the wrong version of the ghc package)
-#   * 2770 check which version of gcc we require
 #   * 3173 make install with DESTDIR
 
 # Possible cleanups:
