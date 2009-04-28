@@ -59,9 +59,10 @@ getImports dflags buf filename source_filename = do
   case unP parseHeader (mkPState buf loc dflags) of
     PFailed span err -> parseError span err
     POk pst rdr_module -> do
-      let ms@(_warns, errs) = getMessages pst
+      let _ms@(_warns, errs) = getMessages pst
       -- don't log warnings: they'll be reported when we parse the file
       -- for real.  See #2500.
+          ms = (emptyBag, errs)
       -- logWarnings warns
       if errorsFound dflags ms
         then liftIO $ throwIO $ mkSrcErr errs
