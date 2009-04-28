@@ -29,7 +29,8 @@ endif
 
 ifeq "$(GhcThreaded)" "YES"
 # Use threaded RTS with GHCi, so threads don't get blocked at the prompt.
-ghc_HC_OPTS += -threaded
+ghc_stage2_HC_OPTS += -threaded
+ghc_stage3_HC_OPTS += -threaded
 endif
 
 ifeq "$(BuildSharedLibs)" "YES"
