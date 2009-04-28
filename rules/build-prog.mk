@@ -1,11 +1,23 @@
+# -----------------------------------------------------------------------------
+#
+# (c) 2009 The University of Glasgow
+#
+# This file is part of the GHC build system.
+#
+# To understand how the build system works and how to modify it, see
+#      http://hackage.haskell.org/trac/ghc/wiki/Building/Architecture
+#      http://hackage.haskell.org/trac/ghc/wiki/Building/Modifying
+#
+# -----------------------------------------------------------------------------
 
-# Build a program with the stage-1 compiler.  Invoke like this:
+
+# Build a program.  Invoke like this:
 #
 # utils/genapply_MODULES = Main
 # utils/genapply_HC_OPTS = -package Cabal
 # utils/genapply_dist_PROG = genapply
 #
-# $(eval $(call build-prog,utils/genapply,dist-install))
+# $(eval $(call build-prog,utils/genapply,dist-install,1))
 
 define build-prog
 # $1 = dir
