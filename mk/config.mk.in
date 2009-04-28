@@ -610,7 +610,6 @@ GHC_COMPAT_DIR          = compat
 
 GHC_MKDEPENDC_DIR       = $(GHC_UTILS_DIR)/mkdependC
 GHC_LTX_DIR             = $(GHC_UTILS_DIR)/ltx
-GHC_RUNTEST_DIR         = $(GHC_UTILS_DIR)/runstdtest
 GHC_LNDIR_DIR           = $(GHC_UTILS_DIR)/lndir
 GHC_MKDIRHIER_DIR       = $(GHC_UTILS_DIR)/mkdirhier
 GHC_DOCBOOK_DIR         = $(GHC_UTILS_DIR)/docbook
@@ -651,7 +650,6 @@ GHC_MKDEPENDC_PGM       = mkdependC
 GHC_LTX_PGM             = ltx$(exeext)
 GHC_MKDIRHIER_PGM       = mkdirhier
 GHC_LNDIR_PGM           = lndir
-GHC_RUNTEST_PGM         = runstdtest
 GHC_DUMMY_GHC_PGM       = dummy-ghc$(exeext)
 
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
@@ -669,7 +667,6 @@ SPLIT			= $(INPLACE_LIB)/$(GHC_SPLIT_PGM)
 SYSMAN 			= $(GHC_SYSMAN_DIR)/$(GHC_SYSMAN_PGM)
 LTX 			= $(GHC_LTX_DIR)/$(GHC_LTX_PGM)
 LNDIR			= $(GHC_LNDIR_DIR)/$(GHC_LNDIR_PGM)
-RUNTEST			= $(GHC_RUNTEST_DIR)/$(GHC_RUNTEST_PGM)
 
 INPLACE			= inplace
 INPLACE_BIN		= $(INPLACE)/bin
