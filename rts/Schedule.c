@@ -285,7 +285,9 @@ schedule (Capability *initialCapability, Task *task)
 
   if (running_finalizers) {
       errorBelch("error: a C finalizer called back into Haskell.\n"
-                 "   use Foreign.Concurrent.newForeignPtr for Haskell finalizers.");
+                 "   This was previously allowed, but is disallowed in GHC 6.10.2 and later.\n"
+                 "   To create finalizers that may call back into Haskll, use\n"
+                 "   Foreign.Concurrent.newForeignPtr instead of Foreign.newForeignPtr.");
       stg_exit(EXIT_FAILURE);
   }
 
