@@ -27,7 +27,7 @@ $(eval $(call distdir-opts,rts,dist))
 # -----------------------------------------------------------------------------
 # Defining the sources
 
-ALL_DIRS = hooks parallel sm
+ALL_DIRS = hooks parallel sm eventlog
 
 ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 ALL_DIRS += win32
