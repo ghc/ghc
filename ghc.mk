@@ -828,12 +828,22 @@ clean_files :
 
 distclean : clean
 	$(RM) config.cache config.status config.log mk/config.h mk/stamp-h
-	$(RM) mk/config.mk mk/are-validating.mk
+	$(RM) mk/config.mk mk/are-validating.mk mk/project.mk
 	$(RM) extra-gcc-opts docs/users_guide/ug-book.xml
 	$(RM) compiler/ghc.cabal ghc/ghc-bin.cabal
 	$(RM) libraries/base/include/HsBaseConfig.h
 	$(RM) libraries/directory/include/HsDirectoryConfig.h
+	$(RM) libraries/process/include/HsProcessConfig.h
+	$(RM) libraries/unix/include/HsUnixConfig.h
+	$(RM) libraries/old-time/include/HsTimeConfig.h
 
 maintainer-clean : distclean
+	$(RM) configure mk/config.h.in
+	$(RM) -r autom4te.cache libraries/*/autom4te.cache
 	$(RM) ghc.spec
-	$(RM) libraries/*/GNUmakefile
+	$(RM) libraries/*/GNUmakefile libraries/*/ghc.mk libraries/*/configure 
+	$(RM) libraries/base/include/HsBaseConfig.h.in
+	$(RM) libraries/directory/include/HsDirectoryConfig.h.in
+	$(RM) libraries/process/include/HsProcessConfig.h.in
+	$(RM) libraries/unix/include/HsUnixConfig.h.in
+	$(RM) libraries/old-time/include/HsTimeConfig.h.in
