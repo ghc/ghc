@@ -123,8 +123,8 @@ $1_$2_SplitObjs = NO
 endif
 endif
 
-# C and S files are built only once, not once per way
-$(call c-objs,$1,$2)
+# C and S files are built the "v" vanlilla way
+$(call c-objs,$1,$2,v)
 $(call distdir-opts,$1,$2,$3)
 $(call c-suffix-rules,$1,$2,v,YES)
 

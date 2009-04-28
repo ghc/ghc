@@ -28,13 +28,13 @@ $1_$2_$3_MKSTUBOBJS = find $1/$2/build -name "*_stub.$$($3_osuf)" -print
 
 # Build the ordinary .a library
 ifeq "$$($1_$2_SplitObjs)" "YES"
-$$($1_$2_$3_LIB) : $$($1_$2_$3_HS_OBJS) $$($1_$2_C_OBJS) $$($1_$2_S_OBJS)
+$$($1_$2_$3_LIB) : $$($1_$2_$3_HS_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS)
 	$$(RM) $$@
-	(echo $$($1_$2_C_OBJS) $$($1_$2_S_OBJS) `$$($1_$2_$3_MKSTUBOBJS)`; find $$(patsubst %.$$($3_osuf),%_split,$$($1_$2_$3_HS_OBJS)) -name '*.$$($3_osuf)' -print) | xargs $$(AR) $$(EXTRA_AR_ARGS) $$@
+	(echo $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS) `$$($1_$2_$3_MKSTUBOBJS)`; find $$(patsubst %.$$($3_osuf),%_split,$$($1_$2_$3_HS_OBJS)) -name '*.$$($3_osuf)' -print) | xargs $$(AR) $$(EXTRA_AR_ARGS) $$@
 else
-$$($1_$2_$3_LIB) : $$($1_$2_$3_HS_OBJS) $$($1_$2_C_OBJS) $$($1_$2_S_OBJS)
+$$($1_$2_$3_LIB) : $$($1_$2_$3_HS_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS)
 	$$(RM) $$@
-	echo $$($1_$2_C_OBJS) $$($1_$2_S_OBJS) $$($1_$2_$3_HS_OBJS) `$$($1_$2_$3_MKSTUBOBJS)` | xargs $$(AR) $$(EXTRA_AR_ARGS) $$@
+	echo $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS) $$($1_$2_$3_HS_OBJS) `$$($1_$2_$3_MKSTUBOBJS)` | xargs $$(AR) $$(EXTRA_AR_ARGS) $$@
 endif
 
 $(call all-target,$1_$2,all_$1_$2_$3)
@@ -53,9 +53,9 @@ $1_$2_GHCI_LIB = $1/$2/build/HS$$($1_PACKAGE)-$$($1_$2_VERSION).$$($3_osuf)
 ifneq "$4" "0"
 BINDIST_LIBS += $$($1_$2_GHCI_LIB)
 endif
-$$($1_$2_GHCI_LIB) : $$($1_$2_$3_HS_OBJS) $$($1_$2_C_OBJS) $$($1_$2_S_OBJS)
+$$($1_$2_GHCI_LIB) : $$($1_$2_$3_HS_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS)
 	$$(RM) $$@
-	$$(LD) -r -o $$@ $$(EXTRA_LD_OPTS) $$($1_$2_$3_HS_OBJS) $$($1_$2_C_OBJS) $$($1_$2_S_OBJS) `$$($1_$2_$3_MKSTUBOBJS)`
+	$$(LD) -r -o $$@ $$(EXTRA_LD_OPTS) $$($1_$2_$3_HS_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS) `$$($1_$2_$3_MKSTUBOBJS)`
 
 $(call all-target,$1_$2,$$($1_$2_GHCI_LIB))
 endif
