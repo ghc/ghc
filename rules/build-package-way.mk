@@ -20,7 +20,7 @@ $$(foreach dir,$$($1_$2_HS_SRC_DIRS),\
 
 $(call hs-objs,$1,$2,$3)
 
-$1_$2_$3_LIB = $1/$2/build/libHS$$($1_PACKAGE)-$$($1_$2_VERSION)$$($3__way).a
+$1_$2_$3_LIB = $1/$2/build/libHS$$($1_PACKAGE)-$$($1_$2_VERSION)$$($3_libsuf)
 
 $1_$2_$3_MKSTUBOBJS = find $1/$2/build -name "*_stub.$$($3_osuf)" -print
 # HACK ^^^ we tried to use $(wildcard), but apparently it fails due to
