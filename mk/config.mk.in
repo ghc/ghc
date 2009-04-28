@@ -360,38 +360,6 @@ PapiIncludeDir=
 
 ################################################################################
 #
-#		nofib
-#
-# 	nofib specific options
-#
-################################################################################
-
-WithNofibHc = $(GHC_INPLACE)
-
-# NoFibSubDirs controls which set of tests should be run
-# You can run one or more of
-#	imaginary 
-#	spectral
-#	real
-#	parallel
-#	PRIVATE
-#	PENDING
-#	UNUSED
-NoFibSubDirs = imaginary spectral real
-
-# The different ways to build nofib. Default is just to mirror
-# what is done for the ghc prelude libraries.
-#
-NoFibWays = $(GhcLibWays)
-
-# Haskell compiler options for nofib
-NoFibHcOpts = -O
-
-# Number of times to run each program
-NoFibRuns = 5
-
-################################################################################
-#
 #		Paths (see paths.mk)
 #
 ################################################################################
