@@ -179,7 +179,7 @@ generate config_args distdir directory
                   maybeSetLibiconv verbosity (libBuildInfo lib) lbi
 
       hooked_bi <-
-           if (buildType pd0 == Just Configure)
+           if (buildType pd0 == Just Configure) || (buildType pd0 == Just Custom)
            then do
               maybe_infoFile <- defaultHookedPackageDesc
               case maybe_infoFile of
