@@ -943,20 +943,6 @@ else
 fi])# FP_PROG_GHC_PKG
 
 
-# FP_GHC_HAS_EDITLINE
-# -------------------
-AC_DEFUN([FP_GHC_HAS_EDITLINE],
-[AC_REQUIRE([FP_PROG_GHC_PKG])
-AC_CACHE_CHECK([whether ghc has editline package], [fp_cv_ghc_has_editline],
-[if "${GhcPkgCmd-ghc-pkg}" --show-package editline >/dev/null 2>&1; then
-  fp_cv_ghc_has_editline=yes
-else
-  fp_cv_ghc_has_editline=no
- fi])
-AC_SUBST([GhcHasEditline], [`echo $fp_cv_ghc_has_editline | sed 'y/yesno/YESNO/'`])
-])# FP_GHC_HAS_EDITLINE
-
-
 # FP_GCC_EXTRA_FLAGS
 # ------------------
 # Determine which extra flags we need to pass gcc when we invoke it

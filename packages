@@ -26,13 +26,14 @@ libraries/bytestring                    packages/bytestring             darcs
 libraries/Cabal                         packages/Cabal                  darcs
 libraries/containers                    packages/containers             darcs
 libraries/directory                     packages/directory              darcs
-libraries/editline                      packages/editline               darcs
 libraries/extensible-exceptions         packages/extensible-exceptions  darcs
 libraries/filepath                      packages/filepath               darcs
 libraries/ghc-prim                      packages/ghc-prim               darcs
+libraries/haskeline                     packages/haskeline              darcs
 libraries/haskell98                     packages/haskell98              darcs
 libraries/hpc                           packages/hpc                    darcs
 libraries/integer-gmp                   packages/integer-gmp            darcs
+libraries/mtl                           packages/mtl                    darcs
 libraries/old-locale                    packages/old-locale             darcs
 libraries/old-time                      packages/old-time               darcs
 libraries/packedstring                  packages/packedstring           darcs
@@ -41,13 +42,14 @@ libraries/process                       packages/process                darcs
 libraries/random                        packages/random                 darcs
 libraries/syb                           packages/syb                    darcs
 libraries/template-haskell              packages/template-haskell       darcs
+libraries/terminfo                      packages/terminfo               darcs
 libraries/unix                          packages/unix                   darcs
+libraries/utf8-string                   packages/utf8-string            darcs
 libraries/Win32                         packages/Win32                  darcs
 libraries/HUnit             extralibs   packages/HUnit                  darcs
 libraries/QuickCheck        extralibs   packages/QuickCheck             darcs
 libraries/haskell-src       extralibs   packages/haskell-src            darcs
 libraries/html              extralibs   packages/html                   darcs
-libraries/mtl               extralibs   packages/mtl                    darcs
 libraries/network           extralibs   packages/network                darcs
 libraries/parsec            extralibs   packages/parsec                 darcs
 libraries/parallel          extralibs   packages/parallel               darcs

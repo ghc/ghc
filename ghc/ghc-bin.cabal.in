@@ -28,15 +28,29 @@ Executable ghc
     Main-Is: Main.hs
     if flag(base3)
         Build-Depends: base       >= 3   && < 5,
-                       directory  >= 1   && < 1.1
+                       array      >= 0.1 && < 0.3,
+                       bytestring >= 0.9 && < 0.10,
+                       directory  >= 1   && < 1.1,
+                       process    >= 1   && < 1.1
     else
         Build-Depends: base < 3
     Build-Depends: base, ghc
     Build-Depends: filepath >= 1 && < 1.2
+    if os(windows)
+        Build-Depends: Win32
+    else
+        Build-Depends: unix
 
     GHC-Options: -Wall
     if flag(ghci)
         CPP-Options: -DGHCI
+        GHC-Options: -fno-warn-name-shadowing
+        Other-Modules: InteractiveUI, GhciMonad, GhciTags
+        Build-Depends: mtl, haskeline
+        Extensions: ForeignFunctionInterface,
+                    UnboxedTuples,
+                    FlexibleInstances,
+                    MagicHash
 
     Extensions: CPP, PatternGuards
 

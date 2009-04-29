@@ -41,8 +41,8 @@ endif
 
 ghc_stage1_MODULES = Main
 
-ghc_stage2_MODULES = $(ghc_stage1_MODULES)
-ghc_stage3_MODULES = $(ghc_stage1_MODULES)
+ghc_stage2_MODULES = $(ghc_stage1_MODULES) GhciMonad GhciTags InteractiveUI
+ghc_stage3_MODULES = $(ghc_stage2_MODULES)
 
 ghc_stage1_PROG = ghc-stage1$(exeext)
 ghc_stage2_PROG = ghc-stage2$(exeext)
@@ -53,10 +53,18 @@ ghc_stage1_USE_BOOT_LIBS = YES
 ghc_stage1_HC_OPTS += -package $(compiler_PACKAGE)-$(compiler_stage1_VERSION)
 ghc_stage2_HC_OPTS += -package $(compiler_PACKAGE)-$(compiler_stage2_VERSION)
 ghc_stage3_HC_OPTS += -package $(compiler_PACKAGE)-$(compiler_stage3_VERSION)
+ghc_stage2_HC_OPTS += -package haskeline
+ghc_stage3_HC_OPTS += -package haskeline
 
-ghc_stage1_HC_OPTS += -XCPP -XPatternGuards
-ghc_stage2_HC_OPTS += -XCPP -XPatternGuards
-ghc_stage3_HC_OPTS += -XCPP -XPatternGuards
+ghc_language_extension_flags = -XCPP \
+                               -XPatternGuards \
+                               -XForeignFunctionInterface \
+                               -XUnboxedTuples \
+                               -XFlexibleInstances \
+                               -XMagicHash
+ghc_stage1_HC_OPTS += $(ghc_language_extension_flags)
+ghc_stage2_HC_OPTS += $(ghc_language_extension_flags)
+ghc_stage3_HC_OPTS += $(ghc_language_extension_flags)
 
 # In stage1 we might not benefit from cross-package dependencies and
 # recompilation checking.  We must force recompilation here, otherwise

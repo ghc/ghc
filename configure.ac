@@ -708,25 +708,6 @@ if test "$WithGhc" != ""; then
   AC_SUBST(ghc_ge_609)dnl
 fi
 
-# Check whether this GHC has editline installed
-FP_GHC_HAS_EDITLINE
-
-# Dummy arguments to print help for --with-editline-* arguments.
-# Those are actually passed to the editline package's configure script
-# via the CONFIGURE_ARGS variable in mk/config.mk
-AC_ARG_WITH(dummy-editline-includes,
-  [AC_HELP_STRING([--with-editline-includes],
-    [directory containing editline/editline.h or editline/readline.h])],
-    [],
-    [])
-
-AC_ARG_WITH(dummy-editline-libraries,
-  [AC_HELP_STRING([--with-editline-libraries],
-    [directory containing the editline library])],
-    [],
-    [])
-
-
 AC_PATH_PROGS(NHC,nhc nhc98)
 AC_PATH_PROG(HBC,hbc)
 

@@ -308,7 +308,15 @@ PACKAGES += \
 	syb \
 	template-haskell \
 	base3-compat \
-	Cabal
+	Cabal \
+	mtl \
+	utf8-string
+
+ifneq "$(Windows)" "YES"
+PACKAGES += terminfo
+endif
+
+PACKAGES += haskeline
 
 BOOT_PKGS = Cabal hpc extensible-exceptions
 

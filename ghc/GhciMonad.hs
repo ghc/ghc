@@ -1,4 +1,4 @@
-{-# OPTIONS -fno-cse #-}
+{-# OPTIONS_GHC -fno-cse -fno-warn-orphans #-}
 -- -fno-cse is needed for GLOBAL_VAR's to behave properly
 
 -----------------------------------------------------------------------------
@@ -15,17 +15,19 @@ module GhciMonad where
 
 import qualified GHC
 import Outputable       hiding (printForUser, printForUserPartWay)
+import qualified Pretty
 import qualified Outputable
 import Panic            hiding (showException)
 import Util
 import DynFlags
-import HscTypes
+import HscTypes hiding (liftIO)
 import SrcLoc
 import Module
 import ObjLink
 import Linker
 import StaticFlags
-import MonadUtils       ( MonadIO, liftIO )
+import qualified MonadUtils
+import qualified ErrUtils
 
 import Exception
 import Data.Maybe
@@ -41,10 +43,16 @@ import System.IO
 import Control.Monad as Monad
 import GHC.Exts
 
+import System.Console.Haskeline (CompletionFunc, InputT)
+import qualified System.Console.Haskeline as Haskeline
+import System.Console.Haskeline.Encoding
+import Control.Monad.Trans as Trans
+import qualified Data.ByteString as B
+
 -----------------------------------------------------------------------------
 -- GHCi monad
 
-type Command = (String, String -> GHCi Bool, Maybe String, String -> IO [String])
+type Command = (String, String -> InputT GHCi Bool, CompletionFunc GHCi)
 
 data GHCiState = GHCiState
      { 
@@ -159,12 +167,26 @@ setGHCiState s = GHCi $ \r -> liftIO $ writeIORef r s
 liftGhc :: Ghc a -> GHCi a
 liftGhc m = GHCi $ \_ -> m
 
-instance MonadIO GHCi where
-  liftIO m = liftGhc $ liftIO m
+instance MonadUtils.MonadIO GHCi where
+  liftIO = liftGhc . MonadUtils.liftIO
+
+instance Trans.MonadIO Ghc where
+  liftIO = MonadUtils.liftIO
 
 instance GhcMonad GHCi where
   setSession s' = liftGhc $ setSession s'
   getSession    = liftGhc $ getSession
+
+instance GhcMonad (InputT GHCi) where
+  setSession = lift . setSession
+  getSession = lift getSession
+
+instance MonadUtils.MonadIO (InputT GHCi) where
+  liftIO = Trans.liftIO
+
+instance WarnLogMonad (InputT GHCi) where
+  setWarnings = lift . setWarnings
+  getWarnings = lift getWarnings
 
 instance ExceptionMonad GHCi where
   gcatch m h = GHCi $ \r -> unGHCi m r `gcatch` (\e -> unGHCi (h e) r)
@@ -175,33 +197,24 @@ instance WarnLogMonad GHCi where
   setWarnings warns = liftGhc $ setWarnings warns
   getWarnings = liftGhc $ getWarnings
 
+instance MonadIO GHCi where
+  liftIO = io
+
+instance Haskeline.MonadException GHCi where
+  catch = gcatch
+  block = gblock
+  unblock = gunblock
+
+instance ExceptionMonad (InputT GHCi) where
+    gcatch = Haskeline.catch
+    gblock = Haskeline.block
+    gunblock = Haskeline.unblock
+
 -- for convenience...
 getPrelude :: GHCi Module
 getPrelude = getGHCiState >>= return . prelude
 
-GLOBAL_VAR(saved_sess, no_saved_sess, Session)
-
-no_saved_sess :: Session
-no_saved_sess = error "no saved_ses"
-
-saveSession :: GHCi ()
-saveSession =
-    liftGhc $ do
-      reifyGhc $ \s ->
-        writeIORef saved_sess s
-
-splatSavedSession :: GHCi ()
-splatSavedSession = io (writeIORef saved_sess no_saved_sess)
-
--- restoreSession :: IO Session
--- restoreSession = readIORef saved_sess
-
-withRestoredSession :: Ghc a -> IO a
-withRestoredSession ghc = do
-    s <- readIORef saved_sess
-    reflectGhc ghc s
-
-getDynFlags :: GHCi DynFlags
+getDynFlags :: GhcMonad m => m DynFlags
 getDynFlags = do
   GHC.getSessionDynFlags
 
@@ -225,17 +238,43 @@ unsetOption opt
       setGHCiState (st{ options = filter (/= opt) (options st) })
 
 io :: IO a -> GHCi a
-io = liftIO
+io = MonadUtils.liftIO
 
 printForUser :: SDoc -> GHCi ()
 printForUser doc = do
   unqual <- GHC.getPrintUnqual
   io $ Outputable.printForUser stdout unqual doc
 
+printForUser' :: SDoc -> InputT GHCi ()
+printForUser' doc = do
+    unqual <- GHC.getPrintUnqual
+    Haskeline.outputStrLn $ showSDocForUser unqual doc
+
 printForUserPartWay :: SDoc -> GHCi ()
 printForUserPartWay doc = do
   unqual <- GHC.getPrintUnqual
   io $ Outputable.printForUserPartWay stdout opt_PprUserLength unqual doc
+
+-- We set log_action to write encoded output.
+-- This fails whenever GHC tries to mention an (already encoded) filename,
+-- but I don't know how to work around that.
+setLogAction :: InputT GHCi ()
+setLogAction = do
+    encoder <- getEncoder
+    dflags <- GHC.getSessionDynFlags
+    GHC.setSessionDynFlags dflags {log_action = logAction encoder}
+    return ()
+  where
+    logAction encoder severity srcSpan style msg = case severity of
+        GHC.SevInfo -> printEncErrs encoder (msg style)
+        GHC.SevFatal -> printEncErrs encoder (msg style)
+        _ -> do
+            hPutChar stderr '\n'
+            printEncErrs encoder (ErrUtils.mkLocMessage srcSpan msg style)
+    printEncErrs encoder doc = do
+        str <- encoder (Pretty.showDocWith Pretty.PageMode doc)
+        B.hPutStrLn stderr str
+        hFlush stderr
 
 runStmt :: String -> GHC.SingleStep -> GHCi GHC.RunResult
 runStmt expr step = do
@@ -254,17 +293,17 @@ resume canLogSpan step = GHC.resume canLogSpan step
 -- --------------------------------------------------------------------------
 -- timing & statistics
 
-timeIt :: GHCi a -> GHCi a
+timeIt :: InputT GHCi a -> InputT GHCi a
 timeIt action
-  = do b <- isOptionSet ShowTiming
+  = do b <- lift $ isOptionSet ShowTiming
        if not b 
 	  then action 
-	  else do allocs1 <- io $ getAllocations
-		  time1   <- io $ getCPUTime
+	  else do allocs1 <- liftIO $ getAllocations
+		  time1   <- liftIO $ getCPUTime
 		  a <- action
-		  allocs2 <- io $ getAllocations
-		  time2   <- io $ getCPUTime
-		  io $ printTimes (fromIntegral (allocs2 - allocs1)) 
+		  allocs2 <- liftIO $ getAllocations
+		  time2   <- liftIO $ getCPUTime
+		  liftIO $ printTimes (fromIntegral (allocs2 - allocs1)) 
 				  (time2 - time1)
 		  return a
 
