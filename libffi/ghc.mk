@@ -57,10 +57,8 @@ PLATFORM := $(shell echo $(HOSTPLATFORM) | sed 's/i[567]86/i486/g')
 # path that always fails.
 
 ifeq "$(BuildSharedLibs)" "YES"
-libffi_STAMP_BUILD     = libffi/stamp.ffi.build-shared
 libffi_STAMP_CONFIGURE = libffi/stamp.ffi.configure-shared
 else
-libffi_STAMP_BUILD     = libffi/stamp.ffi.build
 libffi_STAMP_CONFIGURE = libffi/stamp.ffi.configure
 endif
 
@@ -74,12 +72,12 @@ INSTALL_LIBS      += libffi/libHSffi.a libffi/HSffi.o
 # they will be residing in the system location along with dynamic libs from
 # other GHC installations.
 
-libffi_HS_DYN_LIB_NAME=libHSffi-ghc$(ProjectVersion)$(soext)
-libffi_HS_DYN_LIB_PATH=libffi/$(libffi_HS_DYN_LIB_NAME)
+libffi_HS_DYN_LIB_NAME = libHSffi$(dyn_libsuf)
+libffi_HS_DYN_LIB      = libffi/$(libffi_HS_DYN_LIB_NAME)
 
 ifeq "$(Windows)" "YES"
-libffi_DYNAMIC_PROG = $(libffi_HS_DYN_LIB_PATH).a
-libffi_DYNAMIC_LIBS = $(libffi_HS_DYN_LIB_PATH)
+libffi_DYNAMIC_PROG = $(libffi_HS_DYN_LIB).a
+libffi_DYNAMIC_LIBS = $(libffi_HS_DYN_LIB)
 else
 libffi_DYNAMIC_PROG =
 libffi_DYNAMIC_LIBS = libffi/libffi.so libffi/libffi.so.5 libffi/libffi.so.5.0.7
@@ -92,9 +90,9 @@ libffi_EnableShared=no
 endif
 
 ifeq "$(BuildSharedLibs)" "YES"
-INSTALL_LIBS  += $(libffi_HS_DYN_LIB_PATH)
+INSTALL_LIBS  += $(libffi_HS_DYN_LIB)
 ifeq "$(Windows)" "YES"
-INSTALL_PROGS += $(libffi_HS_DYN_LIB_PATH).a
+INSTALL_PROGS += $(libffi_HS_DYN_LIB).a
 endif
 endif
 
@@ -141,17 +139,26 @@ $(libffi_STAMP_CONFIGURE):
 libffi/ffi.h: $(libffi_STAMP_CONFIGURE)
 	$(CP) libffi/build/include/ffi.h $@
 
-$(libffi_STAMP_BUILD): $(libffi_STAMP_CONFIGURE)
+# All the libs that libffi's own build will generate
+libffi_ALL_LIBS = $(libffi_STATIC_LIB)
+ifeq "$(BuildSharedLibs)" "YES"
+libffi_ALL_LIBS += $(libffi_DYNAMIC_LIBS)
+endif
+ifeq "$(Windows)" "YES"
+libffi_ALL_LIBS += libffi/libffi.dll.a $(libffi_HS_DYN_LIB).a
+endif
+
+$(libffi_ALL_LIBS): $(libffi_STAMP_CONFIGURE)
 	cd libffi && \
 	  $(MAKE) -C build MAKEFLAGS=; \
 	  (cd build; ./libtool --mode=install cp libffi.la $(TOP)/libffi)
+
+# Rename libffi.a to libHSffi.a
+libffi/libHSffi.a libffi/libHSffi_p.a: $(libffi_STATIC_LIB)
 	$(CP) $(libffi_STATIC_LIB) libffi/libHSffi.a
 	$(CP) $(libffi_STATIC_LIB) libffi/libHSffi_p.a
-	touch $@
 
-libffi/libHSffi.a libffi/libHSffi_p.a: $(libffi_STAMP_BUILD)
-
-all_libffi : libffi/libHSffi.a libffi/libHSffi_p.a
+$(eval $(call all-target,libffi,libffi/libHSffi.a libffi/libHSffi_p.a))
 
 # The GHCi import lib isn't needed as compiler/ghci/Linker.lhs + rts/Linker.c
 # link the interpreted references to FFI to the compiled FFI.
@@ -163,7 +170,7 @@ libffi/HSffi.o: libffi/libHSffi.a
 	  touch empty.c; \
 	  $(CC) -c empty.c -o HSffi.o
 
-all_libffi : libffi/HSffi.o
+$(eval $(call all-target,libffi,libffi/HSffi.o))
 
 ifeq "$(BuildSharedLibs)" "YES"
 ifeq "$(Windows)" "YES"
@@ -171,16 +178,17 @@ ifeq "$(Windows)" "YES"
 # there is no need to copy from libffi.dll to libHSffi...dll.
 # However, the renaming is still required for the import library
 # libffi.dll.a.
-$(libffi_HS_DYN_LIB_PATH).a: $(libffi_STAMP_BUILD)
-	$(CP) libffi/libffi.dll.a $(libffi_HS_DYN_LIB_PATH).a
-all_libffi : $(libffi_HS_DYN_LIB_PATH).a
+$(libffi_HS_DYN_LIB).a: libffi/libffi.dll.a
+	$(CP) libffi/libffi.dll.a $(libffi_HS_DYN_LIB).a
+
+$(eval $(call all-target,libffi,$(libffi_HS_DYN_LIB).a))
 
 else
 # Rename libffi.so to libHSffi...so
-$(libffi_HS_DYN_LIB_PATH): $(libffi_DYNAMIC_LIBS)
-	$(CP) $(word 1,$(libffi_DYNAMIC_LIBS)) $(libffi_HS_DYN_LIB_PATH)
+$(libffi_HS_DYN_LIB): $(libffi_DYNAMIC_LIBS)
+	$(CP) $(word 1,$(libffi_DYNAMIC_LIBS)) $(libffi_HS_DYN_LIB)
 
-all_libffi : $(libffi_HS_DYN_LIB_PATH)
+$(eval $(call all-target,libffi,$(libffi_HS_DYN_LIB)))
 endif
 endif
 
@@ -189,7 +197,7 @@ $(eval $(call clean-target,libffi,, \
    libffi/libffi.a libffi/libffi.la \
    libffi/HSffi.o libffi/libHSffi.a libffi/libHSffi_p.a \
    $(libffi_DYNAMIC_PROG) $(libffi_DYNAMIC_LIBS) \
-   $(libffi_HS_DYN_LIB_NAME) $(libffi_HS_DYN_LIB_NAME).a))
+   $(libffi_HS_DYN_LIB) $(libffi_HS_DYN_LIB).a))
 endif
 
 #-----------------------------------------------------------------------------

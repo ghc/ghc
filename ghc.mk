@@ -327,7 +327,10 @@ ALL_LIBS += $(foreach lib,$(PACKAGES),$(libraries/$(lib)_dist-install_dyn_LIB))
 endif
 BOOT_LIBS = $(foreach lib,$(BOOT_PKGS),$(libraries/$(lib)_dist-boot_v_LIB))
 
-OTHER_LIBS = libffi/libHSffi.a libffi/HSffi.o
+OTHER_LIBS = libffi/libHSffi$(v_libsuf) libffi/HSffi.o
+ifeq "$(BuildSharedLibs)" "YES"
+OTHER_LIBS  += libffi/libHSffi$(dyn_libsuf)
+endif
 ifeq "$(HaveLibGmp)" "NO"
 OTHER_LIBS += gmp/libgmp.a
 endif
