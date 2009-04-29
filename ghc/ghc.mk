@@ -33,10 +33,6 @@ ghc_stage2_HC_OPTS += -threaded
 ghc_stage3_HC_OPTS += -threaded
 endif
 
-ifeq "$(BuildSharedLibs)" "YES"
-ghc_HC_OPTS += -dynamic
-endif
-
 # XXX ToDp
 # ifeq "$(GhcProfiled)" "YES"
 
