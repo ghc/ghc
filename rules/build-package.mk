@@ -28,8 +28,6 @@
 # libraries/base_dist_CC_OPTS = -Iinclude ...
 # libraries/base_dist_LD_OPTS = -package ghc-prim-0.1.0.0
 
-# TODO: soext
-
 define build-package
 # $1 = dir
 # $2 = distdir
@@ -123,10 +121,14 @@ $1_$2_SplitObjs = NO
 endif
 endif
 
-# C and S files are built the "v" vanlilla way
+# C and S files are built the "v" vanlilla way and possibly also the "dyn" way.
 $(call c-objs,$1,$2,v)
 $(call distdir-opts,$1,$2,$3)
 $(call c-suffix-rules,$1,$2,v,YES)
+ifeq "$(BuildSharedLibs)" "YES"
+$(call c-objs,$1,$2,dyn)
+$(call c-suffix-rules,$1,$2,dyn,YES)
+endif
 
 # Now generate all the build rules for each way in this directory:
 $$(foreach way,$$($1_$2_WAYS),$$(eval $$(call build-package-way,$1,$2,$$(way),$3)))

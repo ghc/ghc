@@ -26,6 +26,16 @@ $1_$2_$3_MKSTUBOBJS = find $1/$2/build -name "*_stub.$$($3_osuf)" -print
 # HACK ^^^ we tried to use $(wildcard), but apparently it fails due to
 # make using cached directory contents, or something.
 
+ifeq "$3" "dyn"
+# Link a dynamic library
+$$($1_$2_$3_LIB) : $$($1_$2_$3_HS_OBJS) $$($1_$2_dyn_C_OBJS) $$($1_$2_dyn_S_OBJS) $$(ALL_RTS_LIBS)
+	$$(RM) $$@
+	$$($1_$2_HC) $$($1_$2_dyn_C_OBJS) $$($1_$2_dyn_S_OBJS) $$($1_$2_$3_HS_OBJS) \
+         `$$($1_$2_$3_MKSTUBOBJS)` \
+         -shared -dynamic \
+         -no-auto-link-packages $$(addprefix -package,$$($1_$2_DEPS)) \
+         -o $$@
+else
 # Build the ordinary .a library
 ifeq "$$($1_$2_SplitObjs)" "YES"
 $$($1_$2_$3_LIB) : $$($1_$2_$3_HS_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS)
@@ -35,6 +45,7 @@ else
 $$($1_$2_$3_LIB) : $$($1_$2_$3_HS_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS)
 	$$(RM) $$@
 	echo $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS) $$($1_$2_$3_HS_OBJS) `$$($1_$2_$3_MKSTUBOBJS)` | xargs $$(AR) $$(EXTRA_AR_ARGS) $$@
+endif
 endif
 
 $(call all-target,$1_$2,all_$1_$2_$3)

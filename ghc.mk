@@ -320,8 +320,11 @@ PACKAGES += haskeline
 
 BOOT_PKGS = Cabal hpc extensible-exceptions
 
-# The actual .a files: needed for dependencies.
+# The actual .a and .so/.dll files: needed for dependencies.
 ALL_LIBS  = $(foreach lib,$(PACKAGES),$(libraries/$(lib)_dist-install_v_LIB))
+ifeq "$(BuildSharedLibs)" "YES"
+ALL_LIBS += $(foreach lib,$(PACKAGES),$(libraries/$(lib)_dist-install_dyn_LIB))
+endif
 BOOT_LIBS = $(foreach lib,$(BOOT_PKGS),$(libraries/$(lib)_dist-boot_v_LIB))
 
 OTHER_LIBS = libffi/libHSffi.a libffi/HSffi.o

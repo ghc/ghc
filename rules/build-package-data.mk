@@ -12,6 +12,10 @@
 
 define build-package-data # args: $1 = dir, $2 = distdir
 
+ifeq "$(BuildSharedLibs)" "YES"
+$1_$2_CONFIGURE_FLAGS += --enable-shared
+endif
+
 ifeq "$(HSCOLOUR_SRCS)" "YES"
 $1_$2_CONFIGURE_FLAGS += --with-hscolour="$$(HSCOLOUR)"
 endif
