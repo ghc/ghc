@@ -16,9 +16,10 @@
 # We build the RTS with stage 1
 rts_dist_HC = $(GHC_STAGE1)
 
-rts_WAYS = $(strip $(GhcLibWays) $(GhcRTSWays))
+# merge GhcLibWays and GhcRTSWays but strip out duplicates
+rts_WAYS = $(GhcLibWays) $(filter-out $(GhcLibWays),$(GhcRTSWays))
 
-ALL_RTS_LIBS = $(foreach way,$(rts_WAYS),rts/dist/build/libHSrts$($(way)__way).a)
+ALL_RTS_LIBS = $(foreach way,$(rts_WAYS),rts/dist/build/libHSrts$($(way)_libsuf))
 all_rts : $(ALL_RTS_LIBS)
 
 # The per-dir options
@@ -119,7 +120,7 @@ $(call distdir-way-opts,rts,dist,$1)
 $(call c-suffix-rules,rts,dist,$1,YES)
 $(call cmm-suffix-rules,rts,dist,$1)
 
-rts_$1_LIB = rts/dist/build/libHSrts$$($1__way).a
+rts_$1_LIB = rts/dist/build/libHSrts$$($1_libsuf)
 
 rts_$1_C_OBJS   = $$(patsubst rts/%.c,rts/dist/build/%.$$($1_osuf),$$(rts_C_SRCS)) $$(patsubst %.c,%.$$($1_osuf),$$(rts_$1_EXTRA_C_SRCS))
 rts_$1_S_OBJS   = $$(patsubst rts/%.S,rts/dist/build/%.$$($1_osuf),$$(rts_S_SRCS))
@@ -127,9 +128,15 @@ rts_$1_CMM_OBJS = $$(patsubst rts/%.cmm,rts/dist/build/%.$$($1_osuf),$$(rts_CMM_
 
 rts_$1_OBJS = $$(rts_$1_C_OBJS) $$(rts_$1_S_OBJS) $$(rts_$1_CMM_OBJS)
 
+ifneq "$$(findstring dyn, $1)" ""
+$$(rts_$1_LIB) : $$(rts_$1_OBJS)
+	$$(RM) $$@
+	$$(rts_dist_HC) -shared -dynamic -no-auto-link-packages $$(rts_$1_OBJS) -o $$@
+else
 $$(rts_$1_LIB) : $$(rts_$1_OBJS)
 	$$(RM) $$@
 	echo $$(rts_$1_OBJS) | xargs $$(AR) $$(EXTRA_AR_ARGS) $$@
+endif
 
 endef
 
