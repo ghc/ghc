@@ -6,6 +6,9 @@
 #
 # ToDo: strip out all the .h junk
 #
+
+use File::Temp qw/ tempfile tempdir /;;
+
 ($Pgm = $0) =~ s/.*\/([^\/]+)$/\1/;
 $Usage  = "usage: $Pgm: not done yet\n";
 
@@ -178,8 +181,8 @@ sub slurp_file { # follows an example in the `open' item in perl man page
 
     $fname = &tidy_dir_names($fname);
 
-    ($tempfile = $fname) =~ s/\.[^\.]*$/\.d/;
-    $tempfile =~ s|.*/([^/]+)$|$1|g;
+    ($fh, $tempfile) = tempfile();
+    close $fh;
 
     # ${CPP} better be 'gcc -E', or the -x option will fail...
     # ..and the -MM & -MMD.
