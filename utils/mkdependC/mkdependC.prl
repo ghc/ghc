@@ -181,17 +181,17 @@ sub slurp_file { # follows an example in the `open' item in perl man page
 
     $fname = &tidy_dir_names($fname);
 
-    ($fh, $tempfile) = tempfile();
+    ($fh, $tempfile) = tempfile(DIR => '.', SUFFIX => '.d');
     close $fh;
 
     # ${CPP} better be 'gcc -E', or the -x option will fail...
     # ..and the -MM & -MMD.
-    $result = system("${CPP} -MM -MMD $Include_dirs @Defines -x c $fname $ignore_output");
+    $result = system("${CPP} -MM -MMD $Include_dirs @Defines -x c $fname -o $tempfile $ignore_output");
  
     if ($result != 0) {
         # On the cheesy side..we do want to know what went wrong, so
 	# re-run the command.
-	$result = system("${CPP} -MM -MMD $Include_dirs @Defines -x c $fname ");
+	$result = system("${CPP} -MM -MMD $Include_dirs @Defines -x c $fname -o $tempfile");
 	if ($result != 0) {
 	   unlink($tempfile);
    	   exit($result);
