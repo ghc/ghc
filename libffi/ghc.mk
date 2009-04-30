@@ -58,8 +58,10 @@ PLATFORM := $(shell echo $(HOSTPLATFORM) | sed 's/i[567]86/i486/g')
 
 ifeq "$(BuildSharedLibs)" "YES"
 libffi_STAMP_CONFIGURE = libffi/stamp.ffi.configure-shared
+libffi_STAMP_BUILD     = libffi/stamp.ffi.build-shared
 else
 libffi_STAMP_CONFIGURE = libffi/stamp.ffi.configure
+libffi_STAMP_BUILD     = libffi/stamp.ffi.build
 endif
 
 BINDIST_STAMPS = libffi/stamp.ffi.build libfii/stamp.ffi.configure
@@ -139,20 +141,12 @@ $(libffi_STAMP_CONFIGURE):
 libffi/ffi.h: $(libffi_STAMP_CONFIGURE)
 	$(CP) libffi/build/include/ffi.h $@
 
-# All the libs that libffi's own build will generate
-libffi_ALL_LIBS = $(libffi_STATIC_LIB)
-ifeq "$(BuildSharedLibs)" "YES"
-libffi_ALL_LIBS += $(libffi_DYNAMIC_LIBS)
-endif
-ifeq "$(Windows)" "YES"
-libffi_ALL_LIBS += libffi/libffi.dll.a $(libffi_HS_DYN_LIB).a
-endif
-
-$(libffi_ALL_LIBS): $(libffi_STAMP_CONFIGURE)
+$(libffi_STAMP_BUILD): $(libffi_STAMP_CONFIGURE)
 	cd libffi && \
 	  $(MAKE) -C build MAKEFLAGS=; \
 	  (cd build; ./libtool --mode=install cp libffi.la $(TOP)/libffi)
 
+$(libffi_STATIC_LIB): $(libffi_STAMP_BUILD)
 # Rename libffi.a to libHSffi.a
 libffi/libHSffi.a libffi/libHSffi_p.a: $(libffi_STATIC_LIB)
 	$(CP) $(libffi_STATIC_LIB) libffi/libHSffi.a
@@ -174,6 +168,7 @@ $(eval $(call all-target,libffi,libffi/HSffi.o))
 
 ifeq "$(BuildSharedLibs)" "YES"
 ifeq "$(Windows)" "YES"
+libffi/libffi.dll.a $(libffi_HS_DYN_LIB): $(libffi_STAMP_BUILD)
 # Windows libtool creates <soname>.dll, and as we already patched that
 # there is no need to copy from libffi.dll to libHSffi...dll.
 # However, the renaming is still required for the import library
@@ -184,6 +179,7 @@ $(libffi_HS_DYN_LIB).a: libffi/libffi.dll.a
 $(eval $(call all-target,libffi,$(libffi_HS_DYN_LIB).a))
 
 else
+$(libffi_DYNAMIC_LIBS): $(libffi_STAMP_BUILD)
 # Rename libffi.so to libHSffi...so
 $(libffi_HS_DYN_LIB): $(libffi_DYNAMIC_LIBS)
 	$(CP) $(word 1,$(libffi_DYNAMIC_LIBS)) $(libffi_HS_DYN_LIB)
