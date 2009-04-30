@@ -145,6 +145,7 @@ $(libffi_STAMP_BUILD): $(libffi_STAMP_CONFIGURE)
 	cd libffi && \
 	  $(MAKE) -C build MAKEFLAGS=; \
 	  (cd build; ./libtool --mode=install cp libffi.la $(TOP)/libffi)
+	touch $@
 
 $(libffi_STATIC_LIB): $(libffi_STAMP_BUILD)
 # Rename libffi.a to libHSffi.a
