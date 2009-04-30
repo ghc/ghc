@@ -20,7 +20,14 @@ $$(foreach dir,$$($1_$2_HS_SRC_DIRS),\
 
 $(call hs-objs,$1,$2,$3)
 
+# The .a/.so library file, indexed by two different sets of vars:
+# the first is indexed by the dir, distdir and way
+# the second is indexed by the package id, distdir and way
 $1_$2_$3_LIB = $1/$2/build/libHS$$($1_PACKAGE)-$$($1_$2_VERSION)$$($3_libsuf)
+$$($1_PACKAGE)-$($1_$2_VERSION)_$2_$3_LIB = $$($1_$2_$3_LIB)
+
+# All the .a/.so library file dependencies for this library
+$1_$2_$3_DEPS_LIBS=$$(foreach dep,$$($1_$2_DEPS),$$($$(dep)_$2_$3_LIB))
 
 $1_$2_$3_MKSTUBOBJS = find $1/$2/build -name "*_stub.$$($3_osuf)" -print
 # HACK ^^^ we tried to use $(wildcard), but apparently it fails due to
@@ -28,7 +35,7 @@ $1_$2_$3_MKSTUBOBJS = find $1/$2/build -name "*_stub.$$($3_osuf)" -print
 
 ifeq "$3" "dyn"
 # Link a dynamic library
-$$($1_$2_$3_LIB) : $$($1_$2_$3_HS_OBJS) $$($1_$2_dyn_C_OBJS) $$($1_$2_dyn_S_OBJS) $$(ALL_RTS_LIBS)
+$$($1_$2_$3_LIB) : $$($1_$2_$3_HS_OBJS) $$($1_$2_dyn_C_OBJS) $$($1_$2_dyn_S_OBJS) $$(ALL_RTS_LIBS) $$($1_$2_$3_DEPS_LIBS)
 	$$(RM) $$@
 	$$($1_$2_HC) $$($1_$2_dyn_C_OBJS) $$($1_$2_dyn_S_OBJS) $$($1_$2_$3_HS_OBJS) \
          `$$($1_$2_$3_MKSTUBOBJS)` \
