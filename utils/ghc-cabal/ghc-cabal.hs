@@ -14,6 +14,7 @@ import Distribution.Simple.Utils (defaultPackageDesc, withTempFile)
 import Distribution.Simple.Build (writeAutogenFiles)
 import Distribution.Simple.Register (writeInstalledConfig)
 import Distribution.Simple.PackageIndex
+import Distribution.System
 import Distribution.Text
 import Distribution.Verbosity
 import qualified Distribution.InstalledPackageInfo as Installed
@@ -170,7 +171,8 @@ generate config_args distdir directory
       -- Sigh, haskeline proper uses stuff in Setup.hs to handle whether
       -- or not -liconv is used. We don't use Setup.hs, so we replicate
       -- what it does here. We should do this better somehow.
-      when (display (pkgName (package pd0)) == "haskeline") $
+      when ((display (pkgName (package pd0)) == "haskeline") &&
+            (buildOS /= Windows)) $
           case library pd0 of
               Nothing -> fail "Can't happen: No haskeline library"
               Just lib -> do
