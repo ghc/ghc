@@ -1,0 +1,8 @@
+[1 of 2] Compiling B                ( B.hs, B.o )
+[2 of 2] Compiling A                ( A.hs, A.o )
+
+A.hs:8:7:
+    Couldn't match expected type `Int' against inferred type `(t, t1)'
+    In the expression: (2, 3)
+    In the expression: (1, (2, 3))
+    In the definition of `f': f = (1, (2, 3))
