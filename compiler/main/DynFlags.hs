@@ -72,7 +72,7 @@ import PackageConfig
 import PrelNames        ( mAIN, main_RDR_Unqual )
 import RdrName          ( RdrName, mkRdrUnqual )
 import OccName          ( mkVarOccFS )
-#ifdef i386_TARGET_ARCH
+#if defined(i386_TARGET_ARCH) || ! defined(mingw32_TARGET_OS)
 import StaticFlags      ( opt_Static )
 #endif
 import StaticFlags      ( opt_PIC, WayName(..), v_Ways, v_Build_tag,
@@ -2305,7 +2305,7 @@ picCCOpts _dflags
     | otherwise
         = []
 #else
-    | opt_PIC
+    | opt_PIC || not opt_Static
         = ["-fPIC", "-U __PIC__", "-D__PIC__"]
     | otherwise
         = []
