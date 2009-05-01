@@ -42,6 +42,10 @@ $1/$2/build/%.$$($3_way_)s : $1/$2/build/%.c $$($1_$2_HC_DEP)
 	$$(RM) $$@
 	$$($1_$2_HC) $$($1_$2_$3_GHC_CC_OPTS) -S $$< -o $$@
 
+$1/$2/build/%.$$($3_way_)s : $1/%.c $$($1_$2_HC_DEP)
+	$$(RM) $$@
+	$$($1_$2_HC) $$($1_$2_$3_GHC_CC_OPTS) -S $$< -o $$@
+
 else
 
 $1/$2/build/%.$$($3_osuf) : $1/%.c $$(MKDIRHIER)
