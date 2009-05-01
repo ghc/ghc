@@ -733,8 +733,13 @@ binary-dist:
 	$(RM) -f $(BIN_DIST_TAR)
 # h means "follow symlinks", e.g. if aclocal.m4 is a symlink to a source
 # tree then we want to include the real file, not a symlink to it
-	$(TAR) hcf $(BIN_DIST_TAR) -T $(BIN_DIST_LIST)
-	bzip2 < $(BIN_DIST_TAR) > $(BIN_DIST_TAR_BZ2)
+	$(TAR) hcf - -T $(BIN_DIST_LIST) | bzip2 -c >$(BIN_DIST_TAR_BZ2)
+
+nTimes = set -e; for i in `seq 1 $(1)`; do echo Try "$$i: $(2)"; if $(2); then break; fi; done
+
+.PHONY: publish-binary-dist
+publish-binary-dist:
+	$(call nTimes,10,$(PublishCp) $(BIN_DIST_TAR_BZ2) $(PublishLocation)/dist)
 
 # -----------------------------------------------------------------------------
 # Source distributions
@@ -832,14 +837,8 @@ sdist-manifest : $(SRC_DIST_TARBALL)
 # over SSH.
 ifneq "$(PublishLocation)" ""
 publish-sdist :
-	@for i in 0 1 2 3 4 5 6 7 8 9; do \
-		echo "Try $$i: $(PublishCp) $(SRC_DIST_EXTRALIBS_TARBALL) $(PublishLocation)/dist"; \
-		if $(PublishCp) $(SRC_DIST_EXTRALIBS_TARBALL) $(PublishLocation)/dist; then break; fi; \
-	done
-	@for i in 0 1 2 3 4 5 6 7 8 9; do \
-		echo "Try $$i: $(PublishCp) $(SRC_DIST_TARBALL) $(PublishLocation)/dist"; \
-		if $(PublishCp) $(SRC_DIST_TARBALL) $(PublishLocation)/dist; then break; fi; \
-	done
+	$(call nTimes,10,$(PublishCp) $(SRC_DIST_EXTRALIBS_TARBALL) $(PublishLocation)/dist)
+	$(call nTimes,10,$(PublishCp) $(SRC_DIST_TARBALL) $(PublishLocation)/dist)
 endif
 
 # -----------------------------------------------------------------------------
