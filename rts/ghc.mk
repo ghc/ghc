@@ -70,6 +70,11 @@ rts/dist/build/sm/Scav_thr.c : rts/sm/Scav.c
 
 rts_H_FILES = $(wildcard $(GHC_INCLUDE_DIR)/*.h) $(wildcard rts/*.h)
 
+# collect the -l flags that we need to link the rts dyn lib.
+rts/libs.depend : $(GHC_PKG_INPLACE)
+	$$(GHC_PKG_INPLACE) field rts extra-libraries \
+	  | sed -e 's/^extra-libraries: //' -e 's/\([a-z]*\)/-l\1/g' > $$@
+
 #-----------------------------------------------------------------------------
 # Building one way
 
@@ -139,9 +144,9 @@ rts_$1_CMM_OBJS = $$(patsubst rts/%.cmm,rts/dist/build/%.$$($1_osuf),$$(rts_CMM_
 rts_$1_OBJS = $$(rts_$1_C_OBJS) $$(rts_$1_S_OBJS) $$(rts_$1_CMM_OBJS)
 
 ifneq "$$(findstring dyn, $1)" ""
-$$(rts_$1_LIB) : $$(rts_$1_OBJS)
+$$(rts_$1_LIB) : $$(rts_$1_OBJS) rts/libs.depend
 	$$(RM) $$@
-	$$(rts_dist_HC) -shared -dynamic -no-auto-link-packages $$(rts_$1_OBJS) -o $$@
+	$$(rts_dist_HC) -shared -dynamic -no-auto-link-packages `cat rts/libs.depend` $$(rts_$1_OBJS) -o $$@
 else
 $$(rts_$1_LIB) : $$(rts_$1_OBJS)
 	$$(RM) $$@
