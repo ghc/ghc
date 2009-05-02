@@ -165,8 +165,6 @@ $(eval $(call clean-target,inplace,,inplace))
 # When we're just doing 'make clean' or 'make show', then we don't need
 # to build dependencies.
 
-NO_INCLUDE_DEPS = NO
-NO_INCLUDE_PKGDATA = NO
 ifneq "$(findstring clean,$(MAKECMDGOALS))" ""
 NO_INCLUDE_DEPS = YES
 NO_INCLUDE_PKGDATA = YES

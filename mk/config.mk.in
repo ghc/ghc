@@ -51,6 +51,9 @@ BootingFromHc = @BootingFromHc@
 # rather than registerised code, i.e., disable the mangler?
 BootingFromUnregisterisedHc = @BootingFromUnregisterisedHc@
 
+NO_INCLUDE_DEPS = NO
+NO_INCLUDE_PKGDATA = NO
+
 #
 # Which ways should DocBook XML documents be built?
 # options are: dvi ps pdf html chm HxS
