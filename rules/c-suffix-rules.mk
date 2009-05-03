@@ -18,7 +18,7 @@ define c-suffix-rules
 # $4 = use GHC (YES/NO)
 
 # UseGhcForCc is only relevant when not booting from HC files.
-ifeq "$4" "YES"
+ifeq "$4 $$(BootingFromHc)" "YES NO"
 
 $1/$2/build/%.$$($3_osuf) : $1/%.c $$(MKDIRHIER) $$($1_$2_HC_DEP)
 	$$(RM) $$@
