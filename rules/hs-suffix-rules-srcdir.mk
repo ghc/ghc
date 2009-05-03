@@ -57,6 +57,9 @@ endif
 $1/$2/build/%.$$($3_osuf) : $1/$4/%.hc
 	$$(CC) $$($1_$2_$3_ALL_CC_OPTS) -c $$< -o $$@
 
+$1/$2/build/%.$$($3_osuf) : $1/$2/build/%.hc
+	$$(CC) $$($1_$2_$3_ALL_CC_OPTS) -c $$< -o $$@
+
 # $1/$2/build/%.$$($3_osuf) : $1/$2/build/%.$$($3_way_)hc
 # 	$$($1_$2_HC) $$($1_$2_$3_ALL_HC_OPTS) -c $$< -o $$@
 #
