@@ -389,7 +389,9 @@ endif
 
 $(eval $(call manual-package-config,rts))
 
+ifneq "$(BootingFromHc)" "YES"
 rts/package.conf.inplace : $(includes_H_CONFIG) $(includes_H_PLATFORM)
+endif
 
 # -----------------------------------------------------------------------------
 # installing
