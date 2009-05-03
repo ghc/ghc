@@ -31,19 +31,38 @@ do
     fi
 done
 
+libraries=
+
 for f in libraries/*; do
+  pkgs=$f/ghc-packages
+  if test -f $pkgs; then
+    for p in `cat $pkgs`; do
+      libraries="$libraries $f/$p"
+    done
+  else
+    libraries="$libraries $f"
+  fi
+done
+
+for f in $libraries; do
    dir=`basename $f`
    cabals=`echo $f/*.cabal`
    if test -f $cabals; then
        echo "Creating $f/ghc.mk"
        rm -f $f/ghc.mk
        pkg=`basename ${cabals%.cabal}`
+       if test -f $f/ghc-stage; then
+           stage=`cat $f/ghc-stage`
+       else
+           stage=1
+       fi
+       top=`echo $f | sed "s/[^/]*/../g"`
        echo "${f}_PACKAGE = ${pkg}" >> $f/ghc.mk
-       echo "\$(eval \$(call build-package,${f},dist-install,1))" >> $f/ghc.mk
+       echo "\$(eval \$(call build-package,${f},dist-install,${stage}))" >> $f/ghc.mk
        rm -f $f/GNUmakefile
        echo "Creating $f/GNUmakefile"
        echo "dir = ${f}" >> $f/GNUmakefile
-       echo "TOP = ../.." >> $f/GNUmakefile
+       echo "TOP = ${top}" >> $f/GNUmakefile
        echo "include \$(TOP)/mk/sub-makefile.mk" >> $f/GNUmakefile
    fi
 done

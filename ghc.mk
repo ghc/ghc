@@ -316,6 +316,16 @@ endif
 
 PACKAGES += haskeline
 
+ifneq "$(wildcard libraries/dph)" ""
+PACKAGES += \
+	dph/dph-base \
+	dph/dph-prim-interface \
+	dph/dph-prim-seq \
+	dph/dph-prim-par \
+	dph/dph-seq \
+	dph/dph-par
+endif
+
 BOOT_PKGS = Cabal hpc extensible-exceptions
 
 # The actual .a and .so/.dll files: needed for dependencies.
@@ -515,6 +525,9 @@ $(foreach lib,$(PACKAGES),$(eval \
   libraries/$(lib)_dist-install_DISABLE = YES))
 endif
 
+ifneq "$(wildcard libraries/dph)" ""
+include libraries/dph/ghc.mk
+endif
 include $(patsubst %, %/ghc.mk, $(BUILD_DIRS))
 
 # We need -fno-warn-deprecated-flags to avoid failure with -Werror
