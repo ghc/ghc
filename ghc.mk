@@ -26,6 +26,10 @@
 #
 # Once the new build system is in HEAD, and before 6.12:
 #
+#   * separate the logic of whether to do something from the test for
+#     existence of the tool to do it. For example, rather than checking
+#     if $DIR_DOCBOOK_XSL or $XSLTPROC is "", we should have a variable
+#     for controlling the building of the docs.
 #   * remove old Makefiles, add new stubs for building in subdirs
 #     * utils/hsc2hs/Makefile
 #     * utils/haddock/Makefile
