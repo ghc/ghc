@@ -38,7 +38,10 @@ endif
 
 ghc_stage1_MODULES = Main
 
-ghc_stage2_MODULES = $(ghc_stage1_MODULES) GhciMonad GhciTags InteractiveUI
+ghc_stage2_MODULES = $(ghc_stage1_MODULES)
+ifeq "$(GhcWithInterpreter)" "YES"
+ghc_stage2_MODULES += GhciMonad GhciTags InteractiveUI
+endif
 ghc_stage3_MODULES = $(ghc_stage2_MODULES)
 
 ghc_stage1_PROG = ghc-stage1$(exeext)
