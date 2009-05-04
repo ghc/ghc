@@ -716,7 +716,7 @@ install_packages: libffi/package.conf.install rts/package.conf.install
 
 $(eval $(call bindist,.,\
     LICENSE \
-    configure config.sub config.guess \
+    configure config.sub config.guess install-sh \
     extra-gcc-opts.in \
     Makefile \
     mk/config.mk.in \
@@ -742,7 +742,7 @@ $(eval $(call bindist,.,\
 binary-dist:
 	$(RM) -rf $(BIN_DIST_NAME)
 	mkdir $(BIN_DIST_NAME)
-	set -e; for i in LICENSE compiler ghc rts libraries utils gmp docs libffi includes driver mk rules Makefile aclocal.m4 config.sub config.guess extra-gcc-opts.in ghc.mk inplace; do ln -s ../$$i $(BIN_DIST_NAME)/; done
+	set -e; for i in LICENSE compiler ghc rts libraries utils gmp docs libffi includes driver mk rules Makefile aclocal.m4 config.sub config.guess install-sh extra-gcc-opts.in ghc.mk inplace; do ln -s ../$$i $(BIN_DIST_NAME)/; done
 	ln -s ../distrib/configure-bin.ac $(BIN_DIST_NAME)/configure.ac
 	cd $(BIN_DIST_NAME) && autoreconf
 	$(RM) -f $(BIN_DIST_TAR)
