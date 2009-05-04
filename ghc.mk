@@ -856,6 +856,10 @@ publish-sdist :
 	$(call nTimes,10,$(PublishCp) $(SRC_DIST_TARBALL) $(PublishLocation)/dist)
 endif
 
+ifeq "$(GhcUnregisterised)" "YES"
+SRC_CC_OPTS += -DNO_REGS -DUSE_MINIINTERPRETER
+endif
+
 # -----------------------------------------------------------------------------
 # Cleaning
 
