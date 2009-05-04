@@ -21,15 +21,17 @@ include $(TOP)/mk/config.mk
 
 all:
 	$(RM) -rf $(BIN_DIST_INST_SUBDIR)
-	$(RM) -rf ghc*
+	$(RM) -rf a/b/c/*
 	$(RM) HelloWorld HelloWorld.o HelloWorld.hi output
-	# --force-local makes tar not think that c:/foo refers to a remote file
-	$(TAR) --force-local -jxf $(BIN_DIST_TAR_BZ2)
+# We use the a/b/c subdirectory as configure looks for install-sh in
+# . .. ../.. and we don't want it to find the build system's install-sh.
+# --force-local makes tar not think that c:/foo refers to a remote file
+	cd a/b/c/ && $(TAR) --force-local -jxf $(BIN_DIST_TAR_BZ2)
 ifeq "$(Windows)" "YES"
-	mv $(BIN_DIST_NAME) $(BIN_DIST_INST_DIR)
+	mv a/b/c/$(BIN_DIST_NAME) $(BIN_DIST_INST_DIR)
 else
-	cd $(BIN_DIST_NAME) && ./configure --prefix=$(BIN_DIST_INST_DIR)
-	cd $(BIN_DIST_NAME) && make install
+	cd a/b/c/$(BIN_DIST_NAME) && ./configure --prefix=$(BIN_DIST_INST_DIR)
+	cd a/b/c/$(BIN_DIST_NAME) && make install
 endif
 	$(BIN_DIST_INST_DIR)/bin/ghc --make HelloWorld
 	./HelloWorld > output
