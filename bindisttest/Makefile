@@ -36,6 +36,7 @@ endif
 	$(BIN_DIST_INST_DIR)/bin/ghc --make HelloWorld
 	./HelloWorld > output
 	$(CONTEXT_DIFF) output expected_output
+	$(BIN_DIST_INST_DIR)/bin/ghc-pkg check
 
 clean distclean:
 	$(RM) -rf $(BIN_DIST_INST_SUBDIR)
