@@ -277,6 +277,7 @@ sm/Storage_CC_OPTS += -Wno-strict-prototypes
 StgCRun_CC_OPTS += -w
 Typeable_CC_OPTS += -w
 RetainerProfile_CC_OPTS += -w
+RetainerSet_CC_OPTS += -Wno-format
 sm/Compact_CC_OPTS += -w
 # On Windows:
 win32/ConsoleHandler_CC_OPTS += -w
