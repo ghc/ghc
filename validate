@@ -80,7 +80,7 @@ if [ $no_clean -eq 0 ]; then
     ./configure --prefix="$INSTDIR" $config_args
 fi
 
-thisdir=`utils/pwd/pwd forwardslash`
+thisdir=`utils/pwd/pwd`
 
 echo "Validating=YES" > mk/are-validating.mk
 

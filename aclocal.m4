@@ -1255,7 +1255,7 @@ if test ! -f utils/pwd/pwd && test ! -f utils/pwd/pwd.exe; then
   cd ../..
 fi
 
-hardtop=`utils/pwd/pwd forwardslash`
+hardtop=`utils/pwd/pwd`
 
 if ! test -d "$hardtop"; then
   AC_MSG_ERROR([cannot determine current directory])
