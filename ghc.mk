@@ -45,7 +45,6 @@
 #     * libraries/Makefile
 #     * rts/dotnet/Makefile
 #     * utils/Makefile
-#   * docbook PDFs, e.g. "dblatex -T db2latex users_guide.xml"
 #   * GhcProfiled
 #   * optionally install stage3?
 #   * shared libraries, way dyn
