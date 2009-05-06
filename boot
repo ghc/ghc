@@ -50,7 +50,7 @@ for f in $libraries; do
    if test -f $cabals; then
        echo "Creating $f/ghc.mk"
        rm -f $f/ghc.mk
-       pkg=`basename ${cabals%.cabal}`
+       pkg=`echo "$cabals" | sed -e 's#.*/##' -e 's#\.cabal$##'`
        if test -f $f/ghc-stage; then
            stage=`cat $f/ghc-stage`
        else
