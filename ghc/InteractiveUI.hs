@@ -38,6 +38,7 @@ import Outputable       hiding (printForUser, printForUserPartWay)
 import Module           -- for ModuleEnv
 import Name
 import SrcLoc
+import ObjLink
 
 -- Other random utilities
 import CmdLineParser
@@ -285,6 +286,13 @@ findEditor = do
 interactiveUI :: [(FilePath, Maybe Phase)] -> Maybe [String]
               -> Ghc ()
 interactiveUI srcs maybe_exprs = do
+   -- although GHCi compiles with -prof, it is not usable: the byte-code
+   -- compiler and interpreter don't work with profiling.  So we check for
+   -- this up front and emit a helpful error message (#2197)
+   m <- liftIO $ lookupSymbol "PushCostCentre"
+   when (isJust m) $ 
+     ghcError (InstallationError "GHCi cannot be used when compiled with -prof")
+
    -- HACK! If we happen to get into an infinite loop (eg the user
    -- types 'let x=x in x' at the prompt), then the thread will block
    -- on a blackhole, and become unreachable during GC.  The GC will
