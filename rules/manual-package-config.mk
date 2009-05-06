@@ -36,9 +36,7 @@ $1/package.conf.install:
 	grep -v '^#pragma GCC' | \
 	sed -e 's/""//g' -e 's/:[ 	]*,/: /g' >$$@
 
-clean : clean_$1
-.PHONY: clean_$1
-clean_$1 : clean_$1_package.conf
+distclean : clean_$1_package.conf
 .PHONY: clean_$1_package.conf
 clean_$1_package.conf :
 	$(RM) $1/package.conf.install $1/package.conf.inplace
