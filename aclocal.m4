@@ -1243,19 +1243,19 @@ AC_DEFUN([FP_FIND_ROOT],[
 AC_MSG_CHECKING(for path to top of build tree)
 
 dnl This would be
-dnl     make -C utils/pwd clean && make -C utils/pwd
+dnl     make -C utils/ghc-pwd clean && make -C utils/ghc-pwd
 dnl except we don't want to have to know what make is called. Sigh.
-if test ! -f utils/pwd/pwd && test ! -f utils/pwd/pwd.exe; then
-  cd utils/pwd
+if test ! -f utils/ghc-pwd/ghc-pwd && test ! -f utils/ghc-pwd/ghc-pwd.exe; then
+  cd utils/ghc-pwd
   rm -f *.o
   rm -f *.hi
-  rm -f pwd
-  rm -f pwd.exe
-  $WithGhc -v0 --make pwd -o pwd
+  rm -f ghc-pwd
+  rm -f ghc-pwd.exe
+  $WithGhc -v0 --make ghc-pwd -o ghc-pwd
   cd ../..
 fi
 
-hardtop=`utils/pwd/pwd`
+hardtop=`utils/ghc-pwd/ghc-pwd`
 
 if ! test -d "$hardtop"; then
   AC_MSG_ERROR([cannot determine current directory])

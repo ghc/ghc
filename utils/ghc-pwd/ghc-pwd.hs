@@ -13,7 +13,7 @@ main = do
         [] -> do d <- getCurrentDirectory
                  putStr $ map forwardifySlashes d
         _ -> do hPutStrLn stderr ("Bad args: " ++ show args)
-                hPutStrLn stderr "Usage: pwd"
+                hPutStrLn stderr "Usage: ghc-pwd"
                 exitFailure
 
 forwardifySlashes :: Char -> Char

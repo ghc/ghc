@@ -722,7 +722,7 @@ $(eval $(call bindist,.,\
     mk/config.mk.in \
     $(INPLACE_BIN)/mkdirhier \
     $(INPLACE_BIN)/ghc-cabal \
-    utils/pwd/pwd \
+    utils/ghc-pwd/ghc-pwd \
 	$(BINDIST_WRAPPERS) \
 	$(BINDIST_LIBS) \
 	$(BINDIST_HI) \
@@ -865,7 +865,10 @@ endif
 
 .PHONY: clean
 
-CLEAN_FILES += utils/pwd/pwd utils/pwd/pwd.exe utils/pwd/pwd.hi utils/pwd/pwd.o
+CLEAN_FILES += utils/ghc-pwd/ghc-pwd
+CLEAN_FILES += utils/ghc-pwd/ghc-pwd.exe
+CLEAN_FILES += utils/ghc-pwd/ghc-pwd.hi
+CLEAN_FILES += utils/ghc-pwd/ghc-pwd.o
 
 clean : clean_files
 .PHONY: clean_files
