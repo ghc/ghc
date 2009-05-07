@@ -865,6 +865,8 @@ endif
 
 .PHONY: clean
 
+CLEAN_FILES += utils/pwd/pwd utils/pwd/pwd.exe utils/pwd/pwd.hi utils/pwd/pwd.o
+
 clean : clean_files
 .PHONY: clean_files
 clean_files :
