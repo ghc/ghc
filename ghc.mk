@@ -33,7 +33,6 @@
 #   * remove old Makefiles, add new stubs for building in subdirs
 #     * utils/hsc2hs/Makefile
 #     * utils/haddock/Makefile
-#     * mk/oldconfig.mk.in
 #     * docs/Makefile
 #     * docs/docbook-cheat-sheet/Makefile
 #     * docs/ext-core/Makefile
