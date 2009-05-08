@@ -895,3 +895,6 @@ maintainer-clean : distclean
 	$(RM) libraries/process/include/HsProcessConfig.h.in
 	$(RM) libraries/unix/include/HsUnixConfig.h.in
 	$(RM) libraries/old-time/include/HsTimeConfig.h.in
+
+.PHONY: all_libraries
+

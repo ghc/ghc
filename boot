@@ -58,6 +58,7 @@ for f in $libraries; do
        fi
        top=`echo $f | sed 's#[^/]\+#..#g'`
        echo "${f}_PACKAGE = ${pkg}" >> $f/ghc.mk
+       echo "${f}_dist-install_GROUP = libraries" >> $f/ghc.mk
        echo "\$(eval \$(call build-package,${f},dist-install,${stage}))" >> $f/ghc.mk
        rm -f $f/GNUmakefile
        echo "Creating $f/GNUmakefile"
