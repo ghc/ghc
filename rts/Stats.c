@@ -628,11 +628,11 @@ stat_exit(int alloc)
 	    {
 		nat i;
 		Task *task;
+                statsPrintf("                        MUT time (elapsed)       GC time  (elapsed)\n");
 		for (i = 0, task = all_tasks; 
 		     task != NULL; 
 		     i++, task = task->all_link) {
-		    statsPrintf("  Task %2d %-8s :  MUT time: %6.2fs  (%6.2fs elapsed)\n"
-			    "                      GC  time: %6.2fs  (%6.2fs elapsed)\n\n", 
+		    statsPrintf("  Task %2d %-8s :  %6.2fs    (%6.2fs)     %6.2fs    (%6.2fs)\n",
 				i,
 				(task->tso == NULL) ? "(worker)" : "(bound)",
 				TICK_TO_DBL(task->mut_time),
@@ -641,6 +641,8 @@ stat_exit(int alloc)
 				TICK_TO_DBL(task->gc_etime));
 		}
 	    }
+
+	    statsPrintf("\n");
 
             {
                 nat i;
