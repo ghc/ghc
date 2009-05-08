@@ -353,7 +353,7 @@ usage_text[] = {
 "  -K<size> Sets the maximum stack size (default 8M)  Egs: -K32k   -K512k",
 "  -k<size> Sets the initial thread stack size (default 1k)  Egs: -k4k   -k2m",
 "",
-"  -A<size> Sets the minimum allocation area size (default 256k) Egs: -A1m -A10k",
+"  -A<size> Sets the minimum allocation area size (default 512k) Egs: -A1m -A10k",
 "  -M<size> Sets the maximum heap size (default unlimited)  Egs: -M256k -M1G",
 "  -H<size> Sets the minimum heap size (default 0M)   Egs: -H24m  -H1G",
 "  -m<n>    Minimum % of heap which must be available (default 3%)",
