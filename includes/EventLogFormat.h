@@ -73,6 +73,9 @@
  *
  * -------------------------------------------------------------------------- */
 
+#ifndef EVENTLOGFORMAT_H
+#define EVENTLOGFORMAT_H
+
 /*
  * Markers for begin/end of the Header.
  */
@@ -136,3 +139,5 @@ typedef StgWord64 EventThreadID;
 typedef StgWord16 EventCapNo;
 
 #endif
+
+#endif /* EVENTLOGFORMAT_H */
