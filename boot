@@ -56,7 +56,7 @@ for f in $libraries; do
        else
            stage=1
        fi
-       top=`echo $f | sed "s/[^/]*/../g"`
+       top=`echo $f | sed 's#[^/]\+#..#g'`
        echo "${f}_PACKAGE = ${pkg}" >> $f/ghc.mk
        echo "\$(eval \$(call build-package,${f},dist-install,${stage}))" >> $f/ghc.mk
        rm -f $f/GNUmakefile
