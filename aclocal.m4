@@ -768,6 +768,19 @@ EOF
 ]) # FP_GEN_DOCBOOK_XML
 
 
+# FP_PROG_DBLATEX
+# ----------------
+# Sets the output variable DblatexCmd to the full path of dblatex,
+# which we use for building PDF and PS docs.
+# DblatexCmd is empty if dblatex could not be found.
+AC_DEFUN([FP_PROG_DBLATEX],
+[AC_PATH_PROG([DblatexCmd], [dblatex])
+if test -z "$DblatexCmd"; then
+  AC_MSG_WARN([cannot find dblatex in your PATH, you will not be able to build the PDF and PS documentation])
+fi
+])# FP_PROG_DBLATEX
+
+
 # FP_PROG_XSLTPROC
 # ----------------
 # Sets the output variable XsltprocCmd to the full path of the XSLT processor
@@ -775,7 +788,7 @@ EOF
 AC_DEFUN([FP_PROG_XSLTPROC],
 [AC_PATH_PROG([XsltprocCmd], [xsltproc])
 if test -z "$XsltprocCmd"; then
-  AC_MSG_WARN([cannot find xsltproc in your PATH, you will not be able to build the documentation])
+  AC_MSG_WARN([cannot find xsltproc in your PATH, you will not be able to build the HTML documentation])
 fi
 ])# FP_PROG_XSLTPROC
 

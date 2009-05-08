@@ -280,7 +280,7 @@ main = do let xs = {-# SCC "X" #-} [1..1000000]
 
       <para>which gives this heap profile when run:</para>
 
-      <imagedata fileref="prof_scc.png"/>
+      <imagedata fileref="prof_scc"/>
 
     </sect2>
 

@@ -1002,6 +1002,8 @@ FP_CHECK_DOCBOOK_DTD
 FP_DIR_DOCBOOK_XSL([/usr/share/xml/docbook/stylesheet/nwalsh/current /usr/share/xml/docbook/stylesheet/nwalsh /usr/share/xml/docbook/xsl-stylesheets* /usr/share/sgml/docbook/docbook-xsl-stylesheets* /usr/share/sgml/docbook/xsl-stylesheets* /opt/kde?/share/apps/ksgmltools2/docbook/xsl /usr/share/docbook-xsl /usr/share/sgml/docbkxsl /usr/local/share/xsl/docbook /sw/share/xml/xsl/docbook-xsl /opt/local/share/xsl/docbook-xsl])
 FP_PROG_FO_PROCESSOR
 
+FP_PROG_DBLATEX
+
 dnl ** check for ghc-pkg command
 FP_PROG_GHC_PKG
 
@@ -1297,6 +1299,26 @@ else
 fi
 AC_SUBST(HavePapi)
 
+if test "$DIR_DOCBOOK_XSL" = "" -o
+   test "$XsltprocCmd" = ""
+then
+    BUILD_DOCBOOK_HTML=NO
+else
+    BUILD_DOCBOOK_HTML=YES
+fi
+AC_SUBST(BUILD_DOCBOOK_HTML)
+
+if test "$DblatexCmd" = ""
+then
+    BUILD_DOCBOOK_PS=NO
+    BUILD_DOCBOOK_PDF=NO
+else
+    BUILD_DOCBOOK_PS=YES
+    BUILD_DOCBOOK_PDF=YES
+fi
+AC_SUBST(BUILD_DOCBOOK_PS)
+AC_SUBST(BUILD_DOCBOOK_PDF)
+
 AC_CONFIG_FILES([mk/config.mk mk/project.mk compiler/ghc.cabal ghc/ghc-bin.cabal ghc.spec extra-gcc-opts docs/users_guide/ug-book.xml])
 AC_CONFIG_COMMANDS([mk/stamp-h],[echo timestamp > mk/stamp-h])
 AC_OUTPUT
@@ -1362,17 +1384,11 @@ echo ["\
 "]
 fi
 
-if test "$DIR_DOCBOOK_XSL" = ""; then
-echo ["\
-   Building DocBook documentation : no"]
-else
-echo ["\
-   Building DocBook documentation : yes"]
-fi
+echo "Building DocBook HTML documentation: $BUILD_DOCBOOK_HTML"
+echo "Building DocBook PS documentation:   $BUILD_DOCBOOK_PS"
+echo "Building DocBook PDF documentation:  $BUILD_DOCBOOK_PDF"
 
-
-echo ["\
-   Building shared libraries      : $BuildSharedLibs"]
+echo ["Building shared libraries      : $BuildSharedLibs"]
 
 echo ["----------------------------------------------------------------------
 "]

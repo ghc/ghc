@@ -17,10 +17,10 @@ define docbook
 # $1 = dir
 # $2 = docname
 
-$(call clean-target,$1,docbook,$1/$2)
+$(call clean-target,$1,docbook,$1/$2 $1/$2.pdf $1/$2.ps)
 
-ifneq "$$(XSLTPROC)" ""
-$(call all-target,$1,$1/$2/index.html)
+ifeq "$$(BUILD_DOCBOOK_HTML)" "YES"
+$(call all-target,$1_html,$1/$2/index.html)
 
 $1/$2/index.html: $$($1_DOCBOOK_SOURCES)
 	$$(RM) -r $$(dir $$@)
@@ -30,6 +30,20 @@ $1/$2/index.html: $$($1_DOCBOOK_SOURCES)
 	             $$(XSLTPROC_LABEL_OPTS) $$(XSLTPROC_OPTS) \
 	             $$(DIR_DOCBOOK_XSL)/html/chunk.xsl $1/$2.xml
 	cp mk/fptools.css $$(dir $$@)
+endif
+
+ifeq "$$(BUILD_DOCBOOK_PS)" "YES"
+$(call all-target,$1_ps,$1/$2.ps)
+
+$1/$2.ps: $$($1_DOCBOOK_SOURCES)
+	$$(DBLATEX) $$(DBLATEX_OPTS) $1/$2.xml --ps -o $$@
+endif
+
+ifeq "$$(BUILD_DOCBOOK_PDF)" "YES"
+$(call all-target,$1_pdf,$1/$2.pdf)
+
+$1/$2.pdf: $$($1_DOCBOOK_SOURCES)
+	$$(DBLATEX) $$(DBLATEX_OPTS) $1/$2.xml --pdf -o $$@
 endif
 
 endef

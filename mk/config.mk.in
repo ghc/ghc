@@ -892,6 +892,10 @@ ISCC                    =
 #-----------------------------------------------------------------------------
 # DocBook XML stuff
 
+BUILD_DOCBOOK_HTML = @BUILD_DOCBOOK_HTML@
+BUILD_DOCBOOK_PS = @BUILD_DOCBOOK_PS@
+BUILD_DOCBOOK_PDF = @BUILD_DOCBOOK_PDF@
+DBLATEX		= @DblatexCmd@
 XSLTPROC		= @XsltprocCmd@
 XMLLINT			= @XmllintCmd@
 FOP			= @FopCmd@
