@@ -32,8 +32,16 @@ else
 default : all
 	@:
 
+include mk/config.mk
+
+ifeq "$(ProjectVersion)" ""
+$(error Please run ./configure first)
+endif
+
+include mk/custom-settings.mk
+
 # No need to update makefiles for these targets:
-REALGOALS=$(filter-out clean clean_% distclean maintainer-clean show,$(MAKECMDGOALS))
+REALGOALS=$(filter-out framework-pkg clean clean_% distclean maintainer-clean show,$(MAKECMDGOALS))
 
 # NB. not the same as saying '%: ...', which doesn't do the right thing:
 # it does nothing if we specify a target that already exists.
@@ -64,6 +72,11 @@ $(filter clean_%, $(MAKECMDGOALS)) : clean_% :
 
 show:
 	$(MAKE) -r --no-print-directory -f ghc.mk $@
+
+ifeq "$(darwin_TARGET_OS)" "1"
+framework-pkg:
+	$(MAKE) -C distrib/MacOS $@
+endif
 
 # If the user says 'make A B', then we don't want to invoke two
 # instances of the rule above in parallel:

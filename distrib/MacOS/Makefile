@@ -20,8 +20,13 @@
 #
 ############################################################################
 
-TOP=../..
-include $(TOP)/mk/boilerplate.mk
+include ../../mk/config.mk
+
+ifeq "$(ProjectVersion)" ""
+$(error Please run ./configure first)
+endif
+
+include ../../mk/custom-settings.mk
 
 # The ProjectVersionInt is GHC's idea of an API version and hence determines
 # the framework version.
