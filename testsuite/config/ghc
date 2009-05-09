@@ -11,6 +11,7 @@ config.compiler              = 'ghc'
 config.compiler_always_flags = ['-fforce-recomp', '-dcore-lint', '-dcmm-lint']
 
 config.hp2ps		     = 'hp2ps'
+config.hpc		     = 'hpc'
 config.gs		     = 'gs'
 config.confdir               = '.'
 

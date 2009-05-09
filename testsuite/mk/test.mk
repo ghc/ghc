@@ -90,6 +90,7 @@ RUNTEST_OPTS +=  \
 	-e config.compiler_always_flags.append"(\"$(EXTRA_HC_OPTS)\")" \
 	-e config.ghc_pkg=\"$(GHC_PKG)\" \
 	-e config.hp2ps=\"$(HP2PS_ABS)\" \
+	-e config.hpc=\"$(HPC)\" \
 	-e config.gs=\"$(GS)\" \
 	-e config.platform=\"$(TARGETPLATFORM)\" \
 	-e config.os=\"$(TargetOS_CPP)\" \
