@@ -115,6 +115,10 @@ ifeq "$(HP2PS_ABS)" ""
 HP2PS_ABS := $(dir $(TEST_HC))/hp2ps
 endif
 
+ifeq "$(HPC)" ""
+HPC := $(dir $(TEST_HC))/hpc
+endif
+
 $(eval $(call canonicaliseExecutable,TEST_HC))
 ifeq "$(wildcard $(TEST_HC))" ""
 $(error Cannot find ghc: $(TEST_HC))
@@ -133,6 +137,11 @@ endif
 $(eval $(call canonicaliseExecutable,HP2PS_ABS))
 ifeq "$(wildcard $(HP2PS_ABS))" ""
 $(error Cannot find hp2ps: $(HP2PS_ABS))
+endif
+
+$(eval $(call canonicaliseExecutable,HPC))
+ifeq "$(wildcard $(HPC))" ""
+$(error Cannot find hpc: $(HPC))
 endif
 
 $(eval $(call get-ghc-field,GhcRTSWays,RTS ways))
