@@ -23,7 +23,7 @@ ifneq "$$($1_$2_NO_BUILD_DEPS)" "YES"
 
 $$($1_$2_depfile) : $$(MKDIRHIER) $$(MKDEPENDC) $$($1_$2_HS_SRCS) $$($1_$2_HS_BOOT_SRCS) $$($1_$2_HC_MK_DEPEND_DEP) $$($1_$2_C_FILES) $$($1_$2_S_FILES)
 	$$(MKDIRHIER) $1/$2/build
-	$(RM) $$@ $$@.tmp
+	$$(RM) $$@ $$@.tmp
 	touch $$@.tmp
 ifneq "$$($1_$2_C_SRCS)$$($1_$2_S_SRCS)" ""
 	$$(MKDEPENDC) -f $$($1_$2_depfile).tmp $$($1_MKDEPENDC_OPTS) $$(foreach way,$$($1_WAYS),-s $$(way)) -- $$($1_$2_v_ALL_CC_OPTS) -- $$($1_$2_C_FILES) $$($1_$2_S_FILES) || ( $$(RM) $$@; exit 1 )
