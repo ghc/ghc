@@ -1299,7 +1299,7 @@ else
 fi
 AC_SUBST(HavePapi)
 
-if test "$DIR_DOCBOOK_XSL" = "" -o
+if test "$DIR_DOCBOOK_XSL" = "" ||
    test "$XsltprocCmd" = ""
 then
     BUILD_DOCBOOK_HTML=NO
