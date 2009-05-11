@@ -20,7 +20,10 @@ define docbook
 $(call clean-target,$1,docbook,$1/$2 $1/$2.pdf $1/$2.ps)
 
 ifeq "$$(BUILD_DOCBOOK_HTML)" "YES"
-$(call all-target,$1_html,$1/$2/index.html)
+$(call all-target,$1,html_$1)
+
+.PHONY: html_$1
+html_$1 : $1/$2/index.html
 
 $1/$2/index.html: $$($1_DOCBOOK_SOURCES)
 	$$(RM) -r $$(dir $$@)
@@ -33,14 +36,20 @@ $1/$2/index.html: $$($1_DOCBOOK_SOURCES)
 endif
 
 ifeq "$$(BUILD_DOCBOOK_PS)" "YES"
-$(call all-target,$1_ps,$1/$2.ps)
+$(call all-target,$1,ps_$1)
+
+.PHONY: ps_$1
+ps_$1 : $1/$2.ps
 
 $1/$2.ps: $$($1_DOCBOOK_SOURCES)
 	$$(DBLATEX) $$(DBLATEX_OPTS) $1/$2.xml --ps -o $$@
 endif
 
 ifeq "$$(BUILD_DOCBOOK_PDF)" "YES"
-$(call all-target,$1_pdf,$1/$2.pdf)
+$(call all-target,$1,pdf_$1)
+
+.PHONY: pdf_$1
+pdf_$1 : $1/$2.pdf
 
 $1/$2.pdf: $$($1_DOCBOOK_SOURCES)
 	$$(DBLATEX) $$(DBLATEX_OPTS) $1/$2.xml --pdf -o $$@

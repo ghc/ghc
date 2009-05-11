@@ -21,7 +21,7 @@ default :
 .NOTPARALLEL:
 
 # all comes first, we want it to be the default target
-STD_TARGETS = all clean distclean maintainer_clean install
+STD_TARGETS = all clean distclean maintainer_clean install html ps pdf
 
 # The + tells make that we're recursively invoking make, otherwise 'make -j2'
 # goes wrong.
