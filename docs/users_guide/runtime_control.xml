@@ -182,7 +182,7 @@
           <indexterm><primary>allocation area, size</primary></indexterm>
         </term>
 	<listitem>
-	  <para>&lsqb;Default: 256k&rsqb; Set the allocation area size
+	  <para>&lsqb;Default: 512k&rsqb; Set the allocation area size
           used by the garbage collector.  The allocation area
           (actually generation 0 step 0) is fixed and is never resized
           (unless you use <option>-H</option>, below).</para>
@@ -529,21 +529,25 @@
     <itemizedlist>
       <listitem>
         <para>
-          The total bytes allocated by the program. This may be less
-          than the peak memory use, as some may be freed. 
+          The total number of bytes allocated by the program over the
+          whole run.
         </para>
       </listitem>
       <listitem>
         <para>
-          The total number of garbage collections that occurred.
+          The total number of garbage collections performed.
         </para>
       </listitem>
       <listitem>
         <para>
-          The average and maximum space used by your program.
-          This is only checked during major garbage collections, so it
-          is only an approximation; the number of samples tells you how
-          many times it is checked.
+          The average and maximum "residency", which is the amount of
+          live data in bytes.  The runtime can only determine the
+          amount of live data during a major GC, which is why the
+          number of samples corresponds to the number of major GCs
+          (and is usually relatively small).  To get a better picture
+          of the heap profile of your program, use
+          the <option>-hT</option> RTS option
+          (<xref linkend="rts-profiling" />).
         </para>
       </listitem>
       <listitem>
@@ -618,14 +622,14 @@
       <listitem>
         <para>
         The "bytes allocated in the heap" is the total bytes allocated
-        by the program. This may be less than the peak memory use, as
-        some may be freed.
+        by the program over the whole run.
         </para>
       </listitem>
       <listitem>
         <para>
-        GHC uses a copying garbage collector. "bytes copied during GC" 
-        tells you how many bytes it had to copy during garbage collection.
+        GHC uses a copying garbage collector by default. "bytes copied
+        during GC" tells you how many bytes it had to copy during
+        garbage collection.
         </para>
       </listitem>
       <listitem>
@@ -639,7 +643,10 @@
       <listitem>
         <para>
         The "bytes maximum slop" tells you the most space that is ever
-        wasted due to the way GHC packs data into so-called "megablocks".
+        wasted due to the way GHC allocates memory in blocks.  Slop is
+        memory at the end of a block that was wasted.  There's no way
+        to control this; we just like to see how much memory is being
+        lost this way.
         </para>
       </listitem>
       <listitem>
@@ -652,7 +659,7 @@
         <para>
         Next there is information about the garbage collections done.
         For each generation it says how many garbage collections were
-        done, how many of those collections used multiple threads,
+        done, how many of those collections were done in parallel,
         the total CPU time used for garbage collecting that generation,
         and the total wall clock time elapsed while garbage collecting
         that generation.
@@ -671,8 +678,8 @@
       </listitem>
       <listitem>
         <para>
-        Next there is the CPU time and wall clock time elapsedm broken
-        down by what the runtiem system was doing at the time.
+        Next there is the CPU time and wall clock time elapsed broken
+        down by what the runtime system was doing at the time.
         INIT is the runtime system initialisation.
         MUT is the mutator time, i.e. the time spent actually running
         your code.
