@@ -18,7 +18,6 @@ GhcLibWays      = v
 SplitObjs       = NO
 NoFibWays       =
 STRIP           = :
-GhcBootLibs     = YES
 
 ifeq "$(ValidateHpc)" "YES"
 GhcStage2HcOpts += -fhpc -hpcdir $(TOP)/testsuite/hpc_output/
