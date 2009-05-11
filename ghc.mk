@@ -38,7 +38,6 @@
 #     * docs/ext-core/Makefile
 #     * docs/man/Makefile
 #     * docs/storage-mgmt/Makefile
-#     * docs/users_guide/Makefile
 #     * docs/vh/Makefile
 #     * driver/Makefile
 #     * driver/ghc/Makefile
