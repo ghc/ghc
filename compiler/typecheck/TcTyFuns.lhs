@@ -662,7 +662,7 @@ checkOrientation ty1 ty2 co inst
       -- NB: Special cased for efficiency - could be handled as type application
     go (TyConApp con1 args1) (TyConApp con2 args2)
       |  con1 == con2
-      && not (isOpenSynTyCon con1)   -- don't match family synonym apps
+      && isInjectiveTyCon con1   -- don't match family synonym apps
       = do { co_args <- mkTyConEqInstCo co con1 (zip args1 args2)
            ; eqss <- zipWith3M (\ty1 ty2 co -> checkOrientation ty1 ty2 co inst)
                      args1 args2 co_args
@@ -1600,11 +1600,21 @@ misMatchMsg env0 (ty_act, ty_exp)
         msg = sep [sep [ptext (sLit "Couldn't match expected type") <+> pp_exp, 
 			nest 7 $
                               ptext (sLit "against inferred type") <+> pp_act],
-		   nest 2 (extra_exp $$ extra_act)]
+		   nest 2 (extra_exp $$ extra_act),
+		   nest 2 (vcat (map pp_open_tc (nub open_tcs)))]
+		   	-- See Note [Non-injective type functions]
     in
     (env2, msg)
 
   where
+    open_tcs = [tc | TyConApp tc _ <- [ty_act, ty_exp]
+                   , isOpenTyCon tc ]
+    pp_open_tc tc = ptext (sLit "NB:") <+> quotes (ppr tc) 
+    	       	    <+> pp_inj <+> ptext (sLit "type function")
+  		  where
+		    pp_inj | isInjectiveTyCon tc = ptext (sLit "is an (injective)")
+		    	   | otherwise           = ptext (sLit "is a (non-injective)")
+
     ppr_ty :: TidyEnv -> TcType -> (TidyEnv, SDoc, SDoc)
     ppr_ty env ty
       = let (env1, tidy_ty) = tidyOpenType env ty
@@ -1622,6 +1632,24 @@ misMatchMsg env0 (ty_act, ty_exp)
 
     ppr_extra env _ty = (env, empty)		-- Normal case
 \end{code}
+
+Note [Non-injective type functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+It's very confusing to get a message like
+     Couldn't match expected type `Depend s'
+            against inferred type `Depend s1'
+so pp_open_tc adds:
+       NB: `Depend' is a (non-injective) type function
+
+Currently we add this independently for each argument, so we also get
+     Couldn't match expected type `a'
+            against inferred type `Dual (Dual a)'
+       NB: `Dual' is a (non-injective) type function
+which is arguably redundant.  But on the other hand, it's probably
+a good idea for the programmer to know the error involves type functions
+so I've left it in for now.  The obvious alternative is to only add
+this NB in the case of matching (T ...) ~ (T ...). 
+     
 
 Warn of loopy local equalities that were dropped.
 

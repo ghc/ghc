@@ -39,6 +39,7 @@ module TyCon(
         isCoercionTyCon, isCoercionTyCon_maybe,
         isForeignTyCon,
 
+	isInjectiveTyCon,
 	isDataTyCon, isProductTyCon, isEnumerationTyCon, 
 	isNewTyCon, isAbstractTyCon, isOpenTyCon,
         isUnLiftedTyCon,
@@ -814,6 +815,17 @@ isOpenTyCon :: TyCon -> Bool
 isOpenTyCon (SynTyCon {synTcRhs = OpenSynTyCon {}}) = True
 isOpenTyCon (AlgTyCon {algTcRhs = OpenTyCon {}})    = True
 isOpenTyCon _					    = False
+
+-- | Injective 'TyCon's can be decomposed, so that
+--     T ty1 ~ T ty2  =>  ty1 ~ ty2
+isInjectiveTyCon :: TyCon -> Bool
+isInjectiveTyCon tc = not (isSynTyCon tc)
+	-- Ultimately we may have injective associated types
+        -- in which case this test will become more interesting
+	--
+	-- It'd be unusual to call isInjectiveTyCon on a regular H98
+	-- type synonym, because you should probably have expanded it first
+	-- But regardless, it's not injective!
 
 -- | Extract the mapping from 'TyVar' indexes to indexes in the corresponding family
 -- argument lists form an open 'TyCon' of any sort, if the given 'TyCon' is indeed
