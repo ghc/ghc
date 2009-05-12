@@ -127,7 +127,6 @@ builtin_commands = [
   ("def",       keepGoing (defineMacro False),  completeExpression),
   ("def!",      keepGoing (defineMacro True),   completeExpression),
   ("delete",    keepGoing deleteCmd,            noCompletion),
-  ("e",         keepGoing editFile,             completeFilename),
   ("edit",      keepGoing editFile,             completeFilename),
   ("etags",     keepGoing createETagsFileCmd,   completeFilename),
   ("force",     keepGoing forceCmd,             completeExpression),
@@ -753,9 +752,12 @@ lookupCommand str = do
            Nothing -> BadCommand
 
 lookupCommand' :: String -> IO (Maybe Command)
-lookupCommand' str = do
+lookupCommand' ":" = return Nothing
+lookupCommand' str' = do
   macros <- readIORef macros_ref
-  let cmds = builtin_commands ++ macros
+  let{ (str, cmds) = case str' of
+      ':' : rest -> (rest, builtin_commands)
+      _ -> (str', macros ++ builtin_commands) }
   -- look for exact match first, then the first prefix match
   return $ case [ c | c <- cmds, str == cmdName c ] of
            c:_ -> Just c
@@ -934,6 +936,8 @@ chooseEditFile =
         fromTarget _ = Nothing -- when would we get a module target?
 
 defineMacro :: Bool{-overwrite-} -> String -> GHCi ()
+defineMacro _ (':':_) =
+  io $ putStrLn "macro name cannot start with a colon"
 defineMacro overwrite s = do
   let (macro_name, definition) = break isSpace s
   macros <- io (readIORef macros_ref)
@@ -1627,9 +1631,13 @@ ghciCompleteWord line@(left,_) = case firstWord of
             Nothing -> return completeFilename
 
 completeCmd = wrapCompleter " " $ \w -> do
-  cmds <- liftIO $ readIORef macros_ref
-  return (filter (w `isPrefixOf`) (map (':':) 
-             (map cmdName (builtin_commands ++ cmds))))
+  macros <- liftIO $ readIORef macros_ref
+  let macro_names = map (':':) . map cmdName $ macros
+  let command_names = map (':':) . map cmdName $ builtin_commands
+  let{ candidates = case w of
+      ':' : ':' : _ -> map (':':) command_names
+      _ -> nub $ macro_names ++ command_names }
+  return $ filter (w `isPrefixOf`) candidates
 
 completeMacro = wrapIdentCompleter $ \w -> do
   cmds <- liftIO $ readIORef macros_ref
