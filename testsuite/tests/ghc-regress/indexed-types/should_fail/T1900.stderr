@@ -10,6 +10,7 @@ T1900.hs:11:12:
 T1900.hs:14:21:
     Couldn't match expected type `Depend s'
            against inferred type `Depend s1'
+      NB: `Depend' is a (non-injective) type function
     In the first argument of `trans', namely `d'
     In the second argument of `(==)', namely `trans d'
     In the expression: d == trans d

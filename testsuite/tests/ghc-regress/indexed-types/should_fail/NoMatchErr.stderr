@@ -1,0 +1,8 @@
+
+NoMatchErr.hs:20:11:
+    Couldn't match expected type `Memo d'
+           against inferred type `Memo d1'
+      NB: `Memo' is a (non-injective) type function
+    In the second argument of `(.)', namely `appl'
+    In the expression: abst . appl
+    In the definition of `f': f = abst . appl
