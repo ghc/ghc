@@ -271,8 +271,9 @@ data DataCon
 		--	 syntax, provided its type looks like the above.
 		--       The declaration format is held in the TyCon (algTcGadtSyntax)
 
-	dcUnivTyVars :: [TyVar],	-- Universally-quantified type vars 
+	dcUnivTyVars :: [TyVar],	-- Universally-quantified type vars [a,b,c]
 					-- INVARIANT: length matches arity of the dcRepTyCon
+					---           result type of (rep) data con is exactly (T a b c)
 
 	dcExTyVars   :: [TyVar],	-- Existentially-quantified type vars 
 		-- In general, the dcUnivTyVars are NOT NECESSARILY THE SAME AS THE TYVARS
