@@ -61,7 +61,6 @@ import ErrUtils
 import Outputable
 import StringBuffer
 import FastString
-import FastTypes
 import SrcLoc
 import UniqFM
 import DynFlags
@@ -72,7 +71,6 @@ import Control.Monad
 import Data.Bits
 import Data.Char
 import Data.Ratio
-import Debug.Trace
 }
 
 $unispace    = \x05 -- Trick Alex into handling Unicode. See alexGetChar.
@@ -649,6 +647,7 @@ isSpecial _             = False
 -- facilitates using a keyword in two different extensions that can be
 -- activated independently)
 --
+reservedWordsFM :: UniqFM (Token, Int)
 reservedWordsFM = listToUFM $
 	map (\(x, y, z) -> (mkFastString x, (y, z)))
        [( "_",		ITunderscore, 	0 ),
@@ -778,14 +777,18 @@ pop_and :: Action -> Action
 pop_and act span buf len = do popLexState; act span buf len
 
 {-# INLINE nextCharIs #-}
+nextCharIs :: StringBuffer -> (Char -> Bool) -> Bool
 nextCharIs buf p = not (atEnd buf) && p (currentChar buf)
 
+notFollowedBy :: Char -> AlexAccPred Int
 notFollowedBy char _ _ _ (AI _ _ buf) 
   = nextCharIs buf (/=char)
 
+notFollowedBySymbol :: AlexAccPred Int
 notFollowedBySymbol _ _ _ (AI _ _ buf)
   = nextCharIs buf (`notElem` "!#$%&*+./<=>?@\\^|-~")
 
+notFollowedByPragmaChar :: AlexAccPred Int
 notFollowedByPragmaChar _ _ _ (AI _ _ buf)
   = nextCharIs buf (\c -> not (isAlphaNum c || c == '_'))
 
@@ -794,6 +797,7 @@ notFollowedByPragmaChar _ _ _ (AI _ _ buf)
 -- maximal munch, but not always, because the nested comment rule is
 -- valid in all states, but the doc-comment rules are only valid in
 -- the non-layout states.
+isNormalComment :: AlexAccPred Int
 isNormalComment bits _ _ (AI _ _ buf)
   | haddockEnabled bits = notFollowedByDocOrPragma
   | otherwise           = nextCharIs buf (/='#')
@@ -801,6 +805,7 @@ isNormalComment bits _ _ (AI _ _ buf)
     notFollowedByDocOrPragma
        = not $ spaceAndP buf (`nextCharIs` (`elem` "|^*$#"))
 
+spaceAndP :: StringBuffer -> (StringBuffer -> Bool) -> Bool
 spaceAndP buf p = p buf || nextCharIs buf (==' ') && p (snd (nextChar buf))
 
 {-
@@ -808,8 +813,10 @@ haddockDisabledAnd p bits _ _ (AI _ _ buf)
   = if haddockEnabled bits then False else (p buf)
 -}
 
+atEOL :: AlexAccPred Int
 atEOL _ _ _ (AI _ _ buf) = atEnd buf || currentChar buf == '\n'
 
+ifExtension :: (Int -> Bool) -> AlexAccPred Int
 ifExtension pred bits _ _ _ = pred bits
 
 multiline_doc_comment :: Action
@@ -890,6 +897,8 @@ nested_doc_comment span buf _len = withLexedDocType (go "")
         Just (_,_) -> go ('\123':commentAcc) input docType False
       Just (c,input) -> go (c:commentAcc) input docType False
 
+withLexedDocType :: (AlexInput -> (String -> Token) -> Bool -> P (Located Token))
+                 -> P (Located Token)
 withLexedDocType lexDocComment = do
   input@(AI _ _ buf) <- getInput
   case prevChar buf ' ' of
@@ -898,6 +907,7 @@ withLexedDocType lexDocComment = do
     '$' -> lexDocComment input ITdocCommentNamed False
     '*' -> lexDocSection 1 input
     '#' -> lexDocComment input ITdocOptionsOld False
+    _ -> panic "withLexedDocType: Bad doc type"
  where 
     lexDocSection n input = case alexGetChar input of 
       Just ('*', input) -> lexDocSection (n+1) input
@@ -907,12 +917,12 @@ withLexedDocType lexDocComment = do
 -- RULES pragmas turn on the forall and '.' keywords, and we turn them
 -- off again at the end of the pragma.
 rulePrag :: Action
-rulePrag span buf len = do
+rulePrag span _ _ = do
   setExts (.|. bit inRulePragBit)
   return (L span ITrules_prag)
 
 endPrag :: Action
-endPrag span buf len = do
+endPrag span _ _ = do
   setExts (.&. complement (bit inRulePragBit))
   return (L span ITclose_prag)
 
@@ -948,8 +958,9 @@ docCommentEnd input commentAcc docType buf span = do
   span `seq` setLastToken span' last_len last_line_len
   return (L span' (docType comment))
  
+errBrace :: AlexInput -> SrcSpan -> P a
 errBrace (AI end _ _) span = failLocMsgP (srcSpanStart span) end "unterminated `{-'"
- 
+
 open_brace, close_brace :: Action
 open_brace span _str _len = do 
   ctx <- getContext
@@ -959,6 +970,7 @@ close_brace span _str _len = do
   popContext
   return (L span ITccurly)
 
+qvarid, qconid :: StringBuffer -> Int -> Token
 qvarid buf len = ITqvarid $! splitQualName buf len False
 qconid buf len = ITqconid $! splitQualName buf len False
 
@@ -992,7 +1004,8 @@ splitQualName orig_buf len parens = split orig_buf orig_buf
       where
 	qual_size = orig_buf `byteDiff` dot_buf
 
-varid span buf len = 
+varid :: Action
+varid span buf len =
   fs `seq`
   case lookupUFM reservedWordsFM fs of
 	Just (keyword,0)    -> do
@@ -1007,17 +1020,22 @@ varid span buf len =
   where
 	fs = lexemeToFastString buf len
 
+conid :: StringBuffer -> Int -> Token
 conid buf len = ITconid fs
   where fs = lexemeToFastString buf len
 
+qvarsym, qconsym, prefixqvarsym, prefixqconsym :: StringBuffer -> Int -> Token
 qvarsym buf len = ITqvarsym $! splitQualName buf len False
 qconsym buf len = ITqconsym $! splitQualName buf len False
 prefixqvarsym buf len = ITprefixqvarsym $! splitQualName buf len True
 prefixqconsym buf len = ITprefixqconsym $! splitQualName buf len True
 
+varsym, consym :: Action
 varsym = sym ITvarsym
 consym = sym ITconsym
 
+sym :: (FastString -> Token) -> SrcSpan -> StringBuffer -> Int
+    -> P (Located Token)
 sym con span buf len = 
   case lookupUFM reservedSymsFM fs of
 	Just (keyword,exts) -> do
@@ -1039,16 +1057,27 @@ tok_integral itint transint transbuf translen (radix,char_to_int) span buf len =
      (offsetBytes transbuf buf) (subtract translen len) radix char_to_int
 
 -- some conveniences for use with tok_integral
+tok_num :: (Integer -> Integer)
+        -> Int -> Int
+        -> (Integer, (Char->Int)) -> Action
 tok_num = tok_integral ITinteger
+tok_primint :: (Integer -> Integer)
+            -> Int -> Int
+            -> (Integer, (Char->Int)) -> Action
 tok_primint = tok_integral ITprimint
+tok_primword :: Int -> Int
+             -> (Integer, (Char->Int)) -> Action
 tok_primword = tok_integral ITprimword positive
+positive, negative :: (Integer -> Integer)
 positive = id
 negative = negate
+decimal, octal, hexadecimal :: (Integer, Char -> Int)
 decimal = (10,octDecDigit)
 octal = (8,octDecDigit)
 hexadecimal = (16,hexDigit)
 
 -- readRational can understand negative rationals, exponents, everything.
+tok_float, tok_primfloat, tok_primdouble :: String -> Token
 tok_float        str = ITrational   $! readRational str
 tok_primfloat    str = ITprimfloat  $! readRational str
 tok_primdouble   str = ITprimdouble $! readRational str
@@ -1076,6 +1105,7 @@ do_bol span _str _len = do
 
 -- certain keywords put us in the "layout" state, where we might
 -- add an opening curly brace.
+maybe_layout :: Token -> P ()
 maybe_layout ITdo	= pushLexState layout_do
 maybe_layout ITmdo	= pushLexState layout_do
 maybe_layout ITof	= pushLexState layout
@@ -1093,6 +1123,7 @@ maybe_layout _	        = return ()
 -- by a 'do', then we allow the new context to be at the same indentation as
 -- the previous context.  This is what the 'strict' argument is for.
 --
+new_layout_context :: Bool -> Action
 new_layout_context strict span _buf _len = do
     popLexState
     (AI _ offset _) <- getInput
@@ -1109,6 +1140,7 @@ new_layout_context strict span _buf _len = do
 		setContext (Layout offset : ctx)
 		return (L span ITvocurly)
 
+do_layout_left :: Action
 do_layout_left span _buf _len = do
     popLexState
     pushLexState bol  -- we must be at the start of a line
@@ -1208,6 +1240,7 @@ lex_string s = do
 	c' <- lex_char c i
 	lex_string (c':s)
 
+lex_stringgap :: String -> P Token
 lex_stringgap s = do
   c <- getCharOrFail
   case c of
@@ -1283,6 +1316,7 @@ lex_char c inp = do
       c | isAny c -> do setInput inp; return c
       _other -> lit_error
 
+isAny :: Char -> Bool
 isAny c | c > '\x7f' = isPrint c
 	| otherwise  = is_any c
 
@@ -1336,6 +1370,7 @@ readNum is_digit base conv = do
 	then readNum2 is_digit base conv (conv c)
 	else do setInput i; lit_error
 
+readNum2 :: (Char -> Bool) -> Int -> (Char -> Int) -> Int -> P Char
 readNum2 is_digit base conv i = do
   input <- getInput
   read i input
@@ -1348,6 +1383,7 @@ readNum2 is_digit base conv i = do
 		   then do setInput input; return (chr i)
 		   else lit_error
 
+silly_escape_chars :: [(String, Char)]
 silly_escape_chars = [
 	("NUL", '\NUL'),
 	("SOH", '\SOH'),
@@ -1389,6 +1425,7 @@ silly_escape_chars = [
 -- the position of the error in the buffer.  This is so that we can report
 -- a correct location to the user, but also so we can detect UTF-8 decoding
 -- errors if they occur.
+lit_error :: P a
 lit_error = lexError "lexical error in string/character literal"
 
 getCharOrFail :: P Char
@@ -1626,53 +1663,89 @@ getLexState = P $ \s@PState{ lex_state=ls:_ } -> POk s ls
 -- -fglasgow-exts or -XParr) are represented by a bitmap stored in an unboxed
 -- integer
 
-genericsBit, ffiBit, parrBit :: Int
+genericsBit :: Int
 genericsBit = 0 -- {| and |}
+ffiBit :: Int
 ffiBit	   = 1
+parrBit :: Int
 parrBit	   = 2
+arrowsBit :: Int
 arrowsBit  = 4
+thBit :: Int
 thBit	   = 5
+ipBit :: Int
 ipBit      = 6
+explicitForallBit :: Int
 explicitForallBit = 7 -- the 'forall' keyword and '.' symbol
+bangPatBit :: Int
 bangPatBit = 8	-- Tells the parser to understand bang-patterns
 		-- (doesn't affect the lexer)
+tyFamBit :: Int
 tyFamBit   = 9	-- indexed type families: 'family' keyword and kind sigs
+haddockBit :: Int
 haddockBit = 10 -- Lex and parse Haddock comments
+magicHashBit :: Int
 magicHashBit = 11 -- "#" in both functions and operators
+kindSigsBit :: Int
 kindSigsBit = 12 -- Kind signatures on type variables
+recursiveDoBit :: Int
 recursiveDoBit = 13 -- mdo
+unicodeSyntaxBit :: Int
 unicodeSyntaxBit = 14 -- the forall symbol, arrow symbols, etc
+unboxedTuplesBit :: Int
 unboxedTuplesBit = 15 -- (# and #)
+standaloneDerivingBit :: Int
 standaloneDerivingBit = 16 -- standalone instance deriving declarations
+transformComprehensionsBit :: Int
 transformComprehensionsBit = 17
+qqBit :: Int
 qqBit	   = 18 -- enable quasiquoting
+inRulePragBit :: Int
 inRulePragBit = 19
+rawTokenStreamBit :: Int
 rawTokenStreamBit = 20 -- producing a token stream with all comments included
+newQualOpsBit :: Int
 newQualOpsBit = 21 -- Haskell' qualified operator syntax, e.g. Prelude.(+)
 
-genericsEnabled, ffiEnabled, parrEnabled :: Int -> Bool
+always :: Int -> Bool
 always           _     = True
+genericsEnabled :: Int -> Bool
 genericsEnabled  flags = testBit flags genericsBit
-ffiEnabled       flags = testBit flags ffiBit
+parrEnabled :: Int -> Bool
 parrEnabled      flags = testBit flags parrBit
+arrowsEnabled :: Int -> Bool
 arrowsEnabled    flags = testBit flags arrowsBit
+thEnabled :: Int -> Bool
 thEnabled        flags = testBit flags thBit
+ipEnabled :: Int -> Bool
 ipEnabled        flags = testBit flags ipBit
+explicitForallEnabled :: Int -> Bool
 explicitForallEnabled flags = testBit flags explicitForallBit
+bangPatEnabled :: Int -> Bool
 bangPatEnabled   flags = testBit flags bangPatBit
-tyFamEnabled     flags = testBit flags tyFamBit
+-- tyFamEnabled :: Int -> Bool
+-- tyFamEnabled     flags = testBit flags tyFamBit
+haddockEnabled :: Int -> Bool
 haddockEnabled   flags = testBit flags haddockBit
+magicHashEnabled :: Int -> Bool
 magicHashEnabled flags = testBit flags magicHashBit
-kindSigsEnabled  flags = testBit flags kindSigsBit
-recursiveDoEnabled flags = testBit flags recursiveDoBit
+-- kindSigsEnabled :: Int -> Bool
+-- kindSigsEnabled  flags = testBit flags kindSigsBit
+unicodeSyntaxEnabled :: Int -> Bool
 unicodeSyntaxEnabled flags = testBit flags unicodeSyntaxBit
+unboxedTuplesEnabled :: Int -> Bool
 unboxedTuplesEnabled flags = testBit flags unboxedTuplesBit
+standaloneDerivingEnabled :: Int -> Bool
 standaloneDerivingEnabled flags = testBit flags standaloneDerivingBit
-transformComprehensionsEnabled flags = testBit flags transformComprehensionsBit
+qqEnabled :: Int -> Bool
 qqEnabled        flags = testBit flags qqBit
-inRulePrag       flags = testBit flags inRulePragBit
+-- inRulePrag :: Int -> Bool
+-- inRulePrag       flags = testBit flags inRulePragBit
+rawTokenStreamEnabled :: Int -> Bool
 rawTokenStreamEnabled flags = testBit flags rawTokenStreamBit
+newQualOps :: Int -> Bool
 newQualOps       flags = testBit flags newQualOpsBit
+oldQualOps :: Int -> Bool
 oldQualOps flags = not (newQualOps flags)
 
 -- PState for parsing options pragmas
@@ -1844,6 +1917,7 @@ lexToken = do
         span `seq` setLastToken span bytes bytes
         t span buf bytes
 
+reportLexError :: SrcLoc -> SrcLoc -> StringBuffer -> [Char] -> P a
 reportLexError loc1 loc2 buf str
   | atEnd buf = failLocMsgP loc1 loc2 (str ++ " at end of input")
   | otherwise =
