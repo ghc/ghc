@@ -17,7 +17,7 @@ module TcHsType (
 		-- Typechecking kinded types
 	tcHsKindedContext, tcHsKindedType, tcHsBangType,
 	tcTyVarBndrs, dsHsType, tcLHsConResTy,
-	tcDataKindSig,
+	tcDataKindSig, ExpKind(..), EkCtxt(..),
 
 		-- Pattern type signatures
 	tcHsPatSigType, tcPatSig
@@ -232,20 +232,20 @@ tcHsKindedContext hs_theta = addLocM (mapM dsHsLPred) hs_theta
 ---------------------------
 kcLiftedType :: LHsType Name -> TcM (LHsType Name)
 -- The type ty must be a *lifted* *type*
-kcLiftedType ty = kc_check_lhs_type ty liftedTypeKind
+kcLiftedType ty = kc_check_lhs_type ty ekLifted
     
 ---------------------------
 kcTypeType :: LHsType Name -> TcM (LHsType Name)
 -- The type ty must be a *type*, but it can be lifted or 
 -- unlifted or an unboxed tuple.
-kcTypeType ty = kc_check_lhs_type ty openTypeKind
+kcTypeType ty = kc_check_lhs_type ty ekOpen
 
 ---------------------------
-kcCheckLHsType :: LHsType Name -> TcKind -> TcM (LHsType Name)
+kcCheckLHsType :: LHsType Name -> ExpKind -> TcM (LHsType Name)
 kcCheckLHsType ty kind = addKcTypeCtxt ty $ kc_check_lhs_type ty kind
 
 
-kc_check_lhs_type :: LHsType Name -> TcKind -> TcM (LHsType Name)
+kc_check_lhs_type :: LHsType Name -> ExpKind -> TcM (LHsType Name)
 -- Check that the type has the specified kind
 -- Be sure to use checkExpectedKind, rather than simply unifying 
 -- with OpenTypeKind, because it gives better error messages
@@ -254,7 +254,7 @@ kc_check_lhs_type (L span ty) exp_kind
     do { ty' <- kc_check_hs_type ty exp_kind
        ; return (L span ty') }
 
-kc_check_lhs_types :: [(LHsType Name,TcKind)] -> TcM [LHsType Name]
+kc_check_lhs_types :: [(LHsType Name, ExpKind)] -> TcM [LHsType Name]
 kc_check_lhs_types tys_w_kinds
   = mapM kc_arg tys_w_kinds
   where
@@ -262,7 +262,7 @@ kc_check_lhs_types tys_w_kinds
 
 
 ---------------------------
-kc_check_hs_type :: HsType Name -> TcKind -> TcM (HsType Name)
+kc_check_hs_type :: HsType Name -> ExpKind -> TcM (HsType Name)
 
 -- First some special cases for better error messages 
 -- when we know the expected kind
@@ -345,7 +345,7 @@ kc_hs_type (HsNumTy n)
    = return (HsNumTy n, liftedTypeKind)
 
 kc_hs_type (HsKindSig ty k) = do
-    ty' <- kc_check_lhs_type ty k
+    ty' <- kc_check_lhs_type ty (EK k EkKindSig)
     return (HsKindSig ty' k, k)
 
 kc_hs_type (HsTupleTy Boxed tys) = do
@@ -357,7 +357,7 @@ kc_hs_type (HsTupleTy Unboxed tys) = do
     return (HsTupleTy Unboxed tys', ubxTupleKind)
 
 kc_hs_type (HsFunTy ty1 ty2) = do
-    ty1' <- kc_check_lhs_type ty1 argTypeKind
+    ty1' <- kc_check_lhs_type ty1 (EK argTypeKind EkUnk)
     ty2' <- kcTypeType ty2
     return (HsFunTy ty1' ty2', liftedTypeKind)
 
@@ -414,16 +414,16 @@ kcApps :: Outputable a
        -> [LHsType Name]		-- Arg types
        -> TcM ([LHsType Name], TcKind)	-- Kind-checked args
 kcApps the_fun fun_kind args
-  = do { (args_w_kinds, res_kind) <- splitFunKind the_fun fun_kind args
+  = do { (args_w_kinds, res_kind) <- splitFunKind (ppr the_fun) 1 fun_kind args
        ; args' <- kc_check_lhs_types args_w_kinds
        ; return (args', res_kind) }
 
 kcCheckApps :: Outputable a => a -> TcKind -> [LHsType Name]
 	    -> HsType Name     -- The type being checked (for err messages only)
-	    -> TcKind 	       -- Expected kind
+	    -> ExpKind 	       -- Expected kind
 	    -> TcM [LHsType Name]
 kcCheckApps the_fun fun_kind args ty exp_kind
-  = do { (args_w_kinds, res_kind) <- splitFunKind the_fun fun_kind args
+  = do { (args_w_kinds, res_kind) <- splitFunKind (ppr the_fun) 1 fun_kind args
        ; checkExpectedKind ty res_kind exp_kind
        	     -- Check the result kind *before* checking argument kinds
 	     -- This improves error message; Trac #2994
@@ -445,16 +445,16 @@ mkHsAppTys fun_ty (arg_ty:arg_tys)
 						-- never used 
 
 ---------------------------
-splitFunKind :: Outputable a => a -> TcKind -> [b] -> TcM ([(b,TcKind)], TcKind)
-splitFunKind _       fk [] = return ([], fk)
-splitFunKind the_fun fk (arg:args)
+splitFunKind :: SDoc -> Int -> TcKind -> [b] -> TcM ([(b,ExpKind)], TcKind)
+splitFunKind _       _      fk [] = return ([], fk)
+splitFunKind the_fun arg_no fk (arg:args)
   = do { mb_fk <- unifyFunKind fk
        ; case mb_fk of
             Nothing       -> failWithTc too_many_args 
-            Just (ak,fk') -> do { (aks, rk) <- splitFunKind the_fun fk' args
-                                ; return ((arg,ak):aks, rk) } }
+            Just (ak,fk') -> do { (aks, rk) <- splitFunKind the_fun (arg_no+1) fk' args
+                                ; return ((arg, EK ak (EkArg the_fun arg_no)):aks, rk) } }
   where
-    too_many_args = quotes (ppr the_fun) <+>
+    too_many_args = quotes the_fun <+>
 		    ptext (sLit "is applied to too many type arguments")
 
 ---------------------------
@@ -467,7 +467,7 @@ kcHsLPred = wrapLocM kcHsPred
 kcHsPred :: HsPred Name -> TcM (HsPred Name)
 kcHsPred pred = do	-- Checks that the result is of kind liftedType
     (pred', kind) <- kc_pred pred
-    checkExpectedKind pred kind liftedTypeKind
+    checkExpectedKind pred kind ekLifted
     return pred'
     
 ---------------------------
@@ -488,7 +488,7 @@ kc_pred (HsEqualP ty1 ty2)
 --       ; checkExpectedKind ty1 kind1 liftedTypeKind
        ; (ty2', kind2) <- kc_lhs_type ty2
 --       ; checkExpectedKind ty2 kind2 liftedTypeKind
-       ; checkExpectedKind ty2 kind2 kind1
+       ; checkExpectedKind ty2 kind2 (EK kind1 EkEqPred)
        ; return (HsEqualP ty1' ty2', liftedTypeKind)
        }
 
@@ -911,6 +911,94 @@ tcPatSig ctxt sig res_ty
 	  dups = [n' | (n',ty') <- in_scope, tcEqType ty' ty]
 \end{code}
 
+
+%************************************************************************
+%*                                                                      *
+        Checking kinds
+%*                                                                      *
+%************************************************************************
+
+We would like to get a decent error message from
+  (a) Under-applied type constructors
+             f :: (Maybe, Maybe)
+  (b) Over-applied type constructors
+             f :: Int x -> Int x
+
+\begin{code}
+-- The ExpKind datatype means "expected kind" and contains 
+-- some info about just why that kind is expected, to improve
+-- the error message on a mis-match
+data ExpKind = EK TcKind EkCtxt
+data EkCtxt  = EkUnk		-- Unknown context
+      	     | EkEqPred		-- Second argument of an equality predicate
+      	     | EkKindSig	-- Kind signature
+     	     | EkArg SDoc Int   -- Function, arg posn, expected kind
+
+
+ekLifted, ekOpen :: ExpKind
+ekLifted = EK liftedTypeKind EkUnk
+ekOpen   = EK openTypeKind   EkUnk
+
+checkExpectedKind :: Outputable a => a -> TcKind -> ExpKind -> TcM ()
+-- A fancy wrapper for 'unifyKind', which tries
+-- to give decent error messages.
+--      (checkExpectedKind ty act_kind exp_kind)
+-- checks that the actual kind act_kind is compatible
+--      with the expected kind exp_kind
+-- The first argument, ty, is used only in the error message generation
+checkExpectedKind ty act_kind (EK exp_kind ek_ctxt)
+  | act_kind `isSubKind` exp_kind -- Short cut for a very common case
+  = return ()
+  | otherwise = do
+    (_errs, mb_r) <- tryTc (unifyKind exp_kind act_kind)
+    case mb_r of
+        Just _  -> return ()  -- Unification succeeded
+        Nothing -> do
+
+        -- So there's definitely an error
+        -- Now to find out what sort
+           exp_kind <- zonkTcKind exp_kind
+           act_kind <- zonkTcKind act_kind
+
+           env0 <- tcInitTidyEnv
+           let (exp_as, _) = splitKindFunTys exp_kind
+               (act_as, _) = splitKindFunTys act_kind
+               n_exp_as = length exp_as
+               n_act_as = length act_as
+
+               (env1, tidy_exp_kind) = tidyKind env0 exp_kind
+               (env2, tidy_act_kind) = tidyKind env1 act_kind
+
+               err | n_exp_as < n_act_as     -- E.g. [Maybe]
+                   = quotes (ppr ty) <+> ptext (sLit "is not applied to enough type arguments")
+
+                     -- Now n_exp_as >= n_act_as. In the next two cases,
+                     -- n_exp_as == 0, and hence so is n_act_as
+                   | isLiftedTypeKind exp_kind && isUnliftedTypeKind act_kind
+                   = ptext (sLit "Expecting a lifted type, but") <+> quotes (ppr ty)
+                       <+> ptext (sLit "is unlifted")
+
+                   | isUnliftedTypeKind exp_kind && isLiftedTypeKind act_kind
+                   = ptext (sLit "Expecting an unlifted type, but") <+> quotes (ppr ty)
+                       <+> ptext (sLit "is lifted")
+
+                   | otherwise               -- E.g. Monad [Int]
+                   = ptext (sLit "Kind mis-match")
+
+               more_info = sep [ expected_herald ek_ctxt <+> ptext (sLit "kind") 
+                                    <+> quotes (pprKind tidy_exp_kind) <> comma,
+                                 ptext (sLit "but") <+> quotes (ppr ty) <+>
+                                     ptext (sLit "has kind") <+> quotes (pprKind tidy_act_kind)]
+
+               expected_herald EkUnk     = ptext (sLit "Expected")
+               expected_herald EkKindSig = ptext (sLit "An enclosing kind signature specified")
+               expected_herald EkEqPred  = ptext (sLit "The left argument of the equality predicate had")
+               expected_herald (EkArg fun arg_no)
+	         = ptext (sLit "The") <+> speakNth arg_no <+> ptext (sLit "argument of")
+		   <+> quotes fun <+> ptext (sLit ("should have"))
+
+           failWithTcM (env2, err $$ more_info)
+\end{code}
 
 %************************************************************************
 %*									*

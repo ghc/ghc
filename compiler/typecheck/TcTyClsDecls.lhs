@@ -275,7 +275,8 @@ tcFamInstDecl1 (decl@TySynonym {tcdLName = L loc tc_name})
        ; checkTc (isSynTyCon family) (wrongKindOfFamily family)
 
        ; -- (1) kind check the right-hand side of the type equation
-       ; k_rhs <- kcCheckLHsType (tcdSynRhs decl) resKind
+       ; k_rhs <- kcCheckLHsType (tcdSynRhs decl) (EK resKind EkUnk)
+       	       	  -- ToDo: the ExpKind could be better
 
          -- we need the exact same number of type parameters as the family
          -- declaration 
@@ -378,7 +379,8 @@ kcIdxTyPats :: TyClDecl Name
 	    -> TcM a
 kcIdxTyPats decl thing_inside
   = kcHsTyVars (tcdTyVars decl) $ \tvs -> 
-    do { fam_tycon <- tcLookupLocatedTyCon (tcdLName decl)
+    do { let tc_name = tcdLName decl
+       ; fam_tycon <- tcLookupLocatedTyCon tc_name
        ; let { (kinds, resKind) = splitKindFunTys (tyConKind fam_tycon)
 	     ; hs_typats	= fromJust $ tcdTyPats decl }
 
@@ -388,10 +390,11 @@ kcIdxTyPats decl thing_inside
 
          -- type functions can have a higher-kinded result
        ; let resultKind = mkArrowKinds (drop (length hs_typats) kinds) resKind
-       ; typats <- zipWithM kcCheckLHsType hs_typats kinds
+       ; typats <- zipWithM kcCheckLHsType hs_typats 
+       	 	   	    [ EK kind (EkArg (ppr tc_name) n) 
+                            | (kind,n) <- kinds `zip` [1..]]
        ; thing_inside tvs typats resultKind fam_tycon
        }
-  where
 \end{code}
 
 
