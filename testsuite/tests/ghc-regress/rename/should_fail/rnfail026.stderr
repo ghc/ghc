@@ -1,7 +1,8 @@
 
 rnfail026.hs:16:16:
     Kind mis-match
-    Expected kind `* -> *', but `Set a' has kind `*'
+    The first argument of `Monad' should have kind `* -> *',
+    but `Set a' has kind `*'
     In the instance declaration for `Monad (forall a. (Eq a) => Set a)'
 
 rnfail026.hs:19:0:
