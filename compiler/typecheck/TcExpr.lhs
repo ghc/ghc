@@ -408,16 +408,20 @@ Note [Type of a record update]
 The main complication with RecordUpd is that we need to explicitly
 handle the *non-updated* fields.  Consider:
 
-	data T a b = MkT1 { fa :: a, fb :: b }
-		   | MkT2 { fa :: a, fc :: Int -> Int }
-		   | MkT3 { fd :: a }
+	data T a b c = MkT1 { fa :: a, fb :: (b,c) }
+		     | MkT2 { fa :: a, fb :: (b,c), fc :: c -> c }
+		     | MkT3 { fd :: a }
 	
-	upd :: T a b -> c -> T a c
+	upd :: T a b c -> (b',c) -> T a b' c
 	upd t x = t { fb = x}
 
-The type signature on upd is correct (i.e. the result should not be (T a b))
-because upd should be equivalent to:
+The result type should be (T a b' c)
+not (T a b c),   because 'b' *is not* mentioned in a non-updated field
+not (T a b' c'), becuase 'c' *is*     mentioned in a non-updated field
+NB that it's not good enough to look at just one constructor; we must
+look at them all; cf Trac #3219
 
+After all, upd should be equivalent to:
 	upd t x = case t of 
 			MkT1 p q -> MkT1 p x
 			MkT2 a b -> MkT2 p b
@@ -425,9 +429,11 @@ because upd should be equivalent to:
 
 So we need to give a completely fresh type to the result record,
 and then constrain it by the fields that are *not* updated ("p" above).
+We call these the "fixed" type variables, and compute them in getFixedTyVars.
 
 Note that because MkT3 doesn't contain all the fields being updated,
-its RHS is simply an error, so it doesn't impose any type constraints
+its RHS is simply an error, so it doesn't impose any type constraints.
+Hence the use of 'relevant_cont'.
 
 Note [Implict type sharing]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -490,11 +496,10 @@ In the outgoing (HsRecordUpd scrut binds cons in_inst_tys out_inst_tys):
 	
 \begin{code}
 tcExpr expr@(RecordUpd record_expr rbinds _ _ _) res_ty
-  = do	{
+  = ASSERT( notNull upd_fld_names )
+    do	{
 	-- STEP 0
 	-- Check that the field names are really field names
-	  let upd_fld_names = hsRecFields rbinds
-	; MASSERT( notNull upd_fld_names )
 	; sel_ids <- mapM tcLookupField upd_fld_names
 			-- The renamer has already checked that
 			-- selectors are all in scope
@@ -532,11 +537,11 @@ tcExpr expr@(RecordUpd record_expr rbinds _ _ _) res_ty
 	-- STEP 3    Note [Criteria for update]
 	-- Check that each updated field is polymorphic; that is, its type
 	-- mentions only the universally-quantified variables of the data con
-	; let flds_w_tys = zipEqual "tcExpr:RecConUpd" con1_flds con1_arg_tys
-	      (upd_flds_w_tys, fixed_flds_w_tys) = partition is_updated flds_w_tys
+	; let flds1_w_tys = zipEqual "tcExpr:RecConUpd" con1_flds con1_arg_tys
+	      (upd_flds1_w_tys, fixed_flds1_w_tys) = partition is_updated flds1_w_tys
 	      is_updated (fld,ty) = fld `elem` upd_fld_names
 
-	      bad_upd_flds = filter bad_fld upd_flds_w_tys
+	      bad_upd_flds = filter bad_fld upd_flds1_w_tys
 	      con1_tv_set = mkVarSet con1_tvs
 	      bad_fld (fld, ty) = fld `elem` upd_fld_names &&
 				      not (tyVarsOfType ty `subVarSet` con1_tv_set)
@@ -546,14 +551,14 @@ tcExpr expr@(RecordUpd record_expr rbinds _ _ _) res_ty
 	-- Figure out types for the scrutinee and result
 	-- Both are of form (T a b c), with fresh type variables, but with
 	-- common variables where the scrutinee and result must have the same type
-	-- These are variables that appear anywhere *except* in the updated fields
-	; let common_tvs = exactTyVarsOfTypes (map snd fixed_flds_w_tys)
-			   `unionVarSet` constrainedTyVars con1_tvs relevant_cons
-	      is_common_tv tv = tv `elemVarSet` common_tvs
-
+	-- These are variables that appear in *any* arg of *any* of the relevant constructors
+        -- *except* in the updated fields
+	-- 
+	; let fixed_tvs = getFixedTyVars con1_tvs relevant_cons
+	      is_fixed_tv tv = tv `elemVarSet` fixed_tvs
 	      mk_inst_ty tv result_inst_ty 
-	        | is_common_tv tv = return result_inst_ty	    -- Same as result type
-	        | otherwise	  = newFlexiTyVarTy (tyVarKind tv)  -- Fresh type, of correct kind
+	        | is_fixed_tv tv = return result_inst_ty	    -- Same as result type
+	        | otherwise      = newFlexiTyVarTy (tyVarKind tv)  -- Fresh type, of correct kind
 
 	; (_, result_inst_tys, result_inst_env) <- tcInstTyVars con1_tvs
 	; scrut_inst_tys <- zipWithM mk_inst_ty con1_tvs result_inst_tys
@@ -585,17 +590,25 @@ tcExpr expr@(RecordUpd record_expr rbinds _ _ _) res_ty
 	; return (mkHsWrap co_fn (RecordUpd (mkLHsWrap scrut_co record_expr') rbinds'
 				        relevant_cons scrut_inst_tys result_inst_tys)) }
   where
-    constrainedTyVars :: [TyVar] -> [DataCon] -> TyVarSet
-    -- Universally-quantified tyvars that appear in any of the 
-    -- *implicit* arguments to the constructor
+    upd_fld_names = hsRecFields rbinds
+
+    getFixedTyVars :: [TyVar] -> [DataCon] -> TyVarSet
     -- These tyvars must not change across the updates
-    -- See Note [Implict type sharing]
-    constrainedTyVars tvs1 cons
+    getFixedTyVars tvs1 cons
       = mkVarSet [tv1 | con <- cons
-    		      , let (tvs, theta, _, _) = dataConSig con
-    			    bad_tvs = tyVarsOfTheta theta
+    		      , let (tvs, theta, arg_tys, _) = dataConSig con
+		      	    flds = dataConFieldLabels con
+    			    fixed_tvs = exactTyVarsOfTypes fixed_tys
+			    	    -- fixed_tys: See Note [Type of a record update]
+			    	        `unionVarSet` tyVarsOfTheta theta 
+				    -- Universally-quantified tyvars that appear in any of the 
+				    -- *implicit* arguments to the constructor are fixed
+			    	    -- See Note [Implict type sharing]
+			    	        
+		            fixed_tys = [ty | (fld,ty) <- zip flds arg_tys
+                                            , not (fld `elem` upd_fld_names)]
                       , (tv1,tv) <- tvs1 `zip` tvs	-- Discards existentials in tvs
-        	      , tv `elemVarSet` bad_tvs ]
+        	      , tv `elemVarSet` fixed_tvs ]
 \end{code}
 
 %************************************************************************
