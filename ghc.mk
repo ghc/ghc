@@ -316,7 +316,7 @@ endif
 PACKAGES += haskeline
 
 ifneq "$(wildcard libraries/dph)" ""
-PACKAGES += \
+PACKAGES_STAGE2 += \
 	dph/dph-base \
 	dph/dph-prim-interface \
 	dph/dph-prim-seq \
@@ -328,9 +328,9 @@ endif
 BOOT_PKGS = Cabal hpc extensible-exceptions
 
 # The actual .a and .so/.dll files: needed for dependencies.
-ALL_LIBS  = $(foreach lib,$(PACKAGES),$(libraries/$(lib)_dist-install_v_LIB))
+ALL_STAGE1_LIBS  = $(foreach lib,$(PACKAGES),$(libraries/$(lib)_dist-install_v_LIB))
 ifeq "$(BuildSharedLibs)" "YES"
-ALL_LIBS += $(foreach lib,$(PACKAGES),$(libraries/$(lib)_dist-install_dyn_LIB))
+ALL_STAGE1_LIBS += $(foreach lib,$(PACKAGES),$(libraries/$(lib)_dist-install_dyn_LIB))
 endif
 BOOT_LIBS = $(foreach lib,$(BOOT_PKGS),$(libraries/$(lib)_dist-boot_v_LIB))
 
@@ -350,18 +350,20 @@ endif
 # know the dependencies until we've generated the pacakge-data.mk
 # files.
 define fixed_pkg_dep
-libraries/$1/$2/package-data.mk : $(GHC_PKG_INPLACE) $$(if $$(fixed_pkg_prev),libraries/$$(fixed_pkg_prev)/$2/package-data.mk)
+libraries/$1/$2/package-data.mk : $$(GHC_PKG_INPLACE) $$(if $$(fixed_pkg_prev),libraries/$$(fixed_pkg_prev)/$2/package-data.mk)
 fixed_pkg_prev:=$1
 endef
 
 ifneq "$(BINDIST)" "YES"
 fixed_pkg_prev=
-$(foreach pkg,$(PACKAGES),$(eval $(call fixed_pkg_dep,$(pkg),dist-install)))
+$(foreach pkg,$(PACKAGES) $(PACKAGES_STAGE2),$(eval $(call fixed_pkg_dep,$(pkg),dist-install)))
 
 # We assume that the stage2 compiler depends on all the libraries, so
 # they all get added to the package database before we try to configure
 # it
-compiler/stage2/package-data.mk: $(foreach pkg,$(PACKAGES),libraries/$(pkg)/dist-install/package-data.mk)
+compiler/stage2/package-data.mk: $(foreach pkg,$(PACKAGES) $(PACKAGES_STAGE2),libraries/$(pkg)/dist-install/package-data.mk)
+ghc/stage1/package-data.mk: compiler/stage1/package-data.mk
+ghc/stage2/package-data.mk: compiler/stage2/package-data.mk
 # haddock depends on ghc and some libraries, but depending on GHC's
 # package-data.mk is sufficient, as that in turn depends on all the
 # libraries
@@ -480,6 +482,7 @@ BUILD_DIRS += \
    utils/haddock \
    utils/haddock/doc \
    $(patsubst %, libraries/%, $(PACKAGES)) \
+   $(patsubst %, libraries/%, $(PACKAGES_STAGE2)) \
    compiler \
    $(GHC_HSC2HS_DIR) \
    $(GHC_PKG_DIR) \
@@ -521,7 +524,7 @@ compiler_stage2_DISABLE = YES
 compiler_stage3_DISABLE = YES
 ghc_stage2_DISABLE = YES
 ghc_stage3_DISABLE = YES
-$(foreach lib,$(PACKAGES),$(eval \
+$(foreach lib,$(PACKAGES) $(PACKAGES_STAGE2),$(eval \
   libraries/$(lib)_dist-install_DISABLE = YES))
 endif
 
@@ -537,7 +540,10 @@ GhcBootLibHcOpts += -fno-warn-deprecated-flags
 endif
 
 # Add $(GhcLibHcOpts) to all library builds
-$(foreach pkg,$(PACKAGES),$(eval libraries/$(pkg)_dist-install_HC_OPTS += $$(GhcLibHcOpts)))
+$(foreach pkg,$(PACKAGES) $(PACKAGES_STAGE2),$(eval libraries/$(pkg)_dist-install_HC_OPTS += $$(GhcLibHcOpts)))
+
+# XXX Hack; remove this
+$(foreach pkg,$(PACKAGES_STAGE2),$(eval libraries/$(pkg)_dist-install_HC_OPTS += -Wwarn))
 
 # XXX we configure packages with the bootsrapping compiler (for
 # dependency reasons, see the phase ordering), which doesn't
@@ -695,7 +701,7 @@ install_packages: libffi/package.conf.install rts/package.conf.install
 	echo "[]" > $(INSTALLED_PACKAGE_CONF)
 	$(INSTALLED_GHC_PKG_REAL) --force --global-conf $(INSTALLED_PACKAGE_CONF) update libffi/package.conf.install
 	$(INSTALLED_GHC_PKG_REAL) --force --global-conf $(INSTALLED_PACKAGE_CONF) update rts/package.conf.install
-	$(foreach p, $(PACKAGES),\
+	$(foreach p, $(PACKAGES) $(PACKAGES_STAGE2),\
 	    $(GHC_CABAL_INPLACE) install \
 		 $(INSTALLED_GHC_PKG_REAL) \
 		 $(INSTALLED_PACKAGE_CONF) \

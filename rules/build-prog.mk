@@ -100,14 +100,14 @@ $1/$2/build/tmp/$$($1_$2_PROG) : $$($1_$2_v_HS_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2
 	$$($1_$2_HC) -o $$@ $$($1_$2_v_ALL_HC_OPTS) $$(LD_OPTS) $$($1_$2_v_HS_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS) $$($1_$2_OTHER_OBJS)
 
 # Note [lib-depends] if this program is built with stage1 or greater, we
-# need to depend on the libraries too.  NB. since $(ALL_LIBS) and
+# need to depend on the libraries too.  NB. since $(ALL_STAGE1_LIBS) and
 # $(ALL_RTS_LIBS) are not defined until after libraries/*/ghc.mk have
 # been included, this introduces an ordering dependency.
 ifneq "$3" "0"
-ifeq "$$(ALL_LIBS)" ""
-$$(error ordering failure in $1: $$(ALL_LIBS) is empty)
+ifeq "$$(ALL_STAGE1_LIBS)" ""
+$$(error ordering failure in $1: $$(ALL_STAGE1_LIBS) is empty)
 endif
-$1/$2/build/tmp/$($1_$2_PROG) : $$(ALL_LIBS) $$(ALL_RTS_LIBS) $$(OTHER_LIBS)
+$1/$2/build/tmp/$($1_$2_PROG) : $$(ALL_STAGE1_LIBS) $$(ALL_RTS_LIBS) $$(OTHER_LIBS)
 endif
 endif
 
