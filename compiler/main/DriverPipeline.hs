@@ -301,8 +301,10 @@ link LinkBinary dflags batch_attempt_linking hpt
 link LinkDynLib dflags batch_attempt_linking hpt
    = link' dflags batch_attempt_linking hpt
 
+#ifndef GHCI
 -- warning suppression
 link other _ _ _ = panicBadLink other
+#endif
 
 panicBadLink :: GhcLink -> a
 panicBadLink other = panic ("link: GHC not built to link this way: " ++
