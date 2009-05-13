@@ -906,33 +906,6 @@ AC_SUBST([FopCmd])
 ])# FP_PROG_FOP
 
 
-# FP_PROG_FO_PROCESSOR
-# --------------------
-# Try to find an FO processor. PassiveTeX output is sometimes a bit strange, so
-# try FOP first. Sets the output variables FopCmd, XmltexCmd, DvipsCmd, and
-# PdfxmltexCmd.
-AC_DEFUN([FP_PROG_FO_PROCESSOR],
-[AC_REQUIRE([FP_PROG_FOP])
-AC_PATH_PROG([XmltexCmd], [xmltex])
-AC_PATH_PROG([DvipsCmd], [dvips])
-if test -z "$FopCmd"; then
-  if test -z "$XmltexCmd"; then
-    AC_MSG_WARN([cannot find an FO => DVI converter, you will not be able to build DVI or PostScript documentation])
-  else
-    if test -z "$DvipsCmd"; then
-      AC_MSG_WARN([cannot find a DVI  => PS converter, you will not be able to build PostScript documentation])
-    fi
-  fi
-  AC_PATH_PROG([PdfxmltexCmd], [pdfxmltex])
-  if test -z "$PdfxmltexCmd"; then
-    AC_MSG_WARN([cannot find an FO => PDF converter, you will not be able to build PDF documentation])
-  fi
-elif test -z "$XmltexCmd"; then
-  AC_MSG_WARN([cannot find an FO => DVI converter, you will not be able to build DVI documentation])
-fi
-])# FP_PROG_FO_PROCESSOR
-
-
 # FP_PROG_GHC_PKG
 # ----------------
 # Try to find a ghc-pkg matching the ghc mentioned in the environment variable

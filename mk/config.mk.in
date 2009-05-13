@@ -898,10 +898,6 @@ BUILD_DOCBOOK_PDF = @BUILD_DOCBOOK_PDF@
 DBLATEX		= @DblatexCmd@
 XSLTPROC		= @XsltprocCmd@
 XMLLINT			= @XmllintCmd@
-FOP			= @FopCmd@
-XMLTEX			= @XmltexCmd@
-PDFXMLTEX		= @PdfxmltexCmd@
-DVIPS			= @DvipsCmd@
 
 DIR_DOCBOOK_XSL		= @DIR_DOCBOOK_XSL@
 
