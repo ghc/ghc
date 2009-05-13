@@ -478,6 +478,7 @@ endif
 
 BUILD_DIRS += \
    utils/haddock \
+   utils/haddock/doc \
    $(patsubst %, libraries/%, $(PACKAGES)) \
    compiler \
    $(GHC_HSC2HS_DIR) \
