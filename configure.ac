@@ -685,15 +685,8 @@ AC_ARG_ENABLE(bootstrap-with-devel-snapshot,
 if test "$WithGhc" != ""; then
   FPTOOLS_GHC_VERSION([GhcVersion], [GhcMajVersion], [GhcMinVersion], [GhcPatchLevel])dnl
 
-  if test `expr $GhcMinVersion % 2` = "1"; then
-     echo $EnableBootstrapWithDevelSnaphost
-     if test "$EnableBootstrapWithDevelSnaphost" = "NO"; then
-        AC_MSG_ERROR([
-     $WithGhc is a development snapshot of GHC, version $GhcVersion.
-     Bootstrapping using this version of GHC is not supported, and may not
-     work.  Use --enable-bootstrap-with-devel-snapshot to try it anyway,
-     or --with-ghc to specify a different GHC to use.])
-     fi
+  if test "$GhcMajVersion" = "unknown" -o "$GhcMinVersion" = "unknown"; then
+     AC_MSG_ERROR([Cannot determine the version of $WithGhc.  Is it really GHC?])
   fi
 
   AC_SUBST(GhcVersion)dnl
@@ -825,6 +818,17 @@ if test "$BootingFromHc" = "NO" -a -d "$srcdir/compiler"; then
   fi
   FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[6.6],
     [AC_MSG_ERROR([GHC version 6.6 or later is required to compile GHC.])])dnl
+
+  if test `expr $GhcMinVersion % 2` = "1"; then
+     echo $EnableBootstrapWithDevelSnaphost
+     if test "$EnableBootstrapWithDevelSnaphost" = "NO"; then
+        AC_MSG_ERROR([
+     $WithGhc is a development snapshot of GHC, version $GhcVersion.
+     Bootstrapping using this version of GHC is not supported, and may not
+     work.  Use --enable-bootstrap-with-devel-snapshot to try it anyway,
+     or --with-ghc to specify a different GHC to use.])
+     fi
+  fi
 fi;
 
 # This uses GHC, so put it after the "GHC is required" check above:
