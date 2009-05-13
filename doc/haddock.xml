@@ -804,9 +804,8 @@
 	    atribute. (<xref linkend="module-attributes" />).</para>
 	</listitem>
       </varlistentry>
-    </variablelist>
       
-<varlistentry>
+      <varlistentry>
         <term>
           <indexterm><primary><option>-w</option></primary></indexterm>
           <option>-w</option>
@@ -819,6 +818,7 @@
 	  <para>Turn off all warnings.</para>
 	</listitem>
       </varlistentry>
+    </variablelist>
 
     <section id="cpp">
       <title>Using literate or pre-processed source</title>
