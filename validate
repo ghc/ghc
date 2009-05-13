@@ -135,13 +135,15 @@ so be careful!
 
 NOTE: If you have made changes that may cause failures not tested for by
 the minimal testing procedure, please do further testing as necessary.
+-------------------------------------------------------------------
 EOF
    fi
 else
     cat <<EOF
 Oops!  Looks like you have some unexpected test results or framework failures.
 Please fix them before pushing/sending patches.
+-------------------------------------------------------------------
 EOF
+    exit 1
 fi
-echo "-------------------------------------------------------------------"
 
