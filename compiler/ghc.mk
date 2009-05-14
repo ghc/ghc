@@ -404,6 +404,16 @@ compiler/stage3/package-data.mk : compiler/ghc.mk
 
 compiler_PACKAGE = ghc
 
+# The version of the GHC package changes every day, since the
+# patchlevel is the current date.  We don't want to force
+# recompilation of the entire compiler when this happens, so for stage
+# 1 we omit the patchlevel from the version number.  For stage 2 we
+# have to include the patchlevel since this is the package we install,
+# however.
+define compiler_PACKAGE_MAGIC
+compiler_stage1_VERSION = $(subst .$(ProjectPatchLevel),,$(ProjectVersion))
+endef
+
 # haddocking only happens for stage2
 compiler_stage1_DO_HADDOCK = NO
 compiler_stage3_DO_HADDOCK = NO
