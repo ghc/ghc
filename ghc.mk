@@ -799,10 +799,7 @@ SRC_DIST_FILES += \
 	aclocal.m4 README ANNOUNCE HACKING LICENSE Makefile install-sh \
 	ghc.spec.in ghc.spec extra-gcc-opts.in VERSION boot ghc.mk
 
-EXTRA_LIBS=$(patsubst %, $(SRC_DIST_NAME)/%, $(shell grep -E "extralibs|dph" packages | grep -v "^\#" | sed "s/ .*//"))
-
 SRC_DIST_TARBALL = ghc-$(ProjectVersion)-src.tar.bz2
-SRC_DIST_EXTRALIBS_TARBALL = ghc-$(ProjectVersion)-src-extralibs.tar.bz2
 
 VERSION :
 	echo $(ProjectVersion) >VERSION
@@ -849,8 +846,6 @@ sdist-prep :
 
 .PHONY: sdist
 sdist : sdist-prep
-	$(TAR) chf - $(EXTRA_LIBS) | bzip2 >$(TOP)/$(SRC_DIST_EXTRALIBS_TARBALL)
-	$(RM) -rf $(EXTRA_LIBS)
 	$(TAR) chf - $(SRC_DIST_NAME) 2>$src_log | bzip2 >$(TOP)/$(SRC_DIST_TARBALL)
 
 sdist-manifest : $(SRC_DIST_TARBALL)
@@ -861,7 +856,6 @@ sdist-manifest : $(SRC_DIST_TARBALL)
 # over SSH.
 ifneq "$(PublishLocation)" ""
 publish-sdist :
-	$(call nTimes,10,$(PublishCp) $(SRC_DIST_EXTRALIBS_TARBALL) $(PublishLocation)/dist)
 	$(call nTimes,10,$(PublishCp) $(SRC_DIST_TARBALL) $(PublishLocation)/dist)
 endif
 

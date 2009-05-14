@@ -46,18 +46,6 @@ libraries/terminfo                      packages/terminfo               darcs
 libraries/unix                          packages/unix                   darcs
 libraries/utf8-string                   packages/utf8-string            darcs
 libraries/Win32                         packages/Win32                  darcs
-libraries/HUnit             extralibs   packages/HUnit                  darcs
-libraries/QuickCheck        extralibs   packages/QuickCheck             darcs
-libraries/haskell-src       extralibs   packages/haskell-src            darcs
-libraries/html              extralibs   packages/html                   darcs
-libraries/network           extralibs   packages/network                darcs
-libraries/parsec            extralibs   packages/parsec                 darcs
-libraries/parallel          extralibs   packages/parallel               darcs
-libraries/regex-base        extralibs   packages/regex-base             darcs
-libraries/regex-compat      extralibs   packages/regex-compat           darcs
-libraries/regex-posix       extralibs   packages/regex-posix            darcs
-libraries/stm               extralibs   packages/stm                    darcs
-libraries/xhtml             extralibs   packages/xhtml                  darcs
 libraries/dph               dph         packages/dph                    darcs
 testsuite                   testsuite   testsuite                       darcs
 nofib                       nofib       nofib                           darcs
