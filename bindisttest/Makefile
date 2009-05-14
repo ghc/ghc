@@ -40,7 +40,7 @@ endif
 
 clean distclean:
 	$(RM) -rf $(BIN_DIST_INST_SUBDIR)
-	$(RM) -rf ghc*
+	$(RM) -rf a/b/c/*
 	$(RM) HelloWorld HelloWorld.o HelloWorld.hi output
 
 # Ignore a load of other standard targets
