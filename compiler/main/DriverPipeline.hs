@@ -1395,12 +1395,6 @@ linkBinary dflags o_files dep_packages = do
         framework_opts = concat [ ["-framework", fw] | fw <- reverse frameworks ]
 	 -- reverse because they're added in reverse order from the cmd line
 #endif
-#ifdef mingw32_TARGET_OS
-    let dynMain = if not opt_Static then
-		      (head (libraryDirs (getPackageDetails (pkgState dflags) rtsPackageId))) ++ "/Main.dyn_o"
-		  else
-		      ""
-#endif
 	-- probably _stub.o files
     extra_ld_inputs <- readIORef v_Ld_inputs
 
@@ -1442,9 +1436,6 @@ linkBinary dflags o_files dep_packages = do
 		      ++ map SysTools.Option (
 		         md_c_flags
 	 	      ++ o_files
-#ifdef mingw32_TARGET_OS
-	 	      ++ [dynMain]
-#endif
 		      ++ extra_ld_inputs
 	 	      ++ lib_path_opts
 	 	      ++ extra_ld_opts
