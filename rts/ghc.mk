@@ -75,8 +75,8 @@ rts_H_FILES = $(wildcard $(GHC_INCLUDE_DIR)/*.h) $(wildcard rts/*.h)
 
 # collect the -l flags that we need to link the rts dyn lib.
 rts/libs.depend : $(GHC_PKG_INPLACE)
-	$$(GHC_PKG_INPLACE) field rts extra-libraries \
-	  | sed -e 's/^extra-libraries: //' -e 's/\([a-z]*\)/-l\1/g' > $$@
+	$(GHC_PKG_INPLACE) field rts extra-libraries \
+	  | sed -e 's/^extra-libraries: //' -e 's/\([a-z]*\)/-l\1/g' > $@
 
 #-----------------------------------------------------------------------------
 # Building one way
