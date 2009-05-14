@@ -43,13 +43,19 @@ endif
 
 include mk/custom-settings.mk
 
+# If the package ghc.mk files are missing, generate them.  This means that
+# repeating 'make maintainer-clean' works.
+PACKAGE_MK=libraries/base/ghc.mk
+$(PACKAGE_MK):
+	sh boot-pkgs
+
 # No need to update makefiles for these targets:
 REALGOALS=$(filter-out framework-pkg clean clean_% distclean maintainer-clean show,$(MAKECMDGOALS))
 
 # NB. not the same as saying '%: ...', which doesn't do the right thing:
 # it does nothing if we specify a target that already exists.
 .PHONY: $(REALGOALS)
-$(REALGOALS) all:
+$(REALGOALS) all: $(PACKAGE_MK)
 	@echo "===--- updating makefiles phase 0"
 	$(MAKE) -r --no-print-directory -f ghc.mk phase=0 just-makefiles
 	@echo "===--- updating makefiles phase 1"
@@ -61,19 +67,19 @@ $(REALGOALS) all:
 	@echo "===--- finished updating makefiles"
 	$(MAKE) -r --no-print-directory -f ghc.mk $@
 
-binary-dist:
+binary-dist: $(PACKAGE_MK)
 	rm -f bindist-list
 	$(MAKE) -r --no-print-directory -f ghc.mk bindist BINDIST=YES
 	$(MAKE) -r --no-print-directory -f ghc.mk binary-dist
 
-clean distclean maintainer-clean:
+clean distclean maintainer-clean: $(PACKAGE_MK)
 	$(MAKE) -r --no-print-directory -f ghc.mk $@
 	test ! -d testsuite || $(MAKE) -C testsuite $@
 
-$(filter clean_%, $(MAKECMDGOALS)) : clean_% :
+$(filter clean_%, $(MAKECMDGOALS)) : clean_% : $(PACKAGE_MK)
 	$(MAKE) -r --no-print-directory -f ghc.mk $@
 
-show:
+show: $(PACKAGE_MK)
 	$(MAKE) -r --no-print-directory -f ghc.mk $@
 
 ifeq "$(darwin_TARGET_OS)" "1"
@@ -86,4 +92,3 @@ endif
 .NOTPARALLEL:
 
 endif
-
