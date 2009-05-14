@@ -134,17 +134,22 @@ show:
 # -----------------------------------------------------------------------------
 # Include subsidiary build-system bits
 
+ifneq "$(findstring clean,$(MAKECMDGOALS))" ""
+-include mk/config.mk
+else
 include mk/config.mk
-
 ifeq "$(ProjectVersion)" ""
 $(error Please run ./configure first)
+endif
 endif
 
 # (Optional) build-specific configuration
 include mk/custom-settings.mk
 
+ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
 ifeq "$(GhcLibWays)" ""
 $(error $$(GhcLibWays) is empty, it must contain at least one way)
+endif
 endif
 
 # -----------------------------------------------------------------------------
@@ -559,8 +564,10 @@ libraries/base3-compat_dist-install_HC_OPTS += -XPackageImports
 
 ifneq "$(BINDIST)" "YES"
 
+ifneq "$(BOOTSTRAPPING_CONF)" ""
 ifeq "$(wildcard $(BOOTSTRAPPING_CONF))" ""
 $(shell echo "[]" >$(BOOTSTRAPPING_CONF))
+endif
 endif
 
 $(eval $(call clean-target,$(BOOTSTRAPPING_CONF),,$(BOOTSTRAPPING_CONF)))

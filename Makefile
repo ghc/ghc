@@ -32,10 +32,13 @@ else
 default : all
 	@:
 
+ifneq "$(findstring clean,$(MAKECMDGOALS))" ""
+-include mk/config.mk
+else
 include mk/config.mk
-
 ifeq "$(ProjectVersion)" ""
 $(error Please run ./configure first)
+endif
 endif
 
 include mk/custom-settings.mk
