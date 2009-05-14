@@ -22,7 +22,7 @@
 #if defined(PROF_SPIN)
 typedef struct SpinLock_
 {
-    StgWord32 lock;
+    StgWord   lock;
     StgWord64 spin; // DEBUG version counts how much it spins
 } SpinLock;
 #else
