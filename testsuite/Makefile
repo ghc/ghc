@@ -20,6 +20,6 @@ all:
 endif
 endif
 
-clean distclean:
+clean distclean maintainer-clean:
 	$(MAKE) -C $(TOP)/timeout $@
 

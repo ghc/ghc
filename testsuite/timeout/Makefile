@@ -52,7 +52,7 @@ calibrate.out:
 endif
 endif
 
-clean distclean:
+clean distclean maintainer-clean:
 	-./Setup clean
 	$(RM) -rf install-inplace
 	$(RM) -f calibrate.out
