@@ -43,8 +43,6 @@ endif
 
 include mk/custom-settings.mk
 
-# If the package ghc.mk files are missing, generate them.  This means that
-# repeating 'make maintainer-clean' works.
 PACKAGE_MK=libraries/base/ghc.mk
 $(PACKAGE_MK):
 	sh boot-pkgs
@@ -67,16 +65,16 @@ $(REALGOALS) all: $(PACKAGE_MK)
 	@echo "===--- finished updating makefiles"
 	$(MAKE) -r --no-print-directory -f ghc.mk $@
 
-binary-dist: $(PACKAGE_MK)
+binary-dist:
 	rm -f bindist-list
 	$(MAKE) -r --no-print-directory -f ghc.mk bindist BINDIST=YES
 	$(MAKE) -r --no-print-directory -f ghc.mk binary-dist
 
-clean distclean maintainer-clean: $(PACKAGE_MK)
-	$(MAKE) -r --no-print-directory -f ghc.mk $@
+clean distclean maintainer-clean:
+	$(MAKE) -r --no-print-directory -f ghc.mk $@ CLEANING=YES
 	test ! -d testsuite || $(MAKE) -C testsuite $@
 
-$(filter clean_%, $(MAKECMDGOALS)) : clean_% : $(PACKAGE_MK)
+$(filter clean_%, $(MAKECMDGOALS)) : clean_% :
 	$(MAKE) -r --no-print-directory -f ghc.mk $@
 
 show: $(PACKAGE_MK)

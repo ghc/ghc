@@ -134,9 +134,7 @@ show:
 # -----------------------------------------------------------------------------
 # Include subsidiary build-system bits
 
-ifneq "$(findstring clean,$(MAKECMDGOALS))" ""
--include mk/config.mk
-else
+ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
 include mk/config.mk
 ifeq "$(ProjectVersion)" ""
 $(error Please run ./configure first)
@@ -483,10 +481,15 @@ endif
 
 BUILD_DIRS += \
    utils/haddock \
-   utils/haddock/doc \
-   $(patsubst %, libraries/%, $(PACKAGES)) \
-   $(patsubst %, libraries/%, $(PACKAGES_STAGE2)) \
-   libraries/dph \
+   utils/haddock/doc
+
+ifneq "$(CLEANING)" "YES"
+BUILD_DIRS += \
+   $(patsubst %, libraries/%, $(PACKAGES) $(PACKAGES_STAGE2)) \
+   libraries/dph
+endif
+
+BUILD_DIRS += \
    compiler \
    $(GHC_HSC2HS_DIR) \
    $(GHC_PKG_DIR) \
@@ -871,6 +874,9 @@ clean : clean_files
 .PHONY: clean_files
 clean_files :
 	$(RM) $(CLEAN_FILES)
+	$(RM) -r $(patsubst %, libraries/%/dist, $(PACKAGES) $(PACKAGES_STAGE2))
+	$(RM) -r $(patsubst %, libraries/%/dist-install, $(PACKAGES) $(PACKAGES_STAGE2))
+	$(RM) -r $(patsubst %, libraries/%/dist-boot, $(PACKAGES) $(PACKAGES_STAGE2))
 
 distclean : clean
 	$(RM) config.cache config.status config.log mk/config.h mk/stamp-h
@@ -882,6 +888,10 @@ distclean : clean
 	$(RM) libraries/process/include/HsProcessConfig.h
 	$(RM) libraries/unix/include/HsUnixConfig.h
 	$(RM) libraries/old-time/include/HsTimeConfig.h
+	$(RM) $(patsubst %, libraries/%/config.log, $(PACKAGES) $(PACKAGES_STAGE2))
+	$(RM) $(patsubst %, libraries/%/config.status, $(PACKAGES) $(PACKAGES_STAGE2))
+	$(RM) $(patsubst %, libraries/%/include/Hs*Config.h, $(PACKAGES) $(PACKAGES_STAGE2))
+	$(RM) -r $(patsubst %, libraries/%/autom4te.cache, $(PACKAGES) $(PACKAGES_STAGE2))
 
 maintainer-clean : distclean
 	$(RM) configure mk/config.h.in
