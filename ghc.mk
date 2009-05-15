@@ -211,6 +211,10 @@ include rules/c-objs.mk
 # -----------------------------------------------------------------------------
 # Suffix rules
 
+# Suffix rules cause "make clean" to fail on Windows (trac #3233)
+# so we don't make any when cleaning.
+ifneq "$(CLEANING)" "YES"
+
 include rules/hs-suffix-rules-srcdir.mk
 include rules/hs-suffix-rules.mk
 
@@ -226,6 +230,8 @@ $(foreach way,$(ALL_WAYS),\
 # C-related suffix rules
 
 include rules/c-suffix-rules.mk
+
+endif
 
 # -----------------------------------------------------------------------------
 # Building package-data.mk files from .cabal files
