@@ -46,11 +46,15 @@ endif
 
 ifeq "$(BuildFlavour)" "quickest"
 
-SRC_HC_OPTS     = -H64m -O0 -fasm
-GhcStage1HcOpts = -O -fasm
-GhcStage2HcOpts = -O0 -fasm
-GhcLibHcOpts    = -O0 -fasm
-SplitObjs       = NO
+SRC_HC_OPTS        = -H64m -O0 -fasm
+GhcStage1HcOpts    = -O -fasm
+GhcStage2HcOpts    = -O0 -fasm
+GhcLibHcOpts       = -O0 -fasm
+SplitObjs          = NO
+HADDOCK_DOCS       = NO
+BUILD_DOCBOOK_HTML = NO
+BUILD_DOCBOOK_PS   = NO
+BUILD_DOCBOOK_PDF  = NO
 
 endif
 
@@ -58,11 +62,15 @@ endif
 
 ifeq "$(BuildFlavour)" "quick"
 
-SRC_HC_OPTS     = -H64m -O0 -fasm
-GhcStage1HcOpts = -O -fasm
-GhcStage2HcOpts = -O0 -fasm
-GhcLibHcOpts    = -O -fasm
-SplitObjs       = NO
+SRC_HC_OPTS        = -H64m -O0 -fasm
+GhcStage1HcOpts    = -O -fasm
+GhcStage2HcOpts    = -O0 -fasm
+GhcLibHcOpts       = -O -fasm
+SplitObjs          = NO
+HADDOCK_DOCS       = NO
+BUILD_DOCBOOK_HTML = NO
+BUILD_DOCBOOK_PS   = NO
+BUILD_DOCBOOK_PDF  = NO
 
 endif
 
@@ -70,11 +78,15 @@ endif
 
 ifeq "$(BuildFlavour)" "devel1"
 
-SRC_HC_OPTS     = -H64m -O -fasm $(MyWarningOpts)
-GhcLibHcOpts    = -O -dcore-lint $(MyWarningOpts)
-GhcStage1HcOpts = -Rghc-timing -O0 -DDEBUG
-GhcStage2HcOpts = -Rghc-timing -O -fasm
-SplitObjs = NO
+SRC_HC_OPTS        = -H64m -O -fasm $(MyWarningOpts)
+GhcLibHcOpts       = -O -dcore-lint $(MyWarningOpts)
+GhcStage1HcOpts    = -Rghc-timing -O0 -DDEBUG
+GhcStage2HcOpts    = -Rghc-timing -O -fasm
+SplitObjs          = NO
+HADDOCK_DOCS       = NO
+BUILD_DOCBOOK_HTML = NO
+BUILD_DOCBOOK_PS   = NO
+BUILD_DOCBOOK_PDF  = NO
 
 endif
 
@@ -82,11 +94,15 @@ endif
 
 ifeq "$(BuildFlavour)" "devel2"
 
-SRC_HC_OPTS     = -H64m -O -fasm $(MyWarningOpts)
-GhcLibHcOpts    = -O -dcore-lint $(MyWarningOpts)
-GhcStage1HcOpts = -Rghc-timing -O -fasm
-GhcStage2HcOpts = -Rghc-timing -O0 -DDEBUG
-SplitObjs = NO
+SRC_HC_OPTS        = -H64m -O -fasm $(MyWarningOpts)
+GhcLibHcOpts       = -O -dcore-lint $(MyWarningOpts)
+GhcStage1HcOpts    = -Rghc-timing -O -fasm
+GhcStage2HcOpts    = -Rghc-timing -O0 -DDEBUG
+SplitObjs          = NO
+HADDOCK_DOCS       = NO
+BUILD_DOCBOOK_HTML = NO
+BUILD_DOCBOOK_PS   = NO
+BUILD_DOCBOOK_PDF  = NO
 
 endif
 
