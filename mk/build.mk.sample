@@ -22,9 +22,6 @@
 # A development build, working on the stage 2 compiler:
 #BuildFlavour = devel2
 
-# Which warnings we like to use
-MyWarningOpts   = -W -fno-warn-unused-matches -fwarn-unused-imports
-
 GhcLibWays = v
 
 # -------- 1. A Performance/Distribution build--------------------------------
@@ -78,8 +75,8 @@ endif
 
 ifeq "$(BuildFlavour)" "devel1"
 
-SRC_HC_OPTS        = -H64m -O -fasm $(MyWarningOpts)
-GhcLibHcOpts       = -O -dcore-lint $(MyWarningOpts)
+SRC_HC_OPTS        = -H64m -O -fasm
+GhcLibHcOpts       = -O -dcore-lint
 GhcStage1HcOpts    = -Rghc-timing -O0 -DDEBUG
 GhcStage2HcOpts    = -Rghc-timing -O -fasm
 SplitObjs          = NO
@@ -94,8 +91,8 @@ endif
 
 ifeq "$(BuildFlavour)" "devel2"
 
-SRC_HC_OPTS        = -H64m -O -fasm $(MyWarningOpts)
-GhcLibHcOpts       = -O -dcore-lint $(MyWarningOpts)
+SRC_HC_OPTS        = -H64m -O -fasm
+GhcLibHcOpts       = -O -dcore-lint
 GhcStage1HcOpts    = -Rghc-timing -O -fasm
 GhcStage2HcOpts    = -Rghc-timing -O0 -DDEBUG
 SplitObjs          = NO
