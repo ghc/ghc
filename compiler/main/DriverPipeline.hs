@@ -1379,6 +1379,13 @@ linkBinary dflags o_files dep_packages = do
     let lib_paths = libraryPaths dflags
     let lib_path_opts = map ("-L"++) lib_paths
 
+    -- The C "main" function is not in the rts but in a separate static
+    -- library libHSrtsmain.a that sits next to the rts lib files. Assuming
+    -- we're using a Haskell main function then we need to link it in.
+    let no_hs_main = dopt Opt_NoHsMain dflags
+    let main_lib | no_hs_main = []
+                 | otherwise  = [ "-lHSrtsmain" ]
+
     pkg_link_opts <- getPackageLinkOpts dflags dep_packages
 
 #ifdef darwin_TARGET_OS
@@ -1445,6 +1452,7 @@ linkBinary dflags o_files dep_packages = do
 	 	      ++ framework_opts
 #endif
 	 	      ++ pkg_lib_path_opts
+                      ++ main_lib
 	 	      ++ pkg_link_opts
 #ifdef darwin_TARGET_OS
 	 	      ++ pkg_framework_path_opts

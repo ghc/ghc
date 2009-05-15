@@ -19,7 +19,8 @@ rts_dist_HC = $(GHC_STAGE1)
 # merge GhcLibWays and GhcRTSWays but strip out duplicates
 rts_WAYS = $(GhcLibWays) $(filter-out $(GhcLibWays),$(GhcRTSWays))
 
-ALL_RTS_LIBS = $(foreach way,$(rts_WAYS),rts/dist/build/libHSrts$($(way)_libsuf))
+ALL_RTS_LIBS = $(foreach way,$(rts_WAYS),rts/dist/build/libHSrts$($(way)_libsuf)) \
+	       rts/dist/build/libHSrtsmain.a
 all_rts : $(ALL_RTS_LIBS)
 
 # The per-dir options
@@ -36,6 +37,7 @@ else
 ALL_DIRS += posix
 endif
 
+EXCLUDED_SRCS += rts/Main.c
 EXCLUDED_SRCS += rts/parallel/SysMan.c
 EXCLUDED_SRCS += rts/dyn-wrapper.c
 EXCLUDED_SRCS += $(wildcard rts/Vis*.c)
@@ -253,11 +255,11 @@ endif
 # XXX DQ is now the same on all platforms, so get rid of it
 DQ = \"
 
-# If Main.c is built with optimisation then the SEH exception stuff on
+# If RtsMain.c is built with optimisation then the SEH exception stuff on
 # Windows gets confused.
 # This has to be in HC rather than CC opts, as otherwise there's a
 # -optc-O2 that comes after it.
-Main_HC_OPTS += -optc-O0
+RtsMain_HC_OPTS += -optc-O0
 
 RtsMessages_CC_OPTS += -DProjectVersion=$(DQ)$(ProjectVersion)$(DQ)
 RtsUtils_CC_OPTS += -DProjectVersion=$(DQ)$(ProjectVersion)$(DQ)
@@ -397,6 +399,12 @@ DYNWRAPPER_SRC = rts/dyn-wrapper.c
 DYNWRAPPER_PROG = rts/dyn-wrapper$(exeext)
 $(DYNWRAPPER_PROG): $(DYNWRAPPER_SRC)
 	$(HC) -cpp -optc-include -optcdyn-wrapper-patchable-behaviour.h $(INPLACE_EXTRA_FLAGS) $< -o $@
+
+# -----------------------------------------------------------------------------
+# build the static lib containing the C main symbol
+
+rts/dist/build/libHSrtsmain.a : rts/dist/build/Main.o
+	$(AR) $(EXTRA_AR_ARGS) $@ $<
 
 # -----------------------------------------------------------------------------
 # The RTS package config
