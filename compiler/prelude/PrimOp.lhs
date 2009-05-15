@@ -380,6 +380,38 @@ primOpCanFail :: PrimOp -> Bool
 And some primops have side-effects and so, for example, must not be
 duplicated.
 
+This predicate means a little more than just "modifies the state of
+the world".  What it really means is "it cosumes the state on its
+input".  To see what this means, consider
+
+ let
+     t = case readMutVar# v s0 of (# s1, x #) -> (S# s1, x)
+     y = case t of (s,x) -> x
+ in
+     ... y ... y ...
+
+Now, this is part of an ST or IO thread, so we are guaranteed by
+construction that the program uses the state in a single-threaded way.
+Whenever the state resulting from the readMutVar# is demanded, the
+readMutVar# will be performed, and it will be ordered correctly with
+respect to other operations in the monad.
+
+But there's another way this could go wrong: GHC can inline t into y,
+and inline y.  Then although the original readMutVar# will still be
+correctly ordered with respect to the other operations, there will be
+one or more extra readMutVar#s performed later, possibly out-of-order.
+This really happened; see #3207.
+
+The property we need to capture about readMutVar# is that it consumes
+the State# value on its input.  We must retain the linearity of the
+State#.
+
+Our fix for this is to declare any primop that must be used linearly
+as having side-effects.  When primOpHasSideEffects is True,
+primOpOkForSpeculation will be False, and hence primOpIsCheap will
+also be False, and applications of the primop will never be
+duplicated.
+
 \begin{code}
 primOpHasSideEffects :: PrimOp -> Bool
 #include "primop-has-side-effects.hs-incl"

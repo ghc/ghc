@@ -754,6 +754,7 @@ primop  NewArrayOp "newArray#" GenPrimOp
     with each element containing the specified initial value.}
    with
    out_of_line = True
+   has_side_effects = True
 
 primop  SameMutableArrayOp "sameMutableArray#" GenPrimOp
    MutableArray# s a -> MutableArray# s a -> Bool
@@ -761,6 +762,8 @@ primop  SameMutableArrayOp "sameMutableArray#" GenPrimOp
 primop  ReadArrayOp "readArray#" GenPrimOp
    MutableArray# s a -> Int# -> State# s -> (# State# s, a #)
    {Read from specified index of mutable array. Result is not yet evaluated.}
+   with
+   has_side_effects = True
 
 primop  WriteArrayOp "writeArray#" GenPrimOp
    MutableArray# s a -> Int# -> a -> State# s -> State# s
@@ -784,6 +787,7 @@ primop  UnsafeThawArrayOp  "unsafeThawArray#" GenPrimOp
    {Make an immutable array mutable, without copying.}
    with
    out_of_line = True
+   has_side_effects = True
 
 ------------------------------------------------------------------------
 section "Byte Arrays"
@@ -808,16 +812,19 @@ primop  NewByteArrayOp_Char "newByteArray#" GenPrimOp
    {Create a new mutable byte array of specified size (in bytes), in
     the specified state thread.}
    with out_of_line = True
+        has_side_effects = True
 
 primop  NewPinnedByteArrayOp_Char "newPinnedByteArray#" GenPrimOp
    Int# -> State# s -> (# State# s, MutableByteArray# s #)
    {Create a mutable byte array that the GC guarantees not to move.}
    with out_of_line = True
+        has_side_effects = True
 
 primop  NewAlignedPinnedByteArrayOp_Char "newAlignedPinnedByteArray#" GenPrimOp
    Int# -> Int# -> State# s -> (# State# s, MutableByteArray# s #)
    {Create a mutable byte array, aligned by the specified amount, that the GC guarantees not to move.}
    with out_of_line = True
+        has_side_effects = True
 
 primop  ByteArrayContents_Char "byteArrayContents#" GenPrimOp
    ByteArray# -> Addr#
@@ -892,52 +899,68 @@ primop IndexByteArrayOp_Word64 "indexWord64Array#" GenPrimOp
 primop  ReadByteArrayOp_Char "readCharArray#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, Char# #)
    {Read 8-bit character; offset in bytes.}
+   with has_side_effects = True
 
 primop  ReadByteArrayOp_WideChar "readWideCharArray#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, Char# #)
    {Read 31-bit character; offset in 4-byte words.}
+   with has_side_effects = True
 
 primop  ReadByteArrayOp_Int "readIntArray#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, Int# #)
+   with has_side_effects = True
 
 primop  ReadByteArrayOp_Word "readWordArray#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, Word# #)
+   with has_side_effects = True
 
 primop  ReadByteArrayOp_Addr "readAddrArray#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, Addr# #)
+   with has_side_effects = True
 
 primop  ReadByteArrayOp_Float "readFloatArray#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, Float# #)
+   with has_side_effects = True
 
 primop  ReadByteArrayOp_Double "readDoubleArray#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, Double# #)
+   with has_side_effects = True
 
 primop  ReadByteArrayOp_StablePtr "readStablePtrArray#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, StablePtr# a #)
+   with has_side_effects = True
 
 primop  ReadByteArrayOp_Int8 "readInt8Array#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, Int# #)
+   with has_side_effects = True
 
 primop  ReadByteArrayOp_Int16 "readInt16Array#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, Int# #)
+   with has_side_effects = True
 
 primop  ReadByteArrayOp_Int32 "readInt32Array#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, INT32 #)
+   with has_side_effects = True
 
 primop  ReadByteArrayOp_Int64 "readInt64Array#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, INT64 #)
+   with has_side_effects = True
 
 primop  ReadByteArrayOp_Word8 "readWord8Array#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, Word# #)
+   with has_side_effects = True
 
 primop  ReadByteArrayOp_Word16 "readWord16Array#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, Word# #)
+   with has_side_effects = True
 
 primop  ReadByteArrayOp_Word32 "readWord32Array#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, WORD32 #)
+   with has_side_effects = True
 
 primop  ReadByteArrayOp_Word64 "readWord64Array#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, WORD64 #)
+   with has_side_effects = True
 
 primop  WriteByteArrayOp_Char "writeCharArray#" GenPrimOp
    MutableByteArray# s -> Int# -> Char# -> State# s -> State# s
@@ -1090,52 +1113,68 @@ primop IndexOffAddrOp_Word64 "indexWord64OffAddr#" GenPrimOp
 primop ReadOffAddrOp_Char "readCharOffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, Char# #)
    {Reads 8-bit character; offset in bytes.}
+   with has_side_effects = True
 
 primop ReadOffAddrOp_WideChar "readWideCharOffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, Char# #)
    {Reads 31-bit character; offset in 4-byte words.}
+   with has_side_effects = True
 
 primop ReadOffAddrOp_Int "readIntOffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, Int# #)
+   with has_side_effects = True
 
 primop ReadOffAddrOp_Word "readWordOffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, Word# #)
+   with has_side_effects = True
 
 primop ReadOffAddrOp_Addr "readAddrOffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, Addr# #)
+   with has_side_effects = True
 
 primop ReadOffAddrOp_Float "readFloatOffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, Float# #)
+   with has_side_effects = True
 
 primop ReadOffAddrOp_Double "readDoubleOffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, Double# #)
+   with has_side_effects = True
 
 primop ReadOffAddrOp_StablePtr "readStablePtrOffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, StablePtr# a #)
+   with has_side_effects = True
 
 primop ReadOffAddrOp_Int8 "readInt8OffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, Int# #)
+   with has_side_effects = True
 
 primop ReadOffAddrOp_Int16 "readInt16OffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, Int# #)
+   with has_side_effects = True
 
 primop ReadOffAddrOp_Int32 "readInt32OffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, INT32 #)
+   with has_side_effects = True
 
 primop ReadOffAddrOp_Int64 "readInt64OffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, INT64 #)
+   with has_side_effects = True
 
 primop ReadOffAddrOp_Word8 "readWord8OffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, Word# #)
+   with has_side_effects = True
 
 primop ReadOffAddrOp_Word16 "readWord16OffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, Word# #)
+   with has_side_effects = True
 
 primop ReadOffAddrOp_Word32 "readWord32OffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, WORD32 #)
+   with has_side_effects = True
 
 primop ReadOffAddrOp_Word64 "readWord64OffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, WORD64 #)
+   with has_side_effects = True
 
 
 primop  WriteOffAddrOp_Char "writeCharOffAddr#" GenPrimOp
@@ -1215,10 +1254,13 @@ primop  NewMutVarOp "newMutVar#" GenPrimOp
    {Create {\tt MutVar\#} with specified initial value in specified state thread.}
    with
    out_of_line = True
+   has_side_effects = True
 
 primop  ReadMutVarOp "readMutVar#" GenPrimOp
    MutVar# s a -> State# s -> (# State# s, a #)
    {Read contents of {\tt MutVar\#}. Result is not yet evaluated.}
+   with
+   has_side_effects = True
 
 primop  WriteMutVarOp "writeMutVar#"  GenPrimOp
    MutVar# s a -> a -> State# s -> State# s
@@ -1237,8 +1279,8 @@ primop  SameMutVarOp "sameMutVar#" GenPrimOp
 primop  AtomicModifyMutVarOp "atomicModifyMutVar#" GenPrimOp
    MutVar# s a -> (a -> b) -> State# s -> (# State# s, c #)
    with
-   has_side_effects = True
    out_of_line = True
+   has_side_effects = True
 
 ------------------------------------------------------------------------
 section "Exceptions"
@@ -1255,6 +1297,7 @@ primop  CatchOp "catch#" GenPrimOp
 	-- analyser about that!
         -- might use caught action multiply
    out_of_line = True
+   has_side_effects = True
 
 primop  RaiseOp "raise#" GenPrimOp
    a -> b
@@ -1271,23 +1314,27 @@ primop  RaiseIOOp "raiseIO#" GenPrimOp
    a -> State# RealWorld -> (# State# RealWorld, b #)
    with
    out_of_line = True
+   has_side_effects = True
 
 primop  BlockAsyncExceptionsOp "blockAsyncExceptions#" GenPrimOp
         (State# RealWorld -> (# State# RealWorld, a #))
      -> (State# RealWorld -> (# State# RealWorld, a #))
    with
    out_of_line = True
+   has_side_effects = True
 
 primop  UnblockAsyncExceptionsOp "unblockAsyncExceptions#" GenPrimOp
         (State# RealWorld -> (# State# RealWorld, a #))
      -> (State# RealWorld -> (# State# RealWorld, a #))
    with
    out_of_line = True
+   has_side_effects = True
 
 primop  AsyncExceptionsBlockedOp "asyncExceptionsBlocked#" GenPrimOp
         State# RealWorld -> (# State# RealWorld, Int# #)
    with
    out_of_line = True
+   has_side_effects = True
 
 ------------------------------------------------------------------------
 section "STM-accessible Mutable Variables"
@@ -1337,6 +1384,7 @@ primop	NewTVarOp "newTVar#" GenPrimOp
    {Create a new {\tt TVar\#} holding a specified initial value.}
    with
    out_of_line  = True
+   has_side_effects = True
 
 primop	ReadTVarOp "readTVar#" GenPrimOp
        TVar# s a
@@ -1344,6 +1392,7 @@ primop	ReadTVarOp "readTVar#" GenPrimOp
    {Read contents of {\tt TVar\#}.  Result is not yet evaluated.}
    with
    out_of_line	= True
+   has_side_effects = True
 
 primop ReadTVarIOOp "readTVarIO#" GenPrimOp
        TVar# s a
@@ -1351,6 +1400,7 @@ primop ReadTVarIOOp "readTVarIO#" GenPrimOp
    {Read contents of {\tt TVar\#} outside an STM transaction}
    with
    out_of_line	= True
+   has_side_effects = True
 
 primop	WriteTVarOp "writeTVar#" GenPrimOp
        TVar# s a
@@ -1380,38 +1430,39 @@ primop  NewMVarOp "newMVar#"  GenPrimOp
    {Create new {\tt MVar\#}; initially empty.}
    with
    out_of_line = True
+   has_side_effects = True
 
 primop  TakeMVarOp "takeMVar#" GenPrimOp
    MVar# s a -> State# s -> (# State# s, a #)
    {If {\tt MVar\#} is empty, block until it becomes full.
    Then remove and return its contents, and set it empty.}
    with
-   has_side_effects = True
    out_of_line      = True
+   has_side_effects = True
 
 primop  TryTakeMVarOp "tryTakeMVar#" GenPrimOp
    MVar# s a -> State# s -> (# State# s, Int#, a #)
    {If {\tt MVar\#} is empty, immediately return with integer 0 and value undefined.
    Otherwise, return with integer 1 and contents of {\tt MVar\#}, and set {\tt MVar\#} empty.}
    with
-   has_side_effects = True
    out_of_line      = True
+   has_side_effects = True
 
 primop  PutMVarOp "putMVar#" GenPrimOp
    MVar# s a -> a -> State# s -> State# s
    {If {\tt MVar\#} is full, block until it becomes empty.
    Then store value arg as its new contents.}
    with
-   has_side_effects = True
    out_of_line      = True
+   has_side_effects = True
 
 primop  TryPutMVarOp "tryPutMVar#" GenPrimOp
    MVar# s a -> a -> State# s -> (# State# s, Int# #)
    {If {\tt MVar\#} is full, immediately return with integer 0.
     Otherwise, store value arg as {\tt MVar\#}'s new contents, and return with integer 1.}
    with
-   has_side_effects = True
    out_of_line      = True
+   has_side_effects = True
 
 primop  SameMVarOp "sameMVar#" GenPrimOp
    MVar# s a -> MVar# s a -> Bool
@@ -1421,6 +1472,7 @@ primop  IsEmptyMVarOp "isEmptyMVar#" GenPrimOp
    {Return 1 if {\tt MVar\#} is empty; 0 otherwise.}
    with
    out_of_line = True
+   has_side_effects = True
 
 ------------------------------------------------------------------------
 section "Delay/wait operations"
@@ -1526,6 +1578,7 @@ primop  MyThreadIdOp "myThreadId#" GenPrimOp
    State# RealWorld -> (# State# RealWorld, ThreadId# #)
    with
    out_of_line = True
+   has_side_effects = True
 
 primop LabelThreadOp "labelThread#" GenPrimOp
    ThreadId# -> Addr# -> State# RealWorld -> State# RealWorld
@@ -1537,16 +1590,19 @@ primop  IsCurrentThreadBoundOp "isCurrentThreadBound#" GenPrimOp
    State# RealWorld -> (# State# RealWorld, Int# #)
    with
    out_of_line = True
+   has_side_effects = True
 
 primop  NoDuplicateOp "noDuplicate#" GenPrimOp
    State# RealWorld -> State# RealWorld
    with
    out_of_line = True
+   has_side_effects = True
 
 primop  ThreadStatusOp "threadStatus#" GenPrimOp
    ThreadId# -> State# RealWorld -> (# State# RealWorld, Int# #)
    with
    out_of_line = True
+   has_side_effects = True
 
 ------------------------------------------------------------------------
 section "Weak pointers"
