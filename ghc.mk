@@ -893,7 +893,11 @@ maintainer-clean : distclean
 	$(RM) configure mk/config.h.in
 	$(RM) -r autom4te.cache libraries/*/autom4te.cache
 	$(RM) ghc.spec
-	$(RM) libraries/*/GNUmakefile libraries/*/ghc.mk libraries/*/configure 
+	$(RM) $(patsubst %, libraries/%/GNUmakefile, \
+	        $(PACKAGES) $(PACKAGES_STAGE2))
+	$(RM) $(patsubst %, libraries/%/ghc.mk, $(PACKAGES) $(PACKAGES_STAGE2))
+	$(RM) $(patsubst %, libraries/%/configure, \
+	        $(PACKAGES) $(PACKAGES_STAGE2))
 	$(RM) libraries/base/include/HsBaseConfig.h.in
 	$(RM) libraries/directory/include/HsDirectoryConfig.h.in
 	$(RM) libraries/process/include/HsProcessConfig.h.in
