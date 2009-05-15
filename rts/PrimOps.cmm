@@ -367,7 +367,7 @@ mkWeakForeignEnvzh_fast
   flag = R5;
   eptr = R6;
 
-  ALLOC_PRIM( SIZEOF_StgWeak, R1_PTR & R2_PTR & R3_PTR, mkWeakForeignEnvzh_fast );
+  ALLOC_PRIM( SIZEOF_StgWeak, R1_PTR & R2_PTR, mkWeakForeignEnvzh_fast );
 
   w = Hp - SIZEOF_StgWeak + WDS(1);
   SET_HDR(w, stg_WEAK_info, W_[CCCS]);
