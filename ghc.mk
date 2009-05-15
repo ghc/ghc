@@ -491,7 +491,6 @@ BUILD_DIRS += \
    compiler \
    $(GHC_HSC2HS_DIR) \
    $(GHC_PKG_DIR) \
-   utils/hasktags \
    utils/hpc \
    utils/runghc \
    ghc
@@ -522,7 +521,6 @@ ifneq "$(findstring $(phase),0 1 2 3)" ""
 utils/haddock_dist_DISABLE = YES
 utils/runghc_dist_DISABLE = YES
 utils/hpc_dist_DISABLE = YES
-utils/hasktags_dist_DISABLE = YES
 utils/hsc2hs_dist-install_DISABLE = YES
 utils/ghc-pkg_dist-install_DISABLE = YES
 compiler_stage2_DISABLE = YES

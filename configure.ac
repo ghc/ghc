@@ -1007,6 +1007,8 @@ FP_DIR_DOCBOOK_XSL([/usr/share/xml/docbook/stylesheet/nwalsh/current /usr/share/
 
 FP_PROG_DBLATEX
 
+FP_PROG_HSTAGS
+
 dnl ** check for ghc-pkg command
 FP_PROG_GHC_PKG
 
