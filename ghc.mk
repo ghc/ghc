@@ -320,7 +320,6 @@ endif
 
 PACKAGES += haskeline
 
-ifneq "$(wildcard libraries/dph)" ""
 PACKAGES_STAGE2 += \
 	dph/dph-base \
 	dph/dph-prim-interface \
@@ -328,7 +327,6 @@ PACKAGES_STAGE2 += \
 	dph/dph-prim-par \
 	dph/dph-seq \
 	dph/dph-par
-endif
 
 BOOT_PKGS = Cabal hpc extensible-exceptions
 
@@ -488,6 +486,7 @@ BUILD_DIRS += \
    utils/haddock/doc \
    $(patsubst %, libraries/%, $(PACKAGES)) \
    $(patsubst %, libraries/%, $(PACKAGES_STAGE2)) \
+   libraries/dph \
    compiler \
    $(GHC_HSC2HS_DIR) \
    $(GHC_PKG_DIR) \
@@ -531,9 +530,6 @@ $(foreach lib,$(PACKAGES) $(PACKAGES_STAGE2),$(eval \
   libraries/$(lib)_dist-install_DISABLE = YES))
 endif
 
-ifneq "$(wildcard libraries/dph)" ""
-include libraries/dph/ghc.mk
-endif
 include $(patsubst %, %/ghc.mk, $(BUILD_DIRS))
 
 # We need -fno-warn-deprecated-flags to avoid failure with -Werror
