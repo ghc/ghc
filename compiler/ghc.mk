@@ -404,15 +404,22 @@ compiler/stage3/package-data.mk : compiler/ghc.mk
 
 compiler_PACKAGE = ghc
 
+# Note [fiddle-stage1-version]
 # The version of the GHC package changes every day, since the
 # patchlevel is the current date.  We don't want to force
 # recompilation of the entire compiler when this happens, so for stage
 # 1 we omit the patchlevel from the version number.  For stage 2 we
 # have to include the patchlevel since this is the package we install,
 # however.
+#
+# Note: we also have to tweak the version number of the package itself
+# when it gets registered; see Note [munge-stage1-package-config]
+# below.
+ifneq "$(ProjectPatchLevel)" "0"
 define compiler_PACKAGE_MAGIC
 compiler_stage1_VERSION = $(subst .$(ProjectPatchLevel),,$(ProjectVersion))
 endef
+endif
 
 # haddocking only happens for stage2
 compiler_stage1_DO_HADDOCK = NO
@@ -450,5 +457,17 @@ $(compiler_stage3_depfile) : compiler/stage3/$(PLATFORM_H)
 $(compiler_stage1_depfile) : $(includes_H_CONFIG) $(includes_H_PLATFORM) $(includes_GHCCONSTANTS) $(includes_DERIVEDCONSTANTS) $(PRIMOP_BITS)
 $(compiler_stage2_depfile) : $(includes_H_CONFIG) $(includes_H_PLATFORM) $(includes_GHCCONSTANTS) $(includes_DERIVEDCONSTANTS) $(PRIMOP_BITS)
 $(compiler_stage3_depfile) : $(includes_H_CONFIG) $(includes_H_PLATFORM) $(includes_GHCCONSTANTS) $(includes_DERIVEDCONSTANTS) $(PRIMOP_BITS)
+
+# Note [munge-stage1-package-config]
+# Strip the date/patchlevel from the version of stage1.  See Note
+# [fiddle-stage1-version] above.
+ifneq "$(ProjectPatchLevel)" "0"
+compiler/stage1/inplace-pkg-config-munged: compiler/stage1/inplace-pkg-config
+	sed "s#.$(ProjectPatchLevel)##" <$< >$@
+	$(compiler_stage1_GHC_PKG) update --force $(compiler_stage1_GHC_PKG_OPTS) $@
+
+$(compiler_stage1_v_LIB) : compiler/stage1/inplace-pkg-config-munged
+endif
+
 endif
 
