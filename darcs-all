@@ -4,12 +4,11 @@ use strict;
 
 # Usage:
 #
-# ./darcs-all [-q] [-s] [--dph] [--extra] [--nofib] [--testsuite] get [darcs get flags]
+# ./darcs-all [-q] [-s] [--dph] [--nofib] [--testsuite] get [darcs get flags]
 #   This gets the GHC core repos, if they do not already exist.
 #   -q says to be quite, and -s to be silent.
-#   --dph, --extra, --nofib, --testsuite also get the dph library,
-#                                        extralibs, nofib and testsuite
-#                                        repos respectively
+#   --dph, --nofib, --testsuite also get the dph library, nofib and
+#                               testsuite repos respectively
 #   The darcs get flag you are most likely to want is --complete. By
 #   default we pass darcs the --partial flag.
 #
@@ -176,11 +175,6 @@ sub main {
         # It has no effect on the other commands.
         elsif ($arg eq "--dph") {
             $tags{"dph"} = 1;
-        }
-        # --extra says we grab the extra libs with 'get'.
-        # It has no effect on the other commands.
-        elsif ($arg eq "--extra") {
-            $tags{"extralibs"} = 1;
         }
         # --nofib tells get to also grab the nofib repo.
         # It has no effect on the other commands.
