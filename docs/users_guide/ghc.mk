@@ -23,7 +23,7 @@ $(eval $(call docbook,docs/users_guide,users_guide))
 # tree.  This is a horrible hack, but I can't find a better way to do
 # it --SDM (2009-05-11)
 
-build_ug_book = $(TOP)/docs/users_guide/ug-book.xml
+build_ug_book = docs/users_guide/ug-book.xml
 src_ug_book  = $(dir $(realpath $(dir $(build_ug_book))/ug-book.xml.in))ug-book.xml
 
 ifneq "$(build_ug_book)" "$(src_ug_book)"
