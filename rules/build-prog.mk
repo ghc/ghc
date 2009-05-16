@@ -24,8 +24,10 @@ define build-prog
 # $2 = distdir
 # $3 = GHC stage to use (0 == bootstrapping compiler)
 
+ifneq "$$(CLEANING)" "YES"
 ifeq "$$($1_$2_PROG)" ""
 $$(error $1_$2_PROG is not set)
+endif
 endif
 
 ifeq "$$(findstring $3,0 1 2)" ""

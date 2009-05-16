@@ -134,6 +134,8 @@ show:
 # -----------------------------------------------------------------------------
 # Include subsidiary build-system bits
 
+include mk/tree.mk
+
 ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
 include mk/config.mk
 ifeq "$(ProjectVersion)" ""
