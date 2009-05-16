@@ -85,6 +85,8 @@ define cmm-suffix-rules
 
 # .cmm files depend on all the .h files, to a first approximation.
 
+ifneq "$$(CLEANING)" "YES"
+
 ifneq "$$(BootingFromHc)" "YES"
 
 $1/$2/build/%.$$($3_way_)o : $1/%.cmm $$(rts_H_FILES) $$($1_$2_HC)
@@ -112,6 +114,8 @@ $1/$2/build/%.$$($3_way_)o : $1/%.hc
 
 $1/$2/build/%.$$($3_way_)o : $1/$2/build/%.hc
 	$$(CC) $$($1_$2_$3_ALL_CC_OPTS) -Iincludes -x c -c $$< -o $$@
+
+endif
 
 endef
 
