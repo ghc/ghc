@@ -22,9 +22,6 @@
 #
 #	  If you don't have a build.mk file then you get defaults for everything.
 #	  The defaults should provide a reasonable vanilla build.
-#
-# This is one of only two files that configure generates (the other is config.h)
-#
 
 ifneq "$(findstring 3.7, $(MAKE_VERSION))" ""
 ifeq "$(findstring 3.79.1, $(MAKE_VERSION))" ""
