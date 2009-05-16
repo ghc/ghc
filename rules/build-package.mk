@@ -145,7 +145,7 @@ $(call haddock,$1,$2)
 endif # package-data.mk exists
 
 # Don't put bootstrapping packages in the bindist
-ifeq "$3" "1"
+ifneq "$3" "0"
 BINDIST_EXTRAS += $1/*.cabal $1/$2/setup-config $1/LICENSE
 BINDIST_EXTRAS += $$($1_$2_INSTALL_INCLUDES_SRCS)
 endif
