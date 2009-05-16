@@ -120,14 +120,24 @@ $(INPLACE_LIB)/extra-gcc-opts : extra-gcc-opts
 	$(CP) $< $@
 
 # The GHC programs need to depend on all the helper programs they might call
-$(GHC_STAGE1) : $(INPLACE_LIB)/extra-gcc-opts $(MANGLER) $(SPLIT)
-$(GHC_STAGE2) : $(INPLACE_LIB)/extra-gcc-opts $(MANGLER) $(SPLIT)
-$(GHC_STAGE3) : $(INPLACE_LIB)/extra-gcc-opts $(MANGLER) $(SPLIT)
+ifeq "$(GhcUnregisterised)" "NO"
+$(GHC_STAGE1) : $(MANGLER) $(SPLIT)
+$(GHC_STAGE2) : $(MANGLER) $(SPLIT)
+$(GHC_STAGE3) : $(MANGLER) $(SPLIT)
+endif
+
+$(GHC_STAGE1) : $(INPLACE_LIB)/extra-gcc-opts
+$(GHC_STAGE2) : $(INPLACE_LIB)/extra-gcc-opts
+$(GHC_STAGE3) : $(INPLACE_LIB)/extra-gcc-opts
 
 ifeq "$(Windows)" "YES"
 $(GHC_STAGE1) : $(TOUCHY) $(INPLACE)/stamp-mingw $(INPLACE_LIB)/perl.exe
 $(GHC_STAGE2) : $(TOUCHY) $(INPLACE)/stamp-mingw $(INPLACE_LIB)/perl.exe
 $(GHC_STAGE3) : $(TOUCHY) $(INPLACE)/stamp-mingw $(INPLACE_LIB)/perl.exe
+endif
+
+ifeq "$(BootingFromHc)" "YES"
+ghc_stage2_OTHER_OBJS += $(compiler_stage2_v_LIB) $(ALL_LIBS) $(ALL_LIBS) $(ALL_LIBS) $(ALL_RTS_LIBS) -lgmp $(libffi_STATIC_LIB) -lm -lutil -lrt
 endif
 
 endif

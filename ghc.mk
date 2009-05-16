@@ -172,6 +172,10 @@ ifneq "$(findstring clean,$(MAKECMDGOALS))" ""
 NO_INCLUDE_DEPS = YES
 NO_INCLUDE_PKGDATA = YES
 endif
+ifneq "$(findstring bootstrapping-files,$(MAKECMDGOALS))" ""
+NO_INCLUDE_DEPS = YES
+NO_INCLUDE_PKGDATA = YES
+endif
 ifeq "$(findstring show,$(MAKECMDGOALS))" "show"
 NO_INCLUDE_DEPS = YES
 # We want package-data.mk for show
@@ -347,7 +351,8 @@ ifeq "$(BuildSharedLibs)" "YES"
 OTHER_LIBS  += libffi/libHSffi$(dyn_libsuf)
 endif
 ifeq "$(HaveLibGmp)" "NO"
-OTHER_LIBS += gmp/libgmp.a
+GMP_LIB = gmp/libgmp.a
+OTHER_LIBS += $(GMP_LIB)
 endif
 
 # We cannot run ghc-cabal to configure a package until we have
@@ -554,7 +559,7 @@ $(foreach pkg,$(PACKAGES) $(PACKAGES_STAGE2),$(eval libraries/$(pkg)_dist-instal
 # XXX Hack; remove this
 $(foreach pkg,$(PACKAGES_STAGE2),$(eval libraries/$(pkg)_dist-install_HC_OPTS += -Wwarn))
 
-# XXX we configure packages with the bootsrapping compiler (for
+# XXX we configure packages with the bootstrapping compiler (for
 # dependency reasons, see the phase ordering), which doesn't
 # necessarily support all the extensions we need, and Cabal filters
 # out the ones it thinks aren't supported.
@@ -865,7 +870,7 @@ publish-sdist :
 endif
 
 ifeq "$(GhcUnregisterised)" "YES"
-SRC_CC_OPTS += -DNO_REGS -DUSE_MINIINTERPRETER
+SRC_CC_OPTS += -DNO_REGS -DUSE_MINIINTERPRETER -D__GLASGOW_HASKELL__=$(ProjectVersionInt)
 endif
 
 # -----------------------------------------------------------------------------
@@ -917,4 +922,10 @@ maintainer-clean : distclean
 	$(RM) libraries/old-time/include/HsTimeConfig.h.in
 
 .PHONY: all_libraries
+
+.PHONY: bootstrapping-files
+bootstrapping-files: $(GMP_LIB)
+bootstrapping-files: includes/ghcautoconf.h
+bootstrapping-files: includes/DerivedConstants.h
+bootstrapping-files: includes/GHCConstants.h
 

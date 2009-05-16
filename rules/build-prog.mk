@@ -97,9 +97,15 @@ $$(foreach dir,$$($1_$2_HS_SRC_DIRS),\
 $(call c-objs,$1,$2,v)
 $(call hs-objs,$1,$2,v)
 
+ifeq "$$(BootingFromHc)" "NO"
 $1/$2/build/tmp/$$($1_$2_PROG) : $$($1_$2_v_HS_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS) $$($1_$2_OTHER_OBJS)
 	$$(MKDIRHIER) $$(dir $$@)
 	$$($1_$2_HC) -o $$@ $$($1_$2_v_ALL_HC_OPTS) $$(LD_OPTS) $$($1_$2_v_HS_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS) $$($1_$2_OTHER_OBJS)
+else
+$1/$2/build/tmp/$$($1_$2_PROG) : $$($1_$2_v_HS_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS) $$($1_$2_OTHER_OBJS)
+	$$(MKDIRHIER) $$(dir $$@)
+	$$(CC) -o $$@ $$($1_$2_v_ALL_CC_OPTS) $$(LD_OPTS) $$($1_$2_v_HS_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS) $$($1_$2_OTHER_OBJS)
+endif
 
 # Note [lib-depends] if this program is built with stage1 or greater, we
 # need to depend on the libraries too.  NB. since $(ALL_STAGE1_LIBS) and

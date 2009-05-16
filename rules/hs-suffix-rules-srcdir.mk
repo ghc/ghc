@@ -54,7 +54,7 @@ endif
 # XXX: for some reason these get used in preference to the direct
 # .hs->.o rule, I don't know why --SDM
 
-$1/$2/build/%.$$($3_osuf) : $1/$4/%.hc includes/ghcautoconf.h includes/ghcplatform.h
+$1/$2/build/%.$$($3_osuf) : $1/$4/%.hc includes/ghcautoconf.h includes/ghcplatform.h $$(MKDIRHIER)
 	$$(MKDIRHIER) $$(dir $$@)
 	$$(CC) $$($1_$2_$3_ALL_CC_OPTS) -Iincludes -x c -c $$< -o $$@
 

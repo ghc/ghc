@@ -48,7 +48,7 @@ $(PACKAGE_MK):
 	sh boot-pkgs
 
 # No need to update makefiles for these targets:
-REALGOALS=$(filter-out framework-pkg clean clean_% distclean maintainer-clean show,$(MAKECMDGOALS))
+REALGOALS=$(filter-out bootstrapping-files framework-pkg clean clean_% distclean maintainer-clean show,$(MAKECMDGOALS))
 
 # NB. not the same as saying '%: ...', which doesn't do the right thing:
 # it does nothing if we specify a target that already exists.
@@ -77,7 +77,7 @@ clean distclean maintainer-clean:
 $(filter clean_%, $(MAKECMDGOALS)) : clean_% :
 	$(MAKE) -r --no-print-directory -f ghc.mk $@
 
-show: $(PACKAGE_MK)
+bootstrapping-files show: $(PACKAGE_MK)
 	$(MAKE) -r --no-print-directory -f ghc.mk $@
 
 ifeq "$(darwin_TARGET_OS)" "1"

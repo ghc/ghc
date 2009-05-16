@@ -43,11 +43,14 @@ EXCLUDED_SRCS += $(wildcard rts/Vis*.c)
 rts_C_SRCS = $(filter-out $(EXCLUDED_SRCS),$(wildcard rts/*.c $(foreach dir,$(ALL_DIRS),rts/$(dir)/*.c)))
 rts_CMM_SRCS = $(wildcard rts/*.cmm)
 
+# Don't compile .S files when bootstrapping a new arch
+ifeq "$(TARGETPLATFORM)" "$(HOSTPLATFORM)"
 ifneq "$(findstring $(TargetArch_CPP), powerpc powerpc64)" ""
 rts_S_SRCS += rts/AdjustorAsm.S
 else
 ifneq "$(findstring $(TargetOS_CPP), darwin)" ""
 rts_S_SRCS += rts/AdjustorAsm.S
+endif
 endif
 endif
 
