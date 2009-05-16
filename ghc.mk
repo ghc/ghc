@@ -53,7 +53,6 @@
 #
 #   * 2966 make sure --with-gcc does the right thing (#2966)
 #   * 1693 make distclean
-#   * 2689 make maintainer-clean
 #   * 3173 make install with DESTDIR
 
 # Possible cleanups:
