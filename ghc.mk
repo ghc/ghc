@@ -749,6 +749,7 @@ $(eval $(call bindist,.,\
     $(filter-out %/project.mk,$(filter-out mk/config.mk,$(MAKEFILE_LIST))) \
 	mk/fix_install_names.sh \
 	mk/project.mk \
+	libraries/dph/LICENSE \
  ))
 # mk/project.mk gets an absolute path, so we manually include it in
 # the bindist with a relative path
