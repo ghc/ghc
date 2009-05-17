@@ -614,7 +614,7 @@ defaultDynFlags =
 
         outputFile              = Nothing,
         outputHi                = Nothing,
-        dynLibLoader            = Deployable,
+        dynLibLoader            = SystemDependent,
         dumpPrefix              = Nothing,
         dumpPrefixForce         = Nothing,
         includePaths            = [],
