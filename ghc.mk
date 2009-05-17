@@ -329,6 +329,7 @@ endif
 
 PACKAGES += haskeline
 
+ifneq "$(BootingFromHc)" "YES"
 PACKAGES_STAGE2 += \
 	dph/dph-base \
 	dph/dph-prim-interface \
@@ -336,6 +337,7 @@ PACKAGES_STAGE2 += \
 	dph/dph-prim-par \
 	dph/dph-seq \
 	dph/dph-par
+endif
 
 BOOT_PKGS = Cabal hpc extensible-exceptions
 
@@ -497,8 +499,11 @@ BUILD_DIRS += \
 
 ifneq "$(CLEANING)" "YES"
 BUILD_DIRS += \
-   $(patsubst %, libraries/%, $(PACKAGES) $(PACKAGES_STAGE2)) \
+   $(patsubst %, libraries/%, $(PACKAGES) $(PACKAGES_STAGE2))
+ifneq "$(BootingFromHc)" "YES"
+BUILD_DIRS += \
    libraries/dph
+endif
 endif
 
 BUILD_DIRS += \
