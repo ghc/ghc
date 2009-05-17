@@ -29,9 +29,14 @@ $$($1_PACKAGE)-$($1_$2_VERSION)_$2_$3_LIB = $$($1_$2_$3_LIB)
 # All the .a/.so library file dependencies for this library
 $1_$2_$3_DEPS_LIBS=$$(foreach dep,$$($1_$2_DEPS),$$($$(dep)_$2_$3_LIB))
 
+ifneq "$$(BootingFromHc)" "YES"
 $1_$2_$3_MKSTUBOBJS = find $1/$2/build -name "*_stub.$$($3_osuf)" -print
 # HACK ^^^ we tried to use $(wildcard), but apparently it fails due to
 # make using cached directory contents, or something.
+else
+$1_$2_$3_MKSTUBOBJS = true
+$1_$2_v_C_OBJS += $$(shell find $1/$2/build -name "*_stub.c" -print | sed 's/c$$$$/o/')
+endif
 
 ifeq "$3" "dyn"
 # Link a dynamic library

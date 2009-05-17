@@ -137,7 +137,8 @@ $(GHC_STAGE3) : $(TOUCHY) $(INPLACE)/stamp-mingw $(INPLACE_LIB)/perl.exe
 endif
 
 ifeq "$(BootingFromHc)" "YES"
-ghc_stage2_OTHER_OBJS += $(compiler_stage2_v_LIB) $(ALL_LIBS) $(ALL_LIBS) $(ALL_LIBS) $(ALL_RTS_LIBS) -lgmp $(libffi_STATIC_LIB) -lm -lutil -lrt
+$(GHC_STAGE2) : $(ALL_STAGE1_LIBS)
+ghc_stage2_OTHER_OBJS += $(compiler_stage2_v_LIB) $(ALL_STAGE1_LIBS) $(ALL_STAGE1_LIBS) $(ALL_STAGE1_LIBS) $(ALL_RTS_LIBS) $(libffi_STATIC_LIB)
 endif
 
 endif

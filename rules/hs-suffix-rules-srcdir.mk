@@ -84,10 +84,12 @@ $1/$2/build/%.$$($3_way_)o-boot : $1/$4/%.hs-boot $$($1_$2_HC_DEP)
 $1/$2/build/%.$$($3_way_)o-boot : $1/$4/%.lhs-boot $$($1_$2_HC_DEP)
 	$$($1_$2_HC) $$($1_$2_$3_ALL_HC_OPTS) -c $$< -o $$@
 
+ifneq "$$(BootingFromHc)" "YES"
 # stubs are automatically generated and compiled by GHC
 
 $1/$2/build/%_stub.$$($3_osuf): $1/$2/build/%.$$($3_osuf)
 	@:
+endif
 
 endef
 

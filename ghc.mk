@@ -929,7 +929,7 @@ maintainer-clean : distclean
 .PHONY: all_libraries
 
 .PHONY: bootstrapping-files
-bootstrapping-files: $(GMP_LIB)
+bootstrapping-files: $(OTHER_LIBS)
 bootstrapping-files: includes/ghcautoconf.h
 bootstrapping-files: includes/DerivedConstants.h
 bootstrapping-files: includes/GHCConstants.h
