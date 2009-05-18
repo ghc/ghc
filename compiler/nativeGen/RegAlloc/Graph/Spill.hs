@@ -37,7 +37,7 @@ regSpill
 	:: Instruction instr
 	=> [LiveCmmTop instr]		-- ^ the code
 	-> UniqSet Int			-- ^ available stack slots
-	-> UniqSet Reg			-- ^ the regs to spill
+	-> UniqSet VirtualReg		-- ^ the regs to spill
 	-> UniqSM
 		([LiveCmmTop instr]	-- code will spill instructions
 		, UniqSet Int		-- left over slots
@@ -190,7 +190,9 @@ patchInstr
 
 patchInstr reg instr
  = do	nUnique		<- newUnique
- 	let nReg	= renameVirtualReg nUnique reg
+ 	let nReg	= case reg of 
+				RegVirtual vr 	-> RegVirtual (renameVirtualReg nUnique vr)
+				RegReal{}	-> panic "RegAlloc.Graph.Spill.patchIntr: not patching real reg"
 	let instr'	= patchReg1 reg nReg instr
 	return		(instr', nReg)
 

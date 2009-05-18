@@ -10,10 +10,13 @@
 --	TODO: We should also make arch specific versions of RegAlloc.Graph.TrivColorable
 
 module TargetReg (
-	targetRegClass,
-	targetMkVReg,
+	targetVirtualRegSqueeze,
+	targetRealRegSqueeze,
+	targetClassOfRealReg,
+	targetMkVirtualReg,
 	targetWordSize,
-	targetRegDotColor
+	targetRegDotColor,
+	targetClassOfReg
 )
 
 where
@@ -27,6 +30,7 @@ import Size
 import CmmExpr	(wordWidth)
 import Outputable
 import Unique
+import FastTypes
 
 
 #if i386_TARGET_ARCH || x86_64_TARGET_ARCH
@@ -46,8 +50,11 @@ import qualified SPARC.Regs	as SPARC
 
 -- x86 -------------------------------------------------------------------------
 #if i386_TARGET_ARCH || x86_64_TARGET_ARCH
-targetRegClass :: Reg -> RegClass
-targetRegClass	= X86.regClass
+targetRegClasses :: Reg -> [RegClass]
+targetRegClasses = X86.regClasses
+
+targetRegSupportsClass :: Reg -> RegClass -> Bool
+targetRegSupportsClass = X86.regSupportsClass
 
 targetWordSize :: Size
 targetWordSize = intSize wordWidth
@@ -61,8 +68,11 @@ targetRegDotColor = X86.regDotColor
 
 -- ppc -------------------------------------------------------------------------
 #elif powerpc_TARGET_ARCH
-targetRegClass :: Reg -> RegClass
-targetRegClass	= PPC.regClass
+targetRegClasses :: Reg -> [RegClass]
+targetRegClasses = PPC.regClasses
+
+targetRegSupportsClass :: Reg -> RegClass -> Bool
+targetRegSupportsClass = PPC.regSupportsClass
 
 targetWordSize :: Size
 targetWordSize = intSize wordWidth
@@ -76,18 +86,25 @@ targetRegDotColor = PPC.regDotColor
 
 -- sparc -----------------------------------------------------------------------
 #elif sparc_TARGET_ARCH
-targetRegClass :: Reg -> RegClass
-targetRegClass	= SPARC.regClass
+
+targetVirtualRegSqueeze :: RegClass -> VirtualReg -> FastInt
+targetVirtualRegSqueeze = SPARC.virtualRegSqueeze
+
+targetRealRegSqueeze :: RegClass -> RealReg -> FastInt
+targetRealRegSqueeze = SPARC.realRegSqueeze
+
+targetClassOfRealReg :: RealReg -> RegClass
+targetClassOfRealReg = SPARC.classOfRealReg
 
 -- | Size of a machine word. 
 --	This is big enough to hold a pointer.
 targetWordSize :: Size
 targetWordSize = intSize wordWidth
 
-targetMkVReg :: Unique -> Size -> Reg
-targetMkVReg	= SPARC.mkVReg
+targetMkVirtualReg :: Unique -> Size -> VirtualReg
+targetMkVirtualReg = SPARC.mkVirtualReg
 
-targetRegDotColor :: Reg -> SDoc
+targetRegDotColor :: RealReg -> SDoc
 targetRegDotColor = SPARC.regDotColor
 
 --------------------------------------------------------------------------------
@@ -95,5 +112,11 @@ targetRegDotColor = SPARC.regDotColor
 #error "RegAlloc.Graph.TargetReg: not defined"
 #endif
 
+
+targetClassOfReg :: Reg -> RegClass
+targetClassOfReg reg
+ = case reg of
+ 	RegVirtual vr	-> classOfVirtualReg vr
+	RegReal rr	-> targetClassOfRealReg rr
 
 

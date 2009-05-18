@@ -130,12 +130,14 @@ freeReg	i7	= fastBool False
 freeReg f0	= fastBool False
 freeReg f1	= fastBool False
 	
+{-
 freeReg regNo
 	-- don't release high half of double regs
 	| regNo >= f0
 	, regNo <  NCG_FirstFloatReg
 	, regNo `mod` 2 /= 0
 	= fastBool False
+-}
 --------------------------------------
 
 
@@ -181,8 +183,14 @@ freeReg REG_F4	= fastBool False
 #ifdef REG_D1
 freeReg REG_D1	= fastBool False
 #endif
+#ifdef REG_D1_2
+freeReg REG_D1_2 = fastBool False
+#endif
 #ifdef REG_D2
 freeReg REG_D2	= fastBool False
+#endif
+#ifdef REG_D2_2
+freeReg REG_D2_2 = fastBool False
 #endif
 #ifdef REG_Sp 
 freeReg REG_Sp	= fastBool False
@@ -207,85 +215,85 @@ freeReg _	= fastBool True
 -- in a real machine register, otherwise returns @'Just' reg@, where
 -- reg is the machine register it is stored in.
 
-globalRegMaybe :: GlobalReg -> Maybe Reg
+
+globalRegMaybe :: GlobalReg -> Maybe RealReg
 
 #ifdef REG_Base
-globalRegMaybe BaseReg			= Just (RealReg REG_Base)
+globalRegMaybe BaseReg			= Just (RealRegSingle REG_Base)
 #endif
 #ifdef REG_R1
-globalRegMaybe (VanillaReg 1 _)		= Just (RealReg REG_R1)
+globalRegMaybe (VanillaReg 1 _)		= Just (RealRegSingle REG_R1)
 #endif 
 #ifdef REG_R2 
-globalRegMaybe (VanillaReg 2 _)		= Just (RealReg REG_R2)
+globalRegMaybe (VanillaReg 2 _)		= Just (RealRegSingle REG_R2)
 #endif 
 #ifdef REG_R3 
-globalRegMaybe (VanillaReg 3 _) 	= Just (RealReg REG_R3)
+globalRegMaybe (VanillaReg 3 _) 	= Just (RealRegSingle REG_R3)
 #endif 
 #ifdef REG_R4 
-globalRegMaybe (VanillaReg 4 _)		= Just (RealReg REG_R4)
+globalRegMaybe (VanillaReg 4 _)		= Just (RealRegSingle REG_R4)
 #endif 
 #ifdef REG_R5 
-globalRegMaybe (VanillaReg 5 _)		= Just (RealReg REG_R5)
+globalRegMaybe (VanillaReg 5 _)		= Just (RealRegSingle REG_R5)
 #endif 
 #ifdef REG_R6 
-globalRegMaybe (VanillaReg 6 _)		= Just (RealReg REG_R6)
+globalRegMaybe (VanillaReg 6 _)		= Just (RealRegSingle REG_R6)
 #endif 
 #ifdef REG_R7 
-globalRegMaybe (VanillaReg 7 _)		= Just (RealReg REG_R7)
+globalRegMaybe (VanillaReg 7 _)		= Just (RealRegSingle REG_R7)
 #endif 
 #ifdef REG_R8 
-globalRegMaybe (VanillaReg 8 _)		= Just (RealReg REG_R8)
+globalRegMaybe (VanillaReg 8 _)		= Just (RealRegSingle REG_R8)
 #endif
 #ifdef REG_R9 
-globalRegMaybe (VanillaReg 9 _)		= Just (RealReg REG_R9)
+globalRegMaybe (VanillaReg 9 _)		= Just (RealRegSingle REG_R9)
 #endif
 #ifdef REG_R10 
-globalRegMaybe (VanillaReg 10 _)	= Just (RealReg REG_R10)
+globalRegMaybe (VanillaReg 10 _)	= Just (RealRegSingle REG_R10)
 #endif
 #ifdef REG_F1
-globalRegMaybe (FloatReg 1)		= Just (RealReg REG_F1)
+globalRegMaybe (FloatReg 1)		= Just (RealRegSingle REG_F1)
 #endif				 	
 #ifdef REG_F2			 	
-globalRegMaybe (FloatReg 2)		= Just (RealReg REG_F2)
+globalRegMaybe (FloatReg 2)		= Just (RealRegSingle REG_F2)
 #endif				 	
 #ifdef REG_F3			 	
-globalRegMaybe (FloatReg 3)		= Just (RealReg REG_F3)
+globalRegMaybe (FloatReg 3)		= Just (RealRegSingle REG_F3)
 #endif				 	
 #ifdef REG_F4			 	
-globalRegMaybe (FloatReg 4)		= Just (RealReg REG_F4)
+globalRegMaybe (FloatReg 4)		= Just (RealRegSingle REG_F4)
 #endif				 	
 #ifdef REG_D1			 	
-globalRegMaybe (DoubleReg 1)		= Just (RealReg REG_D1)
+globalRegMaybe (DoubleReg 1)		= Just (RealRegPair REG_D1 (REG_D1 + 1))
 #endif				 	
 #ifdef REG_D2			 	
-globalRegMaybe (DoubleReg 2)		= Just (RealReg REG_D2)
+globalRegMaybe (DoubleReg 2)		= Just (RealRegPair REG_D2 (REG_D2 + 1))
 #endif
 #ifdef REG_Sp	    
-globalRegMaybe Sp		   	= Just (RealReg REG_Sp)
+globalRegMaybe Sp		   	= Just (RealRegSingle REG_Sp)
 #endif
 #ifdef REG_Lng1			 	
-globalRegMaybe (LongReg 1)		= Just (RealReg REG_Lng1)
+globalRegMaybe (LongReg 1)		= Just (RealRegSingle REG_Lng1)
 #endif				 	
 #ifdef REG_Lng2			 	
-globalRegMaybe (LongReg 2)		= Just (RealReg REG_Lng2)
+globalRegMaybe (LongReg 2)		= Just (RealRegSingle REG_Lng2)
 #endif
 #ifdef REG_SpLim	    			
-globalRegMaybe SpLim		   	= Just (RealReg REG_SpLim)
+globalRegMaybe SpLim		   	= Just (RealRegSingle REG_SpLim)
 #endif	    				
 #ifdef REG_Hp	   			
-globalRegMaybe Hp		   	= Just (RealReg REG_Hp)
+globalRegMaybe Hp		   	= Just (RealRegSingle REG_Hp)
 #endif	    				
 #ifdef REG_HpLim      			
-globalRegMaybe HpLim		   	= Just (RealReg REG_HpLim)
+globalRegMaybe HpLim		   	= Just (RealRegSingle REG_HpLim)
 #endif	    				
 #ifdef REG_CurrentTSO      			
-globalRegMaybe CurrentTSO	   	= Just (RealReg REG_CurrentTSO)
+globalRegMaybe CurrentTSO	   	= Just (RealRegSingle REG_CurrentTSO)
 #endif	    				
 #ifdef REG_CurrentNursery      			
-globalRegMaybe CurrentNursery	   	= Just (RealReg REG_CurrentNursery)
+globalRegMaybe CurrentNursery	   	= Just (RealRegSingle REG_CurrentNursery)
 #endif	    				
 globalRegMaybe _		   	= Nothing
-
 
 #else
 freeReg :: RegNo -> FastBool

@@ -275,20 +275,20 @@ never generate them.
 fake0, fake1, fake2, fake3, fake4, fake5, 
        eax, ebx, ecx, edx, esp, ebp, esi, edi :: Reg
 
-eax   = RealReg 0
-ebx   = RealReg 1
-ecx   = RealReg 2
-edx   = RealReg 3
-esi   = RealReg 4
-edi   = RealReg 5
-ebp   = RealReg 6
-esp   = RealReg 7
-fake0 = RealReg 8
-fake1 = RealReg 9
-fake2 = RealReg 10
-fake3 = RealReg 11
-fake4 = RealReg 12
-fake5 = RealReg 13
+eax   = regSingle 0
+ebx   = regSingle 1
+ecx   = regSingle 2
+edx   = regSingle 3
+esi   = regSingle 4
+edi   = regSingle 5
+ebp   = regSingle 6
+esp   = regSingle 7
+fake0 = regSingle 8
+fake1 = regSingle 9
+fake2 = regSingle 10
+fake3 = regSingle 11
+fake4 = regSingle 12
+fake5 = regSingle 13
 
 
 
@@ -305,41 +305,41 @@ rax, rbx, rcx, rdx, rsp, rbp, rsi, rdi,
   xmm0, xmm1, xmm2, xmm3, xmm4, xmm5, xmm6, xmm7,
   xmm8, xmm9, xmm10, xmm11, xmm12, xmm13, xmm14, xmm15 :: Reg
 
-rax   = RealReg 0
-rbx   = RealReg 1
-rcx   = RealReg 2
-rdx   = RealReg 3
-rsi   = RealReg 4
-rdi   = RealReg 5
-rbp   = RealReg 6
-rsp   = RealReg 7
-r8    = RealReg 8
-r9    = RealReg 9
-r10   = RealReg 10
-r11   = RealReg 11
-r12   = RealReg 12
-r13   = RealReg 13
-r14   = RealReg 14
-r15   = RealReg 15
-xmm0  = RealReg 16
-xmm1  = RealReg 17
-xmm2  = RealReg 18
-xmm3  = RealReg 19
-xmm4  = RealReg 20
-xmm5  = RealReg 21
-xmm6  = RealReg 22
-xmm7  = RealReg 23
-xmm8  = RealReg 24
-xmm9  = RealReg 25
-xmm10 = RealReg 26
-xmm11 = RealReg 27
-xmm12 = RealReg 28
-xmm13 = RealReg 29
-xmm14 = RealReg 30
-xmm15 = RealReg 31
+rax   = regSingle 0
+rbx   = regSingle 1
+rcx   = regSingle 2
+rdx   = regSingle 3
+rsi   = regSingle 4
+rdi   = regSingle 5
+rbp   = regSingle 6
+rsp   = regSingle 7
+r8    = regSingle 8
+r9    = regSingle 9
+r10   = regSingle 10
+r11   = regSingle 11
+r12   = regSingle 12
+r13   = regSingle 13
+r14   = regSingle 14
+r15   = regSingle 15
+xmm0  = regSingle 16
+xmm1  = regSingle 17
+xmm2  = regSingle 18
+xmm3  = regSingle 19
+xmm4  = regSingle 20
+xmm5  = regSingle 21
+xmm6  = regSingle 22
+xmm7  = regSingle 23
+xmm8  = regSingle 24
+xmm9  = regSingle 25
+xmm10 = regSingle 26
+xmm11 = regSingle 27
+xmm12 = regSingle 28
+xmm13 = regSingle 29
+xmm14 = regSingle 30
+xmm15 = regSingle 31
 
 allFPArgRegs :: [Reg]
-allFPArgRegs	= map RealReg [16 .. 23]
+allFPArgRegs	= map regSingle [16 .. 23]
 
 ripRel :: Displacement -> AddrMode
 ripRel imm	= AddrBaseIndex EABaseRip EAIndexNone imm
@@ -358,7 +358,7 @@ esp = rsp
 -}
 
 xmm :: RegNo -> Reg
-xmm n = RealReg (16+n)
+xmm n = regSingle (16+n)
 
 
 
@@ -501,79 +501,79 @@ freeReg _               = fastBool True
 -- reg is the machine register it is stored in.
 
 #ifdef REG_Base
-globalRegMaybe BaseReg			= Just (RealReg REG_Base)
+globalRegMaybe BaseReg			= Just (regSingle REG_Base)
 #endif
 #ifdef REG_R1
-globalRegMaybe (VanillaReg 1 _)		= Just (RealReg REG_R1)
+globalRegMaybe (VanillaReg 1 _)		= Just (regSingle REG_R1)
 #endif 
 #ifdef REG_R2 
-globalRegMaybe (VanillaReg 2 _)		= Just (RealReg REG_R2)
+globalRegMaybe (VanillaReg 2 _)		= Just (regSingle REG_R2)
 #endif 
 #ifdef REG_R3 
-globalRegMaybe (VanillaReg 3 _) 	= Just (RealReg REG_R3)
+globalRegMaybe (VanillaReg 3 _) 	= Just (regSingle REG_R3)
 #endif 
 #ifdef REG_R4 
-globalRegMaybe (VanillaReg 4 _)		= Just (RealReg REG_R4)
+globalRegMaybe (VanillaReg 4 _)		= Just (regSingle REG_R4)
 #endif 
 #ifdef REG_R5 
-globalRegMaybe (VanillaReg 5 _)		= Just (RealReg REG_R5)
+globalRegMaybe (VanillaReg 5 _)		= Just (regSingle REG_R5)
 #endif 
 #ifdef REG_R6 
-globalRegMaybe (VanillaReg 6 _)		= Just (RealReg REG_R6)
+globalRegMaybe (VanillaReg 6 _)		= Just (regSingle REG_R6)
 #endif 
 #ifdef REG_R7 
-globalRegMaybe (VanillaReg 7 _)		= Just (RealReg REG_R7)
+globalRegMaybe (VanillaReg 7 _)		= Just (regSingle REG_R7)
 #endif 
 #ifdef REG_R8 
-globalRegMaybe (VanillaReg 8 _)		= Just (RealReg REG_R8)
+globalRegMaybe (VanillaReg 8 _)		= Just (regSingle REG_R8)
 #endif
 #ifdef REG_R9 
-globalRegMaybe (VanillaReg 9 _)		= Just (RealReg REG_R9)
+globalRegMaybe (VanillaReg 9 _)		= Just (regSingle REG_R9)
 #endif
 #ifdef REG_R10 
-globalRegMaybe (VanillaReg 10 _)	= Just (RealReg REG_R10)
+globalRegMaybe (VanillaReg 10 _)	= Just (regSingle REG_R10)
 #endif
 #ifdef REG_F1
-globalRegMaybe (FloatReg 1)		= Just (RealReg REG_F1)
+globalRegMaybe (FloatReg 1)		= Just (regSingle REG_F1)
 #endif				 	
 #ifdef REG_F2			 	
-globalRegMaybe (FloatReg 2)		= Just (RealReg REG_F2)
+globalRegMaybe (FloatReg 2)		= Just (regSingle REG_F2)
 #endif				 	
 #ifdef REG_F3			 	
-globalRegMaybe (FloatReg 3)		= Just (RealReg REG_F3)
+globalRegMaybe (FloatReg 3)		= Just (regSingle REG_F3)
 #endif				 	
 #ifdef REG_F4			 	
-globalRegMaybe (FloatReg 4)		= Just (RealReg REG_F4)
+globalRegMaybe (FloatReg 4)		= Just (regSingle REG_F4)
 #endif				 	
 #ifdef REG_D1			 	
-globalRegMaybe (DoubleReg 1)		= Just (RealReg REG_D1)
+globalRegMaybe (DoubleReg 1)		= Just (regSingle REG_D1)
 #endif				 	
 #ifdef REG_D2			 	
-globalRegMaybe (DoubleReg 2)		= Just (RealReg REG_D2)
+globalRegMaybe (DoubleReg 2)		= Just (regSingle REG_D2)
 #endif
 #ifdef REG_Sp	    
-globalRegMaybe Sp		   	= Just (RealReg REG_Sp)
+globalRegMaybe Sp		   	= Just (regSingle REG_Sp)
 #endif
 #ifdef REG_Lng1			 	
-globalRegMaybe (LongReg 1)		= Just (RealReg REG_Lng1)
+globalRegMaybe (LongReg 1)		= Just (regSingle REG_Lng1)
 #endif				 	
 #ifdef REG_Lng2			 	
-globalRegMaybe (LongReg 2)		= Just (RealReg REG_Lng2)
+globalRegMaybe (LongReg 2)		= Just (regSingle REG_Lng2)
 #endif
 #ifdef REG_SpLim	    			
-globalRegMaybe SpLim		   	= Just (RealReg REG_SpLim)
+globalRegMaybe SpLim		   	= Just (regSingle REG_SpLim)
 #endif	    				
 #ifdef REG_Hp	   			
-globalRegMaybe Hp		   	= Just (RealReg REG_Hp)
+globalRegMaybe Hp		   	= Just (regSingle REG_Hp)
 #endif	    				
 #ifdef REG_HpLim      			
-globalRegMaybe HpLim		   	= Just (RealReg REG_HpLim)
+globalRegMaybe HpLim		   	= Just (regSingle REG_HpLim)
 #endif	    				
 #ifdef REG_CurrentTSO      			
-globalRegMaybe CurrentTSO	   	= Just (RealReg REG_CurrentTSO)
+globalRegMaybe CurrentTSO	   	= Just (regSingle REG_CurrentTSO)
 #endif	    				
 #ifdef REG_CurrentNursery      			
-globalRegMaybe CurrentNursery	   	= Just (RealReg REG_CurrentNursery)
+globalRegMaybe CurrentNursery	   	= Just (regSingle REG_CurrentNursery)
 #endif	    				
 globalRegMaybe _		   	= Nothing
 
@@ -583,7 +583,7 @@ globalRegMaybe _		   	= Nothing
 allArgRegs = panic "X86.Regs.allArgRegs: should not be used!"
 
 #elif x86_64_TARGET_ARCH
-allArgRegs = map RealReg [rdi,rsi,rdx,rcx,r8,r9]
+allArgRegs = map regSingle [rdi,rsi,rdx,rcx,r8,r9]
 
 #else
 allArgRegs  = panic "X86.Regs.allArgRegs: not defined for this architecture"
@@ -595,13 +595,13 @@ allArgRegs  = panic "X86.Regs.allArgRegs: not defined for this architecture"
 #if   i386_TARGET_ARCH
 -- caller-saves registers
 callClobberedRegs
-  = map RealReg [eax,ecx,edx,fake0,fake1,fake2,fake3,fake4,fake5]
+  = map regSingle [eax,ecx,edx,fake0,fake1,fake2,fake3,fake4,fake5]
 
 #elif x86_64_TARGET_ARCH
 -- all xmm regs are caller-saves
 -- caller-saves registers
 callClobberedRegs    
-  = map RealReg ([rax,rcx,rdx,rsi,rdi,r8,r9,r10,r11] ++ [16..31])
+  = map regSingle ([rax,rcx,rdx,rsi,rdi,r8,r9,r10,r11] ++ [16..31])
 
 #else
 callClobberedRegs

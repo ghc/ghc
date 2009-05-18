@@ -159,14 +159,12 @@ arg_to_int_vregs arg
 			v1 <- getNewRegNat II32
 			v2 <- getNewRegNat II32
 
-			let Just f0_high = fPair f0
-			
 			let code2 = 
 				code				`snocOL`
 		                FMOV FF64 src f0		`snocOL`
 		                ST   FF32  f0 (spRel 16)	`snocOL`
 		                LD   II32  (spRel 16) v1	`snocOL`
-		                ST   FF32  f0_high (spRel 16)	`snocOL`
+		                ST   FF32  f1 (spRel 16)	`snocOL`
 		                LD   II32  (spRel 16) v2
 
 			return	(code2, [v1,v2])
@@ -228,21 +226,21 @@ assign_code [CmmHinted dest _hint]
 	result
 		| isFloatType rep 
 		, W32	<- width
-		= unitOL $ FMOV FF32 (RealReg $ fReg 0) r_dest
+		= unitOL $ FMOV FF32 (regSingle $ fReg 0) r_dest
 
 		| isFloatType rep
 		, W64	<- width
-		= unitOL $ FMOV FF64 (RealReg $ fReg 0) r_dest
+		= unitOL $ FMOV FF64 (regSingle $ fReg 0) r_dest
 
 		| not $ isFloatType rep
 		, W32	<- width
-		= unitOL $ mkRegRegMoveInstr (RealReg $ oReg 0) r_dest
+		= unitOL $ mkRegRegMoveInstr (regSingle $ oReg 0) r_dest
 
 		| not $ isFloatType rep
 		, W64		<- width
 		, r_dest_hi	<- getHiVRegFromLo r_dest
-		= toOL 	[ mkRegRegMoveInstr (RealReg $ oReg 0) r_dest_hi
-			, mkRegRegMoveInstr (RealReg $ oReg 1) r_dest]
+		= toOL 	[ mkRegRegMoveInstr (regSingle $ oReg 0) r_dest_hi
+			, mkRegRegMoveInstr (regSingle $ oReg 1) r_dest]
 
 		| otherwise
 		= panic "SPARC.CodeGen.GenCCall: no match"

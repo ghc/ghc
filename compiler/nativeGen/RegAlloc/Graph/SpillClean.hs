@@ -436,8 +436,11 @@ isStoreReg ss
 --
 instance Uniquable Store where
     getUnique (SReg  r)
-	| RealReg i	<- r
+	| RegReal (RealRegSingle i)	<- r
 	= mkUnique 'R' i
+
+	| RegReal (RealRegPair r1 r2)	<- r
+	= mkUnique 'P' (r1 * 65535 + r2)
 
 	| otherwise
 	= error "RegSpillClean.getUnique: found virtual reg during spill clean, only real regs expected."

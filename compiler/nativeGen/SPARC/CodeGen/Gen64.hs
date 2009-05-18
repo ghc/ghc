@@ -68,7 +68,7 @@ assignReg_I64Code (CmmLocal (LocalReg u_dst pk)) valueTree
  = do
      ChildCode64 vcode r_src_lo <- iselExpr64 valueTree    
      let 
-         r_dst_lo = mkVReg u_dst (cmmTypeSize pk)
+         r_dst_lo = RegVirtual $ mkVirtualReg u_dst (cmmTypeSize pk)
          r_dst_hi = getHiVRegFromLo r_dst_lo
          r_src_hi = getHiVRegFromLo r_src_lo
          mov_lo = mkMOV r_src_lo r_dst_lo
@@ -164,7 +164,7 @@ iselExpr64 (CmmReg (CmmLocal (LocalReg uq ty)))
  = do
      r_dst_lo <-  getNewRegNat II32
      let r_dst_hi = getHiVRegFromLo r_dst_lo
-         r_src_lo = mkVReg uq II32
+         r_src_lo = RegVirtual $ mkVirtualReg uq II32
          r_src_hi = getHiVRegFromLo r_src_lo
          mov_lo = mkMOV r_src_lo r_dst_lo
          mov_hi = mkMOV r_src_hi r_dst_hi

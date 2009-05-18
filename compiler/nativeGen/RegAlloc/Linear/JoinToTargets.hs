@@ -110,7 +110,8 @@ joinToTargets' block_live new_blocks block_id instr (dest:dests)
 
 -- this is the first time we jumped to this block.
 joinToTargets_first block_live new_blocks block_id instr dest dests
-	block_assig src_assig to_free
+	block_assig src_assig 
+	(to_free :: [RealReg])
 
  = do	-- free up the regs that are not live on entry to this block.
   	freeregs 	<- getFreeRegsR
@@ -292,10 +293,10 @@ handleComponent delta instr
  = do
 	-- spill the source into its slot
 	(instrSpill, slot) 
-			<- spillR (RealReg sreg) vreg
+			<- spillR (RegReal sreg) vreg
 
 	-- reload into destination reg
-	instrLoad	<- loadR (RealReg dreg) slot
+	instrLoad	<- loadR  (RegReal dreg) slot
 	
 	remainingFixUps <- mapM (handleComponent delta instr) 
 				(stronglyConnCompFromEdgedVerticesR rest)
@@ -320,15 +321,15 @@ makeMove
 
 makeMove _     vreg (InReg src) (InReg dst)
  = do	recordSpill (SpillJoinRR vreg)
- 	return	$ mkRegRegMoveInstr (RealReg src) (RealReg dst)
+ 	return	$ mkRegRegMoveInstr (RegReal src) (RegReal dst)
 
 makeMove delta vreg (InMem src) (InReg dst)
  = do	recordSpill (SpillJoinRM vreg)
- 	return	$ mkLoadInstr (RealReg dst) delta src
+ 	return	$ mkLoadInstr  (RegReal dst) delta src
 
 makeMove delta vreg (InReg src) (InMem dst)
  = do	recordSpill (SpillJoinRM vreg)
-	return	$ mkSpillInstr (RealReg src) delta dst
+	return	$ mkSpillInstr (RegReal src) delta dst
 
 -- we don't handle memory to memory moves.
 --	they shouldn't happen because we don't share stack slots between vregs.

@@ -7,11 +7,22 @@
 module Reg (
 	RegNo,
 	Reg(..),
-	isRealReg,
-	unRealReg,
-	isVirtualReg,
+	regPair,
+	regSingle,
+	isRealReg,	takeRealReg,
+	isVirtualReg,	takeVirtualReg,
+	
+	VirtualReg(..),
 	renameVirtualReg,
-	getHiVRegFromLo
+	classOfVirtualReg,
+	getHiVirtualRegFromLo,
+	getHiVRegFromLo,
+
+	RealReg(..),
+	regNosOfRealReg,
+	realRegsAlias,
+	
+	liftPatchFnToRegReg
 )
 
 where
@@ -19,14 +30,12 @@ where
 import Outputable
 import Unique
 import Panic
+import RegClass
+import Data.List
 
--- | An identifier for a real machine register.
+-- | An identifier for a primitive real machine register.
 type RegNo 
 	= Int
-
--- RealRegs are machine regs which are available for allocation, in
--- 	the usual way.  We know what class they are, because that's part of
--- 	the processor's architecture.
 
 -- VirtualRegs are virtual registers.  The register allocator will
 -- 	eventually have to map them into RealRegs, or into spill slots.
@@ -35,79 +44,173 @@ type RegNo
 -- 	value in the abstract assembly code (i.e. dynamic registers are
 -- 	usually single assignment).  
 --
---	With the new register allocator, the
--- 	single assignment restriction isn't necessary to get correct code,
+--	The  single assignment restriction isn't necessary to get correct code,
 -- 	although a better register allocation will result if single
 -- 	assignment is used -- because the allocator maps a VirtualReg into
 -- 	a single RealReg, even if the VirtualReg has multiple live ranges.
-
+--
 -- 	Virtual regs can be of either class, so that info is attached.
-data Reg
-	= RealReg      {-# UNPACK #-} !RegNo
-	| VirtualRegI  {-# UNPACK #-} !Unique
+--
+data VirtualReg
+	= VirtualRegI  {-# UNPACK #-} !Unique
 	| VirtualRegHi {-# UNPACK #-} !Unique  -- High part of 2-word register
 	| VirtualRegF  {-# UNPACK #-} !Unique
 	| VirtualRegD  {-# UNPACK #-} !Unique
-	deriving (Eq, Ord)
+	deriving (Eq, Show, Ord)
 
+instance Uniquable VirtualReg where
+	getUnique reg
+	 = case reg of
+	 	VirtualRegI u	-> u
+		VirtualRegHi u	-> u
+		VirtualRegF u	-> u
+		VirtualRegD u	-> u
 
--- We like to have Uniques for Reg so that we can make UniqFM and UniqSets 
--- in the register allocator.
-instance Uniquable Reg where
-	getUnique (RealReg i)      = mkUnique 'C' i
-	getUnique (VirtualRegI u)  = u
-	getUnique (VirtualRegHi u) = u
-	getUnique (VirtualRegF u)  = u
-	getUnique (VirtualRegD u)  = u
-
-
--- | Print a reg in a generic manner
---	If you want the architecture specific names, then use the pprReg 
---	function from the appropriate Ppr module.
-instance Outputable Reg where
+instance Outputable VirtualReg where
 	ppr reg
 	 = case reg of
-		RealReg i       -> text "%r" 	<> int i
 		VirtualRegI  u  -> text "%vI_" 	<> pprUnique u
 		VirtualRegHi u  -> text "%vHi_" <> pprUnique u
 		VirtualRegF  u  -> text "%vF_" 	<> pprUnique u
 		VirtualRegD  u  -> text "%vD_" 	<> pprUnique u
 
 
-
-isRealReg :: Reg -> Bool
-isRealReg = not . isVirtualReg
-
--- | Take the RegNo from a real reg
-unRealReg :: Reg -> RegNo
-unRealReg (RealReg i)	= i
-unRealReg _		= panic "unRealReg on VirtualReg"
-
-isVirtualReg :: Reg -> Bool
-isVirtualReg (RealReg _)      = False
-isVirtualReg (VirtualRegI _)  = True
-isVirtualReg (VirtualRegHi _) = True
-isVirtualReg (VirtualRegF _)  = True
-isVirtualReg (VirtualRegD _)  = True
-
-
-renameVirtualReg :: Unique -> Reg -> Reg
+renameVirtualReg :: Unique -> VirtualReg -> VirtualReg
 renameVirtualReg u r
  = case r of
- 	RealReg _	-> error "renameVirtualReg: can't change unique on a real reg"
 	VirtualRegI _	-> VirtualRegI  u
 	VirtualRegHi _	-> VirtualRegHi u
 	VirtualRegF _	-> VirtualRegF  u
 	VirtualRegD _	-> VirtualRegD  u
 
+
+classOfVirtualReg :: VirtualReg -> RegClass
+classOfVirtualReg vr
+ = case vr of
+ 	VirtualRegI{}	-> RcInteger
+	VirtualRegHi{}	-> RcInteger
+	VirtualRegF{}	-> RcFloat
+	VirtualRegD{}	-> RcDouble
+
+
 -- Determine the upper-half vreg for a 64-bit quantity on a 32-bit platform
 -- when supplied with the vreg for the lower-half of the quantity.
 -- (NB. Not reversible).
+getHiVirtualRegFromLo :: VirtualReg -> VirtualReg
+getHiVirtualRegFromLo reg
+ = case reg of
+	-- makes a pseudo-unique with tag 'H'
+ 	VirtualRegI u	-> VirtualRegHi (newTagUnique u 'H') 
+	_		-> panic "Reg.getHiVirtualRegFromLo"
+
 getHiVRegFromLo :: Reg -> Reg
-getHiVRegFromLo (VirtualRegI u) 
-   = VirtualRegHi (newTagUnique u 'H') -- makes a pseudo-unique with tag 'H'
+getHiVRegFromLo reg
+ = case reg of
+ 	RegVirtual  vr	-> RegVirtual (getHiVirtualRegFromLo vr)
+	RegReal _	-> panic "Reg.getHiVRegFromLo"
+ 	
 
-getHiVRegFromLo _ 
-   = panic "RegsBase.getHiVRegFromLo"
+------------------------------------------------------------------------------------
+-- | RealRegs are machine regs which are available for allocation, in
+-- 	the usual way.  We know what class they are, because that's part of
+-- 	the processor's architecture.
+--
+-- 	RealRegPairs are pairs of real registers that are allocated together
+--	to hold a larger value, such as with Double regs on SPARC.
+--
+data RealReg
+	= RealRegSingle	{-# UNPACK #-} !RegNo
+	| RealRegPair	{-# UNPACK #-} !RegNo {-# UNPACK #-} !RegNo
+	deriving (Eq, Show, Ord)
 
+instance Uniquable RealReg where
+	getUnique reg
+	 = case reg of
+	 	RealRegSingle i		-> mkUnique 'S' i
+		RealRegPair r1 r2	-> mkUnique 'P' (r1 * 65536 + r2)
+
+instance Outputable RealReg where
+	ppr reg
+	 = case reg of
+	 	RealRegSingle i		-> text "%r" 	<> int i
+		RealRegPair r1 r2	-> text "%r(" <> int r1 <> text "|" <> int r2 <> text ")"
+
+regNosOfRealReg :: RealReg -> [RegNo]
+regNosOfRealReg rr
+ = case rr of
+ 	RealRegSingle r1	-> [r1]
+	RealRegPair   r1 r2	-> [r1, r2]
+	
+
+realRegsAlias :: RealReg -> RealReg -> Bool
+realRegsAlias rr1 rr2
+	= not $ null $ intersect (regNosOfRealReg rr1) (regNosOfRealReg rr2)
+
+--------------------------------------------------------------------------------
+-- | A register, either virtual or real
+data Reg
+	= RegVirtual {-# UNPACK #-} !VirtualReg
+	| RegReal    {-# UNPACK #-} !RealReg
+	deriving (Eq, Ord)
+
+regSingle :: RegNo -> Reg
+regSingle regNo		= RegReal $ RealRegSingle regNo
+
+regPair :: RegNo -> RegNo -> Reg
+regPair regNo1 regNo2	= RegReal $ RealRegPair regNo1 regNo2
+
+
+-- We like to have Uniques for Reg so that we can make UniqFM and UniqSets 
+-- in the register allocator.
+instance Uniquable Reg where
+	getUnique reg
+	 = case reg of
+	 	RegVirtual vr	-> getUnique vr
+		RegReal    rr	-> getUnique rr
+	
+-- | Print a reg in a generic manner
+--	If you want the architecture specific names, then use the pprReg 
+--	function from the appropriate Ppr module.
+instance Outputable Reg where
+	ppr reg
+	 = case reg of
+	 	RegVirtual vr	-> ppr vr
+		RegReal    rr	-> ppr rr
+
+
+isRealReg :: Reg -> Bool
+isRealReg reg 
+ = case reg of
+ 	RegReal _	-> True
+	RegVirtual _	-> False
+
+takeRealReg :: Reg -> Maybe RealReg
+takeRealReg reg
+ = case reg of
+ 	RegReal rr	-> Just rr
+	_		-> Nothing
+
+
+isVirtualReg :: Reg -> Bool
+isVirtualReg reg
+ = case reg of
+ 	RegReal _	-> False
+	RegVirtual _	-> True
+
+takeVirtualReg :: Reg -> Maybe VirtualReg
+takeVirtualReg reg
+ = case reg of
+ 	RegReal _	-> Nothing
+	RegVirtual vr	-> Just vr
+
+
+-- | The patch function supplied by the allocator maps VirtualReg to RealReg
+--	regs, but sometimes we want to apply it to plain old Reg.
+--
+liftPatchFnToRegReg  :: (VirtualReg -> RealReg) -> (Reg -> Reg)
+liftPatchFnToRegReg patchF reg
+ = case reg of
+ 	RegVirtual vr	-> RegReal (patchF vr)
+	RegReal _	-> reg
+	
 

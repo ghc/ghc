@@ -7,14 +7,14 @@
 module SPARC.Regs (
 	-- registers
 	showReg,
-	regClass,
-	allMachRegNos,
+	virtualRegSqueeze,
+	realRegSqueeze,
+	classOfRealReg,
+	allRealRegs,
 
 	-- machine specific info
 	gReg, iReg, lReg, oReg, fReg,
-	fp, sp, g0, g1, g2, o0, o1, f0, f6, f8, f22, f26, f27,
-	nCG_FirstFloatReg,
-	fPair,
+	fp, sp, g0, g1, g2, o0, o1, f0, f1, f6, f8, f22, f26, f27,
 
 	-- allocatable
 	allocatableRegs,
@@ -26,7 +26,7 @@ module SPARC.Regs (
 	callClobberedRegs,
 
 	-- 
-	mkVReg,
+	mkVirtualReg,
 	regDotColor
 )
 
@@ -44,8 +44,8 @@ import CgUtils          ( get_GlobalReg_addr )
 
 import Unique
 import Outputable
+import FastTypes
 import FastBool
-
 
 {-
 	The SPARC has 64 registers of interest; 32 integer registers and 32
@@ -70,30 +70,84 @@ showReg n
 	| otherwise          = panic "SPARC.Regs.showReg: unknown sparc register"
 
 
--- | Get the class of a register.
-{-# INLINE regClass      #-}
-regClass :: Reg -> RegClass
-regClass reg
+-- Get the register class of a certain real reg
+classOfRealReg :: RealReg -> RegClass
+classOfRealReg reg
  = case reg of
- 	VirtualRegI  _	-> RcInteger
-	VirtualRegHi _	-> RcInteger
-	VirtualRegF  _	-> RcFloat
-	VirtualRegD  _	-> RcDouble
-	RealReg i
-	  | i < 32			-> RcInteger 
-	  | i < nCG_FirstFloatReg	-> RcDouble
-	  | otherwise			-> RcFloat
+ 	RealRegSingle i
+		| i < 32	-> RcInteger
+		| otherwise	-> RcFloat
+		
+	RealRegPair{}		-> RcDouble
 
 
--- | The RegNos corresponding to all the registers in the machine.
---	For SPARC we use f0-f22 as doubles, so pretend that the high halves
---	of these, ie f23, f25 .. don't exist.
+-- | regSqueeze_class reg
+--	Calculuate the maximum number of register colors that could be
+--	denied to a node of this class due to having this reg 
+--	as a neighbour.
 --
-allMachRegNos :: [RegNo]
-allMachRegNos	
-	= ([0..31]
-               ++ [32,34 .. nCG_FirstFloatReg-1]
-               ++ [nCG_FirstFloatReg .. 63])	
+{-# INLINE virtualRegSqueeze #-}
+virtualRegSqueeze :: RegClass -> VirtualReg -> FastInt
+
+virtualRegSqueeze cls vr
+ = case cls of
+ 	RcInteger
+	 -> case vr of
+	 	VirtualRegI{}		-> _ILIT(1)
+		VirtualRegHi{}		-> _ILIT(1)
+		VirtualRegF{}		-> _ILIT(0)
+		VirtualRegD{}		-> _ILIT(0)
+
+	RcFloat
+	 -> case vr of
+	 	VirtualRegI{}		-> _ILIT(0)
+		VirtualRegHi{}		-> _ILIT(0)
+		VirtualRegF{}		-> _ILIT(1)
+		VirtualRegD{}		-> _ILIT(2)
+
+	RcDouble
+	 -> case vr of
+	 	VirtualRegI{}		-> _ILIT(0)
+		VirtualRegHi{}		-> _ILIT(0)
+		VirtualRegF{}		-> _ILIT(1)
+		VirtualRegD{}		-> _ILIT(1)
+
+{-# INLINE realRegSqueeze #-}
+realRegSqueeze :: RegClass -> RealReg -> FastInt
+
+realRegSqueeze cls rr
+ = case cls of
+ 	RcInteger
+	 -> case rr of
+	 	RealRegSingle regNo
+			| regNo	< 32	-> _ILIT(1)
+			| otherwise	-> _ILIT(0)
+			
+		RealRegPair{}		-> _ILIT(0)
+
+	RcFloat
+	 -> case rr of
+	 	RealRegSingle regNo
+			| regNo	< 32	-> _ILIT(0)
+			| otherwise	-> _ILIT(1)
+			
+		RealRegPair{}		-> _ILIT(2)
+
+	RcDouble
+	 -> case rr of
+	 	RealRegSingle regNo
+			| regNo	< 32	-> _ILIT(0)
+			| otherwise	-> _ILIT(1)
+			
+		RealRegPair{}		-> _ILIT(1)
+	 		 	 	
+ 	
+-- | All the allocatable registers in the machine, 
+--	including register pairs.
+allRealRegs :: [RealReg]
+allRealRegs  
+	=  [ (RealRegSingle i)		| i <- [0..63] ]
+	++ [ (RealRegPair   i (i+1))	| i <- [32, 34 .. 62 ] ]
 
 
 -- | Get the regno for this sort of reg
@@ -107,34 +161,29 @@ fReg x	= (32 + x)	-- float regs
 
 
 -- | Some specific regs used by the code generator.
-g0, g1, g2, fp, sp, o0, o1, f0, f6, f8, f22, f26, f27 :: Reg
+g0, g1, g2, fp, sp, o0, o1, f0, f1, f6, f8, f22, f26, f27 :: Reg
 
-f6  = RealReg (fReg 6)
-f8  = RealReg (fReg 8)
-f22 = RealReg (fReg 22)
-f26 = RealReg (fReg 26)
-f27 = RealReg (fReg 27)
+f6  = RegReal (RealRegSingle (fReg 6))
+f8  = RegReal (RealRegSingle (fReg 8))
+f22 = RegReal (RealRegSingle (fReg 22))
+f26 = RegReal (RealRegSingle (fReg 26))
+f27 = RegReal (RealRegSingle (fReg 27))
 
-g0  = RealReg (gReg 0)	-- g0 is always zero, and writes to it vanish.
-g1  = RealReg (gReg 1)
-g2  = RealReg (gReg 2)
+-- g0 is always zero, and writes to it vanish.
+g0  = RegReal (RealRegSingle (gReg 0))
+g1  = RegReal (RealRegSingle (gReg 1))
+g2  = RegReal (RealRegSingle (gReg 2))
 
 -- FP, SP, int and float return (from C) regs.
-fp  = RealReg (iReg 6)
-sp  = RealReg (oReg 6)
-o0  = RealReg (oReg 0)
-o1  = RealReg (oReg 1)
-f0  = RealReg (fReg 0)
-
-
--- | We use he first few float regs as double precision. 
---	This is the RegNo of the first float regs we use as single precision.
---
-nCG_FirstFloatReg :: RegNo
-nCG_FirstFloatReg = 54
-
+fp  = RegReal (RealRegSingle (iReg 6))
+sp  = RegReal (RealRegSingle (oReg 6))
+o0  = RegReal (RealRegSingle (oReg 0))
+o1  = RegReal (RealRegSingle (oReg 1))
+f0  = RegReal (RealRegSingle (fReg 0))
+f1  = RegReal (RealRegSingle (fReg 1))
 
 -- | Produce the second-half-of-a-double register given the first half.
+{-
 fPair :: Reg -> Maybe Reg
 fPair (RealReg n) 
 	| n >= 32 && n `mod` 2 == 0  = Just (RealReg (n+1))
@@ -145,16 +194,24 @@ fPair (VirtualRegD u)
 fPair reg
 	= trace ("MachInstrs.fPair: can't get high half of supposed double reg " ++ showPpr reg)
 		Nothing
+-}
 
 
-
--- allocatableRegs is allMachRegNos with the fixed-use regs removed.
--- i.e., these are the regs for which we are prepared to allow the
--- register allocator to attempt to map VRegs to.
-allocatableRegs :: [RegNo]
+-- | All the regs that the register allocator can allocate to, 
+--	with the the fixed use regs removed.
+-- 
+allocatableRegs :: [RealReg]
 allocatableRegs
-   = let isFree i = isFastTrue (freeReg i)
-     in  filter isFree allMachRegNos
+   = let isFree rr 
+   	   = case rr of
+	   	RealRegSingle r		
+			-> isFastTrue (freeReg r)
+
+		RealRegPair   r1 r2	
+			-> isFastTrue (freeReg r1) 
+			&& isFastTrue (freeReg r2)
+
+     in	filter isFree allRealRegs
 
 
 
@@ -165,10 +222,10 @@ allocatableRegs
 -- address in the register table holding it.
 -- (See also get_GlobalReg_addr in CgUtils.)
 
-get_GlobalReg_reg_or_addr :: GlobalReg -> Either Reg CmmExpr
+get_GlobalReg_reg_or_addr :: GlobalReg -> Either RealReg CmmExpr
 get_GlobalReg_reg_or_addr mid
    = case globalRegMaybe mid of
-        Just rr -> Left rr
+        Just rr -> Left  rr
         Nothing -> Right (get_GlobalReg_addr mid)
 
 
@@ -179,12 +236,12 @@ argRegs :: RegNo -> [Reg]
 argRegs r
  = case r of
  	0	-> []
-	1	-> map (RealReg . oReg) [0]
-	2	-> map (RealReg . oReg) [0,1]
-	3	-> map (RealReg . oReg) [0,1,2]
-	4	-> map (RealReg . oReg) [0,1,2,3]
-	5	-> map (RealReg . oReg) [0,1,2,3,4]
-	6	-> map (RealReg . oReg) [0,1,2,3,4,5]
+	1	-> map (RegReal . RealRegSingle . oReg) [0]
+	2	-> map (RegReal . RealRegSingle . oReg) [0,1]
+	3	-> map (RegReal . RealRegSingle . oReg) [0,1,2]
+	4	-> map (RegReal . RealRegSingle . oReg) [0,1,2,3]
+	5	-> map (RegReal . RealRegSingle . oReg) [0,1,2,3,4]
+	6	-> map (RegReal . RealRegSingle . oReg) [0,1,2,3,4,5]
 	_	-> panic "MachRegs.argRegs(sparc): don't know about >6 arguments!"
 
 
@@ -192,7 +249,7 @@ argRegs r
 --
 allArgRegs :: [Reg]
 allArgRegs 
-	= map RealReg [oReg i | i <- [0..5]]
+	= map (RegReal . RealRegSingle) [oReg i | i <- [0..5]]
 
 
 -- These are the regs that we cannot assume stay alive over a C call.  
@@ -200,7 +257,7 @@ allArgRegs
 --
 callClobberedRegs :: [Reg]
 callClobberedRegs
-	= map RealReg 
+	= map (RegReal . RealRegSingle)
 	        (  oReg 7 :
 	          [oReg i | i <- [0..5]] ++
 	          [gReg i | i <- [1..7]] ++
@@ -209,8 +266,8 @@ callClobberedRegs
 
 
 -- | Make a virtual reg with this size.
-mkVReg :: Unique -> Size -> Reg
-mkVReg u size
+mkVirtualReg :: Unique -> Size -> VirtualReg
+mkVirtualReg u size
 	| not (isFloatSize size) 
 	= VirtualRegI u
 
@@ -221,13 +278,12 @@ mkVReg u size
 		_ 	-> panic "mkVReg"
 
 
-regDotColor :: Reg -> SDoc
+regDotColor :: RealReg -> SDoc
 regDotColor reg
- = case regClass reg of
+ = case classOfRealReg reg of
  	RcInteger	-> text "blue"
 	RcFloat		-> text "red"
 	RcDouble	-> text "green"
-
 
 
 

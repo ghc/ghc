@@ -51,14 +51,14 @@ type BlockAssignment
 --
 data Loc 
 	-- | vreg is in a register
-	= InReg   {-# UNPACK #-} !RegNo
+	= InReg   {-# UNPACK #-}  !RealReg
 
 	-- | vreg is held in a stack slot
-	| InMem   {-# UNPACK #-} !StackSlot
+	| InMem   {-# UNPACK #-}  !StackSlot
 
 
 	-- | vreg is held in both a register and a stack slot
-	| InBoth  {-# UNPACK #-}  !RegNo
+	| InBoth  {-# UNPACK #-}  !RealReg
 		   {-# UNPACK #-} !StackSlot
 	deriving (Eq, Show, Ord)
 
@@ -67,7 +67,7 @@ instance Outputable Loc where
 
 
 -- | Get the reg numbers stored in this Loc.
-regsOfLoc :: Loc -> [RegNo]
+regsOfLoc :: Loc -> [RealReg]
 regsOfLoc (InReg r)    = [r]
 regsOfLoc (InBoth r _) = [r]
 regsOfLoc (InMem _)    = []

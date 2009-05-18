@@ -164,11 +164,12 @@ pprReg :: Reg -> Doc
 
 pprReg r
   = case r of
-      RealReg i      -> ppr_reg_no i
-      VirtualRegI  u  -> text "%vI_" <> asmSDoc (pprUnique u)
-      VirtualRegHi u  -> text "%vHi_" <> asmSDoc (pprUnique u)
-      VirtualRegF  u  -> text "%vF_" <> asmSDoc (pprUnique u)
-      VirtualRegD  u  -> text "%vD_" <> asmSDoc (pprUnique u)
+      RegReal    (RealRegSingle i) -> ppr_reg_no i
+      RegReal    (RealRegPair{})   -> panic "PPC.pprReg: no reg pairs on this arch"
+      RegVirtual (VirtualRegI  u)  -> text "%vI_" <> asmSDoc (pprUnique u)
+      RegVirtual (VirtualRegHi u)  -> text "%vHi_" <> asmSDoc (pprUnique u)
+      RegVirtual (VirtualRegF  u)  -> text "%vF_" <> asmSDoc (pprUnique u)
+      RegVirtual (VirtualRegD  u)  -> text "%vD_" <> asmSDoc (pprUnique u)
   where
 #if darwin_TARGET_OS
     ppr_reg_no :: Int -> Doc

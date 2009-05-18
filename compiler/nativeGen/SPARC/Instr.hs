@@ -31,6 +31,7 @@ import SPARC.Cond
 import SPARC.Regs
 import SPARC.RegPlate
 import SPARC.Base
+import TargetReg
 import Instruction
 import RegClass
 import Reg
@@ -40,6 +41,7 @@ import BlockId
 import Cmm
 import FastString
 import FastBool
+import Outputable
 
 import GHC.Exts
 
@@ -53,11 +55,11 @@ data RI
 --  	- a literal zero
 --	- register %g0, which is always zero.
 --
-riZero :: RI -> Bool
-riZero (RIImm (ImmInt 0))	    = True
-riZero (RIImm (ImmInteger 0))	    = True
-riZero (RIReg (RealReg 0))          = True
-riZero _			    = False
+riZero :: RI -> Bool	
+riZero (RIImm (ImmInt 0))			= True
+riZero (RIImm (ImmInteger 0))			= True
+riZero (RIReg (RegReal (RealRegSingle 0)))	= True
+riZero _					= False
 
 
 -- | Calculate the effective address which would be used by the
@@ -271,11 +273,9 @@ sparc_regUsageOfInstr instr
 interesting :: Reg -> Bool
 interesting reg
  = case reg of
- 	VirtualRegI  _	-> True
-	VirtualRegHi _	-> True
-	VirtualRegF  _	-> True
-	VirtualRegD  _	-> True
-	RealReg i	-> isFastTrue (freeReg i)
+	RegVirtual _			-> True
+	RegReal (RealRegSingle r1)	-> isFastTrue (freeReg r1)
+	RegReal (RealRegPair r1 _)	-> isFastTrue (freeReg r1)
 
 
 
@@ -371,7 +371,7 @@ sparc_mkSpillInstr
 sparc_mkSpillInstr reg _ slot
  = let	off     = spillSlotToOffset slot
         off_w	= 1 + (off `div` 4)
-        sz 	= case regClass reg of
+        sz 	= case targetClassOfReg reg of
 			RcInteger -> II32
 			RcFloat   -> FF32
 			RcDouble  -> FF64
@@ -381,7 +381,7 @@ sparc_mkSpillInstr reg _ slot
 
 -- | Make a spill reload instruction.
 sparc_mkLoadInstr
-	:: Reg		-- ^ register to load
+	:: Reg		-- ^ register to load into
 	-> Int		-- ^ current stack delta
 	-> Int		-- ^ spill slot to use
 	-> Instr
@@ -389,7 +389,7 @@ sparc_mkLoadInstr
 sparc_mkLoadInstr reg _ slot
   = let off     = spillSlotToOffset slot
 	off_w	= 1 + (off `div` 4)
-        sz	= case regClass reg of
+        sz	= case targetClassOfReg reg of
 			RcInteger -> II32
 			RcFloat   -> FF32
 			RcDouble  -> FF64
@@ -433,10 +433,16 @@ sparc_mkRegRegMoveInstr
 	-> Instr
 
 sparc_mkRegRegMoveInstr src dst
- = case regClass src of
-	RcInteger -> ADD  False False src (RIReg g0) dst
-	RcDouble  -> FMOV FF64 src dst
-	RcFloat   -> FMOV FF32 src dst
+	| srcClass	<- targetClassOfReg src
+	, dstClass	<- targetClassOfReg dst
+	, srcClass == dstClass
+	= case srcClass of
+		RcInteger -> ADD  False False src (RIReg g0) dst
+		RcDouble  -> FMOV FF64 src dst
+		RcFloat   -> FMOV FF32 src dst
+	
+	| otherwise
+	= panic "SPARC.Instr.mkRegRegMoveInstr: classes of src and dest not the same"
 
 
 -- | Check whether an instruction represents a reg-reg move.

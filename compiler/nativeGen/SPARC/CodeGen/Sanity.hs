@@ -20,7 +20,8 @@ import Outputable
 -- | Enforce intra-block invariants.
 --
 checkBlock
-	:: CmmBasicBlock -> NatBasicBlock Instr -> NatBasicBlock Instr
+	:: CmmBasicBlock 
+	-> NatBasicBlock Instr -> NatBasicBlock Instr
 
 checkBlock cmm block@(BasicBlock _ instrs)
 	| checkBlockInstrs instrs

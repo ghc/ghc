@@ -465,7 +465,8 @@ patchEraseLive patchF cmm
 
 	patchCmm (CmmProc info label params (ListGraph comps))
 	 | LiveInfo static id blockMap	<- info
-	 = let 	patchRegSet set	= mkUniqSet $ map patchF $ uniqSetToList set
+	 = let 	
+	 	patchRegSet set	= mkUniqSet $ map patchF $ uniqSetToList set
 		blockMap'	= mapBlockEnv patchRegSet blockMap
 
 		info'		= LiveInfo static id blockMap'
@@ -779,7 +780,5 @@ liveness1 liveregs blockmap instr
             live_branch_only = live_from_branch `minusUniqSet` liveregs
             r_dying_br  = uniqSetToList (mkUniqSet r_dying `unionUniqSets`
                                         live_branch_only)
-
-
 
 

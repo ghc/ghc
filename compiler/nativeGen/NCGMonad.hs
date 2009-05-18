@@ -132,14 +132,16 @@ getNewLabelNat
 getNewRegNat :: Size -> NatM Reg
 getNewRegNat rep 
  = do	u <- getUniqueNat
- 	return (targetMkVReg u rep)
+ 	return (RegVirtual $ targetMkVirtualReg u rep)
 
 
 getNewRegPairNat :: Size -> NatM (Reg,Reg)
 getNewRegPairNat rep 
  = do	u 	<- getUniqueNat
-	let lo 	= targetMkVReg u rep; hi = getHiVRegFromLo lo
-	return (lo,hi)
+ 	let vLo	= targetMkVirtualReg u rep
+	let lo 	= RegVirtual $ targetMkVirtualReg u rep
+	let hi 	= RegVirtual $ getHiVirtualRegFromLo vLo
+	return (lo, hi)
 
 
 getPicBaseMaybeNat :: NatM (Maybe Reg)

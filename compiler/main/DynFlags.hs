@@ -120,6 +120,7 @@ data DynFlag
    | Opt_D_dump_asm_regalloc_stages
    | Opt_D_dump_asm_conflicts
    | Opt_D_dump_asm_stats
+   | Opt_D_dump_asm_expanded
    | Opt_D_dump_cpranal
    | Opt_D_dump_deriv
    | Opt_D_dump_ds
@@ -1359,6 +1360,8 @@ dynamic_flags = [
                                  (setDumpFlag Opt_D_dump_asm_regalloc_stages)
          Supported
   , Flag "ddump-asm-stats"         (setDumpFlag Opt_D_dump_asm_stats)
+         Supported
+  , Flag "ddump-asm-expanded"      (setDumpFlag Opt_D_dump_asm_expanded)
          Supported
   , Flag "ddump-cpranal"           (setDumpFlag Opt_D_dump_cpranal)
          Supported

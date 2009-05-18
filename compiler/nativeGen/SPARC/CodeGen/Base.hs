@@ -92,12 +92,14 @@ setSizeOfRegister reg size
 getRegisterReg :: CmmReg -> Reg
 
 getRegisterReg (CmmLocal (LocalReg u pk))
-  = mkVReg u (cmmTypeSize pk)
+  	= RegVirtual $ mkVirtualReg u (cmmTypeSize pk)
 
 getRegisterReg (CmmGlobal mid)
   = case get_GlobalReg_reg_or_addr mid of
-       Left (RealReg rrno)	-> RealReg rrno
-       _			-> pprPanic "getRegisterReg-memory" (ppr $ CmmGlobal mid)
+       Left rr	-> RegReal rr
+
+       _	-> pprPanic "SPARC.CodeGen.Base.getRegisterReg: global is in memory" 
+       				(ppr $ CmmGlobal mid)
 
 
 -- Expand CmmRegOff.  ToDo: should we do it this way around, or convert

@@ -138,30 +138,30 @@ spRel n	= AddrRegImm sp (ImmInt (n * wORD_SIZE))
 -- Dunno about Alpha.
 argRegs :: RegNo -> [Reg]
 argRegs 0 = []
-argRegs 1 = map RealReg [3]
-argRegs 2 = map RealReg [3,4]
-argRegs 3 = map RealReg [3..5]
-argRegs 4 = map RealReg [3..6]
-argRegs 5 = map RealReg [3..7]
-argRegs 6 = map RealReg [3..8]
-argRegs 7 = map RealReg [3..9]
-argRegs 8 = map RealReg [3..10]
+argRegs 1 = map regSingle [3]
+argRegs 2 = map regSingle [3,4]
+argRegs 3 = map regSingle [3..5]
+argRegs 4 = map regSingle [3..6]
+argRegs 5 = map regSingle [3..7]
+argRegs 6 = map regSingle [3..8]
+argRegs 7 = map regSingle [3..9]
+argRegs 8 = map regSingle [3..10]
 argRegs _ = panic "MachRegs.argRegs(powerpc): don't know about >8 arguments!"
 
 
 allArgRegs :: [Reg]
-allArgRegs = map RealReg [3..10]
+allArgRegs = map regSingle [3..10]
 
 
 -- these are the regs which we cannot assume stay alive over a C call.  
 callClobberedRegs :: [Reg]
 #if   defined(darwin_TARGET_OS)
 callClobberedRegs
-  = map RealReg (0:[2..12] ++ map fReg [0..13])
+  = map regSingle (0:[2..12] ++ map fReg [0..13])
 
 #elif defined(linux_TARGET_OS)
 callClobberedRegs
-  = map RealReg (0:[2..13] ++ map fReg [0..13])
+  = map regSingle (0:[2..13] ++ map fReg [0..13])
 
 #else
 callClobberedRegs
@@ -175,14 +175,17 @@ allMachRegNos	= [0..63]
 
 {-# INLINE regClass      #-}
 regClass :: Reg -> RegClass
-regClass (VirtualRegI  _) = RcInteger
-regClass (VirtualRegHi _) = RcInteger
-regClass (VirtualRegF  u) = pprPanic ("regClass(ppc):VirtualRegF ") (ppr u)
-regClass (VirtualRegD  _) = RcDouble
-regClass (RealReg i) 
+regClass (RegVirtual (VirtualRegI  _)) = RcInteger
+regClass (RegVirtual (VirtualRegHi _)) = RcInteger
+regClass (RegVirtual (VirtualRegF  u)) = pprPanic ("regClass(ppc):VirtualRegF ") (ppr u)
+regClass (RegVirtual (VirtualRegD  _)) = RcDouble
+
+regClass (RegReal    (RealRegSingle i))
 	| i < 32	= RcInteger 
 	| otherwise	= RcDouble
 
+regClass (RegReal    (RealRegPair{}))
+	= panic "regClass(ppr): no reg pairs on this architecture"
 
 showReg :: RegNo -> String
 showReg n
@@ -196,10 +199,10 @@ showReg n
 
 allFPArgRegs :: [Reg]
 #if    defined(darwin_TARGET_OS)
-allFPArgRegs = map (RealReg . fReg) [1..13]
+allFPArgRegs = map (regSingle . fReg) [1..13]
 
 #elif  defined(linux_TARGET_OS)
-allFPArgRegs = map (RealReg . fReg) [1..8]
+allFPArgRegs = map (regSingle . fReg) [1..8]
 
 #else
 allFPArgRegs = panic "PPC.Regs.allFPArgRegs: not defined for this architecture"
@@ -240,14 +243,14 @@ fReg :: Int -> RegNo
 fReg x = (32 + x)
 
 sp, r3, r4, r27, r28, f1, f20, f21 :: Reg
-sp 	= RealReg 1
-r3 	= RealReg 3
-r4 	= RealReg 4
-r27 	= RealReg 27
-r28 	= RealReg 28
-f1 	= RealReg $ fReg 1
-f20 	= RealReg $ fReg 20
-f21 	= RealReg $ fReg 21
+sp 	= regSingle 1
+r3 	= regSingle 3
+r4 	= regSingle 4
+r27 	= regSingle 27
+r28 	= regSingle 28
+f1 	= regSingle $ fReg 1
+f20 	= regSingle $ fReg 20
+f21 	= regSingle $ fReg 21
 
 
 
@@ -436,79 +439,79 @@ freeReg _               = fastBool True
 
 
 #ifdef REG_Base
-globalRegMaybe BaseReg			= Just (RealReg REG_Base)
+globalRegMaybe BaseReg			= Just (regSingle REG_Base)
 #endif
 #ifdef REG_R1
-globalRegMaybe (VanillaReg 1 _)		= Just (RealReg REG_R1)
+globalRegMaybe (VanillaReg 1 _)		= Just (regSingle REG_R1)
 #endif 
 #ifdef REG_R2 
-globalRegMaybe (VanillaReg 2 _)		= Just (RealReg REG_R2)
+globalRegMaybe (VanillaReg 2 _)		= Just (regSingle REG_R2)
 #endif 
 #ifdef REG_R3 
-globalRegMaybe (VanillaReg 3 _) 	= Just (RealReg REG_R3)
+globalRegMaybe (VanillaReg 3 _) 	= Just (regSingle REG_R3)
 #endif 
 #ifdef REG_R4 
-globalRegMaybe (VanillaReg 4 _)		= Just (RealReg REG_R4)
+globalRegMaybe (VanillaReg 4 _)		= Just (regSingle REG_R4)
 #endif 
 #ifdef REG_R5 
-globalRegMaybe (VanillaReg 5 _)		= Just (RealReg REG_R5)
+globalRegMaybe (VanillaReg 5 _)		= Just (regSingle REG_R5)
 #endif 
 #ifdef REG_R6 
-globalRegMaybe (VanillaReg 6 _)		= Just (RealReg REG_R6)
+globalRegMaybe (VanillaReg 6 _)		= Just (regSingle REG_R6)
 #endif 
 #ifdef REG_R7 
-globalRegMaybe (VanillaReg 7 _)		= Just (RealReg REG_R7)
+globalRegMaybe (VanillaReg 7 _)		= Just (regSingle REG_R7)
 #endif 
 #ifdef REG_R8 
-globalRegMaybe (VanillaReg 8 _)		= Just (RealReg REG_R8)
+globalRegMaybe (VanillaReg 8 _)		= Just (regSingle REG_R8)
 #endif
 #ifdef REG_R9 
-globalRegMaybe (VanillaReg 9 _)		= Just (RealReg REG_R9)
+globalRegMaybe (VanillaReg 9 _)		= Just (regSingle REG_R9)
 #endif
 #ifdef REG_R10 
-globalRegMaybe (VanillaReg 10 _)	= Just (RealReg REG_R10)
+globalRegMaybe (VanillaReg 10 _)	= Just (regSingle REG_R10)
 #endif
 #ifdef REG_F1
-globalRegMaybe (FloatReg 1)		= Just (RealReg REG_F1)
+globalRegMaybe (FloatReg 1)		= Just (regSingle REG_F1)
 #endif				 	
 #ifdef REG_F2			 	
-globalRegMaybe (FloatReg 2)		= Just (RealReg REG_F2)
+globalRegMaybe (FloatReg 2)		= Just (regSingle REG_F2)
 #endif				 	
 #ifdef REG_F3			 	
-globalRegMaybe (FloatReg 3)		= Just (RealReg REG_F3)
+globalRegMaybe (FloatReg 3)		= Just (regSingle REG_F3)
 #endif				 	
 #ifdef REG_F4			 	
-globalRegMaybe (FloatReg 4)		= Just (RealReg REG_F4)
+globalRegMaybe (FloatReg 4)		= Just (regSingle REG_F4)
 #endif				 	
 #ifdef REG_D1			 	
-globalRegMaybe (DoubleReg 1)		= Just (RealReg REG_D1)
+globalRegMaybe (DoubleReg 1)		= Just (regSingle REG_D1)
 #endif				 	
 #ifdef REG_D2			 	
-globalRegMaybe (DoubleReg 2)		= Just (RealReg REG_D2)
+globalRegMaybe (DoubleReg 2)		= Just (regSingle REG_D2)
 #endif
 #ifdef REG_Sp	    
-globalRegMaybe Sp		   	= Just (RealReg REG_Sp)
+globalRegMaybe Sp		   	= Just (regSingle REG_Sp)
 #endif
 #ifdef REG_Lng1			 	
-globalRegMaybe (LongReg 1)		= Just (RealReg REG_Lng1)
+globalRegMaybe (LongReg 1)		= Just (regSingle REG_Lng1)
 #endif				 	
 #ifdef REG_Lng2			 	
-globalRegMaybe (LongReg 2)		= Just (RealReg REG_Lng2)
+globalRegMaybe (LongReg 2)		= Just (regSingle REG_Lng2)
 #endif
 #ifdef REG_SpLim	    			
-globalRegMaybe SpLim		   	= Just (RealReg REG_SpLim)
+globalRegMaybe SpLim		   	= Just (regSingle REG_SpLim)
 #endif	    				
 #ifdef REG_Hp	   			
-globalRegMaybe Hp		   	= Just (RealReg REG_Hp)
+globalRegMaybe Hp		   	= Just (regSingle REG_Hp)
 #endif	    				
 #ifdef REG_HpLim      			
-globalRegMaybe HpLim		   	= Just (RealReg REG_HpLim)
+globalRegMaybe HpLim		   	= Just (regSingle REG_HpLim)
 #endif	    				
 #ifdef REG_CurrentTSO      			
-globalRegMaybe CurrentTSO	   	= Just (RealReg REG_CurrentTSO)
+globalRegMaybe CurrentTSO	   	= Just (regSingle REG_CurrentTSO)
 #endif	    				
 #ifdef REG_CurrentNursery      			
-globalRegMaybe CurrentNursery	   	= Just (RealReg REG_CurrentNursery)
+globalRegMaybe CurrentNursery	   	= Just (regSingle REG_CurrentNursery)
 #endif	    				
 globalRegMaybe _		   	= Nothing
 

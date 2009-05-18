@@ -148,13 +148,25 @@ pprUserReg = pprReg
 
 -- | Pretty print a register.
 pprReg :: Reg -> Doc
-pprReg r
-  = case r of
-      RealReg i		-> pprReg_ofRegNo i
-      VirtualRegI  u	-> text "%vI_"  <> asmSDoc (pprUnique u)
-      VirtualRegHi u	-> text "%vHi_" <> asmSDoc (pprUnique u)
-      VirtualRegF  u	-> text "%vF_"  <> asmSDoc (pprUnique u)
-      VirtualRegD  u	-> text "%vD_"  <> asmSDoc (pprUnique u)
+pprReg reg
+ = case reg of
+ 	RegVirtual vr
+	 -> case vr of
+		VirtualRegI  u	-> text "%vI_"  <> asmSDoc (pprUnique u)
+		VirtualRegHi u	-> text "%vHi_" <> asmSDoc (pprUnique u)
+		VirtualRegF  u	-> text "%vF_"  <> asmSDoc (pprUnique u)
+		VirtualRegD  u	-> text "%vD_"  <> asmSDoc (pprUnique u)
+
+	RegReal rr
+	 -> case rr of
+		RealRegSingle r1
+		 -> pprReg_ofRegNo r1
+
+		RealRegPair   r1 r2	
+		 -> text "(" 	<> pprReg_ofRegNo r1 
+		 <> text "|" 	<> pprReg_ofRegNo r2
+		 <> text ")"
+	
 
 
 -- | Pretty print a register name, based on this register number.
@@ -256,7 +268,7 @@ pprCond c
 pprAddr :: AddrMode -> Doc
 pprAddr am
  = case am of
- 	AddrRegReg r1 (RealReg 0)	
+ 	AddrRegReg r1 (RegReal (RealRegSingle 0))
 	 -> pprReg r1
 
 	AddrRegReg r1 r2
@@ -364,111 +376,40 @@ pprInstr (NEWBLOCK _)
 pprInstr (LDATA _ _)
 	= panic "PprMach.pprInstr: LDATA"
 
-{-
-pprInstr (SPILL reg slot)
- = hcat [
- 	ptext (sLit "\tSPILL"),
-	char '\t',
-	pprReg reg,
-	comma,
-	ptext (sLit "SLOT") <> parens (int slot)]
+-- 64 bit FP loads are expanded into individual instructions in CodeGen.Expand
+pprInstr (LD FF64 _ reg)
+	| RegReal (RealRegSingle{})	<- reg
+ 	= panic "SPARC.Ppr: not emitting potentially misaligned LD FF64 instr"
 
-pprInstr (RELOAD slot reg)
- = hcat [
-	ptext (sLit "\tRELOAD"),
-	char '\t',
-	ptext (sLit "SLOT") <> parens (int slot),
-	comma,
-	pprReg reg]
--}
-
--- a clumsy hack for now, to handle possible double alignment problems
--- even clumsier, to allow for RegReg regs that show when doing indexed
--- reads (bytearrays).
-
--- Translate to the following:
---    add g1,g2,g1
---    ld  [g1],%fn
---    ld  [g1+4],%f(n+1)
---    sub g1,g2,g1           -- to restore g1
-
-pprInstr (LD FF64 (AddrRegReg g1 g2) reg)
- = let Just regH	= fPair reg
-   in vcat [
-       hcat [ptext (sLit "\tadd\t"), pprReg g1, comma, pprReg g2, comma, pprReg g1],
-       hcat [pp_ld_lbracket, pprReg g1, pp_rbracket_comma, pprReg reg],
-       hcat [pp_ld_lbracket, pprReg g1, ptext (sLit "+4]"), comma, pprReg regH],
-       hcat [ptext (sLit "\tsub\t"), pprReg g1, comma, pprReg g2, comma, pprReg g1]
-    ]
-
--- Translate to
---    ld  [addr],%fn
---    ld  [addr+4],%f(n+1)
-pprInstr (LD FF64 addr reg)
- = let	Just addr2	= addrOffset addr 4
- 	Just regH	= fPair reg
-   in	vcat [
-	       hcat [pp_ld_lbracket, pprAddr addr, pp_rbracket_comma, pprReg reg],
-	       hcat [pp_ld_lbracket, pprAddr addr2, pp_rbracket_comma,pprReg regH]
-	    ]
-
-       
 pprInstr (LD size addr reg)
- = hcat [
-       ptext (sLit "\tld"),
-       pprSize size,
-       char '\t',
-       lbrack,
-       pprAddr addr,
-       pp_rbracket_comma,
-       pprReg reg
-    ]
-
--- The same clumsy hack as above
--- Translate to the following:
---    add g1,g2,g1
---    st  %fn,[g1]
---    st  %f(n+1),[g1+4]
---    sub g1,g2,g1           -- to restore g1
-
-pprInstr (ST FF64 reg (AddrRegReg g1 g2))
- = let	Just regH	= fPair reg
-   in vcat [
-       hcat [ptext (sLit "\tadd\t"),	pprReg g1,  comma, pprReg g2, comma, pprReg g1],
-       hcat [ptext (sLit "\tst\t"),	pprReg reg, pp_comma_lbracket, 
-             pprReg g1,	rbrack],
-       hcat [ptext (sLit "\tst\t"), pprReg regH, pp_comma_lbracket,
-             pprReg g1, ptext (sLit "+4]")],
-       hcat [ptext (sLit "\tsub\t"), pprReg g1, comma, pprReg g2, comma, pprReg g1]
-    ]
-
--- Translate to
---    st  %fn,[addr]
---    st  %f(n+1),[addr+4]
-pprInstr (ST FF64 reg addr)
- = let	Just addr2	= addrOffset addr 4
-	Just regH	= fPair reg
-   in	vcat [
-	      hcat [ptext (sLit "\tst\t"), pprReg reg, pp_comma_lbracket, 
-	            pprAddr addr, rbrack],
-	      hcat [ptext (sLit "\tst\t"), pprReg regH, pp_comma_lbracket,
-	            pprAddr addr2, rbrack]
+	= hcat [
+	       ptext (sLit "\tld"),
+	       pprSize size,
+	       char '\t',
+	       lbrack,
+	       pprAddr addr,
+	       pp_rbracket_comma,
+	       pprReg reg
 	    ]
-    
+
+-- 64 bit FP storees are expanded into individual instructions in CodeGen.Expand
+pprInstr (ST FF64 reg _)
+	| RegReal (RealRegSingle{})	<- reg
+ 	= panic "SPARC.Ppr: not emitting potentially misaligned ST FF64 instr"
 
 -- no distinction is made between signed and unsigned bytes on stores for the
 -- Sparc opcodes (at least I cannot see any, and gas is nagging me --SOF),
 -- so we call a special-purpose pprSize for ST..
 pprInstr (ST size reg addr)
-  = hcat [
-       ptext (sLit "\tst"),
-       pprStSize size,
-       char '\t',
-       pprReg reg,
-       pp_comma_lbracket,
-       pprAddr addr,
-       rbrack
-    ]
+	= hcat [
+	       ptext (sLit "\tst"),
+	       pprStSize size,
+	       char '\t',
+	       pprReg reg,
+	       pp_comma_lbracket,
+	       pprAddr addr,
+	       rbrack
+	    ]
 
 
 pprInstr (ADD x cc reg1 ri reg2)
@@ -534,20 +475,11 @@ pprInstr (SETHI imm reg)
 	pprReg reg
     ]
 
-pprInstr NOP = ptext (sLit "\tnop")
+pprInstr NOP 
+	= ptext (sLit "\tnop")
 
-pprInstr (FABS FF32 reg1 reg2)	= pprSizeRegReg (sLit "fabs") FF32 reg1 reg2
-pprInstr (FABS FF64 reg1 reg2)
- = let	Just reg1H	= fPair reg1
- 	Just reg2H	= fPair reg2
-   in
-    (<>) (pprSizeRegReg (sLit "fabs") FF32 reg1 reg2)
-    (if (reg1 == reg2) then empty
-     else (<>) (char '\n')
-    	  (pprSizeRegReg (sLit "fmov") FF32 reg1H reg2H))
-
-pprInstr (FABS _ _ _)
- =panic "SPARC.Ppr.pprInstr(FABS): no match"
+pprInstr (FABS size reg1 reg2)	
+ 	= pprSizeRegReg (sLit "fabs") size reg1 reg2
 
 pprInstr (FADD size reg1 reg2 reg3)	
 	= pprSizeRegRegReg (sLit "fadd") size reg1 reg2 reg3
@@ -558,40 +490,14 @@ pprInstr (FCMP e size reg1 reg2)
 pprInstr (FDIV size reg1 reg2 reg3)
 	= pprSizeRegRegReg (sLit "fdiv") size reg1 reg2 reg3
 
-pprInstr (FMOV FF32 reg1 reg2)	= pprSizeRegReg (sLit "fmov") FF32 reg1 reg2
-pprInstr (FMOV FF64 reg1 reg2)	= pprSizeRegReg (sLit "fmov") FF64 reg1 reg2
-
-pprInstr (FMOV _ _ _)
- =	panic "SPARC.Ppr.pprInstr(FMOV): no match"
-
-{-
-pprInstr (FMOV FF64 reg1 reg2)
- = let	Just reg1H	= fPair reg1
- 	Just reg2H	= fPair reg2
-   in
-    (<>) (pprSizeRegReg (sLit "fmov") FF32 reg1 reg2)
-    (if (reg1 == reg2) then empty
-     else (<>) (char '\n')
-    	  (pprSizeRegReg (sLit "fmov") FF32 reg1H reg2H))
--}
+pprInstr (FMOV size reg1 reg2)	
+	= pprSizeRegReg (sLit "fmov") size reg1 reg2
 
 pprInstr (FMUL size reg1 reg2 reg3)
 	= pprSizeRegRegReg (sLit "fmul") size reg1 reg2 reg3
 
-pprInstr (FNEG FF32 reg1 reg2) 
-	= pprSizeRegReg (sLit "fneg") FF32 reg1 reg2
-
-pprInstr (FNEG FF64 reg1 reg2)
- = let	Just reg1H	= fPair reg1
- 	Just reg2H	= fPair reg2
-   in
-    (<>) (pprSizeRegReg (sLit "fneg") FF32 reg1 reg2)
-    (if (reg1 == reg2) then empty
-     else (<>) (char '\n')
-    	  (pprSizeRegReg (sLit "fmov") FF32 reg1H reg2H))
-
-pprInstr (FNEG _ _ _)
-	= panic "SPARC.Ppr.pprInstr(FNEG): no match"
+pprInstr (FNEG size reg1 reg2) 
+	= pprSizeRegReg (sLit "fneg") size reg1 reg2
 
 pprInstr (FSQRT size reg1 reg2)     
 	= pprSizeRegReg (sLit "fsqrt") size reg1 reg2
@@ -640,6 +546,7 @@ pprInstr (JMP_TBL op _)  = pprInstr (JMP op)
 
 pprInstr (CALL (Left imm) n _)
   = hcat [ ptext (sLit "\tcall\t"), pprImm imm, comma, int n ]
+
 pprInstr (CALL (Right reg) n _)
   = hcat [ ptext (sLit "\tcall\t"), pprReg reg, comma, int n ]
 
@@ -712,10 +619,10 @@ pprRIReg name b ri reg1
     ]
 -}
 
-
+{-
 pp_ld_lbracket :: Doc
 pp_ld_lbracket    = ptext (sLit "\tld\t[")
-
+-}
 
 pp_rbracket_comma :: Doc
 pp_rbracket_comma = text "],"

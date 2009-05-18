@@ -161,16 +161,6 @@ instance Outputable Instr where
     ppr	 instr	= Outputable.docToSDoc $ pprInstr instr
 
 
-
-
-
-
-
-
-
-
-
-
 #if  i386_TARGET_ARCH || x86_64_TARGET_ARCH
 pprUserReg :: Reg -> Doc
 pprUserReg = pprReg IF_ARCH_i386(II32,) IF_ARCH_x86_64(II64,)
@@ -185,11 +175,12 @@ pprReg :: Size -> Reg -> Doc
 
 pprReg s r
   = case r of
-      RealReg i       -> ppr_reg_no s i
-      VirtualRegI  u  -> text "%vI_" <> asmSDoc (pprUnique u)
-      VirtualRegHi u  -> text "%vHi_" <> asmSDoc (pprUnique u)
-      VirtualRegF  u  -> text "%vF_" <> asmSDoc (pprUnique u)
-      VirtualRegD  u  -> text "%vD_" <> asmSDoc (pprUnique u)
+      RegReal    (RealRegSingle i) -> ppr_reg_no s i
+      RegReal    (RealRegPair _ _) -> panic "X86.Ppr: no reg pairs on this arch"
+      RegVirtual (VirtualRegI  u)  -> text "%vI_" <> asmSDoc (pprUnique u)
+      RegVirtual (VirtualRegHi u)  -> text "%vHi_" <> asmSDoc (pprUnique u)
+      RegVirtual (VirtualRegF  u)  -> text "%vF_" <> asmSDoc (pprUnique u)
+      RegVirtual (VirtualRegD  u)  -> text "%vD_" <> asmSDoc (pprUnique u)
   where
 #if i386_TARGET_ARCH
     ppr_reg_no :: Size -> Int -> Doc
@@ -956,7 +947,7 @@ gsp :: Doc
 gsp   = char ' '
 
 gregno :: Reg -> RegNo
-gregno (RealReg i) = i
+gregno (RegReal (RealRegSingle i)) = i
 gregno _           = --pprPanic "gregno" (ppr other)
                      999   -- bogus; only needed for debug printing
 

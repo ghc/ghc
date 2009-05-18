@@ -28,7 +28,7 @@ getFreeRegs cls f = go f 0
 
   where go 0 _ = []
         go n m 
-	  | n .&. 1 /= 0 && regClass (RealReg m) == cls
+	  | n .&. 1 /= 0 && regClass (regSingle m) == cls
 	  = m : (go (n `shiftR` 1) $! (m+1))
 
 	  | otherwise

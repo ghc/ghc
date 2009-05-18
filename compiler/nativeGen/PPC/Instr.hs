@@ -230,12 +230,12 @@ ppc_regUsageOfInstr instr
     regRI  _	= []
 
 interesting :: Reg -> Bool
-interesting (VirtualRegI  _)  = True
-interesting (VirtualRegHi _)  = True
-interesting (VirtualRegF  _)  = True
-interesting (VirtualRegD  _)  = True
-interesting (RealReg i)       = isFastTrue (freeReg i)
+interesting (RegVirtual _) 		= True
+interesting (RegReal (RealRegSingle i))	
+	= isFastTrue (freeReg i)
 
+interesting (RegReal (RealRegPair{}))	
+	= panic "PPC.Instr.interesting: no reg pairs on this arch"
 
 
 

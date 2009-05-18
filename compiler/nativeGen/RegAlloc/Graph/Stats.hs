@@ -39,27 +39,27 @@ data RegAllocStats instr
 
 	-- initial graph
 	= RegAllocStatsStart
-	{ raLiveCmm	:: [LiveCmmTop instr]		  -- ^ initial code, with liveness
-	, raGraph	:: Color.Graph Reg RegClass Reg   -- ^ the initial, uncolored graph
-	, raSpillCosts	:: SpillCostInfo } 		  -- ^ information to help choose which regs to spill
+	{ raLiveCmm	:: [LiveCmmTop instr]		  		-- ^ initial code, with liveness
+	, raGraph	:: Color.Graph VirtualReg RegClass RealReg   	-- ^ the initial, uncolored graph
+	, raSpillCosts	:: SpillCostInfo } 		 		-- ^ information to help choose which regs to spill
 
 	-- a spill stage
 	| RegAllocStatsSpill
-	{ raGraph	:: Color.Graph Reg RegClass Reg	-- ^ the partially colored graph
-	, raCoalesced	:: UniqFM Reg			-- ^ the regs that were coaleced
-	, raSpillStats	:: SpillStats 			-- ^ spiller stats
-	, raSpillCosts	:: SpillCostInfo 		-- ^ number of instrs each reg lives for
-	, raSpilled	:: [LiveCmmTop instr] }		-- ^ code with spill instructions added
+	{ raGraph	:: Color.Graph VirtualReg RegClass RealReg	-- ^ the partially colored graph
+	, raCoalesced	:: UniqFM VirtualReg				-- ^ the regs that were coaleced
+	, raSpillStats	:: SpillStats 					-- ^ spiller stats
+	, raSpillCosts	:: SpillCostInfo 				-- ^ number of instrs each reg lives for
+	, raSpilled	:: [LiveCmmTop instr] }				-- ^ code with spill instructions added
 
 	-- a successful coloring
 	| RegAllocStatsColored
-	{ raGraph	 :: Color.Graph Reg RegClass Reg -- ^ the uncolored graph
-	, raGraphColored :: Color.Graph Reg RegClass Reg -- ^ the coalesced and colored graph
-	, raCoalesced	:: UniqFM Reg			-- ^ the regs that were coaleced
-	, raPatched	:: [LiveCmmTop instr] 		-- ^ code with vregs replaced by hregs
-	, raSpillClean  :: [LiveCmmTop instr]		-- ^ code with unneeded spill\/reloads cleaned out
-	, raFinal	:: [NatCmmTop instr] 		-- ^ final code
-	, raSRMs	:: (Int, Int, Int) }		-- ^ spill\/reload\/reg-reg moves present in this code
+	{ raGraph	 :: Color.Graph VirtualReg RegClass RealReg	-- ^ the uncolored graph
+	, raGraphColored :: Color.Graph VirtualReg RegClass RealReg 	-- ^ the coalesced and colored graph
+	, raCoalesced	:: UniqFM VirtualReg				-- ^ the regs that were coaleced
+	, raPatched	:: [LiveCmmTop instr] 				-- ^ code with vregs replaced by hregs
+	, raSpillClean  :: [LiveCmmTop instr]				-- ^ code with unneeded spill\/reloads cleaned out
+	, raFinal	:: [NatCmmTop instr] 				-- ^ final code
+	, raSRMs	:: (Int, Int, Int) }				-- ^ spill\/reload\/reg-reg moves present in this code
 
 instance Outputable instr => Outputable (RegAllocStats instr) where
 
@@ -132,7 +132,11 @@ instance Outputable instr => Outputable (RegAllocStats instr) where
 	$$ text ""
 
 -- | Do all the different analysis on this list of RegAllocStats
-pprStats :: [RegAllocStats instr] -> Color.Graph Reg RegClass Reg -> SDoc
+pprStats 
+	:: [RegAllocStats instr] 
+	-> Color.Graph VirtualReg RegClass RealReg 
+	-> SDoc
+	
 pprStats stats graph
  = let 	outSpills	= pprStatsSpills    stats
 	outLife		= pprStatsLifetimes stats
@@ -176,7 +180,7 @@ pprStatsLifetimes stats
 	$$ (vcat $ map ppr $ eltsUFM lifeBins)
 	$$ text "\n")
 
-binLifetimeCount :: UniqFM (Reg, Int) -> UniqFM (Int, Int)
+binLifetimeCount :: UniqFM (VirtualReg, Int) -> UniqFM (Int, Int)
 binLifetimeCount fm
  = let	lifes	= map (\l -> (l, (l, 1)))
  		$ map snd
@@ -208,7 +212,7 @@ pprStatsConflict stats
 --	good for making a scatter plot.
 pprStatsLifeConflict
 	:: [RegAllocStats instr]
-	-> Color.Graph Reg RegClass Reg 	-- ^ global register conflict graph
+	-> Color.Graph VirtualReg RegClass RealReg 	-- ^ global register conflict graph
 	-> SDoc
 
 pprStatsLifeConflict stats graph

@@ -208,7 +208,7 @@ getRegisterReg (CmmLocal (LocalReg u pk))
 
 getRegisterReg (CmmGlobal mid)
   = case get_GlobalReg_reg_or_addr mid of
-       Left (RealReg rrno) -> RealReg rrno
+       Left reg@(RegReal _) -> reg
        _other -> pprPanic "getRegisterReg-memory" (ppr $ CmmGlobal mid)
           -- By this stage, the only MagicIds remaining should be the
           -- ones which map to a real machine register on this
@@ -1022,7 +1022,9 @@ getNonClobberedReg expr = do
 	return (tmp, code tmp)
     Fixed rep reg code
 	-- only free regs can be clobbered
-	| RealReg rr <- reg, isFastTrue (freeReg rr) -> do
+	| RegReal (RealRegSingle rr) <- reg
+	, isFastTrue (freeReg rr) 
+	-> do
 		tmp <- getNewRegNat rep
 		return (tmp, code `snocOL` reg2reg rep reg tmp)
 	| otherwise -> 
@@ -1150,7 +1152,7 @@ getNonClobberedOperand e = do
 amodeCouldBeClobbered :: AddrMode -> Bool
 amodeCouldBeClobbered amode = any regClobbered (addrModeRegs amode)
 
-regClobbered (RealReg rr) = isFastTrue (freeReg rr)
+regClobbered (RegReal (RealRegSingle rr)) = isFastTrue (freeReg rr)
 regClobbered _ = False
 
 -- getOperand: the operand is not required to remain valid across the
@@ -1779,7 +1781,9 @@ genCCall target dest_regs args = do
 	assign_code [CmmHinted dest _hint] = 
 	  case typeWidth rep of
 		W32 | isFloatType rep -> unitOL (MOV (floatSize W32) (OpReg xmm0) (OpReg r_dest))
+v v v v v v v
 		W64 | isFloatType rep -> unitOL (MOV (floatSize W64) (OpReg xmm0) (OpReg r_dest))
+^ ^ ^ ^ ^ ^ ^
 		_ -> unitOL (MOV (cmmTypeSize rep) (OpReg rax) (OpReg r_dest))
 	  where 
 		rep = localRegType dest
@@ -1867,7 +1871,7 @@ outOfLineFloatOp mop res args
       dflags <- getDynFlagsNat
       targetExpr <- cmmMakeDynamicReference dflags addImportNat CallReference lbl
       let target = CmmCallee targetExpr CCallConv
-        
+     
       if isFloat64 (localRegType res)
         then
           stmtToInstrs (CmmCall target [CmmHinted res NoHint] args CmmUnsafe CmmMayReturn)

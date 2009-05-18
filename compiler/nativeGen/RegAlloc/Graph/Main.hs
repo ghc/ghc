@@ -11,6 +11,7 @@ module RegAlloc.Graph.Main (
 where
 
 import qualified GraphColor	as Color
+import qualified GraphBase	as Color
 import RegAlloc.Liveness
 import RegAlloc.Graph.Spill
 import RegAlloc.Graph.SpillClean
@@ -47,7 +48,7 @@ maxSpinCount	= 10
 regAlloc
 	:: (Outputable instr, Instruction instr)
 	=> DynFlags
-	-> UniqFM (UniqSet Reg)		-- ^ the registers we can use for allocation
+	-> UniqFM (UniqSet RealReg)	-- ^ the registers we can use for allocation
 	-> UniqSet Int			-- ^ the set of available spill slots.
 	-> [LiveCmmTop instr]		-- ^ code annotated with liveness information.
 	-> UniqSM ( [NatCmmTop instr], [RegAllocStats instr] )
@@ -59,7 +60,9 @@ regAlloc dflags regsFree slotsFree code
 	-- TODO: the regClass function is currently hard coded to the default target
 	--	 architecture. Would prefer to determine this from dflags.
 	--	 There are other uses of targetRegClass later in this module.
-	let triv = trivColorable targetRegClass
+	let triv = trivColorable 
+			targetVirtualRegSqueeze
+			targetRealRegSqueeze
 
  	(code_final, debug_codeGraphs, _)
 		<- regAlloc_spin dflags 0 
@@ -69,7 +72,14 @@ regAlloc dflags regsFree slotsFree code
 	return	( code_final
 		, reverse debug_codeGraphs )
 
-regAlloc_spin dflags spinCount triv regsFree slotsFree debug_codeGraphs code
+regAlloc_spin 
+	dflags 
+	spinCount 
+	(triv 		:: Color.Triv VirtualReg RegClass RealReg)
+	(regsFree 	:: UniqFM (UniqSet RealReg))
+	slotsFree 
+	debug_codeGraphs 
+	code
  = do
  	-- if any of these dump flags are turned on we want to hang on to
 	--	intermediate structures in the allocator - otherwise tell the
@@ -89,7 +99,8 @@ regAlloc_spin dflags spinCount triv regsFree slotsFree debug_codeGraphs code
 		$$ text "slotsFree   = " <> ppr (sizeUniqSet slotsFree))
 
  	-- build a conflict graph from the code.
-	graph		<- {-# SCC "BuildGraph" #-} buildGraph code
+	(graph	:: Color.Graph VirtualReg RegClass RealReg)
+		<- {-# SCC "BuildGraph" #-} buildGraph code
 
 	-- VERY IMPORTANT:
 	--	We really do want the graph to be fully evaluated _before_ we start coloring.
@@ -125,9 +136,15 @@ regAlloc_spin dflags spinCount triv regsFree slotsFree debug_codeGraphs code
 			    	regsFree triv spill graph
 
 	-- rewrite regs in the code that have been coalesced
-	let patchF reg	= case lookupUFM rmCoalesce reg of
-				Just reg'	-> patchF reg'
-				Nothing		-> reg
+	let patchF reg	
+		| RegVirtual vr	<- reg
+		= case lookupUFM rmCoalesce vr of
+			Just vr'	-> patchF (RegVirtual vr')
+			Nothing		-> reg
+			
+		| otherwise
+		= reg
+
 	let code_coalesced
 			= map (patchEraseLive patchF) code
 
@@ -225,7 +242,7 @@ regAlloc_spin dflags spinCount triv regsFree slotsFree debug_codeGraphs code
 buildGraph 
 	:: Instruction instr
 	=> [LiveCmmTop instr]
-	-> UniqSM (Color.Graph Reg RegClass Reg)
+	-> UniqSM (Color.Graph VirtualReg RegClass RealReg)
 	
 buildGraph code
  = do
@@ -252,19 +269,20 @@ buildGraph code
 --
 graphAddConflictSet 
 	:: UniqSet Reg
-	-> Color.Graph Reg RegClass Reg
-	-> Color.Graph Reg RegClass Reg
+	-> Color.Graph VirtualReg RegClass RealReg
+	-> Color.Graph VirtualReg RegClass RealReg
 	
 graphAddConflictSet set graph
- = let	reals		= filterUFM isRealReg set
- 	virtuals	= filterUFM (not . isRealReg) set
+ = let	virtuals	= mkUniqSet 
+ 			[ vr | RegVirtual vr <- uniqSetToList set ]
  
-	graph1	= Color.addConflicts virtuals targetRegClass graph
-	graph2	= foldr (\(r1, r2) -> Color.addExclusion r1 targetRegClass r2)
+	graph1	= Color.addConflicts virtuals classOfVirtualReg graph
+
+	graph2	= foldr (\(r1, r2) -> Color.addExclusion r1 classOfVirtualReg r2)
 			graph1
-			[ (a, b) 
-				| a <- uniqSetToList virtuals
-				, b <- uniqSetToList reals]
+			[ (vr, rr) 
+				| RegVirtual vr <- uniqSetToList set
+				, RegReal    rr <- uniqSetToList set]
 
    in	graph2
 	
@@ -274,26 +292,33 @@ graphAddConflictSet set graph
 --
 graphAddCoalesce 
 	:: (Reg, Reg) 
-	-> Color.Graph Reg RegClass Reg
-	-> Color.Graph Reg RegClass Reg
+	-> Color.Graph VirtualReg RegClass RealReg
+	-> Color.Graph VirtualReg RegClass RealReg
 	
 graphAddCoalesce (r1, r2) graph
-	| RealReg _ <- r1
-	= Color.addPreference (regWithClass r2) r1 graph
+	| RegReal rr 		<- r1
+	, RegVirtual vr 	<- r2
+	= Color.addPreference (vr, classOfVirtualReg vr) rr graph
 	
-	| RealReg _ <- r2
-	= Color.addPreference (regWithClass r1) r2 graph
+	| RegReal rr 		<- r2
+	, RegVirtual vr		<- r1
+	= Color.addPreference (vr, classOfVirtualReg vr) rr graph
 	
-	| otherwise
-	= Color.addCoalesce (regWithClass r1) (regWithClass r2) graph
+	| RegVirtual vr1	<- r1
+	, RegVirtual vr2	<- r2
+	= Color.addCoalesce 
+		(vr1, classOfVirtualReg vr1) 
+		(vr2, classOfVirtualReg vr2) 
+		graph
 
-	where 	regWithClass r	= (r, targetRegClass r)
+	| otherwise
+	= panic "RegAlloc.Graph.Main.graphAddCoalesce: can't coalesce two real regs"
 
 
 -- | Patch registers in code using the reg -> reg mapping in this graph.
 patchRegsFromGraph 
 	:: (Outputable instr, Instruction instr)
-	=> Color.Graph Reg RegClass Reg
+	=> Color.Graph VirtualReg RegClass RealReg
 	-> LiveCmmTop instr -> LiveCmmTop instr
 
 patchRegsFromGraph graph code
@@ -301,21 +326,27 @@ patchRegsFromGraph graph code
  	-- a function to lookup the hardreg for a virtual reg from the graph.
  	patchF reg
 		-- leave real regs alone.
-		| isRealReg reg
+		| RegReal{}	<- reg
 		= reg
 
 		-- this virtual has a regular node in the graph.
- 		| Just node	<- Color.lookupNode graph reg
+ 		| RegVirtual vr	<- reg
+		, Just node	<- Color.lookupNode graph vr
 		= case Color.nodeColor node of
-			Just color	-> color
-			Nothing		-> reg
+			Just color	-> RegReal    color
+			Nothing		-> RegVirtual vr
 			
 		-- no node in the graph for this virtual, bad news.
 		| otherwise
 		= pprPanic "patchRegsFromGraph: register mapping failed." 
 			(  text "There is no node in the graph for register " <> ppr reg
 			$$ ppr code
-			$$ Color.dotGraph (\_ -> text "white") (trivColorable targetRegClass) graph)
+			$$ Color.dotGraph 
+				(\_ -> text "white") 
+				(trivColorable 
+					targetVirtualRegSqueeze
+					targetRealRegSqueeze)
+				graph)
 
    in	patchEraseLive patchF code
    
@@ -323,33 +354,38 @@ patchRegsFromGraph graph code
 -----
 -- for when laziness just isn't what you wanted...
 --
-seqGraph :: Color.Graph Reg RegClass Reg -> ()
+seqGraph :: Color.Graph VirtualReg RegClass RealReg -> ()
 seqGraph graph		= seqNodes (eltsUFM (Color.graphMap graph))
 
-seqNodes :: [Color.Node Reg RegClass Reg] -> ()
+seqNodes :: [Color.Node VirtualReg RegClass RealReg] -> ()
 seqNodes ns
  = case ns of
  	[]		-> ()
 	(n : ns)	-> seqNode n `seq` seqNodes ns
 
-seqNode :: Color.Node Reg RegClass Reg -> ()
+seqNode :: Color.Node VirtualReg RegClass RealReg -> ()
 seqNode node
-	=     seqReg      (Color.nodeId node)
-	`seq` seqRegClass (Color.nodeClass node)
-	`seq` seqMaybeReg (Color.nodeColor node)
-	`seq` (seqRegList (uniqSetToList (Color.nodeConflicts node)))
-	`seq` (seqRegList (uniqSetToList (Color.nodeExclusions node)))
-	`seq` (seqRegList (Color.nodePreference node))
-	`seq` (seqRegList (uniqSetToList (Color.nodeCoalesce node)))
+	=     seqVirtualReg	(Color.nodeId node)
+	`seq` seqRegClass 	(Color.nodeClass node)
+	`seq` seqMaybeRealReg 	(Color.nodeColor node)
+	`seq` (seqVirtualRegList (uniqSetToList (Color.nodeConflicts node)))
+	`seq` (seqRealRegList 	 (uniqSetToList (Color.nodeExclusions node)))
+	`seq` (seqRealRegList (Color.nodePreference node))
+	`seq` (seqVirtualRegList (uniqSetToList (Color.nodeCoalesce node)))
 
-seqReg :: Reg -> ()
-seqReg reg
+seqVirtualReg :: VirtualReg -> ()
+seqVirtualReg reg
  = case reg of
- 	RealReg _	-> ()
 	VirtualRegI _	-> ()
 	VirtualRegHi _	-> ()
 	VirtualRegF _	-> ()
 	VirtualRegD _	-> ()
+
+seqRealReg :: RealReg -> ()
+seqRealReg reg
+ = case reg of
+ 	RealRegSingle _ -> ()
+	RealRegPair _ _	-> ()
 
 seqRegClass :: RegClass -> ()
 seqRegClass c
@@ -358,17 +394,23 @@ seqRegClass c
 	RcFloat		-> ()
 	RcDouble	-> ()
 
-seqMaybeReg :: Maybe Reg -> ()
-seqMaybeReg mr
+seqMaybeRealReg :: Maybe RealReg -> ()
+seqMaybeRealReg mr
  = case mr of
  	Nothing		-> ()
-	Just r		-> seqReg r
+	Just r		-> seqRealReg r
 
-seqRegList :: [Reg] -> ()
-seqRegList rs
+seqVirtualRegList :: [VirtualReg] -> ()
+seqVirtualRegList rs
  = case rs of
  	[]		-> ()
-	(r : rs)	-> seqReg r `seq` seqRegList rs
+	(r : rs)	-> seqVirtualReg r `seq` seqVirtualRegList rs
+
+seqRealRegList :: [RealReg] -> ()
+seqRealRegList rs
+ = case rs of
+ 	[]		-> ()
+	(r : rs)	-> seqRealReg r `seq` seqRealRegList rs
 
 seqList :: [a] -> ()
 seqList ls

@@ -121,7 +121,7 @@ isEmptyUniqSet :: UniqSet a -> Bool
 isEmptyUniqSet (MkUniqSet set) = isNullUFM set {-SLOW: sizeUFM set == 0-}
 
 -- | Invariant: the mapping function doesn't change the unique
-mapUniqSet :: (a -> a) -> UniqSet a -> UniqSet a
+mapUniqSet :: (a -> b) -> UniqSet a -> UniqSet b
 mapUniqSet f (MkUniqSet set) = MkUniqSet (mapUFM f set)
 \end{code}
 

@@ -37,11 +37,11 @@ import Unique
 
 mkVReg :: Unique -> Size -> Reg
 mkVReg u size
-   | not (isFloatSize size) = VirtualRegI u
+   | not (isFloatSize size) = RegVirtual $ VirtualRegI u
    | otherwise
    = case size of
-        FF32	-> VirtualRegD u
-        FF64	-> VirtualRegD u
+        FF32	-> RegVirtual $ VirtualRegD u
+        FF64	-> RegVirtual $ VirtualRegD u
 	_	-> panic "mkVReg"
 
 

@@ -62,12 +62,14 @@ import qualified RegAlloc.Graph.Stats		as Color
 import qualified RegAlloc.Graph.Coalesce	as Color
 import qualified RegAlloc.Graph.TrivColorable	as Color
 
-import qualified TargetReg			as Target
+import qualified SPARC.CodeGen.Expand		as SPARC
 
+import TargetReg
 import Platform
 import Instruction
 import PIC
 import Reg
+import RegClass
 import NCGMonad
 
 import Cmm
@@ -195,7 +197,11 @@ nativeCodeGen dflags h us cmms
 
 		dumpIfSet_dyn dflags
 			Opt_D_dump_asm_conflicts "Register conflict graph"
-			$ Color.dotGraph Target.targetRegDotColor (Color.trivColorable Target.targetRegClass)
+			$ Color.dotGraph 
+				targetRegDotColor 
+				(Color.trivColorable 
+					targetVirtualRegSqueeze 
+					targetRealRegSqueeze)
 			$ graphGlobal)
 
 
@@ -311,13 +317,14 @@ cmmNativeGen dflags us cmm count
 	   || dopt Opt_RegsIterative dflags)
 	  then do
 	  	-- the regs usable for allocation
-		let alloc_regs
+		let (alloc_regs :: UniqFM (UniqSet RealReg))
 			= foldr (\r -> plusUFM_C unionUniqSets
-					$ unitUFM (regClass r) (unitUniqSet r))
+					$ unitUFM (targetClassOfRealReg r) (unitUniqSet r))
 				emptyUFM
-			$ map RealReg allocatableRegs
+			$ allocatableRegs
 
-		-- graph coloring register allocation
+
+		-- do the graph coloring register allocation
 		let ((alloced, regAllocStats), usAlloc)
 			= {-# SCC "RegAlloc" #-}
 			  initUs usLive
@@ -385,7 +392,7 @@ cmmNativeGen dflags us cmm count
 	 	map sequenceTop shorted
 
 	---- x86fp_kludge
-	let final_mach_code =
+	let kludged =
 #if i386_TARGET_ARCH
 	 	{-# SCC "x86fp_kludge" #-}
 	 	map x86fp_kludge sequenced
@@ -393,8 +400,22 @@ cmmNativeGen dflags us cmm count
 		sequenced
 #endif
 
+	---- expansion of SPARC synthetic instrs
+#if sparc_TARGET_ARCH
+	let expanded = 
+		{-# SCC "sparc_expand" #-}
+		map SPARC.expandTop kludged
+
+	dumpIfSet_dyn dflags
+		Opt_D_dump_asm_expanded "Synthetic instructions expanded"
+		(vcat $ map (docToSDoc . pprNatCmmTop) expanded)
+#else
+	let expanded = 
+		kludged
+#endif
+
 	return 	( usAlloc
-		, final_mach_code
+		, expanded
 		, lastMinuteImports ++ imports
 		, ppr_raStatsColor
 		, ppr_raStatsLinear)

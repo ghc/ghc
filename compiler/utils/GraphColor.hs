@@ -98,12 +98,13 @@ colorGraph iterative spinCount colors triv spill graph0
 	--	with the provided triv function.
         --
    in	if not $ null ksNoTriv
-   	 then	pprPanic "colorGraph: trivially colorable nodes didn't color!" empty
-{-	 		(  empty
+   	 then	pprPanic "colorGraph: trivially colorable nodes didn't color!" -- empty
+	 		(  empty
 			$$ text "ksTriv    = " <> ppr ksTriv
 			$$ text "ksNoTriv  = " <> ppr ksNoTriv
+			$$ text "colors    = " <> ppr colors
 			$$ empty
-			$$ dotGraph (\x -> text "white") triv graph1) -}
+			$$ dotGraph (\_ -> text "white") triv graph_triv) 
 
 	 else	( graph_prob
 		, mkUniqSet ksNoColor	-- the nodes that didn't color (spills)
@@ -131,7 +132,7 @@ colorGraph iterative spinCount colors triv spill graph0
 colorScan
 	:: ( Uniquable k, Uniquable cls, Uniquable color
 	   , Ord k, 	  Eq cls
-	   , Outputable k, Outputable color)
+	   , Outputable k, Outputable cls)
 	=> Bool				-- ^ whether to do iterative coalescing
 	-> Triv k cls color		-- ^ fn to decide whether a node is trivially colorable
 	-> (Graph k cls color -> k)	-- ^ fn to choose a node to potentially leave uncolored if nothing is trivially colorable.
@@ -224,7 +225,8 @@ colorScan_spill iterative triv spill graph
 -- | Try to assign a color to all these nodes.
 
 assignColors 
-	:: ( Uniquable k, Uniquable cls, Uniquable color, Eq color )
+	:: ( Uniquable k, Uniquable cls, Uniquable color
+	   , Eq color, Outputable cls)
 	=> UniqFM (UniqSet color)	-- ^ map of (node class -> set of colors available for this class).
 	-> Graph k cls color		-- ^ the graph
 	-> [k]				-- ^ nodes to assign a color to.
@@ -261,7 +263,8 @@ assignColors colors graph ks
 --	returns Nothing if no color can be assigned to this node.
 --
 selectColor
-	:: ( Uniquable k, Uniquable cls, Uniquable color, Eq color)
+	:: ( Uniquable k, Uniquable cls, Uniquable color
+	   , Eq color, Outputable cls)
 	=> UniqFM (UniqSet color)	-- ^ map of (node class -> set of colors available for this class).
 	-> Graph k cls color		-- ^ the graph
 	-> k				-- ^ key of the node to select a color for.
@@ -272,8 +275,10 @@ selectColor colors graph u
  	Just node	= lookupNode graph u
 
 	-- lookup the available colors for the class of this node.
-	Just colors_avail
-			= lookupUFM colors (nodeClass node)
+	colors_avail
+	 = case lookupUFM colors (nodeClass node) of
+	 	Nothing	-> pprPanic "selectColor: no colors available for class " (ppr (nodeClass node))
+		Just cs	-> cs
 
 	-- find colors we can't use because they're already being used
 	--	by a node that conflicts with this one.

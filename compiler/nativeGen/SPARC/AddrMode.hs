@@ -35,7 +35,7 @@ addrOffset addr off
        | otherwise     -> Nothing
        where n2 = n + toInteger off
 
-      AddrRegReg r (RealReg 0)
+      AddrRegReg r (RegReal (RealRegSingle 0))
        | fits13Bits off -> Just (AddrRegImm r (ImmInt off))
        | otherwise     -> Nothing
        

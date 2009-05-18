@@ -655,8 +655,15 @@
 #define REG_F2	    	f23
 #define REG_F3	    	f24
 #define REG_F4	    	f25
+
+/* for each of the double arg regs, 
+   Dn_2 is the high half. */
+   
 #define REG_D1	    	f2
+#define REG_D1_2	f3
+
 #define REG_D2	    	f4
+#define REG_D2_2	f5
 
 #define REG_Sp    	i0
 #define REG_SpLim    	i2

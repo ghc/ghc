@@ -36,10 +36,10 @@ import Data.Maybe
 import Control.Monad
 
 type SpillCostRecord
- = 	( Reg	-- register name
-	, Int	-- number of writes to this reg
-	, Int	-- number of reads from this reg
-	, Int)	-- number of instrs this reg was live on entry to
+ = 	( VirtualReg	-- register name
+	, Int		-- number of writes to this reg
+	, Int		-- number of reads from this reg
+	, Int)		-- number of instrs this reg was live on entry to
 
 type SpillCostInfo
 	= UniqFM SpillCostRecord
@@ -83,7 +83,11 @@ slurpSpillCostInfo cmm
  	countBlock info (BasicBlock blockId instrs)
 		| LiveInfo _ _ blockLive	<- info
 		, Just rsLiveEntry		<- lookupBlockEnv blockLive blockId
-		= countLIs rsLiveEntry instrs
+
+		, rsLiveEntry_virt	<- mapUniqSet (\(RegVirtual vr) -> vr) 
+					$  filterUniqSet isVirtualReg rsLiveEntry
+						
+		= countLIs rsLiveEntry_virt instrs
 
 		| otherwise
 		= error "RegAlloc.SpillCost.slurpSpillCostInfo: bad block"
@@ -113,16 +117,24 @@ slurpSpillCostInfo cmm
 
 		-- increment counts for what regs were read/written from
 		let (RU read written)	= regUsageOfInstr instr
-		mapM_ incUses	$ filter (not . isRealReg) $ nub read
-		mapM_ incDefs 	$ filter (not . isRealReg) $ nub written
+		mapM_ incUses	$ catMaybes $ map takeVirtualReg $ nub read
+		mapM_ incDefs 	$ catMaybes $ map takeVirtualReg $ nub written
 
 		-- compute liveness for entry to next instruction.
+		let takeVirtuals set
+			= mapUniqSet (\(RegVirtual vr) -> vr)
+			$ filterUniqSet isVirtualReg set
+
+		let liveDieRead_virt	= takeVirtuals (liveDieRead  live)
+		let liveDieWrite_virt	= takeVirtuals (liveDieWrite live)
+		let liveBorn_virt	= takeVirtuals (liveBorn     live)
+
 	 	let rsLiveAcross
-			= rsLiveEntry `minusUniqSet` (liveDieRead live)
+			= rsLiveEntry `minusUniqSet` liveDieRead_virt
 
 	 	let rsLiveNext
-			= (rsLiveAcross `unionUniqSets` (liveBorn     live))
-				        `minusUniqSet` (liveDieWrite live)
+			= (rsLiveAcross `unionUniqSets` liveBorn_virt)
+				        `minusUniqSet`  liveDieWrite_virt
 
 	 	countLIs rsLiveNext lis
 
@@ -135,8 +147,8 @@ slurpSpillCostInfo cmm
 
 chooseSpill
 	:: SpillCostInfo
-	-> Graph Reg RegClass Reg
-	-> Reg
+	-> Graph VirtualReg RegClass RealReg
+	-> VirtualReg
 
 chooseSpill info graph
  = let	cost	= spillCost_length info graph
@@ -212,19 +224,20 @@ spillCost_chaitin info graph reg
 -- Just spill the longest live range.
 spillCost_length
 	:: SpillCostInfo
-	-> Graph Reg RegClass Reg
-	-> Reg
+	-> Graph VirtualReg RegClass RealReg
+	-> VirtualReg
 	-> Float
 
 spillCost_length info _ reg
 	| lifetime <= 1		= 1/0
 	| otherwise		= 1 / fromIntegral lifetime
 	where (_, _, _, lifetime)
-		= fromMaybe (reg, 0, 0, 0) $ lookupUFM info reg
+		= fromMaybe (reg, 0, 0, 0) 
+		$ lookupUFM info reg
 
 
 
-lifeMapFromSpillCostInfo :: SpillCostInfo -> UniqFM (Reg, Int)
+lifeMapFromSpillCostInfo :: SpillCostInfo -> UniqFM (VirtualReg, Int)
 lifeMapFromSpillCostInfo info
  	= listToUFM
 	$ map (\(r, _, _, life)	-> (r, (r, life)))
@@ -233,13 +246,19 @@ lifeMapFromSpillCostInfo info
 
 -- | Work out the degree (number of neighbors) of this node which have the same class.
 nodeDegree 
-	:: (Reg -> RegClass)
-	-> Graph Reg RegClass Reg -> Reg -> Int
+	:: (VirtualReg -> RegClass)
+	-> Graph VirtualReg RegClass RealReg 
+	-> VirtualReg 
+	-> Int
 
-nodeDegree regClass graph reg
+nodeDegree classOfVirtualReg graph reg
 	| Just node	<- lookupUFM (graphMap graph) reg
-	, virtConflicts	<- length 	$ filter (\r -> regClass r == regClass reg)
-					$ uniqSetToList $ nodeConflicts node
+
+	, virtConflicts	<- length 	
+			$ filter (\r -> classOfVirtualReg r == classOfVirtualReg reg)
+			$ uniqSetToList 
+			$ nodeConflicts node
+
 	= virtConflicts + sizeUniqSet (nodeExclusions node)
 
 	| otherwise
@@ -248,16 +267,20 @@ nodeDegree regClass graph reg
 
 -- | Show a spill cost record, including the degree from the graph and final calulated spill cos
 pprSpillCostRecord 
-	:: (Reg -> RegClass)
+	:: (VirtualReg -> RegClass)
 	-> (Reg -> SDoc)
-	-> Graph Reg RegClass Reg -> SpillCostRecord -> SDoc
+	-> Graph VirtualReg RegClass RealReg 
+	-> SpillCostRecord 
+	-> SDoc
 
 pprSpillCostRecord regClass pprReg graph (reg, uses, defs, life)
  	=  hsep
-	[ pprReg reg
+	[ pprReg (RegVirtual reg)
 	, ppr uses
 	, ppr defs
 	, ppr life
 	, ppr $ nodeDegree regClass graph reg
 	, text $ show $ (fromIntegral (uses + defs) 
 			/ fromIntegral (nodeDegree regClass graph reg) :: Float) ]
+
+

@@ -8,7 +8,7 @@ module GraphOps (
 	union,
 	addConflict,	delConflict,	addConflicts,
 	addCoalesce,	delCoalesce,	
-	addExclusion,	
+	addExclusion,	addExclusions,
 	addPreference,
 	coalesceNodes,	coalesceGraph,
 	freezeNode,	freezeOneInGraph, freezeAllInGraph,
@@ -212,6 +212,14 @@ addExclusion u getClass color
 		(\node -> node 			{ nodeExclusions = addOneToUniqSet (nodeExclusions node) color })
 		(newNode u (getClass u))  	{ nodeExclusions = unitUniqSet color }
 		u
+
+addExclusions
+	:: (Uniquable k, Uniquable color)
+	=> k -> (k -> cls) -> [color]
+	-> Graph k cls color -> Graph k cls color
+
+addExclusions u getClass colors graph
+	= foldr (addExclusion u getClass) graph colors
 
 
 -- | Add a coalescence edge to the graph, creating nodes if requried.

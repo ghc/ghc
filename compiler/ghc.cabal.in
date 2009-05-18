@@ -505,6 +505,7 @@ Library
             SPARC.CodeGen.Gen32
             SPARC.CodeGen.Gen64
             SPARC.CodeGen.Sanity
+            SPARC.CodeGen.Expand
             RegAlloc.Liveness
             RegAlloc.Graph.Main
             RegAlloc.Graph.Stats
