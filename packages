@@ -37,7 +37,6 @@ libraries/integer-gmp                   packages/integer-gmp            darcs
 libraries/mtl                           packages/mtl                    darcs
 libraries/old-locale                    packages/old-locale             darcs
 libraries/old-time                      packages/old-time               darcs
-libraries/packedstring                  packages/packedstring           darcs
 libraries/pretty                        packages/pretty                 darcs
 libraries/process                       packages/process                darcs
 libraries/random                        packages/random                 darcs

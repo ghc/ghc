@@ -304,7 +304,6 @@ PACKAGES += \
 	extensible-exceptions \
 	haskell98 \
 	hpc \
-	packedstring \
 	pretty \
 	syb \
 	template-haskell \
