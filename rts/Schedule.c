@@ -2235,9 +2235,7 @@ exitScheduler(
 {
     Task *task = NULL;
 
-    ACQUIRE_LOCK(&sched_mutex);
     task = newBoundTask();
-    RELEASE_LOCK(&sched_mutex);
 
     // If we haven't killed all the threads yet, do it now.
     if (sched_state < SCHED_SHUTTING_DOWN) {
@@ -2301,9 +2299,7 @@ performGC_(rtsBool force_major)
     // We must grab a new Task here, because the existing Task may be
     // associated with a particular Capability, and chained onto the 
     // suspended_ccalling_tasks queue.
-    ACQUIRE_LOCK(&sched_mutex);
     task = newBoundTask();
-    RELEASE_LOCK(&sched_mutex);
 
     waitForReturnCapability(&task->cap,task);
     scheduleDoGC(task->cap,task,force_major);

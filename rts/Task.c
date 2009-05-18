@@ -31,6 +31,7 @@ static Task *task_free_list = NULL; // singly-linked
 static nat taskCount;
 static nat tasksRunning;
 static nat workerCount;
+static int tasksInitialized = 0;
 
 /* -----------------------------------------------------------------------------
  * Remembering the current thread's Task
@@ -51,13 +52,11 @@ Task *my_task;
 void
 initTaskManager (void)
 {
-    static int initialized = 0;
-
-    if (!initialized) {
+    if (!tasksInitialized) {
 	taskCount = 0;
 	workerCount = 0;
 	tasksRunning = 0;
-	initialized = 1;
+	tasksInitialized = 1;
 #if defined(THREADED_RTS)
 	newThreadLocalKey(&currentTaskKey);
 #endif
@@ -93,6 +92,8 @@ freeTaskManager (void)
 #if defined(THREADED_RTS)
     freeThreadLocalKey(&currentTaskKey);
 #endif
+
+    tasksInitialized = 0;
 
     return tasksRunning;
 }
@@ -150,7 +151,17 @@ newBoundTask (void)
 {
     Task *task;
 
-    ASSERT_LOCK_HELD(&sched_mutex);
+    if (!tasksInitialized) {
+        errorBelch("newBoundTask: RTS is not initialised; call hs_init() first");
+        stg_exit(EXIT_FAILURE);
+    }
+
+    // ToDo: get rid of this lock in the common case.  We could store
+    // a free Task in thread-local storage, for example.  That would
+    // leave just one lock on the path into the RTS: cap->lock when
+    // acquiring the Capability.
+    ACQUIRE_LOCK(&sched_mutex);
+
     if (task_free_list == NULL) {
 	task = newTask();
     } else {
@@ -168,6 +179,8 @@ newBoundTask (void)
     tasksRunning++;
 
     taskEnter(task);
+
+    RELEASE_LOCK(&sched_mutex);
 
     debugTrace(DEBUG_sched, "new task (taskCount: %d)", taskCount);
     return task;

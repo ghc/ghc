@@ -664,13 +664,7 @@ rts_lock (void)
     Capability *cap;
     Task *task;
 
-    // ToDo: get rid of this lock in the common case.  We could store
-    // a free Task in thread-local storage, for example.  That would
-    // leave just one lock on the path into the RTS: cap->lock when
-    // acquiring the Capability.
-    ACQUIRE_LOCK(&sched_mutex);
     task = newBoundTask();
-    RELEASE_LOCK(&sched_mutex);
 
     cap = NULL;
     waitForReturnCapability(&cap, task);
