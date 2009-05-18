@@ -19,7 +19,7 @@ test('tup001',		normal, compile_and_run, [''])
 
 test('addr001',		normal, compile_and_run, [''])
 test('dynamic001', 	skip_if_fast, compile_and_run, [''])
-test('dynamic002', 	skip_if_fast, compile_and_run, ['-package packedstring'])
+test('dynamic002', 	[skip_if_fast,reqlib('packedstring')], compile_and_run, ['-package packedstring'])
 test('enum01', 		skip_if_fast, compile_and_run, ['-cpp'])
 test('enum02', 		skip_if_fast, compile_and_run, ['-cpp'])
 test('enum03', 		skip_if_fast, compile_and_run, ['-cpp'])
@@ -43,7 +43,7 @@ test('memo002',
       extra_clean(['Memo2.hi', 'Memo2.o'])],
 	multimod_compile_and_run, ['memo002',''])
 
-test('packedstring001', normal, compile_and_run, ['-package packedstring'])
+test('packedstring001', reqlib('packedstring'), compile_and_run, ['-package packedstring'])
 
 test('stableptr001',
      [skip_if_fast, extra_run_opts('+RTS -K8m -RTS')],
