@@ -7261,7 +7261,7 @@ foo = ...
           please give the GHC team a shout</ulink>.
         </para>
         
-        <para>However, apart from these restrictions, many things are allowed, including expressions which not fully evaluated!
+        <para>However, apart from these restrictions, many things are allowed, including expressions which are not fully evaluated!
         Annotation expressions will be evaluated by the compiler just like Template Haskell splices are. So, this annotation is fine:</para>
         
 <programlisting>
