@@ -56,12 +56,18 @@ REALGOALS=$(filter-out bootstrapping-files framework-pkg clean clean_% distclean
 $(REALGOALS) all: $(PACKAGE_MK)
 	@echo "===--- updating makefiles phase 0"
 	$(MAKE) -r --no-print-directory -f ghc.mk phase=0 just-makefiles
+ifneq "$(OMIT_PHASE_1)" "YES"
 	@echo "===--- updating makefiles phase 1"
 	$(MAKE) -r --no-print-directory -f ghc.mk phase=1 just-makefiles
+endif
+ifneq "$(OMIT_PHASE_2)" "YES"
 	@echo "===--- updating makefiles phase 2"
 	$(MAKE) -r --no-print-directory -f ghc.mk phase=2 just-makefiles
+endif
+ifneq "$(OMIT_PHASE_3)" "YES"
 	@echo "===--- updating makefiles phase 3"
 	$(MAKE) -r --no-print-directory -f ghc.mk phase=3 just-makefiles
+endif
 	@echo "===--- finished updating makefiles"
 	$(MAKE) -r --no-print-directory -f ghc.mk $@
 
