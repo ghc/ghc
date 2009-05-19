@@ -72,7 +72,7 @@ $(includes_H_CONFIG) : mk/config.h mk/config.mk includes/ghc.mk
 
 endif
 
-$(includes_H_PLATFORM) : Makefile
+$(includes_H_PLATFORM) : includes/Makefile
 	$(RM) $@
 	@echo "Creating $@..."
 	@echo "#ifndef __GHCPLATFORM_H__"  >$@
