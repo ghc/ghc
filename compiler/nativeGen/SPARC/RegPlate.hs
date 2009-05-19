@@ -299,7 +299,7 @@ globalRegMaybe _		   	= Nothing
 freeReg :: RegNo -> FastBool
 freeReg		= error "SPARC.RegPlate.freeReg: not defined"
 
-globalRegMaybe :: GlobalReg -> Maybe Reg
+globalRegMaybe :: GlobalReg -> Maybe RealReg
 globalRegMaybe	= error "SPARC.RegPlate.globalRegMaybe: not defined"
 
 #endif

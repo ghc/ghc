@@ -18,6 +18,7 @@ import Instruction
 import Size
 import RegClass
 import Reg
+import TargetReg
 
 import BlockId
 import Cmm
@@ -605,7 +606,7 @@ x86_mkSpillInstr reg delta slot
   = let	off     = spillSlotToOffset slot
     in
     let off_w = (off-delta) `div` 4
-    in case regClass reg of
+    in case targetClassOfReg reg of
 	   RcInteger -> MOV II32 (OpReg reg) (OpAddr (spRel off_w))
 	   _         -> GST FF80 reg (spRel off_w) {- RcFloat/RcDouble -}
 
@@ -614,7 +615,7 @@ x86_mkSpillInstr reg delta slot
   = let	off     = spillSlotToOffset slot
     in
     let off_w = (off-delta) `div` 8
-    in case regClass reg of
+    in case targetClassOfReg reg of
 	   RcInteger -> MOV II64 (OpReg reg) (OpAddr (spRel off_w))
 	   RcDouble  -> MOV FF64 (OpReg reg) (OpAddr (spRel off_w))
            _         -> panic "X86.mkSpillInstr: no match"
@@ -638,7 +639,7 @@ x86_mkLoadInstr reg delta slot
   = let off     = spillSlotToOffset slot
     in
 	let off_w = (off-delta) `div` 4
-        in case regClass reg of {
+        in case targetClassOfReg reg of {
               RcInteger -> MOV II32 (OpAddr (spRel off_w)) (OpReg reg);
               _         -> GLD FF80 (spRel off_w) reg} {- RcFloat/RcDouble -}
 #elif x86_64_TARGET_ARCH
@@ -646,7 +647,7 @@ x86_mkLoadInstr reg delta slot
   = let off     = spillSlotToOffset slot
     in
 	let off_w = (off-delta) `div` 8
-        in case regClass reg of
+        in case targetClassOfReg reg of
               RcInteger -> MOV II64 (OpAddr (spRel off_w)) (OpReg reg)
               _         -> MOV FF64 (OpAddr (spRel off_w)) (OpReg reg)
 #else
@@ -710,7 +711,7 @@ x86_mkRegRegMoveInstr
 	-> Instr
 
 x86_mkRegRegMoveInstr src dst
- = case regClass src of
+ = case targetClassOfReg src of
 #if   i386_TARGET_ARCH
         RcInteger -> MOV II32 (OpReg src) (OpReg dst)
         RcDouble  -> GMOV src dst
@@ -793,3 +794,51 @@ is_G_instr instr
 	GTAN{}	 	-> True
         GFREE 		-> panic "is_G_instr: GFREE (!)"
         _     		-> False
+
+
+data JumpDest = DestBlockId BlockId | DestImm Imm
+
+
+canShortcut :: Instr -> Maybe JumpDest
+canShortcut (JXX ALWAYS id) 	= Just (DestBlockId id)
+canShortcut (JMP (OpImm imm)) 	= Just (DestImm imm)
+canShortcut _ 			= Nothing
+
+
+-- The helper ensures that we don't follow cycles.
+shortcutJump :: (BlockId -> Maybe JumpDest) -> Instr -> Instr
+shortcutJump fn insn = shortcutJump' fn emptyBlockSet insn
+  where shortcutJump' fn seen insn@(JXX cc id) =
+          if elemBlockSet id seen then insn
+          else case fn id of
+                 Nothing                -> insn
+                 Just (DestBlockId id') -> shortcutJump' fn seen' (JXX cc id')
+                 Just (DestImm imm)     -> shortcutJump' fn seen' (JXX_GBL cc imm)
+               where seen' = extendBlockSet seen id
+        shortcutJump' _ _ other = other
+
+-- Here because it knows about JumpDest
+shortcutStatic :: (BlockId -> Maybe JumpDest) -> CmmStatic -> CmmStatic
+shortcutStatic fn (CmmStaticLit (CmmLabel lab))
+  | Just uq <- maybeAsmTemp lab 
+  = CmmStaticLit (CmmLabel (shortBlockId fn (BlockId uq)))
+shortcutStatic fn (CmmStaticLit (CmmLabelDiffOff lbl1 lbl2 off))
+  | Just uq <- maybeAsmTemp lbl1
+  = CmmStaticLit (CmmLabelDiffOff (shortBlockId fn (BlockId uq)) lbl2 off)
+        -- slightly dodgy, we're ignoring the second label, but this
+        -- works with the way we use CmmLabelDiffOff for jump tables now.
+
+shortcutStatic _ other_static
+        = other_static
+
+shortBlockId 
+	:: (BlockId -> Maybe JumpDest)
+	-> BlockId
+	-> CLabel
+
+shortBlockId fn blockid@(BlockId uq) =
+   case fn blockid of
+      Nothing -> mkAsmTempLabel uq
+      Just (DestBlockId blockid')  -> shortBlockId fn blockid'
+      Just (DestImm (ImmCLbl lbl)) -> lbl
+      _other -> panic "shortBlockId"

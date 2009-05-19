@@ -1,4 +1,8 @@
 module X86.Regs (
+	-- squeese functions for the graph allocator
+	virtualRegSqueeze,
+	realRegSqueeze,
+
 	-- immediates
 	Imm(..),
 	strImmLit,
@@ -14,7 +18,7 @@ module X86.Regs (
 	allArgRegs,
 	callClobberedRegs,
 	allMachRegNos,
-	regClass,
+	classOfRealReg,
 	showReg,	
 
 	-- machine specific
@@ -62,12 +66,115 @@ import CLabel           ( CLabel )
 import Pretty
 import Outputable	( panic )
 import qualified Outputable
+import FastTypes
 import FastBool
+
 
 #if  defined(i386_TARGET_ARCH) || defined(x86_64_TARGET_ARCH)
 import Constants
-import Outputable	(ppr, pprPanic)
 #endif
+
+
+-- | regSqueeze_class reg
+--	Calculuate the maximum number of register colors that could be
+--	denied to a node of this class due to having this reg 
+--	as a neighbour.
+--
+{-# INLINE virtualRegSqueeze #-}
+virtualRegSqueeze :: RegClass -> VirtualReg -> FastInt
+
+virtualRegSqueeze cls vr
+ = case cls of
+ 	RcInteger
+	 -> case vr of
+	 	VirtualRegI{}		-> _ILIT(1)
+		VirtualRegHi{}		-> _ILIT(1)
+		VirtualRegD{}		-> _ILIT(0)
+		VirtualRegF{}		-> _ILIT(0)
+
+	-- We don't use floats on this arch, but we can't
+	--	return error because the return type is unboxed...
+	RcFloat
+	 -> case vr of
+	 	VirtualRegI{}		-> _ILIT(0)
+		VirtualRegHi{}		-> _ILIT(0)
+		VirtualRegD{}		-> _ILIT(0)
+		VirtualRegF{}		-> _ILIT(0)
+
+	RcDouble
+	 -> case vr of
+	 	VirtualRegI{}		-> _ILIT(0)
+		VirtualRegHi{}		-> _ILIT(0)
+		VirtualRegD{}		-> _ILIT(1)
+		VirtualRegF{}		-> _ILIT(0)
+
+
+
+#if defined(i386_TARGET_ARCH)
+{-# INLINE realRegSqueeze #-}
+realRegSqueeze :: RegClass -> RealReg -> FastInt
+
+realRegSqueeze cls rr
+ = case cls of
+ 	RcInteger
+	 -> case rr of
+	 	RealRegSingle regNo
+			| regNo	< 8	-> _ILIT(1)	-- first fp reg is 8
+			| otherwise	-> _ILIT(0)
+			
+		RealRegPair{}		-> _ILIT(0)
+
+	-- We don't use floats on this arch, but we can't
+	--	return error because the return type is unboxed...
+	RcFloat
+	 -> case rr of
+	 	RealRegSingle regNo
+			| regNo	< 8	-> _ILIT(0)
+			| otherwise	-> _ILIT(0)
+			
+		RealRegPair{}		-> _ILIT(0)
+
+	RcDouble
+	 -> case rr of
+	 	RealRegSingle regNo
+			| regNo	< 8	-> _ILIT(0)
+			| otherwise	-> _ILIT(1)
+			
+		RealRegPair{}		-> _ILIT(0)
+
+#elif defined(x86_64_TARGET_ARCH)
+realRegSqueeze cls rr
+ = case cls of
+ 	RcInteger
+	 -> case rr of
+	 	RealRegSingle regNo
+			| regNo	< 16	-> _ILIT(1)	-- first xmm reg is 16
+			| otherwise	-> _ILIT(0)
+			
+		RealRegPair{}		-> _ILIT(0)
+
+	-- We don't use floats on this arch, but we can't
+	--	return error because the return type is unboxed...
+	RcFloat
+	 -> case rr of
+	 	RealRegSingle regNo
+			| regNo	< 16	-> _ILIT(0)
+			| otherwise	-> _ILIT(0)
+			
+		RealRegPair{}		-> _ILIT(0)
+
+	RcDouble
+	 -> case rr of
+	 	RealRegSingle regNo
+			| regNo	< 16	-> _ILIT(0)
+			| otherwise	-> _ILIT(1)
+			
+		RealRegPair{}		-> _ILIT(0)
+
+#else
+realRegSqueeze	= _ILIT(0)
+#endif
+
 
 
 -- -----------------------------------------------------------------------------
@@ -191,33 +298,31 @@ allMachRegNos	= panic "X86.Regs.callClobberedRegs: not defined for this architec
 
 
 -- | Take the class of a register.
-{-# INLINE regClass      #-}
-regClass :: Reg -> RegClass
+{-# INLINE classOfRealReg      #-}
+classOfRealReg :: RealReg -> RegClass
 
 #if   i386_TARGET_ARCH
 -- On x86, we might want to have an 8-bit RegClass, which would
 -- contain just regs 1-4 (the others don't have 8-bit versions).
 -- However, we can get away without this at the moment because the
 -- only allocatable integer regs are also 8-bit compatible (1, 3, 4).
-regClass (RealReg i)     = if i < 8 then RcInteger else RcDouble
-regClass (VirtualRegI  _) = RcInteger
-regClass (VirtualRegHi _) = RcInteger
-regClass (VirtualRegD  _) = RcDouble
-regClass (VirtualRegF  u) = pprPanic ("regClass(x86):VirtualRegF") (ppr u)
+classOfRealReg reg
+ = case reg of
+	RealRegSingle i	-> if i < 8 then RcInteger else RcDouble
+	RealRegPair{}	-> panic "X86.Regs.classOfRealReg: RegPairs on this arch"
 
 #elif x86_64_TARGET_ARCH
 -- On x86, we might want to have an 8-bit RegClass, which would
 -- contain just regs 1-4 (the others don't have 8-bit versions).
 -- However, we can get away without this at the moment because the
 -- only allocatable integer regs are also 8-bit compatible (1, 3, 4).
-regClass (RealReg i)     = if i < 16 then RcInteger else RcDouble
-regClass (VirtualRegI  _) = RcInteger
-regClass (VirtualRegHi _) = RcInteger
-regClass (VirtualRegD  _) = RcDouble
-regClass (VirtualRegF  u) = pprPanic "regClass(x86_64):VirtualRegF" (ppr u)
+classOfRealReg reg
+ = case reg of
+	RealRegSingle i	-> if i < 16 then RcInteger else RcDouble
+	RealRegPair{}	-> panic "X86.Regs.classOfRealReg: RegPairs on this arch"
 
 #else
-regClass _	= panic "X86.Regs.regClass: not defined for this architecture"
+classOfRealReg _	= panic "X86.Regs.regClass: not defined for this architecture"
 
 #endif
 
@@ -365,7 +470,7 @@ xmm n = regSingle (16+n)
 
 -- horror show -----------------------------------------------------------------
 freeReg 		:: RegNo -> FastBool
-globalRegMaybe 		:: GlobalReg -> Maybe Reg
+globalRegMaybe 		:: GlobalReg -> Maybe RealReg
 allArgRegs 		:: [Reg]
 callClobberedRegs 	:: [Reg]
 
@@ -501,79 +606,79 @@ freeReg _               = fastBool True
 -- reg is the machine register it is stored in.
 
 #ifdef REG_Base
-globalRegMaybe BaseReg			= Just (regSingle REG_Base)
+globalRegMaybe BaseReg			= Just (RealRegSingle REG_Base)
 #endif
 #ifdef REG_R1
-globalRegMaybe (VanillaReg 1 _)		= Just (regSingle REG_R1)
+globalRegMaybe (VanillaReg 1 _)		= Just (RealRegSingle REG_R1)
 #endif 
 #ifdef REG_R2 
-globalRegMaybe (VanillaReg 2 _)		= Just (regSingle REG_R2)
+globalRegMaybe (VanillaReg 2 _)		= Just (RealRegSingle REG_R2)
 #endif 
 #ifdef REG_R3 
-globalRegMaybe (VanillaReg 3 _) 	= Just (regSingle REG_R3)
+globalRegMaybe (VanillaReg 3 _) 	= Just (RealRegSingle REG_R3)
 #endif 
 #ifdef REG_R4 
-globalRegMaybe (VanillaReg 4 _)		= Just (regSingle REG_R4)
+globalRegMaybe (VanillaReg 4 _)		= Just (RealRegSingle REG_R4)
 #endif 
 #ifdef REG_R5 
-globalRegMaybe (VanillaReg 5 _)		= Just (regSingle REG_R5)
+globalRegMaybe (VanillaReg 5 _)		= Just (RealRegSingle REG_R5)
 #endif 
 #ifdef REG_R6 
-globalRegMaybe (VanillaReg 6 _)		= Just (regSingle REG_R6)
+globalRegMaybe (VanillaReg 6 _)		= Just (RealRegSingle REG_R6)
 #endif 
 #ifdef REG_R7 
-globalRegMaybe (VanillaReg 7 _)		= Just (regSingle REG_R7)
+globalRegMaybe (VanillaReg 7 _)		= Just (RealRegSingle REG_R7)
 #endif 
 #ifdef REG_R8 
-globalRegMaybe (VanillaReg 8 _)		= Just (regSingle REG_R8)
+globalRegMaybe (VanillaReg 8 _)		= Just (RealRegSingle REG_R8)
 #endif
 #ifdef REG_R9 
-globalRegMaybe (VanillaReg 9 _)		= Just (regSingle REG_R9)
+globalRegMaybe (VanillaReg 9 _)		= Just (RealRegSingle REG_R9)
 #endif
 #ifdef REG_R10 
-globalRegMaybe (VanillaReg 10 _)	= Just (regSingle REG_R10)
+globalRegMaybe (VanillaReg 10 _)	= Just (RealRegSingle REG_R10)
 #endif
 #ifdef REG_F1
-globalRegMaybe (FloatReg 1)		= Just (regSingle REG_F1)
+globalRegMaybe (FloatReg 1)		= Just (RealRegSingle REG_F1)
 #endif				 	
 #ifdef REG_F2			 	
-globalRegMaybe (FloatReg 2)		= Just (regSingle REG_F2)
+globalRegMaybe (FloatReg 2)		= Just (RealRegSingle REG_F2)
 #endif				 	
 #ifdef REG_F3			 	
-globalRegMaybe (FloatReg 3)		= Just (regSingle REG_F3)
+globalRegMaybe (FloatReg 3)		= Just (RealRegSingle REG_F3)
 #endif				 	
 #ifdef REG_F4			 	
-globalRegMaybe (FloatReg 4)		= Just (regSingle REG_F4)
+globalRegMaybe (FloatReg 4)		= Just (RealRegSingle REG_F4)
 #endif				 	
 #ifdef REG_D1			 	
-globalRegMaybe (DoubleReg 1)		= Just (regSingle REG_D1)
+globalRegMaybe (DoubleReg 1)		= Just (RealRegSingle REG_D1)
 #endif				 	
 #ifdef REG_D2			 	
-globalRegMaybe (DoubleReg 2)		= Just (regSingle REG_D2)
+globalRegMaybe (DoubleReg 2)		= Just (RealRegSingle REG_D2)
 #endif
 #ifdef REG_Sp	    
-globalRegMaybe Sp		   	= Just (regSingle REG_Sp)
+globalRegMaybe Sp		   	= Just (RealRegSingle REG_Sp)
 #endif
 #ifdef REG_Lng1			 	
-globalRegMaybe (LongReg 1)		= Just (regSingle REG_Lng1)
+globalRegMaybe (LongReg 1)		= Just (RealRegSingle REG_Lng1)
 #endif				 	
 #ifdef REG_Lng2			 	
-globalRegMaybe (LongReg 2)		= Just (regSingle REG_Lng2)
+globalRegMaybe (LongReg 2)		= Just (RealRegSingle REG_Lng2)
 #endif
 #ifdef REG_SpLim	    			
-globalRegMaybe SpLim		   	= Just (regSingle REG_SpLim)
+globalRegMaybe SpLim		   	= Just (RealRegSingle REG_SpLim)
 #endif	    				
 #ifdef REG_Hp	   			
-globalRegMaybe Hp		   	= Just (regSingle REG_Hp)
+globalRegMaybe Hp		   	= Just (RealRegSingle REG_Hp)
 #endif	    				
 #ifdef REG_HpLim      			
-globalRegMaybe HpLim		   	= Just (regSingle REG_HpLim)
+globalRegMaybe HpLim		   	= Just (RealRegSingle REG_HpLim)
 #endif	    				
 #ifdef REG_CurrentTSO      			
-globalRegMaybe CurrentTSO	   	= Just (regSingle REG_CurrentTSO)
+globalRegMaybe CurrentTSO	   	= Just (RealRegSingle REG_CurrentTSO)
 #endif	    				
 #ifdef REG_CurrentNursery      			
-globalRegMaybe CurrentNursery	   	= Just (regSingle REG_CurrentNursery)
+globalRegMaybe CurrentNursery	   	= Just (RealRegSingle REG_CurrentNursery)
 #endif	    				
 globalRegMaybe _		   	= Nothing
 
@@ -628,7 +733,7 @@ callClobberedRegs	= panic "X86.Regs.globalRegMaybe: not defined"
 -- address in the register table holding it.
 -- (See also get_GlobalReg_addr in CgUtils.)
 
-get_GlobalReg_reg_or_addr :: GlobalReg -> Either Reg CmmExpr
+get_GlobalReg_reg_or_addr :: GlobalReg -> Either RealReg CmmExpr
 get_GlobalReg_reg_or_addr mid
    = case globalRegMaybe mid of
         Just rr -> Left rr
@@ -638,9 +743,9 @@ get_GlobalReg_reg_or_addr mid
 -- allocatableRegs is allMachRegNos with the fixed-use regs removed.
 -- i.e., these are the regs for which we are prepared to allow the
 -- register allocator to attempt to map VRegs to.
-allocatableRegs :: [RegNo]
+allocatableRegs :: [RealReg]
 allocatableRegs
    = let isFree i = isFastTrue (freeReg i)
-     in  filter isFree allMachRegNos
+     in  map RealRegSingle $ filter isFree allMachRegNos
 
 

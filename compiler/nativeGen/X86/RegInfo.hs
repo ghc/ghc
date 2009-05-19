@@ -1,12 +1,6 @@
 
 module X86.RegInfo (
-	mkVReg,
-
-        JumpDest, 
-	canShortcut, 
-	shortcutJump, 
-	
-	shortcutStatic,
+	mkVirtualReg,
 	regDotColor
 )
 
@@ -15,15 +9,10 @@ where
 #include "nativeGen/NCG.h"
 #include "HsVersions.h"
 
-import X86.Instr
-import X86.Cond
 import X86.Regs
 import Size
 import Reg
 
-import Cmm
-import CLabel
-import BlockId
 import Outputable
 import Unique
 
@@ -32,69 +21,19 @@ import UniqFM
 #endif
 
 
-mkVReg :: Unique -> Size -> Reg
-mkVReg u size
-   | not (isFloatSize size) = RegVirtual (VirtualRegI u)
+mkVirtualReg :: Unique -> Size -> VirtualReg
+mkVirtualReg u size
+   | not (isFloatSize size) = VirtualRegI u
    | otherwise
    = case size of
-        FF32	-> RegVirtual (VirtualRegD u)
-        FF64	-> RegVirtual (VirtualRegD u)
-	_	-> panic "mkVReg"
-
-
-data JumpDest = DestBlockId BlockId | DestImm Imm
-
-
-canShortcut :: Instr -> Maybe JumpDest
-canShortcut (JXX ALWAYS id) 	= Just (DestBlockId id)
-canShortcut (JMP (OpImm imm)) 	= Just (DestImm imm)
-canShortcut _ 			= Nothing
-
-
--- The helper ensures that we don't follow cycles.
-shortcutJump :: (BlockId -> Maybe JumpDest) -> Instr -> Instr
-shortcutJump fn insn = shortcutJump' fn emptyBlockSet insn
-  where shortcutJump' fn seen insn@(JXX cc id) =
-          if elemBlockSet id seen then insn
-          else case fn id of
-                 Nothing                -> insn
-                 Just (DestBlockId id') -> shortcutJump' fn seen' (JXX cc id')
-                 Just (DestImm imm)     -> shortcutJump' fn seen' (JXX_GBL cc imm)
-               where seen' = extendBlockSet seen id
-        shortcutJump' _ _ other = other
-
-
--- Here because it knows about JumpDest
-shortcutStatic :: (BlockId -> Maybe JumpDest) -> CmmStatic -> CmmStatic
-shortcutStatic fn (CmmStaticLit (CmmLabel lab))
-  | Just uq <- maybeAsmTemp lab 
-  = CmmStaticLit (CmmLabel (shortBlockId fn (BlockId uq)))
-shortcutStatic fn (CmmStaticLit (CmmLabelDiffOff lbl1 lbl2 off))
-  | Just uq <- maybeAsmTemp lbl1
-  = CmmStaticLit (CmmLabelDiffOff (shortBlockId fn (BlockId uq)) lbl2 off)
-        -- slightly dodgy, we're ignoring the second label, but this
-        -- works with the way we use CmmLabelDiffOff for jump tables now.
-
-shortcutStatic _ other_static
-        = other_static
-
-shortBlockId 
-	:: (BlockId -> Maybe JumpDest)
-	-> BlockId
-	-> CLabel
-
-shortBlockId fn blockid@(BlockId uq) =
-   case fn blockid of
-      Nothing -> mkAsmTempLabel uq
-      Just (DestBlockId blockid')  -> shortBlockId fn blockid'
-      Just (DestImm (ImmCLbl lbl)) -> lbl
-      _other -> panic "shortBlockId"
-
+        FF32	-> VirtualRegD u
+        FF64	-> VirtualRegD u
+	_	-> panic "mkVirtualReg"
 
 
 -- reg colors for x86
 #if i386_TARGET_ARCH
-regDotColor :: Reg -> SDoc
+regDotColor :: RealReg -> SDoc
 regDotColor reg
  = let	Just	str	= lookupUFM regColors reg
    in	text str
@@ -117,7 +56,7 @@ regColors
 
 -- reg colors for x86_64
 #elif x86_64_TARGET_ARCH
-regDotColor :: Reg -> SDoc
+regDotColor :: RealReg -> SDoc
 regDotColor reg
  = let	Just	str	= lookupUFM regColors reg
    in	text str
