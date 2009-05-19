@@ -44,7 +44,7 @@ $$($1_$2_$3_LIB) : $$($1_$2_$3_HS_OBJS) $$($1_$2_dyn_C_OBJS) $$($1_$2_dyn_S_OBJS
 	$$(RM) $$@
 	$$($1_$2_HC) $$($1_$2_dyn_C_OBJS) $$($1_$2_dyn_S_OBJS) $$($1_$2_$3_HS_OBJS) \
          `$$($1_$2_$3_MKSTUBOBJS)` \
-         -shared -dynamic \
+         -shared -dynamic -dynload deploy \
          -no-auto-link-packages $$(addprefix -package,$$($1_$2_DEPS)) \
          -o $$@
 else

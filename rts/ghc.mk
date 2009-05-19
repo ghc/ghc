@@ -155,7 +155,8 @@ rts_$1_OBJS = $$(rts_$1_C_OBJS) $$(rts_$1_S_OBJS) $$(rts_$1_CMM_OBJS)
 ifneq "$$(findstring dyn, $1)" ""
 $$(rts_$1_LIB) : $$(rts_$1_OBJS) rts/libs.depend
 	$$(RM) $$@
-	$$(rts_dist_HC) -shared -dynamic -no-auto-link-packages `cat rts/libs.depend` $$(rts_$1_OBJS) -o $$@
+	$$(rts_dist_HC) -shared -dynamic -dynload deploy \
+	  -no-auto-link-packages `cat rts/libs.depend` $$(rts_$1_OBJS) -o $$@
 else
 $$(rts_$1_LIB) : $$(rts_$1_OBJS)
 	$$(RM) $$@
