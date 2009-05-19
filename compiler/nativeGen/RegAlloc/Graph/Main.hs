@@ -311,9 +311,13 @@ graphAddCoalesce (r1, r2) graph
 		(vr2, classOfVirtualReg vr2) 
 		graph
 
-	| otherwise
-	= panic "RegAlloc.Graph.Main.graphAddCoalesce: can't coalesce two real regs"
-
+	-- We can't coalesce two real regs, but there could well be existing
+	--	hreg,hreg moves in the input code. We'll just ignore these
+	--	for coalescing purposes.
+	| RegReal _		<- r1
+	, RegReal _	 	<- r2
+	= graph
+	
 
 -- | Patch registers in code using the reg -> reg mapping in this graph.
 patchRegsFromGraph 
