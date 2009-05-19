@@ -2041,12 +2041,15 @@ setOptLevel n dflags
 --                                      sometimes
 --    -fdicts-cheap                     always inline dictionaries
 --    -fmax-simplifier-iterations20     this is necessary sometimes
+--    -fsimplifier-phases=3             we use an additional simplifier phase
+--                                      for fusion
 --    -fno-spec-constr-threshold        run SpecConstr even for big loops
 --    -fno-spec-constr-count            SpecConstr as much as possible
 --    -finline-enough-args              hack to prevent excessive inlining
 --
 setDPHOpt :: DynFlags -> DynFlags
 setDPHOpt dflags = setOptLevel 2 (dflags { maxSimplIterations  = 20
+                                         , simplPhases         = 3
                                          , specConstrThreshold = Nothing
                                          , specConstrCount     = Nothing
                                          })
