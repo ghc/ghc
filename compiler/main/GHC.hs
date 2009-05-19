@@ -888,7 +888,7 @@ load2 how_much mod_graph = do
 	      let 
 	 	main_mod = mainModIs dflags
 		a_root_is_Main = any ((==main_mod).ms_mod) mod_graph
-		do_linking = a_root_is_Main || no_hs_main
+		do_linking = a_root_is_Main || no_hs_main || not StaticFlags.opt_Static
 
 	      when (ghcLink dflags == LinkBinary 
                     && isJust ofile && not do_linking) $
