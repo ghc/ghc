@@ -1561,7 +1561,13 @@ linkDynLib dflags o_files dep_packages = do
     let pkgs_no_rts = pkgs
 #endif
     let pkg_lib_paths = collectLibraryPaths pkgs_no_rts
-    let pkg_lib_path_opts = map ("-L"++) pkg_lib_paths
+    let pkg_lib_path_opts = concatMap get_pkg_lib_path_opts pkg_lib_paths
+#ifdef linux_TARGET_OS
+        get_pkg_lib_path_opts l | (dynLibLoader dflags)==SystemDependent && not opt_Static = ["-L" ++ l, "-Wl,-rpath", "-Wl," ++ l]
+                                | otherwise = ["-L" ++ l]
+#else
+        get_pkg_lib_path_opts l = ["-L" ++ l]
+#endif
 
     let lib_paths = libraryPaths dflags
     let lib_path_opts = map ("-L"++) lib_paths
