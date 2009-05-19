@@ -163,7 +163,7 @@ $(eval $(call all-target,libffi,libffi/libHSffi.a libffi/libHSffi_p.a))
 libffi/HSffi.o: libffi/libHSffi.a
 	cd libffi && \
 	  touch empty.c; \
-	  $(CC) -c empty.c -o HSffi.o
+	  $(CC) $(SRC_CC_OPTS) -c empty.c -o HSffi.o
 
 $(eval $(call all-target,libffi,libffi/HSffi.o))
 
