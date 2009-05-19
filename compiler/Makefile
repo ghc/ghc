@@ -18,11 +18,11 @@ include $(TOP)/mk/sub-makefile.mk
 .PHONY: 1 2 3
 
 1:
-	+$(TOPMAKE) stage=1 all_ghc_stage1 compiler_stage1_NO_BUILD_DEPS=YES
+	+$(TOPMAKE) stage=1 all_ghc_stage1 compiler_stage1_NO_BUILD_DEPS=YES OMIT_PHASE_1=YES OMIT_PHASE_2=YES OMIT_PHASE_3=YES
 
 2:
-	+$(TOPMAKE) stage=2 all_ghc_stage2 compiler_stage2_NO_BUILD_DEPS=YES
+	+$(TOPMAKE) stage=2 all_ghc_stage2 compiler_stage2_NO_BUILD_DEPS=YES OMIT_PHASE_1=YES OMIT_PHASE_2=YES OMIT_PHASE_3=YES
 
 3:
-	+$(TOPMAKE) stage=3 all_ghc_stage3 compiler_stage3_NO_BUILD_DEPS=YES
+	+$(TOPMAKE) stage=3 all_ghc_stage3 compiler_stage3_NO_BUILD_DEPS=YES OMIT_PHASE_1=YES OMIT_PHASE_2=YES OMIT_PHASE_3=YES
 
