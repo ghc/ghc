@@ -335,6 +335,75 @@ Indeed, the bindings can even be recursive.
 <sect1 id="syntax-extns">
 <title>Syntactic extensions</title>
  
+    <sect2 id="unicode-syntax">
+      <title>Unicode syntax</title>
+      <para>The language
+      extension <option>-XUnicodeSyntax</option><indexterm><primary><option>-XUnicodeSyntax</option></primary></indexterm>
+      enables Unicode characters to be used to stand for certain ASCII
+      character sequences.  The following alternatives are provided:</para>
+
+      <informaltable>
+	<tgroup cols="2" align="left" colsep="1" rowsep="1">
+	  <thead>
+	    <row>
+	      <entry>ASCII</entry>
+              <entry>Unicode alternative</entry>
+	      <entry>Code point</entry>
+	      <entry>Name</entry>
+	    </row>
+	  </thead>
+	  <tbody>
+	    <row>
+	      <entry><literal>::</literal></entry>
+	      <entry>::</entry> <!-- no special char, apparently -->
+              <entry>0x2237</entry>
+	      <entry>PROPORTION</entry>
+	    </row>
+          </tbody>
+	  <tbody>
+	    <row>
+	      <entry><literal>=&gt;</literal></entry>
+	      <entry>&rArr;</entry>
+	      <entry>0x21D2</entry>
+              <entry>RIGHTWARDS DOUBLE ARROW</entry>
+	    </row>
+          </tbody>
+	  <tbody>
+	    <row>
+	      <entry><literal>forall</literal></entry>
+	      <entry>&forall;</entry>
+	      <entry>0x2200</entry>
+              <entry>FOR ALL</entry>
+	    </row>
+          </tbody>
+	  <tbody>
+	    <row>
+	      <entry><literal>-&gt;</literal></entry>
+	      <entry>&rarr;</entry>
+	      <entry>0x2192</entry>
+              <entry>RIGHTWARDS ARROW</entry>
+	    </row>
+          </tbody>
+	  <tbody>
+	    <row>
+	      <entry><literal>&lt;-</literal></entry>
+	      <entry>&larr;</entry>
+	      <entry>0x2190</entry>
+              <entry>LEFTWARDS ARROW</entry>
+	    </row>
+          </tbody>
+	  <tbody>
+	    <row>
+	      <entry>..</entry>
+	      <entry>&hellip;</entry>
+	      <entry>0x22EF</entry>
+	      <entry>MIDLINE HORIZONTAL ELLIPSIS</entry>
+	    </row>
+          </tbody>
+        </tgroup>
+      </informaltable>
+    </sect2>
+
     <sect2 id="magic-hash">
       <title>The magic hash</title>
       <para>The language extension <option>-XMagicHash</option> allows "&num;" as a
