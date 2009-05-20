@@ -15,6 +15,21 @@
 
 utils/ghc-pkg_dist_PROG = ghc-pkg
 
+ifeq "$(BootingFromHc)" "YES"
+
+inplace/bin/ghc-pkg : utils/ghc-pkg/dist-install/build/tmp/$(utils/ghc-pkg_dist_PROG)$(exeext)
+ifeq "$(Windows)" "YES"
+	cp $< $@
+else
+	$(RM) $@
+	echo "#!/bin/sh" >>$@
+	echo "PKGCONF=$(TOP)/$(INPLACE_PACKAGE_CONF)" >>$@
+	echo '$(TOP)/$< --global-conf $$PKGCONF $${1+"$$@"}' >> $@
+	chmod +x $@
+endif
+
+else
+
 $(GHC_PKG_INPLACE) : utils/ghc-pkg/dist/build/$(utils/ghc-pkg_dist_PROG)$(exeext) $(MKDIRHIER)
 	$(MKDIRHIER) $(dir $(INPLACE_PACKAGE_CONF))
 	echo "[]" > $(INPLACE_PACKAGE_CONF)
@@ -26,6 +41,8 @@ else
 	echo "PKGCONF=$(TOP)/$(INPLACE_PACKAGE_CONF)" >>$@
 	echo '$(TOP)/$< --global-conf $$PKGCONF $${1+"$$@"}' >> $@
 	chmod +x $@
+endif
+
 endif
 
 # depend on ghc-cabal, otherwise we build Cabal twice when building in parallel
@@ -66,6 +83,10 @@ utils/ghc-pkg_dist-install_SHELL_WRAPPER = YES
 utils/ghc-pkg_dist-install_INSTALL_SHELL_WRAPPER = YES
 utils/ghc-pkg_dist-install_INSTALL_SHELL_WRAPPER_NAME = ghc-pkg-$(ProjectVersion)
 utils/ghc-pkg_dist-install_INSTALL_INPLACE = NO
+
+ifeq "$(BootingFromHc)" "YES"
+utils/ghc-pkg_dist-install_OTHER_OBJS += $(ALL_STAGE1_LIBS) $(ALL_STAGE1_LIBS) $(ALL_STAGE1_LIBS) $(ALL_RTS_LIBS) $(libffi_STATIC_LIB)
+endif
 
 $(eval $(call build-prog,utils/ghc-pkg,dist-install,1))
 
