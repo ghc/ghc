@@ -12,7 +12,6 @@
 -----------------------------------------------------------------------------
 
 --   ToDo / known bugs:
---    - Unicode
 --    - parsing integers is a bit slow
 --    - readRational is a bit slow
 --
