@@ -2258,7 +2258,13 @@ machdepCCOpts _dflags
         = ( [], ["-fomit-frame-pointer", "-G0"] )
 
 #elif x86_64_TARGET_ARCH
-        = ( [], ["-fomit-frame-pointer",
+        = (
+#if darwin_TARGET_OS
+            ["-m64"],
+#else
+            [],
+#endif
+                ["-fomit-frame-pointer",
                  "-fno-asynchronous-unwind-tables",
                         -- the unwind tables are unnecessary for HC code,
                         -- and get in the way of -split-objs.  Another option
