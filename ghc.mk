@@ -51,7 +51,6 @@
 #
 # Tickets we can now close, or fix and close:
 #
-#   * 2966 make sure --with-gcc does the right thing (#2966)
 #   * 1693 make distclean
 #   * 3173 make install with DESTDIR
 
