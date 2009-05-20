@@ -688,9 +688,11 @@ INLINE int __hscore_hs_fileno (FILE *f) { return fileno (f); }
 INLINE int __hscore_open(char *file, int how, mode_t mode) {
 #ifdef __MINGW32__
 	if ((how & O_WRONLY) || (how & O_RDWR) || (how & O_APPEND))
-	  return _sopen(file,how,_SH_DENYRW,mode);
+	  return _sopen(file,how | _O_NOINHERIT,_SH_DENYRW,mode);
+          // _O_NOINHERIT: see #2650
 	else
-	  return _sopen(file,how,_SH_DENYWR,mode);
+	  return _sopen(file,how | _O_NOINHERIT,_SH_DENYWR,mode);
+          // _O_NOINHERIT: see #2650
 #else
 	return open(file,how,mode);
 #endif
