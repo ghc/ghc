@@ -2282,6 +2282,8 @@ machdepCCOpts _dflags
       --     for "normal" programs, but it doesn't support register variable
       --     declarations.
         = ( [], ["-no-cpp-precomp"] )
+#elif x86_64_apple_darwin_TARGET
+        = ( ["-m64"], [] )
 #else
         = ( [], [] )
 #endif
