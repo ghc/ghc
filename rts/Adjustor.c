@@ -294,7 +294,7 @@ typedef struct AdjustorStub {
 } AdjustorStub;
 #endif
 
-#if defined(darwin_HOST_OS) || defined(powerpc_HOST_ARCH) || defined(powerpc64_HOST_ARCH)
+#if (defined(i386_HOST_ARCH) && defined(darwin_HOST_OS)) || defined(powerpc_HOST_ARCH) || defined(powerpc64_HOST_ARCH)
 static int totalArgumentSize(char *typeString)
 {
     int sz = 0;

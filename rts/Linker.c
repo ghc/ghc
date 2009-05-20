@@ -205,7 +205,7 @@ static void machoInitSymbolsWithoutUnderscore( void );
 #define MMAP_32BIT_BASE_DEFAULT 0x40000000
 #endif
 
-static void *mmap_32bit_base = MMAP_32BIT_BASE_DEFAULT;
+static void *mmap_32bit_base = (void *)MMAP_32BIT_BASE_DEFAULT;
 #endif
 
 /* MAP_ANONYMOUS is MAP_ANON on some systems, e.g. OpenBSD */
@@ -4098,7 +4098,9 @@ static int relocateSection(
         
         char    *thingPtr = image + sect->offset + reloc->r_address;
         uint64_t thing;
-        uint64_t value;
+        /* We shouldn't need to initialise this, but gcc on OS X 64 bit
+           complains that it may be used uninitialized if we don't */
+        uint64_t value = 0;
         uint64_t baseValue;
         int type = reloc->r_type;
         
