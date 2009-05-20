@@ -1111,6 +1111,7 @@ runPhase As _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
 	-- might be a hierarchical module.
 	createDirectoryHierarchy (takeDirectory output_fn)
 
+	let (md_c_flags, _) = machdepCCOpts dflags
 	SysTools.runAs dflags	
 		       (map SysTools.Option as_opts
 		       ++ [ SysTools.Option ("-I" ++ p) | p <- cmdline_include_paths ]
@@ -1128,7 +1129,8 @@ runPhase As _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
 		          , SysTools.FileOption "" input_fn
 			  , SysTools.Option "-o"
 			  , SysTools.FileOption "" output_fn
-			  ])
+			  ]
+		       ++ map SysTools.Option md_c_flags)
 
 	return (StopLn, dflags, maybe_loc, output_fn)
 
@@ -1159,6 +1161,7 @@ runPhase SplitAs _stop hsc_env _basename _suff _input_fn get_output_fn maybe_loc
             split_obj n = split_odir </>
                           takeFileName base_o ++ "__" ++ show n <.> osuf
 
+        let (md_c_flags, _) = machdepCCOpts dflags
         let assemble_file n
               = SysTools.runAs dflags
                          (map SysTools.Option as_opts ++
@@ -1176,7 +1179,8 @@ runPhase SplitAs _stop hsc_env _basename _suff _input_fn get_output_fn maybe_loc
                           , SysTools.Option "-o"
                           , SysTools.FileOption "" (split_obj n)
                           , SysTools.FileOption "" (split_s n)
-                          ])
+                          ]
+                       ++ map SysTools.Option md_c_flags)
 
         mapM_ assemble_file [1..n]
 
@@ -1187,7 +1191,9 @@ runPhase SplitAs _stop hsc_env _basename _suff _input_fn get_output_fn maybe_loc
                             SysTools.Option "-Wl,-r",
                             SysTools.Option ld_x_flag,
                             SysTools.Option "-o",
-                            SysTools.FileOption "" output_fn ] ++ args)
+                            SysTools.FileOption "" output_fn ]
+                         ++ map SysTools.Option md_c_flags
+                         ++ args)
             ld_x_flag | null cLD_X = ""
                       | otherwise  = "-Wl,-x"
 
