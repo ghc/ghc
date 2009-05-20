@@ -81,7 +81,7 @@ clean distclean maintainer-clean:
 	test ! -d testsuite || $(MAKE) -C testsuite $@
 
 $(filter clean_%, $(MAKECMDGOALS)) : clean_% :
-	$(MAKE) -r --no-print-directory -f ghc.mk $@
+	$(MAKE) -r --no-print-directory -f ghc.mk $@ CLEANING=YES
 
 bootstrapping-files show: $(PACKAGE_MK)
 	$(MAKE) -r --no-print-directory -f ghc.mk $@
