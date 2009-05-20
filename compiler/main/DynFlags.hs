@@ -72,7 +72,7 @@ import PackageConfig
 import PrelNames        ( mAIN, main_RDR_Unqual )
 import RdrName          ( RdrName, mkRdrUnqual )
 import OccName          ( mkVarOccFS )
-#if defined(i386_TARGET_ARCH) || ! defined(mingw32_TARGET_OS)
+#if defined(i386_TARGET_ARCH) || (!defined(mingw32_TARGET_OS) && !defined(darwin_TARGET_OS))
 import StaticFlags      ( opt_Static )
 #endif
 import StaticFlags      ( opt_PIC, WayName(..), v_Ways, v_Build_tag,
