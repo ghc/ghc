@@ -49,7 +49,7 @@ endif
 utils/ghc-pkg/dist/build/$(utils/ghc-pkg_dist_PROG)$(exeext): utils/ghc-pkg/Main.hs utils/ghc-pkg/Version.hs $(GHC_CABAL_INPLACE) $(MKDIRHIER)
 	$(MKDIRHIER) bootstrapping
 	$(MKDIRHIER) utils/ghc-pkg/dist/build
-	$(GHC) --make utils/ghc-pkg/Main.hs -o $@ \
+	$(GHC) $(SRC_HC_OPTS) --make utils/ghc-pkg/Main.hs -o $@ \
 	       -Wall \
 	       -DCABAL_VERSION=$(CABAL_VERSION) \
 	       -odir  bootstrapping \

@@ -25,7 +25,7 @@ $(GHC_CABAL_INPLACE) : $(GHC_CABAL_DIR)/dist/build/tmp/ghc-cabal$(exeext)
 $(GHC_CABAL_DIR)/dist/build/tmp/ghc-cabal$(exeext): $(GHC_CABAL_DIR)/ghc-cabal.hs $(MKDIRHIER)
 	$(MKDIRHIER) bootstrapping
 	$(MKDIRHIER) $(dir $@)
-	$(GHC) --make $(GHC_CABAL_DIR)/ghc-cabal.hs -o $@ \
+	$(GHC) $(SRC_HC_OPTS) --make $(GHC_CABAL_DIR)/ghc-cabal.hs -o $@ \
 	       -Wall $(WERROR) \
 	       -DCABAL_VERSION=$(CABAL_VERSION) \
 	       -odir  bootstrapping \
