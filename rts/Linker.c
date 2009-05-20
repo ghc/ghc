@@ -1054,6 +1054,16 @@ initLinker( void )
         mmap_32bit_base = (void*)RtsFlags.MiscFlags.linkerMemBase;
     }
 #endif
+
+#if defined(mingw32_HOST_OS)
+    /*
+     * These two libraries cause problems when added to the static link,
+     * but are necessary for resolving symbols in GHCi, hence we load
+     * them manually here.
+     */
+    addDLL("msvcrt");
+    addDLL("kernel32");
+#endif
 }
 
 /* -----------------------------------------------------------------------------
