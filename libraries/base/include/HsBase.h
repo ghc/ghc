@@ -765,5 +765,19 @@ INLINE intptr_t  __hscore_to_intptr   (void *p)     { return (intptr_t)p; }
 void errorBelch2(const char*s, char *t);
 void debugBelch2(const char*s, char *t);
 
+#if !defined(mingw32_HOST_OS) && !defined(__MINGW32__)
+
+INLINE int fcntl_read(int fd, int cmd) {
+    fcntl(fd, cmd);
+}
+INLINE int fcntl_write(int fd, int cmd, long arg) {
+    fcntl(fd, cmd, arg);
+}
+INLINE int fcntl_lock(int fd, int cmd, struct flock *lock) {
+    fcntl(fd, cmd, lock);
+}
+
+#endif
+
 #endif /* __HSBASE_H__ */
 
