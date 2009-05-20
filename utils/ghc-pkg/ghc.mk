@@ -24,7 +24,7 @@ else
 	$(RM) $@
 	echo "#!/bin/sh" >>$@
 	echo "PKGCONF=$(TOP)/$(INPLACE_PACKAGE_CONF)" >>$@
-	echo '$(TOP)/utils/ghc-pkg/dist/build/$(utils/ghc-pkg_dist_PROG) --global-conf $$PKGCONF $${1+"$$@"}' >> $@
+	echo '$(TOP)/$< --global-conf $$PKGCONF $${1+"$$@"}' >> $@
 	chmod +x $@
 endif
 
