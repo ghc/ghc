@@ -144,10 +144,10 @@ outputC dflags filenm flat_absC packages
 
 \begin{code}
 outputAsm :: DynFlags -> FilePath -> [RawCmm] -> IO ()
-outputAsm dflags filenm flat_absC
 
 #ifndef OMIT_NATIVE_CODEGEN
 
+outputAsm dflags filenm flat_absC
   = do ncg_uniqs <- mkSplitUniqSupply 'n'
 
        {-# SCC "OutputAsm" #-} doOutput filenm $
@@ -157,6 +157,7 @@ outputAsm dflags filenm flat_absC
 
 #else /* OMIT_NATIVE_CODEGEN */
 
+outputAsm _ _ _
   = pprPanic "This compiler was built without a native code generator"
 	     (text "Use -fvia-C instead")
 
