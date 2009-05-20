@@ -7,5 +7,5 @@ test('ghci002', just_ghci, compile_and_run, [''])
 test('ghci003', just_ghci, compile_and_run, [''])
 test('2589',    just_ghci, compile_and_run, [''])
 
-test('3171', if_platform('i386_unknown_mingw32',skip), run_command,
+test('3171', if_platform('i386-unknown-mingw32',skip), run_command,
      ['$MAKE -s --no-print-directory 3171'])
