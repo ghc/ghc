@@ -131,7 +131,7 @@ endif
 
 $(eval $(call canonicaliseExecutable,HSC2HS))
 ifeq "$(wildcard $(HSC2HS))" ""
-$(error Cannot find ghc-pkg: $(HSC2HS))
+$(error Cannot find hsc2hs: $(HSC2HS))
 endif
 
 $(eval $(call canonicaliseExecutable,HP2PS_ABS))
