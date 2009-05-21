@@ -371,7 +371,10 @@ x86_64-apple-darwin*)
         HostArch_CPP='x86_64'
         HostVendor_CPP='apple'
         HostOS_CPP='darwin'
-	soext='.dylib'
+        soext='.dylib'
+        # By default, gcc makes 32bit executables on OS X
+        CFLAGS="$CFLAGS -m64"
+        LDFLAGS="$LDFLAGS -m64"
         ;;
 m68k-*-linux*)
         HostPlatform=m68k-unknown-linux # hack again
@@ -948,7 +951,11 @@ AC_PROG_CPP
 dnl ** Without optimization some INLINE trickery fails for GHCi
 SRC_CC_OPTS="-O"
 
+SRC_CC_OPTS="$SRC_CC_OPTS $CFLAGS"
+SRC_LD_OPTS="$SRC_LD_OPTS $LDFLAGS"
+
 AC_SUBST(SRC_CC_OPTS)
+AC_SUBST(SRC_LD_OPTS)
 
 dnl ** figure out how to do context diffs
 FP_PROG_CONTEXT_DIFF

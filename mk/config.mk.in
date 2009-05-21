@@ -687,8 +687,9 @@ else
 endif
 endif
 
-# default C compiler flags
+# default C compiler and linker flags
 SRC_CC_OPTS = @SRC_CC_OPTS@
+SRC_LD_OPTS = @SRC_LD_OPTS@
 
 ifeq "$(TARGETPLATFORM)" "ia64-unknown-linux"
 SRC_CC_OPTS += -G0
