@@ -468,10 +468,14 @@ BUILD_DIRS += \
    gmp \
    docs/users_guide \
    libraries/Cabal/doc \
-   $(GHC_MANGLER_DIR) \
-   $(GHC_SPLIT_DIR) \
    $(GHC_UNLIT_DIR) \
    $(GHC_HP2PS_DIR)
+
+ifneq "$(GhcUnregisterised)" "YES"
+BUILD_DIRS += \
+   $(GHC_MANGLER_DIR) \
+   $(GHC_SPLIT_DIR)
+endif
 
 ifneq "$(BINDIST)" "YES"
 BUILD_DIRS += \
