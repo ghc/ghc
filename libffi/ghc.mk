@@ -119,10 +119,13 @@ $(libffi_STAMP_CONFIGURE):
 	    PATH=`pwd`:$$PATH; \
 	    export PATH; \
 	    cd build && \
-	    CC=$(WhatGccIsCalled) $(SHELL) configure \
-		  --enable-static=yes \
+	    CC=$(WhatGccIsCalled) \
+        CFLAGS="$(SRC_CC_OPTS)" \
+        LDFLAGS="$(SRC_LD_OPTS)" \
+        $(SHELL) configure \
+	          --enable-static=yes \
 	          --enable-shared=$(libffi_EnableShared) \
-		  --host=$(PLATFORM) --build=$(PLATFORM)
+	          --host=$(PLATFORM) --build=$(PLATFORM)
 
 	# libffi.so needs to be built with the correct soname.
 	# NOTE: this builds libffi_convience.so with the incorrect
