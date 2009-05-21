@@ -97,7 +97,7 @@ gmp/libgmp.a:
 
 ifneq "$(NO_CLEAN_GMP)" "YES"
 $(eval $(call clean-target,gmp,,\
-  gmp/libgmp.a gmp/gmpbuild gmp/$(GMP_DIR)))
+  gmp/libgmp.a gmp/gmp.h gmp/gmpbuild gmp/$(GMP_DIR)))
 endif
 
 # XXX TODO:
