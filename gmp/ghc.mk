@@ -38,6 +38,7 @@ ifneq "$(HaveLibGmp)" "YES"
 ifneq "$(HaveFrameworkGMP)" "YES"
 
 INSTALL_LIBS += gmp/libgmp.a
+INSTALL_HEADERS += gmp/gmp.h
 
 $(eval $(call all-target,gmp_dynamic,gmp/libgmp.a))
 
@@ -78,9 +79,7 @@ PLATFORM := $(shell echo $(HOSTPLATFORM) | sed 's/i[567]86/i486/g')
 GMP_TARBALL := $(wildcard gmp/tarball/gmp*.tar.bz2)
 GMP_DIR := $(patsubst gmp/tarball/%-nodoc.tar.bz2,%,$(GMP_TARBALL))
 
-# XXX INSTALL_HEADERS += gmp.h
-
-gmp/libgmp.a:
+gmp/libgmp.a gmp/gmp.h:
 	$(RM) -rf $(GMP_DIR) gmp/gmpbuild
 	cd gmp && $(TAR) -jxf ../$(GMP_TARBALL)
 	mv gmp/$(GMP_DIR) gmp/gmpbuild
@@ -92,6 +91,7 @@ gmp/libgmp.a:
 	    CC=$(WhatGccIsCalled) $(SHELL) configure \
 	          --enable-shared=no --host=$(PLATFORM) --build=$(PLATFORM)
 	$(MAKE) -C gmp/gmpbuild MAKEFLAGS=
+	$(CP) gmp/gmpbuild/gmp.h gmp/
 	$(CP) gmp/gmpbuild/.libs/libgmp.a gmp/
 	$(RANLIB) gmp/libgmp.a
 
