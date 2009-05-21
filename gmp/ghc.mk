@@ -95,8 +95,10 @@ gmp/libgmp.a:
 	$(CP) gmp/gmpbuild/.libs/libgmp.a gmp/
 	$(RANLIB) gmp/libgmp.a
 
+ifneq "$(NO_CLEAN_GMP)" "YES"
 $(eval $(call clean-target,gmp,,\
   gmp/libgmp.a gmp/gmpbuild gmp/$(GMP_DIR)))
+endif
 
 # XXX TODO:
 #stamp.gmp.shared:
