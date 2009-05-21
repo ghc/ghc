@@ -777,6 +777,16 @@ LD_X			= @LdXFlag@
 # overflowing command-line length limits.
 LdIsGNULd		= @LdIsGNULd@
 
+# On MSYS, building with SplitObjs=YES fails with 
+#   ar: Bad file number
+# see #3201.  We need to specify a smaller max command-line size
+# to work around it.  32767 doesn't work; 30000 does.
+ifeq "$(Windows)" "YES"
+XARGS = xargs -s 30000
+else
+XARGS = xargs
+endif
+
 #
 # In emergency situations, REAL_SHELL is used to perform shell commands
 # from within the ghc driver script, by scribbling the command line to
