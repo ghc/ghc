@@ -77,565 +77,6 @@ fi
 AC_SUBST(GMP_INCLUDE_DIRS)
 AC_SUBST(GMP_LIB_DIRS)
 
-dnl--------------------------------------------------------------------
-dnl * Choose host(/target/build) platform
-dnl--------------------------------------------------------------------
-
-dnl Guess host/target/build platform(s) if necessary.
-AC_CANONICAL_TARGET
-
-# "$host" defaults to "$target"
-if test "x$host" = xNONE ; then
-    host=$target
-fi
-
-dnl ** canonicalize platform names
-BuildPlatform=`/bin/sh $srcdir/config.sub $build` || exit 1
-HostPlatform=`/bin/sh $srcdir/config.sub $host` || exit 1
-TargetPlatform=`/bin/sh $srcdir/config.sub $target` || exit 1
-
-if test x"$TargetPlatform" != x"$HostPlatform" ; then
-    AC_MSG_ERROR([
-      GHC configuration does not support differing host/target (i.e., cross-compiling)])
-fi
-
-case $HostPlatform in
-*-cygwin*)
-    AC_MSG_WARN([GHC does not support the Cygwin target at the moment])
-    AC_MSG_WARN([I'm assuming you wanted to build for i386-unknown-mingw32])
-    HostPlatform=i386-unknown-mingw32  
-    ;;
-esac
-
-exeext=''
-soext='.so'
-#
-# The following will be more difficult when we *are* cross-compiling.
-# Suitable names to slam in *_CPP are in platform.h.in.
-# We also record the architecture, vendor, and operating system (OS)
-# separately.
-case $HostPlatform in
-alpha*-dec-osf[[12]]*)
-        HostPlatform=alpha-dec-osf1   # canonicalise for our purposes
-        TargetPlatform=alpha-dec-osf1 # this will work for now... (hack)
-        BuildPlatform=alpha-dec-osf1  # hack
-        HostPlatform_CPP='alpha_dec_osf1'
-        HostArch_CPP='alpha'
-        HostVendor_CPP='dec'
-        HostOS_CPP='osf1'
-        ;;
-alpha*-dec-osf[[345]]*)
-        HostPlatform=alpha-dec-osf3   # canonicalise for our purposes
-        TargetPlatform=alpha-dec-osf3 # this will work for now... (hack)
-        BuildPlatform=alpha-dec-osf3  # hack
-        HostPlatform_CPP='alpha_dec_osf3'
-        HostArch_CPP='alpha'
-        HostVendor_CPP='dec'
-        HostOS_CPP='osf3'
-        ;;
-alpha*-unknown-linux*)
-        HostPlatform=alpha-unknown-linux
-        TargetPlatform=alpha-unknown-linux
-        BuildPlatform=alpha-unknown-linux
-        HostPlatform_CPP='alpha_unknown_linux'
-        HostArch_CPP='alpha'
-        HostVendor_CPP='unknown'
-        HostOS_CPP='linux'
-        ;;
-alpha*-unknown-freebsd*)
-        HostPlatform=alpha-unknown-freebsd
-        TargetPlatform=alpha-unknown-freebsd
-        BuildPlatform=alpha-unknown-freebsd
-        HostPlatform_CPP='alpha_unknown_freebsd'
-        HostArch_CPP='alpha'
-        HostVendor_CPP='unknown'
-        HostOS_CPP='freebsd'
-        ;;
-alpha*-unknown-openbsd*)
-        HostPlatform=alpha-unknown-openbsd
-        TargetPlatform=alpha-unknown-openbsd
-        BuildPlatform=alpha-unknown-openbsd
-        HostPlatform_CPP='alpha_unknown_openbsd'
-        HostArch_CPP='alpha'
-        HostVendor_CPP='unknown'
-        HostOS_CPP='openbsd'
-        ;;
-amd64-*-openbsd*|x86_64-*-openbsd*)
-        HostPlatform=x86_64-unknown-openbsd
-        TargetPlatform=x86_64-unknown-openbsd
-        BuildPlatform=x86_64-unknown-openbsd
-        HostPlatform_CPP='x86_64_unknown_openbsd'
-        HostArch_CPP='x86_64'
-        HostVendor_CPP='unknown'
-        HostOS_CPP='openbsd'
-        ;;
-amd64-*-freebsd*|x86_64-*-freebsd*)
-        HostPlatform=x86_64-unknown-freebsd
-        TargetPlatform=x86_64-unknown-freebsd
-        BuildPlatform=x86_64-unknown-freebsd
-        HostPlatform_CPP='x86_64_unknown_freebsd'
-        HostArch_CPP='x86_64'
-        HostVendor_CPP='unknown'
-        HostOS_CPP='freebsd'
-        ;;
-amd64-*-netbsd*|x86_64-*-netbsd*)
-        HostPlatform=x86_64-unknown-netbsd
-        TargetPlatform=x86_64-unknown-netbsd
-        BuildPlatform=x86_64-unknown-netbsd
-        HostPlatform_CPP='x86_64_unknown_netbsd'
-        HostArch_CPP='x86_64'
-        HostVendor_CPP='unknown'
-        HostOS_CPP='netbsd'
-        ;;
-arm*-linux*)
-        HostPlatform=arm-unknown-linux # hack again
-        TargetPlatform=arm-unknown-linux
-        BuildPlatform=arm-unknown-linux
-        HostPlatform_CPP='arm_unknown_linux'
-        HostArch_CPP='arm'
-        HostVendor_CPP='unknown'
-        HostOS_CPP='linux'
-        ;;
-arm*-openbsd*)
-        HostPlatform=arm-unknown-openbsd
-        TargetPlatform=arm-unknown-openbsd
-        BuildPlatform=arm-unknown-openbsd
-        HostPlatform_CPP='arm_unknown_openbsd'
-        HostArch_CPP='arm'
-        HostVendor_CPP='unknown'
-        HostOS_CPP='openbsd'
-        ;;
-hppa*-*-linux*)
-        HostPlatform=hppa-unknown-linux # hack again
-        TargetPlatform=hppa-unknown-linux
-        BuildPlatform=hppa-unknown-linux
-        HostPlatform_CPP='hppa_unknown_linux'
-        HostArch_CPP='hppa'
-        HostVendor_CPP='unknown'
-        HostOS_CPP='linux'
-        ;;
-hppa*-*-openbsd*)
-        HostPlatform=hppa-unknown-openbsd # hack again
-        TargetPlatform=hppa-unknown-openbsd
-        BuildPlatform=hppa-unknown-openbsd
-        HostPlatform_CPP='hppa_unknown_openbsd'
-        HostArch_CPP='hppa'
-        HostVendor_CPP='unknown'
-        HostOS_CPP='openbsd'
-        ;;
-hppa1.1-hp-hpux*)
-        HostPlatform=hppa1.1-hp-hpux  # canonicalise for our purposes (hack)
-        TargetPlatform=hppa1.1-hp-hpux
-        BuildPlatform=hppa1.1-hp-hpux
-        HostPlatform_CPP='hppa1_1_hp_hpux'
-        HostArch_CPP='hppa1_1'
-        HostVendor_CPP='hp'
-        HostOS_CPP='hpux'
-        ;;
-i[[3456]]86-*-linuxaout*)
-        HostPlatform=i386-unknown-linuxaout   # hack again
-        TargetPlatform=i386-unknown-linuxaout
-        BuildPlatform=i386-unknown-linuxaout
-        HostPlatform_CPP='i386_unknown_linuxaout'
-        HostArch_CPP='i386'
-        HostVendor_CPP='unknown'
-        HostOS_CPP='linuxaout'
-        ;;
-i[[3456]]86-*-linux*)
-        HostPlatform=i386-unknown-linux # hack again
-        TargetPlatform=i386-unknown-linux
-        BuildPlatform=i386-unknown-linux
-        HostPlatform_CPP='i386_unknown_linux'
-        HostArch_CPP='i386'
-        HostVendor_CPP='unknown'
-        HostOS_CPP='linux'
-        ;;
-i[[3456]]86-*-kfreebsd*-gnu)
-        HostPlatform=i386-unknown-kfreebsdgnu # hack again
-        TargetPlatform=i386-unknown-kfreebsdgnu
-        BuildPlatform=i386-unknown-kfreebsdgnu
-        HostPlatform_CPP='i386_unknown_kfreebsdgnu'
-        HostArch_CPP='i386'
-        HostVendor_CPP='unknown'
-        HostOS_CPP='kfreebsdgnu'
-        ;;
-i[[3456]]86-*-freebsd[[3-9]]*) # FreeBSD 3.0+ uses ELF
-        HostPlatform=i386-unknown-freebsd # hack again
-        TargetPlatform=i386-unknown-freebsd
-        BuildPlatform=i386-unknown-freebsd
-        HostPlatform_CPP='i386_unknown_freebsd'
-        HostArch_CPP='i386'
-        HostVendor_CPP='unknown'
-        HostOS_CPP='freebsd'
-        ;;
-i[[3456]]86-*-freebsd2*) # Older FreeBSDs are a.out
-        HostPlatform=i386-unknown-freebsd2 # hack again
-        TargetPlatform=i386-unknown-freebsd2
-        BuildPlatform=i386-unknown-freebsd2
-        HostPlatform_CPP='i386_unknown_freebsd2'
-        HostArch_CPP='i386'
-        HostVendor_CPP='unknown'
-        HostOS_CPP='freebsd2'
-        ;;
-i[[3456]]86-*-netbsd*)
-        HostPlatform=i386-unknown-netbsd # hack again
-        TargetPlatform=i386-unknown-netbsd
-        BuildPlatform=i386-unknown-netbsd
-        HostPlatform_CPP='i386_unknown_netbsd'
-        HostArch_CPP='i386'
-        HostVendor_CPP='unknown'
-        HostOS_CPP='netbsd'
-        ;;
-i[[3456]]86-*-openbsd*)
-        HostPlatform=i386-unknown-openbsd # hack again
-        TargetPlatform=i386-unknown-openbsd
-        BuildPlatform=i386-unknown-openbsd
-        HostPlatform_CPP='i386_unknown_openbsd'
-        HostArch_CPP='i386'
-        HostVendor_CPP='unknown'
-        HostOS_CPP='openbsd'
-        ;;
-i[[3456]]86-*-solaris2*)
-        HostPlatform=i386-unknown-solaris2 # hack again
-        TargetPlatform=i386-unknown-solaris2
-        BuildPlatform=i386-unknown-solaris2
-        HostPlatform_CPP='i386_unknown_solaris2'
-        HostArch_CPP='i386'
-        HostVendor_CPP='unknown'
-        HostOS_CPP='solaris2'
-        ;;
-i[[3456]]86-*-cygwin*)
-        HostPlatform=i386-unknown-cygwin32 # hack again
-        TargetPlatform=i386-unknown-cygwin32
-        BuildPlatform=i386-unknown-cygwin32
-        HostPlatform_CPP='i386_unknown_cygwin32'
-        HostArch_CPP='i386'
-        HostVendor_CPP='unknown'
-        HostOS_CPP='cygwin32'
-        exeext='.exe'
-	soext='.dll'
-        ;;
-i[[3456]]86-*-mingw32*)
-        HostPlatform=i386-unknown-mingw32 # hack again
-        TargetPlatform=i386-unknown-mingw32
-        BuildPlatform=i386-unknown-mingw32
-        HostPlatform_CPP='i386_unknown_mingw32'
-        HostArch_CPP='i386'
-        HostVendor_CPP='unknown'
-        HostOS_CPP='mingw32'
-        exeext='.exe'
-	soext='.dll'
-        ;;
-i[[3456]]86-apple-darwin*)
-        HostPlatform=i386-apple-darwin
-        TargetPlatform=i386-apple-darwin #hack
-        BuildPlatform=i386-apple-darwin #hack
-        HostPlatform_CPP='i386_apple_darwin'
-        HostArch_CPP='i386'
-        HostVendor_CPP='apple'
-        HostOS_CPP='darwin'
-	soext='.dylib'
-        ;;
-i[[3456]]86-*-gnu*)
-        HostPlatform=i386-unknown-gnu
-        TargetPlatform=i386-unknown-gnu
-        BuildPlatform=i386-unknown-gnu
-        HostPlatform_CPP=i386_unknown_gnu
-        HostArch_CPP=i386
-        HostVendor_CPP=unknown
-        HostOS_CPP=gnu
-        ;;
-ia64-*-linux*)
-        HostPlatform=ia64-unknown-linux # hack again
-        TargetPlatform=ia64-unknown-linux
-        BuildPlatform=ia64-unknown-linux
-        HostPlatform_CPP='ia64_unknown_linux'
-        HostArch_CPP='ia64'
-        HostVendor_CPP='unknown'
-        HostOS_CPP='linux'
-        ;;
-x86_64-*-linux*)
-        HostPlatform=x86_64-unknown-linux
-        TargetPlatform=x86_64-unknown-linux
-        BuildPlatform=x86_64-unknown-linux
-        HostPlatform_CPP='x86_64_unknown_linux'
-        HostArch_CPP='x86_64'
-        HostVendor_CPP='unknown'
-        HostOS_CPP='linux'
-        ;;
-x86_64-apple-darwin*)
-        HostPlatform=x86_64-apple-darwin
-        TargetPlatform=x86_64-apple-darwin
-        BuildPlatform=x86_64-apple-darwin
-        HostPlatform_CPP='x86_64_apple_darwin'
-        HostArch_CPP='x86_64'
-        HostVendor_CPP='apple'
-        HostOS_CPP='darwin'
-        soext='.dylib'
-        # By default, gcc makes 32bit executables on OS X
-        CFLAGS="$CFLAGS -m64"
-        LDFLAGS="$LDFLAGS -m64"
-        ;;
-m68k-*-linux*)
-        HostPlatform=m68k-unknown-linux # hack again
-        TargetPlatform=m68k-unknown-linux
-        BuildPlatform=m68k-unknown-linux
-        HostPlatform_CPP='m68k_unknown_linux'
-        HostArch_CPP='m68k'
-        HostVendor_CPP='unknown'
-        HostOS_CPP='linux'
-        ;;
-m68k-next-nextstep2)
-        HostPlatform_CPP='m68k_next_nextstep2'
-        HostArch_CPP='m68k'
-        HostVendor_CPP='next'
-        HostOS_CPP='nextstep2'
-        ;;
-m68k-next-nextstep3)
-        HostPlatform_CPP='m68k_next_nextstep3'
-        HostArch_CPP='m68k'
-        HostVendor_CPP='next'
-        HostOS_CPP='nextstep3'
-        ;;
-i[[3456]]86-next-nextstep3)
-        HostPlatform=i386-next-nextstep3 # hack again
-        TargetPlatform=i386-next-nextstep3
-        BuildPlatform=i386-next-nextstep3
-        HostPlatform_CPP='i386_next_nextstep3'
-        HostArch_CPP='i386'
-        HostVendor_CPP='next'
-        HostOS_CPP='nextstep3'
-        ;;
-m68k-*-openbsd*)
-        HostPlatform=m68k-unknown-openbsd
-        TargetPlatform=m68k-unknown-openbsd
-        BuildPlatform=m68k-unknown-openbsd
-        HostPlatform_CPP='m68k_unknown_openbsd'
-        HostArch_CPP='m68k'
-        HostVendor_CPP='unknown'
-        HostOS_CPP='openbsd'
-        ;;
-m68k-*-netbsd*)
-        HostPlatform=m68k-unknown-netbsd
-        TargetPlatform=m68k-unknown-netbsd
-        BuildPlatform=m68k-unknown-netbsd
-        HostPlatform_CPP='m68k_unknown_netbsd'
-        HostArch_CPP='m68k'
-        HostVendor_CPP='unknown'
-        HostOS_CPP='netbsd'
-        ;;
-m68k-sun-sunos4*)
-        HostPlatform=m68k-sun-sunos4
-        TargetPlatform=m68k-sun-sunos4 #hack
-        BuildPlatform=m68k-sun-sunos4 #hack
-        HostPlatform_CPP='m68k_sun_sunos4'
-        HostArch_CPP='m68k'
-        HostVendor_CPP='sun'
-        HostOS_CPP='sunos4'
-        ;;
-m88k-*-openbsd*)
-        HostPlatform=m88k-unknown-openbsd
-        TargetPlatform=m88k-unknown-openbsd
-        BuildPlatform=m88k-unknown-openbsd
-        HostPlatform_CPP='m88k_unknown_openbsd'
-        HostArch_CPP='m88k'
-        HostVendor_CPP='unknown'
-        HostOS_CPP='openbsd'
-        ;;
-mips-*-linux*)
-        HostPlatform=mips-unknown-linux # hack again
-        TargetPlatform=mips-unknown-linux
-        BuildPlatform=mips-unknown-linux
-        HostPlatform_CPP='mips_unknown_linux'
-        HostArch_CPP='mips'
-        HostVendor_CPP='unknown'
-        HostOS_CPP='linux'
-        ;;
-mipsel-*-linux*)
-        HostPlatform=mipsel-unknown-linux # hack again
-        TargetPlatform=mipsel-unknown-linux
-        BuildPlatform=mipsel-unknown-linux
-        HostPlatform_CPP='mipsel_unknown_linux'
-        HostArch_CPP='mipsel'
-        HostVendor_CPP='unknown'
-        HostOS_CPP='linux'
-        ;;
-mips-dec-ultrix*)
-        HostPlatform_CPP='mips_dec_ultrix'
-        HostArch_CPP='mipsel'   # NB a little different
-        HostVendor_CPP='dec'
-        HostOS_CPP='ultrix'
-        ;;
-mips-sgi-irix*)
-        HostPlatform=mips-sgi-irix
-        TargetPlatform=mips-sgi-irix #hack
-        BuildPlatform=mips-sgi-irix #hack
-        HostPlatform_CPP='mips_sgi_irix'
-        HostArch_CPP='mipseb'   # NB a little different
-        HostVendor_CPP='sgi'
-        HostOS_CPP='irix'
-        ;;
-rs6000-ibm-aix*)
-        HostPlatform=rs6000-ibm-aix
-        TargetPlatform=rs6000-ibm-aix #hack
-        BuildPlatform=rs6000-ibm-aix #hack
-        HostPlatform_CPP='rs6000_ibm_aix'
-        HostArch_CPP='rs6000'
-        HostVendor_CPP='ibm'
-        HostOS_CPP='aix'
-        ;;
-powerpc-ibm-aix*)
-        HostPlatform=powerpc-ibm-aix
-        TargetPlatform=powerpc-ibm-aix #hack
-        BuildPlatform=powerpc-ibm-aix #hack
-        HostPlatform_CPP='powerpc_ibm_aix'
-        HostArch_CPP='powerpc'
-        HostVendor_CPP='ibm'
-        HostOS_CPP='aix'
-        ;;
-powerpc-apple-darwin*)
-        HostPlatform=powerpc-apple-darwin
-        TargetPlatform=powerpc-apple-darwin #hack
-        BuildPlatform=powerpc-apple-darwin #hack
-        HostPlatform_CPP='powerpc_apple_darwin'
-        HostArch_CPP='powerpc'
-        HostVendor_CPP='apple'
-        HostOS_CPP='darwin'
-	soext='.dylib'
-        ;;
-powerpc-unknown-linux*)
-        HostPlatform=powerpc-unknown-linux
-        TargetPlatform=powerpc-unknown-linux
-        BuildPlatform=powerpc-unknown-linux
-        HostPlatform_CPP='powerpc_unknown_linux'
-        HostArch_CPP='powerpc'
-        HostVendor_CPP='unknown'
-        HostOS_CPP='linux'
-        ;;
-powerpc-unknown-openbsd*)
-        HostPlatform=powerpc-unknown-openbsd
-        TargetPlatform=powerpc-unknown-openbsd
-        BuildPlatform=powerpc-unknown-openbsd
-        HostPlatform_CPP='powerpc_unknown_openbsd'
-        HostArch_CPP='powerpc'
-        HostVendor_CPP='unknown'
-        HostOS_CPP='openbsd'
-        ;;
-powerpc64-unknown-linux*)
-        HostPlatform=powerpc64-unknown-linux
-        TargetPlatform=powerpc64-unknown-linux
-        BuildPlatform=powerpc64-unknown-linux
-        HostPlatform_CPP='powerpc64_unknown_linux'
-        HostArch_CPP='powerpc64'
-        HostVendor_CPP='unknown'
-        HostOS_CPP='linux'
-        ;;
-
-s390-ibm-linux*)
-       HostPlatform=s390-ibm-linux
-       TargetPlatform=s390-ibm-linux #hack
-       BuildPlatform=s390-ibm-linux #hack
-        HostPlatform_CPP='s390_ibm_linux'
-        HostArch_CPP='s390'
-        HostVendor_CPP='ibm'
-        HostOS_CPP='linux'
-        ;;
-sparc-sun-sunos4*)
-        HostPlatform=sparc-sun-sunos4
-        TargetPlatform=sparc-sun-sunos4 #hack
-        BuildPlatform=sparc-sun-sunos4 #hack
-        HostPlatform_CPP='sparc_sun_sunos4'
-        HostArch_CPP='sparc'
-        HostVendor_CPP='sun'
-        HostOS_CPP='sunos4'
-        ;;
-sparc-sun-solaris2*)
-        HostPlatform=sparc-sun-solaris2
-        TargetPlatform=sparc-sun-solaris2 #hack
-        BuildPlatform=sparc-sun-solaris2 #hack
-        HostPlatform_CPP='sparc_sun_solaris2'
-        HostArch_CPP='sparc'
-        HostVendor_CPP='sun'
-        HostOS_CPP='solaris2'
-        ;;
-sparc*-linux*)
-        HostPlatform=sparc-unknown-linux
-        TargetPlatform=sparc-unknown-linux
-        BuildPlatform=sparc-unknown-linux
-        HostPlatform_CPP='sparc_unknown_linux'
-        HostArch_CPP='sparc'
-        HostVendor_CPP='unknown'
-        HostOS_CPP='linux'
-        ;;
-sparc-*-openbsd*)
-        HostPlatform=sparc-unknown-openbsd
-        TargetPlatform=sparc-unknown-openbsd
-        BuildPlatform=sparc-unknown-openbsd
-        HostPlatform_CPP='sparc_unknown_openbsd'
-        HostArch_CPP='sparc'
-        HostVendor_CPP='unknown'
-        HostOS_CPP='openbsd'
-        ;;
-sparc64-*-openbsd*)
-        HostPlatform=sparc64-unknown-openbsd
-        TargetPlatform=sparc64-unknown-openbsd
-        BuildPlatform=sparc64-unknown-openbsd
-        HostPlatform_CPP='sparc64_unknown_openbsd'
-        HostArch_CPP='sparc64'
-        HostVendor_CPP='unknown'
-        HostOS_CPP='openbsd'
-        ;;
-vax-*-openbsd*)
-        HostPlatform=vax-unknown-openbsd
-        TargetPlatform=vax-unknown-openbsd
-        BuildPlatform=vax-unknown-openbsd
-        HostPlatform_CPP='vax_unknown_openbsd'
-        HostArch_CPP='vax'
-        HostVendor_CPP='unknown'
-        HostOS_CPP='openbsd'
-        ;;
-*)
-        echo "Unrecognised platform: $HostPlatform"
-        exit 1
-        ;;
-esac
-echo "Canonicalised to: $HostPlatform"
-test  x"$HostPlatform" != x"$TargetPlatform" && echo "Target platform set to $TargetPlatform"
-test  x"$BuildPlatform" != x"$HostPlatform"  && echo "Build platform set to $BuildPlatform"
-
-BuildPlatform_CPP=$HostPlatform_CPP
-TargetPlatform_CPP=$HostPlatform_CPP
-BuildArch_CPP=$HostArch_CPP
-TargetArch_CPP=$HostArch_CPP
-BuildOS_CPP=$HostOS_CPP
-HostOS_Full=$host_os
-TargetOS_CPP=$HostOS_CPP
-BuildVendor_CPP=$HostVendor_CPP
-TargetVendor_CPP=$HostVendor_CPP
-
-AC_SUBST(BuildPlatform)
-AC_SUBST(HostPlatform)
-AC_SUBST(TargetPlatform)
-AC_SUBST(HostPlatform_CPP)
-AC_SUBST(BuildPlatform_CPP)
-AC_SUBST(TargetPlatform_CPP)
-
-AC_SUBST(HostArch_CPP)
-AC_SUBST(BuildArch_CPP)
-AC_SUBST(TargetArch_CPP)
-
-AC_SUBST(HostOS_CPP)
-AC_SUBST(HostOS_Full)
-AC_SUBST(BuildOS_CPP)
-AC_SUBST(TargetOS_CPP)
-
-AC_SUBST(HostVendor_CPP)
-AC_SUBST(BuildVendor_CPP)
-AC_SUBST(TargetVendor_CPP)
-
-AC_SUBST(exeext)
-AC_SUBST(soext)
-
 dnl --------------------------------------------------------------
 dnl * Project specific configuration options
 dnl --------------------------------------------------------------
@@ -655,28 +96,49 @@ AC_ARG_WITH([ghc],
     AC_PATH_PROG([GHC], [ghc])
   fi
   WithGhc="$GHC"])
-# GHC is passed to Cabal, so we need a native path
-if test "${WithGhc}" != "" && test "$HostPlatform" = "i386-unknown-mingw32"
-then
-    if test "${OSTYPE}" = "msys"
-    then
-        WithGhc=`echo "${WithGhc}" | sed "s#^/\([a-zA-Z]\)/#\1:/#"`
-    else
-        # Canonicalise to <drive>:/path/to/ghc
-        WithGhc=`cygpath -m ${WithGhc}`
-    fi
-    echo "Canonicalised to: ${WithGhc}"
-fi
-AC_SUBST([WithGhc])
 
-AC_ARG_WITH(hc,
-[AC_HELP_STRING([--with-hc=ARG],
-        [Use ARG as the path to the compiler for compiling ordinary
-         Haskell code  (default= value of --with-ghc)])],
-[WithHc="$withval"],
-[WithHc=$WithGhc]
+dnl ** Booting from unregisterised .hc files?
+dnl --------------------------------------------------------------
+AC_ARG_ENABLE(hc-boot-unregisterised,
+[AC_HELP_STRING([--enable-hc-boot-unregisterised],
+[ With --enable-hc-boot, treat the intermediate .hc files as
+ unregisterised rather than registerised code.
+ (This option is mostly of interest to porters.) [default=no]])],
+[ if test x"$enableval" = x"yes"; then
+        BootingFromUnregisterisedHc=YES
+  else
+        BootingFromUnregisterisedHc=NO
+  fi
+],
+[BootingFromUnregisterisedHc=NO]
 )
-AC_SUBST(WithHc)
+AC_SUBST(BootingFromUnregisterisedHc)
+
+if test "$BootingFromHc" = "NO"; then
+if test "$BootingFromUnregisterisedHc" = "YES"; then
+AC_MSG_ERROR([--enable-hc-boot-unregisterised requires --enable-hc-boot.])
+fi;
+fi;
+
+dnl ** Must have GHC to build GHC, unless --enable-hc-boot is on
+if test "$BootingFromHc" = "NO" -a -d "$srcdir/compiler"; then
+  if test "$WithGhc" = ""; then
+     AC_MSG_ERROR([GHC is required unless bootstrapping from .hc files.])
+  fi
+  FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[6.8],
+    [AC_MSG_ERROR([GHC version 6.8 or later is required to compile GHC.])])dnl
+
+  if test `expr $GhcMinVersion % 2` = "1"; then
+     echo $EnableBootstrapWithDevelSnaphost
+     if test "$EnableBootstrapWithDevelSnaphost" = "NO"; then
+        AC_MSG_ERROR([
+     $WithGhc is a development snapshot of GHC, version $GhcVersion.
+     Bootstrapping using this version of GHC is not supported, and may not
+     work.  Use --enable-bootstrap-with-devel-snapshot to try it anyway,
+     or --with-ghc to specify a different GHC to use.])
+     fi
+  fi
+fi;
 
 AC_ARG_ENABLE(bootstrap-with-devel-snapshot,
 [AC_HELP_STRING([--enable-bootstrap-with-devel-snapshot],
@@ -703,6 +165,146 @@ if test "$WithGhc" != ""; then
   AC_SUBST(ghc_ge_607)dnl
   AC_SUBST(ghc_ge_609)dnl
 fi
+
+# GHC is passed to Cabal, so we need a native path
+if test "${WithGhc}" != ""
+then
+    ghc_host=`${WithGhc} +RTS --info | grep 'Host platform' | sed -e 's/.*, "//' -e 's/")//'`
+
+    if test "$ghc_host" = "i386-unknown-mingw32"
+    then
+        if test "${OSTYPE}" = "msys"
+        then
+            WithGhc=`echo "${WithGhc}" | sed "s#^/\([a-zA-Z]\)/#\1:/#"`
+        else
+            # Canonicalise to <drive>:/path/to/ghc
+            WithGhc=`cygpath -m ${WithGhc}`
+        fi
+        echo "GHC path canonicalised to: ${WithGhc}"
+    fi
+fi
+AC_SUBST([WithGhc])
+
+dnl--------------------------------------------------------------------
+dnl * Choose host(/target/build) platform
+dnl--------------------------------------------------------------------
+dnl We don't use the standard autoconf macros for this, but instead
+dnl ask the bootstrapping compiler what platform it is for
+
+dnl Guess host/target/build platform(s) if necessary.
+m4_divert_once([HELP_CANON],
+[[
+System types:
+  --build=BUILD     configure for building on BUILD [guessed]
+  --host=HOST       cross-compile to build programs to run on HOST [guessed]
+  --target=TARGET   configure for building compilers for TARGET [guessed]]])dnl
+
+if test "$build" = ""
+then
+    if test "${WithGhc}" != ""
+    then
+        build=`${WithGhc} +RTS --info | grep '^ ,("Target platform"' | sed -e 's/.*, "//' -e 's/")//'`
+        echo "Build platform inferred as: $build"
+    else
+        echo "Can't work out build platform"
+        exit 1
+    fi
+fi
+
+if test "$host" = ""
+then
+    if test "${WithGhc}" != ""
+    then
+        host=`${WithGhc} +RTS --info | grep '^ ,("Target platform"' | sed -e 's/.*, "//' -e 's/")//'`
+        echo "Host platform inferred as: $host"
+    else
+        echo "Can't work out host platform"
+        exit 1
+    fi
+fi
+
+if test "$target" = ""
+then
+    if test "${WithGhc}" != ""
+    then
+        target=`${WithGhc} +RTS --info | grep '^ ,("Target platform"' | sed -e 's/.*, "//' -e 's/")//'`
+        echo "Target platform inferred as: $target"
+    else
+        echo "Can't work out target platform"
+        exit 1
+    fi
+fi
+
+exeext=''
+soext='.so'
+case $HostPlatform in
+*-unknown-cygwin32)
+    AC_MSG_WARN([GHC does not support the Cygwin target at the moment])
+    AC_MSG_WARN([I'm assuming you wanted to build for i386-unknown-mingw32])
+    exit 1
+    ;;
+*-unknown-mingw32)
+    exeext='.exe'
+    soext='.dll'
+    ;;
+i386-apple-darwin|powerpc-apple-darwin)
+    soext='.dylib'
+    ;;
+x86_64-apple-darwin)
+    soext='.dylib'
+    CFLAGS="$CFLAGS -m64"
+    LDFLAGS="$LDFLAGS -m64"
+    ;;
+esac
+
+BuildPlatform=$build
+BuildPlatform_CPP=`echo "$build" | sed 's/\.\|-/_/g'`
+BuildArch_CPP=`echo "$build" | sed 's/-.*//' | sed 's/\.\|-/_/g'`
+BuildVendor_CPP=`echo "$build" | sed -e 's/.*-\(.*\)-.*/\1/' | sed 's/\.\|-/_/g'`
+BuildOS_CPP=`echo "$build" | sed 's/.*-//' | sed 's/\.\|-/_/g'`
+
+HostPlatform=$host
+HostPlatform_CPP=`echo "$host" | sed 's/\.\|-/_/g'`
+HostArch_CPP=`echo "$host" | sed 's/-.*//' | sed 's/\.\|-/_/g'`
+HostVendor_CPP=`echo "$host" | sed -e 's/.*-\(.*\)-.*/\1/' | sed 's/\.\|-/_/g'`
+HostOS_CPP=`echo "$host" | sed 's/.*-//' | sed 's/\.\|-/_/g'`
+
+TargetPlatform=$target
+TargetPlatform_CPP=`echo "$target" | sed 's/\.\|-/_/g'`
+TargetArch_CPP=`echo "$target" | sed 's/-.*//' | sed 's/\.\|-/_/g'`
+TargetVendor_CPP=`echo "$target" | sed -e 's/.*-\(.*\)-.*/\1/' | sed 's/\.\|-/_/g'`
+TargetOS_CPP=`echo "$target" | sed 's/.*-//' | sed 's/\.\|-/_/g'`
+
+AC_SUBST(BuildPlatform)
+AC_SUBST(HostPlatform)
+AC_SUBST(TargetPlatform)
+AC_SUBST(HostPlatform_CPP)
+AC_SUBST(BuildPlatform_CPP)
+AC_SUBST(TargetPlatform_CPP)
+
+AC_SUBST(HostArch_CPP)
+AC_SUBST(BuildArch_CPP)
+AC_SUBST(TargetArch_CPP)
+
+AC_SUBST(HostOS_CPP)
+AC_SUBST(BuildOS_CPP)
+AC_SUBST(TargetOS_CPP)
+
+AC_SUBST(HostVendor_CPP)
+AC_SUBST(BuildVendor_CPP)
+AC_SUBST(TargetVendor_CPP)
+
+AC_SUBST(exeext)
+AC_SUBST(soext)
+
+AC_ARG_WITH(hc,
+[AC_HELP_STRING([--with-hc=ARG],
+        [Use ARG as the path to the compiler for compiling ordinary
+         Haskell code  (default= value of --with-ghc)])],
+[WithHc="$withval"],
+[WithHc=$WithGhc]
+)
+AC_SUBST(WithHc)
 
 AC_PATH_PROGS(NHC,nhc nhc98)
 AC_PATH_PROG(HBC,hbc)
@@ -790,49 +392,6 @@ AC_ARG_ENABLE(hc-boot,
 [BootingFromHc=NO]
 )
 AC_SUBST(BootingFromHc)
-
-dnl ** Booting from unregisterised .hc files?
-dnl --------------------------------------------------------------
-AC_ARG_ENABLE(hc-boot-unregisterised,
-[AC_HELP_STRING([--enable-hc-boot-unregisterised],
-[ With --enable-hc-boot, treat the intermediate .hc files as
- unregisterised rather than registerised code.
- (This option is mostly of interest to porters.) [default=no]])],
-[ if test x"$enableval" = x"yes"; then
-        BootingFromUnregisterisedHc=YES
-  else
-        BootingFromUnregisterisedHc=NO
-  fi
-],
-[BootingFromUnregisterisedHc=NO]
-)
-AC_SUBST(BootingFromUnregisterisedHc)
-
-if test "$BootingFromHc" = "NO"; then
-if test "$BootingFromUnregisterisedHc" = "YES"; then
-AC_MSG_ERROR([--enable-hc-boot-unregisterised requires --enable-hc-boot.])
-fi;
-fi;
-
-dnl ** Must have GHC to build GHC, unless --enable-hc-boot is on
-if test "$BootingFromHc" = "NO" -a -d "$srcdir/compiler"; then
-  if test "$WithGhc" = ""; then
-     AC_MSG_ERROR([GHC is required unless bootstrapping from .hc files.])
-  fi
-  FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[6.6],
-    [AC_MSG_ERROR([GHC version 6.6 or later is required to compile GHC.])])dnl
-
-  if test `expr $GhcMinVersion % 2` = "1"; then
-     echo $EnableBootstrapWithDevelSnaphost
-     if test "$EnableBootstrapWithDevelSnaphost" = "NO"; then
-        AC_MSG_ERROR([
-     $WithGhc is a development snapshot of GHC, version $GhcVersion.
-     Bootstrapping using this version of GHC is not supported, and may not
-     work.  Use --enable-bootstrap-with-devel-snapshot to try it anyway,
-     or --with-ghc to specify a different GHC to use.])
-     fi
-  fi
-fi;
 
 # This uses GHC, so put it after the "GHC is required" check above:
 FP_FIND_ROOT

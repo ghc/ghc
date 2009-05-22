@@ -82,15 +82,9 @@ HOSTPLATFORM			= @HostPlatform@
 TARGETPLATFORM			= @TargetPlatform@
 BUILDPLATFORM			= @BuildPlatform@
 
-# Hack alert:
-# in one or two places, we need to get at the OS version (major and
-# perhaps even minor), HostOS_Full is the OS name reported by
-# AC_CANONICAL_SYSTEM.
-#
 HostPlatform_CPP		= @HostPlatform_CPP@
 HostArch_CPP			= @HostArch_CPP@
 HostOS_CPP			= @HostOS_CPP@
-HostOS_Full			= @HostOS_Full@
 HostVendor_CPP	                = @HostVendor_CPP@
 
 TargetPlatform_CPP		= @TargetPlatform_CPP@
