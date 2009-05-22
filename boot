@@ -30,3 +30,6 @@ do
         chmod +x $f
     fi
 done
+
+# Create libraries/*/{ghc.mk,GNUmakefile}
+sh boot-pkgs
