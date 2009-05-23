@@ -257,23 +257,77 @@ x86_64-apple-darwin)
     ;;
 esac
 
+checkArch() {
+    case $1 in
+    alpha|arm|hppa|hppa1_1|i386|ia64|m68k|mips|mipseb|mipsel|powerpc|powerpc64|rs6000|s390|sparc|sparc64|vax|x86_64)
+        ;;
+    *)
+        echo "Unknown arch $1"
+        exit 1
+        ;;
+    esac
+}
+
+checkVendor() {
+    case $1 in
+    dec|unknown|hp|apple|next|sun|sgi|ibm)
+        ;;
+    *)
+        echo "Unknown vendor $1"
+        exit 1
+        ;;
+    esac
+}
+
+checkOS() {
+    case $1 in
+    linux|freebsd|netbsd|openbsd|osf1|osf3|hpux|linuxaout|kfreebsdgnu|freebsd2|solaris2|cygwin32|mingw32|darwin|gnu|nextstep2|nextstep3|sunos4|ultrix|irix|aix)
+        ;;
+    *)
+        echo "Unknown OS $1"
+        exit 1
+        ;;
+    esac
+}
+
 BuildPlatform=$build
-BuildPlatform_CPP=`echo "$build" | sed 's/\.\|-/_/g'`
-BuildArch_CPP=`echo "$build" | sed 's/-.*//' | sed 's/\.\|-/_/g'`
-BuildVendor_CPP=`echo "$build" | sed -e 's/.*-\(.*\)-.*/\1/' | sed 's/\.\|-/_/g'`
-BuildOS_CPP=`echo "$build" | sed 's/.*-//' | sed 's/\.\|-/_/g'`
+BuildArch=`echo "$build" | sed 's/-.*//'`
+BuildVendor=`echo "$build" | sed -e 's/.*-\(.*\)-.*/\1/'`
+BuildOS=`echo "$build" | sed 's/.*-//'`
+BuildPlatform_CPP=`echo "$BuildPlatform" | sed 's/\.\|-/_/g'`
+BuildArch_CPP=`echo "$BuildArch" | sed 's/\.\|-/_/g'`
+BuildVendor_CPP=`echo "$BuildVendor" | sed 's/\.\|-/_/g'`
+BuildOS_CPP=`echo "$BuildOS" | sed 's/\.\|-/_/g'`
+
+checkArch "$BuildArch"
+checkVendor "$BuildVendor"
+checkOS "$BuildOS"
 
 HostPlatform=$host
-HostPlatform_CPP=`echo "$host" | sed 's/\.\|-/_/g'`
-HostArch_CPP=`echo "$host" | sed 's/-.*//' | sed 's/\.\|-/_/g'`
-HostVendor_CPP=`echo "$host" | sed -e 's/.*-\(.*\)-.*/\1/' | sed 's/\.\|-/_/g'`
-HostOS_CPP=`echo "$host" | sed 's/.*-//' | sed 's/\.\|-/_/g'`
+HostArch=`echo "$host" | sed 's/-.*//'`
+HostVendor=`echo "$host" | sed -e 's/.*-\(.*\)-.*/\1/'`
+HostOS=`echo "$host" | sed 's/.*-//'`
+HostPlatform_CPP=`echo "$HostPlatform" | sed 's/\.\|-/_/g'`
+HostArch_CPP=`echo "$HostArch" | sed 's/\.\|-/_/g'`
+HostVendor_CPP=`echo "$HostVendor" | sed 's/\.\|-/_/g'`
+HostOS_CPP=`echo "$HostOS" | sed 's/\.\|-/_/g'`
+
+checkArch "$HostArch"
+checkVendor "$HostVendor"
+checkOS "$HostOS"
 
 TargetPlatform=$target
-TargetPlatform_CPP=`echo "$target" | sed 's/\.\|-/_/g'`
-TargetArch_CPP=`echo "$target" | sed 's/-.*//' | sed 's/\.\|-/_/g'`
-TargetVendor_CPP=`echo "$target" | sed -e 's/.*-\(.*\)-.*/\1/' | sed 's/\.\|-/_/g'`
-TargetOS_CPP=`echo "$target" | sed 's/.*-//' | sed 's/\.\|-/_/g'`
+TargetArch=`echo "$target" | sed 's/-.*//'`
+TargetVendor=`echo "$target" | sed -e 's/.*-\(.*\)-.*/\1/'`
+TargetOS=`echo "$target" | sed 's/.*-//'`
+TargetPlatform_CPP=`echo "$TargetPlatform" | sed 's/\.\|-/_/g'`
+TargetArch_CPP=`echo "$TargetArch" | sed 's/\.\|-/_/g'`
+TargetVendor_CPP=`echo "$TargetVendor" | sed 's/\.\|-/_/g'`
+TargetOS_CPP=`echo "$TargetOS" | sed 's/\.\|-/_/g'`
+
+checkArch "$TargetArch"
+checkVendor "$TargetVendor"
+checkOS "$TargetOS"
 
 AC_SUBST(BuildPlatform)
 AC_SUBST(HostPlatform)
