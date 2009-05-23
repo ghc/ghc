@@ -13,9 +13,7 @@
 utils/genapply_dist_MODULES = GenApply
 utils/genapply_dist_PROG    = $(GHC_GENAPPLY_PGM)
 
-ifeq "$(ghc_ge_607)" "YES"
 utils/genapply_HC_OPTS += -package pretty
-endif
 
 ifeq "$(GhcUnregisterised)" "YES"
 utils/genapply_HC_OPTS += -DNO_REGS

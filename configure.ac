@@ -160,9 +160,7 @@ if test "$WithGhc" != ""; then
   AC_SUBST(GhcPatchLevel)dnl
   GhcMinVersion2=`echo "$GhcMinVersion" | sed 's/^\\(.\\)$/0\\1/'`
   GhcCanonVersion="$GhcMajVersion$GhcMinVersion2"
-  if test $GhcCanonVersion -ge 607; then ghc_ge_607=YES; else ghc_ge_607=NO; fi
   if test $GhcCanonVersion -ge 609; then ghc_ge_609=YES; else ghc_ge_609=NO; fi
-  AC_SUBST(ghc_ge_607)dnl
   AC_SUBST(ghc_ge_609)dnl
 fi
 

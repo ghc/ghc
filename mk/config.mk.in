@@ -656,7 +656,6 @@ GhcPatchLevel	= @GhcPatchLevel@
 GhcMajVersion	= @GhcMajVersion@
 GhcMinVersion	= @GhcMinVersion@
 
-ghc_ge_607 = @ghc_ge_607@
 ghc_ge_609 = @ghc_ge_609@
 
 # Canonicalised ghc version number, used for easy (integer) version
