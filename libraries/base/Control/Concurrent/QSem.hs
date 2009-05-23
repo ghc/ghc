@@ -39,7 +39,8 @@ newtype QSem = QSem (MVar (Int, [MVar ()]))
 
 INSTANCE_TYPEABLE0(QSem,qSemTc,"QSem")
 
--- |Build a new 'QSem'
+-- |Build a new 'QSem' with a supplied initial quantity.
+--  The initial quantity must be at least 0.
 newQSem :: Int -> IO QSem
 newQSem initial =
     if initial < 0

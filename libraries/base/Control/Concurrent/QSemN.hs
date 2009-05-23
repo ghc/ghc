@@ -35,6 +35,7 @@ newtype QSemN = QSemN (MVar (Int,[(Int,MVar ())]))
 INSTANCE_TYPEABLE0(QSemN,qSemNTc,"QSemN")
 
 -- |Build a new 'QSemN' with a supplied initial quantity.
+--  The initial quantity must be at least 0.
 newQSemN :: Int -> IO QSemN
 newQSemN initial =
     if initial < 0
