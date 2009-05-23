@@ -26,7 +26,6 @@ import Control.Exception
 import Data.Char
 import Data.List
 import Data.Monoid
-import Data.Version
 import System.Cmd
 import System.Directory
 import System.Environment

@@ -6,6 +6,7 @@
 --
 -----------------------------------------------------------------------------
 
+{-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 module GhciTags (createCTagsFileCmd, createETagsFileCmd) where
 
 import GHC
