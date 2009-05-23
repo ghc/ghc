@@ -189,6 +189,7 @@ gen_hs_source (Info defaults entries) =
 	   escape = concatMap (\c -> if c `elem` special then '\\':c:[] else c:[])
 	   	where special = "/'`\"@<"
 
+pprTy :: Ty -> String
 pprTy = pty
     where
           pty (TyF t1 t2) = pbty t1 ++ " -> " ++ pty t2
@@ -253,14 +254,14 @@ gen_ext_core_source entries =
         -- ext-core's Prims module again.
         tcKind "Any" _                = "Klifted"
         tcKind tc [] | last tc == '#' = "Kunlifted"
-        tcKind tc [] | otherwise      = "Klifted"
+        tcKind _  [] | otherwise      = "Klifted"
         -- assumes that all type arguments are lifted (are they?)
-        tcKind tc (v:as)              = "(Karrow Klifted " ++ tcKind tc as 
-                                        ++ ")"
+        tcKind tc (_v:as)              = "(Karrow Klifted " ++ tcKind tc as
+                                         ++ ")"
         valEnt (PseudoOpSpec {name=n, ty=t}) = valEntry n t
         valEnt (PrimOpSpec {name=n, ty=t})   = valEntry n t
         valEnt _                             = ""
-        valEntry name ty = parens name (mkForallTy (freeTvars ty) (pty ty))
+        valEntry name' ty' = parens name' (mkForallTy (freeTvars ty') (pty ty'))
             where pty (TyF t1 t2) = mkFunTy (pty t1) (pty t2)
                   pty (TyApp tc ts) = mkTconApp (mkTcon tc) (map pty ts)  
                   pty (TyUTup ts)   = mkUtupleTy (map pty ts)
@@ -275,7 +276,7 @@ gen_ext_core_source entries =
                   mkForallTy [] t = t
                   mkForallTy vs t = foldr 
                      (\ v s -> "Tforall " ++ 
-                               (paren (quot v ++ ", " ++ vKind v)) ++ " "
+                               (paren (quote v ++ ", " ++ vKind v)) ++ " "
                                ++ paren s) t vs
 
                   -- hack alert!
@@ -292,7 +293,7 @@ gen_ext_core_source entries =
                   tcUTuple n = paren $ "Tcon " ++ paren (qualify False $ "Z" 
                                                           ++ show n ++ "H")
 
-        tyEnt (PrimTypeSpec {ty=(TyApp tc args)}) = "   " ++ paren ("Tcon " ++
+        tyEnt (PrimTypeSpec {ty=(TyApp tc _args)}) = "   " ++ paren ("Tcon " ++
                                                        (paren (qualify True tc)))
         tyEnt _ = ""
 
@@ -312,13 +313,13 @@ gen_ext_core_source entries =
         stringLitTys = prefixes ["Addr"]
         prefixes ps = filter (\ t ->
                         case t of
-                          (PrimTypeSpec {ty=(TyApp tc args)}) ->
+                          (PrimTypeSpec {ty=(TyApp tc _args)}) ->
                             any (\ p -> p `isPrefixOf` tc) ps
                           _ -> False)
 
-        parens n ty = "      (zEncodeString \"" ++ n ++ "\", " ++ ty ++ ")"
+        parens n ty' = "      (zEncodeString \"" ++ n ++ "\", " ++ ty' ++ ")"
         paren s = "(" ++ s ++ ")"
-        quot s = "\"" ++ s ++ "\""
+        quote s = "\"" ++ s ++ "\""
 
 gen_latex_doc :: Info -> String
 gen_latex_doc (Info defaults entries)
