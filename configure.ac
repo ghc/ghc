@@ -235,7 +235,7 @@ fi
 
 exeext=''
 soext='.so'
-case $HostPlatform in
+case $host in
 *-unknown-cygwin32)
     AC_MSG_WARN([GHC does not support the Cygwin target at the moment])
     AC_MSG_WARN([I'm assuming you wanted to build for i386-unknown-mingw32])
