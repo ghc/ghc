@@ -962,6 +962,10 @@ asmTempLabelPrefix =
 pprDynamicLinkerAsmLabel :: DynamicLinkerLabelInfo -> CLabel -> SDoc
 
 #if x86_64_TARGET_ARCH && darwin_TARGET_OS
+pprDynamicLinkerAsmLabel CodeStub lbl
+  = char 'L' <> pprCLabel lbl <> text "$stub"
+pprDynamicLinkerAsmLabel SymbolPtr lbl
+  = char 'L' <> pprCLabel lbl <> text "$non_lazy_ptr"
 pprDynamicLinkerAsmLabel GotSymbolPtr lbl
   = pprCLabel lbl <> text "@GOTPCREL"
 pprDynamicLinkerAsmLabel GotSymbolOffset lbl
