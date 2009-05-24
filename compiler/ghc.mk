@@ -463,7 +463,9 @@ $(compiler_stage3_depfile) : $(includes_H_CONFIG) $(includes_H_PLATFORM) $(inclu
 # [fiddle-stage1-version] above.
 ifneq "$(ProjectPatchLevel)" "0"
 compiler/stage1/inplace-pkg-config-munged: compiler/stage1/inplace-pkg-config
-	sed "s#.$(ProjectPatchLevel)##" <$< >$@
+	sed -e 's/^\(version: .*\)\.$(ProjectPatchLevel)$$/\1/' \
+	    -e 's/^\(hs-libraries: HSghc-.*\)\.$(ProjectPatchLevel)$$/\1/' \
+	  < $< > $@
 	$(compiler_stage1_GHC_PKG) update --force $(compiler_stage1_GHC_PKG_OPTS) $@
 
 $(compiler_stage1_v_LIB) : compiler/stage1/inplace-pkg-config-munged
