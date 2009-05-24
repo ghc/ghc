@@ -890,6 +890,7 @@ CLEAN_FILES += utils/ghc-pwd/ghc-pwd
 CLEAN_FILES += utils/ghc-pwd/ghc-pwd.exe
 CLEAN_FILES += utils/ghc-pwd/ghc-pwd.hi
 CLEAN_FILES += utils/ghc-pwd/ghc-pwd.o
+CLEAN_FILES += libraries/bootstrapping.conf
 
 clean : clean_files
 .PHONY: clean_files
