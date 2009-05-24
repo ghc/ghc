@@ -64,8 +64,6 @@ main(int argc, char** argv)
   char*  new_cmdline;
   char   *ptr, *src;
   unsigned int cmdline_len = 0;
-  char **pp;
-  LPTSTR pp1;
 
   STARTUPINFO si;
   PROCESS_INFORMATION pi;
