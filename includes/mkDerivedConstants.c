@@ -52,7 +52,7 @@
 #define ctype(type) /* nothing */
 #else
 #define ctype(type) \
-    printf("#define SIZEOF_" #type " %zu\n", sizeof(type));
+    printf("#define SIZEOF_" #type " %lu\n", (unsigned long)sizeof(type));
 #endif
 
 #if defined(GEN_HASKELL)
@@ -67,7 +67,7 @@
 */
 #define field_type_(str, s_type, field) \
     printf("#define REP_" str " b"); \
-    printf("%zu\n", sizeof (__typeof__(((((s_type*)0)->field)))) * 8);
+    printf("%lu\n", (unsigned long)sizeof (__typeof__(((((s_type*)0)->field)))) * 8);
 #define field_type_gcptr_(str, s_type, field) \
     printf("#define REP_" str " gcptr\n");
 #endif
@@ -99,17 +99,17 @@
 #if defined(GEN_HASKELL)
 #define def_size(str, size)                \
     printf("sIZEOF_" str " :: Int\n");     \
-    printf("sIZEOF_" str " = %zu\n", size);
+    printf("sIZEOF_" str " = %lu\n", (unsigned long)size);
 #else
 #define def_size(str, size) \
-    printf("#define SIZEOF_" str " %zu\n", size);
+    printf("#define SIZEOF_" str " %lu\n", (unsigned long)size);
 #endif
 
 #if defined(GEN_HASKELL)
 #define def_closure_size(str, size) /* nothing */
 #else
 #define def_closure_size(str, size) \
-    printf("#define SIZEOF_" str " (SIZEOF_StgHeader+%zu)\n", size);
+    printf("#define SIZEOF_" str " (SIZEOF_StgHeader+%lu)\n", (unsigned long)size);
 #endif
 
 #define struct_size(s_type) \
@@ -197,10 +197,10 @@ main(int argc, char *argv[])
 #ifndef GEN_HASKELL
     printf("/* This file is created automatically.  Do not edit by hand.*/\n\n");
 
-    printf("#define STD_HDR_SIZE   %zu\n", sizeofW(StgHeader) - sizeofW(StgProfHeader));
+    printf("#define STD_HDR_SIZE   %lu\n", (unsigned long)sizeofW(StgHeader) - sizeofW(StgProfHeader));
     /* grrr.. PROFILING is on so we need to subtract sizeofW(StgProfHeader) */
-    printf("#define PROF_HDR_SIZE  %zu\n", sizeofW(StgProfHeader));
-    printf("#define GRAN_HDR_SIZE  %zu\n", sizeofW(StgGranHeader));
+    printf("#define PROF_HDR_SIZE  %lu\n", (unsigned long)sizeofW(StgProfHeader));
+    printf("#define GRAN_HDR_SIZE  %lu\n", (unsigned long)sizeofW(StgGranHeader));
 
     printf("#define BLOCK_SIZE   %u\n", BLOCK_SIZE);
     printf("#define MBLOCK_SIZE   %u\n", MBLOCK_SIZE);
