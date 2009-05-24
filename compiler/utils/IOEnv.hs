@@ -139,15 +139,9 @@ unsafeInterleaveM (IOEnv m) = IOEnv (\ env -> unsafeInterleaveIO (m env))
 
 -- For use if the user has imported Control.Monad.Error from MTL
 -- Requires UndecidableInstances
-#if __GLASGOW_HASKELL__ > 606
--- for some reason, this doesn't compile with GHC 6.6:
--- utils/IOEnv.hs:144:33:
---     No instance for (MonadPlus IO)
---       arising from use of `mplus' at utils/IOEnv.hs:144:33-67
 instance MonadPlus IO => MonadPlus (IOEnv env) where
     mzero = IOEnv (const mzero)
     m `mplus` n = IOEnv (\env -> unIOEnv m env `mplus` unIOEnv n env)
-#endif
 
 ----------------------------------------------------------------------
 -- Accessing input/output

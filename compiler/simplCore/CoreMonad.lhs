@@ -125,12 +125,9 @@ instance Applicative CoreM where
 
 -- For use if the user has imported Control.Monad.Error from MTL
 -- Requires UndecidableInstances
-#if __GLASGOW_HASKELL__ > 606
--- see instance MonadPlus IOEnv
 instance MonadPlus IO => MonadPlus CoreM where
     mzero = CoreM (const mzero)
     m `mplus` n = CoreM (\rs -> unCoreM m rs `mplus` unCoreM n rs)
-#endif
 
 instance MonadUnique CoreM where
     getUniqueSupplyM = do
