@@ -292,10 +292,10 @@ BuildPlatform=$build
 BuildArch=`echo "$build" | sed 's/-.*//'`
 BuildVendor=`echo "$build" | sed -e 's/.*-\(.*\)-.*/\1/'`
 BuildOS=`echo "$build" | sed 's/.*-//'`
-BuildPlatform_CPP=`echo "$BuildPlatform" | sed 's/\.\|-/_/g'`
-BuildArch_CPP=`echo "$BuildArch" | sed 's/\.\|-/_/g'`
-BuildVendor_CPP=`echo "$BuildVendor" | sed 's/\.\|-/_/g'`
-BuildOS_CPP=`echo "$BuildOS" | sed 's/\.\|-/_/g'`
+BuildPlatform_CPP=`echo "$BuildPlatform" | sed -e 's/\./_/g' -e 's/-/_/g'`
+BuildArch_CPP=`    echo "$BuildArch"     | sed -e 's/\./_/g' -e 's/-/_/g'`
+BuildVendor_CPP=`  echo "$BuildVendor"   | sed -e 's/\./_/g' -e 's/-/_/g'`
+BuildOS_CPP=`      echo "$BuildOS"       | sed -e 's/\./_/g' -e 's/-/_/g'`
 
 checkArch "$BuildArch"
 checkVendor "$BuildVendor"
@@ -305,10 +305,10 @@ HostPlatform=$host
 HostArch=`echo "$host" | sed 's/-.*//'`
 HostVendor=`echo "$host" | sed -e 's/.*-\(.*\)-.*/\1/'`
 HostOS=`echo "$host" | sed 's/.*-//'`
-HostPlatform_CPP=`echo "$HostPlatform" | sed 's/\.\|-/_/g'`
-HostArch_CPP=`echo "$HostArch" | sed 's/\.\|-/_/g'`
-HostVendor_CPP=`echo "$HostVendor" | sed 's/\.\|-/_/g'`
-HostOS_CPP=`echo "$HostOS" | sed 's/\.\|-/_/g'`
+HostPlatform_CPP=`echo "$HostPlatform" | sed -e 's/\./_/g' -e 's/-/_/g'`
+HostArch_CPP=`    echo "$HostArch"     | sed -e 's/\./_/g' -e 's/-/_/g'`
+HostVendor_CPP=`  echo "$HostVendor"   | sed -e 's/\./_/g' -e 's/-/_/g'`
+HostOS_CPP=`      echo "$HostOS"       | sed -e 's/\./_/g' -e 's/-/_/g'`
 
 checkArch "$HostArch"
 checkVendor "$HostVendor"
@@ -318,10 +318,10 @@ TargetPlatform=$target
 TargetArch=`echo "$target" | sed 's/-.*//'`
 TargetVendor=`echo "$target" | sed -e 's/.*-\(.*\)-.*/\1/'`
 TargetOS=`echo "$target" | sed 's/.*-//'`
-TargetPlatform_CPP=`echo "$TargetPlatform" | sed 's/\.\|-/_/g'`
-TargetArch_CPP=`echo "$TargetArch" | sed 's/\.\|-/_/g'`
-TargetVendor_CPP=`echo "$TargetVendor" | sed 's/\.\|-/_/g'`
-TargetOS_CPP=`echo "$TargetOS" | sed 's/\.\|-/_/g'`
+TargetPlatform_CPP=`echo "$TargetPlatform" | sed -e 's/\./_/g' -e 's/-/_/g'`
+TargetArch_CPP=`    echo "$TargetArch"     | sed -e 's/\./_/g' -e 's/-/_/g'`
+TargetVendor_CPP=`  echo "$TargetVendor"   | sed -e 's/\./_/g' -e 's/-/_/g'`
+TargetOS_CPP=`      echo "$TargetOS"       | sed -e 's/\./_/g' -e 's/-/_/g'`
 
 checkArch "$TargetArch"
 checkVendor "$TargetVendor"
