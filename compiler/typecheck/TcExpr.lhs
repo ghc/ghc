@@ -551,8 +551,8 @@ tcExpr expr@(RecordUpd record_expr rbinds _ _ _) res_ty
 	-- Figure out types for the scrutinee and result
 	-- Both are of form (T a b c), with fresh type variables, but with
 	-- common variables where the scrutinee and result must have the same type
-	-- These are variables that appear in *any* arg of *any* of the relevant constructors
-        -- *except* in the updated fields
+	-- These are variables that appear in *any* arg of *any* of the
+	-- relevant constructors *except* in the updated fields
 	-- 
 	; let fixed_tvs = getFixedTyVars con1_tvs relevant_cons
 	      is_fixed_tv tv = tv `elemVarSet` fixed_tvs
@@ -601,8 +601,9 @@ tcExpr expr@(RecordUpd record_expr rbinds _ _ _) res_ty
     			    fixed_tvs = exactTyVarsOfTypes fixed_tys
 			    	    -- fixed_tys: See Note [Type of a record update]
 			    	        `unionVarSet` tyVarsOfTheta theta 
-				    -- Universally-quantified tyvars that appear in any of the 
-				    -- *implicit* arguments to the constructor are fixed
+				    -- Universally-quantified tyvars that
+				    -- appear in any of the *implicit*
+				    -- arguments to the constructor are fixed
 			    	    -- See Note [Implict type sharing]
 			    	        
 		            fixed_tys = [ty | (fld,ty) <- zip flds arg_tys
