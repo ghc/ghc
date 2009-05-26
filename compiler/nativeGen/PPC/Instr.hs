@@ -22,6 +22,7 @@ import PPC.Regs
 import PPC.Cond
 import Instruction
 import Size
+import TargetReg
 import RegClass
 import Reg
 
@@ -353,7 +354,7 @@ ppc_mkSpillInstr
 ppc_mkSpillInstr reg delta slot
   = let	off     = spillSlotToOffset slot
     in
-    let sz = case regClass reg of
+    let sz = case targetClassOfReg reg of
                 RcInteger -> II32
                 RcDouble  -> FF64
 		_	  -> panic "PPC.Instr.mkSpillInstr: no match"
@@ -369,7 +370,7 @@ ppc_mkLoadInstr
 ppc_mkLoadInstr reg delta slot
   = let off     = spillSlotToOffset slot
     in
-    let sz = case regClass reg of
+    let sz = case targetClassOfReg reg of
                 RcInteger -> II32
                 RcDouble  -> FF64
 		_         -> panic "PPC.Instr.mkLoadInstr: no match"

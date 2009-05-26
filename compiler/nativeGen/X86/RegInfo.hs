@@ -9,7 +9,6 @@ where
 #include "nativeGen/NCG.h"
 #include "HsVersions.h"
 
-import X86.Regs
 import Size
 import Reg
 
@@ -18,6 +17,7 @@ import Unique
 
 #if i386_TARGET_ARCH || x86_64_TARGET_ARCH
 import UniqFM
+import X86.Regs
 #endif
 
 

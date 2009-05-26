@@ -31,6 +31,7 @@ import Instruction
 import Size
 import Reg
 import RegClass
+import TargetReg
 
 import BlockId
 import Cmm
@@ -469,7 +470,7 @@ pprInstr (MR reg1 reg2)
     | reg1 == reg2 = empty
     | otherwise = hcat [
 	char '\t',
-	case regClass reg1 of
+	case targetClassOfReg reg1 of
 	    RcInteger -> ptext (sLit "mr")
 	    _ -> ptext (sLit "fmr"),
 	char '\t',

@@ -5,6 +5,13 @@
 -- -----------------------------------------------------------------------------
 
 module PPC.Regs (
+	-- squeeze functions
+	virtualRegSqueeze,
+	realRegSqueeze,
+
+	mkVirtualReg,
+	regDotColor,
+
 	-- immediates
 	Imm(..),
 	strImmLit,
@@ -20,7 +27,7 @@ module PPC.Regs (
 	allArgRegs,
 	callClobberedRegs,
 	allMachRegNos,
-	regClass,
+	classOfRealReg,
 	showReg,
 	
 	-- machine specific
@@ -46,19 +53,105 @@ where
 
 import Reg
 import RegClass
+import Size
 
 import CgUtils          ( get_GlobalReg_addr )
 import BlockId
 import Cmm
 import CLabel           ( CLabel )
+import Unique
+
 import Pretty
-import Outputable	( Outputable(..), pprPanic, panic )
+import Outputable       ( panic, SDoc )	
 import qualified Outputable
 import Constants
 import FastBool
+import FastTypes
 
 import Data.Word	( Word8, Word16, Word32 )
 import Data.Int 	( Int8, Int16, Int32 )
+
+
+-- squeese functions for the graph allocator -----------------------------------
+
+-- | regSqueeze_class reg
+--	Calculuate the maximum number of register colors that could be
+--	denied to a node of this class due to having this reg 
+--	as a neighbour.
+--
+{-# INLINE virtualRegSqueeze #-}
+virtualRegSqueeze :: RegClass -> VirtualReg -> FastInt
+virtualRegSqueeze cls vr
+ = case cls of
+ 	RcInteger
+	 -> case vr of
+	 	VirtualRegI{}		-> _ILIT(1)
+		VirtualRegHi{}		-> _ILIT(1)
+		VirtualRegD{}		-> _ILIT(0)
+		VirtualRegF{}		-> _ILIT(0)
+
+	-- We don't use floats on this arch, but we can't
+	--	return error because the return type is unboxed...
+	RcFloat
+	 -> case vr of
+	 	VirtualRegI{}		-> _ILIT(0)
+		VirtualRegHi{}		-> _ILIT(0)
+		VirtualRegD{}		-> _ILIT(0)
+		VirtualRegF{}		-> _ILIT(0)
+
+	RcDouble
+	 -> case vr of
+	 	VirtualRegI{}		-> _ILIT(0)
+		VirtualRegHi{}		-> _ILIT(0)
+		VirtualRegD{}		-> _ILIT(1)
+		VirtualRegF{}		-> _ILIT(0)
+
+
+{-# INLINE realRegSqueeze #-}
+realRegSqueeze :: RegClass -> RealReg -> FastInt
+realRegSqueeze cls rr
+ = case cls of
+ 	RcInteger
+	 -> case rr of
+	 	RealRegSingle regNo
+			| regNo	< 32	-> _ILIT(1)	-- first fp reg is 32 
+			| otherwise	-> _ILIT(0)
+			
+		RealRegPair{}		-> _ILIT(0)
+
+	-- We don't use floats on this arch, but we can't
+	--	return error because the return type is unboxed...
+	RcFloat
+	 -> case rr of
+	 	RealRegSingle regNo
+			| regNo	< 32	-> _ILIT(0)
+			| otherwise	-> _ILIT(0)
+			
+		RealRegPair{}		-> _ILIT(0)
+
+	RcDouble
+	 -> case rr of
+	 	RealRegSingle regNo
+			| regNo	< 32	-> _ILIT(0)
+			| otherwise	-> _ILIT(1)
+			
+		RealRegPair{}		-> _ILIT(0)
+
+mkVirtualReg :: Unique -> Size -> VirtualReg
+mkVirtualReg u size
+   | not (isFloatSize size) = VirtualRegI u
+   | otherwise
+   = case size of
+        FF32    -> VirtualRegD u
+        FF64    -> VirtualRegD u
+        _       -> panic "mkVirtualReg"
+
+regDotColor :: RealReg -> SDoc
+regDotColor reg
+ = case classOfRealReg reg of
+        RcInteger       -> Outputable.text "blue"
+        RcFloat         -> Outputable.text "red"
+        RcDouble        -> Outputable.text "green"
 
 
 -- immediates ------------------------------------------------------------------
@@ -173,18 +266,13 @@ allMachRegNos 	:: [RegNo]
 allMachRegNos	= [0..63]
 
 
-{-# INLINE regClass      #-}
-regClass :: Reg -> RegClass
-regClass (RegVirtual (VirtualRegI  _)) = RcInteger
-regClass (RegVirtual (VirtualRegHi _)) = RcInteger
-regClass (RegVirtual (VirtualRegF  u)) = pprPanic ("regClass(ppc):VirtualRegF ") (ppr u)
-regClass (RegVirtual (VirtualRegD  _)) = RcDouble
-
-regClass (RegReal    (RealRegSingle i))
+{-# INLINE classOfRealReg      #-}
+classOfRealReg :: RealReg -> RegClass
+classOfRealReg (RealRegSingle i)
 	| i < 32	= RcInteger 
 	| otherwise	= RcDouble
 
-regClass (RegReal    (RealRegPair{}))
+classOfRealReg (RealRegPair{})
 	= panic "regClass(ppr): no reg pairs on this architecture"
 
 showReg :: RegNo -> String
@@ -541,7 +629,7 @@ get_GlobalReg_reg_or_addr mid
 -- allocatableRegs is allMachRegNos with the fixed-use regs removed.
 -- i.e., these are the regs for which we are prepared to allow the
 -- register allocator to attempt to map VRegs to.
-allocatableRegs :: [RegNo]
+allocatableRegs :: [RealReg]
 allocatableRegs
    = let isFree i = isFastTrue (freeReg i)
-     in  filter isFree allMachRegNos
+     in  map RealRegSingle $ filter isFree allMachRegNos

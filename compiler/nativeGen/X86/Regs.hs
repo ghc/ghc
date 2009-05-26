@@ -108,12 +108,10 @@ virtualRegSqueeze cls vr
 		VirtualRegD{}		-> _ILIT(1)
 		VirtualRegF{}		-> _ILIT(0)
 
-
+realRegSqueeze :: RegClass -> RealReg -> FastInt
 
 #if defined(i386_TARGET_ARCH)
 {-# INLINE realRegSqueeze #-}
-realRegSqueeze :: RegClass -> RealReg -> FastInt
-
 realRegSqueeze cls rr
  = case cls of
  	RcInteger
@@ -172,7 +170,7 @@ realRegSqueeze cls rr
 		RealRegPair{}		-> _ILIT(0)
 
 #else
-realRegSqueeze	= _ILIT(0)
+realRegSqueeze _ _	= _ILIT(0)
 #endif
 
 

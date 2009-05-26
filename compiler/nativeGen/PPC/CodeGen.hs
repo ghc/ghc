@@ -35,6 +35,7 @@ import PIC
 import Size
 import RegClass
 import Reg
+import TargetReg
 import Platform
 
 -- Our intermediate code:
@@ -176,11 +177,11 @@ swizzleRegisterRep (Any _ codefn)     size = Any   size codefn
 getRegisterReg :: CmmReg -> Reg
 
 getRegisterReg (CmmLocal (LocalReg u pk))
-  = mkVReg u (cmmTypeSize pk)
+  = RegVirtual $ mkVirtualReg u (cmmTypeSize pk)
 
 getRegisterReg (CmmGlobal mid)
   = case get_GlobalReg_reg_or_addr mid of
-       Left reg@(RegReal _) -> reg
+       Left reg -> reg
        _other -> pprPanic "getRegisterReg-memory" (ppr $ CmmGlobal mid)
           -- By this stage, the only MagicIds remaining should be the
           -- ones which map to a real machine register on this
@@ -305,7 +306,7 @@ assignReg_I64Code :: CmmReg  -> CmmExpr -> NatM InstrBlock
 assignReg_I64Code (CmmLocal (LocalReg u_dst pk)) valueTree = do
    ChildCode64 vcode r_src_lo <- iselExpr64 valueTree
    let 
-         r_dst_lo = mkVReg u_dst II32
+         r_dst_lo = RegVirtual $ mkVirtualReg u_dst II32
          r_dst_hi = getHiVRegFromLo r_dst_lo
          r_src_hi = getHiVRegFromLo r_src_lo
          mov_lo = MR r_dst_lo r_src_lo
@@ -329,7 +330,7 @@ iselExpr64 (CmmLoad addrTree ty) | isWord64 ty = do
                          rlo
 
 iselExpr64 (CmmReg (CmmLocal (LocalReg vu ty))) | isWord64 ty
-   = return (ChildCode64 nilOL (mkVReg vu II32))
+   = return (ChildCode64 nilOL (RegVirtual $ mkVirtualReg vu II32))
 
 iselExpr64 (CmmLit (CmmInt i _)) = do
   (rlo,rhi) <- getNewRegPairNat II32
@@ -413,7 +414,7 @@ getRegister (CmmLoad mem pk)
   | not (isWord64 pk)
   = do
         Amode addr addr_code <- getAmode mem
-        let code dst = ASSERT((regClass dst == RcDouble) == isFloatType pk)
+        let code dst = ASSERT((targetClassOfReg dst == RcDouble) == isFloatType pk)
                        addr_code `snocOL` LD size dst addr
         return (Any size code)
           where size = cmmTypeSize pk

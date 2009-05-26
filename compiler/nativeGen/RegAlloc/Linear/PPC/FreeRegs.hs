@@ -30,27 +30,31 @@ data FreeRegs = FreeRegs !Word32 !Word32
 noFreeRegs :: FreeRegs
 noFreeRegs = FreeRegs 0 0
 
-releaseReg :: RegNo -> FreeRegs -> FreeRegs
-releaseReg r (FreeRegs g f)
+releaseReg :: RealReg -> FreeRegs -> FreeRegs
+releaseReg (RealRegSingle r) (FreeRegs g f)
     | r > 31    = FreeRegs g (f .|. (1 `shiftL` (fromIntegral r - 32)))
     | otherwise = FreeRegs (g .|. (1 `shiftL` fromIntegral r)) f
+
+releaseReg _ _
+	= panic "RegAlloc.Linear.PPC.releaseReg: bad reg"
     
 initFreeRegs :: FreeRegs
 initFreeRegs = foldr releaseReg noFreeRegs allocatableRegs
 
-getFreeRegs :: RegClass -> FreeRegs -> [RegNo]	-- lazilly
+getFreeRegs :: RegClass -> FreeRegs -> [RealReg]	-- lazilly
 getFreeRegs cls (FreeRegs g f)
     | RcDouble <- cls = go f (0x80000000) 63
     | RcInteger <- cls = go g (0x80000000) 31
     | otherwise = pprPanic "RegAllocLinear.getFreeRegs: Bad register class" (ppr cls)
     where
         go _ 0 _ = []
-        go x m i | x .&. m /= 0 = i : (go x (m `shiftR` 1) $! i-1)
+        go x m i | x .&. m /= 0 = RealRegSingle i : (go x (m `shiftR` 1) $! i-1)
                  | otherwise    = go x (m `shiftR` 1) $! i-1
 
-allocateReg :: RegNo -> FreeRegs -> FreeRegs
-allocateReg r (FreeRegs g f) 
+allocateReg :: RealReg -> FreeRegs -> FreeRegs
+allocateReg (RealRegSingle r) (FreeRegs g f) 
     | r > 31    = FreeRegs g (f .&. complement (1 `shiftL` (fromIntegral r - 32)))
     | otherwise = FreeRegs (g .&. complement (1 `shiftL` fromIntegral r)) f
 
-
+allocateReg _ _
+	= panic "RegAlloc.Linear.PPC.allocateReg: bad reg"

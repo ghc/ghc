@@ -39,7 +39,6 @@ import qualified X86.RegInfo	as X86
 
 #elif powerpc_TARGET_ARCH
 import qualified PPC.Regs	as PPC
-import qualified PPC.RegInfo	as PPC
 
 #elif sparc_TARGET_ARCH	
 import qualified SPARC.Regs	as SPARC

@@ -7,14 +7,11 @@
 -----------------------------------------------------------------------------
 
 module PPC.RegInfo (
-	mkVReg,
-
         JumpDest, 
 	canShortcut, 
 	shortcutJump, 
 
-	shortcutStatic,
-	regDotColor
+	shortcutStatic
 )
 
 where
@@ -24,28 +21,12 @@ where
 
 import PPC.Regs
 import PPC.Instr
-import RegClass
-import Reg
-import Size
 
 import BlockId
 import Cmm
 import CLabel
 
 import Outputable
-import Unique
-
-mkVReg :: Unique -> Size -> Reg
-mkVReg u size
-   | not (isFloatSize size) = RegVirtual $ VirtualRegI u
-   | otherwise
-   = case size of
-        FF32	-> RegVirtual $ VirtualRegD u
-        FF64	-> RegVirtual $ VirtualRegD u
-	_	-> panic "mkVReg"
-
-
-
 
 data JumpDest = DestBlockId BlockId | DestImm Imm
 
@@ -84,11 +65,3 @@ shortBlockId fn blockid@(BlockId uq) =
       Just (DestImm (ImmCLbl lbl)) -> lbl
       _other -> panic "shortBlockId"
 
-
-
-regDotColor :: Reg -> SDoc
-regDotColor reg
- = case regClass reg of
- 	RcInteger	-> text "blue"
-	RcFloat		-> text "red"
-	RcDouble	-> text "green"
