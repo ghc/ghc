@@ -21,6 +21,8 @@ else
 $$(error Already got a haddock file for $$($1_PACKAGE))
 endif
 
+haddock: $$($$($1_PACKAGE)_HADDOCK_FILE)
+
 ifeq "$$(HADDOCK_DOCS)" "YES"
 $(call all-target,$1_$2_haddock,$$($$($1_PACKAGE)_HADDOCK_FILE))
 endif

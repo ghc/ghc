@@ -100,6 +100,8 @@
 #           o libraries/*
 #           o compiler
 
+.PHONY: default all haddock
+
 default : all
 
 # Just bring makefiles up to date:
