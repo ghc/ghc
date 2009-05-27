@@ -1078,6 +1078,10 @@ atype :: { LHsType RdrName }
 	| '[:' ctype ':]'		{ LL $ HsPArrTy  $2 }
 	| '(' ctype ')'		        { LL $ HsParTy   $2 }
 	| '(' ctype '::' kind ')'	{ LL $ HsKindSig $2 (unLoc $4) }
+	| '$(' exp ')'	      		{ LL $ HsSpliceTy (mkHsSplice $2 ) }
+	| TH_ID_SPLICE	      		{ LL $ HsSpliceTy (mkHsSplice 
+					         (L1 $ HsVar (mkUnqual varName 
+							        (getTH_ID_SPLICE $1)))) } -- $x
 -- Generics
         | INTEGER                       { L1 (HsNumTy (getINTEGER $1)) }
 

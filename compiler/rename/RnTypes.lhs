@@ -11,8 +11,13 @@ module RnTypes (
 
 	-- Precence related stuff
 	mkOpAppRn, mkNegAppRn, mkOpFormRn, mkConOpPatRn,
-	checkPrecMatch, checkSectionPrec
+	checkPrecMatch, checkSectionPrec,
+
+	-- Splice related stuff
+	rnSplice, checkTH
   ) where
+
+import {-# SOURCE #-} RnExpr( rnLExpr )
 
 import DynFlags
 import HsSyn
@@ -173,8 +178,9 @@ rnHsType doc (HsPredTy pred) = do
     pred' <- rnPred doc pred
     return (HsPredTy pred')
 
-rnHsType _ (HsSpliceTy _) =
-    failWith (ptext (sLit "Type splices are not yet implemented"))
+rnHsType _ (HsSpliceTy sp)
+  = do { (sp', _fvs) <- rnSplice sp	-- ToDo: deal with fvs
+       ; return (HsSpliceTy sp') }
 
 rnHsType doc (HsDocTy ty haddock_doc) = do
     ty' <- rnLHsType doc ty
@@ -558,4 +564,57 @@ opTyErr op ty@(HsOpTy ty1 _ _)
     forall_head (L _ (HsAppTy ty _)) = forall_head ty
     forall_head _other		     = False
 opTyErr _ ty = pprPanic "opTyErr: Not an op" (ppr ty)
+\end{code}
+
+%*********************************************************
+%*							*
+		Splices
+%*							*
+%*********************************************************
+
+Note [Splices]
+~~~~~~~~~~~~~~
+Consider
+	f = ...
+	h = ...$(thing "f")...
+
+The splice can expand into literally anything, so when we do dependency
+analysis we must assume that it might mention 'f'.  So we simply treat
+all locally-defined names as mentioned by any splice.  This is terribly
+brutal, but I don't see what else to do.  For example, it'll mean
+that every locally-defined thing will appear to be used, so no unused-binding
+warnings.  But if we miss the dependency, then we might typecheck 'h' before 'f',
+and that will crash the type checker because 'f' isn't in scope.
+
+Currently, I'm not treating a splice as also mentioning every import,
+which is a bit inconsistent -- but there are a lot of them.  We might
+thereby get some bogus unused-import warnings, but we won't crash the
+type checker.  Not very satisfactory really.
+
+\begin{code}
+rnSplice :: HsSplice RdrName -> RnM (HsSplice Name, FreeVars)
+rnSplice (HsSplice n expr)
+  = do	{ checkTH expr "splice"
+	; loc  <- getSrcSpanM
+	; [n'] <- newLocalsRn [L loc n]
+	; (expr', fvs) <- rnLExpr expr
+
+	-- Ugh!  See Note [Splices] above
+	; lcl_rdr <- getLocalRdrEnv
+	; gbl_rdr <- getGlobalRdrEnv
+	; let gbl_names = mkNameSet [gre_name gre | gre <- globalRdrEnvElts gbl_rdr, 
+						    isLocalGRE gre]
+	      lcl_names = mkNameSet (occEnvElts lcl_rdr)
+
+	; return (HsSplice n' expr', fvs `plusFV` lcl_names `plusFV` gbl_names) }
+
+checkTH :: Outputable a => a -> String -> RnM ()
+#ifdef GHCI 
+checkTH _ _ = return ()	-- OK
+#else
+checkTH e what 	-- Raise an error in a stage-1 compiler
+  = addErr (vcat [ptext (sLit "Template Haskell") <+> text what <+>  
+	          ptext (sLit "illegal in a stage-1 compiler"),
+	          nest 2 (ppr e)])
+#endif   
 \end{code}

@@ -353,6 +353,7 @@ data UserTypeCtxt
   | ForSigCtxt Name	-- Foreign inport or export signature
   | DefaultDeclCtxt	-- Types in a default declaration
   | SpecInstCtxt	-- SPECIALISE instance pragma
+  | ThBrackCtxt		-- Template Haskell type brackets [t| ... |]
 
 -- Notes re TySynCtxt
 -- We allow type synonyms that aren't types; e.g.  type List = []
@@ -410,6 +411,7 @@ pprUserTypeCtxt ExprSigCtxt     = ptext (sLit "an expression type signature")
 pprUserTypeCtxt (ConArgCtxt c)  = ptext (sLit "the type of the constructor") <+> quotes (ppr c)
 pprUserTypeCtxt (TySynCtxt c)   = ptext (sLit "the RHS of the type synonym") <+> quotes (ppr c)
 pprUserTypeCtxt GenPatCtxt      = ptext (sLit "the type pattern of a generic definition")
+pprUserTypeCtxt ThBrackCtxt     = ptext (sLit "a Template Haskell quotation [t|...|]")
 pprUserTypeCtxt LamPatSigCtxt   = ptext (sLit "a pattern type signature")
 pprUserTypeCtxt BindPatSigCtxt  = ptext (sLit "a pattern type signature")
 pprUserTypeCtxt ResSigCtxt      = ptext (sLit "a result type signature")

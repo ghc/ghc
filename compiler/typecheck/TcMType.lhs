@@ -1059,11 +1059,13 @@ checkValidType ctxt ty = do
 
 		 ForSigCtxt _	-> gen_rank 1
 		 SpecInstCtxt   -> gen_rank 1
+		 ThBrackCtxt    -> gen_rank 1
 
 	actual_kind = typeKind ty
 
 	kind_ok = case ctxt of
 			TySynCtxt _  -> True -- Any kind will do
+			ThBrackCtxt  -> True -- Any kind will do
 			ResSigCtxt   -> isSubOpenTypeKind actual_kind
 			ExprSigCtxt  -> isSubOpenTypeKind actual_kind
 			GenPatCtxt   -> isLiftedTypeKind actual_kind
@@ -1073,6 +1075,7 @@ checkValidType ctxt ty = do
 	ubx_tup = case ctxt of
 	              TySynCtxt _ | unboxed -> UT_Ok
 	              ExprSigCtxt | unboxed -> UT_Ok
+	              ThBrackCtxt | unboxed -> UT_Ok
 	              _                     -> UT_NotOk
 
 	-- Check that the thing has kind Type, and is lifted if necessary
@@ -1223,13 +1226,14 @@ check_arg_type :: Rank -> Type -> TcM ()
 
 check_arg_type rank ty 
   = do	{ impred <- doptM Opt_ImpredicativeTypes
-	; let rank' = if impred then ArbitraryRank  -- Arg of tycon can have arby rank, regardless
-	              else case rank of 	    -- Predictive => must be monotype
-	      	        MustBeMonoType -> MustBeMonoType 
-			_	       -> TyConArgMonoType
+	; let rank' = case rank of 	    -- Predictive => must be monotype
+	      	        MustBeMonoType     -> MustBeMonoType  -- Monotype, regardless
+			_other | impred    -> ArbitraryRank
+			       | otherwise -> TyConArgMonoType
 			-- Make sure that MustBeMonoType is propagated, 
 			-- so that we don't suggest -XImpredicativeTypes in
 			--    (Ord (forall a.a)) => a -> a
+			-- and so that if it Must be a monotype, we check that it is!
 
 	; check_type rank' UT_NotOk ty
 	; checkTc (not (isUnLiftedType ty)) (unliftedArgErr ty) }

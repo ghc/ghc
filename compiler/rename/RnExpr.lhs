@@ -20,14 +20,14 @@ module RnExpr (
 import {-# SOURCE #-} TcSplice( runQuasiQuoteExpr )
 #endif 	/* GHCI */
 
-import RnSource  ( rnSrcDecls, rnSplice, checkTH ) 
+import RnSource  ( rnSrcDecls )
 import RnBinds   ( rnLocalBindsAndThen, rnValBindsLHS, rnValBindsRHS,
                    rnMatchGroup, makeMiniFixityEnv) 
 import HsSyn
 import TcRnMonad
 import TcEnv		( thRnBrack )
 import RnEnv
-import RnTypes		( rnHsTypeFVs, 
+import RnTypes		( rnHsTypeFVs, rnSplice, checkTH,
 			  mkOpFormRn, mkOpAppRn, mkNegAppRn, checkSectionPrec)
 import RnPat
 import DynFlags		( DynFlag(..) )

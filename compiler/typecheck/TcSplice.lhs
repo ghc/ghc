@@ -13,7 +13,7 @@ TcSplice: Template Haskell splices
 --     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
 -- for details
 
-module TcSplice( tcSpliceExpr, tcSpliceDecls, tcBracket,
+module TcSplice( kcSpliceType, tcSpliceExpr, tcSpliceDecls, tcBracket,
                  lookupThName_maybe,
                  runQuasiQuoteExpr, runQuasiQuotePat, runAnnotation ) where
 
@@ -213,30 +213,31 @@ Desugared:	f = do { s7 <- g Int 3
 		       ; return (ConE "Data.Maybe.Just" s7) }
 
 \begin{code}
-tcBracket brack res_ty = do
-   level <- getStage
-   case bracketOK level of {
-	Nothing         -> failWithTc (illegalBracket level) ;
-	Just next_level -> do
+tcBracket brack res_ty 
+  = addErrCtxt (hang (ptext (sLit "In the Template Haskell quotation"))
+                   2 (ppr brack)) $
+    do { level <- getStage
+       ; case bracketOK level of {
+ 	   Nothing         -> failWithTc (illegalBracket level) ;
+	   Just next_level -> do {
 
    	-- Typecheck expr to make sure it is valid,
 	-- but throw away the results.  We'll type check
 	-- it again when we actually use it.
-    recordThUse
-    pending_splices <- newMutVar []
-    lie_var <- getLIEVar
+          recordThUse
+       ; pending_splices <- newMutVar []
+       ; lie_var <- getLIEVar
 
-    (meta_ty, lie) <- setStage (Brack next_level pending_splices lie_var)
-                               (getLIE (tc_bracket next_level brack))
-    tcSimplifyBracket lie
+       ; (meta_ty, lie) <- setStage (Brack next_level pending_splices lie_var)
+                                    (getLIE (tc_bracket next_level brack))
+       ; tcSimplifyBracket lie
 
 	-- Make the expected type have the right shape
-    boxyUnify meta_ty res_ty
+       ; boxyUnify meta_ty res_ty
 
 	-- Return the original expression, not the type-decorated one
-    pendings <- readMutVar pending_splices
-    return (noLoc (HsBracketOut brack pendings))
-    }
+       ; pendings <- readMutVar pending_splices
+       ; return (noLoc (HsBracketOut brack pendings)) }}}
 
 tc_bracket :: ThLevel -> HsBracket Name -> TcM TcType
 tc_bracket use_lvl (VarBr name) 	-- Note [Quoting names]
@@ -256,12 +257,12 @@ tc_bracket use_lvl (VarBr name) 	-- Note [Quoting names]
 
 tc_bracket _ (ExpBr expr) 
   = do	{ any_ty <- newFlexiTyVarTy liftedTypeKind
-	; tcMonoExpr expr any_ty
+	; tcMonoExprNC expr any_ty  -- NC for no context; tcBracket does that
 	; tcMetaTy expQTyConName }
 	-- Result type is Expr (= Q Exp)
 
 tc_bracket _ (TypBr typ) 
-  = do	{ tcHsSigType ExprSigCtxt typ
+  = do	{ tcHsSigTypeNC ThBrackCtxt typ
 	; tcMetaTy typeQTyConName }
 	-- Result type is Type (= Q Typ)
 

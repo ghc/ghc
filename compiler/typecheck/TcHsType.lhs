@@ -6,7 +6,7 @@
 
 \begin{code}
 module TcHsType (
-	tcHsSigType, tcHsDeriv, 
+	tcHsSigType, tcHsSigTypeNC, tcHsDeriv, 
 	tcHsInstHead, tcHsQuantifiedType,
 	UserTypeCtxt(..), 
 
@@ -24,6 +24,10 @@ module TcHsType (
    ) where
 
 #include "HsVersions.h"
+
+#ifdef GHCI 	/* Only if bootstrapped */
+import {-# SOURCE #-}	TcSplice( kcSpliceType )
+#endif
 
 import HsSyn
 import RnHsSyn
@@ -136,14 +140,19 @@ the TyCon being defined.
 %************************************************************************
 
 \begin{code}
-tcHsSigType :: UserTypeCtxt -> LHsType Name -> TcM Type
+tcHsSigType, tcHsSigTypeNC :: UserTypeCtxt -> LHsType Name -> TcM Type
   -- Do kind checking, and hoist for-alls to the top
   -- NB: it's important that the foralls that come from the top-level
   --	 HsForAllTy in hs_ty occur *first* in the returned type.
   --     See Note [Scoped] with TcSigInfo
 tcHsSigType ctxt hs_ty 
   = addErrCtxt (pprHsSigCtxt ctxt hs_ty) $
-    do	{ kinded_ty <- kcTypeType hs_ty
+    tcHsSigTypeNC ctxt hs_ty
+
+tcHsSigTypeNC ctxt hs_ty
+  = do	{ (kinded_ty, _kind) <- kc_lhs_type hs_ty
+    	  -- The kind is checked by checkValidType, and isn't necessarily
+	  -- of kind * in a Template Haskell quote eg [t| Maybe |]
 	; ty <- tcHsKindedType kinded_ty
 	; checkValidType ctxt ty	
 	; return ty }
@@ -399,8 +408,11 @@ kc_hs_type (HsBangTy b ty) = do
     (ty', kind) <- kc_lhs_type ty
     return (HsBangTy b ty', kind)
 
-kc_hs_type ty@(HsSpliceTy _)
-  = failWithTc (ptext (sLit "Unexpected type splice:") <+> ppr ty)
+#ifdef GHCI	/* Only if bootstrapped */
+kc_hs_type (HsSpliceTy sp) = kcSpliceType sp
+#else
+kc_hs_type ty@(HsSpliceTy _) = failWithTc (ptext (sLit "Unexpected type splice:") <+> ppr ty)
+#endif
 
 -- remove the doc nodes here, no need to worry about the location since
 -- its the same for a doc node and it's child type node
