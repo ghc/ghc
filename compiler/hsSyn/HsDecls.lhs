@@ -42,7 +42,7 @@ module HsDecls (
   CImportSpec(..), FoType(..),
   -- ** Data-constructor declarations
   ConDecl(..), LConDecl, ResType(..), ConDeclField(..),
-  HsConDeclDetails, hsConDeclArgTys,
+  HsConDeclDetails, hsConDeclArgTys, hsConDeclsNames,
   -- ** Document comments
   DocDecl(..), LDocDecl, docDeclDoc,
   -- ** Deprecations
@@ -548,7 +548,7 @@ tyClDeclNames (ClassDecl {tcdLName = cls_name, tcdSigs = sigs, tcdATs = ats})
     concatMap (tyClDeclNames . unLoc) ats ++ [n | L _ (TypeSig n _) <- sigs]
 
 tyClDeclNames (TyData {tcdLName = tc_name, tcdCons = cons})
-  = tc_name : conDeclsNames (map unLoc cons)
+  = tc_name : hsConDeclsNames cons
 
 tyClDeclTyVars :: TyClDecl name -> [LHsTyVarBndr name]
 tyClDeclTyVars (TyFamily    {tcdTyVars = tvs}) = tvs
@@ -741,21 +741,21 @@ data ResType name
 \end{code}
 
 \begin{code}
-conDeclsNames :: (Eq name) => [ConDecl name] -> [Located name]
+hsConDeclsNames :: (Eq name) => [LConDecl name] -> [Located name]
   -- See tyClDeclNames for what this does
   -- The function is boringly complicated because of the records
   -- And since we only have equality, we have to be a little careful
-conDeclsNames cons
+hsConDeclsNames cons
   = snd (foldl do_one ([], []) cons)
   where
-    do_one (flds_seen, acc) (ConDecl { con_name = lname, con_details = RecCon flds })
+    do_one (flds_seen, acc) (L _ (ConDecl { con_name = lname, con_details = RecCon flds }))
 	= (map unLoc new_flds ++ flds_seen, lname : new_flds ++ acc)
 	where
 	  new_flds = filterOut (\f -> unLoc f `elem` flds_seen) 
 			       (map cd_fld_name flds)
 
-    do_one (flds_seen, acc) c
-	= (flds_seen, (con_name c):acc)
+    do_one (flds_seen, acc) (L _ (ConDecl { con_name = lname }))
+	= (flds_seen, lname:acc)
 \end{code}
   
 
