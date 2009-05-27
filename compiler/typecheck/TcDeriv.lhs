@@ -257,7 +257,12 @@ There may be a coercion needed which we get from the tycon for the newtype
 when the dict is constructed in TcInstDcls.tcInstDecl2
 
 
-
+Note [Unused constructors and deriving clauses]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+See Trac #3221.  Consider
+   data T = T1 | T2 deriving( Show )
+Are T1 and T2 unused?  Well, no: the deriving clause expands to mention
+both of them.  So we gather defs/uses from deriving just like anything else.
 
 %************************************************************************
 %*									*
@@ -270,10 +275,11 @@ tcDeriving  :: [LTyClDecl Name]  -- All type constructors
             -> [LInstDecl Name]  -- All instance declarations
             -> [LDerivDecl Name] -- All stand-alone deriving declarations
 	    -> TcM ([InstInfo Name],	-- The generated "instance decls"
-		    HsValBinds Name)	-- Extra generated top-level bindings
+		    HsValBinds Name,	-- Extra generated top-level bindings
+                    DefUses)
 
 tcDeriving tycl_decls inst_decls deriv_decls
-  = recoverM (return ([], emptyValBindsOut)) $
+  = recoverM (return ([], emptyValBindsOut, emptyDUs)) $
     do	{   	-- Fish the "deriving"-related information out of the TcEnv
 		-- And make the necessary "equations".
 	  is_boot <- tcIsHsBoot
@@ -291,13 +297,13 @@ tcDeriving tycl_decls inst_decls deriv_decls
 
 		 -- Generate the generic to/from functions from each type declaration
 	; gen_binds <- mkGenericBinds is_boot
-	; (inst_info, rn_binds) <- renameDeriv is_boot gen_binds (insts1 ++ insts2)
+	; (inst_info, rn_binds, rn_dus) <- renameDeriv is_boot gen_binds (insts1 ++ insts2)
 
 	; dflags <- getDOpts
 	; liftIO (dumpIfSet_dyn dflags Opt_D_dump_deriv "Derived instances"
 	         (ddump_deriving inst_info rn_binds))
 
-	; return (inst_info, rn_binds) }
+	; return (inst_info, rn_binds, rn_dus) }
   where
     ddump_deriving :: [InstInfo Name] -> HsValBinds Name -> SDoc
     ddump_deriving inst_infos extra_binds
@@ -305,13 +311,13 @@ tcDeriving tycl_decls inst_decls deriv_decls
 
 renameDeriv :: Bool -> LHsBinds RdrName
 	    -> [(InstInfo RdrName, DerivAuxBinds)]
- 	    -> TcM ([InstInfo Name], HsValBinds Name)
+ 	    -> TcM ([InstInfo Name], HsValBinds Name, DefUses)
 renameDeriv is_boot gen_binds insts
   | is_boot	-- If we are compiling a hs-boot file, don't generate any derived bindings
 		-- The inst-info bindings will all be empty, but it's easier to
 		-- just use rn_inst_info to change the type appropriately
-  = do	{ rn_inst_infos <- mapM rn_inst_info inst_infos	
-	; return (rn_inst_infos, emptyValBindsOut) }
+  = do	{ (rn_inst_infos, fvs) <- mapAndUnzipM rn_inst_info inst_infos	
+	; return (rn_inst_infos, emptyValBindsOut, usesOnly (plusFVs fvs)) }
 
   | otherwise
   = discardWarnings $ 	 -- Discard warnings about unused bindings etc
@@ -330,9 +336,10 @@ renameDeriv is_boot gen_binds insts
 	; let aux_names = map unLoc (collectHsValBinders rn_aux_lhs)
 
 	; bindLocalNames aux_names $ 
-    do	{ (rn_aux, _dus) <- rnTopBindsRHS (mkNameSet aux_names) rn_aux_lhs
-	; rn_inst_infos <- mapM rn_inst_info inst_infos
-	; return (rn_inst_infos, rn_aux `plusHsValBinds` rn_gen) } }
+    do	{ (rn_aux, dus_aux) <- rnTopBindsRHS (mkNameSet aux_names) rn_aux_lhs
+	; (rn_inst_infos, fvs_insts) <- mapAndUnzipM rn_inst_info inst_infos
+	; return (rn_inst_infos, rn_aux `plusHsValBinds` rn_gen,
+                  dus_gen `plusDU` dus_aux `plusDU` usesOnly (plusFVs fvs_insts)) } }
 
   where
     (inst_infos, deriv_aux_binds) = unzip insts
@@ -344,15 +351,15 @@ renameDeriv is_boot gen_binds insts
 
 
     rn_inst_info (InstInfo { iSpec = inst, iBinds = NewTypeDerived co })
-	= return (InstInfo { iSpec = inst, iBinds = NewTypeDerived co })
+	= return (InstInfo { iSpec = inst, iBinds = NewTypeDerived co }, emptyFVs)
 
     rn_inst_info (InstInfo { iSpec = inst, iBinds = VanillaInst binds sigs })
 	= 	-- Bring the right type variables into 
 		-- scope (yuk), and rename the method binds
 	   ASSERT( null sigs )
 	   bindLocalNames (map Var.varName tyvars) $
- 	   do { (rn_binds, _fvs) <- rnMethodBinds clas_nm (\_ -> []) [] binds
-	      ; return (InstInfo { iSpec = inst, iBinds = VanillaInst rn_binds [] }) }
+ 	   do { (rn_binds, fvs) <- rnMethodBinds clas_nm (\_ -> []) [] binds
+	      ; return (InstInfo { iSpec = inst, iBinds = VanillaInst rn_binds [] }, fvs) }
 	where
 	  (tyvars,_,clas,_) = instanceHead inst
 	  clas_nm  	    = className clas

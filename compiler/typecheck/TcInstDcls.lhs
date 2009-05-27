@@ -22,6 +22,7 @@ import FamInstEnv
 import TcDeriv
 import TcEnv
 import RnEnv	( lookupGlobalOccRn )
+import RnSource ( addTcgDUs )
 import TcHsType
 import TcUnify
 import TcSimplify
@@ -339,9 +340,9 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
                 --   a) local instance decls
                 --   b) generic instances
                 --   c) local family instance decls
-       ; addInsts local_info         $ do {
-       ; addInsts generic_inst_info  $ do {
-       ; addFamInsts at_idx_tycons   $ do {
+       ; addInsts local_info         $
+         addInsts generic_inst_info  $
+         addFamInsts at_idx_tycons   $ do {
 
                 -- (4) Compute instances from "deriving" clauses;
                 -- This stuff computes a context for the derived instance
@@ -351,13 +352,13 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
 	 failIfErrsM		-- If the addInsts stuff gave any errors, don't
 				-- try the deriving stuff, becuase that may give
 				-- more errors still
-       ; (deriv_inst_info, deriv_binds) <- tcDeriving tycl_decls inst_decls
-                                                      deriv_decls
+       ; (deriv_inst_info, deriv_binds, deriv_dus) 
+              <- tcDeriving tycl_decls inst_decls deriv_decls
        ; gbl_env <- addInsts deriv_inst_info getGblEnv
-       ; return (gbl_env,
+       ; return ( addTcgDUs gbl_env deriv_dus,
                   generic_inst_info ++ deriv_inst_info ++ local_info,
                   aux_binds `plusHsValBinds` deriv_binds)
-    }}}}}
+    }}}
   where
     -- Make sure that toplevel type instance are not for associated types.
     -- !!!TODO: Need to perform this check for the TyThing of type functions,

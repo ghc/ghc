@@ -216,6 +216,8 @@ rnTyClDecls tycl_decls = do  (decls', _fvs) <- rnList rnTyClDecl tycl_decls
 			     return decls'
 
 addTcgDUs :: TcGblEnv -> DefUses -> TcGblEnv 
+-- This function could be defined lower down in the module hierarchy, 
+-- but there doesn't seem anywhere very logical to put it.
 addTcgDUs tcg_env dus = tcg_env { tcg_dus = tcg_dus tcg_env `plusDU` dus }
 
 rnList :: (a -> RnM (b, FreeVars)) -> [Located a] -> RnM ([Located b], FreeVars)
@@ -659,10 +661,10 @@ rnTyClDecl (tydecl@TyData {tcdND = new_or_data, tcdCtxt = context,
 		    else lookupLocatedTopBndrRn tycon
 	; context' <- rnContext data_doc context
 	; typats' <- rnTyPats data_doc typatsMaybe
-	; (derivs', deriv_fvs) <- rn_derivs derivs
 	; condecls' <- rnConDecls (unLoc tycon') condecls
 		-- No need to check for duplicate constructor decls
 		-- since that is done by RnNames.extendGlobalRdrEnvRn
+	; (derivs', deriv_fvs) <- rn_derivs derivs
 	; return (TyData {tcdND = new_or_data, tcdCtxt = context', 
 			   tcdLName = tycon', tcdTyVars = tyvars', 
 			   tcdTyPats = typats', tcdKindSig = Nothing, 
@@ -689,11 +691,11 @@ rnTyClDecl (tydecl@TyData {tcdND = new_or_data, tcdCtxt = context,
 		-- do not scope over the constructor signatures
 		-- 	data T a where { T1 :: forall b. b-> b }
 
-	; (derivs', deriv_fvs) <- rn_derivs derivs
 	; condecls' <- rnConDecls (unLoc tycon') condecls
 		-- No need to check for duplicate constructor decls
 		-- since that is done by RnNames.extendGlobalRdrEnvRn
 
+	; (derivs', deriv_fvs) <- rn_derivs derivs
 	; return (TyData {tcdND = new_or_data, tcdCtxt = noLoc [], 
 			   tcdLName = tycon', tcdTyVars = tyvars', 
 			   tcdTyPats = typats', tcdKindSig = sig,
