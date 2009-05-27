@@ -77,7 +77,7 @@ regColors
 	, (r14, "#004040")
 	, (r15, "#002080") ]
 
-	++ zip (map RealReg [16..31]) (repeat "red")
+	++ zip (map regSingle [16..31]) (repeat "red")
 #else
 regDotColor :: Reg -> SDoc
 regDotColor	= panic "not defined"

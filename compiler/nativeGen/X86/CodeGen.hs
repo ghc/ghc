@@ -1781,9 +1781,7 @@ genCCall target dest_regs args = do
 	assign_code [CmmHinted dest _hint] = 
 	  case typeWidth rep of
 		W32 | isFloatType rep -> unitOL (MOV (floatSize W32) (OpReg xmm0) (OpReg r_dest))
-v v v v v v v
 		W64 | isFloatType rep -> unitOL (MOV (floatSize W64) (OpReg xmm0) (OpReg r_dest))
-^ ^ ^ ^ ^ ^ ^
 		_ -> unitOL (MOV (cmmTypeSize rep) (OpReg rax) (OpReg r_dest))
 	  where 
 		rep = localRegType dest
