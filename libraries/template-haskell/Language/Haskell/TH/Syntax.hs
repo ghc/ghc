@@ -1,9 +1,10 @@
 {-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
--- The above warning supression flag is a temporary kludge.
+-- The -fno-warn-warnings-deprecations flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and fix
 -- any warnings in the module. See
 --     http://hackage.haskell.org/trac/ghc/wiki/WorkingConventions#Warnings
 -- for details
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Language.Haskell.Syntax
@@ -19,7 +20,7 @@
 -----------------------------------------------------------------------------
 
 module Language.Haskell.TH.Syntax(
-	Quasi(..), Lift(..), 
+	Quasi(..), Lift(..), liftString,
 
 	Q, runQ, 
 	report,	recover, reify,
@@ -223,6 +224,10 @@ instance (Lift a, Lift b) => Lift (Either a b) where
 
 instance Lift a => Lift [a] where
   lift xs = do { xs' <- mapM lift xs; return (ListE xs') }
+
+liftString :: String -> Q Exp
+-- Used in TcExpr to short-circuit the lifting for strings
+liftString s = return (LitE (StringL s))
 
 instance (Lift a, Lift b) => Lift (a, b) where
   lift (a, b)
