@@ -508,7 +508,10 @@ cvtl e = wrapL (cvt e)
     cvt (DoE ss)       = cvtHsDo DoExpr ss
     cvt (CompE ss)     = cvtHsDo ListComp ss
     cvt (ArithSeqE dd) = do { dd' <- cvtDD dd; return $ ArithSeq noPostTcExpr dd' }
-    cvt (ListE xs)     = do { xs' <- mapM cvtl xs; return $ ExplicitList void xs' }
+    cvt (ListE xs)     
+      | Just s <- allCharLs xs       = do { l' <- cvtLit (StringL s); return (HsLit l') }
+      	     -- Note [Converting strings]
+      | otherwise                    = do { xs' <- mapM cvtl xs; return $ ExplicitList void xs' }
     cvt (InfixE (Just x) s (Just y)) = do { x' <- cvtl x; s' <- cvtl s; y' <- cvtl y
 					  ; e' <- returnL $ OpApp x' s' undefined y'
 					  ; return $ HsPar e' }
@@ -596,6 +599,21 @@ cvtOverLit (StringL s)
 cvtOverLit _ = panic "Convert.cvtOverLit: Unexpected overloaded literal"
 -- An Integer is like an (overloaded) '3' in a Haskell source program
 -- Similarly 3.5 for fractionals
+
+{- Note [Converting strings] 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If we get (ListE [CharL 'x', CharL 'y']) we'd like to convert to
+a string literal for "xy".  Of course, we might hope to get 
+(LitE (StringL "xy")), but not always, and allCharLs fails quickly
+if it isn't a literal string
+-}
+
+allCharLs :: [TH.Exp] -> Maybe String
+-- Note [Converting strings]
+allCharLs (LitE (CharL c) : xs) 
+  | Just cs <- allCharLs xs = Just (c:cs)
+allCharLs [] = Just []
+allCharLs _  = Nothing
 
 cvtLit :: Lit -> CvtM HsLit
 cvtLit (IntPrimL i)    = do { force i; return $ HsIntPrim i }

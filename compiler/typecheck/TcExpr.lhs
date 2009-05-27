@@ -1152,17 +1152,32 @@ thBrackId orig id ps_var lie_var
 		-- so we zap it to a LiftedTypeKind monotype
 		-- C.f. the call in TcPat.newLitInst
 
-	; setLIEVar lie_var	$ do
-	{ lift <- newMethodFromName orig id_ty' DsMeta.liftName
-		   -- Put the 'lift' constraint into the right LIE
+	; lift <- if isStringTy id_ty' then
+	       	     tcLookupId DsMeta.liftStringName
+		     -- See Note [Lifting strings]
+	          else
+                     setLIEVar lie_var	$ do  -- Put the 'lift' constraint into the right LIE
+                     newMethodFromName orig id_ty' DsMeta.liftName
 	   
 		   -- Update the pending splices
 	; ps <- readMutVar ps_var
 	; writeMutVar ps_var ((idName id, nlHsApp (nlHsVar lift) (nlHsVar id)) : ps)
 
-	; return id } }
+	; return id }
 #endif /* GHCI */
 \end{code}
+
+Note [Lifting strings]
+~~~~~~~~~~~~~~~~~~~~~~
+If we see $(... [| s |] ...) where s::String, we don't want to
+generate a mass of Cons (CharL 'x') (Cons (CharL 'y') ...)) etc.
+So this conditional short-circuits the lifting mechanism to generate
+(liftString "xy") in that case.  I didn't want to use overlapping instances
+for the Lift class in TH.Syntax, because that can lead to overlapping-instance
+errors in a polymorphic situation.  
+
+If this check fails (which isn't impossible) we get another chance; see
+Note [Converting strings] in Convert.lhs 
 
 Local record selectors
 ~~~~~~~~~~~~~~~~~~~~~~

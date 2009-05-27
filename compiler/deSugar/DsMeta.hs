@@ -23,7 +23,7 @@
 
 module DsMeta( dsBracket, 
 	       templateHaskellNames, qTyConName, nameTyConName,
-	       liftName, expQTyConName, patQTyConName, decQTyConName, typeQTyConName,
+	       liftName, liftStringName, expQTyConName, patQTyConName, decQTyConName, typeQTyConName,
 	       decTyConName, typeTyConName, mkNameG_dName, mkNameG_vName, mkNameG_tcName,
 	       quoteExpName, quotePatName
 	        ) where
@@ -1757,12 +1757,13 @@ predTyConName     = thTc (fsLit "Pred")         predTyConKey
 
 returnQName, bindQName, sequenceQName, newNameName, liftName,
     mkNameName, mkNameG_vName, mkNameG_dName, mkNameG_tcName,
-    mkNameLName :: Name
-returnQName   = thFun (fsLit "returnQ")   returnQIdKey
-bindQName     = thFun (fsLit "bindQ")     bindQIdKey
-sequenceQName = thFun (fsLit "sequenceQ") sequenceQIdKey
+    mkNameLName, liftStringName :: Name
+returnQName    = thFun (fsLit "returnQ")   returnQIdKey
+bindQName      = thFun (fsLit "bindQ")     bindQIdKey
+sequenceQName  = thFun (fsLit "sequenceQ") sequenceQIdKey
 newNameName    = thFun (fsLit "newName")   newNameIdKey
-liftName      = thFun (fsLit "lift")      liftIdKey
+liftName       = thFun (fsLit "lift")      liftIdKey
+liftStringName = thFun (fsLit "liftString")  liftStringIdKey
 mkNameName     = thFun (fsLit "mkName")     mkNameIdKey
 mkNameG_vName  = thFun (fsLit "mkNameG_v")  mkNameG_vIdKey
 mkNameG_dName  = thFun (fsLit "mkNameG_d")  mkNameG_dIdKey
@@ -2053,6 +2054,9 @@ floatPrimLIdKey   = mkPreludeMiscIdUnique 215
 doublePrimLIdKey  = mkPreludeMiscIdUnique 216
 rationalLIdKey    = mkPreludeMiscIdUnique 217
 
+liftStringIdKey :: Unique
+liftStringIdKey     = mkPreludeMiscIdUnique 218
+
 -- data Pat = ...
 litPIdKey, varPIdKey, tupPIdKey, conPIdKey, infixPIdKey, tildePIdKey, bangPIdKey,
     asPIdKey, wildPIdKey, recPIdKey, listPIdKey, sigPIdKey :: Unique
@@ -2080,6 +2084,7 @@ matchIdKey          = mkPreludeMiscIdUnique 231
 -- data Clause = ...
 clauseIdKey :: Unique
 clauseIdKey         = mkPreludeMiscIdUnique 232
+
 
 -- data Exp = ...
 varEIdKey, conEIdKey, litEIdKey, appEIdKey, infixEIdKey, infixAppIdKey,
