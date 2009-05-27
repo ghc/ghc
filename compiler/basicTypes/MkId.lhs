@@ -86,17 +86,42 @@ import Module
 %*                                                                      *
 %************************************************************************
 
+Note [Wired-in Ids]
+~~~~~~~~~~~~~~~~~~~
+There are several reasons why an Id might appear in the wiredInIds:
+
+(1) The ghcPrimIds are wired in because they can't be defined in
+    Haskell at all, although the can be defined in Core.  They have
+    compulsory unfoldings, so they are always inlined and they  have
+    no definition site.  Their home module is GHC.Prim, so they
+    also have a description in primops.txt.pp, where they are called
+    'pseudoops'.
+
+(2) The 'error' function, eRROR_ID, is wired in because we don't yet have
+    a way to express in an interface file that the result type variable
+    is 'open'; that is can be unified with an unboxed type
+
+    [The interface file format now carry such information, but there's
+    no way yet of expressing at the definition site for these 
+    error-reporting functions that they have an 'open' 
+    result type. -- sof 1/99]
+
+(3) Other error functions (rUNTIME_ERROR_ID) are wired in (a) because
+    the desugarer generates code that mentiones them directly, and
+    (b) for the same reason as eRROR_ID
+
+(4) lazyId is wired in because the wired-in version overrides the
+    strictness of the version defined in GHC.Base
+
+In cases (2-4), the function has a definition in a library module, and
+can be called; but the wired-in version means that the details are 
+never read from that module's interface file; instead, the full definition
+is right here.
+
 \begin{code}
 wiredInIds :: [Id]
 wiredInIds
-  = [   -- These error-y things are wired in because we don't yet have
-        -- a way to express in an interface file that the result type variable
-        -- is 'open'; that is can be unified with an unboxed type
-        -- 
-        -- [The interface file format now carry such information, but there's
-        -- no way yet of expressing at the definition site for these 
-        -- error-reporting functions that they have an 'open' 
-        -- result type. -- sof 1/99]
+  = [   
 
     eRROR_ID,   -- This one isn't used anywhere else in the compiler
                 -- But we still need it in wiredInIds so that when GHC
