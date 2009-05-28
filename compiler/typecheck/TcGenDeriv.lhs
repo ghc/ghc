@@ -1241,7 +1241,10 @@ infix_RDR      = dataQual_RDR gENERICS (fsLit "Infix")
 
 %************************************************************************
 %*									*
-	Functor instances
+	                Functor instances
+
+ see http://www.mail-archive.com/haskell-prime@haskell.org/msg02116.html
+
 %*									*
 %************************************************************************
 
@@ -1444,7 +1447,10 @@ mkSimpleTupleCase match_for_con boxity insides x = do
 
 %************************************************************************
 %*									*
-	Foldable instances
+	                Foldable instances
+
+ see http://www.mail-archive.com/haskell-prime@haskell.org/msg02116.html
+
 %*									*
 %************************************************************************
 
@@ -1494,7 +1500,9 @@ gen_Foldable_binds loc tycon
 
 %************************************************************************
 %*									*
-	Traversable instances
+	                Traversable instances
+
+ see http://www.mail-archive.com/haskell-prime@haskell.org/msg02116.html
 %*									*
 %************************************************************************
 
