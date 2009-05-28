@@ -84,7 +84,7 @@ createThread(Capability *cap, nat size)
 	size = MIN_STACK_WORDS + TSO_STRUCT_SIZEW;
     }
 
-    stack_size = size - TSO_STRUCT_SIZEW;
+    stack_size = round_to_mblocks(size) - TSO_STRUCT_SIZEW;
     
     tso = (StgTSO *)allocateLocal(cap, size);
     TICK_ALLOC_TSO(stack_size, 0);
