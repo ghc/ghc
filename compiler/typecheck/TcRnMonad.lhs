@@ -366,9 +366,9 @@ traceOptTcRn flag doc = ifOptM flag $ do
 			; dumpTcRn real_doc }
 
 dumpTcRn :: SDoc -> TcRn ()
-dumpTcRn doc = do { rdr_env <- getGlobalRdrEnv ;
-                    dflags <- getDOpts ;
-                        liftIO (printForUser stderr (mkPrintUnqualified dflags rdr_env) doc) }
+dumpTcRn doc = do { rdr_env <- getGlobalRdrEnv 
+                  ; dflags <- getDOpts 
+                  ; liftIO (printForUser stderr (mkPrintUnqualified dflags rdr_env) doc) }
 
 debugDumpTcRn :: SDoc -> TcRn ()
 debugDumpTcRn doc | opt_NoDebugOutput = return ()
