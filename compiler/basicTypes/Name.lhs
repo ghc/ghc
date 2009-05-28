@@ -63,7 +63,7 @@ module Name (
 	NamedThing(..),
 	getSrcLoc, getSrcSpan, getOccString,
 
- 	pprInfixName, pprPrefixName,
+ 	pprInfixName, pprPrefixName, pprModulePrefix,
 
 	-- Re-export the OccName stuff
 	module OccName
@@ -396,23 +396,16 @@ pprName (Name {n_sort = sort, n_uniq = u, n_occ = occ})
 
 pprExternal :: PprStyle -> Unique -> Module -> OccName -> Bool -> BuiltInSyntax -> SDoc
 pprExternal sty uniq mod occ is_wired is_builtin
-  | codeStyle sty        = ppr mod <> char '_' <> ppr_z_occ_name occ
+  | codeStyle sty = ppr mod <> char '_' <> ppr_z_occ_name occ
 	-- In code style, always qualify
 	-- ToDo: maybe we could print all wired-in things unqualified
 	-- 	 in code style, to reduce symbol table bloat?
- | debugStyle sty       = ppr mod <> dot <> ppr_occ_name occ
-		<> braces (hsep [if is_wired then ptext (sLit "(w)") else empty,
-				 pprNameSpaceBrief (occNameSpace occ), 
-		 		 pprUnique uniq])
-  | BuiltInSyntax <- is_builtin  = ppr_occ_name occ
-	-- never qualify builtin syntax
-  | NameQual modname <- qual_name = ppr modname <> dot <> ppr_occ_name occ
-        -- see HscTypes.mkPrintUnqualified and Outputable.QualifyName:
-  | NameNotInScope1 <- qual_name  = ppr mod <> dot <> ppr_occ_name occ
-  | NameNotInScope2 <- qual_name  = ppr (modulePackageId mod) <> char ':' <>
-                                    ppr (moduleName mod) <> dot <> ppr_occ_name occ
-  | otherwise		          = ppr_occ_name occ
-  where qual_name = qualName sty mod occ
+  | debugStyle sty = ppr mod <> dot <> ppr_occ_name occ
+		     <> braces (hsep [if is_wired then ptext (sLit "(w)") else empty,
+				      pprNameSpaceBrief (occNameSpace occ), 
+		 		      pprUnique uniq])
+  | BuiltInSyntax <- is_builtin = ppr_occ_name occ  -- Never qualify builtin syntax
+  | otherwise		        = pprModulePrefix sty mod occ <> ppr_occ_name occ
 
 pprInternal :: PprStyle -> Unique -> OccName -> SDoc
 pprInternal sty uniq occ
@@ -434,6 +427,18 @@ pprSystem sty uniq occ
 				-- If the tidy phase hasn't run, the OccName
 				-- is unlikely to be informative (like 's'),
 				-- so print the unique
+
+
+pprModulePrefix :: PprStyle -> Module -> OccName -> SDoc
+-- Print the "M." part of a name, based on whether it's in scope or not
+-- See Note [Printing original names] in HscTypes
+pprModulePrefix sty mod occ
+  = case qualName sty mod occ of	           -- See Outputable.QualifyName:
+      NameQual modname -> ppr modname <> dot       -- Name is in scope       
+      NameNotInScope1  -> ppr mod <> dot           -- Not in scope
+      NameNotInScope2  -> ppr (modulePackageId mod) <> colon     -- Module not in
+                          <> ppr (moduleName mod) <> dot         -- scope eithber
+      _otherwise       -> empty
 
 ppr_underscore_unique :: Unique -> SDoc
 -- Print an underscore separating the name from its unique

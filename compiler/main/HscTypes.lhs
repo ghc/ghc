@@ -54,8 +54,9 @@ module HscTypes (
 
         -- * Interactive context
 	InteractiveContext(..), emptyInteractiveContext, 
-	icPrintUnqual, mkPrintUnqualified, extendInteractiveContext,
+	icPrintUnqual, extendInteractiveContext,
         substInteractiveContext,
+        mkPrintUnqualified, pprModulePrefix,
 
 	-- * Interfaces
 	ModIface(..), mkIfaceWarnCache, mkIfaceHashCache, mkIfaceFixCache,
@@ -1202,6 +1203,8 @@ substInteractiveContext ictxt@InteractiveContext{ic_tmp_ids=ids} subst =
 %*									*
 %************************************************************************
 
+Note [Printing original names]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Deciding how to print names is pretty tricky.  We are given a name
 P:M.T, where P is the package name, M is the defining module, and T is
 the occurrence name, and we have to decide in which form to display
@@ -1211,19 +1214,24 @@ Ideally we want to display the name in the form in which it is in
 scope.  However, the name might not be in scope at all, and that's
 where it gets tricky.  Here are the cases:
 
- 1. T   uniquely maps to  P:M.T                         --->  "T"
- 2. there is an X for which X.T uniquely maps to  P:M.T --->  "X.T"
- 3. there is no binding for "M.T"                       --->  "M.T"
- 4. otherwise                                           --->  "P:M.T"
+ 1. T uniquely maps to  P:M.T      --->  "T"      NameUnqual
+ 2. There is an X for which X.T 
+       uniquely maps to  P:M.T     --->  "X.T"    NameQual X
+ 3. There is no binding for "M.T"  --->  "M.T"    NameNotInScope1
+ 4. Otherwise                      --->  "P:M.T"  NameNotInScope2
 
-3 and 4 apply when P:M.T is not in scope.  In these cases we want to
-refer to the name as "M.T", but "M.T" might mean something else in the
-current scope (e.g. if there's an "import X as M"), so to avoid
-confusion we avoid using "M.T" if there's already a binding for it.
+(3) and (4) apply when the entity P:M.T is not in the GlobalRdrEnv at
+all. In these cases we still want to refer to the name as "M.T", *but*
+"M.T" might mean something else in the current scope (e.g. if there's
+an "import X as M"), so to avoid confusion we avoid using "M.T" if
+there's already a binding for it.  Instead we write P:M.T.
 
-There's one further subtlety: if the module M cannot be imported
-because it is not exposed by any package, then we must refer to it as
-"P:M".  This is handled by the qual_mod component of PrintUnqualified.
+There's one further subtlety: in case (3), what if there are two
+things around, P1:M.T and P2:M.T?  Then we don't want to print both of
+them as M.T!  However only one of the modules P1:M and P2:M can be
+exposed (say P2), so we use M.T for that, and P1:M.T for the other one.
+This is handled by the qual_mod component of PrintUnqualified, inside
+the (ppr mod) of case (3), in Name.pprModulePrefix
 
 \begin{code}
 -- | Creates some functions that work out the best ways to format

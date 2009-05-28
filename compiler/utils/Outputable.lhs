@@ -129,6 +129,7 @@ data Depth = AllTheWay
 -- in source code, names are qualified by ModuleNames.
 type QueryQualifyName = Module -> OccName -> QualifyName
 
+-- See Note [Printing original names] in HscTypes
 data QualifyName                        -- given P:M.T
         = NameUnqual                    -- refer to it as "T"
         | NameQual ModuleName           -- refer to it as "X.T" for the supplied X
