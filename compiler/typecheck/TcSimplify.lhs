@@ -2903,12 +2903,16 @@ disambigGroup :: [Type]			-- The default types
 	      -> TcM ()	-- Just does unification, to fix the default types
 
 disambigGroup default_tys dicts
-  = try_default default_tys
+  = do { mb_chosen_ty <- try_default default_tys
+       ; case mb_chosen_ty of
+            Nothing        -> return ()
+            Just chosen_ty -> do { unifyType chosen_ty (mkTyVarTy tyvar) 
+	    	 	         ; warnDefault dicts chosen_ty } }
   where
     (_,_,tyvar) = ASSERT(not (null dicts)) head dicts	-- Should be non-empty
     classes = [c | (_,c,_) <- dicts]
 
-    try_default [] = return ()
+    try_default [] = return Nothing
     try_default (default_ty : default_tys)
       = tryTcLIE_ (try_default default_tys) $
     	do { tcSimplifyDefault [mkClassPred clas [default_ty] | clas <- classes]
@@ -2918,10 +2922,7 @@ disambigGroup default_tys dicts
 		-- For example, if Real a is reqd, but the only type in the
 		-- default list is Int.
 
-		-- After this we can't fail
-	   ; warnDefault dicts default_ty
-	   ; unifyType default_ty (mkTyVarTy tyvar) 
-	   ; return () -- TOMDO: do something with the coercion
+	   ; return (Just default_ty) -- TOMDO: do something with the coercion
 	   }
 
 
