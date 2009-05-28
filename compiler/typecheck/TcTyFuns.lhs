@@ -1610,10 +1610,10 @@ misMatchMsg env0 (ty_act, ty_exp)
     open_tcs = [tc | TyConApp tc _ <- [ty_act, ty_exp]
                    , isOpenTyCon tc ]
     pp_open_tc tc = ptext (sLit "NB:") <+> quotes (ppr tc) 
-    	       	    <+> pp_inj <+> ptext (sLit "type function")
-  		  where
-		    pp_inj | isInjectiveTyCon tc = ptext (sLit "is an (injective)")
-		    	   | otherwise           = ptext (sLit "is a (non-injective)")
+    	       	    <+> ptext (sLit "is a type function") <> pp_inj
+	where
+          pp_inj | isInjectiveTyCon tc = empty
+                 | otherwise = ptext (sLit (", and may not be injective"))
 
     ppr_ty :: TidyEnv -> TcType -> (TidyEnv, SDoc, SDoc)
     ppr_ty env ty
@@ -1639,7 +1639,7 @@ It's very confusing to get a message like
      Couldn't match expected type `Depend s'
             against inferred type `Depend s1'
 so pp_open_tc adds:
-       NB: `Depend' is a (non-injective) type function
+       NB: `Depend' is type function, and hence may not be injective
 
 Currently we add this independently for each argument, so we also get
      Couldn't match expected type `a'
