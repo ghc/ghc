@@ -5863,6 +5863,8 @@ Wiki page</ulink>.
 		  <itemizedlist>
 		    <listitem><para> an expression; the spliced expression must
 		    have type <literal>Q Exp</literal></para></listitem>
+		    <listitem><para> an type; the spliced expression must
+		    have type <literal>Q Typ</literal></para></listitem>
 		    <listitem><para> a list of top-level declarations; the spliced expression must have type <literal>Q [Dec]</literal></para></listitem>
 		    </itemizedlist>
 		</para>
@@ -5911,7 +5913,7 @@ Wiki page</ulink>.
 (Compared to the original paper, there are many differences of detail.
 The syntax for a declaration splice uses "<literal>$</literal>" not "<literal>splice</literal>".
 The type of the enclosed expression must be  <literal>Q [Dec]</literal>, not  <literal>[Q Dec]</literal>.
-Type splices are not implemented, and neither are pattern splices or quotations.
+Pattern splices and quotations are not implemented.)
 
 </sect2>
 
