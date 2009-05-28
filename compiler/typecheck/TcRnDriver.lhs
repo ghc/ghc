@@ -34,7 +34,6 @@ import DynFlags
 import StaticFlags
 import HsSyn
 import RdrHsSyn
-
 import PrelNames
 import RdrName
 import TcHsSyn
@@ -944,6 +943,12 @@ check_main dflags tcg_env
     pp_main_fn | main_fn == main_RDR_Unqual = ptext (sLit "function") <+> quotes (ppr main_fn)
 	       | otherwise                  = ptext (sLit "main function") <+> quotes (ppr main_fn)
 	       
+-- | Get the unqualified name of the function to use as the \"main\" for the main module.
+-- Either returns the default name or the one configured on the command line with -main-is
+getMainFun :: DynFlags -> RdrName
+getMainFun dflags = case (mainFunIs dflags) of
+    Just fn -> mkRdrUnqual (mkVarOccFS (mkFastString fn))
+    Nothing -> main_RDR_Unqual
 \end{code}
 
 Note [Root-main Id]

@@ -31,7 +31,6 @@ module DynFlags (
         dopt_set, dopt_unset,           -- DynFlags -> DynFlag -> DynFlags
         getOpts,                        -- DynFlags -> (DynFlags -> [a]) -> [a]
         getVerbFlag,
-        getMainFun,
         updOptLevel,
         setTmpDir,
         setPackageName,
@@ -69,9 +68,7 @@ import Platform
 #endif
 import Module
 import PackageConfig
-import PrelNames        ( mAIN, main_RDR_Unqual )
-import RdrName          ( RdrName, mkRdrUnqual )
-import OccName          ( mkVarOccFS )
+import PrelNames        ( mAIN )
 #if defined(i386_TARGET_ARCH) || (!defined(mingw32_TARGET_OS) && !defined(darwin_TARGET_OS))
 import StaticFlags      ( opt_Static )
 #endif
@@ -2103,13 +2100,6 @@ setMainIs arg
   = upd $ \d -> d{ mainFunIs = Just arg }
   where
     (main_mod, main_fn) = splitLongestPrefix arg (== '.')
-
--- | Get the unqualified name of the function to use as the \"main\" for the main module.
--- Either returns the default name or the one configured on the command line with -main-is
-getMainFun :: DynFlags -> RdrName
-getMainFun dflags = case (mainFunIs dflags) of
-    Just fn -> mkRdrUnqual (mkVarOccFS (mkFastString fn))
-    Nothing -> main_RDR_Unqual
 
 -----------------------------------------------------------------------------
 -- Paths & Libraries
