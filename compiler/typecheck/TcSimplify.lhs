@@ -2856,6 +2856,7 @@ disambiguate doc interactive dflags insts
 
   where
    extended_defaulting = interactive || dopt Opt_ExtendedDefaultRules dflags
+   		       -- See also Trac #1974
    ovl_strings = dopt Opt_OverloadedStrings dflags
 
    unaries :: [(Inst, Class, TcTyVar)]  -- (C tv) constraints
