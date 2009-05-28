@@ -4,3 +4,7 @@ tcfail204.hs:8:6:
              `RealFrac t' arising from a use of `ceiling' at tcfail204.hs:8:6-16
     In the expression: ceiling 6.3
     In the definition of `foo': foo = ceiling 6.3
+
+<no location info>: 
+Failing due to -Werror.
+
