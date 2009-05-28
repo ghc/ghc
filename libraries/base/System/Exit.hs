@@ -57,7 +57,12 @@ import System
 -- be caught using the functions of "Control.Exception".  This means
 -- that cleanup computations added with 'Control.Exception.bracket'
 -- (from "Control.Exception") are also executed properly on 'exitWith'.
-
+--
+-- Note: in GHC, 'exitWith' should be called from the main program
+-- thread in order to exit the process.  When called from another
+-- thread, 'exitWith' will throw an 'ExitException' as normal, but the
+-- exception will not cause the process itself to exit.
+--
 #ifndef __NHC__
 exitWith :: ExitCode -> IO a
 exitWith ExitSuccess = throwIO ExitSuccess
