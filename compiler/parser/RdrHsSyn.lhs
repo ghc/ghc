@@ -28,7 +28,7 @@ module RdrHsSyn (
 			      -- -> (FastString, RdrName, RdrNameHsType)
 			      -- -> P RdrNameHsDecl
 	mkExtName,           -- RdrName -> CLabelString
-	mkGadtDecl,          -- Located RdrName -> LHsType RdrName -> ConDecl RdrName
+	mkGadtDecl,          -- [Located RdrName] -> LHsType RdrName -> ConDecl RdrName
 			      
 	-- Bunch of functions in the parser monad for 
 	-- checking and constructing values
@@ -813,11 +813,19 @@ checkValSig (L l (HsVar v)) ty
 checkValSig (L l _)         _
   = parseError l "Invalid type signature"
 
-mkGadtDecl :: Located RdrName
+mkGadtDecl :: [Located RdrName]
            -> LHsType RdrName -- assuming HsType
-           -> ConDecl RdrName
-mkGadtDecl name (L _ (HsForAllTy _ qvars cxt ty)) = mk_gadt_con name qvars cxt ty
-mkGadtDecl name ty				  = mk_gadt_con name [] (noLoc []) ty
+           -> [ConDecl RdrName]
+-- We allow C,D :: ty
+-- and expand it as if it had been 
+--    C :: ty; D :: ty
+-- (Just like type signatures in general.)
+mkGadtDecl names ty
+  = [mk_gadt_con name qvars cxt tau | name <- names]
+  where
+    (qvars,cxt,tau) = case ty of
+    		        L _ (HsForAllTy _ qvars cxt tau) -> (qvars, cxt,      tau)
+			_ 	     	                 -> ([],    noLoc [], ty)
 
 mk_gadt_con :: Located RdrName
             -> [LHsTyVarBndr RdrName]

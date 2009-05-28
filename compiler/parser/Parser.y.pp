@@ -1150,9 +1150,9 @@ gadt_constrlist :: { Located [LConDecl RdrName] }
 	|     vocurly    gadt_constrs close	{ $2 }
 
 gadt_constrs :: { Located [LConDecl RdrName] }
-        : gadt_constrs ';' gadt_constr  { LL ($3 : unLoc $1) }
+        : gadt_constrs ';' gadt_constr  { sL (comb2 $1 (head $3)) ($3 ++ unLoc $1) }
         | gadt_constrs ';' 		{ $1 }
-        | gadt_constr                   { L1 [$1] } 
+        | gadt_constr                   { sL (getLoc (head $1)) $1 } 
 
 -- We allow the following forms:
 --	C :: Eq a => a -> T a
@@ -1160,15 +1160,15 @@ gadt_constrs :: { Located [LConDecl RdrName] }
 --	D { x,y :: a } :: T a
 --	forall a. Eq a => D { x,y :: a } :: T a
 
-gadt_constr :: { LConDecl RdrName }
-        : con '::' sigtype
-              { LL (mkGadtDecl $1 $3) } 
+gadt_constr :: { [LConDecl RdrName] }
+        : con_list '::' sigtype
+                { map (sL (comb2 $1 $3)) (mkGadtDecl (unLoc $1) $3) } 
         -- Syntax: Maybe merge the record stuff with the single-case above?
         --         (to kill the mostly harmless reduce/reduce error)
         -- XXX revisit audreyt
 	| constr_stuff_record '::' sigtype
 		{ let (con,details) = unLoc $1 in 
-		  LL (ConDecl con Implicit [] (noLoc []) details (ResTyGADT $3) Nothing) }
+		  [LL (ConDecl con Implicit [] (noLoc []) details (ResTyGADT $3) Nothing)] }
 {-
 	| forall context '=>' constr_stuff_record '::' sigtype
 		{ let (con,details) = unLoc $4 in 
@@ -1727,6 +1727,10 @@ con	:: { Located RdrName }
 	: conid			{ $1 }
 	| '(' consym ')'	{ LL (unLoc $2) }
 	| sysdcon		{ L1 $ nameRdrName (dataConName (unLoc $1)) }
+
+con_list :: { Located [Located RdrName] }
+con_list : con                  { L1 [$1] }
+         | con ',' con_list     { LL ($1 : unLoc $3) }
 
 sysdcon	:: { Located DataCon }	-- Wired in data constructors
 	: '(' ')'		{ LL unitDataCon }

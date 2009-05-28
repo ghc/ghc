@@ -2353,6 +2353,16 @@ otherwise is a <emphasis>generalised</emphasis> data type (<xref linkend="gadt"/
 </para></listitem>
 
 <listitem><para>
+As with other type signatures, you can give a single signature for several data constructors.
+In this example we give a single signature for <literal>T1</literal> and <literal>T2</literal>:
+<programlisting>
+  data T a where
+    T1,T2 :: a -> T a
+    T3 :: T a
+</programlisting>
+</para></listitem>
+
+<listitem><para>
 The type signature of
 each constructor is independent, and is implicitly universally quantified as usual. 
 Different constructors may have different universally-quantified type variables
