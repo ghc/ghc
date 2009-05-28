@@ -348,8 +348,7 @@ tcTopSplice expr res_ty = do
 
     traceTc (text "Got result" <+> ppr expr2)
 
-    showSplice "expression" 
-               zonked_q_expr (ppr expr2)
+    showSplice "expression" expr (ppr expr2)
 
         -- Rename it, but bale out if there are errors
         -- otherwise the type checker just gives more spurious errors
@@ -489,7 +488,7 @@ runQuasiQuote (HsQuasiQuote _name quoter q_span quote) quote_selector desc meta_
       	; traceTc (text "About to run" <+> ppr zonked_q_expr)
       	; result <- runMetaQ convert zonked_q_expr
       	; traceTc (text "Got result" <+> ppr result)
-      	; showSplice desc zonked_q_expr (ppr result)
+      	; showSplice desc quoteExpr (ppr result)
       	; return result
       	}
 
@@ -559,7 +558,7 @@ kcTopSpliceType expr
   
 	; traceTc (text "Got result" <+> ppr hs_ty2)
 
-	; showSplice "type" zonked_q_expr (ppr hs_ty2)
+	; showSplice "type" expr (ppr hs_ty2)
 
 	-- Rename it, but bale out if there are errors
 	-- otherwise the type checker just gives more spurious errors
@@ -591,7 +590,7 @@ tcSpliceDecls expr
 
 	; traceTc (text "Got result" <+> vcat (map ppr decls))
 	; showSplice "declarations"
-	  	     zonked_q_expr 
+	  	     expr 
 		     (ppr (getLoc expr) $$ (vcat (map ppr decls)))
 	; return decls }
 \end{code}
@@ -764,13 +763,18 @@ instance TH.Quasi (IOEnv (Env TcGblEnv TcLclEnv)) where
 %************************************************************************
 
 \begin{code}
-showSplice :: String -> LHsExpr Id -> SDoc -> TcM ()
-showSplice what before after = do
-    loc <- getSrcSpanM
-    traceSplice (vcat [ppr loc <> colon <+> text "Splicing" <+> text what, 
-		       nest 2 (sep [nest 2 (ppr before),
-				    text "======>",
-				    nest 2 after])])
+showSplice :: String -> LHsExpr Name -> SDoc -> TcM ()
+-- Note that 'before' is *renamed* but not *typechecked*
+-- Reason (a) less typechecking crap
+--        (b) data constructors after type checking have been
+--	      changed to their *wrappers*, and that makes them
+--	      print always fully qualified
+showSplice what before after
+  = do { loc <- getSrcSpanM
+       ; traceSplice (vcat [ppr loc <> colon <+> text "Splicing" <+> text what, 
+		            nest 2 (sep [nest 2 (ppr before),
+				         text "======>",
+				         nest 2 after])]) }
 
 illegalBracket :: ThStage -> SDoc
 illegalBracket level
