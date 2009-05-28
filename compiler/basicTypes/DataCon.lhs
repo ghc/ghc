@@ -98,12 +98,12 @@ Note [Data Constructor Naming]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Each data constructor C has two, and possibly up to four, Names associated with it:
 
-			     OccName	Name space	Name of
-  ---------------------------------------------------------------------------
-  * The "data con itself" 	C	DataName	DataCon
-  * The "worker data con"	C	VarName		Id (the worker)
-  * The "wrapper data con"	\$WC	VarName		Id (the wrapper)
-  * The "newtype coercion"      :CoT    TcClsName	TyCon
+		   OccName   Name space	  Name of   Notes
+ ---------------------------------------------------------------------------
+ The "data con itself" 	 C     DataName	  DataCon   In dom( GlobalRdrEnv )
+ The "worker data con"	 C     VarName	  Id        The worker
+ The "wrapper data con"	 $WC   VarName	  Id        The wrapper
+ The "newtype coercion"  :CoT  TcClsName  TyCon
  
 EVERY data constructor (incl for newtypes) has the former two (the
 data con itself, and its worker.  But only some data constructors have a
