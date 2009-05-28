@@ -1175,6 +1175,11 @@ f foo = foo { x = 6 }
           typographical errors that turn into hard-to-find bugs, e.g.,
           in the inadvertent capture of what would be a recursive call in
           <literal>f = ... let f = id in ... f ...</literal>.</para>
+          <para>The warning is suppressed for names beginning with an underscore.  For example
+          <programlisting>
+             f x = do { _ignore &lt;- this; _ignore &lt;- that; return (the other) }
+          </programlisting>
+         </para>
 	</listitem>
       </varlistentry>
 

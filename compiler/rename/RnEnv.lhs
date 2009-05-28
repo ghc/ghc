@@ -904,6 +904,8 @@ checkShadowedNames doc_str (global_env,local_env) loc_rdr_names
 	; mappM_ check_shadow loc_rdr_names }
   where
     check_shadow (loc, occ)
+        | startsWithUnderscore occ = return ()	-- Do not report shadowing for "_x"
+	  		       	     	    	-- See Trac #3262
 	| Just n <- mb_local = complain [ptext (sLit "bound at") <+> ppr (nameSrcLoc n)]
 	| otherwise = do { gres' <- filterM is_shadowed_gre gres
 			 ; complain (map pprNameProvenance gres') }
@@ -1007,7 +1009,7 @@ warnUnusedBinds names  = mappM_ warnUnusedName (filter reportable names)
 	| isWiredInName name = False	-- Don't report unused wired-in names
 					-- Otherwise we get a zillion warnings
 					-- from Data.Tuple
-	| otherwise = reportIfUnused (nameOccName name)
+	| otherwise = not (startsWithUnderscore (nameOccName name))
 
 -------------------------
 

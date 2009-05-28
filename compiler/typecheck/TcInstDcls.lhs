@@ -860,7 +860,7 @@ tcInstanceMethod loc clas tyvars dfun_dicts theta inst_tys
 	    (Nothing, NoDefMeth) -> do		-- No default method in the class
 			{ warn <- doptM Opt_WarnMissingMethods		
                         ; warnTc (warn  -- Warn only if -fwarn-missing-methods
-				  && reportIfUnused (getOccName sel_id))
+				  && not (startsWithUnderscore (getOccName sel_id)))
 					-- Don't warn about _foo methods
 			         omitted_meth_warn
 			; return (error_rhs, emptyBag) }

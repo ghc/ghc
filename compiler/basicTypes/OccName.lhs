@@ -65,7 +65,7 @@ module OccName (
 	occNameFS, occNameString, occNameSpace, 
 
 	isVarOcc, isTvOcc, isTcOcc, isDataOcc, isDataSymOcc, isSymOcc, isValOcc,
-	parenSymOcc, reportIfUnused, 
+	parenSymOcc, startsWithUnderscore, 
 	
 	isTcClsNameSpace, isTvNameSpace, isDataConNameSpace, isVarNameSpace, isValNameSpace,
 
@@ -463,13 +463,12 @@ parenSymOcc occ doc | isSymOcc occ = parens doc
 
 
 \begin{code}
-reportIfUnused :: OccName -> Bool
--- ^ Haskell 98 encourages compilers to suppress warnings about
--- unused names in a pattern if they start with @_@: this implements
--- that test
-reportIfUnused occ = case occNameString occ of
-			('_' : _) -> False
-			_other    -> True
+startsWithUnderscore :: OccName -> Bool
+-- ^ Haskell 98 encourages compilers to suppress warnings about unsed
+-- names in a pattern if they start with @_@: this implements that test
+startsWithUnderscore occ = case occNameString occ of
+			     ('_' : _) -> True
+			     _other    -> False
 \end{code}
 
 
