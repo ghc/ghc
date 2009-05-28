@@ -3544,17 +3544,26 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
             w1 |= w2;
             *pP = w1;
             break;
+
          /* According to the Sun documentation:
             R_SPARC_UA32
             This relocation type resembles R_SPARC_32, except it refers to an
             unaligned word. That is, the word to be relocated must be treated
             as four separate bytes with arbitrary alignment, not as a word
             aligned according to the architecture requirements.
-
-            (JRS: which means that freeloading on the R_SPARC_32 case
-            is probably wrong, but hey ...)
          */
          case R_SPARC_UA32:
+            w2	= (Elf_Word)value;
+
+            // SPARC doesn't do misaligned writes of 32 bit words,
+	    //       so we have to do this one byte-at-a-time.
+	    char *pPc 	= (char*)pP;
+	    pPc[0]	= (char) ((Elf_Word)(w2 & 0xff000000) >> 24);
+	    pPc[1]	= (char) ((Elf_Word)(w2 & 0x00ff0000) >> 16);
+	    pPc[2]	= (char) ((Elf_Word)(w2 & 0x0000ff00) >> 8);
+	    pPc[3]	= (char) ((Elf_Word)(w2 & 0x000000ff));
+	    break;
+
          case R_SPARC_32:
             w2 = (Elf_Word)value;
             *pP = w2;
