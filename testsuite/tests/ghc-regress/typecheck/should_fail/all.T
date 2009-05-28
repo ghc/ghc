@@ -199,7 +199,7 @@ test('tcfail200', normal, compile_fail, [''])
 test('tcfail201', normal, compile_fail, [''])
 test('tcfail202', normal, compile_fail, [''])
 test('tcfail203', expect_broken(2806), compile_fail, [''])
-test('tcfail204', normal, compile_fail, [''])
+test('tcfail204', expect_broken(3261), compile_fail, [''])
 
 test('T1899', normal, compile_fail, [''])
 test('T2126', normal, compile_fail, [''])
