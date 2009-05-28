@@ -20,7 +20,7 @@ module Inst (
 	cloneDict, mkOverLit,
 	newIPDict, newMethod, newMethodFromName, newMethodWithGivenTy, 
 	tcInstClassOp, 
-	tcSyntaxName, isHsVar,
+	tcSyntaxName, 
 
 	tyVarsOfInst, tyVarsOfInsts, tyVarsOfLIE, tcTyVarsOfInst,
 	tcTyVarsOfInsts, ipNamesOfInst, ipNamesOfInsts, fdPredsOfInst,
@@ -570,10 +570,6 @@ mkOverLit (HsFractional r)
 	; return (HsRat r rat_ty) }
 
 mkOverLit (HsIsString s) = return (HsString s)
-
-isHsVar :: HsExpr Name -> Name -> Bool
-isHsVar (HsVar f) g = f == g
-isHsVar _     	  _ = False
 \end{code}
 
 
