@@ -2682,7 +2682,7 @@ GHC always treats the <emphasis>last</emphasis> parameter of the instance
 
 
 <sect2 id="deriving-typeable">
-<title>Deriving clause for classes <literal>Typeable</literal> and <literal>Data</literal></title>
+<title>Deriving clause for extra classes (<literal>Typeable</literal>, <literal>Data</literal>, etc)</title>
 
 <para>
 Haskell 98 allows the programmer to add "<literal>deriving( Eq, Ord )</literal>" to a data type 
@@ -2692,11 +2692,11 @@ classes <literal>Eq</literal>, <literal>Ord</literal>,
 <literal>Enum</literal>, <literal>Ix</literal>, <literal>Bounded</literal>, <literal>Read</literal>, and <literal>Show</literal>.
 </para>
 <para>
-GHC extends this list with two more classes that may be automatically derived 
-(provided the <option>-XDeriveDataTypeable</option> flag is specified):
-<literal>Typeable</literal>, and <literal>Data</literal>.  These classes are defined in the library
-modules <literal>Data.Typeable</literal> and <literal>Data.Generics</literal> respectively, and the
-appropriate class must be in scope before it can be mentioned in the <literal>deriving</literal> clause.
+GHC extends this list with several more classes that may be automatically derived:
+<itemizedlist>
+<listitem><para> With <option>-XDeriveDataTypeable</option>, you can derive instances of the classes
+<literal>Typeable</literal>, and <literal>Data</literal>, defined in the library
+modules <literal>Data.Typeable</literal> and <literal>Data.Generics</literal> respectively.
 </para>
 <para>An instance of <literal>Typeable</literal> can only be derived if the
 data type has seven or fewer type parameters, all of kind <literal>*</literal>.
@@ -2711,6 +2711,26 @@ are used, and only <literal>Typeable1</literal> up to
 In other cases, there is nothing to stop the programmer writing a <literal>TypableX</literal>
 class, whose kind suits that of the data type constructor, and
 then writing the data type instance by hand.
+</para>
+</listitem>
+
+<listitem><para> With <option>-XDeriveFunctor</option>, you can derive instances of 
+the class <literal>Functor</literal>,
+defined in <literal>GHC.Base</literal>.
+</para></listitem>
+
+<listitem><para> With <option>-XDeriveFoldable</option>, you can derive instances of 
+the class <literal>Foldable</literal>,
+defined in <literal>Data.Foldable</literal>.
+</para></listitem>
+
+<listitem><para> With <option>-XDeriveTraversable</option>, you can derive instances of 
+the class <literal>Traversable</literal>,
+defined in <literal>Data.Traversable</literal>.
+</para></listitem>
+</itemizedlist>
+In each case the appropriate class must be in scope before it 
+can be mentioned in the <literal>deriving</literal> clause.
 </para>
 </sect2>
 

@@ -801,11 +801,15 @@ sideConditions cls
   | cls_key == enumClassKey    	   = Just (cond_std `andCond` cond_isEnumeration)
   | cls_key == ixClassKey      	   = Just (cond_std `andCond` cond_enumOrProduct)
   | cls_key == boundedClassKey 	   = Just (cond_std `andCond` cond_enumOrProduct)
-  | cls_key == dataClassKey    	   = Just (cond_mayDeriveDataTypeable `andCond` cond_std `andCond` cond_noUnliftedArgs)
-  | cls_key == functorClassKey 	   = Just (cond_functorOK True)	 -- NB: no cond_std!
-  | cls_key == foldableClassKey	   = Just (cond_functorOK False) -- Functor/Fold/Trav works ok for rank-n types
-  | cls_key == traversableClassKey = Just (cond_functorOK False)
-  | getName cls `elem` typeableClassNames = Just (cond_mayDeriveDataTypeable `andCond` cond_typeableOK)
+  | cls_key == dataClassKey    	   = Just (checkFlag Opt_DeriveDataTypeable `andCond` 
+                                           cond_std `andCond` cond_noUnliftedArgs)
+  | cls_key == functorClassKey 	   = Just (checkFlag Opt_DeriveFunctor `andCond`
+    	                                   cond_functorOK True)	 -- NB: no cond_std!
+  | cls_key == foldableClassKey	   = Just (checkFlag Opt_DeriveFoldable `andCond`
+    	                                   cond_functorOK False) -- Functor/Fold/Trav works ok for rank-n types
+  | cls_key == traversableClassKey = Just (checkFlag Opt_DeriveTraversable `andCond`
+    	                                   cond_functorOK False)
+  | getName cls `elem` typeableClassNames = Just (checkFlag Opt_DeriveDataTypeable `andCond` cond_typeableOK)
   | otherwise = Nothing
   where
     cls_key = getUnique cls
@@ -936,12 +940,16 @@ cond_functorOK allowFunctions (dflags, rep_tc)
     functions 	= ptext (sLit "contains function types")
     wrong_arg 	= ptext (sLit "uses the type variable in an argument other than the last")
 
-cond_mayDeriveDataTypeable :: Condition
-cond_mayDeriveDataTypeable (dflags, _)
- | dopt Opt_DeriveDataTypeable dflags = Nothing
- | otherwise = Just why
+checkFlag :: DynFlag -> Condition
+checkFlag flag (dflags, _)
+  | dopt flag dflags = Nothing
+  | otherwise        = Just why
   where
-    why  = ptext (sLit "You need -XDeriveDataTypeable to derive an instance for this class")
+    why = ptext (sLit "You need -X") <> text flag_str 
+          <+> ptext (sLit "to derive an instance for this class")
+    flag_str = case [ s | (s, f, _) <- xFlags, f==flag ] of
+                 [s]   -> s
+                 other -> pprPanic "checkFlag" (ppr other)
 
 std_class_via_iso :: Class -> Bool
 std_class_via_iso clas	-- These standard classes can be derived for a newtype

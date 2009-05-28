@@ -222,9 +222,13 @@ data DynFlag
    | Opt_ViewPatterns
    | Opt_GADTs
    | Opt_RelaxedPolyRec
+
    | Opt_StandaloneDeriving
    | Opt_DeriveDataTypeable
    | Opt_DeriveFunctor
+   | Opt_DeriveTraversable
+   | Opt_DeriveFoldable
+
    | Opt_TypeSynonymInstances
    | Opt_FlexibleContexts
    | Opt_FlexibleInstances
@@ -1792,6 +1796,8 @@ xFlags = [
   ( "StandaloneDeriving",               Opt_StandaloneDeriving, const Supported ),
   ( "DeriveDataTypeable",               Opt_DeriveDataTypeable, const Supported ),
   ( "DeriveFunctor",                    Opt_DeriveFunctor, const Supported ),
+  ( "DeriveTraversable",                Opt_DeriveTraversable, const Supported ),
+  ( "DeriveFoldable",                   Opt_DeriveFoldable, const Supported ),
   ( "TypeSynonymInstances",             Opt_TypeSynonymInstances, const Supported ),
   ( "FlexibleContexts",                 Opt_FlexibleContexts, const Supported ),
   ( "FlexibleInstances",                Opt_FlexibleInstances, const Supported ),
@@ -1833,6 +1839,8 @@ glasgowExtsFlags = [
            , Opt_StandaloneDeriving
            , Opt_DeriveDataTypeable
            , Opt_DeriveFunctor
+           , Opt_DeriveFoldable
+           , Opt_DeriveTraversable
            , Opt_FlexibleContexts
            , Opt_FlexibleInstances
            , Opt_ConstrainedClassMethods
