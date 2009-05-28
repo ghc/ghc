@@ -2436,9 +2436,16 @@ threadStackUnderflow (Task *task STG_UNUSED, StgTSO *tso)
 
     tso_size_w = tso_sizeW(tso);
 
-    if (tso_size_w < MBLOCK_SIZE_W || 
+    if (tso_size_w < MBLOCK_SIZE_W ||
+          // TSO is less than 2 mblocks (since the first mblock is
+          // shorter than MBLOCK_SIZE_W)
+        (tso_size_w - BLOCKS_PER_MBLOCK*BLOCK_SIZE_W) % MBLOCK_SIZE_W != 0 ||
+          // or TSO is not a whole number of megablocks (ensuring
+          // precondition of splitLargeBlock() below)
         (nat)(tso->stack + tso->stack_size - tso->sp) > tso->stack_size / 4) 
+          // or stack is using more than 1/4 of the available space
     {
+        // then do nothing
         return tso;
     }
 
