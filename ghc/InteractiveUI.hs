@@ -420,7 +420,7 @@ runGHCi paths maybe_exprs = do
         Nothing ->
           do
             -- enter the interactive loop
-            runGHCiInput $ runCommands $ haskelineLoop show_prompt
+            runGHCiInput $ runCommands $ nextInputLine show_prompt is_tty
         Just exprs -> do
             -- just evaluate the expression we were given
             enqueueCommands exprs
@@ -448,13 +448,14 @@ runGHCiInput f = do
         setLogAction
         f
 
--- TODO really bad name
-haskelineLoop :: Bool -> InputT GHCi (Maybe String)
-haskelineLoop show_prompt = do
+nextInputLine :: Bool -> Bool -> InputT GHCi (Maybe String)
+nextInputLine show_prompt is_tty
+  | is_tty = do
     prompt <- if show_prompt then lift mkPrompt else return ""
-    l <- getInputLine prompt
-    return l
-
+    getInputLine prompt
+  | otherwise = do
+    when show_prompt $ lift mkPrompt >>= liftIO . putStr
+    fileLoop stdin
 
 -- NOTE: We only read .ghci files if they are owned by the current user,
 -- and aren't world writable.  Otherwise, we could be accidentally 
@@ -490,7 +491,7 @@ checkPerms name =
 
 fileLoop :: MonadIO m => Handle -> InputT m (Maybe String)
 fileLoop hdl = do
-   l <- liftIO $ IO.try (BS.hGetLine hdl)
+   l <- liftIO $ IO.try $ hGetLine hdl
    case l of
         Left e | isEOFError e              -> return Nothing
                | InvalidArgument <- etype  -> return Nothing
@@ -500,7 +501,7 @@ fileLoop hdl = do
                 -- this can happen if the user closed stdin, or
                 -- perhaps did getContents which closes stdin at
                 -- EOF.
-        Right l -> fmap Just (Encoding.decode l)
+        Right l -> fmap Just (Encoding.decode (BS.pack l))
 
 mkPrompt :: GHCi String
 mkPrompt = do
