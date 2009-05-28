@@ -19,6 +19,9 @@ define docbook
 
 $(call clean-target,$1,docbook,$1/$2 $1/$2.pdf $1/$2.ps)
 
+# empty "all_$1" target just in case we're not building docs at all
+$(call all-target,$1,)
+
 ifeq "$$(BUILD_DOCBOOK_HTML)" "YES"
 $(call all-target,$1,html_$1)
 
