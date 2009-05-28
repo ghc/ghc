@@ -407,7 +407,7 @@ rhsToBodyNF rhs = do { (floats,body) <- rhsToBody rhs
 
 --------
 rhsToBody :: CpeRhs -> UniqSM (Floats, CpeBody)
--- Remove top level lambdas by let-bindinig
+-- Remove top level lambdas by let-binding
 
 rhsToBody (Note n expr)
         -- You can get things like
@@ -511,10 +511,10 @@ cpeApp env expr
       = collect_args fun depth  -- They aren't used by the code generator
 
 	-- N-variable fun, better let-bind it
-	-- ToDo: perhaps we can case-bind rather than let-bind this closure,
-	-- since it is sure to be evaluated.
     collect_args fun depth
       = do { (fun_floats, fun') <- cpeArg env True fun ty
+      	     		  -- The True says that it's sure to be evaluated,
+			  -- so we'll end up case-binding it
            ; return (fun', (fun', depth), ty, fun_floats, []) }
         where
 	  ty = exprType fun
