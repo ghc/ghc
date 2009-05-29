@@ -48,3 +48,6 @@ test('testwsdeque', [if_compiler_lt('ghc', '6.11', skip),
                     compile_and_run, ['-I../../../../rts/parallel'])
 
 test('3236', [c_src, only_ways(['normal','threaded1']), exit_code(1)], compile_and_run, [''])
+
+test('stack001', extra_run_opts('+RTS -K32m -RTS'), compile_and_run, [''])
+test('stack002', extra_run_opts('+RTS -K32m -k4m -RTS'), compile_and_run, [''])
