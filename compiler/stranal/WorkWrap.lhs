@@ -15,14 +15,12 @@ import Id		( Id, idType, isOneShotLambda, idUnfolding,
 			  setIdNewStrictness, mkWorkerId,
 			  setIdWorkerInfo, setInlineActivation,
 			  setIdArity, idInfo )
-import MkId		( lazyIdKey, lazyIdUnfolding )
 import Type		( Type )
 import IdInfo
 import NewDemand        ( Demand(..), StrictSig(..), DmdType(..), DmdResult(..), 
 			  Demands(..), mkTopDmdType, isBotRes, returnsCPR, topSig, isAbsent
 			)
 import UniqSupply
-import Unique		( hasKey )
 import BasicTypes	( RecFlag(..), isNonRec, isNeverActive,
                           Activation, inlinePragmaActivation )
 import VarEnv		( isEmptyVarEnv )
@@ -107,16 +105,11 @@ matching by looking for strict arguments of the correct type.
 \begin{code}
 wwExpr :: CoreExpr -> UniqSM CoreExpr
 
-wwExpr e@(Type _)          = return e
-wwExpr e@(Lit _)           = return e
+wwExpr e@(Type {})         = return e
+wwExpr e@(Lit  {})         = return e
+wwExpr e@(Var  {})         = return e
 wwExpr e@(Note InlineMe _) = return e
 	-- Don't w/w inside InlineMe's
-
-wwExpr e@(Var v)
-  | v `hasKey` lazyIdKey = return lazyIdUnfolding
-  | otherwise            = return e
-	-- HACK alert: Inline 'lazy' after strictness analysis
-	-- (but not inside InlineMe's)
 
 wwExpr (Lam binder expr)
   = Lam binder <$> wwExpr expr

@@ -11,6 +11,7 @@ module CorePrep (
 
 #include "HsVersions.h"
 
+import PrelNames	( lazyIdKey, hasKey )
 import CoreUtils
 import CoreArity
 import CoreFVs
@@ -89,6 +90,8 @@ The goal of this pass is to prepare for code generation.
     We want curried definitions for all of these in case they
     aren't inlined by some caller.
 	
+9.  Replace (lazy e) by e.  See Note [lazyId magic] in MkId.lhs
+
 This is all done modulo type applications and abstractions, so that
 when type erasure is done for conversion to STG, we don't end up with
 any trivial or useless bindings.
@@ -341,8 +344,13 @@ cpeRhsE :: CorePrepEnv -> CoreExpr -> UniqSM (Floats, CpeRhs)
 
 cpeRhsE _env expr@(Type _) = return (emptyFloats, expr)
 cpeRhsE _env expr@(Lit _)  = return (emptyFloats, expr)
-cpeRhsE env expr@(App {})  = cpeApp env expr
 cpeRhsE env expr@(Var {})  = cpeApp env expr
+
+cpeRhsE env (Var f `App` _ `App` arg)
+  | f `hasKey` lazyIdKey  	  -- Replace (lazy a) by a
+  = cpeRhsE env arg		  -- See Note [lazyId magic] in MkId
+
+cpeRhsE env expr@(App {}) = cpeApp env expr
 
 cpeRhsE env (Let bind expr)
   = do { (env', new_binds) <- cpeBind NotTopLevel env bind
@@ -475,7 +483,7 @@ cpeApp env expr
 
     collect_args (App fun arg) depth
       = do { (fun',hd,fun_ty,floats,ss) <- collect_args fun (depth+1)
-           ; let
+      	   ; let
               (ss1, ss_rest)   = case ss of
                                    (ss1:ss_rest) -> (ss1,     ss_rest)
                                    []            -> (lazyDmd, [])

@@ -33,7 +33,7 @@ module MkId (
         -- And some particular Ids; see below for why they are wired in
         wiredInIds, ghcPrimIds,
         unsafeCoerceId, realWorldPrimId, voidArgId, nullAddrId, seqId,
-        lazyId, lazyIdUnfolding, lazyIdKey,
+        lazyId, lazyIdKey,
 
         mkRuntimeErrorApp, mkImpossibleExpr,
         rEC_CON_ERROR_ID, iRREFUT_PAT_ERROR_ID, rUNTIME_ERROR_ID,
@@ -920,29 +920,34 @@ seqId = pcMiscPrelId seqName ty info
     rhs = mkLams [alphaTyVar,openBetaTyVar,x,y] (Case (Var x) x openBetaTy [(DEFAULT, [], Var y)])
 
 ------------------------------------------------
-lazyId :: Id
--- lazy :: forall a?. a? -> a?   (i.e. works for unboxed types too)
--- Used to lazify pseq:         pseq a b = a `seq` lazy b
--- 
--- Also, no strictness: by being a built-in Id, all the info about lazyId comes from here,
--- not from GHC.Base.hi.   This is important, because the strictness
--- analyser will spot it as strict!
---
--- Also no unfolding in lazyId: it gets "inlined" by a HACK in the worker/wrapperpass
---      (see WorkWrap.wwExpr)   
--- We could use inline phases to do this, but that would be vulnerable to changes in 
--- phase numbering....we must inline precisely after strictness analysis.
+lazyId :: Id	-- See Note [lazyId magic]
 lazyId = pcMiscPrelId lazyIdName ty info
   where
     info = noCafIdInfo
     ty  = mkForAllTys [alphaTyVar] (mkFunTy alphaTy alphaTy)
-
-lazyIdUnfolding :: CoreExpr     -- Used to expand 'lazyId' after strictness anal
-lazyIdUnfolding = mkLams [openAlphaTyVar,x] (Var x)
-                where
-                  [x] = mkTemplateLocals [openAlphaTy]
 \end{code}
 
+Note [lazyId magic]
+~~~~~~~~~~~~~~~~~~~
+    lazy :: forall a?. a? -> a?   (i.e. works for unboxed types too)
+
+Used to lazify pseq:   pseq a b = a `seq` lazy b
+
+Also, no strictness: by being a built-in Id, all the info about lazyId comes from here,
+not from GHC.Base.hi.   This is important, because the strictness
+analyser will spot it as strict!
+
+Also no unfolding in lazyId: it gets "inlined" by a HACK in CorePrep.
+It's very important to do this inlining *after* unfoldings are exposed 
+in the interface file.  Otherwise, the unfolding for (say) pseq in the
+interface file will not mention 'lazy', so if we inline 'pseq' we'll totally
+miss the very thing that 'lazy' was there for in the first place.
+See Trac #3259 for a real world example.
+
+lazyId is defined in GHC.Base, so we don't *have* to inline it.  If it
+appears un-applied, we'll end up just calling it.
+
+-------------------------------------------------------------
 @realWorld#@ used to be a magic literal, \tr{void#}.  If things get
 nasty as-is, change it back to a literal (@Literal@).
 
