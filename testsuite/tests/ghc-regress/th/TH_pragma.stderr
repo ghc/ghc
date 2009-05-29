@@ -5,9 +5,9 @@ TH_pragma.hs:1:0:
             foo x = x + 1 |]
       ======>
         TH_pragma.hs:(4,3)-(6,25)
-        foo :: GHC.Types.Int -> GHC.Types.Int
+        foo :: Int -> Int
         {-# NOINLINE foo #-}
-        foo x[] = (x[] `GHC.Num.+` 1)
+        foo x[] = (x[] + 1)
 TH_pragma.hs:1:0:
     TH_pragma.hs:1:0: Splicing declarations
         [d| bar :: (Num a) => a -> a
@@ -15,7 +15,6 @@ TH_pragma.hs:1:0:
             bar x = x * 10 |]
       ======>
         TH_pragma.hs:(8,3)-(10,30)
-        bar :: forall a[]. (GHC.Num.Num a[]) => a[] -> a[]
-        {-# SPECIALIZE INLINE [~1] bar ::
-                                     GHC.Types.Float -> GHC.Types.Float #-}
-        bar x[] = (x[] `GHC.Num.*` 10)
+        bar :: forall a[]. (Num a[]) => a[] -> a[]
+        {-# SPECIALIZE INLINE [~1] bar :: Float -> Float #-}
+        bar x[] = (x[] * 10)
