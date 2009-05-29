@@ -61,7 +61,7 @@ utils/ghc-pkg/dist/build/$(utils/ghc-pkg_dist_PROG)$(exeext): utils/ghc-pkg/Main
 	       -ilibraries/extensible-exceptions \
 	       -ilibraries/hpc
 
-utils/ghc-pkg/Version.hs: mk/config.mk
+utils/ghc-pkg/Version.hs: mk/project.mk
 	"$(RM)" $(RM_OPTS) $@
 	echo "module Version where"                    >> $@
 	echo "version, targetOS, targetARCH :: String" >> $@

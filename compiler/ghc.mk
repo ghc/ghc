@@ -35,7 +35,7 @@ compiler/stage2/package-data.mk : $(compiler_CONFIG_HS)
 compiler/stage3/package-data.mk : $(compiler_CONFIG_HS)
 endif
 
-$(compiler_CONFIG_HS) : mk/config.mk
+$(compiler_CONFIG_HS) : mk/config.mk mk/project.mk
 	"$(RM)" $(RM_OPTS) $@
 	@echo "Creating $@ ... "
 	@echo "module Config where" >>$@
@@ -141,7 +141,7 @@ $(eval $(call clean-target,compiler,config_hs,$(compiler_CONFIG_HS)))
 
 PLATFORM_H = ghc_boot_platform.h
 
-compiler/stage1/$(PLATFORM_H) : mk/config.mk
+compiler/stage1/$(PLATFORM_H) : mk/config.mk mk/project.mk
 	"$(MKDIRHIER)" $(dir $@)
 	"$(RM)" $(RM_OPTS) $@
 	@echo "Creating $@..."
@@ -188,7 +188,7 @@ endif
 # For stage2 and above, the BUILD platform is the HOST of stage1, and
 # the HOST platform is the TARGET of stage1.  The TARGET remains the same
 # (stage1 is the cross-compiler, not stage2).
-compiler/stage2/$(PLATFORM_H) : mk/config.mk
+compiler/stage2/$(PLATFORM_H) : mk/config.mk mk/project.mk
 	"$(MKDIRHIER)" $(dir $@)
 	"$(RM)" $(RM_OPTS) $@
 	@echo "Creating $@..."

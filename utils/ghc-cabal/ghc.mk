@@ -53,8 +53,8 @@ $(eval $(call all-target,$(GHC_CABAL_DIR),$(GHC_CABAL_INPLACE)))
 $(GHC_CABAL_DIR)_dist-dummy-ghc_MODULES = dummy-ghc
 $(GHC_CABAL_DIR)_dist-dummy-ghc_PROG    = dummy-ghc$(exeext)
 
-# depend on config.mk, so we pick up the new version number if it changes.
-$(GHC_CABAL_DIR)/dist-dummy-ghc/build/dummy-ghc.hs : $(GHC_CABAL_DIR)/ghc.mk $(MKDIRHIER) mk/config.mk
+# depend on project.mk, so we pick up the new version number if it changes.
+$(GHC_CABAL_DIR)/dist-dummy-ghc/build/dummy-ghc.hs : $(GHC_CABAL_DIR)/ghc.mk $(MKDIRHIER) mk/project.mk
 	"$(MKDIRHIER)" $(dir $@)
 	echo "import System.Environment; import System.Cmd; import System.Exit" >$@
 	echo "main :: IO ()" >>$@
