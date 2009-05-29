@@ -84,9 +84,10 @@ createThread(Capability *cap, nat size)
 	size = MIN_STACK_WORDS + TSO_STRUCT_SIZEW;
     }
 
-    stack_size = round_to_mblocks(size) - TSO_STRUCT_SIZEW;
-    
+    size = round_to_mblocks(size);
     tso = (StgTSO *)allocateLocal(cap, size);
+
+    stack_size = size - TSO_STRUCT_SIZEW;
     TICK_ALLOC_TSO(stack_size, 0);
 
     SET_HDR(tso, &stg_TSO_info, CCS_SYSTEM);
