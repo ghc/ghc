@@ -11,7 +11,7 @@
 # -----------------------------------------------------------------------------
 
 
-define haddock  # args: $1 = dir,  $2 = distdir, $3 = way
+define haddock  # args: $1 = dir,  $2 = distdir
 
 ifneq "$$($1_$2_DO_HADDOCK)" "NO"
 
