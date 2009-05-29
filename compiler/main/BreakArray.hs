@@ -26,7 +26,11 @@ module BreakArray
   ) where
 #ifdef GHCI
 import GHC.Exts
-import GHC.IOBase
+#if __GLASGOW_HASKELL__ >= 611
+import GHC.IO ( IO(..) )
+#else
+import GHC.IOBase ( IO(..) )
+#endif
 import GHC.Word
 import Constants
 

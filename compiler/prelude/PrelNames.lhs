@@ -237,7 +237,7 @@ pRELUDE		= mkBaseModule_ pRELUDE_NAME
 gHC_PRIM, gHC_TYPES, gHC_BOOL, gHC_UNIT, gHC_ORDERING, gHC_GENERICS, gHC_CLASSES, gHC_BASE, gHC_ENUM,
     gHC_SHOW, gHC_READ, gHC_NUM, gHC_INTEGER, gHC_INTEGER_INTERNALS, gHC_LIST, gHC_PARR,
     gHC_TUPLE, dATA_TUPLE, dATA_EITHER, dATA_STRING, dATA_FOLDABLE, dATA_TRAVERSABLE,
-    gHC_PACK, gHC_CONC, gHC_IO_BASE,
+    gHC_PACK, gHC_CONC, gHC_IO, gHC_IO_Exception,
     gHC_ST, gHC_ARR, gHC_STABLE, gHC_ADDR, gHC_PTR, gHC_ERR, gHC_REAL,
     gHC_FLOAT, gHC_TOP_HANDLER, sYSTEM_IO, dYNAMIC, tYPEABLE, gENERICS,
     dOTNET, rEAD_PREC, lEX, gHC_INT, gHC_WORD, mONAD, mONAD_FIX, aRROW, cONTROL_APPLICATIVE,
@@ -266,7 +266,8 @@ dATA_FOLDABLE	= mkBaseModule (fsLit "Data.Foldable")
 dATA_TRAVERSABLE= mkBaseModule (fsLit "Data.Traversable")
 gHC_PACK	= mkBaseModule (fsLit "GHC.Pack")
 gHC_CONC	= mkBaseModule (fsLit "GHC.Conc")
-gHC_IO_BASE	= mkBaseModule (fsLit "GHC.IOBase")
+gHC_IO    	= mkBaseModule (fsLit "GHC.IO")
+gHC_IO_Exception = mkBaseModule (fsLit "GHC.IO.Exception")
 gHC_ST		= mkBaseModule (fsLit "GHC.ST")
 gHC_ARR		= mkBaseModule (fsLit "GHC.Arr")
 gHC_STABLE	= mkBaseModule (fsLit "GHC.Stable")
@@ -689,7 +690,7 @@ dataClassName = clsQual gENERICS (fsLit "Data") dataClassKey
 
 -- Error module
 assertErrorName    :: Name
-assertErrorName	  = varQual gHC_IO_BASE (fsLit "assertError") assertErrorIdKey
+assertErrorName	  = varQual gHC_IO_Exception (fsLit "assertError") assertErrorIdKey
 
 -- Enum module (Enum, Bounded)
 enumClassName, enumFromName, enumFromToName, enumFromThenName,
@@ -735,15 +736,15 @@ toPName	          = varQual gHC_PARR (fsLit "toP")	       	 toPIdKey
 emptyPName        = varQual gHC_PARR (fsLit "emptyP")            emptyPIdKey
 appPName          = varQual gHC_PARR (fsLit "+:+")               appPIdKey
 
--- IOBase things
+-- IO things
 ioTyConName, ioDataConName, thenIOName, bindIOName, returnIOName,
     failIOName :: Name
-ioTyConName	  = tcQual  gHC_IO_BASE (fsLit "IO") ioTyConKey
-ioDataConName     = conName gHC_IO_BASE (fsLit "IO") ioDataConKey
-thenIOName	  = varQual gHC_IO_BASE (fsLit "thenIO") thenIOIdKey
-bindIOName	  = varQual gHC_IO_BASE (fsLit "bindIO") bindIOIdKey
-returnIOName	  = varQual gHC_IO_BASE (fsLit "returnIO") returnIOIdKey
-failIOName	  = varQual gHC_IO_BASE (fsLit "failIO") failIOIdKey
+ioTyConName	  = tcQual  gHC_IO (fsLit "IO") ioTyConKey
+ioDataConName     = conName gHC_IO (fsLit "IO") ioDataConKey
+thenIOName	  = varQual gHC_IO (fsLit "thenIO") thenIOIdKey
+bindIOName	  = varQual gHC_IO (fsLit "bindIO") bindIOIdKey
+returnIOName	  = varQual gHC_IO (fsLit "returnIO") returnIOIdKey
+failIOName	  = varQual gHC_IO (fsLit "failIO") failIOIdKey
 
 -- IO things
 printName :: Name

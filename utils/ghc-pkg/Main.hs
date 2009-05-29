@@ -61,7 +61,11 @@ import System.Posix hiding (fdToHandle)
 
 import IO ( isPermissionError )
 import System.Posix.Internals
+#if __GLASGOW_HASKELL__ >= 611
+import GHC.IO.Handle.FD (fdToHandle)
+#else
 import GHC.Handle (fdToHandle)
+#endif
 
 #if defined(GLOB)
 import System.Process(runInteractiveCommand)

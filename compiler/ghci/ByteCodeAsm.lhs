@@ -46,8 +46,13 @@ import Data.Int		( Int64 )
 import Data.Char	( ord )
 
 import GHC.Base		( ByteArray#, MutableByteArray#, RealWorld )
-import GHC.IOBase	( IO(..) )
 import GHC.Ptr		( Ptr(..) )
+
+#if __GLASGOW_HASKELL__ >= 611
+import GHC.IO ( IO(..) )
+#else
+import GHC.IOBase ( IO(..) )
+#endif
 
 -- -----------------------------------------------------------------------------
 -- Unlinked BCOs

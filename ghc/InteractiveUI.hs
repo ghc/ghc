@@ -55,6 +55,11 @@ import Maybes		( orElse, expectJust )
 import FastString
 import Encoding
 
+#if __GLASGOW_HASKELL__ < 611
+import Foreign.C
+import Encoding
+#endif
+
 #ifndef mingw32_HOST_OS
 import System.Posix hiding (getEnv)
 #else
@@ -88,7 +93,13 @@ import Control.Monad as Monad
 import Text.Printf
 import Foreign
 import GHC.Exts		( unsafeCoerce# )
+
+#if __GLASGOW_HASKELL__ >= 611
+import GHC.IO.Exception	( IOErrorType(InvalidArgument) )
+#else
 import GHC.IOBase	( IOErrorType(InvalidArgument) )
+#endif
+
 import GHC.TopHandler
 
 import Data.IORef	( IORef, readIORef, writeIORef )
@@ -501,7 +512,7 @@ fileLoop hdl = do
                 -- this can happen if the user closed stdin, or
                 -- perhaps did getContents which closes stdin at
                 -- EOF.
-        Right l -> fmap Just (Encoding.decode (BS.pack l))
+        Right l -> return (Just l)
 
 mkPrompt :: GHCi String
 mkPrompt = do

@@ -63,6 +63,9 @@
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
+#ifdef HAVE_LOCALE_H
+#include <locale.h>
+#endif
 
 #if USE_PAPI
 #include "Papi.h"
@@ -131,6 +134,8 @@ hs_init(int *argc, char **argv[])
 	// second and subsequent inits are ignored
 	return;
     }
+
+    setlocale(LC_CTYPE,"");
 
     /* Initialise the stats department, phase 0 */
     initStats0();

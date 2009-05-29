@@ -35,10 +35,10 @@ extern W_ ZCMain_main_closure[];
 extern StgClosure ZCMain_main_closure;
 #endif
 
-PRELUDE_CLOSURE(base_GHCziIOBase_stackOverflow_closure);
-PRELUDE_CLOSURE(base_GHCziIOBase_heapOverflow_closure);
-PRELUDE_CLOSURE(base_GHCziIOBase_blockedOnDeadMVar_closure);
-PRELUDE_CLOSURE(base_GHCziIOBase_blockedIndefinitely_closure);
+PRELUDE_CLOSURE(base_GHCziIOziException_stackOverflow_closure);
+PRELUDE_CLOSURE(base_GHCziIOziException_heapOverflow_closure);
+PRELUDE_CLOSURE(base_GHCziIOziException_blockedOnDeadMVar_closure);
+PRELUDE_CLOSURE(base_GHCziIOziException_blockedIndefinitely_closure);
 PRELUDE_CLOSURE(base_ControlziExceptionziBase_nonTermination_closure);
 PRELUDE_CLOSURE(base_ControlziExceptionziBase_nestedAtomically_closure);
 
@@ -87,10 +87,10 @@ PRELUDE_INFO(base_GHCziStable_StablePtr_con_info);
 #define runFinalizerBatch_closure DLL_IMPORT_DATA_REF(base_GHCziWeak_runFinalizzerBatch_closure)
 #define mainIO_closure            (&ZCMain_main_closure)
 
-#define stackOverflow_closure     DLL_IMPORT_DATA_REF(base_GHCziIOBase_stackOverflow_closure)
-#define heapOverflow_closure      DLL_IMPORT_DATA_REF(base_GHCziIOBase_heapOverflow_closure)
-#define blockedOnDeadMVar_closure DLL_IMPORT_DATA_REF(base_GHCziIOBase_blockedOnDeadMVar_closure)
-#define blockedIndefinitely_closure DLL_IMPORT_DATA_REF(base_GHCziIOBase_blockedIndefinitely_closure)
+#define stackOverflow_closure     DLL_IMPORT_DATA_REF(base_GHCziIOziException_stackOverflow_closure)
+#define heapOverflow_closure      DLL_IMPORT_DATA_REF(base_GHCziIOziException_heapOverflow_closure)
+#define blockedOnDeadMVar_closure DLL_IMPORT_DATA_REF(base_GHCziIOziException_blockedOnDeadMVar_closure)
+#define blockedIndefinitely_closure DLL_IMPORT_DATA_REF(base_GHCziIOziException_blockedIndefinitely_closure)
 #define nonTermination_closure    DLL_IMPORT_DATA_REF(base_ControlziExceptionziBase_nonTermination_closure)
 #define nestedAtomically_closure  DLL_IMPORT_DATA_REF(base_ControlziExceptionziBase_nestedAtomically_closure)
 

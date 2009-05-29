@@ -22,8 +22,19 @@ import System.IO.Unsafe
 
 import GHC.Exts
 import GHC.Word
-import GHC.IOBase (IO(..))
+
+#if __GLASGOW_HASKELL__ >= 611
+import GHC.IO ( IO(..) )
+#else
+import GHC.IOBase ( IO(..) )
+#endif
+
+#if __GLASGOW_HASKELL__ >= 611
+import GHC.IO (unsafeDupableInterleaveIO)
+#else
 import GHC.IOBase (unsafeDupableInterleaveIO)
+#endif
+
 import GHC.Base (unsafeChr)
 
 -- Just like unsafePerformIO, but we inline it.

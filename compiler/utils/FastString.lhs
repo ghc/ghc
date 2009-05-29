@@ -103,7 +103,12 @@ import Data.IORef       ( IORef, newIORef, readIORef, writeIORef )
 import Data.Maybe       ( isJust )
 import Data.Char        ( ord )
 
-import GHC.IOBase       ( IO(..) )
+#if __GLASGOW_HASKELL__ >= 611
+import GHC.IO ( IO(..) )
+#else
+import GHC.IOBase ( IO(..) )
+#endif
+
 import GHC.Ptr          ( Ptr(..) )
 #if defined(__GLASGOW_HASKELL__)
 import GHC.Base         ( unpackCString# )
