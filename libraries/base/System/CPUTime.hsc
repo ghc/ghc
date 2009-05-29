@@ -37,10 +37,12 @@ import Foreign.C
 #include "HsBase.h"
 #endif
 
+#if !defined(mingw32_HOST_OS) && !defined(cygwin32_HOST_OS)
 realToInteger :: Real a => a -> Integer
 realToInteger ct = round (realToFrac ct :: Double)
   -- CTime, CClock, CUShort etc are in Real but not Fractional, 
   -- so we must convert to Double before we can round it
+#endif
 
 #ifdef __GLASGOW_HASKELL__
 -- -----------------------------------------------------------------------------
@@ -115,7 +117,7 @@ foreign import ccall unsafe times :: Ptr CTms -> IO CClock
           low  <- (#peek FILETIME,dwLowDateTime)  ft :: IO Word32
             -- Convert 100-ns units to picosecs (10^-12) 
             -- => multiply by 10^5.
-          return (((fromIntegral high) * (2^32) + (fromIntegral low)) * 100000)
+          return (((fromIntegral high) * (2^(32::Int)) + (fromIntegral low)) * 100000)
 
     -- ToDo: pin down elapsed times to just the OS thread(s) that
     -- are evaluating/managing Haskell code.
