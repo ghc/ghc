@@ -198,6 +198,7 @@ data DynFlag
    | Opt_IncoherentInstances
    | Opt_MonomorphismRestriction
    | Opt_MonoPatBinds
+   | Opt_MonoLocalBinds
    | Opt_ExtendedDefaultRules           -- Use GHC's extended rules for defaulting
    | Opt_ForeignFunctionInterface
    | Opt_UnliftedFFITypes
@@ -1781,6 +1782,7 @@ xFlags = [
   ( "MonomorphismRestriction",          Opt_MonomorphismRestriction, const Supported ),
   -- On by default (which is not strictly H98):
   ( "MonoPatBinds",                     Opt_MonoPatBinds, const Supported ),
+  ( "MonoLocalBinds",                   Opt_MonoLocalBinds, const Supported ),
   ( "RelaxedPolyRec",                   Opt_RelaxedPolyRec, const Supported ),
   ( "ExtendedDefaultRules",             Opt_ExtendedDefaultRules, const Supported ),
   ( "ImplicitParams",                   Opt_ImplicitParams, const Supported ),

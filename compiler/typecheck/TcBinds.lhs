@@ -734,7 +734,7 @@ generalise :: DynFlags -> TopLevelFlag
 -- The returned [TyVar] are all ready to quantify
 
 generalise dflags top_lvl bind_list sig_fn mono_infos lie_req
-  | isMonoGroup dflags bind_list
+  | isMonoGroup dflags top_lvl bind_list sigs
   = do  { extendLIEs lie_req
         ; return ([], [], emptyBag) }
 
@@ -1157,10 +1157,12 @@ tcInstSig use_skols name
                               sig_loc = loc }) }
 
 -------------------
-isMonoGroup :: DynFlags -> [LHsBind Name] -> Bool
+isMonoGroup :: DynFlags -> TopLevelFlag -> [LHsBind Name]
+            -> [TcSigInfo] ->  Bool
 -- No generalisation at all
-isMonoGroup dflags binds
-  = dopt Opt_MonoPatBinds dflags && any is_pat_bind binds
+isMonoGroup dflags top_lvl binds sigs
+  =  (dopt Opt_MonoPatBinds dflags && any is_pat_bind binds)
+  || (dopt Opt_MonoLocalBinds dflags && null sigs && not (isTopLevel top_lvl))
   where
     is_pat_bind (L _ (PatBind {})) = True
     is_pat_bind _                  = False
