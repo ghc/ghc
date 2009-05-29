@@ -37,6 +37,11 @@ import Foreign.C
 #include "HsBase.h"
 #endif
 
+realToInteger :: Real a => a -> Integer
+realToInteger ct = round (realToFrac ct :: Double)
+  -- CTime, CClock, CUShort etc are in Real but not Fractional, 
+  -- so we must convert to Double before we can round it
+
 #ifdef __GLASGOW_HASKELL__
 -- -----------------------------------------------------------------------------
 -- |Computation 'getCPUTime' returns the number of picoseconds CPU time
@@ -64,7 +69,6 @@ getCPUTime = do
     u_usec <- (#peek struct timeval,tv_usec) ru_utime :: IO CTime
     s_sec  <- (#peek struct timeval,tv_sec)  ru_stime :: IO CTime
     s_usec <- (#peek struct timeval,tv_usec) ru_stime :: IO CTime
-    let realToInteger = round . realToFrac :: Real a => a -> Integer
     return ((realToInteger u_sec * 1000000 + realToInteger u_usec + 
              realToInteger s_sec * 1000000 + realToInteger s_usec) 
                 * 1000000)
@@ -77,7 +81,6 @@ foreign import ccall unsafe getrusage :: CInt -> Ptr CRUsage -> IO CInt
     times p_tms
     u_ticks  <- (#peek struct tms,tms_utime) p_tms :: IO CClock
     s_ticks  <- (#peek struct tms,tms_stime) p_tms :: IO CClock
-    let realToInteger = round . realToFrac :: Real a => a -> Integer
     return (( (realToInteger u_ticks + realToInteger s_ticks) * 1000000000000) 
                         `div` fromIntegral clockTicks)
 

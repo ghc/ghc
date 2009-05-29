@@ -625,7 +625,9 @@ floatToDigits base x =
         -- Haskell promises that p-1 <= logBase b f < p.
         (p - 1 + e0) * 3 `div` 10
      else
-        ceiling ((log (fromInteger (f+1)) +
+	-- f :: Integer, log :: Float -> Float, 
+        --               ceiling :: Float -> Int
+        ceiling ((log (fromInteger (f+1) :: Float) +
                  fromIntegral e * log (fromInteger b)) /
                    log (fromInteger base))
 --WAS:            fromInt e * log (fromInteger b))
