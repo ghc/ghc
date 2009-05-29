@@ -14,13 +14,11 @@
 
 TOPMAKE = $(MAKE) -C $(TOP)
 
-default :
-	+$(TOPMAKE) all_$(dir)
+default: all
 
 # We must not execute multiple recursive invocations of make in parallel.
 .NOTPARALLEL:
 
-# all comes first, we want it to be the default target
 STD_TARGETS = all clean distclean maintainer_clean install html ps pdf
 
 # The + tells make that we're recursively invoking make, otherwise 'make -j2'
