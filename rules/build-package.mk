@@ -55,8 +55,8 @@ maintainer-clean : distclean
 
 .PHONY: clean_$1_$2_config
 clean_$1_$2_config:
-	$(RM) $1/config.log $1/config.status $1/include/Hs*Config.h
-	$(RM) -r $1/autom4te.cache
+	"$$(RM)" $$(RM_OPTS) $1/config.log $1/config.status $1/include/Hs*Config.h
+	"$$(RM)" $$(RM_OPTS) -r $1/autom4te.cache
 
 # --- CONFIGURATION
 

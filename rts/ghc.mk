@@ -63,21 +63,21 @@ endif
 rts_AUTO_APPLY_CMM = rts/dist/build/AutoApply.cmm
 
 $(rts_AUTO_APPLY_CMM): $(GENAPPLY_INPLACE)
-	$(RM) $@
-	$(GENAPPLY_INPLACE) >$@
+	"$(RM)" $(RM_OPTS) $@
+	"$(GENAPPLY_INPLACE)" >$@
 
 rts/dist/build/sm/Evac_thr.c : rts/sm/Evac.c
-	$(MKDIRHIER) $(dir $@)
+	"$(MKDIRHIER)" $(dir $@)
 	cp $< $@
 rts/dist/build/sm/Scav_thr.c : rts/sm/Scav.c
-	$(MKDIRHIER) $(dir $@)
+	"$(MKDIRHIER)" $(dir $@)
 	cp $< $@
 
 rts_H_FILES = $(wildcard $(GHC_INCLUDE_DIR)/*.h) $(wildcard rts/*.h)
 
 # collect the -l flags that we need to link the rts dyn lib.
 rts/libs.depend : $(GHC_PKG_INPLACE)
-	$(GHC_PKG_INPLACE) field rts extra-libraries \
+	"$(GHC_PKG_INPLACE)" field rts extra-libraries \
 	  | sed -e 's/^extra-libraries: //' -e 's/\([a-z]*\)/-l\1/g' > $@
 
 #-----------------------------------------------------------------------------
@@ -95,30 +95,30 @@ ifneq "$$(CLEANING)" "YES"
 ifneq "$$(BootingFromHc)" "YES"
 
 $1/$2/build/%.$$($3_way_)o : $1/%.cmm $$(rts_H_FILES) $$($1_$2_HC)
-	$$($1_$2_HC) $$($1_$2_$3_MOST_HC_OPTS) -c $$< -o $$@
+	"$$($1_$2_HC)" $$($1_$2_$3_MOST_HC_OPTS) -c $$< -o $$@
 
 $1/$2/build/%.$$($3_way_)o : $1/$2/build/%.cmm $$(rts_H_FILES) $$($1_$2_HC)
-	$$($1_$2_HC) $$($1_$2_$3_MOST_HC_OPTS) -c $$< -o $$@
+	"$$($1_$2_HC)" $$($1_$2_$3_MOST_HC_OPTS) -c $$< -o $$@
 
 $1/$2/build/%.$$($3_way_)hc : $1/%.cmm $$(rts_H_FILES) $$($1_$2_HC)
-	$$($1_$2_HC) $$($1_$2_$3_MOST_HC_OPTS) -c $$< -o $$@
+	"$$($1_$2_HC)" $$($1_$2_$3_MOST_HC_OPTS) -c $$< -o $$@
 
 $1/$2/build/%.$$($3_way_)hc : $1/$2/build/%.cmm $$(rts_H_FILES) $$($1_$2_HC)
-	$$($1_$2_HC) $$($1_$2_$3_MOST_HC_OPTS) -c $$< -o $$@
+	"$$($1_$2_HC)" $$($1_$2_$3_MOST_HC_OPTS) -c $$< -o $$@
 
 $1/$2/build/%.$$($3_way_)s : $1/%.cmm $$(rts_H_FILES) $$($1_$2_HC)
-	$$($1_$2_HC) $$($1_$2_$3_MOST_HC_OPTS) -c $$< -o $$@
+	"$$($1_$2_HC)" $$($1_$2_$3_MOST_HC_OPTS) -c $$< -o $$@
 
 $1/$2/build/%.$$($3_way_)s : $1/$2/build/%.cmm $$(rts_H_FILES) $$($1_$2_HC)
-	$$($1_$2_HC) $$($1_$2_$3_MOST_HC_OPTS) -c $$< -o $$@
+	"$$($1_$2_HC)" $$($1_$2_$3_MOST_HC_OPTS) -c $$< -o $$@
 
 endif
 
 $1/$2/build/%.$$($3_way_)o : $1/%.hc
-	$$(CC) $$($1_$2_$3_ALL_CC_OPTS) -Iincludes -x c -c $$< -o $$@
+	"$$(CC)" $$($1_$2_$3_ALL_CC_OPTS) -Iincludes -x c -c $$< -o $$@
 
 $1/$2/build/%.$$($3_way_)o : $1/$2/build/%.hc
-	$$(CC) $$($1_$2_$3_ALL_CC_OPTS) -Iincludes -x c -c $$< -o $$@
+	"$$(CC)" $$($1_$2_$3_ALL_CC_OPTS) -Iincludes -x c -c $$< -o $$@
 
 endif
 
@@ -132,8 +132,8 @@ ifneq "$$(findstring debug, $1)" ""
 rts_dist_$1_HC_OPTS =
 rts_dist_$1_CC_OPTS = -g -O0
 else
-rts_dist_$1_HC_OPTS = $(GhcRtsHcOpts)
-rts_dist_$1_CC_OPTS = $(GhcRtsCcOpts)
+rts_dist_$1_HC_OPTS = $$(GhcRtsHcOpts)
+rts_dist_$1_CC_OPTS = $$(GhcRtsCcOpts)
 endif
 
 ifneq "$$(findstring thr, $1)" ""
@@ -148,19 +148,19 @@ rts_$1_LIB = rts/dist/build/libHSrts$$($1_libsuf)
 
 rts_$1_C_OBJS   = $$(patsubst rts/%.c,rts/dist/build/%.$$($1_osuf),$$(rts_C_SRCS)) $$(patsubst %.c,%.$$($1_osuf),$$(rts_$1_EXTRA_C_SRCS))
 rts_$1_S_OBJS   = $$(patsubst rts/%.S,rts/dist/build/%.$$($1_osuf),$$(rts_S_SRCS))
-rts_$1_CMM_OBJS = $$(patsubst rts/%.cmm,rts/dist/build/%.$$($1_osuf),$$(rts_CMM_SRCS)) $$(patsubst %.cmm,%.$$($1_osuf),$(rts_AUTO_APPLY_CMM))
+rts_$1_CMM_OBJS = $$(patsubst rts/%.cmm,rts/dist/build/%.$$($1_osuf),$$(rts_CMM_SRCS)) $$(patsubst %.cmm,%.$$($1_osuf),$$(rts_AUTO_APPLY_CMM))
 
 rts_$1_OBJS = $$(rts_$1_C_OBJS) $$(rts_$1_S_OBJS) $$(rts_$1_CMM_OBJS)
 
 ifneq "$$(findstring dyn, $1)" ""
 $$(rts_$1_LIB) : $$(rts_$1_OBJS) rts/libs.depend
-	$$(RM) $$@
-	$$(rts_dist_HC) -shared -dynamic -dynload deploy \
+	"$$(RM)" $$(RM_OPTS) $$@
+	"$$(rts_dist_HC)" -shared -dynamic -dynload deploy \
 	  -no-auto-link-packages `cat rts/libs.depend` $$(rts_$1_OBJS) -o $$@
 else
 $$(rts_$1_LIB) : $$(rts_$1_OBJS)
-	$$(RM) $$@
-	echo $$(rts_$1_OBJS) | $$(XARGS) $$(AR) $$(EXTRA_AR_ARGS) $$@
+	"$$(RM)" $$(RM_OPTS) $$@
+	echo $$(rts_$1_OBJS) | "$$(XARGS)" $$(AR) $$(EXTRA_AR_ARGS) $$@
 endif
 
 endef
@@ -399,7 +399,7 @@ rts_LD_OPTS     += -Llibffi/build/include
 DYNWRAPPER_SRC = rts/dyn-wrapper.c
 DYNWRAPPER_PROG = rts/dyn-wrapper$(exeext)
 $(DYNWRAPPER_PROG): $(DYNWRAPPER_SRC)
-	$(HC) -cpp -optc-include -optcdyn-wrapper-patchable-behaviour.h $(INPLACE_EXTRA_FLAGS) $< -o $@
+	"$(HC)" -cpp -optc-include -optcdyn-wrapper-patchable-behaviour.h $(INPLACE_EXTRA_FLAGS) $< -o $@
 
 # -----------------------------------------------------------------------------
 # build the static lib containing the C main symbol
@@ -432,9 +432,9 @@ install : install_rts
 
 .PHONY: install_rts
 install_rts:
-	$(MKDIRHIER) $(DESTDIR)$(libdir)
-	$(MKDIRHIER) $(DESTDIR)$(libdir)/include
-	$(CP) $(ALL_RTS_LIBS) $(DESTDIR)$(libdir)
+	"$(MKDIRHIER)" $(DESTDIR)$(libdir)
+	"$(MKDIRHIER)" $(DESTDIR)$(libdir)/include
+	"$(CP)" $(ALL_RTS_LIBS) $(DESTDIR)$(libdir)
 
 # -----------------------------------------------------------------------------
 # cleaning

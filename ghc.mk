@@ -414,11 +414,11 @@ endef
 PRIMOPS_TXT = $(GHC_COMPILER_DIR)/prelude/primops.txt
 
 libraries/ghc-prim/dist-install/build/GHC/PrimopWrappers.hs : $(GENPRIMOP_INPLACE) $(PRIMOPS_TXT)
-	$(MKDIRHIER) $(dir $@)
-	$(GENPRIMOP_INPLACE) --make-haskell-wrappers <$(PRIMOPS_TXT) >$@
+	"$(MKDIRHIER)" $(dir $@)
+	"$(GENPRIMOP_INPLACE)" --make-haskell-wrappers <$(PRIMOPS_TXT) >$@
 
 libraries/ghc-prim/GHC/Prim.hs : $(GENPRIMOP_INPLACE) $(PRIMOPS_TXT)
-	$(GENPRIMOP_INPLACE) --make-haskell-source <$(PRIMOPS_TXT) >$@
+	"$(GENPRIMOP_INPLACE)" --make-haskell-source <$(PRIMOPS_TXT) >$@
 
 
 # -----------------------------------------------------------------------------
@@ -628,20 +628,20 @@ $(INPLACE)/stamp-mingw : $(MKDIRHIER)
 	$(MKDIRHIER) $(INPLACE_MINGW)/bin
 	GCC=`type -p $(WhatGccIsCalled)`; \
 	GccDir=`dirname $$GCC`; \
-	$(CP) -p $$GccDir/{gcc.exe,ar.exe,as.exe,dlltool.exe,dllwrap.exe,windres.exe} $(INPLACE_MINGW)/bin; \
-	$(CP) -Rp $$GccDir/../include $(INPLACE_MINGW); \
-	$(CP) -Rp $$GccDir/../lib     $(INPLACE_MINGW); \
-	$(CP) -Rp $$GccDir/../libexec $(INPLACE_MINGW); \
-	$(CP) -Rp $$GccDir/../mingw32 $(INPLACE_MINGW)
+	"$(CP)" -p $$GccDir/{gcc.exe,ar.exe,as.exe,dlltool.exe,dllwrap.exe,windres.exe} $(INPLACE_MINGW)/bin; \
+	"$(CP)" -Rp $$GccDir/../include $(INPLACE_MINGW); \
+	"$(CP)" -Rp $$GccDir/../lib     $(INPLACE_MINGW); \
+	"$(CP)" -Rp $$GccDir/../libexec $(INPLACE_MINGW); \
+	"$(CP)" -Rp $$GccDir/../mingw32 $(INPLACE_MINGW)
 	touch $(INPLACE)/stamp-mingw
 
 install : install_mingw
 .PHONY: install_mingw
 install_mingw : $(INPLACE_MINGW)
-	$(CP) -Rp $(INPLACE_MINGW) $(prefix)
+	"$(CP)" -Rp $(INPLACE_MINGW) $(prefix)
 
 $(INPLACE_LIB)/perl.exe $(INPLACE_LIB)/perl56.dll :
-	$(CP) $(GhcDir)../{perl.exe,perl56.dll} $(INPLACE_LIB)
+	"$(CP)" $(GhcDir)../{perl.exe,perl56.dll} $(INPLACE_LIB)
 
 endif # Windows
 
@@ -651,13 +651,13 @@ libraries/ghc-prim/dist-install/doc/html/ghc-prim/ghc-prim.haddock: \
 
 libraries/ghc-prim/dist-install/build/autogen/GHC/Prim.hs: \
                             $(PRIMOPS_TXT) $(GENPRIMOP_INPLACE) $(MKDIRHIER)
-	$(MKDIRHIER) $(dir $@)
-	$(GENPRIMOP_INPLACE) --make-haskell-source < $< > $@
+	"$(MKDIRHIER)" $(dir $@)
+	"$(GENPRIMOP_INPLACE)" --make-haskell-source < $< > $@
 
 libraries/ghc-prim/dist-install/build/autogen/GHC/PrimopWrappers.hs: \
                             $(PRIMOPS_TXT) $(GENPRIMOP_INPLACE) $(MKDIRHIER)
-	$(MKDIRHIER) $(dir $@)
-	$(GENPRIMOP_INPLACE) --make-haskell-wrappers < $< > $@
+	"$(MKDIRHIER)" $(dir $@)
+	"$(GENPRIMOP_INPLACE)" --make-haskell-wrappers < $< > $@
 
 # -----------------------------------------------------------------------------
 # Installation
@@ -694,13 +694,13 @@ install_libs: $(INSTALL_LIBS)
 	done
 
 install_libexec_scripts: $(INSTALL_LIBEXEC_SCRIPTS)
-	$(MKDIRHIER) $(DESTDIR)$(libexecdir)
+	"$(MKDIRHIER)" $(DESTDIR)$(libexecdir)
 	for i in $(INSTALL_LIBEXEC_SCRIPTS); do \
 		$(INSTALL_SCRIPT) $(INSTALL_OPTS) $$i $(DESTDIR)$(libexecdir); \
 	done
 
 install_libexecs:  $(INSTALL_LIBEXECS)
-	$(MKDIRHIER) $(DESTDIR)$(libexecdir)
+	"$(MKDIRHIER)" $(DESTDIR)$(libexecdir)
 	for i in $(INSTALL_LIBEXECS); do \
 		$(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i $(DESTDIR)$(libexecdir); \
 	done
@@ -723,17 +723,17 @@ endif
 
 install_packages: install_libexecs
 install_packages: libffi/package.conf.install rts/package.conf.install
-	$(MKDIRHIER) $(DESTDIR)$(libdir)
+	"$(MKDIRHIER)" $(DESTDIR)$(libdir)
 	echo "[]" > $(INSTALLED_PACKAGE_CONF)
-	$(INSTALLED_GHC_PKG_REAL) --force --global-conf $(INSTALLED_PACKAGE_CONF) update libffi/package.conf.install
-	$(INSTALLED_GHC_PKG_REAL) --force --global-conf $(INSTALLED_PACKAGE_CONF) update rts/package.conf.install
+	"$(INSTALLED_GHC_PKG_REAL)" --force --global-conf $(INSTALLED_PACKAGE_CONF) update libffi/package.conf.install
+	"$(INSTALLED_GHC_PKG_REAL)" --force --global-conf $(INSTALLED_PACKAGE_CONF) update rts/package.conf.install
 	$(foreach p, $(PACKAGES) $(PACKAGES_STAGE2),\
-	    $(GHC_CABAL_INPLACE) install \
+	    "$(GHC_CABAL_INPLACE)" install \
 		 $(INSTALLED_GHC_PKG_REAL) \
 		 $(INSTALLED_PACKAGE_CONF) \
 		 libraries/$p dist-install \
 		 '$(DESTDIR)' '$(prefix)' '$(libdir)' '$(docdir)/libraries' &&) true
-	$(GHC_CABAL_INPLACE) install \
+	"$(GHC_CABAL_INPLACE)" install \
 	 	 $(INSTALLED_GHC_PKG_REAL) \
 		 $(INSTALLED_PACKAGE_CONF) \
 		 compiler stage2 \
@@ -769,15 +769,15 @@ $(eval $(call bindist,.,\
 # the bindist with a relative path
 
 binary-dist:
-	$(RM) -rf $(BIN_DIST_NAME)
+	"$(RM)" $(RM_OPTS) -r $(BIN_DIST_NAME)
 	mkdir $(BIN_DIST_NAME)
 	set -e; for i in LICENSE compiler ghc rts libraries utils gmp docs libffi includes driver mk rules Makefile aclocal.m4 config.sub config.guess install-sh extra-gcc-opts.in ghc.mk inplace; do ln -s ../$$i $(BIN_DIST_NAME)/; done
 	ln -s ../distrib/configure-bin.ac $(BIN_DIST_NAME)/configure.ac
 	cd $(BIN_DIST_NAME) && autoreconf
-	$(RM) -f $(BIN_DIST_TAR)
+	"$(RM)" $(RM_OPTS) $(BIN_DIST_TAR)
 # h means "follow symlinks", e.g. if aclocal.m4 is a symlink to a source
 # tree then we want to include the real file, not a symlink to it
-	$(TAR) hcf - -T $(BIN_DIST_LIST) | bzip2 -c >$(BIN_DIST_TAR_BZ2)
+	"$(TAR)" hcf - -T $(BIN_DIST_LIST) | bzip2 -c >$(BIN_DIST_TAR_BZ2)
 
 nTimes = set -e; for i in `seq 1 $(1)`; do echo Try "$$i: $(2)"; if $(2); then break; fi; done
 
@@ -832,7 +832,7 @@ sdist : VERSION
 # "stage2" is the dist dir.
 sdist_file = \
   if test -f $(TOP)/$1/$2/build/$4.hs; then \
-    $(CP) $(TOP)/$1/$2/build/$4.hs $1/$3/ ; \
+    "$(CP)" $(TOP)/$1/$2/build/$4.hs $1/$3/ ; \
     mv $1/$3/$4.$5 $1/$3/$4.$5.source ;\
   else \
     echo "does not exist: $1/$2//build/$4.hs"; \
@@ -841,14 +841,14 @@ sdist_file = \
 
 .PHONY: sdist-prep
 sdist-prep :
-	$(RM) -rf $(SRC_DIST_DIR)
-	$(RM) $(SRC_DIST_NAME).tar.gz
+	"$(RM)" $(RM_OPTS) -r $(SRC_DIST_DIR)
+	"$(RM)" $(SRC_DIST_NAME).tar.gz
 	mkdir $(SRC_DIST_DIR)
 	( cd $(SRC_DIST_DIR) \
 	  && for i in $(SRC_DIST_DIRS); do mkdir $$i; (cd $$i && lndir $(TOP)/$$i ); done \
 	  && for i in $(SRC_DIST_FILES); do $(LN_S) $(TOP)/$$i .; done \
 	  && $(MAKE) distclean \
-	  && if test -f $(TOP)/libraries/haskell-src/dist/build/Language/Haskell/Parser.hs; then $(CP) $(TOP)/libraries/haskell-src/dist/build/Language/Haskell/Parser.hs libraries/haskell-src/Language/Haskell/ ; mv libraries/haskell-src/Language/Haskell/Parser.ly libraries/haskell-src/Language/Haskell/Parser.ly.source ; fi \
+	  && if test -f $(TOP)/libraries/haskell-src/dist/build/Language/Haskell/Parser.hs; then "$(CP)" $(TOP)/libraries/haskell-src/dist/build/Language/Haskell/Parser.hs libraries/haskell-src/Language/Haskell/ ; mv libraries/haskell-src/Language/Haskell/Parser.ly libraries/haskell-src/Language/Haskell/Parser.ly.source ; fi \
 	  && $(call sdist_file,compiler,stage2,cmm,CmmLex,x) \
 	  && $(call sdist_file,compiler,stage2,cmm,CmmParse,y) \
 	  && $(call sdist_file,compiler,stage2,main,ParsePkgConf,y) \
@@ -860,13 +860,13 @@ sdist-prep :
 	  && $(call sdist_file,utils/hpc,dist,,HpcParser,y) \
 	  && $(call sdist_file,utils/genprimopcode,dist,,Lexer,x) \
 	  && $(call sdist_file,utils/genprimopcode,dist,,Parser,y) \
-	  && $(RM) -rf compiler/stage[123] mk/build.mk \
-	  && $(FIND) $(SRC_DIST_DIRS) \( -name _darcs -o -name SRC -o -name "autom4te*" -o -name "*~" -o -name ".cvsignore" -o -name "\#*" -o -name ".\#*" -o -name "log" -o -name "*-SAVE" -o -name "*.orig" -o -name "*.rej" -o -name "*-darcs-backup*" \) -print | xargs $(RM) -rf \
+	  && "$(RM)" $(RM_OPTS) -r compiler/stage[123] mk/build.mk \
+	  && "$(FIND)" $(SRC_DIST_DIRS) \( -name _darcs -o -name SRC -o -name "autom4te*" -o -name "*~" -o -name ".cvsignore" -o -name "\#*" -o -name ".\#*" -o -name "log" -o -name "*-SAVE" -o -name "*.orig" -o -name "*.rej" -o -name "*-darcs-backup*" \) -print | xargs "$(RM)" $(RM_OPTS) -r \
 	)
 
 .PHONY: sdist
 sdist : sdist-prep
-	$(TAR) chf - $(SRC_DIST_NAME) 2>$src_log | bzip2 >$(TOP)/$(SRC_DIST_TARBALL)
+	"$(TAR)" chf - $(SRC_DIST_NAME) 2>$src_log | bzip2 >$(TOP)/$(SRC_DIST_TARBALL)
 
 sdist-manifest : $(SRC_DIST_TARBALL)
 	tar tjf $(SRC_DIST_TARBALL) | sed "s|^ghc-$(ProjectVersion)/||" | sort >sdist-manifest
@@ -898,43 +898,43 @@ clean : clean_files clean_libraries
 
 .PHONY: clean_files
 clean_files :
-	$(RM) $(CLEAN_FILES)
+	"$(RM)" $(RM_OPTS) $(CLEAN_FILES)
 
 .PHONY: clean_libraries
 clean_libraries:
-	$(RM) -r $(patsubst %, libraries/%/dist, $(PACKAGES) $(PACKAGES_STAGE2))
-	$(RM) -r $(patsubst %, libraries/%/dist-install, $(PACKAGES) $(PACKAGES_STAGE2))
-	$(RM) -r $(patsubst %, libraries/%/dist-boot, $(PACKAGES) $(PACKAGES_STAGE2))
+	"$(RM)" $(RM_OPTS) -r $(patsubst %, libraries/%/dist, $(PACKAGES) $(PACKAGES_STAGE2))
+	"$(RM)" $(RM_OPTS) -r $(patsubst %, libraries/%/dist-install, $(PACKAGES) $(PACKAGES_STAGE2))
+	"$(RM)" $(RM_OPTS) -r $(patsubst %, libraries/%/dist-boot, $(PACKAGES) $(PACKAGES_STAGE2))
 
 distclean : clean
-	$(RM) config.cache config.status config.log mk/config.h mk/stamp-h
-	$(RM) mk/config.mk mk/are-validating.mk mk/project.mk
-	$(RM) extra-gcc-opts docs/users_guide/ug-book.xml
-	$(RM) compiler/ghc.cabal ghc/ghc-bin.cabal
-	$(RM) libraries/base/include/HsBaseConfig.h
-	$(RM) libraries/directory/include/HsDirectoryConfig.h
-	$(RM) libraries/process/include/HsProcessConfig.h
-	$(RM) libraries/unix/include/HsUnixConfig.h
-	$(RM) libraries/old-time/include/HsTimeConfig.h
-	$(RM) $(patsubst %, libraries/%/config.log, $(PACKAGES) $(PACKAGES_STAGE2))
-	$(RM) $(patsubst %, libraries/%/config.status, $(PACKAGES) $(PACKAGES_STAGE2))
-	$(RM) $(patsubst %, libraries/%/include/Hs*Config.h, $(PACKAGES) $(PACKAGES_STAGE2))
-	$(RM) -r $(patsubst %, libraries/%/autom4te.cache, $(PACKAGES) $(PACKAGES_STAGE2))
+	"$(RM)" $(RM_OPTS) config.cache config.status config.log mk/config.h mk/stamp-h
+	"$(RM)" $(RM_OPTS) mk/config.mk mk/are-validating.mk mk/project.mk
+	"$(RM)" $(RM_OPTS) extra-gcc-opts docs/users_guide/ug-book.xml
+	"$(RM)" $(RM_OPTS) compiler/ghc.cabal ghc/ghc-bin.cabal
+	"$(RM)" $(RM_OPTS) libraries/base/include/HsBaseConfig.h
+	"$(RM)" $(RM_OPTS) libraries/directory/include/HsDirectoryConfig.h
+	"$(RM)" $(RM_OPTS) libraries/process/include/HsProcessConfig.h
+	"$(RM)" $(RM_OPTS) libraries/unix/include/HsUnixConfig.h
+	"$(RM)" $(RM_OPTS) libraries/old-time/include/HsTimeConfig.h
+	"$(RM)" $(RM_OPTS) $(patsubst %, libraries/%/config.log, $(PACKAGES) $(PACKAGES_STAGE2))
+	"$(RM)" $(RM_OPTS) $(patsubst %, libraries/%/config.status, $(PACKAGES) $(PACKAGES_STAGE2))
+	"$(RM)" $(RM_OPTS) $(patsubst %, libraries/%/include/Hs*Config.h, $(PACKAGES) $(PACKAGES_STAGE2))
+	"$(RM)" $(RM_OPTS) -r $(patsubst %, libraries/%/autom4te.cache, $(PACKAGES) $(PACKAGES_STAGE2))
 
 maintainer-clean : distclean
-	$(RM) configure mk/config.h.in
-	$(RM) -r autom4te.cache libraries/*/autom4te.cache
-	$(RM) ghc.spec
-	$(RM) $(patsubst %, libraries/%/GNUmakefile, \
+	"$(RM)" $(RM_OPTS) configure mk/config.h.in
+	"$(RM)" $(RM_OPTS) -r autom4te.cache libraries/*/autom4te.cache
+	"$(RM)" $(RM_OPTS) ghc.spec
+	"$(RM)" $(RM_OPTS) $(patsubst %, libraries/%/GNUmakefile, \
 	        $(PACKAGES) $(PACKAGES_STAGE2))
-	$(RM) $(patsubst %, libraries/%/ghc.mk, $(PACKAGES) $(PACKAGES_STAGE2))
-	$(RM) $(patsubst %, libraries/%/configure, \
+	"$(RM)" $(RM_OPTS) $(patsubst %, libraries/%/ghc.mk, $(PACKAGES) $(PACKAGES_STAGE2))
+	"$(RM)" $(RM_OPTS) $(patsubst %, libraries/%/configure, \
 	        $(PACKAGES) $(PACKAGES_STAGE2))
-	$(RM) libraries/base/include/HsBaseConfig.h.in
-	$(RM) libraries/directory/include/HsDirectoryConfig.h.in
-	$(RM) libraries/process/include/HsProcessConfig.h.in
-	$(RM) libraries/unix/include/HsUnixConfig.h.in
-	$(RM) libraries/old-time/include/HsTimeConfig.h.in
+	"$(RM)" $(RM_OPTS) libraries/base/include/HsBaseConfig.h.in
+	"$(RM)" $(RM_OPTS) libraries/directory/include/HsDirectoryConfig.h.in
+	"$(RM)" $(RM_OPTS) libraries/process/include/HsProcessConfig.h.in
+	"$(RM)" $(RM_OPTS) libraries/unix/include/HsUnixConfig.h.in
+	"$(RM)" $(RM_OPTS) libraries/old-time/include/HsTimeConfig.h.in
 
 .PHONY: all_libraries
 

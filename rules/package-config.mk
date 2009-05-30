@@ -17,7 +17,7 @@ $1_$2_HC = $$(GHC_STAGE$3)
 
 # configuration stuff that depends on which GHC we're building with
 ifeq "$3" "0"
-$1_$2_ghc_ge_609 = $(ghc_ge_609)
+$1_$2_ghc_ge_609 = $$(ghc_ge_609)
 $1_$2_HC_CONFIG = $$(GHC_STAGE0)
 $1_$2_HC_CONFIG_DEP =
 $1_$2_GHC_PKG = $$(GHC_PKG)
@@ -28,7 +28,7 @@ $1_$2_HC_MK_DEPEND = $$($1_$2_HC)
 $1_$2_HC_MK_DEPEND_DEP =
 $1_$2_HC_DEP =
 ifeq "$$($1_$2_USE_BOOT_LIBS)" "YES"
-$1_$2_HC_PKGCONF = -package-conf $(BOOTSTRAPPING_CONF)
+$1_$2_HC_PKGCONF = -package-conf $$(BOOTSTRAPPING_CONF)
 $1_$2_GHC_PKG_OPTS = --package-conf=$$(BOOTSTRAPPING_CONF)
 $1_$2_CONFIGURE_OPTS += --package-db=$$(TOP)/$$(BOOTSTRAPPING_CONF)
 endif

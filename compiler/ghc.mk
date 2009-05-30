@@ -36,7 +36,7 @@ compiler/stage3/package-data.mk : $(compiler_CONFIG_HS)
 endif
 
 $(compiler_CONFIG_HS) : mk/config.mk
-	$(RM) -f $@
+	"$(RM)" $(RM_OPTS) $@
 	@echo "Creating $@ ... "
 	@echo "module Config where" >>$@
 	@echo "cProjectName          :: String" >> $@
@@ -142,8 +142,8 @@ $(eval $(call clean-target,compiler,config_hs,$(compiler_CONFIG_HS)))
 PLATFORM_H = ghc_boot_platform.h
 
 compiler/stage1/$(PLATFORM_H) : mk/config.mk
-	$(MKDIRHIER) $(dir $@)
-	$(RM) $@
+	"$(MKDIRHIER)" $(dir $@)
+	"$(RM)" $(RM_OPTS) $@
 	@echo "Creating $@..."
 	@echo "#ifndef __PLATFORM_H__"  >$@
 	@echo "#define __PLATFORM_H__" >>$@
@@ -189,8 +189,8 @@ endif
 # the HOST platform is the TARGET of stage1.  The TARGET remains the same
 # (stage1 is the cross-compiler, not stage2).
 compiler/stage2/$(PLATFORM_H) : mk/config.mk
-	$(MKDIRHIER) $(dir $@)
-	$(RM) $@
+	"$(MKDIRHIER)" $(dir $@)
+	"$(RM)" $(RM_OPTS) $@
 	@echo "Creating $@..."
 	@echo "#ifndef __PLATFORM_H__"  >$@
 	@echo "#define __PLATFORM_H__" >>$@
@@ -233,7 +233,7 @@ endif
 	@echo "Done."
 
 compiler/stage3/$(PLATFORM_H) : compiler/stage2/$(PLATFORM_H)
-	$(CP) $< $@
+	"$(CP)" $< $@
 
 # Every Constants.o object file depends on includes/GHCConstants.h:
 $(eval $(call compiler-hs-dependency,Constants,$(includes_GHCCONSTANTS)))
@@ -263,25 +263,25 @@ $(PRIMOPS_TXT) compiler/parser/Parser.y: %: %.pp compiler/stage1/$(PLATFORM_H)
 $(eval $(call clean-target,compiler,primop, $(PRIMOPS_TXT) compiler/parser/Parser.y $(PRIMOP_BITS)))
 
 compiler/primop-data-decl.hs-incl: $(PRIMOPS_TXT) $(GENPRIMOP_INPLACE)
-	$(GENPRIMOP_INPLACE) --data-decl          < $< > $@
+	"$(GENPRIMOP_INPLACE)" --data-decl          < $< > $@
 compiler/primop-tag.hs-incl: $(PRIMOPS_TXT) $(GENPRIMOP_INPLACE)
-	$(GENPRIMOP_INPLACE) --primop-tag         < $< > $@
+	"$(GENPRIMOP_INPLACE)" --primop-tag         < $< > $@
 compiler/primop-list.hs-incl: $(PRIMOPS_TXT) $(GENPRIMOP_INPLACE)
-	$(GENPRIMOP_INPLACE) --primop-list        < $< > $@
+	"$(GENPRIMOP_INPLACE)" --primop-list        < $< > $@
 compiler/primop-has-side-effects.hs-incl: $(PRIMOPS_TXT) $(GENPRIMOP_INPLACE)
-	$(GENPRIMOP_INPLACE) --has-side-effects   < $< > $@
+	"$(GENPRIMOP_INPLACE)" --has-side-effects   < $< > $@
 compiler/primop-out-of-line.hs-incl: $(PRIMOPS_TXT) $(GENPRIMOP_INPLACE)
-	$(GENPRIMOP_INPLACE) --out-of-line        < $< > $@
+	"$(GENPRIMOP_INPLACE)" --out-of-line        < $< > $@
 compiler/primop-commutable.hs-incl: $(PRIMOPS_TXT) $(GENPRIMOP_INPLACE)
-	$(GENPRIMOP_INPLACE) --commutable         < $< > $@
+	"$(GENPRIMOP_INPLACE)" --commutable         < $< > $@
 compiler/primop-needs-wrapper.hs-incl: $(PRIMOPS_TXT) $(GENPRIMOP_INPLACE)
-	$(GENPRIMOP_INPLACE) --needs-wrapper      < $< > $@
+	"$(GENPRIMOP_INPLACE)" --needs-wrapper      < $< > $@
 compiler/primop-can-fail.hs-incl: $(PRIMOPS_TXT) $(GENPRIMOP_INPLACE)
-	$(GENPRIMOP_INPLACE) --can-fail           < $< > $@
+	"$(GENPRIMOP_INPLACE)" --can-fail           < $< > $@
 compiler/primop-strictness.hs-incl: $(PRIMOPS_TXT) $(GENPRIMOP_INPLACE)
-	$(GENPRIMOP_INPLACE) --strictness         < $< > $@
+	"$(GENPRIMOP_INPLACE)" --strictness         < $< > $@
 compiler/primop-primop-info.hs-incl: $(PRIMOPS_TXT) $(GENPRIMOP_INPLACE)
-	$(GENPRIMOP_INPLACE) --primop-primop-info < $< > $@
+	"$(GENPRIMOP_INPLACE)" --primop-primop-info < $< > $@
 
 # Every PrimOp.o object file depends on $(PRIMOP_BITS):
 $(eval $(call compiler-hs-dependency,PrimOp,$(PRIMOP_BITS)))
@@ -289,7 +289,7 @@ $(eval $(call compiler-hs-dependency,PrimOp,$(PRIMOP_BITS)))
 # Usages aren't used any more; but the generator 
 # can still generate them if we want them back
 compiler/primop-usage.hs-incl: $(PRIMOPS_TXT)
-	$(GENPRIMOP_INPLACE) --usage              < $< > $@
+	"$(GENPRIMOP_INPLACE)" --usage              < $< > $@
 
 # -----------------------------------------------------------------------------
 # Configuration
@@ -466,7 +466,7 @@ compiler/stage1/inplace-pkg-config-munged: compiler/stage1/inplace-pkg-config
 	sed -e 's/^\(version: .*\)\.$(ProjectPatchLevel)$$/\1/' \
 	    -e 's/^\(hs-libraries: HSghc-.*\)\.$(ProjectPatchLevel)$$/\1/' \
 	  < $< > $@
-	$(compiler_stage1_GHC_PKG) update --force $(compiler_stage1_GHC_PKG_OPTS) $@
+	"$(compiler_stage1_GHC_PKG)" update --force $(compiler_stage1_GHC_PKG_OPTS) $@
 
 $(compiler_stage1_v_LIB) : compiler/stage1/inplace-pkg-config-munged
 endif

@@ -20,8 +20,8 @@ ifneq "$(BINDIST)" "YES"
 
 # hack: the build system has trouble with Main modules not called Main.hs
 utils/runghc/dist/build/Main.hs : utils/runghc/runghc.hs $(MKDIRHIER)
-	$(MKDIRHIER) $(dir $@)
-	$(CP) $< $@
+	"$(MKDIRHIER)" $(dir $@)
+	"$(CP)" $< $@
 
 $(eval $(call build-prog,utils/runghc,dist,1))
 
@@ -32,10 +32,10 @@ install: install_runhaskell
 .PHONY: install_runhaskell
 ifeq "$(Windows)" "YES"
 install_runhaskell: install_bins
-	$(CP) $(DESTDIR)$(bindir)/runghc$(exeext) $(DESTDIR)$(bindir)/runhaskell$(exeext)
+	"$(CP)" $(DESTDIR)$(bindir)/runghc$(exeext) $(DESTDIR)$(bindir)/runhaskell$(exeext)
 else
 install_runhaskell:
-	$(RM) $(DESTDIR)$(bindir)/runhaskell
+	"$(RM)" $(RM_OPTS) $(DESTDIR)$(bindir)/runhaskell
 	$(LN_S) runghc $(DESTDIR)$(bindir)/runhaskell
 endif
 

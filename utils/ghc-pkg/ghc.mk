@@ -21,7 +21,7 @@ inplace/bin/ghc-pkg : utils/ghc-pkg/dist-install/build/tmp/$(utils/ghc-pkg_dist_
 ifeq "$(Windows)" "YES"
 	cp $< $@
 else
-	$(RM) $@
+	"$(RM)" $(RM_OPTS) $@
 	echo "#!/bin/sh" >>$@
 	echo "PKGCONF=$(TOP)/$(INPLACE_PACKAGE_CONF)" >>$@
 	echo '$(TOP)/$< --global-conf $$PKGCONF $${1+"$$@"}' >> $@
@@ -31,12 +31,12 @@ endif
 else
 
 $(GHC_PKG_INPLACE) : utils/ghc-pkg/dist/build/$(utils/ghc-pkg_dist_PROG)$(exeext) $(MKDIRHIER)
-	$(MKDIRHIER) $(dir $(INPLACE_PACKAGE_CONF))
+	"$(MKDIRHIER)" $(dir $(INPLACE_PACKAGE_CONF))
 	echo "[]" > $(INPLACE_PACKAGE_CONF)
 ifeq "$(Windows)" "YES"
 	cp $< $@
 else
-	$(RM) $@
+	"$(RM)" $(RM_OPTS) $@
 	echo "#!/bin/sh" >>$@
 	echo "PKGCONF=$(TOP)/$(INPLACE_PACKAGE_CONF)" >>$@
 	echo '$(TOP)/$< --global-conf $$PKGCONF $${1+"$$@"}' >> $@
@@ -47,9 +47,9 @@ endif
 
 # depend on ghc-cabal, otherwise we build Cabal twice when building in parallel
 utils/ghc-pkg/dist/build/$(utils/ghc-pkg_dist_PROG)$(exeext): utils/ghc-pkg/Main.hs utils/ghc-pkg/Version.hs $(GHC_CABAL_INPLACE) $(MKDIRHIER)
-	$(MKDIRHIER) bootstrapping
-	$(MKDIRHIER) utils/ghc-pkg/dist/build
-	$(GHC) $(SRC_HC_OPTS) --make utils/ghc-pkg/Main.hs -o $@ \
+	"$(MKDIRHIER)" bootstrapping
+	"$(MKDIRHIER)" utils/ghc-pkg/dist/build
+	"$(GHC)" $(SRC_HC_OPTS) --make utils/ghc-pkg/Main.hs -o $@ \
 	       -Wall \
 	       -DCABAL_VERSION=$(CABAL_VERSION) \
 	       -odir  bootstrapping \
@@ -62,7 +62,7 @@ utils/ghc-pkg/dist/build/$(utils/ghc-pkg_dist_PROG)$(exeext): utils/ghc-pkg/Main
 	       -ilibraries/hpc
 
 utils/ghc-pkg/Version.hs: mk/config.mk
-	$(RM) -f $@
+	"$(RM)" $(RM_OPTS) $@
 	echo "module Version where"                    >> $@
 	echo "version, targetOS, targetARCH :: String" >> $@
 	echo "version    = \"$(ProjectVersion)\""      >> $@
@@ -95,8 +95,8 @@ install: install_utils/ghc-pkg_link
 
 .PNONY: install_utils/ghc-pkg_link
 install_utils/ghc-pkg_link: 
-	$(MKDIRHIER) $(DESTDIR)$(bindir)
-	$(RM) -f $(DESTDIR)$(bindir)/ghc-pkg
+	"$(MKDIRHIER)" $(DESTDIR)$(bindir)
+	"$(RM)" $(RM_OPTS) $(DESTDIR)$(bindir)/ghc-pkg
 	$(LN_S) ghc-pkg-$(ProjectVersion) $(DESTDIR)$(bindir)/ghc-pkg
 endif
 

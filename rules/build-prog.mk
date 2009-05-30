@@ -99,12 +99,12 @@ $(call hs-objs,$1,$2,v)
 
 ifeq "$$(BootingFromHc)" "NO"
 $1/$2/build/tmp/$$($1_$2_PROG) : $$($1_$2_v_HS_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS) $$($1_$2_OTHER_OBJS)
-	$$(MKDIRHIER) $$(dir $$@)
-	$$($1_$2_HC) -o $$@ $$($1_$2_v_ALL_HC_OPTS) $$(LD_OPTS) $$($1_$2_v_HS_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS) $$($1_$2_OTHER_OBJS)
+	"$$(MKDIRHIER)" $$(dir $$@)
+	"$$($1_$2_HC)" -o $$@ $$($1_$2_v_ALL_HC_OPTS) $$(LD_OPTS) $$($1_$2_v_HS_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS) $$($1_$2_OTHER_OBJS)
 else
 $1/$2/build/tmp/$$($1_$2_PROG) : $$($1_$2_v_HS_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS) $$($1_$2_OTHER_OBJS)
-	$$(MKDIRHIER) $$(dir $$@)
-	$$(CC) -o $$@ $$($1_$2_v_ALL_CC_OPTS) $$(LD_OPTS) $$($1_$2_v_HS_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS) $$($1_$2_OTHER_OBJS) $$($1_$2_v_EXTRA_CC_OPTS)
+	"$$(MKDIRHIER)" $$(dir $$@)
+	"$$(CC)" -o $$@ $$($1_$2_v_ALL_CC_OPTS) $$(LD_OPTS) $$($1_$2_v_HS_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS) $$($1_$2_OTHER_OBJS) $$($1_$2_v_EXTRA_CC_OPTS)
 endif
 
 # Note [lib-depends] if this program is built with stage1 or greater, we
@@ -139,8 +139,8 @@ $(call clean-target,$1,$2_inplace,$$($1_$2_INPLACE))
 # INPLACE_BIN might be empty if we're distcleaning
 ifneq "$$(INPLACE_BIN)" ""
 $$($1_$2_INPLACE) : $1/$2/build/tmp/$$($1_$2_PROG) $$(MKDIRHIER)
-	$$(MKDIRHIER) $$(dir $$@)
-	$$(CP) -p $$< $$@
+	"$$(MKDIRHIER)" $$(dir $$@)
+	"$$(CP)" -p $$< $$@
 	touch $$@
 endif
 

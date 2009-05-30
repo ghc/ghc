@@ -105,14 +105,14 @@ endif
 
 ifneq "$(BINDIST)" "YES"
 $(libffi_STAMP_CONFIGURE):
-	$(RM) -rf $(LIBFFI_DIR) libffi/build
+	"$(RM)" $(RM_OPTS) -r $(LIBFFI_DIR) libffi/build
 	cd libffi && $(TAR) -zxf tarball/libffi*.tar.gz
 	mv libffi/libffi-* libffi/build
 	chmod +x libffi/ln
 	cd libffi && $(PATCH) -p0 < libffi.dllize-3.0.6.patch
 
 	# This patch is just the resulting delta from running automake, autoreconf, libtoolize --force --copy
-	cd libffi && $(PATCH) -p0 < libffi.autotools-update.patch
+	cd libffi && "$(PATCH)" -p0 < libffi.autotools-update.patch
 
 	cd libffi && \
 	  (set -o igncr 2>/dev/null) && set -o igncr; export SHELLOPTS; \
@@ -122,7 +122,7 @@ $(libffi_STAMP_CONFIGURE):
 	    CC=$(WhatGccIsCalled) \
         CFLAGS="$(SRC_CC_OPTS)" \
         LDFLAGS="$(SRC_LD_OPTS)" \
-        $(SHELL) configure \
+        "$(SHELL)" configure \
 	          --enable-static=yes \
 	          --enable-shared=$(libffi_EnableShared) \
 	          --host=$(PLATFORM) --build=$(PLATFORM)
@@ -131,18 +131,18 @@ $(libffi_STAMP_CONFIGURE):
 	# NOTE: this builds libffi_convience.so with the incorrect
 	# soname, but we don't need that anyway!
 	cd libffi && \
-	  $(CP) build/libtool build/libtool.orig; \
+	  "$(CP)" build/libtool build/libtool.orig; \
 	  sed -e s/soname_spec=.*/soname_spec="$(libffi_HS_DYN_LIB_NAME)"/ build/libtool.orig > build/libtool
 
 	# We don't want libtool's cygwin hacks
 	cd libffi && \
-	  $(CP) build/libtool build/libtool.orig; \
+	  "$(CP)" build/libtool build/libtool.orig; \
 	  sed -e s/dlname=\'\$$tdlname\'/dlname=\'\$$dlname\'/ build/libtool.orig > build/libtool
 
 	touch $@
 
 libffi/ffi.h: $(libffi_STAMP_CONFIGURE)
-	$(CP) libffi/build/include/ffi.h $@
+	"$(CP)" libffi/build/include/ffi.h $@
 
 $(libffi_STAMP_BUILD): $(libffi_STAMP_CONFIGURE)
 	cd libffi && \
@@ -153,8 +153,8 @@ $(libffi_STAMP_BUILD): $(libffi_STAMP_CONFIGURE)
 $(libffi_STATIC_LIB): $(libffi_STAMP_BUILD)
 # Rename libffi.a to libHSffi.a
 libffi/libHSffi.a libffi/libHSffi_p.a: $(libffi_STATIC_LIB)
-	$(CP) $(libffi_STATIC_LIB) libffi/libHSffi.a
-	$(CP) $(libffi_STATIC_LIB) libffi/libHSffi_p.a
+	"$(CP)" $(libffi_STATIC_LIB) libffi/libHSffi.a
+	"$(CP)" $(libffi_STATIC_LIB) libffi/libHSffi_p.a
 
 $(eval $(call all-target,libffi,libffi/libHSffi.a libffi/libHSffi_p.a))
 
@@ -166,7 +166,7 @@ $(eval $(call all-target,libffi,libffi/libHSffi.a libffi/libHSffi_p.a))
 libffi/HSffi.o: libffi/libHSffi.a
 	cd libffi && \
 	  touch empty.c; \
-	  $(CC) $(SRC_CC_OPTS) -c empty.c -o HSffi.o
+	  "$(CC)" $(SRC_CC_OPTS) -c empty.c -o HSffi.o
 
 $(eval $(call all-target,libffi,libffi/HSffi.o))
 
@@ -178,7 +178,7 @@ libffi/libffi.dll.a $(libffi_HS_DYN_LIB): $(libffi_STAMP_BUILD)
 # However, the renaming is still required for the import library
 # libffi.dll.a.
 $(libffi_HS_DYN_LIB).a: libffi/libffi.dll.a
-	$(CP) libffi/libffi.dll.a $(libffi_HS_DYN_LIB).a
+	"$(CP)" libffi/libffi.dll.a $(libffi_HS_DYN_LIB).a
 
 $(eval $(call all-target,libffi,$(libffi_HS_DYN_LIB).a))
 
@@ -186,7 +186,7 @@ else
 $(libffi_DYNAMIC_LIBS): $(libffi_STAMP_BUILD)
 # Rename libffi.so to libHSffi...so
 $(libffi_HS_DYN_LIB): $(libffi_DYNAMIC_LIBS)
-	$(CP) $(word 1,$(libffi_DYNAMIC_LIBS)) $(libffi_HS_DYN_LIB)
+	"$(CP)" $(word 1,$(libffi_DYNAMIC_LIBS)) $(libffi_HS_DYN_LIB)
 
 $(eval $(call all-target,libffi,$(libffi_HS_DYN_LIB)))
 endif

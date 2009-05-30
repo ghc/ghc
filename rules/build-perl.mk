@@ -36,21 +36,21 @@ clean_$1 : clean_$1_$2
 
 ifneq "$$(BINDIST)" "YES"
 $1/$2/$$($1_$2_PROG).prl: $1/$$($1_PERL_SRC) $$(UNLIT)
-	$$(MKDIRHIER) $1/$2
-	$$(RM) -f $$@
-	$$(UNLIT) $$(UNLIT_OPTS) $$< $$@
+	"$$(MKDIRHIER)" $1/$2
+	"$$(RM)" $$(RM_OPTS) $$@
+	"$$(UNLIT)" $$(UNLIT_OPTS) $$< $$@
 
 $1/$2/$$($1_$2_PROG): $1/$2/$$($1_$2_PROG).prl
-	$$(RM) -f $$@
+	"$$(RM)" $$(RM_OPTS) $$@
 	echo '#!$$(PERL)'                                  >> $$@
 	echo '$$$$TARGETPLATFORM  = "$$(TARGETPLATFORM)";' >> $$@
 	cat $$<                                            >> $$@
 	$$(EXECUTABLE_FILE) $$@
 
 $$($1_$2_INPLACE): $1/$2/$$($1_$2_PROG)
-	$$(MKDIRHIER) $$(dir $$@)
-	$$(RM) -f $$@
-	$$(CP) $$< $$@
+	"$$(MKDIRHIER)" $$(dir $$@)
+	"$$(RM)" $$(RM_OPTS) $$@
+	"$$(CP)" $$< $$@
 	$$(EXECUTABLE_FILE) $$@
 endif
 

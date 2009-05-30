@@ -46,5 +46,6 @@ INPLACE_BIN		= $(INPLACE)/bin
 INPLACE_LIB		= $(INPLACE)/lib
 INPLACE_MINGW		= $(INPLACE)/mingw
 
-RM			= rm -f
+RM = rm
+RM_OPTS = -f
 

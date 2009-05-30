@@ -41,8 +41,8 @@ endif
 ifeq "$3" "dyn"
 # Link a dynamic library
 $$($1_$2_$3_LIB) : $$($1_$2_$3_HS_OBJS) $$($1_$2_dyn_C_OBJS) $$($1_$2_dyn_S_OBJS) $$(ALL_RTS_LIBS) $$($1_$2_$3_DEPS_LIBS)
-	$$(RM) $$@
-	$$($1_$2_HC) $$($1_$2_dyn_C_OBJS) $$($1_$2_dyn_S_OBJS) $$($1_$2_$3_HS_OBJS) \
+	"$$(RM)" $$(RM_OPTS) $$@
+	"$$($1_$2_HC)" $$($1_$2_dyn_C_OBJS) $$($1_$2_dyn_S_OBJS) $$($1_$2_$3_HS_OBJS) \
          `$$($1_$2_$3_MKSTUBOBJS)` \
          -shared -dynamic -dynload deploy \
          -no-auto-link-packages $$(addprefix -package,$$($1_$2_DEPS)) \
@@ -51,12 +51,12 @@ else
 # Build the ordinary .a library
 ifeq "$$($1_$2_SplitObjs)" "YES"
 $$($1_$2_$3_LIB) : $$($1_$2_$3_HS_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS)
-	$$(RM) $$@
-	(echo $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS) `$$($1_$2_$3_MKSTUBOBJS)`; find $$(patsubst %.$$($3_osuf),%_split,$$($1_$2_$3_HS_OBJS)) -name '*.$$($3_osuf)' -print) | $$(XARGS) $$(AR) $$(EXTRA_AR_ARGS) $$@ || $(RM) $$@
+	"$$(RM)" $$(RM_OPTS) $$@
+	(echo $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS) `$$($1_$2_$3_MKSTUBOBJS)`; find $$(patsubst %.$$($3_osuf),%_split,$$($1_$2_$3_HS_OBJS)) -name '*.$$($3_osuf)' -print) | "$$(XARGS)" $$(AR) $$(EXTRA_AR_ARGS) $$@ || "$$(RM)" $$(RM_OPTS) $$@
 else
 $$($1_$2_$3_LIB) : $$($1_$2_$3_HS_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS)
-	$$(RM) $$@
-	echo $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS) $$($1_$2_$3_HS_OBJS) `$$($1_$2_$3_MKSTUBOBJS)` | $$(XARGS) $$(AR) $$(EXTRA_AR_ARGS) $$@ || $(RM) $$@
+	"$$(RM)" $$(RM_OPTS) $$@
+	echo $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS) $$($1_$2_$3_HS_OBJS) `$$($1_$2_$3_MKSTUBOBJS)` | "$$(XARGS)" $$(AR) $$(EXTRA_AR_ARGS) $$@ || "$$(RM)" $$(RM_OPTS) $$@
 endif
 endif
 
@@ -77,8 +77,8 @@ ifneq "$4" "0"
 BINDIST_LIBS += $$($1_$2_GHCI_LIB)
 endif
 $$($1_$2_GHCI_LIB) : $$($1_$2_$3_HS_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS)
-	$$(RM) $$@
-	$$(LD) -r -o $$@ $$(EXTRA_LD_OPTS) $$($1_$2_$3_HS_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS) `$$($1_$2_$3_MKSTUBOBJS)`
+	"$$(RM)" $$(RM_OPTS) $$@
+	"$$(LD)" -r -o $$@ $$(EXTRA_LD_OPTS) $$($1_$2_$3_HS_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS) `$$($1_$2_$3_MKSTUBOBJS)`
 
 $(call all-target,$1_$2,$$($1_$2_GHCI_LIB))
 endif

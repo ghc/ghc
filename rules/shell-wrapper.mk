@@ -16,7 +16,7 @@ define shell-wrapper
 
 ifeq "$$($1_$2_SHELL_WRAPPER)" "YES"
 
-ifeq "$(Windows)" "YES"
+ifeq "$$(Windows)" "YES"
 
 ifeq "$$($1_$2_INSTALL_SHELL_WRAPPER)" "YES"
 # Just install the binary on Windows
@@ -33,11 +33,11 @@ ifneq "$$($1_$2_INSTALL_INPLACE)" "NO"
 all_$1_$2 : $$(INPLACE_BIN)/$$($1_$2_PROG)
 
 $$(INPLACE_BIN)/$$($1_$2_PROG): $$($1_$2_INPLACE)
-	$$(RM) -f                                         $$@
+	"$$(RM)" $$(RM_OPTS)                              $$@
 	echo '#!$$(SHELL)'                             >> $$@
-	echo 'executablename=$$(TOP)/$$<'  >> $$@
-	echo 'datadir=$$(TOP)/$$(INPLACE_LIB)' >> $$@
-	echo 'bindir=$$(TOP)/$$(INPLACE_BIN)'  >> $$@
+	echo 'executablename=$$(TOP)/$$<'              >> $$@
+	echo 'datadir=$$(TOP)/$$(INPLACE_LIB)'         >> $$@
+	echo 'bindir=$$(TOP)/$$(INPLACE_BIN)'          >> $$@
 	cat $$($1_$2_SHELL_WRAPPER_NAME)               >> $$@
 	$$(EXECUTABLE_FILE)                               $$@
 endif
@@ -57,8 +57,8 @@ install: install_$1_$2_wrapper
 .PHONY: install_$1_$2_wrapper
 install_$1_$2_wrapper: WRAPPER=$$(DESTDIR)$$(bindir)/$$($1_$2_INSTALL_SHELL_WRAPPER_NAME)
 install_$1_$2_wrapper:
-	$$(MKDIRHIER) $$(DESTDIR)$$(bindir)
-	$$(RM) -f                                      $$(WRAPPER)
+	"$$(MKDIRHIER)" $$(DESTDIR)$$(bindir)
+	"$$(RM)" $$(RM_OPTS)                           $$(WRAPPER)
 	echo '#!$$(SHELL)'                          >> $$(WRAPPER)
 	echo 'executablename=$$(libexecdir)/$$($1_$2_PROG)' >> $$(WRAPPER)
 	echo 'datadir=$$(datadir)'                  >> $$(WRAPPER)

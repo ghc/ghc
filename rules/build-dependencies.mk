@@ -22,17 +22,17 @@ endif
 ifneq "$$($1_$2_NO_BUILD_DEPS)" "YES"
 
 $$($1_$2_depfile) : $$(MKDIRHIER) $$(MKDEPENDC) $$($1_$2_HS_SRCS) $$($1_$2_HS_BOOT_SRCS) $$($1_$2_HC_MK_DEPEND_DEP) $$($1_$2_C_FILES) $$($1_$2_S_FILES)
-	$$(MKDIRHIER) $1/$2/build
-	$$(RM) $$@ $$@.tmp
+	"$$(MKDIRHIER)" $1/$2/build
+	"$$(RM)" $$(RM_OPTS) $$@ $$@.tmp
 	touch $$@.tmp
 ifneq "$$($1_$2_C_SRCS)$$($1_$2_S_SRCS)" ""
-	$$(MKDEPENDC) -f $$($1_$2_depfile).tmp $$($1_MKDEPENDC_OPTS) $$(foreach way,$$($1_WAYS),-s $$(way)) -- $$($1_$2_v_ALL_CC_OPTS) -- $$($1_$2_C_FILES) $$($1_$2_S_FILES) || ( $$(RM) $$@; exit 1 )
-	sed -e "s|$1/\([^ :]*o[ :]\)|$1/$2/build/\1|g" -e "s|$(TOP)/||" <$$($1_$2_depfile).tmp >$$($1_$2_depfile)
+	"$$(MKDEPENDC)" -f $$($1_$2_depfile).tmp $$($1_MKDEPENDC_OPTS) $$(foreach way,$$($1_WAYS),-s $$(way)) -- $$($1_$2_v_ALL_CC_OPTS) -- $$($1_$2_C_FILES) $$($1_$2_S_FILES) || ( "$$(RM)" $$(RM_OPTS) $$@; exit 1 )
+	sed -e "s|$1/\([^ :]*o[ :]\)|$1/$2/build/\1|g" -e "s|$$(TOP)/||" <$$($1_$2_depfile).tmp >$$($1_$2_depfile)
 endif
 ifneq "$$($1_$2_HS_SRCS)" ""
-	$$($1_$2_HC_MK_DEPEND) -M $$($1_$2_MKDEPENDHS_FLAGS) \
+	"$$($1_$2_HC_MK_DEPEND)" -M $$($1_$2_MKDEPENDHS_FLAGS) \
 	    $$(filter-out -split-objs, $$($1_$2_v_ALL_HC_OPTS)) \
-	    $$($1_$2_HS_SRCS) || ( $$(RM) $$@; exit 1 )
+	    $$($1_$2_HS_SRCS) || ( "$$(RM)" $$(RM_OPTS) $$@; exit 1 )
 endif
 	echo "$1_$2_depfile_EXISTS = YES" >> $$@
 ifneq "$$($1_$2_SLASH_MODS)" ""

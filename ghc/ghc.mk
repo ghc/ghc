@@ -117,7 +117,7 @@ all_ghc_stage2 : $(GHC_STAGE2)
 all_ghc_stage3 : $(GHC_STAGE3)
 
 $(INPLACE_LIB)/extra-gcc-opts : extra-gcc-opts
-	$(CP) $< $@
+	"$(CP)" $< $@
 
 # The GHC programs need to depend on all the helper programs they might call
 ifeq "$(GhcUnregisterised)" "NO"
@@ -149,15 +149,15 @@ ifeq "$(Windows)" "NO"
 install: install_ghc_link
 .PNONY: install_ghc_link
 install_ghc_link: 
-	$(RM) -f $(DESTDIR)$(bindir)/ghc
-	$(LN_S) ghc-$(ProjectVersion) $(DESTDIR)$(bindir)/ghc
+	"$(RM)" $(RM_OPTS) $(DESTDIR)$(bindir)/ghc
+	"$(LN_S)" ghc-$(ProjectVersion) $(DESTDIR)$(bindir)/ghc
 else
 # On Windows we install the main binary as $(bindir)/ghc.exe
 # To get ghc-<version>.exe we have a little C program in driver/ghc
 install: install_ghc_post
 .PHONY: install_ghc_post
 install_ghc_post: install_bins
-	$(RM) -f $(DESTDIR)$(bindir)/ghc.exe
-	$(MV) -f $(DESTDIR)$(bindir)/ghc-stage$(INSTALL_GHC_STAGE).exe $(DESTDIR)$(bindir)/ghc.exe
+	"$(RM)" $(RM_OPTS) $(DESTDIR)$(bindir)/ghc.exe
+	"$(MV)" -f $(DESTDIR)$(bindir)/ghc-stage$(INSTALL_GHC_STAGE).exe $(DESTDIR)$(bindir)/ghc.exe
 endif
 

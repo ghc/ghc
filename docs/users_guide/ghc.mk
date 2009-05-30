@@ -28,6 +28,6 @@ src_ug_book  = $(dir $(realpath $(dir $(build_ug_book))/ug-book.xml.in))ug-book.
 
 ifneq "$(build_ug_book)" "$(src_ug_book)"
 $(src_ug_book) : $(build_ug_book)
-	$(CP) $< $@
+	"$(CP)" $< $@
 docs/users_guide/users_guide.pdf docs/users_guide/users_guide.ps: $(src_ug_book)
 endif

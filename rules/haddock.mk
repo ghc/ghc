@@ -34,8 +34,8 @@ $1_$2_HADDOCK_FLAGS += --hyperlink-source
 endif
 
 $$($$($1_PACKAGE)_HADDOCK_FILE) : $$(MKDIRHIER) $$(INPLACE_BIN)/haddock$$(exeext) $$(GHC_CABAL_INPLACE) $$($1_$2_HS_SRCS) $$($$($1_PACKAGE)_HADDOCK_DEPS)
-	$$(MKDIRHIER) $$(dir $$@)
-	$$(GHC_CABAL_INPLACE) haddock $2 $1 --with-haddock=$$(TOP)/$$(INPLACE_BIN)/haddock --with-ghc=$$(TOP)/$$(INPLACE_BIN)/ghc-stage2 $$($1_$2_HADDOCK_FLAGS) $$($1_$2_HADDOCK_OPTS)
+	"$$(MKDIRHIER)" $$(dir $$@)
+	"$$(GHC_CABAL_INPLACE)" haddock $2 $1 --with-haddock=$$(TOP)/$$(INPLACE_BIN)/haddock --with-ghc=$$(TOP)/$$(INPLACE_BIN)/ghc-stage2 $$($1_$2_HADDOCK_FLAGS) $$($1_$2_HADDOCK_OPTS)
 
 # Make the haddocking depend on the library .a file, to ensure
 # that we wait until the library is fully build before we haddock it
