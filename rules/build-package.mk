@@ -45,10 +45,8 @@ $(call all-target,$1,all_$1_$2)
 $(call clean-target,$1,$2,$1/$2)
 # This give us things like
 #     all_libraries: all_libraries/base_dist-install
-#     clean_libraries: clean_libraries/base_dist-install
 ifneq "$$($1_$2_GROUP)" ""
 all_$$($1_$2_GROUP): all_$1_$2
-clean_$$($1_$2_GROUP): clean_$1_$2
 endif
 
 distclean : clean_$1_$2_config

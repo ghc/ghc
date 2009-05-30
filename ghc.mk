@@ -894,10 +894,14 @@ CLEAN_FILES += utils/ghc-pwd/ghc-pwd.hi
 CLEAN_FILES += utils/ghc-pwd/ghc-pwd.o
 CLEAN_FILES += libraries/bootstrapping.conf
 
-clean : clean_files
+clean : clean_files clean_libraries
+
 .PHONY: clean_files
 clean_files :
 	$(RM) $(CLEAN_FILES)
+
+.PHONY: clean_libraries
+clean_libraries:
 	$(RM) -r $(patsubst %, libraries/%/dist, $(PACKAGES) $(PACKAGES_STAGE2))
 	$(RM) -r $(patsubst %, libraries/%/dist-install, $(PACKAGES) $(PACKAGES_STAGE2))
 	$(RM) -r $(patsubst %, libraries/%/dist-boot, $(PACKAGES) $(PACKAGES_STAGE2))
