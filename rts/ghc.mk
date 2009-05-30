@@ -160,7 +160,7 @@ $$(rts_$1_LIB) : $$(rts_$1_OBJS) rts/libs.depend
 else
 $$(rts_$1_LIB) : $$(rts_$1_OBJS)
 	"$$(RM)" $$(RM_OPTS) $$@
-	echo $$(rts_$1_OBJS) | "$$(XARGS)" $$(AR) $$(EXTRA_AR_ARGS) $$@
+	echo $$(rts_$1_OBJS) | $$(XARGS) $$(AR) $$(EXTRA_AR_ARGS) $$@
 endif
 
 endef
