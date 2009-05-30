@@ -24,14 +24,12 @@ define hi-rule # $1 = way
 	@if [ ! -f $$@ ] ; then \
 	    echo Panic! $$< exists, but $$@ does not.; \
 	    exit 1; \
-	else exit 0 ; \
 	fi
 
 %.$$($1_way_)hi-boot : %.$$($1_way_)o-boot
 	@if [ ! -f $$@ ] ; then \
 	    echo Panic! $$< exists, but $$@ does not.; \
 	    exit 1; \
-	else exit 0 ; \
 	fi
 endef
 
