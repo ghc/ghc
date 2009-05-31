@@ -13,8 +13,8 @@ ifneq "$(BINDIST)" "YES"
 $(INPLACE_BIN)/$(utils/haddock_dist_PROG): $(INPLACE_LIB)/html
 
 $(INPLACE_LIB)/html:
-	$(RM) -rf $@
-	$(CP) -R utils/haddock/html $@
+	"$(RM)" $(RM_OPTS) -r $@
+	"$(CP)" -R utils/haddock/html $@
 
 $(eval $(call build-prog,utils/haddock,dist,2))
 
@@ -25,8 +25,8 @@ endif
 install: install_utils/haddock_html
 .PHONY: install_utils/haddock_html
 install_utils/haddock_html:
-	$(RM) -rf $(DESTDIR)$(datadir)/html
-	$(CP) -R utils/haddock/html $(DESTDIR)$(datadir)/html
+	"$(RM)" $(RM_OPTS) -r $(DESTDIR)$(datadir)/html
+	"$(CP)" -R utils/haddock/html $(DESTDIR)$(datadir)/html
 
 BINDIST_EXTRAS += $(addprefix utils/haddock/,html/*)
 
