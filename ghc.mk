@@ -819,7 +819,7 @@ SRC_DIST_FILES += \
 	aclocal.m4 README ANNOUNCE HACKING LICENSE Makefile install-sh \
 	ghc.spec.in ghc.spec extra-gcc-opts.in VERSION boot ghc.mk
 
-SRC_DIST_TARBALL = ghc-$(ProjectVersion)-src.tar.bz2
+SRC_DIST_TARBALL = $(SRC_DIST_NAME)-src.tar.bz2
 
 VERSION :
 	echo $(ProjectVersion) >VERSION
@@ -842,7 +842,7 @@ sdist_file = \
 .PHONY: sdist-prep
 sdist-prep :
 	"$(RM)" $(RM_OPTS) -r $(SRC_DIST_DIR)
-	"$(RM)" $(SRC_DIST_NAME).tar.gz
+	"$(RM)" $(RM_OPTS) $(SRC_DIST_TARBALL)
 	mkdir $(SRC_DIST_DIR)
 	( cd $(SRC_DIST_DIR) \
 	  && for i in $(SRC_DIST_DIRS); do mkdir $$i; (cd $$i && lndir $(TOP)/$$i ); done \
