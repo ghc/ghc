@@ -164,6 +164,18 @@ newTopSrcBinder this_mod (L loc rdr_name)
 
 Looking up a name in the RnEnv.
 
+Note [Type and class operator definitions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We want to reject all of these unless we have -XTypeOperators (Trac #3265)
+   data a :*: b  = ...
+   class a :*: b where ...
+   data (:*:) a b  = ....
+   class (:*:) a b where ...
+The latter two mean that we are not just looking for a
+*syntactically-infix* declaration, but one that uses an operator
+OccName.  We use OccName.isSymOcc to detect that case, which isn't
+terribly efficient, but there seems to be no better way.
+
 \begin{code}
 lookupTopBndrRn :: RdrName -> RnM Name
 lookupTopBndrRn n = do nopt <- lookupTopBndrRn_maybe n
@@ -205,7 +217,14 @@ lookupTopBndrRn_maybe rdr_name
         ; return (Just n)}
 
   | otherwise
-  = do	{ mb_gre <- lookupGreLocalRn rdr_name
+  = do	{  -- Check for operators in type or class declarations
+           -- See Note [Type and class operator definitions]
+          let occ = rdrNameOcc rdr_name
+        ; when (isTcOcc occ && isSymOcc occ)
+               (do { op_ok <- doptM Opt_TypeOperators
+	           ; checkM op_ok (addErr (opDeclErr rdr_name)) })
+
+    	; mb_gre <- lookupGreLocalRn rdr_name
 	; case mb_gre of
 		Nothing  -> returnM Nothing
 		Just gre -> returnM (Just $ gre_name gre) }
@@ -1100,4 +1119,9 @@ kindSigErr thing
 badQualBndrErr :: RdrName -> SDoc
 badQualBndrErr rdr_name
   = ptext (sLit "Qualified name in binding position:") <+> ppr rdr_name
+
+opDeclErr :: RdrName -> SDoc
+opDeclErr n 
+  = hang (ptext (sLit "Illegal declaration of a type or class operator") <+> quotes (ppr n))
+       2 (ptext (sLit "Use -XTypeOperators to declare operators in type and declarations"))
 \end{code}
