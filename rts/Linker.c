@@ -618,7 +618,6 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(complementIntegerzh_fast)		\
       SymI_HasProto(createAdjustor)			\
       SymI_HasProto(decodeDoublezh_fast)		\
-      SymI_HasProto(decodeFloatzh_fast)			\
       SymI_HasProto(decodeDoublezu2Intzh_fast)		\
       SymI_HasProto(decodeFloatzuIntzh_fast)		\
       SymI_HasProto(defaultsHook)			\

@@ -301,55 +301,6 @@ __decodeDouble_2Int (I_ *man_sign, W_ *man_high, W_ *man_low, I_ *exp, StgDouble
     }
 }
 
-void
-__decodeFloat (MP_INT *man, I_ *exp, StgFloat flt)
-{
-    /* Do some bit fiddling on IEEE */
-    int high, sign; 	    	    /* assuming 32 bit ints */
-    union { float f; int i; } u;    /* assuming 32 bit float and int */
-
-    ASSERT(sizeof(int          ) == 4            );
-    ASSERT(sizeof(flt          ) == SIZEOF_FLOAT );
-    ASSERT(sizeof(man->_mp_d[0]) == SIZEOF_LIMB_T);
-    ASSERT(FNBIGIT*SIZEOF_LIMB_T >= SIZEOF_FLOAT );
-
-    u.f = flt;	    /* grab the float */
-    high = u.i;
-
-    /* we know the MP_INT* passed in has size zero, so we realloc
-    	no matter what.
-    */
-    man->_mp_alloc = FNBIGIT;
-
-    if ((high & ~FMSBIT) == 0) {
-	man->_mp_size = 0;
-	*exp = 0;
-    } else {
-	man->_mp_size = FNBIGIT;
-	*exp = ((high >> 23) & 0xff) + MY_FMINEXP;
-	sign = high;
-
-	high &= FHIGHBIT-1;
-	if (*exp != MY_FMINEXP)	/* don't add hidden bit to denorms */
-	    high |= FHIGHBIT;
-	else {
-	    (*exp)++;
-	    /* A denorm, normalize the mantissa */
-	    while (! (high & FHIGHBIT)) {
-		high <<= 1;
-		(*exp)--;
-	    }
-	}
-#if FNBIGIT == 1
-	man->_mp_d[0] = (mp_limb_t)high;
-#else
-#error Cannot cope with FNBIGIT
-#endif
-	if (sign < 0)
-	    man->_mp_size = -man->_mp_size;
-    }
-}
-
 /* Convenient union types for checking the layout of IEEE 754 types -
    based on defs in GNU libc <ieee754.h>
 */

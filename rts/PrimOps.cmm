@@ -954,32 +954,6 @@ integer2Wordzh_fast
   jump %ENTRY_CODE(Sp(0));
 }
 
-decodeFloatzh_fast
-{ 
-    W_ p;
-    F_ arg;
-    FETCH_MP_TEMP(mp_tmp1);
-    FETCH_MP_TEMP(mp_tmp_w);
-    
-    /* arguments: F1 = Float# */
-    arg = F1;
-    
-    ALLOC_PRIM( SIZEOF_StgArrWords + WDS(1), NO_PTRS, decodeFloatzh_fast );
-    
-    /* Be prepared to tell Lennart-coded __decodeFloat
-       where mantissa._mp_d can be put (it does not care about the rest) */
-    p = Hp - SIZEOF_StgArrWords;
-    SET_HDR(p,stg_ARR_WORDS_info,W_[CCCS]);
-    StgArrWords_words(p) = 1;
-    MP_INT__mp_d(mp_tmp1) = BYTE_ARR_CTS(p);
-    
-    /* Perform the operation */
-    foreign "C" __decodeFloat(mp_tmp1 "ptr",mp_tmp_w "ptr" ,arg) [];
-    
-    /* returns: (Int# (expn), Int#, ByteArray#) */
-    RET_NNP(W_[mp_tmp_w], TO_W_(MP_INT__mp_size(mp_tmp1)), p);
-}
-
 decodeFloatzuIntzh_fast
 { 
     W_ p;

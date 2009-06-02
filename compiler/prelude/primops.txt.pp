@@ -725,16 +725,9 @@ primop   FloatPowerOp   "powerFloat#"      Dyadic
 
 primop   Float2DoubleOp   "float2Double#" GenPrimOp  Float# -> Double#
 
-primop   FloatDecodeOp   "decodeFloat#" GenPrimOp
-   Float# -> (# Int#, Int#, ByteArray# #)
-   {Convert to arbitrary-precision integer.
-    First {\tt Int\#} in result is the exponent; second {\tt Int\#} and {\tt ByteArray\#}
-    represent an {\tt Integer\#} holding the mantissa.}
-   with out_of_line = True
-
 primop   FloatDecode_IntOp   "decodeFloat_Int#" GenPrimOp
    Float# -> (# Int#, Int# #)
-   {Convert to arbitrary-precision integer.
+   {Convert to integers.
     First {\tt Int\#} in result is the mantissa; second is the exponent.}
    with out_of_line = True
 
