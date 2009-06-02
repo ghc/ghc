@@ -22,10 +22,11 @@ $(call clean-target,$1,docbook,$1/$2 $1/$2.pdf $1/$2.ps)
 # empty "all_$1" target just in case we're not building docs at all
 $(call all-target,$1,)
 
+.PHONY: html_$1
+
 ifeq "$$(BUILD_DOCBOOK_HTML)" "YES"
 $(call all-target,$1,html_$1)
 
-.PHONY: html_$1
 html_$1 : $1/$2/index.html
 
 $1/$2/index.html: $$($1_DOCBOOK_SOURCES)
@@ -36,16 +37,24 @@ $1/$2/index.html: $$($1_DOCBOOK_SOURCES)
 	               $$(XSLTPROC_LABEL_OPTS) $$(XSLTPROC_OPTS) \
 	               $$(DIR_DOCBOOK_XSL)/html/chunk.xsl $1/$2.xml
 	cp mk/fptools.css $$(dir $$@)
+else
+html_$1 :
+	@echo "*** HTML documentation is disabled; BUILD_DOCBOOK_HTML = NO"
+	@exit 1
 endif
 
+.PHONY: ps_$1
 ifeq "$$(BUILD_DOCBOOK_PS)" "YES"
 $(call all-target,$1,ps_$1)
 
-.PHONY: ps_$1
 ps_$1 : $1/$2.ps
 
 $1/$2.ps: $$($1_DOCBOOK_SOURCES)
 	"$$(DBLATEX)" $$(DBLATEX_OPTS) $1/$2.xml --ps -o $$@
+else
+ps_$1 :
+	@echo "*** PS documentation is disabled; BUILD_DOCBOOK_PS = NO"
+	@exit 1
 endif
 
 ifeq "$$(BUILD_DOCBOOK_PDF)" "YES"
@@ -56,6 +65,10 @@ pdf_$1 : $1/$2.pdf
 
 $1/$2.pdf: $$($1_DOCBOOK_SOURCES)
 	"$$(DBLATEX)" $$(DBLATEX_OPTS) $1/$2.xml --pdf -o $$@
+else
+pdf_$1 :
+	@echo "*** PDF documentation is disabled; BUILD_DOCBOOK_PDF = NO"
+	@exit 1
 endif
 
 endef
