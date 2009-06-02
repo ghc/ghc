@@ -9,7 +9,7 @@
 #ifndef RTS_SIGNALS_H
 #define RTS_SIGNALS_H
 
-#if !defined(PAR) && !defined(mingw32_HOST_OS)
+#if !defined(mingw32_HOST_OS)
 
 #include "posix/Signals.h"
 

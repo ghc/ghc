@@ -158,11 +158,7 @@ static void scheduleCheckWakeupThreads(Capability *cap USED_IF_NOT_THREADS);
 static void scheduleCheckBlackHoles (Capability *cap);
 static void scheduleDetectDeadlock (Capability *cap, Task *task);
 static void schedulePushWork(Capability *cap, Task *task);
-#if defined(PARALLEL_HASKELL)
-static rtsBool scheduleGetRemoteWork(Capability *cap);
-static void scheduleSendPendingMessages(void);
-#endif
-#if defined(PARALLEL_HASKELL) || defined(THREADED_RTS)
+#if defined(THREADED_RTS)
 static void scheduleActivateSpark(Capability *cap);
 #endif
 static void schedulePostRunThread(Capability *cap, StgTSO *t);
@@ -208,18 +204,8 @@ static char *whatNext_strs[] = {
 STATIC_INLINE void
 addToRunQueue( Capability *cap, StgTSO *t )
 {
-#if defined(PARALLEL_HASKELL)
-    if (RtsFlags.ParFlags.doFairScheduling) { 
-	// this does round-robin scheduling; good for concurrency
-	appendToRunQueue(cap,t);
-    } else {
-	// this does unfair scheduling; good for parallelism
-	pushOnRunQueue(cap,t);
-    }
-#else
     // this does round-robin scheduling; good for concurrency
     appendToRunQueue(cap,t);
-#endif
 }
 
 /* ---------------------------------------------------------------------------
@@ -264,9 +250,6 @@ schedule (Capability *initialCapability, Task *task)
   StgTSO *t;
   Capability *cap;
   StgThreadReturnCode ret;
-#if defined(PARALLEL_HASKELL)
-  rtsBool receivedFinish = rtsFalse;
-#endif
   nat prev_what_next;
   rtsBool ready_to_gc;
 #if defined(THREADED_RTS)
@@ -296,13 +279,7 @@ schedule (Capability *initialCapability, Task *task)
   // -----------------------------------------------------------
   // Scheduler loop starts here:
 
-#if defined(PARALLEL_HASKELL)
-#define TERMINATION_CONDITION        (!receivedFinish)
-#else
-#define TERMINATION_CONDITION        rtsTrue
-#endif
-
-  while (TERMINATION_CONDITION) {
+  while (1) {
 
     // Check whether we have re-entered the RTS from Haskell without
     // going via suspendThread()/resumeThread (i.e. a 'safe' foreign
@@ -383,21 +360,6 @@ schedule (Capability *initialCapability, Task *task)
     /* work pushing, currently relevant only for THREADED_RTS:
        (pushes threads, wakes up idle capabilities for stealing) */
     schedulePushWork(cap,task);
-
-#if defined(PARALLEL_HASKELL)
-    /* since we perform a blocking receive and continue otherwise,
-       either we never reach here or we definitely have work! */
-    // from here: non-empty run queue
-    ASSERT(!emptyRunQueue(cap));
-
-    if (PacketsWaiting()) {  /* now process incoming messages, if any
-				pending...  
-
-				CAUTION: scheduleGetRemoteWork called
-				above, waits for messages as well! */
-      processMessages(cap, &receivedFinish);
-    }
-#endif // PARALLEL_HASKELL: non-empty run queue!
 
     scheduleDetectDeadlock(cap,task);
 
@@ -692,27 +654,8 @@ scheduleFindWork (Capability *cap)
 
     scheduleCheckBlockedThreads(cap);
 
-#if defined(THREADED_RTS) || defined(PARALLEL_HASKELL)
+#if defined(THREADED_RTS)
     if (emptyRunQueue(cap)) { scheduleActivateSpark(cap); }
-#endif
-
-#if defined(PARALLEL_HASKELL)
-    // if messages have been buffered...
-    scheduleSendPendingMessages();
-#endif
-
-#if defined(PARALLEL_HASKELL)
-    if (emptyRunQueue(cap)) {
-	receivedFinish = scheduleGetRemoteWork(cap);
-	continue; //  a new round, (hopefully) with new work
-	/* 
-	   in GUM, this a) sends out a FISH and returns IF no fish is
-	                   out already
-			b) (blocking) awaits and receives messages
-	   
-	   in Eden, this is only the blocking receive, as b) in GUM.
-	*/
-    }
 #endif
 }
 
@@ -1000,12 +943,6 @@ scheduleCheckBlackHoles (Capability *cap)
 static void
 scheduleDetectDeadlock (Capability *cap, Task *task)
 {
-
-#if defined(PARALLEL_HASKELL)
-    // ToDo: add deadlock detection in GUM (similar to THREADED_RTS) -- HWL
-    return;
-#endif
-
     /* 
      * Detect deadlock: when we have no threads to run, there are no
      * threads blocked, waiting for I/O, or sleeping, and all the
@@ -1110,7 +1047,7 @@ scheduleSendPendingMessages(void)
  * Activate spark threads (PARALLEL_HASKELL and THREADED_RTS)
  * ------------------------------------------------------------------------- */
 
-#if defined(PARALLEL_HASKELL) || defined(THREADED_RTS)
+#if defined(THREADED_RTS)
 static void
 scheduleActivateSpark(Capability *cap)
 {
@@ -1119,51 +1056,6 @@ scheduleActivateSpark(Capability *cap)
         createSparkThread(cap);
         debugTrace(DEBUG_sched, "creating a spark thread");
     }
-}
-#endif // PARALLEL_HASKELL || THREADED_RTS
-
-/* ----------------------------------------------------------------------------
- * Get work from a remote node (PARALLEL_HASKELL only)
- * ------------------------------------------------------------------------- */
-    
-#if defined(PARALLEL_HASKELL)
-static rtsBool /* return value used in PARALLEL_HASKELL only */
-scheduleGetRemoteWork (Capability *cap STG_UNUSED)
-{
-#if defined(PARALLEL_HASKELL)
-  rtsBool receivedFinish = rtsFalse;
-
-  // idle() , i.e. send all buffers, wait for work
-  if (RtsFlags.ParFlags.BufferTime) {
-	IF_PAR_DEBUG(verbose, 
-	        debugBelch("...send all pending data,"));
-        {
-	  nat i;
-	  for (i=1; i<=nPEs; i++)
-	    sendImmediately(i); // send all messages away immediately
-	}
-  }
-
-  /* this would be the place for fishing in GUM... 
-
-     if (no-earlier-fish-around) 
-          sendFish(choosePe());
-   */
-
-  // Eden:just look for incoming messages (blocking receive)
-  IF_PAR_DEBUG(verbose, 
-	       debugBelch("...wait for incoming messages...\n"));
-  processMessages(cap, &receivedFinish); // blocking receive...
-
-
-  return receivedFinish;
-  // reenter scheduling look after having received something
-
-#else /* !PARALLEL_HASKELL, i.e. THREADED_RTS */
-
-  return rtsFalse; /* return value unused in THREADED_RTS */
-
-#endif /* PARALLEL_HASKELL */
 }
 #endif // PARALLEL_HASKELL || THREADED_RTS
 
@@ -1378,7 +1270,7 @@ scheduleHandleYield( Capability *cap, StgTSO *t, nat prev_what_next )
 
 static void
 scheduleHandleThreadBlocked( StgTSO *t
-#if !defined(GRAN) && !defined(DEBUG)
+#if !defined(DEBUG)
     STG_UNUSED
 #endif
     )
@@ -2198,7 +2090,7 @@ initScheduler(void)
 
   initTaskManager();
 
-#if defined(THREADED_RTS) || defined(PARALLEL_HASKELL)
+#if defined(THREADED_RTS)
   initSparkPools();
 #endif
 
@@ -2409,13 +2301,6 @@ threadStackOverflow(Capability *cap, StgTSO *tso)
   tso->sp = (P_)&(tso->stack[tso->stack_size]);
   tso->why_blocked = NotBlocked;
 
-  IF_PAR_DEBUG(verbose,
-	       debugBelch("@@ threadStackOverflow of TSO %d (now at %p): stack size increased to %ld\n",
-		     tso->id, tso, tso->stack_size);
-	       /* If we're debugging, just print out the top of the stack */
-	       printStackChunk(tso->sp, stg_min(tso->stack+tso->stack_size, 
-						tso->sp+64)));
-  
   unlockTSO(dest);
   unlockTSO(tso);
 

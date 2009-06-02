@@ -170,11 +170,7 @@ TAG_CLOSURE(StgWord tag,StgClosure * p)
 /* Info tables, closures & code fragments defined in the RTS */
 #include "StgMiscClosures.h"
 
-/* Simulated-parallel information */
-#include "GranSim.h"
-
 /* Parallel information */
-#include "Parallel.h"
 #include "OSThreads.h"
 #include "SMPClosureOps.h"
 #include "SpinLock.h"
@@ -189,9 +185,6 @@ TAG_CLOSURE(StgWord tag,StgClosure * p)
 /* Macros for STG/C code */
 #include "Block.h"
 #include "ClosureMacros.h"
-
-  /* Ticky-ticky counters */
-#include "TickyCounters.h"
 
 /* Runtime-system hooks */
 #include "Hooks.h"
@@ -285,18 +278,6 @@ TICK_VAR(2)
 #define DEBUG_ONLY(s) s
 #else
 #define DEBUG_ONLY(s) doNothing()
-#endif
-
-#if defined(GRAN) && defined(DEBUG)
-#define IF_GRAN_DEBUG(c,s)  if (RtsFlags.GranFlags.Debug.c) { s; }
-#else
-#define IF_GRAN_DEBUG(c,s)  doNothing()
-#endif
-
-#if defined(PAR) && defined(DEBUG)
-#define IF_PAR_DEBUG(c,s)  if (RtsFlags.ParFlags.Debug.c) { s; }
-#else
-#define IF_PAR_DEBUG(c,s)  doNothing()
 #endif
 
 /* -----------------------------------------------------------------------------

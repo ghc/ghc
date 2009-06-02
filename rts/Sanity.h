@@ -31,22 +31,7 @@ extern StgOffset checkClosure  ( StgClosure* p );
 extern void checkMutableList   ( bdescr *bd, nat gen );
 extern void checkMutableLists ( rtsBool checkTSOs );
 
-#if defined(GRAN)
-extern void checkTSOsSanity(void);
-extern rtsBool checkThreadQSanity (PEs proc, rtsBool check_TSO_too);
-extern rtsBool checkThreadQsSanity (rtsBool check_TSO_too);
-#endif
-
-#if defined(PAR)
-extern void checkBQ (StgBlockingQueueElement *bqe, StgClosure *closure);
-#else
 extern void checkBQ (StgTSO *bqe, StgClosure *closure);
-#endif
-
-#if defined(PAR)
-extern void checkLAGAtable(rtsBool check_closures);
-extern void checkHeapChunk(StgPtr start, StgPtr end);
-#endif
 
 /* test whether an object is already on update list */
 extern rtsBool isBlackhole( StgTSO* tso, StgClosure* p );

@@ -9,19 +9,10 @@
 #ifndef THREADS_H
 #define THREADS_H
 
-#if defined(GRAN) || defined(PARALLEL_HASKELL)
-StgBlockingQueueElement * unblockOne (StgBlockingQueueElement *bqe, 
-				      StgClosure *node);
-#else
 StgTSO * unblockOne (Capability *cap, StgTSO *tso);
 StgTSO * unblockOne_ (Capability *cap, StgTSO *tso, rtsBool allow_migrate);
-#endif
 
-#if defined(GRAN) || defined(PARALLEL_HASKELL)
-void awakenBlockedQueue(StgBlockingQueueElement *q, StgClosure *node);
-#else
 void awakenBlockedQueue (Capability *cap, StgTSO *tso);
-#endif
 
 void removeThreadFromMVarQueue (Capability *cap, StgMVar *mvar, StgTSO *tso);
 void removeThreadFromQueue     (Capability *cap, StgTSO **queue, StgTSO *tso);

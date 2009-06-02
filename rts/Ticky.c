@@ -38,33 +38,21 @@ PrintTickyInfo(void)
   unsigned long tot_allocs = /* total number of things allocated */
 	ALLOC_FUN_ctr + ALLOC_SE_THK_ctr + ALLOC_UP_THK_ctr + ALLOC_CON_ctr + ALLOC_TUP_ctr +
     	+ ALLOC_TSO_ctr + ALLOC_BH_ctr  + ALLOC_PAP_ctr + ALLOC_PRIM_ctr
-#ifdef PAR
-	+ ALLOC_FMBQ_ctr + ALLOC_FME_ctr + ALLOC_BF_ctr
-#endif
       ;	
 
   unsigned long tot_adm_wds = /* total number of admin words allocated */
 	ALLOC_FUN_adm + ALLOC_THK_adm + ALLOC_CON_adm + ALLOC_TUP_adm
     	+ ALLOC_TSO_adm + ALLOC_BH_adm  + ALLOC_PAP_adm + ALLOC_PRIM_adm
-#ifdef PAR
-	+ ALLOC_FMBQ_adm + ALLOC_FME_adm + ALLOC_BF_adm
-#endif
       ;
 
   unsigned long tot_gds_wds = /* total number of words of ``good stuff'' allocated */
 	ALLOC_FUN_gds + ALLOC_THK_gds + ALLOC_CON_gds + ALLOC_TUP_gds
     	+ ALLOC_TSO_gds + ALLOC_BH_gds  + ALLOC_PAP_gds + ALLOC_PRIM_gds
-#ifdef PAR
-	+ ALLOC_FMBQ_gds + ALLOC_FME_gds + ALLOC_BF_gds
-#endif
       ;
 
   unsigned long tot_slp_wds = /* total number of ``slop'' words allocated */
 	ALLOC_FUN_slp + ALLOC_THK_slp + ALLOC_CON_slp + ALLOC_TUP_slp
     	+ ALLOC_TSO_slp + ALLOC_BH_slp  + ALLOC_PAP_slp + ALLOC_PRIM_slp
-#ifdef PAR
-	+ ALLOC_FMBQ_slp + ALLOC_FME_slp + ALLOC_BF_slp
-#endif
       ;
 
   unsigned long tot_wds = /* total words */
@@ -190,23 +178,6 @@ PrintTickyInfo(void)
 	PC(INTAVG(ALLOC_TSO_ctr, tot_allocs)));
   if (ALLOC_TSO_ctr != 0)
       fprintf(tf,"\t\t%5.1f %5.1f %5.1f %5.1f %5.1f", ALLOC_HISTO_MAGIC(TSO));
-#ifdef PAR
-  fprintf(tf,"\n%7ld (%5.1f%%) thread state objects",
-	ALLOC_FMBQ_ctr,
-	PC(INTAVG(ALLOC_FMBQ_ctr, tot_allocs)));
-  if (ALLOC_FMBQ_ctr != 0)
-      fprintf(tf,"\t\t%5.1f %5.1f %5.1f %5.1f %5.1f", ALLOC_HISTO_MAGIC(FMBQ));
-  fprintf(tf,"\n%7ld (%5.1f%%) thread state objects",
-	ALLOC_FME_ctr,
-	PC(INTAVG(ALLOC_FME_ctr, tot_allocs)));
-  if (ALLOC_FME_ctr != 0)
-      fprintf(tf,"\t\t%5.1f %5.1f %5.1f %5.1f %5.1f", ALLOC_HISTO_MAGIC(FME));
-  fprintf(tf,"\n%7ld (%5.1f%%) thread state objects",
-	ALLOC_BF_ctr,
-	PC(INTAVG(ALLOC_BF_ctr, tot_allocs)));
-  if (ALLOC_BF_ctr != 0)
-      fprintf(tf,"\t\t%5.1f %5.1f %5.1f %5.1f %5.1f", ALLOC_HISTO_MAGIC(BF));
-#endif
 
   fprintf(tf,"\n");
 
@@ -419,36 +390,6 @@ PrintTickyInfo(void)
   PR_HST(ALLOC_TSO_hst,2);
   PR_HST(ALLOC_TSO_hst,3);
   PR_HST(ALLOC_TSO_hst,4);
-
-#ifdef PAR
-  PR_CTR(ALLOC_FMBQ_ctr);
-  PR_CTR(ALLOC_FMBQ_adm);
-  PR_CTR(ALLOC_FMBQ_gds);
-  PR_CTR(ALLOC_FMBQ_slp);
-  PR_HST(ALLOC_FMBQ_hst,0);
-  PR_HST(ALLOC_FMBQ_hst,1);
-  PR_HST(ALLOC_FMBQ_hst,2);
-  PR_HST(ALLOC_FMBQ_hst,3);
-  PR_HST(ALLOC_FMBQ_hst,4);
-  PR_CTR(ALLOC_FME_ctr);
-  PR_CTR(ALLOC_FME_adm);
-  PR_CTR(ALLOC_FME_gds);
-  PR_CTR(ALLOC_FME_slp);
-  PR_HST(ALLOC_FME_hst,0);
-  PR_HST(ALLOC_FME_hst,1);
-  PR_HST(ALLOC_FME_hst,2);
-  PR_HST(ALLOC_FME_hst,3);
-  PR_HST(ALLOC_FME_hst,4);
-  PR_CTR(ALLOC_BF_ctr);
-  PR_CTR(ALLOC_BF_adm);
-  PR_CTR(ALLOC_BF_gds);
-  PR_CTR(ALLOC_BF_slp);
-  PR_HST(ALLOC_BF_hst,0);
-  PR_HST(ALLOC_BF_hst,1);
-  PR_HST(ALLOC_BF_hst,2);
-  PR_HST(ALLOC_BF_hst,3);
-  PR_HST(ALLOC_BF_hst,4);
-#endif
   */
 
   PR_CTR(ENT_VIA_NODE_ctr);

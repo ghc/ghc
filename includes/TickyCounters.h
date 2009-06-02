@@ -159,19 +159,6 @@ EXTERN StgInt RET_SEMI_loads_avoided INIT(0);
 
 /* End of counter declarations. */
 
-/* Here are stubs for a bunch of macros that aren't 
-   implemented yet. */
-
-#define TICK_ALLOC_FUN(g,s)
-#define TICK_ALLOC_CON(g,s)
-#define TICK_ALLOC_TUP(g,s)
-#define TICK_ALLOC_BH(g,s)
-#define TICK_ALLOC_PAP(g,s)
-#define TICK_ALLOC_FMBQ(a,g,s)
-#define TICK_ALLOC_FME(a,g,s)
-#define TICK_ALLOC_BF(a,g,s)
-#define TICK_ALLOC_PRIM2(w)
-
 #endif /* TICKY_TICKY */
 
 /* This is ugly, but the story is:

@@ -258,14 +258,10 @@ Size of a closure header.
 
 \begin{code}
 fixedHdrSize :: WordOff
-fixedHdrSize = sTD_HDR_SIZE + profHdrSize + granHdrSize
+fixedHdrSize = sTD_HDR_SIZE + profHdrSize
 
 profHdrSize  :: WordOff
 profHdrSize  | opt_SccProfilingOn   = pROF_HDR_SIZE
-	     | otherwise	    = 0
-
-granHdrSize  :: WordOff
-granHdrSize  | opt_GranMacros	    = gRAN_HDR_SIZE
 	     | otherwise	    = 0
 
 arrWordsHdrSize   :: ByteOff

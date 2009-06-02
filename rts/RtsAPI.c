@@ -497,11 +497,7 @@ StgTSO *
 createGenThread (Capability *cap, nat stack_size,  StgClosure *closure)
 {
   StgTSO *t;
-#if defined(GRAN)
-  t = createThread (cap, stack_size, NO_PRI);
-#else
   t = createThread (cap, stack_size);
-#endif
   pushClosure(t, (W_)closure);
   pushClosure(t, (W_)&stg_enter_info);
   return t;
@@ -511,11 +507,7 @@ StgTSO *
 createIOThread (Capability *cap, nat stack_size,  StgClosure *closure)
 {
   StgTSO *t;
-#if defined(GRAN)
-  t = createThread (cap, stack_size, NO_PRI);
-#else
   t = createThread (cap, stack_size);
-#endif
   pushClosure(t, (W_)&stg_noforceIO_info);
   pushClosure(t, (W_)&stg_ap_v_info);
   pushClosure(t, (W_)closure);
@@ -532,11 +524,7 @@ StgTSO *
 createStrictIOThread(Capability *cap, nat stack_size,  StgClosure *closure)
 {
   StgTSO *t;
-#if defined(GRAN)
-  t = createThread(cap, stack_size, NO_PRI);
-#else
   t = createThread(cap, stack_size);
-#endif
   pushClosure(t, (W_)&stg_forceIO_info);
   pushClosure(t, (W_)&stg_ap_v_info);
   pushClosure(t, (W_)closure);

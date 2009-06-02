@@ -64,6 +64,7 @@ Rts.h
     StgDLL.h		/* stuff related to Windows DLLs */
     MachRegs.h		/* global register assignments for this arch */
     Regs.h		/* "registers" in the virtual machine */
+    TickyCounters.h
     StgMiscClosures.h	/* decls for closures & info tables in the RTS */
     SMP.h               /* basic primitives for synchronisation */
 

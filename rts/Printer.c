@@ -22,12 +22,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#if defined(GRAN) || defined(PAR)
-// HWL: explicit fixed header size to make debugging easier
-int fixed_hs = sizeof(StgHeader), itbl_sz = sizeofW(StgInfoTable), 
-    uf_sz=sizeofW(StgUpdateFrame); 
-#endif
-
 /* --------------------------------------------------------------------------
  * local function decls
  * ------------------------------------------------------------------------*/
@@ -375,50 +369,11 @@ printClosure( StgClosure *obj )
       debugBelch(")\n"); 
       break;
 
-#if defined(PAR)
-    case BLOCKED_FETCH:
-      debugBelch("BLOCKED_FETCH("); 
-      printGA(&(stgCast(StgBlockedFetch*,obj)->ga));
-      printPtr((StgPtr)(stgCast(StgBlockedFetch*,obj)->node));
-      debugBelch(")\n"); 
-      break;
-
-    case FETCH_ME:
-      debugBelch("FETCH_ME("); 
-      printGA((globalAddr *)stgCast(StgFetchMe*,obj)->ga);
-      debugBelch(")\n"); 
-      break;
-
-    case FETCH_ME_BQ:
-      debugBelch("FETCH_ME_BQ("); 
-      // printGA((globalAddr *)stgCast(StgFetchMe*,obj)->ga);
-      printPtr((StgPtr)stgCast(StgFetchMeBlockingQueue*,obj)->blocking_queue);
-      debugBelch(")\n"); 
-      break;
-#endif
-
-#if defined(GRAN) || defined(PAR)
-    case RBH:
-      debugBelch("RBH("); 
-      printPtr((StgPtr)stgCast(StgRBH*,obj)->blocking_queue);
-      debugBelch(")\n"); 
-      break;
-
-#endif
-
 #if 0
       /* Symptomatic of a problem elsewhere, have it fall-through & fail */
     case EVACUATED:
       debugBelch("EVACUATED("); 
       printClosure((StgEvacuated*)obj->evacuee);
-      debugBelch(")\n"); 
-      break;
-#endif
-
-#if defined(PAR) && defined(DIST)
-    case REMOTE_REF:
-      debugBelch("REMOTE_REF("); 
-      printGA((globalAddr *)stgCast(StgFetchMe*,obj)->ga);
       debugBelch(")\n"); 
       break;
 #endif

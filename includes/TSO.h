@@ -33,40 +33,11 @@ typedef struct {
 } StgTSOStatBuf;
 
 /*
- * GRAN: We distinguish between the various classes of threads in 
- * the system.
- */
-typedef enum {
-  AdvisoryPriority,
-  MandatoryPriority,
-  RevalPriority
-} StgThreadPriority;
-
-/*
  * PROFILING info in a TSO
  */
 typedef struct {
   CostCentreStack *CCCS;	/* thread's current CCS */
 } StgTSOProfInfo;
-
-/*
- * PAR info in a TSO
- */
-typedef StgTSOStatBuf StgTSOParInfo;
-
-/*
- * DIST info in a TSO
- */
-typedef struct {
-  StgThreadPriority  priority;   
-  StgInt             revalTid;   /* ToDo: merge both into 1 word */
-  StgInt             revalSlot;
-} StgTSODistInfo;
-
-/*
- * GRAN info in a TSO
- */
-typedef StgTSOStatBuf StgTSOGranInfo;
 
 /*
  * There is no TICKY info in a TSO at this time.
@@ -164,15 +135,6 @@ typedef struct StgTSO_ {
 #ifdef PROFILING
     StgTSOProfInfo prof;
 #endif
-#ifdef PAR
-    StgTSOParInfo par;
-#endif
-#ifdef GRAN
-    StgTSOGranInfo gran;
-#endif
-#ifdef DIST
-    StgTSODistInfo dist;
-#endif
 #ifdef mingw32_HOST_OS
     StgWord32 saved_winerror;
 #endif
@@ -260,16 +222,7 @@ extern StgTSO dummy_tso;
 
 #define TSO_STRUCT_SIZEW (TSO_STRUCT_SIZE / sizeof(W_))
 
-
 /* this is the NIL ptr for a TSO queue (e.g. runnable queue) */
 #define END_TSO_QUEUE  ((StgTSO *)(void*)&stg_END_TSO_QUEUE_closure)
-
-#if defined(PAR) || defined(GRAN)
-/* this is the NIL ptr for a blocking queue */
-# define END_BQ_QUEUE  ((StgBlockingQueueElement *)(void*)&stg_END_TSO_QUEUE_closure)
-/* this is the NIL ptr for a blocked fetch queue (as in PendingFetches in GUM) */
-# define END_BF_QUEUE  ((StgBlockedFetch *)(void*)&stg_END_TSO_QUEUE_closure)
-#endif
-/* ToDo?: different name for end of sleeping queue ? -- HWL */
 
 #endif /* TSO_H */

@@ -107,9 +107,6 @@ sTD_HDR_SIZE = STD_HDR_SIZE
 
 pROF_HDR_SIZE :: Int
 pROF_HDR_SIZE = PROF_HDR_SIZE
-
-gRAN_HDR_SIZE :: Int
-gRAN_HDR_SIZE = GRAN_HDR_SIZE
 \end{code}
 
 Size of a double in StgWords.

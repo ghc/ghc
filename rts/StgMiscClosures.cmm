@@ -289,11 +289,6 @@ INFO_TABLE(stg_IND_OLDGEN_PERM,1,0,IND_OLDGEN_PERM,"IND_OLDGEN_PERM","IND_OLDGEN
  */
 INFO_TABLE(stg_BLACKHOLE,0,1,BLACKHOLE,"BLACKHOLE","BLACKHOLE")
 {
-#if defined(GRAN)
-    /* Before overwriting TSO_LINK */
-    STGCALL3(GranSimBlock,CurrentTSO,CurrentProc,(StgClosure *)R1 /*Node*/);
-#endif
-
     TICK_ENT_BH();
 
 #ifdef THREADED_RTS
@@ -319,48 +314,9 @@ INFO_TABLE(stg_BLACKHOLE,0,1,BLACKHOLE,"BLACKHOLE","BLACKHOLE")
     jump stg_block_blackhole;
 }
 
-#if defined(PAR) || defined(GRAN)
-
-INFO_TABLE(stg_RBH,1,1,RBH,"RBH","RBH")
-{
-# if defined(GRAN)
-    /* mainly statistics gathering for GranSim simulation */
-    STGCALL3(GranSimBlock,CurrentTSO,CurrentProc,(StgClosure *)R1 /*Node*/);
-# endif
-
-    /* exactly the same as a BLACKHOLE_BQ_entry -- HWL */
-    /* Put ourselves on the blocking queue for this black hole */
-    TSO_link(CurrentTSO) = StgBlockingQueue_blocking_queue(R1);
-    StgBlockingQueue_blocking_queue(R1) = CurrentTSO;
-    /* jot down why and on what closure we are blocked */
-    TSO_why_blocked(CurrentTSO) = BlockedOnBlackHole::I16;
-    TSO_block_info(CurrentTSO) = R1;
-
-    /* PAR: dumping of event now done in blockThread -- HWL */
-
-    /* stg_gen_block is too heavyweight, use a specialised one */
-    jump stg_block_1;
-}
-
-INFO_TABLE(stg_RBH_Save_0,0,2,CONSTR,"RBH_Save_0","RBH_Save_0")
-{ foreign "C" barf("RBH_Save_0 object entered!") never returns; }
-
-INFO_TABLE(stg_RBH_Save_1,1,1,CONSTR,"RBH_Save_1","RBH_Save_1");
-{ foreign "C" barf("RBH_Save_1 object entered!") never returns; }
-
-INFO_TABLE(stg_RBH_Save_2,2,0,CONSTR,"RBH_Save_2","RBH_Save_2");
-{ foreign "C" barf("RBH_Save_2 object entered!") never returns; }
-
-#endif /* defined(PAR) || defined(GRAN) */
-
 /* identical to BLACKHOLEs except for the infotag */
 INFO_TABLE(stg_CAF_BLACKHOLE,0,1,CAF_BLACKHOLE,"CAF_BLACKHOLE","CAF_BLACKHOLE")
 {
-#if defined(GRAN)
-    /* mainly statistics gathering for GranSim simulation */
-    STGCALL3(GranSimBlock,CurrentTSO,CurrentProc,(StgClosure *)R1 /*Node*/);
-#endif
-
     TICK_ENT_BH();
     LDV_ENTER(R1);
 

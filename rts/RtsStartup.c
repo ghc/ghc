@@ -47,19 +47,6 @@
 # include "RetainerProfile.h"
 #endif
 
-#if defined(GRAN)
-# include "GranSimRts.h"
-#endif
-
-#if defined(GRAN) || defined(PAR)
-# include "ParallelRts.h"
-#endif
-
-#if defined(PAR)
-# include "Parallel.h"
-# include "LLC.h"
-#endif
-
 #if defined(mingw32_HOST_OS) && !defined(THREADED_RTS)
 #include "win32/AsyncIO.h"
 #endif
@@ -158,22 +145,6 @@ hs_init(int *argc, char **argv[])
     initAllocator();
 #endif
 
-#ifdef PAR
-    /*
-     * The parallel system needs to be initialised and synchronised before
-     * the program is run.  
-     */ 
-    startupParallelSystem(argv);
-     
-    if (*argv[0] == '-') { /* Strip off mainPE flag argument */
-      argv++; 
-      argc--;			
-    }
-
-    argv[1] = argv[0];   /* ignore the nPEs argument */
-    argv++; argc--;
-#endif
-
     /* Set the RTS flags to default values. */
 
     initRtsFlagsDefaults();
@@ -200,27 +171,10 @@ hs_init(int *argc, char **argv[])
     initTracing();
 #endif
 
-#if defined(PAR)
-    /* NB: this really must be done after processing the RTS flags */
-    IF_PAR_DEBUG(verbose,
-                 debugBelch("==== Synchronising system (%d PEs)\n", nPEs));
-    synchroniseSystem();             // calls initParallelSystem etc
-#endif	/* PAR */
-
     /* initialise scheduler data structures (needs to be done before
      * initStorage()).
      */
     initScheduler();
-
-#if defined(GRAN)
-    /* And start GranSim profiling if required: */
-    if (RtsFlags.GranFlags.GranSimStats.Full)
-      init_gr_simulation(rts_argc, rts_argv, prog_argc, prog_argv);
-#elif defined(PAR)
-    /* And start GUM profiling if required: */
-    if (RtsFlags.ParFlags.ParStats.Full)
-      init_gr_simulation(rts_argc, rts_argv, prog_argc, prog_argv);
-#endif	/* PAR || GRAN */
 
     /* initialize the storage manager */
     initStorage();
@@ -427,12 +381,6 @@ hs_exit_(rtsBool wait_foreign)
     }
 #endif
 
-#if defined(GRAN)
-    /* end_gr_simulation prints global stats if requested -- HWL */
-    if (!RtsFlags.GranFlags.GranSimStats.Suppressed)
-	end_gr_simulation();
-#endif
-    
     /* stop the ticker */
     stopTimer();
     exitTimer();
@@ -461,14 +409,6 @@ hs_exit_(rtsBool wait_foreign)
 	}
 	sigprocmask(SIG_SETMASK, &old_sigset, NULL);
     }
-#endif
-
-#if defined(PAR)
-    /* controlled exit; good thread! */
-    shutdownParallelSystem(0);
-    
-    /* global statistics in parallel system */
-    PAR_TICKY_PAR_END();
 #endif
 
     // uninstall signal handlers
@@ -573,12 +513,7 @@ shutdownHaskellAndExit(int n)
     hs_exit_(rtsFalse);
 
     if (hs_init_count == 0) {
-#if defined(PAR)
-	/* really exit (stg_exit() would call shutdownParallelSystem() again) */
-	exit(n);
-#else
 	stg_exit(n);
-#endif
     }
 }
 
@@ -595,24 +530,11 @@ shutdownHaskellAndSignal(int sig)
  * called from STG-land to exit the program
  */
 
-#ifdef PAR
-static int exit_started=rtsFalse;
-#endif
-
 void (*exitFn)(int) = 0;
 
 void  
 stg_exit(int n)
 { 
-#ifdef PAR
-  /* HACK: avoid a loop when exiting due to a stupid error */
-  if (exit_started) 
-    return;
-  exit_started=rtsTrue;
-
-  IF_PAR_DEBUG(verbose, debugBelch("==-- stg_exit %d on [%x]...", n, mytid));
-  shutdownParallelSystem(n);
-#endif
   if (exitFn)
     (*exitFn)(n);
   exit(n);

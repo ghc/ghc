@@ -168,7 +168,7 @@
 
 /* Full byte offset for a TSO field, for use from Cmm */
 #define tso_field_offset_macro(str) \
-    printf("#define TSO_OFFSET_" str " (SIZEOF_StgHeader+SIZEOF_OPT_StgTSOProfInfo+SIZEOF_OPT_StgTSOParInfo+SIZEOF_OPT_StgTSOGranInfo+SIZEOF_OPT_StgTSODistInfo+OFFSET_" str ")\n");
+    printf("#define TSO_OFFSET_" str " (SIZEOF_StgHeader+SIZEOF_OPT_StgTSOProfInfo+OFFSET_" str ")\n");
 
 #define tso_field_offset(s_type, field) \
     tso_payload_offset(s_type, field);  	\
@@ -200,7 +200,6 @@ main(int argc, char *argv[])
     printf("#define STD_HDR_SIZE   %lu\n", (unsigned long)sizeofW(StgHeader) - sizeofW(StgProfHeader));
     /* grrr.. PROFILING is on so we need to subtract sizeofW(StgProfHeader) */
     printf("#define PROF_HDR_SIZE  %lu\n", (unsigned long)sizeofW(StgProfHeader));
-    printf("#define GRAN_HDR_SIZE  %lu\n", (unsigned long)sizeofW(StgGranHeader));
 
     printf("#define BLOCK_SIZE   %u\n", BLOCK_SIZE);
     printf("#define MBLOCK_SIZE   %u\n", MBLOCK_SIZE);
@@ -309,14 +308,8 @@ main(int argc, char *argv[])
     tso_field(StgTSO, stack_size);
 
     struct_size(StgTSOProfInfo);
-    struct_size(StgTSOParInfo);
-    struct_size(StgTSOGranInfo);
-    struct_size(StgTSODistInfo);
 
     opt_struct_size(StgTSOProfInfo,PROFILING);
-    opt_struct_size(StgTSOParInfo,PAR);
-    opt_struct_size(StgTSOGranInfo,GRAN);
-    opt_struct_size(StgTSODistInfo,DIST);
 
     closure_field(StgUpdateFrame, updatee);
 

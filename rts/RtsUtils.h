@@ -40,10 +40,6 @@ extern nat stg_strlen(char *str);
 extern char *time_str(void);
 extern char *ullong_format_string(ullong, char *, rtsBool);
 
-#ifdef PAR
-extern ullong msTime(void);
-#endif
-
 #ifdef DEBUG
 extern void heapCheckFail( void );
 #endif

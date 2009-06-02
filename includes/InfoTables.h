@@ -54,70 +54,6 @@ typedef struct {
 } StgProfInfo;
 
 /* -----------------------------------------------------------------------------
-   Parallelism info
-   -------------------------------------------------------------------------- */
-
-#if 0 && (defined(PAR) || defined(GRAN))
-
-/* CURRENTLY UNUSED
-   ToDo: use this in StgInfoTable (mutually recursive) -- HWL */
-
-typedef struct {
-  StgInfoTable *rbh_infoptr;     /* infoptr to the RBH  */
-} StgParInfo;
-
-#endif /* 0 */
-
-/*
-   Copied from ghc-0.29; ToDo: check this code -- HWL
-
-   In the parallel system, all updatable closures have corresponding
-   revertible black holes.  When we are assembly-mangling, we guarantee
-   that the revertible black hole code precedes the normal entry code, so
-   that the RBH info table resides at a fixed offset from the normal info
-   table.  Otherwise, we add the RBH info table pointer to the end of the
-   normal info table and vice versa.
-
-   Currently has to use a !RBH_MAGIC_OFFSET setting.
-   Still todo: init of par.infoptr field in all infotables!!
-*/
-
-#if defined(PAR) || defined(GRAN)
-
-# ifdef RBH_MAGIC_OFFSET
-
-#  error magic offset not yet implemented
-
-#  define RBH_INFO_WORDS    0
-#  define INCLUDE_RBH_INFO(infoptr)
-
-#  define RBH_INFOPTR(infoptr)	    (((P_)infoptr) - RBH_MAGIC_OFFSET)
-#  define REVERT_INFOPTR(infoptr)   (((P_)infoptr) + RBH_MAGIC_OFFSET)
-
-# else
-
-#  define RBH_INFO_WORDS    1
-#  define INCLUDE_RBH_INFO(info)    rbh_infoptr : &(info)
-
-#  define RBH_INFOPTR(infoptr)	    (((StgInfoTable *)(infoptr))->rbh_infoptr)
-#  define REVERT_INFOPTR(infoptr)   (((StgInfoTable *)(infoptr))->rbh_infoptr)
-
-# endif
-
-/* see ParallelRts.h */
-/*
-EXTFUN(RBH_entry);
-StgClosure *convertToRBH(StgClosure *closure);
-#if defined(GRAN)
-void convertFromRBH(StgClosure *closure);
-#elif defined(PAR)
-void convertToFetchMe(StgPtr closure, globalAddr *ga);
-#endif
-*/
-
-#endif
-
-/* -----------------------------------------------------------------------------
    Ticky info
 
    There is no ticky-specific stuff in an info table at this time.
@@ -282,9 +218,6 @@ typedef struct _StgInfoTable {
     StgFunPtr       entry;	/* pointer to the entry code */
 #endif
 
-#if defined(PAR) || defined(GRAN)
-    struct _StgInfoTable    *rbh_infoptr;
-#endif
 #ifdef PROFILING
     StgProfInfo     prof;
 #endif

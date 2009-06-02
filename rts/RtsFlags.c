@@ -40,57 +40,6 @@ char   *rts_argv[MAX_RTS_ARGS];
 #define RTS 1
 #define PGM 0
 
-#if defined(GRAN)
-
-static char *gran_debug_opts_strs[] = {
-  "DEBUG (-bDe, -bD1): event_trace; printing event trace.\n",
-  "DEBUG (-bDE, -bD2): event_stats; printing event statistics.\n",
-  "DEBUG (-bDb, -bD4): bq; check blocking queues\n",
-  "DEBUG (-bDG, -bD8): pack; routines for (un-)packing graph structures.\n",
-  "DEBUG (-bDq, -bD16): checkSparkQ; check consistency of the spark queues.\n",
-  "DEBUG (-bDf, -bD32): thunkStealing; print forwarding of fetches.\n",
-  "DEBUG (-bDr, -bD64): randomSteal; stealing sparks/threads from random PEs.\n",
-  "DEBUG (-bDF, -bD128): findWork; searching spark-pools (local & remote), thread queues for work.\n",
-  "DEBUG (-bDu, -bD256): unused; currently unused flag.\n",
-  "DEBUG (-bDS, -bD512): pri; priority sparking or scheduling.\n",
-  "DEBUG (-bD:, -bD1024): checkLight; check GranSim-Light setup.\n",
-  "DEBUG (-bDo, -bD2048): sortedQ; check whether spark/thread queues are sorted.\n",
-  "DEBUG (-bDz, -bD4096): blockOnFetch; check for blocked on fetch.\n",
-  "DEBUG (-bDP, -bD8192): packBuffer; routines handling pack buffer (GranSim internal!).\n",
-  "DEBUG (-bDt, -bD16384): blockOnFetch_sanity; check for TSO asleep on fetch.\n",
-};
-
-/* one character codes for the available debug options */
-static char gran_debug_opts_flags[] = {
-  'e', 'E', 'b', 'G', 'q', 'f', 'r', 'F', 'u', 'S', ':', 'o', 'z', 'P', 't'
-};
-
-#elif defined(PAR)
-
-static char *par_debug_opts_strs[] = {
-  "DEBUG (-qDv, -qD1): verbose; be generally verbose with parallel related stuff.\n",
-  "DEBUG (-qDq, -qD2): bq; print blocking queues.\n",
-  "DEBUG (-qDs, -qD4): schedule; scheduling of parallel threads.\n",
-  "DEBUG (-qDe, -qD8): free; free messages.\n",
-  "DEBUG (-qDr, -qD16): resume; resume messages.\n",
-  "DEBUG (-qDw, -qD32): weight; print weights and distrib GC stuff.\n",
-  "DEBUG (-qDF, -qD64): fetch; fetch messages.\n",
-  // "DEBUG (-qDa, -qD128): ack; ack messages.\n",
-  "DEBUG (-qDf, -qD128): fish; fish messages.\n",
-  //"DEBUG (-qDo, -qD512): forward; forwarding messages to other PEs.\n",
-  "DEBUG (-qDl, -qD256): tables; print internal LAGA etc tables.\n",
-  "DEBUG (-qDo, -qD512): packet; packets and graph structures when packing.\n",
-  "DEBUG (-qDp, -qD1024): pack; packing and unpacking graphs.\n",
-  "DEBUG (-qDz, -qD2048): paranoia; ridiculously detailed output (excellent for filling a partition).\n"
-};
-
-/* one character codes for the available debug options */
-static char par_debug_opts_flags[] = {
-  'v', 'q', 's', 'e', 'r', 'w', 'F', 'f', 'l', 'o', 'p', 'z'
-};
-
-#endif /* PAR */
-
 /* -----------------------------------------------------------------------------
    Static function decls
    -------------------------------------------------------------------------- */
@@ -105,17 +54,6 @@ open_stats_file (
 
 static I_ decode(const char *s);
 static void bad_option(const char *s);
-
-#if defined(GRAN)
-static void enable_GranSimLight(void);
-static void process_gran_option(int arg, int *rts_argc, char *rts_argv[], rtsBool *error);
-static void set_GranSim_debug_options(nat n);
-static void help_GranSim_debug_options(nat n);
-#elif defined(PAR)
-static void process_par_option(int arg, int *rts_argc, char *rts_argv[], rtsBool *error);
-static void set_par_debug_options(nat n);
-static void help_par_debug_options(nat n);
-#endif
 
 /* -----------------------------------------------------------------------------
  * Command-line option parsing routines.
@@ -135,16 +73,9 @@ void initRtsFlagsDefaults(void)
     RtsFlags.GcFlags.heapSizeSuggestion	= 0;    /* none */
     RtsFlags.GcFlags.pcFreeHeap		= 3;	/* 3% */
     RtsFlags.GcFlags.oldGenFactor       = 2;
-#if defined(PAR)
-    /* A hack currently needed for GUM -- HWL */
-    RtsFlags.GcFlags.generations        = 1;
-    RtsFlags.GcFlags.steps              = 2;
-    RtsFlags.GcFlags.squeezeUpdFrames	= rtsFalse;
-#else
     RtsFlags.GcFlags.generations        = 2;
     RtsFlags.GcFlags.steps              = 2;
     RtsFlags.GcFlags.squeezeUpdFrames	= rtsTrue;
-#endif
     RtsFlags.GcFlags.compact            = rtsFalse;
     RtsFlags.GcFlags.compactThreshold   = 30.0;
     RtsFlags.GcFlags.sweep              = rtsFalse;
@@ -177,8 +108,6 @@ void initRtsFlagsDefaults(void)
     RtsFlags.DebugFlags.stm             = rtsFalse;
     RtsFlags.DebugFlags.prof		= rtsFalse;
     RtsFlags.DebugFlags.eventlog        = rtsFalse;
-    RtsFlags.DebugFlags.gran		= rtsFalse;
-    RtsFlags.DebugFlags.par		= rtsFalse;
     RtsFlags.DebugFlags.apply		= rtsFalse;
     RtsFlags.DebugFlags.linker		= rtsFalse;
     RtsFlags.DebugFlags.squeeze		= rtsFalse;
@@ -186,9 +115,9 @@ void initRtsFlagsDefaults(void)
     RtsFlags.DebugFlags.timestamp	= rtsFalse;
 #endif
 
-#if defined(PROFILING) || defined(PAR)
+#if defined(PROFILING)
     RtsFlags.CcFlags.doCostCentres	= 0;
-#endif /* PROFILING or PAR */
+#endif /* PROFILING */
 
     RtsFlags.ProfFlags.doHeapProfile      = rtsFalse;
     RtsFlags.ProfFlags.profileInterval    = 100;
@@ -228,100 +157,9 @@ void initRtsFlagsDefaults(void)
     RtsFlags.ParFlags.setAffinity       = 0;
 #endif
 
-#ifdef PAR
-    RtsFlags.ParFlags.ParStats.Full   	  = rtsFalse;
-    RtsFlags.ParFlags.ParStats.Suppressed = rtsFalse;
-    RtsFlags.ParFlags.ParStats.Binary 	  = rtsFalse;
-    RtsFlags.ParFlags.ParStats.Sparks 	  = rtsFalse;
-    RtsFlags.ParFlags.ParStats.Heap   	  = rtsFalse;
-    RtsFlags.ParFlags.ParStats.NewLogfile = rtsFalse;
-    RtsFlags.ParFlags.ParStats.Global     = rtsFalse;
-
-    RtsFlags.ParFlags.outputDisabled	= rtsFalse;
-#ifdef DIST
-    RtsFlags.ParFlags.doFairScheduling  = rtsTrue;  /* fair sched by def */
-#else
-    RtsFlags.ParFlags.doFairScheduling  = rtsFalse;  /* unfair sched by def */
-#endif
-    RtsFlags.ParFlags.packBufferSize	= 1024;
-    RtsFlags.ParFlags.thunksToPack      = 1; /* 0 ... infinity; */
-    RtsFlags.ParFlags.globalising       = 1; /* 0 ... everything */
-    RtsFlags.ParFlags.maxThreads        = 1024;
-    RtsFlags.ParFlags.maxFishes        = MAX_FISHES;
-    RtsFlags.ParFlags.fishDelay         = FISH_DELAY;
-#endif
-
-#if defined(PAR) || defined(THREADED_RTS)
+#if defined(THREADED_RTS)
     RtsFlags.ParFlags.maxLocalSparks	= 4096;
-#endif /* PAR || THREADED_RTS */
-
-#if defined(GRAN)
-    /* ToDo: check defaults for GranSim and GUM */
-    RtsFlags.GcFlags.maxStkSize		= (8 * 1024 * 1024) / sizeof(W_);
-    RtsFlags.GcFlags.initialStkSize	= 1024 / sizeof(W_);
-
-    RtsFlags.GranFlags.maxThreads	= 65536; // refers to mandatory threads
-    RtsFlags.GranFlags.GranSimStats.Full	= rtsFalse;
-    RtsFlags.GranFlags.GranSimStats.Suppressed	= rtsFalse;
-    RtsFlags.GranFlags.GranSimStats.Binary      = rtsFalse;
-    RtsFlags.GranFlags.GranSimStats.Sparks      = rtsFalse;
-    RtsFlags.GranFlags.GranSimStats.Heap        = rtsFalse;
-    RtsFlags.GranFlags.GranSimStats.NewLogfile  = rtsFalse;
-    RtsFlags.GranFlags.GranSimStats.Global      = rtsFalse;
-
-    RtsFlags.GranFlags.packBufferSize	= 1024;
-    RtsFlags.GranFlags.packBufferSize_internal = GRANSIM_DEFAULT_PACK_BUFFER_SIZE;
-
-    RtsFlags.GranFlags.proc         = MAX_PROC;
-    RtsFlags.GranFlags.Fishing      = rtsFalse;
-    RtsFlags.GranFlags.maxFishes   = MAX_FISHES;
-    RtsFlags.GranFlags.time_slice   = GRAN_TIME_SLICE;
-    RtsFlags.GranFlags.Light        = rtsFalse;
-
-    RtsFlags.GranFlags.Costs.latency =             LATENCY;          
-    RtsFlags.GranFlags.Costs.additional_latency =  ADDITIONAL_LATENCY; 
-    RtsFlags.GranFlags.Costs.fetchtime =           FETCHTIME; 
-    RtsFlags.GranFlags.Costs.lunblocktime =        LOCALUNBLOCKTIME; 
-    RtsFlags.GranFlags.Costs.gunblocktime =        GLOBALUNBLOCKTIME;
-    RtsFlags.GranFlags.Costs.mpacktime =           MSGPACKTIME;      
-    RtsFlags.GranFlags.Costs.munpacktime =         MSGUNPACKTIME;
-    RtsFlags.GranFlags.Costs.mtidytime =           MSGTIDYTIME;
-
-    RtsFlags.GranFlags.Costs.threadcreatetime =         THREADCREATETIME;
-    RtsFlags.GranFlags.Costs.threadqueuetime =          THREADQUEUETIME;
-    RtsFlags.GranFlags.Costs.threaddescheduletime =     THREADDESCHEDULETIME;
-    RtsFlags.GranFlags.Costs.threadscheduletime =       THREADSCHEDULETIME;
-    RtsFlags.GranFlags.Costs.threadcontextswitchtime =  THREADCONTEXTSWITCHTIME;
-
-    RtsFlags.GranFlags.Costs.arith_cost =         ARITH_COST;       
-    RtsFlags.GranFlags.Costs.branch_cost =        BRANCH_COST; 
-    RtsFlags.GranFlags.Costs.load_cost =          LOAD_COST;        
-    RtsFlags.GranFlags.Costs.store_cost =         STORE_COST; 
-    RtsFlags.GranFlags.Costs.float_cost =         FLOAT_COST;       
-
-    RtsFlags.GranFlags.Costs.heapalloc_cost =     HEAPALLOC_COST;
-
-    RtsFlags.GranFlags.Costs.pri_spark_overhead = PRI_SPARK_OVERHEAD;        
-    RtsFlags.GranFlags.Costs.pri_sched_overhead = PRI_SCHED_OVERHEAD;        
-
-    RtsFlags.GranFlags.DoFairSchedule           = rtsFalse;             
-    RtsFlags.GranFlags.DoAsyncFetch             = rtsFalse;        
-    RtsFlags.GranFlags.DoStealThreadsFirst      = rtsFalse;        
-    RtsFlags.GranFlags.DoAlwaysCreateThreads    = rtsFalse;      
-    RtsFlags.GranFlags.DoBulkFetching           = rtsFalse;             
-    RtsFlags.GranFlags.DoThreadMigration        = rtsFalse;          
-    RtsFlags.GranFlags.FetchStrategy            = 2;                     
-    RtsFlags.GranFlags.PreferSparksOfLocalNodes = rtsFalse;   
-    RtsFlags.GranFlags.DoPrioritySparking       = rtsFalse;         
-    RtsFlags.GranFlags.DoPriorityScheduling     = rtsFalse;       
-    RtsFlags.GranFlags.SparkPriority            = 0;
-    RtsFlags.GranFlags.SparkPriority2           = 0; 
-    RtsFlags.GranFlags.RandomPriorities         = rtsFalse;           
-    RtsFlags.GranFlags.InversePriorities        = rtsFalse;          
-    RtsFlags.GranFlags.IgnorePriorities         = rtsFalse;           
-    RtsFlags.GranFlags.ThunksToPack             = 0;                      
-    RtsFlags.GranFlags.RandomSteal              = rtsTrue;
-#endif
+#endif /* THREADED_RTS */
 
 #ifdef TICKY_TICKY
     RtsFlags.TickyFlags.showTickyStats	 = rtsFalse;
@@ -377,7 +215,7 @@ usage_text[] = {
 "",
 "  -Z       Don't squeeze out update frames on stack overflow",
 "  -B       Sound the bell at the start of each garbage collection",
-#if defined(PROFILING) || defined(PAR)
+#if defined(PROFILING)
 "",
 "  -px      Time/allocation profile (XML)  (output file <program>.prof)",
 "  -p       Time/allocation profile        (output file <program>.prof)",
@@ -431,10 +269,6 @@ usage_text[] = {
 "  -r<file>  Produce ticky-ticky statistics (with -rstderr for stderr)",
 "",
 #endif
-#if defined(PAR)
-"  -N<n>     Use <n> PVMish processors in parallel (default: 2)",
-/* NB: the -N<n> is implemented by the driver!! */
-#endif
 "  -C<secs>  Context-switch interval in seconds.",
 "            0 or no argument means switch as often as possible.",
 "            Default: 0.02 sec; resolution is set by -V below.",
@@ -455,8 +289,6 @@ usage_text[] = {
 "  -Dt  DEBUG: stable",
 "  -Dp  DEBUG: prof",
 "  -De  DEBUG: event logging",
-"  -Dr  DEBUG: gran",
-"  -DP  DEBUG: par",
 "  -Da  DEBUG: apply",
 "  -Dl  DEBUG: linker",
 "  -Dm  DEBUG: stm",
@@ -476,25 +308,11 @@ usage_text[] = {
 #endif
 "  --install-signal-handlers=<yes|no>",
 "            Install signal handlers (default: yes)",
-#if defined(THREADED_RTS) || defined(PAR)
+#if defined(THREADED_RTS)
 "  -e<size>  Size of spark pools (default 100)",
 #endif
-#if defined(PAR)
-"  -t<num>   Set maximum number of advisory threads per PE (default 32)",
-"  -qP       Enable activity profile (output files in ~/<program>*.gr)",
-"  -qQ<size> Set pack-buffer size (default: 1024)",
-"  -qd       Turn on PVM-ish debugging",
-"  -qO       Disable output for performance measurement",
-#endif
-#if defined(THREADED_RTS) || defined(PAR)
+#if defined(THREADED_RTS)
 "  -e<n>     Maximum number of outstanding local sparks (default: 4096)",
-#endif
-#if defined(PAR)
-"  -d        Turn on PVM-ish debugging",
-"  -O        Disable output for performance measurement",
-#endif /* PAR */
-#if defined(GRAN)  /* ToDo: fill in decent Docu here */
-"  -b...     All GranSim options start with -b; see GranSim User's Guide for details",
 #endif
 #if defined(x86_64_HOST_ARCH)
 "  -xm       Base address to mmap memory in the GHCi linker",
@@ -632,12 +450,11 @@ setupRtsFlags(int *argc, char *argv[], int *rts_argc, char *rts_argv[])
         } else {
 	    switch(rts_argv[arg][1]) {
 
-	      /* process: general args, then PROFILING-only ones,
-		 then CONCURRENT-only, PARallel-only, GRAN-only,
-		 TICKY-only (same order as defined in RtsFlags.lh);
-		 within those groups, mostly in case-insensitive
-		 alphabetical order.
-                 Final group is x*, which allows for more options.
+	      /* process: general args, then PROFILING-only ones, then
+		 CONCURRENT-only, TICKY-only (same order as defined in
+		 RtsFlags.lh); within those groups, mostly in
+		 case-insensitive alphabetical order.  Final group is
+		 x*, which allows for more options.
 	      */
 
 #ifdef TICKY_TICKY
@@ -645,14 +462,6 @@ setupRtsFlags(int *argc, char *argv[], int *rts_argc, char *rts_argv[])
 #else
 # define TICKY_BUILD_ONLY(x) \
 errorBelch("not built for: ticky-ticky stats"); \
-error = rtsTrue;
-#endif
-
-#if defined(PROFILING) 
-# define COST_CENTRE_USING_BUILD_ONLY(x) x
-#else
-# define COST_CENTRE_USING_BUILD_ONLY(x) \
-errorBelch("not built for: -prof or -parallel"); \
 error = rtsTrue;
 #endif
 
@@ -672,35 +481,11 @@ errorBelch("not built for: -par-prof"); \
 error = rtsTrue;
 #endif
 
-#ifdef PAR
-# define PAR_BUILD_ONLY(x)      x
-#else
-# define PAR_BUILD_ONLY(x) \
-errorBelch("not built for: -parallel"); \
-error = rtsTrue;
-#endif
-
 #ifdef THREADED_RTS
 # define THREADED_BUILD_ONLY(x)      x
 #else
 # define THREADED_BUILD_ONLY(x) \
 errorBelch("not built for: -smp"); \
-error = rtsTrue;
-#endif
-
-#if defined(THREADED_RTS) || defined(PAR)
-# define PAR_OR_THREADED_BUILD_ONLY(x)      x
-#else
-# define PAR_OR_THREADED_BUILD_ONLY(x) \
-errorBelch("not built for: -parallel or -smp"); \
-error = rtsTrue;
-#endif
-
-#ifdef GRAN
-# define GRAN_BUILD_ONLY(x)     x
-#else
-# define GRAN_BUILD_ONLY(x) \
-errorBelch("not built for: -gransim"); \
 error = rtsTrue;
 #endif
 
@@ -836,12 +621,6 @@ error = rtsTrue;
 		      case 'e':
 			  RtsFlags.DebugFlags.eventlog = rtsTrue;
                           break;
-		      case 'r':
-			  RtsFlags.DebugFlags.gran = rtsTrue;
-			  break;
-		      case 'P':
-			  RtsFlags.DebugFlags.par = rtsTrue;
-			  break;
 		      case 'l':
 			  RtsFlags.DebugFlags.linker = rtsTrue;
 			  break;
@@ -949,11 +728,6 @@ error = rtsTrue;
 		  goto stats;
 
 	    stats:
-#ifdef PAR
-		/* Opening all those files would almost certainly fail... */
-		// RtsFlags.ParFlags.ParStats.Full = rtsTrue;
-		RtsFlags.GcFlags.statsFile = NULL; /* temporary; ToDo: rm */
-#else
 		{ 
 		    int r;
 		    r = open_stats_file(arg, *argc, argv,
@@ -961,8 +735,7 @@ error = rtsTrue;
 					&RtsFlags.GcFlags.statsFile);
 		    if (r == -1) { error = rtsTrue; }
 		}
-#endif
-		  break;
+                break;
 
 	      case 'Z':
 		RtsFlags.GcFlags.squeezeUpdFrames = rtsFalse;
@@ -980,7 +753,7 @@ error = rtsTrue;
 
 	      case 'P': /* detailed cost centre profiling (time/alloc) */
 	      case 'p': /* cost centre profiling (time/alloc) */
-		COST_CENTRE_USING_BUILD_ONLY(
+		PROFILING_BUILD_ONLY(
 		switch (rts_argv[arg][2]) {
 		  case 'x':
 		    RtsFlags.CcFlags.doCostCentres = COST_CENTRES_XML;
@@ -1246,7 +1019,7 @@ error = rtsTrue;
 #endif
 	      /* =========== PARALLEL =========================== */
 	      case 'e':
-		PAR_OR_THREADED_BUILD_ONLY(
+		THREADED_BUILD_ONLY(
 		if (rts_argv[arg][2] != '\0') {
 		    RtsFlags.ParFlags.maxLocalSparks
 		      = strtol(rts_argv[arg]+2, (char **) NULL, 10);
@@ -1255,20 +1028,6 @@ error = rtsTrue;
 		      error = rtsTrue;
 		    }
 		}
-		) break;
-
-#ifdef PAR
-    	      case 'q':
-		PAR_BUILD_ONLY(
-		  process_par_option(arg, rts_argc, rts_argv, &error);
-		) break;
-#endif
-
-	      /* =========== GRAN =============================== */
-
-    	      case 'b':
-		GRAN_BUILD_ONLY(
-		  process_gran_option(arg, rts_argc, rts_argv, &error);
 		) break;
 
 	      /* =========== TICKY ============================== */
@@ -1431,978 +1190,6 @@ error = rtsTrue;
     }
 }
 
-#if defined(GRAN)
-
-static void
-enable_GranSimLight(void) {
-
-    debugBelch("GrAnSim Light enabled (infinite number of processors;  0 communication costs)\n");
-    RtsFlags.GranFlags.Light=rtsTrue;
-    RtsFlags.GranFlags.Costs.latency = 
-	RtsFlags.GranFlags.Costs.fetchtime = 
-	RtsFlags.GranFlags.Costs.additional_latency =
-	RtsFlags.GranFlags.Costs.gunblocktime = 
-	RtsFlags.GranFlags.Costs.lunblocktime =
-	RtsFlags.GranFlags.Costs.threadcreatetime = 
-	RtsFlags.GranFlags.Costs.threadqueuetime =
-	RtsFlags.GranFlags.Costs.threadscheduletime = 
-	RtsFlags.GranFlags.Costs.threaddescheduletime =
-	RtsFlags.GranFlags.Costs.threadcontextswitchtime = 0;
-  
-    RtsFlags.GranFlags.Costs.mpacktime = 
-	RtsFlags.GranFlags.Costs.munpacktime = 0;
-
-    RtsFlags.GranFlags.DoFairSchedule = rtsTrue;
-    RtsFlags.GranFlags.DoAsyncFetch = rtsFalse;
-    RtsFlags.GranFlags.DoAlwaysCreateThreads = rtsTrue;
-    /* FetchStrategy is irrelevant in GrAnSim-Light */
-
-    /* GrAnSim Light often creates an abundance of parallel threads,
-       each with its own stack etc. Therefore, it's in general a good
-       idea to use small stack chunks (use the -o<size> option to 
-       increase it again). 
-    */
-    // RtsFlags.ConcFlags.stkChunkSize = 100;
-
-    RtsFlags.GranFlags.proc = 1; 
-}
-
-static void
-process_gran_option(int arg, int *rts_argc, char *rts_argv[], rtsBool *error)
-{
-    if (rts_argv[arg][1] != 'b') /* All GranSim options start with -b */
-      return;
-
-    /* or a ridiculously idealised simulator */
-    if(strcmp((rts_argv[arg]+2),"oring")==0) {
-      RtsFlags.GranFlags.Costs.latency = 
-	RtsFlags.GranFlags.Costs.fetchtime = 
-	RtsFlags.GranFlags.Costs.additional_latency =
-	RtsFlags.GranFlags.Costs.gunblocktime = 
-	RtsFlags.GranFlags.Costs.lunblocktime =
-	RtsFlags.GranFlags.Costs.threadcreatetime = 
-	RtsFlags.GranFlags.Costs.threadqueuetime =
-	RtsFlags.GranFlags.Costs.threadscheduletime = 
-	RtsFlags.GranFlags.Costs.threaddescheduletime =
-	RtsFlags.GranFlags.Costs.threadcontextswitchtime = 0;
-
-      RtsFlags.GranFlags.Costs.mpacktime = 
-	RtsFlags.GranFlags.Costs.munpacktime = 0;
-
-      RtsFlags.GranFlags.Costs.arith_cost = 
-	RtsFlags.GranFlags.Costs.float_cost = 
-	RtsFlags.GranFlags.Costs.load_cost =
-	RtsFlags.GranFlags.Costs.store_cost = 
-	RtsFlags.GranFlags.Costs.branch_cost = 0;
-
-      RtsFlags.GranFlags.Costs.heapalloc_cost = 1;
-
-      /* ++RtsFlags.GranFlags.DoFairSchedule; */
-      RtsFlags.GranFlags.DoStealThreadsFirst = rtsTrue;        /* -bZ */
-      RtsFlags.GranFlags.DoThreadMigration   = rtsTrue;        /* -bM */
-      RtsFlags.GranFlags.GranSimStats.Full   = rtsTrue;        /* -bP */
-      return;
-    }
-
-      /* or a somewhat idealised simulator */
-      if(strcmp((rts_argv[arg]+2),"onzo")==0) {
-	RtsFlags.GranFlags.Costs.latency = 
-	RtsFlags.GranFlags.Costs.fetchtime = 
-	RtsFlags.GranFlags.Costs.additional_latency =
-	RtsFlags.GranFlags.Costs.gunblocktime = 
-	RtsFlags.GranFlags.Costs.lunblocktime =
-	RtsFlags.GranFlags.Costs.threadcreatetime = 
-	RtsFlags.GranFlags.Costs.threadqueuetime =
-	RtsFlags.GranFlags.Costs.threadscheduletime = 
-	RtsFlags.GranFlags.Costs.threaddescheduletime =
-	RtsFlags.GranFlags.Costs.threadcontextswitchtime = 0;
-
-	RtsFlags.GranFlags.Costs.mpacktime = 
-	RtsFlags.GranFlags.Costs.munpacktime = 0;
-	
-	RtsFlags.GranFlags.Costs.heapalloc_cost = 1;
-
-	/* RtsFlags.GranFlags.DoFairSchedule  = rtsTrue; */       /* -b-R */
-	/* RtsFlags.GranFlags.DoStealThreadsFirst = rtsTrue; */   /* -b-T */
-	RtsFlags.GranFlags.DoAsyncFetch = rtsTrue;         /* -bZ */
-	RtsFlags.GranFlags.DoThreadMigration  = rtsTrue;          /* -bM */
-	RtsFlags.GranFlags.GranSimStats.Full  = rtsTrue;          /* -bP */
-#  if defined(GRAN_CHECK) && defined(GRAN)
-	RtsFlags.GranFlags.Debug.event_stats = rtsTrue; /* print event statistics   */
-#  endif
-	return;
-      }
-
-      /* Communication and task creation cost parameters */
-      switch(rts_argv[arg][2]) {
-        case '.':
-	  IgnoreYields = rtsTrue; // HWL HACK
-	  break;
-
-        case ':':
-	  enable_GranSimLight();       /* set flags for GrAnSim-Light mode */
-	  break;
-
-        case 'l':
-	  if (rts_argv[arg][3] != '\0')
-	    {
-	      RtsFlags.GranFlags.Costs.gunblocktime = 
-	      RtsFlags.GranFlags.Costs.latency = decode(rts_argv[arg]+3);
-	      RtsFlags.GranFlags.Costs.fetchtime = 2*RtsFlags.GranFlags.Costs.latency;
-	    }
-	  else
-	    RtsFlags.GranFlags.Costs.latency = LATENCY;
-	  break;
-
-        case 'a':
-	  if (rts_argv[arg][3] != '\0')
-	    RtsFlags.GranFlags.Costs.additional_latency = decode(rts_argv[arg]+3);
-	  else
-	    RtsFlags.GranFlags.Costs.additional_latency = ADDITIONAL_LATENCY;
-	  break;
-
-        case 'm':
-	  if (rts_argv[arg][3] != '\0')
-	    RtsFlags.GranFlags.Costs.mpacktime = decode(rts_argv[arg]+3);
-	  else
-	    RtsFlags.GranFlags.Costs.mpacktime = MSGPACKTIME;
-	  break;
-
-        case 'x':
-	  if (rts_argv[arg][3] != '\0')
-	    RtsFlags.GranFlags.Costs.mtidytime = decode(rts_argv[arg]+3);
-	  else
-	    RtsFlags.GranFlags.Costs.mtidytime = 0;
-	  break;
-
-        case 'r':
-	  if (rts_argv[arg][3] != '\0')
-	    RtsFlags.GranFlags.Costs.munpacktime = decode(rts_argv[arg]+3);
-	  else
-	    RtsFlags.GranFlags.Costs.munpacktime = MSGUNPACKTIME;
-	  break;
-	  
-        case 'g':
-	  if (rts_argv[arg][3] != '\0')
-	    RtsFlags.GranFlags.Costs.fetchtime = decode(rts_argv[arg]+3);
-	  else
-	    RtsFlags.GranFlags.Costs.fetchtime = FETCHTIME;
-	  break;
-	  
-        case 'n':
-	  if (rts_argv[arg][3] != '\0')
-	    RtsFlags.GranFlags.Costs.gunblocktime = decode(rts_argv[arg]+3);
-	  else
-	    RtsFlags.GranFlags.Costs.gunblocktime = GLOBALUNBLOCKTIME;
-	  break;
-
-        case 'u':
-	  if (rts_argv[arg][3] != '\0')
-	    RtsFlags.GranFlags.Costs.lunblocktime = decode(rts_argv[arg]+3);
-	  else
-	    RtsFlags.GranFlags.Costs.lunblocktime = LOCALUNBLOCKTIME;
-	  break;
-
-	/* Thread-related metrics */
-        case 't':
-	  if (rts_argv[arg][3] != '\0')
-	    RtsFlags.GranFlags.Costs.threadcreatetime = decode(rts_argv[arg]+3);
-	  else
-	    RtsFlags.GranFlags.Costs.threadcreatetime = THREADCREATETIME;
-	  break;
-	  
-        case 'q':
-	  if (rts_argv[arg][3] != '\0')
-	    RtsFlags.GranFlags.Costs.threadqueuetime = decode(rts_argv[arg]+3);
-	  else
-	    RtsFlags.GranFlags.Costs.threadqueuetime = THREADQUEUETIME;
-	  break;
-	  
-        case 'c':
-	  if (rts_argv[arg][3] != '\0')
-	    RtsFlags.GranFlags.Costs.threadscheduletime = decode(rts_argv[arg]+3);
-	  else
-	    RtsFlags.GranFlags.Costs.threadscheduletime = THREADSCHEDULETIME;
-	  
-	  RtsFlags.GranFlags.Costs.threadcontextswitchtime = RtsFlags.GranFlags.Costs.threadscheduletime
-	    + RtsFlags.GranFlags.Costs.threaddescheduletime;
-	  break;
-
-        case 'd':
-	  if (rts_argv[arg][3] != '\0')
-	    RtsFlags.GranFlags.Costs.threaddescheduletime = decode(rts_argv[arg]+3);
-	  else
-	    RtsFlags.GranFlags.Costs.threaddescheduletime = THREADDESCHEDULETIME;
-	  
-	  RtsFlags.GranFlags.Costs.threadcontextswitchtime = RtsFlags.GranFlags.Costs.threadscheduletime
-	    + RtsFlags.GranFlags.Costs.threaddescheduletime;
-	  break;
-
-	/* Instruction Cost Metrics */
-        case 'A':
-	  if (rts_argv[arg][3] != '\0')
-	    RtsFlags.GranFlags.Costs.arith_cost = decode(rts_argv[arg]+3);
-	  else
-	    RtsFlags.GranFlags.Costs.arith_cost = ARITH_COST;
-	  break;
-
-        case 'F':
-	  if (rts_argv[arg][3] != '\0')
-	    RtsFlags.GranFlags.Costs.float_cost = decode(rts_argv[arg]+3);
-	  else
-	    RtsFlags.GranFlags.Costs.float_cost = FLOAT_COST;
-	  break;
-		      
-        case 'B':
-	  if (rts_argv[arg][3] != '\0')
-	    RtsFlags.GranFlags.Costs.branch_cost = decode(rts_argv[arg]+3);
-	  else
-	    RtsFlags.GranFlags.Costs.branch_cost = BRANCH_COST;
-	  break;
-
-        case 'L':
-	  if (rts_argv[arg][3] != '\0')
-	    RtsFlags.GranFlags.Costs.load_cost = decode(rts_argv[arg]+3);
-	  else
-	    RtsFlags.GranFlags.Costs.load_cost = LOAD_COST;
-	  break;
-	  
-        case 'S':
-	  if (rts_argv[arg][3] != '\0')
-	    RtsFlags.GranFlags.Costs.store_cost = decode(rts_argv[arg]+3);
-	  else
-	    RtsFlags.GranFlags.Costs.store_cost = STORE_COST;
-	  break;
-
-        case 'H':
-	  if (rts_argv[arg][3] != '\0')
-	    RtsFlags.GranFlags.Costs.heapalloc_cost = decode(rts_argv[arg]+3);
-	  else
-	    RtsFlags.GranFlags.Costs.heapalloc_cost = 0;
-	  break;
-
-        case 'y':
-	  RtsFlags.GranFlags.DoAsyncFetch = rtsTrue;
-	  if (rts_argv[arg][3] != '\0')
-	    RtsFlags.GranFlags.FetchStrategy = decode(rts_argv[arg]+3);
-	  else
-	    RtsFlags.GranFlags.FetchStrategy = 2;
-	  if (RtsFlags.GranFlags.FetchStrategy == 0)
-	    RtsFlags.GranFlags.DoAsyncFetch = rtsFalse;
-	  break;
-	  
-        case 'K':   /* sort overhead (per elem in spark list) */
-	  if (rts_argv[arg][3] != '\0')
-	    RtsFlags.GranFlags.Costs.pri_spark_overhead = decode(rts_argv[arg]+3);
-	  else
-	    RtsFlags.GranFlags.Costs.pri_spark_overhead = PRI_SPARK_OVERHEAD;
-	  debugBelch("Overhead for pri spark: %d (per elem).\n",
-		         RtsFlags.GranFlags.Costs.pri_spark_overhead);
-	  break;
-
-        case 'O':  /* sort overhead (per elem in spark list) */
-	  if (rts_argv[arg][3] != '\0')
-	    RtsFlags.GranFlags.Costs.pri_sched_overhead = decode(rts_argv[arg]+3);
-	  else
-	    RtsFlags.GranFlags.Costs.pri_sched_overhead = PRI_SCHED_OVERHEAD;
-	  debugBelch("Overhead for pri sched: %d (per elem).\n",
-		       RtsFlags.GranFlags.Costs.pri_sched_overhead);
-	  break;
-
-        /* General Parameters */
-        case 'p':
-	  if (rts_argv[arg][3] != '\0')
-	    {
-	      RtsFlags.GranFlags.proc = decode(rts_argv[arg]+3);
-	      if (RtsFlags.GranFlags.proc==0) {
-		  enable_GranSimLight(); /* set flags for GrAnSim-Light mode */
-	      } else if (RtsFlags.GranFlags.proc > MAX_PROC || 
-			 RtsFlags.GranFlags.proc < 1)
-		{
-		  debugBelch("setupRtsFlags: no more than %u processors allowed\n",
-			  MAX_PROC);
-		  *error = rtsTrue;
-		}
-	    }
-	  else
-	    RtsFlags.GranFlags.proc = MAX_PROC;
-	  break;
-
-        case 'f':
-	  RtsFlags.GranFlags.Fishing = rtsTrue;
-	  if (rts_argv[arg][3] != '\0')
-	    RtsFlags.GranFlags.maxFishes = decode(rts_argv[arg]+3);
-	  else
-	    RtsFlags.GranFlags.maxFishes = MAX_FISHES;
-	  break;
-	  
-        case 'w':
-	  if (rts_argv[arg][3] != '\0')
-	    RtsFlags.GranFlags.time_slice = decode(rts_argv[arg]+3);
-	  else
-	    RtsFlags.GranFlags.time_slice = GRAN_TIME_SLICE;
-	  break;
-	  
-        case 'C':
-	  RtsFlags.GranFlags.DoAlwaysCreateThreads=rtsTrue;
-	  RtsFlags.GranFlags.DoThreadMigration=rtsTrue;
-	  break;
-
-        case 'G':
-	  debugBelch("Bulk fetching enabled.\n");
-	  RtsFlags.GranFlags.DoBulkFetching=rtsTrue;
-	  break;
-	  
-        case 'M':
-	  debugBelch("Thread migration enabled.\n");
-	  RtsFlags.GranFlags.DoThreadMigration=rtsTrue;
-	  break;
-
-        case 'R':
-	  debugBelch("Fair Scheduling enabled.\n");
-	  RtsFlags.GranFlags.DoFairSchedule=rtsTrue;
-	  break;
-	  
-        case 'I':
-	  debugBelch("Priority Scheduling enabled.\n");
-	  RtsFlags.GranFlags.DoPriorityScheduling=rtsTrue;
-	  break;
-
-        case 'T':
-	  RtsFlags.GranFlags.DoStealThreadsFirst=rtsTrue;
-	  RtsFlags.GranFlags.DoThreadMigration=rtsTrue;
-	  break;
-	  
-        case 'Z':
-	  RtsFlags.GranFlags.DoAsyncFetch=rtsTrue;
-	  break;
-	  
-/*          case 'z': */
-/*  	  RtsFlags.GranFlags.SimplifiedFetch=rtsTrue; */
-/*  	  break; */
-	  
-        case 'N':
-	  RtsFlags.GranFlags.PreferSparksOfLocalNodes=rtsTrue;
-	  break;
-	  
-        case 'b':
-	  RtsFlags.GranFlags.GranSimStats.Binary=rtsTrue;
-	  break;
-	  
-        case 'P':
-	  /* format is -bP<c> where <c> is one char describing kind of profile */
-	  RtsFlags.GranFlags.GranSimStats.Full = rtsTrue;
-	  switch(rts_argv[arg][3]) {
-	  case '\0': break; // nothing special, just an ordinary profile
-	  case '0': RtsFlags.GranFlags.GranSimStats.Suppressed = rtsTrue;
-	    break;
-	  case 'b': RtsFlags.GranFlags.GranSimStats.Binary = rtsTrue;
-	    break;
-	  case 's': RtsFlags.GranFlags.GranSimStats.Sparks = rtsTrue;
-	    break;
-	  case 'h': RtsFlags.GranFlags.GranSimStats.Heap = rtsTrue;
-	    break;
-	  case 'n': RtsFlags.GranFlags.GranSimStats.NewLogfile = rtsTrue;
-	    break;
-	  case 'g': RtsFlags.GranFlags.GranSimStats.Global = rtsTrue;
-	    break;
-	  default: barf("Unknown option -bP%c", rts_argv[arg][3]);
-	  }
-	  break;
-
-        case 's':
-	  RtsFlags.GranFlags.GranSimStats.Sparks=rtsTrue;
-	  break;
-
-        case 'h':
-	  RtsFlags.GranFlags.GranSimStats.Heap=rtsTrue;
-	  break;
-
-        case 'Y':   /* syntax: -bY<n>[,<n>]  n ... pos int */ 
-	  if (rts_argv[arg][3] != '\0') {
-	    char *arg0, *tmp;
-	    
-	    arg0 = rts_argv[arg]+3;
-	    if ((tmp = strstr(arg0,","))==NULL) {
-	      RtsFlags.GranFlags.SparkPriority = decode(arg0);
-	      debugBelch("SparkPriority: %u.\n",RtsFlags.GranFlags.SparkPriority);
-	    } else {
-	      *(tmp++) = '\0'; 
-	      RtsFlags.GranFlags.SparkPriority = decode(arg0);
-	      RtsFlags.GranFlags.SparkPriority2 = decode(tmp);
-	      debugBelch("SparkPriority: %u.\n",
-		      RtsFlags.GranFlags.SparkPriority);
-	      debugBelch("SparkPriority2:%u.\n",
-		      RtsFlags.GranFlags.SparkPriority2);
-	      if (RtsFlags.GranFlags.SparkPriority2 < 
-		  RtsFlags.GranFlags.SparkPriority) {
-		debugBelch("WARNING: 2nd pri < main pri (%u<%u); 2nd pri has no effect\n",
-			RtsFlags.GranFlags.SparkPriority2,
-			RtsFlags.GranFlags.SparkPriority);
-	      }
-	    }
-	  } else {
-	    /* plain pri spark is now invoked with -bX  
-	       RtsFlags.GranFlags.DoPrioritySparking = 1;
-	       debugBelch("PrioritySparking.\n");
-	    */
-	  }
-	  break;
-
-        case 'Q':
-	  if (rts_argv[arg][3] != '\0') {
-	    RtsFlags.GranFlags.ThunksToPack = decode(rts_argv[arg]+3);
-	  } else {
-	    RtsFlags.GranFlags.ThunksToPack = 1;
-	  }
-	  debugBelch("Thunks To Pack in one packet: %u.\n",
-		  RtsFlags.GranFlags.ThunksToPack);
-	  break;
-		      
-        case 'e':
-	  RtsFlags.GranFlags.RandomSteal = rtsFalse;
-	  debugBelch("Deterministic mode (no random stealing)\n");
-		      break;
-
-	  /* The following class of options contains eXperimental */
-	  /* features in connection with exploiting granularity */
-	  /* information. I.e. if -bY is chosen these options */
-	  /* tell the RTS what to do with the supplied info --HWL */
-
-        case 'W':
-	  if (rts_argv[arg][3] != '\0') {
-	    RtsFlags.GranFlags.packBufferSize_internal = decode(rts_argv[arg]+3);
-	  } else {
-	    RtsFlags.GranFlags.packBufferSize_internal = GRANSIM_DEFAULT_PACK_BUFFER_SIZE;
-	  }
-	  debugBelch("Size of GranSim internal pack buffer: %u.\n",
-		  RtsFlags.GranFlags.packBufferSize_internal);
-	  break;
-  		      
-        case 'X':
-	  switch(rts_argv[arg][3]) {
-	    
-	    case '\0':
-	      RtsFlags.GranFlags.DoPrioritySparking = 1;
-	      debugBelch("Priority Sparking with Normal Priorities.\n");
-	      RtsFlags.GranFlags.InversePriorities = rtsFalse; 
-	      RtsFlags.GranFlags.RandomPriorities = rtsFalse;
-	      RtsFlags.GranFlags.IgnorePriorities = rtsFalse;
-	      break;
-			
-	    case 'I':
-	      RtsFlags.GranFlags.DoPrioritySparking = 1;
-	      debugBelch("Priority Sparking with Inverse Priorities.\n");
-	      RtsFlags.GranFlags.InversePriorities++; 
-	      break;
-	      
-	    case 'R': 
-	      RtsFlags.GranFlags.DoPrioritySparking = 1;
-	      debugBelch("Priority Sparking with Random Priorities.\n");
-	      RtsFlags.GranFlags.RandomPriorities++;
-	      break;
-	      
-	    case 'N':
-	      RtsFlags.GranFlags.DoPrioritySparking = 1;
-	      debugBelch("Priority Sparking with No Priorities.\n");
-	      RtsFlags.GranFlags.IgnorePriorities++;
-	      break;
-	      
-	    default:
-	      bad_option( rts_argv[arg] );
-	      break;
-	  }
-	  break;
-
-        case '-':
-	  switch(rts_argv[arg][3]) {
-	    
-	    case 'C':
-	      RtsFlags.GranFlags.DoAlwaysCreateThreads=rtsFalse;
-	      RtsFlags.GranFlags.DoThreadMigration=rtsFalse;
-	      break;
-
-	    case 'G':
-	      RtsFlags.GranFlags.DoBulkFetching=rtsFalse;
-	      break;
-	      
-	    case 'M':
-	      RtsFlags.GranFlags.DoThreadMigration=rtsFalse;
-	      break;
-
-	    case 'R':
-	      RtsFlags.GranFlags.DoFairSchedule=rtsFalse;
-	      break;
-
-	    case 'T':
-	      RtsFlags.GranFlags.DoStealThreadsFirst=rtsFalse;
-	      RtsFlags.GranFlags.DoThreadMigration=rtsFalse;
-	      break;
-
-	    case 'Z':
-	      RtsFlags.GranFlags.DoAsyncFetch=rtsFalse;
-	      break;
-	      
-	    case 'N':
-	      RtsFlags.GranFlags.PreferSparksOfLocalNodes=rtsFalse;
-			 break;
-			 
-	    case 'P':
-	      RtsFlags.GranFlags.GranSimStats.Suppressed=rtsTrue;
-	      break;
-
-	    case 's':
-	      RtsFlags.GranFlags.GranSimStats.Sparks=rtsFalse;
-	      break;
-	    
-	    case 'h':
-	      RtsFlags.GranFlags.GranSimStats.Heap=rtsFalse;
-	      break;
-	    
-	    case 'b':
-	      RtsFlags.GranFlags.GranSimStats.Binary=rtsFalse;
-	      break;
-			 
-	    case 'X':
-	      RtsFlags.GranFlags.DoPrioritySparking = rtsFalse;
-	      break;
-
-	    case 'Y':
-	      RtsFlags.GranFlags.DoPrioritySparking = rtsFalse;
-	      RtsFlags.GranFlags.SparkPriority = rtsFalse;
-	      break;
-
-	    case 'I':
-	      RtsFlags.GranFlags.DoPriorityScheduling = rtsFalse;
-	      break;
-
-	    case 'e':
-	      RtsFlags.GranFlags.RandomSteal = rtsFalse;
-	      break;
-
-	    default:
-	      bad_option( rts_argv[arg] );
-	      break;
-	  }
-	  break;
-
-#  if defined(GRAN_CHECK) && defined(GRAN)
-        case 'D':
-	  switch(rts_argv[arg][3]) {
-	    case 'Q':    /* Set pack buffer size (same as 'Q' in GUM) */
-	      if (rts_argv[arg][4] != '\0') {
-		RtsFlags.GranFlags.packBufferSize = decode(rts_argv[arg]+4);
-		debugBelch("Pack buffer size: %d\n",
-			RtsFlags.GranFlags.packBufferSize);
-	      } else {
-    	    	debugBelch("setupRtsFlags: missing size of PackBuffer (for -Q)\n");
-    	    	*error = rtsTrue;
-    	      }
-	      break;
-
-	  default:
-	      if (isdigit(rts_argv[arg][3])) {/* Set all debugging options in one */
-	    	/* hack warning: interpret the flags as a binary number */
-	    	nat n = decode(rts_argv[arg]+3);
-		set_GranSim_debug_options(n);
-	      } else {
-		nat i;
-		for (i=0; i<=MAX_GRAN_DEBUG_OPTION; i++) 
-		  if (rts_argv[arg][3] == gran_debug_opts_flags[i])
-		    break;
-		
-		if (i==MAX_GRAN_DEBUG_OPTION+1) {
-		  debugBelch("Valid GranSim debug options are:\n");
-		  help_GranSim_debug_options(MAX_GRAN_DEBUG_MASK);
-		  bad_option( rts_argv[arg] );
-		} else { // flag found; now set it
-		  set_GranSim_debug_options(GRAN_DEBUG_MASK(i));  // 2^i
-		}
-	      }
-	      break;
-	      
-#if 0
-	    case 'e':       /* event trace; also -bD1 */
-	      debugBelch("DEBUG: event_trace; printing event trace.\n");
-	      RtsFlags.GranFlags.Debug.event_trace = rtsTrue;
-	      /* RtsFlags.GranFlags.event_trace=rtsTrue; */
-	      break;
-	      
-	    case 'E':       /* event statistics; also -bD2 */
-	      debugBelch("DEBUG: event_stats; printing event statistics.\n");
-	      RtsFlags.GranFlags.Debug.event_stats = rtsTrue;
-	      /* RtsFlags.GranFlags.Debug |= 0x20; print event statistics   */
-	      break;
-	      
-	    case 'f':       /* thunkStealing; also -bD4 */
-	      debugBelch("DEBUG: thunkStealing; printing forwarding of FETCHNODES.\n");
-	      RtsFlags.GranFlags.Debug.thunkStealing = rtsTrue;
-	      /* RtsFlags.GranFlags.Debug |= 0x2;  print fwd messages */
-	      break;
-
-	    case 'z':       /* blockOnFetch; also -bD8 */
-	      debugBelch("DEBUG: blockOnFetch; check for blocked on fetch.\n");
-	      RtsFlags.GranFlags.Debug.blockOnFetch = rtsTrue;
-	      /* RtsFlags.GranFlags.Debug |= 0x4; debug non-reschedule-on-fetch */
-	      break;
-	      
-	    case 't':       /* blockOnFetch_sanity; also -bD16 */  
-	      debugBelch("DEBUG: blockOnFetch_sanity; check for TSO asleep on fetch.\n");
-	      RtsFlags.GranFlags.Debug.blockOnFetch_sanity = rtsTrue;
-	      /* RtsFlags.GranFlags.Debug |= 0x10; debug TSO asleep for fetch  */
-	      break;
-
-	    case 'S':       /* priSpark; also -bD32 */
-	      debugBelch("DEBUG: priSpark; priority sparking.\n");
-	      RtsFlags.GranFlags.Debug.priSpark = rtsTrue;
-	      break;
-
-	    case 's':       /* priSched; also -bD64 */
-	      debugBelch("DEBUG: priSched; priority scheduling.\n");
-	      RtsFlags.GranFlags.Debug.priSched = rtsTrue;
-	      break;
-
-	    case 'F':       /* findWork; also -bD128 */
-	      debugBelch("DEBUG: findWork; searching spark-pools (local & remote), thread queues for work.\n");
-	      RtsFlags.GranFlags.Debug.findWork = rtsTrue;
-	      break;
-	      
-	    case 'g':       /* globalBlock; also -bD256 */
-	      debugBelch("DEBUG: globalBlock; blocking on remote closures (FETCHMEs etc in GUM).\n");
-	      RtsFlags.GranFlags.Debug.globalBlock = rtsTrue;
-	      break;
-	      
-	    case 'G':       /* pack; also -bD512 */
-	      debugBelch("DEBUG: pack; routines for (un-)packing graph structures.\n");
-	      RtsFlags.GranFlags.Debug.pack = rtsTrue;
-	      break;
-	      
-	    case 'P':       /* packBuffer; also -bD1024 */
-	      debugBelch("DEBUG: packBuffer; routines handling pack buffer (GranSim internal!).\n");
-	      RtsFlags.GranFlags.Debug.packBuffer = rtsTrue;
-	      break;
-	      
-	    case 'o':       /* sortedQ; also -bD2048 */
-	      debugBelch("DEBUG: sortedQ; check whether spark/thread queues are sorted.\n");
-	      RtsFlags.GranFlags.Debug.sortedQ = rtsTrue;
-	      break;
-	      
-	    case 'r':       /* randomSteal; also -bD4096 */
-	      debugBelch("DEBUG: randomSteal; stealing sparks/threads from random PEs.\n");
-	      RtsFlags.GranFlags.Debug.randomSteal = rtsTrue;
-	      break;
-	      
-	    case 'q':       /* checkSparkQ; also -bD8192 */
-	      debugBelch("DEBUG: checkSparkQ; check consistency of the spark queues.\n");
-	      RtsFlags.GranFlags.Debug.checkSparkQ = rtsTrue;
-	      break;
-	      
-	    case ':':       /* checkLight; also -bD16384 */
-	      debugBelch("DEBUG: checkLight; check GranSim-Light setup.\n");
-	      RtsFlags.GranFlags.Debug.checkLight = rtsTrue;
-	      break;
-	      
-	    case 'b':       /* bq; also -bD32768 */
-	      debugBelch("DEBUG: bq; check blocking queues\n");
-	      RtsFlags.GranFlags.Debug.bq = rtsTrue;
-	      break;
-	      
-	    case 'd':       /* all options turned on */
-	      debugBelch("DEBUG: all options turned on.\n");
-	      set_GranSim_debug_options(MAX_GRAN_DEBUG_MASK);
-	      /* RtsFlags.GranFlags.Debug |= 0x40; */
-	      break;
-
-/*  	    case '\0': */
-/*  	      RtsFlags.GranFlags.Debug = 1; */
-/*  	      break; */
-#endif
-
-	  }
-	  break;
-#  endif  /* GRAN_CHECK */
-      default:
-	bad_option( rts_argv[arg] );
-	break;
-      }
-}
-
-/*
-  Interpret n as a binary number masking GranSim debug options and set the 
-  correxponding option. See gran_debug_opts_strs for explanations of the flags.
-*/
-static void
-set_GranSim_debug_options(nat n) {
-  nat i;
-
-  for (i=0; i<=MAX_GRAN_DEBUG_OPTION; i++) 
-    if ((n>>i)&1) {
-      errorBelch(gran_debug_opts_strs[i]);
-      switch (i) {
-        case 0: RtsFlags.GranFlags.Debug.event_trace   = rtsTrue;  break;
-        case 1: RtsFlags.GranFlags.Debug.event_stats   = rtsTrue;  break;
-        case 2: RtsFlags.GranFlags.Debug.bq            = rtsTrue;  break;
-        case 3: RtsFlags.GranFlags.Debug.pack          = rtsTrue;  break;
-        case 4: RtsFlags.GranFlags.Debug.checkSparkQ   = rtsTrue;  break;
-        case 5: RtsFlags.GranFlags.Debug.thunkStealing = rtsTrue;  break;
-        case 6: RtsFlags.GranFlags.Debug.randomSteal   = rtsTrue;  break;
-        case 7: RtsFlags.GranFlags.Debug.findWork      = rtsTrue;  break;
-        case 8: RtsFlags.GranFlags.Debug.unused        = rtsTrue;  break;
-        case 9: RtsFlags.GranFlags.Debug.pri           = rtsTrue;  break;
-        case 10: RtsFlags.GranFlags.Debug.checkLight   = rtsTrue;  break;
-        case 11: RtsFlags.GranFlags.Debug.sortedQ      = rtsTrue;  break;
-        case 12: RtsFlags.GranFlags.Debug.blockOnFetch = rtsTrue;  break;
-        case 13: RtsFlags.GranFlags.Debug.packBuffer   = rtsTrue;  break;
-        case 14: RtsFlags.GranFlags.Debug.blockOnFetch_sanity = rtsTrue;  break;
-        default: barf("set_GranSim_debug_options: only %d debug options expected");
-      } /* switch */
-    } /* if */
-}
-
-/*
-  Print one line explanation for each of the GranSim debug options specified
-  in the bitmask n.
-*/
-static void
-help_GranSim_debug_options(nat n) {
-  nat i;
-
-  for (i=0; i<=MAX_GRAN_DEBUG_OPTION; i++) 
-    if ((n>>i)&1) 
-      debugBelch(gran_debug_opts_strs[i]);
-}
-
-# elif defined(PAR)
-
-static void
-process_par_option(int arg, int *rts_argc, char *rts_argv[], rtsBool *error)
-{
-
-  if (rts_argv[arg][1] != 'q') { /* All GUM options start with -q */
-    errorBelch("Warning: GUM option does not start with -q: %s", rts_argv[arg]);
-    return;
-  }
-
-  /* Communication and task creation cost parameters */
-  switch(rts_argv[arg][2]) {
-  case 'e':  /* -qe<n>  ... allow <n> local sparks */
-    if (rts_argv[arg][3] != '\0') { /* otherwise, stick w/ the default */
-      RtsFlags.ParFlags.maxLocalSparks
-	= strtol(rts_argv[arg]+3, (char **) NULL, 10);
-      
-      if (RtsFlags.ParFlags.maxLocalSparks <= 0) {
-	errorBelch("setupRtsFlags: bad value for -e\n");
-	*error = rtsTrue;
-      }
-    }
-    IF_PAR_DEBUG(verbose,
-		 errorBelch("-qe<n>: max %d local sparks", 
-		       RtsFlags.ParFlags.maxLocalSparks));
-    break;
-  
-  case 't':
-    if (rts_argv[arg][3] != '\0') {
-      RtsFlags.ParFlags.maxThreads
-	= strtol(rts_argv[arg]+3, (char **) NULL, 10);
-    } else {
-      errorBelch("missing size for -qt\n");
-      *error = rtsTrue;
-    }
-    IF_PAR_DEBUG(verbose,
-		 errorBelch("-qt<n>: max %d threads", 
-		       RtsFlags.ParFlags.maxThreads));
-    break;
-
-  case 'f':
-    if (rts_argv[arg][3] != '\0')
-      RtsFlags.ParFlags.maxFishes = decode(rts_argv[arg]+3);
-    else
-      RtsFlags.ParFlags.maxFishes = MAX_FISHES;
-    break;
-    IF_PAR_DEBUG(verbose,
-		 errorBelch("-qf<n>: max %d fishes sent out at one time", 
-		       RtsFlags.ParFlags.maxFishes));
-    break;
-  
-  case 'F':
-    if (rts_argv[arg][3] != '\0') {
-      RtsFlags.ParFlags.fishDelay
-	= strtol(rts_argv[arg]+3, (char **) NULL, 10);
-    } else {
-      errorBelch("missing fish delay time for -qF\n");
-      *error = rtsTrue;
-    }
-    IF_PAR_DEBUG(verbose,
-		 errorBelch("-qF<n>: fish delay time %d us", 
-		       RtsFlags.ParFlags.fishDelay));
-    break;
-
-  case 'O':
-    RtsFlags.ParFlags.outputDisabled = rtsTrue;
-    IF_PAR_DEBUG(verbose,
-		 errorBelch("-qO: output disabled"));
-    break;
-  
-  case 'g': /* -qg<n> ... globalisation scheme */
-    if (rts_argv[arg][3] != '\0') {
-      RtsFlags.ParFlags.globalising = decode(rts_argv[arg]+3);
-    } else {
-      errorBelch("missing identifier for globalisation scheme (for -qg)\n");
-      *error = rtsTrue;
-    }
-    IF_PAR_DEBUG(verbose,
-		 debugBelch("-qg<n>: globalisation scheme set to  %d", 
-		       RtsFlags.ParFlags.globalising));
-    break;
-
-  case 'h': /* -qh<n> ... max number of thunks (except root) in packet */
-    if (rts_argv[arg][3] != '\0') {
-      RtsFlags.ParFlags.thunksToPack = decode(rts_argv[arg]+3);
-    } else {
-      errorBelch("missing number of thunks per packet (for -qh)\n");
-      *error = rtsTrue;
-    }
-    IF_PAR_DEBUG(verbose,
-		 debugBelch("-qh<n>: thunks per packet set to %d", 
-		       RtsFlags.ParFlags.thunksToPack));
-    break;
-
-  case 'P': /* -qP for writing a log file */
-    //RtsFlags.ParFlags.ParStats.Full = rtsFalse;
-    /* same encoding as in GranSim after -bP */	
-    switch(rts_argv[arg][3]) {
-    case '\0': RtsFlags.ParFlags.ParStats.Full = rtsTrue;
-      break; // nothing special, just an ordinary profile
-    case '0': RtsFlags.ParFlags.ParStats.Suppressed = rtsTrue;
-	RtsFlags.ParFlags.ParStats.Full = rtsFalse;
-      break;
-    case 'b': RtsFlags.ParFlags.ParStats.Binary = rtsTrue;
-      break;
-    case 's': RtsFlags.ParFlags.ParStats.Sparks = rtsTrue;
-      break;
-      //case 'h': RtsFlags.parFlags.ParStats.Heap = rtsTrue;
-      //  break;
-    case 'n': RtsFlags.ParFlags.ParStats.NewLogfile = rtsTrue;
-      break;
-    case 'g': 
-# if defined(PAR_TICKY)
-      RtsFlags.ParFlags.ParStats.Global = rtsTrue;
-# else 
-      errorBelch("-qPg is only possible for a PAR_TICKY RTS, which this is not");
-      stg_exit(EXIT_FAILURE);
-# endif
-      break;
-    default: barf("Unknown option -qP%c", rts_argv[arg][2]);
-    }
-    IF_PAR_DEBUG(verbose,
-		 debugBelch("(-qP) writing to log-file (RtsFlags.ParFlags.ParStats.Full=%s)",
-		       (RtsFlags.ParFlags.ParStats.Full ? "rtsTrue" : "rtsFalse")));
-    break;
-  
-  case 'Q': /* -qQ<n> ... set pack buffer size to <n> */
-    if (rts_argv[arg][3] != '\0') {
-      RtsFlags.ParFlags.packBufferSize = decode(rts_argv[arg]+3);
-    } else {
-      errorBelch("missing size of PackBuffer (for -qQ)\n");
-      *error = rtsTrue;
-    }
-    IF_PAR_DEBUG(verbose,
-		 debugBelch("-qQ<n>: pack buffer size set to %d", 
-		       RtsFlags.ParFlags.packBufferSize));
-    break;
-
-  case 'R':
-    RtsFlags.ParFlags.doFairScheduling = rtsTrue;
-    IF_PAR_DEBUG(verbose,
-		 debugBelch("-qR: fair-ish scheduling"));
-    break;
-  
-# if defined(DEBUG)  
-  case 'w':
-    if (rts_argv[arg][3] != '\0') {
-      RtsFlags.ParFlags.wait
-	= strtol(rts_argv[arg]+3, (char **) NULL, 10);
-    } else {
-      RtsFlags.ParFlags.wait = 1000;
-    }
-    IF_PAR_DEBUG(verbose,
-		 debugBelch("-qw<n>: length of wait loop after synchr before reduction: %d", 
-		       RtsFlags.ParFlags.wait));
-    break;
-
-  case 'D':  /* -qD ... all the debugging options */
-    if (isdigit(rts_argv[arg][3])) {/* Set all debugging options in one */
-      /* hack warning: interpret the flags as a binary number */
-      nat n = decode(rts_argv[arg]+3);
-      set_par_debug_options(n);
-    } else {
-      nat i;
-      for (i=0; i<=MAX_PAR_DEBUG_OPTION; i++) 
-	if (rts_argv[arg][3] == par_debug_opts_flags[i])
-	  break;
-	
-      if (i==MAX_PAR_DEBUG_OPTION+1) {
-	errorBelch("Valid GUM debug options are:\n");
-	help_par_debug_options(MAX_PAR_DEBUG_MASK);
-	bad_option( rts_argv[arg] );
-      } else { // flag found; now set it
-	set_par_debug_options(PAR_DEBUG_MASK(i));  // 2^i
-      }
-    }
-    break;
-# endif
-  default:
-    errorBelch("Unknown option -q%c (%d opts in total)", 
-	  rts_argv[arg][2], *rts_argc);
-    break;
-  } /* switch */
-}
-
-/*
-  Interpret n as a binary number masking Par debug options and set the 
-  correxponding option. See par_debug_opts_strs for explanations of the flags.
-*/
-static void
-set_par_debug_options(nat n) {
-  nat i;
-
-  for (i=0; i<=MAX_PAR_DEBUG_OPTION; i++) 
-    if ((n>>i)&1) {
-      debugBelch(par_debug_opts_strs[i]);
-      switch (i) {
-        case 0: RtsFlags.ParFlags.Debug.verbose       = rtsTrue;  break;
-        case 1: RtsFlags.ParFlags.Debug.bq            = rtsTrue;  break;
-        case 2: RtsFlags.ParFlags.Debug.schedule      = rtsTrue;  break;
-        case 3: RtsFlags.ParFlags.Debug.free          = rtsTrue;  break;
-        case 4: RtsFlags.ParFlags.Debug.resume        = rtsTrue;  break;
-        case 5: RtsFlags.ParFlags.Debug.weight        = rtsTrue;  break;
-        case 6: RtsFlags.ParFlags.Debug.fetch         = rtsTrue;  break;
-	  //case 7: RtsFlags.ParFlags.Debug.ack           = rtsTrue;  break;
-        case 7: RtsFlags.ParFlags.Debug.fish          = rtsTrue;  break;
-        case 8: RtsFlags.ParFlags.Debug.tables        = rtsTrue;  break;
-        case 9: RtsFlags.ParFlags.Debug.packet        = rtsTrue;  break;
-        case 10: RtsFlags.ParFlags.Debug.pack         = rtsTrue;  break;
-        case 11: RtsFlags.ParFlags.Debug.paranoia     = rtsTrue;  break;
-        default: barf("set_par_debug_options: only %d debug options expected",
-		      MAX_PAR_DEBUG_OPTION);
-      } /* switch */
-    } /* if */
-}
-
-/*
-  Print one line explanation for each of the GranSim debug options specified
-  in the bitmask n.
-*/
-static void
-help_par_debug_options(nat n) {
-  nat i;
-
-  for (i=0; i<=MAX_PAR_DEBUG_OPTION; i++) 
-    if ((n>>i)&1) 
-      debugBelch(par_debug_opts_strs[i]);
-}
-
-#endif /* PAR */
 
 static void
 stats_fprintf(FILE *f, char *s, ...)

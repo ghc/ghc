@@ -380,43 +380,6 @@ void resetNonBlockingFd(int fd STG_UNUSED) {}
 void setNonBlockingFd(int fd STG_UNUSED) {}
 #endif
 
-#ifdef PAR
-static ullong startTime = 0;
-
-/* used in a parallel setup */
-ullong
-msTime(void)
-{
-# if defined(HAVE_GETCLOCK) && !defined(alpha_HOST_ARCH) && !defined(hppa1_1_HOST_ARCH)
-    struct timespec tv;
-
-    if (getclock(TIMEOFDAY, &tv) != 0) {
-	fflush(stdout);
-	fprintf(stderr, "Clock failed\n");
-	stg_exit(EXIT_FAILURE);
-    }
-    return tv.tv_sec * LL(1000) + tv.tv_nsec / LL(1000000) - startTime;
-# elif HAVE_GETTIMEOFDAY && !defined(alpha_HOST_ARCH)
-    struct timeval tv;
- 
-    if (gettimeofday(&tv, NULL) != 0) {
-	fflush(stdout);
-	fprintf(stderr, "Clock failed\n");
-	stg_exit(EXIT_FAILURE);
-    }
-    return tv.tv_sec * LL(1000) + tv.tv_usec / LL(1000) - startTime;
-# else
-    time_t t;
-    if ((t = time(NULL)) == (time_t) -1) {
-	fflush(stdout);
-	fprintf(stderr, "Clock failed\n");
-	stg_exit(EXIT_FAILURE);
-    }
-    return t * LL(1000) - startTime;
-# endif
-}
-#endif /* PAR */
-
 /* -----------------------------------------------------------------------------
    Print large numbers, with punctuation.
    -------------------------------------------------------------------------- */

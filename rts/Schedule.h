@@ -37,13 +37,7 @@ void scheduleThreadOn(Capability *cap, StgWord cpu, StgTSO *tso);
  * Called from STG :  yes
  * Locks assumed   :  none
  */
-#if defined(GRAN)
-void awakenBlockedQueue(StgBlockingQueueElement *q, StgClosure *node);
-#elif defined(PAR)
-void awakenBlockedQueue(StgBlockingQueueElement *q, StgClosure *node);
-#else
 void awakenBlockedQueue (Capability *cap, StgTSO *tso);
-#endif
 
 /* wakeUpRts()
  * 
@@ -75,20 +69,10 @@ StgWord findRetryFrameHelper (StgTSO *tso);
 void OSThreadProcAttr workerStart(Task *task);
 #endif
 
-#if defined(GRAN)
-void    awaken_blocked_queue(StgBlockingQueueElement *q, StgClosure *node);
-void    unlink_from_bq(StgTSO* tso, StgClosure* node);
-void    initThread(StgTSO *tso, nat stack_size, StgInt pri);
-#elif defined(PAR)
-nat     run_queue_len(void);
-void    awaken_blocked_queue(StgBlockingQueueElement *q, StgClosure *node);
-void    initThread(StgTSO *tso, nat stack_size);
-#else
 char   *info_type(StgClosure *closure);    // dummy
 char   *info_type_by_ip(StgInfoTable *ip); // dummy
 void    awaken_blocked_queue(StgTSO *q);
 void    initThread(StgTSO *tso, nat stack_size);
-#endif
 
 /* The state of the scheduler.  This is used to control the sequence
  * of events during shutdown, and when the runtime is interrupted
@@ -121,14 +105,10 @@ extern volatile StgWord recent_activity;
  *
  * In GranSim we have one run/blocked_queue per PE.
  */
-#if defined(GRAN)
-// run_queue_hds defined in GranSim.h
-#else
 extern  StgTSO *RTS_VAR(blackhole_queue);
 #if !defined(THREADED_RTS)
 extern  StgTSO *RTS_VAR(blocked_queue_hd), *RTS_VAR(blocked_queue_tl);
 extern  StgTSO *RTS_VAR(sleeping_queue);
-#endif
 #endif
 
 /* Set to rtsTrue if there are threads on the blackhole_queue, and
@@ -162,9 +142,6 @@ void printAllThreads(void);
  */
 #ifdef DEBUG
 void print_bq (StgClosure *node);
-#endif
-#if defined(PAR)
-void print_bqe (StgBlockingQueueElement *bqe);
 #endif
 
 /* -----------------------------------------------------------------------------

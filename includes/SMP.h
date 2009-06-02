@@ -18,7 +18,7 @@
 
 #if defined(THREADED_RTS)
 
-#if  defined(TICKY_TICKY)
+#if defined(TICKY_TICKY)
 #error Build options incompatible with THREADED_RTS.
 #endif
 

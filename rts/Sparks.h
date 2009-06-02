@@ -11,10 +11,6 @@
 
 #include "WSDeque.h"
 
-#if defined(PARALLEL_HASKELL)
-#error Sparks.c using new internal structure, needs major overhaul!
-#endif
-
 /* typedef for SparkPool in RtsTypes.h */
 
 #if defined(THREADED_RTS)

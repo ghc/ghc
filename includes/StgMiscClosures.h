@@ -92,12 +92,6 @@ RTS_INFO(stg_BLACKHOLE_info);
 RTS_INFO(__stg_EAGER_BLACKHOLE_info);
 RTS_INFO(stg_CAF_BLACKHOLE_info);
 
-#if defined(PAR) || defined(GRAN)
-RTS_INFO(stg_RBH_info);
-#endif
-#if defined(PAR)
-RTS_INFO(stg_FETCH_ME_BQ_info);
-#endif
 RTS_FUN_INFO(stg_BCO_info);
 RTS_INFO(stg_EVACUATED_info);
 RTS_INFO(stg_WEAK_info);
@@ -147,12 +141,6 @@ RTS_ENTRY(stg_WHITEHOLE_entry);
 RTS_ENTRY(stg_BLACKHOLE_entry);
 RTS_ENTRY(__stg_EAGER_BLACKHOLE_entry);
 RTS_ENTRY(stg_CAF_BLACKHOLE_entry);
-#if defined(PAR) || defined(GRAN)
-RTS_ENTRY(stg_RBH_entry);
-#endif
-#if defined(PAR)
-RTS_ENTRY(stg_FETCH_ME_BQ_entry);
-#endif
 RTS_ENTRY(stg_BCO_entry);
 RTS_ENTRY(stg_EVACUATED_entry);
 RTS_ENTRY(stg_WEAK_entry);

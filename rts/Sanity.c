@@ -273,13 +273,6 @@ checkClosure( StgClosure* p )
 	ASSERT(LOOKS_LIKE_CLOSURE_PTR(mvar->head));
 	ASSERT(LOOKS_LIKE_CLOSURE_PTR(mvar->tail));
 	ASSERT(LOOKS_LIKE_CLOSURE_PTR(mvar->value));
-#if 0
-#if defined(PAR)
-	checkBQ((StgBlockingQueueElement *)mvar->head, p);
-#else
-	checkBQ(mvar->head, p);
-#endif
-#endif
 	return sizeofW(StgMVar);
       }
 
@@ -423,37 +416,6 @@ checkClosure( StgClosure* p )
         checkTSO((StgTSO *)p);
         return tso_sizeW((StgTSO *)p);
 
-#if defined(PAR)
-
-    case BLOCKED_FETCH:
-      ASSERT(LOOKS_LIKE_GA(&(((StgBlockedFetch *)p)->ga)));
-      ASSERT(LOOKS_LIKE_CLOSURE_PTR((((StgBlockedFetch *)p)->node)));
-      return sizeofW(StgBlockedFetch);  // see size used in evacuate()
-
-#ifdef DIST
-    case REMOTE_REF:
-      return sizeofW(StgFetchMe); 
-#endif /*DIST */
-      
-    case FETCH_ME:
-      ASSERT(LOOKS_LIKE_GA(((StgFetchMe *)p)->ga));
-      return sizeofW(StgFetchMe);  // see size used in evacuate()
-
-    case FETCH_ME_BQ:
-      checkBQ(((StgFetchMeBlockingQueue *)p)->blocking_queue, (StgClosure *)p);
-      return sizeofW(StgFetchMeBlockingQueue); // see size used in evacuate()
-
-    case RBH:
-      /* In an RBH the BQ may be empty (ie END_BQ_QUEUE) but not NULL */
-      ASSERT(((StgRBH *)p)->blocking_queue!=NULL);
-      if (((StgRBH *)p)->blocking_queue!=END_BQ_QUEUE)
-	checkBQ(((StgRBH *)p)->blocking_queue, p);
-      ASSERT(LOOKS_LIKE_INFO_PTR(REVERT_INFOPTR(get_itbl((StgClosure *)p))));
-      return BLACKHOLE_sizeW();   // see size used in evacuate()
-      // sizeW_fromITBL(REVERT_INFOPTR(get_itbl((StgClosure *)p)));
-
-#endif
-
     case TVAR_WATCH_QUEUE:
       {
         StgTVarWatchQueue *wq = (StgTVarWatchQueue *)p;
@@ -513,45 +475,6 @@ checkClosure( StgClosure* p )
     }
 }
 
-#if defined(PAR)
-
-#define PVM_PE_MASK    0xfffc0000
-#define MAX_PVM_PES    MAX_PES
-#define MAX_PVM_TIDS   MAX_PES
-#define MAX_SLOTS      100000
-
-rtsBool
-looks_like_tid(StgInt tid)
-{
-  StgInt hi = (tid & PVM_PE_MASK) >> 18;
-  StgInt lo = (tid & ~PVM_PE_MASK);
-  rtsBool ok = (hi != 0) && (lo < MAX_PVM_TIDS) && (hi < MAX_PVM_TIDS);
-  return ok;
-}
-
-rtsBool
-looks_like_slot(StgInt slot)
-{
-  /* if tid is known better use looks_like_ga!! */
-  rtsBool ok = slot<MAX_SLOTS;
-  // This refers only to the no. of slots on the current PE
-  // rtsBool ok = slot<=highest_slot();
-  return ok; 
-}
-
-rtsBool
-looks_like_ga(globalAddr *ga)
-{
-  rtsBool is_tid = looks_like_tid((ga)->payload.gc.gtid);
-  rtsBool is_slot = ((ga)->payload.gc.gtid==mytid) ? 
-                     (ga)->payload.gc.slot<=highest_slot() : 
-                     (ga)->payload.gc.slot<MAX_SLOTS;
-  rtsBool ok = is_tid && is_slot;
-  return ok;
-}
-
-#endif
-
 
 /* -----------------------------------------------------------------------------
    Check Heap Sanity
@@ -588,35 +511,6 @@ checkHeap(bdescr *bd)
     }
 }
 
-#if defined(PAR)
-/* 
-   Check heap between start and end. Used after unpacking graphs.
-*/
-void 
-checkHeapChunk(StgPtr start, StgPtr end)
-{
-  extern globalAddr *LAGAlookup(StgClosure *addr);
-  StgPtr p;
-  nat size;
-
-  for (p=start; p<end; p+=size) {
-    ASSERT(LOOKS_LIKE_INFO_PTR((void*)*p));
-    if (get_itbl((StgClosure*)p)->type == FETCH_ME &&
-	*(p+1) == 0x0000eeee /* ie. unpack garbage (see SetGAandCommonUp) */) {
-      /* if it's a FM created during unpack and commoned up, it's not global */
-      ASSERT(LAGAlookup((StgClosure*)p)==NULL);
-      size = sizeofW(StgFetchMe);
-    } else if (get_itbl((StgClosure*)p)->type == IND) {
-      *(p+2) = 0x0000ee11; /* mark slop in IND as garbage */
-      size = sizeofW(StgInd);
-    } else {
-      size = checkClosure((StgClosure *)p);
-      /* This is the smallest size of closure that can live in the heap. */
-      ASSERT( size >= MIN_PAYLOAD_SIZE + sizeofW(StgHeader) );
-    }
-  }
-}
-#else /* !PAR */
 void 
 checkHeapChunk(StgPtr start, StgPtr end)
 {
@@ -630,7 +524,6 @@ checkHeapChunk(StgPtr start, StgPtr end)
     ASSERT( size >= MIN_PAYLOAD_SIZE + sizeofW(StgHeader) );
   }
 }
-#endif
 
 void
 checkLargeObjects(bdescr *bd)
@@ -665,114 +558,8 @@ checkTSO(StgTSO *tso)
 
     ASSERT(stack <= sp && sp < stack_end);
 
-#if defined(PAR)
-    ASSERT(tso->par.magic==TSO_MAGIC);
-
-    switch (tso->why_blocked) {
-    case BlockedOnGA: 
-      checkClosureShallow(tso->block_info.closure);
-      ASSERT(/* Can't be a FETCH_ME because *this* closure is on its BQ */
-	     get_itbl(tso->block_info.closure)->type==FETCH_ME_BQ);
-      break;
-    case BlockedOnGA_NoSend: 
-      checkClosureShallow(tso->block_info.closure);
-      ASSERT(get_itbl(tso->block_info.closure)->type==FETCH_ME_BQ);
-      break;
-    case BlockedOnBlackHole: 
-      checkClosureShallow(tso->block_info.closure);
-      ASSERT(get_itbl(tso->block_info.closure)->type==BLACKHOLE ||
-             get_itbl(tso->block_info.closure)->type==RBH);
-      break;
-    case BlockedOnRead:
-    case BlockedOnWrite:
-    case BlockedOnDelay:
-#if defined(mingw32_HOST_OS)
-    case BlockedOnDoProc:
-#endif
-      /* isOnBQ(blocked_queue) */
-      break;
-    case BlockedOnException:
-      /* isOnSomeBQ(tso) */
-      ASSERT(get_itbl(tso->block_info.tso)->type==TSO);
-      break;
-    case BlockedOnMVar:
-      ASSERT(get_itbl(tso->block_info.closure)->type==MVAR);
-      break;
-    case BlockedOnSTM:
-      ASSERT(tso->block_info.closure == END_TSO_QUEUE);
-      break;
-    default:
-      /* 
-	 Could check other values of why_blocked but I am more 
-	 lazy than paranoid (bad combination) -- HWL 
-      */
-    }
-
-    /* if the link field is non-nil it most point to one of these
-       three closure types */
-    ASSERT(tso->link == END_TSO_QUEUE ||
-	   get_itbl(tso->link)->type == TSO ||
-	   get_itbl(tso->link)->type == BLOCKED_FETCH ||
-	   get_itbl(tso->link)->type == CONSTR);
-#endif
-
     checkStackChunk(sp, stack_end);
 }
-
-#if defined(GRAN)
-void  
-checkTSOsSanity(void) {
-  nat i, tsos;
-  StgTSO *tso;
-  
-  debugBelch("Checking sanity of all runnable TSOs:");
-  
-  for (i=0, tsos=0; i<RtsFlags.GranFlags.proc; i++) {
-    for (tso=run_queue_hds[i]; tso!=END_TSO_QUEUE; tso=tso->link) {
-      debugBelch("TSO %p on PE %d ...", tso, i);
-      checkTSO(tso); 
-      debugBelch("OK, ");
-      tsos++;
-    }
-  }
-  
-  debugBelch(" checked %d TSOs on %d PEs; ok\n", tsos, RtsFlags.GranFlags.proc);
-}
-
-
-// still GRAN only
-
-rtsBool
-checkThreadQSanity (PEs proc, rtsBool check_TSO_too) 
-{
-  StgTSO *tso, *prev;
-
-  /* the NIL value for TSOs is END_TSO_QUEUE; thus, finding NULL is an error */
-  ASSERT(run_queue_hds[proc]!=NULL);
-  ASSERT(run_queue_tls[proc]!=NULL);
-  /* if either head or tail is NIL then the other one must be NIL, too */
-  ASSERT(run_queue_hds[proc]!=END_TSO_QUEUE || run_queue_tls[proc]==END_TSO_QUEUE);
-  ASSERT(run_queue_tls[proc]!=END_TSO_QUEUE || run_queue_hds[proc]==END_TSO_QUEUE);
-  for (tso=run_queue_hds[proc], prev=END_TSO_QUEUE; 
-       tso!=END_TSO_QUEUE;
-       prev=tso, tso=tso->link) {
-    ASSERT((prev!=END_TSO_QUEUE || tso==run_queue_hds[proc]) &&
-	   (prev==END_TSO_QUEUE || prev->link==tso));
-    if (check_TSO_too)
-      checkTSO(tso);
-  }
-  ASSERT(prev==run_queue_tls[proc]);
-}
-
-rtsBool
-checkThreadQsSanity (rtsBool check_TSO_too)
-{
-  PEs p;
-  
-  for (p=0; p<RtsFlags.GranFlags.proc; p++)
-    checkThreadQSanity(p, check_TSO_too);
-}
-#endif /* GRAN */
 
 /* 
    Check that all TSOs have been evacuated.
@@ -880,118 +667,5 @@ checkStaticObjects ( StgClosure* static_objects )
     }
   }
 }
-
-/* 
-   Check the sanity of a blocking queue starting at bqe with closure being
-   the closure holding the blocking queue.
-   Note that in GUM we can have several different closure types in a 
-   blocking queue 
-*/
-#if defined(PAR)
-void
-checkBQ (StgBlockingQueueElement *bqe, StgClosure *closure) 
-{
-  rtsBool end = rtsFalse;
-  StgInfoTable *info = get_itbl(closure);
-
-  ASSERT(info->type == MVAR || info->type == FETCH_ME_BQ || info->type == RBH);
-
-  do {
-    switch (get_itbl(bqe)->type) {
-    case BLOCKED_FETCH:
-    case TSO:
-      checkClosure((StgClosure *)bqe);
-      bqe = bqe->link;
-      end = (bqe==END_BQ_QUEUE);
-      break;
-    
-    case CONSTR:
-      checkClosure((StgClosure *)bqe);
-      end = rtsTrue;
-      break;
-
-    default:
-      barf("checkBQ: strange closure %d in blocking queue for closure %p (%s)\n", 
-	   get_itbl(bqe)->type, closure, info_type(closure));
-    }
-  } while (!end);
-}
-#elif defined(GRAN)
-void
-checkBQ (StgTSO *bqe, StgClosure *closure) 
-{  
-  rtsBool end = rtsFalse;
-  StgInfoTable *info = get_itbl(closure);
-
-  ASSERT(info->type == MVAR);
-
-  do {
-    switch (get_itbl(bqe)->type) {
-    case BLOCKED_FETCH:
-    case TSO:
-      checkClosure((StgClosure *)bqe);
-      bqe = bqe->link;
-      end = (bqe==END_BQ_QUEUE);
-      break;
-    
-    default:
-      barf("checkBQ: strange closure %d in blocking queue for closure %p (%s)\n", 
-	   get_itbl(bqe)->type, closure, info_type(closure));
-    }
-  } while (!end);
-}
-#endif
-    
-
-
-/*
-  This routine checks the sanity of the LAGA and GALA tables. They are 
-  implemented as lists through one hash table, LAtoGALAtable, because entries 
-  in both tables have the same structure:
-   - the LAGA table maps local addresses to global addresses; it starts
-     with liveIndirections
-   - the GALA table maps global addresses to local addresses; it starts 
-     with liveRemoteGAs
-*/
-
-#if defined(PAR)
-#include "Hash.h"
-
-/* hidden in parallel/Global.c; only accessed for testing here */
-extern GALA *liveIndirections;
-extern GALA *liveRemoteGAs;
-extern HashTable *LAtoGALAtable;
-
-void
-checkLAGAtable(rtsBool check_closures)
-{
-  GALA *gala, *gala0;
-  nat n=0, m=0; // debugging
-
-  for (gala = liveIndirections; gala != NULL; gala = gala->next) {
-    n++;
-    gala0 = lookupHashTable(LAtoGALAtable, (StgWord) gala->la);
-    ASSERT(!gala->preferred || gala == gala0);
-    ASSERT(LOOKS_LIKE_INFO_PTR(((StgClosure *)gala->la)->header.info));
-    ASSERT(gala->next!=gala); // detect direct loops
-    if ( check_closures ) {
-      checkClosure((StgClosure *)gala->la);
-    }
-  }
-
-  for (gala = liveRemoteGAs; gala != NULL; gala = gala->next) {
-    m++;
-    gala0 = lookupHashTable(LAtoGALAtable, (StgWord) gala->la);
-    ASSERT(!gala->preferred || gala == gala0);
-    ASSERT(LOOKS_LIKE_INFO_PTR(((StgClosure *)gala->la)->header.info));
-    ASSERT(gala->next!=gala); // detect direct loops
-    /*
-    if ( check_closures ) {
-      checkClosure((StgClosure *)gala->la);
-    }
-    */
-  }
-}
-#endif
 
 #endif /* DEBUG */

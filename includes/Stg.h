@@ -206,9 +206,7 @@ typedef StgWord StgWordArray[];
 #include "MachRegs.h"
 #include "Regs.h"
 
-#ifdef TICKY_TICKY
 #include "TickyCounters.h"
-#endif
 
 #if IN_STG_CODE
 /*

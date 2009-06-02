@@ -222,15 +222,10 @@ typedef struct _RtsSymbolVal {
     void   *addr;
 } RtsSymbolVal;
 
-#if !defined(PAR)
 #define Maybe_Stable_Names      SymI_HasProto(mkWeakzh_fast)			\
       				SymI_HasProto(mkWeakForeignEnvzh_fast)		\
       				SymI_HasProto(makeStableNamezh_fast)		\
       				SymI_HasProto(finalizzeWeakzh_fast)
-#else
-/* These are not available in GUM!!! -- HWL */
-#define Maybe_Stable_Names
-#endif
 
 #if !defined (mingw32_HOST_OS)
 #define RTS_POSIX_ONLY_SYMBOLS                  \

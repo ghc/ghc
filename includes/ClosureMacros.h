@@ -127,22 +127,6 @@
 #define SET_STATIC_PROF_HDR(ccs)
 #endif
 
-#ifdef GRAN
-#define SET_GRAN_HDR(c,pe)		(c)->header.gran.procs = pe
-#define SET_STATIC_GRAN_HDR		gran : { procs : Everywhere },
-#else
-#define SET_GRAN_HDR(c,pe)
-#define SET_STATIC_GRAN_HDR
-#endif
-
-#ifdef PAR
-#define SET_PAR_HDR(c,stuff)
-#define SET_STATIC_PAR_HDR(stuff)
-#else
-#define SET_PAR_HDR(c,stuff)
-#define SET_STATIC_PAR_HDR(stuff)
-#endif
-
 #ifdef TICKY_TICKY
 #define SET_TICKY_HDR(c,stuff)	     /* old: (c)->header.ticky.updated = stuff */
 #define SET_STATIC_TICKY_HDR(stuff)  /* old: ticky : { updated : stuff } */
@@ -154,8 +138,6 @@
 #define SET_HDR(c,_info,ccs)				\
    {							\
 	(c)->header.info = _info;			\
-	SET_GRAN_HDR((StgClosure *)(c),ThisPE);		\
-	SET_PAR_HDR((StgClosure *)(c),LOCAL_GA);	\
 	SET_PROF_HDR((StgClosure *)(c),ccs);		\
 	SET_TICKY_HDR((StgClosure *)(c),0);		\
    }

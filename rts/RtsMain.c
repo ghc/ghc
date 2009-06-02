@@ -26,16 +26,6 @@
 # include "Printer.h"   /* for printing        */
 #endif
 
-#ifdef PAR
-# include "Parallel.h"
-# include "ParallelRts.h"
-# include "LLC.h"
-#endif
-
-#if defined(GRAN) || defined(PAR)
-# include "GranSimRts.h"
-#endif
-
 #ifdef HAVE_WINDOWS_H
 # include <windows.h>
 #endif
@@ -72,44 +62,6 @@ static void real_main(void)
        (IAmMainThread is set in startupHaskell) 
     */
 
-#  if defined(PAR)
-
-#   if defined(DEBUG)
-    { /* a wait loop to allow attachment of gdb to UNIX threads */
-      nat i, j, s;
-
-      for (i=0, s=0; i<(nat)RtsFlags.ParFlags.wait; i++)
-	for (j=0; j<1000000; j++) 
-	  s += j % 65536;
-    }
-    IF_PAR_DEBUG(verbose,
-		 belch("Passed wait loop"));
-#   endif
-
-    if (IAmMainThread == rtsTrue) {
-      IF_PAR_DEBUG(verbose,
-		   debugBelch("==== [%x] Main Thread Started ...\n", mytid));
-
-      /* ToDo: Dump event for the main thread */
-      status = rts_mainLazyIO(progmain_closure, NULL);
-    } else {
-      /* Just to show we're alive */
-      IF_PAR_DEBUG(verbose,
-		   debugBelch("== [%x] Non-Main PE enters scheduler via taskStart() without work ...\n",
-			   mytid));
-     
-      /* all non-main threads enter the scheduler without work */
-      taskStart();       
-      status = Success;  // declare victory (see shutdownParallelSystem)
-    }
-
-#  elif defined(GRAN)
-
-    /* ToDo: Dump event for the main thread */
-    status = rts_mainLazyIO(progmain_closure, NULL);
-
-#  else /* !PAR && !GRAN */
-
     /* ToDo: want to start with a larger stack size */
     { 
 	Capability *cap = rts_lock();
@@ -118,8 +70,6 @@ static void real_main(void)
 	taskTimeStamp(myTask());
 	rts_unlock(cap);
     }
-
-#  endif /* !PAR && !GRAN */
 
     /* check the status of the entire Haskell computation */
     switch (status) {
@@ -137,12 +87,6 @@ static void real_main(void)
     case Success:
       exit_status = EXIT_SUCCESS;
       break;
-#if defined(PAR)
-    case NoStatus:
-      errorBelch("main thread PE killed; probably due to failure of another PE; check /tmp/pvml...");
-      exit_status = EXIT_KILLED;
-      break;
-#endif 
     default:
       barf("main thread completed with invalid status");
     }

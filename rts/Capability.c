@@ -819,7 +819,7 @@ static void
 freeCapability (Capability *cap)
 {
     stgFree(cap->mut_lists);
-#if defined(THREADED_RTS) || defined(PARALLEL_HASKELL)
+#if defined(THREADED_RTS)
     freeSparkPool(cap->sparks);
 #endif
 }

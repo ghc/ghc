@@ -27,14 +27,6 @@ typedef struct {
 } StgProfHeader;
 
 /* -----------------------------------------------------------------------------
-   The GranSim header
-   -------------------------------------------------------------------------- */
-
-typedef struct {
-  StgWord procs; /* bitmask indicating on which PEs this closure resides */
-} StgGranHeader;
-
-/* -----------------------------------------------------------------------------
    The SMP header
    
    A thunk has a padding word to take the updated value.  This is so
@@ -63,18 +55,12 @@ typedef struct {
 #ifdef PROFILING
     StgProfHeader         prof;
 #endif
-#ifdef GRAN
-    StgGranHeader         gran;
-#endif
 } StgHeader;
 
 typedef struct {
     const struct _StgInfoTable* info;
 #ifdef PROFILING
     StgProfHeader         prof;
-#endif
-#ifdef GRAN
-    StgGranHeader         gran;
 #endif
     StgSMPThunkHeader     smp;
 } StgThunkHeader;
@@ -426,68 +412,5 @@ typedef struct {
   StgClosure    *first_code;
   StgClosure    *alt_code;
 } StgCatchRetryFrame;
-
-#if defined(PAR) || defined(GRAN)
-/*
-  StgBlockingQueueElement is a ``collective type'' representing the types
-  of closures that can be found on a blocking queue: StgTSO, StgRBHSave,
-  StgBlockedFetch.  (StgRBHSave can only appear at the end of a blocking
-  queue).  Logically, this is a union type, but defining another struct
-  with a common layout is easier to handle in the code.  
-  Note that in the standard setup only StgTSOs can be on a blocking queue.
-  This is one of the main reasons for slightly different code in files
-  such as Schedule.c.
-*/
-typedef struct StgBlockingQueueElement_ {
-  StgHeader                         header;
-  struct StgBlockingQueueElement_  *link;      /* next elem in BQ */
-  struct StgClosure_               *payload[FLEXIBLE_ARRAY];/* contents of the closure */
-} StgBlockingQueueElement;
-
-/* only difference to std code is type of the elem in the BQ */
-typedef struct StgBlockingQueue_ {
-  StgHeader                 header;
-  struct StgBlockingQueueElement_ *blocking_queue; /* start of the BQ */
-} StgBlockingQueue;
-
-/* this closure is hanging at the end of a blocking queue in (see RBH.c) */
-typedef struct StgRBHSave_ {
-  StgHeader    header;
-  StgClosure  *payload[FLEXIBLE_ARRAY];     /* 2 words ripped out of the guts of the */
-} StgRBHSave;                  /*  closure holding the blocking queue */
- 
-typedef struct StgRBH_ {
-  StgHeader                         header;
-  struct StgBlockingQueueElement_  *blocking_queue; /* start of the BQ */
-} StgRBH;
-
-#endif
-
-#if defined(PAR)
-/* global indirections aka FETCH_ME closures */
-typedef struct StgFetchMe_ {
-  StgHeader              header;
-  globalAddr            *ga;        /* ptr to unique id for a closure */
-} StgFetchMe;
-
-/* same contents as an ordinary StgBlockingQueue */
-typedef struct StgFetchMeBlockingQueue_ {
-  StgHeader                          header;
-  struct StgBlockingQueueElement_   *blocking_queue; /* start of the BQ */
-} StgFetchMeBlockingQueue;
-
-/* This is an entry in a blocking queue. It indicates a fetch request from a 
-   TSO on another PE demanding the value of this closur. Note that a
-   StgBlockedFetch can only occur in a BQ. Once the node is evaluated and
-   updated with the result, the result will be sent back (the PE is encoded
-   in the globalAddr) and the StgBlockedFetch closure will be nuked.
-*/
-typedef struct StgBlockedFetch_ {
-  StgHeader                         header;
-  struct StgBlockingQueueElement_  *link;     /* next elem in the BQ */
-  StgClosure                       *node;     /* node to fetch */
-  globalAddr                        ga;       /* where to send the result to */
-} StgBlockedFetch;                            /* NB: not just a ptr to a GA */
-#endif
 
 #endif /* CLOSURES_H */

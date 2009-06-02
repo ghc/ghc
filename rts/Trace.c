@@ -50,8 +50,6 @@ void initTracing (void)
     DEBUG_FLAG(stm,          DEBUG_stm);
     DEBUG_FLAG(prof,         DEBUG_prof);
     DEBUG_FLAG(eventlog,     DEBUG_eventlog);
-    DEBUG_FLAG(gran,         DEBUG_gran);
-    DEBUG_FLAG(par,          DEBUG_par);
     DEBUG_FLAG(linker,       DEBUG_linker);
     DEBUG_FLAG(squeeze,      DEBUG_squeeze);
     DEBUG_FLAG(hpc,          DEBUG_hpc);
