@@ -1,0 +1,8 @@
+
+T3265.hs:7:7:
+    Illegal declaration of a type or class operator `:+:'
+      Use -XTypeOperators to declare operators in type and declarations
+
+T3265.hs:9:8:
+    Illegal declaration of a type or class operator `:*:'
+      Use -XTypeOperators to declare operators in type and declarations
