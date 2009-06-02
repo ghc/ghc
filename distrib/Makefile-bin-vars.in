@@ -34,7 +34,8 @@ pdfdir      = $(docdir)
 
 PERL        = @PerlCmd@
 SH	    = /bin/sh
-RM          = rm -f
+RM          = rm
+RM_OPTS     = -f
 MV          = mv
 CP          = cp
 LN_S        = @LN_S@
