@@ -36,7 +36,7 @@ module GHC.Integer (
     eqInteger, neqInteger, absInteger, signumInteger,
     leInteger, gtInteger, ltInteger, geInteger, compareInteger,
     divModInteger, quotRemInteger, quotInteger, remInteger,
-    encodeFloatInteger, decodeFloatInteger, floatFromInteger,
+    encodeFloatInteger, floatFromInteger,
     encodeDoubleInteger, decodeDoubleInteger, doubleFromInteger,
     gcdInteger, lcmInteger,
     andInteger, orInteger, xorInteger, complementInteger,
@@ -59,7 +59,7 @@ import GHC.Prim (
     plusInteger#, minusInteger#, timesInteger#,
     quotRemInteger#, quotInteger#, remInteger#, divModInteger#,
     gcdInteger#, gcdIntegerInt#, divExactInteger#,
-    decodeDouble#, decodeFloat#,
+    decodeDouble#,
     int2Integer#, integer2Int#, word2Integer#, integer2Word#,
     andInteger#, orInteger#, xorInteger#, complementInteger#,
 #if WORD_SIZE_IN_BITS < 64
@@ -437,10 +437,6 @@ negateInteger (J# s d)          = J# (negateInt# s) d
 encodeFloatInteger :: Integer -> Int# -> Float#
 encodeFloatInteger (S# i) j     = int_encodeFloat# i j
 encodeFloatInteger (J# s# d#) e = encodeFloat# s# d# e
-
-decodeFloatInteger :: Float# -> (# Integer, Int# #)
-decodeFloatInteger d = case decodeFloat# d of
-                       (# exp#, s#, d# #) -> (# J# s# d#, exp# #)
 
 encodeDoubleInteger :: Integer -> Int# -> Double#
 encodeDoubleInteger (S# i) j     = int_encodeDouble# i j
