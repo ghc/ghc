@@ -305,50 +305,10 @@ int main(int argc, char *argv[])
           <literal>hs_exit()</literal> to shut down the runtime.</para>
       </sect3>
 
-      <sect3 id="hs-exit">
-        <title>On the use of <literal>hs_exit()</literal></title>
-
-        <para><literal>hs_exit()</literal> normally causes the termination of
-          any running Haskell threads in the system, and when
-          <literal>hs_exit()</literal> returns, there will be no more Haskell
-          threads running.  The runtime will then shut down the system in an
-          orderly way, generating profiling
-          output and statistics if necessary, and freeing all the memory it
-          owns.</para>
-
-        <para>It isn't always possible to terminate a Haskell thread forcibly:
-          for example, the thread might be currently executing a foreign call,
-          and we have no way to force the foreign call to complete.  What's
-          more, the runtime must
-          assume that in the worst case the Haskell code and runtime are about
-          to be removed from memory (e.g. if this is a <link linkend="win32-dlls">Windows DLL</link>,
-          <literal>hs_exit()</literal> is normally called before unloading the
-          DLL).  So <literal>hs_exit()</literal> <emphasis>must</emphasis> wait
-          until all outstanding foreign calls return before it can return
-          itself.</para>
-
-        <para>The upshot of this is that if you have Haskell threads that are
-          blocked in foreign calls, then <literal>hs_exit()</literal> may hang
-          (or possibly busy-wait) until the calls return.  Therefore it's a
-          good idea to make sure you don't have any such threads in the system
-          when calling <literal>hs_exit()</literal>.  This includes any threads
-          doing I/O, because I/O may (or may not, depending on the
-          type of I/O and the platform) be implemented using blocking foreign
-          calls.</para>
-
-        <para>The GHC runtime treats program exit as a special case, to avoid
-          the need to wait for blocked threads when a standalone
-          executable exits.  Since the program and all its threads are about to
-          terminate at the same time that the code is removed from memory, it
-          isn't necessary to ensure that the threads have exited first.
-          (Unofficially, if you want to use this fast and loose version of
-          <literal>hs_exit()</literal>, then call
-          <literal>shutdownHaskellAndExit()</literal> instead).</para> 
-      </sect3>
     </sect2>
     
     <sect2 id="glasgow-foreign-headers">
-      <title>Using function headers</title>
+      <title>Using header files</title>
 
       <indexterm><primary>C calls, function headers</primary></indexterm>
 
@@ -456,6 +416,133 @@ int main(int argc, char *argv[])
 	</varlistentry>
       </variablelist>
     </sect2>
+    
+    <sect2 id="ffi-threads">
+      <title>Multi-threading and the FFI</title>
+      
+      <para>In order to use the FFI in a multi-threaded setting, you must
+        use the <option>-threaded</option> option
+        (see <xref linkend="options-linker" />).</para>
+        
+      <sect3>
+        <title>Foreign imports and multi-threading</title>
+        
+        <para>When you call a <literal>foreign import</literal>ed
+          function that is annotated as <literal>safe</literal> (the
+          default), and the program was linked
+          using <option>-threaded</option>, then the call will run
+          concurrently with other running Haskell threads.  If the
+          program was linked without <option>-threaded</option>,
+          then the other Haskell threads will be blocked until the
+          call returns.</para>
+        
+        <para>This means that if you need to make a foreign call to
+          a function that takes a long time or blocks indefinitely,
+          then you should mark it <literal>safe</literal> and
+          use <option>-threaded</option>.  Some library functions
+          make such calls internally; their documentation should
+          indicate when this is the case.</para>
+
+        <para>If you are making foreign calls from multiple Haskell
+          threads and using <option>-threaded</option>, make sure that
+          the foreign code you are calling is thread-safe.  In
+          particularly, some GUI libraries are not thread-safe and
+          require that the caller only invokes GUI methods from a
+          single thread.  If this is the case, you may need to
+          restrict your GUI operations to a single Haskell thread,
+          and possibly also use a bound thread (see
+          <xref linkend="haskell-threads-and-os-threads" />).</para>
+
+        <para>Note that foreign calls made by different Haskell
+          threads may execute in <emphasis>parallel</emphasis>, even
+          when the <literal>+RTS -N</literal> flag is not being used
+          (<xref linkend="parallel-options" />).  The <literal>+RTS
+          -N</literal> flag controls parallel execution of Haskell
+          threads, but there may be an arbitrary number of foreign
+          calls in progress at any one time, regardless of
+          the <literal>+RTS -N</literal> value.</para>
+      </sect3>
+
+      <sect3 id="haskell-threads-and-os-threads">
+        <title>The relationship between Haskell threads and OS
+          threads</title>
+        
+        <para>Normally there is no fixed relationship between Haskell
+          threads and OS threads.  This means that when you make a
+          foreign call, that call may take place in an unspecified OS
+          thread.  Furthermore, there is no guarantee that multiple
+          calls made by one Haskell thread will be made by the same OS
+          thread.</para>
+
+        <para>This usually isn't a problem, and it allows the GHC
+          runtime system to make efficient use of OS thread resources.
+          However, there are cases where it is useful to have more
+          control over which OS thread is used, for example when
+          calling foreign code that makes use of thread-local state.
+          For cases like this, we provide <emphasis>bound
+          threads</emphasis>, which are Haskell threads tied to a
+          particular OS thread.  For information on bound threads, see
+          the documentation
+          for the <ulink url="../libraries/base/Control-Concurrent.html"><literal>Control.Concurrent</literal></ulink>
+          module.</para>
+      </sect3>
+      
+      <sect3>
+        <title>Foreign exports and multi-threading</title>
+        
+        <para>When the program is linked
+          with <option>-threaded</option>, then you may
+          invoke <literal>foreign export</literal>ed functions from
+          multiple OS threads concurrently.  The runtime system must
+          be initialised as usual by
+          calling <literal>hs_init()</literal>
+          and <literal>hs_add_root</literal>, and these calls must
+          complete before invoking any <literal>foreign
+          export</literal>ed functions.</para>
+      </sect3>
+
+      <sect3 id="hs-exit">
+        <title>On the use of <literal>hs_exit()</literal></title>
+
+        <para><literal>hs_exit()</literal> normally causes the termination of
+          any running Haskell threads in the system, and when
+          <literal>hs_exit()</literal> returns, there will be no more Haskell
+          threads running.  The runtime will then shut down the system in an
+          orderly way, generating profiling
+          output and statistics if necessary, and freeing all the memory it
+          owns.</para>
+
+        <para>It isn't always possible to terminate a Haskell thread forcibly:
+          for example, the thread might be currently executing a foreign call,
+          and we have no way to force the foreign call to complete.  What's
+          more, the runtime must
+          assume that in the worst case the Haskell code and runtime are about
+          to be removed from memory (e.g. if this is a <link linkend="win32-dlls">Windows DLL</link>,
+          <literal>hs_exit()</literal> is normally called before unloading the
+          DLL).  So <literal>hs_exit()</literal> <emphasis>must</emphasis> wait
+          until all outstanding foreign calls return before it can return
+          itself.</para>
+
+        <para>The upshot of this is that if you have Haskell threads that are
+          blocked in foreign calls, then <literal>hs_exit()</literal> may hang
+          (or possibly busy-wait) until the calls return.  Therefore it's a
+          good idea to make sure you don't have any such threads in the system
+          when calling <literal>hs_exit()</literal>.  This includes any threads
+          doing I/O, because I/O may (or may not, depending on the
+          type of I/O and the platform) be implemented using blocking foreign
+          calls.</para>
+
+        <para>The GHC runtime treats program exit as a special case, to avoid
+          the need to wait for blocked threads when a standalone
+          executable exits.  Since the program and all its threads are about to
+          terminate at the same time that the code is removed from memory, it
+          isn't necessary to ensure that the threads have exited first.
+          (Unofficially, if you want to use this fast and loose version of
+          <literal>hs_exit()</literal>, then call
+          <literal>shutdownHaskellAndExit()</literal> instead).</para> 
+      </sect3>
+    </sect2>
+        
   </sect1>
 </chapter>
 

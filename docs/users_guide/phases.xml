@@ -966,23 +966,11 @@ $ cat foo.hspp</screen>
               machine.  See <xref linkend="using-smp" />.</para>
 
               <para>The ability to make a foreign call that does not
-              block all other Haskell threads.</para>
-
-              <para>The ability to invoke foreign exported Haskell
-              functions from multiple OS threads.</para>
+              block all other Haskell threads, and to invoke
+              foreign-exported Haskell functions from multiple OS
+              threads. See <xref linkend="ffi-threads" />.</para>
             </listitem>
           </itemizedlist>
-
-          <para>With <option>-threaded</option>, calls to foreign
-          functions are made using the same OS thread that created the
-          Haskell thread (if it was created by a call to a foreign
-          exported Haskell function), or an arbitrary OS thread
-          otherwise (if the Haskell thread was created by
-          <literal>forkIO</literal>).</para>
-
-          <para>More details on the use of "bound threads" in the
-          threaded runtime can be found in the <ulink
-          url="../libraries/base/Control-Concurrent.html"><literal>Control.Concurrent</literal></ulink> module.</para>
         </listitem>
       </varlistentry>
 
