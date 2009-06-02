@@ -46,6 +46,9 @@ INPLACE_BIN		= $(INPLACE)/bin
 INPLACE_LIB		= $(INPLACE)/lib
 INPLACE_MINGW		= $(INPLACE)/mingw
 
+# These are here, rather than in config.mk, as they need to exist in an
+# unconfigured tree so that the various clean targets can be used
+# without configuring:
 RM = rm
 RM_OPTS = -f
 
