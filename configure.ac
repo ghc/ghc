@@ -992,10 +992,12 @@ echo ["\
       which is version   : $GccVersion
 
    ld       : $LdCmd
-   Happy    : $HappyCmd
-   Alex     : $AlexCmd
+   Happy    : $HappyCmd ($HappyVersion)
+   Alex     : $AlexCmd ($AlexVersion)
    Python   : $PythonCmd
-   Perl     : $PerlCmd"]
+   Perl     : $PerlCmd
+   dblatex  : $DblatexCmd
+   xsltproc : $XsltprocCmd"]
 
 if test "$HSCOLOUR" = ""; then
 echo ["
@@ -1007,11 +1009,12 @@ echo ["\
 "]
 fi
 
-echo "Building DocBook HTML documentation: $BUILD_DOCBOOK_HTML"
-echo "Building DocBook PS documentation:   $BUILD_DOCBOOK_PS"
-echo "Building DocBook PDF documentation:  $BUILD_DOCBOOK_PDF"
+echo ["\
+   Building DocBook HTML documentation : $BUILD_DOCBOOK_HTML
+   Building DocBook PS documentation   : $BUILD_DOCBOOK_PS
+   Building DocBook PDF documentation  : $BUILD_DOCBOOK_PDF
 
-echo ["Building shared libraries      : $BuildSharedLibs"]
+   Building shared libraries           : $BuildSharedLibs"]
 
 echo ["----------------------------------------------------------------------
 "]
