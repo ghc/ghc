@@ -34,8 +34,10 @@ $1/$2/index.html: $$($1_DOCBOOK_SOURCES)
 	"$$(XSLTPROC)" --stringparam base.dir $$(dir $$@) \
 	               --stringparam use.id.as.filename 1 \
 	               --stringparam html.stylesheet fptools.css \
+		       --nonet \
 	               $$(XSLTPROC_LABEL_OPTS) $$(XSLTPROC_OPTS) \
-	               $$(DIR_DOCBOOK_XSL)/html/chunk.xsl $1/$2.xml
+		       $$(XSLTPROC_HTML_STYLESHEET) \
+	               $1/$2.xml
 	cp mk/fptools.css $$(dir $$@)
 else
 html_$1 :

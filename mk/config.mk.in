@@ -842,18 +842,17 @@ ISCC                    =
 #-----------------------------------------------------------------------------
 # DocBook XML stuff
 
-BUILD_DOCBOOK_HTML = @BUILD_DOCBOOK_HTML@
-BUILD_DOCBOOK_PS = @BUILD_DOCBOOK_PS@
-BUILD_DOCBOOK_PDF = @BUILD_DOCBOOK_PDF@
-DBLATEX		= @DblatexCmd@
-XSLTPROC		= @XsltprocCmd@
-XMLLINT			= @XmllintCmd@
-
-DIR_DOCBOOK_XSL		= @DIR_DOCBOOK_XSL@
-
-XSLTPROC_LABEL_OPTS	= --stringparam toc.section.depth 3 \
-			  --stringparam section.autolabel 1 \
-			  --stringparam section.label.includes.component.label 1
+BUILD_DOCBOOK_HTML       = @BUILD_DOCBOOK_HTML@
+BUILD_DOCBOOK_PS         = @BUILD_DOCBOOK_PS@
+BUILD_DOCBOOK_PDF        = @BUILD_DOCBOOK_PDF@
+DBLATEX                  = @DblatexCmd@
+XSLTPROC                 = @XsltprocCmd@
+XMLLINT                  = @XmllintCmd@
+HAVE_DOCBOOK_XSL	 = @HAVE_DOCBOOK_XSL@
+XSLTPROC_HTML_STYLESHEET = http://docbook.sourceforge.net/release/xsl/current/html/chunk.xsl
+XSLTPROC_LABEL_OPTS	 = --stringparam toc.section.depth 3 \
+			   --stringparam section.autolabel 1 \
+			   --stringparam section.label.includes.component.label 1
 
 #-----------------------------------------------------------------------------
 # 		FPtools support software

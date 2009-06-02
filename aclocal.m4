@@ -793,33 +793,30 @@ fi
 ])# FP_PROG_XSLTPROC
 
 
-# FP_DIR_DOCBOOK_XSL(XSL-DIRS)
+# FP_DOCBOOK_XSL(XSL-DIRS)
 # ----------------------------
 # Check which of the directories XSL-DIRS contains DocBook XSL stylesheets. The
-# output variable DIR_DOCBOOK_XSL will contain the first usable directory or
+# output variable HAVE_DOCBOOK_XSL will contain the first usable directory or
 # will be empty if none could be found.
-AC_DEFUN([FP_DIR_DOCBOOK_XSL],
+AC_DEFUN([FP_DOCBOOK_XSL],
 [AC_REQUIRE([FP_PROG_XSLTPROC])dnl
 if test -n "$XsltprocCmd"; then
-  AC_CACHE_CHECK([for DocBook XSL stylesheet directory], fp_cv_dir_docbook_xsl,
+  AC_CACHE_CHECK([for DocBook XSL stylesheet], fp_cv_dir_docbook_xsl,
   [FP_GEN_DOCBOOK_XML
   fp_cv_dir_docbook_xsl=no
-  for fp_var in $1; do
-     if $XsltprocCmd ${fp_var}/html/docbook.xsl conftest.xml > /dev/null 2>&1; then
-        fp_cv_dir_docbook_xsl=$fp_var
-        break
-     fi
-  done
+  if $XsltprocCmd --nonet http://docbook.sourceforge.net/release/xsl/current/html/chunk.xsl conftest.xml > /dev/null 2>&1; then
+     fp_cv_dir_docbook_xsl=yes
+  fi
   rm -rf conftest*])
 fi
 if test x"$fp_cv_dir_docbook_xsl" = xno; then
   AC_MSG_WARN([cannot find DocBook XSL stylesheets, you will not be able to build the documentation])
-  DIR_DOCBOOK_XSL=
+  HAVE_DOCBOOK_XSL=NO
 else
-  DIR_DOCBOOK_XSL=$fp_cv_dir_docbook_xsl
+  HAVE_DOCBOOK_XSL=YES
 fi
-AC_SUBST([DIR_DOCBOOK_XSL])
-])# FP_DIR_DOCBOOK_XSL
+AC_SUBST([HAVE_DOCBOOK_XSL])
+])# FP_DOCBOOK_XSL
 
 
 # FP_PROG_XMLLINT
@@ -841,7 +838,7 @@ AC_DEFUN([FP_CHECK_DOCBOOK_DTD],
 if test -n "$XmllintCmd"; then
   AC_MSG_CHECKING([for DocBook DTD])
   FP_GEN_DOCBOOK_XML
-  if $XmllintCmd --valid --noout conftest.xml > /dev/null 2>&1; then
+  if $XmllintCmd --nonet --valid --noout conftest.xml > /dev/null 2>&1; then
     AC_MSG_RESULT([ok])
   else
     AC_MSG_RESULT([failed])
