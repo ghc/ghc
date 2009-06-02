@@ -1,5 +1,4 @@
-
-{-# OPTIONS_GHC -XNoImplicitPrelude #-}
+{-# OPTIONS_GHC -XNoImplicitPrelude -XTypeOperators #-}
 
 module GHC.Generics where
 
