@@ -205,7 +205,7 @@ instance  RealFrac Float  where
 #error FLT_RADIX must be 2
 #endif
     properFraction (F# x#)
-      = case (decodeFloat_Int# x#) of
+      = case decodeFloat_Int# x# of
         (# m#, n# #) ->
             let m = I# m#
                 n = I# n#
