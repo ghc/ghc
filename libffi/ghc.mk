@@ -114,14 +114,16 @@ $(libffi_STAMP_CONFIGURE):
 	# This patch is just the resulting delta from running automake, autoreconf, libtoolize --force --copy
 	cd libffi && "$(PATCH)" -p0 < libffi.autotools-update.patch
 
+# Because -Werror may be in SRC_CC_OPTS/SRC_LD_OPTS, we need to turn
+# warnings off or the compilation of libffi might fail due to warnings
 	cd libffi && \
 	  (set -o igncr 2>/dev/null) && set -o igncr; export SHELLOPTS; \
 	    PATH=`pwd`:$$PATH; \
 	    export PATH; \
 	    cd build && \
 	    CC=$(WhatGccIsCalled) \
-        CFLAGS="$(SRC_CC_OPTS)" \
-        LDFLAGS="$(SRC_LD_OPTS)" \
+        CFLAGS="$(SRC_CC_OPTS) -w" \
+        LDFLAGS="$(SRC_LD_OPTS) -w" \
         "$(SHELL)" configure \
 	          --enable-static=yes \
 	          --enable-shared=$(libffi_EnableShared) \
