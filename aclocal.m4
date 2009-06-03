@@ -747,14 +747,28 @@ AS_VAR_POPDEF([fp_func])dnl
 # FP_GEN_DOCBOOK_XML
 # ------------------
 # Generates a DocBook XML V4.2 document in conftest.xml.
+#
+# It took a lot of experimentation to find a document that will cause
+# xsltproc to fail with an error code when the relevant
+# stylesheets/DTDs are not found.  I couldn't make xsltproc fail with
+# a single-file document, it seems a multi-file document is needed.
+# -- SDM 2009-06-03
+#
 AC_DEFUN([FP_GEN_DOCBOOK_XML],
-[rm -f conftest.xml
+[rm -f conftest.xml conftest-book.xml
 cat > conftest.xml << EOF
 <?xml version="1.0" encoding="iso-8859-1"?>
 <!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.2//EN"
-   "http://www.oasis-open.org/docbook/xml/4.2/docbookx.dtd">
+   "http://www.oasis-open.org/docbook/xml/4.2/docbookx.dtd" [[
+<!ENTITY conftest-book SYSTEM "conftest-book.xml">
+]]>
 <book id="test">
-  <title>A DocBook Test Document</title>
+&conftest-book;
+</book>
+EOF
+cat >conftest-book.xml << EOF
+<?xml version="1.0" encoding="iso-8859-1"?>
+  <title>A DocBook &ldquo;Test Document&rdquo;</title>
   <chapter id="id-one">
     <title>A Chapter Title</title>
     <para>This is a paragraph, referencing <xref linkend="id-two"/>.</para>
@@ -763,7 +777,6 @@ cat > conftest.xml << EOF
     <title>Another Chapter Title</title>
     <para>This is another paragraph, referencing <xref linkend="id-one"/>.</para>
   </chapter>
-</book>
 EOF
 ]) # FP_GEN_DOCBOOK_XML
 
@@ -793,11 +806,9 @@ fi
 ])# FP_PROG_XSLTPROC
 
 
-# FP_DOCBOOK_XSL(XSL-DIRS)
+# FP_DOCBOOK_XSL
 # ----------------------------
-# Check which of the directories XSL-DIRS contains DocBook XSL stylesheets. The
-# output variable HAVE_DOCBOOK_XSL will contain the first usable directory or
-# will be empty if none could be found.
+# Check that we can process a DocBook XML document to HTML using xsltproc.
 AC_DEFUN([FP_DOCBOOK_XSL],
 [AC_REQUIRE([FP_PROG_XSLTPROC])dnl
 if test -n "$XsltprocCmd"; then
@@ -838,7 +849,7 @@ AC_DEFUN([FP_CHECK_DOCBOOK_DTD],
 if test -n "$XmllintCmd"; then
   AC_MSG_CHECKING([for DocBook DTD])
   FP_GEN_DOCBOOK_XML
-  if $XmllintCmd --nonet --valid --noout conftest.xml > /dev/null 2>&1; then
+  if $XmllintCmd --nonet --valid --noout conftest.xml ; then
     AC_MSG_RESULT([ok])
   else
     AC_MSG_RESULT([failed])
