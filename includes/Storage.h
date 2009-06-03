@@ -239,7 +239,6 @@ extern void GarbageCollect(rtsBool force_major_gc, nat gc_type, Capability *cap)
  */
 #if defined(THREADED_RTS)
 extern Mutex sm_mutex;
-extern Mutex atomic_modify_mutvar_mutex;
 #endif
 
 #if defined(THREADED_RTS)
