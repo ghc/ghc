@@ -12,8 +12,6 @@
 
 # ToDo List.
 #
-# Before we can merge the new build system into HEAD:
-#
 #   * finish installation
 #     * other documentation
 #     * create doc index and contents
@@ -23,9 +21,6 @@
 #   * finish binary distributions
 #   * need to fix Cabal for new Windows layout, see
 #     Distribution/Simple/GHC.configureToolchain.
-#
-# Once the new build system is in HEAD, and before 6.12:
-#
 #   * separate the logic of whether to do something from the test for
 #     existence of the tool to do it. For example, rather than checking
 #     if $DIR_DOCBOOK_XSL or $XSLTPROC is "", we should have a variable
