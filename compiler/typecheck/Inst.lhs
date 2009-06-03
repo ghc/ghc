@@ -62,7 +62,7 @@ import InstEnv
 import FunDeps
 import TcMType
 import TcType
-import MkCore
+import MkCore ( mkBigCoreTupTy )
 import TyCon
 import Type
 import TypeRep

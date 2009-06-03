@@ -15,7 +15,7 @@ import SimplEnv
 import SimplUtils
 import FamInstEnv	( FamInstEnv )
 import Id
-import MkId		( mkImpossibleExpr )
+import MkId		( mkImpossibleExpr, seqId )
 import Var
 import IdInfo
 import Coercion
@@ -28,7 +28,7 @@ import CoreUnfold       ( mkUnfolding, callSiteInline, CallCtxt(..) )
 import CoreUtils
 import CoreArity	( exprArity )
 import Rules            ( lookupRule, getRules )
-import BasicTypes       ( isMarkedStrict )
+import BasicTypes       ( isMarkedStrict, Arity )
 import CostCentre       ( currentCCS )
 import TysPrim          ( realWorldStatePrimTy )
 import PrelInfo         ( realWorldPrimId )
@@ -1053,8 +1053,7 @@ simplVar env var cont
 
 completeCall :: SimplEnv -> Id -> SimplCont -> SimplM (SimplEnv, OutExpr)
 completeCall env var cont
-  = do  { dflags <- getDOptsSmpl
-        ; let   (args,call_cont) = contArgs cont
+  = do  { let   (args,call_cont) = contArgs cont
                 -- The args are OutExprs, obtained by *lazily* substituting
                 -- in the args found in cont.  These args are only examined
                 -- to limited depth (unless a rule fires).  But we must do
@@ -1070,45 +1069,18 @@ completeCall env var cont
         -- We used to use the black-listing mechanism to ensure that inlining of
         -- the wrapper didn't occur for things that have specialisations till a
         -- later phase, so but now we just try RULES first
-        --
-        -- Note [Rules for recursive functions]
-        -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        -- You might think that we shouldn't apply rules for a loop breaker:
-        -- doing so might give rise to an infinite loop, because a RULE is
-        -- rather like an extra equation for the function:
-        --      RULE:           f (g x) y = x+y
-        --      Eqn:            f a     y = a-y
-        --
-        -- But it's too drastic to disable rules for loop breakers.
-        -- Even the foldr/build rule would be disabled, because foldr
-        -- is recursive, and hence a loop breaker:
-        --      foldr k z (build g) = g k z
-        -- So it's up to the programmer: rules can cause divergence
-        ; rule_base <- getSimplRules
-        ; let   in_scope   = getInScope env
-	  	rules      = getRules rule_base var
-                maybe_rule = case activeRule dflags env of
-                                Nothing     -> Nothing  -- No rules apply
-                                Just act_fn -> lookupRule act_fn in_scope
-                                                          var args rules 
-        ; case maybe_rule of {
-            Just (rule, rule_rhs) -> do
-                tick (RuleFired (ru_name rule))
-                (if dopt Opt_D_dump_rule_firings dflags then
-                   pprTrace "Rule fired" (vcat [
-                        text "Rule:" <+> ftext (ru_name rule),
-                        text "Before:" <+> ppr var <+> sep (map pprParendExpr args),
-                        text "After: " <+> pprCoreExpr rule_rhs,
-                        text "Cont:  " <+> ppr call_cont])
-                 else
-                        id)             $
-                 simplExprF env rule_rhs (dropArgs (ruleArity rule) cont)
+	-- 
+	-- See also Note [Rules for recursive functions]
+	; mb_rule <- tryRules env var args call_cont
+	; case mb_rule of {
+	     Just (n_args, rule_rhs) -> simplExprF env rule_rhs (dropArgs n_args cont) ;
                  -- The ruleArity says how many args the rule consumed
+           ; Nothing -> do       -- No rules
 
-          ; Nothing -> do       -- No rules
 
         ------------- Next try inlining ----------------
-        { let   arg_infos = [interestingArg arg | arg <- args, isValArg arg]
+        { dflags <- getDOptsSmpl
+        ; let   arg_infos = [interestingArg arg | arg <- args, isValArg arg]
                 n_val_args = length arg_infos
                 interesting_cont = interestingCallContext call_cont
                 active_inline = activeInline env var
@@ -1214,6 +1186,58 @@ to get the effect that finding (error "foo") in a strict arg position will
 discard the entire application and replace it with (error "foo").  Getting
 all this at once is TOO HARD!
 
+
+%************************************************************************
+%*                                                                      *
+                Rewrite rules
+%*                                                                      *
+%************************************************************************
+
+\begin{code}
+tryRules :: SimplEnv -> Id -> [OutExpr] -> SimplCont 
+	 -> SimplM (Maybe (Arity, CoreExpr))	     -- The arity is the number of
+	    	   	  	  		     -- args consumed by the rule
+tryRules env fn args call_cont
+  = do {  dflags <- getDOptsSmpl
+        ; rule_base <- getSimplRules
+        ; let   in_scope   = getInScope env
+	  	rules      = getRules rule_base fn
+                maybe_rule = case activeRule dflags env of
+                                Nothing     -> Nothing  -- No rules apply
+                                Just act_fn -> lookupRule act_fn in_scope
+                                                          fn args rules 
+        ; case (rules, maybe_rule) of {
+	    ([], _)      	        -> return Nothing ;
+	    (_,  Nothing) 	        -> return Nothing ;
+            (_,  Just (rule, rule_rhs)) -> do
+
+        { tick (RuleFired (ru_name rule))
+        ; (if dopt Opt_D_dump_rule_firings dflags then
+                   pprTrace "Rule fired" (vcat [
+                        text "Rule:" <+> ftext (ru_name rule),
+                        text "Before:" <+> ppr fn <+> sep (map pprParendExpr args),
+                        text "After: " <+> pprCoreExpr rule_rhs,
+                        text "Cont:  " <+> ppr call_cont])
+                 else
+                        id)             $
+           return (Just (ruleArity rule, rule_rhs)) }}}
+\end{code}
+
+Note [Rules for recursive functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+You might think that we shouldn't apply rules for a loop breaker:
+doing so might give rise to an infinite loop, because a RULE is
+rather like an extra equation for the function:
+     RULE:           f (g x) y = x+y
+     Eqn:            f a     y = a-y
+
+But it's too drastic to disable rules for loop breakers.
+Even the foldr/build rule would be disabled, because foldr
+is recursive, and hence a loop breaker:
+     foldr k z (build g) = g k z
+So it's up to the programmer: rules can cause divergence
+
+
 %************************************************************************
 %*                                                                      *
                 Rebuilding a cse expression
@@ -1310,12 +1334,13 @@ I don't really know how to improve this situation.
 ---------------------------------------------------------
 --      Eliminate the case if possible
 
-rebuildCase :: SimplEnv
-            -> OutExpr          -- Scrutinee
-            -> InId             -- Case binder
-            -> [InAlt]          -- Alternatives (inceasing order)
-            -> SimplCont
-            -> SimplM (SimplEnv, OutExpr)
+rebuildCase, reallyRebuildCase
+   :: SimplEnv
+   -> OutExpr          -- Scrutinee
+   -> InId             -- Case binder
+   -> [InAlt]          -- Alternatives (inceasing order)
+   -> SimplCont
+   -> SimplM (SimplEnv, OutExpr)
 
 --------------------------------------------------
 --      1. Eliminate the case if there's a known constructor
@@ -1376,12 +1401,28 @@ rebuildCase env scrut case_bndr [(_, bndrs, rhs)] cont
                                     -- exprOkForSpeculation was intended for.
     var_demanded_later _       = False
 
+rebuildCase env scrut case_bndr alts@[(_, bndrs, rhs)] cont
+  | all isDeadBinder (case_bndr : bndrs)  -- So this is just 'seq'
+  = 	-- For this case, see Note [Rules for seq] in MkId
+    do { let rhs' = substExpr env rhs
+             out_args = [Type (substTy env (idType case_bndr)), 
+	     	         Type (exprType rhs'), scrut, rhs']
+	     	      -- Lazily evaluated, so we don't do most of this
+       ; mb_rule <- tryRules env seqId out_args cont
+       ; case mb_rule of 
+           Just (n_args, res) -> simplExprF (zapSubstEnv env) 
+	   	       		    	    (mkApps res (drop n_args out_args))
+                                            cont
+	   Nothing -> reallyRebuildCase env scrut case_bndr alts cont }
+
+rebuildCase env scrut case_bndr alts cont
+  = reallyRebuildCase env scrut case_bndr alts cont
 
 --------------------------------------------------
 --      3. Catch-all case
 --------------------------------------------------
 
-rebuildCase env scrut case_bndr alts cont
+reallyRebuildCase env scrut case_bndr alts cont
   = do  {       -- Prepare the continuation;
                 -- The new subst_env is in place
           (env', dup_cont, nodup_cont) <- prepareCaseCont env alts cont

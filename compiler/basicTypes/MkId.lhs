@@ -904,11 +904,7 @@ nullAddrId = pcMiscPrelId nullAddrName addrPrimTy info
            mkCompulsoryUnfolding (Lit nullAddrLit)
 
 ------------------------------------------------
-seqId :: Id
--- 'seq' is very special.  See notes with
---	See DsUtils.lhs Note [Desugaring seq (1)] and
---			Note [Desugaring seq (2)] and
--- Fixity is set in LoadIface.ghcPrimIface
+seqId :: Id	-- See Note [seqId magic]
 seqId = pcMiscPrelId seqName ty info
   where
     info = noCafIdInfo `setUnfoldingInfo` mkCompulsoryUnfolding rhs
@@ -926,6 +922,44 @@ lazyId = pcMiscPrelId lazyIdName ty info
     info = noCafIdInfo
     ty  = mkForAllTys [alphaTyVar] (mkFunTy alphaTy alphaTy)
 \end{code}
+
+Note [seqId magic]
+~~~~~~~~~~~~~~~~~~
+'seq' is special in several ways.  
+
+a) Its second arg can have an unboxed type
+      x `seq` (v +# w)
+
+b) Its fixity is set in LoadIface.ghcPrimIface
+
+c) It has quite a bit of desugaring magic. 
+   See DsUtils.lhs Note [Desugaring seq (1)] and (2) and (3)
+
+d) There is some special rule handing: Note [RULES for seq]
+
+Note [Rules for seq]
+~~~~~~~~~~~~~~~~~~~~
+Roman found situations where he had
+      case (f n) of _ -> e
+where he knew that f (which was strict in n) would terminate if n did.
+Notice that the result of (f n) is discarded. So it makes sense to
+transform to
+      case n of _ -> e
+
+Rather than attempt some general analysis to support this, I've added
+enough support that you can do this using a rewrite rule:
+
+  RULE "f/seq" forall n.  seq (f n) e = seq n e
+
+You write that rule.  When GHC sees a case expression that discards
+its result, it mentally transforms it to a call to 'seq' and looks for
+a RULE.  (This is done in Simplify.rebuildCase.)  As usual, the
+correctness of the rule is up to you.
+
+To make this work, we need to be careful that the magical desugaring
+done in Note [seqId magic] item (c) is *not* done on the LHS of a rule.
+Or rather, we arrange to un-do it, in DsBinds.decomposeRuleLhs.
+
 
 Note [lazyId magic]
 ~~~~~~~~~~~~~~~~~~~

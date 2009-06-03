@@ -36,6 +36,7 @@ import TcType
 import CostCentre
 import Module
 import Id
+import MkId	( seqId )
 import Var	( Var, TyVar )
 import VarSet
 import Rules
@@ -476,6 +477,12 @@ decomposeRuleLhs lhs
         -- a LHS:       let f71 = M.f Int in f71
     decomp env (Let (NonRec dict rhs) body) 
         = decomp (extendVarEnv env dict (simpleSubst env rhs)) body
+
+    decomp env (Case scrut bndr ty [(DEFAULT, _, body)])
+        | isDeadBinder bndr	-- Note [Matching seqId]
+        = Just (seqId, [Type (idType bndr), Type ty, 
+                        simpleSubst env scrut, simpleSubst env body])
+
     decomp env body 
         = case collectArgs (simpleSubst env body) of
             (Var fn, args) -> Just (fn, args)
@@ -526,6 +533,12 @@ addInlineInfo (Inline prag is_inline) bndr rhs
     wrap_inline True  body = mkInlineMe body
     wrap_inline False body = body
 \end{code}
+
+Note [Matching seq]
+~~~~~~~~~~~~~~~~~~~
+The desugarer turns (seq e r) into (case e of _ -> r), via a special-case hack
+and this code turns it back into an application of seq!  
+See Note [Rules for seq] in MkId for the details.
 
 
 %************************************************************************

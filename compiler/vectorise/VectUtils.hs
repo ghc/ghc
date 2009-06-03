@@ -22,7 +22,7 @@ module VectUtils (
 import VectCore
 import VectMonad
 
-import MkCore
+import MkCore ( mkCoreTup, mkCoreTupTy, mkWildCase )
 import CoreSyn
 import CoreUtils
 import Coercion

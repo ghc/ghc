@@ -4,7 +4,7 @@ module MkCore (
         -- * Constructing normal syntax
         mkCoreLet, mkCoreLets,
         mkCoreApp, mkCoreApps, mkCoreConApps,
-        mkCoreLams, mkWildCase, mkIfThenElse,
+        mkCoreLams, mkWildCase, mkWildBinder, mkIfThenElse,
         
         -- * Constructing boxed literals
         mkWordExpr, mkWordExprWord,
@@ -120,14 +120,6 @@ mkCoreConApps con args = mkCoreApps (Var (dataConWorkId con)) args
 
 -----------
 mk_val_app :: CoreExpr -> CoreExpr -> Type -> Type -> CoreExpr
-mk_val_app (Var f `App` Type ty1 `App` Type _ `App` arg1) arg2 _ res_ty
-  | f `hasKey` seqIdKey            -- Note [Desugaring seq (1), (2)]
-  = Case arg1 case_bndr res_ty [(DEFAULT,[],arg2)]
-  where
-    case_bndr = case arg1 of
-                   Var v1 | isLocalId v1 -> v1        -- Note [Desugaring seq (2) and (3)]
-                   _                     -> mkWildBinder ty1
-
 mk_val_app fun arg arg_ty _        -- See Note [CoreSyn let/app invariant]
   | not (needsCaseBinding arg_ty arg)
   = App fun arg                -- The vastly common case
@@ -167,69 +159,10 @@ mkIfThenElse guard then_expr else_expr
     	   (DataAlt trueDataCon,  [], then_expr) ]
 \end{code}
 
-Note [Desugaring seq (1)]  cf Trac #1031
-~~~~~~~~~~~~~~~~~~~~~~~~~
-   f x y = x `seq` (y `seq` (# x,y #))
+The functions from this point don't really do anything cleverer than
+their counterparts in CoreSyn, but they are here for consistency
 
-The [CoreSyn let/app invariant] means that, other things being equal, because 
-the argument to the outer 'seq' has an unlifted type, we'll use call-by-value thus:
-
-   f x y = case (y `seq` (# x,y #)) of v -> x `seq` v
-
-But that is bad for two reasons: 
-  (a) we now evaluate y before x, and 
-  (b) we can't bind v to an unboxed pair
-
-Seq is very, very special!  So we recognise it right here, and desugar to
-        case x of _ -> case y of _ -> (# x,y #)
-
-Note [Desugaring seq (2)]  cf Trac #2231
-~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider
-   let chp = case b of { True -> fst x; False -> 0 }
-   in chp `seq` ...chp...
-Here the seq is designed to plug the space leak of retaining (snd x)
-for too long.
-
-If we rely on the ordinary inlining of seq, we'll get
-   let chp = case b of { True -> fst x; False -> 0 }
-   case chp of _ { I# -> ...chp... }
-
-But since chp is cheap, and the case is an alluring contet, we'll
-inline chp into the case scrutinee.  Now there is only one use of chp,
-so we'll inline a second copy.  Alas, we've now ruined the purpose of
-the seq, by re-introducing the space leak:
-    case (case b of {True -> fst x; False -> 0}) of
-      I# _ -> ...case b of {True -> fst x; False -> 0}...
-
-We can try to avoid doing this by ensuring that the binder-swap in the
-case happens, so we get his at an early stage:
-   case chp of chp2 { I# -> ...chp2... }
-But this is fragile.  The real culprit is the source program.  Perhaps we
-should have said explicitly
-   let !chp2 = chp in ...chp2...
-
-But that's painful.  So the code here does a little hack to make seq
-more robust: a saturated application of 'seq' is turned *directly* into
-the case expression. So we desugar to:
-   let chp = case b of { True -> fst x; False -> 0 }
-   case chp of chp { I# -> ...chp... }
-Notice the shadowing of the case binder! And now all is well.
-
-The reason it's a hack is because if you define mySeq=seq, the hack
-won't work on mySeq.  
-
-Note [Desugaring seq (3)] cf Trac #2409
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The isLocalId ensures that we don't turn 
-        True `seq` e
-into
-        case True of True { ... }
-which stupidly tries to bind the datacon 'True'. 
 \begin{code}
--- The functions from this point don't really do anything cleverer than
--- their counterparts in CoreSyn, but they are here for consistency
-
 -- | Create a lambda where the given expression has a number of variables
 -- bound over it. The leftmost binder is that bound by the outermost
 -- lambda in the result

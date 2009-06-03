@@ -216,7 +216,7 @@ dsExpr (HsLam a_Match)
   = uncurry mkLams <$> matchWrapper LambdaExpr a_Match
 
 dsExpr (HsApp fun arg)
-  = mkCoreApp <$> dsLExpr fun <*>  dsLExpr arg
+  = mkCoreAppDs <$> dsLExpr fun <*>  dsLExpr arg
 \end{code}
 
 Operator sections.  At first it looks as if we can convert
@@ -243,10 +243,10 @@ will sort it out.
 \begin{code}
 dsExpr (OpApp e1 op _ e2)
   = -- for the type of y, we need the type of op's 2nd argument
-    mkCoreApps <$> dsLExpr op <*> mapM dsLExpr [e1, e2]
+    mkCoreAppsDs <$> dsLExpr op <*> mapM dsLExpr [e1, e2]
     
 dsExpr (SectionL expr op)	-- Desugar (e !) to ((!) e)
-  = mkCoreApp <$> dsLExpr op <*> dsLExpr expr
+  = mkCoreAppDs <$> dsLExpr op <*> dsLExpr expr
 
 -- dsLExpr (SectionR op expr)	-- \ x -> op x expr
 dsExpr (SectionR op expr) = do
@@ -258,7 +258,7 @@ dsExpr (SectionR op expr) = do
     x_id <- newSysLocalDs x_ty
     y_id <- newSysLocalDs y_ty
     return (bindNonRec y_id y_core $
-            Lam x_id (mkCoreApps core_op [Var x_id, Var y_id]))
+            Lam x_id (mkCoreAppsDs core_op [Var x_id, Var y_id]))
 
 dsExpr (HsSCC cc expr) = do
     mod_name <- getModuleDs
