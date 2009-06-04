@@ -109,13 +109,12 @@ doInstall ghcpkg ghcpkgconf directory distDir myDestDir myPrefix myLibdir myDocd
      defaultMainWithHooksArgs hooks ("register" : "--builddir" : distDir : args)
     where
       hooks = userHooks {
-                  copyHook = modHook (copyHook userHooks),
+                  copyHook = noGhcPrimHook (modHook (copyHook userHooks)),
                   regHook  = modHook (regHook userHooks)
               }
 
-      modHook f pd lbi us flags
-              = let
-                    pd'
+      noGhcPrimHook f pd lbi us flags
+              = let pd'
                      | packageName pd == PackageName "ghc-prim" =
                         case library pd of
                         Just lib ->
@@ -126,7 +125,9 @@ doInstall ghcpkg ghcpkgconf directory distDir myDestDir myPrefix myLibdir myDocd
                         Nothing ->
                             error "Expected a library, but none found"
                      | otherwise = pd
-                    idts = installDirTemplates lbi
+                in f pd' lbi us flags
+      modHook f pd lbi us flags
+              = let idts = installDirTemplates lbi
                     idts' = idts { prefix    = toPathTemplate myPrefix,
                                    libdir    = toPathTemplate myLibdir,
                                    libsubdir = toPathTemplate "$pkgid",
@@ -147,7 +148,7 @@ doInstall ghcpkg ghcpkgconf directory distDir myDestDir myPrefix myLibdir myDocd
                                    installDirTemplates = idts',
                                    withPrograms = progs'
                                }
-                in f pd' lbi' us flags
+                in f pd lbi' us flags
 
 generate :: [String] -> FilePath -> FilePath -> IO ()
 generate config_args distdir directory
