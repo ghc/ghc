@@ -35,6 +35,7 @@
 #include "Hpc.h"
 #include "FileLock.h"
 #include "EventLog.h"
+#include "Hash.h"
 
 #if defined(RTS_GTK_FRONTPANEL)
 #include "FrontPanel.h"
