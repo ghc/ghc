@@ -57,6 +57,4 @@ extern void    threadStablePtrTable  ( evac_fn evac, void *user );
 extern void    gcStablePtrTable      ( void );
 extern void    updateStablePtrTable  ( rtsBool full );
 
-extern void    exitHashTable         ( void );
-
 #endif
