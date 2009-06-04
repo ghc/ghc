@@ -215,6 +215,9 @@ GarbageCollect (rtsBool force_major_gc,
   // tell the STM to discard any cached closures it's hoping to re-use
   stmPreGCHook();
 
+  // lock the StablePtr table
+  stablePtrPreGC();
+
 #ifdef DEBUG
   mutlist_MUTVARS = 0;
   mutlist_MUTARRS = 0;
@@ -793,6 +796,9 @@ SET_GCT(gc_threads[0]);
   // ok, GC over: tell the stats department what happened. 
   slop = calcLiveBlocks() * BLOCK_SIZE_W - live;
   stat_endGC(allocated, live, copied, N, max_copied, avg_copied, slop);
+
+  // unlock the StablePtr table
+  stablePtrPostGC();
 
   // Guess which generation we'll collect *next* time
   initialise_N(force_major_gc);

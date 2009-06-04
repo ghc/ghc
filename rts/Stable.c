@@ -316,6 +316,23 @@ enlargeStablePtrTable(void)
 }
 
 /* -----------------------------------------------------------------------------
+ * We must lock the StablePtr table during GC, to prevent simultaneous
+ * calls to freeStablePtr().
+ * -------------------------------------------------------------------------- */
+
+void
+stablePtrPreGC(void)
+{
+    ACQUIRE_LOCK(&stable_mutex);
+}
+
+void
+stablePtrPostGC(void)
+{
+    RELEASE_LOCK(&stable_mutex);
+}
+
+/* -----------------------------------------------------------------------------
  * Treat stable pointers as roots for the garbage collector.
  *
  * A stable pointer is any stable name entry with a ref > 0.  We'll

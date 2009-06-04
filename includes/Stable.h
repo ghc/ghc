@@ -57,4 +57,7 @@ extern void    threadStablePtrTable  ( evac_fn evac, void *user );
 extern void    gcStablePtrTable      ( void );
 extern void    updateStablePtrTable  ( rtsBool full );
 
+extern void    stablePtrPreGC        ( void );
+extern void    stablePtrPostGC       ( void );
+
 #endif
