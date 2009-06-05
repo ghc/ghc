@@ -844,7 +844,8 @@ ghc -c Foo.hs</screen>
     <option>-fwarn-deprecated-flags</option>,
     <option>-fwarn-duplicate-exports</option>,
     <option>-fwarn-missing-fields</option>,
-    <option>-fwarn-missing-methods</option>, and
+    <option>-fwarn-missing-methods</option>,
+    <option>-fwarn-lazy-unlifted-bindings</option>, and
     <option>-fwarn-dodgy-foreign-imports</option>.  The following
     flags are
     simple ways to select standard &ldquo;packages&rdquo; of warnings:
@@ -996,6 +997,20 @@ foreign import "&amp;f" f :: FunPtr t
       <literal>T</literal> is imported
       with all constructors, i.e. <literal>T(..)</literal>, but has been
       exported abstractly, i.e. <literal>T</literal>.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><option>-fwarn-lazy-unlifted-bindings</option>:</term>
+	<listitem>
+	  <indexterm><primary><option>-fwarn-lazy-unlifted-bindings</option></primary>
+	  </indexterm>
+	  <para>Causes a warning to be emitted when an unlifted type
+      is bound in a way that looks lazy, e.g.
+      <literal>where (I# x) = ...</literal>. Use
+      <literal>where !(I# x) = ...</literal> instead. This will be an
+      error, rather than a warning, in GHC 6.14.
+      </para>
 	</listitem>
       </varlistentry>
 
