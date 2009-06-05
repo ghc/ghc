@@ -992,7 +992,7 @@ foreign import "&amp;f" f :: FunPtr t
 	<listitem>
 	  <indexterm><primary><option>-fwarn-dodgy-imports</option></primary>
 	  </indexterm>
-	  <para>Causes a warning to be emitted when a a datatype
+	  <para>Causes a warning to be emitted when a datatype
       <literal>T</literal> is imported
       with all constructors, i.e. <literal>T(..)</literal>, but has been
       exported abstractly, i.e. <literal>T</literal>.</para>
