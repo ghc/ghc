@@ -109,10 +109,10 @@ $(libffi_STAMP_CONFIGURE):
 	cd libffi && $(TAR) -zxf tarball/libffi*.tar.gz
 	mv libffi/libffi-* libffi/build
 	chmod +x libffi/ln
-	cd libffi && $(PATCH) -p0 < libffi.dllize-3.0.6.patch
-
-	# This patch is just the resulting delta from running automake, autoreconf, libtoolize --force --copy
-	cd libffi && "$(PATCH)" -p0 < libffi.autotools-update.patch
+	cd libffi/build && "$(PATCH)" -p1 < ../libffi.dllize-3.0.8.patch
+	# This patch is just the resulting delta from running
+	# automake && autoreconf && libtoolize --force --copy
+	cd libffi/build && "$(PATCH)" -p1 < ../libffi.autotools-update-3.0.8.patch
 
 # Because -Werror may be in SRC_CC_OPTS/SRC_LD_OPTS, we need to turn
 # warnings off or the compilation of libffi might fail due to warnings

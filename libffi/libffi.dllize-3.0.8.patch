@@ -1,6 +1,6 @@
-diff -Nur libffi-3.0.6/Makefile.am build/Makefile.am
---- libffi-3.0.6/Makefile.am	2008-02-21 13:36:18.000000000 +0000
-+++ build/Makefile.am	2009-01-23 17:56:09.000000000 +0000
+diff -Nur libffi-3.0.8/Makefile.am dllize-3.0.8/Makefile.am
+--- libffi-3.0.8/Makefile.am	2008-02-21 13:36:18.000000000 +0000
++++ dllize-3.0.8/Makefile.am	2009-06-05 17:41:33.000000000 +0100
 @@ -165,7 +165,7 @@
  
  AM_CFLAGS = -Wall -g -fexceptions
@@ -10,9 +10,9 @@ diff -Nur libffi-3.0.6/Makefile.am build/Makefile.am
  
  AM_CPPFLAGS = -I. -I$(top_srcdir)/include -Iinclude -I$(top_srcdir)/src
  AM_CCASFLAGS = $(AM_CPPFLAGS)
-diff -Nur libffi-3.0.6/configure.ac build/configure.ac
---- libffi-3.0.6/configure.ac	2008-07-17 13:57:33.000000000 +0100
-+++ build/configure.ac	2009-01-23 17:56:09.000000000 +0000
+diff -Nur libffi-3.0.8/configure.ac dllize-3.0.8/configure.ac
+--- libffi-3.0.8/configure.ac	2008-12-19 16:12:30.000000000 +0000
++++ dllize-3.0.8/configure.ac	2009-06-05 17:41:33.000000000 +0100
 @@ -26,6 +26,20 @@
  
  AM_PROG_AS
@@ -34,9 +34,9 @@ diff -Nur libffi-3.0.6/configure.ac build/configure.ac
  AC_PROG_LIBTOOL
  
  AM_MAINTAINER_MODE
-diff -Nur libffi-3.0.6/include/ffi.h.in build/include/ffi.h.in
---- libffi-3.0.6/include/ffi.h.in	2008-04-03 19:57:34.000000000 +0100
-+++ build/include/ffi.h.in	2009-01-23 17:56:09.000000000 +0000
+diff -Nur libffi-3.0.8/include/ffi.h.in dllize-3.0.8/include/ffi.h.in
+--- libffi-3.0.8/include/ffi.h.in	2008-04-03 19:57:34.000000000 +0100
++++ dllize-3.0.8/include/ffi.h.in	2009-06-05 17:41:33.000000000 +0100
 @@ -61,6 +61,17 @@
  #define @TARGET@
  #endif
@@ -178,9 +178,9 @@ diff -Nur libffi-3.0.6/include/ffi.h.in build/include/ffi.h.in
  
  /* Useful for eliminating compiler warnings */
  #define FFI_FN(f) ((void (*)(void))f)
-diff -Nur libffi-3.0.6/include/ffi_common.h build/include/ffi_common.h
---- libffi-3.0.6/include/ffi_common.h	2008-07-12 06:43:00.000000000 +0100
-+++ build/include/ffi_common.h	2009-01-23 17:56:09.000000000 +0000
+diff -Nur libffi-3.0.8/include/ffi_common.h dllize-3.0.8/include/ffi_common.h
+--- libffi-3.0.8/include/ffi_common.h	2008-07-12 06:43:00.000000000 +0100
++++ dllize-3.0.8/include/ffi_common.h	2009-06-05 17:41:33.000000000 +0100
 @@ -49,9 +49,9 @@
  #endif
  
@@ -203,9 +203,9 @@ diff -Nur libffi-3.0.6/include/ffi_common.h build/include/ffi_common.h
  
  /* Extended cif, used in callback from assembly routine */
  typedef struct
-diff -Nur libffi-3.0.6/src/x86/win32.S build/src/x86/win32.S
---- libffi-3.0.6/src/x86/win32.S	2008-02-15 01:24:06.000000000 +0000
-+++ build/src/x86/win32.S	2009-01-23 17:56:09.000000000 +0000
+diff -Nur libffi-3.0.8/src/x86/win32.S dllize-3.0.8/src/x86/win32.S
+--- libffi-3.0.8/src/x86/win32.S	2008-02-15 01:24:06.000000000 +0000
++++ dllize-3.0.8/src/x86/win32.S	2009-06-05 17:41:33.000000000 +0100
 @@ -33,8 +33,6 @@
   
  .text
