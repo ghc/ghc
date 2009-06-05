@@ -1008,6 +1008,7 @@ This name is not supported by GHC.
 	paper <ulink url="http://research.microsoft.com/~simonpj/papers/list-comp">
 	  Comprehensive comprehensions: comprehensions with "order by" and "group by"</ulink>,
     except that the syntax we use differs slightly from the paper.</para>
+<para>The extension is enabled with the flag <option>-XTransformListComp</option>.</para>
 <para>Here is an example: 
 <programlisting>
 employees = [ ("Simon", "MS", 80)

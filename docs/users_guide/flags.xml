@@ -856,7 +856,7 @@
 	    </row>
 	    <row>
 	      <entry><option>-XTransformListComp</option></entry>
-	      <entry>Enable <link linkend="generalised-list-comprehensions">transform list comprehensions</link>.</entry>
+	      <entry>Enable <link linkend="generalised-list-comprehensions">generalised list comprehensions</link>.</entry>
 	      <entry>dynamic</entry>
 	      <entry><option>-XNoTransformListComp</option></entry>
 	    </row>
