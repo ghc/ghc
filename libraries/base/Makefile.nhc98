@@ -2,6 +2,7 @@ THISPKG	= base
 SEARCH	= -I$(TOPDIR)/targets/$(MACHINE) -Iinclude \
 	  -I../../prelude/PreludeIO -I../../prelude/`$(LOCAL)harch`
 EXTRA_H_FLAGS   = -H4M -K3M
+EXTRA_C_FLAGS   = -D__NHC__
 EXTRA_HBC_FLAGS = -H16M -A1M
 
 DIRS	= \
@@ -39,7 +40,7 @@ SRCS	= \
 	Text/Read.hs Text/Show.hs Text/Show/Functions.hs \
 	Text/ParserCombinators/ReadP.hs Data/Version.hs \
 	Unsafe/Coerce.hs \
-	WCsubst.c \
+	WCsubst.c dirUtils.c \
 	System/Posix/Types.hs System/Posix/Internals.hs \
 
 #	Data/String.hs
