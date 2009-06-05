@@ -1,14 +1,15 @@
 install1:
 bin
 lib
-Reading package info from "dist/installed-pkg-config" ... done.
-Writing new package config file... done.
 install2:
 bin
 lib
 dist:
 build
+inplace-pkg-config
 installed-pkg-config
+package.conf.inplace
 setup-config
+src
 test-1.0.tar.gz
 Writing new package config file... done.
