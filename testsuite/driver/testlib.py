@@ -740,7 +740,7 @@ def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link ):
 
     stats_file = name + '.comp.stats'
     if opts.compiler_stats_num_fields != []:
-        extra_hc_opts += ' +RTS -t' + stats_file + ' --machine-readable -RTS'
+        extra_hc_opts += ' +RTS -V0 -t' + stats_file + ' --machine-readable -RTS'
 
     cmd = 'cd ' + testdir + " && '" \
           + config.compiler + "' " \
@@ -807,7 +807,7 @@ def simple_run( name, way, prog, args ):
 
     stats_file = name + '.stats'
     if opts.stats_num_fields != []:
-        args += ' +RTS -t' + stats_file + ' --machine-readable -RTS'
+        args += ' +RTS -V0 -t' + stats_file + ' --machine-readable -RTS'
 
     if opts.no_stdin:
         stdin_comes_from = ''
