@@ -478,7 +478,8 @@ checkStrictBinds top_lvl rec_group mbind mono_tys infos
         -- This should be a checkTc, not a warnTc, but as of GHC 6.11
         -- the versions of alex and happy available have non-conforming
         -- templates, so the GHC build fails if it's an error:
-        ; warnTc (not bang_pat)
+        ; warnUnlifted <- doptM Opt_WarnLazyUnliftedBindings
+        ; warnTc (warnUnlifted && not bang_pat)
                  (unliftedMustBeBang mbind)
         ; mapM_ check_sig infos
         ; return True }
@@ -495,6 +496,7 @@ unliftedMustBeBang :: LHsBindsLR Var Var -> SDoc
 unliftedMustBeBang mbind
   = hang (text "Bindings containing unlifted types must use an outermost bang pattern:")
          4 (pprLHsBinds mbind)
+ $$ text "*** This will be an error in GHC 6.14! Fix your code now!"
 
 strictBindErr :: String -> Bool -> LHsBindsLR Var Var -> SDoc
 strictBindErr flavour unlifted mbind

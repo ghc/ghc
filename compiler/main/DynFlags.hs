@@ -191,6 +191,7 @@ data DynFlag
    | Opt_WarnTabs
    | Opt_WarnUnrecognisedPragmas
    | Opt_WarnDodgyForeignImports
+   | Opt_WarnLazyUnliftedBindings
 
    -- language opts
    | Opt_OverlappingInstances
@@ -906,6 +907,7 @@ standardWarnings
         Opt_WarnMissingFields,
         Opt_WarnMissingMethods,
         Opt_WarnDuplicateExports,
+        Opt_WarnLazyUnliftedBindings,
         Opt_WarnDodgyForeignImports
       ]
 
@@ -1659,6 +1661,8 @@ fFlags = [
   ( "warn-orphans",                     Opt_WarnOrphans, const Supported ),
   ( "warn-tabs",                        Opt_WarnTabs, const Supported ),
   ( "warn-unrecognised-pragmas",        Opt_WarnUnrecognisedPragmas, const Supported ),
+  ( "warn-lazy-unlifted-bindings",      Opt_WarnLazyUnliftedBindings,
+    const $ Deprecated "lazy unlifted bindings will be an error in GHC 6.14, and this flag will no longer exist"),
   ( "print-explicit-foralls",           Opt_PrintExplicitForalls, const Supported ),
   ( "strictness",                       Opt_Strictness, const Supported ),
   ( "static-argument-transformation",   Opt_StaticArgumentTransformation, const Supported ),
