@@ -52,8 +52,9 @@ test('T1969',
                                     #                 221667908 (x86/OS X)
       if_wordsize(64,
           compiler_stats_num_field('bytes allocated', 440000000,
-                                                      480000000))
+                                                      480000000)),
                                     # expected value: 451976088 (amd64/Linux)
+      only_ways(['normal'])
       ],
      compile,
      [''])
