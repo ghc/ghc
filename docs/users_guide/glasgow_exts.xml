@@ -210,22 +210,20 @@ in a <emphasis>top-level</emphasis> binding.
 in a <emphasis>recursive</emphasis> binding.
 </para></listitem>
 <listitem><para> You may bind unboxed variables in a (non-recursive,
-non-top-level) pattern binding, but any such variable causes the entire
-pattern-match
-to become strict.  For example:
+non-top-level) pattern binding, but you must make any such pattern-match
+strict.  For example, rather than:
 <programlisting>
   data Foo = Foo Int Int#
 
   f x = let (Foo a b, w) = ..rhs.. in ..body..
 </programlisting>
-Since <literal>b</literal> has type <literal>Int#</literal>, the entire pattern
-match
-is strict, and the program behaves as if you had written
+you must write:
 <programlisting>
   data Foo = Foo Int Int#
 
-  f x = case ..rhs.. of { (Foo a b, w) -> ..body.. }
+  f x = let !(Foo a b, w) = ..rhs.. in ..body..
 </programlisting>
+since <literal>b</literal> has type <literal>Int#</literal>.
 </para>
 </listitem>
 </itemizedlist>
