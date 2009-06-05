@@ -198,11 +198,12 @@ generate config_args distdir directory
 
       -- generate inplace-pkg-config
       when (isJust $ library pd) $
-          writeInstalledConfig distdir pd lbi True Nothing
+          writeInstalledConfig distdir pd lbi True
+                               (distdir </> "inplace-pkg-config")
 
       let
-          libBiModules lib = (libBuildInfo lib, libModules pd)
-          exeBiModules exe = (buildInfo exe, ModuleName.main : exeModules pd)
+          libBiModules lib = (libBuildInfo lib, libModules lib)
+          exeBiModules exe = (buildInfo exe, ModuleName.main : exeModules exe)
           biModuless = (maybeToList $ fmap libBiModules $ library pd)
                     ++ (map exeBiModules $ executables pd)
           buildableBiModuless = filter isBuildable biModuless
@@ -236,8 +237,8 @@ generate config_args distdir directory
       let xs = [variablePrefix ++ "_VERSION = " ++ display (pkgVersion (package pd)),
                 variablePrefix ++ "_MODULES = " ++ unwords (map display modules),
                 variablePrefix ++ "_HS_SRC_DIRS = " ++ unwords (hsSourceDirs bi),
-                variablePrefix ++ "_DEPS = " ++ unwords (map display (packageDeps lbi)),
-                variablePrefix ++ "_DEP_NAMES = " ++ unwords (map (display . packageName) (packageDeps lbi)),
+                variablePrefix ++ "_DEPS = " ++ unwords (map display (externalPackageDeps lbi)),
+                variablePrefix ++ "_DEP_NAMES = " ++ unwords (map (display . packageName) (externalPackageDeps lbi)),
                 variablePrefix ++ "_INCLUDE_DIRS = " ++ unwords (includeDirs bi),
                 variablePrefix ++ "_INCLUDES = " ++ unwords (includes bi),
                 variablePrefix ++ "_INSTALL_INCLUDES = " ++ unwords (installIncludes bi),
