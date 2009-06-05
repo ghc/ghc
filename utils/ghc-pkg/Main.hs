@@ -82,7 +82,9 @@ main = do
         (cli,_,[]) | FlagVersion `elem` cli ->
            bye ourCopyright
         (cli,nonopts,[]) ->
-           runit cli nonopts
+           case getVerbosity Normal cli of
+           Right v -> runit v cli nonopts
+           Left err -> die err
         (_,_,errors) -> do
            prog <- getProgramName
            die (concat errors ++ usageInfo (usageHeader prog) flags)
@@ -104,6 +106,7 @@ data Flag
   | FlagNamesOnly
   | FlagIgnoreCase
   | FlagNoUserDb
+  | FlagVerbosity (Maybe String)
   deriving Eq
 
 flags :: [OptDescr Flag]
@@ -133,8 +136,22 @@ flags = [
   Option [] ["names-only"] (NoArg FlagNamesOnly)
         "only print package names, not versions; can only be used with list --simple-output",
   Option [] ["ignore-case"] (NoArg FlagIgnoreCase)
-        "ignore case for substring matching"
+        "ignore case for substring matching",
+  Option ['v'] ["verbose"] (OptArg FlagVerbosity "Verbosity")
+        "verbosity level (0-2, default 1)"
   ]
+
+data Verbosity = Silent | Normal | Verbose
+    deriving (Show, Eq, Ord)
+
+getVerbosity :: Verbosity -> [Flag] -> Either String Verbosity
+getVerbosity v [] = Right v
+getVerbosity _ (FlagVerbosity Nothing    : fs) = getVerbosity Verbose fs
+getVerbosity _ (FlagVerbosity (Just "0") : fs) = getVerbosity Silent  fs
+getVerbosity _ (FlagVerbosity (Just "1") : fs) = getVerbosity Normal  fs
+getVerbosity _ (FlagVerbosity (Just "2") : fs) = getVerbosity Verbose fs
+getVerbosity _ (FlagVerbosity v : _) = Left ("Bad verbosity: " ++ show v)
+getVerbosity v (_ : fs) = getVerbosity v fs
 
 deprecFlags :: [OptDescr Flag]
 deprecFlags = [
@@ -229,8 +246,8 @@ data Force = NoForce | ForceFiles | ForceAll | CannotForce
 
 data PackageArg = Id PackageIdentifier | Substring String (String->Bool)
 
-runit :: [Flag] -> [String] -> IO ()
-runit cli nonopts = do
+runit :: Verbosity -> [Flag] -> [String] -> IO ()
+runit verbosity cli nonopts = do
   installSignalHandlers -- catch ^C and clean up
   prog <- getProgramName
   let
@@ -276,18 +293,18 @@ runit cli nonopts = do
         glob filename >>= print
 #endif
     ["register", filename] ->
-        registerPackage filename cli auto_ghci_libs False force
+        registerPackage filename verbosity cli auto_ghci_libs False force
     ["update", filename] ->
-        registerPackage filename cli auto_ghci_libs True force
+        registerPackage filename verbosity cli auto_ghci_libs True force
     ["unregister", pkgid_str] -> do
         pkgid <- readGlobPkgId pkgid_str
-        unregisterPackage pkgid cli force
+        unregisterPackage pkgid verbosity cli force
     ["expose", pkgid_str] -> do
         pkgid <- readGlobPkgId pkgid_str
-        exposePackage pkgid cli force
+        exposePackage pkgid verbosity cli force
     ["hide",   pkgid_str] -> do
         pkgid <- readGlobPkgId pkgid_str
-        hidePackage pkgid cli force
+        hidePackage pkgid verbosity cli force
     ["list"] -> do
         listPackages cli Nothing Nothing
     ["list", pkgid_str] ->
@@ -494,12 +511,13 @@ readParseDatabase mb_user_conf filename
 -- Registering
 
 registerPackage :: FilePath
+                -> Verbosity
                 -> [Flag]
                 -> Bool              -- auto_ghci_libs
                 -> Bool              -- update
                 -> Force
                 -> IO ()
-registerPackage input my_flags auto_ghci_libs update force = do
+registerPackage input verbosity my_flags auto_ghci_libs update force = do
   (db_stack, Just to_modify) <- getPkgDatabases True my_flags
   let
         db_to_operate_on = my_head "register" $
@@ -508,16 +526,19 @@ registerPackage input my_flags auto_ghci_libs update force = do
   s <-
     case input of
       "-" -> do
-        putStr "Reading package info from stdin ... "
+        when (verbosity >= Normal) $
+            putStr "Reading package info from stdin ... "
         getContents
       f   -> do
-        putStr ("Reading package info from " ++ show f ++ " ... ")
+        when (verbosity >= Normal) $
+            putStr ("Reading package info from " ++ show f ++ " ... ")
         readFile f
 
   expanded <- expandEnvVars s force
 
   pkg <- parsePackageInfo expanded
-  putStrLn "done."
+  when (verbosity >= Normal) $
+      putStrLn "done."
 
   let unversioned_deps = filter (not . realVersion) (depends pkg)
   unless (null unversioned_deps) $
@@ -530,7 +551,7 @@ registerPackage input my_flags auto_ghci_libs update force = do
   validatePackageConfig pkg truncated_stack auto_ghci_libs update force
   let new_details = filter not_this (snd db_to_operate_on) ++ [pkg]
       not_this p = package p /= package pkg
-  writeNewConfig to_modify new_details
+  writeNewConfig verbosity to_modify new_details
 
 parsePackageInfo
         :: String
@@ -545,22 +566,23 @@ parsePackageInfo str =
 -- -----------------------------------------------------------------------------
 -- Exposing, Hiding, Unregistering are all similar
 
-exposePackage :: PackageIdentifier ->  [Flag] -> Force -> IO ()
+exposePackage :: PackageIdentifier -> Verbosity -> [Flag] -> Force -> IO ()
 exposePackage = modifyPackage (\p -> [p{exposed=True}])
 
-hidePackage :: PackageIdentifier ->  [Flag] -> Force -> IO ()
+hidePackage :: PackageIdentifier -> Verbosity -> [Flag] -> Force -> IO ()
 hidePackage = modifyPackage (\p -> [p{exposed=False}])
 
-unregisterPackage :: PackageIdentifier ->  [Flag] -> Force -> IO ()
+unregisterPackage :: PackageIdentifier -> Verbosity -> [Flag] -> Force -> IO ()
 unregisterPackage = modifyPackage (\_ -> [])
 
 modifyPackage
   :: (InstalledPackageInfo -> [InstalledPackageInfo])
   -> PackageIdentifier
+  -> Verbosity
   -> [Flag]
   -> Force
   -> IO ()
-modifyPackage fn pkgid my_flags force = do
+modifyPackage fn pkgid verbosity my_flags force = do
   (db_stack, Just _to_modify) <- getPkgDatabases True{-modify-} my_flags
   ((db_name, pkgs), ps) <- fmap head $ findPackagesByDB db_stack (Id pkgid)
 --  let ((db_name, pkgs) : rest_of_stack) = db_stack
@@ -585,7 +607,7 @@ modifyPackage fn pkgid my_flags force = do
            " would break the following packages: "
               ++ unwords (map display newly_broken))
 
-  writeNewConfig db_name new_config
+  writeNewConfig verbosity db_name new_config
 
 -- -----------------------------------------------------------------------------
 -- Listing packages
@@ -853,9 +875,10 @@ convertPackageInfoIn
                  hiddenModules  = map convert h }
     where convert = fromJust . simpleParse
 
-writeNewConfig :: FilePath -> [InstalledPackageInfo] -> IO ()
-writeNewConfig filename packages = do
-  hPutStr stdout "Writing new package config file... "
+writeNewConfig :: Verbosity -> FilePath -> [InstalledPackageInfo] -> IO ()
+writeNewConfig verbosity filename packages = do
+  when (verbosity >= Normal) $
+      hPutStr stdout "Writing new package config file... "
   createDirectoryIfMissing True $ takeDirectory filename
   let shown = concat $ intersperse ",\n "
                      $ map (show . convertPackageInfoOut) packages
@@ -865,7 +888,8 @@ writeNewConfig filename packages = do
       if isPermissionError e
       then die (filename ++ ": you don't have permission to modify this file")
       else ioError e
-  hPutStrLn stdout "done."
+  when (verbosity >= Normal) $
+      hPutStrLn stdout "done."
 
 -----------------------------------------------------------------------------
 -- Sanity-check a new package config, and automatically build GHCi libs
