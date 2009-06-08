@@ -243,8 +243,9 @@ tcFExport d = pprPanic "tcFExport" (ppr d)
 
 \begin{code}
 tcCheckFEType :: Type -> ForeignExport -> TcM ()
-tcCheckFEType sig_ty (CExport (CExportStatic str _)) = do
+tcCheckFEType sig_ty (CExport (CExportStatic str cconv)) = do
     check (isCLabelString str) (badCName str)
+    checkCConv cconv
     checkForeignArgs isFFIExternalTy arg_tys
     checkForeignRes nonIOok isFFIExportResultTy res_ty
   where
@@ -341,7 +342,7 @@ checkCConv CCallConv  = return ()
 #if i386_TARGET_ARCH
 checkCConv StdCallConv = return ()
 #else
-checkCConv StdCallConv = addErrTc (text "calling convention not supported on this architecture: stdcall")
+checkCConv StdCallConv = addErrTc (text "calling convention not supported on this platform: stdcall")
 #endif
 checkCConv CmmCallConv = panic "checkCConv CmmCallConv"
 \end{code}
