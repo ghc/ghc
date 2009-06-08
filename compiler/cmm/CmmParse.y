@@ -63,6 +63,8 @@ import System.Exit
 #include "HsVersions.h"
 }
 
+%expect 0
+
 %token
 	':'	{ L _ (CmmT_SpecChar ':') }
 	';'	{ L _ (CmmT_SpecChar ';') }

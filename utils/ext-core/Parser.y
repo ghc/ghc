@@ -8,6 +8,7 @@ import Lex
 }
 
 %name parse
+%expect 0
 %tokentype { Token }
 
 %token

@@ -24,6 +24,8 @@ import Panic
 
 }
 
+%expect 0
+
 %token
  '{'		{ L _ ITocurly }
  '}'		{ L _ ITccurly }

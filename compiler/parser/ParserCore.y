@@ -37,6 +37,7 @@ import Unique
 }
 
 %name parseCore
+%expect 0
 %tokentype { Token }
 
 %token

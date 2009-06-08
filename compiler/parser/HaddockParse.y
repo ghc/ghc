@@ -17,6 +17,8 @@ import HsSyn
 import RdrName
 }
 
+%expect 0
+
 %tokentype { Token }
 
 %token	'/'	{ TokSpecial '/' }

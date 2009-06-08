@@ -12,6 +12,7 @@ import HpcLexer
 }
 
 %name parser
+%expect 0
 %tokentype { Token }
 
 %token

@@ -16,6 +16,7 @@ import Syntax
 }
 
 %name      parsex
+%expect    0
 %tokentype { Token }
 %monad     { ParserM }
 %lexer     { lex_tok } { TEOF }
