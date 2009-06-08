@@ -529,6 +529,8 @@ pprParendExpr expr
         -- I think that is usually (always?) right
     in
     case unLoc expr of
+      ArithSeq{}           -> pp_as_was
+      PArrSeq{}            -> pp_as_was
       HsLit _              -> pp_as_was
       HsOverLit _          -> pp_as_was
       HsVar _              -> pp_as_was
