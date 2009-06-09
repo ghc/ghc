@@ -151,6 +151,16 @@ tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv safety _ _ (CFunction t
           checkForeignArgs (isFFIArgumentTy dflags safety) arg_tys
           checkForeignRes nonIOok (isFFIImportResultTy dflags) res_ty
           return idecl
+  | cconv == PrimCallConv = do
+      checkCg (checkCOrAsmOrDotNetOrInterp)
+      checkCTarget target
+      check (safety == PlayRisky)
+            (text "A `foreign import prim' must always be annotated as `unsafe'")
+      dflags <- getDOpts
+      checkForeignArgs (isFFIPrimArgumentTy dflags) arg_tys
+      -- prim import result is more liberal, allows (#,,#)
+      checkForeignRes nonIOok (isFFIPrimResultTy dflags) res_ty
+      return idecl
   | otherwise = do              -- Normal foreign import
       checkCg (checkCOrAsmOrDotNetOrInterp)
       checkCConv cconv
@@ -348,6 +358,7 @@ checkCConv StdCallConv = return ()
 #else
 checkCConv StdCallConv = addErrTc (text "calling convention not supported on this platform: stdcall")
 #endif
+checkCConv PrimCallConv = addErrTc (text "The `prim' calling convention can only be used with `foreign import'")
 checkCConv CmmCallConv = panic "checkCConv CmmCallConv"
 \end{code}
 

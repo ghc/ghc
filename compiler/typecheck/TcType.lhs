@@ -84,6 +84,8 @@ module TcType (
   isFFIExternalTy,     -- :: Type -> Bool
   isFFIDynArgumentTy,  -- :: Type -> Bool
   isFFIDynResultTy,    -- :: Type -> Bool
+  isFFIPrimArgumentTy, -- :: DynFlags -> Type -> Bool
+  isFFIPrimResultTy,   -- :: DynFlags -> Type -> Bool
   isFFILabelTy,        -- :: Type -> Bool
   isFFIDotnetTy,       -- :: DynFlags -> Type -> Bool
   isFFIDotnetObjTy,    -- :: Type -> Bool
@@ -1228,6 +1230,18 @@ isFFILabelTy :: Type -> Bool
 -- or a newtype of either.
 isFFILabelTy = checkRepTyConKey [ptrTyConKey, funPtrTyConKey]
 
+isFFIPrimArgumentTy :: DynFlags -> Type -> Bool
+-- Checks for valid argument type for a 'foreign import prim'
+-- Currently they must all be simple unlifted types.
+isFFIPrimArgumentTy dflags ty
+   = checkRepTyCon (legalFIPrimArgTyCon dflags) ty
+
+isFFIPrimResultTy :: DynFlags -> Type -> Bool
+-- Checks for valid result type for a 'foreign import prim'
+-- Currently it must be an unlifted type, including unboxed tuples.
+isFFIPrimResultTy dflags ty
+   = checkRepTyCon (legalFIPrimResultTyCon dflags) ty
+
 isFFIDotnetTy :: DynFlags -> Type -> Bool
 isFFIDotnetTy dflags ty
   = checkRepTyCon (\ tc -> (legalFIResultTyCon dflags tc || 
@@ -1353,6 +1367,26 @@ boxedMarshalableTyCon tc
 			 , stablePtrTyConKey
 			 , boolTyConKey
 			 ]
+
+legalFIPrimArgTyCon :: DynFlags -> TyCon -> Bool
+-- Check args of 'foreign import prim', only allow simple unlifted types.
+-- Strictly speaking it is unnecessary to ban unboxed tuples here since
+-- currently they're of the wrong kind to use in function args anyway.
+legalFIPrimArgTyCon dflags tc
+  = dopt Opt_UnliftedFFITypes dflags
+    && isUnLiftedTyCon tc
+    && not (isUnboxedTupleTyCon tc)
+
+legalFIPrimResultTyCon :: DynFlags -> TyCon -> Bool
+-- Check result type of 'foreign import prim'. Allow simple unlifted
+-- types and also unboxed tuple result types '... -> (# , , #)'
+legalFIPrimResultTyCon dflags tc
+  = dopt Opt_UnliftedFFITypes dflags
+    && isUnLiftedTyCon tc
+    && (isUnboxedTupleTyCon tc
+        || case tyConPrimRep tc of	-- Note [Marshalling VoidRep]
+	   VoidRep -> False
+	   _       -> True)
 \end{code}
 
 Note [Marshalling VoidRep]
