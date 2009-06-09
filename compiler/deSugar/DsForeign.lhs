@@ -155,6 +155,8 @@ dsCImport id (CLabel cid) cconv _ = do
     in
     return ([(id, rhs)], empty, empty)
 
+dsCImport id (CFunction target) cconv@PrimCallConv safety
+  = dsPrimCall id (CCall (CCallSpec target cconv safety))
 dsCImport id (CFunction target) cconv safety
   = dsFCall id (CCall (CCallSpec target cconv safety))
 dsCImport id CWrapper cconv _
@@ -240,6 +242,39 @@ dsFCall fn_id fcall = do
     return ([(work_id, work_rhs), (fn_id, wrap_rhs)], empty, empty)
 \end{code}
 
+
+%************************************************************************
+%*									*
+\subsection{Primitive calls}
+%*									*
+%************************************************************************
+
+This is for `@foreign import prim@' declarations.
+
+Currently, at the core level we pretend that these primitive calls are
+foreign calls. It may make more sense in future to have them as a distinct
+kind of Id, or perhaps to bundle them with PrimOps since semantically and
+for calling convention they are really prim ops.
+
+\begin{code}
+dsPrimCall :: Id -> ForeignCall -> DsM ([(Id, Expr TyVar)], SDoc, SDoc)
+dsPrimCall fn_id fcall = do
+    let
+        ty                   = idType fn_id
+        (tvs, fun_ty)        = tcSplitForAllTys ty
+        (arg_tys, io_res_ty) = tcSplitFunTys fun_ty
+                -- Must use tcSplit* functions because we want to
+                -- see that (IO t) in the corner
+
+    args <- newSysLocalsDs arg_tys
+
+    ccall_uniq <- newUnique
+    let
+        call_app = mkFCall ccall_uniq fcall (map Var args) io_res_ty
+        rhs      = mkLams tvs (mkLams args call_app)
+    return ([(fn_id, rhs)], empty, empty)
+
+\end{code}
 
 %************************************************************************
 %*									*
@@ -487,7 +522,7 @@ mkFExportCBits c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
   pprCconv = case cc of
 		CCallConv   -> empty
 		StdCallConv -> text (ccallConvAttribute cc)
-                CmmCallConv -> panic "mkFExportCBits/pprCconv CmmCallConv"
+                _           -> panic ("mkFExportCBits/pprCconv " ++ showPpr cc)
 
   header_bits = ptext (sLit "extern") <+> fun_proto <> semi
 
