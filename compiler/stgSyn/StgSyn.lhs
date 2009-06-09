@@ -56,7 +56,7 @@ import ForeignCall	( ForeignCall )
 import DataCon		( DataCon, dataConName )
 import CoreSyn		( AltCon )
 import PprCore		( {- instances -} )
-import PrimOp		( PrimOp )
+import PrimOp		( PrimOp, PrimCall )
 import Outputable
 import Type             ( Type )
 import TyCon            ( TyCon )
@@ -557,6 +557,8 @@ in StgOpApp and COpStmt.
 \begin{code}
 data StgOp = StgPrimOp  PrimOp
 
+           | StgPrimCallOp PrimCall
+
 	   | StgFCallOp ForeignCall Unique
 		-- The Unique is occasionally needed by the C pretty-printer
 		-- (which lacks a unique supply), notably when generating a
@@ -765,6 +767,7 @@ pprStgAlt (con, params, _use_mask, expr)
 
 pprStgOp :: StgOp -> SDoc
 pprStgOp (StgPrimOp  op)   = ppr op
+pprStgOp (StgPrimCallOp op)= ppr op
 pprStgOp (StgFCallOp op _) = ppr op
 
 instance Outputable AltType where

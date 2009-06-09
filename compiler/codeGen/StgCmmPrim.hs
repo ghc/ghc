@@ -110,6 +110,11 @@ cgOpApp (StgPrimOp primop) args res_ty
   where
      result_info = getPrimOpResultInfo primop
 
+cgOpApp (StgPrimCallOp primcall) args _res_ty
+  = do	{ cmm_args <- getNonVoidArgAmodes args
+        ; let fun = CmmLit (CmmLabel (mkPrimCallLabel primcall))
+        ; emitCall (PrimOpCall, PrimOpReturn) fun cmm_args }
+
 ---------------------------------------------------
 cgPrimOp   :: [LocalReg]	-- where to put the results
 	   -> PrimOp		-- the op

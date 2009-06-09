@@ -90,6 +90,8 @@ module CLabel (
 
 	mkRtsApFastLabel,
 
+        mkPrimCallLabel,
+
 	mkForeignLabel,
         addLabelSize,
         foreignLabelStdcallInfo,
@@ -374,6 +376,11 @@ mkSelectorEntryLabel upd off	= RtsLabel (RtsSelectorEntry   upd off)
 
 mkApInfoTableLabel  upd off	= RtsLabel (RtsApInfoTable upd off)
 mkApEntryLabel upd off		= RtsLabel (RtsApEntry   upd off)
+
+        -- Primitive / cmm call labels
+
+mkPrimCallLabel :: PrimCall -> CLabel
+mkPrimCallLabel (PrimCall str)  = ForeignLabel str Nothing False IsFunction
 
 	-- Foreign labels
 

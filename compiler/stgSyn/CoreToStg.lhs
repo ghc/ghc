@@ -34,6 +34,8 @@ import Outputable
 import MonadUtils
 import FastString
 import Util
+import ForeignCall
+import PrimOp		( PrimCall(..) )
 \end{code}
 
 %************************************************************************
@@ -528,6 +530,11 @@ coreToStgApp _ f args = do
       		DataConWorkId dc | saturated -> StgConApp dc args'
 	        PrimOpId op  	 -> ASSERT( saturated )
 				    StgOpApp (StgPrimOp op) args' res_ty
+		FCallId (CCall (CCallSpec (StaticTarget lbl) PrimCallConv _))
+                                 -- prim calls are represented as FCalls in core,
+                                 -- but in stg we distinguish them
+				 -> ASSERT( saturated )
+                                    StgOpApp (StgPrimCallOp (PrimCall lbl)) args' res_ty
 		FCallId call	 -> ASSERT( saturated )
 				    StgOpApp (StgFCallOp call (idUnique f)) args' res_ty
                 TickBoxOpId {}   -> pprPanic "coreToStg TickBox" $ ppr (f,args')

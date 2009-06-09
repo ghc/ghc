@@ -11,6 +11,7 @@ module CgTailCall (
 	returnUnboxedTuple, ccallReturnUnboxedTuple,
 	pushUnboxedTuple,
 	tailCallPrimOp,
+        tailCallPrimCall,
 
 	pushReturnAddress
     ) where
@@ -382,13 +383,21 @@ ccallReturnUnboxedTuple amodes before_jump
 -- Calling an out-of-line primop
 
 tailCallPrimOp :: PrimOp -> [StgArg] -> Code
-tailCallPrimOp op args
+tailCallPrimOp op
+ = tailCallPrim (mkRtsPrimOpLabel op)
+
+tailCallPrimCall :: PrimCall -> [StgArg] -> Code
+tailCallPrimCall primcall
+ = tailCallPrim (mkPrimCallLabel primcall)
+
+tailCallPrim :: CLabel -> [StgArg] -> Code
+tailCallPrim lbl args
  = do	{	-- We're going to perform a normal-looking tail call, 
 		-- except that *all* the arguments will be in registers.
 		-- Hence the ASSERT( null leftovers )
 	  arg_amodes <- getArgAmodes args
 	; let (arg_regs, leftovers) = assignPrimOpCallRegs arg_amodes
-	      jump_to_primop = jumpToLbl (mkRtsPrimOpLabel op)
+	      jump_to_primop = jumpToLbl lbl
 
 	; ASSERT(null leftovers) -- no stack-resident args
  	  emitSimultaneously (assignToRegs arg_regs)

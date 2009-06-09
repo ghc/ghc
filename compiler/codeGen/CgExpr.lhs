@@ -179,6 +179,9 @@ cgExpr (StgOpApp (StgPrimOp primop) args res_ty)
 	     performReturn emitReturnInstr
   where
 	result_info = getPrimOpResultInfo primop
+
+cgExpr (StgOpApp (StgPrimCallOp primcall) args _res_ty)
+  = tailCallPrimCall primcall args
 \end{code}
 
 %********************************************************

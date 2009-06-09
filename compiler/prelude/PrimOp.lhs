@@ -21,7 +21,9 @@ module PrimOp (
 	primOpOutOfLine, primOpNeedsWrapper, 
 	primOpOkForSpeculation, primOpIsCheap, primOpIsDupable,
 
-	getPrimOpResultInfo,  PrimOpResultInfo(..)
+	getPrimOpResultInfo,  PrimOpResultInfo(..),
+
+        PrimCall(..)
     ) where
 
 #include "HsVersions.h"
@@ -36,6 +38,7 @@ import TyCon		( TyCon, isPrimTyCon, tyConPrimRep, PrimRep(..) )
 import Type		( Type, mkForAllTys, mkFunTy, mkFunTys, tyConAppTyCon,
 			  typePrimRep )
 import BasicTypes	( Arity, Boxity(..) )
+import ForeignCall	( CLabelString )
 import Unique		( Unique, mkPrimOpIdUnique )
 import Outputable
 import FastTypes
@@ -506,3 +509,17 @@ pprPrimOp  :: PrimOp -> SDoc
 pprPrimOp other_op = pprOccName (primOpOcc other_op)
 \end{code}
 
+
+%************************************************************************
+%*									*
+\subsubsection[PrimCall]{User-imported primitive calls}
+%*									*
+%************************************************************************
+
+\begin{code}
+newtype PrimCall = PrimCall CLabelString
+
+instance Outputable PrimCall where
+  ppr (PrimCall lbl) = ppr lbl
+
+\end{code}
