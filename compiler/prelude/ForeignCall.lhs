@@ -134,7 +134,7 @@ platforms.
 See: http://www.programmersheaven.com/2/Calling-conventions
 
 \begin{code}
-data CCallConv = CCallConv | StdCallConv | CmmCallConv
+data CCallConv = CCallConv | StdCallConv | CmmCallConv | PrimCallConv
   deriving (Eq)
   {-! derive: Binary !-}
 
@@ -142,6 +142,7 @@ instance Outputable CCallConv where
   ppr StdCallConv = ptext (sLit "stdcall")
   ppr CCallConv   = ptext (sLit "ccall")
   ppr CmmCallConv = ptext (sLit "C--")
+  ppr PrimCallConv = ptext (sLit "prim")
 
 defaultCCallConv :: CCallConv
 defaultCCallConv = CCallConv
@@ -332,11 +333,14 @@ instance Binary CCallConv where
 	    putByte bh 0
     put_ bh StdCallConv = do
 	    putByte bh 1
+    put_ bh PrimCallConv = do
+	    putByte bh 2
     get bh = do
 	    h <- getByte bh
 	    case h of
 	      0 -> do return CCallConv
-	      _ -> do return StdCallConv
+	      1 -> do return StdCallConv
+	      _ -> do return PrimCallConv
 
 instance Binary DNCallSpec where
     put_ bh (DNCallSpec isStatic kind ass nm _ _) = do
