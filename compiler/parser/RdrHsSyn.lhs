@@ -64,7 +64,7 @@ import BasicTypes	( maxPrecedence, Activation, RuleMatchInfo,
                           alwaysInlineSpec, neverInlineSpec )
 import Lexer		( P, failSpanMsgP, extension, standaloneDerivingEnabled, bangPatEnabled )
 import TysWiredIn	( unitTyCon ) 
-import ForeignCall	( CCallConv, Safety, CCallTarget(..), CExportSpec(..),
+import ForeignCall	( CCallConv(..), Safety, CCallTarget(..), CExportSpec(..),
 			  DNCallSpec(..), DNKind(..), CLabelString )
 import OccName  	( srcDataName, varName, isDataOcc, isTcOcc, 
 			  occNameString )
@@ -957,6 +957,11 @@ mkImport :: CallConv
 	 -> Safety 
 	 -> (Located FastString, Located RdrName, LHsType RdrName) 
 	 -> P (HsDecl RdrName)
+mkImport (CCall  cconv) safety (entity, v, ty)
+  | cconv == PrimCallConv                      = do
+  let funcTarget = CFunction (StaticTarget (unLoc entity))
+      importSpec = CImport PrimCallConv safety nilFS nilFS funcTarget
+  return (ForD (ForeignImport v ty importSpec))
 mkImport (CCall  cconv) safety (entity, v, ty) = do
   importSpec <- parseCImport entity cconv safety v
   return (ForD (ForeignImport v ty importSpec))

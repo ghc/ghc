@@ -484,6 +484,7 @@ data Token
   | ITunsafe
   | ITstdcallconv
   | ITccallconv
+  | ITprimcallconv
   | ITdotnet
   | ITmdo
   | ITfamily
@@ -631,6 +632,7 @@ isSpecial ITthreadsafe 	= True
 isSpecial ITunsafe    	= True
 isSpecial ITccallconv   = True
 isSpecial ITstdcallconv = True
+isSpecial ITprimcallconv = True
 isSpecial ITmdo		= True
 isSpecial ITfamily	= True
 isSpecial ITgroup   = True
@@ -692,6 +694,7 @@ reservedWordsFM = listToUFM $
 	( "unsafe",	ITunsafe,	 bit ffiBit),
 	( "stdcall",    ITstdcallconv,	 bit ffiBit),
 	( "ccall",      ITccallconv,	 bit ffiBit),
+	( "prim",       ITprimcallconv,	 bit ffiBit),
 	( "dotnet",     ITdotnet,	 bit ffiBit),
 
 	( "rec",	ITrec,		 bit arrowsBit),

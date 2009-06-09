@@ -246,6 +246,7 @@ incorrect.
  'family'	{ L _ ITfamily }
  'stdcall'      { L _ ITstdcallconv }
  'ccall'        { L _ ITccallconv }
+ 'prim'         { L _ ITprimcallconv }
  'dotnet'       { L _ ITdotnet }
  'proc'		{ L _ ITproc }		-- for arrow notation extension
  'rec'		{ L _ ITrec }		-- for arrow notation extension
@@ -952,6 +953,7 @@ fdecl : 'import' callconv safety fspec
 callconv :: { CallConv }
 	  : 'stdcall'			{ CCall  StdCallConv }
 	  | 'ccall'			{ CCall  CCallConv   }
+	  | 'prim'			{ CCall  PrimCallConv}
 	  | 'dotnet'			{ DNCall	     }
 
 safety :: { Safety }
@@ -1902,6 +1904,7 @@ special_id
 	| 'dynamic'		{ L1 (fsLit "dynamic") }
 	| 'stdcall'             { L1 (fsLit "stdcall") }
 	| 'ccall'               { L1 (fsLit "ccall") }
+	| 'prim'                { L1 (fsLit "prim") }
 
 special_sym :: { Located FastString }
 special_sym : '!'	{ L1 (fsLit "!") }
