@@ -584,7 +584,9 @@ run_thread:
     
     schedulePostRunThread(cap,t);
 
-    t = threadStackUnderflow(task,t);
+    if (ret != StackOverflow) {
+        t = threadStackUnderflow(task,t);
+    }
 
     ready_to_gc = rtsFalse;
 
