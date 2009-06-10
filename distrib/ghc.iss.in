@@ -1,8 +1,8 @@
 
 [Setup]
 AppName=GHC
-AppVerName=GHC @VERSION@
-DefaultDirName={sd}\ghc\ghc-@VERSION@
+AppVerName=GHC @ProjectVersion@
+DefaultDirName={sd}\ghc\ghc-@ProjectVersion@
 UsePreviousAppDir=no
 DefaultGroupName=GHC
 UninstallDisplayIcon={app}\bin\ghci.exe
@@ -14,13 +14,13 @@ ChangesEnvironment=yes
 
 
 [Files]
-Source: "ghc-@VERSION@\*"; DestDir: "{app}"; Flags: recursesubdirs
+Source: "ghc-@ProjectVersion@\*"; DestDir: "{app}"; Flags: recursesubdirs
 
 [Icons]
-Name: "{group}\@VERSION@\GHCi"; Filename: "{app}\bin\ghci.exe"
-Name: "{group}\@VERSION@\GHC Documentation"; Filename: "{app}\doc\index.html"
-Name: "{group}\@VERSION@\GHC Library Documentation"; Filename: "{app}\doc\libraries\index.html"
-Name: "{group}\@VERSION@\GHC Flag Reference"; Filename: "{app}\doc\users_guide\flag-reference.html"
+Name: "{group}\@ProjectVersion@\GHCi"; Filename: "{app}\bin\ghci.exe"
+Name: "{group}\@ProjectVersion@\GHC Documentation"; Filename: "{app}\doc\index.html"
+Name: "{group}\@ProjectVersion@\GHC Library Documentation"; Filename: "{app}\doc\libraries\index.html"
+Name: "{group}\@ProjectVersion@\GHC Flag Reference"; Filename: "{app}\doc\users_guide\flag-reference.html"
 
 [Registry]
 ; set up icon associations
@@ -34,7 +34,7 @@ Root: HKCR; Subkey: "ghc_haskell\shell\open\command"; ValueType: string; ValueNa
 
 ; these flags were always set in the past, by the installer
 ; some programs may rely on them to find GHC
-Root: HKCU; Subkey: "Software\Haskell\GHC\ghc-@VERSION@"; ValueType: string; ValueName: "InstallDir"; ValueData: "{app}"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Haskell\GHC\ghc-@ProjectVersion@"; ValueType: string; ValueName: "InstallDir"; ValueData: "{app}"; Flags: uninsdeletekey
 Root: HKCU; Subkey: "Software\Haskell\GHC"; ValueType: string; ValueName: "InstallDir"; ValueData: "{app}"; Flags: uninsdeletevalue
 
 ; set the PATH variable, for both GHC and Cabal

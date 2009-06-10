@@ -772,13 +772,24 @@ binary-dist:
 	"$(RM)" $(RM_OPTS) $(BIN_DIST_TAR)
 # h means "follow symlinks", e.g. if aclocal.m4 is a symlink to a source
 # tree then we want to include the real file, not a symlink to it
-	"$(TAR)" hcf - -T $(BIN_DIST_LIST) | bzip2 -c >$(BIN_DIST_TAR_BZ2)
+	"$(TAR)" hcf - -T $(BIN_DIST_LIST) | bzip2 -c > $(BIN_DIST_TAR_BZ2)
+
+windows-binary-dist:
+	"$(RM)" $(RM_OPTS) -r $(BIN_DIST_NAME)
+	$(MAKE) prefix=$(BIN_DIST_DIR) install
+	"$(TAR)" cf - $(BIN_DIST_NAME) | bzip2 -c > $(BIN_DIST_TAR_BZ2)
+
+windows-installer:
+	"$(ISCC)" /O. /F$(WINDOWS_INSTALLER_BASE) - < distrib/ghc.iss
 
 nTimes = set -e; for i in `seq 1 $(1)`; do echo Try "$$i: $(2)"; if $(2); then break; fi; done
 
 .PHONY: publish-binary-dist
 publish-binary-dist:
 	$(call nTimes,10,$(PublishCp) $(BIN_DIST_TAR_BZ2) $(PublishLocation)/dist)
+ifeq "$(mingw32_TARGET_OS)" "1"
+	$(call nTimes,10,$(PublishCp) $(WINDOWS_INSTALLER) $(PublishLocation)/dist)
+endif
 
 # -----------------------------------------------------------------------------
 # Source distributions

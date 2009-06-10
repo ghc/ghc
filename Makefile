@@ -68,9 +68,14 @@ endif
 	$(MAKE) -r --no-print-directory -f ghc.mk $@
 
 binary-dist:
+ifeq "$(mingw32_TARGET_OS)" "1"
+	$(MAKE) -r --no-print-directory -f ghc.mk windows-binary-dist
+	$(MAKE) -r --no-print-directory -f ghc.mk windows-installer
+else
 	rm -f bindist-list
 	$(MAKE) -r --no-print-directory -f ghc.mk bindist BINDIST=YES
 	$(MAKE) -r --no-print-directory -f ghc.mk binary-dist
+endif
 
 clean distclean maintainer-clean:
 	$(MAKE) -r --no-print-directory -f ghc.mk $@ CLEANING=YES

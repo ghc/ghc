@@ -380,6 +380,9 @@ BIN_DIST_PREP_DIR=$(TOP)/bindist-prep
 BIN_DIST_PREP=$(BIN_DIST_PREP_DIR)/$(BIN_DIST_NAME)
 BIN_DIST_LIST=$(TOP)/bindist-list
 
+WINDOWS_INSTALLER_BASE = ghc-$(ProjectVersion)-i386-windows
+WINDOWS_INSTALLER = $(WINDOWS_INSTALLER_BASE)$(exeext)
+
 # Definition of installation directories, we don't use half of these, but since
 # the configure script has them on offer while passing through, we might as well
 # set them. Note that we have to be careful, because the GNU coding standards
