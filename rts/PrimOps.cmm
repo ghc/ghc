@@ -644,60 +644,32 @@ word64ToIntegerzh_fast
    RET_NP(s,p);
 }
 
-
-
 #endif /* SUPPORT_LONG_LONGS */
-
-/* ToDo: this is shockingly inefficient */
-
-#ifndef THREADED_RTS
-section "bss" {
-  mp_tmp1:
-    bits8 [SIZEOF_MP_INT];
-}
-
-section "bss" {
-  mp_tmp2:
-    bits8 [SIZEOF_MP_INT];
-}
-
-section "bss" {
-  mp_result1:
-    bits8 [SIZEOF_MP_INT];
-}
-
-section "bss" {
-  mp_result2:
-    bits8 [SIZEOF_MP_INT];
-}
-#endif
-
-#ifdef THREADED_RTS
-#define FETCH_MP_TEMP(X) \
-W_ X; \
-X = BaseReg + (OFFSET_StgRegTable_r ## X);
-#else
-#define FETCH_MP_TEMP(X) /* Nothing */
-#endif
 
 #define GMP_TAKE2_RET1(name,mp_fun)                                     \
 name                                                                    \
 {                                                                       \
   CInt s1, s2;                                                          \
   W_ d1, d2;                                                            \
-  FETCH_MP_TEMP(mp_tmp1);                                               \
-  FETCH_MP_TEMP(mp_tmp2);                                               \
-  FETCH_MP_TEMP(mp_result1)                                             \
-  FETCH_MP_TEMP(mp_result2);                                            \
+  W_ mp_tmp1;                                                           \
+  W_ mp_tmp2;                                                           \
+  W_ mp_result1;                                                        \
+  W_ mp_result2;                                                        \
                                                                         \
   /* call doYouWantToGC() */                                            \
   MAYBE_GC(R2_PTR & R4_PTR, name);                                      \
+                                                                        \
+  STK_CHK_GEN( 4 * SIZEOF_MP_INT, R2_PTR & R4_PTR, name );              \
                                                                         \
   s1 = W_TO_INT(R1);                                                    \
   d1 = R2;                                                              \
   s2 = W_TO_INT(R3);                                                    \
   d2 = R4;                                                              \
                                                                         \
+  mp_tmp1    = Sp - 1 * SIZEOF_MP_INT;                                  \
+  mp_tmp2    = Sp - 2 * SIZEOF_MP_INT;                                  \
+  mp_result1 = Sp - 3 * SIZEOF_MP_INT;                                  \
+  mp_result2 = Sp - 4 * SIZEOF_MP_INT;                                  \
   MP_INT__mp_alloc(mp_tmp1) = W_TO_INT(StgArrWords_words(d1));          \
   MP_INT__mp_size(mp_tmp1)  = (s1);                                     \
   MP_INT__mp_d(mp_tmp1)	    = BYTE_ARR_CTS(d1);                         \
@@ -719,15 +691,19 @@ name                                                                    \
 {                                                                       \
   CInt s1;                                                              \
   W_ d1;                                                                \
-  FETCH_MP_TEMP(mp_tmp1);                                               \
-  FETCH_MP_TEMP(mp_result1)                                             \
+  W_ mp_tmp1;                                                           \
+  W_ mp_result1;                                                        \
                                                                         \
   /* call doYouWantToGC() */                                            \
   MAYBE_GC(R2_PTR, name);                                               \
                                                                         \
+  STK_CHK_GEN( 2 * SIZEOF_MP_INT, R2_PTR, name );                       \
+                                                                        \
   d1 = R2;                                                              \
   s1 = W_TO_INT(R1);                                                    \
                                                                         \
+  mp_tmp1    = Sp - 1 * SIZEOF_MP_INT;                                  \
+  mp_result1 = Sp - 2 * SIZEOF_MP_INT;                                  \
   MP_INT__mp_alloc(mp_tmp1)	= W_TO_INT(StgArrWords_words(d1));      \
   MP_INT__mp_size(mp_tmp1)	= (s1);                                 \
   MP_INT__mp_d(mp_tmp1)		= BYTE_ARR_CTS(d1);                     \
@@ -746,19 +722,25 @@ name                                                                            
 {                                                                                       \
   CInt s1, s2;                                                                          \
   W_ d1, d2;                                                                            \
-  FETCH_MP_TEMP(mp_tmp1);                                                               \
-  FETCH_MP_TEMP(mp_tmp2);                                                               \
-  FETCH_MP_TEMP(mp_result1)                                                             \
-  FETCH_MP_TEMP(mp_result2)                                                             \
+  W_ mp_tmp1;                                                                           \
+  W_ mp_tmp2;                                                                           \
+  W_ mp_result1;                                                                        \
+  W_ mp_result2;                                                                        \
                                                                                         \
   /* call doYouWantToGC() */                                                            \
   MAYBE_GC(R2_PTR & R4_PTR, name);                                                      \
+                                                                                        \
+  STK_CHK_GEN( 4 * SIZEOF_MP_INT, R2_PTR & R4_PTR, name );                              \
                                                                                         \
   s1 = W_TO_INT(R1);                                                                    \
   d1 = R2;                                                                              \
   s2 = W_TO_INT(R3);                                                                    \
   d2 = R4;                                                                              \
                                                                                         \
+  mp_tmp1    = Sp - 1 * SIZEOF_MP_INT;                                                  \
+  mp_tmp2    = Sp - 2 * SIZEOF_MP_INT;                                                  \
+  mp_result1 = Sp - 3 * SIZEOF_MP_INT;                                                  \
+  mp_result2 = Sp - 4 * SIZEOF_MP_INT;                                                  \
   MP_INT__mp_alloc(mp_tmp1)	= W_TO_INT(StgArrWords_words(d1));                      \
   MP_INT__mp_size(mp_tmp1)	= (s1);                                                 \
   MP_INT__mp_d(mp_tmp1)		= BYTE_ARR_CTS(d1);                                     \
@@ -793,17 +775,15 @@ GMP_TAKE1_RET1(complementIntegerzh_fast, __gmpz_com)
 GMP_TAKE2_RET2(quotRemIntegerzh_fast, __gmpz_tdiv_qr)
 GMP_TAKE2_RET2(divModIntegerzh_fast,  __gmpz_fdiv_qr)
 
-#ifndef THREADED_RTS
-section "bss" {
-  mp_tmp_w:  W_; // NB. mp_tmp_w is really an here mp_limb_t
-}
-#endif
-
 gcdIntzh_fast
 {
     /* R1 = the first Int#; R2 = the second Int# */
     W_ r; 
-    FETCH_MP_TEMP(mp_tmp_w);
+    W_ mp_tmp_w;
+
+    STK_CHK_GEN( 1 * SIZEOF_MP_INT, NO_PTRS, gcdIntzh_fast );
+
+    mp_tmp_w = Sp - 1 * SIZEOF_MP_INT;
 
     W_[mp_tmp_w] = R1;
     (r) = foreign "C" __gmpn_gcd_1(mp_tmp_w "ptr", 1, R2) [];
@@ -958,8 +938,13 @@ decodeFloatzuIntzh_fast
 { 
     W_ p;
     F_ arg;
-    FETCH_MP_TEMP(mp_tmp1);
-    FETCH_MP_TEMP(mp_tmp_w);
+    W_ mp_tmp1;
+    W_ mp_tmp_w;
+
+    STK_CHK_GEN( WDS(2), NO_PTRS, decodeFloatzuIntzh_fast );
+
+    mp_tmp1  = Sp - WDS(1);
+    mp_tmp_w = Sp - WDS(2);
     
     /* arguments: F1 = Float# */
     arg = F1;
@@ -978,8 +963,13 @@ decodeDoublezh_fast
 { 
     D_ arg;
     W_ p;
-    FETCH_MP_TEMP(mp_tmp1);
-    FETCH_MP_TEMP(mp_tmp_w);
+    W_ mp_tmp1;
+    W_ mp_tmp_w;
+
+    STK_CHK_GEN( 2 * SIZEOF_MP_INT, NO_PTRS, decodeDoublezh_fast );
+
+    mp_tmp1  = Sp - 1 * SIZEOF_MP_INT;
+    mp_tmp_w = Sp - 2 * SIZEOF_MP_INT;
 
     /* arguments: D1 = Double# */
     arg = D1;
@@ -1004,10 +994,17 @@ decodeDoublezu2Intzh_fast
 { 
     D_ arg;
     W_ p;
-    FETCH_MP_TEMP(mp_tmp1);
-    FETCH_MP_TEMP(mp_tmp2);
-    FETCH_MP_TEMP(mp_result1);
-    FETCH_MP_TEMP(mp_result2);
+    W_ mp_tmp1;
+    W_ mp_tmp2;
+    W_ mp_result1;
+    W_ mp_result2;
+
+    STK_CHK_GEN( WDS(4), NO_PTRS, decodeDoublezu2Intzh_fast );
+
+    mp_tmp1    = Sp - WDS(1);
+    mp_tmp2    = Sp - WDS(2);
+    mp_result1 = Sp - WDS(3);
+    mp_result2 = Sp - WDS(4);
 
     /* arguments: D1 = Double# */
     arg = D1;
