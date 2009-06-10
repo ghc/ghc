@@ -1,9 +1,7 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# OPTIONS_GHC -fglasgow-exts #-}
 
 {-
 	Three kinds of Unicode tests for our purposes.
-
-	Note that GHC_OPTIONS instead of OPTIONS above does not work.
 -}
 
 module UniTest where
