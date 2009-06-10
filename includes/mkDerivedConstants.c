@@ -233,13 +233,6 @@ main(int argc, char *argv[])
     field_offset(StgRegTable, rHpAlloc);
     struct_field(StgRegTable, rRet);
 
-    // Needed for SMP builds
-    field_offset(StgRegTable, rmp_tmp_w);
-    field_offset(StgRegTable, rmp_tmp1);
-    field_offset(StgRegTable, rmp_tmp2);
-    field_offset(StgRegTable, rmp_result1);
-    field_offset(StgRegTable, rmp_result2);
-
     def_offset("stgEagerBlackholeInfo", FUN_OFFSET(stgEagerBlackholeInfo));
     def_offset("stgGCEnter1", FUN_OFFSET(stgGCEnter1));
     def_offset("stgGCFun", FUN_OFFSET(stgGCFun));

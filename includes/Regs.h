@@ -47,11 +47,6 @@ typedef union {
     StgTSOPtr      t;
 } StgUnion;
 
-// Urgh.. we don't know the size of an MP_INT here because we haven't
-// #included gmp.h.  We should really autoconf this, but GMP may not
-// be available at ./configure time if we're building it (GMP) locally.
-#define MP_INT_WORDS 3
-
 /* 
  * This is the table that holds shadow-locations for all the STG
  * registers.  The shadow locations are used when:
@@ -87,14 +82,6 @@ typedef struct StgRegTable_ {
   struct bdescr_ *rCurrentNursery; /* Hp/HpLim point into this block */
   struct bdescr_ *rCurrentAlloc;   /* for allocation using allocate() */
   StgWord         rHpAlloc;	/* number of *bytes* being allocated in heap */
-  // rmp_tmp1..rmp_result2 are only used in THREADED_RTS builds to
-  // avoid per-thread temps in bss, but currently always incldue here
-  // so we just run mkDerivedConstants once
-  StgWord         rmp_tmp_w[MP_INT_WORDS];
-  StgWord         rmp_tmp1[MP_INT_WORDS];
-  StgWord         rmp_tmp2[MP_INT_WORDS];
-  StgWord         rmp_result1[MP_INT_WORDS];
-  StgWord         rmp_result2[MP_INT_WORDS];
   StgWord         rRet;  // holds the return code of the thread
 } StgRegTable;
 
