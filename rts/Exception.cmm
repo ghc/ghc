@@ -187,6 +187,7 @@ killThreadzh_fast
     target = R1;
     exception = R2;
     
+    /* Needs 3 words because throwToSingleThreaded uses some stack */
     STK_CHK_GEN( WDS(3), R1_PTR & R2_PTR, killThreadzh_fast);
 
     /* 
@@ -215,8 +216,8 @@ killThreadzh_fast
     } else {
 	W_ out;
 	W_ retcode;
-	out = BaseReg + OFFSET_StgRegTable_rmp_tmp_w;
-	
+	out = Sp - WDS(1); /* ok to re-use stack space here */
+
 	(retcode) = foreign "C" throwTo(MyCapability() "ptr",
 				      CurrentTSO "ptr",
 				      target "ptr",
