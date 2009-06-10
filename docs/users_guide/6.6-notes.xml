@@ -132,7 +132,7 @@
             The following flags (and, where appropriate, their inverses)
             used to be static (can only be given on
             the command line) but are now dynamic (can also be given in
-            a <literal>GHC_OPTIONS</literal> pragma or with
+            an <literal>OPTIONS_GHC</literal> pragma or with
             <literal>:set</literal> in GHCi):
             <option>-c</option>,
             <option>-hcsuf</option>,

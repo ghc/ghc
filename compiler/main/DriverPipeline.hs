@@ -491,7 +491,7 @@ data PipelineOutput
 -- at which stage to stop.
 --
 -- The DynFlags can be modified by phases in the pipeline (eg. by
--- GHC_OPTIONS pragmas), and the changes affect later phases in the
+-- OPTIONS_GHC pragmas), and the changes affect later phases in the
 -- pipeline.
 runPipeline
   :: GhcMonad m =>
