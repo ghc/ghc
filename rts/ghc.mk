@@ -83,48 +83,6 @@ rts/libs.depend : $(GHC_PKG_INPLACE)
 #-----------------------------------------------------------------------------
 # Building one way
 
-define cmm-suffix-rules
-# $1 = dir
-# $2 = distdir
-# $3 = way
-
-# .cmm files depend on all the .h files, to a first approximation.
-
-ifneq "$$(CLEANING)" "YES"
-
-ifneq "$$(BootingFromHc)" "YES"
-
-$1/$2/build/%.$$($3_way_)o : $1/%.cmm $$(rts_H_FILES) $$($1_$2_HC)
-	"$$($1_$2_HC)" $$($1_$2_$3_MOST_HC_OPTS) -c $$< -o $$@
-
-$1/$2/build/%.$$($3_way_)o : $1/$2/build/%.cmm $$(rts_H_FILES) $$($1_$2_HC)
-	"$$($1_$2_HC)" $$($1_$2_$3_MOST_HC_OPTS) -c $$< -o $$@
-
-$1/$2/build/%.$$($3_way_)hc : $1/%.cmm $$(rts_H_FILES) $$($1_$2_HC)
-	"$$($1_$2_HC)" $$($1_$2_$3_MOST_HC_OPTS) -c $$< -o $$@
-
-$1/$2/build/%.$$($3_way_)hc : $1/$2/build/%.cmm $$(rts_H_FILES) $$($1_$2_HC)
-	"$$($1_$2_HC)" $$($1_$2_$3_MOST_HC_OPTS) -c $$< -o $$@
-
-$1/$2/build/%.$$($3_way_)s : $1/%.cmm $$(rts_H_FILES) $$($1_$2_HC)
-	"$$($1_$2_HC)" $$($1_$2_$3_MOST_HC_OPTS) -c $$< -o $$@
-
-$1/$2/build/%.$$($3_way_)s : $1/$2/build/%.cmm $$(rts_H_FILES) $$($1_$2_HC)
-	"$$($1_$2_HC)" $$($1_$2_$3_MOST_HC_OPTS) -c $$< -o $$@
-
-endif
-
-$1/$2/build/%.$$($3_way_)o : $1/%.hc
-	"$$(CC)" $$($1_$2_$3_ALL_CC_OPTS) -Iincludes -x c -c $$< -o $$@
-
-$1/$2/build/%.$$($3_way_)o : $1/$2/build/%.hc
-	"$$(CC)" $$($1_$2_$3_ALL_CC_OPTS) -Iincludes -x c -c $$< -o $$@
-
-endif
-
-endef
-
-
 define build-rts-way # args: $1 = way
 
 # The per-way CC_OPTS

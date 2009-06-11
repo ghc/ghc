@@ -202,6 +202,7 @@ include rules/c-sources.mk
 include rules/includes-sources.mk
 include rules/hs-objs.mk
 include rules/c-objs.mk
+include rules/cmm-objs.mk
 
 # -----------------------------------------------------------------------------
 # Suffix rules
@@ -225,6 +226,11 @@ $(foreach way,$(ALL_WAYS),\
 # C-related suffix rules
 
 include rules/c-suffix-rules.mk
+
+#-----------------------------------------------------------------------------
+# CMM-related suffix rules
+
+include rules/cmm-suffix-rules.mk
 
 endif
 

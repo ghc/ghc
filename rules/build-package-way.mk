@@ -50,13 +50,13 @@ $$($1_$2_$3_LIB) : $$($1_$2_$3_HS_OBJS) $$($1_$2_dyn_C_OBJS) $$($1_$2_dyn_S_OBJS
 else
 # Build the ordinary .a library
 ifeq "$$($1_$2_SplitObjs)" "YES"
-$$($1_$2_$3_LIB) : $$($1_$2_$3_HS_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS)
+$$($1_$2_$3_LIB) : $$($1_$2_$3_HS_OBJS) $$($1_$2_v_CMM_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS)
 	"$$(RM)" $$(RM_OPTS) $$@
-	(echo $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS) `$$($1_$2_$3_MKSTUBOBJS)`; find $$(patsubst %.$$($3_osuf),%_split,$$($1_$2_$3_HS_OBJS)) -name '*.$$($3_osuf)' -print) | $$(XARGS) $$(AR) $$(EXTRA_AR_ARGS) $$@ || "$$(RM)" $$(RM_OPTS) $$@
+	(echo $$($1_$2_v_CMM_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS) `$$($1_$2_$3_MKSTUBOBJS)`; find $$(patsubst %.$$($3_osuf),%_split,$$($1_$2_$3_HS_OBJS)) -name '*.$$($3_osuf)' -print) | $$(XARGS) $$(AR) $$(EXTRA_AR_ARGS) $$@ || "$$(RM)" $$(RM_OPTS) $$@
 else
-$$($1_$2_$3_LIB) : $$($1_$2_$3_HS_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS)
+$$($1_$2_$3_LIB) : $$($1_$2_$3_HS_OBJS) $$($1_$2_v_CMM_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS)
 	"$$(RM)" $$(RM_OPTS) $$@
-	echo $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS) $$($1_$2_$3_HS_OBJS) `$$($1_$2_$3_MKSTUBOBJS)` | $$(XARGS) $$(AR) $$(EXTRA_AR_ARGS) $$@ || "$$(RM)" $$(RM_OPTS) $$@
+	echo $$($1_$2_v_CMM_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS) $$($1_$2_$3_HS_OBJS) `$$($1_$2_$3_MKSTUBOBJS)` | $$(XARGS) $$(AR) $$(EXTRA_AR_ARGS) $$@ || "$$(RM)" $$(RM_OPTS) $$@
 endif
 endif
 

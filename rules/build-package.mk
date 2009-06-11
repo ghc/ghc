@@ -136,6 +136,9 @@ $(call c-objs,$1,$2,dyn)
 $(call c-suffix-rules,$1,$2,dyn,YES)
 endif
 
+$(call cmm-objs,$1,$2,v)
+$(call cmm-suffix-rules,$1,$2,v)
+
 # Now generate all the build rules for each way in this directory:
 $$(foreach way,$$($1_$2_WAYS),$$(eval $$(call build-package-way,$1,$2,$$(way),$3)))
 
