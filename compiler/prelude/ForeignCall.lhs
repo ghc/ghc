@@ -13,7 +13,7 @@
 
 module ForeignCall (
 	ForeignCall(..),
-	Safety(..), playSafe, playThreadSafe,
+	Safety(..), playSafe,
 
 	CExportSpec(..), CLabelString, isCLabelString, pprCLabelString,
 	CCallSpec(..), 
@@ -57,11 +57,14 @@ instance Outputable ForeignCall where
 data Safety
   = PlaySafe		-- Might invoke Haskell GC, or do a call back, or
 			-- switch threads, etc.  So make sure things are
-			-- tidy before the call
-	Bool            -- => True, external function is also re-entrant.
-			--    [if supported, RTS arranges for the external call
-			--    to be executed by a separate OS thread, i.e.,
-			--    _concurrently_ to the execution of other Haskell threads.]
+			-- tidy before the call. Additionally, in the threaded
+			-- RTS we arrange for the external call to be executed
+			-- by a separate OS thread, i.e., _concurrently_ to the
+			-- execution of other Haskell threads.
+
+      Bool              -- Indicates the deprecated "threadsafe" annotation
+                        -- which is now an alias for "safe". This information
+                        -- is never used except to emit a deprecation warning.
 
   | PlayRisky		-- None of the above can happen; the call will return
 			-- without interacting with the runtime system at all
@@ -77,10 +80,6 @@ instance Outputable Safety where
 playSafe :: Safety -> Bool
 playSafe PlaySafe{} = True
 playSafe PlayRisky  = False
-
-playThreadSafe :: Safety -> Bool
-playThreadSafe (PlaySafe x) = x
-playThreadSafe _ = False
 \end{code}
 
 

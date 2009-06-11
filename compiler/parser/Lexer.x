@@ -688,7 +688,7 @@ reservedWordsFM = listToUFM $
 	( "label",	ITlabel,	 bit ffiBit),
 	( "dynamic",	ITdynamic,	 bit ffiBit),
 	( "safe",	ITsafe,		 bit ffiBit),
-	( "threadsafe",	ITthreadsafe,	 bit ffiBit),
+	( "threadsafe",	ITthreadsafe,	 bit ffiBit),  -- ToDo: remove
 	( "unsafe",	ITunsafe,	 bit ffiBit),
 	( "stdcall",    ITstdcallconv,	 bit ffiBit),
 	( "ccall",      ITccallconv,	 bit ffiBit),

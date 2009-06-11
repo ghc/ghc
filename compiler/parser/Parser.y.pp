@@ -240,7 +240,7 @@ incorrect.
  'label'	{ L _ ITlabel } 
  'dynamic'	{ L _ ITdynamic }
  'safe'		{ L _ ITsafe }
- 'threadsafe'	{ L _ ITthreadsafe }
+ 'threadsafe'	{ L _ ITthreadsafe }  -- ToDo: remove deprecated alias
  'unsafe'	{ L _ ITunsafe }
  'mdo'		{ L _ ITmdo }
  'family'	{ L _ ITfamily }
@@ -957,7 +957,7 @@ callconv :: { CallConv }
 safety :: { Safety }
 	: 'unsafe'			{ PlayRisky }
 	| 'safe'			{ PlaySafe  False }
-	| 'threadsafe'			{ PlaySafe  True }
+	| 'threadsafe'			{ PlaySafe  True } -- deprecated alias
 
 fspec :: { Located (Located FastString, Located RdrName, LHsType RdrName) }
        : STRING var '::' sigtypedoc     { LL (L (getLoc $1) (getSTRING $1), $2, $4) }
