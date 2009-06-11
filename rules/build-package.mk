@@ -39,7 +39,7 @@ endif
 
 # We don't install things compiled by stage 0, so no need to put them
 # in the bindist.
-ifneq "$(BINDIST) $3" "YES 0"
+ifneq "$$(BINDIST) $3" "YES 0"
 
 $(call all-target,$1,all_$1_$2)
 $(call clean-target,$1,$2,$1/$2)
@@ -78,7 +78,7 @@ endif
 
 $(call all-target,$1_$2,$1/$2/package-data.mk)
 
-ifneq "$(BINDIST)" "YES"
+ifneq "$$(BINDIST)" "YES"
 # We have a rule for package-data.mk only when the package is
 # disabled, because we want the build to fail if we haven't run phase 0.
 $(call build-package-data,$1,$2)
