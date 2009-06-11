@@ -905,20 +905,11 @@ powerDouble  (D# x) (D# y) = D# (x **## y)
 \end{code}
 
 \begin{code}
-foreign import ccall unsafe "__encodeFloat"
-        encodeFloat# :: Int# -> ByteArray# -> Int -> Float
-foreign import ccall unsafe "__int_encodeFloat"
-        int_encodeFloat# :: Int# -> Int -> Float
-
-
 foreign import ccall unsafe "isFloatNaN" isFloatNaN :: Float -> Int
 foreign import ccall unsafe "isFloatInfinite" isFloatInfinite :: Float -> Int
 foreign import ccall unsafe "isFloatDenormalized" isFloatDenormalized :: Float -> Int
 foreign import ccall unsafe "isFloatNegativeZero" isFloatNegativeZero :: Float -> Int
 
-
-foreign import ccall unsafe "__encodeDouble"
-        encodeDouble# :: Int# -> ByteArray# -> Int -> Double
 
 foreign import ccall unsafe "isDoubleNaN" isDoubleNaN :: Double -> Int
 foreign import ccall unsafe "isDoubleInfinite" isDoubleInfinite :: Double -> Int
