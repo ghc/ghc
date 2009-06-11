@@ -24,6 +24,6 @@ type FUNC  =  IO ()
 foreign import ccall unsafe "wrapper"
    mkFunc :: FUNC -> IO (FunPtr FUNC)
 
-foreign import ccall threadsafe "ffi014_cbits.h callC"
+foreign import ccall safe "ffi014_cbits.h callC"
    callC:: FunPtr FUNC -> IO ()
 
