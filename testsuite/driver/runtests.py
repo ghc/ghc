@@ -23,20 +23,25 @@ from testglobals import *
 os.environ['TERM'] = 'vt100'
 
 # Try and find a utf8 locale to use
-# First see if 'locale -a' works
-h = os.popen('locale -a', 'r')
+# First see if we already have a UTF8 locale
+h = os.popen('locale | grep LC_CTYPE | grep -i utf', 'r')
 v = h.read()
 h.close()
-if v != '':
-    # If it does then use the first utf8 locale that is available
-    h = os.popen('locale -a | grep -i utf8 | head', 'r')
+if v == '':
+    # We don't, so now see if 'locale -a' works
+    h = os.popen('locale -a', 'r')
     v = h.read()
     h.close()
     if v != '':
-        os.environ['LC_ALL'] = v
-    else:
-        print 'WARNING: No UTF8 locale found.'
-        print 'You may get some spurious test failures.'
+        # If it does then use the first utf8 locale that is available
+        h = os.popen('locale -a | grep -i utf8 | head', 'r')
+        v = h.read()
+        h.close()
+        if v != '':
+            os.environ['LC_ALL'] = v
+        else:
+            print 'WARNING: No UTF8 locale found.'
+            print 'You may get some spurious test failures.'
 
 global config
 config = getConfig() # get it from testglobals
