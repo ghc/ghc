@@ -322,6 +322,7 @@ isSimpleOp :: StgOp -> Bool
 isSimpleOp (StgFCallOp (CCall (CCallSpec _ _ safe)) _) = not (playSafe safe)
 isSimpleOp (StgFCallOp (DNCall _) _)                   = False         -- Safe!
 isSimpleOp (StgPrimOp op)      			       = not (primOpOutOfLine op)
+isSimpleOp (StgPrimCallOp _)                           = False
 
 -----------------
 chooseReturnBndrs :: Id -> AltType -> [StgAlt] -> [NonVoid Id]
