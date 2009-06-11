@@ -358,7 +358,7 @@ repForD decl = notHandled "Foreign declaration" (ppr decl)
 repCCallConv :: CCallConv -> DsM (Core TH.Callconv)
 repCCallConv CCallConv = rep2 cCallName []
 repCCallConv StdCallConv = rep2 stdCallName []
-repCCallConv CmmCallConv = notHandled "repCCallConv" (ppr CmmCallConv)
+repCCallConv callConv    = notHandled "repCCallConv" (ppr callConv)
 
 repSafety :: Safety -> DsM (Core TH.Safety)
 repSafety PlayRisky = rep2 unsafeName []
