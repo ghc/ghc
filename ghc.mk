@@ -20,10 +20,6 @@
 #     * install libgmp.a, gmp.h
 #   * need to fix Cabal for new Windows layout, see
 #     Distribution/Simple/GHC.configureToolchain.
-#   * separate the logic of whether to do something from the test for
-#     existence of the tool to do it. For example, rather than checking
-#     if $DIR_DOCBOOK_XSL or $XSLTPROC is "", we should have a variable
-#     for controlling the building of the docs.
 #   * remove old Makefiles, add new stubs for building in subdirs
 #     * utils/hsc2hs/Makefile
 #     * utils/haddock/Makefile
