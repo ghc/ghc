@@ -590,8 +590,6 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(OnExitHook)				\
       SymI_HasProto(OutOfHeapHook)			\
       SymI_HasProto(StackOverflowHook)			\
-      SymI_HasProto(__encodeDouble)			\
-      SymI_HasProto(__encodeFloat)			\
       SymI_HasProto(addDLL)               		\
       GMP_SYMS					        \
       SymI_HasProto(__int_encodeDouble)			\

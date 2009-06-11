@@ -60,28 +60,6 @@
 #define __abs(a)		(( (a) >= 0 ) ? (a) : (-(a)))
 
 StgDouble
-__encodeDouble (I_ size, StgByteArray ba, I_ e) /* result = s * 2^e */
-{
-    StgDouble r;
-    const mp_limb_t *const arr = (const mp_limb_t *)ba;
-    I_ i;
-
-    /* Convert MP_INT to a double; knows a lot about internal rep! */
-    for(r = 0.0, i = __abs(size)-1; i >= 0; i--)
-	r = (r * GMP_BASE) + arr[i];
-
-    /* Now raise to the exponent */
-    if ( r != 0.0 ) /* Lennart suggests this avoids a bug in MIPS's ldexp */
-	r = ldexp(r, e);
-
-    /* sign is encoded in the size */
-    if (size < 0)
-	r = -r;
-
-    return r;
-}
-
-StgDouble
 __2Int_encodeDouble (I_ j_high, I_ j_low, I_ e)
 {
   StgDouble r;
@@ -136,28 +114,6 @@ __int_encodeDouble (I_ j, I_ e)
     r = -r;
   
   return r;
-}
-
-StgFloat
-__encodeFloat (I_ size, StgByteArray ba, I_ e) /* result = s * 2^e */
-{
-    StgFloat r;
-    const mp_limb_t *arr = (const mp_limb_t *)ba;
-    I_ i;
-
-    /* Convert MP_INT to a float; knows a lot about internal rep! */
-    for(r = 0.0, i = __abs(size)-1; i >= 0; i--)
-	r = (r * GMP_BASE) + arr[i];
-
-    /* Now raise to the exponent */
-    if ( r != 0.0 ) /* Lennart suggests this avoids a bug in MIPS's ldexp */
-	r = ldexp(r, e);
-
-    /* sign is encoded in the size */
-    if (size < 0)
-	r = -r;
-
-    return r;
 }
 
 /* Special version for small Integers */
