@@ -203,6 +203,7 @@ data DynFlag
    | Opt_ExtendedDefaultRules           -- Use GHC's extended rules for defaulting
    | Opt_ForeignFunctionInterface
    | Opt_UnliftedFFITypes
+   | Opt_GHCForeignImportPrim
    | Opt_PArr                           -- Syntactic support for parallel arrays
    | Opt_Arrows                         -- Arrow-notation syntax
    | Opt_TemplateHaskell
@@ -1759,6 +1760,7 @@ xFlags = [
   ( "TransformListComp",                Opt_TransformListComp, const Supported ),
   ( "ForeignFunctionInterface",         Opt_ForeignFunctionInterface, const Supported ),
   ( "UnliftedFFITypes",                 Opt_UnliftedFFITypes, const Supported ),
+  ( "GHCForeignImportPrim",             Opt_GHCForeignImportPrim, const Supported ),
   ( "LiberalTypeSynonyms",              Opt_LiberalTypeSynonyms, const Supported ),
   ( "Rank2Types",                       Opt_Rank2Types, const Supported ),
   ( "RankNTypes",                       Opt_RankNTypes, const Supported ),

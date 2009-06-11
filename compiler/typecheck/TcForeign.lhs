@@ -152,11 +152,13 @@ tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv safety _ _ (CFunction t
           checkForeignRes nonIOok (isFFIImportResultTy dflags) res_ty
           return idecl
   | cconv == PrimCallConv = do
+      dflags <- getDOpts
+      check (dopt Opt_GHCForeignImportPrim dflags)
+            (text "Use -XGHCForeignImportPrim to allow `foreign import prim'.")
       checkCg (checkCOrAsmOrDotNetOrInterp)
       checkCTarget target
       check (playSafe safety)
             (text "The safe/unsafe annotation should not be used with `foreign import prim'.")
-      dflags <- getDOpts
       checkForeignArgs (isFFIPrimArgumentTy dflags) arg_tys
       -- prim import result is more liberal, allows (#,,#)
       checkForeignRes nonIOok (isFFIPrimResultTy dflags) res_ty
