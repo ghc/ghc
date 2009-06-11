@@ -18,7 +18,6 @@
 #     * Windows: should we have ghc-pkg-<version>?
 #     * should we be stripping things?
 #     * install libgmp.a, gmp.h
-#   * finish binary distributions
 #   * need to fix Cabal for new Windows layout, see
 #     Distribution/Simple/GHC.configureToolchain.
 #   * separate the logic of whether to do something from the test for
