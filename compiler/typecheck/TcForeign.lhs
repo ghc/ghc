@@ -154,8 +154,8 @@ tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv safety _ _ (CFunction t
   | cconv == PrimCallConv = do
       checkCg (checkCOrAsmOrDotNetOrInterp)
       checkCTarget target
-      check (safety == PlayRisky)
-            (text "A `foreign import prim' must always be annotated as `unsafe'")
+      check (playSafe safety)
+            (text "The safe/unsafe annotation should not be used with `foreign import prim'.")
       dflags <- getDOpts
       checkForeignArgs (isFFIPrimArgumentTy dflags) arg_tys
       -- prim import result is more liberal, allows (#,,#)
