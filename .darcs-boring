@@ -82,6 +82,11 @@
 ^libraries/unique(/|$)
 ^libraries/unix(/|$)
 ^libraries/xhtml(/|$)
+^libraries/dph(/|$)
+^libraries/utf8-string(/|$)
+^libraries/terminfo(/|$)
+^libraries/haskeline(/|$)
+^libraries/extensible-exceptions(/|$)
 # Other library bits that get generated:
 ^libraries/bootstrapping/
 ^libraries/stamp/
