@@ -2,18 +2,13 @@
 
 module Main(main) where
 
-import IO
-import Monad
-import Directory (removeFile, doesFileExist)
-#ifdef mingw32_HOST_OS
-import GHC.Handle(hSetBinaryMode)
-#endif
+import Control.Monad
+import System.Directory (removeFile, doesFileExist)
+import System.IO
+import System.IO.Error
 
 main = do
   hIn <- openFile "hGetPosn001.in" ReadMode
-#ifdef mingw32_HOST_OS
-  hSetBinaryMode hIn True
-#endif
   f <- doesFileExist "hGetPosn001.out"
   when f (removeFile "hGetPosn001.out")
   hOut <- openFile "hGetPosn001.out" ReadWriteMode
@@ -22,13 +17,7 @@ main = do
   copy hIn hOut
   hSetPosn bof
   copy hIn hOut
-#ifdef mingw32_HOST_OS
-  hSetBinaryMode hOut True
-#endif
   hSeek hOut AbsoluteSeek 0
-#ifdef mingw32_HOST_OS
-  hSetBinaryMode hOut False
-#endif
   stuff <- hGetContents hOut
   putStr stuff
 

@@ -2,14 +2,18 @@ import IO
 import System.IO
 import Foreign
 import CForeign
+import Control.Monad
 
 main = do test True; test False
 
 test blocking = do
-  h <- openBinaryFile "hGetBuf002.hs" ReadMode
+  h <- openBinaryFile "hGetBuf003.hs" ReadMode
 
   let sz = 42
       loop = do
+         -- mix ordinary char buffering with hGetBuf
+         eof <- hIsEOF h
+         when (not eof) $ hGetChar h >>= putChar
   	 b <- allocaBytes sz $ \ptr -> do
                 r <- (if blocking then hGetBuf else hGetBufNonBlocking) h ptr sz
          	if (r == 0)
@@ -25,14 +29,18 @@ import IO
 import System.IO
 import Foreign
 import CForeign
+import Control.Monad
 
 main = do test True; test False
 
 test blocking = do
-  h <- openBinaryFile "hGetBuf002.hs" ReadMode
+  h <- openBinaryFile "hGetBuf003.hs" ReadMode
 
   let sz = 42
       loop = do
+         -- mix ordinary char buffering with hGetBuf
+         eof <- hIsEOF h
+         when (not eof) $ hGetChar h >>= putChar
   	 b <- allocaBytes sz $ \ptr -> do
                 r <- (if blocking then hGetBuf else hGetBufNonBlocking) h ptr sz
          	if (r == 0)

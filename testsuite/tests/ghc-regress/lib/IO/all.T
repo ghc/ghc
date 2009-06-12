@@ -104,3 +104,37 @@ test('concio001.thr', skip, run_command, ['$MAKE -s --no-print-directory test.co
 test('concio002', reqlib('process'), compile_and_run, [''])
 
 test('2122', extra_clean(['2122-test']), compile_and_run, [''])
+
+test('hSetEncoding001',extra_run_opts('hSetEncoding001.in'), compile_and_run, [''])
+test('decodingerror001',normal, compile_and_run, [''])
+
+test('encoding001',
+     extra_clean([
+           'encoding001.utf16', 'encoding001.utf16.utf16be',
+           'encoding001.utf16.utf16le', 'encoding001.utf16.utf32',
+           'encoding001.utf16.utf32be', 'encoding001.utf16.utf32le',
+           'encoding001.utf16.utf8', 'encoding001.utf16be',
+           'encoding001.utf16be.utf16', 'encoding001.utf16be.utf16le',
+           'encoding001.utf16be.utf32', 'encoding001.utf16be.utf32be',
+           'encoding001.utf16be.utf32le', 'encoding001.utf16be.utf8',
+           'encoding001.utf16le', 'encoding001.utf16le.utf16',
+           'encoding001.utf16le.utf16be', 'encoding001.utf16le.utf32',
+           'encoding001.utf16le.utf32be', 'encoding001.utf16le.utf32le',
+           'encoding001.utf16le.utf8', 'encoding001.utf32',
+           'encoding001.utf32.utf16', 'encoding001.utf32.utf16be',
+           'encoding001.utf32.utf16le', 'encoding001.utf32.utf32be',
+           'encoding001.utf32.utf32le', 'encoding001.utf32.utf8',
+           'encoding001.utf32be', 'encoding001.utf32be.utf16',
+           'encoding001.utf32be.utf16be', 'encoding001.utf32be.utf16le',
+           'encoding001.utf32be.utf32', 'encoding001.utf32be.utf32le',
+           'encoding001.utf32be.utf8', 'encoding001.utf32le',
+           'encoding001.utf32le.utf16', 'encoding001.utf32le.utf16be',
+           'encoding001.utf32le.utf16le', 'encoding001.utf32le.utf32',
+           'encoding001.utf32le.utf32be', 'encoding001.utf32le.utf8',
+           'encoding001.utf8', 'encoding001.utf8.utf16',
+           'encoding001.utf8.utf16be', 'encoding001.utf8.utf16le',
+           'encoding001.utf8.utf32', 'encoding001.utf8.utf32be',
+           'encoding001.utf8.utf32le']), 
+     compile_and_run, [''])
+
+test('newline001', extra_clean(['newline001.out']), compile_and_run, [''])

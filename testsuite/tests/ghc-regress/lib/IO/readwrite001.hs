@@ -2,20 +2,14 @@
 
 module Main(main) where
 
-import IO
-import Directory ( removeFile, doesFileExist )
-import Monad
-#ifdef mingw32_HOST_OS
-import GHC.Handle(hSetBinaryMode)
-#endif
+import System.IO
+import System.Directory ( removeFile, doesFileExist )
+import Control.Monad
 
 main = do
   f <- doesFileExist "readwrite001.inout" 
   when f (removeFile "readwrite001.inout")
   hdl <- openFile "readwrite001.inout" ReadWriteMode
-#ifdef mingw32_HOST_OS
-  hSetBinaryMode hdl True
-#endif
   hSetBuffering hdl LineBuffering
   hPutStr hdl "as"
   hSeek hdl AbsoluteSeek 0

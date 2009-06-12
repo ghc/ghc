@@ -35,15 +35,6 @@ file = "hTell001.hs"
 
 main :: IO ()
 main = do
-  h  <- openFile file ReadMode
-  recordDoAndRepos h $
-   recordDoAndRepos h $
-    recordDoAndRepos h $
-     recordDoAndRepos h $
-      recordDoAndRepos h $
-       putStrLn ""
-  hClose h
-  putStrLn ""
   h  <- openBinaryFile file ReadMode
   recordDoAndRepos h $
    recordDoAndRepos h $
@@ -53,7 +44,7 @@ main = do
        putStrLn ""
   hClose h
   putStrLn "\nUsing hSeek/AbsoluteSeek: "
-  h  <- openFile file ReadMode
+  h  <- openBinaryFile file ReadMode
   recordDoAndRepos2 h $
    recordDoAndRepos2 h $
     recordDoAndRepos2 h $
@@ -64,7 +55,7 @@ main = do
   hClose h
   putStrLn "\nUsing hSeek/SeekFromEnd: "
   putStrLn "(Don't worry if you're seeing differing numbers here, it might be down to '\\n' vs '\\r\\n')"
-  h  <- openFile file ReadMode
+  h  <- openBinaryFile file ReadMode
   recordDoAndRepos3 h $
    recordDoAndRepos3 h $
     recordDoAndRepos3 h $

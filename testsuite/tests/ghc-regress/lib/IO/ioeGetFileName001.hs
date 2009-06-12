@@ -1,15 +1,10 @@
 -- !!! test ioeGetFileName
 
-import IO
-#ifdef mingw32_HOST_OS
-import GHC.Handle(hSetBinaryMode)
-#endif
+import System.IO
+import System.IO.Error
 
 main = do
   h <- openFile "ioeGetFileName001.hs" ReadMode
-#ifdef mingw32_HOST_OS
-  hSetBinaryMode h True
-#endif
   hSeek h SeekFromEnd 0
   (hGetChar h >> return ()) `catch`
 	\e -> if isEOFError e 

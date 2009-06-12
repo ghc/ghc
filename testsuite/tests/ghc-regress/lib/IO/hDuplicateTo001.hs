@@ -1,7 +1,9 @@
 import GHC.Handle
 import GHC.IOBase
-import GHC.Conc
 import IO
+import Control.Concurrent.MVar
+import Data.Typeable
+import qualified GHC.IO.FD as FD
 
 main = do
    h <- openFile "tmp" WriteMode
@@ -16,7 +18,7 @@ main = do
 
 
 getfd h@(FileHandle _ mvar) = do
-   h__ <- takeMVar mvar
-   let fd = fromIntegral (haFD h__)
-   putMVar mvar h__
-   return fd
+  withMVar mvar $ \h__@Handle__{haDevice=dev} ->
+   case cast dev of
+     Just fd -> return (FD.fdFD fd)
+     Nothing -> error "getfd"

@@ -10,13 +10,13 @@ _exception :: e = SomeException (GHC.Exception.D:Exception _
 Stopped at <exception thrown>
 _exception :: e = SomeException (GHC.Exception.D:Exception _
                                                            (GHC.Show.D:Show ...) ....)
-                                (GHC.IOBase.IOError Nothing GHC.IOBase.UserError ....)
+                                (GHC.IO.Exception.IOError Nothing GHC.IO.Exception.UserError ....)
 *** Exception: user error (error)
 Stopped at <exception thrown>
 _exception :: e = SomeException (GHC.Exception.D:Exception _
                                                            (GHC.Show.D:Show ...) ....)
-                                (GHC.IOBase.IOError Nothing GHC.IOBase.UserError ....)
+                                (GHC.IO.Exception.IOError Nothing GHC.IO.Exception.UserError ....)
 Stopped at <exception thrown>
 _exception :: e = SomeException (GHC.Exception.D:Exception _
                                                            (GHC.Show.D:Show ...) ....)
-                                (GHC.IOBase.IOError Nothing GHC.IOBase.UserError ....)
+                                (GHC.IO.Exception.IOError Nothing GHC.IO.Exception.UserError ....)

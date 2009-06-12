@@ -2,11 +2,8 @@
 
 module Main(main) where
 
-import IO
-import Monad ( sequence )
-#ifdef mingw32_HOST_OS
-import GHC.Handle(hSetBinaryMode)
-#endif
+import System.IO
+import Control.Monad ( sequence )
 
 testPosns :: Handle -> BufferMode -> IO ()
 testPosns hdl bmo = do
@@ -19,9 +16,6 @@ bmo_ls = [NoBuffering, LineBuffering, BlockBuffering Nothing,
 
 main = do
   hdl  <- openFile "hSeek003.hs" ReadMode
-#ifdef mingw32_HOST_OS
-  hSetBinaryMode hdl True
-#endif
   sequence (zipWith testPosns (repeat hdl) bmo_ls)
   hClose hdl
 

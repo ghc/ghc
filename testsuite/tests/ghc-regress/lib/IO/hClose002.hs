@@ -1,8 +1,10 @@
 import System.IO
 import Control.Exception
 
-import GHC.IOBase
-import GHC.Handle
+import qualified GHC.IO.Device as IODevice
+import GHC.IO.Handle
+import GHC.IO.Handle.Internals
+import GHC.IO.Handle.Types
 import System.Posix.Internals
 
 main = do
@@ -25,6 +27,6 @@ showPossibleException f = do e <- try f
                              print (e :: Either SomeException ())
 
 naughtyClose h = 
-  withHandle_ "naughtyClose" h $ \ h_ -> do
-     let fd = haFD h_
-     c_close fd
+  withHandle_ "naughtyClose" h $ \ Handle__{haDevice=dev} -> do
+     IODevice.close dev
+

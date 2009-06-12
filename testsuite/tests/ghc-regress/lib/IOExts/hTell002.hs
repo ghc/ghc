@@ -7,7 +7,7 @@ import Directory
 
 main :: IO ()
 main = do
-  h <- openFile "tst-seek" WriteMode
+  h <- openBinaryFile "tst-seek" WriteMode
   hPutStr h "test string1"
    -- seek to EOF should be cool..
   hSeek h SeekFromEnd 0

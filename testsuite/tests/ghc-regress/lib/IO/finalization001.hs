@@ -4,8 +4,7 @@
 
 module Main (main) where
 
-import IO
-import System
+import System.IO
 
 doTest :: IO ()
 doTest = do

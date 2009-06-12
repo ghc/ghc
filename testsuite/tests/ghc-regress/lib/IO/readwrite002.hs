@@ -1,11 +1,10 @@
 -- !!! Testing RW handles 
 
-import IO
-import Directory (removeFile, doesFileExist)
-import Monad
-#ifdef mingw32_HOST_OS
-import GHC.Handle(hSetBinaryMode)
-#endif
+import System.IO
+import System.IO.Error
+import System.Directory (removeFile, doesFileExist)
+import Control.Monad
+import System.Cmd
 
 -- This test is weird, full marks to whoever dreamt it up!
 
@@ -15,18 +14,22 @@ main = do
    f <- doesFileExist username
    when f (removeFile username)
    cd <- openFile username ReadWriteMode
-#ifdef mingw32_HOST_OS
+
+   -- binary mode needed, otherwise newline translation gives
+   -- unpredictable results.
    hSetBinaryMode cd True
-#endif
-   hSetBuffering stdin NoBuffering
-   hSetBuffering stdout NoBuffering
-   hSetBuffering cd NoBuffering
+
+-- Leva buffering on to make things more interesting:
+--   hSetBuffering stdin NoBuffering
+--   hSetBuffering stdout NoBuffering
+--   hSetBuffering cd NoBuffering
    hPutStr cd speakString
    hSeek cd AbsoluteSeek 0
    speak cd  `catch` \ err -> if isEOFError err then putStrLn "\nCaught EOF" else ioError err
    hSeek cd AbsoluteSeek 0
    hSetBuffering cd LineBuffering
    speak cd  `catch` \ err -> if isEOFError err then putStrLn "\nCaught EOF" else ioError err
+   return ()
    hSeek cd AbsoluteSeek 0
    hSetBuffering cd (BlockBuffering Nothing)
    speak cd  `catch` \ err -> if isEOFError err then putStrLn "\nCaught EOF" else ioError err

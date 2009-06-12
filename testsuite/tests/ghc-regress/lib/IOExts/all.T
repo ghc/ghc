@@ -12,5 +12,6 @@ test('performGC001', normal, compile_and_run, [''])
 test('trace001', normal, compile_and_run, [''])
 
 test('hGetBuf002', normal, compile_and_run, [''])
+test('hGetBuf003', normal, compile_and_run, [''])
 test('hPutBuf001', normal, compile_and_run, [''])
 test('hPutBuf002', extra_clean(['hPutBuf002.out']), compile_and_run, [''])
