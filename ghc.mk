@@ -905,6 +905,7 @@ clean_libraries:
 	"$(RM)" $(RM_OPTS) -r $(patsubst %, libraries/%/dist, $(PACKAGES) $(PACKAGES_STAGE2))
 	"$(RM)" $(RM_OPTS) -r $(patsubst %, libraries/%/dist-install, $(PACKAGES) $(PACKAGES_STAGE2))
 	"$(RM)" $(RM_OPTS) -r $(patsubst %, libraries/%/dist-boot, $(PACKAGES) $(PACKAGES_STAGE2))
+	"$(RM)" $(RM_OPTS) $(patsubst %, libraries/%/*.buildinfo, $(PACKAGES) $(PACKAGES_STAGE2))
 
 distclean : clean
 	"$(RM)" $(RM_OPTS) config.cache config.status config.log mk/config.h mk/stamp-h
