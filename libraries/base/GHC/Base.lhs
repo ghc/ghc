@@ -773,7 +773,7 @@ used in the case of partial applications, etc.
 {-# INLINE remInt #-}
 {-# INLINE negateInt #-}
 
-plusInt, minusInt, timesInt, quotInt, remInt, divInt, modInt, gcdInt :: Int -> Int -> Int
+plusInt, minusInt, timesInt, quotInt, remInt, divInt, modInt :: Int -> Int -> Int
 (I# x) `plusInt`  (I# y) = I# (x +# y)
 (I# x) `minusInt` (I# y) = I# (x -# y)
 (I# x) `timesInt` (I# y) = I# (x *# y)
@@ -792,17 +792,6 @@ plusInt, minusInt, timesInt, quotInt, remInt, divInt, modInt, gcdInt :: Int -> I
 "x# *# 1#" forall x#. x# *# 1# = x#
 "1# *# x#" forall x#. 1# *# x# = x#
   #-}
-
-gcdInt (I# a) (I# b) = g a b
-   where g 0# 0# = error "GHC.Base.gcdInt: gcd 0 0 is undefined"
-         g 0# _  = I# absB
-         g _  0# = I# absA
-         g _  _  = I# (gcdInt# absA absB)
-
-         absInt x = if x <# 0# then negateInt# x else x
-
-         !absA     = absInt a
-         !absB     = absInt b
 
 negateInt :: Int -> Int
 negateInt (I# x) = I# (negateInt# x)
