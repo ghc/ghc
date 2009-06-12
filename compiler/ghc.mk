@@ -17,7 +17,7 @@ define compiler-hs-dependency # args: $1 = module, $2 = dependency
 
 $$(foreach stage,1 2 3,\
  $$(foreach way,$$(compiler_stage$$(stage)_WAYS),\
-  compiler/stage$$(stage)/build/$1.$($(way)_osuf))) : $2
+  compiler/stage$$(stage)/build/$1.$$($$(way)_osuf))) : $2
 
 endef
 
@@ -235,9 +235,6 @@ endif
 compiler/stage3/$(PLATFORM_H) : compiler/stage2/$(PLATFORM_H)
 	"$(CP)" $< $@
 
-# Every Constants.o object file depends on includes/GHCConstants.h:
-$(eval $(call compiler-hs-dependency,Constants,$(includes_GHCCONSTANTS)))
-
 # ----------------------------------------------------------------------------
 #		Generate supporting stuff for prelude/PrimOp.lhs 
 #		from prelude/primops.txt
@@ -282,9 +279,6 @@ compiler/primop-strictness.hs-incl: $(PRIMOPS_TXT) $(GENPRIMOP_INPLACE)
 	"$(GENPRIMOP_INPLACE)" --strictness         < $< > $@
 compiler/primop-primop-info.hs-incl: $(PRIMOPS_TXT) $(GENPRIMOP_INPLACE)
 	"$(GENPRIMOP_INPLACE)" --primop-primop-info < $< > $@
-
-# Every PrimOp.o object file depends on $(PRIMOP_BITS):
-$(eval $(call compiler-hs-dependency,PrimOp,$(PRIMOP_BITS)))
 
 # Usages aren't used any more; but the generator 
 # can still generate them if we want them back
@@ -457,6 +451,12 @@ $(compiler_stage3_depfile) : compiler/stage3/$(PLATFORM_H)
 $(compiler_stage1_depfile) : $(includes_H_CONFIG) $(includes_H_PLATFORM) $(includes_GHCCONSTANTS) $(includes_DERIVEDCONSTANTS) $(PRIMOP_BITS)
 $(compiler_stage2_depfile) : $(includes_H_CONFIG) $(includes_H_PLATFORM) $(includes_GHCCONSTANTS) $(includes_DERIVEDCONSTANTS) $(PRIMOP_BITS)
 $(compiler_stage3_depfile) : $(includes_H_CONFIG) $(includes_H_PLATFORM) $(includes_GHCCONSTANTS) $(includes_DERIVEDCONSTANTS) $(PRIMOP_BITS)
+
+# Every Constants.o object file depends on includes/GHCConstants.h:
+$(eval $(call compiler-hs-dependency,Constants,$(includes_GHCCONSTANTS)))
+
+# Every PrimOp.o object file depends on $(PRIMOP_BITS):
+$(eval $(call compiler-hs-dependency,PrimOp,$(PRIMOP_BITS)))
 
 # Note [munge-stage1-package-config]
 # Strip the date/patchlevel from the version of stage1.  See Note
