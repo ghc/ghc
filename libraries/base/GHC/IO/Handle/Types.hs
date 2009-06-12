@@ -1,0 +1,400 @@
+{-# OPTIONS_GHC -fno-implicit-prelude -funbox-strict-fields #-}
+{-# OPTIONS_HADDOCK hide #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  GHC.IO.Handle.Types
+-- Copyright   :  (c) The University of Glasgow, 1994-2009
+-- License     :  see libraries/base/LICENSE
+-- 
+-- Maintainer  :  libraries@haskell.org
+-- Stability   :  internal
+-- Portability :  non-portable
+--
+-- Basic types for the implementation of IO Handles.
+--
+-----------------------------------------------------------------------------
+
+module GHC.IO.Handle.Types (
+      Handle(..), Handle__(..), showHandle,
+      checkHandleInvariants,
+      BufferList(..),
+      HandleType(..),
+      isReadableHandleType, isWritableHandleType, isReadWriteHandleType,
+      BufferMode(..),
+      BufferCodec(..),
+      NewlineMode(..), Newline(..), nativeNewline,
+      universalNewlineMode, noNewlineTranslation, nativeNewlineMode
+  ) where
+
+#undef DEBUG
+
+import GHC.Base
+import GHC.MVar
+import GHC.IO
+import GHC.IO.Buffer
+import GHC.IO.BufferedIO
+import GHC.IO.Encoding.Types
+import GHC.IORef
+import Data.Maybe
+import GHC.Show
+import GHC.Read
+import GHC.Word
+import GHC.IO.Device
+import Data.Typeable
+
+-- ---------------------------------------------------------------------------
+-- Handle type
+
+--  A Handle is represented by (a reference to) a record 
+--  containing the state of the I/O port/device. We record
+--  the following pieces of info:
+
+--    * type (read,write,closed etc.)
+--    * the underlying file descriptor
+--    * buffering mode 
+--    * buffer, and spare buffers
+--    * user-friendly name (usually the
+--      FilePath used when IO.openFile was called)
+
+-- Note: when a Handle is garbage collected, we want to flush its buffer
+-- and close the OS file handle, so as to free up a (precious) resource.
+
+-- | Haskell defines operations to read and write characters from and to files,
+-- represented by values of type @Handle@.  Each value of this type is a
+-- /handle/: a record used by the Haskell run-time system to /manage/ I\/O
+-- with file system objects.  A handle has at least the following properties:
+-- 
+--  * whether it manages input or output or both;
+--
+--  * whether it is /open/, /closed/ or /semi-closed/;
+--
+--  * whether the object is seekable;
+--
+--  * whether buffering is disabled, or enabled on a line or block basis;
+--
+--  * a buffer (whose length may be zero).
+--
+-- Most handles will also have a current I\/O position indicating where the next
+-- input or output operation will occur.  A handle is /readable/ if it
+-- manages only input or both input and output; likewise, it is /writable/ if
+-- it manages only output or both input and output.  A handle is /open/ when
+-- first allocated.
+-- Once it is closed it can no longer be used for either input or output,
+-- though an implementation cannot re-use its storage while references
+-- remain to it.  Handles are in the 'Show' and 'Eq' classes.  The string
+-- produced by showing a handle is system dependent; it should include
+-- enough information to identify the handle for debugging.  A handle is
+-- equal according to '==' only to itself; no attempt
+-- is made to compare the internal state of different handles for equality.
+--
+-- GHC note: a 'Handle' will be automatically closed when the garbage
+-- collector detects that it has become unreferenced by the program.
+-- However, relying on this behaviour is not generally recommended:
+-- the garbage collector is unpredictable.  If possible, use explicit
+-- an explicit 'hClose' to close 'Handle's when they are no longer
+-- required.  GHC does not currently attempt to free up file
+-- descriptors when they have run out, it is your responsibility to
+-- ensure that this doesn't happen.
+
+data Handle 
+  = FileHandle                          -- A normal handle to a file
+        FilePath                        -- the file (used for error messages
+                                        -- only)
+        !(MVar Handle__)
+
+  | DuplexHandle                        -- A handle to a read/write stream
+        FilePath                        -- file for a FIFO, otherwise some
+                                        --   descriptive string (used for error
+                                        --   messages only)
+        !(MVar Handle__)                -- The read side
+        !(MVar Handle__)                -- The write side
+
+  deriving Typeable
+
+-- NOTES:
+--    * A 'FileHandle' is seekable.  A 'DuplexHandle' may or may not be
+--      seekable.
+
+instance Eq Handle where
+ (FileHandle _ h1)     == (FileHandle _ h2)     = h1 == h2
+ (DuplexHandle _ h1 _) == (DuplexHandle _ h2 _) = h1 == h2
+ _ == _ = False 
+
+data Handle__
+  = forall dev . (IODevice dev, BufferedIO dev, Typeable dev) =>
+    Handle__ {
+      haDevice      :: !dev,
+      haType        :: HandleType,           -- type (read/write/append etc.)
+      haByteBuffer  :: !(IORef (Buffer Word8)),
+      haBufferMode  :: BufferMode,
+      haLastDecode  :: !(IORef (Buffer Word8)),
+      haCharBuffer  :: !(IORef (Buffer CharBufElem)), -- the current buffer
+      haBuffers     :: !(IORef (BufferList CharBufElem)),  -- spare buffers
+      haEncoder     :: Maybe TextEncoder,
+      haDecoder     :: Maybe TextDecoder,
+      haInputNL     :: Newline,
+      haOutputNL    :: Newline,
+      haOtherSide   :: Maybe (MVar Handle__) -- ptr to the write side of a 
+                                             -- duplex handle.
+    }
+    deriving Typeable
+
+-- we keep a few spare buffers around in a handle to avoid allocating
+-- a new one for each hPutStr.  These buffers are *guaranteed* to be the
+-- same size as the main buffer.
+data BufferList e
+  = BufferListNil 
+  | BufferListCons (RawBuffer e) (BufferList e)
+
+--  Internally, we classify handles as being one
+--  of the following:
+
+data HandleType
+ = ClosedHandle
+ | SemiClosedHandle
+ | ReadHandle
+ | WriteHandle
+ | AppendHandle
+ | ReadWriteHandle
+
+isReadableHandleType :: HandleType -> Bool
+isReadableHandleType ReadHandle         = True
+isReadableHandleType ReadWriteHandle    = True
+isReadableHandleType _                  = False
+
+isWritableHandleType :: HandleType -> Bool
+isWritableHandleType AppendHandle    = True
+isWritableHandleType WriteHandle     = True
+isWritableHandleType ReadWriteHandle = True
+isWritableHandleType _               = False
+
+isReadWriteHandleType :: HandleType -> Bool
+isReadWriteHandleType ReadWriteHandle{} = True
+isReadWriteHandleType _                 = False
+
+-- INVARIANTS on Handles:
+--
+--   * A handle *always* has a buffer, even if it is only 1 character long
+--     (an unbuffered handle needs a 1 character buffer in order to support
+--      hLookAhead and hIsEOF).
+--   * In a read Handle, the byte buffer is always empty (we decode when reading)
+--   * In a wriite Handle, the Char buffer is always empty (we encode when writing)
+--
+checkHandleInvariants :: Handle__ -> IO ()
+#ifdef DEBUG
+checkHandleInvariants h_ = do
+ bbuf <- readIORef (haByteBuffer h_)
+ checkBuffer bbuf
+ cbuf <- readIORef (haCharBuffer h_)
+ checkBuffer cbuf
+#else
+checkHandleInvariants _ = return ()
+#endif
+
+-- ---------------------------------------------------------------------------
+-- Buffering modes
+
+-- | Three kinds of buffering are supported: line-buffering, 
+-- block-buffering or no-buffering.  These modes have the following
+-- effects. For output, items are written out, or /flushed/,
+-- from the internal buffer according to the buffer mode:
+--
+--  * /line-buffering/: the entire output buffer is flushed
+--    whenever a newline is output, the buffer overflows, 
+--    a 'System.IO.hFlush' is issued, or the handle is closed.
+--
+--  * /block-buffering/: the entire buffer is written out whenever it
+--    overflows, a 'System.IO.hFlush' is issued, or the handle is closed.
+--
+--  * /no-buffering/: output is written immediately, and never stored
+--    in the buffer.
+--
+-- An implementation is free to flush the buffer more frequently,
+-- but not less frequently, than specified above.
+-- The output buffer is emptied as soon as it has been written out.
+--
+-- Similarly, input occurs according to the buffer mode for the handle:
+--
+--  * /line-buffering/: when the buffer for the handle is not empty,
+--    the next item is obtained from the buffer; otherwise, when the
+--    buffer is empty, characters up to and including the next newline
+--    character are read into the buffer.  No characters are available
+--    until the newline character is available or the buffer is full.
+--
+--  * /block-buffering/: when the buffer for the handle becomes empty,
+--    the next block of data is read into the buffer.
+--
+--  * /no-buffering/: the next input item is read and returned.
+--    The 'System.IO.hLookAhead' operation implies that even a no-buffered
+--    handle may require a one-character buffer.
+--
+-- The default buffering mode when a handle is opened is
+-- implementation-dependent and may depend on the file system object
+-- which is attached to that handle.
+-- For most implementations, physical files will normally be block-buffered 
+-- and terminals will normally be line-buffered.
+
+data BufferMode  
+ = NoBuffering  -- ^ buffering is disabled if possible.
+ | LineBuffering
+                -- ^ line-buffering should be enabled if possible.
+ | BlockBuffering (Maybe Int)
+                -- ^ block-buffering should be enabled if possible.
+                -- The size of the buffer is @n@ items if the argument
+                -- is 'Just' @n@ and is otherwise implementation-dependent.
+   deriving (Eq, Ord, Read, Show)
+
+{-
+[note Buffering Implementation]
+
+Each Handle has two buffers: a byte buffer (haByteBuffer) and a Char
+buffer (haCharBuffer).  
+
+[note Buffered Reading]
+
+For read Handles, bytes are read into the byte buffer, and immediately
+decoded into the Char buffer (see
+GHC.IO.Handle.Internals.readTextDevice).  The only way there might be
+some data left in the byte buffer is if there is a partial multi-byte
+character sequence that cannot be decoded into a full character.
+
+Note that the buffering mode (haBufferMode) makes no difference when
+reading data into a Handle.  When reading, we can always just read all
+the data there is available without blocking, decode it into the Char
+buffer, and then provide it immediately to the caller.
+
+[note Buffered Writing]
+
+Characters are written into the Char buffer by e.g. hPutStr.  When the
+buffer is full, we call writeTextDevice, which encodes the Char buffer
+into the byte buffer, and then immediately writes it all out to the
+underlying device.  The Char buffer will always be empty afterward.
+This might require multiple decoding/writing cycles.
+
+[note Buffer Sizing]
+
+Since the buffer mode makes no difference when reading, we can just
+use the default buffer size for both the byte and the Char buffer.
+Ineed, we must have room for at least one Char in the Char buffer,
+because we have to implement hLookAhead, which requires caching a Char
+in the Handle.  Furthermore, when doing newline translation, we need
+room for at least two Chars in the read buffer, so we can spot the
+\r\n sequence.
+
+For writing, however, when the buffer mode is NoBuffering, we use a
+1-element Char buffer to force flushing of the buffer after each Char
+is read.
+
+[note Buffer Flushing]
+
+** Flushing the Char buffer
+
+We must be able to flush the Char buffer, in order to implement
+hSetEncoding, and things like hGetBuf which want to read raw bytes.
+
+Flushing the Char buffer on a write Handle is easy: just call
+writeTextDevice to encode and write the date.
+
+Flushing the Char buffer on a read Handle involves rewinding the byte
+buffer to the point representing the next Char in the Char buffer.
+This is done by
+
+ - remembering the state of the byte buffer *before* the last decode
+
+ - re-decoding the bytes that represent the chars already read from the
+   Char buffer.  This gives us the point in the byte buffer that
+   represents the *next* Char to be read.
+
+In order for this to work, after readTextHandle we must NOT MODIFY THE
+CONTENTS OF THE BYTE OR CHAR BUFFERS, except to remove characters from
+the Char buffer.
+
+** Flushing the byte buffer
+
+The byte buffer can be flushed if the Char buffer has already been
+flushed (see above).  For a read Handle, flushing the byte buffer
+means seeking the device back by the number of bytes in the buffer,
+and hence it is only possible on a seekable Handle.
+
+-}
+
+-- ---------------------------------------------------------------------------
+-- Newline translation
+
+-- | The representation of a newline in the external file or stream.
+data Newline = LF    -- ^ "\n"
+             | CRLF  -- ^ "\r\n"
+             deriving Eq
+
+-- | Specifies the translation, if any, of newline characters between
+-- internal Strings and the external file or stream.  Haskell Strings
+-- are assumed to represent newlines with the '\n' character; the
+-- newline mode specifies how to translate '\n' on output, and what to
+-- translate into '\n' on input.
+data NewlineMode 
+  = NewlineMode { inputNL :: Newline,
+                    -- ^ the representation of newlines on input
+                  outputNL :: Newline
+                    -- ^ the representation of newlines on output
+                 }
+             deriving Eq
+
+-- | The native newline representation for the current platform
+nativeNewline :: Newline
+#ifdef mingw32_HOST_OS
+nativeNewline = CRLF
+#else
+nativeNewline = LF
+#endif
+
+-- | Map "\r\n" into "\n" on input, and "\n" to the native newline
+-- represetnation on output.  This mode can be used on any platform, and
+-- works with text files using any newline convention.  The downside is
+-- that @readFile >>= writeFile@ might yield a different file.
+-- 
+-- > universalNewlineMode  = NewlineMode { inputNL  = CRLF, 
+-- >                                       outputNL = nativeNewline }
+--
+universalNewlineMode :: NewlineMode
+universalNewlineMode  = NewlineMode { inputNL  = CRLF, 
+                                      outputNL = nativeNewline }
+
+-- | Use the native newline representation on both input and output
+-- 
+-- > nativeNewlineMode  = NewlineMode { inputNL  = nativeNewline
+-- >                                    outputNL = nativeNewline }
+--
+nativeNewlineMode    :: NewlineMode
+nativeNewlineMode     = NewlineMode { inputNL  = nativeNewline, 
+                                      outputNL = nativeNewline }
+
+-- | Do no newline translation at all.
+-- 
+-- > noNewlineTranslation  = NewlineMode { inputNL  = LF, outputNL = LF }
+--
+noNewlineTranslation :: NewlineMode
+noNewlineTranslation  = NewlineMode { inputNL  = LF, outputNL = LF }
+
+-- ---------------------------------------------------------------------------
+-- Show instance for Handles
+
+-- handle types are 'show'n when printing error msgs, so
+-- we provide a more user-friendly Show instance for it
+-- than the derived one.
+
+instance Show HandleType where
+  showsPrec _ t =
+    case t of
+      ClosedHandle      -> showString "closed"
+      SemiClosedHandle  -> showString "semi-closed"
+      ReadHandle        -> showString "readable"
+      WriteHandle       -> showString "writable"
+      AppendHandle      -> showString "writable (append)"
+      ReadWriteHandle   -> showString "read-writable"
+
+instance Show Handle where 
+  showsPrec _ (FileHandle   file _)   = showHandle file
+  showsPrec _ (DuplexHandle file _ _) = showHandle file
+
+showHandle :: FilePath -> String -> String
+showHandle file = showString "{handle: " . showString file . showString "}"

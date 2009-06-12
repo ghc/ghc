@@ -23,7 +23,8 @@ module System.Exit
 import Prelude
 
 #ifdef __GLASGOW_HASKELL__
-import GHC.IOBase
+import GHC.IO
+import GHC.IO.Exception
 #endif
 
 #ifdef __HUGS__

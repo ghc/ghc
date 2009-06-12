@@ -28,7 +28,7 @@ module Foreign.Concurrent
   ) where
 
 #ifdef __GLASGOW_HASKELL__
-import GHC.IOBase       ( IO )
+import GHC.IO           ( IO )
 import GHC.Ptr          ( Ptr )
 import GHC.ForeignPtr   ( ForeignPtr )
 import qualified GHC.ForeignPtr

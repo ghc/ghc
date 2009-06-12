@@ -20,7 +20,7 @@ module System.IO.Unsafe (
   ) where
 
 #ifdef __GLASGOW_HASKELL__
-import GHC.IOBase (unsafePerformIO, unsafeInterleaveIO)
+import GHC.IO (unsafePerformIO, unsafeInterleaveIO)
 #endif
 
 #ifdef __HUGS__

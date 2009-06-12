@@ -47,7 +47,7 @@ import GHC.Int
 import GHC.Word
 import GHC.Ptr
 import GHC.Err
-import GHC.IOBase
+import GHC.IO
 import GHC.Base
 #else
 import Data.Int

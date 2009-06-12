@@ -57,7 +57,7 @@ unsafeInterleaveST =
 #ifdef __GLASGOW_HASKELL__
 import GHC.ST           ( ST, runST, fixST, unsafeInterleaveST )
 import GHC.Base         ( RealWorld )
-import GHC.IOBase       ( stToIO, unsafeIOToST, unsafeSTToIO )
+import GHC.IO           ( stToIO, unsafeIOToST, unsafeSTToIO )
 #endif
 
 instance MonadFix (ST s) where

@@ -175,9 +175,12 @@ import System.Posix.Internals
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
-import GHC.IOBase       -- Together these four Prelude modules define
-import GHC.Handle       -- all the stuff exported by IO for the GHC version
-import GHC.IO
+import GHC.IO hiding ( onException )
+import GHC.IO.IOMode
+import GHC.IO.Handle.FD
+import GHC.IO.Handle
+import GHC.IORef
+import GHC.IO.Exception ( userError )
 import GHC.Exception
 import GHC.Num
 import Text.Read

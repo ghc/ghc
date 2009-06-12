@@ -38,7 +38,7 @@ import Hugs.Stable
 #endif
 
 #ifdef __GLASGOW_HASKELL__
-import GHC.IOBase	( IO(..) )
+import GHC.IO           ( IO(..) )
 import GHC.Base		( Int(..), StableName#, makeStableName#
 			, eqStableName#, stableNameToInt# )
 

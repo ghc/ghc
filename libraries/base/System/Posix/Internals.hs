@@ -48,7 +48,10 @@ import System.IO.Error
 import GHC.Base
 import GHC.Num
 import GHC.Real
-import GHC.IOBase
+import GHC.IO
+import GHC.IO.IOMode
+import GHC.IO.Exception
+import GHC.IO.Device
 #elif __HUGS__
 import Hugs.Prelude (IOException(..), IOErrorType(..))
 import Hugs.IO (IOMode(..))
@@ -80,9 +83,7 @@ type CTms       = ()
 type CUtimbuf   = ()
 type CUtsname   = ()
 
-#ifndef __GLASGOW_HASKELL__
 type FD = CInt
-#endif
 
 -- ---------------------------------------------------------------------------
 -- stat()-related stuff
@@ -99,10 +100,7 @@ fdFileSize fd =
       c_size <- st_size p_stat
       return (fromIntegral c_size)
 
-data FDType  = Directory | Stream | RegularFile | RawDevice
-               deriving (Eq)
-
-fileType :: FilePath -> IO FDType
+fileType :: FilePath -> IO IODeviceType
 fileType file =
   allocaBytes sizeof_stat $ \ p_stat -> do
   withCString file $ \p_file -> do
@@ -112,7 +110,7 @@ fileType file =
 
 -- NOTE: On Win32 platforms, this will only work with file descriptors
 -- referring to file handles. i.e., it'll fail for socket FDs.
-fdStat :: FD -> IO (FDType, CDev, CIno)
+fdStat :: FD -> IO (IODeviceType, CDev, CIno)
 fdStat fd = 
   allocaBytes sizeof_stat $ \ p_stat -> do
     throwErrnoIfMinus1Retry "fdType" $
@@ -122,10 +120,10 @@ fdStat fd =
     ino <- st_ino p_stat
     return (ty,dev,ino)
     
-fdType :: FD -> IO FDType
+fdType :: FD -> IO IODeviceType
 fdType fd = do (ty,_,_) <- fdStat fd; return ty
 
-statGetType :: Ptr CStat -> IO FDType
+statGetType :: Ptr CStat -> IO IODeviceType
 statGetType p_stat = do
   c_mode <- st_mode p_stat :: IO CMode
   case () of
@@ -147,16 +145,6 @@ ioe_unknownfiletype = IOError Nothing UnsupportedOperation "fdType"
                         Nothing
 #else
 ioe_unknownfiletype = UserError "fdType" "unknown file type"
-#endif
-
-#if __GLASGOW_HASKELL__ && (defined(mingw32_HOST_OS) || defined(__MINGW32__))
-closeFd :: Bool -> CInt -> IO CInt
-closeFd isStream fd 
-  | isStream  = c_closesocket fd
-  | otherwise = c_close fd
-
-foreign import stdcall unsafe "HsBase.h closesocket"
-   c_closesocket :: CInt -> IO CInt
 #endif
 
 fdGetMode :: FD -> IO IOMode
@@ -185,9 +173,6 @@ fdGetMode fd = do
 
 -- ---------------------------------------------------------------------------
 -- Terminal-related stuff
-
-fdIsTTY :: FD -> IO Bool
-fdIsTTY fd = c_isatty fd >>= return.toBool
 
 #if defined(HTYPE_TCFLAG_T)
 
@@ -551,3 +536,8 @@ foreign import ccall unsafe "HsBase.h __hscore_s_issock" c_s_issock :: CMode -> 
 #else
 s_issock _ = False
 #endif
+
+foreign import ccall unsafe "__hscore_bufsiz"   dEFAULT_BUFFER_SIZE :: Int
+foreign import ccall unsafe "__hscore_seek_cur" sEEK_CUR :: CInt
+foreign import ccall unsafe "__hscore_seek_set" sEEK_SET :: CInt
+foreign import ccall unsafe "__hscore_seek_end" sEEK_END :: CInt

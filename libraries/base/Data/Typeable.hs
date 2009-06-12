@@ -95,12 +95,14 @@ import GHC.Show         (Show(..), ShowS,
 import GHC.Err          (undefined)
 import GHC.Num          (Integer, fromInteger, (+))
 import GHC.Real         ( rem, Ratio )
-import GHC.IOBase       (IORef,newIORef,unsafePerformIO)
+import GHC.IORef        (IORef,newIORef)
+import GHC.IO           (IO, unsafePerformIO,block)
 
 -- These imports are so we can define Typeable instances
 -- It'd be better to give Typeable instances in the modules themselves
 -- but they all have to be compiled before Typeable
-import GHC.IOBase       ( IOArray, IO, MVar, Handle, block )
+import GHC.IOArray
+import GHC.MVar
 import GHC.ST           ( ST )
 import GHC.STRef        ( STRef )
 import GHC.Ptr          ( Ptr, FunPtr )
@@ -488,7 +490,7 @@ INSTANCE_TYPEABLE2((->),funTc,"->")
 INSTANCE_TYPEABLE1(IO,ioTc,"IO")
 
 #if defined(__GLASGOW_HASKELL__) || defined(__HUGS__)
--- Types defined in GHC.IOBase
+-- Types defined in GHC.MVar
 INSTANCE_TYPEABLE1(MVar,mvarTc,"MVar" )
 #endif
 
@@ -538,7 +540,9 @@ INSTANCE_TYPEABLE0(Word,wordTc,"Word" )
 #endif
 INSTANCE_TYPEABLE0(Integer,integerTc,"Integer")
 INSTANCE_TYPEABLE0(Ordering,orderingTc,"Ordering")
+#ifndef __GLASGOW_HASKELL__
 INSTANCE_TYPEABLE0(Handle,handleTc,"Handle")
+#endif
 
 INSTANCE_TYPEABLE0(Int8,int8Tc,"Int8")
 INSTANCE_TYPEABLE0(Int16,int16Tc,"Int16")

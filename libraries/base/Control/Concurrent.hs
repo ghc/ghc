@@ -100,9 +100,8 @@ import GHC.Exception
 import GHC.Conc         ( ThreadId(..), myThreadId, killThread, yield,
                           threadDelay, forkIO, childHandler )
 import qualified GHC.Conc
-import GHC.IOBase       ( IO(..) )
-import GHC.IOBase       ( unsafeInterleaveIO )
-import GHC.IOBase       ( newIORef, readIORef, writeIORef )
+import GHC.IO           ( IO(..), unsafeInterleaveIO )
+import GHC.IORef        ( newIORef, readIORef, writeIORef )
 import GHC.Base
 
 import System.Posix.Types ( Fd )
@@ -113,7 +112,6 @@ import Control.Monad    ( when )
 #ifdef mingw32_HOST_OS
 import Foreign.C
 import System.IO
-import GHC.Handle
 #endif
 #endif
 

@@ -268,16 +268,6 @@ INLINE void *
 __hscore_memcpy_src_off( char *dst, char *src, int src_off, size_t sz )
 { return memcpy(dst, src+src_off, sz); }
 
-INLINE HsBool
-__hscore_supportsTextMode()
-{
-#if defined(_MSC_VER) || defined(__MINGW32__) || defined(_WIN32)
-  return HS_BOOL_FALSE;
-#else
-  return HS_BOOL_TRUE;
-#endif
-}
-
 INLINE HsInt
 __hscore_bufsiz()
 {

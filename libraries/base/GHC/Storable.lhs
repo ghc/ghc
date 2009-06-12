@@ -55,7 +55,7 @@ import GHC.Stable       ( StablePtr(..) )
 import GHC.Int
 import GHC.Word
 import GHC.Ptr
-import GHC.IOBase
+import GHC.IO
 import GHC.Base
 \end{code}
 

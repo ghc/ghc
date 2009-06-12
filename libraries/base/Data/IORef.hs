@@ -35,7 +35,9 @@ import Hugs.IORef
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
 import GHC.STRef
-import GHC.IOBase
+import GHC.IO
+import GHC.IORef hiding (atomicModifyIORef)
+import qualified GHC.IORef
 #if !defined(__PARALLEL_HASKELL__)
 import GHC.Weak
 #endif
@@ -75,7 +77,7 @@ modifyIORef ref f = readIORef ref >>= writeIORef ref . f
 --
 atomicModifyIORef :: IORef a -> (a -> (a,b)) -> IO b
 #if defined(__GLASGOW_HASKELL__)
-atomicModifyIORef (IORef (STRef r#)) f = IO $ \s -> atomicModifyMutVar# r# f s
+atomicModifyIORef = GHC.IORef.atomicModifyIORef
 
 #elif defined(__HUGS__)
 atomicModifyIORef = plainModifyIORef    -- Hugs has no preemption

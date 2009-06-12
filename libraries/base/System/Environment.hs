@@ -34,7 +34,8 @@ import Foreign
 import Foreign.C
 import Control.Exception.Base   ( bracket )
 import Control.Monad
-import GHC.IOBase
+import GHC.IO
+import GHC.IO.Exception
 #endif
 
 #ifdef __HUGS__

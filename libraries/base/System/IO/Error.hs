@@ -93,7 +93,9 @@ import Data.Maybe
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
-import GHC.IOBase
+import GHC.IO
+import GHC.IO.Exception
+import GHC.IO.Handle.Types
 import Text.Show
 #endif
 

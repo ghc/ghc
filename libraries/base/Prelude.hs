@@ -155,7 +155,8 @@ import Data.Tuple
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
-import GHC.IOBase
+import GHC.IO
+import GHC.IO.Exception
 import Text.Read
 import GHC.Enum
 import GHC.Num

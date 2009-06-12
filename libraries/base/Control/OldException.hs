@@ -134,13 +134,15 @@ module Control.OldException (
 import GHC.Base
 import GHC.Num
 import GHC.Show
-import GHC.IOBase ( IO )
-import qualified GHC.IOBase as New
+import GHC.IO ( IO )
+import GHC.IO.Handle.FD ( stdout )
+import qualified GHC.IO as New
+import qualified GHC.IO.Exception as New
 import GHC.Conc hiding (setUncaughtExceptionHandler,
                         getUncaughtExceptionHandler)
 import Data.IORef       ( IORef, newIORef, readIORef, writeIORef )
 import Foreign.C.String ( CString, withCString )
-import GHC.Handle       ( stdout, hFlush )
+import GHC.IO.Handle ( hFlush )
 #endif
 
 #ifdef __HUGS__

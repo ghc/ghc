@@ -106,9 +106,10 @@ module Control.Exception.Base (
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
-import GHC.IOBase
+import GHC.IO hiding (finally,onException)
+import GHC.IO.Exception
+import GHC.Exception
 import GHC.Show
-import GHC.IOBase
 import GHC.Exception hiding ( Exception )
 import GHC.Conc
 #endif
@@ -382,7 +383,7 @@ catch   :: Exception e
         -> (e -> IO a)  -- ^ Handler to invoke if an exception is raised
         -> IO a
 #if __GLASGOW_HASKELL__
-catch = GHC.IOBase.catchException
+catch = GHC.IO.catchException
 #elif __HUGS__
 catch m h = Hugs.Exception.catchException m h'
   where h' e = case fromException e of

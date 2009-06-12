@@ -50,9 +50,9 @@ import GHC.Real         ( fromIntegral )
 import GHC.Show         ( Show(..) )
 import GHC.Int          ( Int64 )
 
-import GHC.IOBase       ( IO, IOArray, newIOArray,
-                          unsafeReadIOArray, unsafeWriteIOArray, unsafePerformIO,
-                          IORef, newIORef, readIORef, writeIORef )
+import GHC.IO
+import GHC.IOArray
+import GHC.IORef
 #else
 import Data.Char        ( ord )
 import Data.IORef       ( IORef, newIORef, readIORef, writeIORef )

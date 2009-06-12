@@ -50,17 +50,6 @@ module GHC.Conc
         , threadWaitRead        -- :: Int -> IO ()
         , threadWaitWrite       -- :: Int -> IO ()
 
-        -- * MVars
-        , MVar(..)
-        , newMVar       -- :: a -> IO (MVar a)
-        , newEmptyMVar  -- :: IO (MVar a)
-        , takeMVar      -- :: MVar a -> IO a
-        , putMVar       -- :: MVar a -> a -> IO ()
-        , tryTakeMVar   -- :: MVar a -> IO (Maybe a)
-        , tryPutMVar    -- :: MVar a -> a -> IO Bool
-        , isEmptyMVar   -- :: MVar a -> IO Bool
-        , addMVarFinalizer -- :: MVar a -> IO () -> IO ()
-
         -- * TVars
         , STM(..)
         , atomically    -- :: STM a -> IO a
@@ -78,6 +67,7 @@ module GHC.Conc
         , unsafeIOToSTM -- :: IO a -> STM a
 
         -- * Miscellaneous
+        , withMVar
 #ifdef mingw32_HOST_OS
         , asyncRead     -- :: Int -> Int -> Int -> Ptr a -> IO (Int, Int)
         , asyncWrite    -- :: Int -> Int -> Int -> Ptr a -> IO (Int, Int)
@@ -121,11 +111,17 @@ import Control.Monad
 import Data.Maybe
 
 import GHC.Base
-import {-# SOURCE #-} GHC.Handle
-import GHC.IOBase
+import {-# SOURCE #-} GHC.IO.Handle ( hFlush )
+import {-# SOURCE #-} GHC.IO.Handle.FD ( stdout )
+import GHC.IO
+import GHC.IO.Exception
+import GHC.Exception
+import GHC.IORef
+import GHC.MVar
 import GHC.Num          ( Num(..) )
 import GHC.Real         ( fromIntegral )
 #ifndef mingw32_HOST_OS
+import GHC.IOArray
 import GHC.Arr          ( inRange )
 #endif
 #ifdef mingw32_HOST_OS
@@ -136,10 +132,8 @@ import GHC.Ptr          ( plusPtr, FunPtr(..) )
 import GHC.Read         ( Read )
 import GHC.Enum         ( Enum )
 #endif
-import GHC.Exception    ( SomeException(..), throw )
 import GHC.Pack         ( packCString# )
 import GHC.Ptr          ( Ptr(..) )
-import GHC.STRef
 import GHC.Show         ( Show(..), showString )
 import Data.Typeable
 import GHC.Err
@@ -599,110 +593,18 @@ writeTVar (TVar tvar#) val = STM $ \s1# ->
   
 \end{code}
 
-%************************************************************************
-%*                                                                      *
-\subsection[mvars]{M-Structures}
-%*                                                                      *
-%************************************************************************
-
-M-Vars are rendezvous points for concurrent threads.  They begin
-empty, and any attempt to read an empty M-Var blocks.  When an M-Var
-is written, a single blocked thread may be freed.  Reading an M-Var
-toggles its state from full back to empty.  Therefore, any value
-written to an M-Var may only be read once.  Multiple reads and writes
-are allowed, but there must be at least one read between any two
-writes.
+MVar utilities
 
 \begin{code}
---Defined in IOBase to avoid cycle: data MVar a = MVar (SynchVar# RealWorld a)
-
--- |Create an 'MVar' which is initially empty.
-newEmptyMVar  :: IO (MVar a)
-newEmptyMVar = IO $ \ s# ->
-    case newMVar# s# of
-         (# s2#, svar# #) -> (# s2#, MVar svar# #)
-
--- |Create an 'MVar' which contains the supplied value.
-newMVar :: a -> IO (MVar a)
-newMVar value =
-    newEmptyMVar        >>= \ mvar ->
-    putMVar mvar value  >>
-    return mvar
-
--- |Return the contents of the 'MVar'.  If the 'MVar' is currently
--- empty, 'takeMVar' will wait until it is full.  After a 'takeMVar', 
--- the 'MVar' is left empty.
--- 
--- There are two further important properties of 'takeMVar':
---
---   * 'takeMVar' is single-wakeup.  That is, if there are multiple
---     threads blocked in 'takeMVar', and the 'MVar' becomes full,
---     only one thread will be woken up.  The runtime guarantees that
---     the woken thread completes its 'takeMVar' operation.
---
---   * When multiple threads are blocked on an 'MVar', they are
---     woken up in FIFO order.  This is useful for providing
---     fairness properties of abstractions built using 'MVar's.
---
-takeMVar :: MVar a -> IO a
-takeMVar (MVar mvar#) = IO $ \ s# -> takeMVar# mvar# s#
-
--- |Put a value into an 'MVar'.  If the 'MVar' is currently full,
--- 'putMVar' will wait until it becomes empty.
---
--- There are two further important properties of 'putMVar':
---
---   * 'putMVar' is single-wakeup.  That is, if there are multiple
---     threads blocked in 'putMVar', and the 'MVar' becomes empty,
---     only one thread will be woken up.  The runtime guarantees that
---     the woken thread completes its 'putMVar' operation.
---
---   * When multiple threads are blocked on an 'MVar', they are
---     woken up in FIFO order.  This is useful for providing
---     fairness properties of abstractions built using 'MVar's.
---
-putMVar  :: MVar a -> a -> IO ()
-putMVar (MVar mvar#) x = IO $ \ s# ->
-    case putMVar# mvar# x s# of
-        s2# -> (# s2#, () #)
-
--- |A non-blocking version of 'takeMVar'.  The 'tryTakeMVar' function
--- returns immediately, with 'Nothing' if the 'MVar' was empty, or
--- @'Just' a@ if the 'MVar' was full with contents @a@.  After 'tryTakeMVar',
--- the 'MVar' is left empty.
-tryTakeMVar :: MVar a -> IO (Maybe a)
-tryTakeMVar (MVar m) = IO $ \ s ->
-    case tryTakeMVar# m s of
-        (# s', 0#, _ #) -> (# s', Nothing #)      -- MVar is empty
-        (# s', _,  a #) -> (# s', Just a  #)      -- MVar is full
-
--- |A non-blocking version of 'putMVar'.  The 'tryPutMVar' function
--- attempts to put the value @a@ into the 'MVar', returning 'True' if
--- it was successful, or 'False' otherwise.
-tryPutMVar  :: MVar a -> a -> IO Bool
-tryPutMVar (MVar mvar#) x = IO $ \ s# ->
-    case tryPutMVar# mvar# x s# of
-        (# s, 0# #) -> (# s, False #)
-        (# s, _  #) -> (# s, True #)
-
--- |Check whether a given 'MVar' is empty.
---
--- Notice that the boolean value returned  is just a snapshot of
--- the state of the MVar. By the time you get to react on its result,
--- the MVar may have been filled (or emptied) - so be extremely
--- careful when using this operation.   Use 'tryTakeMVar' instead if possible.
-isEmptyMVar :: MVar a -> IO Bool
-isEmptyMVar (MVar mv#) = IO $ \ s# -> 
-    case isEmptyMVar# mv# s# of
-        (# s2#, flg #) -> (# s2#, not (flg ==# 0#) #)
-
--- |Add a finalizer to an 'MVar' (GHC only).  See "Foreign.ForeignPtr" and
--- "System.Mem.Weak" for more about finalizers.
-addMVarFinalizer :: MVar a -> IO () -> IO ()
-addMVarFinalizer (MVar m) finalizer = 
-  IO $ \s -> case mkWeak# m () finalizer s of { (# s1, _ #) -> (# s1, () #) }
+withMVar :: MVar a -> (a -> IO b) -> IO b
+withMVar m io = 
+  block $ do
+    a <- takeMVar m
+    b <- catchAny (unblock (io a))
+            (\e -> do putMVar m a; throw e)
+    putMVar m a
+    return b
 \end{code}
-
 
 %************************************************************************
 %*                                                                      *
@@ -897,10 +799,6 @@ delayTime (Delay t _) = t
 delayTime (DelaySTM t _) = t
 
 type USecs = Word64
-
--- XXX: move into GHC.IOBase from Data.IORef?
-atomicModifyIORef :: IORef a -> (a -> (a,b)) -> IO b
-atomicModifyIORef (IORef (STRef r#)) f = IO $ \s -> atomicModifyMutVar# r# f s
 
 foreign import ccall unsafe "getUSecOfDay" 
   getUSecOfDay :: IO USecs
@@ -1408,14 +1306,4 @@ setUncaughtExceptionHandler = writeIORef uncaughtExceptionHandler
 
 getUncaughtExceptionHandler :: IO (SomeException -> IO ())
 getUncaughtExceptionHandler = readIORef uncaughtExceptionHandler
-
-
-withMVar :: MVar a -> (a -> IO b) -> IO b
-withMVar m io = 
-  block $ do
-    a <- takeMVar m
-    b <- catchAny (unblock (io a))
-            (\e -> do putMVar m a; throw e)
-    putMVar m a
-    return b
 \end{code}

@@ -138,7 +138,7 @@ import Control.Exception.Base
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
-import GHC.IOBase
+import GHC.IO hiding ( onException, finally )
 import Data.Maybe
 #else
 import Prelude hiding (catch)

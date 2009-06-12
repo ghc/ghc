@@ -1,0 +1,115 @@
+{-# OPTIONS_GHC -fno-implicit-prelude -funbox-strict-fields #-}
+{-# OPTIONS_HADDOCK hide #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  GHC.IO.BufferedIO
+-- Copyright   :  (c) The University of Glasgow 2008
+-- License     :  see libraries/base/LICENSE
+-- 
+-- Maintainer  :  cvs-ghc@haskell.org
+-- Stability   :  internal
+-- Portability :  non-portable (GHC Extensions)
+--
+-- Class of buffered IO devices
+--
+-----------------------------------------------------------------------------
+
+module GHC.IO.BufferedIO (
+   BufferedIO(..),
+   readBuf, readBufNonBlocking, writeBuf, writeBufNonBlocking
+ ) where
+
+import GHC.Base
+import GHC.Ptr
+import Data.Word
+import GHC.Num
+import GHC.Real
+import Data.Maybe
+import GHC.IO
+import GHC.IO.Device as IODevice
+import GHC.IO.Device as RawIO
+import GHC.IO.Buffer
+
+-- | The purpose of 'BufferedIO' is to provide a common interface for I/O
+-- devices that can read and write data through a buffer.  Devices that
+-- implement 'BufferedIO' include ordinary files, memory-mapped files,
+-- and bytestrings.  The underlying device implementing a 'Handle' must
+-- provide 'BufferedIO'.
+--
+class BufferedIO dev where
+  -- | allocate a new buffer.  The size of the buffer is at the
+  -- discretion of the device; e.g. for a memory-mapped file the
+  -- buffer will probably cover the entire file.
+  newBuffer         :: dev -> BufferState -> IO (Buffer Word8)
+
+  -- | reads bytes into the buffer, blocking if there are no bytes
+  -- available.  Returns the number of bytes read (zero indicates
+  -- end-of-file), and the new buffer.
+  fillReadBuffer    :: dev -> Buffer Word8 -> IO (Int, Buffer Word8)
+
+  -- | reads bytes into the buffer without blocking.  Returns the
+  -- number of bytes read (Nothing indicates end-of-file), and the new
+  -- buffer.
+  fillReadBuffer0   :: dev -> Buffer Word8 -> IO (Maybe Int, Buffer Word8)
+
+  -- | Flush all the data from the supplied write buffer out to the device
+  flushWriteBuffer  :: dev -> Buffer Word8 -> IO ()
+
+  -- | Flush data from the supplied write buffer out to the device
+  -- without blocking.  Returns the number of bytes written and the
+  -- remaining buffer.
+  flushWriteBuffer0 :: dev -> Buffer Word8 -> IO (Int, Buffer Word8)
+
+-- for an I/O device, these operations will perform reading/writing
+-- to/from the device.
+
+-- for a memory-mapped file, the buffer will be the whole file in
+-- memory.  fillReadBuffer sets the pointers to encompass the whole
+-- file, and flushWriteBuffer will do nothing.  A memory-mapped file
+-- has to maintain its own file pointer.
+
+-- for a bytestring, again the buffer should match the bytestring in
+-- memory.
+
+-- ---------------------------------------------------------------------------
+-- Low-level read/write to/from buffers
+
+-- These operations make it easy to implement an instance of 'BufferedIO'
+-- for an object that supports 'RawIO'.
+
+readBuf :: RawIO dev => dev -> Buffer Word8 -> IO (Int, Buffer Word8)
+readBuf dev bbuf = do
+  let bytes = bufferAvailable bbuf
+  res <- withBuffer bbuf $ \ptr ->
+             RawIO.read dev (ptr `plusPtr` bufR bbuf) (fromIntegral bytes)
+  let res' = fromIntegral res
+  return (res', bbuf{ bufR = bufR bbuf + res' })
+         -- zero indicates end of file
+
+readBufNonBlocking :: RawIO dev => dev -> Buffer Word8
+                     -> IO (Maybe Int,   -- Nothing ==> end of file
+                                         -- Just n  ==> n bytes were read (n>=0)
+                            Buffer Word8)
+readBufNonBlocking dev bbuf = do
+  let bytes = bufferAvailable bbuf
+  res <- withBuffer bbuf $ \ptr ->
+           IODevice.readNonBlocking dev (ptr `plusPtr` bufR bbuf) (fromIntegral bytes)
+  case res of
+     Nothing -> return (Nothing, bbuf)
+     Just n  -> return (Just n, bbuf{ bufR = bufR bbuf + fromIntegral n })
+
+writeBuf :: RawIO dev => dev -> Buffer Word8 -> IO ()
+writeBuf dev bbuf = do
+  let bytes = bufferElems bbuf
+  withBuffer bbuf $ \ptr ->
+      IODevice.write dev (ptr `plusPtr` bufL bbuf) (fromIntegral bytes)
+
+-- XXX ToDo
+writeBufNonBlocking :: RawIO dev => dev -> Buffer Word8 -> IO (Int, Buffer Word8)
+writeBufNonBlocking dev bbuf = do
+  let bytes = bufferElems bbuf
+  res <- withBuffer bbuf $ \ptr ->
+            IODevice.writeNonBlocking dev (ptr `plusPtr` bufL bbuf)
+                                      (fromIntegral bytes)
+  return (res, bbuf{ bufL = bufL bbuf + res })
+

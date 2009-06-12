@@ -36,8 +36,11 @@ import GHC.Base
 import GHC.Conc hiding (throwTo)
 import GHC.Num
 import GHC.Real
-import GHC.Handle
-import GHC.IOBase
+import GHC.MVar
+import GHC.IO
+import GHC.IO.Handle.FD
+import GHC.IO.Handle
+import GHC.IO.Exception
 import GHC.Weak
 import Data.Typeable
 #if defined(mingw32_HOST_OS)

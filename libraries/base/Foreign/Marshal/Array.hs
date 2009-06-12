@@ -68,7 +68,7 @@ import Foreign.Marshal.Alloc (mallocBytes, allocaBytes, reallocBytes)
 import Foreign.Marshal.Utils (copyBytes, moveBytes)
 
 #ifdef __GLASGOW_HASKELL__
-import GHC.IOBase
+import GHC.IO
 import GHC.Num
 import GHC.List
 import GHC.Err

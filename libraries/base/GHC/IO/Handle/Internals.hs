@@ -1,0 +1,793 @@
+{-# OPTIONS_GHC -XNoImplicitPrelude -#include "HsBase.h" #-}
+{-# OPTIONS_GHC -fno-warn-unused-matches #-}
+{-# OPTIONS_GHC -fno-warn-unused-binds #-}
+{-# OPTIONS_GHC -fno-warn-name-shadowing #-}
+{-# OPTIONS_GHC -XRecordWildCards #-}
+{-# OPTIONS_HADDOCK hide #-}
+
+#undef DEBUG_DUMP
+
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  GHC.IO.Handle.Internals
+-- Copyright   :  (c) The University of Glasgow, 1994-2001
+-- License     :  see libraries/base/LICENSE
+-- 
+-- Maintainer  :  libraries@haskell.org
+-- Stability   :  internal
+-- Portability :  non-portable
+--
+-- This module defines the basic operations on I\/O \"handles\".  All
+-- of the operations defined here are independent of the underlying
+-- device.
+--
+-----------------------------------------------------------------------------
+
+-- #hide
+module GHC.IO.Handle.Internals (
+  withHandle, withHandle', withHandle_,
+  withHandle__', withHandle_', withAllHandles__,
+  wantWritableHandle, wantReadableHandle, wantReadableHandle_, 
+  wantSeekableHandle,
+
+  mkHandle, mkFileHandle, mkDuplexHandle,
+  getEncoding, initBufferState,
+  dEFAULT_CHAR_BUFFER_SIZE,
+
+  flushBuffer, flushWriteBuffer, flushWriteBuffer_, flushCharReadBuffer,
+  flushCharBuffer, flushByteReadBuffer,
+
+  readTextDevice, writeTextDevice, readTextDeviceNonBlocking,
+
+  augmentIOError,
+  ioe_closedHandle, ioe_EOF, ioe_notReadable, ioe_notWritable,
+  ioe_finalizedHandle, ioe_bufsiz,
+
+  hClose_help, hLookAhead_,
+
+  HandleFinalizer, handleFinalizer,
+
+  debugIO,
+ ) where
+
+import GHC.IO
+import GHC.IO.IOMode
+import GHC.IO.Encoding
+import GHC.IO.Handle.Types
+import GHC.IO.Buffer
+import GHC.IO.BufferedIO (BufferedIO)
+import GHC.IO.Exception
+import GHC.IO.Device (IODevice, SeekMode(..))
+import qualified GHC.IO.Device as IODevice
+import qualified GHC.IO.BufferedIO as Buffered
+
+import GHC.Real
+import GHC.Base
+import GHC.List
+import GHC.Exception
+import GHC.Num          ( Num(..) )
+import GHC.Show
+import GHC.IORef
+import GHC.MVar
+import Data.Typeable
+import Control.Monad
+import Data.Maybe
+import Foreign
+import System.IO.Error
+import System.Posix.Internals hiding (FD)
+import qualified System.Posix.Internals as Posix
+
+#ifdef DEBUG_DUMP
+import Foreign.C
+#endif
+
+-- ---------------------------------------------------------------------------
+-- Creating a new handle
+
+type HandleFinalizer = FilePath -> MVar Handle__ -> IO ()
+
+newFileHandle :: FilePath -> Maybe HandleFinalizer -> Handle__ -> IO Handle
+newFileHandle filepath mb_finalizer hc = do
+  m <- newMVar hc
+  case mb_finalizer of
+    Just finalizer -> addMVarFinalizer m (finalizer filepath m)
+    Nothing        -> return ()
+  return (FileHandle filepath m)
+
+-- ---------------------------------------------------------------------------
+-- Working with Handles
+
+{-
+In the concurrent world, handles are locked during use.  This is done
+by wrapping an MVar around the handle which acts as a mutex over
+operations on the handle.
+
+To avoid races, we use the following bracketing operations.  The idea
+is to obtain the lock, do some operation and replace the lock again,
+whether the operation succeeded or failed.  We also want to handle the
+case where the thread receives an exception while processing the IO
+operation: in these cases we also want to relinquish the lock.
+
+There are three versions of @withHandle@: corresponding to the three
+possible combinations of:
+
+        - the operation may side-effect the handle
+        - the operation may return a result
+
+If the operation generates an error or an exception is raised, the
+original handle is always replaced.
+-}
+
+{-# INLINE withHandle #-}
+withHandle :: String -> Handle -> (Handle__ -> IO (Handle__,a)) -> IO a
+withHandle fun h@(FileHandle _ m)     act = withHandle' fun h m act
+withHandle fun h@(DuplexHandle _ m _) act = withHandle' fun h m act
+
+withHandle' :: String -> Handle -> MVar Handle__
+   -> (Handle__ -> IO (Handle__,a)) -> IO a
+withHandle' fun h m act =
+   block $ do
+   h_ <- takeMVar m
+   checkHandleInvariants h_
+   (h',v)  <- (act h_ `catchAny` \err -> putMVar m h_ >> throw err)
+              `catchException` \ex -> ioError (augmentIOError ex fun h)
+   checkHandleInvariants h'
+   putMVar m h'
+   return v
+
+{-# INLINE withHandle_ #-}
+withHandle_ :: String -> Handle -> (Handle__ -> IO a) -> IO a
+withHandle_ fun h@(FileHandle _ m)     act = withHandle_' fun h m act
+withHandle_ fun h@(DuplexHandle _ m _) act = withHandle_' fun h m act
+
+withHandle_' :: String -> Handle -> MVar Handle__ -> (Handle__ -> IO a) -> IO a
+withHandle_' fun h m act =
+   block $ do
+   h_ <- takeMVar m
+   checkHandleInvariants h_
+   v  <- (act h_ `catchAny` \err -> putMVar m h_ >> throw err)
+         `catchException` \ex -> ioError (augmentIOError ex fun h)
+   checkHandleInvariants h_
+   putMVar m h_
+   return v
+
+withAllHandles__ :: String -> Handle -> (Handle__ -> IO Handle__) -> IO ()
+withAllHandles__ fun h@(FileHandle _ m)     act = withHandle__' fun h m act
+withAllHandles__ fun h@(DuplexHandle _ r w) act = do
+  withHandle__' fun h r act
+  withHandle__' fun h w act
+
+withHandle__' :: String -> Handle -> MVar Handle__ -> (Handle__ -> IO Handle__)
+              -> IO ()
+withHandle__' fun h m act =
+   block $ do
+   h_ <- takeMVar m
+   checkHandleInvariants h_
+   h'  <- (act h_ `catchAny` \err -> putMVar m h_ >> throw err)
+          `catchException` \ex -> ioError (augmentIOError ex fun h)
+   checkHandleInvariants h'
+   putMVar m h'
+   return ()
+
+augmentIOError :: IOException -> String -> Handle -> IOException
+augmentIOError ioe@IOError{ ioe_filename = fp } fun h
+  = ioe { ioe_handle = Just h, ioe_location = fun, ioe_filename = filepath }
+  where filepath
+          | Just _ <- fp = fp
+          | otherwise = case h of
+                          FileHandle path _     -> Just path
+                          DuplexHandle path _ _ -> Just path
+
+-- ---------------------------------------------------------------------------
+-- Wrapper for write operations.
+
+wantWritableHandle :: String -> Handle -> (Handle__ -> IO a) -> IO a
+wantWritableHandle fun h@(FileHandle _ m) act
+  = wantWritableHandle' fun h m act
+wantWritableHandle fun h@(DuplexHandle _ _ m) act
+  = withHandle_' fun h m  act
+
+wantWritableHandle'
+        :: String -> Handle -> MVar Handle__
+        -> (Handle__ -> IO a) -> IO a
+wantWritableHandle' fun h m act
+   = withHandle_' fun h m (checkWritableHandle act)
+
+checkWritableHandle :: (Handle__ -> IO a) -> Handle__ -> IO a
+checkWritableHandle act h_@Handle__{..}
+  = case haType of
+      ClosedHandle         -> ioe_closedHandle
+      SemiClosedHandle     -> ioe_closedHandle
+      ReadHandle           -> ioe_notWritable
+      ReadWriteHandle      -> do
+        buf <- readIORef haCharBuffer
+        when (not (isWriteBuffer buf)) $ do
+           flushCharReadBuffer h_
+           flushByteReadBuffer h_
+           buf <- readIORef haCharBuffer
+           writeIORef haCharBuffer buf{ bufState = WriteBuffer }
+           buf <- readIORef haByteBuffer
+           writeIORef haByteBuffer buf{ bufState = WriteBuffer }
+        act h_
+      _other               -> act h_
+
+-- ---------------------------------------------------------------------------
+-- Wrapper for read operations.
+
+wantReadableHandle :: String -> Handle -> (Handle__ -> IO (Handle__,a)) -> IO a
+wantReadableHandle fun h act = withHandle fun h (checkReadableHandle act)
+
+wantReadableHandle_ :: String -> Handle -> (Handle__ -> IO a) -> IO a
+wantReadableHandle_ fun h@(FileHandle  _ m)   act
+  = wantReadableHandle' fun h m act
+wantReadableHandle_ fun h@(DuplexHandle _ m _) act
+  = withHandle_' fun h m act
+
+wantReadableHandle'
+        :: String -> Handle -> MVar Handle__
+        -> (Handle__ -> IO a) -> IO a
+wantReadableHandle' fun h m act
+  = withHandle_' fun h m (checkReadableHandle act)
+
+checkReadableHandle :: (Handle__ -> IO a) -> Handle__ -> IO a
+checkReadableHandle act h_@Handle__{..} =
+    case haType of
+      ClosedHandle         -> ioe_closedHandle
+      SemiClosedHandle     -> ioe_closedHandle
+      AppendHandle         -> ioe_notReadable
+      WriteHandle          -> ioe_notReadable
+      ReadWriteHandle      -> do
+          -- a read/write handle and we want to read from it.  We must
+          -- flush all buffered write data first.
+          cbuf <- readIORef haCharBuffer
+          when (isWriteBuffer cbuf) $ do
+             cbuf' <- flushWriteBuffer_ h_ cbuf
+             writeIORef haCharBuffer cbuf'{ bufState = ReadBuffer }
+             bbuf <- readIORef haByteBuffer
+             writeIORef haByteBuffer bbuf{ bufState = ReadBuffer }
+          act h_
+      _other               -> act h_
+
+-- ---------------------------------------------------------------------------
+-- Wrapper for seek operations.
+
+wantSeekableHandle :: String -> Handle -> (Handle__ -> IO a) -> IO a
+wantSeekableHandle fun h@(DuplexHandle _ _ _) _act =
+  ioException (IOError (Just h) IllegalOperation fun
+                   "handle is not seekable" Nothing Nothing)
+wantSeekableHandle fun h@(FileHandle _ m) act =
+  withHandle_' fun h m (checkSeekableHandle act)
+
+checkSeekableHandle :: (Handle__ -> IO a) -> Handle__ -> IO a
+checkSeekableHandle act handle_@Handle__{haDevice=dev} =
+    case haType handle_ of
+      ClosedHandle      -> ioe_closedHandle
+      SemiClosedHandle  -> ioe_closedHandle
+      AppendHandle      -> ioe_notSeekable
+      _ -> do b <- IODevice.isSeekable dev
+              if b then act handle_
+                   else ioe_notSeekable
+
+-- -----------------------------------------------------------------------------
+-- Handy IOErrors
+
+ioe_closedHandle, ioe_EOF,
+  ioe_notReadable, ioe_notWritable, ioe_cannotFlushTextRead,
+  ioe_notSeekable, ioe_notSeekable_notBin, ioe_invalidCharacter :: IO a
+
+ioe_closedHandle = ioException
+   (IOError Nothing IllegalOperation ""
+        "handle is closed" Nothing Nothing)
+ioe_EOF = ioException
+   (IOError Nothing EOF "" "" Nothing Nothing)
+ioe_notReadable = ioException
+   (IOError Nothing IllegalOperation ""
+        "handle is not open for reading" Nothing Nothing)
+ioe_notWritable = ioException
+   (IOError Nothing IllegalOperation ""
+        "handle is not open for writing" Nothing Nothing)
+ioe_notSeekable = ioException
+   (IOError Nothing IllegalOperation ""
+        "handle is not seekable" Nothing Nothing)
+ioe_notSeekable_notBin = ioException
+   (IOError Nothing IllegalOperation ""
+      "seek operations on text-mode handles are not allowed on this platform"
+        Nothing Nothing)
+ioe_cannotFlushTextRead = ioException
+   (IOError Nothing IllegalOperation ""
+      "cannot flush the read buffer of a text-mode handle"
+        Nothing Nothing)
+ioe_invalidCharacter = ioException
+   (IOError Nothing InvalidArgument ""
+        ("invalid byte sequence for this encoding") Nothing Nothing)
+
+ioe_finalizedHandle :: FilePath -> Handle__
+ioe_finalizedHandle fp = throw
+   (IOError Nothing IllegalOperation ""
+        "handle is finalized" Nothing (Just fp))
+
+ioe_bufsiz :: Int -> IO a
+ioe_bufsiz n = ioException
+   (IOError Nothing InvalidArgument "hSetBuffering"
+        ("illegal buffer size " ++ showsPrec 9 n []) Nothing Nothing)
+                                -- 9 => should be parens'ified.
+
+-- -----------------------------------------------------------------------------
+-- Handle Finalizers
+
+-- For a duplex handle, we arrange that the read side points to the write side
+-- (and hence keeps it alive if the read side is alive).  This is done by
+-- having the haOtherSide field of the read side point to the read side.
+-- The finalizer is then placed on the write side, and the handle only gets
+-- finalized once, when both sides are no longer required.
+
+-- NOTE about finalized handles: It's possible that a handle can be
+-- finalized and then we try to use it later, for example if the
+-- handle is referenced from another finalizer, or from a thread that
+-- has become unreferenced and then resurrected (arguably in the
+-- latter case we shouldn't finalize the Handle...).  Anyway,
+-- we try to emit a helpful message which is better than nothing.
+
+handleFinalizer :: FilePath -> MVar Handle__ -> IO ()
+handleFinalizer fp m = do
+  handle_ <- takeMVar m
+  case haType handle_ of
+      ClosedHandle -> return ()
+      _ -> do flushWriteBuffer handle_ `catchAny` \_ -> return ()
+                -- ignore errors and async exceptions, and close the
+                -- descriptor anyway...
+              hClose_handle_ handle_
+              return ()
+  putMVar m (ioe_finalizedHandle fp)
+
+-- ---------------------------------------------------------------------------
+-- Allocating buffers
+
+-- using an 8k char buffer instead of 32k improved performance for a
+-- basic "cat" program by ~30% for me.  --SDM
+dEFAULT_CHAR_BUFFER_SIZE :: Int
+dEFAULT_CHAR_BUFFER_SIZE = dEFAULT_BUFFER_SIZE `div` 4
+
+getCharBuffer :: IODevice dev => dev -> BufferState
+              -> IO (IORef CharBuffer, BufferMode)
+getCharBuffer dev state = do
+  buffer <- newCharBuffer dEFAULT_CHAR_BUFFER_SIZE state
+  ioref  <- newIORef buffer
+  is_tty <- IODevice.isTerminal dev
+
+  let buffer_mode 
+         | is_tty    = LineBuffering 
+         | otherwise = BlockBuffering Nothing
+
+  return (ioref, buffer_mode)
+
+mkUnBuffer :: BufferState -> IO (IORef CharBuffer, BufferMode)
+mkUnBuffer state = do
+  buffer <- case state of  --  See [note Buffer Sizing], GHC.IO.Handle.Types
+              ReadBuffer  -> newCharBuffer dEFAULT_CHAR_BUFFER_SIZE state
+              WriteBuffer -> newCharBuffer 1 state
+  ref <- newIORef buffer
+  return (ref, NoBuffering)
+
+-- -----------------------------------------------------------------------------
+-- Flushing buffers
+
+-- | syncs the file with the buffer, including moving the
+-- file pointer backwards in the case of a read buffer.  This can fail
+-- on a non-seekable read Handle.
+flushBuffer :: Handle__ -> IO ()
+flushBuffer h_@Handle__{..} = do
+  buf <- readIORef haCharBuffer
+  case bufState buf of
+    ReadBuffer  -> do
+        flushCharReadBuffer h_
+        flushByteReadBuffer h_
+    WriteBuffer -> do
+        buf' <- flushWriteBuffer_ h_ buf
+        writeIORef haCharBuffer buf'
+
+-- | flushes at least the Char buffer, and the byte buffer for a write
+-- Handle.  Works on all Handles.
+flushCharBuffer :: Handle__ -> IO ()
+flushCharBuffer h_@Handle__{..} = do
+  buf <- readIORef haCharBuffer
+  case bufState buf of
+    ReadBuffer  -> do
+        flushCharReadBuffer h_
+    WriteBuffer -> do
+        buf' <- flushWriteBuffer_ h_ buf
+        writeIORef haCharBuffer buf'
+
+-- -----------------------------------------------------------------------------
+-- Writing data (flushing write buffers)
+
+-- flushWriteBuffer flushes the buffer iff it contains pending write
+-- data.  Flushes both the Char and the byte buffer, leaving both
+-- empty.
+flushWriteBuffer :: Handle__ -> IO ()
+flushWriteBuffer h_@Handle__{..} = do
+  buf <- readIORef haCharBuffer
+  if isWriteBuffer buf
+         then do buf' <- flushWriteBuffer_ h_ buf
+                 writeIORef haCharBuffer buf'
+         else return ()
+
+flushWriteBuffer_ :: Handle__ -> CharBuffer -> IO CharBuffer
+flushWriteBuffer_ h_@Handle__{..} cbuf = do
+  bbuf <- readIORef haByteBuffer
+  if not (isEmptyBuffer cbuf) || not (isEmptyBuffer bbuf)
+     then do writeTextDevice h_ cbuf
+             return cbuf{ bufL=0, bufR=0 }
+     else return cbuf
+
+-- -----------------------------------------------------------------------------
+-- Flushing read buffers
+
+-- It is always possible to flush the Char buffer back to the byte buffer.
+flushCharReadBuffer :: Handle__ -> IO ()
+flushCharReadBuffer Handle__{..} = do
+  cbuf <- readIORef haCharBuffer
+  if isWriteBuffer cbuf || isEmptyBuffer cbuf then return () else do
+
+  -- haLastDecode is the byte buffer just before we did our last batch of
+  -- decoding.  We're going to re-decode the bytes up to the current char,
+  -- to find out where we should revert the byte buffer to.
+  bbuf0 <- readIORef haLastDecode
+
+  cbuf0 <- readIORef haCharBuffer
+  writeIORef haCharBuffer cbuf0{ bufL=0, bufR=0 }
+
+  -- if we haven't used any characters from the char buffer, then just
+  -- re-install the old byte buffer.
+  if bufL cbuf0 == 0
+     then do writeIORef haByteBuffer bbuf0
+             return ()
+     else do
+
+  case haDecoder of
+    Nothing -> do
+      writeIORef haByteBuffer bbuf0 { bufL = bufL bbuf0 + bufL cbuf0 }
+      -- no decoder: the number of bytes to decode is the same as the
+      -- number of chars we have used up.
+
+    Just decoder -> do
+      debugIO ("flushCharReadBuffer re-decode, bbuf=" ++ summaryBuffer bbuf0 ++
+               " cbuf=" ++ summaryBuffer cbuf0)
+    
+      (bbuf1,cbuf1) <- (encode decoder) bbuf0
+                               cbuf0{ bufL=0, bufR=0, bufSize = bufL cbuf0 }
+    
+      -- tricky case: if the decoded string starts with e BOM, then it was
+      -- probably ignored last time we decoded these bytes, and we should
+      -- therefore decode another char.
+      (c,_) <- readCharBuf (bufRaw cbuf1) (bufL cbuf1)
+      (bbuf2,_) <- if (c == '\xfeff')
+                      then do debugIO "found BOM, decoding another char"
+                              (encode decoder) bbuf1
+                                      cbuf0{ bufL=0, bufR=0, bufSize = 1 }
+                      else return (bbuf1,cbuf1)
+    
+      debugIO ("finished, bbuf=" ++ summaryBuffer bbuf1 ++
+               " cbuf=" ++ summaryBuffer cbuf1)
+
+      writeIORef haByteBuffer bbuf2
+
+
+-- When flushing the byte read buffer, we seek backwards by the number
+-- of characters in the buffer.  The file descriptor must therefore be
+-- seekable: attempting to flush the read buffer on an unseekable
+-- handle is not allowed.
+
+flushByteReadBuffer :: Handle__ -> IO ()
+flushByteReadBuffer h_@Handle__{..} = do
+  bbuf <- readIORef haByteBuffer
+
+  if isEmptyBuffer bbuf then return () else do
+
+  seekable <- IODevice.isSeekable haDevice
+  when (not seekable) $ ioe_cannotFlushTextRead
+
+  let seek = negate (bufR bbuf - bufL bbuf)
+
+  debugIO ("flushByteReadBuffer: new file offset = " ++ show seek)
+  IODevice.seek haDevice RelativeSeek (fromIntegral seek)
+
+  writeIORef haByteBuffer bbuf{ bufL=0, bufR=0 }
+
+-- ----------------------------------------------------------------------------
+-- Making Handles
+
+mkHandle :: (IODevice dev, BufferedIO dev, Typeable dev) => dev
+            -> FilePath
+            -> HandleType
+            -> Bool                     -- buffered?
+            -> Maybe TextEncoding
+            -> NewlineMode
+            -> (Maybe HandleFinalizer)
+            -> Maybe (MVar Handle__)
+            -> IO Handle
+
+mkHandle dev filepath ha_type buffered mb_codec nl finalizer other_side = do
+   let buf_state = initBufferState ha_type
+   bbuf <- Buffered.newBuffer dev buf_state
+   bbufref <- newIORef bbuf
+   last_decode <- newIORef bbuf
+
+   (mb_encoder, mb_decoder) <- getEncoding mb_codec ha_type
+
+   (cbufref,bmode) <- 
+         if buffered then getCharBuffer dev buf_state
+                     else mkUnBuffer buf_state
+
+   spares <- newIORef BufferListNil
+   newFileHandle filepath finalizer
+            (Handle__ { haDevice = dev,
+                        haType = ha_type,
+                        haBufferMode = bmode,
+                        haByteBuffer = bbufref,
+                        haLastDecode = last_decode,
+                        haCharBuffer = cbufref,
+                        haBuffers = spares,
+                        haEncoder = mb_encoder,
+                        haDecoder = mb_decoder,
+                        haInputNL = inputNL nl,
+                        haOutputNL = outputNL nl,
+                        haOtherSide = other_side
+                      })
+
+-- | makes a new 'Handle'
+mkFileHandle :: (IODevice dev, BufferedIO dev, Typeable dev)
+             => dev -- ^ the underlying IO device, which must support 
+                    -- 'IODevice', 'BufferedIO' and 'Typeable'
+             -> FilePath
+                    -- ^ a string describing the 'Handle', e.g. the file
+                    -- path for a file.  Used in error messages.
+             -> IOMode
+                    -- The mode in which the 'Handle' is to be used
+             -> Maybe TextEncoding
+                    -- Create the 'Handle' with no text encoding?
+             -> NewlineMode
+                    -- Translate newlines?
+             -> IO Handle
+mkFileHandle dev filepath iomode mb_codec tr_newlines = do
+   mkHandle dev filepath (ioModeToHandleType iomode) True{-buffered-} mb_codec
+            tr_newlines
+            (Just handleFinalizer) Nothing{-other_side-}
+
+-- | like 'mkFileHandle', except that a 'Handle' is created with two
+-- independent buffers, one for reading and one for writing.  Used for
+-- full-dupliex streams, such as network sockets.
+mkDuplexHandle :: (IODevice dev, BufferedIO dev, Typeable dev) => dev
+               -> FilePath -> Maybe TextEncoding -> NewlineMode -> IO Handle
+mkDuplexHandle dev filepath mb_codec tr_newlines = do
+
+  write_side@(FileHandle _ write_m) <- 
+       mkHandle dev filepath WriteHandle True mb_codec
+                        tr_newlines
+                        (Just handleFinalizer)
+                        Nothing -- no othersie
+
+  read_side@(FileHandle _ read_m) <- 
+      mkHandle dev filepath ReadHandle True mb_codec
+                        tr_newlines
+                        Nothing -- no finalizer
+                        (Just write_m)
+
+  return (DuplexHandle filepath read_m write_m)
+
+ioModeToHandleType :: IOMode -> HandleType
+ioModeToHandleType ReadMode      = ReadHandle
+ioModeToHandleType WriteMode     = WriteHandle
+ioModeToHandleType ReadWriteMode = ReadWriteHandle
+ioModeToHandleType AppendMode    = AppendHandle
+
+initBufferState :: HandleType -> BufferState
+initBufferState ReadHandle = ReadBuffer
+initBufferState _          = WriteBuffer
+
+getEncoding :: Maybe TextEncoding -> HandleType
+            -> IO (Maybe TextEncoder, 
+                   Maybe TextDecoder)
+
+getEncoding Nothing   ha_type = return (Nothing, Nothing)
+getEncoding (Just te) ha_type = do
+    mb_decoder <- if isReadableHandleType ha_type then do
+                     decoder <- mkTextDecoder te
+                     return (Just decoder)
+                  else
+                     return Nothing
+    mb_encoder <- if isWritableHandleType ha_type then do
+                     encoder <- mkTextEncoder te
+                     return (Just encoder)
+                  else 
+                     return Nothing
+    return (mb_encoder, mb_decoder)
+
+-- ---------------------------------------------------------------------------
+-- closing Handles
+
+-- hClose_help is also called by lazyRead (in PrelIO) when EOF is read
+-- or an IO error occurs on a lazy stream.  The semi-closed Handle is
+-- then closed immediately.  We have to be careful with DuplexHandles
+-- though: we have to leave the closing to the finalizer in that case,
+-- because the write side may still be in use.
+hClose_help :: Handle__ -> IO (Handle__, Maybe SomeException)
+hClose_help handle_ =
+  case haType handle_ of 
+      ClosedHandle -> return (handle_,Nothing)
+      _ -> do flushWriteBuffer handle_ -- interruptible
+              hClose_handle_ handle_
+
+hClose_handle_ :: Handle__ -> IO (Handle__, Maybe SomeException)
+hClose_handle_ Handle__{..} = do
+
+    -- close the file descriptor, but not when this is the read
+    -- side of a duplex handle.
+    -- If an exception is raised by the close(), we want to continue
+    -- to close the handle and release the lock if it has one, then 
+    -- we return the exception to the caller of hClose_help which can
+    -- raise it if necessary.
+    maybe_exception <- 
+      case haOtherSide of
+        Nothing -> (do IODevice.close haDevice; return Nothing)
+                     `catchException` \e -> return (Just e)
+
+        Just _  -> return Nothing
+
+    -- free the spare buffers
+    writeIORef haBuffers BufferListNil
+    writeIORef haCharBuffer noCharBuffer
+    writeIORef haByteBuffer noByteBuffer
+  
+    -- release our encoder/decoder
+    case haDecoder of Nothing -> return (); Just d -> close d
+    case haEncoder of Nothing -> return (); Just d -> close d
+
+    -- we must set the fd to -1, because the finalizer is going
+    -- to run eventually and try to close/unlock it.
+    -- ToDo: necessary?  the handle will be marked ClosedHandle
+    -- XXX GHC won't let us use record update here, hence wildcards
+    return (Handle__{ haType = ClosedHandle, .. }, maybe_exception)
+
+{-# NOINLINE noCharBuffer #-}
+noCharBuffer :: CharBuffer
+noCharBuffer = unsafePerformIO $ newCharBuffer 1 ReadBuffer
+
+{-# NOINLINE noByteBuffer #-}
+noByteBuffer :: Buffer Word8
+noByteBuffer = unsafePerformIO $ newByteBuffer 1 ReadBuffer
+
+-- ---------------------------------------------------------------------------
+-- Looking ahead
+
+hLookAhead_ :: Handle__ -> IO Char
+hLookAhead_ handle_@Handle__{..} = do
+    buf <- readIORef haCharBuffer
+  
+    -- fill up the read buffer if necessary
+    new_buf <- if isEmptyBuffer buf
+                  then readTextDevice handle_ buf
+                  else return buf
+    writeIORef haCharBuffer new_buf
+  
+    peekCharBuf (bufRaw buf) (bufL buf)
+
+-- ---------------------------------------------------------------------------
+-- debugging
+
+debugIO :: String -> IO ()
+#if defined(DEBUG_DUMP)
+debugIO s = do 
+  withCStringLen (s++"\n") $ \(p,len) -> c_write 1 p (fromIntegral len)
+  return ()
+#else
+debugIO s = return ()
+#endif
+
+-- ----------------------------------------------------------------------------
+-- Text input/output
+
+-- Write the contents of the supplied Char buffer to the device, return
+-- only when all the data has been written.
+writeTextDevice :: Handle__ -> CharBuffer -> IO ()
+writeTextDevice h_@Handle__{..} cbuf = do
+  --
+  bbuf <- readIORef haByteBuffer
+
+  debugIO ("writeTextDevice: cbuf=" ++ summaryBuffer cbuf ++ 
+        " bbuf=" ++ summaryBuffer bbuf)
+
+  (cbuf',bbuf') <- case haEncoder of
+    Nothing      -> latin1_encode cbuf bbuf
+    Just encoder -> (encode encoder) cbuf bbuf
+
+  debugIO ("writeTextDevice after encoding: cbuf=" ++ summaryBuffer cbuf' ++ 
+        " bbuf=" ++ summaryBuffer bbuf')
+
+  Buffered.flushWriteBuffer haDevice bbuf'
+  writeIORef haByteBuffer bbuf{bufL=0,bufR=0}
+  if not (isEmptyBuffer cbuf')
+     then writeTextDevice h_ cbuf'
+     else return ()
+
+-- Read characters into the provided buffer.  Return when any
+-- characters are available; raise an exception if the end of 
+-- file is reached.
+readTextDevice :: Handle__ -> CharBuffer -> IO CharBuffer
+readTextDevice h_@Handle__{..} cbuf = do
+  --
+  bbuf0 <- readIORef haByteBuffer
+
+  debugIO ("readTextDevice: cbuf=" ++ summaryBuffer cbuf ++ 
+        " bbuf=" ++ summaryBuffer bbuf0)
+
+  bbuf1 <- if not (isEmptyBuffer bbuf0)
+              then return bbuf0
+              else do
+                   (r,bbuf1) <- Buffered.fillReadBuffer haDevice bbuf0
+                   if r == 0 then ioe_EOF else do  -- raise EOF
+                   return bbuf1
+
+  debugIO ("readTextDevice after reading: bbuf=" ++ summaryBuffer bbuf1)
+
+  writeIORef haLastDecode bbuf1
+  (bbuf2,cbuf') <- case haDecoder of
+                     Nothing      -> latin1_decode bbuf1 cbuf
+                     Just decoder -> (encode decoder) bbuf1 cbuf
+
+  debugIO ("readTextDevice after decoding: cbuf=" ++ summaryBuffer cbuf' ++ 
+        " bbuf=" ++ summaryBuffer bbuf2)
+
+  writeIORef haByteBuffer bbuf2
+  if bufR cbuf' == bufR cbuf -- no new characters
+     then readTextDevice' h_ bbuf2 cbuf -- we need more bytes to make a Char
+     else return cbuf'
+
+-- we have an incomplete byte sequence at the end of the buffer: try to
+-- read more bytes.
+readTextDevice' :: Handle__ -> Buffer Word8 -> CharBuffer -> IO CharBuffer
+readTextDevice' h_@Handle__{..} bbuf0 cbuf = do
+  --
+  -- copy the partial sequence to the beginning of the buffer, so we have
+  -- room to read more bytes.
+  bbuf1 <- slideContents bbuf0
+
+  bbuf2 <- do (r,bbuf2) <- Buffered.fillReadBuffer haDevice bbuf1
+              if r == 0 
+                 then ioe_invalidCharacter
+                 else return bbuf2
+
+  debugIO ("readTextDevice after reading: bbuf=" ++ summaryBuffer bbuf2)
+
+  writeIORef haLastDecode bbuf2
+  (bbuf3,cbuf') <- case haDecoder of
+                     Nothing      -> latin1_decode bbuf2 cbuf
+                     Just decoder -> (encode decoder) bbuf2 cbuf
+
+  debugIO ("readTextDevice after decoding: cbuf=" ++ summaryBuffer cbuf' ++ 
+        " bbuf=" ++ summaryBuffer bbuf3)
+
+  writeIORef haByteBuffer bbuf3
+  if bufR cbuf == bufR cbuf'
+     then readTextDevice' h_ bbuf3 cbuf'
+     else return cbuf'
+
+-- Read characters into the provided buffer.  Do not block;
+-- return zero characters instead.  Raises an exception on end-of-file.
+readTextDeviceNonBlocking :: Handle__ -> CharBuffer -> IO CharBuffer
+readTextDeviceNonBlocking h_@Handle__{..} cbuf = do
+  --
+  bbuf0 <- readIORef haByteBuffer
+  bbuf1 <- if not (isEmptyBuffer bbuf0)
+              then return bbuf0
+              else do
+                   (r,bbuf1) <- Buffered.fillReadBuffer haDevice bbuf0
+                   if r == 0 then ioe_EOF else do  -- raise EOF
+                   return bbuf1
+
+  (bbuf2,cbuf') <- case haDecoder of
+                     Nothing      -> latin1_decode bbuf1 cbuf
+                     Just decoder -> (encode decoder) bbuf1 cbuf
+
+  writeIORef haByteBuffer bbuf2
+  return cbuf'

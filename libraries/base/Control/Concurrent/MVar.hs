@@ -40,7 +40,7 @@ import Hugs.ConcBase ( MVar, newEmptyMVar, newMVar, takeMVar, putMVar,
 #endif
 
 #ifdef __GLASGOW_HASKELL__
-import GHC.Conc ( MVar, newEmptyMVar, newMVar, takeMVar, putMVar,
+import GHC.MVar ( MVar, newEmptyMVar, newMVar, takeMVar, putMVar,
                   tryTakeMVar, tryPutMVar, isEmptyMVar, addMVarFinalizer
                 )
 #endif
