@@ -49,9 +49,9 @@ module Language.Haskell.TH.Syntax(
 	PkgName, mkPkgName, pkgString
     ) where
 
-import Data.PackedString
 import GHC.Base		( Int(..), Int#, (<#), (==#) )
 
+import Language.Haskell.TH.Syntax.Internals
 import Data.Data (Data(..), Typeable, mkConstr, mkDataType, constrIndex)
 import qualified Data.Data as Data
 import Data.IORef
@@ -282,35 +282,29 @@ rightName = mkNameG DataName "base" "Data.Either" "Right"
 --		Names and uniques 
 -----------------------------------------------------
 
-type ModName = PackedString	-- Module name
-
 mkModName :: String -> ModName
-mkModName s = packString s
+mkModName s = ModName s
 
 modString :: ModName -> String
-modString m = unpackPS m
+modString (ModName m) = m
 
-
-type PkgName = PackedString	-- package name
 
 mkPkgName :: String -> PkgName
-mkPkgName s = packString s
+mkPkgName s = PkgName s
 
 pkgString :: PkgName -> String
-pkgString m = unpackPS m
+pkgString (PkgName m) = m
 
 
 -----------------------------------------------------
 --		OccName
 -----------------------------------------------------
 
-type OccName = PackedString
-
 mkOccName :: String -> OccName
-mkOccName s = packString s
+mkOccName s = OccName s
 
 occString :: OccName -> String
-occString occ = unpackPS occ
+occString (OccName occ) = occ
 
 
 -----------------------------------------------------

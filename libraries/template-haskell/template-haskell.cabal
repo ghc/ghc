@@ -1,5 +1,5 @@
 name:		template-haskell
-version:	2.3.0.0
+version:	2.4.0.0
 license:	BSD3
 license-file:	LICENSE
 maintainer:	libraries@haskell.org
@@ -10,8 +10,9 @@ build-type: Simple
 Cabal-Version: >= 1.6
 
 Library
-    build-depends: base, pretty, packedstring, containers
+    build-depends: base, pretty, containers
     exposed-modules:
+        Language.Haskell.TH.Syntax.Internals
         Language.Haskell.TH.Syntax
         Language.Haskell.TH.PprLib
         Language.Haskell.TH.Ppr
