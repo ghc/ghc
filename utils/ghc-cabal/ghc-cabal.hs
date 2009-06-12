@@ -1,7 +1,6 @@
 
 module Main (main) where
 
-import Distribution.Compat.Exception
 import qualified Distribution.ModuleName as ModuleName
 import Distribution.PackageDescription
 import Distribution.PackageDescription.Configuration
@@ -10,11 +9,10 @@ import Distribution.Simple
 import Distribution.Simple.Configure
 import Distribution.Simple.LocalBuildInfo
 import Distribution.Simple.Program
-import Distribution.Simple.Utils (defaultPackageDesc, withTempFile)
+import Distribution.Simple.Utils (defaultPackageDesc)
 import Distribution.Simple.Build (writeAutogenFiles)
 import Distribution.Simple.Register (writeInstalledConfig)
 import Distribution.Simple.PackageIndex
-import Distribution.System
 import Distribution.Text
 import Distribution.Verbosity
 import qualified Distribution.InstalledPackageInfo as Installed
@@ -22,7 +20,6 @@ import qualified Distribution.InstalledPackageInfo as Installed
 import qualified Distribution.Simple.PackageIndex as PackageIndex
          ( topologicalOrder, lookupPackageName, insert )
 
-import Control.Exception
 import Control.Monad
 import Data.Maybe
 import System.IO
@@ -169,18 +166,6 @@ generate config_args distdir directory
       lbi <- getPersistBuildConfig distdir
       let pd0 = localPkgDescr lbi
 
-      -- Sigh, haskeline proper uses stuff in Setup.hs to handle whether
-      -- or not -liconv is used. We don't use Setup.hs, so we replicate
-      -- what it does here. We should do this better somehow.
-      when ((display (pkgName (package pd0)) == "haskeline") &&
-            (buildOS /= Windows)) $
-          case library pd0 of
-              Nothing -> fail "Can't happen: No haskeline library"
-              Just lib -> do
-                  d <- getCurrentDirectory
-                  print d
-                  maybeSetLibiconv verbosity (libBuildInfo lib) lbi
-
       hooked_bi <-
            if (buildType pd0 == Just Configure) || (buildType pd0 == Just Custom)
            then do
@@ -262,69 +247,4 @@ generate config_args distdir directory
       writeFile (distdir ++ "/package-data.mk") $ unlines xs
   where
      escape = foldr (\c xs -> if c == '#' then '\\':'#':xs else c:xs) []
-
-----------------------------------------------------------------------
--- haskeline-specific hacks
-
--- Sigh, haskeline proper uses stuff in Setup.hs to handle whether
--- or not -liconv is used. We don't use Setup.hs, so we replicate
--- what it does here. We should do this better somehow.
-
--- Test whether compiling a c program that links against libiconv needs -liconv.
-maybeSetLibiconv :: Verbosity -> BuildInfo -> LocalBuildInfo -> IO ()
-maybeSetLibiconv verb bi lbi = do
-    let biWithIconv = addIconv bi
-    worksWithout <- tryCompile iconv_prog bi lbi verb
-    if worksWithout
-        then writeBuildInfo ""
-        else do
-    worksWith <- tryCompile iconv_prog biWithIconv lbi verb
-    if worksWith
-        then do
-            writeBuildInfo "iconv"
-        else fail "Unable to link against the iconv library."
-  where
-    -- Cabal (at least 1.6.0.1) won't parse an empty buildinfo file.
-    writeBuildInfo libs = writeFile "haskeline.buildinfo"
-                            $ unlines ["extra-libraries: " ++ libs]
-
-tryCompile :: String -> BuildInfo -> LocalBuildInfo -> Verbosity -> IO Bool
-tryCompile program bi lbi verb = flip catchIO processException $ flip catchExit processExit $ do
-    tempDir <- getTemporaryDirectory
-    withTempFile tempDir ".c" $ \fname h -> do
-        hPutStr h program
-        hClose h
-        -- TODO take verbosity from the args.
-        rawSystemProgramStdoutConf verb gccProgram (withPrograms lbi) (fname : args)
-        return True
-  where
-    processException :: IOException -> IO Bool
-    processException _ = return False
-    processExit = return . (==ExitSuccess)
-    -- Mimicing Distribution.Simple.Configure
-    deps = topologicalOrder (installedPkgs lbi)
-    args = concat
-                  [ ccOptions bi
-                  , cppOptions bi
-                  , ldOptions bi
-                  -- --extra-include-dirs and --extra-lib-dirs are included
-                  -- in the below fields.
-                  -- Also sometimes a dependency like rts points to a nonstandard
-                  -- include/lib directory where iconv can be found.
-                  , map ("-I" ++) (includeDirs bi ++ concatMap Installed.includeDirs deps)
-                  , map ("-L" ++) (extraLibDirs bi ++ concatMap Installed.libraryDirs deps)
-                  , map ("-l" ++) (extraLibs bi)
-                  ]
-
-addIconv :: BuildInfo -> BuildInfo
-addIconv bi = bi {extraLibs = "iconv" : extraLibs bi}
-
-iconv_prog :: String
-iconv_prog = unlines $
-    [ "#include <iconv.h>"
-    , "int main(void) {"
-    , "    iconv_t t = iconv_open(\"UTF-8\", \"UTF-8\");"
-    , "    return 0;"
-    , "}"
-    ]
 
