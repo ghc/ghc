@@ -752,6 +752,7 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(rts_mkWord32)			\
       SymI_HasProto(rts_mkWord64)			\
       SymI_HasProto(rts_unlock)				\
+      SymI_HasProto(rts_unsafeGetMyCapability)          \
       SymI_HasProto(rtsSupportsBoundThreads)		\
       SymI_HasProto(__hscore_get_saved_termios)		\
       SymI_HasProto(__hscore_set_saved_termios)		\

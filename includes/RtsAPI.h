@@ -66,6 +66,15 @@ Capability *rts_lock (void);
 // releases the token acquired with rts_lock().
 void rts_unlock (Capability *token);
 
+// If you are in a context where you know you have a current capability but
+// do not know what it is, then use this to get it. Basically this only
+// applies to "unsafe" foreign calls (as unsafe foreign calls are made with
+// the capability held).
+//
+// WARNING: There is *no* guarantee this returns anything sensible (eg NULL)
+// when there is no current capability.
+Capability *rts_unsafeGetMyCapability (void);
+
 /* ----------------------------------------------------------------------------
    Building Haskell objects from C datatypes.
    ------------------------------------------------------------------------- */

@@ -44,6 +44,21 @@ Capability *last_free_capability;
 /* GC indicator, in scope for the scheduler, init'ed to false */
 volatile StgWord waiting_for_gc = 0;
 
+/* Let foreign code get the current Capability -- assuming there is one!
+ * This is useful for unsafe foreign calls because they are called with
+ * the current Capability held, but they are not passed it. For example,
+ * see see the integer-gmp package which calls allocateLocal() in its
+ * stgAllocForGMP() function (which gets called by gmp functions).
+ * */
+Capability * rts_unsafeGetMyCapability (void)
+{
+#if defined(THREADED_RTS)
+  return myTask()->cap;
+#else
+  return &MainCapability;
+#endif
+}
+
 #if defined(THREADED_RTS)
 STATIC_INLINE rtsBool
 globalWorkToDo (void)
