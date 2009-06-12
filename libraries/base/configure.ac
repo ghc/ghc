@@ -102,4 +102,10 @@ FP_CHECK_CONST([O_BINARY], [#include <fcntl.h>], [0])
 # Check for idiosyncracies in some mingw impls of directory handling.
 FP_READDIR_EOF_ERRNO
 
+AC_CHECK_LIB(iconv, iconv_open,
+    [EXTRA_LIBS="$EXTRA_LIBS iconv"])
+
+AC_SUBST(EXTRA_LIBS)
+AC_CONFIG_FILES([base.buildinfo])
+
 AC_OUTPUT
