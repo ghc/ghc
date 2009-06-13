@@ -8,7 +8,7 @@ synopsis:       Integer library based on GMP
 description:
     This package contains an Integer library based on GMP.
 cabal-version:  >=1.6
-build-type: Simple
+build-type: Configure
 
 extra-source-files:
   cbits/float.c
