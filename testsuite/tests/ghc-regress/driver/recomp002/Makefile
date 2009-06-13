@@ -5,12 +5,12 @@ include $(TOP)/mk/test.mk
 # Recompilation tests
 
 clean:
-	@rm -f *.o*
-	@rm -f *.hi*
+	rm -f *.o*
+	rm -f *.hi*
 
 # Only the first invocation should print any "Compiling" messages
 
 recomp002: clean
-	@$(TEST_HC) --make Q.hs
-	@echo Middle >&2
-	@$(TEST_HC) --make Q.hs
+	$(TEST_HC) --make Q.hs
+	echo Middle >&2
+	$(TEST_HC) --make Q.hs
