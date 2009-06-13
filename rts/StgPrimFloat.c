@@ -17,27 +17,6 @@
  * (lib/fltcode.c).
  */
 
-#ifdef _SHORT_LIMB
-#define SIZEOF_LIMB_T SIZEOF_UNSIGNED_INT
-#else
-#ifdef _LONG_LONG_LIMB
-#define SIZEOF_LIMB_T SIZEOF_UNSIGNED_LONG_LONG
-#else
-#define SIZEOF_LIMB_T SIZEOF_UNSIGNED_LONG
-#endif
-#endif
-
-#if SIZEOF_LIMB_T == 4
-#define GMP_BASE 4294967296.0
-#elif SIZEOF_LIMB_T == 8
-#define GMP_BASE 18446744073709551616.0
-#else
-#error Cannot cope with SIZEOF_LIMB_T -- please add definition of GMP_BASE
-#endif
-
-#define DNBIGIT	 ((SIZEOF_DOUBLE+SIZEOF_LIMB_T-1)/SIZEOF_LIMB_T)
-#define FNBIGIT	 ((SIZEOF_FLOAT +SIZEOF_LIMB_T-1)/SIZEOF_LIMB_T)
-
 #if IEEE_FLOATING_POINT
 #define MY_DMINEXP  ((DBL_MIN_EXP) - (DBL_MANT_DIG) - 1)
 /* DMINEXP is defined in values.h on Linux (for example) */
@@ -151,66 +130,6 @@ __word_encodeFloat (W_ j, I_ e)
 }
 
 /* This only supports IEEE floating point */
-
-void
-__decodeDouble (MP_INT *man, I_ *exp, StgDouble dbl)
-{
-    /* Do some bit fiddling on IEEE */
-    unsigned int low, high; 	     	/* assuming 32 bit ints */
-    int sign, iexp;
-    union { double d; unsigned int i[2]; } u;	/* assuming 32 bit ints, 64 bit double */
-
-    ASSERT(sizeof(unsigned int ) == 4            );
-    ASSERT(sizeof(dbl          ) == SIZEOF_DOUBLE);
-    ASSERT(sizeof(man->_mp_d[0]) == SIZEOF_LIMB_T);
-    ASSERT(DNBIGIT*SIZEOF_LIMB_T >= SIZEOF_DOUBLE);
-
-    u.d = dbl;	    /* grab chunks of the double */
-    low = u.i[L];
-    high = u.i[H];
-
-    /* we know the MP_INT* passed in has size zero, so we realloc
-    	no matter what.
-    */
-    man->_mp_alloc = DNBIGIT;
-
-    if (low == 0 && (high & ~DMSBIT) == 0) {
-	man->_mp_size = 0;
-	*exp = 0L;
-    } else {
-	man->_mp_size = DNBIGIT;
-	iexp = ((high >> 20) & 0x7ff) + MY_DMINEXP;
-	sign = high;
-
-	high &= DHIGHBIT-1;
-	if (iexp != MY_DMINEXP)	/* don't add hidden bit to denorms */
-	    high |= DHIGHBIT;
-	else {
-	    iexp++;
-	    /* A denorm, normalize the mantissa */
-	    while (! (high & DHIGHBIT)) {
-		high <<= 1;
-		if (low & DMSBIT)
-		    high++;
-		low <<= 1;
-		iexp--;
-	    }
-	}
-        *exp = (I_) iexp;
-#if DNBIGIT == 2
-	man->_mp_d[0] = (mp_limb_t)low;
-	man->_mp_d[1] = (mp_limb_t)high;
-#else
-#if DNBIGIT == 1
-	man->_mp_d[0] = ((mp_limb_t)high) << 32 | (mp_limb_t)low;
-#else
-#error Cannot cope with DNBIGIT
-#endif
-#endif
-	if (sign < 0)
-	    man->_mp_size = -man->_mp_size;
-    }
-}
 
 void
 __decodeDouble_2Int (I_ *man_sign, W_ *man_high, W_ *man_low, I_ *exp, StgDouble dbl)

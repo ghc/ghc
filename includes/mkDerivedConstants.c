@@ -422,11 +422,5 @@ main(int argc, char *argv[])
     struct_field(StgAsyncIOResult, errCode);
 #endif
 
-    struct_size(MP_INT);
-    struct_field(MP_INT,_mp_alloc);
-    struct_field(MP_INT,_mp_size);
-    struct_field(MP_INT,_mp_d);
-
-    ctype(mp_limb_t);
     return 0;
 }

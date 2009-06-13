@@ -537,23 +537,6 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(stg_ap_pppppp_ret)
 #endif
 
-/* On Windows, we link libgmp.a statically into libHSrts.dll */
-#ifdef mingw32_HOST_OS
-#define GMP_SYMS				        \
-      SymI_HasProto(__gmpz_cmp)				\
-      SymI_HasProto(__gmpz_cmp_si)			\
-      SymI_HasProto(__gmpz_cmp_ui)			\
-      SymI_HasProto(__gmpz_get_si)			\
-      SymI_HasProto(__gmpz_get_ui)
-#else
-#define GMP_SYMS				        \
-      SymE_HasProto(__gmpz_cmp)			        \
-      SymE_HasProto(__gmpz_cmp_si)			\
-      SymE_HasProto(__gmpz_cmp_ui)			\
-      SymE_HasProto(__gmpz_get_si)			\
-      SymE_HasProto(__gmpz_get_ui)
-#endif
-
 #define RTS_SYMBOLS				        \
       Maybe_Stable_Names			        \
       SymI_HasProto(StgReturn)				\
@@ -591,13 +574,11 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(OutOfHeapHook)			\
       SymI_HasProto(StackOverflowHook)			\
       SymI_HasProto(addDLL)               		\
-      GMP_SYMS					        \
       SymI_HasProto(__int_encodeDouble)			\
       SymI_HasProto(__word_encodeDouble)		\
       SymI_HasProto(__2Int_encodeDouble)		\
       SymI_HasProto(__int_encodeFloat)			\
       SymI_HasProto(__word_encodeFloat)			\
-      SymI_HasProto(andIntegerzh_fast)			\
       SymI_HasProto(atomicallyzh_fast)			\
       SymI_HasProto(barf)				\
       SymI_HasProto(debugBelch)				\
@@ -611,11 +592,7 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(checkzh_fast)                       \
       SymI_HasProto(closure_flags)                      \
       SymI_HasProto(cmp_thread)				\
-      SymI_HasProto(cmpIntegerzh_fast)	        	\
-      SymI_HasProto(cmpIntegerIntzh_fast)	      	\
-      SymI_HasProto(complementIntegerzh_fast)		\
       SymI_HasProto(createAdjustor)			\
-      SymI_HasProto(decodeDoublezh_fast)		\
       SymI_HasProto(decodeDoublezu2Intzh_fast)		\
       SymI_HasProto(decodeFloatzuIntzh_fast)		\
       SymI_HasProto(defaultsHook)			\
@@ -623,8 +600,6 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(deRefWeakzh_fast)			\
       SymI_HasProto(deRefStablePtrzh_fast)		\
       SymI_HasProto(dirty_MUT_VAR)			\
-      SymI_HasProto(divExactIntegerzh_fast)		\
-      SymI_HasProto(divModIntegerzh_fast)		\
       SymI_HasProto(forkzh_fast)			\
       SymI_HasProto(forkOnzh_fast)			\
       SymI_HasProto(forkProcess)			\
@@ -633,9 +608,6 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(freeStablePtr)		        \
       SymI_HasProto(getOrSetTypeableStore)		\
       SymI_HasProto(getOrSetSignalHandlerStore)		\
-      SymI_HasProto(gcdIntegerzh_fast)			\
-      SymI_HasProto(gcdIntegerIntzh_fast)		\
-      SymI_HasProto(gcdIntzh_fast)			\
       SymI_HasProto(genSymZh)				\
       SymI_HasProto(genericRaise)			\
       SymI_HasProto(getProgArgv)			\
@@ -654,9 +626,6 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(unpackClosurezh_fast)               \
       SymI_HasProto(getApStackValzh_fast)               \
       SymI_HasProto(getSparkzh_fast)                    \
-      SymI_HasProto(int2Integerzh_fast)			\
-      SymI_HasProto(integer2Intzh_fast)			\
-      SymI_HasProto(integer2Wordzh_fast)		\
       SymI_HasProto(isCurrentThreadBoundzh_fast)	\
       SymI_HasProto(isDoubleDenormalized)		\
       SymI_HasProto(isDoubleInfinite)			\
@@ -673,7 +642,6 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(insertSymbol)     			\
       SymI_HasProto(lookupSymbol)     			\
       SymI_HasProto(makeStablePtrzh_fast)		\
-      SymI_HasProto(minusIntegerzh_fast)		\
       SymI_HasProto(mkApUpd0zh_fast)			\
       SymI_HasProto(myThreadIdzh_fast)			\
       SymI_HasProto(labelThreadzh_fast)                 \
@@ -689,20 +657,15 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(newPinnedByteArrayzh_fast)		\
       SymI_HasProto(newAlignedPinnedByteArrayzh_fast)	\
       SymI_HasProto(newSpark)				\
-      SymI_HasProto(orIntegerzh_fast)			\
       SymI_HasProto(performGC)				\
       SymI_HasProto(performMajorGC)			\
-      SymI_HasProto(plusIntegerzh_fast)			\
       SymI_HasProto(prog_argc)				\
       SymI_HasProto(prog_argv)				\
       SymI_HasProto(putMVarzh_fast)			\
-      SymI_HasProto(quotIntegerzh_fast)			\
-      SymI_HasProto(quotRemIntegerzh_fast)		\
       SymI_HasProto(raisezh_fast)			\
       SymI_HasProto(raiseIOzh_fast)			\
       SymI_HasProto(readTVarzh_fast)			\
       SymI_HasProto(readTVarIOzh_fast)			\
-      SymI_HasProto(remIntegerzh_fast)			\
       SymI_HasProto(resetNonBlockingFd)			\
       SymI_HasProto(resumeThread)			\
       SymI_HasProto(resolveObjs)                        \
@@ -833,7 +796,6 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(suspendThread)			\
       SymI_HasProto(takeMVarzh_fast)			\
       SymI_HasProto(threadStatuszh_fast)		\
-      SymI_HasProto(timesIntegerzh_fast)		\
       SymI_HasProto(tryPutMVarzh_fast)			\
       SymI_HasProto(tryTakeMVarzh_fast)			\
       SymI_HasProto(unblockAsyncExceptionszh_fast)	\
@@ -841,9 +803,7 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(unsafeThawArrayzh_fast)		\
       SymI_HasProto(waitReadzh_fast)			\
       SymI_HasProto(waitWritezh_fast)			\
-      SymI_HasProto(word2Integerzh_fast)		\
       SymI_HasProto(writeTVarzh_fast)			\
-      SymI_HasProto(xorIntegerzh_fast)			\
       SymI_HasProto(yieldzh_fast)                       \
       SymI_NeedsProto(stg_interp_constr_entry)          \
       SymI_HasProto(alloc_blocks)                       \
@@ -862,13 +822,6 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(traceCcszh_fast)                    \
       RTS_USER_SIGNALS_SYMBOLS
 
-#ifdef SUPPORT_LONG_LONGS
-#define RTS_LONG_LONG_SYMS			        \
-      SymI_HasProto(int64ToIntegerzh_fast)		\
-      SymI_HasProto(word64ToIntegerzh_fast)
-#else
-#define RTS_LONG_LONG_SYMS /* nothing */
-#endif
 
 // 64-bit support functions in libgcc.a
 #if defined(__GNUC__) && SIZEOF_VOID_P <= 4
@@ -916,7 +869,6 @@ typedef struct _RtsSymbolVal {
 #define SymI_HasProto_redirect(vvv,xxx) /**/
 RTS_SYMBOLS
 RTS_RET_SYMBOLS
-RTS_LONG_LONG_SYMS
 RTS_POSIX_ONLY_SYMBOLS
 RTS_MINGW_ONLY_SYMBOLS
 RTS_CYGWIN_ONLY_SYMBOLS
@@ -952,7 +904,6 @@ RTS_LIBFFI_SYMBOLS
 static RtsSymbolVal rtsSyms[] = {
       RTS_SYMBOLS
       RTS_RET_SYMBOLS
-      RTS_LONG_LONG_SYMS
       RTS_POSIX_ONLY_SYMBOLS
       RTS_MINGW_ONLY_SYMBOLS
       RTS_CYGWIN_ONLY_SYMBOLS
