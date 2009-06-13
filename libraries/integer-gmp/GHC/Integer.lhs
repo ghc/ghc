@@ -261,13 +261,6 @@ gcdInteger :: Integer -> Integer -> Integer
 gcdInteger a@(S# INT_MINBOUND) b = gcdInteger (toBig a) b
 gcdInteger a b@(S# INT_MINBOUND) = gcdInteger a (toBig b)
 gcdInteger (S# a) (S# b) = S# (gcdInt a b)
-    where -- XXX Copied from GHC.Base
-          gcdInt :: Int# -> Int# -> Int#
-          gcdInt 0# y  = absInt y
-          gcdInt x  0# = absInt x
-          gcdInt x  y  = gcdInt# (absInt x) (absInt y)
-
-          absInt x = if x <# 0# then negateInt# x else x
 gcdInteger ia@(S# a)  ib@(J# sb b)
  =      if a  ==# 0# then absInteger ib
    else if sb ==# 0# then absInteger ia
@@ -284,6 +277,17 @@ lcmInteger a b =      if a `eqInteger` S# 0# then S# 0#
                  else (divExact aa (gcdInteger aa ab)) `timesInteger` ab
   where aa = absInteger a
         ab = absInteger b
+
+{-# RULES "gcdInteger/Int" forall a b.
+            gcdInteger (S# a) (S# b) = S# (gcdInt a b)
+  #-}
+gcdInt :: Int# -> Int# -> Int#
+gcdInt 0# y  = absInt y
+gcdInt x  0# = absInt x
+gcdInt x  y  = gcdInt# (absInt x) (absInt y)
+
+absInt :: Int# -> Int#
+absInt x = if x <# 0# then negateInt# x else x
 
 divExact :: Integer -> Integer -> Integer
 divExact a@(S# INT_MINBOUND) b = divExact (toBig a) b
