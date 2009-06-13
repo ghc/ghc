@@ -771,6 +771,7 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(stg_MVAR_DIRTY_info)		\
       SymI_HasProto(stg_IND_STATIC_info)		\
       SymI_HasProto(stg_INTLIKE_closure)		\
+      SymI_HasProto(stg_ARR_WORDS_info)                 \
       SymI_HasProto(stg_MUT_ARR_PTRS_DIRTY_info)	\
       SymI_HasProto(stg_MUT_ARR_PTRS_FROZEN_info)	\
       SymI_HasProto(stg_MUT_ARR_PTRS_FROZEN0_info)	\
@@ -845,6 +846,9 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(xorIntegerzh_fast)			\
       SymI_HasProto(yieldzh_fast)                       \
       SymI_NeedsProto(stg_interp_constr_entry)          \
+      SymI_HasProto(alloc_blocks)                       \
+      SymI_HasProto(alloc_blocks_lim)                   \
+      SymI_HasProto(allocateLocal)                      \
       SymI_HasProto(allocateExec)	                \
       SymI_HasProto(freeExec)		                \
       SymI_HasProto(getAllocations)                     \
