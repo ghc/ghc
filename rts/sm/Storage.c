@@ -72,13 +72,6 @@ Mutex sm_mutex;
 #endif
 
 
-/*
- * Forward references
- */
-static void *stgAllocForGMP   (size_t size_in_bytes);
-static void *stgReallocForGMP (void *ptr, size_t old_size, size_t new_size);
-static void  stgDeallocForGMP (void *ptr, size_t size);
-
 static void
 initStep (step *stp, int g, int s)
 {
@@ -260,9 +253,6 @@ initStorage( void )
   alloc_blocks_lim = RtsFlags.GcFlags.minAllocAreaSize;
 
   exec_block = NULL;
-
-  /* Tell GNU multi-precision pkg about our custom alloc functions */
-  mp_set_memory_functions(stgAllocForGMP, stgReallocForGMP, stgDeallocForGMP);
 
 #ifdef THREADED_RTS
   initSpinLock(&gc_alloc_block_sync);
@@ -896,63 +886,6 @@ dirty_MVAR(StgRegTable *reg, StgClosure *p)
     bdescr *bd;
     bd = Bdescr((StgPtr)p);
     if (bd->gen_no > 0) recordMutableCap(p,cap,bd->gen_no);
-}
-
-/* -----------------------------------------------------------------------------
-   Allocation functions for GMP.
-
-   These all use the allocate() interface - we can't have any garbage
-   collection going on during a gmp operation, so we use allocate()
-   which always succeeds.  The gmp operations which might need to
-   allocate will ask the storage manager (via doYouWantToGC()) whether
-   a garbage collection is required, in case we get into a loop doing
-   only allocate() style allocation.
-   -------------------------------------------------------------------------- */
-
-static void *
-stgAllocForGMP (size_t size_in_bytes)
-{
-  StgArrWords* arr;
-  nat data_size_in_words, total_size_in_words;
-  
-  /* round up to a whole number of words */
-  data_size_in_words  = (size_in_bytes + sizeof(W_) + 1) / sizeof(W_);
-  total_size_in_words = sizeofW(StgArrWords) + data_size_in_words;
-  
-  /* allocate and fill it in. */
-#if defined(THREADED_RTS)
-  arr = (StgArrWords *)allocateLocal(myTask()->cap, total_size_in_words);
-#else
-  arr = (StgArrWords *)allocateLocal(&MainCapability, total_size_in_words);
-#endif
-  SET_ARR_HDR(arr, &stg_ARR_WORDS_info, CCCS, data_size_in_words);
-  
-  /* and return a ptr to the goods inside the array */
-  return arr->payload;
-}
-
-static void *
-stgReallocForGMP (void *ptr, size_t old_size, size_t new_size)
-{
-    size_t min_size;
-    void *new_stuff_ptr = stgAllocForGMP(new_size);
-    nat i = 0;
-    char *p = (char *) ptr;
-    char *q = (char *) new_stuff_ptr;
-
-    min_size = old_size < new_size ? old_size : new_size;
-    for (; i < min_size; i++, p++, q++) {
-	*q = *p;
-    }
-
-    return(new_stuff_ptr);
-}
-
-static void
-stgDeallocForGMP (void *ptr STG_UNUSED, 
-		  size_t size STG_UNUSED)
-{
-    /* easy for us: the garbage collector does the dealloc'n */
 }
 
 /* -----------------------------------------------------------------------------
