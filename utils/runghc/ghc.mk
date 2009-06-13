@@ -17,15 +17,13 @@ utils/runghc_dist_SHELL_WRAPPER = YES
 utils/runghc_dist_INSTALL_SHELL_WRAPPER = YES
 
 ifneq "$(BINDIST)" "YES"
-
 # hack: the build system has trouble with Main modules not called Main.hs
 utils/runghc/dist/build/Main.hs : utils/runghc/runghc.hs $(MKDIRHIER)
 	"$(MKDIRHIER)" $(dir $@)
 	"$(CP)" $< $@
+endif
 
 $(eval $(call build-prog,utils/runghc,dist,1))
-
-endif
 
 install: install_runhaskell
 
