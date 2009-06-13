@@ -62,7 +62,7 @@
 #define __abs(a)                (( (a) >= 0 ) ? (a) : (-(a)))
 
 StgDouble
-__encodeDouble (I_ size, StgByteArray ba, I_ e) /* result = s * 2^e */
+integer_cbits_encodeDouble (I_ size, StgByteArray ba, I_ e) /* result = s * 2^e */
 {
     StgDouble r;
     const mp_limb_t *const arr = (const mp_limb_t *)ba;
@@ -84,7 +84,7 @@ __encodeDouble (I_ size, StgByteArray ba, I_ e) /* result = s * 2^e */
 }
 
 StgFloat
-__encodeFloat (I_ size, StgByteArray ba, I_ e) /* result = s * 2^e */
+integer_cbits_encodeFloat (I_ size, StgByteArray ba, I_ e) /* result = s * 2^e */
 {
     StgFloat r;
     const mp_limb_t *arr = (const mp_limb_t *)ba;
@@ -103,4 +103,66 @@ __encodeFloat (I_ size, StgByteArray ba, I_ e) /* result = s * 2^e */
 	r = -r;
 
     return r;
+}
+
+/* This only supports IEEE floating point */
+
+void
+integer_cbits_decodeDouble (MP_INT *man, I_ *exp, StgDouble dbl)
+{
+    /* Do some bit fiddling on IEEE */
+    unsigned int low, high; 	     	/* assuming 32 bit ints */
+    int sign, iexp;
+    union { double d; unsigned int i[2]; } u;	/* assuming 32 bit ints, 64 bit double */
+
+    ASSERT(sizeof(unsigned int ) == 4            );
+    ASSERT(sizeof(dbl          ) == SIZEOF_DOUBLE);
+    ASSERT(sizeof(man->_mp_d[0]) == SIZEOF_LIMB_T);
+    ASSERT(DNBIGIT*SIZEOF_LIMB_T >= SIZEOF_DOUBLE);
+
+    u.d = dbl;	    /* grab chunks of the double */
+    low = u.i[L];
+    high = u.i[H];
+
+    /* we know the MP_INT* passed in has size zero, so we realloc
+    	no matter what.
+    */
+    man->_mp_alloc = DNBIGIT;
+
+    if (low == 0 && (high & ~DMSBIT) == 0) {
+	man->_mp_size = 0;
+	*exp = 0L;
+    } else {
+	man->_mp_size = DNBIGIT;
+	iexp = ((high >> 20) & 0x7ff) + MY_DMINEXP;
+	sign = high;
+
+	high &= DHIGHBIT-1;
+	if (iexp != MY_DMINEXP)	/* don't add hidden bit to denorms */
+	    high |= DHIGHBIT;
+	else {
+	    iexp++;
+	    /* A denorm, normalize the mantissa */
+	    while (! (high & DHIGHBIT)) {
+		high <<= 1;
+		if (low & DMSBIT)
+		    high++;
+		low <<= 1;
+		iexp--;
+	    }
+	}
+        *exp = (I_) iexp;
+#if DNBIGIT == 2
+	man->_mp_d[0] = (mp_limb_t)low;
+	man->_mp_d[1] = (mp_limb_t)high;
+#else
+#if DNBIGIT == 1
+	man->_mp_d[0] = ((mp_limb_t)high) << 32 | (mp_limb_t)low;
+#else
+#error Cannot cope with DNBIGIT
+#endif
+#endif
+	if (sign < 0)
+	    man->_mp_size = -man->_mp_size;
+    }
 }

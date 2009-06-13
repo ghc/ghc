@@ -51,14 +51,19 @@ import GHC.Prim (
     -- Operations on Int# that we use for operations on S#
     quotInt#, remInt#, negateInt#,
     (==#), (/=#), (<=#), (>=#), (<#), (>#), (*#), (-#), (+#),
-    mulIntMayOflo#, addIntC#, subIntC#, gcdInt#,
+    mulIntMayOflo#, addIntC#, subIntC#,
     and#, or#, xor#,
     indexIntArray#,
-    -- GMP-related primitives in the RTS
+ )
+
+import GHC.Integer.Internals (
+    Integer(..),
+
+    -- GMP-related primitives
     cmpInteger#, cmpIntegerInt#,
     plusInteger#, minusInteger#, timesInteger#,
     quotRemInteger#, quotInteger#, remInteger#, divModInteger#,
-    gcdInteger#, gcdIntegerInt#, divExactInteger#,
+    gcdInteger#, gcdIntegerInt#, gcdInt#, divExactInteger#,
     decodeDouble#,
     int2Integer#, integer2Int#, word2Integer#, integer2Word#,
     andInteger#, orInteger#, xorInteger#, complementInteger#,
@@ -66,8 +71,6 @@ import GHC.Prim (
     int64ToInteger#, word64ToInteger#,
 #endif
  )
-
-import GHC.Integer.Internals (Integer(..))
 
 #if WORD_SIZE_IN_BITS < 64
 import GHC.IntWord64 (
@@ -460,12 +463,12 @@ floatFromInteger :: Integer -> Float#
 floatFromInteger (S# i#) = int2Float# i#
 floatFromInteger (J# s# d#) = encodeFloat# s# d# 0#
 
-foreign import ccall unsafe "__encodeFloat"
+foreign import ccall unsafe "integer_cbits_encodeFloat"
         encodeFloat# :: Int# -> ByteArray# -> Int# -> Float#
 foreign import ccall unsafe "__int_encodeFloat"
         int_encodeFloat# :: Int# -> Int# -> Float#
 
-foreign import ccall unsafe "__encodeDouble"
+foreign import ccall unsafe "integer_cbits_encodeDouble"
         encodeDouble# :: Int# -> ByteArray# -> Int# -> Double#
 foreign import ccall unsafe "__int_encodeDouble"
         int_encodeDouble# :: Int# -> Int# -> Double#
