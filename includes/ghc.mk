@@ -34,13 +34,6 @@ includes_CC_OPTS += -DTABLES_NEXT_TO_CODE
 endif
 
 includes_CC_OPTS += -Iincludes -Irts -Irts/parallel
-ifeq "$(HaveLibGmp)" "YES"
-ifneq "$(GMP_INCLUDE_DIRS)" ""
-includes_CC_OPTS += -I$(GMP_INCLUDE_DIRS)
-endif
-else
-includes_CC_OPTS += -Igmp/gmpbuild
-endif
 
 ifneq "$(GhcWithSMP)" "YES"
 includes_CC_OPTS += -DNOSMP

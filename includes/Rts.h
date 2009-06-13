@@ -175,13 +175,6 @@ TAG_CLOSURE(StgWord tag,StgClosure * p)
 #include "SMPClosureOps.h"
 #include "SpinLock.h"
 
-/* GNU mp library */
-#if defined(HAVE_FRAMEWORK_GMP)
-#include <GMP/gmp.h>
-#else
-#include "gmp.h"
-#endif
-
 /* Macros for STG/C code */
 #include "Block.h"
 #include "ClosureMacros.h"

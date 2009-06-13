@@ -15,27 +15,18 @@ hidden-modules:
 import-dirs:
 
 #ifdef INSTALLING
-library-dirs:		LIB_DIR GMP_LIB_DIRS PAPI_LIB_DIR
+library-dirs:		LIB_DIR PAPI_LIB_DIR
 # ifdef mingw32_HOST_OS
 			, LIB_DIR"/gcc-lib"
 			/* force the dist-provided gcc-lib/ into scope. */
 # endif
 #else /* !INSTALLING */
-library-dirs:		TOP"/rts/dist/build" GMP_LIB_DIRS PAPI_LIB_DIR
-# if !defined(HAVE_LIB_GMP) && !defined(HAVE_FRAMEWORK_GMP)
-			, TOP"/gmp"
-# endif
+library-dirs:		TOP"/rts/dist/build" PAPI_LIB_DIR
 #endif
 
 hs-libraries:   "HSrts"
 
 extra-libraries:		"m"		/* for ldexp() */
-#ifndef HAVE_FRAMEWORK_GMP
-			      , "gmp"
-#ifdef HAVE_LIBDL
-			      , "dl"
-#endif
-#endif
 #ifdef HAVE_LIBRT
 			      , "rt"
 #endif
@@ -58,14 +49,9 @@ extra-libraries:		"m"		/* for ldexp() */
 #endif
 
 #ifdef INSTALLING
-include-dirs:		INCLUDE_DIR GMP_INCLUDE_DIRS PAPI_INCLUDE_DIR
+include-dirs:		INCLUDE_DIR PAPI_INCLUDE_DIR
 #else /* !INSTALLING */
 include-dirs:		TOP"/includes"
-# if !defined(HAVE_LIB_GMP) && !defined(HAVE_FRAMEWORK_GMP)
-             		TOP"/gmp/gmpbuild"
-# endif
-             		GMP_INCLUDE_DIRS
-#endif
 
 includes:		Stg.h
 depends:	 	ffi-1.0
@@ -164,12 +150,6 @@ ld-options:
 #endif
 
 framework-dirs:
-
-#ifdef HAVE_FRAMEWORK_GMP
-frameworks:	"GMP"
-#else
-frameworks:
-#endif
 
 haddock-interfaces:
 haddock-html:

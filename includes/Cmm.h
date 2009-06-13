@@ -342,11 +342,6 @@
 #include "Block.h"  /* For Bdescr() */
 
 
-/* Can't think of a better place to put this. */
-#if SIZEOF_mp_limb_t != SIZEOF_VOID_P
-#error mp_limb_t != StgWord: assumptions in PrimOps.cmm are now false
-#endif
-
 #define MyCapability()  (BaseReg - OFFSET_Capability_r)
 
 /* -------------------------------------------------------------------------

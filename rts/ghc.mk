@@ -322,28 +322,6 @@ $(eval $(call build-dependencies,rts,dist))
 
 $(rts_dist_depfile) : libffi/ffi.h
 
-# -----------------------------------------------------------------------------
-
-# Need to get the GMP vars in through CPP to package.conf.in, and put
-# quotes around each element.
-
-rts_PACKAGE_CPP_OPTS += -DGMP_INCLUDE_DIRS='$(subst $(space),$(comma),$(patsubst %,"%",$(strip $(GMP_INCLUDE_DIRS))))'
-rts_PACKAGE_CPP_OPTS += -DGMP_LIB_DIRS='$(subst $(space),$(comma),$(patsubst %,"%",$(strip $(GMP_LIB_DIRS))))'
-
-ifneq "$(GMP_INCLUDE_DIRS)" ""
-rts_HC_OPTS += -I$(GMP_INCLUDE_DIRS)
-rts_CC_OPTS += -I$(GMP_INCLUDE_DIRS)
-rts_HSC2HS_OPTS += -I$(GMP_INCLUDE_DIRS)
-endif
-ifneq "$(GMP_LIB_DIRS)" ""
-rts_LD_OPTS += -L$(GMP_LIB_DIRS)
-endif
-
-rts_CC_OPTS     += -Igmp/gmpbuild
-rts_HC_OPTS     += -Igmp/gmpbuild
-rts_HSC2HS_OPTS += -Igmp/gmpbuild
-rts_LD_OPTS     += -Lgmp/gmpbuild
-
 #-----------------------------------------------------------------------------
 # libffi stuff
 
