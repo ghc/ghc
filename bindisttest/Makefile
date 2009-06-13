@@ -33,6 +33,8 @@ else
 	cd a/b/c/$(BIN_DIST_NAME) && ./configure --prefix=$(BIN_DIST_INST_DIR)
 	cd a/b/c/$(BIN_DIST_NAME) && make install
 endif
+	$(BIN_DIST_INST_DIR)/bin/runghc HelloWorld > output
+	$(CONTEXT_DIFF) output expected_output
 	$(BIN_DIST_INST_DIR)/bin/ghc --make HelloWorld
 	./HelloWorld > output
 	$(CONTEXT_DIFF) output expected_output
