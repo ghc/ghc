@@ -16,11 +16,11 @@ $(INPLACE_LIB)/html:
 	"$(RM)" $(RM_OPTS) -r $@
 	"$(CP)" -R utils/haddock/html $@
 
+endif
+
 $(eval $(call build-prog,utils/haddock,dist,2))
 
 utils/haddock_dist_MODULES += Paths_haddock
-
-endif
 
 install: install_utils/haddock_html
 .PHONY: install_utils/haddock_html
