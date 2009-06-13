@@ -219,9 +219,6 @@ primop   IntRemOp    "remInt#"    Dyadic
    {Satisfies \texttt{(quotInt\# x y) *\# y +\# (remInt\# x y) == x}.}
    with can_fail = True
 
-primop   IntGcdOp    "gcdInt#"    Dyadic   Int# -> Int# -> Int#
-   with out_of_line = True
-
 primop   IntNegOp    "negateInt#"    Monadic   Int# -> Int#
 primop   IntAddCOp   "addIntC#"    GenPrimOp   Int# -> Int# -> (# Int#, Int# #)
 	 {Add with carry.  First member of result is (wrapped) sum; 
@@ -249,10 +246,6 @@ primop   ChrOp   "chr#"   GenPrimOp   Int# -> Char#
 primop   Int2WordOp "int2Word#" GenPrimOp Int# -> Word#
 primop   Int2FloatOp   "int2Float#"      GenPrimOp  Int# -> Float#
 primop   Int2DoubleOp   "int2Double#"          GenPrimOp  Int# -> Double#
-
-primop   Int2IntegerOp    "int2Integer#"
-   GenPrimOp Int# -> (# Int#, ByteArray# #)
-   with out_of_line = True
 
 primop   ISllOp   "uncheckedIShiftL#" GenPrimOp  Int# -> Int# -> Int#
 	 {Shift left.  Result undefined if shift amount is not
@@ -305,10 +298,6 @@ primop   SrlOp   "uncheckedShiftRL#"   GenPrimOp   Word# -> Int# -> Word#
 
 primop   Word2IntOp   "word2Int#"   GenPrimOp   Word# -> Int#
 
-primop   Word2IntegerOp   "word2Integer#"   GenPrimOp 
-   Word# -> (# Int#, ByteArray# #)
-   with out_of_line = True
-
 primop   WordGtOp   "gtWord#"   Compare   Word# -> Word# -> Bool
 primop   WordGeOp   "geWord#"   Compare   Word# -> Word# -> Bool
 primop   WordEqOp   "eqWord#"   Compare   Word# -> Word# -> Bool
@@ -339,11 +328,6 @@ section "Int32#"
 
 primtype Int32#
 
-primop   Int32ToIntegerOp   "int32ToInteger#" GenPrimOp 
-   Int32# -> (# Int#, ByteArray# #)
-   with out_of_line = True
-
-
 ------------------------------------------------------------------------
 section "Word32#"
 	{Operations on 32-bit unsigned words. This type is only used 
@@ -352,11 +336,6 @@ section "Word32#"
 ------------------------------------------------------------------------
 
 primtype Word32#
-
-primop   Word32ToIntegerOp   "word32ToInteger#" GenPrimOp
-   Word32# -> (# Int#, ByteArray# #)
-   with out_of_line = True
-
 
 #endif 
 
@@ -371,10 +350,6 @@ section "Int64#"
 
 primtype Int64#
 
-primop   Int64ToIntegerOp   "int64ToInteger#" GenPrimOp 
-   Int64# -> (# Int#, ByteArray# #)
-   with out_of_line = True
-
 ------------------------------------------------------------------------
 section "Word64#"
 	{Operations on 64-bit unsigned words. This type is only used 
@@ -384,128 +359,7 @@ section "Word64#"
 
 primtype Word64#
 
-primop   Word64ToIntegerOp   "word64ToInteger#" GenPrimOp
-   Word64# -> (# Int#, ByteArray# #)
-   with out_of_line = True
-
 #endif
-
-------------------------------------------------------------------------
-section "Integer#"
-	{Operations on arbitrary-precision integers. These operations are 
-implemented via the GMP package. An integer is represented as a pair
-consisting of an {\tt Int\#} representing the number of 'limbs' in use and
-the sign, and a {\tt ByteArray\#} containing the 'limbs' themselves.  Such pairs
-are returned as unboxed pairs, but must be passed as separate
-components.
-
-For .NET these operations are implemented by foreign imports, so the
-primops are omitted.}
-------------------------------------------------------------------------
-
-#ifndef ILX
-
-primop   IntegerAddOp   "plusInteger#" GenPrimOp   
-   Int# -> ByteArray# -> Int# -> ByteArray# -> (# Int#, ByteArray# #)
-   with commutable = True
-        out_of_line = True
-
-primop   IntegerSubOp   "minusInteger#" GenPrimOp  
-   Int# -> ByteArray# -> Int# -> ByteArray# -> (# Int#, ByteArray# #)
-   with out_of_line = True
-
-primop   IntegerMulOp   "timesInteger#" GenPrimOp   
-   Int# -> ByteArray# -> Int# -> ByteArray# -> (# Int#, ByteArray# #)
-   with commutable = True
-        out_of_line = True
-
-primop   IntegerGcdOp   "gcdInteger#" GenPrimOp    
-   Int# -> ByteArray# -> Int# -> ByteArray# -> (# Int#, ByteArray# #)
-   {Greatest common divisor.}
-   with commutable = True
-        out_of_line = True
-
-primop   IntegerIntGcdOp   "gcdIntegerInt#" GenPrimOp
-   Int# -> ByteArray# -> Int# -> Int#
-   {Greatest common divisor, where second argument is an ordinary {\tt Int\#}.}
-   with out_of_line = True
-
-primop   IntegerDivExactOp   "divExactInteger#" GenPrimOp
-   Int# -> ByteArray# -> Int# -> ByteArray# -> (# Int#, ByteArray# #)
-   {Divisor is guaranteed to be a factor of dividend.}
-   with out_of_line = True
-
-primop   IntegerQuotOp   "quotInteger#" GenPrimOp
-   Int# -> ByteArray# -> Int# -> ByteArray# -> (# Int#, ByteArray# #)
-   {Rounds towards zero.}
-   with out_of_line = True
-
-primop   IntegerRemOp   "remInteger#" GenPrimOp
-   Int# -> ByteArray# -> Int# -> ByteArray# -> (# Int#, ByteArray# #)
-   {Satisfies \texttt{plusInteger\# (timesInteger\# (quotInteger\# x y) y) (remInteger\# x y) == x}.}
-   with out_of_line = True
-
-primop   IntegerCmpOp   "cmpInteger#"   GenPrimOp  
-   Int# -> ByteArray# -> Int# -> ByteArray# -> Int#
-   {Returns -1,0,1 according as first argument is less than, equal to, or greater than second argument.}
-   with needs_wrapper = True
-        out_of_line = True
-
-primop   IntegerCmpIntOp   "cmpIntegerInt#" GenPrimOp
-   Int# -> ByteArray# -> Int# -> Int#
-   {Returns -1,0,1 according as first argument is less than, equal to, or greater than second argument, which
-   is an ordinary Int\#.}
-   with needs_wrapper = True
-        out_of_line = True
-
-primop   IntegerQuotRemOp   "quotRemInteger#" GenPrimOp
-   Int# -> ByteArray# -> Int# -> ByteArray# -> (# Int#, ByteArray#, Int#, ByteArray# #)
-   {Compute quot and rem simulaneously.}
-   with can_fail = True
-        out_of_line = True
-
-primop   IntegerDivModOp    "divModInteger#"  GenPrimOp
-   Int# -> ByteArray# -> Int# -> ByteArray# -> (# Int#, ByteArray#, Int#, ByteArray# #)
-   {Compute div and mod simultaneously, where div rounds towards negative infinity
-    and\texttt{(q,r) = divModInteger\#(x,y)} implies \texttt{plusInteger\# (timesInteger\# q y) r = x}.}
-   with can_fail = True
-        out_of_line = True
-
-primop   Integer2IntOp   "integer2Int#"    GenPrimOp
-   Int# -> ByteArray# -> Int#
-   with needs_wrapper = True
-        out_of_line = True
-
-primop   Integer2WordOp   "integer2Word#"   GenPrimOp
-   Int# -> ByteArray# -> Word#
-   with needs_wrapper = True
-        out_of_line = True
-
-#if WORD_SIZE_IN_BITS < 32
-primop   IntegerToInt32Op   "integerToInt32#" GenPrimOp
-   Int# -> ByteArray# -> Int32#
-
-primop   IntegerToWord32Op   "integerToWord32#" GenPrimOp
-   Int# -> ByteArray# -> Word32#
-#endif
-
-primop   IntegerAndOp  "andInteger#" GenPrimOp
-   Int# -> ByteArray# -> Int# -> ByteArray# -> (# Int#, ByteArray# #)
-   with out_of_line = True
-
-primop   IntegerOrOp  "orInteger#" GenPrimOp
-   Int# -> ByteArray# -> Int# -> ByteArray# -> (# Int#, ByteArray# #)
-   with out_of_line = True
-
-primop   IntegerXorOp  "xorInteger#" GenPrimOp
-   Int# -> ByteArray# -> Int# -> ByteArray# -> (# Int#, ByteArray# #)
-   with out_of_line = True
-
-primop   IntegerComplementOp  "complementInteger#" GenPrimOp
-   Int# -> ByteArray# -> (# Int#, ByteArray# #)
-   with out_of_line = True
-
-#endif /* ndef ILX */
 
 ------------------------------------------------------------------------
 section "Double#"
@@ -611,16 +465,9 @@ primop   DoublePowerOp   "**##" Dyadic
    {Exponentiation.}
    with needs_wrapper = True
 
-primop   DoubleDecodeOp   "decodeDouble#" GenPrimOp    
-   Double# -> (# Int#, Int#, ByteArray# #)
-   {Convert to arbitrary-precision integer.
-    First {\tt Int\#} in result is the exponent; second {\tt Int\#} and {\tt ByteArray\#}
-    represent an {\tt Integer\#} holding the mantissa.}
-   with out_of_line = True
-
 primop   DoubleDecode_2IntOp   "decodeDouble_2Int#" GenPrimOp    
    Double# -> (# Int#, Word#, Word#, Int# #)
-   {Convert to arbitrary-precision integer.
+   {Convert to integer.
     First component of the result is -1 or 1, indicating the sign of the
     mantissa. The next two are the high and low 32 bits of the mantissa
     respectively, and the last is the exponent.}
