@@ -347,10 +347,6 @@ OTHER_LIBS = libffi/libHSffi$(v_libsuf) libffi/HSffi.o
 ifeq "$(BuildSharedLibs)" "YES"
 OTHER_LIBS  += libffi/libHSffi$(dyn_libsuf)
 endif
-ifeq "$(HaveLibGmp)" "NO"
-GMP_LIB = gmp/libgmp.a
-OTHER_LIBS += $(GMP_LIB)
-endif
 
 # We cannot run ghc-cabal to configure a package until we have
 # configured and registered all of its dependencies.  So the following
@@ -461,7 +457,7 @@ BUILD_DIRS += \
 endif
 
 BUILD_DIRS += \
-   gmp \
+   libraries/integer-gmp/gmp \
    docs/users_guide \
    libraries/Cabal/doc \
    $(GHC_UNLIT_DIR) \
@@ -769,7 +765,7 @@ $(eval $(call bindist,.,\
 binary-dist:
 	"$(RM)" $(RM_OPTS) -r $(BIN_DIST_NAME)
 	mkdir $(BIN_DIST_NAME)
-	set -e; for i in LICENSE compiler ghc rts libraries utils gmp docs libffi includes driver mk rules Makefile aclocal.m4 config.sub config.guess install-sh extra-gcc-opts.in ghc.mk inplace; do ln -s ../$$i $(BIN_DIST_NAME)/; done
+	set -e; for i in LICENSE compiler ghc rts libraries utils docs libffi includes driver mk rules Makefile aclocal.m4 config.sub config.guess install-sh extra-gcc-opts.in ghc.mk inplace; do ln -s ../$$i $(BIN_DIST_NAME)/; done
 	ln -s ../distrib/configure-bin.ac $(BIN_DIST_NAME)/configure.ac
 	cd $(BIN_DIST_NAME) && autoreconf
 	"$(RM)" $(RM_OPTS) $(BIN_DIST_TAR)
@@ -822,7 +818,7 @@ SRC_DIST_DIR=$(shell pwd)/$(SRC_DIST_NAME)
 #
 # Files to include in source distributions
 #
-SRC_DIST_DIRS = mk rules docs distrib bindisttest gmp libffi includes utils docs rts compiler ghc driver libraries
+SRC_DIST_DIRS = mk rules docs distrib bindisttest libffi includes utils docs rts compiler ghc driver libraries
 SRC_DIST_FILES += \
 	configure.ac config.guess config.sub configure \
 	aclocal.m4 README ANNOUNCE HACKING LICENSE Makefile install-sh \
